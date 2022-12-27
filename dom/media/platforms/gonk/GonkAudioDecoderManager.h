@@ -26,20 +26,20 @@ public:
 
   virtual ~GonkAudioDecoderManager() override;
 
-  virtual android::sp<MediaCodecProxy> Init(MediaDataDecoderCallback* aCallback) override;
+  RefPtr<InitPromise> Init(MediaDataDecoderCallback* aCallback) override;
 
-  virtual nsresult Input(MediaRawData* aSample) override;
+  nsresult Input(MediaRawData* aSample) override;
 
-  virtual nsresult Output(int64_t aStreamOffset,
-                          nsRefPtr<MediaData>& aOutput) override;
+  nsresult Output(int64_t aStreamOffset,
+                          RefPtr<MediaData>& aOutput) override;
 
-  virtual nsresult Flush() override;
+  nsresult Flush() override;
 
-  virtual bool HasQueuedSample() override;
-
-  virtual TrackType GetTrackType() override { return TrackType::kAudioTrack; }
+  bool HasQueuedSample() override;
 
 private:
+  bool InitMediaCodecProxy(MediaDataDecoderCallback* aCallback);
+
   nsresult CreateAudioData(int64_t aStreamOffset,
                               AudioData** aOutData);
 
@@ -56,16 +56,13 @@ private:
   android::MediaBuffer* mAudioBuffer;
   android::sp<ALooper> mLooper;
 
-  // MediaCodedc's wrapper that performs the decoding.
-  android::sp<android::MediaCodecProxy> mDecoder;
-
   // This monitor protects mQueueSample.
   Monitor mMonitor;
 
   // An queue with the MP4 samples which are waiting to be sent into OMX.
   // If an element is an empty MP4Sample, that menas EOS. There should not
   // any sample be queued after EOS.
-  nsTArray<nsRefPtr<MediaRawData>> mQueueSample;
+  nsTArray<RefPtr<MediaRawData>> mQueueSample;
 };
 
 } // namespace mozilla

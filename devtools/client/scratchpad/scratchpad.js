@@ -14,9 +14,9 @@
 
 "use strict";
 
-const Cu = Components.utils;
-const Cc = Components.classes;
-const Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
 
 const SCRATCHPAD_CONTEXT_CONTENT = 1;
 const SCRATCHPAD_CONTEXT_BROWSER = 2;
@@ -40,31 +40,38 @@ const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
 
 const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesView.xul";
 
-const {require, loader} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const {require, loader} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
 const Telemetry = require("devtools/client/shared/telemetry");
 const Editor    = require("devtools/client/sourceeditor/editor");
 const TargetFactory = require("devtools/client/framework/target").TargetFactory;
 const EventEmitter = require("devtools/shared/event-emitter");
-const {DevToolsWorker} = require("devtools/shared/shared/worker");
+const {DevToolsWorker} = require("devtools/shared/worker/worker");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const promise = require("promise");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
-Cu.import("resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm");
+Cu.import("resource://devtools/client/scratchpad/scratchpad-manager.jsm");
 Cu.import("resource://gre/modules/jsdebugger.jsm");
-Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
+Cu.import("resource://devtools/client/framework/gDevTools.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/reflect.jsm");
 
+XPCOMUtils.defineConstant(this, "SCRATCHPAD_CONTEXT_CONTENT", SCRATCHPAD_CONTEXT_CONTENT);
+XPCOMUtils.defineConstant(this, "SCRATCHPAD_CONTEXT_BROWSER", SCRATCHPAD_CONTEXT_BROWSER);
+XPCOMUtils.defineConstant(this, "BUTTON_POSITION_SAVE", BUTTON_POSITION_SAVE);
+XPCOMUtils.defineConstant(this, "BUTTON_POSITION_CANCEL", BUTTON_POSITION_CANCEL);
+XPCOMUtils.defineConstant(this, "BUTTON_POSITION_DONT_SAVE", BUTTON_POSITION_DONT_SAVE);
+XPCOMUtils.defineConstant(this, "BUTTON_POSITION_REVERT", BUTTON_POSITION_REVERT);
+
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesView",
-  "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+  "resource://devtools/client/shared/widgets/VariablesView.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesViewController",
-  "resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
+  "resource://devtools/client/shared/widgets/VariablesViewController.jsm");
 
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 
@@ -631,7 +638,7 @@ var Scratchpad = {
   get prettyPrintWorker() {
     if (!this._prettyPrintWorker) {
       this._prettyPrintWorker = new DevToolsWorker(
-        "resource://gre/modules/devtools/server/actors/pretty-print-worker.js",
+        "resource://devtools/server/actors/pretty-print-worker.js",
         { name: 'pretty-print',
           verbose: DevToolsUtils.dumpn.wantLogging }
       );
@@ -1695,7 +1702,7 @@ var Scratchpad = {
       this._onPaste = WebConsoleUtils.pasteHandlerGen(this.editor.container.contentDocument.body,
                                                       document.querySelector('#scratchpad-notificationbox'),
                                                       msg, okstring);
-      editorElement.addEventListener("paste", this._onPaste);
+      editorElement.addEventListener("paste", this._onPaste, true);
       editorElement.addEventListener("drop", this._onPaste);
       this.editor.on("saveRequested", () => this.saveFile());
       this.editor.focus();
@@ -1770,7 +1777,7 @@ var Scratchpad = {
     CloseObserver.uninit();
     if (this._onPaste) {
       let editorElement = document.querySelector("#scratchpad-editor");
-      editorElement.removeEventListener("paste", this._onPaste);
+      editorElement.removeEventListener("paste", this._onPaste, true);
       editorElement.removeEventListener("drop", this._onPaste);
       this._onPaste = null;
     }

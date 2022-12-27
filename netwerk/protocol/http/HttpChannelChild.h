@@ -37,6 +37,7 @@ namespace net {
 
 class InterceptedChannelContent;
 class InterceptStreamListener;
+class OverrideRunnable;
 
 class HttpChannelChild final : public PHttpChannelChild
                              , public HttpBaseChannel
@@ -88,6 +89,7 @@ public:
   NS_IMETHOD GetLocalPort(int32_t* port) override;
   NS_IMETHOD GetRemoteAddress(nsACString& addr) override;
   NS_IMETHOD GetRemotePort(int32_t* port) override;
+  NS_IMETHOD ForceIntercepted(uint64_t aInterceptionID) override;
   // nsISupportsPriority
   NS_IMETHOD SetPriority(int32_t value) override;
   // nsIClassOfService
@@ -174,12 +176,16 @@ private:
   // asynchronously read from the pump.
   void OverrideWithSynthesizedResponse(nsAutoPtr<nsHttpResponseHead>& aResponseHead,
                                        nsIInputStream* aSynthesizedInput,
-                                       nsIStreamListener* aStreamListener);
+                                       InterceptStreamListener* aStreamListener);
+
+  void ForceIntercepted(nsIInputStream* aSynthesizedInput);
 
   RequestHeaderTuples mClientSetRequestHeaders;
   nsCOMPtr<nsIChildChannel> mRedirectChannelChild;
-  nsRefPtr<InterceptStreamListener> mInterceptListener;
-  nsRefPtr<nsInputStreamPump> mSynthesizedResponsePump;
+  RefPtr<InterceptStreamListener> mInterceptListener;
+  RefPtr<nsInputStreamPump> mSynthesizedResponsePump;
+  nsAutoPtr<nsHttpResponseHead> mSynthesizedResponseHead;
+  nsCOMPtr<nsIInputStream> mSynthesizedInput;
   int64_t mSynthesizedStreamLength;
 
   bool mIsFromCache;
@@ -193,7 +199,13 @@ private:
 
   bool mIPCOpen;
   bool mKeptAlive;            // IPC kept open, but only for security info
-  nsRefPtr<ChannelEventQueue> mEventQ;
+  RefPtr<ChannelEventQueue> mEventQ;
+
+  // If nsUnknownDecoder is involved OnStartRequest call will be delayed and
+  // this queue keeps OnDataAvailable data until OnStartRequest is finally
+  // called.
+  nsTArray<nsAutoPtr<ChannelEvent>> mUnknownDecoderEventQ;
+  bool mUnknownDecoderInvolved;
 
   // Once set, OnData and possibly OnStop will be diverted to the parent.
   bool mDivertingToParent;
@@ -207,6 +219,13 @@ private:
   // Set if a response was synthesized, indicating that any forthcoming redirects
   // should be intercepted.
   bool mSynthesizedResponse;
+
+  // Set if a synthesized response should cause us to explictly allows intercepting
+  // an expected forthcoming redirect.
+  bool mShouldInterceptSubsequentRedirect;
+  // Set if a redirection is being initiated to facilitate providing a synthesized
+  // response to a channel using a different principal than the current one.
+  bool mRedirectingForSubsequentSynthesizedResponse;
 
   // Set if the corresponding parent channel should force an interception to occur
   // before the network transaction is initiated.
@@ -229,6 +248,9 @@ private:
                       const NetAddr& selfAddr,
                       const NetAddr& peerAddr,
                       const uint32_t& cacheKey);
+  void MaybeDivertOnData(const nsCString& data,
+                         const uint64_t& offset,
+                         const uint32_t& count);
   void OnTransportAndData(const nsresult& channelStatus,
                           const nsresult& status,
                           const uint64_t progress,
@@ -237,6 +259,7 @@ private:
                           const uint64_t& offset,
                           const uint32_t& count);
   void OnStopRequest(const nsresult& channelStatus, const ResourceTimingStruct& timing);
+  void MaybeDivertOnStop(const nsresult& aChannelStatus);
   void OnProgress(const int64_t& progress, const int64_t& progressMax);
   void OnStatus(const nsresult& status);
   void FailedAsyncOpen(const nsresult& status);
@@ -249,10 +272,22 @@ private:
   void Redirect3Complete();
   void DeleteSelf();
 
+  // Create a a new channel to be used in a redirection, based on the provided
+  // response headers.
+  nsresult SetupRedirect(nsIURI* uri,
+                         const nsHttpResponseHead* responseHead,
+                         nsIChannel** outChannel);
+
+  // Perform a redirection without communicating with the parent process at all.
+  void BeginNonIPCRedirect(nsIURI* responseURI,
+                           const nsHttpResponseHead* responseHead);
+
   friend class AssociateApplicationCacheEvent;
   friend class StartRequestEvent;
   friend class StopRequestEvent;
   friend class TransportAndDataEvent;
+  friend class MaybeDivertOnDataHttpEvent;
+  friend class MaybeDivertOnStopHttpEvent;
   friend class ProgressEvent;
   friend class StatusEvent;
   friend class FailedAsyncOpenEvent;
@@ -262,6 +297,7 @@ private:
   friend class HttpAsyncAborter<HttpChannelChild>;
   friend class InterceptStreamListener;
   friend class InterceptedChannelContent;
+  friend class OverrideRunnable;
 };
 
 //-----------------------------------------------------------------------------

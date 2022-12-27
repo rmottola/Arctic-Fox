@@ -40,7 +40,6 @@ enum class DataURIHandling
 class nsCORSListenerProxy final : public nsIStreamListener,
                                   public nsIInterfaceRequestor,
                                   public nsIChannelEventSink,
-                                  public nsIAsyncVerifyRedirectCallback,
                                   public nsIThreadRetargetableStreamListener
 {
 public:
@@ -53,7 +52,6 @@ public:
   NS_DECL_NSISTREAMLISTENER
   NS_DECL_NSIINTERFACEREQUESTOR
   NS_DECL_NSICHANNELEVENTSINK
-  NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
   NS_DECL_NSITHREADRETARGETABLESTREAMLISTENER
 
   // Must be called at startup.
@@ -73,15 +71,7 @@ private:
 
   static void RemoveFromCorsPreflightCache(nsIURI* aURI,
                                            nsIPrincipal* aRequestingPrincipal);
-
-  nsCORSListenerProxy(nsIStreamListener* aOuter,
-                      nsIPrincipal* aRequestingPrincipal,
-                      bool aWithCredentials,
-                      const nsCString& aPreflightMethod,
-                      const nsTArray<nsCString>& aPreflightHeaders);
-
   static nsresult StartCORSPreflight(nsIChannel* aRequestChannel,
-                                     nsIStreamListener* aListener,
                                      nsIPrincipal* aPrincipal,
                                      nsICorsPreflightCallback* aCallback,
                                      bool aWithCredentials,
@@ -108,15 +98,9 @@ private:
   // an http: request to https: in nsHttpChannel::Connect() and hence
   // a request might not be marked as cross site request based on that promise.
   bool mHasBeenCrossSite;
-  bool mIsPreflight;
 #ifdef DEBUG
   bool mInited;
 #endif
-  nsCString mPreflightMethod;
-  nsTArray<nsCString> mPreflightHeaders;
-  nsCOMPtr<nsIAsyncVerifyRedirectCallback> mRedirectCallback;
-  nsCOMPtr<nsIChannel> mOldRedirectChannel;
-  nsCOMPtr<nsIChannel> mNewRedirectChannel;
 };
 
 #endif

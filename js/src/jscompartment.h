@@ -149,10 +149,10 @@ typedef HashMap<CrossCompartmentKey, ReadBarrieredValue,
 //                  set.
 //
 // * PendingMetadata: This object has been allocated and is still pending its
-//                    metadata. This should never be the case in an allocation
-//                    path, as a constructor function was supposed to have set
-//                    the metadata of the previous object *before* allocating
-//                    another object.
+//                    metadata. This should never be the case when we begin an
+//                    allocation, as a constructor function was supposed to have
+//                    set the metadata of the previous object *before*
+//                    allocating another object.
 //
 // The js::AutoSetNewObjectMetadata RAII class provides an ergonomic way for
 // constructor functions to navigate state transitions, and its instances
@@ -274,8 +274,8 @@ struct JSCompartment
   public:
     bool                         isSelfHosting;
     bool                         marked;
-    bool                         warnedAboutNoSuchMethod;
     bool                         warnedAboutFlagsArgument;
+    bool                         warnedAboutExprClosure;
 
     // A null add-on ID means that the compartment is not associated with an
     // add-on.
@@ -374,6 +374,12 @@ struct JSCompartment
     js::NewObjectMetadataState objectMetadataState;
 
   public:
+    // Recompute the probability with which this compartment should record
+    // profiling data (stack traces, allocations log, etc.) about each
+    // allocation. We consult the probabilities requested by the Debugger
+    // instances observing us, if any.
+    void chooseAllocationSamplingProbability() { savedStacks_.chooseSamplingProbability(this); }
+
     bool hasObjectPendingMetadata() const { return objectMetadataState.is<js::PendingMetadata>(); }
 
     void setObjectPendingMetadata(JSContext* cx, JSObject* obj) {
@@ -674,11 +680,7 @@ struct JSCompartment
 
     // The code coverage can be enabled either for each compartment, with the
     // Debugger API, or for the entire runtime.
-    bool collectCoverage() const {
-        return debuggerObservesCoverage() ||
-               runtimeFromAnyThread()->profilingScripts ||
-               runtimeFromAnyThread()->lcovOutput.isEnabled();
-    }
+    bool collectCoverage() const;
     void clearScriptCounts();
 
     bool needsDelazificationForDebugger() const {
@@ -743,11 +745,12 @@ struct JSCompartment
         // NO LONGER USING 1
         DeprecatedLegacyGenerator = 2,      // JS 1.7+
         DeprecatedExpressionClosure = 3,    // Added in JS 1.8
-        DeprecatedLetBlock = 4,             // Added in JS 1.7
-        // No longer using 5 (was: let expressions)
-        DeprecatedNoSuchMethod = 6,         // JS 1.7+
+        // NO LONGER USING 4
+        // NO LONGER USING 5
+        // NO LONGER USING 6
         DeprecatedFlagsArgument = 7,        // JS 1.3 or older
-        RegExpSourceProperty = 8,           // ES5
+        // NO LONGER USING 8
+        DeprecatedRestoredRegExpStatics = 9,// Unknown
         DeprecatedLanguageExtensionCount
     };
 

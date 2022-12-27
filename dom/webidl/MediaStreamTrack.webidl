@@ -30,12 +30,16 @@ enum MediaSourceEnum {
     "microphone",
     "audioCapture",
     "other"
+    // If values are added, adjust n_values in Histograms.json (2 places)
 };
 
 typedef (long or ConstrainLongRange) ConstrainLong;
 typedef (double or ConstrainDoubleRange) ConstrainDouble;
 typedef (boolean or ConstrainBooleanParameters) ConstrainBoolean;
 typedef (DOMString or sequence<DOMString> or ConstrainDOMStringParameters) ConstrainDOMString;
+
+// Note: When adding new constraints, remember to update the SelectSettings()
+// function in MediaManager.cpp to make OverconstrainedError's constraint work!
 
 dictionary MediaTrackConstraintSet {
     ConstrainLong width;
@@ -46,6 +50,10 @@ dictionary MediaTrackConstraintSet {
     long long browserWindow;
     boolean scrollWithPage;
     ConstrainDOMString deviceId;
+    ConstrainLong viewportOffsetX;
+    ConstrainLong viewportOffsetY;
+    ConstrainLong viewportWidth;
+    ConstrainLong viewportHeight;
 };
 
 dictionary MediaTrackConstraints : MediaTrackConstraintSet {

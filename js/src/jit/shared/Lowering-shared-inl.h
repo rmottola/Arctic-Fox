@@ -190,7 +190,7 @@ LIRGeneratorShared::defineSinCos(LInstructionHelper<2, Ops, Temps> *lir, MDefini
 #elif defined(JS_CODEGEN_ARM64)
     lir->setDef(1, LDefinition(vreg + VREG_INCREMENT, LDefinition::DOUBLE,
                 LFloatReg(FloatRegister(FloatRegisters::d1, FloatRegisters::Double))));
-#elif defined(JS_CODEGEN_MIPS32)
+#elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     lir->setDef(1, LDefinition(vreg + VREG_INCREMENT, LDefinition::DOUBLE, LFloatReg(f2)));
 #elif defined(JS_CODEGEN_NONE)
     MOZ_CRASH();
@@ -616,6 +616,25 @@ LIRGeneratorShared::useBox(LInstruction* lir, size_t n, MDefinition* mir,
     lir->setOperand(n, LUse(mir->virtualRegister(), policy, useAtStart));
 #if defined(JS_NUNBOX32)
     lir->setOperand(n + 1, LUse(VirtualRegisterOfPayload(mir), policy, useAtStart));
+#endif
+}
+
+void
+LIRGeneratorShared::useBoxOrTypedOrConstant(LInstruction* lir, size_t n, MDefinition* mir,
+                                            bool useConstant)
+{
+    if (mir->type() == MIRType_Value) {
+        useBox(lir, n, mir);
+        return;
+    }
+
+    if (useConstant && mir->isConstant())
+        lir->setOperand(n, LAllocation(mir->toConstant()->vp()));
+    else
+        lir->setOperand(n, useRegister(mir));
+
+#if defined(JS_NUNBOX32)
+    lir->setOperand(n + 1, LAllocation());
 #endif
 }
 

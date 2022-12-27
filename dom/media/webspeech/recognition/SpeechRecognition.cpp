@@ -153,7 +153,7 @@ SpeechRecognition::Constructor(const GlobalObject& aGlobal,
   }
 
   MOZ_ASSERT(win->IsInnerWindow());
-  nsRefPtr<SpeechRecognition> object = new SpeechRecognition(win);
+  RefPtr<SpeechRecognition> object = new SpeechRecognition(win);
   return object.forget();
 }
 
@@ -480,7 +480,7 @@ SpeechRecognition::NotifyFinalResult(SpeechEvent* aEvent)
   init.mInterpretation = JS::NullValue();
   // init.mEmma = nullptr;
 
-  nsRefPtr<SpeechRecognitionEvent> event =
+  RefPtr<SpeechRecognitionEvent> event =
     SpeechRecognitionEvent::Constructor(this, NS_LITERAL_STRING("result"), init);
   event->SetTrusted(true);
 
@@ -535,11 +535,11 @@ SpeechRecognition::StartRecording(DOMMediaStream* aDOMStream)
   // doesn't get Destroy()'ed
   mDOMStream = aDOMStream;
 
-  if (NS_WARN_IF(!mDOMStream->GetStream())) {
+  if (NS_WARN_IF(!mDOMStream->GetPlaybackStream())) {
     return NS_ERROR_UNEXPECTED;
   }
   mSpeechListener = new SpeechStreamListener(this);
-  mDOMStream->GetStream()->AddListener(mSpeechListener);
+  mDOMStream->GetPlaybackStream()->AddListener(mSpeechListener);
 
   mEndpointer.StartSession();
 
@@ -553,7 +553,7 @@ SpeechRecognition::StopRecording()
   // we only really need to remove the listener explicitly when testing,
   // as our JS code still holds a reference to mDOMStream and only assigning
   // it to nullptr isn't guaranteed to free the stream and the listener.
-  mDOMStream->GetStream()->RemoveListener(mSpeechListener);
+  mDOMStream->GetPlaybackStream()->RemoveListener(mSpeechListener);
   mSpeechListener = nullptr;
   mDOMStream = nullptr;
 
@@ -724,14 +724,14 @@ SpeechRecognition::Start(const Optional<NonNull<DOMMediaStream>>& aStream, Error
                           new GetUserMediaErrorCallback(this));
   }
 
-  nsRefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_START);
+  RefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_START);
   NS_DispatchToMainThread(event);
 }
 
 void
 SpeechRecognition::Stop()
 {
-  nsRefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_STOP);
+  RefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_STOP);
   NS_DispatchToMainThread(event);
 }
 
@@ -743,7 +743,7 @@ SpeechRecognition::Abort()
   }
 
   mAborted = true;
-  nsRefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_ABORT);
+  RefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_ABORT);
   NS_DispatchToMainThread(event);
 }
 
@@ -756,14 +756,13 @@ SpeechRecognition::DispatchError(EventType aErrorType,
   MOZ_ASSERT(aErrorType == EVENT_RECOGNITIONSERVICE_ERROR ||
              aErrorType == EVENT_AUDIO_ERROR, "Invalid error type!");
 
-  nsRefPtr<SpeechRecognitionError> srError =
+  RefPtr<SpeechRecognitionError> srError =
     new SpeechRecognitionError(nullptr, nullptr, nullptr);
 
-  ErrorResult err;
   srError->InitSpeechRecognitionError(NS_LITERAL_STRING("error"), true, false,
-                                      aErrorCode, aMessage, err);
+                                      aErrorCode, aMessage);
 
-  nsRefPtr<SpeechEvent> event = new SpeechEvent(this, aErrorType);
+  RefPtr<SpeechEvent> event = new SpeechEvent(this, aErrorType);
   event->mError = srError;
   NS_DispatchToMainThread(event);
 }
@@ -800,12 +799,12 @@ SpeechRecognition::FillSamplesBuffer(const int16_t* aSamples,
 uint32_t
 SpeechRecognition::SplitSamplesBuffer(const int16_t* aSamplesBuffer,
                                       uint32_t aSampleCount,
-                                      nsTArray<nsRefPtr<SharedBuffer>>& aResult)
+                                      nsTArray<RefPtr<SharedBuffer>>& aResult)
 {
   uint32_t chunkStart = 0;
 
   while (chunkStart + mAudioSamplesPerChunk <= aSampleCount) {
-    nsRefPtr<SharedBuffer> chunk =
+    RefPtr<SharedBuffer> chunk =
       SharedBuffer::Create(mAudioSamplesPerChunk * sizeof(int16_t));
 
     memcpy(chunk->Data(), aSamplesBuffer + chunkStart,
@@ -819,11 +818,11 @@ SpeechRecognition::SplitSamplesBuffer(const int16_t* aSamplesBuffer,
 }
 
 AudioSegment*
-SpeechRecognition::CreateAudioSegment(nsTArray<nsRefPtr<SharedBuffer>>& aChunks)
+SpeechRecognition::CreateAudioSegment(nsTArray<RefPtr<SharedBuffer>>& aChunks)
 {
   AudioSegment* segment = new AudioSegment();
   for (uint32_t i = 0; i < aChunks.Length(); ++i) {
-    nsRefPtr<SharedBuffer> buffer = aChunks[i];
+    RefPtr<SharedBuffer> buffer = aChunks[i];
     const int16_t* chunkData = static_cast<const int16_t*>(buffer->Data());
 
     nsAutoTArray<const int16_t*, 1> channels;
@@ -849,11 +848,11 @@ SpeechRecognition::FeedAudioData(already_AddRefed<SharedBuffer> aSamples,
   // (a multiple of Endpointer's frame size) before feeding to Endpointer.
 
   // ensure aSamples is deleted
-  nsRefPtr<SharedBuffer> refSamples = aSamples;
+  RefPtr<SharedBuffer> refSamples = aSamples;
 
   uint32_t samplesIndex = 0;
   const int16_t* samples = static_cast<int16_t*>(refSamples->Data());
-  nsAutoTArray<nsRefPtr<SharedBuffer>, 5> chunksToSend;
+  nsAutoTArray<RefPtr<SharedBuffer>, 5> chunksToSend;
 
   // fill up our buffer and make a chunk out of it, if possible
   if (mBufferedSamples > 0) {
@@ -882,7 +881,7 @@ SpeechRecognition::FeedAudioData(already_AddRefed<SharedBuffer> aSamples,
   }
 
   AudioSegment* segment = CreateAudioSegment(chunksToSend);
-  nsRefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_AUDIO_DATA);
+  RefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_AUDIO_DATA);
   event->mAudioSegment = segment;
   event->mProvider = aProvider;
   event->mTrackRate = aTrackRate;
@@ -944,7 +943,7 @@ NS_IMPL_ISUPPORTS(SpeechRecognition::GetUserMediaSuccessCallback, nsIDOMGetUserM
 NS_IMETHODIMP
 SpeechRecognition::GetUserMediaSuccessCallback::OnSuccess(nsISupports* aStream)
 {
-  nsRefPtr<DOMMediaStream> stream = do_QueryObject(aStream);
+  RefPtr<DOMMediaStream> stream = do_QueryObject(aStream);
   if (!stream) {
     return NS_ERROR_NO_INTERFACE;
   }
@@ -957,7 +956,7 @@ NS_IMPL_ISUPPORTS(SpeechRecognition::GetUserMediaErrorCallback, nsIDOMGetUserMed
 NS_IMETHODIMP
 SpeechRecognition::GetUserMediaErrorCallback::OnError(nsISupports* aError)
 {
-  nsRefPtr<MediaStreamError> error = do_QueryObject(aError);
+  RefPtr<MediaStreamError> error = do_QueryObject(aError);
   if (!error) {
     return NS_OK;
   }

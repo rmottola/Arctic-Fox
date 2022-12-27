@@ -13,6 +13,7 @@
 #import "mozAccessible.h"
 #import "mozActionElements.h"
 #import "mozHTMLAccessible.h"
+#import "mozTableAccessible.h"
 #import "mozTextAccessible.h"
 
 using namespace mozilla;
@@ -29,20 +30,20 @@ AccessibleWrap::~AccessibleWrap()
 {
 }
 
-mozAccessible* 
+mozAccessible*
 AccessibleWrap::GetNativeObject()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
-  
+
   if (!mNativeInited && !mNativeObject && !IsDefunct() && !AncestorIsFlat()) {
     uintptr_t accWrap = reinterpret_cast<uintptr_t>(this);
     mNativeObject = [[GetNativeType() alloc] initWithAccessible:accWrap];
   }
-  
+
   mNativeInited = true;
-  
+
   return mNativeObject;
-  
+
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
 }
 
@@ -61,6 +62,15 @@ AccessibleWrap::GetNativeType ()
 
   if (IsXULTabpanels())
     return [mozPaneAccessible class];
+
+  if (IsTable())
+    return [mozTableAccessible class];
+
+  if (IsTableRow())
+    return [mozTableRowAccessible class];
+
+  if (IsTableCell())
+    return [mozTableCellAccessible class];
 
   return GetTypeFromRole(Role());
 
@@ -94,14 +104,20 @@ AccessibleWrap::HandleAccEvent(AccEvent* aEvent)
   nsresult rv = Accessible::HandleAccEvent(aEvent);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  if (IPCAccessibilityActive()) {
+    return NS_OK;
+  }
+
   uint32_t eventType = aEvent->GetEventType();
 
-  // ignore everything but focus-changed, value-changed, caret and selection
-  // events for now.
+  // ignore everything but focus-changed, value-changed, caret, selection
+  // and document load complete events for now.
   if (eventType != nsIAccessibleEvent::EVENT_FOCUS &&
       eventType != nsIAccessibleEvent::EVENT_VALUE_CHANGE &&
+      eventType != nsIAccessibleEvent::EVENT_TEXT_VALUE_CHANGE &&
       eventType != nsIAccessibleEvent::EVENT_TEXT_CARET_MOVED &&
-      eventType != nsIAccessibleEvent::EVENT_TEXT_SELECTION_CHANGED)
+      eventType != nsIAccessibleEvent::EVENT_TEXT_SELECTION_CHANGED &&
+      eventType != nsIAccessibleEvent::EVENT_DOCUMENT_LOAD_COMPLETE)
     return NS_OK;
 
   Accessible* accessible = aEvent->GetAccessible();
@@ -233,11 +249,15 @@ a11y::FireNativeEvent(mozAccessible* aNativeAcc, uint32_t aEventType)
       [aNativeAcc didReceiveFocus];
       break;
     case nsIAccessibleEvent::EVENT_VALUE_CHANGE:
+    case nsIAccessibleEvent::EVENT_TEXT_VALUE_CHANGE:
       [aNativeAcc valueDidChange];
       break;
     case nsIAccessibleEvent::EVENT_TEXT_CARET_MOVED:
     case nsIAccessibleEvent::EVENT_TEXT_SELECTION_CHANGED:
       [aNativeAcc selectedTextDidChange];
+      break;
+    case nsIAccessibleEvent::EVENT_DOCUMENT_LOAD_COMPLETE:
+      [aNativeAcc documentLoadComplete];
       break;
   }
 
@@ -245,7 +265,7 @@ a11y::FireNativeEvent(mozAccessible* aNativeAcc, uint32_t aEventType)
 }
 
 Class
-a11y::GetTypeFromRole(roles::Role aRole) 
+a11y::GetTypeFromRole(roles::Role aRole)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
@@ -257,13 +277,13 @@ a11y::GetTypeFromRole(roles::Role aRole)
     {
         return [mozButtonAccessible class];
     }
-    
+
     case roles::PAGETAB:
       return [mozButtonAccessible class];
 
     case roles::CHECKBUTTON:
       return [mozCheckboxAccessible class];
-      
+
     case roles::HEADING:
       return [mozHeadingAccessible class];
 
@@ -283,11 +303,11 @@ a11y::GetTypeFromRole(roles::Role aRole)
 
     case roles::LINK:
       return [mozLinkAccessible class];
-      
+
     default:
       return [mozAccessible class];
   }
-  
+
   return nil;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;

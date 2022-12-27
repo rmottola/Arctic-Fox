@@ -20,11 +20,11 @@ already_AddRefed<Touch> SingleTouchData::ToNewDOMTouch() const
 {
   MOZ_ASSERT(NS_IsMainThread(),
              "Can only create dom::Touch instances on main thread");
-  nsRefPtr<Touch> touch = new Touch(mIdentifier,
-                                    LayoutDeviceIntPoint(mScreenPoint.x, mScreenPoint.y),
-                                    nsIntPoint(mRadius.width, mRadius.height),
-                                    mRotationAngle,
-                                    mForce);
+  RefPtr<Touch> touch = new Touch(mIdentifier,
+                                  LayoutDeviceIntPoint(mScreenPoint.x, mScreenPoint.y),
+                                  LayoutDeviceIntPoint(mRadius.width, mRadius.height),
+                                  mRotationAngle,
+                                  mForce);
   return touch.forget();
 }
 

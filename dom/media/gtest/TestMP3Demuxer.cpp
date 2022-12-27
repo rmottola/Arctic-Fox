@@ -64,8 +64,8 @@ struct MP3Resource {
 
   // The first n frame offsets.
   std::vector<int32_t> mSyncOffsets;
-  nsRefPtr<MockMP3MediaResource> mResource;
-  nsRefPtr<MP3TrackDemuxer> mDemuxer;
+  RefPtr<MockMP3MediaResource> mResource;
+  RefPtr<MP3TrackDemuxer> mDemuxer;
 };
 
 class MP3DemuxerTest : public ::testing::Test {
@@ -280,7 +280,7 @@ protected:
 
 TEST_F(MP3DemuxerTest, ID3Tags) {
   for (const auto& target: mTargets) {
-    nsRefPtr<MediaRawData> frame(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frame(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frame);
 
     const auto& id3 = target.mDemuxer->ID3Header();
@@ -295,7 +295,7 @@ TEST_F(MP3DemuxerTest, ID3Tags) {
 
 TEST_F(MP3DemuxerTest, VBRHeader) {
   for (const auto& target: mTargets) {
-    nsRefPtr<MediaRawData> frame(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frame(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frame);
 
     const auto& vbr = target.mDemuxer->VBRInfo();
@@ -313,7 +313,7 @@ TEST_F(MP3DemuxerTest, VBRHeader) {
 
 TEST_F(MP3DemuxerTest, FrameParsing) {
   for (const auto& target: mTargets) {
-    nsRefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frameData);
     EXPECT_EQ(target.mFileSize, target.mDemuxer->StreamLength());
 
@@ -375,7 +375,7 @@ TEST_F(MP3DemuxerTest, FrameParsing) {
 
 TEST_F(MP3DemuxerTest, Duration) {
   for (const auto& target: mTargets) {
-    nsRefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frameData);
     EXPECT_EQ(target.mFileSize, target.mDemuxer->StreamLength());
 
@@ -395,7 +395,7 @@ TEST_F(MP3DemuxerTest, Duration) {
     }
 
     target.mDemuxer->Reset();
-    nsRefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frameData);
 
     const int64_t duration = target.mDemuxer->Duration().ToMicroseconds();
@@ -415,7 +415,7 @@ TEST_F(MP3DemuxerTest, Duration) {
 
 TEST_F(MP3DemuxerTest, Seek) {
   for (const auto& target: mTargets) {
-    nsRefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frameData);
 
     const int64_t seekTime = TimeUnit::FromSeconds(1).ToMicroseconds();
@@ -434,7 +434,7 @@ TEST_F(MP3DemuxerTest, Seek) {
   // Seeking should work with in-between resets, too.
   for (const auto& target: mTargets) {
     target.mDemuxer->Reset();
-    nsRefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
+    RefPtr<MediaRawData> frameData(target.mDemuxer->DemuxSample());
     ASSERT_TRUE(frameData);
 
     const int64_t seekTime = TimeUnit::FromSeconds(1).ToMicroseconds();

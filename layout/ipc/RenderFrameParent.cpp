@@ -298,7 +298,7 @@ RenderFrameParent::RenderFrameParent(nsFrameLoader* aFrameLoader,
     return;
   }
 
-  nsRefPtr<LayerManager> lm = GetFrom(mFrameLoader);
+  RefPtr<LayerManager> lm = GetFrom(mFrameLoader);
 
   mAsyncPanZoomEnabled = lm && lm->AsyncPanZoomEnabled();
 
@@ -380,7 +380,9 @@ RenderFrameParent::BuildLayer(nsDisplayListBuilder* aBuilder,
     // draw a manager's subtree.  The latter is bad bad bad, but the the
     // MOZ_ASSERT() above will flag it.  Returning nullptr here will just
     // cause the shadow subtree not to be rendered.
-    NS_WARNING("Remote iframe not rendered");
+    if (!aContainerParameters.mForEventsOnly) {
+      NS_WARNING("Remote iframe not rendered");
+    }
     return nullptr;
   }
 
@@ -389,7 +391,7 @@ RenderFrameParent::BuildLayer(nsDisplayListBuilder* aBuilder,
     return nullptr;
   }
 
-  nsRefPtr<Layer> layer =
+  RefPtr<Layer> layer =
     (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, aItem));
   if (!layer) {
     layer = aManager->CreateRefLayer();
@@ -420,7 +422,7 @@ RenderFrameParent::OwnerContentChanged(nsIContent* aContent)
   MOZ_ASSERT(!mFrameLoader || mFrameLoader->GetOwnerContent() == aContent,
              "Don't build new map if owner is same!");
 
-  nsRefPtr<LayerManager> lm = mFrameLoader ? GetFrom(mFrameLoader) : nullptr;
+  RefPtr<LayerManager> lm = mFrameLoader ? GetFrom(mFrameLoader) : nullptr;
   // Perhaps the document containing this frame currently has no presentation?
   if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
     ClientLayerManager *clientManager =
@@ -557,7 +559,7 @@ RenderFrameParent::SetTargetAPZC(uint64_t aInputBlockId,
         = &APZCTreeManager::SetTargetAPZC;
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         GetApzcTreeManager(), setTargetApzcFunc,
-        aInputBlockId, aTargets));
+        aInputBlockId, nsTArray<ScrollableLayerGuid>(aTargets)));
   }
 }
 
@@ -568,7 +570,7 @@ RenderFrameParent::SetAllowedTouchBehavior(uint64_t aInputBlockId,
   if (GetApzcTreeManager()) {
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         GetApzcTreeManager(), &APZCTreeManager::SetAllowedTouchBehavior,
-        aInputBlockId, aFlags));
+        aInputBlockId, nsTArray<TouchBehaviorFlags>(aFlags)));
   }
 }
 
@@ -607,7 +609,7 @@ RenderFrameParent::StartScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
 void
 RenderFrameParent::GetTextureFactoryIdentifier(TextureFactoryIdentifier* aTextureFactoryIdentifier)
 {
-  nsRefPtr<LayerManager> lm = mFrameLoader ? GetFrom(mFrameLoader) : nullptr;
+  RefPtr<LayerManager> lm = mFrameLoader ? GetFrom(mFrameLoader) : nullptr;
   // Perhaps the document containing this frame currently has no presentation?
   if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
     *aTextureFactoryIdentifier =
@@ -666,7 +668,7 @@ nsDisplayRemote::BuildLayer(nsDisplayListBuilder* aBuilder,
   int32_t appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
   nsIntRect visibleRect = GetVisibleRect().ToNearestPixels(appUnitsPerDevPixel);
   visibleRect += aContainerParameters.mOffset;
-  nsRefPtr<Layer> layer = mRemoteFrame->BuildLayer(aBuilder, mFrame, aManager, visibleRect, this, aContainerParameters);
+  RefPtr<Layer> layer = mRemoteFrame->BuildLayer(aBuilder, mFrame, aManager, visibleRect, this, aContainerParameters);
   if (layer && layer->AsContainerLayer()) {
     layer->AsContainerLayer()->SetEventRegionsOverride(mEventRegionsOverride);
   }

@@ -805,7 +805,7 @@ AccessibleWrap::get_accSelection(VARIANT __RPC_FAR *pvarChildren)
     SelectedItems(&selectedItems);
 
     // 1) Create and initialize the enumeration
-    nsRefPtr<AccessibleEnumerator> pEnum = new AccessibleEnumerator(selectedItems);
+    RefPtr<AccessibleEnumerator> pEnum = new AccessibleEnumerator(selectedItems);
     pvarChildren->vt = VT_UNKNOWN;    // this must be VT_UNKNOWN for an IEnumVARIANT
     NS_ADDREF(pvarChildren->punkVal = pEnum);
   }
@@ -884,9 +884,6 @@ AccessibleWrap::accSelect(
 
     if (flagsSelect & SELFLAG_REMOVESELECTION)
       xpAccessible->SetSelected(false);
-
-    if (flagsSelect & SELFLAG_EXTENDSELECTION)
-      xpAccessible->ExtendSelection();
 
     return S_OK;
   }
@@ -1180,6 +1177,10 @@ AccessibleWrap::HandleAccEvent(AccEvent* aEvent)
   nsresult rv = Accessible::HandleAccEvent(aEvent);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  if (IPCAccessibilityActive()) {
+    return NS_OK;
+  }
+
   uint32_t eventType = aEvent->GetEventType();
 
   static_assert(sizeof(gWinEventMap)/sizeof(gWinEventMap[0]) == nsIAccessibleEvent::EVENT_LAST_ENTRY,
@@ -1377,7 +1378,7 @@ AccessibleWrap::UpdateSystemCaretFor(Accessible* aAccessible)
     return;
 
   nsIWidget* widget = nullptr;
-  nsIntRect caretRect = text->GetCaretRect(&widget);
+  LayoutDeviceIntRect caretRect = text->GetCaretRect(&widget);
   HWND caretWnd;
   if (caretRect.IsEmpty() || !(caretWnd = (HWND)widget->GetNativeData(NS_NATIVE_WINDOW))) {
     return;

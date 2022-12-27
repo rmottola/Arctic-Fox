@@ -141,7 +141,7 @@ ImageLoader::MaybeRegisterCSSImage(ImageLoader::Image* aImage)
     return;
   }
 
-  nsRefPtr<imgRequestProxy> request;
+  RefPtr<imgRequestProxy> request;
 
   // Ignore errors here.  If cloning fails for some reason we'll put a null
   // entry in the hash and we won't keep trying to clone.
@@ -278,7 +278,7 @@ ImageLoader::LoadImage(nsIURI* aURI, nsIPrincipal* aOriginPrincipal,
     return;
   }
 
-  nsRefPtr<imgRequestProxy> request;
+  RefPtr<imgRequestProxy> request;
   nsContentUtils::LoadImage(aURI, mDocument, aOriginPrincipal, aReferrer,
                             mDocument->GetReferrerPolicy(),
                             nullptr, nsIRequest::LOAD_NORMAL,
@@ -289,7 +289,7 @@ ImageLoader::LoadImage(nsIURI* aURI, nsIPrincipal* aOriginPrincipal,
     return;
   }
 
-  nsRefPtr<imgRequestProxy> clonedRequest;
+  RefPtr<imgRequestProxy> clonedRequest;
   mInClone = true;
   nsresult rv = request->Clone(this, getter_AddRefs(clonedRequest));
   mInClone = false;

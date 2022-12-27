@@ -9,8 +9,8 @@
  */
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
-const { Heritage } = require("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
-const { AbstractTreeItem } = require("resource:///modules/devtools/client/shared/widgets/AbstractTreeItem.jsm");
+const { Heritage } = require("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
+const { AbstractTreeItem } = require("resource://devtools/client/shared/widgets/AbstractTreeItem.jsm");
 
 loader.lazyRequireGetter(this, "MarkerUtils",
   "devtools/client/performance/modules/logic/marker-utils");
@@ -110,6 +110,7 @@ MarkerView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
   _displaySelf: function(document, arrowNode) {
     let targetNode = document.createElement("hbox");
     targetNode.className = "waterfall-tree-item";
+    targetNode.setAttribute("otmt", this.marker.isOffMainThread);
 
     if (this == this.root) {
       // Bounds are needed for properly positioning and scaling markers in

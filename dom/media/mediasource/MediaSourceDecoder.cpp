@@ -28,15 +28,15 @@ using namespace mozilla::media;
 namespace mozilla {
 
 MediaSourceDecoder::MediaSourceDecoder(dom::HTMLMediaElement* aElement)
-  : mMediaSource(nullptr)
+  : MediaDecoder(aElement)
+  , mMediaSource(nullptr)
   , mEnded(false)
 {
   SetExplicitDuration(UnspecifiedNaN<double>());
-  Init(aElement);
 }
 
 MediaDecoder*
-MediaSourceDecoder::Clone()
+MediaSourceDecoder::Clone(MediaDecoderOwner* aOwner)
 {
   // TODO: Sort out cloning.
   return nullptr;
@@ -47,12 +47,13 @@ MediaSourceDecoder::CreateStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   mDemuxer = new MediaSourceDemuxer();
-  nsRefPtr<MediaFormatReader> reader = new MediaFormatReader(this, mDemuxer);
+  RefPtr<MediaFormatReader> reader =
+    new MediaFormatReader(this, mDemuxer, GetVideoFrameContainer());
   return new MediaDecoderStateMachine(this, reader);
 }
 
 nsresult
-MediaSourceDecoder::Load(nsIStreamListener**, MediaDecoder*)
+MediaSourceDecoder::Load(nsIStreamListener**)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!GetStateMachine());
@@ -62,7 +63,7 @@ MediaSourceDecoder::Load(nsIStreamListener**, MediaDecoder*)
     return NS_ERROR_FAILURE;
   }
 
-  nsresult rv = GetStateMachine()->Init(nullptr);
+  nsresult rv = GetStateMachine()->Init();
   NS_ENSURE_SUCCESS(rv, rv);
 
   SetStateMachineParameters();
@@ -168,7 +169,7 @@ MediaSourceDecoder::Shutdown()
 already_AddRefed<MediaResource>
 MediaSourceDecoder::CreateResource(nsIPrincipal* aPrincipal)
 {
-  return nsRefPtr<MediaResource>(new MediaSourceResource(aPrincipal)).forget();
+  return RefPtr<MediaResource>(new MediaSourceResource(aPrincipal)).forget();
 }
 
 void

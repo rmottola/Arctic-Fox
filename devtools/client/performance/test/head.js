@@ -7,16 +7,16 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 var { Preferences } = Cu.import("resource://gre/modules/Preferences.jsm", {});
 var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
-var { gDevTools } = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
-var { console } = require("resource://gre/modules/devtools/shared/Console.jsm");
+var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
+var { console } = require("resource://gre/modules/Console.jsm");
 var { TargetFactory } = require("devtools/client/framework/target");
 var Promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { DebuggerServer } = require("devtools/server/main");
 var { merge } = require("sdk/util/object");
 var { createPerformanceFront } = require("devtools/server/actors/performance");
-var RecordingUtils = require("devtools/shared/performance/utils");
+var RecordingUtils = require("devtools/shared/performance/recording-utils");
 var {
   PMM_loadFrameScripts, PMM_isProfilerActive, PMM_stopProfiler,
   sendProfilerCommand, consoleMethod
@@ -29,6 +29,7 @@ const EXAMPLE_URL = "http://example.com/browser/devtools/client/performance/test
 const SIMPLE_URL = EXAMPLE_URL + "doc_simple-test.html";
 const MARKERS_URL = EXAMPLE_URL + "doc_markers.html";
 const ALLOCS_URL = EXAMPLE_URL + "doc_allocs.html";
+const WORKER_URL = EXAMPLE_URL + "doc_worker.html";
 
 const MEMORY_SAMPLE_PROB_PREF = "devtools.performance.memory.sample-probability";
 const MEMORY_MAX_LOG_LEN_PREF = "devtools.performance.memory.max-log-length";
@@ -263,7 +264,7 @@ function consoleExecute (console, method, val) {
   ui.on("new-messages", handler);
   jsterm.execute(message);
 
-  let { console: c } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+  let { console: c } = Cu.import("resource://gre/modules/Console.jsm", {});
   function handler (event, messages) {
     for (let msg of messages) {
       if (msg.response._message === message) {

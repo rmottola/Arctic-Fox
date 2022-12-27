@@ -37,7 +37,7 @@ Allowed actions, and subfields:
   test_status
       test - ID for the test
       subtest - Name of the subtest
-      status [PASS | FAIL | TIMEOUT | NOTRUN] - test status
+      status [PASS | FAIL | TIMEOUT | NOTRUN | SKIP] - test status
       expected [As for status] - Status that the subtest was expected to get,
                                  or absent if the subtest got the expected status
 
@@ -187,6 +187,9 @@ class StructuredLogger(object):
                 "expected" not in raw_data):
                 del data["expected"]
 
+        if not self._ensure_suite_state(action, data):
+            return
+
         self._handle_log(data)
 
     def _log_data(self, action, data=None):
@@ -217,6 +220,21 @@ class StructuredLogger(object):
         all_data.update(data)
         return all_data
 
+    def _ensure_suite_state(self, action, data):
+        if action == 'suite_start':
+            if self._state.suite_started:
+                self.error("Got second suite_start message before suite_end. " +
+                           "Logged with data: {}".format(json.dumps(data)))
+                return False
+            self._state.suite_started = True
+        elif action == 'suite_end':
+            if not self._state.suite_started:
+                self.error("Got suite_end message before suite_start. " +
+                           "Logged with data: {}".format(json.dumps(data)))
+                return False
+            self._state.suite_started = False
+        return True
+
     @log_action(List("tests", Unicode),
                 Dict("run_info", default=None, optional=True),
                 Dict("version_info", default=None, optional=True),
@@ -229,23 +247,16 @@ class StructuredLogger(object):
         :param dict version_info: Optional target application version information provided by mozversion.
         :param dict device_info: Optional target device information provided by mozdevice.
         """
-        if self._state.suite_started:
-            self.error("Got second suite_start message before suite_end. Logged with data %s" %
-                       json.dumps(data))
+        if not self._ensure_suite_state('suite_start', data):
             return
-
-        self._state.suite_started = True
 
         self._log_data("suite_start", data)
 
     @log_action()
     def suite_end(self, data):
         """Log a suite_end message"""
-        if not self._state.suite_started:
-            self.error("Got suite_end message before suite_start.")
+        if not self._ensure_suite_state('suite_end', data):
             return
-
-        self._state.suite_started = False
 
         self._log_data("suite_end")
 
@@ -361,6 +372,38 @@ class StructuredLogger(object):
             data["stackwalk_errors"] = []
 
         self._log_data("crash", data)
+
+    @log_action(Unicode("primary", default=None),
+                List("secondary", Unicode, default=None))
+    def valgrind_error(self, data):
+        self._log_data("valgrind_error", data)
+
+    @log_action(Unicode("process"),
+                Unicode("command", default=None, optional=True))
+    def process_start(self, data):
+        """Log start event of a process.
+
+        :param process: A unique identifier for the process producing the
+                        output (typically the pid)
+        :param command: A string representing the full command line used to
+                        start the process.
+        """
+        self._log_data("process_start", data)
+
+    @log_action(Unicode("process"),
+                Int("exitcode"),
+                Unicode("command", default=None, optional=True))
+    def process_exit(self, data):
+        """Log exit event of a process.
+
+        :param process: A unique identifier for the process producing the
+                        output (typically the pid)
+        :param exitcode: the exit code
+        :param command: A string representing the full command line used to
+                        start the process.
+        """
+        self._log_data("process_exit", data)
+
 
 def _log_func(level_name):
     @log_action(Unicode("message"),

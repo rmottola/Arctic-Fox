@@ -15,11 +15,11 @@
 //
 // Some listeners do not send a response message back.
 
-let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
-let {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
-let {CssLogic} = require("devtools/styleinspector/css-logic");
-let promise = require("promise");
+var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var {CssLogic} = require("devtools/shared/styleinspector/css-logic");
+var promise = require("promise");
 
 /**
  * Get a value for a given property name in a css rule in a stylesheet, given

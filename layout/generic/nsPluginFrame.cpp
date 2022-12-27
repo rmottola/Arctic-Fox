@@ -12,6 +12,7 @@
 #include "gfxMatrix.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/BasicEvents.h"
+#include "mozilla/MouseEvents.h"
 #ifdef XP_WIN
 // This is needed for DoublePassRenderingEvent.
 #include "mozilla/plugins/PluginMessageUtils.h"
@@ -155,7 +156,9 @@ protected:
 
 nsPluginFrame::nsPluginFrame(nsStyleContext* aContext)
   : nsPluginFrameSuper(aContext)
+  , mInstanceOwner(nullptr)
   , mReflowCallbackPosted(false)
+  , mIsHiddenDueToScroll(false)
 {
   MOZ_LOG(GetObjectFrameLog(), LogLevel::Debug,
          ("Created new nsPluginFrame %p\n", this));
@@ -321,7 +324,7 @@ nsPluginFrame::PrepForDrawing(nsIWidget *aWidget)
     configuration->mBounds.height = NSAppUnitsToIntPixels(mRect.height, appUnitsPerDevPixel);
     parentWidget->ConfigureChildren(configurations);
 
-    nsRefPtr<nsDeviceContext> dx = viewMan->GetDeviceContext();
+    RefPtr<nsDeviceContext> dx = viewMan->GetDeviceContext();
     mInnerView->AttachWidgetEventHandler(mWidget);
 
 #ifdef XP_MACOSX
@@ -412,7 +415,8 @@ nsPluginFrame::GetWidgetConfiguration(nsTArray<nsIWidget::Configuration>* aConfi
 
   nsIWidget::Configuration* configuration = aConfigurations->AppendElement();
   configuration->mChild = mWidget;
-  configuration->mBounds = mNextConfigurationBounds;
+  configuration->mBounds =
+    LayoutDeviceIntRect::FromUnknownRect(mNextConfigurationBounds);
   configuration->mClipRegion = mNextConfigurationClipRegion;
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   if (XRE_IsContentProcess()) {
@@ -593,7 +597,7 @@ nsPluginFrame::CallSetWindow(bool aCheckIsHidden)
   NPWindow *win = nullptr;
  
   nsresult rv = NS_ERROR_FAILURE;
-  nsRefPtr<nsNPAPIPluginInstance> pi;
+  RefPtr<nsNPAPIPluginInstance> pi;
   if (!mInstanceOwner ||
       NS_FAILED(rv = mInstanceOwner->GetInstance(getter_AddRefs(pi))) ||
       !pi ||
@@ -610,7 +614,7 @@ nsPluginFrame::CallSetWindow(bool aCheckIsHidden)
   // on OS X) or SetWindow() (below, on all platforms) can destroy this
   // frame.  (FixUpPluginWindow() calls SetWindow()).  So grab a safe
   // reference to mInstanceOwner which we can use below, if needed.
-  nsRefPtr<nsPluginInstanceOwner> instanceOwnerRef(mInstanceOwner);
+  RefPtr<nsPluginInstanceOwner> instanceOwnerRef(mInstanceOwner);
 
   // refresh the plugin port as well
 #ifdef XP_MACOSX
@@ -761,6 +765,23 @@ nsPluginFrame::IsHidden(bool aCheckVisibilityStyle) const
   }
 
   return false;
+}
+
+// Clips windowed plugin frames during remote content scroll operations managed
+// by nsGfxScrollFrame.
+void
+nsPluginFrame::SetScrollVisibility(bool aState)
+{
+  // Limit this setting to windowed plugins by checking if we have a widget
+  if (mWidget) {
+    bool changed = mIsHiddenDueToScroll != aState;
+    mIsHiddenDueToScroll = aState;
+    // Force a paint so plugin window visibility gets flushed via
+    // the compositor.
+    if (changed) {
+      SchedulePaint();
+    }
+  }
 }
 
 mozilla::LayoutDeviceIntPoint
@@ -1096,6 +1117,11 @@ nsPluginFrame::DidSetWidgetGeometry()
 bool
 nsPluginFrame::IsOpaque() const
 {
+  // Insure underlying content gets painted when we clip windowed plugins
+  // during remote content scroll operations managed by nsGfxScrollFrame.
+  if (mIsHiddenDueToScroll) {
+    return false;
+  }
 #if defined(XP_MACOSX)
   return false;
 #elif defined(MOZ_WIDGET_ANDROID)
@@ -1125,7 +1151,7 @@ nsPluginFrame::IsTransparentMode() const
     return false;
 
   nsresult rv;
-  nsRefPtr<nsNPAPIPluginInstance> pi;
+  RefPtr<nsNPAPIPluginInstance> pi;
   rv = mInstanceOwner->GetInstance(getter_AddRefs(pi));
   if (NS_FAILED(rv) || !pi)
     return false;
@@ -1141,6 +1167,12 @@ nsPluginFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists)
 {
+  // Clip windowed plugin frames from the list during remote content scroll
+  // operations managed by nsGfxScrollFrame.
+  if (mIsHiddenDueToScroll) {
+    return;
+  }
+
   // XXX why are we painting collapsed object frames?
   if (!IsVisibleOrCollapsedForPainting(aBuilder))
     return;
@@ -1247,7 +1279,7 @@ nsPluginFrame::PrintPlugin(nsRenderingContext& aRenderingContext,
     return;
 
   // finally we can get our plugin instance
-  nsRefPtr<nsNPAPIPluginInstance> pi;
+  RefPtr<nsNPAPIPluginInstance> pi;
   if (NS_FAILED(objectFrame->GetPluginInstance(getter_AddRefs(pi))) || !pi)
     return;
 
@@ -1397,12 +1429,12 @@ nsPluginFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
   gfxRect r = nsLayoutUtils::RectToGfxRect(area, PresContext()->AppUnitsPerDevPixel());
   // to provide crisper and faster drawing.
   r.Round();
-  nsRefPtr<Layer> layer =
+  RefPtr<Layer> layer =
     (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, aItem));
 
   if (aItem->GetType() == nsDisplayItem::TYPE_PLUGIN) {
     // Create image
-    nsRefPtr<ImageContainer> container = mInstanceOwner->GetImageContainer();
+    RefPtr<ImageContainer> container = mInstanceOwner->GetImageContainer();
     if (!container) {
       // This can occur if our instance is gone.
       return nullptr;
@@ -1441,7 +1473,7 @@ nsPluginFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
     nsDisplayPluginVideo* videoItem = reinterpret_cast<nsDisplayPluginVideo*>(aItem);
     nsNPAPIPluginInstance::VideoInfo* videoInfo = videoItem->VideoInfo();
 
-    nsRefPtr<ImageContainer> container = mInstanceOwner->GetImageContainerForVideo(videoInfo);
+    RefPtr<ImageContainer> container = mInstanceOwner->GetImageContainerForVideo(videoInfo);
     if (!container)
       return nullptr;
 
@@ -1569,7 +1601,7 @@ nsPluginFrame::PaintPlugin(nsDisplayListBuilder* aBuilder,
         return;
       }
 
-      nsRefPtr<nsNPAPIPluginInstance> inst;
+      RefPtr<nsNPAPIPluginInstance> inst;
       GetPluginInstance(getter_AddRefs(inst));
       if (!inst) {
         NS_WARNING("null plugin instance during PaintPlugin");
@@ -1636,7 +1668,7 @@ nsPluginFrame::PaintPlugin(nsDisplayListBuilder* aBuilder,
     }
   }
 #elif defined(XP_WIN)
-  nsRefPtr<nsNPAPIPluginInstance> inst;
+  RefPtr<nsNPAPIPluginInstance> inst;
   GetPluginInstance(getter_AddRefs(inst));
   if (inst) {
     gfxRect frameGfxRect =
@@ -1817,6 +1849,50 @@ nsPluginFrame::HandleEvent(nsPresContext* aPresContext,
   return rv;
 }
 
+void
+nsPluginFrame::HandleWheelEventAsDefaultAction(WidgetWheelEvent* aWheelEvent)
+{
+  MOZ_ASSERT(WantsToHandleWheelEventAsDefaultAction());
+  MOZ_ASSERT(!aWheelEvent->mFlags.mDefaultPrevented);
+
+  if (NS_WARN_IF(!mInstanceOwner) ||
+      NS_WARN_IF(aWheelEvent->mMessage != eWheel)) {
+    return;
+  }
+
+  // If the wheel event has native message, it should may be handled by
+  // HandleEvent() in the future.  In such case, we should do nothing here.
+  if (NS_WARN_IF(!!aWheelEvent->mPluginEvent)) {
+    return;
+  }
+
+  mInstanceOwner->ProcessEvent(*aWheelEvent);
+  // We need to assume that the event is always consumed/handled by the
+  // plugin.  There is no way to know if it's actually consumed/handled.
+  aWheelEvent->mViewPortIsOverscrolled = false;
+  aWheelEvent->overflowDeltaX = 0;
+  aWheelEvent->overflowDeltaY = 0;
+  // Consume the event explicitly.
+  aWheelEvent->PreventDefault();
+}
+
+bool
+nsPluginFrame::WantsToHandleWheelEventAsDefaultAction() const
+{
+#ifdef XP_WIN
+  if (!mInstanceOwner) {
+    return false;
+  }
+  NPWindow* window = nullptr;
+  mInstanceOwner->GetWindow(window);
+  // On Windows, only when the plugin is windowless, we need to send wheel
+  // events as default action.
+  return window->type == NPWindowTypeDrawable;
+#else
+  return false;
+#endif
+}
+
 nsresult
 nsPluginFrame::GetPluginInstance(nsNPAPIPluginInstance** aPluginInstance)
 {
@@ -1836,7 +1912,7 @@ nsPluginFrame::GetCursor(const nsPoint& aPoint, nsIFrame::Cursor& aCursor)
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<nsNPAPIPluginInstance> inst;
+  RefPtr<nsNPAPIPluginInstance> inst;
   mInstanceOwner->GetInstance(getter_AddRefs(inst));
   if (!inst) {
     return NS_ERROR_FAILURE;
@@ -1867,7 +1943,7 @@ nsPluginFrame::GetNextObjectFrame(nsPresContext* aPresContext, nsIFrame* aRoot)
   while (child) {
     nsIObjectFrame* outFrame = do_QueryFrame(child);
     if (outFrame) {
-      nsRefPtr<nsNPAPIPluginInstance> pi;
+      RefPtr<nsNPAPIPluginInstance> pi;
       outFrame->GetPluginInstance(getter_AddRefs(pi));  // make sure we have a REAL plugin
       if (pi)
         return outFrame;

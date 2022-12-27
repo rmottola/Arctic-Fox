@@ -88,7 +88,7 @@ HeapSnapshot::Create(JSContext* cx,
                      uint32_t size,
                      ErrorResult& rv)
 {
-  nsRefPtr<HeapSnapshot> snapshot = new HeapSnapshot(cx, global.GetAsSupports());
+  RefPtr<HeapSnapshot> snapshot = new HeapSnapshot(cx, global.GetAsSupports());
   if (!snapshot->init(buffer, size)) {
     rv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
@@ -201,6 +201,12 @@ HeapSnapshot::saveNode(const protobuf::Node& node)
   if (NS_WARN_IF(!node.has_id()))
     return false;
   NodeId id = node.id();
+
+  // NodeIds are derived from pointers (at most 48 bits) and we rely on them
+  // fitting into JS numbers (IEEE 754 doubles, can precisely store 53 bit
+  // integers) despite storing them on disk as 64 bit integers.
+  if (NS_WARN_IF(!JS::Value::isNumberRepresentable(id)))
+    return false;
 
   // Should only deserialize each node once.
   if (NS_WARN_IF(nodes.has(id)))
@@ -1369,7 +1375,7 @@ ThreadSafeChromeUtils::ReadHeapSnapshot(GlobalObject& global,
   if (rv.Failed())
     return nullptr;
 
-  nsRefPtr<HeapSnapshot> snapshot = HeapSnapshot::Create(
+  RefPtr<HeapSnapshot> snapshot = HeapSnapshot::Create(
       cx, global, reinterpret_cast<const uint8_t*>(mm.address()), mm.size(), rv);
 
   if (!rv.Failed())

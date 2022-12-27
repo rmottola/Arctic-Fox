@@ -3,14 +3,14 @@
 
 "use strict";
 
-const {utils: Cu, classes: Cc, interfaces: Ci} = Components;
+var {utils: Cu, classes: Cc, interfaces: Ci} = Components;
 
 Cu.import('resource://gre/modules/Services.jsm');
 Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
-const {gDevTools} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const {gDevTools} = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 const promise = require("promise");
 const {AppProjects} = require("devtools/client/app-manager/app-projects");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
@@ -42,7 +42,6 @@ registerCleanupFunction(() => {
   Services.prefs.clearUserPref("devtools.webide.enableLocalRuntime");
   Services.prefs.clearUserPref("devtools.webide.autoinstallADBHelper");
   Services.prefs.clearUserPref("devtools.webide.autoinstallFxdtAdapters");
-  Services.prefs.clearUserPref("devtools.webide.sidebars");
   Services.prefs.clearUserPref("devtools.webide.busyTimeout");
   Services.prefs.clearUserPref("devtools.webide.lastSelectedProject");
   Services.prefs.clearUserPref("devtools.webide.lastConnectedRuntime");
@@ -204,25 +203,27 @@ function getProjectDocument(win) {
   return win.document.querySelector("#project-listing-panel-details").contentDocument;
 }
 
-function connectToLocalRuntime(aWindow) {
+function getRuntimeWindow(win) {
+  return win.document.querySelector("#runtime-listing-panel-details").contentWindow;
+}
+
+function getProjectWindow(win) {
+  return win.document.querySelector("#project-listing-panel-details").contentWindow;
+}
+
+function connectToLocalRuntime(win) {
   info("Loading local runtime.");
 
   let panelNode;
   let runtimePanel;
 
-  // If we are currently toggled to the sidebar panel display in WebIDE then
-  // the runtime panel is in an iframe.
-  if (aWindow.runtimeList.sidebarsEnabled) {
-    runtimePanel = getRuntimeDocument(aWindow);
-  } else {
-    runtimePanel = aWindow.document;
-  }
+  runtimePanel = getRuntimeDocument(win);
 
   panelNode = runtimePanel.querySelector("#runtime-panel");
   let items = panelNode.querySelectorAll(".runtime-panel-item-other");
   is(items.length, 2, "Found 2 custom runtime buttons");
 
-  let updated = waitForUpdate(aWindow, "runtime-global-actors");
+  let updated = waitForUpdate(win, "runtime-global-actors");
   items[1].click();
   return updated;
 }

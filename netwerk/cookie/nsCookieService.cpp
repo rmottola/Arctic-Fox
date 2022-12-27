@@ -340,7 +340,7 @@ class DBListenerErrorHandler : public mozIStorageStatementCallback
 {
 protected:
   explicit DBListenerErrorHandler(DBState* dbState) : mDBState(dbState) { }
-  nsRefPtr<DBState> mDBState;
+  RefPtr<DBState> mDBState;
   virtual const char *GetOpType() = 0;
 
 public:
@@ -549,7 +549,7 @@ class CloseCookieDBListener final :  public mozIStorageCompletionCallback
 
 public:
   explicit CloseCookieDBListener(DBState* dbState) : mDBState(dbState) { }
-  nsRefPtr<DBState> mDBState;
+  RefPtr<DBState> mDBState;
   NS_DECL_ISUPPORTS
 
   NS_IMETHOD Complete(nsresult, nsISupports*) override
@@ -1994,7 +1994,7 @@ nsCookieService::Add(const nsACString &aHost,
 
   int64_t currentTimeInUsec = PR_Now();
 
-  nsRefPtr<nsCookie> cookie =
+  RefPtr<nsCookie> cookie =
     nsCookie::Create(aName, aValue, host, aPath,
                      aExpiry,
                      currentTimeInUsec,
@@ -2031,7 +2031,7 @@ nsCookieService::Remove(const nsACString& aHost, uint32_t aAppId,
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsListIter matchIter;
-  nsRefPtr<nsCookie> cookie;
+  RefPtr<nsCookie> cookie;
   if (FindCookie(nsCookieKey(baseDomain, aAppId, aInBrowserElement),
                  host,
                  PromiseFlatCString(aName),
@@ -2301,7 +2301,7 @@ nsCookieService::EnsureReadDomain(const nsCookieKey &aKey)
 
   bool hasResult;
   nsCString name, value, host, path;
-  nsAutoTArray<nsRefPtr<nsCookie>, kMaxCookiesPerHost> array;
+  nsAutoTArray<RefPtr<nsCookie>, kMaxCookiesPerHost> array;
   while (1) {
     rv = mDefaultDBState->stmtReadDomain->ExecuteStep(&hasResult);
     if (NS_FAILED(rv)) {
@@ -2547,7 +2547,7 @@ nsCookieService::ImportCookies(nsIFile *aCookieFile)
 
     // Create a new nsCookie and assign the data. We don't know the cookie
     // creation time, so just use the current time to generate a unique one.
-    nsRefPtr<nsCookie> newCookie =
+    RefPtr<nsCookie> newCookie =
       nsCookie::Create(Substring(buffer, nameIndex, cookieIndex - nameIndex - 1),
                        Substring(buffer, cookieIndex, buffer.Length() - cookieIndex),
                        host,
@@ -2917,7 +2917,7 @@ nsCookieService::SetCookieInternal(nsIURI                        *aHostURI,
   }
 
   // create a new nsCookie and copy attributes
-  nsRefPtr<nsCookie> cookie =
+  RefPtr<nsCookie> cookie =
     nsCookie::Create(cookieAttributes.name,
                      cookieAttributes.value,
                      cookieAttributes.host,
@@ -2985,7 +2985,7 @@ nsCookieService::AddInternal(const nsCookieKey             &aKey,
   bool foundCookie = FindCookie(aKey, aCookie->Host(),
     aCookie->Name(), aCookie->Path(), matchIter);
 
-  nsRefPtr<nsCookie> oldCookie;
+  RefPtr<nsCookie> oldCookie;
   nsCOMPtr<nsIArray> purgedList;
   if (foundCookie) {
     oldCookie = matchIter.Cookie();

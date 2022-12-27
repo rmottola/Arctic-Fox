@@ -1136,7 +1136,7 @@ void
 NativeKey::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
                         const ModifierKeyState& aModKeyState) const
 {
-  nsIntPoint point(0, 0);
+  LayoutDeviceIntPoint point(0, 0);
   mWidget->InitEvent(aKeyEvent, &point);
 
   switch (aKeyEvent.mMessage) {

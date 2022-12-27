@@ -222,8 +222,6 @@ const static js::Class sNPObjectJSWrapperClass =
     nullptr,                                                /* trace */
     JS_NULL_CLASS_SPEC,
     {
-      nullptr,                                              /* outerObject */
-      nullptr,                                              /* innerObject */
       false,                                                /* isWrappedNative */
       nullptr,                                              /* weakmapKeyDelegateOp */
       NPObjWrapper_ObjectMoved
@@ -455,7 +453,7 @@ GetGlobalObject(NPP npp)
   nsNPAPIPluginInstance* inst = (nsNPAPIPluginInstance*)npp->ndata;
   NS_ENSURE_TRUE(inst, nullptr);
 
-  nsRefPtr<nsPluginInstanceOwner> owner = inst->GetOwner();
+  RefPtr<nsPluginInstanceOwner> owner = inst->GetOwner();
   NS_ENSURE_TRUE(owner, nullptr);
 
   nsCOMPtr<nsIDocument> doc;

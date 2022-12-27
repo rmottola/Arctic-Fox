@@ -231,7 +231,7 @@ NS_IMETHODIMP nsXULWindow::SetZLevel(uint32_t aLevel)
     nsCOMPtr<nsIDocument> doc = cv->GetDocument();
     if (doc) {
       ErrorResult rv;
-      nsRefPtr<dom::Event> event =
+      RefPtr<dom::Event> event =
         doc->CreateEvent(NS_LITERAL_STRING("Events"),rv);
       if (event) {
         event->InitEvent(NS_LITERAL_STRING("windowZLevel"), true, false);
@@ -646,7 +646,7 @@ NS_IMETHODIMP nsXULWindow::SetPositionAndSize(int32_t aX, int32_t aY,
 NS_IMETHODIMP nsXULWindow::GetPositionAndSize(int32_t* x, int32_t* y, int32_t* cx,
    int32_t* cy)
 {
-  nsIntRect rect;
+  LayoutDeviceIntRect rect;
 
   if (!mWindow)
     return NS_ERROR_FAILURE;
@@ -1174,9 +1174,8 @@ bool nsXULWindow::LoadSizeFromXUL()
     // constrain to screen size
     nsCOMPtr<nsIDOMWindow> domWindow;
     GetWindowDOMWindow(getter_AddRefs(domWindow));
-    if (domWindow) {
-      nsCOMPtr<nsIDOMScreen> screen;
-      domWindow->GetScreen(getter_AddRefs(screen));
+    if (nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(domWindow)) {
+      nsCOMPtr<nsIDOMScreen> screen = window->GetScreen();
       if (screen) {
         int32_t screenWidth;
         int32_t screenHeight;
@@ -1260,7 +1259,8 @@ bool nsXULWindow::LoadMiscPersistentAttributesFromXUL()
   if (sizeMode == nsSizeMode_Fullscreen) {
     nsCOMPtr<nsIDOMWindow> ourWindow;
     GetWindowDOMWindow(getter_AddRefs(ourWindow));
-    ourWindow->SetFullScreen(true);
+    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(ourWindow);
+    piWindow->SetFullScreen(true);
   } else {
     mWindow->SetSizeMode(sizeMode);
   }
@@ -1420,7 +1420,8 @@ void nsXULWindow::SyncAttributesToWidget()
   nsIntMargin margins;
   windowElement->GetAttribute(NS_LITERAL_STRING("chromemargin"), attr);
   if (nsContentUtils::ParseIntMarginValue(attr, margins)) {
-    mWindow->SetNonClientMargins(margins);
+    LayoutDeviceIntMargin tmp = LayoutDeviceIntMargin::FromUnknownMargin(margins);
+    mWindow->SetNonClientMargins(tmp);
   }
 
   // "windowtype" attribute
@@ -1473,8 +1474,13 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
     return NS_OK;
   }
 
+  bool isFullscreen = false;
+  if (nsPIDOMWindow* domWindow = mDocShell->GetWindow()) {
+    isFullscreen = domWindow->GetFullScreen();
+  }
+
   // get our size, position and mode to persist
-  nsIntRect rect;
+  LayoutDeviceIntRect rect;
   bool gotRestoredBounds = NS_SUCCEEDED(mWindow->GetRestoredBounds(rect));
 
   CSSToLayoutDeviceScale scale = mWindow->GetDefaultScale();
@@ -2003,8 +2009,8 @@ void nsXULWindow::SetContentScrollbarVisibility(bool aVisible)
   if (contentWin) {
     mozilla::ErrorResult rv;
 
-    nsRefPtr<nsGlobalWindow> window = static_cast<nsGlobalWindow*>(contentWin.get());
-    nsRefPtr<mozilla::dom::BarProp> scrollbars = window->GetScrollbars(rv);
+    RefPtr<nsGlobalWindow> window = static_cast<nsGlobalWindow*>(contentWin.get());
+    RefPtr<mozilla::dom::BarProp> scrollbars = window->GetScrollbars(rv);
     if (scrollbars) {
       scrollbars->SetVisible(aVisible, rv);
     }

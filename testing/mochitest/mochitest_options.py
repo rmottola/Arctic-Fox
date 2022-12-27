@@ -4,6 +4,7 @@
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from argparse import ArgumentParser, SUPPRESS
+from distutils.util import strtobool
 from urlparse import urlparse
 import os
 import tempfile
@@ -28,7 +29,24 @@ except ImportError:
     conditions = None
 
 
-VMWARE_RECORDING_HELPER_BASENAME = "vmwarerecordinghelper"
+def get_default_valgrind_suppression_files():
+    # We are trying to locate files in the source tree.  So if we
+    # don't know where the source tree is, we must give up.
+    if build_obj is None or build_obj.topsrcdir is None:
+        return []
+
+    supps_path = os.path.join(build_obj.topsrcdir, "build", "valgrind")
+
+    rv = []
+    if mozinfo.os == "linux":
+        if mozinfo.processor == "x86_64":
+            rv.append(os.path.join(supps_path, "x86_64-redhat-linux-gnu.sup"))
+            rv.append(os.path.join(supps_path, "cross-architecture.sup"))
+        elif mozinfo.processor == "x86":
+            rv.append(os.path.join(supps_path, "i386-redhat-linux-gnu.sup"))
+            rv.append(os.path.join(supps_path, "cross-architecture.sup"))
+
+    return rv
 
 
 class ArgumentContainer():
@@ -66,10 +84,12 @@ class MochitestArguments(ArgumentContainer):
                   "(to run recursively). If omitted, the entire suite is run.",
           }],
         [["--keep-open"],
-         {"action": "store_false",
-          "dest": "closeWhenDone",
-          "default": True,
-          "help": "Always keep the browser open after tests complete.",
+         {"nargs": "?",
+          "type": strtobool,
+          "const": "true",
+          "default": None,
+          "help": "Always keep the browser open after tests complete. Or always close the "
+                  "browser with --keep-open=false",
           }],
         [["--appname"],
          {"dest": "app",
@@ -293,14 +313,6 @@ class MochitestArguments(ArgumentContainer):
           "help": "Directory where testing-only JS modules are located.",
           "suppress": True,
           }],
-        [["--use-vmware-recording"],
-         {"action": "store_true",
-          "dest": "vmwareRecording",
-          "default": False,
-          "help": "Enables recording while the application is running inside a VMware "
-                  "Workstation 7.0 or later VM.",
-          "suppress": True,
-          }],
         [["--repeat"],
          {"type": int,
           "default": 0,
@@ -376,6 +388,13 @@ class MochitestArguments(ArgumentContainer):
          {"action": "store_true",
           "default": False,
           "help": "Run tests with electrolysis preferences and test filtering enabled.",
+          }],
+        [["--store-chrome-manifest"],
+         {"action": "store",
+          "help": "Destination path to write a copy of any chrome manifest "
+                  "written by the harness.",
+          "default": None,
+          "suppress": True,
           }],
         [["--strict-content-sandbox"],
          {"action": "store_true",
@@ -477,6 +496,20 @@ class MochitestArguments(ArgumentContainer):
          {"dest": "debuggerArgs",
           "default": None,
           "help": "Arguments to pass to the debugger.",
+          }],
+        [["--valgrind"],
+         {"default": None,
+          "help": "Valgrind binary to run tests with. Program name or path.",
+          }],
+        [["--valgrind-args"],
+         {"dest": "valgrindArgs",
+          "default": None,
+          "help": "Extra arguments to pass to Valgrind.",
+          }],
+        [["--valgrind-supp-files"],
+         {"dest": "valgrindSuppFiles",
+          "default": None,
+          "help": "Comma-separated list of suppression files to pass to Valgrind.",
           }],
         [["--debugger-interactive"],
          {"action": "store_true",
@@ -614,16 +647,6 @@ class MochitestArguments(ArgumentContainer):
         elif not options.symbolsPath and build_obj:
             options.symbolsPath = os.path.join(build_obj.distdir, 'crashreporter-symbols')
 
-        if options.vmwareRecording:
-            if not mozinfo.isWin:
-                parser.error(
-                    "use-vmware-recording is only supported on Windows.")
-            options.vmwareHelperPath = os.path.join(
-                options.utilityPath, VMWARE_RECORDING_HELPER_BASENAME + ".dll")
-            if not os.path.exists(options.vmwareHelperPath):
-                parser.error("%s not found, cannot automate VMware recording." %
-                             options.vmwareHelperPath)
-
         if options.webapprtContent and options.webapprtChrome:
             parser.error(
                 "Only one of --webapprt-content and --webapprt-chrome may be given.")
@@ -643,6 +666,13 @@ class MochitestArguments(ArgumentContainer):
         if options.debuggerArgs and not options.debugger:
             parser.error(
                 "--debugger-args requires --debugger.")
+
+        if options.store_chrome_manifest:
+            options.store_chrome_manifest = os.path.abspath(options.store_chrome_manifest)
+            if not os.path.isdir(os.path.dirname(options.store_chrome_manifest)):
+                parser.error(
+                    "directory for %s does not exist as a destination to copy a "
+                    "chrome manifest." % options.store_chrome_manifest)
 
         if options.testingModulesDir is None:
             if build_obj:
@@ -787,7 +817,7 @@ class B2GArguments(ArgumentContainer):
           }],
         [["--adbpath"],
          {"dest": "adbPath",
-          "default": "adb",
+          "default": None,
           "help": "Path to adb binary.",
           "suppress": True,
           }],
@@ -1016,12 +1046,6 @@ class AndroidArguments(ArgumentContainer):
           "default": "",
           "help": "name of the Robocop APK to use for ADB test running",
           }],
-        [["--robocop-ids"],
-         {"dest": "robocopIds",
-          "default": "",
-          "help": "name of the file containing the view ID map \
-                   (fennec_ids.txt)",
-          }],
         [["--remoteTestRoot"],
          {"dest": "remoteTestRoot",
           "default": None,
@@ -1120,7 +1144,8 @@ class AndroidArguments(ArgumentContainer):
             options.robocopIni = os.path.abspath(options.robocopIni)
 
             if not options.robocopApk and build_obj:
-                options.robocopApk = os.path.join(build_obj.topobjdir, 'build', 'mobile',
+                options.robocopApk = os.path.join(build_obj.topobjdir, 'mobile', 'android',
+                                                  'tests', 'browser',
                                                   'robocop', 'robocop-debug.apk')
 
         if options.robocopApk != "":
@@ -1129,13 +1154,6 @@ class AndroidArguments(ArgumentContainer):
                     "Unable to find robocop APK '%s'" %
                     options.robocopApk)
             options.robocopApk = os.path.abspath(options.robocopApk)
-
-        if options.robocopIds != "":
-            if not os.path.exists(options.robocopIds):
-                parser.error(
-                    "Unable to find specified robocop IDs file '%s'" %
-                    options.robocopIds)
-            options.robocopIds = os.path.abspath(options.robocopIds)
 
         # allow us to keep original application around for cleanup while
         # running robocop via 'am'

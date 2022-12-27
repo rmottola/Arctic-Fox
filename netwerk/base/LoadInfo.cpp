@@ -31,7 +31,9 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mLoadingContext(do_GetWeakReference(aLoadingContext))
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
+  , mTainting(LoadTainting::Basic)
   , mUpgradeInsecureRequests(false)
+  , mUpgradeInsecurePreloads(false)
   , mInnerWindowID(0)
   , mOuterWindowID(0)
   , mParentOuterWindowID(0)
@@ -79,7 +81,10 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
     }
 
     mUpgradeInsecureRequests = aLoadingContext->OwnerDoc()->GetUpgradeInsecureRequests();
+    mUpgradeInsecurePreloads = aLoadingContext->OwnerDoc()->GetUpgradeInsecurePreloads();
   }
+
+  mOriginAttributes = BasePrincipal::Cast(mLoadingPrincipal)->OriginAttributesRef();
 }
 
 LoadInfo::LoadInfo(const LoadInfo& rhs)
@@ -88,12 +93,18 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
   , mLoadingContext(rhs.mLoadingContext)
   , mSecurityFlags(rhs.mSecurityFlags)
   , mInternalContentPolicyType(rhs.mInternalContentPolicyType)
+  , mTainting(rhs.mTainting)
   , mUpgradeInsecureRequests(rhs.mUpgradeInsecureRequests)
+  , mUpgradeInsecurePreloads(rhs.mUpgradeInsecurePreloads)
   , mInnerWindowID(rhs.mInnerWindowID)
   , mOuterWindowID(rhs.mOuterWindowID)
   , mParentOuterWindowID(rhs.mParentOuterWindowID)
-  , mEnforceSecurity(false)
-  , mInitialSecurityCheckDone(false)
+  , mEnforceSecurity(rhs.mEnforceSecurity)
+  , mInitialSecurityCheckDone(rhs.mInitialSecurityCheckDone)
+  , mOriginAttributes(rhs.mOriginAttributes)
+  , mRedirectChainIncludingInternalRedirects(
+      rhs.mRedirectChainIncludingInternalRedirects)
+  , mRedirectChain(rhs.mRedirectChain)
   , mIsFromProcessingFrameAttributes(rhs.mIsFromProcessingFrameAttributes)
 {
 }
@@ -103,26 +114,34 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    nsSecurityFlags aSecurityFlags,
                    nsContentPolicyType aContentPolicyType,
                    bool aUpgradeInsecureRequests,
+                   bool aUpgradeInsecurePreloads,
                    uint64_t aInnerWindowID,
                    uint64_t aOuterWindowID,
                    uint64_t aParentOuterWindowID,
                    bool aEnforceSecurity,
                    bool aInitialSecurityCheckDone,
+                   const OriginAttributes& aOriginAttributes,
+                   nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChainIncludingInternalRedirects,
                    nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain)
   : mLoadingPrincipal(aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
   , mUpgradeInsecureRequests(aUpgradeInsecureRequests)
+  , mUpgradeInsecurePreloads(aUpgradeInsecurePreloads)
   , mInnerWindowID(aInnerWindowID)
   , mOuterWindowID(aOuterWindowID)
   , mParentOuterWindowID(aParentOuterWindowID)
   , mEnforceSecurity(aEnforceSecurity)
   , mInitialSecurityCheckDone(aInitialSecurityCheckDone)
+  , mOriginAttributes(aOriginAttributes)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
+
+  mRedirectChainIncludingInternalRedirects.SwapElements(
+    aRedirectChainIncludingInternalRedirects);
 
   mRedirectChain.SwapElements(aRedirectChain);
 }
@@ -136,7 +155,18 @@ NS_IMPL_ISUPPORTS(LoadInfo, nsILoadInfo)
 already_AddRefed<nsILoadInfo>
 LoadInfo::Clone() const
 {
-  nsRefPtr<LoadInfo> copy(new LoadInfo(*this));
+  RefPtr<LoadInfo> copy(new LoadInfo(*this));
+  return copy.forget();
+}
+
+already_AddRefed<nsILoadInfo>
+LoadInfo::CloneForNewRequest() const
+{
+  RefPtr<LoadInfo> copy(new LoadInfo(*this));
+  copy->mEnforceSecurity = false;
+  copy->mInitialSecurityCheckDone = false;
+  copy->mRedirectChainIncludingInternalRedirects.Clear();
+  copy->mRedirectChain.Clear();
   return copy.forget();
 }
 
@@ -189,6 +219,14 @@ LoadInfo::GetSecurityFlags(nsSecurityFlags* aResult)
 {
   *aResult = mSecurityFlags;
   return NS_OK;
+}
+
+void
+LoadInfo::SetWithCredentialsSecFlag()
+{
+  MOZ_ASSERT(!mEnforceSecurity,
+             "Request should not have been opened yet");
+  mSecurityFlags |= nsILoadInfo::SEC_REQUIRE_CORS_WITH_CREDENTIALS;
 }
 
 NS_IMETHODIMP
@@ -263,6 +301,13 @@ LoadInfo::GetUpgradeInsecureRequests(bool* aResult)
 }
 
 NS_IMETHODIMP
+LoadInfo::GetUpgradeInsecurePreloads(bool* aResult)
+{
+  *aResult = mUpgradeInsecurePreloads;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 LoadInfo::GetInnerWindowID(uint64_t* aResult)
 {
   *aResult = mInnerWindowID;
@@ -294,6 +339,44 @@ LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttribu
 {
   MOZ_ASSERT(aIsFromProcessingFrameAttributes);
   *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetScriptableOriginAttributes(JSContext* aCx,
+  JS::MutableHandle<JS::Value> aOriginAttributes)
+{
+  if (NS_WARN_IF(!ToJSValue(aCx, mOriginAttributes, aOriginAttributes))) {
+    return NS_ERROR_FAILURE;
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::SetScriptableOriginAttributes(JSContext* aCx,
+  JS::Handle<JS::Value> aOriginAttributes)
+{
+  OriginAttributes attrs;
+  if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  mOriginAttributes = attrs;
+  return NS_OK;
+}
+
+nsresult
+LoadInfo::GetOriginAttributes(mozilla::OriginAttributes* aOriginAttributes)
+{
+  NS_ENSURE_ARG(aOriginAttributes);
+  *aOriginAttributes = mOriginAttributes;
+  return NS_OK;
+}
+
+nsresult
+LoadInfo::SetOriginAttributes(const mozilla::OriginAttributes& aOriginAttributes)
+{
+  mOriginAttributes = aOriginAttributes;
   return NS_OK;
 }
 
@@ -335,11 +418,29 @@ LoadInfo::GetInitialSecurityCheckDone(bool* aResult)
 }
 
 NS_IMETHODIMP
-LoadInfo::AppendRedirectedPrincipal(nsIPrincipal* aPrincipal)
+LoadInfo::AppendRedirectedPrincipal(nsIPrincipal* aPrincipal, bool aIsInternalRedirect)
 {
   NS_ENSURE_ARG(aPrincipal);
-  mRedirectChain.AppendElement(aPrincipal);
+  mRedirectChainIncludingInternalRedirects.AppendElement(aPrincipal);
+  if (!aIsInternalRedirect) {
+    mRedirectChain.AppendElement(aPrincipal);
+  }
   return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetRedirectChainIncludingInternalRedirects(JSContext* aCx, JS::MutableHandle<JS::Value> aChain)
+{
+  if (!ToJSValue(aCx, mRedirectChainIncludingInternalRedirects, aChain)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+  return NS_OK;
+}
+
+const nsTArray<nsCOMPtr<nsIPrincipal>>&
+LoadInfo::RedirectChainIncludingInternalRedirects()
+{
+  return mRedirectChainIncludingInternalRedirects;
 }
 
 NS_IMETHODIMP
@@ -355,6 +456,25 @@ const nsTArray<nsCOMPtr<nsIPrincipal>>&
 LoadInfo::RedirectChain()
 {
   return mRedirectChain;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetTainting(uint32_t* aTaintingOut)
+{
+  MOZ_ASSERT(aTaintingOut);
+  *aTaintingOut = static_cast<uint32_t>(mTainting);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::MaybeIncreaseTainting(uint32_t aTainting)
+{
+  NS_ENSURE_ARG(aTainting <= TAINTING_OPAQUE);
+  LoadTainting tainting = static_cast<LoadTainting>(aTainting);
+  if (tainting > mTainting) {
+    mTainting = tainting;
+  }
+  return NS_OK;
 }
 
 } // namespace mozilla

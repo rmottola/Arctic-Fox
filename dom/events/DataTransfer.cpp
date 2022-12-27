@@ -10,7 +10,6 @@
 #include "DataTransfer.h"
 
 #include "nsIDOMDocument.h"
-#include "nsIVariant.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIScriptSecurityManager.h"
 #include "mozilla/dom/DOMStringList.h"
@@ -24,6 +23,7 @@
 #include "nsIScriptContext.h"
 #include "nsIDocument.h"
 #include "nsIScriptGlobalObject.h"
+#include "nsVariant.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/DataTransferBinding.h"
 #include "mozilla/dom/Directory.h"
@@ -31,6 +31,7 @@
 #include "mozilla/dom/FileList.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/OSFileSystem.h"
+#include "mozilla/dom/Promise.h"
 
 namespace mozilla {
 namespace dom {
@@ -157,7 +158,7 @@ DataTransfer::Constructor(const GlobalObject& aGlobal,
   }
 
   EventMessage eventMessage = nsContentUtils::GetEventMessage(eventTypeAtom);
-  nsRefPtr<DataTransfer> transfer = new DataTransfer(aGlobal.GetAsSupports(),
+  RefPtr<DataTransfer> transfer = new DataTransfer(aGlobal.GetAsSupports(),
                                                      eventMessage, aIsExternal,
                                                      -1);
   return transfer.forget();
@@ -298,7 +299,7 @@ DataTransfer::GetFiles(ErrorResult& aRv)
 
       nsCOMPtr<nsIFile> file = do_QueryInterface(supports);
 
-      nsRefPtr<File> domFile;
+      RefPtr<File> domFile;
       if (file) {
 #ifdef DEBUG
         if (XRE_GetProcessType() == GeckoProcessType_Default) {
@@ -348,7 +349,7 @@ DataTransfer::Types()
 NS_IMETHODIMP
 DataTransfer::GetTypes(nsISupports** aTypes)
 {
-  nsRefPtr<DOMStringList> types = Types();
+  RefPtr<DOMStringList> types = Types();
   types.forget(aTypes);
 
   return NS_OK;
@@ -418,12 +419,7 @@ void
 DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData,
                       ErrorResult& aRv)
 {
-  nsCOMPtr<nsIWritableVariant> variant = do_CreateInstance(NS_VARIANT_CONTRACTID);
-  if (!variant) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-
+  RefPtr<nsVariant> variant = new nsVariant();
   variant->SetAsAString(aData);
 
   aRv = MozSetDataAt(aFormat, variant, 0);
@@ -532,7 +528,7 @@ DataTransfer::MozTypesAt(uint32_t aIndex, ErrorResult& aRv) const
     return nullptr;
   }
 
-  nsRefPtr<DOMStringList> types = new DOMStringList();
+  RefPtr<DOMStringList> types = new DOMStringList();
   if (aIndex < mItems.Length()) {
     bool addFile = false;
     // note that you can retrieve the types regardless of their principal
@@ -565,7 +561,7 @@ NS_IMETHODIMP
 DataTransfer::MozTypesAt(uint32_t aIndex, nsISupports** aTypes)
 {
   ErrorResult rv;
-  nsRefPtr<DOMStringList> types = MozTypesAt(aIndex, rv);
+  RefPtr<DOMStringList> types = MozTypesAt(aIndex, rv);
   types.forget(aTypes);
   return rv.StealNSResult();
 }
@@ -857,7 +853,7 @@ MakeOrReuseFileSystem(const nsAString& aNewLocalRootPath,
 {
   MOZ_ASSERT(aWindow);
 
-  nsRefPtr<OSFileSystem> fs;
+  RefPtr<OSFileSystem> fs;
   if (aFS) {
     const nsAString& prevLocalRootPath = aFS->GetLocalRootPath();
     if (aNewLocalRootPath == prevLocalRootPath) {
@@ -887,7 +883,7 @@ DataTransfer::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> p = Promise::Create(global, aRv);
+  RefPtr<Promise> p = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -909,7 +905,7 @@ DataTransfer::GetFilesAndDirectories(ErrorResult& aRv)
 
     nsPIDOMWindow* window = parentNode->OwnerDoc()->GetInnerWindow();
 
-    nsRefPtr<OSFileSystem> fs;
+    RefPtr<OSFileSystem> fs;
     for (uint32_t i = 0; i < mFiles->Length(); ++i) {
       if (mFiles->Item(i)->Impl()->IsDirectory()) {
 #if defined(ANDROID) || defined(MOZ_B2G)
@@ -1369,9 +1365,7 @@ DataTransfer::FillInExternalData(TransferItem& aItem, uint32_t aIndex)
     if (!data)
       return;
 
-    nsCOMPtr<nsIWritableVariant> variant = do_CreateInstance(NS_VARIANT_CONTRACTID);
-    if (!variant)
-      return;
+    RefPtr<nsVariant> variant = new nsVariant();
 
     nsCOMPtr<nsISupportsString> supportsstr = do_QueryInterface(data);
     if (supportsstr) {

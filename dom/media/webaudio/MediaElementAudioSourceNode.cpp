@@ -19,7 +19,7 @@ MediaElementAudioSourceNode::MediaElementAudioSourceNode(AudioContext* aContext)
 MediaElementAudioSourceNode::Create(AudioContext* aContext,
                                     DOMMediaStream* aStream, ErrorResult& aRv)
 {
-  nsRefPtr<MediaElementAudioSourceNode> node =
+  RefPtr<MediaElementAudioSourceNode> node =
     new MediaElementAudioSourceNode(aContext);
 
   node->Init(aStream, aRv);

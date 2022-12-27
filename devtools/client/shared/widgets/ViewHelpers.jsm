@@ -16,9 +16,9 @@ const WIDGET_FOCUSABLE_NODES = new Set(["vbox", "hbox"]);
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
-const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
-Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
+Cu.import("resource://devtools/shared/event-emitter.js");
 
 this.EXPORTED_SYMBOLS = [
   "Heritage", "ViewHelpers", "WidgetMethods",
@@ -771,7 +771,9 @@ this.WidgetMethods = {
    * Gets the element node or widget associated with this container.
    * @return nsIDOMNode | object
    */
-  get widget() this._widget,
+  get widget() {
+    return this._widget;
+  },
 
   /**
    * Prepares an item to be added to this container. This allows, for example,

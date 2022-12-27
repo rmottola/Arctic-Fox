@@ -8,6 +8,7 @@
 #include "Layers.h"                     // for Layer, etc
 #include "gfx2DGlue.h"
 #include "gfxPlatform.h"                // for gfxPlatform
+#include "mozilla/Atomics.h"
 #include "mozilla/ipc/SharedMemory.h"   // for SharedMemory, etc
 #include "mozilla/layers/CompositableForwarder.h"
 #include "mozilla/layers/ISurfaceAllocator.h"
@@ -24,6 +25,7 @@
 #include "nsPrintfCString.h"            // for nsPrintfCString
 #include "LayersLogging.h"              // for AppendToString
 #include "gfxUtils.h"                   // for gfxUtils::GetAsLZ4Base64Str
+#include "IPDLActor.h"
 
 #ifdef XP_WIN
 #include "mozilla/layers/TextureD3D9.h"
@@ -86,12 +88,12 @@ struct ReleaseKeepAlive : public nsRunnable
  * TextureClient's data until the compositor side confirmed that it is safe to
  * deallocte or recycle the it.
  */
-class TextureChild final : public PTextureChild
+class TextureChild final : public ChildActor<PTextureChild>
 {
   ~TextureChild()
   {
     if (mKeep && mMainThreadOnly && !NS_IsMainThread()) {
-      nsRefPtr<ReleaseKeepAlive> release = new ReleaseKeepAlive();
+      RefPtr<ReleaseKeepAlive> release = new ReleaseKeepAlive();
       release->mKeep = Move(mKeep);
       NS_DispatchToMainThread(release);
     }
@@ -101,7 +103,9 @@ public:
 
   TextureChild()
   : mForwarder(nullptr)
+  , mMonitor("TextureChild")
   , mTextureClient(nullptr)
+  , mDestroyed(false)
   , mMainThreadOnly(false)
   , mIPCOpen(false)
   {
@@ -118,8 +122,12 @@ public:
 
   void WaitForCompositorRecycle()
   {
-    mWaitForRecycle = mTextureClient;
+    {
+      MonitorAutoLock mon(mMonitor);
+      mWaitForRecycle = mDestroyed ? nullptr : mTextureClient;
+    }
     RECYCLE_LOG("[CLIENT] Wait for recycle %p\n", mWaitForRecycle.get());
+    MOZ_ASSERT(CanSend());
     SendClientRecycle();
   }
 
@@ -148,10 +156,19 @@ private:
     Release();
   }
 
+  void SetTextureClient(TextureClient* aTextureClient) {
+    MonitorAutoLock mon(mMonitor);
+    mTextureClient = aTextureClient;
+  }
+
   RefPtr<CompositableForwarder> mForwarder;
   RefPtr<TextureClient> mWaitForRecycle;
+
+  // Monitor protecting mTextureClient.
+  Monitor mMonitor;
   TextureClient* mTextureClient;
   UniquePtr<KeepAlive> mKeep;
+  Atomic<bool> mDestroyed;
   bool mMainThreadOnly;
   bool mIPCOpen;
 
@@ -169,6 +186,7 @@ TextureChild::ActorDestroy(ActorDestroyReason why)
 {
   if (mTextureClient) {
     mTextureClient->mActor = nullptr;
+    mTextureClient->mAllocator = nullptr;
   }
   mWaitForRecycle = nullptr;
   mKeep = nullptr;
@@ -209,7 +227,7 @@ TextureClient::AddFlags(TextureFlags aFlags)
   MOZ_ASSERT(!IsSharedWithCompositor() ||
              ((GetFlags() & TextureFlags::RECYCLE) && !IsAddedToCompositableClient()));
   mFlags |= aFlags;
-  if (mValid && mActor && mActor->IPCOpen()) {
+  if (mValid && mActor && !mActor->mDestroyed && mActor->IPCOpen()) {
     mActor->SendRecycleTexture(mFlags);
   }
 }
@@ -220,7 +238,7 @@ TextureClient::RemoveFlags(TextureFlags aFlags)
   MOZ_ASSERT(!IsSharedWithCompositor() ||
              ((GetFlags() & TextureFlags::RECYCLE) && !IsAddedToCompositableClient()));
   mFlags &= ~aFlags;
-  if (mValid && mActor && mActor->IPCOpen()) {
+  if (mValid && mActor && !mActor->mDestroyed && mActor->IPCOpen()) {
     mActor->SendRecycleTexture(mFlags);
   }
 }
@@ -233,7 +251,7 @@ TextureClient::RecycleTexture(TextureFlags aFlags)
   mAddedToCompositableClient = false;
   if (mFlags != aFlags) {
     mFlags = aFlags;
-    if (mValid && mActor && mActor->IPCOpen()) {
+    if (mValid && mActor && !mActor->mDestroyed && mActor->IPCOpen()) {
       mActor->SendRecycleTexture(mFlags);
     }
   }
@@ -275,10 +293,10 @@ bool
 TextureClient::InitIPDLActor(CompositableForwarder* aForwarder)
 {
   MOZ_ASSERT(aForwarder && aForwarder->GetMessageLoop() == mAllocator->GetMessageLoop());
-  if (mActor && mActor->GetForwarder() == aForwarder) {
+  if (mActor && !mActor->mDestroyed && mActor->GetForwarder() == aForwarder) {
     return true;
   }
-  MOZ_ASSERT(!mActor, "Cannot use a texture on several IPC channels.");
+  MOZ_ASSERT(!mActor || mActor->mDestroyed, "Cannot use a texture on several IPC channels.");
 
   SurfaceDescriptor desc;
   if (!ToSurfaceDescriptor(desc)) {
@@ -365,12 +383,17 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
                                 TextureFlags aTextureFlags,
                                 TextureAllocationFlags aAllocFlags)
 {
-  LayersBackend parentBackend = aAllocator->GetCompositorBackendType();
-  gfx::BackendType moz2DBackend = BackendTypeForBackendSelector(parentBackend, aSelector);
+  MOZ_ASSERT(aAllocator->IPCOpen());
+  if (!aAllocator || !aAllocator->IPCOpen()) {
+    return nullptr;
+  }
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
     return nullptr;
   }
+
+  LayersBackend parentBackend = aAllocator->GetCompositorBackendType();
+  gfx::BackendType moz2DBackend = BackendTypeForBackendSelector(parentBackend, aSelector);
 
   RefPtr<TextureClient> texture;
 
@@ -475,6 +498,11 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
                                         TextureFlags aTextureFlags,
                                         TextureAllocationFlags aAllocFlags)
 {
+  MOZ_ASSERT(aAllocator->IPCOpen());
+  if (!aAllocator || !aAllocator->IPCOpen()) {
+    return nullptr;
+  }
+
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
     return nullptr;
   }
@@ -498,6 +526,11 @@ TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
                               StereoMode aStereoMode,
                               TextureFlags aTextureFlags)
 {
+  MOZ_ASSERT(aAllocator->IPCOpen());
+  if (!aAllocator || !aAllocator->IPCOpen()) {
+    return nullptr;
+  }
+
   if (!gfx::Factory::AllowedSurfaceSize(aYSize)) {
     return nullptr;
   }
@@ -527,6 +560,11 @@ TextureClient::CreateWithBufferSize(ISurfaceAllocator* aAllocator,
                      size_t aSize,
                      TextureFlags aTextureFlags)
 {
+  MOZ_ASSERT(aAllocator->IPCOpen());
+  if (!aAllocator || !aAllocator->IPCOpen()) {
+    return nullptr;
+  }
+
   RefPtr<BufferTextureClient> texture;
   if (aAllocator->IsSameProcess()) {
     texture = new MemoryTextureClient(aAllocator, gfx::SurfaceFormat::YUV,
@@ -573,17 +611,16 @@ TextureClient::KeepUntilFullDeallocation(UniquePtr<KeepAlive> aKeep, bool aMainT
 
 void TextureClient::ForceRemove(bool sync)
 {
+  if (mActor && mActor->mDestroyed) {
+    mActor = nullptr;
+  }
   if (mValid && mActor) {
     FinalizeOnIPDLThread();
-    if (sync || GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
-      MOZ_PERFORMANCE_WARNING("gfx", "TextureClient/Host pair requires synchronous deallocation");
-      if (mActor->IPCOpen()) {
-        mActor->SendClearTextureHostSync();
-        mActor->SendRemoveTexture();
-      }
-    } else {
-      if (mActor->IPCOpen()) {
-        mActor->SendRemoveTexture();
+    if (mActor->CanSend()) {
+      if (sync || GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
+        mActor->DestroySynchronously();
+      } else {
+        mActor->Destroy();
       }
     }
   }
@@ -624,15 +661,20 @@ void
 TextureClient::Finalize()
 {
   MOZ_ASSERT(!IsLocked());
+
   // Always make a temporary strong reference to the actor before we use it,
   // in case TextureChild::ActorDestroy might null mActor concurrently.
   RefPtr<TextureChild> actor = mActor;
 
   if (actor) {
+    if (actor->mDestroyed) {
+      actor = nullptr;
+      return;
+    }
     // The actor has a raw pointer to us, actor->mTextureClient.
     // Null it before RemoveTexture calls to avoid invalid actor->mTextureClient
     // when calling TextureChild::ActorDestroy()
-    actor->mTextureClient = nullptr;
+    actor->SetTextureClient(nullptr);
 
     // `actor->mWaitForRecycle` may not be null, as we may be being called from setting
     // this RefPtr to null! Clearing it here will double-Release() it.

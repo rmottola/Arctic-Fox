@@ -38,7 +38,7 @@ NS_IMPL_CI_INTERFACE_GETTER(nsNullPrincipal,
 /* static */ already_AddRefed<nsNullPrincipal>
 nsNullPrincipal::CreateWithInheritedAttributes(nsIPrincipal* aInheritFrom)
 {
-  nsRefPtr<nsNullPrincipal> nullPrin = new nsNullPrincipal();
+  RefPtr<nsNullPrincipal> nullPrin = new nsNullPrincipal();
   nsresult rv = nullPrin->Init(Cast(aInheritFrom)->OriginAttributesRef());
   return NS_SUCCEEDED(rv) ? nullPrin.forget() : nullptr;
 }
@@ -46,7 +46,7 @@ nsNullPrincipal::CreateWithInheritedAttributes(nsIPrincipal* aInheritFrom)
 /* static */ already_AddRefed<nsNullPrincipal>
 nsNullPrincipal::Create(const OriginAttributes& aOriginAttributes)
 {
-  nsRefPtr<nsNullPrincipal> nullPrin = new nsNullPrincipal();
+  RefPtr<nsNullPrincipal> nullPrin = new nsNullPrincipal();
   nsresult rv = nullPrin->Init(aOriginAttributes);
   NS_ENSURE_SUCCESS(rv, nullptr);
 
@@ -57,7 +57,6 @@ nsresult
 nsNullPrincipal::Init(const OriginAttributes& aOriginAttributes)
 {
   mOriginAttributes = aOriginAttributes;
-  MOZ_ASSERT(AppId() != nsIScriptSecurityManager::UNKNOWN_APP_ID);
 
   mURI = nsNullPrincipalURI::Create();
   NS_ENSURE_TRUE(mURI, NS_ERROR_NOT_AVAILABLE);
@@ -123,13 +122,6 @@ nsNullPrincipal::MayLoadInternal(nsIURI* aURI)
   }
 
   return false;
-}
-
-NS_IMETHODIMP
-nsNullPrincipal::GetIsNullPrincipal(bool* aIsNullPrincipal)
-{
-  *aIsNullPrincipal = true;
-  return NS_OK;
 }
 
 NS_IMETHODIMP

@@ -349,6 +349,8 @@ XRE_InitChildProcess(int aArgc,
   // NB: This must be called before profiler_init
   NS_LogInit();
 
+  mozilla::LogModule::Init();
+
   char aLocal;
   profiler_init(&aLocal);
 
@@ -826,7 +828,7 @@ ContentParent* gContentParent; //long-lived, manually refcounted
 TestShellParent* GetOrCreateTestShellParent()
 {
     if (!gContentParent) {
-        nsRefPtr<ContentParent> parent = ContentParent::GetNewOrUsedBrowserProcess();
+        RefPtr<ContentParent> parent = ContentParent::GetNewOrUsedBrowserProcess();
         parent.forget(&gContentParent);
     } else if (!gContentParent->IsAlive()) {
         return nullptr;

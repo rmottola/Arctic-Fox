@@ -125,15 +125,15 @@ RemoteOpenFileChild::~RemoteOpenFileChild()
                                                           NS_DISPATCH_NORMAL)));
       }
     } else {
-      using mozilla::unused;
+      using mozilla::Unused;
 
       NS_WARNING("RemoteOpenFileChild released after thread shutdown, leaking "
                  "its members!");
 
-      unused << mURI.forget();
-      unused << mAppURI.forget();
-      unused << mListener.forget();
-      unused << mTabChild.forget();
+      Unused << mURI.forget();
+      Unused << mAppURI.forget();
+      Unused << mListener.forget();
+      Unused << mTabChild.forget();
     }
   }
 
@@ -217,7 +217,7 @@ RemoteOpenFileChild::AsyncRemoteFileOpen(int32_t aFlags,
 #if defined(XP_WIN) || defined(MOZ_WIDGET_COCOA)
   // Windows/OSX desktop builds skip remoting, and just open file in child
   // process when asked for NSPR handle
-  nsRefPtr<CallsListenerInNewEvent> runnable =
+  RefPtr<CallsListenerInNewEvent> runnable =
     new CallsListenerInNewEvent(aListener, NS_OK);
   runnable->Dispatch();
 
@@ -228,6 +228,8 @@ RemoteOpenFileChild::AsyncRemoteFileOpen(int32_t aFlags,
   if (NS_FAILED(mFile->GetPath(path))) {
     MOZ_CRASH("Couldn't get path from file!");
   }
+
+  mListener = aListener;
 
   if (mTabChild) {
     if (mTabChild->GetCachedFileDescriptor(path, this)) {
@@ -248,7 +250,6 @@ RemoteOpenFileChild::AsyncRemoteFileOpen(int32_t aFlags,
   // The chrome process now has a logical ref to us until it calls Send__delete.
   AddIPDLReference();
 
-  mListener = aListener;
   mAsyncOpenCalled = true;
   return NS_OK;
 #endif
@@ -296,7 +297,7 @@ RemoteOpenFileChild::HandleFileDescriptorAndNotifyListener(
     // descriptor callback or through the normal messaging mechanism). Close the
     // file descriptor if it is valid.
     if (aFD.IsValid()) {
-      nsRefPtr<CloseFileRunnable> runnable = new CloseFileRunnable(aFD);
+      RefPtr<CloseFileRunnable> runnable = new CloseFileRunnable(aFD);
       runnable->Dispatch();
     }
     return;
@@ -304,7 +305,7 @@ RemoteOpenFileChild::HandleFileDescriptorAndNotifyListener(
 
   MOZ_ASSERT(!mNSPRFileDesc);
 
-  nsRefPtr<TabChild> tabChild;
+  RefPtr<TabChild> tabChild;
   mTabChild.swap(tabChild);
 
   // If RemoteOpenFile reply (Recv__delete__) for app's application.zip comes
@@ -338,7 +339,7 @@ RemoteOpenFileChild::NotifyListener(nsresult aResult)
   mListener->OnRemoteFileOpenComplete(aResult);
   mListener = nullptr;     // release ref to listener
 
-  nsRefPtr<nsJARProtocolHandler> handler(gJarHandler);
+  RefPtr<nsJARProtocolHandler> handler(gJarHandler);
   NS_WARN_IF_FALSE(handler, "nsJARProtocolHandler is already gone!");
 
   if (handler) {

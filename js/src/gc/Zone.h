@@ -48,7 +48,8 @@ class ZoneHeapThreshold
     double allocTrigger(bool highFrequencyGC) const;
 
     void updateAfterGC(size_t lastBytes, JSGCInvocationKind gckind,
-                       const GCSchedulingTunables& tunables, const GCSchedulingState& state);
+                       const GCSchedulingTunables& tunables, const GCSchedulingState& state,
+                       const AutoLockGC& lock);
     void updateForRemovedArena(const GCSchedulingTunables& tunables);
 
   private:
@@ -57,7 +58,8 @@ class ZoneHeapThreshold
                                                          const GCSchedulingState& state);
     static size_t computeZoneTriggerBytes(double growthFactor, size_t lastBytes,
                                           JSGCInvocationKind gckind,
-                                          const GCSchedulingTunables& tunables);
+                                          const GCSchedulingTunables& tunables,
+                                          const AutoLockGC& lock);
 };
 
 // Maps a Cell* to a unique, 64bit id.
@@ -142,6 +144,8 @@ struct Zone : public JS::shadow::Zone,
     void onTooMuchMalloc();
 
     void* onOutOfMemory(js::AllocFunction allocFunc, size_t nbytes, void* reallocPtr = nullptr) {
+        if (!CurrentThreadCanAccessRuntime(runtime_))
+            return nullptr;
         return runtimeFromMainThread()->onOutOfMemory(allocFunc, nbytes, reallocPtr);
     }
     void reportAllocationOverflow() { js::ReportAllocationOverflow(nullptr); }
@@ -281,8 +285,8 @@ struct Zone : public JS::shadow::Zone,
 
     js::TypeZone types;
 
-    /* Linked list of live weakmaps in this zone. */
-    js::WeakMapBase* gcWeakMapList;
+    /* Live weakmaps in this zone. */
+    mozilla::LinkedList<js::WeakMapBase> gcWeakMapList;
 
     // The set of compartments in this zone.
     typedef js::Vector<JSCompartment*, 1, js::SystemAllocPolicy> CompartmentVector;
@@ -296,6 +300,12 @@ struct Zone : public JS::shadow::Zone,
     // preserved for re-scanning during sweeping.
     using WeakEdges = js::Vector<js::gc::TenuredCell**, 0, js::SystemAllocPolicy>;
     WeakEdges gcWeakRefs;
+
+    /*
+     * Mapping from not yet marked keys to a vector of all values that the key
+     * maps to in any live weak map.
+     */
+    js::gc::WeakKeyTable gcWeakKeys;
 
     // A set of edges from this zone to other zones.
     //
@@ -370,8 +380,9 @@ struct Zone : public JS::shadow::Zone,
         // If the cell was in the nursery, hopefully unlikely, then we need to
         // tell the nursery about it so that it can sweep the uid if the thing
         // does not get tenured.
+        js::AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!runtimeFromAnyThread()->gc.nursery.addedUniqueIdToCell(cell))
-            js::CrashAtUnhandlableOOM("failed to allocate tracking data for a nursery uid");
+            oomUnsafe.crash("failed to allocate tracking data for a nursery uid");
         return true;
     }
 

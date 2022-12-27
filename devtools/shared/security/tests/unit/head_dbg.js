@@ -2,14 +2,14 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 "use strict";
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-const CC = Components.Constructor;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
+var CC = Components.Constructor;
 
 const { require } =
-  Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 

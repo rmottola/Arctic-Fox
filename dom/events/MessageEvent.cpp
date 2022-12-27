@@ -14,9 +14,6 @@
 #include "jsapi.h"
 #include "nsGlobalWindow.h" // So we can assign an nsGlobalWindow* to mWindowSource
 
-#include "ServiceWorker.h"
-#include "ServiceWorkerClient.h"
-
 namespace mozilla {
 namespace dom {
 
@@ -107,14 +104,12 @@ MessageEvent::GetSource(nsIDOMWindow** aSource)
 }
 
 void
-MessageEvent::GetSource(Nullable<OwningWindowProxyOrMessagePortOrClient>& aValue) const
+MessageEvent::GetSource(Nullable<OwningWindowProxyOrMessagePort>& aValue) const
 {
   if (mWindowSource) {
     aValue.SetValue().SetAsWindowProxy() = mWindowSource;
   } else if (mPortSource) {
     aValue.SetValue().SetAsMessagePort() = mPortSource;
-  } else if (mClientSource) {
-    aValue.SetValue().SetAsClient() = mClientSource;
   }
 }
 
@@ -134,13 +129,9 @@ MessageEvent::Constructor(EventTarget* aEventTarget,
                           const MessageEventInit& aParam,
                           ErrorResult& aRv)
 {
-  nsRefPtr<MessageEvent> event = new MessageEvent(aEventTarget, nullptr, nullptr);
+  RefPtr<MessageEvent> event = new MessageEvent(aEventTarget, nullptr, nullptr);
 
-  aRv = event->InitEvent(aType, aParam.mBubbles, aParam.mCancelable);
-  if (aRv.Failed()) {
-    return nullptr;
-  }
-
+  event->InitEvent(aType, aParam.mBubbles, aParam.mCancelable);
   bool trusted = event->Init(aEventTarget);
   event->SetTrusted(trusted);
 
@@ -167,7 +158,7 @@ MessageEvent::Constructor(EventTarget* aEventTarget,
   }
 
   if (aParam.mPorts.WasPassed() && !aParam.mPorts.Value().IsNull()) {
-    nsTArray<nsRefPtr<MessagePort>> ports;
+    nsTArray<RefPtr<MessagePort>> ports;
     for (uint32_t i = 0, len = aParam.mPorts.Value().Value().Length(); i < len; ++i) {
       ports.AppendElement(aParam.mPorts.Value().Value()[i].get());
     }
@@ -187,9 +178,7 @@ MessageEvent::InitMessageEvent(const nsAString& aType,
                                const nsAString& aLastEventId,
                                nsIDOMWindow* aSource)
 {
-  nsresult rv = Event::InitEvent(aType, aCanBubble, aCancelable);
-  NS_ENSURE_SUCCESS(rv, rv);
-
+  Event::InitEvent(aType, aCanBubble, aCancelable);
   mData = aData;
   mozilla::HoldJSObjects(this);
   mOrigin = aOrigin;
@@ -197,6 +186,44 @@ MessageEvent::InitMessageEvent(const nsAString& aType,
   mWindowSource = aSource;
 
   return NS_OK;
+}
+
+void
+MessageEvent::InitMessageEvent(JSContext* aCx, const nsAString& aType,
+                               bool aCanBubble, bool aCancelable,
+                               JS::Handle<JS::Value> aData,
+                               const nsAString& aOrigin,
+                               const nsAString& aLastEventId,
+                               const Nullable<WindowProxyOrMessagePort>& aSource,
+                               const Nullable<Sequence<OwningNonNull<MessagePort>>>& aPorts)
+{
+  Event::InitEvent(aType, aCanBubble, aCancelable);
+  mData = aData;
+  mozilla::HoldJSObjects(this);
+  mOrigin = aOrigin;
+  mLastEventId = aLastEventId;
+
+  mWindowSource = nullptr;
+  mPortSource = nullptr;
+
+  if (!aSource.IsNull()) {
+    if (aSource.Value().IsWindowProxy()) {
+      mWindowSource = aSource.Value().GetAsWindowProxy();
+    } else {
+      mPortSource = &aSource.Value().GetAsMessagePort();
+    }
+  }
+
+  mPorts = nullptr;
+
+  if (!aPorts.IsNull()) {
+    nsTArray<RefPtr<MessagePort>> ports;
+    for (uint32_t i = 0, len = aPorts.Value().Length(); i < len; ++i) {
+      ports.AppendElement(aPorts.Value()[i]);
+    }
+
+    mPorts = new MessagePortList(static_cast<Event*>(this), ports);
+  }
 }
 
 void
@@ -212,12 +239,6 @@ MessageEvent::SetSource(mozilla::dom::MessagePort* aPort)
   mPortSource = aPort;
 }
 
-void
-MessageEvent::SetSource(mozilla::dom::workers::ServiceWorkerClient* aClient)
-{
-  mClientSource = aClient;
-}
-
 } // namespace dom
 } // namespace mozilla
 
@@ -227,8 +248,8 @@ using namespace mozilla::dom;
 already_AddRefed<MessageEvent>
 NS_NewDOMMessageEvent(EventTarget* aOwner,
                       nsPresContext* aPresContext,
-                      WidgetEvent* aEvent) 
+                      WidgetEvent* aEvent)
 {
-  nsRefPtr<MessageEvent> it = new MessageEvent(aOwner, aPresContext, aEvent);
+  RefPtr<MessageEvent> it = new MessageEvent(aOwner, aPresContext, aEvent);
   return it.forget();
 }

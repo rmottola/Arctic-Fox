@@ -395,7 +395,7 @@ public:
   already_AddRefed<XPCOMCallbackT> ToXPCOMCallback() const
   {
     if (!HasWebIDLCallback()) {
-      nsRefPtr<XPCOMCallbackT> callback = GetXPCOMCallback();
+      RefPtr<XPCOMCallbackT> callback = GetXPCOMCallback();
       return callback.forget();
     }
 
@@ -410,7 +410,7 @@ public:
   already_AddRefed<WebIDLCallbackT> ToWebIDLCallback() const
   {
     if (HasWebIDLCallback()) {
-      nsRefPtr<WebIDLCallbackT> callback = GetWebIDLCallback();
+      RefPtr<WebIDLCallbackT> callback = GetWebIDLCallback();
       return callback.forget();
     }
     return nullptr;

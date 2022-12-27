@@ -71,6 +71,9 @@ public:
   virtual nsresult Deallocate() override;;
   virtual nsresult Start(SourceMediaStream*, TrackID) override;
   virtual nsresult Stop(SourceMediaStream*, TrackID) override;
+  virtual nsresult Restart(const dom::MediaTrackConstraints& aConstraints,
+                           const MediaEnginePrefs &aPrefs,
+                           const nsString& aDeviceId) override;
   virtual void NotifyPull(MediaStreamGraph* aGraph,
                           SourceMediaStream* aSource,
                           TrackID aId,
@@ -78,6 +81,10 @@ public:
   virtual const dom::MediaSourceEnum GetMediaSource() override {
     return mMediaSource;
   }
+
+  bool ChooseCapability(const dom::MediaTrackConstraints &aConstraints,
+                        const MediaEnginePrefs &aPrefs,
+                        const nsString& aDeviceId) override;
 
   void Refresh(int aIndex);
 

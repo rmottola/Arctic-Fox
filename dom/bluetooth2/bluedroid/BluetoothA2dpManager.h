@@ -123,7 +123,7 @@ private:
   void PassthroughCmdNotification(int aId, int aKeyState) override;
 
   nsString mDeviceAddress;
-  nsRefPtr<BluetoothProfileController> mController;
+  RefPtr<BluetoothProfileController> mController;
 
   // A2DP data member
   bool mA2dpConnected;

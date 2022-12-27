@@ -40,7 +40,11 @@
 // Generated
 #include "nsIDOMEventListener.h"
 #include "nsIDOMWebGLRenderingContext.h"
+#include "nsICanvasRenderingContextInternal.h"
 #include "nsIObserver.h"
+#include "mozilla/dom/HTMLCanvasElement.h"
+#include "nsWrapperCache.h"
+#include "nsLayoutUtils.h"
 
 
 class nsIDocShell;
@@ -80,7 +84,6 @@ class WebGLContextLossHandler;
 class WebGLBuffer;
 class WebGLExtensionBase;
 class WebGLFramebuffer;
-class WebGLObserver;
 class WebGLProgram;
 class WebGLQuery;
 class WebGLRenderbuffer;
@@ -95,6 +98,7 @@ class WebGLVertexArray;
 namespace dom {
 class Element;
 class ImageData;
+class OwningHTMLCanvasElementOrOffscreenCanvas;
 struct WebGLContextAttributes;
 template<typename> struct Nullable;
 } // namespace dom
@@ -184,7 +188,6 @@ class WebGLContext
     friend class WebGLExtensionLoseContext;
     friend class WebGLExtensionVertexArray;
     friend class WebGLMemoryTracker;
-    friend class WebGLObserver;
 
     enum {
         UNPACK_FLIP_Y_WEBGL = 0x9240,
@@ -214,6 +217,9 @@ public:
 
     NS_DECL_NSIDOMWEBGLRENDERINGCONTEXT
 
+    virtual void OnVisibilityChange() override;
+    virtual void OnMemoryPressure() override;
+
     // nsICanvasRenderingContextInternal
     virtual int32_t GetWidth() const override;
     virtual int32_t GetHeight() const override;
@@ -230,8 +236,7 @@ public:
         return NS_ERROR_NOT_IMPLEMENTED;
     }
 
-    virtual void GetImageBuffer(uint8_t** out_imageBuffer,
-                                int32_t* out_format) override;
+    virtual UniquePtr<uint8_t[]> GetImageBuffer(int32_t* out_format) override;
     NS_IMETHOD GetInputStream(const char* mimeType,
                               const char16_t* encoderOptions,
                               nsIInputStream** out_stream) override;
@@ -242,7 +247,8 @@ public:
     NS_IMETHOD SetIsOpaque(bool) override { return NS_OK; };
     bool GetIsOpaque() override { return false; }
     NS_IMETHOD SetContextOptions(JSContext* cx,
-                                 JS::Handle<JS::Value> options) override;
+                                 JS::Handle<JS::Value> options,
+                                 ErrorResult& aRvForDictionaryInit) override;
 
     NS_IMETHOD SetIsIPC(bool) override {
         return NS_ERROR_NOT_IMPLEMENTED;
@@ -361,8 +367,11 @@ public:
     void AssertCachedBindings();
     void AssertCachedState();
 
-    // WebIDL WebGLRenderingContext API
     dom::HTMLCanvasElement* GetCanvas() const { return mCanvasElement; }
+
+    // WebIDL WebGLRenderingContext API
+    void Commit();
+    void GetCanvas(Nullable<dom::OwningHTMLCanvasElementOrOffscreenCanvas>& retval);
     GLsizei DrawingBufferWidth() const { return IsContextLost() ? 0 : mWidth; }
     GLsizei DrawingBufferHeight() const {
         return IsContextLost() ? 0 : mHeight;
@@ -435,7 +444,7 @@ public:
 
     void
     GetAttachedShaders(WebGLProgram* prog,
-                       dom::Nullable<nsTArray<nsRefPtr<WebGLShader>>>& retval);
+                       dom::Nullable<nsTArray<RefPtr<WebGLShader>>>& retval);
 
     GLint GetAttribLocation(WebGLProgram* prog, const nsAString& name);
     JS::Value GetBufferParameter(GLenum target, GLenum pname);
@@ -1125,7 +1134,7 @@ protected:
     // -------------------------------------------------------------------------
     // WebGL extensions (implemented in WebGLContextExtensions.cpp)
     typedef EnumeratedArray<WebGLExtensionID, WebGLExtensionID::Max,
-                            nsRefPtr<WebGLExtensionBase>> ExtensionsArrayType;
+                            RefPtr<WebGLExtensionBase>> ExtensionsArrayType;
 
     ExtensionsArrayType mExtensions;
 
@@ -1508,8 +1517,6 @@ protected:
     ForceDiscreteGPUHelperCGL mForceDiscreteGPUHelper;
 #endif
 
-    nsRefPtr<WebGLObserver> mContextObserver;
-
 public:
     // console logging helpers
     void GenerateWarning(const char* fmt, ...);
@@ -1611,32 +1618,6 @@ WebGLContext::ValidateObject(const char* info, ObjectType* object)
 
     return ValidateObjectAssumeNonNull(info, object);
 }
-
-// Listen visibilitychange and memory-pressure event for context lose/restore
-class WebGLObserver final
-    : public nsIObserver
-    , public nsIDOMEventListener
-{
-public:
-    NS_DECL_ISUPPORTS
-    NS_DECL_NSIOBSERVER
-    NS_DECL_NSIDOMEVENTLISTENER
-
-    explicit WebGLObserver(WebGLContext* webgl);
-
-    void Destroy();
-
-    void RegisterVisibilityChangeEvent();
-    void UnregisterVisibilityChangeEvent();
-
-    void RegisterMemoryPressureEvent();
-    void UnregisterMemoryPressureEvent();
-
-private:
-    ~WebGLObserver();
-
-    WebGLContext* mWebGL;
-};
 
 size_t RoundUpToMultipleOf(size_t value, size_t multiple);
 

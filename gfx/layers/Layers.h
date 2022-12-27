@@ -73,6 +73,7 @@ namespace layers {
 
 class Animation;
 class AnimationData;
+class AsyncCanvasRenderer;
 class AsyncPanZoomController;
 class ClientLayerManager;
 class Layer;
@@ -102,13 +103,8 @@ class LayersPacket;
   virtual const char* Name() const override { return n; }  \
   virtual LayerType GetType() const override { return e; }
 
-/**
- * Base class for userdata objects attached to layers and layer managers.
- */
-class LayerUserData {
-public:
-  virtual ~LayerUserData() {}
-};
+// Defined in LayerUserData.h; please include that file instead.
+class LayerUserData;
 
 /*
  * Motivation: For truly smooth animation and video playback, we need to
@@ -135,11 +131,6 @@ public:
  * efficient implementation in an "immediate mode" style. See the
  * BasicLayerManager for such an implementation.
  */
-
-static void LayerManagerUserDataDestroy(void *data)
-{
-  delete static_cast<LayerUserData*>(data);
-}
 
 /**
  * A LayerManager controls a tree of layers. All layers in the tree
@@ -508,16 +499,13 @@ public:
    */
   void SetUserData(void* aKey, LayerUserData* aData)
   {
-    mUserData.Add(static_cast<gfx::UserDataKey*>(aKey), aData, LayerManagerUserDataDestroy);
+    mUserData.Add(static_cast<gfx::UserDataKey*>(aKey), aData, LayerUserDataDestroy);
   }
   /**
    * This can be used anytime. Ownership passes to the caller!
    */
-  nsAutoPtr<LayerUserData> RemoveUserData(void* aKey)
-  {
-    nsAutoPtr<LayerUserData> d(static_cast<LayerUserData*>(mUserData.Remove(static_cast<gfx::UserDataKey*>(aKey))));
-    return d;
-  }
+  nsAutoPtr<LayerUserData> RemoveUserData(void* aKey);
+
   /**
    * This getter can be used anytime.
    */
@@ -675,8 +663,10 @@ public:
     return false;
   }
 
+  static void LayerUserDataDestroy(void* data);
+
 protected:
-  nsRefPtr<Layer> mRoot;
+  RefPtr<Layer> mRoot;
   gfx::UserData mUserData;
   bool mDestroyed;
   bool mSnapEffectiveTransforms;
@@ -1062,7 +1052,7 @@ public:
    * CONSTRUCTION PHASE ONLY
    * Add a FrameMetrics-associated mask layer.
    */
-  void SetAncestorMaskLayers(const nsTArray<nsRefPtr<Layer>>& aLayers) {
+  void SetAncestorMaskLayers(const nsTArray<RefPtr<Layer>>& aLayers) {
     if (aLayers != mAncestorMaskLayers) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) AncestorMaskLayers", this));
       mAncestorMaskLayers = aLayers;
@@ -1162,6 +1152,11 @@ public:
    *     compositing the layer tree with a transformation (such as when
    *     asynchronously scrolling and zooming).
    *
+   *   - |aSides| is the set of sides to which the element is fixed relative to.
+   *     This is used if the viewport size is changed in the compositor and
+   *     fixed position items need to shift accordingly. This value is made up
+   *     combining appropriate values from mozilla::SideBits.
+   *
    *   - |aIsClipFixed| is true if this layer's clip rect and mask layer
    *     should also remain fixed during async scrolling/animations.
    *     This is the case for fixed position layers, but not for
@@ -1169,11 +1164,13 @@ public:
    */
   void SetFixedPositionData(FrameMetrics::ViewID aScrollId,
                             const LayerPoint& aAnchor,
+                            int32_t aSides,
                             bool aIsClipFixed)
   {
     if (!mFixedPositionData ||
         mFixedPositionData->mScrollId != aScrollId ||
         mFixedPositionData->mAnchor != aAnchor ||
+        mFixedPositionData->mSides != aSides ||
         mFixedPositionData->mIsClipFixed != aIsClipFixed) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) FixedPositionData", this));
       if (!mFixedPositionData) {
@@ -1181,6 +1178,7 @@ public:
       }
       mFixedPositionData->mScrollId = aScrollId;
       mFixedPositionData->mAnchor = aAnchor;
+      mFixedPositionData->mSides = aSides;
       mFixedPositionData->mIsClipFixed = aIsClipFixed;
       Mutated();
     }
@@ -1275,6 +1273,7 @@ public:
   bool GetIsStickyPosition() { return mStickyPositionData; }
   FrameMetrics::ViewID GetFixedPositionScrollContainerId() { return mFixedPositionData ? mFixedPositionData->mScrollId : FrameMetrics::NULL_SCROLL_ID; }
   LayerPoint GetFixedPositionAnchor() { return mFixedPositionData ? mFixedPositionData->mAnchor : LayerPoint(); }
+  int32_t GetFixedPositionSides() { return mFixedPositionData ? mFixedPositionData->mSides : eSideBitsNone; }
   bool IsClipFixed() { return mFixedPositionData ? mFixedPositionData->mIsClipFixed : false; }
   FrameMetrics::ViewID GetStickyScrollContainerId() { return mStickyPositionData->mScrollId; }
   const LayerRect& GetStickyScrollRangeOuter() { return mStickyPositionData->mOuter; }
@@ -1388,16 +1387,12 @@ public:
    */
   void SetUserData(void* aKey, LayerUserData* aData)
   {
-    mUserData.Add(static_cast<gfx::UserDataKey*>(aKey), aData, LayerManagerUserDataDestroy);
+    mUserData.Add(static_cast<gfx::UserDataKey*>(aKey), aData, LayerManager::LayerUserDataDestroy);
   }
   /**
    * This can be used anytime. Ownership passes to the caller!
    */
-  nsAutoPtr<LayerUserData> RemoveUserData(void* aKey)
-  {
-    nsAutoPtr<LayerUserData> d(static_cast<LayerUserData*>(mUserData.Remove(static_cast<gfx::UserDataKey*>(aKey))));
-    return d;
-  }
+  nsAutoPtr<LayerUserData> RemoveUserData(void* aKey);
   /**
    * This getter can be used anytime.
    */
@@ -1627,7 +1622,9 @@ public:
    * marked as needed to be recomposited.
    */
   const nsIntRegion& GetInvalidRegion() { return mInvalidRegion; }
-  const void SetInvalidRegion(const nsIntRegion& aRect) { mInvalidRegion = aRect; }
+  const void AddInvalidRegion(const nsIntRegion& aRegion) {
+    mInvalidRegion.Or(mInvalidRegion, aRegion);
+  }
 
   /**
    * Mark the entirety of the layer's visible region as being invalid.
@@ -1771,8 +1768,8 @@ protected:
   Layer* mNextSibling;
   Layer* mPrevSibling;
   void* mImplData;
-  nsRefPtr<Layer> mMaskLayer;
-  nsTArray<nsRefPtr<Layer>> mAncestorMaskLayers;
+  RefPtr<Layer> mMaskLayer;
+  nsTArray<RefPtr<Layer>> mAncestorMaskLayers;
   gfx::UserData mUserData;
   gfx::IntRect mLayerBounds;
   nsIntRegion mVisibleRegion;
@@ -1796,13 +1793,14 @@ protected:
   Maybe<ParentLayerIntRect> mClipRect;
   gfx::IntRect mTileSourceRect;
   nsIntRegion mInvalidRegion;
-  nsTArray<nsRefPtr<AsyncPanZoomController> > mApzcs;
+  nsTArray<RefPtr<AsyncPanZoomController> > mApzcs;
   uint32_t mContentFlags;
   bool mUseTileSourceRect;
   bool mIsFixedPosition;
   struct FixedPositionData {
     FrameMetrics::ViewID mScrollId;
     LayerPoint mAnchor;
+    int32_t mSides;
     bool mIsClipFixed;
   };
   UniquePtr<FixedPositionData> mFixedPositionData;
@@ -2074,7 +2072,7 @@ public:
   RenderTargetIntRect GetIntermediateSurfaceRect()
   {
     NS_ASSERTION(mUseIntermediateSurface, "Must have intermediate surface");
-    return RenderTargetPixel::FromUntyped(mVisibleRegion.GetBounds());
+    return RenderTargetIntRect::FromUnknownRect(mVisibleRegion.GetBounds());
   }
 
   /**
@@ -2192,7 +2190,7 @@ protected:
   // the intermediate surface.
   bool mChildrenChanged;
   EventRegionsOverride mEventRegionsOverride;
-  nsRefPtr<gfx::VRHMDInfo> mHMDInfo;
+  RefPtr<gfx::VRHMDInfo> mHMDInfo;
 };
 
 /**
@@ -2272,15 +2270,17 @@ public:
     Data()
       : mBufferProvider(nullptr)
       , mGLContext(nullptr)
+      , mRenderer(nullptr)
       , mFrontbufferGLTex(0)
       , mSize(0,0)
       , mHasAlpha(false)
       , mIsGLAlphaPremult(true)
     { }
 
-    // One of these two must be specified for Canvas2D, but never both
+    // One of these three must be specified for Canvas2D, but never more than one
     PersistentBufferProvider* mBufferProvider; // A BufferProvider for the Canvas contents
     mozilla::gl::GLContext* mGLContext; // or this, for GL.
+    AsyncCanvasRenderer* mRenderer; // or this, for OffscreenCanvas
 
     // Frontbuffer override
     uint32_t mFrontbufferGLTex;
@@ -2396,16 +2396,14 @@ public:
     ComputeEffectiveTransformForMaskLayers(aTransformToSurface);
   }
 
+  bool GetIsAsyncRenderer() const
+  {
+    return !!mAsyncRenderer;
+  }
+
 protected:
-  CanvasLayer(LayerManager* aManager, void* aImplData)
-    : Layer(aManager, aImplData)
-    , mPreTransCallback(nullptr)
-    , mPreTransCallbackData(nullptr)
-    , mPostTransCallback(nullptr)
-    , mPostTransCallbackData(nullptr)
-    , mFilter(gfx::Filter::GOOD)
-    , mDirty(false)
-  {}
+  CanvasLayer(LayerManager* aManager, void* aImplData);
+  virtual ~CanvasLayer();
 
   virtual void PrintInfo(std::stringstream& aStream, const char* aPrefix) override;
 
@@ -2427,6 +2425,7 @@ protected:
   DidTransactionCallback mPostTransCallback;
   void* mPostTransCallbackData;
   gfx::Filter mFilter;
+  RefPtr<AsyncCanvasRenderer> mAsyncRenderer;
 
 private:
   /**

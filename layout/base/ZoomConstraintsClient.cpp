@@ -46,7 +46,7 @@ static nsIWidget*
 GetWidget(nsIPresShell* aShell)
 {
   if (nsIFrame* rootFrame = aShell->GetRootFrame()) {
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
     return rootFrame->GetNearestWidget();
 #else
     if (nsView* view = rootFrame->GetView()) {
@@ -197,8 +197,7 @@ ZoomConstraintsClient::RefreshZoomConstraints()
     return;
   }
 
-  nsViewportInfo viewportInfo = nsContentUtils::GetViewportInfo(
-    mDocument,
+  nsViewportInfo viewportInfo = mDocument->GetViewportInfo(
     ViewAs<ScreenPixel>(screenSize, PixelCastJustification::LayoutDeviceIsScreenForBounds));
 
   mozilla::layers::ZoomConstraints zoomConstraints =

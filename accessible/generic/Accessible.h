@@ -534,11 +534,6 @@ public:
   virtual void SetSelected(bool aSelect);
 
   /**
-   * Extend selection to this accessible.
-   */
-  void ExtendSelection() { };
-
-  /**
    * Select the accessible within its container.
    */
   void TakeSelection();
@@ -622,6 +617,16 @@ public:
   {
     MOZ_ASSERT(IsProxy());
     return mBits.proxy;
+  }
+  uint32_t ProxyInterfaces() const
+  {
+    MOZ_ASSERT(IsProxy());
+    return mInt.mProxyInterfaces;
+  }
+  void SetProxyInterfaces(uint32_t aInterfaces)
+  {
+    MOZ_ASSERT(IsProxy());
+    mInt.mProxyInterfaces = aInterfaces;
   }
 
   bool IsOuterDoc() const { return mType == eOuterDocType; }
@@ -1116,8 +1121,8 @@ protected:
   nsCOMPtr<nsIContent> mContent;
   DocAccessible* mDoc;
 
-  nsRefPtr<Accessible> mParent;
-  nsTArray<nsRefPtr<Accessible> > mChildren;
+  RefPtr<Accessible> mParent;
+  nsTArray<RefPtr<Accessible> > mChildren;
   int32_t mIndexInParent;
 
   static const uint8_t kChildrenFlagsBits = 2;
@@ -1143,7 +1148,11 @@ protected:
   friend class AutoTreeMutation;
 
   nsAutoPtr<mozilla::a11y::EmbeddedObjCollector> mEmbeddedObjCollector;
-  int32_t mIndexOfEmbeddedChild;
+  union {
+    int32_t mIndexOfEmbeddedChild;
+    uint32_t mProxyInterfaces;
+  } mInt;
+
   friend class EmbeddedObjCollector;
 
   union

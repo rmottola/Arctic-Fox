@@ -95,8 +95,8 @@ LoginManager.prototype = {
 
     if (Services.appinfo.processType ===
         Services.appinfo.PROCESS_TYPE_DEFAULT) {
-        Services.obs.addObserver(this._observer, "passwordmgr-storage-replace",
-                                 false);
+      Services.obs.addObserver(this._observer, "passwordmgr-storage-replace",
+                               false);
 
       // Initialize storage so that asynchronous data loading can start.
       this._initStorage();

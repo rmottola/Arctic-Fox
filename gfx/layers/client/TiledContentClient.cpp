@@ -601,7 +601,8 @@ CopyFrontToBack(TextureClient* aFront,
                 TextureClient* aBack,
                 const gfx::IntRect& aRectToCopy)
 {
-  if (!aFront->Lock(OpenMode::OPEN_READ)) {
+  TextureClientAutoLock frontLock(aFront, OpenMode::OPEN_READ);
+  if (!frontLock.Succeeded()) {
     gfxCriticalError() << "[Tiling:Client] Failed to lock the tile's front buffer";
     return false;
   }
@@ -613,8 +614,6 @@ CopyFrontToBack(TextureClient* aFront,
 
   gfx::IntPoint rectToCopyTopLeft = aRectToCopy.TopLeft();
   aFront->CopyToTextureClient(aBack, &aRectToCopy, &rectToCopyTopLeft);
-
-  aFront->Unlock();
   return true;
 }
 
@@ -929,7 +928,7 @@ ClientMultiTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
   NS_ASSERTION(!aPaintRegion.GetBounds().IsEmpty(), "Empty paint region\n");
 
   if (!gfxPrefs::TiledDrawTargetEnabled()) {
-    nsRefPtr<gfxContext> ctxt;
+    RefPtr<gfxContext> ctxt;
 
     const IntRect bounds = aPaintRegion.GetBounds();
     {
@@ -1508,13 +1507,13 @@ ClientMultiTiledLayerBuffer::ComputeProgressiveUpdateRegion(const nsIntRegion& a
   // make the progressive paint more visible to the user while scrolling.
   // On B2G uploads are cheaper and we value coherency more, especially outside
   // the browser, so we always use the entire user-visible area.
-  IntRect coherentUpdateRect(LayerIntRect::ToUntyped(RoundedOut(
+  IntRect coherentUpdateRect(RoundedOut(
 #ifdef MOZ_WIDGET_ANDROID
     transformedCompositionBounds->Intersect(aPaintData->mCompositionBounds)
 #else
     *transformedCompositionBounds
 #endif
-  )));
+  ).ToUnknownRect());
 
   TILING_LOG("TILING %p: Progressive update final coherency rect %s\n", mPaintedLayer, Stringify(coherentUpdateRect).c_str());
 

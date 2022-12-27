@@ -51,7 +51,7 @@ class BluetoothParent : public PBluetoothParent
     Dead
   };
 
-  nsRefPtr<BluetoothService> mService;
+  RefPtr<BluetoothService> mService;
   ShutdownState mShutdownState;
   bool mReceivedStopNotifying;
   bool mSentBeginShutdown;
@@ -108,7 +108,7 @@ class BluetoothRequestParent : public PBluetoothRequestParent
 
   friend class ReplyRunnable;
 
-  nsRefPtr<BluetoothService> mService;
+  RefPtr<BluetoothService> mService;
   nsRevocableEventPtr<ReplyRunnable> mReplyRunnable;
 
 #ifdef DEBUG
@@ -279,6 +279,30 @@ protected:
 
   bool
   DoRequest(const UnregisterGattServerRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerAddServiceRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerAddIncludedServiceRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerAddCharacteristicRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerAddDescriptorRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerRemoveServiceRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerStartServiceRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerStopServiceRequest& aRequest);
+
+  bool
+  DoRequest(const GattServerSendResponseRequest& aRequest);
 };
 
 END_BLUETOOTH_NAMESPACE

@@ -54,7 +54,7 @@ let gGestureSupport = {
     }
 
     // Create a preference object with some defaults
-    let def = function(aThreshold, aLatched)
+    let def = (aThreshold, aLatched) =>
       ({ threshold: aThreshold, latched: !!aLatched });
 
     switch (aEvent.type) {

@@ -110,6 +110,10 @@
 #include "nsCharsetSource.h"
 #include "nsIStringBundle.h"
 #include "nsDOMClassInfo.h"
+#include "nsFocusManager.h"
+#include "nsIFrame.h"
+#include "nsIContent.h"
+#include "nsLayoutStylesheetCache.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -143,31 +147,11 @@ static bool ConvertToMidasInternalCommand(const nsAString & inCommandID,
 // ==================================================================
 // =
 // ==================================================================
-static nsresult
-RemoveFromAgentSheets(nsCOMArray<nsIStyleSheet> &aAgentSheets, const nsAString& url)
-{
-  nsCOMPtr<nsIURI> uri;
-  nsresult rv = NS_NewURI(getter_AddRefs(uri), url);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  for (int32_t i = aAgentSheets.Count() - 1; i >= 0; --i) {
-    nsIStyleSheet* sheet = aAgentSheets[i];
-    nsIURI* sheetURI = sheet->GetSheetURI();
-
-    bool equals = false;
-    uri->Equals(sheetURI, &equals);
-    if (equals) {
-      aAgentSheets.RemoveObjectAt(i);
-    }
-  }
-
-  return NS_OK;
-}
 
 nsresult
 NS_NewHTMLDocument(nsIDocument** aInstancePtrResult, bool aLoadedAsData)
 {
-  nsRefPtr<nsHTMLDocument> doc = new nsHTMLDocument();
+  RefPtr<nsHTMLDocument> doc = new nsHTMLDocument();
 
   nsresult rv = doc->Init();
 
@@ -1411,7 +1395,7 @@ nsHTMLDocument::Open(JSContext* /* unused */,
     rv.Throw(NS_ERROR_NOT_INITIALIZED);
     return nullptr;
   }
-  nsRefPtr<nsGlobalWindow> win = static_cast<nsGlobalWindow*>(window.get());
+  RefPtr<nsGlobalWindow> win = static_cast<nsGlobalWindow*>(window.get());
   nsCOMPtr<nsIDOMWindow> newWindow;
   // XXXbz We ignore aReplace for now.
   rv = win->OpenJS(aURL, aName, aFeatures, getter_AddRefs(newWindow));
@@ -1424,6 +1408,9 @@ nsHTMLDocument::Open(JSContext* cx,
                      const nsAString& aReplace,
                      ErrorResult& rv)
 {
+  // Implements the "When called with two arguments (or fewer)" steps here:
+  // https://html.spec.whatwg.org/multipage/webappapis.html#opening-the-input-stream
+
   NS_ASSERTION(nsContentUtils::CanCallerAccess(static_cast<nsIDOMHTMLDocument*>(this)),
                "XOW should have caught this!");
   if (!IsHTMLDocument() || mDisableDocWrite || !IsMasterDocument()) {
@@ -1545,7 +1532,7 @@ nsHTMLDocument::Open(JSContext* cx,
 
     if (cv) {
       bool okToUnload;
-      if (NS_SUCCEEDED(cv->PermitUnload(false, &okToUnload)) && !okToUnload) {
+      if (NS_SUCCEEDED(cv->PermitUnload(&okToUnload)) && !okToUnload) {
         // We don't want to unload, so stop here, but don't throw an
         // exception.
         nsCOMPtr<nsIDocument> ret = this;
@@ -1564,7 +1551,7 @@ nsHTMLDocument::Open(JSContext* cx,
   }
 
   // The open occurred after the document finished loading.
-  // So we reset the document and create a new one.
+  // So we reset the document and then reinitialize it.
   nsCOMPtr<nsIChannel> channel;
   nsCOMPtr<nsILoadGroup> group = do_QueryReferent(mDocumentLoadGroup);
   rv = NS_NewChannel(getter_AddRefs(channel),
@@ -1640,8 +1627,9 @@ nsHTMLDocument::Open(JSContext* cx,
     }
 #endif
 
-    // Should this pass true for aForceReuseInnerWindow?
-    rv = window->SetNewDocument(this, nullptr, false);
+    // Per spec, we pass false here so that a new Window is created.
+    rv = window->SetNewDocument(this, nullptr,
+                                /* aForceReuseInnerWindow */ false);
     if (rv.Failed()) {
       return nullptr;
     }
@@ -2551,7 +2539,7 @@ public:
   }
 
 private:
-  nsRefPtr<nsHTMLDocument> mDoc;
+  RefPtr<nsHTMLDocument> mDoc;
   nsCOMPtr<nsIContent> mElement;
 };
 
@@ -2599,7 +2587,7 @@ nsHTMLDocument::DeferredContentEditableCountChange(nsIContent *aElement)
       nsCOMPtr<nsIEditor> editor;
       docshell->GetEditor(getter_AddRefs(editor));
       if (editor) {
-        nsRefPtr<nsRange> range = new nsRange(aElement);
+        RefPtr<nsRange> range = new nsRange(aElement);
         rv = range->SelectNode(node);
         if (NS_FAILED(rv)) {
           // The node might be detached from the document at this point,
@@ -2657,9 +2645,9 @@ nsHTMLDocument::TearingDownEditor(nsIEditor *aEditor)
     nsCOMArray<nsIStyleSheet> agentSheets;
     presShell->GetAgentStyleSheets(agentSheets);
 
-    RemoveFromAgentSheets(agentSheets, NS_LITERAL_STRING("resource://gre/res/contenteditable.css"));
+    agentSheets.RemoveObject(nsLayoutStylesheetCache::ContentEditableSheet());
     if (oldState == eDesignMode)
-      RemoveFromAgentSheets(agentSheets, NS_LITERAL_STRING("resource://gre/res/designmode.css"));
+      agentSheets.RemoveObject(nsLayoutStylesheetCache::DesignModeSheet());
 
     presShell->SetAgentStyleSheets(agentSheets);
 
@@ -2716,7 +2704,7 @@ nsHTMLDocument::EditingStateChanged()
   }
 
   if (mEditingState == eSettingUp || mEditingState == eTearingDown) {
-    // XXX We shouldn't recurse.
+    // XXX We shouldn't recurse
     return NS_OK;
   }
 
@@ -2780,11 +2768,83 @@ nsHTMLDocument::EditingStateChanged()
   bool makeWindowEditable = mEditingState == eOff;
   bool updateState = false;
   bool spellRecheckAll = false;
+  bool putOffToRemoveScriptBlockerUntilModifyingEditingState = false;
   nsCOMPtr<nsIEditor> editor;
 
   {
     EditingState oldState = mEditingState;
     nsAutoEditingState push(this, eSettingUp);
+
+    nsCOMPtr<nsIPresShell> presShell = GetShell();
+    NS_ENSURE_TRUE(presShell, NS_ERROR_FAILURE);
+
+    // Before making this window editable, we need to modify UA style sheet
+    // because new style may change whether focused element will be focusable
+    // or not.
+    nsCOMArray<nsIStyleSheet> agentSheets;
+    rv = presShell->GetAgentStyleSheets(agentSheets);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    CSSStyleSheet* contentEditableSheet =
+      nsLayoutStylesheetCache::ContentEditableSheet();
+
+    bool result;
+
+    if (!agentSheets.Contains(contentEditableSheet)) {
+      bool result = agentSheets.AppendObject(contentEditableSheet);
+      NS_ENSURE_TRUE(result, NS_ERROR_OUT_OF_MEMORY);
+    }
+
+    // Should we update the editable state of all the nodes in the document? We
+    // need to do this when the designMode value changes, as that overrides
+    // specific states on the elements.
+    if (designMode) {
+      // designMode is being turned on (overrides contentEditable).
+      CSSStyleSheet* designModeSheet =
+        nsLayoutStylesheetCache::DesignModeSheet();
+      if (!agentSheets.Contains(designModeSheet)) {
+        result = agentSheets.AppendObject(designModeSheet);
+        NS_ENSURE_TRUE(result, NS_ERROR_OUT_OF_MEMORY);
+      }
+
+      updateState = true;
+      spellRecheckAll = oldState == eContentEditable;
+    }
+    else if (oldState == eDesignMode) {
+      // designMode is being turned off (contentEditable is still on).
+      agentSheets.RemoveObject(nsLayoutStylesheetCache::DesignModeSheet());
+      updateState = true;
+    }
+
+    rv = presShell->SetAgentStyleSheets(agentSheets);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    presShell->ReconstructStyleData();
+
+    // Adjust focused element with new style but blur event shouldn't be fired
+    // until mEditingState is modified with newState.
+    nsAutoScriptBlocker scriptBlocker;
+    if (designMode) {
+      nsCOMPtr<nsPIDOMWindow> focusedWindow;
+      nsIContent* focusedContent =
+        nsFocusManager::GetFocusedDescendant(window, false,
+                                             getter_AddRefs(focusedWindow));
+      if (focusedContent) {
+        nsIFrame* focusedFrame = focusedContent->GetPrimaryFrame();
+        bool clearFocus = focusedFrame ? !focusedFrame->IsFocusable() :
+                                         !focusedContent->IsFocusable();
+        if (clearFocus) {
+          nsFocusManager* fm = nsFocusManager::GetFocusManager();
+          if (fm) {
+            fm->ClearFocus(window);
+            // If we need to dispatch blur event, we should put off after
+            // modifying mEditingState since blur event handler may change
+            // designMode state again.
+            putOffToRemoveScriptBlockerUntilModifyingEditingState = true;
+          }
+        }
+      }
+    }
 
     if (makeWindowEditable) {
       // Editing is being turned on (through designMode or contentEditable)
@@ -2801,61 +2861,26 @@ nsHTMLDocument::EditingStateChanged()
     if (!editor)
       return NS_ERROR_FAILURE;
 
-    nsCOMPtr<nsIPresShell> presShell = GetShell();
-    NS_ENSURE_TRUE(presShell, NS_ERROR_FAILURE);
-
     // If we're entering the design mode, put the selection at the beginning of
     // the document for compatibility reasons.
     if (designMode && oldState == eOff) {
       editor->BeginningOfDocument();
     }
 
-    nsCOMArray<nsIStyleSheet> agentSheets;
-    rv = presShell->GetAgentStyleSheets(agentSheets);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIURI> uri;
-    rv = NS_NewURI(getter_AddRefs(uri), NS_LITERAL_STRING("resource://gre/res/contenteditable.css"));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsRefPtr<CSSStyleSheet> sheet;
-    rv = LoadChromeSheetSync(uri, true, getter_AddRefs(sheet));
-    NS_ENSURE_TRUE(sheet, rv);
-
-    bool result = agentSheets.AppendObject(sheet);
-    NS_ENSURE_TRUE(result, NS_ERROR_OUT_OF_MEMORY);
-
-    // Should we update the editable state of all the nodes in the document? We
-    // need to do this when the designMode value changes, as that overrides
-    // specific states on the elements.
-    if (designMode) {
-      // designMode is being turned on (overrides contentEditable).
-      rv = NS_NewURI(getter_AddRefs(uri), NS_LITERAL_STRING("resource://gre/res/designmode.css"));
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      rv = LoadChromeSheetSync(uri, true, getter_AddRefs(sheet));
-      NS_ENSURE_TRUE(sheet, rv);
-
-      result = agentSheets.AppendObject(sheet);
-      NS_ENSURE_TRUE(result, NS_ERROR_OUT_OF_MEMORY);
-
-      updateState = true;
-      spellRecheckAll = oldState == eContentEditable;
+    if (putOffToRemoveScriptBlockerUntilModifyingEditingState) {
+      nsContentUtils::AddScriptBlocker();
     }
-    else if (oldState == eDesignMode) {
-      // designMode is being turned off (contentEditable is still on).
-      RemoveFromAgentSheets(agentSheets, NS_LITERAL_STRING("resource://gre/res/designmode.css"));
-
-      updateState = true;
-    }
-
-    rv = presShell->SetAgentStyleSheets(agentSheets);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    presShell->ReconstructStyleData();
   }
 
   mEditingState = newState;
+  if (putOffToRemoveScriptBlockerUntilModifyingEditingState) {
+    nsContentUtils::RemoveScriptBlocker();
+    // If mEditingState is overwritten by another call and already disabled
+    // the editing, we shouldn't keep making window editable.
+    if (mEditingState == eOff) {
+      return NS_OK;
+    }
+  }
 
   if (makeWindowEditable) {
     // Set the editor to not insert br's on return when in p
@@ -2909,7 +2934,7 @@ nsHTMLDocument::SetDesignMode(const nsAString & aDesignMode)
 void
 nsHTMLDocument::SetDesignMode(const nsAString& aDesignMode, ErrorResult& rv)
 {
-  if (!nsContentUtils::SubjectPrincipal()->Subsumes(NodePrincipal())) {
+  if (!nsContentUtils::LegacyIsCallerNativeCode() && !nsContentUtils::SubjectPrincipal()->Subsumes(NodePrincipal())) {
     rv.Throw(NS_ERROR_DOM_PROP_ACCESS_DENIED);
     return;
   }
@@ -3519,6 +3544,24 @@ nsHTMLDocument::QueryCommandSupported(const nsAString & commandID,
 bool
 nsHTMLDocument::QueryCommandSupported(const nsAString& commandID)
 {
+  // Gecko technically supports all the clipboard commands including
+  // cut/copy/paste, but non-privileged content will be unable to call
+  // paste, and depending on the pref "dom.allow_cut_copy", cut and copy
+  // may also be disallowed to be called from non-privileged content.
+  // For that reason, we report the support status of corresponding
+  // command accordingly.
+  if (!nsContentUtils::IsCallerChrome()) {
+    if (commandID.LowerCaseEqualsLiteral("paste")) {
+      return false;
+    }
+    if (nsContentUtils::IsCutCopyRestricted()) {
+      if (commandID.LowerCaseEqualsLiteral("cut") ||
+          commandID.LowerCaseEqualsLiteral("copy")) {
+        return false;
+      }
+    }
+  }
+
   // commandID is supported if it can be converted to a Midas command
   nsAutoCString cmdToDispatch;
   return ConvertToMidasInternalCommand(commandID, cmdToDispatch);
@@ -3618,7 +3661,7 @@ nsHTMLDocument::Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult) cons
   NS_ASSERTION(aNodeInfo->NodeInfoManager() == mNodeInfoManager,
                "Can't import this document into another document!");
 
-  nsRefPtr<nsHTMLDocument> clone = new nsHTMLDocument();
+  RefPtr<nsHTMLDocument> clone = new nsHTMLDocument();
   nsresult rv = CloneDocHelper(clone.get());
   NS_ENSURE_SUCCESS(rv, rv);
 

@@ -118,7 +118,7 @@ public:
   static already_AddRefed<gfxShmSharedReadLock>
   Open(mozilla::layers::ISurfaceAllocator* aAllocator, const mozilla::layers::ShmemSection& aShmemSection)
   {
-    nsRefPtr<gfxShmSharedReadLock> readLock = new gfxShmSharedReadLock(aAllocator, aShmemSection);
+    RefPtr<gfxShmSharedReadLock> readLock = new gfxShmSharedReadLock(aAllocator, aShmemSection);
     return readLock.forget();
   }
 
@@ -648,9 +648,8 @@ protected:
   ~MultiTiledContentClient()
   {
     MOZ_COUNT_DTOR(MultiTiledContentClient);
- 
-    mDestroyed = true;
-    mTiledBuffer.DiscardBuffers();
+
+      mTiledBuffer.DiscardBuffers();
     mLowPrecisionTiledBuffer.DiscardBuffers();
   }
 

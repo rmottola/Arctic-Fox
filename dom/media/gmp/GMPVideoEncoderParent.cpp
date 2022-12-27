@@ -49,9 +49,11 @@ GMPVideoEncoderParent::GMPVideoEncoderParent(GMPContentParent *aPlugin)
 : GMPSharedMemManager(aPlugin),
   mIsOpen(false),
   mShuttingDown(false),
+  mActorDestroyed(false),
   mPlugin(aPlugin),
   mCallback(nullptr),
-  mVideoHost(this)
+  mVideoHost(this),
+  mPluginId(aPlugin->GetPluginId())
 {
   MOZ_ASSERT(mPlugin);
 
@@ -86,7 +88,7 @@ GMPVideoEncoderParent::Close()
   // Let Shutdown mark us as dead so it knows if we had been alive
 
   // In case this is the last reference
-  nsRefPtr<GMPVideoEncoderParent> kungfudeathgrip(this);
+  RefPtr<GMPVideoEncoderParent> kungfudeathgrip(this);
   Release();
   Shutdown();
 }
@@ -121,7 +123,7 @@ GMPVideoEncoderParent::InitEncode(const GMPVideoCodec& aCodecSettings,
 }
 
 GMPErr
-GMPVideoEncoderParent::Encode(GMPUnique<GMPVideoi420Frame>::Ptr aInputFrame,
+GMPVideoEncoderParent::Encode(GMPUniquePtr<GMPVideoi420Frame> aInputFrame,
                               const nsTArray<uint8_t>& aCodecSpecificInfo,
                               const nsTArray<GMPVideoFrameType>& aFrameTypes)
 {
@@ -132,7 +134,7 @@ GMPVideoEncoderParent::Encode(GMPUnique<GMPVideoi420Frame>::Ptr aInputFrame,
 
   MOZ_ASSERT(mPlugin->GMPThread() == NS_GetCurrentThread());
 
-  GMPUnique<GMPVideoi420FrameImpl>::Ptr inputFrameImpl(
+  GMPUniquePtr<GMPVideoi420FrameImpl> inputFrameImpl(
     static_cast<GMPVideoi420FrameImpl*>(aInputFrame.release()));
 
   // Very rough kill-switch if the plugin stops processing.  If it's merely
@@ -210,12 +212,6 @@ GMPVideoEncoderParent::SetPeriodicKeyFrames(bool aEnable)
   return GMPNoErr;
 }
 
-const uint32_t
-GMPVideoEncoderParent::ParentID()
-{
-  return mPlugin ? mPlugin->GetPluginId() : 0;
-}
-
 // Note: Consider keeping ActorDestroy sync'd up when making changes here.
 void
 GMPVideoEncoderParent::Shutdown()
@@ -236,7 +232,9 @@ GMPVideoEncoderParent::Shutdown()
   mVideoHost.DoneWithAPI();
 
   mIsOpen = false;
-  unused << SendEncodingComplete();
+  if (!mActorDestroyed) {
+    Unused << SendEncodingComplete();
+  }
 }
 
 static void
@@ -251,6 +249,7 @@ GMPVideoEncoderParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   LOGD(("%s::%s: %p (%d)", __CLASS__, __FUNCTION__, this, (int) aWhy));
   mIsOpen = false;
+  mActorDestroyed = true;
   if (mCallback) {
     // May call Close() (and Shutdown()) immediately or with a delay
     mCallback->Terminated();

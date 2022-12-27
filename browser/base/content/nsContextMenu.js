@@ -349,9 +349,9 @@ nsContextMenu.prototype = {
     }
 
     // BiDi UI
-    this.showItem("context-sep-bidi", top.gBidiUI);
+    this.showItem("context-sep-bidi", !this.onNumeric && top.gBidiUI);
     this.showItem("context-bidi-text-direction-toggle",
-                  this.onTextInput && top.gBidiUI);
+                  this.onTextInput && !this.onNumeric && top.gBidiUI);
     this.showItem("context-bidi-page-direction-toggle",
                   !this.onTextInput && top.gBidiUI);
   },
@@ -461,7 +461,7 @@ nsContextMenu.prototype = {
     this.showItem("context-media-showcontrols", onMedia && !this.target.controls);
     this.showItem("context-media-hidecontrols", onMedia && this.target.controls);
     this.showItem("context-video-fullscreen", this.onVideo && this.target.ownerDocument.mozFullScreenElement == null);
-    var statsShowing = this.onVideo && XPCNativeWrapper.unwrap(this.target).mozMediaStatisticsShowing;
+    var statsShowing = this.onVideo && this.target.mozMediaStatisticsShowing;
     this.showItem("context-video-showstats", this.onVideo && this.target.controls && !statsShowing);
     this.showItem("context-video-hidestats", this.onVideo && this.target.controls && statsShowing);
 
@@ -551,12 +551,19 @@ nsContextMenu.prototype = {
   },
 
   inspectNode: function CM_inspectNode() {
-    let {devtools} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+    let {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
     let gBrowser = this.browser.ownerDocument.defaultView.gBrowser;
     let tt = devtools.TargetFactory.forTab(gBrowser.selectedTab);
     return gDevTools.showToolbox(tt, "inspector").then(function(toolbox) {
       let inspector = toolbox.getCurrentPanel();
-      inspector.selection.setNode(this.target, "browser-context-menu");
+      if (this.isRemote) {
+        this.browser.messageManager.sendAsyncMessage("debug:inspect", {}, {node: this.target});
+        inspector.walker.findInspectingNode().then(nodeFront => {
+          inspector.selection.setNodeFront(nodeFront, "browser-context-menu");
+        });
+      } else {
+        inspector.selection.setNode(this.target, "browser-context-menu");
+      }
     }.bind(this));
   },
 
@@ -590,6 +597,7 @@ nsContextMenu.prototype = {
     this.onVideo           = false;
     this.onAudio           = false;
     this.onTextInput       = false;
+    this.onNumeric         = false;
     this.onKeywordField    = false;
     this.mediaURL          = "";
     this.onLink            = false;
@@ -650,7 +658,7 @@ nsContextMenu.prototype = {
     }
 
     // Check if we are in a synthetic document (stand alone image, video, etc.).
-    this.inSyntheticDoc =  ownerDoc.mozSyntheticDocument;
+    this.inSyntheticDoc = ownerDoc.mozSyntheticDocument;
     // First, do checks for nodes that never have children.
     if (this.target.nodeType == Node.ELEMENT_NODE) {
       // See if the user clicked on an image. This check mirrors
@@ -701,6 +709,7 @@ nsContextMenu.prototype = {
       }
       else if (editFlags & (SpellCheckHelper.INPUT | SpellCheckHelper.TEXTAREA)) {
         this.onTextInput = (editFlags & SpellCheckHelper.TEXTINPUT) !== 0;
+        this.onNumeric = (editFlags & SpellCheckHelper.NUMERIC) !== 0;
         this.onEditableArea = (editFlags & SpellCheckHelper.EDITABLE) !== 0;
         this.onPassword = (editFlags & SpellCheckHelper.PASSWORD) !== 0;
         if (this.onEditableArea) {
@@ -785,7 +794,7 @@ nsContextMenu.prototype = {
               this.linkDownload = elem.download;
             }
           }
-          catch (ex) {}          
+          catch (ex) {}
         }
 
         // Background image?  Don't bother if we've already found a
@@ -1042,27 +1051,17 @@ nsContextMenu.prototype = {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document);
   },
 
-
-  viewImageDesc: function(e) {
-    var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.imageDescURL,
-                     this.browser.contentPrincipal,
-                     Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
-    openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
-                             referrerURI: doc.documentURIObject });
-  },
-
   viewImageInfo: function() {
     BrowserPageInfo(this.target.ownerDocument.defaultView.top.document,
                     "mediaTab", this.target);
   },
 
   viewImageDesc: function(e) {
-    var doc = this.target.ownerDocument;
-    urlSecurityCheck(this.imageDescURL, this.browser.contentPrincipal,
+    urlSecurityCheck(this.imageDescURL,
+                     this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
     openUILink(this.imageDescURL, e, { disallowInheritPrincipal: true,
-                             referrerURI: doc.documentURIObject });
+                                       referrerURI: gContextMenuContentData.documentURIObject });
   },
 
   viewFrameInfo: function() {
@@ -1113,12 +1112,14 @@ nsContextMenu.prototype = {
   saveVideoFrameAsImage: function () {
     let mm = this.browser.messageManager;
     let name = "";
-    try {
-      let uri = makeURI(this.mediaURL);
-      let url = uri.QueryInterface(Ci.nsIURL);
-      if (url.fileBaseName)
-        name = decodeURI(url.fileBaseName) + ".jpg";
-    } catch (e) { }
+    if (this.mediaURL) {
+      try {
+        let uri = makeURI(this.mediaURL);
+        let url = uri.QueryInterface(Ci.nsIURL);
+        if (url.fileBaseName)
+          name = decodeURI(url.fileBaseName) + ".jpg";
+      } catch (e) { }
+    }
     if (!name)
       name = "snapshot.jpg";
 
@@ -1130,7 +1131,7 @@ nsContextMenu.prototype = {
       mm.removeMessageListener("ContextMenu:SaveVideoFrameAsImage:Result", onMessage);
       let dataURL = message.data.dataURL;
       saveImageURL(dataURL, name, "SaveImageTitle", true, false,
-                   document.documentURIObject, this.target.ownerDocument);
+                   document.documentURIObject, document);
     };
     mm.addMessageListener("ContextMenu:SaveVideoFrameAsImage:Result", onMessage);
   },
@@ -1144,9 +1145,8 @@ nsContextMenu.prototype = {
     urlSecurityCheck(this.bgImageURL,
                      this.browser.contentPrincipal,
                      Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
-    var doc = this.target.ownerDocument;
     openUILink(this.bgImageURL, e, { disallowInheritPrincipal: true,
-                                     referrerURI: doc.documentURIObject });
+                                     referrerURI: gContextMenuContentData.documentURIObject });
   },
 
   setDesktopBackground: function() {
@@ -1374,7 +1374,7 @@ nsContextMenu.prototype = {
 
   // Save URL of the clicked upon image, video, or audio.
   saveMedia: function() {
-    var doc = this.target.ownerDocument;
+    let doc = this.ownerDoc;
     let referrerURI = gContextMenuContentData.documentURIObject;
     if (this.onCanvas) {
       // Bypass cache, since it's a data: URL.

@@ -208,6 +208,7 @@ enum WorkerPreference
   WORKERPREF_PERFORMANCE_LOGGING_ENABLED, // dom.performance.enable_user_timing_logging
   WORKERPREF_PUSH, // dom.push.enabled
   WORKERPREF_REQUESTCONTEXT, // dom.requestcontext.enabled
+  WORKERPREF_OFFSCREENCANVAS, // gfx.offscreencanvas.enabled
   WORKERPREF_COUNT
 };
 
@@ -253,7 +254,7 @@ struct WorkerLoadInfo
   };
 
   // Only set if we have a custom overriden load group
-  nsRefPtr<InterfaceRequestor> mInterfaceRequestor;
+  RefPtr<InterfaceRequestor> mInterfaceRequestor;
 
   nsAutoPtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
   nsCString mDomain;
@@ -292,6 +293,12 @@ FreezeWorkersForWindow(nsPIDOMWindow* aWindow);
 
 void
 ThawWorkersForWindow(nsPIDOMWindow* aWindow);
+
+void
+SuspendWorkersForWindow(nsPIDOMWindow* aWindow);
+
+void
+ResumeWorkersForWindow(nsPIDOMWindow* aWindow);
 
 class WorkerTask
 {

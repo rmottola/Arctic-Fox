@@ -7,6 +7,7 @@
 #include "GMPAudioDecoder.h"
 #include "nsServiceManagerUtils.h"
 #include "MediaInfo.h"
+#include "GMPDecoderModule.h"
 
 namespace mozilla {
 
@@ -36,7 +37,7 @@ AudioCallbackAdapter::Decoded(const nsTArray<int16_t>& aPCM, uint64_t aTimeStamp
 
   size_t numFrames = aPCM.Length() / aChannels;
   MOZ_ASSERT((aPCM.Length() % aChannels) == 0);
-  nsAutoArrayPtr<AudioDataValue> audioData(new AudioDataValue[aPCM.Length()]);
+  auto audioData = MakeUnique<AudioDataValue[]>(aPCM.Length());
 
   for (size_t i = 0; i < aPCM.Length(); ++i) {
     audioData[i] = AudioSampleToFloat(aPCM[i]);
@@ -70,13 +71,13 @@ AudioCallbackAdapter::Decoded(const nsTArray<int16_t>& aPCM, uint64_t aTimeStamp
     return;
   }
 
-  nsRefPtr<AudioData> audio(new AudioData(mLastStreamOffset,
-                                          timestamp.value(),
-                                          duration.value(),
-                                          numFrames,
-                                          audioData.forget(),
-                                          aChannels,
-                                          aRate));
+  RefPtr<AudioData> audio(new AudioData(mLastStreamOffset,
+                                        timestamp.value(),
+                                        duration.value(),
+                                        numFrames,
+                                        Move(audioData),
+                                        aChannels,
+                                        aRate));
 
 #ifdef LOG_SAMPLE_DECODE
   LOG("Decoded audio sample! timestamp=%lld duration=%lld currentLength=%u",
@@ -126,6 +127,11 @@ void
 GMPAudioDecoder::InitTags(nsTArray<nsCString>& aTags)
 {
   aTags.AppendElement(NS_LITERAL_CSTRING("aac"));
+  const Maybe<nsCString> gmp(
+    GMPDecoderModule::PreferredGMP(NS_LITERAL_CSTRING("audio/mp4a-latm")));
+  if (gmp.isSome()) {
+    aTags.AppendElement(gmp.value());
+  }
 }
 
 nsCString
@@ -167,7 +173,7 @@ GMPAudioDecoder::GMPInitDone(GMPAudioDecoderProxy* aGMP)
   }
 }
 
-nsRefPtr<MediaDataDecoder::InitPromise>
+RefPtr<MediaDataDecoder::InitPromise>
 GMPAudioDecoder::Init()
 {
   MOZ_ASSERT(IsOnGMPThread());
@@ -177,7 +183,7 @@ GMPAudioDecoder::Init()
 
   nsCOMPtr<nsIThread> gmpThread = NS_GetCurrentThread();
 
-  nsRefPtr<GMPInitDoneRunnable> initDone(new GMPInitDoneRunnable());
+  RefPtr<GMPInitDoneRunnable> initDone(new GMPInitDoneRunnable());
   gmpThread->Dispatch(
     NS_NewRunnableMethodWithArg<GMPInitDoneRunnable*>(this,
                                                       &GMPAudioDecoder::GetGMPAPI,
@@ -197,7 +203,7 @@ GMPAudioDecoder::Input(MediaRawData* aSample)
 {
   MOZ_ASSERT(IsOnGMPThread());
 
-  nsRefPtr<MediaRawData> sample(aSample);
+  RefPtr<MediaRawData> sample(aSample);
   if (!mGMP) {
     mCallback->Error();
     return NS_ERROR_FAILURE;

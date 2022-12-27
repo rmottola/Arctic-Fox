@@ -38,7 +38,8 @@ public:
                                           const nsAString& aRequestedCodecs);
 
   // Returns the CanPlayStatus indicating if we can handle this MIME type and
-  // codecs type natively. 
+  // codecs type natively, excluding any plugins-based reader (such as
+  // GStreamer)
   // The MIME type should not include the codecs parameter.
   // That parameter is passed in aRequestedCodecs.
   static CanPlayStatus CanHandleCodecsType(const char* aMIMEType,
@@ -69,8 +70,8 @@ public:
   // OnConnected signal. (currently RTSP only)
   static bool DecoderWaitsForOnConnected(const nsACString& aType);
 
-  static bool IsWebMType(const nsACString& aType);
-  static bool IsMP4Type(const nsACString& aType);
+  static bool IsWebMTypeAndEnabled(const nsACString& aType);
+  static bool IsMP4TypeAndEnabled(const nsACString& aType);
 };
 
 } // namespace mozilla

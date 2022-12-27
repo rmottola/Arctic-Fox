@@ -101,7 +101,7 @@ FINAL_TARGET ?= $(if $(XPI_NAME),$(DIST)/xpi-stage/$(XPI_NAME),$(DIST)/bin)$(DIS
 FINAL_TARGET_FROZEN := '$(FINAL_TARGET)'
 
 ifdef XPI_NAME
-DEFINES += -DXPI_NAME=$(XPI_NAME)
+ACDEFINES += -DXPI_NAME=$(XPI_NAME)
 endif
 
 # The VERSION_NUMBER is suffixed onto the end of the DLLs we ship.
@@ -162,13 +162,7 @@ _DEBUG_ASFLAGS :=
 _DEBUG_CFLAGS :=
 _DEBUG_LDFLAGS :=
 
-ifdef MOZ_DEBUG
-  _DEBUG_CFLAGS += $(MOZ_DEBUG_ENABLE_DEFS)
-  XULPPFLAGS += $(MOZ_DEBUG_ENABLE_DEFS)
-else
-  _DEBUG_CFLAGS += $(MOZ_DEBUG_DISABLE_DEFS)
-  XULPPFLAGS += $(MOZ_DEBUG_DISABLE_DEFS)
-endif
+_DEBUG_CFLAGS += $(MOZ_DEBUG_DEFINES)
 
 ifneq (,$(MOZ_DEBUG)$(MOZ_DEBUG_SYMBOLS))
   ifeq ($(AS),yasm)
@@ -317,7 +311,6 @@ ifndef IS_GYP_DIR
 # NSPR_CFLAGS and NSS_CFLAGS must appear ahead of the other flags to avoid Linux
 # builds wrongly picking up system NSPR/NSS header files.
 OS_INCLUDES := \
-  $(if $(LIBXUL_SDK),-I$(LIBXUL_SDK)/include) \
   $(NSPR_CFLAGS) $(NSS_CFLAGS) \
   $(MOZ_JPEG_CFLAGS) \
   $(MOZ_PNG_CFLAGS) \
@@ -424,8 +417,8 @@ OS_COMPILE_CMMFLAGS += -fobjc-abi-version=2 -fobjc-legacy-dispatch
 endif
 endif
 
-COMPILE_CFLAGS	= $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(OS_INCLUDES) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS) $(RTL_FLAGS) $(OS_CPPFLAGS) $(OS_COMPILE_CFLAGS) $(CFLAGS) $(MOZBUILD_CFLAGS)
-COMPILE_CXXFLAGS = $(if $(DISABLE_STL_WRAPPING),,$(STL_FLAGS)) $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(OS_INCLUDES) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS) $(RTL_FLAGS) $(OS_CPPFLAGS) $(OS_COMPILE_CXXFLAGS) $(CXXFLAGS) $(MOZBUILD_CXXFLAGS)
+COMPILE_CFLAGS	= $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(OS_INCLUDES) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS) $(RTL_FLAGS) $(OS_COMPILE_CFLAGS) $(CFLAGS) $(MOZBUILD_CFLAGS)
+COMPILE_CXXFLAGS = $(if $(DISABLE_STL_WRAPPING),,$(STL_FLAGS)) $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(OS_INCLUDES) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS) $(RTL_FLAGS) $(OS_COMPILE_CXXFLAGS) $(CXXFLAGS) $(MOZBUILD_CXXFLAGS)
 COMPILE_CMFLAGS = $(OS_COMPILE_CMFLAGS) $(MOZBUILD_CMFLAGS)
 COMPILE_CMMFLAGS = $(OS_COMPILE_CMMFLAGS) $(MOZBUILD_CMMFLAGS)
 ASFLAGS += $(MOZBUILD_ASFLAGS)
@@ -443,13 +436,8 @@ HOST_CXXFLAGS += $(HOST_DEFINES) $(MOZBUILD_HOST_CXXFLAGS)
 # Override defaults
 
 # Default location of include files
-ifndef LIBXUL_SDK
 IDL_PARSER_DIR = $(topsrcdir)/xpcom/idl-parser
 IDL_PARSER_CACHE_DIR = $(DEPTH)/xpcom/idl-parser
-else
-IDL_PARSER_DIR = $(LIBXUL_SDK)/sdk/bin
-IDL_PARSER_CACHE_DIR = $(LIBXUL_SDK)/sdk/bin
-endif
 
 SDK_LIB_DIR = $(DIST)/sdk/lib
 SDK_BIN_DIR = $(DIST)/sdk/bin
@@ -550,7 +538,7 @@ sysinstall_cmd = install_cmd
 # overridden by the command line. (Besides, AB_CD is prettier).
 AB_CD = $(MOZ_UI_LOCALE)
 # Many locales directories want this definition.
-DEFINES += -DAB_CD=$(AB_CD)
+ACDEFINES += -DAB_CD=$(AB_CD)
 
 ifndef L10NBASEDIR
   L10NBASEDIR = $(error L10NBASEDIR not defined by configure)
@@ -706,5 +694,3 @@ export CL_INCLUDES_PREFIX
 # in environment variables to prevent it from breking silently on
 # non-English systems.
 export NONASCII
-
-DEFINES += -DNO_NSPR_10_SUPPORT

@@ -146,8 +146,13 @@ public:
   NS_IMETHOD CheckMayLoad(nsIURI* uri, bool report, bool allowIfInheritsPrincipal) final;
   NS_IMETHOD GetCsp(nsIContentSecurityPolicy** aCsp) override;
   NS_IMETHOD SetCsp(nsIContentSecurityPolicy* aCsp) override;
+  NS_IMETHOD GetPreloadCsp(nsIContentSecurityPolicy** aPreloadCSP) override;
+  NS_IMETHOD SetPreloadCsp(nsIContentSecurityPolicy* aPreloadCSP) override;
   NS_IMETHOD GetCspJSON(nsAString& outCSPinJSON) override;
-  NS_IMETHOD GetIsNullPrincipal(bool* aIsNullPrincipal) override;
+  NS_IMETHOD GetIsNullPrincipal(bool* aResult) override;
+  NS_IMETHOD GetIsCodebasePrincipal(bool* aResult) override;
+  NS_IMETHOD GetIsExpandedPrincipal(bool* aResult) override;
+  NS_IMETHOD GetIsSystemPrincipal(bool* aResult) override;
   NS_IMETHOD GetJarPrefix(nsACString& aJarPrefix) final;
   NS_IMETHOD GetOriginAttributes(JSContext* aCx, JS::MutableHandle<JS::Value> aVal) final;
   NS_IMETHOD GetOriginSuffix(nsACString& aOriginSuffix) final;
@@ -171,6 +176,15 @@ public:
   uint32_t UserContextId() const { return mOriginAttributes.mUserContextId; }
   bool IsInBrowserElement() const { return mOriginAttributes.mInBrowser; }
 
+  enum PrincipalKind {
+    eNullPrincipal,
+    eCodebasePrincipal,
+    eExpandedPrincipal,
+    eSystemPrincipal
+  };
+
+  virtual PrincipalKind Kind() = 0;
+
 protected:
   virtual ~BasePrincipal();
 
@@ -188,6 +202,7 @@ protected:
   bool AddonAllowsLoad(nsIURI* aURI);
 
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;
+  nsCOMPtr<nsIContentSecurityPolicy> mPreloadCSP;
   OriginAttributes mOriginAttributes;
 };
 

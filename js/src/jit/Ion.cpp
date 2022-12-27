@@ -1503,9 +1503,21 @@ OptimizeMIR(MIRGenerator* mir)
     if (mir->shouldCancel("Start"))
         return false;
 
+    if (!js_JitOptions.disablePgo && !mir->compilingAsmJS()) {
+        AutoTraceLog log(logger, TraceLogger_PruneUnusedBranches);
+        if (!PruneUnusedBranches(mir, graph))
+            return false;
+        gs.spewPass("Prune Unused Branches");
+        AssertBasicGraphCoherency(graph);
+
+        if (mir->shouldCancel("Prune Unused Branches"))
+            return false;
+    }
+
     {
         AutoTraceLog log(logger, TraceLogger_FoldTests);
-        FoldTests(graph);
+        if (!FoldTests(graph))
+            return false;
         gs.spewPass("Fold Tests");
         AssertBasicGraphCoherency(graph);
 
@@ -2197,6 +2209,11 @@ IonCompile(JSContext* cx, JSScript* script,
             TrackIonAbort(cx, abortScript, abortPc, abortMessage);
         }
 
+        if (cx->isThrowingOverRecursed()) {
+            // Non-analysis compilations should never fail with stack overflow.
+            MOZ_CRASH("Stack overflow during compilation");
+        }
+
         return reason;
     }
 
@@ -2549,8 +2566,11 @@ jit::CanEnter(JSContext* cx, RunState& state)
         }
 
         if (!state.maybeCreateThisForConstructor(cx)) {
-            cx->recoverFromOutOfMemory();
-            return Method_Skipped;
+            if (cx->isThrowingOutOfMemory()) {
+                cx->recoverFromOutOfMemory();
+                return Method_Skipped;
+            }
+            return Method_Error;
         }
     }
 
@@ -2661,7 +2681,8 @@ EnterIon(JSContext* cx, EnterJitData& data)
     EnterJitCode enter = cx->runtime()->jitRuntime()->enterIon();
 
     // Caller must construct |this| before invoking the Ion function.
-    MOZ_ASSERT_IF(data.constructing, data.maxArgv[0].isObject());
+    MOZ_ASSERT_IF(data.constructing,
+                  data.maxArgv[0].isObject() || data.maxArgv[0].isMagic(JS_UNINITIALIZED_LEXICAL));
 
     data.result.setInt32(data.numActualArgs);
     {
@@ -2674,9 +2695,13 @@ EnterIon(JSContext* cx, EnterJitData& data)
 
     MOZ_ASSERT(!cx->runtime()->jitRuntime()->hasIonReturnOverride());
 
-    // Jit callers wrap primitive constructor return.
-    if (!data.result.isMagic() && data.constructing && data.result.isPrimitive())
+    // Jit callers wrap primitive constructor return, except for derived class constructors.
+    if (!data.result.isMagic() && data.constructing &&
+        data.result.isPrimitive())
+    {
+        MOZ_ASSERT(data.maxArgv[0].isObject());
         data.result = data.maxArgv[0];
+    }
 
     // Release temporary buffer used for OSR into Ion.
     cx->runtime()->getJitRuntime(cx)->freeOsrTempData();
@@ -2825,7 +2850,7 @@ InvalidateActivation(FreeOp* fop, const JitActivationIterator& activations, bool
     for (JitFrameIterator it(activations); !it.done(); ++it, ++frameno) {
         MOZ_ASSERT_IF(frameno == 1, it.isExitFrame() || it.type() == JitFrame_Bailout);
 
-#ifdef DEBUG
+#ifdef JS_JITSPEW
         switch (it.type()) {
           case JitFrame_Exit:
           case JitFrame_LazyLink:
@@ -2875,7 +2900,7 @@ InvalidateActivation(FreeOp* fop, const JitActivationIterator& activations, bool
             JitSpew(JitSpew_IonInvalidate, "#%d entry frame @ %p", frameno, it.fp());
             break;
         }
-#endif
+#endif // JS_JITSPEW
 
         if (!it.isIonScripted())
             continue;
@@ -3202,7 +3227,7 @@ PerThreadData::setAutoFlushICache(AutoFlushICache* afc)
 void
 AutoFlushICache::setRange(uintptr_t start, size_t len)
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     AutoFlushICache* afc = TlsPerThreadData.get()->PerThreadData::autoFlushICache();
     MOZ_ASSERT(afc);
     MOZ_ASSERT(!afc->start_);
@@ -3235,13 +3260,13 @@ AutoFlushICache::setRange(uintptr_t start, size_t len)
 void
 AutoFlushICache::flush(uintptr_t start, size_t len)
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     PerThreadData* pt = TlsPerThreadData.get();
     AutoFlushICache* afc = pt ? pt->PerThreadData::autoFlushICache() : nullptr;
     if (!afc) {
         JitSpewCont(JitSpew_CacheFlush, "#");
         ExecutableAllocator::cacheFlush((void*)start, len);
-        MOZ_ASSERT(len <= 16);
+        MOZ_ASSERT(len <= 32);
         return;
     }
 
@@ -3262,7 +3287,7 @@ AutoFlushICache::flush(uintptr_t start, size_t len)
 void
 AutoFlushICache::setInhibit()
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     AutoFlushICache* afc = TlsPerThreadData.get()->PerThreadData::autoFlushICache();
     MOZ_ASSERT(afc);
     MOZ_ASSERT(afc->start_);
@@ -3289,14 +3314,14 @@ AutoFlushICache::setInhibit()
 // the respective AutoFlushICache dynamic context.
 //
 AutoFlushICache::AutoFlushICache(const char* nonce, bool inhibit)
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
   : start_(0),
     stop_(0),
     name_(nonce),
     inhibit_(inhibit)
 #endif
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     PerThreadData* pt = TlsPerThreadData.get();
     AutoFlushICache* afc = pt->PerThreadData::autoFlushICache();
     if (afc)
@@ -3311,7 +3336,7 @@ AutoFlushICache::AutoFlushICache(const char* nonce, bool inhibit)
 
 AutoFlushICache::~AutoFlushICache()
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     PerThreadData* pt = TlsPerThreadData.get();
     MOZ_ASSERT(pt->PerThreadData::autoFlushICache() == this);
 

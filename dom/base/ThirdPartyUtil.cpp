@@ -146,7 +146,6 @@ ThirdPartyUtil::IsThirdPartyWindow(nsIDOMWindow* aWindow,
     // We use GetScriptableParent rather than GetParent because we consider
     // <iframe mozbrowser/mozapp> to be a top-level frame.
     parent = current->GetScriptableParent();
-
     if (SameCOMIdentity(parent, current)) {
       // We're at the topmost content window. We already know the answer.
       *aResult = false;
@@ -268,14 +267,16 @@ ThirdPartyUtil::IsThirdPartyChannel(nsIChannel* aChannel,
   // to the channel. This is limited to loads of certain types of resources. If
   // those loads require cookies, the forceAllowThirdPartyCookie property should
   // be set on the channel.
-  nsCOMPtr<nsIDOMWindow> ourWin;
+  nsCOMPtr<nsIDOMWindow> ourWin, parentWin;
   ctx->GetAssociatedWindow(getter_AddRefs(ourWin));
   if (!ourWin) return NS_ERROR_INVALID_ARG;
 
+  nsCOMPtr<nsPIDOMWindow> piOurWin = do_QueryInterface(ourWin);
+  MOZ_ASSERT(piOurWin);
+
   // We use GetScriptableParent rather than GetParent because we consider
   // <iframe mozbrowser/mozapp> to be a top-level frame.
-  nsCOMPtr<nsPIDOMWindow> ourPWin = do_QueryInterface(ourWin);
-  nsCOMPtr<nsPIDOMWindow> parentWin = ourPWin->GetScriptableParent();
+  parentWin = piOurWin->GetScriptableParent();
   NS_ENSURE_TRUE(parentWin, NS_ERROR_INVALID_ARG);
 
   // Check whether this is the document channel for this window (representing a
@@ -323,10 +324,10 @@ ThirdPartyUtil::GetTopWindowForChannel(nsIChannel* aChannel, nsIDOMWindow** aWin
   nsCOMPtr<nsIDOMWindow> window;
   ctx->GetAssociatedWindow(getter_AddRefs(window));
   nsCOMPtr<nsPIDOMWindow> top = do_QueryInterface(window);
-  if (!window) {
+  if (!top) {
     return NS_ERROR_INVALID_ARG;
   }
-
+  
   top = top->GetTop();
   top.forget(aWin);
   return NS_OK;

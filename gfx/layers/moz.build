@@ -34,6 +34,7 @@ EXPORTS += [
     'LayerSorter.h',
     'LayersTypes.h',
     'LayerTreeInvalidation.h',
+    'LayerUserData.h',
     'opengl/Composer2D.h',
     'opengl/OGLShaderProgram.h',
     'opengl/TexturePoolOGL.h',
@@ -105,6 +106,7 @@ EXPORTS.mozilla.layers += [
     'apz/util/ChromeProcessController.h',
     'apz/util/DoubleTapToZoom.h',
     'apz/util/InputAPZContext.h',
+    'AsyncCanvasRenderer.h',
     'AtomicRefCountedWithFinalize.h',
     'AxisPhysicsModel.h',
     'AxisPhysicsMSDModel.h',
@@ -212,9 +214,11 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
 # has full system permissions there.
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
     EXPORTS.mozilla.layers += [
+        'basic/GrallocTextureHostBasic.h',
         'ipc/ShadowLayerUtilsGralloc.h',
     ]
     UNIFIED_SOURCES += [
+        'basic/GrallocTextureHostBasic.cpp',
         'GrallocImages.cpp',
         'opengl/EGLImageHelpers.cpp',
         'opengl/GrallocTextureClient.cpp',
@@ -250,6 +254,7 @@ UNIFIED_SOURCES += [
     'apz/util/ChromeProcessController.cpp',
     'apz/util/DoubleTapToZoom.cpp',
     'apz/util/InputAPZContext.cpp',
+    'AsyncCanvasRenderer.cpp',
     'AxisPhysicsModel.cpp',
     'AxisPhysicsMSDModel.cpp',
     'basic/BasicCanvasLayer.cpp',

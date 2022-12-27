@@ -62,9 +62,9 @@ public:
   }
 
 private:
-  nsRefPtr<MozMtpDatabase> mMozMtpDatabase;
-  nsRefPtr<RefCountedMtpServer> mMtpServer;
-  nsRefPtr<DeviceStorageFile> mFile;
+  RefPtr<MozMtpDatabase> mMozMtpDatabase;
+  RefPtr<RefCountedMtpServer> mMtpServer;
+  RefPtr<DeviceStorageFile> mFile;
   nsCString mEventType;
 };
 
@@ -119,13 +119,13 @@ public:
             NS_LossyConvertUTF16toASCII(file->mPath).get(),
             eventType.get());
 
-    nsRefPtr<MozMtpDatabase> mozMtpDatabase = mMozMtpServer->GetMozMtpDatabase();
-    nsRefPtr<RefCountedMtpServer> mtpServer = mMozMtpServer->GetMtpServer();
+    RefPtr<MozMtpDatabase> mozMtpDatabase = mMozMtpServer->GetMozMtpDatabase();
+    RefPtr<RefCountedMtpServer> mtpServer = mMozMtpServer->GetMtpServer();
 
     // We're not supposed to perform I/O on the main thread, so punt the
     // notification (which will write to /dev/mtp_usb) to an I/O Thread.
 
-    nsRefPtr<FileWatcherUpdateRunnable> r =
+    RefPtr<FileWatcherUpdateRunnable> r =
       new FileWatcherUpdateRunnable(mozMtpDatabase, mtpServer, file, eventType);
     mIOThread->Dispatch(r, NS_DISPATCH_NORMAL);
 
@@ -133,7 +133,7 @@ public:
   }
 
 private:
-  nsRefPtr<MozMtpServer> mMozMtpServer;
+  RefPtr<MozMtpServer> mMozMtpServer;
   nsCOMPtr<nsIThread> mIOThread;
 };
 NS_IMPL_ISUPPORTS(FileWatcherUpdate, nsIObserver)
@@ -154,7 +154,7 @@ public:
     return NS_OK;
   }
 private:
-  nsRefPtr<MozMtpServer> mMozMtpServer;
+  RefPtr<MozMtpServer> mMozMtpServer;
 };
 
 class FreeFileWatcherUpdateRunnable final : public nsRunnable
@@ -172,7 +172,7 @@ public:
     return NS_OK;
   }
 private:
-  nsRefPtr<MozMtpServer> mMozMtpServer;
+  RefPtr<MozMtpServer> mMozMtpServer;
 };
 
 class MtpServerRunnable : public nsRunnable
@@ -186,7 +186,7 @@ public:
 
   nsresult Run()
   {
-    nsRefPtr<RefCountedMtpServer> server = mMozMtpServer->GetMtpServer();
+    RefPtr<RefCountedMtpServer> server = mMozMtpServer->GetMtpServer();
 
     DebugOnly<nsresult> rv =
       NS_DispatchToMainThread(new AllocFileWatcherUpdateRunnable(mMozMtpServer));
@@ -206,21 +206,21 @@ public:
   }
 
 private:
-  nsRefPtr<MozMtpServer> mMozMtpServer;
+  RefPtr<MozMtpServer> mMozMtpServer;
   ScopedClose mMtpUsbFd; // We want to hold this open while the server runs
 };
 
 already_AddRefed<RefCountedMtpServer>
 MozMtpServer::GetMtpServer()
 {
-  nsRefPtr<RefCountedMtpServer> server = mMtpServer;
+  RefPtr<RefCountedMtpServer> server = mMtpServer;
   return server.forget();
 }
 
 already_AddRefed<MozMtpDatabase>
 MozMtpServer::GetMozMtpDatabase()
 {
-  nsRefPtr<MozMtpDatabase> db = mMozMtpDatabase;
+  RefPtr<MozMtpDatabase> db = mMozMtpDatabase;
   return db.forget();
 }
 

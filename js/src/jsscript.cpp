@@ -1418,6 +1418,20 @@ ScriptCounts::maybeGetPCCounts(size_t offset) const {
     return elem;
 }
 
+js::PCCounts*
+ScriptCounts::getImmediatePrecedingPCCounts(size_t offset)
+{
+    PCCounts searched = PCCounts(offset);
+    PCCounts* elem = std::lower_bound(pcCounts_.begin(), pcCounts_.end(), searched);
+    if (elem == pcCounts_.end())
+        return &pcCounts_.back();
+    if (elem->pcOffset() == offset)
+        return elem;
+    if (elem != pcCounts_.begin())
+        return elem - 1;
+    return nullptr;
+}
+
 const js::PCCounts*
 ScriptCounts::maybeGetThrowCounts(size_t offset) const {
     PCCounts searched = PCCounts(offset);
@@ -1425,6 +1439,23 @@ ScriptCounts::maybeGetThrowCounts(size_t offset) const {
     if (elem == throwCounts_.end() || elem->pcOffset() != offset)
         return nullptr;
     return elem;
+}
+
+const js::PCCounts*
+ScriptCounts::getImmediatePrecedingThrowCounts(size_t offset) const
+{
+    PCCounts searched = PCCounts(offset);
+    const PCCounts* elem = std::lower_bound(throwCounts_.begin(), throwCounts_.end(), searched);
+    if (elem == throwCounts_.end()) {
+        if (throwCounts_.begin() == throwCounts_.end())
+            return nullptr;
+        return &throwCounts_.back();
+    }
+    if (elem->pcOffset() == offset)
+        return elem;
+    if (elem != throwCounts_.begin())
+        return elem - 1;
+    return nullptr;
 }
 
 js::PCCounts*
@@ -1463,6 +1494,47 @@ js::PCCounts*
 JSScript::getThrowCounts(jsbytecode* pc) {
     MOZ_ASSERT(containsPC(pc));
     return getScriptCounts().getThrowCounts(pcToOffset(pc));
+}
+
+uint64_t
+JSScript::getHitCount(jsbytecode* pc)
+{
+    MOZ_ASSERT(containsPC(pc));
+    if (pc < main())
+        pc = main();
+
+    ScriptCounts& sc = getScriptCounts();
+    size_t targetOffset = pcToOffset(pc);
+    const js::PCCounts* baseCount = sc.getImmediatePrecedingPCCounts(targetOffset);
+    if (!baseCount)
+        return 0;
+    if (baseCount->pcOffset() == targetOffset)
+        return baseCount->numExec();
+    MOZ_ASSERT(baseCount->pcOffset() < targetOffset);
+    uint64_t count = baseCount->numExec();
+    do {
+        const js::PCCounts* throwCount = sc.getImmediatePrecedingThrowCounts(targetOffset);
+        if (!throwCount)
+            return count;
+        if (throwCount->pcOffset() <= baseCount->pcOffset())
+            return count;
+        count -= throwCount->numExec();
+        targetOffset = throwCount->pcOffset() - 1;
+    } while (true);
+}
+
+void
+JSScript::incHitCount(jsbytecode* pc)
+{
+    MOZ_ASSERT(containsPC(pc));
+    if (pc < main())
+        pc = main();
+
+    ScriptCounts& sc = getScriptCounts();
+    js::PCCounts* baseCount = sc.getImmediatePrecedingPCCounts(pcToOffset(pc));
+    if (!baseCount)
+        return;
+    baseCount->numExec()++;
 }
 
 void
@@ -3551,6 +3623,9 @@ js::CloneScriptIntoFunction(JSContext* cx, HandleObject enclosingScope, HandleFu
     if (!dst)
         return nullptr;
 
+    // Save flags in case we need to undo the early mutations.
+    const int preservedFlags = fun->flags();
+
     dst->setFunction(fun);
     Rooted<LazyScript*> lazy(cx);
     if (fun->isInterpretedLazy()) {
@@ -3565,6 +3640,7 @@ js::CloneScriptIntoFunction(JSContext* cx, HandleObject enclosingScope, HandleFu
             fun->initLazyScript(lazy);
         else
             fun->setScript(nullptr);
+        fun->setFlags(preservedFlags);
         return nullptr;
     }
 
@@ -3771,9 +3847,11 @@ JSScript::traceChildren(JSTracer* trc)
                   static_cast<GCMarker*>(trc)->shouldCheckCompartments(),
                   zone()->isCollecting());
 
-    for (uint32_t i = 0; i < natoms(); ++i) {
-        if (atoms[i])
-            TraceEdge(trc, &atoms[i], "atom");
+    if (atoms) {
+        for (uint32_t i = 0; i < natoms(); ++i) {
+            if (atoms[i])
+                TraceEdge(trc, &atoms[i], "atom");
+        }
     }
 
     if (hasObjects()) {
@@ -4026,17 +4104,11 @@ JSScript::argumentsOptimizationFailed(JSContext* cx, HandleScript script)
             continue;
         AbstractFramePtr frame = i.abstractFramePtr();
         if (frame.isFunctionFrame() && frame.script() == script) {
+            /* We crash on OOM since cleaning up here would be complicated. */
+            AutoEnterOOMUnsafeRegion oomUnsafe;
             ArgumentsObject* argsobj = ArgumentsObject::createExpected(cx, frame);
-            if (!argsobj) {
-                /*
-                 * We can't leave stack frames with script->needsArgsObj but no
-                 * arguments object. It is, however, safe to leave frames with
-                 * an arguments object but !script->needsArgsObj.
-                 */
-                script->needsArgsObj_ = false;
-                return false;
-            }
-
+            if (!argsobj)
+                oomUnsafe.crash("JSScript::argumentsOptimizationFailed");
             SetFrameArgumentsObject(cx, frame, script, argsobj);
         }
     }
@@ -4413,4 +4485,32 @@ JS::ubi::Concrete<JSScript>::size(mozilla::MallocSizeOf mallocSizeOf) const
 
     MOZ_ASSERT(size > 0);
     return size;
+}
+
+const char*
+JS::ubi::Concrete<JSScript>::scriptFilename() const
+{
+    return get().filename();
+}
+
+JS::ubi::Node::Size
+JS::ubi::Concrete<js::LazyScript>::size(mozilla::MallocSizeOf mallocSizeOf) const
+{
+    Size size = js::gc::Arena::thingSize(get().asTenured().getAllocKind());
+    size += get().sizeOfExcludingThis(mallocSizeOf);
+    return size;
+}
+
+const char*
+JS::ubi::Concrete<js::LazyScript>::scriptFilename() const
+{
+    auto sourceObject = get().sourceObject();
+    if (!sourceObject)
+        return nullptr;
+
+    auto source = sourceObject->source();
+    if (!source)
+        return nullptr;
+
+    return source->filename();
 }

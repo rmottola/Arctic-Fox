@@ -136,7 +136,7 @@ protected:
 
   // This represent the application's main thread (SAMPLER_INIT)
   ThreadProfile* mPrimaryThreadProfile;
-  mozilla::RefPtr<ProfileBuffer> mBuffer;
+  RefPtr<ProfileBuffer> mBuffer;
   bool mSaveRequested;
   bool mAddLeafAddresses;
   bool mUseStackWalk;
@@ -161,7 +161,7 @@ protected:
 #endif
 
 private:
-  nsRefPtr<mozilla::ProfileGatherer> mGatherer;
+  RefPtr<mozilla::ProfileGatherer> mGatherer;
 };
 
 #endif

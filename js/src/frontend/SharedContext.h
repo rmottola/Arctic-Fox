@@ -267,7 +267,7 @@ class SharedContext
     }
 
     bool isDotVariable(JSAtom* atom) const {
-        return atom == context->names().dotGenerator || atom == context->names().dotGenRVal;
+        return atom == context->names().dotGenerator;
     }
 };
 
@@ -390,6 +390,7 @@ class FunctionBox : public ObjectBox, public SharedContext
                hasExtensibleScope() ||
                needsDeclEnvObject() ||
                needsHomeObject()    ||
+               isDerivedClassConstructor() ||
                isGenerator();
     }
 };

@@ -21,6 +21,7 @@ function* performTest() {
   let parser = new OutputParser(doc);
   testParseCssProperty(doc, parser);
   testParseCssVar(doc, parser);
+  testParseURL(doc, parser);
 
   host.destroy();
 }
@@ -32,12 +33,8 @@ var COLOR_TEST_CLASS = "test-class";
 // property.  |value| is the CSS text to use.  |segments| is an array
 // describing the expected result.  If an element of |segments| is a
 // string, it is simply appended to the expected string.  Otherwise,
-// it must be an object with a |value| property and a |name| property.
-// These describe the color and are both used in the generated
-// expected output -- |name| is the color name as it appears in the
-// input (e.g., "red"); and |value| is the hash-style numeric value
-// for the color, which parseCssProperty emits in some spots (e.g.,
-// "#F00").
+// it must be an object with a |value| property, which is the color
+// name as it appears in the input.
 //
 // This approach is taken to reduce boilerplate and to make it simpler
 // to modify the test when the parseCssProperty output changes.
@@ -52,10 +49,10 @@ function makeColorTest(name, value, segments) {
     if (typeof (segment) === "string") {
       result.expected += segment;
     } else {
-      result.expected += "<span data-color=\"" + segment.value + "\">" +
+      result.expected += "<span data-color=\"" + segment.name + "\">" +
         "<span style=\"background-color:" + segment.name +
         "\" class=\"" + COLOR_TEST_CLASS + "\"></span><span>" +
-        segment.value + "</span></span>";
+        segment.name + "</span></span>";
     }
   }
 
@@ -67,25 +64,25 @@ function makeColorTest(name, value, segments) {
 function testParseCssProperty(doc, parser) {
   let tests = [
     makeColorTest("border", "1px solid red",
-                  ["1px solid ", {name: "red", value: "#F00"}]),
+                  ["1px solid ", {name: "red"}]),
 
     makeColorTest("background-image",
                   "linear-gradient(to right, #F60 10%, rgba(0,0,0,1))",
-                  ["linear-gradient(to right, ", {name: "#F60", value: "#F60"},
-                   " 10%, ", {name: "rgba(0,0,0,1)", value: "#000"},
+                  ["linear-gradient(to right, ", {name: "#F60"},
+                   " 10%, ", {name: "rgba(0,0,0,1)"},
                    ")"]),
 
     // In "arial black", "black" is a font, not a color.
     makeColorTest("font-family", "arial black", ["arial black"]),
 
     makeColorTest("box-shadow", "0 0 1em red",
-                  ["0 0 1em ", {name: "red", value: "#F00"}]),
+                  ["0 0 1em ", {name: "red"}]),
 
     makeColorTest("box-shadow",
                   "0 0 1em red, 2px 2px 0 0 rgba(0,0,0,.5)",
-                  ["0 0 1em ", {name: "red", value: "#F00"},
+                  ["0 0 1em ", {name: "red"},
                    ", 2px 2px 0 0 ",
-                   {name: "rgba(0,0,0,.5)", value: "rgba(0,0,0,.5)"}]),
+                   {name: "rgba(0,0,0,.5)"}]),
 
     makeColorTest("content", "\"red\"", ["\"red\""]),
 
@@ -97,8 +94,8 @@ function testParseCssProperty(doc, parser) {
                   ["<span data-filters=\"blur(1px) drop-shadow(0 0 0 blue) ",
                    "url(red.svg#blue)\"><span>",
                    "blur(1px) drop-shadow(0 0 0 ",
-                   {name: "blue", value: "#00F"},
-                   ") url(\"red.svg#blue\")</span></span>"]),
+                   {name: "blue"},
+                   ") url(red.svg#blue)</span></span>"]),
 
     makeColorTest("color", "currentColor", ["currentColor"]),
   ];
@@ -135,4 +132,75 @@ function testParseCssVar(doc, parser) {
      "CSS property correctly parsed");
 
   target.innerHTML = "";
+}
+
+function testParseURL(doc, parser) {
+  info("Test that URL parsing preserves quoting style");
+
+  const tests = [
+    {
+      desc: "simple test without quotes",
+      leader: "url(",
+      trailer: ")",
+    },
+    {
+      desc: "simple test with single quotes",
+      leader: "url('",
+      trailer: "')",
+    },
+    {
+      desc: "simple test with double quotes",
+      leader: "url(\"",
+      trailer: "\")",
+    },
+    {
+      desc: "test with single quotes and whitespace",
+      leader: "url( \t'",
+      trailer: "'\r\n\f)",
+    },
+    {
+      desc: "simple test with uppercase",
+      leader: "URL(",
+      trailer: ")",
+    },
+    {
+      desc: "bad url, missing paren",
+      leader: "url(",
+      trailer: "",
+      expectedTrailer: ")"
+    },
+    {
+      desc: "bad url, double quote, missing paren",
+      leader: "url(\"",
+      trailer: "\"",
+      expectedTrailer: "\")",
+    },
+    {
+      desc: "bad url, single quote, missing paren and quote",
+      leader: "url('",
+      trailer: "",
+      expectedTrailer: "')"
+    }
+  ];
+
+  for (let test of tests) {
+    let url = test.leader + "something.jpg" + test.trailer;
+    let frag = parser.parseCssProperty("background", url, {
+      urlClass: "test-urlclass"
+    });
+
+    let target = doc.querySelector("div");
+    target.appendChild(frag);
+
+    let expectedTrailer = test.expectedTrailer || test.trailer;
+
+    let expected = test.leader +
+        "<a href=\"something.jpg\" class=\"test-urlclass\" " +
+        "target=\"_blank\">something.jpg</a>" +
+        expectedTrailer;
+
+    is(target.innerHTML, expected, test.desc);
+
+    target.innerHTML = "";
+  }
 }

@@ -132,7 +132,7 @@ protected:
                                          MaybeTransform* aTransform)
                                          override;
   virtual bool RecvSetAsyncScrollOffset(const FrameMetrics::ViewID& aId,
-                                        const int32_t& aX, const int32_t& aY) override;
+                                        const float& aX, const float& aY) override;
   virtual bool RecvSetAsyncZoom(const FrameMetrics::ViewID& aId,
                                 const float& aValue) override;
   virtual bool RecvFlushApzRepaints() override;
@@ -176,11 +176,11 @@ protected:
   friend class layout::RenderFrameParent;
 
 private:
-  nsRefPtr<LayerManagerComposite> mLayerManager;
+  RefPtr<LayerManagerComposite> mLayerManager;
   ShadowLayersManager* mShadowLayersManager;
   // Hold the root because it might be grafted under various
   // containers in the "real" layer tree
-  nsRefPtr<Layer> mRoot;
+  RefPtr<Layer> mRoot;
   // When this is nonzero, it refers to a layer tree owned by the
   // compositor thread.  It is always true that
   //   mId != 0 => mRoot == null

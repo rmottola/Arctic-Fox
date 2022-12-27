@@ -51,15 +51,17 @@ Animation::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 void
 Animation::SetEffect(KeyframeEffectReadOnly* aEffect)
 {
+  RefPtr<Animation> kungFuDeathGrip(this);
+
   if (mEffect == aEffect) {
     return;
   }
   if (mEffect) {
-    mEffect->SetParentTime(Nullable<TimeDuration>());
+    mEffect->SetAnimation(nullptr);
   }
   mEffect = aEffect;
   if (mEffect) {
-    mEffect->SetParentTime(GetCurrentTime());
+    mEffect->SetAnimation(this);
   }
 
   UpdateTiming(SeekFlag::NoSeek, SyncNotifyFlag::Async);
@@ -73,7 +75,7 @@ Animation::SetTimeline(AnimationTimeline* aTimeline)
   }
 
   if (mTimeline) {
-    mTimeline->RemoveAnimation(*this);
+    mTimeline->NotifyAnimationUpdated(*this);
   }
 
   mTimeline = aTimeline;
@@ -360,15 +362,18 @@ Animation::SetCurrentTimeAsDouble(const Nullable<double>& aCurrentTime,
 void
 Animation::Tick()
 {
-  // Since we are not guaranteed to get only one call per refresh driver tick,
-  // it's possible that mPendingReadyTime is set to a time in the future.
-  // In that case, we should wait until the next refresh driver tick before
-  // resuming.
+  // Finish pending if we have a pending ready time, but only if we also
+  // have an active timeline.
   if (mPendingState != PendingState::NotPending &&
       !mPendingReadyTime.IsNull() &&
       mTimeline &&
-      !mTimeline->GetCurrentTime().IsNull() &&
-      mPendingReadyTime.Value() <= mTimeline->GetCurrentTime().Value()) {
+      !mTimeline->GetCurrentTime().IsNull()) {
+    // Even though mPendingReadyTime is initialized using TimeStamp::Now()
+    // during the *previous* tick of the refresh driver, it can still be
+    // ahead of the *current* timeline time when we are using the
+    // vsync timer so we need to clamp it to the timeline time.
+    mPendingReadyTime.SetValue(std::min(mTimeline->GetCurrentTime().Value(),
+                                        mPendingReadyTime.Value()));
     FinishPendingAt(mPendingReadyTime.Value());
     mPendingReadyTime.SetNull();
   }
@@ -573,9 +578,9 @@ Animation::CanThrottle() const
 }
 
 void
-Animation::ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
+Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                         nsCSSPropertySet& aSetProperties,
-                        bool& aNeedsRefreshes)
+                        bool& aStyleChanging)
 {
   if (!mEffect) {
     return;
@@ -583,9 +588,8 @@ Animation::ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
 
   AnimationPlayState playState = PlayState();
   if (playState == AnimationPlayState::Running ||
-      playState == AnimationPlayState::Pending ||
-      HasEndEventToQueue()) {
-    aNeedsRefreshes = true;
+      playState == AnimationPlayState::Pending) {
+    aStyleChanging = true;
   }
 
   if (!IsInEffect()) {
@@ -843,39 +847,8 @@ Animation::UpdateTiming(SeekFlag aSeekFlag, SyncNotifyFlag aSyncNotifyFlag)
   UpdateFinishedState(aSeekFlag, aSyncNotifyFlag);
   UpdateEffect();
 
-  // Unconditionally Add/Remove from the timeline. This is ok because if the
-  // animation has already been added/removed (which will be true more often
-  // than not) the work done by AnimationTimeline/DocumentTimeline is still
-  // negligible and its easier than trying to detect whenever we are switching
-  // to/from being relevant.
-  //
-  // We need to do this after calling UpdateEffect since it updates some
-  // cached state used by IsRelevant.
-  //
-  // Note that we only store relevant animations on the timeline since they
-  // are the only ones that need ticks and are the only ones returned from
-  // AnimationTimeline::GetAnimations. Storing any more than that would mean
-  // that we fail to garbage collect irrelevant animations since the timeline
-  // keeps a strong reference to each animation.
-  //
-  // Once we tick animations from the their timeline, and once we expect
-  // timelines to go in and out of being inactive, we will also need to store
-  // non-idle animations that are waiting for their timeline to become active
-  // on their timeline (as otherwise once the timeline becomes active it will
-  // have no way of notifying its animations). For now, however, we can
-  // simply store just the relevant animations.
   if (mTimeline) {
-    // FIXME: Once we expect animations to go back and forth betweeen being
-    // inactive and active, we will need to store more than just relevant
-    // animations on the timeline. This is because an animation might be
-    // deemed irrelevant because its timeline is inactive. If it is removed
-    // from the timeline at that point the timeline will have no way of
-    // getting the animation to add itself again once it becomes active.
-    if (IsRelevant()) {
-      mTimeline->AddAnimation(*this);
-    } else {
-      mTimeline->RemoveAnimation(*this);
-    }
+    mTimeline->NotifyAnimationUpdated(*this);
   }
 }
 
@@ -934,7 +907,6 @@ void
 Animation::UpdateEffect()
 {
   if (mEffect) {
-    mEffect->SetParentTime(GetCurrentTime());
     UpdateRelevance();
   }
 }
@@ -1045,6 +1017,46 @@ Animation::EffectEnd() const
          + mEffect->GetComputedTiming().mActiveDuration;
 }
 
+TimeStamp
+Animation::AnimationTimeToTimeStamp(const StickyTimeDuration& aTime) const
+{
+  // Initializes to null. Return the same object every time to benefit from
+  // return-value-optimization.
+  TimeStamp result;
+
+  // We *don't* check for mTimeline->TracksWallclockTime() here because that
+  // method only tells us if the timeline times can be converted to
+  // TimeStamps that can be compared to TimeStamp::Now() or not, *not*
+  // whether the timelines can be converted to TimeStamp values at all.
+  //
+  // Since we never compare the result of this method with TimeStamp::Now()
+  // it is ok to return values even if mTimeline->TracksWallclockTime() is
+  // false. Furthermore, we want to be able to use this method when the
+  // refresh driver is under test control (in which case TracksWallclockTime()
+  // will return false).
+  //
+  // Once we introduce timelines that are not time-based we will need to
+  // differentiate between them here and determine how to sort their events.
+  if (!mTimeline) {
+    return result;
+  }
+
+  // Check the time is convertible to a timestamp
+  if (aTime == TimeDuration::Forever() ||
+      mPlaybackRate == 0.0 ||
+      mStartTime.IsNull()) {
+    return result;
+  }
+
+  // Invert the standard relation:
+  //   animation time = (timeline time - start time) * playback rate
+  TimeDuration timelineTime =
+    TimeDuration(aTime).MultDouble(1.0 / mPlaybackRate) + mStartTime.Value();
+
+  result = mTimeline->ToTimeStamp(timelineTime);
+  return result;
+}
+
 nsIDocument*
 Animation::GetRenderedDocument() const
 {
@@ -1101,7 +1113,7 @@ Animation::DoFinishNotification(SyncNotifyFlag aSyncNotifyFlag)
   if (aSyncNotifyFlag == SyncNotifyFlag::Sync) {
     DoFinishNotificationImmediately();
   } else if (!mFinishNotificationTask.IsPending()) {
-    nsRefPtr<nsRunnableMethod<Animation>> runnable =
+    RefPtr<nsRunnableMethod<Animation>> runnable =
       NS_NewRunnableMethod(this, &Animation::DoFinishNotificationImmediately);
     Promise::DispatchToMicroTask(runnable);
     mFinishNotificationTask = runnable;
@@ -1150,11 +1162,11 @@ Animation::DispatchPlaybackEvent(const nsAString& aName)
     init.mTimelineTime = mTimeline->GetCurrentTimeAsDouble();
   }
 
-  nsRefPtr<AnimationPlaybackEvent> event =
+  RefPtr<AnimationPlaybackEvent> event =
     AnimationPlaybackEvent::Constructor(this, aName, init);
   event->SetTrusted(true);
 
-  nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(this, event);
   asyncDispatcher->PostDOMEvent();
 }

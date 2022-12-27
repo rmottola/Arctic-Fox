@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const {utils: Cu, interfaces: Ci} = Components;
-Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {utils: Cu, interfaces: Ci} = Components;
+Cu.import("resource://devtools/client/framework/gDevTools.jsm");
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const {Toolbox} = require("devtools/client/framework/toolbox");
 const {ConnectionManager, Connection} = require("devtools/shared/client/connection-manager");
 const promise = require("devtools/shared/deprecated-sync-thenables");

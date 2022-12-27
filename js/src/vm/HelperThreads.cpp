@@ -765,8 +765,8 @@ IonBuilderHasHigherPriority(jit::IonBuilder* first, jit::IonBuilder* second)
         return first->optimizationInfo().level() < second->optimizationInfo().level();
 
     // A script without an IonScript has precedence on one with.
-    if (first->script()->hasIonScript() != second->script()->hasIonScript())
-        return !first->script()->hasIonScript();
+    if (first->scriptHasIonScript() != second->scriptHasIonScript())
+        return !first->scriptHasIonScript();
 
     // A higher warm-up counter indicates a higher priority.
     return first->script()->getWarmUpCount() / first->script()->length() >
@@ -1426,8 +1426,11 @@ HelperThread::handleParseWorkload()
 
     // FinishOffThreadScript will need to be called on the script to
     // migrate it into the correct compartment.
-    if (!HelperThreadState().parseFinishedList().append(task))
-        CrashAtUnhandlableOOM("handleParseWorkload");
+    {
+        AutoEnterOOMUnsafeRegion oomUnsafe;
+        if (!HelperThreadState().parseFinishedList().append(task))
+            oomUnsafe.crash("handleParseWorkload");
+    }
 
     currentTask.reset();
 

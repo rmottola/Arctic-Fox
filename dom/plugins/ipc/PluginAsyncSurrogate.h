@@ -167,7 +167,7 @@ struct AsyncNPObject : NPObject
 
   NPObject* GetRealObject();
 
-  nsRefPtr<PluginAsyncSurrogate>  mSurrogate;
+  RefPtr<PluginAsyncSurrogate>  mSurrogate;
   NPObject*                       mRealObject;
 };
 

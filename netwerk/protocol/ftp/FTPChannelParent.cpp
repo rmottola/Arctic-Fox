@@ -625,7 +625,7 @@ public:
     return NS_OK;
   }
 private:
-  nsRefPtr<FTPChannelParent> mChannelParent;
+  RefPtr<FTPChannelParent> mChannelParent;
   nsresult mErrorCode;
   bool mSkipResume;
 };
@@ -688,7 +688,7 @@ FTPChannelParent::NotifyDiversionFailed(nsresult aErrorCode,
   mChannel = nullptr;
 
   if (!mIPCClosed) {
-    unused << SendDeleteSelf();
+    Unused << SendDeleteSelf();
   }
 }
 

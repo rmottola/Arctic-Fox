@@ -45,6 +45,7 @@
 #include "vm/MallocProvider.h"
 #include "vm/SPSProfiler.h"
 #include "vm/Stack.h"
+#include "vm/Stopwatch.h"
 #include "vm/Symbol.h"
 
 #ifdef _MSC_VER
@@ -635,6 +636,9 @@ struct JSRuntime : public JS::shadow::Runtime,
     mozilla::Atomic<uintptr_t, mozilla::Relaxed> jitStackLimit_;
     void resetJitStackLimit();
 
+    // Like jitStackLimit_, but not reset to trigger interrupts.
+    uintptr_t jitStackLimitNoInterrupt_;
+
   public:
     void initJitStackLimit();
 
@@ -643,6 +647,8 @@ struct JSRuntime : public JS::shadow::Runtime,
     // For read-only JIT use:
     void* addressOfJitStackLimit() { return &jitStackLimit_; }
     static size_t offsetOfJitStackLimit() { return offsetof(JSRuntime, jitStackLimit_); }
+
+    void* addressOfJitStackLimitNoInterrupt() { return &jitStackLimitNoInterrupt_; }
 
     // Information about the heap allocated backtrack stack used by RegExp JIT code.
     js::irregexp::RegExpStack regexpStack;
@@ -1037,12 +1043,8 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* Garbage collector state, used by jsgc.c. */
     js::gc::GCRuntime   gc;
 
-    /* Garbage collector state has been sucessfully initialized. */
+    /* Garbage collector state has been successfully initialized. */
     bool                gcInitialized;
-
-    bool isHeapMajorCollecting() const { return heapState_ == JS::HeapState::MajorCollecting; }
-    bool isHeapMinorCollecting() const { return heapState_ == JS::HeapState::MinorCollecting; }
-    bool isHeapCollecting() const { return isHeapMinorCollecting() || isHeapMajorCollecting(); }
 
     int gcZeal() { return gc.zeal(); }
 
@@ -1111,7 +1113,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* Had an out-of-memory error which did not populate an exception. */
     bool                hadOutOfMemory;
 
-    /* We are curently deleting an object due to an initialization failure. */
+    /* We are currently deleting an object due to an initialization failure. */
     mozilla::DebugOnly<bool> handlingInitFailure;
 
     /* A context has been created on this runtime. */
@@ -1214,7 +1216,6 @@ struct JSRuntime : public JS::shadow::Runtime,
     js::LazyScriptCache lazyScriptCache;
 
     js::CompressedSourceSet compressedSourceSet;
-    js::DateTimeInfo    dateTimeInfo;
 
     // Pool of maps used during parse/emit. This may be modified by threads
     // with an ExclusiveContext and requires a lock. Active compilations
@@ -1409,6 +1410,7 @@ struct JSRuntime : public JS::shadow::Runtime,
 
   private:
     JS::RuntimeOptions options_;
+    const js::Class* windowProxyClass_;
 
     // Settings for how helper threads can be used.
     bool offthreadIonCompilationEnabled_;
@@ -1444,6 +1446,13 @@ struct JSRuntime : public JS::shadow::Runtime,
     }
     JS::RuntimeOptions& options() {
         return options_;
+    }
+
+    const js::Class* maybeWindowProxyClass() const {
+        return windowProxyClass_;
+    }
+    void setWindowProxyClass(const js::Class* clasp) {
+        windowProxyClass_ = clasp;
     }
 
 #ifdef DEBUG
@@ -1489,7 +1498,7 @@ struct JSRuntime : public JS::shadow::Runtime,
             reportAllocationOverflow();
             return nullptr;
         }
-        return static_cast<T*>(onOutOfMemoryCanGC(js::AllocFunction::Realloc, bytes));
+        return static_cast<T*>(onOutOfMemoryCanGC(js::AllocFunction::Realloc, bytes, p));
     }
 
     /*
@@ -1502,302 +1511,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     int64_t lastAnimationTime;
 
   public:
-
-    /* ------------------------------------------
-       Performance measurements
-       ------------------------------------------ */
-    struct Stopwatch {
-        /**
-         * A map used to collapse compartments belonging to the same
-         * add-on (respectively to the same webpage, to the platform)
-         * into a single group.
-         *
-         * Keys: for system compartments, a `JSAddonId*` (which may be
-         * `nullptr`), and for webpages, a `JSPrincipals*` (which may
-         * not). Note that compartments may start as non-system
-         * compartments and become compartments later during their
-         * lifetime, which requires an invalidation.
-         *
-         * This map is meant to be accessed only by instances of
-         * PerformanceGroupHolder, which handle both reference-counting
-         * of the values and invalidation of the key/value pairs.
-         */
-        typedef js::HashMap<void*, js::PerformanceGroup*,
-                            js::DefaultHasher<void*>,
-                            js::SystemAllocPolicy> Groups;
-
-        Groups& groups() {
-            return groups_;
-        }
-
-        /**
-         * Performance data on the entire runtime.
-         */
-        js::PerformanceGroupHolder performance;
-
-        /**
-         * Callback used to ask the embedding to determine in which
-         * Performance Group the current execution belongs. Typically, this is
-         * used to regroup JSCompartments from several iframes from the same
-         * page or from several compartments of the same addon into a single
-         * Performance Group.
-         *
-         * May be `nullptr`, in which case we put all the JSCompartments
-         * in the same PerformanceGroup.
-         */
-        JSCurrentPerfGroupCallback currentPerfGroupCallback;
-
-        /**
-         * The number of the current iteration of the event loop.
-         */
-        uint64_t iteration() {
-            return iteration_;
-        }
-
-        explicit Stopwatch(JSRuntime* runtime)
-          : performance(runtime)
-          , currentPerfGroupCallback(nullptr)
-          , totalCPOWTime(0)
-          , isMonitoringJank_(false)
-          , isMonitoringCPOW_(false)
-          , isMonitoringPerCompartment_(false)
-          , iteration_(0)
-          , startedAtIteration_(0)
-          , idCounter_(0)
-        { }
-
-        /**
-         * Reset the stopwatch.
-         *
-         * This method is meant to be called whenever we start
-         * processing an event, to ensure that we stop any ongoing
-         * measurement that would otherwise provide irrelevant
-         * results.
-         */
-        void reset();
-
-        /**
-         * Start the stopwatch.
-         *
-         * This method is meant to be called once we know that the
-         * current event contains JavaScript code to execute. Calling
-         * this several times during the same iteration is idempotent.
-         */
-        void start();
-
-        /**
-         * Commit the performance data collected since the last call
-         * to `start()`, unless `reset()` has been called since then.
-         */
-        void commit();
-
-        /**
-         * Activate/deactivate stopwatch measurement of jank.
-         *
-         * Noop if `value` is `true` and the stopwatch is already
-         * measuring jank, or if `value` is `false` and the stopwatch
-         * is not measuring jank.
-         *
-         * Otherwise, any pending measurements are dropped, but previous
-         * measurements remain stored.
-         *
-         * May return `false` if the underlying hashtable cannot be allocated.
-         */
-        bool setIsMonitoringJank(bool value) {
-            if (isMonitoringJank_ != value)
-                reset();
-
-            if (value && !groups_.initialized()) {
-                if (!groups_.init(128))
-                    return false;
-            }
-
-            isMonitoringJank_ = value;
-            return true;
-        }
-        bool isMonitoringJank() const {
-            return isMonitoringJank_;
-        }
-
-        /**
-         * Activate/deactivate stopwatch measurement per compartment.
-         *
-         * Noop if `value` is `true` and the stopwatch is already
-         * measuring per compartment, or if `value` is `false` and the
-         * stopwatch is not measuring per compartment.
-         *
-         * Otherwise, any pending measurements are dropped, but previous
-         * measurements remain stored.
-         *
-         * May return `false` if the underlying hashtable cannot be allocated.
-         */
-        bool setIsMonitoringPerCompartment(bool value) {
-            if (isMonitoringPerCompartment_ != value)
-                reset();
-
-            if (value && !groups_.initialized()) {
-                if (!groups_.init(128))
-                    return false;
-            }
-
-            isMonitoringPerCompartment_ = value;
-            return true;
-        }
-        bool isMonitoringPerCompartment() const {
-            return isMonitoringPerCompartment_;
-        }
-
-        /**
-         * Activate/deactivate stopwatch measurement of CPOW.
-         *
-         * Noop if `value` is `true` and the stopwatch is already
-         * measuring CPOW, or if `value` is `false` and the stopwatch
-         * is not measuring CPOW.
-         *
-         * Otherwise, any pending measurements are dropped, but previous
-         * measurements remain stored.
-         *
-         * May return `false` if the underlying hashtable cannot be allocated.
-         */
-        bool setIsMonitoringCPOW(bool value) {
-            if (isMonitoringCPOW_ != value)
-                reset();
-
-            if (value && !groups_.initialized()) {
-                if (!groups_.init(128))
-                    return false;
-            }
-
-            isMonitoringCPOW_ = value;
-            return true;
-        }
-
-        bool isMonitoringCPOW() const {
-            return isMonitoringCPOW_;
-        }
-
-        /**
-         * Return a identifier for a group, unique to the runtime.
-         */
-        uint64_t uniqueId() {
-            return idCounter_++;
-        }
-
-        /**
-         * Mark a group as changed during the current iteration.
-         *
-         * Recent data from this group will be post-processed and
-         * committed at the end of the iteration.
-         */
-        void addChangedGroup(js::PerformanceGroup* group) {
-            MOZ_ASSERT(group->recentTicks == 0);
-            touchedGroups.append(group);
-        }
-
-        // The total amount of time spent waiting on CPOWs since the
-        // start of the process, in microseconds.
-        uint64_t totalCPOWTime;
-
-        // Data extracted by the AutoStopwatch to determine how often
-        // we reschedule the process to a different CPU during the
-        // execution of JS.
-        //
-        // Warning: These values are incremented *only* on platforms
-        // that offer a syscall/libcall to check on which CPU a
-        // process is currently executed.
-        struct TestCpuRescheduling
-        {
-            // Incremented once we have finished executing code
-            // in a group, if the CPU on which we started
-            // execution is the same as the CPU on which
-            // we finished.
-            uint64_t stayed;
-            // Incremented once we have finished executing code
-            // in a group, if the CPU on which we started
-            // execution is different from the CPU on which
-            // we finished.
-            uint64_t moved;
-            TestCpuRescheduling()
-              : stayed(0),
-                moved(0)
-            { }
-        };
-        TestCpuRescheduling testCpuRescheduling;
-
-    private:
-        Stopwatch(const Stopwatch&) = delete;
-        Stopwatch& operator=(const Stopwatch&) = delete;
-
-        // Commit a piece of data to a single group.
-        // `totalUserTimeDelta`, `totalSystemTimeDelta`, `totalCyclesDelta`
-        // represent the outer measures, taken for the entire runtime.
-        void transferDeltas(uint64_t totalUserTimeDelta,
-                            uint64_t totalSystemTimeDelta,
-                            uint64_t totalCyclesDelta,
-                            js::PerformanceGroup* destination);
-
-        // Query the OS for the time spent in CPU/kernel since process
-        // launch.
-        bool getResources(uint64_t* userTime, uint64_t* systemTime) const;
-
-    private:
-        Groups groups_;
-        friend struct js::PerformanceGroupHolder;
-
-        /**
-         * `true` if stopwatch monitoring is active for Jank, `false` otherwise.
-         */
-        bool isMonitoringJank_;
-        /**
-         * `true` if stopwatch monitoring is active for CPOW, `false` otherwise.
-         */
-        bool isMonitoringCPOW_;
-        /**
-         * `true` if the stopwatch should udpdate data per-compartment, in
-         * addition to data per-group.
-         */
-        bool isMonitoringPerCompartment_;
-
-        /**
-         * The number of times we have entered the event loop.
-         * Used to reset counters whenever we enter the loop,
-         * which may be caused either by having completed the
-         * previous run of the event loop, or by entering a
-         * nested loop.
-         *
-         * Always incremented by 1, may safely overflow.
-         */
-        uint64_t iteration_;
-
-        /**
-         * The iteration at which the stopwatch was last started.
-         *
-         * Used both to avoid starting the stopwatch several times
-         * during the same event loop and to avoid committing stale
-         * stopwatch results.
-         */
-        uint64_t startedAtIteration_;
-
-        /**
-         * A counter used to generate unique identifiers for groups.
-         */
-        uint64_t idCounter_;
-
-        /**
-         * The timestamps returned by `getResources()` during the call to
-         * `start()` in the current iteration of the event loop.
-         */
-        uint64_t userTimeStart_;
-        uint64_t systemTimeStart_;
-
-        /**
-         * Performance groups used during the current event.
-         *
-         * They are cleared by `commit()` and `reset()`.
-         */
-        mozilla::Vector<mozilla::RefPtr<js::PerformanceGroup>> touchedGroups;
-    };
-    Stopwatch stopwatch;
+    js::PerformanceMonitoring performanceMonitoring;
 };
 
 namespace js {

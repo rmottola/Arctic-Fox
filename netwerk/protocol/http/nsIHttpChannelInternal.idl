@@ -39,8 +39,7 @@ interface nsIHttpUpgradeListener : nsISupports
  * using any feature exposed by this interface, be aware that this interface
  * will change and you will be broken.  You have been warned.
  */
-[scriptable, uuid(5f019a6f-6f6f-4b5c-8994-70cdbc40258e)]
-
+[scriptable, uuid(9eabaac6-cc7c-4ca1-9430-65f2daaa578f)]
 interface nsIHttpChannelInternal : nsISupports
 {
     /**
@@ -223,6 +222,13 @@ interface nsIHttpChannelInternal : nsISupports
 
     readonly attribute PRTime lastModifiedTime;
 
+    /**
+     * Force a channel that has not been AsyncOpen'ed to skip any check for possible
+     * interception and proceed immediately to open a previously-synthesized cache
+     * entry using the provided ID.
+     */
+    void forceIntercepted(in uint64_t aInterceptionID);
+
     readonly attribute boolean responseSynthesized;
 
     /**
@@ -235,7 +241,6 @@ interface nsIHttpChannelInternal : nsISupports
     const unsigned long CORS_MODE_SAME_ORIGIN = 0;
     const unsigned long CORS_MODE_NO_CORS = 1;
     const unsigned long CORS_MODE_CORS = 2;
-    const unsigned long CORS_MODE_CORS_WITH_FORCED_PREFLIGHT = 3;
     /**
      * Set by nsCORSListenerProxy to indicate CORS load type. Defaults to CORS_MODE_NO_CORS.
      */

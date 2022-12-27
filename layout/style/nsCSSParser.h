@@ -9,6 +9,7 @@
 #define nsCSSParser_h___
 
 #include "mozilla/Attributes.h"
+#include "mozilla/css/Loader.h"
 
 #include "nsCSSProperty.h"
 #include "nsCSSScanner.h"
@@ -32,7 +33,6 @@ class CSSVariableValues;
 namespace css {
 class Rule;
 class Declaration;
-class Loader;
 class StyleRule;
 } // namespace css
 } // namespace mozilla
@@ -77,24 +77,27 @@ public:
    * @param aSheetPrincipal the principal of the stylesheet.  This must match
    *                        the principal of the sheet passed to SetStyleSheet.
    * @param aLineNumber the line number of the first line of the sheet.
-   * @param aAllowUnsafeRules see aEnableUnsafeRules in
-   *                          mozilla::css::Loader::LoadSheetSync
+   * @param aParsingMode  see SheetParsingMode in css/Loader.h
+   * @param aReusableSheets style sheets that can be reused by an @import.
+   *                        This can be nullptr.
    */
   nsresult ParseSheet(const nsAString& aInput,
                       nsIURI*          aSheetURL,
                       nsIURI*          aBaseURI,
                       nsIPrincipal*    aSheetPrincipal,
                       uint32_t         aLineNumber,
-                      bool             aAllowUnsafeRules);
+                      mozilla::css::SheetParsingMode aParsingMode,
+                      mozilla::css::LoaderReusableStyleSheets* aReusableSheets =
+                        nullptr);
 
   // Parse HTML style attribute or its equivalent in other markup
   // languages.  aBaseURL is the base url to use for relative links in
   // the declaration.
-  nsresult ParseStyleAttribute(const nsAString&  aAttributeValue,
+  already_AddRefed<mozilla::css::Declaration>
+           ParseStyleAttribute(const nsAString&  aAttributeValue,
                                nsIURI*           aDocURL,
                                nsIURI*           aBaseURL,
-                               nsIPrincipal*     aNodePrincipal,
-                               mozilla::css::StyleRule** aResult);
+                               nsIPrincipal*     aNodePrincipal);
 
   // Parse the body of a declaration block.  Very similar to
   // ParseStyleAttribute, but used under different circumstances.
@@ -131,6 +134,16 @@ public:
                      bool*               aChanged,
                      bool                aIsImportant,
                      bool                aIsSVGMode = false);
+
+  // Same as ParseProperty but returns an nsCSSValue in aResult
+  // rather than storing the property in a Declaration.  aPropID
+  // must be a longhand property.
+  void ParseLonghandProperty(const nsCSSProperty aPropID,
+                             const nsAString&    aPropValue,
+                             nsIURI*             aSheetURL,
+                             nsIURI*             aBaseURL,
+                             nsIPrincipal*       aSheetPrincipal,
+                             nsCSSValue&         aResult);
 
   // The same as ParseProperty but for a variable.
   void ParseVariable(const nsAString&    aVariableName,
@@ -308,6 +321,11 @@ public:
   // Check whether a given value can be applied to a property.
   bool IsValueValidForProperty(const nsCSSProperty aPropID,
                                const nsAString&    aPropValue);
+
+  // Return the default value to be used for -moz-control-character-visibility,
+  // from preferences (cached by our Startup(), so that both nsStyleText and
+  // nsRuleNode can have fast access to it).
+  static uint8_t ControlCharVisibilityDefault();
 
 protected:
   // This is a CSSParserImpl*, but if we expose that type name in this

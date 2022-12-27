@@ -28,14 +28,14 @@ public:
   {}
 
   // GMPVideoDecoderCallbackProxy
-  virtual void Decoded(GMPVideoi420Frame* aDecodedFrame) override;
-  virtual void ReceivedDecodedReferenceFrame(const uint64_t aPictureId) override;
-  virtual void ReceivedDecodedFrame(const uint64_t aPictureId) override;
-  virtual void InputDataExhausted() override;
-  virtual void DrainComplete() override;
-  virtual void ResetComplete() override;
-  virtual void Error(GMPErr aErr) override;
-  virtual void Terminated() override;
+  void Decoded(GMPVideoi420Frame* aDecodedFrame) override;
+  void ReceivedDecodedReferenceFrame(const uint64_t aPictureId) override;
+  void ReceivedDecodedFrame(const uint64_t aPictureId) override;
+  void InputDataExhausted() override;
+  void DrainComplete() override;
+  void ResetComplete() override;
+  void Error(GMPErr aErr) override;
+  void Terminated() override;
 
   void SetLastStreamOffset(int64_t aStreamOffset) {
     mLastStreamOffset = aStreamOffset;
@@ -46,7 +46,7 @@ private:
   int64_t mLastStreamOffset;
 
   VideoInfo mVideoInfo;
-  nsRefPtr<layers::ImageContainer> mImageContainer;
+  RefPtr<layers::ImageContainer> mImageContainer;
 };
 
 class GMPVideoDecoder : public MediaDataDecoder {
@@ -84,16 +84,16 @@ public:
   {
   }
 
-  virtual nsRefPtr<InitPromise> Init() override;
-  virtual nsresult Input(MediaRawData* aSample) override;
-  virtual nsresult Flush() override;
-  virtual nsresult Drain() override;
-  virtual nsresult Shutdown() override;
+  RefPtr<InitPromise> Init() override;
+  nsresult Input(MediaRawData* aSample) override;
+  nsresult Flush() override;
+  nsresult Drain() override;
+  nsresult Shutdown() override;
 
 protected:
   virtual void InitTags(nsTArray<nsCString>& aTags);
   virtual nsCString GetNodeId();
-  virtual GMPUnique<GMPVideoEncodedFrame>::Ptr CreateFrame(MediaRawData* aSample);
+  virtual GMPUniquePtr<GMPVideoEncodedFrame> CreateFrame(MediaRawData* aSample);
 
 private:
   class GMPInitDoneRunnable : public nsRunnable
@@ -139,7 +139,7 @@ private:
     {
     }
 
-    virtual void Done(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost)
+    void Done(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost) override
     {
       if (aGMP) {
         mDecoder->GMPInitDone(aGMP, aHost);
@@ -148,8 +148,8 @@ private:
     }
 
   private:
-    nsRefPtr<GMPVideoDecoder> mDecoder;
-    nsRefPtr<GMPInitDoneRunnable> mGMPInitDone;
+    RefPtr<GMPVideoDecoder> mDecoder;
+    RefPtr<GMPInitDoneRunnable> mGMPInitDone;
   };
   void GMPInitDone(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost);
 

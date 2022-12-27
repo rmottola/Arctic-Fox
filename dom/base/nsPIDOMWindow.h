@@ -22,6 +22,7 @@
 
 class nsIArray;
 class nsIContent;
+class nsICSSDeclaration;
 class nsIDocShell;
 class nsIDocShellLoadInfo;
 class nsIDocument;
@@ -63,8 +64,8 @@ enum UIStateChangeType
 };
 
 #define NS_PIDOMWINDOW_IID \
-{ 0x052e675a, 0xacd3, 0x48d1, \
-  { 0x8a, 0xcd, 0xbf, 0xff, 0xbd, 0x24, 0x4c, 0xed } }
+{ 0x775dabc9, 0x8f43, 0x4277, \
+  { 0x9a, 0xdb, 0xf1, 0x99, 0x0d, 0x77, 0xcf, 0xfb } }
 
 class nsPIDOMWindow : public nsIDOMWindowInternal
 {
@@ -309,10 +310,12 @@ public:
 
   // Suspend timeouts in this window and in child windows.
   virtual void SuspendTimeouts(uint32_t aIncrease = 1,
-                               bool aFreezeChildren = true) = 0;
+                               bool aFreezeChildren = true,
+                               bool aFreezeWorkers = true) = 0;
 
   // Resume suspended timeouts in this window and in child windows.
-  virtual nsresult ResumeTimeouts(bool aThawChildren = true) = 0;
+  virtual nsresult ResumeTimeouts(bool aThawChildren = true,
+                                  bool aThawWorkers = true) = 0;
 
   virtual uint32_t TimeoutSuspendCount() = 0;
 
@@ -429,7 +432,7 @@ public:
    * SetOpenerWindow is called.  It might never be true, of course, if the
    * window does not have an opener when it's created.
    */
-  virtual void SetOpenerWindow(nsPIDOMWindow* aOpener,
+  virtual void SetOpenerWindow(nsIDOMWindow* aOpener,
                                bool aOriginalOpener) = 0;
 
   virtual void EnsureSizeUpToDate() = 0;
@@ -774,7 +777,14 @@ public:
     return mMarkedCCGeneration;
   }
 
+  virtual nsIDOMScreen* GetScreen() = 0;
+  virtual nsIDOMNavigator* GetNavigator() = 0;
+  virtual nsIDOMLocation* GetLocation() = 0;
+  virtual nsresult GetPrompter(nsIPrompt** aPrompt) = 0;
+  virtual nsresult GetControllers(nsIControllers** aControllers) = 0;
+  virtual already_AddRefed<nsISelection> GetSelection() = 0;
   virtual already_AddRefed<nsPIDOMWindow> GetOpener() = 0;
+  virtual already_AddRefed<nsIDOMWindowCollection> GetFrames() = 0;
   // aLoadInfo will be passed on through to the windowwatcher.
   // aForceNoOpener will act just like a "noopener" feature in aOptions except
   //                will not affect any other window features.
@@ -786,6 +796,24 @@ public:
   virtual nsresult OpenDialog(const nsAString& aUrl, const nsAString& aName,
                               const nsAString& aOptions,
                               nsISupports* aExtraArgument, nsIDOMWindow** _retval) = 0;
+
+  virtual nsresult GetDevicePixelRatio(float* aRatio) = 0;
+  virtual nsresult GetInnerWidth(int32_t* aWidth) = 0;
+  virtual nsresult GetInnerHeight(int32_t* aHeight) = 0;
+  virtual already_AddRefed<nsICSSDeclaration>
+    GetComputedStyle(mozilla::dom::Element& aElt, const nsAString& aPseudoElt,
+                     mozilla::ErrorResult& aError) = 0;
+  virtual already_AddRefed<nsIDOMElement> GetFrameElement() = 0;
+  virtual already_AddRefed<nsIDOMOfflineResourceList> GetApplicationCache() = 0;
+  virtual bool Closed() = 0;
+  virtual bool GetFullScreen() = 0;
+  virtual nsresult SetFullScreen(bool aFullScreen) = 0;
+
+  virtual nsresult Focus() = 0;
+  virtual nsresult Close() = 0;
+
+  virtual nsresult MoveBy(int32_t aXDif, int32_t aYDif) = 0;
+  virtual nsresult UpdateCommands(const nsAString& anAction, nsISelection* aSel, int16_t aReason) = 0;
 
 protected:
   // The nsPIDOMWindow constructor. The aOuterWindow argument should
@@ -824,7 +852,7 @@ protected:
   nsIDocShell           *mDocShell;  // Weak Reference
 
   // mPerformance is only used on inner windows.
-  nsRefPtr<nsPerformance>       mPerformance;
+  RefPtr<nsPerformance>       mPerformance;
 
   uint32_t               mModalStateDepth;
 

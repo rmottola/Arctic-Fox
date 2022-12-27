@@ -28,7 +28,7 @@ nsScreenManagerProxy::nsScreenManagerProxy()
   , mCacheWillInvalidate(false)
 {
   bool success = false;
-  unused << ContentChild::GetSingleton()->SendPScreenManagerConstructor(
+  Unused << ContentChild::GetSingleton()->SendPScreenManagerConstructor(
                                             this,
                                             &mNumberOfScreens,
                                             &mSystemDefaultScale,
@@ -64,7 +64,7 @@ nsScreenManagerProxy::GetPrimaryScreen(nsIScreen** outScreen)
   if (!mPrimaryScreen) {
     ScreenDetails details;
     bool success = false;
-    unused << SendGetPrimaryScreen(&details, &success);
+    Unused << SendGetPrimaryScreen(&details, &success);
     if (!success) {
       return NS_ERROR_FAILURE;
     }
@@ -92,12 +92,12 @@ nsScreenManagerProxy::ScreenForRect(int32_t inLeft,
 {
   bool success = false;
   ScreenDetails details;
-  unused << SendScreenForRect(inLeft, inTop, inWidth, inHeight, &details, &success);
+  Unused << SendScreenForRect(inLeft, inTop, inWidth, inHeight, &details, &success);
   if (!success) {
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<ScreenProxy> screen = new ScreenProxy(this, details);
+  RefPtr<ScreenProxy> screen = new ScreenProxy(this, details);
   NS_ADDREF(*outScreen = screen);
 
   return NS_OK;
@@ -126,13 +126,13 @@ nsScreenManagerProxy::ScreenForNativeWidget(void* aWidget,
   // for it.
   bool success = false;
   ScreenDetails details;
-  unused << SendScreenForBrowser(tabChild->GetTabId(), &details, &success);
+  Unused << SendScreenForBrowser(tabChild->GetTabId(), &details, &success);
   if (!success) {
     return NS_ERROR_FAILURE;
   }
 
   ScreenCacheEntry newEntry;
-  nsRefPtr<ScreenProxy> screen = new ScreenProxy(this, details);
+  RefPtr<ScreenProxy> screen = new ScreenProxy(this, details);
 
   newEntry.mScreenProxy = screen;
   newEntry.mTabChild = tabChild;
@@ -177,7 +177,7 @@ nsScreenManagerProxy::EnsureCacheIsValid()
   bool success = false;
   // Kick off a synchronous IPC call to the parent to get the
   // most up-to-date information.
-  unused << SendRefresh(&mNumberOfScreens, &mSystemDefaultScale, &success);
+  Unused << SendRefresh(&mNumberOfScreens, &mSystemDefaultScale, &success);
   if (!success) {
     NS_WARNING("Refreshing nsScreenManagerProxy failed in the parent process.");
     return false;

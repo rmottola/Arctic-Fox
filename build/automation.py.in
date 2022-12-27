@@ -16,7 +16,6 @@ from datetime import datetime, timedelta
 
 SCRIPT_DIR = os.path.abspath(os.path.realpath(os.path.dirname(sys.argv[0])))
 sys.path.insert(0, SCRIPT_DIR)
-import automationutils
 
 # --------------------------------------------------------------
 # TODO: this is a hack for mozbase without virtualenv, remove with bug 849900
@@ -31,6 +30,8 @@ if os.path.isdir(mozbase):
             sys.path.append(package_path)
 
 import mozcrash
+from mozscreenshot import printstatus, dump_screen
+
 
 # ---------------------------------------------------------------
 
@@ -63,6 +64,7 @@ _IS_CYGWIN = False
 #expand _CERTS_SRC_DIR = __CERTS_SRC_DIR__
 #expand _IS_TEST_BUILD = __IS_TEST_BUILD__
 #expand _IS_DEBUG_BUILD = __IS_DEBUG_BUILD__
+#expand _CRASHREPORTER = __CRASHREPORTER__ == 1
 #expand _IS_ASAN = __IS_ASAN__ == 1
 
 
@@ -108,6 +110,7 @@ class Automation(object):
   CERTS_SRC_DIR = _CERTS_SRC_DIR
   IS_TEST_BUILD = _IS_TEST_BUILD
   IS_DEBUG_BUILD = _IS_DEBUG_BUILD
+  CRASHREPORTER = _CRASHREPORTER
   IS_ASAN = _IS_ASAN
 
   # timeout, in seconds
@@ -224,6 +227,12 @@ class Automation(object):
 
     if dmdPath and dmdLibrary and preloadEnvVar:
       env[preloadEnvVar] = os.path.join(dmdPath, dmdLibrary)
+
+    if crashreporter and not debugger:
+      env['MOZ_CRASHREPORTER_NO_REPORT'] = '1'
+      env['MOZ_CRASHREPORTER'] = '1'
+    else:
+      env['MOZ_CRASHREPORTER_DISABLE'] = '1'
 
     # Crash on non-local network connections by default.
     # MOZ_DISABLE_NONLOCAL_CONNECTIONS can be set to "0" to temporarily
@@ -359,7 +368,7 @@ class Automation(object):
       return
 
     self.haveDumpedScreen = True;
-    automationutils.dumpScreen(utilityPath)
+    dump_screen(utilityPath, self.log)
 
 
   def killAndGetStack(self, processPID, utilityPath, debuggerInfo):
@@ -371,6 +380,20 @@ class Automation(object):
 
   def killAndGetStackNoScreenshot(self, processPID, utilityPath, debuggerInfo):
     """Kill the process, preferrably in a way that gets us a stack trace."""
+    if self.CRASHREPORTER and not debuggerInfo:
+      if not self.IS_WIN32:
+        # ABRT will get picked up by Breakpad's signal handler
+        os.kill(processPID, signal.SIGABRT)
+        return
+      else:
+        # We should have a "crashinject" program in our utility path
+        crashinject = os.path.normpath(os.path.join(utilityPath, "crashinject.exe"))
+        if os.path.exists(crashinject):
+          status = subprocess.Popen([crashinject, str(processPID)]).wait()
+          printstatus("crashinject", status)
+          if status == 0:
+            return
+    self.log.info("Can't trigger Breakpad, just killing process")
     self.killPid(processPID)
 
   def waitForFinish(self, proc, utilityPath, timeout, maxTime, startTime, debuggerInfo, symbolsPath):
@@ -436,7 +459,7 @@ class Automation(object):
         self.killAndGetStack(browserProcessId, utilityPath, debuggerInfo)
 
     status = proc.wait()
-    automationutils.printstatus(status, "Main app process")
+    printstatus("Main app process", status)
     if status == 0:
       self.lastTestSeen = "Main app process exited normally"
     if status != 0 and not didTimeout and not hitMaxTime:
@@ -507,7 +530,8 @@ class Automation(object):
              xrePath = None, certPath = None,
              debuggerInfo = None, symbolsPath = None,
              timeout = -1, maxTime = None, onLaunch = None,
-             detectShutdownLeaks = False, screenshotOnFail=False, testPath=None, bisectChunk=None):
+             detectShutdownLeaks = False, screenshotOnFail=False, testPath=None, bisectChunk=None,
+             valgrindPath=None, valgrindArgs=None, valgrindSuppFiles=None):
     """
     Run the app, log the duration it took to execute, return the status code.
     Kills the app if it runs for longer than |maxTime| seconds, or outputs nothing for |timeout| seconds.
@@ -545,7 +569,8 @@ class Automation(object):
 
     self.lastTestSeen = "automation.py"
     proc = self.Process([cmd] + args,
-                 env = self.environment(env, xrePath = xrePath),
+                 env = self.environment(env, xrePath = xrePath,
+                                   crashreporter = not debuggerInfo),
                  stdout = outputPipe,
                  stderr = subprocess.STDOUT)
     self.log.info("INFO | automation.py | Application pid: %d", proc.pid)

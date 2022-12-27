@@ -16,8 +16,7 @@ extern PRLogModuleInfo* gMediaDecoderLog;
 NS_IMPL_ISUPPORTS0(BufferDecoder)
 
 BufferDecoder::BufferDecoder(MediaResource* aResource)
-  : mReentrantMonitor("BufferDecoder")
-  , mResource(aResource)
+  : mResource(aResource)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_COUNT_CTOR(BufferDecoder);
@@ -37,26 +36,6 @@ BufferDecoder::BeginDecoding(TaskQueue* aTaskQueueIdentity)
 {
   MOZ_ASSERT(!mTaskQueueIdentity && aTaskQueueIdentity);
   mTaskQueueIdentity = aTaskQueueIdentity;
-}
-
-ReentrantMonitor&
-BufferDecoder::GetReentrantMonitor()
-{
-  return mReentrantMonitor;
-}
-
-bool
-BufferDecoder::OnStateMachineTaskQueue() const
-{
-  // BufferDecoder doesn't have the concept of a state machine.
-  return true;
-}
-
-bool
-BufferDecoder::OnDecodeTaskQueue() const
-{
-  MOZ_ASSERT(mTaskQueueIdentity, "Forgot to call BeginDecoding?");
-  return mTaskQueueIdentity->IsCurrentThreadIn();
 }
 
 MediaResource*
@@ -124,12 +103,6 @@ BufferDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo, MediaDecoderEventVis
 
 void
 BufferDecoder::OnReadMetadataCompleted()
-{
-  // ignore
-}
-
-void
-BufferDecoder::NotifyWaitingForResourcesStatusChanged()
 {
   // ignore
 }

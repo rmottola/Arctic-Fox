@@ -43,8 +43,8 @@ VideoFrame::TakeFrom(VideoFrame* aFrame)
 /* static */ already_AddRefed<Image>
 VideoFrame::CreateBlackImage(const gfx::IntSize& aSize)
 {
-  nsRefPtr<ImageContainer> container;
-  nsRefPtr<Image> image;
+  RefPtr<ImageContainer> container;
+  RefPtr<Image> image;
   container = LayerManager::CreateImageContainer();
   image = container->CreateImage(ImageFormat::PLANAR_YCBCR);
   if (!image) {
@@ -80,7 +80,10 @@ VideoFrame::CreateBlackImage(const gfx::IntSize& aSize)
   data.mStereoMode = StereoMode::MONO;
 
   // SetData copies data, so we can free data.
-  planar->SetData(data);
+  if (!planar->SetData(data)) {
+    MOZ_ASSERT(false);
+    return nullptr;
+  }
 
   return image.forget();
 }

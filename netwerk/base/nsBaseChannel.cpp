@@ -107,7 +107,7 @@ nsBaseChannel::Redirect(nsIChannel *newChannel, uint32_t redirectFlags,
   // we support nsIHttpEventSink if we are an HTTP channel and if this is not
   // an internal redirect.
 
-  nsRefPtr<nsAsyncRedirectVerifyHelper> redirectCallbackHelper =
+  RefPtr<nsAsyncRedirectVerifyHelper> redirectCallbackHelper =
       new nsAsyncRedirectVerifyHelper();
 
   bool checkRedirectSynchronously = !openNewChannel;
@@ -169,7 +169,7 @@ nsBaseChannel::ContinueRedirect()
       nsCOMPtr<nsIPrincipal> uriPrincipal;
       nsIScriptSecurityManager *sm = nsContentUtils::GetSecurityManager();
       sm->GetChannelURIPrincipal(this, getter_AddRefs(uriPrincipal));
-      mLoadInfo->AppendRedirectedPrincipal(uriPrincipal);
+      mLoadInfo->AppendRedirectedPrincipal(uriPrincipal, false);
     }
   }
 
@@ -303,7 +303,7 @@ nsBaseChannel::ClassifyURI()
   }
 
   if (mLoadFlags & LOAD_CLASSIFY_URI) {
-    nsRefPtr<nsChannelClassifier> classifier = new nsChannelClassifier();
+    RefPtr<nsChannelClassifier> classifier = new nsChannelClassifier();
     if (classifier) {
       classifier->Start(this);
     } else {
@@ -837,7 +837,7 @@ nsBaseChannel::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
     } else {
       class OnTransportStatusAsyncEvent : public nsRunnable
       {
-        nsRefPtr<nsBaseChannel> mChannel;
+        RefPtr<nsBaseChannel> mChannel;
         int64_t mProgress;
         int64_t mContentLength;
       public:

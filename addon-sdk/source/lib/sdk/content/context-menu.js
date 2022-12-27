@@ -138,7 +138,7 @@ CONTEXTS.PageContext = Class({
     // If the clicked node or any of its ancestors is one of the blocked
     // NON_PAGE_CONTEXT_ELTS then this context does not match
     while (!(popupNode instanceof Ci.nsIDOMDocument)) {
-      if (NON_PAGE_CONTEXT_ELTS.some(function(type) popupNode instanceof type))
+      if (NON_PAGE_CONTEXT_ELTS.some(type => popupNode instanceof type))
         return false;
 
       popupNode = popupNode.parentNode;
@@ -183,7 +183,7 @@ CONTEXTS.SelectorContext = Class({
     let selector = this.selector;
 
     while (!(popupNode instanceof Ci.nsIDOMDocument)) {
-      if (popupNode.mozMatchesSelector(selector))
+      if (popupNode.matches(selector))
         return popupNode;
 
       popupNode = popupNode.parentNode;

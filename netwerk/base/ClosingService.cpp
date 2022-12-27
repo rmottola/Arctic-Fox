@@ -6,6 +6,9 @@
 
 #include "ClosingService.h"
 #include "nsIOService.h"
+#ifdef MOZ_NUWA_PROCESS
+#include "ipc/Nuwa.h"
+#endif
 
 class ClosingLayerSecret
 {
@@ -20,7 +23,7 @@ public:
     mClosingService = nullptr;
   }
 
-  nsRefPtr<mozilla::net::ClosingService> mClosingService;
+  RefPtr<mozilla::net::ClosingService> mClosingService;
 };
 
 namespace mozilla {
@@ -108,7 +111,7 @@ ClosingService::StartInternal()
 {
   mThread = PR_CreateThread(PR_USER_THREAD, ThreadFunc, this,
                             PR_PRIORITY_NORMAL, PR_GLOBAL_THREAD,
-                            PR_JOINABLE_THREAD, 4 * 4096);
+                            PR_JOINABLE_THREAD, 32 * 1024);
   if (!mThread) {
     return NS_ERROR_FAILURE;
   }
@@ -200,6 +203,13 @@ ClosingService::ShutdownInternal()
 void
 ClosingService::ThreadFunc()
 {
+  PR_SetCurrentThreadName("Closing Service");
+#ifdef MOZ_NUWA_PROCESS
+  if (IsNuwaProcess()) {
+    NuwaMarkCurrentThread(nullptr, nullptr);
+  }
+#endif
+
   for (;;) {
     PRFileDesc *fd;
     {

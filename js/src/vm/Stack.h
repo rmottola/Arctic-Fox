@@ -204,6 +204,7 @@ class AbstractFramePtr
 
     inline bool hasCallObj() const;
     inline bool isFunctionFrame() const;
+    inline bool isModuleFrame() const;
     inline bool isGlobalFrame() const;
     inline bool isEvalFrame() const;
     inline bool isDebuggerEvalFrame() const;
@@ -451,6 +452,9 @@ class InterpreterFrame
 
     bool prologue(JSContext* cx);
     void epilogue(JSContext* cx);
+
+    bool checkReturn(JSContext* cx);
+    bool checkThis(JSContext* cx);
 
     bool initFunctionScopeObjects(JSContext* cx);
 
@@ -733,9 +737,17 @@ class InterpreterFrame
     }
 
     Value& thisValue() const {
-        if (flags_ & (EVAL | GLOBAL))
+        if (flags_ & (EVAL | GLOBAL | MODULE))
             return ((Value*)this)[-1];
         return argv()[-1];
+    }
+
+    void setDerivedConstructorThis(HandleObject thisv) {
+        MOZ_ASSERT(isNonEvalFunctionFrame());
+        MOZ_ASSERT(script()->isDerivedClassConstructor());
+        MOZ_ASSERT(callee().isClassConstructor());
+        MOZ_ASSERT(thisValue().isMagic(JS_UNINITIALIZED_LEXICAL));
+        argv()[-1] = ObjectValue(*thisv);
     }
 
     /*
@@ -2028,6 +2040,9 @@ class FrameIter
 
     // This can only be called when isPhysicalIonFrame():
     inline jit::CommonFrameLayout* physicalIonFrame() const;
+
+    // This is used to provide a raw interface for debugging.
+    void* rawFramePtr() const;
 
   private:
     Data data_;

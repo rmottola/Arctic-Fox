@@ -20,7 +20,12 @@ TaskThrottler::TaskThrottler(const TimeStamp& aTimeStamp, const TimeDuration& aM
   , mMaxWait(aMaxWait)
   , mMean(1)
   , mTimer(do_CreateInstance(NS_TIMER_CONTRACTID))
-{ }
+{
+  // The TaskThrottler must be created on the main thread (or some nsITimer-
+  // compatible thread) for the nsITimer to work properly. In particular,
+  // creating it on the Compositor thread doesn't work.
+  MOZ_ASSERT(NS_IsMainThread());
+}
 
 TaskThrottler::~TaskThrottler()
 {
@@ -45,7 +50,7 @@ TaskThrottler::PostTask(const tracked_objects::Location& aLocation,
       // even if we don't get a TaskComplete() until then.
       TimeDuration timeout = mMaxWait - TimeSinceLastRequest(aTimeStamp);
       TimeStamp timeoutTime = mStartTime + mMaxWait;
-      nsRefPtr<TaskThrottler> refPtrThis = this;
+      RefPtr<TaskThrottler> refPtrThis = this;
       mTimer->InitWithCallback(NewTimerCallback(
           [refPtrThis, timeoutTime]()
           {

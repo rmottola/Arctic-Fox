@@ -22,6 +22,8 @@
 #include "prtime.h"
 #include "AudioSampleFormat.h"
 #include "TimeUnits.h"
+#include "nsITimer.h"
+#include "nsCOMPtr.h"
 
 using mozilla::CheckedInt64;
 using mozilla::CheckedUint64;
@@ -152,9 +154,9 @@ nsresult SecondsToUsecs(double aSeconds, int64_t& aOutUsecs);
 // The maximum height and width of the video. Used for
 // sanitizing the memory allocation of the RGB buffer.
 // The maximum resolution we anticipate encountering in the
-// wild is 2160p - 3840x2160 pixels.
-static const int32_t MAX_VIDEO_WIDTH = 4000;
-static const int32_t MAX_VIDEO_HEIGHT = 3000;
+// wild is 2160p (UHD "4K") or 4320p - 7680x4320 pixels for VR.
+static const int32_t MAX_VIDEO_WIDTH = 8192;
+static const int32_t MAX_VIDEO_HEIGHT = 4608;
 
 // Scales the display rect aDisplay by aspect ratio aAspectRatio.
 // Note that aDisplay must be validated by IsValidVideoRegion()
@@ -276,22 +278,22 @@ CreateFlushableMediaDecodeTaskQueue();
 // Iteratively invokes aWork until aCondition returns true, or aWork returns false.
 // Use this rather than a while loop to avoid bogarting the task queue.
 template<class Work, class Condition>
-nsRefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
-  nsRefPtr<GenericPromise::Private> p = new GenericPromise::Private(__func__);
+RefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
+  RefPtr<GenericPromise::Private> p = new GenericPromise::Private(__func__);
 
   if (aCondition()) {
     p->Resolve(true, __func__);
   }
 
   struct Helper {
-    static void Iteration(nsRefPtr<GenericPromise::Private> aPromise, Work aWork, Condition aCondition) {
-      if (!aWork()) {
+    static void Iteration(RefPtr<GenericPromise::Private> aPromise, Work aLocalWork, Condition aLocalCondition) {
+      if (!aLocalWork()) {
         aPromise->Reject(NS_ERROR_FAILURE, __func__);
-      } else if (aCondition()) {
+      } else if (aLocalCondition()) {
         aPromise->Resolve(true, __func__);
       } else {
         nsCOMPtr<nsIRunnable> r =
-          NS_NewRunnableFunction([aPromise, aWork, aCondition] () { Iteration(aPromise, aWork, aCondition); });
+          NS_NewRunnableFunction([aPromise, aLocalWork, aLocalCondition] () { Iteration(aPromise, aLocalWork, aLocalCondition); });
         AbstractThread::GetCurrent()->Dispatch(r.forget());
       }
     }
@@ -300,6 +302,32 @@ nsRefPtr<GenericPromise> InvokeUntil(Work aWork, Condition aCondition) {
   Helper::Iteration(p, aWork, aCondition);
   return p.forget();
 }
+
+// Simple timer to run a runnable after a timeout.
+class SimpleTimer : public nsITimerCallback
+{
+public:
+  NS_DECL_ISUPPORTS
+
+  // Create a new timer to run aTask after aTimeoutMs milliseconds
+  // on thread aTarget. If aTarget is null, task is run on the main thread.
+  static already_AddRefed<SimpleTimer> Create(nsIRunnable* aTask,
+                                              uint32_t aTimeoutMs,
+                                              nsIThread* aTarget = nullptr);
+  void Cancel();
+
+  NS_IMETHOD Notify(nsITimer *timer) override;
+
+private:
+  virtual ~SimpleTimer() {}
+  nsresult Init(nsIRunnable* aTask, uint32_t aTimeoutMs, nsIThread* aTarget);
+
+  RefPtr<nsIRunnable> mTask;
+  nsCOMPtr<nsITimer> mTimer;
+};
+
+void
+LogToBrowserConsole(const nsAString& aMsg);
 
 bool
 ParseCodecsString(const nsAString& aCodecs, nsTArray<nsString>& aOutCodecs);

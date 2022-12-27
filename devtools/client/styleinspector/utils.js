@@ -4,15 +4,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global domUtils */
-
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
 const {setTimeout, clearTimeout} =
       Cu.import("resource://gre/modules/Timer.jsm", {});
 const {parseDeclarations} =
-      require("devtools/client/styleinspector/css-parsing-utils");
+      require("devtools/client/shared/css-parsing-utils");
 const promise = require("promise");
 
 loader.lazyServiceGetter(this, "domUtils",

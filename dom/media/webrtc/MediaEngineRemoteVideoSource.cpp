@@ -97,7 +97,12 @@ MediaEngineRemoteVideoSource::Allocate(const dom::MediaTrackConstraints& aConstr
 {
   LOG((__PRETTY_FUNCTION__));
 
-  if (mState == kReleased && mInitDone) {
+  if (!mInitDone) {
+    LOG(("Init not done"));
+    return NS_ERROR_FAILURE;
+  }
+
+  if (mState == kReleased) {
     // Note: if shared, we don't allow a later opener to affect the resolution.
     // (This may change depending on spec changes for Constraints/settings)
 
@@ -121,19 +126,20 @@ MediaEngineRemoteVideoSource::Allocate(const dom::MediaTrackConstraints& aConstr
     }
   }
 
+  ++mNrAllocations;
+
   return NS_OK;
 }
 
 nsresult
 MediaEngineRemoteVideoSource::Deallocate()
 {
-  LOG((__FUNCTION__));
-  bool empty;
-  {
-    MonitorAutoLock lock(mMonitor);
-    empty = mSources.IsEmpty();
-  }
-  if (empty) {
+  LOG((__PRETTY_FUNCTION__));
+
+  --mNrAllocations;
+  MOZ_ASSERT(mNrAllocations >= 0, "Double-deallocations are prohibited");
+
+  if (mNrAllocations == 0) {
     if (mState != kStopped && mState != kAllocated) {
       return NS_ERROR_FAILURE;
     }
@@ -212,6 +218,31 @@ MediaEngineRemoteVideoSource::Stop(mozilla::SourceMediaStream* aSource,
   return NS_OK;
 }
 
+nsresult
+MediaEngineRemoteVideoSource::Restart(const dom::MediaTrackConstraints& aConstraints,
+                                      const MediaEnginePrefs& aPrefs,
+                                      const nsString& aDeviceId)
+{
+  if (!mInitDone) {
+    LOG(("Init not done"));
+    return NS_ERROR_FAILURE;
+  }
+  if (!ChooseCapability(aConstraints, aPrefs, aDeviceId)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  if (mState != kStarted) {
+    return NS_OK;
+  }
+
+  mozilla::camera::StopCapture(mCapEngine, mCaptureIndex);
+  if (mozilla::camera::StartCapture(mCapEngine,
+                                    mCaptureIndex, mCapability, this)) {
+    LOG(("StartCapture failed"));
+    return NS_ERROR_FAILURE;
+  }
+  return NS_OK;
+}
+
 void
 MediaEngineRemoteVideoSource::NotifyPull(MediaStreamGraph* aGraph,
                                          SourceMediaStream* aSource,
@@ -258,7 +289,7 @@ MediaEngineRemoteVideoSource::DeliverFrame(unsigned char* buffer,
   }
 
   // Create a video frame and append it to the track.
-  nsRefPtr<layers::Image> image = mImageContainer->CreateImage(ImageFormat::PLANAR_YCBCR);
+  RefPtr<layers::Image> image = mImageContainer->CreateImage(ImageFormat::PLANAR_YCBCR);
   layers::PlanarYCbCrImage* videoImage = static_cast<layers::PlanarYCbCrImage*>(image.get());
 
   uint8_t* frame = static_cast<uint8_t*> (buffer);
@@ -279,7 +310,10 @@ MediaEngineRemoteVideoSource::DeliverFrame(unsigned char* buffer,
   data.mPicSize = IntSize(mWidth, mHeight);
   data.mStereoMode = StereoMode::MONO;
 
-  videoImage->SetData(data);
+  if (!videoImage->SetData(data)) {
+    MOZ_ASSERT(false);
+    return 0;
+  }
 
 #ifdef DEBUG
   static uint32_t frame_num = 0;
@@ -360,6 +394,31 @@ MediaEngineRemoteVideoSource::NumCapabilities()
   }
 
   return mHardcodedCapabilities.Length();
+}
+
+bool
+MediaEngineRemoteVideoSource::ChooseCapability(const MediaTrackConstraints &aConstraints,
+    const MediaEnginePrefs &aPrefs,
+    const nsString& aDeviceId)
+{
+
+  switch(mMediaSource) {
+    case dom::MediaSourceEnum::Screen:
+    case dom::MediaSourceEnum::Window:
+    case dom::MediaSourceEnum::Application: {
+      FlattenedConstraints c(aConstraints);
+      mCapability.width = ((c.mWidth.mIdeal.WasPassed() ?
+        c.mWidth.mIdeal.Value() : 0) & 0xffff) << 16 | (c.mWidth.mMax & 0xffff);
+      mCapability.height = ((c.mHeight.mIdeal.WasPassed() ?
+        c.mHeight.mIdeal.Value() : 0) & 0xffff) << 16 | (c.mHeight.mMax & 0xffff);
+      mCapability.maxFPS = c.mFrameRate.Clamp(c.mFrameRate.mIdeal.WasPassed() ?
+        c.mFrameRate.mIdeal.Value() : aPrefs.mFPS);
+      return true;
+    }
+    default:
+      return MediaEngineCameraVideoSource::ChooseCapability(aConstraints, aPrefs, aDeviceId);
+  }
+
 }
 
 void

@@ -40,8 +40,17 @@ class Date;
 class File;
 class FileList;
 
-class UploadLastDir final : public nsIObserver, public nsSupportsWeakReference {
-
+/**
+ * A class we use to create a singleton object that is used to keep track of
+ * the last directory from which the user has picked files (via
+ * <input type=file>) on a per-domain basis. The implementation uses
+ * nsIContentPrefService2/NS_CONTENT_PREF_SERVICE_CONTRACTID to store the last
+ * directory per-domain, and to ensure that whether the directories are
+ * persistently saved (saved across sessions) or not honors whether or not the
+ * page is being viewed in private browsing.
+ */
+class UploadLastDir final : public nsIObserver, public nsSupportsWeakReference
+{
   ~UploadLastDir() {}
 
 public:
@@ -211,12 +220,12 @@ public:
 
   void GetDisplayFileName(nsAString& aFileName) const;
 
-  const nsTArray<nsRefPtr<File>>& GetFilesInternal() const
+  const nsTArray<RefPtr<File>>& GetFilesInternal() const
   {
     return mFiles;
   }
 
-  void SetFiles(const nsTArray<nsRefPtr<File>>& aFiles, bool aSetValueChanged);
+  void SetFiles(const nsTArray<RefPtr<File>>& aFiles, bool aSetValueChanged);
   void SetFiles(nsIDOMFileList* aFiles, bool aSetValueChanged);
 
   // Called when a nsIFilePicker or a nsIColorPicker terminate.
@@ -832,9 +841,14 @@ protected:
                                      uint32_t aLen, uint32_t* aResult);
 
   // Helper method
-  nsresult SetValueInternal(const nsAString& aValue,
-                            bool aUserInput,
-                            bool aSetValueChanged);
+
+  /**
+   * Setting the value.
+   *
+   * @param aValue      String to set.
+   * @param aFlags      See nsTextEditorState::SetValueFlags.
+   */
+  nsresult SetValueInternal(const nsAString& aValue, uint32_t aFlags);
 
   nsresult GetValueInternal(nsAString& aValue) const;
 
@@ -1266,7 +1280,7 @@ protected:
    * the frame. Whenever the frame wants to change the filename it has to call
    * SetFileNames to update this member.
    */
-  nsTArray<nsRefPtr<File>> mFiles;
+  nsTArray<RefPtr<File>> mFiles;
 
 #ifndef MOZ_CHILD_PERMISSIONS
   /**
@@ -1275,7 +1289,7 @@ protected:
   nsString mFirstFilePath;
 #endif
 
-  nsRefPtr<FileList>  mFileList;
+  RefPtr<FileList>  mFileList;
 
   nsString mStaticDocFileList;
   
@@ -1418,7 +1432,7 @@ private:
 
   private:
     nsCOMPtr<nsIFilePicker> mFilePicker;
-    nsRefPtr<HTMLInputElement> mInput;
+    RefPtr<HTMLInputElement> mInput;
   };
 };
 

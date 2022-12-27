@@ -13,10 +13,11 @@
 #include "Layers.h"                     // for WriteSnapshotToDumpFile
 #include "LayerScope.h"                 // for LayerScope
 #include "gfxCrashReporterUtils.h"      // for ScopedGfxFeatureReporter
+#include "gfxEnv.h"                     // for gfxEnv
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "gfxPrefs.h"                   // for gfxPrefs
 #include "gfxRect.h"                    // for gfxRect
-#include "gfxUtils.h"                   // for NextPowerOfTwo, gfxUtils, etc
+#include "gfxUtils.h"                   // for gfxUtils, etc
 #include "mozilla/ArrayUtils.h"         // for ArrayLength
 #include "mozilla/Preferences.h"        // for Preferences
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
@@ -50,13 +51,6 @@
 #endif
 
 #include "GeckoProfiler.h"
-
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-#include "libdisplay/GonkDisplay.h"     // for GonkDisplay
-#include <ui/Fence.h>
-#include "nsWindow.h"
-#include "nsScreenManagerGonk.h"
-#endif
 
 namespace mozilla {
 
@@ -101,7 +95,7 @@ CompositorOGL::~CompositorOGL()
 already_AddRefed<mozilla::gl::GLContext>
 CompositorOGL::CreateContext()
 {
-  nsRefPtr<GLContext> context;
+  RefPtr<GLContext> context;
 
   // Used by mock widget to create an offscreen context
   void* widgetOpenGLContext = mWidget->GetNativeData(NS_NATIVE_OPENGL_CONTEXT);
@@ -111,14 +105,14 @@ CompositorOGL::CreateContext()
   }
 
 #ifdef XP_WIN
-  if (PR_GetEnv("MOZ_LAYERS_PREFER_EGL")) {
+  if (gfxEnv::LayersPreferEGL()) {
     printf_stderr("Trying GL layers...\n");
     context = gl::GLContextProviderEGL::CreateForWindow(mWidget);
   }
 #endif
 
   // Allow to create offscreen GL context for main Layer Manager
-  if (!context && PR_GetEnv("MOZ_LAYERS_PREFER_OFFSCREEN")) {
+  if (!context && gfxEnv::LayersPreferOffscreen()) {
     SurfaceCaps caps = SurfaceCaps::ForRGB();
     caps.preserve = false;
     caps.bpp16 = gfxPlatform::GetPlatform()->GetOffscreenFormat() == gfxImageFormat::RGB16_565;
@@ -168,7 +162,7 @@ CompositorOGL::CleanupResources()
                          reinterpret_cast<uintptr_t>(nullptr));
 #endif
 
-  nsRefPtr<GLContext> ctx = mGLContext->GetSharedContext();
+  RefPtr<GLContext> ctx = mGLContext->GetSharedContext();
   if (!ctx) {
     ctx = mGLContext;
   }
@@ -240,7 +234,7 @@ CompositorOGL::Initialize()
     mGLContext->IsExtensionSupported(gl::GLContext::EXT_bgra);
 
   mGLContext->fBlendFuncSeparate(LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA,
-                                 LOCAL_GL_ONE, LOCAL_GL_ONE);
+                                 LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA);
   mGLContext->fEnable(LOCAL_GL_BLEND);
 
   // initialise a common shader to check that we can actually compile a shader
@@ -615,7 +609,6 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
 
   MOZ_ASSERT(!mFrameInProgress, "frame still in progress (should have called EndFrame");
 
-  mFrameInProgress = true;
   gfx::Rect rect;
   if (mUseExternalSurfaceSize) {
     rect = gfx::Rect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
@@ -634,6 +627,9 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
   // so just return
   if (width == 0 || height == 0)
     return;
+
+  // We're about to actually draw a frame.
+  mFrameInProgress = true;
 
   // If the widget size changed, we have to force a MakeCurrent
   // to make sure that GL sees the updated widget size.
@@ -657,7 +653,7 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
 
   // Default blend function implements "OVER"
   mGLContext->fBlendFuncSeparate(LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA,
-                                 LOCAL_GL_ONE, LOCAL_GL_ONE);
+                                 LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA);
   mGLContext->fEnable(LOCAL_GL_BLEND);
 
   // Make sure SCISSOR is enabled before setting the render target, since the RT
@@ -743,13 +739,13 @@ CompositorOGL::CreateFBOWithTexture(const IntRect& aRect, bool aCopyFromSource,
 
       // RGBA
       size_t bufferSize = clampedRect.width * clampedRect.height * 4;
-      nsAutoArrayPtr<uint8_t> buf(new uint8_t[bufferSize]);
+      auto buf = MakeUnique<uint8_t[]>(bufferSize);
 
       mGLContext->fReadPixels(clampedRect.x, clampedRect.y,
                               clampedRect.width, clampedRect.height,
                               LOCAL_GL_RGBA,
                               LOCAL_GL_UNSIGNED_BYTE,
-                              buf);
+                              buf.get());
       mGLContext->fTexImage2D(mFBOTextureTarget,
                               0,
                               LOCAL_GL_RGBA,
@@ -757,7 +753,7 @@ CompositorOGL::CreateFBOWithTexture(const IntRect& aRect, bool aCopyFromSource,
                               0,
                               LOCAL_GL_RGBA,
                               LOCAL_GL_UNSIGNED_BYTE,
-                              buf);
+                              buf.get());
     }
     GLenum error = mGLContext->fGetError();
     if (error != LOCAL_GL_NO_ERROR) {
@@ -837,16 +833,9 @@ CompositorOGL::GetShaderConfigFor(Effect *aEffect,
     MOZ_ASSERT_IF(source->GetTextureTarget() == LOCAL_GL_TEXTURE_RECTANGLE_ARB,
                   source->GetFormat() == gfx::SurfaceFormat::R8G8B8A8 ||
                   source->GetFormat() == gfx::SurfaceFormat::R8G8B8X8 ||
-                  source->GetFormat() == gfx::SurfaceFormat::R5G6B5);
+                  source->GetFormat() == gfx::SurfaceFormat::R5G6B5_UINT16);
     config = ShaderConfigFromTargetAndFormat(source->GetTextureTarget(),
                                              source->GetFormat());
-    if ((aOp == gfx::CompositionOp::OP_MULTIPLY ||
-         aOp == gfx::CompositionOp::OP_SCREEN) &&
-        !texturedEffect->mPremultiplied) {
-      // We can do these blend modes just using glBlendFunc but we need the data
-      // to be premultiplied first.
-      config.SetPremultiply(true);
-    }
     break;
   }
   }
@@ -901,24 +890,12 @@ static bool SetBlendMode(GLContext* aGL, gfx::CompositionOp aBlendMode, bool aIs
   GLenum srcBlend;
   GLenum dstBlend;
   GLenum srcAlphaBlend = LOCAL_GL_ONE;
-  GLenum dstAlphaBlend = LOCAL_GL_ONE;
+  GLenum dstAlphaBlend = LOCAL_GL_ONE_MINUS_SRC_ALPHA;
 
   switch (aBlendMode) {
     case gfx::CompositionOp::OP_OVER:
       MOZ_ASSERT(!aIsPremultiplied);
       srcBlend = LOCAL_GL_SRC_ALPHA;
-      dstBlend = LOCAL_GL_ONE_MINUS_SRC_ALPHA;
-      break;
-    case gfx::CompositionOp::OP_SCREEN:
-      // If the source data was un-premultiplied we should have already
-      // asked the fragment shader to fix that.
-      srcBlend = LOCAL_GL_ONE;
-      dstBlend = LOCAL_GL_ONE_MINUS_SRC_COLOR;
-      break;
-    case gfx::CompositionOp::OP_MULTIPLY:
-      // If the source data was un-premultiplied we should have already
-      // asked the fragment shader to fix that.
-      srcBlend = LOCAL_GL_DST_COLOR;
       dstBlend = LOCAL_GL_ONE_MINUS_SRC_ALPHA;
       break;
     case gfx::CompositionOp::OP_SOURCE:
@@ -984,12 +961,16 @@ CompositorOGL::DrawQuad(const Rect& aRect,
     return;
   }
 
+  IntPoint offset = mCurrentRenderTarget->GetOrigin();
+  Rect renderBound = mRenderBound;
+  renderBound.IntersectRect(renderBound, aClipRect);
+  renderBound.MoveBy(offset);
+
+  Rect destRect = aTransform.TransformAndClipBounds(aRect, renderBound);
+
   // XXX: This doesn't handle 3D transforms. It also doesn't handled rotated
   //      quads. Fix me.
-  Rect destRect = aTransform.TransformAndClipBounds(aRect, aClipRect);
   mPixelsFilled += destRect.width * destRect.height;
-
-  IntPoint offset = mCurrentRenderTarget->GetOrigin();
 
   // Do a simple culling if this rect is out of target buffer.
   // Inflate a small size to avoid some numerical imprecision issue.
@@ -1380,7 +1361,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
                                      effectComponentAlpha->mOnBlack);
 
       mGLContext->fBlendFuncSeparate(LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA,
-                                     LOCAL_GL_ONE, LOCAL_GL_ONE);
+                                     LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA);
     }
     break;
   default:
@@ -1390,7 +1371,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
 
   if (didSetBlendMode) {
     gl()->fBlendFuncSeparate(LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA,
-                             LOCAL_GL_ONE, LOCAL_GL_ONE);
+                             LOCAL_GL_ONE, LOCAL_GL_ONE_MINUS_SRC_ALPHA);
   }
 
   // in case rendering has used some other GL context
@@ -1407,10 +1388,10 @@ CompositorOGL::EndFrame()
   MOZ_ASSERT(mCurrentRenderTarget == mWindowRenderTarget, "Rendering target not properly restored");
 
 #ifdef MOZ_DUMP_PAINTING
-  if (gfxUtils::sDumpPainting) {
-    IntRect rect;
+  if (gfxEnv::DumpCompositorTextures()) {
+    LayoutDeviceIntRect rect;
     if (mUseExternalSurfaceSize) {
-      rect = IntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
+      rect = LayoutDeviceIntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
     } else {
       mWidget->GetBounds(rect);
     }
@@ -1470,59 +1451,10 @@ CompositorOGL::EndFrame()
   }
 }
 
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-void
-CompositorOGL::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
-{
-  // OpenGL does not provide ReleaseFence for rendering.
-  // Instead use DispAcquireFence as layer buffer's ReleaseFence
-  // to prevent flickering and tearing.
-  // DispAcquireFence is DisplaySurface's AcquireFence.
-  // AcquireFence will be signaled when a buffer's content is available.
-  // See Bug 974152.
-
-  if (!aLayer || !aWidget) {
-    return;
-  }
-  nsWindow* window = static_cast<nsWindow*>(aWidget);
-  RefPtr<FenceHandle::FdObj> fence = new FenceHandle::FdObj(
-      window->GetScreen()->GetPrevDispAcquireFd());
-  mReleaseFenceHandle.Merge(FenceHandle(fence));
-}
-
-FenceHandle
-CompositorOGL::GetReleaseFence()
-{
-  if (!mReleaseFenceHandle.IsValid()) {
-    return FenceHandle();
-  }
-
-  nsRefPtr<FenceHandle::FdObj> fdObj = mReleaseFenceHandle.GetDupFdObj();
-  return FenceHandle(fdObj);
-}
-
-#else
-void
-CompositorOGL::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
-{
-}
-
-FenceHandle
-CompositorOGL::GetReleaseFence()
-{
-  return FenceHandle();
-}
-#endif
-
 void
 CompositorOGL::EndFrameForExternalComposition(const gfx::Matrix& aTransform)
 {
-  // This lets us reftest and screenshot content rendered externally
-  if (mTarget) {
-    MakeCurrent();
-    CopyToTarget(mTarget, mTargetBounds.TopLeft(), aTransform);
-    mGLContext->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, 0);
-  }
+  MOZ_ASSERT(!mTarget);
   if (mTexturePool) {
     mTexturePool->EndFrame();
   }
@@ -1600,7 +1532,7 @@ CompositorOGL::Pause()
 bool
 CompositorOGL::Resume()
 {
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_UIKIT)
   if (!gl() || gl()->IsDestroyed())
     return false;
 

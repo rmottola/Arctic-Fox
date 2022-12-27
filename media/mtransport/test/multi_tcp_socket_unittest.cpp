@@ -266,7 +266,7 @@ class MultiTcpSocketTest : public ::testing::Test {
   }
   std::vector<nr_socket *> socks;
   Atomic<bool> readable;
-  nsRefPtr<NrIceCtx> ice_ctx_;
+  RefPtr<NrIceCtx> ice_ctx_;
 };
 }
 

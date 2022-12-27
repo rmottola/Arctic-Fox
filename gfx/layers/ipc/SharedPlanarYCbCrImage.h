@@ -35,13 +35,10 @@ public:
   virtual uint8_t* GetBuffer() override;
 
   virtual already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() override;
-  virtual void SetData(const PlanarYCbCrData& aData) override;
-  virtual void SetDataNoCopy(const Data &aData) override;
+  virtual bool SetData(const PlanarYCbCrData& aData) override;
+  virtual bool SetDataNoCopy(const Data &aData) override;
 
   virtual bool Allocate(PlanarYCbCrData& aData);
-  virtual uint8_t* AllocateBuffer(uint32_t aSize) override;
-  // needs to be overriden because the parent class sets mBuffer which we
-  // do not want to happen.
   virtual uint8_t* AllocateAndGetNewBuffer(uint32_t aSize) override;
 
   virtual bool IsValid() override;

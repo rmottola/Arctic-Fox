@@ -15,6 +15,7 @@ EXPORTS += [
     'gfxColor.h',
     'gfxContext.h',
     'gfxDrawable.h',
+    'gfxEnv.h',
     'gfxFailure.h',
     'gfxFont.h',
     'gfxFontConstants.h',
@@ -271,6 +272,7 @@ GENERATED_FILES = [
 ]
 
 LOCAL_INCLUDES += [
+    '/dom/workers',
     '/dom/xml',
 ]
 

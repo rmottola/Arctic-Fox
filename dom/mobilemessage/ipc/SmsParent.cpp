@@ -53,9 +53,9 @@ MmsAttachmentDataToJSObject(JSContext* aContext,
     return nullptr;
   }
 
-  nsRefPtr<BlobImpl> blobImpl = static_cast<BlobParent*>(aAttachment.contentParent())->GetBlobImpl();
+  RefPtr<BlobImpl> blobImpl = static_cast<BlobParent*>(aAttachment.contentParent())->GetBlobImpl();
 
-  // nsRefPtr<File> needs to go out of scope before toObjectOrNull() is
+  // RefPtr<File> needs to go out of scope before toObjectOrNull() is
   // called because the static analysis thinks dereferencing XPCOM objects
   // can GC (because in some cases it can!), and a return statement with a
   // JSObject* type means that JSObject* is on the stack as a raw pointer
@@ -65,7 +65,7 @@ MmsAttachmentDataToJSObject(JSContext* aContext,
     nsIGlobalObject *global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(aContext));
     MOZ_ASSERT(global);
 
-    nsRefPtr<Blob> blob = Blob::Create(global, blobImpl);
+    RefPtr<Blob> blob = Blob::Create(global, blobImpl);
     if (!ToJSValue(aContext, blob, &content)) {
       return nullptr;
     }
@@ -225,7 +225,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyReceivedMessage(msgData);
+    Unused << SendNotifyReceivedMessage(msgData);
     return NS_OK;
   }
 
@@ -236,7 +236,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyRetrievingMessage(msgData);
+    Unused << SendNotifyRetrievingMessage(msgData);
     return NS_OK;
   }
 
@@ -247,7 +247,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifySendingMessage(msgData);
+    Unused << SendNotifySendingMessage(msgData);
     return NS_OK;
   }
 
@@ -258,7 +258,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifySentMessage(msgData);
+    Unused << SendNotifySentMessage(msgData);
     return NS_OK;
   }
 
@@ -269,7 +269,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyFailedMessage(msgData);
+    Unused << SendNotifyFailedMessage(msgData);
     return NS_OK;
   }
 
@@ -280,7 +280,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyDeliverySuccessMessage(msgData);
+    Unused << SendNotifyDeliverySuccessMessage(msgData);
     return NS_OK;
   }
 
@@ -291,7 +291,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyDeliveryErrorMessage(msgData);
+    Unused << SendNotifyDeliveryErrorMessage(msgData);
     return NS_OK;
   }
 
@@ -309,7 +309,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
 
     MobileMessageData msgData =
       static_cast<SmsMessage*>(smsMsg.get())->GetData();
-    unused << SendNotifyReceivedSilentMessage(msgData);
+    Unused << SendNotifyReceivedSilentMessage(msgData);
     return NS_OK;
   }
 
@@ -320,7 +320,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyReadSuccessMessage(msgData);
+    Unused << SendNotifyReadSuccessMessage(msgData);
     return NS_OK;
   }
 
@@ -331,7 +331,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyReadErrorMessage(msgData);
+    Unused << SendNotifyReadErrorMessage(msgData);
     return NS_OK;
   }
 
@@ -342,7 +342,7 @@ SmsParent::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    unused << SendNotifyDeletedMessageInfo(
+    Unused << SendNotifyDeletedMessageInfo(
       static_cast<DeletedMessageInfo*>(deletedInfo.get())->GetData());
     return NS_OK;
   }

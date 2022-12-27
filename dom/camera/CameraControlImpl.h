@@ -9,9 +9,9 @@
 #include "nsWeakPtr.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ReentrantMonitor.h"
+#include "mozilla/Mutex.h"
 #include "nsIFile.h"
 #include "nsProxyRelease.h"
-#include "AutoRwLock.h"
 #include "ICameraControl.h"
 #include "CameraCommon.h"
 #include "DeviceStorage.h"
@@ -20,9 +20,13 @@
 
 namespace mozilla {
 
+namespace dom {
+  class BlobImpl;
+} // namespace dom
+
 namespace layers {
   class Image;
-}
+} // namespace layers
 
 class CameraControlImpl : public ICameraControl
 {
@@ -44,6 +48,8 @@ public:
   virtual nsresult StartRecording(DeviceStorageFileDescriptor* aFileDescriptor,
                                   const StartRecordingOptions* aOptions) override;
   virtual nsresult StopRecording() override;
+  virtual nsresult PauseRecording() override;
+  virtual nsresult ResumeRecording() override;
   virtual nsresult ResumeContinuousFocus() override;
 
   // Event handlers called directly from outside this class.
@@ -56,7 +62,8 @@ protected:
   // Event handlers.
   void OnAutoFocusComplete(bool aAutoFocusSucceeded);
   void OnFacesDetected(const nsTArray<Face>& aFaces);
-  void OnTakePictureComplete(uint8_t* aData, uint32_t aLength, const nsAString& aMimeType);
+  void OnTakePictureComplete(const uint8_t* aData, uint32_t aLength, const nsAString& aMimeType);
+  void OnPoster(dom::BlobImpl* aBlobImpl);
 
   void OnRateLimitPreview(bool aLimit);
   bool OnNewPreviewFrame(layers::Image* aImage, uint32_t aWidth, uint32_t aHeight);
@@ -83,8 +90,8 @@ protected:
   // Manage camera event listeners.
   void AddListenerImpl(already_AddRefed<CameraControlListener> aListener);
   void RemoveListenerImpl(CameraControlListener* aListener);
-  nsTArray<nsRefPtr<CameraControlListener> > mListeners;
-  PRRWLock* mListenerLock;
+  nsTArray<RefPtr<CameraControlListener> > mListeners;
+  mutable Mutex mListenerLock;
 
   class ControlMessage;
   class ListenerMessage;
@@ -116,6 +123,8 @@ protected:
   virtual nsresult StartRecordingImpl(DeviceStorageFileDescriptor* aFileDescriptor,
                                       const StartRecordingOptions* aOptions) = 0;
   virtual nsresult StopRecordingImpl() = 0;
+  virtual nsresult PauseRecordingImpl() = 0;
+  virtual nsresult ResumeRecordingImpl() = 0;
   virtual nsresult ResumeContinuousFocusImpl() = 0;
   virtual nsresult PushParametersImpl() = 0;
   virtual nsresult PullParametersImpl() = 0;

@@ -12,7 +12,8 @@
 #include "AudioSampleFormat.h"
 #include "nsIMemoryReporter.h"
 #include "SharedBuffer.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
+#include "mozilla/UniquePtr.h"
 #include "nsTArray.h"
 
 namespace mozilla {
@@ -123,18 +124,18 @@ public:
             int64_t aTime,
             int64_t aDuration,
             uint32_t aFrames,
-            AudioDataValue* aData,
+            UniquePtr<AudioDataValue[]> aData,
             uint32_t aChannels,
             uint32_t aRate)
     : MediaData(sType, aOffset, aTime, aDuration, aFrames)
     , mChannels(aChannels)
     , mRate(aRate)
-    , mAudioData(aData) {}
+    , mAudioData(Move(aData)) {}
 
   static const Type sType = AUDIO_DATA;
   static const char* sTypeName;
 
-  // Creates a new VideoData identical to aOther, but with a different
+  // Creates a new AudioData identical to aOther, but with a different
   // specified timestamp and duration. All data from aOther is copied
   // into the new AudioData but the audio data which is transferred.
   // After such call, the original aOther is unusable.
@@ -152,9 +153,9 @@ public:
   const uint32_t mRate;
   // At least one of mAudioBuffer/mAudioData must be non-null.
   // mChannels channels, each with mFrames frames
-  nsRefPtr<SharedBuffer> mAudioBuffer;
+  RefPtr<SharedBuffer> mAudioBuffer;
   // mFrames frames, each with mChannels values
-  nsAutoArrayPtr<AudioDataValue> mAudioData;
+  UniquePtr<AudioDataValue[]> mAudioData;
 
 protected:
   ~AudioData() {}
@@ -252,7 +253,7 @@ public:
                                                      int64_t aOffset,
                                                      int64_t aTime,
                                                      int64_t aDuration,
-                                                     const nsRefPtr<Image>& aImage,
+                                                     const RefPtr<Image>& aImage,
                                                      bool aKeyframe,
                                                      int64_t aTimecode,
                                                      const IntRect& aPicture);
@@ -282,7 +283,7 @@ public:
 
   // Initialize PlanarYCbCrImage. Only When aCopyData is true,
   // video data is copied to PlanarYCbCrImage.
-  static void SetVideoDataToImage(PlanarYCbCrImage* aVideoImage,
+  static bool SetVideoDataToImage(PlanarYCbCrImage* aVideoImage,
                                   const VideoInfo& aInfo,
                                   const YCbCrBuffer &aBuffer,
                                   const IntRect& aPicture,
@@ -296,7 +297,7 @@ public:
   const IntSize mDisplay;
 
   // This frame's image.
-  nsRefPtr<Image> mImage;
+  RefPtr<Image> mImage;
 
   int32_t mFrameID;
 
@@ -317,21 +318,22 @@ protected:
 class CryptoTrack
 {
 public:
-  CryptoTrack() : valid(false) {}
-  bool valid;
-  int32_t mode;
-  int32_t iv_size;
-  nsTArray<uint8_t> key;
+  CryptoTrack() : mValid(false) {}
+  bool mValid;
+  int32_t mMode;
+  int32_t mIVSize;
+  nsTArray<uint8_t> mKeyId;
 };
 
 class CryptoSample : public CryptoTrack
 {
 public:
-  nsTArray<uint16_t> plain_sizes;
-  nsTArray<uint32_t> encrypted_sizes;
-  nsTArray<uint8_t> iv;
-  nsTArray<nsCString> session_ids;
+  nsTArray<uint16_t> mPlainSizes;
+  nsTArray<uint32_t> mEncryptedSizes;
+  nsTArray<uint8_t> mIV;
+  nsTArray<nsCString> mSessionIds;
 };
+
 
 // MediaRawData is a MediaData container used to store demuxed, still compressed
 // samples.
@@ -399,9 +401,9 @@ public:
   }
 
   const CryptoSample& mCrypto;
-  nsRefPtr<MediaByteBuffer> mExtraData;
+  RefPtr<MediaByteBuffer> mExtraData;
 
-  nsRefPtr<SharedTrackInfo> mTrackInfo;
+  RefPtr<SharedTrackInfo> mTrackInfo;
 
   // Return a deep copy or nullptr if out of memory.
   virtual already_AddRefed<MediaRawData> Clone() const;

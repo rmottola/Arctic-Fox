@@ -255,6 +255,95 @@ MacroAssemblerCompat::breakpoint()
     Brk((code++) & 0xffff);
 }
 
+template<typename T>
+void
+MacroAssemblerCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem,
+                                                     Register oldval, Register newval,
+                                                     Register temp, AnyRegister output)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+        compareExchange8SignExtend(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Uint8:
+        compareExchange8ZeroExtend(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Uint8Clamped:
+        compareExchange8ZeroExtend(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Int16:
+        compareExchange16SignExtend(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Uint16:
+        compareExchange16ZeroExtend(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Int32:
+        compareExchange32(mem, oldval, newval, output.gpr());
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        compareExchange32(mem, oldval, newval, temp);
+        convertUInt32ToDouble(temp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+MacroAssemblerCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const Address& mem,
+                                                     Register oldval, Register newval, Register temp,
+                                                     AnyRegister output);
+template void
+MacroAssemblerCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
+                                                     Register oldval, Register newval, Register temp,
+                                                     AnyRegister output);
+
+template<typename T>
+void
+MacroAssemblerCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem,
+                                                    Register value, Register temp, AnyRegister output)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+        atomicExchange8SignExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint8:
+        atomicExchange8ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint8Clamped:
+        atomicExchange8ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Int16:
+        atomicExchange16SignExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Uint16:
+        atomicExchange16ZeroExtend(mem, value, output.gpr());
+        break;
+      case Scalar::Int32:
+        atomicExchange32(mem, value, output.gpr());
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        atomicExchange32(mem, value, temp);
+        convertUInt32ToDouble(temp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+MacroAssemblerCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const Address& mem,
+                                                    Register value, Register temp, AnyRegister output);
+template void
+MacroAssemblerCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
+                                                    Register value, Register temp, AnyRegister output);
+
 //{{{ check_macroassembler_style
 // ===============================================================
 // Stack manipulation functions.
@@ -408,18 +497,20 @@ MacroAssembler::reserveStack(uint32_t amount)
 // ===============================================================
 // Simple call functions.
 
-void
+CodeOffsetLabel
 MacroAssembler::call(Register reg)
 {
     syncStackPtr();
     Blr(ARMRegister(reg, 64));
+    return CodeOffsetLabel(currentOffset());
 }
 
-void
+CodeOffsetLabel
 MacroAssembler::call(Label* label)
 {
     syncStackPtr();
     Bl(label);
+    return CodeOffsetLabel(currentOffset());
 }
 
 void
@@ -455,6 +546,18 @@ MacroAssembler::call(JitCode* c)
     BufferOffset off = immPool64(scratch64, uint64_t(c->raw()));
     addPendingJump(off, ImmPtr(c->raw()), Relocation::JITCODE);
     blr(scratch64);
+}
+
+CodeOffsetLabel
+MacroAssembler::callWithPatch()
+{
+    MOZ_CRASH("NYI");
+    return CodeOffsetLabel();
+}
+void
+MacroAssembler::patchCall(uint32_t callerOffset, uint32_t calleeOffset)
+{
+    MOZ_CRASH("NYI");
 }
 
 void

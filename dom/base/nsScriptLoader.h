@@ -470,9 +470,10 @@ private:
     return mEnabled && !mBlockerCount;
   }
 
-  nsresult AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest);
+  nsresult AttemptAsyncScriptCompile(nsScriptLoadRequest* aRequest);
   nsresult ProcessRequest(nsScriptLoadRequest* aRequest);
-  nsresult CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest);
+  nsresult CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest,
+                                            bool* oCompiledOffThread=nullptr);
   void FireScriptAvailable(nsresult aResult,
                            nsScriptLoadRequest* aRequest);
   void FireScriptEvaluated(nsresult aResult,
@@ -486,6 +487,7 @@ private:
                                     JS::Handle<JSObject *> aScopeChain,
                                     JS::CompileOptions *aOptions);
 
+  uint32_t NumberOfProcessors();
   nsresult PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
                                 nsIStreamLoader* aLoader,
                                 nsresult aStatus,
@@ -504,11 +506,11 @@ private:
   nsScriptLoadRequestList mLoadedAsyncRequests;
   nsScriptLoadRequestList mDeferRequests;
   nsScriptLoadRequestList mXSLTRequests;
-  nsRefPtr<nsScriptLoadRequest> mParserBlockingRequest;
+  RefPtr<nsScriptLoadRequest> mParserBlockingRequest;
 
   // In mRequests, the additional information here is stored by the element.
   struct PreloadInfo {
-    nsRefPtr<nsScriptLoadRequest> mRequest;
+    RefPtr<nsScriptLoadRequest> mRequest;
     nsString mCharset;
   };
 
@@ -527,8 +529,9 @@ private:
   nsCOMPtr<nsIScriptElement> mCurrentScript;
   nsCOMPtr<nsIScriptElement> mCurrentParserInsertedScript;
   // XXXbz do we want to cycle-collect these or something?  Not sure.
-  nsTArray< nsRefPtr<nsScriptLoader> > mPendingChildLoaders;
+  nsTArray< RefPtr<nsScriptLoader> > mPendingChildLoaders;
   uint32_t mBlockerCount;
+  uint32_t mNumberOfProcessors;
   bool mEnabled;
   bool mDeferEnabled;
   bool mDocumentParsingDone;
@@ -555,7 +558,7 @@ public:
   }
 
   bool mWasEnabled;
-  nsRefPtr<nsScriptLoader> mLoader;
+  RefPtr<nsScriptLoader> mLoader;
 };
 
 #endif //__nsScriptLoader_h__

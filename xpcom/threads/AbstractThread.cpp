@@ -8,7 +8,9 @@
 
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/MozPromise.h" // We initialize the MozPromise logging in this file.
 #include "mozilla/StaticPtr.h"
+#include "mozilla/StateWatching.h" // We initialize the StateWatching logging in this file.
 #include "mozilla/TaskQueue.h"
 #include "mozilla/TaskDispatcher.h"
 #include "mozilla/unused.h"
@@ -19,6 +21,9 @@
 
 
 namespace mozilla {
+
+LazyLogModule gMozPromiseLog("MozPromise");
+LazyLogModule gStateWatchingLog("StateWatching");
 
 StaticRefPtr<AbstractThread> sMainThread;
 ThreadLocal<AbstractThread*> AbstractThread::sCurrentThreadTLS;
@@ -55,7 +60,7 @@ public:
 
     nsresult rv = mTarget->Dispatch(r, NS_DISPATCH_NORMAL);
     MOZ_DIAGNOSTIC_ASSERT(aFailureHandling == DontAssertDispatchSuccess || NS_SUCCEEDED(rv));
-    unused << rv;
+    Unused << rv;
   }
 
   virtual bool IsCurrentThreadIn() override
@@ -93,7 +98,7 @@ public:
   virtual nsIThread* AsXPCOMThread() override { return mTarget; }
 
 private:
-  nsRefPtr<nsIThread> mTarget;
+  RefPtr<nsIThread> mTarget;
   Maybe<AutoTaskDispatcher> mTailDispatcher;
 };
 
@@ -144,7 +149,7 @@ AbstractThread::DispatchDirectTask(already_AddRefed<nsIRunnable> aRunnable)
 already_AddRefed<AbstractThread>
 CreateXPCOMAbstractThreadWrapper(nsIThread* aThread, bool aRequireTailDispatch)
 {
-  nsRefPtr<XPCOMThreadWrapper> wrapper = new XPCOMThreadWrapper(aThread, aRequireTailDispatch);
+  RefPtr<XPCOMThreadWrapper> wrapper = new XPCOMThreadWrapper(aThread, aRequireTailDispatch);
   return wrapper.forget();
 }
 

@@ -73,7 +73,6 @@ class nsIRequest;
 class nsIRunnable;
 class nsIStreamListener;
 class nsIStructuredCloneContainer;
-class nsIStyleRule;
 class nsIStyleSheet;
 class nsIURI;
 class nsIVariant;
@@ -102,6 +101,7 @@ template<typename> class OwningNonNull;
 namespace css {
 class Loader;
 class ImageLoader;
+class Rule;
 } // namespace css
 
 namespace gfx {
@@ -158,8 +158,8 @@ typedef CallbackObjectHolder<NodeFilter, nsIDOMNodeFilter> NodeFilterHolder;
 } // namespace mozilla
 
 #define NS_IDOCUMENT_IID \
-{ 0x72391609, 0x673d, 0x4bec, \
-  { 0xbd, 0x75, 0x64, 0xbf, 0x1f, 0x6a, 0x6b, 0x5e } }
+{ 0x4307abe8, 0x5386, 0x4024, \
+  { 0xa2, 0xfe, 0x4a, 0x80, 0xe8, 0x47, 0x46, 0x90 } }
 
 // Enum for requesting a particular type of document when creating a doc
 enum DocumentFlavor {
@@ -263,9 +263,12 @@ public:
   /**
    * Return the URI for the document. May return null.
    *
-   * The value returned corresponds to the "document's current address" in
+   * The value returned corresponds to the "document's address" in
    * HTML5.  As such, it may change over the lifetime of the document, for
-   * instance as a result of a call to pushState() or replaceState().
+   * instance as a result of the user navigating to a fragment identifier on
+   * the page, or as a result to a call to pushState() or replaceState().
+   *
+   * https://html.spec.whatwg.org/multipage/dom.html#the-document%27s-address
    */
   nsIURI* GetDocumentURI() const
   {
@@ -274,11 +277,14 @@ public:
 
   /**
    * Return the original URI of the document.  This is the same as the
-   * document's URI unless history.pushState() or replaceState() is invoked on
-   * the document.
+   * document's URI unless that has changed from its original value (for
+   * example, due to history.pushState() or replaceState() being invoked on the
+   * document).
    *
-   * This method corresponds to the "document's address" in HTML5 and, once
-   * set, doesn't change over the lifetime of the document.
+   * This method corresponds to the "creation URL" in HTML5 and, once set,
+   * doesn't change over the lifetime of the document.
+   *
+   * https://html.spec.whatwg.org/multipage/webappapis.html#creation-url
    */
   nsIURI* GetOriginalURI() const
   {
@@ -302,6 +308,11 @@ public:
    * chrome privileged script.
    */
   virtual void SetChromeXHRDocBaseURI(nsIURI* aURI) = 0;
+
+  /**
+   * Set referrer policy and upgrade-insecure-requests flags
+   */
+  virtual void ApplySettingsFromCSP(bool aSpeculative) = 0;
 
   /**
    * Return the referrer policy of the document. Return "default" if there's no
@@ -330,6 +341,14 @@ public:
   bool GetUpgradeInsecureRequests() const
   {
     return mUpgradeInsecureRequests;
+  }
+
+  /**
+   * Same as GetUpgradeInsecureRequests() but *only* for preloads.
+   */
+  bool GetUpgradeInsecurePreloads() const
+  {
+    return mUpgradeInsecurePreloads;
   }
 
   /**
@@ -670,6 +689,8 @@ public:
     return GetBFCacheEntry() ? nullptr : mPresShell;
   }
 
+  // Instead using this method, what you probably want is
+  // RemoveFromBFCacheSync() as we do in MessagePort and BroadcastChannel.
   void DisallowBFCaching()
   {
     NS_ASSERTION(!mBFCacheEntry, "We're already in the bfcache!");
@@ -745,6 +766,19 @@ public:
 
   mozilla::dom::Selection* GetSelection(mozilla::ErrorResult& aRv);
 
+  /**
+   * Retrieve information about the viewport as a data structure.
+   * This will return information in the viewport META data section
+   * of the document. This can be used in lieu of ProcessViewportInfo(),
+   * which places the viewport information in the document header instead
+   * of returning it directly.
+   *
+   * @param aDisplaySize size of the on-screen display area for this
+   * document, in device pixels.
+   *
+   * NOTE: If the site is optimized for mobile (via the doctype), this
+   * will return viewport information that specifies default information.
+   */
   virtual nsViewportInfo GetViewportInfo(const mozilla::ScreenIntSize& aDisplaySize) = 0;
 
   /**
@@ -784,7 +818,7 @@ public:
                          mozilla::ErrorResult& aError);
   void RemoveAnonymousContent(mozilla::dom::AnonymousContent& aContent,
                               mozilla::ErrorResult& aError);
-  nsTArray<nsRefPtr<mozilla::dom::AnonymousContent>>& GetAnonymousContents() {
+  nsTArray<RefPtr<mozilla::dom::AnonymousContent>>& GetAnonymousContents() {
     return mAnonymousContents;
   }
 
@@ -957,7 +991,7 @@ public:
     eAgentSheet,
     eUserSheet,
     eAuthorSheet,
-    SheetTypeCount
+    AdditionalSheetTypeCount
   };
 
   virtual nsresult LoadAdditionalStyleSheet(additionalSheetType aType, nsIURI* aSheetURI) = 0;
@@ -1104,6 +1138,11 @@ public:
    * this document.
    */
   virtual Element* GetFullScreenElement() = 0;
+
+  /**
+   * Returns all elements in the fullscreen stack in the insertion order.
+   */
+  virtual nsTArray<Element*> GetFullscreenStack() const = 0;
 
   /**
    * Asynchronously requests that the document make aElement the fullscreen
@@ -1262,12 +1301,12 @@ public:
   // Observation hooks for style data to propagate notifications
   // to document observers
   virtual void StyleRuleChanged(nsIStyleSheet* aStyleSheet,
-                                nsIStyleRule* aOldStyleRule,
-                                nsIStyleRule* aNewStyleRule) = 0;
+                                mozilla::css::Rule* aOldStyleRule,
+                                mozilla::css::Rule* aNewStyleRule) = 0;
   virtual void StyleRuleAdded(nsIStyleSheet* aStyleSheet,
-                              nsIStyleRule* aStyleRule) = 0;
+                              mozilla::css::Rule* aStyleRule) = 0;
   virtual void StyleRuleRemoved(nsIStyleSheet* aStyleSheet,
-                                nsIStyleRule* aStyleRule) = 0;
+                                mozilla::css::Rule* aStyleRule) = 0;
 
   /**
    * Flush notifications for this document and its parent documents
@@ -2163,7 +2202,7 @@ public:
                                         int32_t *aHandle);
   void CancelFrameRequestCallback(int32_t aHandle);
 
-  typedef nsTArray<nsRefPtr<mozilla::dom::FrameRequestCallback>> FrameRequestCallbackList;
+  typedef nsTArray<RefPtr<mozilla::dom::FrameRequestCallback>> FrameRequestCallbackList;
   /**
    * Put this document's frame request callbacks into the provided
    * list, and forget about them.
@@ -2736,6 +2775,7 @@ protected:
   ReferrerPolicyEnum mReferrerPolicy;
 
   bool mUpgradeInsecureRequests;
+  bool mUpgradeInsecurePreloads;
 
   mozilla::WeakPtr<nsDocShell> mDocumentContainer;
 
@@ -2751,11 +2791,11 @@ protected:
   // This is a weak reference, but we hold a strong reference to mNodeInfo,
   // which in turn holds a strong reference to this mNodeInfoManager.
   nsNodeInfoManager* mNodeInfoManager;
-  nsRefPtr<mozilla::css::Loader> mCSSLoader;
-  nsRefPtr<mozilla::css::ImageLoader> mStyleImageLoader;
-  nsRefPtr<nsHTMLStyleSheet> mAttrStyleSheet;
-  nsRefPtr<nsHTMLCSSStyleSheet> mStyleAttrStyleSheet;
-  nsRefPtr<mozilla::SVGAttrAnimationRuleProcessor> mSVGAttrAnimationRuleProcessor;
+  RefPtr<mozilla::css::Loader> mCSSLoader;
+  RefPtr<mozilla::css::ImageLoader> mStyleImageLoader;
+  RefPtr<nsHTMLStyleSheet> mAttrStyleSheet;
+  RefPtr<nsHTMLCSSStyleSheet> mStyleAttrStyleSheet;
+  RefPtr<mozilla::SVGAttrAnimationRuleProcessor> mSVGAttrAnimationRuleProcessor;
 
   // The set of all object, embed, applet, video/audio elements or
   // nsIObjectLoadingContent or nsIDocumentActivity for which this is the
@@ -2770,7 +2810,7 @@ protected:
   nsTHashtable<nsPtrHashKey<mozilla::dom::Link> > mLinksToUpdate;
 
   // SMIL Animation Controller, lazily-initialized in GetAnimationController
-  nsRefPtr<nsSMILAnimationController> mAnimationController;
+  RefPtr<nsSMILAnimationController> mAnimationController;
 
   // Table of element properties for this document.
   nsPropertyTable mPropertyTable;
@@ -2780,7 +2820,7 @@ protected:
   nsCOMPtr<nsIHTMLCollection> mChildrenCollection;
 
   // container for per-context fonts (downloadable, SVG, etc.)
-  nsRefPtr<mozilla::dom::FontFaceSet> mFontFaceSet;
+  RefPtr<mozilla::dom::FontFaceSet> mFontFaceSet;
 
   // Compatibility mode
   nsCompatibility mCompatMode;
@@ -3045,9 +3085,9 @@ protected:
 
   uint32_t mInSyncOperationCount;
 
-  nsRefPtr<mozilla::dom::XPathEvaluator> mXPathEvaluator;
+  RefPtr<mozilla::dom::XPathEvaluator> mXPathEvaluator;
 
-  nsTArray<nsRefPtr<mozilla::dom::AnonymousContent>> mAnonymousContents;
+  nsTArray<RefPtr<mozilla::dom::AnonymousContent>> mAnonymousContents;
 
   uint32_t mBlockDOMContentLoaded;
   bool mDidFireDOMContentLoaded:1;

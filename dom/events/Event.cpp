@@ -412,9 +412,9 @@ Event::Constructor(const GlobalObject& aGlobal,
                    ErrorResult& aRv)
 {
   nsCOMPtr<mozilla::dom::EventTarget> t = do_QueryInterface(aGlobal.GetAsSupports());
-  nsRefPtr<Event> e = new Event(t, nullptr, nullptr);
+  RefPtr<Event> e = new Event(t, nullptr, nullptr);
   bool trusted = e->Init(t);
-  aRv = e->InitEvent(aType, aParam.mBubbles, aParam.mCancelable);
+  e->InitEvent(aType, aParam.mBubbles, aParam.mCancelable);
   e->SetTrusted(trusted);
   return e.forget();
 }
@@ -572,13 +572,13 @@ Event::SetEventType(const nsAString& aEventTypeArg)
   }
 }
 
-NS_IMETHODIMP
+void
 Event::InitEvent(const nsAString& aEventTypeArg,
                  bool aCanBubbleArg,
                  bool aCancelableArg)
 {
   // Make sure this event isn't already being dispatched.
-  NS_ENSURE_TRUE(!mEvent->mFlags.mIsBeingDispatched, NS_OK);
+  NS_ENSURE_TRUE_VOID(!mEvent->mFlags.mIsBeingDispatched);
 
   if (IsTrusted()) {
     // Ensure the caller is permitted to dispatch trusted DOM events.
@@ -600,7 +600,6 @@ Event::InitEvent(const nsAString& aEventTypeArg,
   // re-dispatching it.
   mEvent->target = nullptr;
   mEvent->originalTarget = nullptr;
-  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -899,16 +898,16 @@ Event::Shutdown()
   }
 }
 
-LayoutDeviceIntPoint
+// static
+CSSIntPoint
 Event::GetScreenCoords(nsPresContext* aPresContext,
                        WidgetEvent* aEvent,
                        LayoutDeviceIntPoint aPoint)
 {
-  if (!nsContentUtils::IsCallerChrome() &&
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode() &&
       nsContentUtils::ResistFingerprinting()) {
     // When resisting fingerprinting, return client coordinates instead.
-    CSSIntPoint clientCoords = GetClientCoords(aPresContext, aEvent, aPoint, CSSIntPoint(0, 0));
-    return LayoutDeviceIntPoint(clientCoords.x, clientCoords.y);
+    return GetClientCoords(aPresContext, aEvent, aPoint, CSSIntPoint(0, 0));
   }
 
   if (EventStateManager::sIsPointerLocked) {
@@ -923,19 +922,26 @@ Event::GetScreenCoords(nsPresContext* aPresContext,
         aEvent->mClass != eTouchEventClass &&
         aEvent->mClass != eDragEventClass &&
         aEvent->mClass != eSimpleGestureEventClass)) {
-    return LayoutDeviceIntPoint(0, 0);
+    return CSSIntPoint(0, 0);
   }
+
+  // Doing a straight conversion from LayoutDeviceIntPoint to CSSIntPoint
+  // seem incorrect, but it is needed to maintain legacy functionality.
+  if (!aPresContext) {
+    return CSSIntPoint(aPoint.x, aPoint.y);
+  }
+
+  LayoutDeviceIntPoint offset = aPoint;
 
   WidgetGUIEvent* guiEvent = aEvent->AsGUIEvent();
-  if (!guiEvent->widget) {
-    return aPoint;
+  if (guiEvent && guiEvent->widget) {
+    offset += guiEvent->widget->WidgetToScreenOffset();
   }
 
-  LayoutDeviceIntPoint offset = aPoint + guiEvent->widget->WidgetToScreenOffset();
-  nscoord factor =
-    aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom();
-  return LayoutDeviceIntPoint(nsPresContext::AppUnitsToIntCSSPixels(offset.x * factor),
-                              nsPresContext::AppUnitsToIntCSSPixels(offset.y * factor));
+  nsPoint pt =
+    LayoutDevicePixel::ToAppUnits(offset, aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom());
+
+  return CSSPixel::FromAppUnitsRounded(pt);
 }
 
 // static
@@ -1195,8 +1201,7 @@ Event::Deserialize(const IPC::Message* aMsg, void** aIter)
   bool trusted = false;
   NS_ENSURE_TRUE(IPC::ReadParam(aMsg, aIter, &trusted), false);
 
-  nsresult rv = InitEvent(type, bubbles, cancelable);
-  NS_ENSURE_SUCCESS(rv, false);
+  InitEvent(type, bubbles, cancelable);
   SetTrusted(trusted);
 
   return true;
@@ -1303,6 +1308,6 @@ NS_NewDOMEvent(EventTarget* aOwner,
                nsPresContext* aPresContext,
                WidgetEvent* aEvent) 
 {
-  nsRefPtr<Event> it = new Event(aOwner, aPresContext, aEvent);
+  RefPtr<Event> it = new Event(aOwner, aPresContext, aEvent);
   return it.forget();
 }

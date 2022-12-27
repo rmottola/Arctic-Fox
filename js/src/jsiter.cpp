@@ -136,6 +136,33 @@ Enumerate(JSContext* cx, HandleObject pobj, jsid id,
 }
 
 static bool
+EnumerateExtraProperties(JSContext* cx, HandleObject obj, unsigned flags, Maybe<IdSet>& ht,
+                         AutoIdVector* props)
+{
+    MOZ_ASSERT(obj->getOps()->enumerate);
+
+    AutoIdVector properties(cx);
+    bool enumerableOnly = !(flags & JSITER_HIDDEN);
+    if (!obj->getOps()->enumerate(cx, obj, properties, enumerableOnly))
+        return false;
+
+    RootedId id(cx);
+    for (size_t n = 0; n < properties.length(); n++) {
+        id = properties[n];
+
+        // The enumerate hook does not indicate whether the properties
+        // it returns are enumerable or not. Since we already passed
+        // `enumerableOnly` to the hook to filter out non-enumerable
+        // properties, it doesn't really matter what we pass here.
+        bool enumerable = true;
+        if (!Enumerate(cx, obj, id, enumerable, flags, ht, props))
+            return false;
+    }
+
+    return true;
+}
+
+static bool
 SortComparatorIntegerIds(jsid a, jsid b, bool* lessOrEqualp)
 {
     uint32_t indexA, indexB;
@@ -147,13 +174,14 @@ SortComparatorIntegerIds(jsid a, jsid b, bool* lessOrEqualp)
 
 static bool
 EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags, Maybe<IdSet>& ht,
-                          AutoIdVector* props)
+                          AutoIdVector* props, Handle<UnboxedPlainObject*> unboxed = nullptr)
 {
     bool enumerateSymbols;
     if (flags & JSITER_SYMBOLSONLY) {
         enumerateSymbols = true;
     } else {
         /* Collect any dense elements from this object. */
+        size_t firstElemIndex = props->length();
         size_t initlen = pobj->getDenseInitializedLength();
         const Value* vp = pobj->getDenseElements();
         bool hasHoles = false;
@@ -179,7 +207,10 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
         // Collect any sparse elements from this object.
         bool isIndexed = pobj->isIndexed();
         if (isIndexed) {
-            size_t numElements = props->length();
+            // If the dense elements didn't have holes, we don't need to include
+            // them in the sort.
+            if (!hasHoles)
+                firstElemIndex = props->length();
 
             for (Shape::Range<NoGC> r(pobj->lastProperty()); !r.empty(); r.popFront()) {
                 Shape& shape = r.front();
@@ -191,12 +222,10 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
                 }
             }
 
-            // If the dense elements didn't have holes, we don't need to include
-            // them in the sort.
-            size_t startIndex = hasHoles ? 0 : numElements;
+            MOZ_ASSERT(firstElemIndex <= props->length());
 
-            jsid* ids = props->begin() + startIndex;
-            size_t n = props->length() - startIndex;
+            jsid* ids = props->begin() + firstElemIndex;
+            size_t n = props->length() - firstElemIndex;
 
             AutoIdVector tmp(cx);
             if (!tmp.resize(n))
@@ -204,6 +233,16 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
             PodCopy(tmp.begin(), ids, n);
 
             if (!MergeSort(ids, n, tmp.begin(), SortComparatorIntegerIds))
+                return false;
+        }
+
+        if (unboxed) {
+            // If |unboxed| is set then |pobj| is the expando for an unboxed
+            // plain object we are enumerating. Add the unboxed properties
+            // themselves here since they are all property names that were
+            // given to the object before any of the expando's properties.
+            MOZ_ASSERT(pobj->is<UnboxedExpandoObject>());
+            if (!EnumerateExtraProperties(cx, unboxed, flags, ht, props))
                 return false;
         }
 
@@ -331,28 +370,23 @@ Snapshot(JSContext* cx, HandleObject pobj_, unsigned flags, AutoIdVector* props)
     RootedObject pobj(cx, pobj_);
 
     do {
-        if (JSNewEnumerateOp enumerate = pobj->getOps()->enumerate) {
-            AutoIdVector properties(cx);
-            bool enumerableOnly = !(flags & JSITER_HIDDEN);
-            if (!enumerate(cx, pobj, properties, enumerableOnly))
-                 return false;
-
-            RootedId id(cx);
-            for (size_t n = 0; n < properties.length(); n++) {
-                id = properties[n];
-
-                // The enumerate hook does not indicate whether the properties
-                // it returns are enumerable or not. Since we already passed
-                // `enumerableOnly` to the hook to filter out non-enumerable
-                // properties, it doesn't really matter what we pass here.
-                bool enumerable = true;
-                if (!Enumerate(cx, pobj, id, enumerable, flags, ht, props))
+        if (pobj->getOps()->enumerate) {
+            if (pobj->is<UnboxedPlainObject>() && pobj->as<UnboxedPlainObject>().maybeExpando()) {
+                // Special case unboxed objects with an expando object.
+                RootedNativeObject expando(cx, pobj->as<UnboxedPlainObject>().maybeExpando());
+                if (!EnumerateNativeProperties(cx, expando, flags, ht, props,
+                                               pobj.as<UnboxedPlainObject>()))
+                {
                     return false;
-            }
-
-            if (pobj->isNative()) {
-                if (!EnumerateNativeProperties(cx, pobj.as<NativeObject>(), flags, ht, props))
+                }
+            } else {
+                if (!EnumerateExtraProperties(cx, pobj, flags, ht, props))
                     return false;
+
+                if (pobj->isNative()) {
+                    if (!EnumerateNativeProperties(cx, pobj.as<NativeObject>(), flags, ht, props))
+                        return false;
+                }
             }
         } else if (pobj->isNative()) {
             // Give the object a chance to resolve all lazy properties
@@ -1098,6 +1132,18 @@ const Class StringIteratorObject::class_ = {
 static const JSFunctionSpec string_iterator_methods[] = {
     JS_SELF_HOSTED_FN("next", "StringIteratorNext", 0, 0),
     JS_FS_END
+};
+
+enum {
+    ListIteratorSlotIteratedObject,
+    ListIteratorSlotNextIndex,
+    ListIteratorSlotNextMethod,
+    ListIteratorSlotCount
+};
+
+const Class ListIteratorObject::class_ = {
+    "List Iterator",
+    JSCLASS_HAS_RESERVED_SLOTS(ListIteratorSlotCount)
 };
 
 bool

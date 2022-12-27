@@ -1102,8 +1102,8 @@
             window.addEventListener("keypress", this, true);
             window.addEventListener("keyup", this, true);
          ]]>
-       </body>
-     </method>
+        </body>
+      </method>
 
       <method name="handleEvent">
         <parameter name="aEvent"/>
@@ -1271,6 +1271,33 @@
         ]]>
         </body>
       </method>
+
+      <method name="getInPermitUnload">
+        <parameter name="aCallback"/>
+        <body>
+        <![CDATA[
+          if (!this.docShell || !this.docShell.contentViewer) {
+            aCallback(false);
+            return;
+          }
+          aCallback(this.docShell.contentViewer.inPermitUnload);
+        ]]>
+        </body>
+      </method>
+
+      <method name="permitUnload">
+        <body>
+        <![CDATA[
+          if (!this.docShell || !this.docShell.contentViewer) {
+            return true;
+          }
+          return {permitUnload: this.docShell.contentViewer.permitUnload(), timedOut: false};
+        ]]>
+        </body>
+      </method>
+
+      <!-- This will go away if the binding has been removed for some reason. -->
+      <field name="_alive">true</field>
     </implementation>
 
     <handlers>

@@ -56,6 +56,7 @@
 #include "mozilla/TypedEnumBits.h"
 #include "RuleProcessorCache.h"
 #include "nsIDOMMutationEvent.h"
+#include "nsIMozBrowserFrame.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -543,7 +544,7 @@ RuleHash::~RuleHash()
         RuleValue* value = &(mUniversalRules[i]);
         nsAutoString selectorText;
         uint32_t lineNumber = value->mRule->GetLineNumber();
-        nsRefPtr<CSSStyleSheet> cssSheet = value->mRule->GetStyleSheet();
+        RefPtr<CSSStyleSheet> cssSheet = value->mRule->GetStyleSheet();
         value->mSelector->ToString(selectorText, cssSheet);
 
         printf("    line %d, %s\n",
@@ -1013,7 +1014,7 @@ RuleCascadeData::AttributeListFor(nsIAtom* aAttribute)
 //
 
 nsCSSRuleProcessor::nsCSSRuleProcessor(const sheet_array_type& aSheets,
-                                       uint8_t aSheetType,
+                                       SheetType aSheetType,
                                        Element* aScopeElement,
                                        nsCSSRuleProcessor*
                                          aPreviousCSSRuleProcessor,
@@ -1034,7 +1035,7 @@ nsCSSRuleProcessor::nsCSSRuleProcessor(const sheet_array_type& aSheets,
   , mDocumentRulesAndCacheKeyValid(false)
 #endif
 {
-  NS_ASSERTION(!!mScopeElement == (aSheetType == nsStyleSet::eScopedDocSheet),
+  NS_ASSERTION(!!mScopeElement == (aSheetType == SheetType::ScopedDoc),
                "aScopeElement must be specified iff aSheetType is "
                "eScopedDocSheet");
   for (sheet_array_type::size_type i = mSheets.Length(); i-- != 0; ) {
@@ -1560,8 +1561,11 @@ nthChildGenericMatches(Element* aElement,
   // Integer division in C does truncation (towards 0).  So
   // check that the result is nonnegative, and that there was no
   // truncation.
-  const int32_t n = (index - b) / a;
-  return n >= 0 && (a * n == index - b);
+  const CheckedInt<int32_t> indexMinusB = CheckedInt<int32_t>(index) - b;
+  const CheckedInt<int32_t> n = indexMinusB / a;
+  return n.isValid() &&
+         n.value() >= 0 &&
+         a * n == indexMinusB;
 }
 
 static inline bool
@@ -2144,6 +2148,17 @@ static bool SelectorMatches(Element* aElement,
         }
         break;
 
+      case nsCSSPseudoClasses::ePseudoClass_mozBrowserFrame:
+        {
+          nsCOMPtr<nsIMozBrowserFrame>
+            browserFrame = do_QueryInterface(aElement);
+          if (!browserFrame ||
+              !browserFrame->GetReallyIsBrowserOrApp()) {
+            return false;
+          }
+        }
+        break;
+
       case nsCSSPseudoClasses::ePseudoClass_mozDir:
       case nsCSSPseudoClasses::ePseudoClass_dir:
         {
@@ -2377,10 +2392,20 @@ nsCSSRuleProcessor::RestrictedSelectorMatches(
 #define NS_IS_GREEDY_OPERATOR(ch) \
   ((ch) == char16_t(' ') || (ch) == char16_t('~'))
 
-static bool SelectorMatchesTree(Element* aPrevElement,
-                                  nsCSSSelector* aSelector,
-                                  TreeMatchContext& aTreeMatchContext,
-                                  bool aLookForRelevantLink)
+/**
+ * Flags for SelectorMatchesTree.
+ */
+enum SelectorMatchesTreeFlags {
+  // Whether we still have not found the closest ancestor link element and
+  // thus have to check the current element for it.
+  eLookForRelevantLink = 0x1,
+};
+
+static bool
+SelectorMatchesTree(Element* aPrevElement,
+                    nsCSSSelector* aSelector,
+                    TreeMatchContext& aTreeMatchContext,
+                    SelectorMatchesTreeFlags aFlags)
 {
   MOZ_ASSERT(!aSelector || !aSelector->IsPseudoElement());
   nsCSSSelector* selector = aSelector;
@@ -2403,7 +2428,7 @@ static bool SelectorMatchesTree(Element* aPrevElement,
     if (char16_t('+') == selector->mOperator ||
         char16_t('~') == selector->mOperator) {
       // The relevant link must be an ancestor of the node being matched.
-      aLookForRelevantLink = false;
+      aFlags = SelectorMatchesTreeFlags(aFlags & ~eLookForRelevantLink);
       nsIContent* parent = prevElement->GetParent();
       if (parent) {
         if (aTreeMatchContext.mForStyling)
@@ -2435,7 +2460,7 @@ static bool SelectorMatchesTree(Element* aPrevElement,
         if (selector->mOperator == '>' && element->IsActiveChildrenElement()) {
           Element* styleScope = aTreeMatchContext.mCurrentStyleScope;
           if (SelectorMatchesTree(element, selector, aTreeMatchContext,
-                                  aLookForRelevantLink)) {
+                                  aFlags)) {
             // It matched, don't try matching on the <xbl:children> element at
             // all.
             return true;
@@ -2451,10 +2476,10 @@ static bool SelectorMatchesTree(Element* aPrevElement,
     if (!element) {
       return false;
     }
-    NodeMatchContext nodeContext(EventStates(),
-                                 aLookForRelevantLink &&
-                                   nsCSSRuleProcessor::IsLink(element));
-    if (nodeContext.mIsRelevantLink) {
+    const bool isRelevantLink = (aFlags & eLookForRelevantLink) &&
+                                nsCSSRuleProcessor::IsLink(element);
+    NodeMatchContext nodeContext(EventStates(), isRelevantLink);
+    if (isRelevantLink) {
       // If we find an ancestor of the matched node that is a link
       // during the matching process, then it's the relevant link (see
       // constructor call above).
@@ -2462,7 +2487,7 @@ static bool SelectorMatchesTree(Element* aPrevElement,
       // :visited (they'll just fail), we will always find such a node
       // during the selector matching process if there is a relevant
       // link that can influence selector matching.
-      aLookForRelevantLink = false;
+      aFlags = SelectorMatchesTreeFlags(aFlags & ~eLookForRelevantLink);
       aTreeMatchContext.SetHaveRelevantLink();
     }
     if (SelectorMatches(element, selector, nodeContext, aTreeMatchContext,
@@ -2486,8 +2511,7 @@ static bool SelectorMatchesTree(Element* aPrevElement,
         // doesn't matter much for performance since most selectors
         // don't match.  (If most did, it might be faster...)
         Element* styleScope = aTreeMatchContext.mCurrentStyleScope;
-        if (SelectorMatchesTree(element, selector, aTreeMatchContext,
-                                aLookForRelevantLink)) {
+        if (SelectorMatchesTree(element, selector, aTreeMatchContext, aFlags)) {
           return true;
         }
         // We want to reset mCurrentStyleScope on aTreeMatchContext
@@ -2562,12 +2586,15 @@ void ContentEnumFunc(const RuleValue& value, nsCSSSelector* aSelector,
   if (SelectorMatches(data->mElement, selector, nodeContext,
                       data->mTreeMatchContext, selectorFlags)) {
     nsCSSSelector *next = selector->mNext;
-    if (!next || SelectorMatchesTree(data->mElement, next,
-                                     data->mTreeMatchContext,
-                                     !nodeContext.mIsRelevantLink)) {
-      css::StyleRule *rule = value.mRule;
-      rule->RuleMatched();
-      data->mRuleWalker->Forward(rule);
+    if (!next ||
+        SelectorMatchesTree(data->mElement, next,
+                            data->mTreeMatchContext,
+                            nodeContext.mIsRelevantLink ?
+                              SelectorMatchesTreeFlags(0) :
+                              eLookForRelevantLink)) {
+      css::Declaration* declaration = value.mRule->GetDeclaration();
+      declaration->SetImmutable();
+      data->mRuleWalker->Forward(declaration);
       // nsStyleSet will deal with the !important rule
     }
   }
@@ -2612,8 +2639,9 @@ nsCSSRuleProcessor::RulesMatching(AnonBoxRuleProcessorData* aData)
       nsTArray<RuleValue>& rules = entry->mRules;
       for (RuleValue *value = rules.Elements(), *end = value + rules.Length();
            value != end; ++value) {
-        value->mRule->RuleMatched();
-        aData->mRuleWalker->Forward(value->mRule);
+        css::Declaration* declaration = value->mRule->GetDeclaration();
+        declaration->SetImmutable();
+        aData->mRuleWalker->Forward(declaration);
       }
     }
   }
@@ -2738,7 +2766,7 @@ nsCSSRuleProcessor::HasStateDependentStyle(ElementDependentRuleProcessorData* aD
                           aData->mTreeMatchContext, selectorFlags) &&
           SelectorMatchesTree(aData->mElement, selector->mNext,
                               aData->mTreeMatchContext,
-                              false))
+                              SelectorMatchesTreeFlags(0)))
       {
         hint = nsRestyleHint(hint | possibleChange);
       }
@@ -2774,13 +2802,76 @@ nsCSSRuleProcessor::HasDocumentStateDependentStyle(StateRuleProcessorData* aData
 }
 
 struct AttributeEnumData {
-  explicit AttributeEnumData(AttributeRuleProcessorData *aData)
-    : data(aData), change(nsRestyleHint(0)) {}
+  AttributeEnumData(AttributeRuleProcessorData *aData,
+                    RestyleHintData& aRestyleHintData)
+    : data(aData), change(nsRestyleHint(0)), hintData(aRestyleHintData) {}
 
   AttributeRuleProcessorData *data;
   nsRestyleHint change;
+  RestyleHintData& hintData;
 };
 
+
+static inline nsRestyleHint
+RestyleHintForSelectorWithAttributeChange(nsRestyleHint aCurrentHint,
+                                          nsCSSSelector* aSelector,
+                                          nsCSSSelector* aRightmostSelector)
+{
+  MOZ_ASSERT(aSelector);
+
+  char16_t oper = aSelector->mOperator;
+
+  if (oper == char16_t('+') || oper == char16_t('~')) {
+    return eRestyle_LaterSiblings;
+  }
+
+  if (oper == char16_t(':')) {
+    return eRestyle_Subtree;
+  }
+
+  if (oper != char16_t(0)) {
+    // Check whether the selector is in a form that supports
+    // eRestyle_SomeDescendants.  If it isn't, return eRestyle_Subtree.
+
+    if (aCurrentHint & eRestyle_Subtree) {
+      // No point checking, since we'll end up restyling the whole
+      // subtree anyway.
+      return eRestyle_Subtree;
+    }
+
+    if (!aRightmostSelector) {
+      // aSelector wasn't a top-level selector, which means we were inside
+      // a :not() or :-moz-any().  We don't support that.
+      return eRestyle_Subtree;
+    }
+
+    MOZ_ASSERT(aSelector != aRightmostSelector,
+               "if aSelector == aRightmostSelector then we should have "
+               "no operator");
+
+    // Check that aRightmostSelector can be passed to RestrictedSelectorMatches.
+    if (!aRightmostSelector->IsRestrictedSelector()) {
+      return eRestyle_Subtree;
+    }
+
+    // We also don't support pseudo-elements on any of the selectors
+    // between aRightmostSelector and aSelector.
+    // XXX Can we lift this restriction, so that we don't have to loop
+    // over all the selectors?
+    for (nsCSSSelector* sel = aRightmostSelector->mNext;
+         sel != aSelector;
+         sel = sel->mNext) {
+      MOZ_ASSERT(sel, "aSelector must be reachable from aRightmostSelector");
+      if (sel->PseudoType() != nsCSSPseudoElements::ePseudo_NotPseudoElement) {
+        return eRestyle_Subtree;
+      }
+    }
+
+    return eRestyle_SomeDescendants;
+  }
+
+  return eRestyle_Self;
+}
 
 static void
 AttributeEnumFunc(nsCSSSelector* aSelector,
@@ -2796,18 +2887,27 @@ AttributeEnumFunc(nsCSSSelector* aSelector,
     return;
   }
 
-  nsRestyleHint possibleChange = RestyleHintForOp(aSelector->mOperator);
+  nsRestyleHint possibleChange =
+    RestyleHintForSelectorWithAttributeChange(aData->change,
+                                              aSelector, aRightmostSelector);
 
-  // If enumData->change already includes all the bits of possibleChange, don't
-  // bother calling SelectorMatches, since even if it returns false
-  // enumData->change won't change.
+  // If, ignoring eRestyle_SomeDescendants, enumData->change already includes
+  // all the bits of possibleChange, don't bother calling SelectorMatches, since
+  // even if it returns false enumData->change won't change.  If possibleChange
+  // has eRestyle_SomeDescendants, we need to call SelectorMatches(Tree)
+  // regardless as it might give us new selectors to append to
+  // mSelectorsForDescendants.
   NodeMatchContext nodeContext(EventStates(), false);
-  if ((possibleChange & ~(aData->change)) &&
+  if (((possibleChange & (~(aData->change) | eRestyle_SomeDescendants))) &&
       SelectorMatches(data->mElement, aSelector, nodeContext,
                       data->mTreeMatchContext, SelectorMatchesFlags::UNKNOWN) &&
       SelectorMatchesTree(data->mElement, aSelector->mNext,
-                          data->mTreeMatchContext, false)) {
+                          data->mTreeMatchContext,
+                          SelectorMatchesTreeFlags(0))) {
     aData->change = nsRestyleHint(aData->change | possibleChange);
+    if (possibleChange & eRestyle_SomeDescendants) {
+      aData->hintData.mSelectorsForDescendants.AppendElement(aRightmostSelector);
+    }
   }
 }
 
@@ -2839,7 +2939,7 @@ nsCSSRuleProcessor::HasAttributeDependentStyle(
   //  We could try making use of aData->mModType, but :not rules make it a bit
   //  of a pain to do so...  So just ignore it for now.
 
-  AttributeEnumData data(aData);
+  AttributeEnumData data(aData, aRestyleHintDataResult);
 
   // Don't do our special handling of certain attributes if the attr
   // hasn't changed yet.
@@ -3426,7 +3526,7 @@ struct CascadeEnumData {
                   nsTArray<css::DocumentRule*>& aDocumentRules,
                   nsMediaQueryResultCacheKey& aKey,
                   nsDocumentRuleResultCacheKey& aDocumentKey,
-                  uint8_t aSheetType,
+                  SheetType aSheetType,
                   bool aMustGatherDocumentRules)
     : mPresContext(aPresContext),
       mFontFaceRules(aFontFaceRules),
@@ -3464,7 +3564,7 @@ struct CascadeEnumData {
   // Hooray, a manual PLDHashTable since nsClassHashtable doesn't
   // provide a getter that gives me a *reference* to the value.
   PLDHashTable mRulesByWeight; // of PerWeightDataListItem linked lists
-  uint8_t mSheetType;
+  SheetType mSheetType;
   bool mMustGatherDocumentRules;
 };
 
@@ -3735,13 +3835,13 @@ nsCSSRuleProcessor::RefreshRuleCascade(nsPresContext* aPresContext)
 
       // Sort the hash table of per-weight linked lists by weight.
       uint32_t weightCount = data.mRulesByWeight.EntryCount();
-      nsAutoArrayPtr<PerWeightData> weightArray(new PerWeightData[weightCount]);
+      auto weightArray = MakeUnique<PerWeightData[]>(weightCount);
       int32_t j = 0;
       for (auto iter = data.mRulesByWeight.Iter(); !iter.Done(); iter.Next()) {
         auto entry = static_cast<const RuleByWeightEntry*>(iter.Get());
         weightArray[j++] = entry->data;
       }
-      NS_QuickSort(weightArray, weightCount, sizeof(PerWeightData),
+      NS_QuickSort(weightArray.get(), weightCount, sizeof(PerWeightData),
                    CompareWeightData, nullptr);
 
       // Put things into the rule hash.
@@ -3831,7 +3931,8 @@ nsCSSRuleProcessor::SelectorListMatches(Element* aElement,
                         SelectorMatchesFlags::NONE)) {
       nsCSSSelector* next = sel->mNext;
       if (!next ||
-          SelectorMatchesTree(aElement, next, aTreeMatchContext, false)) {
+          SelectorMatchesTree(aElement, next, aTreeMatchContext,
+                              SelectorMatchesTreeFlags(0))) {
         return true;
       }
     }

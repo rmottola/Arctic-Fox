@@ -31,7 +31,7 @@ using mozilla::BitwiseCast;
 namespace js {
 namespace jit {
 
-#ifdef DEBUG
+#ifdef JS_JITSPEW
 void
 FallbackICSpew(JSContext* cx, ICFallbackStub* stub, const char* fmt, ...)
 {
@@ -81,7 +81,7 @@ TypeFallbackICSpew(JSContext* cx, ICTypeMonitor_Fallback* stub, const char* fmt,
                 fmtbuf);
     }
 }
-#endif
+#endif // JS_JITSPEW
 
 ICFallbackStub*
 ICEntry::fallbackStub() const
@@ -852,7 +852,7 @@ ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, Val
     masm.branchValueIsNurseryObject(Assembler::NotEqual, val, scratch, &skipBarrier);
 
     // void PostWriteBarrier(JSRuntime* rt, JSObject* obj);
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     saveRegs.add(ICTailCallReg);
 #endif
     saveRegs.set() = GeneralRegisterSet::Intersect(saveRegs.set(), GeneralRegisterSet::Volatile());

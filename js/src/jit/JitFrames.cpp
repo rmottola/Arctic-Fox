@@ -1744,6 +1744,14 @@ RInstructionResults::isInitialized() const
     return initialized_;
 }
 
+#ifdef DEBUG
+size_t
+RInstructionResults::length() const
+{
+    return results_->length();
+}
+#endif
+
 JitFrameLayout*
 RInstructionResults::frame() const
 {
@@ -2025,7 +2033,7 @@ SnapshotIterator::maybeRead(const RValueAllocation& a, MaybeReadFallback& fallba
 
     if (fallback.canRecoverResults()) {
         if (!initInstructionResults(fallback))
-            js::CrashAtUnhandlableOOM("Unable to recover allocations.");
+            MOZ_CRASH("Unable to recover allocations.");
 
         if (allocationReadable(a))
             return allocationValue(a);
@@ -2210,6 +2218,7 @@ SnapshotIterator::initInstructionResults(MaybeReadFallback& fallback)
     }
 
     MOZ_ASSERT(results->isInitialized());
+    MOZ_ASSERT(results->length() == recover_.numInstructions() - 1);
     instructionResults_ = results;
     return true;
 }
@@ -2577,6 +2586,11 @@ MachineState::FromBailout(RegisterDump::GPRArray& regs, RegisterDump::FPUArray& 
     for (unsigned i = 0; i < FloatRegisters::TotalSingle; i++) {
         machine.setRegisterLocation(FloatRegister::FromIndex(i, FloatRegister::Single),
                                     (double*)&fbase[i]);
+    }
+#elif defined(JS_CODEGEN_MIPS64)
+    for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Double), &fpregs[i]);
+        machine.setRegisterLocation(FloatRegister(i, FloatRegisters::Single), &fpregs[i]);
     }
 #elif defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
     for (unsigned i = 0; i < FloatRegisters::TotalPhys; i++) {

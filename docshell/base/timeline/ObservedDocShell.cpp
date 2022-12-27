@@ -6,38 +6,68 @@
 
 #include "ObservedDocShell.h"
 
-#include "TimelineMarker.h"
+#include "AbstractTimelineMarker.h"
 #include "LayerTimelineMarker.h"
+#include "MainThreadUtils.h"
 #include "mozilla/Move.h"
 
 namespace mozilla {
 
-ObservedDocShell::ObservedDocShell(nsDocShell* aDocShell)
-  : mDocShell(aDocShell)
-{}
+ObservedDocShell::ObservedDocShell(nsIDocShell* aDocShell)
+  : MarkersStorage("ObservedDocShellMutex")
+  , mDocShell(aDocShell)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+}
 
 void
-ObservedDocShell::AddMarker(UniquePtr<TimelineMarker>&& aMarker)
+ObservedDocShell::AddMarker(UniquePtr<AbstractTimelineMarker>&& aMarker)
 {
+  // Only allow main thread markers to go into this list. No need to lock
+  // here since `mTimelineMarkers` will only be accessed or modified on the
+  // main thread only.
+  MOZ_ASSERT(NS_IsMainThread());
   mTimelineMarkers.AppendElement(Move(aMarker));
+}
+
+void
+ObservedDocShell::AddOTMTMarker(UniquePtr<AbstractTimelineMarker>&& aMarker)
+{
+  // Only allow off the main thread markers to go into this list. Since most
+  // of our markers come from the main thread, be a little more efficient and
+  // avoid dealing with multithreading scenarios until all the markers are
+  // actually cleared or popped in `ClearMarkers` or `PopMarkers`.
+  MOZ_ASSERT(!NS_IsMainThread());
+  MutexAutoLock lock(GetLock()); // for `mOffTheMainThreadTimelineMarkers`.
+  mOffTheMainThreadTimelineMarkers.AppendElement(Move(aMarker));
 }
 
 void
 ObservedDocShell::ClearMarkers()
 {
+  MutexAutoLock lock(GetLock()); // for `mOffTheMainThreadTimelineMarkers`.
   mTimelineMarkers.Clear();
+  mOffTheMainThreadTimelineMarkers.Clear();
 }
 
 void
 ObservedDocShell::PopMarkers(JSContext* aCx,
                              nsTArray<dom::ProfileTimelineMarker>& aStore)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  MutexAutoLock lock(GetLock()); // for `mOffTheMainThreadTimelineMarkers`.
+
+  // First, move all of our markers into a single array. We'll chose
+  // the `mTimelineMarkers` store because that's where we expect most of
+  // our markers to be.
+  mTimelineMarkers.AppendElements(Move(mOffTheMainThreadTimelineMarkers));
+
   // If we see an unpaired START, we keep it around for the next call
   // to ObservedDocShell::PopMarkers. We store the kept START objects here.
-  nsTArray<UniquePtr<TimelineMarker>> keptStartMarkers;
+  nsTArray<UniquePtr<AbstractTimelineMarker>> keptStartMarkers;
 
   for (uint32_t i = 0; i < mTimelineMarkers.Length(); ++i) {
-    UniquePtr<TimelineMarker>& startPayload = mTimelineMarkers[i];
+    UniquePtr<AbstractTimelineMarker>& startPayload = mTimelineMarkers.ElementAt(i);
 
     // If this is a TIMESTAMP marker, there's no corresponding END,
     // as it's a single unit of time, not a duration.
@@ -76,12 +106,13 @@ ObservedDocShell::PopMarkers(JSContext* aCx,
       // enough for the amount of markers to always be small enough that the
       // nested for loop isn't going to be a performance problem.
       for (uint32_t j = i + 1; j < mTimelineMarkers.Length(); ++j) {
-        UniquePtr<TimelineMarker>& endPayload = mTimelineMarkers[j];
+        UniquePtr<AbstractTimelineMarker>& endPayload = mTimelineMarkers.ElementAt(j);
         bool endIsLayerType = strcmp(endPayload->GetName(), "Layer") == 0;
 
         // Look for "Layer" markers to stream out "Paint" markers.
         if (startIsPaintType && endIsLayerType) {
-          LayerTimelineMarker* layerPayload = static_cast<LayerTimelineMarker*>(endPayload.get());
+          AbstractTimelineMarker* raw = endPayload.get();
+          LayerTimelineMarker* layerPayload = static_cast<LayerTimelineMarker*>(raw);
           layerPayload->AddLayerRectangles(layerRectangles);
           hasSeenLayerType = true;
         }
@@ -116,7 +147,7 @@ ObservedDocShell::PopMarkers(JSContext* aCx,
 
       // If we did not see the corresponding END, keep the START.
       if (!hasSeenEnd) {
-        keptStartMarkers.AppendElement(Move(mTimelineMarkers[i]));
+        keptStartMarkers.AppendElement(Move(mTimelineMarkers.ElementAt(i)));
         mTimelineMarkers.RemoveElementAt(i);
         --i;
       }

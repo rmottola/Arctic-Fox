@@ -122,12 +122,16 @@ nsCSPTokenizer::tokenizeCSPPolicy(const nsAString &aPolicyString,
 
 nsCSPParser::nsCSPParser(cspTokens& aTokens,
                          nsIURI* aSelfURI,
-                         uint64_t aInnerWindowID)
+                         nsCSPContext* aCSPContext,
+                         bool aDeliveredViaMetaTag)
  : mHasHashOrNonce(false)
  , mUnsafeInlineKeywordSrc(nullptr)
+ , mChildSrc(nullptr)
+ , mFrameSrc(nullptr)
  , mTokens(aTokens)
  , mSelfURI(aSelfURI)
- , mInnerWindowID(aInnerWindowID)
+ , mCSPContext(aCSPContext)
+ , mDeliveredViaMetaTag(aDeliveredViaMetaTag)
 {
   CSPPARSERLOG(("nsCSPParser::nsCSPParser"));
 }
@@ -294,16 +298,16 @@ nsCSPParser::logWarningErrorToConsole(uint32_t aSeverityFlag,
                                       uint32_t aParamsLength)
 {
   CSPPARSERLOG(("nsCSPParser::logWarningErrorToConsole: %s", aProperty));
-
-  nsXPIDLString logMsg;
-  CSP_GetLocalizedStr(NS_ConvertUTF8toUTF16(aProperty).get(),
-                      aParams,
-                      aParamsLength,
-                      getter_Copies(logMsg));
-
-  CSP_LogMessage(logMsg, EmptyString(), EmptyString(),
-                 0, 0, aSeverityFlag,
-                 "CSP", mInnerWindowID);
+  // send console messages off to the context and let the context
+  // deal with it (potentially messages need to be queued up)
+  mCSPContext->logToConsole(NS_ConvertUTF8toUTF16(aProperty).get(),
+                            aParams,
+                            aParamsLength,
+                            EmptyString(), // aSourceName
+                            EmptyString(), // aSourceLine
+                            0,             // aLineNumber
+                            0,             // aColumnNumber
+                            aSeverityFlag); // aFlags
 }
 
 bool
@@ -985,9 +989,38 @@ nsCSPParser::directiveName()
     return nullptr;
   }
 
+  // CSP delivered via meta tag should ignore the following directives:
+  // report-uri, frame-ancestors, and sandbox, see:
+  // http://www.w3.org/TR/CSP11/#delivery-html-meta-element
+  if (mDeliveredViaMetaTag &&
+       ((CSP_IsDirective(mCurToken, nsIContentSecurityPolicy::REPORT_URI_DIRECTIVE)) ||
+        (CSP_IsDirective(mCurToken, nsIContentSecurityPolicy::FRAME_ANCESTORS_DIRECTIVE)))) {
+    // log to the console to indicate that meta CSP is ignoring the directive
+    const char16_t* params[] = { mCurToken.get() };
+    logWarningErrorToConsole(nsIScriptError::warningFlag,
+                             "ignoringSrcFromMetaCSP",
+                             params, ArrayLength(params));
+    return nullptr;
+  }
+
   // special case handling for upgrade-insecure-requests
   if (CSP_IsDirective(mCurToken, nsIContentSecurityPolicy::UPGRADE_IF_INSECURE_DIRECTIVE)) {
     return new nsUpgradeInsecureDirective(CSP_StringToCSPDirective(mCurToken));
+  }
+
+  // child-src has it's own class to handle frame-src if necessary
+  if (CSP_IsDirective(mCurToken, nsIContentSecurityPolicy::CHILD_SRC_DIRECTIVE)) {
+    mChildSrc = new nsCSPChildSrcDirective(CSP_StringToCSPDirective(mCurToken));
+    return mChildSrc;
+  }
+
+  // if we have a frame-src, cache it so we can decide whether to use child-src
+  if (CSP_IsDirective(mCurToken, nsIContentSecurityPolicy::FRAME_SRC_DIRECTIVE)) {
+    const char16_t* params[] = { mCurToken.get(), NS_LITERAL_STRING("child-src").get() };
+    logWarningErrorToConsole(nsIScriptError::warningFlag, "deprecatedDirective",
+                             params, ArrayLength(params));
+    mFrameSrc = new nsCSPDirective(CSP_StringToCSPDirective(mCurToken));
+    return mFrameSrc;
   }
 
   return new nsCSPDirective(CSP_StringToCSPDirective(mCurToken));
@@ -1008,7 +1041,7 @@ nsCSPParser::directive()
   // Make sure that the directive-srcs-array contains at least
   // one directive and one src.
   if (mCurDir.Length() < 1) {
-    const char16_t* params[] = { NS_LITERAL_STRING("directive missing").get() };
+    const char16_t* params[] = { MOZ_UTF16("directive missing") };
     logWarningErrorToConsole(nsIScriptError::warningFlag, "failedToParseUnrecognizedSource",
                              params, ArrayLength(params));
     return;
@@ -1025,7 +1058,7 @@ nsCSPParser::directive()
   // by a directive name but does not include any srcs.
   if (cspDir->equals(nsIContentSecurityPolicy::UPGRADE_IF_INSECURE_DIRECTIVE)) {
     if (mCurDir.Length() > 1) {
-      const char16_t* params[] = { NS_LITERAL_STRING("upgrade-insecure-requests").get() };
+      const char16_t* params[] = { MOZ_UTF16("upgrade-insecure-requests") };
       logWarningErrorToConsole(nsIScriptError::warningFlag,
                                "ignoreSrcForDirective",
                                params, ArrayLength(params));
@@ -1065,7 +1098,7 @@ nsCSPParser::directive()
       mHasHashOrNonce && mUnsafeInlineKeywordSrc) {
     mUnsafeInlineKeywordSrc->invalidate();
     // log to the console that unsafe-inline will be ignored
-    const char16_t* params[] = { NS_LITERAL_STRING("'unsafe-inline'").get() };
+    const char16_t* params[] = { MOZ_UTF16("'unsafe-inline'") };
     logWarningErrorToConsole(nsIScriptError::warningFlag, "ignoringSrcWithinScriptSrc",
                              params, ArrayLength(params));
   }
@@ -1089,6 +1122,12 @@ nsCSPParser::policy()
     mCurDir = mTokens[i];
     directive();
   }
+
+  if (mChildSrc && !mFrameSrc) {
+    // if we have a child-src, it handles frame-src too, unless frame-src is set
+    mChildSrc->setHandleFrameSrc();
+  }
+
   return mPolicy;
 }
 
@@ -1096,7 +1135,8 @@ nsCSPPolicy*
 nsCSPParser::parseContentSecurityPolicy(const nsAString& aPolicyString,
                                         nsIURI *aSelfURI,
                                         bool aReportOnly,
-                                        uint64_t aInnerWindowID)
+                                        nsCSPContext* aCSPContext,
+                                        bool aDeliveredViaMetaTag)
 {
   if (CSPPARSERLOGENABLED()) {
     CSPPARSERLOG(("nsCSPParser::parseContentSecurityPolicy, policy: %s",
@@ -1106,6 +1146,8 @@ nsCSPParser::parseContentSecurityPolicy(const nsAString& aPolicyString,
     CSPPARSERLOG(("nsCSPParser::parseContentSecurityPolicy, selfURI: %s", spec.get()));
     CSPPARSERLOG(("nsCSPParser::parseContentSecurityPolicy, reportOnly: %s",
                  (aReportOnly ? "true" : "false")));
+    CSPPARSERLOG(("nsCSPParser::parseContentSecurityPolicy, deliveredViaMetaTag: %s",
+                 (aDeliveredViaMetaTag ? "true" : "false")));
   }
 
   NS_ASSERTION(aSelfURI, "Can not parseContentSecurityPolicy without aSelfURI");
@@ -1118,7 +1160,7 @@ nsCSPParser::parseContentSecurityPolicy(const nsAString& aPolicyString,
   nsTArray< nsTArray<nsString> > tokens;
   nsCSPTokenizer::tokenizeCSPPolicy(aPolicyString, tokens);
 
-  nsCSPParser parser(tokens, aSelfURI, aInnerWindowID);
+  nsCSPParser parser(tokens, aSelfURI, aCSPContext, aDeliveredViaMetaTag);
 
   // Start the parser to generate a new CSPPolicy using the generated tokens.
   nsCSPPolicy* policy = parser.policy();

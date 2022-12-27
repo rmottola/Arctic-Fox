@@ -53,6 +53,7 @@ class gfxContext final {
     typedef mozilla::gfx::Pattern Pattern;
     typedef mozilla::gfx::Rect Rect;
     typedef mozilla::gfx::RectCornerRadii RectCornerRadii;
+    typedef mozilla::gfx::Size Size;
 
     NS_INLINE_DECL_REFCOUNTING(gfxContext)
 
@@ -194,7 +195,7 @@ public:
      * Converts a size from device to user coordinates. This does not apply
      * translation components of the matrix.
      */
-    gfxSize DeviceToUser(const gfxSize& size) const;
+    Size DeviceToUser(const Size& size) const;
 
     /**
      * Converts a rectangle from device to user coordinates; this has the
@@ -213,7 +214,7 @@ public:
      * Converts a size from user to device coordinates. This does not apply
      * translation components of the matrix.
      */
-    gfxSize UserToDevice(const gfxSize& size) const;
+    Size UserToDevice(const Size& size) const;
 
     /**
      * Converts a rectangle from user to device coordinates.  The
@@ -430,6 +431,11 @@ public:
      * Groups
      */
     void PushGroup(gfxContentType content = gfxContentType::COLOR);
+
+    void PushGroupForBlendBack(gfxContentType content, mozilla::gfx::Float aOpacity = 1.0f,
+                               mozilla::gfx::SourceSurface* aMask = nullptr,
+                               const mozilla::gfx::Matrix& aMaskTransform = mozilla::gfx::Matrix());
+
     /**
      * Like PushGroup, but if the current surface is gfxContentType::COLOR and
      * content is gfxContentType::COLOR_ALPHA, makes the pushed surface gfxContentType::COLOR
@@ -444,6 +450,7 @@ public:
     void PushGroupAndCopyBackground(gfxContentType content = gfxContentType::COLOR);
     already_AddRefed<gfxPattern> PopGroup();
     void PopGroupToSource();
+    void PopGroupAndBlend();
 
     already_AddRefed<mozilla::gfx::SourceSurface>
     PopGroupToSurface(mozilla::gfx::Matrix* aMatrix);
@@ -502,14 +509,14 @@ private:
 
     mozilla::gfx::CompositionOp op;
     Color color;
-    nsRefPtr<gfxPattern> pattern;
-    nsRefPtr<gfxASurface> sourceSurfCairo;
-    mozilla::RefPtr<SourceSurface> sourceSurface;
+    RefPtr<gfxPattern> pattern;
+    RefPtr<gfxASurface> sourceSurfCairo;
+    RefPtr<SourceSurface> sourceSurface;
     mozilla::gfx::Point sourceSurfaceDeviceOffset;
     Matrix surfTransform;
     Matrix transform;
     struct PushedClip {
-      mozilla::RefPtr<Path> path;
+      RefPtr<Path> path;
       Rect rect;
       Matrix transform;
     };
@@ -518,14 +525,19 @@ private:
     bool clipWasReset;
     mozilla::gfx::FillRule fillRule;
     StrokeOptions strokeOptions;
-    mozilla::RefPtr<DrawTarget> drawTarget;
-    mozilla::RefPtr<DrawTarget> parentTarget;
+    RefPtr<DrawTarget> drawTarget;
+    RefPtr<DrawTarget> parentTarget;
     mozilla::gfx::AntialiasMode aaMode;
     bool patternTransformChanged;
     Matrix patternTransform;
     Color fontSmoothingBackgroundColor;
     // This is used solely for using minimal intermediate surface size.
     mozilla::gfx::Point deviceOffset;
+    // Support groups
+    mozilla::gfx::Float mBlendOpacity;
+    RefPtr<SourceSurface> mBlendMask;
+    Matrix mBlendMaskTransform;
+    mozilla::DebugOnly<bool> mWasPushedForBlendBack;
   };
 
   // This ensures mPath contains a valid path (in user space!)
@@ -545,8 +557,8 @@ private:
   bool mTransformChanged;
   Matrix mPathTransform;
   Rect mRect;
-  mozilla::RefPtr<PathBuilder> mPathBuilder;
-  mozilla::RefPtr<Path> mPath;
+  RefPtr<PathBuilder> mPathBuilder;
+  RefPtr<Path> mPath;
   Matrix mTransform;
   nsTArray<AzureState> mStateStack;
 
@@ -555,8 +567,8 @@ private:
 
   cairo_t *mRefCairo;
 
-  mozilla::RefPtr<DrawTarget> mDT;
-  mozilla::RefPtr<DrawTarget> mOriginalDT;
+  RefPtr<DrawTarget> mDT;
+  RefPtr<DrawTarget> mOriginalDT;
 };
 
 /**
@@ -671,7 +683,7 @@ public:
     }
 
 private:
-    mozilla::RefPtr<mozilla::gfx::DrawTarget> mDT;
+    RefPtr<mozilla::gfx::DrawTarget> mDT;
     bool mSubpixelAntialiasingEnabled;
 };
 

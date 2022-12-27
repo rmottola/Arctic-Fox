@@ -11,6 +11,13 @@
 #include "gfx2DGlue.h"
 #include "nsAppRunner.h"
 
+#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
+#include "libdisplay/GonkDisplay.h"     // for GonkDisplay
+#include <ui/Fence.h>
+#include "nsWindow.h"
+#include "nsScreenManagerGonk.h"
+#endif
+
 namespace mozilla {
 namespace gfx {
 class Matrix4x4;
@@ -59,11 +66,12 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
     while (const gfx::IntRect* rect = screenIter.Next())
     {
       DrawDiagnostics(aFlags | DiagnosticFlags::REGION_RECT,
-                      ToRect(*rect), aClipRect, aTransform, aFlashCounter);
+                      IntRectToRect(*rect), aClipRect, aTransform,
+                      aFlashCounter);
     }
   }
 
-  DrawDiagnostics(aFlags, ToRect(aVisibleRegion.GetBounds()),
+  DrawDiagnostics(aFlags, IntRectToRect(aVisibleRegion.GetBounds()),
                   aClipRect, aTransform, aFlashCounter);
 }
 
@@ -104,7 +112,13 @@ Compositor::DrawDiagnosticsInternal(DiagnosticFlags aFlags,
       color = gfx::Color(0.0f, 1.0f, 1.0f, 1.0f); // greenish blue
     }
   } else if (aFlags & DiagnosticFlags::IMAGE) {
-    color = gfx::Color(1.0f, 0.0f, 0.0f, 1.0f); // red
+    if (aFlags & DiagnosticFlags::NV12) {
+      color = gfx::Color(1.0f, 1.0f, 0.0f, 1.0f); // yellow
+    } else if (aFlags & DiagnosticFlags::YCBCR) {
+      color = gfx::Color(1.0f, 0.55f, 0.0f, 1.0f); // orange
+    } else {
+      color = gfx::Color(1.0f, 0.0f, 0.0f, 1.0f); // red
+    }
   } else if (aFlags & DiagnosticFlags::COLOR) {
     color = gfx::Color(0.0f, 0.0f, 1.0f, 1.0f); // blue
   } else if (aFlags & DiagnosticFlags::CONTAINER) {
@@ -352,6 +366,50 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
            flipped);
   return 4;
 }
+
+#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
+void
+Compositor::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
+{
+  // OpenGL does not provide ReleaseFence for rendering.
+  // Instead use DispAcquireFence as layer buffer's ReleaseFence
+  // to prevent flickering and tearing.
+  // DispAcquireFence is DisplaySurface's AcquireFence.
+  // AcquireFence will be signaled when a buffer's content is available.
+  // See Bug 974152.
+
+  if (!aLayer || !aWidget) {
+    return;
+  }
+  nsWindow* window = static_cast<nsWindow*>(aWidget);
+  RefPtr<FenceHandle::FdObj> fence = new FenceHandle::FdObj(
+      window->GetScreen()->GetPrevDispAcquireFd());
+  mReleaseFenceHandle.Merge(FenceHandle(fence));
+}
+
+FenceHandle
+Compositor::GetReleaseFence()
+{
+  if (!mReleaseFenceHandle.IsValid()) {
+    return FenceHandle();
+  }
+
+  RefPtr<FenceHandle::FdObj> fdObj = mReleaseFenceHandle.GetDupFdObj();
+  return FenceHandle(fdObj);
+}
+
+#else
+void
+Compositor::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
+{
+}
+
+FenceHandle
+Compositor::GetReleaseFence()
+{
+  return FenceHandle();
+}
+#endif
 
 } // namespace layers
 } // namespace mozilla

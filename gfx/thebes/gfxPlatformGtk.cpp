@@ -104,7 +104,7 @@ already_AddRefed<gfxASurface>
 gfxPlatformGtk::CreateOffscreenSurface(const IntSize& aSize,
                                        gfxImageFormat aFormat)
 {
-    nsRefPtr<gfxASurface> newSurface;
+    RefPtr<gfxASurface> newSurface;
     bool needsClear = true;
 #ifdef MOZ_X11
     // XXX we really need a different interface here, something that passes
@@ -256,34 +256,35 @@ gfxFontEntry*
 gfxPlatformGtk::LookupLocalFont(const nsAString& aFontName,
                                 uint16_t aWeight,
                                 int16_t aStretch,
-                                bool aItalic)
+                                uint8_t aStyle)
 {
     if (sUseFcFontList) {
         gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
-        return pfl->LookupLocalFont(aFontName, aWeight, aStretch, aItalic);
+        return pfl->LookupLocalFont(aFontName, aWeight, aStretch,
+                                    aStyle);
     }
 
     return gfxPangoFontGroup::NewFontEntry(aFontName, aWeight,
-                                           aStretch, aItalic);
+                                           aStretch, aStyle);
 }
 
 gfxFontEntry* 
 gfxPlatformGtk::MakePlatformFont(const nsAString& aFontName,
                                  uint16_t aWeight,
                                  int16_t aStretch,
-                                 bool aItalic,
+                                 uint8_t aStyle,
                                  const uint8_t* aFontData,
                                  uint32_t aLength)
 {
     if (sUseFcFontList) {
         gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
-        return pfl->MakePlatformFont(aFontName, aWeight, aStretch, aItalic,
-                                     aFontData, aLength);
+        return pfl->MakePlatformFont(aFontName, aWeight, aStretch,
+                                     aStyle, aFontData, aLength);
     }
 
     // passing ownership of the font data to the new font entry
     return gfxPangoFontGroup::NewFontEntry(aFontName, aWeight,
-                                           aStretch, aItalic,
+                                           aStretch, aStyle,
                                            aFontData, aLength);
 }
 

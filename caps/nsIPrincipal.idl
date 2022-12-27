@@ -20,7 +20,7 @@ interface nsIContentSecurityPolicy;
 [ptr] native JSPrincipals(JSPrincipals);
 [ptr] native PrincipalArray(nsTArray<nsCOMPtr<nsIPrincipal> >);
 
-[scriptable, builtinclass, uuid(a083acd0-1ebf-4585-85ab-08cfdd9c96bd)]
+[scriptable, builtinclass, uuid(188fc4a2-3157-4956-a7a2-d674991770da)]
 interface nsIPrincipal : nsISerializable
 {
     /**
@@ -60,8 +60,10 @@ interface nsIPrincipal : nsISerializable
 
     /**
      * The domain URI to which this principal pertains.
-     * This is congruent with HTMLDocument.domain, and may be null.
+     * This is null unless script successfully sets document.domain to our URI
+     * or a superdomain of our URI.
      * Setting this has no effect on the URI.
+     * See https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy#Changing_origin
      */
     [noscript] attribute nsIURI domain;
 
@@ -130,8 +132,28 @@ interface nsIPrincipal : nsISerializable
 
     /**
      * A Content Security Policy associated with this principal.
+     *
+     * Please note that if a csp was already set on the
+     * principal, then it should not be destroyed! Instead, the
+     * current csp should be quried and extended by
+     * calling AppendPolicy() on it.
      */
     [noscript] attribute nsIContentSecurityPolicy csp;
+
+    /**
+     * A speculative Content Security Policy associated with this
+     * principal. Set during speculative loading (preloading) and
+     * used *only* for preloads.
+     *
+     * If you want to query the CSP associated with that principal,
+     * then this is *not* what you want. Instead query 'csp'.
+     * 
+     * Please note that if a preloadCSP was already set on the
+     * principal, then it should not be destroyed! Instead, the
+     * current preloadCSP should be quried and extended by
+     * calling AppendPolicy() on it.
+     */
+    [noscript] attribute nsIContentSecurityPolicy preloadCsp;
 
     /**
      * The CSP of the principal in JSON notation.
@@ -280,10 +302,25 @@ interface nsIPrincipal : nsISerializable
     [infallible] readonly attribute boolean unknownAppId;
 
     /**
-     * Returns true iff this principal is a null principal (corresponding to an
+     * Returns true iff this is a null principal (corresponding to an
      * unknown, hence assumed minimally privileged, security context).
      */
     [infallible] readonly attribute boolean isNullPrincipal;
+
+    /**
+     * Returns true iff this principal corresponds to a codebase origin.
+     */
+    [infallible] readonly attribute boolean isCodebasePrincipal;
+
+    /**
+     * Returns true iff this is an expanded principal.
+     */
+    [infallible] readonly attribute boolean isExpandedPrincipal;
+
+    /**
+     * Returns true iff this is the system principal.
+     */
+    [infallible] readonly attribute boolean isSystemPrincipal;
 
     /**
      * Returns true if this principal's origin is recognized as being on the

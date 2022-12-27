@@ -430,7 +430,7 @@ nsViewManager::ProcessPendingUpdatesPaint(nsIWidget* aWidget)
   if (aWidget->NeedsPaint()) {
     // If an ancestor widget was hidden and then shown, we could
     // have a delayed resize to handle.
-    for (nsRefPtr<nsViewManager> vm = this; vm;
+    for (RefPtr<nsViewManager> vm = this; vm;
          vm = vm->mRootView->GetParent()
            ? vm->mRootView->GetParent()->GetViewManager()
            : nullptr) {
@@ -497,7 +497,7 @@ void nsViewManager::FlushDirtyRegionToWidget(nsView* aView)
   // for it to make it on screen
   if (gfxPrefs::DrawFrameCounter()) {
     nsRect counterBounds = ToAppUnits(gfxPlatform::FrameCounterBounds(), AppUnitsPerDevPixel());
-    r = r.Or(r, counterBounds);
+    r.OrWith(counterBounds);
   }
 
   nsViewManager* widgetVM = nearestViewWithWidget->GetViewManager();
@@ -586,7 +586,7 @@ nsViewManager::InvalidateWidgetArea(nsView *aWidgetView,
 #ifndef XP_MACOSX
         // GetBounds should compensate for chrome on a toplevel widget
         nsIntRect bounds;
-        childWidget->GetBounds(bounds);
+        childWidget->GetBoundsUntyped(bounds);
 
         nsTArray<nsIntRect> clipRects;
         childWidget->GetWindowClipRegion(&clipRects);
@@ -1091,7 +1091,7 @@ nsViewManager::ProcessPendingUpdates()
   if (mPresShell) {
     mPresShell->GetPresContext()->RefreshDriver()->RevokeViewManagerFlush();
 
-    nsRefPtr<nsViewManager> strongThis(this);
+    RefPtr<nsViewManager> strongThis(this);
     CallWillPaintOnObservers();
 
     ProcessPendingUpdatesForView(mRootView, true);
@@ -1108,7 +1108,7 @@ nsViewManager::UpdateWidgetGeometry()
 
   if (mHasPendingWidgetGeometryChanges) {
     mHasPendingWidgetGeometryChanges = false;
-    nsRefPtr<nsViewManager> strongThis(this);
+    RefPtr<nsViewManager> strongThis(this);
     ProcessPendingUpdatesForView(mRootView, false);
   }
 }

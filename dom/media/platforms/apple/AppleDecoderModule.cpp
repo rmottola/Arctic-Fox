@@ -15,14 +15,6 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Logging.h"
 
-PRLogModuleInfo* GetAppleMediaLog() {
-  static PRLogModuleInfo* log = nullptr;
-  if (!log) {
-    log = PR_NewLogModule("AppleMedia");
-  }
-  return log;
-}
-
 namespace mozilla {
 
 bool AppleDecoderModule::sInitialized = false;
@@ -84,7 +76,7 @@ AppleDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                        FlushableTaskQueue* aVideoTaskQueue,
                                        MediaDataDecoderCallback* aCallback)
 {
-  nsRefPtr<MediaDataDecoder> decoder;
+  RefPtr<MediaDataDecoder> decoder;
 
   if (sIsVDAAvailable && (!sIsVTHWAvailable || sForceVDA)) {
     decoder =
@@ -110,7 +102,7 @@ AppleDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
                                        FlushableTaskQueue* aAudioTaskQueue,
                                        MediaDataDecoderCallback* aCallback)
 {
-  nsRefPtr<MediaDataDecoder> decoder =
+  RefPtr<MediaDataDecoder> decoder =
     new AppleATDecoder(aConfig, aAudioTaskQueue, aCallback);
   return decoder.forget();
 }
@@ -119,7 +111,9 @@ bool
 AppleDecoderModule::SupportsMimeType(const nsACString& aMimeType)
 {
   return aMimeType.EqualsLiteral("audio/mpeg") ||
-    PlatformDecoderModule::SupportsMimeType(aMimeType);
+    aMimeType.EqualsLiteral("audio/mp4a-latm") ||
+    aMimeType.EqualsLiteral("video/mp4") ||
+    aMimeType.EqualsLiteral("video/avc");
 }
 
 PlatformDecoderModule::ConversionRequired

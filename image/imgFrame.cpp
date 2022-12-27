@@ -302,9 +302,9 @@ imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
 
   // Draw using the drawable the caller provided.
   nsIntRect imageRect(0, 0, mSize.width, mSize.height);
-  nsRefPtr<gfxContext> ctx = new gfxContext(target);
+  RefPtr<gfxContext> ctx = new gfxContext(target);
   gfxUtils::DrawPixelSnapped(ctx, aDrawable, mSize,
-                             ImageRegion::Create(imageRect),
+                             ImageRegion::Create(ThebesRect(imageRect)),
                              mFormat, aFilter, aImageFlags);
 
   if (canUseDataSurface && !mImageSurface) {
@@ -396,7 +396,7 @@ imgFrame::Optimize()
     ->Optimal2DFormatForContent(gfxContentType::COLOR);
 
   if (mFormat != SurfaceFormat::B8G8R8A8 &&
-      optFormat == SurfaceFormat::R5G6B5) {
+      optFormat == SurfaceFormat::R5G6B5_UINT16) {
     RefPtr<VolatileBuffer> buf =
       AllocateBufferForImage(mSize, optFormat);
     if (!buf) {
@@ -820,7 +820,7 @@ public:
   NS_IMETHOD Run() { return mTarget->UnlockImageData(); }
 
 private:
-  nsRefPtr<imgFrame> mTarget;
+  RefPtr<imgFrame> mTarget;
 };
 
 nsresult

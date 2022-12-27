@@ -26,15 +26,22 @@ class Promise;
 } /* namespace dom */
 
 struct AnimationEventInfo {
-  nsRefPtr<mozilla::dom::Element> mElement;
-  mozilla::InternalAnimationEvent mEvent;
+  RefPtr<dom::Element> mElement;
+  RefPtr<dom::Animation> mAnimation;
+  InternalAnimationEvent mEvent;
+  TimeStamp mTimeStamp;
 
-  AnimationEventInfo(mozilla::dom::Element *aElement,
-                     const nsSubstring& aAnimationName,
+  AnimationEventInfo(dom::Element* aElement,
+                     nsCSSPseudoElements::Type aPseudoType,
                      EventMessage aMessage,
-                     const mozilla::StickyTimeDuration& aElapsedTime,
-                     nsCSSPseudoElements::Type aPseudoType)
-    : mElement(aElement), mEvent(true, aMessage)
+                     const nsSubstring& aAnimationName,
+                     const StickyTimeDuration& aElapsedTime,
+                     const TimeStamp& aTimeStamp,
+                     dom::Animation* aAnimation)
+    : mElement(aElement)
+    , mAnimation(aAnimation)
+    , mEvent(true, aMessage)
+    , mTimeStamp(aTimeStamp)
   {
     // XXX Looks like nobody initialize WidgetEvent::time
     mEvent.animationName = aAnimationName;
@@ -44,9 +51,11 @@ struct AnimationEventInfo {
 
   // InternalAnimationEvent doesn't support copy-construction, so we need
   // to ourselves in order to work with nsTArray
-  AnimationEventInfo(const AnimationEventInfo &aOther)
+  AnimationEventInfo(const AnimationEventInfo& aOther)
     : mElement(aOther.mElement)
+    , mAnimation(aOther.mAnimation)
     , mEvent(true, aOther.mEvent.mMessage)
+    , mTimeStamp(aOther.mTimeStamp)
   {
     mEvent.AssignAnimationEventData(aOther.mEvent, false);
   }
@@ -117,7 +126,6 @@ public:
 
   void Tick() override;
   void QueueEvents();
-  bool HasEndEventToQueue() const override;
 
   bool IsStylePaused() const { return mIsStylePaused; }
 
@@ -164,6 +172,21 @@ protected:
   CommonAnimationManager* GetAnimationManager() const override;
   void UpdateTiming(SeekFlag aSeekFlag,
                     SyncNotifyFlag aSyncNotifyFlag) override;
+
+  // Returns the duration from the start of the animation's source effect's
+  // active interval to the point where the animation actually begins playback.
+  // This is zero unless the animation's source effect has a negative delay in
+  // which // case it is the absolute value of that delay.
+  // This is used for setting the elapsedTime member of CSS AnimationEvents.
+  TimeDuration InitialAdvance() const {
+    return mEffect ?
+           std::max(TimeDuration(), mEffect->Timing().mDelay * -1) :
+           TimeDuration();
+  }
+  // Converts an AnimationEvent's elapsedTime value to an equivalent TimeStamp
+  // that can be used to sort events by when they occurred.
+  TimeStamp ElapsedTimeToTimeStamp(const StickyTimeDuration& aElapsedTime)
+    const;
 
   nsString mAnimationName;
 
@@ -306,6 +329,7 @@ public:
    * contexts are created.
    */
   void DispatchEvents()  { mEventDispatcher.DispatchEvents(mPresContext); }
+  void SortEvents()      { mEventDispatcher.SortEvents(); }
   void ClearEventQueue() { mEventDispatcher.ClearEventQueue(); }
 
   // Stop animations on the element. This method takes the real element
@@ -313,6 +337,10 @@ public:
   // ::before and ::after.
   void StopAnimationsForElement(mozilla::dom::Element* aElement,
                                 nsCSSPseudoElements::Type aPseudoType);
+
+  bool IsAnimationManager() override {
+    return true;
+  }
 
 protected:
   virtual ~nsAnimationManager() {}
@@ -325,9 +353,6 @@ protected:
   }
   virtual nsIAtom* GetAnimationsAfterAtom() override {
     return nsGkAtoms::animationsOfAfterProperty;
-  }
-  virtual bool IsAnimationManager() override {
-    return true;
   }
 
   mozilla::DelayedEventDispatcher<mozilla::AnimationEventInfo> mEventDispatcher;

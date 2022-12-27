@@ -15,6 +15,7 @@
 #include "jit/CompileInfo.h"
 #include "jit/JitSpewer.h"
 #include "jit/mips32/Simulator-mips32.h"
+#include "jit/mips64/Simulator-mips64.h"
 #include "jit/Recover.h"
 #include "jit/RematerializedFrame.h"
 
@@ -374,7 +375,8 @@ struct BaselineStackBuilder
         priorOffset -= sizeof(void*);
         return virtualPointerAtStackOffset(priorOffset);
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-      defined(JS_CODEGEN_X64) || defined(JS_CODEGEN_MIPS32)
+      defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_X64)
         // On X64, ARM, ARM64, and MIPS, the frame pointer save location depends on
         // the caller of the rectifier frame.
         BufferPointer<RectifierFrameLayout> priorFrame =
@@ -791,6 +793,16 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
     jsbytecode* pc = catchingException ? excInfo->resumePC() : script->offsetToPC(iter.pcOffset());
     bool resumeAfter = catchingException ? false : iter.resumeAfter();
 
+    // When pgo is enabled, increment the counter of the block in which we
+    // resume, as Ion does not keep track of the code coverage.
+    //
+    // We need to do that when pgo is enabled, as after a specific number of
+    // FirstExecution bailouts, we invalidate and recompile the script with
+    // IonMonkey. Failing to increment the counter of the current basic block
+    // might lead to repeated bailouts and invalidations.
+    if (!js_JitOptions.disablePgo && script->hasScriptCounts())
+        script->incHitCount(pc);
+
     JSOp op = JSOp(*pc);
 
     // Fixup inlined JSOP_FUNCALL, JSOP_FUNAPPLY, and accessors on the caller side.
@@ -971,7 +983,9 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
             }
         }
     }
+#endif
 
+#ifdef JS_JITSPEW
     JitSpew(JitSpew_BaselineBailouts, "      Resuming %s pc offset %d (op %s) (line %d) of %s:%" PRIuSIZE,
                 resumeAfter ? "after" : "at", (int) pcOff, js_CodeName[op],
                 PCToLineNumber(script, pc), script->filename(), script->lineno());
@@ -980,7 +994,7 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
 #endif
 
     bool pushedNewTarget = op == JSOP_NEW;
-    
+
     // If this was the last inline frame, or we are bailing out to a catch or
     // finally block in this frame, then unpacking is almost done.
     if (!iter.moreFrames() || catchingException) {
@@ -1420,12 +1434,14 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
     //      Entry - Interpreter or other calling into Ion.
     //      Rectifier - Arguments rectifier calling into Ion.
     MOZ_ASSERT(iter.isBailoutJS());
-    mozilla::DebugOnly<FrameType> prevFrameType = iter.prevType();
+#if defined(DEBUG) || defined(JS_JITSPEW)
+    FrameType prevFrameType = iter.prevType();
     MOZ_ASSERT(prevFrameType == JitFrame_IonJS ||
                prevFrameType == JitFrame_BaselineStub ||
                prevFrameType == JitFrame_Entry ||
                prevFrameType == JitFrame_Rectifier ||
                prevFrameType == JitFrame_IonAccessorIC);
+#endif
 
     // All incoming frames are going to look like this:
     //
@@ -1877,7 +1893,15 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
       case Bailout_NonSimdFloat32x4Input:
       case Bailout_InitialState:
       case Bailout_Debugger:
+      case Bailout_UninitializedThis:
+      case Bailout_BadDerivedConstructorReturn:
         // Do nothing.
+        break;
+
+      case Bailout_FirstExecution:
+        // Do not return directly, as this was not frequent in the first place,
+        // thus rely on the check for frequent bailouts to recompile the current
+        // script.
         break;
 
       // Invalid assumption based on baseline code.
@@ -1913,7 +1937,7 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
         MOZ_CRASH("Unknown bailout kind!");
     }
 
-    if (!CheckFrequentBailouts(cx, outerScript))
+    if (!CheckFrequentBailouts(cx, outerScript, bailoutKind))
         return false;
 
     // We're returning to JIT code, so we should clear the override pc.

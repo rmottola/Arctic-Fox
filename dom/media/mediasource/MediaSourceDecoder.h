@@ -36,9 +36,9 @@ class MediaSourceDecoder : public MediaDecoder
 public:
   explicit MediaSourceDecoder(dom::HTMLMediaElement* aElement);
 
-  virtual MediaDecoder* Clone() override;
+  virtual MediaDecoder* Clone(MediaDecoderOwner* aOwner) override;
   virtual MediaDecoderStateMachine* CreateStateMachine() override;
-  virtual nsresult Load(nsIStreamListener**, MediaDecoder*) override;
+  virtual nsresult Load(nsIStreamListener**) override;
   virtual media::TimeIntervals GetSeekable() override;
   media::TimeIntervals GetBuffered() override;
 
@@ -87,7 +87,7 @@ private:
   // calls Attach/DetachMediaSource on this decoder to set and clear
   // mMediaSource.
   dom::MediaSource* mMediaSource;
-  nsRefPtr<MediaSourceDemuxer> mDemuxer;
+  RefPtr<MediaSourceDemuxer> mDemuxer;
   Atomic<bool> mEnded;
 };
 

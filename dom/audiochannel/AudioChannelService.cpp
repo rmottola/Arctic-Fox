@@ -91,7 +91,7 @@ void
 NotifyChannelActive(uint64_t aWindowID, AudioChannel aAudioChannel,
                     bool aActive)
 {
-  nsRefPtr<nsRunnable> runnable =
+  RefPtr<nsRunnable> runnable =
     new NotifyChannelActiveRunnable(aWindowID, aAudioChannel, aActive);
   NS_DispatchToCurrentThread(runnable);
 }
@@ -131,8 +131,8 @@ public:
       observerService->NotifyObservers(
         ToSupports(mWindow),
         "audio-playback",
-        mActive ? NS_LITERAL_STRING("active").get()
-                : NS_LITERAL_STRING("inactive").get());
+        mActive ? MOZ_UTF16("active")
+                : MOZ_UTF16("inactive"));
     }
 
     return NS_OK;
@@ -168,7 +168,7 @@ AudioChannelService::GetOrCreate()
     gAudioChannelService = new AudioChannelService();
   }
 
-  nsRefPtr<AudioChannelService> service = gAudioChannelService.get();
+  RefPtr<AudioChannelService> service = gAudioChannelService.get();
   return service.forget();
 }
 
@@ -252,7 +252,7 @@ AudioChannelService::RegisterAudioChannelAgent(AudioChannelAgent* aAgent,
 
   // If this is the first agent for this window, we must notify the observers.
   if (winData->mAgents.Length() == 1) {
-    nsRefPtr<MediaPlaybackRunnable> runnable =
+    RefPtr<MediaPlaybackRunnable> runnable =
       new MediaPlaybackRunnable(aAgent->Window(), true /* active */);
     NS_DispatchToCurrentThread(runnable);
   }
@@ -294,7 +294,7 @@ AudioChannelService::UnregisterAudioChannelAgent(AudioChannelAgent* aAgent)
 
   // If this is the last agent for this window, we must notify the observers.
   if (winData->mAgents.IsEmpty()) {
-    nsRefPtr<MediaPlaybackRunnable> runnable =
+    RefPtr<MediaPlaybackRunnable> runnable =
       new MediaPlaybackRunnable(aAgent->Window(), false /* active */);
     NS_DispatchToCurrentThread(runnable);
   }
@@ -525,7 +525,7 @@ struct RefreshAgentsVolumeData
   {}
 
   nsPIDOMWindow* mWindow;
-  nsTArray<nsRefPtr<AudioChannelAgent>> mAgents;
+  nsTArray<RefPtr<AudioChannelAgent>> mAgents;
 };
 
 void
@@ -534,7 +534,12 @@ AudioChannelService::RefreshAgentsVolume(nsPIDOMWindow* aWindow)
   MOZ_ASSERT(aWindow);
   MOZ_ASSERT(aWindow->IsOuterWindow());
 
-  AudioChannelWindow* winData = GetWindowData(aWindow->WindowID());
+  nsCOMPtr<nsPIDOMWindow> topWindow = aWindow->GetScriptableTop();
+  if (!topWindow) {
+    return;
+  }
+
+  AudioChannelWindow* winData = GetWindowData(topWindow->WindowID());
   if (!winData) {
     return;
   }

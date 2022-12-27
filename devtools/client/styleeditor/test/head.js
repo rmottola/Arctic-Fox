@@ -7,9 +7,9 @@ const TEST_BASE_HTTP = "http://example.com/browser/devtools/client/styleeditor/t
 const TEST_BASE_HTTPS = "https://example.com/browser/devtools/client/styleeditor/test/";
 const TEST_HOST = 'mochi.test:8888';
 
-var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var {TargetFactory} = require("devtools/client/framework/target");
-var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+var {console} = Cu.import("resource://gre/modules/Console.jsm", {});
 var promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
@@ -71,17 +71,29 @@ function* cleanup()
 }
 
 /**
- * Creates a new tab in specified window navigates it to the given URL and
- * opens style editor in it.
+ * Open the style editor for the current tab.
  */
-var openStyleEditorForURL = Task.async(function* (url, win) {
-  let tab = yield addTab(url, win);
+var openStyleEditor = Task.async(function*(tab) {
+  if (!tab) {
+    tab = gBrowser.selectedTab;
+  }
   let target = TargetFactory.forTab(tab);
   let toolbox = yield gDevTools.showToolbox(target, "styleeditor");
   let panel = toolbox.getPanel("styleeditor");
   let ui = panel.UI;
 
-  return { tab, toolbox, panel, ui };
+  return { toolbox, panel, ui };
+});
+
+/**
+ * Creates a new tab in specified window navigates it to the given URL and
+ * opens style editor in it.
+ */
+var openStyleEditorForURL = Task.async(function* (url, win) {
+  let tab = yield addTab(url, win);
+  let result = yield openStyleEditor(tab);
+  result.tab = tab;
+  return result;
 });
 
 /**

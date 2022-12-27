@@ -56,7 +56,7 @@ using mozilla::ipc::BackgroundChild;
 using mozilla::ipc::IsOnBackgroundThread;
 using mozilla::ipc::PBackgroundChild;
 using mozilla::ipc::PrincipalInfo;
-using mozilla::unused;
+using mozilla::Unused;
 using mozilla::HashString;
 
 namespace mozilla {
@@ -322,7 +322,7 @@ protected:
     mQuotaObject = nullptr;
   }
 
-  nsRefPtr<QuotaObject> mQuotaObject;
+  RefPtr<QuotaObject> mQuotaObject;
   int64_t mFileSize;
   PRFileDesc* mFileDesc;
   PRFileMap* mFileMap;
@@ -332,7 +332,7 @@ protected:
 class UnlockDirectoryRunnable final
   : public nsRunnable
 {
-  nsRefPtr<DirectoryLock> mDirectoryLock;
+  RefPtr<DirectoryLock> mDirectoryLock;
 
 public:
   explicit
@@ -478,7 +478,7 @@ private:
     FinishOnOwningThread();
 
     if (!mActorDestroyed) {
-      unused << Send__delete__(this, mResult);
+      Unused << Send__delete__(this, mResult);
     }
   }
 
@@ -618,7 +618,7 @@ private:
   quota::PersistenceType mPersistence;
   nsCString mGroup;
   nsCString mOrigin;
-  nsRefPtr<DirectoryLock> mDirectoryLock;
+  RefPtr<DirectoryLock> mDirectoryLock;
 
   // State initialized during eReadyToReadMetadata
   nsCOMPtr<nsIFile> mDirectory;
@@ -904,7 +904,7 @@ ParentRunnable::FinishOnOwningThread()
   FileDescriptorHolder::Finish();
 
   if (mDirectoryLock) {
-    nsRefPtr<UnlockDirectoryRunnable> runnable =
+    RefPtr<UnlockDirectoryRunnable> runnable =
       new UnlockDirectoryRunnable(mDirectoryLock.forget());
 
     NS_DispatchToMainThread(runnable);
@@ -993,7 +993,7 @@ ParentRunnable::Run()
 
       // Metadata is now open.
       if (!SendOnOpenMetadataForRead(mMetadata)) {
-        unused << Send__delete__(this, JS::AsmJSCache_InternalError);
+        Unused << Send__delete__(this, JS::AsmJSCache_InternalError);
       }
 
       return NS_OK;
@@ -1035,7 +1035,7 @@ ParentRunnable::Run()
       FileDescriptor::PlatformHandleType handle =
         FileDescriptor::PlatformHandleType(PR_FileDesc2NativeHandle(mFileDesc));
       if (!SendOnOpenCacheFile(mFileSize, FileDescriptor(handle))) {
-        unused << Send__delete__(this, JS::AsmJSCache_InternalError);
+        Unused << Send__delete__(this, JS::AsmJSCache_InternalError);
       }
 
       return NS_OK;
@@ -1144,7 +1144,7 @@ AllocEntryParent(OpenMode aOpenMode,
     return nullptr;
   }
 
-  nsRefPtr<ParentRunnable> runnable =
+  RefPtr<ParentRunnable> runnable =
     new ParentRunnable(aPrincipalInfo, aOpenMode, aWriteParams);
 
   nsresult rv = NS_DispatchToMainThread(runnable);
@@ -1158,7 +1158,7 @@ void
 DeallocEntryParent(PAsmJSCacheEntryParent* aActor)
 {
   // Transfer ownership back from IPDL.
-  nsRefPtr<ParentRunnable> op =
+  RefPtr<ParentRunnable> op =
     dont_AddRef(static_cast<ParentRunnable*>(aActor));
 }
 
@@ -1451,7 +1451,7 @@ ChildRunnable::Run()
       Release();
 
       if (!mActorDestroyed) {
-        unused << Send__delete__(this, JS::AsmJSCache_Success);
+        Unused << Send__delete__(this, JS::AsmJSCache_Success);
       }
 
       mState = eFinished;
@@ -1544,7 +1544,7 @@ OpenFile(nsIPrincipal* aPrincipal,
   // We need to synchronously call into the parent to open the file and
   // interact with the QuotaManager. The child can then map the file into its
   // address space to perform I/O.
-  nsRefPtr<ChildRunnable> childRunnable =
+  RefPtr<ChildRunnable> childRunnable =
     new ChildRunnable(aPrincipal, aOpenMode, aWriteParams, aReadParams);
 
   JS::AsmJSCacheResult openResult =

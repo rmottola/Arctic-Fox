@@ -29,11 +29,11 @@ NotifyGamepadChange(const T& aInfo)
   nsTArray<ContentParent*> t;
   ContentParent::GetAll(t);
   for(uint32_t i = 0; i < t.Length(); ++i) {
-    unused << t[i]->SendGamepadUpdate(e);
+    Unused << t[i]->SendGamepadUpdate(e);
   }
   // If we have a GamepadService in the main process, send directly to it.
   if (GamepadService::IsServiceRunning()) {
-    nsRefPtr<GamepadService> svc = GamepadService::GetService();
+    RefPtr<GamepadService> svc = GamepadService::GetService();
     svc->Update(e);
   }
 }

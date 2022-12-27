@@ -38,10 +38,9 @@ public:
                     ImageContainer* aImageContainer);
   virtual ~FFmpegH264Decoder();
 
-  virtual nsRefPtr<InitPromise> Init() override;
-  virtual nsresult Input(MediaRawData* aSample) override;
-  virtual nsresult Drain() override;
-  virtual nsresult Flush() override;
+  RefPtr<InitPromise> Init() override;
+  nsresult Input(MediaRawData* aSample) override;
+  void ProcessDrain() override;
   void InitCodecContext() override;
   static AVCodecID GetCodecId(const nsACString& aMimeType);
 
@@ -61,8 +60,7 @@ private:
   int AllocateYUV420PVideoBuffer(AVCodecContext* aCodecContext,
                                  AVFrame* aFrame);
 
-  MediaDataDecoderCallback* mCallback;
-  nsRefPtr<ImageContainer> mImageContainer;
+  RefPtr<ImageContainer> mImageContainer;
   uint32_t mPictureWidth;
   uint32_t mPictureHeight;
   uint32_t mDisplayWidth;

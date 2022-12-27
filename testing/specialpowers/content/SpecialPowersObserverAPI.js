@@ -321,32 +321,21 @@ SpecialPowersObserverAPI.prototype = {
 
       case "SPPermissionManager": {
         let msg = aMessage.json;
-
-        let secMan = Services.scriptSecurityManager;
-        // TODO: Bug 1196665 - Add originAttributes into SpecialPowers
-        let attrs = {appId: msg.appId, inBrowser: msg.isInBrowserElement};
-        let principal = secMan.createCodebasePrincipal(this._getURI(msg.url), attrs);
+        let principal = msg.principal;
 
         switch (msg.op) {
           case "add":
-            Services.perms.addFromPrincipal(principal, msg.type, msg.permission);
+            Services.perms.addFromPrincipal(principal, msg.type, msg.permission, msg.expireType, msg.expireTime);
             break;
           case "remove":
             Services.perms.removeFromPrincipal(principal, msg.type);
             break;
           case "has":
             let hasPerm = Services.perms.testPermissionFromPrincipal(principal, msg.type);
-            if (hasPerm == Ci.nsIPermissionManager.ALLOW_ACTION) 
-              return true;
-            return false;
-            break;
+            return hasPerm == Ci.nsIPermissionManager.ALLOW_ACTION;
           case "test":
             let testPerm = Services.perms.testPermissionFromPrincipal(principal, msg.type, msg.value);
-            if (testPerm == msg.value)  {
-              return true;
-            }
-            return false;
-            break;
+            return testPerm == msg.value;
           default:
             throw new SpecialPowersError(
               "Invalid operation for SPPermissionManager");
@@ -387,32 +376,32 @@ SpecialPowersObserverAPI.prototype = {
               return;
             }
           case "inject-app":
-	    {
+            {
               let aAppId = aMessage.json.appId;
-	      let aApp   = aMessage.json.app;
+              let aApp   = aMessage.json.app;
 
               let keys = Object.keys(Webapps.DOMApplicationRegistry.webapps);
-	      let exists = keys.indexOf(aAppId) !== -1;
-	      if (exists) {
+              let exists = keys.indexOf(aAppId) !== -1;
+              if (exists) {
                 return false;
-	      }
+              }
 
               Webapps.DOMApplicationRegistry.webapps[aAppId] = aApp;
-	      return true;
-	    }
-	  case "reject-app":
-	    {
+              return true;
+            }
+          case "reject-app":
+            {
               let aAppId = aMessage.json.appId;
 
               let keys = Object.keys(Webapps.DOMApplicationRegistry.webapps);
-	      let exists = keys.indexOf(aAppId) !== -1;
-	      if (!exists) {
+              let exists = keys.indexOf(aAppId) !== -1;
+              if (!exists) {
                 return false;
-	      }
+              }
 
               delete Webapps.DOMApplicationRegistry.webapps[aAppId];
-	      return true;
-	    }
+              return true;
+            }
           default:
             throw new SpecialPowersError("Invalid operation for SPWebAppsService");
         }
@@ -510,17 +499,12 @@ SpecialPowersObserverAPI.prototype = {
                          .frameLoader
                          .messageManager;
         let msg = aMessage.data;
+        let principal = msg.principal;
         let op = msg.op;
 
         if (op != 'clear' && op != 'getUsage' && op != 'reset') {
           throw new SpecialPowersError('Invalid operation for SPQuotaManager');
         }
-
-        let secMan = Services.scriptSecurityManager;
-        let principal = secMan.createCodebasePrincipal(this._getURI(msg.uri), {
-          appId: msg.appId,
-          inBrowser: msg.inBrowser,
-        });
 
         if (op == 'clear') {
           qm.clearStoragesForPrincipal(principal);
@@ -545,15 +529,13 @@ SpecialPowersObserverAPI.prototype = {
         return undefined;	// See comment at the beginning of this function.
       }
 
-      case "SPPeriodicServiceWorkerUpdates": {
-        // We could just dispatch a generic idle-daily notification here, but
-        // this is better since it avoids invoking other idle daily observers
-        // at the cost of hard-coding the usage of PeriodicServiceWorkerUpdater.
-        Cc["@mozilla.org/service-worker-periodic-updater;1"].
-          getService(Ci.nsIObserver).
-          observe(null, "idle-daily", "Caller:SpecialPowers");
-
-        return undefined;	// See comment at the beginning of this function.
+      case "SPCleanUpSTSData": {
+        let origin = aMessage.data.origin;
+        let flags = aMessage.data.flags;
+        let uri = Services.io.newURI(origin, null, null);
+        let sss = Cc["@mozilla.org/ssservice;1"].
+                  getService(Ci.nsISiteSecurityService);
+        sss.removeState(Ci.nsISiteSecurityService.HEADER_HSTS, uri, flags);
       }
 
       case "SPLoadExtension": {

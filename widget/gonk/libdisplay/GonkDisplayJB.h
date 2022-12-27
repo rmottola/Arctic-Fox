@@ -50,12 +50,16 @@ public:
         GonkDisplay::DisplayType aDisplayType,
         android::IGraphicBufferProducer* aProducer = nullptr);
 
+    virtual void NotifyBootAnimationStopped();
+
 private:
     void StopBootAnim();
     void CreateSurface(android::sp<ANativeWindow>& aNativeWindow,
                        android::sp<android::DisplaySurface>& aDisplaySurface,
                        uint32_t aWidth, uint32_t aHeight);
     void PowerOnDisplay(int aDpy);
+
+    int DoQueueBuffer(ANativeWindowBuffer* buf);
 
     hw_module_t const*        mModule;
     hw_module_t const*        mFBModule;

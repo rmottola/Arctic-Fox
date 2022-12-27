@@ -31,8 +31,8 @@
 #include <android/log.h>
 #define GVDM_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "GonkVideoDecoderManager", __VA_ARGS__)
 
-PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+extern PRLogModuleInfo* GetPDMLog();
+#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 using namespace mozilla::layers;
 using namespace android;
 typedef android::MediaCodecProxy MediaCodecProxy;
@@ -72,7 +72,7 @@ GonkVideoDecoderManager::~GonkVideoDecoderManager()
   MOZ_COUNT_DTOR(GonkVideoDecoderManager);
 }
 
-android::sp<MediaCodecProxy>
+RefPtr<MediaDataDecoder::InitPromise>
 GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 {
   nsIntSize displaySize(mDisplayWidth, mDisplayHeight);
@@ -82,13 +82,16 @@ GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   nsIntSize frameSize(mVideoWidth, mVideoHeight);
   if (!IsValidVideoRegion(frameSize, pictureRect, displaySize)) {
     GVDM_LOG("It is not a valid region");
-    return nullptr;
+    return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
   }
 
   mReaderCallback = aCallback;
 
+  mReaderTaskQueue = AbstractThread::GetCurrent()->AsTaskQueue();
+  MOZ_ASSERT(!mReaderTaskQueue);
+
   if (mLooper.get() != nullptr) {
-    return nullptr;
+    return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
   }
   // Create ALooper
   mLooper = new ALooper;
@@ -98,10 +101,11 @@ GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   mManagerLooper->registerHandler(mHandler);
   // Start ALooper thread.
   if (mLooper->start() != OK || mManagerLooper->start() != OK ) {
-    return nullptr;
+    return InitPromise::CreateAndReject(DecoderFailureReason::INIT_ERROR, __func__);
   }
+  RefPtr<InitPromise> p = mInitPromise.Ensure(__func__);
   mDecoder = MediaCodecProxy::CreateByType(mLooper, mMimeType.get(), false, mVideoListener);
-  mDecoder->AskMediaCodecAndWait();
+  mDecoder->AsyncAskMediaCodec();
 
   uint32_t capability = MediaCodecProxy::kEmptyCapability;
   if (mDecoder->getCapability(&capability) == OK && (capability &
@@ -109,7 +113,7 @@ GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
     mNativeWindow = new GonkNativeWindow();
   }
 
-  return mDecoder;
+  return p;
 }
 
 void
@@ -161,7 +165,7 @@ nsresult
 GonkVideoDecoderManager::Input(MediaRawData* aSample)
 {
   MonitorAutoLock mon(mMonitor);
-  nsRefPtr<MediaRawData> sample;
+  RefPtr<MediaRawData> sample;
 
   if (!aSample) {
     // It means EOS with empty sample.
@@ -174,7 +178,7 @@ GonkVideoDecoderManager::Input(MediaRawData* aSample)
 
   status_t rv;
   while (mQueueSample.Length()) {
-    nsRefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
+    RefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
     {
       MonitorAutoUnlock mon_unlock(mMonitor);
       rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->mData),
@@ -207,7 +211,7 @@ nsresult
 GonkVideoDecoderManager::CreateVideoData(int64_t aStreamOffset, VideoData **v)
 {
   *v = nullptr;
-  nsRefPtr<VideoData> data;
+  RefPtr<VideoData> data;
   int64_t timeUs;
   int32_t keyFrame;
 
@@ -407,7 +411,7 @@ GonkVideoDecoderManager::Flush()
 // Blocks until decoded sample is produced by the deoder.
 nsresult
 GonkVideoDecoderManager::Output(int64_t aStreamOffset,
-                                nsRefPtr<MediaData>& aOutData)
+                                RefPtr<MediaData>& aOutData)
 {
   aOutData = nullptr;
   status_t err;
@@ -420,7 +424,7 @@ GonkVideoDecoderManager::Output(int64_t aStreamOffset,
   switch (err) {
     case OK:
     {
-      nsRefPtr<VideoData> data;
+      RefPtr<VideoData> data;
       nsresult rv = CreateVideoData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // Decoder outputs a empty video buffer, try again
@@ -457,7 +461,7 @@ GonkVideoDecoderManager::Output(int64_t aStreamOffset,
     case android::ERROR_END_OF_STREAM:
     {
       GVDM_LOG("Got the EOS frame!");
-      nsRefPtr<VideoData> data;
+      RefPtr<VideoData> data;
       nsresult rv = CreateVideoData(aStreamOffset, getter_AddRefs(data));
       if (rv == NS_ERROR_NOT_AVAILABLE) {
         // For EOS, no need to do any thing.
@@ -520,14 +524,18 @@ GonkVideoDecoderManager::codecReserved()
                                 android::MediaCodec::BUFFER_FLAG_CODECCONFIG);
   if (rv != OK) {
     GVDM_LOG("Failed to configure codec!!!!");
-    mReaderCallback->Error();
+    mInitPromise.Reject(DecoderFailureReason::INIT_ERROR, __func__);
+    return;
   }
+
+  mInitPromise.ResolveIfExists(TrackType::kVideoTrack, __func__);
 }
 
 void
 GonkVideoDecoderManager::codecCanceled()
 {
-  mDecoder = nullptr;
+  GVDM_LOG("codecCanceled");
+  mInitPromise.RejectIfExists(DecoderFailureReason::CANCELED, __func__);
 }
 
 // Called on GonkVideoDecoderManager::mManagerLooper thread.
@@ -578,16 +586,20 @@ GonkVideoDecoderManager::VideoResourceListener::~VideoResourceListener()
 void
 GonkVideoDecoderManager::VideoResourceListener::codecReserved()
 {
-  if (mManager != nullptr) {
-    mManager->codecReserved();
+  if (mManager) {
+    nsCOMPtr<nsIRunnable> r =
+      NS_NewNonOwningRunnableMethod(mManager, &GonkVideoDecoderManager::codecReserved);
+    mManager->mReaderTaskQueue->Dispatch(r.forget());
   }
 }
 
 void
 GonkVideoDecoderManager::VideoResourceListener::codecCanceled()
 {
-  if (mManager != nullptr) {
-    mManager->codecCanceled();
+  if (mManager) {
+    nsCOMPtr<nsIRunnable> r =
+      NS_NewNonOwningRunnableMethod(mManager, &GonkVideoDecoderManager::codecCanceled);
+    mManager->mReaderTaskQueue->Dispatch(r.forget());
   }
 }
 

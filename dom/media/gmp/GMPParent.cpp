@@ -120,7 +120,7 @@ void
 GMPParent::Crash()
 {
   if (mState != GMPStateNotLoaded) {
-    unused << SendCrashPluginNow();
+    Unused << SendCrashPluginNow();
   }
 }
 
@@ -192,7 +192,7 @@ AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  nsRefPtr<GeckoMediaPluginServiceParent> service =
+  RefPtr<GeckoMediaPluginServiceParent> service =
     GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     service->AsyncShutdownComplete(parent);
@@ -221,7 +221,7 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   }
 
   int32_t timeout = GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT;
-  nsRefPtr<GeckoMediaPluginServiceParent> service =
+  RefPtr<GeckoMediaPluginServiceParent> service =
     GeckoMediaPluginServiceParent::GetSingleton();
   if (service) {
     timeout = service->AsyncShutdownTimeoutMs();
@@ -229,7 +229,7 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   rv = mAsyncShutdownTimeout->InitWithFuncCallback(
     &AbortWaitingForGMPAsyncShutdown, this, timeout,
     nsITimer::TYPE_ONE_SHOT);
-  unused << NS_WARN_IF(NS_FAILED(rv));
+  Unused << NS_WARN_IF(NS_FAILED(rv));
   return rv;
 }
 
@@ -333,7 +333,7 @@ GMPParent::AbortAsyncShutdown()
     return;
   }
 
-  nsRefPtr<GMPParent> kungFuDeathGrip(this);
+  RefPtr<GMPParent> kungFuDeathGrip(this);
   mService->AsyncShutdownComplete(this);
   mAsyncShutdownRequired = false;
   mAsyncShutdownInProgress = false;
@@ -427,7 +427,7 @@ GMPParent::Shutdown()
     return;
   }
 
-  nsRefPtr<GMPParent> self(this);
+  RefPtr<GMPParent> self(this);
   DeleteProcess();
 
   // XXX Get rid of mDeleteProcessOnlyOnUnload and this code when
@@ -580,10 +580,8 @@ GMPParent::WriteExtraDataForMinidump(CrashReporter::AnnotationTable& notes)
 void
 GMPParent::GetCrashID(nsString& aResult)
 {
-  CrashReporterParent* cr = nullptr;
-  if (ManagedPCrashReporterParent().Length() > 0) {
-    cr = static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
-  }
+  CrashReporterParent* cr =
+    static_cast<CrashReporterParent*>(LoneManagedOrNull(ManagedPCrashReporterParent()));
   if (NS_WARN_IF(!cr)) {
     return;
   }
@@ -616,7 +614,7 @@ GMPNotifyObservers(const uint32_t aPluginID, const nsACString& aPluginName, cons
     obs->NotifyObservers(propbag, "gmp-plugin-crash", nullptr);
   }
 
-  nsRefPtr<gmp::GeckoMediaPluginService> service =
+  RefPtr<gmp::GeckoMediaPluginService> service =
     gmp::GeckoMediaPluginService::GetGeckoMediaPluginService();
   if (service) {
     service->RunPluginCrashCallbacks(aPluginID, aPluginName);
@@ -647,7 +645,7 @@ GMPParent::ActorDestroy(ActorDestroyReason aWhy)
 
   // Normal Shutdown() will delete the process on unwind.
   if (AbnormalShutdown == aWhy) {
-    nsRefPtr<GMPParent> self(this);
+    RefPtr<GMPParent> self(this);
     if (mAsyncShutdownRequired) {
 #if defined(MOZ_CRASHREPORTER)
       if (mService) {
@@ -988,7 +986,7 @@ public:
   }
 
 private:
-  nsRefPtr<GMPContentParent> mGMPContentParent;
+  RefPtr<GMPContentParent> mGMPContentParent;
   nsTArray<UniquePtr<GetGMPContentParentCallback>> mCallbacks;
 };
 
@@ -1002,7 +1000,7 @@ GMPParent::AllocPGMPContentParent(Transport* aTransport, ProcessId aOtherPid)
   mGMPContentParent->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop(),
                           ipc::ParentSide);
 
-  nsRefPtr<RunCreateContentParentCallbacks> runCallbacks =
+  RefPtr<RunCreateContentParentCallbacks> runCallbacks =
     new RunCreateContentParentCallbacks(mGMPContentParent);
   runCallbacks->TakeCallbacks(mCallbacks);
   NS_DispatchToCurrentThread(runCallbacks);

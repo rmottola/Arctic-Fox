@@ -1,4 +1,4 @@
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -8,9 +8,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "WebRequest",
                                   "resource://gre/modules/WebRequest.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-let {
+var {
   SingletonEventManager,
-  runSafe,
+  runSafeSync,
 } = ExtensionUtils;
 
 // EventManager-like class specifically for WebRequest. Inherits from
@@ -53,7 +53,7 @@ function WebRequestEventManager(context, eventName)
         }
       }
 
-      return runSafe(context, callback, data2);
+      return runSafeSync(context, callback, data2);
     };
 
     let filter2 = {};

@@ -69,7 +69,7 @@ static_assert(sizeof(void*) == sizeof(nullptr),
 nsresult
 NS_NewSVGElement(Element **aResult, already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo)
 {
-  nsRefPtr<nsSVGElement> it = new nsSVGElement(aNodeInfo);
+  RefPtr<nsSVGElement> it = new nsSVGElement(aNodeInfo);
   nsresult rv = it->Init();
 
   if (NS_FAILED(rv)) {
@@ -257,7 +257,7 @@ nsSVGElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   }
   const nsAttrValue* oldVal = mAttrsAndChildren.GetAttr(nsGkAtoms::style);
 
-  if (oldVal && oldVal->Type() == nsAttrValue::eCSSStyleRule) {
+  if (oldVal && oldVal->Type() == nsAttrValue::eCSSDeclaration) {
     // we need to force a reparse because the baseURI of the document
     // may have changed, and in particular because we may be clones of
     // XBL anonymous content now being bound to the document we should
@@ -269,8 +269,8 @@ nsSVGElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     oldVal->ToString(stringValue);
     // Force in data doc, since we already have a style rule
     ParseStyleAttribute(stringValue, attrValue, true);
-    // Don't bother going through SetInlineStyleRule, we don't want to fire off
-    // mutation events or document notifications anyway
+    // Don't bother going through SetInlineStyleDeclaration; we don't
+    // want to fire off mutation events or document notifications anyway
     rv = mAttrsAndChildren.SetAndSwapAttr(nsGkAtoms::style, attrValue);
     NS_ENSURE_SUCCESS(rv, rv);
   }
@@ -903,8 +903,9 @@ nsSVGElement::WalkContentStyleRules(nsRuleWalker* aRuleWalker)
     UpdateContentStyleRule();
 
   if (mContentStyleRule) {
-    mContentStyleRule->RuleMatched();
-    aRuleWalker->Forward(mContentStyleRule);
+    css::Declaration* declaration = mContentStyleRule->GetDeclaration();
+    declaration->SetImmutable();
+    aRuleWalker->Forward(declaration);
   }
 
   return NS_OK;
@@ -927,8 +928,9 @@ nsSVGElement::WalkAnimatedContentStyleRules(nsRuleWalker* aRuleWalker)
       animContentStyleRule = GetAnimatedContentStyleRule();
     }
     if (animContentStyleRule) {
-      animContentStyleRule->RuleMatched();
-      aRuleWalker->Forward(animContentStyleRule);
+      css::Declaration* declaration = animContentStyleRule->GetDeclaration();
+      declaration->SetImmutable();
+      aRuleWalker->Forward(declaration);
     }
   }
 }
@@ -1227,7 +1229,7 @@ MappedAttrParser::CreateStyleRule()
     return nullptr; // No mapped attributes were parsed
   }
 
-  nsRefPtr<css::StyleRule> rule = new css::StyleRule(nullptr, mDecl, 0, 0);
+  RefPtr<css::StyleRule> rule = new css::StyleRule(nullptr, mDecl, 0, 0);
   mDecl = nullptr; // We no longer own the declaration -- drop our pointer to it
   return rule.forget();
 }
@@ -1345,7 +1347,7 @@ nsSVGElement::UpdateAnimatedContentStyleRule()
   doc->PropertyTable(SMIL_MAPPED_ATTR_ANIMVAL)->
     Enumerate(this, ParseMappedAttrAnimValueCallback, &mappedAttrParser);
  
-  nsRefPtr<css::StyleRule>
+  RefPtr<css::StyleRule>
     animContentStyleRule(mappedAttrParser.CreateStyleRule());
 
   if (animContentStyleRule) {
@@ -1356,7 +1358,7 @@ nsSVGElement::UpdateAnimatedContentStyleRule()
                   SMIL_MAPPED_ATTR_STYLERULE_ATOM,
                   animContentStyleRule.get(),
                   ReleaseStyleRule);
-    unused << animContentStyleRule.forget();
+    Unused << animContentStyleRule.forget();
     MOZ_ASSERT(rv == NS_OK,
                "SetProperty failed (or overwrote something)");
   }

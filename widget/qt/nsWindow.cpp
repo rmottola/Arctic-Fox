@@ -466,7 +466,8 @@ nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
     // synthesize a resize event if this isn't a toplevel
     if (mIsTopLevel || mListenForResizes) {
         nsEventStatus status;
-        DispatchResizeEvent(mBounds, status);
+        DispatchResizeEvent(LayoutDeviceIntRect::FromUnknownRect(mBounds),
+                            status);
     }
 
     NotifyRollupGeometryChange();
@@ -529,7 +530,8 @@ nsWindow::Resize(double aX, double aY, double aWidth, double aHeight,
     if (mIsTopLevel || mListenForResizes) {
         // synthesize a resize event
         nsEventStatus status;
-        DispatchResizeEvent(mBounds, status);
+        DispatchResizeEvent(LayoutDeviceIntRect::FromUnknownRect(mBounds),
+                            status);
     }
 
     if (aRepaint) {
@@ -601,11 +603,13 @@ nsWindow::ConfigureChildren(const nsTArray<nsIWidget::Configuration>& aConfigura
         NS_ASSERTION(w->GetParent() == this,
                      "Configured widget is not a child");
 
-        if (w->mBounds.Size() != configuration.mBounds.Size()) {
+        LayoutDeviceIntRect wBounds =
+            LayoutDeviceIntRect::FromUnknownRect(w->mBounds);
+        if (wBounds.Size() != configuration.mBounds.Size()) {
             w->Resize(configuration.mBounds.x, configuration.mBounds.y,
                       configuration.mBounds.width, configuration.mBounds.height,
                       true);
-        } else if (w->mBounds.TopLeft() != configuration.mBounds.TopLeft()) {
+        } else if (wBounds.TopLeft() != configuration.mBounds.TopLeft()) {
             w->Move(configuration.mBounds.x, configuration.mBounds.y);
         }
     }
@@ -905,7 +909,7 @@ nsWindow::moveEvent(QMoveEvent* aEvent)
 nsEventStatus
 nsWindow::resizeEvent(QResizeEvent* aEvent)
 {
-    nsIntRect rect;
+    LayoutDeviceIntRect rect;
 
     // Generate XPFE resize event
     GetBounds(rect);
@@ -1366,7 +1370,8 @@ nsWindow::DispatchDeactivateEventOnTopLevelWindow(void)
 }
 
 void
-nsWindow::DispatchResizeEvent(nsIntRect &aRect, nsEventStatus &aStatus)
+nsWindow::DispatchResizeEvent(LayoutDeviceIntRect& aRect,
+                              nsEventStatus& aStatus)
 {
     aStatus = nsEventStatus_eIgnore;
     if (mWidgetListener &&
@@ -1495,7 +1500,7 @@ void find_first_visible_parent(QWindow* aItem, QWindow*& aVisibleItem)
 }
 
 NS_IMETHODIMP
-nsWindow::GetScreenBounds(nsIntRect &aRect)
+nsWindow::GetScreenBoundsUntyped(nsIntRect &aRect)
 {
     aRect = gfx::IntRect(gfx::IntPoint(0, 0), mBounds.Size());
     if (mIsTopLevel) {

@@ -26,7 +26,6 @@
 #include <hardware/power.h>
 #include <suspend/autosuspend.h>
 
-#include "BootAnimation.h"
 #include "FramebufferSurface.h"
 #if ANDROID_VERSION == 17
 #include "GraphicBufferAlloc.h"
@@ -126,9 +125,6 @@ GonkDisplayJB::GonkDisplayJB()
         // only create this buffer for devices w/ hwc version > 1.0.
         CreateSurface(mBootAnimSTClient, mBootAnimDispSurface, mWidth, mHeight);
     }
-
-    ALOGI("Starting bootanimation with (%d) format framebuffer", surfaceformat);
-    StartBootAnimation();
 }
 
 GonkDisplayJB::~GonkDisplayJB()
@@ -225,8 +221,6 @@ GonkDisplayJB::GetHWCDevice()
 bool
 GonkDisplayJB::SwapBuffers(EGLDisplay dpy, EGLSurface sur)
 {
-    StopBootAnim();
-
     // Should be called when composition rendering is complete for a frame.
     // Only HWC v1.0 needs this call.
     // HWC > v1.0 case, do not call compositionComplete().
@@ -323,32 +317,46 @@ GonkDisplayJB::DequeueBuffer()
 bool
 GonkDisplayJB::QueueBuffer(ANativeWindowBuffer* buf)
 {
-    int error = 0;
     bool success = false;
+    int error = DoQueueBuffer(buf);
+    // Check for bootAnim or normal display flow.
+    if (!mBootAnimSTClient.get()) {
+        success = Post(mDispSurface->lastHandle, mDispSurface->GetPrevDispAcquireFd());
+    } else {
+        success = Post(mBootAnimDispSurface->lastHandle, mBootAnimDispSurface->GetPrevDispAcquireFd());
+    }
+    return error == 0 && success;
+}
+
+int
+GonkDisplayJB::DoQueueBuffer(ANativeWindowBuffer* buf)
+{
+    int error = 0;
     // Check for bootAnim or normal display flow.
     if (!mBootAnimSTClient.get()) {
         error = mSTClient->queueBuffer(mSTClient.get(), buf, -1);
-        success = Post(mDispSurface->lastHandle, mDispSurface->GetPrevDispAcquireFd());
     } else {
         error = mBootAnimSTClient->queueBuffer(mBootAnimSTClient.get(), buf, -1);
-        success = Post(mBootAnimDispSurface->lastHandle, mBootAnimDispSurface->GetPrevDispAcquireFd());
     }
-
-    return error == 0 && success;
+    return error;
 }
 
 void
 GonkDisplayJB::UpdateDispSurface(EGLDisplay dpy, EGLSurface sur)
 {
-    StopBootAnim();
-
-    eglSwapBuffers(dpy, sur);
+    if (sur != EGL_NO_SURFACE) {
+      eglSwapBuffers(dpy, sur);
+    } else {
+      // When BasicCompositor is used as Compositor,
+      // EGLSurface does not exit.
+      ANativeWindowBuffer* buf = DequeueBuffer();
+      DoQueueBuffer(buf);
+    }
 }
 
 void
-GonkDisplayJB::StopBootAnim()
+GonkDisplayJB::NotifyBootAnimationStopped()
 {
-    StopBootAnimation();
     if (mBootAnimSTClient.get()) {
         mBootAnimSTClient = nullptr;
         mBootAnimDispSurface = nullptr;
@@ -377,7 +385,6 @@ GonkDisplayJB::GetNativeData(GonkDisplay::DisplayType aDisplayType,
     NativeData data;
 
     if (aDisplayType == DISPLAY_PRIMARY) {
-        StopBootAnim();
         data.mNativeWindow = mSTClient;
         data.mDisplaySurface = mDispSurface;
         data.mXdpi = xdpi;

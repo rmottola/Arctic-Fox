@@ -50,14 +50,14 @@ nsPrintingProxy::GetInstance()
     ClearOnShutdown(&sPrintingProxyInstance);
   }
 
-  nsRefPtr<nsPrintingProxy> inst = sPrintingProxyInstance.get();
+  RefPtr<nsPrintingProxy> inst = sPrintingProxyInstance.get();
   return inst.forget();
 }
 
 nsresult
 nsPrintingProxy::Init()
 {
-  mozilla::unused << ContentChild::GetSingleton()->SendPPrintingConstructor(this);
+  mozilla::Unused << ContentChild::GetSingleton()->SendPPrintingConstructor(this);
   return NS_OK;
 }
 
@@ -100,10 +100,10 @@ nsPrintingProxy::ShowPrintDialog(nsIDOMWindow *parent,
   // nested event loop while we wait for the results of the dialog
   // to be returned to us.
 
-  nsRefPtr<PrintSettingsDialogChild> dialog = new PrintSettingsDialogChild();
+  RefPtr<PrintSettingsDialogChild> dialog = new PrintSettingsDialogChild();
   SendPPrintSettingsDialogConstructor(dialog);
 
-  mozilla::unused << SendShowPrintDialog(dialog, pBrowser, inSettings);
+  mozilla::Unused << SendShowPrintDialog(dialog, pBrowser, inSettings);
 
   while(!dialog->returned()) {
     NS_ProcessNextEvent(nullptr, true);
@@ -144,15 +144,17 @@ nsPrintingProxy::ShowProgress(nsIDOMWindow*            parent,
   nsCOMPtr<nsITabChild> tabchild = do_GetInterface(owner);
   TabChild* pBrowser = static_cast<TabChild*>(tabchild.get());
 
-  nsRefPtr<PrintProgressDialogChild> dialogChild =
+  RefPtr<PrintProgressDialogChild> dialogChild =
     new PrintProgressDialogChild(openDialogObserver);
 
   SendPPrintProgressDialogConstructor(dialogChild);
 
-  bool success = false;
+  mozilla::Unused << SendShowProgress(pBrowser, dialogChild,
+                                      isForPrinting, notifyOnOpen, &rv);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  mozilla::unused << SendShowProgress(pBrowser, dialogChild,
-                                      isForPrinting, notifyOnOpen, &success);
   NS_ADDREF(*webProgressListener = dialogChild);
   NS_ADDREF(*printProgressParams = dialogChild);
 
@@ -189,7 +191,7 @@ nsPrintingProxy::SavePrintSettings(nsIPrintSettings* aPS,
   rv = po->SerializeToPrintData(aPS, nullptr, &settings);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  unused << SendSavePrintSettings(settings, aUsePrinterNamePrefix, aFlags,
+  Unused << SendSavePrintSettings(settings, aUsePrinterNamePrefix, aFlags,
                                   &rv);
   return rv;
 }

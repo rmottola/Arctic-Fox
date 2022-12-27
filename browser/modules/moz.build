@@ -4,9 +4,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
-# XXX: Include this until we convert browser/ to use toolkit promises directly
-EXTRA_JS_MODULES += [ 'promise.js' ]
+BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
+XPCSHELL_TESTS_MANIFESTS += [
+    'test/unit/social/xpcshell.ini',
+    'test/xpcshell/xpcshell.ini',
+]
 
 EXTRA_JS_MODULES += [
     'AboutHome.jsm',
@@ -44,6 +46,3 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
         'WindowsJumpLists.jsm',
         'WindowsPreviewPerTab.jsm',
     ]
-
-if CONFIG['MOZILLA_OFFICIAL']:
-    DEFINES['MOZILLA_OFFICIAL'] = 1

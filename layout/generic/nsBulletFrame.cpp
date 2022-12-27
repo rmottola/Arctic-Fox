@@ -128,7 +128,7 @@ nsBulletFrame::DidSetStyleContext(nsStyleContext* aOldStyleContext)
     }
 
     if (needNewRequest) {
-      nsRefPtr<imgRequestProxy> newRequestClone;
+      RefPtr<imgRequestProxy> newRequestClone;
       newRequest->Clone(mListener, getter_AddRefs(newRequestClone));
 
       // Deregister the old request. We wait until after Clone is done in case
@@ -304,7 +304,7 @@ nsBulletFrame::PaintBullet(nsRenderingContext& aRenderingContext, nsPoint aPt,
     }
   }
 
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   ColorPattern color(ToDeviceColor(
                        nsLayoutUtils::GetColor(this, eCSSProperty_color)));
 
@@ -535,7 +535,7 @@ nsBulletFrame::GetDesiredSize(nsPresContext*  aCX,
 
   const nsStyleList* myList = StyleList();
   nscoord ascent;
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
                                         aFontSizeInflation);
 
@@ -712,9 +712,20 @@ nsBulletFrame::Notify(imgIRequest *aRequest, int32_t aType, const nsIntRect* aDa
     // Unconditionally start decoding for now.
     // XXX(seth): We eventually want to decide whether to do this based on
     // visibility. We should get that for free from bug 1091236.
-    if (aRequest == mImageRequest) {
-      mImageRequest->RequestDecode();
+    nsCOMPtr<imgIContainer> container;
+    aRequest->GetImage(getter_AddRefs(container));
+    if (container) {
+      // Retrieve the intrinsic size of the image.
+      int32_t width = 0;
+      int32_t height = 0;
+      container->GetWidth(&width);
+      container->GetHeight(&height);
+
+      // Request a decode at that size.
+      container->RequestDecodeForSize(IntSize(width, height),
+                                      imgIContainer::DECODE_FLAGS_DEFAULT);
     }
+
     InvalidateFrame();
   }
 
@@ -893,7 +904,7 @@ nsBulletFrame::GetLogicalBaseline(WritingMode aWritingMode) const
   if (GetStateBits() & BULLET_FRAME_IMAGE_LOADING) {
     ascent = BSize(aWritingMode);
   } else {
-    nsRefPtr<nsFontMetrics> fm;
+    RefPtr<nsFontMetrics> fm;
     nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
                                           GetFontSizeInflation());
     CounterStyle* listStyleType = StyleList()->GetCounterStyle();

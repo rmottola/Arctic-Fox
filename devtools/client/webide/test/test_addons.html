@@ -19,7 +19,7 @@
         SimpleTest.waitForExplicitFinish();
 
         const {GetAvailableAddons} = require("devtools/client/webide/modules/addons");
-        const {Devices} = Cu.import("resource://gre/modules/devtools/shared/apps/Devices.jsm");
+        const {Devices} = Cu.import("resource://devtools/shared/apps/Devices.jsm");
         const {Simulators} = require("devtools/client/webide/modules/simulators");
 
         let adbAddonsInstalled = promise.defer();
@@ -85,11 +85,12 @@
           return deferred.promise;
         }
 
-        Task.spawn(function* () {
+        Task.spawn(function*() {
 
           ok(!Devices.helperAddonInstalled, "Helper not installed");
 
           let win = yield openWebIDE(true);
+          let docRuntime = getRuntimeDocument(win);
 
           yield adbAddonsInstalled.promise;
 
@@ -131,7 +132,7 @@
 
           yield nextTick();
 
-          let panelNode = win.document.querySelector("#runtime-panel");
+          let panelNode = docRuntime.querySelector("#runtime-panel");
           let items;
 
           items = panelNode.querySelectorAll(".runtime-panel-item-usb");
@@ -165,8 +166,6 @@
 
         });
       }
-
-
     </script>
   </body>
 </html>

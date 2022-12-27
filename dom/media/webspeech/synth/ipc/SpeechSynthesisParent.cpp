@@ -34,14 +34,6 @@ SpeechSynthesisParent::RecvReadVoicesAndState(InfallibleTArray<RemoteVoice>* aVo
   return true;
 }
 
-bool
-SpeechSynthesisParent::RecvDropGlobalQueue()
-{
-  nsSynthVoiceRegistry::GetInstance()->DropGlobalQueue();
-
-  return true;
-}
-
 PSpeechSynthesisRequestParent*
 SpeechSynthesisParent::AllocPSpeechSynthesisRequestParent(const nsString& aText,
                                                           const nsString& aLang,
@@ -50,7 +42,7 @@ SpeechSynthesisParent::AllocPSpeechSynthesisRequestParent(const nsString& aText,
                                                           const float& aRate,
                                                           const float& aPitch)
 {
-  nsRefPtr<SpeechTaskParent> task = new SpeechTaskParent(aVolume, aText);
+  RefPtr<SpeechTaskParent> task = new SpeechTaskParent(aVolume, aText);
   SpeechSynthesisRequestParent* actor = new SpeechSynthesisRequestParent(task);
   return actor;
 }
@@ -124,6 +116,14 @@ SpeechSynthesisRequestParent::RecvCancel()
 {
   MOZ_ASSERT(mTask);
   mTask->Cancel();
+  return true;
+}
+
+bool
+SpeechSynthesisRequestParent::RecvForceEnd()
+{
+  MOZ_ASSERT(mTask);
+  mTask->ForceEnd();
   return true;
 }
 

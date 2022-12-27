@@ -45,6 +45,8 @@ class nsIStreamLoaderObserver;
 class nsIUnicharStreamLoader;
 class nsIUnicharStreamLoaderObserver;
 
+namespace mozilla { class OriginAttributes; }
+
 template <class> class nsCOMPtr;
 template <typename> struct already_AddRefed;
 
@@ -566,6 +568,7 @@ NS_NewBufferedInputStream(nsIInputStream **result,
 nsresult NS_NewBufferedOutputStream(nsIOutputStream **result,
                                     nsIOutputStream  *str,
                                     uint32_t          bufferSize);
+
 /**
  * Attempts to buffer a given output stream.  If this fails, it returns the
  * passed-in output stream.
@@ -600,20 +603,8 @@ nsresult NS_ReadInputStreamToString(nsIInputStream *aInputStream,
 #endif
 
 nsresult
-NS_LoadPersistentPropertiesFromURI(nsIPersistentProperties **outResult,
-                                   nsIURI                   *aUri,
-                                   nsIPrincipal             *aLoadingPrincipal,
-                                   nsContentPolicyType       aContentPolicyType,
-                                   nsIIOService             *aIoService = nullptr);
-
-nsresult
 NS_LoadPersistentPropertiesFromURISpec(nsIPersistentProperties **outResult,
-                                       const nsACString         &aSpec,
-                                       nsIPrincipal             *aLoadingPrincipal,
-                                       nsContentPolicyType       aContentPolicyType,
-                                       const char               *aCharset = nullptr,
-                                       nsIURI                   *aBaseURI = nullptr,
-                                       nsIIOService             *aIoService = nullptr);
+                                       const nsACString         &aSpec);
 
 /**
  * NS_QueryNotificationCallbacks implements the canonical algorithm for
@@ -691,6 +682,12 @@ NS_QueryNotificationCallbacks(nsIInterfaceRequestor  *callbacks,
  * Returns false if channel's callbacks don't implement nsILoadContext.
  */
 bool NS_UsePrivateBrowsing(nsIChannel *channel);
+
+/**
+ * Extract the OriginAttributes from the channel's triggering principal.
+ */
+bool NS_GetOriginAttributes(nsIChannel *aChannel,
+                            mozilla::OriginAttributes &aAttributes);
 
 // Constants duplicated from nsIScriptSecurityManager so we avoid having necko
 // know about script security manager.

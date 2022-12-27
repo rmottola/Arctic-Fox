@@ -18,7 +18,7 @@ const promise = require("promise");
 const PromiseDebugging = require("PromiseDebugging");
 const xpcInspector = require("xpcInspector");
 const ScriptStore = require("./utils/ScriptStore");
-const { DevToolsWorker } = require("devtools/shared/shared/worker");
+const { DevToolsWorker } = require("devtools/shared/worker/worker");
 
 const { defer, resolve, reject, all } = promise;
 
@@ -520,7 +520,7 @@ ThreadActor.prototype = {
   get prettyPrintWorker() {
     if (!this._prettyPrintWorker) {
       this._prettyPrintWorker = new DevToolsWorker(
-        "resource://gre/modules/devtools/server/actors/pretty-print-worker.js",
+        "resource://devtools/server/actors/pretty-print-worker.js",
         { name: "pretty-print",
           verbose: dumpn.wantLogging }
       );
@@ -829,6 +829,17 @@ ThreadActor.prototype = {
     // Otherwise take what a "step" means into consideration.
     return function () {
       // onStep is called with 'this' set to the current frame.
+
+      // Only allow stepping stops at entry points for the line, when
+      // the stepping occurs in a single frame.  The "same frame"
+      // check makes it so a sequence of steps can step out of a frame
+      // and into subsequent calls in the outer frame.  E.g., if there
+      // is a call "a(b())" and the user steps into b, then this
+      // condition makes it possible to step out of b and into a.
+      if (this === startFrame &&
+          !this.script.getOffsetLocation(this.offset).isEntryPoint) {
+        return undefined;
+      }
 
       const generatedLocation = thread.sources.getFrameLocation(this);
       const newLocation = thread.unsafeSynchronize(thread.sources.getOriginalLocation(
@@ -3653,7 +3664,7 @@ function hackDebugger(Debugger) {
     configurable: true,
     get: function() {
       if (this.script) {
-        return this.script.getOffsetLine(this.offset);
+        return this.script.getOffsetLocation(this.offset).lineNumber;
       } else {
         return null;
       }

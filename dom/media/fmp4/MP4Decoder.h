@@ -14,13 +14,13 @@ namespace mozilla {
 class MP4Decoder : public MediaDecoder
 {
 public:
-  MP4Decoder();
+  explicit MP4Decoder(MediaDecoderOwner* aOwner);
 
-  virtual MediaDecoder* Clone() override {
+  virtual MediaDecoder* Clone(MediaDecoderOwner* aOwner) override {
     if (!IsEnabled()) {
       return nullptr;
     }
-    return new MP4Decoder();
+    return new MP4Decoder(aOwner);
   }
 
   virtual MediaDecoderStateMachine* CreateStateMachine() override;
@@ -38,8 +38,6 @@ public:
   static bool IsEnabled();
 
   static bool IsVideoAccelerated(layers::LayersBackend aBackend, nsACString& aReason);
-  static bool CanCreateAACDecoder();
-  static bool CanCreateH264Decoder();
 };
 
 } // namespace mozilla

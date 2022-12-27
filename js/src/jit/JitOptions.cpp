@@ -98,6 +98,9 @@ JitOptions::JitOptions()
     // Toggles whether Loop Unrolling is globally disabled.
     SET_DEFAULT(disableLoopUnrolling, true);
 
+    // Toggle whether Profile Guided Optimization is globally disabled.
+    SET_DEFAULT(disablePgo, true);
+
     // Toggles whether instruction reordering is globally disabled.
     SET_DEFAULT(disableInstructionReordering, false);
 
@@ -112,7 +115,7 @@ JitOptions::JitOptions()
 
     // Toggles whether sincos optimization is globally disabled.
     // See bug984018: The MacOS is the only one that has the sincos fast.
-    #if defined(XP_DARWIN)
+    #if defined(XP_MACOSX)
         SET_DEFAULT(disableSincos, false);
     #else
         SET_DEFAULT(disableSincos, true);

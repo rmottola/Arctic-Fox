@@ -516,7 +516,7 @@ nsBlockFrame::GetCaretBaseline() const
       return bp.top + firstLine->mFirstChild->GetCaretBaseline();
     }
   }
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   float inflation = nsLayoutUtils::FontSizeInflationFor(this);
   nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm), inflation);
   nscoord lineHeight =
@@ -2624,7 +2624,7 @@ nsBlockFrame::ReflowDirtyLines(nsBlockReflowState& aState)
         }
       }
 
-      nsRefPtr<nsFontMetrics> fm;
+      RefPtr<nsFontMetrics> fm;
       nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
         nsLayoutUtils::FontSizeInflationFor(this));
 
@@ -6793,8 +6793,11 @@ nsBlockFrame::Init(nsIContent*       aContent,
   //   If the box is a block container, then it establishes a new block
   //   formatting context.
   // (http://dev.w3.org/csswg/css-writing-modes/#block-flow)
-  if (GetParent() && StyleVisibility()->mWritingMode !=
-                     GetParent()->StyleVisibility()->mWritingMode) {
+  // If the box has contain: paint (or contain: strict), then it should also
+  // establish a formatting context.
+  if ((GetParent() && StyleVisibility()->mWritingMode !=
+                      GetParent()->StyleVisibility()->mWritingMode) ||
+      StyleDisplay()->IsContainPaint()) {
     AddStateBits(NS_BLOCK_FLOAT_MGR | NS_BLOCK_MARGIN_ROOT);
   }
 
@@ -6843,7 +6846,7 @@ nsBlockFrame::SetInitialChildList(ChildListID     aListID,
        pseudo == nsCSSAnonBoxes::mozSVGText) &&
       GetType() != nsGkAtoms::comboboxControlFrame &&
       !IsFrameOfType(eMathML) &&
-      nsRefPtr<nsStyleContext>(GetFirstLetterStyle(PresContext())) != nullptr;
+      RefPtr<nsStyleContext>(GetFirstLetterStyle(PresContext())) != nullptr;
     NS_ASSERTION(haveFirstLetterStyle ==
                  ((mState & NS_BLOCK_HAS_FIRST_LETTER_STYLE) != 0),
                  "NS_BLOCK_HAS_FIRST_LETTER_STYLE state out of sync");
@@ -6899,7 +6902,7 @@ nsBlockFrame::CreateBulletFrameForListItem(bool aCreateBulletList,
                             nsCSSPseudoElements::GetPseudoAtom(pseudoType))->
     StyleContext();
 
-  nsRefPtr<nsStyleContext> kidSC = shell->StyleSet()->
+  RefPtr<nsStyleContext> kidSC = shell->StyleSet()->
     ResolvePseudoElementStyle(mContent->AsElement(), pseudoType,
                               parentStyle, nullptr);
 

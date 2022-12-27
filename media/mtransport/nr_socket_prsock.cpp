@@ -908,7 +908,7 @@ abort:
 NS_IMPL_ISUPPORTS(NrSocketIpcProxy, nsIUDPSocketInternal)
 
 nsresult
-NrSocketIpcProxy::Init(const nsRefPtr<NrSocketIpc>& socket)
+NrSocketIpcProxy::Init(const RefPtr<NrSocketIpc>& socket)
 {
   nsresult rv;
   sts_thread_ = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
@@ -1048,7 +1048,7 @@ NS_IMETHODIMP NrSocketIpc::CallListenerReceivedData(const nsACString &host,
   RefPtr<nr_udp_message> msg(new nr_udp_message(addr, buf));
 
   RUN_ON_THREAD(sts_thread_,
-                mozilla::WrapRunnable(nsRefPtr<NrSocketIpc>(this),
+                mozilla::WrapRunnable(RefPtr<NrSocketIpc>(this),
                                       &NrSocketIpc::recv_callback_s,
                                       msg),
                 NS_DISPATCH_NORMAL);
@@ -1160,7 +1160,7 @@ int NrSocketIpc::create(nr_transport_addr *addr) {
   state_ = NR_CONNECTING;
 
   RUN_ON_THREAD(io_thread_,
-                mozilla::WrapRunnable(nsRefPtr<NrSocketIpc>(this),
+                mozilla::WrapRunnable(RefPtr<NrSocketIpc>(this),
                                       &NrSocketIpc::create_i,
                                       host, static_cast<uint16_t>(port)),
                 NS_DISPATCH_NORMAL);
@@ -1203,7 +1203,7 @@ int NrSocketIpc::sendto(const void *msg, size_t len, int flags,
   nsAutoPtr<DataBuffer> buf(new DataBuffer(static_cast<const uint8_t*>(msg), len));
 
   RUN_ON_THREAD(io_thread_,
-                mozilla::WrapRunnable(nsRefPtr<NrSocketIpc>(this),
+                mozilla::WrapRunnable(RefPtr<NrSocketIpc>(this),
                                       &NrSocketIpc::sendto_i,
                                       addr, buf),
                 NS_DISPATCH_NORMAL);
@@ -1217,7 +1217,7 @@ void NrSocketIpc::close() {
   state_ = NR_CLOSING;
 
   RUN_ON_THREAD(io_thread_,
-                mozilla::WrapRunnable(nsRefPtr<NrSocketIpc>(this),
+                mozilla::WrapRunnable(RefPtr<NrSocketIpc>(this),
                                       &NrSocketIpc::close_i),
                 NS_DISPATCH_NORMAL);
 
@@ -1330,7 +1330,7 @@ void NrSocketIpc::create_i(const nsACString &host, const uint16_t port) {
     socketChild = nullptr;
   }
 
-  nsRefPtr<NrSocketIpcProxy> proxy(new NrSocketIpcProxy);
+  RefPtr<NrSocketIpcProxy> proxy(new NrSocketIpcProxy);
   rv = proxy->Init(this);
   if (NS_FAILED(rv)) {
     err_ = true;
@@ -1381,7 +1381,7 @@ void NrSocketIpc::close_i() {
 // static
 void NrSocketIpc::release_child_i(nsIUDPSocketChild* aChild,
                                   nsCOMPtr<nsIEventTarget> sts_thread) {
-  nsRefPtr<nsIUDPSocketChild> socket_child_ref =
+  RefPtr<nsIUDPSocketChild> socket_child_ref =
     already_AddRefed<nsIUDPSocketChild>(aChild);
   if (socket_child_ref) {
     socket_child_ref->Close();

@@ -61,7 +61,7 @@ public:
   };
 
   FallibleTArray<NextParent> mNextParents;
-  FallibleTArray<nsRefPtr<SharedMessagePortMessage>> mMessages;
+  FallibleTArray<RefPtr<SharedMessagePortMessage>> mMessages;
 };
 
 /* static */ MessagePortService*
@@ -157,7 +157,7 @@ MessagePortService::RequestEntangling(MessagePortParent* aParent,
 bool
 MessagePortService::DisentanglePort(
                   MessagePortParent* aParent,
-                  FallibleTArray<nsRefPtr<SharedMessagePortMessage>>& aMessages)
+                  FallibleTArray<RefPtr<SharedMessagePortMessage>>& aMessages)
 {
   MessagePortServiceData* data;
   if (!mPorts.Get(aParent->ID(), &data)) {
@@ -207,7 +207,7 @@ MessagePortService::DisentanglePort(
     return false;
   }
 
-  unused << data->mParent->Entangled(array);
+  Unused << data->mParent->Entangled(array);
   return true;
 }
 
@@ -296,7 +296,7 @@ MessagePortService::MaybeShutdown()
 bool
 MessagePortService::PostMessages(
                   MessagePortParent* aParent,
-                  FallibleTArray<nsRefPtr<SharedMessagePortMessage>>& aMessages)
+                  FallibleTArray<RefPtr<SharedMessagePortMessage>>& aMessages)
 {
   MessagePortServiceData* data;
   if (!mPorts.Get(aParent->ID(), &data)) {
@@ -325,7 +325,7 @@ MessagePortService::PostMessages(
     }
 
     data->mMessages.Clear();
-    unused << data->mParent->SendReceiveData(messages);
+    Unused << data->mParent->SendReceiveData(messages);
   }
 
   return true;

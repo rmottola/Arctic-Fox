@@ -34,12 +34,6 @@ import urllib2
 import zipfile
 import bisection
 
-from automationutils import (
-    dumpScreen,
-    printstatus,
-    setAutomationLog,
-)
-
 from datetime import datetime
 from manifestparser import TestManifest
 from manifestparser.filters import (
@@ -51,13 +45,16 @@ from manifestparser.filters import (
     tags,
 )
 from leaks import ShutdownLeaks, LSANLeaks
-from mochitest_options import MochitestArgumentParser, build_obj
+from mochitest_options import (
+    MochitestArgumentParser, build_obj, get_default_valgrind_suppression_files
+)
 from mozprofile import Profile, Preferences
 from mozprofile.permissions import ServerLocations
 from urllib import quote_plus as encodeURIComponent
 from mozlog.formatters import TbplFormatter
 from mozlog import commandline
-from mozrunner.utils import test_environment
+from mozrunner.utils import get_stack_fixer_function, test_environment
+from mozscreenshot import dump_screen
 import mozleak
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -152,6 +149,13 @@ class MessageLogger(object):
                     message['test'] = test[len(prefix):]
                     break
 
+    def _fix_message_format(self, message):
+        if 'message' in message:
+            if isinstance(message['message'], bytes):
+                message['message'] = message['message'].decode('utf-8', 'replace')
+            elif not isinstance(message['message'], unicode):
+                message['message'] = unicode(message['message'])
+
     def parse_line(self, line):
         """Takes a given line of input (structured or not) and returns a list of structured messages"""
         line = line.rstrip().decode("UTF-8", "replace")
@@ -175,6 +179,7 @@ class MessageLogger(object):
                     message=fragment,
                     unstructured=True)
             self._fix_test_name(message)
+            self._fix_message_format(message)
             messages.append(message)
 
         return messages
@@ -337,7 +342,7 @@ class MochitestServer(object):
         if isinstance(options, Namespace):
             options = vars(options)
         self._log = logger
-        self._closeWhenDone = options['closeWhenDone']
+        self._keep_open = bool(options['keep_open'])
         self._utilityPath = options['utilityPath']
         self._xrePath = options['xrePath']
         self._profileDir = options['profilePath']
@@ -395,7 +400,7 @@ class MochitestServer(object):
                 "server": self.webServer,
                 "testPrefix": self.testPrefix,
                 "displayResults": str(
-                    not self._closeWhenDone).lower()},
+                    self._keep_open).lower()},
             "-f",
             os.path.join(
                 SCRIPT_DIR,
@@ -423,8 +428,8 @@ class MochitestServer(object):
         while i < timeout:
             if os.path.exists(aliveFile):
                 break
-            time.sleep(1)
-            i += 1
+            time.sleep(.05)
+            i += .05
         else:
             self._log.info(
                 "TEST-UNEXPECTED-FAIL | runtests.py | Timed out while waiting for server startup.")
@@ -526,7 +531,6 @@ class MochitestUtilsMixin(object):
                                                      "tbpl": sys.stdout
                                                  })
             MochitestUtilsMixin.log = self.log
-            setAutomationLog(self.log)
 
         self.message_logger = MessageLogger(logger=self.log)
 
@@ -600,7 +604,7 @@ class MochitestUtilsMixin(object):
                 self.urlOpts.append("timeout=%d" % options.timeout)
             if options.maxTimeouts:
                 self.urlOpts.append("maxTimeouts=%d" % options.maxTimeouts)
-            if options.closeWhenDone:
+            if not options.keep_open:
                 self.urlOpts.append("closeWhenDone=1")
             if options.webapprtContent:
                 self.urlOpts.append("testRoot=webapprtContent")
@@ -735,7 +739,7 @@ class MochitestUtilsMixin(object):
         testHost = "http://mochi.test:8888"
         testURL = "/".join([testHost, self.TEST_PATH])
 
-        if len(options.test_paths) == 1 :
+        if len(options.test_paths) == 1:
             if options.repeat > 0 and os.path.isfile(
                 os.path.join(
                     self.oldcwd,
@@ -901,6 +905,8 @@ class MochitestUtilsMixin(object):
             if options.testingModulesDir is not None:
                 manifestFile.write("resource testing-common file:///%s\n" %
                                    options.testingModulesDir)
+        if options.store_chrome_manifest:
+            shutil.copyfile(manifest, options.store_chrome_manifest)
         return manifest
 
     def addChromeToProfile(self, options):
@@ -1223,7 +1229,6 @@ class Mochitest(MochitestUtilsMixin):
     _active_tests = None
     certdbNew = False
     sslTunnel = None
-    vmwareHelper = None
     DEFAULT_TIMEOUT = 60.0
     mediaDevices = None
 
@@ -1529,11 +1534,6 @@ class Mochitest(MochitestUtilsMixin):
         if not options.enableCPOWWarnings:
             browserEnv["DISABLE_UNSAFE_CPOW_WARNINGS"] = "1"
 
-        # Force use of core Xlib events on GTK3 to work around focus bug.
-        # See bug 1170342.
-        if mozinfo.info.get('toolkit') == 'gtk3':
-            browserEnv["GDK_CORE_DEVICE_EVENTS"] = "1"
-
         return browserEnv
 
     def cleanup(self, options):
@@ -1559,7 +1559,7 @@ class Mochitest(MochitestUtilsMixin):
                 "Not taking screenshot here: see the one that was previously logged")
             return
         self.haveDumpedScreen = True
-        dumpScreen(utilityPath)
+        dump_screen(utilityPath, self.log)
 
     def killAndGetStack(
             self,
@@ -1576,9 +1576,17 @@ class Mochitest(MochitestUtilsMixin):
         if dump_screen:
             self.dumpScreen(utilityPath)
 
-        try:
-            os.kill(processPID, signal.SIGABRT)
-        return
+        if mozinfo.info.get('crashreporter', True) and not debuggerInfo:
+            try:
+                minidump_path = os.path.join(self.profile.profile,
+                                             'minidumps')
+                mozcrash.kill_and_get_minidump(processPID, minidump_path)
+            except OSError:
+                # https://bugzilla.mozilla.org/show_bug.cgi?id=921509
+                self.log.info(
+                    "Can't trigger Breakpad, process no longer exists")
+            return
+        self.log.info("Can't trigger Breakpad, just killing process")
         killPid(processPID, self.log)
 
     def checkForZombies(self, processLog, utilityPath, debuggerInfo):
@@ -1622,37 +1630,6 @@ class Mochitest(MochitestUtilsMixin):
 
         return foundZombie
 
-    def startVMwareRecording(self, options):
-        """ starts recording inside VMware VM using the recording helper dll """
-        assert mozinfo.isWin
-        from ctypes import cdll
-        self.vmwareHelper = cdll.LoadLibrary(self.vmwareHelperPath)
-        if self.vmwareHelper is None:
-            self.log.warning("runtests.py | Failed to load "
-                             "VMware recording helper")
-            return
-        self.log.info("runtests.py | Starting VMware recording.")
-        try:
-            self.vmwareHelper.StartRecording()
-        except Exception as e:
-            self.log.warning("runtests.py | Failed to start "
-                             "VMware recording: (%s)" % str(e))
-            self.vmwareHelper = None
-
-    def stopVMwareRecording(self):
-        """ stops recording inside VMware VM using the recording helper dll """
-        try:
-            assert mozinfo.isWin
-            if self.vmwareHelper is not None:
-                self.log.info("runtests.py | Stopping VMware recording.")
-                self.vmwareHelper.StopRecording()
-        except Exception as e:
-            self.log.warning("runtests.py | Failed to stop "
-                             "VMware recording: (%s)" % str(e))
-            self.log.exception('Error stopping VMWare recording')
-
-        self.vmwareHelper = None
-
     def runApp(self,
                testUrl,
                env,
@@ -1661,6 +1638,9 @@ class Mochitest(MochitestUtilsMixin):
                extraArgs,
                utilityPath,
                debuggerInfo=None,
+               valgrindPath=None,
+               valgrindArgs=None,
+               valgrindSuppFiles=None,
                symbolsPath=None,
                timeout=-1,
                onLaunch=None,
@@ -1676,6 +1656,11 @@ class Mochitest(MochitestUtilsMixin):
         # configure the message logger buffering
         self.message_logger.buffering = quiet
 
+        # It can't be the case that both a with-debugger and an
+        # on-Valgrind run have been requested.  doTests() should have
+        # already excluded this possibility.
+        assert not(valgrindPath and debuggerInfo)
+
         # debugger information
         interactive = False
         debug_args = None
@@ -1683,9 +1668,31 @@ class Mochitest(MochitestUtilsMixin):
             interactive = debuggerInfo.interactive
             debug_args = [debuggerInfo.path] + debuggerInfo.args
 
+        # Set up Valgrind arguments.
+        if valgrindPath:
+            interactive = False
+            valgrindArgs_split = ([] if valgrindArgs is None
+                                  else valgrindArgs.split())
+            valgrindSuppFiles_split = ([] if valgrindSuppFiles is None
+                                       else valgrindSuppFiles.split(","))
+
+            valgrindSuppFiles_final = []
+            if valgrindSuppFiles is not None:
+                valgrindSuppFiles_final = ["--suppressions=" + path for path in valgrindSuppFiles.split(",")]
+
+            debug_args = ([valgrindPath]
+                          + mozdebug.get_default_valgrind_args()
+                          + valgrindArgs_split
+                          + valgrindSuppFiles_final)
+
         # fix default timeout
         if timeout == -1:
             timeout = self.DEFAULT_TIMEOUT
+
+        # Note in the log if running on Valgrind
+        if valgrindPath:
+            self.log.info("runtests.py | Running on Valgrind.  "
+                          + "Using timeout of %d seconds." % timeout)
 
         # copy env so we don't munge the caller's environment
         env = env.copy()
@@ -1697,9 +1704,9 @@ class Mochitest(MochitestUtilsMixin):
             os.close(tmpfd)
             env["MOZ_PROCESS_LOG"] = processLog
 
-            if interactive:
-                # If an interactive debugger is attached,
-                # don't use timeouts, and don't capture ctrl-c.
+            if debuggerInfo:
+                # If a debugger is attached, don't use timeouts, and don't
+                # capture ctrl-c.
                 timeout = None
                 signal.signal(signal.SIGINT, lambda sigid, frame: None)
 
@@ -1775,6 +1782,7 @@ class Mochitest(MochitestUtilsMixin):
                          outputTimeout=timeout)
             proc = runner.process_handler
             self.log.info("runtests.py | Application pid: %d" % proc.pid)
+            self.log.process_start("Main app process")
 
             if onLaunch is not None:
                 # Allow callers to specify an onLaunch callback to be fired after the
@@ -1789,7 +1797,7 @@ class Mochitest(MochitestUtilsMixin):
             # until bug 913970 is fixed regarding mozrunner `wait` not returning status
             # see https://bugzilla.mozilla.org/show_bug.cgi?id=913970
             status = proc.wait()
-            printstatus(status, "Main app process")
+            self.log.process_exit("Main app process", status)
             runner.process_handler = None
 
             # finalize output handler
@@ -1843,12 +1851,8 @@ class Mochitest(MochitestUtilsMixin):
         options.profilePath = None
         self.urlOpts = []
 
-    def resolve_runtime_file(self, options, info):
-        platform = info['platform_guess']
-        buildtype = info['buildtype_guess']
-
-        data_dir = os.path.join(SCRIPT_DIR, 'runtimes', '{}-{}'.format(
-            platform, buildtype))
+    def resolve_runtime_file(self, options):
+        data_dir = os.path.join(SCRIPT_DIR, 'runtimes')
 
         flavor = self.getTestFlavor(options)
         if flavor == 'browser-chrome' and options.subsuite == 'devtools':
@@ -1908,7 +1912,7 @@ class Mochitest(MochitestUtilsMixin):
             # Add chunking filters if specified
             if options.totalChunks:
                 if options.chunkByRuntime:
-                    runtime_file = self.resolve_runtime_file(options, info)
+                    runtime_file = self.resolve_runtime_file(options)
                     if not os.path.exists(runtime_file):
                         self.log.warning("runtime file %s not found; defaulting to chunk-by-dir" %
                                          runtime_file)
@@ -2078,9 +2082,7 @@ class Mochitest(MochitestUtilsMixin):
         self.killNamedOrphans('xpcshell')
 
         # Until we have all green, this only runs on bc*/dt*/mochitest-chrome
-        # jobs, not webapprt*, jetpack*, or plain
-        if options.browserChrome:
-            options.runByDir = True
+        # jobs, not webapprt*, jetpack*, a11yr (for perf reasons), or plain
 
         testsToRun = self.getTestsToRun(options)
         if not options.runByDir:
@@ -2092,7 +2094,7 @@ class Mochitest(MochitestUtilsMixin):
         result = 1  # default value, if no tests are run.
         for d in dirs:
             print "dir: %s" % d
-            tests_in_dir = [t for t in testsToRun if t.startswith(d)]
+            tests_in_dir = [t for t in testsToRun if os.path.dirname(t) == d]
 
             # If we are using --run-by-dir, we should not use the profile path (if) provided
             # by the user, since we need to create a new directory for each run. We would face problems
@@ -2149,6 +2151,29 @@ class Mochitest(MochitestUtilsMixin):
                 return 1
             self.mediaDevices = devices
 
+        # See if we were asked to run on Valgrind
+        valgrindPath = None
+        valgrindArgs = None
+        valgrindSuppFiles = None
+        if options.valgrind:
+            valgrindPath = options.valgrind
+        if options.valgrindArgs:
+            valgrindArgs = options.valgrindArgs
+        if options.valgrindSuppFiles:
+            valgrindSuppFiles = options.valgrindSuppFiles
+
+        if (valgrindArgs or valgrindSuppFiles) and not valgrindPath:
+            self.log.error("Specified --valgrind-args or --valgrind-supp-files,"
+                           " but not --valgrind")
+            return 1
+
+        if valgrindPath and debuggerInfo:
+            self.log.error("Can't use both --debugger and --valgrind together")
+            return 1
+
+        if valgrindPath and not valgrindSuppFiles:
+            valgrindSuppFiles = ",".join(get_default_valgrind_suppression_files())
+
         # buildProfile sets self.profile .
         # This relies on sideeffects and isn't very stateful:
         # https://bugzilla.mozilla.org/show_bug.cgi?id=919300
@@ -2204,6 +2229,11 @@ class Mochitest(MochitestUtilsMixin):
             if self.urlOpts:
                 testURL += "?" + "&".join(self.urlOpts)
 
+            # On Mac, pass the path to the runtime, to ensure the test app
+            # uses that specific runtime instead of another one on the system.
+            if mozinfo.isMac and options.webapprtChrome:
+                options.browserArgs.extend(('-runtime', os.path.dirname(os.path.dirname(options.xrePath))))
+
             if options.webapprtContent:
                 options.browserArgs.extend(('-test-mode', testURL))
                 testURL = None
@@ -2229,9 +2259,6 @@ class Mochitest(MochitestUtilsMixin):
             else:
                 timeout = 330.0  # default JS harness timeout is 300 seconds
 
-            if options.vmwareRecording:
-                self.startVMwareRecording(options)
-
             # detect shutdown leaks for m-bc runs
             detectShutdownLeaks = mozinfo.info[
                 "debug"] and options.browserChrome and not options.webapprtChrome
@@ -2245,6 +2272,9 @@ class Mochitest(MochitestUtilsMixin):
                                      extraArgs=options.browserArgs,
                                      utilityPath=options.utilityPath,
                                      debuggerInfo=debuggerInfo,
+                                     valgrindPath=valgrindPath,
+                                     valgrindArgs=valgrindArgs,
+                                     valgrindSuppFiles=valgrindSuppFiles,
                                      symbolsPath=options.symbolsPath,
                                      timeout=timeout,
                                      onLaunch=onLaunch,
@@ -2263,8 +2293,6 @@ class Mochitest(MochitestUtilsMixin):
                 status = 1
 
         finally:
-            if options.vmwareRecording:
-                self.stopVMwareRecording()
             self.stopServers()
 
         mozleak.process_leak_log(
@@ -2272,6 +2300,8 @@ class Mochitest(MochitestUtilsMixin):
             leak_thresholds=options.leakThresholds,
             ignore_missing_leaks=options.ignoreMissingLeaks,
             log=self.log,
+            stack_fixer=get_stack_fixer_function(options.utilityPath,
+                                                 options.symbolsPath),
         )
 
         if self.nsprLogs:
@@ -2354,7 +2384,7 @@ class Mochitest(MochitestUtilsMixin):
             messages = self.harness.message_logger.parse_line(line)
 
             for message in messages:
-                    # Passing the message to the handlers
+                # Passing the message to the handlers
                 for handler in self.outputHandlers():
                     message = handler(message)
 
@@ -2381,47 +2411,9 @@ class Mochitest(MochitestUtilsMixin):
 
         def stackFixer(self):
             """
-            return stackFixerFunction, if any, to use on the output lines
+            return get_stack_fixer_function, if any, to use on the output lines
             """
-
-            if not mozinfo.info.get('debug'):
-                return None
-
-            stackFixerFunction = None
-
-            def import_stackFixerModule(module_name):
-                sys.path.insert(0, self.utilityPath)
-                module = __import__(module_name, globals(), locals(), [])
-                sys.path.pop(0)
-                return module
-
-            if self.symbolsPath and os.path.exists(self.symbolsPath):
-                # Run each line through a function in fix_stack_using_bpsyms.py (uses breakpad symbol files).
-                # This method is preferred for Tinderbox builds, since native
-                # symbols may have been stripped.
-                stackFixerModule = import_stackFixerModule(
-                    'fix_stack_using_bpsyms')
-                stackFixerFunction = lambda line: stackFixerModule.fixSymbols(
-                    line,
-                    self.symbolsPath)
-
-            elif mozinfo.isMac:
-                # Run each line through fix_macosx_stack.py (uses atos).
-                # This method is preferred for developer machines, so we don't
-                # have to run "make buildsymbols".
-                stackFixerModule = import_stackFixerModule('fix_macosx_stack')
-                stackFixerFunction = lambda line: stackFixerModule.fixSymbols(
-                    line)
-
-            elif mozinfo.isLinux:
-                # Run each line through fix_linux_stack.py (uses addr2line).
-                # This method is preferred for developer machines, so we don't
-                # have to run "make buildsymbols".
-                stackFixerModule = import_stackFixerModule('fix_linux_stack')
-                stackFixerFunction = lambda line: stackFixerModule.fixSymbols(
-                    line)
-
-            return stackFixerFunction
+            return get_stack_fixer_function(self.utilityPath, self.symbolsPath)
 
         def finish(self):
             if self.shutdownLeaks:
@@ -2460,11 +2452,12 @@ class Mochitest(MochitestUtilsMixin):
         def countline(self, message):
             if message['action'] != 'log':
                 return message
+
             line = message['message']
             val = 0
             try:
                 val = int(line.split(':')[-1].strip())
-            except ValueError:
+            except (AttributeError, ValueError):
                 return message
 
             if "Passed:" in line:
@@ -2477,10 +2470,7 @@ class Mochitest(MochitestUtilsMixin):
 
         def fix_stack(self, message):
             if message['action'] == 'log' and self.stackFixerFunction:
-                message['message'] = self.stackFixerFunction(
-                    message['message'].encode(
-                        'utf-8',
-                        'replace'))
+                message['message'] = self.stackFixerFunction(message['message'])
             return message
 
         def record_last_test(self, message):
@@ -2525,6 +2515,8 @@ class Mochitest(MochitestUtilsMixin):
         d = dict((k, v) for k, v in options.__dict__.items() if (v is None) or
             isinstance(v,(basestring,numbers.Number)))
         d['testRoot'] = self.testRoot
+        if not options.keep_open:
+            d['closeWhenDone'] = '1'
         content = json.dumps(d)
 
         with open(os.path.join(options.profilePath, "testConfig.js"), "w") as config:
@@ -2576,8 +2568,21 @@ class Mochitest(MochitestUtilsMixin):
 
 def run_test_harness(options):
     logger_options = {
-        key: value for key, value in vars(options).iteritems() if key.startswith('log')}
+        key: value for key, value in vars(options).iteritems()
+        if key.startswith('log') or key == 'valgrind' }
     runner = Mochitest(logger_options)
+
+    options.runByDir = False
+
+    if runner.getTestFlavor(options) == 'browser-chrome':
+        options.runByDir = True
+
+    if runner.getTestFlavor(options) == 'mochitest' and (not mozinfo.info['debug']) and (not mozinfo.info['asan']):
+        options.runByDir = True
+
+    if mozinfo.info.get('buildapp') == 'mulet':
+        options.runByDir = False
+
     result = runner.runTests(options)
 
     # don't dump failures if running from automation as treeherder already displays them

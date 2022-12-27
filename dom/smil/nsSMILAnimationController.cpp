@@ -519,7 +519,7 @@ nsSMILAnimationController::DoMilestoneSamples()
       break;
     }
 
-    nsTArray<nsRefPtr<mozilla::dom::SVGAnimationElement>> elements;
+    nsTArray<RefPtr<mozilla::dom::SVGAnimationElement>> elements;
     for (auto iter = mChildContainerTable.Iter(); !iter.Done(); iter.Next()) {
       nsSMILTimeContainer* container = iter.Get()->GetKey();
       if (container->IsPausedByType(nsSMILTimeContainer::PAUSE_BEGIN)) {
@@ -719,7 +719,7 @@ nsSMILAnimationController::AddStyleUpdatesTo(RestyleTracker& aTracker)
     }
 
     // mIsCSS true means that the rules are the ones returned from
-    // Element::GetSMILOverrideStyleRule (via nsSMILCSSProperty objects),
+    // Element::GetSMILOverrideStyleDeclaration (via nsSMILCSSProperty objects),
     // and mIsCSS false means the rules are nsSMILMappedAttribute objects
     // returned from nsSVGElement::GetAnimatedContentStyleRule.
     nsRestyleHint rshint = key.mIsCSS ? eRestyle_StyleAttribute_Animations

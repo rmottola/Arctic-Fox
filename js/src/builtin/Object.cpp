@@ -520,16 +520,6 @@ js::obj_hasOwnProperty(JSContext* cx, unsigned argc, Value* vp)
     jsid id;
     if (args.thisv().isObject() && ValueToId<NoGC>(cx, idValue, &id)) {
         JSObject* obj = &args.thisv().toObject();
-
-#ifndef RELEASE_BUILD
-        if (obj->is<RegExpObject>() && id == NameToId(cx->names().source)) {
-            if (JSScript* script = cx->currentScript()) {
-                const char* filename = script->filename();
-                cx->compartment()->addTelemetry(filename, JSCompartment::RegExpSourceProperty);
-            }
-        }
-#endif
-
         Shape* prop;
         if (obj->isNative() &&
             NativeLookupOwnProperty<NoGC>(cx, &obj->as<NativeObject>(), id, &prop))
@@ -1014,8 +1004,6 @@ static const JSFunctionSpec object_static_methods[] = {
     JS_FN("setPrototypeOf",            obj_setPrototypeOf,          2, 0),
     JS_FN("getOwnPropertyDescriptor",  obj_getOwnPropertyDescriptor,2, 0),
     JS_FN("keys",                      obj_keys,                    1, 0),
-    JS_SELF_HOSTED_FN("values",        "ObjectValues",              1, JSPROP_DEFINE_LATE),
-    JS_SELF_HOSTED_FN("entries",       "ObjectEntries",             1, JSPROP_DEFINE_LATE),
     JS_FN("is",                        obj_is,                      2, 0),
     JS_FN("defineProperty",            obj_defineProperty,          3, 0),
     JS_FN("defineProperties",          obj_defineProperties,        2, 0),
@@ -1057,6 +1045,13 @@ CreateObjectPrototype(JSContext* cx, JSProtoKey key)
                                                                            SingletonObject));
     if (!objectProto)
         return nullptr;
+
+    bool succeeded;
+    if (!SetImmutablePrototype(cx, objectProto, &succeeded))
+        return nullptr;
+    MOZ_ASSERT(succeeded,
+               "should have been able to make a fresh Object.prototype's "
+               "[[Prototype]] immutable");
 
     /*
      * The default 'new' type of Object.prototype is required by type inference

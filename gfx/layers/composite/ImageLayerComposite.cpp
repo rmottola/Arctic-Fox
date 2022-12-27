@@ -7,8 +7,8 @@
 #include "CompositableHost.h"           // for CompositableHost
 #include "Layers.h"                     // for WriteSnapshotToDumpFile, etc
 #include "gfx2DGlue.h"                  // for ToFilter
+#include "gfxEnv.h"                     // for gfxEnv
 #include "gfxRect.h"                    // for gfxRect
-#include "gfxUtils.h"                   // for gfxUtils, etc
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4
 #include "mozilla/gfx/Point.h"          // for IntSize, Point
@@ -18,7 +18,7 @@
 #include "mozilla/layers/TextureHost.h"  // for TextureHost, etc
 #include "mozilla/mozalloc.h"           // for operator delete
 #include "nsAString.h"
-#include "mozilla/nsRefPtr.h"           // for nsRefPtr
+#include "mozilla/RefPtr.h"           // for nsRefPtr
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsString.h"                   // for nsAutoCString
@@ -87,7 +87,7 @@ ImageLayerComposite::RenderLayer(const IntRect& aClipRect)
   }
 
 #ifdef MOZ_DUMP_PAINTING
-  if (gfxUtils::sDumpPainting) {
+  if (gfxEnv::DumpCompositorTextures()) {
     RefPtr<gfx::DataSourceSurface> surf = mImageHost->GetAsSurface();
     WriteSnapshotToDumpFile(this, surf);
   }

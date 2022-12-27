@@ -22,6 +22,7 @@
 #include "mozilla/dom/ipc/IdType.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIDeprecationWarner.h"
+#include "nsIPackagedAppChannelListener.h"
 
 class nsICacheEntry;
 class nsIAssociatedContentSecurity;
@@ -46,6 +47,7 @@ class HttpChannelParent final : public PHttpChannelParent
                               , public nsINetworkInterceptController
                               , public nsIDeprecationWarner
                               , public DisconnectableParent
+                              , public nsIPackagedAppChannelListener
                               , public HttpChannelSecurityWarningReporter
 {
   virtual ~HttpChannelParent();
@@ -54,6 +56,7 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIREQUESTOBSERVER
   NS_DECL_NSISTREAMLISTENER
+  NS_DECL_NSIPACKAGEDAPPCHANNELLISTENER
   NS_DECL_NSIPARENTCHANNEL
   NS_DECL_NSIPARENTREDIRECTINGCHANNEL
   NS_DECL_NSIPROGRESSEVENTSINK
@@ -136,6 +139,7 @@ protected:
   virtual bool RecvCancel(const nsresult& status) override;
   virtual bool RecvRedirect2Verify(const nsresult& result,
                                    const RequestHeaderTuples& changedHeaders,
+                                   const uint32_t& loadFlags,
                                    const OptionalURIParams& apiRedirectUri) override;
   virtual bool RecvUpdateAssociatedContentSecurity(const int32_t& broken,
                                                    const int32_t& no) override;
@@ -157,7 +161,7 @@ protected:
   void FailDiversion(nsresult aErrorCode, bool aSkipResume = true);
 
   friend class HttpChannelParentListener;
-  nsRefPtr<mozilla::dom::TabParent> mTabParent;
+  RefPtr<mozilla::dom::TabParent> mTabParent;
 
   void OfflineDisconnect() override;
   uint32_t GetAppId() override;
@@ -181,7 +185,7 @@ private:
   friend class DivertCompleteEvent;
   friend class ResponseSynthesizer;
 
-  nsRefPtr<nsHttpChannel>       mChannel;
+  RefPtr<nsHttpChannel>       mChannel;
   nsCOMPtr<nsICacheEntry>       mCacheEntry;
   nsCOMPtr<nsIAssociatedContentSecurity>  mAssociatedContentSecurity;
   Atomic<bool> mIPCClosed;                // PHttpChannel actor has been Closed()
@@ -201,16 +205,16 @@ private:
   bool mSentRedirect1BeginFailed    : 1;
   bool mReceivedRedirect2Verify     : 1;
 
-  nsRefPtr<OfflineObserver> mObserver;
+  RefPtr<OfflineObserver> mObserver;
 
   PBOverrideStatus mPBOverride;
 
   nsCOMPtr<nsILoadContext> mLoadContext;
-  nsRefPtr<nsHttpHandler>  mHttpHandler;
+  RefPtr<nsHttpHandler>  mHttpHandler;
 
   nsAutoPtr<nsHttpResponseHead> mSynthesizedResponseHead;
 
-  nsRefPtr<HttpChannelParentListener> mParentListener;
+  RefPtr<HttpChannelParentListener> mParentListener;
   // This is listener we are diverting to.
   nsCOMPtr<nsIStreamListener> mDivertListener;
   // Set to the canceled status value if the main channel was canceled.
@@ -235,7 +239,7 @@ private:
   // Handle to the channel wrapper if this channel has been intercepted.
   nsCOMPtr<nsIInterceptedChannel> mInterceptedChannel;
 
-  nsRefPtr<ChannelEventQueue> mEventQ;
+  RefPtr<ChannelEventQueue> mEventQ;
 };
 
 } // namespace net

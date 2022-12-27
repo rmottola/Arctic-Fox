@@ -35,7 +35,7 @@
 #include "nsITextServicesDocument.h"    // for nsITextServicesDocument
 #include "nsITextServicesFilter.h"      // for nsITextServicesFilter
 #include "nsIURI.h"                     // for nsIURI
-#include "nsIVariant.h"                 // for nsIWritableVariant, etc
+#include "nsVariant.h"                  // for nsIWritableVariant, etc
 #include "nsLiteralString.h"            // for NS_LITERAL_STRING, etc
 #include "nsMemory.h"                   // for nsMemory
 #include "nsRange.h"
@@ -151,7 +151,7 @@ public:
 private:
   ~DictionaryFetcher() {}
 
-  nsRefPtr<nsEditorSpellCheck> mSpellCheck;
+  RefPtr<nsEditorSpellCheck> mSpellCheck;
 };
 NS_IMPL_ISUPPORTS(DictionaryFetcher, nsIContentPrefCallback2)
 
@@ -201,8 +201,7 @@ StoreCurrentDictionary(nsIEditor* aEditor, const nsAString& aDictionary)
   rv = docUri->GetSpec(docUriSpec);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIWritableVariant> prefValue = do_CreateInstance(NS_VARIANT_CONTRACTID);
-  NS_ENSURE_TRUE(prefValue, NS_ERROR_OUT_OF_MEMORY);
+  RefPtr<nsVariant> prefValue = new nsVariant();
   prefValue->SetAsAString(aDictionary);
 
   nsCOMPtr<nsIContentPrefService2> contentPrefService =
@@ -348,7 +347,7 @@ nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionCh
 
     nsCOMPtr<nsISelection> domSelection;
     aEditor->GetSelection(getter_AddRefs(domSelection));
-    nsRefPtr<Selection> selection = static_cast<Selection*>(domSelection.get());
+    RefPtr<Selection> selection = static_cast<Selection*>(domSelection.get());
     NS_ENSURE_TRUE(selection, NS_ERROR_FAILURE);
 
     int32_t count = 0;
@@ -357,7 +356,7 @@ nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionCh
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (count > 0) {
-      nsRefPtr<nsRange> range = selection->GetRangeAt(0);
+      RefPtr<nsRange> range = selection->GetRangeAt(0);
       NS_ENSURE_STATE(range);
 
       bool collapsed = false;
@@ -368,7 +367,7 @@ nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionCh
         // We don't want to touch the range in the selection,
         // so create a new copy of it.
 
-        nsRefPtr<nsRange> rangeBounds = range->CloneRange();
+        RefPtr<nsRange> rangeBounds = range->CloneRange();
 
         // Make sure the new range spans complete words.
 
@@ -399,7 +398,7 @@ nsEditorSpellCheck::InitSpellChecker(nsIEditor* aEditor, bool aEnableSelectionCh
     // However, if it does fail, we still need to call the callback since we
     // discard the failure.  Do it asynchronously so that the caller is always
     // guaranteed async behavior.
-    nsRefPtr<CallbackCaller> caller = new CallbackCaller(aCallback);
+    RefPtr<CallbackCaller> caller = new CallbackCaller(aCallback);
     NS_ENSURE_STATE(caller);
     rv = NS_DispatchToMainThread(caller);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -586,7 +585,7 @@ nsEditorSpellCheck::SetCurrentDictionary(const nsAString& aDictionary)
 {
   NS_ENSURE_TRUE(mSpellChecker, NS_ERROR_NOT_INITIALIZED);
 
-  nsRefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
+  RefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
 
   // The purpose of mUpdateDictionaryRunning is to avoid doing all of this if
   // UpdateCurrentDictionary's helper method DictionaryFetched, which calls us,
@@ -670,7 +669,7 @@ nsEditorSpellCheck::UpdateCurrentDictionary(nsIEditorSpellCheckCallback* aCallba
 {
   nsresult rv;
 
-  nsRefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
+  RefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
 
   // Get language with html5 algorithm
   nsCOMPtr<nsIContent> rootContent;
@@ -700,7 +699,7 @@ nsEditorSpellCheck::UpdateCurrentDictionary(nsIEditorSpellCheckCallback* aCallba
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<DictionaryFetcher> fetcher =
+  RefPtr<DictionaryFetcher> fetcher =
     new DictionaryFetcher(this, aCallback, mDictionaryFetcherGroup);
   rootContent->GetLang(fetcher->mRootContentLang);
   nsCOMPtr<nsIDocument> doc = rootContent->GetCurrentDoc();
@@ -755,7 +754,7 @@ nsresult
 nsEditorSpellCheck::DictionaryFetched(DictionaryFetcher* aFetcher)
 {
   MOZ_ASSERT(aFetcher);
-  nsRefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
+  RefPtr<nsEditorSpellCheck> kungFuDeathGrip = this;
 
   // Important: declare the holder after the callback caller so that the former
   // is destructed first so that it's not active when the callback is called.

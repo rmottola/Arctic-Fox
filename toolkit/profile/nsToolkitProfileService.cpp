@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/UniquePtr.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +52,7 @@ public:
     NS_DECL_NSITOOLKITPROFILE
 
     friend class nsToolkitProfileService;
-    nsRefPtr<nsToolkitProfile> mNext;
+    RefPtr<nsToolkitProfile> mNext;
     nsToolkitProfile          *mPrev;
 
 private:
@@ -87,7 +88,7 @@ public:
 private:
     ~nsToolkitProfileLock();
 
-    nsRefPtr<nsToolkitProfile> mProfile;
+    RefPtr<nsToolkitProfile> mProfile;
     nsCOMPtr<nsIFile> mDirectory;
     nsCOMPtr<nsIFile> mLocalDirectory;
 
@@ -138,7 +139,7 @@ private:
                                    bool aForExternalApp,
                                    nsIToolkitProfile** aResult);
 
-    nsRefPtr<nsToolkitProfile>  mFirst;
+    RefPtr<nsToolkitProfile>  mFirst;
     nsCOMPtr<nsIToolkitProfile> mChosen;
     nsCOMPtr<nsIToolkitProfile> mDefault;
     nsCOMPtr<nsIFile>           mAppData;
@@ -160,7 +161,7 @@ private:
           { mCurrent = first; }
     private:
         ~ProfileEnumerator() { }
-        nsRefPtr<nsToolkitProfile> mCurrent;
+        RefPtr<nsToolkitProfile> mCurrent;
     };
 };
 
@@ -278,7 +279,7 @@ nsToolkitProfile::Lock(nsIProfileUnlocker* *aUnlocker, nsIProfileLock* *aResult)
         return NS_OK;
     }
 
-    nsRefPtr<nsToolkitProfileLock> lock = new nsToolkitProfileLock();
+    RefPtr<nsToolkitProfileLock> lock = new nsToolkitProfileLock();
     if (!lock) return NS_ERROR_OUT_OF_MEMORY;
 
     nsresult rv = lock->Init(this, aUnlocker);
@@ -671,7 +672,7 @@ nsresult
 NS_LockProfilePath(nsIFile* aPath, nsIFile* aTempPath,
                    nsIProfileUnlocker* *aUnlocker, nsIProfileLock* *aResult)
 {
-    nsRefPtr<nsToolkitProfileLock> lock = new nsToolkitProfileLock();
+    RefPtr<nsToolkitProfileLock> lock = new nsToolkitProfileLock();
     if (!lock) return NS_ERROR_OUT_OF_MEMORY;
 
     nsresult rv = lock->Init(aPath, aTempPath, aUnlocker);
@@ -971,12 +972,10 @@ nsToolkitProfileService::Flush()
 
     uint32_t length;
     const int bufsize = 100+MAXPATHLEN*pCount;
-    nsAutoArrayPtr<char> buffer (new char[bufsize]);
+    auto buffer = MakeUnique<char[]>(bufsize);
 
-    NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
-
-    char *pos = buffer;
-    char *end = buffer + bufsize;
+    char *pos = buffer.get();
+    char *end = pos + bufsize;
 
     pos += snprintf(pos, end - pos,
                     "[General]\n"
@@ -1024,13 +1023,11 @@ nsToolkitProfileService::Flush()
     rv = mListFile->OpenANSIFileDesc("w", &writeFile);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    if (buffer) {
-        length = pos - buffer;
+    length = pos - buffer.get();
 
-        if (fwrite(buffer, sizeof(char), length, writeFile) != length) {
-            fclose(writeFile);
-            return NS_ERROR_UNEXPECTED;
-        }
+    if (fwrite(buffer.get(), sizeof(char), length, writeFile) != length) {
+        fclose(writeFile);
+        return NS_ERROR_UNEXPECTED;
     }
 
     fclose(writeFile);

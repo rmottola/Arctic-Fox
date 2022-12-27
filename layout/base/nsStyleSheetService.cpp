@@ -169,7 +169,7 @@ nsStyleSheetService::LoadAndRegisterSheet(nsIURI *aSheetURI,
       SerializeURI(aSheetURI, uri);
 
       for (uint32_t i = 0; i < children.Length(); i++) {
-        unused << children[i]->SendLoadAndRegisterSheet(uri, aSheetType);
+        Unused << children[i]->SendLoadAndRegisterSheet(uri, aSheetType);
       }
     }
   }
@@ -180,17 +180,32 @@ nsresult
 nsStyleSheetService::LoadAndRegisterSheetInternal(nsIURI *aSheetURI,
                                                   uint32_t aSheetType)
 {
-  NS_ENSURE_ARG(aSheetType == AGENT_SHEET ||
-                aSheetType == USER_SHEET ||
-                aSheetType == AUTHOR_SHEET);
   NS_ENSURE_ARG_POINTER(aSheetURI);
 
-  nsRefPtr<css::Loader> loader = new css::Loader();
+  css::SheetParsingMode parsingMode;
+  switch (aSheetType) {
+    case AGENT_SHEET:
+      parsingMode = css::eAgentSheetFeatures;
+      break;
 
-  nsRefPtr<CSSStyleSheet> sheet;
-  // Allow UA sheets, but not user sheets, to use unsafe rules
-  nsresult rv = loader->LoadSheetSync(aSheetURI, aSheetType == AGENT_SHEET,
-                                      true, getter_AddRefs(sheet));
+    case USER_SHEET:
+      parsingMode = css::eUserSheetFeatures;
+      break;
+
+    case AUTHOR_SHEET:
+      parsingMode = css::eAuthorSheetFeatures;
+      break;
+
+    default:
+      NS_WARNING("invalid sheet type argument");
+      return NS_ERROR_INVALID_ARG;
+  }
+
+  RefPtr<css::Loader> loader = new css::Loader();
+
+  RefPtr<CSSStyleSheet> sheet;
+  nsresult rv = loader->LoadSheetSync(aSheetURI, parsingMode, true,
+                                      getter_AddRefs(sheet));
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (!mSheets[aSheetType].AppendObject(sheet)) {
@@ -219,18 +234,32 @@ NS_IMETHODIMP
 nsStyleSheetService::PreloadSheet(nsIURI *aSheetURI, uint32_t aSheetType,
                                   nsIDOMStyleSheet **aSheet)
 {
-  NS_ENSURE_ARG(aSheetType == AGENT_SHEET ||
-                aSheetType == USER_SHEET ||
-                aSheetType == AUTHOR_SHEET);
-  NS_ENSURE_ARG_POINTER(aSheetURI);
   NS_PRECONDITION(aSheet, "Null out param");
+  NS_ENSURE_ARG_POINTER(aSheetURI);
+  css::SheetParsingMode parsingMode;
+  switch (aSheetType) {
+    case AGENT_SHEET:
+      parsingMode = css::eAgentSheetFeatures;
+      break;
 
-  nsRefPtr<css::Loader> loader = new css::Loader();
+    case USER_SHEET:
+      parsingMode = css::eUserSheetFeatures;
+      break;
 
-  // Allow UA sheets, but not user sheets, to use unsafe rules
-  nsRefPtr<CSSStyleSheet> sheet;
-  nsresult rv = loader->LoadSheetSync(aSheetURI, aSheetType == AGENT_SHEET,
-                                      true, getter_AddRefs(sheet));
+    case AUTHOR_SHEET:
+      parsingMode = css::eAuthorSheetFeatures;
+      break;
+
+    default:
+      NS_WARNING("invalid sheet type argument");
+      return NS_ERROR_INVALID_ARG;
+  }
+
+  RefPtr<css::Loader> loader = new css::Loader();
+
+  RefPtr<CSSStyleSheet> sheet;
+  nsresult rv = loader->LoadSheetSync(aSheetURI, parsingMode, true,
+                                      getter_AddRefs(sheet));
   NS_ENSURE_SUCCESS(rv, rv);
   sheet.forget(aSheet);
   return NS_OK;
@@ -278,7 +307,7 @@ nsStyleSheetService::UnregisterSheet(nsIURI *aSheetURI, uint32_t aSheetType)
     SerializeURI(aSheetURI, uri);
 
     for (uint32_t i = 0; i < children.Length(); i++) {
-      unused << children[i]->SendUnregisterSheet(uri, aSheetType);
+      Unused << children[i]->SendUnregisterSheet(uri, aSheetType);
     }
   }
 

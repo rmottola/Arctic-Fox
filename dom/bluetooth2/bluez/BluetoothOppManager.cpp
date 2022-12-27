@@ -146,7 +146,7 @@ public:
     if (numRead > 0) {
       sBluetoothOppManager->CheckPutFinal(numRead);
 
-      nsRefPtr<SendSocketDataTask> task =
+      RefPtr<SendSocketDataTask> task =
         new SendSocketDataTask((uint8_t*)buf.forget(), numRead);
       if (NS_FAILED(NS_DispatchToMainThread(task))) {
         BT_WARNING("Failed to dispatch to main thread!");
@@ -181,7 +181,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothSocket> mSocket;
+  RefPtr<BluetoothSocket> mSocket;
 };
 
 BluetoothOppManager::BluetoothOppManager() : mConnected(false)
@@ -372,7 +372,7 @@ BluetoothOppManager::SendFile(const nsAString& aDeviceAddress,
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsRefPtr<FileImpl> impl = aActor->GetBlobImpl();
+  RefPtr<FileImpl> impl = aActor->GetBlobImpl();
   nsCOMPtr<nsIDOMBlob> blob = new File(nullptr, impl);
 
   return SendFile(aDeviceAddress, blob.get());
@@ -1093,7 +1093,7 @@ BluetoothOppManager::ClientDataHandler(UnixSocketRawData* aMessage)
       }
     }
 
-    nsRefPtr<ReadFileTask> task = new ReadFileTask(mInputStream,
+    RefPtr<ReadFileTask> task = new ReadFileTask(mInputStream,
                                                    mRemoteMaxPacketLength);
     rv = mReadFileThread->Dispatch(task, NS_DISPATCH_NORMAL);
     if (NS_FAILED(rv)) {

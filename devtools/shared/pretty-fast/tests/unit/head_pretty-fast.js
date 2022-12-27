@@ -1,15 +1,15 @@
 "use strict";
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
 
-const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
 this.sourceMap = require("source-map");
 this.acorn = require("acorn/acorn");
 this.prettyFast = require("devtools/shared/pretty-fast/pretty-fast");
-const { console } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+const { console } = Cu.import("resource://gre/modules/Console.jsm", {});
 
 // Register a console listener, so console messages don't just disappear
 // into the ether.

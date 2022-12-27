@@ -27,7 +27,6 @@
 using mozilla::gfx::DataSourceSurface;
 using mozilla::gfx::SourceSurface;
 using mozilla::LogLevel;
-using mozilla::RefPtr;
 
 // Screenshots use the (undocumented) png pasteboard type.
 #define IMAGE_PASTEBOARD_TYPES NSTIFFPboardType, @"Apple PNG pasteboard type", nil
@@ -60,7 +59,7 @@ GetDataFromPasteboard(NSPasteboard* aPasteboard, NSString* aType)
   } @catch (NSException* e) {
     NS_WARNING(nsPrintfCString("Exception raised while getting data from the pasteboard: \"%s - %s\"",
                                [[e name] UTF8String], [[e reason] UTF8String]).get());
-    mozilla::unused << e;
+    mozilla::Unused << e;
   }
   return data;
 }

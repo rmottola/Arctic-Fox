@@ -33,7 +33,7 @@ AssertInnerizedScopeChain(JSContext* cx, JSObject& scopeobj)
 #ifdef DEBUG
     RootedObject obj(cx);
     for (obj = &scopeobj; obj; obj = obj->enclosingScope())
-        MOZ_ASSERT(GetInnerObject(obj) == obj);
+        MOZ_ASSERT(!IsWindowProxy(obj));
 #endif
 }
 
@@ -273,11 +273,8 @@ EvalKernel(JSContext* cx, const CallArgs& args, EvalType evalType, AbstractFrame
     } else {
         MOZ_ASSERT(args.callee().global() == scopeobj->as<ClonedBlockObject>().global());
 
-        // Use the global as 'this', modulo outerization.
-        JSObject* thisobj = GetThisObject(cx, scopeobj);
-        if (!thisobj)
-            return false;
-        thisv = ObjectValue(*thisobj);
+        // Use the global as 'this' (or the WindowProxy if it's a Window).
+        thisv = GetThisValue(scopeobj);
     }
 
     RootedLinearString linearStr(cx, str->ensureLinear(cx));
@@ -441,10 +438,8 @@ js::DirectEvalStringFromIon(JSContext* cx,
     // value as necessary while it executes.
     RootedValue nthisValue(cx, thisValue);
     if (!callerScript->strict() && esg.script()->strict() && !thisValue.isObject()) {
-        JSObject* obj = BoxNonStrictThis(cx, thisValue);
-        if (!obj)
+        if (!BoxNonStrictThis(cx, thisValue, &nthisValue))
             return false;
-        nthisValue = ObjectValue(*obj);
     }
 
     return ExecuteKernel(cx, esg.script(), *scopeobj, nthisValue, newTargetValue,
@@ -520,11 +515,8 @@ js::ExecuteInGlobalAndReturnScope(JSContext* cx, HandleObject global, HandleScri
     if (!scope)
         return false;
 
-    JSObject* thisobj = GetThisObject(cx, global);
-    if (!thisobj)
-        return false;
+    RootedValue thisv(cx, GetThisValue(global));
 
-    RootedValue thisv(cx, ObjectValue(*thisobj));
     RootedValue rval(cx);
     if (!ExecuteKernel(cx, script, *scope, thisv, UndefinedValue(), EXECUTE_GLOBAL,
                        NullFramePtr() /* evalInFrame */, rval.address()))

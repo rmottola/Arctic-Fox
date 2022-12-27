@@ -6,10 +6,10 @@
  * Test encoding a simple message.
  */
 
-const { utils: Cu } = Components;
-const { require } = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+var { utils: Cu } = Components;
+const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
-const QR = require("devtools/toolkit/qrcode/index");
+const QR = require("devtools/shared/qrcode/index");
 
 function run_test() {
   let imgData = QR.encodeToDataURI("HELLO", "L");

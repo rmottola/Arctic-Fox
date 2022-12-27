@@ -149,7 +149,7 @@ public:
 
     nsAutoPtr<txVariableMap> mTemplateParams;
 
-    nsRefPtr<txStylesheet> mStylesheet;
+    RefPtr<txStylesheet> mStylesheet;
 
 private:
     txStack mReturnStack;
@@ -161,7 +161,7 @@ private:
     txInstruction* mNextInstruction;
     txVariableMap* mLocalVariables;
     txVariableMap mGlobalVariableValues;
-    nsRefPtr<txAExprResult> mGlobalVarPlaceholderValue;
+    RefPtr<txAExprResult> mGlobalVarPlaceholderValue;
     int32_t mRecursionDepth;
 
     AutoInfallibleTArray<TemplateRule, 10> mTemplateRules;
@@ -173,7 +173,7 @@ private:
 
     txLoadedDocumentsHash mLoadedDocuments;
     txKeyHash mKeyHash;
-    nsRefPtr<txResultRecycler> mRecycler;
+    RefPtr<txResultRecycler> mRecycler;
     bool mDisableLoads;
 
     static const int32_t kMaxRecursionDepth;

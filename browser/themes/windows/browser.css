@@ -8,6 +8,7 @@
 @namespace html url("http://www.w3.org/1999/xhtml");
 
 %include ../shared/browser.inc
+%include windowsShared.inc
 %filter substitution
 %define toolbarShadowColor rgba(10%,10%,10%,.4)
 %define toolbarShadowOnTab linear-gradient(to top, rgba(10%,10%,10%,.4) 1px, transparent 1px)
@@ -1367,6 +1368,9 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 
 .urlbar-icon {
   padding: 0 3px;
+  /* 16x16 icon with border-box sizing */
+  width: 22px;
+  height: 16px;
 }
 
 .searchbar-engine-button,
@@ -3574,6 +3578,18 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
   }
 }
 
-.browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
+%include ../shared/contextmenu.inc.css
+
+#context-navigation {
+  background-color: menu;
+  padding-bottom: 4px;
+}
+
+#context-sep-navigation {
+  -moz-margin-start: -28px;
+  margin-top: -4px;
+}
+
+.browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }

@@ -125,8 +125,9 @@ MovableCellHasher<T>::hash(const Lookup& l)
                l->zoneFromAnyThread()->isSelfHostingZone());
 
     HashNumber hn;
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     if (!l->zoneFromAnyThread()->getHashCode(l, &hn))
-        CrashAtUnhandlableOOM("failed to get a stable hash code");
+        oomUnsafe.crash("failed to get a stable hash code");
     return hn;
 }
 
@@ -162,6 +163,7 @@ template struct MovableCellHasher<JSObject*>;
 template struct MovableCellHasher<GlobalObject*>;
 template struct MovableCellHasher<SavedFrame*>;
 template struct MovableCellHasher<ScopeObject*>;
+template struct MovableCellHasher<JSScript*>;
 
 } // namespace js
 

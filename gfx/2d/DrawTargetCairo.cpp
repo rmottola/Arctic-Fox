@@ -669,7 +669,7 @@ GfxFormatForCairoSurface(cairo_surface_t* surface)
   // xlib is currently the only Cairo backend that creates 16bpp surfaces
   if (type == CAIRO_SURFACE_TYPE_XLIB &&
       cairo_xlib_surface_get_depth(surface) == 16) {
-    return SurfaceFormat::R5G6B5;
+    return SurfaceFormat::R5G6B5_UINT16;
   }
 #endif
   return CairoContentToGfxFormat(cairo_surface_get_content(surface));
@@ -1100,7 +1100,7 @@ DrawTargetCairo::ClearRect(const Rect& aRect)
   if (!mContext || aRect.Width() <= 0 || aRect.Height() <= 0 ||
       !IsFinite(aRect.X()) || !IsFinite(aRect.Width()) ||
       !IsFinite(aRect.Y()) || !IsFinite(aRect.Height())) {
-    gfxCriticalError(CriticalLog::DefaultOptions(false)) << "ClearRect with invalid argument " << gfx::hexa(mContext) << " with " << aRect.Width() << "x" << aRect.Height() << " [" << aRect.X() << ", " << aRect.Y() << "]";
+    gfxCriticalNote << "ClearRect with invalid argument " << gfx::hexa(mContext) << " with " << aRect.Width() << "x" << aRect.Height() << " [" << aRect.X() << ", " << aRect.Y() << "]";
   }
 
   cairo_set_antialias(mContext, CAIRO_ANTIALIAS_NONE);
@@ -1476,10 +1476,10 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
   Display *dpy = DisplayOfScreen(screen);
   XRenderPictFormat* xrenderFormat = nullptr;
   switch (format) {
-  case SurfaceFormat::B8G8R8A8:
+  case SurfaceFormat::A8R8G8B8_UINT32:
     xrenderFormat = XRenderFindStandardFormat(dpy, PictStandardARGB32);
     break;
-  case SurfaceFormat::B8G8R8X8:
+  case SurfaceFormat::X8R8G8B8_UINT32:
     xrenderFormat = XRenderFindStandardFormat(dpy, PictStandardRGB24);
     break;
   case SurfaceFormat::A8:
@@ -1587,7 +1587,7 @@ DrawTargetCairo::InitAlreadyReferenced(cairo_surface_t* aSurface, const IntSize&
   cairo_rectangle(mContext, 0, 0, mSize.width, mSize.height);
   cairo_clip(mContext);
 
-  if (mFormat == SurfaceFormat::B8G8R8A8 ||
+  if (mFormat == SurfaceFormat::A8R8G8B8_UINT32 ||
       mFormat == SurfaceFormat::R8G8B8A8) {
     SetPermitSubpixelAA(false);
   } else {

@@ -1372,7 +1372,7 @@ nsWebBrowser::GetPositionAndSize(int32_t* aX, int32_t* aY,
       *aCY = mInitInfo->cy;
     }
   } else if (mInternalWidget) {
-    nsIntRect bounds;
+    LayoutDeviceIntRect bounds;
     NS_ENSURE_SUCCESS(mInternalWidget->GetBounds(bounds), NS_ERROR_FAILURE);
 
     if (aX) {
@@ -1731,7 +1731,7 @@ nsWebBrowser::PaintWindow(nsIWidget* aWidget, nsIntRegion aRegion)
   NS_ASSERTION(layerManager, "Must be in paint event");
 
   layerManager->BeginTransaction();
-  nsRefPtr<PaintedLayer> root = layerManager->CreatePaintedLayer();
+  RefPtr<PaintedLayer> root = layerManager->CreatePaintedLayer();
   if (root) {
     nsIntRect dirtyRect = aRegion.GetBounds();
     root->SetVisibleRegion(dirtyRect);

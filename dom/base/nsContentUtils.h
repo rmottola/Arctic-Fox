@@ -102,10 +102,10 @@ class nsWrapperCache;
 class nsAttrValue;
 class nsITransferable;
 class nsPIWindowRoot;
+class nsIWindowProvider;
 
 struct JSPropertyDescriptor;
 struct JSRuntime;
-struct nsIntMargin;
 
 template<class E> class nsCOMArray;
 template<class K, class V> class nsDataHashtable;
@@ -194,6 +194,47 @@ public:
   static bool     IsCallerChrome();
   static bool     ThreadsafeIsCallerChrome();
   static bool     IsCallerContentXBL();
+
+  // In the traditional Gecko architecture, both C++ code and untrusted JS code
+  // needed to rely on the same XPCOM method/getter/setter to get work done.
+  // This required lots of security checks in the various exposed methods, which
+  // in turn created difficulty in determining whether the caller was script
+  // (whose access needed to be checked) and internal C++ platform code (whose
+  // access did not need to be checked). To address this problem, Gecko had a
+  // convention whereby the absence of script on the stack was interpretted as
+  // "System Caller" and always granted unfettered access.
+  //
+  // Unfortunately, this created a bunch of footguns. For example, when the
+  // implementation of a DOM method wanted to perform a privileged
+  // sub-operation, it needed to "hide" the presence of script on the stack in
+  // order for that sub-operation to be allowed. Additionally, if script could
+  // trigger an API entry point to be invoked in some asynchronous way without
+  // script on the stack, it could potentially perform privilege escalation.
+  //
+  // In the modern world, untrusted script should interact with the platform
+  // exclusively over WebIDL APIs, and platform code has a lot more flexibility
+  // in deciding whether or not to use XPCOM. This gives us the flexibility to
+  // do something better.
+  //
+  // Going forward, APIs should be designed such that any security checks that
+  // ask the question "is my caller allowed to do this?" should live in WebIDL
+  // API entry points, with a separate method provided for internal callers
+  // that just want to get the job done.
+  //
+  // To enforce this and catch bugs, nsContentUtils::SubjectPrincipal will crash
+  // if it is invoked without script on the stack. To land that transition, it
+  // was necessary to go through and whitelist a bunch of callers that were
+  // depending on the old behavior. Those callers should be fixed up, and these
+  // methods should not be used by new code without review from bholley or bz.
+  static bool     LegacyIsCallerNativeCode() { return !GetCurrentJSContext(); }
+  static bool     LegacyIsCallerChromeOrNativeCode() { return LegacyIsCallerNativeCode() || IsCallerChrome(); }
+  static nsIPrincipal* SubjectPrincipalOrSystemIfNativeCaller()
+  {
+    if (!GetCurrentJSContext()) {
+      return GetSystemPrincipal();
+    }
+    return SubjectPrincipal();
+  }
 
   static bool     IsImageSrcSetDisabled();
 
@@ -858,9 +899,6 @@ public:
                                     = EmptyString(),
                                   uint32_t aLineNumber = 0,
                                   uint32_t aColumnNumber = 0);
-
-  static nsresult
-  MaybeReportInterceptionErrorToConsole(nsIDocument* aDocument, nsresult aError);
 
   static void LogMessageToConsole(const char* aMsg, ...);
   
@@ -1632,6 +1670,11 @@ public:
     return sScriptBlockerCount == 0;
   }
 
+  // XXXcatalinb: workaround for weird include error when trying to reference
+  // ipdl types in WindowWatcher.
+  static nsIWindowProvider*
+  GetWindowProviderForContentProcess();
+
   /**
    * Call this function if !IsSafeToRunScript() and we fail to run the script
    * (rather than using AddScriptRunner as we usually do). |aDocument| is
@@ -1663,24 +1706,6 @@ public:
    * was called
    */
   static void RunInMetastableState(already_AddRefed<nsIRunnable> aRunnable);
-
-  /**
-   * Retrieve information about the viewport as a data structure.
-   * This will return information in the viewport META data section
-   * of the document. This can be used in lieu of ProcessViewportInfo(),
-   * which places the viewport information in the document header instead
-   * of returning it directly.
-   *
-   * @param aDisplayWidth width of the on-screen display area for this
-   * document, in device pixels.
-   * @param aDisplayHeight height of the on-screen display area for this
-   * document, in device pixels.
-   *
-   * NOTE: If the site is optimized for mobile (via the doctype), this
-   * will return viewport information that specifies default information.
-   */
-  static nsViewportInfo GetViewportInfo(nsIDocument* aDocument,
-                                        const mozilla::ScreenIntSize& aDisplaySize);
 
   // Call EnterMicroTask when you're entering JS execution.
   // Usually the best way to do this is to use nsAutoMicroTask.
@@ -2313,14 +2338,6 @@ public:
                                         int32_t& aOutEndOffset);
 
   /**
-   * Takes a selection, and return selection's bounding rect which is relative
-   * to root frame.
-   *
-   * @param aSel      Selection to check
-   */
-  static nsRect GetSelectionBoundingRect(mozilla::dom::Selection* aSel);
-
-  /**
    * Takes a frame for anonymous content within a text control (<input> or
    * <textarea>), and returns an offset in the text content, adjusted for a
    * trailing <br> frame.
@@ -2504,7 +2521,7 @@ public:
 
   static bool PushEnabled(JSContext* aCx, JSObject* aObj);
 
-  static bool IsWorkerLoad(nsContentPolicyType aLoadType);
+  static bool IsNonSubresourceRequest(nsIChannel* aChannel);
 
   // The order of these entries matters, as we use std::min for total ordering
   // of permissions. Private Browsing is considered to be more limiting

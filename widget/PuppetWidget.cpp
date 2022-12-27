@@ -238,7 +238,7 @@ PuppetWidget::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
     NS_ASSERTION(w->GetParent() == this,
                  "Configured widget is not a child");
     w->SetWindowClipRegion(configuration.mClipRegion, true);
-    nsIntRect bounds;
+    LayoutDeviceIntRect bounds;
     w->GetBounds(bounds);
     if (bounds.Size() != configuration.mBounds.Size()) {
       w->Resize(configuration.mBounds.x, configuration.mBounds.y,
@@ -255,8 +255,10 @@ PuppetWidget::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
 NS_IMETHODIMP
 PuppetWidget::SetFocus(bool aRaise)
 {
-  // XXX/cjones: someone who knows about event handling needs to
-  // decide how this should work.
+  if (aRaise && mTabChild) {
+    mTabChild->SendRequestFocus(true);
+  }
+
   return NS_OK;
 }
 
@@ -283,16 +285,14 @@ PuppetWidget::Invalidate(const nsIntRect& aRect)
 }
 
 void
-PuppetWidget::InitEvent(WidgetGUIEvent& event, nsIntPoint* aPoint)
+PuppetWidget::InitEvent(WidgetGUIEvent& event, LayoutDeviceIntPoint* aPoint)
 {
   if (nullptr == aPoint) {
     event.refPoint.x = 0;
     event.refPoint.y = 0;
-  }
-  else {
+  } else {
     // use the point override if provided
-    event.refPoint.x = aPoint->x;
-    event.refPoint.y = aPoint->y;
+    event.refPoint = *aPoint;
   }
   event.time = PR_Now() / 1000;
 }
@@ -334,11 +334,11 @@ PuppetWidget::DispatchInputEvent(WidgetInputEvent* aEvent)
 
   switch (aEvent->mClass) {
     case eMouseEventClass:
-      unused <<
+      Unused <<
         mTabChild->SendDispatchMouseEvent(*aEvent->AsMouseEvent());
       break;
     case eKeyboardEventClass:
-      unused <<
+      Unused <<
         mTabChild->SendDispatchKeyboardEvent(*aEvent->AsKeyboardEvent());
       break;
     default:
@@ -363,7 +363,7 @@ PuppetWidget::DispatchAPZAwareEvent(WidgetInputEvent* aEvent)
 
   switch (aEvent->mClass) {
     case eWheelEventClass:
-      unused <<
+      Unused <<
         mTabChild->SendDispatchWheelEvent(*aEvent->AsWheelEvent());
       break;
     default:
@@ -880,7 +880,7 @@ PuppetWidget::SetCursor(imgIContainer* aCursor,
     return NS_ERROR_FAILURE;
   }
 
-  mozilla::RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
+  RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
     surface->GetDataSurface();
   size_t length;
   int32_t stride;
@@ -939,7 +939,7 @@ PuppetWidget::Paint()
         mTabChild->NotifyPainted();
       }
     } else {
-      nsRefPtr<gfxContext> ctx = new gfxContext(mDrawTarget);
+      RefPtr<gfxContext> ctx = new gfxContext(mDrawTarget);
       ctx->Rectangle(gfxRect(0,0,0,0));
       ctx->Clip();
       AutoLayerManagerSetup setupLayerManager(this, ctx,
@@ -1101,7 +1101,7 @@ PuppetWidget::GetChromeDimensions()
     NS_WARNING("PuppetWidget without Tab does not have chrome information.");
     return nsIntPoint();
   }
-  return LayoutDeviceIntPoint::ToUntyped(GetOwningTabChild()->GetChromeDisplacement());
+  return GetOwningTabChild()->GetChromeDisplacement().ToUnknownPoint();
 }
 
 nsIntPoint
@@ -1117,8 +1117,8 @@ PuppetWidget::GetWindowPosition()
 }
 
 NS_METHOD
-PuppetWidget::GetScreenBounds(nsIntRect &aRect) {
-  aRect.MoveTo(LayoutDeviceIntPoint::ToUntyped(WidgetToScreenOffset()));
+PuppetWidget::GetScreenBoundsUntyped(nsIntRect &aRect) {
+  aRect.MoveTo(WidgetToScreenOffsetUntyped());
   aRect.SizeTo(mBounds.Size());
   return NS_OK;
 }

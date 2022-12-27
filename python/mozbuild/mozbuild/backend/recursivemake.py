@@ -24,6 +24,11 @@ from mozpack.manifests import (
 )
 import mozpack.path as mozpath
 
+from mozbuild.frontend.context import (
+    Path,
+    SourcePath,
+    ObjDirPath,
+)
 from .common import CommonBackend
 from ..frontend.data import (
     AndroidAssetsDirs,
@@ -42,7 +47,6 @@ from ..frontend.data import (
     ExternalLibrary,
     FinalTargetFiles,
     GeneratedFile,
-    GeneratedInclude,
     GeneratedSources,
     HostDefines,
     HostLibrary,
@@ -556,9 +560,6 @@ class RecursiveMakeBackend(CommonBackend):
         elif isinstance(obj, LocalInclude):
             self._process_local_include(obj.path, backend_file)
 
-        elif isinstance(obj, GeneratedInclude):
-            self._process_generated_include(obj.path, backend_file)
-
         elif isinstance(obj, PerSourceFlag):
             self._process_per_source_flag(obj, backend_file)
 
@@ -605,19 +606,23 @@ class RecursiveMakeBackend(CommonBackend):
                 backend_file.write('DIST_FILES += %s\n' % f)
 
         elif isinstance(obj, AndroidResDirs):
+            # Order matters.
             for p in obj.paths:
                 backend_file.write('ANDROID_RES_DIRS += %s\n' % p.full_path)
 
         elif isinstance(obj, AndroidAssetsDirs):
+            # Order matters.
             for p in obj.paths:
                 backend_file.write('ANDROID_ASSETS_DIRS += %s\n' % p.full_path)
 
         elif isinstance(obj, AndroidExtraResDirs):
-            for p in obj.paths:
-                backend_file.write('ANDROID_EXTRA_RES_DIRS += %s\n' % p.full_path)
+            # Order does not matter.
+            for p in sorted(set(p.full_path for p in obj.paths)):
+                backend_file.write('ANDROID_EXTRA_RES_DIRS += %s\n' % p)
 
         elif isinstance(obj, AndroidExtraPackages):
-            for p in obj.packages:
+            # Order does not matter.
+            for p in sorted(set(obj.packages)):
                 backend_file.write('ANDROID_EXTRA_PACKAGES += %s\n' % p)
 
         else:
@@ -867,6 +872,21 @@ class RecursiveMakeBackend(CommonBackend):
         self._write_manifests('install', self._install_manifests)
 
         ensureParentDir(mozpath.join(self.environment.topobjdir, 'dist', 'foo'))
+
+    def _pretty_path(self, path, backend_file):
+        assert isinstance(path, Path)
+        if isinstance(path, SourcePath):
+            if path.full_path.startswith(backend_file.srcdir):
+                return '$(srcdir)' + path.full_path[len(backend_file.srcdir):]
+            if path.full_path.startswith(self.environment.topsrcdir):
+                return '$(topsrcdir)' + path.full_path[len(self.environment.topsrcdir):]
+        elif isinstance(path, ObjDirPath):
+            if path.full_path.startswith(backend_file.objdir):
+                return path.full_path[len(backend_file.objdir) + 1:]
+            if path.full_path.startswith(self.environment.topobjdir):
+                return '$(DEPTH)' + path.full_path[len(self.environment.topobjdir):]
+
+        return path.full_path
 
     def _process_unified_sources(self, obj):
         backend_file = self._get_backend_file_for(obj)
@@ -1219,18 +1239,11 @@ INSTALL_TARGETS += %(prefix)s
             self.backend_input_files |= obj.manifest.manifests
 
     def _process_local_include(self, local_include, backend_file):
-        if local_include.startswith('/'):
-            path = '$(topsrcdir)'
+        path = self._pretty_path(local_include, backend_file)
+        if ' ' in path:
+            backend_file.write('LOCAL_INCLUDES += -I\'%s\'\n' % path)
         else:
-            path = '$(srcdir)/'
-        backend_file.write('LOCAL_INCLUDES += -I%s%s\n' % (path, local_include))
-
-    def _process_generated_include(self, generated_include, backend_file):
-        if generated_include.startswith('/'):
-            path = self.environment.topobjdir.replace('\\', '/')
-        else:
-            path = ''
-        backend_file.write('LOCAL_INCLUDES += -I%s%s\n' % (path, generated_include))
+            backend_file.write('LOCAL_INCLUDES += -I%s\n' % path)
 
     def _process_per_source_flag(self, per_source_flag, backend_file):
         for flag in per_source_flag.flags:
@@ -1248,7 +1261,7 @@ INSTALL_TARGETS += %(prefix)s
                 (target, ' '.join(mozpath.join('generated', f) for f in jar.generated_sources)))
         if jar.extra_jars:
             backend_file.write('%s_EXTRA_JARS := %s\n' %
-                (target, ' '.join(jar.extra_jars)))
+                (target, ' '.join(sorted(set(jar.extra_jars)))))
         if jar.javac_flags:
             backend_file.write('%s_JAVAC_FLAGS := %s\n' %
                 (target, ' '.join(jar.javac_flags)))
@@ -1497,7 +1510,7 @@ INSTALL_TARGETS += %(prefix)s
                 # which would modify content in the source directory.
                 '$(RM) $@',
                 '$(call py_action,preprocessor,$(DEFINES) $(ACDEFINES) '
-                    '$(XULPPFLAGS) $< -o $@)'
+                    '$(MOZ_DEBUG_DEFINES) $< -o $@)'
             ])
 
         self._add_unified_build_rules(mk,

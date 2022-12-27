@@ -168,7 +168,7 @@ public:
     NS_DECL_NSIWEBBROWSERPERSISTRESOURCEVISITOR
     NS_DECL_ISUPPORTS
 private:
-    nsRefPtr<nsWebBrowserPersist> mParent;
+    RefPtr<nsWebBrowserPersist> mParent;
     nsCOMPtr<nsIURI> mFile;
     nsCOMPtr<nsIFile> mDataPath;
 
@@ -193,7 +193,7 @@ public:
     NS_DECL_NSIWEBBROWSERPERSISTWRITECOMPLETION
     NS_DECL_ISUPPORTS
 private:
-    nsRefPtr<nsWebBrowserPersist> mParent;
+    RefPtr<nsWebBrowserPersist> mParent;
     nsCOMPtr<nsIURI> mFile;
     nsCOMPtr<nsIFile> mLocalFile;
 
@@ -653,7 +653,7 @@ nsWebBrowserPersist::SerializeNextFile()
                 return;
             }
         }
-        nsRefPtr<FlatURIMap> flatMap = new FlatURIMap(targetBaseSpec);
+        RefPtr<FlatURIMap> flatMap = new FlatURIMap(targetBaseSpec);
         mURIMap.EnumerateRead(EnumCopyURIsToFlatMap, flatMap);
         mFlatURIMap = flatMap.forget();
     }
@@ -685,7 +685,7 @@ nsWebBrowserPersist::SerializeNextFile()
         return;
     }
 
-    nsRefPtr<OnWrite> finish = new OnWrite(this, docData->mFile, localFile);
+    RefPtr<OnWrite> finish = new OnWrite(this, docData->mFile, localFile);
     rv = docData->mDocument->WriteContent(outputStream,
                                           mFlatURIMap,
                                           NS_ConvertUTF16toUTF8(mContentType),

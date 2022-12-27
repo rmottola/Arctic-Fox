@@ -126,4 +126,3 @@ function testThrow(pattern, input, binding) {
   )(input);
 }
 testDeclaration(testThrow);
-

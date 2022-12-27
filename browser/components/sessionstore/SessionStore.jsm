@@ -147,7 +147,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gScreenManager",
 XPCOMUtils.defineLazyServiceGetter(this, "Telemetry",
   "@mozilla.org/base/telemetry;1", "nsITelemetry");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/devtools/shared/Console.jsm");
+  "resource://gre/modules/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
   "resource:///modules/RecentWindow.jsm");
 
@@ -160,7 +160,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
 XPCOMUtils.defineLazyModuleGetter(this, "RunState",
   "resource:///modules/sessionstore/RunState.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ScratchpadManager",
-  "resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm");
+  "resource://devtools/client/scratchpad/scratchpad-manager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionSaver",
   "resource:///modules/sessionstore/SessionSaver.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionCookies",
@@ -2756,7 +2756,7 @@ var SessionStoreInternal = {
       global: this._globalState.getState()
     };
 
-    if (Cu.isModuleLoaded("resource:///modules/devtools/scratchpad-manager.jsm")) {
+    if (Cu.isModuleLoaded("resource://devtools/client/scratchpad/scratchpad-manager.jsm")) {
       // get open Scratchpad window states too
       let scratchpads = ScratchpadManager.getSessionState();
       if (scratchpads && scratchpads.length) {
@@ -3161,8 +3161,8 @@ var SessionStoreInternal = {
     // In case we didn't collect/receive data for any tabs yet we'll have to
     // fill the array with at least empty tabData objects until |_tPos| or
     // we'll end up with |null| entries.
-    for (let tab of Array.slice(tabbrowser.tabs, 0, tab._tPos)) {
-      let emptyState = {entries: [], lastAccessed: tab.lastAccessed};
+    for (let otherTab of Array.slice(tabbrowser.tabs, 0, tab._tPos)) {
+      let emptyState = {entries: [], lastAccessed: otherTab.lastAccessed};
       this._windows[window.__SSi].tabs.push(emptyState);
     }
 

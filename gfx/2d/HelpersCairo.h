@@ -147,13 +147,13 @@ GfxFormatToCairoFormat(SurfaceFormat format)
 {
   switch (format)
   {
-    case SurfaceFormat::B8G8R8A8:
+    case SurfaceFormat::A8R8G8B8_UINT32:
       return CAIRO_FORMAT_ARGB32;
-    case SurfaceFormat::B8G8R8X8:
+    case SurfaceFormat::X8R8G8B8_UINT32:
       return CAIRO_FORMAT_RGB24;
     case SurfaceFormat::A8:
       return CAIRO_FORMAT_A8;
-    case SurfaceFormat::R5G6B5:
+    case SurfaceFormat::R5G6B5_UINT16:
       return CAIRO_FORMAT_RGB16_565;
     default:
       gfxCriticalError() << "Unknown image format " << (int)format;
@@ -166,10 +166,10 @@ GfxFormatToCairoContent(SurfaceFormat format)
 {
   switch (format)
   {
-    case SurfaceFormat::B8G8R8A8:
+    case SurfaceFormat::A8R8G8B8_UINT32:
       return CAIRO_CONTENT_COLOR_ALPHA;
-    case SurfaceFormat::B8G8R8X8:
-    case SurfaceFormat::R5G6B5:  //fall through
+    case SurfaceFormat::X8R8G8B8_UINT32:
+    case SurfaceFormat::R5G6B5_UINT16:  //fall through
       return CAIRO_CONTENT_COLOR;
     case SurfaceFormat::A8:
       return CAIRO_CONTENT_ALPHA;
@@ -219,10 +219,10 @@ CairoContentToGfxFormat(cairo_content_t content)
   switch (content)
   {
     case CAIRO_CONTENT_COLOR_ALPHA:
-      return SurfaceFormat::B8G8R8A8;
+      return SurfaceFormat::A8R8G8B8_UINT32;
     case CAIRO_CONTENT_COLOR:
       // BEWARE! format may be 565
-      return SurfaceFormat::B8G8R8X8;
+      return SurfaceFormat::X8R8G8B8_UINT32;
     case CAIRO_CONTENT_ALPHA:
       return SurfaceFormat::A8;
   }
@@ -235,13 +235,13 @@ CairoFormatToGfxFormat(cairo_format_t format)
 {
   switch (format) {
     case CAIRO_FORMAT_ARGB32:
-      return SurfaceFormat::B8G8R8A8;
+      return SurfaceFormat::A8R8G8B8_UINT32;
     case CAIRO_FORMAT_RGB24:
-      return SurfaceFormat::B8G8R8X8;
+      return SurfaceFormat::X8R8G8B8_UINT32;
     case CAIRO_FORMAT_A8:
       return SurfaceFormat::A8;
     case CAIRO_FORMAT_RGB16_565:
-      return SurfaceFormat::R5G6B5;
+      return SurfaceFormat::R5G6B5_UINT16;
     default:
       gfxCriticalError() << "Unknown cairo format " << format;
       return SurfaceFormat::UNKNOWN;

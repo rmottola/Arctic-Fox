@@ -5,6 +5,7 @@
 
 #include "OfflineCacheUpdateParent.h"
 
+#include "BackgroundUtils.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -77,11 +78,12 @@ OfflineCacheUpdateParent::ActorDestroy(ActorDestroyReason why)
 nsresult
 OfflineCacheUpdateParent::Schedule(const URIParams& aManifestURI,
                                    const URIParams& aDocumentURI,
+                                   const PrincipalInfo& aLoadingPrincipalInfo,
                                    const bool& stickDocument)
 {
     LOG(("OfflineCacheUpdateParent::RecvSchedule [%p]", this));
 
-    nsRefPtr<nsOfflineCacheUpdate> update;
+    RefPtr<nsOfflineCacheUpdate> update;
     nsCOMPtr<nsIURI> manifestURI = DeserializeURI(aManifestURI);
     if (!manifestURI)
         return NS_ERROR_FAILURE;
@@ -119,9 +121,13 @@ OfflineCacheUpdateParent::Schedule(const URIParams& aManifestURI,
     if (!update) {
         update = new nsOfflineCacheUpdate();
 
+        nsCOMPtr<nsIPrincipal> loadingPrincipal =
+          PrincipalInfoToPrincipal(aLoadingPrincipalInfo, &rv);
+        NS_ENSURE_SUCCESS(rv, rv);
+
         // Leave aDocument argument null. Only glues and children keep 
         // document instances.
-        rv = update->Init(manifestURI, documentURI, nullptr, nullptr,
+        rv = update->Init(manifestURI, documentURI, loadingPrincipal, nullptr, nullptr,
                           mOriginAttributes.mAppId, mOriginAttributes.mInBrowser);
         NS_ENSURE_SUCCESS(rv, rv);
 
@@ -150,7 +156,7 @@ OfflineCacheUpdateParent::UpdateStateChanged(nsIOfflineCacheUpdate *aUpdate, uin
 
     uint64_t byteProgress;
     aUpdate->GetByteProgress(&byteProgress);
-    unused << SendNotifyStateEvent(state, byteProgress);
+    Unused << SendNotifyStateEvent(state, byteProgress);
 
     if (state == nsIOfflineCacheUpdateObserver::STATE_FINISHED) {
         // Tell the child the particulars after the update has finished.
@@ -161,7 +167,7 @@ OfflineCacheUpdateParent::UpdateStateChanged(nsIOfflineCacheUpdate *aUpdate, uin
         bool succeeded;
         aUpdate->GetSucceeded(&succeeded);
 
-        unused << SendFinish(succeeded, isUpgrade);
+        Unused << SendFinish(succeeded, isUpgrade);
     }
 
     return NS_OK;
@@ -180,7 +186,7 @@ OfflineCacheUpdateParent::ApplicationCacheAvailable(nsIApplicationCache *aApplic
     nsCString cacheGroupId;
     aApplicationCache->GetGroupID(cacheGroupId);
 
-    unused << SendAssociateDocuments(cacheGroupId, cacheClientId);
+    Unused << SendAssociateDocuments(cacheGroupId, cacheClientId);
     return NS_OK;
 }
 

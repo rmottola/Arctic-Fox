@@ -150,11 +150,11 @@ public:
     auto event = MakeUnique<WidgetTouchEvent>(true, aMessage, nullptr);
     int32_t identifier = 0;
     LayoutDeviceIntPoint point(aX, aY);
-    nsIntPoint radius(19, 19);
+    LayoutDeviceIntPoint radius(19, 19);
     float rotationAngle = 0;
     float force = 1;
 
-    nsRefPtr<dom::Touch> touch(
+    RefPtr<dom::Touch> touch(
       new dom::Touch(identifier, point, radius, rotationAngle, force));
     event->touches.AppendElement(touch);
 
@@ -234,7 +234,7 @@ public:
     ReleaseEventCreator aReleaseEventCreator);
 
   // Member variables
-  nsRefPtr<MockAccessibleCaretEventHub> mHub{new MockAccessibleCaretEventHub()};
+  RefPtr<MockAccessibleCaretEventHub> mHub{new MockAccessibleCaretEventHub()};
 
 }; // class AccessibleCaretEventHubTester
 

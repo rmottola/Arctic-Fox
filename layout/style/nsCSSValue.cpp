@@ -23,6 +23,7 @@
 #include "nsPresContext.h"
 #include "nsStyleUtil.h"
 #include "nsDeviceContext.h"
+#include "nsStyleSet.h"
 
 using namespace mozilla;
 
@@ -739,7 +740,7 @@ bool nsCSSValue::IsNonTransparentColor() const
 nsCSSValue::Array*
 nsCSSValue::InitFunction(nsCSSKeyword aFunctionId, uint32_t aNumArgs)
 {
-  nsRefPtr<nsCSSValue::Array> func = Array::Create(aNumArgs + 1);
+  RefPtr<nsCSSValue::Array> func = Array::Create(aNumArgs + 1);
   func->Item(0).SetIntValue(aFunctionId, eCSSUnit_Enumerated);
   SetArrayValue(func, eCSSUnit_Function);
   return func;
@@ -765,7 +766,7 @@ nsCSSValue::EqualsFunction(nsCSSKeyword aFunctionId) const
 already_AddRefed<nsStringBuffer>
 nsCSSValue::BufferFromString(const nsString& aValue)
 {
-  nsRefPtr<nsStringBuffer> buffer = nsStringBuffer::FromString(aValue);
+  RefPtr<nsStringBuffer> buffer = nsStringBuffer::FromString(aValue);
   if (buffer) {
     return buffer.forget();
   }
@@ -1006,6 +1007,28 @@ nsCSSValue::AppendInsetToString(nsCSSProperty aProperty, nsAString& aResult,
   } else {
     MOZ_ASSERT(array->Item(5).GetUnit() == eCSSUnit_Null,
                "unexpected value");
+  }
+}
+
+/* static */ void
+nsCSSValue::AppendAlignJustifyValueToString(int32_t aValue, nsAString& aResult)
+{
+  auto legacy = aValue & NS_STYLE_ALIGN_LEGACY;
+  if (legacy) {
+    aValue &= ~legacy;
+    aResult.AppendLiteral("legacy ");
+  }
+  auto overflowPos = aValue & (NS_STYLE_ALIGN_SAFE | NS_STYLE_ALIGN_UNSAFE);
+  aValue &= ~overflowPos;
+  MOZ_ASSERT(!(aValue & NS_STYLE_ALIGN_FLAG_BITS),
+             "unknown bits in align/justify value");
+  const auto& kwtable(nsCSSProps::kAlignAllKeywords);
+  AppendASCIItoUTF16(nsCSSProps::ValueToKeyword(aValue, kwtable), aResult);
+  if (MOZ_UNLIKELY(overflowPos != 0)) {
+    MOZ_ASSERT(legacy == 0, "'legacy' together with <overflow-position>");
+    aResult.Append(' ');
+    AppendASCIItoUTF16(nsCSSProps::ValueToKeyword(overflowPos, kwtable),
+                       aResult);
   }
 }
 
@@ -1305,6 +1328,11 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
                                          NS_STYLE_CONTAIN_STRICT,
                                          NS_STYLE_CONTAIN_PAINT,
                                          aResult);
+      break;
+
+    case eCSSProperty_justify_items:
+    case eCSSProperty_justify_self:
+      AppendAlignJustifyValueToString(intValue, aResult);
       break;
 
     default:
@@ -2343,7 +2371,6 @@ css::URLValue::URLValue(nsIURI* aURI, nsStringBuffer* aString,
     mURIResolved(true)
 {
   MOZ_ASSERT(aOriginPrincipal, "Must have an origin principal");
-  mString->AddRef();
 }
 
 css::URLValue::URLValue(nsStringBuffer* aString, nsIURI* aBaseURI,
@@ -2355,12 +2382,6 @@ css::URLValue::URLValue(nsStringBuffer* aString, nsIURI* aBaseURI,
     mURIResolved(false)
 {
   MOZ_ASSERT(aOriginPrincipal, "Must have an origin principal");
-  mString->AddRef();
-}
-
-css::URLValue::~URLValue()
-{
-  mString->Release();
 }
 
 bool
@@ -2451,7 +2472,7 @@ css::ImageValue::ImageValue(nsIURI* aURI, nsStringBuffer* aString,
 }
 
 static PLDHashOperator
-ClearRequestHashtable(nsISupports* aKey, nsRefPtr<imgRequestProxy>& aValue,
+ClearRequestHashtable(nsISupports* aKey, RefPtr<imgRequestProxy>& aValue,
                       void* aClosure)
 {
   mozilla::css::ImageValue* image =
@@ -2544,6 +2565,7 @@ nsCSSValueGradient::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) con
 nsCSSValueTokenStream::nsCSSValueTokenStream()
   : mPropertyID(eCSSProperty_UNKNOWN)
   , mShorthandPropertyID(eCSSProperty_UNKNOWN)
+  , mLevel(SheetType::Count)
 {
   MOZ_COUNT_CTOR(nsCSSValueTokenStream);
 }

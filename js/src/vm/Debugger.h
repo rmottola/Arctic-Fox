@@ -42,7 +42,7 @@ class Breakpoint;
 class DebuggerMemory;
 
 typedef HashSet<ReadBarrieredGlobalObject,
-                DefaultHasher<ReadBarrieredGlobalObject>,
+                MovableCellHasher<ReadBarrieredGlobalObject>,
                 SystemAllocPolicy> WeakGlobalObjectSet;
 
 /*
@@ -70,10 +70,11 @@ typedef HashSet<ReadBarrieredGlobalObject,
  * transitions.
  */
 template <class UnbarrieredKey, bool InvisibleKeysOk=false>
-class DebuggerWeakMap : private WeakMap<PreBarriered<UnbarrieredKey>, RelocatablePtrObject>
+class DebuggerWeakMap : private WeakMap<RelocatablePtr<UnbarrieredKey>, RelocatablePtrObject,
+                                        MovableCellHasher<RelocatablePtr<UnbarrieredKey>>>
 {
   private:
-    typedef PreBarriered<UnbarrieredKey> Key;
+    typedef RelocatablePtr<UnbarrieredKey> Key;
     typedef RelocatablePtrObject Value;
 
     typedef HashMap<JS::Zone*,
@@ -85,23 +86,13 @@ class DebuggerWeakMap : private WeakMap<PreBarriered<UnbarrieredKey>, Relocatabl
     JSCompartment* compartment;
 
   public:
-    typedef WeakMap<Key, Value, DefaultHasher<Key> > Base;
+    typedef WeakMap<Key, Value, MovableCellHasher<Key>> Base;
 
     explicit DebuggerWeakMap(JSContext* cx)
         : Base(cx),
           zoneCounts(cx->runtime()),
           compartment(cx->compartment())
     { }
-
-    ~DebuggerWeakMap() {
-        // If our owning Debugger fails construction after already initializing
-        // this DebuggerWeakMap, we need to make sure that we aren't in the
-        // compartment's weak map list anymore. Normally, when we are destroyed
-        // because the GC finds us unreachable, the GC takes care of removing us
-        // from this list.
-        if (WeakMapBase::isInList())
-            WeakMapBase::removeWeakMapFromList(this);
-    }
 
   public:
     /* Expose those parts of HashMap public interface that are used by Debugger methods. */
@@ -166,13 +157,9 @@ class DebuggerWeakMap : private WeakMap<PreBarriered<UnbarrieredKey>, Relocatabl
     /* Override sweep method to also update our edge cache. */
     void sweep() {
         for (Enum e(*static_cast<Base*>(this)); !e.empty(); e.popFront()) {
-            Key k(e.front().key());
-            if (gc::IsAboutToBeFinalized(&k)) {
+            if (gc::IsAboutToBeFinalized(&e.front().mutableKey())) {
+                decZoneCount(e.front().key()->zone());
                 e.removeFront();
-                decZoneCount(k->zone());
-            } else {
-                // markKeys() should have done any necessary relocation.
-                MOZ_ASSERT(k == e.front().key());
             }
         }
         Base::assertEntriesNotAboutToBeFinalized();
@@ -210,6 +197,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     friend class DebuggerMemory;
     friend class SavedStacks;
     friend class mozilla::LinkedListElement<Debugger>;
+    friend class mozilla::LinkedList<Debugger>;
     friend bool (::JS_DefineDebuggerObject)(JSContext* cx, JS::HandleObject obj);
     friend bool (::JS::dbg::IsDebugger)(JSObject&);
     friend bool (::JS::dbg::GetDebuggeeGlobals)(JSContext*, JSObject&, AutoObjectVector&);
@@ -268,7 +256,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     // Return true if the given compartment is a debuggee of this debugger,
     // false otherwise.
-    bool isDebuggee(const JSCompartment* compartment) const;
+    bool isDebuggeeUnbarriered(const JSCompartment* compartment) const;
 
     // Return true if this Debugger observed a debuggee that participated in the
     // GC identified by the given GC number. Return false otherwise.
@@ -396,7 +384,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * debuggee's compartment. The given debuggee global must be observed by at
      * least one Debugger that is enabled and tracking allocations.
      */
-    static bool addAllocationsTracking(JSContext* cx, GlobalObject& debuggee);
+    static bool addAllocationsTracking(JSContext* cx, Handle<GlobalObject*> debuggee);
 
     /*
      * Remove allocations tracking for objects allocated within the given
@@ -952,14 +940,14 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 };
 
 template<>
-struct DefaultTracer<Debugger::TenurePromotionsLogEntry> {
+struct DefaultGCPolicy<Debugger::TenurePromotionsLogEntry> {
     static void trace(JSTracer* trc, Debugger::TenurePromotionsLogEntry* e, const char*) {
         Debugger::TenurePromotionsLogEntry::trace(e, trc);
     }
 };
 
 template<>
-struct DefaultTracer<Debugger::AllocationsLogEntry> {
+struct DefaultGCPolicy<Debugger::AllocationsLogEntry> {
     static void trace(JSTracer* trc, Debugger::AllocationsLogEntry* e, const char*) {
         Debugger::AllocationsLogEntry::trace(e, trc);
     }

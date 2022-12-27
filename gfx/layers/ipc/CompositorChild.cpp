@@ -29,7 +29,7 @@
 
 using mozilla::layers::LayerTransactionChild;
 using mozilla::dom::TabChildBase;
-using mozilla::unused;
+using mozilla::Unused;
 
 namespace mozilla {
 namespace layers {
@@ -51,8 +51,8 @@ CompositorChild::~CompositorChild()
   }
 }
 
-static void DeferredDestroyCompositor(nsRefPtr<CompositorParent> aCompositorParent,
-                                      nsRefPtr<CompositorChild> aCompositorChild)
+static void DeferredDestroyCompositor(RefPtr<CompositorParent> aCompositorParent,
+                                      RefPtr<CompositorChild> aCompositorChild)
 {
     // Bug 848949 needs to be fixed before
     // we can close the channel properly
@@ -74,7 +74,7 @@ CompositorChild::Destroy()
   // Destroying the layer manager may cause all sorts of things to happen, so
   // let's make sure there is still a reference to keep this alive whatever
   // happens.
-  nsRefPtr<CompositorChild> selfRef = this;
+  RefPtr<CompositorChild> selfRef = this;
 
   SendWillStop();
   // The call just made to SendWillStop can result in IPC from the
@@ -92,11 +92,11 @@ CompositorChild::Destroy()
     mLayerManager = nullptr;
   }
 
-  // start from the end of the array because Destroy() can cause the
-  // LayerTransactionChild to be removed from the array.
-  for (int i = ManagedPLayerTransactionChild().Length() - 1; i >= 0; --i) {
+  nsAutoTArray<PLayerTransactionChild*, 16> transactions;
+  ManagedPLayerTransactionChild(transactions);
+  for (int i = transactions.Length() - 1; i >= 0; --i) {
     RefPtr<LayerTransactionChild> layers =
-      static_cast<LayerTransactionChild*>(ManagedPLayerTransactionChild()[i]);
+      static_cast<LayerTransactionChild*>(transactions[i]);
     layers->Destroy();
   }
 
@@ -126,7 +126,7 @@ CompositorChild::Create(Transport* aTransport, ProcessId aOtherPid)
   // There's only one compositor per child process.
   MOZ_ASSERT(!sCompositor);
 
-  nsRefPtr<CompositorChild> child(new CompositorChild(nullptr));
+  RefPtr<CompositorChild> child(new CompositorChild(nullptr));
   if (!child->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop(), ipc::ChildSide)) {
     NS_RUNTIMEABORT("Couldn't Open() Compositor channel.");
     return nullptr;
@@ -302,8 +302,6 @@ CompositorChild::RecvUpdatePluginConfigurations(const nsIntPoint& aContentOffset
       // Handle invalidation, this can be costly, avoid if it is not needed.
       if (isVisible) {
         // invalidate region (widget origin)
-        gfx::IntRect bounds = aPlugins[pluginsIdx].bounds();
-        gfx::IntRect rect(0, 0, bounds.width, bounds.height);
 #if defined(XP_WIN)
         // Work around for flash's crummy sandbox. See bug 762948. This call
         // digs down into the window hirearchy, invalidating regions on
@@ -320,21 +318,27 @@ CompositorChild::RecvUpdatePluginConfigurations(const nsIntPoint& aContentOffset
   // Any plugins we didn't update need to be hidden, as they are
   // not associated with visible content.
   nsIWidget::UpdateRegisteredPluginWindowVisibility((uintptr_t)parent, visiblePluginIds);
+#if defined(XP_WIN)
+  SendRemotePluginsReady();
+#endif
   return true;
 #endif // !defined(XP_WIN) && !defined(MOZ_WIDGET_GTK)
 }
 
 bool
-CompositorChild::RecvUpdatePluginVisibility(const uintptr_t& aOwnerWidget,
-                                            nsTArray<uintptr_t>&& aVisibleIdList)
+CompositorChild::RecvHideAllPlugins(const uintptr_t& aParentWidget)
 {
 #if !defined(XP_WIN) && !defined(MOZ_WIDGET_GTK)
-  NS_NOTREACHED("CompositorChild::RecvUpdatePluginVisibility calls "
+  NS_NOTREACHED("CompositorChild::RecvHideAllPlugins calls "
                 "unexpected on this platform.");
   return false;
 #else
   MOZ_ASSERT(NS_IsMainThread());
-  nsIWidget::UpdateRegisteredPluginWindowVisibility(aOwnerWidget, aVisibleIdList);
+  nsTArray<uintptr_t> list;
+  nsIWidget::UpdateRegisteredPluginWindowVisibility(aParentWidget, list);
+#if defined(XP_WIN)
+  SendRemotePluginsReady();
+#endif
   return true;
 #endif // !defined(XP_WIN) && !defined(MOZ_WIDGET_GTK)
 }
@@ -346,10 +350,10 @@ CompositorChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTransact
 {
   if (mLayerManager) {
     MOZ_ASSERT(aId == 0);
-    nsRefPtr<ClientLayerManager> m = mLayerManager;
+    RefPtr<ClientLayerManager> m = mLayerManager;
     m->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
   } else if (aId != 0) {
-    nsRefPtr<dom::TabChild> child = dom::TabChild::GetFrom(aId);
+    RefPtr<dom::TabChild> child = dom::TabChild::GetFrom(aId);
     if (child) {
       child->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
     }
@@ -498,7 +502,7 @@ CompositorChild::RecvRemotePaintIsReady()
   // XPCOM gives a soup of compiler errors when trying to do_QueryReference
   // so I'm using static_cast<>
   MOZ_LAYERS_LOG(("[RemoteGfx] CompositorChild received RemotePaintIsReady"));
-  nsRefPtr<nsISupports> iTabChildBase(do_QueryReferent(mWeakTabChild));
+  RefPtr<nsISupports> iTabChildBase(do_QueryReferent(mWeakTabChild));
   if (!iTabChildBase) {
     MOZ_LAYERS_LOG(("[RemoteGfx] Note: TabChild was released before RemotePaintIsReady. "
         "MozAfterRemotePaint will not be sent to listener."));
@@ -507,7 +511,7 @@ CompositorChild::RecvRemotePaintIsReady()
   TabChildBase* tabChildBase = static_cast<TabChildBase*>(iTabChildBase.get());
   TabChild* tabChild = static_cast<TabChild*>(tabChildBase);
   MOZ_ASSERT(tabChild);
-  unused << tabChild->SendRemotePaintIsReady();
+  Unused << tabChild->SendRemotePaintIsReady();
   mWeakTabChild = nullptr;
   return true;
 }
@@ -518,13 +522,13 @@ CompositorChild::RequestNotifyAfterRemotePaint(TabChild* aTabChild)
 {
   MOZ_ASSERT(aTabChild, "NULL TabChild not allowed in CompositorChild::RequestNotifyAfterRemotePaint");
   mWeakTabChild = do_GetWeakReference( static_cast<dom::TabChildBase*>(aTabChild) );
-  unused << SendRequestNotifyAfterRemotePaint();
+  Unused << SendRequestNotifyAfterRemotePaint();
 }
 
 void
 CompositorChild::CancelNotifyAfterRemotePaint(TabChild* aTabChild)
 {
-  nsRefPtr<nsISupports> iTabChildBase(do_QueryReferent(mWeakTabChild));
+  RefPtr<nsISupports> iTabChildBase(do_QueryReferent(mWeakTabChild));
   if (!iTabChildBase) {
     return;
   }

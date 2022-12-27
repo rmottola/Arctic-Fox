@@ -13,11 +13,9 @@ using namespace mozilla::net;
 NS_IMPL_ISUPPORTS(InterceptedJARChannel, nsIInterceptedChannel)
 
 InterceptedJARChannel::InterceptedJARChannel(nsJARChannel* aChannel,
-                                             nsINetworkInterceptController* aController,
-                                             bool aIsNavigation)
+                                             nsINetworkInterceptController* aController)
 : mController(aController)
 , mChannel(aChannel)
-, mIsNavigation(aIsNavigation)
 {
 }
 
@@ -25,13 +23,6 @@ NS_IMETHODIMP
 InterceptedJARChannel::GetResponseBody(nsIOutputStream** aStream)
 {
   NS_IF_ADDREF(*aStream = mResponseBody);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-InterceptedJARChannel::GetIsNavigation(bool* aIsNavigation)
-{
-  *aIsNavigation = mIsNavigation;
   return NS_OK;
 }
 
@@ -87,10 +78,16 @@ InterceptedJARChannel::SynthesizeHeader(const nsACString& aName,
 }
 
 NS_IMETHODIMP
-InterceptedJARChannel::FinishSynthesizedResponse()
+InterceptedJARChannel::FinishSynthesizedResponse(const nsACString& aFinalURLSpec)
 {
   if (NS_WARN_IF(!mChannel)) {
     return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  if (!aFinalURLSpec.IsEmpty()) {
+    // We don't support rewriting responses for JAR channels where the principal
+    // needs to be modified.
+    return NS_ERROR_NOT_IMPLEMENTED;
   }
 
   mChannel->OverrideWithSynthesizedResponse(mSynthesizedInput, mContentType);
@@ -148,4 +145,10 @@ InterceptedJARChannel::NotifyController()
         "Failed to resume intercepted network request");
   }
   mController = nullptr;
+}
+
+nsIConsoleReportCollector*
+InterceptedJARChannel::GetConsoleReportCollector() const
+{
+  return nullptr;
 }

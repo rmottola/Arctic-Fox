@@ -18,7 +18,10 @@ namespace jit {
 class MIRGenerator;
 class MIRGraph;
 
-void
+bool
+PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph);
+
+bool
 FoldTests(MIRGraph& graph);
 
 bool

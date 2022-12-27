@@ -466,7 +466,7 @@ WarningOnlyErrorReporter(JSContext* aCx, const char* aMessage, JSErrorReport* aR
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(JSREPORT_IS_WARNING(aRep->flags));
 
-  nsRefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
+  RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
   nsPIDOMWindow* win = xpc::CurrentWindowOrNull(aCx);
   xpcReport->Init(aRep, aMessage, nsContentUtils::IsCallerChrome(),
                   win ? win->WindowID() : 0);
@@ -512,7 +512,7 @@ AutoJSAPI::ReportException()
   js::ErrorReport jsReport(cx());
   if (StealException(&exn) && jsReport.init(cx(), exn)) {
     if (mIsMainThread) {
-      nsRefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
+      RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
       nsCOMPtr<nsPIDOMWindow> win = xpc::WindowGlobalOrNull(errorGlobal);
       xpcReport->Init(jsReport.report(), jsReport.message(),
                       nsContentUtils::IsCallerChrome(),
@@ -600,7 +600,8 @@ AutoEntryScript::DocshellEntryMonitor::DocshellEntryMonitor(JSContext* aCx,
 
 void
 AutoEntryScript::DocshellEntryMonitor::Entry(JSContext* aCx, JSFunction* aFunction,
-                                             JSScript* aScript)
+                                             JSScript* aScript, JS::Handle<JS::Value> aAsyncStack,
+                                             JS::Handle<JSString*> aAsyncCause)
 {
   JS::Rooted<JSFunction*> rootedFunction(aCx);
   if (aFunction) {
@@ -645,10 +646,13 @@ AutoEntryScript::DocshellEntryMonitor::Entry(JSContext* aCx, JSFunction* aFuncti
     const char16_t* functionNameChars = functionName.isTwoByte() ?
       functionName.twoByteChars() : nullptr;
 
+    JS::Rooted<JS::Value> asyncCauseValue(aCx, aAsyncCause ? StringValue(aAsyncCause) :
+                                          JS::NullValue());
     docShellForJSRunToCompletion->NotifyJSRunToCompletionStart(mReason,
                                                                functionNameChars,
                                                                filename.BeginReading(),
-                                                               lineNumber);
+                                                               lineNumber, aAsyncStack,
+                                                               asyncCauseValue);
   }
 }
 

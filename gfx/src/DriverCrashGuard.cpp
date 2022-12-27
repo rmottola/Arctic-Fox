@@ -3,9 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "DriverCrashGuard.h"
+#include "gfxEnv.h"
 #include "gfxPrefs.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
 #include "nsServiceManagerUtils.h"
 #include "nsString.h"
 #include "nsXULAppAPI.h"
@@ -52,11 +56,23 @@ DriverCrashGuard::InitializeIfNeeded()
 void
 DriverCrashGuard::Initialize()
 {
+#ifdef NIGHTLY_BUILD
+  // We only use the crash guard on non-nightly channels, since the nightly
+  // channel is for development and having graphics features perma-disabled
+  // is rather annoying.
+  return;
+#endif
+
   // Using DriverCrashGuard off the main thread currently does not work. Under
   // e10s it could conceivably work by dispatching the IPC calls via the main
   // thread. In the parent process this would be harder. For now, we simply
   // exit early instead.
   if (!NS_IsMainThread()) {
+    return;
+  }
+
+  // Check to see if all guards have been disabled through the environment.
+  if (gfxEnv::DisableCrashGuard()) {
     return;
   }
 
@@ -123,6 +139,12 @@ DriverCrashGuard::~DriverCrashGuard()
   } else {
     dom::ContentChild::GetSingleton()->SendEndDriverCrashGuard(uint32_t(mType));
   }
+
+#ifdef MOZ_CRASHREPORTER
+  // Remove the crash report annotation.
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("GraphicsStartupTest"),
+                                     NS_LITERAL_CSTRING(""));
+#endif
 }
 
 bool
@@ -183,6 +205,7 @@ DriverCrashGuard::ActivateGuard()
     // In parent process guards, we use two tombstones to detect crashes: a
     // preferences and a zero-byte file on the filesystem.
     FlushPreferences();
+
     // Create a temporary tombstone/lockfile.
     FILE* fp = nullptr;
     mGuardFile = GetGuardFile();
@@ -401,14 +424,14 @@ void
 D3D11LayersCrashGuard::LogCrashRecovery()
 {
   RecordTelemetry(TelemetryState::RecoveredFromCrash);
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "D3D11 layers just crashed; D3D11 will be disabled.";
+  gfxCriticalNote << "D3D11 layers just crashed; D3D11 will be disabled.";
 }
 
 void
 D3D11LayersCrashGuard::LogFeatureDisabled()
 {
   RecordTelemetry(TelemetryState::FeatureDisabled);
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "D3D11 layers disabled due to a prior crash.";
+  gfxCriticalNote << "D3D11 layers disabled due to a prior crash.";
 }
 
 void
@@ -445,18 +468,30 @@ D3D9VideoCrashGuard::UpdateEnvironment()
 void
 D3D9VideoCrashGuard::LogCrashRecovery()
 {
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "DXVA2D3D9 just crashed; hardware video will be disabled.";
+  gfxCriticalNote << "DXVA2D3D9 just crashed; hardware video will be disabled.";
 }
 
 void
 D3D9VideoCrashGuard::LogFeatureDisabled()
 {
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "DXVA2D3D9 video decoding is disabled due to a previous crash.";
+  gfxCriticalNote << "DXVA2D3D9 video decoding is disabled due to a previous crash.";
 }
 
 GLContextCrashGuard::GLContextCrashGuard(dom::ContentParent* aContentParent)
  : DriverCrashGuard(CrashGuardType::GLContext, aContentParent)
 {
+}
+
+void
+GLContextCrashGuard::Initialize()
+{
+  if (XRE_IsContentProcess()) {
+    // Disable the GL crash guard in content processes, since we're not going
+    // to lose the entire browser and we don't want to hinder WebGL availability.
+    return;
+  }
+
+  DriverCrashGuard::Initialize();
 }
 
 bool
@@ -490,13 +525,13 @@ GLContextCrashGuard::UpdateEnvironment()
 void
 GLContextCrashGuard::LogCrashRecovery()
 {
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "GLContext just crashed and is now disabled.";
+  gfxCriticalNote << "GLContext just crashed and is now disabled.";
 }
 
 void
 GLContextCrashGuard::LogFeatureDisabled()
 {
-  gfxCriticalError(CriticalLog::DefaultOptions(false)) << "GLContext is disabled due to a previous crash.";
+  gfxCriticalNote << "GLContext is disabled due to a previous crash.";
 }
 
 } // namespace gfx

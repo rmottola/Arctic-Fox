@@ -12,7 +12,7 @@
 #include "nsWrapperCache.h"
 #include "js/TypeDecls.h"
 #include "nsPIDOMWindow.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 
 #if defined(XP_WIN) && defined(GetMessage)
 #undef GetMessage
@@ -34,10 +34,10 @@ class BaseMediaMgrError
 protected:
   BaseMediaMgrError(const nsAString& aName,
                     const nsAString& aMessage,
-                    const nsAString& aConstraintName);
+                    const nsAString& aConstraint);
   const nsString mName;
   nsString mMessage;
-  const nsString mConstraintName;
+  const nsString mConstraint;
 };
 
 class MediaMgrError final : public nsISupports,
@@ -46,8 +46,8 @@ class MediaMgrError final : public nsISupports,
 public:
   explicit MediaMgrError(const nsAString& aName,
                          const nsAString& aMessage =  EmptyString(),
-                         const nsAString& aConstraintName =  EmptyString())
-  : BaseMediaMgrError(aName, aMessage, aConstraintName) {}
+                         const nsAString& aConstraint =  EmptyString())
+  : BaseMediaMgrError(aName, aMessage, aConstraint) {}
 
   NS_DECL_THREADSAFE_ISUPPORTS
 
@@ -64,11 +64,11 @@ public:
   MediaStreamError(nsPIDOMWindow* aParent,
                    const nsAString& aName,
                    const nsAString& aMessage = EmptyString(),
-                   const nsAString& aConstraintName =  EmptyString());
+                   const nsAString& aConstraint =  EmptyString());
 
   MediaStreamError(nsPIDOMWindow* aParent,
                    const BaseMediaMgrError& aOther)
-  : BaseMediaMgrError(aOther.mName, aOther.mMessage, aOther.mConstraintName)
+  : BaseMediaMgrError(aOther.mName, aOther.mMessage, aOther.mConstraint)
   , mParent(aParent) {}
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -83,12 +83,12 @@ public:
   }
   void GetName(nsAString& aName) const;
   void GetMessage(nsAString& aMessage) const;
-  void GetConstraintName(nsAString& aConstraintName) const;
+  void GetConstraint(nsAString& aConstraint) const;
 
 private:
   virtual ~MediaStreamError() {}
 
-  nsRefPtr<nsPIDOMWindow> mParent;
+  RefPtr<nsPIDOMWindow> mParent;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(MediaStreamError,

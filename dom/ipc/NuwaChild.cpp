@@ -229,7 +229,7 @@ AddNewIPCProcess(pid_t aPid, NuwaProtoFdInfo* aInfoList, size_t aInfoListSize)
     maps.AppendElement(map);
   }
 
-  nsRefPtr<RunAddNewIPCProcess> runner = new RunAddNewIPCProcess(aPid, maps);
+  RefPtr<RunAddNewIPCProcess> runner = new RunAddNewIPCProcess(aPid, maps);
   NS_DispatchToMainThread(runner);
 }
 
@@ -239,7 +239,7 @@ OnNuwaProcessReady()
   NuwaChild* nuwaChild = NuwaChild::GetSingleton();
   MOZ_ASSERT(nuwaChild);
 
-  mozilla::unused << nuwaChild->SendNotifyReady();
+  mozilla::Unused << nuwaChild->SendNotifyReady();
 }
 
 NS_EXPORT void

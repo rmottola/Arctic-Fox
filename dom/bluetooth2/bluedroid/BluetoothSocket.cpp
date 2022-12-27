@@ -295,7 +295,7 @@ DroidSocketImpl::Accept(int aFd)
   SetFd(aFd);
   mConnectionStatus = SOCKET_IS_CONNECTED;
 
-  nsRefPtr<nsRunnable> r =
+  RefPtr<nsRunnable> r =
     new SocketIOEventRunnable<DroidSocketImpl>(
       this, SocketIOEventRunnable<DroidSocketImpl>::CONNECT_SUCCESS);
   NS_DispatchToMainThread(r);
@@ -439,7 +439,7 @@ DroidSocketImpl::OnSocketCanAcceptWithoutBlocking(int aFd)
    */
 
   RemoveWatchers(READ_WATCHER);
-  nsRefPtr<AcceptRunnable> t = new AcceptRunnable(this, aFd);
+  RefPtr<AcceptRunnable> t = new AcceptRunnable(this, aFd);
   NS_DispatchToMainThread(t);
 }
 
@@ -484,7 +484,7 @@ DroidSocketImpl::OnSocketCanConnectWithoutBlocking(int aFd)
 
   mConnectionStatus = SOCKET_IS_CONNECTED;
 
-  nsRefPtr<nsRunnable> r =
+  RefPtr<nsRunnable> r =
     new SocketIOEventRunnable<DroidSocketImpl>(
       this, SocketIOEventRunnable<DroidSocketImpl>::CONNECT_SUCCESS);
   NS_DispatchToMainThread(r);

@@ -18,6 +18,7 @@
 #include "nsNetUtil.h"
 #include "nsTArray.h"
 #include "prprf.h"
+#include "nsVariant.h"
 
 using namespace mozilla;
 
@@ -301,7 +302,7 @@ nsNavHistory::QueryStringToQueryArray(const nsACString& aQueryString,
   aQueries->Clear();
   *aOptions = nullptr;
 
-  nsRefPtr<nsNavHistoryQueryOptions> options(new nsNavHistoryQueryOptions());
+  RefPtr<nsNavHistoryQueryOptions> options(new nsNavHistoryQueryOptions());
   if (! options)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -1117,13 +1118,11 @@ NS_IMETHODIMP nsNavHistoryQuery::GetTags(nsIVariant **aTags)
 {
   NS_ENSURE_ARG_POINTER(aTags);
 
-  nsresult rv;
-  nsCOMPtr<nsIWritableVariant> out = do_CreateInstance(NS_VARIANT_CONTRACTID,
-                                                       &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
+  RefPtr<nsVariant> out = new nsVariant();
 
   uint32_t arrayLen = mTags.Length();
 
+  nsresult rv;
   if (arrayLen == 0)
     rv = out->SetAsEmptyArray();
   else {
@@ -1517,7 +1516,7 @@ nsNavHistoryQueryOptions::Clone(nsNavHistoryQueryOptions **aResult)
   if (! result)
     return NS_ERROR_OUT_OF_MEMORY;
 
-  nsRefPtr<nsNavHistoryQueryOptions> resultHolder(result);
+  RefPtr<nsNavHistoryQueryOptions> resultHolder(result);
   result->mSort = mSort;
   result->mResultType = mResultType;
   result->mExcludeItems = mExcludeItems;

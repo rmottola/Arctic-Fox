@@ -800,6 +800,7 @@ function testModeCors() {
 }
 
 function testCrossOriginCredentials() {
+  var origin = "http://mochi.test:8888";
   var tests = [
            { pass: 1,
              method: "GET",
@@ -890,6 +891,113 @@ function testCrossOriginCredentials() {
              noCookie: 1,
              withCred: "same-origin",
            },
+           {
+             // Initialize by setting a cookies for same- and cross- origins.
+             pass: 1,
+             hops: [{ server: origin,
+                      setCookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: origin,
+                      allowCred: 1,
+                      setCookie: escape("a=2"),
+                    },
+                    ],
+             withCred: "include",
+           },
+           { pass: 1,
+             method: "GET",
+             hops: [{ server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: origin,
+                      noCookie: 1,
+                    },
+                    ],
+             withCred: "same-origin",
+           },
+           { pass: 1,
+             method: "GET",
+             hops: [{ server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: origin,
+                      allowCred: 1,
+                      cookie: escape("a=2"),
+                    },
+                    ],
+             withCred: "include",
+           },
+           { pass: 1,
+             method: "GET",
+             hops: [{ server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: '*',
+                      noCookie: 1,
+                    },
+                    ],
+             withCred: "same-origin",
+           },
+           { pass: 0,
+             method: "GET",
+             hops: [{ server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: '*',
+                      allowCred: 1,
+                      cookie: escape("a=2"),
+                    },
+                    ],
+             withCred: "include",
+           },
+           // fails because allow-credentials CORS header is not set by server
+           { pass: 0,
+             method: "GET",
+             hops: [{ server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: origin,
+                      cookie: escape("a=1"),
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: origin,
+                      cookie: escape("a=2"),
+                    },
+                    ],
+             withCred: "include",
+           },
+           { pass: 1,
+             method: "GET",
+             hops: [{ server: origin,
+                      noCookie: 1,
+                    },
+                    { server: origin,
+                      noCookie: 1,
+                    },
+                    { server: "http://example.com",
+                      allowOrigin: origin,
+                      noCookie: 1,
+                    },
+                    ],
+             withCred: "omit",
+           },
            ];
 
   var baseURL = "http://example.org" + corsServerPath;
@@ -902,8 +1010,15 @@ function testCrossOriginCredentials() {
   });
 
   function makeRequest(test) {
+    var url;
+    if (test.hops) {
+      url = test.hops[0].server + corsServerPath + "hop=1&hops=" +
+            escape(test.hops.toSource());
+    } else {
+      url = baseURL + "allowOrigin=" + escape(test.origin || origin);
+    }
     req = {
-      url: baseURL + "allowOrigin=" + escape(test.origin || origin),
+      url: url,
       method: test.method,
       headers: test.headers,
       withCred: test.withCred,
@@ -1134,7 +1249,7 @@ function testRedirects() {
                     },
                     ],
            },
-           { pass: 1,
+           { pass: 0,
              method: "POST",
              body: "hi there",
              headers: { "Content-Type": "text/plain",
@@ -1166,7 +1281,7 @@ function testRedirects() {
                     }
                     ],
            },
-           { pass: 1,
+           { pass: 0,
              method: "DELETE",
              hops: [{ server: "http://mochi.test:8888",
                     },
@@ -1277,7 +1392,18 @@ function testRedirects() {
         ok(test.pass, "Expected test to pass for " + test.toSource());
         is(res.status, 200, "wrong status in test for " + test.toSource());
         is(res.statusText, "OK", "wrong status text for " + test.toSource());
-        is((new URL(res.url)).host, (new URL(test.hops[test.hops.length-1].server)).host, "Response URL should be redirected URL");
+        is(res.type, 'cors', 'wrong response type for ' + test.toSource());
+        var reqHost = (new URL(req.url)).host;
+        // If there is a service worker present, the redirections will be
+        // transparent, assuming that the original request is to the current
+        // site and would be intercepted.
+        if (isSWPresent) {
+          if (reqHost === location.host) {
+            is((new URL(res.url)).host, reqHost, "Response URL should be original URL with a SW present");
+          }
+        } else {
+          is((new URL(res.url)).host, (new URL(test.hops[test.hops.length-1].server)).host, "Response URL should be redirected URL");
+        }
         return res.text().then(function(v) {
           is(v, "<res>hello pass</res>\n",
              "wrong responseText in test for " + test.toSource());

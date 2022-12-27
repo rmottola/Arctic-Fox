@@ -187,13 +187,15 @@ public:
   NS_IMETHOD              MoveClient(double aX, double aY) override;
   NS_IMETHOD              ResizeClient(double aWidth, double aHeight, bool aRepaint) override;
   NS_IMETHOD              ResizeClient(double aX, double aY, double aWidth, double aHeight, bool aRepaint) override;
-  NS_IMETHOD              GetBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetClientBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetScreenBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetRestoredBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetNonClientMargins(nsIntMargin &margins) override;
-  NS_IMETHOD              SetNonClientMargins(nsIntMargin &margins) override;
-  virtual nsIntPoint      GetClientOffset() override;
+  NS_IMETHOD              GetBoundsUntyped(nsIntRect &aRect) override;
+  NS_IMETHOD              GetClientBoundsUntyped(nsIntRect &aRect) override;
+  NS_IMETHOD              GetScreenBoundsUntyped(nsIntRect &aRect) override;
+  NS_IMETHOD              GetRestoredBounds(mozilla::LayoutDeviceIntRect &aRect) override;
+  NS_IMETHOD              GetNonClientMargins(
+                            mozilla::LayoutDeviceIntMargin &margins) override;
+  NS_IMETHOD              SetNonClientMargins(
+                            mozilla::LayoutDeviceIntMargin &margins) override;
+  virtual nsIntPoint      GetClientOffsetUntyped() override;
   NS_IMETHOD              EnableDragDrop(bool aEnable) override;
   NS_IMETHOD              GetAttention(int32_t aCycleCount) override;
   virtual bool            HasPendingInputEvent() override;
@@ -224,7 +226,7 @@ public:
   virtual bool            ComputeShouldAccelerate();
   NS_IMETHOD              GetToggledKeyState(uint32_t aKeyCode, bool* aLEDState) override { return NS_ERROR_NOT_IMPLEMENTED; }
   virtual nsIMEUpdatePreference GetIMEUpdatePreference() override { return nsIMEUpdatePreference(); }
-  NS_IMETHOD              OnDefaultButtonLoaded(const nsIntRect &aButtonRect) override { return NS_ERROR_NOT_IMPLEMENTED; }
+  NS_IMETHOD              OnDefaultButtonLoaded(const mozilla::LayoutDeviceIntRect& aButtonRect) override { return NS_ERROR_NOT_IMPLEMENTED; }
   NS_IMETHOD              OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
                                                          double aOriginalDeltaY,
                                                          double& aOverriddenDeltaX,
@@ -308,7 +310,7 @@ public:
   virtual const SizeConstraints& GetSizeConstraints() const override;
   virtual void SetSizeConstraints(const SizeConstraints& aConstraints) override;
 
-  virtual bool CaptureWidgetOnScreen(mozilla::RefPtr<mozilla::gfx::DrawTarget> aDT) override {
+  virtual bool CaptureWidgetOnScreen(RefPtr<mozilla::gfx::DrawTarget> aDT) override {
     return false;
   }
 
@@ -332,7 +334,7 @@ public:
     ~AutoLayerManagerSetup();
   private:
     nsBaseWidget* mWidget;
-    nsRefPtr<BasicLayerManager> mLayerManager;
+    RefPtr<BasicLayerManager> mLayerManager;
   };
   friend class AutoLayerManagerSetup;
 
@@ -473,6 +475,7 @@ protected:
    * Notify the widget that this window is being used with OMTC.
    */
   virtual void WindowUsesOMTC() {}
+  virtual void RegisterTouchWindow() {}
 
   nsIDocument* GetDocument() const;
 
@@ -494,21 +497,21 @@ protected:
   nsIWidgetListener* mWidgetListener;
   nsIWidgetListener* mAttachedWidgetListener;
   nsIWidgetListener* mPreviouslyAttachedWidgetListener;
-  nsRefPtr<LayerManager> mLayerManager;
-  nsRefPtr<CompositorChild> mCompositorChild;
-  nsRefPtr<CompositorParent> mCompositorParent;
-  nsRefPtr<mozilla::CompositorVsyncDispatcher> mCompositorVsyncDispatcher;
-  nsRefPtr<APZCTreeManager> mAPZC;
-  nsRefPtr<APZEventState> mAPZEventState;
+  RefPtr<LayerManager> mLayerManager;
+  RefPtr<CompositorChild> mCompositorChild;
+  RefPtr<CompositorParent> mCompositorParent;
+  RefPtr<mozilla::CompositorVsyncDispatcher> mCompositorVsyncDispatcher;
+  RefPtr<APZCTreeManager> mAPZC;
+  RefPtr<APZEventState> mAPZEventState;
   SetAllowedTouchBehaviorCallback mSetAllowedTouchBehaviorCallback;
-  nsRefPtr<WidgetShutdownObserver> mShutdownObserver;
-  nsRefPtr<TextEventDispatcher> mTextEventDispatcher;
+  RefPtr<WidgetShutdownObserver> mShutdownObserver;
+  RefPtr<TextEventDispatcher> mTextEventDispatcher;
   nsCursor          mCursor;
   nsBorderStyle     mBorderStyle;
   nsIntRect         mBounds;
   nsIntRect*        mOriginalBounds;
   // When this pointer is null, the widget is not clipped
-  nsAutoArrayPtr<nsIntRect> mClipRects;
+  mozilla::UniquePtr<nsIntRect[]> mClipRects;
   uint32_t          mClipRectCount;
   nsSizeMode        mSizeMode;
   nsPopupLevel      mPopupLevel;

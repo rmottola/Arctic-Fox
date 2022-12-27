@@ -24,7 +24,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "DownloadsCommon",
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
                                   "resource://gre/modules/TelemetryStopwatch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/devtools/Console.jsm");
+                                  "resource://gre/modules/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "setTimeout",
@@ -446,8 +446,8 @@ Sanitizer.prototype = {
 
         let count = 0;
         let countDone = {
-          handleResult : function(aResult) count = aResult,
-          handleError : function(aError) Components.utils.reportError(aError),
+          handleResult : aResult => count = aResult,
+          handleError : aError => Components.utils.reportError(aError),
           handleCompletion :
             function(aReason) { aCallback("formdata", aReason == 0 && count > 0, aArg); }
         };
@@ -575,28 +575,17 @@ Sanitizer.prototype = {
     openWindows: {
       privateStateForNewWindow: "non-private",
       _canCloseWindow: function(aWindow) {
-        // Bug 967873 - Proxy nsDocumentViewer::PermitUnload to the child process
-        if (!aWindow.gMultiProcessBrowser) {
-          // Cargo-culted out of browser.js' WindowIsClosing because we don't care
-          // about TabView or the regular 'warn me before closing windows with N tabs'
-          // stuff here, and more importantly, we want to set aCallerClosesWindow to true
-          // when calling into permitUnload:
-          for (let browser of aWindow.gBrowser.browsers) {
-            let ds = browser.docShell;
-            // 'true' here means we will be closing the window soon, so please don't dispatch
-            // another onbeforeunload event when we do so. If unload is *not* permitted somewhere,
-            // we will reset the flag that this triggers everywhere so that we don't interfere
-            // with the browser after all:
-            if (ds.contentViewer && !ds.contentViewer.permitUnload(true)) {
-              return false;
-            }
-          }
+        if (aWindow.CanCloseWindow()) {
+          // We already showed PermitUnload for the window, so let's
+          // make sure we don't do it again when we actually close the
+          // window.
+          aWindow.skipNextCanClose = true;
+          return true;
         }
-        return true;
       },
       _resetAllWindowClosures: function(aWindowList) {
         for (let win of aWindowList) {
-          win.getInterface(Ci.nsIDocShell).contentViewer.resetCloseWindow();
+          win.skipNextCanClose = false;
         }
       },
       clear: Task.async(function*() {

@@ -32,6 +32,7 @@
 #include "nsIHTMLDocument.h"
 #include "nsContentUtils.h"
 #include "nsLayoutUtils.h"
+#include "nsBidiPresUtils.h"
 #include "nsBidiUtils.h"
 #include "mozilla/ContentEvents.h"
 #include "mozilla/EventDispatcher.h"
@@ -44,6 +45,7 @@
 #include "nsSMILKeySpline.h"
 #include "nsSubDocumentFrame.h"
 #include "nsSVGOuterSVGFrame.h"
+#include "nsIObjectLoadingContent.h"
 #include "mozilla/Attributes.h"
 #include "ScrollbarActivity.h"
 #include "nsRefreshDriver.h"
@@ -56,8 +58,10 @@
 #include "gfxPrefs.h"
 #include "AsyncScrollBase.h"
 #include "UnitTransforms.h"
+#include "nsPluginFrame.h"
 #include <mozilla/layers/AxisPhysicsModel.h>
 #include <mozilla/layers/AxisPhysicsMSDModel.h>
+#include "mozilla/unused.h"
 #include <algorithm>
 #include <cstdlib> // for std::abs(int/long)
 #include <cmath> // for std::abs(float/double)
@@ -1842,7 +1846,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mUpdateScrollbarAttributes(false)
   , mHasBeenScrolledRecently(false)
   , mCollapsedResizer(false)
-  , mShouldBuildScrollableLayer(false)
+  , mWillBuildScrollableLayer(false)
   , mIsScrollableLayerInRootContainer(false)
   , mHasBeenScrolled(false)
   , mIsResolutionSet(false)
@@ -1851,6 +1855,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mTransformingByAPZ(false)
   , mZoomableByAPZ(false)
   , mVelocityQueue(aOuter->PresContext())
+  , mAsyncScrollEvent(END_DOM)
 {
   if (LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars) != 0) {
     mScrollbarActivity = new ScrollbarActivity(do_QueryFrame(aOuter));
@@ -1957,6 +1962,8 @@ ScrollFrameHelper::AsyncScrollCallback(ScrollFrameHelper* aInstance,
 void
 ScrollFrameHelper::CompleteAsyncScroll(const nsRect &aRange, nsIAtom* aOrigin)
 {
+  NotifyPluginFrames(END_DOM);
+
   // Apply desired destination range since this is the last step of scrolling.
   mAsyncSmoothMSDScroll = nullptr;
   mAsyncScroll = nullptr;
@@ -1968,6 +1975,56 @@ ScrollFrameHelper::CompleteAsyncScroll(const nsRect &aRange, nsIAtom* aOrigin)
   // We are done scrolling, set our destination to wherever we actually ended
   // up scrolling to.
   mDestination = GetScrollPosition();
+}
+
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+static void
+NotifyPluginFramesCallback(nsISupports* aSupports, void* aFlag)
+{
+  nsCOMPtr<nsIContent> content = do_QueryInterface(aSupports);
+  if (content) {
+    nsIFrame *frame = content->GetPrimaryFrame();
+    if (frame) {
+      nsPluginFrame* plugin = do_QueryFrame(frame);
+      if (plugin) {
+        plugin->SetScrollVisibility(aFlag != nullptr);
+      }
+    }
+  }
+}
+static bool
+NotifyPluginSubframesCallback(nsIDocument* aDocument, void* aFlag)
+{
+  aDocument->EnumerateActivityObservers(NotifyPluginFramesCallback,
+                                        aFlag);
+  return true;
+}
+#endif
+
+void
+ScrollFrameHelper::NotifyPluginFrames(AsyncScrollEventType aEvent)
+{
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+  if (!gfxPrefs::HidePluginsForScroll()) {
+    return;
+  }
+  if (XRE_IsContentProcess()) {
+    // Ignore 'inner' dom events triggered by apz transformations
+    if (mAsyncScrollEvent == BEGIN_APZ && aEvent != END_APZ) {
+      return;
+    }
+    if (aEvent != mAsyncScrollEvent) {
+      nsPresContext* presContext = mOuter->PresContext();
+      bool begin = (aEvent == BEGIN_APZ || aEvent == BEGIN_DOM);
+      presContext->Document()->EnumerateActivityObservers(NotifyPluginFramesCallback,
+                                                          (void*)begin);
+      presContext->Document()->EnumerateSubDocuments(NotifyPluginSubframesCallback,
+                                                     (void*)begin);
+
+      mAsyncScrollEvent = aEvent;
+    }
+  }
+#endif
 }
 
 void
@@ -2124,6 +2181,7 @@ ScrollFrameHelper::ScrollToWithOrigin(nsPoint aScrollPosition,
   mAsyncScroll->mIsSmoothScroll = isSmoothScroll;
 
   if (isSmoothScroll) {
+    NotifyPluginFrames(BEGIN_DOM);
     mAsyncScroll->InitSmoothScroll(now, mDestination, aOrigin, range, currentVelocity);
   } else {
     mAsyncScroll->Init(range);
@@ -2641,17 +2699,20 @@ ScrollFrameHelper::AppendScrollPartsTo(nsDisplayListBuilder*   aBuilder,
     nsDisplayListBuilder::AutoBuildingDisplayList
       buildingForChild(aBuilder, scrollParts[i],
                        dirty + mOuter->GetOffsetTo(scrollParts[i]), true);
+
+    // Always create layers for overlay scrollbars so that we don't create a
+    // giant layer covering the whole scrollport if both scrollbars are visible.
+    bool isOverlayScrollbar = (flags != 0) && overlayScrollbars;
+    bool createLayer = aCreateLayer || isOverlayScrollbar;
+
     nsDisplayListBuilder::AutoCurrentScrollbarInfoSetter
-      infoSetter(aBuilder, scrollTargetId, flags);
+      infoSetter(aBuilder, scrollTargetId, flags, createLayer);
     nsDisplayListCollection partList;
     mOuter->BuildDisplayListForChild(
       aBuilder, scrollParts[i], dirty, partList,
       nsIFrame::DISPLAY_CHILD_FORCE_STACKING_CONTEXT);
 
-    // Always create layers for overlay scrollbars so that we don't create a
-    // giant layer covering the whole scrollport if both scrollbars are visible.
-    bool isOverlayScrollbar = (flags != 0) && overlayScrollbars;
-    if (aCreateLayer || isOverlayScrollbar) {
+    if (createLayer) {
       appendToTopFlags |= APPEND_OWN_LAYER;
     }
     if (aPositioned) {
@@ -2818,6 +2879,9 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     mOuter->PresContext()->IsRootContentDocument();
 
   if (aBuilder->GetIgnoreScrollFrame() == mOuter || IsIgnoringViewportClipping()) {
+    bool usingDisplayPort = aBuilder->IsPaintingToWindow() &&
+      nsLayoutUtils::GetDisplayPort(mOuter->GetContent());
+
     // Root scrollframes have FrameMetrics and clipping on their container
     // layers, so don't apply clipping again.
     mAddClipRectToLayer = false;
@@ -2825,16 +2889,6 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     // If we are a root scroll frame that has a display port we want to add
     // scrollbars, they will be children of the scrollable layer, but they get
     // adjusted by the APZC automatically.
-    bool usingDisplayPort = aBuilder->IsPaintingToWindow() &&
-        nsLayoutUtils::GetDisplayPort(mOuter->GetContent());
-
-    if (usingDisplayPort) {
-      // There is a display port for this frame, so we want to appear as having
-      // active scrolling, so that animated geometry roots are assigned correctly.
-      mShouldBuildScrollableLayer = true;
-      mIsScrollableLayerInRootContainer = true;
-    }
-
     bool addScrollBars = mIsRoot && usingDisplayPort && !aBuilder->IsForEventDelivery();
 
     if (addScrollBars) {
@@ -2873,54 +2927,30 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   // dirty rect here.
   nsRect dirtyRect = aDirtyRect.Intersect(mScrollPort);
 
-  nsRect displayPort;
-  bool usingDisplayport = false;
-  if (aBuilder->IsPaintingToWindow()) {
-    bool wasUsingDisplayPort = nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), nullptr);
+  Unused << DecideScrollableLayer(aBuilder, &dirtyRect,
+              /* aAllowCreateDisplayPort = */ !mIsRoot);
 
-    if (mIsRoot) {
-      if (gfxPrefs::LayoutUseContainersForRootFrames()) {
-        // For a root frame in a container, just get the value of the existing
-        // display port if any.
-        usingDisplayport = nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), &displayPort);
-      } else {
-        // Override the value of the display port base rect, and possibly create a
-        // display port if there isn't one already.
-        nsRect displayportBase = dirtyRect;
-        if (mIsRoot && mOuter->PresContext()->IsRootContentDocument()) {
-          displayportBase =
-            nsRect(nsPoint(0, 0), nsLayoutUtils::CalculateCompositionSizeForFrame(mOuter));
-        }
-        usingDisplayport = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
-              *aBuilder, mOuter, displayportBase, &displayPort);
-      }
-    } else {
-      // For a non-root scroll frame, override the value of the display port
-      // base rect, and possibly create a display port if there isn't one
-      // already. For root scroll frame, nsLayoutUtils::PaintFrame or
-      // nsSubDocumentFrame::BuildDisplayList takes care of this.
-      nsRect displayportBase = dirtyRect;
-      usingDisplayport = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
-          *aBuilder, mOuter, displayportBase, &displayPort);
-    }
+  bool usingDisplayPort = aBuilder->IsPaintingToWindow() &&
+    nsLayoutUtils::GetDisplayPort(mOuter->GetContent());
 
-    bool usingLowPrecision = gfxPrefs::UseLowPrecisionBuffer();
-    if (usingDisplayport && usingLowPrecision) {
-      // If we have low-res painting enabled we should check the critical displayport too
-      nsRect critDp;
-      nsLayoutUtils::GetCriticalDisplayPort(mOuter->GetContent(), &critDp);
-    }
-
-    // Override the dirty rectangle if the displayport has been set.
-    if (usingDisplayport) {
-      dirtyRect = displayPort;
-
-      // The cached animated geometry root for the display builder is out of
-      // date if we just introduced a new animated geometry root.
-      if (!wasUsingDisplayPort) {
-        aBuilder->RecomputeCurrentAnimatedGeometryRoot();
-      }
-    }
+  // Whether we might want to build a scrollable layer for this scroll frame
+  // at some point in the future. This controls whether we add the information
+  // to the layer tree (a scroll info layer if necessary, and add the right
+  // area to the dispatch to content layer event regions) necessary to activate
+  // a scroll frame so it creates a scrollable layer.
+  bool couldBuildLayer = false;
+  if (mWillBuildScrollableLayer) {
+    couldBuildLayer = true;
+  } else {
+    couldBuildLayer =
+      nsLayoutUtils::AsyncPanZoomEnabled(mOuter) &&
+      WantAsyncScroll() &&
+      // If we are using containers for root frames, and we are the root
+      // scroll frame for the display root, then we don't need a scroll
+      // info layer. nsDisplayList::PaintForFrame already calls
+      // ComputeFrameMetrics for us.
+      (!(gfxPrefs::LayoutUseContainersForRootFrames() && mIsRoot) ||
+       (aBuilder->RootReferenceFrame()->PresContext() != mOuter->PresContext()));
   }
 
   // Now display the scrollbars and scrollcorner. These parts are drawn
@@ -2930,7 +2960,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   // Note that this does not apply for overlay scrollbars; those are drawn
   // in the positioned-elements layer on top of everything else by the call
   // to AppendScrollPartsTo(..., true) further down.
-  AppendScrollPartsTo(aBuilder, aDirtyRect, aLists, usingDisplayport,
+  AppendScrollPartsTo(aBuilder, aDirtyRect, aLists, usingDisplayPort,
                       createLayersForScrollbars, false);
 
   if (aBuilder->IsForImageVisibility()) {
@@ -2944,31 +2974,6 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   const nsStyleDisplay* disp = mOuter->StyleDisplay();
   if (disp && (disp->mWillChangeBitField & NS_STYLE_WILL_CHANGE_SCROLL)) {
     aBuilder->AddToWillChangeBudget(mOuter, GetScrollPositionClampingScrollPortSize());
-  }
-
-  // Since making new layers is expensive, only use nsDisplayScrollLayer
-  // if the area is scrollable and we're the content process (unless we're on
-  // B2G, where we support async scrolling for scrollable elements in the
-  // parent process as well).
-  // When a displayport is being used, force building of a layer so that
-  // CompositorParent can always find the scrollable layer for the root content
-  // document.
-  // If the element is marked 'scrollgrab', also force building of a layer
-  // so that APZ can implement scroll grabbing.
-  mShouldBuildScrollableLayer = usingDisplayport || nsContentUtils::HasScrollgrab(mOuter->GetContent());
-  bool shouldBuildLayer = false;
-  if (mShouldBuildScrollableLayer) {
-    shouldBuildLayer = true;
-  } else {
-    shouldBuildLayer =
-      nsLayoutUtils::AsyncPanZoomEnabled(mOuter) &&
-      WantAsyncScroll() &&
-      // If we are using containers for root frames, and we are the root
-      // scroll frame for the display root, then we don't need a scroll
-      // info layer. nsDisplayList::PaintForFrame already calls
-      // ComputeFrameMetrics for us.
-      (!(gfxPrefs::LayoutUseContainersForRootFrames() && mIsRoot) ||
-       (aBuilder->RootReferenceFrame()->PresContext() != mOuter->PresContext()));
   }
 
   mScrollParentID = aBuilder->GetCurrentScrollParentId();
@@ -3007,7 +3012,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     // and scroll info layers.
     nsDisplayListBuilder::AutoCurrentScrollParentIdSetter idSetter(
         aBuilder,
-        shouldBuildLayer && mScrolledFrame->GetContent()
+        couldBuildLayer && mScrolledFrame->GetContent()
             ? nsLayoutUtils::FindOrCreateIDFor(mScrolledFrame->GetContent())
             : aBuilder->GetCurrentScrollParentId());
 
@@ -3016,7 +3021,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     // clipStatePtr will always point to the innermost used one.
     DisplayListClipState::AutoSaveRestore clipState(aBuilder);
     DisplayListClipState::AutoSaveRestore* clipStatePtr = &clipState;
-    if (!mIsRoot || !usingDisplayport) {
+    if (!mIsRoot || !usingDisplayPort) {
       nsRect clip = mScrollPort + aBuilder->ToReferenceFrame(mOuter);
       nscoord radii[8];
       bool haveRadii = mOuter->GetPaddingBoxBorderRadii(radii);
@@ -3041,7 +3046,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
 
     Maybe<DisplayListClipState::AutoSaveRestore> clipStateNonCaret;
-    if (usingDisplayport) {
+    if (usingDisplayPort) {
       // Capture the clip state of the parent scroll frame. This will be saved
       // on FrameMetrics for layers with this frame as their animated geoemetry
       // root.
@@ -3086,27 +3091,26 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       // above (where the idSetter variable is created).
       //
       // This is not compatible when using containes for root scrollframes.
-      MOZ_ASSERT(shouldBuildLayer && mScrolledFrame->GetContent());
-      mShouldBuildScrollableLayer = true;
+      MOZ_ASSERT(couldBuildLayer && mScrolledFrame->GetContent());
+      mWillBuildScrollableLayer = true;
     }
   }
 
-  if (mShouldBuildScrollableLayer && !gfxPrefs::LayoutUseContainersForRootFrames()) {
+  if (mWillBuildScrollableLayer && !gfxPrefs::LayoutUseContainersForRootFrames()) {
     aBuilder->ForceLayerForScrollParent();
   }
 
   if (contentBoxClipForNonCaretContent) {
     ClipListsExceptCaret(&scrolledContent, aBuilder, mScrolledFrame,
-                         *contentBoxClipForNonCaretContent, usingDisplayport);
+                         *contentBoxClipForNonCaretContent, usingDisplayPort);
   }
 
-  if (shouldBuildLayer) {
+  if (couldBuildLayer) {
     // Make sure that APZ will dispatch events back to content so we can create
     // a displayport for this frame. We'll add the item later on.
     nsDisplayLayerEventRegions* inactiveRegionItem = nullptr;
     if (aBuilder->IsPaintingToWindow() &&
-        !mShouldBuildScrollableLayer &&
-        shouldBuildLayer &&
+        !mWillBuildScrollableLayer &&
         aBuilder->IsBuildingLayerEventRegions())
     {
       inactiveRegionItem = new (aBuilder) nsDisplayLayerEventRegions(aBuilder, mScrolledFrame);
@@ -3133,16 +3137,74 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     }
   }
   // Now display overlay scrollbars and the resizer, if we have one.
-  AppendScrollPartsTo(aBuilder, aDirtyRect, scrolledContent, usingDisplayport,
+  AppendScrollPartsTo(aBuilder, aDirtyRect, scrolledContent, usingDisplayPort,
                       createLayersForScrollbars, true);
   scrolledContent.MoveTo(aLists);
 }
+
+bool
+ScrollFrameHelper::DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
+                                         nsRect* aDirtyRect,
+                                         bool aAllowCreateDisplayPort)
+{
+  bool usingDisplayPort = false;
+  nsIContent* content = mOuter->GetContent();
+  if (aBuilder->IsPaintingToWindow()) {
+    bool wasUsingDisplayPort = nsLayoutUtils::GetDisplayPort(content);
+
+    nsRect displayportBase = *aDirtyRect;
+    nsPresContext* pc = mOuter->PresContext();
+    if (mIsRoot && (pc->IsRootContentDocument() || !pc->GetParentPresContext())) {
+      displayportBase =
+        nsRect(nsPoint(0, 0), nsLayoutUtils::CalculateCompositionSizeForFrame(mOuter));
+    }
+
+    nsRect displayPort;
+    if (aAllowCreateDisplayPort) {
+      // Provide the value of the display port base rect, and possibly create a
+      // display port if there isn't one already.
+      usingDisplayPort = nsLayoutUtils::GetOrMaybeCreateDisplayPort(
+            *aBuilder, mOuter, displayportBase, &displayPort);
+    } else {
+      // We should have already been called with aAllowCreateDisplayPort == true
+      // which should have set a displayport base.
+      MOZ_ASSERT(content->GetProperty(nsGkAtoms::DisplayPortBase));
+      usingDisplayPort = nsLayoutUtils::GetDisplayPort(content, &displayPort);
+    }
+
+    // Override the dirty rectangle if the displayport has been set.
+    if (usingDisplayPort) {
+      *aDirtyRect = displayPort;
+
+      // The cached animated geometry root for the display builder is out of
+      // date if we just introduced a new animated geometry root.
+      if (!wasUsingDisplayPort) {
+        aBuilder->RecomputeCurrentAnimatedGeometryRoot();
+      }
+    }
+  }
+
+  // Since making new layers is expensive, only create a scrollable layer
+  // for some scroll frames.
+  // When a displayport is being used, force building of a layer so that
+  // the compositor can find the scrollable layer for async scrolling.
+  // If the element is marked 'scrollgrab', also force building of a layer
+  // so that APZ can implement scroll grabbing.
+  mWillBuildScrollableLayer = usingDisplayPort || nsContentUtils::HasScrollgrab(content);
+
+  if (gfxPrefs::LayoutUseContainersForRootFrames() && mWillBuildScrollableLayer && mIsRoot) {
+    mIsScrollableLayerInRootContainer = true;
+  }
+
+  return mWillBuildScrollableLayer;
+}
+
 
 Maybe<DisplayItemClip>
 ScrollFrameHelper::ComputeScrollClip(bool aIsForCaret) const
 {
   const Maybe<DisplayItemClip>& ancestorClip = aIsForCaret ? mAncestorClipForCaret : mAncestorClip;
-  if (!mShouldBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
+  if (!mWillBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
     return Nothing();
   }
 
@@ -3155,7 +3217,7 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
                                        const ContainerLayerParameters& aParameters,
                                        bool aIsForCaret) const
 {
-  if (!mShouldBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
+  if (!mWillBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
     return Nothing();
   }
 
@@ -3557,7 +3619,7 @@ ScrollFrameHelper::ScrollSnap(const nsPoint &aDestination,
 nsSize
 ScrollFrameHelper::GetLineScrollAmount() const
 {
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(mOuter, getter_AddRefs(fm),
     nsLayoutUtils::FontSizeInflationFor(mOuter));
   NS_ASSERTION(fm, "FontMetrics is null, assuming fontHeight == 1 appunit");
@@ -3877,15 +3939,23 @@ ScrollFrameHelper::CreateAnonymousContent(
 
   nsNodeInfoManager *nodeInfoManager =
     presContext->Document()->NodeInfoManager();
-  nsRefPtr<NodeInfo> nodeInfo;
+  RefPtr<NodeInfo> nodeInfo;
   nodeInfo = nodeInfoManager->GetNodeInfo(nsGkAtoms::scrollbar, nullptr,
                                           kNameSpaceID_XUL,
                                           nsIDOMNode::ELEMENT_NODE);
   NS_ENSURE_TRUE(nodeInfo, NS_ERROR_OUT_OF_MEMORY);
 
   if (canHaveHorizontal) {
-    nsRefPtr<NodeInfo> ni = nodeInfo;
+    RefPtr<NodeInfo> ni = nodeInfo;
     NS_TrustedNewXULElement(getter_AddRefs(mHScrollbarContent), ni.forget());
+#ifdef DEBUG
+    // Scrollbars can get restyled by theme changes.  Whether such a restyle
+    // will actually reconstruct them correctly if it involves a frame
+    // reconstruct... I don't know.  :(
+    mHScrollbarContent->SetProperty(nsGkAtoms::restylableAnonymousNode,
+                                    reinterpret_cast<void*>(true));
+#endif // DEBUG
+
     mHScrollbarContent->SetAttr(kNameSpaceID_None, nsGkAtoms::orient,
                                 NS_LITERAL_STRING("horizontal"), false);
     mHScrollbarContent->SetAttr(kNameSpaceID_None, nsGkAtoms::clickthrough,
@@ -3899,8 +3969,16 @@ ScrollFrameHelper::CreateAnonymousContent(
   }
 
   if (canHaveVertical) {
-    nsRefPtr<NodeInfo> ni = nodeInfo;
+    RefPtr<NodeInfo> ni = nodeInfo;
     NS_TrustedNewXULElement(getter_AddRefs(mVScrollbarContent), ni.forget());
+#ifdef DEBUG
+    // Scrollbars can get restyled by theme changes.  Whether such a restyle
+    // will actually reconstruct them correctly if it involves a frame
+    // reconstruct... I don't know.  :(
+    mVScrollbarContent->SetProperty(nsGkAtoms::restylableAnonymousNode,
+                                    reinterpret_cast<void*>(true));
+#endif // DEBUG
+
     mVScrollbarContent->SetAttr(kNameSpaceID_None, nsGkAtoms::orient,
                                 NS_LITERAL_STRING("vertical"), false);
     mVScrollbarContent->SetAttr(kNameSpaceID_None, nsGkAtoms::clickthrough,
@@ -3914,7 +3992,7 @@ ScrollFrameHelper::CreateAnonymousContent(
   }
 
   if (isResizable) {
-    nsRefPtr<NodeInfo> nodeInfo;
+    RefPtr<NodeInfo> nodeInfo;
     nodeInfo = nodeInfoManager->GetNodeInfo(nsGkAtoms::resizer, nullptr,
                                             kNameSpaceID_XUL,
                                             nsIDOMNode::ELEMENT_NODE);
@@ -4084,7 +4162,7 @@ void ScrollFrameHelper::CurPosAttributeChanged(nsIContent* aContent)
   }
 
   if (mScrollbarActivity) {
-    nsRefPtr<ScrollbarActivity> scrollbarActivity(mScrollbarActivity);
+    RefPtr<ScrollbarActivity> scrollbarActivity(mScrollbarActivity);
     scrollbarActivity->ActivityOccurred();
   }
 
@@ -4121,6 +4199,7 @@ ScrollFrameHelper::FireScrollEvent()
 {
   mScrollEvent.Forget();
 
+  ActiveLayerTracker::SetCurrentScrollHandlerFrame(mOuter);
   WidgetGUIEvent event(true, eScroll, nullptr);
   nsEventStatus status = nsEventStatus_eIgnore;
   nsIContent* content = mOuter->GetContent();
@@ -4138,6 +4217,7 @@ ScrollFrameHelper::FireScrollEvent()
     event.mFlags.mBubbles = false;
     EventDispatcher::Dispatch(content, prescontext, &event, nullptr, &status);
   }
+  ActiveLayerTracker::SetCurrentScrollHandlerFrame(nullptr);
 }
 
 void
@@ -4406,7 +4486,7 @@ ScrollFrameHelper::IsMaybeScrollingActive() const
 
   return mHasBeenScrolledRecently ||
       IsAlwaysActive() ||
-      mShouldBuildScrollableLayer;
+      mWillBuildScrollableLayer;
 }
 
 bool
@@ -4420,7 +4500,7 @@ ScrollFrameHelper::IsScrollingActive(nsDisplayListBuilder* aBuilder) const
 
   return mHasBeenScrolledRecently ||
         IsAlwaysActive() ||
-        mShouldBuildScrollableLayer;
+        mWillBuildScrollableLayer;
 }
 
 /**
@@ -5086,7 +5166,7 @@ ScrollFrameHelper::SetCoordAttribute(nsIContent* aContent, nsIAtom* aAtom,
   }
 
   if (mScrollbarActivity) {
-    nsRefPtr<ScrollbarActivity> scrollbarActivity(mScrollbarActivity);
+    RefPtr<ScrollbarActivity> scrollbarActivity(mScrollbarActivity);
     scrollbarActivity->ActivityOccurred();
   }
 }

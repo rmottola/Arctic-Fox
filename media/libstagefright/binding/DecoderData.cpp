@@ -113,9 +113,9 @@ UpdateTrackInfo(mozilla::TrackInfo& aConfig,
   aConfig.mDuration = FindInt64(aMetaData, kKeyDuration);
   aConfig.mMediaTime = FindInt64(aMetaData, kKeyMediaTime);
   aConfig.mTrackId = FindInt32(aMetaData, kKeyTrackID);
-  aConfig.mCrypto.valid = aMetaData->findInt32(kKeyCryptoMode, &crypto.mode) &&
-    aMetaData->findInt32(kKeyCryptoDefaultIVSize, &crypto.iv_size) &&
-    FindData(aMetaData, kKeyCryptoKey, &crypto.key);
+  aConfig.mCrypto.mValid = aMetaData->findInt32(kKeyCryptoMode, &crypto.mMode) &&
+    aMetaData->findInt32(kKeyCryptoDefaultIVSize, &crypto.mIVSize) &&
+    FindData(aMetaData, kKeyCryptoKey, &crypto.mKeyId);
 }
 
 void

@@ -61,6 +61,7 @@ static GtkWidget* gMenuSeparatorWidget;
 static GtkWidget* gHPanedWidget;
 static GtkWidget* gVPanedWidget;
 static GtkWidget* gScrolledWindowWidget;
+static GtkWidget* gInfoBar;
 
 static style_prop_t style_prop_func;
 static gboolean have_arrow_scaling;
@@ -356,6 +357,15 @@ ensure_combo_box_widgets()
      * is invalid we just won't paint it. */
 
     return MOZ_GTK_SUCCESS;
+}
+
+static void
+ensure_info_bar()
+{
+  if (!gInfoBar) {
+      gInfoBar = gtk_info_bar_new();
+      setup_widget_prototype(gInfoBar);
+  }
 }
 
 /* We need to have pointers to the inner widgets (entry, button, arrow) of
@@ -1152,6 +1162,7 @@ static gint
 moz_gtk_scrollbar_trough_paint(GtkThemeWidgetType widget,
                                cairo_t *cr, GdkRectangle* rect,
                                GtkWidgetState* state,
+                               GtkScrollbarTrackFlags flags,
                                GtkTextDirection direction)
 {
     GtkStyleContext* style;
@@ -1166,6 +1177,11 @@ moz_gtk_scrollbar_trough_paint(GtkThemeWidgetType widget,
 
     gtk_widget_set_direction(GTK_WIDGET(scrollbar), direction);
     
+    if (flags & MOZ_GTK_TRACK_OPAQUE) {
+        style = gtk_widget_get_style_context(GTK_WIDGET(gProtoWindow));
+        gtk_render_background(style, cr, rect->x, rect->y, rect->width, rect->height);
+    }
+
     style = gtk_widget_get_style_context(GTK_WIDGET(scrollbar));
     gtk_style_context_save(style);
     gtk_style_context_add_class(style, GTK_STYLE_CLASS_TROUGH);
@@ -1593,7 +1609,7 @@ moz_gtk_treeview_expander_paint(cairo_t *cr, GdkRectangle* rect,
 
     /* Because the frame we get is of the entire treeview, we can't get the precise
      * event state of one expander, thus rendering hover and active feedback useless. */
-    state_flags = state->disabled ? GTK_STATE_INSENSITIVE : GTK_STATE_NORMAL;
+    state_flags = state->disabled ? GTK_STATE_FLAG_INSENSITIVE : GTK_STATE_FLAG_NORMAL;
 
     /* GTK_STATE_FLAG_ACTIVE controls expanded/colapsed state rendering
      * in gtk_render_expander()
@@ -2600,6 +2616,29 @@ moz_gtk_window_paint(cairo_t *cr, GdkRectangle* rect,
     return MOZ_GTK_SUCCESS;
 }
 
+static gint
+moz_gtk_info_bar_paint(cairo_t *cr, GdkRectangle* rect,
+                       GtkWidgetState* state)
+{
+    GtkStateFlags state_flags = GetStateFlagsFromGtkWidgetState(state);
+    GtkStyleContext *style;
+    ensure_info_bar();
+
+    style = gtk_widget_get_style_context(gInfoBar);
+    gtk_style_context_save(style);
+
+    gtk_style_context_set_state(style, state_flags);
+    gtk_style_context_add_class(style, GTK_STYLE_CLASS_INFO);
+
+    gtk_render_background(style, cr, rect->x, rect->y, rect->width,
+                          rect->height);
+    gtk_render_frame(style, cr, rect->x, rect->y, rect->width, rect->height);
+
+    gtk_style_context_restore(style);
+
+    return MOZ_GTK_SUCCESS;
+}
+
 static void
 moz_gtk_add_style_border(GtkStyleContext* style,
                          gint* left, gint* top, gint* right, gint* bottom)
@@ -2680,13 +2719,11 @@ moz_gtk_get_widget_border(GtkThemeWidgetType widget, gint* left, gint* top,
         }
     case MOZ_GTK_TREE_HEADER_CELL:
         {
-            /* A Tree Header in GTK is just a different styled button 
+            /* A Tree Header in GTK is just a different styled button
              * It must be placed in a TreeView for getting the correct style
              * assigned.
-             * That is why the following code is the same as for MOZ_GTK_BUTTON.  
+             * That is why the following code is the same as for MOZ_GTK_BUTTON.
              * */
-            GtkStyleContext *style;
-
             ensure_tree_header_cell_widget();
             *left = *top = *right = *bottom = gtk_container_get_border_width(GTK_CONTAINER(gTreeHeaderCellWidget));
 
@@ -2823,6 +2860,10 @@ moz_gtk_get_widget_border(GtkThemeWidgetType widget, gint* left, gint* top,
                                       left, top, right, bottom);
             return MOZ_GTK_SUCCESS;
         }
+    case MOZ_GTK_INFO_BAR:
+        ensure_info_bar();
+        w = gInfoBar;
+        break;
     /* These widgets have no borders, since they are not containers. */
     case MOZ_GTK_CHECKBUTTON_LABEL:
     case MOZ_GTK_RADIOBUTTON_LABEL:
@@ -3143,7 +3184,9 @@ moz_gtk_widget_paint(GtkThemeWidgetType widget, cairo_t *cr,
     case MOZ_GTK_SCROLLBAR_TRACK_HORIZONTAL:
     case MOZ_GTK_SCROLLBAR_TRACK_VERTICAL:
         return moz_gtk_scrollbar_trough_paint(widget, cr, rect,
-                                              state, direction);
+                                              state,
+                                              (GtkScrollbarTrackFlags) flags,
+                                              direction);
         break;
     case MOZ_GTK_SCROLLBAR_THUMB_HORIZONTAL:
     case MOZ_GTK_SCROLLBAR_THUMB_VERTICAL:
@@ -3300,6 +3343,9 @@ moz_gtk_widget_paint(GtkThemeWidgetType widget, cairo_t *cr,
         break;
     case MOZ_GTK_WINDOW:
         return moz_gtk_window_paint(cr, rect, direction);
+        break;
+    case MOZ_GTK_INFO_BAR:
+        return moz_gtk_info_bar_paint(cr, rect, state);
         break;
     default:
         g_warning("Unknown widget type: %d", widget);

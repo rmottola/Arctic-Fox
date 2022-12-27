@@ -176,7 +176,7 @@ nsJSID::NewID(const char* str)
         return nullptr;
     }
 
-    nsRefPtr<nsJSID> idObj = new nsJSID();
+    RefPtr<nsJSID> idObj = new nsJSID();
     NS_ENSURE_SUCCESS(idObj->Initialize(str), nullptr);
     return idObj.forget();
 }
@@ -185,7 +185,7 @@ nsJSID::NewID(const char* str)
 already_AddRefed<nsJSID>
 nsJSID::NewID(const nsID& id)
 {
-    nsRefPtr<nsJSID> idObj = new nsJSID();
+    RefPtr<nsJSID> idObj = new nsJSID();
     idObj->mID = id;
     idObj->mName = nullptr;
     idObj->mNumber = nullptr;
@@ -371,7 +371,7 @@ nsJSIID::NewID(nsIInterfaceInfo* aInfo)
     if (NS_FAILED(aInfo->IsScriptable(&canScript)) || !canScript)
         return nullptr;
 
-    nsRefPtr<nsJSIID> idObj = new nsJSIID(aInfo);
+    RefPtr<nsJSIID> idObj = new nsJSIID(aInfo);
     return idObj.forget();
 }
 
@@ -463,7 +463,7 @@ FindObjectForHasInstance(JSContext* cx, HandleObject objArg)
            !IsDOMObject(obj) && !mozilla::jsipc::IsCPOW(obj))
     {
         if (js::IsWrapper(obj)) {
-            obj = js::CheckedUnwrap(obj, /* stopAtOuter = */ false);
+            obj = js::CheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
             continue;
         }
         if (!js::GetObjectProto(cx, obj, &proto))
@@ -584,7 +584,7 @@ nsJSCID::NewID(const char* str)
         return nullptr;
     }
 
-    nsRefPtr<nsJSCID> idObj = new nsJSCID();
+    RefPtr<nsJSCID> idObj = new nsJSCID();
     if (str[0] == '{') {
         NS_ENSURE_SUCCESS(idObj->Initialize(str), nullptr);
     } else {

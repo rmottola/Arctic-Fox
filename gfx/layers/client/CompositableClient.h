@@ -156,7 +156,7 @@ public:
 
   void Destroy();
 
-  bool IsDestroyed() { return mDestroyed; }
+  bool IsConnected() const;
 
   PCompositableChild* GetIPDLActor() const;
 
@@ -234,11 +234,10 @@ public:
                                 TextureDumpMode aCompress);
 protected:
   CompositableChild* mCompositableChild;
-  CompositableForwarder* mForwarder;
+  RefPtr<CompositableForwarder> mForwarder;
   // Some layers may want to enforce some flags to all their textures
   // (like disallowing tiling)
   TextureFlags mTextureFlags;
-  bool mDestroyed;
   RefPtr<TextureClientRecycleAllocator> mTextureClientRecycler;
 
   friend class CompositableChild;

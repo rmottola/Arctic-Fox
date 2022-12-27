@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cc = Components.classes;
-const Cu = Components.utils;
-const Ci = Components.interfaces;
+var Cc = Components.classes;
+var Cu = Components.utils;
+var Ci = Components.interfaces;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -12,7 +12,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ZipUtils", "resource://gre/modules/ZipUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Downloads", "resource://gre/modules/Downloads.jsm");
 
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const {FileUtils} = Cu.import("resource://gre/modules/FileUtils.jsm");
 const {AppProjects} = require("devtools/client/app-manager/app-projects");
 const {AppManager} = require("devtools/client/webide/modules/app-manager");

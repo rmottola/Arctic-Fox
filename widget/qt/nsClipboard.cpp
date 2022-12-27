@@ -62,7 +62,7 @@ _moz2dformat_to_qformat(SurfaceFormat aFormat)
         return QImage::Format_ARGB32_Premultiplied;
     case SurfaceFormat::B8G8R8X8:
         return QImage::Format_ARGB32;
-    case SurfaceFormat::R5G6B5:
+    case SurfaceFormat::R5G6B5_UINT16:
         return QImage::Format_RGB16;
     default:
         return QImage::Format_Invalid;
@@ -467,14 +467,6 @@ nsClipboard::SetData(nsITransferable *aTransferable,
     {
         return NS_OK;
     }
-
-    nsresult rv;
-    if (!mPrivacyHandler) {
-      rv = NS_NewClipboardPrivacyHandler(getter_AddRefs(mPrivacyHandler));
-      NS_ENSURE_SUCCESS(rv, rv);
-    }
-    rv = mPrivacyHandler->PrepareDataForClipboard(aTransferable);
-    NS_ENSURE_SUCCESS(rv, rv);
 
     EmptyClipboard(aWhichClipboard);
 

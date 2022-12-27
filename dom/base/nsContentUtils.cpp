@@ -36,6 +36,7 @@
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/LoadInfo.h"
+#include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/DocumentFragment.h"
 #include "mozilla/dom/DOMTypes.h"
 #include "mozilla/dom/Element.h"
@@ -188,6 +189,7 @@
 #include "nsViewManager.h"
 #include "nsViewportInfo.h"
 #include "nsWidgetsCID.h"
+#include "nsIWindowProvider.h"
 #include "nsWrapperCacheInlines.h"
 #include "nsXULPopupManager.h"
 #include "xpcprivate.h" // nsXPConnect
@@ -403,7 +405,7 @@ protected:          // declared protected to silence clang warnings
   const void *mKey; // must be first, to look like PLDHashEntryStub
 
 public:
-  nsRefPtr<EventListenerManager> mListenerManager;
+  RefPtr<EventListenerManager> mListenerManager;
 };
 
 static void
@@ -487,7 +489,7 @@ nsContentUtils::Init()
 
   // We use the constructor here because we want infallible initialization; we
   // apparently don't care whether sNullSubjectPrincipal has a sane URI or not.
-  nsRefPtr<nsNullPrincipal> nullPrincipal = new nsNullPrincipal();
+  RefPtr<nsNullPrincipal> nullPrincipal = new nsNullPrincipal();
   nullPrincipal->Init();
   nullPrincipal.forget(&sNullSubjectPrincipal);
 
@@ -1760,7 +1762,7 @@ nsContentUtils::IsControlledByServiceWorker(nsIDocument* aDocument)
     return false;
   }
 
-  nsRefPtr<workers::ServiceWorkerManager> swm =
+  RefPtr<workers::ServiceWorkerManager> swm =
     workers::ServiceWorkerManager::GetInstance();
   MOZ_ASSERT(swm);
 
@@ -1964,9 +1966,6 @@ nsContentUtils::CheckSameOrigin(const nsINode* aTrustedNode,
 {
   MOZ_ASSERT(aTrustedNode);
   MOZ_ASSERT(unTrustedNode);
-  if (IsCallerChrome()) {
-    return NS_OK;
-  }
 
   /*
    * Get hold of each node's principal
@@ -3133,7 +3132,8 @@ nsContentUtils::IsImageInCache(nsIURI* aURI, nsIDocument* aDocument)
     // If something unexpected happened we return false, otherwise if props
     // is set, the image is cached and we return true
     nsCOMPtr<nsIProperties> props;
-    nsresult rv = cache->FindEntryProperties(aURI, getter_AddRefs(props));
+    nsCOMPtr<nsIDOMDocument> domDoc = do_QueryInterface(aDocument);
+    nsresult rv = cache->FindEntryProperties(aURI, domDoc, getter_AddRefs(props));
     return (NS_SUCCEEDED(rv) && props);
 }
 
@@ -3222,7 +3222,7 @@ already_AddRefed<imgRequestProxy>
 nsContentUtils::GetStaticRequest(imgRequestProxy* aRequest)
 {
   NS_ENSURE_TRUE(aRequest, nullptr);
-  nsRefPtr<imgRequestProxy> retval;
+  RefPtr<imgRequestProxy> retval;
   aRequest->GetStaticRequest(getter_AddRefs(retval));
   return retval.forget();
 }
@@ -3482,40 +3482,6 @@ nsContentUtils::ReportToConsole(uint32_t aErrorFlags,
   return ReportToConsoleNonLocalized(errorText, aErrorFlags, aCategory,
                                      aDocument, aURI, aSourceLine,
                                      aLineNumber, aColumnNumber);
-}
-
-/* static */ nsresult
-nsContentUtils::MaybeReportInterceptionErrorToConsole(nsIDocument* aDocument,
-                                                      nsresult aError)
-{
-  const char* messageName = nullptr;
-  if (aError == NS_ERROR_INTERCEPTION_FAILED) {
-    messageName = "InterceptionFailed";
-  } else if (aError == NS_ERROR_OPAQUE_INTERCEPTION_DISABLED) {
-    messageName = "OpaqueInterceptionDisabled";
-  } else if (aError == NS_ERROR_BAD_OPAQUE_INTERCEPTION_REQUEST_MODE) {
-    messageName = "BadOpaqueInterceptionRequestMode";
-  } else if (aError == NS_ERROR_INTERCEPTED_ERROR_RESPONSE) {
-    messageName = "InterceptedErrorResponse";
-  } else if (aError == NS_ERROR_INTERCEPTED_USED_RESPONSE) {
-    messageName = "InterceptedUsedResponse";
-  } else if (aError == NS_ERROR_CLIENT_REQUEST_OPAQUE_INTERCEPTION) {
-    messageName = "ClientRequestOpaqueInterception";
-  } else if (aError == NS_ERROR_BAD_OPAQUE_REDIRECT_INTERCEPTION) {
-    messageName = "BadOpaqueRedirectInterception";
-  } else if (aError == NS_ERROR_INTERCEPTION_CANCELED) {
-    messageName = "InterceptionCanceled";
-  }
-
-  if (messageName) {
-    return ReportToConsole(nsIScriptError::warningFlag,
-                           NS_LITERAL_CSTRING("Service Worker Interception"),
-                           aDocument,
-                           nsContentUtils::eDOM_PROPERTIES,
-                           messageName);
-  }
-
-  return NS_OK;
 }
 
 
@@ -3794,9 +3760,7 @@ nsresult GetEventAndTarget(nsIDocument* aDoc, nsISupports* aTarget,
     domDoc->CreateEvent(NS_LITERAL_STRING("Events"), getter_AddRefs(event));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = event->InitEvent(aEventName, aCanBubble, aCancelable);
-  NS_ENSURE_SUCCESS(rv, rv);
-
+  event->InitEvent(aEventName, aCanBubble, aCancelable);
   event->SetTrusted(aTrusted);
 
   rv = event->SetTarget(target);
@@ -4235,7 +4199,7 @@ nsContentUtils::RemoveListenerManager(nsINode *aNode)
     auto entry = static_cast<EventListenerManagerMapEntry*>
                             (sEventListenerManagersHash->Search(aNode));
     if (entry) {
-      nsRefPtr<EventListenerManager> listenerManager;
+      RefPtr<EventListenerManager> listenerManager;
       listenerManager.swap(entry->mListenerManager);
       // Remove the entry and *then* do operations that could cause further
       // modification of sEventListenerManagersHash.  See bug 334177.
@@ -4316,7 +4280,7 @@ nsContentUtils::CreateContextualFragment(nsINode* aContextNode,
 #endif
 
   if (isHTML) {
-    nsRefPtr<DocumentFragment> frag =
+    RefPtr<DocumentFragment> frag =
       new DocumentFragment(document->NodeInfoManager());
     
     nsCOMPtr<nsIContent> contextAsContent = do_QueryInterface(aContextNode);
@@ -4646,7 +4610,7 @@ nsContentUtils::SetNodeTextContent(nsIContent* aContent,
     return NS_OK;
   }
 
-  nsRefPtr<nsTextNode> textContent =
+  RefPtr<nsTextNode> textContent =
     new nsTextNode(aContent->NodeInfo()->NodeInfoManager());
 
   textContent->SetText(aValue, true);
@@ -5212,6 +5176,14 @@ nsContentUtils::RemoveScriptBlocker()
 }
 
 /* static */
+nsIWindowProvider*
+nsContentUtils::GetWindowProviderForContentProcess()
+{
+  MOZ_ASSERT(XRE_IsContentProcess());
+  return ContentChild::GetSingleton();
+}
+
+/* static */
 void
 nsContentUtils::WarnScriptWasIgnored(nsIDocument* aDocument)
 {
@@ -5360,14 +5332,6 @@ static void ProcessViewportToken(nsIDocument *aDocument,
 
 #define IS_SEPARATOR(c) ((c == '=') || (c == ',') || (c == ';') || \
                          (c == '\t') || (c == '\n') || (c == '\r'))
-
-/* static */
-nsViewportInfo
-nsContentUtils::GetViewportInfo(nsIDocument *aDocument,
-                                const ScreenIntSize& aDisplaySize)
-{
-  return aDocument->GetViewportInfo(aDisplaySize);
-}
 
 /* static */
 nsresult
@@ -6238,7 +6202,7 @@ nsContentUtils::CreateBlobBuffer(JSContext* aCx,
 {
   uint32_t blobLen = aData.Length();
   void* blobData = malloc(blobLen);
-  nsRefPtr<Blob> blob;
+  RefPtr<Blob> blob;
   if (blobData) {
     memcpy(blobData, aData.BeginReading(), blobLen);
     blob = mozilla::dom::Blob::CreateMemoryBlob(aParent, blobData, blobLen,
@@ -6431,10 +6395,7 @@ nsContentUtils::FlushLayoutForTree(nsIDOMWindow* aWindow)
     // is O(N^2) in docshell tree depth.  However, the docshell tree is
     // usually pretty shallow.
 
-    nsCOMPtr<nsIDOMDocument> domDoc;
-    aWindow->GetDocument(getter_AddRefs(domDoc));
-    nsCOMPtr<nsIDocument> doc = do_QueryInterface(domDoc);
-    if (doc) {
+    if (nsCOMPtr<nsIDocument> doc = piWin->GetDoc()) {
         doc->FlushPendingNotifications(Flush_Layout);
     }
 
@@ -6570,7 +6531,7 @@ LayerManagerForDocumentInternal(const nsIDocument *aDoc, bool aRequirePersistent
 {
   nsIWidget *widget = nsContentUtils::WidgetForDocument(aDoc);
   if (widget) {
-    nsRefPtr<LayerManager> manager =
+    RefPtr<LayerManager> manager =
       widget->GetLayerManager(aRequirePersistent ? nsIWidget::LAYER_MANAGER_PERSISTENT : 
                               nsIWidget::LAYER_MANAGER_CURRENT,
                               aAllowRetaining);
@@ -6821,7 +6782,7 @@ CheckForWindowedPlugins(nsISupports* aSupports, void* aResult)
   if (!olc) {
     return;
   }
-  nsRefPtr<nsNPAPIPluginInstance> plugin;
+  RefPtr<nsNPAPIPluginInstance> plugin;
   olc->GetPluginInstance(getter_AddRefs(plugin));
   if (!plugin) {
     return;
@@ -7026,38 +6987,6 @@ nsContentUtils::GetSelectionInTextControl(Selection* aSelection,
   // Make sure aOutStartOffset <= aOutEndOffset.
   aOutStartOffset = std::min(anchorOffset, focusOffset);
   aOutEndOffset = std::max(anchorOffset, focusOffset);
-}
-
-/* static */
-nsRect
-nsContentUtils::GetSelectionBoundingRect(Selection* aSel)
-{
-  nsRect res;
-  // Bounding client rect may be empty after calling GetBoundingClientRect
-  // when range is collapsed. So we get caret's rect when range is
-  // collapsed.
-  if (aSel->IsCollapsed()) {
-    nsIFrame* frame = nsCaret::GetGeometry(aSel, &res);
-    if (frame) {
-      nsIFrame* relativeTo =
-        nsLayoutUtils::GetContainingBlockForClientRect(frame);
-      res = nsLayoutUtils::TransformFrameRectToAncestor(frame, res, relativeTo);
-    }
-  } else {
-    int32_t rangeCount = aSel->RangeCount();
-    nsLayoutUtils::RectAccumulator accumulator;
-    for (int32_t idx = 0; idx < rangeCount; ++idx) {
-      nsRange* range = aSel->GetRangeAt(idx);
-      nsRange::CollectClientRects(&accumulator, range,
-                                  range->GetStartParent(), range->StartOffset(),
-                                  range->GetEndParent(), range->EndOffset(),
-                                  true, false);
-    }
-    res = accumulator.mResultRect.IsEmpty() ? accumulator.mFirstRect :
-      accumulator.mResultRect;
-  }
-
-  return res;
 }
 
 
@@ -7500,7 +7429,7 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
               image->GetFrame(imgIContainer::FRAME_CURRENT,
                               imgIContainer::FLAG_SYNC_DECODE);
             if (surface) {
-              mozilla::RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
+              RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
                 surface->GetDataSurface();
               size_t length;
               int32_t stride;
@@ -8139,10 +8068,21 @@ nsContentUtils::PushEnabled(JSContext* aCx, JSObject* aObj)
 
 // static
 bool
-nsContentUtils::IsWorkerLoad(nsContentPolicyType aType)
+nsContentUtils::IsNonSubresourceRequest(nsIChannel* aChannel)
 {
-  return aType == nsIContentPolicy::TYPE_INTERNAL_WORKER ||
-         aType == nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER;
+  nsLoadFlags loadFlags = 0;
+  aChannel->GetLoadFlags(&loadFlags);
+  if (loadFlags & nsIChannel::LOAD_DOCUMENT_URI) {
+    return true;
+  }
+
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
+  if (!loadInfo) {
+    return false;
+  }
+  nsContentPolicyType type = loadInfo->InternalContentPolicyType();
+  return type == nsIContentPolicy::TYPE_INTERNAL_WORKER ||
+         type == nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER;
 }
 
 // static, public

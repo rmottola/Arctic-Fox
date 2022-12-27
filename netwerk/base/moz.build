@@ -69,7 +69,9 @@ XPIDL_SOURCES += [
     'nsINSSErrorsService.idl',
     'nsINullChannel.idl',
     'nsIPACGenerator.idl',
+    'nsIPackagedAppChannelListener.idl',
     'nsIPackagedAppService.idl',
+    'nsIPackagedAppUtils.idl',
     'nsIPackagedAppVerifier.idl',
     'nsIParentChannel.idl',
     'nsIParentRedirectingChannel.idl',
@@ -166,6 +168,7 @@ EXPORTS += [
 
 EXPORTS.mozilla += [
     'LoadInfo.h',
+    'LoadTainting.h',
 ]
 
 EXPORTS.mozilla.net += [

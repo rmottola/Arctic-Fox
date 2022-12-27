@@ -112,7 +112,7 @@ DetailsFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
   nsXPIDLString defaultSummaryText;
   nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
                                      "DefaultSummary", defaultSummaryText);
-  nsRefPtr<nsTextNode> description = new nsTextNode(nodeInfoManager);
+  RefPtr<nsTextNode> description = new nsTextNode(nodeInfoManager);
   description->SetText(defaultSummaryText, false);
   mDefaultSummary->AppendChildTo(description, false);
 

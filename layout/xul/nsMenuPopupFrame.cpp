@@ -358,7 +358,7 @@ NS_IMETHODIMP nsXULPopupShownEvent::HandleEvent(nsIDOMEvent* aEvent)
   if (popup) {
     // ResetPopupShownDispatcher will delete the reference to this, so keep
     // another one until Run is finished.
-    nsRefPtr<nsXULPopupShownEvent> event = this;
+    RefPtr<nsXULPopupShownEvent> event = this;
     // Only call Run if it the dispatcher was assigned. This avoids calling the
     // Run method if the transitionend event fires multiple times.
     if (popup->ClearPopupShownDispatcher()) {
@@ -1469,7 +1469,7 @@ nsMenuPopupFrame::SetPopupPosition(nsIFrame* aAnchorFrame, bool aIsMove, bool aS
   // to save time since they will never have a titlebar.
   nsIWidget* widget = view->GetWidget();
   if (mPopupType == ePopupTypePanel && widget) {
-    mLastClientOffset = widget->GetClientOffset();
+    mLastClientOffset = widget->GetClientOffsetUntyped();
     viewPoint.x += presContext->DevPixelsToAppUnits(mLastClientOffset.x);
     viewPoint.y += presContext->DevPixelsToAppUnits(mLastClientOffset.y);
   }
@@ -2137,7 +2137,7 @@ nsMenuPopupFrame::MoveTo(const CSSIntPoint& aPos, bool aUpdateAttrs)
 {
   nsIWidget* widget = GetWidget();
   if ((mScreenRect.x == aPos.x && mScreenRect.y == aPos.y) &&
-      (!widget || widget->GetClientOffset() == mLastClientOffset)) {
+      (!widget || widget->GetClientOffsetUntyped() == mLastClientOffset)) {
     return;
   }
 

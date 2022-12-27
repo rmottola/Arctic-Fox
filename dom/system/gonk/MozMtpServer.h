@@ -43,8 +43,8 @@ public:
   already_AddRefed<MozMtpDatabase> GetMozMtpDatabase();
 
 private:
-  nsRefPtr<RefCountedMtpServer> mMtpServer;
-  nsRefPtr<MozMtpDatabase> mMozMtpDatabase;
+  RefPtr<RefCountedMtpServer> mMtpServer;
+  RefPtr<MozMtpDatabase> mMozMtpDatabase;
   nsCOMPtr<nsIThread> mServerThread;
   ScopedClose mMtpUsbFd;
 };

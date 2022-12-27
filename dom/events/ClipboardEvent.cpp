@@ -43,7 +43,7 @@ ClipboardEvent::InitClipboardEvent(const nsAString& aType,
   // Null clipboardData is OK
 
   ErrorResult rv;
-  InitClipboardEvent(aType, aCanBubble, aCancelable, clipboardData, rv);
+  InitClipboardEvent(aType, aCanBubble, aCancelable, clipboardData);
 
   return rv.StealNSResult();
 }
@@ -51,14 +51,9 @@ ClipboardEvent::InitClipboardEvent(const nsAString& aType,
 void
 ClipboardEvent::InitClipboardEvent(const nsAString& aType, bool aCanBubble,
                                    bool aCancelable,
-                                   DataTransfer* aClipboardData,
-                                   ErrorResult& aError)
+                                   DataTransfer* aClipboardData)
 {
-  aError = Event::InitEvent(aType, aCanBubble, aCancelable);
-  if (aError.Failed()) {
-    return;
-  }
-
+  Event::InitEvent(aType, aCanBubble, aCancelable);
   mEvent->AsClipboardEvent()->clipboardData = aClipboardData;
 }
 
@@ -69,10 +64,10 @@ ClipboardEvent::Constructor(const GlobalObject& aGlobal,
                             ErrorResult& aRv)
 {
   nsCOMPtr<EventTarget> t = do_QueryInterface(aGlobal.GetAsSupports());
-  nsRefPtr<ClipboardEvent> e = new ClipboardEvent(t, nullptr, nullptr);
+  RefPtr<ClipboardEvent> e = new ClipboardEvent(t, nullptr, nullptr);
   bool trusted = e->Init(t);
 
-  nsRefPtr<DataTransfer> clipboardData;
+  RefPtr<DataTransfer> clipboardData;
   if (e->mEventIsInternal) {
     InternalClipboardEvent* event = e->mEvent->AsClipboardEvent();
     if (event) {
@@ -85,7 +80,7 @@ ClipboardEvent::Constructor(const GlobalObject& aGlobal,
   }
 
   e->InitClipboardEvent(aType, aParam.mBubbles, aParam.mCancelable,
-                        clipboardData, aRv);
+                        clipboardData);
   e->SetTrusted(trusted);
   return e.forget();
 }
@@ -128,7 +123,7 @@ NS_NewDOMClipboardEvent(EventTarget* aOwner,
                         nsPresContext* aPresContext,
                         InternalClipboardEvent* aEvent)
 {
-  nsRefPtr<ClipboardEvent> it =
+  RefPtr<ClipboardEvent> it =
     new ClipboardEvent(aOwner, aPresContext, aEvent);
   return it.forget();
 }

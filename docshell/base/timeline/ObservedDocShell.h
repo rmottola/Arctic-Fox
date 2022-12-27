@@ -7,13 +7,15 @@
 #ifndef mozilla_ObservedDocShell_h_
 #define mozilla_ObservedDocShell_h_
 
+#include "MarkersStorage.h"
+#include "mozilla/RefPtr.h"
+#include "mozilla/UniquePtr.h"
 #include "nsTArray.h"
-#include "mozilla/nsRefPtr.h"
 
-class nsDocShell;
+class nsIDocShell;
 
 namespace mozilla {
-class TimelineMarker;
+class AbstractTimelineMarker;
 
 namespace dom {
 struct ProfileTimelineMarker;
@@ -23,19 +25,25 @@ struct ProfileTimelineMarker;
 //
 // A wrapper around a docshell for which docshell-specific markers are
 // allowed to exist. See TimelineConsumers for register/unregister logic.
-class ObservedDocShell : public LinkedListElement<ObservedDocShell>
+class ObservedDocShell : public MarkersStorage
 {
 private:
-  nsRefPtr<nsDocShell> mDocShell;
-  nsTArray<UniquePtr<TimelineMarker>> mTimelineMarkers;
+  RefPtr<nsIDocShell> mDocShell;
+
+  // Main thread only.
+  nsTArray<UniquePtr<AbstractTimelineMarker>> mTimelineMarkers;
+
+  // Off the main thread only.
+  nsTArray<UniquePtr<AbstractTimelineMarker>> mOffTheMainThreadTimelineMarkers;
 
 public:
-  explicit ObservedDocShell(nsDocShell* aDocShell);
-  nsDocShell* operator*() const { return mDocShell.get(); }
+  explicit ObservedDocShell(nsIDocShell* aDocShell);
+  nsIDocShell* operator*() const { return mDocShell.get(); }
 
-  void AddMarker(UniquePtr<TimelineMarker>&& aMarker);
-  void ClearMarkers();
-  void PopMarkers(JSContext* aCx, nsTArray<dom::ProfileTimelineMarker>& aStore);
+  void AddMarker(UniquePtr<AbstractTimelineMarker>&& aMarker) override;
+  void AddOTMTMarker(UniquePtr<AbstractTimelineMarker>&& aMarker) override;
+  void ClearMarkers() override;
+  void PopMarkers(JSContext* aCx, nsTArray<dom::ProfileTimelineMarker>& aStore) override;
 };
 
 } // namespace mozilla

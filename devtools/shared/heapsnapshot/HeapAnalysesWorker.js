@@ -10,7 +10,10 @@
 
 "use strict";
 
-importScripts("resource://gre/modules/devtools/shared/shared/worker-helper.js");
+importScripts("resource://gre/modules/workers/require.js");
+importScripts("resource://devtools/shared/worker/helper.js");
+const { CensusTreeNode } = require("resource://devtools/shared/heapsnapshot/census-tree-node.js");
+const CensusUtils = require("resource://devtools/shared/heapsnapshot/CensusUtils.js");
 
 // The set of HeapSnapshot instances this worker has read into memory. Keyed by
 // snapshot file path.
@@ -28,10 +31,41 @@ workerHelper.createTask(self, "readHeapSnapshot", ({ snapshotFilePath }) => {
 /**
  * @see HeapAnalysesClient.prototype.takeCensus
  */
-workerHelper.createTask(self, "takeCensus", ({ snapshotFilePath, censusOptions }) => {
+workerHelper.createTask(self, "takeCensus", ({ snapshotFilePath, censusOptions, requestOptions }) => {
   if (!snapshots[snapshotFilePath]) {
     throw new Error(`No known heap snapshot for '${snapshotFilePath}'`);
   }
 
-  return snapshots[snapshotFilePath].takeCensus(censusOptions);
+  let report = snapshots[snapshotFilePath].takeCensus(censusOptions);
+  return requestOptions.asTreeNode
+    ? new CensusTreeNode(censusOptions.breakdown, report)
+    : report;
+});
+
+/**
+ * @see HeapAnalysesClient.prototype.takeCensusDiff
+ */
+workerHelper.createTask(self, "takeCensusDiff", request => {
+  const {
+    firstSnapshotFilePath,
+    secondSnapshotFilePath,
+    censusOptions,
+    requestOptions
+  } = request;
+
+  if (!snapshots[firstSnapshotFilePath]) {
+    throw new Error(`No known heap snapshot for '${firstSnapshotFilePath}'`);
+  }
+
+  if (!snapshots[secondSnapshotFilePath]) {
+    throw new Error(`No known heap snapshot for '${secondSnapshotFilePath}'`);
+  }
+
+  const first = snapshots[firstSnapshotFilePath].takeCensus(censusOptions);
+  const second = snapshots[secondSnapshotFilePath].takeCensus(censusOptions);
+  const delta = CensusUtils.diff(censusOptions.breakdown, first, second);
+
+  return requestOptions.asTreeNode
+    ? new CensusTreeNode(censusOptions.breakdown, delta)
+    : delta;
 });

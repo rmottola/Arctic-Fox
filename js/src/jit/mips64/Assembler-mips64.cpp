@@ -256,7 +256,7 @@ Assembler::Bind(uint8_t* rawCode, AbsoluteLabel* label, const void* address)
 }
 
 void
-Assembler::bind(InstImm* inst, uint64_t branch, uint64_t target)
+Assembler::bind(InstImm* inst, uintptr_t branch, uintptr_t target)
 {
     int64_t offset = target - branch;
     InstImm inst_bgezal = InstImm(op_regimm, zero, rt_bgezal, BOffImm16(0));
@@ -281,18 +281,21 @@ Assembler::bind(InstImm* inst, uint64_t branch, uint64_t target)
     }
 
     if (BOffImm16::IsInRange(offset)) {
-        bool conditional = (inst[0].encode() != inst_bgezal.encode() &&
-                            inst[0].encode() != inst_beq.encode());
-
         inst[0].setBOffImm16(BOffImm16(offset));
         inst[1].makeNop();
 
+        // Don't skip trailing nops can imporve performance
+        // on Loongson3 platform.
+#ifndef _MIPS_ARCH_LOONGSON3A
+        bool conditional = (inst[0].encode() != inst_bgezal.encode() &&
+                            inst[0].encode() != inst_beq.encode());
+
         // Skip the trailing nops in conditional branches.
-        // FIXME: On Loongson3 platform, the branch degrade performance.
-        if (0 && conditional) {
+        if (conditional) {
             inst[2] = InstImm(op_regimm, zero, rt_bgez, BOffImm16(5 * sizeof(uint32_t))).encode();
             // There are 4 nops after this
         }
+#endif
         return;
     }
 
@@ -317,7 +320,7 @@ void
 Assembler::bind(RepatchLabel* label)
 {
     BufferOffset dest = nextOffset();
-    if (label->used()) {
+    if (label->used() && !oom()) {
         // If the label has a use, then change this use to refer to
         // the bound label;
         BufferOffset b(label->offset());
@@ -368,10 +371,10 @@ uint64_t
 Assembler::ExtractLoad64Value(Instruction* inst0)
 {
     InstImm* i0 = (InstImm*) inst0;
-    InstImm* i1 = (InstImm*) inst0->next();
-    InstReg* i2 = (InstReg*) inst1->next();
-    InstImm* i3 = (InstImm*) inst2->next();
-    InstImm* i5 = (InstImm*) inst3->next()->next();
+    InstImm* i1 = (InstImm*) i0->next();
+    InstReg* i2 = (InstReg*) i1->next();
+    InstImm* i3 = (InstImm*) i2->next();
+    InstImm* i5 = (InstImm*) i3->next()->next();
 
     MOZ_ASSERT(i0->extractOpcode() == ((uint32_t)op_lui >> OpcodeShift));
     MOZ_ASSERT(i1->extractOpcode() == ((uint32_t)op_ori >> OpcodeShift));
@@ -398,10 +401,10 @@ void
 Assembler::UpdateLoad64Value(Instruction* inst0, uint64_t value)
 {
     InstImm* i0 = (InstImm*) inst0;
-    InstImm* i1 = (InstImm*) inst0->next();
-    InstReg* i2 = (InstReg*) inst1->next();
-    InstImm* i3 = (InstImm*) inst2->next();
-    InstImm* i5 = (InstImm*) inst3->next()->next();
+    InstImm* i1 = (InstImm*) i0->next();
+    InstReg* i2 = (InstReg*) i1->next();
+    InstImm* i3 = (InstImm*) i2->next();
+    InstImm* i5 = (InstImm*) i3->next()->next();
 
     MOZ_ASSERT(i0->extractOpcode() == ((uint32_t)op_lui >> OpcodeShift));
     MOZ_ASSERT(i1->extractOpcode() == ((uint32_t)op_ori >> OpcodeShift));

@@ -149,7 +149,7 @@ WebrtcGmpVideoEncoder::InitEncode(const webrtc::VideoCodec* aCodecSettings,
   nsCOMPtr<nsIThread> currentThread(do_GetCurrentThread());
   MOZ_ASSERT(currentThread != mGMPThread);
 
-  nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+  RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
   mGMPThread->Dispatch(WrapRunnable(this,
                                     &WebrtcGmpVideoEncoder::InitEncode_g,
                                     aCodecSettings,
@@ -257,7 +257,7 @@ WebrtcGmpVideoEncoder::Encode(const webrtc::I420VideoFrame& aInputImage,
     LOGD(("GMP Encode: resolution change from %ux%u to %dx%d",
           mCodecParams.mWidth, mCodecParams.mHeight, aInputImage.width(), aInputImage.height()));
 
-    nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+    RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
     nsCOMPtr<nsIRunnable> task(
       WrapRunnable(this,
                    &WebrtcGmpVideoEncoder::RegetEncoderForResolutionChange,
@@ -324,7 +324,7 @@ WebrtcGmpVideoEncoder::Encode_g(const webrtc::I420VideoFrame* aInputImage,
   if (err != GMPNoErr) {
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
-  GMPUnique<GMPVideoi420Frame>::Ptr frame(static_cast<GMPVideoi420Frame*>(ftmp));
+  GMPUniquePtr<GMPVideoi420Frame> frame(static_cast<GMPVideoi420Frame*>(ftmp));
 
   err = frame->CreateFrame(aInputImage->allocated_size(webrtc::kYPlane),
                            aInputImage->buffer(webrtc::kYPlane),
@@ -604,7 +604,7 @@ WebrtcGmpVideoDecoder::InitDecode(const webrtc::VideoCodec* aCodecSettings,
     }
   }
 
-  nsRefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
+  RefPtr<InitDoneRunnable> initDone(new InitDoneRunnable());
   mGMPThread->Dispatch(WrapRunnable(this,
                                     &WebrtcGmpVideoDecoder::InitDecode_g,
                                     aCodecSettings,
@@ -713,7 +713,7 @@ WebrtcGmpVideoDecoder::Decode_g(const webrtc::EncodedImage& aInputImage,
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
 
-  GMPUnique<GMPVideoEncodedFrame>::Ptr frame(static_cast<GMPVideoEncodedFrame*>(ftmp));
+  GMPUniquePtr<GMPVideoEncodedFrame> frame(static_cast<GMPVideoEncodedFrame*>(ftmp));
   err = frame->CreateEmptyFrame(aInputImage._length);
   if (err != GMPNoErr) {
     return WEBRTC_VIDEO_CODEC_ERROR;

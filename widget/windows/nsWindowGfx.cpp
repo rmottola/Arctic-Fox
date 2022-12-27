@@ -205,7 +205,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     PluginInstanceParent* instance = reinterpret_cast<PluginInstanceParent*>(
       ::GetPropW(mWnd, L"PluginInstanceParentProperty"));
     if (instance) {
-      unused << instance->CallUpdateWindow();
+      Unused << instance->CallUpdateWindow();
     } else {
       // We should never get here since in-process plugins should have
       // subclassed our HWND and handled WM_PAINT, but in some cases that
@@ -312,7 +312,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     switch (GetLayerManager()->GetBackendType()) {
       case LayersBackend::LAYERS_BASIC:
         {
-          nsRefPtr<gfxASurface> targetSurface;
+          RefPtr<gfxASurface> targetSurface;
 
 #if defined(MOZ_XUL)
           // don't support transparency for non-GDI rendering, for now
@@ -325,7 +325,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
           }
 #endif
 
-          nsRefPtr<gfxWindowsSurface> targetSurfaceWin;
+          RefPtr<gfxWindowsSurface> targetSurfaceWin;
           if (!targetSurface &&
               (IsRenderMode(gfxWindowsPlatform::RENDER_GDI) ||
                IsRenderMode(gfxWindowsPlatform::RENDER_DIRECT2D)))
@@ -336,7 +336,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
             targetSurface = targetSurfaceWin;
           }
 
-          nsRefPtr<gfxImageSurface> targetSurfaceImage;
+          RefPtr<gfxImageSurface> targetSurfaceImage;
           if (!targetSurface &&
               (IsRenderMode(gfxWindowsPlatform::RENDER_IMAGE_STRETCH32) ||
                IsRenderMode(gfxWindowsPlatform::RENDER_IMAGE_STRETCH24)))
@@ -402,7 +402,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 #endif
           }
 
-          nsRefPtr<gfxContext> thebesContext = new gfxContext(dt);
+          RefPtr<gfxContext> thebesContext = new gfxContext(dt);
 
           {
             AutoLayerManagerSetup
@@ -640,7 +640,7 @@ nsresult nsWindowGfx::CreateIcon(imgIContainer *aContainer,
   MOZ_ASSERT(dataSurface->GetFormat() == SurfaceFormat::B8G8R8A8);
 
   uint8_t* data = nullptr;
-  nsAutoArrayPtr<uint8_t> autoDeleteArray;
+  UniquePtr<uint8_t[]> autoDeleteArray;
   if (map.mStride == BytesPerPixel(dataSurface->GetFormat()) * iconSize.width) {
     // Mapped data is already packed
     data = map.mData;
@@ -653,7 +653,8 @@ nsresult nsWindowGfx::CreateIcon(imgIContainer *aContainer,
     dataSurface->Unmap();
     map.mData = nullptr;
 
-    data = autoDeleteArray = SurfaceToPackedBGRA(dataSurface);
+    autoDeleteArray = SurfaceToPackedBGRA(dataSurface);
+    data = autoDeleteArray.get();
     NS_ENSURE_TRUE(data, NS_ERROR_FAILURE);
   }
 

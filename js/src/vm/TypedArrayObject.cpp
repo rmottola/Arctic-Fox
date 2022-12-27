@@ -412,7 +412,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
     {
         CallArgs args = CallArgsFromVp(argc, vp);
 
-        if (!WarnIfNotConstructing(cx, args, "typed array"))
+        if (!ThrowIfNotConstructing(cx, args, "typed array"))
             return false;
 
         JSObject* obj = create(cx, args);
@@ -1836,7 +1836,7 @@ const Class TypedArrayObject::classes[Scalar::MaxTypedArrayViewType] = {
      * Actually ({}).toString.call(Uint8Array.prototype) should throw, because
      * Uint8Array.prototype lacks the the typed array internal slots.  (Same as
      * with %TypedArray%.prototype.)  It's not clear this is desirable (see
-     * above), but it's what we've always done, so keep doing it til we
+     * above), but it's what we've always done, so keep doing it till we
      * implement @@toStringTag or ES6 changes.
      */ \
     #typedArray "Prototype", \

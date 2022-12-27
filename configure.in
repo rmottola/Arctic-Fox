@@ -3368,11 +3368,7 @@ MOZ_CONFIG_NSPR()
 
 dnl set GRE_MILESTONE
 dnl ========================================================
-if test -n "$LIBXUL_SDK"; then
-    GRE_MILESTONE=`$PYTHON "$_topsrcdir"/config/printconfigsetting.py "$LIBXUL_DIST"/bin/platform.ini Build Milestone`
-else
-    GRE_MILESTONE=`tail -n 1 "$_topsrcdir"/config/milestone.txt 2>/dev/null || tail -1 "$_topsrcdir"/config/milestone.txt`
-fi
+GRE_MILESTONE=`tail -n 1 "$_topsrcdir"/config/milestone.txt 2>/dev/null || tail -1 "$_topsrcdir"/config/milestone.txt`
 AC_SUBST(GRE_MILESTONE)
 
 # set RELEASE_BUILD and NIGHTLY_BUILD variables depending on the cycle we're in
@@ -3727,7 +3723,6 @@ MOZ_DISABLE_PARENTAL_CONTROLS=1
 ENABLE_SYSTEM_EXTENSION_DIRS=1
 MOZ_BRANDING_DIRECTORY=
 MOZ_OFFICIAL_BRANDING=
-MC_OFFICIAL=1
 MOZ_FEEDS=1
 MOZ_AUTH_EXTENSION=1
 if test "$MOZ_IOS"; then
@@ -3821,6 +3816,9 @@ MOZ_CONTENT_SANDBOX=
 MOZ_GMP_SANDBOX=
 MOZ_SANDBOX=
 MOZ_DEVTOOLS=
+MOZ_ADDON_SIGNING=
+MOZ_REQUIRE_SIGNING=
+MOZ_DEVTOOLS=server
 
 case "$target_os" in
     mingw*)
@@ -3953,6 +3951,19 @@ fi
 AC_SUBST(MOZ_BING_API_CLIENTID)
 AC_SUBST(MOZ_BING_API_KEY)
 
+dnl ========================================================
+dnl = Trademarked Branding
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(official-branding,
+[  --enable-official-branding
+                          Enable Official mozilla.org Branding
+                          Do not distribute builds with
+                          --enable-official-branding unless you have
+                          permission to use trademarks per
+                          http://www.mozilla.org/foundation/trademarks/ .],
+    MOZ_OFFICIAL_BRANDING=1,
+    MOZ_OFFICIAL_BRANDING=)
+
 # Allow the application to influence configure with a confvars.sh script.
 AC_MSG_CHECKING([if app-specific confvars.sh exists])
 if test -f "${srcdir}/${MOZ_BUILD_APP}/confvars.sh" ; then
@@ -3993,15 +4004,6 @@ WITH_APP_BASENAME=$withval,
 if test -n "$WITH_APP_BASENAME" ; then
     MOZ_APP_BASENAME="$WITH_APP_BASENAME"
 fi
-
-# Now is a good time to test for logic errors, define mismatches, etc.
-case "$MOZ_BUILD_APP" in
-xulrunner)
-  if test "$LIBXUL_SDK"; then
-    AC_MSG_ERROR([Building XULRunner --with-libxul-sdk doesn't make sense; XULRunner provides the libxul SDK.])
-  fi
-  ;;
-esac
 
 # Special cases where we need to AC_DEFINE something. Also a holdover for apps
 # that haven't made a confvars.sh yet. Don't add new stuff here, use
@@ -4515,42 +4517,14 @@ MOZ_ARG_ENABLE_STRING(ui-locale,
     MOZ_UI_LOCALE=$enableval )
 AC_SUBST(MOZ_UI_LOCALE)
 
-dnl ========================================================
-dnl = Vendor override
-dnl ========================================================
-MOZ_ARG_DISABLE_BOOL(official-vendor,
-[  --disable-official-vendor   Disable the use of official vendor.],
-    MC_OFFICIAL=,
-    MC_OFFICIAL=1)
-
-dnl ========================================================
-dnl = Trademarked Branding
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(official-branding,
-[  --enable-official-branding
-                          Enable official branding
-                          Do not distribute builds with
-                          --enable-official-branding unless you have
-                          permission to use the name/logo per
-                          http://www.palemoon.org/redist.shtml .],
-[
+AC_SUBST(MOZ_OFFICIAL_BRANDING)
+if test -n "$MOZ_OFFICIAL_BRANDING"; then
   if test -z "$MOZ_OFFICIAL_BRANDING_DIRECTORY"; then
     AC_MSG_ERROR([You must specify MOZ_OFFICIAL_BRANDING_DIRECTORY to use --enable-official-branding.])
   else
     MOZ_BRANDING_DIRECTORY=${MOZ_OFFICIAL_BRANDING_DIRECTORY}
-    MOZ_OFFICIAL_BRANDING=1
-    MC_OFFICIAL=1
+    AC_DEFINE(MOZ_OFFICIAL_BRANDING)
   fi
-], MOZ_OFFICIAL_BRANDING=)
-
-AC_SUBST(MC_OFFICIAL)
-if test -n "$MC_OFFICIAL"; then
-  AC_DEFINE(MC_OFFICIAL)
-fi
-
-AC_SUBST(MOZ_OFFICIAL_BRANDING)
-if test -n "$MOZ_OFFICIAL_BRANDING"; then
-  AC_DEFINE(MOZ_OFFICIAL_BRANDING)
 fi
 
 MOZ_ARG_WITH_STRING(branding,
@@ -4569,22 +4543,6 @@ elif test -f "${EXTERNAL_SOURCE_DIR}/$REAL_BRANDING_DIRECTORY/configure.sh"; the
 fi
 
 AC_SUBST(MOZ_BRANDING_DIRECTORY)
-
-dnl ========================================================
-dnl = Private Build
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(private-build,
-[  --enable-private-build   Enable private builds
-                            This allows you to build with official
-                            branding for personal use only using any
-                            build time configuration.],
-    MC_PRIVATE_BUILD=1,
-    MC_PRIVATE_BUILD=)
-
-AC_SUBST(MC_PRIVATE_BUILD)
-if test -n "$MC_PRIVATE_BUILD"; then
-  AC_DEFINE(MC_PRIVATE_BUILD)
-fi
 
 dnl ========================================================
 dnl = Distribution ID
@@ -6085,11 +6043,6 @@ if test -z "$MOZ_ENABLE_GIO" -a `echo "$MOZ_EXTENSIONS" | grep -c gio` -ne 0; th
     if test -n "$MOZ_X11"; then
         AC_MSG_WARN([Removing gio from MOZ_EXTENSIONS due to --disable-gio.])
     fi
-    MOZ_EXTENSIONS=`echo $MOZ_EXTENSIONS | sed -e 's|gio||'`
-fi
-
-dnl Do not build gio with libxul based apps
-if test -n "$LIBXUL_SDK_DIR" -a `echo "$MOZ_EXTENSIONS" | grep -c gio` -ne 0; then
     MOZ_EXTENSIONS=`echo $MOZ_EXTENSIONS | sed -e 's|gio||'`
 fi
 
@@ -8297,8 +8250,6 @@ AC_SUBST(MOZ_AUTH_EXTENSION)
 AC_SUBST(MOZ_PREF_EXTENSIONS)
 AC_SUBST(MOZ_DEBUG)
 AC_SUBST(MOZ_DEBUG_SYMBOLS)
-AC_SUBST(MOZ_DEBUG_ENABLE_DEFS)
-AC_SUBST(MOZ_DEBUG_DISABLE_DEFS)
 AC_SUBST(MOZ_DEBUG_LDFLAGS)
 AC_SUBST(WARNINGS_AS_ERRORS)
 AC_SUBST(MOZ_EXTENSIONS)
@@ -8373,6 +8324,9 @@ AC_SUBST(MOZ_BUILD_ROOT)
 AC_SUBST(MOZ_POST_DSO_LIB_COMMAND)
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
 AC_SUBST(MOZ_LINKER_EXTRACT)
+
+AC_SUBST(MOZ_ADDON_SIGNING)
+AC_SUBST(MOZ_REQUIRE_SIGNING)
 
 AC_SUBST(MOZ_JSDOWNLOADS)
 if test -n "$MOZ_JSDOWNLOADS"; then
@@ -8516,9 +8470,9 @@ AC_SUBST(MOZ_APP_STATIC_INI)
 AC_SUBST(MOZ_PKG_SPECIAL)
 
 AC_SUBST(MOZILLA_OFFICIAL)
-
-# Build revisions should always be present in official builds
 if test "$MOZILLA_OFFICIAL"; then
+    AC_DEFINE(MOZILLA_OFFICIAL)
+    # Build revisions should always be present in official builds
     MOZ_INCLUDE_SOURCE_INFO=1
 fi
 
@@ -8707,6 +8661,7 @@ AC_SUBST(MOZ_INSTRUMENT_EVENT_LOOP)
 AC_SUBST(MOZ_CODE_COVERAGE)
 AC_SUBST(LIBJPEG_TURBO_AS)
 AC_SUBST_LIST(LIBJPEG_TURBO_ASFLAGS)
+AC_SUBST(MOZ_DEVTOOLS)
 
 AC_SUBST(MOZ_PACKAGE_JSSHELL)
 AC_SUBST(MOZ_FOLD_LIBS)
@@ -8869,6 +8824,18 @@ HAVE_SYS_MOUNT_H
 "
 
 dnl ========================================================
+dnl Determine options to use for running the preprocessor.
+dnl ========================================================
+
+if test -z "$GNU_CC" -a "$OS_ARCH" = "WINNT"; then
+    PREPROCESS_OPTION="-P -Fi"
+else
+    PREPROCESS_OPTION="-E -o "
+fi
+
+AC_SUBST(PREPROCESS_OPTION)
+
+dnl ========================================================
 dnl ICU Support
 dnl ========================================================
 
@@ -8894,10 +8861,12 @@ if test -z "$JS_SHARED_LIBRARY"; then
 fi
 AC_SUBST(JS_SHARED_LIBRARY)
 
+# Avoid using obsolete NSPR features
+AC_DEFINE(NO_NSPR_10_SUPPORT)
+
 MOZ_CREATE_CONFIG_STATUS()
 
-# No need to run subconfigures when building with LIBXUL_SDK_DIR
-if test "$COMPILE_ENVIRONMENT" -a -z "$LIBXUL_SDK_DIR"; then
+if test "$COMPILE_ENVIRONMENT"; then
   MOZ_SUBCONFIGURE_ICU()
   MOZ_SUBCONFIGURE_FFI()
 fi
@@ -8966,8 +8935,7 @@ if test -n "$_subconfigure_subdir"; then
   srcdir="$_save_srcdir"
 fi
 
-# No need to run subconfigures when building with LIBXUL_SDK_DIR
-if test "$COMPILE_ENVIRONMENT" -a -z "$LIBXUL_SDK_DIR"; then
+if test "$COMPILE_ENVIRONMENT"; then
 
 export WRAP_LDFLAGS
 
@@ -9046,7 +9014,7 @@ fi
 AC_OUTPUT_SUBDIRS(js/src,$cache_file)
 ac_configure_args="$_SUBDIR_CONFIG_ARGS"
 
-fi # COMPILE_ENVIRONMENT && !LIBXUL_SDK_DIR
+fi # COMPILE_ENVIRONMENT
 
 export WRITE_MOZINFO=1
 dnl we need to run config.status after js/src subconfigure because we're

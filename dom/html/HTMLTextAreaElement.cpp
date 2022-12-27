@@ -128,7 +128,7 @@ HTMLTextAreaElement::Select()
 
   nsIFocusManager* fm = nsFocusManager::GetFocusManager();
 
-  nsRefPtr<nsPresContext> presContext = GetPresContext(eForComposedDoc);
+  RefPtr<nsPresContext> presContext = GetPresContext(eForComposedDoc);
   if (state == eInactiveWindow) {
     if (fm)
       fm->SetFocus(this, nsIFocusManager::FLAG_NOSCROLL);
@@ -297,13 +297,14 @@ HTMLTextAreaElement::GetPlaceholderVisibility()
 
 nsresult
 HTMLTextAreaElement::SetValueInternal(const nsAString& aValue,
-                                      bool aUserInput)
+                                      uint32_t aFlags)
 {
   // Need to set the value changed flag here, so that
   // nsTextControlFrame::UpdateValueDisplay retrieves the correct value
   // if needed.
   SetValueChanged(true);
-  if (!mState.SetValue(aValue, aUserInput, true)) {
+  aFlags |= nsTextEditorState::eSetValue_Notify;
+  if (!mState.SetValue(aValue, aFlags)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -323,7 +324,8 @@ HTMLTextAreaElement::SetValue(const nsAString& aValue)
   nsAutoString currentValue;
   GetValueInternal(currentValue, true);
 
-  nsresult rv = SetValueInternal(aValue, false);
+  nsresult rv =
+    SetValueInternal(aValue, nsTextEditorState::eSetValue_ByContent);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (mFocusedValue.Equals(currentValue)) {
@@ -339,7 +341,7 @@ HTMLTextAreaElement::SetUserInput(const nsAString& aValue)
   if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
-  return SetValueInternal(aValue, true);
+  return SetValueInternal(aValue, nsTextEditorState::eSetValue_BySetUserInput);
 }
 
 NS_IMETHODIMP
@@ -901,7 +903,7 @@ HTMLTextAreaElement::SetSelectionRange(uint32_t aSelectionStart,
     rv = textControlFrame->SetSelectionRange(aSelectionStart, aSelectionEnd, dir);
     if (NS_SUCCEEDED(rv)) {
       rv = textControlFrame->ScrollSelectionIntoView();
-      nsRefPtr<AsyncEventDispatcher> asyncDispatcher =
+      RefPtr<AsyncEventDispatcher> asyncDispatcher =
         new AsyncEventDispatcher(this, NS_LITERAL_STRING("select"),
                                  true, false);
       asyncDispatcher->PostDOMEvent();
@@ -968,7 +970,8 @@ HTMLTextAreaElement::SetRangeText(const nsAString& aReplacement,
 
   if (aStart <= aEnd) {
     value.Replace(aStart, aEnd - aStart, aReplacement);
-    nsresult rv = SetValueInternal(value, false);
+    nsresult rv =
+      SetValueInternal(value, nsTextEditorState::eSetValue_ByContent);
     if (NS_FAILED(rv)) {
       aRv.Throw(rv);
       return;

@@ -62,6 +62,7 @@ WebGLUtil = (function() {
     var prefArrArr = [
       ['webgl.force-enabled', true],
       ['webgl.disable-angle', true],
+      ['webgl.bypass-shader-validation', true],
       ['webgl.enable-prototype-webgl2', true],
     ];
     var prefEnv = {'set': prefArrArr};
@@ -72,12 +73,6 @@ WebGLUtil = (function() {
       try {
         gl = canvas.getContext('webgl2');
       } catch(e) {}
-
-      if (!gl) {
-        try {
-          gl = canvas.getContext('experimental-webgl2');
-        } catch(e) {}
-      }
 
       if (!gl) {
         todo(false, 'WebGL2 is not supported');

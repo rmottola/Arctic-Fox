@@ -11,10 +11,10 @@
 #include "nsTArray.h"
 #include "nsRegion.h"
 #include "nsIFrame.h"
-#include "ImageLayers.h"
 #include "DisplayItemClip.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "LayerState.h"
+#include "LayerUserData.h"
 
 class nsDisplayListBuilder;
 class nsDisplayList;
@@ -28,6 +28,7 @@ class ContainerLayer;
 class LayerManager;
 class BasicLayerManager;
 class PaintedLayer;
+class ImageLayer;
 } // namespace layers
 
 namespace gfx {
@@ -60,6 +61,7 @@ struct ContainerLayerParameters {
     , mInActiveTransformedSubtree(false)
     , mDisableSubpixelAntialiasingInDescendants(false)
     , mInLowPrecisionDisplayPort(false)
+    , mForEventsOnly(false)
   {}
   ContainerLayerParameters(float aXScale, float aYScale)
     : mXScale(aXScale)
@@ -70,6 +72,7 @@ struct ContainerLayerParameters {
     , mInActiveTransformedSubtree(false)
     , mDisableSubpixelAntialiasingInDescendants(false)
     , mInLowPrecisionDisplayPort(false)
+    , mForEventsOnly(false)
   {}
   ContainerLayerParameters(float aXScale, float aYScale,
                            const nsIntPoint& aOffset,
@@ -83,6 +86,7 @@ struct ContainerLayerParameters {
     , mInActiveTransformedSubtree(aParent.mInActiveTransformedSubtree)
     , mDisableSubpixelAntialiasingInDescendants(aParent.mDisableSubpixelAntialiasingInDescendants)
     , mInLowPrecisionDisplayPort(aParent.mInLowPrecisionDisplayPort)
+    , mForEventsOnly(aParent.mForEventsOnly)
   {}
 
   float mXScale, mYScale;
@@ -103,7 +107,7 @@ struct ContainerLayerParameters {
   nsIntPoint mOffset;
 
   LayerIntPoint Offset() const {
-    return LayerIntPoint::FromUntyped(mOffset);
+    return LayerIntPoint::FromUnknownPoint(mOffset);
   }
 
   nscolor mBackgroundColor;
@@ -111,6 +115,7 @@ struct ContainerLayerParameters {
   bool mInActiveTransformedSubtree;
   bool mDisableSubpixelAntialiasingInDescendants;
   bool mInLowPrecisionDisplayPort;
+  bool mForEventsOnly;
   /**
    * When this is false, PaintedLayer coordinates are drawn to with an integer
    * translation and the scale in mXScale/mYScale.
@@ -172,20 +177,8 @@ public:
   typedef layers::BasicLayerManager BasicLayerManager;
   typedef layers::EventRegions EventRegions;
 
-  FrameLayerBuilder() :
-    mRetainingManager(nullptr),
-    mDetectedDOMModification(false),
-    mInvalidateAllLayers(false),
-    mInLayerTreeCompressionMode(false),
-    mContainerLayerGeneration(0),
-    mMaxContainerLayerGeneration(0)
-  {
-    MOZ_COUNT_CTOR(FrameLayerBuilder);
-  }
-  ~FrameLayerBuilder()
-  {
-    MOZ_COUNT_DTOR(FrameLayerBuilder);
-  }
+  FrameLayerBuilder();
+  ~FrameLayerBuilder();
 
   static void Shutdown();
 
@@ -492,9 +485,9 @@ public:
     void EndUpdate();
 
     LayerManagerData* mParent;
-    nsRefPtr<Layer> mLayer;
-    nsRefPtr<Layer> mOptLayer;
-    nsRefPtr<BasicLayerManager> mInactiveManager;
+    RefPtr<Layer> mLayer;
+    RefPtr<Layer> mOptLayer;
+    RefPtr<BasicLayerManager> mInactiveManager;
     nsAutoTArray<nsIFrame*, 1> mFrameList;
     nsAutoPtr<nsDisplayItemGeometry> mGeometry;
     DisplayItemClip mClip;
@@ -578,11 +571,7 @@ protected:
    * PaintedLayer.
    */
   struct ClippedDisplayItem {
-    ClippedDisplayItem(nsDisplayItem* aItem, uint32_t aGeneration)
-      : mItem(aItem), mContainerLayerGeneration(aGeneration)
-    {
-    }
-
+    ClippedDisplayItem(nsDisplayItem* aItem, uint32_t aGeneration);
     ~ClippedDisplayItem();
 
     nsDisplayItem* mItem;
@@ -592,7 +581,7 @@ protected:
      * layer, then this stores the layer manager being
      * used for the inactive transaction.
      */
-    nsRefPtr<LayerManager> mInactiveLayerManager;
+    RefPtr<LayerManager> mInactiveLayerManager;
 
     uint32_t mContainerLayerGeneration;
 
@@ -623,19 +612,9 @@ protected:
 public:
   class PaintedLayerItemsEntry : public nsPtrHashKey<PaintedLayer> {
   public:
-    explicit PaintedLayerItemsEntry(const PaintedLayer *key)
-      : nsPtrHashKey<PaintedLayer>(key)
-      , mContainerLayerFrame(nullptr)
-      , mLastCommonClipCount(0)
-      , mContainerLayerGeneration(0)
-      , mHasExplicitLastPaintOffset(false)
-      , mCommonClipCount(0)
-    {}
-    PaintedLayerItemsEntry(const PaintedLayerItemsEntry &toCopy) :
-      nsPtrHashKey<PaintedLayer>(toCopy.mKey), mItems(toCopy.mItems)
-    {
-      NS_ERROR("Should never be called, since we ALLOW_MEMMOVE");
-    }
+    explicit PaintedLayerItemsEntry(const PaintedLayer *key);
+    PaintedLayerItemsEntry(const PaintedLayerItemsEntry&);
+    ~PaintedLayerItemsEntry();
 
     nsTArray<ClippedDisplayItem> mItems;
     nsIFrame* mContainerLayerFrame;
@@ -699,7 +678,7 @@ protected:
   /**
    * The root prescontext for the display list builder reference frame
    */
-  nsRefPtr<nsRootPresContext>         mRootPresContext;
+  RefPtr<nsRootPresContext>         mRootPresContext;
 
   /**
    * The display list builder being used.

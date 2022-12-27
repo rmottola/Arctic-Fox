@@ -302,7 +302,7 @@ class CodeGeneratorShared : public LElementVisitor
 
     // Encode all encountered safepoints in CG-order, and resolve |indices| for
     // safepoint offsets.
-    void encodeSafepoints();
+    bool encodeSafepoints();
 
     // Fixup offsets of native-to-bytecode map.
     bool createNativeToBytecodeScriptList(JSContext* cx);
@@ -470,7 +470,7 @@ class CodeGeneratorShared : public LElementVisitor
     void jumpToBlock(MBasicBlock* mir);
 
 // This function is not used for MIPS. MIPS has branchToBlock.
-#ifndef JS_CODEGEN_MIPS32
+#if !defined(JS_CODEGEN_MIPS32) && !defined(JS_CODEGEN_MIPS64)
     void jumpToBlock(MBasicBlock* mir, Assembler::Condition cond);
 #endif
 
@@ -522,7 +522,7 @@ class CodeGeneratorShared : public LElementVisitor
 
     inline void verifyHeapAccessDisassembly(uint32_t begin, uint32_t end, bool isLoad,
                                             Scalar::Type type, unsigned numElems,
-                                            const Operand &mem, LAllocation alloc);
+                                            const Operand& mem, LAllocation alloc);
 };
 
 // An out-of-line path is generated at the end of the function.

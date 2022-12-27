@@ -25,10 +25,10 @@
 #include "mozilla/layers/LayersSurfaces.h"  // for SurfaceDescriptor, etc
 #include "mozilla/layers/ShadowLayers.h"  // for ShadowLayerForwarder, etc
 #include "mozilla/mozalloc.h"           // for operator new
+#include "gfxEnv.h"
 #include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_ERROR
-#include "prenv.h"                      // for PR_GetEnv
 
 using namespace mozilla::gl;
 
@@ -45,7 +45,7 @@ namespace layers {
 static bool
 UsingXCompositing()
 {
-  if (!PR_GetEnv("MOZ_LAYERS_ENABLE_XLIB_SURFACES")) {
+  if (!gfxEnv::LayersEnableXlibSurfaces()) {
       return false;
   }
   return (gfxSurfaceType::Xlib ==
@@ -94,7 +94,7 @@ SurfaceDescriptorX11::OpenForeign() const
   Display* display = DefaultXDisplay();
   Screen* screen = DefaultScreenOfDisplay(display);
 
-  nsRefPtr<gfxXlibSurface> surf;
+  RefPtr<gfxXlibSurface> surf;
   XRenderPictFormat* pictFormat = GetXRenderPictFormatFromId(display, mFormat);
   if (pictFormat) {
     surf = new gfxXlibSurface(screen, mId, pictFormat, mSize);

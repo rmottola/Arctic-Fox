@@ -28,7 +28,6 @@
 #include "imgFrame.h"
 #include "Image.h"
 #include "LookupResult.h"
-#include "nsAutoPtr.h"
 #include "nsExpirationTracker.h"
 #include "nsHashKeys.h"
 #include "nsRefPtrHashtable.h"
@@ -221,7 +220,7 @@ public:
 
 private:
   nsExpirationState  mExpirationState;
-  nsRefPtr<imgFrame> mSurface;
+  RefPtr<imgFrame> mSurface;
   DrawableFrameRef   mDrawableRef;
   const Cost         mCost;
   const ImageKey     mImageKey;
@@ -270,7 +269,7 @@ public:
 
   already_AddRefed<CachedSurface> Lookup(const SurfaceKey& aSurfaceKey)
   {
-    nsRefPtr<CachedSurface> surface;
+    RefPtr<CachedSurface> surface;
     mSurfaces.Get(aSurfaceKey, getter_AddRefs(surface));
     return surface.forget();
   }
@@ -280,7 +279,7 @@ public:
                   const Maybe<SurfaceFlags>& aAlternateFlags)
   {
     // Try for an exact match first.
-    nsRefPtr<CachedSurface> exactMatch;
+    RefPtr<CachedSurface> exactMatch;
     mSurfaces.Get(aSurfaceKey, getter_AddRefs(exactMatch));
     if (exactMatch && exactMatch->IsDecoded()) {
       return MakePair(exactMatch.forget(), MatchType::EXACT);
@@ -336,7 +335,7 @@ private:
 
     const SurfaceKey& mIdealKey;
     const Maybe<SurfaceFlags> mAlternateFlags;
-    nsRefPtr<CachedSurface> mBestMatch;
+    RefPtr<CachedSurface> mBestMatch;
   };
 
   static PLDHashOperator TryToImproveMatch(const SurfaceKey& aSurfaceKey,
@@ -499,13 +498,13 @@ public:
 
     // Locate the appropriate per-image cache. If there's not an existing cache
     // for this image, create it.
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       cache = new ImageSurfaceCache;
       mImageCaches.Put(aImageKey, cache);
     }
 
-    nsRefPtr<CachedSurface> surface =
+    RefPtr<CachedSurface> surface =
       new CachedSurface(aSurface, aCost, aImageKey, aSurfaceKey);
 
     // We require that locking succeed if the image is locked and we're not
@@ -531,7 +530,7 @@ public:
     MOZ_ASSERT(aSurface, "Should have a surface");
     ImageKey imageKey = aSurface->GetImageKey();
 
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(imageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(imageKey);
     MOZ_ASSERT(cache, "Shouldn't try to remove a surface with no image cache");
 
     // If the surface was not a placeholder, tell its image that we discarded it.
@@ -602,13 +601,13 @@ public:
                       const SurfaceKey& aSurfaceKey,
                       bool aMarkUsed = true)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       // No cached surfaces for this image.
       return LookupResult(MatchType::NOT_FOUND);
     }
 
-    nsRefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
+    RefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
     if (!surface) {
       // Lookup in the per-image cache missed.
       return LookupResult(MatchType::NOT_FOUND);
@@ -639,7 +638,7 @@ public:
                                const SurfaceKey&      aSurfaceKey,
                                const Maybe<SurfaceFlags>& aAlternateFlags)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       // No cached surfaces for this image.
       return LookupResult(MatchType::NOT_FOUND);
@@ -651,7 +650,7 @@ public:
     // XXX(seth): This is O(N^2), but N is expected to be very small. If we
     // encounter a performance problem here we can revisit this.
 
-    nsRefPtr<CachedSurface> surface;
+    RefPtr<CachedSurface> surface;
     DrawableFrameRef ref;
     MatchType matchType = MatchType::NOT_FOUND;
     while (true) {
@@ -689,12 +688,12 @@ public:
   void RemoveSurface(const ImageKey    aImageKey,
                      const SurfaceKey& aSurfaceKey)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       return;  // No cached surfaces for this image.
     }
 
-    nsRefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
+    RefPtr<CachedSurface> surface = cache->Lookup(aSurfaceKey);
     if (!surface) {
       return;  // Lookup in the per-image cache missed.
     }
@@ -709,7 +708,7 @@ public:
 
   void LockImage(const ImageKey aImageKey)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       cache = new ImageSurfaceCache;
       mImageCaches.Put(aImageKey, cache);
@@ -723,7 +722,7 @@ public:
 
   void UnlockImage(const ImageKey aImageKey)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache || !cache->IsLocked()) {
       return;  // Already unlocked.
     }
@@ -736,7 +735,7 @@ public:
 
   void UnlockSurfaces(const ImageKey aImageKey)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache || !cache->IsLocked()) {
       return;  // Already unlocked.
     }
@@ -750,7 +749,7 @@ public:
 
   void RemoveImage(const ImageKey aImageKey)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       return;  // No cached surfaces for this image, so nothing to do.
     }
@@ -882,7 +881,7 @@ public:
                              nsTArray<SurfaceMemoryCounter>& aCounters,
                              MallocSizeOf                    aMallocSizeOf)
   {
-    nsRefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
     if (!cache) {
       return;  // No surfaces for this image.
     }
@@ -904,7 +903,7 @@ public:
 private:
   already_AddRefed<ImageSurfaceCache> GetImageCache(const ImageKey aImageKey)
   {
-    nsRefPtr<ImageSurfaceCache> imageCache;
+    RefPtr<ImageSurfaceCache> imageCache;
     mImageCaches.Get(aImageKey, getter_AddRefs(imageCache));
     return imageCache.forget();
   }
@@ -968,7 +967,7 @@ private:
   nsRefPtrHashtable<nsPtrHashKey<Image>,
     ImageSurfaceCache> mImageCaches;
   SurfaceTracker                          mExpirationTracker;
-  nsRefPtr<MemoryPressureObserver>        mMemoryPressureObserver;
+  RefPtr<MemoryPressureObserver>        mMemoryPressureObserver;
   Mutex                                   mMutex;
   const uint32_t                          mDiscardFactor;
   const Cost                              mMaxCost;

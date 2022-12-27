@@ -1,3 +1,4 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,7 +10,7 @@
 #include "nsIObserverService.h"
 #include "nsIWebProgress.h"
 #include "nsCURILoader.h"
-#include "nsICachingChannel.h"
+#include "nsICacheInfoChannel.h"
 #include "nsIHttpChannel.h"
 #include "nsIURL.h"
 #include "nsISimpleEnumerator.h"
@@ -79,8 +80,8 @@ private:
 
     void Increment();
 
-    nsRefPtr<nsPrefetchService> mService;
-    nsRefPtr<nsPrefetchNode> mCurrent;
+    RefPtr<nsPrefetchService> mService;
+    RefPtr<nsPrefetchNode> mCurrent;
     bool mStarted;
 };
 
@@ -185,15 +186,17 @@ nsPrefetchNode::OpenChannel()
         return NS_ERROR_FAILURE;
     }
     nsCOMPtr<nsILoadGroup> loadGroup = source->OwnerDoc()->GetDocumentLoadGroup();
-    nsresult rv = NS_NewChannel(getter_AddRefs(mChannel),
-                                mURI,
-                                nsContentUtils::GetSystemPrincipal(),
-                                nsILoadInfo::SEC_NORMAL,
-                                nsIContentPolicy::TYPE_OTHER,
-                                loadGroup, // aLoadGroup
-                                this,      // aCallbacks
-                                nsIRequest::LOAD_BACKGROUND |
-                                nsICachingChannel::LOAD_ONLY_IF_MODIFIED);
+    nsresult rv = NS_NewChannelInternal(getter_AddRefs(mChannel),
+                                        mURI,
+                                        source,
+                                        source->NodePrincipal(),
+                                        nullptr,   //aTriggeringPrincipal
+                                        nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS,
+                                        nsIContentPolicy::TYPE_OTHER,
+                                        loadGroup, // aLoadGroup
+                                        this,      // aCallbacks
+                                        nsIRequest::LOAD_BACKGROUND |
+                                        nsICachingChannel::LOAD_ONLY_IF_MODIFIED);
 
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -208,10 +211,7 @@ nsPrefetchNode::OpenChannel()
             false);
     }
 
-    rv = mChannel->AsyncOpen(this, nullptr);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    return NS_OK;
+    return mChannel->AsyncOpen2(this);
 }
 
 nsresult
@@ -244,13 +244,13 @@ nsPrefetchNode::OnStartRequest(nsIRequest *aRequest,
 {
     nsresult rv;
 
-    nsCOMPtr<nsICachingChannel> cachingChannel =
+    nsCOMPtr<nsICacheInfoChannel> cacheInfoChannel =
         do_QueryInterface(aRequest, &rv);
     if (NS_FAILED(rv)) return rv;
-
+ 
     // no need to prefetch a document that is already in the cache
     bool fromCache;
-    if (NS_SUCCEEDED(cachingChannel->IsFromCache(&fromCache)) &&
+    if (NS_SUCCEEDED(cacheInfoChannel->IsFromCache(&fromCache)) &&
         fromCache) {
         LOG(("document is already in the cache; canceling prefetch\n"));
         return NS_BINDING_ABORTED;
@@ -260,17 +260,8 @@ nsPrefetchNode::OnStartRequest(nsIRequest *aRequest,
     // no need to prefetch a document that must be requested fresh each
     // and every time.
     //
-    nsCOMPtr<nsISupports> cacheToken;
-    cachingChannel->GetCacheToken(getter_AddRefs(cacheToken));
-    if (!cacheToken)
-        return NS_ERROR_ABORT; // bail, no cache entry
-
-    nsCOMPtr<nsICacheEntry> entryInfo =
-        do_QueryInterface(cacheToken, &rv);
-    if (NS_FAILED(rv)) return rv;
-
     uint32_t expTime;
-    if (NS_SUCCEEDED(entryInfo->GetExpirationTime(&expTime))) {
+    if (NS_SUCCEEDED(cacheInfoChannel->GetCacheTokenExpirationTime(&expTime))) {
         if (NowInSeconds() >= expTime) {
             LOG(("document cannot be reused from cache; "
                  "canceling prefetch\n"));
@@ -463,7 +454,7 @@ nsPrefetchService::ProcessNextURI()
         //
         // if opening the channel fails, then just skip to the next uri
         //
-        nsRefPtr<nsPrefetchNode> node = mCurrentNode;
+        RefPtr<nsPrefetchNode> node = mCurrentNode;
         rv = node->OpenChannel();
     }
     while (NS_FAILED(rv));
@@ -571,7 +562,7 @@ void
 nsPrefetchService::EmptyQueue()
 {
     do {
-        nsRefPtr<nsPrefetchNode> node;
+        RefPtr<nsPrefetchNode> node;
         DequeueNode(getter_AddRefs(node));
     } while (mQueueHead);
 }
@@ -719,7 +710,7 @@ nsPrefetchService::Prefetch(nsIURI *aURI,
         }
     }
 
-    nsRefPtr<nsPrefetchNode> enqueuedNode;
+    RefPtr<nsPrefetchNode> enqueuedNode;
     rv = EnqueueURI(aURI, aReferrerURI, aSource,
                     getter_AddRefs(enqueuedNode));
     NS_ENSURE_SUCCESS(rv, rv);

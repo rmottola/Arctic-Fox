@@ -17,6 +17,7 @@
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Attributes.h"
 #include "AlternateServices.h"
+#include "ARefBase.h"
 
 #include "nsIObserver.h"
 #include "nsITimer.h"
@@ -30,6 +31,10 @@ class NullHttpTransaction;
 struct HttpRetParams;
 
 //-----------------------------------------------------------------------------
+
+// message handlers have this signature
+class nsHttpConnectionMgr;
+typedef void (nsHttpConnectionMgr:: *nsConnEventHandler)(int32_t, ARefBase *);
 
 class nsHttpConnectionMgr final : public nsIObserver
                                 , public AltSvcCache
@@ -242,11 +247,6 @@ public:
     // bit different.
     void ReportSpdyConnection(nsHttpConnection *, bool usingSpdy);
 
-    // A spdy server can supply cwnd information for the session that is used
-    // in future sessions to speed up the opening portions of the connection.
-    void ReportSpdyCWNDSetting(nsHttpConnectionInfo *host, uint32_t cwndValue);
-    uint32_t GetSpdyCWNDSetting(nsHttpConnectionInfo *host);
-
     bool     SupportsPipelining(nsHttpConnectionInfo *);
 
     bool GetConnectionData(nsTArray<HttpRetParams> *);
@@ -292,7 +292,7 @@ private:
         explicit nsConnectionEntry(nsHttpConnectionInfo *ci);
         ~nsConnectionEntry();
 
-        nsRefPtr<nsHttpConnectionInfo> mConnInfo;
+        RefPtr<nsHttpConnectionInfo> mConnInfo;
         nsTArray<nsHttpTransaction*> mPendingQ;    // pending transaction queue
         nsTArray<nsHttpConnection*>  mActiveConns; // active connections
         nsTArray<nsHttpConnection*>  mIdleConns;   // idle persistent connections
@@ -366,11 +366,6 @@ private:
         //
         nsTArray<nsCString> mCoalescingKeys;
 
-        // The value of a recevied SPDY settings type 5 previously received
-        // for this connection entry and the time it was set.
-        uint32_t            mSpdyCWND;
-        TimeStamp  mSpdyCWNDTimeStamp;
-
         // To have the UsingSpdy flag means some host with the same connection
         // entry has done NPN=spdy/* at some point. It does not mean every
         // connection is currently using spdy.
@@ -399,32 +394,9 @@ private:
         void ResetIPFamilyPreference();
     };
 
-    // nsConnectionHandle
-    //
-    // thin wrapper around a real connection, used to keep track of references
-    // to the connection to determine when the connection may be reused.  the
-    // transaction (or pipeline) owns a reference to this handle.  this extra
-    // layer of indirection greatly simplifies consumer code, avoiding the
-    // need for consumer code to know when to give the connection back to the
-    // connection manager.
-    //
-    class nsConnectionHandle : public nsAHttpConnection
-    {
-        virtual ~nsConnectionHandle();
-
-    public:
-        NS_DECL_THREADSAFE_ISUPPORTS
-        NS_DECL_NSAHTTPCONNECTION(mConn)
-
-        explicit nsConnectionHandle(nsHttpConnection *conn) { NS_ADDREF(mConn = conn); }
-
-        nsHttpConnection *mConn;
-    };
 public:
-    static nsAHttpConnection *MakeConnectionHandle(nsHttpConnection *aWrapped)
-    {
-        return new nsConnectionHandle(aWrapped);
-    }
+    static nsAHttpConnection *MakeConnectionHandle(nsHttpConnection *aWrapped);
+
 private:
 
     // nsHalfOpenSocket is used to hold the state of an opening TCP socket
@@ -477,7 +449,7 @@ private:
         void PrintDiagnostics(nsCString &log);
     private:
         nsConnectionEntry              *mEnt;
-        nsRefPtr<nsAHttpTransaction>   mTransaction;
+        RefPtr<nsAHttpTransaction>   mTransaction;
         bool                           mDispatchedMTransaction;
         nsCOMPtr<nsISocketTransport>   mSocketTransport;
         nsCOMPtr<nsIAsyncOutputStream> mStreamOut;
@@ -532,7 +504,7 @@ private:
     uint16_t mMaxRequestDelay; // in seconds
     uint16_t mMaxPipelinedRequests;
     uint16_t mMaxOptimisticPipelinedRequests;
-    bool mIsShuttingDown;
+    Atomic<bool, mozilla::Relaxed> mIsShuttingDown;
 
     //-------------------------------------------------------------------------
     // NOTE: these members are only accessed on the socket transport thread
@@ -604,72 +576,30 @@ private:
         const nsACString &key, nsAutoPtr<nsConnectionEntry> &ent,
         void *closure);
 
-    // message handlers have this signature
-    typedef void (nsHttpConnectionMgr:: *nsConnEventHandler)(int32_t, void *);
-
-    // nsConnEvent
-    //
-    // subclass of nsRunnable used to marshall events to the socket transport
-    // thread.  this class is used to implement PostEvent.
-    //
-    class nsConnEvent;
-    friend class nsConnEvent;
-    class nsConnEvent : public nsRunnable
-    {
-    public:
-        nsConnEvent(nsHttpConnectionMgr *mgr,
-                    nsConnEventHandler handler,
-                    int32_t iparam,
-                    void *vparam)
-            : mMgr(mgr)
-            , mHandler(handler)
-            , mIParam(iparam)
-            , mVParam(vparam)
-        {
-            NS_ADDREF(mMgr);
-        }
-
-        NS_IMETHOD Run()
-        {
-            (mMgr->*mHandler)(mIParam, mVParam);
-            return NS_OK;
-        }
-
-    private:
-        virtual ~nsConnEvent()
-        {
-            NS_RELEASE(mMgr);
-        }
-
-        nsHttpConnectionMgr *mMgr;
-        nsConnEventHandler   mHandler;
-        int32_t              mIParam;
-        void                *mVParam;
-    };
-
+    // used to marshall events to the socket transport thread.
     nsresult PostEvent(nsConnEventHandler  handler,
                        int32_t             iparam = 0,
-                       void               *vparam = nullptr);
+                       ARefBase            *vparam = nullptr);
 
     // message handlers
-    void OnMsgShutdown             (int32_t, void *);
-    void OnMsgShutdownConfirm      (int32_t, void *);
-    void OnMsgNewTransaction       (int32_t, void *);
-    void OnMsgReschedTransaction   (int32_t, void *);
-    void OnMsgCancelTransaction    (int32_t, void *);
-    void OnMsgCancelTransactions   (int32_t, void *);
-    void OnMsgProcessPendingQ      (int32_t, void *);
-    void OnMsgPruneDeadConnections (int32_t, void *);
-    void OnMsgSpeculativeConnect   (int32_t, void *);
-    void OnMsgReclaimConnection    (int32_t, void *);
-    void OnMsgCompleteUpgrade      (int32_t, void *);
-    void OnMsgUpdateParam          (int32_t, void *);
-    void OnMsgDoShiftReloadConnectionCleanup (int32_t, void *);
-    void OnMsgProcessFeedback      (int32_t, void *);
-    void OnMsgProcessAllSpdyPendingQ (int32_t, void *);
-    void OnMsgUpdateRequestTokenBucket (int32_t, void *);
-    void OnMsgVerifyTraffic (int32_t, void *);
-    void OnMsgPruneNoTraffic (int32_t, void *);
+    void OnMsgShutdown             (int32_t, ARefBase *);
+    void OnMsgShutdownConfirm      (int32_t, ARefBase *);
+    void OnMsgNewTransaction       (int32_t, ARefBase *);
+    void OnMsgReschedTransaction   (int32_t, ARefBase *);
+    void OnMsgCancelTransaction    (int32_t, ARefBase *);
+    void OnMsgCancelTransactions   (int32_t, ARefBase *);
+    void OnMsgProcessPendingQ      (int32_t, ARefBase *);
+    void OnMsgPruneDeadConnections (int32_t, ARefBase *);
+    void OnMsgSpeculativeConnect   (int32_t, ARefBase *);
+    void OnMsgReclaimConnection    (int32_t, ARefBase *);
+    void OnMsgCompleteUpgrade      (int32_t, ARefBase *);
+    void OnMsgUpdateParam          (int32_t, ARefBase *);
+    void OnMsgDoShiftReloadConnectionCleanup (int32_t, ARefBase *);
+    void OnMsgProcessFeedback      (int32_t, ARefBase *);
+    void OnMsgProcessAllSpdyPendingQ (int32_t, ARefBase *);
+    void OnMsgUpdateRequestTokenBucket (int32_t, ARefBase *);
+    void OnMsgVerifyTraffic (int32_t, ARefBase *);
+    void OnMsgPruneNoTraffic (int32_t, ARefBase *);
 
     // Total number of active connections in all of the ConnectionEntry objects
     // that are accessed from mCT connection table.
@@ -721,7 +651,7 @@ private:
                                          void *closure);
 
     // For diagnostics
-    void OnMsgPrintDiagnostics(int32_t, void *);
+    void OnMsgPrintDiagnostics(int32_t, ARefBase *);
     static PLDHashOperator PrintDiagnosticsCB(const nsACString &key,
                                               nsAutoPtr<nsConnectionEntry> &ent,
                                               void *closure);

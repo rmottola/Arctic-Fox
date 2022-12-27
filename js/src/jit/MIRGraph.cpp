@@ -345,17 +345,28 @@ MBasicBlock::NewAsmJS(MIRGraph& graph, CompileInfo& info, MBasicBlock* pred, Kin
         if (block->kind_ == PENDING_LOOP_HEADER) {
             size_t nphis = block->stackPosition_;
 
+            size_t nfree = graph.phiFreeListLength();
+
             TempAllocator& alloc = graph.alloc();
-            MPhi* phis = alloc.allocateArray<MPhi>(nphis);
-            if (!phis)
-                return nullptr;
+            MPhi* phis = nullptr;
+            if (nphis > nfree) {
+                phis = alloc.allocateArray<MPhi>(nphis - nfree);
+                if (!phis)
+                    return nullptr;
+            }
 
             // Note: Phis are inserted in the same order as the slots.
             for (size_t i = 0; i < nphis; i++) {
                 MDefinition* predSlot = pred->getSlot(i);
 
                 MOZ_ASSERT(predSlot->type() != MIRType_Value);
-                MPhi* phi = new(phis + i) MPhi(alloc, predSlot->type());
+
+                MPhi* phi;
+                if (i < nfree)
+                    phi = graph.takePhiFromFreeList();
+                else
+                    phi = phis + (i - nfree);
+                new(phi) MPhi(alloc, predSlot->type());
 
                 phi->addInput(predSlot);
 
@@ -383,6 +394,7 @@ MBasicBlock::MBasicBlock(MIRGraph& graph, CompileInfo& info, BytecodeSite* site,
     numDominated_(0),
     pc_(site->pc()),
     lir_(nullptr),
+    callerResumePoint_(nullptr),
     entryResumePoint_(nullptr),
     outerResumePoint_(nullptr),
     successorWithPhis_(nullptr),
@@ -392,7 +404,9 @@ MBasicBlock::MBasicBlock(MIRGraph& graph, CompileInfo& info, BytecodeSite* site,
     mark_(false),
     immediatelyDominated_(graph.alloc()),
     immediateDominator_(nullptr),
-    trackedSite_(site)
+    trackedSite_(site),
+    hitCount_(0),
+    hitState_(HitState::NotDefined)
 #if defined (JS_ION_PERF)
     , lineno_(0u),
     columnIndex_(0u)

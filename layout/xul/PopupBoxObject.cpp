@@ -271,7 +271,7 @@ PopupBoxObject::GetAnchorNode() const
 already_AddRefed<DOMRect>
 PopupBoxObject::GetOuterScreenRect()
 {
-  nsRefPtr<DOMRect> rect = new DOMRect(mContent);
+  RefPtr<DOMRect> rect = new DOMRect(mContent);
 
   // Return an empty rectangle if the popup is not open.
   nsMenuPopupFrame *menuPopupFrame = do_QueryFrame(GetFrame(false));
@@ -284,7 +284,7 @@ PopupBoxObject::GetOuterScreenRect()
     nsIWidget* widget = view->GetWidget();
     if (widget) {
       nsIntRect screenRect;
-      widget->GetScreenBounds(screenRect);
+      widget->GetScreenBoundsUntyped(screenRect);
 
       int32_t pp = menuPopupFrame->PresContext()->AppUnitsPerDevPixel();
       rect->SetLayoutRect(ToAppUnits(screenRect, pp));

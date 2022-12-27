@@ -9,6 +9,7 @@
 
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
+#include "nsIAsyncShutdown.h"
 
 namespace mozilla {
 namespace media {
@@ -32,7 +33,7 @@ namespace media {
  * or variables you lambda-capture into them, need be threasafe or support
  * threadsafe refcounting. After all, they'll run later on the same thread.
  *
- *   nsRefPtr<media::Pledge<Foo>> p = GetFooAsynchronously(); // returns a pledge
+ *   RefPtr<media::Pledge<Foo>> p = GetFooAsynchronously(); // returns a pledge
  *   p->Then([](const Foo& foo) {
  *     // use foo here (same thread. Need not be thread-safe!)
  *   });
@@ -63,24 +64,24 @@ class Pledge : public PledgeBase
   };
 
 public:
-  explicit Pledge() : mDone(false), mError(nullptr) {}
+  explicit Pledge() : mDone(false), mRejected(false) {}
   Pledge(const Pledge& aOther) = delete;
   Pledge& operator = (const Pledge&) = delete;
 
   template<typename OnSuccessType>
-  void Then(OnSuccessType aOnSuccess)
+  void Then(OnSuccessType&& aOnSuccess)
   {
-    Then(aOnSuccess, [](ErrorType&){});
+    Then(Forward<OnSuccessType>(aOnSuccess), [](ErrorType&){});
   }
 
   template<typename OnSuccessType, typename OnFailureType>
-  void Then(OnSuccessType aOnSuccess, OnFailureType aOnFailure)
+  void Then(OnSuccessType&& aOnSuccess, OnFailureType&& aOnFailure)
   {
     class Functors : public FunctorsBase
     {
     public:
-      Functors(OnSuccessType& aOnSuccess, OnFailureType& aOnFailure)
-        : mOnSuccess(aOnSuccess), mOnFailure(aOnFailure) {}
+      Functors(OnSuccessType&& aOnSuccess, OnFailureType&& aOnFailure)
+        : mOnSuccess(Move(aOnSuccess)), mOnFailure(Move(aOnFailure)) {}
 
       void Succeed(ValueType& result)
       {
@@ -94,13 +95,13 @@ public:
       OnSuccessType mOnSuccess;
       OnFailureType mOnFailure;
     };
-    mFunctors = new Functors(aOnSuccess, aOnFailure);
-
+    mFunctors = new Functors(Forward<OnSuccessType>(aOnSuccess),
+                             Forward<OnFailureType>(aOnFailure));
     if (mDone) {
-      if (!mError) {
+      if (!mRejected) {
         mFunctors->Succeed(mValue);
       } else {
-        mFunctors->Fail(*mError);
+        mFunctors->Fail(mError);
       }
     }
   }
@@ -110,22 +111,11 @@ public:
     mValue = aValue;
     Resolve();
   }
-protected:
-  void Resolve()
-  {
-    if (!mDone) {
-      mDone = true;
-      MOZ_ASSERT(!mError);
-      if (mFunctors) {
-        mFunctors->Succeed(mValue);
-      }
-    }
-  }
 
   void Reject(ErrorType rv)
   {
     if (!mDone) {
-      mDone = true;
+      mDone = mRejected = true;
       mError = rv;
       if (mFunctors) {
         mFunctors->Fail(mError);
@@ -133,95 +123,14 @@ protected:
     }
   }
 
-  ValueType mValue;
-private:
-  ~Pledge() {};
-  bool mDone;
-  nsRefPtr<ErrorType> mError;
-  ScopedDeletePtr<FunctorsBase> mFunctors;
-};
-
-template<typename ValueType>
-class Pledge<ValueType, nsresult>  : public PledgeBase
-{
-  // TODO: Remove workaround once mozilla allows std::function from <functional>
-  // wo/std::function support, do template + virtual trick to accept lambdas
-  class FunctorsBase
-  {
-  public:
-    FunctorsBase() {}
-    virtual void Succeed(ValueType& result) = 0;
-    virtual void Fail(nsresult error) = 0;
-    virtual ~FunctorsBase() {};
-  };
-
-public:
-  explicit Pledge() : mDone(false), mError(NS_OK) {}
-  Pledge(const Pledge& aOther) = delete;
-  Pledge& operator = (const Pledge&) = delete;
-
-  template<typename OnSuccessType>
-  void Then(OnSuccessType aOnSuccess)
-  {
-    Then(aOnSuccess, [](nsresult){});
-  }
-
-  template<typename OnSuccessType, typename OnFailureType>
-  void Then(OnSuccessType aOnSuccess, OnFailureType aOnFailure)
-  {
-    class Functors : public FunctorsBase
-    {
-    public:
-      Functors(OnSuccessType& aOnSuccess, OnFailureType& aOnFailure)
-        : mOnSuccess(aOnSuccess), mOnFailure(aOnFailure) {}
-
-      void Succeed(ValueType& result)
-      {
-        mOnSuccess(result);
-      }
-      void Fail(nsresult rv)
-      {
-        mOnFailure(rv);
-      };
-
-      OnSuccessType mOnSuccess;
-      OnFailureType mOnFailure;
-    };
-    mFunctors = new Functors(aOnSuccess, aOnFailure);
-
-    if (mDone) {
-      if (mError == NS_OK) {
-        mFunctors->Succeed(mValue);
-      } else {
-        mFunctors->Fail(mError);
-      }
-    }
-  }
-
-  void Resolve(const ValueType& aValue)
-  {
-    mValue = aValue;
-    Resolve();
-  }
 protected:
   void Resolve()
   {
     if (!mDone) {
       mDone = true;
-      MOZ_ASSERT(mError == NS_OK);
+      MOZ_ASSERT(!mRejected);
       if (mFunctors) {
         mFunctors->Succeed(mValue);
-      }
-    }
-  }
-
-  void Reject(nsresult error)
-  {
-    if (!mDone) {
-      mDone = true;
-      mError = error;
-      if (mFunctors) {
-        mFunctors->Fail(mError);
       }
     }
   }
@@ -230,7 +139,8 @@ protected:
 private:
   ~Pledge() {};
   bool mDone;
-  nsresult mError;
+  bool mRejected;
+  ErrorType mError;
   ScopedDeletePtr<FunctorsBase> mFunctors;
 };
 
@@ -250,10 +160,10 @@ private:
  *         // Use mBar
  *       }
  *     private:
- *       nsRefPtr<Bar> mBar;
+ *       RefPtr<Bar> mBar;
  *     };
  *
- *     nsRefPtr<Bar> bar = new Bar();
+ *     RefPtr<Bar> bar = new Bar();
  *     NS_DispatchToMainThread(new FooRunnable(bar);
  *   }
  *
@@ -261,7 +171,7 @@ private:
  *
  *   void Foo()
  *   {
- *     nsRefPtr<Bar> bar = new Bar();
+ *     RefPtr<Bar> bar = new Bar();
  *     NS_DispatchToMainThread(media::NewRunnableFrom([bar]() mutable {
  *       // use bar
  *     });
@@ -277,7 +187,7 @@ template<typename OnRunType>
 class LambdaRunnable : public nsRunnable
 {
 public:
-  explicit LambdaRunnable(OnRunType& aOnRun) : mOnRun(aOnRun) {}
+  explicit LambdaRunnable(OnRunType&& aOnRun) : mOnRun(Move(aOnRun)) {}
 private:
   NS_IMETHODIMP
   Run()
@@ -289,16 +199,16 @@ private:
 
 template<typename OnRunType>
 LambdaRunnable<OnRunType>*
-NewRunnableFrom(OnRunType aOnRun)
+NewRunnableFrom(OnRunType&& aOnRun)
 {
-  return new LambdaRunnable<OnRunType>(aOnRun);
+  return new LambdaRunnable<OnRunType>(Forward<OnRunType>(aOnRun));
 }
 
 template<typename OnRunType>
 class LambdaTask : public Task
 {
 public:
-  explicit LambdaTask(OnRunType& aOnRun) : mOnRun(aOnRun) {}
+  explicit LambdaTask(OnRunType&& aOnRun) : mOnRun(Move(aOnRun)) {}
 private:
   void
   Run()
@@ -310,9 +220,9 @@ private:
 
 template<typename OnRunType>
 LambdaTask<OnRunType>*
-NewTaskFrom(OnRunType aOnRun)
+NewTaskFrom(OnRunType&& aOnRun)
 {
-  return new LambdaTask<OnRunType>(aOnRun);
+  return new LambdaTask<OnRunType>(Forward<OnRunType>(aOnRun));
 }
 
 /* media::CoatCheck - There and back again. Park an object in exchange for an id.
@@ -335,14 +245,14 @@ NewTaskFrom(OnRunType aOnRun)
  *   public:
  *     void DoFoo()
  *     {
- *       nsRefPtr<Foo> foo = new Foo();
+ *       RefPtr<Foo> foo = new Foo();
  *       uint32_t requestId = mOutstandingFoos.Append(*foo);
  *       sChild->SendFoo(requestId);
  *     }
  *
  *     void RecvFooResponse(uint32_t requestId)
  *     {
- *       nsRefPtr<Foo> foo = mOutstandingFoos.Remove(requestId);
+ *       RefPtr<Foo> foo = mOutstandingFoos.Remove(requestId);
  *       if (foo) {
  *         // use foo
  *       }
@@ -358,7 +268,7 @@ NewTaskFrom(OnRunType aOnRun)
  *   public:
  *     already_addRefed<Pledge<Foo>> GetFooAsynchronously()
  *     {
- *       nsRefPtr<Pledge<Foo>> p = new Pledge<Foo>();
+ *       RefPtr<Pledge<Foo>> p = new Pledge<Foo>();
  *       uint32_t requestId = mOutstandingPledges.Append(*p);
  *       sChild->SendFoo(requestId);
  *       return p.forget();
@@ -366,7 +276,7 @@ NewTaskFrom(OnRunType aOnRun)
  *
  *     void RecvFooResponse(uint32_t requestId, const Foo& fooResult)
  *     {
- *       nsRefPtr<Foo> p = mOutstandingPledges.Remove(requestId);
+ *       RefPtr<Foo> p = mOutstandingPledges.Remove(requestId);
  *       if (p) {
  *         p->Resolve(fooResult);
  *       }
@@ -381,12 +291,12 @@ template<class T>
 class CoatCheck
 {
 public:
-  typedef std::pair<uint32_t, nsRefPtr<T>> Element;
+  typedef std::pair<uint32_t, RefPtr<T>> Element;
 
   uint32_t Append(T& t)
   {
     uint32_t id = GetNextId();
-    mElements.AppendElement(Element(id, nsRefPtr<T>(&t)));
+    mElements.AppendElement(Element(id, RefPtr<T>(&t)));
     return id;
   }
 
@@ -394,7 +304,7 @@ public:
   {
     for (auto& element : mElements) {
       if (element.first == aId) {
-        nsRefPtr<T> ref;
+        RefPtr<T> ref;
         ref.swap(element.second);
         mElements.RemoveElement(element);
         return ref.forget();
@@ -413,7 +323,71 @@ private:
   nsAutoTArray<Element, 3> mElements;
 };
 
-}
-}
+/* media::Refcountable - Add threadsafe ref-counting to something that isn't.
+ *
+ * Often, reference counting is the most practical way to share an object with
+ * another thread without imposing lifetime restrictions, even if there's
+ * otherwise no concurrent access happening on the object.  For instance, an
+ * algorithm on another thread may find it more expedient to modify a passed-in
+ * object, rather than pass expensive copies back and forth.
+ *
+ * Lists in particular often aren't ref-countable, yet are expensive to copy,
+ * e.g. nsTArray<RefPtr<Foo>>. Refcountable can be used to make such objects
+ * (or owning smart-pointers to such objects) refcountable.
+ *
+ * Technical limitation: A template specialization is needed for types that take
+ * a constructor. Please add below (ScopedDeletePtr covers a lot of ground though).
+ */
+
+template<typename T>
+class Refcountable : public T
+{
+public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(Refcountable<T>)
+private:
+  ~Refcountable<T>() {}
+};
+
+template<typename T>
+class Refcountable<ScopedDeletePtr<T>> : public ScopedDeletePtr<T>
+{
+public:
+  explicit Refcountable<ScopedDeletePtr<T>>(T* aPtr) : ScopedDeletePtr<T>(aPtr) {}
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(Refcountable<T>)
+private:
+  ~Refcountable<ScopedDeletePtr<T>>() {}
+};
+
+/* media::ShutdownBlocker - Async shutdown helper.
+ */
+
+class ShutdownBlocker : public nsIAsyncShutdownBlocker
+{
+public:
+  ShutdownBlocker(const nsString& aName) : mName(aName) {}
+
+  NS_IMETHOD
+  BlockShutdown(nsIAsyncShutdownClient* aProfileBeforeChange) override = 0;
+
+  NS_IMETHOD GetName(nsAString& aName) override
+  {
+    aName = mName;
+    return NS_OK;
+  }
+
+  NS_IMETHOD GetState(nsIPropertyBag**) override
+  {
+    return NS_OK;
+  }
+
+  NS_DECL_ISUPPORTS
+protected:
+  virtual ~ShutdownBlocker() {}
+private:
+  const nsString mName;
+};
+
+} // namespace media
+} // namespace mozilla
 
 #endif // mozilla_MediaUtils_h

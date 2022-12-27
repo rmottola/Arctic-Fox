@@ -21,7 +21,7 @@ public:
   virtual void OnAutoFocusComplete(bool aAutoFocusSucceeded) override;
   virtual void OnAutoFocusMoving(bool aIsMoving) override;
   virtual void OnFacesDetected(const nsTArray<ICameraControl::Face>& aFaces) override;
-  virtual void OnTakePictureComplete(uint8_t* aData, uint32_t aLength, const nsAString& aMimeType) override;
+  virtual void OnTakePictureComplete(const uint8_t* aData, uint32_t aLength, const nsAString& aMimeType) override;
 
   virtual void OnHardwareStateChange(HardwareState aState, nsresult aReason) override;
   virtual void OnPreviewStateChange(PreviewState aState) override;
@@ -31,6 +31,7 @@ public:
   virtual void OnRateLimitPreview(bool aLimit) override;
   virtual bool OnNewPreviewFrame(layers::Image* aImage, uint32_t aWidth, uint32_t aHeight) override;
   virtual void OnUserError(UserContext aContext, nsresult aError) override;
+  virtual void OnPoster(dom::BlobImpl* aBlobImpl) override;
 
 protected:
   virtual ~DOMCameraControlListener();

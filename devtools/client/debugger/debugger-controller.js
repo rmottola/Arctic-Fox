@@ -5,7 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 const DBG_STRINGS_URI = "chrome://browser/locale/devtools/debugger.properties";
 const NEW_SOURCE_IGNORED_URLS = ["debugger eval code", "XStringBundle"];
@@ -42,6 +42,7 @@ const EVENTS = {
   // When a breakpoint has been added or removed on the debugger server.
   BREAKPOINT_ADDED: "Debugger:BreakpointAdded",
   BREAKPOINT_REMOVED: "Debugger:BreakpointRemoved",
+  BREAKPOINT_CLICKED: "Debugger:BreakpointClicked",
 
   // When a breakpoint has been shown or hidden in the source editor
   // or the pane.
@@ -94,16 +95,17 @@ const FRAME_TYPE = {
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
-Cu.import("resource:///modules/devtools/client/shared/widgets/SimpleListWidget.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/BreadcrumbsWidget.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/SideMenuWidget.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
-Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+Cu.import("resource://devtools/shared/event-emitter.js");
+Cu.import("resource://devtools/client/shared/widgets/SimpleListWidget.jsm");
+Cu.import("resource://devtools/client/shared/widgets/BreadcrumbsWidget.jsm");
+Cu.import("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
+Cu.import("resource://devtools/client/shared/widgets/VariablesView.jsm");
+Cu.import("resource://devtools/client/shared/widgets/VariablesViewController.jsm");
+Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 
-Cu.import("resource:///modules/devtools/client/shared/browser-loader.js");
-const require = BrowserLoader("resource:///modules/devtools/client/debugger/", this).require;
+Cu.import("resource://devtools/client/shared/browser-loader.js");
+const require = BrowserLoader("resource://devtools/client/debugger/", this).require;
+XPCOMUtils.defineConstant(this, "require", require);
 
 const {TargetFactory} = require("devtools/client/framework/target");
 const {Toolbox} = require("devtools/client/framework/toolbox");
@@ -118,7 +120,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Parser",
-  "resource:///modules/devtools/client/shared/Parser.jsm");
+  "resource://devtools/shared/Parser.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
   "resource://gre/modules/ShortcutUtils.jsm");

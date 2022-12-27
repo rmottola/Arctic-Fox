@@ -7,8 +7,8 @@
 
 // Tests the CubicBezier API in the CubicBezierWidget module
 
-const Cu = Components.utils;
-var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var Cu = Components.utils;
+var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var {CubicBezier, _parseTimingFunction} = require("devtools/client/shared/widgets/CubicBezierWidget");
 
 function run_test() {

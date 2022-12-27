@@ -207,7 +207,7 @@ IsDOMObject(JSObject* obj)
 // Some callers don't want to set an exception when unwrapping fails
 // (for example, overload resolution uses unwrapping to tell what sort
 // of thing it's looking at).
-// U must be something that a T* can be assigned to (e.g. T* or an nsRefPtr<T>).
+// U must be something that a T* can be assigned to (e.g. T* or an RefPtr<T>).
 template <class T, typename U>
 MOZ_ALWAYS_INLINE nsresult
 UnwrapObject(JSObject* obj, U& value, prototypes::ID protoID,
@@ -222,7 +222,7 @@ UnwrapObject(JSObject* obj, U& value, prototypes::ID protoID,
       return NS_ERROR_XPC_BAD_CONVERT_JS;
     }
 
-    obj = js::CheckedUnwrap(obj, /* stopAtOuter = */ false);
+    obj = js::CheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
     if (!obj) {
       return NS_ERROR_XPC_SECURITY_MANAGER_VETO;
     }
@@ -702,7 +702,6 @@ struct NativeHasMember
   HAS_MEMBER_TYPEDEFS;
 
   HAS_MEMBER(GetParentObject, GetParentObject);
-  HAS_MEMBER(JSBindingFinalized, JSBindingFinalized);
   HAS_MEMBER(WrapObject, WrapObject);
 };
 
@@ -776,13 +775,9 @@ CouldBeDOMBinding(nsWrapperCache* aCache)
 inline bool
 TryToOuterize(JSContext* cx, JS::MutableHandle<JS::Value> rval)
 {
-  if (js::IsInnerObject(&rval.toObject())) {
-    JS::Rooted<JSObject*> obj(cx, &rval.toObject());
-    obj = JS_ObjectToOuterObject(cx, obj);
-    if (!obj) {
-      return false;
-    }
-
+  if (js::IsWindow(&rval.toObject())) {
+    JSObject* obj = js::ToWindowProxyIfWindow(&rval.toObject());
+    MOZ_ASSERT(obj);
     rval.set(JS::ObjectValue(*obj));
   }
 
@@ -1090,7 +1085,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     JS::Rooted<JSObject*> scope(cx, scopeArg);
     JS::Rooted<JSObject*> proto(cx, givenProto);
     if (js::IsWrapper(scope)) {
-      scope = js::CheckedUnwrap(scope, /* stopAtOuter = */ false);
+      scope = js::CheckedUnwrap(scope, /* stopAtWindowProxy = */ false);
       if (!scope)
         return false;
       ac.emplace(cx, scope);
@@ -1141,7 +1136,7 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
     JS::Rooted<JSObject*> scope(cx, scopeArg);
     JS::Rooted<JSObject*> proto(cx, givenProto);
     if (js::IsWrapper(scope)) {
-      scope = js::CheckedUnwrap(scope, /* stopAtOuter = */ false);
+      scope = js::CheckedUnwrap(scope, /* stopAtWindowProxy = */ false);
       if (!scope)
         return false;
       ac.emplace(cx, scope);
@@ -1501,7 +1496,7 @@ WrapObject(JSContext* cx, const nsCOMPtr<T>& p,
 // Helper to make it possible to wrap directly out of an nsRefPtr
 template<class T>
 inline bool
-WrapObject(JSContext* cx, const nsRefPtr<T>& p,
+WrapObject(JSContext* cx, const RefPtr<T>& p,
            const nsIID* iid, JS::MutableHandle<JS::Value> rval)
 {
   return WrapObject(cx, p.get(), iid, rval);
@@ -1510,7 +1505,7 @@ WrapObject(JSContext* cx, const nsRefPtr<T>& p,
 // Helper to make it possible to wrap directly out of an nsRefPtr
 template<class T>
 inline bool
-WrapObject(JSContext* cx, const nsRefPtr<T>& p,
+WrapObject(JSContext* cx, const RefPtr<T>& p,
            JS::MutableHandle<JS::Value> rval)
 {
   return WrapObject(cx, p, nullptr, rval);
@@ -2561,24 +2556,7 @@ HasConstructor(JSObject* obj)
   return JS_IsNativeFunction(obj, Constructor) ||
          js::GetObjectClass(obj)->construct;
 }
-#endif
- 
-template<class T, bool hasCallback=NativeHasMember<T>::JSBindingFinalized>
-struct JSBindingFinalized
-{
-  static void Finalized(T* self)
-  {
-  }
-};
-
-template<class T>
-struct JSBindingFinalized<T, true>
-{
-  static void Finalized(T* self)
-  {
-    self->JSBindingFinalized();
-  }
-};
+ #endif
 
 // Helpers for creating a const version of a type.
 template<typename T>
@@ -2870,7 +2848,7 @@ private:
   };
 
   JS::Rooted<JSObject*> mReflector;
-  typename Conditional<IsRefcounted<T>::value, nsRefPtr<T>, OwnedNative>::Type mNative;
+  typename Conditional<IsRefcounted<T>::value, RefPtr<T>, OwnedNative>::Type mNative;
 };
 
 template<class T>
@@ -2879,7 +2857,7 @@ struct DeferredFinalizerImpl
   typedef typename Conditional<IsSame<T, nsISupports>::value,
                                nsCOMPtr<T>,
                                typename Conditional<IsRefcounted<T>::value,
-                                                    nsRefPtr<T>,
+                                                    RefPtr<T>,
                                                     nsAutoPtr<T>>::Type>::Type SmartPtr;
   typedef nsTArray<SmartPtr> SmartPtrArray;
 
@@ -2893,7 +2871,7 @@ struct DeferredFinalizerImpl
   }
   template<class U>
   static inline void
-  AppendAndTake(nsTArray<nsRefPtr<U>>& smartPtrArray, U* ptr)
+  AppendAndTake(nsTArray<RefPtr<U>>& smartPtrArray, U* ptr)
   {
     smartPtrArray.AppendElement(dont_AddRef(ptr));
   }
@@ -3114,6 +3092,14 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
     return nullptr;
   }
 
+  bool succeeded;
+  if (!JS_SetImmutablePrototype(aCx, aGlobal, &succeeded)) {
+    return nullptr;
+  }
+  MOZ_ASSERT(succeeded,
+             "making a fresh global object's [[Prototype]] immutable can "
+             "internally fail, but it should never be unsuccessful");
+
   return proto;
 }
 
@@ -3269,7 +3255,7 @@ WrappedJSToDictionary(nsISupports* aObject, T& aDictionary)
 
 
 template<class T, class S>
-inline nsRefPtr<T>
+inline RefPtr<T>
 StrongOrRawPtr(already_AddRefed<S>&& aPtr)
 {
   return aPtr.template downcast<T>();
@@ -3292,7 +3278,7 @@ template<class T>
 struct StrongPtrForMember
 {
   typedef typename Conditional<IsRefcounted<T>::value,
-                               nsRefPtr<T>, nsAutoPtr<T>>::Type Type;
+                               RefPtr<T>, nsAutoPtr<T>>::Type Type;
 };
 
 inline
@@ -3351,6 +3337,10 @@ void
 DeprecationWarning(JSContext* aCx, JSObject* aObject,
                    nsIDocument::DeprecatedOperations aOperation);
 
+// A callback to perform funToString on an interface object
+JSString*
+InterfaceObjectToString(JSContext* aCx, JS::Handle<JSObject*> aObject,
+                        unsigned /* indent */);
 } // namespace dom
 } // namespace mozilla
 

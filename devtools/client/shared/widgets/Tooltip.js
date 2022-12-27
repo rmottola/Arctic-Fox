@@ -23,13 +23,13 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "setNamedTimeout",
-  "resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+  "resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "clearNamedTimeout",
-  "resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm");
+  "resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesView",
-  "resource:///modules/devtools/client/shared/widgets/VariablesView.jsm");
+  "resource://devtools/client/shared/widgets/VariablesView.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "VariablesViewController",
-  "resource:///modules/devtools/client/shared/widgets/VariablesViewController.jsm");
+  "resource://devtools/client/shared/widgets/VariablesViewController.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 
@@ -1145,6 +1145,8 @@ SwatchColorPickerTooltip.prototype = Heritage.extend(SwatchBasedEditorTooltip.pr
     // Then set spectrum's color and listen to color changes to preview them
     if (this.activeSwatch) {
       this.currentSwatchColor = this.activeSwatch.nextSibling;
+      this._colorUnit =
+        colorUtils.classifyColor(this.currentSwatchColor.textContent);
       let color = this.activeSwatch.style.backgroundColor;
       this.spectrum.then(spectrum => {
         spectrum.off("changed", this._onSpectrumColorChange);
@@ -1222,6 +1224,7 @@ SwatchColorPickerTooltip.prototype = Heritage.extend(SwatchBasedEditorTooltip.pr
 
   _toDefaultType: function(color) {
     let colorObj = new colorUtils.CssColor(color);
+    colorObj.colorUnit = this._colorUnit;
     return colorObj.toString();
   },
 

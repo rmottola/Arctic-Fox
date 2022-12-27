@@ -607,7 +607,7 @@ BluetoothDaemonHandsfreeModule::HandleRsp(
     return;
   }
 
-  nsRefPtr<BluetoothHandsfreeResultHandler> res =
+  RefPtr<BluetoothHandsfreeResultHandler> res =
     already_AddRefed<BluetoothHandsfreeResultHandler>(
       static_cast<BluetoothHandsfreeResultHandler*>(aUserData));
 
@@ -991,7 +991,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothHandsfreeResultHandler> mRes;
+  RefPtr<BluetoothHandsfreeResultHandler> mRes;
 };
 
 void
@@ -1057,7 +1057,7 @@ public:
 
 private:
   BluetoothDaemonHandsfreeModule* mModule;
-  nsRefPtr<BluetoothHandsfreeResultHandler> mRes;
+  RefPtr<BluetoothHandsfreeResultHandler> mRes;
 };
 
 void

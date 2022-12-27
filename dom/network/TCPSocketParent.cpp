@@ -37,7 +37,7 @@ namespace dom {
 static void
 FireInteralError(mozilla::net::PTCPSocketParent* aActor, uint32_t aLineNo)
 {
-  mozilla::unused <<
+  mozilla::Unused <<
       aActor->SendCallback(NS_LITERAL_STRING("onerror"),
                            TCPError(NS_LITERAL_STRING("InvalidStateError"), NS_LITERAL_STRING("Internal error")),
                            static_cast<uint32_t>(TCPReadyState::Connecting));
@@ -67,27 +67,25 @@ TCPSocketParentBase::~TCPSocketParentBase()
 uint32_t
 TCPSocketParent::GetAppId()
 {
-  uint32_t appId = nsIScriptSecurityManager::UNKNOWN_APP_ID;
   const PContentParent *content = Manager()->Manager();
-  const InfallibleTArray<PBrowserParent*>& browsers = content->ManagedPBrowserParent();
-  if (browsers.Length() > 0) {
-    TabParent *tab = TabParent::GetFrom(browsers[0]);
-    appId = tab->OwnAppId();
+  if (PBrowserParent* browser = LoneManagedOrNull(content->ManagedPBrowserParent())) {
+    TabParent *tab = TabParent::GetFrom(browser);
+    return tab->OwnAppId();
+  } else {
+    return nsIScriptSecurityManager::UNKNOWN_APP_ID;
   }
-  return appId;
 };
 
 bool
 TCPSocketParent::GetInBrowser()
 {
-  bool inBrowser = false;
   const PContentParent *content = Manager()->Manager();
-  const InfallibleTArray<PBrowserParent*>& browsers = content->ManagedPBrowserParent();
-  if (browsers.Length() > 0) {
-    TabParent *tab = TabParent::GetFrom(browsers[0]);
-    inBrowser = tab->IsBrowserElement();
+  if (PBrowserParent* browser = LoneManagedOrNull(content->ManagedPBrowserParent())) {
+    TabParent *tab = TabParent::GetFrom(browser);
+    return tab->IsBrowserElement();
+  } else {
+    return false;
   }
-  return inBrowser;
 }
 
 nsresult
@@ -137,7 +135,7 @@ NS_IMETHODIMP_(MozExternalRefCountType) TCPSocketParent::Release(void)
 {
   nsrefcnt refcnt = TCPSocketParentBase::Release();
   if (refcnt == 1 && mIPCOpen) {
-    mozilla::unused << PTCPSocketParent::SendRequestDelete();
+    mozilla::Unused << PTCPSocketParent::SendRequestDelete();
     return 1;
   }
   return refcnt;
@@ -225,9 +223,8 @@ TCPSocketParent::RecvOpenBind(const nsCString& aRemoteHost,
   uint32_t appId = nsIScriptSecurityManager::NO_APP_ID;
   bool     inBrowser = false;
   const PContentParent *content = Manager()->Manager();
-  const InfallibleTArray<PBrowserParent*>& browsers = content->ManagedPBrowserParent();
-  if (browsers.Length() > 0) {
-    TabParent *tab = static_cast<TabParent*>(browsers[0]);
+  if (PBrowserParent* browser = LoneManagedOrNull(content->ManagedPBrowserParent())) {
+    TabParent *tab = TabParent::GetFrom(browser);
     appId = tab->OwnAppId();
     inBrowser = tab->IsBrowserElement();
   }
@@ -338,7 +335,7 @@ TCPSocketParent::FireStringDataEvent(const nsACString& aData, TCPReadyState aRea
 void
 TCPSocketParent::SendEvent(const nsAString& aType, CallbackData aData, TCPReadyState aReadyState)
 {
-  mozilla::unused << PTCPSocketParent::SendCallback(nsString(aType), aData,
+  mozilla::Unused << PTCPSocketParent::SendCallback(nsString(aType), aData,
                                                     static_cast<uint32_t>(aReadyState));
 }
 
@@ -382,7 +379,7 @@ TCPSocketParent::ActorDestroy(ActorDestroyReason why)
 bool
 TCPSocketParent::RecvRequestDelete()
 {
-  mozilla::unused << Send__delete__(this);
+  mozilla::Unused << Send__delete__(this);
   return true;
 }
 

@@ -26,7 +26,7 @@ ScreenManagerParent::ScreenManagerParent(uint32_t* aNumberOfScreens,
     MOZ_CRASH("Couldn't get nsIScreenManager from ScreenManagerParent.");
   }
 
-  unused << RecvRefresh(aNumberOfScreens, aSystemDefaultScale, aSuccess);
+  Unused << RecvRefresh(aNumberOfScreens, aSystemDefaultScale, aSuccess);
 }
 
 bool
@@ -64,7 +64,7 @@ ScreenManagerParent::RecvScreenRefresh(const uint32_t& aId,
   }
 
   ScreenDetails details;
-  unused << ExtractScreenDetails(screen, details);
+  Unused << ExtractScreenDetails(screen, details);
 
   *aRetVal = details;
   *aSuccess = true;
@@ -133,7 +133,7 @@ ScreenManagerParent::RecvScreenForBrowser(const TabId& aTabId,
   // the nsIScreen it's on.
   ContentParent* cp = static_cast<ContentParent*>(this->Manager());
   ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
-  nsRefPtr<TabParent> tabParent =
+  RefPtr<TabParent> tabParent =
     cpm->GetTopLevelTabParentByProcessAndTabId(cp->ChildID(), aTabId);
   if(!tabParent){
     return false;

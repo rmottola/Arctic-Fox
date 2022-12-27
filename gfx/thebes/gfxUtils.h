@@ -10,13 +10,16 @@
 #include "imgIContainer.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/UniquePtr.h"
 #include "nsColor.h"
 #include "nsPrintfCString.h"
+#include "nsRegionFwd.h"
 #include "mozilla/gfx/Rect.h"
 
 class gfxASurface;
 class gfxDrawable;
-class nsIntRegion;
+class nsIInputStream;
+class nsIGfxInfo;
 class nsIPresShell;
 
 namespace mozilla {
@@ -280,6 +283,20 @@ public:
     static nsCString GetAsDataURI(DrawTarget* aDT);
     static nsCString GetAsLZ4Base64Str(DataSourceSurface* aSourceSurface);
 
+    static mozilla::UniquePtr<uint8_t[]> GetImageBuffer(DataSourceSurface* aSurface,
+                                                        bool aIsAlphaPremultiplied,
+                                                        int32_t* outFormat);
+
+    static nsresult GetInputStream(DataSourceSurface* aSurface,
+                                   bool aIsAlphaPremultiplied,
+                                   const char* aMimeType,
+                                   const char16_t* aEncoderOptions,
+                                   nsIInputStream** outStream);
+
+    static nsresult ThreadSafeGetFeatureStatus(const nsCOMPtr<nsIGfxInfo>& gfxInfo,
+                                               int32_t feature,
+                                               int32_t* status);
+
     /**
      * Copy to the clipboard as a PNG encoded Data URL.
      */
@@ -288,10 +305,6 @@ public:
 
     static bool DumpDisplayList();
 
-    static bool sDumpPainting;
-    static bool sDumpPaintingIntermediate;
-    static bool sDumpPaintingToFile;
-    static bool sDumpPaintItems;
     static FILE* sDumpPaintFile;
 };
 

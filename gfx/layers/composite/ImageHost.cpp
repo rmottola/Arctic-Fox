@@ -17,7 +17,7 @@
 #include "nsPrintfCString.h"            // for nsPrintfCString
 #include "nsString.h"                   // for nsAutoCString
 
-class nsIntRegion;
+#define BIAS_TIME_MS 1.0
 
 namespace mozilla {
 namespace gfx {
@@ -102,6 +102,22 @@ ImageHost::UseTextureHost(const nsTArray<TimedTexture>& aTextures)
     img.mFrontBuffer->PrepareTextureSource(img.mTextureSource);
   }
   mImages.SwapElements(newImages);
+
+  // Video producers generally send replacement images with the same frameID but
+  // slightly different timestamps in order to sync with the audio clock. This
+  // means that any CompositeUntil() call we made in Composite() may no longer
+  // guarantee that we'll composite until the next frame is ready. Fix that here.
+  if (GetCompositor() && mLastFrameID >= 0) {
+    for (size_t i = 0; i < mImages.Length(); ++i) {
+      bool frameComesAfter = mImages[i].mFrameID > mLastFrameID ||
+                             mImages[i].mProducerID != mLastProducerID;
+      if (frameComesAfter && !mImages[i].mTimeStamp.IsNull()) {
+        GetCompositor()->CompositeUntil(mImages[i].mTimeStamp +
+                                        TimeDuration::FromMilliseconds(BIAS_TIME_MS));
+        break;
+      }
+    }
+  }
 }
 
 void
@@ -124,9 +140,9 @@ GetBiasedTime(const TimeStamp& aInput, ImageHost::Bias aBias)
 {
   switch (aBias) {
   case ImageHost::BIAS_NEGATIVE:
-    return aInput - TimeDuration::FromMilliseconds(1.0);
+    return aInput - TimeDuration::FromMilliseconds(BIAS_TIME_MS);
   case ImageHost::BIAS_POSITIVE:
-    return aInput + TimeDuration::FromMilliseconds(1.0);
+    return aInput + TimeDuration::FromMilliseconds(BIAS_TIME_MS);
   default:
     return aInput;
   }
@@ -257,7 +273,7 @@ ImageHost::Composite(LayerComposite* aLayer,
   }
 
   if (uint32_t(imageIndex) + 1 < mImages.Length()) {
-    GetCompositor()->CompositeUntil(mImages[imageIndex + 1].mTimeStamp);
+    GetCompositor()->CompositeUntil(mImages[imageIndex + 1].mTimeStamp + TimeDuration::FromMilliseconds(BIAS_TIME_MS));
   }
 
   TimedImage* img = &mImages[imageIndex];
@@ -296,6 +312,13 @@ ImageHost::Composite(LayerComposite* aLayer,
 
     if (!GetCompositor()->SupportsEffect(effect->mType)) {
       return;
+    }
+
+    DiagnosticFlags diagnosticFlags = DiagnosticFlags::IMAGE;
+    if (effect->mType == EffectTypes::NV12) {
+      diagnosticFlags |= DiagnosticFlags::NV12;
+    } else if (effect->mType == EffectTypes::YCBCR) {
+      diagnosticFlags |= DiagnosticFlags::YCBCR;
     }
 
     if (mLastFrameID != img->mFrameID || mLastProducerID != img->mProducerID) {
@@ -345,12 +368,12 @@ ImageHost::Composite(LayerComposite* aLayer,
         }
         GetCompositor()->DrawQuad(rect, aClipRect, aEffectChain,
                                   aOpacity, aTransform);
-        GetCompositor()->DrawDiagnostics(DiagnosticFlags::IMAGE | DiagnosticFlags::BIGIMAGE,
+        GetCompositor()->DrawDiagnostics(diagnosticFlags | DiagnosticFlags::BIGIMAGE,
                                          rect, aClipRect, aTransform, mFlashCounter);
       } while (it->NextTile());
       it->EndBigImageIteration();
       // layer border
-      GetCompositor()->DrawDiagnostics(DiagnosticFlags::IMAGE, pictureRect,
+      GetCompositor()->DrawDiagnostics(diagnosticFlags, pictureRect,
                                        aClipRect, aTransform, mFlashCounter);
     } else {
       IntSize textureSize = img->mTextureSource->GetSize();
@@ -366,7 +389,7 @@ ImageHost::Composite(LayerComposite* aLayer,
 
       GetCompositor()->DrawQuad(pictureRect, aClipRect, aEffectChain,
                                 aOpacity, aTransform);
-      GetCompositor()->DrawDiagnostics(DiagnosticFlags::IMAGE,
+      GetCompositor()->DrawDiagnostics(diagnosticFlags,
                                        pictureRect, aClipRect,
                                        aTransform, mFlashCounter);
     }

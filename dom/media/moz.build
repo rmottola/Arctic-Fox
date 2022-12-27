@@ -108,6 +108,7 @@ EXPORTS += [
     'EncodedBufferCache.h',
     'FileBlockCache.h',
     'FlushableTaskQueue.h',
+    'FrameStatistics.h',
     'Intervals.h',
     'Latency.h',
     'MediaCache.h',
@@ -124,6 +125,7 @@ EXPORTS += [
     'MediaQueue.h',
     'MediaRecorder.h',
     'MediaResource.h',
+    'MediaResourceCallback.h',
     'MediaSegment.h',
     'MediaStatistics.h',
     'MediaStreamGraph.h',
@@ -140,18 +142,16 @@ EXPORTS += [
     'StreamBuffer.h',
     'ThreadPoolCOMListener.h',
     'TimeUnits.h',
-    'TimeVarying.h',
     'TrackUnionStream.h',
     'VideoFrameContainer.h',
     'VideoSegment.h',
     'VideoUtils.h',
     'VorbisUtils.h',
+    'XiphExtradata.h',
 ]
 
 EXPORTS.mozilla += [
     'MediaManager.h',
-    'StateMirroring.h',
-    'StateWatching.h',
 ]
 
 EXPORTS.mozilla.media.webrtc += [
@@ -243,6 +243,7 @@ UNIFIED_SOURCES += [
     'VideoTrackList.cpp',
     'VideoUtils.cpp',
     'WebVTTListener.cpp',
+    'XiphExtradata.cpp',
 ]
 
 if CONFIG['OS_TARGET'] == 'WINNT':

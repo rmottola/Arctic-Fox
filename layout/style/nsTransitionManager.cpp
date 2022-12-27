@@ -57,14 +57,14 @@ ElementPropertyTransition::CurrentValuePortion() const
   timingToUse.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BOTH;
   ComputedTiming computedTiming = GetComputedTiming(&timingToUse);
 
-  MOZ_ASSERT(computedTiming.mProgress != ComputedTiming::kNullProgress,
+  MOZ_ASSERT(!computedTiming.mProgress.IsNull(),
              "Got a null progress for a fill mode of 'both'");
   MOZ_ASSERT(mProperties.Length() == 1,
              "Should have one animation property for a transition");
   MOZ_ASSERT(mProperties[0].mSegments.Length() == 1,
              "Animation property should have one segment for a transition");
   return mProperties[0].mSegments[0].mTimingFunction
-         .GetValue(computedTiming.mProgress);
+         .GetValue(computedTiming.mProgress.Value());
 }
 
 ////////////////////////// CSSTransition ////////////////////////////
@@ -145,23 +145,14 @@ CSSTransition::QueueEvents()
   if (!presContext) {
     return;
   }
+
   nsTransitionManager* manager = presContext->TransitionManager();
-
-  manager->QueueEvent(
-    TransitionEventInfo(owningElement, TransitionProperty(),
-                        mEffect->Timing().mIterationDuration,
-                        owningPseudoType));
-}
-
-bool
-CSSTransition::HasEndEventToQueue() const
-{
-  if (!mEffect) {
-    return false;
-  }
-
-  return !mWasFinishedOnLastTick &&
-         PlayState() == AnimationPlayState::Finished;
+  manager->QueueEvent(TransitionEventInfo(owningElement, owningPseudoType,
+                                          TransitionProperty(),
+                                          mEffect->Timing()
+                                            .mIterationDuration,
+                                          AnimationTimeToTimeStamp(EffectEnd()),
+                                          this));
 }
 
 void
@@ -238,7 +229,7 @@ NS_INTERFACE_MAP_END
 void
 nsTransitionManager::StyleContextChanged(dom::Element *aElement,
                                          nsStyleContext *aOldStyleContext,
-                                         nsRefPtr<nsStyleContext>* aNewStyleContext /* inout */)
+                                         RefPtr<nsStyleContext>* aNewStyleContext /* inout */)
 {
   nsStyleContext* newStyleContext = *aNewStyleContext;
 
@@ -339,7 +330,7 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
   // style", which is the new style without any data from transitions,
   // but still inheriting from data that contains transitions that are
   // not stopping or starting right now.
-  nsRefPtr<nsStyleContext> afterChangeStyle;
+  RefPtr<nsStyleContext> afterChangeStyle;
   if (collection) {
     nsStyleSet* styleSet = mPresContext->StyleSet();
     afterChangeStyle =
@@ -485,7 +476,7 @@ nsTransitionManager::StyleContextChanged(dom::Element *aElement,
     // creates a new style rule if we started *or* stopped transitions.
     collection->mStyleRuleRefreshTime = TimeStamp();
     collection->UpdateCheckGeneration(mPresContext);
-    collection->mNeedsRefreshes = true;
+    collection->mStyleChanging = true;
     TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
     collection->EnsureStyleRuleFor(now);
   }
@@ -670,7 +661,7 @@ nsTransitionManager::ConsiderStartingTransition(
   timing.mDirection = NS_STYLE_ANIMATION_DIRECTION_NORMAL;
   timing.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BACKWARDS;
 
-  nsRefPtr<ElementPropertyTransition> pt =
+  RefPtr<ElementPropertyTransition> pt =
     new ElementPropertyTransition(aElement->OwnerDoc(), aElement,
                                   aNewStyleContext->GetPseudoType(), timing);
   pt->mStartForReversingTest = startForReversingTest;
@@ -687,7 +678,7 @@ nsTransitionManager::ConsiderStartingTransition(
   segment.mToKey = 1;
   segment.mTimingFunction.Init(tf);
 
-  nsRefPtr<CSSTransition> animation =
+  RefPtr<CSSTransition> animation =
     new CSSTransition(mPresContext->Document()->GetScopeObject());
   animation->SetOwningElement(
     OwningElementRef(*aElement, aNewStyleContext->GetPseudoType()));

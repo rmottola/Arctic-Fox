@@ -9,7 +9,7 @@
 #include "gfxPrefs.h"
 #include "MainThreadUtils.h"
 #include "nsIThread.h"
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "SoftwareVsyncSource.h"
 #include "VsyncSource.h"
 #include "mozilla/Monitor.h"
@@ -87,7 +87,7 @@ protected:
     mVsyncSource = nullptr;
   }
 
-  nsRefPtr<VsyncSource> mVsyncSource;
+  RefPtr<VsyncSource> mVsyncSource;
 };
 
 static void
@@ -130,8 +130,8 @@ TEST_F(VsyncTester, CompositorGetVsyncNotifications)
   globalDisplay.DisableVsync();
   ASSERT_FALSE(globalDisplay.IsVsyncEnabled());
 
-  nsRefPtr<CompositorVsyncDispatcher> vsyncDispatcher = new CompositorVsyncDispatcher();
-  nsRefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
+  RefPtr<CompositorVsyncDispatcher> vsyncDispatcher = new CompositorVsyncDispatcher();
+  RefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
 
   vsyncDispatcher->SetCompositorVsyncObserver(testVsyncObserver);
   FlushMainThreadLoop();
@@ -147,18 +147,14 @@ TEST_F(VsyncTester, CompositorGetVsyncNotifications)
 // Test that if we have vsync enabled, the parent refresh driver should get notifications
 TEST_F(VsyncTester, ParentRefreshDriverGetVsyncNotifications)
 {
-  if (!gfxPrefs::VsyncAlignedRefreshDriver()) {
-    return;
-  }
-
   VsyncSource::Display& globalDisplay = mVsyncSource->GetGlobalDisplay();
   globalDisplay.DisableVsync();
   ASSERT_FALSE(globalDisplay.IsVsyncEnabled());
 
-  nsRefPtr<RefreshTimerVsyncDispatcher> vsyncDispatcher = globalDisplay.GetRefreshTimerVsyncDispatcher();
+  RefPtr<RefreshTimerVsyncDispatcher> vsyncDispatcher = globalDisplay.GetRefreshTimerVsyncDispatcher();
   ASSERT_TRUE(vsyncDispatcher != nullptr);
 
-  nsRefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
+  RefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
   vsyncDispatcher->SetParentRefreshTimer(testVsyncObserver);
   ASSERT_TRUE(globalDisplay.IsVsyncEnabled());
 
@@ -177,18 +173,14 @@ TEST_F(VsyncTester, ParentRefreshDriverGetVsyncNotifications)
 // Test that child refresh vsync observers get vsync notifications
 TEST_F(VsyncTester, ChildRefreshDriverGetVsyncNotifications)
 {
-  if (!gfxPrefs::VsyncAlignedRefreshDriver()) {
-    return;
-  }
-
   VsyncSource::Display& globalDisplay = mVsyncSource->GetGlobalDisplay();
   globalDisplay.DisableVsync();
   ASSERT_FALSE(globalDisplay.IsVsyncEnabled());
 
-  nsRefPtr<RefreshTimerVsyncDispatcher> vsyncDispatcher = globalDisplay.GetRefreshTimerVsyncDispatcher();
+  RefPtr<RefreshTimerVsyncDispatcher> vsyncDispatcher = globalDisplay.GetRefreshTimerVsyncDispatcher();
   ASSERT_TRUE(vsyncDispatcher != nullptr);
 
-  nsRefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
+  RefPtr<TestVsyncObserver> testVsyncObserver = new TestVsyncObserver();
   vsyncDispatcher->AddChildRefreshTimer(testVsyncObserver);
   ASSERT_TRUE(globalDisplay.IsVsyncEnabled());
 

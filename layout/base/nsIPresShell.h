@@ -36,6 +36,7 @@
 #include "nsCompatibility.h"
 #include "nsFrameManagerBase.h"
 #include "nsRect.h"
+#include "nsRegionFwd.h"
 #include "mozFlushType.h"
 #include "nsWeakReference.h"
 #include <stdio.h> // for FILE definition
@@ -69,7 +70,6 @@ class nsFrameManager;
 class nsILayoutHistoryState;
 class nsIReflowCallback;
 class nsIDOMNode;
-class nsIntRegion;
 class nsIStyleSheet;
 class nsCSSFrameConstructor;
 class nsISelection;
@@ -1122,17 +1122,22 @@ public:
                                   nscolor aBackgroundColor,
                                   gfxContext* aRenderedContext) = 0;
 
+  enum {
+    RENDER_AUTO_SCALE = 0x80
+  };
+
   /**
    * Renders a node aNode to a surface and returns it. The aRegion may be used
    * to clip the rendering. This region is measured in CSS pixels from the
-   * edge of the presshell area. The aPoint, aScreenRect and aSurface
-   * arguments function in a similar manner as RenderSelection.
+   * edge of the presshell area. The aPoint, aScreenRect and aFlags arguments
+   * function in a similar manner as RenderSelection.
    */
   virtual already_AddRefed<SourceSurface>
   RenderNode(nsIDOMNode* aNode,
              nsIntRegion* aRegion,
              nsIntPoint& aPoint,
-             nsIntRect* aScreenRect) = 0;
+             nsIntRect* aScreenRect,
+             uint32_t aFlags) = 0;
 
   /**
    * Renders a selection to a surface and returns it. This method is primarily
@@ -1141,18 +1146,20 @@ public:
    * aScreenRect will be filled in with the bounding rectangle of the
    * selection area on screen.
    *
-   * If the area of the selection is large, the image will be scaled down.
-   * The argument aPoint is used in this case as a reference point when
-   * determining the new screen rectangle after scaling. Typically, this
-   * will be the mouse position, so that the screen rectangle is positioned
-   * such that the mouse is over the same point in the scaled image as in
-   * the original. When scaling does not occur, the mouse point isn't used
-   * as the position can be determined from the displayed frames.
+   * If the area of the selection is large and the RENDER_AUTO_SCALE flag is
+   * set, the image will be scaled down. The argument aPoint is used in this
+   * case as a reference point when determining the new screen rectangle after
+   * scaling. Typically, this will be the mouse position, so that the screen
+   * rectangle is positioned such that the mouse is over the same point in the
+   * scaled image as in the original. When scaling does not occur, the mouse
+   * point isn't used because the position can be determined from the displayed
+   * frames.
    */
   virtual already_AddRefed<SourceSurface>
   RenderSelection(nsISelection* aSelection,
                   nsIntPoint& aPoint,
-                  nsIntRect* aScreenRect) = 0;
+                  nsIntRect* aScreenRect,
+                  uint32_t aFlags) = 0;
 
   void AddWeakFrameInternal(nsWeakFrame* aWeakFrame);
   virtual void AddWeakFrameExternal(nsWeakFrame* aWeakFrame);
@@ -1663,12 +1670,6 @@ public:
   virtual void ThemeChanged() = 0;
   virtual void BackingScaleFactorChanged() = 0;
 
-  nscoord MaxLineBoxWidth() {
-    return mMaxLineBoxWidth;
-  }
-
-  void SetMaxLineBoxWidth(nscoord aMaxLineBoxWidth);
-
   /**
    * Returns whether or not there is a reflow on zoom event pending. A reflow
    * on zoom event is a change to the max line box width, followed by a reflow.
@@ -1715,12 +1716,12 @@ protected:
   // These are the same Document and PresContext owned by the DocViewer.
   // we must share ownership.
   nsCOMPtr<nsIDocument>     mDocument;
-  nsRefPtr<nsPresContext>   mPresContext;
+  RefPtr<nsPresContext>   mPresContext;
   nsStyleSet*               mStyleSet;      // [OWNS]
   nsCSSFrameConstructor*    mFrameConstructor; // [OWNS]
   nsViewManager*           mViewManager;   // [WEAK] docViewer owns it so I don't have to
   nsPresArena               mFrameArena;
-  nsRefPtr<nsFrameSelection> mSelection;
+  RefPtr<nsFrameSelection> mSelection;
   // Pointer into mFrameConstructor - this is purely so that FrameManager() and
   // GetRootFrame() can be inlined:
   nsFrameManagerBase*       mFrameManager;
@@ -1810,7 +1811,7 @@ protected:
   // same update block we have already had other changes that require
   // the whole document to be restyled (i.e., mStylesHaveChanged is already
   // true), then we don't bother adding the scope root here.
-  nsAutoTArray<nsRefPtr<mozilla::dom::Element>,1> mChangedScopeStyleRoots;
+  nsAutoTArray<RefPtr<mozilla::dom::Element>,1> mChangedScopeStyleRoots;
 
   static nsIContent*        gKeyDownTarget;
 
@@ -1830,10 +1831,6 @@ protected:
   // Flag to indicate whether or not there is a reflow on zoom event pending.
   // See IsReflowOnZoomPending() for more information.
   bool mReflowOnZoomPending;
-
-  // The maximum width of a line box. Text on a single line that exceeds this
-  // width will be wrapped. A value of 0 indicates that no limit is enforced.
-  nscoord mMaxLineBoxWidth;
 
   // If a document belongs to an invisible DocShell, this flag must be set
   // to true, so we can avoid any paint calls for widget related to this

@@ -42,13 +42,13 @@ class CameraPreviewMediaStream : public MediaStream
 public:
   explicit CameraPreviewMediaStream(DOMMediaStream* aWrapper);
 
-  virtual CameraPreviewMediaStream* AsCameraPreviewStream() override { return this; };
   virtual void AddAudioOutput(void* aKey) override;
   virtual void SetAudioOutputVolume(void* aKey, float aVolume) override;
   virtual void RemoveAudioOutput(void* aKey) override;
   virtual void AddVideoOutput(VideoFrameContainer* aContainer) override;
   virtual void RemoveVideoOutput(VideoFrameContainer* aContainer) override;
-  virtual void ChangeExplicitBlockerCount(int32_t aDelta) override;
+  virtual void Suspend() override {}
+  virtual void Resume() override {}
   virtual void AddListener(MediaStreamListener* aListener) override;
   virtual void RemoveListener(MediaStreamListener* aListener) override;
   virtual void Destroy() override;
@@ -70,7 +70,7 @@ protected:
   uint32_t mDiscardedFrames;
   bool mRateLimit;
   bool mTrackCreated;
-  nsRefPtr<FakeMediaStreamGraph> mFakeMediaStreamGraph;
+  RefPtr<FakeMediaStreamGraph> mFakeMediaStreamGraph;
 };
 
 } // namespace mozilla

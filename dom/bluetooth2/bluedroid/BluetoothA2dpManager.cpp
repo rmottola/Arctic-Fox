@@ -153,7 +153,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
 };
 
 class BluetoothA2dpManager::InitA2dpResultHandler final
@@ -196,7 +196,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
 };
 
 class BluetoothA2dpManager::OnErrorProfileResultHandlerRunnable final
@@ -218,7 +218,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
   nsresult mRv;
 };
 
@@ -236,7 +236,7 @@ BluetoothA2dpManager::InitA2dpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no backend interface, we dispatch a runnable
     // that calls the profile result handler.
-    nsRefPtr<nsRunnable> r =
+    RefPtr<nsRunnable> r =
       new OnErrorProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HFP OnError runnable");
@@ -248,7 +248,7 @@ BluetoothA2dpManager::InitA2dpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!sBtA2dpInterface)) {
     // If there's no A2DP interface, we dispatch a runnable
     // that calls the profile result handler.
-    nsRefPtr<nsRunnable> r =
+    RefPtr<nsRunnable> r =
       new OnErrorProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HFP OnError runnable");
@@ -365,7 +365,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
 };
 
 class BluetoothA2dpManager::CleanupA2dpResultHandler final
@@ -399,7 +399,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
 };
 
 class BluetoothA2dpManager::CleanupA2dpResultHandlerRunnable final
@@ -426,7 +426,7 @@ public:
   }
 
 private:
-  nsRefPtr<BluetoothProfileResultHandler> mRes;
+  RefPtr<BluetoothProfileResultHandler> mRes;
 };
 
 // static
@@ -440,7 +440,7 @@ BluetoothA2dpManager::DeinitA2dpInterface(BluetoothProfileResultHandler* aRes)
   } else if (aRes) {
     // We dispatch a runnable here to make the profile resource handler
     // behave as if A2DP was initialized.
-    nsRefPtr<nsRunnable> r = new CleanupA2dpResultHandlerRunnable(aRes);
+    RefPtr<nsRunnable> r = new CleanupA2dpResultHandlerRunnable(aRes);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch cleanup-result-handler runnable");
     }
@@ -577,7 +577,7 @@ BluetoothA2dpManager::OnConnect(const nsAString& aErrorStr)
    */
   NS_ENSURE_TRUE_VOID(mController);
 
-  nsRefPtr<BluetoothProfileController> controller = mController.forget();
+  RefPtr<BluetoothProfileController> controller = mController.forget();
   controller->NotifyCompletion(aErrorStr);
 }
 
@@ -592,7 +592,7 @@ BluetoothA2dpManager::OnDisconnect(const nsAString& aErrorStr)
    */
   NS_ENSURE_TRUE_VOID(mController);
 
-  nsRefPtr<BluetoothProfileController> controller = mController.forget();
+  RefPtr<BluetoothProfileController> controller = mController.forget();
   controller->NotifyCompletion(aErrorStr);
 
   Reset();

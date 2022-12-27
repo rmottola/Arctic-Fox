@@ -69,6 +69,7 @@ public:
 
 BasicCompositor::BasicCompositor(nsIWidget *aWidget)
   : mWidget(aWidget)
+  , mDidExternalComposition(false)
 {
   MOZ_COUNT_CTOR(BasicCompositor);
 
@@ -509,9 +510,16 @@ BasicCompositor::BeginFrame(const nsIntRegion& aInvalidRegion,
   IntRect intRect = gfx::IntRect(IntPoint(), mWidgetSize);
   Rect rect = Rect(0, 0, intRect.width, intRect.height);
 
-  // Sometimes the invalid region is larger than we want to draw.
   nsIntRegion invalidRegionSafe;
-  invalidRegionSafe.And(aInvalidRegion, intRect);
+  if (mDidExternalComposition) {
+    // We do not know rendered region during external composition, just redraw
+    // whole widget.
+    invalidRegionSafe = intRect;
+    mDidExternalComposition = false;
+  } else {
+    // Sometimes the invalid region is larger than we want to draw.
+    invalidRegionSafe.And(aInvalidRegion, intRect);
+  }
 
   IntRect invalidRect = invalidRegionSafe.GetBounds();
   mInvalidRect = IntRect(invalidRect.x, invalidRect.y, invalidRect.width, invalidRect.height);
@@ -579,7 +587,7 @@ BasicCompositor::EndFrame()
     float g = float(rand()) / RAND_MAX;
     float b = float(rand()) / RAND_MAX;
     // We're still clipped to mInvalidRegion, so just fill the bounds.
-    mRenderTarget->mDrawTarget->FillRect(ToRect(mInvalidRegion.GetBounds()),
+    mRenderTarget->mDrawTarget->FillRect(IntRectToRect(mInvalidRegion.GetBounds()),
                                          ColorPattern(Color(r, g, b, 0.2f)));
   }
 
@@ -609,6 +617,17 @@ BasicCompositor::EndFrame()
   mDrawTarget = nullptr;
   mRenderTarget = nullptr;
 }
+
+void
+BasicCompositor::EndFrameForExternalComposition(const gfx::Matrix& aTransform)
+{
+  MOZ_ASSERT(!mTarget);
+  MOZ_ASSERT(!mDrawTarget);
+  MOZ_ASSERT(!mRenderTarget);
+
+  mDidExternalComposition = true;
+}
+
 
 } // namespace layers
 } // namespace mozilla

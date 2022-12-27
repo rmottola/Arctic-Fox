@@ -22,10 +22,6 @@ class MFTManager {
 public:
   virtual ~MFTManager() {}
 
-  // Creates an initializs the MFTDecoder.
-  // Returns nullptr on failure.
-  virtual already_AddRefed<MFTDecoder> Init() = 0;
-
   // Submit a compressed sample for decoding.
   // This should forward to the MFTDecoder after performing
   // any required sample formatting.
@@ -38,7 +34,16 @@ public:
   // than MF_E_TRANSFORM_NEED_MORE_INPUT, an error will be reported to the
   // MP4Reader.
   virtual HRESULT Output(int64_t aStreamOffset,
-                         nsRefPtr<MediaData>& aOutput) = 0;
+                         RefPtr<MediaData>& aOutput) = 0;
+
+  void Flush() { mDecoder->Flush(); }
+
+  void Drain()
+  {
+    if (FAILED(mDecoder->SendMFTMessage(MFT_MESSAGE_COMMAND_DRAIN, 0))) {
+      NS_WARNING("Failed to send DRAIN command to MFT");
+    }
+  }
 
   // Destroys all resources.
   virtual void Shutdown() = 0;
@@ -47,6 +52,9 @@ public:
 
   virtual TrackInfo::TrackType GetType() = 0;
 
+protected:
+  // IMFTransform wrapper that performs the decoding.
+  RefPtr<MFTDecoder> mDecoder;
 };
 
 // Decodes audio and video using Windows Media Foundation. Samples are decoded
@@ -57,22 +65,21 @@ public:
 class WMFMediaDataDecoder : public MediaDataDecoder {
 public:
   WMFMediaDataDecoder(MFTManager* aOutputSource,
-                      MFTDecoder* aDecoder,
                       FlushableTaskQueue* aAudioTaskQueue,
                       MediaDataDecoderCallback* aCallback);
   ~WMFMediaDataDecoder();
 
-  virtual nsRefPtr<MediaDataDecoder::InitPromise> Init() override;
+  RefPtr<MediaDataDecoder::InitPromise> Init() override;
 
-  virtual nsresult Input(MediaRawData* aSample);
+  nsresult Input(MediaRawData* aSample);
 
-  virtual nsresult Flush() override;
+  nsresult Flush() override;
 
-  virtual nsresult Drain() override;
+  nsresult Drain() override;
 
-  virtual nsresult Shutdown() override;
+  nsresult Shutdown() override;
 
-  virtual bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
+  bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
 
 private:
 
@@ -97,7 +104,6 @@ private:
   RefPtr<FlushableTaskQueue> mTaskQueue;
   MediaDataDecoderCallback* mCallback;
 
-  RefPtr<MFTDecoder> mDecoder;
   nsAutoPtr<MFTManager> mMFTManager;
 
   // The last offset into the media resource that was passed into Input().

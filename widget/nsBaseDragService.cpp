@@ -217,7 +217,7 @@ nsBaseDragService::InvokeDragSession(nsIDOMNode *aDOMNode,
   // stash the document of the dom node
   aDOMNode->GetOwnerDocument(getter_AddRefs(mSourceDocument));
   mSourceNode = aDOMNode;
-  mEndDragPoint = nsIntPoint(0, 0);
+  mEndDragPoint = LayoutDeviceIntPoint(0, 0);
 
   // When the mouse goes down, the selection code starts a mouse
   // capture. However, this gets in the way of determining drag
@@ -225,7 +225,15 @@ nsBaseDragService::InvokeDragSession(nsIDOMNode *aDOMNode,
   // are in the wrong coord system, so turn off mouse capture.
   nsIPresShell::ClearMouseCapture(nullptr);
 
-  return NS_OK;
+  nsresult rv = InvokeDragSessionImpl(aTransferableArray,
+                                      aDragRgn, aActionType);
+
+  if (NS_FAILED(rv)) {
+    mSourceNode = nullptr;
+    mSourceDocument = nullptr;
+  }
+
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -367,7 +375,7 @@ nsBaseDragService::EndDragSession(bool aDoneDrag)
   }
 
   for (uint32_t i = 0; i < mChildProcesses.Length(); ++i) {
-    mozilla::unused << mChildProcesses[i]->SendEndDragSession(aDoneDrag,
+    mozilla::Unused << mChildProcesses[i]->SendEndDragSession(aDoneDrag,
                                                               mUserCancelled);
   }
   mChildProcesses.Clear();
@@ -387,7 +395,7 @@ nsBaseDragService::EndDragSession(bool aDoneDrag)
   mImageOffset = CSSIntPoint();
   mScreenX = -1;
   mScreenY = -1;
-  mEndDragPoint = nsIntPoint(0, 0);
+  mEndDragPoint = LayoutDeviceIntPoint(0, 0);
   mInputSource = nsIDOMMouseEvent::MOZ_SOURCE_MOUSE;
 
   return NS_OK;
@@ -405,8 +413,7 @@ nsBaseDragService::FireDragEventAtSource(EventMessage aEventMessage)
         WidgetDragEvent event(true, aEventMessage, nullptr);
         event.inputSource = mInputSource;
         if (aEventMessage == eDragEnd) {
-          event.refPoint.x = mEndDragPoint.x;
-          event.refPoint.y = mEndDragPoint.y;
+          event.refPoint = mEndDragPoint;
           event.userCancelled = mUserCancelled;
         }
 
@@ -487,7 +494,7 @@ nsBaseDragService::DrawDrag(nsIDOMNode* aDOMNode,
 
   nsCOMPtr<nsIFrameLoaderOwner> flo = do_QueryInterface(dragNode);
   if (flo) {
-    nsRefPtr<nsFrameLoader> fl = flo->GetFrameLoader();
+    RefPtr<nsFrameLoader> fl = flo->GetFrameLoader();
     if (fl) {
       mozilla::dom::TabParent* tp =
         static_cast<mozilla::dom::TabParent*>(fl->GetRemoteBrowser());
@@ -559,7 +566,8 @@ nsBaseDragService::DrawDrag(nsIDOMNode* aDOMNode,
   // draw the image for selections
   if (mSelection) {
     nsIntPoint pnt(aScreenDragRect->x, aScreenDragRect->y);
-    *aSurface = presShell->RenderSelection(mSelection, pnt, aScreenDragRect);
+    *aSurface = presShell->RenderSelection(mSelection, pnt, aScreenDragRect,
+                                           mImage ? 0 : nsIPresShell::RENDER_AUTO_SCALE);
     return NS_OK;
   }
 
@@ -601,7 +609,8 @@ nsBaseDragService::DrawDrag(nsIDOMNode* aDOMNode,
 
     nsIntPoint pnt(aScreenDragRect->x, aScreenDragRect->y);
     *aSurface = presShell->RenderNode(dragNode, aRegion ? &clipRegion : nullptr,
-                                      pnt, aScreenDragRect);
+                                      pnt, aScreenDragRect,
+                                      mImage ? 0 : nsIPresShell::RENDER_AUTO_SCALE);
   }
 
   // if an image was specified, reposition the drag rectangle to
@@ -662,7 +671,7 @@ nsBaseDragService::DrawDragForImage(nsPresContext* aPresContext,
     if (!dt)
       return NS_ERROR_FAILURE;
 
-    nsRefPtr<gfxContext> ctx = new gfxContext(dt);
+    RefPtr<gfxContext> ctx = new gfxContext(dt);
     if (!ctx)
       return NS_ERROR_FAILURE;
 

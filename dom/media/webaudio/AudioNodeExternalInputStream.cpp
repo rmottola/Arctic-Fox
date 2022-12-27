@@ -12,8 +12,8 @@ using namespace mozilla::dom;
 
 namespace mozilla {
 
-AudioNodeExternalInputStream::AudioNodeExternalInputStream(AudioNodeEngine* aEngine, TrackRate aSampleRate, uint32_t aContextId)
-  : AudioNodeStream(aEngine, NO_STREAM_FLAGS, aSampleRate, aContextId)
+AudioNodeExternalInputStream::AudioNodeExternalInputStream(AudioNodeEngine* aEngine, TrackRate aSampleRate)
+  : AudioNodeStream(aEngine, NO_STREAM_FLAGS, aSampleRate)
 {
   MOZ_COUNT_CTOR(AudioNodeExternalInputStream);
 }
@@ -27,12 +27,13 @@ AudioNodeExternalInputStream::~AudioNodeExternalInputStream()
 AudioNodeExternalInputStream::Create(MediaStreamGraph* aGraph,
                                      AudioNodeEngine* aEngine)
 {
+  AudioContext* ctx = aEngine->NodeMainThread()->Context();
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aGraph->GraphRate() == aEngine->NodeMainThread()->Context()->SampleRate());
+  MOZ_ASSERT(aGraph->GraphRate() == ctx->SampleRate());
 
-  nsRefPtr<AudioNodeExternalInputStream> stream =
-    new AudioNodeExternalInputStream(aEngine, aGraph->GraphRate(),
-                                     aEngine->NodeMainThread()->Context()->Id());
+  RefPtr<AudioNodeExternalInputStream> stream =
+    new AudioNodeExternalInputStream(aEngine, aGraph->GraphRate());
+  stream->mSuspendedCount += ctx->ShouldSuspendNewStream();
   aGraph->AddStream(stream);
   return stream.forget();
 }
@@ -44,7 +45,7 @@ AudioNodeExternalInputStream::Create(MediaStreamGraph* aGraph,
  */
 template <typename T>
 static void
-CopyChunkToBlock(AudioChunk& aInput, AudioChunk *aBlock,
+CopyChunkToBlock(AudioChunk& aInput, AudioBlock *aBlock,
                  uint32_t aOffsetInBlock)
 {
   uint32_t blockChannels = aBlock->ChannelCount();
@@ -79,7 +80,7 @@ CopyChunkToBlock(AudioChunk& aInput, AudioChunk *aBlock,
  * channels in every chunk of aSegment. aBlock must be float format or null.
  */
 static void ConvertSegmentToAudioBlock(AudioSegment* aSegment,
-                                       AudioChunk* aBlock,
+                                       AudioBlock* aBlock,
                                        int32_t aFallbackChannelCount)
 {
   NS_ASSERTION(aSegment->GetDuration() == WEBAUDIO_BLOCK_SIZE, "Bad segment duration");
@@ -95,7 +96,7 @@ static void ConvertSegmentToAudioBlock(AudioSegment* aSegment,
     }
   }
 
-  AllocateAudioBlock(aFallbackChannelCount, aBlock);
+  aBlock->AllocateChannels(aFallbackChannelCount);
 
   uint32_t duration = 0;
   for (AudioSegment::ChunkIterator ci(*aSegment); !ci.IsEnded(); ci.Next()) {
@@ -126,7 +127,6 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   // Handle that.
   if (!IsEnabled() || mInputs.IsEmpty() || mPassThrough) {
     mLastChunks[0].SetNull(WEBAUDIO_BLOCK_SIZE);
-    AdvanceOutputSegment();
     return;
   }
 
@@ -138,6 +138,10 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   for (StreamBuffer::TrackIter tracks(source->mBuffer, MediaSegment::AUDIO);
        !tracks.IsEnded(); tracks.Next()) {
     const StreamBuffer::Track& inputTrack = *tracks;
+    if (!mInputs[0]->PassTrackThrough(tracks->GetID())) {
+      continue;
+    }
+
     const AudioSegment& inputSegment =
         *static_cast<AudioSegment*>(inputTrack.GetSegment());
     if (inputSegment.IsNull()) {
@@ -153,6 +157,8 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
         break;
       next = interval.mEnd;
 
+      // We know this stream does not block during the processing interval ---
+      // we're not finished, we don't underrun, and we're not suspended.
       StreamTime outputStart = GraphTimeToStreamTime(interval.mStart);
       StreamTime outputEnd = GraphTimeToStreamTime(interval.mEnd);
       StreamTime ticks = outputEnd - outputStart;
@@ -160,6 +166,8 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
       if (interval.mInputIsBlocked) {
         segment.AppendNullData(ticks);
       } else {
+        // The input stream is not blocked in this interval, so no need to call
+        // GraphTimeToStreamTimeWithBlocking.
         StreamTime inputStart =
           std::min(inputSegment.GetDuration(),
                    source->GraphTimeToStreamTime(interval.mStart));
@@ -182,11 +190,11 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   if (inputChannels) {
     nsAutoTArray<float,GUESS_AUDIO_CHANNELS*WEBAUDIO_BLOCK_SIZE> downmixBuffer;
     for (uint32_t i = 0; i < audioSegments.Length(); ++i) {
-      AudioChunk tmpChunk;
+      AudioBlock tmpChunk;
       ConvertSegmentToAudioBlock(&audioSegments[i], &tmpChunk, inputChannels);
       if (!tmpChunk.IsNull()) {
         if (accumulateIndex == 0) {
-          AllocateAudioBlock(inputChannels, &mLastChunks[0]);
+          mLastChunks[0].AllocateChannels(inputChannels);
         }
         AccumulateInputChunk(accumulateIndex, tmpChunk, &mLastChunks[0], &downmixBuffer);
         accumulateIndex++;
@@ -196,9 +204,6 @@ AudioNodeExternalInputStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   if (accumulateIndex == 0) {
     mLastChunks[0].SetNull(WEBAUDIO_BLOCK_SIZE);
   }
-
-  // Using AudioNodeStream's AdvanceOutputSegment to push the media stream graph along with null data.
-  AdvanceOutputSegment();
 }
 
 bool

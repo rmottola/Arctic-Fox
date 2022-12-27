@@ -82,21 +82,21 @@ const Register ABIArgGenerator::NonReturn_VolatileReg1 = a1;
 uint32_t
 js::jit::RT(FloatRegister r)
 {
-    MOZ_ASSERT(r.id() < FloatRegisters::TotalSingle);
+    MOZ_ASSERT(r.id() < FloatRegisters::RegisterIdLimit);
     return r.id() << RTShift;
 }
 
 uint32_t
 js::jit::RD(FloatRegister r)
 {
-    MOZ_ASSERT(r.id() < FloatRegisters::TotalSingle);
+    MOZ_ASSERT(r.id() < FloatRegisters::RegisterIdLimit);
     return r.id() << RDShift;
 }
 
 uint32_t
 js::jit::SA(FloatRegister r)
 {
-    MOZ_ASSERT(r.id() < FloatRegisters::TotalSingle);
+    MOZ_ASSERT(r.id() < FloatRegisters::RegisterIdLimit);
     return r.id() << SAShift;
 }
 
@@ -261,7 +261,7 @@ Assembler::Bind(uint8_t* rawCode, AbsoluteLabel* label, const void* address)
 }
 
 void
-Assembler::bind(InstImm* inst, uint32_t branch, uint32_t target)
+Assembler::bind(InstImm* inst, uintptr_t branch, uintptr_t target)
 {
     int32_t offset = target - branch;
     InstImm inst_bgezal = InstImm(op_regimm, zero, rt_bgezal, BOffImm16(0));
@@ -321,7 +321,7 @@ void
 Assembler::bind(RepatchLabel* label)
 {
     BufferOffset dest = nextOffset();
-    if (label->used()) {
+    if (label->used() && !oom()) {
         // If the label has a use, then change this use to refer to
         // the bound label;
         BufferOffset b(label->offset());

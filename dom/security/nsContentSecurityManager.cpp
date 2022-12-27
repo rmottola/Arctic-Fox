@@ -10,7 +10,7 @@
 
 NS_IMPL_ISUPPORTS(nsContentSecurityManager, nsIContentSecurityManager)
 
-nsresult
+static nsresult
 ValidateSecurityFlags(nsILoadInfo* aLoadInfo)
 {
   nsSecurityFlags securityMode = aLoadInfo->GetSecurityMode();
@@ -43,7 +43,7 @@ static bool SchemeIs(nsIURI* aURI, const char* aScheme)
   return NS_SUCCEEDED(baseURI->SchemeIs(aScheme, &isScheme)) && isScheme;
 }
 
-nsresult
+static nsresult
 DoCheckLoadURIChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
 {
   nsresult rv = NS_OK;
@@ -73,29 +73,48 @@ DoCheckLoadURIChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
   return NS_OK;
 }
 
-nsresult
+static bool
+URIHasFlags(nsIURI* aURI, uint32_t aURIFlags)
+{
+  bool hasFlags;
+  nsresult rv = NS_URIChainHasFlags(aURI, aURIFlags, &hasFlags);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  return hasFlags;
+}
+
+static nsresult
 DoSOPChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
 {
-  if (aLoadInfo->GetAllowChrome() && SchemeIs(aURI, "chrome")) {
-    // Enforce same-origin policy, except to chrome.
+  if (aLoadInfo->GetAllowChrome() &&
+      (URIHasFlags(aURI, nsIProtocolHandler::URI_IS_UI_RESOURCE) ||
+       SchemeIs(aURI, "moz-safe-about"))) {
+    // UI resources are allowed.
     return DoCheckLoadURIChecks(aURI, aLoadInfo);
   }
 
   nsIPrincipal* loadingPrincipal = aLoadInfo->LoadingPrincipal();
   bool sameOriginDataInherits =
     aLoadInfo->GetSecurityMode() == nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS;
+
+  if (sameOriginDataInherits &&
+      aLoadInfo->GetAboutBlankInherits() &&
+      NS_IsAboutBlank(aURI)) {
+    return NS_OK;
+  }
+
   return loadingPrincipal->CheckMayLoad(aURI,
                                         true, // report to console
                                         sameOriginDataInherits);
 }
 
-nsresult
+static nsresult
 DoCORSChecks(nsIChannel* aChannel, nsILoadInfo* aLoadInfo,
              nsCOMPtr<nsIStreamListener>& aInAndOutListener)
 {
-  MOZ_ASSERT(aInAndOutListener, "can not perform CORS checks without a listener");
+  MOZ_RELEASE_ASSERT(aInAndOutListener, "can not perform CORS checks without a listener");
   nsIPrincipal* loadingPrincipal = aLoadInfo->LoadingPrincipal();
-  nsRefPtr<nsCORSListenerProxy> corsListener =
+  RefPtr<nsCORSListenerProxy> corsListener =
     new nsCORSListenerProxy(aInAndOutListener,
                             loadingPrincipal,
                             aLoadInfo->GetRequireCorsWithCredentials());
@@ -108,14 +127,15 @@ DoCORSChecks(nsIChannel* aChannel, nsILoadInfo* aLoadInfo,
   return NS_OK;
 }
 
-nsresult
+static nsresult
 DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
 {
-  nsContentPolicyType contentPolicyType = aLoadInfo->GetExternalContentPolicyType();
-  nsCString mimeTypeGuess;
-  nsCOMPtr<nsINode> requestingContext = nullptr;
+  nsContentPolicyType contentPolicyType =
+    aLoadInfo->GetExternalContentPolicyType();
   nsContentPolicyType internalContentPolicyType =
     aLoadInfo->InternalContentPolicyType();
+  nsCString mimeTypeGuess;
+  nsCOMPtr<nsINode> requestingContext = nullptr;
 
   switch(contentPolicyType) {
     case nsIContentPolicy::TYPE_OTHER: {
@@ -124,7 +144,12 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
       break;
     }
 
-    case nsIContentPolicy::TYPE_SCRIPT:
+    case nsIContentPolicy::TYPE_SCRIPT: {
+      mimeTypeGuess = NS_LITERAL_CSTRING("application/javascript");
+      requestingContext = aLoadInfo->LoadingNode();
+      break;
+    }
+
     case nsIContentPolicy::TYPE_IMAGE:
     case nsIContentPolicy::TYPE_STYLESHEET:
     case nsIContentPolicy::TYPE_OBJECT:
@@ -166,9 +191,13 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
                  requestingContext->NodeType() == nsIDOMNode::DOCUMENT_NODE,
                  "type_xml requires requestingContext of type Document");
 
+      // We're checking for the external TYPE_XMLHTTPREQUEST here in case
+      // an addon creates a request with that type.
       if (internalContentPolicyType ==
-            nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST) {
-        mimeTypeGuess = NS_LITERAL_CSTRING("application/xml");
+            nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST ||
+          internalContentPolicyType ==
+            nsIContentPolicy::TYPE_XMLHTTPREQUEST) {
+        mimeTypeGuess = EmptyCString();
       }
       else {
         MOZ_ASSERT(internalContentPolicyType ==
@@ -208,9 +237,14 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
       break;
     }
 
-    case nsIContentPolicy::TYPE_WEBSOCKET:
-    case nsIContentPolicy::TYPE_CSP_REPORT: {
+    case nsIContentPolicy::TYPE_WEBSOCKET: {
       MOZ_ASSERT(false, "contentPolicyType not supported yet");
+      break;
+    }
+
+    case nsIContentPolicy::TYPE_CSP_REPORT: {
+      mimeTypeGuess = EmptyCString();
+      requestingContext = aLoadInfo->LoadingNode();
       break;
     }
 
@@ -232,7 +266,12 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
       break;
     }
 
-    case nsIContentPolicy::TYPE_FETCH:
+    case nsIContentPolicy::TYPE_FETCH: {
+      mimeTypeGuess = EmptyCString();
+      requestingContext = aLoadInfo->LoadingNode();
+      break;
+    }
+
     case nsIContentPolicy::TYPE_IMAGESET: {
       MOZ_ASSERT(false, "contentPolicyType not supported yet");
       break;
@@ -244,7 +283,7 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
   }
 
   int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-  nsresult rv = NS_CheckContentLoadPolicy(contentPolicyType,
+  nsresult rv = NS_CheckContentLoadPolicy(internalContentPolicyType,
                                           aURI,
                                           aLoadInfo->LoadingPrincipal(),
                                           requestingContext,
@@ -369,5 +408,38 @@ nsContentSecurityManager::PerformSecurityCheck(nsIChannel* aChannel,
   NS_ENSURE_SUCCESS(rv, rv);
 
   inAndOutListener.forget(outStreamListener);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsContentSecurityManager::IsURIPotentiallyTrustworthy(nsIURI* aURI, bool* aIsTrustWorthy)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  NS_ENSURE_ARG_POINTER(aURI);
+  NS_ENSURE_ARG_POINTER(aIsTrustWorthy);
+
+  *aIsTrustWorthy = false;
+  nsAutoCString scheme;
+  nsresult rv = aURI->GetScheme(scheme);
+  NS_ENSURE_SUCCESS(rv, NS_OK);
+
+  if (scheme.EqualsLiteral("https") ||
+      scheme.EqualsLiteral("file") ||
+      scheme.EqualsLiteral("app")) {
+    *aIsTrustWorthy = true;
+    return NS_OK;
+  }
+
+  nsAutoCString host;
+  rv = aURI->GetHost(host);
+  NS_ENSURE_SUCCESS(rv, NS_OK);
+
+  if (host.Equals("127.0.0.1") ||
+      host.Equals("localhost") ||
+      host.Equals("::1")) {
+    *aIsTrustWorthy = true;
+    return NS_OK;
+  }
+
   return NS_OK;
 }

@@ -1184,6 +1184,9 @@ this.DOMApplicationRegistry = {
       Services.obs.removeObserver(this, "xpcom-shutdown");
       cpmm = null;
       ppmm = null;
+      if (AppConstants.MOZ_B2GDROID) {
+        AndroidUtils.uninit();
+      }
     } else if (aTopic == "memory-pressure") {
       // Clear the manifest cache on memory pressure.
       this._manifestCache = {};
@@ -3742,6 +3745,10 @@ this.DOMApplicationRegistry = {
         throw "INVALID_MANIFEST";
       }
       newManifest = UserCustomizations.convertManifest(newManifest);
+      // Keep track of the add-on version, to use for blocklisting.
+      if (newManifest.version) {
+        aNewApp.extensionVersion = newManifest.version;
+      }
     }
 
     if (!AppsUtils.checkManifest(newManifest, aOldApp)) {
@@ -4568,7 +4575,7 @@ this.DOMApplicationRegistry = {
   },
 
   // Returns a promise that resolves to the app object with the manifest.
-  getFullAppByManifestURL: function(aManifestURL, aEntryPoint) {
+  getFullAppByManifestURL: function(aManifestURL, aEntryPoint, aLang) {
     let app = this.getAppByManifestURL(aManifestURL);
     if (!app) {
       return Promise.reject("NoSuchApp");
@@ -4586,7 +4593,8 @@ this.DOMApplicationRegistry = {
         manifest.version = aManifest.version;
       }
 
-      app.manifest = new ManifestHelper(manifest, app.origin, app.manifestURL);
+      app.manifest =
+        new ManifestHelper(manifest, app.origin, app.manifestURL, aLang);
       return app;
     });
   },

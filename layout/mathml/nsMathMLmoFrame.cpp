@@ -362,7 +362,7 @@ nsMathMLmoFrame::ProcessOperatorData()
       // Cache the default values of lspace and rspace.
       // since these values are relative to the 'em' unit, convert to twips now
       nscoord em;
-      nsRefPtr<nsFontMetrics> fm;
+      RefPtr<nsFontMetrics> fm;
       nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
                                             fontSizeInflation);
       GetEmHeight(fm, em);
@@ -615,7 +615,7 @@ nsMathMLmoFrame::Stretch(nsRenderingContext& aRenderingContext,
 
   // get the axis height;
   float fontSizeInflation = nsLayoutUtils::FontSizeInflationFor(this);
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
                                         fontSizeInflation);
   nscoord axisHeight, height;
@@ -1034,7 +1034,8 @@ nsMathMLmoFrame::MarkIntrinsicISizesDirty()
 }
 
 /* virtual */ void
-nsMathMLmoFrame::GetIntrinsicISizeMetrics(nsRenderingContext *aRenderingContext, nsHTMLReflowMetrics& aDesiredSize)
+nsMathMLmoFrame::GetIntrinsicISizeMetrics(nsRenderingContext *aRenderingContext,
+                                          nsHTMLReflowMetrics& aDesiredSize)
 {
   ProcessOperatorData();
   if (UseMathMLChar()) {
@@ -1043,8 +1044,7 @@ nsMathMLmoFrame::GetIntrinsicISizeMetrics(nsRenderingContext *aRenderingContext,
     aDesiredSize.Width() = mMathMLChar.
       GetMaxWidth(PresContext(), *aRenderingContext,
                   nsLayoutUtils::FontSizeInflationFor(this),
-                  stretchHint, mMaxSize,
-                  NS_MATHML_OPERATOR_MAXSIZE_IS_ABSOLUTE(mFlags));
+                  stretchHint);
   }
   else {
     nsMathMLTokenFrame::GetIntrinsicISizeMetrics(aRenderingContext,

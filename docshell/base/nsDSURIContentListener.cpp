@@ -122,7 +122,7 @@ nsDSURIContentListener::DoContent(const nsACString& aContentType,
                  aContentType.EqualsLiteral("image/jpeg");
 
   if (mExistingJPEGStreamListener && reuseCV) {
-    nsRefPtr<nsIStreamListener> copy(mExistingJPEGStreamListener);
+    RefPtr<nsIStreamListener> copy(mExistingJPEGStreamListener);
     copy.forget(aContentHandler);
     rv = NS_OK;
   } else {
@@ -148,8 +148,8 @@ nsDSURIContentListener::DoContent(const nsACString& aContentType,
   }
 
   if (loadFlags & nsIChannel::LOAD_RETARGETED_DOCUMENT_URI) {
-    nsCOMPtr<nsIDOMWindow> domWindow =
-      mDocShell ? mDocShell->GetWindow() : nullptr;
+    nsCOMPtr<nsPIDOMWindow> domWindow = do_QueryInterface(
+      mDocShell ? mDocShell->GetWindow() : nullptr);
     NS_ENSURE_TRUE(domWindow, NS_ERROR_FAILURE);
     domWindow->Focus();
   }
@@ -223,7 +223,7 @@ NS_IMETHODIMP
 nsDSURIContentListener::SetLoadCookie(nsISupports* aLoadCookie)
 {
 #ifdef DEBUG
-  nsRefPtr<nsDocLoader> cookieAsDocLoader =
+  RefPtr<nsDocLoader> cookieAsDocLoader =
     nsDocLoader::GetAsDocLoader(aLoadCookie);
   NS_ASSERTION(cookieAsDocLoader && cookieAsDocLoader == mDocShell,
                "Invalid load cookie being set!");

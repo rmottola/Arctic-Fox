@@ -68,6 +68,7 @@ SEARCH_PATHS = [
     'testing/mozbase/mozrunner',
     'testing/mozbase/mozsystemmonitor',
     'testing/mozbase/mozinfo',
+    'testing/mozbase/mozscreenshot',
     'testing/mozbase/moztest',
     'testing/mozbase/mozversion',
     'testing/mozbase/manifestparser',

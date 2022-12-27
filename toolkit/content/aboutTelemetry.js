@@ -4,9 +4,9 @@
 
 'use strict';
 
-const Ci = Components.interfaces;
-const Cc = Components.classes;
-const Cu = Components.utils;
+var Ci = Components.interfaces;
+var Cc = Components.classes;
+var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/TelemetryTimestamps.jsm");
@@ -40,10 +40,10 @@ const isWindows = (Services.appinfo.OS == "WINNT");
 const EOL = isWindows ? "\r\n" : "\n";
 
 // This is the ping object currently displayed in the page.
-let gPingData = null;
+var gPingData = null;
 
 // Cached value of document's RTL mode
-let documentRTLMode = "";
+var documentRTLMode = "";
 
 /**
  * Helper function for determining whether the document direction is RTL.
@@ -201,7 +201,7 @@ function shortTimeString(date) {
          + ":" + padToTwoDigits(date.getSeconds());
 }
 
-let Settings = {
+var Settings = {
   SETTINGS: [
     // data upload
     {
@@ -259,7 +259,7 @@ let Settings = {
   }
 };
 
-let PingPicker = {
+var PingPicker = {
   viewCurrentPingData: true,
   _archivedPings: null,
 
@@ -434,7 +434,7 @@ let PingPicker = {
   },
 };
 
-let GeneralData = {
+var GeneralData = {
   /**
    * Renders the general data
    */
@@ -483,7 +483,7 @@ let GeneralData = {
   },
 };
 
-let EnvironmentData = {
+var EnvironmentData = {
   /**
    * Renders the environment data
    */
@@ -530,7 +530,7 @@ let EnvironmentData = {
   },
 };
 
-let TelLog = {
+var TelLog = {
   /**
    * Renders the telemetry log
    */
@@ -582,7 +582,7 @@ let TelLog = {
   },
 };
 
-let SlowSQL = {
+var SlowSQL = {
 
   slowSqlHits: bundle.GetStringFromName("slowSqlHits"),
 
@@ -698,7 +698,7 @@ let SlowSQL = {
   }
 };
 
-let StackRenderer = {
+var StackRenderer = {
 
   stackTitle: bundle.GetStringFromName("stackTitle"),
 
@@ -853,7 +853,7 @@ function SymbolicationRequest_fetchSymbols() {
   this.symbolRequest.send(requestJSON);
 }
 
-let ChromeHangs = {
+var ChromeHangs = {
 
   symbolRequest: null,
 
@@ -875,7 +875,7 @@ let ChromeHangs = {
   }
 };
 
-let ThreadHangStats = {
+var ThreadHangStats = {
 
   /**
    * Renders raw thread hang stats data
@@ -926,7 +926,7 @@ let ThreadHangStats = {
   },
 };
 
-let Histogram = {
+var Histogram = {
 
   hgramSamplesCaption: bundle.GetStringFromName("histogramSamples"),
 
@@ -1179,7 +1179,7 @@ function RenderObject(aObject) {
   return output + "}";
 };
 
-let KeyValueTable = {
+var KeyValueTable = {
   /**
    * Returns a 2-column table with keys and values
    * @param aMeasurements Each key in this JS object is rendered as a row in
@@ -1243,7 +1243,7 @@ let KeyValueTable = {
   }
 };
 
-let KeyedHistogram = {
+var KeyedHistogram = {
   render: function(parent, id, keyedHistogram) {
     let outerDiv = document.createElement("div");
     outerDiv.className = "keyed-histogram";
@@ -1263,7 +1263,7 @@ let KeyedHistogram = {
   },
 };
 
-let AddonDetails = {
+var AddonDetails = {
   tableIDTitle: bundle.GetStringFromName("addonTableID"),
   tableDetailsTitle: bundle.GetStringFromName("addonTableDetails"),
 
@@ -1431,7 +1431,7 @@ function onLoad() {
   }
 }
 
-let LateWritesSingleton = {
+var LateWritesSingleton = {
   renderHeader: function LateWritesSingleton_renderHeader(aIndex) {
     StackRenderer.renderHeader("late-writes", [aIndex + 1]);
   },

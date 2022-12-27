@@ -87,12 +87,12 @@ public:
     mUpSampler = speex_resampler_init(aChannels,
                                       aSampleRate,
                                       aSampleRate * ValueOf(aType),
-                                      SPEEX_RESAMPLER_QUALITY_DEFAULT,
+                                      SPEEX_RESAMPLER_QUALITY_MIN,
                                       nullptr);
     mDownSampler = speex_resampler_init(aChannels,
                                         aSampleRate * ValueOf(aType),
                                         aSampleRate,
-                                        SPEEX_RESAMPLER_QUALITY_DEFAULT,
+                                        SPEEX_RESAMPLER_QUALITY_MIN,
                                         nullptr);
     mBuffer.SetLength(WEBAUDIO_BLOCK_SIZE*ValueOf(aType));
   }
@@ -215,11 +215,12 @@ public:
   }
 
   virtual void ProcessBlock(AudioNodeStream* aStream,
-                            const AudioChunk& aInput,
-                            AudioChunk* aOutput,
+                            GraphTime aFrom,
+                            const AudioBlock& aInput,
+                            AudioBlock* aOutput,
                             bool* aFinished) override
   {
-    uint32_t channelCount = aInput.mChannelData.Length();
+    uint32_t channelCount = aInput.ChannelCount();
     if (!mCurve.Length() || !channelCount) {
       // Optimize the case where we don't have a curve buffer,
       // or the input is null.
@@ -227,7 +228,7 @@ public:
       return;
     }
 
-    AllocateAudioBlock(channelCount, aOutput);
+    aOutput->AllocateChannels(channelCount);
     for (uint32_t i = 0; i < channelCount; ++i) {
       float* scaledSample = (float *)(aInput.mChannelData[i]);
       AudioBlockInPlaceScale(scaledSample, aInput.mVolume);
@@ -288,7 +289,7 @@ WaveShaperNode::WaveShaperNode(AudioContext* aContext)
   mozilla::HoldJSObjects(this);
 
   WaveShaperNodeEngine* engine = new WaveShaperNodeEngine(this);
-  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+  mStream = AudioNodeStream::Create(aContext, engine,
                                     AudioNodeStream::NO_STREAM_FLAGS);
 }
 

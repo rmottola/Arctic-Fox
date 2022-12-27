@@ -399,7 +399,7 @@ AppProtocolHandler::NewChannel2(nsIURI* aUri,
                                 nsIChannel** aResult)
 {
   NS_ENSURE_ARG_POINTER(aUri);
-  nsRefPtr<nsJARChannel> channel = new nsJARChannel();
+  RefPtr<nsJARChannel> channel = new nsJARChannel();
 
   nsAutoCString host;
   nsresult rv = aUri->GetHost(host);
@@ -441,7 +441,7 @@ AppProtocolHandler::NewChannel2(nsIURI* aUri,
     if (NS_FAILED(rv) || !jsInfo.isObject()) {
       // Return a DummyChannel.
       printf_stderr("!! Creating a dummy channel for %s (no appInfo)\n", host.get());
-      nsRefPtr<nsIChannel> dummyChannel = new DummyChannel();
+      RefPtr<nsIChannel> dummyChannel = new DummyChannel();
       dummyChannel->SetLoadInfo(aLoadInfo);
       dummyChannel.forget(aResult);
       return NS_OK;
@@ -452,7 +452,7 @@ AppProtocolHandler::NewChannel2(nsIURI* aUri,
     if (!appInfo->Init(cx, jsInfo) || appInfo->mPath.IsEmpty()) {
       // Return a DummyChannel.
       printf_stderr("!! Creating a dummy channel for %s (invalid appInfo)\n", host.get());
-      nsRefPtr<nsIChannel> dummyChannel = new DummyChannel();
+      RefPtr<nsIChannel> dummyChannel = new DummyChannel();
       dummyChannel->SetLoadInfo(aLoadInfo);
       dummyChannel.forget(aResult);
       return NS_OK;
@@ -460,12 +460,11 @@ AppProtocolHandler::NewChannel2(nsIURI* aUri,
     mAppInfoCache.Put(host, appInfo);
   }
 
-  bool noRemote = (appInfo->mIsCoreApp ||
-                   XRE_IsParentProcess());
-
-  // In-parent and CoreApps can directly access files, so use jar:file://
-  nsAutoCString jarSpec(noRemote ? "jar:file://"
-                                 : "jar:remoteopenfile://");
+  // Even core apps are on /system partition and can be accessed directly, but
+  // to ease sandboxing code not to handle the special case of core apps, only
+  // use scheme jar:file in parent, see bug 1119692 comment 20.
+  nsAutoCString jarSpec(XRE_IsParentProcess() ? "jar:file://"
+                                              : "jar:remoteopenfile://");
   jarSpec += NS_ConvertUTF16toUTF8(appInfo->mPath) +
              NS_LITERAL_CSTRING("/application.zip!") +
              fileSpec;

@@ -19,6 +19,7 @@
 #include "nsPrimitiveHelpers.h"
 #include "prtime.h"
 #include "prthread.h"
+#include <dlfcn.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include "nsCRT.h"
@@ -38,6 +39,7 @@
 #include "nsGtkUtils.h"
 #include "mozilla/gfx/2D.h"
 #include "gfxPlatform.h"
+#include "nsScreenGtk.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -102,7 +104,12 @@ nsDragService::nsDragService()
     obsServ->AddObserver(this, "quit-application", false);
 
     // our hidden source widget
+#if (MOZ_WIDGET_GTK == 2)
     mHiddenWidget = gtk_window_new(GTK_WINDOW_POPUP);
+#else
+    // Using an offscreen window works around bug 983843.
+    mHiddenWidget = gtk_offscreen_window_new();
+#endif
     // make sure that the widget is realized so that
     // we can use it as a drag source.
     gtk_widget_realize(mHiddenWidget);
@@ -230,8 +237,10 @@ OnSourceGrabEventAfter(GtkWidget *widget, GdkEvent *event, gpointer user_data)
         // Update the cursor position.  The last of these recorded gets used for
         // the eDragEnd event.
         nsDragService *dragService = static_cast<nsDragService*>(user_data);
-        dragService->SetDragEndPoint(nsIntPoint(event->motion.x_root,
-                                                event->motion.y_root));
+        gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+        LayoutDeviceIntPoint p(floor(event->motion.x_root * scale + 0.5),
+                               floor(event->motion.y_root * scale + 0.5));
+        dragService->SetDragEndPoint(p);
     } else if (sMotionEvent && (event->type == GDK_KEY_PRESS ||
                                 event->type == GDK_KEY_RELEASE)) {
         // Update modifier state from key events.
@@ -266,7 +275,7 @@ GetGtkWindow(nsIDOMDocument *aDocument)
     if (!presShell)
         return nullptr;
 
-    nsRefPtr<nsViewManager> vm = presShell->GetViewManager();
+    RefPtr<nsViewManager> vm = presShell->GetViewManager();
     if (!vm)
         return nullptr;
 
@@ -305,11 +314,16 @@ nsDragService::InvokeDragSession(nsIDOMNode *aDOMNode,
     if (mSourceNode)
         return NS_ERROR_NOT_AVAILABLE;
 
-    nsresult rv = nsBaseDragService::InvokeDragSession(aDOMNode,
-                                                       aArrayTransferables,
-                                                       aRegion, aActionType);
-    NS_ENSURE_SUCCESS(rv, rv);
+    return nsBaseDragService::InvokeDragSession(aDOMNode, aArrayTransferables,
+                                                aRegion, aActionType);
+}
 
+// nsBaseDragService
+nsresult
+nsDragService::InvokeDragSessionImpl(nsISupportsArray* aArrayTransferables,
+                                     nsIScriptableRegion* aRegion,
+                                     uint32_t aActionType)
+{
     // make sure that we have an array of transferables to use
     if (!aArrayTransferables)
         return NS_ERROR_INVALID_ARG;
@@ -370,6 +384,7 @@ nsDragService::InvokeDragSession(nsIDOMNode *aDOMNode,
 
     mSourceRegion = nullptr;
 
+    nsresult rv;
     if (context) {
         StartDragSession();
 
@@ -383,7 +398,8 @@ nsDragService::InvokeDragSession(nsIDOMNode *aDOMNode,
                              G_CALLBACK(OnSourceGrabEventAfter), this);
         }
         // We don't have a drag end point yet.
-        mEndDragPoint = nsIntPoint(-1, -1);
+        mEndDragPoint = LayoutDeviceIntPoint(-1, -1);
+        rv = NS_OK;
     }
     else {
         rv = NS_ERROR_FAILURE;
@@ -401,7 +417,6 @@ nsDragService::SetAlphaPixmap(SourceSurface *aSurface,
                               int32_t aYOffset,
                               const nsIntRect& dragRect)
 {
-#if (MOZ_WIDGET_GTK == 2)
     GdkScreen* screen = gtk_widget_get_screen(mHiddenWidget);
 
     // Transparent drag icons need, like a lot of transparency-related things,
@@ -409,6 +424,7 @@ nsDragService::SetAlphaPixmap(SourceSurface *aSurface,
     if (!gdk_screen_is_composited(screen))
       return false;
 
+#if (MOZ_WIDGET_GTK == 2)
     GdkColormap* alphaColormap = gdk_screen_get_rgba_colormap(screen);
     if (!alphaColormap)
       return false;
@@ -421,7 +437,7 @@ nsDragService::SetAlphaPixmap(SourceSurface *aSurface,
     gdk_drawable_set_colormap(GDK_DRAWABLE(pixmap), alphaColormap);
 
     // Make a gfxXlibSurface wrapped around the pixmap to render on
-    nsRefPtr<gfxASurface> xPixmapSurface =
+    RefPtr<gfxASurface> xPixmapSurface =
          nsWindow::GetSurfaceForGdkDrawable(GDK_DRAWABLE(pixmap),
                                             dragRect.Size());
     if (!xPixmapSurface)
@@ -449,8 +465,46 @@ nsDragService::SetAlphaPixmap(SourceSurface *aSurface,
     g_object_unref(pixmap);
     return true;
 #else
-    // TODO GTK3
-    return false;
+#ifdef cairo_image_surface_create
+#error "Looks like we're including Mozilla's cairo instead of system cairo"
+#endif
+    // TODO: grab X11 pixmap or image data instead of expensive readback.
+    cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+                                                       dragRect.width,
+                                                       dragRect.height);
+    if (!surf)
+        return false;
+
+    RefPtr<DrawTarget> dt = gfxPlatform::GetPlatform()->
+        CreateDrawTargetForData(cairo_image_surface_get_data(surf),
+                                dragRect.Size(),
+                                cairo_image_surface_get_stride(surf),
+                                SurfaceFormat::B8G8R8A8);
+    if (!dt)
+        return false;
+
+    dt->ClearRect(Rect(0, 0, dragRect.width, dragRect.height));
+    dt->DrawSurface(aSurface,
+                    Rect(0, 0, dragRect.width, dragRect.height),
+                    Rect(0, 0, dragRect.width, dragRect.height),
+                    DrawSurfaceOptions(),
+                    DrawOptions(DRAG_IMAGE_ALPHA_LEVEL, CompositionOp::OP_SOURCE));
+
+    cairo_surface_mark_dirty(surf);
+    cairo_surface_set_device_offset(surf, -aXOffset, -aYOffset);
+
+    // Ensure that the surface is drawn at the correct scale on HiDPI displays.
+    static auto sCairoSurfaceSetDeviceScalePtr =
+        (void (*)(cairo_surface_t*,double,double))
+        dlsym(RTLD_DEFAULT, "cairo_surface_set_device_scale");
+    if (sCairoSurfaceSetDeviceScalePtr) {
+        gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+        sCairoSurfaceSetDeviceScalePtr(surf, scale, scale);
+    }
+
+    gtk_drag_set_icon_surface(aContext, surf);
+    cairo_surface_destroy(surf);
+    return true;
 #endif
 }
 
@@ -510,6 +564,26 @@ nsDragService::GetCanDrop(bool *aCanDrop)
     return NS_OK;
 }
 
+static void
+UTF16ToNewUTF8(const char16_t* aUTF16,
+               uint32_t aUTF16Len,
+               char** aUTF8,
+               uint32_t* aUTF8Len)
+{
+  nsDependentSubstring utf16(aUTF16, aUTF16Len);
+  *aUTF8 = ToNewUTF8String(utf16, aUTF8Len);
+}
+
+static void
+UTF8ToNewUTF16(const char* aUTF8,
+               uint32_t aUTF8Len,
+               char16_t** aUTF16,
+               uint32_t* aUTF16Len)
+{
+  nsDependentCSubstring utf8(aUTF8, aUTF8Len);
+  *aUTF16 = UTF8ToNewUnicode(utf8, aUTF16Len);
+}
+
 // count the number of URIs in some text/uri-list format data.
 static uint32_t
 CountTextUriListItems(const char *data,
@@ -541,7 +615,7 @@ GetTextUriListItem(const char *data,
                    uint32_t datalen,
                    uint32_t aItemIndex,
                    char16_t **convertedText,
-                   int32_t *convertedTextLen)
+                   uint32_t *convertedTextLen)
 {
     const char *p = data;
     const char *endPtr = p + datalen;
@@ -560,8 +634,7 @@ GetTextUriListItem(const char *data,
             const char *q = p;
             while (q < endPtr && *q != '\0' && *q != '\n' && *q != '\r')
               q++;
-            nsPrimitiveHelpers::ConvertPlatformPlainTextToUnicode(
-                                p, q - p, convertedText, convertedTextLen);
+            UTF8ToNewUTF16(p, q - p, convertedText, convertedTextLen);
             break;
         }
         // skip to the end of the line
@@ -572,8 +645,7 @@ GetTextUriListItem(const char *data,
 
     // didn't find the desired item, so just pass the whole lot
     if (!*convertedText) {
-        nsPrimitiveHelpers::ConvertPlatformPlainTextToUnicode(
-                            data, datalen, convertedText, convertedTextLen);
+        UTF8ToNewUTF16(data, datalen, convertedText, convertedTextLen);
     }
 }
 
@@ -731,7 +803,7 @@ nsDragService::GetData(nsITransferable * aTransferable,
                     if (mTargetDragData) {
                         const char* text = static_cast<char*>(mTargetDragData);
                         char16_t* convertedText = nullptr;
-                        int32_t convertedTextLen = 0;
+                        uint32_t convertedTextLen = 0;
 
                         GetTextUriListItem(text, mTargetDragDataLen, aItemIndex,
                                            &convertedText, &convertedTextLen);
@@ -739,8 +811,8 @@ nsDragService::GetData(nsITransferable * aTransferable,
                         if (convertedText) {
                             nsCOMPtr<nsIIOService> ioService = do_GetIOService(&rv);
                             nsCOMPtr<nsIURI> fileURI;
-                            nsresult rv = ioService->NewURI(NS_ConvertUTF16toUTF8(convertedText),
-                                                            nullptr, nullptr, getter_AddRefs(fileURI));
+                            rv = ioService->NewURI(NS_ConvertUTF16toUTF8(convertedText),
+                                                   nullptr, nullptr, getter_AddRefs(fileURI));
                             if (NS_SUCCEEDED(rv)) {
                                 nsCOMPtr<nsIFileURL> fileURL = do_QueryInterface(fileURI, &rv);
                                 if (NS_SUCCEEDED(rv)) {
@@ -803,10 +875,9 @@ nsDragService::GetData(nsITransferable * aTransferable,
                             const char* castedText =
                                         reinterpret_cast<char*>(mTargetDragData);
                             char16_t* convertedText = nullptr;
-                            int32_t convertedTextLen = 0;
-                            nsPrimitiveHelpers::ConvertPlatformPlainTextToUnicode(
-                                                castedText, mTargetDragDataLen,
-                                                &convertedText, &convertedTextLen);
+                            uint32_t convertedTextLen = 0;
+                            UTF8ToNewUTF16(castedText, mTargetDragDataLen,
+                                           &convertedText, &convertedTextLen);
                             if ( convertedText ) {
                                 MOZ_LOG(sDragLm, LogLevel::Debug,
                                        ("successfully converted plain text \
@@ -836,7 +907,7 @@ nsDragService::GetData(nsITransferable * aTransferable,
                         const char *data =
                                    reinterpret_cast<char*>(mTargetDragData);
                         char16_t* convertedText = nullptr;
-                        int32_t convertedTextLen = 0;
+                        uint32_t convertedTextLen = 0;
 
                         GetTextUriListItem(data, mTargetDragDataLen, aItemIndex,
                                            &convertedText, &convertedTextLen);
@@ -868,8 +939,8 @@ nsDragService::GetData(nsITransferable * aTransferable,
                             const char* castedText =
                                   reinterpret_cast<char*>(mTargetDragData);
                             char16_t* convertedText = nullptr;
-                            int32_t convertedTextLen = 0;
-                            nsPrimitiveHelpers::ConvertPlatformPlainTextToUnicode(castedText, mTargetDragDataLen, &convertedText, &convertedTextLen);
+                            uint32_t convertedTextLen = 0;
+                            UTF8ToNewUTF16(castedText, mTargetDragDataLen, &convertedText, &convertedTextLen);
                             if ( convertedText ) {
                                 MOZ_LOG(sDragLm,
                                        LogLevel::Debug,
@@ -1344,8 +1415,9 @@ nsDragService::SourceEndDragSession(GdkDragContext *aContext,
         gint x, y;
         GdkDisplay* display = gdk_display_get_default();
         if (display) {
+            gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
             gdk_display_get_pointer(display, nullptr, &x, &y, nullptr);
-            SetDragEndPoint(nsIntPoint(x, y));
+            SetDragEndPoint(LayoutDeviceIntPoint(x * scale, y * scale));
         }
     }
 
@@ -1393,7 +1465,7 @@ nsDragService::SourceEndDragSession(GdkDragContext *aContext,
     }
 
     // Schedule the appropriate drag end dom events.
-    Schedule(eDragTaskSourceEnd, nullptr, nullptr, nsIntPoint(), 0);
+    Schedule(eDragTaskSourceEnd, nullptr, nullptr, LayoutDeviceIntPoint(), 0);
 }
 
 static void
@@ -1426,14 +1498,13 @@ CreateUriList(nsISupportsArray *items, gchar **text, gint *length)
                 char* plainTextData = nullptr;
                 char16_t* castedUnicode = reinterpret_cast<char16_t*>
                                                            (tmpData);
-                int32_t plainTextLen = 0;
-                nsPrimitiveHelpers::ConvertUnicodeToPlatformPlainText(
-                                    castedUnicode,
-                                    tmpDataLen / 2,
-                                    &plainTextData,
-                                    &plainTextLen);
+                uint32_t plainTextLen = 0;
+                UTF16ToNewUTF8(castedUnicode,
+                               tmpDataLen / 2,
+                               &plainTextData,
+                               &plainTextLen);
                 if (plainTextData) {
-                    int32_t j;
+                    uint32_t j;
 
                     // text/x-moz-url is of form url + "\n" + title.
                     // We just want the url.
@@ -1532,19 +1603,11 @@ nsDragService::SourceDataGet(GtkWidget        *aWidget,
                 char* plainTextData = nullptr;
                 char16_t* castedUnicode = reinterpret_cast<char16_t*>
                                                            (tmpData);
-                int32_t plainTextLen = 0;
-                if (strcmp(mimeFlavor, gTextPlainUTF8Type) == 0) {
-                    plainTextData =
-                        ToNewUTF8String(
-                            nsDependentString(castedUnicode, tmpDataLen / 2),
-                            (uint32_t*)&plainTextLen);
-                } else {
-                    nsPrimitiveHelpers::ConvertUnicodeToPlatformPlainText(
-                                        castedUnicode,
-                                        tmpDataLen / 2,
-                                        &plainTextData,
-                                        &plainTextLen);
-                }
+                uint32_t plainTextLen = 0;
+                UTF16ToNewUTF8(castedUnicode,
+                               tmpDataLen / 2,
+                               &plainTextData,
+                               &plainTextLen);
                 if (tmpData) {
                     // this was not allocated using glib
                     free(tmpData);
@@ -1723,7 +1786,7 @@ invisibleSourceDragEnd(GtkWidget        *aWidget,
 gboolean
 nsDragService::ScheduleMotionEvent(nsWindow *aWindow,
                                    GdkDragContext *aDragContext,
-                                   nsIntPoint aWindowPoint, guint aTime)
+                                   LayoutDeviceIntPoint aWindowPoint, guint aTime)
 {
     if (mScheduledTask == eDragTaskMotion) {
         // The drag source has sent another motion message before we've
@@ -1746,7 +1809,7 @@ nsDragService::ScheduleLeaveEvent()
     // We don't know at this stage whether a drop signal will immediately
     // follow.  If the drop signal gets sent it will happen before we return
     // to the main loop and the scheduled leave task will be replaced.
-    if (!Schedule(eDragTaskLeave, nullptr, nullptr, nsIntPoint(), 0)) {
+    if (!Schedule(eDragTaskLeave, nullptr, nullptr, LayoutDeviceIntPoint(), 0)) {
         NS_WARNING("Drag leave after drop");
     }        
 }
@@ -1754,7 +1817,7 @@ nsDragService::ScheduleLeaveEvent()
 gboolean
 nsDragService::ScheduleDropEvent(nsWindow *aWindow,
                                  GdkDragContext *aDragContext,
-                                 nsIntPoint aWindowPoint, guint aTime)
+                                 LayoutDeviceIntPoint aWindowPoint, guint aTime)
 {
     if (!Schedule(eDragTaskDrop, aWindow,
                   aDragContext, aWindowPoint, aTime)) {
@@ -1762,7 +1825,7 @@ nsDragService::ScheduleDropEvent(nsWindow *aWindow,
         return FALSE;        
     }
 
-    SetDragEndPoint(aWindowPoint + aWindow->WidgetToScreenOffsetUntyped());
+    SetDragEndPoint(aWindowPoint + aWindow->WidgetToScreenOffset());
 
     // We'll reply with gtk_drag_finish().
     return TRUE;
@@ -1771,7 +1834,7 @@ nsDragService::ScheduleDropEvent(nsWindow *aWindow,
 gboolean
 nsDragService::Schedule(DragTask aTask, nsWindow *aWindow,
                         GdkDragContext *aDragContext,
-                        nsIntPoint aWindowPoint, guint aTime)
+                        LayoutDeviceIntPoint aWindowPoint, guint aTime)
 {
     // If there is an existing leave or motion task scheduled, then that
     // will be replaced.  When the new task is run, it will dispatch
@@ -1808,7 +1871,7 @@ nsDragService::Schedule(DragTask aTask, nsWindow *aWindow,
 gboolean
 nsDragService::TaskDispatchCallback(gpointer data)
 {
-    nsRefPtr<nsDragService> dragService = static_cast<nsDragService*>(data);
+    RefPtr<nsDragService> dragService = static_cast<nsDragService*>(data);
     return dragService->RunScheduledTask();
 }
 

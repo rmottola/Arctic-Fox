@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm");
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
+Cu.import("resource://devtools/client/framework/gDevTools.jsm");
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const {ConnectionManager, Connection} = require("devtools/shared/client/connection-manager");
 const {AppProjects} = require("devtools/client/app-manager/app-projects");
 const {AppValidator} = require("devtools/client/app-manager/app-validator");
@@ -15,7 +15,7 @@ const {Services} = Cu.import("resource://gre/modules/Services.jsm");
 const {FileUtils} = Cu.import("resource://gre/modules/FileUtils.jsm");
 const {installHosted, installPackaged, getTargetForApp,
        reloadApp, launchApp, closeApp} = require("devtools/shared/apps/app-actor-front");
-const {EventEmitter} = Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
+const {EventEmitter} = Cu.import("resource://devtools/shared/event-emitter.js");
 
 const promise = require("devtools/shared/deprecated-sync-thenables");
 

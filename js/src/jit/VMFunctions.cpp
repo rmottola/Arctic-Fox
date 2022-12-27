@@ -13,6 +13,7 @@
 #include "jit/JitCompartment.h"
 #include "jit/JitFrames.h"
 #include "jit/mips32/Simulator-mips32.h"
+#include "jit/mips64/Simulator-mips64.h"
 #include "vm/ArrayObject.h"
 #include "vm/Debugger.h"
 #include "vm/Interpreter.h"
@@ -565,7 +566,7 @@ GetIntrinsicValue(JSContext* cx, HandlePropertyName name, MutableHandleValue rva
 }
 
 bool
-CreateThis(JSContext* cx, HandleObject callee, MutableHandleValue rval)
+CreateThis(JSContext* cx, HandleObject callee, HandleObject newTarget, MutableHandleValue rval)
 {
     rval.set(MagicValue(JS_IS_CONSTRUCTING));
 
@@ -575,10 +576,14 @@ CreateThis(JSContext* cx, HandleObject callee, MutableHandleValue rval)
             JSScript* script = fun->getOrCreateScript(cx);
             if (!script || !script->ensureHasTypes(cx))
                 return false;
-            JSObject* thisObj = CreateThisForFunction(cx, callee, GenericObject);
-            if (!thisObj)
-                return false;
-            rval.set(ObjectValue(*thisObj));
+            if (script->isDerivedClassConstructor()) {
+                rval.set(MagicValue(JS_UNINITIALIZED_LEXICAL));
+            } else {
+                JSObject* thisObj = CreateThisForFunction(cx, callee, newTarget, GenericObject);
+                if (!thisObj)
+                    return false;
+                rval.set(ObjectValue(*thisObj));
+            }
         }
     }
 
@@ -1283,12 +1288,25 @@ MarkObjectGroupFromIon(JSRuntime* rt, ObjectGroup** groupp)
 }
 
 bool
-ThrowUninitializedLexical(JSContext* cx)
+ThrowRuntimeLexicalError(JSContext* cx, unsigned errorNumber)
 {
     ScriptFrameIter iter(cx);
     RootedScript script(cx, iter.script());
-    ReportUninitializedLexical(cx, script, iter.pc());
+    ReportRuntimeLexicalError(cx, errorNumber, script, iter.pc());
     return false;
+}
+
+bool
+ThrowBadDerivedReturn(JSContext* cx, HandleValue v)
+{
+    ReportValueError(cx, JSMSG_BAD_DERIVED_RETURN, JSDVG_IGNORE_STACK, v, nullptr);
+    return false;
+}
+
+bool
+BaselineThrowUninitializedThis(JSContext* cx, BaselineFrame* frame)
+{
+    return ThrowUninitializedThis(cx, frame);
 }
 
 } // namespace jit

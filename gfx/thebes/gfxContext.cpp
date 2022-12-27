@@ -89,7 +89,7 @@ gfxContext::gfxContext(DrawTarget *aTarget, const Point& aDeviceOffset)
 gfxContext::ContextForDrawTarget(DrawTarget* aTarget)
 {
   Matrix transform = aTarget->GetTransform();
-  nsRefPtr<gfxContext> result = new gfxContext(aTarget);
+  RefPtr<gfxContext> result = new gfxContext(aTarget);
   result->SetMatrix(ThebesMatrix(transform));
   return result.forget();
 }
@@ -324,12 +324,12 @@ gfxContext::DeviceToUser(const gfxPoint& point) const
   return ThebesPoint(matrix * ToPoint(point));
 }
 
-gfxSize
-gfxContext::DeviceToUser(const gfxSize& size) const
+Size
+gfxContext::DeviceToUser(const Size& size) const
 {
   Matrix matrix = mTransform;
   matrix.Invert();
-  return ThebesSize(matrix * ToSize(size));
+  return matrix * size;
 }
 
 gfxRect
@@ -346,12 +346,12 @@ gfxContext::UserToDevice(const gfxPoint& point) const
   return ThebesPoint(mTransform * ToPoint(point));
 }
 
-gfxSize
-gfxContext::UserToDevice(const gfxSize& size) const
+Size
+gfxContext::UserToDevice(const Size& size) const
 {
   const Matrix &matrix = mTransform;
 
-  gfxSize newSize;
+  Size newSize;
   newSize.width = size.width * matrix._11 + size.height * matrix._12;
   newSize.height = size.width * matrix._21 + size.height * matrix._22;
   return newSize;
@@ -763,7 +763,7 @@ gfxContext::SetPattern(gfxPattern *pattern)
 already_AddRefed<gfxPattern>
 gfxContext::GetPattern()
 {
-  nsRefPtr<gfxPattern> pat;
+  RefPtr<gfxPattern> pat;
 
   AzureState &state = CurrentState();
   if (state.pattern) {
@@ -881,6 +881,16 @@ gfxContext::PushGroup(gfxContentType content)
   mDT->SetTransform(GetDTTransform());
 }
 
+void
+gfxContext::PushGroupForBlendBack(gfxContentType content, Float aOpacity, SourceSurface* aMask, const Matrix& aMaskTransform)
+{
+  PushGroup(content);
+  CurrentState().mBlendOpacity = aOpacity;
+  CurrentState().mBlendMask = aMask;
+  CurrentState().mWasPushedForBlendBack = true;
+  CurrentState().mBlendMaskTransform = aMaskTransform;
+}
+
 static gfxRect
 GetRoundOutDeviceClipExtents(gfxContext* aCtx)
 {
@@ -962,7 +972,7 @@ gfxContext::PopGroup()
   mat.Invert();
   mat.PreTranslate(deviceOffset.x, deviceOffset.y); // device offset translation
 
-  nsRefPtr<gfxPattern> pat = new gfxPattern(src, mat);
+  RefPtr<gfxPattern> pat = new gfxPattern(src, mat);
 
   return pat.forget();
 }
@@ -1002,6 +1012,33 @@ gfxContext::PopGroupToSource()
   mat.PreTranslate(deviceOffset.x, deviceOffset.y); // device offset translation
 
   CurrentState().surfTransform = mat;
+}
+
+void
+gfxContext::PopGroupAndBlend()
+{
+  MOZ_ASSERT(CurrentState().mWasPushedForBlendBack);
+  Float opacity = CurrentState().mBlendOpacity;
+  RefPtr<SourceSurface> mask = CurrentState().mBlendMask;
+  Matrix maskTransform = CurrentState().mBlendMaskTransform;
+
+  PopGroupToSource();
+
+  CompositionOp oldOp = GetOp();
+  SetOp(CompositionOp::OP_OVER);
+
+  if (mask) {
+    if (!maskTransform.HasNonTranslation()) {
+      Mask(mask, opacity, Point(maskTransform._31, maskTransform._32));
+    } else {
+      MOZ_ASSERT(opacity == 1.0f);
+      Mask(mask, maskTransform);
+    }
+  } else {
+    Paint(opacity);
+  }
+
+  SetOp(oldOp);
 }
 
 #ifdef MOZ_DUMP_PAINTING

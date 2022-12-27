@@ -96,6 +96,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mResponseHead(nullptr)
     , mContentLength(-1)
     , mContentRead(0)
+    , mTransferSize(0)
     , mInvalidResponseBytesRead(0)
     , mPushedStream(nullptr)
     , mInitialRwin(0)
@@ -422,7 +423,7 @@ already_AddRefed<nsAHttpConnection>
 nsHttpTransaction::GetConnectionReference()
 {
     MutexAutoLock lock(mLock);
-    nsRefPtr<nsAHttpConnection> connection(mConnection);
+    RefPtr<nsAHttpConnection> connection(mConnection);
     return connection.forget();
 }
 
@@ -477,7 +478,7 @@ nsHttpTransaction::Http1xTransactionCount()
 
 nsresult
 nsHttpTransaction::TakeSubTransactions(
-    nsTArray<nsRefPtr<nsAHttpTransaction> > &outTransactions)
+    nsTArray<RefPtr<nsAHttpTransaction> > &outTransactions)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -512,7 +513,7 @@ nsHttpTransaction::SetSecurityCallbacks(nsIInterfaceRequestor* aCallbacks)
     }
 
     if (gSocketTransportService) {
-        nsRefPtr<UpdateSecurityCallbacks> event = new UpdateSecurityCallbacks(this, aCallbacks);
+        RefPtr<UpdateSecurityCallbacks> event = new UpdateSecurityCallbacks(this, aCallbacks);
         gSocketTransportService->Dispatch(event, nsIEventTarget::DISPATCH_NORMAL);
     }
 }
@@ -821,6 +822,7 @@ nsHttpTransaction::WritePipeSegment(nsIOutputStream *stream,
     MOZ_ASSERT(*countWritten > 0, "bad writer");
     trans->CountRecvBytes(*countWritten);
     trans->mReceivedData = true;
+    trans->mTransferSize += *countWritten;
 
     // Let the transaction "play" with the buffer.  It is free to modify
     // the contents of the buffer and/or modify countWritten.
@@ -919,7 +921,7 @@ nsHttpTransaction::SaveNetworkStats(bool enforce)
 
     // Create the event to save the network statistics.
     // the event is then dispathed to the main thread.
-    nsRefPtr<nsRunnable> event =
+    RefPtr<nsRunnable> event =
         new SaveNetworkStatsEvent(mAppId, mIsInBrowser, mActiveNetworkInfo,
                                   mCountRecv, mCountSent, false);
     NS_DispatchToMainThread(event);
@@ -1314,7 +1316,7 @@ nsHttpTransaction::Restart()
 
     if (!mConnInfo->GetRoutedHost().IsEmpty()) {
         MutexAutoLock lock(*nsHttp::GetLock());
-        nsRefPtr<nsHttpConnectionInfo> ci;
+        RefPtr<nsHttpConnectionInfo> ci;
          mConnInfo->CloneAsDirectRoute(getter_AddRefs(ci));
          mConnInfo = ci;
         if (mRequestHead) {

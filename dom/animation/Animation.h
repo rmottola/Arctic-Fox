@@ -140,6 +140,12 @@ public:
   virtual void CancelFromStyle() { DoCancel(); }
 
   virtual void Tick();
+  bool NeedsTicks() const
+  {
+    AnimationPlayState playState = PlayState();
+    return playState == AnimationPlayState::Running ||
+           playState == AnimationPlayState::Pending;
+  }
 
   /**
    * Set the time to use for starting or pausing a pending animation.
@@ -232,11 +238,11 @@ public:
 
   bool HasInPlayEffect() const
   {
-    return GetEffect() && GetEffect()->IsInPlay(*this);
+    return GetEffect() && GetEffect()->IsInPlay();
   }
   bool HasCurrentEffect() const
   {
-    return GetEffect() && GetEffect()->IsCurrent(*this);
+    return GetEffect() && GetEffect()->IsCurrent();
   }
   bool IsInEffect() const
   {
@@ -279,26 +285,13 @@ public:
    * if any.
    * Any properties already contained in |aSetProperties| are not changed. Any
    * properties that are changed are added to |aSetProperties|.
-   * |aNeedsRefreshes| will be set to true if this animation expects to update
+   * |aStyleChanging| will be set to true if this animation expects to update
    * the style rule on the next refresh driver tick as well (because it
    * is running and has an effect to sample).
    */
-  void ComposeStyle(nsRefPtr<AnimValuesStyleRule>& aStyleRule,
+  void ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                     nsCSSPropertySet& aSetProperties,
-                    bool& aNeedsRefreshes);
-
-
-  // FIXME: Because we currently determine if we need refresh driver ticks
-  // during restyling (specifically ComposeStyle above) and not necessarily
-  // during a refresh driver tick, we can arrive at a situation where we
-  // have finished running an animation but are waiting until the next tick
-  // to queue the final end event. This method tells us when we are in that
-  // situation so we can avoid unregistering from the refresh driver until
-  // we've finished dispatching events.
-  //
-  // This is a temporary measure until bug 1195180 is done and we can do all
-  // our registering and unregistering within a tick callback.
-  virtual bool HasEndEventToQueue() const { return false; }
+                    bool& aStyleChanging);
 
   void NotifyEffectTimingUpdated();
 
@@ -357,14 +350,15 @@ protected:
 
   bool IsPossiblyOrphanedPendingAnimation() const;
   StickyTimeDuration EffectEnd() const;
+  TimeStamp AnimationTimeToTimeStamp(const StickyTimeDuration& aTime) const;
 
   nsIDocument* GetRenderedDocument() const;
   nsPresContext* GetPresContext() const;
   virtual CommonAnimationManager* GetAnimationManager() const = 0;
   AnimationCollection* GetCollection() const;
 
-  nsRefPtr<AnimationTimeline> mTimeline;
-  nsRefPtr<KeyframeEffectReadOnly> mEffect;
+  RefPtr<AnimationTimeline> mTimeline;
+  RefPtr<KeyframeEffectReadOnly> mEffect;
   // The beginning of the delay period.
   Nullable<TimeDuration> mStartTime; // Timeline timescale
   Nullable<TimeDuration> mHoldTime;  // Animation timescale
@@ -376,14 +370,14 @@ protected:
   // and fulfilled when Play() is successfully completed.
   // This object is lazily created by GetReady.
   // See http://w3c.github.io/web-animations/#current-ready-promise
-  nsRefPtr<Promise> mReady;
+  RefPtr<Promise> mReady;
 
   // A Promise that is resolved when we reach the end of the effect, or
   // 0 when playing backwards. The Promise is replaced if the animation is
   // finished but then a state change makes it not finished.
   // This object is lazily created by GetFinished.
   // See http://w3c.github.io/web-animations/#current-finished-promise
-  nsRefPtr<Promise> mFinished;
+  RefPtr<Promise> mFinished;
 
   // Indicates if the animation is in the pending state (and what state it is
   // waiting to enter when it finished pending). We use this rather than

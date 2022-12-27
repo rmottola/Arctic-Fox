@@ -8,7 +8,7 @@
 #include "mozilla/RefCounted.h"
 
 using mozilla::RefCounted;
-using mozilla::RefPtr;
+using RefPtr;
 
 class Foo : public RefCounted<Foo>
 {
@@ -112,7 +112,7 @@ main()
 
   {
     RefPtr<Foo> f = new Foo();
-    GetNewFoo(byRef(f));
+    GetNewFoo(getter_AddRefs(f));
     MOZ_RELEASE_ASSERT(7 == Foo::sNumDestroyed);
   }
   MOZ_RELEASE_ASSERT(8 == Foo::sNumDestroyed);

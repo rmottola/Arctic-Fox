@@ -14,6 +14,7 @@
 #include "mozilla/ArenaObjectID.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/CSSVariableValues.h"
+#include "mozilla/SheetType.h"
 #include "nsColor.h"
 #include "nsCoord.h"
 #include "nsMargin.h"
@@ -35,6 +36,7 @@ class nsIURI;
 class nsStyleContext;
 class nsTextFrame;
 class imgIContainer;
+struct nsStyleVisibility;
 
 // Includes nsStyleStructID.
 #include "nsStyleStructFwd.h"
@@ -89,15 +91,16 @@ class imgIContainer;
 // Additional bits for nsRuleNode's mNoneBits:
 #define NS_RULE_NODE_HAS_ANIMATION_DATA     0x80000000
 
+static_assert(int(mozilla::SheetType::Count) - 1 <=
+                (NS_RULE_NODE_LEVEL_MASK >> NS_RULE_NODE_LEVEL_SHIFT),
+              "NS_RULE_NODE_LEVEL_MASK cannot fit SheetType");
+
 // The lifetime of these objects is managed by the presshell's arena.
 
 struct nsStyleFont {
   nsStyleFont(const nsFont& aFont, nsPresContext *aPresContext);
   nsStyleFont(const nsStyleFont& aStyleFont);
   explicit nsStyleFont(nsPresContext *aPresContext);
-private:
-  void Init(nsPresContext *aPresContext);
-public:
   ~nsStyleFont(void) {
     MOZ_COUNT_DTOR(nsStyleFont);
   }
@@ -118,6 +121,7 @@ public:
 
   static nscoord ZoomText(nsPresContext* aPresContext, nscoord aSize);
   static nscoord UnZoomText(nsPresContext* aPresContext, nscoord aSize);
+  static already_AddRefed<nsIAtom> GetLanguage(nsPresContext* aPresContext);
 
   void* operator new(size_t sz, nsPresContext* aContext) CPP_THROW_NEW {
     return aContext->PresShell()->
@@ -143,6 +147,9 @@ public:
   uint8_t mMathVariant;          // [inherited]
   // MathML displaystyle support
   uint8_t mMathDisplay;         // [inherited]
+
+  // allow different min font-size for certain cases
+  uint8_t mMinFontSizeRatio;     // [inherited] percent * 100
 
   // was mLanguage set based on a lang attribute in the document?
   bool mExplicitLanguage;        // [inherited]
@@ -864,9 +871,10 @@ struct nsStyleBorder {
 
   nsChangeHint CalcDifference(const nsStyleBorder& aOther) const;
   static nsChangeHint MaxDifference() {
-    return NS_CombineHint(NS_STYLE_HINT_REFLOW,
-                          NS_CombineHint(nsChangeHint_BorderStyleNoneChange,
-                                         nsChangeHint_NeutralChange));
+    return NS_STYLE_HINT_REFLOW |
+           nsChangeHint_UpdateOverflow |
+           nsChangeHint_BorderStyleNoneChange |
+           nsChangeHint_NeutralChange;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -954,9 +962,6 @@ struct nsStyleBorder {
     return mBorderImageSource.IsLoaded();
   }
 
-  // Defined in nsStyleStructInlines.h
-  inline nsresult RequestDecode();
-
   void GetBorderColor(mozilla::css::Side aSide, nscolor& aColor,
                       bool& aForeground) const
   {
@@ -1032,7 +1037,7 @@ struct nsStyleBorder {
 
 public:
   nsBorderColors** mBorderColors;        // [reset] composite (stripe) colors
-  nsRefPtr<nsCSSShadowArray> mBoxShadow; // [reset] nullptr for 'none'
+  RefPtr<nsCSSShadowArray> mBoxShadow; // [reset] nullptr for 'none'
 
 public:
   nsStyleCorners mBorderRadius;       // [reset] coord, percent
@@ -1236,8 +1241,8 @@ struct nsStyleList {
   uint8_t   mListStylePosition;         // [inherited]
 private:
   nsString  mListStyleType;             // [inherited]
-  nsRefPtr<mozilla::CounterStyle> mCounterStyle; // [inherited]
-  nsRefPtr<imgRequestProxy> mListStyleImage; // [inherited]
+  RefPtr<mozilla::CounterStyle> mCounterStyle; // [inherited]
+  RefPtr<imgRequestProxy> mListStyleImage; // [inherited]
   nsStyleList& operator=(const nsStyleList& aOther) = delete;
 public:
   nsRect        mImageRegion;           // [inherited] the rect to use within an image
@@ -1369,7 +1374,7 @@ struct nsStylePosition {
   }
 
   nsChangeHint CalcDifference(const nsStylePosition& aOther,
-                              nsStyleContext* aContext) const;
+                              const nsStyleVisibility* aOldStyleVisibility) const;
   static nsChangeHint MaxDifference() {
     return NS_CombineHint(NS_STYLE_HINT_REFLOW,
                           nsChangeHint(nsChangeHint_RecomputePosition |
@@ -1386,6 +1391,20 @@ struct nsStylePosition {
   // XXXdholbert nsStyleBackground::Position should probably be moved to a
   // different scope, since we're now using it in multiple style structs.
   typedef nsStyleBackground::Position Position;
+
+  /**
+   * Return the computed value for 'justify-items' given our 'display' value in
+   * aDisplay and the parent StyleContext aParent (or null for the root).
+   */
+  uint8_t ComputedJustifyItems(const nsStyleDisplay* aDisplay,
+                               nsStyleContext* aParent) const;
+
+  /**
+   * Return the computed value for 'justify-self' given our 'display' value in
+   * aDisplay and the parent StyleContext aParent (or null for the root).
+   */
+  uint8_t ComputedJustifySelf(const nsStyleDisplay* aDisplay,
+                              nsStyleContext* aParent) const;
 
   Position      mObjectPosition;        // [reset]
   nsStyleSides  mOffset;                // [reset] coord, percent, calc, auto
@@ -1405,6 +1424,15 @@ struct nsStylePosition {
   uint8_t       mAlignContent;          // [reset] see nsStyleConsts.h
   uint8_t       mAlignItems;            // [reset] see nsStyleConsts.h
   uint8_t       mAlignSelf;             // [reset] see nsStyleConsts.h
+private:
+  friend class nsRuleNode;
+  // Helper for the ComputedAlign/Justify* methods.
+  uint8_t MapLeftRightToStart(uint8_t aAlign, mozilla::LogicalAxis aAxis,
+                              const nsStyleDisplay* aDisplay) const;
+
+  uint8_t       mJustifyItems;          // [reset] see nsStyleConsts.h
+  uint8_t       mJustifySelf;           // [reset] see nsStyleConsts.h
+public:
   uint8_t       mFlexDirection;         // [reset] see nsStyleConsts.h
   uint8_t       mFlexWrap;              // [reset] see nsStyleConsts.h
   uint8_t       mJustifyContent;        // [reset] see nsStyleConsts.h
@@ -1417,7 +1445,7 @@ struct nsStylePosition {
   nsStyleGridTemplate mGridTemplateRows;
 
   // nullptr for 'none'
-  nsRefPtr<mozilla::css::GridTemplateAreasValue> mGridTemplateAreas;
+  RefPtr<mozilla::css::GridTemplateAreasValue> mGridTemplateAreas;
 
   nsStyleGridLine mGridColumnStart;
   nsStyleGridLine mGridColumnEnd;
@@ -1652,7 +1680,8 @@ struct nsStyleText {
 
   nsChangeHint CalcDifference(const nsStyleText& aOther) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return NS_STYLE_HINT_FRAMECHANGE |
+           nsChangeHint_UpdateSubtreeOverflow;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -1678,12 +1707,12 @@ struct nsStyleText {
   uint8_t mControlCharacterVisibility;  // [inherited] see nsStyleConsts.h
   int32_t mTabSize;                     // [inherited] see nsStyleConsts.h
 
-  nscoord mWordSpacing;                 // [inherited]
-  nsStyleCoord  mLetterSpacing;         // [inherited] coord, normal
-  nsStyleCoord  mLineHeight;            // [inherited] coord, factor, normal
-  nsStyleCoord  mTextIndent;            // [inherited] coord, percent, calc
+  nsStyleCoord mWordSpacing;            // [inherited] coord, percent, calc
+  nsStyleCoord mLetterSpacing;          // [inherited] coord, normal
+  nsStyleCoord mLineHeight;             // [inherited] coord, factor, normal
+  nsStyleCoord mTextIndent;             // [inherited] coord, percent, calc
 
-  nsRefPtr<nsCSSShadowArray> mTextShadow; // [inherited] nullptr in case of a zero-length
+  RefPtr<nsCSSShadowArray> mTextShadow; // [inherited] nullptr in case of a zero-length
 
   bool WhiteSpaceIsSignificant() const {
     return mWhiteSpace == NS_STYLE_WHITESPACE_PRE ||
@@ -2139,7 +2168,7 @@ struct nsStyleDisplay {
 
   // We guarantee that if mBinding is non-null, so are mBinding->GetURI() and
   // mBinding->mOriginPrincipal.
-  nsRefPtr<mozilla::css::URLValue> mBinding;    // [reset]
+  RefPtr<mozilla::css::URLValue> mBinding;    // [reset]
   nsRect  mClip;                // [reset] offsets from upper-left border edge
   float   mOpacity;             // [reset]
   uint8_t mDisplay;             // [reset] see nsStyleConsts.h NS_STYLE_DISPLAY_*
@@ -2164,6 +2193,7 @@ struct nsStyleDisplay {
   uint8_t mOrient;              // [reset] see nsStyleConsts.h
   uint8_t mMixBlendMode;        // [reset] see nsStyleConsts.h
   uint8_t mIsolation;           // [reset] see nsStyleConsts.h
+  uint8_t mTopLayer;            // [reset] see nsStyleConsts.h
   uint8_t mWillChangeBitField;  // [reset] see nsStyleConsts.h. Stores a
                                 // bitfield representation of the properties
                                 // that are frequently queried. This should
@@ -2188,7 +2218,7 @@ struct nsStyleDisplay {
   uint8_t mBackfaceVisibility;
   uint8_t mTransformStyle;
   uint8_t mTransformBox;        // [reset] see nsStyleConsts.h
-  nsRefPtr<nsCSSValueSharedList> mSpecifiedTransform; // [reset]
+  RefPtr<nsCSSValueSharedList> mSpecifiedTransform; // [reset]
   nsStyleCoord mTransformOrigin[3]; // [reset] percent, coord, calc, 3rd param is coord, calc only
   nsStyleCoord mChildPerspective; // [reset] none, coord
   nsStyleCoord mPerspectiveOrigin[2]; // [reset] percent, coord, calc
@@ -2315,6 +2345,10 @@ struct nsStyleDisplay {
            mOverflowX != NS_STYLE_OVERFLOW_CLIP;
   }
 
+  bool IsContainPaint() const {
+    return NS_STYLE_CONTAIN_PAINT & mContain;
+  }
+
   /* Returns whether the element has the -moz-transform property
    * or a related property. */
   bool HasTransformStyle() const {
@@ -2362,6 +2396,12 @@ struct nsStyleDisplay {
    * aContextFrame is the frame for which this is the nsStylePosition.
    */
   inline bool IsFixedPosContainingBlock(const nsIFrame* aContextFrame) const;
+
+  // Return the 'float' and 'clear' properties, with inline-{start,end} values
+  // resolved to {left,right} according to the given writing mode. These are
+  // defined in WritingModes.h.
+  inline uint8_t PhysicalFloats(mozilla::WritingMode aWM) const;
+  inline uint8_t PhysicalBreakType(mozilla::WritingMode aWM) const;
 };
 
 struct nsStyleTable {

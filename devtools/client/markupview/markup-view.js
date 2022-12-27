@@ -3,6 +3,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+"use strict";
 
 const {Cc, Cu, Ci} = require("chrome");
 
@@ -21,7 +22,7 @@ const AUTOCOMPLETE_POPUP_PANEL_ID = "markupview_autoCompletePopup";
 
 const {UndoStack} = require("devtools/client/shared/undo");
 const {editableField, InplaceEditor} = require("devtools/client/shared/inplace-editor");
-const {gDevTools} = Cu.import("resource:///modules/devtools/client/framework/gDevTools.jsm", {});
+const {gDevTools} = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 const {HTMLEditor} = require("devtools/client/markupview/html-editor");
 const promise = require("promise");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
@@ -33,12 +34,12 @@ const ELLIPSIS = Services.prefs.getComplexValue("intl.ellipsis", Ci.nsIPrefLocal
 const {Task} = require("resource://gre/modules/Task.jsm");
 const {scrollIntoViewIfNeeded} = require("devtools/shared/layout/utils");
 
-Cu.import("resource://gre/modules/devtools/shared/gcli/Templater.jsm");
+Cu.import("resource://devtools/shared/gcli/Templater.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 loader.lazyGetter(this, "DOMParser", function() {
- return Cc["@mozilla.org/xmlextras/domparser;1"].createInstance(Ci.nsIDOMParser);
+  return Cc["@mozilla.org/xmlextras/domparser;1"].createInstance(Ci.nsIDOMParser);
 });
 loader.lazyGetter(this, "AutocompletePopup", () => {
   return require("devtools/client/shared/autocomplete-popup").AutocompletePopup;

@@ -164,7 +164,7 @@ BodyStartWriteStream(const QuotaInfo& aQuotaInfo,
                              aQuotaInfo.mOrigin, tmpFile);
   if (NS_WARN_IF(!fileStream)) { return NS_ERROR_UNEXPECTED; }
 
-  nsRefPtr<SnappyCompressOutputStream> compressed =
+  RefPtr<SnappyCompressOutputStream> compressed =
     new SnappyCompressOutputStream(fileStream);
 
   nsCOMPtr<nsIEventTarget> target =
@@ -187,7 +187,7 @@ BodyCancelWrite(nsIFile* aBaseDir, nsISupports* aCopyContext)
   MOZ_ASSERT(aCopyContext);
 
   nsresult rv = NS_CancelAsyncCopy(aCopyContext, NS_ERROR_ABORT);
-  unused << NS_WARN_IF(NS_FAILED(rv));
+  Unused << NS_WARN_IF(NS_FAILED(rv));
 
   // The partially written file must be cleaned up after the async copy
   // makes its callback.

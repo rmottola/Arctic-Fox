@@ -378,9 +378,9 @@ public:
   NS_IMETHOD              Enable(bool aState) override;
   virtual bool            IsEnabled() const override;
   NS_IMETHOD              SetFocus(bool aRaise) override;
-  NS_IMETHOD              GetBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetClientBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetScreenBounds(nsIntRect &aRect) override;
+  NS_IMETHOD              GetBoundsUntyped(nsIntRect &aRect) override;
+  NS_IMETHOD              GetClientBoundsUntyped(nsIntRect &aRect) override;
+  NS_IMETHOD              GetScreenBoundsUntyped(nsIntRect &aRect) override;
 
   // Returns the "backing scale factor" of the view's window, which is the
   // ratio of pixels in the window's backing store to Cocoa points. Prior to
@@ -551,7 +551,7 @@ public:
 
   bool IsPluginFocused() { return mPluginFocused; }
 
-  virtual nsIntPoint GetClientOffset() override;
+  virtual nsIntPoint GetClientOffsetUntyped() override;
 
   void DispatchAPZWheelInputEvent(mozilla::InputData& aEvent, bool aCanTriggerSwipe);
 
@@ -612,7 +612,7 @@ protected:
 protected:
 
   NSView<mozView>*      mView;      // my parallel cocoa view (ChildView or NativeScrollbarView), [STRONG]
-  nsRefPtr<mozilla::widget::TextInputHandler> mTextInputHandler;
+  RefPtr<mozilla::widget::TextInputHandler> mTextInputHandler;
   InputContext          mInputContext;
 
   NSView<mozView>*      mParentView;
@@ -674,7 +674,7 @@ protected:
   nsAutoPtr<GLPresenter> mGLPresenter;
 
   mozilla::UniquePtr<mozilla::VibrancyManager> mVibrancyManager;
-  nsRefPtr<mozilla::SwipeTracker> mSwipeTracker;
+  RefPtr<mozilla::SwipeTracker> mSwipeTracker;
   mozilla::UniquePtr<mozilla::SwipeEventQueue> mSwipeEventQueue;
 
   // This flag is only used when APZ is off. It indicates that the current pan

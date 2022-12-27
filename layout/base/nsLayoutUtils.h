@@ -72,6 +72,7 @@ class Element;
 class HTMLImageElement;
 class HTMLCanvasElement;
 class HTMLVideoElement;
+class Selection;
 } // namespace dom
 namespace gfx {
 struct RectCornerRadii;
@@ -2064,7 +2065,7 @@ public:
     SurfaceFromElementResult();
 
     /* mSourceSurface will contain the resulting surface, or will be nullptr on error */
-    mozilla::RefPtr<SourceSurface> mSourceSurface;
+    RefPtr<SourceSurface> mSourceSurface;
     /* Contains info for drawing when there is no mSourceSurface. */
     DirectDrawInfo mDrawInfo;
 
@@ -2090,28 +2091,28 @@ public:
 
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::Element *aElement,
                                                      uint32_t aSurfaceFlags,
-                                                     mozilla::RefPtr<DrawTarget>& aTarget);
+                                                     RefPtr<DrawTarget>& aTarget);
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::Element *aElement,
                                                      uint32_t aSurfaceFlags = 0) {
-    mozilla::RefPtr<DrawTarget> target = nullptr;
+    RefPtr<DrawTarget> target = nullptr;
     return SurfaceFromElement(aElement, aSurfaceFlags, target);
   }
 
   static SurfaceFromElementResult SurfaceFromElement(nsIImageLoadingContent *aElement,
                                                      uint32_t aSurfaceFlags,
-                                                     mozilla::RefPtr<DrawTarget>& aTarget);
+                                                     RefPtr<DrawTarget>& aTarget);
   // Need an HTMLImageElement overload, because otherwise the
   // nsIImageLoadingContent and mozilla::dom::Element overloads are ambiguous
   // for HTMLImageElement.
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::HTMLImageElement *aElement,
                                                      uint32_t aSurfaceFlags,
-                                                     mozilla::RefPtr<DrawTarget>& aTarget);
+                                                     RefPtr<DrawTarget>& aTarget);
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::HTMLCanvasElement *aElement,
                                                      uint32_t aSurfaceFlags,
-                                                     mozilla::RefPtr<DrawTarget>& aTarget);
+                                                     RefPtr<DrawTarget>& aTarget);
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::HTMLVideoElement *aElement,
                                                      uint32_t aSurfaceFlags,
-                                                     mozilla::RefPtr<DrawTarget>& aTarget);
+                                                     RefPtr<DrawTarget>& aTarget);
 
   /**
    * When the document is editable by contenteditable attribute of its root
@@ -2767,6 +2768,13 @@ public:
    */
   static void AppendFrameTextContent(nsIFrame* aFrame, nsAString& aResult);
 
+  /**
+   * Takes a selection, and returns selection's bounding rect which is relative
+   * to its root frame.
+   *
+   * @param aSel      Selection to check
+   */
+  static nsRect GetSelectionBoundingRect(mozilla::dom::Selection* aSel);
 private:
   static uint32_t sFontSizeInflationEmPerLine;
   static uint32_t sFontSizeInflationMinTwips;

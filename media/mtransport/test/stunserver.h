@@ -97,7 +97,7 @@ class TestStunTcpServer: public TestStunServer {
   TestStunTcpServer()
       : ice_ctx_(nullptr) {}
 
-  nsRefPtr<NrIceCtx> ice_ctx_;
+  RefPtr<NrIceCtx> ice_ctx_;
  private:
   virtual int TryOpenListenSocket(nr_local_addr* addr, uint16_t port);
   static TestStunTcpServer *Create(int address_family);

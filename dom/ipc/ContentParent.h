@@ -81,6 +81,7 @@ class ContentParent final : public PContentParent
     typedef mozilla::ipc::PFileDescriptorSetParent PFileDescriptorSetParent;
     typedef mozilla::ipc::TestShellParent TestShellParent;
     typedef mozilla::ipc::URIParams URIParams;
+    typedef mozilla::ipc::PrincipalInfo PrincipalInfo;
     typedef mozilla::dom::ClonedMessageData ClonedMessageData;
 
 public:
@@ -175,6 +176,10 @@ public:
                                                nsTArray<nsCString>&& aTags,
                                                bool* aHasPlugin,
                                                nsCString* aVersion) override;
+    virtual bool RecvIsGMPPresentOnDisk(const nsString& aKeySystem,
+                                        const nsCString& aVersion,
+                                        bool* aIsPresent,
+                                        nsCString* aMessage) override;
 
     virtual bool RecvLoadPlugin(const uint32_t& aPluginId, nsresult* aRv, uint32_t* aRunID) override;
     virtual bool RecvConnectPluginBridge(const uint32_t& aPluginId, nsresult* aRv) override;
@@ -195,11 +200,11 @@ public:
      */
     virtual bool DoLoadMessageManagerScript(const nsAString& aURL,
                                             bool aRunInGlobalScope) override;
-    virtual bool DoSendAsyncMessage(JSContext* aCx,
-                                    const nsAString& aMessage,
-                                    StructuredCloneData& aData,
-                                    JS::Handle<JSObject *> aCpows,
-                                    nsIPrincipal* aPrincipal) override;
+    virtual nsresult DoSendAsyncMessage(JSContext* aCx,
+                                        const nsAString& aMessage,
+                                        StructuredCloneData& aData,
+                                        JS::Handle<JSObject *> aCpows,
+                                        nsIPrincipal* aPrincipal) override;
     virtual bool CheckPermission(const nsAString& aPermission) override;
     virtual bool CheckManifestURL(const nsAString& aManifestURL) override;
     virtual bool CheckAppHasPermission(const nsAString& aPermission) override;
@@ -314,8 +319,6 @@ public:
 
     virtual void OnChannelError() override;
 
-    virtual void OnBeginSyncTransaction() override;
-
     virtual PCrashReporterParent*
     AllocPCrashReporterParent(const NativeThreadId& tid,
                               const uint32_t& processType) override;
@@ -390,12 +393,14 @@ public:
     virtual POfflineCacheUpdateParent*
     AllocPOfflineCacheUpdateParent(const URIParams& aManifestURI,
                                    const URIParams& aDocumentURI,
+                                   const PrincipalInfo& aLoadingPrincipalInfo,
                                    const bool& aStickDocument,
                                    const TabId& aTabId) override;
     virtual bool
     RecvPOfflineCacheUpdateConstructor(POfflineCacheUpdateParent* aActor,
                                        const URIParams& aManifestURI,
                                        const URIParams& aDocumentURI,
+                                       const PrincipalInfo& aLoadingPrincipal,
                                        const bool& stickDocument,
                                        const TabId& aTabId) override;
     virtual bool
@@ -414,10 +419,27 @@ public:
     virtual bool
     DeallocPContentPermissionRequestParent(PContentPermissionRequestParent* actor) override;
 
+    virtual bool HandleWindowsMessages(const Message& aMsg) const override;
+
     bool HasGamepadListener() const { return mHasGamepadListener; }
 
     void SetNuwaParent(NuwaParent* aNuwaParent) { mNuwaParent = aNuwaParent; }
     void ForkNewProcess(bool aBlocking);
+
+    virtual bool RecvCreateWindow(PBrowserParent* aThisTabParent,
+                                  PBrowserParent* aOpener,
+                                  const uint32_t& aChromeFlags,
+                                  const bool& aCalledFromJS,
+                                  const bool& aPositionSpecified,
+                                  const bool& aSizeSpecified,
+                                  const nsString& aURI,
+                                  const nsString& aName,
+                                  const nsCString& aFeatures,
+                                  const nsString& aBaseURI,
+                                  nsresult* aResult,
+                                  bool* aWindowIsNew,
+                                  InfallibleTArray<FrameScriptInfo>* aFrameScripts,
+                                  nsCString* aURLToLoad) override;
 
 protected:
     void OnChannelConnected(int32_t pid) override;
@@ -741,6 +763,8 @@ private:
     virtual bool RecvSetURITitle(const URIParams& uri,
                                  const nsString& title) override;
 
+    bool HasNotificationPermission(const IPC::Principal& aPrincipal);
+
     virtual bool RecvShowAlertNotification(const nsString& aImageUrl, const nsString& aTitle,
                                            const nsString& aText, const bool& aTextClickable,
                                            const nsString& aCookie, const nsString& aName,
@@ -751,6 +775,10 @@ private:
 
     virtual bool RecvCloseAlert(const nsString& aName,
                                 const IPC::Principal& aPrincipal) override;
+
+    virtual bool RecvDisableNotifications(const IPC::Principal& aPrincipal) override;
+
+    virtual bool RecvOpenNotificationSettings(const IPC::Principal& aPrincipal) override;
 
     virtual bool RecvLoadURIExternal(const URIParams& uri) override;
 
@@ -964,7 +992,7 @@ private:
     // Allows NuwaParent to access OnNuwaReady() and OnNewProcessCreated().
     friend class NuwaParent;
 
-    nsRefPtr<nsConsoleService>  mConsoleService;
+    RefPtr<nsConsoleService>  mConsoleService;
     nsConsoleService* GetConsoleService();
 
     nsTArray<nsCOMPtr<nsIObserver>> mIdleListeners;
@@ -984,10 +1012,10 @@ private:
 
     // NuwaParent and ContentParent hold strong references to each other. The
     // cycle will be broken when either actor is destroyed.
-    nsRefPtr<NuwaParent> mNuwaParent;
+    RefPtr<NuwaParent> mNuwaParent;
 
 #ifdef MOZ_ENABLE_PROFILER_SPS
-    nsRefPtr<mozilla::ProfileGatherer> mGatherer;
+    RefPtr<mozilla::ProfileGatherer> mGatherer;
 #endif
     nsCString mProfile;
 
@@ -1009,7 +1037,7 @@ public:
   {}
 private:
   virtual ~ParentIdleListener() {}
-  nsRefPtr<mozilla::dom::ContentParent> mParent;
+  RefPtr<mozilla::dom::ContentParent> mParent;
   uint64_t mObserver;
   uint32_t mTime;
 };

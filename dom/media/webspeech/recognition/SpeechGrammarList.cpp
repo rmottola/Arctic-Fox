@@ -43,7 +43,7 @@ SpeechGrammarList::Constructor(const GlobalObject& aGlobal,
     aRv.Throw(NS_ERROR_NOT_AVAILABLE);
     return nullptr;
   } else {
-    nsRefPtr<SpeechGrammarList> speechGrammarList =
+    RefPtr<SpeechGrammarList> speechGrammarList =
       new SpeechGrammarList(aGlobal.GetAsSupports(), recognitionService);
     return speechGrammarList.forget();
   }
@@ -70,7 +70,7 @@ SpeechGrammarList::Length() const
 already_AddRefed<SpeechGrammar>
 SpeechGrammarList::Item(uint32_t aIndex, ErrorResult& aRv)
 {
-  nsRefPtr<SpeechGrammar> result = mItems.ElementAt(aIndex);
+  RefPtr<SpeechGrammar> result = mItems.ElementAt(aIndex);
   return result.forget();
 }
 

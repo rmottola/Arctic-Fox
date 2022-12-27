@@ -15,6 +15,7 @@
 #include "nsHttpRequestHead.h"
 #include "nsHttpResponseHead.h"
 #include "nsHttpConnectionInfo.h"
+#include "nsIConsoleReportCollector.h"
 #include "nsIEncodedChannel.h"
 #include "nsIHttpChannel.h"
 #include "nsHttpHandler.h"
@@ -48,6 +49,9 @@ class nsISecurityConsoleMessage;
 class nsIPrincipal;
 
 namespace mozilla {
+
+class LogCollector;
+
 namespace net {
 
 /*
@@ -70,6 +74,7 @@ class HttpBaseChannel : public nsHashPropertyBag
                       , public PrivateBrowsingChannel<HttpBaseChannel>
                       , public nsITimedChannel
                       , public nsIForcePendingChannel
+                      , public nsIConsoleReportCollector
 {
 protected:
   virtual ~HttpBaseChannel();
@@ -159,9 +164,13 @@ public:
   NS_IMETHOD GetRequestSucceeded(bool *aValue) override;
   NS_IMETHOD RedirectTo(nsIURI *newURI) override;
   NS_IMETHOD GetSchedulingContextID(nsID *aSCID) override;
+  NS_IMETHOD GetTransferSize(uint64_t *aTransferSize) override;
+  NS_IMETHOD GetDecodedBodySize(uint64_t *aDecodedBodySize) override;
+  NS_IMETHOD GetEncodedBodySize(uint64_t *aEncodedBodySize) override;
   NS_IMETHOD SetSchedulingContextID(const nsID aSCID) override;
   NS_IMETHOD GetIsMainDocumentChannel(bool* aValue) override;
   NS_IMETHOD SetIsMainDocumentChannel(bool aValue) override;
+  NS_IMETHOD GetProtocolVersion(nsACString & aProtocolVersion) override;
 
   // nsIHttpChannelInternal
   NS_IMETHOD GetDocumentURI(nsIURI **aDocumentURI) override;
@@ -225,6 +234,19 @@ public:
   // nsIResumableChannel
   NS_IMETHOD GetEntityID(nsACString& aEntityID) override;
 
+
+  // nsIConsoleReportCollector
+  void
+  AddConsoleReport(uint32_t aErrorFlags, const nsACString& aCategory,
+                   nsContentUtils::PropertiesFile aPropertiesFile,
+                   const nsACString& aSourceFileURI,
+                   uint32_t aLineNumber, uint32_t aColumnNumber,
+                   const nsACString& aMessageName,
+                   const nsTArray<nsString>& aStringParams) override;
+
+  void
+  FlushConsoleReports(nsIDocument* aDocument) override;
+
   class nsContentEncodings : public nsIUTF8StringEnumerator
     {
     public:
@@ -257,7 +279,6 @@ public:
     const NetAddr& GetPeerAddr() { return mPeerAddr; }
 
     nsresult OverrideSecurityInfo(nsISupports* aSecurityInfo);
-    nsresult OverrideURI(nsIURI* aRedirectedURI);
 
 public: /* Necko internal use only... */
     bool IsNavigation();
@@ -337,11 +358,14 @@ protected:
   nsCOMPtr<nsIURI>                  mReferrer;
   nsCOMPtr<nsIApplicationCache>     mApplicationCache;
 
+  // An instance of nsHTTPCompressConv
+  nsCOMPtr<nsIStreamListener>       mCompressListener;
+
   nsHttpRequestHead                 mRequestHead;
   nsCOMPtr<nsIInputStream>          mUploadStream;
   nsCOMPtr<nsIRunnable>             mUploadCloneableCallback;
   nsAutoPtr<nsHttpResponseHead>     mResponseHead;
-  nsRefPtr<nsHttpConnectionInfo>    mConnectionInfo;
+  RefPtr<nsHttpConnectionInfo>    mConnectionInfo;
   nsCOMPtr<nsIProxyInfo>            mProxyInfo;
   nsCOMPtr<nsISupports>             mSecurityInfo;
 
@@ -418,7 +442,7 @@ protected:
   uint32_t                          mContentDispositionHint;
   nsAutoPtr<nsString>               mContentDispositionFilename;
 
-  nsRefPtr<nsHttpHandler>           mHttpHandler;  // keep gHttpHandler alive
+  RefPtr<nsHttpHandler>           mHttpHandler;  // keep gHttpHandler alive
 
   uint32_t                          mReferrerPolicy;
 
@@ -457,6 +481,10 @@ protected:
   // than once.
   bool mOnStartRequestCalled;
 
+  uint64_t mTransferSize;
+  uint64_t mDecodedBodySize;
+  uint64_t mEncodedBodySize;
+
   // The network interface id that's associated with this channel.
   nsCString mNetworkInterfaceId;
 
@@ -467,6 +495,8 @@ protected:
   bool                              mWithCredentials;
   nsTArray<nsCString>               mUnsafeHeaders;
   nsCOMPtr<nsIPrincipal>            mPreflightPrincipal;
+
+  nsCOMPtr<nsIConsoleReportCollector> mReportCollector;
 
   bool mForceMainDocumentChannel;
 };
@@ -543,7 +573,7 @@ nsresult HttpAsyncAborter<T>::AsyncCall(void (T::*funcPtr)(),
 {
   nsresult rv;
 
-  nsRefPtr<nsRunnableMethod<T> > event = NS_NewRunnableMethod(mThis, funcPtr);
+  RefPtr<nsRunnableMethod<T> > event = NS_NewRunnableMethod(mThis, funcPtr);
   rv = NS_DispatchToCurrentThread(event);
   if (NS_SUCCEEDED(rv) && retval) {
     *retval = event;

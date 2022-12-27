@@ -106,7 +106,6 @@
  */
 
 class nsIWidget;
-class nsIntRegion;
 
 namespace mozilla {
 namespace gfx {
@@ -370,12 +369,9 @@ public:
    */
   virtual void EndFrame() = 0;
 
-  virtual void SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget) {}
+  virtual void SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget);
 
-  virtual FenceHandle GetReleaseFence()
-  {
-    return FenceHandle();
-  }
+  virtual FenceHandle GetReleaseFence();
 
   /**
    * Post-rendering stuff if the rendering is done outside of this Compositor
@@ -540,6 +536,10 @@ protected:
 
   RefPtr<gfx::DrawTarget> mTarget;
   gfx::IntRect mTargetBounds;
+
+#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
+  FenceHandle mReleaseFenceHandle;
+#endif
 
 private:
   static LayersBackend sBackend;

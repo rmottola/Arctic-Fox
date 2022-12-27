@@ -4,8 +4,8 @@
 
 /* eslint-env browser */
 
-const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var Cu = Components.utils;
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const ProjectList = require("devtools/client/webide/modules/project-list");
 
 var projectList = new ProjectList(window, window.parent);

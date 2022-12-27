@@ -64,7 +64,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "DownloadsLogger", () => {
-  let { ConsoleAPI } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+  let { ConsoleAPI } = Cu.import("resource://gre/modules/Console.jsm", {});
   let consoleOptions = {
     maxLogLevelPref: "browser.download.loglevel",
     prefix: "Downloads"
@@ -128,7 +128,6 @@ var PrefObserver = {
 
 PrefObserver.register({
   // prefName: defaultValue
-  debug: false,
   animateNotifications: true
 });
 
@@ -147,20 +146,6 @@ this.DownloadsCommon = {
   BLOCK_VERDICT_MALWARE: "Malware",
   BLOCK_VERDICT_POTENTIALLY_UNWANTED: "PotentiallyUnwanted",
   BLOCK_VERDICT_UNCOMMON: "Uncommon",
-
-  log(...aMessageArgs) {
-    if (!PrefObserver.debug) {
-      return;
-    }
-    DownloadsLogger.log(...aMessageArgs);
-  },
-
-  error(...aMessageArgs) {
-    if (!PrefObserver.debug) {
-      return;
-    }
-    DownloadsLogger.reportError(...aMessageArgs);
-  },
 
   /**
    * Returns an object whose keys are the string names from the downloads string
@@ -555,7 +540,8 @@ this.DownloadsCommon = {
     let s = DownloadsCommon.strings;
     let title = s.unblockHeader;
     let buttonFlags = (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_0) +
-                      (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_1);
+                      (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_1) +
+                      Ci.nsIPrompt.BUTTON_POS_1_DEFAULT;
     let type = "";
     let message = s.unblockTip;
     let okButton = s.unblockButtonContinue;
@@ -596,11 +582,20 @@ this.DownloadsCommon = {
       }
     });
 
+    // The ordering of the ok/cancel buttons is used this way to allow "cancel"
+    // to have the same result as hitting the ESC or Close button (see bug 345067).
     let rv = Services.prompt.confirmEx(aOwnerWindow, title, message, buttonFlags,
-                                       cancelButton, okButton, null, null, {});
-    return (rv == 1);
+                                       okButton, cancelButton, null, null, {});
+    return (rv == 0);
   }),
 };
+
+XPCOMUtils.defineLazyGetter(this.DownloadsCommon, "log", () => {
+  return DownloadsLogger.log.bind(DownloadsLogger);
+});
+XPCOMUtils.defineLazyGetter(this.DownloadsCommon, "error", () => {
+  return DownloadsLogger.error.bind(DownloadsLogger);
+});
 
 /**
  * Returns true if we are executing on Windows Vista or a later version.
@@ -690,6 +685,9 @@ DownloadsDataCtor.prototype = {
                                                         : Downloads.PUBLIC);
     promiseList.then(list => list.removeFinished())
                .then(null, Cu.reportError);
+    let indicatorData = this._isPrivate ? PrivateDownloadsIndicatorData
+                                        : DownloadsIndicatorData;
+    indicatorData.attention = false;
   },
 
   //////////////////////////////////////////////////////////////////////////////

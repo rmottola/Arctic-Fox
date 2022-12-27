@@ -53,8 +53,6 @@ bool OriginAttributes::CopyFromLoadContext(nsILoadContext* aLoadContext)
 void
 OriginAttributes::CreateSuffix(nsACString& aStr) const
 {
-  MOZ_RELEASE_ASSERT(mAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID);
-
   UniquePtr<URLParams> params(new URLParams());
   nsAutoString value;
 
@@ -124,10 +122,6 @@ public:
       nsresult rv;
       mOriginAttributes->mAppId = aValue.ToInteger(&rv);
       if (NS_WARN_IF(NS_FAILED(rv))) {
-        return false;
-      }
-
-      if (mOriginAttributes->mAppId == nsIScriptSecurityManager::UNKNOWN_APP_ID) {
         return false;
       }
 
@@ -221,14 +215,6 @@ BasePrincipal::GetOrigin(nsACString& aOrigin)
 {
   nsresult rv = GetOriginInternal(aOrigin);
   NS_ENSURE_SUCCESS(rv, rv);
-
-  // OriginAttributes::CreateSuffix asserts against UNKNOWN_APP_ID. It's trivial
-  // to trigger this getter from script on such a principal, so we handle it
-  // here at the API entry point.
-  if (mOriginAttributes.mAppId == nsIScriptSecurityManager::UNKNOWN_APP_ID) {
-    NS_WARNING("Refusing to provide canonical origin string to principal with UNKNOWN_APP_ID");
-    return NS_ERROR_FAILURE;
-  }
 
   nsAutoCString suffix;
   mOriginAttributes.CreateSuffix(suffix);
@@ -331,12 +317,28 @@ BasePrincipal::GetCsp(nsIContentSecurityPolicy** aCsp)
 NS_IMETHODIMP
 BasePrincipal::SetCsp(nsIContentSecurityPolicy* aCsp)
 {
-  // If CSP was already set, it should not be destroyed!  Instead, it should
-  // get set anew when a new principal is created.
-  if (mCSP)
+  if (mCSP) {
     return NS_ERROR_ALREADY_INITIALIZED;
+  }
 
   mCSP = aCsp;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+BasePrincipal::GetPreloadCsp(nsIContentSecurityPolicy** aPreloadCSP)
+{
+  NS_IF_ADDREF(*aPreloadCSP = mPreloadCSP);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+BasePrincipal::SetPreloadCsp(nsIContentSecurityPolicy* aPreloadCSP)
+{
+  if (mPreloadCSP) {
+    return NS_ERROR_ALREADY_INITIALIZED;
+  }
+  mPreloadCSP = aPreloadCSP;
   return NS_OK;
 }
 
@@ -354,17 +356,36 @@ BasePrincipal::GetCspJSON(nsAString& outCSPinJSON)
 }
 
 NS_IMETHODIMP
-BasePrincipal::GetIsNullPrincipal(bool* aIsNullPrincipal)
+BasePrincipal::GetIsNullPrincipal(bool* aResult)
 {
-  *aIsNullPrincipal = false;
+  *aResult = Kind() == eNullPrincipal;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+BasePrincipal::GetIsCodebasePrincipal(bool* aResult)
+{
+  *aResult = Kind() == eCodebasePrincipal;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+BasePrincipal::GetIsExpandedPrincipal(bool* aResult)
+{
+  *aResult = Kind() == eExpandedPrincipal;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+BasePrincipal::GetIsSystemPrincipal(bool* aResult)
+{
+  *aResult = Kind() == eSystemPrincipal;
   return NS_OK;
 }
 
 NS_IMETHODIMP
 BasePrincipal::GetJarPrefix(nsACString& aJarPrefix)
 {
-  MOZ_ASSERT(AppId() != nsIScriptSecurityManager::UNKNOWN_APP_ID);
-
   mozilla::GetJarPrefix(mOriginAttributes.mAppId, mOriginAttributes.mInBrowser, aJarPrefix);
   return NS_OK;
 }
@@ -453,12 +474,12 @@ BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, const OriginAttributes& aAt
     if (!principal) {
       return nsNullPrincipal::Create();
     }
-    nsRefPtr<BasePrincipal> concrete = Cast(principal);
+    RefPtr<BasePrincipal> concrete = Cast(principal);
     return concrete.forget();
   }
 
   // Mint a codebase principal.
-  nsRefPtr<nsPrincipal> codebase = new nsPrincipal();
+  RefPtr<nsPrincipal> codebase = new nsPrincipal();
   rv = codebase->Init(aURI, aAttrs);
   NS_ENSURE_SUCCESS(rv, nullptr);
   return codebase.forget();

@@ -173,10 +173,10 @@ LocalMediaStreamPlayback.prototype = Object.create(MediaStreamPlayback.prototype
    * @param {Boolean} isResume specifies if this media element is being resumed
    *                           from a previous run
    */
-  playMediaWithStreamStop : {
+  playMediaWithDeprecatedStreamStop : {
     value: function(isResume) {
       return this.startMedia(isResume)
-        .then(() => this.stopStreamInMediaPlayback())
+        .then(() => this.deprecatedStopStreamInMediaPlayback())
         .then(() => this.stopMediaElement());
     }
   },
@@ -189,7 +189,7 @@ LocalMediaStreamPlayback.prototype = Object.create(MediaStreamPlayback.prototype
    *               being played.
    *
    */
-  stopStreamInMediaPlayback : {
+  deprecatedStopStreamInMediaPlayback : {
     value: function () {
       return new Promise((resolve, reject) => {
         /**
@@ -231,6 +231,6 @@ function createHTML(options) {
   return scriptsReady.then(() => realCreateHTML(options));
 }
 
-function runTest(f) {
-  return scriptsReady.then(() => runTestWhenReady(f));
-}
+var runTest = testFunction => scriptsReady
+  .then(() => runTestWhenReady(testFunction))
+  .then(() => finish());

@@ -18,6 +18,8 @@
 
 #include "gc/Marking.h"
 #include "jit/JitCompartment.h"
+#include "jit/JitOptions.h"
+#include "js/Date.h"
 #include "js/Proxy.h"
 #include "js/RootingAPI.h"
 #include "proxy/DeadObjectProxy.h"
@@ -45,8 +47,8 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     isSystem_(false),
     isSelfHosting(false),
     marked(true),
-    warnedAboutNoSuchMethod(false),
     warnedAboutFlagsArgument(false),
+    warnedAboutExprClosure(false),
     addonId(options.addonIdOrNull()),
 #ifdef DEBUG
     firedOnNewGlobalObject(false),
@@ -119,11 +121,10 @@ JSCompartment::init(JSContext* maybecx)
      *
      * As a hack, we clear our timezone cache every time we create a new
      * compartment. This ensures that the cache is always relatively fresh, but
-     * shouldn't interfere with benchmarks which create tons of date objects
+     * shouldn't interfere with benchmarks that create tons of date objects
      * (unless they also create tons of iframes, which seems unlikely).
      */
-    if (maybecx)
-        maybecx->runtime()->dateTimeInfo.updateTimeZoneAdjustment();
+    JS::ResetTimeZone();
 
     if (!crossCompartmentWrappers.init(0)) {
         if (maybecx)
@@ -166,11 +167,12 @@ JSRuntime::createJitRuntime(JSContext* cx)
     JitRuntime::AutoMutateBackedges amb(jrt);
     jitRuntime_ = jrt;
 
+    AutoEnterOOMUnsafeRegion noOOM;
     if (!jitRuntime_->initialize(cx)) {
         // Handling OOM here is complicated: if we delete jitRuntime_ now, we
         // will destroy the ExecutableAllocator, even though there may still be
         // JitCode instances holding references to ExecutablePools.
-        CrashAtUnhandlableOOM("OOM in createJitRuntime");
+        noOOM.crash("OOM in createJitRuntime");
     }
 
     return jitRuntime_;
@@ -255,7 +257,8 @@ JSCompartment::checkWrapperMapAfterMovingGC()
         CrossCompartmentKey key = e.front().key();
         CheckGCThingAfterMovingGC(key.debugger);
         CheckGCThingAfterMovingGC(key.wrapped);
-        CheckGCThingAfterMovingGC(static_cast<Cell*>(e.front().value().get().toGCThing()));
+        CheckGCThingAfterMovingGC(
+                static_cast<Cell*>(e.front().value().unbarrieredGet().toGCThing()));
 
         WrapperMap::Ptr ptr = crossCompartmentWrappers.lookup(key);
         MOZ_RELEASE_ASSERT(ptr.found() && &*ptr == &e.front());
@@ -393,7 +396,7 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
     const JSWrapObjectCallbacks* cb = cx->runtime()->wrapObjectCallbacks;
 
     if (obj->compartment() == this) {
-        obj.set(GetOuterObject(cx, obj));
+        obj.set(ToWindowProxyIfWindow(obj));
         return true;
     }
 
@@ -406,10 +409,10 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
 
     // Unwrap the object, but don't unwrap outer windows.
     RootedObject objectPassedToWrap(cx, obj);
-    obj.set(UncheckedUnwrap(obj, /* stopAtOuter = */ true));
+    obj.set(UncheckedUnwrap(obj, /* stopAtWindowProxy = */ true));
 
     if (obj->compartment() == this) {
-        MOZ_ASSERT(obj == GetOuterObject(cx, obj));
+        MOZ_ASSERT(!IsWindow(obj));
         return true;
     }
 
@@ -432,11 +435,10 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
         if (!obj)
             return false;
     }
-    MOZ_ASSERT(obj == GetOuterObject(cx, obj));
+    MOZ_ASSERT(!IsWindow(obj));
 
     if (obj->compartment() == this)
         return true;
-
 
     // If we already have a wrapper for this value, use it.
     RootedValue key(cx, ObjectValue(*obj));
@@ -458,15 +460,27 @@ JSCompartment::wrap(JSContext* cx, MutableHandleObject obj, HandleObject existin
         }
     }
 
-    obj.set(cb->wrap(cx, existing, obj));
-    if (!obj)
+    RootedObject wrapper(cx, cb->wrap(cx, existing, obj));
+    if (!wrapper)
         return false;
 
     // We maintain the invariant that the key in the cross-compartment wrapper
     // map is always directly wrapped by the value.
-    MOZ_ASSERT(Wrapper::wrappedObject(obj) == &key.get().toObject());
+    MOZ_ASSERT(Wrapper::wrappedObject(wrapper) == &key.get().toObject());
 
-    return putWrapper(cx, CrossCompartmentKey(key), ObjectValue(*obj));
+    if (!putWrapper(cx, CrossCompartmentKey(key), ObjectValue(*wrapper))) {
+        // Enforce the invariant that all cross-compartment wrapper object are
+        // in the map by nuking the wrapper if we couldn't add it.
+        // Unfortunately it's possible for the wrapper to still be marked if we
+        // took this path, for example if the object metadata callback stashes a
+        // reference to it.
+        if (wrapper->is<CrossCompartmentWrapperObject>())
+            NukeCrossCompartmentWrapper(cx, wrapper);
+        return false;
+    }
+
+    obj.set(wrapper);
+    return true;
 }
 
 bool
@@ -536,7 +550,7 @@ JSCompartment::traceOutgoingCrossCompartmentWrappers(JSTracer* trc)
     MOZ_ASSERT(!zone()->isCollecting() || trc->runtime()->gc.isHeapCompacting());
 
     for (WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
-        Value v = e.front().value();
+        Value v = e.front().value().unbarrieredGet();
         if (e.front().key().kind == CrossCompartmentKey::ObjectWrapper) {
             ProxyObject* wrapper = &v.toObject().as<ProxyObject>();
 
@@ -663,9 +677,9 @@ JSCompartment::sweepSavedStacks()
 void
 JSCompartment::sweepGlobalObject(FreeOp* fop)
 {
-    if (global_.unbarrieredGet() && IsAboutToBeFinalized(&global_)) {
+    if (global_ && IsAboutToBeFinalized(&global_)) {
         if (isDebuggee())
-            Debugger::detachAllDebuggersFromGlobal(fop, global_);
+            Debugger::detachAllDebuggersFromGlobal(fop, global_.unbarrieredGet());
         global_.set(nullptr);
     }
 }
@@ -1002,7 +1016,10 @@ JSCompartment::updateDebuggerObservesFlag(unsigned flag)
                flag == DebuggerObservesCoverage ||
                flag == DebuggerObservesAsmJS);
 
-    const GlobalObject::DebuggerVector* v = maybeGlobal()->getDebuggers();
+    GlobalObject* global = zone()->runtimeFromMainThread()->gc.isForegroundSweeping()
+                           ? unsafeUnbarrieredMaybeGlobal()
+                           : maybeGlobal();
+    const GlobalObject::DebuggerVector* v = global->getDebuggers();
     for (Debugger * const* p = v->begin(); p != v->end(); p++) {
         Debugger* dbg = *p;
         if (flag == DebuggerObservesAllExecution ? dbg->observesAllExecution() :
@@ -1049,6 +1066,15 @@ JSCompartment::updateDebuggerObservesCoverage()
         return;
 
     clearScriptCounts();
+}
+
+bool
+JSCompartment::collectCoverage() const
+{
+    return !js_JitOptions.disablePgo ||
+           debuggerObservesCoverage() ||
+           runtimeFromAnyThread()->profilingScripts ||
+           runtimeFromAnyThread()->lcovOutput.isEnabled();
 }
 
 void
@@ -1114,25 +1140,29 @@ JSCompartment::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
 void
 JSCompartment::reportTelemetry()
 {
-    // Only report telemetry for web content, not add-ons or chrome JS.
-    if (addonId || isSystem_)
+    // Only report telemetry for web content and add-ons, not chrome JS.
+    if (isSystem_)
         return;
 
     // Hazard analysis can't tell that the telemetry callbacks don't GC.
     JS::AutoSuppressGCAnalysis nogc;
 
+    int id = addonId
+             ? JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_ADDONS
+             : JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT;
+
     // Call back into Firefox's Telemetry reporter.
     for (size_t i = 0; i < DeprecatedLanguageExtensionCount; i++) {
         if (sawDeprecatedLanguageExtension[i])
-            runtime_->addTelemetry(JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT, i);
+            runtime_->addTelemetry(id, i);
     }
 }
 
 void
 JSCompartment::addTelemetry(const char* filename, DeprecatedLanguageExtension e)
 {
-    // Only report telemetry for web content, not add-ons or chrome JS.
-    if (addonId || isSystem_ || !filename || strncmp(filename, "http", 4) != 0)
+    // Only report telemetry for web content and add-ons, not chrome JS.
+    if (isSystem_ || (!addonId && (!filename || strncmp(filename, "http", 4) != 0)))
         return;
 
     sawDeprecatedLanguageExtension[e] = true;

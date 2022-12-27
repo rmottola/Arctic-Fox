@@ -67,6 +67,7 @@
 #include "jit/OptimizationTracking.h"
 #include "js/Debug.h"
 #include "js/GCAPI.h"
+#include "js/Initialization.h"
 #include "js/StructuredClone.h"
 #include "js/TrackedOptimizationInfo.h"
 #include "perf/jsperf.h"
@@ -2498,9 +2499,8 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
             ac.emplace(cx, sobj);
         }
 
-        sobj = GetInnerObject(sobj);
-        if (!sobj)
-            return false;
+        sobj = ToWindowIfWindowProxy(sobj);
+
         if (!(sobj->getClass()->flags & JSCLASS_IS_GLOBAL)) {
             JS_ReportError(cx, "Invalid scope argument to evalcx");
             return false;
@@ -3627,8 +3627,7 @@ NestedShell(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-DecompileFunctionSomehow(JSContext* cx, unsigned argc, Value* vp,
-                         JSString* (*decompiler)(JSContext*, HandleFunction, unsigned))
+DecompileFunction(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 1 || !args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
@@ -3636,23 +3635,11 @@ DecompileFunctionSomehow(JSContext* cx, unsigned argc, Value* vp,
         return true;
     }
     RootedFunction fun(cx, &args[0].toObject().as<JSFunction>());
-    JSString* result = decompiler(cx, fun, 0);
+    JSString* result = JS_DecompileFunction(cx, fun, 0);
     if (!result)
         return false;
     args.rval().setString(result);
     return true;
-}
-
-static bool
-DecompileBody(JSContext* cx, unsigned argc, Value* vp)
-{
-    return DecompileFunctionSomehow(cx, argc, vp, JS_DecompileFunctionBody);
-}
-
-static bool
-DecompileFunction(JSContext* cx, unsigned argc, Value* vp)
-{
-    return DecompileFunctionSomehow(cx, argc, vp, JS_DecompileFunction);
 }
 
 static bool
@@ -4332,7 +4319,8 @@ class ShellAutoEntryMonitor : JS::dbg::AutoEntryMonitor {
         MOZ_ASSERT(!enteredWithoutExit);
     }
 
-    void Entry(JSContext* cx, JSFunction* function) override {
+    void Entry(JSContext* cx, JSFunction* function, JS::HandleValue asyncStack,
+               JS::HandleString asyncCause) override {
         MOZ_ASSERT(!enteredWithoutExit);
         enteredWithoutExit = true;
 
@@ -4346,7 +4334,8 @@ class ShellAutoEntryMonitor : JS::dbg::AutoEntryMonitor {
         oom = !log.append(make_string_copy("anonymous"));
     }
 
-    void Entry(JSContext* cx, JSScript* script) override {
+    void Entry(JSContext* cx, JSScript* script, JS::HandleValue asyncStack,
+               JS::HandleString asyncCause) override {
         MOZ_ASSERT(!enteredWithoutExit);
         enteredWithoutExit = true;
 
@@ -4789,10 +4778,6 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
     JS_FN_HELP("decompileFunction", DecompileFunction, 1, 0,
 "decompileFunction(func)",
 "  Decompile a function."),
-
-    JS_FN_HELP("decompileBody", DecompileBody, 1, 0,
-"decompileBody(func)",
-"  Decompile a function's body."),
 
     JS_FN_HELP("decompileThis", DecompileThisScript, 0, 0,
 "decompileThis()",
@@ -5767,6 +5752,13 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
             return nullptr;
 #endif
 
+        bool succeeded;
+        if (!JS_SetImmutablePrototype(cx, glob, &succeeded))
+            return nullptr;
+        MOZ_ASSERT(succeeded,
+                   "a fresh, unexposed global object is always capable of "
+                   "having its [[Prototype]] be immutable");
+
 #ifdef JS_HAS_CTYPES
         if (!JS_InitCTypesClass(cx, glob))
             return nullptr;
@@ -5998,6 +5990,15 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
             jit::js_JitOptions.disableEdgeCaseAnalysis = true;
         else
             return OptionFailure("ion-edgecase-analysis", str);
+    }
+
+    if (const char* str = op.getStringOption("ion-pgo")) {
+        if (strcmp(str, "on") == 0)
+            jit::js_JitOptions.disablePgo = false;
+        else if (strcmp(str, "off") == 0)
+            jit::js_JitOptions.disablePgo = true;
+        else
+            return OptionFailure("ion-pgo", str);
     }
 
     if (const char* str = op.getStringOption("ion-range-analysis")) {
@@ -6359,6 +6360,8 @@ main(int argc, char** argv, char** envp)
                                "Loop invariant code motion (default: on, off to disable)")
         || !op.addStringOption('\0', "ion-edgecase-analysis", "on/off",
                                "Find edge cases where Ion can avoid bailouts (default: on, off to disable)")
+        || !op.addStringOption('\0', "ion-pgo", "on/off",
+                               "Profile guided optimization (default: off, on to enable)")
         || !op.addStringOption('\0', "ion-range-analysis", "on/off",
                                "Range analysis (default: on, off to disable)")
 #if defined(__APPLE__)

@@ -88,15 +88,17 @@ class MessageListener
     virtual void OnExitedCall() {
         NS_RUNTIMEABORT("default impl shouldn't be invoked");
     }
-    /* This callback is called when a sync message is sent that begins a new IPC transaction
-       (i.e., when it is not part of an existing sequence of nested messages). */
-    virtual void OnBeginSyncTransaction() {
-    }
     virtual RacyInterruptPolicy MediateInterruptRace(const Message& parent,
                                                      const Message& child)
     {
         return RIPChildWins;
     }
+
+    /**
+     * Return true if windows messages can be handled while waiting for a reply
+     * to a sync IPDL message.
+     */
+    virtual bool HandleWindowsMessages(const Message& aMsg) const { return true; }
 
     virtual void OnEnteredSyncSend() {
     }

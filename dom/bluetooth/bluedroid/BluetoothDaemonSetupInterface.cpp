@@ -39,7 +39,7 @@ BluetoothDaemonSetupModule::HandleSvc(const DaemonSocketPDUHeader& aHeader,
     return;
   }
 
-  nsRefPtr<BluetoothSetupResultHandler> res =
+  RefPtr<BluetoothSetupResultHandler> res =
     static_cast<BluetoothSetupResultHandler*>(aRes);
 
   if (!aRes) {
@@ -75,7 +75,7 @@ BluetoothDaemonSetupModule::RegisterModuleCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return rv;
 }
 
@@ -97,7 +97,7 @@ BluetoothDaemonSetupModule::UnregisterModuleCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return rv;
 }
 
@@ -121,7 +121,7 @@ BluetoothDaemonSetupModule::ConfigurationCmd(
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return rv;
 }
 

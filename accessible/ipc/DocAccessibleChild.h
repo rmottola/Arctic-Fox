@@ -48,6 +48,15 @@ public:
     SendShutdown();
   }
 
+  virtual void ActorDestroy(ActorDestroyReason) override
+  {
+    if (!mDoc)
+      return;
+
+    mDoc->SetIPCDoc(nullptr);
+    mDoc = nullptr;
+  }
+
   void ShowEvent(AccShowEvent* aShowEvent);
 
   /*
@@ -94,8 +103,8 @@ public:
     override;
   virtual bool RecvCaretOffset(const uint64_t& aID, int32_t* aOffset)
     override;
-  virtual bool RecvSetCaretOffset(const uint64_t& aID, const int32_t& aOffset,
-                                  bool* aValid) override;
+  virtual bool RecvSetCaretOffset(const uint64_t& aID, const int32_t& aOffset)
+    override;
 
   virtual bool RecvCharacterCount(const uint64_t& aID, int32_t* aCount)
      override;
@@ -122,6 +131,10 @@ public:
                                        const int32_t& aBoundaryType,
                                        nsString* aText, int32_t* aStartOffset,
                                        int32_t* aEndOffset) override;
+
+  virtual bool RecvCharAt(const uint64_t& aID,
+                          const int32_t& aOffset,
+                          uint16_t* aChar) override;
 
   virtual bool RecvTextAttributes(const uint64_t& aID,
                                   const bool& aIncludeDefAttrs,
@@ -210,10 +223,6 @@ public:
 
   virtual bool RecvPasteText(const uint64_t& aID,
                              const int32_t& aPosition, bool* aValid) override;
-
-  virtual bool RecvCharAt(const uint64_t& aID,
-                          const int32_t& aOffset,
-                          uint16_t* aChar) override;
 
   virtual bool RecvImagePosition(const uint64_t& aID,
                                  const uint32_t& aCoordType,
@@ -354,6 +363,14 @@ public:
                                     const uint32_t& aRow) override;
   virtual bool RecvTableIsProbablyForLayout(const uint64_t& aID,
                                             bool* aForLayout) override;
+  virtual bool RecvAtkTableColumnHeader(const uint64_t& aID,
+                                        const int32_t& aCol,
+                                        uint64_t* aHeader,
+                                        bool* aOk) override;
+  virtual bool RecvAtkTableRowHeader(const uint64_t& aID,
+                                     const int32_t& aRow,
+                                     uint64_t* aHeader,
+                                     bool* aOk) override;
 
   virtual bool RecvSelectedItems(const uint64_t& aID,
                                  nsTArray<uint64_t>* aSelectedItemIDs) override;
@@ -384,6 +401,10 @@ public:
   virtual bool RecvUnselectAll(const uint64_t& aID,
                                bool* aSuccess) override;
 
+  virtual bool RecvTakeSelection(const uint64_t& aID) override;
+  virtual bool RecvSetSelected(const uint64_t& aID,
+                               const bool& aSelect) override;
+
   virtual bool RecvDoAction(const uint64_t& aID,
                             const uint8_t& aIndex,
                             bool* aSuccess) override;
@@ -407,21 +428,24 @@ public:
                                     uint32_t* aKey,
                                     uint32_t* aModifierMask) override;
 
+  virtual bool RecvAtkKeyBinding(const uint64_t& aID,
+                                 nsString* aResult) override;
+
   virtual bool RecvCurValue(const uint64_t& aID,
-                            double* aValue);
+                            double* aValue) override;
 
   virtual bool RecvSetCurValue(const uint64_t& aID,
                                const double& aValue,
-                               bool* aRetVal);
+                               bool* aRetVal) override;
 
   virtual bool RecvMinValue(const uint64_t& aID,
-                            double* aValue);
+                            double* aValue) override;
 
   virtual bool RecvMaxValue(const uint64_t& aID,
-                            double* aValue);
+                            double* aValue) override;
 
   virtual bool RecvStep(const uint64_t& aID,
-                        double* aStep);
+                        double* aStep) override;
 
   virtual bool RecvTakeFocus(const uint64_t& aID) override;
 

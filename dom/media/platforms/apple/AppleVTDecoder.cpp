@@ -19,8 +19,8 @@
 #include "VideoUtils.h"
 #include "gfxPlatform.h"
 
-PRLogModuleInfo* GetAppleMediaLog();
-#define LOG(...) MOZ_LOG(GetAppleMediaLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+extern PRLogModuleInfo* GetPDMLog();
+#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
 #ifdef LOG_MEDIA_SHA1
@@ -51,7 +51,7 @@ AppleVTDecoder::~AppleVTDecoder()
   MOZ_COUNT_DTOR(AppleVTDecoder);
 }
 
-nsRefPtr<MediaDataDecoder::InitPromise>
+RefPtr<MediaDataDecoder::InitPromise>
 AppleVTDecoder::Init()
 {
   nsresult rv = InitializeSession();
@@ -106,7 +106,7 @@ AppleVTDecoder::Input(MediaRawData* aSample)
   mInputIncoming++;
 
   nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethodWithArg<nsRefPtr<MediaRawData>>(
+      NS_NewRunnableMethodWithArg<RefPtr<MediaRawData>>(
           this, &AppleVTDecoder::SubmitFrame, aSample);
   mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;

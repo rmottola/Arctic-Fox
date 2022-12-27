@@ -4,6 +4,8 @@
 
 #include "GLLibraryEGL.h"
 
+#include "gfxCrashReporterUtils.h"
+#include "gfxUtils.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Assertions.h"
 #include "nsDirectoryServiceDefs.h"
@@ -13,13 +15,17 @@
 #ifdef XP_WIN
 #include "nsWindowsHelpers.h"
 #endif
+#include "OGLShaderProgram.h"
 #include "prenv.h"
 #include "GLContext.h"
+#include "GLContextProvider.h"
 #include "gfxPrefs.h"
+#include "ScopedGLHelpers.h"
 
 namespace mozilla {
 namespace gl {
 
+StaticMutex GLLibraryEGL::sMutex;
 GLLibraryEGL sEGLLibrary;
 #ifdef MOZ_B2G
 ThreadLocal<EGLContext> GLLibraryEGL::sCurrentContext;
@@ -45,6 +51,8 @@ static const char *sEGLExtensionNames[] = {
 
 static PRLibrary* LoadApitraceLibrary()
 {
+    // Initialization of gfx prefs here is only needed during the unit tests...
+    gfxPrefs::GetSingleton();
     if (!gfxPrefs::UseApitrace()) {
         return nullptr;
     }
@@ -125,7 +133,9 @@ static bool
 IsAccelAngleSupported(const nsCOMPtr<nsIGfxInfo>& gfxInfo)
 {
     int32_t angleSupport;
-    gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_WEBGL_ANGLE, &angleSupport);
+    gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
+                                         nsIGfxInfo::FEATURE_WEBGL_ANGLE,
+                                         &angleSupport);
     return (angleSupport == nsIGfxInfo::FEATURE_STATUS_OK);
 }
 
@@ -143,11 +153,39 @@ GetAndInitDisplay(GLLibraryEGL& egl, void* displayType)
 }
 
 bool
+GLLibraryEGL::ReadbackEGLImage(EGLImage image, gfx::DataSourceSurface* out_surface)
+{
+    StaticMutexAutoUnlock lock(sMutex);
+    if (!mReadbackGL) {
+        mReadbackGL = gl::GLContextProvider::CreateHeadless(gl::CreateContextFlags::NONE);
+    }
+
+    ScopedTexture destTex(mReadbackGL);
+    const GLuint target = LOCAL_GL_TEXTURE_EXTERNAL;
+    ScopedBindTexture autoTex(mReadbackGL, destTex.Texture(), target);
+    mReadbackGL->fTexParameteri(target, LOCAL_GL_TEXTURE_WRAP_S, LOCAL_GL_CLAMP_TO_EDGE);
+    mReadbackGL->fTexParameteri(target, LOCAL_GL_TEXTURE_WRAP_T, LOCAL_GL_CLAMP_TO_EDGE);
+    mReadbackGL->fTexParameteri(target, LOCAL_GL_TEXTURE_MAG_FILTER, LOCAL_GL_NEAREST);
+    mReadbackGL->fTexParameteri(target, LOCAL_GL_TEXTURE_MIN_FILTER, LOCAL_GL_NEAREST);
+    mReadbackGL->fEGLImageTargetTexture2D(target, image);
+
+    ShaderConfigOGL config = ShaderConfigFromTargetAndFormat(target,
+                                                             out_surface->GetFormat());
+    int shaderConfig = config.mFeatures;
+    mReadbackGL->ReadTexImageHelper()->ReadTexImage(out_surface, 0, target,
+                                                    out_surface->GetSize(), shaderConfig);
+
+    return true;
+}
+
+bool
 GLLibraryEGL::EnsureInitialized(bool forceAccel)
 {
     if (mInitialized) {
         return true;
     }
+
+    mozilla::ScopedGfxFeatureReporter reporter("EGL");
 
 #ifdef MOZ_B2G
     if (!sCurrentContext.init())
@@ -483,6 +521,7 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
     }
 
     mInitialized = true;
+    reporter.SetSuccessful();
     return true;
 }
 

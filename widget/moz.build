@@ -25,6 +25,7 @@ if toolkit == 'windows':
         'nsITaskbarProgress.idl',
         'nsITaskbarTabPreview.idl',
         'nsITaskbarWindowPreview.idl',
+        'nsIWindowsUIUtils.idl',
         'nsIWinTaskbar.idl',
     ]
 elif toolkit == 'cocoa':
@@ -144,7 +145,6 @@ UNIFIED_SOURCES += [
     'nsBaseDragService.cpp',
     'nsBaseScreen.cpp',
     'nsClipboardHelper.cpp',
-    'nsClipboardPrivacyHandler.cpp',
     'nsClipboardProxy.cpp',
     'nsColorPickerProxy.cpp',
     'nsContentProcessWidgetFactory.cpp',

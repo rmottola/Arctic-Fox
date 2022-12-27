@@ -27,6 +27,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsILoadContext.h"
 #include "nsIURL.h"
+#include "mozilla/Telemetry.h"
 
 namespace mozilla {
 namespace net {
@@ -34,6 +35,10 @@ namespace net {
 #define SUBRESOURCE_AUTH_DIALOG_DISALLOW_ALL 0
 #define SUBRESOURCE_AUTH_DIALOG_DISALLOW_CROSS_ORIGIN 1
 #define SUBRESOURCE_AUTH_DIALOG_ALLOW_ALL 2
+
+#define HTTP_AUTH_DIALOG_TOP_LEVEL_DOC 0
+#define HTTP_AUTH_DIALOG_SAME_ORIGIN_SUBRESOURCE 1
+#define HTTP_AUTH_DIALOG_CROSS_ORIGIN_SUBRESOURCE 2
 
 #define MAX_DISPLAYED_USER_LENGTH 64
 #define MAX_DISPLAYED_HOST_LENGTH 64
@@ -819,9 +824,27 @@ nsHttpChannelAuthProvider::BlockPrompt()
         return false;
     }
 
+    if (gHttpHandler->IsTelemetryEnabled()) {
+      if (loadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_DOCUMENT) {
+        Telemetry::Accumulate(Telemetry::HTTP_AUTH_DIALOG_STATS,
+                              HTTP_AUTH_DIALOG_TOP_LEVEL_DOC);
+      } else {
+        nsCOMPtr<nsIPrincipal> loadingPrincipal = loadInfo->LoadingPrincipal();
+        if (loadingPrincipal) {
+          if (NS_SUCCEEDED(loadingPrincipal->CheckMayLoad(mURI, false, false))) {
+            Telemetry::Accumulate(Telemetry::HTTP_AUTH_DIALOG_STATS,
+              HTTP_AUTH_DIALOG_SAME_ORIGIN_SUBRESOURCE);
+          } else {
+            Telemetry::Accumulate(Telemetry::HTTP_AUTH_DIALOG_STATS,
+              HTTP_AUTH_DIALOG_CROSS_ORIGIN_SUBRESOURCE);
+          }
+        }
+      }
+    }
+
     // Allow if it is the top-level document or xhr.
-    if ((loadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_DOCUMENT) ||
-        (loadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_XMLHTTPREQUEST)) {
+    if ((loadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_DOCUMENT) ||
+        (loadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_XMLHTTPREQUEST)) {
         return false;
     }
 
@@ -1039,7 +1062,7 @@ nsHttpChannelAuthProvider::PromptForIdentity(uint32_t            level,
     if (authFlags & nsIHttpAuthenticator::IDENTITY_INCLUDES_DOMAIN)
         promptFlags |= nsIAuthInformation::NEED_DOMAIN;
 
-    nsRefPtr<nsHTTPAuthInformation> holder =
+    RefPtr<nsHTTPAuthInformation> holder =
         new nsHTTPAuthInformation(promptFlags, realmU,
                                   nsDependentCString(authType));
     if (!holder)

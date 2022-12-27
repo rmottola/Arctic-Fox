@@ -103,7 +103,7 @@ AppleMP3Reader::Read(uint32_t *aNumBytes, char *aData)
 }
 
 nsresult
-AppleMP3Reader::Init(MediaDecoderReader* aCloneDonor)
+AppleMP3Reader::Init()
 {
   AudioFileTypeID fileType = kAudioFileMP3Type;
 
@@ -208,7 +208,7 @@ AppleMP3Reader::AudioSampleCallback(UInt32 aNumBytes,
 
   do {
     // Decompressed audio buffer
-    nsAutoArrayPtr<uint8_t> decoded(new uint8_t[decodedSize]);
+    auto decoded = MakeUnique<uint8_t[]>(decodedSize);
 
     AudioBufferList decBuffer;
     decBuffer.mNumberBuffers = 1;
@@ -246,9 +246,11 @@ AppleMP3Reader::AudioSampleCallback(UInt32 aNumBytes,
     LOGD("pushed audio at time %lfs; duration %lfs\n",
          (double)time / USECS_PER_S, (double)duration / USECS_PER_S);
 
+    auto samples = UniquePtr<AudioDataValue[]>(reinterpret_cast<AudioDataValue*>
+					       (decoded.release()));
     AudioData *audio = new AudioData(mResource.Tell(),
                                      time, duration, numFrames,
-                                     reinterpret_cast<AudioDataValue *>(decoded.forget()),
+                                     Move(samples),
                                      mAudioChannels, mAudioSampleRate);
     mAudioQueue.Push(audio);
 
@@ -298,21 +300,6 @@ AppleMP3Reader::DecodeAudioData()
 bool
 AppleMP3Reader::DecodeVideoFrame(bool &aKeyframeSkip,
                                  int64_t aTimeThreshold)
-{
-  MOZ_ASSERT(OnTaskQueue());
-  return false;
-}
-
-
-bool
-AppleMP3Reader::HasAudio()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  return mStreamReady;
-}
-
-bool
-AppleMP3Reader::HasVideo()
 {
   MOZ_ASSERT(OnTaskQueue());
   return false;
@@ -477,7 +464,7 @@ AppleMP3Reader::SetupDecoder()
 }
 
 
-nsRefPtr<MediaDecoderReader::SeekPromise>
+RefPtr<MediaDecoderReader::SeekPromise>
 AppleMP3Reader::Seek(int64_t aTime, int64_t aEndTime)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -513,30 +500,41 @@ AppleMP3Reader::Seek(int64_t aTime, int64_t aEndTime)
 }
 
 void
-AppleMP3Reader::NotifyDataArrivedInternal(uint32_t aLength, int64_t aOffset)
+AppleMP3Reader::NotifyDataArrivedInternal()
 {
   MOZ_ASSERT(OnTaskQueue());
   if (!mMP3FrameParser.NeedsData()) {
     return;
   }
 
-  IntervalSet<int64_t> intervals = mFilter.NotifyDataArrived(aLength, aOffset);
+  AutoPinned<MediaResource> resource(mResource.GetResource());
+  nsTArray<MediaByteRange> byteRanges;
+  nsresult rv = resource->GetCachedRanges(byteRanges);
+
+  if (NS_FAILED(rv)) {
+    return;
+  }
+
+  IntervalSet<int64_t> intervals;
+  for (auto& range : byteRanges) {
+    intervals += mFilter.NotifyDataArrived(range.Length(), range.mStart);
+  }
   for (const auto& interval : intervals) {
-    nsRefPtr<MediaByteBuffer> bytes =
-      mResource.MediaReadAt(interval.mStart, interval.Length());
+    RefPtr<MediaByteBuffer> bytes =
+      resource->MediaReadAt(interval.mStart, interval.Length());
     NS_ENSURE_TRUE_VOID(bytes);
     mMP3FrameParser.Parse(bytes->Elements(), interval.Length(), interval.mStart);
     if (!mMP3FrameParser.IsMP3()) {
       return;
     }
+  }
 
-    uint64_t duration = mMP3FrameParser.GetDuration();
-    if (duration != mDuration) {
-      LOGD("Updating media duration to %lluus\n", duration);
-      MOZ_ASSERT(mDecoder);
-      mDuration = duration;
-      mDecoder->DispatchUpdateEstimatedMediaDuration(duration);
-    }
+  uint64_t duration = mMP3FrameParser.GetDuration();
+  if (duration != mDuration) {
+    LOGD("Updating media duration to %lluus\n", duration);
+    MOZ_ASSERT(mDecoder);
+    mDuration = duration;
+    mDecoder->DispatchUpdateEstimatedMediaDuration(duration);
   }
 }
 

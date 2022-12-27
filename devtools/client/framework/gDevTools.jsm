@@ -10,14 +10,14 @@ const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-const { require, loader } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const { require, loader } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 // Load target and toolbox lazily as they need gDevTools to be fully initialized
 loader.lazyRequireGetter(this, "TargetFactory", "devtools/client/framework/target", true);
 loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", true);
 
 XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/devtools/shared/Console.jsm");
+                                  "resource://gre/modules/Console.jsm");
 //XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
 //                                  "resource:///modules/CustomizableUI.jsm");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);

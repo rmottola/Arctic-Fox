@@ -51,6 +51,8 @@
 // and rarely used) valloc.
 #define MOZ_REPLACE_ONLY_MEMALIGN 1
 
+#ifndef PAGE_SIZE
+#define DMD_DEFINED_PAGE_SIZE
 #ifdef XP_WIN
 #define PAGE_SIZE GetPageSize()
 static long GetPageSize()
@@ -59,12 +61,16 @@ static long GetPageSize()
   GetSystemInfo(&si);
   return si.dwPageSize;
 }
-#else
+#else // XP_WIN
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
-#endif
+#endif // XP_WIN
+#endif // PAGE_SIZE
 #include "replace_malloc.h"
 #undef MOZ_REPLACE_ONLY_MEMALIGN
+#ifdef DMD_DEFINED_PAGE_SIZE
+#undef DMD_DEFINED_PAGE_SIZE
 #undef PAGE_SIZE
+#endif // DMD_DEFINED_PAGE_SIZE
 
 #include "DMD.h"
 
@@ -76,13 +82,13 @@ class DMDBridge : public ReplaceMallocBridge
   virtual DMDFuncs* GetDMDFuncs() override;
 };
 
-static DMDBridge sDMDBridge;
-static DMDFuncs sDMDFuncs;
+static DMDBridge* gDMDBridge;
+static DMDFuncs gDMDFuncs;
 
 DMDFuncs*
 DMDBridge::GetDMDFuncs()
 {
-  return &sDMDFuncs;
+  return &gDMDFuncs;
 }
 
 inline void
@@ -90,7 +96,7 @@ StatusMsg(const char* aFmt, ...)
 {
   va_list ap;
   va_start(ap, aFmt);
-  sDMDFuncs.StatusMsg(aFmt, ap);
+  gDMDFuncs.StatusMsg(aFmt, ap);
   va_end(ap);
 }
 
@@ -362,7 +368,13 @@ class Options
     // Like "Live", but also outputs the same data for dead blocks. This mode
     // does cumulative heap profiling, which is good for identifying where large
     // amounts of short-lived allocations occur.
-    Cumulative
+    Cumulative,
+
+    // Like "Live", but this mode also outputs for each live block the address
+    // of the block and the values contained in the blocks. This mode is useful
+    // for investigating leaks, by helping to figure out which blocks refer to
+    // other blocks. This mode disables sampling.
+    Scan
   };
 
   char* mDMDEnvVar;   // a saved copy, for later printing
@@ -384,6 +396,9 @@ public:
   bool IsLiveMode()       const { return mMode == Live; }
   bool IsDarkMatterMode() const { return mMode == DarkMatter; }
   bool IsCumulativeMode() const { return mMode == Cumulative; }
+  bool IsScanMode()       const { return mMode == Scan; }
+
+  const char* ModeString() const;
 
   const char* DMDEnvVar() const { return mDMDEnvVar; }
 
@@ -1209,7 +1224,7 @@ replace_init(const malloc_table_t* aMallocTable)
 ReplaceMallocBridge*
 replace_get_bridge()
 {
-  return &mozilla::dmd::sDMDBridge;
+  return mozilla::dmd::gDMDBridge;
 }
 
 void*
@@ -1447,6 +1462,8 @@ Options::Options(const char* aDMDEnvVar)
         mMode = Options::DarkMatter;
       } else if (strcmp(arg, "--mode=cumulative") == 0) {
         mMode = Options::Cumulative;
+      } else if (strcmp(arg, "--mode=scan") == 0) {
+        mMode = Options::Scan;
 
       } else if (GetLong(arg, "--sample-below", 1, mSampleBelowSize.mMax,
                  &myLong)) {
@@ -1469,6 +1486,10 @@ Options::Options(const char* aDMDEnvVar)
       // Undo the temporary isolation.
       *e = replacedChar;
     }
+  }
+
+  if (mMode == Options::Scan) {
+    mSampleBelowSize.mActual = 1;
   }
 }
 
@@ -1496,6 +1517,24 @@ Options::BadArg(const char* aArg)
   exit(1);
 }
 
+const char*
+Options::ModeString() const
+{
+  switch (mMode) {
+  case Live:
+    return "live";
+  case DarkMatter:
+    return "dark-matter";
+  case Cumulative:
+    return "cumulative";
+  case Scan:
+    return "scan";
+  default:
+    MOZ_ASSERT(false);
+    return "(unknown DMD mode)";
+  }
+}
+
 //---------------------------------------------------------------------------
 // DMD start-up
 //---------------------------------------------------------------------------
@@ -1516,6 +1555,7 @@ static void
 Init(const malloc_table_t* aMallocTable)
 {
   gMallocTable = aMallocTable;
+  gDMDBridge = InfallibleAllocPolicy::new_<DMDBridge>();
 
   // DMD is controlled by the |DMD| environment variable.
   const char* e = getenv("DMD");
@@ -1743,6 +1783,41 @@ private:
   char mIdBuf[kIdBufLen];
 };
 
+// Helper class for converting a pointer value to a string.
+class ToStringConverter
+{
+public:
+  const char* ToPtrString(const void* aPtr)
+  {
+    snprintf(kPtrBuf, sizeof(kPtrBuf) - 1, "%" PRIxPTR, (uintptr_t)aPtr);
+    return kPtrBuf;
+  }
+
+private:
+  char kPtrBuf[32];
+};
+
+static void
+WriteBlockContents(JSONWriter& aWriter, const LiveBlock& aBlock)
+{
+  MOZ_ASSERT(!aBlock.IsSampled(), "Sampled blocks do not have accurate sizes");
+
+  size_t numWords = aBlock.ReqSize() / sizeof(uintptr_t*);
+  if (numWords == 0) {
+    return;
+  }
+
+  aWriter.StartArrayProperty("contents", aWriter.SingleLineStyle);
+  {
+    const uintptr_t** block = (const uintptr_t**)aBlock.Address();
+    ToStringConverter sc;
+    for (size_t i = 0; i < numWords; ++i) {
+      aWriter.StringElement(sc.ToPtrString(block[i]));
+    }
+  }
+  aWriter.EndArray();
+}
+
 static void
 AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
 {
@@ -1777,19 +1852,7 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
         writer.NullProperty("dmdEnvVar");
       }
 
-      const char* mode;
-      if (gOptions->IsLiveMode()) {
-        mode = "live";
-      } else if (gOptions->IsDarkMatterMode()) {
-        mode = "dark-matter";
-      } else if (gOptions->IsCumulativeMode()) {
-        mode = "cumulative";
-      } else {
-        MOZ_ASSERT(false);
-        mode = "(unknown DMD mode)";
-      }
-      writer.StringProperty("mode", mode);
-
+      writer.StringProperty("mode", gOptions->ModeString());
       writer.IntProperty("sampleBelowSize", gOptions->SampleBelowSize());
     }
     writer.EndObject();
@@ -1797,6 +1860,7 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
     StatusMsg("  Constructing the heap block list...\n");
 
     ToIdStringConverter isc;
+    ToStringConverter sc;
 
     writer.StartArrayProperty("blockList");
     {
@@ -1808,6 +1872,10 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
         writer.StartObjectElement(writer.SingleLineStyle);
         {
           if (!b.IsSampled()) {
+            if (gOptions->IsScanMode()) {
+              writer.StringProperty("addr", sc.ToPtrString(b.Address()));
+              WriteBlockContents(writer, b);
+            }
             writer.IntProperty("req", b.ReqSize());
             if (b.SlopSize() > 0) {
               writer.IntProperty("slop", b.SlopSize());
@@ -1815,7 +1883,6 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
           }
           writer.StringProperty("alloc", isc.ToIdString(b.AllocStackTrace()));
           if (gOptions->IsDarkMatterMode() && b.NumReports() > 0) {
-            MOZ_ASSERT(gOptions->IsDarkMatterMode());
             writer.StartArrayProperty("reps");
             {
               if (b.ReportStackTrace1()) {

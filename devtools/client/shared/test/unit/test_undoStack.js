@@ -3,13 +3,13 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const Cu = Components.utils;
+var Cu = Components.utils;
 var {Loader} = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {});
 
 var loader = new Loader.Loader({
   paths: {
     "": "resource://gre/modules/commonjs/",
-    "devtools": "resource:///modules/devtools",
+    "devtools": "resource://devtools",
   },
   globals: {},
 });

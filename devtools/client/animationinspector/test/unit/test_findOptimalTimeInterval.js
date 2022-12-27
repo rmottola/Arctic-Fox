@@ -6,8 +6,8 @@
 
 "use strict";
 
-const Cu = Components.utils;
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var Cu = Components.utils;
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const {findOptimalTimeInterval} = require("devtools/client/animationinspector/utils");
 
 // This test array contains objects that are used to test the

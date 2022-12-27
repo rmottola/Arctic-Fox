@@ -1,7 +1,7 @@
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 const loaders = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {});
-const devtools = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {}).devtools;
+const devtools = Cu.import("resource://devtools/shared/Loader.jsm", {}).devtools;
 const { joinURI } = devtools.require("devtools/shared/path");
 var appConstants;
 
@@ -9,7 +9,7 @@ var appConstants;
 // available in xpcshell tests. This is ok, we can easily polyfill the
 // values that we need.
 try {
-  const system = devtools.require("devtools/shared/shared/system");
+  const system = devtools.require("devtools/shared/system");
   appConstants = system.constants;
 }
 catch(e) {
@@ -23,7 +23,7 @@ catch(e) {
   };
 }
 
-const VENDOR_CONTENT_URL = "resource:///modules/devtools/shared/vendor";
+const VENDOR_CONTENT_URL = "resource://devtools/client/shared/vendor";
 
 /*
  * Create a loader to be used in a browser environment. This evaluates
@@ -57,7 +57,7 @@ function BrowserLoader(baseURI, window) {
   if (appConstants.DEBUG_JS_MODULES) {
     // Load in the dev version of React
     dynamicPaths["devtools/shared/vendor/react"] =
-      "resource:///modules/devtools/vendor/react-dev.js";
+      "resource://devtools/vendor/react-dev.js";
   }
 
   const opts = {
@@ -67,7 +67,7 @@ function BrowserLoader(baseURI, window) {
     paths: Object.assign({}, loaderOptions.paths, dynamicPaths),
     invisibleToDebugger: loaderOptions.invisibleToDebugger,
     require: (id, require) => {
-      const uri = require.resolve(id);
+      let uri = require.resolve(id);
 
       if (!uri.startsWith(baseURI) &&
           !uri.startsWith(VENDOR_CONTENT_URL)) {

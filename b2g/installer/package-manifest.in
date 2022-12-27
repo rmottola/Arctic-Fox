@@ -327,7 +327,6 @@
 @RESPATH@/components/plugin.xpt
 @RESPATH@/components/pref.xpt
 @RESPATH@/components/prefetch.xpt
-@RESPATH@/components/profile.xpt
 @RESPATH@/components/proxyObject.xpt
 @RESPATH@/components/rdf.xpt
 @RESPATH@/components/satchel.xpt
@@ -415,6 +414,8 @@
 @RESPATH@/components/AlarmsManager.manifest
 @RESPATH@/components/FeedProcessor.manifest
 @RESPATH@/components/FeedProcessor.js
+@RESPATH@/components/PackagedAppUtils.manifest
+@RESPATH@/components/PackagedAppUtils.js
 @RESPATH@/components/BrowserFeeds.manifest
 @RESPATH@/components/FeedConverter.js
 @RESPATH@/components/FeedWriter.js
@@ -753,6 +754,9 @@
 #endif
 #endif
 
+; DevTools
+@RESPATH@/chrome/devtools@JAREXT@
+@RESPATH@/chrome/devtools.manifest
 
 ; shell icons
 #ifdef XP_UNIX

@@ -8,10 +8,10 @@
 
 #include "dns_sd.h"
 #include "mozilla/Atomics.h"
+#include "mozilla/RefPtr.h"
 #include "nsCOMPtr.h"
 #include "nsIDNSServiceDiscovery.h"
 #include "nsIThread.h"
-#include "nsRefPtr.h"
 #include "nsString.h"
 
 namespace mozilla {
@@ -19,6 +19,8 @@ namespace net {
 
 class MDNSResponderOperator
 {
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MDNSResponderOperator)
+
 public:
   MDNSResponderOperator();
 
@@ -37,23 +39,19 @@ private:
   class ServiceWatcher;
 
   DNSServiceRef mService;
-  nsRefPtr<ServiceWatcher> mWatcher;
+  RefPtr<ServiceWatcher> mWatcher;
   nsCOMPtr<nsIThread> mThread; // remember caller thread for callback
   Atomic<bool> mIsCancelled;
 };
 
-class BrowseOperator final : private MDNSResponderOperator
+class BrowseOperator final : public MDNSResponderOperator
 {
 public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(BrowseOperator)
-
   BrowseOperator(const nsACString& aServiceType,
                  nsIDNSServiceDiscoveryListener* aListener);
 
   nsresult Start() override;
   nsresult Stop() override;
-  using MDNSResponderOperator::Cancel;
-  using MDNSResponderOperator::GetThread;
 
   void Reply(DNSServiceRef aSdRef,
              DNSServiceFlags aFlags,
@@ -70,20 +68,16 @@ private:
   nsCOMPtr<nsIDNSServiceDiscoveryListener> mListener;
 };
 
-class RegisterOperator final : private MDNSResponderOperator
+class RegisterOperator final : public MDNSResponderOperator
 {
   enum { TXT_BUFFER_SIZE = 256 };
 
 public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(RegisterOperator)
-
   RegisterOperator(nsIDNSServiceInfo* aServiceInfo,
                    nsIDNSRegistrationListener* aListener);
 
   nsresult Start() override;
   nsresult Stop() override;
-  using MDNSResponderOperator::Cancel;
-  using MDNSResponderOperator::GetThread;
 
   void Reply(DNSServiceRef aSdRef,
              DNSServiceFlags aFlags,
@@ -99,19 +93,15 @@ private:
   nsCOMPtr<nsIDNSRegistrationListener> mListener;
 };
 
-class ResolveOperator final : private MDNSResponderOperator
+class ResolveOperator final : public MDNSResponderOperator
 {
   enum { TXT_BUFFER_SIZE = 256 };
 
 public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ResolveOperator)
-
   ResolveOperator(nsIDNSServiceInfo* aServiceInfo,
                   nsIDNSServiceResolveListener* aListener);
 
   nsresult Start() override;
-  nsresult Stop() override;
-  using MDNSResponderOperator::GetThread;
 
   void Reply(DNSServiceRef aSdRef,
              DNSServiceFlags aFlags,
@@ -125,12 +115,35 @@ public:
 
 private:
   ~ResolveOperator() = default;
+  void GetAddrInfor(nsIDNSServiceInfo* aServiceInfo);
 
   nsCOMPtr<nsIDNSServiceInfo> mServiceInfo;
   nsCOMPtr<nsIDNSServiceResolveListener> mListener;
+};
 
-  // hold self until callback is made.
-  nsRefPtr<ResolveOperator> mDeleteProtector;
+union NetAddr;
+
+class GetAddrInfoOperator final : public MDNSResponderOperator
+{
+public:
+  GetAddrInfoOperator(nsIDNSServiceInfo* aServiceInfo,
+                      nsIDNSServiceResolveListener* aListener);
+
+  nsresult Start() override;
+
+  void Reply(DNSServiceRef aSdRef,
+             DNSServiceFlags aFlags,
+             uint32_t aInterfaceIndex,
+             DNSServiceErrorType aErrorCode,
+             const nsACString& aHostName,
+             const NetAddr& aAddress,
+             uint32_t aTTL);
+
+private:
+  ~GetAddrInfoOperator() = default;
+
+  nsCOMPtr<nsIDNSServiceInfo> mServiceInfo;
+  nsCOMPtr<nsIDNSServiceResolveListener> mListener;
 };
 
 } // namespace net

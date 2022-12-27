@@ -18,6 +18,8 @@
 # include "jit/arm64/BaselineCompiler-arm64.h"
 #elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/BaselineCompiler-mips32.h"
+#elif defined(JS_CODEGEN_MIPS64)
+# include "jit/mips64/BaselineCompiler-mips64.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/BaselineCompiler-none.h"
 #else
@@ -198,10 +200,20 @@ namespace jit {
     _(JSOP_FINALYIELDRVAL)     \
     _(JSOP_RESUME)             \
     _(JSOP_CALLEE)             \
+    _(JSOP_GETRVAL)            \
     _(JSOP_SETRVAL)            \
     _(JSOP_RETRVAL)            \
     _(JSOP_RETURN)             \
-    _(JSOP_NEWTARGET)
+    _(JSOP_NEWTARGET)          \
+    _(JSOP_SUPERCALL)          \
+    _(JSOP_SPREADSUPERCALL)    \
+    _(JSOP_THROWSETCONST)      \
+    _(JSOP_THROWSETALIASEDCONST) \
+    _(JSOP_INITHIDDENPROP_GETTER) \
+    _(JSOP_INITHIDDENPROP_SETTER) \
+    _(JSOP_INITHIDDENELEM)     \
+    _(JSOP_INITHIDDENELEM_GETTER) \
+    _(JSOP_INITHIDDENELEM_SETTER)
 
 class BaselineCompiler : public BaselineCompilerSpecific
 {
@@ -304,7 +316,9 @@ class BaselineCompiler : public BaselineCompilerSpecific
 
     bool emitFormalArgAccess(uint32_t arg, bool get);
 
+    bool emitThrowConstAssignment();
     bool emitUninitializedLexicalCheck(const ValueOperand& val);
+    bool emitCheckThis();
 
     bool addPCMappingEntry(bool addIndexEntry);
 

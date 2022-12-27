@@ -244,8 +244,8 @@ void nsBaseWidget::DestroyCompositor()
   if (mCompositorChild) {
     // XXX CompositorChild and CompositorParent might be re-created in
     // ClientLayerManager destructor. See bug 1133426.
-    nsRefPtr<CompositorChild> compositorChild = mCompositorChild;
-    nsRefPtr<CompositorParent> compositorParent = mCompositorParent;
+    RefPtr<CompositorChild> compositorChild = mCompositorChild;
+    RefPtr<CompositorParent> compositorParent = mCompositorParent;
     mCompositorChild->Destroy();
   }
 
@@ -691,16 +691,16 @@ nsBaseWidget::IsWindowClipRegionEqual(const nsTArray<nsIntRect>& aRects)
 {
   return mClipRects &&
          mClipRectCount == aRects.Length() &&
-         memcmp(mClipRects, aRects.Elements(), sizeof(nsIntRect)*mClipRectCount) == 0;
+         memcmp(mClipRects.get(), aRects.Elements(), sizeof(nsIntRect)*mClipRectCount) == 0;
 }
 
 void
 nsBaseWidget::StoreWindowClipRegion(const nsTArray<nsIntRect>& aRects)
 {
   mClipRectCount = aRects.Length();
-  mClipRects = new nsIntRect[mClipRectCount];
+  mClipRects = MakeUnique<nsIntRect[]>(mClipRectCount);
   if (mClipRects) {
-    memcpy(mClipRects, aRects.Elements(), sizeof(nsIntRect)*mClipRectCount);
+    memcpy(mClipRects.get(), aRects.Elements(), sizeof(nsIntRect)*mClipRectCount);
   }
 }
 
@@ -861,7 +861,7 @@ CompositorParent* nsBaseWidget::NewCompositorParent(int aSurfaceWidth,
 
 void nsBaseWidget::CreateCompositor()
 {
-  nsIntRect rect;
+  LayoutDeviceIntRect rect;
   GetBounds(rect);
   CreateCompositor(rect.width, rect.height);
 }
@@ -869,7 +869,7 @@ void nsBaseWidget::CreateCompositor()
 already_AddRefed<GeckoContentController>
 nsBaseWidget::CreateRootContentController()
 {
-  nsRefPtr<GeckoContentController> controller = new ChromeProcessController(this, mAPZEventState);
+  RefPtr<GeckoContentController> controller = new ChromeProcessController(this, mAPZEventState);
   return controller.forget();
 }
 
@@ -881,7 +881,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
 
   mAPZC->SetDPI(GetDPI());
 
-  nsRefPtr<APZCTreeManager> treeManager = mAPZC;  // for capture by the lambdas
+  RefPtr<APZCTreeManager> treeManager = mAPZC;  // for capture by the lambdas
 
   ContentReceivedInputBlockCallback callback(
       [treeManager](const ScrollableLayerGuid& aGuid,
@@ -901,13 +901,21 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
     MOZ_ASSERT(NS_IsMainThread());
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         treeManager.get(), &APZCTreeManager::SetAllowedTouchBehavior,
-        aInputBlockId, aFlags));
+        aInputBlockId, nsTArray<TouchBehaviorFlags>(aFlags)));
   };
 
-  nsRefPtr<GeckoContentController> controller = CreateRootContentController();
+  RefPtr<GeckoContentController> controller = CreateRootContentController();
   if (controller) {
     uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
     CompositorParent::SetControllerForLayerTree(rootLayerTreeId, controller);
+  }
+
+  // When APZ is enabled, we can actually enable raw touch events because we
+  // have code that can deal with them properly. If APZ is not enabled, this
+  // function doesn't get called.
+  if (Preferences::GetInt("dom.w3c_touch_events.enabled", 0) ||
+      Preferences::GetBool("dom.w3c_pointer_events.enabled", false)) {
+    RegisterTouchWindow();
   }
 }
 
@@ -925,7 +933,7 @@ nsBaseWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
   void (APZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
           = &APZCTreeManager::SetTargetAPZC;
   APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-    mAPZC.get(), setTargetApzcFunc, aInputBlockId, mozilla::Move(aTargets)));
+    mAPZC.get(), setTargetApzcFunc, aInputBlockId, nsTArray<ScrollableLayerGuid>(aTargets)));
 }
 
 void
@@ -1087,7 +1095,7 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
 
   CreateCompositorVsyncDispatcher();
   mCompositorParent = NewCompositorParent(aWidth, aHeight);
-  nsRefPtr<ClientLayerManager> lm = new ClientLayerManager(this);
+  RefPtr<ClientLayerManager> lm = new ClientLayerManager(this);
   mCompositorChild = new CompositorChild(lm);
   mCompositorChild->OpenSameProcess(mCompositorParent);
 
@@ -1207,7 +1215,7 @@ NS_METHOD nsBaseWidget::SetWindowClass(const nsAString& xulWinType)
 
 NS_METHOD nsBaseWidget::MoveClient(double aX, double aY)
 {
-  nsIntPoint clientOffset(GetClientOffset());
+  LayoutDeviceIntPoint clientOffset(GetClientOffset());
 
   // GetClientOffset returns device pixels; scale back to display pixels
   // if that's what this widget uses for the Move/Resize APIs
@@ -1227,7 +1235,7 @@ NS_METHOD nsBaseWidget::ResizeClient(double aWidth,
   NS_ASSERTION((aWidth >=0) , "Negative width passed to ResizeClient");
   NS_ASSERTION((aHeight >=0), "Negative height passed to ResizeClient");
 
-  nsIntRect clientBounds;
+  LayoutDeviceIntRect clientBounds;
   GetClientBounds(clientBounds);
 
   // GetClientBounds and mBounds are device pixels; scale back to display pixels
@@ -1251,14 +1259,14 @@ NS_METHOD nsBaseWidget::ResizeClient(double aX,
   NS_ASSERTION((aWidth >=0) , "Negative width passed to ResizeClient");
   NS_ASSERTION((aHeight >=0), "Negative height passed to ResizeClient");
 
-  nsIntRect clientBounds;
+  LayoutDeviceIntRect clientBounds;
   GetClientBounds(clientBounds);
 
   double scale = BoundsUseDisplayPixels() ? 1.0 / GetDefaultScale().scale : 1.0;
   aWidth = mBounds.width * scale + (aWidth - clientBounds.width * scale);
   aHeight = mBounds.height * scale + (aHeight - clientBounds.height * scale);
 
-  nsIntPoint clientOffset(GetClientOffset());
+  LayoutDeviceIntPoint clientOffset(GetClientOffset());
   aX -= clientOffset.x * scale;
   aY -= clientOffset.y * scale;
 
@@ -1275,16 +1283,16 @@ NS_METHOD nsBaseWidget::ResizeClient(double aX,
 * If the implementation of nsWindow supports borders this method MUST be overridden
 *
 **/
-NS_METHOD nsBaseWidget::GetClientBounds(nsIntRect &aRect)
+NS_METHOD nsBaseWidget::GetClientBoundsUntyped(nsIntRect &aRect)
 {
-  return GetBounds(aRect);
+  return GetBoundsUntyped(aRect);
 }
 
 /**
 * If the implementation of nsWindow supports borders this method MUST be overridden
 *
 **/
-NS_METHOD nsBaseWidget::GetBounds(nsIntRect &aRect)
+NS_METHOD nsBaseWidget::GetBoundsUntyped(nsIntRect &aRect)
 {
   aRect = mBounds;
   return NS_OK;
@@ -1295,12 +1303,12 @@ NS_METHOD nsBaseWidget::GetBounds(nsIntRect &aRect)
 * this method must be overridden
 *
 **/
-NS_METHOD nsBaseWidget::GetScreenBounds(nsIntRect &aRect)
+NS_METHOD nsBaseWidget::GetScreenBoundsUntyped(nsIntRect &aRect)
 {
-  return GetBounds(aRect);
+  return GetBoundsUntyped(aRect);
 }
 
-NS_METHOD nsBaseWidget::GetRestoredBounds(nsIntRect &aRect)
+NS_METHOD nsBaseWidget::GetRestoredBounds(LayoutDeviceIntRect &aRect)
 {
   if (SizeMode() != nsSizeMode_Normal) {
     return NS_ERROR_FAILURE;
@@ -1308,19 +1316,20 @@ NS_METHOD nsBaseWidget::GetRestoredBounds(nsIntRect &aRect)
   return GetScreenBounds(aRect);
 }
 
-nsIntPoint nsBaseWidget::GetClientOffset()
+nsIntPoint
+nsBaseWidget::GetClientOffsetUntyped()
 {
   return nsIntPoint(0, 0);
 }
 
 NS_IMETHODIMP
-nsBaseWidget::GetNonClientMargins(nsIntMargin &margins)
+nsBaseWidget::GetNonClientMargins(LayoutDeviceIntMargin &margins)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP
-nsBaseWidget::SetNonClientMargins(nsIntMargin &margins)
+nsBaseWidget::SetNonClientMargins(LayoutDeviceIntMargin &margins)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -1693,7 +1702,7 @@ nsIntRect
 nsBaseWidget::GetScaledScreenBounds()
 {
   nsIntRect bounds;
-  GetScreenBounds(bounds);
+  GetScreenBoundsUntyped(bounds);
   CSSToLayoutDeviceScale scale = GetDefaultScale();
   bounds.x = NSToIntRound(bounds.x / scale.scale);
   bounds.y = NSToIntRound(bounds.y / scale.scale);
@@ -1880,6 +1889,7 @@ nsIWidget::LookupRegisteredPluginWindow(uintptr_t aWindowID)
 struct VisEnumContext {
   uintptr_t parentWidget;
   const nsTArray<uintptr_t>* list;
+  bool widgetVisibilityFlag;
 };
 
 static PLDHashOperator
@@ -1892,9 +1902,8 @@ RegisteredPluginEnumerator(const void* aWindowId, nsIWidget* aWidget, void* aUse
 
   if (!aWidget->Destroyed()) {
     VisEnumContext* pctx = static_cast<VisEnumContext*>(aUserArg);
-    if ((uintptr_t)aWidget->GetParent() == pctx->parentWidget &&
-        !pctx->list->Contains((uintptr_t)aWindowId)) {
-      aWidget->Show(false);
+    if ((uintptr_t)aWidget->GetParent() == pctx->parentWidget) {
+      aWidget->Show(pctx->list->Contains((uintptr_t)aWindowId));
     }
   }
   return PLDHashOperator::PL_DHASH_NEXT;
@@ -1904,7 +1913,7 @@ RegisteredPluginEnumerator(const void* aWindowId, nsIWidget* aWidget, void* aUse
 // static
 void
 nsIWidget::UpdateRegisteredPluginWindowVisibility(uintptr_t aOwnerWidget,
-                                                  nsTArray<uintptr_t>& aVisibleList)
+                                                  nsTArray<uintptr_t>& aPluginIds)
 {
 #if !defined(XP_WIN) && !defined(MOZ_WIDGET_GTK)
   NS_NOTREACHED("nsBaseWidget::UpdateRegisteredPluginWindowVisibility not implemented!");
@@ -1915,7 +1924,7 @@ nsIWidget::UpdateRegisteredPluginWindowVisibility(uintptr_t aOwnerWidget,
   // Our visible list is associated with a compositor which is associated with
   // a specific top level window. We hand the parent widget in here so the
   // enumerator can skip the plugin widgets owned by other top level windows.
-  VisEnumContext ctx = { aOwnerWidget, &aVisibleList };
+  VisEnumContext ctx = { aOwnerWidget, &aPluginIds };
   sPluginWidgetList->EnumerateRead(RegisteredPluginEnumerator, static_cast<void*>(&ctx));
 #endif
 }
@@ -1939,7 +1948,7 @@ nsIWidget::SnapshotWidgetOnScreen()
     return nullptr;
   }
 
-  nsIntRect bounds;
+  LayoutDeviceIntRect bounds;
   GetBounds(bounds);
   if (bounds.IsEmpty()) {
     return nullptr;

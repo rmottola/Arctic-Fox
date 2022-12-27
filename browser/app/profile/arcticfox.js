@@ -153,7 +153,7 @@ pref("app.update.silent", false);
 pref("app.update.staging.enabled", true);
 
 // Update service URL:
-pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki/Downloads");
+pref("app.update.url", "https://github.com/rmottola/Arctic-Fox/wiki/Downloads");
 // app.update.url.manual is in branding section
 // app.update.url.details is in branding section
 
@@ -323,8 +323,8 @@ pref("browser.urlbar.rss", true);
 
 pref("browser.altClickSave", false);
 
-// Enable logging downloads operations to the Error Console.
-pref("browser.download.debug", false);
+// Enable logging downloads operations to the Console.
+pref("browser.download.loglevel", "Error");
 
 // Number of milliseconds to wait for the http headers (and thus
 // the Content-Disposition filename) before giving up and falling back to
@@ -904,7 +904,7 @@ pref("browser.zoom.siteSpecific", true);
 pref("browser.zoom.updateBackgroundTabs", true);
 
 // base URL for web-based support pages
-pref("app.support.baseURL", "https://github.com/wicknix/Arctic-Fox/wiki/");
+pref("app.support.baseURL", "https://github.com/rmottola/Arctic-Fox/wiki/");
 
 // Name of alternate about: page for certificate errors (when undefined, defaults to about:neterror)
 pref("security.alternate_certificate_error_page", "certerror");
@@ -941,6 +941,16 @@ pref("dom.ipc.plugins.enabled", true);
 #endif
 
 pref("dom.ipc.shims.enabledWarnings", false);
+
+// Decode using Gecko Media Plugins in <video>, if a system decoder is not
+// availble and the preferred GMP is available.
+pref("media.gmp.decoder.enabled", true);
+
+// If decoding-via-GMP is turned on for <video>, use Adobe's GMP for decoding,
+// if it's available. Note: We won't fallback to another GMP if Adobe's is not
+// installed.
+pref("media.gmp.decoder.aac", 2);
+pref("media.gmp.decoder.h264", 2);
 
 // Start the browser in e10s mode
 pref("browser.tabs.remote.autostart", false);
@@ -1142,6 +1152,9 @@ pref("devtools.command-button-measure.enabled", false);
 // Enable the MDN docs tooltip
 pref("devtools.inspector.mdnDocsTooltip.enabled", true);
 
+// DevTools default color unit
+pref("devtools.defaultColorUnit", "authored");
+
 // Enable the Debugger
 pref("devtools.debugger.enabled", true);
 pref("devtools.debugger.chrome-debugging-host", "localhost");
@@ -1339,11 +1352,17 @@ pref("browser.newtab.preload", false);
 // Toggles the content of 'about:newtab'. Shows the grid when enabled.
 pref("browser.newtabpage.enabled", true);
 
+// Toggles the enhanced content of 'about:newtab'. Shows sponsored tiles.
+sticky_pref("browser.newtabpage.enhanced", false);
+
 // number of columns of newtab grid
 pref("browser.newtabpage.columns", 4);
 
 // number of rows of newtab grid
 pref("browser.newtabpage.rows", 4);
+
+// activates the remote-hosted newtab page
+pref("browser.newtabpage.remote", false);
 
 // about:permissions
 // Maximum number of sites to return from the places database.
@@ -1429,11 +1448,12 @@ pref("browser.display.standalone_images.background_color", "#2E3B41");
 
 pref("view_source.tab", true);
 
-// Enable Service Workers for desktop on non-release builds
-#ifndef RELEASE_BUILD
+// Enable ServiceWorkers for Push API consumers.
+// Interception is still disabled.
 pref("dom.serviceWorkers.enabled", true);
-pref("dom.serviceWorkers.interception.enabled", true);
-#endif
+
+// Enable Push API.
+pref("dom.push.enabled", true);
 
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);

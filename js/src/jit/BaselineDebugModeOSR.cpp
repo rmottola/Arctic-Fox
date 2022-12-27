@@ -287,7 +287,7 @@ CollectInterpreterStackScripts(JSContext* cx, const Debugger::ExecutionObservabl
     return true;
 }
 
-#ifdef DEBUG
+#ifdef JS_JITSPEW
 static const char*
 ICEntryKindToString(ICEntry::Kind kind)
 {
@@ -312,7 +312,7 @@ ICEntryKindToString(ICEntry::Kind kind)
         MOZ_CRASH("bad ICEntry kind");
     }
 }
-#endif // DEBUG
+#endif // JS_JITSPEW
 
 static void
 SpewPatchBaselineFrame(uint8_t* oldReturnAddress, uint8_t* newReturnAddress,
@@ -704,15 +704,6 @@ RecompileBaselineScriptForDebugMode(JSContext* cx, JSScript* script,
     _(SetProp_CallScripted)                     \
     _(SetProp_CallNative)
 
-#if JS_HAS_NO_SUCH_METHOD
-#define PATCHABLE_NSM_ICSTUB_KIND_LIST(_)       \
-    _(GetElem_Dense)                            \
-    _(GetElem_Arguments)                        \
-    _(GetProp_NativePrototype)                  \
-    _(GetProp_Native)                           \
-    _(GetName_Global)
-#endif
-
 static bool
 CloneOldBaselineStub(JSContext* cx, DebugModeOSREntryVector& entries, size_t entryIndex)
 {
@@ -778,9 +769,6 @@ CloneOldBaselineStub(JSContext* cx, DebugModeOSREntryVector& entries, size_t ent
                                             *oldStub->to##kindName());       \
         break;
         PATCHABLE_ICSTUB_KIND_LIST(CASE_KIND)
-#if JS_HAS_NO_SUCH_METHOD
-        PATCHABLE_NSM_ICSTUB_KIND_LIST(CASE_KIND)
-#endif
 #undef CASE_KIND
 
       default:

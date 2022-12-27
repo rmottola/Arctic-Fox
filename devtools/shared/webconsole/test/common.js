@@ -11,9 +11,9 @@ Cu.import("resource://gre/modules/Services.jsm");
 const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
 
 // This gives logging to stdout for tests
-var {console} = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
+var {console} = Cu.import("resource://gre/modules/Console.jsm", {});
 
-var {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 
 var ConsoleAPIStorage = Cc["@mozilla.org/consoleAPI-storage;1"]

@@ -970,9 +970,9 @@ CycleCollectedJSRuntime::UsefulToMergeZones() const
     if (!obj) {
       continue;
     }
-    MOZ_ASSERT(js::IsOuterObject(obj));
-    // Grab the inner from the outer.
-    obj = JS_ObjectToInnerObject(cx, obj);
+    MOZ_ASSERT(js::IsWindowProxy(obj));
+    // Grab the global from the WindowProxy.
+    obj = js::ToWindowIfWindowProxy(obj);
     MOZ_ASSERT(JS_IsGlobalObject(obj));
     if (JS::ObjectIsMarkedGray(obj) &&
         !js::IsSystemCompartment(js::GetObjectCompartment(obj))) {
@@ -1281,6 +1281,16 @@ CycleCollectedJSRuntime::AnnotateAndSetOutOfMemory(OOMState* aStatePtr,
                                                    OOMState aNewState)
 {
   *aStatePtr = aNewState;
+#ifdef MOZ_CRASHREPORTER
+  CrashReporter::AnnotateCrashReport(aStatePtr == &mOutOfMemoryState
+                                     ? NS_LITERAL_CSTRING("JSOutOfMemory")
+                                     : NS_LITERAL_CSTRING("JSLargeAllocationFailure"),
+                                     aNewState == OOMState::Reporting
+                                     ? NS_LITERAL_CSTRING("Reporting")
+                                     : aNewState == OOMState::Reported
+                                     ? NS_LITERAL_CSTRING("Reported")
+                                     : NS_LITERAL_CSTRING("Recovered"));
+#endif
 }
 
 void
@@ -1291,6 +1301,14 @@ CycleCollectedJSRuntime::OnGC(JSGCStatus aStatus)
       nsCycleCollector_prepareForGarbageCollection();
       break;
     case JSGC_END: {
+#ifdef MOZ_CRASHREPORTER
+      if (mOutOfMemoryState == OOMState::Reported) {
+        AnnotateAndSetOutOfMemory(&mOutOfMemoryState, OOMState::Recovered);
+      }
+      if (mLargeAllocationFailureState == OOMState::Reported) {
+        AnnotateAndSetOutOfMemory(&mLargeAllocationFailureState, OOMState::Recovered);
+      }
+#endif
 
       // Do any deferred finalization of native objects.
       FinalizeDeferredThings(JS::WasIncrementalGC(mJSRuntime) ? FinalizeIncrementally :

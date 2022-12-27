@@ -413,7 +413,7 @@ IsElementClickableAndReadable(nsIFrame* aFrame, WidgetGUIEvent* aEvent, const Ev
       (pc->AppUnitsToGfxUnits(frameSize.width) * cumulativeResolution) < limitReadableSize) {
     return false;
   }
-  nsRefPtr<nsFontMetrics> fm;
+  RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(aFrame, getter_AddRefs(fm),
     nsLayoutUtils::FontSizeInflationFor(aFrame));
   if (fm) {

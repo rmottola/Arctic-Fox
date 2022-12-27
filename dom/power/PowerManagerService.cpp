@@ -59,7 +59,7 @@ PowerManagerService::GetInstance()
     ClearOnShutdown(&sSingleton);
   }
 
-  nsRefPtr<PowerManagerService> service = sSingleton.get();
+  RefPtr<PowerManagerService> service = sSingleton.get();
   return service.forget();
 }
 
@@ -211,7 +211,7 @@ PowerManagerService::NewWakeLock(const nsAString& aTopic,
                                  nsIDOMWindow* aWindow,
                                  mozilla::ErrorResult& aRv)
 {
-  nsRefPtr<WakeLock> wakelock = new WakeLock();
+  RefPtr<WakeLock> wakelock = new WakeLock();
   aRv = wakelock->Init(aTopic, aWindow);
   if (aRv.Failed()) {
     return nullptr;
@@ -226,7 +226,7 @@ PowerManagerService::NewWakeLock(const nsAString &aTopic,
                                  nsISupports **aWakeLock)
 {
   mozilla::ErrorResult rv;
-  nsRefPtr<WakeLock> wakelock = NewWakeLock(aTopic, aWindow, rv);
+  RefPtr<WakeLock> wakelock = NewWakeLock(aTopic, aWindow, rv);
   if (rv.Failed()) {
     return rv.StealNSResult();
   }
@@ -240,7 +240,7 @@ already_AddRefed<WakeLock>
 PowerManagerService::NewWakeLockOnBehalfOfProcess(const nsAString& aTopic,
                                                   ContentParent* aContentParent)
 {
-  nsRefPtr<WakeLock> wakelock = new WakeLock();
+  RefPtr<WakeLock> wakelock = new WakeLock();
   nsresult rv = wakelock->Init(aTopic, aContentParent);
   NS_ENSURE_SUCCESS(rv, nullptr);
   return wakelock.forget();

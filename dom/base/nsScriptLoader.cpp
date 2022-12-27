@@ -10,6 +10,7 @@
 
 #include "nsScriptLoader.h"
 
+#include "prsystem.h"
 #include "jsapi.h"
 #include "jsfriendapi.h"
 #include "xpcpublic.h"
@@ -85,7 +86,7 @@ void
 nsScriptLoadRequestList::Clear()
 {
   while (!isEmpty()) {
-    nsRefPtr<nsScriptLoadRequest> first = StealFirst();
+    RefPtr<nsScriptLoadRequest> first = StealFirst();
     first->Cancel();
     // And just let it go out of scope and die.
   }
@@ -113,6 +114,7 @@ nsScriptLoadRequestList::Contains(nsScriptLoadRequest* aElem)
 nsScriptLoader::nsScriptLoader(nsIDocument *aDocument)
   : mDocument(aDocument),
     mBlockerCount(0),
+    mNumberOfProcessors(0),
     mEnabled(true),
     mDeferEnabled(false),
     mDocumentParsingDone(false),
@@ -273,30 +275,41 @@ nsScriptLoader::ShouldLoadScript(nsIDocument* aDocument,
   return NS_OK;
 }
 
+class ContextMediator : public nsIStreamLoaderObserver
+{
+public:
+  explicit ContextMediator(nsScriptLoader *aScriptLoader, nsISupports *aContext)
+  : mScriptLoader(aScriptLoader)
+  , mContext(aContext) {}
+
+  NS_DECL_ISUPPORTS
+  NS_DECL_NSISTREAMLOADEROBSERVER
+
+private:
+  virtual ~ContextMediator() {}
+  RefPtr<nsScriptLoader> mScriptLoader;
+  nsCOMPtr<nsISupports>  mContext;
+};
+
+NS_IMPL_ISUPPORTS(ContextMediator, nsIStreamLoaderObserver)
+
+NS_IMETHODIMP
+ContextMediator::OnStreamComplete(nsIStreamLoader* aLoader,
+                                  nsISupports* aContext,
+                                  nsresult aStatus,
+                                  uint32_t aStringLen,
+                                  const uint8_t* aString)
+{
+  // pass arguments through except for the aContext,
+  // we have to mediate and use mContext instead.
+  return mScriptLoader->OnStreamComplete(aLoader, mContext, aStatus,
+                                         aStringLen, aString);
+}
+
 nsresult
 nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
                           bool aScriptFromHead)
 {
-  nsISupports *context = aRequest->mElement.get()
-                         ? static_cast<nsISupports *>(aRequest->mElement.get())
-                         : static_cast<nsISupports *>(mDocument);
-  nsresult rv = ShouldLoadScript(mDocument, context, aRequest->mURI, aType, aRequest->IsPreload());
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  nsCOMPtr<nsILoadGroup> loadGroup = mDocument->GetDocumentLoadGroup();
-
-  nsCOMPtr<nsPIDOMWindow> window(do_QueryInterface(mDocument->MasterDocument()->GetWindow()));
-
-  if (!window) {
-    return NS_ERROR_NULL_POINTER;
-  }
-
-  nsIDocShell *docshell = window->GetDocShell();
-
-  nsCOMPtr<nsIInterfaceRequestor> prompter(do_QueryInterface(docshell));
-
   // If this document is sandboxed without 'allow-scripts', abort.
   if (mDocument->HasScriptsBlockedBySandbox()) {
     return NS_OK;
@@ -305,17 +318,39 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
   nsContentPolicyType contentPolicyType = aRequest->IsPreload()
                                           ? nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD
                                           : nsIContentPolicy::TYPE_INTERNAL_SCRIPT;
+  nsCOMPtr<nsINode> context;
+  if (aRequest->mElement) {
+    context = do_QueryInterface(aRequest->mElement);
+  }
+  else {
+    context = mDocument;
+  }
+
+  nsCOMPtr<nsILoadGroup> loadGroup = mDocument->GetDocumentLoadGroup();
+  nsCOMPtr<nsPIDOMWindow> window(do_QueryInterface(mDocument->MasterDocument()->GetWindow()));
+  NS_ENSURE_TRUE(window, NS_ERROR_NULL_POINTER);
+  nsIDocShell *docshell = window->GetDocShell();
+  nsCOMPtr<nsIInterfaceRequestor> prompter(do_QueryInterface(docshell));
+
+  nsSecurityFlags securityFlags =
+    aRequest->mCORSMode == CORS_NONE
+    ? nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL
+    : nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS;
+  if (aRequest->mCORSMode == CORS_USE_CREDENTIALS) {
+    securityFlags |= nsILoadInfo::SEC_REQUIRE_CORS_WITH_CREDENTIALS;
+  }
+  securityFlags |= nsILoadInfo::SEC_ALLOW_CHROME;
 
   nsCOMPtr<nsIChannel> channel;
-  rv = NS_NewChannel(getter_AddRefs(channel),
-                     aRequest->mURI,
-                     mDocument,
-                     nsILoadInfo::SEC_NORMAL,
-                     contentPolicyType,
-                     loadGroup,
-                     prompter,
-                     nsIRequest::LOAD_NORMAL |
-                     nsIChannel::LOAD_CLASSIFY_URI);
+  nsresult rv = NS_NewChannel(getter_AddRefs(channel),
+                              aRequest->mURI,
+                              context,
+                              securityFlags,
+                              contentPolicyType,
+                              loadGroup,
+                              prompter,
+                              nsIRequest::LOAD_NORMAL |
+                              nsIChannel::LOAD_CLASSIFY_URI);
 
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -354,26 +389,13 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
     timedChannel->SetInitiatorType(NS_LITERAL_STRING("script"));
   }
 
+  RefPtr<ContextMediator> mediator = new ContextMediator(this, aRequest);
+
   nsCOMPtr<nsIStreamLoader> loader;
-  rv = NS_NewStreamLoader(getter_AddRefs(loader), this);
+  rv = NS_NewStreamLoader(getter_AddRefs(loader), mediator);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIStreamListener> listener = loader.get();
-
-  if (aRequest->mCORSMode != CORS_NONE) {
-    bool withCredentials = (aRequest->mCORSMode == CORS_USE_CREDENTIALS);
-    nsRefPtr<nsCORSListenerProxy> corsListener =
-      new nsCORSListenerProxy(listener, mDocument->NodePrincipal(),
-                              withCredentials);
-    rv = corsListener->Init(channel, DataURIHandling::Allow);
-    NS_ENSURE_SUCCESS(rv, rv);
-    listener = corsListener;
-  }
-
-  rv = channel->AsyncOpen(listener, aRequest);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  return NS_OK;
+  return channel->AsyncOpen2(loader);
 }
 
 bool
@@ -388,8 +410,8 @@ nsScriptLoader::PreloadURIComparator::Equals(const PreloadInfo &aPi,
 class nsScriptRequestProcessor : public nsRunnable
 {
 private:
-  nsRefPtr<nsScriptLoader> mLoader;
-  nsRefPtr<nsScriptLoadRequest> mRequest;
+  RefPtr<nsScriptLoader> mLoader;
+  RefPtr<nsScriptLoadRequest> mRequest;
 public:
   nsScriptRequestProcessor(nsScriptLoader* aLoader,
                            nsScriptLoadRequest* aRequest)
@@ -508,7 +530,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
 
   // Step 14. in the HTML5 spec
   nsresult rv = NS_OK;
-  nsRefPtr<nsScriptLoadRequest> request;
+  RefPtr<nsScriptLoadRequest> request;
   if (aElement->GetScriptExternal()) {
     // external script
     nsCOMPtr<nsIURI> scriptURI = aElement->GetScriptURI();
@@ -541,7 +563,12 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
           ourCORSMode == request->mCORSMode &&
           ourRefPolicy == request->mReferrerPolicy) {
         rv = CheckContentPolicy(mDocument, aElement, request->mURI, type, false);
-        NS_ENSURE_SUCCESS(rv, false);
+        if (NS_FAILED(rv)) {
+          // probably plans have changed; even though the preload was allowed seems
+          // like the actual load is not; let's cancel the preload request.
+          request->Cancel();
+          return false;
+        }
       } else {
         // Drop the preload
         request = nullptr;
@@ -597,7 +624,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
         // loop gets a chance to spin.
 
         // KVKV TODO: Instead of processing immediately, try off-thread-parsing
-        // it and only schedule a ProcessRequest if that fails.
+        // it and only schedule a pending ProcessRequest if that fails.
         ProcessPendingRequestsAsync();
       } else {
         mLoadingAsyncRequests.AppendElement(request);
@@ -646,6 +673,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
       }
       return true;
     }
+
     if (request->IsDoneLoading() && ReadyToExecuteScripts()) {
       // The request has already been loaded and there are no pending style
       // sheets. If the script comes from the network stream, cheat for
@@ -664,6 +692,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
       ProcessPendingRequestsAsync();
       return true;
     }
+
     // The script hasn't loaded yet or there's a style sheet blocking it.
     // The script will be run when it loads or the style sheet loads.
     NS_ASSERTION(!mParserBlockingRequest,
@@ -735,8 +764,8 @@ namespace {
 
 class NotifyOffThreadScriptLoadCompletedRunnable : public nsRunnable
 {
-  nsRefPtr<nsScriptLoadRequest> mRequest;
-  nsRefPtr<nsScriptLoader> mLoader;
+  RefPtr<nsScriptLoadRequest> mRequest;
+  RefPtr<nsScriptLoader> mLoader;
   void *mToken;
 
 public:
@@ -762,6 +791,23 @@ nsScriptLoader::ProcessOffThreadRequest(nsScriptLoadRequest* aRequest)
 {
   MOZ_ASSERT(aRequest->mProgress == nsScriptLoadRequest::Progress_Compiling);
   aRequest->mProgress = nsScriptLoadRequest::Progress_DoneCompiling;
+  if (aRequest == mParserBlockingRequest) {
+    if (!ReadyToExecuteScripts()) {
+      // If not ready to execute scripts, schedule an async call to
+      // ProcessPendingRequests to handle it.
+      ProcessPendingRequestsAsync();
+      return NS_OK;
+    }
+
+    // Same logic as in top of ProcessPendingRequests.
+    mParserBlockingRequest = nullptr;
+    UnblockParser(aRequest);
+    ProcessRequest(aRequest);
+    mDocument->UnblockOnload(false);
+    ContinueParserAsync(aRequest);
+    return NS_OK;
+  }
+
   nsresult rv = ProcessRequest(aRequest);
   mDocument->UnblockOnload(false);
   return rv;
@@ -778,8 +824,8 @@ NotifyOffThreadScriptLoadCompletedRunnable::~NotifyOffThreadScriptLoadCompletedR
     } else {
       MOZ_ASSERT(false, "We really shouldn't leak!");
       // Better to leak than crash.
-      unused << mRequest.forget();
-      unused << mLoader.forget();
+      Unused << mRequest.forget();
+      Unused << mLoader.forget();
     }
   }
 }
@@ -791,8 +837,8 @@ NotifyOffThreadScriptLoadCompletedRunnable::Run()
 
   // We want these to be dropped on the main thread, once we return from this
   // function.
-  nsRefPtr<nsScriptLoadRequest> request = mRequest.forget();
-  nsRefPtr<nsScriptLoader> loader = mLoader.forget();
+  RefPtr<nsScriptLoadRequest> request = mRequest.forget();
+  RefPtr<nsScriptLoader> loader = mLoader.forget();
 
   request->mOffThreadToken = mToken;
   nsresult rv = loader->ProcessOffThreadRequest(request);
@@ -803,16 +849,17 @@ NotifyOffThreadScriptLoadCompletedRunnable::Run()
 static void
 OffThreadScriptLoaderCallback(void *aToken, void *aCallbackData)
 {
-  nsRefPtr<NotifyOffThreadScriptLoadCompletedRunnable> aRunnable =
+  RefPtr<NotifyOffThreadScriptLoadCompletedRunnable> aRunnable =
     dont_AddRef(static_cast<NotifyOffThreadScriptLoadCompletedRunnable*>(aCallbackData));
   aRunnable->SetToken(aToken);
   NS_DispatchToMainThread(aRunnable);
 }
 
 nsresult
-nsScriptLoader::AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest)
+nsScriptLoader::AttemptAsyncScriptCompile(nsScriptLoadRequest* aRequest)
 {
-  if (!aRequest->mElement->GetScriptAsync() || aRequest->mIsInline) {
+  // Don't off-thread compile inline scripts.
+  if (aRequest->mIsInline) {
     return NS_ERROR_FAILURE;
   }
 
@@ -835,7 +882,7 @@ nsScriptLoader::AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest)
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<NotifyOffThreadScriptLoadCompletedRunnable> runnable =
+  RefPtr<NotifyOffThreadScriptLoadCompletedRunnable> runnable =
     new NotifyOffThreadScriptLoadCompletedRunnable(aRequest, this);
 
   if (!JS::CompileOffThread(cx, options,
@@ -848,12 +895,13 @@ nsScriptLoader::AttemptAsyncScriptParse(nsScriptLoadRequest* aRequest)
   mDocument->BlockOnload();
   aRequest->mProgress = nsScriptLoadRequest::Progress_Compiling;
 
-  unused << runnable.forget();
+  Unused << runnable.forget();
   return NS_OK;
 }
 
 nsresult
-nsScriptLoader::CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest)
+nsScriptLoader::CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest,
+                                                 bool* oCompiledOffThread)
 {
   NS_ASSERTION(nsContentUtils::IsSafeToRunScript(),
                "Processing requests when running scripts is unsafe.");
@@ -862,8 +910,11 @@ nsScriptLoader::CompileOffThreadOrProcessRequest(nsScriptLoadRequest* aRequest)
   NS_ASSERTION(!aRequest->InCompilingStage(),
                "Candidate for off-thread compile is already in compiling stage.");
 
-  nsresult rv = AttemptAsyncScriptParse(aRequest);
+  nsresult rv = AttemptAsyncScriptCompile(aRequest);
   if (rv != NS_ERROR_FAILURE) {
+    if (oCompiledOffThread && rv == NS_OK) {
+      *oCompiledOffThread = true;
+    }
     return rv;
   }
 
@@ -1148,14 +1199,18 @@ nsScriptLoader::ProcessPendingRequestsAsync()
 void
 nsScriptLoader::ProcessPendingRequests()
 {
-  nsRefPtr<nsScriptLoadRequest> request;
+  RefPtr<nsScriptLoadRequest> request;
 
   if (mParserBlockingRequest &&
       mParserBlockingRequest->IsReadyToRun() &&
       ReadyToExecuteScripts()) {
     request.swap(mParserBlockingRequest);
+    bool offThreadCompiled = request->mProgress == nsScriptLoadRequest::Progress_DoneCompiling;
     UnblockParser(request);
     ProcessRequest(request);
+    if (offThreadCompiled) {
+      mDocument->UnblockOnload(false);
+    }
     ContinueParserAsync(request);
   }
 
@@ -1189,7 +1244,7 @@ nsScriptLoader::ProcessPendingRequests()
   }
 
   while (!mPendingChildLoaders.IsEmpty() && ReadyToExecuteScripts()) {
-    nsRefPtr<nsScriptLoader> child = mPendingChildLoaders[0];
+    RefPtr<nsScriptLoader> child = mPendingChildLoaders[0];
     mPendingChildLoaders.RemoveElementAt(0);
     child->RemoveExecuteBlocker();
   }
@@ -1233,8 +1288,8 @@ nsScriptLoader::ReadyToExecuteScripts()
   }
 
   if (mDocument && !mDocument->IsMasterDocument()) {
-    nsRefPtr<ImportManager> im = mDocument->ImportManager();
-    nsRefPtr<ImportLoader> loader = im->Find(mDocument);
+    RefPtr<ImportManager> im = mDocument->ImportManager();
+    RefPtr<ImportLoader> loader = im->Find(mDocument);
     MOZ_ASSERT(loader, "How can we have an import document without a loader?");
 
     // The referring link that counts in the execution order calculation
@@ -1246,7 +1301,7 @@ nsScriptLoader::ReadyToExecuteScripts()
     // wait with script execution until all the predecessors are done.
     // Technically it means we have to wait for the last one to finish,
     // which is the neares one to us in the order.
-    nsRefPtr<ImportLoader> lastPred = im->GetNearestPredecessor(referrer);
+    RefPtr<ImportLoader> lastPred = im->GetNearestPredecessor(referrer);
     if (!lastPred) {
       // If there is no predecessor we can run.
       return true;
@@ -1416,23 +1471,23 @@ nsScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader,
 
     if (request->mIsDefer) {
       if (request->isInList()) {
-        nsRefPtr<nsScriptLoadRequest> req = mDeferRequests.Steal(request);
+        RefPtr<nsScriptLoadRequest> req = mDeferRequests.Steal(request);
         FireScriptAvailable(rv, req);
       }
     } else if (request->mIsAsync) {
       if (request->isInList()) {
-        nsRefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(request);
+        RefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(request);
         FireScriptAvailable(rv, req);
       }
     } else if (request->mIsNonAsyncScriptInserted) {
       if (request->isInList()) {
-        nsRefPtr<nsScriptLoadRequest> req =
+        RefPtr<nsScriptLoadRequest> req =
           mNonAsyncExternalScriptInsertedRequests.Steal(request);
         FireScriptAvailable(rv, req);
       }
     } else if (request->mIsXSLT) {
       if (request->isInList()) {
-        nsRefPtr<nsScriptLoadRequest> req = mXSLTRequests.Steal(request);
+        RefPtr<nsScriptLoadRequest> req = mXSLTRequests.Steal(request);
         FireScriptAvailable(rv, req);
       }
     } else if (mParserBlockingRequest == request) {
@@ -1465,6 +1520,18 @@ void
 nsScriptLoader::ContinueParserAsync(nsScriptLoadRequest* aParserBlockingRequest)
 {
   aParserBlockingRequest->mElement->ContinueParserAsync();
+}
+
+uint32_t
+nsScriptLoader::NumberOfProcessors()
+{
+  if (mNumberOfProcessors > 0)
+    return mNumberOfProcessors;
+
+  int32_t numProcs = PR_GetNumberOfProcessors();
+  if (numProcs > 0)
+    mNumberOfProcessors = numProcs;
+  return mNumberOfProcessors;
 }
 
 nsresult
@@ -1555,13 +1622,30 @@ nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
   // Mark this as loaded
   aRequest->mProgress = nsScriptLoadRequest::Progress_DoneLoading;
 
+  // If this is currently blocking the parser, attempt to compile it off-main-thread.
+  if (aRequest == mParserBlockingRequest && (NumberOfProcessors() > 1)) {
+    nsresult rv = AttemptAsyncScriptCompile(aRequest);
+    if (rv == NS_OK) {
+      NS_ASSERTION(aRequest->mProgress == nsScriptLoadRequest::Progress_Compiling,
+          "Request should be off-thread compiling now.");
+      return NS_OK;
+    }
+
+    // If off-thread compile errored, return the error.
+    if (rv != NS_ERROR_FAILURE) {
+      return rv;
+    }
+
+    // If off-thread compile was rejected, continue with regular processing.
+  }
+
   // And if it's async, move it to the loaded list.  aRequest->mIsAsync really
   // _should_ be in a list, but the consequences if it's not are bad enough we
   // want to avoid trying to move it if it's not.
   if (aRequest->mIsAsync) {
     MOZ_ASSERT(aRequest->isInList());
     if (aRequest->isInList()) {
-      nsRefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(aRequest);
+      RefPtr<nsScriptLoadRequest> req = mLoadingAsyncRequests.Steal(aRequest);
       mLoadedAsyncRequests.AppendElement(req);
     }
   }
@@ -1616,7 +1700,7 @@ nsScriptLoader::PreloadURI(nsIURI *aURI, const nsAString &aCharset,
     SRICheck::IntegrityMetadata(aIntegrity, mDocument, &sriMetadata);
   }
 
-  nsRefPtr<nsScriptLoadRequest> request =
+  RefPtr<nsScriptLoadRequest> request =
     new nsScriptLoadRequest(nullptr, 0,
                             Element::StringToCORSMode(aCrossOrigin),
                             sriMetadata);

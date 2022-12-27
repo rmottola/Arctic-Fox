@@ -403,7 +403,7 @@ nsHttpHandler::MakeNewRequestTokenBucket()
     if (!mConnMgr)
         return;
 
-    nsRefPtr<EventTokenBucket> tokenBucket =
+    RefPtr<EventTokenBucket> tokenBucket =
         new EventTokenBucket(RequestTokenBucketHz(), RequestTokenBucketBurst());
     mConnMgr->UpdateRequestTokenBucket(tokenBucket);
 }
@@ -440,16 +440,19 @@ nsHttpHandler::AddStandardRequestHeaders(nsHttpHeaderArray *request, bool isSecu
     if (NS_FAILED(rv)) return rv;
 
     // MIME based content negotiation lives!
-    // Add the "Accept" header
+    // Add the "Accept" header.  Note, this is set as an override because the
+    // service worker expects to see it.  The other "default" headers are
+    // hidden from service worker interception.
     rv = request->SetHeader(nsHttp::Accept, mAccept,
-                            false, nsHttpHeaderArray::eVarietyDefault);
+                            false, nsHttpHeaderArray::eVarietyOverride);
     if (NS_FAILED(rv)) return rv;
 
-    // Add the "Accept-Language" header
+    // Add the "Accept-Language" header.  This header is also exposed to the
+    // service worker.
     if (!mAcceptLanguages.IsEmpty()) {
         // Add the "Accept-Language" header
         rv = request->SetHeader(nsHttp::Accept_Language, mAcceptLanguages,
-                                false, nsHttpHeaderArray::eVarietyDefault);
+                                false, nsHttpHeaderArray::eVarietyOverride);
         if (NS_FAILED(rv)) return rv;
     }
 
@@ -513,7 +516,6 @@ nsHttpHandler::IsAcceptableEncoding(const char *enc, bool isSecure)
     } else {
         rv = nsHttp::FindToken(mHttpAcceptEncodings.get(), enc, HTTP_LWS ",") != nullptr;
     }
-
     // gzip and deflate are inherently acceptable in modern HTTP - always
     // process them if a stream converter can also be found.
     if (!rv &&
@@ -605,7 +607,7 @@ nsHttpHandler::AsyncOnChannelRedirect(nsIChannel* oldChan, nsIChannel* newChan,
                                  uint32_t flags)
 {
     // TODO E10S This helper has to be initialized on the other process
-    nsRefPtr<nsAsyncRedirectVerifyHelper> redirectCallbackHelper =
+    RefPtr<nsAsyncRedirectVerifyHelper> redirectCallbackHelper =
         new nsAsyncRedirectVerifyHelper();
 
     return redirectCallbackHelper->Init(oldChan, newChan, flags);
@@ -1663,7 +1665,7 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
 void
 nsHttpHandler::TimerCallback(nsITimer * aTimer, void * aClosure)
 {
-    nsRefPtr<nsHttpHandler> thisObject = static_cast<nsHttpHandler*>(aClosure);
+    RefPtr<nsHttpHandler> thisObject = static_cast<nsHttpHandler*>(aClosure);
     if (!thisObject->mPipeliningEnabled)
         thisObject->mCapabilities &= ~NS_HTTP_ALLOW_PIPELINING;
 }
@@ -1936,7 +1938,7 @@ nsHttpHandler::NewProxiedChannel2(nsIURI *uri,
                                   nsILoadInfo* aLoadInfo,
                                   nsIChannel** result)
 {
-    nsRefPtr<HttpBaseChannel> httpChannel;
+    RefPtr<HttpBaseChannel> httpChannel;
 
     LOG(("nsHttpHandler::NewProxiedChannel [proxyInfo=%p]\n",
         givenProxyInfo));
@@ -2248,13 +2250,12 @@ nsHttpHandler::TickleWifi(nsIInterfaceRequestor *cb)
     // If B2G requires a similar mechanism nsINetworkManager, currently only avail
     // on B2G, contains the necessary information on wifi and gateway
 
-    nsCOMPtr<nsIDOMWindow> domWindow;
-    cb->GetInterface(NS_GET_IID(nsIDOMWindow), getter_AddRefs(domWindow));
-    if (!domWindow)
+    nsCOMPtr<nsIDOMWindow> domWindow = do_GetInterface(cb);
+    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(domWindow);
+    if (!piWindow)
         return;
 
-    nsCOMPtr<nsIDOMNavigator> domNavigator;
-    domWindow->GetNavigator(getter_AddRefs(domNavigator));
+    nsCOMPtr<nsIDOMNavigator> domNavigator = piWindow->GetNavigator();
     nsCOMPtr<nsIMozNavigatorNetwork> networkNavigator =
         do_QueryInterface(domNavigator);
     if (!networkNavigator)

@@ -35,6 +35,7 @@
 #include "gfxGdkNativeRenderer.h"
 #include "mozilla/gfx/BorrowedContext.h"
 #include "mozilla/gfx/HelpersCairo.h"
+#include "mozilla/gfx/PathHelpers.h"
 
 #ifdef MOZ_X11
 #  ifdef CAIRO_HAS_XLIB_SURFACE
@@ -258,6 +259,13 @@ nsNativeThemeGTK::GetGtkWidgetAndState(uint8_t aWidgetType, nsIFrame* aFrame,
 
         aState->focused = TRUE;
         aState->depressed = TRUE; // see moz_gtk_entry_paint()
+      } else if (aWidgetType == NS_THEME_BUTTON ||
+                 aWidgetType == NS_THEME_TOOLBAR_BUTTON ||
+                 aWidgetType == NS_THEME_TOOLBAR_DUAL_BUTTON ||
+                 aWidgetType == NS_THEME_TOOLBAR_BUTTON_DROPDOWN ||
+                 aWidgetType == NS_THEME_DROPDOWN ||
+                 aWidgetType == NS_THEME_DROPDOWN_BUTTON) {
+        aState->active &= aState->inHover;
       }
 
       if (IsFrameContentNodeInNamespace(aFrame, kNameSpaceID_XUL)) {
@@ -404,9 +412,17 @@ nsNativeThemeGTK::GetGtkWidgetAndState(uint8_t aWidgetType, nsIFrame* aFrame,
     break;
   case NS_THEME_SCROLLBAR_TRACK_VERTICAL:
     aGtkWidgetType = MOZ_GTK_SCROLLBAR_TRACK_VERTICAL;
+    if (GetWidgetTransparency(aFrame, aWidgetType) == eOpaque)
+        *aWidgetFlags = MOZ_GTK_TRACK_OPAQUE;
+    else
+        *aWidgetFlags = 0;
     break;
   case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
     aGtkWidgetType = MOZ_GTK_SCROLLBAR_TRACK_HORIZONTAL;
+    if (GetWidgetTransparency(aFrame, aWidgetType) == eOpaque)
+        *aWidgetFlags = MOZ_GTK_TRACK_OPAQUE;
+    else
+        *aWidgetFlags = 0;
     break;
   case NS_THEME_SCROLLBAR_THUMB_VERTICAL:
     aGtkWidgetType = MOZ_GTK_SCROLLBAR_THUMB_VERTICAL;
@@ -664,6 +680,9 @@ nsNativeThemeGTK::GetGtkWidgetAndState(uint8_t aWidgetType, nsIFrame* aFrame,
   case NS_THEME_DIALOG:
     aGtkWidgetType = MOZ_GTK_WINDOW;
     break;
+  case NS_THEME_GTK_INFO_BAR:
+    aGtkWidgetType = MOZ_GTK_INFO_BAR;
+    break;
   default:
     return false;
   }
@@ -715,6 +734,85 @@ ThemeRenderer::DrawWithGDK(GdkDrawable * drawable, gint offsetX,
   return NS_OK;
 }
 #else
+class SystemCairoClipper : public ClipExporter {
+public:
+  explicit SystemCairoClipper(cairo_t* aContext) : mContext(aContext)
+  {
+  }
+
+  void
+  BeginClip(const Matrix& aTransform) override
+  {
+    cairo_matrix_t mat;
+    GfxMatrixToCairoMatrix(aTransform, mat);
+    cairo_set_matrix(mContext, &mat);
+
+    cairo_new_path(mContext);
+  }
+
+  void
+  MoveTo(const Point &aPoint) override
+  {
+    cairo_move_to(mContext, aPoint.x, aPoint.y);
+    mCurrentPoint = aPoint;
+  }
+
+  void
+  LineTo(const Point &aPoint) override
+  {
+    cairo_line_to(mContext, aPoint.x, aPoint.y);
+    mCurrentPoint = aPoint;
+  }
+
+  void
+  BezierTo(const Point &aCP1, const Point &aCP2, const Point &aCP3) override
+  {
+    cairo_curve_to(mContext, aCP1.x, aCP1.y, aCP2.x, aCP2.y, aCP3.x, aCP3.y);
+    mCurrentPoint = aCP3;
+  }
+
+  void
+  QuadraticBezierTo(const Point &aCP1, const Point &aCP2) override
+  {
+    Point CP0 = CurrentPoint();
+    Point CP1 = (CP0 + aCP1 * 2.0) / 3.0;
+    Point CP2 = (aCP2 + aCP1 * 2.0) / 3.0;
+    Point CP3 = aCP2;
+    cairo_curve_to(mContext, CP1.x, CP1.y, CP2.x, CP2.y, CP3.x, CP3.y);
+    mCurrentPoint = aCP2;
+  }
+
+  void
+  Arc(const Point &aOrigin, float aRadius, float aStartAngle, float aEndAngle,
+      bool aAntiClockwise) override
+  {
+    ArcToBezier(this, aOrigin, Size(aRadius, aRadius), aStartAngle, aEndAngle,
+                aAntiClockwise);
+  }
+
+  void
+  Close() override
+  {
+    cairo_close_path(mContext);
+  }
+
+  void
+  EndClip() override
+  {
+    cairo_clip(mContext);
+  }
+
+  Point
+  CurrentPoint() const override
+  {
+    return mCurrentPoint;
+  }
+
+private:
+  cairo_t* mContext;
+  Point mCurrentPoint;
+};
+
 static void
 DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
                    GtkWidgetState aState, GtkThemeWidgetType aGTKWidgetType,
@@ -722,62 +820,65 @@ DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
                    bool aSnapped, const Point& aDrawOrigin, const nsIntSize& aDrawSize,
                    GdkRectangle& aGDKRect, nsITheme::Transparency aTransparency)
 {
+  Point drawOffset;
+  Matrix transform;
+  if (!aSnapped) {
+    // If we are not snapped, we depend on the DT for translation.
+    drawOffset = aDrawOrigin;
+    transform = aDrawTarget->GetTransform().PreTranslate(aDrawOrigin);
+  } else {
+    // Otherwise, we only need to take the device offset into account.
+    drawOffset = aDrawOrigin - aContext->GetDeviceOffset();
+    transform = Matrix::Translation(drawOffset);
+  }
+
+  if (aScaleFactor != 1)
+    transform.PreScale(aScaleFactor, aScaleFactor);
+
+  cairo_matrix_t mat;
+  GfxMatrixToCairoMatrix(transform, mat);
+
 #ifndef MOZ_TREE_CAIRO
   // Directly use the Cairo draw target to render the widget if using system Cairo everywhere.
-  BorrowedCairoContext borrow(aDrawTarget);
-  if (borrow.mCairo) {
-    if (aSnapped) {
-      cairo_identity_matrix(borrow.mCairo);
-    }
-    if (aDrawOrigin != Point(0, 0)) {
-      cairo_translate(borrow.mCairo, aDrawOrigin.x, aDrawOrigin.y);
-    }
-    if (aScaleFactor != 1) {
-      cairo_scale(borrow.mCairo, aScaleFactor, aScaleFactor);
-    }
+  BorrowedCairoContext borrowCairo(aDrawTarget);
+  if (borrowCairo.mCairo) {
+    cairo_set_matrix(borrowCairo.mCairo, &mat);
 
-    moz_gtk_widget_paint(aGTKWidgetType, borrow.mCairo, &aGDKRect, &aState, aFlags, aDirection);
+    moz_gtk_widget_paint(aGTKWidgetType, borrowCairo.mCairo, &aGDKRect, &aState, aFlags, aDirection);
 
-    borrow.Finish();
+    borrowCairo.Finish();
     return;
   }
 #endif
 
   // A direct Cairo draw target is not available, so we need to create a temporary one.
-  bool needClip = !aSnapped || aContext->HasComplexClip();
 #if defined(MOZ_X11) && defined(CAIRO_HAS_XLIB_SURFACE)
-  if (!needClip) {
-    // If using a Cairo xlib surface, then try to reuse it.
-    BorrowedXlibDrawable borrow(aDrawTarget);
-    if (borrow.GetDrawable()) {
-      nsIntSize size = aDrawTarget->GetSize();
-      cairo_surface_t* surf = nullptr;
-      // Check if the surface is using XRender.
+  // If using a Cairo xlib surface, then try to reuse it.
+  BorrowedXlibDrawable borrow(aDrawTarget);
+  if (borrow.GetDrawable()) {
+    nsIntSize size = aDrawTarget->GetSize();
+    cairo_surface_t* surf = nullptr;
+    // Check if the surface is using XRender.
 #ifdef CAIRO_HAS_XLIB_XRENDER_SURFACE
-      if (borrow.GetXRenderFormat()) {
-        surf = cairo_xlib_surface_create_with_xrender_format(
+    if (borrow.GetXRenderFormat()) {
+      surf = cairo_xlib_surface_create_with_xrender_format(
           borrow.GetDisplay(), borrow.GetDrawable(), borrow.GetScreen(),
           borrow.GetXRenderFormat(), size.width, size.height);
-      } else {
+    } else {
 #else
       if (! borrow.GetXRenderFormat()) {
 #endif
         surf = cairo_xlib_surface_create(
-          borrow.GetDisplay(), borrow.GetDrawable(), borrow.GetVisual(),
-          size.width, size.height);
+            borrow.GetDisplay(), borrow.GetDrawable(), borrow.GetVisual(),
+            size.width, size.height);
       }
       if (!NS_WARN_IF(!surf)) {
         cairo_t* cr = cairo_create(surf);
         if (!NS_WARN_IF(!cr)) {
-          cairo_new_path(cr);
-          cairo_rectangle(cr, aDrawOrigin.x, aDrawOrigin.y, aDrawSize.width, aDrawSize.height);
-          cairo_clip(cr);
-          if (aDrawOrigin != Point(0, 0)) {
-            cairo_translate(cr, aDrawOrigin.x, aDrawOrigin.y);
-          }
-          if (aScaleFactor != 1) {
-            cairo_scale(cr, aScaleFactor, aScaleFactor);
-          }
+          RefPtr<SystemCairoClipper> clipper = new SystemCairoClipper(cr);
+          aContext->ExportClip(*clipper);
+
+          cairo_set_matrix(cr, &mat);
 
           moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags, aDirection);
 
@@ -788,7 +889,6 @@ DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
       borrow.Finish();
       return;
     }
-  }
 #endif
 
   // Check if the widget requires complex masking that must be composited.
@@ -797,18 +897,18 @@ DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
   nsIntSize size;
   int32_t stride;
   SurfaceFormat format;
-  if (!needClip && aDrawTarget->LockBits(&data, &size, &stride, &format)) {
+  if (aDrawTarget->LockBits(&data, &size, &stride, &format)) {
     // Create a Cairo image surface context the device rectangle.
     cairo_surface_t* surf =
       cairo_image_surface_create_for_data(
-        data + int32_t(aDrawOrigin.y) * stride + int32_t(aDrawOrigin.x) * BytesPerPixel(format),
-        GfxFormatToCairoFormat(format), aDrawSize.width, aDrawSize.height, stride);
+        data, GfxFormatToCairoFormat(format), size.width, size.height, stride);
     if (!NS_WARN_IF(!surf)) {
       cairo_t* cr = cairo_create(surf);
       if (!NS_WARN_IF(!cr)) {
-        if (aScaleFactor != 1) {
-          cairo_scale(cr, aScaleFactor, aScaleFactor);
-        }
+        RefPtr<SystemCairoClipper> clipper = new SystemCairoClipper(cr);
+        aContext->ExportClip(*clipper);
+
+        cairo_set_matrix(cr, &mat);
 
         moz_gtk_widget_paint(aGTKWidgetType, cr, &aGDKRect, &aState, aFlags, aDirection);
 
@@ -845,16 +945,17 @@ DrawThemeWithCairo(gfxContext* aContext, DrawTarget* aDrawTarget,
       dataSurface->Unmap();
 
       if (cr) {
-        if (needClip || aTransparency != nsITheme::eOpaque) {
+        if (!aSnapped || aTransparency != nsITheme::eOpaque) {
           // The widget either needs to be masked or has transparency, so use the slower drawing path.
           aDrawTarget->DrawSurface(dataSurface,
-                                   Rect(aDrawOrigin, Size(aDrawSize)),
+                                   Rect(aSnapped ? drawOffset - aDrawTarget->GetTransform().GetTranslation() : drawOffset,
+                                        Size(aDrawSize)),
                                    Rect(0, 0, aDrawSize.width, aDrawSize.height));
         } else {
           // The widget is a simple opaque rectangle, so just copy it out.
           aDrawTarget->CopySurface(dataSurface,
                                    IntRect(0, 0, aDrawSize.width, aDrawSize.height),
-                                   TruncatedToInt(aDrawOrigin));
+                                   TruncatedToInt(drawOffset));
         }
 
         cairo_destroy(cr);
@@ -1577,6 +1678,15 @@ nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
     return false;
 
   switch (aWidgetType) {
+  // Combobox dropdowns don't support native theming in vertical mode.
+  case NS_THEME_DROPDOWN:
+  case NS_THEME_DROPDOWN_TEXT:
+  case NS_THEME_DROPDOWN_TEXTFIELD:
+    if (aFrame && aFrame->GetWritingMode().IsVertical()) {
+      return false;
+    }
+    // fall through
+
   case NS_THEME_BUTTON:
   case NS_THEME_BUTTON_FOCUS:
   case NS_THEME_RADIO:
@@ -1633,7 +1743,6 @@ nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
   case NS_THEME_NUMBER_INPUT:
   case NS_THEME_TEXTFIELD:
   case NS_THEME_TEXTFIELD_MULTILINE:
-  case NS_THEME_DROPDOWN_TEXTFIELD:
   case NS_THEME_RANGE:
   case NS_THEME_RANGE_THUMB:
   case NS_THEME_SCALE_HORIZONTAL:
@@ -1657,11 +1766,15 @@ nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
   case NS_THEME_SPLITTER:
   case NS_THEME_WINDOW:
   case NS_THEME_DIALOG:
-  case NS_THEME_DROPDOWN:
-  case NS_THEME_DROPDOWN_TEXT:
+#if (MOZ_WIDGET_GTK == 3)
+  case NS_THEME_GTK_INFO_BAR:
+#endif
     return !IsWidgetStyled(aPresContext, aFrame, aWidgetType);
 
   case NS_THEME_DROPDOWN_BUTTON:
+    if (aFrame && aFrame->GetWritingMode().IsVertical()) {
+      return false;
+    }
     // "Native" dropdown buttons cause padding and margin problems, but only
     // in HTML so allow them in XUL.
     return (!aFrame || IsFrameContentNodeInNamespace(aFrame, kNameSpaceID_XUL)) &&
@@ -1715,14 +1828,23 @@ nsNativeThemeGTK::GetWidgetTransparency(nsIFrame* aFrame, uint8_t aWidgetType)
   switch (aWidgetType) {
   // These widgets always draw a default background.
 #if (MOZ_WIDGET_GTK == 2)
-  case NS_THEME_SCROLLBAR_TRACK_VERTICAL:
-  case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
   case NS_THEME_TOOLBAR:
   case NS_THEME_MENUBAR:
 #endif
   case NS_THEME_MENUPOPUP:
   case NS_THEME_WINDOW:
   case NS_THEME_DIALOG:
+    return eOpaque;
+  case NS_THEME_SCROLLBAR_TRACK_VERTICAL:
+  case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
+#if (MOZ_WIDGET_GTK == 3)
+    // Make scrollbar tracks opaque on the window's scroll frame to prevent
+    // leaf layers from overlapping. See bug 1179780.
+    if (!(CheckBooleanAttr(aFrame, nsGkAtoms::root_) &&
+          aFrame->PresContext()->IsRootContentDocument() &&
+          IsFrameContentNodeInNamespace(aFrame, kNameSpaceID_XUL)))
+      return eTransparent;
+#endif
     return eOpaque;
   // Tooltips use gtk_paint_flat_box() on Gtk2
   // but are shaped on Gtk3

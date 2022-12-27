@@ -101,11 +101,13 @@ DCFromDrawTarget::DCFromDrawTarget(DrawTarget& aDrawTarget)
         cairo_win32_scaled_font_select_font(scaled, mDC);
       }
     }
-    if (!mDC) {
-      mDC = GetDC(nullptr);
-      SetGraphicsMode(mDC, GM_ADVANCED);
-      mNeedsRelease = true;
-    }
+  }
+
+  if (!mDC) {
+    // Get the whole screen DC:
+    mDC = GetDC(nullptr);
+    SetGraphicsMode(mDC, GM_ADVANCED);
+    mNeedsRelease = true;
   }
 }
 
@@ -194,7 +196,7 @@ public:
         IDXGIAdapter *DXGIAdapter;
 
         HMODULE gdi32Handle;
-        PFND3DKMTQS queryD3DKMTStatistics;
+        PFND3DKMTQS queryD3DKMTStatistics = nullptr;
 
         // GPU memory reporting is not available before Windows 7
         if (!IsWin7OrLater())
@@ -454,7 +456,7 @@ gfxWindowsPlatform::InitDWriteSupport()
   HRESULT hr = createDWriteFactory(
       DWRITE_FACTORY_TYPE_SHARED,
       __uuidof(IDWriteFactory),
-      (IUnknown **)((IDWriteFactory **)byRef(factory)));
+      (IUnknown **)((IDWriteFactory **)getter_AddRefs(factory)));
   if (FAILED(hr) || !factory) {
     return false;
   }
@@ -568,7 +570,7 @@ gfxWindowsPlatform::GetContentBackendFor(mozilla::layers::LayersBackend aLayers)
 
 #ifdef CAIRO_HAS_D2D_SURFACE
 HRESULT
-gfxWindowsPlatform::CreateDevice(nsRefPtr<IDXGIAdapter1> &adapter1,
+gfxWindowsPlatform::CreateDevice(RefPtr<IDXGIAdapter1> &adapter1,
                                  int featureLevelIndex)
 {
   nsModuleHandle d3d10module(LoadLibrarySystem32(L"d3d10_1.dll"));
@@ -634,7 +636,7 @@ gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
 
     int supportedFeatureLevelsCount = ArrayLength(kSupportedFeatureLevels);
 
-    nsRefPtr<IDXGIAdapter1> adapter1 = GetDXGIAdapter();
+    RefPtr<IDXGIAdapter1> adapter1 = GetDXGIAdapter();
 
     if (!adapter1) {
       // Unable to create adapter, abort acceleration.
@@ -687,10 +689,13 @@ gfxPlatformFontList*
 gfxWindowsPlatform::CreatePlatformFontList()
 {
     gfxPlatformFontList *pfl;
+
 #ifdef CAIRO_HAS_DWRITE_FONT
     // bug 630201 - older pre-RTM versions of Direct2D/DirectWrite cause odd
     // crashers so blacklist them altogether
-    if (IsNotWin7PreRTM() && GetDWriteFactory()) {
+    if (IsNotWin7PreRTM() && GetDWriteFactory() &&
+        // Skia doesn't support DirectWrite fonts yet.
+       (gfxPlatform::GetDefaultContentBackend() != BackendType::SKIA)) {
         pfl = new gfxDWriteFontList();
         if (NS_SUCCEEDED(pfl->InitFontList())) {
             return pfl;
@@ -732,7 +737,7 @@ already_AddRefed<gfxASurface>
 gfxWindowsPlatform::CreateOffscreenSurface(const IntSize& aSize,
                                            gfxImageFormat aFormat)
 {
-    nsRefPtr<gfxASurface> surf = nullptr;
+    RefPtr<gfxASurface> surf = nullptr;
 
 #ifdef CAIRO_HAS_WIN32_SURFACE
     if (mRenderMode == RENDER_GDI || mRenderMode == RENDER_DIRECT2D)
@@ -1058,26 +1063,26 @@ gfxFontEntry*
 gfxWindowsPlatform::LookupLocalFont(const nsAString& aFontName,
                                     uint16_t aWeight,
                                     int16_t aStretch,
-                                    bool aItalic)
+                                    uint8_t aStyle)
 {
     return gfxPlatformFontList::PlatformFontList()->LookupLocalFont(aFontName,
                                                                     aWeight,
                                                                     aStretch,
-                                                                    aItalic);
+                                                                    aStyle);
 }
 
 gfxFontEntry* 
 gfxWindowsPlatform::MakePlatformFont(const nsAString& aFontName,
                                      uint16_t aWeight,
                                      int16_t aStretch,
-                                     bool aItalic,
+                                     uint8_t aStyle,
                                      const uint8_t* aFontData,
                                      uint32_t aLength)
 {
     return gfxPlatformFontList::PlatformFontList()->MakePlatformFont(aFontName,
                                                                      aWeight,
                                                                      aStretch,
-                                                                     aItalic,
+                                                                     aStyle,
                                                                      aFontData,
                                                                      aLength);
 }
@@ -1472,7 +1477,7 @@ gfxWindowsPlatform::SetupClearTypeParams()
             break;
         }
 
-        nsRefPtr<IDWriteRenderingParams> defaultRenderingParams;
+        RefPtr<IDWriteRenderingParams> defaultRenderingParams;
         GetDWriteFactory()->CreateRenderingParams(getter_AddRefs(defaultRenderingParams));
         // For EnhancedContrast, we override the default if the user has not set it
         // in the registry (by using the ClearType Tuner).
@@ -1630,7 +1635,7 @@ gfxWindowsPlatform::GetDXGIAdapter()
   // Try to use a DXGI 1.1 adapter in order to share resources
   // across processes.
   if (createDXGIFactory1) {
-    nsRefPtr<IDXGIFactory1> factory1;
+    RefPtr<IDXGIFactory1> factory1;
     HRESULT hr = createDXGIFactory1(__uuidof(IDXGIFactory1),
                                     getter_AddRefs(factory1));
 
@@ -1640,7 +1645,7 @@ gfxWindowsPlatform::GetDXGIAdapter()
       return nullptr;
     }
 
-    hr = factory1->EnumAdapters1(0, byRef(mAdapter));
+    hr = factory1->EnumAdapters1(0, getter_AddRefs(mAdapter));
     if (FAILED(hr)) {
       // We should return and not accelerate if we can't obtain
       // an adapter.
@@ -1692,12 +1697,12 @@ bool DoesD3D11DeviceWork(ID3D11Device *device)
 static void
 CheckForAdapterMismatch(ID3D11Device *device)
 {
-  nsRefPtr<IDXGIDevice> dxgiDevice;
+  RefPtr<IDXGIDevice> dxgiDevice;
   if (FAILED(device->QueryInterface(__uuidof(IDXGIDevice),
                                     getter_AddRefs(dxgiDevice)))) {
       return;
   }
-  nsRefPtr<IDXGIAdapter> dxgiAdapter;
+  RefPtr<IDXGIAdapter> dxgiAdapter;
   if (FAILED(dxgiDevice->GetAdapter(getter_AddRefs(dxgiAdapter)))) {
       return;
   }
@@ -1721,11 +1726,11 @@ void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
         return;
     }
 
-    nsRefPtr<ID3D11DeviceContext> deviceContext;
+    RefPtr<ID3D11DeviceContext> deviceContext;
     device->GetImmediateContext(getter_AddRefs(deviceContext));
     int backbufferWidth = 32; int backbufferHeight = 32;
-    nsRefPtr<ID3D11Texture2D> offscreenTexture;
-    nsRefPtr<IDXGIKeyedMutex> keyedMutex;
+    RefPtr<ID3D11Texture2D> offscreenTexture;
+    RefPtr<IDXGIKeyedMutex> keyedMutex;
 
     D3D11_TEXTURE2D_DESC offscreenTextureDesc = { 0 };
     offscreenTextureDesc.Width = backbufferWidth;
@@ -1749,7 +1754,7 @@ void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
     offscreenRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     offscreenRTVDesc.Texture2D.MipSlice = 0;
 
-    nsRefPtr<ID3D11RenderTargetView> offscreenRTView;
+    RefPtr<ID3D11RenderTargetView> offscreenRTView;
     result = device->CreateRenderTargetView(offscreenTexture, &offscreenRTVDesc, getter_AddRefs(offscreenRTView));
 
     // Acquire and clear
@@ -1836,12 +1841,12 @@ bool DoesD3D11TextureSharingWorkInternal(ID3D11Device *device, DXGI_FORMAT forma
   desc.CPUAccessFlags = 0;
   desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
   desc.BindFlags = bindflags;
-  if (FAILED(device->CreateTexture2D(&desc, NULL, byRef(texture)))) {
+  if (FAILED(device->CreateTexture2D(&desc, NULL, getter_AddRefs(texture)))) {
     return false;
   }
 
   HANDLE shareHandle;
-  nsRefPtr<IDXGIResource> otherResource;
+  RefPtr<IDXGIResource> otherResource;
   if (FAILED(texture->QueryInterface(__uuidof(IDXGIResource),
                                      getter_AddRefs(otherResource))))
   {
@@ -1852,8 +1857,8 @@ bool DoesD3D11TextureSharingWorkInternal(ID3D11Device *device, DXGI_FORMAT forma
     return false;
   }
 
-  nsRefPtr<ID3D11Resource> sharedResource;
-  nsRefPtr<ID3D11Texture2D> sharedTexture;
+  RefPtr<ID3D11Resource> sharedResource;
+  RefPtr<ID3D11Texture2D> sharedTexture;
   if (FAILED(device->OpenSharedResource(shareHandle, __uuidof(ID3D11Resource),
                                         getter_AddRefs(sharedResource))))
   {
@@ -1870,8 +1875,8 @@ bool DoesD3D11TextureSharingWorkInternal(ID3D11Device *device, DXGI_FORMAT forma
   RefPtr<ID3D11ShaderResourceView> sharedView;
 
   // This if(FAILED()) is the one that actually fails on systems affected by bug 1083071.
-  if (FAILED(device->CreateShaderResourceView(sharedTexture, NULL, byRef(sharedView)))) {
-    gfxCriticalError(CriticalLog::DefaultOptions(false)) << "CreateShaderResourceView failed for format" << format;
+  if (FAILED(device->CreateShaderResourceView(sharedTexture, NULL, getter_AddRefs(sharedView)))) {
+    gfxCriticalNote << "CreateShaderResourceView failed for format" << format;
     return false;
   }
 
@@ -1931,6 +1936,10 @@ gfxWindowsPlatform::CheckD3D11Support(bool* aCanUseHardware)
     *aCanUseHardware = false;
     return FeatureStatus::Available;
   }
+  if (gfxPrefs::LayersAccelerationForceEnabled()) {
+    *aCanUseHardware = true;
+    return FeatureStatus::Available;
+  }
 
   if (nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo()) {
     int32_t status;
@@ -1972,7 +1981,7 @@ gfxWindowsPlatform::AttemptD3D11DeviceCreation()
                            // to prevent bug 1092260. IE 11 also uses this flag.
                            D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS,
                            mFeatureLevels.Elements(), mFeatureLevels.Length(),
-                           D3D11_SDK_VERSION, byRef(mD3D11Device), nullptr, nullptr);
+                           D3D11_SDK_VERSION, getter_AddRefs(mD3D11Device), nullptr, nullptr);
   } MOZ_SEH_EXCEPT (EXCEPTION_EXECUTE_HANDLER) {
     gfxCriticalError() << "Crash during D3D11 device creation";
     return;
@@ -2008,7 +2017,7 @@ gfxWindowsPlatform::AttemptWARPDeviceCreation()
                            // to prevent bug 1092260. IE 11 also uses this flag.
                            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
                            mFeatureLevels.Elements(), mFeatureLevels.Length(),
-                           D3D11_SDK_VERSION, byRef(mD3D11Device), nullptr, nullptr);
+                           D3D11_SDK_VERSION, getter_AddRefs(mD3D11Device), nullptr, nullptr);
 
     if (FAILED(hr)) {
       // This should always succeed... in theory.
@@ -2051,7 +2060,7 @@ gfxWindowsPlatform::AttemptD3D11ContentDeviceCreation()
                            nullptr,
                            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
                            mFeatureLevels.Elements(), mFeatureLevels.Length(),
-                           D3D11_SDK_VERSION, byRef(mD3D11ContentDevice), nullptr, nullptr);
+                           D3D11_SDK_VERSION, getter_AddRefs(mD3D11ContentDevice), nullptr, nullptr);
   } MOZ_SEH_EXCEPT (EXCEPTION_EXECUTE_HANDLER) {
     return false;
   }
@@ -2073,7 +2082,7 @@ gfxWindowsPlatform::AttemptD3D11ContentDeviceCreation()
 
   mD3D11ContentDevice->SetExceptionMode(0);
 
-  nsRefPtr<ID3D10Multithread> multi;
+  RefPtr<ID3D10Multithread> multi;
   mD3D11ContentDevice->QueryInterface(__uuidof(ID3D10Multithread), getter_AddRefs(multi));
   multi->SetMultithreadProtected(TRUE);
 
@@ -2090,7 +2099,7 @@ gfxWindowsPlatform::AttemptD3D11ImageBridgeDeviceCreation()
       sD3D11CreateDeviceFn(GetDXGIAdapter(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
                            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
                            mFeatureLevels.Elements(), mFeatureLevels.Length(),
-                           D3D11_SDK_VERSION, byRef(mD3D11ImageBridgeDevice), nullptr, nullptr);
+                           D3D11_SDK_VERSION, getter_AddRefs(mD3D11ImageBridgeDevice), nullptr, nullptr);
   } MOZ_SEH_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
     return;
   }
@@ -2408,7 +2417,7 @@ gfxWindowsPlatform::CreateD3D11DecoderDevice()
     hr = d3d11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr,
                            D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
                            featureLevels.Elements(), featureLevels.Length(),
-                           D3D11_SDK_VERSION, byRef(device), nullptr, nullptr);
+                           D3D11_SDK_VERSION, getter_AddRefs(device), nullptr, nullptr);
   } MOZ_SEH_EXCEPT(EXCEPTION_EXECUTE_HANDLER) {
     return nullptr;
   }
@@ -2417,7 +2426,7 @@ gfxWindowsPlatform::CreateD3D11DecoderDevice()
     return nullptr;
   }
 
-  nsRefPtr<ID3D10Multithread> multi;
+  RefPtr<ID3D10Multithread> multi;
   device->QueryInterface(__uuidof(ID3D10Multithread), getter_AddRefs(multi));
 
   multi->SetMultithreadProtected(TRUE);
@@ -2444,12 +2453,36 @@ public:
     public:
       D3DVsyncDisplay()
         : mVsyncEnabledLock("D3DVsyncEnabledLock")
+        , mPrevVsync(TimeStamp::Now())
         , mVsyncEnabled(false)
       {
         mVsyncThread = new base::Thread("WindowsVsyncThread");
         const double rate = 1000 / 60.0;
         mSoftwareVsyncRate = TimeDuration::FromMilliseconds(rate);
         MOZ_RELEASE_ASSERT(mVsyncThread->Start(), "Could not start Windows vsync thread");
+        SetVsyncRate();
+      }
+
+      void SetVsyncRate()
+      {
+        if (!DwmCompositionEnabled()) {
+          mVsyncRate = TimeDuration::FromMilliseconds(1000.0 / 60.0);
+          return;
+        }
+
+        DWM_TIMING_INFO vblankTime;
+        // Make sure to init the cbSize, otherwise GetCompositionTiming will fail
+        vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
+        HRESULT hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
+        if (SUCCEEDED(hr)) {
+          UNSIGNED_RATIO refreshRate = vblankTime.rateRefresh;
+          // We get the rate in hertz / time, but we want the rate in ms.
+          float rate = ((float) refreshRate.uiDenominator
+                       / (float) refreshRate.uiNumerator) * 1000;
+          mVsyncRate = TimeDuration::FromMilliseconds(rate);
+        } else {
+          mVsyncRate = TimeDuration::FromMilliseconds(1000.0 / 60.0);
+        }
       }
 
       virtual void EnableVsync() override
@@ -2487,6 +2520,11 @@ public:
         return mVsyncEnabled;
       }
 
+      virtual TimeDuration GetVsyncRate() override
+      {
+        return mVsyncRate;
+      }
+
       void ScheduleSoftwareVsync(TimeStamp aVsyncTimestamp)
       {
         MOZ_ASSERT(IsInVsyncThread());
@@ -2503,6 +2541,53 @@ public:
             delay.ToMilliseconds());
       }
 
+      TimeStamp GetAdjustedVsyncTimeStamp(LARGE_INTEGER& aFrequency,
+                                          QPC_TIME& aQpcVblankTime)
+      {
+        TimeStamp vsync = TimeStamp::Now();
+        LARGE_INTEGER qpcNow;
+        QueryPerformanceCounter(&qpcNow);
+
+        const int microseconds = 1000000;
+        int64_t adjust = qpcNow.QuadPart - aQpcVblankTime;
+        int64_t usAdjust = (adjust * microseconds) / aFrequency.QuadPart;
+        vsync -= TimeDuration::FromMicroseconds((double) usAdjust);
+
+        if (IsWin10OrLater()) {
+          // On Windows 10 and on, DWMGetCompositionTimingInfo, mostly
+          // reports the upcoming vsync time, which is in the future.
+          // It can also sometimes report a vblank time in the past.
+          // Since large parts of Gecko assume TimeStamps can't be in future,
+          // use the previous vsync.
+
+          // Windows 10 and Intel HD vsync timestamps are messy and
+          // all over the place once in a while. Most of the time,
+          // it reports the upcoming vsync. Sometimes, that upcoming
+          // vsync is in the past. Sometimes that upcoming vsync is before
+          // the previously seen vsync. Sometimes, the previous vsync
+          // is still in the future. In these error cases,
+          // we try to normalize to Now().
+          TimeStamp upcomingVsync = vsync;
+          if (upcomingVsync < mPrevVsync) {
+            // Windows can report a vsync that's before
+            // the previous one. So update it to sometime in the future.
+            upcomingVsync = TimeStamp::Now() + TimeDuration::FromMilliseconds(1);
+          }
+
+          vsync = mPrevVsync;
+          mPrevVsync = upcomingVsync;
+        }
+        // On Windows 7 and 8, DwmFlush wakes up AFTER qpcVBlankTime
+        // from DWMGetCompositionTimingInfo. We can return the adjusted vsync.
+
+        // Once in a while, the reported vsync timestamp can be in the future.
+        // Normalize the reported timestamp to now.
+        if (vsync >= TimeStamp::Now()) {
+          vsync = TimeStamp::Now();
+        }
+        return vsync;
+      }
+
       void VBlankLoop()
       {
         MOZ_ASSERT(IsInVsyncThread());
@@ -2512,12 +2597,9 @@ public:
         // Make sure to init the cbSize, otherwise GetCompositionTiming will fail
         vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
 
-        LARGE_INTEGER qpcNow;
         LARGE_INTEGER frequency;
         QueryPerformanceFrequency(&frequency);
         TimeStamp vsync = TimeStamp::Now();
-        TimeStamp previousVsync = vsync;
-        const int microseconds = 1000000;
 
         for (;;) {
           { // scope lock
@@ -2525,12 +2607,9 @@ public:
             if (!mVsyncEnabled) return;
           }
 
-          if (previousVsync > vsync) {
-            vsync = TimeStamp::Now();
-            NS_WARNING("Previous vsync timestamp is ahead of the calculated vsync timestamp.");
-          }
-
-          previousVsync = vsync;
+          // Large parts of gecko assume that the refresh driver timestamp
+          // must be <= Now() and cannot be in the future.
+          MOZ_ASSERT(vsync <= TimeStamp::Now());
           Display::NotifyVsync(vsync);
 
           // DwmComposition can be dynamically enabled/disabled
@@ -2548,13 +2627,7 @@ public:
           HRESULT hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
           vsync = TimeStamp::Now();
           if (SUCCEEDED(hr)) {
-            QueryPerformanceCounter(&qpcNow);
-            // Adjust the timestamp to be the vsync timestamp since when
-            // DwmFlush wakes up and when the actual vsync occurred are not the
-            // same.
-            int64_t adjust = qpcNow.QuadPart - vblankTime.qpcVBlank;
-            int64_t usAdjust = (adjust * microseconds) / frequency.QuadPart;
-            vsync -= TimeDuration::FromMicroseconds((double) usAdjust);
+            vsync = GetAdjustedVsyncTimeStamp(frequency, vblankTime.qpcVBlank);
           }
         } // end for
       }
@@ -2574,8 +2647,10 @@ public:
       }
 
       TimeDuration mSoftwareVsyncRate;
+      TimeStamp mPrevVsync; // Only used on Windows 10
       Monitor mVsyncEnabledLock;
       base::Thread* mVsyncThread;
+      TimeDuration mVsyncRate;
       bool mVsyncEnabled;
   }; // end d3dvsyncdisplay
 
@@ -2593,7 +2668,7 @@ private:
   virtual ~D3DVsyncSource()
   {
   }
-  nsRefPtr<D3DVsyncDisplay> mPrimaryDisplay;
+  RefPtr<D3DVsyncDisplay> mPrimaryDisplay;
 }; // end D3DVsyncSource
 
 already_AddRefed<mozilla::gfx::VsyncSource>
@@ -2612,7 +2687,7 @@ gfxWindowsPlatform::CreateHardwareVsyncSource()
     return gfxPlatform::CreateHardwareVsyncSource();
   }
 
-  nsRefPtr<VsyncSource> d3dVsyncSource = new D3DVsyncSource();
+  RefPtr<VsyncSource> d3dVsyncSource = new D3DVsyncSource();
   return d3dVsyncSource.forget();
 }
 

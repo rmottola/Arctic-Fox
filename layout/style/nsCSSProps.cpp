@@ -28,6 +28,35 @@ using namespace mozilla;
 
 typedef nsCSSProps::KTableValue KTableValue;
 
+// MSVC before 2015 doesn't consider string literal as a constant
+// expression, thus we are not able to do this check here.
+#if !defined(_MSC_VER) || _MSC_VER >= 1900
+// By wrapping internal-only properties in this macro, we are not
+// exposing them in the CSSOM. Since currently it is not necessary to
+// allow accessing them in that way, it is easier and cheaper to just
+// do this rather than exposing them conditionally.
+#define CSS_PROP(name_, id_, method_, flags_, pref_, ...) \
+  static_assert(!((flags_) & CSS_PROPERTY_ENABLED_MASK) || pref_[0], \
+                "Internal-only property '" #name_ "' should be wrapped in " \
+                "#ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL");
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#define CSS_PROP_LIST_EXCLUDE_INTERNAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_EXCLUDE_INTERNAL
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP
+#endif
+
+#define CSS_PROP(name_, id_, method_, flags_, pref_, ...) \
+  static_assert(!((flags_) & CSS_PROPERTY_ENABLED_IN_CHROME) || \
+                ((flags_) & CSS_PROPERTY_ENABLED_IN_UA_SHEETS), \
+                "Property '" #name_ "' is enabled in chrome, so it should " \
+                "also be enabled in UA sheets");
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP
+
 // required to make the symbol external, so that TestCSSPropertyLookup.cpp can link with it
 extern const char* const kCSSRawProperties[];
 
@@ -55,6 +84,7 @@ static nsStaticCaseInsensitiveNameTable* gPropertyTable;
 static nsStaticCaseInsensitiveNameTable* gFontDescTable;
 static nsStaticCaseInsensitiveNameTable* gCounterDescTable;
 static nsStaticCaseInsensitiveNameTable* gPredefinedCounterStyleTable;
+static nsDataHashtable<nsCStringHashKey,nsCSSProperty>* gPropertyIDLNameTable;
 
 /* static */ nsCSSProperty *
   nsCSSProps::gShorthandsContainingTable[eCSSProperty_COUNT_no_shorthands];
@@ -73,15 +103,30 @@ static const char* const kCSSRawCounterDescs[] = {
 };
 
 static const char* const kCSSRawPredefinedCounterStyles[] = {
-  "none", "decimal", "decimal-leading-zero", "cjk-decimal",
-  "lower-roman", "upper-roman", "armenian", "georgian", "hebrew",
+  "none",
+  // 6 Simple Predefined Counter Styles
+  // 6.1 Numeric
+  "decimal", "decimal-leading-zero", "arabic-indic", "armenian",
+  "upper-armenian", "lower-armenian", "bengali", "cambodian", "khmer",
+  "cjk-decimal", "devanagari", "georgian", "gujarati", "gurmukhi", "hebrew",
+  "kannada", "lao", "malayalam", "mongolian", "myanmar", "oriya", "persian",
+  "lower-roman", "upper-roman", "tamil", "telugu", "thai", "tibetan",
+  // 6.2 Alphabetic
   "lower-alpha", "lower-latin", "upper-alpha", "upper-latin",
-  "lower-greek", "hiragana", "hiragana-iroha", "katakana", "katakana-iroha",
+  "cjk-earthly-branch", "cjk-heavenly-stem", "lower-greek",
+  "hiragana", "hiragana-iroha", "katakana", "katakana-iroha",
+  // 6.3 Symbolic
   "disc", "circle", "square", "disclosure-open", "disclosure-closed",
+  // 7 Complex Predefined Counter Styles
+  // 7.1 Longhand East Asian Counter Styles
+  // 7.1.1 Japanese
   "japanese-informal", "japanese-formal",
+  // 7.1.2 Korean
   "korean-hangul-formal", "korean-hanja-informal", "korean-hanja-formal",
+  // 7.1.3 Chinese
   "simp-chinese-informal", "simp-chinese-formal",
   "trad-chinese-informal", "trad-chinese-formal", "cjk-ideographic",
+  // 7.2 Ethiopic Numeric Counter Style
   "ethiopic-numeric"
 };
 
@@ -139,6 +184,7 @@ nsCSSProps::AddRefTable(void)
     MOZ_ASSERT(!gFontDescTable, "pre existing array!");
     MOZ_ASSERT(!gCounterDescTable, "pre existing array!");
     MOZ_ASSERT(!gPredefinedCounterStyleTable, "pre existing array!");
+    MOZ_ASSERT(!gPropertyIDLNameTable, "pre existing array!");
 
     gPropertyTable = CreateStaticTable(
         kCSSRawProperties, eCSSProperty_COUNT_with_aliases);
@@ -148,6 +194,15 @@ nsCSSProps::AddRefTable(void)
     gPredefinedCounterStyleTable = CreateStaticTable(
         kCSSRawPredefinedCounterStyles,
         ArrayLength(kCSSRawPredefinedCounterStyles));
+
+    gPropertyIDLNameTable = new nsDataHashtable<nsCStringHashKey,nsCSSProperty>;
+    for (nsCSSProperty p = nsCSSProperty(0);
+         size_t(p) < ArrayLength(kIDLNameTable);
+         p = nsCSSProperty(p + 1)) {
+      if (kIDLNameTable[p]) {
+        gPropertyIDLNameTable->Put(nsDependentCString(kIDLNameTable[p]), p);
+      }
+    }
 
     BuildShorthandsContainingTable();
 
@@ -184,11 +239,12 @@ nsCSSProps::AddRefTable(void)
 
 #ifdef DEBUG
     {
-      // Assert that if CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS is used
-      // on a shorthand property that all of its component longhands
-      // also has the flag.
+      // Assert that if CSS_PROPERTY_ENABLED_IN_UA_SHEETS or
+      // CSS_PROPERTY_ENABLED_IN_CHROME is used on a shorthand property
+      // that all of its component longhands also have the flag.
       static uint32_t flagsToCheck[] = {
-        CSS_PROPERTY_ALWAYS_ENABLED_IN_UA_SHEETS
+        CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
+        CSS_PROPERTY_ENABLED_IN_CHROME
       };
       for (nsCSSProperty shorthand = eCSSProperty_COUNT_no_shorthands;
            shorthand < eCSSProperty_COUNT;
@@ -204,7 +260,7 @@ nsCSSProps::AddRefTable(void)
                ++p) {
             MOZ_ASSERT(nsCSSProps::PropHasFlags(*p, flag),
                        "all subproperties of a property with a "
-                       "CSS_PROPERTY_ALWAYS_ENABLED_* flag must also have "
+                       "CSS_PROPERTY_ENABLED_* flag must also have "
                        "the flag");
           }
         }
@@ -429,6 +485,9 @@ nsCSSProps::ReleaseTable(void)
     delete gPredefinedCounterStyleTable;
     gPredefinedCounterStyleTable = nullptr;
 
+    delete gPropertyIDLNameTable;
+    gPropertyIDLNameTable = nullptr;
+
     delete [] gShorthandsContainingPool;
     gShorthandsContainingPool = nullptr;
   }
@@ -478,7 +537,7 @@ nsCSSProps::LookupProperty(const nsACString& aProperty,
   }
   MOZ_ASSERT(eCSSAliasCount != 0,
              "'res' must be an alias at this point so we better have some!");
-  // We intentionally don't support eEnabledInUASheets or eEnabledInChromeOrCertifiedApp
+  // We intentionally don't support eEnabledInUASheets or eEnabledInChrome
   // for aliases yet because it's unlikely there will be a need for it.
   if (IsEnabled(res) || aEnabled == eIgnoreEnabledState) {
     res = gAliases[res - eCSSProperty_COUNT];
@@ -512,8 +571,8 @@ nsCSSProps::LookupProperty(const nsAString& aProperty, EnabledState aEnabled)
   }
   MOZ_ASSERT(eCSSAliasCount != 0,
              "'res' must be an alias at this point so we better have some!");
-  // We intentionally don't support eEnabledInUASheets for aliases yet
-  // because it's unlikely there will be a need for it.
+  // We intentionally don't support eEnabledInUASheets or eEnabledInChrome
+  // for aliases yet because it's unlikely there will be a need for it.
   if (IsEnabled(res) || aEnabled == eIgnoreEnabledState) {
     res = gAliases[res - eCSSProperty_COUNT];
     MOZ_ASSERT(0 <= res && res < eCSSProperty_COUNT,
@@ -523,6 +582,30 @@ nsCSSProps::LookupProperty(const nsAString& aProperty, EnabledState aEnabled)
     }
   }
   return eCSSProperty_UNKNOWN;
+}
+
+nsCSSProperty
+nsCSSProps::LookupPropertyByIDLName(const nsACString& aPropertyIDLName,
+                                    EnabledState aEnabled)
+{
+  nsCSSProperty res;
+  if (!gPropertyIDLNameTable->Get(aPropertyIDLName, &res)) {
+    return eCSSProperty_UNKNOWN;
+  }
+  MOZ_ASSERT(res < eCSSProperty_COUNT);
+  if (!IsEnabled(res, aEnabled)) {
+    return eCSSProperty_UNKNOWN;
+  }
+  return res;
+}
+
+nsCSSProperty
+nsCSSProps::LookupPropertyByIDLName(const nsAString& aPropertyIDLName,
+                                    EnabledState aEnabled)
+{
+  MOZ_ASSERT(gPropertyIDLNameTable, "no lookup table, needs addref");
+  return LookupPropertyByIDLName(NS_ConvertUTF16toUTF8(aPropertyIDLName),
+                                 aEnabled);
 }
 
 nsCSSFontDesc
@@ -764,6 +847,7 @@ const KTableValue nsCSSProps::kAppearanceKTable[] = {
   eCSSKeyword__moz_mac_vibrancy_dark,         NS_THEME_MAC_VIBRANCY_DARK,
   eCSSKeyword__moz_mac_disclosure_button_open,   NS_THEME_MAC_DISCLOSURE_BUTTON_OPEN,
   eCSSKeyword__moz_mac_disclosure_button_closed, NS_THEME_MAC_DISCLOSURE_BUTTON_CLOSED,
+  eCSSKeyword__moz_gtk_info_bar,              NS_THEME_GTK_INFO_BAR,
   eCSSKeyword_UNKNOWN,-1
 };
 
@@ -925,11 +1009,13 @@ const KTableValue nsCSSProps::kCaptionSideKTable[] = {
   eCSSKeyword_UNKNOWN,              -1
 };
 
-const KTableValue nsCSSProps::kClearKTable[] = {
-  eCSSKeyword_none, NS_STYLE_CLEAR_NONE,
-  eCSSKeyword_left, NS_STYLE_CLEAR_LEFT,
-  eCSSKeyword_right, NS_STYLE_CLEAR_RIGHT,
-  eCSSKeyword_both, NS_STYLE_CLEAR_BOTH,
+KTableValue nsCSSProps::kClearKTable[] = {
+  eCSSKeyword_none,         NS_STYLE_CLEAR_NONE,
+  eCSSKeyword_left,         NS_STYLE_CLEAR_LEFT,
+  eCSSKeyword_right,        NS_STYLE_CLEAR_RIGHT,
+  eCSSKeyword_inline_start, NS_STYLE_CLEAR_INLINE_START,
+  eCSSKeyword_inline_end,   NS_STYLE_CLEAR_INLINE_END,
+  eCSSKeyword_both,         NS_STYLE_CLEAR_BOTH,
   eCSSKeyword_UNKNOWN,-1
 };
 
@@ -977,6 +1063,7 @@ const KTableValue nsCSSProps::kColorKTable[] = {
   eCSSKeyword__moz_dialog, LookAndFeel::eColorID__moz_dialog,
   eCSSKeyword__moz_dialogtext, LookAndFeel::eColorID__moz_dialogtext,
   eCSSKeyword__moz_dragtargetzone, LookAndFeel::eColorID__moz_dragtargetzone,
+  eCSSKeyword__moz_gtk_info_bar_text, LookAndFeel::eColorID__moz_gtk_info_bar_text,
   eCSSKeyword__moz_hyperlinktext, NS_COLOR_MOZ_HYPERLINKTEXT,
   eCSSKeyword__moz_html_cellhighlight, LookAndFeel::eColorID__moz_html_cellhighlight,
   eCSSKeyword__moz_html_cellhighlighttext, LookAndFeel::eColorID__moz_html_cellhighlighttext,
@@ -1164,6 +1251,68 @@ const KTableValue nsCSSProps::kEmptyCellsKTable[] = {
   eCSSKeyword_UNKNOWN,-1
 };
 
+const KTableValue nsCSSProps::kAlignAllKeywords[] = {
+  eCSSKeyword_auto,          NS_STYLE_ALIGN_AUTO,
+  eCSSKeyword_start,         NS_STYLE_ALIGN_START,
+  eCSSKeyword_end,           NS_STYLE_ALIGN_END,
+  eCSSKeyword_flex_start,    NS_STYLE_ALIGN_FLEX_START,
+  eCSSKeyword_flex_end,      NS_STYLE_ALIGN_FLEX_END,
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE,
+  eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE,
+  eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH,
+  eCSSKeyword_self_start,    NS_STYLE_ALIGN_SELF_START,
+  eCSSKeyword_self_end,      NS_STYLE_ALIGN_SELF_END,
+  eCSSKeyword_space_between, NS_STYLE_ALIGN_SPACE_BETWEEN,
+  eCSSKeyword_space_around,  NS_STYLE_ALIGN_SPACE_AROUND,
+  eCSSKeyword_space_evenly,  NS_STYLE_ALIGN_SPACE_EVENLY,
+  eCSSKeyword_legacy,        NS_STYLE_ALIGN_LEGACY,
+  eCSSKeyword_safe,          NS_STYLE_ALIGN_SAFE,
+  eCSSKeyword_unsafe,        NS_STYLE_ALIGN_UNSAFE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignOverflowPosition[] = {
+  eCSSKeyword_unsafe,        NS_STYLE_ALIGN_UNSAFE,
+  eCSSKeyword_safe,          NS_STYLE_ALIGN_SAFE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignSelfPosition[] = {
+  eCSSKeyword_start,         NS_STYLE_ALIGN_START,
+  eCSSKeyword_end,           NS_STYLE_ALIGN_END,
+  eCSSKeyword_flex_start,    NS_STYLE_ALIGN_FLEX_START,
+  eCSSKeyword_flex_end,      NS_STYLE_ALIGN_FLEX_END,
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_self_start,    NS_STYLE_ALIGN_SELF_START,
+  eCSSKeyword_self_end,      NS_STYLE_ALIGN_SELF_END,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignLegacy[] = {
+  eCSSKeyword_legacy,        NS_STYLE_ALIGN_LEGACY,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignLegacyPosition[] = {
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignAutoStretchBaseline[] = {
+  eCSSKeyword_auto,          NS_STYLE_ALIGN_AUTO,
+  eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH,
+  eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE,
+  eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
 const KTableValue nsCSSProps::kAlignContentKTable[] = {
   eCSSKeyword_flex_start,    NS_STYLE_ALIGN_CONTENT_FLEX_START,
   eCSSKeyword_flex_end,      NS_STYLE_ALIGN_CONTENT_FLEX_END,
@@ -1225,10 +1374,12 @@ const KTableValue nsCSSProps::kJustifyContentKTable[] = {
   eCSSKeyword_UNKNOWN,-1
 };
 
-const KTableValue nsCSSProps::kFloatKTable[] = {
-  eCSSKeyword_none,  NS_STYLE_FLOAT_NONE,
-  eCSSKeyword_left,  NS_STYLE_FLOAT_LEFT,
-  eCSSKeyword_right, NS_STYLE_FLOAT_RIGHT,
+KTableValue nsCSSProps::kFloatKTable[] = {
+  eCSSKeyword_none,         NS_STYLE_FLOAT_NONE,
+  eCSSKeyword_left,         NS_STYLE_FLOAT_LEFT,
+  eCSSKeyword_right,        NS_STYLE_FLOAT_RIGHT,
+  eCSSKeyword_inline_start, NS_STYLE_FLOAT_INLINE_START,
+  eCSSKeyword_inline_end,   NS_STYLE_FLOAT_INLINE_END,
   eCSSKeyword_UNKNOWN,-1
 };
 
@@ -1791,6 +1942,12 @@ const KTableValue nsCSSProps::kTouchActionKTable[] = {
   eCSSKeyword_pan_y,        NS_STYLE_TOUCH_ACTION_PAN_Y,
   eCSSKeyword_manipulation, NS_STYLE_TOUCH_ACTION_MANIPULATION,
   eCSSKeyword_UNKNOWN,      -1
+};
+
+const KTableValue nsCSSProps::kTopLayerKTable[] = {
+  eCSSKeyword_none,     NS_STYLE_TOP_LAYER_NONE,
+  eCSSKeyword_top,      NS_STYLE_TOP_LAYER_TOP,
+  eCSSKeyword_UNKNOWN,  -1
 };
 
 const KTableValue nsCSSProps::kTransformBoxKTable[] = {
@@ -2943,16 +3100,24 @@ nsCSSProps::gPropertyIndexInStruct[eCSSProperty_COUNT_no_shorthands] = {
 
 /* static */ bool
 nsCSSProps::gPropertyEnabled[eCSSProperty_COUNT_with_aliases] = {
+  // If the property has any "ENABLED_IN" flag set, it is disabled by
+  // default. Note that, if a property has pref, whatever its default
+  // value is, it will later be changed in nsCSSProps::AddRefTable().
+  // If the property has "ENABLED_IN" flags but doesn't have a pref,
+  // it is an internal property which is disabled elsewhere.
+  #define IS_ENABLED_BY_DEFAULT(flags_) \
+    (!((flags_) & CSS_PROPERTY_ENABLED_MASK))
+
   #define CSS_PROP(name_, id_, method_, flags_, pref_, parsevariant_,     \
                    kwtable_, stylestruct_, stylestructoffset_, animtype_) \
-    true,
+    IS_ENABLED_BY_DEFAULT(flags_),
   #define CSS_PROP_LIST_INCLUDE_LOGICAL
   #include "nsCSSPropList.h"
   #undef CSS_PROP_LIST_INCLUDE_LOGICAL
   #undef CSS_PROP
 
   #define  CSS_PROP_SHORTHAND(name_, id_, method_, flags_, pref_) \
-    true,
+    IS_ENABLED_BY_DEFAULT(flags_),
   #include "nsCSSPropList.h"
   #undef CSS_PROP_SHORTHAND
 
@@ -2960,6 +3125,8 @@ nsCSSProps::gPropertyEnabled[eCSSProperty_COUNT_with_aliases] = {
     true,
   #include "nsCSSPropAliasList.h"
   #undef CSS_PROP_ALIAS
+
+  #undef IS_ENABLED_BY_DEFAULT
 };
 
 #include "../../dom/base/PropertyUseCounterMap.inc"

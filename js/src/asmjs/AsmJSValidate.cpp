@@ -105,7 +105,7 @@ static inline ParseNode*
 ReturnExpr(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_RETURN));
-    return BinaryLeft(pn);
+    return UnaryKid(pn);
 }
 
 static inline ParseNode*
@@ -584,6 +584,8 @@ TypedArrayLoadType(Scalar::Type viewType)
     MOZ_CRASH("Unexpected array type");
 }
 
+const size_t LIFO_ALLOC_PRIMARY_CHUNK_SIZE = 1 << 12;
+
 namespace {
 
 // The ModuleValidator encapsulates the entire validation of an asm.js module.
@@ -773,6 +775,10 @@ class MOZ_STACK_CLASS ModuleValidator
             MOZ_ASSERT(isAnyArrayView());
             return u.viewInfo.isSharedView_;
         }
+        void setViewIsSharedView() {
+            MOZ_ASSERT(isAnyArrayView());
+            u.viewInfo.isSharedView_ = true;
+        }
         bool isMathFunction() const {
             return which_ == MathBuiltinFunction;
         }
@@ -881,12 +887,25 @@ class MOZ_STACK_CLASS ModuleValidator
         }
     };
 
+    struct SlowFunction
+    {
+        SlowFunction(PropertyName* name, unsigned ms, unsigned line, unsigned column)
+         : name(name), ms(ms), line(line), column(column)
+        {}
+
+        PropertyName* name;
+        unsigned ms;
+        unsigned line;
+        unsigned column;
+    };
+
   private:
     typedef HashMap<PropertyName*, Global*> GlobalMap;
     typedef HashMap<PropertyName*, MathBuiltin> MathNameMap;
     typedef HashMap<PropertyName*, AsmJSAtomicsBuiltinFunction> AtomicsNameMap;
     typedef HashMap<PropertyName*, AsmJSSimdOperation> SimdOperationNameMap;
     typedef Vector<ArrayView> ArrayViewVector;
+    typedef Vector<SlowFunction> SlowFunctionVector;
 
   public:
     typedef HashMap<ExitDescriptor, unsigned, ExitDescriptor> ExitMap;
@@ -918,6 +937,10 @@ class MOZ_STACK_CLASS ModuleValidator
     bool                                    canValidateChangeHeap_;
     bool                                    hasChangeHeap_;
     bool                                    supportsSimd_;
+    bool                                    atomicsPresent_;
+
+    Vector<uint32_t>                        functionEntryOffsets_;
+    SlowFunctionVector                      slowFunctions_;
 
     ScopedJSDeletePtr<ModuleCompileResults> compileResults_;
     DebugOnly<bool>                         finishedFunctionBodies_;
@@ -943,6 +966,9 @@ class MOZ_STACK_CLASS ModuleValidator
         canValidateChangeHeap_(false),
         hasChangeHeap_(false),
         supportsSimd_(cx->jitSupportsSimd()),
+        atomicsPresent_(false),
+        functionEntryOffsets_(cx),
+        slowFunctions_(cx),
         compileResults_(nullptr),
         finishedFunctionBodies_(false)
     {
@@ -1155,6 +1181,7 @@ class MOZ_STACK_CLASS ModuleValidator
         Global* global = moduleLifo_.new_<Global>(Global::AtomicsBuiltinFunction);
         if (!global)
             return false;
+        atomicsPresent_ = true;
         global->u.atomicsBuiltinFunc_ = func;
         return globals_.putNew(varName, global);
     }
@@ -1392,6 +1419,9 @@ class MOZ_STACK_CLASS ModuleValidator
     FuncPtrTable& funcPtrTable(unsigned i) const {
         return *funcPtrTables_[i];
     }
+    uint32_t functionEntryOffset(unsigned i) {
+        return functionEntryOffsets_[i];
+    }
 
     const Global* lookupGlobal(PropertyName* name) const {
         if (GlobalMap::Ptr p = globals_.lookup(name))
@@ -1438,8 +1468,42 @@ class MOZ_STACK_CLASS ModuleValidator
     Label& onDetachedLabel()         { return compileResults_->onDetachedLabel(); }
     Label& onOutOfBoundsLabel()      { return compileResults_->onOutOfBoundsLabel(); }
     Label& onConversionErrorLabel()  { return compileResults_->onConversionErrorLabel(); }
-    Label* functionEntry(unsigned i) { return compileResults_->functionEntry(i); }
     ExitMap::Range allExits() const  { return exits_.all(); }
+
+    bool finishGeneratingFunction(FunctionCompileResults& results) {
+        const AsmFunction& func = results.func();
+        unsigned i = func.funcIndex();
+        if (functionEntryOffsets_.length() <= i && !functionEntryOffsets_.resize(i + 1))
+            return false;
+
+        AsmJSModule::FunctionCodeRange codeRange = results.codeRange();
+        functionEntryOffsets_[i] = codeRange.entry();
+
+        PropertyName* funcName = func.name();
+        unsigned line = func.lineno();
+        unsigned column = func.column();
+
+        // These must be done before the module is done with function bodies.
+        if (results.counts() && !module().addFunctionCounts(results.counts()))
+            return false;
+        if (!module().addFunctionCodeRange(codeRange.name(), codeRange))
+            return false;
+
+        unsigned compileTime = func.compileTime();
+        if (compileTime >= 250) {
+            if (!slowFunctions_.append(SlowFunction(funcName, compileTime, line, column)))
+                return false;
+        }
+
+#if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
+        // Perf and profiling information
+        AsmJSModule::ProfiledFunction pf(funcName, codeRange.entry(), codeRange.end(), line, column);
+        if (!module().addProfiledFunction(Move(pf)))
+            return false;
+#endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
+
+        return true;
+    }
 
     bool finishGeneratingEntry(unsigned exportIndex, Label* begin) {
         MOZ_ASSERT(finishedFunctionBodies_);
@@ -1497,8 +1561,7 @@ class MOZ_STACK_CLASS ModuleValidator
             for (unsigned elemIndex = 0; elemIndex < table.numElems(); elemIndex++) {
                 AsmJSModule::RelativeLink link(AsmJSModule::RelativeLink::RawPointer);
                 link.patchAtOffset = tableBaseOffset + elemIndex * sizeof(uint8_t*);
-                Label* entry = functionEntry(table.elem(elemIndex).funcIndex());
-                link.targetOffset = entry->offset();
+                link.targetOffset = functionEntryOffset(table.elem(elemIndex).funcIndex());
                 if (!module_->addRelativeLink(link))
                     return false;
             }
@@ -1509,29 +1572,28 @@ class MOZ_STACK_CLASS ModuleValidator
     }
 
     void startFunctionBodies() {
+        if (atomicsPresent_) {
+            for (GlobalMap::Range r = globals_.all() ; !r.empty() ; r.popFront()) {
+                Global* g = r.front().value();
+                if (g->isAnyArrayView())
+                    g->setViewIsSharedView();
+            }
+            module_->setViewsAreShared();
+        }
         module_->startFunctionBodies();
     }
     bool finishFunctionBodies(ScopedJSDeletePtr<ModuleCompileResults>* compileResults) {
         // Take ownership of compilation results
         compileResults_ = compileResults->forget();
 
-        // These must be done before the module is done with function bodies.
-        for (size_t i = 0; i < compileResults_->numFunctionCounts(); ++i) {
-            if (!module().addFunctionCounts(compileResults_->functionCount(i)))
-                return false;
-        }
-#if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-        for (size_t i = 0; i < compileResults_->numProfiledFunctions(); ++i) {
-            if (!module().addProfiledFunction(Move(compileResults_->profiledFunction(i))))
-                return false;
-        }
-#endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-
-        // Hand in code ranges, script counts and perf profiling data to the AsmJSModule
-        for (size_t i = 0; i < compileResults_->numCodeRanges(); ++i) {
-            AsmJSModule::FunctionCodeRange& codeRange = compileResults_->codeRange(i);
-            if (!module().addFunctionCodeRange(codeRange.name(), Move(codeRange)))
-                return false;
+        // Patch internal calls to their final positions
+        for (auto& cs : masm().callSites()) {
+            if (!cs.isInternal())
+                continue;
+            MOZ_ASSERT(cs.kind() == CallSiteDesc::Relative);
+            uint32_t callerOffset = cs.returnAddressOffset();
+            uint32_t calleeOffset = functionEntryOffset(cs.targetIndex());
+            masm().patchCall(callerOffset, calleeOffset);
         }
 
         // When an interrupt is triggered, all function code is mprotected and,
@@ -1553,19 +1615,18 @@ class MOZ_STACK_CLASS ModuleValidator
         ScopedJSFreePtr<char> slowFuns;
         int64_t usecAfter = PRMJ_Now();
         int msTotal = (usecAfter - compileResults_->usecBefore()) / PRMJ_USEC_PER_MSEC;
-        ModuleCompileResults::SlowFunctionVector& slowFunctions = compileResults_->slowFunctions();
-        if (!slowFunctions.empty()) {
-            slowFuns.reset(JS_smprintf("; %d functions compiled slowly: ", slowFunctions.length()));
+        if (!slowFunctions_.empty()) {
+            slowFuns.reset(JS_smprintf("; %d functions compiled slowly: ", slowFunctions_.length()));
             if (!slowFuns)
                 return;
-            for (unsigned i = 0; i < slowFunctions.length(); i++) {
-                ModuleCompileResults::SlowFunction& func = slowFunctions[i];
+            for (unsigned i = 0; i < slowFunctions_.length(); i++) {
+                ModuleValidator::SlowFunction& func = slowFunctions_[i];
                 JSAutoByteString name;
                 if (!AtomToPrintableString(cx_, func.name, &name))
                     return;
                 slowFuns.reset(JS_smprintf("%s%s:%u:%u (%ums)%s", slowFuns.get(),
                                            name.ptr(), func.line, func.column, func.ms,
-                                           i+1 < slowFunctions.length() ? ", " : ""));
+                                           i+1 < slowFunctions_.length() ? ", " : ""));
                 if (!slowFuns)
                     return;
             }
@@ -6352,8 +6413,7 @@ ParseFunction(ModuleValidator& m, ParseNode** fnOut)
         return false;
 
     Directives newDirectives = directives;
-    AsmJSParseContext funpc(&m.parser(), outerpc, fn, funbox, &newDirectives,
-                            /* blockScopeDepth = */ 0);
+    AsmJSParseContext funpc(&m.parser(), outerpc, fn, funbox, &newDirectives);
     if (!funpc.init(m.parser()))
         return false;
 
@@ -6400,6 +6460,9 @@ CheckFunction(ModuleValidator& m, LifoAlloc& lifo, AsmFunction** funcOut)
     }
 
     AsmFunction* asmFunc = lifo.new_<AsmFunction>(lifo);
+    if (!asmFunc)
+        return false;
+
     FunctionValidator f(m, *asmFunc, fn);
     if (!f.init())
         return false;
@@ -6521,7 +6584,10 @@ CheckFunctionsSequential(ModuleValidator& m, ScopedJSDeletePtr<ModuleCompileResu
             func->accumulateCompileTime((PRMJ_Now() - before) / PRMJ_USEC_PER_MSEC);
         }
 
-        if (!GenerateAsmFunctionCode(mc, *func, *mir, *lir))
+        FunctionCompileResults results;
+        if (!GenerateAsmFunctionCode(mc, *func, *mir, *lir, &results))
+            return false;
+        if (!m.finishGeneratingFunction(results))
             return false;
     }
 
@@ -6602,10 +6668,10 @@ GetFinishedCompilation(ModuleCompiler& m, ParallelGroupState& group)
 }
 
 static bool
-GetUsedTask(ModuleCompiler& m, ParallelGroupState& group, AsmJSParallelTask** outTask)
+GetUsedTask(ModuleValidator& m, ModuleCompiler& mc, ParallelGroupState& group, AsmJSParallelTask** outTask)
 {
     // Block until a used LifoAlloc becomes available.
-    AsmJSParallelTask* task = GetFinishedCompilation(m, group);
+    AsmJSParallelTask* task = GetFinishedCompilation(mc, group);
     if (!task)
         return false;
 
@@ -6613,7 +6679,10 @@ GetUsedTask(ModuleCompiler& m, ParallelGroupState& group, AsmJSParallelTask** ou
     func.accumulateCompileTime(task->compileTime);
 
     // Perform code generation on the main thread.
-    if (!GenerateAsmFunctionCode(m, func, *task->mir, *task->lir))
+    FunctionCompileResults results;
+    if (!GenerateAsmFunctionCode(mc, func, *task->mir, *task->lir, &results))
+        return false;
+    if (!m.finishGeneratingFunction(results))
         return false;
 
     group.compiledJobs++;
@@ -6665,7 +6734,7 @@ CheckFunctionsParallel(ModuleValidator& m, ParallelGroupState& group,
         if (tk != TOK_FUNCTION)
             break;
 
-        if (!task && !GetUnusedTask(group, i, &task) && !GetUsedTask(mc, group, &task))
+        if (!task && !GetUnusedTask(group, i, &task) && !GetUsedTask(m, mc, group, &task))
             return false;
 
         AsmFunction* func;
@@ -6693,7 +6762,7 @@ CheckFunctionsParallel(ModuleValidator& m, ParallelGroupState& group,
     // Block for all outstanding helpers to complete.
     while (group.outstandingJobs > 0) {
         AsmJSParallelTask* ignored = nullptr;
-        if (!GetUsedTask(mc, group, &ignored))
+        if (!GetUsedTask(m, mc, group, &ignored))
             return false;
     }
 
@@ -7037,7 +7106,7 @@ GenerateEntry(ModuleValidator& m, unsigned exportIndex)
     // Save the return address if it wasn't already saved by the call insn.
 #if defined(JS_CODEGEN_ARM)
     masm.push(lr);
-#elif defined(JS_CODEGEN_MIPS32)
+#elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     masm.push(ra);
 #elif defined(JS_CODEGEN_X86)
     static const unsigned EntryFrameSize = sizeof(void*);
@@ -7049,15 +7118,15 @@ GenerateEntry(ModuleValidator& m, unsigned exportIndex)
     masm.PushRegsInMask(NonVolatileRegs);
     MOZ_ASSERT(masm.framePushed() == FramePushedAfterSave);
 
-    // ARM and MIPS have a globally-pinned GlobalReg (x64 uses RIP-relative
+    // ARM and MIPS/MIPS64 have a globally-pinned GlobalReg (x64 uses RIP-relative
     // addressing, x86 uses immediates in effective addresses). For the
     // AsmJSGlobalRegBias addition, see Assembler-(mips,arm).h.
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     masm.movePtr(IntArgReg1, GlobalReg);
     masm.addPtr(Imm32(AsmJSGlobalRegBias), GlobalReg);
 #endif
 
-    // ARM, MIPS and x64 have a globally-pinned HeapReg (x86 uses immediates in
+    // ARM, MIPS/MIPS64 and x64 have a globally-pinned HeapReg (x86 uses immediates in
     // effective addresses). Loading the heap register depends on the global
     // register already having been loaded.
     masm.loadAsmJSHeapRegisterFromGlobalData();
@@ -7163,7 +7232,9 @@ GenerateEntry(ModuleValidator& m, unsigned exportIndex)
 
     // Call into the real function.
     masm.assertStackAlignment(AsmJSStackAlignment);
-    masm.call(CallSiteDesc(CallSiteDesc::Relative), m.functionEntry(func.funcIndex()));
+    Label funcLabel;
+    funcLabel.bind(m.functionEntryOffset(func.funcIndex()));
+    masm.call(CallSiteDesc(CallSiteDesc::Relative), &funcLabel);
 
     // Recover the stack pointer value before dynamic alignment.
     masm.loadAsmJSActivation(scratch);
@@ -7366,7 +7437,7 @@ GenerateFFIInterpExit(ModuleValidator& m, const Signature& sig, unsigned exitInd
     return !masm.oom() && m.finishGeneratingInterpExit(exitIndex, &begin, &profilingReturn);
 }
 
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
 static const unsigned MaybeSavedGlobalReg = sizeof(void*);
 #else
 static const unsigned MaybeSavedGlobalReg = 0;
@@ -7410,7 +7481,7 @@ GenerateFFIIonExit(ModuleValidator& m, const Signature& sig, unsigned exitIndex,
     m.masm().append(AsmJSGlobalAccess(masm.leaRipRelative(callee), globalDataOffset));
 #elif defined(JS_CODEGEN_X86)
     m.masm().append(AsmJSGlobalAccess(masm.movlWithPatch(Imm32(0), callee), globalDataOffset));
-#elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     masm.computeEffectiveAddress(Address(GlobalReg, globalDataOffset - AsmJSGlobalRegBias), callee);
 #endif
 
@@ -7446,7 +7517,7 @@ GenerateFFIIonExit(ModuleValidator& m, const Signature& sig, unsigned exitIndex,
     //    so they must be explicitly preserved. Only save GlobalReg since
     //    HeapReg must be reloaded (from global data) after the call since the
     //    heap may change during the FFI call.
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     static_assert(MaybeSavedGlobalReg == sizeof(void*), "stack frame accounting");
     masm.storePtr(GlobalReg, Address(masm.getStackPointer(), ionFrameBytes));
 #endif
@@ -7562,7 +7633,7 @@ GenerateFFIIonExit(ModuleValidator& m, const Signature& sig, unsigned exitIndex,
     }
 
     // Reload the global register since Ion code can clobber any register.
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     static_assert(MaybeSavedGlobalReg == sizeof(void*), "stack frame accounting");
     masm.loadPtr(Address(masm.getStackPointer(), ionFrameBytes), GlobalReg);
 #endif
@@ -7877,7 +7948,7 @@ GenerateAsyncInterruptExit(ModuleValidator& m, Label* throwLabel)
     masm.PopRegsInMask(AllRegsExceptSP); // restore all GP/FP registers (except SP)
     masm.popFlags();              // after this, nothing that sets conditions
     masm.ret();                   // pop resumePC into PC
-#elif defined(JS_CODEGEN_MIPS32)
+#elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     // Reserve space to store resumePC.
     masm.subFromStackPtr(Imm32(sizeof(intptr_t)));
     // set to zero so we can use masm.framePushed() below.
@@ -8135,7 +8206,9 @@ CheckModule(ExclusiveContext* cx, AsmJSParser& parser, ParseNode* stmtList,
     m.startFunctionBodies();
 
 #if !defined(ENABLE_SHARED_ARRAY_BUFFER)
-    MOZ_ASSERT(!m.module().hasArrayView() || !m.module().isSharedView());
+    if (m.module().hasArrayView() && m.module().isSharedView())
+        return m.failOffset(m.parser().tokenStream.currentToken().pos.begin,
+                            "shared views not supported by this build");
 #endif
 
     ScopedJSDeletePtr<ModuleCompileResults> mcd;
@@ -8213,6 +8286,10 @@ EstablishPreconditions(ExclusiveContext* cx, AsmJSParser& parser)
 
     if (parser.pc->isArrowFunction())
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by arrow function context");
+
+    // Class constructors are also methods
+    if (parser.pc->isMethod())
+        return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by class constructor or method context");
 
     return true;
 }

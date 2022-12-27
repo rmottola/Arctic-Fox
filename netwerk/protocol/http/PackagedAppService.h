@@ -13,6 +13,7 @@
 #include "PackagedAppVerifier.h"
 #include "nsIMultiPartChannel.h"
 #include "PackagedAppVerifier.h"
+#include "nsIPackagedAppChannelListener.h"
 
 namespace mozilla {
 namespace net {
@@ -124,7 +125,10 @@ private:
                                              const nsACString& aPackageOrigin);
     // Registers a callback which gets called when the given nsIURI is downloaded
     // aURI is the full URI of a subresource, composed of packageURI + !// + subresourcePath
-    nsresult AddCallback(nsIURI *aURI, nsICacheEntryOpenCallback *aCallback);
+    // aRequester is the outer channel who makes the request for aURI.
+    nsresult AddCallback(nsIURI *aURI,
+                         nsICacheEntryOpenCallback *aCallback,
+                         nsIChannel* aRequester);
 
     // Remove the callback from the resource callback list.
     nsresult RemoveCallbacks(nsICacheEntryOpenCallback* aCallback);
@@ -191,7 +195,7 @@ private:
     static nsresult GetSubresourceURI(nsIRequest * aRequest, nsIURI **aResult);
     // Used to write data into the cache entry of the resource currently being
     // downloaded. It is kept alive until the downloader receives OnStopRequest
-    nsRefPtr<CacheEntryWriter> mWriter;
+    RefPtr<CacheEntryWriter> mWriter;
     // Cached value of nsICacheStorage
     nsCOMPtr<nsICacheStorage> mCacheStorage;
     // A hastable containing all the consumers which requested a resource and need
@@ -207,7 +211,10 @@ private:
     bool mIsFromCache;
 
     // Deal with verification and delegate callbacks to the downloader.
-    nsRefPtr<PackagedAppVerifier> mVerifier;
+    RefPtr<PackagedAppVerifier> mVerifier;
+
+    // The outer channels which have issued the request to the downloader.
+    nsCOMArray<nsIPackagedAppChannelListener> mRequesters;
 
     // The package origin without signed package origin identifier.
     // If you need the origin with the signity taken into account, use
@@ -249,7 +256,7 @@ private:
   private:
     ~PackagedAppChannelListener() { }
 
-    nsRefPtr<PackagedAppDownloader> mDownloader;
+    RefPtr<PackagedAppDownloader> mDownloader;
     nsCOMPtr<nsIStreamListener> mListener; // nsMultiMixedConv
   };
 

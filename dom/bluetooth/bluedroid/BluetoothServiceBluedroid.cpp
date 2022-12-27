@@ -68,7 +68,7 @@ using namespace mozilla::ipc;
 USING_BLUETOOTH_NAMESPACE
 
 static BluetoothInterface* sBtInterface;
-static nsTArray<nsRefPtr<BluetoothProfileController> > sControllerArray;
+static nsTArray<RefPtr<BluetoothProfileController> > sControllerArray;
 
 /*
  *  Static methods
@@ -165,7 +165,7 @@ public:
     // Register all the bluedroid callbacks before enable() gets called. This is
     // required to register a2dp callbacks before a2dp media task starts up.
     // If any interface cannot be initialized, turn on bluetooth core anyway.
-    nsRefPtr<ProfileInitResultHandler> res =
+    RefPtr<ProfileInitResultHandler> res =
       new ProfileInitResultHandler(MOZ_ARRAY_LENGTH(sInitManager));
 
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sInitManager); ++i) {
@@ -603,6 +603,159 @@ BluetoothServiceBluedroid::UnregisterGattServerInternal(
   gatt->UnregisterServer(aServerIf, aRunnable);
 }
 
+void
+BluetoothServiceBluedroid::GattServerAddServiceInternal(
+  const nsAString& aAppUuid,
+  const BluetoothGattServiceId& aServiceId,
+  uint16_t aHandleCount,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerAddService(aAppUuid, aServiceId, aHandleCount, aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerAddIncludedServiceInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  const BluetoothAttributeHandle& aIncludedServiceHandle,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerAddIncludedService(aAppUuid,
+                                 aServiceHandle,
+                                 aIncludedServiceHandle,
+                                 aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerAddCharacteristicInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  const BluetoothUuid& aCharacteristicUuid,
+  BluetoothGattAttrPerm aPermissions,
+  BluetoothGattCharProp aProperties,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerAddCharacteristic(aAppUuid,
+                                aServiceHandle,
+                                aCharacteristicUuid,
+                                aPermissions,
+                                aProperties,
+                                aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerAddDescriptorInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  const BluetoothAttributeHandle& aCharacteristicHandle,
+  const BluetoothUuid& aDescriptorUuid,
+  BluetoothGattAttrPerm aPermissions,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerAddDescriptor(aAppUuid,
+                            aServiceHandle,
+                            aCharacteristicHandle,
+                            aDescriptorUuid,
+                            aPermissions,
+                            aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerRemoveServiceInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerRemoveService(aAppUuid, aServiceHandle, aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerStartServiceInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerStartService(aAppUuid, aServiceHandle, aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerStopServiceInternal(
+  const nsAString& aAppUuid,
+  const BluetoothAttributeHandle& aServiceHandle,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerStopService(aAppUuid, aServiceHandle, aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::GattServerSendResponseInternal(
+  const nsAString& aAppUuid,
+  const nsAString& aAddress,
+  uint16_t aStatus,
+  int32_t aRequestId,
+  const BluetoothGattResponse& aRsp,
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothGattManager* gatt = BluetoothGattManager::Get();
+  ENSURE_GATT_MGR_IS_READY_VOID(gatt, aRunnable);
+
+  gatt->ServerSendResponse(
+    aAppUuid, aAddress, aStatus, aRequestId, aRsp, aRunnable);
+}
+
 nsresult
 BluetoothServiceBluedroid::GetAdaptersInternal(
   BluetoothReplyRunnable* aRunnable)
@@ -651,7 +804,7 @@ public:
 
   int mDeviceCount;
   InfallibleTArray<BluetoothNamedValue> mDevicesPack;
-  nsRefPtr<BluetoothReplyRunnable> mRunnable;
+  RefPtr<BluetoothReplyRunnable> mRunnable;
 };
 
 class BluetoothServiceBluedroid::GetRemoteDevicePropertiesResultHandler
@@ -756,7 +909,7 @@ class BluetoothServiceBluedroid::DispatchReplyErrorResultHandler final
 {
 public:
   DispatchReplyErrorResultHandler(
-    nsTArray<nsRefPtr<BluetoothReplyRunnable>>& aRunnableArray,
+    nsTArray<RefPtr<BluetoothReplyRunnable>>& aRunnableArray,
     BluetoothReplyRunnable* aRunnable)
     : mRunnableArray(aRunnableArray)
     , mRunnable(aRunnable)
@@ -773,7 +926,7 @@ public:
   }
 
 private:
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>>& mRunnableArray;
+  nsTArray<RefPtr<BluetoothReplyRunnable>>& mRunnableArray;
   BluetoothReplyRunnable* mRunnable;
 };
 
@@ -930,7 +1083,7 @@ BluetoothServiceBluedroid::GetServiceChannel(
   mGetRemoteServiceRecordArray.AppendElement(
     GetRemoteServiceRecordRequest(aDeviceAddress, uuid, aManager));
 
-  nsRefPtr<BluetoothResultHandler> res =
+  RefPtr<BluetoothResultHandler> res =
     new GetRemoteServiceRecordResultHandler(mGetRemoteServiceRecordArray,
                                             aDeviceAddress, uuid);
 
@@ -1025,7 +1178,7 @@ BluetoothServiceBluedroid::UpdateSdpRecords(
   mGetRemoteServicesArray.AppendElement(
     GetRemoteServicesRequest(aDeviceAddress, aManager));
 
-  nsRefPtr<BluetoothResultHandler> res =
+  RefPtr<BluetoothResultHandler> res =
     new GetRemoteServicesResultHandler(mGetRemoteServicesArray,
                                        aDeviceAddress, aManager);
 
@@ -1655,7 +1808,7 @@ BluetoothServiceBluedroid::AdapterStateChangedNotification(bool aState)
 
     // Cleanup Bluetooth interfaces after state becomes BT_STATE_OFF. This
     // will also stop the Bluetooth daemon and disable the adapter.
-    nsRefPtr<ProfileDeinitResultHandler> res =
+    RefPtr<ProfileDeinitResultHandler> res =
       new ProfileDeinitResultHandler(MOZ_ARRAY_LENGTH(sDeinitManager),
                                      mIsRestart);
 
@@ -1880,7 +2033,7 @@ BluetoothServiceBluedroid::RemoteDevicePropertiesNotification(
           break;
         }
       }
-      unused << NS_WARN_IF(i == mGetRemoteServiceRecordArray.Length());
+      Unused << NS_WARN_IF(i == mGetRemoteServiceRecordArray.Length());
     } else if (p.mType == PROPERTY_UNKNOWN) {
       /* Bug 1065999: working around unknown properties */
     } else {

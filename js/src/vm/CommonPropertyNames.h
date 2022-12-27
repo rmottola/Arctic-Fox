@@ -66,7 +66,6 @@
     macro(displayURL, displayURL, "displayURL") \
     macro(done, done, "done") \
     macro(dotGenerator, dotGenerator, ".generator") \
-    macro(dotGenRVal, dotGenRVal, ".genrval") \
     macro(each, each, "each") \
     macro(elementType, elementType, "elementType") \
     macro(empty, empty, "") \
@@ -131,6 +130,7 @@
     macro(int8, int8, "int8") \
     macro(int16, int16, "int16") \
     macro(int32, int32, "int32") \
+    macro(isEntryPoint, isEntryPoint, "isEntryPoint") \
     macro(isExtensible, isExtensible, "isExtensible") \
     macro(iteratorIntrinsic, iteratorIntrinsic, "__iterator__") \
     macro(join, join, "join") \
@@ -164,8 +164,8 @@
     macro(NFKC, NFKC, "NFKC") \
     macro(NFKD, NFKD, "NFKD") \
     macro(nonincrementalReason, nonincrementalReason, "nonincrementalReason") \
+    macro(noFilename, noFilename, "noFilename") \
     macro(noStack, noStack, "noStack") \
-    macro(noSuchMethod, noSuchMethod, "__noSuchMethod__") \
     macro(NumberFormat, NumberFormat, "NumberFormat") \
     macro(NumberFormatFormatGet, NumberFormatFormatGet, "Intl_NumberFormat_format_get") \
     macro(numeric, numeric, "numeric") \
@@ -275,7 +275,7 @@
     macro(match, match, "match") \
     macro(species, species, "species") \
     macro(hasInstance, hasInstance, "hasInstance") \
-    macro(toPrimitive, toPrimitive, "toPrimtive") \
+    macro(toPrimitive, toPrimitive, "toPrimitive") \
     macro(unscopables, unscopables, "unscopables") \
     /* Same goes for the descriptions of the well-known symbols. */ \
     macro(Symbol_create, Symbol_create, "Symbol.create") \
@@ -287,5 +287,7 @@
     macro(Symbol_hasInstance, Symbol_hasInstance, "Symbol.hasInstance") \
     macro(Symbol_toPrimitive, Symbol_toPrimitive, "Symbol.toPrimitive") \
     macro(Symbol_unscopables, Symbol_unscopables, "Symbol.unscopables") \
+    /* Function names for properties named by symbols. */ \
+    macro(Symbol_iterator_fun, Symbol_iterator_fun, "[Symbol.iterator]") \
 
 #endif /* vm_CommonPropertyNames_h */

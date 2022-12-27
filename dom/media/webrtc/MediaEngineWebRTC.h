@@ -84,6 +84,9 @@ public:
   }
   nsresult Start(SourceMediaStream* aMediaStream, TrackID aId) override;
   nsresult Stop(SourceMediaStream* aMediaStream, TrackID aId) override;
+  nsresult Restart(const dom::MediaTrackConstraints& aConstraints,
+                   const MediaEnginePrefs &aPrefs,
+                   const nsString& aDeviceId) override;
   void SetDirectListeners(bool aDirect) override
   {}
   nsresult Config(bool aEchoOn, uint32_t aEcho, bool aAgcOn,
@@ -132,8 +135,10 @@ public:
     , mThread(aThread)
     , mCapIndex(aIndex)
     , mChannel(-1)
+    , mNrAllocations(0)
     , mInitDone(false)
     , mStarted(false)
+    , mSampleFrequency(MediaEngine::DEFAULT_SAMPLE_RATE)
     , mEchoOn(false), mAgcOn(false), mNoiseOn(false)
     , mEchoCancel(webrtc::kEcDefault)
     , mAGC(webrtc::kAgcDefault)
@@ -155,6 +160,9 @@ public:
   virtual nsresult Deallocate() override;
   virtual nsresult Start(SourceMediaStream* aStream, TrackID aID) override;
   virtual nsresult Stop(SourceMediaStream* aSource, TrackID aID) override;
+  virtual nsresult Restart(const dom::MediaTrackConstraints& aConstraints,
+                           const MediaEnginePrefs &aPrefs,
+                           const nsString& aDeviceId) override;
   virtual void SetDirectListeners(bool aHasDirectListeners) override {};
   virtual nsresult Config(bool aEchoOn, uint32_t aEcho,
                           bool aAgcOn, uint32_t aAGC,
@@ -208,10 +216,11 @@ private:
   // from kStarted to kStopped (which are combined with EndTrack()).
   // mSources[] is accessed from webrtc threads.
   Monitor mMonitor;
-  nsTArray<nsRefPtr<SourceMediaStream>> mSources; // When this goes empty, we shut down HW
+  nsTArray<RefPtr<SourceMediaStream>> mSources;
   nsCOMPtr<nsIThread> mThread;
   int mCapIndex;
   int mChannel;
+  int mNrAllocations; // When this becomes 0, we shut down HW
   TrackID mTrackID;
   bool mInitDone;
   bool mStarted;
@@ -219,6 +228,7 @@ private:
   nsString mDeviceName;
   nsCString mDeviceUUID;
 
+  uint32_t mSampleFrequency;
   bool mEchoOn, mAgcOn, mNoiseOn;
   webrtc::EcModes  mEchoCancel;
   webrtc::AgcModes mAGC;
@@ -238,9 +248,9 @@ public:
   void Shutdown() override;
 
   virtual void EnumerateVideoDevices(dom::MediaSourceEnum,
-                                     nsTArray<nsRefPtr<MediaEngineVideoSource>>*) override;
+                                     nsTArray<RefPtr<MediaEngineVideoSource>>*) override;
   virtual void EnumerateAudioDevices(dom::MediaSourceEnum,
-                                     nsTArray<nsRefPtr<MediaEngineAudioSource>>*) override;
+                                     nsTArray<RefPtr<MediaEngineAudioSource>>*) override;
 private:
   ~MediaEngineWebRTC() {
     Shutdown();

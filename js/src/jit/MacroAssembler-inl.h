@@ -19,6 +19,8 @@
 # include "jit/arm64/MacroAssembler-arm64-inl.h"
 #elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/MacroAssembler-mips32-inl.h"
+#elif defined(JS_CODEGEN_MIPS64)
+# include "jit/mips64/MacroAssembler-mips64-inl.h"
 #elif !defined(JS_CODEGEN_NONE)
 # error "Unknown architecture!"
 #endif
@@ -79,15 +81,22 @@ MacroAssembler::PushWithPatch(ImmPtr imm)
 void
 MacroAssembler::call(const CallSiteDesc& desc, const Register reg)
 {
-    call(reg);
-    append(desc, currentOffset(), framePushed());
+    CodeOffsetLabel l = call(reg);
+    append(desc, l, framePushed());
 }
 
 void
 MacroAssembler::call(const CallSiteDesc& desc, Label* label)
 {
-    call(label);
-    append(desc, currentOffset(), framePushed());
+    CodeOffsetLabel l = call(label);
+    append(desc, l, framePushed());
+}
+
+void
+MacroAssembler::call(const CallSiteDesc& desc, AsmJSInternalCallee callee)
+{
+    CodeOffsetLabel l = callWithPatch();
+    append(desc, l, framePushed(), callee.index);
 }
 
 // ===============================================================

@@ -28,7 +28,7 @@ WebBrowserPersistRemoteDocument
 WebBrowserPersistRemoteDocument::~WebBrowserPersistRemoteDocument()
 {
     if (mActor) {
-        unused << mActor->Send__delete__(mActor);
+        Unused << mActor->Send__delete__(mActor);
         // That will call mActor->ActorDestroy, which calls this->ActorDestroy
         // (whether or not the IPC send succeeds).
     }
@@ -138,7 +138,7 @@ WebBrowserPersistRemoteDocument::ReadResources(nsIWebBrowserPersistResourceVisit
     if (!mActor) {
         return NS_ERROR_FAILURE;
     }
-    nsRefPtr<WebBrowserPersistResourcesParent> subActor =
+    RefPtr<WebBrowserPersistResourcesParent> subActor =
         new WebBrowserPersistResourcesParent(this, aVisitor);
     return mActor->SendPWebBrowserPersistResourcesConstructor(
         subActor.forget().take())

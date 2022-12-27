@@ -7,8 +7,8 @@
 #ifndef mozilla_TimelineMarker_h_
 #define mozilla_TimelineMarker_h_
 
-#include "nsContentUtils.h"
 #include "AbstractTimelineMarker.h"
+#include "js/RootingAPI.h"
 
 namespace mozilla {
 
@@ -18,19 +18,17 @@ namespace mozilla {
 class TimelineMarker : public AbstractTimelineMarker
 {
 public:
-  TimelineMarker(const char* aName,
-                 MarkerTracingType aTracingType,
-                 MarkerStackRequest aStackRequest = MarkerStackRequest::STACK);
+  explicit TimelineMarker(const char* aName,
+                          MarkerTracingType aTracingType,
+                          MarkerStackRequest aStackRequest = MarkerStackRequest::STACK);
 
-  TimelineMarker(const char* aName,
-                 const TimeStamp& aTime,
-                 MarkerTracingType aTracingType,
-                 MarkerStackRequest aStackRequest = MarkerStackRequest::STACK);
+  explicit TimelineMarker(const char* aName,
+                          const TimeStamp& aTime,
+                          MarkerTracingType aTracingType,
+                          MarkerStackRequest aStackRequest = MarkerStackRequest::STACK);
 
-  virtual bool Equals(const AbstractTimelineMarker& aOther) override;
   virtual void AddDetails(JSContext* aCx, dom::ProfileTimelineMarker& aMarker) override;
-
-  JSObject* GetStack();
+  virtual JSObject* GetStack() override;
 
 protected:
   void CaptureStack();

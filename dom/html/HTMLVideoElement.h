@@ -137,7 +137,7 @@ protected:
   virtual void WakeLockRelease() override;
   void UpdateScreenWakeLock();
 
-  nsRefPtr<WakeLock> mScreenWakeLock;
+  RefPtr<WakeLock> mScreenWakeLock;
 
 private:
   static void MapAttributesIntoRule(const nsMappedAttributes* aAttributes,

@@ -6,6 +6,7 @@
 #include "TextureHost.h"
 
 #include "CompositableHost.h"           // for CompositableHost
+#include "LayerScope.h"
 #include "LayersLogging.h"              // for AppendToString
 #include "mozilla/gfx/2D.h"             // for DataSourceSurface, Factory
 #include "mozilla/ipc/Shmem.h"          // for Shmem
@@ -17,13 +18,15 @@
 #include "mozilla/layers/TextureHostOGL.h"  // for TextureHostOGL
 #include "mozilla/layers/YCbCrImageDataSerializer.h"
 #include "nsAString.h"
-#include "mozilla/nsRefPtr.h"           // for nsRefPtr
+#include "mozilla/RefPtr.h"           // for nsRefPtr
 #include "nsPrintfCString.h"            // for nsPrintfCString
 #include "mozilla/layers/PTextureParent.h"
 #include "mozilla/unused.h"
 #include <limits>
 #include "../opengl/CompositorOGL.h"
+#include "gfxPrefs.h"
 #include "gfxUtils.h"
+#include "IPDLActor.h"
 
 #ifdef MOZ_ENABLE_D3D10_LAYER
 #include "../d3d11/CompositorD3D11.h"
@@ -59,7 +62,7 @@ namespace layers {
  * TextureParent is the host-side IPDL glue between TextureClient and TextureHost.
  * It is an IPDL actor just like LayerParent, CompositableParent, etc.
  */
-class TextureParent : public PTextureParent
+class TextureParent : public ParentActor<PTextureParent>
 {
 public:
   explicit TextureParent(CompositableParentManager* aManager);
@@ -74,17 +77,11 @@ public:
 
   virtual bool RecvClientRecycle() override;
 
-  virtual bool RecvClearTextureHostSync() override;
-
-  virtual bool RecvRemoveTexture() override;
-
   virtual bool RecvRecycleTexture(const TextureFlags& aTextureFlags) override;
 
   TextureHost* GetTextureHost() { return mTextureHost; }
 
-  void ActorDestroy(ActorDestroyReason why) override;
-
-  void ClearTextureHost();
+  virtual void Destroy() override;
 
   CompositableParentManager* mCompositableManager;
   RefPtr<TextureHost> mWaitForClientRecycle;
@@ -174,7 +171,7 @@ TextureHost::SetAcquireFenceHandle(const FenceHandle& aAcquireFenceHandle)
 FenceHandle
 TextureHost::GetAndResetAcquireFenceHandle()
 {
-  nsRefPtr<FenceHandle::FdObj> fdObj = mAcquireFenceHandle.GetAndResetFdObj();
+  RefPtr<FenceHandle::FdObj> fdObj = mAcquireFenceHandle.GetAndResetFdObj();
   return FenceHandle(fdObj);
 }
 
@@ -212,10 +209,10 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
       return CreateBackendIndependentTextureHost(aDesc, aDeallocator, aFlags);
 
     case SurfaceDescriptor::TEGLImageDescriptor:
-    case SurfaceDescriptor::TNewSurfaceDescriptorGralloc:
     case SurfaceDescriptor::TSurfaceTextureDescriptor:
       return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
 
+    case SurfaceDescriptor::TNewSurfaceDescriptorGralloc:
     case SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
       if (aBackend == LayersBackend::LAYERS_OPENGL) {
         return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
@@ -413,7 +410,7 @@ BufferTextureHost::UpdatedInternal(const nsIntRegion* aRegion)
   // If the last frame wasn't uploaded yet, and we -don't- have a partial update,
   // we still need to update the full surface.
   if (aRegion && !mNeedsFullUpdate) {
-    mMaybeUpdatedRegion = mMaybeUpdatedRegion.Or(mMaybeUpdatedRegion, *aRegion);
+    mMaybeUpdatedRegion.OrWith(*aRegion);
   } else {
     mNeedsFullUpdate = true;
   }
@@ -774,7 +771,7 @@ TextureParent::CompositorRecycle()
   mTextureHost->ClearRecycleCallback();
 
   if (mTextureHost->GetFlags() & TextureFlags::RECYCLE) {
-    mozilla::unused << SendCompositorRecycle();
+    mozilla::Unused << SendCompositorRecycle();
     // Don't forget to prepare for the next reycle
     // if TextureClient request it.
     mWaitForClientRecycle = mTextureHost;
@@ -814,37 +811,8 @@ TextureParent::Init(const SurfaceDescriptor& aSharedData,
   return !!mTextureHost;
 }
 
-bool
-TextureParent::RecvRemoveTexture()
-{
-  return PTextureParent::Send__delete__(this);
-}
-
-bool
-TextureParent::RecvClearTextureHostSync()
-{
-  ClearTextureHost();
-  return true;
-}
-
 void
-TextureParent::ActorDestroy(ActorDestroyReason why)
-{
-  switch (why) {
-  case AncestorDeletion:
-  case Deletion:
-  case NormalShutdown:
-  case AbnormalShutdown:
-    break;
-  case FailedConstructor:
-    NS_RUNTIMEABORT("FailedConstructor isn't possible in PTexture");
-  }
-
-  ClearTextureHost();
-}
-
-void
-TextureParent::ClearTextureHost()
+TextureParent::Destroy()
 {
   if (!mTextureHost) {
     return;

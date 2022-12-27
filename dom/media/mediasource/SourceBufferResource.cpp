@@ -64,7 +64,7 @@ SourceBufferResource::ReadInternal(char* aBuffer, uint32_t aCount, uint32_t* aBy
   uint32_t available = GetLength() - readOffset;
   uint32_t count = std::min(aCount, available);
   SBR_DEBUGV("readOffset=%llu GetLength()=%u available=%u count=%u mEnded=%d",
-             this, readOffset, GetLength(), available, count, mEnded);
+             readOffset, GetLength(), available, count, mEnded);
   if (available == 0) {
     SBR_DEBUGV("reached EOF");
     *aBytes = 0;

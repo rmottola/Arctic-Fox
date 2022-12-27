@@ -72,11 +72,11 @@ class TempAllocPolicy
                                        void* reallocPtr = nullptr);
 
     template <typename T>
-    T* onOutOfMemoryTyped(AllocFunction allocFunc, size_t numElems) {
+    T* onOutOfMemoryTyped(AllocFunction allocFunc, size_t numElems, void* reallocPtr = nullptr) {
         size_t bytes;
         if (MOZ_UNLIKELY(!CalculateAllocSize<T>(numElems, &bytes)))
             return nullptr;
-        return static_cast<T*>(onOutOfMemory(allocFunc, bytes));
+        return static_cast<T*>(onOutOfMemory(allocFunc, bytes, reallocPtr));
     }
 
   public:
@@ -118,7 +118,7 @@ class TempAllocPolicy
     T* pod_realloc(T* prior, size_t oldSize, size_t newSize) {
         T* p2 = maybe_pod_realloc<T>(prior, oldSize, newSize);
         if (MOZ_UNLIKELY(!p2))
-            p2 = onOutOfMemoryTyped<T>(AllocFunction::Realloc, newSize);
+            p2 = onOutOfMemoryTyped<T>(AllocFunction::Realloc, newSize, prior);
         return p2;
     }
 

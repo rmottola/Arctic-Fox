@@ -67,11 +67,28 @@ function testClone() {
   });
 }
 
+function testError() {
+  var res = Response.error();
+  is(res.status, 0, "Error response status should be 0");
+  try {
+    res.headers.set("someheader", "not allowed");
+    ok(false, "Error response should have immutable headers");
+  } catch(e) {
+    ok(true, "Error response should have immutable headers");
+  }
+}
+
 function testRedirect() {
   var res = Response.redirect("./redirect.response");
   is(res.status, 302, "Default redirect has status code 302");
   var h = res.headers.get("location");
   ok(h === (new URL("./redirect.response", self.location.href)).href, "Location header should be correct absolute URL");
+  try {
+    res.headers.set("someheader", "not allowed");
+    ok(false, "Redirects should have immutable headers");
+  } catch(e) {
+    ok(true, "Redirects should have immutable headers");
+  }
 
   var successStatus = [301, 302, 303, 307, 308];
   for (var i = 0; i < successStatus.length; ++i) {
@@ -91,16 +108,16 @@ function testRedirect() {
 }
 
 function testOk() {
-  var r1 = new Response("", { status: 200});
+  var r1 = new Response("", { status: 200 });
   ok(r1.ok, "Response with status 200 should have ok true");
 
-  var r2 = new Response("", { status: 204});
+  var r2 = new Response(undefined, { status: 204 });
   ok(r2.ok, "Response with status 204 should have ok true");
 
-  var r3 = new Response("", { status: 299});
+  var r3 = new Response("", { status: 299 });
   ok(r3.ok, "Response with status 299 should have ok true");
 
-  var r4 = new Response("", { status: 302});
+  var r4 = new Response("", { status: 302 });
   ok(!r4.ok, "Response with status 302 should have ok false");
 }
 
@@ -185,14 +202,37 @@ function testBodyExtraction() {
   })
 }
 
+function testNullBodyStatus() {
+  [204, 205, 304].forEach(function(status) {
+    try {
+      var res = new Response(new Blob(), { "status": status });
+      ok(false, "Response body provided but status code does not permit a body");
+    } catch(e) {
+      ok(true, "Response body provided but status code does not permit a body");
+    }
+  });
+
+  [204, 205, 304].forEach(function(status) {
+    try {
+      var res = new Response(undefined, { "status": status });
+      ok(true, "Response body provided but status code does not permit a body");
+    } catch(e) {
+      ok(false, "Response body provided but status code does not permit a body");
+    }
+  });
+}
+
 function runTest() {
   testDefaultCtor();
+  testError();
   testRedirect();
   testOk();
+  testNullBodyStatus();
 
   return Promise.resolve()
     .then(testBodyCreation)
     .then(testBodyUsed)
     .then(testBodyExtraction)
     .then(testClone)
+    // Put more promise based tests here.
 }

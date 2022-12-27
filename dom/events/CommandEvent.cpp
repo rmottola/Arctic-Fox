@@ -51,8 +51,7 @@ CommandEvent::InitCommandEvent(const nsAString& aTypeArg,
                                bool aCancelableArg,
                                const nsAString& aCommand)
 {
-  nsresult rv = Event::InitEvent(aTypeArg, aCanBubbleArg, aCancelableArg);
-  NS_ENSURE_SUCCESS(rv, rv);
+  Event::InitEvent(aTypeArg, aCanBubbleArg, aCancelableArg);
 
   mEvent->AsCommandEvent()->command = do_GetAtom(aCommand);
   return NS_OK;
@@ -69,7 +68,7 @@ NS_NewDOMCommandEvent(EventTarget* aOwner,
                       nsPresContext* aPresContext,
                       WidgetCommandEvent* aEvent)
 {
-  nsRefPtr<CommandEvent> it =
+  RefPtr<CommandEvent> it =
     new CommandEvent(aOwner, aPresContext, aEvent);
   return it.forget();
 }

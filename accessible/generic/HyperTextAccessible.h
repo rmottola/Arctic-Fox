@@ -331,7 +331,7 @@ public:
    * @param [out] the widget containing the caret
    * @return      the caret rect
    */
-  nsIntRect GetCaretRect(nsIWidget** aWidget);
+  mozilla::LayoutDeviceIntRect GetCaretRect(nsIWidget** aWidget);
 
   /**
    * Return selected regions count within the accessible.

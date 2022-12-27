@@ -140,7 +140,7 @@ TextComposition::OnCompositionEventDiscarded(
 
   if (mTabParent) {
     // The composition event should be discarded in the child process too.
-    unused << mTabParent->SendCompositionEvent(*aCompositionEvent);
+    Unused << mTabParent->SendCompositionEvent(*aCompositionEvent);
   }
 
   // XXX If composition events are discarded, should we dispatch them with
@@ -218,7 +218,7 @@ TextComposition::DispatchCompositionEvent(
   // If the content is a container of TabParent, composition should be in the
   // remote process.
   if (mTabParent) {
-    unused << mTabParent->SendCompositionEvent(*aCompositionEvent);
+    Unused << mTabParent->SendCompositionEvent(*aCompositionEvent);
     aCompositionEvent->mFlags.mPropagationStopped = true;
     if (aCompositionEvent->CausesDOMTextEvent()) {
       mLastData = aCompositionEvent->mData;
@@ -386,7 +386,7 @@ TextComposition::HandleSelectionEvent(nsPresContext* aPresContext,
   // If the content is a container of TabParent, composition should be in the
   // remote process.
   if (aTabParent) {
-    unused << aTabParent->SendSelectionEvent(*aSelectionEvent);
+    Unused << aTabParent->SendSelectionEvent(*aSelectionEvent);
     aSelectionEvent->mFlags.mPropagationStopped = true;
     return;
   }
@@ -456,7 +456,7 @@ TextComposition::RequestToCommit(nsIWidget* aWidget, bool aDiscard)
     return NS_OK;
   }
 
-  nsRefPtr<TextComposition> kungFuDeathGrip(this);
+  RefPtr<TextComposition> kungFuDeathGrip(this);
   const nsAutoString lastData(mLastData);
 
   {
@@ -608,7 +608,7 @@ TextComposition::CompositionEventDispatcher::Run()
     return NS_OK; // cannot dispatch any events anymore
   }
 
-  nsRefPtr<nsPresContext> presContext = mTextComposition->mPresContext;
+  RefPtr<nsPresContext> presContext = mTextComposition->mPresContext;
   nsEventStatus status = nsEventStatus_eIgnore;
   switch (mEventMessage) {
     case eCompositionStart: {

@@ -106,8 +106,8 @@ CSPService::ShouldLoad(uint32_t aContentType,
                        int16_t *aDecision)
 {
   MOZ_ASSERT(aContentType ==
-             nsContentUtils::InternalContentPolicyTypeToExternalOrPreload(aContentType),
-             "We should only see external content policy types or preloads here.");
+             nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(aContentType),
+             "We should only see external content policy types or CSP special types (preloads or workers) here.");
 
   if (!aContentLocation) {
     return NS_ERROR_FAILURE;
@@ -198,13 +198,14 @@ CSPService::ShouldLoad(uint32_t aContentType,
 
   // ----- END OF TEMPORARY FAST PATH FOR CERTIFIED APPS. -----
 
-  // find the principal of the document that initiated this request and see
-  // if it has a CSP policy object
+  // query the principal of the document; if no document is passed, then
+  // fall back to using the requestPrincipal (e.g. service workers do not
+  // pass a document).
   nsCOMPtr<nsINode> node(do_QueryInterface(aRequestContext));
-  nsCOMPtr<nsIPrincipal> principal;
-  nsCOMPtr<nsIContentSecurityPolicy> csp;
-  if (node) {
-    principal = node->NodePrincipal();
+  nsCOMPtr<nsIPrincipal> principal = node ? node->NodePrincipal()
+                                          : aRequestPrincipal;
+  if (principal) {
+    nsCOMPtr<nsIContentSecurityPolicy> csp;
     principal->GetCsp(getter_AddRefs(csp));
 
     if (csp) {
@@ -236,7 +237,7 @@ CSPService::ShouldLoad(uint32_t aContentType,
     nsAutoCString uriSpec;
     aContentLocation->GetSpec(uriSpec);
     MOZ_LOG(gCspPRLog, LogLevel::Debug,
-           ("COULD NOT get nsINode for location: %s", uriSpec.get()));
+           ("COULD NOT get nsIPrincipal for location: %s", uriSpec.get()));
   }
 
   return NS_OK;
@@ -253,7 +254,7 @@ CSPService::ShouldProcess(uint32_t         aContentType,
                           int16_t          *aDecision)
 {
   MOZ_ASSERT(aContentType ==
-             nsContentUtils::InternalContentPolicyTypeToExternalOrPreload(aContentType),
+             nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(aContentType),
              "We should only see external content policy types or preloads here.");
 
   if (!aContentLocation)
@@ -313,8 +314,16 @@ CSPService::AsyncOnChannelRedirect(nsIChannel *oldChannel,
   nsCOMPtr<nsIURI> originalUri;
   rv = oldChannel->GetOriginalURI(getter_AddRefs(originalUri));
   NS_ENSURE_SUCCESS(rv, rv);
-  nsContentPolicyType policyType =
-    nsContentUtils::InternalContentPolicyTypeToExternal(loadInfo->InternalContentPolicyType());
+  nsContentPolicyType policyType = loadInfo->InternalContentPolicyType();
+
+  bool isPreload = nsContentUtils::IsPreloadType(policyType);
+
+  /* On redirect, if the content policy is a preload type, rejecting the preload
+   * results in the load silently failing, so we convert preloads to the actual
+   * type. See Bug 1219453.
+   */
+  policyType =
+    nsContentUtils::InternalContentPolicyTypeToExternalOrWorker(policyType);
 
   int16_t aDecision = nsIContentPolicy::ACCEPT;
   csp->ShouldLoad(policyType,     // load type per nsIContentPolicy (uint32_t)

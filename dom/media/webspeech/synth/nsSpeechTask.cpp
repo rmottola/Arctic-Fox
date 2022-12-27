@@ -19,6 +19,8 @@
 extern PRLogModuleInfo* GetSpeechSynthLog();
 #define LOG(type, msg) MOZ_LOG(GetSpeechSynthLog(), type, msg)
 
+#define AUDIO_TRACK 1
+
 namespace mozilla {
 namespace dom {
 
@@ -186,17 +188,17 @@ nsSpeechTask::Setup(nsISpeechTaskCallback* aCallback,
   mChannels = aChannels;
 
   AudioSegment* segment = new AudioSegment();
-  mStream->AddAudioTrack(1, aRate, 0, segment);
+  mStream->AddAudioTrack(AUDIO_TRACK, aRate, 0, segment);
   mStream->AddAudioOutput(this);
   mStream->SetAudioOutputVolume(this, mVolume);
 
   return NS_OK;
 }
 
-static nsRefPtr<mozilla::SharedBuffer>
+static RefPtr<mozilla::SharedBuffer>
 makeSamples(int16_t* aData, uint32_t aDataLen)
 {
-  nsRefPtr<mozilla::SharedBuffer> samples =
+  RefPtr<mozilla::SharedBuffer> samples =
     SharedBuffer::Create(aDataLen * sizeof(int16_t));
   int16_t* frames = static_cast<int16_t*>(samples->Data());
 
@@ -254,7 +256,7 @@ nsSpeechTask::SendAudio(JS::Handle<JS::Value> aData, JS::Handle<JS::Value> aLand
   }
 
   uint32_t dataLen = JS_GetTypedArrayLength(tsrc);
-  nsRefPtr<mozilla::SharedBuffer> samples;
+  RefPtr<mozilla::SharedBuffer> samples;
   {
     JS::AutoCheckCannotGC nogc;
     samples = makeSamples(JS_GetInt16ArrayData(tsrc, nogc), dataLen);
@@ -284,14 +286,14 @@ nsSpeechTask::SendAudioNative(int16_t* aData, uint32_t aDataLen)
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<mozilla::SharedBuffer> samples = makeSamples(aData, aDataLen);
+  RefPtr<mozilla::SharedBuffer> samples = makeSamples(aData, aDataLen);
   SendAudioImpl(samples, aDataLen);
 
   return NS_OK;
 }
 
 void
-nsSpeechTask::SendAudioImpl(nsRefPtr<mozilla::SharedBuffer>& aSamples, uint32_t aDataLen)
+nsSpeechTask::SendAudioImpl(RefPtr<mozilla::SharedBuffer>& aSamples, uint32_t aDataLen)
 {
   if (aDataLen == 0) {
     mStream->EndAllTrackAndFinish();
@@ -384,7 +386,7 @@ nsSpeechTask::DispatchEndImpl(float aElapsedTime, uint32_t aCharIndex)
     mStream->Destroy();
   }
 
-  nsRefPtr<SpeechSynthesisUtterance> utterance = mUtterance;
+  RefPtr<SpeechSynthesisUtterance> utterance = mUtterance;
 
   if (mSpeechSynthesis) {
     mSpeechSynthesis->OnEnd(this);
@@ -558,7 +560,7 @@ nsSpeechTask::Pause()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(1);
+    mStream->Suspend();
   }
 
   if (!mInited) {
@@ -581,7 +583,7 @@ nsSpeechTask::Resume()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(-1);
+    mStream->Resume();
   }
 
   if (mPrePaused) {
@@ -607,7 +609,7 @@ nsSpeechTask::Cancel()
   }
 
   if (mStream) {
-    mStream->ChangeExplicitBlockerCount(1);
+    mStream->Suspend();
   }
 
   if (!mInited) {
@@ -617,6 +619,20 @@ nsSpeechTask::Cancel()
   if (!mIndirectAudio) {
     DispatchEndInner(GetCurrentTime(), GetCurrentCharOffset());
   }
+}
+
+void
+nsSpeechTask::ForceEnd()
+{
+  if (mStream) {
+    mStream->Suspend();
+  }
+
+  if (!mInited) {
+    mPreCanceled = true;
+  }
+
+  DispatchEndInner(GetCurrentTime(), GetCurrentCharOffset());
 }
 
 float

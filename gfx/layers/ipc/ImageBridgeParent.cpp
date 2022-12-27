@@ -58,7 +58,6 @@ ImageBridgeParent::ImageBridgeParent(MessageLoop* aLoop,
   : mMessageLoop(aLoop)
   , mTransport(aTransport)
   , mSetChildThreadPriority(false)
-  , mCompositorThreadHolder(GetCompositorThreadHolder())
 {
   MOZ_ASSERT(NS_IsMainThread());
   sMainLoop = MessageLoop::current();
@@ -176,7 +175,7 @@ ConnectImageBridgeInParentProcess(ImageBridgeParent* aBridge,
 ImageBridgeParent::Create(Transport* aTransport, ProcessId aChildProcessId)
 {
   MessageLoop* loop = CompositorParent::CompositorLoop();
-  nsRefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(loop, aTransport, aChildProcessId);
+  RefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(loop, aTransport, aChildProcessId);
   bridge->mSelfRef = bridge;
   loop->PostTask(FROM_HERE,
                  NewRunnableFunction(ConnectImageBridgeInParentProcess,
@@ -287,7 +286,7 @@ ImageBridgeParent::DeallocPImageContainerParent(PImageContainerParent* actor)
 void
 ImageBridgeParent::SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage)
 {
-  mozilla::unused << SendParentAsyncMessages(aMessage);
+  mozilla::Unused << SendParentAsyncMessages(aMessage);
 }
 
 bool
@@ -344,6 +343,7 @@ MessageLoop * ImageBridgeParent::GetMessageLoop() const {
 void
 ImageBridgeParent::DeferredDestroy()
 {
+  MOZ_ASSERT(mCompositorThreadHolder);
   mCompositorThreadHolder = nullptr;
   mSelfRef = nullptr;
 }
@@ -367,10 +367,19 @@ ImageBridgeParent::CloneToplevel(const InfallibleTArray<ProtocolFdMapping>& aFds
       PImageBridgeParent* bridge = Create(transport, base::GetProcId(aPeerProcess));
       bridge->CloneManagees(this, aCtx);
       bridge->IToplevelProtocol::SetTransport(transport);
+      // The reference to the compositor thread is held in OnChannelConnected().
+      // We need to do this for cloned actors, too.
+      bridge->OnChannelConnected(base::GetProcId(aPeerProcess));
       return bridge;
     }
   }
   return nullptr;
+}
+
+void
+ImageBridgeParent::OnChannelConnected(int32_t aPid)
+{
+  mCompositorThreadHolder = GetCompositorThreadHolder();
 }
 
 bool ImageBridgeParent::IsSameProcess() const

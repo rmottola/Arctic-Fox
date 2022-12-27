@@ -59,6 +59,7 @@ struct GonkRecorder {
     virtual status_t prepare();
     virtual status_t start();
     virtual status_t pause();
+    virtual status_t resume();
     virtual status_t stop();
     virtual status_t close();
     virtual status_t reset();
@@ -70,10 +71,13 @@ protected:
     virtual ~GonkRecorder();
 
 private:
+    struct WrappedMediaSource;
+
     sp<IMediaRecorderClient> mListener;
     String16 mClientName;
     uid_t mClientUid;
     sp<MediaWriter> mWriter;
+    sp<WrappedMediaSource> mWriterSource;
     int mOutputFd;
     sp<AudioSource> mAudioSourceNode;
 
@@ -123,7 +127,8 @@ private:
         int32_t videoWidth, int32_t videoHeight,
         int32_t videoBitRate,
         int32_t *totalBitRate,
-        sp<MediaWriter> *mediaWriter);
+        sp<MediaWriter> *mediaWriter,
+        sp<WrappedMediaSource> *mediaSource);
     void setupMPEG4MetaData(int64_t startTimeUs, int32_t totalBitRate,
         sp<MetaData> *meta);
     status_t startMPEG4Recording();

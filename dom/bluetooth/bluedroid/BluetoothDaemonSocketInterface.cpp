@@ -49,7 +49,7 @@ BluetoothDaemonSocketModule::ListenCmd(BluetoothSocketType aType,
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return rv;
 }
 
@@ -80,7 +80,7 @@ BluetoothDaemonSocketModule::ConnectCmd(const nsAString& aBdAddr,
   if (NS_FAILED(rv)) {
     return rv;
   }
-  unused << pdu.forget();
+  Unused << pdu.forget();
   return rv;
 }
 
@@ -180,7 +180,7 @@ BluetoothDaemonSocketModule::HandleSvc(const DaemonSocketPDUHeader& aHeader,
     return;
   }
 
-  nsRefPtr<BluetoothSocketResultHandler> res =
+  RefPtr<BluetoothSocketResultHandler> res =
     static_cast<BluetoothSocketResultHandler*>(aRes);
 
   if (!res) {

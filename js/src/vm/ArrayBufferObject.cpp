@@ -118,8 +118,6 @@ const Class ArrayBufferObject::class_ = {
     ArrayBufferObject::trace,
     JS_NULL_CLASS_SPEC,
     {
-        nullptr,    /* outerObject */
-        nullptr,    /* innerObject */
         false,      /* isWrappedNative */
         nullptr,    /* weakmapKeyDelegateOp */
         ArrayBufferObject::objectMoved
@@ -461,7 +459,7 @@ ArrayBufferObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (!WarnIfNotConstructing(cx, args, "ArrayBuffer"))
+    if (!ThrowIfNotConstructing(cx, args, "ArrayBuffer"))
         return false;
 
     int32_t nbytes = 0;
@@ -1043,17 +1041,19 @@ ArrayBufferObject::addView(JSContext* cx, JSObject* viewArg)
 static size_t VIEW_LIST_MAX_LENGTH = 500;
 
 bool
-InnerViewTable::addView(JSContext* cx, ArrayBufferObject* obj, ArrayBufferViewObject* view)
+InnerViewTable::addView(JSContext* cx, ArrayBufferObject* buffer, ArrayBufferViewObject* view)
 {
     // ArrayBufferObject entries are only added when there are multiple views.
-    MOZ_ASSERT(obj->firstView());
+    MOZ_ASSERT(buffer->firstView());
 
-    if (!map.initialized() && !map.init())
+    if (!map.initialized() && !map.init()) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
-    Map::AddPtr p = map.lookupForAdd(obj);
+    Map::AddPtr p = map.lookupForAdd(buffer);
 
-    MOZ_ASSERT(!gc::IsInsideNursery(obj));
+    MOZ_ASSERT(!gc::IsInsideNursery(buffer));
     bool addToNursery = nurseryKeysValid && gc::IsInsideNursery(view);
 
     if (p) {
@@ -1068,8 +1068,10 @@ InnerViewTable::addView(JSContext* cx, ArrayBufferObject* obj, ArrayBufferViewOb
                 nurseryKeysValid = false;
             } else {
                 for (size_t i = 0; i < views.length(); i++) {
-                    if (gc::IsInsideNursery(views[i]))
+                    if (gc::IsInsideNursery(views[i])) {
                         addToNursery = false;
+                        break;
+                    }
                 }
             }
         }
@@ -1079,33 +1081,37 @@ InnerViewTable::addView(JSContext* cx, ArrayBufferObject* obj, ArrayBufferViewOb
             return false;
         }
     } else {
-        if (!map.add(p, obj, ViewVector()))
+        if (!map.add(p, buffer, ViewVector())) {
+            ReportOutOfMemory(cx);
             return false;
-        JS_ALWAYS_TRUE(p->value().append(view));
+        }
+        // ViewVector has one inline element, so the first insertion is
+        // guaranteed to succeed.
+        MOZ_ALWAYS_TRUE(p->value().append(view));
     }
 
-    if (addToNursery && !nurseryKeys.append(obj))
+    if (addToNursery && !nurseryKeys.append(buffer))
         nurseryKeysValid = false;
 
     return true;
 }
 
 InnerViewTable::ViewVector*
-InnerViewTable::maybeViewsUnbarriered(ArrayBufferObject* obj)
+InnerViewTable::maybeViewsUnbarriered(ArrayBufferObject* buffer)
 {
     if (!map.initialized())
         return nullptr;
 
-    Map::Ptr p = map.lookup(obj);
+    Map::Ptr p = map.lookup(buffer);
     if (p)
         return &p->value();
     return nullptr;
 }
 
 void
-InnerViewTable::removeViews(ArrayBufferObject* obj)
+InnerViewTable::removeViews(ArrayBufferObject* buffer)
 {
-    Map::Ptr p = map.lookup(obj);
+    Map::Ptr p = map.lookup(buffer);
     MOZ_ASSERT(p);
 
     map.remove(p);
@@ -1137,11 +1143,8 @@ InnerViewTable::sweep(JSRuntime* rt)
         return;
 
     for (Map::Enum e(map); !e.empty(); e.popFront()) {
-        JSObject* key = e.front().key();
-        if (sweepEntry(&key, e.front().value()))
+        if (sweepEntry(&e.front().mutableKey(), e.front().value()))
             e.removeFront();
-        else if (key != e.front().key())
-            e.rekeyFront(key);
     }
 }
 
@@ -1152,15 +1155,13 @@ InnerViewTable::sweepAfterMinorGC(JSRuntime* rt)
 
     if (nurseryKeysValid) {
         for (size_t i = 0; i < nurseryKeys.length(); i++) {
-            JSObject* key = nurseryKeys[i];
-            Map::Ptr p = map.lookup(key);
+            JSObject* buffer = MaybeForwarded(nurseryKeys[i]);
+            Map::Ptr p = map.lookup(buffer);
             if (!p)
                 continue;
 
-            if (sweepEntry(&key, p->value()))
-                map.remove(nurseryKeys[i]);
-            else
-                map.rekeyIfMoved(nurseryKeys[i], key);
+            if (sweepEntry(&p->mutableKey(), p->value()))
+                map.remove(buffer);
         }
         nurseryKeys.clear();
     } else {
@@ -1569,7 +1570,7 @@ js::GetArrayBufferLengthAndData(JSObject* obj, uint32_t* length, uint8_t** data)
 }
 
 JSObject*
-js::InitArrayBufferClass(JSContext *cx, HandleObject obj)
+js::InitArrayBufferClass(JSContext* cx, HandleObject obj)
 {
     Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
     if (global->isStandardClassResolved(JSProto_ArrayBuffer))

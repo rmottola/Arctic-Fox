@@ -102,8 +102,9 @@ public:
   }
 
   virtual void ProcessBlock(AudioNodeStream* aStream,
-                            const AudioChunk& aInput,
-                            AudioChunk* aOutput,
+                            GraphTime aFrom,
+                            const AudioBlock& aInput,
+                            AudioBlock* aOutput,
                             bool* aFinished) override
   {
     if (!mReverb) {
@@ -111,16 +112,17 @@ public:
       return;
     }
 
-    AudioChunk input = aInput;
+    AudioBlock input = aInput;
     if (aInput.IsNull()) {
       if (mLeftOverData > 0) {
         mLeftOverData -= WEBAUDIO_BLOCK_SIZE;
-        AllocateAudioBlock(1, &input);
+        input.AllocateChannels(1);
         WriteZeroesToAudioBlock(&input, 0, WEBAUDIO_BLOCK_SIZE);
       } else {
         if (mLeftOverData != INT32_MIN) {
           mLeftOverData = INT32_MIN;
-          nsRefPtr<PlayingRefChanged> refchanged =
+          aStream->ScheduleCheckForInactive();
+          RefPtr<PlayingRefChanged> refchanged =
             new PlayingRefChanged(aStream, PlayingRefChanged::RELEASE);
           aStream->Graph()->
             DispatchToMainThreadAfterStreamStateUpdate(refchanged.forget());
@@ -131,8 +133,8 @@ public:
     } else {
       if (aInput.mVolume != 1.0f) {
         // Pre-multiply the input's volume
-        uint32_t numChannels = aInput.mChannelData.Length();
-        AllocateAudioBlock(numChannels, &input);
+        uint32_t numChannels = aInput.ChannelCount();
+        input.AllocateChannels(numChannels);
         for (uint32_t i = 0; i < numChannels; ++i) {
           const float* src = static_cast<const float*>(aInput.mChannelData[i]);
           float* dest = input.ChannelFloatsForWrite(i);
@@ -141,7 +143,7 @@ public:
       }
 
       if (mLeftOverData <= 0) {
-        nsRefPtr<PlayingRefChanged> refchanged =
+        RefPtr<PlayingRefChanged> refchanged =
           new PlayingRefChanged(aStream, PlayingRefChanged::ADDREF);
         aStream->Graph()->
           DispatchToMainThreadAfterStreamStateUpdate(refchanged.forget());
@@ -149,9 +151,14 @@ public:
       mLeftOverData = mBufferLength;
       MOZ_ASSERT(mLeftOverData > 0);
     }
-    AllocateAudioBlock(2, aOutput);
+    aOutput->AllocateChannels(2);
 
     mReverb->process(&input, aOutput, WEBAUDIO_BLOCK_SIZE);
+  }
+
+  virtual bool IsActive() const override
+  {
+    return mLeftOverData != INT32_MIN;
   }
 
   virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override
@@ -174,7 +181,7 @@ public:
   }
 
 private:
-  nsRefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
+  RefPtr<ThreadSharedFloatArrayBufferList> mBuffer;
   nsAutoPtr<WebCore::Reverb> mReverb;
   int32_t mBufferLength;
   int32_t mLeftOverData;
@@ -191,7 +198,7 @@ ConvolverNode::ConvolverNode(AudioContext* aContext)
   , mNormalize(true)
 {
   ConvolverNodeEngine* engine = new ConvolverNodeEngine(this, mNormalize);
-  mStream = AudioNodeStream::Create(aContext->Graph(), engine,
+  mStream = AudioNodeStream::Create(aContext, engine,
                                     AudioNodeStream::NO_STREAM_FLAGS);
 }
 
@@ -246,14 +253,14 @@ ConvolverNode::SetBuffer(JSContext* aCx, AudioBuffer* aBuffer, ErrorResult& aRv)
   MOZ_ASSERT(ns, "Why don't we have a stream here?");
   if (mBuffer) {
     uint32_t length = mBuffer->Length();
-    nsRefPtr<ThreadSharedFloatArrayBufferList> data =
+    RefPtr<ThreadSharedFloatArrayBufferList> data =
       mBuffer->GetThreadSharedChannelsForRate(aCx);
     if (data && length < WEBAUDIO_BLOCK_SIZE) {
       // For very small impulse response buffers, we need to pad the
       // buffer with 0 to make sure that the Reverb implementation
       // has enough data to compute FFTs from.
       length = WEBAUDIO_BLOCK_SIZE;
-      nsRefPtr<ThreadSharedFloatArrayBufferList> paddedBuffer =
+      RefPtr<ThreadSharedFloatArrayBufferList> paddedBuffer =
         new ThreadSharedFloatArrayBufferList(data->GetChannels());
       float* channelData = (float*) malloc(sizeof(float) * length * data->GetChannels());
       for (uint32_t i = 0; i < data->GetChannels(); ++i) {

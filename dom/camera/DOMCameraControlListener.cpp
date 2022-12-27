@@ -53,7 +53,7 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
-    nsRefPtr<nsDOMCameraControl> camera = do_QueryObject(mDOMCameraControl.get());
+    RefPtr<nsDOMCameraControl> camera = do_QueryObject(mDOMCameraControl.get());
     if (!camera) {
       DOM_CAMERA_LOGE("do_QueryObject failed to get an nsDOMCameraControl\n");
       return NS_ERROR_INVALID_ARG;
@@ -195,7 +195,7 @@ DOMCameraControlListener::OnConfigurationChange(const CameraListenerConfiguratio
     void
     RunCallback(nsDOMCameraControl* aDOMCameraControl) override
     {
-      nsRefPtr<nsDOMCameraControl::DOMCameraConfiguration> config =
+      RefPtr<nsDOMCameraControl::DOMCameraConfiguration> config =
         new nsDOMCameraControl::DOMCameraConfiguration();
 
       switch (mConfiguration.mMode) {
@@ -341,18 +341,20 @@ DOMCameraControlListener::OnAutoFocusComplete(bool aAutoFocusSucceeded)
 }
 
 void
-DOMCameraControlListener::OnTakePictureComplete(uint8_t* aData, uint32_t aLength, const nsAString& aMimeType)
+DOMCameraControlListener::OnTakePictureComplete(const uint8_t* aData, uint32_t aLength, const nsAString& aMimeType)
 {
   class Callback : public DOMCallback
   {
   public:
     Callback(nsMainThreadPtrHandle<nsISupports> aDOMCameraControl,
-             uint8_t* aData, uint32_t aLength, const nsAString& aMimeType)
+             const uint8_t* aData, uint32_t aLength, const nsAString& aMimeType)
       : DOMCallback(aDOMCameraControl)
-      , mData(aData)
       , mLength(aLength)
       , mMimeType(aMimeType)
-    { }
+    {
+        mData = (uint8_t*) malloc(aLength);
+        memcpy(mData, aData, aLength);
+    }
 
     void
     RunCallback(nsDOMCameraControl* aDOMCameraControl) override
@@ -407,4 +409,28 @@ DOMCameraControlListener::OnUserError(UserContext aContext, nsresult aError)
   };
 
   NS_DispatchToMainThread(new Callback(mDOMCameraControl, aContext, aError));
+}
+
+void
+DOMCameraControlListener::OnPoster(BlobImpl* aBlobImpl)
+{
+  class Callback : public DOMCallback
+  {
+  public:
+    Callback(nsMainThreadPtrHandle<nsISupports> aDOMCameraControl, BlobImpl* aBlobImpl)
+      : DOMCallback(aDOMCameraControl)
+      , mBlobImpl(aBlobImpl)
+    { }
+
+    void
+    RunCallback(nsDOMCameraControl* aDOMCameraControl) override
+    {
+      aDOMCameraControl->OnPoster(mBlobImpl);
+    }
+
+  protected:
+    RefPtr<BlobImpl> mBlobImpl;
+  };
+
+  NS_DispatchToMainThread(new Callback(mDOMCameraControl, aBlobImpl));
 }

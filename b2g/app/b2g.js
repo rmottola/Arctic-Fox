@@ -203,6 +203,9 @@ pref("geo.provider.use_mls", false);
 pref("geo.cell.scan", true);
 pref("geo.wifi.uri", "https://location.services.mozilla.com/v1/geolocate?key=%MOZILLA_API_KEY%");
 
+// base url for the stumbler
+pref("geo.stumbler.url", "https://location.services.mozilla.com/v1/geosubmit?key=%MOZILLA_API_KEY%");
+
 // enable geo
 pref("geo.enabled", true);
 
@@ -336,7 +339,6 @@ pref("image.mem.surfacecache.max_size_kb", 131072);  // 128MB
 pref("image.mem.surfacecache.size_factor", 8);  // 1/8 of main memory
 pref("image.mem.surfacecache.discard_factor", 2);  // Discard 1/2 of the surface cache at a time.
 pref("image.mem.surfacecache.min_expiration_ms", 86400000); // 24h, we rely on the out of memory hook
-pref("image.onload.decode.limit", 24); /* don't decode more than 24 images eagerly */
 
 // XXX this isn't a good check for "are touch events supported", but
 // we don't really have a better one at the moment.
@@ -1079,8 +1081,9 @@ pref("gfx.vsync.refreshdriver", true);
 pref("dom.activities.developer_mode_only", "import-app");
 
 // mulet apparently loads firefox.js as well as b2g.js, so we have to explicitly
-// disable serviceworkers here to get them disabled in mulet.
+// disable serviceworkers and push here to get them disabled in mulet.
 pref("dom.serviceWorkers.enabled", false);
+pref("dom.push.enabled", false);
 
 // Retain at most 10 processes' layers buffers
 pref("layers.compositor-lru-size", 10);

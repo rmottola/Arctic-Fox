@@ -7,12 +7,14 @@
 #include "BasicLayers.h"                // for BasicLayerManager
 #include "gfxContext.h"                 // for gfxContext, etc
 #include "gfxPlatform.h"                // for gfxPlatform
+#include "gfxEnv.h"                     // for gfxEnv
 #include "gfxPrefs.h"                   // for gfxPrefs
 #include "gfxPoint.h"                   // for IntSize, gfxPoint
 #include "gfxTeeSurface.h"              // for gfxTeeSurface
 #include "gfxUtils.h"                   // for gfxUtils
 #include "ipc/ShadowLayers.h"           // for ShadowLayerForwarder
 #include "mozilla/ArrayUtils.h"         // for ArrayLength
+#include "mozilla/Maybe.h"
 #include "mozilla/gfx/2D.h"             // for DrawTarget, Factory
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/BaseSize.h"       // for BaseSize
@@ -26,7 +28,6 @@
 #include "nsDebug.h"                    // for NS_ASSERTION, NS_WARNING, etc
 #include "nsISupportsImpl.h"            // for gfxContext::Release, etc
 #include "nsIWidget.h"                  // for nsIWidget
-#include "prenv.h"                      // for PR_GetEnv
 #include "nsLayoutUtils.h"
 #ifdef XP_WIN
 #include "gfxWindowsPlatform.h"
@@ -88,7 +89,7 @@ ContentClient::CreateContentClient(CompositableForwarder* aForwarder)
                          backend == LayersBackend::LAYERS_BASIC;
   }
 
-  if (useDoubleBuffering || PR_GetEnv("MOZ_FORCE_DOUBLE_BUFFERING")) {
+  if (useDoubleBuffering || gfxEnv::ForceDoubleBuffering()) {
     return MakeAndAddRef<ContentClientDoubleBuffered>(aForwarder);
   }
   return MakeAndAddRef<ContentClientSingleBuffered>(aForwarder);
@@ -184,7 +185,7 @@ public:
         continue;
       }
 
-      nsRefPtr<gfxContext> ctx =
+      RefPtr<gfxContext> ctx =
         sink->BeginUpdate(update.mUpdateRect + offset, update.mSequenceCounter);
 
       if (!ctx) {
@@ -570,33 +571,30 @@ ContentClientDoubleBuffered::FinalizeFrame(const nsIntRegion& aRegionToDraw)
 
   // We need to ensure that we lock these two buffers in the same
   // order as the compositor to prevent deadlocks.
-  if (!mFrontClient->Lock(OpenMode::OPEN_READ_ONLY)) {
+  TextureClientAutoLock frontLock(mFrontClient, OpenMode::OPEN_READ_ONLY);
+  if (!frontLock.Succeeded()) {
     return;
   }
-  if (mFrontClientOnWhite &&
-      !mFrontClientOnWhite->Lock(OpenMode::OPEN_READ_ONLY)) {
-    mFrontClient->Unlock();
-    return;
-  }
-  {
-    // Restrict the DrawTargets and frontBuffer to a scope to make
-    // sure there is no more external references to the DrawTargets
-    // when we Unlock the TextureClients.
-    RefPtr<SourceSurface> surf = mFrontClient->BorrowDrawTarget()->Snapshot();
-    RefPtr<SourceSurface> surfOnWhite = mFrontClientOnWhite
-      ? mFrontClientOnWhite->BorrowDrawTarget()->Snapshot()
-      : nullptr;
-    SourceRotatedBuffer frontBuffer(surf,
-                                    surfOnWhite,
-                                    mFrontBufferRect,
-                                    mFrontBufferRotation);
-    UpdateDestinationFrom(frontBuffer, updateRegion);
+  Maybe<TextureClientAutoLock> frontOnWhiteLock;
+  if (mFrontClientOnWhite) {
+    frontOnWhiteLock.emplace(mFrontClientOnWhite, OpenMode::OPEN_READ_ONLY);
+    if (!frontOnWhiteLock->Succeeded()) {
+      return;
+    }
   }
 
-  mFrontClient->Unlock();
-  if (mFrontClientOnWhite) {
-    mFrontClientOnWhite->Unlock();
-  }
+  // Restrict the DrawTargets and frontBuffer to a scope to make
+  // sure there is no more external references to the DrawTargets
+  // when we Unlock the TextureClients.
+  RefPtr<SourceSurface> surf = mFrontClient->BorrowDrawTarget()->Snapshot();
+  RefPtr<SourceSurface> surfOnWhite = mFrontClientOnWhite
+    ? mFrontClientOnWhite->BorrowDrawTarget()->Snapshot()
+    : nullptr;
+  SourceRotatedBuffer frontBuffer(surf,
+                                  surfOnWhite,
+                                  mFrontBufferRect,
+                                  mFrontBufferRotation);
+  UpdateDestinationFrom(frontBuffer, updateRegion);
 }
 
 void

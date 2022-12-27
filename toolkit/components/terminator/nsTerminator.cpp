@@ -29,6 +29,9 @@
 
 #include "nsIObserverService.h"
 #include "nsIPrefService.h"
+#if defined(MOZ_CRASHREPORTER)
+#include "nsExceptionHandler.h"
+#endif
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
@@ -219,8 +222,8 @@ void RunWriter(void* arg)
   tmpFilePath.AppendLiteral(".tmp");
 
   // Cleanup any file leftover from a previous run
-  unused << PR_Delete(tmpFilePath.get());
-  unused << PR_Delete(destinationPath.get());
+  Unused << PR_Delete(tmpFilePath.get());
+  Unused << PR_Delete(destinationPath.get());
 
   while (true) {
     //
@@ -523,6 +526,13 @@ nsTerminator::UpdateTelemetry()
 void
 nsTerminator::UpdateCrashReport(const char* aTopic)
 {
+#if defined(MOZ_CRASHREPORTER)
+  // In case of crash, we wish to know where in shutdown we are
+  nsAutoCString report(aTopic);
+
+  Unused << CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("ShutdownProgress"),
+                                               report);
+#endif // defined(MOZ_CRASH_REPORTER)
 }
 
 

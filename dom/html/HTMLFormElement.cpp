@@ -134,17 +134,6 @@ HTMLFormElement::~HTMLFormElement()
 
 // nsISupports
 
-static PLDHashOperator
-ElementTraverser(const nsAString& key, HTMLInputElement* element,
-                 void* userArg)
-{
-  nsCycleCollectionTraversalCallback *cb =
-    static_cast<nsCycleCollectionTraversalCallback*>(userArg);
-
-  cb->NoteXPCOMChild(ToSupports(element));
-  return PL_DHASH_NEXT;
-}
-
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLFormElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLFormElement,
@@ -152,7 +141,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLFormElement,
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mControls)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mImageNameLookupTable)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPastNameLookupTable)
-  tmp->mSelectedRadioButtons.EnumerateRead(ElementTraverser, &cb);
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSelectedRadioButtons)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLFormElement,
@@ -310,7 +299,7 @@ HTMLFormElement::RequestAutocomplete()
     init.mCancelable = false;
     init.mReason = AutoCompleteErrorReason::Disabled;
 
-    nsRefPtr<AutocompleteErrorEvent> event =
+    RefPtr<AutocompleteErrorEvent> event =
       AutocompleteErrorEvent::Constructor(this, NS_LITERAL_STRING("autocompleteerror"), init);
 
     (new AsyncEventDispatcher(this, event))->PostDOMEvent();
@@ -1329,7 +1318,7 @@ HTMLFormElement::AddElement(nsGenericHTMLFormElement* aChild,
   // This has to be done _after_ UpdateValidity() call to prevent the element
   // being count twice.
   if (type == NS_FORM_INPUT_RADIO) {
-    nsRefPtr<HTMLInputElement> radio =
+    RefPtr<HTMLInputElement> radio =
       static_cast<HTMLInputElement*>(aChild);
     radio->AddedToRadioGroup();
   }
@@ -1354,7 +1343,7 @@ HTMLFormElement::RemoveElement(nsGenericHTMLFormElement* aChild,
   //
   nsresult rv = NS_OK;
   if (aChild->GetType() == NS_FORM_INPUT_RADIO) {
-    nsRefPtr<HTMLInputElement> radio =
+    RefPtr<HTMLInputElement> radio =
       static_cast<HTMLInputElement*>(aChild);
     radio->WillRemoveFromRadioGroup();
   }
@@ -1771,7 +1760,7 @@ HTMLFormElement::GetActionURL(nsIURI** aActionURL,
     NS_ConvertUTF8toUTF16 reportScheme(scheme);
 
     const char16_t* params[] = { reportSpec.get(), reportScheme.get() };
-    CSP_LogLocalizedStr(NS_LITERAL_STRING("upgradeInsecureRequest").get(),
+    CSP_LogLocalizedStr(MOZ_UTF16("upgradeInsecureRequest"),
                         params, ArrayLength(params),
                         EmptyString(), // aSourceFile
                         EmptyString(), // aScriptSample
@@ -2187,7 +2176,7 @@ HTMLFormElement::GetNextRadioButton(const nsAString& aName,
   // If no radio is focused, get the radio relative to the selected one.
   *aRadioOut = nullptr;
 
-  nsRefPtr<HTMLInputElement> currentRadio;
+  RefPtr<HTMLInputElement> currentRadio;
   if (aFocusedRadio) {
     currentRadio = aFocusedRadio;
   }
@@ -2209,7 +2198,7 @@ HTMLFormElement::GetNextRadioButton(const nsAString& aName,
 
   uint32_t numRadios;
   radioGroup->GetLength(&numRadios);
-  nsRefPtr<HTMLInputElement> radio;
+  RefPtr<HTMLInputElement> radio;
 
   bool isRadio = false;
   do {

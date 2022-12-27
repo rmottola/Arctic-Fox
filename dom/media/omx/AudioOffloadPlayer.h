@@ -88,7 +88,7 @@ public:
 
   virtual void SetVolume(double aVolume) override;
 
-  virtual double GetMediaTimeSecs() override;
+  virtual int64_t GetMediaTimeUs() override;
 
   // To update progress bar when the element is visible
   virtual void SetElementVisibility(bool aIsVisible) override;;
@@ -98,7 +98,7 @@ public:
   // data is available
   virtual MediaDecoderOwner::NextFrameStatus GetNextFrameStatus() override;
 
-  virtual nsRefPtr<MediaDecoder::SeekPromise> Seek(SeekTarget aTarget) override;
+  virtual RefPtr<MediaDecoder::SeekPromise> Seek(SeekTarget aTarget) override;
 
   void TimeUpdate();
 
@@ -190,9 +190,7 @@ private:
 
   // To avoid device suspend when mResetTimer is going to be triggered.
   // Used only from main thread so no lock is needed.
-  nsRefPtr<mozilla::dom::WakeLock> mWakeLock;
-
-  int64_t GetMediaTimeUs();
+  RefPtr<mozilla::dom::WakeLock> mWakeLock;
 
   // Provide the playback position in microseconds from total number of
   // frames played by audio track

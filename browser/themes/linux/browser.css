@@ -10,6 +10,7 @@
 @namespace html url("http://www.w3.org/1999/xhtml");
 
 %include ../shared/browser.inc
+%include linuxShared.inc
 %filter substitution
 %define toolbarHighlight rgba(255,255,255,.3)
 %define selectedTabHighlight rgba(255,255,255,.8) 1px, rgba(255,255,255,.5) 3px
@@ -676,7 +677,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #new-window-button {
-  -moz-image-region: rect(0px 120px 24px 96px);
+  -moz-image-region: rect(0px 342px 18px 324px);
 }
 
 #cut-button {
@@ -713,7 +714,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #sync-button {
-  -moz-image-region: rect(0px 144px 24px 120px);
+  -moz-image-region: rect(0px 270px 18px 252px);
 }
 #sync-button[status="active"] {
   list-style-image: url("chrome://browser/skin/sync-24-throbber.png");
@@ -721,7 +722,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #feed-button {
-  -moz-image-region: rect(0px 168px 24px 144px);
+  -moz-image-region: rect(0px 288px 18px 270px);
 }
 
 #feed-button[disabled] > .toolbarbutton-icon {
@@ -929,6 +930,9 @@ toolbar[iconsize="small"] #feed-button {
 .urlbar-icon {
   cursor: pointer;
   padding: 0 3px;
+  /* 16x16 icon with border-box sizing */
+  width: 22px;
+  height: 16px;
 }
 
 #urlbar-search-splitter {
@@ -1910,6 +1914,15 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
   width: 40px;
 }
 
-.browser-action-panel > .panel-arrowcontainer > .panel-arrowcontent {
+%include ../shared/contextmenu.inc.css
+
+#context-navigation > .menuitem-iconic > .menu-iconic-left {
+  visibility: visible;
+  /* override toolkit/themes/linux/global/menu.css */
+  -moz-padding-end: 0 !important;
+  -moz-margin-end: 0 !important;
+}
+
+.browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }

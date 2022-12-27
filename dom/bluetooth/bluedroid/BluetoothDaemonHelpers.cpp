@@ -417,6 +417,17 @@ Convert(uint8_t aIn, BluetoothStatus& aOut)
 }
 
 nsresult
+Convert(int32_t aIn, BluetoothAttributeHandle& aOut)
+{
+  if (NS_WARN_IF(aIn < 0x0000) || NS_WARN_IF(aIn > 0xFFFF)) {
+    aOut.mHandle = 0x0000; // silences compiler warning
+    return NS_ERROR_ILLEGAL_VALUE;
+  }
+  aOut.mHandle = static_cast<uint16_t>(aIn);
+  return NS_OK;
+}
+
+nsresult
 Convert(int32_t aIn, BluetoothGattStatus& aOut)
 {
   /* Reference: $B2G/external/bluetooth/bluedroid/stack/include/gatt_api.h */
@@ -571,6 +582,13 @@ Convert(const BluetoothAddress& aIn, nsAString& aOut)
 
   aOut = NS_ConvertUTF8toUTF16(str);
 
+  return NS_OK;
+}
+
+nsresult
+Convert(const BluetoothAttributeHandle& aIn, int32_t& aOut)
+{
+  aOut = static_cast<int32_t>(aIn.mHandle);
   return NS_OK;
 }
 
@@ -976,15 +994,15 @@ Convert(const ConvertArray<Tin>& aIn, Tout& aOut)
 //
 
 nsresult
-PackPDU(bool aIn, DaemonSocketPDU& aPDU)
-{
-  return PackPDU(PackConversion<bool, uint8_t>(aIn), aPDU);
-}
-
-nsresult
 PackPDU(const BluetoothAddress& aIn, DaemonSocketPDU& aPDU)
 {
   return PackPDU(PackArray<uint8_t>(aIn.mAddr, sizeof(aIn.mAddr)), aPDU);
+}
+
+nsresult
+PackPDU(const BluetoothAttributeHandle& aIn, DaemonSocketPDU& aPDU)
+{
+  return PackPDU(PackConversion<BluetoothAttributeHandle, int32_t>(aIn), aPDU);
 }
 
 nsresult
@@ -1343,18 +1361,6 @@ PackPDU(BluetoothGattWriteType aIn, DaemonSocketPDU& aPDU)
 //
 
 nsresult
-UnpackPDU(DaemonSocketPDU& aPDU, bool& aOut)
-{
-  return UnpackPDU(aPDU, UnpackConversion<uint8_t, bool>(aOut));
-}
-
-nsresult
-UnpackPDU(DaemonSocketPDU& aPDU, char& aOut)
-{
-  return UnpackPDU(aPDU, UnpackConversion<uint8_t, char>(aOut));
-}
-
-nsresult
 UnpackPDU(DaemonSocketPDU& aPDU, BluetoothA2dpAudioState& aOut)
 {
   return UnpackPDU(
@@ -1372,6 +1378,13 @@ nsresult
 UnpackPDU(DaemonSocketPDU& aPDU, BluetoothAclState& aOut)
 {
   return UnpackPDU(aPDU, UnpackConversion<uint8_t, BluetoothAclState>(aOut));
+}
+
+nsresult
+UnpackPDU(DaemonSocketPDU& aPDU, BluetoothAttributeHandle& aOut)
+{
+  return UnpackPDU(
+    aPDU, UnpackConversion<int32_t, BluetoothAttributeHandle>(aOut));
 }
 
 nsresult

@@ -60,6 +60,7 @@
 #include "nsBidi.h"
 #include "nsBidiPresUtils.h"
 #include "Layers.h"
+#include "LayerUserData.h"
 #include "CanvasUtils.h"
 #include "nsIMemoryReporter.h"
 #include "nsStyleUtil.h"
@@ -1020,14 +1021,14 @@ CanvasRenderingContext2D::ParseColor(const nsAString& aString,
   } else {
     // otherwise resolve it
     nsCOMPtr<nsIPresShell> presShell = GetPresShell();
-    nsRefPtr<nsStyleContext> parentContext;
+    RefPtr<nsStyleContext> parentContext;
     if (mCanvasElement && mCanvasElement->IsInDoc()) {
       // Inherit from the canvas element.
       parentContext = nsComputedDOMStyle::GetStyleContextForElement(
         mCanvasElement, nullptr, presShell);
     }
 
-    unused << nsRuleNode::ComputeColor(
+    Unused << nsRuleNode::ComputeColor(
       value, presShell ? presShell->GetPresContext() : nullptr, parentContext,
       *aColor);
   }
@@ -1391,7 +1392,7 @@ CanvasRenderingContext2D::EnsureTarget(RenderingMode aRenderingMode)
       ownerDoc = mCanvasElement->OwnerDoc();
     }
 
-    nsRefPtr<LayerManager> layerManager = nullptr;
+    RefPtr<LayerManager> layerManager = nullptr;
 
     if (ownerDoc) {
       layerManager =
@@ -1533,7 +1534,7 @@ CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight)
   
   // For vertical writing-mode, unless text-orientation is sideways,
   // we'll modify the initial value of textBaseline to 'middle'.
-  nsRefPtr<nsStyleContext> canvasStyle;
+  RefPtr<nsStyleContext> canvasStyle;
   if (mCanvasElement && mCanvasElement->IsInDoc()) {
     nsCOMPtr<nsIPresShell> presShell = GetPresShell();
     if (presShell) {
@@ -1612,7 +1613,9 @@ CanvasRenderingContext2D::SetIsIPC(bool isIPC)
 }
 
 NS_IMETHODIMP
-CanvasRenderingContext2D::SetContextOptions(JSContext* aCx, JS::Handle<JS::Value> aOptions)
+CanvasRenderingContext2D::SetContextOptions(JSContext* aCx,
+                                            JS::Handle<JS::Value> aOptions,
+                                            ErrorResult& aRvForDictionaryInit)
 {
   if (aOptions.isNullOrUndefined()) {
     return NS_OK;
@@ -1622,7 +1625,10 @@ CanvasRenderingContext2D::SetContextOptions(JSContext* aCx, JS::Handle<JS::Value
   MOZ_ASSERT(!mTarget);
 
   ContextAttributes2D attributes;
-  NS_ENSURE_TRUE(attributes.Init(aCx, aOptions), NS_ERROR_UNEXPECTED);
+  if (!attributes.Init(aCx, aOptions)) {
+    aRvForDictionaryInit.Throw(NS_ERROR_UNEXPECTED);
+    return NS_ERROR_UNEXPECTED;
+  }
 
   if (Preferences::GetBool("gfx.canvas.willReadFrequently.enable", false)) {
     // Use software when there is going to be a lot of readback
@@ -1642,26 +1648,24 @@ CanvasRenderingContext2D::SetContextOptions(JSContext* aCx, JS::Handle<JS::Value
   return NS_OK;
 }
 
-void
-CanvasRenderingContext2D::GetImageBuffer(uint8_t** aImageBuffer,
-                                         int32_t* aFormat)
+UniquePtr<uint8_t[]>
+CanvasRenderingContext2D::GetImageBuffer(int32_t* aFormat)
 {
-  *aImageBuffer = nullptr;
   *aFormat = 0;
 
   EnsureTarget();
   RefPtr<SourceSurface> snapshot = mTarget->Snapshot();
   if (!snapshot) {
-    return;
+    return nullptr;
   }
 
   RefPtr<DataSourceSurface> data = snapshot->GetDataSurface();
   if (!data || data->GetSize() != IntSize(mWidth, mHeight)) {
-    return;
+    return nullptr;
   }
 
-  *aImageBuffer = SurfaceToPackedBGRA(data);
   *aFormat = imgIEncoder::INPUT_FORMAT_HOSTARGB;
+  return SurfaceToPackedBGRA(data);
 }
 
 nsString CanvasRenderingContext2D::GetHitRegion(const mozilla::gfx::Point& aPoint)
@@ -1687,29 +1691,15 @@ CanvasRenderingContext2D::GetInputStream(const char *aMimeType,
     return NS_ERROR_FAILURE;
   }
 
-  nsAutoArrayPtr<uint8_t> imageBuffer;
   int32_t format = 0;
-  GetImageBuffer(getter_Transfers(imageBuffer), &format);
+  UniquePtr<uint8_t[]> imageBuffer = GetImageBuffer(&format);
   if (!imageBuffer) {
     return NS_ERROR_FAILURE;
   }
-  
-  bool PoisonData = Preferences::GetBool("canvas.poisondata",false);
-  if (PoisonData) {
-    srand(time(nullptr));
-    // Image buffer is always a packed BGRA array (BGRX -> BGR[FF])
-    // so always 4-value pixels.
-    // GetImageBuffer => SurfaceToPackedBGRA [=> ConvertBGRXToBGRA]
-    int32_t dataSize = mWidth * mHeight * 4;
-#pragma omp parallel for
-    for (int32_t j = 0; j < dataSize; ++j) {
-      if (imageBuffer[j] !=0 && imageBuffer[j] != 255)
-        imageBuffer[j] += rand() % 3 - 1;
-    }
-  }
 
-  return ImageEncoder::GetInputStream(mWidth, mHeight, imageBuffer, format,
-                                      encoder, aEncoderOptions, aStream);
+  return ImageEncoder::GetInputStream(mWidth, mHeight, imageBuffer.get(),
+                                      format, encoder, aEncoderOptions,
+                                      aStream);
 }
 
 SurfaceFormat
@@ -2019,7 +2009,7 @@ CanvasRenderingContext2D::GetFillRule(nsAString& aString)
 already_AddRefed<CanvasGradient>
 CanvasRenderingContext2D::CreateLinearGradient(double x0, double y0, double x1, double y1)
 {
-  nsRefPtr<CanvasGradient> grad =
+  RefPtr<CanvasGradient> grad =
     new CanvasLinearGradient(this, Point(x0, y0), Point(x1, y1));
 
   return grad.forget();
@@ -2035,7 +2025,7 @@ CanvasRenderingContext2D::CreateRadialGradient(double x0, double y0, double r0,
     return nullptr;
   }
 
-  nsRefPtr<CanvasGradient> grad =
+  RefPtr<CanvasGradient> grad =
     new CanvasRadialGradient(this, Point(x0, y0), r0, Point(x1, y1), r1);
 
   return grad.forget();
@@ -2079,7 +2069,7 @@ CanvasRenderingContext2D::CreatePattern(const CanvasImageSource& source,
       // This might not be an Azure canvas!
       RefPtr<SourceSurface> srcSurf = srcCanvas->GetSurfaceSnapshot();
 
-      nsRefPtr<CanvasPattern> pat =
+      RefPtr<CanvasPattern> pat =
         new CanvasPattern(this, srcSurf, repeatMode, htmlElement->NodePrincipal(), canvas->IsWriteOnly(), false);
 
       return pat.forget();
@@ -2103,7 +2093,7 @@ CanvasRenderingContext2D::CreatePattern(const CanvasImageSource& source,
     // An ImageBitmap never taints others so we set principalForSecurityCheck to
     // nullptr and set CORSUsed to true for passing the security check in
     // CanvasUtils::DoDrawImageSecurityCheck().
-    nsRefPtr<CanvasPattern> pat =
+    RefPtr<CanvasPattern> pat =
       new CanvasPattern(this, srcSurf, repeatMode, nullptr, false, true);
 
     return pat.forget();
@@ -2122,7 +2112,7 @@ CanvasRenderingContext2D::CreatePattern(const CanvasImageSource& source,
     return nullptr;
   }
 
-  nsRefPtr<CanvasPattern> pat =
+  RefPtr<CanvasPattern> pat =
     new CanvasPattern(this, res.mSourceSurface, repeatMode, res.mPrincipal,
                              res.mIsWriteOnly, res.mCORSUsed);
 
@@ -2147,14 +2137,11 @@ CanvasRenderingContext2D::SetShadowColor(const nsAString& shadowColor)
 // filters
 //
 
-static already_AddRefed<StyleRule>
-CreateStyleRule(nsINode* aNode,
+static already_AddRefed<Declaration>
+CreateDeclaration(nsINode* aNode,
   const nsCSSProperty aProp1, const nsAString& aValue1, bool* aChanged1,
-  const nsCSSProperty aProp2, const nsAString& aValue2, bool* aChanged2,
-  ErrorResult& error)
+  const nsCSSProperty aProp2, const nsAString& aValue2, bool* aChanged2)
 {
-  nsRefPtr<StyleRule> rule;
-
   nsIPrincipal* principal = aNode->NodePrincipal();
   nsIDocument* document = aNode->OwnerDoc();
 
@@ -2165,38 +2152,32 @@ CreateStyleRule(nsINode* aNode,
   // to include the outer window ID.
   nsCSSParser parser(document->CSSLoader());
 
-  error = parser.ParseStyleAttribute(EmptyString(), docURL, baseURL,
-                                     principal, getter_AddRefs(rule));
-  if (error.Failed()) {
-    return nullptr;
-  }
+  RefPtr<Declaration> declaration =
+    parser.ParseStyleAttribute(EmptyString(), docURL, baseURL, principal);
 
   if (aProp1 != eCSSProperty_UNKNOWN) {
     parser.ParseProperty(aProp1, aValue1, docURL, baseURL, principal,
-                         rule->GetDeclaration(), aChanged1, false);
+                         declaration, aChanged1, false);
   }
 
   if (aProp2 != eCSSProperty_UNKNOWN) {
     parser.ParseProperty(aProp2, aValue2, docURL, baseURL, principal,
-                         rule->GetDeclaration(), aChanged2, false);
+                         declaration, aChanged2, false);
   }
 
-  rule->RuleMatched();
-
-  return rule.forget();
+  declaration->SetImmutable();
+  return declaration.forget();
 }
 
-static already_AddRefed<StyleRule>
-CreateFontStyleRule(const nsAString& aFont,
-                    nsINode* aNode,
-                    bool* aOutFontChanged,
-                    ErrorResult& error)
+static already_AddRefed<Declaration>
+CreateFontDeclaration(const nsAString& aFont,
+                      nsINode* aNode,
+                      bool* aOutFontChanged)
 {
   bool lineHeightChanged;
-  return CreateStyleRule(aNode,
+  return CreateDeclaration(aNode,
     eCSSProperty_font, aFont, aOutFontChanged,
-    eCSSProperty_line_height, NS_LITERAL_STRING("normal"), &lineHeightChanged,
-    error);
+    eCSSProperty_line_height, NS_LITERAL_STRING("normal"), &lineHeightChanged);
 }
 
 static already_AddRefed<nsStyleContext>
@@ -2205,7 +2186,7 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* presShell,
 {
   if (aElement && aElement->IsInDoc()) {
     // Inherit from the canvas element.
-    nsRefPtr<nsStyleContext> result =
+    RefPtr<nsStyleContext> result =
       nsComputedDOMStyle::GetStyleContextForElement(aElement, nullptr,
                                                     presShell);
     if (!result) {
@@ -2217,17 +2198,13 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* presShell,
 
   // otherwise inherit from default (10px sans-serif)
   bool changed;
-  nsRefPtr<css::StyleRule> parentRule =
-    CreateFontStyleRule(NS_LITERAL_STRING("10px sans-serif"),
-                        presShell->GetDocument(), &changed, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+  RefPtr<css::Declaration> parentRule =
+    CreateFontDeclaration(NS_LITERAL_STRING("10px sans-serif"),
+                          presShell->GetDocument(), &changed);
 
   nsTArray<nsCOMPtr<nsIStyleRule>> parentRules;
   parentRules.AppendElement(parentRule);
-  nsRefPtr<nsStyleContext> result =
+  RefPtr<nsStyleContext> result =
     presShell->StyleSet()->ResolveStyleForRules(nullptr, parentRules);
 
   if (!result) {
@@ -2238,13 +2215,12 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* presShell,
 }
 
 static bool
-PropertyIsInheritOrInitial(StyleRule* aRule, const nsCSSProperty aProperty)
+PropertyIsInheritOrInitial(Declaration* aDeclaration, const nsCSSProperty aProperty)
 {
-  css::Declaration* declaration = aRule->GetDeclaration();
   // We know the declaration is not !important, so we can use
   // GetNormalBlock().
   const nsCSSValue* filterVal =
-    declaration->GetNormalBlock()->ValueFor(aProperty);
+    aDeclaration->GetNormalBlock()->ValueFor(aProperty);
   return (!filterVal || (filterVal->GetUnit() == eCSSUnit_Unset ||
                          filterVal->GetUnit() == eCSSUnit_Inherit ||
                          filterVal->GetUnit() == eCSSUnit_Initial));
@@ -2257,13 +2233,9 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
                     ErrorResult& error)
 {
   bool fontParsedSuccessfully = false;
-  nsRefPtr<css::StyleRule> rule =
-    CreateFontStyleRule(aFont, presShell->GetDocument(),
-                        &fontParsedSuccessfully, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+  RefPtr<css::Declaration> decl =
+    CreateFontDeclaration(aFont, presShell->GetDocument(),
+                          &fontParsedSuccessfully);
 
   if (!fontParsedSuccessfully) {
     // We got a syntax error.  The spec says this value must be ignored.
@@ -2274,13 +2246,13 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
   // 'inherit' and 'initial'. The easiest way to check for this is to look
   // at font-size-adjust, which the font shorthand resets to either 'none' or
   // '-moz-system-font'.
-  if (PropertyIsInheritOrInitial(rule, eCSSProperty_font_size_adjust)) {
+  if (PropertyIsInheritOrInitial(decl, eCSSProperty_font_size_adjust)) {
     return nullptr;
   }
 
   // have to get a parent style context for inherit-like relative
   // values (2em, bolder, etc.)
-  nsRefPtr<nsStyleContext> parentContext =
+  RefPtr<nsStyleContext> parentContext =
     GetFontParentStyleContext(aElement, presShell, error);
 
   if (error.Failed()) {
@@ -2295,50 +2267,44 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
              "GetFontParentStyleContext should have returned an error if the presshell is being destroyed.");
 
   nsTArray<nsCOMPtr<nsIStyleRule>> rules;
-  rules.AppendElement(rule);
+  rules.AppendElement(decl);
   // add a rule to prevent text zoom from affecting the style
   rules.AppendElement(new nsDisableTextZoomStyleRule);
 
   nsStyleSet* styleSet = presShell->StyleSet();
-  nsRefPtr<nsStyleContext> sc =
+  RefPtr<nsStyleContext> sc =
     styleSet->ResolveStyleForRules(parentContext, rules);
 
   // The font getter is required to be reserialized based on what we
   // parsed (including having line-height removed).  (Older drafts of
   // the spec required font sizes be converted to pixels, but that no
   // longer seems to be required.)
-  rule->GetDeclaration()->GetValue(eCSSProperty_font, aOutUsedFont);
+  decl->GetValue(eCSSProperty_font, aOutUsedFont);
 
   return sc.forget();
 }
 
-static already_AddRefed<StyleRule>
-CreateFilterStyleRule(const nsAString& aFilter,
-                      nsINode* aNode,
-                      bool* aOutFilterChanged,
-                      ErrorResult& error)
+static already_AddRefed<Declaration>
+CreateFilterDeclaration(const nsAString& aFilter,
+                        nsINode* aNode,
+                        bool* aOutFilterChanged)
 {
   bool dummy;
-  return CreateStyleRule(aNode,
+  return CreateDeclaration(aNode,
     eCSSProperty_filter, aFilter, aOutFilterChanged,
-    eCSSProperty_UNKNOWN, EmptyString(), &dummy,
-    error);
+    eCSSProperty_UNKNOWN, EmptyString(), &dummy);
 }
 
 static already_AddRefed<nsStyleContext>
-ResolveStyleForFilterRule(const nsAString& aFilterString,
-                          nsIPresShell* aPresShell,
-                          nsStyleContext* aParentContext,
-                          ErrorResult& error)
+ResolveStyleForFilter(const nsAString& aFilterString,
+                      nsIPresShell* aPresShell,
+                      nsStyleContext* aParentContext,
+                      ErrorResult& error)
 {
   nsIDocument* document = aPresShell->GetDocument();
   bool filterChanged = false;
-  nsRefPtr<css::StyleRule> rule =
-    CreateFilterStyleRule(aFilterString, document, &filterChanged, error);
-
-  if (error.Failed()) {
-    return nullptr;
-  }
+  RefPtr<css::Declaration> decl =
+    CreateFilterDeclaration(aFilterString, document, &filterChanged);
 
   if (!filterChanged) {
     // Refuse to accept the filter, but do not throw an error.
@@ -2347,14 +2313,14 @@ ResolveStyleForFilterRule(const nsAString& aFilterString,
 
   // In addition to unparseable values, the spec says we need to reject
   // 'inherit' and 'initial'.
-  if (PropertyIsInheritOrInitial(rule, eCSSProperty_filter)) {
+  if (PropertyIsInheritOrInitial(decl, eCSSProperty_filter)) {
     return nullptr;
   }
 
   nsTArray<nsCOMPtr<nsIStyleRule>> rules;
-  rules.AppendElement(rule);
+  rules.AppendElement(decl);
 
-  nsRefPtr<nsStyleContext> sc =
+  RefPtr<nsStyleContext> sc =
     aPresShell->StyleSet()->ResolveStyleForRules(aParentContext, rules);
 
   return sc.forget();
@@ -2378,7 +2344,7 @@ CanvasRenderingContext2D::ParseFilter(const nsAString& aString,
   }
 
   nsString usedFont;
-  nsRefPtr<nsStyleContext> parentContext =
+  RefPtr<nsStyleContext> parentContext =
     GetFontStyleContext(mCanvasElement, GetFont(),
                         presShell, usedFont, error);
   if (!parentContext) {
@@ -2386,8 +2352,8 @@ CanvasRenderingContext2D::ParseFilter(const nsAString& aString,
     return false;
   }
 
-  nsRefPtr<nsStyleContext> sc =
-    ResolveStyleForFilterRule(aString, presShell, parentContext, error);
+  RefPtr<nsStyleContext> sc =
+    ResolveStyleForFilter(aString, presShell, parentContext, error);
 
   if (!sc) {
     return false;
@@ -2460,7 +2426,7 @@ public:
   virtual float GetExLength() const override
   {
     gfxTextPerfMetrics* tp = mPresContext->GetTextPerfMetrics();
-    nsRefPtr<nsFontMetrics> fontMetrics;
+    RefPtr<nsFontMetrics> fontMetrics;
     nsDeviceContext* dc = mPresContext->DeviceContext();
     dc->GetMetricsFor(mFont, mFontLanguage, mExplicitLanguage,
                       gfxFont::eHorizontal, nullptr, tp,
@@ -3187,7 +3153,7 @@ CanvasRenderingContext2D::SetFontInternal(const nsAString& font,
   }
 
   nsString usedFont;
-  nsRefPtr<nsStyleContext> sc =
+  RefPtr<nsStyleContext> sc =
     GetFontStyleContext(mCanvasElement, font, presShell, usedFont, error);
   if (!sc) {
     return false;
@@ -3213,7 +3179,7 @@ CanvasRenderingContext2D::SetFontInternal(const nsAString& font,
   resizedFont.size =
     (fontStyle->mSize * c->AppUnitsPerDevPixel()) / c->AppUnitsPerCSSPixel();
 
-  nsRefPtr<nsFontMetrics> metrics;
+  RefPtr<nsFontMetrics> metrics;
   c->DeviceContext()->GetMetricsFor(resizedFont,
                                     fontStyle->mLanguage,
                                     fontStyle->mExplicitLanguage,
@@ -3739,7 +3705,7 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
   nsAutoPtr<gfxTextRun> mTextRun;
 
   // pointer to a screen reference context used to measure text and such
-  nsRefPtr<gfxContext> mThebes;
+  RefPtr<gfxContext> mThebes;
 
   // Pointer to the draw target we should fill our text to
   CanvasRenderingContext2D *mCtx;
@@ -3808,7 +3774,7 @@ CanvasRenderingContext2D::DrawOrMeasureText(const nsAString& aRawText,
   // for now, default to ltr if not in doc
   bool isRTL = false;
 
-  nsRefPtr<nsStyleContext> canvasStyle;
+  RefPtr<nsStyleContext> canvasStyle;
   if (mCanvasElement && mCanvasElement->IsInDoc()) {
     // try to find the closest context
     canvasStyle =
@@ -4514,7 +4480,7 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& image,
     if (ok) {
       NativeSurface texSurf;
       texSurf.mType = NativeSurfaceType::OPENGL_TEXTURE;
-      texSurf.mFormat = SurfaceFormat::R5G6B5;
+      texSurf.mFormat = SurfaceFormat::R5G6B5_UINT16;
       texSurf.mSize.width = mCurrentVideoSize.width;
       texSurf.mSize.height = mCurrentVideoSize.height;
       texSurf.mSurface = (void*)((uintptr_t)mVideoTexture);
@@ -4698,7 +4664,7 @@ CanvasRenderingContext2D::DrawDirectlyToCanvas(
   // the matrix even though this is a temp gfxContext.
   AutoRestoreTransform autoRestoreTransform(mTarget);
 
-  nsRefPtr<gfxContext> context = new gfxContext(tempTarget);
+  RefPtr<gfxContext> context = new gfxContext(tempTarget);
   context->SetMatrix(contextMatrix.
                        Scale(1.0 / contextScale.width,
                              1.0 / contextScale.height).
@@ -4839,7 +4805,7 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& window, double x,
     nsContentUtils::FlushLayoutForTree(&window);
   }
 
-  nsRefPtr<nsPresContext> presContext;
+  RefPtr<nsPresContext> presContext;
   nsIDocShell* docshell = window.GetDocShell();
   if (docshell) {
     docshell->GetPresContext(getter_AddRefs(presContext));
@@ -4887,7 +4853,7 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& window, double x,
     return;
   }
 
-  nsRefPtr<gfxContext> thebes;
+  RefPtr<gfxContext> thebes;
   RefPtr<DrawTarget> drawDT;
   // Rendering directly is faster and can be done if mTarget supports Azure
   // and does not need alpha blending.
@@ -4911,7 +4877,7 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& window, double x,
   }
 
   nsCOMPtr<nsIPresShell> shell = presContext->PresShell();
-  unused << shell->RenderDocument(r, renderDocFlags, backgroundColor, thebes);
+  Unused << shell->RenderDocument(r, renderDocFlags, backgroundColor, thebes);
   if (drawDT) {
     RefPtr<SourceSurface> snapshot = drawDT->Snapshot();
     RefPtr<DataSourceSurface> data = snapshot->GetDataSurface();
@@ -4978,7 +4944,7 @@ CanvasRenderingContext2D::AsyncDrawXULElement(nsXULElement& elem,
     return;
   }
 
-  nsRefPtr<nsFrameLoader> frameloader = loaderOwner->GetFrameLoader();
+  RefPtr<nsFrameLoader> frameloader = loaderOwner->GetFrameLoader();
   if (!frameloader) {
     error.Throw(NS_ERROR_FAILURE);
     return;
@@ -5053,7 +5019,7 @@ CanvasRenderingContext2D::DrawWidgetAsOnScreen(nsGlobalWindow& aWindow,
     return;
   }
 
-  nsRefPtr<nsPresContext> presContext;
+  RefPtr<nsPresContext> presContext;
   nsIDocShell* docshell = aWindow.GetDocShell();
   if (docshell) {
     docshell->GetPresContext(getter_AddRefs(presContext));
@@ -5167,16 +5133,8 @@ CanvasRenderingContext2D::GetImageData(JSContext* aCx, double aSx,
   }
   MOZ_ASSERT(array);
 
-  nsRefPtr<ImageData> imageData = new ImageData(w, h, *array);
+  RefPtr<ImageData> imageData = new ImageData(w, h, *array);
   return imageData.forget();
-}
-
-inline uint8_t PoisonValue(uint8_t v)
-{
-  if (v==0 || v==255)
-    return v; //don't fuzz edges to prevent overflow/underflow
-    
-  return v + rand() %3 -1;
 }
 
 nsresult
@@ -5192,10 +5150,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
   }
 
   MOZ_ASSERT(aWidth && aHeight);
-  
-  bool PoisonData = Preferences::GetBool("canvas.poisondata",false);
-  if (PoisonData)
-    srand(time(nullptr));
 
   CheckedInt<uint32_t> len = CheckedInt<uint32_t>(aWidth) * aHeight * 4;
   if (!len.isValid()) {
@@ -5271,14 +5225,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
         g = *src++;
         b = *src++;
 #endif
-
-        // Poison data for trackers if enabled
-        if (PoisonData) {
-          PoisonValue(r);
-          PoisonValue(g);
-          PoisonValue(b);
-        }
-
         *dst++ = r;
         *dst++ = g;
         *dst++ = b;
@@ -5302,15 +5248,6 @@ CanvasRenderingContext2D::GetImageDataArray(JSContext* aCx,
       g = *src++;
       b = *src++;
 #endif
-
-      // Poison data for trackers if enabled
-      if (PoisonData) {
-        PoisonValue(a);
-        PoisonValue(r);
-        PoisonValue(g);
-        PoisonValue(b);
-      }
-
       // Convert to non-premultiplied color
       *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + r];
       *dst++ = gfxUtils::sUnpremultiplyTable[a * 256 + g];
@@ -5459,7 +5396,7 @@ CanvasRenderingContext2D::PutImageData_explicit(int32_t x, int32_t y, uint32_t w
 
   uint32_t copyWidth = dirtyRect.Width();
   uint32_t copyHeight = dirtyRect.Height();
-  nsRefPtr<gfxImageSurface> imgsurf = new gfxImageSurface(gfx::IntSize(copyWidth, copyHeight),
+  RefPtr<gfxImageSurface> imgsurf = new gfxImageSurface(gfx::IntSize(copyWidth, copyHeight),
                                                           gfxImageFormat::ARGB32,
                                                           false);
   if (!imgsurf || imgsurf->CairoStatus()) {
@@ -5549,7 +5486,7 @@ CreateImageData(JSContext* cx, CanvasRenderingContext2D* context,
     return nullptr;
   }
 
-  nsRefPtr<mozilla::dom::ImageData> imageData =
+  RefPtr<mozilla::dom::ImageData> imageData =
     new mozilla::dom::ImageData(w, h, *darray);
   return imageData.forget();
 }
@@ -5661,12 +5598,12 @@ CanvasRenderingContext2D::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
     }
 
     if (userData && userData->IsForContext(this) && aOldLayer->IsDataValid(data)) {
-      nsRefPtr<CanvasLayer> ret = aOldLayer;
+      RefPtr<CanvasLayer> ret = aOldLayer;
       return ret.forget();
     }
   }
 
-  nsRefPtr<CanvasLayer> canvasLayer = aManager->CreateCanvasLayer();
+  RefPtr<CanvasLayer> canvasLayer = aManager->CreateCanvasLayer();
   if (!canvasLayer) {
     NS_WARNING("CreateCanvasLayer returned null!");
     // No DidTransactionCallback will be received, so mark the context clean
@@ -5776,7 +5713,7 @@ CanvasPath::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 already_AddRefed<CanvasPath>
 CanvasPath::Constructor(const GlobalObject& aGlobal, ErrorResult& aRv)
 {
-  nsRefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports());
+  RefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports());
   return path.forget();
 }
 
@@ -5786,7 +5723,7 @@ CanvasPath::Constructor(const GlobalObject& aGlobal, CanvasPath& aCanvasPath, Er
   RefPtr<gfx::Path> tempPath = aCanvasPath.GetPath(CanvasWindingRule::Nonzero,
                                                    gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget());
 
-  nsRefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports(), tempPath->CopyToBuilder());
+  RefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports(), tempPath->CopyToBuilder());
   return path.forget();
 }
 
@@ -5798,7 +5735,7 @@ CanvasPath::Constructor(const GlobalObject& aGlobal, const nsAString& aPathStrin
     return Constructor(aGlobal, aRv);
   }
 
-  nsRefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports(), tempPath->CopyToBuilder());
+  RefPtr<CanvasPath> path = new CanvasPath(aGlobal.GetAsSupports(), tempPath->CopyToBuilder());
   return path.forget();
 }
 

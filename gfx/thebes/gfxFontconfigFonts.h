@@ -45,12 +45,12 @@ public:
     static gfxFontEntry *NewFontEntry(const nsAString& aFontName,
                                       uint16_t aWeight,
                                       int16_t aStretch,
-                                      bool aItalic);
+                                      uint8_t aStyle);
     // Used for @font-face { src: url(); }
     static gfxFontEntry *NewFontEntry(const nsAString& aFontName,
                                       uint16_t aWeight,
                                       int16_t aStretch,
-                                      bool aItalic,
+                                      uint8_t aStyle,
                                       const uint8_t* aFontData,
                                       uint32_t aLength);
 
@@ -68,7 +68,7 @@ private:
     public:
         FontSetByLangEntry(PangoLanguage *aLang, gfxFcFontSet *aFontSet);
         PangoLanguage *mLang;
-        nsRefPtr<gfxFcFontSet> mFontSet;
+        RefPtr<gfxFcFontSet> mFontSet;
     };
     // There is only one of entry in this array unless characters from scripts
     // of other languages are measured.

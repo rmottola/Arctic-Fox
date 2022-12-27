@@ -52,6 +52,7 @@
 
 #include "mozilla/CheckedInt.h"
 
+#if defined(PR_LOGGING)
 GFX2D_API PRLogModuleInfo *
 GetGFX2DLog()
 {
@@ -60,6 +61,7 @@ GetGFX2DLog()
     sLog = PR_NewLogModule("gfx2d");
   return sLog;
 }
+#endif
 
 // The following code was largely taken from xpcom/glue/SSE.cpp and
 // made a little simpler.
@@ -739,7 +741,7 @@ Factory::SetDirect3D11Device(ID3D11Device *aDevice)
   RefPtr<ID2D1Factory1> factory = D2DFactory1();
 
   RefPtr<IDXGIDevice> device;
-  aDevice->QueryInterface((IDXGIDevice**)byRef(device));
+  aDevice->QueryInterface((IDXGIDevice**)getter_AddRefs(device));
   HRESULT hr = factory->CreateDevice(device, &mD2D1Device);
   if (FAILED(hr)) {
     gfxCriticalError() << "[D2D1] Failed to create gfx factory's D2D1 device, code: " << hexa(hr);
@@ -960,6 +962,14 @@ CriticalLogger::OutputMessage(const std::string &aString,
   }
 
   BasicLogger::OutputMessage(aString, aLevel, aNoNewline);
+}
+
+void
+CriticalLogger::CrashAction(LogReason aReason)
+{
+  if (Factory::GetLogForwarder()) {
+    Factory::GetLogForwarder()->CrashAction(aReason);
+  }
 }
 
 } // namespace gfx

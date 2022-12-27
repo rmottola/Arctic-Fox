@@ -310,6 +310,65 @@ public:
   UnregisterGattServerInternal(int aServerIf,
                                BluetoothReplyRunnable* aRunnable) override;
 
+  virtual void
+  GattServerAddServiceInternal(
+    const nsAString& aAppUuid,
+    const BluetoothGattServiceId& aServiceId,
+    uint16_t aHandleCount,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerAddIncludedServiceInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    const BluetoothAttributeHandle& aIncludedServiceHandle,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerAddCharacteristicInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    const BluetoothUuid& aCharacteristicUuid,
+    BluetoothGattAttrPerm aPermissions,
+    BluetoothGattCharProp aProperties,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerAddDescriptorInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    const BluetoothAttributeHandle& aCharacteristicHandle,
+    const BluetoothUuid& aDescriptorUuid,
+    BluetoothGattAttrPerm aPermissions,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerRemoveServiceInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerStartServiceInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerStopServiceInternal(
+    const nsAString& aAppUuid,
+    const BluetoothAttributeHandle& aServiceHandle,
+    BluetoothReplyRunnable* aRunnable) override;
+
+  virtual void
+  GattServerSendResponseInternal(
+    const nsAString& aAppUuid,
+    const nsAString& aAddress,
+    uint16_t aStatus,
+    int32_t aRequestId,
+    const BluetoothGattResponse& aRsp,
+    BluetoothReplyRunnable* aRunnable) override;
+
   //
   // Bluetooth notifications
   //
@@ -383,12 +442,12 @@ protected:
   bool mIsFirstTimeToggleOffBt;
 
   // Runnable arrays
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mChangeAdapterStateRunnables;
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mSetAdapterPropertyRunnables;
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mChangeDiscoveryRunnables;
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mFetchUuidsRunnables;
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mCreateBondRunnables;
-  nsTArray<nsRefPtr<BluetoothReplyRunnable>> mRemoveBondRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mChangeAdapterStateRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mSetAdapterPropertyRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mChangeDiscoveryRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mFetchUuidsRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mCreateBondRunnables;
+  nsTArray<RefPtr<BluetoothReplyRunnable>> mRemoveBondRunnables;
 
   // Array of get device requests. Each request remembers
   // 1) remaining device count to receive properties,

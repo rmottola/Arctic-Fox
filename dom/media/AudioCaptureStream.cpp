@@ -29,8 +29,8 @@ namespace mozilla
 // We are mixing to mono until PeerConnection can accept stereo
 static const uint32_t MONO = 1;
 
-AudioCaptureStream::AudioCaptureStream(DOMMediaStream* aWrapper)
-  : ProcessedMediaStream(aWrapper), mTrackCreated(false)
+AudioCaptureStream::AudioCaptureStream(DOMMediaStream* aWrapper, TrackID aTrackId)
+  : ProcessedMediaStream(aWrapper), mTrackId(aTrackId), mTrackCreated(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_COUNT_CTOR(AudioCaptureStream);
@@ -48,14 +48,14 @@ AudioCaptureStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
                                  uint32_t aFlags)
 {
   uint32_t inputCount = mInputs.Length();
-  StreamBuffer::Track* track = EnsureTrack(AUDIO_TRACK);
+  StreamBuffer::Track* track = EnsureTrack(mTrackId);
   // Notify the DOM everything is in order.
   if (!mTrackCreated) {
     for (uint32_t i = 0; i < mListeners.Length(); i++) {
       MediaStreamListener* l = mListeners[i];
       AudioSegment tmp;
       l->NotifyQueuedTrackChanges(
-        Graph(), AUDIO_TRACK, 0, MediaStreamListener::TRACK_EVENT_CREATED, tmp);
+        Graph(), mTrackId, 0, MediaStreamListener::TRACK_EVENT_CREATED, tmp);
       l->NotifyFinishedTrackCreation(Graph());
     }
     mTrackCreated = true;
@@ -65,8 +65,7 @@ AudioCaptureStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   // HTMLMediaElement with a stream as source, or an AudioContext), a cycle
   // situation occur. This can work if it's an AudioContext with at least one
   // DelayNode, but the MSG will mute the whole cycle otherwise.
-  bool blocked = mFinished || mBlocked.GetAt(aFrom);
-  if (blocked || InMutedCycle() || inputCount == 0) {
+  if (mFinished || InMutedCycle() || inputCount == 0) {
     track->Get<AudioSegment>()->AppendNullData(aTo - aFrom);
   } else {
     // We mix down all the tracks of all inputs, to a stereo track. Everything
@@ -78,8 +77,8 @@ AudioCaptureStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
       StreamBuffer::TrackIter tracks(s->GetStreamBuffer(), MediaSegment::AUDIO);
       while (!tracks.IsEnded()) {
         AudioSegment* inputSegment = tracks->Get<AudioSegment>();
-        StreamTime inputStart = s->GraphTimeToStreamTime(aFrom);
-        StreamTime inputEnd = s->GraphTimeToStreamTime(aTo);
+        StreamTime inputStart = s->GraphTimeToStreamTimeWithBlocking(aFrom);
+        StreamTime inputEnd = s->GraphTimeToStreamTimeWithBlocking(aTo);
         AudioSegment toMix;
         toMix.AppendSlice(*inputSegment, inputStart, inputEnd);
         // Care for streams blocked in the [aTo, aFrom] range.
@@ -95,7 +94,7 @@ AudioCaptureStream::ProcessInput(GraphTime aFrom, GraphTime aTo,
   }
 
   // Regardless of the status of the input tracks, we go foward.
-  mBuffer.AdvanceKnownTracksTime(GraphTimeToStreamTime((aTo)));
+  mBuffer.AdvanceKnownTracksTime(GraphTimeToStreamTimeWithBlocking((aTo)));
 }
 
 void
@@ -128,6 +127,6 @@ AudioCaptureStream::MixerCallback(AudioDataValue* aMixedBuffer,
   }
 
   // Now we have mixed data, simply append it to out track.
-  EnsureTrack(AUDIO_TRACK)->Get<AudioSegment>()->AppendAndConsumeChunk(&chunk);
+  EnsureTrack(mTrackId)->Get<AudioSegment>()->AppendAndConsumeChunk(&chunk);
 }
 }

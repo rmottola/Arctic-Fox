@@ -89,7 +89,7 @@ public:
     virtual nsISupports *GetTarget() override { return nullptr; }
 
 private:
-    nsRefPtr<txStylesheetCompiler> mCompiler;
+    RefPtr<txStylesheetCompiler> mCompiler;
     nsCOMPtr<nsIStreamListener>    mListener;
     nsCOMPtr<nsIParser>            mParser;
     bool mCheckedForXML;
@@ -379,7 +379,7 @@ public:
                        ReferrerPolicy aReferrerPolicy);
 
 private:
-    nsRefPtr<txMozillaXSLTProcessor> mProcessor;
+    RefPtr<txMozillaXSLTProcessor> mProcessor;
     nsCOMPtr<nsIDocument> mLoaderDocument;
 
     // This exists solely to suppress a warning from nsDerivedSafe
@@ -479,7 +479,7 @@ txCompileObserver::startLoad(nsIURI* aUri, txStylesheetCompiler* aCompiler,
     nsCOMPtr<nsIParser> parser = do_CreateInstance(kCParserCID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsRefPtr<txStylesheetSink> sink = new txStylesheetSink(aCompiler, parser);
+    RefPtr<txStylesheetSink> sink = new txStylesheetSink(aCompiler, parser);
     NS_ENSURE_TRUE(sink, NS_ERROR_OUT_OF_MEMORY);
 
     channel->SetNotificationCallbacks(sink);
@@ -501,11 +501,11 @@ TX_LoadSheet(nsIURI* aUri, txMozillaXSLTProcessor* aProcessor,
     aUri->GetSpec(spec);
     MOZ_LOG(txLog::xslt, LogLevel::Info, ("TX_LoadSheet: %s\n", spec.get()));
 
-    nsRefPtr<txCompileObserver> observer =
+    RefPtr<txCompileObserver> observer =
         new txCompileObserver(aProcessor, aLoaderDocument);
     NS_ENSURE_TRUE(observer, NS_ERROR_OUT_OF_MEMORY);
 
-    nsRefPtr<txStylesheetCompiler> compiler =
+    RefPtr<txStylesheetCompiler> compiler =
         new txStylesheetCompiler(NS_ConvertUTF8toUTF16(spec), aReferrerPolicy,
                                  observer);
     NS_ENSURE_TRUE(compiler, NS_ERROR_OUT_OF_MEMORY);
@@ -597,7 +597,7 @@ private:
     {
     }
 
-    nsRefPtr<txMozillaXSLTProcessor> mProcessor;
+    RefPtr<txMozillaXSLTProcessor> mProcessor;
 };
 
 txSyncCompileObserver::txSyncCompileObserver(txMozillaXSLTProcessor* aProcessor)
@@ -629,20 +629,6 @@ txSyncCompileObserver::loadURI(const nsAString& aUri,
                                  getter_AddRefs(referrerPrincipal));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    // Content Policy
-    int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-    rv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_INTERNAL_STYLESHEET,
-                                   uri,
-                                   referrerPrincipal,
-                                   nullptr,
-                                   NS_LITERAL_CSTRING("application/xml"),
-                                   nullptr,
-                                   &shouldLoad);
-    NS_ENSURE_SUCCESS(rv, rv);
-    if (NS_CP_REJECTED(shouldLoad)) {
-        return NS_ERROR_DOM_BAD_URI;
-    }
-
     // This is probably called by js, a loadGroup for the channel doesn't
     // make sense.
     nsCOMPtr<nsINode> source;
@@ -652,8 +638,12 @@ txSyncCompileObserver::loadURI(const nsAString& aUri,
     }
     nsAutoSyncOperation sync(source ? source->OwnerDoc() : nullptr);
     nsCOMPtr<nsIDOMDocument> document;
-    rv = nsSyncLoadService::LoadDocument(uri, referrerPrincipal, nullptr,
-                                         false, aReferrerPolicy,
+
+    rv = nsSyncLoadService::LoadDocument(uri, nsIContentPolicy::TYPE_XSLT,
+                                         referrerPrincipal,
+                                         nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS,
+                                         nullptr, false,
+                                         aReferrerPolicy,
                                          getter_AddRefs(document));
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -709,11 +699,11 @@ TX_CompileStylesheet(nsINode* aNode, txMozillaXSLTProcessor* aProcessor,
     uri->GetSpec(spec);
     NS_ConvertUTF8toUTF16 stylesheetURI(spec);
 
-    nsRefPtr<txSyncCompileObserver> obs =
+    RefPtr<txSyncCompileObserver> obs =
         new txSyncCompileObserver(aProcessor);
     NS_ENSURE_TRUE(obs, NS_ERROR_OUT_OF_MEMORY);
 
-    nsRefPtr<txStylesheetCompiler> compiler =
+    RefPtr<txStylesheetCompiler> compiler =
         new txStylesheetCompiler(stylesheetURI, doc->GetReferrerPolicy(), obs);
     NS_ENSURE_TRUE(compiler, NS_ERROR_OUT_OF_MEMORY);
 

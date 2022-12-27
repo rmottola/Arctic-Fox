@@ -5,6 +5,7 @@
 
 #include "gfxPlatform.h"
 #include "mozilla/layers/ISurfaceAllocator.h"
+#include "mozilla/layers/CompositableForwarder.h"
 #include "TextureClientRecycleAllocator.h"
 
 namespace mozilla {
@@ -67,7 +68,7 @@ public:
   }
 
 private:
-  mozilla::RefPtr<TextureClient> mTextureClient;
+  RefPtr<TextureClient> mTextureClient;
   TextureFlags mFlags;
 };
 

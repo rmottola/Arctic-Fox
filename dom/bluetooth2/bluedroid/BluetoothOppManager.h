@@ -213,18 +213,18 @@ private:
   nsCOMPtr<nsIOutputStream> mOutputStream;
   nsCOMPtr<nsIInputStream> mInputStream;
   nsCOMPtr<nsIVolumeMountLock> mMountLock;
-  nsRefPtr<DeviceStorageFile> mDsFile;
-  nsRefPtr<DeviceStorageFile> mDummyDsFile;
+  RefPtr<DeviceStorageFile> mDsFile;
+  RefPtr<DeviceStorageFile> mDummyDsFile;
 
   // If a connection has been established, mSocket will be the socket
   // communicating with the remote socket. We maintain the invariant that if
   // mSocket is non-null, mServerSocket must be null (and vice versa).
-  nsRefPtr<BluetoothSocket> mSocket;
+  RefPtr<BluetoothSocket> mSocket;
 
   // Server sockets. Once an inbound connection is established, it will hand
   // over the ownership to mSocket, and get a new server socket while Listen()
   // is called.
-  nsRefPtr<BluetoothSocket> mServerSocket;
+  RefPtr<BluetoothSocket> mServerSocket;
 };
 
 END_BLUETOOTH_NAMESPACE

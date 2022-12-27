@@ -2,15 +2,14 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 "use strict";
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-const CC = Components.Constructor;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
+var CC = Components.Constructor;
 
-const { devtools } =
 const { require } =
-  Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+  Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 
@@ -25,16 +24,6 @@ const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 // Services.prefs.setBoolPref("devtools.debugger.log.verbose", true);
 // Enable remote debugging for the relevant tests.
 Services.prefs.setBoolPref("devtools.debugger.remote-enabled", true);
-
-function tryImport(url) {
-  try {
-    Cu.import(url);
-  } catch (e) {
-    dump("Error importing " + url + "\n");
-    dump(DevToolsUtils.safeErrorString(e) + "\n");
-    throw e;
-  }
-}
 
 const { DebuggerServer } = require("devtools/server/main");
 const { DebuggerClient } = require("devtools/shared/client/main");
@@ -73,8 +62,8 @@ function dbg_assert(cond, e) {
 
 // Register a console listener, so console messages don't just disappear
 // into the ether.
-let errorCount = 0;
-let listener = {
+var errorCount = 0;
+var listener = {
   observe: function (aMessage) {
     errorCount++;
     try {
@@ -107,7 +96,7 @@ let listener = {
   }
 };
 
-let consoleService = Cc["@mozilla.org/consoleservice;1"]
+var consoleService = Cc["@mozilla.org/consoleservice;1"]
                      .getService(Ci.nsIConsoleService);
 consoleService.registerListener(listener);
 
@@ -258,7 +247,7 @@ function writeTestTempFile(aFileName, aContent) {
 
 /*** Transport Factories ***/
 
-let socket_transport = Task.async(function*() {
+var socket_transport = Task.async(function*() {
   if (!DebuggerServer.listeningSockets) {
     let AuthenticatorType = DebuggerServer.Authenticators.get("PROMPT");
     let authenticator = new AuthenticatorType.Server();
@@ -281,7 +270,7 @@ function local_transport() {
 
 /*** Sample Data ***/
 
-let gReallyLong;
+var gReallyLong;
 function really_long() {
   if (gReallyLong) {
     return gReallyLong;

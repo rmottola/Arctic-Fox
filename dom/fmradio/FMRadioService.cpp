@@ -191,7 +191,7 @@ class ReadAirplaneModeSettingTask final : public nsISettingsServiceCallback
 public:
   NS_DECL_ISUPPORTS
 
-  ReadAirplaneModeSettingTask(nsRefPtr<FMRadioReplyRunnable> aPendingRequest)
+  ReadAirplaneModeSettingTask(RefPtr<FMRadioReplyRunnable> aPendingRequest)
     : mPendingRequest(aPendingRequest) { }
 
   NS_IMETHOD
@@ -239,7 +239,7 @@ public:
   }
 
 private:
-  nsRefPtr<FMRadioReplyRunnable> mPendingRequest;
+  RefPtr<FMRadioReplyRunnable> mPendingRequest;
 };
 
 NS_IMPL_ISUPPORTS(ReadAirplaneModeSettingTask, nsISettingsServiceCallback)
@@ -568,7 +568,7 @@ FMRadioService::Enable(double aFrequencyInMHz,
       return;
     }
 
-    nsRefPtr<ReadAirplaneModeSettingTask> callback =
+    RefPtr<ReadAirplaneModeSettingTask> callback =
       new ReadAirplaneModeSettingTask(mPendingRequest);
 
     rv = settingsLock->Get(SETTING_KEY_AIRPLANEMODE_ENABLED, callback);
@@ -615,7 +615,7 @@ FMRadioService::Disable(FMRadioReplyRunnable* aReplyRunnable)
       break;
   }
 
-  nsRefPtr<FMRadioReplyRunnable> enablingRequest = mPendingRequest;
+  RefPtr<FMRadioReplyRunnable> enablingRequest = mPendingRequest;
 
   // If the FM Radio is currently seeking, no fail-to-seek or similar
   // event will be fired, execute the seek callback manually.

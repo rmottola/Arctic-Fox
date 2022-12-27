@@ -123,7 +123,7 @@ protected:
 private:
   static already_AddRefed<nsIDOMRange> CreateRange(nsINode* aNode)
   {
-    nsRefPtr<nsRange> range = new nsRange(aNode);
+    RefPtr<nsRange> range = new nsRange(aNode);
     range->SetMaySpanAnonymousSubtrees(true);
     return range.forget();
   }

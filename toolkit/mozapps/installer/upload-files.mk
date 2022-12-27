@@ -64,7 +64,6 @@ SDK           = $(SDK_PATH)$(PKG_BASENAME)-$(TARGET_CPU).sdk$(SDK_SUFFIX)
 endif
 
 # JavaScript Shell packaging
-ifndef LIBXUL_SDK
 JSSHELL_BINS  = \
   js$(BIN_SUFFIX) \
   $(DLL_PREFIX)mozglue$(DLL_SUFFIX) \
@@ -116,7 +115,6 @@ endif # Darwin
 endif # WINNT
 endif # MOZ_STATIC_JS
 MAKE_JSSHELL  = $(call py_action,zip,-C $(DIST)/bin $(abspath $(PKG_JSSHELL)) $(JSSHELL_BINS))
-endif # LIBXUL_SDK
 
 _ABS_DIST = $(abspath $(DIST))
 JARLOG_DIR = $(abspath $(DEPTH)/jarlog/)
@@ -336,7 +334,7 @@ UPLOAD_EXTRA_FILES += ../embedding/android/geckoview_example/geckoview_example.a
 # Robocop/Robotium tests, Android Background tests, and Fennec need to
 # be signed with the same key, which means release signing them all.
 
-ROBOCOP_PATH = $(abspath $(_ABS_DIST)/../build/mobile/robocop)
+ROBOCOP_PATH = $(abspath $(DEPTH)/mobile/android/tests/browser/robocop)
 # Normally, $(NSINSTALL) would be used instead of cp, but INNER_ROBOCOP_PACKAGE
 # is used in a series of commands that run under a "cd something", while
 # $(NSINSTALL) is relative.
@@ -618,7 +616,6 @@ NO_PKG_FILES += \
 	ClientAuthServer* \
 	OCSPStaplingServer* \
 	GenerateOCSPResponse* \
-	winEmbed.exe \
 	chrome/chrome.rdf \
 	chrome/app-chrome.manifest \
 	chrome/overlayinfo \
@@ -659,10 +656,6 @@ GARBAGE		+= $(DIST)/$(PACKAGE) $(PACKAGE)
 
 PKG_ARG = , '$(pkg)'
 
-ifeq (gonk,$(MOZ_WIDGET_TOOLKIT))
-ELF_HACK_FLAGS = --fill
-endif
-
 # MOZ_PKG_MANIFEST is the canonical way to define the package manifest (which
 # the packager will preprocess), but for a smooth transition, we derive it
 # from the now deprecated MOZ_PKG_MANIFEST_P when MOZ_PKG_MANIFEST is not
@@ -690,8 +683,6 @@ endif
 ifneq (android,$(MOZ_WIDGET_TOOLKIT))
 OPTIMIZEJARS = 1
 endif
-
-export NO_PKG_FILES USE_ELF_HACK ELF_HACK_FLAGS
 
 # A js binary is needed to perform verification of JavaScript minification.
 # We can only use the built binary when not cross-compiling. Environments

@@ -23,8 +23,8 @@
 #include "mozilla/Preferences.h"
 #include "nsPrintfCString.h"
 
-PRLogModuleInfo* GetDemuxerLog();
-#define LOG(...) MOZ_LOG(GetDemuxerLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+extern PRLogModuleInfo* GetPDMLog();
+#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using mozilla::layers::Image;
 using mozilla::layers::IMFYCbCrImage;
@@ -166,7 +166,7 @@ WMFVideoMFTManager::InitializeDXVA(bool aForceD3D9)
   }
 
   // The DXVA manager must be created on the main thread.
-  nsRefPtr<CreateDXVAManagerEvent> event = 
+  RefPtr<CreateDXVAManagerEvent> event =
     new CreateDXVAManagerEvent(aForceD3D9 ? LayersBackend::LAYERS_D3D9 : mLayersBackend, mDXVAFailureReason);
 
   if (NS_IsMainThread()) {
@@ -179,25 +179,25 @@ WMFVideoMFTManager::InitializeDXVA(bool aForceD3D9)
   return mDXVA2Manager != nullptr;
 }
 
-already_AddRefed<MFTDecoder>
+bool
 WMFVideoMFTManager::Init()
 {
-  RefPtr<MFTDecoder> decoder = InitInternal(/* aForceD3D9 = */ false);
+  bool success = InitInternal(/* aForceD3D9 = */ false);
 
   // If initialization failed with d3d11 DXVA then try falling back
   // to d3d9.
-  if (!decoder && mDXVA2Manager && mDXVA2Manager->IsD3D11()) {
+  if (!success && mDXVA2Manager && mDXVA2Manager->IsD3D11()) {
     mDXVA2Manager = nullptr;
     nsCString d3d11Failure = mDXVAFailureReason;
-    decoder = InitInternal(true);
+    success = InitInternal(true);
     mDXVAFailureReason.Append(NS_LITERAL_CSTRING("; "));
     mDXVAFailureReason.Append(d3d11Failure);
   }
 
-  return decoder.forget();
+  return success;
 }
 
-already_AddRefed<MFTDecoder>
+bool
 WMFVideoMFTManager::InitInternal(bool aForceD3D9)
 {
   mUseHwAccel = false; // default value; changed if D3D setup succeeds.
@@ -206,7 +206,7 @@ WMFVideoMFTManager::InitInternal(bool aForceD3D9)
   RefPtr<MFTDecoder> decoder(new MFTDecoder());
 
   HRESULT hr = decoder->Create(GetMFTGUID());
-  NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
+  NS_ENSURE_TRUE(SUCCEEDED(hr), false);
 
   RefPtr<IMFAttributes> attr(decoder->GetAttributes());
   UINT32 aware = 0;
@@ -214,12 +214,13 @@ WMFVideoMFTManager::InitInternal(bool aForceD3D9)
     attr->GetUINT32(MF_SA_D3D_AWARE, &aware);
     attr->SetUINT32(CODECAPI_AVDecNumWorkerThreads,
       WMFDecoderModule::GetNumDecoderThreads());
-    hr = attr->SetUINT32(CODECAPI_AVLowLatencyMode, TRUE);
-    if (SUCCEEDED(hr)) {
-      LOG("Enabling Low Latency Mode");
-    }
-    else {
-      LOG("Couldn't enable Low Latency Mode");
+    if (WMFDecoderModule::LowLatencyMFTEnabled()) {
+      hr = attr->SetUINT32(CODECAPI_AVLowLatencyMode, TRUE);
+      if (SUCCEEDED(hr)) {
+        LOG("Enabling Low Latency Mode");
+      } else {
+        LOG("Couldn't enable Low Latency Mode");
+      }
     }
   }
 
@@ -245,7 +246,7 @@ WMFVideoMFTManager::InitInternal(bool aForceD3D9)
 
   mDecoder = decoder;
   hr = SetDecoderMediaTypes();
-  NS_ENSURE_TRUE(SUCCEEDED(hr), nullptr);
+  NS_ENSURE_TRUE(SUCCEEDED(hr), false);
 
   LOG("Video Decoder initialized, Using DXVA: %s", (mUseHwAccel ? "Yes" : "No"));
 
@@ -256,7 +257,7 @@ WMFVideoMFTManager::InitInternal(bool aForceD3D9)
   mVideoHeight = 0;
   mPictureRegion.SetEmpty();
 
-  return decoder.forget();
+  return true;
 }
 
 HRESULT
@@ -264,7 +265,7 @@ WMFVideoMFTManager::SetDecoderMediaTypes()
 {
   // Setup the input/output media types.
   RefPtr<IMFMediaType> inputType;
-  HRESULT hr = wmf::MFCreateMediaType(byRef(inputType));
+  HRESULT hr = wmf::MFCreateMediaType(getter_AddRefs(inputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   hr = inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
@@ -277,7 +278,7 @@ WMFVideoMFTManager::SetDecoderMediaTypes()
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   RefPtr<IMFMediaType> outputType;
-  hr = wmf::MFCreateMediaType(byRef(outputType));
+  hr = wmf::MFCreateMediaType(getter_AddRefs(outputType));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   hr = outputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
@@ -441,7 +442,7 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
   RefPtr<IMFMediaBuffer> buffer;
 
   // Must convert to contiguous buffer to use IMD2DBuffer interface.
-  hr = aSample->ConvertToContiguousBuffer(byRef(buffer));
+  hr = aSample->ConvertToContiguousBuffer(getter_AddRefs(buffer));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
   // Try and use the IMF2DBuffer interface if available, otherwise fallback
@@ -450,7 +451,7 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
   BYTE* data = nullptr;
   LONG stride = 0;
   RefPtr<IMF2DBuffer> twoDBuffer;
-  hr = buffer->QueryInterface(static_cast<IMF2DBuffer**>(byRef(twoDBuffer)));
+  hr = buffer->QueryInterface(static_cast<IMF2DBuffer**>(getter_AddRefs(twoDBuffer)));
   if (SUCCEEDED(hr)) {
     hr = twoDBuffer->Lock2D(&data, &stride);
     NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
@@ -505,7 +506,7 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
   media::TimeUnit duration = GetSampleDuration(aSample);
   NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
 
-  nsRefPtr<layers::PlanarYCbCrImage> image =
+  RefPtr<layers::PlanarYCbCrImage> image =
     new IMFYCbCrImage(buffer, twoDBuffer);
 
   VideoData::SetVideoDataToImage(image,
@@ -514,7 +515,7 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
                                  mPictureRegion,
                                  false);
 
-  nsRefPtr<VideoData> v =
+  RefPtr<VideoData> v =
     VideoData::CreateFromImage(mVideoInfo,
                                mImageContainer,
                                aStreamOffset,
@@ -542,7 +543,7 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
   *aOutVideoData = nullptr;
   HRESULT hr;
 
-  nsRefPtr<Image> image;
+  RefPtr<Image> image;
   hr = mDXVA2Manager->CopyToImage(aSample,
                                   mPictureRegion,
                                   mImageContainer,
@@ -554,7 +555,7 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
   NS_ENSURE_TRUE(pts.IsValid(), E_FAIL);
   media::TimeUnit duration = GetSampleDuration(aSample);
   NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
-  nsRefPtr<VideoData> v = VideoData::CreateFromImage(mVideoInfo,
+  RefPtr<VideoData> v = VideoData::CreateFromImage(mVideoInfo,
                                                      mImageContainer,
                                                      aStreamOffset,
                                                      pts.ToMicroseconds(),
@@ -573,11 +574,12 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
 // Blocks until decoded sample is produced by the deoder.
 HRESULT
 WMFVideoMFTManager::Output(int64_t aStreamOffset,
-                           nsRefPtr<MediaData>& aOutData)
+                           RefPtr<MediaData>& aOutData)
 {
   RefPtr<IMFSample> sample;
   HRESULT hr;
   aOutData = nullptr;
+  int typeChangeCount = 0;
 
   // Loop until we decode a sample, or an unexpected error that we can't
   // handle occurs.
@@ -593,7 +595,12 @@ WMFVideoMFTManager::Output(int64_t aStreamOffset,
       MOZ_ASSERT(!sample);
       hr = ConfigureVideoFrameGeometry();
       NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
+      // Catch infinite loops, but some decoders perform at least 2 stream
+      // changes on consecutive calls, so be permissive.
+      // 100 is arbitrarily > 2.
+      NS_ENSURE_TRUE(typeChangeCount < 100, MF_E_TRANSFORM_STREAM_CHANGE);
       // Loop back and try decoding again...
+      ++typeChangeCount;
       continue;
     }
     if (SUCCEEDED(hr)) {
@@ -604,7 +611,7 @@ WMFVideoMFTManager::Output(int64_t aStreamOffset,
     return hr;
   }
 
-  nsRefPtr<VideoData> frame;
+  RefPtr<VideoData> frame;
   if (mUseHwAccel) {
     hr = CreateD3DVideoFrame(sample, aStreamOffset, getter_AddRefs(frame));
   } else {

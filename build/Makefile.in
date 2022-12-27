@@ -7,11 +7,7 @@ USE_RCS_MK := 1
 include $(topsrcdir)/config/makefiles/makeutils.mk
 
 ifdef MOZ_APP_BASENAME
-ifdef LIBXUL_SDK
-APP_INI_DEPS = $(LIBXUL_DIST)/bin/platform.ini
-else
 APP_INI_DEPS = $(topsrcdir)/config/milestone.txt
-endif
 
 APP_BUILDID := $(shell cat $(DEPTH)/config/buildid)
 APP_INI_DEPS += $(DEPTH)/config/buildid
@@ -99,6 +95,3 @@ endif
 
 libs:: automation.py
 
-ifdef ENABLE_TESTS
-GARBAGE += $(srcdir)/automationutils.pyc
-endif # ENABLE_TESTS

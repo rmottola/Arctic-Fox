@@ -571,10 +571,6 @@ class FullParseHandler
         return new_<TernaryNode>(kind, JSOP_NOP, pn1, pn2, pn3, pos);
     }
 
-    ParseNode* newFreshenBlock(const TokenPos& pos) {
-        return new_<NullaryNode>(PNK_FRESHENBLOCK, pos);
-    }
-
     ParseNode* newSwitchStatement(uint32_t begin, ParseNode* discriminant, ParseNode* caseList) {
         TokenPos pos(begin, caseList->pn_pos.end);
         return new_<BinaryNode>(PNK_SWITCH, JSOP_NOP, pos, discriminant, caseList);
@@ -593,9 +589,9 @@ class FullParseHandler
         return new_<BreakStatement>(label, pos);
     }
 
-    ParseNode* newReturnStatement(ParseNode* expr, ParseNode* genrval, const TokenPos& pos) {
+    ParseNode* newReturnStatement(ParseNode* expr, const TokenPos& pos) {
         MOZ_ASSERT_IF(expr, pos.encloses(expr->pn_pos));
-        return new_<BinaryNode>(PNK_RETURN, JSOP_RETURN, pos, expr, genrval);
+        return new_<UnaryNode>(PNK_RETURN, JSOP_RETURN, pos, expr);
     }
 
     ParseNode* newWithStatement(uint32_t begin, ParseNode* expr, ParseNode* body,

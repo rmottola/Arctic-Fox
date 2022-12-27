@@ -20,7 +20,7 @@ namespace gmp {
 class GMPContentParent;
 
 class GMPDecryptorParent final : public GMPDecryptorProxy
-                                   , public PGMPDecryptorParent
+                               , public PGMPDecryptorParent
 {
 public:
   NS_INLINE_DECL_REFCOUNTING(GMPDecryptorParent)
@@ -28,7 +28,8 @@ public:
   explicit GMPDecryptorParent(GMPContentParent *aPlugin);
 
   // GMPDecryptorProxy
-  virtual const uint32_t GetPluginId() const override;
+
+  virtual const uint32_t GetPluginId() const override { return mPluginId; }
 
   virtual nsresult Init(GMPDecryptorProxyCallback* aCallback) override;
 
@@ -110,7 +111,8 @@ private:
 
   bool mIsOpen;
   bool mShuttingDown;
-  nsRefPtr<GMPContentParent> mPlugin;
+  bool mActorDestroyed;
+  RefPtr<GMPContentParent> mPlugin;
   uint32_t mPluginId;
   GMPDecryptorProxyCallback* mCallback;
 #ifdef DEBUG

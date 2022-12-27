@@ -41,8 +41,8 @@ protected:
 
 private:
   mozNotificationCenterDelegate *mDelegate;
-  nsTArray<nsRefPtr<OSXNotificationInfo> > mActiveAlerts;
-  nsTArray<nsRefPtr<OSXNotificationInfo> > mPendingAlerts;
+  nsTArray<RefPtr<OSXNotificationInfo> > mActiveAlerts;
+  nsTArray<RefPtr<OSXNotificationInfo> > mPendingAlerts;
 };
 
 } // namespace mozilla

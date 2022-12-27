@@ -85,21 +85,19 @@ BuiltinProvider.prototype = {
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "": "resource://gre/modules/commonjs/",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "devtools": "resource://gre/modules/devtools",
+        "devtools": "resource://devtools",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "devtools/client": "resource:///modules/devtools/client",
+        "devtools/client": "resource://devtools/client",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "gcli": "resource://gre/modules/devtools/gcli",
+        "gcli": "resource://devtools/gcli",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "promise": "resource://gre/modules/Promise-backend.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "acorn": "resource://gre/modules/devtools/acorn",
+        "acorn": "resource://devtools/acorn",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "acorn/util/walk": "resource://gre/modules/devtools/acorn/walk.js",
+        "acorn/util/walk": "resource://devtools/acorn/walk.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "tern": "resource://gre/modules/devtools/tern",
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "source-map": "resource://gre/modules/devtools/sourcemap/source-map.js",
+        "source-map": "resource://devtools/sourcemap/source-map.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         // Allow access to xpcshell test items from the loader.
         "xpcshell-test": "resource://test"
@@ -146,7 +144,6 @@ SrcdirProvider.prototype = {
                                                "Promise-backend.js"));
     let acornURI = this.fileURI(OS.Path.join(sharedDir, "acorn"));
     let acornWalkURI = OS.Path.join(acornURI, "walk.js");
-    let ternURI = OS.Path.join(sharedDir, "tern");
     let sourceMapURI = this.fileURI(OS.Path.join(sharedDir,
                                                  "sourcemap", "source-map.js"));
     this.loader = new Loader.Loader({
@@ -165,8 +162,6 @@ SrcdirProvider.prototype = {
         "acorn": acornURI,
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "acorn/util/walk": acornWalkURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "tern": ternURI,
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "source-map": sourceMapURI,
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
@@ -398,7 +393,7 @@ DevToolsLoader.prototype = {
     };
     // Lazy define console in order to load Console.jsm only when it is used
     XPCOMUtils.defineLazyGetter(this._provider.globals, "console", () => {
-      return Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {}).console;
+      return Cu.import("resource://gre/modules/Console.jsm", {}).console;
     });
 
     this._provider.load();
@@ -438,7 +433,7 @@ DevToolsLoader.prototype = {
     if (showToolbox) {
       let { gBrowser } = Services.wm.getMostRecentWindow("navigator:browser");
       let target = this.TargetFactory.forTab(gBrowser.selectedTab);
-      const { gDevTools } = this.require("resource:///modules/devtools/client/framework/gDevTools.jsm");
+      const { gDevTools } = this.require("resource://devtools/client/framework/gDevTools.jsm");
       gDevTools.showToolbox(target);
     }
   },

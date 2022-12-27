@@ -101,6 +101,16 @@ const TIMELINE_BLUEPRINT = {
     label: L10N.getStr("marker.label.domevent"),
     fields: Formatters.DOMEventFields,
   },
+  "document::DOMContentLoaded": {
+    group: 1,
+    colorName: "graphs-full-red",
+    label: "DOMContentLoaded"
+  },
+  "document::Load": {
+    group: 1,
+    colorName: "graphs-full-blue",
+    label: "Load"
+  },
   "Javascript": {
     group: 1,
     colorName: "graphs-yellow",
@@ -134,6 +144,12 @@ const TIMELINE_BLUEPRINT = {
     colorName: "graphs-red",
     label: L10N.getStr("marker.label.cycleCollection.forgetSkippable"),
     fields: Formatters.CycleCollectionFields,
+  },
+  "Worker": {
+    group: 1,
+    colorName: "graphs-orange",
+    label: L10N.getStr("marker.label.worker"),
+    fields: Formatters.WorkerFields
   },
 
   /* Group 2 - User Controlled */

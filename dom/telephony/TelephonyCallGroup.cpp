@@ -33,7 +33,7 @@ TelephonyCallGroup::Create(Telephony* aTelephony)
 {
   NS_ASSERTION(aTelephony, "Null telephony!");
 
-  nsRefPtr<TelephonyCallGroup> group =
+  RefPtr<TelephonyCallGroup> group =
     new TelephonyCallGroup(aTelephony->GetOwner());
 
   group->mTelephony = aTelephony;
@@ -75,7 +75,7 @@ TelephonyCallGroup::NotifyError(const nsAString& aName, const nsAString& aMessag
   init.mName = aName;
   init.mMessage = aMessage;
 
-  nsRefPtr<CallGroupErrorEvent> event =
+  RefPtr<CallGroupErrorEvent> event =
     CallGroupErrorEvent::Constructor(this, NS_LITERAL_STRING("error"), init);
 
   return DispatchTrustedEvent(event);
@@ -127,7 +127,7 @@ TelephonyCallGroup::ChangeState(uint16_t aCallState)
   }
 
   for (uint32_t index = 0; index < mCalls.Length(); index++) {
-    nsRefPtr<TelephonyCall> call = mCalls[index];
+    RefPtr<TelephonyCall> call = mCalls[index];
     call->ChangeState(aCallState);
 
     MOZ_ASSERT(call->CallState() == aCallState);
@@ -149,7 +149,7 @@ TelephonyCallGroup::DispatchCallEvent(const nsAString& aType,
   init.mCancelable = false;
   init.mCall = aCall;
 
-  nsRefPtr<CallEvent> event = CallEvent::Constructor(this, aType, init);
+  RefPtr<CallEvent> event = CallEvent::Constructor(this, aType, init);
   return DispatchTrustedEvent(event);
 }
 
@@ -162,7 +162,7 @@ TelephonyCallGroup::CreatePromise(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -206,10 +206,10 @@ TelephonyCallGroup::CanConference(const TelephonyCall& aCall,
 already_AddRefed<TelephonyCall>
 TelephonyCallGroup::GetCall(uint32_t aServiceId, uint32_t aCallIndex)
 {
-  nsRefPtr<TelephonyCall> call;
+  RefPtr<TelephonyCall> call;
 
   for (uint32_t index = 0; index < mCalls.Length(); index++) {
-    nsRefPtr<TelephonyCall>& tempCall = mCalls[index];
+    RefPtr<TelephonyCall>& tempCall = mCalls[index];
     if (tempCall->ServiceId() == aServiceId &&
         tempCall->CallIndex() == aCallIndex) {
       call = tempCall;
@@ -246,7 +246,7 @@ NS_IMPL_RELEASE_INHERITED(TelephonyCallGroup, DOMEventTargetHelper)
 already_AddRefed<CallsList>
 TelephonyCallGroup::Calls() const
 {
-  nsRefPtr<CallsList> list = mCallsList;
+  RefPtr<CallsList> list = mCallsList;
   return list.forget();
 }
 
@@ -256,7 +256,7 @@ TelephonyCallGroup::Add(TelephonyCall& aCall,
 {
   MOZ_ASSERT(!mCalls.IsEmpty());
 
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }
@@ -278,7 +278,7 @@ TelephonyCallGroup::Add(TelephonyCall& aCall,
                         TelephonyCall& aSecondCall,
                         ErrorResult& aRv)
 {
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }
@@ -300,7 +300,7 @@ TelephonyCallGroup::Remove(TelephonyCall& aCall, ErrorResult& aRv)
 {
   MOZ_ASSERT(!mCalls.IsEmpty());
 
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }
@@ -314,7 +314,7 @@ TelephonyCallGroup::Remove(TelephonyCall& aCall, ErrorResult& aRv)
   uint32_t serviceId = aCall.ServiceId();
   uint32_t callIndex = aCall.CallIndex();
 
-  nsRefPtr<TelephonyCall> call = GetCall(serviceId, callIndex);
+  RefPtr<TelephonyCall> call = GetCall(serviceId, callIndex);
   if (!call) {
     NS_WARNING("Didn't have this call. Ignore!");
     promise->MaybeReject(NS_ERROR_NOT_AVAILABLE);
@@ -333,7 +333,7 @@ TelephonyCallGroup::HangUp(ErrorResult& aRv)
 {
   MOZ_ASSERT(!mCalls.IsEmpty());
 
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }
@@ -351,7 +351,7 @@ TelephonyCallGroup::Hold(ErrorResult& aRv)
 {
   MOZ_ASSERT(!mCalls.IsEmpty());
 
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }
@@ -376,7 +376,7 @@ TelephonyCallGroup::Resume(ErrorResult& aRv)
 {
   MOZ_ASSERT(!mCalls.IsEmpty());
 
-  nsRefPtr<Promise> promise = CreatePromise(aRv);
+  RefPtr<Promise> promise = CreatePromise(aRv);
   if (!promise) {
     return nullptr;
   }

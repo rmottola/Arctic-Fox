@@ -132,8 +132,12 @@ this.ImportExport = {
     }
 
     let files = [];
+    debug("aApp=" + uneval(aApp));
     if (aApp.origin.startsWith("app://")) {
-      files.push("update.webapp");
+      // Apps sideloaded from WebIDE don't have an update manifest.
+      if (!aApp.sideloaded) {
+        files.push("update.webapp");
+      }
       files.push("application.zip");
     } else {
       files.push("manifest.webapp");
@@ -216,18 +220,19 @@ this.ImportExport = {
   _importPackagedApp: function(aZipReader, aManifestURL, aDir) {
     debug("Importing packaged app " + aManifestURL);
 
-    if (!aZipReader.hasEntry("update.webapp")) {
-      throw "NoUpdateManifestFound";
-    }
-
     if (!aZipReader.hasEntry("application.zip")) {
       throw "NoPackageFound";
     }
 
+    // The order matters, application.zip needs to be the last element.
+    let files = [];
+    aZipReader.hasEntry("update.webapp") && files.push("update.webapp");
+    files.push("application.zip");
+
     // Extract application.zip and update.webapp
     // We get manifest.webapp from application.zip itself.
     let file;
-    ["update.webapp", "application.zip"].forEach((aName) => {
+    files.forEach((aName) => {
       file = aDir.clone();
       file.append(aName);
       aZipReader.extract(aName, file);
@@ -390,6 +395,11 @@ this.ImportExport = {
       meta.installerIsBrowser = false;
       meta.role = manifest.role;
 
+      let devMode = false;
+      try {
+        devMode = Services.prefs.getBoolPref("dom.apps.developer_mode");
+      } catch(e) {}
+
       // Set the appropriate metadata for hosted and packaged apps.
       if (isPackage) {
         meta.origin = "app://" + meta.id;
@@ -399,12 +409,10 @@ this.ImportExport = {
           yield DOMApplicationRegistry._openPackage(appFile, meta, false);
         let maxStatus = isSigned ? Ci.nsIPrincipal.APP_STATUS_PRIVILEGED
                                  : Ci.nsIPrincipal.APP_STATUS_INSTALLED;
-        try {
-          // Anything is possible in developer mode.
-          if (Services.prefs.getBoolPref("dom.apps.developer_mode")) {
-            maxStatus = Ci.nsIPrincipal.APP_STATUS_CERTIFIED;
-          }
-        } catch(e) {};
+        // Anything is possible in developer mode.
+        if (devMode) {
+          maxStatus = Ci.nsIPrincipal.APP_STATUS_CERTIFIED;
+        }
         meta.appStatus = AppsUtils.getAppManifestStatus(manifest);
         debug("Signed app? " + isSigned);
         if (meta.appStatus > maxStatus) {
@@ -413,12 +421,12 @@ this.ImportExport = {
 
         // Custom origin.
         // We unfortunately can't reuse _checkOrigin here.
-        if (isSigned &&
-            meta.appStatus == Ci.nsIPrincipal.APP_STATUS_PRIVILEGED &&
+        if ((isSigned || devMode) &&
+            meta.appStatus >= Ci.nsIPrincipal.APP_STATUS_PRIVILEGED &&
             manifest.origin) {
           let uri;
           try {
-            uri = Services.io.newURI(aManifest.origin, null, null);
+            uri = Services.io.newURI(manifest.origin, null, null);
           } catch(e) {
             throw "InvalidOrigin";
           }

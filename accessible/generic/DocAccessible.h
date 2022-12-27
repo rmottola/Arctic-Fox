@@ -618,12 +618,12 @@ protected:
     bool mStateBitWasOn;
   };
 
-  nsTArray<nsRefPtr<DocAccessible> > mChildDocuments;
+  nsTArray<RefPtr<DocAccessible> > mChildDocuments;
 
   /**
    * The virtual cursor of the document.
    */
-  nsRefPtr<nsAccessiblePivot> mVirtualCursor;
+  RefPtr<nsAccessiblePivot> mVirtualCursor;
 
   /**
    * A storage class for pairing content with one of its relation attributes.
@@ -665,7 +665,7 @@ protected:
    *
    * @see ProcessInvalidationList
    */
-  nsTArray<nsRefPtr<nsIContent>> mInvalidationList;
+  nsTArray<RefPtr<nsIContent>> mInvalidationList;
 
   /**
    * Holds a list of aria-owns relations.
@@ -689,7 +689,7 @@ protected:
   /**
    * Used to process notification from core and accessible events.
    */
-  nsRefPtr<NotificationController> mNotificationController;
+  RefPtr<NotificationController> mNotificationController;
   friend class EventQueue;
   friend class NotificationController;
 

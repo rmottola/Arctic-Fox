@@ -21,6 +21,8 @@
 # include "jit/arm64/Lowering-arm64.h"
 #elif defined(JS_CODEGEN_MIPS32)
 # include "jit/mips32/Lowering-mips32.h"
+#elif defined(JS_CODEGEN_MIPS64)
+# include "jit/mips64/Lowering-mips64.h"
 #elif defined(JS_CODEGEN_NONE)
 # include "jit/none/Lowering-none.h"
 #else
@@ -226,7 +228,6 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitGetPropertyCache(MGetPropertyCache* ins);
     void visitGetPropertyPolymorphic(MGetPropertyPolymorphic* ins);
     void visitSetPropertyPolymorphic(MSetPropertyPolymorphic* ins);
-    void visitGetElementCache(MGetElementCache* ins);
     void visitBindNameCache(MBindNameCache* ins);
     void visitGuardObjectIdentity(MGuardObjectIdentity* ins);
     void visitGuardClass(MGuardClass* ins);
@@ -246,7 +247,6 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitCallSetElement(MCallSetElement* ins);
     void visitCallInitElementArray(MCallInitElementArray* ins);
     void visitSetPropertyCache(MSetPropertyCache* ins);
-    void visitSetElementCache(MSetElementCache* ins);
     void visitCallSetProperty(MCallSetProperty* ins);
     void visitIteratorStart(MIteratorStart* ins);
     void visitIteratorMore(MIteratorMore* ins);
@@ -300,12 +300,13 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitArrayState(MArrayState* ins);
     void visitUnknownValue(MUnknownValue* ins);
     void visitLexicalCheck(MLexicalCheck* ins);
-    void visitThrowUninitializedLexical(MThrowUninitializedLexical* ins);
+    void visitThrowRuntimeLexicalError(MThrowRuntimeLexicalError* ins);
     void visitGlobalNameConflictsCheck(MGlobalNameConflictsCheck* ins);
     void visitDebugger(MDebugger* ins);
     void visitNewTarget(MNewTarget* ins);
     void visitArrowNewTarget(MArrowNewTarget* ins);
     void visitAtomicIsLockFree(MAtomicIsLockFree* ins);
+    void visitCheckReturn(MCheckReturn* ins);
 };
 
 } // namespace jit

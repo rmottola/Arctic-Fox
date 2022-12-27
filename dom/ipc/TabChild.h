@@ -145,7 +145,7 @@ public:
   }
 
   nsCOMPtr<nsIContentFrameMessageManager> mMessageManager;
-  nsRefPtr<TabChildBase> mTabChild;
+  RefPtr<TabChildBase> mTabChild;
 
 protected:
   ~TabChildGlobal();
@@ -210,7 +210,7 @@ protected:
     bool UpdateFrameHandler(const mozilla::layers::FrameMetrics& aFrameMetrics);
 
 protected:
-    nsRefPtr<TabChildGlobal> mTabChildGlobal;
+    RefPtr<TabChildGlobal> mTabChildGlobal;
     nsCOMPtr<nsIWebBrowserChrome3> mWebBrowserChrome;
 };
 
@@ -240,6 +240,16 @@ public:
     static already_AddRefed<TabChild> FindTabChild(const TabId& aTabId);
 
 public:
+    /**
+     * Create a new TabChild object.
+     */
+    TabChild(nsIContentChild* aManager,
+             const TabId& aTabId,
+             const TabContext& aContext,
+             uint32_t aChromeFlags);
+
+    nsresult Init();
+
     /**
      * This is expected to be called off the critical path to content
      * startup.  This is an opportunity to load things that are slow
@@ -280,16 +290,17 @@ public:
                                        nsIPrincipal* aPrincipal,
                                        nsTArray<StructuredCloneData>* aRetVal,
                                        bool aIsSync) override;
-    virtual bool DoSendAsyncMessage(JSContext* aCx,
-                                    const nsAString& aMessage,
-                                    StructuredCloneData& aData,
-                                    JS::Handle<JSObject *> aCpows,
-                                    nsIPrincipal* aPrincipal) override;
+    virtual nsresult DoSendAsyncMessage(JSContext* aCx,
+                                        const nsAString& aMessage,
+                                        StructuredCloneData& aData,
+                                        JS::Handle<JSObject *> aCpows,
+                                        nsIPrincipal* aPrincipal) override;
     virtual bool DoUpdateZoomConstraints(const uint32_t& aPresShellId,
                                          const ViewID& aViewId,
                                          const Maybe<ZoomConstraints>& aConstraints) override;
     virtual bool RecvLoadURL(const nsCString& aURI,
-                             const BrowserConfiguration& aConfiguration) override;
+                             const BrowserConfiguration& aConfiguration,
+                             const ShowInfo& aInfo) override;
     virtual bool RecvCacheFileDescriptor(const nsString& aPath,
                                          const FileDescriptor& aFileDescriptor)
                                          override;
@@ -510,6 +521,12 @@ public:
 
     virtual ScreenIntSize GetInnerSize() override;
 
+    // Call RecvShow(nsIntSize(0, 0)) and block future calls to RecvShow().
+    void DoFakeShow(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
+                    const uint64_t& aLayersId,
+                    PRenderFrameChild* aRenderFrame,
+                    const ShowInfo& aShowInfo);
+
 protected:
     virtual ~TabChild();
 
@@ -535,16 +552,6 @@ protected:
 #endif
 
 private:
-    /**
-     * Create a new TabChild object.
-     */
-    TabChild(nsIContentChild* aManager,
-             const TabId& aTabId,
-             const TabContext& aContext,
-             uint32_t aChromeFlags);
-
-    nsresult Init();
-
     class DelayedFireContextMenuEvent;
 
     // Notify others that our TabContext has been updated.  (At the moment, this
@@ -564,11 +571,6 @@ private:
     void DestroyWindow();
     void SetProcessNameToAppName();
 
-    // Call RecvShow(nsIntSize(0, 0)) and block future calls to RecvShow().
-    void DoFakeShow(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
-                    const uint64_t& aLayersId,
-                    PRenderFrameChild* aRenderFrame);
-
     void ApplyShowInfo(const ShowInfo& aInfo);
 
     // These methods are used for tracking synthetic mouse events
@@ -580,19 +582,6 @@ private:
     void FireContextMenuEvent();
     void CancelTapTracking();
     void UpdateTapState(const WidgetTouchEvent& aEvent, nsEventStatus aStatus);
-
-    nsresult
-    ProvideWindowCommon(nsIDOMWindow* aOpener,
-                        bool aIframeMoz,
-                        uint32_t aChromeFlags,
-                        bool aCalledFromJS,
-                        bool aPositionSpecified,
-                        bool aSizeSpecified,
-                        nsIURI* aURI,
-                        const nsAString& aName,
-                        const nsACString& aFeatures,
-                        bool* aWindowIsNew,
-                        nsIDOMWindow** aReturn);
 
     bool HasValidInnerSize();
 
@@ -610,10 +599,10 @@ private:
 
     TextureFactoryIdentifier mTextureFactoryIdentifier;
     nsCOMPtr<nsIWebNavigation> mWebNav;
-    nsRefPtr<PuppetWidget> mPuppetWidget;
+    RefPtr<PuppetWidget> mPuppetWidget;
     nsCOMPtr<nsIURI> mLastURI;
     RenderFrameChild* mRemoteFrame;
-    nsRefPtr<nsIContentChild> mManager;
+    RefPtr<nsIContentChild> mManager;
     uint32_t mChromeFlags;
     int32_t mActiveSuppressDisplayport;
     uint64_t mLayersId;
@@ -640,19 +629,23 @@ private:
     bool mUpdateHitRegion;
 
     bool mIgnoreKeyPressEvent;
-    nsRefPtr<APZEventState> mAPZEventState;
+    RefPtr<APZEventState> mAPZEventState;
     SetAllowedTouchBehaviorCallback mSetAllowedTouchBehaviorCallback;
     bool mHasValidInnerSize;
     bool mDestroyed;
     // Position of tab, relative to parent widget (typically the window)
     LayoutDeviceIntPoint mChromeDisp;
     TabId mUniqueId;
+
+    friend class ContentChild;
     float mDPI;
     double mDefaultScale;
+
     bool mIPCOpen;
     bool mParentIsActive;
     bool mAsyncPanZoomEnabled;
     CSSSize mUnscaledInnerSize;
+    bool mDidSetRealShowInfo;
 
     nsAutoTArray<bool, NUMBER_OF_AUDIO_CHANNELS> mAudioChannelsActive;
 

@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const Cu = Components.utils;
+var Cu = Components.utils;
 
-const { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const { GetDevices, GetDeviceString } = require("devtools/client/shared/devices");
 const { Services } = Cu.import("resource://gre/modules/Services.jsm");
 const { Simulators, Simulator } = require("devtools/client/webide/modules/simulators");

@@ -54,7 +54,7 @@ nsNullPrincipalURI::Init()
 already_AddRefed<nsNullPrincipalURI>
 nsNullPrincipalURI::Create()
 {
-  nsRefPtr<nsNullPrincipalURI> uri = new nsNullPrincipalURI();
+  RefPtr<nsNullPrincipalURI> uri = new nsNullPrincipalURI();
   nsresult rv = uri->Init();
   NS_ENSURE_SUCCESS(rv, nullptr);
   return uri.forget();

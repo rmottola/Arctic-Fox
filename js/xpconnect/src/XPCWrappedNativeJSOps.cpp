@@ -646,8 +646,6 @@ const XPCWrappedNativeJSClass XPC_WN_NoHelper_JSClass = {
 
     // ClassExtension
     {
-        nullptr, // outerObject
-        nullptr, // innerObject
         true,    // isWrappedNative
         nullptr, // weakmapKeyDelegateOp
         WrappedNativeObjectMoved
@@ -665,7 +663,7 @@ const XPCWrappedNativeJSClass XPC_WN_NoHelper_JSClass = {
         nullptr, nullptr, // watch/unwatch
         nullptr, // getElements
         nullptr, // enumerate
-        XPC_WN_JSOp_ThisObject,
+        nullptr, // funToString
     }
   }
 };
@@ -927,12 +925,6 @@ XPC_WN_JSOp_Enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties,
     return retval;
 }
 
-JSObject*
-XPC_WN_JSOp_ThisObject(JSContext* cx, HandleObject obj)
-{
-    return JS_ObjectToOuterObject(cx, obj);
-}
-
 /***************************************************************************/
 
 // static
@@ -1036,8 +1028,6 @@ XPCNativeScriptableShared::PopulateJSClass()
     js::ObjectOps* ops = &mJSClass.base.ops;
     if (mFlags.WantNewEnumerate())
         ops->enumerate = XPC_WN_JSOp_Enumerate;
-    ops->thisObject = XPC_WN_JSOp_ThisObject;
-
 
     if (mFlags.WantCall())
         mJSClass.base.call = XPC_WN_Helper_Call;
@@ -1255,8 +1245,6 @@ XPC_WN_ModsAllowed_Proto_Resolve(JSContext* cx, HandleObject obj, HandleId id, b
 
 #define XPC_WN_SHARED_PROTO_CLASS_EXT                                  \
     {                                                                  \
-        nullptr,    /* outerObject */                                  \
-        nullptr,    /* innerObject */                                  \
         false,      /* isWrappedNative */                              \
         nullptr,    /* weakmapKeyDelegateOp */                         \
         XPC_WN_Shared_Proto_ObjectMoved                                \
@@ -1508,8 +1496,6 @@ const js::Class XPC_WN_Tearoff_JSClass = {
 
     // ClassExtension
     {
-        nullptr,                               // outerObject
-        nullptr,                               // innerObject
         false,                                 // isWrappedNative
         nullptr,                               // weakmapKeyDelegateOp
         XPC_WN_TearOff_ObjectMoved

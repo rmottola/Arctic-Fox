@@ -47,18 +47,18 @@ ogg_packet InitOggPacket(const unsigned char* aData, size_t aLength,
 class VorbisDecoder : public WebMAudioDecoder
 {
 public:
-  nsRefPtr<InitPromise> Init() override;
-  void Shutdown();
-  nsresult ResetDecode();
-  nsresult DecodeHeader(const unsigned char* aData, size_t aLength);
-  nsresult FinishInit(AudioInfo& aInfo);
+  nsresult Init() override;
+  void Shutdown() override;
+  nsresult ResetDecode() override;
+  nsresult DecodeHeader(const unsigned char* aData, size_t aLength) override;
+  nsresult FinishInit(AudioInfo& aInfo) override;
   bool Decode(const unsigned char* aData, size_t aLength,
               int64_t aOffset, uint64_t aTstampUsecs,
-              int64_t aDiscardPadding, int32_t* aTotalFrames);
+              int64_t aDiscardPadding, int32_t* aTotalFrames) override;
   explicit VorbisDecoder(WebMReader* aReader);
   ~VorbisDecoder();
 private:
-  nsRefPtr<WebMReader> mReader;
+  RefPtr<WebMReader> mReader;
 
   // Vorbis decoder state
   vorbis_info mVorbisInfo;
@@ -94,14 +94,14 @@ VorbisDecoder::Shutdown()
   mReader = nullptr;
 }
 
-nsRefPtr<InitPromise>
+nsresult
 VorbisDecoder::Init()
 {
   vorbis_info_init(&mVorbisInfo);
   vorbis_comment_init(&mVorbisComment);
   PodZero(&mVorbisDsp);
   PodZero(&mVorbisBlock);
-  return InitPromise::CreateAndResolve(TrackType::kAudioTrack, __func__);
+  return NS_OK;
 }
 
 nsresult
@@ -180,7 +180,7 @@ VorbisDecoder::Decode(const unsigned char* aData, size_t aLength,
   }
   while (frames > 0) {
     uint32_t channels = mVorbisDsp.vi->channels;
-    nsAutoArrayPtr<AudioDataValue> buffer(new AudioDataValue[frames*channels]);
+    auto buffer = MakeUnique<AudioDataValue[]>(frames*channels);
     for (uint32_t j = 0; j < channels; ++j) {
       VorbisPCMValue* channel = pcm[j];
       for (uint32_t i = 0; i < uint32_t(frames); ++i) {
@@ -211,7 +211,7 @@ VorbisDecoder::Decode(const unsigned char* aData, size_t aLength,
                                              time.value(),
                                              duration.value(),
                                              frames,
-                                             buffer.forget(),
+                                             Move(buffer),
                                              mVorbisDsp.vi->channels,
                                              mVorbisDsp.vi->rate));
     if (vorbis_synthesis_read(&mVorbisDsp, frames)) {
@@ -229,18 +229,18 @@ VorbisDecoder::Decode(const unsigned char* aData, size_t aLength,
 class OpusDecoder : public WebMAudioDecoder
 {
 public:
-  nsRefPtr<InitPromise> Init() override;
-  void Shutdown();
-  nsresult ResetDecode();
-  nsresult DecodeHeader(const unsigned char* aData, size_t aLength);
+  nsresult Init() override;
+  void Shutdown() override;
+  nsresult ResetDecode() override;
+  nsresult DecodeHeader(const unsigned char* aData, size_t aLength) override;
   nsresult FinishInit(AudioInfo& aInfo);
   bool Decode(const unsigned char* aData, size_t aLength,
               int64_t aOffset, uint64_t aTstampUsecs,
-              int64_t aDiscardPadding, int32_t* aTotalFrames);
+              int64_t aDiscardPadding, int32_t* aTotalFrames) override;
   explicit OpusDecoder(WebMReader* aReader);
   ~OpusDecoder();
 private:
-  nsRefPtr<WebMReader> mReader;
+  RefPtr<WebMReader> mReader;
 
   // Opus decoder state
   nsAutoPtr<OpusParser> mOpusParser;
@@ -277,10 +277,10 @@ OpusDecoder::Shutdown()
   mReader = nullptr;
 }
 
-nsRefPtr<InitPromise>
+nsresult
 OpusDecoder::Init()
 {
-  return InitPromise::CreateAndResolve(TrackType::kAudioTrack, __func__);
+  return NS_OK;
 }
 
 nsresult
@@ -371,17 +371,17 @@ OpusDecoder::Decode(const unsigned char* aData, size_t aLength,
   if (frames < 120 || frames > 5760)
     return false;
 
-  nsAutoArrayPtr<AudioDataValue> buffer(new AudioDataValue[frames * channels]);
+  auto buffer = MakeUnique<AudioDataValue[]>(frames * channels);
 
   // Decode to the appropriate sample type.
 #ifdef MOZ_SAMPLE_TYPE_FLOAT32
   int ret = opus_multistream_decode_float(mOpusDecoder,
                                           aData, aLength,
-                                          buffer, frames, false);
+                                          buffer.get(), frames, false);
 #else
   int ret = opus_multistream_decode(mOpusDecoder,
                                     aData, aLength,
-                                    buffer, frames, false);
+                                    buffer.get(), frames, false);
 #endif
   if (ret < 0)
     return false;
@@ -463,7 +463,7 @@ OpusDecoder::Decode(const unsigned char* aData, size_t aLength,
                                            time.value(),
                                            duration.value(),
                                            frames,
-                                           buffer.forget(),
+                                           Move(buffer),
                                            mOpusParser->mChannels,
                                            mOpusParser->mRate));
   return true;

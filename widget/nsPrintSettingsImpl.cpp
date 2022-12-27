@@ -1069,7 +1069,7 @@ nsPrintSettings::GetPageRanges(nsTArray<int32_t> &aPages)
 nsresult 
 nsPrintSettings::_Clone(nsIPrintSettings **_retval)
 {
-  nsRefPtr<nsPrintSettings> printSettings = new nsPrintSettings(*this);
+  RefPtr<nsPrintSettings> printSettings = new nsPrintSettings(*this);
   printSettings.forget(_retval);
   return NS_OK;
 }

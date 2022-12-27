@@ -194,48 +194,6 @@ void tracefunc (void *aClosure, const char *aStmt)
                                      aStmt));
 }
 
-struct FFEArguments
-{
-    nsISupports *target;
-    bool found;
-};
-PLDHashOperator
-findFunctionEnumerator(const nsACString &aKey,
-                       Connection::FunctionInfo aData,
-                       void *aUserArg)
-{
-  FFEArguments *args = static_cast<FFEArguments *>(aUserArg);
-  if (aData.function == args->target) {
-    args->found = true;
-    return PL_DHASH_STOP;
-  }
-  return PL_DHASH_NEXT;
-}
-
-PLDHashOperator
-copyFunctionEnumerator(const nsACString &aKey,
-                       Connection::FunctionInfo aData,
-                       void *aUserArg)
-{
-  NS_PRECONDITION(aData.type == Connection::FunctionInfo::SIMPLE ||
-                  aData.type == Connection::FunctionInfo::AGGREGATE,
-                  "Invalid function type!");
-
-  Connection *connection = static_cast<Connection *>(aUserArg);
-  if (aData.type == Connection::FunctionInfo::SIMPLE) {
-    mozIStorageFunction *function =
-      static_cast<mozIStorageFunction *>(aData.function.get());
-    (void)connection->CreateFunction(aKey, aData.numArgs, function);
-  }
-  else {
-    mozIStorageAggregateFunction *function =
-      static_cast<mozIStorageAggregateFunction *>(aData.function.get());
-    (void)connection->CreateAggregateFunction(aKey, aData.numArgs, function);
-  }
-
-  return PL_DHASH_NEXT;
-}
-
 void
 basicFunctionHelper(sqlite3_context *aCtx,
                     int aArgc,
@@ -245,7 +203,7 @@ basicFunctionHelper(sqlite3_context *aCtx,
 
   mozIStorageFunction *func = static_cast<mozIStorageFunction *>(userData);
 
-  nsRefPtr<ArgValueArray> arguments(new ArgValueArray(aArgc, aArgv));
+  RefPtr<ArgValueArray> arguments(new ArgValueArray(aArgc, aArgv));
   if (!arguments)
       return;
 
@@ -283,7 +241,7 @@ aggregateFunctionStepHelper(sqlite3_context *aCtx,
   mozIStorageAggregateFunction *func =
     static_cast<mozIStorageAggregateFunction *>(userData);
 
-  nsRefPtr<ArgValueArray> arguments(new ArgValueArray(aArgc, aArgv));
+  RefPtr<ArgValueArray> arguments(new ArgValueArray(aArgc, aArgv));
   if (!arguments)
     return;
 
@@ -298,7 +256,7 @@ aggregateFunctionFinalHelper(sqlite3_context *aCtx)
   mozIStorageAggregateFunction *func =
     static_cast<mozIStorageAggregateFunction *>(userData);
 
-  nsRefPtr<nsIVariant> result;
+  RefPtr<nsIVariant> result;
   if (NS_FAILED(func->OnFinal(getter_AddRefs(result)))) {
     NS_WARNING("User aggregate final function returned error code!");
     ::sqlite3_result_error(aCtx,
@@ -434,7 +392,7 @@ public:
     (void)NS_ProxyRelease(thread, mCallbackEvent);
   }
 private:
-  nsRefPtr<Connection> mConnection;
+  RefPtr<Connection> mConnection;
   sqlite3 *mNativeConnection;
   nsCOMPtr<nsIRunnable> mCallbackEvent;
   nsCOMPtr<nsIThread> mAsyncExecutionThread;
@@ -481,7 +439,7 @@ public:
 
 private:
   nsresult Dispatch(nsresult aResult, nsISupports* aValue) {
-    nsRefPtr<CallbackComplete> event = new CallbackComplete(aResult,
+    RefPtr<CallbackComplete> event = new CallbackComplete(aResult,
                                                             aValue,
                                                             mCallback.forget());
     return mClone->threadOpenedOn->Dispatch(event, NS_DISPATCH_NORMAL);
@@ -511,8 +469,8 @@ private:
     (void)NS_ProxyRelease(thread, rawCallback);
   }
 
-  nsRefPtr<Connection> mConnection;
-  nsRefPtr<Connection> mClone;
+  RefPtr<Connection> mConnection;
+  RefPtr<Connection> mClone;
   const bool mReadOnly;
   nsCOMPtr<mozIStorageCompletionCallback> mCallback;
 };
@@ -864,9 +822,13 @@ bool
 Connection::findFunctionByInstance(nsISupports *aInstance)
 {
   sharedDBMutex.assertCurrentThreadOwns();
-  FFEArguments args = { aInstance, false };
-  (void)mFunctions.EnumerateRead(findFunctionEnumerator, &args);
-  return args.found;
+
+  for (auto iter = mFunctions.Iter(); !iter.Done(); iter.Next()) {
+    if (iter.UserData().function == aInstance) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /* static */ int
@@ -1298,10 +1260,10 @@ Connection::AsyncClone(bool aReadOnly,
     flags = (~SQLITE_OPEN_CREATE & flags);
   }
 
-  nsRefPtr<Connection> clone = new Connection(mStorageService, flags,
+  RefPtr<Connection> clone = new Connection(mStorageService, flags,
                                               mAsyncOnly);
 
-  nsRefPtr<AsyncInitializeClone> initEvent =
+  RefPtr<AsyncInitializeClone> initEvent =
     new AsyncInitializeClone(this, clone, aReadOnly, aCallback);
   nsCOMPtr<nsIEventTarget> target = clone->getAsyncExecutionTarget();
   if (!target) {
@@ -1352,7 +1314,31 @@ Connection::initializeClone(Connection* aClone, bool aReadOnly)
 
   // Copy any functions that have been added to this connection.
   SQLiteMutexAutoLock lockedScope(sharedDBMutex);
-  (void)mFunctions.EnumerateRead(copyFunctionEnumerator, aClone);
+  for (auto iter = mFunctions.Iter(); !iter.Done(); iter.Next()) {
+    const nsACString &key = iter.Key();
+    Connection::FunctionInfo data = iter.UserData();
+
+    MOZ_ASSERT(data.type == Connection::FunctionInfo::SIMPLE ||
+               data.type == Connection::FunctionInfo::AGGREGATE,
+               "Invalid function type!");
+
+    if (data.type == Connection::FunctionInfo::SIMPLE) {
+      mozIStorageFunction *function =
+        static_cast<mozIStorageFunction *>(data.function.get());
+      rv = aClone->CreateFunction(key, data.numArgs, function);
+      if (NS_FAILED(rv)) {
+        NS_WARNING("Failed to copy function to cloned connection");
+      }
+
+    } else {
+      mozIStorageAggregateFunction *function =
+        static_cast<mozIStorageAggregateFunction *>(data.function.get());
+      rv = aClone->CreateAggregateFunction(key, data.numArgs, function);
+      if (NS_FAILED(rv)) {
+        NS_WARNING("Failed to copy aggregate function to cloned connection");
+      }
+    }
+  }
 
   return NS_OK;
 }
@@ -1379,7 +1365,7 @@ Connection::Clone(bool aReadOnly,
     flags = (~SQLITE_OPEN_CREATE & flags);
   }
 
-  nsRefPtr<Connection> clone = new Connection(mStorageService, flags,
+  RefPtr<Connection> clone = new Connection(mStorageService, flags,
                                               mAsyncOnly);
 
   nsresult rv = initializeClone(clone, aReadOnly);
@@ -1493,7 +1479,7 @@ Connection::CreateStatement(const nsACString &aSQLStatement,
   NS_ENSURE_ARG_POINTER(_stmt);
   if (!mDBConn) return NS_ERROR_NOT_INITIALIZED;
 
-  nsRefPtr<Statement> statement(new Statement());
+  RefPtr<Statement> statement(new Statement());
   NS_ENSURE_TRUE(statement, NS_ERROR_OUT_OF_MEMORY);
 
   nsresult rv = statement->initialize(this, mDBConn, aSQLStatement);
@@ -1512,7 +1498,7 @@ Connection::CreateAsyncStatement(const nsACString &aSQLStatement,
   NS_ENSURE_ARG_POINTER(_stmt);
   if (!mDBConn) return NS_ERROR_NOT_INITIALIZED;
 
-  nsRefPtr<AsyncStatement> statement(new AsyncStatement());
+  RefPtr<AsyncStatement> statement(new AsyncStatement());
   NS_ENSURE_TRUE(statement, NS_ERROR_OUT_OF_MEMORY);
 
   nsresult rv = statement->initialize(this, mDBConn, aSQLStatement);

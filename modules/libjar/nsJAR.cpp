@@ -104,7 +104,7 @@ MozExternalRefCountType nsJAR::Release(void)
   nsrefcnt count;
   NS_PRECONDITION(0 != mRefCnt, "dup release");
 
-  nsRefPtr<nsZipReaderCache> cache;
+  RefPtr<nsZipReaderCache> cache;
   if (mRefCnt == 2) { // don't use a lock too frequently
     // Use a mutex here to guarantee mCache is not racing and the target instance
     // is still valid to increase ref-count.
@@ -146,7 +146,7 @@ nsJAR::Open(nsIFile* zipFile)
 
   // The omnijar is special, it is opened early on and closed late
   // this avoids reopening it
-  nsRefPtr<nsZipArchive> zip = mozilla::Omnijar::GetReader(zipFile);
+  RefPtr<nsZipArchive> zip = mozilla::Omnijar::GetReader(zipFile);
   if (zip) {
     mZip = zip;
     return NS_OK;
@@ -172,7 +172,7 @@ nsJAR::OpenInner(nsIZipReader *aZipReader, const nsACString &aZipEntry)
 
   mOuterZipEntry.Assign(aZipEntry);
 
-  nsRefPtr<nsZipHandle> handle;
+  RefPtr<nsZipHandle> handle;
   rv = nsZipHandle::Init(static_cast<nsJAR*>(aZipReader)->mZip.get(), PromiseFlatCString(aZipEntry).get(),
                          getter_AddRefs(handle));
   if (NS_FAILED(rv))
@@ -189,7 +189,7 @@ nsJAR::OpenMemory(void* aData, uint32_t aLength)
 
   mOpened = true;
 
-  nsRefPtr<nsZipHandle> handle;
+  RefPtr<nsZipHandle> handle;
   nsresult rv = nsZipHandle::Init(static_cast<uint8_t*>(aData), aLength,
                                   getter_AddRefs(handle));
   if (NS_FAILED(rv))
@@ -215,8 +215,8 @@ nsJAR::Close()
   mGlobalStatus = JAR_MANIFEST_NOT_PARSED;
   mTotalItemsInManifest = 0;
 
-  nsRefPtr<nsZipArchive> greOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
-  nsRefPtr<nsZipArchive> appOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::APP);
+  RefPtr<nsZipArchive> greOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
+  RefPtr<nsZipArchive> appOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::APP);
 
   if (mZip == greOmni || mZip == appOmni) {
     mZip = new nsZipArchive();
@@ -360,8 +360,8 @@ nsJAR::GetSigningCert(const nsACString& aFilename, nsIX509Cert** aSigningCert)
 
   // Don't check signatures in the omnijar - this is only
   // interesting for extensions/XPIs.
-  nsRefPtr<nsZipArchive> greOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
-  nsRefPtr<nsZipArchive> appOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::APP);
+  RefPtr<nsZipArchive> greOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::GRE);
+  RefPtr<nsZipArchive> appOmni = mozilla::Omnijar::GetReader(mozilla::Omnijar::APP);
 
   if (mZip == greOmni || mZip == appOmni)
     return NS_OK;
@@ -430,7 +430,7 @@ nsJAR::GetNSPRFileDesc(PRFileDesc** aNSPRFileDesc)
     return NS_ERROR_FAILURE;
   }
 
-  nsRefPtr<nsZipHandle> handle = mZip->GetFD();
+  RefPtr<nsZipHandle> handle = mZip->GetFD();
   if (!handle) {
     return NS_ERROR_FAILURE;
   }
@@ -1142,7 +1142,7 @@ nsZipReaderCache::GetZip(nsIFile* zipFile, nsIZipReader* *result)
 
   uri.Insert(NS_LITERAL_CSTRING("file:"), 0);
 
-  nsRefPtr<nsJAR> zip;
+  RefPtr<nsJAR> zip;
   mZips.Get(uri, getter_AddRefs(zip));
   if (zip) {
 #ifdef ZIP_CACHE_HIT_RATE
@@ -1188,7 +1188,7 @@ nsZipReaderCache::GetInnerZip(nsIFile* zipFile, const nsACString &entry,
   uri.AppendLiteral("!/");
   uri.Append(entry);
 
-  nsRefPtr<nsJAR> zip;
+  RefPtr<nsJAR> zip;
   mZips.Get(uri, getter_AddRefs(zip));
   if (zip) {
 #ifdef ZIP_CACHE_HIT_RATE
@@ -1231,7 +1231,7 @@ nsZipReaderCache::GetFd(nsIFile* zipFile, PRFileDesc** aRetVal)
   uri.Insert(NS_LITERAL_CSTRING("file:"), 0);
 
   MutexAutoLock lock(mLock);
-  nsRefPtr<nsJAR> zip;
+  RefPtr<nsJAR> zip;
   mZips.Get(uri, getter_AddRefs(zip));
   if (!zip) {
     return NS_ERROR_FAILURE;
@@ -1241,7 +1241,7 @@ nsZipReaderCache::GetFd(nsIFile* zipFile, PRFileDesc** aRetVal)
   rv = zip->GetNSPRFileDesc(aRetVal);
   // Do this to avoid possible deadlock on mLock with ReleaseZip().
   MutexAutoUnlock unlock(mLock);
-  nsRefPtr<nsJAR> zipTemp = zip.forget();
+  RefPtr<nsJAR> zipTemp = zip.forget();
   return rv;
 #endif /* XP_WIN */
 }
@@ -1340,7 +1340,7 @@ nsZipReaderCache::ReleaseZip(nsJAR* zip)
   // Retrieving and removing the JAR must be done without an extra AddRef
   // and Release, or we'll trigger nsJAR::Release's magic refcount 1 case
   // an extra time and trigger a deadlock.
-  nsRefPtr<nsJAR> removed;
+  RefPtr<nsJAR> removed;
   mZips.Remove(uri, getter_AddRefs(removed));
   NS_ASSERTION(removed, "botched");
   NS_ASSERTION(oldest == removed, "removed wrong entry");
@@ -1352,7 +1352,7 @@ nsZipReaderCache::ReleaseZip(nsJAR* zip)
 }
 
 static PLDHashOperator
-FindFlushableZip(const nsACString &aKey, nsRefPtr<nsJAR>& aCurrent, void*)
+FindFlushableZip(const nsACString &aKey, RefPtr<nsJAR>& aCurrent, void*)
 {
   if (aCurrent->GetReleaseTime() != PR_INTERVAL_NO_TIMEOUT) {
     aCurrent->SetZipReaderCache(nullptr);
@@ -1388,7 +1388,7 @@ nsZipReaderCache::Observe(nsISupports *aSubject,
 
     MutexAutoLock lock(mLock);
 
-    nsRefPtr<nsJAR> zip;
+    RefPtr<nsJAR> zip;
     mZips.Get(uri, getter_AddRefs(zip));
     if (!zip)
       return NS_OK;

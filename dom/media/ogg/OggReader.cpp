@@ -152,7 +152,7 @@ OggReader::~OggReader()
   MOZ_COUNT_DTOR(OggReader);
 }
 
-nsresult OggReader::Init(MediaDecoderReader* aCloneDonor) {
+nsresult OggReader::Init() {
   int ret = ogg_sync_init(&mOggState);
   NS_ENSURE_TRUE(ret == 0, NS_ERROR_FAILURE);
   return NS_OK;
@@ -470,22 +470,16 @@ nsresult OggReader::ReadMetadata(MediaInfo* aInfo,
   SetupMediaTracksInfo(serials);
 
   if (HasAudio() || HasVideo()) {
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-
-    if (mInfo.mMetadataDuration.isNothing() && !mDecoder->IsOggDecoderShutdown() &&
-        mResource.GetLength() >= 0 && mDecoder->IsMediaSeekable())
-    {
+    if (mInfo.mMetadataDuration.isNothing() &&
+        !mDecoder->IsOggDecoderShutdown() &&
+        mResource.GetLength() >= 0) {
       // We didn't get a duration from the index or a Content-Duration header.
       // Seek to the end of file to find the end time.
       int64_t length = mResource.GetLength();
 
       NS_ASSERTION(length > 0, "Must have a content length to get end time");
 
-      int64_t endTime = 0;
-      {
-        ReentrantMonitorAutoExit exitMon(mDecoder->GetReentrantMonitor());
-        endTime = RangeEndTime(length);
-      }
+      int64_t endTime = RangeEndTime(length);
       if (endTime != -1) {
         mInfo.mUnadjustedMetadataEndTime.emplace(TimeUnit::FromMicroseconds(endTime));
         LOG(LogLevel::Debug, ("Got Ogg duration from seeking to end %lld", endTime));
@@ -526,7 +520,7 @@ nsresult OggReader::DecodeVorbis(ogg_packet* aPacket) {
   ogg_int64_t endFrame = aPacket->granulepos;
   while ((frames = vorbis_synthesis_pcmout(&mVorbisState->mDsp, &pcm)) > 0) {
     mVorbisState->ValidateVorbisPacketSamples(aPacket, frames);
-    nsAutoArrayPtr<AudioDataValue> buffer(new AudioDataValue[frames * channels]);
+    auto buffer = MakeUnique<AudioDataValue[]>(frames * channels);
     for (uint32_t j = 0; j < channels; ++j) {
       VorbisPCMValue* channel = pcm[j];
       for (uint32_t i = 0; i < uint32_t(frames); ++i) {
@@ -545,7 +539,7 @@ nsresult OggReader::DecodeVorbis(ogg_packet* aPacket) {
                                    startTime,
                                    duration,
                                    frames,
-                                   buffer.forget(),
+                                   Move(buffer),
                                    channels,
                                    mVorbisState->mInfo.rate));
 
@@ -575,17 +569,17 @@ nsresult OggReader::DecodeOpus(ogg_packet* aPacket) {
   if (frames < 120 || frames > 5760)
     return NS_ERROR_FAILURE;
   uint32_t channels = mOpusState->mChannels;
-  nsAutoArrayPtr<AudioDataValue> buffer(new AudioDataValue[frames * channels]);
+  auto buffer = MakeUnique<AudioDataValue[]>(frames * channels);
 
   // Decode to the appropriate sample type.
 #ifdef MOZ_SAMPLE_TYPE_FLOAT32
   int ret = opus_multistream_decode_float(mOpusState->mDecoder,
                                           aPacket->packet, aPacket->bytes,
-                                          buffer, frames, false);
+                                          buffer.get(), frames, false);
 #else
   int ret = opus_multistream_decode(mOpusState->mDecoder,
                                     aPacket->packet, aPacket->bytes,
-                                    buffer, frames, false);
+                                    buffer.get(), frames, false);
 #endif
   if (ret < 0)
     return NS_ERROR_FAILURE;
@@ -615,13 +609,13 @@ nsresult OggReader::DecodeOpus(ogg_packet* aPacket) {
     }
     int32_t keepFrames = frames - skipFrames;
     int samples = keepFrames * channels;
-    nsAutoArrayPtr<AudioDataValue> trimBuffer(new AudioDataValue[samples]);
+    auto trimBuffer = MakeUnique<AudioDataValue[]>(samples);
     for (int i = 0; i < samples; i++)
       trimBuffer[i] = buffer[skipFrames*channels + i];
 
     startFrame = endFrame - keepFrames;
     frames = keepFrames;
-    buffer = trimBuffer;
+    buffer = Move(trimBuffer);
 
     mOpusState->mSkip -= skipFrames;
     LOG(LogLevel::Debug, ("Opus decoder skipping %d frames", skipFrames));
@@ -662,7 +656,7 @@ nsresult OggReader::DecodeOpus(ogg_packet* aPacket) {
                                  startTime,
                                  endTime - startTime,
                                  frames,
-                                 buffer.forget(),
+                                 Move(buffer),
                                  channels,
                                  mOpusState->mRate));
 
@@ -862,7 +856,7 @@ nsresult OggReader::DecodeTheora(ogg_packet* aPacket, int64_t aTimeThreshold)
     b.mPlanes[i].mOffset = b.mPlanes[i].mSkip = 0;
   }
 
-  nsRefPtr<VideoData> v = VideoData::Create(mInfo.mVideo,
+  RefPtr<VideoData> v = VideoData::Create(mInfo.mVideo,
                                             mDecoder->GetImageContainer(),
                                             mResource.Tell(),
                                             time,
@@ -1027,7 +1021,7 @@ struct nsAutoOggSyncState {
 
 int64_t OggReader::RangeEndTime(int64_t aEndOffset)
 {
-  MOZ_ASSERT(OnTaskQueue() || mDecoder->OnStateMachineTaskQueue());
+  MOZ_ASSERT(OnTaskQueue());
 
   int64_t position = mResource.Tell();
   int64_t endTime = RangeEndTime(0, aEndOffset, false);
@@ -1400,7 +1394,7 @@ nsresult OggReader::SeekInUnbuffered(int64_t aTarget,
   return SeekBisection(seekTarget, k, SEEK_FUZZ_USECS);
 }
 
-nsRefPtr<MediaDecoderReader::SeekPromise>
+RefPtr<MediaDecoderReader::SeekPromise>
 OggReader::Seek(int64_t aTarget, int64_t aEndTime)
 {
   nsresult res = SeekInternal(aTarget, aEndTime);
@@ -1476,7 +1470,7 @@ nsresult OggReader::SeekInternal(int64_t aTarget, int64_t aEndTime)
     // keyframe.
     VideoData* v;
     while ((v = mVideoQueue.PeekFront()) && !v->mKeyframe) {
-      nsRefPtr<VideoData> releaseMe = mVideoQueue.PopFront();
+      RefPtr<VideoData> releaseMe = mVideoQueue.PopFront();
     }
     if (mVideoQueue.GetSize() == 0) {
       // We didn't find a keyframe in the frames already here, so decode
@@ -1825,7 +1819,9 @@ nsresult OggReader::SeekBisection(int64_t aTarget,
 media::TimeIntervals OggReader::GetBuffered()
 {
   MOZ_ASSERT(OnTaskQueue());
-  NS_ENSURE_TRUE(HaveStartTime(), media::TimeIntervals());
+  if (!HaveStartTime()) {
+    return media::TimeIntervals();
+  }
   {
     mozilla::ReentrantMonitorAutoEnter mon(mMonitor);
     if (mIsChained) {
@@ -1943,7 +1939,7 @@ media::TimeIntervals OggReader::GetBuffered()
 
 VideoData* OggReader::FindStartTime(int64_t& aOutStartTime)
 {
-  MOZ_ASSERT(OnTaskQueue() || mDecoder->OnStateMachineTaskQueue());
+  MOZ_ASSERT(OnTaskQueue());
 
   // Extract the start times of the bitstreams in order to calculate
   // the duration.

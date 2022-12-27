@@ -33,7 +33,7 @@ class InterceptedJARChannel : public nsIInterceptedChannel
   nsCOMPtr<nsINetworkInterceptController> mController;
 
   // The actual channel being intercepted.
-  nsRefPtr<nsJARChannel> mChannel;
+  RefPtr<nsJARChannel> mChannel;
 
   // Reader-side of the synthesized response body.
   nsCOMPtr<nsIInputStream> mSynthesizedInput;
@@ -44,19 +44,18 @@ class InterceptedJARChannel : public nsIInterceptedChannel
   // The content type of the synthesized response.
   nsCString mContentType;
 
-  // Wether this intercepted channel was performing a navigation.
-  bool mIsNavigation;
-
   virtual ~InterceptedJARChannel() {};
 public:
   InterceptedJARChannel(nsJARChannel* aChannel,
-                        nsINetworkInterceptController* aController,
-                        bool aIsNavigation);
+                        nsINetworkInterceptController* aController);
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSIINTERCEPTEDCHANNEL
 
   void NotifyController();
+
+  virtual nsIConsoleReportCollector*
+  GetConsoleReportCollector() const override;
 };
 
 } // namespace net

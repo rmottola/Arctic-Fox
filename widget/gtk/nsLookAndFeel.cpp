@@ -23,6 +23,7 @@
 #include "gtkdrawing.h"
 #include "nsStyleConsts.h"
 #include "gfxFontConstants.h"
+#include "WidgetUtils.h"
 
 #include <dlfcn.h>
 
@@ -413,6 +414,13 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor& aColor)
     case eColorID__moz_menubarhovertext:
         aColor = sMenuBarHoverText;
         break;
+    case eColorID__moz_gtk_info_bar_text:
+#if (MOZ_WIDGET_GTK == 3)
+        aColor = sInfoBarText;
+#else
+        aColor = sInfoText;
+#endif
+        break;
     default:
         /* default color is BLACK */
         aColor = 0;
@@ -626,8 +634,13 @@ nsLookAndFeel::GetIntImpl(IntID aID, int32_t &aResult)
         res = NS_ERROR_NOT_IMPLEMENTED;
         break;
     case eIntID_TouchEnabled:
+#if MOZ_WIDGET_GTK == 3
+        aResult = mozilla::widget::WidgetUtils::IsTouchDeviceSupportPresent();
+        break;
+#else
         aResult = 0;
         res = NS_ERROR_NOT_IMPLEMENTED;
+#endif
         break;
     case eIntID_MacGraphiteTheme:
     case eIntID_MacLionTheme:
@@ -1187,6 +1200,19 @@ nsLookAndFeel::Init()
     style = gtk_widget_get_style_context(frame);
     gtk_style_context_get_border_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sFrameInnerDarkBorder = sFrameOuterLightBorder = GDK_RGBA_TO_NS_RGBA(color);
+
+    gtk_widget_path_free(path);
+
+    // GtkInfoBar
+    path = gtk_widget_path_new();
+    gtk_widget_path_append_type(path, GTK_TYPE_WINDOW);
+    gtk_widget_path_append_type(path, GTK_TYPE_INFO_BAR);
+    style = create_context(path);
+    gtk_style_context_add_class(style, GTK_STYLE_CLASS_INFO);
+    gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
+    sInfoBarText = GDK_RGBA_TO_NS_RGBA(color);
+    g_object_unref(style);
+    gtk_widget_path_free(path);
 #endif
     // Some themes have a unified menu bar, and support window dragging on it
     gboolean supports_menubar_drag = FALSE;

@@ -31,8 +31,8 @@ class ScopeIter;
 extern bool
 BoxNonStrictThis(JSContext* cx, const CallReceiver& call);
 
-extern JSObject*
-BoxNonStrictThis(JSContext* cx, HandleValue thisv);
+extern bool
+BoxNonStrictThis(JSContext* cx, HandleValue thisv, MutableHandleValue vp);
 
 /*
  * Ensure that fp->thisValue() is the correct value of |this| for the scripted
@@ -275,9 +275,6 @@ UnwindAllScopesInFrame(JSContext* cx, ScopeIter& si);
 extern jsbytecode*
 UnwindScopeToTryPc(JSScript* script, JSTryNote* tn);
 
-extern bool
-OnUnknownMethod(JSContext* cx, HandleObject obj, Value idval, MutableHandleValue vp);
-
 template <class StackDepthOp>
 class MOZ_STACK_CLASS TryNoteIter
 {
@@ -355,9 +352,6 @@ ThrowingOperation(JSContext* cx, HandleValue v);
 
 bool
 GetProperty(JSContext* cx, HandleValue value, HandlePropertyName name, MutableHandleValue vp);
-
-bool
-CallProperty(JSContext* cx, HandleValue value, HandlePropertyName name, MutableHandleValue vp);
 
 bool
 GetScopeName(JSContext* cx, HandleObject obj, HandlePropertyName name, MutableHandleValue vp);
@@ -481,10 +475,13 @@ JSObject*
 NewArrayOperationWithTemplate(JSContext* cx, HandleObject templateObject);
 
 void
-ReportUninitializedLexical(JSContext* cx, HandlePropertyName name);
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandleId id);
 
 void
-ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc);
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandlePropertyName name);
+
+void
+ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber, HandleScript script, jsbytecode* pc);
 
 // The parser only reports redeclarations that occurs within a single
 // script. Due to the extensibility of the global lexical scope, we also check
@@ -492,6 +489,15 @@ ReportUninitializedLexical(JSContext* cx, HandleScript script, jsbytecode* pc);
 void
 ReportRuntimeRedeclaration(JSContext* cx, HandlePropertyName name,
                            frontend::Definition::Kind declKind);
+
+bool
+ThrowUninitializedThis(JSContext* cx, AbstractFramePtr frame);
+
+bool
+DefaultClassConstructor(JSContext* cx, unsigned argc, Value* vp);
+
+bool
+DefaultDerivedClassConstructor(JSContext* cx, unsigned argc, Value* vp);
 
 }  /* namespace js */
 

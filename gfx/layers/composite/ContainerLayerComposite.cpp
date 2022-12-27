@@ -8,8 +8,8 @@
 #include "apz/src/AsyncPanZoomController.h"  // for AsyncPanZoomController
 #include "FrameMetrics.h"               // for FrameMetrics
 #include "Units.h"                      // for LayerRect, LayerPixel, etc
+#include "gfxEnv.h"                     // for gfxEnv
 #include "gfxPrefs.h"                   // for gfxPrefs
-#include "gfxUtils.h"                   // for gfxUtils, etc
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
 #include "mozilla/RefPtr.h"             // for RefPtr
 #include "mozilla/UniquePtr.h"          // for UniquePtr
@@ -24,7 +24,7 @@
 #include "mozilla/layers/AsyncCompositionManager.h" // for ViewTransform
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/mozalloc.h"           // for operator delete, etc
-#include "mozilla/nsRefPtr.h"                   // for nsRefPtr
+#include "mozilla/RefPtr.h"                   // for nsRefPtr
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsISupportsUtils.h"           // for NS_ADDREF, NS_RELEASE
@@ -40,7 +40,7 @@
 #define CULLING_LOG(...)
 // #define CULLING_LOG(...) printf_stderr("CULLING: " __VA_ARGS__)
 
-#define DUMP(...) do { if (getenv("DUMP_DEBUG")) { printf_stderr(__VA_ARGS__); } } while(0)
+#define DUMP(...) do { if (gfxEnv::DumpDebug()) { printf_stderr(__VA_ARGS__); } } while(0)
 #define XYWH(k)  (k).x, (k).y, (k).width, (k).height
 #define XY(k)    (k).x, (k).y
 #define WH(k)    (k).width, (k).height
@@ -163,7 +163,7 @@ ContainerRenderVR(ContainerT* aContainer,
   surfaceRect.height = std::min(maxTextureSize, surfaceRect.height);
 
   gfx::VRHMDRenderingSupport *vrRendering = aHMD->GetRenderingSupport();
-  if (PR_GetEnv("NO_VR_RENDERING")) vrRendering = nullptr;
+  if (gfxEnv::NoVRRendering()) vrRendering = nullptr;
   if (vrRendering) {
     if (!aContainer->mVRRenderTargetSet || aContainer->mVRRenderTargetSet->size != surfaceRect.Size()) {
       aContainer->mVRRenderTargetSet = vrRendering->CreateRenderTargetSet(compositor, surfaceRect.Size());
@@ -226,9 +226,11 @@ ContainerRenderVR(ContainerT* aContainer,
       // proper bounds here (visible region bounds are 0,0,0,0)
       // and I'm not sure if this is the bounds we want anyway.
       if (layer->GetType() == Layer::TYPE_CANVAS) {
-        layerBounds = ToRect(static_cast<CanvasLayer*>(layer)->GetBounds());
+        layerBounds =
+          IntRectToRect(static_cast<CanvasLayer*>(layer)->GetBounds());
       } else {
-        layerBounds = ToRect(layer->GetEffectiveVisibleRegion().GetBounds());
+        layerBounds =
+          IntRectToRect(layer->GetEffectiveVisibleRegion().GetBounds());
       }
       const gfx::Matrix4x4 childTransform = layer->GetEffectiveTransform();
       layerBounds = childTransform.TransformBounds(layerBounds);
@@ -297,7 +299,7 @@ ContainerRenderVR(ContainerT* aContainer,
 
   // draw the temporary surface with VR distortion to the original destination
   EffectChain vrEffect(aContainer);
-  bool skipDistortion = vrRendering || PR_GetEnv("MOZ_GFX_VR_NO_DISTORTION");
+  bool skipDistortion = vrRendering || gfxEnv::VRNoDistortion();
   if (skipDistortion) {
     vrEffect.mPrimaryEffect = new EffectRenderTarget(surface);
   } else {
@@ -409,7 +411,7 @@ ContainerPrepare(ContainerT* aContainer,
         surface = CreateOrRecycleTarget(aContainer, aManager);
 
         MOZ_PERFORMANCE_WARNING("gfx", "[%p] Container layer requires intermediate surface rendering\n", aContainer);
-        RenderIntermediate(aContainer, aManager, RenderTargetPixel::ToUntyped(aClipRect), surface);
+        RenderIntermediate(aContainer, aManager, aClipRect.ToUnknownRect(), surface);
         aContainer->SetChildrenChanged(false);
       }
 
@@ -561,7 +563,7 @@ RenderLayers(ContainerT* aContainer,
         layerToRender->SetClearRect(gfx::IntRect(0, 0, 0, 0));
       }
     } else {
-      layerToRender->RenderLayer(RenderTargetPixel::ToUntyped(clipRect));
+      layerToRender->RenderLayer(clipRect.ToUnknownRect());
     }
 
     if (gfxPrefs::UniformityInfo()) {
@@ -669,7 +671,7 @@ RenderIntermediate(ContainerT* aContainer,
 
   compositor->SetRenderTarget(surface);
   // pre-render all of the layers into our temporary
-  RenderLayers(aContainer, aManager, RenderTargetPixel::FromUntyped(aClipRect));
+  RenderLayers(aContainer, aManager, RenderTargetIntRect::FromUnknownRect(aClipRect));
   // Unbind the current surface and rebind the previous one.
   compositor->SetRenderTarget(previousTarget);
 }
@@ -706,9 +708,9 @@ ContainerRender(ContainerT* aContainer,
     }
 
     gfx::Rect visibleRect(aContainer->GetEffectiveVisibleRegion().GetBounds());
-    nsRefPtr<Compositor> compositor = aManager->GetCompositor();
+    RefPtr<Compositor> compositor = aManager->GetCompositor();
 #ifdef MOZ_DUMP_PAINTING
-    if (gfxUtils::sDumpPainting) {
+    if (gfxEnv::DumpCompositorTextures()) {
       RefPtr<gfx::DataSourceSurface> surf = surface->Dump(compositor);
       if (surf) {
         WriteSnapshotToDumpFile(aContainer, surf);
@@ -716,7 +718,7 @@ ContainerRender(ContainerT* aContainer,
     }
 #endif
 
-    nsRefPtr<ContainerT> container = aContainer;
+    RefPtr<ContainerT> container = aContainer;
     RenderWithAllMasks(aContainer, compositor, aClipRect,
                        [&, surface, compositor, container](EffectChain& effectChain, const Rect& clipRect) {
       effectChain.mPrimaryEffect = new EffectRenderTarget(surface);
@@ -725,7 +727,7 @@ ContainerRender(ContainerT* aContainer,
                            container->GetEffectiveTransform());
     });
   } else {
-    RenderLayers(aContainer, aManager, RenderTargetPixel::FromUntyped(aClipRect));
+    RenderLayers(aContainer, aManager, RenderTargetIntRect::FromUnknownRect(aClipRect));
   }
   aContainer->mPrepared = nullptr;
 

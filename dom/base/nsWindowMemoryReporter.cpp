@@ -63,12 +63,10 @@ AddNonJSSizeOfWindowAndItsDescendents(nsGlobalWindow* aWindow,
     innerWindowSizes.addToTabSizes(aSizes);
   }
 
-  nsCOMPtr<nsIDOMWindowCollection> frames;
-  nsresult rv = aWindow->GetFrames(getter_AddRefs(frames));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDOMWindowCollection> frames = aWindow->GetFrames();
 
   uint32_t length;
-  rv = frames->GetLength(&length);
+  nsresult rv = frames->GetLength(&length);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Measure this window's descendents.
@@ -446,7 +444,7 @@ CollectWindowReports(nsGlobalWindow *aWindow,
   return NS_OK;
 }
 
-typedef nsTArray< nsRefPtr<nsGlobalWindow> > WindowArray;
+typedef nsTArray< RefPtr<nsGlobalWindow> > WindowArray;
 
 static
 PLDHashOperator
@@ -749,7 +747,7 @@ CheckForGhostWindowsEnumerator(nsISupports *aKey, TimeStamp& aTimeStamp,
   // Avoid calling GetTop() if we have no outer window.  Nothing will break if
   // we do, but it will spew debug output, which can cause our test logs to
   // overflow.
-  nsCOMPtr<nsIDOMWindow> top;
+  nsCOMPtr<nsPIDOMWindow> top;
   if (window->GetOuterWindow()) {
     top = window->GetOuterWindow()->GetTop();
   }
@@ -790,37 +788,6 @@ CheckForGhostWindowsEnumerator(nsISupports *aKey, TimeStamp& aTimeStamp,
     }
   }
 
-  return PL_DHASH_NEXT;
-}
-
-struct GetNonDetachedWindowDomainsEnumeratorData
-{
-  nsTHashtable<nsCStringHashKey> *nonDetachedDomains;
-  nsIEffectiveTLDService *tldService;
-};
-
-static PLDHashOperator
-GetNonDetachedWindowDomainsEnumerator(const uint64_t& aId, nsGlobalWindow* aWindow,
-                                      void* aClosure)
-{
-  GetNonDetachedWindowDomainsEnumeratorData *data =
-    static_cast<GetNonDetachedWindowDomainsEnumeratorData*>(aClosure);
-
-  // Null outer window implies null top, but calling GetTop() when there's no
-  // outer window causes us to spew debug warnings.
-  if (!aWindow->GetOuterWindow() || !aWindow->GetTopInternal()) {
-    // This window is detached, so we don't care about its domain.
-    return PL_DHASH_NEXT;
-  }
-
-  nsCOMPtr<nsIURI> uri = GetWindowURI(aWindow);
-
-  nsAutoCString domain;
-  if (uri) {
-    data->tldService->GetBaseDomain(uri, 0, domain);
-  }
-
-  data->nonDetachedDomains->PutEntry(domain);
   return PL_DHASH_NEXT;
 }
 
@@ -865,10 +832,22 @@ nsWindowMemoryReporter::CheckForGhostWindows(
   nsTHashtable<nsCStringHashKey> nonDetachedWindowDomains;
 
   // Populate nonDetachedWindowDomains.
-  GetNonDetachedWindowDomainsEnumeratorData nonDetachedEnumData =
-    { &nonDetachedWindowDomains, tldService };
-  windowsById->EnumerateRead(GetNonDetachedWindowDomainsEnumerator,
-                             &nonDetachedEnumData);
+  for (auto iter = windowsById->Iter(); !iter.Done(); iter.Next()) {
+    // Null outer window implies null top, but calling GetTop() when there's no
+    // outer window causes us to spew debug warnings.
+    nsGlobalWindow* window = iter.UserData();
+    if (!window->GetOuterWindow() || !window->GetTopInternal()) {
+      // This window is detached, so we don't care about its domain.
+      continue;
+    }
+
+    nsCOMPtr<nsIURI> uri = GetWindowURI(window);
+    nsAutoCString domain;
+    if (uri) {
+      tldService->GetBaseDomain(uri, 0, domain);
+    }
+    nonDetachedWindowDomains.PutEntry(domain);
+  }
 
   // Update mDetachedWindows and write the ghost window IDs into aOutGhostIDs,
   // if it's not null.
@@ -928,7 +907,7 @@ nsWindowMemoryReporter::UnlinkGhostWindows()
       continue;
     }
 
-    nsRefPtr<nsGlobalWindow> window = windowsById->Get(iter.Get()->GetKey());
+    RefPtr<nsGlobalWindow> window = windowsById->Get(iter.Get()->GetKey());
     if (window) {
       window->RiskyUnlink();
     }

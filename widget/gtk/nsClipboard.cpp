@@ -137,14 +137,6 @@ nsClipboard::SetData(nsITransferable *aTransferable,
         return NS_OK;
     }
 
-    nsresult rv;
-    if (!mPrivacyHandler) {
-        rv = NS_NewClipboardPrivacyHandler(getter_AddRefs(mPrivacyHandler));
-        NS_ENSURE_SUCCESS(rv, rv);
-    }
-    rv = mPrivacyHandler->PrepareDataForClipboard(aTransferable);
-    NS_ENSURE_SUCCESS(rv, rv);
-
     // Clear out the clipboard in order to set the new data
     EmptyClipboard(aWhichClipboard);
 
@@ -154,7 +146,8 @@ nsClipboard::SetData(nsITransferable *aTransferable,
     // Get the types of supported flavors
     nsCOMPtr<nsISupportsArray> flavors;
 
-    rv = aTransferable->FlavorsTransferableCanExport(getter_AddRefs(flavors));
+    nsresult rv =
+        aTransferable->FlavorsTransferableCanExport(getter_AddRefs(flavors));
     if (!flavors || NS_FAILED(rv))
         return NS_ERROR_FAILURE;
 
@@ -523,9 +516,8 @@ nsClipboard::SelectionGetEvent(GtkClipboard     *aClipboard,
     nsCOMPtr<nsISupports> item;
     uint32_t len;
 
-  
     GdkAtom selectionTarget = gtk_selection_data_get_target(aSelectionData);
-  
+
     // Check to see if the selection data includes any of the string
     // types that we support.
     if (selectionTarget == gdk_atom_intern ("STRING", FALSE) ||
@@ -563,12 +555,11 @@ nsClipboard::SelectionGetEvent(GtkClipboard     *aClipboard,
         // Look through our transfer data for the image
         static const char* const imageMimeTypes[] = {
             kNativeImageMime, kPNGImageMime, kJPEGImageMime, kJPGImageMime, kGIFImageMime };
-        nsCOMPtr<nsISupports> item;
-        uint32_t len;
+        nsCOMPtr<nsISupports> imageItem;
         nsCOMPtr<nsISupportsInterfacePointer> ptrPrimitive;
         for (uint32_t i = 0; !ptrPrimitive && i < ArrayLength(imageMimeTypes); i++) {
-            rv = trans->GetTransferData(imageMimeTypes[i], getter_AddRefs(item), &len);
-            ptrPrimitive = do_QueryInterface(item);
+            rv = trans->GetTransferData(imageMimeTypes[i], getter_AddRefs(imageItem), &len);
+            ptrPrimitive = do_QueryInterface(imageItem);
         }
         if (!ptrPrimitive)
             return;

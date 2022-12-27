@@ -15,13 +15,12 @@
   <body>
 
     <script type="application/javascript;version=1.8">
-
-      function connectToLocal(win) {
+      function connectToLocal(win, docRuntime) {
         let deferred = promise.defer();
         win.AppManager.connection.once(
             win.Connection.Events.CONNECTED,
             () => deferred.resolve());
-        win.document.querySelectorAll(".runtime-panel-item-other")[1].click();
+        docRuntime.querySelectorAll(".runtime-panel-item-other")[1].click();
         return deferred.promise;
       }
 
@@ -30,16 +29,17 @@
 
         Task.spawn(function* () {
           const { DebuggerServer } = require("devtools/server/main");
-          win = yield openWebIDE();
+          let win = yield openWebIDE();
+          let docProject = getProjectDocument(win);
+          let docRuntime = getRuntimeDocument(win);
           win.AppManager.update("runtime-list");
 
-          yield connectToLocal(win);
+          yield connectToLocal(win, docRuntime);
 
           // Select main process
-          yield win.Cmds.showProjectPanel();
           yield waitForUpdate(win, "runtime-targets");
           SimpleTest.executeSoon(() => {
-            win.document.querySelectorAll("#project-panel-runtimeapps .panel-item")[0].click();
+            docProject.querySelectorAll("#project-panel-runtimeapps .panel-item")[0].click();
           });
 
           yield waitForUpdate(win, "project");
@@ -47,10 +47,8 @@
           ok(win.UI.toolboxPromise, "Toolbox promise exists");
           yield win.UI.toolboxPromise;
 
-          ok(win.UI.toolboxIframe, "Toolbox iframe exists");
-
           let nbox = win.document.querySelector("#notificationbox");
-          ok(nbox.hasAttribute("toolboxfullscreen"), "Toolbox is fullsreen");
+          ok(!nbox.hasAttribute("toolboxfullscreen"), "Toolbox is not fullscreen");
 
           win.Cmds.showRuntimeDetails();
 
@@ -65,8 +63,6 @@
           SimpleTest.finish();
         });
       }
-
-
     </script>
   </body>
 </html>

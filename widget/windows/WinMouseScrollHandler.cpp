@@ -319,10 +319,10 @@ MouseScrollHandler::SynthesizeNativeMouseScrollEvent(nsWindowBase* aWidget,
 void
 MouseScrollHandler::InitEvent(nsWindowBase* aWidget,
                               WidgetGUIEvent& aEvent,
-                              nsIntPoint* aPoint)
+                              LayoutDeviceIntPoint* aPoint)
 {
   NS_ENSURE_TRUE_VOID(aWidget);
-  nsIntPoint point;
+  LayoutDeviceIntPoint point;
   if (aPoint) {
     point = *aPoint;
   } else {
@@ -624,7 +624,7 @@ MouseScrollHandler::HandleMouseWheelMessage(nsWindowBase* aWidget,
   ModifierKeyState modKeyState = GetModifierKeyState(aMessage);
 
   // Grab the widget, it might be destroyed by a DOM event handler.
-  nsRefPtr<nsWindowBase> kungFuDethGrip(aWidget);
+  RefPtr<nsWindowBase> kungFuDethGrip(aWidget);
 
   WidgetWheelEvent wheelEvent(true, eWheel, aWidget);
   if (mLastEventInfo.InitWheelEvent(aWidget, wheelEvent, modKeyState)) {

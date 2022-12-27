@@ -24,9 +24,12 @@
 // (In some cases, there are internal (private) methods that don't do this;
 // such methods should only be used by other methods that have already checked
 // the writing modes.)
+// The check ignores the eSidewaysMask bit of writing mode, because this does
+// not affect the interpretation of logical coordinates.
 
 #define CHECK_WRITING_MODE(param) \
-   NS_ASSERTION(param == GetWritingMode(), "writing-mode mismatch")
+   NS_ASSERTION(param.IgnoreSideways() == GetWritingMode().IgnoreSideways(), \
+                "writing-mode mismatch")
 
 namespace mozilla {
 
@@ -259,6 +262,13 @@ public:
    */
   bool IsSideways() const { return !!(mWritingMode & eSidewaysMask); }
 
+#ifdef DEBUG // Used by CHECK_WRITING_MODE to compare modes without regard
+             // for the eSidewaysMask flag.
+  WritingMode IgnoreSideways() const {
+    return WritingMode(mWritingMode & ~eSidewaysMask);
+  }
+#endif
+
   static mozilla::PhysicalAxis PhysicalAxisForLogicalAxis(
                                               uint8_t aWritingModeValue,
                                               LogicalAxis aAxis)
@@ -456,10 +466,19 @@ public:
   explicit WritingMode(nsStyleContext* aStyleContext)
   {
     NS_ASSERTION(aStyleContext, "we need an nsStyleContext here");
+    InitFromStyleVisibility(aStyleContext->StyleVisibility());
+  }
 
-    const nsStyleVisibility* styleVisibility = aStyleContext->StyleVisibility();
+  explicit WritingMode(const nsStyleVisibility* aStyleVisibility)
+  {
+    NS_ASSERTION(aStyleVisibility, "we need an nsStyleVisibility here");
+    InitFromStyleVisibility(aStyleVisibility);
+  }
 
-    switch (styleVisibility->mWritingMode) {
+private:
+  void InitFromStyleVisibility(const nsStyleVisibility* aStyleVisibility)
+  {
+    switch (aStyleVisibility->mWritingMode) {
       case NS_STYLE_WRITING_MODE_HORIZONTAL_TB:
         mWritingMode = 0;
         break;
@@ -469,7 +488,7 @@ public:
         mWritingMode = eBlockFlowMask |
                        eLineOrientMask |
                        eOrientationMask;
-        uint8_t textOrientation = aStyleContext->StyleVisibility()->mTextOrientation;
+        uint8_t textOrientation = aStyleVisibility->mTextOrientation;
         if (textOrientation == NS_STYLE_TEXT_ORIENTATION_SIDEWAYS) {
           mWritingMode |= eSidewaysMask;
         }
@@ -479,7 +498,7 @@ public:
       case NS_STYLE_WRITING_MODE_VERTICAL_RL:
       {
         mWritingMode = eOrientationMask;
-        uint8_t textOrientation = aStyleContext->StyleVisibility()->mTextOrientation;
+        uint8_t textOrientation = aStyleVisibility->mTextOrientation;
         if (textOrientation == NS_STYLE_TEXT_ORIENTATION_SIDEWAYS) {
           mWritingMode |= eSidewaysMask;
         }
@@ -504,23 +523,34 @@ public:
         break;
     }
 
-    if (NS_STYLE_DIRECTION_RTL == styleVisibility->mDirection) {
+    if (NS_STYLE_DIRECTION_RTL == aStyleVisibility->mDirection) {
       mWritingMode ^= eInlineFlowMask | eBidiMask;
     }
   }
+public:
 
-  // For unicode-bidi: plaintext, reset the direction of the writing mode from
-  // the bidi paragraph level of the content
-
-  //XXX change uint8_t to UBiDiLevel after bug 924851
+  /**
+   * This function performs fixup for elements with 'unicode-bidi: plaintext',
+   * where inline directionality is derived from the Unicode bidi categories
+   * of the element's content, and not the CSS 'direction' property.
+   *
+   * The WritingMode constructor will have already incorporated the 'direction'
+   * property into our flag bits, so such elements need to use this method
+   * (after resolving the bidi level of their content) to update the direction
+   * bits as needed.
+   *
+   * If it turns out that our bidi direction already matches what plaintext
+   * resolution determined, there's nothing to do here. If it didn't (i.e. if
+   * the rtl-ness doesn't match), then we correct the direction by flipping the
+   * same bits that get flipped in the constructor's CSS 'direction'-based
+   * chunk.
+   *
+   * XXX change uint8_t to UBiDiLevel after bug 924851
+   */
   void SetDirectionFromBidiLevel(uint8_t level)
   {
-    if (IS_LEVEL_RTL(level)) {
-      // set RTL
-      mWritingMode |= eBidiMask;
-    } else {
-      // set LTR
-      mWritingMode &= ~eBidiMask;
+    if (IS_LEVEL_RTL(level) == IsBidiLTR()) {
+      mWritingMode ^= eBidiMask | eInlineFlowMask;
     }
   }
 
@@ -546,6 +576,19 @@ public:
   }
 
   uint8_t GetBits() const { return mWritingMode; }
+
+  const char* DebugString() const {
+    return IsVertical()
+      ? IsVerticalLR()
+        ? IsBidiLTR()
+          ? IsSideways() ? "sw-lr-ltr" : "v-lr-ltr"
+          : IsSideways() ? "sw-lr-rtl" : "v-lr-rtl"
+        : IsBidiLTR()
+          ? IsSideways() ? "sw-rl-ltr" : "v-rl-ltr"
+          : IsSideways() ? "sw-rl-rtl" : "v-rl-rtl"
+      : IsBidiLTR() ? "h-ltr" : "h-rtl"
+      ;
+  }
 
 private:
   friend class LogicalPoint;
@@ -1932,6 +1975,30 @@ nsStylePosition::MaxBSizeDependsOnContainer(mozilla::WritingMode aWM) const
 {
   return aWM.IsVertical() ? MaxWidthDependsOnContainer()
                           : MaxHeightDependsOnContainer();
+}
+
+inline uint8_t
+nsStyleDisplay::PhysicalFloats(mozilla::WritingMode aWM) const
+{
+  if (mFloats == NS_STYLE_FLOAT_INLINE_START) {
+    return aWM.IsBidiLTR() ? NS_STYLE_FLOAT_LEFT : NS_STYLE_FLOAT_RIGHT;
+  }
+  if (mFloats == NS_STYLE_FLOAT_INLINE_END) {
+    return aWM.IsBidiLTR() ? NS_STYLE_FLOAT_RIGHT : NS_STYLE_FLOAT_LEFT;
+  }
+  return mFloats;
+}
+
+inline uint8_t
+nsStyleDisplay::PhysicalBreakType(mozilla::WritingMode aWM) const
+{
+  if (mBreakType == NS_STYLE_CLEAR_INLINE_START) {
+    return aWM.IsBidiLTR() ? NS_STYLE_CLEAR_LEFT : NS_STYLE_CLEAR_RIGHT;
+  }
+  if (mBreakType == NS_STYLE_CLEAR_INLINE_END) {
+    return aWM.IsBidiLTR() ? NS_STYLE_CLEAR_RIGHT : NS_STYLE_CLEAR_LEFT;
+  }
+  return mBreakType;
 }
 
 #endif // WritingModes_h_

@@ -28,6 +28,7 @@
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TimeStamp.h"
 #include "nsMargin.h"
+#include "nsRegionFwd.h"
 
 #include "nsWinGesture.h"
 
@@ -49,7 +50,6 @@
 
 class nsNativeDragTarget;
 class nsIRollupListener;
-class nsIntRegion;
 class imgIContainer;
 
 namespace mozilla {
@@ -81,7 +81,7 @@ public:
 
   // nsWindowBase
   virtual void InitEvent(mozilla::WidgetGUIEvent& aEvent,
-                         nsIntPoint* aPoint = nullptr) override;
+                         mozilla::LayoutDeviceIntPoint* aPoint = nullptr) override;
   virtual bool DispatchWindowEvent(mozilla::WidgetGUIEvent* aEvent) override;
   virtual bool DispatchKeyboardEvent(mozilla::WidgetKeyboardEvent* aEvent) override;
   virtual bool DispatchWheelEvent(mozilla::WidgetWheelEvent* aEvent) override;
@@ -116,11 +116,11 @@ public:
   NS_IMETHOD              Enable(bool aState);
   virtual bool            IsEnabled() const;
   NS_IMETHOD              SetFocus(bool aRaise);
-  NS_IMETHOD              GetBounds(nsIntRect &aRect);
-  NS_IMETHOD              GetScreenBounds(nsIntRect &aRect);
-  NS_IMETHOD              GetRestoredBounds(nsIntRect &aRect) override;
-  NS_IMETHOD              GetClientBounds(nsIntRect &aRect);
-  virtual nsIntPoint      GetClientOffset();
+  NS_IMETHOD              GetBoundsUntyped(nsIntRect &aRect);
+  NS_IMETHOD              GetScreenBoundsUntyped(nsIntRect &aRect);
+  NS_IMETHOD              GetRestoredBounds(mozilla::LayoutDeviceIntRect &aRect) override;
+  NS_IMETHOD              GetClientBoundsUntyped(nsIntRect &aRect);
+  virtual nsIntPoint      GetClientOffsetUntyped() override;
   void                    SetBackgroundColor(const nscolor &aColor);
   NS_IMETHOD              SetCursor(imgIContainer* aCursor,
                                     uint32_t aHotspotX, uint32_t aHotspotY);
@@ -156,7 +156,7 @@ public:
                                           LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
                                           LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
                                           bool* aAllowRetaining = nullptr);
-  NS_IMETHOD              OnDefaultButtonLoaded(const nsIntRect &aButtonRect);
+  NS_IMETHOD              OnDefaultButtonLoaded(const mozilla::LayoutDeviceIntRect& aButtonRect) override;
   NS_IMETHOD              OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
                                                          double aOriginalDeltaY,
                                                          double& aOverriddenDeltaX,
@@ -195,8 +195,10 @@ public:
   virtual void            UpdateOpaqueRegion(const nsIntRegion& aOpaqueRegion);
 #endif // MOZ_XUL
   virtual nsIMEUpdatePreference GetIMEUpdatePreference();
-  NS_IMETHOD              GetNonClientMargins(nsIntMargin &margins);
-  NS_IMETHOD              SetNonClientMargins(nsIntMargin &margins);
+  NS_IMETHOD              GetNonClientMargins(
+                            mozilla::LayoutDeviceIntMargin &margins) override;
+  NS_IMETHOD              SetNonClientMargins(
+                            mozilla::LayoutDeviceIntMargin &margins) override;
   void                    SetDrawsInTitlebar(bool aState);
   already_AddRefed<mozilla::gfx::DrawTarget> StartRemoteDrawing() override;
   virtual void            EndRemoteDrawing() override;
@@ -291,14 +293,13 @@ public:
   bool IsPopup();
   virtual bool ShouldUseOffMainThreadCompositing();
 
-  bool CaptureWidgetOnScreen(mozilla::RefPtr<mozilla::gfx::DrawTarget> aDT);
+  bool CaptureWidgetOnScreen(RefPtr<mozilla::gfx::DrawTarget> aDT);
 
 protected:
   virtual ~nsWindow();
 
   virtual void WindowUsesOMTC() override;
-  virtual void ConfigureAPZCTreeManager() override;
-  void RegisterTouchWindow();
+  virtual void RegisterTouchWindow() override;
 
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;
@@ -516,11 +517,11 @@ protected:
 
   // Non-client margin settings
   // Pre-calculated outward offset applied to default frames
-  nsIntMargin           mNonClientOffset;
+  mozilla::LayoutDeviceIntMargin mNonClientOffset;
   // Margins set by the owner
-  nsIntMargin           mNonClientMargins;
+  mozilla::LayoutDeviceIntMargin mNonClientMargins;
   // Margins we'd like to set once chrome is reshown:
-  nsIntMargin           mFutureMarginsOnceChromeShows;
+  mozilla::LayoutDeviceIntMargin mFutureMarginsOnceChromeShows;
   // Indicates we need to apply margins once toggling chrome into showing:
   bool                  mFutureMarginsToUse;
 
@@ -573,7 +574,7 @@ protected:
   // Transparency
 #ifdef MOZ_XUL
   // Use layered windows to support full 256 level alpha translucency
-  nsRefPtr<gfxASurface> mTransparentSurface;
+  RefPtr<gfxASurface> mTransparentSurface;
   HDC                   mMemoryDC;
   nsTransparencyMode    mTransparencyMode;
   nsIntRegion           mPossiblyTransparentRegion;
@@ -601,11 +602,6 @@ protected:
   POINT mCachedHitTestPoint;
   TimeStamp mCachedHitTestTime;
   int32_t mCachedHitTestResult;
-
-  // For converting native event times to timestamps we record the time of the
-  // first received event in each time scale.
-  static DWORD     sFirstEventTime;
-  static TimeStamp sFirstEventTimeStamp;
 
   static bool sNeedsToInitMouseWheelSettings;
   static void InitMouseWheelScrollData();

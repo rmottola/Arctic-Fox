@@ -9,6 +9,7 @@
 #include "mozilla/Endian.h"
 #include "prsystem.h"
 #include "MediaData.h"
+#include "GMPDecoderModule.h"
 
 namespace mozilla {
 
@@ -19,7 +20,7 @@ extern bool IsOnGMPThread();
 void
 VideoCallbackAdapter::Decoded(GMPVideoi420Frame* aDecodedFrame)
 {
-  GMPUnique<GMPVideoi420Frame>::Ptr decodedFrame(aDecodedFrame);
+  GMPUniquePtr<GMPVideoi420Frame> decodedFrame(aDecodedFrame);
 
   MOZ_ASSERT(IsOnGMPThread());
 
@@ -39,7 +40,7 @@ VideoCallbackAdapter::Decoded(GMPVideoi420Frame* aDecodedFrame)
   }
 
   gfx::IntRect pictureRegion(0, 0, decodedFrame->Width(), decodedFrame->Height());
-  nsRefPtr<VideoData> v = VideoData::Create(mVideoInfo,
+  RefPtr<VideoData> v = VideoData::Create(mVideoInfo,
                                             mImageContainer,
                                             mLastStreamOffset,
                                             decodedFrame->Timestamp(),
@@ -107,6 +108,11 @@ void
 GMPVideoDecoder::InitTags(nsTArray<nsCString>& aTags)
 {
   aTags.AppendElement(NS_LITERAL_CSTRING("h264"));
+  const Maybe<nsCString> gmp(
+    GMPDecoderModule::PreferredGMP(NS_LITERAL_CSTRING("video/avc")));
+  if (gmp.isSome()) {
+    aTags.AppendElement(gmp.value());
+  }
 }
 
 nsCString
@@ -115,7 +121,7 @@ GMPVideoDecoder::GetNodeId()
   return NS_LITERAL_CSTRING("");
 }
 
-GMPUnique<GMPVideoEncodedFrame>::Ptr
+GMPUniquePtr<GMPVideoEncodedFrame>
 GMPVideoDecoder::CreateFrame(MediaRawData* aSample)
 {
   GMPVideoFrame* ftmp = nullptr;
@@ -125,7 +131,7 @@ GMPVideoDecoder::CreateFrame(MediaRawData* aSample)
     return nullptr;
   }
 
-  GMPUnique<GMPVideoEncodedFrame>::Ptr frame(static_cast<GMPVideoEncodedFrame*>(ftmp));
+  GMPUniquePtr<GMPVideoEncodedFrame> frame(static_cast<GMPVideoEncodedFrame*>(ftmp));
   err = frame->CreateEmptyFrame(aSample->Size());
   if (GMP_FAILED(err)) {
     mCallback->Error();
@@ -211,7 +217,7 @@ GMPVideoDecoder::GMPInitDone(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost)
   }
 }
 
-nsRefPtr<MediaDataDecoder::InitPromise>
+RefPtr<MediaDataDecoder::InitPromise>
 GMPVideoDecoder::Init()
 {
   MOZ_ASSERT(IsOnGMPThread());
@@ -221,7 +227,7 @@ GMPVideoDecoder::Init()
 
   nsCOMPtr<nsIThread> gmpThread = NS_GetCurrentThread();
 
-  nsRefPtr<GMPInitDoneRunnable> initDone(new GMPInitDoneRunnable());
+  RefPtr<GMPInitDoneRunnable> initDone(new GMPInitDoneRunnable());
   gmpThread->Dispatch(
     NS_NewRunnableMethodWithArg<GMPInitDoneRunnable*>(this,
                                                       &GMPVideoDecoder::GetGMPAPI,
@@ -241,7 +247,7 @@ GMPVideoDecoder::Input(MediaRawData* aSample)
 {
   MOZ_ASSERT(IsOnGMPThread());
 
-  nsRefPtr<MediaRawData> sample(aSample);
+  RefPtr<MediaRawData> sample(aSample);
   if (!mGMP) {
     mCallback->Error();
     return NS_ERROR_FAILURE;
@@ -249,7 +255,7 @@ GMPVideoDecoder::Input(MediaRawData* aSample)
 
   mAdapter->SetLastStreamOffset(sample->mOffset);
 
-  GMPUnique<GMPVideoEncodedFrame>::Ptr frame = CreateFrame(sample);
+  GMPUniquePtr<GMPVideoEncodedFrame> frame = CreateFrame(sample);
   nsTArray<uint8_t> info; // No codec specific per-frame info to pass.
   nsresult rv = mGMP->Decode(Move(frame), false, info, 0);
   if (NS_FAILED(rv)) {

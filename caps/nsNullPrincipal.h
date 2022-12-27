@@ -44,7 +44,6 @@ public:
   NS_IMETHOD GetURI(nsIURI** aURI) override;
   NS_IMETHOD GetDomain(nsIURI** aDomain) override;
   NS_IMETHOD SetDomain(nsIURI* aDomain) override;
-  NS_IMETHOD GetIsNullPrincipal(bool* aIsNullPrincipal) override;
   NS_IMETHOD GetBaseDomain(nsACString& aBaseDomain) override;
   nsresult GetOriginInternal(nsACString& aOrigin) override;
 
@@ -59,6 +58,8 @@ public:
 
   virtual void GetScriptLocation(nsACString &aStr) override;
 
+  PrincipalKind Kind() override { return eNullPrincipal; }
+
  protected:
   virtual ~nsNullPrincipal() {}
 
@@ -70,7 +71,6 @@ public:
   bool MayLoadInternal(nsIURI* aURI) override;
 
   nsCOMPtr<nsIURI> mURI;
-  nsCOMPtr<nsIContentSecurityPolicy> mCSP;
 };
 
 #endif // nsNullPrincipal_h__

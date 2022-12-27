@@ -88,9 +88,9 @@ Cu.import("resource://gre/modules/Log.jsm");
 // Configure a logger at the parent 'addons' level to format
 // messages for all the modules under addons.*
 const PARENT_LOGGER_ID = "addons";
-let parentLogger = Log.repository.getLogger(PARENT_LOGGER_ID);
+var parentLogger = Log.repository.getLogger(PARENT_LOGGER_ID);
 parentLogger.level = Log.Level.Warn;
-let formatter = new Log.BasicFormatter();
+var formatter = new Log.BasicFormatter();
 // Set parent logger (and its children) to append to
 // the Javascript section of the Browser Console
 parentLogger.addAppender(new Log.ConsoleAppender(formatter));
@@ -101,7 +101,7 @@ parentLogger.addAppender(new Log.DumpAppender(formatter));
 // Create a new logger (child of 'addons' logger)
 // for use by the Addons Manager
 const LOGGER_ID = "addons.manager";
-let logger = Log.repository.getLogger(LOGGER_ID);
+var logger = Log.repository.getLogger(LOGGER_ID);
 
 // Provide the ability to enable/disable logging
 // messages at runtime.
@@ -815,6 +815,13 @@ var AddonManagerInternal = {
     logger.debug(`Provider finished startup: ${providerName(aProvider)}`);
   },
 
+  _getProviderByName(aName) {
+    for (let provider of this.providers) {
+      if (providerName(provider) == aName)
+        return provider;
+    }
+  },
+
   /**
    * Initializes the AddonManager, loading any known providers and initializing
    * them.
@@ -1375,6 +1382,12 @@ var AddonManagerInternal = {
                                  Cr.NS_ERROR_NOT_INITIALIZED);
 
     let buPromise = Task.spawn(function* backgroundUpdateTask() {
+      let hotfixID = this.hotfixID;
+
+      let appUpdateEnabled = Services.prefs.getBoolPref(PREF_APP_UPDATE_ENABLED) &&
+                             Services.prefs.getBoolPref(PREF_APP_UPDATE_AUTO);
+      let checkHotfix = hotfixID && appUpdateEnabled;
+
       logger.debug("Background update check beginning");
 
       Services.obs.notifyObservers(null, "addons-background-update-start", null);
@@ -1418,6 +1431,113 @@ var AddonManagerInternal = {
         yield Promise.all(updates);
       }
 
+      if (checkHotfix) {
+        var hotfixVersion = "";
+        try {
+          hotfixVersion = Services.prefs.getCharPref(PREF_EM_HOTFIX_LASTVERSION);
+        }
+        catch (e) { }
+
+        let url = null;
+        if (Services.prefs.getPrefType(PREF_EM_HOTFIX_URL) == Ci.nsIPrefBranch.PREF_STRING)
+          url = Services.prefs.getCharPref(PREF_EM_HOTFIX_URL);
+        else
+          url = Services.prefs.getCharPref(PREF_EM_UPDATE_BACKGROUND_URL);
+
+        // Build the URI from a fake add-on data.
+        url = AddonManager.escapeAddonURI({
+          id: hotfixID,
+          version: hotfixVersion,
+          userDisabled: false,
+          appDisabled: false
+        }, url);
+
+        Components.utils.import("resource://gre/modules/addons/AddonUpdateChecker.jsm");
+        let update = null;
+        try {
+          let foundUpdates = yield new Promise((resolve, reject) => {
+            AddonUpdateChecker.checkForUpdates(hotfixID, null, url, {
+              onUpdateCheckComplete: resolve,
+              onUpdateCheckError: reject
+            });
+          });
+          update = AddonUpdateChecker.getNewestCompatibleUpdate(foundUpdates);
+        } catch (e) {
+          // AUC.checkForUpdates already logged the error
+        }
+
+        // Check that we have a hotfix update, and it's newer than the one we already
+        // have installed (if any)
+        if (update) {
+          if (Services.vc.compare(hotfixVersion, update.version) < 0) {
+            logger.debug("Downloading hotfix version " + update.version);
+            let aInstall = yield new Promise((resolve, reject) =>
+              AddonManager.getInstallForURL(update.updateURL, resolve,
+                "application/x-xpinstall", update.updateHash, null,
+                null, update.version));
+
+            aInstall.addListener({
+              onDownloadEnded: function BUC_onDownloadEnded(aInstall) {
+                if (aInstall.addon.id != hotfixID) {
+                  logger.warn("The downloaded hotfix add-on did not have the " +
+                              "expected ID and so will not be installed.");
+                  aInstall.cancel();
+                  return;
+                }
+
+                // If XPIProvider has reported the hotfix as properly signed then
+                // there is nothing more to do here
+                if (aInstall.addon.signedState == AddonManager.SIGNEDSTATE_SIGNED)
+                  return;
+
+                try {
+                  if (!Services.prefs.getBoolPref(PREF_EM_CERT_CHECKATTRIBUTES))
+                    return;
+                }
+                catch (e) {
+                  // By default don't do certificate checks.
+                  return;
+                }
+
+                try {
+                  CertUtils.validateCert(aInstall.certificate,
+                                         CertUtils.readCertPrefs(PREF_EM_HOTFIX_CERTS));
+                }
+                catch (e) {
+                  logger.warn("The hotfix add-on was not signed by the expected " +
+                       "certificate and so will not be installed.", e);
+                  aInstall.cancel();
+                }
+              },
+
+              onInstallEnded: function BUC_onInstallEnded(aInstall) {
+                // Remember the last successfully installed version.
+                Services.prefs.setCharPref(PREF_EM_HOTFIX_LASTVERSION,
+                                           aInstall.version);
+              },
+
+              onInstallCancelled: function BUC_onInstallCancelled(aInstall) {
+                // Revert to the previous version if the installation was
+                // cancelled.
+                Services.prefs.setCharPref(PREF_EM_HOTFIX_LASTVERSION,
+                                           hotfixVersion);
+              }
+            });
+
+            aInstall.install();
+          }
+        }
+      }
+
+      if (appUpdateEnabled) {
+        try {
+          yield AddonManagerInternal._getProviderByName("XPIProvider").updateSystemAddons();
+        }
+        catch (e) {
+          logger.warn("Failed to update system addons", e);
+        }
+      }
+
       logger.debug("Background update check complete");
       Services.obs.notifyObservers(null,
                                    "addons-background-update-complete",
@@ -1451,6 +1571,7 @@ var AddonManagerInternal = {
 
     if (gStartupComplete)
       return;
+    logger.debug("Registering startup change '" + aType + "' for " + aID);
 
     // Ensure that an ID is only listed in one type of change
     for (let type in this.startupChanges)
@@ -2818,6 +2939,8 @@ this.AddonManager = {
 
   // Constants for Addon.signedState. Any states that should cause an add-on
   // to be unusable in builds that require signing should have negative values.
+  // Add-on signing is not required, e.g. because the pref is disabled.
+  SIGNEDSTATE_NOT_REQUIRED: undefined,
   // Add-on is signed but signature verification has failed.
   SIGNEDSTATE_BROKEN: -2,
   // Add-on may be signed but by an certificate that doesn't chain to our

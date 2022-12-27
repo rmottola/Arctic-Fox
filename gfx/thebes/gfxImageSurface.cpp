@@ -32,7 +32,7 @@ gfxImageSurface::InitFromSurface(cairo_surface_t *csurf)
     mSize.width = cairo_image_surface_get_width(csurf);
     mSize.height = cairo_image_surface_get_height(csurf);
     mData = cairo_image_surface_get_data(csurf);
-    mFormat = (gfxImageFormat) cairo_image_surface_get_format(csurf);
+    mFormat = gfxCairoFormatToImageFormat(cairo_image_surface_get_format(csurf));
     mOwnsData = false;
     mStride = cairo_image_surface_get_stride(csurf);
 
@@ -66,9 +66,10 @@ gfxImageSurface::InitWithData(unsigned char *aData, const IntSize& aSize,
     if (!CheckSurfaceSize(aSize))
         MakeInvalid();
 
+    cairo_format_t cformat = gfxImageFormatToCairoFormat(mFormat);
     cairo_surface_t *surface =
         cairo_image_surface_create_for_data((unsigned char*)mData,
-                                            (cairo_format_t)(int)mFormat,
+                                            cformat,
                                             mSize.width,
                                             mSize.height,
                                             mStride);
@@ -135,9 +136,10 @@ gfxImageSurface::AllocateAndInit(long aStride, int32_t aMinimalAllocation,
 
     mOwnsData = true;
 
+    cairo_format_t cformat = gfxImageFormatToCairoFormat(mFormat);
     cairo_surface_t *surface =
         cairo_image_surface_create_for_data((unsigned char*)mData,
-                                            (cairo_format_t)(int)mFormat,
+                                            cformat,
                                             mSize.width,
                                             mSize.height,
                                             mStride);
@@ -162,7 +164,7 @@ gfxImageSurface::gfxImageSurface(cairo_surface_t *csurf)
     mSize.width = cairo_image_surface_get_width(csurf);
     mSize.height = cairo_image_surface_get_height(csurf);
     mData = cairo_image_surface_get_data(csurf);
-    mFormat = (gfxImageFormat) cairo_image_surface_get_format(csurf);
+    mFormat = gfxCairoFormatToImageFormat(cairo_image_surface_get_format(csurf));
     mOwnsData = false;
     mStride = cairo_image_surface_get_stride(csurf);
 
@@ -188,9 +190,7 @@ gfxImageSurface::ComputeStride(const IntSize& aSize, gfxImageFormat aFormat)
         stride = aSize.width * 2;
     else if (aFormat == gfxImageFormat::A8)
         stride = aSize.width;
-    else if (aFormat == gfxImageFormat::A1) {
-        stride = (aSize.width + 7) / 8;
-    } else {
+    else {
         NS_WARNING("Unknown format specified to gfxImageSurface!");
         stride = aSize.width * 4;
     }
@@ -257,7 +257,7 @@ FormatsAreCompatible(gfxImageFormat a1, gfxImageFormat a2)
 bool
 gfxImageSurface::CopyFrom (SourceSurface *aSurface)
 {
-    mozilla::RefPtr<DataSourceSurface> data = aSurface->GetDataSurface();
+    RefPtr<DataSourceSurface> data = aSurface->GetDataSurface();
 
     if (!data) {
         return false;
@@ -297,7 +297,7 @@ gfxImageSurface::CopyFrom(gfxImageSurface *other)
 
 bool
 gfxImageSurface::CopyTo(SourceSurface *aSurface) {
-    mozilla::RefPtr<DataSourceSurface> data = aSurface->GetDataSurface();
+    RefPtr<DataSourceSurface> data = aSurface->GetDataSurface();
 
     if (!data) {
         return false;
@@ -348,7 +348,7 @@ gfxImageSurface::GetSubimage(const gfxRect& aRect)
         format = gfxImageFormat::RGB24;
     }
 
-    nsRefPtr<gfxSubimageSurface> image =
+    RefPtr<gfxSubimageSurface> image =
         new gfxSubimageSurface(this, subData,
                                IntSize((int)r.Width(), (int)r.Height()),
                                format);
@@ -368,6 +368,6 @@ gfxSubimageSurface::gfxSubimageSurface(gfxImageSurface* aParent,
 already_AddRefed<gfxImageSurface>
 gfxImageSurface::GetAsImageSurface()
 {
-  nsRefPtr<gfxImageSurface> surface = this;
+  RefPtr<gfxImageSurface> surface = this;
   return surface.forget();
 }

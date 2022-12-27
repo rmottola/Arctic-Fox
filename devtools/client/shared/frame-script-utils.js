@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 "use strict";
-const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
-const {require, loader} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+const {require, loader} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
 loader.lazyImporter(this, "Task", "resource://gre/modules/Task.jsm", "Task");
 const subScriptLoader = Cc["@mozilla.org/moz/jssubscript-loader;1"]

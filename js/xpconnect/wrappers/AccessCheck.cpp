@@ -120,8 +120,7 @@ IsFrameId(JSContext* cx, JSObject* obj, jsid idArg)
         return false;
     }
 
-    nsCOMPtr<nsIDOMWindowCollection> col;
-    win->GetFrames(getter_AddRefs(col));
+    nsCOMPtr<nsIDOMWindowCollection> col = win->GetFrames();
     if (!col) {
         return false;
     }
@@ -143,7 +142,7 @@ IsFrameId(JSContext* cx, JSObject* obj, jsid idArg)
 CrossOriginObjectType
 IdentifyCrossOriginObject(JSObject* obj)
 {
-    obj = js::UncheckedUnwrap(obj, /* stopAtOuter = */ false);
+    obj = js::UncheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
     const js::Class* clasp = js::GetObjectClass(obj);
     MOZ_ASSERT(!XrayUtils::IsXPCWNHolderClass(Jsvalify(clasp)), "shouldn't have a holder here");
 
@@ -172,7 +171,7 @@ AccessCheck::isCrossOriginAccessPermitted(JSContext* cx, HandleObject wrapper, H
                isCrossOriginAccessPermitted(cx, wrapper, id, Wrapper::SET);
     }
 
-    RootedObject obj(cx, js::UncheckedUnwrap(wrapper, /* stopAtOuter = */ false));
+    RootedObject obj(cx, js::UncheckedUnwrap(wrapper, /* stopAtWindowProxy = */ false));
     CrossOriginObjectType type = IdentifyCrossOriginObject(obj);
     if (JSID_IS_STRING(id)) {
         if (IsPermitted(type, JSID_TO_FLAT_STRING(id), act == Wrapper::SET))
@@ -412,18 +411,17 @@ ExposedPropertiesOnly::check(JSContext* cx, HandleObject wrapper, HandleId id, W
     }
 
     // Inspect the property on the underlying object to check for red flags.
-    bool skipCallableChecks = CompartmentPrivate::Get(wrappedObject)->skipCOWCallableChecks;
     if (!JS_GetPropertyDescriptorById(cx, wrappedObject, id, &desc))
         return false;
 
     // Reject accessor properties.
-    if (!skipCallableChecks && desc.hasGetterOrSetter()) {
+    if (desc.hasGetterOrSetter()) {
         EnterAndThrow(cx, wrapper, "Exposing privileged accessor properties is prohibited");
         return false;
     }
 
     // Reject privileged or cross-origin callables.
-    if (!skipCallableChecks && desc.value().isObject()) {
+    if (desc.value().isObject()) {
         RootedObject maybeCallable(cx, js::UncheckedUnwrap(&desc.value().toObject()));
         if (JS::IsCallable(maybeCallable) && !AccessCheck::subsumes(wrapper, maybeCallable)) {
             EnterAndThrow(cx, wrapper, "Exposing privileged or cross-origin callable is prohibited");

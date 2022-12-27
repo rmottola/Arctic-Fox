@@ -406,28 +406,90 @@ SavedFrame::getPrincipals()
 }
 
 void
+SavedFrame::initSource(JSAtom* source)
+{
+    MOZ_ASSERT(source);
+    initReservedSlot(JSSLOT_SOURCE, StringValue(source));
+}
+
+void
+SavedFrame::initLine(uint32_t line)
+{
+    initReservedSlot(JSSLOT_LINE, PrivateUint32Value(line));
+}
+
+void
+SavedFrame::initColumn(uint32_t column)
+{
+    initReservedSlot(JSSLOT_COLUMN, PrivateUint32Value(column));
+}
+
+void
+SavedFrame::initPrincipals(JSPrincipals* principals)
+{
+    if (principals)
+        JS_HoldPrincipals(principals);
+    initPrincipalsAlreadyHeld(principals);
+}
+
+void
+SavedFrame::initPrincipalsAlreadyHeld(JSPrincipals* principals)
+{
+    MOZ_ASSERT_IF(principals, principals->refcount > 0);
+    initReservedSlot(JSSLOT_PRINCIPALS, PrivateValue(principals));
+}
+
+void
+SavedFrame::initFunctionDisplayName(JSAtom* maybeName)
+{
+    initReservedSlot(JSSLOT_FUNCTIONDISPLAYNAME, maybeName ? StringValue(maybeName) : NullValue());
+}
+
+void
+SavedFrame::initAsyncCause(JSAtom* maybeCause)
+{
+    initReservedSlot(JSSLOT_ASYNCCAUSE, maybeCause ? StringValue(maybeCause) : NullValue());
+}
+
+void
+SavedFrame::initParent(SavedFrame* maybeParent)
+{
+    initReservedSlot(JSSLOT_PARENT, ObjectOrNullValue(maybeParent));
+}
+
+void
 SavedFrame::initFromLookup(SavedFrame::HandleLookup lookup)
 {
-    MOZ_ASSERT(lookup->source);
-    MOZ_ASSERT(getReservedSlot(JSSLOT_SOURCE).isUndefined());
-    setReservedSlot(JSSLOT_SOURCE, StringValue(lookup->source));
+    initSource(lookup->source);
+    initLine(lookup->line);
+    initColumn(lookup->column);
+    initFunctionDisplayName(lookup->functionDisplayName);
+    initAsyncCause(lookup->asyncCause);
+    initParent(lookup->parent);
+    initPrincipals(lookup->principals);
+}
 
-    setReservedSlot(JSSLOT_LINE, PrivateUint32Value(lookup->line));
-    setReservedSlot(JSSLOT_COLUMN, PrivateUint32Value(lookup->column));
-    setReservedSlot(JSSLOT_FUNCTIONDISPLAYNAME,
-                    lookup->functionDisplayName
-                        ? StringValue(lookup->functionDisplayName)
-                        : NullValue());
-    setReservedSlot(JSSLOT_ASYNCCAUSE,
-                    lookup->asyncCause
-                        ? StringValue(lookup->asyncCause)
-                        : NullValue());
-    setReservedSlot(JSSLOT_PARENT, ObjectOrNullValue(lookup->parent));
+/* static */ SavedFrame*
+SavedFrame::create(JSContext* cx)
+{
+    RootedGlobalObject global(cx, cx->global());
+    assertSameCompartment(cx, global);
 
-    MOZ_ASSERT(getReservedSlot(JSSLOT_PRINCIPALS).isUndefined());
-    if (lookup->principals)
-        JS_HoldPrincipals(lookup->principals);
-    setReservedSlot(JSSLOT_PRINCIPALS, PrivateValue(lookup->principals));
+    // Ensure that we don't try to capture the stack again in the
+    // `SavedStacksMetadataCallback` for this new SavedFrame object, and
+    // accidentally cause O(n^2) behavior.
+    SavedStacks::AutoReentrancyGuard guard(cx->compartment()->savedStacks());
+
+    RootedNativeObject proto(cx, GlobalObject::getOrCreateSavedFramePrototype(cx, global));
+    if (!proto)
+        return nullptr;
+    assertSameCompartment(cx, proto);
+
+    RootedObject frameObj(cx, NewObjectWithGivenProto(cx, &SavedFrame::class_, proto));
+    if (!frameObj)
+        return nullptr;
+
+    return &frameObj->as<SavedFrame>();
 }
 
 bool
@@ -473,28 +535,37 @@ SavedFrameSubsumedByCaller(JSContext* cx, HandleSavedFrame frame)
 // skipped frames had the |asyncCause| property set, otherwise it is explicitly
 // set to false.
 static SavedFrame*
-GetFirstSubsumedFrame(JSContext* cx, HandleSavedFrame frame, bool& skippedAsync)
+GetFirstSubsumedFrame(JSContext* cx, HandleSavedFrame frame, JS::SavedFrameSelfHosted selfHosted,
+                      bool& skippedAsync)
 {
     skippedAsync = false;
 
     RootedSavedFrame rootedFrame(cx, frame);
-    while (rootedFrame && !SavedFrameSubsumedByCaller(cx, rootedFrame)) {
+    while (rootedFrame) {
+        if ((selfHosted == JS::SavedFrameSelfHosted::Include || !rootedFrame->isSelfHosted()) &&
+            SavedFrameSubsumedByCaller(cx, rootedFrame))
+        {
+            return rootedFrame;
+        }
+
         if (rootedFrame->getAsyncCause())
             skippedAsync = true;
+
         rootedFrame = rootedFrame->getParent();
     }
 
-    return rootedFrame;
+    return nullptr;
 }
 
 JS_FRIEND_API(JSObject*)
-GetFirstSubsumedSavedFrame(JSContext* cx, HandleObject savedFrame)
+GetFirstSubsumedSavedFrame(JSContext* cx, HandleObject savedFrame,
+                           JS::SavedFrameSelfHosted selfHosted)
 {
     if (!savedFrame)
         return nullptr;
     bool skippedAsync;
     RootedSavedFrame frame(cx, &savedFrame->as<SavedFrame>());
-    return GetFirstSubsumedFrame(cx, frame, skippedAsync);
+    return GetFirstSubsumedFrame(cx, frame, selfHosted, skippedAsync);
 }
 
 /* static */ bool
@@ -596,23 +667,28 @@ public:
 } // namespace
 
 static inline js::SavedFrame*
-UnwrapSavedFrame(JSContext* cx, HandleObject obj, bool& skippedAsync)
+UnwrapSavedFrame(JSContext* cx, HandleObject obj, SavedFrameSelfHosted selfHosted,
+                 bool& skippedAsync)
 {
     if (!obj)
         return nullptr;
+
     RootedObject savedFrameObj(cx, CheckedUnwrap(obj));
-    MOZ_ASSERT(savedFrameObj);
+    if (!savedFrameObj)
+        return nullptr;
+
     MOZ_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*savedFrameObj));
     js::RootedSavedFrame frame(cx, &savedFrameObj->as<js::SavedFrame>());
-    return GetFirstSubsumedFrame(cx, frame, skippedAsync);
+    return GetFirstSubsumedFrame(cx, frame, selfHosted, skippedAsync);
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameSource(JSContext* cx, HandleObject savedFrame, MutableHandleString sourcep)
+GetSavedFrameSource(JSContext* cx, HandleObject savedFrame, MutableHandleString sourcep,
+                    SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         sourcep.set(cx->runtime()->emptyString);
         return SavedFrameResult::AccessDenied;
@@ -622,12 +698,13 @@ GetSavedFrameSource(JSContext* cx, HandleObject savedFrame, MutableHandleString 
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameLine(JSContext* cx, HandleObject savedFrame, uint32_t* linep)
+GetSavedFrameLine(JSContext* cx, HandleObject savedFrame, uint32_t* linep,
+                  SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     MOZ_ASSERT(linep);
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         *linep = 0;
         return SavedFrameResult::AccessDenied;
@@ -637,12 +714,13 @@ GetSavedFrameLine(JSContext* cx, HandleObject savedFrame, uint32_t* linep)
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameColumn(JSContext* cx, HandleObject savedFrame, uint32_t* columnp)
+GetSavedFrameColumn(JSContext* cx, HandleObject savedFrame, uint32_t* columnp,
+                    SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     MOZ_ASSERT(columnp);
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         *columnp = 0;
         return SavedFrameResult::AccessDenied;
@@ -652,11 +730,12 @@ GetSavedFrameColumn(JSContext* cx, HandleObject savedFrame, uint32_t* columnp)
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameFunctionDisplayName(JSContext* cx, HandleObject savedFrame, MutableHandleString namep)
+GetSavedFrameFunctionDisplayName(JSContext* cx, HandleObject savedFrame, MutableHandleString namep,
+                                 SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         namep.set(nullptr);
         return SavedFrameResult::AccessDenied;
@@ -666,11 +745,12 @@ GetSavedFrameFunctionDisplayName(JSContext* cx, HandleObject savedFrame, Mutable
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameAsyncCause(JSContext* cx, HandleObject savedFrame, MutableHandleString asyncCausep)
+GetSavedFrameAsyncCause(JSContext* cx, HandleObject savedFrame, MutableHandleString asyncCausep,
+                        SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         asyncCausep.set(nullptr);
         return SavedFrameResult::AccessDenied;
@@ -682,11 +762,12 @@ GetSavedFrameAsyncCause(JSContext* cx, HandleObject savedFrame, MutableHandleStr
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameAsyncParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject asyncParentp)
+GetSavedFrameAsyncParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject asyncParentp,
+                         SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         asyncParentp.set(nullptr);
         return SavedFrameResult::AccessDenied;
@@ -696,7 +777,8 @@ GetSavedFrameAsyncParent(JSContext* cx, HandleObject savedFrame, MutableHandleOb
     // The current value of |skippedAsync| is not interesting, because we are
     // interested in whether we would cross any async parents to get from here
     // to the first subsumed parent frame instead.
-    js::RootedSavedFrame subsumedParent(cx, GetFirstSubsumedFrame(cx, parent, skippedAsync));
+    js::RootedSavedFrame subsumedParent(cx, GetFirstSubsumedFrame(cx, parent, selfHosted,
+                                                                  skippedAsync));
 
     // Even if |parent| is not subsumed, we still want to return a pointer to it
     // rather than |subsumedParent| so it can pick up any |asyncCause| from the
@@ -709,11 +791,12 @@ GetSavedFrameAsyncParent(JSContext* cx, HandleObject savedFrame, MutableHandleOb
 }
 
 JS_PUBLIC_API(SavedFrameResult)
-GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject parentp)
+GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject parentp,
+                    SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
-    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, skippedAsync));
+    js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
     if (!frame) {
         parentp.set(nullptr);
         return SavedFrameResult::AccessDenied;
@@ -723,7 +806,8 @@ GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject 
     // The current value of |skippedAsync| is not interesting, because we are
     // interested in whether we would cross any async parents to get from here
     // to the first subsumed parent frame instead.
-    js::RootedSavedFrame subsumedParent(cx, GetFirstSubsumedFrame(cx, parent, skippedAsync));
+    js::RootedSavedFrame subsumedParent(cx, GetFirstSubsumedFrame(cx, parent, selfHosted,
+                                                                  skippedAsync));
 
     // Even if |parent| is not subsumed, we still want to return a pointer to it
     // rather than |subsumedParent| so it can pick up any |asyncCause| from the
@@ -747,7 +831,8 @@ BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp,
     {
         AutoMaybeEnterFrameCompartment ac(cx, stack);
         bool skippedAsync;
-        js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, stack, skippedAsync));
+        js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, stack, SavedFrameSelfHosted::Exclude,
+                                                        skippedAsync));
         if (!frame) {
             stringp.set(cx->runtime()->emptyString);
             return true;
@@ -756,30 +841,29 @@ BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp,
         js::RootedSavedFrame parent(cx);
         do {
             MOZ_ASSERT(SavedFrameSubsumedByCaller(cx, frame));
+            MOZ_ASSERT(!frame->isSelfHosted());
 
-            if (!frame->isSelfHosted()) {
-                RootedString asyncCause(cx, frame->getAsyncCause());
-                if (!asyncCause && skippedAsync)
-                    asyncCause.set(cx->names().Async);
+            RootedString asyncCause(cx, frame->getAsyncCause());
+            if (!asyncCause && skippedAsync)
+                asyncCause.set(cx->names().Async);
 
-                js::RootedAtom name(cx, frame->getFunctionDisplayName());
-                if ((indent && !sb.appendN(' ', indent))
-                    || (asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
-                    || (name && !sb.append(name))
-                    || !sb.append('@')
-                    || !sb.append(frame->getSource())
-                    || !sb.append(':')
-                    || !NumberValueToStringBuffer(cx, NumberValue(frame->getLine()), sb)
-                    || !sb.append(':')
-                    || !NumberValueToStringBuffer(cx, NumberValue(frame->getColumn()), sb)
-                    || !sb.append('\n'))
-                {
-                    return false;
-                }
+            js::RootedAtom name(cx, frame->getFunctionDisplayName());
+            if ((indent && !sb.appendN(' ', indent))
+                || (asyncCause && (!sb.append(asyncCause) || !sb.append('*')))
+                || (name && !sb.append(name))
+                || !sb.append('@')
+                || !sb.append(frame->getSource())
+                || !sb.append(':')
+                || !NumberValueToStringBuffer(cx, NumberValue(frame->getLine()), sb)
+                || !sb.append(':')
+                || !NumberValueToStringBuffer(cx, NumberValue(frame->getColumn()), sb)
+                || !sb.append('\n'))
+            {
+                return false;
             }
 
             parent = frame->getParent();
-            frame = js::GetFirstSubsumedFrame(cx, parent, skippedAsync);
+            frame = js::GetFirstSubsumedFrame(cx, parent, SavedFrameSelfHosted::Exclude, skippedAsync);
         } while (frame);
     }
 
@@ -926,6 +1010,21 @@ SavedStacks::saveCurrentStack(JSContext* cx, MutableHandleSavedFrame frame, unsi
 
     FrameIter iter(cx, FrameIter::ALL_CONTEXTS, FrameIter::GO_THROUGH_SAVED);
     return insertFrames(cx, iter, frame, maxFrameCount);
+}
+
+bool
+SavedStacks::copyAsyncStack(JSContext* cx, HandleObject asyncStack, HandleString asyncCause,
+                            MutableHandleSavedFrame adoptedStack, unsigned maxFrameCount)
+{
+    MOZ_ASSERT(initialized());
+    assertSameCompartment(cx, this);
+
+    RootedObject asyncStackObj(cx, CheckedUnwrap(asyncStack));
+    MOZ_ASSERT(asyncStackObj);
+    MOZ_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*asyncStackObj));
+    RootedSavedFrame frame(cx, &asyncStackObj->as<js::SavedFrame>());
+
+    return adoptAsyncStack(cx, frame, asyncCause, adoptedStack, maxFrameCount);
 }
 
 void
@@ -1217,30 +1316,15 @@ SavedStacks::getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup looku
 SavedFrame*
 SavedStacks::createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup)
 {
-    RootedGlobalObject global(cx, cx->global());
-    assertSameCompartment(cx, global);
-
-    // Ensure that we don't try to capture the stack again in the
-    // `SavedStacksMetadataCallback` for this new SavedFrame object, and
-    // accidentally cause O(n^2) behavior.
-    SavedStacks::AutoReentrancyGuard guard(*this);
-
-    RootedNativeObject proto(cx, GlobalObject::getOrCreateSavedFramePrototype(cx, global));
-    if (!proto)
+    RootedSavedFrame frame(cx, SavedFrame::create(cx));
+    if (!frame)
         return nullptr;
-    assertSameCompartment(cx, proto);
+    frame->initFromLookup(lookup);
 
-    RootedObject frameObj(cx, NewObjectWithGivenProto(cx, &SavedFrame::class_, proto));
-    if (!frameObj)
+    if (!FreezeObject(cx, frame))
         return nullptr;
 
-    RootedSavedFrame f(cx, &frameObj->as<SavedFrame>());
-    f->initFromLookup(lookup);
-
-    if (!FreezeObject(cx, frameObj))
-        return nullptr;
-
-    return f.get();
+    return frame;
 }
 
 /*
@@ -1326,9 +1410,13 @@ SavedStacks::getLocation(JSContext* cx, const FrameIter& iter, MutableHandleLoca
 }
 
 void
-SavedStacks::chooseSamplingProbability(JSContext* cx)
+SavedStacks::chooseSamplingProbability(JSCompartment* compartment)
 {
-    GlobalObject::DebuggerVector* dbgs = cx->global()->getDebuggers();
+    GlobalObject* global = compartment->maybeGlobal();
+    if (!global)
+        return;
+
+    GlobalObject::DebuggerVector* dbgs = global->getDebuggers();
     if (!dbgs || dbgs->empty())
         return;
 
@@ -1361,7 +1449,6 @@ SavedStacksMetadataCallback(JSContext* cx, JSObject* target)
         return nullptr;
     }
 
-    stacks.chooseSamplingProbability(cx);
     if (stacks.allocationSamplingProbability == 0.0)
         return nullptr;
 

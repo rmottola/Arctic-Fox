@@ -11,26 +11,26 @@ const Cc = Components.classes;
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 
-const {require} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const Editor  = require("devtools/client/sourceeditor/editor");
 const promise = require("promise");
 const {CssLogic} = require("devtools/shared/styleinspector/css-logic");
-const {console} = require("resource://gre/modules/devtools/shared/Console.jsm");
+const {console} = require("resource://gre/modules/Console.jsm");
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
-Cu.import("resource://gre/modules/devtools/shared/event-emitter.js");
-Cu.import("resource:///modules/devtools/client/styleeditor/StyleEditorUtil.jsm");
+Cu.import("resource://devtools/shared/event-emitter.js");
+Cu.import("resource://devtools/client/styleeditor/StyleEditorUtil.jsm");
 
 const LOAD_ERROR = "error-load";
 const SAVE_ERROR = "error-save";
 
 // max update frequency in ms (avoid potential typing lag and/or flicker)
 // @see StyleEditor.updateStylesheet
-const UPDATE_STYLESHEET_THROTTLE_DELAY = 500;
+const UPDATE_STYLESHEET_DELAY = 500;
 
 // Pref which decides if CSS autocompletion is enabled in Style Editor or not.
 const AUTOCOMPLETION_PREF = "devtools.styleeditor.autocompletion-enabled";
@@ -86,6 +86,12 @@ function StyleSheetEditor(styleSheet, win, file, isNew, walker, highlighter) {
   this.walker = walker;
   this.highlighter = highlighter;
 
+  // True when we've called update() on the style sheet.
+  this._isUpdating = false;
+  // True when we've just set the editor text based on a style-applied
+  // event from the StyleSheetActor.
+  this._justSetText = false;
+
   this._state = {   // state to use when inputElement attaches
     text: "",
     selection: {
@@ -103,11 +109,13 @@ function StyleSheetEditor(styleSheet, win, file, isNew, walker, highlighter) {
   this._onPropertyChange = this._onPropertyChange.bind(this);
   this._onError = this._onError.bind(this);
   this._onMediaRuleMatchesChange = this._onMediaRuleMatchesChange.bind(this);
-  this._onMediaRulesChanged = this._onMediaRulesChanged.bind(this)
+  this._onMediaRulesChanged = this._onMediaRulesChanged.bind(this);
+  this._onStyleApplied = this._onStyleApplied.bind(this);
   this.checkLinkedFileForChanges = this.checkLinkedFileForChanges.bind(this);
   this.markLinkedFileBroken = this.markLinkedFileBroken.bind(this);
   this.saveToFile = this.saveToFile.bind(this);
   this.updateStyleSheet = this.updateStyleSheet.bind(this);
+  this._updateStyleSheet = this._updateStyleSheet.bind(this);
   this._onMouseMove = this._onMouseMove.bind(this);
 
   this._focusOnSourceEditorReady = false;
@@ -118,6 +126,7 @@ function StyleSheetEditor(styleSheet, win, file, isNew, walker, highlighter) {
     this.cssSheet.getMediaRules().then(this._onMediaRulesChanged, Cu.reportError);
   }
   this.cssSheet.on("media-rules-changed", this._onMediaRulesChanged);
+  this.cssSheet.on("style-applied", this._onStyleApplied);
   this.savedFile = file;
   this.linkCSSFile();
 }
@@ -191,6 +200,15 @@ StyleSheetEditor.prototype = {
   },
 
   /**
+   * Check if transitions are enabled for style changes.
+   *
+   * @return Boolean
+   */
+  get transitionsEnabled() {
+    return Services.prefs.getBoolPref(TRANSITION_PREF);
+  },
+
+  /**
    * If this is an original source, get the path of the CSS file it generated.
    */
   linkCSSFile: function() {
@@ -235,25 +253,38 @@ StyleSheetEditor.prototype = {
   },
 
   /**
+   * A helper function that fetches the source text from the style
+   * sheet.  The text is possibly prettified using
+   * CssLogic.prettifyCSS.  This also sets |this._state.text| to the
+   * new text.
+   *
+   * @return {Promise} a promise that resolves to the new text
+   */
+  _getSourceTextAndPrettify: function() {
+    return this.styleSheet.getText().then((longStr) => {
+      return longStr.string();
+    }).then((source) => {
+      let ruleCount = this.styleSheet.ruleCount;
+      if (!this.styleSheet.isOriginalSource) {
+        source = CssLogic.prettifyCSS(source, ruleCount);
+      }
+      this._state.text = source;
+      return source;
+    });
+  },
+
+  /**
    * Start fetching the full text source for this editor's sheet.
    *
    * @return {Promise}
    *         A promise that'll resolve with the source text once the source
    *         has been loaded or reject on unexpected error.
    */
-  fetchSource: function () {
-    return Task.spawn(function* () {
-      let longStr = yield this.styleSheet.getText();
-      let source = yield longStr.string();
-      let ruleCount = this.styleSheet.ruleCount;
-      if (!this.styleSheet.isOriginalSource) {
-        source = CssLogic.prettifyCSS(source, ruleCount);
-      }
-      this._state.text = source;
+  fetchSource: function() {
+    return this._getSourceTextAndPrettify().then((source) => {
       this.sourceLoaded = true;
-
       return source;
-    }.bind(this)).then(null, e => {
+    }).then(null, e => {
       if (this._isDestroyed) {
         console.warn("Could not fetch the source for " +
                      this.styleSheet.href +
@@ -311,6 +342,26 @@ StyleSheetEditor.prototype = {
    */
   _onPropertyChange: function(property, value) {
     this.emit("property-change", property, value);
+  },
+
+  /**
+   * Called when the stylesheet text changes.
+   */
+  _onStyleApplied: function() {
+    if (this._isUpdating) {
+      // We just applied an edit in the editor, so we can drop this
+      // notification.
+      this._isUpdating = false;
+    } else if (this.sourceEditor) {
+      this._getSourceTextAndPrettify().then((newText) => {
+        this._justSetText = true;
+        let firstLine = this.sourceEditor.getFirstVisibleLine();
+        let pos = this.sourceEditor.getCursor();
+        this.sourceEditor.setText(newText);
+        this.sourceEditor.setFirstVisibleLine(firstLine);
+        this.sourceEditor.setCursor(pos);
+      });
+    }
   },
 
   /**
@@ -460,22 +511,15 @@ StyleSheetEditor.prototype = {
 
   /**
    * Queue a throttled task to update the live style sheet.
-   *
-   * @param boolean immediate
-   *        Optional. If true the update is performed immediately.
    */
-  updateStyleSheet: function(immediate) {
+  updateStyleSheet: function() {
     if (this._updateTask) {
       // cancel previous queued task not executed within throttle delay
       this._window.clearTimeout(this._updateTask);
     }
 
-    if (immediate) {
-      this._updateStyleSheet();
-    } else {
-      this._updateTask = this._window.setTimeout(this._updateStyleSheet.bind(this),
-                                           UPDATE_STYLESHEET_THROTTLE_DELAY);
-    }
+    this._updateTask = this._window.setTimeout(this._updateStyleSheet,
+                                               UPDATE_STYLESHEET_DELAY);
   },
 
   /**
@@ -484,6 +528,11 @@ StyleSheetEditor.prototype = {
   _updateStyleSheet: function() {
     if (this.styleSheet.disabled) {
       return;  // TODO: do we want to do this?
+    }
+
+    if (this._justSetText) {
+      this._justSetText = false;
+      return;
     }
 
     this._updateTask = null; // reset only if we actually perform an update
@@ -495,9 +544,8 @@ StyleSheetEditor.prototype = {
       this._state.text = this.sourceEditor.getText();
     }
 
-    let transitionsEnabled = Services.prefs.getBoolPref(TRANSITION_PREF);
-
-    this.styleSheet.update(this._state.text, transitionsEnabled)
+    this._isUpdating = true;
+    this.styleSheet.update(this._state.text, this.transitionsEnabled)
                    .then(null, Cu.reportError);
   },
 
@@ -683,7 +731,7 @@ StyleSheetEditor.prototype = {
       let text = decoder.decode(array);
 
       let relatedSheet = this.styleSheet.relatedStyleSheet;
-      relatedSheet.update(text, true);
+      relatedSheet.update(text, this.transitionsEnabled);
     }, this.markLinkedFileBroken);
   },
 
@@ -725,10 +773,11 @@ StyleSheetEditor.prototype = {
     }
     this.cssSheet.off("property-change", this._onPropertyChange);
     this.cssSheet.off("media-rules-changed", this._onMediaRulesChanged);
+    this.cssSheet.off("style-applied", this._onStyleApplied);
     this.styleSheet.off("error", this._onError);
     this._isDestroyed = true;
   }
-}
+};
 
 /**
  * Find a path on disk for a file given it's hosted uri, the uri of the

@@ -11,13 +11,13 @@
 
 const EventEmitter = require("devtools/shared/event-emitter");
 const { Cu } = require("chrome");
-const { ViewHelpers } = Cu.import("resource:///modules/devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const { ViewHelpers } = Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm", {});
 const STRINGS_URI = "chrome://browser/locale/devtools/filterwidget.properties";
 const L10N = new ViewHelpers.L10N(STRINGS_URI);
-const {cssTokenizer} = require("devtools/client/sourceeditor/css-tokenizer");
+const {cssTokenizer} = require("devtools/client/shared/css-parsing-utils");
 
 loader.lazyGetter(this, "asyncStorage",
-                  () => require("devtools/shared/shared/async-storage"));
+                  () => require("devtools/shared/async-storage"));
 
 const DEFAULT_FILTER_TYPE = "length";
 const UNIT_MAPPING = {

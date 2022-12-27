@@ -38,13 +38,13 @@ public:
                               const nsTArray<uint8_t>& aCodecSpecific,
                               GMPVideoDecoderCallbackProxy* aCallback,
                               int32_t aCoreCount) override;
-  virtual nsresult Decode(GMPUnique<GMPVideoEncodedFrame>::Ptr aInputFrame,
+  virtual nsresult Decode(GMPUniquePtr<GMPVideoEncodedFrame> aInputFrame,
                           bool aMissingFrames,
                           const nsTArray<uint8_t>& aCodecSpecificInfo,
                           int64_t aRenderTimeMs = -1) override;
   virtual nsresult Reset() override;
   virtual nsresult Drain() override;
-  virtual const uint64_t ParentID() override { return reinterpret_cast<uint64_t>(mPlugin.get()); }
+  virtual const uint32_t GetPluginId() const override { return mPluginId; }
   virtual const nsCString& GetDisplayName() const override;
 
   // GMPSharedMemManager
@@ -79,11 +79,17 @@ private:
                                Shmem* aMem) override;
   virtual bool Recv__delete__() override;
 
+  void UnblockResetAndDrain();
+
   bool mIsOpen;
   bool mShuttingDown;
-  nsRefPtr<GMPContentParent> mPlugin;
+  bool mActorDestroyed;
+  bool mIsAwaitingResetComplete;
+  bool mIsAwaitingDrainComplete;
+  RefPtr<GMPContentParent> mPlugin;
   GMPVideoDecoderCallbackProxy* mCallback;
   GMPVideoHostImpl mVideoHost;
+  const uint32_t mPluginId;
 };
 
 } // namespace gmp

@@ -377,11 +377,11 @@ nsSVGPatternFrame::PaintPattern(const DrawTarget* aDrawTarget,
   }
   dt->ClearRect(Rect(0, 0, surfaceSize.width, surfaceSize.height));
 
-  nsRefPtr<gfxContext> gfx = new gfxContext(dt);
+  RefPtr<gfxContext> gfx = new gfxContext(dt);
 
   if (aGraphicOpacity != 1.0f) {
     gfx->Save();
-    gfx->PushGroup(gfxContentType::COLOR_ALPHA);
+    gfx->PushGroupForBlendBack(gfxContentType::COLOR_ALPHA, aGraphicOpacity);
   }
 
   // OK, now render -- note that we use "firstKid", which
@@ -417,8 +417,7 @@ nsSVGPatternFrame::PaintPattern(const DrawTarget* aDrawTarget,
   patternWithChildren->mSource = nullptr;
 
   if (aGraphicOpacity != 1.0f) {
-    gfx->PopGroupToSource();
-    gfx->Paint(aGraphicOpacity);
+    gfx->PopGroupAndBlend();
     gfx->Restore();
   }
 
@@ -704,7 +703,7 @@ nsSVGPatternFrame::GetPaintServerPattern(nsIFrame *aSource,
                                          const gfxRect *aOverrideBounds)
 {
   if (aGraphicOpacity == 0.0f) {
-    nsRefPtr<gfxPattern> pattern = new gfxPattern(Color());
+    RefPtr<gfxPattern> pattern = new gfxPattern(Color());
     return pattern.forget();
   }
 
@@ -718,7 +717,7 @@ nsSVGPatternFrame::GetPaintServerPattern(nsIFrame *aSource,
     return nullptr;
   }
 
-  nsRefPtr<gfxPattern> pattern = new gfxPattern(surface, pMatrix);
+  RefPtr<gfxPattern> pattern = new gfxPattern(surface, pMatrix);
 
   if (!pattern || pattern->CairoStatus())
     return nullptr;

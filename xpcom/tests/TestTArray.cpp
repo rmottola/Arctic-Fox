@@ -538,7 +538,7 @@ class RefcountedObject {
 static bool test_refptr_array() {
   bool rv = true;
 
-  nsTArray< nsRefPtr<RefcountedObject> > objArray;
+  nsTArray< RefPtr<RefcountedObject> > objArray;
 
   RefcountedObject *a = new RefcountedObject(); a->AddRef();
   RefcountedObject *b = new RefcountedObject(); b->AddRef();
@@ -1113,7 +1113,7 @@ static bool test_SetLengthAndRetainStorage_no_ctor() {
   } while (0)
 
   // Setup test arrays.
-  FOR_EACH(; unused << , .SetLength(N, fallible));
+  FOR_EACH(; Unused << , .SetLength(N, fallible));
   for (int n = 0; n < N; ++n) {
     FOR_EACH(;, [n] = n);
   }

@@ -364,7 +364,7 @@ IMEContentObserver::NotifyIMEOfBlur()
   // mWidget must have been non-nullptr if IME has focus.
   MOZ_RELEASE_ASSERT(widget);
 
-  nsRefPtr<IMEContentObserver> kungFuDeathGrip(this);
+  RefPtr<IMEContentObserver> kungFuDeathGrip(this);
 
   MOZ_LOG(sIMECOLog, LogLevel::Info,
     ("IMECO: 0x%p IMEContentObserver::NotifyIMEOfBlur(), "
@@ -502,7 +502,7 @@ IMEContentObserver::IsEditorHandlingEventForComposition() const
   if (!mWidget) {
     return false;
   }
-  nsRefPtr<TextComposition> composition =
+  RefPtr<TextComposition> composition =
     IMEStateManager::GetTextCompositionFor(mWidget);
   if (!composition) {
     return false;
@@ -623,7 +623,7 @@ IMEContentObserver::OnMouseButtonEvent(nsPresContext* aPresContext,
     return false;
   }
 
-  nsRefPtr<IMEContentObserver> kungFuDeathGrip(this);
+  RefPtr<IMEContentObserver> kungFuDeathGrip(this);
 
   WidgetQueryContentEvent charAtPt(true, eQueryCharacterAtPoint,
                                    aMouseEvent->widget);
@@ -660,9 +660,9 @@ IMEContentObserver::OnMouseButtonEvent(nsPresContext* aPresContext,
   notification.mMouseButtonEventData.mEventMessage = aMouseEvent->mMessage;
   notification.mMouseButtonEventData.mOffset = charAtPt.mReply.mOffset;
   notification.mMouseButtonEventData.mCursorPos.Set(
-    LayoutDeviceIntPoint::ToUntyped(charAtPt.refPoint));
+    charAtPt.refPoint.ToUnknownPoint());
   notification.mMouseButtonEventData.mCharRect.Set(
-    LayoutDevicePixel::ToUntyped(charAtPt.mReply.mRect));
+    charAtPt.mReply.mRect.ToUnknownRect());
   notification.mMouseButtonEventData.mButton = aMouseEvent->button;
   notification.mMouseButtonEventData.mButtons = aMouseEvent->buttons;
   notification.mMouseButtonEventData.mModifiers = aMouseEvent->modifiers;
@@ -1354,7 +1354,7 @@ IMEContentObserver::IMENotificationSender::Run()
     MOZ_LOG(sIMECOLog, LogLevel::Debug,
       ("IMECO: 0x%p IMEContentObserver::IMENotificationSender::Run(), "
        "posting AsyncMergeableNotificationsFlusher to current thread", this));
-    nsRefPtr<AsyncMergeableNotificationsFlusher> asyncFlusher =
+    RefPtr<AsyncMergeableNotificationsFlusher> asyncFlusher =
       new AsyncMergeableNotificationsFlusher(mIMEContentObserver);
     NS_DispatchToCurrentThread(asyncFlusher);
   }

@@ -32,7 +32,7 @@ Touch::Touch(EventTarget* aTarget,
   mTarget = aTarget;
   mIdentifier = aIdentifier;
   mPagePoint = CSSIntPoint(aPageX, aPageY);
-  mScreenPoint = LayoutDeviceIntPoint(aScreenX, aScreenY);
+  mScreenPoint = CSSIntPoint(aScreenX, aScreenY);
   mClientPoint = CSSIntPoint(aClientX, aClientY);
   mRefPoint = LayoutDeviceIntPoint(0, 0);
   mPointsInitialized = true;
@@ -48,13 +48,13 @@ Touch::Touch(EventTarget* aTarget,
 
 Touch::Touch(int32_t aIdentifier,
              LayoutDeviceIntPoint aPoint,
-             nsIntPoint aRadius,
+             LayoutDeviceIntPoint aRadius,
              float aRotationAngle,
              float aForce)
 {
   mIdentifier = aIdentifier;
   mPagePoint = CSSIntPoint(0, 0);
-  mScreenPoint = LayoutDeviceIntPoint(0, 0);
+  mScreenPoint = CSSIntPoint(0, 0);
   mClientPoint = CSSIntPoint(0, 0);
   mRefPoint = aPoint;
   mPointsInitialized = false;
@@ -64,6 +64,23 @@ Touch::Touch(int32_t aIdentifier,
 
   mChanged = false;
   mMessage = 0;
+  nsJSContext::LikelyShortLivingObjectCreated();
+}
+
+Touch::Touch(const Touch& aOther)
+  : mTarget(aOther.mTarget)
+  , mRefPoint(aOther.mRefPoint)
+  , mChanged(aOther.mChanged)
+  , mMessage(aOther.mMessage)
+  , mIdentifier(aOther.mIdentifier)
+  , mPagePoint(aOther.mPagePoint)
+  , mClientPoint(aOther.mClientPoint)
+  , mScreenPoint(aOther.mScreenPoint)
+  , mRadius(aOther.mRadius)
+  , mRotationAngle(aOther.mRotationAngle)
+  , mForce(aOther.mForce)
+  , mPointsInitialized(aOther.mPointsInitialized)
+{
   nsJSContext::LikelyShortLivingObjectCreated();
 }
 
@@ -93,6 +110,7 @@ Touch::GetTarget() const
 {
   nsCOMPtr<nsIContent> content = do_QueryInterface(mTarget);
   if (content && content->ChromeOnlyAccess() &&
+      !nsContentUtils::LegacyIsCallerNativeCode() &&
       !nsContentUtils::CanAccessNativeAnon()) {
     return content->FindFirstNonChromeOnlyAccessContent();
   }

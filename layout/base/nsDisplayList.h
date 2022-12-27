@@ -15,12 +15,12 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/EnumSet.h"
 #include "nsCOMPtr.h"
 #include "nsContainerFrame.h"
 #include "nsPoint.h"
 #include "nsRect.h"
 #include "plarena.h"
-#include "Layers.h"
 #include "nsRegion.h"
 #include "nsDisplayListInvalidation.h"
 #include "DisplayListClipState.h"
@@ -309,6 +309,14 @@ public:
   {
     *aOutScrollbarTarget = mCurrentScrollbarTarget;
     *aOutScrollbarFlags = mCurrentScrollbarFlags;
+  }
+  /**
+   * Returns true if building a scrollbar, and the scrollbar will not be
+   * layerized.
+   */
+  bool IsBuildingNonLayerizedScrollbar() const {
+    return mCurrentScrollbarTarget != FrameMetrics::NULL_SCROLL_ID &&
+           !mCurrentScrollbarWillHaveLayer;
   }
   /**
    * Calling this setter makes us include all out-of-flow descendant
@@ -751,15 +759,17 @@ public:
   class AutoCurrentScrollbarInfoSetter {
   public:
     AutoCurrentScrollbarInfoSetter(nsDisplayListBuilder* aBuilder, ViewID aScrollTargetID,
-                                   uint32_t aScrollbarFlags)
+                                   uint32_t aScrollbarFlags, bool aWillHaveLayer)
      : mBuilder(aBuilder) {
       aBuilder->mCurrentScrollbarTarget = aScrollTargetID;
       aBuilder->mCurrentScrollbarFlags = aScrollbarFlags;
+      aBuilder->mCurrentScrollbarWillHaveLayer = aWillHaveLayer;
     }
     ~AutoCurrentScrollbarInfoSetter() {
       // No need to restore old values because scrollbars cannot be nested.
       mBuilder->mCurrentScrollbarTarget = FrameMetrics::NULL_SCROLL_ID;
       mBuilder->mCurrentScrollbarFlags = 0;
+      mBuilder->mCurrentScrollbarWillHaveLayer = false;
     }
   private:
     nsDisplayListBuilder* mBuilder;
@@ -864,6 +874,13 @@ public:
 
   NS_DECLARE_FRAME_PROPERTY(OutOfFlowDisplayDataProperty,
                             DeleteValue<OutOfFlowDisplayData>)
+
+  static OutOfFlowDisplayData* GetOutOfFlowData(nsIFrame* aFrame)
+  {
+    return static_cast<OutOfFlowDisplayData*>(
+      aFrame->Properties().Get(OutOfFlowDisplayDataProperty()));
+  }
+
   NS_DECLARE_FRAME_PROPERTY(Preserve3DDirtyRectProperty, DeleteValue<nsRect>)
 
   nsPresContext* CurrentPresContext() {
@@ -1143,6 +1160,7 @@ private:
   uint32_t                       mCurrentScrollbarFlags;
   BlendModeSet                   mContainedBlendModes;
   Preserves3DContext             mPreserves3DCtx;
+  bool                           mCurrentScrollbarWillHaveLayer;
   bool                           mBuildCaret;
   bool                           mIgnoreSuppression;
   bool                           mHadToIgnoreSuppression;
@@ -2363,7 +2381,7 @@ public:
   void SetNeedsCustomScrollClip() { mNeedsCustomScrollClip = true; }
 
 protected:
-  nsRefPtr<nsCaret> mCaret;
+  RefPtr<nsCaret> mCaret;
   nsRect mBounds;
   bool mNeedsCustomScrollClip;
 };
@@ -2582,7 +2600,7 @@ protected:
   // mIsThemed is true or if FindBackground returned false.
   const nsStyleBackground* mBackgroundStyle;
   nsCOMPtr<imgIContainer> mImage;
-  nsRefPtr<ImageContainer> mImageContainer;
+  RefPtr<ImageContainer> mImageContainer;
   LayoutDeviceRect mDestRect;
   /* Bounds of this display item */
   nsRect mBounds;
@@ -2913,7 +2931,6 @@ public:
     : nsDisplayItem(aBuilder, aFrame)
   {
     MOZ_COUNT_CTOR(nsDisplayLayerEventRegions);
-    AddFrame(aBuilder, aFrame);
   }
 #ifdef NS_BUILD_REFCNT_LOGGING
   virtual ~nsDisplayLayerEventRegions() {
@@ -3161,7 +3178,7 @@ protected:
 class nsDisplayOpacity : public nsDisplayWrapList {
 public:
   nsDisplayOpacity(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                   nsDisplayList* aList);
+                   nsDisplayList* aList, bool aForEventsOnly);
 #ifdef NS_BUILD_REFCNT_LOGGING
   virtual ~nsDisplayOpacity();
 #endif
@@ -3196,6 +3213,7 @@ public:
 
 private:
   float mOpacity;
+  bool mForEventsOnly;
 };
 
 class nsDisplayMixBlendMode : public nsDisplayWrapList {
@@ -3246,13 +3264,7 @@ public:
                                                const ContainerLayerParameters& aContainerParameters) override;
     virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
                                      LayerManager* aManager,
-                                     const ContainerLayerParameters& aParameters) override
-    {
-      if (mCanBeActive && aManager->SupportsMixBlendModes(mContainedBlendModes)) {
-        return mozilla::LAYER_ACTIVE;
-      }
-      return mozilla::LAYER_INACTIVE;
-    }
+                                     const ContainerLayerParameters& aParameters) override;
     virtual bool TryMerge(nsDisplayListBuilder* aBuilder, nsDisplayItem* aItem) override;
     virtual bool ShouldFlattenAway(nsDisplayListBuilder* aBuilder) override {
       return false;
@@ -3789,7 +3801,7 @@ public:
     }
 
     const nsIFrame* mFrame;
-    nsRefPtr<nsCSSValueSharedList> mTransformList;
+    RefPtr<nsCSSValueSharedList> mTransformList;
     const Point3D mToTransformOrigin;
     nscoord mChildPerspective;
 
@@ -3984,7 +3996,7 @@ public:
                                              const ContainerLayerParameters& aContainerParameters) override;
 
 protected:
-  nsRefPtr<mozilla::gfx::VRHMDInfo> mHMD;
+  RefPtr<mozilla::gfx::VRHMDInfo> mHMD;
 };
 
 #endif /*NSDISPLAYLIST_H_*/

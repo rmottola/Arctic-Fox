@@ -20,6 +20,7 @@
 #include "mozilla/dom/CanvasPattern.h"
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/UniquePtr.h"
 #include "gfx2DGlue.h"
 #include "imgIEncoder.h"
 #include "nsLayoutUtils.h"
@@ -70,6 +71,10 @@ public:
 
   HTMLCanvasElement* GetCanvas() const
   {
+    if (mCanvasElement->IsInNativeAnonymousSubtree()) {
+      return nullptr;
+    }
+
     // corresponds to changes to the old bindings made in bug 745025
     return mCanvasElement->GetOriginalCanvas();
   }
@@ -468,7 +473,9 @@ public:
   // this rect is in canvas device space
   void Redraw(const mozilla::gfx::Rect &r);
   NS_IMETHOD Redraw(const gfxRect &r) override { Redraw(ToRect(r)); return NS_OK; }
-  NS_IMETHOD SetContextOptions(JSContext* aCx, JS::Handle<JS::Value> aOptions) override;
+  NS_IMETHOD SetContextOptions(JSContext* aCx,
+                               JS::Handle<JS::Value> aOptions,
+                               ErrorResult& aRvForDictionaryInit) override;
 
   /**
    * An abstract base class to be implemented by callers wanting to be notified
@@ -527,7 +534,7 @@ public:
 
   friend class CanvasRenderingContext2DUserData;
 
-  virtual void GetImageBuffer(uint8_t** aImageBuffer, int32_t* aFormat) override;
+  virtual UniquePtr<uint8_t[]> GetImageBuffer(int32_t* aFormat) override;
 
 
   // Given a point, return hit region ID if it exists
@@ -735,9 +742,9 @@ protected:
   // This is created lazily so it is necessary to call EnsureTarget before
   // accessing it. In the event of an error it will be equal to
   // sErrorTarget.
-  mozilla::RefPtr<mozilla::gfx::DrawTarget> mTarget;
+  RefPtr<mozilla::gfx::DrawTarget> mTarget;
 
-  mozilla::RefPtr<mozilla::layers::PersistentBufferProvider> mBufferProvider;
+  RefPtr<mozilla::layers::PersistentBufferProvider> mBufferProvider;
 
   uint32_t SkiaGLTex() const;
 
@@ -768,7 +775,7 @@ protected:
 
   // This is stored after GetThebesSurface has been called once to avoid
   // excessive ThebesSurface initialization overhead.
-  nsRefPtr<gfxASurface> mThebesSurface;
+  RefPtr<gfxASurface> mThebesSurface;
 
   /**
     * We also have a device space pathbuilder. The reason for this is as
@@ -794,9 +801,9 @@ protected:
     *
     * mPath is always in user-space.
     */
-  mozilla::RefPtr<mozilla::gfx::Path> mPath;
-  mozilla::RefPtr<mozilla::gfx::PathBuilder> mDSPathBuilder;
-  mozilla::RefPtr<mozilla::gfx::PathBuilder> mPathBuilder;
+  RefPtr<mozilla::gfx::Path> mPath;
+  RefPtr<mozilla::gfx::PathBuilder> mDSPathBuilder;
+  RefPtr<mozilla::gfx::PathBuilder> mPathBuilder;
   bool mPathTransformWillUpdate;
   mozilla::gfx::Matrix mPathToDS;
 
@@ -813,7 +820,7 @@ protected:
   {
     nsString          mId;
     // fallback element for a11y
-    nsRefPtr<Element> mElement;
+    RefPtr<Element> mElement;
     // Path of the hit region in the 2d context coordinate space (not user space)
     RefPtr<gfx::Path> mPath;
   };
@@ -990,14 +997,14 @@ protected:
       return std::min(SIGMA_MAX, shadowBlur / 2.0f);
     }
 
-    std::vector<mozilla::RefPtr<mozilla::gfx::Path> > clipsPushed;
+    std::vector<RefPtr<mozilla::gfx::Path> > clipsPushed;
 
-    nsRefPtr<gfxFontGroup> fontGroup;
+    RefPtr<gfxFontGroup> fontGroup;
     nsCOMPtr<nsIAtom> fontLanguage;
     nsFont fontFont;
 
-    EnumeratedArray<Style, Style::MAX, nsRefPtr<CanvasGradient>> gradientStyles;
-    EnumeratedArray<Style, Style::MAX, nsRefPtr<CanvasPattern>> patternStyles;
+    EnumeratedArray<Style, Style::MAX, RefPtr<CanvasGradient>> gradientStyles;
+    EnumeratedArray<Style, Style::MAX, RefPtr<CanvasPattern>> patternStyles;
     EnumeratedArray<Style, Style::MAX, nscolor> colorStyles;
 
     nsString font;
@@ -1022,9 +1029,9 @@ protected:
 
     nsString filterString;
     nsTArray<nsStyleFilter> filterChain;
-    nsRefPtr<nsSVGFilterChainObserver> filterChainObserver;
+    RefPtr<nsSVGFilterChainObserver> filterChainObserver;
     mozilla::gfx::FilterDescription filter;
-    nsTArray<mozilla::RefPtr<mozilla::gfx::SourceSurface>> filterAdditionalImages;
+    nsTArray<RefPtr<mozilla::gfx::SourceSurface>> filterAdditionalImages;
 
     bool imageSmoothingEnabled;
     bool fontExplicitLanguage;

@@ -93,7 +93,7 @@ private:
   // currently this is the case) that any time page JS can get ts hands on a
   // child sheet that means we've already ensured unique inners throughout its
   // parent chain and things are good.
-  nsRefPtr<CSSStyleSheet> mFirstChild;
+  RefPtr<CSSStyleSheet> mFirstChild;
   CORSMode               mCORSMode;
   // The Referrer Policy of a stylesheet is used for its child sheets, so it is
   // stored here.
@@ -228,7 +228,7 @@ public:
 
   /* Get the URI this sheet was originally loaded from, if any.  Can
      return null */
-  virtual nsIURI* GetOriginalURI() const;
+  nsIURI* GetOriginalURI() const { return mInner->mOriginalSheetURI; }
 
   // nsICSSLoaderObserver interface
   NS_IMETHOD StyleSheetLoaded(CSSStyleSheet* aSheet, bool aWasAlternate,
@@ -242,7 +242,7 @@ public:
   bool UseForPresentation(nsPresContext* aPresContext,
                             nsMediaQueryResultCacheKey& aKey) const;
 
-  nsresult ParseSheet(const nsAString& aInput);
+  nsresult ReparseSheet(const nsAString& aInput);
 
   void SetInRuleProcessorCache() { mInRuleProcessorCache = true; }
 
@@ -317,6 +317,12 @@ public:
   }
   virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
+  // Changes to sheets should be inside of a WillDirty-DidDirty pair.
+  // However, the calls do not need to be matched; it's ok to call
+  // WillDirty and then make no change and skip the DidDirty call.
+  void WillDirty();
+  void DidDirty();
+
 private:
   CSSStyleSheet(const CSSStyleSheet& aCopy,
                 CSSStyleSheet* aParentToUse,
@@ -331,9 +337,6 @@ protected:
   virtual ~CSSStyleSheet();
 
   void ClearRuleCascades();
-
-  void     WillDirty();
-  void     DidDirty();
 
   // Return success if the subject principal subsumes the principal of our
   // inner, error otherwise.  This will also succeed if the subject has
@@ -357,18 +360,18 @@ protected:
 
 protected:
   nsString              mTitle;
-  nsRefPtr<nsMediaList> mMedia;
-  nsRefPtr<CSSStyleSheet> mNext;
+  RefPtr<nsMediaList> mMedia;
+  RefPtr<CSSStyleSheet> mNext;
   CSSStyleSheet*        mParent;    // weak ref
   css::ImportRule*      mOwnerRule; // weak ref
 
-  nsRefPtr<CSSRuleListImpl> mRuleCollection;
+  RefPtr<CSSRuleListImpl> mRuleCollection;
   nsIDocument*          mDocument; // weak ref; parents maintain this for their children
   nsINode*              mOwningNode; // weak ref
   bool                  mDisabled;
   bool                  mDirty; // has been modified 
   bool                  mInRuleProcessorCache;
-  nsRefPtr<dom::Element> mScopeElement;
+  RefPtr<dom::Element> mScopeElement;
 
   CSSStyleSheetInner*   mInner;
 

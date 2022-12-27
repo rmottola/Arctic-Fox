@@ -15,6 +15,7 @@
 #include "LayersLogging.h"              // for AppendToString
 #include "ReadbackLayer.h"              // for ReadbackLayer
 #include "UnitTransforms.h"             // for ViewAs
+#include "gfxEnv.h"
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "gfxPrefs.h"
 #include "gfxUtils.h"                   // for gfxUtils, etc
@@ -25,12 +26,16 @@
 #include "mozilla/gfx/2D.h"             // for DrawTarget
 #include "mozilla/gfx/BaseSize.h"       // for BaseSize
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4
+#include "mozilla/layers/AsyncCanvasRenderer.h"
+#include "mozilla/layers/CompositableClient.h"  // for CompositableClient
 #include "mozilla/layers/Compositor.h"  // for Compositor
 #include "mozilla/layers/CompositorTypes.h"
 #include "mozilla/layers/LayerManagerComposite.h"  // for LayerComposite
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/layers/LayersMessages.h"  // for TransformFunction, etc
+#include "mozilla/layers/LayersTypes.h"  // for TextureDumpMode
 #include "mozilla/layers/PersistentBufferProvider.h"
+#include "mozilla/layers/ShadowLayers.h"  // for ShadowableLayer
 #include "nsAString.h"
 #include "nsCSSValue.h"                 // for nsCSSValue::Array, etc
 #include "nsPrintfCString.h"            // for nsPrintfCString
@@ -191,7 +196,7 @@ LayerManager::Mutated(Layer* aLayer)
 already_AddRefed<ImageContainer>
 LayerManager::CreateImageContainer(ImageContainer::Mode flag)
 {
-  nsRefPtr<ImageContainer> container = new ImageContainer(flag);
+  RefPtr<ImageContainer> container = new ImageContainer(flag);
   return container.forget();
 }
 
@@ -199,6 +204,19 @@ bool
 LayerManager::AreComponentAlphaLayersEnabled()
 {
   return gfxPrefs::ComponentAlphaEnabled();
+}
+
+/*static*/ void
+LayerManager::LayerUserDataDestroy(void* data)
+{
+  delete static_cast<LayerUserData*>(data);
+}
+
+nsAutoPtr<LayerUserData>
+LayerManager::RemoveUserData(void* aKey)
+{
+  nsAutoPtr<LayerUserData> d(static_cast<LayerUserData*>(mUserData.Remove(static_cast<gfx::UserDataKey*>(aKey))));
+  return d;
 }
 
 //--------------------------------------------------
@@ -298,7 +316,7 @@ CreateCSSValueList(const InfallibleTArray<TransformFunction>& aFunctions)
   nsAutoPtr<nsCSSValueList> result;
   nsCSSValueList** resultTail = getter_Transfers(result);
   for (uint32_t i = 0; i < aFunctions.Length(); i++) {
-    nsRefPtr<nsCSSValue::Array> arr;
+    RefPtr<nsCSSValue::Array> arr;
     switch (aFunctions[i].type()) {
       case TransformFunction::TRotationX:
       {
@@ -705,7 +723,7 @@ Layer::SnapTransform(const Matrix4x4& aTransform,
   Matrix4x4 result;
   if (mManager->IsSnappingEffectiveTransforms() &&
       aTransform.Is2D(&matrix2D) &&
-      gfx::Size(1.0, 1.0) <= ToSize(aSnapRect.Size()) &&
+      gfxSize(1.0, 1.0) <= aSnapRect.Size() &&
       matrix2D.PreservesAxisAlignedRectangles()) {
     IntPoint transformedTopLeft = RoundedToInt(matrix2D * ToPoint(aSnapRect.TopLeft()));
     IntPoint transformedTopRight = RoundedToInt(matrix2D * ToPoint(aSnapRect.TopRight()));
@@ -989,6 +1007,10 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
 {
   MOZ_ASSERT(aLayerOffset, "invalid offset pointer");
 
+  if (!GetParent()) {
+    return false;
+  }
+
   IntPoint offset;
   aResult = GetEffectiveVisibleRegion();
   for (Layer* layer = this; layer; layer = layer->GetParent()) {
@@ -1008,7 +1030,7 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
     // If the parent layer clips its lower layers, clip the visible region
     // we're accumulating.
     if (layer->GetEffectiveClipRect()) {
-      aResult.AndWith(ParentLayerIntRect::ToUntyped(*layer->GetEffectiveClipRect()));
+      aResult.AndWith(layer->GetEffectiveClipRect()->ToUnknownRect());
     }
 
     // Now we need to walk across the list of siblings for this parent layer,
@@ -1030,6 +1052,12 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
       nsIntRegion siblingVisibleRegion(sibling->GetEffectiveVisibleRegion());
       // Translate the siblings region to |layer|'s origin.
       siblingVisibleRegion.MoveBy(-siblingOffset.x, -siblingOffset.y);
+      // Apply the sibling's clip.
+      // Layer clip rects are not affected by the layer's transform.
+      Maybe<ParentLayerIntRect> clipRect = sibling->GetEffectiveClipRect();
+      if (clipRect) {
+        siblingVisibleRegion.AndWith(clipRect->ToUnknownRect());
+      }
       // Subtract the sibling visible region from the visible region of |this|.
       aResult.SubOut(siblingVisibleRegion);
     }
@@ -1308,6 +1336,12 @@ ContainerLayer::SortChildrenBy3DZOrder(nsTArray<Layer*>& aArray)
       if (toSort.Length() > 0) {
         SortLayersBy3DZOrder(toSort);
         aArray.AppendElements(Move(toSort));
+        // XXX The move analysis gets confused here, because toSort gets moved
+        // here, and then gets used again outside of the loop. To clarify that
+        // we realize that the array is going to be empty to the move checker,
+        // we clear it again here. (This method renews toSort for the move
+        // analysis)
+        toSort.ClearAndRetainStorage();
       }
       aArray.AppendElement(l);
     }
@@ -1334,7 +1368,7 @@ ContainerLayer::DefaultComputeEffectiveTransforms(const Matrix4x4& aTransformToS
       GetForceIsolatedGroup()) {
     useIntermediateSurface = true;
 #ifdef MOZ_DUMP_PAINTING
-  } else if (gfxUtils::sDumpPaintingIntermediate && !Extend3DContext()) {
+  } else if (gfxEnv::DumpPaintIntermediate() && !Extend3DContext()) {
     useIntermediateSurface = true;
 #endif
   } else {
@@ -1668,11 +1702,20 @@ void WriteSnapshotToDumpFile(Compositor* aCompositor, DrawTarget* aTarget)
 void
 Layer::Dump(std::stringstream& aStream, const char* aPrefix, bool aDumpHtml)
 {
+#ifdef MOZ_DUMP_PAINTING
+  bool dumpCompositorTexture = gfxEnv::DumpCompositorTextures() && AsLayerComposite() &&
+                               AsLayerComposite()->GetCompositableHost();
+  bool dumpClientTexture = gfxEnv::DumpPaint() && AsShadowableLayer() &&
+                           AsShadowableLayer()->GetCompositableClient();
+  nsCString layerId(Name());
+  layerId.Append('-');
+  layerId.AppendInt((uint64_t)this);
+#endif
   if (aDumpHtml) {
     aStream << nsPrintfCString("<li><a id=\"%p\" ", this).get();
 #ifdef MOZ_DUMP_PAINTING
-    if (GetType() == TYPE_CONTAINER || GetType() == TYPE_PAINTED) {
-      WriteSnapshotLinkToDumpFile(this, aStream);
+    if (dumpCompositorTexture || dumpClientTexture) {
+      aStream << nsPrintfCString("href=\"javascript:ViewImage('%s')\"", layerId.BeginReading()).get();
     }
 #endif
     aStream << ">";
@@ -1680,13 +1723,27 @@ Layer::Dump(std::stringstream& aStream, const char* aPrefix, bool aDumpHtml)
   DumpSelf(aStream, aPrefix);
 
 #ifdef MOZ_DUMP_PAINTING
-  if (gfxUtils::sDumpPainting && AsLayerComposite() && AsLayerComposite()->GetCompositableHost()) {
+  if (dumpCompositorTexture) {
     AsLayerComposite()->GetCompositableHost()->Dump(aStream, aPrefix, aDumpHtml);
+  } else if (dumpClientTexture) {
+    if (aDumpHtml) {
+      aStream << nsPrintfCString("<script>array[\"%s\"]=\"", layerId.BeginReading()).get();
+    }
+    AsShadowableLayer()->GetCompositableClient()->Dump(aStream, aPrefix,
+        aDumpHtml, TextureDumpMode::DoNotCompress);
+    if (aDumpHtml) {
+      aStream << "\";</script>";
+    }
   }
 #endif
 
   if (aDumpHtml) {
     aStream << "</a>";
+#ifdef MOZ_DUMP_PAINTING
+    if (dumpClientTexture) {
+      aStream << nsPrintfCString("<br><img id=\"%s\">\n", layerId.BeginReading()).get();
+    }
+#endif
   }
 
   if (Layer* mask = GetMaskLayer()) {
@@ -1859,8 +1916,9 @@ Layer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   }
   if (GetIsFixedPosition()) {
     LayerPoint anchor = GetFixedPositionAnchor();
-    aStream << nsPrintfCString(" [isFixedPosition scrollId=%lld anchor=%s%s]",
+    aStream << nsPrintfCString(" [isFixedPosition scrollId=%lld sides=0x%x anchor=%s%s]",
                      GetFixedPositionScrollContainerId(),
+                     GetFixedPositionSides(),
                      ToString(anchor).c_str(),
                      IsClipFixed() ? "" : " scrollingClip").get();
   }
@@ -2032,6 +2090,13 @@ Layer::IsBackfaceHidden()
   return false;
 }
 
+nsAutoPtr<LayerUserData>
+Layer::RemoveUserData(void* aKey)
+{
+  nsAutoPtr<LayerUserData> d(static_cast<LayerUserData*>(mUserData.Remove(static_cast<gfx::UserDataKey*>(aKey))));
+  return d;
+}
+
 void
 PaintedLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
 {
@@ -2106,6 +2171,19 @@ ColorLayer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
   layer->set_type(LayersPacket::Layer::ColorLayer);
   layer->set_color(mColor.ToABGR());
 }
+
+CanvasLayer::CanvasLayer(LayerManager* aManager, void* aImplData)
+  : Layer(aManager, aImplData)
+  , mPreTransCallback(nullptr)
+  , mPreTransCallbackData(nullptr)
+  , mPostTransCallback(nullptr)
+  , mPostTransCallbackData(nullptr)
+  , mFilter(gfx::Filter::GOOD)
+  , mDirty(false)
+{}
+
+CanvasLayer::~CanvasLayer()
+{}
 
 void
 CanvasLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)

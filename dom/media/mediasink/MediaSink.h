@@ -7,7 +7,7 @@
 #ifndef MediaSink_h_
 #define MediaSink_h_
 
-#include "mozilla/nsRefPtr.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/MozPromise.h"
 #include "nsISupportsImpl.h"
 #include "MediaInfo.h"
@@ -40,10 +40,10 @@ public:
 
   struct PlaybackParams {
     PlaybackParams()
-      : volume(1.0) , playbackRate(1.0) , preservesPitch(true) {}
-    double volume;
-    double playbackRate;
-    bool preservesPitch;
+      : mVolume(1.0) , mPlaybackRate(1.0) , mPreservesPitch(true) {}
+    double mVolume;
+    double mPlaybackRate;
+    bool mPreservesPitch;
   };
 
   // Return the playback parameters of this sink.
@@ -57,7 +57,7 @@ public:
   // Return a promise which is resolved when the track finishes
   // or null if no such track.
   // Must be called after playback starts.
-  virtual nsRefPtr<GenericPromise> OnEnded(TrackType aType) = 0;
+  virtual RefPtr<GenericPromise> OnEnded(TrackType aType) = 0;
 
   // Return the end time of the audio/video data that has been consumed
   // or -1 if no such track.
@@ -93,6 +93,11 @@ public:
   // Pause/resume the playback. Only work after playback starts.
   virtual void SetPlaying(bool aPlaying) = 0;
 
+  // Single frame rendering operation may need to be done before playback
+  // started (1st frame) or right after seek completed or playback stopped.
+  // Do nothing if this sink has no video track. Can be called in any state.
+  virtual void Redraw() {};
+
   // Begin a playback session with the provided start time and media info.
   // Must be called when playback is stopped.
   virtual void Start(int64_t aStartTime, const MediaInfo& aInfo) = 0;
@@ -104,6 +109,10 @@ public:
   // Return true if playback has started.
   // Can be called in any state.
   virtual bool IsStarted() const = 0;
+
+  // Return true if playback is started and not paused otherwise false.
+  // Can be called in any state.
+  virtual bool IsPlaying() const = 0;
 
   // Called on the state machine thread to shut down the sink. All resources
   // allocated by this sink should be released.

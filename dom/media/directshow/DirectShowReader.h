@@ -43,24 +43,18 @@ public:
 
   virtual ~DirectShowReader();
 
-  nsresult Init(MediaDecoderReader* aCloneDonor) override;
-
   bool DecodeAudioData() override;
   bool DecodeVideoFrame(bool &aKeyframeSkip,
                         int64_t aTimeThreshold) override;
 
-  bool HasAudio() override;
-  bool HasVideo() override;
-
   nsresult ReadMetadata(MediaInfo* aInfo,
                         MetadataTags** aTags) override;
 
-  nsRefPtr<SeekPromise>
+  RefPtr<SeekPromise>
   Seek(int64_t aTime, int64_t aEndTime) override;
 
 protected:
-  void NotifyDataArrivedInternal(uint32_t aLength,
-                                 int64_t aOffset) override;
+  void NotifyDataArrivedInternal() override;
 public:
 
   bool IsMediaSeekable() override;

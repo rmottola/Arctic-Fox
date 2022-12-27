@@ -18,6 +18,7 @@ class ShaderValidator final
 {
     const ShHandle mHandle;
     const int mCompileOptions;
+    const int mMaxVaryingVectors;
     bool mHasRun;
 
 public:
@@ -27,9 +28,10 @@ public:
                                    int compileOptions);
 
 private:
-    ShaderValidator(ShHandle handle, int compileOptions)
+    ShaderValidator(ShHandle handle, int compileOptions, int maxVaryingVectors)
         : mHandle(handle)
         , mCompileOptions(compileOptions)
+        , mMaxVaryingVectors(maxVaryingVectors)
         , mHasRun(false)
     { }
 
@@ -49,9 +51,18 @@ public:
     bool FindAttribMappedNameByUserName(const std::string& userName,
                                         const std::string** const out_mappedName) const;
 
+    bool FindVaryingMappedNameByUserName(const std::string& userName,
+                                         const std::string** const out_mappedName) const;
+
+    bool FindVaryingByMappedName(const std::string& mappedName,
+                                 std::string* const out_userName,
+                                 bool* const out_isArray) const;
     bool FindUniformByMappedName(const std::string& mappedName,
                                  std::string* const out_userName,
                                  bool* const out_isArray) const;
+    bool FindUniformBlockByMappedName(const std::string& mappedName,
+                                      std::string* const out_userName) const;
+
 };
 
 } // namespace webgl

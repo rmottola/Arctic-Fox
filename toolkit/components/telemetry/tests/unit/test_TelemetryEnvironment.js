@@ -230,13 +230,7 @@ function checkNullOrString(aValue) {
  *         boolean.
  */
 function checkNullOrBool(aValue) {
-  if (aValue) {
-    return (typeof aValue == "boolean");
-  } else if (aValue === null) {
-    return true;
-  }
-
-  return false;
+  return aValue === null || (typeof aValue == "boolean");
 }
 
 function checkBuildSection(data) {
@@ -502,7 +496,7 @@ function checkActiveAddon(data){
     hasBinaryComponents: "boolean",
     installDay: "number",
     updateDay: "number",
-    signedState: "number",
+    signedState: mozinfo.addon_signing ? "number" : "undefined",
   };
 
   for (let f in EXPECTED_ADDON_FIELDS_TYPES) {
@@ -566,7 +560,7 @@ function checkTheme(data) {
 function checkActiveGMPlugin(data) {
   Assert.equal(typeof data.version, "string");
   Assert.equal(typeof data.userDisabled, "boolean");
-  Assert.equal(typeof data.applyBackgroundUpdates, "boolean");
+  Assert.equal(typeof data.applyBackgroundUpdates, "number");
 }
 
 function checkAddonsSection(data) {
@@ -802,7 +796,7 @@ add_task(function* test_signedAddon() {
     hasBinaryComponents: false,
     installDay: ADDON_INSTALL_DATE,
     updateDay: ADDON_INSTALL_DATE,
-    signedState: AddonManager.SIGNEDSTATE_SIGNED,
+    signedState: mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED,
   };
 
   // Set the clock in the future so our changes don't get throttled.
@@ -1005,7 +999,7 @@ add_task(function* test_addonsAndPlugins() {
     hasBinaryComponents: false,
     installDay: ADDON_INSTALL_DATE,
     updateDay: ADDON_INSTALL_DATE,
-    signedState: AddonManager.SIGNEDSTATE_MISSING,
+    signedState: mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_MISSING : AddonManager.SIGNEDSTATE_NOT_REQUIRED,
   };
 
   const EXPECTED_PLUGIN_DATA = {

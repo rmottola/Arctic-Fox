@@ -4,8 +4,8 @@
 
 "use strict";
 
-var { console } = Cu.import("resource://gre/modules/devtools/shared/Console.jsm", {});
-var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { console } = Cu.import("resource://gre/modules/Console.jsm", {});
+var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var { TargetFactory } = require("devtools/client/framework/target");
 var promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");

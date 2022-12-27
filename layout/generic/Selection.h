@@ -38,7 +38,7 @@ struct RangeData
     : mRange(aRange)
   {}
 
-  nsRefPtr<nsRange> mRange;
+  RefPtr<nsRange> mRange;
   mozilla::TextRangeStyle mTextRangeStyle;
 };
 
@@ -204,7 +204,7 @@ public:
   void GetRangesForInterval(nsINode& aBeginNode, int32_t aBeginOffset,
                             nsINode& aEndNode, int32_t aEndOffset,
                             bool aAllowAdjacent,
-                            nsTArray<nsRefPtr<nsRange>>& aReturn,
+                            nsTArray<RefPtr<nsRange>>& aReturn,
                             mozilla::ErrorResult& aRv);
 
   void ScrollIntoView(int16_t aRegion, bool aIsSynchronous,
@@ -299,7 +299,7 @@ private:
                                  int32_t* aStartIndex, int32_t* aEndIndex);
   RangeData* FindRangeData(nsIDOMRange* aRange);
 
-  void UserSelectRangesToAdd(nsRange* aItem, nsTArray<nsRefPtr<nsRange> >& rangesToAdd);
+  void UserSelectRangesToAdd(nsRange* aItem, nsTArray<RefPtr<nsRange> >& rangesToAdd);
 
   /**
    * Helper method for AddItem.
@@ -321,9 +321,9 @@ private:
   // O(log n) time, though this would require rebalancing and other overhead.
   nsTArray<RangeData> mRanges;
 
-  nsRefPtr<nsRange> mAnchorFocusRange;
-  nsRefPtr<nsFrameSelection> mFrameSelection;
-  nsRefPtr<nsAutoScrollTimer> mAutoScrollTimer;
+  RefPtr<nsRange> mAnchorFocusRange;
+  RefPtr<nsFrameSelection> mFrameSelection;
+  RefPtr<nsAutoScrollTimer> mAutoScrollTimer;
   nsCOMArray<nsISelectionListener> mSelectionListeners;
   nsRevocableEventPtr<ScrollSelectionIntoViewEvent> mScrollEvent;
   CachedOffsetForFrame *mCachedOffsetForFrame;
@@ -345,7 +345,7 @@ private:
 class MOZ_STACK_CLASS SelectionBatcher final
 {
 private:
-  nsRefPtr<Selection> mSelection;
+  RefPtr<Selection> mSelection;
 public:
   explicit SelectionBatcher(Selection* aSelection)
   {
@@ -366,7 +366,7 @@ public:
 class MOZ_STACK_CLASS AutoHideSelectionChanges final
 {
 private:
-  nsRefPtr<Selection> mSelection;
+  RefPtr<Selection> mSelection;
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 public:
   explicit AutoHideSelectionChanges(const nsFrameSelection* aFrame);

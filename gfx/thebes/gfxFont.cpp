@@ -231,7 +231,7 @@ gfxFontCache::Lookup(const gfxFontEntry* aFontEntry,
     if (!entry)
         return nullptr;
 
-    nsRefPtr<gfxFont> font = entry->mFont;
+    RefPtr<gfxFont> font = entry->mFont;
     return font.forget();
 }
 
@@ -1516,7 +1516,7 @@ private:
             if (state.pattern || mFontParams.contextPaint) {
                 Pattern *pat;
 
-                nsRefPtr<gfxPattern> fillPattern;
+                RefPtr<gfxPattern> fillPattern;
                 if (!mFontParams.contextPaint ||
                     !(fillPattern = mFontParams.contextPaint->GetFillPattern(
                                         mRunParams.context->GetDrawTarget(),
@@ -1600,7 +1600,7 @@ private:
         RefPtr<Path> path =
             mFontParams.scaledFont->GetPathForGlyphs(aBuf, mRunParams.dt);
         if (mFontParams.contextPaint) {
-            nsRefPtr<gfxPattern> strokePattern =
+            RefPtr<gfxPattern> strokePattern =
                 mFontParams.contextPaint->GetStrokePattern(
                     mRunParams.context->GetDrawTarget(),
                     mRunParams.context->CurrentMatrix());
@@ -1628,7 +1628,7 @@ double
 gfxFont::CalcXScale(gfxContext *aContext)
 {
     // determine magnitude of a 1px x offset in device space
-    gfxSize t = aContext->UserToDevice(gfxSize(1.0, 0.0));
+    Size t = aContext->UserToDevice(Size(1.0, 0.0));
     if (t.width == 1.0 && t.height == 0.0) {
         // short-circuit the most common case to avoid sqrt() and division
         return 1.0;
@@ -1902,7 +1902,7 @@ gfxFont::Draw(gfxTextRun *aTextRun, uint32_t aStart, uint32_t aEnd,
         // If no pattern is specified for fill, use the current pattern
         NS_ASSERTION((int(aRunParams.drawMode) & int(DrawMode::GLYPH_STROKE)) == 0,
                      "no pattern supplied for stroking text");
-        nsRefPtr<gfxPattern> fillPattern = aRunParams.context->GetPattern();
+        RefPtr<gfxPattern> fillPattern = aRunParams.context->GetPattern();
         contextPaint =
             new SimpleTextContextPaint(fillPattern, nullptr,
                                        aRunParams.context->CurrentMatrix());
@@ -2283,7 +2283,9 @@ gfxFont::Measure(gfxTextRun *aTextRun,
     // If the font may be rendered with a fake-italic effect, we need to allow
     // for the top-right of the glyphs being skewed to the right, and the
     // bottom-left being skewed further left.
-    if (mStyle.style != NS_FONT_STYLE_NORMAL && !mFontEntry->IsItalic()) {
+    if (mStyle.style != NS_FONT_STYLE_NORMAL &&
+        mFontEntry->IsUpright() &&
+        mStyle.allowSyntheticStyle) {
         gfxFloat extendLeftEdge =
             ceil(OBLIQUE_SKEW_FACTOR * metrics.mBoundingBox.YMost());
         gfxFloat extendRightEdge =
@@ -2920,7 +2922,7 @@ gfxFont::InitFakeSmallCapsRun(gfxContext     *aContext,
 {
     bool ok = true;
 
-    nsRefPtr<gfxFont> smallCapsFont = GetSmallCapsFont();
+    RefPtr<gfxFont> smallCapsFont = GetSmallCapsFont();
 
     enum RunCaseAction {
         kNoChange,

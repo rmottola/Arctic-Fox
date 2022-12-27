@@ -26,6 +26,7 @@
 #include "GLXLibrary.h"
 #include "gfxXlibSurface.h"
 #include "gfxContext.h"
+#include "gfxEnv.h"
 #include "gfxPlatform.h"
 #include "GLContextGLX.h"
 #include "gfxUtils.h"
@@ -98,7 +99,7 @@ GLXLibrary::EnsureInitialized()
         reporter.SetSuccessful();
     }
 
-    if (PR_GetEnv("MOZ_GLX_DEBUG")) {
+    if (gfxEnv::GlxDebug()) {
         mDebug = true;
     }
 
@@ -759,7 +760,7 @@ GLContextGLX::CreateGLContext(
     }
 
     GLXContext context;
-    nsRefPtr<GLContextGLX> glContext;
+    RefPtr<GLContextGLX> glContext;
     bool error;
 
     ScopedXErrorHandler xErrorHandler;
@@ -1007,7 +1008,7 @@ GLContextProviderGLX::CreateWrappingExisting(void* aContext, void* aSurface)
 
     if (aContext && aSurface) {
         SurfaceCaps caps = SurfaceCaps::Any();
-        nsRefPtr<GLContextGLX> glContext =
+        RefPtr<GLContextGLX> glContext =
             new GLContextGLX(caps,
                              nullptr, // SharedContext
                              false, // Offscreen
@@ -1119,7 +1120,7 @@ GLContextProviderGLX::CreateForWindow(nsIWidget *aWidget)
     GLContextGLX *shareContext = GetGlobalContextGLX();
 
     SurfaceCaps caps = SurfaceCaps::Any();
-    nsRefPtr<GLContextGLX> glContext = GLContextGLX::CreateGLContext(caps,
+    RefPtr<GLContextGLX> glContext = GLContextGLX::CreateGLContext(caps,
                                                                      shareContext,
                                                                      false,
                                                                      display,
@@ -1283,16 +1284,8 @@ GLContextProviderGLX::CreateOffscreen(const IntSize& size,
 /*static*/ GLContext*
 GLContextProviderGLX::GetGlobalContext()
 {
-    static bool checkedContextSharing = false;
-    static bool useContextSharing = false;
-
-    if (!checkedContextSharing) {
-        useContextSharing = getenv("MOZ_DISABLE_CONTEXT_SHARING_GLX") == 0;
-        checkedContextSharing = true;
-    }
-
     // TODO: get GLX context sharing to work well with multiple threads
-    if (!useContextSharing) {
+    if (gfxEnv::DisableContextSharingGlx()) {
         return nullptr;
     }
 

@@ -30,6 +30,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "CharsetMenu",
                                   "resource://gre/modules/CharsetMenu.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
                                   "resource://gre/modules/ShortcutUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                  "resource://gre/modules/NewTabUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
@@ -143,18 +145,21 @@ XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
 
 XPCOMUtils.defineLazyGetter(this, "DeveloperToolbar", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/shared/DeveloperToolbar.jsm", tmp);
+  Cu.import("resource://devtools/client/shared/DeveloperToolbar.jsm", tmp);
   return new tmp.DeveloperToolbar(window, document.getElementById("developer-toolbar"));
 });
 
 XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/framework/ToolboxProcess.jsm", tmp);
+  Cu.import("resource://devtools/client/framework/ToolboxProcess.jsm", tmp);
   return tmp.BrowserToolboxProcess;
 });
 
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
   "resource://gre/modules/PageThumbs.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ProcessHangMonitor",
+  "resource:///modules/ProcessHangMonitor.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
@@ -219,6 +224,10 @@ var gInitialPages = [
 
 XPCOMUtils.defineLazyGetter(this, "Win7Features", function () {
 #ifdef XP_WIN
+  // Bug 666808 - AeroPeek support for e10s
+  if (gMultiProcessBrowser)
+    return null;
+
   const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
   if (WINTASKBAR_CONTRACTID in Cc &&
       Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
@@ -490,6 +499,13 @@ var gPopupBlockerObserver = {
       // Hide the icon in the location bar (if the location bar exists)
       if (gURLBar)
         this._reportButton.hidden = true;
+
+      // Hide the notification box (if it's visible).
+      var notificationBox = gBrowser.getNotificationBox();
+      var notification = notificationBox.getNotificationWithValue("popup-blocked");
+      if (notification) {
+        notificationBox.removeNotification(notification, false);
+      }
       return;
     }
 
@@ -975,10 +991,6 @@ var gBrowserInit = {
     gBrowser.addProgressListener(window.XULBrowserWindow);
     gBrowser.addTabsProgressListener(window.TabsProgressListener);
 
-    // setup our MozApplicationManifest listener
-    gBrowser.addEventListener("MozApplicationManifest",
-                              OfflineApps, false);
-
     // setup simple gestures support
     gGestureSupport.init(true);
 
@@ -1092,6 +1104,13 @@ var gBrowserInit = {
     TelemetryTimestamps.add("delayedStartupStarted");
 
     this._cancelDelayedStartup();
+
+    // We need to set the MozApplicationManifest event listeners up
+    // before we start loading the home pages in case a document has
+    // a "manifest" attribute, in which the MozApplicationManifest event
+    // will be fired.
+    gBrowser.addEventListener("MozApplicationManifest",
+                              OfflineApps, false);
 
     // This pageshow listener needs to be registered before we may call
     // swapBrowsersAndCloseOther() to receive pageshow events fired by that.
@@ -1207,8 +1226,9 @@ var gBrowserInit = {
       }
       // Note: loadOneOrMoreURIs *must not* be called if window.arguments.length >= 3.
       // Such callers expect that window.arguments[0] is handled as a single URI.
-      else
+      else {
         loadOneOrMoreURIs(uriToLoad);
+      }
     }
 
     Services.obs.addObserver(gSessionHistoryObserver, "browser:purge-session-history", false);
@@ -1339,11 +1359,8 @@ var gBrowserInit = {
     gBrowser.mPanelContainer.addEventListener("PreviewBrowserTheme", LightWeightThemeWebInstaller, false, true);
     gBrowser.mPanelContainer.addEventListener("ResetBrowserThemePreview", LightWeightThemeWebInstaller, false, true);
 
-    // Bug 666808 - AeroPeek support for e10s
-    if (!gMultiProcessBrowser) {
-      if (Win7Features)
-        Win7Features.onOpenWindow();
-    }
+    if (Win7Features)
+      Win7Features.onOpenWindow();
 
     FullScreen.init();
 
@@ -1505,6 +1522,8 @@ var gBrowserInit = {
       gBrowser.removeTabsProgressListener(window.TabsProgressListener);
     } catch (ex) {
     }
+
+    PlacesToolbarHelper.uninit();
 
     BookmarkingUI.uninit();
 
@@ -1687,7 +1706,7 @@ var gBrowserInit = {
       let itemArray = itemBranch.getChildList("");
 
       // See if any privacy.item prefs are set
-      let doMigrate = itemArray.some(function (name) itemBranch.prefHasUserValue(name));
+      let doMigrate = itemArray.some(name => itemBranch.prefHasUserValue(name));
       // Or if sanitizeOnShutdown is set
       if (!doMigrate)
         doMigrate = gPrefService.getBoolPref("privacy.sanitize.sanitizeOnShutdown");
@@ -2347,7 +2366,6 @@ function BrowserViewSourceOfDocument(aArgsOrDocument) {
   let viewInternal = () => {
     let inTab = Services.prefs.getBoolPref("view_source.tab");
     if (inTab) {
-      let viewSourceURL = `view-source:${args.URL}`;
       let tabBrowser = gBrowser;
       // In the case of sidebars and chat windows, gBrowser is defined but null,
       // because no #content element exists.  For these cases, we need to find
@@ -2358,9 +2376,24 @@ function BrowserViewSourceOfDocument(aArgsOrDocument) {
         let browserWindow = RecentWindow.getMostRecentBrowserWindow();
         tabBrowser = browserWindow.gBrowser;
       }
-      let tab = tabBrowser.loadOneTab(viewSourceURL, {
+      // Some internal URLs (such as specific chrome: and about: URLs that are
+      // not yet remote ready) cannot be loaded in a remote browser.  View
+      // source in tab expects the new view source browser's remoteness to match
+      // that of the original URL, so disable remoteness if necessary for this
+      // URL.
+      let contentProcess = Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT
+      let forceNotRemote =
+        gMultiProcessBrowser &&
+        !E10SUtils.canLoadURIInProcess(args.URL, contentProcess);
+      // `viewSourceInBrowser` will load the source content from the page
+      // descriptor for the tab (when possible) or fallback to the network if
+      // that fails.  Either way, the view source module will manage the tab's
+      // location, so use "about:blank" here to avoid unnecessary redundant
+      // requests.
+      let tab = tabBrowser.loadOneTab("about:blank", {
         relatedToCurrent: true,
-        inBackground: false
+        inBackground: false,
+        forceNotRemote,
       });
       args.viewSourceBrowser = tabBrowser.getBrowserForTab(tab);
       top.gViewSourceUtils.viewSourceInBrowser(args);
@@ -2409,7 +2442,7 @@ function BrowserPageInfo(doc, initialTab, imageElement, frameOuterWindowID) {
               frameOuterWindowID: frameOuterWindowID};
   var windows = Services.wm.getEnumerator("Browser:page-info");
 
-  var documentURL = doc ? doc.location : window.gBrowser.selectedBrowser.contentDocumentAsCPOW.location;
+  var documentURL = doc ? doc.location : window.gBrowser.selectedBrowser.currentURI.spec;
 
   // Check for windows matching the url
   while (windows.hasMoreElements()) {
@@ -3166,7 +3199,7 @@ function FillInHTMLTooltip(tipElement)
 }
 
 var browserDragAndDrop = {
-  canDropLink: function (aEvent) Services.droppedLinkHandler.canDropLink(aEvent, true),
+  canDropLink: aEvent => Services.droppedLinkHandler.canDropLink(aEvent, true),
 
   dragOver: function (aEvent)
   {
@@ -3343,7 +3376,7 @@ const BrowserSearch = {
 
     // Check to see whether we've already added an engine with this title
     if (browser.engines) {
-      if (browser.engines.some(function (e) e.title == engine.title))
+      if (browser.engines.some(e => e.title == engine.title))
         return;
     }
 
@@ -4542,7 +4575,9 @@ var LinkTargetDisplay = {
   DELAY_HIDE: 250,
   _timer: 0,
 
-  get _isVisible () XULBrowserWindow.statusTextField.label != "",
+  get _isVisible () {
+    return XULBrowserWindow.statusTextField.label != "";
+  },
 
   update: function () {
     clearTimeout(this._timer);
@@ -4938,7 +4973,11 @@ nsBrowserAccess.prototype = {
   },
 
   isTabContentWindow: function (aWindow) {
-    return gBrowser.browsers.some(function (browser) browser.contentWindow == aWindow);
+    return gBrowser.browsers.some(browser => browser.contentWindow == aWindow);
+  },
+
+  canClose() {
+    return CanCloseWindow();
   },
 }
 
@@ -5172,8 +5211,9 @@ var TabsInTitlebar = {
   },
 
   _update: function (aForce=false) {
-    function $(id) document.getElementById(id);
-    function rect(ele) ele.getBoundingClientRect();
+    let $ = id => document.getElementById(id);
+    let rect = ele => ele.getBoundingClientRect();
+    let verticalMargins = cstyle => parseFloat(cstyle.marginBottom) + parseFloat(cstyle.marginTop);
 
     if (!this._initialized || window.fullScreen)
       return;
@@ -5219,8 +5259,6 @@ var TabsInTitlebar = {
       // We set the tabsintitlebar attribute first so that our CSS for
       // tabsintitlebar manifests before we do our measurements.
       document.documentElement.setAttribute("tabsintitlebar", "true");
-
-      function rect(ele)   ele.getBoundingClientRect();
 
 #ifdef MENUBAR_CAN_AUTOHIDE
       let appmenuButtonBox  = $("appmenu-button-container");
@@ -6351,6 +6389,26 @@ var IndexedDBPromptHelper = {
   }
 };
 
+function CanCloseWindow()
+{
+  // Avoid redundant calls to canClose from showing multiple
+  // PermitUnload dialogs.
+  if (window.skipNextCanClose) {
+    return true;
+  }
+
+  for (let browser of gBrowser.browsers) {
+    let {permitUnload, timedOut} = browser.permitUnload();
+    if (timedOut) {
+      return true;
+    }
+    if (!permitUnload) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function WindowIsClosing()
 {
   let event = document.createEvent("Events");
@@ -6361,17 +6419,19 @@ function WindowIsClosing()
   if (!closeWindow(false, warnAboutClosingWindow))
     return false;
 
-  // Bug 967873 - Proxy nsDocumentViewer::PermitUnload to the child process
-  if (gMultiProcessBrowser)
+  // In theory we should exit here and the Window's internal Close
+  // method should trigger canClose on nsBrowserAccess. However, by
+  // that point it's too late to be able to show a prompt for
+  // PermitUnload. So we do it here, when we still can.
+  if (CanCloseWindow()) {
+    // This flag ensures that the later canClose call does nothing.
+    // It's only needed to make tests pass, since they detect the
+    // prompt even when it's not actually shown.
+    window.skipNextCanClose = true;
     return true;
-
-  for (let browser of gBrowser.browsers) {
-    let ds = browser.docShell;
-    if (ds.contentViewer && !ds.contentViewer.permitUnload())
-      return false;
   }
 
-  return true;
+  return false;
 }
 
 /**
@@ -7192,12 +7252,19 @@ var gIdentityHandler = {
     let label = document.createElement("label");
     label.setAttribute("flex", "1");
     label.setAttribute("control", menulist.getAttribute("id"));
-    label.setAttribute("value", SitePermissions.getPermissionLabel(aPermission));
+    label.textContent = SitePermissions.getPermissionLabel(aPermission);
 
     let container = document.createElement("hbox");
     container.setAttribute("align", "center");
     container.appendChild(label);
     container.appendChild(menulist);
+
+    // The menuitem text can be long and we don't want the dropdown
+    // to expand to the width of unselected labels.
+    // Need to set this attribute after it's appended, otherwise it gets
+    // overridden with sizetopopup="pref".
+    menulist.setAttribute("sizetopopup", "none");
+
     return container;
   }
 };
@@ -7515,14 +7582,14 @@ var TabContextMenu = {
 };
 
 XPCOMUtils.defineLazyModuleGetter(this, "gDevTools",
-                                  "resource:///modules/devtools/client/framework/gDevTools.jsm");
+                                  "resource://devtools/client/framework/gDevTools.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "gDevToolsBrowser",
-                                  "resource:///modules/devtools/client/framework/gDevTools.jsm");
+                                  "resource://devtools/client/framework/gDevTools.jsm");
 
 Object.defineProperty(this, "HUDService", {
   get: function HUDService_getter() {
-    let devtools = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {}).devtools;
+    let devtools = Cu.import("resource://devtools/shared/Loader.jsm", {}).devtools;
     return devtools.require("devtools/client/webconsole/hudservice");
   },
   configurable: true,
@@ -7638,7 +7705,7 @@ var Scratchpad = {
 
 XPCOMUtils.defineLazyGetter(Scratchpad, "ScratchpadManager", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/scratchpad/scratchpad-manager.jsm", tmp);
+  Cu.import("resource://devtools/client/scratchpad/scratchpad-manager.jsm", tmp);
   return tmp.ScratchpadManager;
 });
 
@@ -7650,7 +7717,7 @@ var ResponsiveUI = {
 
 XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUIManager", function() {
   let tmp = {};
-  Cu.import("resource:///modules/devtools/client/responsivedesign/responsivedesign.jsm", tmp);
+  Cu.import("resource://devtools/client/responsivedesign/responsivedesign.jsm", tmp);
   return tmp.ResponsiveUIManager;
 });
 
@@ -7662,7 +7729,7 @@ function openEyedropper() {
 
 Object.defineProperty(this, "Eyedropper", {
   get: function() {
-    let devtools = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {}).devtools;
+    let devtools = Cu.import("resource://devtools/shared/Loader.jsm", {}).devtools;
     return devtools.require("devtools/client/eyedropper/eyedropper").Eyedropper;
   },
   configurable: true,
@@ -7679,7 +7746,7 @@ XPCOMUtils.defineLazyGetter(window, "gShowPageResizers", function () {
 });
 
 var MousePosTracker = {
-  _listeners: [],
+  _listeners: new Set(),
   _x: 0,
   _y: 0,
   get _windowUtils() {
@@ -7688,21 +7755,17 @@ var MousePosTracker = {
   },
 
   addListener: function (listener) {
-    if (this._listeners.indexOf(listener) >= 0)
+    if (this._listeners.has(listener))
       return;
 
     listener._hover = false;
-    this._listeners.push(listener);
+    this._listeners.add(listener);
 
     this._callListener(listener);
   },
 
   removeListener: function (listener) {
-    var index = this._listeners.indexOf(listener);
-    if (index < 0)
-      return;
-
-    this._listeners.splice(index, 1);
+    this._listeners.delete(listener);
   },
 
   handleEvent: function (event) {

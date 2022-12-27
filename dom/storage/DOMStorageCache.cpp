@@ -109,7 +109,7 @@ DOMStorageCache::Release(void)
     return;
   }
 
-  nsRefPtr<nsRunnableMethod<DOMStorageCacheBridge, void, false> > event =
+  RefPtr<nsRunnableMethod<DOMStorageCacheBridge, void, false> > event =
     NS_NewNonOwningRunnableMethod(static_cast<DOMStorageCacheBridge*>(this),
                                   &DOMStorageCacheBridge::Release);
 
@@ -254,7 +254,7 @@ class DOMStorageCacheHolder : public nsITimerCallback
     return NS_OK;
   }
 
-  nsRefPtr<DOMStorageCache> mCache;
+  RefPtr<DOMStorageCache> mCache;
 
 public:
   explicit DOMStorageCacheHolder(DOMStorageCache* aCache) : mCache(aCache) {}
@@ -275,7 +275,7 @@ DOMStorageCache::KeepAlive()
 
   if (!NS_IsMainThread()) {
     // Timer and the holder must be initialized on the main thread.
-    nsRefPtr<nsRunnableMethod<DOMStorageCache> > event =
+    RefPtr<nsRunnableMethod<DOMStorageCache> > event =
       NS_NewRunnableMethod(this, &DOMStorageCache::KeepAlive);
 
     NS_DispatchToMainThread(event);
@@ -287,7 +287,7 @@ DOMStorageCache::KeepAlive()
     return;
   }
 
-  nsRefPtr<DOMStorageCacheHolder> holder = new DOMStorageCacheHolder(this);
+  RefPtr<DOMStorageCacheHolder> holder = new DOMStorageCacheHolder(this);
   timer->InitWithCallback(holder, DOM_STORAGE_CACHE_KEEP_ALIVE_TIME_MS,
                           nsITimer::TYPE_ONE_SHOT);
 
@@ -465,6 +465,9 @@ nsresult
 DOMStorageCache::SetItem(const DOMStorage* aStorage, const nsAString& aKey,
                          const nsString& aValue, nsString& aOld)
 {
+  // Size of the cache that will change after this action.
+  int64_t delta = 0;
+
   if (Persist(aStorage)) {
     WaitForPreload(Telemetry::LOCALDOMSTORAGE_SETVALUE_BLOCKING_MS);
     if (NS_FAILED(mLoadResult)) {
@@ -475,11 +478,14 @@ DOMStorageCache::SetItem(const DOMStorage* aStorage, const nsAString& aKey,
   Data& data = DataSet(aStorage);
   if (!data.mKeys.Get(aKey, &aOld)) {
     SetDOMStringToNull(aOld);
+
+    // We only consider key size if the key doesn't exist before.
+    delta += static_cast<int64_t>(aKey.Length());
   }
 
-  // Check the quota first
-  const int64_t delta = static_cast<int64_t>(aValue.Length()) -
-                        static_cast<int64_t>(aOld.Length());
+  delta += static_cast<int64_t>(aValue.Length()) -
+           static_cast<int64_t>(aOld.Length());
+
   if (!ProcessUsageDelta(aStorage, delta)) {
     return NS_ERROR_DOM_QUOTA_REACHED;
   }
@@ -525,8 +531,9 @@ DOMStorageCache::RemoveItem(const DOMStorage* aStorage, const nsAString& aKey,
   }
 
   // Recalculate the cached data size
-  const int64_t delta = -(static_cast<int64_t>(aOld.Length()));
-  unused << ProcessUsageDelta(aStorage, delta);
+  const int64_t delta = -(static_cast<int64_t>(aOld.Length()) +
+                          static_cast<int64_t>(aKey.Length()));
+  Unused << ProcessUsageDelta(aStorage, delta);
   data.mKeys.Remove(aKey);
 
   if (Persist(aStorage)) {
@@ -565,7 +572,7 @@ DOMStorageCache::Clear(const DOMStorage* aStorage)
   bool hadData = !!data.mKeys.Count();
 
   if (hadData) {
-    unused << ProcessUsageDelta(aStorage, -data.mOriginQuotaUsage);
+    Unused << ProcessUsageDelta(aStorage, -data.mOriginQuotaUsage);
     data.mKeys.Clear();
   }
 
@@ -726,7 +733,7 @@ DOMStorageUsage::LoadUsage(const int64_t aUsage)
   // stored in the database we have just loaded usage for.
   if (!NS_IsMainThread()) {
     // In single process scenario we get this call from the DB thread
-    nsRefPtr<LoadUsageRunnable> r =
+    RefPtr<LoadUsageRunnable> r =
       new LoadUsageRunnable(mUsage + kDefaultSet, aUsage);
     NS_DispatchToMainThread(r);
   } else {
@@ -771,7 +778,7 @@ DOMStorageCache::StartDatabase()
 
     sDatabase = db.forget();
   } else {
-    nsRefPtr<DOMStorageDBChild> db = new DOMStorageDBChild(
+    RefPtr<DOMStorageDBChild> db = new DOMStorageDBChild(
         DOMLocalStorageManager::Self());
 
     nsresult rv = db->Init();

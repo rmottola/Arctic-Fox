@@ -6,9 +6,12 @@
 #include "WebGLShaderValidator.h"
 
 #include "angle/ShaderLang.h"
+#include "gfxPrefs.h"
 #include "GLContext.h"
+#include "mozilla/Preferences.h"
 #include "MurmurHash3.h"
 #include "nsPrintfCString.h"
+#include "nsTArray.h"
 #include <string>
 #include <vector>
 #include "WebGLContext.h"
@@ -32,11 +35,25 @@ ChooseValidatorCompileOptions(const ShBuiltInResources& resources,
 {
     int options = SH_VARIABLES |
                   SH_ENFORCE_PACKING_RESTRICTIONS |
+                  SH_INIT_VARYINGS_WITHOUT_STATIC_USE |
                   SH_OBJECT_CODE |
-                  SH_LIMIT_CALL_STACK_DEPTH;
+                  SH_LIMIT_CALL_STACK_DEPTH |
+                  SH_INIT_GL_POSITION;
 
     if (resources.MaxExpressionComplexity > 0) {
         options |= SH_LIMIT_EXPRESSION_COMPLEXITY;
+    }
+
+    if (gfxPrefs::WebGLAllANGLEOptions()) {
+        return options |
+               SH_VALIDATE_LOOP_INDEXING |
+               SH_UNROLL_FOR_LOOP_WITH_INTEGER_INDEX |
+               SH_UNROLL_FOR_LOOP_WITH_SAMPLER_ARRAY_INDEX |
+               SH_EMULATE_BUILT_IN_FUNCTIONS |
+               SH_CLAMP_INDIRECT_ARRAY_BOUNDS |
+               SH_UNFOLD_SHORT_CIRCUIT |
+               SH_SCALARIZE_VEC_AND_MAT_CONSTRUCTOR_ARGS |
+               SH_REGENERATE_STRUCT_NAMES;
     }
 
 #ifndef XP_MACOSX
@@ -82,7 +99,7 @@ WebGLContext::CreateShaderValidator(GLenum shaderType) const
     if (mBypassShaderValidation)
         return nullptr;
 
-    ShShaderSpec spec = SH_WEBGL_SPEC;
+    ShShaderSpec spec = IsWebGL2() ? SH_WEBGL2_SPEC : SH_WEBGL_SPEC;
     ShShaderOutput outputLanguage = gl->IsGLES() ? SH_ESSL_OUTPUT
                                                  : SH_GLSL_COMPATIBILITY_OUTPUT;
 
@@ -145,7 +162,7 @@ ShaderValidator::Create(GLenum shaderType, ShShaderSpec spec,
     if (!handle)
         return nullptr;
 
-    return new ShaderValidator(handle, compileOptions);
+    return new ShaderValidator(handle, compileOptions, resources.MaxVaryingVectors);
 }
 
 ShaderValidator::~ShaderValidator()
@@ -193,12 +210,23 @@ StartsWith(const std::string& haystack, const char (&needle)[N])
 bool
 ShaderValidator::CanLinkTo(const ShaderValidator* prev, nsCString* const out_log) const
 {
-    {
-        const std::vector<sh::Uniform>& vertList = *ShGetUniforms(prev->mHandle);
-        const std::vector<sh::Uniform>& fragList = *ShGetUniforms(mHandle);
+    if (!prev) {
+        nsPrintfCString error("Passed in NULL prev ShaderValidator.");
+        *out_log = error;
+        return false;
+    }
 
-        for (auto itrFrag = fragList.begin(); itrFrag != fragList.end(); ++itrFrag) {
-            for (auto itrVert = vertList.begin(); itrVert != vertList.end(); ++itrVert) {
+    {
+        const std::vector<sh::Uniform>* vertPtr = ShGetUniforms(prev->mHandle);
+        const std::vector<sh::Uniform>* fragPtr = ShGetUniforms(mHandle);
+        if (!vertPtr || !fragPtr) {
+            nsPrintfCString error("Could not create uniform list.");
+            *out_log = error;
+            return false;
+        }
+
+        for (auto itrFrag = fragPtr->begin(); itrFrag != fragPtr->end(); ++itrFrag) {
+            for (auto itrVert = vertPtr->begin(); itrVert != vertPtr->end(); ++itrVert) {
                 if (itrVert->name != itrFrag->name)
                     continue;
 
@@ -215,17 +243,32 @@ ShaderValidator::CanLinkTo(const ShaderValidator* prev, nsCString* const out_log
         }
     }
     {
-        const std::vector<sh::Varying>& vertList = *ShGetVaryings(prev->mHandle);
-        const std::vector<sh::Varying>& fragList = *ShGetVaryings(mHandle);
+        const std::vector<sh::Varying>* vertPtr = ShGetVaryings(prev->mHandle);
+        const std::vector<sh::Varying>* fragPtr = ShGetVaryings(mHandle);
+        if (!vertPtr || !fragPtr) {
+            nsPrintfCString error("Could not create varying list.");
+            *out_log = error;
+            return false;
+        }
 
-        for (auto itrFrag = fragList.begin(); itrFrag != fragList.end(); ++itrFrag) {
+        nsTArray<ShVariableInfo> staticUseVaryingList;
+
+        for (auto itrFrag = fragPtr->begin(); itrFrag != fragPtr->end(); ++itrFrag) {
+            const ShVariableInfo varInfo = { itrFrag->type,
+                                             (int)itrFrag->elementCount() };
+
             static const char prefix[] = "gl_";
-            if (StartsWith(itrFrag->name, prefix))
+            if (StartsWith(itrFrag->name, prefix)) {
+                if (itrFrag->staticUse)
+                    staticUseVaryingList.AppendElement(varInfo);
+
                 continue;
+            }
 
             bool definedInVertShader = false;
+            bool staticVertUse = false;
 
-            for (auto itrVert = vertList.begin(); itrVert != vertList.end(); ++itrVert) {
+            for (auto itrVert = vertPtr->begin(); itrVert != vertPtr->end(); ++itrVert) {
                 if (itrVert->name != itrFrag->name)
                     continue;
 
@@ -238,6 +281,7 @@ ShaderValidator::CanLinkTo(const ShaderValidator* prev, nsCString* const out_log
                 }
 
                 definedInVertShader = true;
+                staticVertUse = itrVert->staticUse;
                 break;
             }
 
@@ -248,6 +292,18 @@ ShaderValidator::CanLinkTo(const ShaderValidator* prev, nsCString* const out_log
                 *out_log = error;
                 return false;
             }
+
+            if (staticVertUse && itrFrag->staticUse)
+                staticUseVaryingList.AppendElement(varInfo);
+        }
+
+        if (!ShCheckVariablesWithinPackingLimits(mMaxVaryingVectors,
+                                                 staticUseVaryingList.Elements(),
+                                                 staticUseVaryingList.Length()))
+        {
+            *out_log = "Statically used varyings do not fit within packing limits. (see"
+                       " GLSL ES Specification 1.0.17, p111)";
+            return false;
         }
     }
 
@@ -311,6 +367,38 @@ ShaderValidator::FindAttribMappedNameByUserName(const std::string& userName,
     return false;
 }
 
+bool
+ShaderValidator::FindVaryingByMappedName(const std::string& mappedName,
+                                         std::string* const out_userName,
+                                         bool* const out_isArray) const
+{
+    const std::vector<sh::Varying>& varyings = *ShGetVaryings(mHandle);
+    for (auto itr = varyings.begin(); itr != varyings.end(); ++itr) {
+        const sh::ShaderVariable* found;
+        if (!itr->findInfoByMappedName(mappedName, &found, out_userName))
+            continue;
+
+        *out_isArray = found->isArray();
+        return true;
+    }
+
+    return false;
+}
+
+bool
+ShaderValidator::FindVaryingMappedNameByUserName(const std::string& userName,
+                                                 const std::string** const out_mappedName) const
+{
+    const std::vector<sh::Varying>& attribs = *ShGetVaryings(mHandle);
+    for (auto itr = attribs.begin(); itr != attribs.end(); ++itr) {
+        if (itr->name == userName) {
+            *out_mappedName = &(itr->mappedName);
+            return true;
+        }
+    }
+
+    return false;
+}
 // This must handle names like "foo.bar[0]".
 bool
 ShaderValidator::FindUniformByMappedName(const std::string& mappedName,
@@ -325,6 +413,34 @@ ShaderValidator::FindUniformByMappedName(const std::string& mappedName,
 
         *out_isArray = found->isArray();
         return true;
+    }
+
+    const std::vector<sh::InterfaceBlock>& interfaces = *ShGetInterfaceBlocks(mHandle);
+    for (const auto& interface : interfaces) {
+        for (const auto& field : interface.fields) {
+            const sh::ShaderVariable* found;
+
+            if (!field.findInfoByMappedName(mappedName, &found, out_userName))
+                continue;
+
+            *out_isArray = found->isArray();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+ShaderValidator::FindUniformBlockByMappedName(const std::string& mappedName,
+                                              std::string* const out_userName) const
+{
+    const std::vector<sh::InterfaceBlock>& interfaces = *ShGetInterfaceBlocks(mHandle);
+    for (const auto& interface : interfaces) {
+        if (mappedName == interface.mappedName) {
+            *out_userName = interface.name;
+            return true;
+        }
     }
 
     return false;

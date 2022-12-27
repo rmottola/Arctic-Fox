@@ -30,7 +30,7 @@ var StarUI = {
   get _blockedCommands() {
     delete this._blockedCommands;
     return this._blockedCommands =
-      ["cmd_close", "cmd_closeWindow"].map(function (id) this._element(id), this);
+      ["cmd_close", "cmd_closeWindow"].map(id => this._element(id));
   },
 
   _blockCommands: function SU__blockCommands() {
@@ -1048,7 +1048,7 @@ var PlacesToolbarHelper = {
     return document.getElementById("PlacesToolbar");
   },
 
-  init: function PTH_init() {
+  init: function PTH_init(forceToolbarOverflowCheck) {
     let viewElt = this._viewElt;
     if (!viewElt || viewElt._placesView)
       return;
@@ -1064,6 +1064,14 @@ var PlacesToolbarHelper = {
       return;
 
     new PlacesToolbar(this._place);
+    if (forceToolbarOverflowCheck) {
+      viewElt._placesView.updateOverflowStatus();
+    }
+    this._shouldWrap = false;
+  },
+
+  uninit: function PTH_uninit() {
+
   },
 
   customizeStart: function PTH_customizeStart() {
@@ -1335,7 +1343,7 @@ var BookmarkingUI = {
       // calls back.  For such an edge case, retain all unique entries from both
       // arrays.
       this._itemIds = this._itemIds.filter(
-        function (id) aItemIds.indexOf(id) == -1
+        id => aItemIds.indexOf(id) == -1
       ).concat(aItemIds);
 
       this._updateStar();

@@ -38,7 +38,7 @@ class AnalyserNodeEngine final : public AudioNodeEngine
 
     NS_IMETHOD Run()
     {
-      nsRefPtr<AnalyserNode> node =
+      RefPtr<AnalyserNode> node =
         static_cast<AnalyserNode*>(mStream->Engine()->NodeMainThread());
       if (node) {
         node->AppendChunk(mChunk);
@@ -47,7 +47,7 @@ class AnalyserNodeEngine final : public AudioNodeEngine
     }
 
   private:
-    nsRefPtr<AudioNodeStream> mStream;
+    RefPtr<AudioNodeStream> mStream;
     AudioChunk mChunk;
   };
 
@@ -59,20 +59,46 @@ public:
   }
 
   virtual void ProcessBlock(AudioNodeStream* aStream,
-                            const AudioChunk& aInput,
-                            AudioChunk* aOutput,
+                            GraphTime aFrom,
+                            const AudioBlock& aInput,
+                            AudioBlock* aOutput,
                             bool* aFinished) override
   {
     *aOutput = aInput;
 
-    nsRefPtr<TransferBuffer> transfer = new TransferBuffer(aStream, aInput);
+    if (aInput.IsNull()) {
+      // If AnalyserNode::mChunks has only null chunks, then there is no need
+      // to send further null chunks.
+      if (mChunksToProcess <= 0) {
+        if (mChunksToProcess != INT32_MIN) {
+          mChunksToProcess = INT32_MIN;
+          aStream->ScheduleCheckForInactive();
+        }
+        return;
+      }
+
+      --mChunksToProcess;
+    } else {
+      // This many null chunks will be required to empty AnalyserNode::mChunks.
+      mChunksToProcess = CHUNK_COUNT;
+    }
+
+    RefPtr<TransferBuffer> transfer =
+      new TransferBuffer(aStream, aInput.AsAudioChunk());
     NS_DispatchToMainThread(transfer);
+  }
+
+  virtual bool IsActive() const override
+  {
+    return mChunksToProcess != INT32_MIN;
   }
 
   virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
   {
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
+
+  int32_t mChunksToProcess = INT32_MIN;
 };
 
 AnalyserNode::AnalyserNode(AudioContext* aContext)
@@ -85,14 +111,14 @@ AnalyserNode::AnalyserNode(AudioContext* aContext)
   , mMaxDecibels(-30.)
   , mSmoothingTimeConstant(.8)
 {
-  mStream = AudioNodeStream::Create(aContext->Graph(),
+  mStream = AudioNodeStream::Create(aContext,
                                     new AnalyserNodeEngine(this),
                                     AudioNodeStream::NO_STREAM_FLAGS);
 
   // Enough chunks must be recorded to handle the case of fftSize being
   // increased to maximum immediately before getFloatTimeDomainData() is
   // called, for example.
-  unused << mChunks.SetLength(CHUNK_COUNT, fallible);
+  Unused << mChunks.SetLength(CHUNK_COUNT, fallible);
 
   AllocateBuffer();
 }
@@ -329,7 +355,7 @@ AnalyserNode::GetTimeDomainData(float* aData, size_t aLength)
 
   for (size_t writeIndex = 0; writeIndex < aLength; ) {
     const AudioChunk& chunk = mChunks[readChunk & (CHUNK_COUNT - 1)];
-    const size_t channelCount = chunk.mChannelData.Length();
+    const size_t channelCount = chunk.ChannelCount();
     size_t copyLength =
       std::min<size_t>(aLength - writeIndex, WEBAUDIO_BLOCK_SIZE);
     float* dataOut = &aData[writeIndex];

@@ -1254,6 +1254,8 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
     NS_LogInit();
 
+    mozilla::LogModule::Init();
+
     // A initializer to initialize histogram collection
     // used by telemetry.
     UniquePtr<base::StatisticsRecorder> telStats =
@@ -1465,7 +1467,7 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
         xpc->SetFunctionThisTranslator(NS_GET_IID(nsITestXPCFunctionCallback), translator);
 #endif
 
-        nsRefPtr<BackstagePass> backstagePass;
+        RefPtr<BackstagePass> backstagePass;
         rv = NS_NewBackstagePass(getter_AddRefs(backstagePass));
         if (NS_FAILED(rv)) {
             fprintf(gErrFile, "+++ Failed to create BackstagePass: %8x\n",

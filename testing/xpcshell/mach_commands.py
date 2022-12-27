@@ -78,8 +78,9 @@ class XPCShellRunner(MozbuildObject):
         if build_path not in sys.path:
             sys.path.append(build_path)
 
-        if not os.path.isfile(os.path.join(self.topsrcdir, 'build', 'automationutils.py')):
-            sys.path.append(os.path.join(self.topsrcdir, 'mozilla', 'build'))
+        src_build_path = os.path.join(self.topsrcdir, 'mozilla', 'build')
+        if os.path.isdir(src_build_path):
+            sys.path.append(src_build_path)
 
         if test_paths == 'all':
             self.run_suite(interactive=interactive,
@@ -172,6 +173,7 @@ class XPCShellRunner(MozbuildObject):
             'jsDebugger': jsDebugger,
             'jsDebuggerPort': jsDebuggerPort,
             'test_tags': test_tags,
+            'utility_path': self.bindir,
         }
 
         if test_path is not None:
@@ -475,6 +477,8 @@ class MachCommands(MachCommandBase):
                                                              {"verbose": True})
 
         if conditions.is_android(self):
+            from mozrunner.devices.android_device import verify_android_device
+            verify_android_device(self)
             xpcshell = self._spawn(AndroidXPCShellRunner)
         elif conditions.is_b2g(self):
             xpcshell = self._spawn(B2GXPCShellRunner)

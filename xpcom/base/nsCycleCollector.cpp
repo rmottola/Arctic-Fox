@@ -1256,9 +1256,11 @@ class JSPurpleBuffer;
 
 class nsCycleCollector : public nsIMemoryReporter
 {
+public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIMEMORYREPORTER
 
+private:
   bool mActivelyCollecting;
   bool mFreeingSnowWhite;
   // mScanInProgress should be false when we're collecting white objects.
@@ -1271,7 +1273,7 @@ class nsCycleCollector : public nsIMemoryReporter
   ccPhase mIncrementalPhase;
   CCGraph mGraph;
   nsAutoPtr<CCGraphBuilder> mBuilder;
-  nsRefPtr<nsCycleCollectorLogger> mLogger;
+  RefPtr<nsCycleCollectorLogger> mLogger;
 
   DebugOnly<void*> mThread;
 
@@ -1287,7 +1289,7 @@ class nsCycleCollector : public nsIMemoryReporter
   uint32_t mUnmergedNeeded;
   uint32_t mMergedInARow;
 
-  nsRefPtr<JSPurpleBuffer> mJSPurpleBuffer;
+  RefPtr<JSPurpleBuffer> mJSPurpleBuffer;
 
 private:
   virtual ~nsCycleCollector();
@@ -1327,6 +1329,8 @@ public:
                nsICycleCollectorListener* aManualListener,
                bool aPreferShorterSlices = false);
   void Shutdown();
+
+  bool IsIdle() const { return mIncrementalPhase == IdlePhase; }
 
   void SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf,
                            size_t* aObjectSize,
@@ -1401,7 +1405,7 @@ public:
 
 struct CollectorData
 {
-  nsRefPtr<nsCycleCollector> mCollector;
+  RefPtr<nsCycleCollector> mCollector;
   CycleCollectedJSRuntime* mRuntime;
 };
 
@@ -1973,7 +1977,7 @@ public:
   }
   NS_IMETHOD AsLogger(nsCycleCollectorLogger** aRetVal) override
   {
-    nsRefPtr<nsCycleCollectorLogger> rval = this;
+    RefPtr<nsCycleCollectorLogger> rval = this;
     rval.forget(aRetVal);
     return NS_OK;
   }
@@ -2041,7 +2045,7 @@ private:
   nsCycleCollectionParticipant* mJSParticipant;
   nsCycleCollectionParticipant* mJSZoneParticipant;
   nsCString mNextEdgeName;
-  nsRefPtr<nsCycleCollectorLogger> mLogger;
+  RefPtr<nsCycleCollectorLogger> mLogger;
   bool mMergeZones;
   nsAutoPtr<NodePool::Enumerator> mCurrNode;
 
@@ -2560,7 +2564,7 @@ class JSPurpleBuffer
   }
 
 public:
-  explicit JSPurpleBuffer(nsRefPtr<JSPurpleBuffer>& aReferenceToThis)
+  explicit JSPurpleBuffer(RefPtr<JSPurpleBuffer>& aReferenceToThis)
     : mReferenceToThis(aReferenceToThis)
     , mValues(kSegmentSize)
     , mObjects(kSegmentSize)
@@ -2580,7 +2584,7 @@ public:
   NS_INLINE_DECL_CYCLE_COLLECTING_NATIVE_REFCOUNTING(JSPurpleBuffer)
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_NATIVE_CLASS(JSPurpleBuffer)
 
-  nsRefPtr<JSPurpleBuffer>& mReferenceToThis;
+  RefPtr<JSPurpleBuffer>& mReferenceToThis;
 
   // These are raw pointers instead of Heap<T> because we only need Heap<T> for
   // pointers which may point into the nursery. The purple buffer never contains
@@ -2722,7 +2726,7 @@ public:
   }
 
 private:
-  nsRefPtr<nsCycleCollector> mCollector;
+  RefPtr<nsCycleCollector> mCollector;
   ObjectsVector mObjects;
 };
 
@@ -2833,7 +2837,7 @@ nsCycleCollector::ForgetSkippable(bool aRemoveChildlessNodes,
 
   // If we remove things from the purple buffer during graph building, we may
   // lose track of an object that was mutated during graph building.
-  MOZ_ASSERT(mIncrementalPhase == IdlePhase);
+  MOZ_ASSERT(IsIdle());
 
   if (mJSRuntime) {
     mJSRuntime->PrepareForForgetSkippable();
@@ -2991,7 +2995,7 @@ public:
 
 private:
   CCGraph& mGraph;
-  nsRefPtr<nsCycleCollectorLogger> mLogger;
+  RefPtr<nsCycleCollectorLogger> mLogger;
   uint32_t& mCount;
   bool& mFailed;
 };
@@ -3583,7 +3587,7 @@ nsCycleCollector::Collect(ccType aCCType,
     marker.emplace("nsCycleCollector::Collect");
   }
 
-  bool startedIdle = (mIncrementalPhase == IdlePhase);
+  bool startedIdle = IsIdle();
   bool collectedAny = false;
 
   // If the CC started idle, it will call BeginCollection, which
@@ -3651,13 +3655,13 @@ nsCycleCollector::Collect(ccType aCCType,
     // We were in the middle of an incremental CC (using its own listener).
     // Somebody has forced a CC, so after having finished out the current CC,
     // run the CC again using the new listener.
-    MOZ_ASSERT(mIncrementalPhase == IdlePhase);
+    MOZ_ASSERT(IsIdle());
     if (Collect(aCCType, aBudget, aManualListener)) {
       collectedAny = true;
     }
   }
 
-  MOZ_ASSERT_IF(aCCType != SliceCC, mIncrementalPhase == IdlePhase);
+  MOZ_ASSERT_IF(aCCType != SliceCC, IsIdle());
 
   return collectedAny;
 }
@@ -3669,7 +3673,7 @@ nsCycleCollector::Collect(ccType aCCType,
 void
 nsCycleCollector::PrepareForGarbageCollection()
 {
-  if (mIncrementalPhase == IdlePhase) {
+  if (IsIdle()) {
     MOZ_ASSERT(mGraph.IsEmpty(), "Non-empty graph when idle");
     MOZ_ASSERT(!mBuilder, "Non-null builder when idle");
     if (mJSPurpleBuffer) {
@@ -3684,7 +3688,7 @@ nsCycleCollector::PrepareForGarbageCollection()
 void
 nsCycleCollector::FinishAnyCurrentCollection()
 {
-  if (mIncrementalPhase == IdlePhase) {
+  if (IsIdle()) {
     return;
   }
 
@@ -3697,7 +3701,7 @@ nsCycleCollector::FinishAnyCurrentCollection()
   // current CC if we're reentering the CC at some point past
   // graph building. We need to be past the point where the CC will
   // look at JS objects so that it is safe to GC.
-  MOZ_ASSERT(mIncrementalPhase == IdlePhase ||
+  MOZ_ASSERT(IsIdle() ||
              (mActivelyCollecting && mIncrementalPhase != GraphBuildingPhase),
              "Reentered CC during graph building");
 }
@@ -3742,7 +3746,7 @@ nsCycleCollector::BeginCollection(ccType aCCType,
                                   nsICycleCollectorListener* aManualListener)
 {
   TimeLog timeLog;
-  MOZ_ASSERT(mIncrementalPhase == IdlePhase);
+  MOZ_ASSERT(IsIdle());
 
   mCollectionStart = TimeStamp::Now();
 
@@ -3834,7 +3838,7 @@ nsCycleCollector::Shutdown()
   // Always delete snow white objects.
   FreeSnowWhite(true);
 
-#ifndef DEBUG
+#ifndef NS_FREE_PERMANENT_DATA
   if (PR_GetEnv("MOZ_CC_RUN_DURING_SHUTDOWN"))
 #endif
   {
@@ -3845,7 +3849,7 @@ nsCycleCollector::Shutdown()
 void
 nsCycleCollector::RemoveObjectFromGraph(void* aObj)
 {
-  if (mIncrementalPhase == IdlePhase) {
+  if (IsIdle()) {
     return;
   }
 
@@ -3878,7 +3882,7 @@ nsCycleCollector::GetJSPurpleBuffer()
     // JSPurpleBuffer keeps itself alive, but we need to create it in such way
     // that it ends up in the normal purple buffer. That happens when
     // nsRefPtr goes out of the scope and calls Release.
-    nsRefPtr<JSPurpleBuffer> pb = new JSPurpleBuffer(mJSPurpleBuffer);
+    RefPtr<JSPurpleBuffer> pb = new JSPurpleBuffer(mJSPurpleBuffer);
   }
   return mJSPurpleBuffer;
 }

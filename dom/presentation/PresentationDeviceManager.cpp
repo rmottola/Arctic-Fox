@@ -21,7 +21,6 @@ namespace dom {
 NS_IMPL_ISUPPORTS(PresentationDeviceManager,
                   nsIPresentationDeviceManager,
                   nsIPresentationDeviceListener,
-                  nsIPresentationDeviceEventListener,
                   nsIObserver,
                   nsISupportsWeakReference)
 
@@ -153,6 +152,11 @@ PresentationDeviceManager::GetAvailableDevices(nsIArray** aRetVal)
   NS_ENSURE_ARG_POINTER(aRetVal);
   MOZ_ASSERT(NS_IsMainThread());
 
+  // Bug 1194049: some providers may discontinue discovery after timeout.
+  // Call |ForceDiscovery()| here to make sure device lists are updated.
+  NS_DispatchToMainThread(
+      NS_NewRunnableMethod(this, &PresentationDeviceManager::ForceDiscovery));
+
   nsCOMPtr<nsIMutableArray> devices = do_CreateInstance(NS_ARRAY_CONTRACTID);
   for (uint32_t i = 0; i < mDevices.Length(); ++i) {
     devices->AppendElement(mDevices[i], false);
@@ -175,7 +179,6 @@ PresentationDeviceManager::AddDevice(nsIPresentationDevice* aDevice)
   }
 
   mDevices.AppendElement(aDevice);
-  aDevice->SetListener(this);
 
   NotifyDeviceChange(aDevice, MOZ_UTF16("add"));
 
@@ -193,7 +196,6 @@ PresentationDeviceManager::RemoveDevice(nsIPresentationDevice* aDevice)
     return NS_ERROR_FAILURE;
   }
 
-  mDevices[index]->SetListener(nullptr);
   mDevices.RemoveElementAt(index);
 
   NotifyDeviceChange(aDevice, MOZ_UTF16("remove"));
@@ -216,7 +218,6 @@ PresentationDeviceManager::UpdateDevice(nsIPresentationDevice* aDevice)
   return NS_OK;
 }
 
-// nsIPresentationDeviceListener
 NS_IMETHODIMP
 PresentationDeviceManager::OnSessionRequest(nsIPresentationDevice* aDevice,
                                             const nsAString& aUrl,
@@ -229,7 +230,7 @@ PresentationDeviceManager::OnSessionRequest(nsIPresentationDevice* aDevice,
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   NS_ENSURE_TRUE(obs, NS_ERROR_FAILURE);
 
-  nsRefPtr<PresentationSessionRequest> request =
+  RefPtr<PresentationSessionRequest> request =
     new PresentationSessionRequest(aDevice, aUrl, aPresentationId, aControlChannel);
   obs->NotifyObservers(request,
                        PRESENTATION_SESSION_REQUEST_TOPIC,

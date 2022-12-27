@@ -105,6 +105,7 @@ let TESTS = [{
     content.console.timeStamp(undefined);
   },
   check: function (markers) {
+    markers = markers.filter(e => e.name != "Worker");
     is(markers.length, 4, "Got 4 markers");
     is(markers[0].name, "TimeStamp", "Got Timestamp marker");
     is(markers[0].causeName, "paper", "Got Timestamp label value");

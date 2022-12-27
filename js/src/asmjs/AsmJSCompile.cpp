@@ -115,51 +115,6 @@ class ModuleCompiler
 
     /***************************************************** Mutable interface */
 
-    bool getOrCreateFunctionEntry(uint32_t funcIndex, Label** label)
-    {
-        return compileResults_->getOrCreateFunctionEntry(funcIndex, label);
-    }
-
-    bool finishGeneratingFunction(AsmFunction& func, CodeGenerator& codegen,
-                                  const AsmJSFunctionLabels& labels)
-    {
-        // If we have hit OOM then invariants which we assert below may not
-        // hold, so abort now.
-        if (masm().oom())
-            return false;
-
-        // Code range
-        unsigned line = func.lineno();
-        unsigned column = func.column();
-        PropertyName* funcName = func.name();
-        if (!compileResults_->addCodeRange(AsmJSModule::FunctionCodeRange(funcName, line, labels)))
-            return false;
-
-        // Script counts
-        jit::IonScriptCounts* counts = codegen.extractScriptCounts();
-        if (counts && !compileResults_->addFunctionCounts(counts)) {
-            js_delete(counts);
-            return false;
-        }
-
-        // Slow functions
-        if (func.compileTime() >= 250) {
-            ModuleCompileResults::SlowFunction sf(funcName, func.compileTime(), line, column);
-            if (!compileResults_->slowFunctions().append(Move(sf)))
-                return false;
-        }
-
-#if defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-        // Perf and profiling information
-        unsigned begin = labels.begin.offset();
-        unsigned end = labels.end.offset();
-        AsmJSModule::ProfiledFunction profiledFunc(funcName, begin, end, line, column);
-        if (!compileResults_->addProfiledFunction(profiledFunc))
-            return false;
-#endif // defined(MOZ_VTUNE) || defined(JS_ION_PERF)
-        return true;
-    }
-
     void finish(ScopedJSDeletePtr<ModuleCompileResults>* results) {
         *results = compileResults_.forget();
     }
@@ -191,7 +146,6 @@ class FunctionCompiler
 
     ModuleCompiler &         m_;
     LifoAlloc &              lifo_;
-    RetType                  retType_;
 
     const AsmFunction &      func_;
     size_t                   pc_;
@@ -217,7 +171,6 @@ class FunctionCompiler
     FunctionCompiler(ModuleCompiler& m, const AsmFunction& func, LifoAlloc& lifo)
       : m_(m),
         lifo_(lifo),
-        retType_(func.returnedType()),
         func_(func),
         pc_(0),
         alloc_(nullptr),
@@ -227,10 +180,10 @@ class FunctionCompiler
         curBlock_(nullptr)
     {}
 
-    ModuleCompiler &        m() const            { return m_; }
-    TempAllocator &         alloc() const        { return *alloc_; }
-    LifoAlloc &             lifo() const         { return lifo_; }
-    RetType                 returnedType() const { return retType_; }
+    ModuleCompiler & m() const            { return m_; }
+    TempAllocator &  alloc() const        { return *alloc_; }
+    LifoAlloc &      lifo() const         { return lifo_; }
+    RetType          returnedType() const { return func_.returnedType(); }
 
     bool init()
     {
@@ -803,7 +756,7 @@ class FunctionCompiler
             return true;
         }
 
-        CallSiteDesc::Kind kind = CallSiteDesc::Kind(-1);  // initialize to silence GCC warning
+        CallSiteDesc::Kind kind = CallSiteDesc::Kind(-1);
         switch (callee.which()) {
           case MAsmJSCall::Callee::Internal: kind = CallSiteDesc::Relative; break;
           case MAsmJSCall::Callee::Dynamic:  kind = CallSiteDesc::Register; break;
@@ -821,10 +774,10 @@ class FunctionCompiler
     }
 
   public:
-    bool internalCall(const Signature& sig, Label* entry, const Call& call, MDefinition** def)
+    bool internalCall(const Signature& sig, uint32_t funcIndex, const Call& call, MDefinition** def)
     {
         MIRType returnType = sig.retType().toMIRType();
-        return callPrivate(MAsmJSCall::Callee(entry), call, returnType, def);
+        return callPrivate(MAsmJSCall::Callee(AsmJSInternalCallee(funcIndex)), call, returnType, def);
     }
 
     bool funcPtrCall(const Signature& sig, uint32_t maskLit, uint32_t globalDataOffset, MDefinition* index,
@@ -1038,6 +991,61 @@ class FunctionCompiler
         return pos;
     }
 
+    void fixupRedundantPhis(MBasicBlock* b)
+    {
+        for (size_t i = 0, depth = b->stackDepth(); i < depth; i++) {
+            MDefinition* def = b->getSlot(i);
+            if (def->isUnused())
+                b->setSlot(i, def->toPhi()->getOperand(0));
+        }
+    }
+    template <typename T>
+    void fixupRedundantPhis(MBasicBlock* loopEntry, T& map)
+    {
+        if (!map.initialized())
+            return;
+        for (typename T::Enum e(map); !e.empty(); e.popFront()) {
+            BlockVector& blocks = e.front().value();
+            for (size_t i = 0; i < blocks.length(); i++) {
+                if (blocks[i]->loopDepth() >= loopEntry->loopDepth())
+                    fixupRedundantPhis(blocks[i]);
+            }
+        }
+    }
+    bool setLoopBackedge(MBasicBlock* loopEntry, MBasicBlock* backedge, MBasicBlock* afterLoop)
+    {
+        if (!loopEntry->setBackedgeAsmJS(backedge))
+            return false;
+
+        // Flag all redundant phis as unused.
+        for (MPhiIterator phi = loopEntry->phisBegin(); phi != loopEntry->phisEnd(); phi++) {
+            MOZ_ASSERT(phi->numOperands() == 2);
+            if (phi->getOperand(0) == phi->getOperand(1))
+                phi->setUnused();
+        }
+
+        // Fix up phis stored in the slots Vector of pending blocks.
+        if (afterLoop)
+            fixupRedundantPhis(afterLoop);
+        fixupRedundantPhis(loopEntry, labeledContinues_);
+        fixupRedundantPhis(loopEntry, labeledBreaks_);
+        fixupRedundantPhis(loopEntry, unlabeledContinues_);
+        fixupRedundantPhis(loopEntry, unlabeledBreaks_);
+
+        // Discard redundant phis and add to the free list.
+        for (MPhiIterator phi = loopEntry->phisBegin(); phi != loopEntry->phisEnd(); ) {
+            MPhi* entryDef = *phi++;
+            if (!entryDef->isUnused())
+                continue;
+
+            entryDef->justReplaceAllUsesWith(entryDef->getOperand(0));
+            loopEntry->discardPhi(entryDef);
+            mirGraph().addPhiToFreeList(entryDef);
+        }
+
+        return true;
+    }
+
   public:
     bool closeLoop(MBasicBlock* loopEntry, MBasicBlock* afterLoop)
     {
@@ -1053,7 +1061,7 @@ class FunctionCompiler
         if (curBlock_) {
             MOZ_ASSERT(curBlock_->loopDepth() == loopStack_.length() + 1);
             curBlock_->end(MGoto::New(alloc(), loopEntry));
-            if (!loopEntry->setBackedgeAsmJS(curBlock_))
+            if (!setLoopBackedge(loopEntry, curBlock_, afterLoop))
                 return false;
         }
         curBlock_ = afterLoop;
@@ -1076,7 +1084,7 @@ class FunctionCompiler
             if (cond->isConstant()) {
                 if (cond->toConstant()->valueToBoolean()) {
                     curBlock_->end(MGoto::New(alloc(), loopEntry));
-                    if (!loopEntry->setBackedgeAsmJS(curBlock_))
+                    if (!setLoopBackedge(loopEntry, curBlock_, nullptr))
                         return false;
                     curBlock_ = nullptr;
                 } else {
@@ -1091,7 +1099,7 @@ class FunctionCompiler
                 if (!newBlock(curBlock_, &afterLoop))
                     return false;
                 curBlock_->end(MTest::New(alloc(), cond, loopEntry, afterLoop));
-                if (!loopEntry->setBackedgeAsmJS(curBlock_))
+                if (!setLoopBackedge(loopEntry, curBlock_, afterLoop))
                     return false;
                 curBlock_ = afterLoop;
             }
@@ -1696,13 +1704,7 @@ static bool
 EmitInternalCall(FunctionCompiler& f, RetType retType, MDefinition** def)
 {
     uint32_t funcIndex = f.readU32();
-
-    Label* entry;
-    if (!f.m().getOrCreateFunctionEntry(funcIndex, &entry))
-        return false;
-
     const Signature& sig = *f.readSignature();
-
     MOZ_ASSERT_IF(sig.retType() != RetType::Void, sig.retType() == retType);
 
     uint32_t lineno, column;
@@ -1712,7 +1714,7 @@ EmitInternalCall(FunctionCompiler& f, RetType retType, MDefinition** def)
     if (!EmitCallArgs(f, sig, &call))
         return false;
 
-    return f.internalCall(sig, entry, call, def);
+    return f.internalCall(sig, funcIndex, call, def);
 }
 
 static bool
@@ -3123,7 +3125,8 @@ js::GenerateAsmFunctionMIR(ModuleCompiler& m, LifoAlloc& lifo, AsmFunction& func
 }
 
 bool
-js::GenerateAsmFunctionCode(ModuleCompiler& m, AsmFunction& func, MIRGenerator& mir, LIRGraph& lir)
+js::GenerateAsmFunctionCode(ModuleCompiler& m, AsmFunction& func, MIRGenerator& mir, LIRGraph& lir,
+                            FunctionCompileResults* results)
 {
     JitContext jitContext(m.runtime(), /* CompileCompartment = */ nullptr, &mir.alloc());
 
@@ -3140,18 +3143,19 @@ js::GenerateAsmFunctionCode(ModuleCompiler& m, AsmFunction& func, MIRGenerator& 
     if (!codegen)
         return false;
 
-    Label* funcEntry;
-    if (!m.getOrCreateFunctionEntry(func.funcIndex(), &funcEntry))
-        return false;
-
-    AsmJSFunctionLabels labels(*funcEntry, m.stackOverflowLabel());
+    Label entry;
+    AsmJSFunctionLabels labels(entry, m.stackOverflowLabel());
     if (!codegen->generateAsmJS(&labels))
         return false;
 
     func.accumulateCompileTime((PRMJ_Now() - before) / PRMJ_USEC_PER_MSEC);
 
-    if (!m.finishGeneratingFunction(func, *codegen, labels))
-        return false;
+    PropertyName* funcName = func.name();
+    unsigned line = func.lineno();
+
+    // Fill in the results of the function's compilation
+    AsmJSModule::FunctionCodeRange codeRange(funcName, line, labels);
+    results->finishCodegen(func, codeRange, *codegen->extractScriptCounts());
 
     // Unlike regular IonMonkey, which links and generates a new JitCode for
     // every function, we accumulate all the functions in the module in a

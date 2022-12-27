@@ -53,9 +53,14 @@ private:
   virtual bool RecvShutdown() override;
   virtual bool Recv__delete__() override;
 
+  void UnblockResetAndDrain();
+
   bool mIsOpen;
   bool mShuttingDown;
-  nsRefPtr<GMPContentParent> mPlugin;
+  bool mActorDestroyed;
+  bool mIsAwaitingResetComplete;
+  bool mIsAwaitingDrainComplete;
+  RefPtr<GMPContentParent> mPlugin;
   GMPAudioDecoderCallbackProxy* mCallback;
 };
 

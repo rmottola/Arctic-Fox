@@ -8,6 +8,7 @@
 #include "mozilla/dom/MediaStreamAudioSourceNodeBinding.h"
 #include "AudioNodeEngine.h"
 #include "AudioNodeExternalInputStream.h"
+#include "AudioStreamTrack.h"
 #include "nsIDocument.h"
 #include "mozilla/CORSMode.h"
 
@@ -42,7 +43,7 @@ MediaStreamAudioSourceNode::MediaStreamAudioSourceNode(AudioContext* aContext)
 MediaStreamAudioSourceNode::Create(AudioContext* aContext,
                                    DOMMediaStream* aStream, ErrorResult& aRv)
 {
-  nsRefPtr<MediaStreamAudioSourceNode> node =
+  RefPtr<MediaStreamAudioSourceNode> node =
     new MediaStreamAudioSourceNode(aContext);
 
   node->Init(aStream, aRv);
@@ -57,7 +58,7 @@ void
 MediaStreamAudioSourceNode::Init(DOMMediaStream* aMediaStream, ErrorResult& aRv)
 {
   MOZ_ASSERT(aMediaStream);
-  MediaStream* inputStream = aMediaStream->GetStream();
+  MediaStream* inputStream = aMediaStream->GetPlaybackStream();
   MediaStreamGraph* graph = Context()->Graph();
   if (NS_WARN_IF(graph != inputStream->Graph())) {
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
@@ -68,8 +69,7 @@ MediaStreamAudioSourceNode::Init(DOMMediaStream* aMediaStream, ErrorResult& aRv)
   AudioNodeEngine* engine = new MediaStreamAudioSourceNodeEngine(this);
   mStream = AudioNodeExternalInputStream::Create(graph, engine);
   ProcessedMediaStream* outputStream = static_cast<ProcessedMediaStream*>(mStream.get());
-  mInputPort = outputStream->AllocateInputPort(inputStream,
-                                               MediaInputPort::FLAG_BLOCK_INPUT);
+  mInputPort = outputStream->AllocateInputPort(aMediaStream->GetPlaybackStream());
   mInputStream->AddConsumerToKeepAlive(static_cast<nsIDOMEventTarget*>(this));
 
   PrincipalChanged(mInputStream); // trigger enabling/disabling of the connector

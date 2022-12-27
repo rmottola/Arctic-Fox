@@ -10,7 +10,6 @@
 #include "AndroidMediaPluginHost.h"
 #include "nsXPCOMStrings.h"
 #include "nsISeekableStream.h"
-#include "AndroidMediaReader.h"
 #include "nsIGfxInfo.h"
 #include "prmem.h"
 #include "prlink.h"

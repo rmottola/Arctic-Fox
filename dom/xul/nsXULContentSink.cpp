@@ -110,7 +110,7 @@ XULContentSinkImpl::ContextStack::Pop(State* aState)
 
 
 nsresult
-XULContentSinkImpl::ContextStack::GetTopNode(nsRefPtr<nsXULPrototypeNode>& aNode)
+XULContentSinkImpl::ContextStack::GetTopNode(RefPtr<nsXULPrototypeNode>& aNode)
 {
     if (mDepth == 0)
         return NS_ERROR_UNEXPECTED;
@@ -362,7 +362,7 @@ XULContentSinkImpl::FlushText(bool aCreateTextNode)
         if (! aCreateTextNode)
             break;
 
-        nsRefPtr<nsXULPrototypeNode> node;
+        RefPtr<nsXULPrototypeNode> node;
         rv = mContextStack.GetTopNode(node);
         if (NS_FAILED(rv)) return rv;
 
@@ -423,7 +423,7 @@ XULContentSinkImpl::NormalizeAttributeString(const char16_t *aExpatName,
         return NS_OK;
     }
 
-    nsRefPtr<mozilla::dom::NodeInfo> ni;
+    RefPtr<mozilla::dom::NodeInfo> ni;
     ni = mNodeInfoManager->GetNodeInfo(localName, prefix,
                                        nameSpaceID,
                                        nsIDOMNode::ATTRIBUTE_NODE);
@@ -474,7 +474,7 @@ XULContentSinkImpl::HandleStartElement(const char16_t *aName,
   nsContentUtils::SplitExpatName(aName, getter_AddRefs(prefix),
                                  getter_AddRefs(localName), &nameSpaceID);
 
-  nsRefPtr<mozilla::dom::NodeInfo> nodeInfo;
+  RefPtr<mozilla::dom::NodeInfo> nodeInfo;
   nodeInfo = mNodeInfoManager->GetNodeInfo(localName, prefix, nameSpaceID,
                                            nsIDOMNode::ELEMENT_NODE);
   
@@ -509,7 +509,7 @@ XULContentSinkImpl::HandleEndElement(const char16_t *aName)
     // the parser's little mind all over the planet.
     nsresult rv;
 
-    nsRefPtr<nsXULPrototypeNode> node;
+    RefPtr<nsXULPrototypeNode> node;
     rv = mContextStack.GetTopNode(node);
 
     if (NS_FAILED(rv)) {
@@ -632,7 +632,7 @@ XULContentSinkImpl::HandleProcessingInstruction(const char16_t *aTarget,
     const nsDependentString data(aData);
 
     // Note: the created nsXULPrototypePI has mRefCnt == 1
-    nsRefPtr<nsXULPrototypePI> pi = new nsXULPrototypePI();
+    RefPtr<nsXULPrototypePI> pi = new nsXULPrototypePI();
     if (!pi)
         return NS_ERROR_OUT_OF_MEMORY;
 
@@ -936,7 +936,7 @@ XULContentSinkImpl::OpenScript(const char16_t** aAttributes,
       nsCOMPtr<nsIScriptGlobalObject> globalObject;
       if (doc)
           globalObject = do_QueryInterface(doc->GetWindow());
-      nsRefPtr<nsXULPrototypeScript> script =
+      RefPtr<nsXULPrototypeScript> script =
           new nsXULPrototypeScript(aLineNumber, version);
       if (! script)
           return NS_ERROR_OUT_OF_MEMORY;

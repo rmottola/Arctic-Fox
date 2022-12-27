@@ -40,7 +40,7 @@ SpeakerManagerService::GetOrCreateSpeakerManagerService()
   }
 
   // Create new instance, register, return
-  nsRefPtr<SpeakerManagerService> service = new SpeakerManagerService();
+  RefPtr<SpeakerManagerService> service = new SpeakerManagerService();
 
   gSpeakerManagerService = service;
 
@@ -128,7 +128,7 @@ SpeakerManagerService::Notify()
   nsTArray<ContentParent*> children;
   ContentParent::GetAll(children);
   for (uint32_t i = 0; i < children.Length(); i++) {
-    unused << children[i]->SendSpeakerManagerNotify();
+    Unused << children[i]->SendSpeakerManagerNotify();
   }
 
   for (uint32_t i = 0; i < mRegisteredSpeakerManagers.Length(); i++) {
@@ -189,7 +189,7 @@ SpeakerManagerService::SpeakerManagerService()
       obs->AddObserver(this, "ipc:content-shutdown", false);
     }
   }
-  nsRefPtr<AudioChannelService> audioChannelService =
+  RefPtr<AudioChannelService> audioChannelService =
     AudioChannelService::GetOrCreate();
   audioChannelService->RegisterSpeakerManager(this);
 }
@@ -197,7 +197,7 @@ SpeakerManagerService::SpeakerManagerService()
 SpeakerManagerService::~SpeakerManagerService()
 {
   MOZ_COUNT_DTOR(SpeakerManagerService);
-  nsRefPtr<AudioChannelService> audioChannelService =
+  RefPtr<AudioChannelService> audioChannelService =
     AudioChannelService::GetOrCreate();
   audioChannelService->UnregisterSpeakerManager(this);
 }

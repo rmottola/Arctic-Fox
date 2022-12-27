@@ -177,7 +177,7 @@ LoadManagerSingleton::RemoveObserver(webrtc::CPULoadStateObserver * aObserver)
   if (mObservers.Length() == 0) {
     if (mLoadMonitor) {
       // Dance to avoid deadlock on mLock!
-      nsRefPtr<LoadMonitor> loadMonitor = mLoadMonitor.forget();
+      RefPtr<LoadMonitor> loadMonitor = mLoadMonitor.forget();
       MutexAutoUnlock unlock(mLock);
 
       loadMonitor->Shutdown();

@@ -17,6 +17,7 @@
 #include "GLScreenBuffer.h"
 
 #include "gfxCrashReporterUtils.h"
+#include "gfxEnv.h"
 #include "gfxUtils.h"
 #include "GLContextProvider.h"
 #include "GLTextureImage.h"
@@ -636,16 +637,16 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
 
 
 #ifdef MOZ_GL_DEBUG
-    if (PR_GetEnv("MOZ_GL_DEBUG"))
+    if (gfxEnv::GlDebug())
         sDebugMode |= DebugEnabled;
 
     // enables extra verbose output, informing of the start and finish of every GL call.
     // useful e.g. to record information to investigate graphics system crashes/lockups
-    if (PR_GetEnv("MOZ_GL_DEBUG_VERBOSE"))
+    if (gfxEnv::GlDebugVerbose())
         sDebugMode |= DebugTrace;
 
     // aborts on GL error. Can be useful to debug quicker code that is known not to generate any GL error in principle.
-    if (PR_GetEnv("MOZ_GL_DEBUG_ABORT_ON_ERROR"))
+    if (gfxEnv::GlDebugAbortOnError())
         sDebugMode |= DebugAbortOnError;
 #endif
 
@@ -1352,6 +1353,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
             SymLoadStruct mapBufferRangeSymbols[] = {
                 { (PRFuncPtr*) &mSymbols.fMapBufferRange, { "MapBufferRange", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fFlushMappedBufferRange, { "FlushMappedBufferRange", nullptr } },
+                { (PRFuncPtr*) &mSymbols.fUnmapBuffer, { "UnmapBuffer", nullptr } },
                 END_SYMBOLS
             };
 
@@ -2574,8 +2576,7 @@ GLContext::FlushIfHeavyGLCallsSinceLastFlush()
 /*static*/ bool
 GLContext::ShouldDumpExts()
 {
-    static bool ret = PR_GetEnv("MOZ_GL_DUMP_EXTS");
-    return ret;
+    return gfxEnv::GlDumpExtensions();
 }
 
 bool
@@ -2605,8 +2606,7 @@ DoesStringMatch(const char* aString, const char *aWantedString)
 /*static*/ bool
 GLContext::ShouldSpew()
 {
-    static bool ret = PR_GetEnv("MOZ_GL_SPEW");
-    return ret;
+    return gfxEnv::GlSpew();
 }
 
 void
@@ -2650,6 +2650,7 @@ GLContext::Readback(SharedSurface* src, gfx::DataSourceSurface* dest)
     }
 
     GLuint tempFB = 0;
+    GLuint tempTex = 0;
 
     {
         ScopedBindFramebuffer autoFB(this);
@@ -2681,6 +2682,24 @@ GLContext::Readback(SharedSurface* src, gfx::DataSourceSurface* dest)
             MOZ_ASSERT(status == LOCAL_GL_FRAMEBUFFER_COMPLETE);
         }
 
+        if (src->NeedsIndirectReads()) {
+            fGenTextures(1, &tempTex);
+            {
+                ScopedBindTexture autoTex(this, tempTex);
+
+                GLenum format = src->mHasAlpha ? LOCAL_GL_RGBA
+                                               : LOCAL_GL_RGB;
+                auto width = src->mSize.width;
+                auto height = src->mSize.height;
+                fCopyTexImage2D(LOCAL_GL_TEXTURE_2D, 0, format, 0, 0, width,
+                                height, 0);
+            }
+
+            fFramebufferTexture2D(LOCAL_GL_FRAMEBUFFER,
+                                  LOCAL_GL_COLOR_ATTACHMENT0,
+                                  LOCAL_GL_TEXTURE_2D, tempTex, 0);
+        }
+
         ReadPixelsIntoDataSurface(this, dest);
 
         src->ProducerReadRelease();
@@ -2688,6 +2707,10 @@ GLContext::Readback(SharedSurface* src, gfx::DataSourceSurface* dest)
 
     if (tempFB)
         fDeleteFramebuffers(1, &tempFB);
+
+    if (tempTex) {
+        fDeleteTextures(1, &tempTex);
+    }
 
     if (needsSwap) {
         src->UnlockProd();

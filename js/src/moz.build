@@ -114,6 +114,7 @@ EXPORTS.js += [
     '../public/HashTable.h',
     '../public/HeapAPI.h',
     '../public/Id.h',
+    '../public/Initialization.h',
     '../public/LegacyIntTypes.h',
     '../public/MemoryMetrics.h',
     '../public/Principals.h',
@@ -323,6 +324,7 @@ UNIFIED_SOURCES += [
     'vm/SharedTypedArrayObject.cpp',
     'vm/SPSProfiler.cpp',
     'vm/Stack.cpp',
+    'vm/Stopwatch.cpp',
     'vm/String.cpp',
     'vm/StringBuffer.cpp',
     'vm/StructuredClone.cpp',
@@ -361,6 +363,7 @@ SOURCES += [
     'jsatom.cpp',
     'jsmath.cpp',
     'jsutil.cpp',
+    'vm/Initialization.cpp',
 ]
 
 if CONFIG['JS_POSIX_NSPR']:
@@ -486,6 +489,7 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
         'jit/mips-shared/BaselineIC-mips-shared.cpp',
         'jit/mips-shared/CodeGenerator-mips-shared.cpp',
         'jit/mips-shared/Lowering-mips-shared.cpp',
+        'jit/mips-shared/MacroAssembler-mips-shared.cpp',
         'jit/mips-shared/MoveEmitter-mips-shared.cpp',
     ]
     if CONFIG['JS_CODEGEN_MIPS32']:
@@ -510,7 +514,20 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
         UNIFIED_SOURCES += [
             'jit/mips64/Architecture-mips64.cpp',
             'jit/mips64/Assembler-mips64.cpp',
+            'jit/mips64/Bailouts-mips64.cpp',
+            'jit/mips64/BaselineCompiler-mips64.cpp',
+            'jit/mips64/BaselineIC-mips64.cpp',
+            'jit/mips64/CodeGenerator-mips64.cpp',
+            'jit/mips64/Lowering-mips64.cpp',
+            'jit/mips64/MacroAssembler-mips64.cpp',
+            'jit/mips64/MoveEmitter-mips64.cpp',
+            'jit/mips64/SharedIC-mips64.cpp',
+            'jit/mips64/Trampoline-mips64.cpp',
         ]
+        if CONFIG['JS_SIMULATOR_MIPS64']:
+            UNIFIED_SOURCES += [
+                'jit/mips64/Simulator-mips64.cpp'
+            ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [
@@ -529,8 +546,8 @@ if CONFIG['JS_HAS_CTYPES']:
         'ctypes/Library.cpp',
     ]
     if not CONFIG['MOZ_NATIVE_FFI']:
-        GENERATED_INCLUDES += [
-            'ctypes/libffi/include',
+        LOCAL_INCLUDES += [
+            '!ctypes/libffi/include',
         ]
 
 if CONFIG['MOZ_VTUNE']:
@@ -657,3 +674,32 @@ if not CONFIG['GNU_CXX']:
 NO_EXPAND_LIBS = True
 
 DIST_INSTALL = True
+
+# Prepare self-hosted JS code for embedding
+GENERATED_FILES += ['selfhosted.out.h']
+selfhosted = GENERATED_FILES['selfhosted.out.h']
+selfhosted.script = 'builtin/embedjs.py:generate_selfhosted'
+selfhosted.inputs = [
+    'js.msg',
+    'builtin/TypedObjectConstants.h',
+    'builtin/SelfHostingDefines.h',
+    'builtin/Utilities.js',
+    'builtin/Array.js',
+    'builtin/Date.js',
+    'builtin/Error.js',
+    'builtin/Generator.js',
+    'builtin/Intl.js',
+    'builtin/IntlData.js',
+    'builtin/Iterator.js',
+    'builtin/Map.js',
+    'builtin/Module.js',
+    'builtin/Number.js',
+    'builtin/Object.js',
+    'builtin/Reflect.js',
+    'builtin/RegExp.js',
+    'builtin/String.js',
+    'builtin/Set.js',
+    'builtin/TypedArray.js',
+    'builtin/TypedObject.js',
+    'builtin/WeakSet.js'
+]

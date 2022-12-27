@@ -14,3 +14,5 @@ TESTING_JS_MODULES += [
     'StructuredLog.jsm',
     'TestUtils.jsm',
 ]
+
+TEST_HARNESS_FILES.testing.mochitest.tests.SimpleTest += ['StructuredLog.jsm']

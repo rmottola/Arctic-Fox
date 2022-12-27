@@ -231,7 +231,7 @@ private:
    */
   void CleanupWeakRefs();
 
-  nsRefPtr<DOMSVGLengthList> mList;
+  RefPtr<DOMSVGLengthList> mList;
 
   // Bounds for the following are checked in the ctor, so be sure to update
   // that if you change the capacity of any of the following.
@@ -246,7 +246,7 @@ private:
 
   // The following members are only used when we have an nsSVGLength2
   nsSVGLength2* mVal; // kept alive because it belongs to mSVGElement
-  nsRefPtr<nsSVGElement> mSVGElement;
+  RefPtr<nsSVGElement> mSVGElement;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(DOMSVGLength, MOZILLA_DOMSVGLENGTH_IID)

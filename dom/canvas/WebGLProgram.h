@@ -61,11 +61,13 @@ struct LinkedProgramInfo final
     WebGLProgram* const prog;
     std::vector<RefPtr<WebGLActiveInfo>> activeAttribs;
     std::vector<RefPtr<WebGLActiveInfo>> activeUniforms;
+    std::vector<RefPtr<WebGLActiveInfo>> transformFeedbackVaryings;
 
     // Needed for Get{Attrib,Uniform}Location. The keys for these are non-mapped
     // user-facing `GLActiveInfo::name`s, without any final "[0]".
     std::map<nsCString, const WebGLActiveInfo*> attribMap;
     std::map<nsCString, const WebGLActiveInfo*> uniformMap;
+    std::map<nsCString, const WebGLActiveInfo*> transformFeedbackVaryingsMap;
     std::map<nsCString, const nsCString>* fragDataMap;
 
     std::vector<RefPtr<UniformBlockInfo>> uniformBlocks;
@@ -150,7 +152,7 @@ public:
     void DetachShader(WebGLShader* shader);
     already_AddRefed<WebGLActiveInfo> GetActiveAttrib(GLuint index) const;
     already_AddRefed<WebGLActiveInfo> GetActiveUniform(GLuint index) const;
-    void GetAttachedShaders(nsTArray<nsRefPtr<WebGLShader>>* const out) const;
+    void GetAttachedShaders(nsTArray<RefPtr<WebGLShader>>* const out) const;
     GLint GetAttribLocation(const nsAString& name) const;
     GLint GetFragDataLocation(const nsAString& name) const;
     void GetProgramInfoLog(nsAString* const out) const;
@@ -173,6 +175,9 @@ public:
 
     bool FindAttribUserNameByMappedName(const nsACString& mappedName,
                                         nsDependentCString* const out_userName) const;
+    bool FindVaryingByMappedName(const nsACString& mappedName,
+                                 nsCString* const out_userName,
+                                 bool* const out_isArray) const;
     bool FindUniformByMappedName(const nsACString& mappedName,
                                  nsCString* const out_userName,
                                  bool* const out_isArray) const;

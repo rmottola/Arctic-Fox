@@ -104,7 +104,7 @@ PrincipalInfoToPrincipal(const PrincipalInfo& aPrincipalInfo,
         whitelist.AppendElement(wlPrincipal);
       }
 
-      nsRefPtr<nsExpandedPrincipal> expandedPrincipal = new nsExpandedPrincipal(whitelist);
+      RefPtr<nsExpandedPrincipal> expandedPrincipal = new nsExpandedPrincipal(whitelist);
       if (!expandedPrincipal) {
         NS_WARNING("could not instantiate expanded principal");
         return nullptr;
@@ -224,6 +224,12 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
   rv = PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
                                 &triggeringPrincipalInfo);
 
+  nsTArray<PrincipalInfo> redirectChainIncludingInternalRedirects;
+  for (const nsCOMPtr<nsIPrincipal>& principal : aLoadInfo->RedirectChainIncludingInternalRedirects()) {
+    rv = PrincipalToPrincipalInfo(principal, redirectChainIncludingInternalRedirects.AppendElement());
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
   nsTArray<PrincipalInfo> redirectChain;
   for (const nsCOMPtr<nsIPrincipal>& principal : aLoadInfo->RedirectChain()) {
     rv = PrincipalToPrincipalInfo(principal, redirectChain.AppendElement());
@@ -237,11 +243,14 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
       aLoadInfo->GetSecurityFlags(),
       aLoadInfo->InternalContentPolicyType(),
       aLoadInfo->GetUpgradeInsecureRequests(),
+      aLoadInfo->GetUpgradeInsecurePreloads(),
       aLoadInfo->GetInnerWindowID(),
       aLoadInfo->GetOuterWindowID(),
       aLoadInfo->GetParentOuterWindowID(),
       aLoadInfo->GetEnforceSecurity(),
       aLoadInfo->GetInitialSecurityCheckDone(),
+      aLoadInfo->GetOriginAttributes(),
+      redirectChainIncludingInternalRedirects,
       redirectChain);
 
   return NS_OK;
@@ -267,6 +276,14 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
     PrincipalInfoToPrincipal(loadInfoArgs.triggeringPrincipalInfo(), &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  nsTArray<nsCOMPtr<nsIPrincipal>> redirectChainIncludingInternalRedirects;
+  for (const PrincipalInfo& principalInfo : loadInfoArgs.redirectChainIncludingInternalRedirects()) {
+    nsCOMPtr<nsIPrincipal> redirectedPrincipal =
+      PrincipalInfoToPrincipal(principalInfo, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+    redirectChainIncludingInternalRedirects.AppendElement(redirectedPrincipal.forget());
+  }
+
   nsTArray<nsCOMPtr<nsIPrincipal>> redirectChain;
   for (const PrincipalInfo& principalInfo : loadInfoArgs.redirectChain()) {
     nsCOMPtr<nsIPrincipal> redirectedPrincipal =
@@ -281,11 +298,14 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
                           loadInfoArgs.securityFlags(),
                           loadInfoArgs.contentPolicyType(),
                           loadInfoArgs.upgradeInsecureRequests(),
+                          loadInfoArgs.upgradeInsecurePreloads(),
                           loadInfoArgs.innerWindowID(),
                           loadInfoArgs.outerWindowID(),
                           loadInfoArgs.parentOuterWindowID(),
                           loadInfoArgs.enforceSecurity(),
                           loadInfoArgs.initialSecurityCheckDone(),
+                          loadInfoArgs.originAttributes(),
+                          redirectChainIncludingInternalRedirects,
                           redirectChain);
 
    loadInfo.forget(outLoadInfo);

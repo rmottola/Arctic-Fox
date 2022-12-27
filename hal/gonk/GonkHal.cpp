@@ -496,7 +496,7 @@ public:
   }
 
 private:
-  nsRefPtr<BatteryUpdater> mUpdater;
+  RefPtr<BatteryUpdater> mUpdater;
 };
 
 // sBatteryObserver is owned by the IO thread. Only the IO thread may
@@ -936,7 +936,7 @@ DisableScreenConfigurationNotifications()
 void
 GetCurrentScreenConfiguration(hal::ScreenConfiguration* aScreenConfiguration)
 {
-  nsRefPtr<nsScreenGonk> screen = nsScreenManagerGonk::GetPrimaryScreen();
+  RefPtr<nsScreenGonk> screen = nsScreenManagerGonk::GetPrimaryScreen();
   *aScreenConfiguration = screen->GetConfiguration();
 }
 
@@ -1036,7 +1036,7 @@ WaitForAlarm(void* aData)
       // *on time* (the system won't sleep during the process in any way),
       // we need to acquire a CPU wake lock before firing the alarm event.
       InternalLockCpu();
-      nsRefPtr<AlarmFiredEvent> event =
+      RefPtr<AlarmFiredEvent> event =
         new AlarmFiredEvent(alarmData->mGeneration);
       NS_DispatchToMainThread(event);
     }
@@ -1729,7 +1729,7 @@ EnsureKernelLowMemKillerParamsSet()
   }
 
   // Ensure OOM events appear in logcat
-  nsRefPtr<OomVictimLogger> oomLogger = new OomVictimLogger();
+  RefPtr<OomVictimLogger> oomLogger = new OomVictimLogger();
   nsCOMPtr<nsIObserverService> os = services::GetObserverService();
   if (os) {
     os->AddObserver(oomLogger, "ipc:content-shutdown", false);

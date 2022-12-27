@@ -146,6 +146,7 @@ namespace js {
 // principals.
 
 class SavedStacks {
+    friend class SavedFrame;
     friend JSObject* SavedStacksMetadataCallback(JSContext* cx, JSObject* target);
     friend bool JS::ubi::ConstructSavedFrameStackSlow(JSContext* cx,
                                                       JS::ubi::StackFrame& ubiFrame,
@@ -163,11 +164,14 @@ class SavedStacks {
     bool     init();
     bool     initialized() const { return frames.initialized(); }
     bool     saveCurrentStack(JSContext* cx, MutableHandleSavedFrame frame, unsigned maxFrameCount = 0);
+    bool     copyAsyncStack(JSContext* cx, HandleObject asyncStack, HandleString asyncCause,
+                            MutableHandleSavedFrame adoptedStack, unsigned maxFrameCount = 0);
     void     sweep(JSRuntime* rt);
     void     trace(JSTracer* trc);
     uint32_t count();
     void     clear();
     void     setRNGState(uint64_t state) { rngState = state; }
+    void     chooseSamplingProbability(JSCompartment*);
 
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf);
 
@@ -206,7 +210,6 @@ class SavedStacks {
                                 unsigned maxFrameCount);
     SavedFrame* getOrCreateSavedFrame(JSContext* cx, SavedFrame::HandleLookup lookup);
     SavedFrame* createFrameFromLookup(JSContext* cx, SavedFrame::HandleLookup lookup);
-    void        chooseSamplingProbability(JSContext* cx);
 
     // Cache for memoizing PCToLineNumber lookups.
 

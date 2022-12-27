@@ -1221,7 +1221,7 @@ HyperTextAccessible::CaretLineNumber()
 {
   // Provide the line number for the caret, relative to the
   // currently focused node. Use a 1-based index
-  nsRefPtr<nsFrameSelection> frameSelection = FrameSelection();
+  RefPtr<nsFrameSelection> frameSelection = FrameSelection();
   if (!frameSelection)
     return -1;
 
@@ -1285,34 +1285,34 @@ HyperTextAccessible::CaretLineNumber()
   return lineNumber;
 }
 
-nsIntRect
+LayoutDeviceIntRect
 HyperTextAccessible::GetCaretRect(nsIWidget** aWidget)
 {
   *aWidget = nullptr;
 
-  nsRefPtr<nsCaret> caret = mDoc->PresShell()->GetCaret();
-  NS_ENSURE_TRUE(caret, nsIntRect());
+  RefPtr<nsCaret> caret = mDoc->PresShell()->GetCaret();
+  NS_ENSURE_TRUE(caret, LayoutDeviceIntRect());
 
   bool isVisible = caret->IsVisible();
   if (!isVisible)
-    return nsIntRect();
+    return LayoutDeviceIntRect();
 
   nsRect rect;
   nsIFrame* frame = caret->GetGeometry(&rect);
   if (!frame || rect.IsEmpty())
-    return nsIntRect();
+    return LayoutDeviceIntRect();
 
   nsPoint offset;
   // Offset from widget origin to the frame origin, which includes chrome
   // on the widget.
   *aWidget = frame->GetNearestWidget(offset);
-  NS_ENSURE_TRUE(*aWidget, nsIntRect());
+  NS_ENSURE_TRUE(*aWidget, LayoutDeviceIntRect());
   rect.MoveBy(offset);
 
-  nsIntRect caretRect;
-  caretRect = rect.ToOutsidePixels(frame->PresContext()->AppUnitsPerDevPixel());
+  LayoutDeviceIntRect caretRect = LayoutDeviceIntRect::FromUnknownRect(
+    rect.ToOutsidePixels(frame->PresContext()->AppUnitsPerDevPixel()));
   // ((content screen origin) - (content offset in the widget)) = widget origin on the screen
-  caretRect.MoveBy((*aWidget)->WidgetToScreenOffsetUntyped() - (*aWidget)->GetClientOffset());
+  caretRect.MoveBy((*aWidget)->WidgetToScreenOffset() - (*aWidget)->GetClientOffset());
 
   // Correct for character size, so that caret always matches the size of
   // the character. This is important for font size transitions, and is
@@ -1332,7 +1332,7 @@ HyperTextAccessible::GetSelectionDOMRanges(int16_t aType,
                                            nsTArray<nsRange*>* aRanges)
 {
   // Ignore selection if it is not visible.
-  nsRefPtr<nsFrameSelection> frameSelection = FrameSelection();
+  RefPtr<nsFrameSelection> frameSelection = FrameSelection();
   if (!frameSelection ||
       frameSelection->GetDisplaySelection() <= nsISelectionController::SELECTION_HIDDEN)
     return;
@@ -1440,7 +1440,7 @@ HyperTextAccessible::SetSelectionBoundsAt(int32_t aSelectionNum,
   if (!domSel)
     return false;
 
-  nsRefPtr<nsRange> range;
+  RefPtr<nsRange> range;
   uint32_t rangeCount = domSel->RangeCount();
   if (aSelectionNum == static_cast<int32_t>(rangeCount))
     range = new nsRange(mContent);
@@ -1480,7 +1480,7 @@ void
 HyperTextAccessible::ScrollSubstringTo(int32_t aStartOffset, int32_t aEndOffset,
                                        uint32_t aScrollType)
 {
-  nsRefPtr<nsRange> range = new nsRange(mContent);
+  RefPtr<nsRange> range = new nsRange(mContent);
   if (OffsetsToDOMRange(aStartOffset, aEndOffset, range))
     nsCoreUtils::ScrollSubstringTo(GetFrame(), range, aScrollType);
 }
@@ -1498,7 +1498,7 @@ HyperTextAccessible::ScrollSubstringToPoint(int32_t aStartOffset,
   nsIntPoint coords = nsAccUtils::ConvertToScreenCoords(aX, aY, aCoordinateType,
                                                         this);
 
-  nsRefPtr<nsRange> range = new nsRange(mContent);
+  RefPtr<nsRange> range = new nsRange(mContent);
   if (!OffsetsToDOMRange(aStartOffset, aEndOffset, range))
     return;
 
@@ -1892,7 +1892,7 @@ HyperTextAccessible::GetSpellTextAttr(nsINode* aNode,
                                       uint32_t* aEndOffset,
                                       nsIPersistentProperties* aAttributes)
 {
-  nsRefPtr<nsFrameSelection> fs = FrameSelection();
+  RefPtr<nsFrameSelection> fs = FrameSelection();
   if (!fs)
     return;
 

@@ -168,7 +168,7 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
   nsCOMPtr<nsIURI> scriptURI;
   rv = NS_NewURI(getter_AddRefs(scriptURI), aScriptURL, nullptr, baseURI);
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    aRv.ThrowTypeError(MSG_INVALID_URL, &aScriptURL);
+    aRv.ThrowTypeError<MSG_INVALID_URL>(&aScriptURL);
     return nullptr;
   }
 
@@ -190,7 +190,7 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
       nsAutoCString spec;
       scriptURI->GetSpec(spec);
       NS_ConvertUTF8toUTF16 wSpec(spec);
-      aRv.ThrowTypeError(MSG_INVALID_SCOPE, &defaultScope, &wSpec);
+      aRv.ThrowTypeError<MSG_INVALID_SCOPE>(&defaultScope, &wSpec);
       return nullptr;
     }
   } else {
@@ -201,7 +201,7 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
       nsAutoCString spec;
       baseURI->GetSpec(spec);
       NS_ConvertUTF8toUTF16 wSpec(spec);
-      aRv.ThrowTypeError(MSG_INVALID_SCOPE, &aOptions.mScope.Value(), &wSpec);
+      aRv.ThrowTypeError<MSG_INVALID_SCOPE>(&aOptions.mScope.Value(), &wSpec);
       return nullptr;
     }
 
@@ -220,7 +220,7 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
     return nullptr;
   }
 
-  nsRefPtr<Promise> ret = static_cast<Promise*>(promise.get());
+  RefPtr<Promise> ret = static_cast<Promise*>(promise.get());
   MOZ_ASSERT(ret);
   return ret.forget();
 }
@@ -240,7 +240,6 @@ ServiceWorkerContainer::GetController()
     //       thread running, but it seems our design does not expect that.
     nsCOMPtr<nsISupports> serviceWorker;
     rv = swm->GetDocumentController(GetOwner(),
-                                    nullptr, // aLoadFailedRunnable
                                     getter_AddRefs(serviceWorker));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return nullptr;
@@ -250,7 +249,7 @@ ServiceWorkerContainer::GetController()
       static_cast<workers::ServiceWorker*>(serviceWorker.get());
   }
 
-  nsRefPtr<workers::ServiceWorker> ref = mControllerWorker;
+  RefPtr<workers::ServiceWorker> ref = mControllerWorker;
   return ref.forget();
 }
 
@@ -270,7 +269,7 @@ ServiceWorkerContainer::GetRegistrations(ErrorResult& aRv)
     return nullptr;
   }
 
-  nsRefPtr<Promise> ret = static_cast<Promise*>(promise.get());
+  RefPtr<Promise> ret = static_cast<Promise*>(promise.get());
   MOZ_ASSERT(ret);
   return ret.forget();
 }
@@ -292,7 +291,7 @@ ServiceWorkerContainer::GetRegistration(const nsAString& aDocumentURL,
     return nullptr;
   }
 
-  nsRefPtr<Promise> ret = static_cast<Promise*>(promise.get());
+  RefPtr<Promise> ret = static_cast<Promise*>(promise.get());
   MOZ_ASSERT(ret);
   return ret.forget();
 }

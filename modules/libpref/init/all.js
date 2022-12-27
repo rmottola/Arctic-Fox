@@ -157,7 +157,6 @@ pref("dom.workers.maxPerDomain", 20);
 // Whether or not Shared Web Workers are enabled.
 pref("dom.workers.sharedWorkers.enabled", true);
 
-// Service workers
 pref("dom.serviceWorkers.enabled", false);
 
 // Allow service workers to intercept network requests using the fetch event
@@ -165,6 +164,12 @@ pref("dom.serviceWorkers.interception.enabled", false);
 
 // Allow service workers to intercept opaque (cross origin) responses
 pref("dom.serviceWorkers.interception.opaque.enabled", false);
+
+// The amount of time (milliseconds) service workers keep running after each event.
+pref("dom.serviceWorkers.idle_timeout", 30000);
+
+// The amount of time (milliseconds) service workers can be kept running using waitUntil promises.
+pref("dom.serviceWorkers.idle_extended_timeout", 300000);
 
 // Whether nonzero values can be returned from performance.timing.*
 pref("dom.enable_performance", true);
@@ -236,7 +241,10 @@ pref("browser.display.force_inline_alttext", false); // true = force ALT text fo
 // 1 = use external leading only when font provides,
 // 2 = add extra leading both internal leading and external leading are zero
 pref("browser.display.normal_lineheight_calc_control", 2);
-pref("browser.display.show_image_placeholders", true); // true = show image placeholders while image is loaded and when image is broken
+// enable showing image placeholders while image is loading or when image is broken
+pref("browser.display.show_image_placeholders", true);
+// if browser.display.show_image_placeholders is true then this controls whether the loading image placeholder and border is shown or not
+pref("browser.display.show_loading_image_placeholder", false);
 // min font device pixel size at which to turn on high quality
 pref("browser.display.auto_quality_min_font_size", 20);
 // Background color for standalone images; leave empty to use default
@@ -283,6 +291,9 @@ pref("browser.triple_click_selects_paragraph", true);
 
 // Print/Preview Shrink-To-Fit won't shrink below 20% for text-ish documents.
 pref("print.shrink-to-fit.scale-limit-percent", 20);
+
+// Enable scale transform for stretchy MathML operators. See bug 414277.
+pref("mathml.scale_stretchy_operators.enabled", true);
 
 // Media cache size in kilobytes
 pref("media.cache_size", 512000);
@@ -341,19 +352,25 @@ pref("media.directshow.enabled", true);
 #endif
 #ifdef MOZ_FMP4
 pref("media.fragmented-mp4.enabled", true);
+pref("media.fragmented-mp4.gmp.aac", 0);
+pref("media.fragmented-mp4.gmp.h264", 0);
 #endif
 // Specifies whether the PDM can create a test decoder that
 // just outputs blank frames/audio instead of actually decoding. The blank
 // decoder works on all platforms.
 pref("media.use-blank-decoder", false);
 #ifdef MOZ_WMF
+pref("media.wmf.enabled", true);
 pref("media.wmf.decoder.thread-count", -1);
+pref("media.wmf.low-latency.enabled", false);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
 pref("media.libavcodec.allow-obsolete", false);
 #endif
 pref("media.gmp.decoder.enabled", false);
+pref("media.gmp.decoder.aac", 0);
+pref("media.gmp.decoder.h264", 0);
 #ifdef MOZ_RAW
 pref("media.raw.enabled", true);
 #endif
@@ -365,7 +382,7 @@ pref("media.wave.enabled", true);
 #ifdef MOZ_WEBM
 pref("media.webm.enabled", true);
 #if defined(MOZ_FMP4) && defined(MOZ_WMF)
-pref("media.webm.intel_decoder.enabled", false);
+pref("media.webm.intel_decoder.enabled", true);
 #endif
 #endif
 #ifdef MOZ_GSTREAMER
@@ -429,6 +446,7 @@ pref("media.peerconnection.video.min_bitrate", 200);
 pref("media.peerconnection.video.start_bitrate", 300);
 pref("media.peerconnection.video.max_bitrate", 2000);
 #endif
+pref("media.navigator.audio.fake_frequency", 1000);
 pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
@@ -889,7 +907,7 @@ pref("devtools.debugger.forbid-certified-apps", true);
 pref("devtools.apps.forbidden-permissions", "embed-apps,engineering-mode,embed-widgets");
 
 // DevTools default color unit
-pref("devtools.defaultColorUnit", "hex");
+pref("devtools.defaultColorUnit", "authored");
 
 // Used for devtools debugging
 pref("devtools.dump.emit", false);
@@ -1395,7 +1413,7 @@ pref("privacy.trackingprotection.enabled",  false);
 
 pref("dom.event.contextmenu.enabled",       true);
 pref("dom.event.clipboardevents.enabled",   true);
-#if defined(XP_WIN) && !defined(RELEASE_BUILD)
+#if defined(XP_WIN) && !defined(RELEASE_BUILD) || defined(MOZ_WIDGET_GTK) && !defined(RELEASE_BUILD)
 pref("dom.event.highrestimestamp.enabled",  true);
 #else
 pref("dom.event.highrestimestamp.enabled",  false);
@@ -1418,6 +1436,7 @@ pref("javascript.options.asyncstack",       true);
 #else
 pref("javascript.options.asyncstack",       false);
 #endif
+pref("javascript.options.throw_on_asmjs_validation_failure", false);
 pref("javascript.options.ion.offthread_compilation", true);
 // This preference instructs the JS engine to discard the
 // source of any privileged JS after compilation. This saves
@@ -1718,8 +1737,8 @@ pref("network.http.diagnostics", false);
 
 pref("network.http.pacing.requests.enabled", true);
 pref("network.http.pacing.requests.min-parallelism", 6);
-pref("network.http.pacing.requests.hz", 100);
-pref("network.http.pacing.requests.burst", 32);
+pref("network.http.pacing.requests.hz", 80);
+pref("network.http.pacing.requests.burst", 10);
 
 // TCP Keepalive config for HTTP connections.
 pref("network.http.tcp_keepalive.short_lived_connections", true);
@@ -2016,6 +2035,7 @@ pref("network.predictor.preconnect-min-confidence", 90);
 pref("network.predictor.preresolve-min-confidence", 60);
 pref("network.predictor.redirect-likely-confidence", 75);
 pref("network.predictor.max-resources-per-entry", 100);
+pref("network.predictor.max-uri-length", 500);
 pref("network.predictor.cleaned-up", false);
 
 // The following prefs pertain to the negotiate-auth extension (see bug 17578),
@@ -2224,7 +2244,7 @@ pref("intl.hyphenation-alias.nb-*", "nb");
 pref("intl.hyphenation-alias.nn-*", "nn");
 
 pref("font.name.serif.x-math", "Latin Modern Math");
-pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Standard Symbols L, serif");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, serif");
 pref("font.name.sans-serif.x-math", "sans-serif");
 pref("font.name.monospace.x-math", "monospace");
 
@@ -2584,6 +2604,14 @@ pref("layout.css.unicode-range.enabled", false);
 // Is support for CSS "text-align: unsafe X" enabled?
 pref("layout.css.text-align-unsafe-value.enabled", false);
 
+// Is support for CSS "float: inline-{start,end}" and
+// "clear: inline-{start,end}" enabled?
+#if defined(MOZ_B2G) || defined(NIGHTLY_BUILD)
+pref("layout.css.float-logical-values.enabled", true);
+#else
+pref("layout.css.float-logical-values.enabled", false);
+#endif
+
 // Is support for the CSS4 image-orientation property enabled?
 pref("layout.css.image-orientation.enabled", true);
 
@@ -2691,6 +2719,13 @@ pref("layout.css.scroll-behavior.damping-ratio", "1.0");
 // Don't enable the pref for the CSS Font Loading API until bug 1072101 is
 // fixed, as we don't want to expose more indexed properties on the Web.
 pref("layout.css.font-loading-api.enabled", false);
+
+// Should stray control characters be rendered visibly?
+#ifdef RELEASE_BUILD
+pref("layout.css.control-characters.visible", false);
+#else
+pref("layout.css.control-characters.visible", true);
+#endif
 
 // pref for which side vertical scrollbars should be on
 // 0 = end-side in UI direction
@@ -3343,7 +3378,7 @@ pref("font.minimum-size.th", 10);
 pref("font.default.x-devanagari", "sans-serif");
 pref("font.name.serif.x-math", "Latin Modern Math");
 // We have special support for Monotype Symbol on Windows.
-pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times New Roman");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times New Roman");
 pref("font.name.sans-serif.x-math", "Arial");
 pref("font.name.monospace.x-math", "Courier New");
 pref("font.name.cursive.x-math", "Comic Sans MS");
@@ -3781,7 +3816,7 @@ pref("font.size.variable.zh-TW", 15);
 
 pref("font.name.serif.x-math", "Latin Modern Math");
 // Apple's Symbol is Unicode so use it
-pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, Symbol, Times");
 pref("font.name.sans-serif.x-math", "Helvetica");
 pref("font.name.monospace.x-math", "Courier");
 pref("font.name.cursive.x-math", "Apple Chancery");
@@ -4147,7 +4182,7 @@ pref("font.name.monospace.zh-TW", "Fira Mono");
 pref("font.name-list.sans-serif.zh-TW", "Fira Sans,Droid Sans Fallback");
 
 pref("font.name.serif.x-math", "Latin Modern Math");
-pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
 pref("font.name.sans-serif.x-math", "Fira Sans");
 pref("font.name.monospace.x-math", "Fira Mono");
 
@@ -4225,7 +4260,7 @@ pref("font.name-list.sans-serif.zh-TW", "Roboto, Droid Sans, Noto Sans TC, Noto 
 pref("font.name-list.monospace.zh-TW", "Droid Sans Fallback");
 
 pref("font.name.serif.x-math", "Latin Modern Math");
-pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, MathJax_Main, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
+pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
 pref("font.name.sans-serif.x-math", "Clear Sans");
 pref("font.name.monospace.x-math", "Droid Sans Mono");
 
@@ -4390,13 +4425,6 @@ pref("image.multithreaded_decoding.limit", -1);
 // cache.
 pref("canvas.image.cache.limit", 0);
 
-// Allow track-fobics to deliberately poison canvas data for
-// toDataURL() and getImageData()
-pref("canvas.poisondata", false);
-
-// How many images to eagerly decode on a given page. 0 means "no limit".
-pref("image.onload.decode.limit", 0);
-
 // WebGL prefs
 #ifdef ANDROID
 // Disable MSAA on mobile.
@@ -4443,6 +4471,8 @@ pref("webgl.angle.try-d3d11", true);
 pref("webgl.angle.force-d3d11", false);
 pref("webgl.angle.force-warp", false);
 #endif
+
+pref("gfx.offscreencanvas.enabled", false);
 
 #ifdef MOZ_WIDGET_GONK
 pref("gfx.gralloc.fence-with-readpixels", false);
@@ -4711,9 +4741,14 @@ pref("dom.mozContacts.enabled", false);
 pref("dom.mozAlarms.enabled", false);
 
 // Push
+
 pref("dom.push.enabled", false);
 
-pref("dom.push.debug", false);
+#if !defined(RELEASE_BUILD)
+pref("dom.push.debug", true);
+#endif
+
+
 pref("dom.push.serverURL", "wss://push.services.mozilla.com/");
 pref("dom.push.userAgentID", "");
 
@@ -4766,8 +4801,12 @@ pref("dom.mozSettings.enabled", false);
 pref("dom.mozPermissionSettings.enabled", false);
 
 // W3C touch events
-// 0 - disabled, 1 - enabled, 2 - autodetect (win)
+// 0 - disabled, 1 - enabled, 2 - autodetect (win/gtk3)
 #ifdef XP_WIN
+pref("dom.w3c_touch_events.enabled", 2);
+#endif
+
+#if MOZ_WIDGET_GTK == 3
 pref("dom.w3c_touch_events.enabled", 2);
 #endif
 
@@ -5150,7 +5189,7 @@ pref("dom.beforeAfterKeyboardEvent.enabled", false);
 // Presentation API
 pref("dom.presentation.enabled", false);
 pref("dom.presentation.tcp_server.debug", false);
-pref("dom.presentation.discovery.enabled", true);
+pref("dom.presentation.discovery.enabled", false);
 pref("dom.presentation.discovery.timeout_ms", 10000);
 pref("dom.presentation.discoverable", false);
 
@@ -5319,13 +5358,6 @@ pref("media.gmp.insecure.allow", false);
 #endif
 
 pref("dom.audiochannel.mutedByDefault", false);
-
-// Use vsync aligned rendering. b2g prefs are in b2g.js.
-// Hardware vsync supported on windows, os x, and b2g.
-// Linux and fennec will use software vsync.
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(XP_LINUX)
-pref("gfx.vsync.refreshdriver", true);
-#endif
 
 // Secure Element API
 #ifdef MOZ_SECUREELEMENT

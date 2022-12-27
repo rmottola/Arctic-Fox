@@ -401,7 +401,13 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 10,
-    "description": "Use of SpiderMonkey's deprecated language extensions in web content: ForEach=0, DestructuringForIn=1, LegacyGenerator=2, ExpressionClosure=3, LetBlock=4, LetExpression=5, NoSuchMethod=6, FlagsArgument=7, RegExpSourceProp=8"
+    "description": "Use of SpiderMonkey's deprecated language extensions in web content: ForEach=0, DestructuringForIn=1, LegacyGenerator=2, ExpressionClosure=3, LetBlock=4, LetExpression=5, NoSuchMethod=6, FlagsArgument=7, RegExpSourceProp=8, RestoredRegExpStatics=9"
+  },
+  "JS_DEPRECATED_LANGUAGE_EXTENSIONS_IN_ADDONS": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "description": "Use of SpiderMonkey's deprecated language extensions in add-ons: ForEach=0, DestructuringForIn=1, LegacyGenerator=2, ExpressionClosure=3, LetBlock=4, LetExpression=5, NoSuchMethod=6, FlagsArgument=7, RegExpSourceProp=8, RestoredRegExpStatics=9"
   },
   "XUL_CACHE_DISABLED": {
     "expires_in_version": "default",
@@ -1475,7 +1481,7 @@
     "description": "SPDY: KB read per connection"
   },
   "SPDY_SETTINGS_UL_BW": {
-    "expires_in_version": "never",
+    "expires_in_version": "42",
     "kind": "exponential",
     "high": "10000",
     "n_buckets": 100,
@@ -1483,7 +1489,7 @@
     "description": "SPDY: Settings Upload Bandwidth"
   },
   "SPDY_SETTINGS_DL_BW": {
-    "expires_in_version": "never",
+    "expires_in_version": "42",
     "kind": "exponential",
     "high": "10000",
     "n_buckets": 100,
@@ -1491,7 +1497,7 @@
     "description": "SPDY: Settings Download Bandwidth"
   },
   "SPDY_SETTINGS_RTT": {
-    "expires_in_version": "never",
+    "expires_in_version": "42",
     "kind": "exponential",
     "high": "1000",
     "n_buckets": 100,
@@ -1504,10 +1510,10 @@
     "high": "5000",
     "n_buckets": 100,
     "extended_statistics_ok": true,
-    "description": "SPDY: Settings Max Streams parameter"
+    "description": "H2: Settings Max Streams parameter"
   },
   "SPDY_SETTINGS_CWND": {
-    "expires_in_version": "never",
+    "expires_in_version": "42",
     "kind": "exponential",
     "high": "500",
     "n_buckets": 50,
@@ -1515,7 +1521,7 @@
     "description": "SPDY: Settings CWND (packets)"
   },
   "SPDY_SETTINGS_RETRANS": {
-    "expires_in_version": "never",
+    "expires_in_version": "42",
     "kind": "exponential",
     "high": "100",
     "n_buckets": 50,
@@ -4038,12 +4044,19 @@
     "n_buckets": 30,
     "description": "Average paint duration during any tab open/close animation (excluding tabstrip scroll)"
   },
-  "FX_REFRESH_DRIVER_FRAME_DELAY_MS": {
+  "FX_REFRESH_DRIVER_CHROME_FRAME_DELAY_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
     "high": "10000",
     "n_buckets": 50,
-    "description": "Delay in ms between the target and the actual handling time of the frame at refresh driver"
+    "description": "Delay in ms between the target and the actual handling time of the frame at refresh driver in the chrome process."
+  },
+  "FX_REFRESH_DRIVER_CONTENT_FRAME_DELAY_MS": {
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": 50,
+    "description": "Delay in ms between the target and the actual handling time of the frame at refresh driver in the content process."
   },
   "FX_TAB_SWITCH_UPDATE_MS": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
@@ -5107,6 +5120,14 @@
     "kind": "count",
     "keyed" : true,
     "description" : "Exceptions thrown by add-ons"
+  },
+  "IPC_SAME_PROCESS_MESSAGE_COPY_OOM_KB": {
+     "expires_in_version": "50",
+     "kind": "exponential",
+     "low": 100,
+     "high": 10000000,
+     "n_buckets": 10,
+     "description": "Whenever the same-process MessageManager cannot be sent through sendAsyncMessage as it would cause an OOM, the size of the message content, in kb."
   },
   "MISBEHAVING_ADDONS_CPOW_TIME_MS": {
     "expires_in_version": "never",
@@ -8348,6 +8369,28 @@
     "kind": "count",
     "description": "Count of usernames copied from the password management interface"
   },
+  "PWMGR_MANAGE_DELETED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of passwords deleted from the password management interface (including via Remove All)"
+  },
+  "PWMGR_MANAGE_DELETED_ALL": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Count of times that Remove All was used from the password management interface"
+  },
+  "PWMGR_MANAGE_OPENED": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values" : 5,
+    "description": "Accumulates how the password management interface was opened. (0=Preferences, 1=Page Info)"
+  },
+  "PWMGR_MANAGE_SORTED": {
+    "expires_in_version": "never",
+    "keyed": true,
+    "kind": "count",
+    "description": "Reports the column that logins are sorted by"
+  },
   "PWMGR_NUM_PASSWORDS_PER_HOSTNAME": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -8940,7 +8983,7 @@
   },
   "PERF_MONITORING_TEST_CPU_RESCHEDULING_PROPORTION_MOVED": {
     "alert_emails": ["dteller@mozilla.com"],
-    "expires_in_version": "45",
+    "expires_in_version": "48",
     "kind": "linear",
     "high": "100",
     "n_buckets": "20",
@@ -9164,5 +9207,12 @@
     "expires_in_version": "55",
     "kind": "count",
     "description": "Attempt to notify ServiceWorker of push notification resubscription."
+  },
+  "GFX_CRASH": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 100,
+    "releaseChannelCollection": "opt-out",
+    "description": "Graphics Crash Reason (...)"
   }
 }
