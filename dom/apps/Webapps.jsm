@@ -3489,6 +3489,10 @@ this.DOMApplicationRegistry = {
       // nsILoadContext
       appId: aOldApp.installerAppId,
       isInBrowserElement: aOldApp.installerIsBrowser,
+      originAttributes: {
+        appId: aOldApp.installerAppId,
+        inBrowser: aOldApp.installerIsBrowser
+      },
       usePrivateBrowsing: false,
       isContent: false,
       associatedWindow: null,

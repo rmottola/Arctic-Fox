@@ -153,6 +153,10 @@ this.AppsUtils = {
        topWindow : null,
        appId: aAppId,
        isInBrowserElement: aIsBrowser,
+       originAttributes: {
+         appId: aAppId,
+         inBrowser: aIsBrowser
+       },
        usePrivateBrowsing: false,
        isContent: false,
 
