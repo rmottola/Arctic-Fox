@@ -214,6 +214,8 @@ ParseIDFromDeviceID(const nsAString &key, const char *prefix, int length)
 // based on http://msdn.microsoft.com/en-us/library/ms724834(VS.85).aspx
 enum {
   kWindowsUnknown = 0,
+  kWindowsXP = 0x50001,
+  kWindowsServer2003 = 0x50002,
   kWindowsVista = 0x60000,
   kWindows7 = 0x60001,
   kWindows8 = 0x60002,
