@@ -302,6 +302,9 @@ var dataProviders = {
               ["tryNewerDriver", suggestedDriverVersion] :
               ["blockedDriver"];
         break;
+      case Ci.nsIGfxInfo.FEATURE_BLOCKED_MISMATCHED_VERSION:
+        msg = ["blockedMismatchedVersion"];
+        break;
       }
       return msg;
     }
