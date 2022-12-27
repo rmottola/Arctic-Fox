@@ -8,7 +8,7 @@
 
 /* NOTE: this interface is completely undesigned, not stable and likely to change */
 
-[scriptable, uuid(98690931-c9a5-4675-9ab4-90932ec32bf2)]
+[scriptable, uuid(74fdaac3-e5ce-4944-becc-c08c168f673c)]
 interface nsIGfxInfo : nsISupports
 {
   /*

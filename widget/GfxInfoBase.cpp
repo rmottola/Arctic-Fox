@@ -119,11 +119,11 @@ GetPrefNameForFeature(int32_t aFeature)
     case nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS:
       name = BLACKLIST_PREF_BRANCH "layers.direct3d11";
       break;
-    case nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING:
-      name = BLACKLIST_PREF_BRANCH "hardwarevideodecoding";
-      break;
     case nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE:
       name = BLACKLIST_PREF_BRANCH "direct3d11angle";
+      break;
+    case nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING:
+      name = BLACKLIST_PREF_BRANCH "hardwarevideodecoding";
       break;
     case nsIGfxInfo::FEATURE_OPENGL_LAYERS:
       name = BLACKLIST_PREF_BRANCH "layers.opengl";

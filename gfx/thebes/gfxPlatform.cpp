@@ -2090,7 +2090,6 @@ gfxPlatform::UsesOffMainThreadCompositing()
   return result;
 }
 
-
 /***
  * The preference "layout.frame_rate" has 3 meanings depending on the value:
  *
