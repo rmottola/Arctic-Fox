@@ -136,9 +136,6 @@ nsScriptableUnicodeConverter::ConvertToUnicode(const nsACString& aSrc, nsAString
                               _retval);
 }
 
-/* AString convertFromByteArray([const,array,size_is(aCount)] in octet aData,
-                                in unsigned long aCount);
- */
 NS_IMETHODIMP
 nsScriptableUnicodeConverter::ConvertFromByteArray(const uint8_t* aData,
                                                    uint32_t aCount,
@@ -180,10 +177,6 @@ nsScriptableUnicodeConverter::ConvertFromByteArray(const uint8_t* aData,
 
 }
 
-/* void convertToByteArray(in AString aString,
-                          [optional] out unsigned long aLen,
-                          [array, size_is(aLen),retval] out octet aData);
- */
 NS_IMETHODIMP
 nsScriptableUnicodeConverter::ConvertToByteArray(const nsAString& aString,
                                                  uint32_t* aLen,

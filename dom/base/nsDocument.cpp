@@ -7479,7 +7479,6 @@ nsIDocument::GetDocumentURIObject() const
 }
 
 
-// readonly attribute DOMString compatMode;
 // Returns "BackCompat" if we are in quirks mode, "CSS1Compat" if we are
 // in almost standards or full standards mode. See bug 105640.  This was
 // implemented to match MSIE's compatMode property.

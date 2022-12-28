@@ -2054,15 +2054,6 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
     return rv;
 }
 
-// imgIRequest loadImage(in nsIURI aURI,
-//                       in nsIURI aInitialDocumentURL,
-//                       in nsIURI aReferrerURI,
-//                       in nsIPrincipal aLoadingPrincipal,
-//                       in nsILoadGroup aLoadGroup,
-//                       in imgINotificationObserver aObserver,
-//                       in nsISupports aCX,
-//                       in nsLoadFlags aLoadFlags,
-//                       in nsISupports cacheKey);
 nsresult
 imgLoader::LoadImage(nsIURI* aURI,
                      nsIURI* aInitialDocumentURI,
@@ -2343,11 +2334,6 @@ imgLoader::LoadImage(nsIURI* aURI,
   return NS_OK;
 }
 
-/* imgIRequest
-loadImageWithChannelXPCOM(in nsIChannel channel,
-                          in imgINotificationObserver aObserver,
-                          in nsISupports cx,
-                          out nsIStreamListener); */
 NS_IMETHODIMP
 imgLoader::LoadImageWithChannelXPCOM(nsIChannel* channel,
                                      imgINotificationObserver* aObserver,
@@ -2862,8 +2848,6 @@ ProxyListener::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
-                       in nsresult status); */
 NS_IMETHODIMP
 ProxyListener::OnStopRequest(nsIRequest* aRequest,
                              nsISupports* ctxt,
@@ -2878,10 +2862,6 @@ ProxyListener::OnStopRequest(nsIRequest* aRequest,
 
 /** nsIStreamListener methods **/
 
-/* void onDataAvailable (in nsIRequest request, in nsISupports ctxt,
-                         in nsIInputStream inStr,
-                         in unsigned long long sourceOffset,
-                         in unsigned long count); */
 NS_IMETHODIMP
 ProxyListener::OnDataAvailable(nsIRequest* aRequest, nsISupports* ctxt,
                                nsIInputStream* inStr, uint64_t sourceOffset,
@@ -3086,8 +3066,6 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
-                       in nsresult status); */
 NS_IMETHODIMP
 imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
                                  nsISupports* ctxt,
@@ -3106,10 +3084,6 @@ imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
 /** nsIStreamListener methods **/
 
 
-/* void
-   onDataAvailable (in nsIRequest request, in nsISupports ctxt,
-   in nsIInputStream inStr, in unsigned long long sourceOffset,
-   in unsigned long count); */
 NS_IMETHODIMP
 imgCacheValidator::OnDataAvailable(nsIRequest* aRequest, nsISupports* ctxt,
                                    nsIInputStream* inStr,
