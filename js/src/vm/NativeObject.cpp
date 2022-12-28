@@ -1561,7 +1561,7 @@ js::NativeDefineElement(ExclusiveContext* cx, HandleNativeObject obj, uint32_t i
 
 bool
 js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId id,
-                         HandleValue value, GetterOp getter, SetterOp setter,
+                         HandleValue value, JSGetterOp getter, JSSetterOp setter,
                          unsigned attrs)
 {
     ObjectOpResult result;
@@ -1581,7 +1581,7 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
 
 bool
 js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, PropertyName* name,
-                         HandleValue value, GetterOp getter, SetterOp setter,
+                         HandleValue value, JSGetterOp getter, JSSetterOp setter,
                          unsigned attrs)
 {
     RootedId id(cx, NameToId(name));
