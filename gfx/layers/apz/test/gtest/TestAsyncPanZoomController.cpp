@@ -67,7 +67,6 @@ public:
   MOCK_METHOD3(HandleDoubleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD3(HandleSingleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD4(HandleLongTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&, uint64_t));
-  MOCK_METHOD3(SendAsyncScrollDOMEvent, void(bool aIsRoot, const CSSRect &aContentRect, const CSSSize &aScrollableSize));
   MOCK_METHOD2(PostDelayedTask, void(Task* aTask, int aDelayMs));
   MOCK_METHOD3(NotifyAPZStateChange, void(const ScrollableLayerGuid& aGuid, APZStateChange aChange, int aArg));
   MOCK_METHOD0(NotifyFlushComplete, void());
@@ -791,10 +790,8 @@ protected:
     MakeApzcZoomable();
 
     if (aShouldTriggerPinch) {
-      EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(AtLeast(1));
       EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(1);
     } else {
-      EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(AtMost(2));
       EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(0);
     }
 
@@ -927,7 +924,6 @@ TEST_F(APZCBasicTester, Overzoom) {
 
   MakeApzcZoomable();
 
-  EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(AtLeast(1));
   EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(1);
 
   PinchWithPinchInputAndCheckStatus(apzc, 50, 50, 0.5, true);
@@ -1056,10 +1052,8 @@ protected:
   void DoPanTest(bool aShouldTriggerScroll, bool aShouldBeConsumed, uint32_t aBehavior)
   {
     if (aShouldTriggerScroll) {
-      EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(AtLeast(1));
       EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(1);
     } else {
-      EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(0);
       EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(0);
     }
 
@@ -1169,7 +1163,6 @@ TEST_F(APZCPanningTester, PanWithPreventDefault) {
 }
 
 TEST_F(APZCBasicTester, Fling) {
-  EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(AtLeast(1));
   EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(1);
 
   int touchStart = 50;
@@ -1591,7 +1584,6 @@ protected:
   void DoLongPressPreventDefaultTest(uint32_t aBehavior) {
     MakeApzcUnzoomable();
 
-    EXPECT_CALL(*mcc, SendAsyncScrollDOMEvent(_,_,_)).Times(0);
     EXPECT_CALL(*mcc, RequestContentRepaint(_)).Times(0);
 
     int touchX = 10,
