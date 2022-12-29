@@ -125,7 +125,7 @@ js::ScopeCoordinateFunctionScript(JSScript* script, jsbytecode* pc)
 void
 ScopeObject::setEnclosingScope(HandleObject obj)
 {
-    MOZ_ASSERT_IF(obj->is<CallObject>() || obj->is<DeclEnvObject>() || obj->is<BlockObject>(),
+    MOZ_ASSERT_IF(obj->is<LexicalScopeBase>() || obj->is<DeclEnvObject>() || obj->is<BlockObject>(),
                   obj->isDelegate());
     setFixedSlot(SCOPE_CHAIN_SLOT, ObjectValue(*obj));
 }
@@ -1776,9 +1776,7 @@ class DebugScopeProxy : public BaseProxyHandler
 
     static bool isFunctionScope(const JSObject& scope)
     {
-        return scope.is<CallObject>() &&
-               !scope.is<ModuleEnvironmentObject>() &&
-               !scope.as<CallObject>().isForEval();
+        return scope.is<CallObject>() && !scope.as<CallObject>().isForEval();
     }
 
     /*
@@ -2203,7 +2201,7 @@ bool
 DebugScopeObject::isForDeclarative() const
 {
     ScopeObject& s = scope();
-    return s.is<CallObject>() || s.is<BlockObject>() || s.is<DeclEnvObject>();
+    return s.is<LexicalScopeBase>() || s.is<BlockObject>() || s.is<DeclEnvObject>();
 }
 
 bool
@@ -2224,7 +2222,7 @@ DebugScopeObject::isOptimizedOut() const
     if (s.is<ClonedBlockObject>())
         return !s.as<ClonedBlockObject>().staticBlock().needsClone();
 
-    if (s.is<CallObject>() && !s.is<ModuleEnvironmentObject>()) {
+    if (s.is<CallObject>()) {
         return !s.as<CallObject>().isForEval() &&
                !s.as<CallObject>().callee().needsCallObject() &&
                !maybeSnapshot();
