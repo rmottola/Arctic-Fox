@@ -154,7 +154,6 @@ class SavedStacks {
                                                       JS::ubi::StackFrame& ubiFrame,
                                                       MutableHandleObject outSavedFrameStack);
 
-
   public:
     SavedStacks()
       : frames(),
@@ -179,7 +178,7 @@ class SavedStacks {
   private:
     SavedFrame::Set frames;
     mozilla::FastBernoulliTrial bernoulli;
-    bool            creatingSavedFrame;
+    bool creatingSavedFrame;
 
     // Similar to mozilla::ReentrancyGuard, but instead of asserting against
     // reentrancy, just change the behavior of SavedStacks::saveCurrentStack to

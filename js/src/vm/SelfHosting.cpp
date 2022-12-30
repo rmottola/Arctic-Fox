@@ -645,6 +645,186 @@ intrinsic_StarGeneratorObjectIsClosed(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+bool
+js::intrinsic_IsSuspendedStarGenerator(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+
+    if (!args[0].isObject() || !args[0].toObject().is<StarGeneratorObject>()) {
+        args.rval().setBoolean(false);
+        return true;
+    }
+
+    StarGeneratorObject& genObj = args[0].toObject().as<StarGeneratorObject>();
+    args.rval().setBoolean(!genObj.isClosed() && genObj.isSuspended());
+    return true;
+}
+
+static bool
+intrinsic_IsLegacyGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    args.rval().setBoolean(args[0].toObject().is<LegacyGeneratorObject>());
+    return true;
+}
+
+static bool
+intrinsic_LegacyGeneratorObjectIsClosed(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    LegacyGeneratorObject* genObj = &args[0].toObject().as<LegacyGeneratorObject>();
+    args.rval().setBoolean(genObj->isClosed());
+    return true;
+}
+
+static bool
+intrinsic_CloseClosingLegacyGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    LegacyGeneratorObject* genObj = &args[0].toObject().as<LegacyGeneratorObject>();
+    MOZ_ASSERT(genObj->isClosing());
+    genObj->setClosed();
+    return true;
+}
+
+static bool
+intrinsic_ThrowStopIteration(JSContext* cx, unsigned argc, Value* vp)
+{
+    MOZ_ASSERT(CallArgsFromVp(argc, vp).length() == 0);
+
+    return ThrowStopIteration(cx);
+}
+
+static bool
+intrinsic_GeneratorIsRunning(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    GeneratorObject* genObj = &args[0].toObject().as<GeneratorObject>();
+    args.rval().setBoolean(genObj->isRunning() || genObj->isClosing());
+    return true;
+}
+
+static bool
+intrinsic_GeneratorSetClosed(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    GeneratorObject* genObj = &args[0].toObject().as<GeneratorObject>();
+    genObj->setClosed();
+    return true;
+}
+
+static bool
+intrinsic_IsArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    args.rval().setBoolean(args[0].toObject().is<ArrayBufferObject>());
+    return true;
+}
+
+static bool
+intrinsic_IsTypedArray(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    args.rval().setBoolean(args[0].toObject().is<TypedArrayObject>());
+    return true;
+}
+
+static bool
+intrinsic_IsPossiblyWrappedTypedArray(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+
+    bool isTypedArray = false;
+    if (args[0].isObject()) {
+        JSObject* obj = CheckedUnwrap(&args[0].toObject());
+        if (!obj) {
+            JS_ReportError(cx, "Permission denied to access object");
+            return false;
+        }
+
+        isTypedArray = obj->is<TypedArrayObject>();
+    }
+
+    args.rval().setBoolean(isTypedArray);
+    return true;
+}
+
+static bool
+intrinsic_TypedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(TypedArrayObject::is(args[0]));
+
+    Rooted<TypedArrayObject*> tarray(cx, &args[0].toObject().as<TypedArrayObject>());
+    if (!TypedArrayObject::ensureHasBuffer(cx, tarray))
+        return false;
+
+    args.rval().set(TypedArrayObject::bufferValue(tarray));
+    return true;
+}
+
+static bool
+intrinsic_TypedArrayByteOffset(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(TypedArrayObject::is(args[0]));
+
+    args.rval().set(TypedArrayObject::byteOffsetValue(&args[0].toObject().as<TypedArrayObject>()));
+    return true;
+}
+
+static bool
+intrinsic_TypedArrayElementShift(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(TypedArrayObject::is(args[0]));
+
+    unsigned shift = TypedArrayShift(args[0].toObject().as<TypedArrayObject>().type());
+    MOZ_ASSERT(shift == 0 || shift == 1 || shift == 2 || shift == 3);
+
+    args.rval().setInt32(mozilla::AssertedCast<int32_t>(shift));
+    return true;
+}
+
+// Return the value of [[ArrayLength]] internal slot of the TypedArray
+static bool
+intrinsic_TypedArrayLength(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+
+    RootedObject obj(cx, &args[0].toObject());
+    MOZ_ASSERT(obj->is<TypedArrayObject>());
+    args.rval().setInt32(obj->as<TypedArrayObject>().length());
+    return true;
+}
+
 static bool
 intrinsic_MoveTypedArrayElements(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -1048,186 +1228,6 @@ intrinsic_SetOverlappingTypedElements(JSContext* cx, unsigned argc, Value* vp)
                         unsafeSrcTypeCrossCompartment, count);
 
     args.rval().setUndefined();
-    return true;
-}
-
-bool
-js::intrinsic_IsSuspendedStarGenerator(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-
-    if (!args[0].isObject() || !args[0].toObject().is<StarGeneratorObject>()) {
-        args.rval().setBoolean(false);
-        return true;
-    }
-
-    StarGeneratorObject& genObj = args[0].toObject().as<StarGeneratorObject>();
-    args.rval().setBoolean(!genObj.isClosed() && genObj.isSuspended());
-    return true;
-}
-
-static bool
-intrinsic_IsLegacyGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<LegacyGeneratorObject>());
-    return true;
-}
-
-static bool
-intrinsic_LegacyGeneratorObjectIsClosed(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    LegacyGeneratorObject* genObj = &args[0].toObject().as<LegacyGeneratorObject>();
-    args.rval().setBoolean(genObj->isClosed());
-    return true;
-}
-
-static bool
-intrinsic_CloseClosingLegacyGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    LegacyGeneratorObject* genObj = &args[0].toObject().as<LegacyGeneratorObject>();
-    MOZ_ASSERT(genObj->isClosing());
-    genObj->setClosed();
-    return true;
-}
-
-static bool
-intrinsic_ThrowStopIteration(JSContext* cx, unsigned argc, Value* vp)
-{
-    MOZ_ASSERT(CallArgsFromVp(argc, vp).length() == 0);
-
-    return ThrowStopIteration(cx);
-}
-
-static bool
-intrinsic_GeneratorIsRunning(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    GeneratorObject* genObj = &args[0].toObject().as<GeneratorObject>();
-    args.rval().setBoolean(genObj->isRunning() || genObj->isClosing());
-    return true;
-}
-
-static bool
-intrinsic_GeneratorSetClosed(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    GeneratorObject* genObj = &args[0].toObject().as<GeneratorObject>();
-    genObj->setClosed();
-    return true;
-}
-
-static bool
-intrinsic_IsArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ArrayBufferObject>());
-    return true;
-}
-
-static bool
-intrinsic_IsTypedArray(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<TypedArrayObject>());
-    return true;
-}
-
-static bool
-intrinsic_IsPossiblyWrappedTypedArray(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-
-    bool isTypedArray = false;
-    if (args[0].isObject()) {
-        JSObject* obj = CheckedUnwrap(&args[0].toObject());
-        if (!obj) {
-            JS_ReportError(cx, "Permission denied to access object");
-            return false;
-        }
-
-        isTypedArray = obj->is<TypedArrayObject>();
-    }
-
-    args.rval().setBoolean(isTypedArray);
-    return true;
-}
-
-static bool
-intrinsic_TypedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(TypedArrayObject::is(args[0]));
-
-    Rooted<TypedArrayObject*> tarray(cx, &args[0].toObject().as<TypedArrayObject>());
-    if (!TypedArrayObject::ensureHasBuffer(cx, tarray))
-        return false;
-
-    args.rval().set(TypedArrayObject::bufferValue(tarray));
-    return true;
-}
-
-static bool
-intrinsic_TypedArrayByteOffset(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(TypedArrayObject::is(args[0]));
-
-    args.rval().set(TypedArrayObject::byteOffsetValue(&args[0].toObject().as<TypedArrayObject>()));
-    return true;
-}
-
-static bool
-intrinsic_TypedArrayElementShift(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(TypedArrayObject::is(args[0]));
-
-    unsigned shift = TypedArrayShift(args[0].toObject().as<TypedArrayObject>().type());
-    MOZ_ASSERT(shift == 0 || shift == 1 || shift == 2 || shift == 3);
-
-    args.rval().setInt32(mozilla::AssertedCast<int32_t>(shift));
-    return true;
-}
-
-// Return the value of [[ArrayLength]] internal slot of the TypedArray
-static bool
-intrinsic_TypedArrayLength(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-
-    RootedObject obj(cx, &args[0].toObject());
-    MOZ_ASSERT(obj->is<TypedArrayObject>());
-    args.rval().setInt32(obj->as<TypedArrayObject>().length());
     return true;
 }
 
