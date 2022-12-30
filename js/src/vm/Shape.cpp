@@ -1546,6 +1546,11 @@ NewObjectCache::invalidateEntriesForShape(JSContext* cx, HandleShape shape, Hand
 
     Rooted<GlobalObject*> global(cx, shape->compartment()->unsafeUnbarrieredMaybeGlobal());
     RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, clasp, TaggedProto(proto)));
+    if (!group) {
+        purge();
+        cx->recoverFromOutOfMemory();
+        return;
+    }
 
     EntryIndex entry;
     if (lookupGlobal(clasp, global, kind, &entry))
