@@ -108,29 +108,18 @@
 - Bug 1226909 multipart AsyncOpen2 
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
 - 1185106 - at least part 0 to 4 for TFF
-- Check completeness of Bug 1216401: Eviscerate nsIDOMWindow
-- Bug 1158632 - IonBuilder TableSwitch, fill-the-gap cases should encor¿
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1169268 - Don't crash when pasting files. r=ndeakin
-- Bug 1202085 2015-10-26 - Part 0 to 6
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
 - Bug 1242578
 
-JS - breaks:
-https://bugzilla.mozilla.org/show_bug.cgi?id=589199
-
 
 impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-More session store stuff to check:
-
-- Bug 1243549 - Add missing bits. r=post-facto
-- Bug 1243549 - Make sure that startup sanitization doesn't throw becau
 
 ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
@@ -143,13 +132,9 @@ Check with Roy Tam:
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
-Parents of:
-https://github.com/mozilla/newtab-dev/commit/ac250f9d737362d0730b0897603ae379eca89ebf
 
 ## Enhancing JS
  Bug 1316079 - Mark JS::PropertyDescriptor as JS_PUBLIC_API to fix lin¿
-- Bug 1208747 - Move most of Stopwatch-related code to XPCOM-land (JSAP
-- Bug 930414 - remaining 6 out of 22 parts
 
 ### FIXME / TODO
 - Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
