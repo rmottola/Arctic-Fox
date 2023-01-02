@@ -215,7 +215,7 @@ TextTrackManager::UpdateCueDisplay()
   mTextTracks->UpdateAndGetShowingCues(activeCues);
 
   if (activeCues.Length() > 0) {
-    RefPtr<nsVariant> jsCues = new nsVariant();
+    RefPtr<nsVariantCC> jsCues = new nsVariantCC();
 
     jsCues->SetAsArray(nsIDataType::VTYPE_INTERFACE,
                        &NS_GET_IID(nsIDOMEventTarget),

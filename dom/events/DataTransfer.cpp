@@ -419,7 +419,7 @@ void
 DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData,
                       ErrorResult& aRv)
 {
-  RefPtr<nsVariant> variant = new nsVariant();
+  RefPtr<nsVariantCC> variant = new nsVariantCC();
   variant->SetAsAString(aData);
 
   aRv = MozSetDataAt(aFormat, variant, 0);
@@ -1365,7 +1365,7 @@ DataTransfer::FillInExternalData(TransferItem& aItem, uint32_t aIndex)
     if (!data)
       return;
 
-    RefPtr<nsVariant> variant = new nsVariant();
+    RefPtr<nsVariantCC> variant = new nsVariantCC();
 
     nsCOMPtr<nsISupportsString> supportsstr = do_QueryInterface(data);
     if (supportsstr) {

@@ -3064,7 +3064,7 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
         auto& items = aTransfers[i].items();
         for (uint32_t j = 0; j < items.Length(); ++j) {
           const IPCDataTransferItem& item = items[j];
-          RefPtr<nsVariant> variant = new nsVariant();
+          RefPtr<nsVariantCC> variant = new nsVariantCC();
           if (item.data().type() == IPCDataTransferData::TnsString) {
             const nsString& data = item.data().get_nsString();
             variant->SetAsAString(data);

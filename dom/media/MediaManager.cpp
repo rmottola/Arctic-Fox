@@ -2253,7 +2253,8 @@ MediaManager::AnonymizeId(nsAString& aId, const nsACString& aOriginKey)
 already_AddRefed<nsIWritableVariant>
 MediaManager::ToJSArray(SourceSet& aDevices)
 {
-  RefPtr<nsVariant> var = new nsVariant();
+  MOZ_ASSERT(NS_IsMainThread());
+  RefPtr<nsVariantCC> var = new nsVariantCC();
   size_t len = aDevices.Length();
   if (len) {
     nsTArray<nsIMediaDevice*> tmp(len);
