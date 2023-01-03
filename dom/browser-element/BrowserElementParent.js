@@ -283,7 +283,8 @@ BrowserElementParent.prototype = {
     /* username and password */
     let detail = {
       host:     authDetail.host,
-      realm:    authDetail.realm
+      realm:    authDetail.realm,
+      isProxy:  authDetail.isProxy
     };
 
     evt = this._createEvent('usernameandpasswordrequired', detail,
