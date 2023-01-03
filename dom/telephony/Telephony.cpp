@@ -166,8 +166,6 @@ bool
 Telephony::IsActiveState(uint16_t aCallState) {
   return aCallState == nsITelephonyService::CALL_STATE_DIALING ||
       aCallState == nsITelephonyService::CALL_STATE_ALERTING ||
-      aCallState == nsITelephonyService::CALL_STATE_HOLDING ||
-      aCallState == nsITelephonyService::CALL_STATE_DISCONNECTING ||
       aCallState == nsITelephonyService::CALL_STATE_CONNECTED;
 }
 
