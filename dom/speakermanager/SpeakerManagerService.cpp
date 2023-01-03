@@ -174,6 +174,20 @@ SpeakerManagerService::Observe(nsISupports* aSubject,
     } else {
       NS_WARNING("ipc:content-shutdown message without childID property");
     }
+  } else if (!strcmp(aTopic, "xpcom-will-shutdown")) {
+    // Note that we need to do this before xpcom-shutdown, since the
+    // AudioChannelService cannot be used past that point.
+    RefPtr<AudioChannelService> audioChannelService =
+      AudioChannelService::GetOrCreate();
+    audioChannelService->UnregisterSpeakerManager(this);
+
+    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+    if (obs) {
+      obs->RemoveObserver(this, "ipc:content-shutdown");
+      obs->RemoveObserver(this, "xpcom-will-shutdown");
+    }
+
+    Shutdown();
   }
   return NS_OK;
 }
@@ -187,6 +201,7 @@ SpeakerManagerService::SpeakerManagerService()
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
       obs->AddObserver(this, "ipc:content-shutdown", false);
+      obs->AddObserver(this, "xpcom-will-shutdown", false);
     }
   }
   RefPtr<AudioChannelService> audioChannelService =
@@ -197,7 +212,4 @@ SpeakerManagerService::SpeakerManagerService()
 SpeakerManagerService::~SpeakerManagerService()
 {
   MOZ_COUNT_DTOR(SpeakerManagerService);
-  RefPtr<AudioChannelService> audioChannelService =
-    AudioChannelService::GetOrCreate();
-  audioChannelService->UnregisterSpeakerManager(this);
 }

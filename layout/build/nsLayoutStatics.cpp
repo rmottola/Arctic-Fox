@@ -110,7 +110,6 @@
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsVolumeService.h"
-#include "SpeakerManagerService.h"
 using namespace mozilla::system;
 #endif
 
@@ -409,7 +408,6 @@ nsLayoutStatics::Shutdown()
 
 #ifdef MOZ_WIDGET_GONK
   nsVolumeService::Shutdown();
-  SpeakerManagerService::Shutdown();
 #endif
 
 #ifdef MOZ_WEBSPEECH
