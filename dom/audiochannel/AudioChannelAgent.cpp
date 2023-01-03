@@ -77,7 +77,7 @@ AudioChannelAgent::InitInternal(nsIDOMWindow* aWindow, int32_t aChannelType,
              "Enum of channel on nsIAudioChannelAgent.idl should be the same with AudioChannelBinding.h");
 
   if (mAudioChannelType != AUDIO_AGENT_CHANNEL_ERROR ||
-      aChannelType > AUDIO_AGENT_CHANNEL_PUBLICNOTIFICATION ||
+      aChannelType > AUDIO_AGENT_CHANNEL_SYSTEM ||
       aChannelType < AUDIO_AGENT_CHANNEL_NORMAL) {
     return NS_ERROR_FAILURE;
   }
