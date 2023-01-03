@@ -851,7 +851,7 @@ public:
   void GetStatus(nsAString& aStatus, mozilla::ErrorResult& aError);
   void SetStatusOuter(const nsAString& aStatus);
   void SetStatus(const nsAString& aStatus, mozilla::ErrorResult& aError);
-  void CloseOuter();
+  void CloseOuter(bool aTrustedCaller);
   void Close(mozilla::ErrorResult& aError);
   nsresult Close() override;
   bool GetClosedOuter();
