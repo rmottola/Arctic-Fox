@@ -87,6 +87,38 @@ const COMMAND_MAP = {
 
 var global = this;
 
+function BrowserElementProxyForwarder() {
+}
+
+BrowserElementProxyForwarder.prototype = {
+  init: function() {
+    Services.obs.addObserver(this, "browser-element-api:proxy-call", false);
+    addMessageListener("browser-element-api:proxy", this);
+  },
+
+  uninit: function() {
+    Services.obs.removeObserver(this, "browser-element-api:proxy-call", false);
+    removeMessageListener("browser-element-api:proxy", this);
+  },
+
+  // Observer callback receives messages from BrowserElementProxy.js
+  observe: function(subject, topic, stringifedData) {
+    if (subject !== content) {
+      return;
+    }
+
+    // Forward it to BrowserElementParent.js
+    sendAsyncMessage(topic, JSON.parse(stringifedData));
+  },
+
+  // Message manager callback receives messages from BrowserElementParent.js
+  receiveMessage: function(mmMsg) {
+    // Forward it to BrowserElementProxy.js
+    Services.obs.notifyObservers(
+      content, mmMsg.name, JSON.stringify(mmMsg.json));
+  }
+};
+
 function BrowserElementChild() {
   // Maps outer window id --> weak ref to window.  Used by modal dialog code.
   this._windowIDDict = {};
@@ -105,6 +137,8 @@ function BrowserElementChild() {
   this._isContentWindowCreated = false;
   this._pendingSetInputMethodActive = [];
   this._selectionStateChangedTarget = null;
+
+  this.forwarder = new BrowserElementProxyForwarder();
 
   this._init();
 };
@@ -292,6 +326,8 @@ BrowserElementChild.prototype = {
     OBSERVED_EVENTS.forEach((aTopic) => {
       Services.obs.addObserver(this, aTopic, false);
     });
+
+    this.forwarder.init();
   },
 
   observe: function(subject, topic, data) {
@@ -331,6 +367,9 @@ BrowserElementChild.prototype = {
     OBSERVED_EVENTS.forEach((aTopic) => {
       Services.obs.removeObserver(this, aTopic);
     });
+
+    this.forwarder.uninit();
+    this.forwarder = null;
   },
 
   get _windowUtils() {
@@ -899,7 +938,7 @@ BrowserElementChild.prototype = {
   },
 
   _getSystemCtxMenuData: function(elem) {
-    let documentURI = 
+    let documentURI =
       docShell.QueryInterface(Ci.nsIWebNavigation).currentURI.spec;
     if ((elem instanceof Ci.nsIDOMHTMLAnchorElement && elem.href) ||
         (elem instanceof Ci.nsIDOMHTMLAreaElement && elem.href)) {
