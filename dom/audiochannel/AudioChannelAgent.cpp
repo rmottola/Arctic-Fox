@@ -121,6 +121,13 @@ NS_IMETHODIMP AudioChannelAgent::NotifyStartedPlaying(float *aVolume,
   MOZ_ASSERT(aVolume);
   MOZ_ASSERT(aMuted);
 
+  // Window-less AudioChannelAgents are muted by default.
+  if (!mWindow) {
+    *aVolume = 0;
+    *aMuted = true;
+    return NS_OK;
+  }
+
   RefPtr<AudioChannelService> service = AudioChannelService::GetOrCreate();
   if (mAudioChannelType == AUDIO_AGENT_CHANNEL_ERROR ||
       service == nullptr || mIsRegToService) {
