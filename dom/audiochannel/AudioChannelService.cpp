@@ -40,6 +40,7 @@ namespace {
 
 // If true, any new AudioChannelAgent will be muted when created.
 bool sAudioChannelMutedByDefault = false;
+bool sXPCOMShuttingDown = false;
 
 class NotifyChannelActiveRunnable final : public nsRunnable
 {
@@ -172,12 +173,16 @@ AudioChannelService::CreateServiceIfNeeded()
 /* static */ already_AddRefed<AudioChannelService>
 AudioChannelService::GetOrCreate()
 {
+  if (sXPCOMShuttingDown) {
+    return nullptr;
+  }
+
   CreateServiceIfNeeded();
   RefPtr<AudioChannelService> service = gAudioChannelService.get();
   return service.forget();
 }
 
-void
+/* static */ void
 AudioChannelService::Shutdown()
 {
   if (gAudioChannelService) {
@@ -193,6 +198,12 @@ AudioChannelService::Shutdown()
 #endif
       }
     }
+
+    gAudioChannelService->mWindows.Clear();
+    gAudioChannelService->mPlayingChildren.Clear();
+#ifdef MOZ_WIDGET_GONK
+    gAudioChannelService->mSpeakerManager.Clear();
+#endif
 
     gAudioChannelService = nullptr;
   }
@@ -461,7 +472,7 @@ AudioChannelService::Observe(nsISupports* aSubject, const char* aTopic,
                              const char16_t* aData)
 {
   if (!strcmp(aTopic, "xpcom-shutdown")) {
-    mWindows.Clear();
+    sXPCOMShuttingDown = true;
     Shutdown();
   } else if (!strcmp(aTopic, "outer-window-destroyed")) {
     nsCOMPtr<nsISupportsPRUint64> wrapper = do_QueryInterface(aSubject);

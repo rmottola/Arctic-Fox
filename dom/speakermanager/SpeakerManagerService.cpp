@@ -179,7 +179,9 @@ SpeakerManagerService::Observe(nsISupports* aSubject,
     // AudioChannelService cannot be used past that point.
     RefPtr<AudioChannelService> audioChannelService =
       AudioChannelService::GetOrCreate();
-    audioChannelService->UnregisterSpeakerManager(this);
+    if (audioChannelService) {
+      audioChannelService->UnregisterSpeakerManager(this);
+    }
 
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
@@ -206,7 +208,9 @@ SpeakerManagerService::SpeakerManagerService()
   }
   RefPtr<AudioChannelService> audioChannelService =
     AudioChannelService::GetOrCreate();
-  audioChannelService->RegisterSpeakerManager(this);
+  if (audioChannelService) {
+    audioChannelService->RegisterSpeakerManager(this);
+  }
 }
 
 SpeakerManagerService::~SpeakerManagerService()
