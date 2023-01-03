@@ -118,6 +118,9 @@ class RequestOrUSVString;
 class Selection;
 class SpeechSynthesis;
 class WakeLock;
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+class WindowOrientationObserver;
+#endif
 namespace cache {
 class CacheStorage;
 } // namespace cache
@@ -643,6 +646,11 @@ public:
   // Inner windows only.
   virtual void EnableDeviceSensor(uint32_t aType) override;
   virtual void DisableDeviceSensor(uint32_t aType) override;
+
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+  virtual void EnableOrientationChangeListener() override;
+  virtual void DisableOrientationChangeListener() override;
+#endif
 
   virtual void EnableTimeChangeNotifications() override;
   virtual void DisableTimeChangeNotifications() override;
@@ -1841,6 +1849,10 @@ protected:
   nsTHashtable<nsPtrHashKey<mozilla::DOMEventTargetHelper> > mEventTargetObjects;
 
   nsTArray<uint32_t> mEnabledSensors;
+
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+  nsAutoPtr<mozilla::dom::WindowOrientationObserver> mOrientationChangeObserver;
+#endif
 
 #ifdef MOZ_WEBSPEECH
   // mSpeechSynthesis is only used on inner windows.

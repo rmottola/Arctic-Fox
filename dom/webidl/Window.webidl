@@ -400,6 +400,14 @@ Window implements TouchEventHandlers;
 
 Window implements OnErrorEventHandlerForWindow;
 
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+// https://compat.spec.whatwg.org/#windoworientation-interface
+partial interface Window {
+  readonly attribute short orientation;
+           attribute EventHandler onorientationchange;
+};
+#endif
+
 // ConsoleAPI
 partial interface Window {
   [Replaceable, GetterThrows]
