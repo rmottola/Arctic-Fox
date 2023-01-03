@@ -300,11 +300,6 @@ private:
   bool mSuspended;
 };
 
-static bool UseAudioChannelService()
-{
-  return Preferences::GetBool("media.useAudioChannelService");
-}
-
 static bool UseAudioChannelAPI()
 {
   return Preferences::GetBool("media.useAudioChannelAPI");
@@ -589,10 +584,6 @@ AudioDestinationNode::SetMozAudioChannelType(AudioChannel aValue, ErrorResult& a
 bool
 AudioDestinationNode::CheckAudioChannelPermissions(AudioChannel aValue)
 {
-  if (!Preferences::GetBool("media.useAudioChannelService")) {
-    return true;
-  }
-
   // Only normal channel doesn't need permission.
   if (aValue == AudioChannel::Normal) {
     return true;
@@ -628,7 +619,7 @@ AudioDestinationNode::CheckAudioChannelPermissions(AudioChannel aValue)
 void
 AudioDestinationNode::CreateAudioChannelAgent()
 {
-  if (mIsOffline || !UseAudioChannelService()) {
+  if (mIsOffline) {
     return;
   }
 

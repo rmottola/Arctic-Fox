@@ -1121,11 +1121,6 @@ static bool IsScriptedAutoplayEnabled()
   return Preferences::GetBool("media.autoplay.allowscripted");
 }
 
-static bool UseAudioChannelService()
-{
-  return Preferences::GetBool("media.useAudioChannelService");
-}
-
 static bool UseAudioChannelAPI()
 {
   return Preferences::GetBool("media.useAudioChannelAPI");
@@ -2449,10 +2444,6 @@ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
 
 bool HTMLMediaElement::CheckAudioChannelPermissions(const nsAString& aString)
 {
-  if (!UseAudioChannelService()) {
-    return true;
-  }
-
   // Only normal channel doesn't need permission.
   if (aString.EqualsASCII("normal")) {
     return true;
@@ -4635,10 +4626,6 @@ ImageContainer* HTMLMediaElement::GetImageContainer()
 
 nsresult HTMLMediaElement::UpdateChannelMuteState(float aVolume, bool aMuted)
 {
-  if (!UseAudioChannelService()) {
-    return NS_OK;
-  }
-
   if (mAudioChannelVolume != aVolume) {
     mAudioChannelVolume = aVolume;
     SetVolumeInternal();
@@ -4683,10 +4670,6 @@ HTMLMediaElement::MaybeCreateAudioChannelAgent()
 void
 HTMLMediaElement::UpdateAudioChannelPlayingState()
 {
-  if (!UseAudioChannelService()) {
-    return;
-  }
-
   bool playingThroughTheAudioChannel =
      (!mPaused &&
       !Muted() &&
