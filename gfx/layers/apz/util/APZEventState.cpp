@@ -288,10 +288,10 @@ APZEventState::ProcessTouchEvent(const WidgetTouchEvent& aEvent,
       mTouchEndCancelled = true;
       mEndTouchIsClick = false;
     }
-    // fall through
+    MOZ_FALLTHROUGH;
   case eTouchCancel:
     mActiveElementManager->HandleTouchEndEvent(mEndTouchIsClick);
-    // fall through
+    MOZ_FALLTHROUGH;
   case eTouchMove: {
     if (mPendingTouchPreventedResponse) {
       MOZ_ASSERT(aGuid == mPendingTouchPreventedGuid);
@@ -426,4 +426,3 @@ APZEventState::GetWidget() const
 
 } // namespace layers
 } // namespace mozilla
-
