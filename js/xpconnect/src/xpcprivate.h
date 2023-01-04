@@ -1125,8 +1125,8 @@ public:
     static bool
     IsDyingScope(XPCWrappedNativeScope* scope);
 
-    typedef js::HashSet<JSObject*,
-                        js::PointerHasher<JSObject*, 3>,
+    typedef js::HashSet<JS::Heap<JSObject*>,
+                        js::MovableCellHasher<JS::Heap<JSObject*>>,
                         js::SystemAllocPolicy> DOMExpandoSet;
 
     bool RegisterDOMExpandoObject(JSObject* expando) {
@@ -1136,11 +1136,11 @@ public:
             mDOMExpandoSet = new DOMExpandoSet();
             mDOMExpandoSet->init(8);
         }
-        return mDOMExpandoSet->put(expando);
+        return mDOMExpandoSet->put(JS::Heap<JSObject*>(expando));
     }
     void RemoveDOMExpandoObject(JSObject* expando) {
         if (mDOMExpandoSet) {
-            DOMExpandoSet::Ptr p = mDOMExpandoSet->lookup(expando);
+            DOMExpandoSet::Ptr p = mDOMExpandoSet->lookup(JS::Heap<JSObject*>(expando));
             MOZ_ASSERT(p.found());
             mDOMExpandoSet->remove(p);
         }
