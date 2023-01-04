@@ -90,8 +90,9 @@ WeakMapBase::sweepZone(JS::Zone* zone)
     }
 
 #ifdef DEBUG
-    for (WeakMapBase* m : zone->gcWeakMapList)
+    for (WeakMapBase* m : zone->gcWeakMapList) {
         MOZ_ASSERT(m->isInList() && m->marked);
+    }
 #endif
 }
 
