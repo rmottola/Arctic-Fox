@@ -2,10 +2,11 @@
 
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
+browserElementTestHelpers.setClipboardPlainTextOnlyPref(false);
 browserElementTestHelpers.addPermission();
 
-let audioUrl = 'http://mochi.test:8888/tests/dom/browser-element/mochitest/audio.ogg';
-let videoUrl = 'http://mochi.test:8888/tests/dom/browser-element/mochitest/short-video.ogv';
+var audioUrl = 'http://mochi.test:8888/tests/dom/browser-element/mochitest/audio.ogg';
+var videoUrl = 'http://mochi.test:8888/tests/dom/browser-element/mochitest/short-video.ogv';
 
 function runTests() {
   createIframe(function onIframeLoaded() {

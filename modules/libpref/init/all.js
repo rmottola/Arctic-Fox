@@ -2322,6 +2322,9 @@ pref("mouse.button5.enabled", true);
 // Clipboard behavior
 pref("clipboard.autocopy", false);
 
+// Clipboard only supports text/plain
+pref("clipboard.plainTextOnly", false);
+
 // mouse wheel scroll transaction period of time (in milliseconds)
 pref("mousewheel.transaction.timeout", 1500);
 // mouse wheel scroll transaction is held even if the mouse cursor is moved.
