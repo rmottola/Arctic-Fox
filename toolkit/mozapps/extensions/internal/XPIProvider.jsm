@@ -1326,7 +1326,7 @@ let loadManifestFromZipReader = Task.async(function* loadManifestFromZipReader(a
  * @return an AddonInternal object
  * @throws if the XPI file does not contain a valid install manifest
  */
-let loadManifestFromZipFile = Task.async(function* loadManifestFromZipFile(aXPIFile) {
+var loadManifestFromZipFile = Task.async(function* loadManifestFromZipFile(aXPIFile, aInstallLocation) {
   let zipReader = Cc["@mozilla.org/libjar/zip-reader;1"].
                   createInstance(Ci.nsIZipReader);
   try {

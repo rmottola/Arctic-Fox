@@ -37,6 +37,15 @@ XPCOMUtils.defineLazyGetter(Services, "dirsvc", function () {
            .QueryInterface(Ci.nsIProperties);
 });
 
+if (AppConstants.MOZ_CRASHREPORTER) {
+  XPCOMUtils.defineLazyGetter(Services, "crashmanager", () => {
+    let ns = {};
+    Components.utils.import("resource://gre/modules/CrashManager.jsm", ns);
+
+    return ns.CrashManager.Singleton;
+  });
+}
+
 XPCOMUtils.defineLazyGetter(Services, "mm", () => {
   return Cc["@mozilla.org/globalmessagemanager;1"]
            .getService(Ci.nsIMessageBroadcaster)

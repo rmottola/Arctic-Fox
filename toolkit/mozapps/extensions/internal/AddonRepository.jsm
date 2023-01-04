@@ -72,7 +72,7 @@ const LOGGER_ID = "addons.repository";
 
 // Create a new logger for use by the Addons Repository
 // (Requires AddonManager.jsm)
-let logger = Log.repository.getLogger(LOGGER_ID);
+var logger = Log.repository.getLogger(LOGGER_ID);
 
 // A map between XML keys to AddonSearchResult keys for string values
 // that require no extra parsing from XML
@@ -101,7 +101,7 @@ const INTEGER_KEY_MAP = {
 };
 
 // Wrap the XHR factory so that tests can override with a mock
-let XHRequest = Components.Constructor("@mozilla.org/xmlextras/xmlhttprequest;1",
+var XHRequest = Components.Constructor("@mozilla.org/xmlextras/xmlhttprequest;1",
                                        "nsIXMLHttpRequest");
 
 function convertHTMLToPlainText(html) {
