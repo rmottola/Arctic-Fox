@@ -4646,6 +4646,8 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
 
   MOZ_ASSERT(aThebesContext->CurrentOp() == CompositionOp::OP_OVER);
 
+  aThebesContext->Clip();
+
   nsDeviceContext* devCtx = mPresContext->DeviceContext();
 
   gfxPoint offset(-nsPresContext::AppUnitsToFloatCSSPixels(aRect.x),
