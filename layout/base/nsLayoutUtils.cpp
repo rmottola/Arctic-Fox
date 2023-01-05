@@ -1929,10 +1929,12 @@ nsLayoutUtils::GetAnimatedGeometryRootForFrame(nsDisplayListBuilder* aBuilder,
 
 nsIFrame*
 nsLayoutUtils::GetAnimatedGeometryRootFor(nsDisplayItem* aItem,
-                                          nsDisplayListBuilder* aBuilder)
+                                          nsDisplayListBuilder* aBuilder,
+                                          uint32_t aFlags)
 {
   nsIFrame* f = aItem->Frame();
-  if (aItem->ShouldFixToViewport(aBuilder)) {
+  if (!(aFlags & AGR_IGNORE_BACKGROUND_ATTACHMENT_FIXED) &&
+      aItem->ShouldFixToViewport(aBuilder)) {
     // Make its active scrolled root be the active scrolled root of
     // the enclosing viewport, since it shouldn't be scrolled by scrolled
     // frames in its document. InvalidateFixedBackgroundFramesFromList in
@@ -1941,6 +1943,14 @@ nsLayoutUtils::GetAnimatedGeometryRootFor(nsDisplayItem* aItem,
       nsLayoutUtils::GetClosestFrameOfType(f, nsGkAtoms::viewportFrame, aBuilder->RootReferenceFrame());
     if (viewportFrame) {
       return GetAnimatedGeometryRootForFrame(aBuilder, viewportFrame);
+    }
+  }
+  if (aItem->GetType() == nsDisplayItem::TYPE_TRANSFORM &&
+      static_cast<nsDisplayTransform*>(aItem)->IsReferenceFrameBoundary() &&
+      f != aBuilder->RootReferenceFrame()) {
+    nsIFrame* parent = nsLayoutUtils::GetCrossDocParentFrame(f);
+    if (parent) {
+      return GetAnimatedGeometryRootForFrame(aBuilder, parent);
     }
   }
   return GetAnimatedGeometryRootForFrame(aBuilder, f);

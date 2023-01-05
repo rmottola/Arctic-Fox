@@ -1041,6 +1041,9 @@ nsDisplayListBuilder::IsAnimatedGeometryRoot(nsIFrame* aFrame, nsIFrame** aParen
     // for background-attachment:fixed elements.
     return true;
   }
+  if (aFrame->IsTransformed()) {
+    return true;
+  }
 
   nsIFrame* parent = nsLayoutUtils::GetCrossDocParentFrame(aFrame);
   if (!parent)
@@ -4779,6 +4782,9 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
 void
 nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
 {
+  if (mFrame == aBuilder->RootReferenceFrame()) {
+    return;
+  }
   nsIFrame *outerFrame = nsLayoutUtils::GetCrossDocParentFrame(mFrame);
   mReferenceFrame =
     aBuilder->FindReferenceFrameFor(outerFrame);
