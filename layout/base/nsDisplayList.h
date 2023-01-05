@@ -2622,7 +2622,7 @@ protected:
   const nsStyleBackground* mBackgroundStyle;
   nsCOMPtr<imgIContainer> mImage;
   RefPtr<ImageContainer> mImageContainer;
-  LayoutDeviceRect mDestRect;
+  LayoutDeviceRect mImageLayerDestRect;
   /* Bounds of this display item */
   nsRect mBounds;
   uint32_t mLayer;
