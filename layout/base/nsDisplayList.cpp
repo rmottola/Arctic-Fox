@@ -4729,7 +4729,7 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
   , mChildrenVisibleRect(aChildrenVisibleRect)
   , mIndex(aIndex)
   , mNoExtendContext(false)
-  , mHasPresetTransform(false)
+  , mIsTransformSeparator(false)
   , mTransformPreserves3DInited(false)
 {
   MOZ_COUNT_CTOR(nsDisplayTransform);
@@ -4750,6 +4750,7 @@ nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
 void
 nsDisplayTransform::Init(nsDisplayListBuilder* aBuilder)
 {
+  mHasBounds = false;
   mStoredList.SetClip(aBuilder, DisplayItemClip::NoClip());
   mStoredList.SetVisibleRect(mChildrenVisibleRect);
   mMaybePrerender = ShouldPrerenderTransformedContent(aBuilder, mFrame);
@@ -4776,13 +4777,14 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
   , mChildrenVisibleRect(aChildrenVisibleRect)
   , mIndex(aIndex)
   , mNoExtendContext(false)
-  , mHasPresetTransform(false)
+  , mIsTransformSeparator(false)
   , mTransformPreserves3DInited(false)
 {
   MOZ_COUNT_CTOR(nsDisplayTransform);
   MOZ_ASSERT(aFrame, "Must have a frame!");
   SetReferenceFrameToAncestor(aBuilder);
   Init(aBuilder);
+  UpdateBoundsFor3D(aBuilder);
 }
 
 nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
@@ -4795,7 +4797,7 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
   , mChildrenVisibleRect(aChildrenVisibleRect)
   , mIndex(aIndex)
   , mNoExtendContext(false)
-  , mHasPresetTransform(false)
+  , mIsTransformSeparator(false)
   , mTransformPreserves3DInited(false)
 {
   MOZ_COUNT_CTOR(nsDisplayTransform);
@@ -4816,12 +4818,13 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
   , mChildrenVisibleRect(aChildrenVisibleRect)
   , mIndex(aIndex)
   , mNoExtendContext(false)
-  , mHasPresetTransform(true)
+  , mIsTransformSeparator(true)
   , mTransformPreserves3DInited(false)
 {
   MOZ_COUNT_CTOR(nsDisplayTransform);
   MOZ_ASSERT(aFrame, "Must have a frame!");
   Init(aBuilder);
+  UpdateBoundsFor3D(aBuilder);
 }
 
 /* Returns the delta specified by the transform-origin property.
@@ -5325,7 +5328,7 @@ nsDisplayTransform::GetTransform()
     if (mTransformGetter) {
       mTransform = mTransformGetter(mFrame, scale);
       mTransform.ChangeBasis(newOrigin.x, newOrigin.y, newOrigin.z);
-    } else if (!mHasPresetTransform) {
+    } else if (!mIsTransformSeparator) {
       bool isReference =
         mFrame->IsTransformed() ||
         mFrame->Combines3DTransformWithAncestors() || mFrame->Extend3DContext();
@@ -5587,8 +5590,36 @@ nsDisplayTransform::GetHitDepthAtPoint(nsDisplayListBuilder* aBuilder, const nsP
 /* The bounding rectangle for the object is the overflow rectangle translated
  * by the reference point.
  */
-nsRect nsDisplayTransform::GetBounds(nsDisplayListBuilder *aBuilder, bool* aSnap)
+nsRect
+nsDisplayTransform::GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap)
 {
+  *aSnap = false;
+
+  if (mHasBounds) {
+    return mBounds;
+  }
+
+  if (mFrame->Extend3DContext()) {
+    return nsRect();
+  }
+
+  nsRect untransformedBounds = MaybePrerender() ?
+    mFrame->GetVisualOverflowRectRelativeToSelf() :
+    mStoredList.GetBounds(aBuilder, aSnap);
+  // GetTransform always operates in dev pixels.
+  float factor = mFrame->PresContext()->AppUnitsPerDevPixel();
+  mBounds = nsLayoutUtils::MatrixTransformRect(untransformedBounds,
+                                               GetTransform(),
+                                               factor);
+  mHasBounds = true;
+  return mBounds;
+}
+
+void
+nsDisplayTransform::ComputeBounds(nsDisplayListBuilder* aBuilder)
+{
+  MOZ_ASSERT(mFrame->Extend3DContext() || IsLeafOf3DContext());
+
   /* For some cases, the transform would make an empty bounds, but it
    * may be turned back again to get a non-empty bounds.  We should
    * not depend on transforming bounds level by level.
@@ -5598,27 +5629,22 @@ nsRect nsDisplayTransform::GetBounds(nsDisplayListBuilder *aBuilder, bool* aSnap
    * nsDisplayListBuilder.
    */
   nsDisplayListBuilder::AutoAccumulateTransform accTransform(aBuilder);
-  Maybe<nsDisplayListBuilder::AutoAccumulateRect> accRect;
-  bool startPreserves3D =
-    mFrame->Extend3DContext() && !mFrame->Combines3DTransformWithAncestors();
-
-  if (!mFrame->Combines3DTransformWithAncestors()) {
-    accTransform.StartRoot();
-  }
 
   accTransform.Accumulate(GetTransform());
-  if (startPreserves3D) {
-    accRect.emplace(aBuilder);
+
+  if (!IsLeafOf3DContext()) {
+    // Do not dive into another 3D context.
+    mStoredList.DoUpdateBoundsPreserves3D(aBuilder);
   }
 
   /* For Preserves3D, it is bounds of only children as leaf frames.
    * For non-leaf frames, their bounds are accumulated and kept at
    * nsDisplayListBuilder.
    */
+  bool snap;
   nsRect untransformedBounds = MaybePrerender() ?
     mFrame->GetVisualOverflowRectRelativeToSelf() :
-    mStoredList.GetBounds(aBuilder, aSnap);
-  *aSnap = false;
+    mStoredList.GetBounds(aBuilder, &snap);
   // GetTransform always operates in dev pixels.
   float factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   nsRect rect =
@@ -5626,22 +5652,7 @@ nsRect nsDisplayTransform::GetBounds(nsDisplayListBuilder *aBuilder, bool* aSnap
                                        accTransform.GetCurrentTransform(),
                                        factor);
 
-  if (mFrame->Combines3DTransformWithAncestors()) {
-    if (!mFrame->Extend3DContext() &&
-        !aBuilder->GetAccumulatedRectLevels()) {
-      // For preserve-3d, only leaf frames and frames start
-      // preserve-3d chain have non-empty bounds.
-      return rect;
-    }
-    aBuilder->AccumulateRect(rect);
-    return nsRect();
-  }
-
-  if (startPreserves3D) {
-    rect.UnionRect(rect, aBuilder->GetAccumulatedRect());
-  }
-
-  return rect;
+  aBuilder->AccumulateRect(rect);
 }
 
 /* The transform is opaque iff the transform consists solely of scales and
