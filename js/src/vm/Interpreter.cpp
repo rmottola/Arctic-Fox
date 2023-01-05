@@ -4694,7 +4694,8 @@ js::ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber,
     MOZ_ASSERT(op == JSOP_CHECKLEXICAL ||
                op == JSOP_CHECKALIASEDLEXICAL ||
                op == JSOP_THROWSETCONST ||
-               op == JSOP_THROWSETALIASEDCONST);
+               op == JSOP_THROWSETALIASEDCONST ||
+               op == JSOP_GETIMPORT);
 
     RootedPropertyName name(cx);
 
@@ -4729,6 +4730,8 @@ js::ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber,
             MOZ_ASSERT(JSID_IS_ATOM(id));
             name = JSID_TO_ATOM(id)->asPropertyName();
         }
+    } else if (IsAtomOp(op)) {
+        name = script->getName(pc);
     } else {
         MOZ_ASSERT(IsAliasedVarOp(op));
         name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc);
