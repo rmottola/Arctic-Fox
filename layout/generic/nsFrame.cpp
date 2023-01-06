@@ -1998,10 +1998,9 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
   nsRect dirtyRectOutsideTransform = dirtyRect;
   if (isTransformed) {
     const nsRect overflow = GetVisualOverflowRectRelativeToSelf();
-    if (aBuilder->IsForPainting() &&
-        (nsDisplayTransform::ShouldPrerenderTransformedContent(aBuilder,
-                                                               this) ||
-         Extend3DContext() || Combines3DTransformWithAncestors())) {
+    if (Extend3DContext() || Combines3DTransformWithAncestors() ||
+        nsDisplayTransform::ShouldPrerenderTransformedContent(aBuilder,
+                                                              this)) {
       dirtyRect = overflow;
     } else {
       if (overflow.IsEmpty()) {
