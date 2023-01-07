@@ -4,7 +4,7 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -60,7 +60,7 @@ var healthReportWrapper = {
 
   injectData: function (type, content) {
     let report = this._getReportURI();
-    
+
     // file URIs can't be used for targetOrigin, so we use "*" for this special case
     // in all other cases, pass in the URL to the report so we properly restrict the message dispatch
     let reportUrl = report.scheme == "file" ? "*" : report.spec;

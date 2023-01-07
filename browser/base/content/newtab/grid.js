@@ -29,7 +29,7 @@ var gGrid = {
   /**
    * All cells contained in the grid.
    */
-  _cells: null,
+  _cells: [],
   get cells() { return this._cells; },
 
   /**
