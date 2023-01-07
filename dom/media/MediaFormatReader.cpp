@@ -617,7 +617,7 @@ void
 MediaFormatReader::NotifyError(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("Decoder has requested more %s data", TrackTypeToStr(aTrack));
+  LOGV("%s Decoding error", TrackTypeToStr(aTrack));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mError = true;
   ScheduleUpdate(aTrack);
@@ -636,7 +636,6 @@ void
 MediaFormatReader::NotifyEndOfStream(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("%s Decoding error", TrackTypeToStr(aTrack));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mDemuxEOS = true;
   decoder.mNeedDraining = true;
@@ -791,6 +790,8 @@ MediaFormatReader::HandleDemuxedSamples(TrackType aTrack,
   if (!EnsureDecoderInitialized(aTrack)) {
     return;
   }
+
+  LOGV("Giving %s input to decoder", TrackTypeToStr(aTrack));
 
   // Decode all our demuxed frames.
   bool samplesPending = false;
@@ -1269,6 +1270,7 @@ MediaFormatReader::Seek(int64_t aTime, int64_t aUnused)
   MOZ_ASSERT(OnTaskQueue());
 
   LOG("aTime=(%lld)", aTime);
+
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty());
   MOZ_DIAGNOSTIC_ASSERT(!mVideo.HasPromise());
   MOZ_DIAGNOSTIC_ASSERT(!mAudio.HasPromise());
@@ -1381,6 +1383,7 @@ void
 MediaFormatReader::OnVideoSeekCompleted(media::TimeUnit aTime)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("Video seeked to %lld", aTime.ToMicroseconds());
   mVideo.mSeekRequest.Complete();
 
   if (HasAudio()) {
@@ -1409,6 +1412,7 @@ void
 MediaFormatReader::OnAudioSeekCompleted(media::TimeUnit aTime)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("Audio seeked to %lld", aTime.ToMicroseconds());
   mAudio.mSeekRequest.Complete();
   mPendingSeekTime.reset();
   mSeekPromise.Resolve(aTime.ToMicroseconds(), __func__);
