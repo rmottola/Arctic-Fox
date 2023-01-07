@@ -38,7 +38,10 @@ var gGrid = {
   get sites() { return [for (cell of this.cells) cell.site]; },
 
   // Tells whether the grid has already been initialized.
-  get ready() { return !!this._node; },
+  get ready() { return !!this._ready; },
+
+  // Returns whether the page has finished loading yet.
+  get isDocumentLoaded() { return document.readyState == "complete"; },
 
   /**
    * Initializes the grid.
