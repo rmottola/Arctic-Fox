@@ -2673,6 +2673,9 @@ pref("layout.css.overflow-clip-box.enabled", false);
 // Is support for CSS grid enabled?
 pref("layout.css.grid.enabled", false);
 
+// Is support for CSS "grid-template-{columns,rows}: subgrid X" enabled?
+pref("layout.css.grid-template-subgrid-value.enabled", false);
+
 // Is support for CSS contain enabled?
 pref("layout.css.contain.enabled", false);
 

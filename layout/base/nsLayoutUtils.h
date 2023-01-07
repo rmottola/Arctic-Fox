@@ -2321,6 +2321,12 @@ public:
   static bool UnsetValueEnabled();
 
   /**
+   * Checks whether support for the CSS grid-template-{columns,rows} 'subgrid X'
+   * value is enabled.
+   */
+  static bool IsGridTemplateSubgridValueEnabled();
+
+  /**
    * Checks whether support for the CSS text-align (and -moz-text-align-last)
    * 'true' value is enabled.
    */
