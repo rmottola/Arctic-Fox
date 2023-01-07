@@ -1323,7 +1323,7 @@ void
 MediaFormatReader::OnSeekFailed(TrackType aTrack, DemuxerFailureReason aResult)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("%s failure = %d", TrackTypeToStr(aTrack), aResult);
+  LOGV("%s failure:%d", TrackTypeToStr(aTrack), aResult);
   if (aTrack == TrackType::kVideoTrack) {
     mVideo.mSeekRequest.Complete();
   } else {
