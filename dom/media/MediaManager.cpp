@@ -1922,7 +1922,7 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
             (!privileged && !HostHasPermission(*docURI))) {
           RefPtr<MediaStreamError> error =
               new MediaStreamError(aWindow,
-                                   NS_LITERAL_STRING("PermissionDeniedError"));
+                                   NS_LITERAL_STRING("SecurityError"));
           onFailure->OnError(error);
           return NS_OK;
         }
@@ -2001,7 +2001,7 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
         if (!Preferences::GetBool("media.getusermedia.audiocapture.enabled")) {
           RefPtr<MediaStreamError> error =
             new MediaStreamError(aWindow,
-                                 NS_LITERAL_STRING("PermissionDeniedError"));
+                                 NS_LITERAL_STRING("SecurityError"));
           onFailure->OnError(error);
           return NS_OK;
         }
@@ -2061,7 +2061,7 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
     if ((!IsOn(c.mAudio) || audioPerm == nsIPermissionManager::DENY_ACTION) &&
         (!IsOn(c.mVideo) || videoPerm == nsIPermissionManager::DENY_ACTION)) {
       RefPtr<MediaStreamError> error =
-          new MediaStreamError(aWindow, NS_LITERAL_STRING("PermissionDeniedError"));
+          new MediaStreamError(aWindow, NS_LITERAL_STRING("SecurityError"));
       onFailure->OnError(error);
       RemoveFromWindowList(windowID, listener);
       return NS_OK;
@@ -2728,7 +2728,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
       array->Count(&len);
       if (!len) {
         // neither audio nor video were selected
-        task->Denied(NS_LITERAL_STRING("PermissionDeniedError"));
+        task->Denied(NS_LITERAL_STRING("SecurityError"));
         return NS_OK;
       }
       bool videoFound = false, audioFound = false;
@@ -2765,7 +2765,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
     return NS_OK;
 
   } else if (!strcmp(aTopic, "getUserMedia:response:deny")) {
-    nsString errorMessage(NS_LITERAL_STRING("PermissionDeniedError"));
+    nsString errorMessage(NS_LITERAL_STRING("SecurityError"));
 
     if (aSubject) {
       nsCOMPtr<nsISupportsString> msg(do_QueryInterface(aSubject));

@@ -217,7 +217,9 @@ function checkNotSharing() {
   assertWebRTCIndicatorStatus(false);
 }
 
-let gTests = [
+const permissionError = "error: SecurityError: The operation is insecure.";
+
+var gTests = [
 
 {
   desc: "getUserMedia audio+video",
