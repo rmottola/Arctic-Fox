@@ -6513,7 +6513,7 @@ nsLayoutUtils::DrawSingleUnscaledImage(gfxContext&          aContext,
                                        uint32_t             aImageFlags,
                                        const nsRect*        aSourceArea)
 {
-  nsIntSize imageSize;
+  CSSIntSize imageSize;
   aImage->GetWidth(&imageSize.width);
   aImage->GetHeight(&imageSize.height);
   if (imageSize.width < 1 || imageSize.height < 1) {
@@ -6521,10 +6521,7 @@ nsLayoutUtils::DrawSingleUnscaledImage(gfxContext&          aContext,
     return DrawResult::TEMPORARY_ERROR;
   }
 
-  nscoord appUnitsPerCSSPixel = nsDeviceContext::AppUnitsPerCSSPixel();
-  nsSize size(imageSize.width*appUnitsPerCSSPixel,
-              imageSize.height*appUnitsPerCSSPixel);
-
+  nsSize size(CSSPixel::ToAppUnits(imageSize));
   nsRect source;
   if (aSourceArea) {
     source = *aSourceArea;
@@ -6564,9 +6561,7 @@ nsLayoutUtils::DrawSingleImage(gfxContext&            aContext,
     return DrawResult::SUCCESS;  // no point in drawing a zero size image
   }
 
-  nsSize imageSize(pixelImageSize.width * appUnitsPerCSSPixel,
-                   pixelImageSize.height * appUnitsPerCSSPixel);
-
+  nsSize imageSize(CSSPixel::ToAppUnits(pixelImageSize));
   nsRect source;
   nsCOMPtr<imgIContainer> image;
   if (aSourceArea) {
