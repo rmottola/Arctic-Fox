@@ -1941,12 +1941,6 @@ nsTableFrame::Reflow(nsPresContext*           aPresContext,
       mutable_rs.mFlags.mSpecialBSizeReflow = false;
     }
   }
-  else {
-    // Calculate the overflow area contribution from our children.
-    for (nsIFrame* kid : mFrames) {
-      ConsiderChildOverflow(aDesiredSize.mOverflowAreas, kid);
-    }
-  }
 
   aDesiredSize.ISize(wm) = aReflowState.ComputedISize() +
     aReflowState.ComputedLogicalBorderPadding().IStartEnd(wm);
@@ -1964,6 +1958,14 @@ nsTableFrame::Reflow(nsPresContext*           aPresContext,
       kid->MovePositionBy(nsPoint(aDesiredSize.Width(), 0));
       RePositionViews(kid);
     }
+  }
+
+  // Calculate the overflow area contribution from our children. We couldn't
+  // do this on the fly during ReflowChildren(), because in vertical-rl mode
+  // with unconstrained width, we weren't placing them in their final positions
+  // until the fixupKidPositions loop just above.
+  for (nsIFrame* kid : mFrames) {
+    ConsiderChildOverflow(aDesiredSize.mOverflowAreas, kid);
   }
 
   LogicalMargin borderPadding = GetChildAreaOffset(wm, &aReflowState);
@@ -3297,7 +3299,6 @@ nsTableFrame::ReflowChildren(nsTableReflowState& aReflowState,
         aReflowState.availSize.BSize(wm) -= cellSpacingB + kidRect.BSize(wm);
       }
     }
-    ConsiderChildOverflow(aOverflowAreas, kidFrame);
   }
 
   // We've now propagated the column resizes and geometry changes to all
