@@ -2599,10 +2599,8 @@ BytecodeEmitter::emitPropLHS(ParseNode* pn)
         ParseNode* pndot = pn2;
         ParseNode* pnup = nullptr;
         ParseNode* pndown;
-        ptrdiff_t top = offset();
         for (;;) {
             /* Reverse pndot->pn_expr to point up, not down. */
-            pndot->pn_offset = top;
             MOZ_ASSERT(!pndot->isUsed());
             pndown = pndot->pn_expr;
             pndot->pn_expr = pnup;
@@ -3298,16 +3296,22 @@ BytecodeEmitter::emitSwitch(ParseNode* pn)
 
     ptrdiff_t defaultOffset = -1;
 
-    /* Emit code for each case's statements, copying pn_offset up to caseNode. */
+    /* Emit code for each case's statements. */
     for (ParseNode* caseNode = cases->pn_head; caseNode; caseNode = caseNode->pn_next) {
         if (switchOp == JSOP_CONDSWITCH && !caseNode->isKind(PNK_DEFAULT))
             setJumpOffsetAt(caseNode->pn_offset);
-        ParseNode* caseValue = caseNode->pn_right;
-        if (!emitTree(caseValue))
-            return false;
-        caseNode->pn_offset = caseValue->pn_offset;
+
+        // If this is emitted as a TABLESWITCH, we'll need to know this case's
+        // offset later when emitting the table. Store it in the node's
+        // pn_offset (giving the field a different meaning vs. how we used it
+        // on the immediately preceding line of code).
+        ptrdiff_t here = offset();
+        caseNode->pn_offset = here;
         if (caseNode->isKind(PNK_DEFAULT))
-            defaultOffset = caseNode->pn_offset - top;
+            defaultOffset = here - top;
+
+        if (!emitTree(caseNode->pn_right))
+            return false;
     }
 
     if (!hasDefault) {
@@ -5354,12 +5358,13 @@ BytecodeEmitter::emitForInOrOfVariables(ParseNode* pn, bool* letDecl)
 }
 
 bool
-BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn)
 {
     MOZ_ASSERT(type == StmtType::FOR_OF_LOOP || type == StmtType::SPREAD);
     MOZ_ASSERT_IF(type == StmtType::FOR_OF_LOOP, pn && pn->pn_left->isKind(PNK_FOROF));
     MOZ_ASSERT_IF(type == StmtType::SPREAD, !pn);
 
+    ptrdiff_t top = offset();
     ParseNode* forHead = pn ? pn->pn_left : nullptr;
     ParseNode* forHeadExpr = forHead ? forHead->pn_kid3 : nullptr;
     ParseNode* forBody = pn ? pn->pn_right : nullptr;
@@ -5505,8 +5510,9 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn, ptrdiff_t top)
 }
 
 bool
-BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitForIn(ParseNode* pn)
 {
+    ptrdiff_t top = offset();
     ParseNode* forHead = pn->pn_left;
     ParseNode* forBody = pn->pn_right;
 
@@ -5627,10 +5633,10 @@ BytecodeEmitter::emitForIn(ParseNode* pn, ptrdiff_t top)
 
 /* C-style `for (init; cond; update) ...` loop. */
 bool
-BytecodeEmitter::emitCStyleFor(ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitCStyleFor(ParseNode* pn)
 {
     LoopStmtInfo stmtInfo(cx);
-    pushLoopStatement(&stmtInfo, StmtType::FOR_LOOP, top);
+    pushLoopStatement(&stmtInfo, StmtType::FOR_LOOP, offset());
 
     ParseNode* forHead = pn->pn_left;
     ParseNode* forBody = pn->pn_right;
@@ -5700,7 +5706,7 @@ BytecodeEmitter::emitCStyleFor(ParseNode* pn, ptrdiff_t top)
             return false;
     }
 
-    top = offset();
+    ptrdiff_t top = offset();
     stmtInfo.setTop(top);
 
     /* Emit code for the loop body. */
@@ -5802,7 +5808,7 @@ BytecodeEmitter::emitCStyleFor(ParseNode* pn, ptrdiff_t top)
 }
 
 bool
-BytecodeEmitter::emitFor(ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitFor(ParseNode* pn)
 {
     if (pn->pn_left->isKind(PNK_FORHEAD))
         return emitCStyleFor(pn, top);
@@ -5811,10 +5817,10 @@ BytecodeEmitter::emitFor(ParseNode* pn, ptrdiff_t top)
         return false;
 
     if (pn->pn_left->isKind(PNK_FORIN))
-        return emitForIn(pn, top);
+        return emitForIn(pn);
 
     MOZ_ASSERT(pn->pn_left->isKind(PNK_FOROF));
-    return emitForOf(StmtType::FOR_OF_LOOP, pn, top);
+    return emitForOf(StmtType::FOR_OF_LOOP, pn);
 }
 
 MOZ_NEVER_INLINE bool
@@ -6043,7 +6049,7 @@ BytecodeEmitter::emitDo(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitWhile(ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitWhile(ParseNode* pn)
 {
     /*
      * Minimize bytecodes issued for one or more iterations by jumping to
@@ -6073,7 +6079,7 @@ BytecodeEmitter::emitWhile(ParseNode* pn, ptrdiff_t top)
         return false;
 
     LoopStmtInfo stmtInfo(cx);
-    pushLoopStatement(&stmtInfo, StmtType::WHILE_LOOP, top);
+    pushLoopStatement(&stmtInfo, StmtType::WHILE_LOOP, offset());
 
     unsigned noteIndex;
     if (!newSrcNote(SRC_WHILE, &noteIndex))
@@ -6083,7 +6089,7 @@ BytecodeEmitter::emitWhile(ParseNode* pn, ptrdiff_t top)
     if (!emitJump(JSOP_GOTO, 0, &jmp))
         return false;
 
-    top = offset();
+    ptrdiff_t top = offset();
     if (!emitLoopHead(pn->pn_right))
         return false;
 
@@ -6406,7 +6412,7 @@ BytecodeEmitter::emitYieldStar(ParseNode* iter, ParseNode* gen)
 }
 
 bool
-BytecodeEmitter::emitStatementList(ParseNode* pn, ptrdiff_t top)
+BytecodeEmitter::emitStatementList(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isArity(PN_LIST));
     for (ParseNode* pn2 = pn->pn_head; pn2; pn2 = pn2->pn_next) {
@@ -7286,7 +7292,7 @@ BytecodeEmitter::emitArrayComp(ParseNode* pn)
 bool
 BytecodeEmitter::emitSpread()
 {
-    return emitForOf(StmtType::SPREAD, nullptr, -1);
+    return emitForOf(StmtType::SPREAD, nullptr);
 }
 
 bool
@@ -7610,8 +7616,6 @@ BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
     EmitLevelManager elm(this);
 
     bool ok = true;
-    ptrdiff_t top = offset();
-    pn->pn_offset = top;
 
     /* Emit notes to tell the current bytecode's source line number.
        However, a couple trees require special treatment; see the
@@ -7723,7 +7727,7 @@ BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
         break;
 
       case PNK_WHILE:
-        ok = emitWhile(pn, top);
+        ok = emitWhile(pn);
         break;
 
       case PNK_DOWHILE:
@@ -7731,7 +7735,7 @@ BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
         break;
 
       case PNK_FOR:
-        ok = emitFor(pn, top);
+        ok = emitFor(pn);
         break;
 
       case PNK_BREAK:
@@ -7779,7 +7783,7 @@ BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
         break;
 
       case PNK_STATEMENTLIST:
-        ok = emitStatementList(pn, top);
+        ok = emitStatementList(pn);
         break;
 
       case PNK_SEMI:
