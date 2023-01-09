@@ -31,7 +31,6 @@
 
 #ifdef XP_MACOSX
 #include "mozilla/gfx/QuartzSupport.h"
-#include "MacIOSurfaceImage.h"
 #endif
 
 #ifdef XP_WIN
@@ -76,12 +75,6 @@ ImageFactory::CreateImage(ImageFormat aFormat,
     img = new RecyclingPlanarYCbCrImage(aRecycleBin);
     return img.forget();
   }
-#ifdef XP_MACOSX
-  if (aFormat == ImageFormat::MAC_IOSURFACE) {
-    img = new MacIOSurfaceImage();
-    return img.forget();
-  }
-#endif
   return nullptr;
 }
 
