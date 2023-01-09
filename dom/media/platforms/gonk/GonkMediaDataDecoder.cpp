@@ -16,6 +16,10 @@
 #define INPUT_TIMEOUT_US 0LL // Don't wait for buffer if none is available.
 #define MIN_QUEUED_SAMPLES 2
 
+#ifdef DEBUG
+#include <utils/AndroidThreads.h>
+#endif
+
 extern PRLogModuleInfo* GetPDMLog();
 #define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 
@@ -47,6 +51,11 @@ GonkDecoderManager::InitLoopers(MediaData::Type aType)
   mTaskLooper->setName(name.c_str());
   mTaskLooper->registerHandler(this);
 
+#ifdef DEBUG
+  sp<AMessage> findThreadId(new AMessage(kNotifyFindLooperId, id()));
+  findThreadId->post();
+#endif
+
   return mDecodeLooper->start() == OK && mTaskLooper->start() == OK;
 }
 
@@ -77,6 +86,8 @@ GonkDecoderManager::Input(MediaRawData* aSample)
 int32_t
 GonkDecoderManager::ProcessQueuedSamples()
 {
+  MOZ_ASSERT(OnTaskLooper());
+
   MutexAutoLock lock(mMutex);
   status_t rv;
   while (mQueuedSamples.Length()) {
@@ -199,6 +210,8 @@ GonkDecoderManager::HasQueuedSample()
 void
 GonkDecoderManager::ProcessInput(bool aEndOfStream)
 {
+  MOZ_ASSERT(OnTaskLooper());
+
   status_t rv = ProcessQueuedSamples();
   if (rv >= 0) {
     if (!aEndOfStream && rv <= MIN_QUEUED_SAMPLES) {
@@ -221,6 +234,9 @@ GonkDecoderManager::ProcessInput(bool aEndOfStream)
 void
 GonkDecoderManager::ProcessFlush()
 {
+  MOZ_ASSERT(OnTaskLooper());
+
+  mLastTime = INT64_MIN;
   MonitorAutoLock lock(mFlushMonitor);
   mWaitOutput.Clear();
   if (mDecoder->flush() != OK) {
@@ -231,9 +247,32 @@ GonkDecoderManager::ProcessFlush()
   lock.NotifyAll();
 }
 
+// Use output timestamp to determine which output buffer is already returned
+// and remove corresponding info, except for EOS, from the waiting list.
+// This method handles the cases that audio decoder sends multiple output
+// buffers for one input.
+void
+GonkDecoderManager::UpdateWaitingList(int64_t aForgetUpTo)
+{
+  MOZ_ASSERT(OnTaskLooper());
+
+  size_t i;
+  for (i = 0; i < mWaitOutput.Length(); i++) {
+    const auto& item = mWaitOutput.ElementAt(i);
+    if (item.mEOS || item.mTimestamp > aForgetUpTo) {
+      break;
+    }
+  }
+  if (i > 0) {
+    mWaitOutput.RemoveElementsAt(0, i);
+  }
+}
+
 void
 GonkDecoderManager::ProcessToDo(bool aEndOfStream)
 {
+  MOZ_ASSERT(OnTaskLooper());
+
   MOZ_ASSERT(mToDo.get() != nullptr);
   mToDo.clear();
 
@@ -302,6 +341,14 @@ GonkDecoderManager::onMessageReceived(const sp<AMessage> &aMessage)
       ProcessToDo(aMessage->findInt32("input-eos", &eos) && eos);
       break;
     }
+#ifdef DEBUG
+    case kNotifyFindLooperId:
+    {
+      mTaskLooperId = androidGetThreadId();
+      MOZ_ASSERT(mTaskLooperId);
+      break;
+    }
+#endif
     default:
       {
         TRESPASS();
@@ -309,6 +356,14 @@ GonkDecoderManager::onMessageReceived(const sp<AMessage> &aMessage)
       }
   }
 }
+
+#ifdef DEBUG
+bool
+GonkDecoderManager::OnTaskLooper()
+{
+  return androidGetThreadId() == mTaskLooperId;
+}
+#endif
 
 GonkMediaDataDecoder::GonkMediaDataDecoder(GonkDecoderManager* aManager,
                                            FlushableTaskQueue* aTaskQueue,
