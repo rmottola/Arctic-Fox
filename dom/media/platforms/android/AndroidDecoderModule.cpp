@@ -12,14 +12,29 @@
 #include "GLLibraryEGL.h"
 
 #include "MediaData.h"
-
 #include "MediaInfo.h"
 
 #include "nsThreadUtils.h"
 #include "nsAutoPtr.h"
 #include "nsPromiseFlatString.h"
 
+#include "prlog.h"
+
 #include <jni.h>
+
+static PRLogModuleInfo* AndroidDecoderModuleLog()
+{
+  static PRLogModuleInfo* sLogModule = nullptr;
+  if (!sLogModule) {
+    sLogModule = PR_NewLogModule("AndroidDecoderModule");
+  }
+  return sLogModule;
+}
+
+#undef LOG
+#define LOG(arg, ...) MOZ_LOG(AndroidDecoderModuleLog(), \
+    mozilla::LogLevel::Debug, ("AndroidDecoderModule(%p)::%s: " arg, \
+      this, __func__, ##__VA_ARGS__))
 
 using namespace mozilla;
 using namespace mozilla::gl;
@@ -294,7 +309,13 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
       aMimeType.EqualsLiteral("video/avc")) {
     return true;
   }
-  return static_cast<bool>(mozilla::CreateDecoder(aMimeType));
+
+  MediaCodec::LocalRef ref = mozilla::CreateDecoder(aMimeType);
+  if (!ref) {
+    return false;
+  }
+  ref->Release();
+  return true;
 }
 
 already_AddRefed<MediaDataDecoder>
