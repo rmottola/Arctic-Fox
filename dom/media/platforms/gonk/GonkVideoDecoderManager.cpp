@@ -23,7 +23,8 @@
 #include "mozilla/layers/GrallocTextureClient.h"
 #include "mozilla/layers/TextureClient.h"
 
-#define READ_OUTPUT_BUFFER_TIMEOUT_US  3000
+#define CODECCONFIG_TIMEOUT_US 10000LL
+#define READ_OUTPUT_BUFFER_TIMEOUT_US  0LL
 
 #include <android/log.h>
 #define GVDM_LOG(...) __android_log_print(ANDROID_LOG_DEBUG, "GonkVideoDecoderManager", __VA_ARGS__)
@@ -397,8 +398,14 @@ GonkVideoDecoderManager::codecReserved()
   }
   mDecoder->configure(format, surface, nullptr, 0);
   mDecoder->Prepare();
-  status_t rv = mDecoder->Input(mCodecSpecificData->Elements(), mCodecSpecificData->Length(), 0,
-                                android::MediaCodec::BUFFER_FLAG_CODECCONFIG);
+
+  if (mMimeType.EqualsLiteral("video/mp4v-es")) {
+    rv = mDecoder->Input(mCodecSpecificData->Elements(),
+                         mCodecSpecificData->Length(), 0,
+                         android::MediaCodec::BUFFER_FLAG_CODECCONFIG,
+                         CODECCONFIG_TIMEOUT_US);
+  }
+
   if (rv != OK) {
     GVDM_LOG("Failed to configure codec!!!!");
     mInitPromise.Reject(DecoderFailureReason::INIT_ERROR, __func__);
