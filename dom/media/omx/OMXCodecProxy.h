@@ -14,7 +14,7 @@
 #include <utils/threads.h>
 
 #include "mozilla/media/MediaSystemResourceClient.h"
-#include "RefPtr.h"
+#include "mozilla/RefPtr.h"
 
 namespace android {
 

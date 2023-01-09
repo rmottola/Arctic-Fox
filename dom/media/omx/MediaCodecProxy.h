@@ -14,7 +14,7 @@
 
 #include "mozilla/media/MediaSystemResourceClient.h"
 #include "mozilla/Monitor.h"
-#include "RefPtr.h"
+#include "mozilla/RefPtr.h"
 
 namespace android {
 // This class is intended to be a proxy for MediaCodec with codec resource
