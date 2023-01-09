@@ -216,7 +216,7 @@ AppleVTDecoder::SubmitFrame(MediaRawData* aSample)
   // For some reason this gives me a double-free error with stagefright.
   AutoCFRelease<CMBlockBufferRef> block = nullptr;
   AutoCFRelease<CMSampleBufferRef> sample = nullptr;
-  VTDecodeInfoFlags flags;
+  VTDecodeInfoFlags infoFlags;
   OSStatus rv;
 
   // FIXME: This copies the sample data. I think we can provide
@@ -249,8 +249,8 @@ AppleVTDecoder::SubmitFrame(MediaRawData* aSample)
                                          sample,
                                          decodeFlags,
                                          CreateAppleFrameRef(aSample),
-                                         &flags);
-  if (rv != noErr) {
+                                         &infoFlags);
+  if (rv != noErr && !(infoFlags & kVTDecodeInfo_FrameDropped)) {
     NS_WARNING("Couldn't pass frame to decoder");
     return NS_ERROR_FAILURE;
   }
