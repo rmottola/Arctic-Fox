@@ -112,6 +112,7 @@ SpeechRecognition::SpeechRecognition(nsPIDOMWindow* aOwnerWindow)
   , mAudioSamplesPerChunk(mEndpointer.FrameSize())
   , mSpeechDetectionTimer(do_CreateInstance(NS_TIMER_CONTRACTID))
   , mSpeechGrammarList(new SpeechGrammarList(GetParentObject()))
+  , mInterimResults(false)
 {
   SR_LOG("created SpeechRecognition");
 
@@ -665,16 +666,15 @@ SpeechRecognition::SetContinuous(bool aArg, ErrorResult& aRv)
 }
 
 bool
-SpeechRecognition::GetInterimResults(ErrorResult& aRv) const
+SpeechRecognition::InterimResults() const
 {
-  aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  return false;
+  return mInterimResults;
 }
 
 void
-SpeechRecognition::SetInterimResults(bool aArg, ErrorResult& aRv)
+SpeechRecognition::SetInterimResults(bool aArg)
 {
-  aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+  mInterimResults = aArg;
   return;
 }
 
