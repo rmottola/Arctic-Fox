@@ -44,11 +44,6 @@ public:
   // Shutdown decoder and rejects the init promise.
   nsresult Shutdown();
 
-  void ClearQueuedSample() {
-    MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
-    mQueueSample.Clear();
-  }
-
 protected:
   RefPtr<MediaByteBuffer> mCodecSpecificData;
 
