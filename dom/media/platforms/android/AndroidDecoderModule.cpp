@@ -151,16 +151,10 @@ public:
         NS_WARNING("No EGL fence support detected, rendering artifacts may occur!");
       }
 
-      img = mImageContainer->CreateImage(ImageFormat::EGLIMAGE);
-      layers::EGLImageImage::Data data;
-      data.mImage = eglImage;
-      data.mSync = eglSync;
-      data.mOwns = true;
-      data.mSize = mConfig.mDisplay;
-      data.mOriginPos = gl::OriginPos::BottomLeft;
-
-      layers::EGLImageImage* typedImg = static_cast<layers::EGLImageImage*>(img.get());
-      typedImg->SetData(data);
+      img = new layers::EGLImageImage(
+        eglImage, eglSync,
+        mConfig.mDisplay, gl::OriginPos::TopLeft,
+        true /* owns */);
     }
 
     nsresult rv;
