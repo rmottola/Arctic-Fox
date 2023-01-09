@@ -24,7 +24,6 @@ using mozilla::layers::Image;
 using mozilla::layers::LayerManager;
 using mozilla::layers::LayersBackend;
 
-#ifdef PR_LOGGING
 PRLogModuleInfo* GetFormatDecoderLog() {
   static PRLogModuleInfo* log = nullptr;
   if (!log) {
@@ -34,10 +33,6 @@ PRLogModuleInfo* GetFormatDecoderLog() {
 }
 #define LOG(arg, ...) MOZ_LOG(GetFormatDecoderLog(), mozilla::LogLevel::Debug, ("MediaFormatReader(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 #define LOGV(arg, ...) MOZ_LOG(GetFormatDecoderLog(), mozilla::LogLevel::Verbose, ("MediaFormatReader(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
-#else
-#define LOG(...)
-#define LOGV(...)
-#endif
 
 namespace mozilla {
 
