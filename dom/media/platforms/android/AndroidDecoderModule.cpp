@@ -289,6 +289,7 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
       (AndroidBridge::Bridge()->GetAPIVersion() < 16)) {
     return false;
   }
+
   if (aMimeType.EqualsLiteral("video/mp4") ||
       aMimeType.EqualsLiteral("video/avc")) {
     return true;
@@ -779,10 +780,10 @@ MediaCodecDataDecoder::Shutdown()
     return NS_OK;
   }
 
-  mState = kStopping;
+  State(kStopping);
   lock.Notify();
 
-  while (mState == kStopping) {
+  while (State() == kStopping) {
     lock.Wait();
   }
 
