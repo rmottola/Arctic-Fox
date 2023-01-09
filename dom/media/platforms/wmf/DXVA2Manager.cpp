@@ -72,6 +72,7 @@ private:
   RefPtr<D3D9RecycleAllocator> mTextureClientAllocator;
   RefPtr<IDirectXVideoDecoderService> mDecoderService;
   UINT32 mResetToken;
+  bool mFirstFrame;
 };
 
 void GetDXVA2ExtendedFormatFromMFMediaType(IMFMediaType *pType,
@@ -179,6 +180,7 @@ D3D9DXVA2Manager::SupportsConfig(IMFMediaType* aType)
 
 D3D9DXVA2Manager::D3D9DXVA2Manager()
   : mResetToken(0)
+  , mFirstFrame(true)
 {
   MOZ_COUNT_CTOR(D3D9DXVA2Manager);
   MOZ_ASSERT(NS_IsMainThread());
@@ -351,7 +353,8 @@ D3D9DXVA2Manager::CopyToImage(IMFSample* aSample,
                "Wrong format?");
 
   D3D9SurfaceImage* videoImage = static_cast<D3D9SurfaceImage*>(image.get());
-  hr = videoImage->SetData(D3D9SurfaceImage::Data(surface, aRegion, mTextureClientAllocator));
+  hr = videoImage->SetData(D3D9SurfaceImage::Data(surface, aRegion, mTextureClientAllocator, mFirstFrame));
+  mFirstFrame = false;
 
   image.forget(aOutImage);
 
