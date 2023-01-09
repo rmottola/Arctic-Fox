@@ -36,8 +36,6 @@ typedef android::MediaCodecProxy MediaCodecProxy;
 typedef mozilla::layers::TextureClient TextureClient;
 
 public:
-  typedef MozPromise<bool /* aIgnored */, bool /* aIgnored */, /* IsExclusive = */ true> MediaResourcePromise;
-
   GonkVideoDecoderManager(mozilla::layers::ImageContainer* aImageContainer,
                           const VideoInfo& aConfig);
 
@@ -68,29 +66,6 @@ private:
 
   void onMessageReceived(const android::sp<android::AMessage> &aMessage) override;
 
-  class VideoResourceListener : public android::MediaCodecProxy::CodecResourceListener
-  {
-  public:
-    VideoResourceListener();
-    ~VideoResourceListener();
-
-    nsRefPtr<MediaResourcePromise> Init()
-    {
-      nsRefPtr<MediaResourcePromise> p = mVideoCodecPromise.Ensure(__func__);
-      return p.forget();
-    }
-
-    void codecReserved() override;
-    void codecCanceled() override;
-
-  private:
-    // Forbidden
-    VideoResourceListener(const VideoResourceListener &rhs) = delete;
-    const VideoResourceListener &operator=(const VideoResourceListener &rhs) = delete;
-
-    MozPromiseHolder<MediaResourcePromise> mVideoCodecPromise;
-  };
-
   bool SetVideoFormat();
 
   nsresult CreateVideoData(MediaBuffer* aBuffer, int64_t aStreamOffset, VideoData** aOutData);
@@ -114,8 +89,7 @@ private:
   RefPtr<layers::ImageContainer> mImageContainer;
 
   MediaInfo mInfo;
-  android::sp<VideoResourceListener> mVideoListener;
-  MozPromiseRequestHolder<MediaResourcePromise> mVideoCodecRequest;
+  MozPromiseRequestHolder<android::MediaCodecProxy::CodecPromise> mVideoCodecRequest;
   FrameInfo mFrameInfo;
 
   // color converter
