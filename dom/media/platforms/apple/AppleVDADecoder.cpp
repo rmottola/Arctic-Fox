@@ -542,7 +542,7 @@ AppleVDADecoder::InitializeSession()
                      &mDecoder);
 
   if (rv != noErr) {
-    NS_ERROR("AppleVDADecoder: Couldn't create decoder!");
+    NS_WARNING("AppleVDADecoder: Couldn't create hardware VDA decoder");
     return NS_ERROR_FAILURE;
   }
 
