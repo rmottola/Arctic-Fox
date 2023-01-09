@@ -980,7 +980,6 @@ pref("media.webspeech.synth.enabled", true);
 
 // Enable Web Speech recognition API
 pref("media.webspeech.recognition.enable", true);
-pref("media.webspeech.service.default", "pocketsphinx");
 
 // Downloads API
 pref("dom.mozDownloads.enabled", true);
