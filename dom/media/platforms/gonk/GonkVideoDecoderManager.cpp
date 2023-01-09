@@ -105,7 +105,7 @@ GonkVideoDecoderManager::Init(MediaDataDecoderCallback* aCallback)
   }
   RefPtr<InitPromise> p = mInitPromise.Ensure(__func__);
   mDecoder = MediaCodecProxy::CreateByType(mLooper, mMimeType.get(), false, mVideoListener);
-  mDecoder->AsyncAskMediaCodec();
+  mDecoder->AsyncAllocateVideoMediaCodec();
 
   uint32_t capability = MediaCodecProxy::kEmptyCapability;
   if (mDecoder->getCapability(&capability) == OK && (capability &
