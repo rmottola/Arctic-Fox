@@ -50,7 +50,6 @@ private:
   uint32_t mAudioChannels;
   uint32_t mAudioRate;
   const uint32_t mAudioProfile;
-  nsTArray<uint8_t> mUserData;
 
   MediaDataDecoderCallback*  mReaderCallback;
   android::MediaBuffer* mAudioBuffer;

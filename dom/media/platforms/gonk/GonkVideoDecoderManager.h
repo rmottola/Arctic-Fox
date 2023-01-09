@@ -143,7 +143,6 @@ private:
 
   android::MediaBuffer* mVideoBuffer;
 
-  RefPtr<MediaByteBuffer>  mCodecSpecificData;
   MediaDataDecoderCallback*  mReaderCallback;
   MediaInfo mInfo;
   android::sp<VideoResourceListener> mVideoListener;
@@ -173,8 +172,6 @@ private:
   Vector<android::MediaBuffer*> mPendingVideoBuffers;
   // The lock protects mPendingVideoBuffers.
   Mutex mPendingVideoBuffersLock;
-
-  nsAutoCString mMimeType;
 
   // This monitor protects mQueueSample.
   Monitor mMonitor;

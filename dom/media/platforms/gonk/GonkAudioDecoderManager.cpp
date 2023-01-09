@@ -43,8 +43,8 @@ GonkAudioDecoderManager::GonkAudioDecoderManager(const AudioInfo& aConfig)
 {
   MOZ_COUNT_CTOR(GonkAudioDecoderManager);
   MOZ_ASSERT(mAudioChannels);
-  mUserData.AppendElements(aConfig.mCodecSpecificConfig->Elements(),
-                           aConfig.mCodecSpecificConfig->Length());
+  mCodecSpecificData = aConfig.mCodecSpecificConfig;
+  mMimeType = aConfig.mMimeType;
 }
 
 GonkAudioDecoderManager::~GonkAudioDecoderManager()
@@ -65,6 +65,7 @@ GonkAudioDecoderManager::Init(MediaDataDecoderCallback* aCallback)
 bool
 GonkAudioDecoderManager::InitMediaCodecProxy(MediaDataDecoderCallback* aCallback)
 {
+  status_t rv = OK;
   if (mLooper != nullptr) {
     return false;
   }
@@ -86,7 +87,7 @@ GonkAudioDecoderManager::InitMediaCodecProxy(MediaDataDecoderCallback* aCallback
   // Fixed values
   GADM_LOG("Configure audio mime type:%s, chan no:%d, sample-rate:%d, profile:%d",
            mMimeType.get(), mAudioChannels, mAudioRate, mAudioProfile);
-  format->setString("mime", "audio/mp4a-latm");
+  format->setString("mime", mMimeType.get());
   format->setInt32("channel-count", mAudioChannels);
   format->setInt32("sample-rate", mAudioRate);
   format->setInt32("aac-profile", mAudioProfile);
@@ -94,8 +95,11 @@ GonkAudioDecoderManager::InitMediaCodecProxy(MediaDataDecoderCallback* aCallback
   if (err != OK || !mDecoder->Prepare()) {
     return false;
   }
-  status_t rv = mDecoder->Input(mUserData.Elements(), mUserData.Length(), 0,
-                                android::MediaCodec::BUFFER_FLAG_CODECCONFIG);
+
+  if (mMimeType.EqualsLiteral("audio/mp4a-latm")) {
+    rv = mDecoder->Input(mCodecSpecificData->Elements(), mCodecSpecificData->Length(), 0,
+                         android::MediaCodec::BUFFER_FLAG_CODECCONFIG);
+  }
 
   if (rv == OK) {
     return true;

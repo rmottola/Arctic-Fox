@@ -50,7 +50,9 @@ public:
   }
 
 protected:
+  RefPtr<MediaByteBuffer> mCodecSpecificData;
 
+  nsAutoCString mMimeType;
 
   // MediaCodedc's wrapper that performs the decoding.
   android::sp<android::MediaCodecProxy> mDecoder;
