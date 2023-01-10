@@ -156,7 +156,7 @@ public:
 
   static SECKEYPublicKey* PublicKeyFromSpki(CryptoBuffer& aKeyData,
                                             const nsNSSShutDownPreventionLock& /*proofOfLock*/);
-  static nsresult PublicKeyToSpki(SECKEYPublicKey* aPrivKey,
+  static nsresult PublicKeyToSpki(SECKEYPublicKey* aPubKey,
                                   CryptoBuffer& aRetVal,
                                   const nsNSSShutDownPreventionLock& /*proofOfLock*/);
 
@@ -168,7 +168,7 @@ public:
 
   static SECKEYPublicKey* PublicKeyFromJwk(const JsonWebKey& aKeyData,
                                            const nsNSSShutDownPreventionLock& /*proofOfLock*/);
-  static nsresult PublicKeyToJwk(SECKEYPublicKey* aPrivKey,
+  static nsresult PublicKeyToJwk(SECKEYPublicKey* aPubKey,
                                  JsonWebKey& aRetVal,
                                  const nsNSSShutDownPreventionLock& /*proofOfLock*/);
 
