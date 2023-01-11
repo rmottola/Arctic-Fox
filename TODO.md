@@ -109,7 +109,6 @@
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
 - 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
-- Bug 1169268 - Don't crash when pasting files. r=ndeakin
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
