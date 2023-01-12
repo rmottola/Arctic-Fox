@@ -812,6 +812,11 @@ protected:
   static const int DEFAULT_NEXT_FRAME_AVAILABLE_BUFFERED = 250000;
 
 private:
+  MediaEventSource<void>*
+  DataArrivedEvent() override { return &mDataArrivedEvent; }
+
+  MediaEventProducer<void> mDataArrivedEvent;
+
   // The state machine object for handling the decoding. It is safe to
   // call methods of this object from other threads. Its internal data
   // is synchronised on a monitor. The lifetime of this object is
