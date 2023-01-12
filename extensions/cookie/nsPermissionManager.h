@@ -219,6 +219,7 @@ private:
                                 bool        aExactHostMatch,
                                 bool        aIncludingSession);
 
+  nsresult OpenDatabase(nsIFile* permissionsFile);
   nsresult InitDB(bool aRemoveFile);
   nsresult CreateTable();
   nsresult Import();
@@ -271,6 +272,8 @@ private:
   nsCOMPtr<mozIStorageAsyncStatement> mStmtInsert;
   nsCOMPtr<mozIStorageAsyncStatement> mStmtDelete;
   nsCOMPtr<mozIStorageAsyncStatement> mStmtUpdate;
+
+  bool mMemoryOnlyDB;
 
   nsTHashtable<PermissionHashKey> mPermissionTable;
   // a unique, monotonically increasing id used to identify each database entry
