@@ -1410,6 +1410,7 @@ gfxContext::GetRoundOffsetsToPixels(bool *aRoundX, bool *aRoundY)
                     DWRITE_MEASURING_MODE_NATURAL) {
                 return;
             }
+            MOZ_FALLTHROUGH;
 #endif
         case CAIRO_FONT_TYPE_QUARTZ:
             // Quartz surfaces implement show_glyphs for Quartz fonts
@@ -1417,13 +1418,13 @@ gfxContext::GetRoundOffsetsToPixels(bool *aRoundX, bool *aRoundY)
                 CAIRO_SURFACE_TYPE_QUARTZ) {
                 return;
             }
+            break;
         default:
             break;
         }
-        // fall through:
+        break;
     case CAIRO_HINT_METRICS_ON:
         break;
     }
     *aRoundX = true;
-    return;
 }
