@@ -1468,12 +1468,6 @@ MediaDecoder::BreakCycles() {
   SetStateMachine(nullptr);
 }
 
-MediaDecoderOwner*
-MediaDecoder::GetMediaOwner() const
-{
-  return mOwner;
-}
-
 void
 MediaDecoder::FireTimeUpdate()
 {
