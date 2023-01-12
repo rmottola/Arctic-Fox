@@ -15,6 +15,7 @@
 #include "mozilla/Services.h"
 #include "nsIMobileMessageDatabaseService.h"
 #include "nsIObserverService.h"
+#include "nsThreadUtils.h"
 
 using namespace mozilla::dom;
 using namespace mozilla::dom::mobilemessage;
@@ -393,5 +394,36 @@ SmsManager::NotifyCursorDone(int32_t aRequestId)
     NS_DispatchToMainThread(runnable);
 }
 
-} // namespace
+/*static*/
+void
+SmsManager::NotifySmsMarkedAsRead(bool aMarkedAsRead, int32_t aRequestId)
+{
+    nsCOMPtr<nsIRunnable> runnable = NS_NewRunnableFunction([=]() {
+        nsCOMPtr<nsIMobileMessageCallback> request =
+            AndroidBridge::Bridge()->DequeueSmsRequest(aRequestId);
+        if (!request) {
+            return;
+        }
 
+        request->NotifyMessageMarkedRead(aMarkedAsRead);
+    });
+    NS_DispatchToMainThread(runnable);
+}
+
+/*static*/
+void
+SmsManager::NotifySmsMarkAsReadFailed(int32_t aError, int32_t aRequestId)
+{
+    nsCOMPtr<nsIRunnable> runnable = NS_NewRunnableFunction([=]() {
+        nsCOMPtr<nsIMobileMessageCallback> request =
+            AndroidBridge::Bridge()->DequeueSmsRequest(aRequestId);
+        if (!request) {
+            return;
+        }
+
+        request->NotifyMarkMessageReadFailed(aError);
+    });
+    NS_DispatchToMainThread(runnable);
+}
+
+} // namespace
