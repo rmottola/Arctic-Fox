@@ -98,7 +98,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gSmsMessenger",
                                    "@mozilla.org/ril/system-messenger-helper;1",
                                    "nsISmsMessenger");
 
-let DEBUG = RIL.DEBUG_RIL;
+var DEBUG = RIL.DEBUG_RIL;
 function debug(s) {
   dump("SmsService: " + s);
 }
@@ -314,7 +314,7 @@ SmsService.prototype = {
                                          (aRv, aDomMessage) => {
           // TODO bug 832140 handle !Components.isSuccessCode(aRv)
           this._broadcastSmsSystemMessage(
-            Ci.nsISmsMessenger_new.NOTIFICATION_TYPE_SENT_FAILED, aDomMessage);
+            Ci.nsISmsMessenger.NOTIFICATION_TYPE_SENT_FAILED, aDomMessage);
           aRequest.notifySendMessageFailed(error, aDomMessage);
           Services.obs.notifyObservers(aDomMessage, kSmsFailedObserverTopic, null);
         });
@@ -385,7 +385,7 @@ SmsService.prototype = {
             ? [kSmsDeliverySuccessObserverTopic,
                Ci.nsISmsMessenger.NOTIFICATION_TYPE_DELIVERY_SUCCESS]
             : [kSmsDeliveryErrorObserverTopic,
-               Ci.nsISmsMessenger_new.NOTIFICATION_TYPE_DELIVERY_ERROR];
+               Ci.nsISmsMessenger.NOTIFICATION_TYPE_DELIVERY_ERROR];
 
         // Broadcasting a "sms-delivery-success/sms-delivery-error" system
         // message to open apps.
@@ -869,7 +869,7 @@ SmsService.prototype = {
       if (!Components.isSuccessCode(aRv)) {
         if (DEBUG) debug("Error! Fail to save sending message! aRv = " + aRv);
         this._broadcastSmsSystemMessage(
-          Ci.nsISmsMessenger_new.NOTIFICATION_TYPE_SENT_FAILED, aSendingMessage);
+          Ci.nsISmsMessenger.NOTIFICATION_TYPE_SENT_FAILED, aSendingMessage);
         aRequest.notifySendMessageFailed(
           gMobileMessageDatabaseService.translateCrErrorToMessageCallbackError(aRv),
           aSendingMessage);
@@ -913,7 +913,7 @@ SmsService.prototype = {
                                          (aRv, aDomMessage) => {
           // TODO bug 832140 handle !Components.isSuccessCode(aRv)
           this._broadcastSmsSystemMessage(
-            Ci.nsISmsMessenger_new.NOTIFICATION_TYPE_SENT_FAILED, aDomMessage);
+            Ci.nsISmsMessenger.NOTIFICATION_TYPE_SENT_FAILED, aDomMessage);
           aRequest.notifySendMessageFailed(errorCode, aDomMessage);
           Services.obs.notifyObservers(aDomMessage, kSmsFailedObserverTopic, null);
         });

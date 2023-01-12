@@ -59,7 +59,6 @@ RILSystemMessengerHelper.prototype = {
   classID: RILSYSTEMMESSENGERHELPER_CID,
   QueryInterface: XPCOMUtils.generateQI([Ci.nsITelephonyMessenger,
                                          Ci.nsISmsMessenger,
-                                         Ci.nsISmsMessenger_new,
                                          Ci.nsICellbroadcastMessenger,
                                          Ci.nsIMobileConnectionMessenger,
                                          Ci.nsIIccMessenger]),
