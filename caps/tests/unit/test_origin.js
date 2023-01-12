@@ -1,9 +1,8 @@
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/BrowserUtils.jsm");
 var ssm = Services.scriptSecurityManager;
 function makeURI(uri) { return Services.io.newURI(uri, null, null); }
 
@@ -27,10 +26,12 @@ function checkOriginAttributes(prin, attrs, suffix) {
   do_check_eq(prin.originAttributes.appId, attrs.appId || 0);
   do_check_eq(prin.originAttributes.inBrowser, attrs.inBrowser || false);
   do_check_eq(prin.originSuffix, suffix || '');
+  do_check_eq(ChromeUtils.originAttributesToSuffix(attrs), suffix || '');
+  do_check_true(ChromeUtils.originAttributesMatchPattern(prin.originAttributes, attrs));
   if (!prin.isNullPrincipal && !prin.origin.startsWith('[')) {
-    do_check_true(BrowserUtils.principalFromOrigin(prin.origin).equals(prin));
+    do_check_true(ssm.createCodebasePrincipalFromOrigin(prin.origin).equals(prin));
   } else {
-    checkThrows(() => BrowserUtils.principalFromOrigin(prin.origin));
+    checkThrows(() => ssm.createCodebasePrincipalFromOrigin(prin.origin));
   }
 }
 
@@ -118,7 +119,7 @@ function run_test() {
 
   // Just signedPkg
   var exampleOrg_signedPkg = ssm.createCodebasePrincipal(makeURI('http://example.org'), {signedPkg: 'whatever'});
-  checkOriginAttributes(exampleOrg_signedPkg, { signedPkg: 'id' }, '^signedPkg=whatever');
+  checkOriginAttributes(exampleOrg_signedPkg, { signedPkg: 'whatever' }, '^signedPkg=whatever');
   do_check_eq(exampleOrg_signedPkg.origin, 'http://example.org^signedPkg=whatever');
 
   // signedPkg and browser
