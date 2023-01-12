@@ -476,6 +476,7 @@ void
 MediaDecoder::SetInfinite(bool aInfinite)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!mShuttingDown);
   mInfiniteStream = aInfinite;
   DurationChanged();
 }
@@ -865,6 +866,7 @@ nsresult
 MediaDecoder::FinishDecoderSetup(MediaResource* aResource)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!mShuttingDown);
   HTMLMediaElement* element = mOwner->GetMediaElement();
   NS_ENSURE_TRUE(element, NS_ERROR_FAILURE);
   element->FinishDecoderSetup(this, aResource);
@@ -875,8 +877,7 @@ void
 MediaDecoder::ResetConnectionState()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mShuttingDown)
-    return;
+  MOZ_ASSERT(!mShuttingDown);
 
   // Notify the media element that connection gets lost.
   mOwner->ResetConnectionState();
@@ -1020,9 +1021,7 @@ void
 MediaDecoder::NotifySuspendedStatusChanged()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mShuttingDown) {
-    return;
-  }
+  MOZ_ASSERT(!mShuttingDown);
   if (mResource) {
     bool suspended = mResource->IsSuspendedByCache();
     mOwner->NotifySuspendedByCache(suspended);
@@ -1044,9 +1043,7 @@ void
 MediaDecoder::NotifyDownloadEnded(nsresult aStatus)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mShuttingDown) {
-    return;
-  }
+  MOZ_ASSERT(!mShuttingDown);
 
   DECODER_LOG("NotifyDownloadEnded, status=%x", aStatus);
 
@@ -1072,9 +1069,7 @@ void
 MediaDecoder::NotifyPrincipalChanged()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (mShuttingDown) {
-    return;
-  }
+  MOZ_ASSERT(!mShuttingDown);
   mOwner->NotifyDecoderPrincipalChanged();
 }
 
@@ -1082,8 +1077,9 @@ void
 MediaDecoder::NotifyBytesConsumed(int64_t aBytes, int64_t aOffset)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!mShuttingDown);
 
-  if (mShuttingDown || mIgnoreProgressData) {
+  if (mIgnoreProgressData) {
     return;
   }
 
