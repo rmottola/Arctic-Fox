@@ -80,7 +80,6 @@ IPDL_SOURCES += [
 
 LOCAL_INCLUDES += [
     '/dom/base',
-    '/widget/android',
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')
