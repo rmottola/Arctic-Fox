@@ -218,7 +218,7 @@ private:
   bool mDialingRequestProcessed;
   bool mNrecEnabled;
   PhoneType mPhoneType;
-  nsString mDeviceAddress;
+  BluetoothAddress mDeviceAddress;
   nsString mMsisdn;
   nsString mOperatorName;
 
