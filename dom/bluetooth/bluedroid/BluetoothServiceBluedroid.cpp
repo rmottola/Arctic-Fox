@@ -1587,6 +1587,44 @@ BluetoothServiceBluedroid::IsScoConnected(BluetoothReplyRunnable* aRunnable)
 }
 
 void
+BluetoothServiceBluedroid::SetObexPassword(const nsAString& aPassword,
+                                           BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothPbapManager* pbap = BluetoothPbapManager::Get();
+  if (!pbap) {
+    DispatchReplyError(aRunnable,
+                       NS_LITERAL_STRING("Failed to set OBEX password"));
+    return;
+  }
+
+  pbap->ReplyToAuthChallenge(aPassword);
+  DispatchReplySuccess(aRunnable);
+}
+
+void
+BluetoothServiceBluedroid::RejectObexAuth(
+  BluetoothReplyRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ENSURE_BLUETOOTH_IS_READY_VOID(aRunnable);
+
+  BluetoothPbapManager* pbap = BluetoothPbapManager::Get();
+  if (!pbap) {
+    DispatchReplyError(aRunnable,
+      NS_LITERAL_STRING("Failed to reject OBEX authentication request"));
+    return;
+  }
+
+  pbap->ReplyToAuthChallenge(EmptyString());
+  DispatchReplySuccess(aRunnable);
+}
+
+void
 BluetoothServiceBluedroid::ReplyTovCardPulling(
   BlobParent* aBlobParent,
   BlobChild* aBlobChild,
