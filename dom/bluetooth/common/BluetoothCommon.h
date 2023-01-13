@@ -481,6 +481,11 @@ struct BluetoothUuid {
   }
 };
 
+struct BluetoothPinCode {
+  uint8_t mPinCode[16]; /* not \0-terminated */
+  uint8_t mLength;
+};
+
 struct BluetoothServiceRecord {
   BluetoothUuid mUuid;
   uint16_t mChannel;

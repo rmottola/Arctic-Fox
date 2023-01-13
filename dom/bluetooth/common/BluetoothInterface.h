@@ -1084,7 +1084,7 @@ public:
   /* Authentication */
 
   virtual void PinReply(const BluetoothAddress& aBdAddr, bool aAccept,
-                        const nsAString& aPinCode,
+                        const BluetoothPinCode& aPinCode,
                         BluetoothResultHandler* aRes) = 0;
 
   virtual void SspReply(const BluetoothAddress& aBdAddr,
