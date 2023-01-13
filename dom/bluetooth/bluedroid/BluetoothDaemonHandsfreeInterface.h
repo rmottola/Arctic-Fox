@@ -290,6 +290,11 @@ protected:
     NotificationHandlerWrapper, void, nsString, const nsAString&>
     KeyPressedNotification;
 
+  typedef mozilla::ipc::DaemonNotificationRunnable2<
+    NotificationHandlerWrapper, void, BluetoothHandsfreeWbsConfig, nsString,
+    BluetoothHandsfreeWbsConfig, const nsAString&>
+    WbsNotification;
+
   class ConnectionStateInitOp;
   class AudioStateInitOp;
   class VoiceRecognitionInitOp;
@@ -307,6 +312,7 @@ protected:
   class VolumeInitOp;
   class UnknownAtInitOp;
   class KeyPressedInitOp;
+  class WbsInitOp;
 
   void ConnectionStateNtf(const DaemonSocketPDUHeader& aHeader,
                           DaemonSocketPDU& aPDU);
@@ -355,6 +361,9 @@ protected:
 
   void KeyPressedNtf(const DaemonSocketPDUHeader& aHeader,
                      DaemonSocketPDU& aPDU);
+
+  void WbsNtf(const DaemonSocketPDUHeader& aHeader,
+              DaemonSocketPDU& aPDU);
 
   void HandleNtf(const DaemonSocketPDUHeader& aHeader,
                  DaemonSocketPDU& aPDU,
