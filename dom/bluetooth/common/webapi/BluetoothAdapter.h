@@ -243,13 +243,6 @@ private:
   void SetAdapterState(BluetoothAdapterState aState);
 
   /**
-   * Handle "DeviceFound" bluetooth signal.
-   *
-   * @param aValue [in] Properties array of the discovered device.
-   */
-  void HandleDeviceFound(const BluetoothValue& aValue);
-
-  /**
    * Pair/Unpair adapter to device of given address.
    * This function is called by methods Enable() and Disable().
    *
@@ -274,6 +267,13 @@ private:
    * @param aValue [in] Array of changed properties
    */
   void HandlePropertyChanged(const BluetoothValue& aValue);
+
+  /**
+   * Handle "DeviceFound" bluetooth signal.
+   *
+   * @param aValue [in] Properties array of the discovered device.
+   */
+  void HandleDeviceFound(const BluetoothValue& aValue);
 
   /**
    * Handle DEVICE_PAIRED_ID bluetooth signal.
