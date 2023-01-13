@@ -2436,7 +2436,8 @@ BluetoothServiceBluedroid::BondStateChangedNotification(
 
 void
 BluetoothServiceBluedroid::AclStateChangedNotification(
-  BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr, bool aState)
+  BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr,
+  BluetoothAclState aState)
 {
   MOZ_ASSERT(NS_IsMainThread());
 

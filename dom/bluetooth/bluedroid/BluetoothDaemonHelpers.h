@@ -27,11 +27,6 @@ using namespace mozilla::ipc::DaemonSocketPDUHelpers;
 // Helper structures
 //
 
-enum BluetoothAclState {
-  ACL_STATE_CONNECTED,
-  ACL_STATE_DISCONNECTED
-};
-
 struct BluetoothAvrcpAttributeTextPairs {
   BluetoothAvrcpAttributeTextPairs(const uint8_t* aAttr,
                                    const char** aText,
@@ -177,9 +172,6 @@ Convert(const nsAString& aIn, BluetoothPropertyType& aOut);
 
 nsresult
 Convert(const nsAString& aIn, BluetoothServiceName& aOut);
-
-nsresult
-Convert(BluetoothAclState aIn, bool& aOut);
 
 nsresult
 Convert(const BluetoothAttributeHandle& aIn, int32_t& aOut);
