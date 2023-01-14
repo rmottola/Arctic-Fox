@@ -193,13 +193,6 @@
     "n_buckets": 50,
     "description": "Time spent in between cycle collections (seconds)"
   },
-  "CYCLE_COLLECTOR_CONTENT_UNBIND": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": "10000",
-    "n_buckets": 50,
-    "description": "Time spent on one ContentUnbinder (ms)"
-  },
   "CYCLE_COLLECTOR_OOM": {
     "expires_in_version": "never",
     "kind": "flag",
