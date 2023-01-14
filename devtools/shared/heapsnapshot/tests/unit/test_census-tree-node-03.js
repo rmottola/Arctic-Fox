@@ -35,9 +35,7 @@ const EXPECTED = {
       totalBytes: 100,
       count: 1,
       totalCount: 1,
-      children: undefined,
-      id: 3,
-      parent: 1,
+      children: undefined
     },
     {
       name: "other",
@@ -52,9 +50,7 @@ const EXPECTED = {
           totalBytes: 40,
           count: 4,
           totalCount: 4,
-          children: undefined,
-          id: 6,
-          parent: 4,
+          children: undefined
         },
         {
           name: "JIT::CODE::NOW!!!",
@@ -62,13 +58,9 @@ const EXPECTED = {
           totalBytes: 20,
           count: 2,
           totalCount: 2,
-          children: undefined,
-          id: 5,
-          parent: 4,
+          children: undefined
         },
-      ],
-      id: 4,
-      parent: 1,
+      ]
     },
     {
       name: "Function",
@@ -76,13 +68,9 @@ const EXPECTED = {
       totalBytes: 10,
       count: 10,
       totalCount: 10,
-      children: undefined,
-      id: 2,
-      parent: 1,
+      children: undefined
     },
-  ],
-  id: 1,
-  parent: undefined,
+  ]
 };
 
 function run_test() {
