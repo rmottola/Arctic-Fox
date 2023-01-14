@@ -758,3 +758,11 @@ exports.openFileStream = function (filePath) {
     );
   });
 }
+
+exports.isGenerator = function (fn) {
+  return typeof fn === "function" && fn.isGenerator();
+};
+
+exports.isPromise = function (p) {
+  return p && typeof p.then === "function";
+};
