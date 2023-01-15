@@ -462,6 +462,9 @@ exports.dbg_assert = function dbg_assert(cond, e) {
 };
 
 exports.defineLazyGetter(this, "AppConstants", () => {
+  if (isWorker) {
+    return {};
+  }
   const scope = {};
   Cu.import("resource://gre/modules/AppConstants.jsm", scope);
   return scope.AppConstants;
