@@ -1200,7 +1200,7 @@ PathExtentsToMaxStrokeExtents(const gfxRect& aPathExtents,
   gfxMatrix outerSVGToUser;
   if (nsSVGUtils::GetNonScalingStrokeTransform(aFrame, &outerSVGToUser)) {
     outerSVGToUser.Invert();
-    matrix *= outerSVGToUser;
+    matrix.PreMultiply(outerSVGToUser);
   }
 
   double dx = style_expansion * (fabs(matrix._11) + fabs(matrix._21));
