@@ -51,7 +51,7 @@ function finishTest()
 {
   try {
     localStorage.clear();
-  } catch(e) {}
+  } catch (e) {}
   postMsg("done");
   return false;
 }

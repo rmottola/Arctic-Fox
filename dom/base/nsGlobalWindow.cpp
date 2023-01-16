@@ -10107,13 +10107,6 @@ nsGlobalWindow::GetLocalStorage(ErrorResult& aError)
       return nullptr;
     }
 
-    // If the document has the sandboxed origin flag set
-    // don't allow access to localStorage.
-    if (mDoc && (mDoc->GetSandboxFlags() & SANDBOXED_ORIGIN)) {
-      aError.Throw(NS_ERROR_DOM_SECURITY_ERR);
-      return nullptr;
-    }
-
     nsString documentURI;
     if (mDoc) {
       mDoc->GetDocumentURI(documentURI);
