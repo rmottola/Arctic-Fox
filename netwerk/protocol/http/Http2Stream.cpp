@@ -333,7 +333,7 @@ Http2Stream::WriteSegments(nsAHttpSegmentWriter *writer,
     // that can be meaningfully giving this signal
     bool doBuffer = true;
     if (mIsTunnel) {
-      nsRefPtr<SpdyConnectTransaction> qiTrans(mTransaction->QuerySpdyConnectTransaction());
+      RefPtr<SpdyConnectTransaction> qiTrans(mTransaction->QuerySpdyConnectTransaction());
       if (qiTrans) {
         doBuffer = qiTrans->ConnectedReadyForInput();
       }
