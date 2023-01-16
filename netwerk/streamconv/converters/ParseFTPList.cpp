@@ -27,7 +27,7 @@ int ParseFTPList(const char *line, struct list_state *state,
                  struct list_result *result )
 {
   unsigned int carry_buf_len; /* copy of state->carry_buf_len */
-  unsigned int linelen, pos;
+  unsigned int pos;
   const char *p;
 
   if (!line || !state || !result)
@@ -40,8 +40,6 @@ int ParseFTPList(const char *line, struct list_state *state,
   carry_buf_len = state->carry_buf_len;
   state->carry_buf_len = 0;
 
-  linelen = 0;
-
   /* strip leading whitespace */
   while (*line == ' ' || *line == '\t')
     line++;
@@ -50,7 +48,7 @@ int ParseFTPList(const char *line, struct list_state *state,
   p = line;
   while (*p && *p != '\n')
     p++;
-  linelen = p - line;
+  unsigned int linelen = p - line;
 
   if (linelen > 0 && *p == '\n' && *(p-1) == '\r')
     linelen--;
