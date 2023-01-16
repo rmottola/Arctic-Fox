@@ -34,7 +34,7 @@
 
 // values for mCookiesLifetimePolicy
 // 0 == accept normally
-// 1 == ask before accepting -- obsolete, treated as ACCEPT_NORMALLY
+// 1 == ask before accepting, no more supported, treated like ACCEPT_NORMALLY (Bug 606655).
 // 2 == downgrade to session
 // 3 == limit lifetime to N days
 static const uint32_t ACCEPT_NORMALLY = 0;
