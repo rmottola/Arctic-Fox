@@ -65,7 +65,9 @@ nsChannelClassifier::ShouldEnableTrackingProtection(nsIChannel *aChannel,
     NS_ENSURE_ARG(result);
     *result = false;
 
-    if (!Preferences::GetBool("privacy.trackingprotection.enabled", false)) {
+    if (!Preferences::GetBool("privacy.trackingprotection.enabled", false) &&
+        (!Preferences::GetBool("privacy.trackingprotection.pbmode.enabled",
+                               false) || !NS_UsePrivateBrowsing(aChannel))) {
       return NS_OK;
     }
 
