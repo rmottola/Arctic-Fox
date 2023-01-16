@@ -3203,7 +3203,8 @@ Http2Session::OnWriteSegment(char *buf,
   }
 
   if (mDownstreamState == NOT_USING_NETWORK ||
-      mDownstreamState == BUFFERING_FRAME_HEADER) {
+      mDownstreamState == BUFFERING_FRAME_HEADER ||
+      mDownstreamState == DISCARDING_DATA_FRAME_PADDING) {
     return NS_BASE_STREAM_WOULD_BLOCK;
   }
 
