@@ -34,11 +34,7 @@
 #include "prnetdb.h"
 #include "sslt.h"
 #include "mozilla/Snprintf.h"
-
-#ifdef DEBUG
-// defined by the socket transport service while active
-extern PRThread *gSocketThread;
-#endif
+#include "nsSocketTransportService2.h"
 
 namespace mozilla {
 namespace net {
