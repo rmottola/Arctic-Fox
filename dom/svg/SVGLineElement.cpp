@@ -146,6 +146,7 @@ SVGLineElement::GetGeometryBounds(Rect* aBounds,
   // bounds
   Matrix nonScalingToBounds;
   if (aToNonScalingStrokeSpace) {
+    MOZ_ASSERT(!aToNonScalingStrokeSpace->IsSingular());
     Matrix nonScalingToUser = aToNonScalingStrokeSpace->Inverse();
     nonScalingToBounds = nonScalingToUser * aToBoundsSpace;
   }
