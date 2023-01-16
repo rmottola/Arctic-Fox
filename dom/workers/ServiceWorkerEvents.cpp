@@ -395,8 +395,8 @@ ExtractErrorValues(JSContext* aCx, JS::Handle<JS::Value> aValue,
     else if(NS_SUCCEEDED(UNWRAP_OBJECT(DOMException, obj, domException))) {
 
       nsAutoString filename;
-      if (NS_SUCCEEDED(domException->GetFilename(filename)) &&
-          !filename.IsEmpty()) {
+      domException->GetFilename(filename);
+      if (!filename.IsEmpty()) {
         CopyUTF16toUTF8(filename, aSourceSpecOut);
         *aLineOut = domException->LineNumber();
         *aColumnOut = domException->ColumnNumber();
@@ -418,6 +418,8 @@ ExtractErrorValues(JSContext* aCx, JS::Handle<JS::Value> aValue,
     nsAutoJSString jsString;
     if (jsString.init(aCx, aValue)) {
       aMessageOut = jsString;
+    } else {
+      JS_ClearPendingException(aCx);
     }
   }
 }
