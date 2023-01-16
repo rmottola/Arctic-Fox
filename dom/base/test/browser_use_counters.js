@@ -1,13 +1,13 @@
 /* -*- Mode: javascript; tab-width: 2; indent-tabs-mode: nil; js-indent-level: 2 -*- */
 
-let {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
+var {Promise: promise} = Cu.import("resource://gre/modules/Promise.jsm", {});
 
 const gHttpTestRoot = "http://example.com/browser/dom/base/test/";
 
 /**
  * Enable local telemetry recording for the duration of the tests.
  */
-let gOldContentCanRecord = false;
+var gOldContentCanRecord = false;
 add_task(function* test_initialize() {
    gOldContentCanRecord = yield ContentTask.spawn(gBrowser.selectedBrowser, {}, function () {
     let telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
@@ -112,7 +112,7 @@ function grabHistogramsFromContent(browser, use_counter_middlefix) {
   });
 }
 
-let check_use_counter_iframe = Task.async(function* (file, use_counter_middlefix, check_documents=true) {
+var check_use_counter_iframe = Task.async(function* (file, use_counter_middlefix, check_documents=true) {
   info("checking " + file + " with histogram " + use_counter_middlefix);
 
   let newTab = gBrowser.addTab( "about:blank");
