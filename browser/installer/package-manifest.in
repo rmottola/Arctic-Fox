@@ -652,6 +652,20 @@
 @RESPATH@/browser/modules/*
 @RESPATH@/modules/*
 
+; Safe Browsing
+#ifdef MOZ_URL_CLASSIFIER
+@RESPATH@/components/nsURLClassifier.manifest
+@RESPATH@/components/nsUrlClassifierHashCompleter.js
+@RESPATH@/components/nsUrlClassifierListManager.js
+@RESPATH@/components/nsUrlClassifierLib.js
+@RESPATH@/components/url-classifier.xpt
+#endif
+
+; Private Browsing
+@RESPATH@/components/privatebrowsing.xpt
+@RESPATH@/components/PrivateBrowsing.manifest
+@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
+
 ; Signed Packaged Content
 @RESPATH@/components/InstallPackagedWebapp.manifest
 @RESPATH@/components/InstallPackagedWebapp.js
