@@ -1264,6 +1264,12 @@ SpdyConnectTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
   return rv;
 }
 
+bool
+SpdyConnectTransaction::ConnectedReadyForInput()
+{
+  return mTunneledConn && mTunnelStreamIn->mCallback;
+}
+
 nsHttpRequestHead *
 SpdyConnectTransaction::RequestHead()
 {
