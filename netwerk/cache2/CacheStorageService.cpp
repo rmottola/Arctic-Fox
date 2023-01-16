@@ -310,7 +310,8 @@ private:
 
   virtual void OnEntryInfo(const nsACString & aURISpec, const nsACString & aIdEnhance,
                            int64_t aDataSize, int32_t aFetchCount,
-                           uint32_t aLastModifiedTime, uint32_t aExpirationTime)
+                           uint32_t aLastModifiedTime, uint32_t aExpirationTime,
+                           bool aPinned)
   {
     nsCOMPtr<nsIURI> uri;
     nsresult rv = NS_NewURI(getter_AddRefs(uri), aURISpec);
@@ -318,7 +319,7 @@ private:
       return;
 
     mCallback->OnCacheEntryInfo(uri, aIdEnhance, aDataSize, aFetchCount,
-                                aLastModifiedTime, aExpirationTime);
+                                aLastModifiedTime, aExpirationTime, aPinned);
   }
 
 private:
@@ -378,7 +379,7 @@ private:
 
       mWalker->mCallback->OnCacheEntryInfo(
         uri, mIdEnhance, mDataSize, mFetchCount,
-        mLastModifiedTime, mExpirationTime);
+        mLastModifiedTime, mExpirationTime, mPinned);
       return NS_OK;
     }
 
@@ -390,6 +391,7 @@ private:
     int32_t mFetchCount;
     uint32_t mLastModifiedTime;
     uint32_t mExpirationTime;
+    bool mPinned;
   };
 
   NS_IMETHODIMP Run()
@@ -469,7 +471,8 @@ private:
 
   virtual void OnEntryInfo(const nsACString & aURISpec, const nsACString & aIdEnhance,
                            int64_t aDataSize, int32_t aFetchCount,
-                           uint32_t aLastModifiedTime, uint32_t aExpirationTime)
+                           uint32_t aLastModifiedTime, uint32_t aExpirationTime,
+                           bool aPinned)
   {
     // Called directly from CacheFileIOManager::GetEntryInfo.
 
@@ -481,6 +484,7 @@ private:
     info->mFetchCount = aFetchCount;
     info->mLastModifiedTime = aLastModifiedTime;
     info->mExpirationTime = aExpirationTime;
+    info->mPinned = aPinned;
 
     NS_DispatchToMainThread(info);
   }
@@ -1871,7 +1875,8 @@ CacheStorageService::GetCacheEntryInfo(CacheEntry* aEntry,
   }
 
   aCallback->OnEntryInfo(uriSpec, enhanceId, dataSize,
-                         fetchCount, lastModified, expirationTime);
+                         fetchCount, lastModified, expirationTime,
+                         aEntry->IsPinned());
 }
 
 // Telementry collection
