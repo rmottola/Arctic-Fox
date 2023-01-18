@@ -29,6 +29,10 @@ struct InputContext;
 struct InputContextAction;
 }
 
+namespace mozilla {
+class HwcComposer2D;
+}
+
 class nsScreenGonk;
 
 class nsWindow : public nsBaseWidget
@@ -164,6 +168,8 @@ private:
     nsAutoPtr<mozilla::MultiTouchInput> mSynthesizedTouchInput;
 
     RefPtr<nsScreenGonk> mScreen;
+
+    RefPtr<mozilla::HwcComposer2D> mComposer2D;
 };
 
 #endif /* nsWindow_h */
