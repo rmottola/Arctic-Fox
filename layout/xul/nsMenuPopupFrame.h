@@ -396,7 +396,10 @@ public:
   // or (-1, -1, 0, 0) if anchored.
   nsIntRect GetScreenAnchorRect() const { return mScreenRect; }
 
-  nsIntPoint GetLastClientOffset() const { return mLastClientOffset; }
+  mozilla::LayoutDeviceIntPoint GetLastClientOffset() const
+  {
+    return mLastClientOffset;
+  }
 
   // Return the alignment of the popup
   int8_t GetAlignmentPosition() const;
@@ -533,7 +536,7 @@ protected:
   // The value of the client offset of our widget the last time we positioned
   // ourselves. We store this so that we can detect when it changes but the
   // position of our widget didn't change.
-  nsIntPoint mLastClientOffset;
+  mozilla::LayoutDeviceIntPoint mLastClientOffset;
 
   nsPopupType mPopupType; // type of popup
   nsPopupState mPopupState; // open state of the popup
