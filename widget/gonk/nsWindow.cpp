@@ -843,10 +843,10 @@ nsWindow::GetGLFrameBufferFormat()
     return LOCAL_GL_NONE;
 }
 
-nsIntRect
-nsWindow::GetNaturalBoundsUntyped()
+LayoutDeviceIntRect
+nsWindow::GetNaturalBounds()
 {
-    return mScreen->GetNaturalBounds().ToUnknownRect();
+    return mScreen->GetNaturalBounds();
 }
 
 nsScreenGonk*
