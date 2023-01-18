@@ -201,7 +201,7 @@ nsScreenGonk::GetRect(int32_t *outLeft,  int32_t *outTop,
     return NS_OK;
 }
 
-nsIntRect
+LayoutDeviceIntRect
 nsScreenGonk::GetRect()
 {
     return mVirtualBounds;
@@ -273,9 +273,9 @@ nsScreenGonk::SetRotation(uint32_t aRotation)
     uint32_t rotation = EffectiveScreenRotation();
     if (rotation == nsIScreen::ROTATION_90_DEG ||
         rotation == nsIScreen::ROTATION_270_DEG) {
-        mVirtualBounds = nsIntRect(0, 0,
-                                   mNaturalBounds.height,
-                                   mNaturalBounds.width);
+        mVirtualBounds = LayoutDeviceIntRect(0, 0,
+                                             mNaturalBounds.height,
+                                             mNaturalBounds.width);
     } else {
         mVirtualBounds = mNaturalBounds;
     }
@@ -294,7 +294,7 @@ nsScreenGonk::SetRotation(uint32_t aRotation)
 LayoutDeviceIntRect
 nsScreenGonk::GetNaturalBounds()
 {
-    return LayoutDeviceIntRect::FromUnknownRect(mNaturalBounds);
+    return mNaturalBounds;
 }
 
 uint32_t
@@ -306,7 +306,7 @@ nsScreenGonk::EffectiveScreenRotation()
 // NB: This isn't gonk-specific, but gonk is the only widget backend
 // that does this calculation itself, currently.
 static ScreenOrientationInternal
-ComputeOrientation(uint32_t aRotation, const nsIntSize& aScreenSize)
+ComputeOrientation(uint32_t aRotation, const LayoutDeviceIntSize& aScreenSize)
 {
     bool naturallyPortrait = (aScreenSize.height > aScreenSize.width);
     switch (aRotation) {
@@ -340,12 +340,12 @@ RotationToAngle(uint32_t aRotation)
 ScreenConfiguration
 nsScreenGonk::GetConfiguration()
 {
-    ScreenOrientationInternal orientation = ComputeOrientation(mScreenRotation,
-                                                               mNaturalBounds.Size());
+    ScreenOrientationInternal orientation =
+        ComputeOrientation(mScreenRotation, mNaturalBounds.Size());
 
     // NB: perpetuating colorDepth == pixelDepth illusion here, for
     // consistency.
-    return ScreenConfiguration(mVirtualBounds, orientation,
+    return ScreenConfiguration(mVirtualBounds.ToUnknownRect(), orientation,
                                RotationToAngle(mScreenRotation),
                                mColorDepth, mColorDepth);
 }
@@ -473,7 +473,7 @@ nsScreenGonk::EnableMirroring()
     nsWidgetInitData initData;
     initData.mScreenId = mId;
     RefPtr<nsWindow> window = new nsWindow();
-    window->Create(nullptr, nullptr, mNaturalBounds, &initData);
+    window->Create(nullptr, nullptr, mNaturalBounds.ToUnknownRect(), &initData);
     MOZ_ASSERT(static_cast<nsWindow*>(window)->GetScreen() == this);
 
     // Update mMirroringWidget on compositor thread
