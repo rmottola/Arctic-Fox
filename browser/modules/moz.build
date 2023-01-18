@@ -25,6 +25,7 @@ EXTRA_JS_MODULES += [
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
     'NetworkPrioritizer.jsm',
+    'NewTabURL.jsm',
     'offlineAppCache.jsm',
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
