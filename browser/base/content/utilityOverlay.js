@@ -219,6 +219,7 @@ function openLinkIn(url, where, params) {
   var aAllowPinnedTabHostChange = !!params.allowPinnedTabHostChange;
   var aNoReferrer           = params.noReferrer;
   var aAllowPopups          = !!params.allowPopups;
+  var aUserContextId        = params.userContextId;
   var sendReferrerURI       = true;
 
   if (where == "save") {
@@ -367,7 +368,8 @@ function openLinkIn(url, where, params) {
       relatedToCurrent: aRelatedToCurrent,
       skipAnimation: aSkipTabAnimation,
       allowMixedContent: aAllowMixedContent,
-      noReferrer: aNoReferrer
+      noReferrer: aNoReferrer,
+      userContextId: aUserContextId
     });
     break;
   }
