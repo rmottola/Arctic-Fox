@@ -153,6 +153,10 @@ this.PushServiceWebSocket = {
                       PushRecordWebSocket);
   },
 
+  serviceType: function() {
+    return "WebSocket";
+  },
+
   disconnect: function() {
     this._shutdownWS();
   },
