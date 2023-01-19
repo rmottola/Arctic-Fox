@@ -103,6 +103,7 @@ function ExtraNetworkInfo(aNetwork) {
   this.dnses = aNetwork.info.getDnses();
   this.httpProxyHost = aNetwork.httpProxyHost;
   this.httpProxyPort = aNetwork.httpProxyPort;
+  this.mtu = aNetwork.mtu;
 }
 ExtraNetworkInfo.prototype = {
   getAddresses: function(aIps, aPrefixLengths) {
@@ -374,6 +375,13 @@ NetworkManager.prototype = {
             return this.setSecondaryDefaultRoute(extNetworkInfo);
           })
           .then(() => this._addSubnetRoutes(extNetworkInfo))
+          .then(() => {
+            if (extNetworkInfo.mtu <= 0) {
+              return;
+            }
+
+            return this._setMtu(extNetworkInfo);
+          })
           .then(() => this.setAndConfigureActive())
           .then(() => {
             // Update data connection when Wifi connected/disconnected
@@ -934,6 +942,18 @@ NetworkManager.prototype = {
           aReject("setDNS failed");
           return;
         }
+        aResolve();
+      });
+    });
+  },
+
+  _setMtu: function(aNetworkInfo) {
+    return new Promise((aResolve, aReject) => {
+      gNetworkService.setMtu(aNetworkInfo.name, aNetworkInfo.mtu, (aSuccess) => {
+        if (!aSuccess) {
+          debug("setMtu failed");
+        }
+        // Always resolve.
         aResolve();
       });
     });
