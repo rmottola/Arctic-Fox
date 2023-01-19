@@ -643,6 +643,10 @@ this.PushServiceWebSocket = {
     }
   },
 
+  isConnected: function() {
+    return !!this._ws;
+  },
+
   /**
    * There is only one alarm active at any time. This alarm has 3 intervals
    * corresponding to 3 tasks.
