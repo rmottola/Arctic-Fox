@@ -1109,9 +1109,6 @@ this.PushServiceWebSocket = {
       return;
     }
 
-    // Since we've had a successful connection reset the retry fail count.
-    this._retryFailCount = 0;
-
     let data = {
       messageType: "hello",
       use_webpush: true,
@@ -1187,12 +1184,10 @@ this.PushServiceWebSocket = {
       return;
     }
 
-    // If we are not waiting for a hello message, reset the retry fail count
-    if (this._currentState != STATE_WAITING_FOR_HELLO) {
-      debug('Reseting _retryFailCount and _pingIntervalRetryTimes');
-      this._retryFailCount = 0;
-      this._pingIntervalRetryTimes = {};
-    }
+    // If we receive a message, we know the connection succeeded. Reset the
+    // connection attempt and ping interval counters.
+    this._retryFailCount = 0;
+    this._pingIntervalRetryTimes = {};
 
     let doNotHandle = false;
     if ((message === '{}') ||
