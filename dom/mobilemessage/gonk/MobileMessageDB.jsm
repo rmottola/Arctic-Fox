@@ -4271,7 +4271,7 @@ MobileMessageDB.prototype = {
   }
 };
 
-let FilterSearcherHelper = {
+var FilterSearcherHelper = {
 
   /**
    * @param index
