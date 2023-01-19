@@ -822,7 +822,7 @@ this.PushServiceWebSocket = {
     if (this._UAID != reply.uaid) {
       console.debug("handleHelloReply: Received new UAID");
 
-      this._mainPushService.dropRegistrations()
+      this._mainPushService.dropUnexpiredRegistrations()
           .then(finishHandshake.bind(this));
 
       return;
@@ -1463,8 +1463,8 @@ PushRecordWebSocket.prototype = Object.create(PushRecord.prototype, {
   },
 });
 
-PushRecordWebSocket.prototype.toRegistration = function() {
-  let registration = PushRecord.prototype.toRegistration.call(this);
-  registration.version = this.version;
-  return registration;
+PushRecordWebSocket.prototype.toSubscription = function() {
+  let subscription = PushRecord.prototype.toSubscription.call(this);
+  subscription.version = this.version;
+  return subscription;
 };
