@@ -1315,7 +1315,7 @@ this.PushServiceWebSocket = {
   },
 };
 
-let PushNetworkInfo = {
+var PushNetworkInfo = {
   /**
    * Returns information about MCC-MNC and the IP of the current connection.
    */
