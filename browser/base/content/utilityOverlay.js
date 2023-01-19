@@ -220,6 +220,7 @@ function openLinkIn(url, where, params) {
   var aNoReferrer           = params.noReferrer;
   var aAllowPopups          = !!params.allowPopups;
   var aUserContextId        = params.userContextId;
+  var aIndicateErrorPageLoad = params.indicateErrorPageLoad;
   var sendReferrerURI       = true;
 
   if (where == "save") {
@@ -345,6 +346,9 @@ function openLinkIn(url, where, params) {
 
     if (aAllowPopups) {
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_POPUPS;
+    }
+    if (aIndicateErrorPageLoad) {
+      flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ERROR_LOAD_CHANGES_RV;
     }
 
     w.gBrowser.loadURIWithFlags(url, {
