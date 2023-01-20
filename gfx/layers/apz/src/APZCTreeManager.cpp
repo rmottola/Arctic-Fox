@@ -980,7 +980,7 @@ APZCTreeManager::UpdateWheelTransaction(WidgetInputEvent& aEvent)
      }
 
      ScreenIntPoint point =
-       ViewAs<ScreenPixel>(aEvent.refPoint, PixelCastJustification::LayoutDeviceToScreenForUntransformedEvent);
+       ViewAs<ScreenPixel>(aEvent.refPoint, PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent);
      txn->OnMouseMove(point);
      return;
    }

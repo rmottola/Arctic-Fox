@@ -119,9 +119,8 @@ MultiTouchInput::MultiTouchInput(const WidgetTouchEvent& aTouchEvent)
     float force = domTouch->Force();
 
     SingleTouchData data(identifier,
-                         ScreenIntPoint::FromUnknownPoint(
-                           gfx::IntPoint(domTouch->mRefPoint.x,
-                                         domTouch->mRefPoint.y)),
+                         ViewAs<ScreenPixel>(domTouch->mRefPoint,
+                                             PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent),
                          ScreenSize(radiusX, radiusY),
                          rotationAngle,
                          force);
@@ -259,9 +258,8 @@ MultiTouchInput::MultiTouchInput(const WidgetMouseEvent& aMouseEvent)
   }
 
   mTouches.AppendElement(SingleTouchData(0,
-                                         ScreenIntPoint::FromUnknownPoint(
-                                           gfx::IntPoint(aMouseEvent.refPoint.x,
-                                                         aMouseEvent.refPoint.y)),
+                                         ViewAs<ScreenPixel>(aMouseEvent.refPoint,
+                                                             PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent),
                                          ScreenSize(1, 1),
                                          180.0f,
                                          1.0f));
@@ -302,7 +300,7 @@ PanGestureInput::ToWidgetWheelEvent(nsIWidget* aWidget) const
   wheelEvent.timeStamp = mTimeStamp;
   wheelEvent.refPoint =
     RoundedToInt(ViewAs<LayoutDevicePixel>(mPanStartPoint,
-      PixelCastJustification::LayoutDeviceToScreenForUntransformedEvent));
+      PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent));
   wheelEvent.buttons = 0;
   wheelEvent.deltaMode = nsIDOMWheelEvent::DOM_DELTA_PIXEL;
   wheelEvent.isMomentum = IsMomentum();
@@ -365,6 +363,22 @@ DeltaModeForDeltaType(ScrollWheelInput::ScrollDeltaType aDeltaType)
   }
 }
 
+ScrollWheelInput::ScrollWheelInput(const WidgetWheelEvent& aWheelEvent) :
+  InputData(SCROLLWHEEL_INPUT, aWheelEvent.time, aWheelEvent.timeStamp, aWheelEvent.modifiers),
+  mDeltaType(DeltaTypeForDeltaMode(aWheelEvent.deltaMode)),
+  mScrollMode(SCROLLMODE_INSTANT),
+  mHandledByAPZ(aWheelEvent.mFlags.mHandledByAPZ),
+  mDeltaX(aWheelEvent.deltaX),
+  mDeltaY(aWheelEvent.deltaY),
+  mLineOrPageDeltaX(aWheelEvent.lineOrPageDeltaX),
+  mLineOrPageDeltaY(aWheelEvent.lineOrPageDeltaY),
+  mIsMomentum(aWheelEvent.isMomentum)
+{
+  mOrigin =
+    ScreenPoint(ViewAs<ScreenPixel>(aWheelEvent.refPoint,
+      PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent));
+}
+
 WidgetWheelEvent
 ScrollWheelInput::ToWidgetWheelEvent(nsIWidget* aWidget) const
 {
@@ -374,7 +388,7 @@ ScrollWheelInput::ToWidgetWheelEvent(nsIWidget* aWidget) const
   wheelEvent.timeStamp = mTimeStamp;
   wheelEvent.refPoint =
     RoundedToInt(ViewAs<LayoutDevicePixel>(mOrigin,
-      PixelCastJustification::LayoutDeviceToScreenForUntransformedEvent));
+      PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent));
   wheelEvent.buttons = 0;
   wheelEvent.deltaMode = DeltaModeForDeltaType(mDeltaType);
   wheelEvent.isMomentum = mIsMomentum;
