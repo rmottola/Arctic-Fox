@@ -130,7 +130,7 @@ var blocklist_contents =
     "<certItem issuerName='YW5vdGhlciBpbWFnaW5hcnkgaXNzdWVy'>" +
     "<serialNumber>c2VyaWFsMi4=</serialNumber>" +
     "<serialNumber>YW5vdGhlciBzZXJpYWwu</serialNumber>" +
-    // This item revokes same-issuer-ee.pem by subject and serial number.
+    // This item revokes same-issuer-ee.pem by subject and pubKeyHash.
     "</certItem><certItem subject='MCIxIDAeBgNVBAMMF0Fub3RoZXIgVGVzdCBFbmQtZW50aXR5'"+
     " pubKeyHash='VCIlmPM9NkgFQtrs4Oa5TeFcDu6MWRTKSNdePEhOgD8='>" +
     "</certItem></certItems></blocklist>";
