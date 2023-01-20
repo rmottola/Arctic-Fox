@@ -389,7 +389,7 @@ enum {
   bottomMargin
 };
 
-static int EnumSizeForCocoaSize(NSControlSize cocoaControlSize) {
+static size_t EnumSizeForCocoaSize(NSControlSize cocoaControlSize) {
   if (cocoaControlSize == NSMiniControlSize)
     return miniControlSize;
   else if (cocoaControlSize == NSSmallControlSize)
@@ -424,7 +424,7 @@ static void InflateControlRect(NSRect* rect, NSControlSize cocoaControlSize, con
 
   static int osIndex = nsCocoaFeatures::OnYosemiteOrLater() ?
                          yosemiteOSorlater : leopardOSorlater;
-  int controlSize = EnumSizeForCocoaSize(cocoaControlSize);
+  size_t controlSize = EnumSizeForCocoaSize(cocoaControlSize);
   const float* buttonMargins = marginSet[osIndex][controlSize];
   rect->origin.x -= buttonMargins[leftMargin];
   rect->origin.y -= buttonMargins[bottomMargin];
@@ -515,7 +515,6 @@ static BOOL IsActive(nsIFrame* aFrame, BOOL aIsToolbarControl)
 }
 
 NS_IMPL_ISUPPORTS_INHERITED(nsNativeThemeCocoa, nsNativeTheme, nsITheme)
-
 
 nsNativeThemeCocoa::nsNativeThemeCocoa()
 {
@@ -853,13 +852,13 @@ static void DrawCellWithSnapping(NSCell *cell,
   NSControlSize controlSizeY = FindControlSize(rectHeight, controlHeights, snapTolerance);
 
   NSControlSize controlSize = NSRegularControlSize;
-  int sizeIndex = 0;
+  size_t sizeIndex = 0;
 
   // At some sizes, don't scale but snap.
   const NSControlSize smallerControlSize =
     EnumSizeForCocoaSize(controlSizeX) < EnumSizeForCocoaSize(controlSizeY) ?
     controlSizeX : controlSizeY;
-  const int smallerControlSizeIndex = EnumSizeForCocoaSize(smallerControlSize);
+  const size_t smallerControlSizeIndex = EnumSizeForCocoaSize(smallerControlSize);
   const NSSize size = sizes[smallerControlSizeIndex];
   float diffWidth = size.width ? rectWidth - size.width : 0.0f;
   float diffHeight = size.height ? rectHeight - size.height : 0.0f;
