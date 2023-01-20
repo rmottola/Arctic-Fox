@@ -74,7 +74,9 @@
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
+- bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - 1245241 remaining 4 parts
+- Bug 1242578
 - Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
@@ -109,11 +111,7 @@
 - Bug 1213646: Allow URI_IS_UI_RESOURCE and safe about: URIs when SEC_A
 - 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
-- https://bugzilla.mozilla.org/show_bug.cgi?id=1201314
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
-- bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
-- bug 1181823 - convert test_ev_certs.js, test_keysize_ev.js, a
-- Bug 1242578
 
 
 impacting download and shutdown:
