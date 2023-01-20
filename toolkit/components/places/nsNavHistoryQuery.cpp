@@ -1333,7 +1333,7 @@ NS_IMETHODIMP nsNavHistoryQuery::Clone(nsINavHistoryQuery** _retval)
 {
   *_retval = nullptr;
 
-  nsRefPtr<nsNavHistoryQuery> clone = new nsNavHistoryQuery(*this);
+  RefPtr<nsNavHistoryQuery> clone = new nsNavHistoryQuery(*this);
   NS_ENSURE_TRUE(clone, NS_ERROR_OUT_OF_MEMORY);
 
   clone.forget(_retval);
