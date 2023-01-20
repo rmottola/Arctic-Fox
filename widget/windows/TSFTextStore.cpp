@@ -4383,15 +4383,22 @@ TSFTextStore::GetIMEUpdatePreference()
 nsresult
 TSFTextStore::OnTextChangeInternal(const IMENotification& aIMENotification)
 {
+  const IMENotification::TextChangeDataBase& textChangeData =
+    aIMENotification.mTextChangeData;
+
   MOZ_LOG(sTextStoreLog, LogLevel::Debug,
          ("TSF: 0x%p   TSFTextStore::OnTextChangeInternal(aIMENotification={ "
           "mMessage=0x%08X, mTextChangeData={ mStartOffset=%lu, "
-          "mRemovedEndOffset=%lu, mAddedEndOffset=%lu}), mSink=0x%p, "
-          "mSinkMask=%s, mComposition.IsComposing()=%s",
+          "mRemovedEndOffset=%lu, mAddedEndOffset=%lu, "
+          "mCausedByComposition=%s, mOccurredDuringComposition=%s }), "
+          "mSink=0x%p, mSinkMask=%s, mComposition.IsComposing()=%s",
           this, aIMENotification.mMessage,
-          aIMENotification.mTextChangeData.mStartOffset,
-          aIMENotification.mTextChangeData.mRemovedEndOffset,
-          aIMENotification.mTextChangeData.mAddedEndOffset, mSink.get(),
+          textChangeData.mStartOffset,
+          textChangeData.mRemovedEndOffset,
+          textChangeData.mAddedEndOffset,
+          GetBoolName(textChangeData.mCausedByComposition),
+          GetBoolName(textChangeData.mOccurredDuringComposition),
+          mSink.get(),
           GetSinkMaskNameStr(mSinkMask).get(),
           GetBoolName(mComposition.IsComposing())));
 
@@ -4412,12 +4419,9 @@ TSFTextStore::OnTextChangeInternal(const IMENotification& aIMENotification)
 
   if (aIMENotification.mTextChangeData.IsInInt32Range()) {
     TS_TEXTCHANGE textChange;
-    textChange.acpStart =
-      static_cast<LONG>(aIMENotification.mTextChangeData.mStartOffset);
-    textChange.acpOldEnd =
-      static_cast<LONG>(aIMENotification.mTextChangeData.mRemovedEndOffset);
-    textChange.acpNewEnd =
-      static_cast<LONG>(aIMENotification.mTextChangeData.mAddedEndOffset);
+    textChange.acpStart = static_cast<LONG>(textChangeData.mStartOffset);
+    textChange.acpOldEnd = static_cast<LONG>(textChangeData.mRemovedEndOffset);
+    textChange.acpNewEnd = static_cast<LONG>(textChangeData.mAddedEndOffset);
     NotifyTSFOfTextChange(textChange);
   } else {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
@@ -4470,7 +4474,8 @@ TSFTextStore::OnSelectionChangeInternal(const IMENotification& aIMENotification)
          ("TSF: 0x%p   TSFTextStore::OnSelectionChangeInternal("
           "aIMENotification={ mSelectionChangeData={ mOffset=%lu, "
           "Length()=%lu, mReversed=%s, mWritingMode=%s, "
-          "mCausedByComposition=%s, mCausedBySelectionEvent=%s } }), "
+          "mCausedByComposition=%s, mCausedBySelectionEvent=%s, "
+          "mOccurredDuringComposition=%s } }), "
           "mSink=0x%p, mSinkMask=%s, mIsRecordingActionsWithoutLock=%s, "
           "mComposition.IsComposing()=%s",
           this, selectionChangeData.mOffset, selectionChangeData.Length(),
@@ -4478,6 +4483,7 @@ TSFTextStore::OnSelectionChangeInternal(const IMENotification& aIMENotification)
           GetWritingModeName(selectionChangeData.GetWritingMode()).get(),
           GetBoolName(selectionChangeData.mCausedByComposition),
           GetBoolName(selectionChangeData.mCausedBySelectionEvent),
+          GetBoolName(selectionChangeData.mOccurredDuringComposition),
           mSink.get(), GetSinkMaskNameStr(mSinkMask).get(),
           GetBoolName(mIsRecordingActionsWithoutLock),
           GetBoolName(mComposition.IsComposing())));
