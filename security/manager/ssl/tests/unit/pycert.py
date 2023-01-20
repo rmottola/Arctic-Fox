@@ -516,6 +516,16 @@ class Certificate:
         nameConstraints.setComponentByName(subtreesType, generalSubtrees)
         self.addExtension(rfc2459.id_ce_nameConstraints, nameConstraints)
 
+    def addCertificatePolicies(self, policyOID):
+        policies = rfc2459.CertificatePolicies()
+        policy = rfc2459.PolicyInformation()
+        if policyOID == 'any':
+            policyOID = '2.5.29.32.0'
+        policyIdentifier = rfc2459.CertPolicyId(policyOID)
+        policy.setComponentByName('policyIdentifier', policyIdentifier)
+        policies.setComponentByPosition(0, policy)
+        self.addExtension(rfc2459.id_ce_certificatePolicies, policies)
+
     def getVersion(self):
         return rfc2459.Version(self.versionValue).subtype(
             explicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0))
