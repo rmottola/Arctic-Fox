@@ -15,6 +15,11 @@
 
 #include "GfxInfoX11.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#include "nsICrashReporter.h"
+#endif
+
 namespace mozilla {
 namespace widget {
 
@@ -171,6 +176,9 @@ GfxInfo::GetData()
             mAdapterDescription.Append(nsDependentCString(buf));
             mAdapterDescription.Append('\n');
         }
+#ifdef MOZ_CRASHREPORTER
+        CrashReporter::AppendAppNotesToCrashReport(mAdapterDescription);
+#endif
         return;
     }
 
@@ -186,6 +194,9 @@ GfxInfo::GetData()
     if (mHasTextureFromPixmap)
         note.AppendLiteral(" -- texture_from_pixmap");
     note.Append('\n');
+#ifdef MOZ_CRASHREPORTER
+    CrashReporter::AppendAppNotesToCrashReport(note);
+#endif
 
     // determine the major OpenGL version. That's the first integer in the version string.
     mGLMajorVersion = strtol(mVersion.get(), 0, 10);

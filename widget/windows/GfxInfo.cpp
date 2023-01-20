@@ -558,6 +558,8 @@ GfxInfo::Init()
     mAdapterDeviceID.AssignASCII(spoofedDevice);
   }
 
+  AddCrashReportAnnotations();
+
   return rv;
 }
 
