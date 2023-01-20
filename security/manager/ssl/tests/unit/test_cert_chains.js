@@ -9,16 +9,16 @@ function build_cert_chain(certNames) {
   let certList = Cc["@mozilla.org/security/x509certlist;1"]
                    .createInstance(Ci.nsIX509CertList);
   certNames.forEach(function(certName) {
-    let cert = constructCertFromFile("tlsserver/" + certName + ".der");
+    let cert = constructCertFromFile("tlsserver/" + certName + ".pem");
     certList.addCert(cert);
   });
   return certList;
 }
 
 function test_cert_equals() {
-  let certA = constructCertFromFile("tlsserver/default-ee.der");
-  let certB = constructCertFromFile("tlsserver/default-ee.der");
-  let certC = constructCertFromFile("tlsserver/expired-ee.der");
+  let certA = constructCertFromFile("tlsserver/default-ee.pem");
+  let certB = constructCertFromFile("tlsserver/default-ee.pem");
+  let certC = constructCertFromFile("tlsserver/expired-ee.pem");
 
   do_check_false(certA == certB);
   do_check_true(certA.equals(certB));

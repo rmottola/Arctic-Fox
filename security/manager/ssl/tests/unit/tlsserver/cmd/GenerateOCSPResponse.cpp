@@ -105,8 +105,6 @@ WriteResponse(const char* filename, const SECItem* item)
   return true;
 }
 
-
-
 int
 main(int argc, char* argv[])
 {

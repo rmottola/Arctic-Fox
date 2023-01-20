@@ -4,13 +4,58 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 "use strict";
 
-let gFetchCount = 0;
-let gGoodOCSPResponse = null;
+// Checks various aspects of the OCSP cache, mainly to to ensure we do not fetch
+// responses more than necessary.
+
+var gFetchCount = 0;
+var gGoodOCSPResponse = null;
+var gResponsePattern = [];
+var gMessage= "";
+
+function respondWithGoodOCSP(request, response) {
+  do_print("returning 200 OK");
+  response.setStatusLine(request.httpVersion, 200, "OK");
+  response.setHeader("Content-Type", "application/ocsp-response");
+  response.write(gGoodOCSPResponse);
+}
+
+function respondWithSHA1OCSP(request, response) {
+  do_print("returning 200 OK with sha-1 delegated response");
+  response.setStatusLine(request.httpVersion, 200, "OK");
+  response.setHeader("Content-Type", "application/ocsp-response");
+
+  let args = [ ["good-delegated", "default-ee", "delegatedSHA1Signer" ] ];
+  let responses = generateOCSPResponses(args, "tlsserver");
+  response.write(responses[0]);
+}
+
+function respondWithError(request, response) {
+  do_print("returning 500 Internal Server Error");
+  response.setStatusLine(request.httpVersion, 500, "Internal Server Error");
+  let body = "Refusing to return a response";
+  response.bodyOutputStream.write(body, body.length);
+}
 
 function generateGoodOCSPResponse() {
-  let args = [ ["good", "localhostAndExampleCom", "unused" ] ];
+  let args = [ ["good", "default-ee", "unused" ] ];
   let responses = generateOCSPResponses(args, "tlsserver");
   return responses[0];
+}
+
+function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage) {
+  add_connection_test(aHost, aExpectedResult,
+      function() {
+        clearSessionCache();
+        gFetchCount = 0;
+        gResponsePattern = aResponses;
+        gMessage = aMessage;
+      },
+      function() {
+        // check the number of requests matches the size of aResponses
+        equal(gFetchCount, aResponses.length,
+              "should have made " + aResponses.length +
+              " OCSP request" + (aResponses.length == 1 ? "" : "s"));
+      });
 }
 
 function run_test() {
@@ -84,19 +129,26 @@ function add_tests() {
   // This test assumes that OCSPStaplingServer uses the same cert for
   // ocsp-stapling-unknown.example.com and ocsp-stapling-none.example.com.
 
-  // Get an Unknown response for the *.exmaple.com cert and put it in the
+  // Get an Unknown response for the *.example.com cert and put it in the
   // OCSP cache.
-  add_connection_test("ocsp-stapling-unknown.example.com",
-                      SEC_ERROR_OCSP_UNKNOWN_CERT,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 0); run_next_test(); });
-
-  // A failure to retrieve an OCSP response must result in the cached Unkown
+  add_ocsp_test("ocsp-stapling-unknown.example.com",
+                SEC_ERROR_OCSP_UNKNOWN_CERT, [],
+                "Stapled Unknown response -> a fetch should not have been" +
+                " attempted");
+  // A failure to retrieve an OCSP response must result in the cached Unknown
   // response being recognized and honored.
-  add_connection_test("ocsp-stapling-none.example.com",
-                      SEC_ERROR_OCSP_UNKNOWN_CERT,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 1); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-none.example.com", SEC_ERROR_OCSP_UNKNOWN_CERT,
+                [
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                  respondWithError,
+                ],
+                "No stapled response -> a fetch should have been attempted");
 
   // A valid Good response from the OCSP responder must override the cached
   // Unknown response.
