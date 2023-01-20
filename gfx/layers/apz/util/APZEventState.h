@@ -62,6 +62,9 @@ public:
   void ProcessWheelEvent(const WidgetWheelEvent& aEvent,
                          const ScrollableLayerGuid& aGuid,
                          uint64_t aInputBlockId);
+  void ProcessMouseEvent(const WidgetMouseEvent& aEvent,
+                         const ScrollableLayerGuid& aGuid,
+                         uint64_t aInputBlockId);
   void ProcessAPZStateChange(const nsCOMPtr<nsIDocument>& aDocument,
                              ViewID aViewId,
                              APZStateChange aChange,
