@@ -404,8 +404,8 @@ APZCCallbackHelper::AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollI
     }
 }
 
-static nsIPresShell*
-GetRootContentDocumentPresShellForContent(nsIContent* aContent)
+nsIPresShell*
+APZCCallbackHelper::GetRootContentDocumentPresShellForContent(nsIContent* aContent)
 {
     nsIDocument* doc = aContent->GetComposedDoc();
     if (!doc) {
