@@ -321,6 +321,7 @@ private:
   RefPtr<DrawTarget> mDrawTarget;
   // IME
   nsIMEUpdatePreference mIMEPreferenceOfParent;
+  InputContext mInputContext;
   ContentCacheInChild mContentCache;
   bool mNeedIMEStateInit;
 
