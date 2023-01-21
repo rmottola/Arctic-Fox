@@ -2008,14 +2008,7 @@ TabParent::RecvNotifyIMESelection(const ContentCache& aContentCache,
     return true;
 
   mContentCache.AssignContent(aContentCache, &aIMENotification);
-
-  const nsIMEUpdatePreference updatePreference =
-    widget->GetIMEUpdatePreference();
-  if (updatePreference.WantSelectionChange() &&
-      (updatePreference.WantChangesCausedByComposition() ||
-       !aIMENotification.mSelectionChangeData.mCausedByComposition)) {
-    mContentCache.MaybeNotifyIME(widget, aIMENotification);
-  }
+  mContentCache.MaybeNotifyIME(widget, aIMENotification);
   return true;
 }
 
@@ -2057,12 +2050,7 @@ TabParent::RecvNotifyIMEPositionChange(const ContentCache& aContentCache,
   }
 
   mContentCache.AssignContent(aContentCache, &aIMENotification);
-
-  const nsIMEUpdatePreference updatePreference =
-    widget->GetIMEUpdatePreference();
-  if (updatePreference.WantPositionChanged()) {
-    mContentCache.MaybeNotifyIME(widget, aIMENotification);
-  }
+  mContentCache.MaybeNotifyIME(widget, aIMENotification);
   return true;
 }
 
