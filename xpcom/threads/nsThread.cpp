@@ -430,6 +430,34 @@ nsThread::ThreadFunc(void* aArg)
 
 //-----------------------------------------------------------------------------
 
+#ifdef MOZ_CRASHREPORTER
+// Tell the crash reporter to save a memory report if our heuristics determine
+// that an OOM failure is likely to occur soon.
+static bool SaveMemoryReportNearOOM()
+{
+  bool needMemoryReport = false;
+
+#ifdef XP_WIN // XXX implement on other platforms as needed
+  const size_t LOWMEM_THRESHOLD_VIRTUAL = 200 * 1024 * 1024;
+  MEMORYSTATUSEX statex;
+  statex.dwLength = sizeof(statex);
+  if (GlobalMemoryStatusEx(&statex)) {
+    if (statex.ullAvailVirtual < LOWMEM_THRESHOLD_VIRTUAL) {
+      needMemoryReport = true;
+    }
+  }
+#endif
+
+  if (needMemoryReport) {
+    nsCOMPtr<nsICrashReporter> cr =
+      do_GetService("@mozilla.org/toolkit/crash-reporter;1");
+    cr->SaveMemoryReport();
+  }
+
+  return needMemoryReport;
+}
+#endif
+
 #ifdef MOZ_CANARY
 int sCanaryOutputFD = -1;
 #endif
@@ -871,7 +899,6 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
       }
     }
   }
-
 
 #ifdef MOZ_CRASHREPORTER
   if (MAIN_THREAD == mIsMainThread && !ShuttingDown()) {
