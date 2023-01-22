@@ -36,6 +36,7 @@
 #include "nsXPCOMPrivate.h"
 #include "mozilla/ChaosMode.h"
 #include "mozilla/TimeStamp.h"
+#include "nsThreadSyncDispatch.h"
 #include "LeakRefPtr.h"
 
 #ifdef MOZ_CRASHREPORTER
@@ -1133,20 +1134,6 @@ nsThread::SetScriptObserver(mozilla::CycleCollectedJSRuntime* aScriptObserver)
 
   MOZ_ASSERT(!mScriptObserver);
   mScriptObserver = aScriptObserver;
-}
-
-//-----------------------------------------------------------------------------
-
-NS_IMETHODIMP
-nsThreadSyncDispatch::Run()
-{
-  if (mSyncTask) {
-    mResult = mSyncTask->Run();
-    mSyncTask = nullptr;
-    // unblock the origin thread
-    mOrigin->Dispatch(this, NS_DISPATCH_NORMAL);
-  }
-  return NS_OK;
 }
 
 //-----------------------------------------------------------------------------
