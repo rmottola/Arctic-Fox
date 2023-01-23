@@ -76,17 +76,17 @@ XPCOMUtils.defineLazyGetter(this, "gWAP", function() {
   return ns;
 });
 
-XPCOMUtils.defineLazyGetter(this, "gSmsSendingSchedulars", function() {
+XPCOMUtils.defineLazyGetter(this, "gSmsSendingSchedulers", function() {
   return {
-    _schedulars: [],
-    getSchedularByServiceId: function(aServiceId) {
-      let schedular = this._schedulars[aServiceId];
-      if (!schedular) {
-        schedular = this._schedulars[aServiceId] =
-          new SmsSendingSchedular(aServiceId);
+    _schedulers: [],
+    getSchedulerByServiceId: function(aServiceId) {
+      let scheduler = this._schedulers[aServiceId];
+      if (!scheduler) {
+        scheduler = this._schedulers[aServiceId] =
+          new SmsSendingScheduler(aServiceId);
       }
 
-      return schedular;
+      return scheduler;
     }
   };
 });
@@ -337,11 +337,14 @@ SmsService.prototype = {
    * Schedule the sending request.
    */
   _scheduleSending: function(aServiceId, aDomMessage, aSilent, aOptions, aRequest) {
-    gSmsSendingSchedulars.getSchedularByServiceId(aServiceId)
+    gSmsSendingSchedulers.getSchedulerByServiceId(aServiceId)
       .schedule({
         messageId: aDomMessage.id,
         onSend: () => {
-          if (DEBUG) debug("onSend: " + aDomMessage.id);
+          if (DEBUG) {
+            debug("onSend: messageId=" + aDomMessage.id +
+                  ", serviceId=" + aServiceId);
+          }
           this._sendToTheAir(aServiceId,
                              aDomMessage,
                              aSilent,
@@ -1216,14 +1219,36 @@ SmsService.prototype = {
   }
 };
 
-function SmsSendingSchedular(aServiceId) {
+/**
+ * Get enabled GSM national language locking shift / single shift table pairs
+ * for current SIM MCC.
+ *
+ * @return a list of pairs of national language identifiers for locking shift
+ * table and single shfit table, respectively.
+ */
+function getEnabledGsmTableTuplesFromMcc() {
+  let mcc;
+  try {
+    mcc = Services.prefs.getCharPref(kPrefLastKnownSimMcc);
+  } catch (e) {}
+  let tuples = [[RIL.PDU_NL_IDENTIFIER_DEFAULT,
+    RIL.PDU_NL_IDENTIFIER_DEFAULT]];
+  let extraTuples = RIL.PDU_MCC_NL_TABLE_TUPLES_MAPPING[mcc];
+  if (extraTuples) {
+    tuples = tuples.concat(extraTuples);
+  }
+
+  return tuples;
+};
+
+function SmsSendingScheduler(aServiceId) {
   this._serviceId = aServiceId;
   this._queue = [];
 
   Services.obs.addObserver(this, kSmsDeletedObserverTopic, false);
   Services.obs.addObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
 }
-SmsSendingSchedular.prototype = {
+SmsSendingScheduler.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIMobileConnectionListener]),
 
   _serviceId: 0,
@@ -1273,6 +1298,10 @@ SmsSendingSchedular.prototype = {
    */
   schedule: function(aSendingRequest) {
     if (aSendingRequest) {
+      if (DEBUG) {
+        debug("scheduling message: messageId=" + aSendingRequest.messageId +
+              ", serviceId=" + this._serviceId);
+      }
       this._ensureMoboConnObserverRegistration();
       this._queue.push(aSendingRequest)
 
@@ -1291,7 +1320,7 @@ SmsSendingSchedular.prototype = {
    */
   send: function() {
     let connection =
-      gMobileConnectionService.getItemByServiceId(this._servicdeId);
+      gMobileConnectionService.getItemByServiceId(this._serviceId);
 
     // If the voice connection is temporarily unavailable, pend the request.
     let voiceInfo = connection && connection.voice;
@@ -1383,26 +1412,5 @@ SmsSendingSchedular.prototype = {
   notifyNetworkSelectionModeChanged: function() {}
 };
 
-/**
- * Get enabled GSM national language locking shift / single shift table pairs
- * for current SIM MCC.
- *
- * @return a list of pairs of national language identifiers for locking shift
- * table and single shfit table, respectively.
- */
-function getEnabledGsmTableTuplesFromMcc() {
-  let mcc;
-  try {
-    mcc = Services.prefs.getCharPref(kPrefLastKnownSimMcc);
-  } catch (e) {}
-  let tuples = [[RIL.PDU_NL_IDENTIFIER_DEFAULT,
-    RIL.PDU_NL_IDENTIFIER_DEFAULT]];
-  let extraTuples = RIL.PDU_MCC_NL_TABLE_TUPLES_MAPPING[mcc];
-  if (extraTuples) {
-    tuples = tuples.concat(extraTuples);
-  }
-
-  return tuples;
-};
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([SmsService]);
