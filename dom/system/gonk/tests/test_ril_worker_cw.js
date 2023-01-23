@@ -64,7 +64,7 @@ add_test(function test_queryCallWaiting_success_enabled_true() {
     context.Buf.int32Array = [
       1,  // serviceClass
       1,  // enabled
-      1   // length
+      2   // length
     ];
     context.RIL[REQUEST_QUERY_CALL_WAITING](1, {});
   };
@@ -74,9 +74,7 @@ add_test(function test_queryCallWaiting_success_enabled_true() {
   let postedMessage = workerHelper.postedMessage;
 
   equal(postedMessage.errorMsg, undefined);
-  ok(postedMessage.success);
-  equal(postedMessage.length, 1);
-  ok(postedMessage.enabled);
+  equal(postedMessage.serviceClass, 1);
   run_next_test();
 });
 
@@ -93,7 +91,7 @@ add_test(function test_queryCallWaiting_success_enabled_false() {
     context.Buf.int32Array = [
       1,  // serviceClass
       0,  // enabled
-      1   // length
+      2   // length
     ];
     context.RIL[REQUEST_QUERY_CALL_WAITING](1, {});
   };
@@ -103,8 +101,6 @@ add_test(function test_queryCallWaiting_success_enabled_false() {
   let postedMessage = workerHelper.postedMessage;
 
   equal(postedMessage.errorMsg, undefined);
-  ok(postedMessage.success);
-  equal(postedMessage.length, 1);
-  ok(!postedMessage.enabled);
+  equal(postedMessage.serviceClass, ICC_SERVICE_CLASS_NONE);
   run_next_test();
 });

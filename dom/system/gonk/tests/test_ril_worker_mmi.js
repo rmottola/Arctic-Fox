@@ -518,8 +518,6 @@ add_test(function test_sendMMI_call_waiting_interrogation() {
   let postedMessage = workerhelper.postedMessage;
 
   equal(postedMessage.errorMsg, GECKO_ERROR_SUCCESS);
-  ok(postedMessage.success);
-  equal(postedMessage.length, 2);
-  ok(postedMessage.enabled);
+  equal(postedMessage.serviceClass, 7);
   run_next_test();
 });

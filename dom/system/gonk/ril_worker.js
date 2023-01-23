@@ -64,30 +64,30 @@ const ICC_MAX_LINEAR_FIXED_RECORDS = 0xfe;
 
 const GET_CURRENT_CALLS_RETRY_MAX = 3;
 
-let RILQUIRKS_CALLSTATE_EXTRA_UINT32;
+var RILQUIRKS_CALLSTATE_EXTRA_UINT32;
 // This may change at runtime since in RIL v6 and later, we get the version
 // number via the UNSOLICITED_RIL_CONNECTED parcel.
-let RILQUIRKS_V5_LEGACY;
-let RILQUIRKS_REQUEST_USE_DIAL_EMERGENCY_CALL;
-let RILQUIRKS_SIM_APP_STATE_EXTRA_FIELDS;
+var RILQUIRKS_V5_LEGACY;
+var RILQUIRKS_REQUEST_USE_DIAL_EMERGENCY_CALL;
+var RILQUIRKS_SIM_APP_STATE_EXTRA_FIELDS;
 // Needed for call-waiting on Peak device
-let RILQUIRKS_EXTRA_UINT32_2ND_CALL;
+var RILQUIRKS_EXTRA_UINT32_2ND_CALL;
 // On the emulator we support querying the number of lock retries
-let RILQUIRKS_HAVE_QUERY_ICC_LOCK_RETRY_COUNT;
+var RILQUIRKS_HAVE_QUERY_ICC_LOCK_RETRY_COUNT;
 
 // Ril quirk to Send STK Profile Download
-let RILQUIRKS_SEND_STK_PROFILE_DOWNLOAD;
+var RILQUIRKS_SEND_STK_PROFILE_DOWNLOAD;
 
 // Ril quirk to attach data registration on demand.
-let RILQUIRKS_DATA_REGISTRATION_ON_DEMAND;
+var RILQUIRKS_DATA_REGISTRATION_ON_DEMAND;
 
 // Ril quirk to control the uicc/data subscription.
-let RILQUIRKS_SUBSCRIPTION_CONTROL;
+var RILQUIRKS_SUBSCRIPTION_CONTROL;
 
-let RILQUIRKS_SIGNAL_EXTRA_INT32;
+var RILQUIRKS_SIGNAL_EXTRA_INT32;
 
 // Ril quirk to describe the SMSC address format.
-let RILQUIRKS_SMSC_ADDRESS_FORMAT;
+var RILQUIRKS_SMSC_ADDRESS_FORMAT;
 
 /**
  * The RIL state machine.
@@ -961,7 +961,7 @@ RilObject.prototype = {
     Buf.newParcel(REQUEST_QUERY_CALL_WAITING, options);
     Buf.writeInt32(1);
     // As per 3GPP TS 24.083, section 1.6 UE doesn't need to send service
-    // class parameter in call waiting interrogation  to network
+    // class parameter in call waiting interrogation to network.
     Buf.writeInt32(ICC_SERVICE_CLASS_NONE);
     Buf.sendParcel();
   },
@@ -969,16 +969,17 @@ RilObject.prototype = {
   /**
    * Set call waiting status.
    *
-   * @param on
+   * @param enabled
    *        Boolean indicating the desired waiting status.
+   * @param serviceClass
+   *        One of ICC_SERVICE_CLASS_* constants.
    */
   setCallWaiting: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_SET_CALL_WAITING, options);
     Buf.writeInt32(2);
     Buf.writeInt32(options.enabled ? 1 : 0);
-    Buf.writeInt32(options.serviceClass !== undefined ?
-                    options.serviceClass : ICC_SERVICE_CLASS_VOICE);
+    Buf.writeInt32(options.serviceClass);
     Buf.sendParcel();
   },
 
@@ -5017,9 +5018,9 @@ RilObject.prototype[REQUEST_QUERY_CALL_WAITING] =
   }
 
   let Buf = this.context.Buf;
-  options.length = Buf.readInt32();
-  options.enabled = ((Buf.readInt32() == 1) &&
-                     ((Buf.readInt32() & ICC_SERVICE_CLASS_VOICE) == 0x01));
+  let results = Buf.readInt32List();
+  let enabled = (results[0] === 1);
+  options.serviceClass = enabled ? results[1] : ICC_SERVICE_CLASS_NONE;
   this.sendChromeMessage(options);
 };
 

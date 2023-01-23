@@ -1054,9 +1054,13 @@ MobileConnectionProvider.prototype = {
     }).bind(this));
   },
 
-  setCallWaiting: function(aEnabled, aCallback) {
-    this._radioInterface.sendWorkerMessage("setCallWaiting",
-                                           {enabled: aEnabled},
+  setCallWaiting: function(aEnabled, aServiceClass, aCallback) {
+    let options = {
+      enabled: aEnabled,
+      serviceClass: aServiceClass
+    };
+
+    this._radioInterface.sendWorkerMessage("setCallWaiting", options,
                                            (function(aResponse) {
       if (aResponse.errorMsg) {
         aCallback.notifyError(aResponse.errorMsg);
@@ -1076,7 +1080,7 @@ MobileConnectionProvider.prototype = {
         return false;
       }
 
-      aCallback.notifySuccessWithBoolean(aResponse.enabled);
+      aCallback.notifyGetCallWaitingSuccess(aResponse.serviceClass);
       return false;
     }).bind(this));
   },
