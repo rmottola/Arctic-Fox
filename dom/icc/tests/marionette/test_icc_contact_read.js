@@ -10,19 +10,24 @@ function testReadContacts(aIcc, aType) {
   return aIcc.readContacts(aType)
     .then((aResult) => {
       is(Array.isArray(aResult), true);
+      is(aResult.length, 4, "Check contact number.");
 
+      // Alpha Id(Encoded with GSM 8 bit): "Mozilla", Dialling Number: 15555218201
       is(aResult[0].name[0], "Mozilla");
       is(aResult[0].tel[0].value, "15555218201");
       is(aResult[0].id, iccId + "1");
 
+      // Alpha Id(Encoded with UCS2 0x80: "Saßê\u9ec3", Dialling Number: 15555218202
       is(aResult[1].name[0], "Saßê黃");
       is(aResult[1].tel[0].value, "15555218202");
       is(aResult[1].id, iccId + "2");
 
+      // Alpha Id(Encoded with UCS2 0x81): "Fire \u706b", Dialling Number: 15555218203
       is(aResult[2].name[0], "Fire 火");
       is(aResult[2].tel[0].value, "15555218203");
       is(aResult[2].id, iccId + "3");
 
+      // Alpha Id(Encoded with UCS2 0x82): "Huang \u9ec3", Dialling Number: 15555218204
       is(aResult[3].name[0], "Huang 黃");
       is(aResult[3].tel[0].value, "15555218204");
       is(aResult[3].id, iccId + "4");
@@ -31,36 +36,6 @@ function testReadContacts(aIcc, aType) {
     });
 }
 
-function testAddContact(aIcc, aType, aPin2) {
-  log("testAddContact: type=" + aType + ", pin2=" + aPin2);
-  let contact = new mozContact({
-    name: ["add"],
-    tel: [{value: "0912345678"}],
-    email:[]
-  });
-
-  return aIcc.updateContact(aType, contact, aPin2)
-    .then((aResult) => {
-      // Get ICC contact for checking new contact
-      return aIcc.readContacts(aType)
-        .then((aResult) => {
-          // There are 4 SIM contacts which are harded in emulator
-          is(aResult.length, 5);
-
-          is(aResult[4].name[0], "add");
-          is(aResult[4].tel[0].value, "0912345678");
-        }, (aError) => {
-          ok(false, "Cannot get " + aType + " contacts: " + aError.name);
-        })
-    }, (aError) => {
-      if (aType === "fdn" && aPin2 === undefined) {
-        ok(aError.name === "SimPin2",
-           "expected error when pin2 is not provided");
-      } else {
-        ok(false, "Cannot add " + aType + " contact: " + aError.name);
-      }
-    });
-}
 
 // Start tests
 startTestCommon(function() {
@@ -68,14 +43,8 @@ startTestCommon(function() {
 
   // Test read adn contacts
   return testReadContacts(icc, "adn")
-    // Test add adn contacts
-    .then(() => testAddContact(icc, "adn"))
     // Test read fdn contact
     .then(() => testReadContacts(icc, "fdn"))
-    // Test add fdn contacts
-    .then(() => testAddContact(icc, "fdn", "0000"))
-    // Test add fdn contacts without passing pin2
-    .then(() => testAddContact(icc, "fdn"))
     // Test read sdn contacts
     .then(() => testReadContacts(icc, "sdn"));
 });
