@@ -65,9 +65,6 @@ const ICC_MAX_LINEAR_FIXED_RECORDS = 0xfe;
 const GET_CURRENT_CALLS_RETRY_MAX = 3;
 
 var RILQUIRKS_CALLSTATE_EXTRA_UINT32;
-// This may change at runtime since in RIL v6 and later, we get the version
-// number via the UNSOLICITED_RIL_CONNECTED parcel.
-var RILQUIRKS_V5_LEGACY;
 var RILQUIRKS_REQUEST_USE_DIAL_EMERGENCY_CALL;
 var RILQUIRKS_SIM_APP_STATE_EXTRA_FIELDS;
 // Needed for call-waiting on Peak device
@@ -105,9 +102,6 @@ function RilObject(aContext) {
   this.pendingNetworkType = {};
   this._receivedSmsCbPagesMap = {};
   this._getCurrentCallsRetryCount = 0;
-
-  // Init properties that are only initialized once.
-  this.v5Legacy = RILQUIRKS_V5_LEGACY;
 }
 RilObject.prototype = {
   context: null,
@@ -116,7 +110,6 @@ RilObject.prototype = {
    * RIL version.
    */
   version: null,
-  v5Legacy: null,
 
   /**
    * Call state of current conference group.
@@ -363,11 +356,9 @@ RilObject.prototype = {
   enterICCPIN: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_ENTER_SIM_PIN, options);
-    Buf.writeInt32(this.v5Legacy ? 1 : 2);
+    Buf.writeInt32(2);
     Buf.writeString(options.password);
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -382,11 +373,9 @@ RilObject.prototype = {
   enterICCPIN2: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_ENTER_SIM_PIN2, options);
-    Buf.writeInt32(this.v5Legacy ? 1 : 2);
+    Buf.writeInt32(2);
     Buf.writeString(options.password);
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -419,12 +408,10 @@ RilObject.prototype = {
   changeICCPIN: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_CHANGE_SIM_PIN, options);
-    Buf.writeInt32(this.v5Legacy ? 2 : 3);
+    Buf.writeInt32(3);
     Buf.writeString(options.password);
     Buf.writeString(options.newPassword);
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -441,12 +428,10 @@ RilObject.prototype = {
   changeICCPIN2: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_CHANGE_SIM_PIN2, options);
-    Buf.writeInt32(this.v5Legacy ? 2 : 3);
+    Buf.writeInt32(3);
     Buf.writeString(options.password);
     Buf.writeString(options.newPassword);
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -460,17 +445,15 @@ RilObject.prototype = {
    * @param [optional] aid
    *        AID value.
    */
-   enterICCPUK: function(options) {
-     let Buf = this.context.Buf;
-     Buf.newParcel(REQUEST_ENTER_SIM_PUK, options);
-     Buf.writeInt32(this.v5Legacy ? 2 : 3);
-     Buf.writeString(options.password);
-     Buf.writeString(options.newPin);
-     if (!this.v5Legacy) {
-       Buf.writeString(options.aid || this.aid);
-     }
-     Buf.sendParcel();
-   },
+  enterICCPUK: function(options) {
+    let Buf = this.context.Buf;
+    Buf.newParcel(REQUEST_ENTER_SIM_PUK, options);
+    Buf.writeInt32(3);
+    Buf.writeString(options.password);
+    Buf.writeString(options.newPin);
+    Buf.writeString(options.aid || this.aid);
+    Buf.sendParcel();
+  },
 
   /**
    * Supplies ICC PUK2 and a new PIN2 to unlock the ICC.
@@ -482,17 +465,15 @@ RilObject.prototype = {
    * @param [optional] aid
    *        AID value.
    */
-   enterICCPUK2: function(options) {
-     let Buf = this.context.Buf;
-     Buf.newParcel(REQUEST_ENTER_SIM_PUK2, options);
-     Buf.writeInt32(this.v5Legacy ? 2 : 3);
-     Buf.writeString(options.password);
-     Buf.writeString(options.newPin);
-     if (!this.v5Legacy) {
-       Buf.writeString(options.aid || this.aid);
-     }
-     Buf.sendParcel();
-   },
+  enterICCPUK2: function(options) {
+    let Buf = this.context.Buf;
+    Buf.newParcel(REQUEST_ENTER_SIM_PUK2, options);
+    Buf.writeInt32(3);
+    Buf.writeString(options.password);
+    Buf.writeString(options.newPin);
+    Buf.writeString(options.aid || this.aid);
+    Buf.sendParcel();
+  },
 
   /**
    * Helper function for changing ICC locks.
@@ -621,13 +602,11 @@ RilObject.prototype = {
   queryICCFacilityLock: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_QUERY_FACILITY_LOCK, options);
-    Buf.writeInt32(this.v5Legacy ? 3 : 4);
+    Buf.writeInt32(4);
     Buf.writeString(options.facility);
     Buf.writeString(options.password);
     Buf.writeString(options.serviceClass.toString());
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -648,14 +627,12 @@ RilObject.prototype = {
   setICCFacilityLock: function(options) {
     let Buf = this.context.Buf;
     Buf.newParcel(REQUEST_SET_FACILITY_LOCK, options);
-    Buf.writeInt32(this.v5Legacy ? 4 : 5);
+    Buf.writeInt32(5);
     Buf.writeString(options.facility);
     Buf.writeString(options.enabled ? "1" : "0");
     Buf.writeString(options.password);
     Buf.writeString(options.serviceClass.toString());
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -707,9 +684,7 @@ RilObject.prototype = {
       Buf.writeString(null);
     }
 
-    if (!this.v5Legacy) {
-      Buf.writeString(options.aid || this.aid);
-    }
+    Buf.writeString(options.aid || this.aid);
     Buf.sendParcel();
   },
 
@@ -721,10 +696,6 @@ RilObject.prototype = {
    */
   getIMSI: function(aid) {
     let Buf = this.context.Buf;
-    if (this.v5Legacy) {
-      Buf.simpleRequest(REQUEST_GET_IMSI);
-      return;
-    }
     Buf.newParcel(REQUEST_GET_IMSI);
     Buf.writeInt32(1);
     Buf.writeString(aid || this.aid);
@@ -1770,13 +1741,7 @@ RilObject.prototype = {
     // Otherwise, it must be + 2
     //
     // See also bug 901232 and 867873
-    let radioTech;
-    if (this.v5Legacy) {
-      radioTech = this._isCdma ? DATACALL_RADIOTECHNOLOGY_CDMA
-                               : DATACALL_RADIOTECHNOLOGY_GSM;
-    } else {
-      radioTech = options.radioTech + 2;
-    }
+    let radioTech = options.radioTech + 2;
     let Buf = this.context.Buf;
     let token = Buf.newParcel(REQUEST_SETUP_DATA_CALL, options);
     Buf.writeInt32(7);
@@ -4004,9 +3969,7 @@ RilObject.prototype[REQUEST_GET_SIM_STATUS] = function REQUEST_GET_SIM_STATUS(le
   iccStatus.universalPINState = Buf.readInt32(); // CARD_PINSTATE_*
   iccStatus.gsmUmtsSubscriptionAppIndex = Buf.readInt32();
   iccStatus.cdmaSubscriptionAppIndex = Buf.readInt32();
-  if (!this.v5Legacy) {
-    iccStatus.imsSubscriptionAppIndex = Buf.readInt32();
-  }
+  iccStatus.imsSubscriptionAppIndex = Buf.readInt32();
 
   let apps_length = Buf.readInt32();
   if (apps_length > CARD_MAX_APPS) {
@@ -4202,13 +4165,11 @@ RilObject.prototype[REQUEST_SIGNAL_STRENGTH] = function REQUEST_SIGNAL_STRENGTH(
   signal.evdoECIO = Buf.readInt32();
   signal.evdoSNR = Buf.readInt32();
 
-  if (!this.v5Legacy) {
-    signal.lteSignalStrength = Buf.readInt32();
-    signal.lteRSRP =           Buf.readInt32();
-    signal.lteRSRQ =           Buf.readInt32();
-    signal.lteRSSNR =          Buf.readInt32();
-    signal.lteCQI =            Buf.readInt32();
-  }
+  signal.lteSignalStrength = Buf.readInt32();
+  signal.lteRSRP =           Buf.readInt32();
+  signal.lteRSRQ =           Buf.readInt32();
+  signal.lteRSSNR =          Buf.readInt32();
+  signal.lteCQI =            Buf.readInt32();
 
   if (DEBUG) this.context.debug("signal strength: " + JSON.stringify(signal));
 
@@ -4256,35 +4217,9 @@ RilObject.prototype[REQUEST_SEND_SMS] = function REQUEST_SEND_SMS(length, option
 };
 RilObject.prototype[REQUEST_SEND_SMS_EXPECT_MORE] = null;
 
-RilObject.prototype.readSetupDataCall_v5 = function readSetupDataCall_v5(options) {
-  if (!options) {
-    options = {};
-  }
-  let [cid, ifname, addresses, dnses, gateways] = this.context.Buf.readStringList();
-  options.cid = cid;
-  options.ifname = ifname;
-  options.addresses = addresses ? [addresses] : [];
-  options.dnses = dnses ? [dnses] : [];
-  options.gateways = gateways ? [gateways] : [];
-  options.active = DATACALL_ACTIVE_UNKNOWN;
-  options.state = GECKO_NETWORK_STATE_CONNECTING;
-  return options;
-};
-
 RilObject.prototype[REQUEST_SETUP_DATA_CALL] = function REQUEST_SETUP_DATA_CALL(length, options) {
   if (options.errorMsg) {
     this.sendChromeMessage(options);
-    return;
-  }
-
-  if (this.v5Legacy) {
-    // Populate the `options` object with the data call information. That way
-    // we retain the APN and other info about how the data call was set up.
-    this.readSetupDataCall_v5(options);
-    this.sendChromeMessage(options);
-    // Let's get the list of data calls to ensure we know whether it's active
-    // or not.
-    this.getDataCallList();
     return;
   }
 
@@ -4541,37 +4476,12 @@ RilObject.prototype[REQUEST_QUERY_CLIP] = function REQUEST_QUERY_CLIP(length, op
 RilObject.prototype[REQUEST_LAST_DATA_CALL_FAIL_CAUSE] = null;
 
 /**
- * V3:
- *  # address   - A space-delimited list of addresses.
- *
- * V4:
- *  # address   - An address.
- *
- * V5:
- *  # addresses - A space-delimited list of addresses.
- *  # dnses     - A space-delimited list of DNS server addresses.
- *
  * V6:
  *  # addresses - A space-delimited list of addresses with optional "/" prefix
  *                length.
  *  # dnses     - A space-delimited list of DNS server addresses.
  *  # gateways  - A space-delimited list of default gateway addresses.
  */
-RilObject.prototype.readDataCall_v5 = function(options) {
-  if (!options) {
-    options = {};
-  }
-  let Buf = this.context.Buf;
-  options.cid = Buf.readInt32().toString();
-  options.active = Buf.readInt32(); // DATACALL_ACTIVE_*
-  options.type = Buf.readString();
-  options.apn = Buf.readString();
-  options.addresses = Buf.readString();
-  options.dnses = Buf.readString();
-  options.gateways = [];
-
-  return options;
-};
 
 RilObject.prototype.readDataCall_v6 = function(options) {
   if (!options) {
@@ -4611,19 +4521,12 @@ RilObject.prototype[REQUEST_DATA_CALL_LIST] = function REQUEST_DATA_CALL_LIST(le
   }
 
   let Buf = this.context.Buf;
-  let version = 0;
-  if (!this.v5Legacy) {
-    version = Buf.readInt32();
-  }
+  let version = Buf.readInt32();
   let num = Buf.readInt32();
   let datacalls = [];
   for (let i = 0; i < num; i++) {
     let datacall;
-    if (version < 6) {
-      datacall = this.readDataCall_v5();
-    } else {
-      datacall = this.readDataCall_v6();
-    }
+    datacall = this.readDataCall_v6();
     datacalls.push(datacall);
   }
 
@@ -5191,10 +5094,6 @@ RilObject.prototype[UNSOLICITED_SIGNAL_STRENGTH] = function UNSOLICITED_SIGNAL_S
   this[REQUEST_SIGNAL_STRENGTH](length, {});
 };
 RilObject.prototype[UNSOLICITED_DATA_CALL_LIST_CHANGED] = function UNSOLICITED_DATA_CALL_LIST_CHANGED(length) {
-  if (this.v5Legacy) {
-    this.getDataCallList();
-    return;
-  }
   this[REQUEST_DATA_CALL_LIST](length, {});
 };
 RilObject.prototype[UNSOLICITED_SUPP_SVC_NOTIFICATION] = function UNSOLICITED_SUPP_SVC_NOTIFICATION(length) {
@@ -5336,10 +5235,8 @@ RilObject.prototype[UNSOLICITED_RIL_CONNECTED] = function UNSOLICITED_RIL_CONNEC
   }
 
   this.version = this.context.Buf.readInt32List()[0];
-  this.v5Legacy = (this.version < 5);
   if (DEBUG) {
     this.context.debug("Detected RIL version " + this.version);
-    this.context.debug("this.v5Legacy is " + this.v5Legacy);
   }
 
   this.initRILState();
@@ -15148,7 +15045,6 @@ let ContextPool = {
 
     let quirks = aOptions.quirks;
     RILQUIRKS_CALLSTATE_EXTRA_UINT32 = quirks.callstateExtraUint32;
-    RILQUIRKS_V5_LEGACY = quirks.v5Legacy;
     RILQUIRKS_REQUEST_USE_DIAL_EMERGENCY_CALL = quirks.requestUseDialEmergencyCall;
     RILQUIRKS_SIM_APP_STATE_EXTRA_FIELDS = quirks.simAppStateExtraFields;
     RILQUIRKS_EXTRA_UINT32_2ND_CALL = quirks.extraUint2ndCall;
