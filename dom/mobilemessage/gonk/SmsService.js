@@ -21,6 +21,7 @@ const NS_PREFBRANCH_PREFCHANGE_TOPIC_ID  = "nsPref:changed";
 const kPrefDefaultServiceId = "dom.sms.defaultServiceId";
 const kPrefRilDebuggingEnabled = "ril.debugging.enabled";
 const kPrefRilNumRadioInterfaces = "ril.numRadioInterfaces";
+const kPrefLastKnownSimMcc = "ril.lastKnownSimMcc";
 
 const kDiskSpaceWatcherObserverTopic = "disk-space-watcher";
 
@@ -56,6 +57,10 @@ XPCOMUtils.defineLazyGetter(this, "gRadioInterfaces", function() {
 XPCOMUtils.defineLazyGetter(this, "gSmsSegmentHelper", function() {
   let ns = {};
   Cu.import("resource://gre/modules/SmsSegmentHelper.jsm", ns);
+
+  // Initialize enabledGsmTableTuples from current MCC.
+  ns.SmsSegmentHelper.enabledGsmTableTuples = getEnabledGsmTableTuplesFromMcc();
+
   return ns.SmsSegmentHelper;
 });
 
@@ -131,6 +136,7 @@ function SmsService() {
 
   Services.prefs.addObserver(kPrefRilDebuggingEnabled, this, false);
   Services.prefs.addObserver(kPrefDefaultServiceId, this, false);
+  Services.prefs.addObserver(kPrefLastKnownSimMcc, this, false);
   Services.obs.addObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
   Services.obs.addObserver(this, kDiskSpaceWatcherObserverTopic, false);
 }
@@ -1187,6 +1193,10 @@ SmsService.prototype = {
         else if (aData === kPrefDefaultServiceId) {
           this.smsDefaultServiceId = this._getDefaultServiceId();
         }
+        else if ( aData === kPrefLastKnownSimMcc) {
+          gSmsSegmentHelper.enabledGsmTableTuples =
+            getEnabledGsmTableTuplesFromMcc();
+        }
         break;
       case kDiskSpaceWatcherObserverTopic:
         if (DEBUG) {
@@ -1371,6 +1381,28 @@ SmsSendingSchedular.prototype = {
   notifyLastKnownNetworkChanged: function() {},
   notifyLastKnownHomeNetworkChanged: function() {},
   notifyNetworkSelectionModeChanged: function() {}
+};
+
+/**
+ * Get enabled GSM national language locking shift / single shift table pairs
+ * for current SIM MCC.
+ *
+ * @return a list of pairs of national language identifiers for locking shift
+ * table and single shfit table, respectively.
+ */
+function getEnabledGsmTableTuplesFromMcc() {
+  let mcc;
+  try {
+    mcc = Services.prefs.getCharPref(kPrefLastKnownSimMcc);
+  } catch (e) {}
+  let tuples = [[RIL.PDU_NL_IDENTIFIER_DEFAULT,
+    RIL.PDU_NL_IDENTIFIER_DEFAULT]];
+  let extraTuples = RIL.PDU_MCC_NL_TABLE_TUPLES_MAPPING[mcc];
+  if (extraTuples) {
+    tuples = tuples.concat(extraTuples);
+  }
+
+  return tuples;
 };
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([SmsService]);
