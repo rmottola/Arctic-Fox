@@ -174,15 +174,26 @@ Telephony::IsActiveState(uint16_t aCallState) {
 }
 
 uint32_t
-Telephony::ProvidedOrDefaultServiceId(const Optional<uint32_t>& aServiceId)
+Telephony::GetServiceId(const Optional<uint32_t>& aServiceId,
+                        bool aGetIfActiveCall)
 {
   if (aServiceId.WasPassed()) {
     return aServiceId.Value();
-  } else {
-    uint32_t serviceId = 0;
-    mService->GetDefaultServiceId(&serviceId);
-    return serviceId;
+  } else if (aGetIfActiveCall) {
+    nsTArray<RefPtr<TelephonyCall> > &calls = mCalls;
+    if (mGroup->CallState() == nsITelephonyService::CALL_STATE_CONNECTED) {
+      calls = mGroup->CallsArray();
+    }
+    for (uint32_t i = 0; i < calls.Length(); i++) {
+      if (IsActiveState(calls[i]->CallState())) {
+        return calls[i]->mServiceId;
+      }
+    }
   }
+
+  uint32_t serviceId = 0;
+  mService->GetDefaultServiceId(&serviceId);
+  return serviceId;
 }
 
 bool
@@ -441,7 +452,7 @@ already_AddRefed<Promise>
 Telephony::Dial(const nsAString& aNumber, const Optional<uint32_t>& aServiceId,
                 ErrorResult& aRv)
 {
-  uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
+  uint32_t serviceId = GetServiceId(aServiceId);
   RefPtr<Promise> promise = DialInternal(serviceId, aNumber, false, aRv);
   return promise.forget();
 }
@@ -451,7 +462,7 @@ Telephony::DialEmergency(const nsAString& aNumber,
                          const Optional<uint32_t>& aServiceId,
                          ErrorResult& aRv)
 {
-  uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
+  uint32_t serviceId = GetServiceId(aServiceId);
   RefPtr<Promise> promise = DialInternal(serviceId, aNumber, true, aRv);
   return promise.forget();
 }
@@ -463,7 +474,8 @@ Telephony::SendTones(const nsAString& aDTMFChars,
                      const Optional<uint32_t>& aServiceId,
                      ErrorResult& aRv)
 {
-  uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
+  uint32_t serviceId = GetServiceId(aServiceId,
+                                    true /* aGetIfActiveCall */);
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   if (!global) {
@@ -500,7 +512,8 @@ Telephony::StartTone(const nsAString& aDTMFChar,
                      const Optional<uint32_t>& aServiceId,
                      ErrorResult& aRv)
 {
-  uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
+  uint32_t serviceId = GetServiceId(aServiceId,
+                                    true /* aGetIfActiveCall */);
 
   if (aDTMFChar.IsEmpty()) {
     NS_WARNING("Empty tone string will be ignored");
@@ -518,7 +531,8 @@ Telephony::StartTone(const nsAString& aDTMFChar,
 void
 Telephony::StopTone(const Optional<uint32_t>& aServiceId, ErrorResult& aRv)
 {
-  uint32_t serviceId = ProvidedOrDefaultServiceId(aServiceId);
+  uint32_t serviceId = GetServiceId(aServiceId,
+                                    true /* aGetIfActiveCall */);
 
   if (!IsValidServiceId(serviceId)) {
     aRv.Throw(NS_ERROR_INVALID_ARG);
