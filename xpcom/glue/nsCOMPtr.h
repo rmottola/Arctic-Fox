@@ -388,7 +388,7 @@ private:
   void assert_validity()
   {
     static_assert(1 < sizeof(TestForIID<T>(nullptr)), "nsCOMPtr only works "
-                  "for types with IIDs.  Either use nsRefPtr; add an IID to "
+                  "for types with IIDs.  Either use RefPtr; add an IID to "
                   "your type with NS_DECLARE_STATIC_IID_ACCESSOR/"
                   "NS_DEFINE_STATIC_IID_ACCESSOR; or make the nsCOMPtr point "
                   "to a base class with an IID.");
