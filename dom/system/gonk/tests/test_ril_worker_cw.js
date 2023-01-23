@@ -23,7 +23,6 @@ add_test(function test_setCallWaiting_success() {
   let postedMessage = workerHelper.postedMessage;
 
   equal(postedMessage.errorMsg, undefined);
-  ok(postedMessage.success);
 
   run_next_test();
 });
@@ -45,8 +44,7 @@ add_test(function test_setCallWaiting_generic_failure() {
 
   let postedMessage = workerHelper.postedMessage;
 
-  equal(postedMessage.errorMsg, "GenericFailure");
-  ok(!postedMessage.success);
+  equal(postedMessage.errorMsg, GECKO_ERROR_GENERIC_FAILURE);
 
   run_next_test();
 });

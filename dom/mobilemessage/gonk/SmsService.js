@@ -1415,5 +1415,4 @@ SmsSendingScheduler.prototype = {
 
 };
 
-
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([SmsService]);
