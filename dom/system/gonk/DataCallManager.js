@@ -963,7 +963,8 @@ function DataCall(aClientId, aApnSetting, aDataCallHandler) {
     addresses: [],
     dnses: [],
     gateways: [],
-    pcscf: []
+    pcscf: [],
+    mtu: null
   };
   this.state = NETWORK_STATE_UNKNOWN;
   this.requestedNetworkIfaces = [];
@@ -1027,6 +1028,10 @@ DataCall.prototype = {
           return "changed";
         }
       }
+    }
+
+    if (aCurrentDataCall.mtu != aUpdatedDataCall.mtu) {
+      return "changed";
     }
 
     return "identical";
@@ -1095,6 +1100,7 @@ DataCall.prototype = {
     this.linkInfo.gateways = aDataCall.gateways ? aDataCall.gateways.split(" ") : [];
     this.linkInfo.dnses = aDataCall.dnses ? aDataCall.dnses.split(" ") : [];
     this.linkInfo.pcscf = aDataCall.pcscf ? aDataCall.pcscf.split(" ") : [];
+    this.linkInfo.mtu = aDataCall.mtu > 0 ? aDataCall.mtu : 0;
     this.state = this._getGeckoDataCallState(aDataCall);
 
     // Notify DataCallHandler about data call connected.
@@ -1148,7 +1154,8 @@ DataCall.prototype = {
       addresses: aUpdatedDataCall.addresses ? aUpdatedDataCall.addresses.split(" ") : [],
       dnses: aUpdatedDataCall.dnses ? aUpdatedDataCall.dnses.split(" ") : [],
       gateways: aUpdatedDataCall.gateways ? aUpdatedDataCall.gateways.split(" ") : [],
-      pcscf: aUpdatedDataCall.pcscf ? aUpdatedDataCall.pcscf.split(" ") : []
+      pcscf: aUpdatedDataCall.pcscf ? aUpdatedDataCall.pcscf.split(" ") : [],
+      mtu: aUpdatedDataCall.mtu > 0 ? aUpdatedDataCall.mtu : 0
     };
 
     switch (dataCallState) {
@@ -1175,6 +1182,7 @@ DataCall.prototype = {
           this.linkInfo.gateways = newLinkInfo.gateways.slice();
           this.linkInfo.dnses = newLinkInfo.dnses.slice();
           this.linkInfo.pcscf = newLinkInfo.pcscf.slice();
+          this.linkInfo.mtu = newLinkInfo.mtu;
         }
         break;
       case NETWORK_STATE_DISCONNECTED:
@@ -1274,6 +1282,7 @@ DataCall.prototype = {
     this.linkInfo.dnses = [];
     this.linkInfo.gateways = [];
     this.linkInfo.pcscf = [];
+    this.linkInfo.mtu = null;
   },
 
   reset: function() {
@@ -1666,6 +1675,11 @@ RILNetworkInterface.prototype = {
 
   get httpProxyPort() {
     return this.apnSetting.port || "";
+  },
+
+  get mtu() {
+    // Value provided by network has higher priority than apn settings.
+    return this.dataCall.linkInfo.mtu || this.apnSetting.mtu || -1;
   },
 
   // Helpers
