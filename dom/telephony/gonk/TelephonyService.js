@@ -233,6 +233,7 @@ function TelephonyService() {
   this._currentCalls = {};
   this._currentConferenceState = nsITelephonyService.CALL_STATE_UNKNOWN;
   this._audioStates = [];
+  this._ussdSessions = [];
 
   this._cdmaCallWaitingNumber = null;
 
@@ -246,6 +247,7 @@ function TelephonyService() {
 
   for (let i = 0; i < this._numClients; ++i) {
     this._audioStates[i] = nsITelephonyAudioService.PHONE_STATE_NORMAL;
+    this._ussdSessions[i] = false;
     this._currentCalls[i] = {};
     this._enumerateCallsForClient(i);
   }
@@ -267,6 +269,15 @@ TelephonyService.prototype = {
   // a timer to bound the lock's life cycle to avoid exhausting the battery.
   _callRingWakeLock: null,
   _callRingWakeLockTimer: null,
+
+  /**
+   * USSD session flags.
+   * Only one USSD session may exist at a time, and the session is assumed
+   * to exist until:
+   *    a) There's a call to cancelUSSD()
+   *    b) Receiving a session end unsolicited event.
+   */
+  _ussdSessions: null,
 
   _acquireCallRingWakeLock: function() {
     if (!this._callRingWakeLock) {
@@ -919,51 +930,24 @@ TelephonyService.prototype = {
         this._callWaitingMMI(aClientId, aMmi, aCallback);
         break;
 
-      // Fall back to "sendMMI".
+      // Handle unknown MMI code as USSD.
       default:
-        this._sendMMI(aClientId, aMmi, aCallback);
-        break;
-    }
-  },
-
-  _sendMMI: function(aClientId, aMmi, aCallback) {
-    this._sendToRilWorker(aClientId, "sendMMI",
-                          { mmi: aMmi }, response => {
-      if (DEBUG) debug("MMI response: " + JSON.stringify(response));
-
-      if (!response.success) {
-        if (response.additionalInformation != null) {
-          aCallback.notifyDialMMIErrorWithInfo(response.errorMsg,
-                                               response.additionalInformation);
-        } else {
+        if (!this._isRadioOn(aClientId)) {
+          aCallback.notifyDialMMIError(RIL.GECKO_ERROR_RADIO_NOT_AVAILABLE);
+          return;
           aCallback.notifyDialMMIError(response.errorMsg);
         }
-        return;
-      }
 
-      // No additional information
-      if (response.additionalInformation === undefined) {
-        aCallback.notifyDialMMISuccess(response.statusMessage);
-        return;
-      }
+        this._sendUSSDInternal(aClientId, aMmi.fullMMI, aResponse => {
+          if (aResponse.errorMsg) {
+            aCallback.notifyDialMMIError(aResponse.errorMsg);
+            return;
+          }
 
-      // Additional information is an integer.
-      if (!isNaN(parseInt(response.additionalInformation, 10))) {
-        aCallback.notifyDialMMISuccessWithInteger(
-          response.statusMessage, response.additionalInformation);
-        return;
-      }
-
-      // Additional information is an array of strings.
-      let array = response.additionalInformation;
-      if (Array.isArray(array) && array.length > 0 && typeof array[0] === "string") {
-        aCallback.notifyDialMMISuccessWithStrings(response.statusMessage,
-                                                  array.length, array);
-        return;
-      }
-
-      aCallback.notifyDialMMISuccess(response.statusMessage);
-    });
+          aCallback.notifyDialMMISuccess("");
+        });
+        break;
+    }
   },
 
   /**
@@ -2007,13 +1991,42 @@ TelephonyService.prototype = {
   },
 
   sendUSSD: function(aClientId, aUssd, aCallback) {
-    this._sendToRilWorker(aClientId, "sendUSSD", { ussd: aUssd },
-                          this._defaultCallbackHandler.bind(this, aCallback));
+    this._sendUSSDInternal(aClientId, aUssd,
+                           this._defaultCallbackHandler.bind(this, aCallback));
+  },
+
+  _sendUSSDInternal: function(aClientId, aUssd, aCallback) {
+    if (!this._ussdSessions[aClientId]) {
+      this._sendToRilWorker(aClientId, "sendUSSD", { ussd: aUssd }, aResponse => {
+        this._ussdSessions[aClientId] = !aResponse.errorMsg;
+        aCallback(aResponse);
+      });
+      return;
+    }
+
+    // Cancel the previous ussd session first.
+    this._cancelUSSDInternal(aClientId, aResponse => {
+      // Fail to cancel ussd session, report error instead of sending ussd
+      // request.
+      if (aResponse.errorMsg) {
+        aCallback(aResponse);
+        return;
+      }
+
+      this._sendUSSDInternal(aClientId, aUssd, aCallback);
+    });
   },
 
   cancelUSSD: function(aClientId, aCallback) {
-    this._sendToRilWorker(aClientId, "cancelUSSD", {},
-                          this._defaultCallbackHandler.bind(this, aCallback));
+    this._cancelUSSDInternal(aClientId,
+                             this._defaultCallbackHandler.bind(this, aCallback));
+  },
+
+  _cancelUSSDInternal: function(aClientId, aCallback) {
+    this._sendToRilWorker(aClientId, "cancelUSSD", {}, aResponse => {
+      this._ussdSessions[aClientId] = !!aResponse.errorMsg;
+      aCallback(aResponse);
+    });
   },
 
   get microphoneMuted() {
@@ -2289,6 +2302,13 @@ TelephonyService.prototype = {
     if (DEBUG) {
       debug("notifyUssdReceived for " + aClientId + ": " +
             aMessage + " (sessionEnded : " + aSessionEnded + ")");
+    }
+
+    let oldSession = this._ussdSessions[aClientId];
+    this._ussdSessions[aClientId] = !aSessionEnded;
+
+    if (!oldSession && !this._ussdSessions[aClientId] && !aMessage) {
+      return;
     }
 
     gTelephonyMessenger.notifyUssdReceived(aClientId, aMessage, aSessionEnded);
