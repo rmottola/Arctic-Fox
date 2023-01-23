@@ -67,22 +67,18 @@ const GET_CURRENT_CALLS_RETRY_MAX = 3;
 var RILQUIRKS_CALLSTATE_EXTRA_UINT32;
 var RILQUIRKS_REQUEST_USE_DIAL_EMERGENCY_CALL;
 var RILQUIRKS_SIM_APP_STATE_EXTRA_FIELDS;
+var RILQUIRKS_SIGNAL_EXTRA_INT32;
+var RILQUIRKS_AVAILABLE_NETWORKS_EXTRA_STRING;
 // Needed for call-waiting on Peak device
 var RILQUIRKS_EXTRA_UINT32_2ND_CALL;
 // On the emulator we support querying the number of lock retries
 var RILQUIRKS_HAVE_QUERY_ICC_LOCK_RETRY_COUNT;
-
 // Ril quirk to Send STK Profile Download
 var RILQUIRKS_SEND_STK_PROFILE_DOWNLOAD;
-
 // Ril quirk to attach data registration on demand.
 var RILQUIRKS_DATA_REGISTRATION_ON_DEMAND;
-
 // Ril quirk to control the uicc/data subscription.
 var RILQUIRKS_SUBSCRIPTION_CONTROL;
-
-var RILQUIRKS_SIGNAL_EXTRA_INT32;
-
 // Ril quirk to describe the SMSC address format.
 var RILQUIRKS_SMSC_ADDRESS_FORMAT;
 
@@ -3041,7 +3037,8 @@ RilObject.prototype = {
     let strings = this.context.Buf.readStringList();
     let networks = [];
 
-    for (let i = 0; i < strings.length; i += 4) {
+    for (let i = 0; i < strings.length;
+         i += RILQUIRKS_AVAILABLE_NETWORKS_EXTRA_STRING ? 5 : 4) {
       let network = {
         longName: strings[i],
         shortName: strings[i + 1],
@@ -15053,6 +15050,7 @@ let ContextPool = {
     RILQUIRKS_DATA_REGISTRATION_ON_DEMAND = quirks.dataRegistrationOnDemand;
     RILQUIRKS_SUBSCRIPTION_CONTROL = quirks.subscriptionControl;
     RILQUIRKS_SIGNAL_EXTRA_INT32 = quirks.signalExtraInt;
+    RILQUIRKS_AVAILABLE_NETWORKS_EXTRA_STRING = quirks.availableNetworkExtraStr;
     RILQUIRKS_SMSC_ADDRESS_FORMAT = quirks.smscAddressFormat;
   },
 
