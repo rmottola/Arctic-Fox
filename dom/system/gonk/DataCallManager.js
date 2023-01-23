@@ -962,7 +962,8 @@ function DataCall(aClientId, aApnSetting, aDataCallHandler) {
     ifname: null,
     addresses: [],
     dnses: [],
-    gateways: []
+    gateways: [],
+    pcscf: []
   };
   this.state = NETWORK_STATE_UNKNOWN;
   this.requestedNetworkIfaces = [];
@@ -1093,6 +1094,7 @@ DataCall.prototype = {
     this.linkInfo.addresses = aDataCall.addresses ? aDataCall.addresses.split(" ") : [];
     this.linkInfo.gateways = aDataCall.gateways ? aDataCall.gateways.split(" ") : [];
     this.linkInfo.dnses = aDataCall.dnses ? aDataCall.dnses.split(" ") : [];
+    this.linkInfo.pcscf = aDataCall.pcscf ? aDataCall.pcscf.split(" ") : [];
     this.state = this._getGeckoDataCallState(aDataCall);
 
     // Notify DataCallHandler about data call connected.
@@ -1145,7 +1147,8 @@ DataCall.prototype = {
       ifname: aUpdatedDataCall.ifname,
       addresses: aUpdatedDataCall.addresses ? aUpdatedDataCall.addresses.split(" ") : [],
       dnses: aUpdatedDataCall.dnses ? aUpdatedDataCall.dnses.split(" ") : [],
-      gateways: aUpdatedDataCall.gateways ? aUpdatedDataCall.gateways.split(" ") : []
+      gateways: aUpdatedDataCall.gateways ? aUpdatedDataCall.gateways.split(" ") : [],
+      pcscf: aUpdatedDataCall.pcscf ? aUpdatedDataCall.pcscf.split(" ") : []
     };
 
     switch (dataCallState) {
@@ -1171,6 +1174,7 @@ DataCall.prototype = {
           this.linkInfo.addresses = newLinkInfo.addresses.slice();
           this.linkInfo.gateways = newLinkInfo.gateways.slice();
           this.linkInfo.dnses = newLinkInfo.dnses.slice();
+          this.linkInfo.pcscf = newLinkInfo.pcscf.slice();
         }
         break;
       case NETWORK_STATE_DISCONNECTED:
@@ -1269,6 +1273,7 @@ DataCall.prototype = {
     this.linkInfo.addresses = [];
     this.linkInfo.dnses = [];
     this.linkInfo.gateways = [];
+    this.linkInfo.pcscf = [];
   },
 
   reset: function() {
@@ -1605,6 +1610,20 @@ RILNetworkInfo.prototype = {
     // Note: Port 0 is reserved, so we treat it as invalid as well.
     // See http://www.iana.org/assignments/port-numbers
     return this.getApnSetting().mmsport || -1;
+  },
+
+  getPcscf: function(aCount) {
+    if (this.type != NETWORK_TYPE_MOBILE_IMS) {
+      if (DEBUG) this.debug("Error! Only IMS network can get pcscf.");
+      throw Cr.NS_ERROR_UNEXPECTED;
+    }
+
+    let linkInfo = this.getDataCall().linkInfo;
+
+    if (aCount) {
+      aCount.value = linkInfo.pcscf.length;
+    }
+    return linkInfo.pcscf.slice();
   },
 };
 
