@@ -59,7 +59,7 @@ TelephonyDialCallback::NotifyDialCallSuccess(uint32_t aClientId,
   RefPtr<TelephonyCallId> id = mTelephony->CreateCallId(aNumber);
   RefPtr<TelephonyCall> call =
       mTelephony->CreateCall(id, aClientId, aCallIndex,
-                             nsITelephonyService::CALL_STATE_DIALING);
+                             TelephonyCallState::Dialing);
 
   mPromise->MaybeResolve(call);
   return NS_OK;
