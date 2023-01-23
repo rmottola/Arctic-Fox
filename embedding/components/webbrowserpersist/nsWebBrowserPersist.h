@@ -148,8 +148,6 @@ private:
         nsISupports *aKey, UploadData *aData, void* aClosure);
     static PLDHashOperator EnumFixRedirect(
         nsISupports *aKey, OutputData *aData, void* aClosure);
-    static PLDHashOperator EnumCountURIsToPersist(
-        const nsACString &aKey, URIData *aData, void* aClosure);
     static PLDHashOperator EnumCopyURIsToFlatMap(
         const nsACString &aKey, URIData *aData, void* aClosure);
 
