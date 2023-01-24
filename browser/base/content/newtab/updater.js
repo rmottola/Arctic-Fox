@@ -134,17 +134,16 @@ var gUpdater = {
       if (!aSite || aSites.indexOf(aSite) != -1)
         return;
 
-      let deferred = Promise.defer();
-      batch.push(deferred.promise);
+      batch.push(new Promise(resolve => {
+        // Fade out the to-be-removed site.
+        gTransformation.hideSite(aSite, function () {
+          let node = aSite.node;
 
-      // Fade out the to-be-removed site.
-      gTransformation.hideSite(aSite, function () {
-        let node = aSite.node;
-
-        // Remove the site from the DOM.
-        node.parentNode.removeChild(node);
-        deferred.resolve();
-      });
+          // Remove the site from the DOM.
+          node.parentNode.removeChild(node);
+          resolve();
+        });
+      }));
     });
 
     let wait = Promise.promised(aCallback);
@@ -165,19 +164,18 @@ var gUpdater = {
       if (aSite || !aLinks[aIndex])
         return;
 
-      let deferred = Promise.defer();
-      batch.push(deferred.promise);
+      batch.push(new Promise(resolve => {
+        // Create the new site and fade it in.
+        let site = gGrid.createSite(aLinks[aIndex], cells[aIndex]);
 
-      // Create the new site and fade it in.
-      let site = gGrid.createSite(aLinks[aIndex], cells[aIndex]);
+        // Set the site's initial opacity to zero.
+        site.node.style.opacity = 0;
 
-      // Set the site's initial opacity to zero.
-      site.node.style.opacity = 0;
-
-      // Flush all style changes for the dynamically inserted site to make
-      // the fade-in transition work.
-      window.getComputedStyle(site.node).opacity;
-      gTransformation.showSite(site, function () deferred.resolve());
+        // Flush all style changes for the dynamically inserted site to make
+        // the fade-in transition work.
+        window.getComputedStyle(site.node).opacity;
+        gTransformation.showSite(site, resolve);
+      }));
     });
 
     let wait = Promise.promised(aCallback);
