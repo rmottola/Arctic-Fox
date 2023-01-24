@@ -73,6 +73,7 @@ MainProcessSingleton.prototype = {
       // Load this script early so that console.* is initialized
       // before other frame scripts.
       Services.mm.loadFrameScript("chrome://global/content/browser-content.js", true);
+      Services.ppmm.loadProcessScript("chrome://global/content/process-content.js", true);
       Services.ppmm.addMessageListener("Console:Log", this.logConsoleMessage);
       Services.mm.addMessageListener("Search:AddEngine", this.addSearchEngine);
       break;
