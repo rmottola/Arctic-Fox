@@ -72,7 +72,7 @@ var gPage = {
     if (document.hidden) {
       addEventListener("visibilitychange", this);
     } else {
-      this.onPageFirstVisible();
+      setTimeout(_ => this.onPageFirstVisible());
     }
 
     // Initialize and render the grid.
@@ -151,31 +151,42 @@ var gPage = {
     // Record another page impression.
     Services.telemetry.getHistogramById("NEWTAB_PAGE_SHOWN").add(true);
 
-    // Initialize type counting with the types we want to count
-    let directoryCount = {};
-    for (let type of DirectoryLinksProvider.linkTypes) {
-      directoryCount[type] = 0;
-    }
-
     for (let site of gGrid.sites) {
       if (site) {
-        // The site may need to modify and/or re-render itself if
-        // something changed after newtab was created by preloader.
-        // For example, the suggested tile endTime may have passed.
-        site.onFirstVisible();
+        site.captureIfMissing();
       }
     }
 
-    // Record how many directory sites were shown, but place counts over the
-    // default 9 in the same bucket
-    for (let type of Object.keys(directoryCount)) {
-      let count = directoryCount[type];
-      let shownId = "NEWTAB_PAGE_DIRECTORY_" + type.toUpperCase() + "_SHOWN";
-      let shownCount = Math.min(10, count);
-      Services.telemetry.getHistogramById(shownId).add(shownCount);
+    // Allow the document to reflow so the page has sizing info
+    let i = 0;
+    let checkSizing = _ => setTimeout(_ => {
+      if (document.documentElement.clientWidth == 0) {
+        checkSizing();
+      }
+      else {
+        this.onPageFirstSized();
+      }
+    });
+    checkSizing();
+  },
+
+  onPageFirstSized: function() {
+    // Work backwards to find the first visible site from the end
+    let {sites} = gGrid;
+    let lastIndex = sites.length;
+    while (lastIndex-- > 0) {
+      let site = sites[lastIndex];
+      if (site) {
+        let {node} = site;
+        let rect = node.getBoundingClientRect();
+        let target = document.elementFromPoint(rect.x + rect.width / 2,
+                                               rect.y + rect.height / 2);
+        if (node.contains(target)) {
+          break;
+        }
+      }
     }
 
-    // Set up initial search state.
-    gSearch.setUpInitialState();
+    DirectoryLinksProvider.reportSitesAction(gGrid.sites, "view", lastIndex);
   }
 };

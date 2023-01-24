@@ -1136,9 +1136,6 @@ pref("browser.newtab.preload", false);
 // Toggles the content of 'about:newtab'. Shows the grid when enabled.
 pref("browser.newtabpage.enabled", true);
 
-// Toggles the enhanced content of 'about:newtab'. Shows sponsored tiles.
-sticky_pref("browser.newtabpage.enhanced", false);
-
 // number of columns of newtab grid
 pref("browser.newtabpage.columns", 4);
 
@@ -1152,6 +1149,9 @@ pref("browser.newtabpage.remote", false);
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
 pref("permissions.places-sites-limit", 50);
+
+// endpoint to send newtab click and view pings
+pref("browser.newtabpage.directory.ping", "https://tiles.up.mozillalabs.com/v2/links/");
 
 // Enable the DOM fullscreen API.
 pref("full-screen-api.enabled", true);
