@@ -1188,8 +1188,7 @@ function defineSyncGUID(aAddon) {
       let rng = Cc["@mozilla.org/security/random-generator;1"].
         createInstance(Ci.nsIRandomGenerator);
       let bytes = rng.generateRandomBytes(9);
-      let byte_string = [String.fromCharCode(byte) for each (byte in bytes)]
-                        .join("");
+      let byte_string = bytes.map(byte => String.fromCharCode(byte)).join("");
       // Base64 encode
       let guid = btoa(byte_string).replace(/\+/g, '-')
         .replace(/\//g, '_');
@@ -3783,7 +3782,7 @@ this.XPIProvider = {
     let typesToGet = getAllAliasesForTypes(aTypes);
 
     XPIDatabase.getVisibleAddons(typesToGet, function getAddonsByTypes_getVisibleAddons(aAddons) {
-      aCallback([createWrapper(a) for each (a in aAddons)]);
+      aCallback(aAddons.map(a => createWrapper(a)));
     });
   },
 
@@ -3815,7 +3814,7 @@ this.XPIProvider = {
 
     XPIDatabase.getVisibleAddonsWithPendingOperations(typesToGet,
       function getAddonsWithOpsByTypes_getVisibleAddonsWithPendingOps(aAddons) {
-      let results = [createWrapper(a) for each (a in aAddons)];
+      let results = aAddons.map(a => createWrapper(a));
       XPIProvider.installs.forEach(function(aInstall) {
         if (aInstall.state == AddonManager.STATE_INSTALLED &&
             !(aInstall.addon.inDatabase))
@@ -6038,7 +6037,7 @@ function AddonInstallWrapper(aInstall) {
   this.__defineGetter__("linkedInstalls", function AIW_linkedInstallsGetter() {
     if (!aInstall.linkedInstalls)
       return null;
-    return [i.wrapper for each (i in aInstall.linkedInstalls)];
+    return aInstall.linkedInstalls.map(i => i.wrapper);
   });
 
   this.install = function AIW_install() {
