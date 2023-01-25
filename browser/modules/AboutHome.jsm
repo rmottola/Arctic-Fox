@@ -200,7 +200,7 @@ var AboutHome = {
 
           // Trigger a search through nsISearchEngine.getSubmission()
           let submission = engine.getSubmission(data.searchTerms, null, "homepage");
-          let where = data.useNewTab ? "tab" : "current";
+          let where = data.useNewTab ? "tabshifted" : "current";
           window.openUILinkIn(submission.uri.spec, where, false,
                               submission.postData);
 
