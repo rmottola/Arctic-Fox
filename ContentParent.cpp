@@ -45,6 +45,9 @@
 #include "mozilla/dom/ExternalHelperAppParent.h"
 #include "mozilla/dom/FileSystemRequestParent.h"
 #include "mozilla/dom/GeolocationBinding.h"
+#ifdef MOZ_EME
+#include "mozilla/dom/MediaKeySystemAccess.h"
+#endif
 #include "mozilla/dom/Notification.h"
 #include "mozilla/dom/NuwaParent.h"
 #include "mozilla/dom/PContentBridgeParent.h"
@@ -242,6 +245,8 @@ using namespace mozilla::system;
 
 #if defined(MOZ_CONTENT_SANDBOX) && defined(XP_LINUX)
 #include "mozilla/SandboxInfo.h"
+#include "mozilla/SandboxBroker.h"
+#include "mozilla/SandboxBrokerPolicyFactory.h"
 #endif
 
 #ifdef MOZ_TOOLKIT_SEARCH
@@ -533,13 +538,13 @@ public:
 private:
     virtual bool RecvCloseGCLog() override
     {
-        Unused << mSink->CloseGCLog();
+        unused << mSink->CloseGCLog();
         return true;
     }
 
     virtual bool RecvCloseCCLog() override
     {
-        Unused << mSink->CloseCCLog();
+        unused << mSink->CloseCCLog();
         return true;
     }
 
@@ -550,7 +555,7 @@ private:
         nsCOMPtr<nsIFile> gcLog, ccLog;
         mSink->GetGcLog(getter_AddRefs(gcLog));
         mSink->GetCcLog(getter_AddRefs(ccLog));
-        Unused << mCallback->OnDump(gcLog, ccLog, /* parent = */ false);
+        unused << mCallback->OnDump(gcLog, ccLog, /* parent = */ false);
         return true;
     }
 
@@ -643,6 +648,9 @@ nsDataHashtable<nsStringHashKey, ContentParent*>* ContentParent::sAppContentPare
 nsTArray<ContentParent*>* ContentParent::sNonAppContentParents;
 nsTArray<ContentParent*>* ContentParent::sPrivateContent;
 StaticAutoPtr<LinkedList<ContentParent> > ContentParent::sContentParents;
+#if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
+UniquePtr<SandboxBrokerPolicyFactory> ContentParent::sSandboxBrokerPolicyFactory;
+#endif
 
 #ifdef MOZ_NUWA_PROCESS
 // The pref updates sent to the Nuwa process.
@@ -850,6 +858,10 @@ ContentParent::StartUp()
     MaybeTestPBackground();
 
     sDisableUnsafeCPOWWarnings = PR_GetEnv("DISABLE_UNSAFE_CPOW_WARNINGS");
+
+#if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
+    sSandboxBrokerPolicyFactory = MakeUnique<SandboxBrokerPolicyFactory>();
+#endif
 }
 
 /*static*/ void
@@ -858,6 +870,10 @@ ContentParent::ShutDown()
     // No-op for now.  We rely on normal process shutdown and
     // ClearOnShutdown() to clean up our state.
     sCanLaunchSubprocesses = false;
+
+#if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
+    sSandboxBrokerPolicyFactory = nullptr;
+#endif
 }
 
 /*static*/ void
@@ -1518,7 +1534,7 @@ ContentParent::Init()
     // If accessibility is running in chrome process then start it in content
     // process.
     if (nsIPresShell::IsAccessibilityActive()) {
-        Unused << SendActivateA11y();
+        unused << SendActivateA11y();
     }
 #endif
 }
@@ -1535,7 +1551,7 @@ ContentParent::ForwardKnownInfo()
     RefPtr<nsVolumeService> vs = nsVolumeService::GetSingleton();
     if (vs && !mIsForBrowser) {
         vs->GetVolumesForIPC(&volumeInfo);
-        Unused << SendVolumes(volumeInfo);
+        unused << SendVolumes(volumeInfo);
     }
 #endif /* MOZ_WIDGET_GONK */
 
@@ -1879,6 +1895,28 @@ ContentParent::OnChannelError()
 }
 
 void
+ContentParent::OnBeginSyncTransaction() {
+    if (XRE_IsParentProcess()) {
+        nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
+        JSContext *cx = nsContentUtils::GetCurrentJSContext();
+        if (!sDisableUnsafeCPOWWarnings) {
+            if (console && cx) {
+                nsAutoString filename;
+                uint32_t lineno = 0, column = 0;
+                nsJSUtils::GetCallingLocation(cx, filename, &lineno, &column);
+                nsCOMPtr<nsIScriptError> error(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
+                error->Init(NS_LITERAL_STRING("unsafe CPOW usage"), filename,
+                            EmptyString(), lineno, column,
+                            nsIScriptError::warningFlag, "chrome javascript");
+                console->LogMessage(error);
+            } else {
+                NS_WARNING("Unsafe synchronous IPC message");
+            }
+        }
+    }
+}
+
+void
 ContentParent::OnChannelConnected(int32_t pid)
 {
     SetOtherProcessId(pid);
@@ -2214,7 +2252,7 @@ ContentParent::NotifyTabDestroyed(const TabId& aTabId,
     // Need to close undeleted ContentPermissionRequestParents before tab is closed.
     for (auto& permissionRequestParent : parentArray) {
         nsTArray<PermissionChoice> emptyChoices;
-        Unused << PContentPermissionRequestParent::Send__delete__(permissionRequestParent,
+        unused << PContentPermissionRequestParent::Send__delete__(permissionRequestParent,
                                                                   false,
                                                                   emptyChoices);
     }
@@ -2495,7 +2533,7 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
         nsCString vendor(gAppData->vendor);
 
         // Sending all information to content process.
-        Unused << SendAppInfo(version, buildID, name, UAName, ID, vendor);
+        unused << SendAppInfo(version, buildID, name, UAName, ID, vendor);
     }
 
     // Initialize the message manager (and load delayed scripts) now that we
@@ -2535,7 +2573,7 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
 
     if (gAppData) {
         // Sending all information to content process.
-        Unused << SendAppInit();
+        unused << SendAppInit();
     }
 
     nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
@@ -2547,21 +2585,21 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
         for (uint32_t i = 0; i < agentSheets.Length(); i++) {
             URIParams uri;
             SerializeURI(agentSheets[i]->GetSheetURI(), uri);
-            Unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::AGENT_SHEET);
+            unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::AGENT_SHEET);
         }
 
         nsCOMArray<nsIStyleSheet>& userSheets = *sheetService->UserStyleSheets();
         for (uint32_t i = 0; i < userSheets.Length(); i++) {
             URIParams uri;
             SerializeURI(userSheets[i]->GetSheetURI(), uri);
-            Unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::USER_SHEET);
+            unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::USER_SHEET);
         }
 
         nsCOMArray<nsIStyleSheet>& authorSheets = *sheetService->AuthorStyleSheets();
         for (uint32_t i = 0; i < authorSheets.Length(); i++) {
             URIParams uri;
             SerializeURI(authorSheets[i]->GetSheetURI(), uri);
-            Unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::AUTHOR_SHEET);
+            unused << SendLoadAndRegisterSheet(uri, nsIStyleSheetService::AUTHOR_SHEET);
         }
     }
 
@@ -2572,7 +2610,25 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
         shouldSandbox = false;
     }
 #endif
-    if (shouldSandbox && !SendSetProcessSandbox()) {
+    MaybeFileDesc brokerFd = void_t();
+#ifdef XP_LINUX
+    if (shouldSandbox) {
+        MOZ_ASSERT(!mSandboxBroker);
+        UniquePtr<SandboxBroker::Policy> policy =
+            sSandboxBrokerPolicyFactory->GetContentPolicy(Pid());
+        if (policy) {
+            brokerFd = FileDescriptor();
+            mSandboxBroker = SandboxBroker::Create(Move(policy), Pid(),
+                                                   brokerFd);
+            if (!mSandboxBroker) {
+                KillHard("SandboxBroker::Create failed");
+                return;
+            }
+            MOZ_ASSERT(static_cast<const FileDescriptor&>(brokerFd).IsValid());
+        }
+    }
+#endif
+    if (shouldSandbox && !SendSetProcessSandbox(brokerFd)) {
         KillHard("SandboxInitFailed");
     }
 #endif
@@ -3015,7 +3071,7 @@ ContentParent::OnNewProcessCreated(uint32_t aPid,
                                 sNuwaPrefUpdates->Length() : 0;
     // Resend pref updates to the forked child.
     for (size_t i = 0; i < numNuwaPrefUpdates; i++) {
-        mozilla::Unused << content->SendPreferenceUpdate(sNuwaPrefUpdates->ElementAt(i));
+        mozilla::unused << content->SendPreferenceUpdate(sNuwaPrefUpdates->ElementAt(i));
     }
 
     // Update offline settings.
@@ -3029,8 +3085,8 @@ ContentParent::OnNewProcessCreated(uint32_t aPid,
     RecvGetXPCOMProcessAttributes(&isOffline, &isConnected,
                                   &isLangRTL, &unusedDictionaries,
                                   &clipboardCaps, &domainPolicy, &initialData);
-    mozilla::Unused << content->SendSetOffline(isOffline);
-    mozilla::Unused << content->SendSetConnectivity(isConnected);
+    mozilla::unused << content->SendSetOffline(isOffline);
+    mozilla::unused << content->SendSetConnectivity(isConnected);
     MOZ_ASSERT(!clipboardCaps.supportsSelectionClipboard() &&
                !clipboardCaps.supportsFindClipboard(),
                "Unexpected values");
@@ -3094,7 +3150,7 @@ ContentParent::Observe(nsISupports* aSubject,
     if (!strcmp(aTopic, "memory-pressure") &&
         !StringEndsWith(nsDependentString(aData),
                         NS_LITERAL_STRING("-no-forward"))) {
-        Unused << SendFlushMemory(nsDependentString(aData));
+        unused << SendFlushMemory(nsDependentString(aData));
     }
     // listening for remotePrefs...
     else if (!strcmp(aTopic, "nsPref:changed")) {
@@ -3143,22 +3199,22 @@ ContentParent::Observe(nsISupports* aSubject,
             return NS_ERROR_NOT_AVAILABLE;
     }
     else if (!strcmp(aTopic, "child-gc-request")){
-        Unused << SendGarbageCollect();
+        unused << SendGarbageCollect();
     }
     else if (!strcmp(aTopic, "child-cc-request")){
-        Unused << SendCycleCollect();
+        unused << SendCycleCollect();
     }
     else if (!strcmp(aTopic, "child-mmu-request")){
-        Unused << SendMinimizeMemoryUsage();
+        unused << SendMinimizeMemoryUsage();
     }
     else if (!strcmp(aTopic, "last-pb-context-exited")) {
-        Unused << SendLastPrivateDocShellDestroyed();
+        unused << SendLastPrivateDocShellDestroyed();
     }
     else if (!strcmp(aTopic, "file-watcher-update")) {
         nsCString creason;
         CopyUTF16toUTF8(aData, creason);
         DeviceStorageFile* file = static_cast<DeviceStorageFile*>(aSubject);
-        Unused << SendFilePathUpdate(file->mStorageType, file->mStorageName, file->mPath, creason);
+        unused << SendFilePathUpdate(file->mStorageType, file->mStorageName, file->mPath, creason);
     }
 #ifdef MOZ_WIDGET_GONK
     else if(!strcmp(aTopic, NS_VOLUME_STATE_CHANGED)) {
@@ -3191,17 +3247,17 @@ ContentParent::Observe(nsISupports* aSubject,
         vol->GetIsRemovable(&isRemovable);
         vol->GetIsHotSwappable(&isHotSwappable);
 
-        Unused << SendFileSystemUpdate(volName, mountPoint, state,
+        unused << SendFileSystemUpdate(volName, mountPoint, state,
                                        mountGeneration, isMediaPresent,
                                        isSharing, isFormatting, isFake,
                                        isUnmounting, isRemovable, isHotSwappable);
     } else if (!strcmp(aTopic, "phone-state-changed")) {
         nsString state(aData);
-        Unused << SendNotifyPhoneStateChange(state);
+        unused << SendNotifyPhoneStateChange(state);
     }
     else if(!strcmp(aTopic, NS_VOLUME_REMOVED)) {
         nsString volName(aData);
-        Unused << SendVolumeRemoved(volName);
+        unused << SendVolumeRemoved(volName);
     }
 #endif
 #ifdef ACCESSIBILITY
@@ -3209,11 +3265,11 @@ ContentParent::Observe(nsISupports* aSubject,
     // gets initiated in chrome process.
     else if (aData && (*aData == '1') &&
              !strcmp(aTopic, "a11y-init-or-shutdown")) {
-        Unused << SendActivateA11y();
+        unused << SendActivateA11y();
     }
 #endif
     else if (!strcmp(aTopic, "app-theme-changed")) {
-        Unused << SendOnAppThemeChanged();
+        unused << SendOnAppThemeChanged();
     }
 #ifdef MOZ_ENABLE_PROFILER_SPS
     else if (!strcmp(aTopic, "profiler-started")) {
@@ -3224,21 +3280,21 @@ ContentParent::Observe(nsISupports* aSubject,
         params->GetInterval(&interval);
         const nsTArray<nsCString>& features = params->GetFeatures();
         const nsTArray<nsCString>& threadFilterNames = params->GetThreadFilterNames();
-        Unused << SendStartProfiler(entries, interval, features, threadFilterNames);
+        unused << SendStartProfiler(entries, interval, features, threadFilterNames);
     }
     else if (!strcmp(aTopic, "profiler-stopped")) {
-        Unused << SendStopProfiler();
+        unused << SendStopProfiler();
     }
     else if (!strcmp(aTopic, "profiler-paused")) {
-        Unused << SendPauseProfiler(true);
+        unused << SendPauseProfiler(true);
     }
     else if (!strcmp(aTopic, "profiler-resumed")) {
-        Unused << SendPauseProfiler(false);
+        unused << SendPauseProfiler(false);
     }
     else if (!strcmp(aTopic, "profiler-subprocess-gather")) {
         mGatherer = static_cast<ProfileGatherer*>(aSubject);
         mGatherer->WillGatherOOPProfile();
-        Unused << SendGatherProfile();
+        unused << SendGatherProfile();
     }
     else if (!strcmp(aTopic, "profiler-subprocess")) {
         nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
@@ -3251,7 +3307,7 @@ ContentParent::Observe(nsISupports* aSubject,
     }
 #endif
     else if (!strcmp(aTopic, "gmp-changed")) {
-      Unused << SendNotifyGMPsChanged();
+      unused << SendNotifyGMPsChanged();
     }
     return NS_OK;
 }
@@ -4173,7 +4229,7 @@ ContentParent::RecvGetSystemMemory(const uint64_t& aGetterId)
     memoryTotal = mozilla::hal::GetTotalSystemMemoryLevel();
 #endif
 
-    Unused << SendSystemMemoryAvailable(aGetterId, memoryTotal);
+    unused << SendSystemMemoryAvailable(aGetterId, memoryTotal);
 
     return true;
 }
@@ -4285,7 +4341,7 @@ bool
 ContentParent::RecvDisableNotifications(const IPC::Principal& aPrincipal)
 {
     if (HasNotificationPermission(aPrincipal)) {
-        Unused << Notification::RemovePermission(aPrincipal);
+        unused << Notification::RemovePermission(aPrincipal);
     }
     return true;
 }
@@ -4294,7 +4350,7 @@ bool
 ContentParent::RecvOpenNotificationSettings(const IPC::Principal& aPrincipal)
 {
     if (HasNotificationPermission(aPrincipal)) {
-        Unused << Notification::OpenSettings(aPrincipal);
+        unused << Notification::OpenSettings(aPrincipal);
     }
     return true;
 }
@@ -4448,7 +4504,7 @@ ContentParent::RecvSetGeolocationHigherAccuracy(const bool& aEnable)
 NS_IMETHODIMP
 ContentParent::HandleEvent(nsIDOMGeoPosition* postion)
 {
-    Unused << SendGeolocationUpdate(GeoPosition(postion));
+    unused << SendGeolocationUpdate(GeoPosition(postion));
     return NS_OK;
 }
 
@@ -4459,7 +4515,7 @@ ContentParent::HandleEvent(nsIDOMGeoPositionError* postionError)
     nsresult rv;
     rv = postionError->GetCode(&errorCode);
     NS_ENSURE_SUCCESS(rv,rv);
-    Unused << SendGeolocationError(errorCode);
+    unused << SendGeolocationError(errorCode);
     return NS_OK;
 }
 
@@ -5028,7 +5084,7 @@ ContentParent::NotifyUpdatedDictionaries()
     spellChecker->GetDictionaryList(&dictionaries);
 
     for (size_t i = 0; i < processes.Length(); ++i) {
-        Unused << processes[i]->SendUpdateDictionaryList(dictionaries);
+        unused << processes[i]->SendUpdateDictionaryList(dictionaries);
     }
 }
 
@@ -5154,7 +5210,7 @@ ContentParent::RecvPOfflineCacheUpdateConstructor(POfflineCacheUpdateParent* aAc
     nsresult rv = update->Schedule(aManifestURI, aDocumentURI, aLoadingPrincipal, aStickDocument);
     if (NS_FAILED(rv) && IsAlive()) {
         // Inform the child of failure.
-        Unused << update->SendFinish(false, false);
+        unused << update->SendFinish(false, false);
     }
 
     return true;
@@ -5233,7 +5289,7 @@ ContentParent::MaybeInvokeDragSession(TabParent* aParent)
                                                       this);
       uint32_t action;
       session->GetDragAction(&action);
-      mozilla::Unused << SendInvokeDragSession(dataTransfers, action);
+      mozilla::unused << SendInvokeDragSession(dataTransfers, action);
     }
   }
 }
@@ -5330,10 +5386,10 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
                                 const bool& aCalledFromJS,
                                 const bool& aPositionSpecified,
                                 const bool& aSizeSpecified,
-                                const nsCString& aURI,
+                                const nsString& aURI,
                                 const nsString& aName,
                                 const nsCString& aFeatures,
-                                const nsCString& aBaseURI,
+                                const nsString& aBaseURI,
                                 nsresult* aResult,
                                 bool* aWindowIsNew,
                                 InfallibleTArray<FrameScriptInfo>* aFrameScripts,
@@ -5429,7 +5485,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
         }
 
         nsCOMPtr<nsIOpenURIInFrameParams> params = new nsOpenURIInFrameParams();
-        params->SetReferrer(NS_ConvertUTF8toUTF16(aBaseURI));
+        params->SetReferrer(aBaseURI);
         params->SetIsPrivate(isPrivate);
 
         TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
@@ -5463,7 +5519,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     nsAutoCString finalURIString;
     if (!aURI.IsEmpty()) {
         nsCOMPtr<nsIURI> finalURI;
-        *aResult = NS_NewURI(getter_AddRefs(finalURI), aURI.get(), baseURI);
+        *aResult = NS_NewURI(getter_AddRefs(finalURI), NS_ConvertUTF16toUTF8(aURI).get(), baseURI);
 
         if (NS_WARN_IF(NS_FAILED(*aResult))) {
             return true;
@@ -5476,16 +5532,11 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
 
     TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
-    // If nsWindowWatcher::OpenWindowInternal was passed a nullptr for the URI
-    // to open in the content process, we indicate that by sending up a voided
-    // nsString (since primitives are not nullable). If we detect the voided
-    // nsString, we know that we need to send OpenWindow2 a nullptr for the URI.
-    const char* uri = aURI.IsVoid() ? nullptr : finalURIString.get();
-    const char* name = aName.IsVoid() ? nullptr : NS_ConvertUTF16toUTF8(aName).get();
-    const char* features = aFeatures.IsVoid() ? nullptr : aFeatures.get();
-
-    *aResult = pwwatch->OpenWindow2(parent, uri, name, features, aCalledFromJS,
-                                    false, false, thisTabParent, nullptr, nullptr, getter_AddRefs(window));
+    const char* features = aFeatures.Length() ? aFeatures.get() : nullptr;
+    *aResult = pwwatch->OpenWindow2(parent, finalURIString.get(),
+                                    NS_ConvertUTF16toUTF8(aName).get(),
+                                    features, aCalledFromJS,
+                                    false, false, thisTabParent, nullptr, getter_AddRefs(window));
 
     if (NS_WARN_IF(NS_FAILED(*aResult))) {
         return true;
@@ -5690,7 +5741,7 @@ NS_IMPL_ISUPPORTS(ParentIdleListener, nsIObserver)
 
 NS_IMETHODIMP
 ParentIdleListener::Observe(nsISupports*, const char* aTopic, const char16_t* aData) {
-    mozilla::Unused << mParent->SendNotifyIdleObserver(mObserver,
+    mozilla::unused << mParent->SendNotifyIdleObserver(mObserver,
                                                        nsDependentCString(aTopic),
                                                        nsDependentString(aData));
     return NS_OK;
