@@ -1351,6 +1351,10 @@ DocAccessible::ProcessInvalidationList()
   // Alter the tree according to aria-owns (seize the trees).
   for (uint32_t idx = 0; idx < mARIAOwnsInvalidationList.Length(); idx++) {
     Accessible* owner = mARIAOwnsInvalidationList[idx].mOwner;
+    if (owner->IsDefunct()) { // eventually died until we've got here
+      continue;
+    }
+
     Accessible* child = GetAccessible(mARIAOwnsInvalidationList[idx].mChild);
     if (!child) {
       continue;

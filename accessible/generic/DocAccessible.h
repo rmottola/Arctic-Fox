@@ -687,8 +687,8 @@ protected:
     ARIAOwnsPair& operator =(const ARIAOwnsPair& aPair)
       { mOwner = aPair.mOwner; mChild = aPair.mChild; return *this; }
 
-    Accessible* mOwner;
-    nsIContent* mChild;
+    RefPtr<Accessible> mOwner;
+    nsCOMPtr<nsIContent> mChild;
   };
   nsTArray<ARIAOwnsPair> mARIAOwnsInvalidationList;
 
