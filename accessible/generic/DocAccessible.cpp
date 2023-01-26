@@ -1360,6 +1360,11 @@ DocAccessible::ProcessInvalidationList()
       continue;
     }
 
+    if (!child->Parent()) {
+      NS_ERROR("The accessible is in document but doesn't have a parent");
+      continue;
+    }
+
     // XXX: update context flags
     {
       Accessible* oldParent = child->Parent();
