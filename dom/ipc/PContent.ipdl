@@ -71,7 +71,6 @@ include GraphicsMessages;
 include "mozilla/dom/PContentBridgeParent.h";
 
 include "mozilla/dom/indexedDB/SerializationHelpers.h";
-include "mozilla/dom/TabMessageUtils.h";
 
 using GeoPosition from "nsGeoPositionIPCSerialiser.h";
 
