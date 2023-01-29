@@ -411,7 +411,7 @@ html|a:hover:active,
 
 /* Hide the actual checkbox */
 html|input[type="checkbox"] {
-  opacity: 0;
+  visibility: hidden;
   position: absolute;
 }
 
@@ -509,7 +509,7 @@ xul|*.radio-label-box {
 
 /* Category List */
 
-xul|*#categories {
+*|*#categories {
   -moz-appearance: none;
   background-color: #424f5a;
   padding-top: 39px;
@@ -517,7 +517,7 @@ xul|*#categories {
   border-width: 0;
 }
 
-xul|*.category {
+*|*.category {
   -moz-appearance: none;
   color: #c1c1c1;
   -moz-border-end-width: 0;
@@ -527,20 +527,20 @@ xul|*.category {
   transition: background-color 150ms;
 }
 
-xul|*.category:hover {
-  background-color: #5e6972;
+*|*.category:hover {
+  background-color: var(--in-content-category-background-hover);
 }
 
-xul|*.category[selected] {
-  background-color: #343f48;
-  color: #f2f2f2;
+*|*.category[selected] {
+  background-color: var(--in-content-category-background-active);
+  color: var(--in-content-category-text-selected);
   -moz-padding-start: 11px; /* compensate the 4px border */
-  -moz-border-start: solid 4px #ff9500;
+  -moz-border-start: solid 4px var(--in-content-border-highlight);
 }
 
-xul|*#categories[keyboard-navigation="true"]:-moz-focusring > xul|*.category[current] {
-  border-top: 1px #ffffff dotted;
-  border-bottom: 1px #ffffff dotted;
+*|*#categories[keyboard-navigation="true"]:-moz-focusring > *|*.category[current] {
+  border-top: var(--in-content-category-border-focus);
+  border-bottom: var(--in-content-category-border-focus);
 }
 
 *|*.category-name {
