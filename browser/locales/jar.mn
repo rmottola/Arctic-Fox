@@ -23,6 +23,8 @@
     locale/browser/browser.properties              (%chrome/browser/browser.properties)
     locale/browser/charsetMenu.properties          (%chrome/browser/charsetMenu.properties)
     locale/browser/charsetMenu.dtd                 (%chrome/browser/charsetMenu.dtd)
+    locale/browser/devtools/aboutdebugging.dtd        (%chrome/browser/devtools/aboutdebugging.dtd)
+    locale/browser/devtools/aboutdebugging.properties (%chrome/browser/devtools/aboutdebugging.properties)
     locale/browser/devtools/animationinspector.dtd    (%chrome/browser/devtools/animationinspector.dtd)
     locale/browser/devtools/animationinspector.properties (%chrome/browser/devtools/animationinspector.properties)
     locale/browser/devtools/appcacheutils.properties  (%chrome/browser/devtools/appcacheutils.properties)
