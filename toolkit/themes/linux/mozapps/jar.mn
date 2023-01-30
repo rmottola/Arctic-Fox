@@ -10,7 +10,7 @@ toolkit.jar:
 + skin/classic/mozapps/extensions/category-search.png      (extensions/category-search.png)
 + skin/classic/mozapps/extensions/category-discover.png    (extensions/category-discover.png)
 + skin/classic/mozapps/extensions/category-languages.png   (extensions/localeGeneric.png)
-+ skin/classic/mozapps/extensions/category-extensions.png  (../../shared/extensions/extensionGeneric.svg)
++ skin/classic/mozapps/extensions/category-extensions.svg  (../../shared/extensions/extensionGeneric.svg)
 + skin/classic/mozapps/extensions/category-themes.png      (extensions/themeGeneric.png)
 + skin/classic/mozapps/extensions/category-plugins.png     (extensions/category-plugins.png)
 + skin/classic/mozapps/extensions/category-service.png     (extensions/category-service.png)
@@ -42,7 +42,6 @@ toolkit.jar:
 + skin/classic/mozapps/plugins/pluginGeneric-16.png        (plugins/pluginGeneric-16.png)
 + skin/classic/mozapps/profile/profileicon.png             (profile/profileicon.png)
 + skin/classic/mozapps/viewsource/viewsource.css           (viewsource/viewsource.css)
-+ skin/classic/mozapps/xpinstall/xpinstallItemGeneric.svg  (../../shared/extensions/extensionGeneric.svg)
 #ifdef MOZ_PLACES
 + skin/classic/mozapps/places/defaultFavicon.png           (places/defaultFavicon.png)
 #endif

@@ -77,7 +77,6 @@ toolkit.jar:
   skin/classic/mozapps/update/buttons.png                         (update/buttons.png)
 * skin/classic/mozapps/update/updates.css                         (update/updates.css)
   skin/classic/mozapps/viewsource/viewsource.css                  (viewsource/viewsource.css)
-  skin/classic/mozapps/xpinstall/xpinstallItemGeneric.svg         (../../shared/extensions/extensionGeneric.svg)
   skin/classic/mozapps/xpinstall/xpinstallConfirm.css             (extensions/xpinstallConfirm.css)
 #ifdef MOZ_PLACES
   skin/classic/mozapps/places/defaultFavicon.png                  (places/defaultFavicon.png)
