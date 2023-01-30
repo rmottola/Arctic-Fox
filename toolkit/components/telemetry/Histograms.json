@@ -9259,6 +9259,13 @@
     "kind": "count",
     "description": "Attempt to notify ServiceWorker of push notification resubscription."
   },
+  "D3D11_SYNC_HANDLE_FAILURE": {
+    "alert_emails": ["bschouten@mozilla.com","danderson@mozilla.com","msreckovic@mozilla.com","ashughes@mozilla.com"],
+    "expires_in_version": "50",
+    "releaseChannelCollection": "opt-out",
+    "kind": "count",
+    "description": "Number of times the D3D11 compositor failed to get a texture sync handle."
+  },
   "GFX_CRASH": {
     "expires_in_version": "never",
     "kind": "enumerated",
