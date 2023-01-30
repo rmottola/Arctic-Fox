@@ -748,19 +748,19 @@ DXGIYCbCrTextureClient::Create(ISurfaceAllocator* aAllocator,
 
   RefPtr<IDXGIResource> resource;
 
-  aTextureY->QueryInterface((IDXGIResource**)byRef(resource));
+  aTextureY->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   HRESULT hr = resource->GetSharedHandle(&texture->mHandles[0]);
   if (FAILED(hr)) {
     return nullptr;
   }
 
-  aTextureCb->QueryInterface((IDXGIResource**)byRef(resource));
+  aTextureCb->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   hr = resource->GetSharedHandle(&texture->mHandles[1]);
   if (FAILED(hr)) {
     return nullptr;
   }
 
-  aTextureCr->QueryInterface((IDXGIResource**)byRef(resource));
+  aTextureCr->QueryInterface((IDXGIResource**)getter_AddRefs(resource));
   hr = resource->GetSharedHandle(&texture->mHandles[2]);
   if (FAILED(hr)) {
     return nullptr;
