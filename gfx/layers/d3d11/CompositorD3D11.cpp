@@ -1110,8 +1110,6 @@ CompositorD3D11::EndFrame()
     return;
   }
 
-  mContext->Flush();
-
   IntSize oldSize = mSize;
   EnsureSize();
   if (mSize.width <= 0 || mSize.height <= 0) {
