@@ -486,7 +486,7 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
 
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
-  if (Failed(hr) || !texture) {
+  if (FAILED(hr) || !texture) {
     gfxCriticalNote << "Failed in CreateRenderTarget " << hexa(hr);
     return nullptr;
   }
@@ -524,8 +524,9 @@ CompositorD3D11::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
   NS_ASSERTION(texture, "Could not create texture");
-  if (Failed(hr) || !texture) {
+  if (FAILED(hr) || !texture) {
     gfxCriticalNote << "Failed in CreateRenderTargetFromSource " << hexa(hr);
+    HandleError(hr);
     return nullptr;
   }
 
@@ -768,6 +769,7 @@ CompositorD3D11::DrawVRDistortion(const gfx::Rect& aRect,
     hr = mContext->Map(mAttachments->mVRDistortionConstants, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
     if (FAILED(hr) || !resource.pData) {
       gfxCriticalError() << "Failed to map VRDistortionConstants. Result: " << hr;
+      HandleError(hr);
       return;
     }
     *(gfx::VRDistortionConstants*)resource.pData = shaderConstants;
@@ -1154,8 +1156,9 @@ CompositorD3D11::EndFrame()
       chain->Present1(presentInterval, mDisableSequenceForNextFrame ? DXGI_PRESENT_DO_NOT_SEQUENCE : 0, &params);
     } else {
       hr = mSwapChain->Present(presentInterval, mDisableSequenceForNextFrame ? DXGI_PRESENT_DO_NOT_SEQUENCE : 0);
-      if (Failed(hr)) {
+      if (FAILED(hr)) {
         gfxCriticalNote << "D3D11 swap chain preset failed " << hexa(hr);
+        HandleError(hr);
       }
     }
     mDisableSequenceForNextFrame = false;
@@ -1216,8 +1219,9 @@ CompositorD3D11::VerifyBufferSize()
   HRESULT hr;
 
   hr = mSwapChain->GetDesc(&swapDesc);
-  if (Failed(hr)) {
-    gfxCriticalError() << "Failed to get the description " << hexa(hr);
+  if (FAILED(hr)) {
+    gfxCriticalError() << "Failed to get the description " << hexa(hr) << ", " << mSize << ", " << (int)mVerifyBuffersFailed;
+    HandleError(hr);
     return false;
   }
 
@@ -1241,12 +1245,13 @@ CompositorD3D11::VerifyBufferSize()
   hr = mSwapChain->ResizeBuffers(1, mSize.width, mSize.height,
                                  DXGI_FORMAT_B8G8R8A8_UNORM,
                                  0);
-  if (Failed(hr)) {
-    gfxCriticalNote << "D3D11 swap resize buffers failed " << hexa(hr) << " on " << mSize;
-  }
   mVerifyBuffersFailed = FAILED(hr);
+  if (mVerifyBuffersFailed) {
+    gfxCriticalNote << "D3D11 swap resize buffers failed " << hexa(hr) << " on " << mSize;
+    HandleError(hr);
+  }
 
-  return Succeeded(hr);
+  return !mVerifyBuffersFailed;
 }
 
 bool
@@ -1267,7 +1272,7 @@ CompositorD3D11::UpdateRenderTarget()
   }
 
   if (mSize.width <= 0 || mSize.height <= 0) {
-    gfxCriticalNote << "Invalid size in UpdateRenderTarget " << mSize;
+    gfxCriticalNote << "Invalid size in UpdateRenderTarget " << mSize << ", " << (int)mVerifyBuffersFailed;
     return false;
   }
 
@@ -1279,12 +1284,13 @@ CompositorD3D11::UpdateRenderTarget()
   if (hr == DXGI_ERROR_INVALID_CALL) {
     // This happens on some GPUs/drivers when there's a TDR.
     if (mDevice->GetDeviceRemovedReason() != S_OK) {
-      gfxCriticalError() << "GetBuffer returned invalid call!";
+      gfxCriticalError() << "GetBuffer returned invalid call! " << mSize << ", " << (int)mVerifyBuffersFailed;
       return false;
     }
   }
-  if (Failed(hr)) {
-    gfxCriticalNote << "Failed in UpdateRenderTarget " << hexa(hr);
+  if (FAILED(hr)) {
+    gfxCriticalNote << "Failed in UpdateRenderTarget " << hexa(hr) << ", " << mSize << ", " << (int)mVerifyBuffersFailed;
+    HandleError(hr);
     return false;
   }
 
@@ -1373,8 +1379,9 @@ CompositorD3D11::UpdateConstantBuffers()
   resource.pData = nullptr;
 
   hr = mContext->Map(mAttachments->mVSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-  if (Failed(hr) || !resource.pData) {
-    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hexa(hr);
+  if (FAILED(hr) || !resource.pData) {
+    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hexa(hr) << ", " << (int)mVerifyBuffersFailed;
+    HandleError(hr);
     return false;
   }
   *(VertexShaderConstants*)resource.pData = mVSConstants;
@@ -1382,8 +1389,9 @@ CompositorD3D11::UpdateConstantBuffers()
   resource.pData = nullptr;
 
   hr = mContext->Map(mAttachments->mPSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-  if (Failed(hr) || !resource.pData) {
-    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hexa(hr);
+  if (FAILED(hr) || !resource.pData) {
+    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hexa(hr) << ", " << (int)mVerifyBuffersFailed;
+    HandleError(hr);
     return false;
   }
   *(PixelShaderConstants*)resource.pData = mPSConstants;
@@ -1422,8 +1430,9 @@ CompositorD3D11::PaintToTarget()
   HRESULT hr;
 
   hr = mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)backBuf.StartAssignment());
-  if (Failed(hr)) {
+  if (FAILED(hr)) {
     gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 1";
+    HandleError(hr);
     return;
   }
 
@@ -1443,16 +1452,18 @@ CompositorD3D11::PaintToTarget()
   }
 
   hr = mDevice->CreateTexture2D(&softDesc, nullptr, getter_AddRefs(readTexture));
-  if (Failed(hr)) {
+  if (FAILED(hr)) {
     gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 2";
+    HandleError(hr);
     return;
   }
   mContext->CopyResource(readTexture, backBuf);
 
   D3D11_MAPPED_SUBRESOURCE map;
   hr = mContext->Map(readTexture, 0, D3D11_MAP_READ, 0, &map);
-  if (Failed(hr)) {
+  if (FAILED(hr)) {
     gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 3";
+    HandleError(hr);
     return;
   }
   RefPtr<DataSourceSurface> sourceSurface =
@@ -1474,7 +1485,7 @@ CompositorD3D11::Failed(HRESULT hr, const char* aContext)
   if (SUCCEEDED(hr))
     return false;
 
-  gfxCriticalNote << "[D3D11] " << aContext << " failed: " << hexa(hr);
+  gfxCriticalNote << "[D3D11] " << aContext << " failed: " << hexa(hr) << ", " << (int)mVerifyBuffersFailed;
   return true;
 }
 
@@ -1490,7 +1501,7 @@ CompositorD3D11::HandleError(HRESULT hr, Severity aSeverity)
   }
 
   if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in HandleError";
+    gfxCriticalError() << "Out of sync D3D11 devices in HandleError, " << (int)mVerifyBuffersFailed;
   }
 
   HRESULT hrOnReset = S_OK;
@@ -1510,7 +1521,7 @@ CompositorD3D11::HandleError(HRESULT hr, Severity aSeverity)
   gfxCriticalError(CriticalLog::DefaultOptions(!deviceRemoved))
     << (deviceRemoved ? "[CompositorD3D11] device removed with error code: "
                       : "[CompositorD3D11] error code: ")
-    << hexa(hr) << ", " << hexa(hrOnReset);
+    << hexa(hr) << ", " << hexa(hrOnReset) << ", " << (int)mVerifyBuffersFailed;
 
   // Crash if we are making invalid calls outside of device removal
   if (hr == DXGI_ERROR_INVALID_CALL) {
@@ -1520,20 +1531,6 @@ CompositorD3D11::HandleError(HRESULT hr, Severity aSeverity)
   if (aSeverity == Recoverable) {
     NS_WARNING("Encountered a recoverable D3D11 error");
   }
-}
-
-bool
-CompositorD3D11::Failed(HRESULT hr, Severity aSeverity)
-{
-  HandleError(hr, aSeverity);
-  return FAILED(hr);
-}
-
-bool
-CompositorD3D11::Succeeded(HRESULT hr, Severity aSeverity)
-{
-  HandleError(hr, aSeverity);
-  return SUCCEEDED(hr);
 }
 
 }
