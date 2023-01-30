@@ -219,7 +219,8 @@ public:
                      uint32_t aLength) override;
 
     gfxFontFamily* FindFamily(const nsAString& aFamily,
-                              gfxFontStyle* aStyle = nullptr) override;
+                              gfxFontStyle* aStyle = nullptr,
+                              gfxFloat aDevToCssSize = 1.0) override;
 
     bool GetStandardFamilyName(const nsAString& aFontName,
                                nsAString& aFamilyName) override;

@@ -735,7 +735,8 @@ public:
     gfxFontGroup(const mozilla::FontFamilyList& aFontFamilyList,
                  const gfxFontStyle* aStyle,
                  gfxTextPerfMetrics* aTextPerf,
-                 gfxUserFontSet* aUserFontSet = nullptr);
+                 gfxUserFontSet* aUserFontSet,
+                 gfxFloat aDevToCssSize);
 
     virtual ~gfxFontGroup();
 
@@ -1035,6 +1036,7 @@ protected:
 
     gfxFloat mUnderlineOffset;
     gfxFloat mHyphenWidth;
+    gfxFloat mDevToCssSize;
 
     RefPtr<gfxUserFontSet> mUserFontSet;
     uint64_t mCurrGeneration;  // track the current user font set generation, rebuild font list if needed
