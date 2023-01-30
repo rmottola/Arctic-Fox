@@ -1118,6 +1118,13 @@ pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
 
+// Enable the JSON View tool (an inspector for application/json documents)
+#ifdef MOZ_DEV_EDITION
+  pref("devtools.jsonview.enabled", true);
+#else
+  pref("devtools.jsonview.enabled", false);
+#endif
+
 // Whether the character encoding menu is under the main Firefox button. This
 // preference is a string so that localizers can alter it.
 pref("browser.menu.showCharacterEncoding", "chrome://browser/locale/browser.properties");
