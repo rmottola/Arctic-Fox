@@ -20,59 +20,6 @@ namespace layers {
 
 class CompositorD3D11;
 
-class DXGIYCbCrTextureClientD3D11 : public TextureClient
-{
-public:
-  DXGIYCbCrTextureClientD3D11(ISurfaceAllocator* aAllocator,
-                              TextureFlags aFlags);
-
-  virtual ~DXGIYCbCrTextureClientD3D11();
-
-  // TextureClient
-
-  virtual bool IsAllocated() const override{ return !!mTextures[0]; }
-
-  virtual bool Lock(OpenMode aOpenMode) override;
-
-  virtual void Unlock() override;
-
-  virtual bool IsLocked() const override{ return mIsLocked; }
-
-  virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) override;
-
-  void InitWith(ID3D11Texture2D* aTextureY,
-                ID3D11Texture2D* aTextureCb,
-                ID3D11Texture2D* aTextureCr,
-                const gfx::IntSize& aSize)
-  {
-    MOZ_ASSERT(aTextureY && aTextureCb && aTextureCr);
-    MOZ_ASSERT(!mTextures[0]);
-    mTextures[0] = aTextureY;
-    mTextures[1] = aTextureCb;
-    mTextures[2] = aTextureCr;
-    mSize = aSize;
-  }
-
-  virtual gfx::IntSize GetSize() const
-  {
-    return mSize;
-  }
-
-  virtual bool HasInternalBuffer() const override{ return true; }
-
-    // This TextureClient should not be used in a context where we use CreateSimilar
-    // (ex. component alpha) because the underlying texture data is always created by
-    // an external producer.
-    virtual already_AddRefed<TextureClient>
-    CreateSimilar(TextureFlags, TextureAllocationFlags) const override{ return nullptr; }
-
-private:
-  RefPtr<ID3D11Texture2D> mTextures[3];
-  gfx::IntSize mSize;
-  bool mIsLocked;
-};
-
-
 /**
  * A TextureClient to share a D3D10 texture with the compositor thread.
  * The corresponding TextureHost is DXGITextureHostD3D11
