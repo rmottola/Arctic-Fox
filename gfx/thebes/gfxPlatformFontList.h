@@ -315,6 +315,8 @@ protected:
 
     virtual void GetFontFamilyNames(nsTArray<nsString>& aFontFamilyNames);
 
+    nsILanguageAtomService* GetLangService();
+
     // helper function to map lang to lang group
     nsIAtom* GetLangGroup(nsIAtom* aLanguage);
 
