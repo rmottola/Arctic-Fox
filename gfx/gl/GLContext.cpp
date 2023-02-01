@@ -78,6 +78,7 @@ static const char *sExtensionNames[] = {
     "GL_ANGLE_timer_query",
     "GL_APPLE_client_storage",
     "GL_APPLE_framebuffer_multisample",
+    "GL_APPLE_sync",
     "GL_APPLE_texture_range",
     "GL_APPLE_vertex_array_object",
     "GL_ARB_ES2_compatibility",
@@ -784,7 +785,6 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
         }
 
         if (!IsSupported(GLFeature::framebuffer_object)) {
-
             // Check for aux symbols based on extensions
             if (IsSupported(GLFeature::framebuffer_object_EXT_OES))
             {
@@ -812,11 +812,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 }
             }
 
-            if (IsExtensionSupported(GLContext::ANGLE_framebuffer_blit) ||
-                IsExtensionSupported(GLContext::EXT_framebuffer_blit) ||
-                IsExtensionSupported(GLContext::NV_framebuffer_blit))
-
-            {
+            if (IsSupported(GLFeature::framebuffer_blit)) {
                 SymLoadStruct extSymbols[] = {
                     EXT_SYMBOL3(BlitFramebuffer, ANGLE, EXT, NV),
                     END_SYMBOLS
@@ -827,11 +823,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 }
             }
 
-            if (IsExtensionSupported(GLContext::ANGLE_framebuffer_multisample) ||
-                IsExtensionSupported(GLContext::APPLE_framebuffer_multisample) ||
-                IsExtensionSupported(GLContext::EXT_framebuffer_multisample) ||
-                IsExtensionSupported(GLContext::EXT_multisampled_render_to_texture))
-            {
+            if (IsSupported(GLFeature::framebuffer_multisample)) {
                 SymLoadStruct extSymbols[] = {
                     EXT_SYMBOL3(RenderbufferStorageMultisample, ANGLE, APPLE, EXT),
                     END_SYMBOLS
@@ -1432,10 +1424,11 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
         }
 
         if (IsSupported(GLFeature::uniform_buffer_object)) {
+            // Note: Don't query for glGetActiveUniformName because it is not
+            // supported by GL ES 3.
             SymLoadStruct uboSymbols[] = {
                 { (PRFuncPtr*) &mSymbols.fGetUniformIndices, { "GetUniformIndices", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fGetActiveUniformsiv, { "GetActiveUniformsiv", nullptr } },
-                { (PRFuncPtr*) &mSymbols.fGetActiveUniformName, { "GetActiveUniformName", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fGetUniformBlockIndex, { "GetUniformBlockIndex", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fGetActiveUniformBlockiv, { "GetActiveUniformBlockiv", nullptr } },
                 { (PRFuncPtr*) &mSymbols.fGetActiveUniformBlockName, { "GetActiveUniformBlockName", nullptr } },
@@ -1546,7 +1539,7 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
 
         if (IsSupported(GLFeature::read_buffer)) {
             SymLoadStruct extSymbols[] = {
-                { (PRFuncPtr*) &mSymbols.fReadBuffer, { "ReadBuffer",    nullptr } },
+                { (PRFuncPtr*) &mSymbols.fReadBuffer, { "ReadBuffer", nullptr } },
                 END_SYMBOLS
             };
 
@@ -1554,6 +1547,20 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
                 NS_ERROR("GL supports read_buffer without supplying its functions.");
 
                 MarkUnsupported(GLFeature::read_buffer);
+                ClearSymbols(extSymbols);
+            }
+        }
+
+        if (IsExtensionSupported(APPLE_framebuffer_multisample)) {
+            SymLoadStruct extSymbols[] = {
+                { (PRFuncPtr*) &mSymbols.fResolveMultisampleFramebufferAPPLE, { "ResolveMultisampleFramebufferAPPLE", nullptr } },
+                END_SYMBOLS
+            };
+
+            if (!LoadSymbols(&extSymbols[0], trygl, prefix)) {
+                NS_ERROR("GL supports APPLE_framebuffer_multisample without supplying its functions.");
+
+                MarkExtensionUnsupported(APPLE_framebuffer_multisample);
                 ClearSymbols(extSymbols);
             }
         }
@@ -2911,7 +2918,7 @@ GLContext::GetReadFB()
     if (mScreen)
         return mScreen->GetReadFB();
 
-    GLenum bindEnum = IsSupported(GLFeature::framebuffer_blit)
+    GLenum bindEnum = IsSupported(GLFeature::split_framebuffer)
                         ? LOCAL_GL_READ_FRAMEBUFFER_BINDING_EXT
                         : LOCAL_GL_FRAMEBUFFER_BINDING;
 

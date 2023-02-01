@@ -1008,7 +1008,7 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
                  const gfxTextPerfMetrics::TextCounts& aCounts,
                  float aTime, TextPerfLogType aLogType, const char* aURL)
 {
-  PRLogModuleInfo* tpLog = gfxPlatform::GetLog(eGfxLog_textperf);
+  LogModule* tpLog = gfxPlatform::GetLog(eGfxLog_textperf);
 
   // ignore XUL contexts unless at debug level
   mozilla::LogLevel logLevel = LogLevel::Warning;
@@ -4644,36 +4644,9 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
 
   gfxContextAutoSaveRestore save(aThebesContext);
 
-  CompositionOp oldOp = aThebesContext->CurrentOp();
-  if (oldOp == CompositionOp::OP_OVER) {
-    // Clip to the destination rectangle before we push the group,
-    // to limit the size of the temporary surface
-    aThebesContext->Clip();
-  }
+  MOZ_ASSERT(aThebesContext->CurrentOp() == CompositionOp::OP_OVER);
 
-  // we want the window to be composited as a single image using
-  // whatever operator was set; set OP_OVER here, which is
-  // either already the case, or overrides the operator in a group.
-  // the original operator will be present when we PopGroup.
-  // we can avoid using a temporary surface if we're using OP_OVER
-  bool needsGroup = oldOp != CompositionOp::OP_OVER;
-
-  if (needsGroup) {
-    aThebesContext->PushGroup(NS_GET_A(aBackgroundColor) == 0xff ?
-                              gfxContentType::COLOR :
-                              gfxContentType::COLOR_ALPHA);
-    aThebesContext->Save();
-
-    if (oldOp != CompositionOp::OP_OVER) {
-      // Clip now while we paint to the temporary surface. For
-      // non-source-bounded operators (e.g., SOURCE), we need to do clip
-      // here after we've pushed the group, so that eventually popping
-      // the group and painting it will be able to clear the entire
-      // destination surface.
-      aThebesContext->Clip();
-      aThebesContext->SetOp(CompositionOp::OP_OVER);
-    }
-  }
+  aThebesContext->Clip();
 
   nsDeviceContext* devCtx = mPresContext->DeviceContext();
 
@@ -4744,13 +4717,6 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
 
   nsLayoutUtils::PaintFrame(&rc, rootFrame, nsRegion(aRect),
                             aBackgroundColor, flags);
-
-  // if we had to use a group, paint it to the destination now
-  if (needsGroup) {
-    aThebesContext->Restore();
-    aThebesContext->PopGroupToSource();
-    aThebesContext->Paint();
-  }
 
   return NS_OK;
 }
@@ -5384,6 +5350,9 @@ nsresult PresShell::SetResolutionImpl(float aResolution, bool aScaleToResolution
   state.mResolution = aResolution;
   SetRenderingState(state);
   mScaleToResolution = aScaleToResolution;
+  if (mMobileViewportManager) {
+    mMobileViewportManager->ResolutionUpdated();
+  }
 
   return NS_OK;
 }

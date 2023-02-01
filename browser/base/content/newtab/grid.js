@@ -29,7 +29,7 @@ var gGrid = {
   /**
    * All cells contained in the grid.
    */
-  _cells: null,
+  _cells: [],
   get cells() { return this._cells; },
 
   /**
@@ -38,7 +38,10 @@ var gGrid = {
   get sites() { return [for (cell of this.cells) cell.site]; },
 
   // Tells whether the grid has already been initialized.
-  get ready() { return !!this._node; },
+  get ready() { return !!this._ready; },
+
+  // Returns whether the page has finished loading yet.
+  get isDocumentLoaded() { return document.readyState == "complete"; },
 
   /**
    * Initializes the grid.
@@ -47,7 +50,24 @@ var gGrid = {
   init: function Grid_init() {
     this._node = document.getElementById("newtab-grid");
     this._createSiteFragment();
-    this._render();
+
+    gLinks.populateCache(() => {
+      this.refresh();
+      this._ready = true;
+
+      // If fetching links took longer than loading the page itself then
+      // we need to resize the grid as that was blocked until now.
+      // We also want to resize now if the page was already loaded when
+      // initializing the grid (the user toggled the page).
+      this._resizeGrid();
+
+      addEventListener("resize", this);
+    });
+
+    // Resize the grid as soon as the page loads.
+    if (!this.isDocumentLoaded) {
+      addEventListener("load", this);
+    }
   },
 
   /**
@@ -63,20 +83,15 @@ var gGrid = {
   },
 
   /**
-   * Refreshes the grid and re-creates all sites.
+   * Handles all grid events.
    */
-  refresh: function Grid_refresh() {
-    // Remove all sites.
-    this.cells.forEach(function (cell) {
-      let node = cell.node;
-      let child = node.firstElementChild;
-
-      if (child)
-        node.removeChild(child);
-    }, this);
-
-    // Render the grid again.
-    this._render();
+  handleEvent: function Grid_handleEvent(aEvent) {
+    switch (aEvent.type) {
+      case "load":
+      case "resize":
+        this._resizeGrid();
+        break;
+    }
   },
 
   /**
@@ -94,29 +109,45 @@ var gGrid = {
   },
 
   /**
-   * Creates the newtab grid.
+   * Renders the grid, including cells and sites.
    */
-  _renderGrid: function Grid_renderGrid() {
-    let row = document.createElementNS(HTML_NAMESPACE, "div");
+  refresh() {
     let cell = document.createElementNS(HTML_NAMESPACE, "div");
-    row.classList.add("newtab-row");
     cell.classList.add("newtab-cell");
 
-    // Clear the grid
+    // Creates all the cells up to the maximum
+    let fragment = document.createDocumentFragment();
+    for (let i = 0; i < gGridPrefs.gridColumns * gGridPrefs.gridRows; i++) {
+      fragment.appendChild(cell.cloneNode(true));
+    }
+
+    // Create cells.
+    let cells = [new Cell(this, cell) for (cell of fragment.childNodes)];
+
+    // Fetch links.
+    let links = gLinks.getLinks();
+
+    // Create sites.
+    let numLinks = Math.min(links.length, cells.length);
+    for (let i = 0; i < numLinks; i++) {
+      if (links[i]) {
+        this.createSite(links[i], cells[i]);
+      }
+    }
+
+    this._cells = cells;
     this._node.innerHTML = "";
+    this._node.appendChild(fragment);
+  },
 
-    // Creates the structure of one row
-    for (let i = 0; i < gGridPrefs.gridColumns; i++) {
-      row.appendChild(cell.cloneNode(true));
-    }
-    // Creates the grid
-    for (let j = 0; j < gGridPrefs.gridRows; j++) {
-      this._node.appendChild(row.cloneNode(true));
-    }
-
-    // (Re-)initialize all cells.
-    let cellElements = this.node.querySelectorAll(".newtab-cell");
-    this._cells = [new Cell(this, cell) for (cell of cellElements)];
+  /**
+   * Calculate the height for a number of rows up to the maximum rows
+   * @param rows Number of rows defaulting to the max
+   */
+  _computeHeight: function Grid_computeHeight(aRows) {
+    let {gridRows} = gGridPrefs;
+    aRows = aRows === undefined ? gridRows : Math.min(gridRows, aRows);
+    return aRows * this._cellHeight + GRID_BOTTOM_EXTRA;
   },
 
   /**
@@ -143,36 +174,31 @@ var gGrid = {
   },
 
   /**
-   * Renders the sites, creates all sites and puts them into their cells.
+   * Make sure the correct number of rows and columns are visible
    */
-  _renderSites: function Grid_renderSites() {
-    let cells = this.cells;
-    // Put sites into the cells.
-    let links = gLinks.getLinks();
-    let length = Math.min(links.length, cells.length);
-
-    for (let i = 0; i < length; i++) {
-      if (links[i])
-        this.createSite(links[i], cells[i]);
-    }
-  },
-
-  /**
-   * Renders the grid.
-   */
-  _render: function Grid_render() {
-    if (this._shouldRenderGrid()) {
-      this._renderGrid();
+  _resizeGrid: function Grid_resizeGrid() {
+    // If we're somehow called before the page has finished loading,
+    // let's bail out to avoid caching zero heights and widths.
+    // We'll be called again when DOMContentLoaded fires.
+    // Same goes for the grid if that's not ready yet.
+    if (!this.isDocumentLoaded || !this._ready) {
+      return;
     }
 
-    this._renderSites();
-  },
+    // Save the cell's computed height/width including margin and border
+    if (this._cellMargin === undefined) {
+      let refCell = document.querySelector(".newtab-cell");
+      this._cellMargin = parseFloat(getComputedStyle(refCell).marginTop) * 2;
+      this._cellHeight = refCell.offsetHeight + this._cellMargin;
+      this._cellWidth = refCell.offsetWidth + this._cellMargin;
+    }
 
-  _shouldRenderGrid : function Grid_shouldRenderGrid() {
-    let rowsLength = this._node.querySelectorAll(".newtab-row").length;
-    let cellsLength = this._node.querySelectorAll(".newtab-cell").length;
-
-    return (rowsLength != gGridPrefs.gridRows ||
-            cellsLength != (gGridPrefs.gridRows * gGridPrefs.gridColumns));
+    let availSpace = document.documentElement.clientHeight - this._cellMargin -
+                     document.querySelector("#newtab-margin-top").offsetHeight;
+    let visibleRows = Math.floor(availSpace / this._cellHeight);
+    this._node.style.height = this._computeHeight() + "px";
+    this._node.style.maxHeight = this._computeHeight(visibleRows) + "px";
+    this._node.style.maxWidth = gGridPrefs.gridColumns * this._cellWidth +
+                                GRID_WIDTH_EXTRA + "px";
   }
 };

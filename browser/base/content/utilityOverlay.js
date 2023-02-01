@@ -9,30 +9,16 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Components.utils.import("resource:///modules/RecentWindow.jsm");
 
-XPCOMUtils.defineLazyGetter(this, "BROWSER_NEW_TAB_URL", function () {
-  const PREF = "browser.newtab.url";
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
+  "resource:///modules/NewTabURL.jsm");
 
-  function getNewTabPageURL() {
-    if (!Services.prefs.prefHasUserValue(PREF)) {
-      if (PrivateBrowsingUtils.isWindowPrivate(window) &&
-          !PrivateBrowsingUtils.permanentPrivateBrowsing)
-        return "about:privatebrowsing";
-    }
-    return Services.prefs.getCharPref(PREF) || "about:blank";
+this.__defineGetter__("BROWSER_NEW_TAB_URL", () => {
+  if (PrivateBrowsingUtils.isWindowPrivate(window) &&
+      !PrivateBrowsingUtils.permanentPrivateBrowsing &&
+      !NewTabURL.overridden) {
+    return "about:privatebrowsing";
   }
-
-  function update() {
-    BROWSER_NEW_TAB_URL = getNewTabPageURL();
-  }
-
-  Services.prefs.addObserver(PREF, update, false);
-
-  addEventListener("unload", function onUnload() {
-    removeEventListener("unload", onUnload);
-    Services.prefs.removeObserver(PREF, update);
-  });
-
-  return getNewTabPageURL();
+  return NewTabURL.get();
 });
 
 var TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
@@ -233,6 +219,8 @@ function openLinkIn(url, where, params) {
   var aAllowPinnedTabHostChange = !!params.allowPinnedTabHostChange;
   var aNoReferrer           = params.noReferrer;
   var aAllowPopups          = !!params.allowPopups;
+  var aUserContextId        = params.userContextId;
+  var aIndicateErrorPageLoad = params.indicateErrorPageLoad;
   var sendReferrerURI       = true;
 
   if (where == "save") {
@@ -359,6 +347,9 @@ function openLinkIn(url, where, params) {
     if (aAllowPopups) {
       flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_POPUPS;
     }
+    if (aIndicateErrorPageLoad) {
+      flags |= Ci.nsIWebNavigation.LOAD_FLAGS_ERROR_LOAD_CHANGES_RV;
+    }
 
     w.gBrowser.loadURIWithFlags(url, {
       flags: flags,
@@ -381,7 +372,8 @@ function openLinkIn(url, where, params) {
       relatedToCurrent: aRelatedToCurrent,
       skipAnimation: aSkipTabAnimation,
       allowMixedContent: aAllowMixedContent,
-      noReferrer: aNoReferrer
+      noReferrer: aNoReferrer,
+      userContextId: aUserContextId
     });
     break;
   }

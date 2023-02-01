@@ -111,6 +111,11 @@ private:
     virtual void run(const MatchFinder::MatchResult &Result);
   };
 
+  class RefCountedCopyConstructorChecker : public MatchFinder::MatchCallback {
+  public:
+    virtual void run(const MatchFinder::MatchResult &Result);
+  };
+
   ScopeChecker scopeChecker;
   ArithmeticArgChecker arithmeticArgChecker;
   TrivialCtorDtorChecker trivialCtorDtorChecker;
@@ -124,6 +129,7 @@ private:
   ExplicitImplicitChecker explicitImplicitChecker;
   NoAutoTypeChecker noAutoTypeChecker;
   NoExplicitMoveConstructorChecker noExplicitMoveConstructorChecker;
+  RefCountedCopyConstructorChecker refCountedCopyConstructorChecker;
   MatchFinder astMatcher;
 };
 
@@ -254,6 +260,8 @@ public:
   CustomTypeAnnotation(const char *Spelling, const char *Pretty)
       : Spelling(Spelling), Pretty(Pretty){};
 
+  virtual ~CustomTypeAnnotation() {}
+
   // Checks if this custom annotation "effectively affects" the given type.
   bool hasEffectiveAnnotation(QualType T) {
     return directAnnotationReason(T).valid();
@@ -274,6 +282,10 @@ public:
 private:
   bool hasLiteralAnnotation(QualType T) const;
   AnnotationReason directAnnotationReason(QualType T);
+
+protected:
+  // Allow subclasses to apply annotations to external code:
+  virtual bool hasFakeAnnotation(const TagDecl *D) const { return false; }
 };
 
 static CustomTypeAnnotation StackClass =
@@ -288,8 +300,32 @@ static CustomTypeAnnotation NonTemporaryClass =
     CustomTypeAnnotation("moz_non_temporary_class", "non-temporary");
 static CustomTypeAnnotation MustUse =
     CustomTypeAnnotation("moz_must_use", "must-use");
-static CustomTypeAnnotation NonMemMovable =
-  CustomTypeAnnotation("moz_non_memmovable", "non-memmove()able");
+
+class MemMoveAnnotation final : public CustomTypeAnnotation {
+public:
+  MemMoveAnnotation()
+      : CustomTypeAnnotation("moz_non_memmovable", "non-memmove()able") {}
+
+  virtual ~MemMoveAnnotation() {}
+
+protected:
+  bool hasFakeAnnotation(const TagDecl *D) const override {
+    // Annotate everything in ::std, with a few exceptions; see bug
+    // 1201314 for discussion.
+    if (getDeclarationNamespace(D) == "std") {
+      // This doesn't check that it's really ::std::pair and not
+      // ::std::something_else::pair, but should be good enough.
+      StringRef Name = D->getName();
+      if (Name == "pair" || Name == "atomic" || Name == "__atomic_base") {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+};
+
+static MemMoveAnnotation NonMemMovable = MemMoveAnnotation();
 
 class MozChecker : public ASTConsumer, public RecursiveASTVisitor<MozChecker> {
   DiagnosticsEngine &Diag;
@@ -630,35 +666,6 @@ AST_MATCHER(MemberExpr, isAddRefOrRelease) {
 }
 
 /// This matcher will select classes which are refcounted.
-AST_MATCHER(QualType, isRefCounted) { return isClassRefCounted(Node); }
-
-#if CLANG_VERSION_FULL < 304
-
-/// The 'equalsBoundeNode' matcher was added in clang 3.4.
-/// Since infra runs clang 3.3, we polyfill it here.
-AST_POLYMORPHIC_MATCHER_P(equalsBoundNode, std::string, ID) {
-  BoundNodesTree bindings = Builder->build();
-  bool haveMatchingResult = false;
-  struct Visitor : public BoundNodesTree::Visitor {
-    const NodeType &Node;
-    std::string ID;
-    bool &haveMatchingResult;
-    Visitor(const NodeType &Node, const std::string &ID,
-            bool &haveMatchingResult)
-        : Node(Node), ID(ID), haveMatchingResult(haveMatchingResult) {}
-    void visitMatch(const BoundNodes &BoundNodesView) override {
-      if (BoundNodesView.getNodeAs<NodeType>(ID) == &Node) {
-        haveMatchingResult = true;
-      }
-    }
-  };
-  Visitor visitor(Node, ID, haveMatchingResult);
-  bindings.visitMatches(&visitor);
-  return haveMatchingResult;
-}
-
-#endif
-
 AST_MATCHER(CXXRecordDecl, hasRefCntMember) {
   return isClassRefCounted(&Node) && getClassRefCntMember(&Node);
 }
@@ -713,6 +720,10 @@ AST_MATCHER(QualType, autoNonAutoableType) {
 
 AST_MATCHER(CXXConstructorDecl, isExplicitMoveConstructor) {
   return Node.isExplicit() && Node.isMoveConstructor();
+}
+
+AST_MATCHER(CXXConstructorDecl, isCompilerProvidedCopyConstructor) {
+  return !Node.isUserProvided() && Node.isCopyConstructor();
 }
 }
 }
@@ -775,7 +786,7 @@ bool CustomTypeAnnotation::hasLiteralAnnotation(QualType T) const {
 #else
   if (const CXXRecordDecl *D = T->getAsCXXRecordDecl()) {
 #endif
-    return MozChecker::hasCustomAnnotation(D, Spelling);
+    return hasFakeAnnotation(D) || MozChecker::hasCustomAnnotation(D, Spelling);
   }
   return false;
 }
@@ -992,6 +1003,12 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
 
   astMatcher.addMatcher(constructorDecl(isExplicitMoveConstructor()).bind("node"),
                         &noExplicitMoveConstructorChecker);
+
+  astMatcher.addMatcher(constructExpr(hasDeclaration(
+                                          constructorDecl(
+                                              isCompilerProvidedCopyConstructor(),
+                                              ofClass(hasRefCntMember())))).bind("node"),
+                        &refCountedCopyConstructorChecker);
 }
 
 // These enum variants determine whether an allocation has occured in the code.
@@ -1416,6 +1433,28 @@ void DiagnosticsMatcher::NoExplicitMoveConstructorChecker::run(
     Result.Nodes.getNodeAs<CXXConstructorDecl>("node");
 
   Diag.Report(D->getLocation(), ErrorID);
+}
+
+void DiagnosticsMatcher::RefCountedCopyConstructorChecker::run(
+    const MatchFinder::MatchResult &Result) {
+  DiagnosticsEngine &Diag = Result.Context->getDiagnostics();
+  unsigned ErrorID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Error, "Invalid use of compiler-provided copy constructor "
+                            "on refcounted type");
+  unsigned NoteID = Diag.getDiagnosticIDs()->getCustomDiagID(
+      DiagnosticIDs::Note, "The default copy constructor also copies the "
+                           "default mRefCnt property, leading to reference "
+                           "count imbalance issues. Please provide your own "
+                           "copy constructor which only copies the fields which "
+                           "need to be copied");
+
+  // Everything we needed to know was checked in the matcher - we just report
+  // the error here
+  const CXXConstructExpr *E =
+    Result.Nodes.getNodeAs<CXXConstructExpr>("node");
+
+  Diag.Report(E->getLocation(), ErrorID);
+  Diag.Report(E->getLocation(), NoteID);
 }
 
 class MozCheckAction : public PluginASTAction {

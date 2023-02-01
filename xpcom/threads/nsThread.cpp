@@ -36,6 +36,8 @@
 #include "nsXPCOMPrivate.h"
 #include "mozilla/ChaosMode.h"
 #include "mozilla/TimeStamp.h"
+#include "nsThreadSyncDispatch.h"
+#include "LeakRefPtr.h"
 
 #ifdef MOZ_CRASHREPORTER
 #include "nsServiceManagerUtils.h"
@@ -428,6 +430,34 @@ nsThread::ThreadFunc(void* aArg)
 
 //-----------------------------------------------------------------------------
 
+#ifdef MOZ_CRASHREPORTER
+// Tell the crash reporter to save a memory report if our heuristics determine
+// that an OOM failure is likely to occur soon.
+static bool SaveMemoryReportNearOOM()
+{
+  bool needMemoryReport = false;
+
+#ifdef XP_WIN // XXX implement on other platforms as needed
+  const size_t LOWMEM_THRESHOLD_VIRTUAL = 200 * 1024 * 1024;
+  MEMORYSTATUSEX statex;
+  statex.dwLength = sizeof(statex);
+  if (GlobalMemoryStatusEx(&statex)) {
+    if (statex.ullAvailVirtual < LOWMEM_THRESHOLD_VIRTUAL) {
+      needMemoryReport = true;
+    }
+  }
+#endif
+
+  if (needMemoryReport) {
+    nsCOMPtr<nsICrashReporter> cr =
+      do_GetService("@mozilla.org/toolkit/crash-reporter;1");
+    cr->SaveMemoryReport();
+  }
+
+  return needMemoryReport;
+}
+#endif
+
 #ifdef MOZ_CANARY
 int sCanaryOutputFD = -1;
 #endif
@@ -505,6 +535,9 @@ nsThread::PutEvent(nsIRunnable* aEvent, nsNestedEventTarget* aTarget)
 nsresult
 nsThread::PutEvent(already_AddRefed<nsIRunnable>&& aEvent, nsNestedEventTarget* aTarget)
 {
+  // We want to leak the reference when we fail to dispatch it, so that
+  // we won't release the event in a wrong thread.
+  LeakRefPtr<nsIRunnable> event(Move(aEvent));
   nsCOMPtr<nsIThreadObserver> obs;
 
 #ifdef MOZ_NUWA_PROCESS
@@ -518,11 +551,9 @@ nsThread::PutEvent(already_AddRefed<nsIRunnable>&& aEvent, nsNestedEventTarget* 
     nsChainedEventQueue* queue = aTarget ? aTarget->mQueue : &mEventsRoot;
     if (!queue || (queue == &mEventsRoot && mEventsAreDoomed)) {
       NS_WARNING("An event was posted to a thread that will never run it (rejected)");
-      nsCOMPtr<nsIRunnable> temp(aEvent);
-      nsIRunnable* temp2 = temp.forget().take(); // can't use unused << aEvent here due to Windows (boo)
-      return temp2 ? NS_ERROR_UNEXPECTED : NS_ERROR_UNEXPECTED; // to make compiler not bletch on us
+      return NS_ERROR_UNEXPECTED;
     }
-    queue->PutEvent(Move(aEvent), lock);
+    queue->PutEvent(event.take(), lock);
 
     // Make sure to grab the observer before dropping the lock, otherwise the
     // event that we just placed into the queue could run and eventually delete
@@ -542,7 +573,9 @@ nsresult
 nsThread::DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFlags,
                            nsNestedEventTarget* aTarget)
 {
-  nsCOMPtr<nsIRunnable> event(aEvent);
+  // We want to leak the reference when we fail to dispatch it, so that
+  // we won't release the event in a wrong thread.
+  LeakRefPtr<nsIRunnable> event(Move(aEvent));
   if (NS_WARN_IF(!event)) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -553,8 +586,9 @@ nsThread::DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFla
   }
 
 #ifdef MOZ_TASK_TRACER
-  nsCOMPtr<nsIRunnable> tracedRunnable = CreateTracedRunnable(event); // adds a ref
+  nsCOMPtr<nsIRunnable> tracedRunnable = CreateTracedRunnable(event.take());
   (static_cast<TracedRunnable*>(tracedRunnable.get()))->DispatchTask();
+  // XXX tracedRunnable will always leaked when we fail to disptch.
   event = tracedRunnable.forget();
 #endif
 
@@ -569,10 +603,14 @@ nsThread::DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFla
     //     that to tell us when the event has been processed.
 
     RefPtr<nsThreadSyncDispatch> wrapper =
-      new nsThreadSyncDispatch(thread, event.forget());
+      new nsThreadSyncDispatch(thread, event.take());
     nsresult rv = PutEvent(wrapper, aTarget); // hold a ref
     // Don't wait for the event to finish if we didn't dispatch it...
     if (NS_FAILED(rv)) {
+      // PutEvent leaked the wrapper runnable object on failure, so we
+      // explicitly release this object once for that. Note that this
+      // object will be released again soon because it exits the scope.
+      wrapper.get()->Release();
       return rv;
     }
 
@@ -580,11 +618,13 @@ nsThread::DispatchInternal(already_AddRefed<nsIRunnable>&& aEvent, uint32_t aFla
     while (wrapper->IsPending()) {
       NS_ProcessNextEvent(thread, true);
     }
+    // NOTE that, unlike the behavior above, the event is not leaked by
+    // this place, while it is possible that the result is an error.
     return wrapper->Result();
   }
 
   NS_ASSERTION(aFlags == NS_DISPATCH_NORMAL, "unexpected dispatch flags");
-  return PutEvent(event.forget(), aTarget);
+  return PutEvent(event.take(), aTarget);
 }
 
 //-----------------------------------------------------------------------------
@@ -860,7 +900,6 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
     }
   }
 
-
 #ifdef MOZ_CRASHREPORTER
   if (MAIN_THREAD == mIsMainThread && !ShuttingDown()) {
     // Keep an eye on memory usage (cheap, ~7ms) somewhat frequently,
@@ -1131,20 +1170,6 @@ nsThread::SetScriptObserver(mozilla::CycleCollectedJSRuntime* aScriptObserver)
 
   MOZ_ASSERT(!mScriptObserver);
   mScriptObserver = aScriptObserver;
-}
-
-//-----------------------------------------------------------------------------
-
-NS_IMETHODIMP
-nsThreadSyncDispatch::Run()
-{
-  if (mSyncTask) {
-    mResult = mSyncTask->Run();
-    mSyncTask = nullptr;
-    // unblock the origin thread
-    mOrigin->Dispatch(this, NS_DISPATCH_NORMAL);
-  }
-  return NS_OK;
 }
 
 //-----------------------------------------------------------------------------

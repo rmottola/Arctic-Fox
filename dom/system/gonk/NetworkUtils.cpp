@@ -51,6 +51,11 @@ static const char* USB_FUNCTION_ADB    = "adb";
 // Use this command to continue the function chain.
 static const char* DUMMY_COMMAND = "tether status";
 
+// IPV6 Tethering is not supported in AOSP, use the property to
+// identify vendor specific support in IPV6. We can remove this flag
+// once upstream Android support IPV6 in tethering.
+static const char* IPV6_TETHERING = "ro.tethering.ipv6";
+
 // Retry 20 times (2 seconds) for usb state transition.
 static const uint32_t USB_FUNCTION_RETRY_TIMES = 20;
 // Check "sys.usb.state" every 100ms.
@@ -81,6 +86,7 @@ static const uint32_t BUF_SIZE = 1024;
 static const int32_t SUCCESS = 0;
 
 static uint32_t SDK_VERSION;
+static uint32_t SUPPORT_IPV6_TETHERING;
 
 struct IFProperties {
   char gateway[PROPERTY_VALUE_MAX];
@@ -201,6 +207,7 @@ const CommandFunc NetworkUtils::sUSBEnableChain[] = {
   NetworkUtils::tetheringStatus,
   NetworkUtils::startTethering,
   NetworkUtils::setDnsForwarders,
+  NetworkUtils::addUpstreamInterface,
   NetworkUtils::usbTetheringSuccess
 };
 
@@ -209,6 +216,7 @@ const CommandFunc NetworkUtils::sUSBDisableChain[] = {
   NetworkUtils::removeInterfaceFromLocalNetwork,
   NetworkUtils::preTetherInterfaceList,
   NetworkUtils::postTetherInterfaceList,
+  NetworkUtils::removeUpstreamInterface,
   NetworkUtils::disableNat,
   NetworkUtils::setIpForwardingEnabled,
   NetworkUtils::stopTethering,
@@ -223,7 +231,9 @@ const CommandFunc NetworkUtils::sUSBFailChain[] = {
 
 const CommandFunc NetworkUtils::sUpdateUpStreamChain[] = {
   NetworkUtils::cleanUpStream,
+  NetworkUtils::removeUpstreamInterface,
   NetworkUtils::createUpStream,
+  NetworkUtils::addUpstreamInterface,
   NetworkUtils::updateUpStreamSuccess
 };
 
@@ -254,6 +264,23 @@ const CommandFunc NetworkUtils::sNetworkInterfaceDisableAlarmChain[] = {
 const CommandFunc NetworkUtils::sNetworkInterfaceSetAlarmChain[] = {
   NetworkUtils::setAlarm,
   NetworkUtils::networkInterfaceAlarmSuccess
+};
+
+const CommandFunc NetworkUtils::sTetheringInterfaceSetAlarmChain[] = {
+  NetworkUtils::setGlobalAlarm,
+  NetworkUtils::removeAlarm,
+  NetworkUtils::networkInterfaceAlarmSuccess
+};
+
+const CommandFunc NetworkUtils::sTetheringInterfaceRemoveAlarmChain[] = {
+  NetworkUtils::removeGlobalAlarm,
+  NetworkUtils::setAlarm,
+  NetworkUtils::networkInterfaceAlarmSuccess
+};
+
+const CommandFunc NetworkUtils::sTetheringGetStatusChain[] = {
+  NetworkUtils::tetheringStatus,
+  NetworkUtils::defaultAsyncSuccessHandler
 };
 
 /**
@@ -710,6 +737,36 @@ void NetworkUtils::setAlarm(CommandChain* aChain,
   doCommand(command, aChain, aCallback);
 }
 
+void NetworkUtils::removeAlarm(CommandChain* aChain,
+                            CommandCallback aCallback,
+                            NetworkResultOptions& aResult)
+{
+  char command[MAX_COMMAND_SIZE];
+  PR_snprintf(command, MAX_COMMAND_SIZE - 1, "bandwidth removeinterfacealert %s", GET_CHAR(mIfname));
+
+  doCommand(command, aChain, aCallback);
+}
+
+void NetworkUtils::setGlobalAlarm(CommandChain* aChain,
+                                  CommandCallback aCallback,
+                                  NetworkResultOptions& aResult)
+{
+  char command[MAX_COMMAND_SIZE];
+
+  PR_snprintf(command, MAX_COMMAND_SIZE - 1, "bandwidth setglobalalert %ld", GET_FIELD(mThreshold));
+  doCommand(command, aChain, aCallback);
+}
+
+void NetworkUtils::removeGlobalAlarm(CommandChain* aChain,
+                                     CommandCallback aCallback,
+                                     NetworkResultOptions& aResult)
+{
+  char command[MAX_COMMAND_SIZE];
+
+  PR_snprintf(command, MAX_COMMAND_SIZE - 1, "bandwidth removeglobalalert");
+  doCommand(command, aChain, aCallback);
+}
+
 void NetworkUtils::setInterfaceUp(CommandChain* aChain,
                                   CommandCallback aCallback,
                                   NetworkResultOptions& aResult)
@@ -807,9 +864,84 @@ void NetworkUtils::postTetherInterfaceList(CommandChain* aChain,
 
   char buf[BUF_SIZE];
   NS_ConvertUTF16toUTF8 reason(aResult.mResultReason);
-  memcpy(buf, reason.get(), reason.Length() + 1);
+
+  size_t length = reason.Length() + 1 < BUF_SIZE ? reason.Length() + 1 : BUF_SIZE;
+  memcpy(buf, reason.get(), length);
   split(buf, INTERFACE_DELIMIT, GET_FIELD(mInterfaceList));
 
+  doCommand(command, aChain, aCallback);
+}
+
+bool isCommandChainIPv6(CommandChain* aChain, const char *externalInterface) {
+  // Check by gateway address
+  if (getIpType(GET_CHAR(mGateway)) == AF_INET6) {
+    return true;
+  }
+
+  uint32_t length = GET_FIELD(mGateways).Length();
+  for (uint32_t i = 0; i < length; i++) {
+    NS_ConvertUTF16toUTF8 autoGateway(GET_FIELD(mGateways)[i]);
+    if(getIpType(autoGateway.get()) == AF_INET6) {
+      return true;
+    }
+  }
+
+  // Check by external inteface address
+  FILE *file = fopen("/proc/net/if_inet6", "r");
+  if (!file) {
+    return false;
+  }
+
+  bool isIPv6 = false;
+  char interface[32];
+  while(fscanf(file, "%*s %*s %*s %*s %*s %32s", interface)) {
+    if (strcmp(interface, externalInterface) == 0) {
+      isIPv6 = true;
+      break;
+    }
+  }
+
+  fclose(file);
+  return isIPv6;
+}
+
+void NetworkUtils::addUpstreamInterface(CommandChain* aChain,
+                                        CommandCallback aCallback,
+                                        NetworkResultOptions& aResult)
+{
+  nsCString interface(GET_CHAR(mExternalIfname));
+  if (!interface.get()[0]) {
+    interface = GET_CHAR(mCurExternalIfname);
+  }
+
+  if (SUPPORT_IPV6_TETHERING == 0 || !isCommandChainIPv6(aChain, interface.get())) {
+    aCallback(aChain, false, aResult);
+    return;
+  }
+
+  char command[MAX_COMMAND_SIZE];
+  snprintf(command, MAX_COMMAND_SIZE - 1, "tether interface add_upstream %s",
+           interface.get());
+  doCommand(command, aChain, aCallback);
+}
+
+void NetworkUtils::removeUpstreamInterface(CommandChain* aChain,
+                                           CommandCallback aCallback,
+                                           NetworkResultOptions& aResult)
+{
+  nsCString interface(GET_CHAR(mExternalIfname));
+  if (!interface.get()[0]) {
+    interface = GET_CHAR(mPreExternalIfname);
+  }
+
+  if (SUPPORT_IPV6_TETHERING == 0 || !isCommandChainIPv6(aChain, interface.get())) {
+    aCallback(aChain, false, aResult);
+    return;
+  }
+
+  char command[MAX_COMMAND_SIZE];
+  snprintf(command, MAX_COMMAND_SIZE - 1, "tether interface remove_upstream %s",
+           interface.get());
   doCommand(command, aChain, aCallback);
 }
 
@@ -991,14 +1123,39 @@ void NetworkUtils::removeDefaultRoute(CommandChain* aChain,
                                       CommandCallback aCallback,
                                       NetworkResultOptions& aResult)
 {
-  char command[MAX_COMMAND_SIZE];
-  // FIXME: (Bug 1121795) We only remove the first gateway to the default route.
-  //        For dual stack (ipv4/ipv6) device, one of the gateway would
-  //        not be added to the default route.
-  snprintf(command, MAX_COMMAND_SIZE - 1, "network route remove %d %s 0.0.0.0/0 %s",
-                    GET_FIELD(mNetId), GET_CHAR(mIfname), GET_CHAR(mGateways[0]));
+  if (GET_FIELD(mLoopIndex) >= GET_FIELD(mGateways).Length()) {
+    aCallback(aChain, false, aResult);
+    return;
+  }
 
-  doCommand(command, aChain, aCallback);
+  char command[MAX_COMMAND_SIZE];
+  nsTArray<nsString>& gateways = GET_FIELD(mGateways);
+  NS_ConvertUTF16toUTF8 autoGateway(gateways[GET_FIELD(mLoopIndex)]);
+
+  int type = getIpType(autoGateway.get());
+  snprintf(command, MAX_COMMAND_SIZE - 1, "network route remove %d %s %s/0 %s",
+           GET_FIELD(mNetId), GET_CHAR(mIfname),
+           type == AF_INET6 ? "::" : "0.0.0.0", autoGateway.get());
+
+  struct MyCallback {
+    static void callback(CommandCallback::CallbackType aOriginalCallback,
+                         CommandChain* aChain,
+                         bool aError,
+                         mozilla::dom::NetworkResultOptions& aResult)
+    {
+      NS_ConvertUTF16toUTF8 reason(aResult.mResultReason);
+      NU_DBG("removeDefaultRoute's reason: %s", reason.get());
+      if (aError && !reason.EqualsASCII("removeRoute() failed (No such process)")) {
+        return aOriginalCallback(aChain, aError, aResult);
+      }
+
+      GET_FIELD(mLoopIndex)++;
+      return removeDefaultRoute(aChain, aOriginalCallback, aResult);
+    }
+  };
+
+  CommandCallback wrappedCallback(MyCallback::callback, aCallback);
+  doCommand(command, aChain, wrappedCallback);
 }
 
 void NetworkUtils::setInterfaceDns(CommandChain* aChain,
@@ -1146,13 +1303,19 @@ void NetworkUtils::addDefaultRouteToNetwork(CommandChain* aChain,
                                             CommandCallback aCallback,
                                             NetworkResultOptions& aResult)
 {
-  char command[MAX_COMMAND_SIZE];
+  if (GET_FIELD(mLoopIndex) >= GET_FIELD(mGateways).Length()) {
+    aCallback(aChain, false, aResult);
+    return;
+  }
 
-  // FIXME: (Bug 1121795) We only add the first gateway to the default route.
-  //        For dual stack (ipv4/ipv6) device, one of the gateway would
-  //        not be added to the default route.
-  snprintf(command, MAX_COMMAND_SIZE - 1, "network route add %d %s 0.0.0.0/0 %s",
-                    GET_FIELD(mNetId), GET_CHAR(mIfname), GET_CHAR(mGateways[0]));
+  char command[MAX_COMMAND_SIZE];
+  nsTArray<nsString>& gateways = GET_FIELD(mGateways);
+  NS_ConvertUTF16toUTF8 autoGateway(gateways[GET_FIELD(mLoopIndex)]);
+
+  int type = getIpType(autoGateway.get());
+  snprintf(command, MAX_COMMAND_SIZE - 1, "network route add %d %s %s/0 %s",
+           GET_FIELD(mNetId), GET_CHAR(mIfname),
+           type == AF_INET6 ? "::" : "0.0.0.0", autoGateway.get());
 
   struct MyCallback {
     static void callback(CommandCallback::CallbackType aOriginalCallback,
@@ -1162,11 +1325,12 @@ void NetworkUtils::addDefaultRouteToNetwork(CommandChain* aChain,
     {
       NS_ConvertUTF16toUTF8 reason(aResult.mResultReason);
       NU_DBG("addDefaultRouteToNetwork's reason: %s", reason.get());
-      if (aError && reason.EqualsASCII("addRoute() failed (File exists)")) {
-        NU_DBG("Ignore \"File exists\" error when adding host route.");
-        return aOriginalCallback(aChain, false, aResult);
+      if (aError && !reason.EqualsASCII("addRoute() failed (File exists)")) {
+        return aOriginalCallback(aChain, aError, aResult);
       }
-      aOriginalCallback(aChain, aError, aResult);
+
+      GET_FIELD(mLoopIndex)++;
+      return addDefaultRouteToNetwork(aChain, aOriginalCallback, aResult);
     }
   };
 
@@ -1270,6 +1434,17 @@ void NetworkUtils::disableIpv6(CommandChain* aChain,
                                NetworkResultOptions& aResult)
 {
   setIpv6Enabled(aChain, aCallback, aResult, false);
+}
+
+void NetworkUtils::setMtu(CommandChain* aChain,
+                          CommandCallback aCallback,
+                          NetworkResultOptions& aResult)
+{
+  char command[MAX_COMMAND_SIZE];
+  PR_snprintf(command, MAX_COMMAND_SIZE - 1, "interface setmtu %s %d",
+              GET_CHAR(mIfname), GET_FIELD(mMtu));
+
+  doCommand(command, aChain, aCallback);
 }
 
 #undef GET_CHAR
@@ -1450,6 +1625,9 @@ NetworkUtils::NetworkUtils(MessageCallback aCallback)
   property_get("ro.build.version.sdk", value, nullptr);
   SDK_VERSION = atoi(value);
 
+  property_get(IPV6_TETHERING, value, "0");
+  SUPPORT_IPV6_TETHERING = atoi(value);
+
   gNetworkUtils = this;
 }
 
@@ -1489,6 +1667,9 @@ void NetworkUtils::ExecuteCommand(NetworkParams aOptions)
     BUILD_ENTRY(setNetworkInterfaceAlarm),
     BUILD_ENTRY(enableNetworkInterfaceAlarm),
     BUILD_ENTRY(disableNetworkInterfaceAlarm),
+    BUILD_ENTRY(setTetheringAlarm),
+    BUILD_ENTRY(removeTetheringAlarm),
+    BUILD_ENTRY(getTetheringStatus),
     BUILD_ENTRY(setWifiOperationMode),
     BUILD_ENTRY(setDhcpServer),
     BUILD_ENTRY(setWifiTethering),
@@ -1504,6 +1685,7 @@ void NetworkUtils::ExecuteCommand(NetworkParams aOptions)
     BUILD_ENTRY(createNetwork),
     BUILD_ENTRY(destroyNetwork),
     BUILD_ENTRY(getNetId),
+    BUILD_ENTRY(setMtu),
 
     #undef BUILD_ENTRY
   };
@@ -1822,8 +2004,9 @@ CommandResult NetworkUtils::setDefaultRoute(NetworkParams& aOptions)
   }
 
   aOptions.mNetId = netIdInfo.mNetId;
-
+  aOptions.mLoopIndex = 0;
   runChain(aOptions, COMMAND_CHAIN, defaultAsyncFailureHandler);
+
   return CommandResult::Pending();
 }
 
@@ -1833,13 +2016,6 @@ CommandResult NetworkUtils::setDefaultRoute(NetworkParams& aOptions)
 CommandResult NetworkUtils::setDefaultRouteLegacy(NetworkParams& aOptions)
 {
   NS_ConvertUTF16toUTF8 autoIfname(aOptions.mIfname);
-
-  if (!aOptions.mOldIfname.IsEmpty()) {
-    // Remove IPv4's default route.
-    RETURN_IF_FAILED(mNetUtils->do_ifc_remove_default_route(GET_CHAR(mOldIfname)));
-    // Remove IPv6's default route.
-    WARN_IF_FAILED(mNetUtils->do_ifc_remove_route(GET_CHAR(mOldIfname), "::", 0, NULL));
-  }
 
   uint32_t length = aOptions.mGateways.Length();
   if (length > 0) {
@@ -1916,6 +2092,7 @@ CommandResult NetworkUtils::removeDefaultRoute(NetworkParams& aOptions)
   NU_DBG("Obtained netid %d for interface %s", netIdInfo.mNetId, GET_CHAR(mIfname));
 
   aOptions.mNetId = netIdInfo.mNetId;
+  aOptions.mLoopIndex = 0;
   runChain(aOptions, COMMAND_CHAIN, defaultAsyncFailureHandler);
 
   return CommandResult::Pending();
@@ -2233,6 +2410,27 @@ CommandResult NetworkUtils::disableNetworkInterfaceAlarm(NetworkParams& aOptions
   return CommandResult::Pending();
 }
 
+CommandResult NetworkUtils::setTetheringAlarm(NetworkParams& aOptions)
+{
+  NU_DBG("setTetheringAlarm");
+  runChain(aOptions, sTetheringInterfaceSetAlarmChain, networkInterfaceAlarmFail);
+  return CommandResult::Pending();
+}
+
+CommandResult NetworkUtils::removeTetheringAlarm(NetworkParams& aOptions)
+{
+  NU_DBG("removeTetheringAlarm");
+  runChain(aOptions, sTetheringInterfaceRemoveAlarmChain, networkInterfaceAlarmFail);
+  return CommandResult::Pending();
+}
+
+CommandResult NetworkUtils::getTetheringStatus(NetworkParams& aOptions)
+{
+  NU_DBG("getTetheringStatus");
+  runChain(aOptions, sTetheringGetStatusChain, networkInterfaceAlarmFail);
+  return CommandResult::Pending();
+}
+
 /**
  * handling main thread's reload Wifi firmware request
  */
@@ -2524,6 +2722,23 @@ CommandResult NetworkUtils::getNetId(NetworkParams& aOptions)
   }
   result.mNetId.AppendInt(netIdInfo.mNetId, 10);
   return result;
+}
+
+CommandResult NetworkUtils::setMtu(NetworkParams& aOptions)
+{
+  // Setting/getting mtu is supported since Kitkat.
+  if (SDK_VERSION < 19) {
+    ERROR("setMtu is not supported in current SDK_VERSION.");
+    return -1;
+  }
+
+  static CommandFunc COMMAND_CHAIN[] = {
+    setMtu,
+    defaultAsyncSuccessHandler,
+  };
+
+  runChain(aOptions, COMMAND_CHAIN, defaultAsyncFailureHandler);
+  return CommandResult::Pending();
 }
 
 void NetworkUtils::sendBroadcastMessage(uint32_t code, char* reason)

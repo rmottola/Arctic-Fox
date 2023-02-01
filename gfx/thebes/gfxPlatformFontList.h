@@ -120,7 +120,7 @@ public:
 
     void UpdateFontList();
 
-    void ClearLangGroupPrefFonts();
+    virtual void ClearLangGroupPrefFonts();
 
     virtual void GetFontFamilyList(nsTArray<RefPtr<gfxFontFamily> >& aFamilyArray);
 
@@ -129,8 +129,9 @@ public:
                           int32_t aRunScript,
                           const gfxFontStyle* aStyle);
 
-    virtual gfxFontFamily* FindFamily(const nsAString& aFamily,
-                                      gfxFontStyle* aStyle = nullptr);
+    virtual gfxFontFamily*
+    FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle = nullptr,
+               gfxFloat aDevToCssSize = 1.0);
 
     gfxFontEntry* FindFontForFamily(const nsAString& aFamily, const gfxFontStyle* aStyle, bool& aNeedsBold);
 
@@ -313,6 +314,13 @@ protected:
                                 void* aUserArg);
 
     virtual void GetFontFamilyNames(nsTArray<nsString>& aFontFamilyNames);
+
+    nsILanguageAtomService* GetLangService();
+
+    // helper function to map lang to lang group
+    nsIAtom* GetLangGroup(nsIAtom* aLanguage);
+
+    static const char* GetGenericName(mozilla::FontFamilyType aGenericType);
 
     // gfxFontInfoLoader overrides, used to load in font cmaps
     virtual void InitLoader();

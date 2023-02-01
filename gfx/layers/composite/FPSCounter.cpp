@@ -18,7 +18,7 @@
 #include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsIFile.h"                    // for nsIFile
 #include "nsDirectoryServiceDefs.h"     // for NS_OS_TMP_DIR
-#include "prprf.h"                      // for PR_snprintf
+#include "mozilla/Snprintf.h"
 #include "FPSCounter.h"
 
 namespace mozilla {
@@ -28,6 +28,7 @@ using namespace mozilla::gfx;
 
 FPSCounter::FPSCounter(const char* aName)
   : mWriteIndex(0)
+  , mIteratorIndex(-1)
   , mFPSName(aName)
 {
   Init();
@@ -208,7 +209,7 @@ FPSCounter::WriteFrameTimeStamps(PRFileDesc* fd)
 {
   const int bufferSize = 256;
   char buffer[bufferSize];
-  int writtenCount = PR_snprintf(buffer, bufferSize, "FPS Data for: %s\n", mFPSName);
+  int writtenCount = snprintf_literal(buffer, "FPS Data for: %s\n", mFPSName);
   MOZ_ASSERT(writtenCount >= 0);
   PR_Write(fd, buffer, writtenCount);
 
@@ -223,7 +224,7 @@ FPSCounter::WriteFrameTimeStamps(PRFileDesc* fd)
 
   while (HasNext(startTimeStamp)) {
     TimeDuration duration = previousSample - nextTimeStamp;
-    writtenCount = PR_snprintf(buffer, bufferSize, "%f,\n", duration.ToMilliseconds());
+    writtenCount = snprintf_literal(buffer, "%f,\n", duration.ToMilliseconds());
 
     MOZ_ASSERT(writtenCount >= 0);
     PR_Write(fd, buffer, writtenCount);
@@ -308,8 +309,8 @@ FPSCounter::PrintHistogram(std::map<int, int>& aHistogram)
     int fps = iter->first;
     int count = iter->second;
 
-    length += PR_snprintf(buffer + length, kBufferLength - length,
-                        "FPS: %d = %d. ", fps, count);
+    length += snprintf(buffer + length, kBufferLength - length,
+                       "FPS: %d = %d. ", fps, count);
     NS_ASSERTION(length >= kBufferLength, "Buffer overrun while printing FPS histogram.");
   }
 

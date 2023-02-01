@@ -24,11 +24,6 @@
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 
-#ifdef DEBUG
-// defined by the socket transport service while active
-extern PRThread *gSocketThread;
-#endif
-
 namespace mozilla {
 namespace net {
 
@@ -1267,6 +1262,12 @@ SpdyConnectTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
     mTunnelStreamOut->AsyncWait(mTunnelStreamOut->mCallback, 0, 0, nullptr);
   }
   return rv;
+}
+
+bool
+SpdyConnectTransaction::ConnectedReadyForInput()
+{
+  return mTunneledConn && mTunnelStreamIn->mCallback;
 }
 
 nsHttpRequestHead *

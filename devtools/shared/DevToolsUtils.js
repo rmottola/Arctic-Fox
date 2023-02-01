@@ -387,13 +387,6 @@ exports.dumpv = function(msg) {
 // loader, so define it on dumpn instead.
 exports.dumpv.wantVerbose = false;
 
-exports.dbg_assert = function dbg_assert(cond, e) {
-  if (!cond) {
-    return e;
-  }
-};
-
-
 /**
  * Utility function for updating an object with the properties of
  * other objects.
@@ -449,6 +442,71 @@ exports.defineLazyGetter = function defineLazyGetter(aObject, aName, aLambda) {
     enumerable: true
   });
 };
+
+// DEPRECATED: use DevToolsUtils.assert(condition, message) instead!
+let haveLoggedDeprecationMessage = false;
+exports.dbg_assert = function dbg_assert(cond, e) {
+  if (!haveLoggedDeprecationMessage) {
+    haveLoggedDeprecationMessage = true;
+    const deprecationMessage = "DevToolsUtils.dbg_assert is deprecated! Use DevToolsUtils.assert instead!\n"
+          + Error().stack;
+    dump(deprecationMessage);
+    if (typeof console === "object" && console && console.warn) {
+      console.warn(deprecationMessage);
+    }
+  }
+
+  if (!cond) {
+    return e;
+  }
+};
+
+exports.defineLazyGetter(this, "AppConstants", () => {
+  if (isWorker) {
+    return {};
+  }
+  const scope = {};
+  Cu.import("resource://gre/modules/AppConstants.jsm", scope);
+  return scope.AppConstants;
+});
+
+/**
+ * No operation. The empty function.
+ */
+exports.noop = function () { };
+
+function reallyAssert(condition, message) {
+  if (!condition) {
+    const err = new Error("Assertion failure: " + message);
+    exports.reportException("DevToolsUtils.assert", err);
+    throw err;
+  }
+}
+
+/**
+ * DevToolsUtils.assert(condition, message)
+ *
+ * @param Boolean condition
+ * @param String message
+ *
+ * Assertions are enabled when any of the following are true:
+ *   - This is a DEBUG_JS_MODULES build
+ *   - This is a DEBUG build
+ *   - DevToolsUtils.testing is set to true
+ *
+ * If assertions are enabled, then `condition` is checked and if false-y, the
+ * assertion failure is logged and then an error is thrown.
+ *
+ * If assertions are not enabled, then this function is a no-op.
+ *
+ * This is an improvement over `dbg_assert`, which doesn't actually cause any
+ * fatal behavior, and is therefore much easier to accidentally ignore.
+ */
+Object.defineProperty(exports, "assert", {
+  get: () => (AppConstants.DEBUG || AppConstants.DEBUG_JS_MODULES || this.testing)
+    ? reallyAssert
+    : exports.noop,
+})
 
 /**
  * Defines a getter on a specified object for a module.  The module will not
@@ -758,3 +816,18 @@ exports.openFileStream = function (filePath) {
     );
   });
 }
+
+exports.isGenerator = function (fn) {
+  return typeof fn === "function" && fn.isGenerator();
+};
+
+exports.isPromise = function (p) {
+  return p && typeof p.then === "function";
+};
+
+/**
+ * Return true if `thing` is a SavedFrame, false otherwise.
+ */
+exports.isSavedFrame = function (thing) {
+  return Object.prototype.toString.call(thing) === "[object SavedFrame]";
+};

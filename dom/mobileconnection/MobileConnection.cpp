@@ -299,7 +299,7 @@ bool
 MobileConnection::IsValidCallBarringProgram(int32_t aProgram)
 {
   return aProgram >= nsIMobileConnection::CALL_BARRING_PROGRAM_ALL_OUTGOING &&
-         aProgram <= nsIMobileConnection::CALL_BARRING_PROGRAM_INCOMING_ROAMING;
+         aProgram <= nsIMobileConnection::CALL_BARRING_PROGRAM_INCOMING_SERVICE;
 }
 
 bool
@@ -875,7 +875,9 @@ MobileConnection::SetCallWaitingOption(bool aEnabled, ErrorResult& aRv)
   RefPtr<MobileConnectionCallback> requestCallback =
     new MobileConnectionCallback(GetOwner(), request);
 
-  nsresult rv = mMobileConnection->SetCallWaiting(aEnabled, requestCallback);
+  nsresult rv = mMobileConnection->SetCallWaiting(aEnabled,
+                                                  nsIMobileConnection::ICC_SERVICE_CLASS_VOICE,
+                                                  requestCallback);
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
     return nullptr;
@@ -1122,6 +1124,13 @@ MobileConnection::NotifyLastKnownHomeNetworkChanged()
 NS_IMETHODIMP
 MobileConnection::NotifyNetworkSelectionModeChanged()
 {
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+MobileConnection::NotifyDeviceIdentitiesChanged()
+{
+  // To be supported when bug 1222870 is required in m-c.
   return NS_OK;
 }
 

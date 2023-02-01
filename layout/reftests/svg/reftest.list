@@ -51,6 +51,7 @@ fuzzy-if(/^Windows\x20NT\x206\.[12]/.test(http.oscpu),1,5) fuzzy-if(azureQuartz,
 == conditions-06.svg pass.svg
 == conditions-07.svg pass.svg
 == conditions-08.svg conditions-08-ref.svg
+== conditions-09.svg conditions-09-ref.svg
 == currentColor-01.svg pass.svg
 == currentColor-02.svg pass.svg
 == currentColor-03.svg pass.svg
@@ -290,6 +291,7 @@ fuzzy-if(cocoaWidget,4,15982) fuzzy-if(winWidget,4,92) == radialGradient-basic-0
 == rootElement-null-01.svg pass.svg
 == script-empty-01.svg pass.svg
 == selector-01.svg pass.svg
+== stroke-linecap-circle-ellipse-01.svg stroke-linecap-circle-ellipse-01-ref.svg
 == stroke-width-percentage-01.svg pass.svg
 == stroke-width-percentage-02a.svg stroke-width-percentage-02-ref.svg
 == stroke-width-percentage-02b.svg stroke-width-percentage-02-ref.svg

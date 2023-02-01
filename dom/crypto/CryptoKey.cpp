@@ -6,6 +6,7 @@
 
 #include "pk11pub.h"
 #include "cryptohi.h"
+#include "nsNSSComponent.h"
 #include "ScopedNSSTypes.h"
 #include "mozilla/dom/CryptoKey.h"
 #include "mozilla/dom/WebCryptoCommon.h"
@@ -384,31 +385,41 @@ CryptoKey::AllUsagesRecognized(const Sequence<nsString>& aUsages)
   return true;
 }
 
-void CryptoKey::SetSymKey(const CryptoBuffer& aSymKey)
+nsresult CryptoKey::SetSymKey(const CryptoBuffer& aSymKey)
 {
-  mSymKey = aSymKey;
+  if (!mSymKey.Assign(aSymKey)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  return NS_OK;
 }
 
-void
+nsresult
 CryptoKey::SetPrivateKey(SECKEYPrivateKey* aPrivateKey)
 {
   nsNSSShutDownPreventionLock locker;
+
   if (!aPrivateKey || isAlreadyShutDown()) {
     mPrivateKey = nullptr;
-    return;
+    return NS_OK;
   }
+
   mPrivateKey = SECKEY_CopyPrivateKey(aPrivateKey);
+  return mPrivateKey ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
 }
 
-void
+nsresult
 CryptoKey::SetPublicKey(SECKEYPublicKey* aPublicKey)
 {
   nsNSSShutDownPreventionLock locker;
+
   if (!aPublicKey || isAlreadyShutDown()) {
     mPublicKey = nullptr;
-    return;
+    return NS_OK;
   }
+
   mPublicKey = SECKEY_CopyPublicKey(aPublicKey);
+  return mPublicKey ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
 }
 
 const CryptoBuffer&
@@ -1249,6 +1260,11 @@ CryptoKey::ReadStructuredClone(JSStructuredCloneReader* aReader)
     return false;
   }
 
+  // Ensure that NSS is initialized.
+  if (!EnsureNSSInitializedChromeOrContent()) {
+    return false;
+  }
+
   uint32_t version;
   CryptoBuffer sym, priv, pub;
 
@@ -1262,8 +1278,8 @@ CryptoKey::ReadStructuredClone(JSStructuredCloneReader* aReader)
     return false;
   }
 
-  if (sym.Length() > 0)  {
-    mSymKey = sym;
+  if (sym.Length() > 0 && !mSymKey.Assign(sym))  {
+    return false;
   }
   if (priv.Length() > 0) {
     mPrivateKey = CryptoKey::PrivateKeyFromPkcs8(priv, locker);

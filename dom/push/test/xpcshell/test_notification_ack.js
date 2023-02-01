@@ -54,7 +54,8 @@ add_task(function* test_notification_ack() {
   ]);
 
   let acks = 0;
-  let ackDefer = Promise.defer();
+  let ackDone;
+  let ackPromise = new Promise(resolve => ackDone = resolve);
   PushService.init({
     serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
@@ -64,11 +65,6 @@ add_task(function* test_notification_ack() {
         onHello(request) {
           equal(request.uaid, userAgentID,
             'Should send matching device IDs in handshake');
-          deepEqual(request.channelIDs.sort(), [
-            '21668e05-6da8-42c9-b8ab-9cc3f4d5630c',
-            '5477bfda-22db-45d4-9614-fee369630260',
-            '9a5ff87f-47c9-4215-b2b8-0bdd38b4b305'
-          ], 'Should send matching channel IDs in handshake');
           this.serverSendMsg(JSON.stringify({
             messageType: 'hello',
             uaid: userAgentID,
@@ -115,7 +111,7 @@ add_task(function* test_notification_ack() {
               channelID: '5477bfda-22db-45d4-9614-fee369630260',
               version: 6
             }], updates, 'Wrong updates for acknowledgement 3');
-            ackDefer.resolve();
+            ackDone();
             break;
 
           default:
@@ -128,6 +124,6 @@ add_task(function* test_notification_ack() {
 
   yield waitForPromise(notifyPromise, DEFAULT_TIMEOUT,
     'Timed out waiting for notifications');
-  yield waitForPromise(ackDefer.promise, DEFAULT_TIMEOUT,
+  yield waitForPromise(ackPromise, DEFAULT_TIMEOUT,
     'Timed out waiting for multiple acknowledgements');
 });

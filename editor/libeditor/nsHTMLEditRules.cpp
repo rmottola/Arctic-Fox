@@ -845,14 +845,8 @@ nsHTMLEditRules::GetAlignment(bool *aMixed, nsIHTMLEditor::EAlignment *aAlign)
 
   NS_NAMED_LITERAL_STRING(typeAttrName, "align");
   nsIAtom  *dummyProperty = nullptr;
-  nsCOMPtr<Element> blockParent;
   NS_ENSURE_STATE(mHTMLEditor);
-  if (mHTMLEditor->IsBlockNode(nodeToExamine))
-    blockParent = nodeToExamine->AsElement();
-  else {
-    NS_ENSURE_STATE(mHTMLEditor);
-    blockParent = mHTMLEditor->GetBlockNodeParent(nodeToExamine);
-  }
+  nsCOMPtr<Element> blockParent = mHTMLEditor->GetBlock(*nodeToExamine);
 
   NS_ENSURE_TRUE(blockParent, NS_ERROR_FAILURE);
 
@@ -1648,7 +1642,7 @@ nsHTMLEditRules::StandardBreakImpl(nsIDOMNode* aNode, int32_t aOffset,
   } else {
     NS_ENSURE_STATE(mHTMLEditor);
     nsWSRunObject wsObj(mHTMLEditor, node, aOffset);
-    int32_t visOffset = 0, newOffset;
+    int32_t visOffset = 0;
     WSType wsType;
     nsCOMPtr<nsINode> node_(do_QueryInterface(node)), visNode;
     wsObj.PriorVisibleNode(node_, aOffset, address_of(visNode),
@@ -1669,12 +1663,12 @@ nsHTMLEditRules::StandardBreakImpl(nsIDOMNode* aNode, int32_t aOffset,
       res = linkNode->GetParentNode(getter_AddRefs(linkParent));
       NS_ENSURE_SUCCESS(res, res);
       NS_ENSURE_STATE(mHTMLEditor);
-      res = mHTMLEditor->SplitNodeDeep(linkNode, node, aOffset,
-                                       &newOffset, true);
-      NS_ENSURE_SUCCESS(res, res);
-      // reset {node,aOffset} to the point where link was split
+      nsCOMPtr<nsIContent> linkNodeContent = do_QueryInterface(linkNode);
+      NS_ENSURE_STATE(linkNodeContent || !linkNode);
+      aOffset = mHTMLEditor->SplitNodeDeep(*linkNodeContent,
+          *node_->AsContent(), aOffset, nsHTMLEditor::EmptyContainers::no);
+      NS_ENSURE_STATE(aOffset != -1);
       node = linkParent;
-      aOffset = newOffset;
     }
     node_ = do_QueryInterface(node);
     nsCOMPtr<Element> br =
@@ -1746,10 +1740,10 @@ nsresult
 nsHTMLEditRules::SplitMailCites(Selection* aSelection, bool* aHandled)
 {
   NS_ENSURE_TRUE(aSelection && aHandled, NS_ERROR_NULL_POINTER);
-  nsCOMPtr<nsIDOMNode> leftCite, rightCite;
+  nsCOMPtr<nsIContent> leftCite, rightCite;
   nsCOMPtr<nsINode> selNode;
   nsCOMPtr<Element> citeNode;
-  int32_t selOffset, newOffset;
+  int32_t selOffset;
   NS_ENSURE_STATE(mHTMLEditor);
   nsresult res = mHTMLEditor->GetStartNodeAndOffset(aSelection, getter_AddRefs(selNode), &selOffset);
   NS_ENSURE_SUCCESS(res, res);
@@ -1783,11 +1777,11 @@ nsHTMLEditRules::SplitMailCites(Selection* aSelection, bool* aHandled)
     }
 
     NS_ENSURE_STATE(mHTMLEditor);
-    res = mHTMLEditor->SplitNodeDeep(GetAsDOMNode(citeNode),
-                                     GetAsDOMNode(selNode), selOffset,
-                                     &newOffset, true, address_of(leftCite),
-                                     address_of(rightCite));
-    NS_ENSURE_SUCCESS(res, res);
+    NS_ENSURE_STATE(selNode->IsContent());
+    int32_t newOffset = mHTMLEditor->SplitNodeDeep(*citeNode,
+        *selNode->AsContent(), selOffset, nsHTMLEditor::EmptyContainers::no,
+        getter_AddRefs(leftCite), getter_AddRefs(rightCite));
+    NS_ENSURE_STATE(newOffset != -1);
     selNode = citeNode->GetParentNode();
     NS_ENSURE_STATE(mHTMLEditor);
     nsCOMPtr<Element> brNode = mHTMLEditor->CreateBR(selNode, newOffset);
@@ -2335,21 +2329,9 @@ nsHTMLEditRules::WillDeleteSelection(Selection* aSelection,
       }
 
       // Figure out block parents
-      nsCOMPtr<Element> leftParent;
-      if (IsBlockNode(GetAsDOMNode(startNode))) {
-        leftParent = startNode->AsElement();
-      } else {
-        NS_ENSURE_STATE(mHTMLEditor);
-        leftParent = mHTMLEditor->GetBlockNodeParent(startNode);
-      }
-
-      nsCOMPtr<Element> rightParent;
-      if (IsBlockNode(GetAsDOMNode(endNode))) {
-        rightParent = endNode->AsElement();
-      } else {
-        NS_ENSURE_STATE(mHTMLEditor);
-        rightParent = mHTMLEditor->GetBlockNodeParent(endNode);
-      }
+      NS_ENSURE_STATE(mHTMLEditor);
+      nsCOMPtr<Element> leftParent = mHTMLEditor->GetBlock(*startNode);
+      nsCOMPtr<Element> rightParent = mHTMLEditor->GetBlock(*endNode);
 
       // Are endpoint block parents the same?  Use default deletion
       if (leftParent && leftParent == rightParent) {
@@ -3455,15 +3437,11 @@ nsHTMLEditRules::WillMakeBasicBlock(Selection* aSelection,
     if (tString.EqualsLiteral("normal") ||
         tString.IsEmpty() ) // we are removing blocks (going to "body text")
     {
-      nsCOMPtr<nsIDOMNode> curBlock = parent->AsDOMNode();
-      if (!IsBlockNode(curBlock)) {
-        NS_ENSURE_STATE(mHTMLEditor);
-        curBlock = dont_AddRef(GetAsDOMNode(
-          mHTMLEditor->GetBlockNodeParent(parent).take()));
-      }
-      nsCOMPtr<nsIDOMNode> curBlockPar;
+      NS_ENSURE_STATE(mHTMLEditor);
+      nsCOMPtr<Element> curBlock = mHTMLEditor->GetBlock(*parent);
       NS_ENSURE_TRUE(curBlock, NS_ERROR_NULL_POINTER);
-      curBlock->GetParentNode(getter_AddRefs(curBlockPar));
+      nsCOMPtr<nsIDOMNode> curBlockPar =
+        GetAsDOMNode(curBlock->GetParentNode());
       if (nsHTMLEditUtils::IsFormatNode(curBlock))
       {
         // if the first editable node after selection is a br, consume it.  Otherwise
@@ -3481,9 +3459,10 @@ nsHTMLEditRules::WillMakeBasicBlock(Selection* aSelection,
         }
         // do the splits!
         NS_ENSURE_STATE(mHTMLEditor);
-        res = mHTMLEditor->SplitNodeDeep(curBlock, parent->AsDOMNode(), offset,
-                                         &offset, true);
-        NS_ENSURE_SUCCESS(res, res);
+        offset = mHTMLEditor->SplitNodeDeep(*curBlock, *parent->AsContent(),
+                                            offset,
+                                            nsHTMLEditor::EmptyContainers::no);
+        NS_ENSURE_STATE(offset != -1);
         // put a br at the split point
         NS_ENSURE_STATE(mHTMLEditor);
         res = mHTMLEditor->CreateBR(curBlockPar, offset, address_of(brNode));
@@ -3611,17 +3590,11 @@ nsHTMLEditRules::WillCSSIndent(Selection* aSelection,
   nsCOMPtr<Element> liNode;
   if (aSelection->Collapsed()) {
     nsCOMPtr<nsINode> node;
-    nsCOMPtr<Element> block;
     int32_t offset;
     NS_ENSURE_STATE(mHTMLEditor);
     nsresult res = mHTMLEditor->GetStartNodeAndOffset(aSelection, getter_AddRefs(node), &offset);
     NS_ENSURE_SUCCESS(res, res);
-    if (IsBlockNode(GetAsDOMNode(node))) {
-      block = node->AsElement();
-    } else {
-      NS_ENSURE_STATE(mHTMLEditor);
-      block = mHTMLEditor->GetBlockNodeParent(node);
-    }
+    nsCOMPtr<Element> block = mHTMLEditor->GetBlock(*node);
     if (block && nsHTMLEditUtils::IsListItem(block))
       liNode = block;
   }
@@ -4334,38 +4307,49 @@ nsHTMLEditRules::SplitBlock(nsIDOMNode *aBlock,
 {
   NS_ENSURE_TRUE(aBlock && aStartChild && aEndChild, NS_ERROR_NULL_POINTER);
 
-  nsCOMPtr<nsIDOMNode> leftNode, rightNode;
-  int32_t startOffset, endOffset, offset;
-  nsresult res;
+  nsCOMPtr<nsIContent> leftNode, rightNode;
+  int32_t startOffset, endOffset;
 
   // get split point location
   nsCOMPtr<nsIDOMNode> startParent = nsEditor::GetNodeLocation(aStartChild, &startOffset);
 
   // do the splits!
+  nsCOMPtr<nsIContent> block = do_QueryInterface(aBlock);
+  NS_ENSURE_STATE(block || !aBlock);
+  nsCOMPtr<nsIContent> startParentContent = do_QueryInterface(startParent);
+  NS_ENSURE_STATE(startParentContent || !startParent);
   NS_ENSURE_STATE(mHTMLEditor);
-  res = mHTMLEditor->SplitNodeDeep(aBlock, startParent, startOffset, &offset,
-                                   true, address_of(leftNode), address_of(rightNode));
-  NS_ENSURE_SUCCESS(res, res);
-  if (rightNode)  aBlock = rightNode;
+  mHTMLEditor->SplitNodeDeep(*block, *startParentContent, startOffset,
+                             nsHTMLEditor::EmptyContainers::no,
+                             getter_AddRefs(leftNode),
+                             getter_AddRefs(rightNode));
+  if (rightNode) {
+    aBlock = GetAsDOMNode(rightNode);
+  }
 
   // remember left portion of block if caller requested
   if (aLeftNode)
-    *aLeftNode = leftNode;
+    *aLeftNode = GetAsDOMNode(leftNode);
 
   // get split point location
   nsCOMPtr<nsIDOMNode> endParent = nsEditor::GetNodeLocation(aEndChild, &endOffset);
   endOffset++;  // want to be after lastBQChild
 
   // do the splits!
+  nsCOMPtr<nsIContent> endParentContent = do_QueryInterface(endParent);
+  NS_ENSURE_STATE(endParentContent || !endParent);
   NS_ENSURE_STATE(mHTMLEditor);
-  res = mHTMLEditor->SplitNodeDeep(aBlock, endParent, endOffset, &offset,
-                                   true, address_of(leftNode), address_of(rightNode));
-  NS_ENSURE_SUCCESS(res, res);
-  if (leftNode)  aBlock = leftNode;
+  mHTMLEditor->SplitNodeDeep(*block, *endParentContent, endOffset,
+                             nsHTMLEditor::EmptyContainers::no,
+                             getter_AddRefs(leftNode),
+                             getter_AddRefs(rightNode));
+  if (leftNode) {
+    aBlock = GetAsDOMNode(leftNode);
+  }
 
   // remember right portion of block if caller requested
   if (aRightNode)
-    *aRightNode = rightNode;
+    *aRightNode = GetAsDOMNode(rightNode);
 
   if (aMiddleNode)
     *aMiddleNode = aBlock;
@@ -4540,8 +4524,10 @@ nsHTMLEditRules::CreateStyleForInsertText(Selection* aSelection,
     if (mHTMLEditor->IsTextNode(node)) {
       // if we are in a text node, split it
       NS_ENSURE_STATE(mHTMLEditor);
-      res = mHTMLEditor->SplitNodeDeep(node, node, offset, &offset);
-      NS_ENSURE_SUCCESS(res, res);
+      nsCOMPtr<nsIContent> content = do_QueryInterface(node);
+      NS_ENSURE_STATE(content || !node);
+      offset = mHTMLEditor->SplitNodeDeep(*content, *content, offset);
+      NS_ENSURE_STATE(offset != -1);
       node->GetParentNode(getter_AddRefs(tmp));
       node = tmp;
     }
@@ -4704,7 +4690,7 @@ nsHTMLEditRules::WillAlign(Selection* aSelection,
     // consume a trailing br, if any.  This is to keep an alignment from
     // creating extra lines, if possible.
     NS_ENSURE_STATE(mHTMLEditor);
-    res = mHTMLEditor->GetNextHTMLNode(parent->AsDOMNode(), offset,
+    res = mHTMLEditor->GetNextHTMLNode(GetAsDOMNode(parent), offset,
                                        address_of(brNode));
     NS_ENSURE_SUCCESS(res, res);
     if (brNode && nsTextEditUtils::IsBreak(brNode))
@@ -4713,7 +4699,7 @@ nsHTMLEditRules::WillAlign(Selection* aSelection,
       // we are putting our div is not a block, then the br we
       // found is in same block we are, so its safe to consume it.
       NS_ENSURE_STATE(mHTMLEditor);
-      res = mHTMLEditor->GetNextHTMLSibling(parent->AsDOMNode(), offset,
+      res = mHTMLEditor->GetNextHTMLSibling(GetAsDOMNode(parent), offset,
                                             address_of(sib));
       NS_ENSURE_SUCCESS(res, res);
       if (!IsBlockNode(sib))
@@ -4728,14 +4714,14 @@ nsHTMLEditRules::WillAlign(Selection* aSelection,
                                                        offset);
     NS_ENSURE_STATE(theDiv);
     // remember our new block for postprocessing
-    mNewBlock = theDiv->AsDOMNode();
+    mNewBlock = GetAsDOMNode(theDiv);
     // set up the alignment on the div, using HTML or CSS
     nsCOMPtr<nsIDOMElement> divElem = do_QueryInterface(theDiv);
     res = AlignBlock(divElem, alignType, true);
     NS_ENSURE_SUCCESS(res, res);
     *aHandled = true;
     // put in a moz-br so that it won't get deleted
-    res = CreateMozBR(theDiv->AsDOMNode(), 0);
+    res = CreateMozBR(GetAsDOMNode(theDiv), 0);
     NS_ENSURE_SUCCESS(res, res);
     res = aSelection->Collapse(theDiv, 0);
     selectionResetter.Abort();  // don't reset our selection in this case.
@@ -4834,7 +4820,7 @@ nsHTMLEditRules::WillAlign(Selection* aSelection,
       curDiv = mHTMLEditor->CreateNode(nsGkAtoms::div, curParent, offset);
       NS_ENSURE_STATE(curDiv);
       // remember our new block for postprocessing
-      mNewBlock = curDiv->AsDOMNode();
+      mNewBlock = GetAsDOMNode(curDiv);
       // set up the alignment on the div
       nsCOMPtr<nsIDOMElement> divElem = do_QueryInterface(curDiv);
       res = AlignBlock(divElem, alignType, true);
@@ -4870,7 +4856,7 @@ nsHTMLEditRules::AlignInnerBlocks(nsINode& aNode, const nsAString* alignType)
 
   // Now that we have the list, align their contents as requested
   for (auto& node : nodeArray) {
-    nsresult res = AlignBlockContents(node->AsDOMNode(), alignType);
+    nsresult res = AlignBlockContents(GetAsDOMNode(node), alignType);
     NS_ENSURE_SUCCESS(res, res);
   }
 
@@ -4960,27 +4946,23 @@ nsHTMLEditRules::CheckForEmptyBlock(nsINode* aStartNode,
   if (IsInlineNode(GetAsDOMNode(aBodyNode))) {
     return NS_OK;
   }
+  NS_ENSURE_STATE(mHTMLEditor);
+  nsCOMPtr<nsIEditor> kungFuDeathGrip(mHTMLEditor);
+
   // If we are inside an empty block, delete it.  Note: do NOT delete table
   // elements this way.
-  nsCOMPtr<Element> block;
-  if (IsBlockNode(GetAsDOMNode(aStartNode))) {
-    block = aStartNode->AsElement();
-  } else {
-    block = mHTMLEditor->GetBlockNodeParent(aStartNode);
-  }
+  nsCOMPtr<Element> block = mHTMLEditor->GetBlock(*aStartNode);
   bool bIsEmptyNode;
   nsCOMPtr<Element> emptyBlock;
   nsresult res;
   if (block && block != aBodyNode) {
     // Efficiency hack, avoiding IsEmptyNode() call when in body
-    NS_ENSURE_STATE(mHTMLEditor);
     res = mHTMLEditor->IsEmptyNode(block, &bIsEmptyNode, true, false);
     NS_ENSURE_SUCCESS(res, res);
     while (block && bIsEmptyNode && !nsHTMLEditUtils::IsTableElement(block) &&
            block != aBodyNode) {
       emptyBlock = block;
       block = mHTMLEditor->GetBlockNodeParent(emptyBlock);
-      NS_ENSURE_STATE(mHTMLEditor);
       if (block) {
         res = mHTMLEditor->IsEmptyNode(block, &bIsEmptyNode, true, false);
         NS_ENSURE_SUCCESS(res, res);
@@ -5702,12 +5684,7 @@ nsHTMLEditRules::PromoteRange(nsRange& aRange, EditAction aOperationType)
   // inside block elements that contain nothing but a solo <br>.  It's easier
   // to put a workaround here than to revamp GetPromotedPoint.  :-(
   if (startNode == endNode && startOffset == endOffset) {
-    nsCOMPtr<Element> block;
-    if (IsBlockNode(GetAsDOMNode(startNode))) {
-      block = startNode->AsElement();
-    } else {
-      block = mHTMLEditor->GetBlockNodeParent(startNode);
-    }
+    nsCOMPtr<Element> block = mHTMLEditor->GetBlock(*startNode);
     if (block) {
       bool bIsEmptyNode = false;
       nsCOMPtr<nsIContent> root = mHTMLEditor->GetActiveEditingHost();
@@ -5883,7 +5860,7 @@ nsHTMLEditRules::GetNodesForOperation(nsTArray<RefPtr<nsRange>>& aArrayOfRanges,
           IsInlineNode(GetAsDOMNode(node)) && mHTMLEditor->IsContainer(node) &&
           !mHTMLEditor->IsTextNode(node)) {
         nsTArray<OwningNonNull<nsINode>> arrayOfInlines;
-        res = BustUpInlinesAtBRs(*node, arrayOfInlines);
+        res = BustUpInlinesAtBRs(*node->AsContent(), arrayOfInlines);
         NS_ENSURE_SUCCESS(res, res);
 
         // Put these nodes in aOutArrayOfNodes, replacing the current node
@@ -6094,52 +6071,51 @@ nsHTMLEditRules::GetParagraphFormatNodes(nsTArray<OwningNonNull<nsINode>>& outAr
 nsresult
 nsHTMLEditRules::BustUpInlinesAtRangeEndpoints(nsRangeStore &item)
 {
-  nsresult res = NS_OK;
   bool isCollapsed = ((item.startNode == item.endNode) && (item.startOffset == item.endOffset));
 
-  nsCOMPtr<nsIDOMNode> endInline =
-    GetHighestInlineParent(GetAsDOMNode(item.endNode));
+  nsCOMPtr<nsIContent> endInline =
+    do_QueryInterface(GetHighestInlineParent(GetAsDOMNode(item.endNode)));
 
   // if we have inline parents above range endpoints, split them
   if (endInline && !isCollapsed)
   {
-    nsCOMPtr<nsIDOMNode> resultEndNode;
-    int32_t resultEndOffset;
-    endInline->GetParentNode(getter_AddRefs(resultEndNode));
+    nsCOMPtr<nsINode> resultEndNode = endInline->GetParentNode();
     NS_ENSURE_STATE(mHTMLEditor);
-    res = mHTMLEditor->SplitNodeDeep(endInline, GetAsDOMNode(item.endNode),
-                                     item.endOffset, &resultEndOffset, true);
-    NS_ENSURE_SUCCESS(res, res);
+    // item.endNode must be content if endInline isn't null
+    int32_t resultEndOffset =
+      mHTMLEditor->SplitNodeDeep(*endInline, *item.endNode->AsContent(),
+                                 item.endOffset,
+                                 nsEditor::EmptyContainers::no);
+    NS_ENSURE_TRUE(resultEndOffset != -1, NS_ERROR_FAILURE);
     // reset range
-    item.endNode = do_QueryInterface(resultEndNode);
+    item.endNode = resultEndNode;
     item.endOffset = resultEndOffset;
   }
 
-  nsCOMPtr<nsIDOMNode> startInline =
-    GetHighestInlineParent(GetAsDOMNode(item.startNode));
+  nsCOMPtr<nsIContent> startInline =
+    do_QueryInterface(GetHighestInlineParent(GetAsDOMNode(item.startNode)));
 
   if (startInline)
   {
-    nsCOMPtr<nsIDOMNode> resultStartNode;
-    int32_t resultStartOffset;
-    startInline->GetParentNode(getter_AddRefs(resultStartNode));
+    nsCOMPtr<nsINode> resultStartNode = startInline->GetParentNode();
     NS_ENSURE_STATE(mHTMLEditor);
-    res = mHTMLEditor->SplitNodeDeep(startInline, GetAsDOMNode(item.startNode),
-                                     item.startOffset, &resultStartOffset,
-                                     true);
-    NS_ENSURE_SUCCESS(res, res);
+    int32_t resultStartOffset =
+      mHTMLEditor->SplitNodeDeep(*startInline, *item.startNode->AsContent(),
+                                 item.startOffset,
+                                 nsEditor::EmptyContainers::no);
+    NS_ENSURE_TRUE(resultStartOffset != -1, NS_ERROR_FAILURE);
     // reset range
-    item.startNode = do_QueryInterface(resultStartNode);
+    item.startNode = resultStartNode;
     item.startOffset = resultStartOffset;
   }
 
-  return res;
+  return NS_OK;
 }
 
 
 
 nsresult
-nsHTMLEditRules::BustUpInlinesAtBRs(nsINode& aNode,
+nsHTMLEditRules::BustUpInlinesAtBRs(nsIContent& aNode,
                                     nsTArray<OwningNonNull<nsINode>>& aOutArrayOfNodes)
 {
   NS_ENSURE_STATE(mHTMLEditor);
@@ -6159,43 +6135,41 @@ nsHTMLEditRules::BustUpInlinesAtBRs(nsINode& aNode,
 
   // Else we need to bust up inNode along all the breaks
   nsCOMPtr<nsINode> inlineParentNode = aNode.GetParentNode();
-  nsCOMPtr<nsIDOMNode> splitDeepNode = GetAsDOMNode(&aNode);
-  nsCOMPtr<nsIDOMNode> leftDOMNode, rightDOMNode;
+  nsCOMPtr<nsIContent> splitDeepNode = &aNode;
+  nsCOMPtr<nsIContent> leftNode, rightNode;
 
   for (uint32_t i = 0; i < arrayOfBreaks.Length(); i++) {
     OwningNonNull<Element> breakNode = *arrayOfBreaks[i]->AsElement();
     NS_ENSURE_TRUE(splitDeepNode, NS_ERROR_NULL_POINTER);
-    nsCOMPtr<nsINode> splitParentNode = breakNode->GetParentNode();
-    int32_t splitOffset = splitParentNode ?
-      splitParentNode->IndexOf(breakNode) : -1;
+    NS_ENSURE_TRUE(breakNode->GetParent(), NS_ERROR_NULL_POINTER);
+    OwningNonNull<nsIContent> splitParentNode = *breakNode->GetParent();
+    int32_t splitOffset = splitParentNode->IndexOf(breakNode);
 
-    int32_t resultOffset;
-    nsresult res = mHTMLEditor->SplitNodeDeep(splitDeepNode,
-        GetAsDOMNode(splitParentNode), splitOffset, &resultOffset, false,
-        address_of(leftDOMNode), address_of(rightDOMNode));
-    NS_ENSURE_SUCCESS(res, res);
+    int32_t resultOffset =
+      mHTMLEditor->SplitNodeDeep(*splitDeepNode, splitParentNode, splitOffset,
+                                 nsHTMLEditor::EmptyContainers::yes,
+                                 getter_AddRefs(leftNode),
+                                 getter_AddRefs(rightNode));
+    NS_ENSURE_STATE(resultOffset != -1);
 
     // Put left node in node list
-    if (leftDOMNode) {
+    if (leftNode) {
       // Might not be a left node.  A break might have been at the very
       // beginning of inline container, in which case SplitNodeDeep would not
       // actually split anything
-      nsCOMPtr<nsINode> leftNode = do_QueryInterface(leftDOMNode);
-      NS_ENSURE_STATE(leftNode);
       aOutArrayOfNodes.AppendElement(*leftNode);
     }
     // Move break outside of container and also put in node list
-    res = mHTMLEditor->MoveNode(breakNode, inlineParentNode, resultOffset);
+    nsresult res = mHTMLEditor->MoveNode(breakNode, inlineParentNode,
+                                         resultOffset);
     NS_ENSURE_SUCCESS(res, res);
     aOutArrayOfNodes.AppendElement(*breakNode);
 
     // Now rightNode becomes the new node to split
-    splitDeepNode = rightDOMNode;
+    splitDeepNode = rightNode;
   }
   // Now tack on remaining rightNode, if any, to the list
-  if (rightDOMNode) {
-    nsCOMPtr<nsINode> rightNode = do_QueryInterface(rightDOMNode);
-    NS_ENSURE_STATE(rightNode);
+  if (rightNode) {
     aOutArrayOfNodes.AppendElement(*rightNode);
   }
   return NS_OK;
@@ -6346,25 +6320,25 @@ nsHTMLEditRules::ReturnInHeader(Selection* aSelection,
                                 nsIDOMNode *aNode,
                                 int32_t aOffset)
 {
-  NS_ENSURE_TRUE(aSelection && aHeader && aNode, NS_ERROR_NULL_POINTER);
+  nsCOMPtr<Element> header = do_QueryInterface(aHeader);
+  nsCOMPtr<nsINode> node = do_QueryInterface(aNode);
+  NS_ENSURE_TRUE(aSelection && header && node, NS_ERROR_NULL_POINTER);
 
   // remeber where the header is
   int32_t offset;
   nsCOMPtr<nsIDOMNode> headerParent = nsEditor::GetNodeLocation(aHeader, &offset);
 
   // get ws code to adjust any ws
-  nsCOMPtr<nsINode> selNode(do_QueryInterface(aNode));
   NS_ENSURE_STATE(mHTMLEditor);
   nsresult res = nsWSRunObject::PrepareToSplitAcrossBlocks(mHTMLEditor,
-                                                           address_of(selNode),
+                                                           address_of(node),
                                                            &aOffset);
   NS_ENSURE_SUCCESS(res, res);
 
   // split the header
-  int32_t newOffset;
+  NS_ENSURE_STATE(node->IsContent());
   NS_ENSURE_STATE(mHTMLEditor);
-  res = mHTMLEditor->SplitNodeDeep(aHeader, GetAsDOMNode(selNode), aOffset, &newOffset);
-  NS_ENSURE_SUCCESS(res, res);
+  mHTMLEditor->SplitNodeDeep(*header, *node->AsContent(), aOffset);
 
   // if the leftand heading is empty, put a mozbr in it
   nsCOMPtr<nsIDOMNode> prevItem;
@@ -6561,13 +6535,14 @@ nsHTMLEditRules::SplitParagraph(nsIDOMNode *aPara,
                                 nsCOMPtr<nsIDOMNode> *aSelNode,
                                 int32_t *aOffset)
 {
-  NS_ENSURE_TRUE(aPara && aBRNode && aSelNode && *aSelNode && aOffset && aSelection, NS_ERROR_NULL_POINTER);
+  nsCOMPtr<Element> para = do_QueryInterface(aPara);
+  NS_ENSURE_TRUE(para && aBRNode && aSelNode && *aSelNode && aOffset &&
+                 aSelection, NS_ERROR_NULL_POINTER);
   nsresult res = NS_OK;
 
   // split para
-  int32_t newOffset;
   // get ws code to adjust any ws
-  nsCOMPtr<nsIDOMNode> leftPara, rightPara;
+  nsCOMPtr<nsIContent> leftPara, rightPara;
   NS_ENSURE_STATE(mHTMLEditor);
   nsCOMPtr<nsINode> selNode(do_QueryInterface(*aSelNode));
   res = nsWSRunObject::PrepareToSplitAcrossBlocks(mHTMLEditor, address_of(selNode), aOffset);
@@ -6575,9 +6550,11 @@ nsHTMLEditRules::SplitParagraph(nsIDOMNode *aPara,
   NS_ENSURE_SUCCESS(res, res);
   // split the paragraph
   NS_ENSURE_STATE(mHTMLEditor);
-  res = mHTMLEditor->SplitNodeDeep(aPara, *aSelNode, *aOffset, &newOffset, false,
-                                   address_of(leftPara), address_of(rightPara));
-  NS_ENSURE_SUCCESS(res, res);
+  NS_ENSURE_STATE(selNode->IsContent());
+  mHTMLEditor->SplitNodeDeep(*para, *selNode->AsContent(), *aOffset,
+                             nsHTMLEditor::EmptyContainers::yes,
+                             getter_AddRefs(leftPara),
+                             getter_AddRefs(rightPara));
   // get rid of the break, if it is visible (otherwise it may be needed to prevent an empty p)
   NS_ENSURE_STATE(mHTMLEditor);
   if (mHTMLEditor->IsVisBreak(aBRNode))
@@ -6594,9 +6571,9 @@ nsHTMLEditRules::SplitParagraph(nsIDOMNode *aPara,
   NS_ENSURE_SUCCESS(res, res);
 
   // check both halves of para to see if we need mozBR
-  res = InsertMozBRIfNeeded(leftPara);
+  res = InsertMozBRIfNeeded(GetAsDOMNode(leftPara));
   NS_ENSURE_SUCCESS(res, res);
-  res = InsertMozBRIfNeeded(rightPara);
+  res = InsertMozBRIfNeeded(GetAsDOMNode(rightPara));
   NS_ENSURE_SUCCESS(res, res);
 
   // selection to beginning of right hand para;
@@ -6716,10 +6693,9 @@ nsHTMLEditRules::ReturnInListItem(Selection* aSelection,
   res = nsWSRunObject::PrepareToSplitAcrossBlocks(mHTMLEditor, address_of(selNode), &aOffset);
   NS_ENSURE_SUCCESS(res, res);
   // now split list item
-  int32_t newOffset;
   NS_ENSURE_STATE(mHTMLEditor);
-  res = mHTMLEditor->SplitNodeDeep(aListItem, GetAsDOMNode(selNode), aOffset, &newOffset, false);
-  NS_ENSURE_SUCCESS(res, res);
+  NS_ENSURE_STATE(selNode->IsContent());
+  mHTMLEditor->SplitNodeDeep(*listItem, *selNode->AsContent(), aOffset);
   // hack: until I can change the damaged doc range code back to being
   // extra inclusive, I have to manually detect certain list items that
   // may be left empty.
@@ -7121,14 +7097,15 @@ nsHTMLEditRules::SplitAsNeeded(nsIAtom& aTag,
     // Could not find a place to build tag!
     return NS_ERROR_FAILURE;
   }
-  if (splitNode) {
+  if (splitNode && splitNode->IsContent() && inOutParent->IsContent()) {
     // We found a place for block, but above inOutParent. We need to split.
     NS_ENSURE_STATE(mHTMLEditor);
-    nsresult res = mHTMLEditor->SplitNodeDeep(splitNode->AsDOMNode(),
-                                              inOutParent->AsDOMNode(),
-                                              inOutOffset, &inOutOffset);
-    NS_ENSURE_SUCCESS(res, res);
+    int32_t offset = mHTMLEditor->SplitNodeDeep(*splitNode->AsContent(),
+                                                *inOutParent->AsContent(),
+                                                inOutOffset);
+    NS_ENSURE_STATE(offset != -1);
     inOutParent = tagParent;
+    inOutOffset = offset;
   }
   return NS_OK;
 }
@@ -7515,14 +7492,9 @@ nsHTMLEditRules::AdjustSelection(Selection* aSelection,
 
   // make sure we aren't in an empty block - user will see no cursor.  If this
   // is happening, put a <br> in the block if allowed.
-  nsCOMPtr<nsINode> theblock;
-  if (IsBlockNode(GetAsDOMNode(selNode))) {
-    theblock = selNode;
-  } else {
-    NS_ENSURE_STATE(mHTMLEditor);
-    theblock = mHTMLEditor->GetBlockNodeParent(selNode);
-  }
   NS_ENSURE_STATE(mHTMLEditor);
+  nsCOMPtr<Element> theblock = mHTMLEditor->GetBlock(*selNode);
+
   if (theblock && mHTMLEditor->IsEditable(theblock)) {
     bool bIsEmptyNode;
     NS_ENSURE_STATE(mHTMLEditor);
@@ -7563,15 +7535,9 @@ nsHTMLEditRules::AdjustSelection(Selection* aSelection,
   if (nearNode)
   {
     // is nearNode also a descendant of same block?
-    nsCOMPtr<nsINode> block, nearBlock;
-    if (IsBlockNode(GetAsDOMNode(selNode))) {
-      block = selNode;
-    } else {
-      NS_ENSURE_STATE(mHTMLEditor);
-      block = mHTMLEditor->GetBlockNodeParent(selNode);
-    }
     NS_ENSURE_STATE(mHTMLEditor);
-    nearBlock = mHTMLEditor->GetBlockNodeParent(nearNode);
+    nsCOMPtr<Element> block = mHTMLEditor->GetBlock(*selNode);
+    nsCOMPtr<Element> nearBlock = mHTMLEditor->GetBlockNodeParent(nearNode);
     if (block && block == nearBlock) {
       if (nearNode && nsTextEditUtils::IsBreak(nearNode) )
       {

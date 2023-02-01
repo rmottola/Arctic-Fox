@@ -10,6 +10,11 @@
 #include "mozilla/layers/Compositor.h"
 #include "mozilla/layers/CompositorParent.h"
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+#include "GeckoProfiler.h"
+#include "ProfilerMarkers.h"
+#endif
+
 namespace mozilla {
 static bool sThreadAssertionsEnabled = true;
 
@@ -32,12 +37,16 @@ CompositorVsyncDispatcher::~CompositorVsyncDispatcher()
 {
   MOZ_ASSERT(XRE_IsParentProcess());
   // We auto remove this vsync dispatcher from the vsync source in the nsBaseWidget
-  MOZ_ASSERT(NS_IsMainThread());
 }
 
 void
 CompositorVsyncDispatcher::NotifyVsync(TimeStamp aVsyncTimestamp)
 {
+  // In vsync thread
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  layers::CompositorParent::PostInsertVsyncProfilerMarker(aVsyncTimestamp);
+#endif
+
   MutexAutoLock lock(mCompositorObserverLock);
   if (mCompositorVsyncObserver) {
     mCompositorVsyncObserver->NotifyVsync(aVsyncTimestamp);

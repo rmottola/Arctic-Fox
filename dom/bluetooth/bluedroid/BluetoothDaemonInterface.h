@@ -27,6 +27,7 @@ class BluetoothDaemonAvrcpInterface;
 class BluetoothDaemonGattInterface;
 class BluetoothDaemonHandsfreeInterface;
 class BluetoothDaemonProtocol;
+class BluetoothDaemonSetupInterface;
 class BluetoothDaemonSocketInterface;
 
 class BluetoothDaemonInterface final
@@ -62,21 +63,21 @@ public:
 
   /* Remote Device Properties */
 
-  void GetRemoteDeviceProperties(const nsAString& aRemoteAddr,
+  void GetRemoteDeviceProperties(const BluetoothAddress& aRemoteAddr,
                                  BluetoothResultHandler* aRes) override;
-  void GetRemoteDeviceProperty(const nsAString& aRemoteAddr,
+  void GetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
                                const nsAString& aName,
                                BluetoothResultHandler* aRes) override;
-  void SetRemoteDeviceProperty(const nsAString& aRemoteAddr,
+  void SetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
                                const BluetoothNamedValue& aProperty,
                                BluetoothResultHandler* aRes) override;
 
   /* Remote Services */
 
-  void GetRemoteServiceRecord(const nsAString& aRemoteAddr,
+  void GetRemoteServiceRecord(const BluetoothAddress& aRemoteAddr,
                               const BluetoothUuid& aUuid,
                               BluetoothResultHandler* aRes) override;
-  void GetRemoteServices(const nsAString& aRemoteAddr,
+  void GetRemoteServices(const BluetoothAddress& aRemoteAddr,
                          BluetoothResultHandler* aRes) override;
 
   /* Discovery */
@@ -86,25 +87,27 @@ public:
 
   /* Bonds */
 
-  void CreateBond(const nsAString& aBdAddr, BluetoothTransport aTransport,
+  void CreateBond(const BluetoothAddress& aBdAddr,
+                  BluetoothTransport aTransport,
                   BluetoothResultHandler* aRes) override;
-  void RemoveBond(const nsAString& aBdAddr,
+  void RemoveBond(const BluetoothAddress& aBdAddr,
                   BluetoothResultHandler* aRes) override;
-  void CancelBond(const nsAString& aBdAddr,
+  void CancelBond(const BluetoothAddress& aBdAddr,
                   BluetoothResultHandler* aRes) override;
 
   /* Connection */
 
-  void GetConnectionState(const nsAString& aBdAddr,
+  void GetConnectionState(const BluetoothAddress& aBdAddr,
                           BluetoothResultHandler* aRes) override;
 
   /* Authentication */
 
-  void PinReply(const nsAString& aBdAddr, bool aAccept,
-                const nsAString& aPinCode,
+  void PinReply(const BluetoothAddress& aBdAddr, bool aAccept,
+                const BluetoothPinCode& aPinCode,
                 BluetoothResultHandler* aRes) override;
 
-  void SspReply(const nsAString& aBdAddr, BluetoothSspVariant aVariant,
+  void SspReply(const BluetoothAddress& aBdAddr,
+                BluetoothSspVariant aVariant,
                 bool aAccept, uint32_t aPasskey,
                 BluetoothResultHandler* aRes) override;
 
@@ -123,8 +126,9 @@ public:
 
   void ReadEnergyInfo(BluetoothResultHandler* aRes) override;
 
-  /* Profile Interfaces */
+  /* Service Interfaces */
 
+  BluetoothSetupInterface* GetBluetoothSetupInterface() override;
   BluetoothSocketInterface* GetBluetoothSocketInterface() override;
   BluetoothHandsfreeInterface* GetBluetoothHandsfreeInterface() override;
   BluetoothA2dpInterface* GetBluetoothA2dpInterface() override;
@@ -160,6 +164,7 @@ private:
 
   nsTArray<RefPtr<BluetoothResultHandler> > mResultHandlerQ;
 
+  nsAutoPtr<BluetoothDaemonSetupInterface> mSetupInterface;
   nsAutoPtr<BluetoothDaemonSocketInterface> mSocketInterface;
   nsAutoPtr<BluetoothDaemonHandsfreeInterface> mHandsfreeInterface;
   nsAutoPtr<BluetoothDaemonA2dpInterface> mA2dpInterface;

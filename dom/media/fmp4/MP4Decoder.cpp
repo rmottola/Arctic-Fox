@@ -13,6 +13,7 @@
 #include "nsContentTypeParser.h"
 #include "VideoUtils.h"
 #include "mozilla/Logging.h"
+#include "nsMimeTypes.h"
 
 #ifdef XP_WIN
 #include "mozilla/WindowsVersion.h"
@@ -112,7 +113,7 @@ MP4Decoder::CanHandleMediaType(const nsACString& aMIMETypeExcludingCodecs,
     return false;
   }
 
-  #ifdef MOZ_GONK_MEDIACODEC
+#ifdef MOZ_GONK_MEDIACODEC
   if (aMIMETypeExcludingCodecs.EqualsASCII(VIDEO_3GPP)) {
     return Preferences::GetBool("media.gonk.enabled", false);
   }

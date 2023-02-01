@@ -2781,7 +2781,7 @@ ContentParent::RecvGetClipboard(nsTArray<nsCString>&& aTypes,
 
     clipboard->GetData(trans, aWhichClipboard);
     nsContentUtils::TransferableToIPCTransferable(trans, aDataTransfer,
-                                                  nullptr, this);
+                                                  true, nullptr, this);
     return true;
 }
 
@@ -5228,6 +5228,7 @@ ContentParent::MaybeInvokeDragSession(TabParent* aParent)
         transfer->GetTransferables(lc);
       nsContentUtils::TransferablesToIPCTransferables(transferables,
                                                       dataTransfers,
+                                                      false,
                                                       nullptr,
                                                       this);
       uint32_t action;
@@ -5329,10 +5330,10 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
                                 const bool& aCalledFromJS,
                                 const bool& aPositionSpecified,
                                 const bool& aSizeSpecified,
-                                const nsString& aURI,
+                                const nsCString& aURI,
                                 const nsString& aName,
                                 const nsCString& aFeatures,
-                                const nsString& aBaseURI,
+                                const nsCString& aBaseURI,
                                 nsresult* aResult,
                                 bool* aWindowIsNew,
                                 InfallibleTArray<FrameScriptInfo>* aFrameScripts,
@@ -5428,7 +5429,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
         }
 
         nsCOMPtr<nsIOpenURIInFrameParams> params = new nsOpenURIInFrameParams();
-        params->SetReferrer(aBaseURI);
+        params->SetReferrer(NS_ConvertUTF8toUTF16(aBaseURI));
         params->SetIsPrivate(isPrivate);
 
         TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
@@ -5462,7 +5463,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     nsAutoCString finalURIString;
     if (!aURI.IsEmpty()) {
         nsCOMPtr<nsIURI> finalURI;
-        *aResult = NS_NewURI(getter_AddRefs(finalURI), NS_ConvertUTF16toUTF8(aURI).get(), baseURI);
+        *aResult = NS_NewURI(getter_AddRefs(finalURI), aURI.get(), baseURI);
 
         if (NS_WARN_IF(NS_FAILED(*aResult))) {
             return true;
@@ -5475,10 +5476,15 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
 
     TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
-    const char* features = aFeatures.Length() ? aFeatures.get() : nullptr;
-    *aResult = pwwatch->OpenWindow2(parent, finalURIString.get(),
-                                    NS_ConvertUTF16toUTF8(aName).get(),
-                                    features, aCalledFromJS,
+    // If nsWindowWatcher::OpenWindowInternal was passed a nullptr for the URI
+    // to open in the content process, we indicate that by sending up a voided
+    // nsString (since primitives are not nullable). If we detect the voided
+    // nsString, we know that we need to send OpenWindow2 a nullptr for the URI.
+    const char* uri = aURI.IsVoid() ? nullptr : finalURIString.get();
+    const char* name = aName.IsVoid() ? nullptr : NS_ConvertUTF16toUTF8(aName).get();
+    const char* features = aFeatures.IsVoid() ? nullptr : aFeatures.get();
+
+    *aResult = pwwatch->OpenWindow2(parent, uri, name, features, aCalledFromJS,
                                     false, false, thisTabParent, nullptr, nullptr, getter_AddRefs(window));
 
     if (NS_WARN_IF(NS_FAILED(*aResult))) {

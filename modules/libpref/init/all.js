@@ -390,6 +390,9 @@ pref("media.gstreamer.enabled", true);
 pref("media.gstreamer.enable-blacklist", true);
 #endif
 #ifdef MOZ_APPLEMEDIA
+#ifdef MOZ_WIDGET_UIKIT
+pref("media.mp3.enabled", true);
+#endif
 pref("media.apple.mp3.enabled", true);
 pref("media.apple.mp4.enabled", true);
 #endif
@@ -566,8 +569,6 @@ pref("layout.event-regions.enabled", false);
 // gfx/layers/apz/src/AsyncPanZoomController.cpp.
 pref("apz.allow_checkerboarding", true);
 pref("apz.allow_zooming", false);
-pref("apz.asyncscroll.throttle", 100);
-pref("apz.asyncscroll.timeout", 300);
 
 // Whether to lock touch scrolling to one axis at a time
 // 0 = FREE (No locking at all)
@@ -876,6 +877,8 @@ pref("toolkit.identity.debug", false);
 
 // AsyncShutdown delay before crashing in case of shutdown freeze
 pref("toolkit.asyncshutdown.timeout.crash", 60000);
+// Extra logging for AsyncShutdown barriers and phases
+pref("toolkit.asyncshutdown.log", false);
 
 // Enable deprecation warnings.
 pref("devtools.errorconsole.deprecation_warnings", false);
@@ -1408,8 +1411,10 @@ pref("privacy.popups.disable_from_plugins", 2);
 
 // send "do not track" HTTP header, disabled by default
 pref("privacy.donottrackheader.enabled",    false);
-// Enforce tracking protection
+// Enforce tracking protection in all modes
 pref("privacy.trackingprotection.enabled",  false);
+// Enforce tracking protection in Private Browsing mode
+pref("privacy.trackingprotection.pbmode.enabled",  true);
 
 pref("dom.event.contextmenu.enabled",       true);
 pref("dom.event.clipboardevents.enabled",   true);
@@ -2130,7 +2135,7 @@ pref("network.cookie.cookieBehavior",       0); // 0-Accept, 1-dontAcceptForeign
 pref("network.cookie.cookieBehavior",       0); // Keep the old default of accepting all cookies
 #endif
 pref("network.cookie.thirdparty.sessionOnly", false);
-pref("network.cookie.lifetimePolicy",       0); // 0-accept normally, 2-acceptForSession,3-acceptForNDays
+pref("network.cookie.lifetimePolicy",       0); // 0-accept, 2-acceptForSession, 3-acceptForNDays
 pref("network.cookie.alwaysAcceptSessionCookies", false);
 pref("network.cookie.prefsMigrated",        false);
 pref("network.cookie.lifetime.days",        90);
@@ -2323,6 +2328,9 @@ pref("mouse.button5.enabled", true);
 
 // Clipboard behavior
 pref("clipboard.autocopy", false);
+
+// Clipboard only supports text/plain
+pref("clipboard.plainTextOnly", false);
 
 // mouse wheel scroll transaction period of time (in milliseconds)
 pref("mousewheel.transaction.timeout", 1500);
@@ -2671,6 +2679,9 @@ pref("layout.css.overflow-clip-box.enabled", false);
 
 // Is support for CSS grid enabled?
 pref("layout.css.grid.enabled", false);
+
+// Is support for CSS "grid-template-{columns,rows}: subgrid X" enabled?
+pref("layout.css.grid-template-subgrid-value.enabled", false);
 
 // Is support for CSS contain enabled?
 pref("layout.css.contain.enabled", false);
@@ -3566,6 +3577,18 @@ pref("ui.window_class_override", "");
 // page back/forward actions, or if pinch-to-zoom does not work.
 pref("ui.elantech_gesture_hacks.enabled", -1);
 
+// Show the Windows on-screen keyboard (osk.exe) when a text field is focused.
+#ifdef RELEASE_BUILD
+pref("ui.osk.enabled", false);
+#else
+pref("ui.osk.enabled", true);
+#endif
+// Only show the on-screen keyboard if there are no physical keyboards attached
+// to the device.
+pref("ui.osk.detect_physical_keyboard", true);
+// Path to TabTip.exe on local machine. Cached for performance reasons.
+pref("ui.osk.on_screen_keyboard_path", "");
+
 # XP_WIN
 #endif
 
@@ -4095,6 +4118,9 @@ pref("gfx.font_rendering.fontconfig.fontlist.enabled", false);
 #else
 pref("gfx.font_rendering.fontconfig.fontlist.enabled", true);
 #endif
+
+// maximum number of fonts to substitute for a generic
+pref("gfx.font_rendering.fontconfig.max_generic_substitutions", 3);
 #endif
 
 # XP_UNIX
@@ -4470,6 +4496,7 @@ pref("webgl.vendor-string-override", "");
 pref("webgl.angle.try-d3d11", true);
 pref("webgl.angle.force-d3d11", false);
 pref("webgl.angle.force-warp", false);
+pref("webgl.dxgl.enabled", false);
 #endif
 
 pref("gfx.offscreencanvas.enabled", false);
@@ -4744,17 +4771,18 @@ pref("dom.mozAlarms.enabled", false);
 
 pref("dom.push.enabled", false);
 
-#if !defined(RELEASE_BUILD)
-pref("dom.push.debug", true);
-#endif
-
+pref("dom.push.loglevel", "off");
 
 pref("dom.push.serverURL", "wss://push.services.mozilla.com/");
 pref("dom.push.userAgentID", "");
 
-// The maximum number of notifications that a service worker can receive
+// The maximum number of push messages that a service worker can receive
 // without user interaction.
 pref("dom.push.maxQuotaPerSubscription", 16);
+
+// The delay between receiving a push message and updating the quota for a
+// subscription.
+pref("dom.push.quotaUpdateDelay", 3000); // 3 seconds
 
 // Is the network connection allowed to be up?
 // This preference should be used in UX to enable/disable push.
@@ -5197,10 +5225,6 @@ pref("dom.presentation.discoverable", false);
 // Use raw ICU instead of CoreServices API in Unicode collation
 pref("intl.collation.mac.use_icu", true);
 
-// Enable NSTextInput protocol for use with IMEs that have not
-// been updated to use the NSTextInputClient protocol.
-pref("intl.ime.nstextinput.enable", false);
-
 #if !defined(RELEASE_BUILD) || defined(DEBUG)
 // In non-release builds we crash by default on insecure text input (when a
 // password editor has focus but secure event input isn't enabled).  The
@@ -5381,8 +5405,6 @@ pref("memory.report_concurrency", 1);
 pref("memory.report_concurrency", 10);
 #endif
 
-// Make <audio>, <video>, NPAPI plugins and webAudio talk to the AudioChannelService.
-pref("media.useAudioChannelService", true);
 // Add Mozilla AudioChannel APIs.
 pref("media.useAudioChannelAPI", false);
 

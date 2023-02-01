@@ -15,7 +15,7 @@ interface TelephonyCall : EventTarget {
   // call. We need an additional attribute for the CDMA waiting call.
   readonly attribute TelephonyCallId? secondId;
 
-  readonly attribute DOMString state;
+  readonly attribute TelephonyCallState state;
 
   // The property "emergency" indicates whether the call number is an emergency
   // number. Only the outgoing call could have a value with true and it is
@@ -30,6 +30,8 @@ interface TelephonyCall : EventTarget {
   readonly attribute boolean mergeable;
 
   readonly attribute DOMError? error;
+
+  readonly attribute TelephonyCallDisconnectedReason? disconnectedReason;
 
   readonly attribute TelephonyCallGroup? group;
 
@@ -52,4 +54,80 @@ interface TelephonyCall : EventTarget {
 
   // Fired whenever the group attribute changes.
   attribute EventHandler ongroupchange;
+};
+
+enum TelephonyCallState {
+  "dialing",
+  "alerting",
+  "connected",
+  "held",
+  "disconnected",
+  "incoming",
+};
+
+enum TelephonyCallDisconnectedReason {
+  "BadNumber",
+  "NoRouteToDestination",
+  "ChannelUnacceptable",
+  "OperatorDeterminedBarring",
+  "NormalCallClearing",
+  "Busy",
+  "NoUserResponding",
+  "UserAlertingNoAnswer",
+  "CallRejected",
+  "NumberChanged",
+  "CallRejectedDestinationFeature",
+  "PreEmption",
+  "DestinationOutOfOrder",
+  "InvalidNumberFormat",
+  "FacilityRejected",
+  "ResponseToStatusEnquiry",
+  "Congestion",
+  "NetworkOutOfOrder",
+  "NetworkTempFailure",
+  "SwitchingEquipCongestion",
+  "AccessInfoDiscarded",
+  "RequestedChannelNotAvailable",
+  "ResourceUnavailable",
+  "QosUnavailable",
+  "RequestedFacilityNotSubscribed",
+  "IncomingCallsBarredWithinCug",
+  "BearerCapabilityNotAuthorized",
+  "BearerCapabilityNotAvailable",
+  "BearerNotImplemented",
+  "ServiceNotAvailable",
+  "IncomingCallExceeded",
+  "RequestedFacilityNotImplemented",
+  "UnrestrictedBearerNotAvailable",
+  "ServiceNotImplemented",
+  "InvalidTransactionId",
+  "NotCugMember",
+  "IncompatibleDestination",
+  "InvalidTransitNetworkSelection",
+  "SemanticallyIncorrectMessage",
+  "InvalidMandatoryInfo",
+  "MessageTypeNotImplemented",
+  "MessageTypeIncompatibleProtocolState",
+  "InfoElementNotImplemented",
+  "ConditionalIe",
+  "MessageIncompatibleProtocolState",
+  "RecoveryOnTimerExpiry",
+  "Protocol",
+  "Interworking",
+  "Barred",
+  "FDNBlocked",
+  "SubscriberUnknown",
+  "DeviceNotAccepted",
+  "ModifiedDial",
+  "CdmaLockedUntilPowerCycle",
+  "CdmaDrop",
+  "CdmaIntercept",
+  "CdmaReorder",
+  "CdmaSoReject",
+  "CdmaRetryOrder",
+  "CdmaAcess",
+  "CdmaPreempted",
+  "CdmaNotEmergency",
+  "CdmaAccessBlocked",
+  "Unspecified",
 };

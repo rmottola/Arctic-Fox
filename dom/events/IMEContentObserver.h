@@ -113,10 +113,16 @@ private:
     eState_Observing
   };
   State GetState() const;
+  bool InitWithEditor(nsPresContext* aPresContext, nsIContent* aContent,
+                      nsIEditor* aEditor);
+  bool InitWithPlugin(nsPresContext* aPresContext, nsIContent* aContent);
+  bool IsInitializedWithPlugin() const { return !mEditor; }
+  void Clear();
   bool IsObservingContent(nsPresContext* aPresContext,
                           nsIContent* aContent) const;
   bool IsReflowLocked() const;
   bool IsSafeToNotifyIME() const;
+  bool IsEditorComposing() const;
 
   void PostFocusSetNotification();
   void MaybeNotifyIMEOfFocusSet();
@@ -124,7 +130,8 @@ private:
   void MaybeNotifyIMEOfTextChange(const TextChangeDataBase& aTextChangeData);
   void PostSelectionChangeNotification();
   void MaybeNotifyIMEOfSelectionChange(bool aCausedByComposition,
-                                       bool aCausedBySelectionEvent);
+                                       bool aCausedBySelectionEvent,
+                                       bool aOccurredDuringComposition);
   void PostPositionChangeNotification();
   void MaybeNotifyIMEOfPositionChange();
 

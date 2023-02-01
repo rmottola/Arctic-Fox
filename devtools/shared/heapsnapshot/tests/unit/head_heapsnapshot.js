@@ -20,7 +20,7 @@ const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const HeapAnalysesClient =
   require("devtools/shared/heapsnapshot/HeapAnalysesClient");
 const Services = require("Services");
-const { CensusTreeNode } = require("devtools/shared/heapsnapshot/census-tree-node");
+const { censusReportToCensusTreeNode } = require("devtools/shared/heapsnapshot/census-tree-node");
 const CensusUtils = require("devtools/shared/heapsnapshot/CensusUtils");
 
 // Always log packets when running tests. runxpcshelltests.py will throw
@@ -117,6 +117,13 @@ function saveNewHeapSnapshot() {
   return filePath;
 }
 
+function readHeapSnapshot(filePath) {
+  const snapshot = ChromeUtils.readHeapSnapshot(filePath);
+  ok(snapshot, "Should have read a heap snapshot back from " + filePath);
+  ok(snapshot instanceof HeapSnapshot, "snapshot should be an instance of HeapSnapshot");
+  return snapshot;
+}
+
 /**
  * Save a heap snapshot to the file with the given name in the current
  * directory, read it back as a HeapSnapshot instance, and then take a census of
@@ -138,16 +145,50 @@ function saveNewHeapSnapshot() {
  */
 function saveHeapSnapshotAndTakeCensus(dbg=null, censusOptions=undefined) {
   const snapshotOptions = dbg ? { debugger: dbg } : { runtime: true };
-  const filePath = ChromeUtils.saveHeapSnapshot(snapshotOptions);
-  ok(filePath, "Should get a file path to save the core dump to.");
-  ok(true, "Should have saved a heap snapshot to " + filePath);
-
-  const snapshot = ChromeUtils.readHeapSnapshot(filePath);
-  ok(snapshot, "Should have read a heap snapshot back from " + filePath);
-  ok(snapshot instanceof HeapSnapshot, "snapshot should be an instance of HeapSnapshot");
+  const filePath = saveNewHeapSnapshot(snapshotOptions);
+  const snapshot = readHeapSnapshot(filePath);
 
   equal(typeof snapshot.takeCensus, "function", "snapshot should have a takeCensus method");
+
   return snapshot.takeCensus(censusOptions);
+}
+
+/**
+ * Save a heap snapshot to disk, read it back as a HeapSnapshot instance, and
+ * then compute its dominator tree.
+ *
+ * @param {Debugger|null} dbg
+ *        If a Debugger object is given, only serialize the subgraph covered by
+ *        the Debugger's debuggees. If null, serialize the whole heap graph.
+ *
+ * @returns {DominatorTree}
+ */
+function saveHeapSnapshotAndComputeDominatorTree(dbg = null) {
+  const snapshotOptions = dbg ? { debugger: dbg } : { runtime: true };
+  const filePath = saveNewHeapSnapshot(snapshotOptions);
+  const snapshot = readHeapSnapshot(filePath);
+
+  equal(typeof snapshot.computeDominatorTree, "function",
+        "snapshot should have a `computeDominatorTree` method");
+
+  const dominatorTree = snapshot.computeDominatorTree();
+
+  ok(dominatorTree, "Should be able to compute a dominator tree");
+  ok(dominatorTree instanceof DominatorTree, "Should be an instance of DominatorTree");
+
+  return dominatorTree;
+}
+
+function isSavedFrame(obj) {
+  return Object.prototype.toString.call(obj) === "[object SavedFrame]";
+}
+
+function savedFrameReplacer(key, val) {
+  if (isSavedFrame(val)) {
+    return `<SavedFrame '${val.toString().split(/\n/g).shift()}'>`;
+  } else {
+    return val;
+  }
 }
 
 /**
@@ -163,17 +204,29 @@ function saveHeapSnapshotAndTakeCensus(dbg=null, censusOptions=undefined) {
  * @param {Object} expected
  *        The expected CensusTreeNode result.
  *
- * @param {String} assertion
- *        The assertion message.
+ * @param {Object} options
+ *        The options to pass through to `censusReportToCensusTreeNode`.
  */
-function compareCensusViewData (breakdown, report, expected, assertion) {
-  let data = new CensusTreeNode(breakdown, report);
-  equal(JSON.stringify(data), JSON.stringify(expected), assertion);
+function compareCensusViewData (breakdown, report, expected, options) {
+  dumpn("Generating CensusTreeNode from report:");
+  dumpn("breakdown: " + JSON.stringify(breakdown, null, 4));
+  dumpn("report: " + JSON.stringify(report, null, 4));
+  dumpn("expected: " + JSON.stringify(expected, savedFrameReplacer, 4));
+
+  const actual = censusReportToCensusTreeNode(breakdown, report, options);
+  dumpn("actual: " + JSON.stringify(actual, savedFrameReplacer, 4));
+
+  assertStructurallyEquivalent(actual, expected);
 }
 
 // Deep structural equivalence that can handle Map objects in addition to plain
 // objects.
 function assertStructurallyEquivalent(actual, expected, path="root") {
+  if (actual === expected) {
+    equal(actual, expected, "actual and expected are the same");
+    return;
+  }
+
   equal(typeof actual, typeof expected, `${path}: typeof should be the same`);
 
   if (actual && typeof actual === "object") {
@@ -195,7 +248,7 @@ function assertStructurallyEquivalent(actual, expected, path="root") {
       }
 
       equal(expectedKeys.size, 0,
-            `${path}: every key in expected should also exist in actual`);
+            `${path}: every key in expected should also exist in actual, did not see ${[...expectedKeys]}`);
     } else {
       const expectedKeys = new Set(Object.keys(expected));
 
@@ -208,7 +261,7 @@ function assertStructurallyEquivalent(actual, expected, path="root") {
       }
 
       equal(expectedKeys.size, 0,
-            `${path}: every key in expected should also exist in actual`);
+            `${path}: every key in expected should also exist in actual, did not see ${[...expectedKeys]}`);
     }
   } else {
     equal(actual, expected, `${path}: primitives should be equal`);

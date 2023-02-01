@@ -24,7 +24,7 @@
 
 namespace mozilla {
 
-PRLogModuleInfo* gMediaCacheLog;
+LazyLogModule gMediaCacheLog("MediaCache");
 #define CACHE_LOG(type, msg) MOZ_LOG(gMediaCacheLog, type, msg)
 
 // Readahead blocks for non-seekable streams will be limited to this
@@ -104,9 +104,7 @@ class MediaCache {
 public:
   friend class MediaCacheStream::BlockList;
   typedef MediaCacheStream::BlockList BlockList;
-  enum {
-    BLOCK_SIZE = MediaCacheStream::BLOCK_SIZE
-  };
+  static const int64_t BLOCK_SIZE = MediaCacheStream::BLOCK_SIZE;
 
   MediaCache() : mNextResourceID(1),
     mReentrantMonitor("MediaCache.mReentrantMonitor"),
@@ -581,10 +579,6 @@ MediaCache::Init()
   mFileCache = new FileBlockCache();
   rv = mFileCache->Open(fileDesc);
   NS_ENSURE_SUCCESS(rv,rv);
-
-  if (!gMediaCacheLog) {
-    gMediaCacheLog = PR_NewLogModule("MediaCache");
-  }
 
   MediaCacheFlusher::Init();
 
@@ -1834,11 +1828,10 @@ MediaCacheStream::NotifyDataReceived(int64_t aSize, const char* aData,
 }
 
 void
-MediaCacheStream::FlushPartialBlockInternal(bool aNotifyAll)
+MediaCacheStream::FlushPartialBlockInternal(bool aNotifyAll,
+                                            ReentrantMonitorAutoEnter& aReentrantMonitor)
 {
   NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
-
-  ReentrantMonitorAutoEnter mon(gMediaCache->GetReentrantMonitor());
 
   int32_t blockOffset = int32_t(mChannelOffset%BLOCK_SIZE);
   if (blockOffset > 0) {
@@ -1861,7 +1854,7 @@ MediaCacheStream::FlushPartialBlockInternal(bool aNotifyAll)
   // that will never come.
   if ((blockOffset > 0 || mChannelOffset == 0) && aNotifyAll) {
     // Wake up readers who may be waiting for this data
-    mon.NotifyAll();
+    aReentrantMonitor.NotifyAll();
   }
 }
 
@@ -1876,7 +1869,7 @@ MediaCacheStream::FlushPartialBlock()
   // Note: This writes a full block, so if data is not at the end of the
   // stream, the decoder must subsequently choose correct start and end offsets
   // for reading/seeking.
-  FlushPartialBlockInternal(false);
+  FlushPartialBlockInternal(false, mon);
 
   gMediaCache->QueueUpdate();
 }
@@ -1897,7 +1890,7 @@ MediaCacheStream::NotifyDataEnded(nsresult aStatus)
 
   // It is prudent to update channel/cache status before calling
   // CacheClientNotifyDataEnded() which will read |mChannelEnded|.
-  FlushPartialBlockInternal(true);
+  FlushPartialBlockInternal(true, mon);
   mChannelEnded = true;
   gMediaCache->QueueUpdate();
 
@@ -2224,7 +2217,7 @@ MediaCacheStream::Read(char* aBuffer, uint32_t aCount, uint32_t* aBytes)
     uint32_t streamBlock = uint32_t(mStreamOffset/BLOCK_SIZE);
     uint32_t offsetInStreamBlock =
       uint32_t(mStreamOffset - streamBlock*BLOCK_SIZE);
-    int64_t size = std::min(aCount - count, BLOCK_SIZE - offsetInStreamBlock);
+    int64_t size = std::min<int64_t>(aCount - count, BLOCK_SIZE - offsetInStreamBlock);
 
     if (mStreamLength >= 0) {
       // Don't try to read beyond the end of the stream
@@ -2461,13 +2454,13 @@ nsresult MediaCacheStream::GetCachedRanges(nsTArray<MediaByteRange>& aRanges)
   // shrink while we're trying to loop over them.
   NS_ASSERTION(mPinCount > 0, "Must be pinned");
 
-  int64_t startOffset = GetNextCachedData(0);
+  int64_t startOffset = GetNextCachedDataInternal(0);
   while (startOffset >= 0) {
-    int64_t endOffset = GetCachedDataEnd(startOffset);
+    int64_t endOffset = GetCachedDataEndInternal(startOffset);
     NS_ASSERTION(startOffset < endOffset, "Buffered range must end after its start");
     // Bytes [startOffset..endOffset] are cached.
     aRanges.AppendElement(MediaByteRange(startOffset, endOffset));
-    startOffset = GetNextCachedData(endOffset);
+    startOffset = GetNextCachedDataInternal(endOffset);
     NS_ASSERTION(startOffset == -1 || startOffset > endOffset,
       "Must have advanced to start of next range, or hit end of stream");
   }

@@ -33,6 +33,39 @@ namespace dom {
 
 using namespace workers;
 
+namespace {
+
+nsresult
+GetPermissionState(nsIPrincipal* aPrincipal,
+                            PushPermissionState& aState)
+{
+  nsCOMPtr<nsIPermissionManager> permManager =
+    mozilla::services::GetPermissionManager();
+
+  if (!permManager) {
+    return NS_ERROR_FAILURE;
+  }
+  uint32_t permission = nsIPermissionManager::UNKNOWN_ACTION;
+  nsresult rv = permManager->TestExactPermissionFromPrincipal(
+                  aPrincipal,
+                  "desktop-notification",
+                  &permission);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  if (permission == nsIPermissionManager::ALLOW_ACTION) {
+    aState = PushPermissionState::Granted;
+  } else if (permission == nsIPermissionManager::DENY_ACTION) {
+    aState = PushPermissionState::Denied;
+  } else {
+    aState = PushPermissionState::Prompt;
+  }
+  return NS_OK;
+}
+
+} // anonymous namespace
+
 class UnsubscribeResultCallback final : public nsIUnsubscribeResultCallback
 {
 public:
@@ -393,12 +426,13 @@ public:
       do_CreateInstance("@mozilla.org/push/PushClient;1");
     if (!client) {
       callback->OnUnsubscribe(NS_ERROR_FAILURE, false);
+      return NS_OK;
     }
 
     nsCOMPtr<nsIPrincipal> principal = mProxy->GetWorkerPrivate()->GetPrincipal();
     if (NS_WARN_IF(NS_FAILED(client->Unsubscribe(mScope, principal, callback)))) {
       callback->OnUnsubscribe(NS_ERROR_FAILURE, false);
-      return NS_ERROR_FAILURE;
+      return NS_OK;
     }
     return NS_OK;
   }
@@ -488,7 +522,7 @@ public:
         promise->MaybeResolve(sub);
       }
     } else {
-      promise->MaybeReject(NS_ERROR_DOM_ABORT_ERR);
+      promise->MaybeReject(NS_ERROR_DOM_PUSH_ABORT_ERR);
     }
 
     mProxy->CleanUp(aCx);
@@ -580,22 +614,20 @@ public:
 
     RefPtr<GetSubscriptionCallback> callback = new GetSubscriptionCallback(mProxy, mScope);
 
-    nsCOMPtr<nsIPermissionManager> permManager =
-      mozilla::services::GetPermissionManager();
-    if (!permManager) {
+    nsCOMPtr<nsIPrincipal> principal = mProxy->GetWorkerPrivate()->GetPrincipal();
+
+    PushPermissionState state;
+    nsresult rv = GetPermissionState(principal, state);
+    if (NS_FAILED(rv)) {
       callback->OnPushEndpoint(NS_ERROR_FAILURE, EmptyString(), 0, nullptr);
       return NS_OK;
     }
 
-    nsCOMPtr<nsIPrincipal> principal = mProxy->GetWorkerPrivate()->GetPrincipal();
-
-    uint32_t permission = nsIPermissionManager::DENY_ACTION;
-    nsresult rv = permManager->TestExactPermissionFromPrincipal(
-                    principal,
-                    "desktop-notification",
-                    &permission);
-
-    if (NS_WARN_IF(NS_FAILED(rv)) || permission != nsIPermissionManager::ALLOW_ACTION) {
+    if (state != PushPermissionState::Granted) {
+      if (mAction == WorkerPushManager::GetSubscriptionAction) {
+        callback->OnPushEndpoint(NS_OK, EmptyString(), 0, nullptr);
+        return NS_OK;
+      }
       callback->OnPushEndpoint(NS_ERROR_FAILURE, EmptyString(), 0, nullptr);
       return NS_OK;
     }
@@ -616,7 +648,7 @@ public:
 
     if (NS_WARN_IF(NS_FAILED(rv))) {
       callback->OnPushEndpoint(NS_ERROR_FAILURE, EmptyString(), 0, nullptr);
-      return rv;
+      return NS_OK;
     }
 
     return NS_OK;
@@ -646,7 +678,7 @@ WorkerPushManager::PerformSubscriptionAction(SubscriptionAction aAction, ErrorRe
 
   RefPtr<PromiseWorkerProxy> proxy = PromiseWorkerProxy::Create(worker, p);
   if (!proxy) {
-    p->MaybeReject(NS_ERROR_DOM_ABORT_ERR);
+    p->MaybeReject(NS_ERROR_DOM_PUSH_ABORT_ERR);
     return p.forget();
   }
 
@@ -728,27 +760,11 @@ public:
       return NS_OK;
     }
 
-    nsCOMPtr<nsIPermissionManager> permManager =
-      mozilla::services::GetPermissionManager();
-
-    nsresult rv = NS_ERROR_FAILURE;
-    PushPermissionState state = PushPermissionState::Prompt;
-
-    if (permManager) {
-      uint32_t permission = nsIPermissionManager::UNKNOWN_ACTION;
-      rv = permManager->TestExactPermissionFromPrincipal(
-             mProxy->GetWorkerPrivate()->GetPrincipal(),
-             "desktop-notification",
-             &permission);
-
-      if (NS_SUCCEEDED(rv)) {
-        if (permission == nsIPermissionManager::ALLOW_ACTION) {
-          state = PushPermissionState::Granted;
-        } else if (permission == nsIPermissionManager::DENY_ACTION) {
-          state = PushPermissionState::Denied;
-        }
-      }
-    }
+    PushPermissionState state;
+    nsresult rv = GetPermissionState(
+      mProxy->GetWorkerPrivate()->GetPrincipal(),
+      state
+    );
 
     AutoJSAPI jsapi;
     jsapi.Init();

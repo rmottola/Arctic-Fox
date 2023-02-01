@@ -563,6 +563,9 @@ nsBrowserElement::GetAllowedAudioChannels(
       return;
     }
 
+    MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
+            ("nsBrowserElement, GetAllowedAudioChannels, this = %p\n", this));
+
     GenerateAllowedAudioChannels(window, frameLoader, mBrowserElementAPI,
                                  manifestURL, mBrowserElementAudioChannels,
                                  aRv);
@@ -603,7 +606,8 @@ nsBrowserElement::GenerateAllowedAudioChannels(
 
   RefPtr<BrowserElementAudioChannel> ac =
     BrowserElementAudioChannel::Create(aWindow, aFrameLoader, aAPI,
-                                       AudioChannel::Normal, aRv);
+                                       AudioChannel::Normal,
+                                       aManifestURL, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
@@ -630,7 +634,7 @@ nsBrowserElement::GenerateAllowedAudioChannels(
         RefPtr<BrowserElementAudioChannel> ac =
           BrowserElementAudioChannel::Create(aWindow, aFrameLoader, aAPI,
                                              (AudioChannel)audioChannelTable[i].value,
-                                             aRv);
+                                             aManifestURL, aRv);
         if (NS_WARN_IF(aRv.Failed())) {
           return;
         }
@@ -777,5 +781,23 @@ nsBrowserElement::GetStructuredData(ErrorResult& aRv)
 
   return req.forget().downcast<DOMRequest>();
 }
+
+already_AddRefed<DOMRequest>
+nsBrowserElement::GetWebManifest(ErrorResult& aRv)
+{
+  NS_ENSURE_TRUE(IsBrowserElementOrThrow(aRv), nullptr);
+
+  nsCOMPtr<nsIDOMDOMRequest> req;
+  nsresult rv = mBrowserElementAPI->GetWebManifest(getter_AddRefs(req));
+
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
+
+  return req.forget().downcast<DOMRequest>();
+}
+
+
 
 } // namespace mozilla

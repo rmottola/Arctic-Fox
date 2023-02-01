@@ -84,6 +84,7 @@ IsTypeInList(const nsACString& aType, const char* const aList[])
       return true;
     }
   }
+
   return false;
 }
 
@@ -179,14 +180,15 @@ nsContentDLF::CreateInstance(const char* aCommand,
   // Try html or plaintext; both use the same document CID
   if (IsTypeInList(contentType, gHTMLTypes) ||
       nsContentUtils::IsPlainTextType(contentType)) {
-    return CreateDocument(aCommand, 
+    return CreateDocument(aCommand,
                           aChannel, aLoadGroup,
                           aContainer, kHTMLDocumentCID,
                           aDocListener, aDocViewer);
   }
 
+  // Try XML
   if (IsTypeInList(contentType, gXMLTypes)) {
-    return CreateDocument(aCommand, 
+    return CreateDocument(aCommand,
                           aChannel, aLoadGroup,
                           aContainer, kXMLDocumentCID,
                           aDocListener, aDocViewer);

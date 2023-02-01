@@ -1121,11 +1121,6 @@ static bool IsScriptedAutoplayEnabled()
   return Preferences::GetBool("media.autoplay.allowscripted");
 }
 
-static bool UseAudioChannelService()
-{
-  return Preferences::GetBool("media.useAudioChannelService");
-}
-
 static bool UseAudioChannelAPI()
 {
   return Preferences::GetBool("media.useAudioChannelAPI");
@@ -2217,6 +2212,13 @@ HTMLMediaElement::PlayInternal(bool aCallerIsChrome)
       && !EventStateManager::IsHandlingUserInput()
       && !aCallerIsChrome) {
     LOG(LogLevel::Debug, ("%p Blocked attempt to autoplay media.", this));
+#if defined(MOZ_WIDGET_ANDROID)
+    nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
+                                         static_cast<nsIContent*>(this),
+                                         NS_LITERAL_STRING("MozAutoplayMediaBlocked"),
+                                         false,
+                                         false);
+#endif
     return NS_OK;
   }
 
@@ -2449,10 +2451,6 @@ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
 
 bool HTMLMediaElement::CheckAudioChannelPermissions(const nsAString& aString)
 {
-  if (!UseAudioChannelService()) {
-    return true;
-  }
-
   // Only normal channel doesn't need permission.
   if (aString.EqualsASCII("normal")) {
     return true;
@@ -2737,7 +2735,9 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
 
   decoder->SetMediaSeekable(aOriginal->IsMediaSeekable());
 
-  RefPtr<MediaResource> resource = originalResource->CloneData(decoder);
+  RefPtr<MediaResource> resource =
+    originalResource->CloneData(decoder->GetResourceCallback());
+
   if (!resource) {
     LOG(LogLevel::Debug, ("%p Failed to cloned stream for decoder %p", this, decoder.get()));
     return NS_ERROR_FAILURE;
@@ -2769,7 +2769,9 @@ nsresult HTMLMediaElement::InitializeDecoderForChannel(nsIChannel* aChannel,
 
   LOG(LogLevel::Debug, ("%p Created decoder %p for type %s", this, decoder.get(), mimeType.get()));
 
-  RefPtr<MediaResource> resource = MediaResource::Create(decoder, aChannel);
+  RefPtr<MediaResource> resource =
+    MediaResource::Create(decoder->GetResourceCallback(), aChannel);
+
   if (!resource)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -4635,10 +4637,6 @@ ImageContainer* HTMLMediaElement::GetImageContainer()
 
 nsresult HTMLMediaElement::UpdateChannelMuteState(float aVolume, bool aMuted)
 {
-  if (!UseAudioChannelService()) {
-    return NS_OK;
-  }
-
   if (mAudioChannelVolume != aVolume) {
     mAudioChannelVolume = aVolume;
     SetVolumeInternal();
@@ -4683,10 +4681,6 @@ HTMLMediaElement::MaybeCreateAudioChannelAgent()
 void
 HTMLMediaElement::UpdateAudioChannelPlayingState()
 {
-  if (!UseAudioChannelService()) {
-    return;
-  }
-
   bool playingThroughTheAudioChannel =
      (!mPaused &&
       !Muted() &&
@@ -4712,11 +4706,6 @@ HTMLMediaElement::UpdateAudioChannelPlayingState()
 void
 HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
 {
-  // Don't do anything if this element doesn't have any audio tracks.
-  if (!HasAudio()) {
-    return;
-  }
-
   // Immediately check if this should go to the MSG instead of the normal
   // media playback route.
   WindowAudioCaptureChanged();
@@ -4727,9 +4716,13 @@ HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
   AutoNoJSAPI nojsapi;
 
   if (aPlaying) {
+    // Don't notify playback if this element doesn't have any audio tracks.
+    uint32_t notify = HasAudio() ? nsIAudioChannelAgent::AUDIO_AGENT_NOTIFY :
+                                   nsIAudioChannelAgent::AUDIO_AGENT_DONT_NOTIFY;
+
     float volume = 0.0;
     bool muted = true;
-    mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
+    mAudioChannelAgent->NotifyStartedPlaying(notify, &volume, &muted);
     WindowVolumeChanged(volume, muted);
   } else {
     mAudioChannelAgent->NotifyStoppedPlaying();

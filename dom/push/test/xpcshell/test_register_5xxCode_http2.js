@@ -79,7 +79,6 @@ add_task(function* test1() {
 
   PushService.init({
     serverURI: serverURL + "/subscribe5xxCode",
-    service: PushServiceHttp2,
     db
   });
 
@@ -91,15 +90,11 @@ add_task(function* test1() {
   var subscriptionUri = serverURL + '/subscription';
   var pushEndpoint = serverURL + '/pushEndpoint';
   var pushReceiptEndpoint = serverURL + '/receiptPushEndpoint';
-  equal(newRecord.subscriptionUri, subscriptionUri,
-    'Wrong subscription ID in registration record');
   equal(newRecord.pushEndpoint, pushEndpoint,
     'Wrong push endpoint in registration record');
 
   equal(newRecord.pushReceiptEndpoint, pushReceiptEndpoint,
     'Wrong push endpoint receipt in registration record');
-  equal(newRecord.scope, 'https://example.com/retry5xxCode',
-    'Wrong scope in registration record');
 
   let record = yield db.getByKeyID(subscriptionUri);
   equal(record.subscriptionUri, subscriptionUri,

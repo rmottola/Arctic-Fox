@@ -32,10 +32,11 @@ VibrancyManager::UpdateVibrantRegion(VibrancyType aType, const nsIntRegion& aReg
   for (size_t i = 0; (iterRect = iter.Next()) || i < viewsToRecycle.Length(); ++i) {
     if (iterRect) {
       NSView* view = nil;
-      NSRect rect = mCoordinateConverter.DevPixelsToCocoaPoints(*iterRect);
+      NSRect rect = mCoordinateConverter.UntypedDevPixelsToCocoaPoints(*iterRect);
       if (i < viewsToRecycle.Length()) {
         view = viewsToRecycle[i];
         [view setFrame:rect];
+        [view setNeedsDisplay:YES];
       } else {
         view = CreateEffectView(aType, rect);
         [mContainerView addSubview:view];
@@ -56,20 +57,12 @@ VibrancyManager::UpdateVibrantRegion(VibrancyType aType, const nsIntRegion& aReg
   vr.region = aRegion;
 }
 
-static PLDHashOperator
-ClearVibrantRegionFunc(const uint32_t& aVibrancyType,
-                       VibrancyManager::VibrantRegion* aVibrantRegion,
-                       void* aVM)
-{
-  static_cast<VibrancyManager*>(aVM)->ClearVibrantRegion(*aVibrantRegion);
-  return PL_DHASH_NEXT;
-}
-
 void
 VibrancyManager::ClearVibrantAreas() const
 {
-  mVibrantRegions.EnumerateRead(ClearVibrantRegionFunc,
-                                const_cast<VibrancyManager*>(this));
+  for (auto iter = mVibrantRegions.ConstIter(); !iter.Done(); iter.Next()) {
+    ClearVibrantRegion(*iter.UserData());
+  }
 }
 
 void
@@ -79,13 +72,26 @@ VibrancyManager::ClearVibrantRegion(const VibrantRegion& aVibrantRegion) const
 
   nsIntRegionRectIterator iter(aVibrantRegion.region);
   while (const nsIntRect* rect = iter.Next()) {
-    NSRectFill(mCoordinateConverter.DevPixelsToCocoaPoints(*rect));
+    NSRectFill(mCoordinateConverter.UntypedDevPixelsToCocoaPoints(*rect));
   }
 }
 
 @interface NSView(CurrentFillColor)
 - (NSColor*)_currentFillColor;
 @end
+
+static NSColor*
+AdjustedColor(NSColor* aFillColor, VibrancyType aType)
+{
+  if (aType == VibrancyType::MENU && [aFillColor alphaComponent] == 1.0) {
+    // The opaque fill color that's used for the menu background when "Reduce
+    // vibrancy" is checked in the system accessibility prefs is too dark.
+    // This is probably because we're not using the right material for menus,
+    // see VibrancyManager::CreateEffectView.
+    return [NSColor colorWithDeviceWhite:0.96 alpha:1.0];
+  }
+  return aFillColor;
+}
 
 NSColor*
 VibrancyManager::VibrancyFillColorForType(VibrancyType aType)
@@ -98,7 +104,7 @@ VibrancyManager::VibrancyFillColorForType(VibrancyType aType)
     // -[NSVisualEffectView _currentFillColor] is the color that our view
     // would draw during its drawRect implementation, if we hadn't
     // disabled that.
-    return [views[0] _currentFillColor];
+    return AdjustedColor([views[0] _currentFillColor], aType);
   }
   return [NSColor whiteColor];
 }

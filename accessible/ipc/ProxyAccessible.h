@@ -46,6 +46,21 @@ public:
 
   uint32_t ChildrenCount() const { return mChildren.Length(); }
   ProxyAccessible* ChildAt(uint32_t aIdx) const { return mChildren[aIdx]; }
+  ProxyAccessible* FirstChild() const
+    { return mChildren.Length() ? mChildren[0] : nullptr; }
+  ProxyAccessible* LastChild() const
+    { return mChildren.Length() ? mChildren[mChildren.Length() - 1] : nullptr; }
+  ProxyAccessible* PrevSibling() const
+  {
+    size_t idx = IndexInParent();
+    return idx > 0 ? Parent()->mChildren[idx - 1] : nullptr;
+  }
+  ProxyAccessible* NextSibling() const
+  {
+    size_t idx = IndexInParent();
+    return idx < Parent()->mChildren.Length() ? Parent()->mChildren[idx + 1]
+    : nullptr;
+  }
 
   // XXX evaluate if this is fast enough.
   size_t IndexInParent() const { return Parent()->mChildren.IndexOf(this); }
@@ -218,10 +233,25 @@ public:
   bool IsLinkValid();
 
   // XXX checking mRole alone may not result in same behavior as Accessibles
-  // due to ARIA roles
-  inline bool IsTable() const { return mRole == roles::TABLE; }
-  inline bool IsTableRow() const { return mRole == roles::ROW; }
-  inline bool IsTableCell() const { return mRole == roles::CELL; }
+  // due to ARIA roles. See bug 1210477.
+  inline bool IsTable() const
+  {
+    return mRole == roles::TABLE || mRole == roles::MATHML_TABLE;
+  }
+  inline bool IsTableRow() const
+  {
+    return (mRole == roles::ROW ||
+            mRole == roles::MATHML_TABLE_ROW ||
+            mRole == roles::MATHML_LABELED_ROW);
+  }
+  inline bool IsTableCell() const
+  {
+    return (mRole == roles::CELL ||
+            mRole == roles::COLUMNHEADER ||
+            mRole == roles::ROWHEADER ||
+            mRole == roles::GRID_CELL ||
+            mRole == roles::MATHML_CELL);
+  }
 
   uint32_t AnchorCount(bool* aOk);
 

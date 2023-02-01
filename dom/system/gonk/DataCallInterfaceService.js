@@ -71,7 +71,9 @@ DataCall.prototype = {
   ifname: null,
   addreses: null,
   dnses: null,
-  gateways: null
+  gateways: null,
+  pcscf: null,
+  mtu: -1
 };
 
 function DataCallInterfaceService() {

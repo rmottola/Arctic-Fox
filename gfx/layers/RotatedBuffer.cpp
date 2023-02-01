@@ -306,9 +306,12 @@ RotatedContentBuffer::BorrowDrawTargetForQuadrantUpdate(const IntRect& aBounds,
 void
 BorrowDrawTarget::ReturnDrawTarget(gfx::DrawTarget*& aReturned)
 {
+  MOZ_ASSERT(mLoanedDrawTarget);
   MOZ_ASSERT(aReturned == mLoanedDrawTarget);
-  mLoanedDrawTarget->SetTransform(mLoanedTransform);
-  mLoanedDrawTarget = nullptr;
+  if (mLoanedDrawTarget) {
+    mLoanedDrawTarget->SetTransform(mLoanedTransform);
+    mLoanedDrawTarget = nullptr;
+  }
   aReturned = nullptr;
 }
 
@@ -646,7 +649,7 @@ RotatedContentBuffer::BeginPaint(PaintedLayer* aLayer,
                          &destDTBuffer, &destDTBufferOnWhite);
             if (!destDTBuffer ||
                 (!destDTBufferOnWhite && (bufferFlags & BUFFER_COMPONENT_ALPHA))) {
-              gfxCriticalError() << "Failed 1 buffer db=" << hexa(destDTBuffer.get()) << " dw=" << hexa(destDTBufferOnWhite.get()) << " for " << destBufferRect.x << ", " << destBufferRect.y << ", " << destBufferRect.width << ", " << destBufferRect.height;
+              gfxCriticalError(CriticalLog::DefaultOptions(Factory::ReasonableSurfaceSize(IntSize(destBufferRect.width, destBufferRect.height)))) << "Failed 1 buffer db=" << hexa(destDTBuffer.get()) << " dw=" << hexa(destDTBufferOnWhite.get()) << " for " << destBufferRect.x << ", " << destBufferRect.y << ", " << destBufferRect.width << ", " << destBufferRect.height;
               return result;
             }
           }
@@ -668,7 +671,7 @@ RotatedContentBuffer::BeginPaint(PaintedLayer* aLayer,
                  &destDTBuffer, &destDTBufferOnWhite);
     if (!destDTBuffer ||
         (!destDTBufferOnWhite && (bufferFlags & BUFFER_COMPONENT_ALPHA))) {
-      gfxCriticalError() << "Failed 2 buffer db=" << hexa(destDTBuffer.get()) << " dw=" << hexa(destDTBufferOnWhite.get()) << " for " << destBufferRect.x << ", " << destBufferRect.y << ", " << destBufferRect.width << ", " << destBufferRect.height;
+      gfxCriticalError(CriticalLog::DefaultOptions(Factory::ReasonableSurfaceSize(IntSize(destBufferRect.width, destBufferRect.height)))) << "Failed 2 buffer db=" << hexa(destDTBuffer.get()) << " dw=" << hexa(destDTBufferOnWhite.get()) << " for " << destBufferRect.x << ", " << destBufferRect.y << ", " << destBufferRect.width << ", " << destBufferRect.height;
       return result;
     }
   }
@@ -752,9 +755,8 @@ RotatedContentBuffer::BorrowDrawTargetForPainting(PaintState& aPaintState,
   if (aPaintState.mMode == SurfaceMode::SURFACE_COMPONENT_ALPHA) {
     if (!mDTBuffer || !mDTBufferOnWhite) {
       // This can happen in release builds if allocating one of the two buffers
-      // failed. This is pretty bad and the reason for the failure is already
-      // reported through gfxCriticalError.
-      MOZ_ASSERT(false);
+      // failed. This in turn can happen if unreasonably large textures are
+      // requested.
       return nullptr;
     }
     nsIntRegionRectIterator iter(*drawPtr);

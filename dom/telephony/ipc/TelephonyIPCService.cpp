@@ -377,15 +377,6 @@ TelephonyIPCService::CallStateChanged(uint32_t aLength, nsITelephonyCallInfo** a
 }
 
 NS_IMETHODIMP
-TelephonyIPCService::ConferenceCallStateChanged(uint16_t aCallState)
-{
-  for (uint32_t i = 0; i < mListeners.Length(); i++) {
-    mListeners[i]->ConferenceCallStateChanged(aCallState);
-  }
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 TelephonyIPCService::EnumerateCallStateComplete()
 {
   MOZ_CRASH("Not a EnumerateCalls request!");
@@ -417,16 +408,6 @@ TelephonyIPCService::NotifyConferenceError(const nsAString& aName,
 {
   for (uint32_t i = 0; i < mListeners.Length(); i++) {
     mListeners[i]->NotifyConferenceError(aName, aMessage);
-  }
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-TelephonyIPCService::NotifyError(uint32_t aClientId, int32_t aCallIndex,
-                                  const nsAString& aError)
-{
-  for (uint32_t i = 0; i < mListeners.Length(); i++) {
-    mListeners[i]->NotifyError(aClientId, aCallIndex, aError);
   }
   return NS_OK;
 }

@@ -85,7 +85,9 @@ add_task(function* test_expiration_origin_threshold() {
     updates++;
     return updates == 6;
   });
-  let unregisterDefer = Promise.defer();
+
+  let unregisterDone;
+  let unregisterPromise = new Promise(resolve => unregisterDone = resolve);
 
   PushService.init({
     serverURI: 'wss://push.example.org/',
@@ -94,10 +96,6 @@ add_task(function* test_expiration_origin_threshold() {
     makeWebSocket(uri) {
       return new MockWebSocket(uri, {
         onHello(request) {
-          deepEqual(request.channelIDs.sort(), [
-            '46cc6f6a-c106-4ffa-bb7c-55c60bd50c41',
-            'eb33fc90-c883-4267-b5cb-613969e8e349',
-          ], 'Wrong active registrations in handshake');
           this.serverSendMsg(JSON.stringify({
             messageType: 'hello',
             status: 200,
@@ -127,7 +125,7 @@ add_task(function* test_expiration_origin_threshold() {
         },
         onUnregister(request) {
           equal(request.channelID, 'eb33fc90-c883-4267-b5cb-613969e8e349', 'Unregistered wrong channel ID');
-          unregisterDefer.resolve();
+          unregisterDone();
         },
         // We expect to receive acks, but don't care about their
         // contents.
@@ -136,7 +134,7 @@ add_task(function* test_expiration_origin_threshold() {
     },
   });
 
-  yield waitForPromise(unregisterDefer.promise, DEFAULT_TIMEOUT,
+  yield waitForPromise(unregisterPromise, DEFAULT_TIMEOUT,
     'Timed out waiting for unregister request');
 
   yield waitForPromise(notifyPromise, DEFAULT_TIMEOUT,

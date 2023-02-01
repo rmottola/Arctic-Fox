@@ -703,7 +703,7 @@ TileClient::DiscardBackBuffer()
 {
   if (mBackBuffer) {
     MOZ_ASSERT(mBackLock);
-    if (!mBackBuffer->ImplementsLocking() && mBackLock->GetReadCount() > 1) {
+    if (!mBackBuffer->HasSynchronization() && mBackLock->GetReadCount() > 1) {
       // Our current back-buffer is still locked by the compositor. This can occur
       // when the client is producing faster than the compositor can consume. In
       // this case we just want to drop it and not return it to the pool.
@@ -1239,7 +1239,8 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
   if (aTile.IsPlaceholderTile()) {
     aTile.SetLayerManager(mManager);
     aTile.SetTextureAllocator(mManager->GetTexturePool(
-      gfxPlatform::GetPlatform()->Optimal2DFormatForContent(content)));
+      gfxPlatform::GetPlatform()->Optimal2DFormatForContent(content),
+      TextureFlags::DISALLOW_BIGIMAGE | TextureFlags::IMMEDIATE_UPLOAD));
   }
   aTile.SetCompositableClient(mCompositableClient);
 

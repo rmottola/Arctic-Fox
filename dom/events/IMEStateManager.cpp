@@ -162,7 +162,7 @@ GetNotifyIMEMessageName(IMEMessage aMessage)
 
 StaticRefPtr<nsIContent> IMEStateManager::sContent;
 nsPresContext* IMEStateManager::sPresContext = nullptr;
-StaticRefPtr<nsIWidget> IMEStateManager::sFocusedIMEWidget;
+nsIWidget* IMEStateManager::sFocusedIMEWidget;
 StaticRefPtr<TabParent> IMEStateManager::sActiveTabParent;
 StaticRefPtr<IMEContentObserver> IMEStateManager::sActiveIMEContentObserver;
 TextCompositionArray* IMEStateManager::sTextCompositions = nullptr;
@@ -215,6 +215,15 @@ IMEStateManager::OnTabParentDestroying(TabParent* aTabParent)
 
   // TODO: Need to cancel composition without TextComposition and make
   //       disable IME.
+}
+
+// static
+void
+IMEStateManager::WidgetDestroyed(nsIWidget* aWidget)
+{
+  if (sFocusedIMEWidget == aWidget) {
+    sFocusedIMEWidget = nullptr;
+  }
 }
 
 // static
@@ -510,8 +519,12 @@ IMEStateManager::OnChangeFocusInternal(nsPresContext* aPresContext,
   sPresContext = aPresContext;
   sContent = aContent;
 
-  // Don't call CreateIMEContentObserver() here, it should be called from
-  // focus event handler of editor.
+  // Don't call CreateIMEContentObserver() here except when a plugin gets
+  // focus because it will be called from the focus event handler of focused
+  // editor.
+  if (newState.mEnabled == IMEState::PLUGIN) {
+    CreateIMEContentObserver(nullptr);
+  }
 
   return NS_OK;
 }
@@ -1294,7 +1307,7 @@ IMEStateManager::NotifyIME(const IMENotification& aNotification,
      "aWidget=0x%p, aOriginIsRemote=%s), sFocusedIMEWidget=0x%p, "
      "sRemoteHasFocus=%s",
      GetNotifyIMEMessageName(aNotification.mMessage), aWidget,
-     GetBoolName(aOriginIsRemote), sFocusedIMEWidget.get(),
+     GetBoolName(aOriginIsRemote), sFocusedIMEWidget,
      GetBoolName(sRemoteHasFocus)));
 
   if (NS_WARN_IF(!aWidget)) {
@@ -1504,7 +1517,7 @@ IMEStateManager::GetRootEditableNode(nsPresContext* aPresContext,
 bool
 IMEStateManager::IsIMEObserverNeeded(const IMEState& aState)
 {
-  return aState.IsEditable();
+  return aState.MaybeEditable();
 }
 
 // static

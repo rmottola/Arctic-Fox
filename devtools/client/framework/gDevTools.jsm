@@ -26,6 +26,7 @@ loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", 
 const DefaultTools = require("devtools/client/definitions").defaultTools;
 const EventEmitter = require("devtools/shared/event-emitter");
 const Telemetry = require("devtools/client/shared/telemetry");
+const {JsonView} = require("devtools/client/jsonview/main");
 
 const TABS_OPEN_PEAK_HISTOGRAM = "DEVTOOLS_TABS_OPEN_PEAK_LINEAR";
 const TABS_OPEN_AVG_HISTOGRAM = "DEVTOOLS_TABS_OPEN_AVERAGE_LINEAR";
@@ -50,6 +51,9 @@ this.DevTools = function DevTools() {
   // destroy() is an observer's handler so we need to preserve context.
   this.destroy = this.destroy.bind(this);
   this._teardown = this._teardown.bind(this);
+
+  // JSON Viewer for 'application/json' documents.
+  JsonView.initialize();
 
   EventEmitter.decorate(this);
 
@@ -490,6 +494,8 @@ DevTools.prototype = {
       this.unregisterTool(key, true);
     }
 
+    JsonView.destroy();
+
     this._pingTelemetry();
     this._telemetry = null;
 
@@ -602,10 +608,6 @@ var gDevToolsBrowser = {
       gDevToolsBrowser.uninstallWebIDEWidget();
     }
 
-    // Enable App Manager?
-    let appMgrEnabled = Services.prefs.getBoolPref("devtools.appmanager.enabled");
-    toggleCmd("Tools:DevAppMgr", !webIDEEnabled && appMgrEnabled);
-
     // Enable Browser Toolbox?
     let chromeEnabled = Services.prefs.getBoolPref("devtools.chrome.enabled");
     let devtoolsRemoteEnabled = Services.prefs.getBoolPref("devtools.debugger.remote-enabled");
@@ -686,13 +688,6 @@ var gDevToolsBrowser = {
    */
   openConnectScreen: function(gBrowser) {
     gBrowser.selectedTab = gBrowser.addTab("chrome://devtools/content/framework/connect/connect.xhtml");
-  },
-
-  /**
-   * Open the App Manager
-   */
-  openAppManager: function(gBrowser) {
-    gBrowser.selectedTab = gBrowser.addTab("about:app-manager");
   },
 
   /**

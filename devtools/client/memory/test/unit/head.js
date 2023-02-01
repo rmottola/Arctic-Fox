@@ -14,6 +14,7 @@ var promise = require("promise");
 var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 var { expectState } = require("devtools/server/actors/common");
 var HeapSnapshotFileUtils = require("devtools/shared/heapsnapshot/HeapSnapshotFileUtils");
+var HeapAnalysesClient = require("devtools/shared/heapsnapshot/HeapAnalysesClient");
 var { addDebuggerToGlobal } = require("resource://gre/modules/jsdebugger.jsm");
 var Store = require("devtools/client/memory/store");
 var SYSTEM_PRINCIPAL = Cc["@mozilla.org/systemprincipal;1"].createInstance(Ci.nsIPrincipal);
@@ -27,6 +28,8 @@ function initDebugger () {
 }
 
 function StubbedMemoryFront () {
+  this.state = "detached";
+  this.recordingAllocations = false;
   this.dbg = initDebugger();
 }
 
@@ -39,9 +42,16 @@ StubbedMemoryFront.prototype.detach = Task.async(function *() {
 });
 
 StubbedMemoryFront.prototype.saveHeapSnapshot = expectState("attached", Task.async(function *() {
-  let path = ThreadSafeChromeUtils.saveHeapSnapshot({ debugger: this.dbg });
-  return HeapSnapshotFileUtils.getSnapshotIdFromPath(path);
+  return ThreadSafeChromeUtils.saveHeapSnapshot({ runtime: true });
 }), "saveHeapSnapshot");
+
+StubbedMemoryFront.prototype.startRecordingAllocations = expectState("attached", Task.async(function* () {
+  this.recordingAllocations = true;
+}));
+
+StubbedMemoryFront.prototype.stopRecordingAllocations = expectState("attached", Task.async(function* () {
+  this.recordingAllocations = false;
+}));
 
 function waitUntilState (store, predicate) {
   let deferred = promise.defer();
@@ -58,4 +68,33 @@ function waitUntilState (store, predicate) {
   check();
 
   return deferred.promise;
+}
+
+function waitUntilSnapshotState (store, expected) {
+  let predicate = () => {
+    let snapshots = store.getState().snapshots;
+    do_print(snapshots.map(x => x.state));
+    return snapshots.length === expected.length &&
+           expected.every((state, i) => state === "*" || snapshots[i].state === state);
+  };
+  do_print(`Waiting for snapshots to be of state: ${expected}`);
+  return waitUntilState(store, predicate);
+}
+
+function isBreakdownType (census, type) {
+  // Little sanity check, all censuses should have atleast a children array
+  if (!census || !Array.isArray(census.children)) {
+    return false;
+  }
+  switch (type) {
+    case "coarseType":
+      return census.children.find(c => c.name === "objects");
+    case "objectClass":
+      return census.children.find(c => c.name === "Function");
+    case "internalType":
+      return census.children.find(c => c.name === "js::BaseShape") &&
+             !census.children.find(c => c.name === "objects");
+    default:
+      throw new Error(`isBreakdownType does not yet support ${type}`);
+  }
 }

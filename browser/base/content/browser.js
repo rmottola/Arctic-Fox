@@ -50,7 +50,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
                                    "nsIDNSService");
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
-
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
+                                  "resource:///modules/NewTabURL.jsm");
 
 const nsIWebNavigation = Ci.nsIWebNavigation;
 const gToolbarInfoSeparators = ["|", "-"];
@@ -4223,6 +4224,10 @@ var XULBrowserWindow = {
     }
 
     return true;
+  },
+
+  shouldAddToSessionHistory: function(aDocShell, aURI) {
+    return aURI.spec != NewTabURL.get();
   },
 
   onProgressChange: function (aWebProgress, aRequest,

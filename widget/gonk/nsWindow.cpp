@@ -87,7 +87,7 @@ nsWindow::nsWindow()
 nsWindow::~nsWindow()
 {
     if (mScreen->IsPrimaryScreen()) {
-        HwcComposer2D::GetInstance()->SetCompositorParent(nullptr);
+        mComposer2D->SetCompositorParent(nullptr);
     }
 }
 
@@ -353,8 +353,10 @@ nsWindow::Create(nsIWidget *aParent,
     mVisible = false;
 
     if (!aParent) {
-        mBounds = mScreen->GetRect();
+        mBounds = mScreen->GetRect().ToUnknownRect();
     }
+
+    mComposer2D = HwcComposer2D::GetInstance();
 
     if (!IS_TOPLEVEL()) {
         return NS_OK;
@@ -784,7 +786,7 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
     CreateCompositor();
     if (mCompositorParent && mScreen->IsPrimaryScreen()) {
-        HwcComposer2D::GetInstance()->SetCompositorParent(mCompositorParent);
+        mComposer2D->SetCompositorParent(mCompositorParent);
     }
     MOZ_ASSERT(mLayerManager);
     return mLayerManager;
@@ -843,10 +845,10 @@ nsWindow::GetGLFrameBufferFormat()
     return LOCAL_GL_NONE;
 }
 
-nsIntRect
-nsWindow::GetNaturalBoundsUntyped()
+LayoutDeviceIntRect
+nsWindow::GetNaturalBounds()
 {
-    return mScreen->GetNaturalBounds().ToUnknownRect();
+    return mScreen->GetNaturalBounds();
 }
 
 nsScreenGonk*
@@ -871,5 +873,5 @@ nsWindow::GetComposer2D()
         return nullptr;
     }
 
-    return HwcComposer2D::GetInstance();
+    return mComposer2D;
 }

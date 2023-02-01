@@ -5,20 +5,11 @@
 
 #include "nsContentSecurityManager.h"
 #include "nsSecCheckWrapChannel.h"
-#include "nsHttpChannel.h"
+#include "nsIForcePendingChannel.h"
 #include "nsCOMPtr.h"
 
-static PRLogModuleInfo*
-GetChannelWrapperLog()
-{
-  static PRLogModuleInfo* gChannelWrapperPRLog;
-  if (!gChannelWrapperPRLog) {
-    gChannelWrapperPRLog = PR_NewLogModule("ChannelWrapper");
-  }
-  return gChannelWrapperPRLog;
-}
-
-#define CHANNELWRAPPERLOG(args) MOZ_LOG(GetChannelWrapperLog(), mozilla::LogLevel::Debug, args)
+static mozilla::LazyLogModule gChannelWrapperLog("ChannelWrapper");
+#define CHANNELWRAPPERLOG(args) MOZ_LOG(gChannelWrapperLog, mozilla::LogLevel::Debug, args)
 
 NS_IMPL_ADDREF(nsSecCheckWrapChannelBase)
 NS_IMPL_RELEASE(nsSecCheckWrapChannelBase)
@@ -29,8 +20,8 @@ NS_INTERFACE_MAP_BEGIN(nsSecCheckWrapChannelBase)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIHttpChannel)
   NS_INTERFACE_MAP_ENTRY(nsIRequest)
   NS_INTERFACE_MAP_ENTRY(nsIChannel)
-  NS_INTERFACE_MAP_ENTRY(nsIUploadChannel)
-  NS_INTERFACE_MAP_ENTRY(nsIUploadChannel2)
+  NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIUploadChannel, mUploadChannel)
+  NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIUploadChannel2, mUploadChannel2)
   NS_INTERFACE_MAP_ENTRY(nsISecCheckWrapChannel)
 NS_INTERFACE_MAP_END
 
@@ -82,6 +73,26 @@ nsSecCheckWrapChannel::nsSecCheckWrapChannel(nsIChannel* aChannel,
     }
     CHANNELWRAPPERLOG(("nsSecCheckWrapChannel::nsSecCheckWrapChannel [%p] (%s)",this, spec.get()));
   }
+}
+
+// static
+already_AddRefed<nsIChannel>
+nsSecCheckWrapChannel::MaybeWrap(nsIChannel* aChannel, nsILoadInfo* aLoadInfo)
+{
+  // Maybe a custom protocol handler actually returns a gecko
+  // http/ftpChannel - To check this we will check whether the channel
+  // implements a gecko non-scriptable interface e.g. nsIForcePendingChannel.
+  nsCOMPtr<nsIForcePendingChannel> isGeckoChannel = do_QueryInterface(aChannel);
+
+  nsCOMPtr<nsIChannel> channel;
+  if (isGeckoChannel) {
+    // If it is a gecko channel (ftp or http) we do not need to wrap it.
+    channel = aChannel;
+    channel->SetLoadInfo(aLoadInfo);
+  } else {
+    channel = new nsSecCheckWrapChannel(aChannel, aLoadInfo);
+  }
+  return channel.forget();
 }
 
 nsSecCheckWrapChannel::~nsSecCheckWrapChannel()

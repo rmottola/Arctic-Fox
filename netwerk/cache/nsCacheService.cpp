@@ -1129,8 +1129,6 @@ nsCacheService::Init()
         return NS_ERROR_UNEXPECTED;
     }
 
-    CACHE_LOG_INIT();
-
     nsresult rv;
 
     mStorageService = do_GetService("@mozilla.org/storage/service;1", &rv);
@@ -1571,9 +1569,6 @@ NS_IMETHODIMP nsCacheService::GetCacheIOTarget(nsIEventTarget * *aCacheIOTarget)
     return rv;
 }
 
-/* nsICacheServiceInternal
- * readonly attribute double lockHeldTime;
-*/
 NS_IMETHODIMP nsCacheService::GetLockHeldTime(double *aLockHeldTime)
 {
     MutexAutoLock lock(mTimeStampLock);

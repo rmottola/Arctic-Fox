@@ -47,6 +47,8 @@
 
 #define GDK_PIXMAP_SIZE_MAX 32767
 
+#define GFX_PREF_MAX_GENERIC_SUBSTITUTIONS "gfx.font_rendering.fontconfig.max_generic_substitutions"
+
 using namespace mozilla;
 using namespace mozilla::gfx;
 using namespace mozilla::unicode;
@@ -71,6 +73,8 @@ gfxPlatformGtk::gfxPlatformGtk()
     if (!sUseFcFontList && !sFontconfigUtils) {
         sFontconfigUtils = gfxFontconfigUtils::GetFontconfigUtils();
     }
+
+    mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
 
 #ifdef MOZ_X11
     sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ? 
@@ -243,13 +247,16 @@ gfxFontGroup *
 gfxPlatformGtk::CreateFontGroup(const FontFamilyList& aFontFamilyList,
                                 const gfxFontStyle* aStyle,
                                 gfxTextPerfMetrics* aTextPerf,
-                                gfxUserFontSet* aUserFontSet)
+                                gfxUserFontSet* aUserFontSet,
+                                gfxFloat aDevToCssSize)
 {
     if (sUseFcFontList) {
-        return new gfxFontGroup(aFontFamilyList, aStyle, aTextPerf, aUserFontSet);
+        return new gfxFontGroup(aFontFamilyList, aStyle, aTextPerf,
+                                aUserFontSet, aDevToCssSize);
     }
 
-    return new gfxPangoFontGroup(aFontFamilyList, aStyle, aUserFontSet);
+    return new gfxPangoFontGroup(aFontFamilyList, aStyle,
+                                 aUserFontSet, aDevToCssSize);
 }
 
 gfxFontEntry*
@@ -362,6 +369,35 @@ gfxPlatformGtk::GetOffscreenFormat()
     }
 
     return gfxImageFormat::RGB24;
+}
+
+void gfxPlatformGtk::FontsPrefsChanged(const char *aPref)
+{
+    // only checking for generic substitions, pass other changes up
+    if (strcmp(GFX_PREF_MAX_GENERIC_SUBSTITUTIONS, aPref)) {
+        gfxPlatform::FontsPrefsChanged(aPref);
+        return;
+    }
+
+    mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
+    if (sUseFcFontList) {
+        gfxFcPlatformFontList* pfl = gfxFcPlatformFontList::PlatformFontList();
+        pfl->ClearGenericMappings();
+        FlushFontAndWordCaches();
+    }
+}
+
+uint32_t gfxPlatformGtk::MaxGenericSubstitions()
+{
+    if (mMaxGenericSubstitutions == UNINITIALIZED_VALUE) {
+        mMaxGenericSubstitutions =
+            Preferences::GetInt(GFX_PREF_MAX_GENERIC_SUBSTITUTIONS, 3);
+        if (mMaxGenericSubstitutions < 0) {
+            mMaxGenericSubstitutions = 3;
+        }
+    }
+
+    return uint32_t(mMaxGenericSubstitutions);
 }
 
 void

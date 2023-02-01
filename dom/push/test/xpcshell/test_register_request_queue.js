@@ -21,15 +21,16 @@ add_task(function* test_register_request_queue() {
   let db = PushServiceWebSocket.newPushDB();
   do_register_cleanup(() => {return db.drop().then(_ => db.close());});
 
-  let helloDefer = Promise.defer();
-  let onHello = after(2, function onHello(request) {
+  let onHello;
+  let helloPromise = new Promise(resolve => onHello = after(2, function onHello(request) {
     this.serverSendMsg(JSON.stringify({
       messageType: 'hello',
       status: 200,
       uaid: '54b08a9e-59c6-4ed7-bb54-f4fd60d6f606'
     }));
-    helloDefer.resolve();
-  });
+    resolve();
+  }));
+
   PushService.init({
     serverURI: "wss://push.example.org/",
     networkInfo: new MockDesktopNetworkInfo(),
@@ -54,14 +55,10 @@ add_task(function* test_register_request_queue() {
   );
 
   yield waitForPromise(Promise.all([
-    rejects(firstRegister, function(error) {
-      return error == 'TimeoutError';
-    }, 'Should time out the first request'),
-    rejects(secondRegister, function(error) {
-      return error == 'TimeoutError';
-    }, 'Should time out the second request')
+    rejects(firstRegister, 'Should time out the first request'),
+    rejects(secondRegister, 'Should time out the second request')
   ]), DEFAULT_TIMEOUT, 'Queued requests did not time out');
 
-  yield waitForPromise(helloDefer.promise, DEFAULT_TIMEOUT,
+  yield waitForPromise(helloPromise, DEFAULT_TIMEOUT,
     'Timed out waiting for reconnect');
 });

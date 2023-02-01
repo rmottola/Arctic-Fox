@@ -218,15 +218,6 @@ public:
   virtual size_t SizeOfVideoQueueInFrames();
   virtual size_t SizeOfAudioQueueInFrames();
 
-  void DispatchNotifyDataArrived()
-  {
-    RefPtr<nsRunnable> r = NS_NewRunnableMethod(
-      this, &MediaDecoderReader::NotifyDataArrived);
-
-    OwnerThread()->Dispatch(
-      r.forget(), AbstractThread::DontAssertDispatchSuccess);
-  }
-
   void NotifyDataArrived()
   {
     MOZ_ASSERT(OnTaskQueue());
@@ -423,6 +414,8 @@ private:
   // "discontinuity" in the stream. For example after a seek.
   bool mAudioDiscontinuity;
   bool mVideoDiscontinuity;
+
+  MediaEventListener mDataArrivedListener;
 };
 
 } // namespace mozilla

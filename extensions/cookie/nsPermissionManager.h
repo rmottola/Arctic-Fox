@@ -8,7 +8,6 @@
 
 #include "nsIPermissionManager.h"
 #include "nsIObserver.h"
-#include "nsIObserverService.h"
 #include "nsWeakReference.h"
 #include "nsCOMPtr.h"
 #include "nsIInputStream.h"
@@ -21,8 +20,11 @@
 #include "nsCOMArray.h"
 #include "nsDataHashtable.h"
 
+namespace mozilla {
+class OriginAttributesPattern;
+}
+
 class nsIPermission;
-class nsIIDNService;
 class mozIStorageConnection;
 class mozIStorageAsyncStatement;
 
@@ -196,12 +198,15 @@ public:
                        const bool aIgnoreSessionPermissions = false);
 
   /**
-   * Initialize the "webapp-uninstall" observing.
+   * Initialize the "clear-origin-data" observing.
    * Will create a nsPermissionManager instance if needed.
    * That way, we can prevent have nsPermissionManager created at startup just
    * to be able to clear data when an application is uninstalled.
    */
-  static void AppClearDataObserverInit();
+  static void ClearOriginDataObserverInit();
+
+  nsresult
+  RemovePermissionsWithAttributes(mozilla::OriginAttributesPattern& aAttrs);
 
 private:
   virtual ~nsPermissionManager();
@@ -219,6 +224,7 @@ private:
                                 bool        aExactHostMatch,
                                 bool        aIncludingSession);
 
+  nsresult OpenDatabase(nsIFile* permissionsFile);
   nsresult InitDB(bool aRemoveFile);
   nsresult CreateTable();
   nsresult Import();
@@ -239,7 +245,6 @@ private:
 
   nsresult RemoveAllInternal(bool aNotifyObservers);
   nsresult RemoveAllFromMemory();
-  nsresult NormalizeToACE(nsCString &aHost);
   static void UpdateDB(OperationType aOp,
                        mozIStorageAsyncStatement* aStmt,
                        int64_t aID,
@@ -264,13 +269,12 @@ private:
   nsresult
   FetchPermissions();
 
-  nsCOMPtr<nsIObserverService> mObserverService;
-  nsCOMPtr<nsIIDNService>      mIDNService;
-
   nsCOMPtr<mozIStorageConnection> mDBConn;
   nsCOMPtr<mozIStorageAsyncStatement> mStmtInsert;
   nsCOMPtr<mozIStorageAsyncStatement> mStmtDelete;
   nsCOMPtr<mozIStorageAsyncStatement> mStmtUpdate;
+
+  bool mMemoryOnlyDB;
 
   nsTHashtable<PermissionHashKey> mPermissionTable;
   // a unique, monotonically increasing id used to identify each database entry

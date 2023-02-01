@@ -24,7 +24,7 @@ namespace mozilla {
 
 namespace gl {
 class SharedSurface;
-}
+} // namespace gl
 
 namespace layers {
 

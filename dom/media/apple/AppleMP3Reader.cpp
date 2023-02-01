@@ -23,7 +23,7 @@ using namespace mozilla::media;
 
 namespace mozilla {
 
-extern PRLogModuleInfo* gMediaDecoderLog;
+extern LazyLogModule gMediaDecoderLog;
 #define LOGE(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Error, (__VA_ARGS__))
 #define LOGW(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Warning, (__VA_ARGS__))
 #define LOGD(...) MOZ_LOG(gMediaDecoderLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
@@ -431,9 +431,10 @@ AppleMP3Reader::SetupDecoder()
   // Set output format
 #if defined(MOZ_SAMPLE_TYPE_FLOAT32)
   outputFormat.mBitsPerChannel = 32;
-  outputFormat.mFormatFlags =
-    kLinearPCMFormatFlagIsFloat |
-    0;
+  outputFormat.mFormatFlags = kLinearPCMFormatFlagIsFloat;
+#elif defined(MOZ_SAMPLE_TYPE_S16)
+  outputFormat.mBitsPerChannel = 32;
+  outputFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger;
 #else
 #error Unknown audio sample type
 #endif

@@ -387,6 +387,8 @@
 @RESPATH@/components/ConsoleAPIStorage.js
 @RESPATH@/components/BrowserElementParent.manifest
 @RESPATH@/components/BrowserElementParent.js
+@RESPATH@/components/BrowserElementProxy.manifest
+@RESPATH@/components/BrowserElementProxy.js
 @RESPATH@/components/FeedProcessor.manifest
 @RESPATH@/components/FeedProcessor.js
 @RESPATH@/components/PackagedAppUtils.js
@@ -650,6 +652,20 @@
 @RESPATH@/browser/modules/*
 @RESPATH@/modules/*
 
+; Safe Browsing
+#ifdef MOZ_URL_CLASSIFIER
+@RESPATH@/components/nsURLClassifier.manifest
+@RESPATH@/components/nsUrlClassifierHashCompleter.js
+@RESPATH@/components/nsUrlClassifierListManager.js
+@RESPATH@/components/nsUrlClassifierLib.js
+@RESPATH@/components/url-classifier.xpt
+#endif
+
+; Private Browsing
+@RESPATH@/components/privatebrowsing.xpt
+@RESPATH@/components/PrivateBrowsing.manifest
+@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
+
 ; Signed Packaged Content
 @RESPATH@/components/InstallPackagedWebapp.manifest
 @RESPATH@/components/InstallPackagedWebapp.js
@@ -685,6 +701,7 @@
 ; DevTools
 @RESPATH@/browser/chrome/devtools@JAREXT@
 @RESPATH@/browser/chrome/devtools.manifest
+@RESPATH@/browser/@PREF_DIR@/devtools.js
 
 ; shell icons
 #ifdef XP_UNIX

@@ -402,9 +402,12 @@ nsHTMLEditor::DoInsertHTMLWithContext(const nsAString & aInputString,
     // Are we in a text node? If so, split it.
     if (IsTextNode(parentNode))
     {
+      nsCOMPtr<nsIContent> parentContent = do_QueryInterface(parentNode);
+      NS_ENSURE_STATE(parentContent || !parentNode);
+      offsetOfNewNode = SplitNodeDeep(*parentContent, *parentContent,
+                                      offsetOfNewNode);
+      NS_ENSURE_STATE(offsetOfNewNode != -1);
       nsCOMPtr<nsIDOMNode> temp;
-      rv = SplitNodeDeep(parentNode, parentNode, offsetOfNewNode, &offsetOfNewNode);
-      NS_ENSURE_SUCCESS(rv, rv);
       rv = parentNode->GetParentNode(getter_AddRefs(temp));
       NS_ENSURE_SUCCESS(rv, rv);
       parentNode = temp;
@@ -684,12 +687,15 @@ nsHTMLEditor::DoInsertHTMLWithContext(const nsAString & aInputString,
         // nudging selection point beyond it?  Because it might have ended in a BR
         // that is not visible.  If so, the code above just placed selection
         // inside that.  So I split it instead.
-        nsCOMPtr<nsIDOMNode> leftLink;
-        int32_t linkOffset;
-        rv = SplitNodeDeep(link, selNode, selOffset, &linkOffset, true, address_of(leftLink));
-        NS_ENSURE_SUCCESS(rv, rv);
+        nsCOMPtr<nsIContent> linkContent = do_QueryInterface(link);
+        NS_ENSURE_STATE(linkContent || !link);
+        nsCOMPtr<nsIContent> selContent = do_QueryInterface(selNode);
+        NS_ENSURE_STATE(selContent || !selNode);
+        nsCOMPtr<nsIContent> leftLink;
+        SplitNodeDeep(*linkContent, *selContent, selOffset,
+                      EmptyContainers::no, getter_AddRefs(leftLink));
         if (leftLink) {
-          selNode = GetNodeLocation(leftLink, &selOffset);
+          selNode = GetNodeLocation(GetAsDOMNode(leftLink), &selOffset);
           selection->Collapse(selNode, selOffset+1);
         }
       }
@@ -1015,63 +1021,52 @@ nsresult nsHTMLEditor::InsertObject(const char* aType, nsISupports* aObject, boo
 {
   nsresult rv;
 
-  const char* type = aType;
+  nsAutoCString type(aType);
 
   // Check to see if we can insert an image file
   bool insertAsImage = false;
-  nsCOMPtr<nsIURI> fileURI;
-  if (0 == nsCRT::strcmp(type, kFileMime))
+  nsCOMPtr<nsIFile> fileObj;
+  if (type.EqualsLiteral(kFileMime))
   {
-    nsCOMPtr<nsIFile> fileObj = do_QueryInterface(aObject);
+    fileObj = do_QueryInterface(aObject);
     if (fileObj)
     {
-      rv = NS_NewFileURI(getter_AddRefs(fileURI), fileObj);
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      nsCOMPtr<nsIMIMEService> mime = do_GetService("@mozilla.org/mime;1");
-      NS_ENSURE_TRUE(mime, NS_ERROR_FAILURE);
-      nsAutoCString contentType;
-      rv = mime->GetTypeFromFile(fileObj, contentType);
-      NS_ENSURE_SUCCESS(rv, rv);
-
       // Accept any image type fed to us
-      if (StringBeginsWith(contentType, NS_LITERAL_CSTRING("image/"))) {
+      if (nsContentUtils::IsFileImage(fileObj, type))
+      {
         insertAsImage = true;
-        type = contentType.get();
+      }
+      else
+      {
+        // Reset type.
+        type.AssignLiteral(kFileMime);
       }
     }
   }
 
-  if (0 == nsCRT::strcmp(type, kJPEGImageMime) ||
-      0 == nsCRT::strcmp(type, kJPGImageMime) ||
-      0 == nsCRT::strcmp(type, kPNGImageMime) ||
-      0 == nsCRT::strcmp(type, kGIFImageMime) ||
+  if (type.EqualsLiteral(kJPEGImageMime) ||
+      type.EqualsLiteral(kJPGImageMime) ||
+      type.EqualsLiteral(kPNGImageMime) ||
+      type.EqualsLiteral(kGIFImageMime) ||
       insertAsImage)
   {
-    nsCOMPtr<nsIInputStream> imageStream;
-    if (insertAsImage) {
-      NS_ASSERTION(fileURI, "The file URI should be retrieved earlier");
-
-      nsCOMPtr<nsIChannel> channel;
-      rv = NS_NewChannel(getter_AddRefs(channel),
-                         fileURI,
-                         nsContentUtils::GetSystemPrincipal(),
-                         nsILoadInfo::SEC_NORMAL,
-                         nsIContentPolicy::TYPE_OTHER);
-      NS_ENSURE_SUCCESS(rv, rv);
-      rv = channel->Open(getter_AddRefs(imageStream));
-      NS_ENSURE_SUCCESS(rv, rv);
-    } else {
-      imageStream = do_QueryInterface(aObject);
-      NS_ENSURE_TRUE(imageStream, NS_ERROR_FAILURE);
-    }
-
     nsCString imageData;
-    rv = NS_ConsumeStream(imageStream, UINT32_MAX, imageData);
-    NS_ENSURE_SUCCESS(rv, rv);
+    if (insertAsImage)
+    {
+      rv = nsContentUtils::SlurpFileToString(fileObj, imageData);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+    else
+    {
+      nsCOMPtr<nsIInputStream> imageStream = do_QueryInterface(aObject);
+      NS_ENSURE_TRUE(imageStream, NS_ERROR_FAILURE);
 
-    rv = imageStream->Close();
-    NS_ENSURE_SUCCESS(rv, rv);
+      rv = NS_ConsumeStream(imageStream, UINT32_MAX, imageData);
+      NS_ENSURE_SUCCESS(rv, rv);
+
+      rv = imageStream->Close();
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
 
     nsAutoCString data64;
     rv = Base64Encode(imageData, data64);
@@ -1203,7 +1198,7 @@ GetStringFromDataTransfer(nsIDOMDataTransfer *aDataTransfer, const nsAString& aT
                           int32_t aIndex, nsAString& aOutputString)
 {
   nsCOMPtr<nsIVariant> variant;
-  aDataTransfer->MozGetDataAt(aType, aIndex, getter_AddRefs(variant));
+  DataTransfer::Cast(aDataTransfer)->GetDataAtNoSecurityCheck(aType, aIndex, getter_AddRefs(variant));
   if (variant)
     variant->GetAsAString(aOutputString);
 }
@@ -1238,7 +1233,7 @@ nsresult nsHTMLEditor::InsertFromDataTransfer(DataTransfer *aDataTransfer,
           type.EqualsLiteral(kPNGImageMime) ||
           type.EqualsLiteral(kGIFImageMime)) {
         nsCOMPtr<nsIVariant> variant;
-        aDataTransfer->MozGetDataAt(type, aIndex, getter_AddRefs(variant));
+        DataTransfer::Cast(aDataTransfer)->GetDataAtNoSecurityCheck(type, aIndex, getter_AddRefs(variant));
         if (variant) {
           nsCOMPtr<nsISupports> object;
           variant->GetAsISupports(getter_AddRefs(object));
@@ -2095,7 +2090,8 @@ nsresult nsHTMLEditor::CreateDOMFragmentFromPaste(const nsAString &aInputString,
     }
   }
 
-  GetLengthOfDOMNode(*outEndNode, (uint32_t&)*outEndOffset);
+  nsCOMPtr<nsINode> node = do_QueryInterface(*outEndNode);
+  *outEndOffset = node->Length();
   return NS_OK;
 }
 

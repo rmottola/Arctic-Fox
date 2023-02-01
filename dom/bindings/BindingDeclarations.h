@@ -122,6 +122,11 @@ public:
     mImpl.emplace(aValue);
   }
 
+  bool operator==(const Optional_base<T, InternalType>& aOther) const
+  {
+    return mImpl == aOther.mImpl;
+  }
+
   template<typename T1, typename T2>
   explicit Optional_base(const T1& aValue1, const T2& aValue2)
   {
@@ -474,14 +479,14 @@ GetWrapperCache(const SmartPtr<T>& aObject)
 
 struct MOZ_STACK_CLASS ParentObject {
   template<class T>
-  ParentObject(T* aObject) :
+  MOZ_IMPLICIT ParentObject(T* aObject) :
     mObject(aObject),
     mWrapperCache(GetWrapperCache(aObject)),
     mUseXBLScope(false)
   {}
 
   template<class T, template<typename> class SmartPtr>
-  ParentObject(const SmartPtr<T>& aObject) :
+  MOZ_IMPLICIT ParentObject(const SmartPtr<T>& aObject) :
     mObject(aObject.get()),
     mWrapperCache(GetWrapperCache(aObject.get())),
     mUseXBLScope(false)

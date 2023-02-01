@@ -400,6 +400,8 @@
 @RESPATH@/components/ConsoleAPIStorage.js
 @RESPATH@/components/BrowserElementParent.manifest
 @RESPATH@/components/BrowserElementParent.js
+@RESPATH@/components/BrowserElementProxy.manifest
+@RESPATH@/components/BrowserElementProxy.js
 @RESPATH@/components/ContactManager.js
 @RESPATH@/components/ContactManager.manifest
 @RESPATH@/components/PhoneNumberService.js
@@ -537,6 +539,8 @@
 @RESPATH@/components/RILSystemMessengerHelper.manifest
 @RESPATH@/components/TelephonyAudioService.js
 @RESPATH@/components/TelephonyAudioService.manifest
+@RESPATH@/components/USSDReceivedWrapper.js
+@RESPATH@/components/USSDReceivedWrapper.manifest
 #ifndef DISABLE_MOZ_RIL_GEOLOC
 @RESPATH@/components/TelephonyService.js
 @RESPATH@/components/TelephonyService.manifest
@@ -546,15 +550,16 @@
 #endif // MOZ_WIDGET_GONK && MOZ_B2G_RIL
 
 #ifndef MOZ_WIDGET_GONK
-@RESPATH@/components/extensions.manifest
 @RESPATH@/components/addonManager.js
 @RESPATH@/components/amContentHandler.js
 @RESPATH@/components/amInstallTrigger.js
 @RESPATH@/components/amWebInstallListener.js
-@RESPATH@/components/nsBlocklistService.js
+
 @RESPATH@/components/OopCommandLine.js
 @RESPATH@/components/CommandLine.js
 #endif
+@RESPATH@/components/extensions.manifest
+@RESPATH@/components/nsBlocklistService.js
 @RESPATH@/components/BootstrapCommandLine.js
 
 #ifdef MOZ_UPDATER
@@ -719,6 +724,7 @@
 @RESPATH@/components/nsUrlClassifierHashCompleter.js
 @RESPATH@/components/nsUrlClassifierListManager.js
 @RESPATH@/components/nsUrlClassifierLib.js
+@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
 @RESPATH@/components/url-classifier.xpt
 
 ; GNOME hooks

@@ -208,15 +208,15 @@ BluetoothServiceChildProcess::RemoveDeviceInternal(
 }
 
 nsresult
-BluetoothServiceChildProcess::GetServiceChannel(const nsAString& aDeviceAddress,
-                                                const nsAString& aServiceUuid,
+BluetoothServiceChildProcess::GetServiceChannel(const BluetoothAddress& aDeviceAddress,
+                                                const BluetoothUuid& aServiceUuid,
                                                 BluetoothProfileManagerBase* aManager)
 {
   MOZ_CRASH("This should never be called!");
 }
 
 bool
-BluetoothServiceChildProcess::UpdateSdpRecords(const nsAString& aDeviceAddress,
+BluetoothServiceChildProcess::UpdateSdpRecords(const BluetoothAddress& aDeviceAddress,
                                                BluetoothProfileManagerBase* aManager)
 {
   MOZ_CRASH("This should never be called!");
@@ -367,6 +367,20 @@ BluetoothServiceChildProcess::IsScoConnected(BluetoothReplyRunnable* aRunnable)
 }
 
 void
+BluetoothServiceChildProcess::SetObexPassword(
+  const nsAString& aPassword,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable, SetObexPasswordRequest(nsString(aPassword)));
+}
+
+void
+BluetoothServiceChildProcess::RejectObexAuth(BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable, RejectObexAuthRequest());
+}
+
+void
 BluetoothServiceChildProcess::ReplyTovCardPulling(
   BlobParent* aBlobParent,
   BlobChild* aBlobChild,
@@ -424,6 +438,89 @@ BluetoothServiceChildProcess::ReplyTovCardListing(
 {
   // Parent-process-only method
   MOZ_CRASH("This should never be called!");
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapFolderListing(long aMasId,
+  const nsAString& aFolderList,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+              ReplyToFolderListingRequest(aMasId, nsString(aFolderList)));
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapMessagesListing(BlobParent* aBlobParent,
+  BlobChild* aBlobChild,
+  long aMasId,
+  bool aNewMessage,
+  const nsAString& aTimestamp,
+  int aSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+              ReplyToMessagesListingRequest(aMasId, nullptr, aBlobChild,
+                                            aNewMessage, nsString(aTimestamp), aSize));
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapMessagesListing(long aMasId,
+  Blob* aBlob,
+  bool aNewMessage,
+  const nsAString& aTimestamp,
+  int aSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+  // Parent-process-only method
+  MOZ_CRASH("This should never be called!");
+}
+
+
+void
+BluetoothServiceChildProcess::ReplyToMapGetMessage(BlobParent* aBlobParent,
+  BlobChild* aBlobChild,
+  long aMasId,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    ReplyToGetMessageRequest(aMasId, nullptr, aBlobChild));
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapGetMessage(Blob* aBlob,
+  long aMasId,
+  BluetoothReplyRunnable* aRunnable)
+{
+  // Parent-process-only method
+  MOZ_CRASH("This should never be called!");
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapSetMessageStatus(long aMasId,
+  bool aStatus,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    ReplyToSetMessageStatusRequest(aMasId, aStatus));
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapSendMessage(long aMasId,
+  const nsAString& aHandleId,
+  bool aStatus,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    ReplyToSendMessageRequest(aMasId, nsString(aHandleId), aStatus));
+}
+
+void
+BluetoothServiceChildProcess::ReplyToMapMessageUpdate(long aMasId,
+  bool aStatus,
+  BluetoothReplyRunnable* aRunnable)
+{
+  SendRequest(aRunnable,
+    ReplyToMessageUpdateRequest(aMasId, aStatus));
 }
 
 #ifdef MOZ_B2G_RIL

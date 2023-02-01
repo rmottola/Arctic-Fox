@@ -5668,7 +5668,6 @@
 #define LOCAL_GLX_X_VISUAL_TYPE_EXT                          0x22
 #define LOCAL_GLX_Y_INVERTED_EXT                             0x20D4
 
-
 // WGL
 #define LOCAL_WGL_ACCELERATION_ARB                           0x2003
 #define LOCAL_WGL_ACCELERATION_EXT                           0x2003
@@ -5948,7 +5947,5 @@
 #define LOCAL_WGL_VIDEO_OUT_FRAME                            0x20C8
 #define LOCAL_WGL_VIDEO_OUT_STACKED_FIELDS_1_2               0x20CB
 #define LOCAL_WGL_VIDEO_OUT_STACKED_FIELDS_2_1               0x20CC
-
-
 
 #endif // GLCONSTS_H_

@@ -1061,9 +1061,10 @@ public:
     MOZ_ASSERT_IF(isAtRoot, mContainerReferenceFrame == mBuilder->RootReferenceFrame());
     mContainerAnimatedGeometryRoot = isAtRoot
       ? mContainerReferenceFrame
-      : nsLayoutUtils::GetAnimatedGeometryRootFor(aContainerItem, aBuilder);
-    MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(mBuilder->RootReferenceFrame(),
-                                                      mContainerAnimatedGeometryRoot));
+      : aContainerItem->AnimatedGeometryRoot();
+    MOZ_ASSERT(!mBuilder->IsPaintingToWindow() ||
+      nsLayoutUtils::IsAncestorFrameCrossDoc(mBuilder->RootReferenceFrame(),
+                                             mContainerAnimatedGeometryRoot));
     NS_ASSERTION(!aContainerItem || !aContainerItem->ShouldFixToViewport(mBuilder),
                  "Container items never return true for ShouldFixToViewport");
     mContainerFixedPosFrame =
@@ -2119,8 +2120,7 @@ ContainerState::GetLayerCreationHint(const nsIFrame* aAnimatedGeometryRoot)
   nsIFrame* fParent;
   for (const nsIFrame* f = aAnimatedGeometryRoot;
        f != mContainerAnimatedGeometryRoot;
-       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(mBuilder,
-           fParent, mContainerAnimatedGeometryRoot)) {
+       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(mBuilder, fParent)) {
     fParent = nsLayoutUtils::GetCrossDocParentFrame(f);
     if (!fParent) {
       break;
@@ -2801,7 +2801,7 @@ PaintedLayerDataTree::GetParentAnimatedGeometryRoot(const nsIFrame* aAnimatedGeo
   }
 
   nsIFrame* agr = Builder()->FindAnimatedGeometryRootFor(
-    const_cast<nsIFrame*>(aAnimatedGeometryRoot), Builder()->RootReferenceFrame());
+    const_cast<nsIFrame*>(aAnimatedGeometryRoot));
   MOZ_ASSERT_IF(agr, nsLayoutUtils::IsAncestorFrameCrossDoc(Builder()->RootReferenceFrame(), agr));
   if (agr != aAnimatedGeometryRoot) {
     return agr;
@@ -2812,7 +2812,7 @@ PaintedLayerDataTree::GetParentAnimatedGeometryRoot(const nsIFrame* aAnimatedGeo
   if (!parent) {
     return nullptr;
   }
-  return Builder()->FindAnimatedGeometryRootFor(parent, Builder()->RootReferenceFrame());
+  return Builder()->FindAnimatedGeometryRootFor(parent);
 }
 
 void
@@ -3716,8 +3716,7 @@ ContainerState::ChooseAnimatedGeometryRoot(const nsDisplayList& aList,
 
     // Try using the actual active scrolled root of the backmost item, as that
     // should result in the least invalidation when scrolling.
-    *aAnimatedGeometryRoot =
-      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder);
+    *aAnimatedGeometryRoot = item->AnimatedGeometryRoot();
     return true;
   }
   return false;
@@ -3791,8 +3790,7 @@ GetScrollClipIntersection(nsDisplayListBuilder* aBuilder, const nsIFrame* aAnima
   nsIFrame* fParent;
   for (const nsIFrame* f = aAnimatedGeometryRoot;
        f != aStopAtAnimatedGeometryRoot;
-       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(aBuilder,
-           fParent, aStopAtAnimatedGeometryRoot)) {
+       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(aBuilder, fParent)) {
     fParent = nsLayoutUtils::GetCrossDocParentFrame(f);
     if (!fParent) {
       // This means aStopAtAnimatedGeometryRoot was not an ancestor
@@ -3884,6 +3882,13 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       aList->SetNeedsTransparentSurface();
     }
 
+    nsDisplayItem::Type itemType = item->GetType();
+
+    if (mParameters.mForEventsOnly && !item->GetChildren() &&
+        itemType != nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
+      continue;
+    }
+
     LayerState layerState = item->GetLayerState(mBuilder, mManager, mParameters);
     if (layerState == LAYER_INACTIVE &&
         nsDisplayItem::ForceActiveLayers()) {
@@ -3893,8 +3898,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     bool forceInactive;
     const nsIFrame* animatedGeometryRoot;
     const nsIFrame* animatedGeometryRootForScrollMetadata = nullptr;
-    const nsIFrame* realAnimatedGeometryRootOfItem =
-      nsLayoutUtils::GetAnimatedGeometryRootFor(item, mBuilder);
+    const nsIFrame* realAnimatedGeometryRootOfItem = item->AnimatedGeometryRoot();
     if (mFlattenToSingleLayer) {
       forceInactive = true;
       animatedGeometryRoot = lastAnimatedGeometryRoot;
@@ -3905,8 +3909,8 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         // Unlike GetAnimatedGeometryRootFor(), GetAnimatedGeometryRootForFrame() does not
         // take ShouldFixToViewport() into account, so it will return something different
         // for fixed background items.
-        animatedGeometryRootForScrollMetadata = nsLayoutUtils::GetAnimatedGeometryRootForFrame(
-            mBuilder, item->Frame(), item->ReferenceFrame());
+        animatedGeometryRootForScrollMetadata = nsLayoutUtils::GetAnimatedGeometryRootFor(
+          item, mBuilder, nsLayoutUtils::AGR_IGNORE_BACKGROUND_ATTACHMENT_FIXED);
       } else {
         // For inactive layer subtrees, splitting content into PaintedLayers
         // based on animated geometry roots is pointless. It's more efficient
@@ -3922,8 +3926,6 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     if (!animatedGeometryRootForScrollMetadata) {
       animatedGeometryRootForScrollMetadata = animatedGeometryRoot;
     }
-
-    nsDisplayItem::Type itemType = item->GetType();
 
     if (animatedGeometryRoot != realAnimatedGeometryRootOfItem) {
       // Pick up any scroll clips that should apply to the item and apply them.
@@ -4745,6 +4747,12 @@ ContainerState::SetupScrollingMetadata(NewLayerEntry* aEntry)
     return;
   }
 
+  if (!mBuilder->IsPaintingToWindow()) {
+    // async scrolling not possible, and async scrolling info not computed
+    // for this paint.
+    return;
+  }
+
   nsAutoTArray<FrameMetrics,2> metricsArray;
   if (aEntry->mBaseFrameMetrics) {
     metricsArray.AppendElement(*aEntry->mBaseFrameMetrics);
@@ -4761,8 +4769,7 @@ ContainerState::SetupScrollingMetadata(NewLayerEntry* aEntry)
   nsIFrame* fParent;
   for (const nsIFrame* f = aEntry->mAnimatedGeometryRootForScrollMetadata;
        f != mContainerAnimatedGeometryRoot;
-       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(this->mBuilder,
-           fParent, mContainerAnimatedGeometryRoot)) {
+       f = nsLayoutUtils::GetAnimatedGeometryRootForFrame(this->mBuilder, fParent)) {
     fParent = nsLayoutUtils::GetCrossDocParentFrame(f);
     if (!fParent) {
       // This means mContainerAnimatedGeometryRoot was not an ancestor
@@ -4906,8 +4913,7 @@ ContainerState::PostprocessRetainedLayers(nsIntRegion* aOpaqueRegionForContainer
     if (!e->mOpaqueRegion.IsEmpty()) {
       const nsIFrame* animatedGeometryRootToCover = animatedGeometryRootForOpaqueness;
       if (e->mOpaqueForAnimatedGeometryRootParent &&
-          nsLayoutUtils::GetAnimatedGeometryRootForFrame(mBuilder, e->mAnimatedGeometryRoot->GetParent(),
-                                                         mContainerAnimatedGeometryRoot)
+          nsLayoutUtils::GetAnimatedGeometryRootForFrame(mBuilder, e->mAnimatedGeometryRoot->GetParent())
             == mContainerAnimatedGeometryRoot) {
         animatedGeometryRootToCover = mContainerAnimatedGeometryRoot;
         data = FindOpaqueRegionEntry(opaqueRegions,
@@ -5140,7 +5146,7 @@ ChooseScaleAndSetTransform(FrameLayerBuilder* aLayerBuilder,
       nsIWidget* widget = aContainerFrame->GetNearestWidget();
       nsSize displaySize;
       if (widget) {
-        IntSize widgetSize = widget->GetClientSize();
+        LayoutDeviceIntSize widgetSize = widget->GetClientSize();
         int32_t p2a = presContext->AppUnitsPerDevPixel();
         displaySize.width = NSIntPixelsToAppUnits(widgetSize.width, p2a);
         displaySize.height = NSIntPixelsToAppUnits(widgetSize.height, p2a);
@@ -6135,13 +6141,8 @@ ContainerState::CreateMaskLayer(Layer *aLayer,
     // build the image and container
     container = aLayer->Manager()->CreateImageContainer();
     NS_ASSERTION(container, "Could not create image container for mask layer.");
-    RefPtr<Image> image = container->CreateImage(ImageFormat::CAIRO_SURFACE);
-    NS_ASSERTION(image, "Could not create image container for mask layer.");
-    CairoImage::Data data;
-    data.mSize = surfaceSizeInt;
-    data.mSourceSurface = surface;
 
-    static_cast<CairoImage*>(image.get())->SetData(data);
+    RefPtr<CairoImage> image = new CairoImage(surfaceSizeInt, surface);
     container->SetCurrentImageInTransaction(image);
 
     GetMaskLayerImageCache()->PutImage(newKey.forget(), container);

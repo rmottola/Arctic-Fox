@@ -71,7 +71,6 @@ include GraphicsMessages;
 include "mozilla/dom/PContentBridgeParent.h";
 
 include "mozilla/dom/indexedDB/SerializationHelpers.h";
-include "mozilla/dom/TabMessageUtils.h";
 
 using GeoPosition from "nsGeoPositionIPCSerialiser.h";
 
@@ -1123,10 +1122,10 @@ parent:
                       bool aCalledFromJS,
                       bool aPositionSpecified,
                       bool aSizeSpecified,
-                      nsString aURI,
+                      nsCString aURI,
                       nsString aName,
                       nsCString aFeatures,
-                      nsString aBaseURI)
+                      nsCString aBaseURI)
       returns (nsresult rv,
                bool windowOpened,
                FrameScriptInfo[] frameScripts,

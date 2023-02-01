@@ -7,6 +7,7 @@
 #include <CoreFoundation/CFString.h>
 
 #include "AppleCMLinker.h"
+#include "AppleDecoderModule.h"
 #include "AppleUtils.h"
 #include "AppleVTDecoder.h"
 #include "AppleVTLinker.h"
@@ -19,7 +20,7 @@
 #include "VideoUtils.h"
 #include "gfxPlatform.h"
 
-extern PRLogModuleInfo* GetPDMLog();
+extern mozilla::LogModule* GetPDMLog();
 #define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
@@ -167,18 +168,14 @@ PlatformCallback(void* decompressionOutputRefCon,
   // Validate our arguments.
   if (status != noErr || !image) {
     NS_WARNING("VideoToolbox decoder returned no data");
-    return;
+    image = nullptr;
+  } else if (flags & kVTDecodeInfo_FrameDropped) {
+    NS_WARNING("  ...frame tagged as dropped...");
+  } else {
+    MOZ_ASSERT(CFGetTypeID(image) == CVPixelBufferGetTypeID(),
+      "VideoToolbox returned an unexpected image type");
   }
-  if (flags & kVTDecodeInfo_FrameDropped) {
-    NS_WARNING("  ...frame dropped...");
-  }
-  MOZ_ASSERT(CFGetTypeID(image) == CVPixelBufferGetTypeID(),
-    "VideoToolbox returned an unexpected image type");
-
-  nsCOMPtr<nsIRunnable> task =
-    NS_NewRunnableMethodWithArgs<CFRefPtr<CVPixelBufferRef>, AppleVTDecoder::AppleFrameRef>(
-      decoder, &AppleVTDecoder::OutputFrame, image, *frameRef);
-  decoder->DispatchOutputTask(task.forget());
+  decoder->OutputFrame(image, *frameRef);
 }
 
 nsresult
@@ -215,7 +212,7 @@ AppleVTDecoder::SubmitFrame(MediaRawData* aSample)
   // For some reason this gives me a double-free error with stagefright.
   AutoCFRelease<CMBlockBufferRef> block = nullptr;
   AutoCFRelease<CMSampleBufferRef> sample = nullptr;
-  VTDecodeInfoFlags flags;
+  VTDecodeInfoFlags infoFlags;
   OSStatus rv;
 
   // FIXME: This copies the sample data. I think we can provide
@@ -242,20 +239,24 @@ AppleVTDecoder::SubmitFrame(MediaRawData* aSample)
     return NS_ERROR_FAILURE;
   }
 
+  mQueuedSamples++;
+
   VTDecodeFrameFlags decodeFlags =
     kVTDecodeFrame_EnableAsynchronousDecompression;
   rv = VTDecompressionSessionDecodeFrame(mSession,
                                          sample,
                                          decodeFlags,
                                          CreateAppleFrameRef(aSample),
-                                         &flags);
-  if (rv != noErr) {
+                                         &infoFlags);
+  if (rv != noErr && !(infoFlags & kVTDecodeInfo_FrameDropped)) {
+    LOG("AppleVTDecoder: Error %d VTDecompressionSessionDecodeFrame", rv);
     NS_WARNING("Couldn't pass frame to decoder");
+    mCallback->Error();
     return NS_ERROR_FAILURE;
   }
 
   // Ask for more data.
-  if (!mInputIncoming) {
+  if (!mInputIncoming && mQueuedSamples <= mMaxRefFrames) {
     LOG("AppleVTDecoder task queue empty; requesting more data");
     mCallback->InputExhausted();
   }
@@ -382,7 +383,7 @@ AppleVTDecoder::CreateDecoderSpecification()
 
   const void* specKeys[] = { AppleVTLinker::skPropEnableHWAccel };
   const void* specValues[1];
-  if (gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding()) {
+  if (AppleDecoderModule::sCanUseHardwareVideoDecoder) {
     specValues[0] = kCFBooleanTrue;
   } else {
     // This GPU is blacklisted for hardware decoding.

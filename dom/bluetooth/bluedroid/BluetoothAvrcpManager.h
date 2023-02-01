@@ -62,8 +62,8 @@ protected:
 private:
   class CleanupAvrcpResultHandler;
   class CleanupAvrcpResultHandlerRunnable;
-  class ConnectResultHandler;
-  class DisconnectResultHandler;
+  class ConnectRunnable;
+  class DisconnectRunnable;
   class InitAvrcpResultHandler;
   class OnErrorProfileResultHandlerRunnable;
 
@@ -107,7 +107,7 @@ private:
 
   void PassthroughCmdNotification(int aId, int aKeyState) override;
 
-  nsString mDeviceAddress;
+  BluetoothAddress mDeviceAddress;
   RefPtr<BluetoothProfileController> mController;
 
   bool mAvrcpConnected;

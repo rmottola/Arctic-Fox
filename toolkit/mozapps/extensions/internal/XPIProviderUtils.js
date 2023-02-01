@@ -4,10 +4,10 @@
 
 "use strict";
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cr = Components.results;
-const Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cr = Components.results;
+var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -73,7 +73,7 @@ const DB_BOOL_METADATA   = ["visible", "active", "userDisabled", "appDisabled",
 // Properties to save in JSON file
 const PROP_JSON_FIELDS = ["id", "syncGUID", "location", "version", "type",
                           "internalName", "updateURL", "updateKey", "optionsURL",
-                          "optionsType", "aboutURL", "iconURL", "icon64URL",
+                          "optionsType", "aboutURL", "icons", "iconURL", "icon64URL",
                           "defaultLocale", "visible", "active", "userDisabled",
                           "appDisabled", "pendingUninstall", "descriptor", "installDate",
                           "updateDate", "applyBackgroundUpdates", "bootstrap",
@@ -2116,8 +2116,10 @@ this.XPIDatabaseReconcile = {
       }
     }
 
-    // None of the active add-ons match the selected theme, enable the default.
-    if (!sawActiveTheme) {
+    // If a custom theme is selected and it wasn't seen in the new list of
+    // active add-ons then enable the default theme
+    if (XPIProvider.selectedSkin != XPIProvider.defaultSkin && !sawActiveTheme) {
+      logger.info("Didn't see selected skin " + XPIProvider.selectedSkin);
       XPIProvider.enableDefaultTheme();
     }
 

@@ -11,7 +11,7 @@
 #include "MediaTrackConstraints.h"
 #include "CamerasChild.h"
 
-extern PRLogModuleInfo* GetMediaManagerLog();
+extern mozilla::LogModule* GetMediaManagerLog();
 #define LOG(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Debug, msg)
 #define LOGFRAME(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Verbose, msg)
 
@@ -289,8 +289,7 @@ MediaEngineRemoteVideoSource::DeliverFrame(unsigned char* buffer,
   }
 
   // Create a video frame and append it to the track.
-  RefPtr<layers::Image> image = mImageContainer->CreateImage(ImageFormat::PLANAR_YCBCR);
-  layers::PlanarYCbCrImage* videoImage = static_cast<layers::PlanarYCbCrImage*>(image.get());
+  RefPtr<layers::PlanarYCbCrImage> image = mImageContainer->CreatePlanarYCbCrImage();
 
   uint8_t* frame = static_cast<uint8_t*> (buffer);
   const uint8_t lumaBpp = 8;
@@ -310,7 +309,7 @@ MediaEngineRemoteVideoSource::DeliverFrame(unsigned char* buffer,
   data.mPicSize = IntSize(mWidth, mHeight);
   data.mStereoMode = StereoMode::MONO;
 
-  if (!videoImage->SetData(data)) {
+  if (!image->SetData(data)) {
     MOZ_ASSERT(false);
     return 0;
   }

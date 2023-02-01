@@ -39,7 +39,7 @@ using namespace mozilla::gfx;
 
 namespace mozilla {
 
-PRLogModuleInfo* gMediaStreamGraphLog;
+LazyLogModule gMediaStreamGraphLog("MediaStreamGraph");
 #define STREAM_LOG(type, msg) MOZ_LOG(gMediaStreamGraphLog, type, msg)
 
 // #define ENABLE_LIFECYCLE_LOG
@@ -827,13 +827,11 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
 
     if (frame->GetForceBlack()) {
       if (!blackImage) {
-        blackImage = aStream->mVideoOutputs[0]->
-          GetImageContainer()->CreateImage(ImageFormat::PLANAR_YCBCR);
+        blackImage = aStream->mVideoOutputs[0]->GetImageContainer()->CreatePlanarYCbCrImage();
         if (blackImage) {
           // Sets the image to a single black pixel, which will be scaled to
           // fill the rendered size.
-          SetImageToBlackPixel(static_cast<PlanarYCbCrImage*>
-                               (blackImage.get()));
+          SetImageToBlackPixel(blackImage->AsPlanarYCbCrImage());
         }
       }
       if (blackImage) {
@@ -2636,10 +2634,6 @@ MediaStreamGraphImpl::MediaStreamGraphImpl(GraphDriverType aDriverRequested,
 #endif
   , mAudioChannel(aChannel)
 {
-  if (!gMediaStreamGraphLog) {
-    gMediaStreamGraphLog = PR_NewLogModule("MediaStreamGraph");
-  }
-
   if (mRealtime) {
     if (aDriverRequested == AUDIO_THREAD_DRIVER) {
       AudioCallbackDriver* driver = new AudioCallbackDriver(this);

@@ -202,6 +202,22 @@ function log(msg, prefix = "", error = null) {
     }
   }
 }
+const PREF_DEBUG_LOG = "toolkit.asyncshutdown.log";
+var DEBUG_LOG = false;
+try {
+  DEBUG_LOG = Services.prefs.getBoolPref(PREF_DEBUG_LOG);
+} catch (ex) {
+  // Ignore errors
+}
+Services.prefs.addObserver(PREF_DEBUG_LOG, function() {
+  DEBUG_LOG = Services.prefs.getBoolPref(PREF_DEBUG_LOG);
+}, false);
+
+function debug(msg, error=null) {
+  if (DEBUG_LOG) {
+    return log(msg, "DEBUG: ", error);
+  }
+}
 function warn(msg, error = null) {
   return log(msg, "WARNING: ", error);
 }
@@ -275,6 +291,49 @@ function looseTimer(delay) {
   // and not garbage-collected until then.
   deferred.promise.then(() => timer.cancel(), () => timer.cancel());
   return deferred;
+}
+
+/**
+ * Given an nsIStackFrame object, find the caller filename, line number,
+ * and stack if necessary, and return them as an object.
+ *
+ * @param {nsIStackFrame} topFrame Top frame of the call stack.
+ * @param {string} filename Pre-supplied filename or null if unknown.
+ * @param {number} lineNumber Pre-supplied line number or null if unknown.
+ * @param {string} stack Pre-supplied stack or null if unknown.
+ *
+ * @return object
+ */
+function getOrigin(topFrame, filename = null, lineNumber = null, stack = null) {
+  // Determine the filename and line number of the caller.
+  let frame = topFrame;
+
+  for (; frame && frame.filename == topFrame.filename; frame = frame.caller) {
+    // Climb up the stack
+  }
+
+  if (filename == null) {
+    filename = frame ? frame.filename : "?";
+  }
+  if (lineNumber == null) {
+    lineNumber = frame ? frame.lineNumber : 0;
+  }
+  if (stack == null) {
+    // Now build the rest of the stack as a string, using Task.jsm's rewriting
+    // to ensure that we do not lose information at each call to `Task.spawn`.
+    let frames = [];
+    while (frame != null) {
+      frames.push(frame.filename + ":" + frame.name + ":" + frame.lineNumber);
+      frame = frame.caller;
+    }
+    stack = Task.Debugging.generateReadableStack(frames.join("\n")).split("\n");
+  }
+
+  return {
+    filename: filename,
+    lineNumber: lineNumber,
+    stack: stack,
+  };
 }
 
 this.EXPORTED_SYMBOLS = ["AsyncShutdown"];
@@ -474,6 +533,7 @@ Spinner.prototype = {
         Promise.reject(ex);
       }
     }
+    debug(`Finished phase ${ topic }`);
   }
 };
 
@@ -607,40 +667,14 @@ function Barrier(name) {
       if (!this._waitForMe) {
         throw new Error(`Phase "${ this._name } is finished, it is too late to register completion condition "${ name }"`);
       }
+      debug(`Adding blocker ${ name } for phase ${ this._name }`);
 
       // Normalize the details
 
       let fetchState = details.fetchState || null;
-      let filename = details.filename || "?";
-      let lineNumber = details.lineNumber || -1;
-      let stack = details.stack || undefined;
-
-      if (filename == "?" || lineNumber == -1 || stack === undefined) {
-        // Determine the filename and line number of the caller.
-        let leaf = Components.stack;
-        let frame;
-        for (frame = leaf; frame != null && frame.filename == leaf.filename; frame = frame.caller) {
-          // Climb up the stack
-        }
-
-        if (filename == "?") {
-          filename = frame ? frame.filename : "?";
-        }
-        if (lineNumber == -1) {
-          lineNumber = frame ? frame.lineNumber : -1;
-        }
-
-        // Now build the rest of the stack as a string, using Task.jsm's rewriting
-        // to ensure that we do not lose information at each call to `Task.spawn`.
-        let frames = [];
-        while (frame != null) {
-          frames.push(frame.filename + ":" + frame.name + ":" + frame.lineNumber);
-          frame = frame.caller;
-        }
-        if (stack === undefined) {
-          stack = Task.Debugging.generateReadableStack(frames.join("\n")).split("\n");
-        }
-      }
+      let filename = details.filename || null;
+      let lineNumber = details.lineNumber || null;
+      let stack = details.stack || null;
 
       // Split the condition between a trigger function and a promise.
 
@@ -681,14 +715,17 @@ function Barrier(name) {
         Promise.reject(error);
       });
 
+      let topFrame = null;
+      if (filename == null || lineNumber == null || stack == null) {
+        topFrame = Components.stack;
+      }
+
       let blocker = {
         trigger: trigger,
         promise: promise,
         name: name,
         fetchState: fetchState,
-        stack: stack,
-        filename: filename,
-        lineNumber: lineNumber
+        getOrigin: () => getOrigin(topFrame, filename, lineNumber, stack),
       };
 
       this._waitForMe.add(promise);
@@ -698,9 +735,10 @@ function Barrier(name) {
       // As conditions may hold lots of memory, we attempt to cleanup
       // as soon as we are done (which might be in the next tick, if
       // we have been passed a resolved promise).
-      promise = promise.then(() =>
-        this._removeBlocker(condition)
-      );
+      promise = promise.then(() => {
+        debug(`Completed blocker ${ name } for phase ${ this._name }`);
+        this._removeBlocker(condition);
+      });
 
       if (this._isStarted) {
         // The wait has already started. The blocker should be
@@ -738,7 +776,9 @@ Barrier.prototype = Object.freeze({
       return "Complete";
     }
     let frozen = [];
-    for (let {name, fetchState, stack, filename, lineNumber} of this._promiseToBlocker.values()) {
+    for (let blocker of this._promiseToBlocker.values()) {
+      let {name, fetchState} = blocker;
+      let {stack, filename, lineNumber} = blocker.getOrigin();
       frozen.push({
         name: name,
         state: safeGetState(fetchState),
@@ -901,9 +941,8 @@ Barrier.prototype = Object.freeze({
           // which have been determined during the call to `addBlocker`.
           let filename = "?";
           let lineNumber = -1;
-          for (let blocker of this._promiseToBlocker) {
-            filename = blocker.filename;
-            lineNumber = blocker.lineNumber;
+          for (let blocker of this._promiseToBlocker.values()) {
+            ({filename, lineNumber} = blocker.getOrigin());
             break;
           }
           gDebug.abort(filename, lineNumber);

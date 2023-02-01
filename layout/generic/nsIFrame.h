@@ -898,7 +898,7 @@ public:
 
   NS_DECLARE_FRAME_PROPERTY(InvalidationRect, DeleteValue<nsRect>)
 
-  NS_DECLARE_FRAME_PROPERTY(RefusedAsyncAnimation, nullptr)
+  NS_DECLARE_FRAME_PROPERTY(RefusedAsyncAnimationProperty, nullptr)
 
   NS_DECLARE_FRAME_PROPERTY(GenConProperty, DestroyContentArray)
 
@@ -1202,6 +1202,12 @@ public:
    * Does this frame need a view?
    */
   virtual bool NeedsView() { return false; }
+
+  bool RefusedAsyncAnimation() const
+  {
+    void* prop = Properties().Get(nsIFrame::RefusedAsyncAnimationProperty());
+    return bool(reinterpret_cast<intptr_t>(prop));
+  }
 
   /**
    * Returns true if this frame is transformed (e.g. has CSS or SVG transforms)
@@ -3040,6 +3046,15 @@ NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
    */
   bool IsContainerForFontSizeInflation() const {
     return GetStateBits() & NS_FRAME_FONT_INFLATION_CONTAINER;
+  }
+
+  /**
+   * Return whether this frame keeps track of overflow areas. (Frames for
+   * non-display SVG elements -- e.g. <clipPath> -- do not maintain overflow
+   * areas, because they're never painted.)
+   */
+  bool FrameMaintainsOverflow() const {
+    return !HasAllStateBits(NS_FRAME_SVG_LAYOUT | NS_FRAME_IS_NONDISPLAY);
   }
 
   /**

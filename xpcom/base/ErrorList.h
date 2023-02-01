@@ -231,6 +231,8 @@
   /* The request failed because the user tried to access to a remote XUL
    * document from a website that is not in its white-list. */
   ERROR(NS_ERROR_REMOTE_XUL,           FAILURE(75)),
+  /* The request resulted in an error page being displayed. */
+  ERROR(NS_ERROR_LOAD_SHOWED_ERRORPAGE, FAILURE(77)),
 
 
   /* FTP specific error codes: */
@@ -531,6 +533,12 @@
   /* An nsresult value to use in ErrorResult to indicate that we want to throw
      a DOMException */
   ERROR(NS_ERROR_DOM_DOMEXCEPTION,                 FAILURE(1017)),
+
+  /* An nsresult value to use in ErrorResult to indicate that we
+   * should just rethrow whatever is on the JSContext (which might be
+   * nothing if an uncatchable exception was thrown).
+   */
+  ERROR(NS_ERROR_DOM_EXCEPTION_ON_JSCONTEXT,       FAILURE(1018)),
 
   /* May be used to indicate when e.g. setting a property value didn't
    * actually change the value, like for obj.foo = "bar"; obj.foo = "bar";
@@ -926,6 +934,16 @@
 #define MODULE NS_ERROR_MODULE_DOM_ANIM
   ERROR(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR,              FAILURE(1)),
   ERROR(NS_ERROR_DOM_ANIM_NO_TARGET_ERR,                  FAILURE(2)),
+#undef MODULE
+
+  /* ======================================================================= */
+  /* 40: NS_ERROR_MODULE_DOM_PUSH */
+  /* ======================================================================= */
+#define MODULE NS_ERROR_MODULE_DOM_PUSH
+  ERROR(NS_ERROR_DOM_PUSH_INVALID_REGISTRATION_ERR, FAILURE(1)),
+  ERROR(NS_ERROR_DOM_PUSH_DENIED_ERR, FAILURE(2)),
+  ERROR(NS_ERROR_DOM_PUSH_ABORT_ERR, FAILURE(3)),
+  ERROR(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE, FAILURE(4)),
 #undef MODULE
 
   /* ======================================================================= */

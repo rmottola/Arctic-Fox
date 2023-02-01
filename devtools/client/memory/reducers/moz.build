@@ -4,5 +4,9 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 DevToolsModules(
-    'snapshot.js',
+    'allocations.js',
+    'breakdown.js',
+    'errors.js',
+    'inverted.js',
+    'snapshots.js',
 )

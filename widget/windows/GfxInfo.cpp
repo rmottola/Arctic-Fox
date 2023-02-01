@@ -15,8 +15,15 @@
 #include "prprf.h"
 #include "GfxDriverInfo.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/gfx/Logging.h"
 #include "nsPrintfCString.h"
 #include "jsapi.h"
+
+#if defined(MOZ_CRASHREPORTER)
+#include "nsExceptionHandler.h"
+#include "nsICrashReporter.h"
+#define NS_CRASHREPORTER_CONTRACTID "@mozilla.org/toolkit/crash-reporter;1"
+#endif
 
 using namespace mozilla;
 using namespace mozilla::widget;
@@ -207,6 +214,8 @@ ParseIDFromDeviceID(const nsAString &key, const char *prefix, int length)
 // based on http://msdn.microsoft.com/en-us/library/ms724834(VS.85).aspx
 enum {
   kWindowsUnknown = 0,
+  kWindowsXP = 0x50001,
+  kWindowsServer2003 = 0x50002,
   kWindowsVista = 0x60000,
   kWindows7 = 0x60001,
   kWindows8 = 0x60002,
@@ -512,18 +521,25 @@ GfxInfo::Init()
              driverNumericVersion = 0, knownSafeMismatchVersion = 0;
     ParseDriverVersion(dllVersion, &dllNumericVersion);
     ParseDriverVersion(dllVersion2, &dllNumericVersion2);
+
     ParseDriverVersion(mDriverVersion, &driverNumericVersion);
     ParseDriverVersion(NS_LITERAL_STRING("9.17.10.0"), &knownSafeMismatchVersion);
 
     // If there's a driver version mismatch, consider this harmful only when
     // the driver version is less than knownSafeMismatchVersion.  See the
-    // above comment about crashes with old mismatches. If the GetDllVersion
-    // call fails, then they return 0, so that will be considered a mismatch.
-    if (dllNumericVersion != driverNumericVersion &&
-        dllNumericVersion2 != driverNumericVersion &&
-        (driverNumericVersion < knownSafeMismatchVersion ||
-         std::max(dllNumericVersion, dllNumericVersion2) < knownSafeMismatchVersion)) {
-      mHasDriverVersionMismatch = true;
+    // above comment about crashes with old mismatches.  If the GetDllVersion
+    // call fails, we are not calling it a mismatch.
+    if ((dllNumericVersion != 0 && dllNumericVersion != driverNumericVersion) ||
+        (dllNumericVersion2 != 0 && dllNumericVersion2 != driverNumericVersion)) {
+      if (driverNumericVersion < knownSafeMismatchVersion ||
+          std::max(dllNumericVersion, dllNumericVersion2) < knownSafeMismatchVersion) {
+        mHasDriverVersionMismatch = true;
+        gfxWarningOnce() << "Mismatched driver versions between the registry " << mDriverVersion.get() << " and DLL(s) " << NS_ConvertUTF16toUTF8(dllVersion).get() << ", " << NS_ConvertUTF16toUTF8(dllVersion2).get() << " reported.";
+      }
+    } else if (dllNumericVersion == 0 && dllNumericVersion2 == 0) {
+      // Leave it as an asserting error for now, to see if we can find
+      // a system that exhibits this kind of a problem internally.
+      gfxCriticalErrorOnce() << "Potential driver version mismatch ignored due to missing DLLs";
     }
   }
 
@@ -541,6 +557,8 @@ GfxInfo::Init()
   if (spoofedDevice) {
     mAdapterDeviceID.AssignASCII(spoofedDevice);
   }
+
+  AddCrashReportAnnotations();
 
   return rv;
 }
@@ -674,10 +692,112 @@ GfxInfo::GetIsGPU2Active(bool* aIsGPU2Active)
   return NS_OK;
 }
 
+#if defined(MOZ_CRASHREPORTER)
+/* Cisco's VPN software can cause corruption of the floating point state.
+ * Make a note of this in our crash reports so that some weird crashes
+ * make more sense */
+static void
+CheckForCiscoVPN() {
+  LONG result;
+  HKEY key;
+  /* This will give false positives, but hopefully no false negatives */
+  result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Cisco Systems\\VPN Client", 0, KEY_QUERY_VALUE, &key);
+  if (result == ERROR_SUCCESS) {
+    RegCloseKey(key);
+    CrashReporter::AppendAppNotesToCrashReport(NS_LITERAL_CSTRING("Cisco VPN\n"));
+  }
+}
+#endif
+
+void
+GfxInfo::AddCrashReportAnnotations()
+{
+#if defined(MOZ_CRASHREPORTER)
+  CheckForCiscoVPN();
+
+  if (mHasDriverVersionMismatch) {
+    CrashReporter::AppendAppNotesToCrashReport(NS_LITERAL_CSTRING("DriverVersionMismatch\n"));
+  }
+
+  nsString deviceID, vendorID, driverVersion, subsysID;
+  nsCString narrowDeviceID, narrowVendorID, narrowDriverVersion, narrowSubsysID;
+
+  GetAdapterDeviceID(deviceID);
+  CopyUTF16toUTF8(deviceID, narrowDeviceID);
+  GetAdapterVendorID(vendorID);
+  CopyUTF16toUTF8(vendorID, narrowVendorID);
+  GetAdapterDriverVersion(driverVersion);
+  CopyUTF16toUTF8(driverVersion, narrowDriverVersion);
+  GetAdapterSubsysID(subsysID);
+  CopyUTF16toUTF8(subsysID, narrowSubsysID);
+
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AdapterVendorID"),
+                                     narrowVendorID);
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AdapterDeviceID"),
+                                     narrowDeviceID);
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AdapterDriverVersion"),
+                                     narrowDriverVersion);
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AdapterSubsysID"),
+                                     narrowSubsysID);
+
+  /* Add an App Note for now so that we get the data immediately. These
+   * can go away after we store the above in the socorro db */
+  nsAutoCString note;
+  /* AppendPrintf only supports 32 character strings, mrghh. */
+  note.AppendLiteral("AdapterVendorID: ");
+  note.Append(narrowVendorID);
+  note.AppendLiteral(", AdapterDeviceID: ");
+  note.Append(narrowDeviceID);
+  note.AppendLiteral(", AdapterSubsysID: ");
+  note.Append(narrowSubsysID);
+  note.AppendLiteral(", AdapterDriverVersion: ");
+  note.Append(NS_LossyConvertUTF16toASCII(driverVersion));
+
+  if (vendorID == GfxDriverInfo::GetDeviceVendor(VendorAll)) {
+    /* if we didn't find a valid vendorID lets append the mDeviceID string to try to find out why */
+    note.AppendLiteral(", ");
+    LossyAppendUTF16toASCII(mDeviceID, note);
+    note.AppendLiteral(", ");
+    LossyAppendUTF16toASCII(mDeviceKeyDebug, note);
+    LossyAppendUTF16toASCII(mDeviceKeyDebug, note);
+  }
+  note.Append("\n");
+
+  if (mHasDualGPU) {
+    nsString deviceID2, vendorID2, subsysID2;
+    nsAutoString adapterDriverVersionString2;
+    nsCString narrowDeviceID2, narrowVendorID2, narrowSubsysID2;
+
+    note.AppendLiteral("Has dual GPUs. GPU #2: ");
+    GetAdapterDeviceID2(deviceID2);
+    CopyUTF16toUTF8(deviceID2, narrowDeviceID2);
+    GetAdapterVendorID2(vendorID2);
+    CopyUTF16toUTF8(vendorID2, narrowVendorID2);
+    GetAdapterDriverVersion2(adapterDriverVersionString2);
+    GetAdapterSubsysID(subsysID2);
+    CopyUTF16toUTF8(subsysID2, narrowSubsysID2);
+    note.AppendLiteral("AdapterVendorID2: ");
+    note.Append(narrowVendorID2);
+    note.AppendLiteral(", AdapterDeviceID2: ");
+    note.Append(narrowDeviceID2);
+    note.AppendLiteral(", AdapterSubsysID2: ");
+    note.Append(narrowSubsysID2);
+    note.AppendLiteral(", AdapterDriverVersion2: ");
+    note.Append(NS_LossyConvertUTF16toASCII(adapterDriverVersionString2));
+  }
+  CrashReporter::AppendAppNotesToCrashReport(note);
+
+#endif
+}
+
 static OperatingSystem
 WindowsVersionToOperatingSystem(int32_t aWindowsVersion)
 {
   switch(aWindowsVersion) {
+    case kWindowsXP:
+      return DRIVER_OS_WINDOWS_XP;
+    case kWindowsServer2003:
+      return DRIVER_OS_WINDOWS_SERVER_2003;
     case kWindowsVista:
       return DRIVER_OS_WINDOWS_VISTA;
     case kWindows7:
@@ -910,6 +1030,18 @@ GfxInfo::GetGfxDriverInfo()
       nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
       DRIVER_LESS_THAN, GfxDriverInfo::allDriverVersions );
 
+    /* Disable D3D11 layers on Intel GMA 3150 for failing to allocate a shared handle for textures.
+     * See bug 1207665. Additionally block D2D so we don't accidentally use WARP.
+     */
+    APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_ALL,
+        (nsAString&) GfxDriverInfo::GetDeviceVendor(VendorIntel), (GfxDeviceFamily*) GfxDriverInfo::GetDeviceFamily(Bug1207665),
+        nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+      DRIVER_LESS_THAN, GfxDriverInfo::allDriverVersions );
+    APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_ALL,
+        (nsAString&) GfxDriverInfo::GetDeviceVendor(VendorIntel), (GfxDeviceFamily*) GfxDriverInfo::GetDeviceFamily(Bug1207665),
+        nsIGfxInfo::FEATURE_DIRECT2D, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+      DRIVER_LESS_THAN, GfxDriverInfo::allDriverVersions );
+
     /* Disable D2D on AMD Catalyst 14.4 until 14.6
      * See bug 984488
      */
@@ -975,6 +1107,12 @@ GfxInfo::GetGfxDriverInfo()
       GfxDriverInfo::allFeatures, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
       DRIVER_BETWEEN_INCLUSIVE, V(8,17,12,5730), V(8,17,12,6901), "Nvidia driver > 8.17.12.6901");
 
+    /* Bug 1153381: WebGL issues with D3D11 ANGLE on Intel. These may be fixed by an ANGLE update. */
+    APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_ALL,
+      (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorIntel), (GfxDeviceFamily*)GfxDriverInfo::GetDeviceFamily(IntelGMAX4500HD),
+      nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+      DRIVER_LESS_THAN, GfxDriverInfo::allDriverVersions);
+
   }
   return *mDriverInfo;
 }
@@ -1027,6 +1165,27 @@ GfxInfo::GetFeatureStatusImpl(int32_t aFeature,
       return NS_ERROR_FAILURE;
     }
 
+    // special-case the WinXP test slaves: they have out-of-date drivers, but we still want to
+    // whitelist them, actually we do know that this combination of device and driver version
+    // works well.
+    if (mWindowsVersion == kWindowsXP &&
+        adapterVendorID.Equals(GfxDriverInfo::GetDeviceVendor(VendorNVIDIA), nsCaseInsensitiveStringComparator()) &&
+        adapterDeviceID.LowerCaseEqualsLiteral("0x0861") && // GeForce 9400
+        driverVersion == V(6,14,11,7756))
+    {
+      *aStatus = FEATURE_STATUS_OK;
+      return NS_OK;
+    }
+
+    // Windows Server 2003 should be just like Windows XP for present purpose, but still has a different version number.
+    // OTOH Windows Server 2008 R1 and R2 already have the same version numbers as Vista and Seven respectively
+    if (os == DRIVER_OS_WINDOWS_SERVER_2003)
+      os = DRIVER_OS_WINDOWS_XP;
+
+    if (mHasDriverVersionMismatch) {
+      *aStatus = nsIGfxInfo::FEATURE_BLOCKED_MISMATCHED_VERSION;
+      return NS_OK;
+    }
   }
 
   return GfxInfoBase::GetFeatureStatusImpl(aFeature, aStatus, aSuggestedDriverVersion, aDriverInfo, &os);

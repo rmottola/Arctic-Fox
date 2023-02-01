@@ -12,7 +12,7 @@
 
 importScripts("resource://gre/modules/workers/require.js");
 importScripts("resource://devtools/shared/worker/helper.js");
-const { CensusTreeNode } = require("resource://devtools/shared/heapsnapshot/census-tree-node.js");
+const { censusReportToCensusTreeNode } = require("resource://devtools/shared/heapsnapshot/census-tree-node.js");
 const CensusUtils = require("resource://devtools/shared/heapsnapshot/CensusUtils.js");
 
 // The set of HeapSnapshot instances this worker has read into memory. Keyed by
@@ -36,10 +36,17 @@ workerHelper.createTask(self, "takeCensus", ({ snapshotFilePath, censusOptions, 
     throw new Error(`No known heap snapshot for '${snapshotFilePath}'`);
   }
 
-  let report = snapshots[snapshotFilePath].takeCensus(censusOptions);
-  return requestOptions.asTreeNode
-    ? new CensusTreeNode(censusOptions.breakdown, report)
-    : report;
+  const report = snapshots[snapshotFilePath].takeCensus(censusOptions);
+
+  if (requestOptions.asTreeNode || requestOptions.asInvertedTreeNode) {
+    const opts = { filter: requestOptions.filter || null };
+    if (requestOptions.asInvertedTreeNode) {
+      opts.invert = true;
+    }
+    return censusReportToCensusTreeNode(censusOptions.breakdown, report, opts);
+  }
+
+  return report;
 });
 
 /**
@@ -65,7 +72,19 @@ workerHelper.createTask(self, "takeCensusDiff", request => {
   const second = snapshots[secondSnapshotFilePath].takeCensus(censusOptions);
   const delta = CensusUtils.diff(censusOptions.breakdown, first, second);
 
-  return requestOptions.asTreeNode
-    ? new CensusTreeNode(censusOptions.breakdown, delta)
-    : delta;
+  if (requestOptions.asTreeNode) {
+    return censusReportToCensusTreeNode(censusOptions.breakdown, delta);
+  } else if (requestOptions.asInvertedTreeNode) {
+    return censusReportToCensusTreeNode(censusOptions.breakdown, delta, { invert: true });
+  } else {
+    return delta;
+  }
+});
+
+/**
+ * @see HeapAnalysesClient.prototype.getCreationTime
+ */
+workerHelper.createTask(self, "getCreationTime", (snapshotFilePath) => {
+  let snapshot = snapshots[snapshotFilePath];
+  return snapshot ? snapshot.creationTime : null;
 });

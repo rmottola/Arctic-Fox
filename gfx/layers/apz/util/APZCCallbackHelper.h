@@ -18,7 +18,6 @@ class nsIPresShell;
 class nsIWidget;
 template<class T> struct already_AddRefed;
 template<class T> class nsCOMPtr;
-template<class T> class nsRefPtr;
 
 namespace mozilla {
 namespace layers {
@@ -78,6 +77,9 @@ public:
        that it accepts future scroll offset updates from APZ. */
     static void AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollId,
                                         const uint32_t& aScrollGeneration);
+
+    /* Get the pres shell associated with the root content document enclosing |aContent|. */
+    static nsIPresShell* GetRootContentDocumentPresShellForContent(nsIContent* aContent);
 
     /* Apply an "input transform" to the given |aInput| and return the transformed value.
        The input transform applied is the one for the content element corresponding to

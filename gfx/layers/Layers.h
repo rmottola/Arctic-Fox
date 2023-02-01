@@ -168,9 +168,7 @@ public:
     , mSnapEffectiveTransforms(true)
     , mId(0)
     , mInTransaction(false)
-  {
-    InitLog();
-  }
+  {}
 
   /**
    * Release layers and resources held by this layer manager, and mark
@@ -621,7 +619,7 @@ public:
   void BeginTabSwitch();
 
   static bool IsLogEnabled();
-  static PRLogModuleInfo* GetLog() { return sLog; }
+  static mozilla::LogModule* GetLog();
 
   bool IsCompositingCheap(LayersBackend aBackend)
   {
@@ -684,8 +682,6 @@ protected:
   // Internally used to implement Dump().
   virtual void DumpPacket(layerscope::LayersPacket* aPacket);
 
-  static void InitLog();
-  static PRLogModuleInfo* sLog;
   uint64_t mId;
   bool mInTransaction;
   // The time when painting most recently finished. This is recorded so that
@@ -1466,9 +1462,12 @@ public:
   bool Extend3DContext() {
     return GetContentFlags() & CONTENT_EXTEND_3D_CONTEXT;
   }
-  bool Is3DContextLeaf() {
-    return !Extend3DContext() && GetParent() &&
+  bool Combines3DTransformWithAncestors() {
+    return GetParent() &&
       reinterpret_cast<Layer*>(GetParent())->Extend3DContext();
+  }
+  bool Is3DContextLeaf() {
+    return !Extend3DContext() && Combines3DTransformWithAncestors();
   }
   /**
    * It is true if the user can see the back of the layer and the
@@ -2534,7 +2533,6 @@ protected:
 
   virtual void DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent) override;
 
-  Layer* mTempReferent;
   // 0 is a special value that means "no ID".
   uint64_t mId;
 };

@@ -36,11 +36,21 @@
 namespace mozilla {
 namespace dom {
 
+inline void
+ImplCycleCollectionTraverse(nsCycleCollectionTraversalCallback& aCallback,
+                            TransferItem& aField,
+                            const char* aName,
+                            uint32_t aFlags = 0)
+{
+  ImplCycleCollectionTraverse(aCallback, aField.mData, aName, aFlags);
+}
+
 NS_IMPL_CYCLE_COLLECTION_CLASS(DataTransfer)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(DataTransfer)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mParent)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFiles)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mItems)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDragTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDragImage)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
@@ -48,6 +58,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(DataTransfer)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParent)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFiles)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mItems)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDragTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDragImage)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
@@ -270,6 +281,12 @@ DataTransfer::GetMozUserCancelled(bool* aUserCancelled)
 FileList*
 DataTransfer::GetFiles(ErrorResult& aRv)
 {
+  return GetFilesInternal(aRv, nsContentUtils::SubjectPrincipal());
+}
+
+FileList*
+DataTransfer::GetFilesInternal(ErrorResult& aRv, nsIPrincipal* aSubjectPrincipal)
+{
   if (mEventMessage != eDrop &&
       mEventMessage != eLegacyDragDrop &&
       mEventMessage != ePaste) {
@@ -283,7 +300,7 @@ DataTransfer::GetFiles(ErrorResult& aRv)
 
     for (uint32_t i = 0; i < count; i++) {
       nsCOMPtr<nsIVariant> variant;
-      aRv = MozGetDataAt(NS_ConvertUTF8toUTF16(kFileMime), i, getter_AddRefs(variant));
+      aRv = GetDataAtInternal(NS_ConvertUTF8toUTF16(kFileMime), i, aSubjectPrincipal, getter_AddRefs(variant));
       if (aRv.Failed()) {
         return nullptr;
       }
@@ -335,7 +352,7 @@ NS_IMETHODIMP
 DataTransfer::GetFiles(nsIDOMFileList** aFileList)
 {
   ErrorResult rv;
-  NS_IF_ADDREF(*aFileList = GetFiles(rv));
+  NS_IF_ADDREF(*aFileList = GetFilesInternal(rv, nsContentUtils::GetSystemPrincipal()));
   return rv.StealNSResult();
 }
 
@@ -363,7 +380,7 @@ DataTransfer::GetData(const nsAString& aFormat, nsAString& aData,
   aData.Truncate();
 
   nsCOMPtr<nsIVariant> data;
-  nsresult rv = MozGetDataAt(aFormat, 0, getter_AddRefs(data));
+  nsresult rv = GetDataAtInternal(aFormat, 0, nsContentUtils::SubjectPrincipal(), getter_AddRefs(data));
   if (NS_FAILED(rv)) {
     if (rv != NS_ERROR_DOM_INDEX_SIZE_ERR) {
       aRv.Throw(rv);
@@ -419,18 +436,10 @@ void
 DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData,
                       ErrorResult& aRv)
 {
-  RefPtr<nsVariant> variant = new nsVariant();
+  RefPtr<nsVariantCC> variant = new nsVariantCC();
   variant->SetAsAString(aData);
 
-  aRv = MozSetDataAt(aFormat, variant, 0);
-}
-
-NS_IMETHODIMP
-DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData)
-{
-  ErrorResult rv;
-  SetData(aFormat, aData, rv);
-  return rv.StealNSResult();
+  aRv = SetDataAtInternal(aFormat, variant, 0, nsContentUtils::SubjectPrincipal());
 }
 
 void
@@ -498,7 +507,8 @@ DataTransfer::GetMozSourceNode()
   nsCOMPtr<nsIDOMNode> sourceNode;
   dragSession->GetSourceNode(getter_AddRefs(sourceNode));
   nsCOMPtr<nsINode> node = do_QueryInterface(sourceNode);
-  if (node && !nsContentUtils::CanCallerAccess(node)) {
+  if (node && !nsContentUtils::LegacyIsCallerNativeCode()
+      && !nsContentUtils::CanCallerAccess(node)) {
     return nullptr;
   }
 
@@ -566,9 +576,16 @@ DataTransfer::MozTypesAt(uint32_t aIndex, nsISupports** aTypes)
   return rv.StealNSResult();
 }
 
-NS_IMETHODIMP
-DataTransfer::MozGetDataAt(const nsAString& aFormat, uint32_t aIndex,
-                           nsIVariant** aData)
+nsresult
+DataTransfer::GetDataAtNoSecurityCheck(const nsAString& aFormat, uint32_t aIndex,
+                                       nsIVariant** aData)
+{
+  return GetDataAtInternal(aFormat, aIndex, nsContentUtils::GetSystemPrincipal(), aData);
+}
+
+nsresult
+DataTransfer::GetDataAtInternal(const nsAString& aFormat, uint32_t aIndex,
+                                nsIPrincipal* aSubjectPrincipal, nsIVariant** aData)
 {
   *aData = nullptr;
 
@@ -609,22 +626,18 @@ DataTransfer::MozGetDataAt(const nsAString& aFormat, uint32_t aIndex,
   // source of the drag is in a child frame of the caller. In that case,
   // we only allow access to data of the same principal. During other events,
   // only allow access to the data with the same principal.
-  nsIPrincipal* principal = nullptr;
-  if (mIsCrossDomainSubFrameDrop ||
+  bool checkFormatItemPrincipal = mIsCrossDomainSubFrameDrop ||
       (mEventMessage != eDrop && mEventMessage != eLegacyDragDrop &&
-       mEventMessage != ePaste &&
-       !nsContentUtils::IsCallerChrome())) {
-    principal = nsContentUtils::SubjectPrincipal();
-  }
+       mEventMessage != ePaste);
 
   uint32_t count = item.Length();
   for (uint32_t i = 0; i < count; i++) {
     TransferItem& formatitem = item[i];
     if (formatitem.mFormat.Equals(format)) {
-      bool subsumes;
-      if (formatitem.mPrincipal && principal &&
-          (NS_FAILED(principal->Subsumes(formatitem.mPrincipal, &subsumes)) || !subsumes))
+      if (formatitem.mPrincipal && checkFormatItemPrincipal &&
+          !aSubjectPrincipal->Subsumes(formatitem.mPrincipal)) {
         return NS_ERROR_DOM_SECURITY_ERR;
+      }
 
       if (!formatitem.mData) {
         FillInExternalData(formatitem, aIndex);
@@ -643,12 +656,7 @@ DataTransfer::MozGetDataAt(const nsAString& aFormat, uint32_t aIndex,
           MOZ_ASSERT(sp, "This cannot fail on the main thread.");
           nsIPrincipal* dataPrincipal = sp->GetPrincipal();
           NS_ENSURE_TRUE(dataPrincipal, NS_ERROR_DOM_SECURITY_ERR);
-          if (!principal) {
-            principal = nsContentUtils::SubjectPrincipal();
-          }
-          bool equals = false;
-          NS_ENSURE_TRUE(NS_SUCCEEDED(principal->Equals(dataPrincipal, &equals)) && equals,
-                         NS_ERROR_DOM_SECURITY_ERR);
+          NS_ENSURE_TRUE(aSubjectPrincipal->Subsumes(dataPrincipal), NS_ERROR_DOM_SECURITY_ERR);
         }
       }
       *aData = formatitem.mData;
@@ -667,7 +675,7 @@ DataTransfer::MozGetDataAt(JSContext* aCx, const nsAString& aFormat,
                            mozilla::ErrorResult& aRv)
 {
   nsCOMPtr<nsIVariant> data;
-  aRv = MozGetDataAt(aFormat, aIndex, getter_AddRefs(data));
+  aRv = GetDataAtInternal(aFormat, aIndex, nsContentUtils::SubjectPrincipal(), getter_AddRefs(data));
   if (aRv.Failed()) {
     return;
   }
@@ -684,9 +692,9 @@ DataTransfer::MozGetDataAt(JSContext* aCx, const nsAString& aFormat,
   }
 }
 
-NS_IMETHODIMP
-DataTransfer::MozSetDataAt(const nsAString& aFormat, nsIVariant* aData,
-                           uint32_t aIndex)
+nsresult
+DataTransfer::SetDataAtInternal(const nsAString& aFormat, nsIVariant* aData,
+                                uint32_t aIndex, nsIPrincipal* aSubjectPrincipal)
 {
   if (aFormat.IsEmpty()) {
     return NS_OK;
@@ -711,7 +719,7 @@ DataTransfer::MozSetDataAt(const nsAString& aFormat, nsIVariant* aData,
 
   // Don't allow non-chrome to add non-string or file data. We block file
   // promises as well which are used internally for drags to the desktop.
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (!nsContentUtils::IsSystemPrincipal(aSubjectPrincipal)) {
     if (aFormat.EqualsLiteral(kFilePromiseMime) ||
         aFormat.EqualsLiteral(kFileMime)) {
       return NS_ERROR_DOM_SECURITY_ERR;
@@ -725,8 +733,7 @@ DataTransfer::MozSetDataAt(const nsAString& aFormat, nsIVariant* aData,
     }
   }
 
-  return SetDataWithPrincipal(aFormat, aData, aIndex,
-                              nsContentUtils::SubjectPrincipal());
+  return SetDataWithPrincipal(aFormat, aData, aIndex, aSubjectPrincipal);
 }
 
 void
@@ -738,7 +745,7 @@ DataTransfer::MozSetDataAt(JSContext* aCx, const nsAString& aFormat,
   aRv = nsContentUtils::XPConnect()->JSValToVariant(aCx, aData,
                                                     getter_AddRefs(data));
   if (!aRv.Failed()) {
-    aRv = MozSetDataAt(aFormat, data, aIndex);
+    aRv = SetDataAtInternal(aFormat, data, aIndex, nsContentUtils::SubjectPrincipal());
   }
 }
 
@@ -1365,7 +1372,7 @@ DataTransfer::FillInExternalData(TransferItem& aItem, uint32_t aIndex)
     if (!data)
       return;
 
-    RefPtr<nsVariant> variant = new nsVariant();
+    RefPtr<nsVariantCC> variant = new nsVariantCC();
 
     nsCOMPtr<nsISupportsString> supportsstr = do_QueryInterface(data);
     if (supportsstr) {

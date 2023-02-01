@@ -69,6 +69,7 @@ using mozilla::Maybe;
 using mozilla::Move;
 using mozilla::PositiveInfinity;
 using mozilla::UniquePtr;
+using JS::AsmJSOption;
 using JS::GenericNaN;
 
 /*****************************************************************************/
@@ -172,18 +173,22 @@ VarListHead(ParseNode* pn)
     return ListHead(pn);
 }
 
+static inline bool
+IsDefaultCase(ParseNode* pn)
+{
+    return pn->as<CaseClause>().isDefault();
+}
+
 static inline ParseNode*
 CaseExpr(ParseNode* pn)
 {
-    MOZ_ASSERT(pn->isKind(PNK_CASE) || pn->isKind(PNK_DEFAULT));
-    return BinaryLeft(pn);
+    return pn->as<CaseClause>().caseExpression();
 }
 
 static inline ParseNode*
 CaseBody(ParseNode* pn)
 {
-    MOZ_ASSERT(pn->isKind(PNK_CASE) || pn->isKind(PNK_DEFAULT));
-    return BinaryRight(pn);
+    return pn->as<CaseClause>().statementList();
 }
 
 static inline ParseNode*
@@ -1596,17 +1601,9 @@ class MOZ_STACK_CLASS ModuleValidator
             masm().patchCall(callerOffset, calleeOffset);
         }
 
-        // When an interrupt is triggered, all function code is mprotected and,
-        // for sanity, stub code (particularly the interrupt stub) is not.
-        // Protection works at page granularity, so we need to ensure that no
-        // stub code gets into the function code pages.
-        // TODO; this is no longer true and could be removed, see also
-        // bug 1200609.
         MOZ_ASSERT(!finishedFunctionBodies_);
-        masm().haltingAlign(AsmJSPageSize);
         module_->finishFunctionBodies(masm().currentOffset());
         finishedFunctionBodies_ = true;
-
         return true;
     }
 
@@ -5915,8 +5912,7 @@ static bool
 CheckDefaultAtEnd(FunctionValidator& f, ParseNode* stmt)
 {
     for (; stmt; stmt = NextNode(stmt)) {
-        MOZ_ASSERT(stmt->isKind(PNK_CASE) || stmt->isKind(PNK_DEFAULT));
-        if (stmt->isKind(PNK_DEFAULT) && NextNode(stmt) != nullptr)
+        if (IsDefaultCase(stmt) && NextNode(stmt) != nullptr)
             return f.fail(stmt, "default label must be at the end");
     }
 
@@ -5927,7 +5923,7 @@ static bool
 CheckSwitchRange(FunctionValidator& f, ParseNode* stmt, int32_t* low, int32_t* high,
                  int32_t* tableLength)
 {
-    if (stmt->isKind(PNK_DEFAULT)) {
+    if (IsDefaultCase(stmt)) {
         *low = 0;
         *high = -1;
         *tableLength = 0;
@@ -5941,7 +5937,7 @@ CheckSwitchRange(FunctionValidator& f, ParseNode* stmt, int32_t* low, int32_t* h
     *low = *high = i;
 
     ParseNode* initialStmt = stmt;
-    for (stmt = NextNode(stmt); stmt && stmt->isKind(PNK_CASE); stmt = NextNode(stmt)) {
+    for (stmt = NextNode(stmt); stmt && !IsDefaultCase(stmt); stmt = NextNode(stmt)) {
         int32_t i = 0;
         if (!CheckCaseExpr(f, CaseExpr(stmt), &i))
             return false;
@@ -6016,7 +6012,7 @@ CheckSwitch(FunctionValidator& f, ParseNode* switchStmt)
         return false;
 
     uint32_t numCases = 0;
-    for (; stmt && stmt->isKind(PNK_CASE); stmt = NextNode(stmt)) {
+    for (; stmt && !IsDefaultCase(stmt); stmt = NextNode(stmt)) {
         int32_t caseValue = ExtractNumericLiteral(f.m(), CaseExpr(stmt)).toInt32();
         unsigned caseIndex = caseValue - low;
 
@@ -6033,7 +6029,7 @@ CheckSwitch(FunctionValidator& f, ParseNode* switchStmt)
     }
 
     bool hasDefault = false;
-    if (stmt && stmt->isKind(PNK_DEFAULT)) {
+    if (stmt && IsDefaultCase(stmt)) {
         hasDefault = true;
         if (!CheckStatement(f, CaseBody(stmt)))
             return false;
@@ -8275,11 +8271,14 @@ EstablishPreconditions(ExclusiveContext* cx, AsmJSParser& parser)
     if (cx->gcSystemPageSize() != AsmJSPageSize)
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by non 4KiB system page size");
 
-    if (!parser.options().asmJSOption)
+    switch (parser.options().asmJSOption) {
+      case AsmJSOption::Disabled:
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by javascript.options.asmjs in about:config");
-
-    if (cx->compartment()->debuggerObservesAsmJS())
+      case AsmJSOption::DisabledByDebugger:
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by debugger");
+      case AsmJSOption::Enabled:
+        break;
+    }
 
     if (parser.pc->isGenerator())
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by generator context");

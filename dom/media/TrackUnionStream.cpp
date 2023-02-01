@@ -42,15 +42,12 @@ namespace mozilla {
 #undef STREAM_LOG
 #endif
 
-PRLogModuleInfo* gTrackUnionStreamLog;
+LazyLogModule gTrackUnionStreamLog("TrackUnionStream");
 #define STREAM_LOG(type, msg) MOZ_LOG(gTrackUnionStreamLog, type, msg)
 
 TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
   ProcessedMediaStream(aWrapper), mNextAvailableTrackID(1)
 {
-  if (!gTrackUnionStreamLog) {
-    gTrackUnionStreamLog = PR_NewLogModule("TrackUnionStream");
-  }
 }
 
   void TrackUnionStream::RemoveInput(MediaInputPort* aPort)
@@ -146,18 +143,6 @@ TrackUnionStream::TrackUnionStream(DOMMediaStream* aWrapper) :
     if (allHaveCurrentData) {
       // We can make progress if we're not blocked
       mHasCurrentData = true;
-    }
-  }
-
-  // Forward SetTrackEnabled(output_track_id, enabled) to the Source MediaStream,
-  // translating the output track ID into the correct ID in the source.
-  void TrackUnionStream::ForwardTrackEnabled(TrackID aOutputID, bool aEnabled)
-  {
-    for (int32_t i = mTrackMap.Length() - 1; i >= 0; --i) {
-      if (mTrackMap[i].mOutputTrackID == aOutputID) {
-        mTrackMap[i].mInputPort->GetSource()->
-          SetTrackEnabled(mTrackMap[i].mInputTrackID, aEnabled);
-      }
     }
   }
 

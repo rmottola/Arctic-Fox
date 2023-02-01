@@ -12,10 +12,9 @@ var promise = require("promise");
 var { ActorPool, createExtraActors, appendExtraActors } = require("devtools/server/actors/common");
 var { DebuggerServer } = require("devtools/server/main");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
-var { dbg_assert } = DevToolsUtils;
+var { assert  } = DevToolsUtils;
 var { TabSources } = require("./utils/TabSources");
 var makeDebugger = require("./utils/make-debugger");
-var { WorkerActorList } = require("devtools/server/actors/worker");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -23,6 +22,7 @@ loader.lazyRequireGetter(this, "RootActor", "devtools/server/actors/root", true)
 loader.lazyRequireGetter(this, "ThreadActor", "devtools/server/actors/script", true);
 loader.lazyRequireGetter(this, "unwrapDebuggerObjectGlobal", "devtools/server/actors/script", true);
 loader.lazyRequireGetter(this, "BrowserAddonActor", "devtools/server/actors/addon", true);
+loader.lazyRequireGetter(this, "WorkerActorList", "devtools/server/actors/worker", true);
 loader.lazyImporter(this, "AddonManager", "resource://gre/modules/AddonManager.jsm");
 
 // Assumptions on events module:
@@ -129,6 +129,7 @@ function createRootActor(aConnection)
                        {
                          tabList: new BrowserTabList(aConnection),
                          addonList: new BrowserAddonList(aConnection),
+                         workerList: new WorkerActorList({}),
                          globalActorFactories: DebuggerServer.globalActorFactories,
                          onShutdown: sendShutdownEvent
                        });
@@ -344,8 +345,7 @@ BrowserTabList.prototype._getActorForBrowser = function(browser) {
     this._checkListening();
     return actor.connect();
   } else {
-    actor = new BrowserTabActor(this._connection, browser,
-                                browser.getTabBrowser());
+    actor = new BrowserTabActor(this._connection, browser);
     this._actorByBrowser.set(browser, actor);
     this._checkListening();
     return promise.resolve(actor);
@@ -893,7 +893,7 @@ TabActor.prototype = {
 
   get sources() {
     if (!this._sources) {
-      dbg_assert(this.threadActor, "threadActor should exist when creating sources.");
+      assert(this.threadActor, "threadActor should exist when creating sources.");
       this._sources = new TabSources(this.threadActor);
     }
     return this._sources;
@@ -909,9 +909,9 @@ TabActor.prototype = {
   },
 
   form: function BTA_form() {
-    dbg_assert(!this.exited,
+    assert(!this.exited,
                "form() shouldn't be called on exited browser actor.");
-    dbg_assert(this.actorID,
+    assert(this.actorID,
                "tab should have an actorID.");
 
     let response = {
@@ -1028,7 +1028,7 @@ TabActor.prototype = {
     }
 
     // Create a pool for tab-lifetime actors.
-    dbg_assert(!this._tabPool, "Shouldn't have a tab pool if we weren't attached.");
+    assert(!this._tabPool, "Shouldn't have a tab pool if we weren't attached.");
     this._tabPool = new ActorPool(this.conn);
     this.conn.addActorPool(this._tabPool);
 
@@ -1277,7 +1277,7 @@ TabActor.prototype = {
    * up the content window for debugging.
    */
   _pushContext: function BTA_pushContext() {
-    dbg_assert(!this._contextPool, "Can't push multiple contexts");
+    assert(!this._contextPool, "Can't push multiple contexts");
 
     this._contextPool = new ActorPool(this.conn);
     this.conn.addActorPool(this._contextPool);
@@ -1291,7 +1291,7 @@ TabActor.prototype = {
    * The content window is no longer being debugged after this call.
    */
   _popContext: function BTA_popContext() {
-    dbg_assert(!!this._contextPool, "No context to pop.");
+    assert(!!this._contextPool, "No context to pop.");
 
     this.conn.removeActorPool(this._contextPool);
     this._contextPool = null;
@@ -1846,20 +1846,21 @@ exports.TabActor = TabActor;
 
 /**
  * Creates a tab actor for handling requests to a single in-process
- * <browser> tab. Most of the implementation comes from TabActor.
+ * <xul:browser> tab, or <html:iframe>.
+ * Most of the implementation comes from TabActor.
  *
  * @param aConnection DebuggerServerConnection
  *        The connection to the client.
  * @param aBrowser browser
- *        The browser instance that contains this tab.
- * @param aTabBrowser tabbrowser
- *        The tabbrowser that can receive nsIWebProgressListener events.
+ *        The frame instance that contains this tab.
  */
-function BrowserTabActor(aConnection, aBrowser, aTabBrowser)
+function BrowserTabActor(aConnection, aBrowser)
 {
   TabActor.call(this, aConnection, aBrowser);
   this._browser = aBrowser;
-  this._tabbrowser = aTabBrowser;
+  if (typeof(aBrowser.getTabBrowser) == "function") {
+    this._tabbrowser = aBrowser.getTabBrowser();
+  }
 
   Object.defineProperty(this, "docShell", {
     value: this._browser.docShell,
@@ -1974,6 +1975,10 @@ RemoteBrowserTabActor.prototype = {
     if (this._form) {
       let deferred = promise.defer();
       let onFormUpdate = msg => {
+        // There may be more than just one childtab.js up and running
+        if (this._form.actor != msg.json.actor) {
+          return;
+        }
         this._mm.removeMessageListener("debug:form", onFormUpdate);
         this._form = msg.json;
         deferred.resolve(this);

@@ -8,6 +8,7 @@
 #define mozilla_dom_bluetooth_ObexBase_h
 
 #include "BluetoothCommon.h"
+#include "mozilla/Endian.h"
 #include "nsAutoPtr.h"
 #include "nsTArray.h"
 
@@ -123,6 +124,18 @@ enum ObexResponseCode {
   DatabaseLocked = 0xE1,
 };
 
+enum ObexDigestChallenge {
+  Nonce = 0x00,
+  Options = 0x01,
+  Realm = 0x02
+};
+
+enum ObexDigestResponse {
+  ReqDigest = 0x00,
+  UserId = 0x01,
+  NonceChallenged = 0x02
+};
+
 class ObexHeader
 {
 public:
@@ -178,7 +191,7 @@ public:
         uint8_t* ptr = mHeaders[i]->mData.get();
 
         for (int j = 0; j < nameLength; ++j) {
-          char16_t c = ((((uint32_t)ptr[j * 2]) << 8) | ptr[j * 2 + 1]);
+          char16_t c = BigEndian::readUint16(&ptr[j * 2]);
           aRetName += c;
         }
 
@@ -211,10 +224,7 @@ public:
     for (int i = 0; i < length; ++i) {
       if (mHeaders[i]->mId == ObexHeaderId::Length) {
         uint8_t* ptr = mHeaders[i]->mData.get();
-        *aRetLength = ((uint32_t)ptr[0] << 24) |
-                      ((uint32_t)ptr[1] << 16) |
-                      ((uint32_t)ptr[2] << 8) |
-                      ((uint32_t)ptr[3]);
+        *aRetLength = BigEndian::readUint32(&ptr[0]);
         return;
       }
     }
@@ -250,6 +260,21 @@ public:
         *aRetTarget = new uint8_t[mHeaders[i]->mDataLength];
         memcpy(*aRetTarget, ptr, mHeaders[i]->mDataLength);
         *aRetTargetLength = mHeaders[i]->mDataLength;
+        return;
+      }
+    }
+  }
+
+  void GetAuthChallenge(nsAutoArrayPtr<uint8_t>& aRetData,
+                        int* aRetDataLength) const
+  {
+    *aRetDataLength = 0;
+
+    for (uint8_t i = 0; i < mHeaders.Length(); ++i) {
+      if (mHeaders[i]->mId == ObexHeaderId::AuthChallenge) {
+        aRetData = new uint8_t[mHeaders[i]->mDataLength];
+        memcpy(aRetData, mHeaders[i]->mData, mHeaders[i]->mDataLength);
+        *aRetDataLength = mHeaders[i]->mDataLength;
         return;
       }
     }
@@ -347,6 +372,8 @@ int AppendHeaderTarget(uint8_t* aRetBuf, int aBufferSize, const uint8_t* aTarget
                        int aLength);
 int AppendHeaderWho(uint8_t* aRetBuf, int aBufferSize, const uint8_t* aWho,
                     int aLength);
+int AppendAuthResponse(uint8_t* aRetBuf, int aBufferSize,
+                       const uint8_t* aDigest, int aLength);
 int AppendHeaderAppParameters(uint8_t* aRetBuf, int aBufferSize,
                               const uint8_t* aAppParameters, int aLength);
 int AppendAppParameter(uint8_t* aRetBuf, int aBufferSize, const uint8_t aTagId,

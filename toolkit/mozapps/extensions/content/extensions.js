@@ -4,10 +4,10 @@
 
 "use strict";
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -638,8 +638,10 @@ var gViewController = {
     this.viewObjects["detail"] = gDetailView;
     this.viewObjects["updates"] = gUpdatesView;
 
-    for each (let view in this.viewObjects)
+    for (let type in this.viewObjects) {
+      let view = this.viewObjects[type];
       view.initialize();
+    }
 
     window.controllers.appendController(this);
 
@@ -655,7 +657,8 @@ var gViewController = {
       this.currentViewObj.hide();
     this.currentViewRequest = 0;
 
-    for each(let view in this.viewObjects) {
+    for (let type in this.viewObjects) {
+      let view = this.viewObjects[type];
       if ("shutdown" in view) {
         try {
           view.shutdown();
@@ -2904,7 +2907,7 @@ var gDetailView = {
       gCategories.select("addons://list/" + aAddon.type);
 
     document.getElementById("detail-name").textContent = aAddon.name;
-    var icon = aAddon.icon64URL ? aAddon.icon64URL : aAddon.iconURL;
+    var icon = AddonManager.getPreferredIconURL(aAddon, 64, window);
     document.getElementById("detail-icon").src = icon ? icon : "";
     document.getElementById("detail-creator").setCreator(aAddon.creator, aAddon.homepageURL);
     document.getElementById("detail-translators").setTranslators(aAddon.translators, aAddon.type);

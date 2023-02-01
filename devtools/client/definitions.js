@@ -38,6 +38,7 @@ const performanceProps = "chrome://browser/locale/devtools/performance.propertie
 const netMonitorProps = "chrome://browser/locale/devtools/netmonitor.properties";
 const storageProps = "chrome://browser/locale/devtools/storage.properties";
 const scratchpadProps = "chrome://browser/locale/devtools/scratchpad.properties";
+const memoryProps = "chrome://browser/locale/devtools/memory.properties";
 
 loader.lazyGetter(this, "toolboxStrings", () => Services.strings.createBundle(toolboxProps));
 loader.lazyGetter(this, "performanceStrings",() => Services.strings.createBundle(performanceProps));
@@ -51,6 +52,7 @@ loader.lazyGetter(this, "inspectorStrings", () => Services.strings.createBundle(
 loader.lazyGetter(this, "netMonitorStrings", () => Services.strings.createBundle(netMonitorProps));
 loader.lazyGetter(this, "storageStrings", () => Services.strings.createBundle(storageProps));
 loader.lazyGetter(this, "scratchpadStrings", () => Services.strings.createBundle(scratchpadProps));
+loader.lazyGetter(this, "memoryStrings", () => Services.strings.createBundle(memoryProps));
 
 var Tools = {};
 exports.Tools = Tools;
@@ -278,13 +280,14 @@ Tools.performance = {
 Tools.memory = {
   id: "memory",
   ordinal: 8,
-  icon: "chrome://devtools/skin/themes/images/tool-styleeditor.svg",
+  icon: "chrome://devtools/skin/themes/images/tool-memory.svg",
   invertIconForLightTheme: true,
+  highlightedicon: "chrome://devtools/skin/themes/images/tool-memory-active.svg",
   url: "chrome://devtools/content/memory/memory.xhtml",
   visibilityswitch: "devtools.memory.enabled",
-  label: "Memory",
-  panelLabel: "Memory Panel",
-  tooltip: "Memory (keyboardshortcut)",
+  label: l10n("memory.label", memoryStrings),
+  panelLabel: l10n("memory.panelLabel", memoryStrings),
+  tooltip: l10n("memory.tooltip", memoryStrings),
   hiddenInOptions: true,
 
   isTargetSupported: function (target) {

@@ -329,16 +329,6 @@ JS_CallUnbarrieredStringTracer(JSTracer* trc, JSString** strp, const char* name)
 extern JS_PUBLIC_API(void)
 JS_CallUnbarrieredScriptTracer(JSTracer* trc, JSScript** scriptp, const char* name);
 
-template <typename HashSetEnum>
-inline void
-JS_CallHashSetObjectTracer(JSTracer* trc, HashSetEnum& e, JSObject* const& key, const char* name)
-{
-    JSObject* updated = key;
-    JS_CallUnbarrieredObjectTracer(trc, &updated, name);
-    if (updated != key)
-        e.rekeyFront(updated);
-}
-
 /**
  * Trace an object that is known to always be tenured.  No post barriers are
  * required in this case.
@@ -384,12 +374,17 @@ struct StructGCPolicy {
         // trace method.
         t->trace(trc);
     }
+
+    static bool needsSweep(T* t) {
+        return t->needsSweep();
+    }
 };
 
 // This policy ignores any GC interaction, e.g. for non-GC types.
 template <typename T>
 struct IgnoreGCPolicy {
-    static void trace(JSTracer* trc, uint32_t* id, const char* name) {}
+    static void trace(JSTracer* trc, T* t, const char* name) {}
+    static bool needsSweep(T* v) { return false; }
 };
 
 // The default policy when no other more specific policy fits (e.g. for a

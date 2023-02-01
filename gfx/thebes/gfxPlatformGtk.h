@@ -54,7 +54,8 @@ public:
     CreateFontGroup(const mozilla::FontFamilyList& aFontFamilyList,
                     const gfxFontStyle *aStyle,
                     gfxTextPerfMetrics* aTextPerf,
-                    gfxUserFontSet *aUserFontSet) override;
+                    gfxUserFontSet *aUserFontSet,
+                    gfxFloat aDevToCssSize) override;
 
     /**
      * Look up a local platform font using the full font face name (needed to
@@ -126,8 +127,15 @@ public:
       return true;
     }
 
+    void FontsPrefsChanged(const char *aPref) override;
+
+    // maximum number of fonts to substitute for a generic
+    uint32_t MaxGenericSubstitions();
+
 protected:
     static gfxFontconfigUtils *sFontconfigUtils;
+
+    int8_t mMaxGenericSubstitutions;
 
 private:
     virtual void GetPlatformCMSOutputProfile(void *&mem,

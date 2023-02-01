@@ -93,6 +93,8 @@
 #include "VibrancyManager.h"
 #include "nsNativeThemeCocoa.h"
 #include "nsIDOMWindowUtils.h"
+#include "Units.h"
+#include "UnitTransforms.h"
 
 using namespace mozilla;
 using namespace mozilla::layers;
@@ -162,7 +164,7 @@ static uint32_t gNumberOfWidgetsNeedingEventThread = 0;
 - (void)processPendingRedraws;
 
 - (void)drawRect:(NSRect)aRect inContext:(CGContextRef)aContext;
-- (nsIntRegion)nativeDirtyRegionWithBoundingRect:(NSRect)aRect;
+- (LayoutDeviceIntRegion)nativeDirtyRegionWithBoundingRect:(NSRect)aRect;
 - (BOOL)isUsingMainThreadOpenGL;
 - (BOOL)isUsingOpenGL;
 - (void)drawUsingOpenGL;
@@ -191,7 +193,7 @@ static uint32_t gNumberOfWidgetsNeedingEventThread = 0;
 - (id<mozAccessible>)accessible;
 #endif
 
-- (nsIntPoint)convertWindowCoordinates:(NSPoint)aPoint;
+- (LayoutDeviceIntPoint)convertWindowCoordinates:(NSPoint)aPoint;
 - (APZCTreeManager*)apzctm;
 
 - (BOOL)inactiveWindowAcceptsMouseEvent:(NSEvent*)aEvent;
@@ -279,13 +281,15 @@ public:
   virtual ~RectTextureImage();
 
   already_AddRefed<gfx::DrawTarget>
-    BeginUpdate(const nsIntSize& aNewSize,
-                const nsIntRegion& aDirtyRegion = nsIntRegion());
+    BeginUpdate(const LayoutDeviceIntSize& aNewSize,
+                const LayoutDeviceIntRegion& aDirtyRegion =
+                  LayoutDeviceIntRegion());
   void EndUpdate(bool aKeepSurface = false);
 
-  void UpdateIfNeeded(const nsIntSize& aNewSize,
-                      const nsIntRegion& aDirtyRegion,
-                      void (^aCallback)(gfx::DrawTarget*, const nsIntRegion&))
+  void UpdateIfNeeded(const LayoutDeviceIntSize& aNewSize,
+                      const LayoutDeviceIntRegion& aDirtyRegion,
+                      void (^aCallback)(gfx::DrawTarget*,
+                                        const LayoutDeviceIntRegion&))
   {
     RefPtr<gfx::DrawTarget> drawTarget = BeginUpdate(aNewSize, aDirtyRegion);
     if (drawTarget) {
@@ -294,29 +298,30 @@ public:
     }
   }
 
-  void UpdateFromCGContext(const nsIntSize& aNewSize,
-                           const nsIntRegion& aDirtyRegion,
+  void UpdateFromCGContext(const LayoutDeviceIntSize& aNewSize,
+                           const LayoutDeviceIntRegion& aDirtyRegion,
                            CGContextRef aCGContext);
 
-  nsIntRegion GetUpdateRegion() {
+  LayoutDeviceIntRegion GetUpdateRegion() {
     MOZ_ASSERT(mInUpdate, "update region only valid during update");
     return mUpdateRegion;
   }
 
   void Draw(mozilla::layers::GLManager* aManager,
-            const nsIntPoint& aLocation,
+            const LayoutDeviceIntPoint& aLocation,
             const Matrix4x4& aTransform = Matrix4x4());
 
-  static nsIntSize TextureSizeForSize(const nsIntSize& aSize);
+  static LayoutDeviceIntSize TextureSizeForSize(
+    const LayoutDeviceIntSize& aSize);
 
 protected:
 
   RefPtr<gfx::DrawTarget> mUpdateDrawTarget;
   GLContext* mGLContext;
-  nsIntRegion mUpdateRegion;
-  nsIntSize mUsedSize;
-  nsIntSize mBufferSize;
-  nsIntSize mTextureSize;
+  LayoutDeviceIntRegion mUpdateRegion;
+  LayoutDeviceIntSize mUsedSize;
+  LayoutDeviceIntSize mBufferSize;
+  LayoutDeviceIntSize mTextureSize;
   GLuint mTexture;
   bool mInUpdate;
 };
@@ -356,7 +361,7 @@ public:
                                const gfx::Rect& aLayerRect,
                                const gfx::Rect& aTextureRect) override;
 
-  void BeginFrame(nsIntSize aRenderSize);
+  void BeginFrame(LayoutDeviceIntSize aRenderSize);
   void EndFrame();
 
   NSOpenGLContext* GetNSOpenGLContext()
@@ -513,7 +518,8 @@ nsresult nsChildView::Create(nsIWidget *aParent,
   // create our parallel NSView and hook it up to our parent. Recall
   // that NS_NATIVE_WIDGET is the NSView.
   CGFloat scaleFactor = nsCocoaUtils::GetBackingScaleFactor(mParentView);
-  NSRect r = nsCocoaUtils::DevPixelsToCocoaPoints(mBounds, scaleFactor);
+  NSRect r = nsCocoaUtils::DevPixelsToCocoaPoints(
+    LayoutDeviceIntRect::FromUnknownRect(mBounds), scaleFactor);
   mView = [(NSView<mozView>*)CreateCocoaView(r) retain];
   if (!mView) {
     return NS_ERROR_FAILURE;
@@ -906,31 +912,29 @@ NS_IMETHODIMP nsChildView::SetCursor(imgIContainer* aCursor,
 #pragma mark -
 
 // Get this component dimension
-NS_IMETHODIMP nsChildView::GetBoundsUntyped(nsIntRect &aRect)
+NS_IMETHODIMP nsChildView::GetBounds(LayoutDeviceIntRect& aRect)
 {
-  if (!mView) {
-    aRect = mBounds;
-  } else {
-    aRect = CocoaPointsToDevPixels([mView frame]);
-  }
+  aRect = !mView
+        ? LayoutDeviceIntRect::FromUnknownRect(mBounds)
+        : CocoaPointsToDevPixels([mView frame]);
   return NS_OK;
 }
 
-NS_IMETHODIMP nsChildView::GetClientBoundsUntyped(nsIntRect &aRect)
+NS_IMETHODIMP nsChildView::GetClientBounds(mozilla::LayoutDeviceIntRect& aRect)
 {
-  GetBoundsUntyped(aRect);
+  GetBounds(aRect);
   if (!mParentWidget) {
     // For top level widgets we want the position on screen, not the position
     // of this view inside the window.
-    aRect.MoveTo(WidgetToScreenOffsetUntyped());
+    aRect.MoveTo(WidgetToScreenOffset());
   }
   return NS_OK;
 }
 
-NS_IMETHODIMP nsChildView::GetScreenBoundsUntyped(nsIntRect &aRect)
+NS_IMETHODIMP nsChildView::GetScreenBounds(LayoutDeviceIntRect& aRect)
 {
-  GetBoundsUntyped(aRect);
-  aRect.MoveTo(WidgetToScreenOffsetUntyped());
+  GetBounds(aRect);
+  aRect.MoveTo(WidgetToScreenOffset());
   return NS_OK;
 }
 
@@ -1007,7 +1011,7 @@ NS_IMETHODIMP nsChildView::Move(double aX, double aY)
   mBounds.y = y;
 
   ManipulateViewWithoutNeedingDisplay(mView, ^{
-    [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
+    [mView setFrame:UntypedDevPixelsToCocoaPoints(mBounds)];
   });
 
   NotifyRollupGeometryChange();
@@ -1032,7 +1036,7 @@ NS_IMETHODIMP nsChildView::Resize(double aWidth, double aHeight, bool aRepaint)
   mBounds.height = height;
 
   ManipulateViewWithoutNeedingDisplay(mView, ^{
-    [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
+    [mView setFrame:UntypedDevPixelsToCocoaPoints(mBounds)];
   });
 
   if (mVisible && aRepaint)
@@ -1071,7 +1075,7 @@ NS_IMETHODIMP nsChildView::Resize(double aX, double aY,
   }
 
   ManipulateViewWithoutNeedingDisplay(mView, ^{
-    [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
+    [mView setFrame:UntypedDevPixelsToCocoaPoints(mBounds)];
   });
 
   if (mVisible && aRepaint)
@@ -1093,7 +1097,7 @@ NS_IMETHODIMP nsChildView::Resize(double aX, double aY,
 
 static const int32_t resizeIndicatorWidth = 15;
 static const int32_t resizeIndicatorHeight = 15;
-bool nsChildView::ShowsResizeIndicator(nsIntRect* aResizerRect)
+bool nsChildView::ShowsResizeIndicator(LayoutDeviceIntRect* aResizerRect)
 {
   NSView *topLevelView = mView, *superView = nil;
   while ((superView = [topLevelView superview]))
@@ -1365,10 +1369,10 @@ NS_IMETHODIMP nsChildView::Invalidate(const nsIntRect &aRect)
   if ([NSView focusView]) {
     // if a view is focussed (i.e. being drawn), then postpone the invalidate so that we
     // don't lose it.
-    [mView setNeedsPendingDisplayInRect:DevPixelsToCocoaPoints(aRect)];
+    [mView setNeedsPendingDisplayInRect:UntypedDevPixelsToCocoaPoints(aRect)];
   }
   else {
-    [mView setNeedsDisplayInRect:DevPixelsToCocoaPoints(aRect)];
+    [mView setNeedsDisplayInRect:UntypedDevPixelsToCocoaPoints(aRect)];
   }
 
   return NS_OK;
@@ -1523,7 +1527,7 @@ void nsChildView::ReportSizeEvent()
 
 #pragma mark -
 
-nsIntPoint nsChildView::GetClientOffsetUntyped()
+LayoutDeviceIntPoint nsChildView::GetClientOffset()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
@@ -1531,7 +1535,7 @@ nsIntPoint nsChildView::GetClientOffsetUntyped()
   origin.y = [[mView window] frame].size.height - origin.y;
   return CocoaPointsToDevPixels(origin);
 
-  NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(nsIntPoint(0, 0));
+  NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0, 0));
 }
 
 //    Return the offset between this child view and the screen.
@@ -1554,7 +1558,7 @@ LayoutDeviceIntPoint nsChildView::WidgetToScreenOffset()
   FlipCocoaScreenCoordinate(origin);
 
   // convert to device pixels
-  return LayoutDeviceIntPoint::FromUnknownPoint(CocoaPointsToDevPixels(origin));
+  return CocoaPointsToDevPixels(origin);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0,0));
 }
@@ -1646,20 +1650,18 @@ nsChildView::NotifyIMEInternal(const IMENotification& aIMENotification)
       mTextInputHandler->CancelIMEComposition();
       return NS_OK;
     case NOTIFY_IME_OF_FOCUS:
-      if (mInputContext.IsPasswordEditor()) {
-        TextInputHandler::EnableSecureEventInput();
-      } else {
-        TextInputHandler::EnsureSecureEventInputDisabled();
+      if (mTextInputHandler->IsFocused()) {
+        if (mInputContext.IsPasswordEditor()) {
+          TextInputHandler::EnableSecureEventInput();
+        } else {
+          TextInputHandler::EnsureSecureEventInputDisabled();
+        }
       }
 
       NS_ENSURE_TRUE(mTextInputHandler, NS_ERROR_NOT_AVAILABLE);
       mTextInputHandler->OnFocusChangeInGecko(true);
       return NS_OK;
     case NOTIFY_IME_OF_BLUR:
-      // When we're going to be deactive, we must disable the secure event input
-      // mode, see the Carbon Event Manager Reference.
-      TextInputHandler::EnsureSecureEventInputDisabled();
-
       NS_ENSURE_TRUE(mTextInputHandler, NS_ERROR_NOT_AVAILABLE);
       mTextInputHandler->OnFocusChangeInGecko(false);
       return NS_OK;
@@ -1720,7 +1722,7 @@ nsChildView::SetInputContext(const InputContext& aContext,
 {
   NS_ENSURE_TRUE_VOID(mTextInputHandler);
 
-  if (mTextInputHandler->IsOrWouldBeFocused()) {
+  if (mTextInputHandler->IsFocused()) {
     if (aContext.IsPasswordEditor()) {
       TextInputHandler::EnableSecureEventInput();
     } else {
@@ -1883,32 +1885,11 @@ nsChildView::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
 nsIMEUpdatePreference
 nsChildView::GetIMEUpdatePreference()
 {
-  return nsIMEUpdatePreference(nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE);
-}
-
-NS_IMETHODIMP nsChildView::GetToggledKeyState(uint32_t aKeyCode,
-                                              bool* aLEDState)
-{
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
-
-  NS_ENSURE_ARG_POINTER(aLEDState);
-  uint32_t key;
-  switch (aKeyCode) {
-    case NS_VK_CAPS_LOCK:
-      key = alphaLock;
-      break;
-    case NS_VK_NUM_LOCK:
-      key = kEventKeyModifierNumLockMask;
-      break;
-    // Mac doesn't support SCROLL_LOCK state.
-    default:
-      return NS_ERROR_NOT_IMPLEMENTED;
+  // While a plugin has focus, IMEInputHandler doesn't need any notifications.
+  if (mInputContext.mIMEState.mEnabled == IMEState::PLUGIN) {
+    return nsIMEUpdatePreference();
   }
-  uint32_t modifierFlags = ::GetCurrentKeyModifiers();
-  *aLEDState = (modifierFlags & key) != 0;
-  return NS_OK;
-
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  return nsIMEUpdatePreference(nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE);
 }
 
 NSView<mozView>* nsChildView::GetEditorView()
@@ -1965,7 +1946,7 @@ nsChildView::ConfigureAPZControllerThread()
   }
 }
 
-nsIntRect
+LayoutDeviceIntRect
 nsChildView::RectContainingTitlebarControls()
 {
   // Start with a thin strip at the top of the window for the highlight line.
@@ -2039,7 +2020,8 @@ nsChildView::PostRender(LayerManagerComposite* aManager)
 }
 
 void
-nsChildView::DrawWindowOverlay(LayerManagerComposite* aManager, nsIntRect aRect)
+nsChildView::DrawWindowOverlay(LayerManagerComposite* aManager,
+                               LayoutDeviceIntRect aRect)
 {
   nsAutoPtr<GLManager> manager(GLManager::CreateGLManager(aManager));
   if (manager) {
@@ -2048,20 +2030,20 @@ nsChildView::DrawWindowOverlay(LayerManagerComposite* aManager, nsIntRect aRect)
 }
 
 void
-nsChildView::DrawWindowOverlay(GLManager* aManager, nsIntRect aRect)
+nsChildView::DrawWindowOverlay(GLManager* aManager, LayoutDeviceIntRect aRect)
 {
   GLContext* gl = aManager->gl();
   ScopedGLState scopedScissorTestState(gl, LOCAL_GL_SCISSOR_TEST, false);
 
-  MaybeDrawTitlebar(aManager, aRect);
-  MaybeDrawResizeIndicator(aManager, aRect);
+  MaybeDrawTitlebar(aManager);
+  MaybeDrawResizeIndicator(aManager);
   MaybeDrawRoundedCorners(aManager, aRect);
 }
 
 static void
-ClearRegion(gfx::DrawTarget *aDT, nsIntRegion aRegion)
+ClearRegion(gfx::DrawTarget *aDT, LayoutDeviceIntRegion aRegion)
 {
-  gfxUtils::ClipToRegion(aDT, aRegion);
+  gfxUtils::ClipToRegion(aDT, aRegion.ToUnknownRegion());
   aDT->ClearRect(gfx::Rect(0, 0, aDT->GetSize().width, aDT->GetSize().height));
   aDT->PopClip();
 }
@@ -2100,7 +2082,7 @@ DrawResizer(CGContextRef aCtx)
 }
 
 void
-nsChildView::MaybeDrawResizeIndicator(GLManager* aManager, const nsIntRect& aRect)
+nsChildView::MaybeDrawResizeIndicator(GLManager* aManager)
 {
   MutexAutoLock lock(mEffectsLock);
   if (!mShowsResizeIndicator) {
@@ -2111,8 +2093,8 @@ nsChildView::MaybeDrawResizeIndicator(GLManager* aManager, const nsIntRect& aRec
     mResizerImage = new RectTextureImage(aManager->gl());
   }
 
-  nsIntSize size = mResizeIndicatorRect.Size();
-  mResizerImage->UpdateIfNeeded(size, nsIntRegion(), ^(gfx::DrawTarget* drawTarget, const nsIntRegion& updateRegion) {
+  LayoutDeviceIntSize size = mResizeIndicatorRect.Size();
+  mResizerImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(), ^(gfx::DrawTarget* drawTarget, const LayoutDeviceIntRegion& updateRegion) {
     ClearRegion(drawTarget, updateRegion);
     gfx::BorrowedCGContext borrow(drawTarget);
     DrawResizer(borrow.cg);
@@ -2155,7 +2137,7 @@ DrawTitlebarHighlight(NSSize aWindowSize, CGFloat aRadius, CGFloat aDevicePixelW
 }
 
 static CGContextRef
-CreateCGContext(const nsIntSize& aSize)
+CreateCGContext(const LayoutDeviceIntSize& aSize)
 {
   CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
   CGContextRef ctx =
@@ -2188,7 +2170,8 @@ nsChildView::UpdateTitlebarCGContext()
   NSRect dirtyRect = [mView convertRect:[(BaseWindow*)[mView window] getAndResetNativeDirtyRect] fromView:nil];
   NSRect dirtyTitlebarRect = NSIntersectionRect(titlebarRect, dirtyRect);
 
-  nsIntSize texSize = RectTextureImage::TextureSizeForSize(mTitlebarRect.Size());
+  LayoutDeviceIntSize texSize =
+    RectTextureImage::TextureSizeForSize(mTitlebarRect.Size());
   if (!mTitlebarCGContext ||
       CGBitmapContextGetWidth(mTitlebarCGContext) != size_t(texSize.width) ||
       CGBitmapContextGetHeight(mTitlebarCGContext) != size_t(texSize.height)) {
@@ -2313,14 +2296,14 @@ nsChildView::UpdateTitlebarCGContext()
 // GLContext surface. In order to make the titlebar controls visible, we have
 // to redraw them inside the OpenGL context surface.
 void
-nsChildView::MaybeDrawTitlebar(GLManager* aManager, const nsIntRect& aRect)
+nsChildView::MaybeDrawTitlebar(GLManager* aManager)
 {
   MutexAutoLock lock(mEffectsLock);
   if (!mIsCoveringTitlebar || mIsFullscreen) {
     return;
   }
 
-  nsIntRegion updatedTitlebarRegion;
+  LayoutDeviceIntRegion updatedTitlebarRegion;
   updatedTitlebarRegion.And(mUpdatedTitlebarRegion, mTitlebarRect);
   mUpdatedTitlebarRegion.SetEmpty();
 
@@ -2343,7 +2326,8 @@ DrawTopLeftCornerMask(CGContextRef aCtx, int aRadius)
 }
 
 void
-nsChildView::MaybeDrawRoundedCorners(GLManager* aManager, const nsIntRect& aRect)
+nsChildView::MaybeDrawRoundedCorners(GLManager* aManager,
+                                     const LayoutDeviceIntRect& aRect)
 {
   MutexAutoLock lock(mEffectsLock);
 
@@ -2351,8 +2335,8 @@ nsChildView::MaybeDrawRoundedCorners(GLManager* aManager, const nsIntRect& aRect
     mCornerMaskImage = new RectTextureImage(aManager->gl());
   }
 
-  nsIntSize size(mDevPixelCornerRadius, mDevPixelCornerRadius);
-  mCornerMaskImage->UpdateIfNeeded(size, nsIntRegion(), ^(gfx::DrawTarget* drawTarget, const nsIntRegion& updateRegion) {
+  LayoutDeviceIntSize size(mDevPixelCornerRadius, mDevPixelCornerRadius);
+  mCornerMaskImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(), ^(gfx::DrawTarget* drawTarget, const LayoutDeviceIntRegion& updateRegion) {
     ClearRegion(drawTarget, updateRegion);
     RefPtr<gfx::PathBuilder> builder = drawTarget->CreatePathBuilder();
     builder->Arc(gfx::Point(mDevPixelCornerRadius, mDevPixelCornerRadius), mDevPixelCornerRadius, 0, 2.0f * M_PI);
@@ -2420,17 +2404,17 @@ FindUnifiedToolbarBottom(const nsTArray<nsIWidget::ThemeGeometry>& aThemeGeometr
   return unifiedToolbarBottom;
 }
 
-static nsIntRect
+static LayoutDeviceIntRect
 FindFirstRectOfType(const nsTArray<nsIWidget::ThemeGeometry>& aThemeGeometries,
                     nsITheme::ThemeGeometryType aThemeGeometryType)
 {
   for (uint32_t i = 0; i < aThemeGeometries.Length(); ++i) {
     const nsIWidget::ThemeGeometry& g = aThemeGeometries[i];
     if (g.mType == aThemeGeometryType) {
-      return g.mRect;
+      return LayoutDeviceIntRect::FromUnknownRect(g.mRect);
     }
   }
-  return nsIntRect();
+  return LayoutDeviceIntRect();
 }
 
 void
@@ -2462,9 +2446,9 @@ nsChildView::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometri
   [win setSheetAttachmentPosition:DevPixelsToCocoaPoints(devSheetPosition)];
 
   // Update titlebar control offsets.
-  nsIntRect windowButtonRect = FindFirstRectOfType(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeWindowButtons);
+  LayoutDeviceIntRect windowButtonRect = FindFirstRectOfType(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeWindowButtons);
   [win placeWindowButtons:[mView convertRect:DevPixelsToCocoaPoints(windowButtonRect) toView:nil]];
-  nsIntRect fullScreenButtonRect = FindFirstRectOfType(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeFullscreenButton);
+  LayoutDeviceIntRect fullScreenButtonRect = FindFirstRectOfType(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeFullscreenButton);
   [win placeFullScreenButton:[mView convertRect:DevPixelsToCocoaPoints(fullScreenButtonRect) toView:nil]];
 }
 
@@ -2660,8 +2644,9 @@ nsChildView::StartRemoteDrawing()
     }
   }
 
-  nsIntRegion dirtyRegion = mBounds;
-  nsIntSize renderSize = mBounds.Size();
+  LayoutDeviceIntRegion dirtyRegion(LayoutDeviceIntRect::FromUnknownRect(mBounds));
+  LayoutDeviceIntSize renderSize =
+    LayoutDeviceIntSize::FromUnknownSize(mBounds.Size());
 
   if (!mBasicCompositorImage) {
     mBasicCompositorImage = new RectTextureImage(mGLPresenter->gl());
@@ -2672,7 +2657,7 @@ nsChildView::StartRemoteDrawing()
 
   if (!drawTarget) {
     // Composite unchanged textures.
-    DoRemoteComposition(mBounds);
+    DoRemoteComposition(LayoutDeviceIntRect::FromUnknownRect(mBounds));
     return nullptr;
   }
 
@@ -2683,7 +2668,7 @@ void
 nsChildView::EndRemoteDrawing()
 {
   mBasicCompositorImage->EndUpdate(true);
-  DoRemoteComposition(mBounds);
+  DoRemoteComposition(LayoutDeviceIntRect::FromUnknownRect(mBounds));
 }
 
 void
@@ -2710,7 +2695,7 @@ nsChildView::InitCompositor(Compositor* aCompositor)
 }
 
 void
-nsChildView::DoRemoteComposition(const nsIntRect& aRenderRect)
+nsChildView::DoRemoteComposition(const LayoutDeviceIntRect& aRenderRect)
 {
   if (![(ChildView*)mView preRender:mGLPresenter->GetNSOpenGLContext()]) {
     return;
@@ -2718,7 +2703,7 @@ nsChildView::DoRemoteComposition(const nsIntRect& aRenderRect)
   mGLPresenter->BeginFrame(aRenderRect.Size());
 
   // Draw the result from the basic compositor.
-  mBasicCompositorImage->Draw(mGLPresenter, nsIntPoint(0, 0));
+  mBasicCompositorImage->Draw(mGLPresenter, LayoutDeviceIntPoint(0, 0));
 
   // DrawWindowOverlay doesn't do anything for non-GL, so it didn't paint
   // anything during the basic compositor transaction. Draw the overlay now.
@@ -2732,8 +2717,10 @@ nsChildView::DoRemoteComposition(const nsIntRect& aRenderRect)
 void
 nsChildView::UpdateWindowDraggingRegion(const nsIntRegion& aRegion)
 {
-  if (mDraggableRegion != aRegion) {
-    mDraggableRegion = aRegion;
+  LayoutDeviceIntRegion region =
+    LayoutDeviceIntRegion::FromUnknownRegion(aRegion);
+  if (mDraggableRegion != region) {
+    mDraggableRegion = region;
     [(ChildView*)mView updateWindowDraggableState];
   }
 }
@@ -2903,29 +2890,30 @@ RectTextureImage::~RectTextureImage()
   }
 }
 
-nsIntSize
-RectTextureImage::TextureSizeForSize(const nsIntSize& aSize)
+LayoutDeviceIntSize
+RectTextureImage::TextureSizeForSize(const LayoutDeviceIntSize& aSize)
 {
-  return nsIntSize(gfx::NextPowerOfTwo(aSize.width),
-                   gfx::NextPowerOfTwo(aSize.height));
+  return LayoutDeviceIntSize(gfx::NextPowerOfTwo(aSize.width),
+                             gfx::NextPowerOfTwo(aSize.height));
 }
 
 already_AddRefed<gfx::DrawTarget>
-RectTextureImage::BeginUpdate(const nsIntSize& aNewSize,
-                              const nsIntRegion& aDirtyRegion)
+RectTextureImage::BeginUpdate(const LayoutDeviceIntSize& aNewSize,
+                              const LayoutDeviceIntRegion& aDirtyRegion)
 {
   MOZ_ASSERT(!mInUpdate, "Beginning update during update!");
   mUpdateRegion = aDirtyRegion;
   if (aNewSize != mUsedSize) {
     mUsedSize = aNewSize;
-    mUpdateRegion = gfx::IntRect(gfx::IntPoint(0, 0), aNewSize);
+    mUpdateRegion =
+      LayoutDeviceIntRect(LayoutDeviceIntPoint(0, 0), aNewSize);
   }
 
   if (mUpdateRegion.IsEmpty()) {
     return nullptr;
   }
 
-  nsIntSize neededBufferSize = TextureSizeForSize(mUsedSize);
+  LayoutDeviceIntSize neededBufferSize = TextureSizeForSize(mUsedSize);
   if (!mUpdateDrawTarget || mBufferSize != neededBufferSize) {
     gfx::IntSize size(neededBufferSize.width, neededBufferSize.height);
     mUpdateDrawTarget =
@@ -2958,14 +2946,15 @@ RectTextureImage::EndUpdate(bool aKeepSurface)
   MOZ_ASSERT(mInUpdate, "Ending update while not in update");
 
   bool overwriteTexture = false;
-  nsIntRegion updateRegion = mUpdateRegion;
+  LayoutDeviceIntRegion updateRegion = mUpdateRegion;
   if (!mTexture || (mTextureSize != mBufferSize)) {
     overwriteTexture = true;
     mTextureSize = mBufferSize;
   }
 
   if (overwriteTexture || !CanUploadSubtextures()) {
-    updateRegion = gfx::IntRect(gfx::IntPoint(0, 0), mTextureSize);
+    updateRegion =
+      LayoutDeviceIntRect(LayoutDeviceIntPoint(0, 0), mTextureSize);
   }
 
   RefPtr<gfx::SourceSurface> snapshot = mUpdateDrawTarget->Snapshot();
@@ -2973,10 +2962,10 @@ RectTextureImage::EndUpdate(bool aKeepSurface)
 
   UploadSurfaceToTexture(mGLContext,
                          dataSnapshot,
-                         updateRegion,
+                         updateRegion.ToUnknownRegion(),
                          mTexture,
                          overwriteTexture,
-                         updateRegion.GetBounds().TopLeft(),
+                         updateRegion.GetBounds().TopLeft().ToUnknownPoint(),
                          false,
                          LOCAL_GL_TEXTURE0,
                          LOCAL_GL_TEXTURE_RECTANGLE_ARB);
@@ -2989,8 +2978,8 @@ RectTextureImage::EndUpdate(bool aKeepSurface)
 }
 
 void
-RectTextureImage::UpdateFromCGContext(const nsIntSize& aNewSize,
-                                      const nsIntRegion& aDirtyRegion,
+RectTextureImage::UpdateFromCGContext(const LayoutDeviceIntSize& aNewSize,
+                                      const LayoutDeviceIntRegion& aDirtyRegion,
                                       CGContextRef aCGContext)
 {
   gfx::IntSize size = gfx::IntSize(CGBitmapContextGetWidth(aCGContext),
@@ -2999,7 +2988,7 @@ RectTextureImage::UpdateFromCGContext(const nsIntSize& aNewSize,
   RefPtr<gfx::DrawTarget> dt = BeginUpdate(aNewSize, aDirtyRegion);
   if (dt) {
     gfx::Rect rect(0, 0, size.width, size.height);
-    gfxUtils::ClipToRegion(dt, GetUpdateRegion());
+    gfxUtils::ClipToRegion(dt, GetUpdateRegion().ToUnknownRegion());
     RefPtr<gfx::SourceSurface> sourceSurface =
       dt->CreateSourceSurfaceFromData(static_cast<uint8_t *>(CGBitmapContextGetData(aCGContext)),
                                       size,
@@ -3015,7 +3004,7 @@ RectTextureImage::UpdateFromCGContext(const nsIntSize& aNewSize,
 
 void
 RectTextureImage::Draw(GLManager* aManager,
-                       const nsIntPoint& aLocation,
+                       const LayoutDeviceIntPoint& aLocation,
                        const Matrix4x4& aTransform)
 {
   ShaderProgramOGL* program = aManager->GetProgram(LOCAL_GL_TEXTURE_RECTANGLE_ARB,
@@ -3108,7 +3097,7 @@ GLPresenter::BindAndDrawQuad(ShaderProgramOGL *aProgram,
 }
 
 void
-GLPresenter::BeginFrame(nsIntSize aRenderSize)
+GLPresenter::BeginFrame(LayoutDeviceIntSize aRenderSize)
 {
   mGLContext->MakeCurrent();
 
@@ -3642,9 +3631,9 @@ NSEvent* gLastDragMouseDownEvent = nil;
   return mGeckoChild->VibrancyFontSmoothingBackgroundColorForThemeGeometryType(aThemeGeometryType);
 }
 
-- (nsIntRegion)nativeDirtyRegionWithBoundingRect:(NSRect)aRect
+- (LayoutDeviceIntRegion)nativeDirtyRegionWithBoundingRect:(NSRect)aRect
 {
-  nsIntRect boundingRect = mGeckoChild->CocoaPointsToDevPixels(aRect);
+  LayoutDeviceIntRect boundingRect = mGeckoChild->CocoaPointsToDevPixels(aRect);
   const NSRect *rects;
   NSInteger count;
   [self getRectsBeingDrawn:&rects count:&count];
@@ -3653,7 +3642,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
     return boundingRect;
   }
 
-  nsIntRegion region;
+  LayoutDeviceIntRegion region;
   for (NSInteger i = 0; i < count; ++i) {
     region.Or(region, mGeckoChild->CocoaPointsToDevPixels(rects[i]));
   }
@@ -3730,7 +3719,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   CGContextSaveGState(aContext);
 
-  nsIntRegion region = [self nativeDirtyRegionWithBoundingRect:aRect];
+  LayoutDeviceIntRegion region = [self nativeDirtyRegionWithBoundingRect:aRect];
 
   // Create Cairo objects.
   RefPtr<gfxQuartzSurface> targetSurface;
@@ -3744,10 +3733,10 @@ NSEvent* gLastDragMouseDownEvent = nil;
   RefPtr<gfxContext> targetContext = new gfxContext(dt);
 
   // Set up the clip region.
-  nsIntRegionRectIterator iter(region);
+  LayoutDeviceIntRegion::RectIterator iter(region);
   targetContext->NewPath();
   for (;;) {
-    const nsIntRect* r = iter.Next();
+    const LayoutDeviceIntRect* r = iter.Next();
     if (!r)
       break;
     targetContext->Rectangle(gfxRect(r->x, r->y, r->width, r->height));
@@ -3759,10 +3748,10 @@ NSEvent* gLastDragMouseDownEvent = nil;
   if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_BASIC) {
     nsBaseWidget::AutoLayerManagerSetup
       setupLayerManager(mGeckoChild, targetContext, BufferMode::BUFFER_NONE);
-    painted = mGeckoChild->PaintWindow(region);
+    painted = mGeckoChild->PaintWindow(region.ToUnknownRegion());
   } else if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
     // We only need this so that we actually get DidPaintWindow fired
-    painted = mGeckoChild->PaintWindow(region);
+    painted = mGeckoChild->PaintWindow(region.ToUnknownRegion());
   }
 
   targetContext = nullptr;
@@ -4532,7 +4521,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   else
     geckoEvent.button = WidgetMouseEvent::eLeftButton;
 
-  mGeckoChild->DispatchInputEvent(&geckoEvent);
+  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
   mBlockedLastMouseDown = NO;
 
   // XXX maybe call markedTextSelectionChanged:client: here?
@@ -4559,7 +4548,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   // This might destroy our widget (and null out mGeckoChild).
   bool defaultPrevented =
-    (mGeckoChild->DispatchInputEvent(&geckoEvent) == nsEventStatus_eConsumeNoDefault);
+    (mGeckoChild->DispatchAPZAwareEvent(&geckoEvent) == nsEventStatus_eConsumeNoDefault);
 
   // Check to see if we are double-clicking in the titlebar.
   CGFloat locationInTitlebar = [[self window] frame].size.height - [theEvent locationInWindow].y;
@@ -4592,8 +4581,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   EventMessage msg = aEnter ? eMouseEnterIntoWidget : eMouseExitFromWidget;
   WidgetMouseEvent event(true, msg, mGeckoChild, WidgetMouseEvent::eReal);
-  event.refPoint = LayoutDeviceIntPoint::FromUnknownPoint(
-    mGeckoChild->CocoaPointsToDevPixels(localEventLocation));
+  event.refPoint = mGeckoChild->CocoaPointsToDevPixels(localEventLocation);
 
   event.exit = aType;
 
@@ -4620,15 +4608,16 @@ NSEvent* gLastDragMouseDownEvent = nil;
 }
 
 static CGSRegionObj
-NewCGSRegionFromRegion(const nsIntRegion& aRegion,
-                       CGRect (^aRectConverter)(const nsIntRect&))
+NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
+                       CGRect (^aRectConverter)(const LayoutDeviceIntRect&))
 {
   nsTArray<CGRect> rects;
-  nsIntRegionRectIterator iter(aRegion);
+  LayoutDeviceIntRegion::RectIterator iter(aRegion);
   for (;;) {
-    const nsIntRect* r = iter.Next();
-    if (!r)
+    const LayoutDeviceIntRect* r = iter.Next();
+    if (!r) {
       break;
+    }
     rects.AppendElement(aRectConverter(*r));
   }
 
@@ -4647,12 +4636,12 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
     return [super _regionForOpaqueDescendants:aRect forMove:aForMove];
   }
 
-  nsIntRect boundingRect = mGeckoChild->CocoaPointsToDevPixels(aRect);
+  LayoutDeviceIntRect boundingRect = mGeckoChild->CocoaPointsToDevPixels(aRect);
 
-  nsIntRegion opaqueRegion;
+  LayoutDeviceIntRegion opaqueRegion;
   opaqueRegion.Sub(boundingRect, mGeckoChild->GetDraggableRegion());
 
-  return NewCGSRegionFromRegion(opaqueRegion, ^(const nsIntRect& r) {
+  return NewCGSRegionFromRegion(opaqueRegion, ^(const LayoutDeviceIntRect& r) {
     return [self convertToFlippedWindowCoordinates:mGeckoChild->DevPixelsToCocoaPoints(r)];
   });
 }
@@ -4685,7 +4674,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
-  mGeckoChild->DispatchInputEvent(&geckoEvent);
+  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4731,7 +4720,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.button = WidgetMouseEvent::eRightButton;
   geckoEvent.clickCount = [theEvent clickCount];
 
-  mGeckoChild->DispatchInputEvent(&geckoEvent);
+  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
   if (!mGeckoChild)
     return;
 
@@ -4755,7 +4744,7 @@ NewCGSRegionFromRegion(const nsIntRegion& aRegion,
   geckoEvent.clickCount = [theEvent clickCount];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
-  mGeckoChild->DispatchInputEvent(&geckoEvent);
+  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4924,8 +4913,9 @@ PanGestureTypeForEvent(NSEvent* aEvent)
 
   NSPoint locationInWindow = nsCocoaUtils::EventLocationForWindow(theEvent, [self window]);
 
-  ScreenPoint position = ScreenPoint::FromUnknownPoint(
-    [self convertWindowCoordinates:locationInWindow]);
+  ScreenPoint position = ViewAs<ScreenPixel>(
+    [self convertWindowCoordinates:locationInWindow],
+    PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent);
 
   bool usePreciseDeltas = nsCocoaUtils::HasPreciseScrollingDeltas(theEvent) &&
     Preferences::GetBool("mousewheel.enable_pixel_scrolling", true);
@@ -4999,7 +4989,9 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   CGPoint loc = CGEventGetLocation(cgEvent);
   loc.y = nsCocoaUtils::FlippedScreenY(loc.y);
   NSPoint locationInWindow = [[self window] convertScreenToBase:NSPointFromCGPoint(loc)];
-  ScreenIntPoint location = ScreenIntPoint::FromUnknownPoint([self convertWindowCoordinates:locationInWindow]);
+  ScreenIntPoint location = ViewAs<ScreenPixel>(
+    [self convertWindowCoordinates:locationInWindow],
+    PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent);
 
   static NSTimeInterval sStartTime = [NSDate timeIntervalSinceReferenceDate];
   static TimeStamp sStartTimeStamp = TimeStamp::Now();
@@ -5016,8 +5008,9 @@ PanGestureTypeForEvent(NSEvent* aEvent)
     NSPoint locationInWindowMoved = NSMakePoint(
       locationInWindow.x + pixelDeltaX,
       locationInWindow.y - pixelDeltaY);
-    ScreenIntPoint locationMoved = ScreenIntPoint::FromUnknownPoint(
-      [self convertWindowCoordinates:locationInWindowMoved]);
+    ScreenIntPoint locationMoved = ViewAs<ScreenPixel>(
+      [self convertWindowCoordinates:locationInWindowMoved],
+      PixelCastJustification::LayoutDeviceIsScreenForUntransformedEvent);
     ScreenPoint delta = ScreenPoint(locationMoved - location);
     ScrollableLayerGuid guid;
 
@@ -5163,8 +5156,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   // convert point to view coordinate system
   NSPoint locationInWindow = nsCocoaUtils::EventLocationForWindow(aMouseEvent, [self window]);
 
-  outGeckoEvent->refPoint = LayoutDeviceIntPoint::FromUnknownPoint(
-    [self convertWindowCoordinates:locationInWindow]);
+  outGeckoEvent->refPoint = [self convertWindowCoordinates:locationInWindow];
 
   WidgetMouseEventBase* mouseEvent = outGeckoEvent->AsMouseEventBase();
   mouseEvent->buttons = 0;
@@ -5227,116 +5219,6 @@ PanGestureTypeForEvent(NSEvent* aEvent)
           objectForKey:MDAppleMiniaturizeOnDoubleClickKey] boolValue];
 
   return shouldMinimize;
-}
-
-#pragma mark -
-// NSTextInput implementation
-
-- (void)insertText:(id)insertString
-{
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
-
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return;
-  }
-
-  NS_ENSURE_TRUE_VOID(mGeckoChild);
-
-  nsAutoRetainCocoaObject kungFuDeathGrip(self);
-
-  NSAttributedString* attrStr;
-  if ([insertString isKindOfClass:[NSAttributedString class]]) {
-    attrStr = static_cast<NSAttributedString*>(insertString);
-  } else {
-    attrStr =
-      [[[NSAttributedString alloc] initWithString:insertString] autorelease];
-  }
-
-  mTextInputHandler->InsertText(attrStr);
-
-  NS_OBJC_END_TRY_ABORT_BLOCK;
-}
-
-- (void)insertNewline:(id)sender
-{
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return;
-  }
-
-  [self insertText:@"\n"];
-}
-
-- (NSInteger)conversationIdentifier
-{
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return 0;
-  }
-
-  NS_ENSURE_TRUE(mTextInputHandler, reinterpret_cast<NSInteger>(self));
-  return mTextInputHandler->ConversationIdentifier();
-}
-
-- (NSRect)firstRectForCharacterRange:(NSRange)theRange
-{
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return NSMakeRect(0.0, 0.0, 0.0, 0.0);
-  }
-
-  NSRect rect;
-  NS_ENSURE_TRUE(mTextInputHandler, rect);
-  return mTextInputHandler->FirstRectForCharacterRange(theRange);
-}
-
-- (NSAttributedString *)attributedSubstringFromRange:(NSRange)theRange
-{
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return nil;
-  }
-
-  NS_ENSURE_TRUE(mTextInputHandler, nil);
-  return mTextInputHandler->GetAttributedSubstringFromRange(theRange);
-}
-
-- (void)setMarkedText:(id)aString selectedRange:(NSRange)selRange
-{
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
-
-  // We're considering not implementing NSTextInput. Start by just
-  // preffing its methods off.
-  if (!Preferences::GetBool("intl.ime.nstextinput.enable", false)) {
-    NSLog(@"Set intl.ime.nstextinput.enable to true in about:config to fix input.");
-    return;
-  }
-
-  NS_ENSURE_TRUE_VOID(mTextInputHandler);
-
-  nsAutoRetainCocoaObject kungFuDeathGrip(self);
-
-  NSAttributedString* attrStr;
-  if ([aString isKindOfClass:[NSAttributedString class]]) {
-    attrStr = static_cast<NSAttributedString*>(aString);
-  } else {
-    attrStr = [[[NSAttributedString alloc] initWithString:aString] autorelease];
-  }
-
-  mTextInputHandler->SetMarkedText(attrStr, selRange);
-
-  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 #pragma mark -
@@ -5578,6 +5460,15 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
+- (void)insertNewline:(id)sender
+{
+  if (mTextInputHandler) {
+    NSAttributedString *attrStr = [[NSAttributedString alloc] initWithString:@"\n"];
+    mTextInputHandler->InsertText(attrStr);
+    [attrStr release];
+  }
+}
+
 - (void)flagsChanged:(NSEvent*)theEvent
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
@@ -5657,6 +5548,12 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   if (isMozWindow)
     [[self window] setSuppressMakeKeyFront:NO];
 
+  if (mGeckoChild->GetInputContext().IsPasswordEditor()) {
+    TextInputHandler::EnableSecureEventInput();
+  } else {
+    TextInputHandler::EnsureSecureEventInputDisabled();
+  }
+
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
@@ -5670,6 +5567,8 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   nsIWidgetListener* listener = mGeckoChild->GetWidgetListener();
   if (listener)
     listener->WindowDeactivated();
+
+  TextInputHandler::EnsureSecureEventInputDisabled();
 }
 
 // If the call to removeFromSuperview isn't delayed from nsChildView::
@@ -5707,10 +5606,10 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   return NSDragOperationNone;
 }
 
-- (nsIntPoint)convertWindowCoordinates:(NSPoint)aPoint
+- (LayoutDeviceIntPoint)convertWindowCoordinates:(NSPoint)aPoint
 {
   if (!mGeckoChild) {
-    return nsIntPoint(0, 0);
+    return LayoutDeviceIntPoint(0, 0);
   }
 
   NSPoint localPoint = [self convertPoint:aPoint fromView:nil];
@@ -5789,8 +5688,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   // Convert event from gecko global coords to gecko view coords.
   NSPoint draggingLoc = [aSender draggingLocation];
 
-  geckoEvent.refPoint = LayoutDeviceIntPoint::FromUnknownPoint(
-    [self convertWindowCoordinates:draggingLoc]);
+  geckoEvent.refPoint = [self convertWindowCoordinates:draggingLoc];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
   mGeckoChild->DispatchInputEvent(&geckoEvent);
@@ -5897,7 +5795,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
     NSPoint pnt = [NSEvent mouseLocation];
     FlipCocoaScreenCoordinate(pnt);
 
-    nsIntPoint devPoint = mGeckoChild->CocoaPointsToDevPixels(pnt);
+    LayoutDeviceIntPoint devPoint = mGeckoChild->CocoaPointsToDevPixels(pnt);
     dragService->DragMoved(devPoint.x, devPoint.y);
   }
 }

@@ -48,10 +48,9 @@ EXPORTS.mozilla.gfx += [
     'UserData.h',
 ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('cocoa', 'uikit'):
     EXPORTS.mozilla.gfx += [
         'MacIOSurface.h',
-        'QuartzSupport.h',
     ]
     UNIFIED_SOURCES += [
         'DrawTargetCG.cpp',
@@ -116,6 +115,9 @@ if CONFIG['INTEL_ARCHITECTURE']:
     if CONFIG['MOZ_ENABLE_SKIA']:
         SOURCES['convolverSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
 elif CONFIG['CPU_ARCH'].startswith('mips'):
+    SOURCES += [
+        'BlurLS3.cpp',
+    ]
     if CONFIG['MOZ_ENABLE_SKIA']:
         SOURCES += [
             'convolverLS3.cpp',
@@ -163,6 +165,9 @@ SOURCES += [
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+    EXPORTS.mozilla.gfx += [
+        'QuartzSupport.h',
+    ]
     SOURCES += [
         'MacIOSurface.cpp',
         'QuartzSupport.mm',

@@ -123,7 +123,7 @@ void
 TCPServerSocket::FireEvent(const nsAString& aType, TCPSocket* aSocket)
 {
   AutoJSAPI api;
-  api.Init(GetOwner());
+  api.Init(GetOwnerGlobal());
 
   TCPServerSocketEventInit init;
   init.mBubbles = false;
@@ -144,7 +144,7 @@ TCPServerSocket::FireEvent(const nsAString& aType, TCPSocket* aSocket)
 NS_IMETHODIMP
 TCPServerSocket::OnSocketAccepted(nsIServerSocket* aServer, nsISocketTransport* aTransport)
 {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
+  nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal();
   RefPtr<TCPSocket> socket = TCPSocket::CreateAcceptedSocket(global, aTransport, mUseArrayBuffers);
   if (mServerBridgeParent) {
     socket->SetAppIdAndBrowser(mServerBridgeParent->GetAppId(),
@@ -174,7 +174,7 @@ TCPServerSocket::OnStopListening(nsIServerSocket* aServer, nsresult aStatus)
 nsresult
 TCPServerSocket::AcceptChildSocket(TCPSocketChild* aSocketChild)
 {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
+  nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal();
   NS_ENSURE_TRUE(global, NS_ERROR_FAILURE);
   RefPtr<TCPSocket> socket = TCPSocket::CreateAcceptedSocket(global, aSocketChild, mUseArrayBuffers);
   NS_ENSURE_TRUE(socket, NS_ERROR_FAILURE);

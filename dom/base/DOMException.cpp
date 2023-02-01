@@ -87,6 +87,9 @@ enum DOM4ErrorTypeCodeMap {
   BtAuthFailureError       = 0,
   BtRmtDevDownError        = 0,
   BtAuthRejectedError      = 0,
+
+  /* Push API errors */
+  PermissionDeniedError    = 0,
 };
 
 #define DOM4_MSG_DEF(name, message, nsresult) {(nsresult), name, #name, message},
@@ -435,9 +438,6 @@ Exception::ToString(nsACString& _retval)
   return NS_OK;
 }
 
-/* void initialize (in AUTF8String aMessage, in nsresult aResult,
- *                  in AUTF8String aName, in nsIStackFrame aLocation,
- *                  in nsISupports aData, in nsIException aInner); */
 NS_IMETHODIMP
 Exception::Initialize(const nsACString& aMessage, nsresult aResult,
                       const nsACString& aName, nsIStackFrame *aLocation,

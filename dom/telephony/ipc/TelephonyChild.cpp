@@ -48,17 +48,6 @@ TelephonyChild::DeallocPTelephonyRequestChild(PTelephonyRequestChild* aActor)
 }
 
 bool
-TelephonyChild::RecvNotifyCallError(const uint32_t& aClientId,
-                                    const int32_t& aCallIndex,
-                                    const nsString& aError)
-{
-  MOZ_ASSERT(mService);
-
-  mService->NotifyError(aClientId, aCallIndex, aError);
-  return true;
-}
-
-bool
 TelephonyChild::RecvNotifyCallStateChanged(nsTArray<nsITelephonyCallInfo*>&& aAllInfo)
 {
   uint32_t length = aAllInfo.Length();
@@ -88,15 +77,6 @@ TelephonyChild::RecvNotifyCdmaCallWaiting(const uint32_t& aClientId,
                                   aData.numberPresentation(),
                                   aData.name(),
                                   aData.namePresentation());
-  return true;
-}
-
-bool
-TelephonyChild::RecvNotifyConferenceCallStateChanged(const uint16_t& aCallState)
-{
-  MOZ_ASSERT(mService);
-
-  mService->ConferenceCallStateChanged(aCallState);
   return true;
 }
 

@@ -51,7 +51,7 @@ struct MediaTrackConstraints;
 struct MediaTrackConstraintSet;
 } // namespace dom
 
-extern PRLogModuleInfo* GetMediaManagerLog();
+extern LogModule* GetMediaManagerLog();
 #define MM_LOG(msg) MOZ_LOG(GetMediaManagerLog(), mozilla::LogLevel::Debug, msg)
 
 class MediaDevice : public nsIMediaDevice
@@ -533,8 +533,7 @@ private:
   nsAutoPtr<base::Thread> mMediaThread;
   nsCOMPtr<nsIAsyncShutdownBlocker> mShutdownBlocker;
 
-  Mutex mMutex;
-  // protected with mMutex:
+  // ONLY accessed from MediaManagerThread
   RefPtr<MediaEngine> mBackend;
 
   static StaticRefPtr<MediaManager> sSingleton;

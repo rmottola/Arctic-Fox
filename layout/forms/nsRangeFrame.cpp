@@ -578,7 +578,7 @@ nsRangeFrame::GetValueAtEventPoint(WidgetGUIEvent* aEvent)
     nscoord posAtEnd = posAtStart + traversableDistance;
     nscoord posOfPoint = mozilla::clamped(point.x, posAtStart, posAtEnd);
     fraction = Decimal(posOfPoint - posAtStart) / Decimal(traversableDistance);
-    if (StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
+    if (IsRightToLeft()) {
       fraction = Decimal(1) - fraction;
     }
   } else {
@@ -656,13 +656,11 @@ nsRangeFrame::DoUpdateThumbPosition(nsIFrame* aThumbFrame,
   double fraction = GetValueAsFractionOfRange();
   MOZ_ASSERT(fraction >= 0.0 && fraction <= 1.0);
 
-  // We are called under Reflow, so we need to pass IsHorizontal a valid rect.
-  nsSize frameSizeOverride(aRangeSize.width, aRangeSize.height);
-  if (IsHorizontal(&frameSizeOverride)) {
+  if (IsHorizontal()) {
     if (thumbSize.width < rangeContentBoxSize.width) {
       nscoord traversableDistance =
         rangeContentBoxSize.width - thumbSize.width;
-      if (StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
+      if (IsRightToLeft()) {
         newPosition.x += NSToCoordRound((1.0 - fraction) * traversableDistance);
       } else {
         newPosition.x += NSToCoordRound(fraction * traversableDistance);
@@ -707,11 +705,9 @@ nsRangeFrame::DoUpdateRangeProgressFrame(nsIFrame* aRangeProgressFrame,
   double fraction = GetValueAsFractionOfRange();
   MOZ_ASSERT(fraction >= 0.0 && fraction <= 1.0);
 
-  // We are called under Reflow, so we need to pass IsHorizontal a valid rect.
-  nsSize frameSizeOverride(aRangeSize.width, aRangeSize.height);
-  if (IsHorizontal(&frameSizeOverride)) {
+  if (IsHorizontal()) {
     nscoord progLength = NSToCoordRound(fraction * rangeContentBoxSize.width);
-    if (StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
+    if (IsRightToLeft()) {
       progRect.x += rangeContentBoxSize.width - progLength;
     }
     progRect.y += (rangeContentBoxSize.height - progSize.height)/2;
@@ -778,10 +774,7 @@ nsRangeFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
   nscoord oneEm = NSToCoordRound(StyleFont()->mFont.size *
                                  nsLayoutUtils::FontSizeInflationFor(this)); // 1em
 
-  // frameSizeOverride values just gets us to fall back to being horizontal
-  // (the actual values are irrelevant, as long as width > height):
-  nsSize frameSizeOverride(10,1);
-  bool isInlineOriented = IsHorizontal(&frameSizeOverride);
+  bool isInlineOriented = IsInlineOriented();
 
   const WritingMode wm = GetWritingMode();
   LogicalSize autoSize(wm);
@@ -815,34 +808,38 @@ nsRangeFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 nscoord
 nsRangeFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
 {
-  // frameSizeOverride values just gets us to fall back to being horizontal:
-  nsSize frameSizeOverride(10,1);
-  bool isHorizontal = IsHorizontal(&frameSizeOverride);
+  bool isInline = IsInlineOriented();
 
-  if (!isHorizontal && IsThemed()) {
+  if (!isInline && IsThemed()) {
     // nsFrame::ComputeSize calls GetMinimumWidgetSize to prevent us from being
     // given too small a size when we're natively themed. We return zero and
-    // depend on that correction to get our "natuaral" width when we're a
+    // depend on that correction to get our "natural" width when we're a
     // vertical slider.
     return 0;
   }
 
-  nscoord prefWidth = NSToCoordRound(StyleFont()->mFont.size *
+  nscoord prefISize = NSToCoordRound(StyleFont()->mFont.size *
                                      nsLayoutUtils::FontSizeInflationFor(this)); // 1em
 
-  if (isHorizontal) {
-    prefWidth *= LONG_SIDE_TO_SHORT_SIDE_RATIO;
+  if (isInline) {
+    prefISize *= LONG_SIDE_TO_SHORT_SIDE_RATIO;
   }
 
-  return prefWidth;
+  return prefISize;
 }
 
 bool
-nsRangeFrame::IsHorizontal(const nsSize *aFrameSizeOverride) const
+nsRangeFrame::IsHorizontal() const
 {
-  dom::HTMLInputElement* element = static_cast<dom::HTMLInputElement*>(mContent);
-  return !element->AttrValueIs(kNameSpaceID_None, nsGkAtoms::orient,
-                               nsGkAtoms::vertical, eCaseMatters);
+  dom::HTMLInputElement* element =
+    static_cast<dom::HTMLInputElement*>(mContent);
+  return element->AttrValueIs(kNameSpaceID_None, nsGkAtoms::orient,
+                              nsGkAtoms::horizontal, eCaseMatters) ||
+         (!element->AttrValueIs(kNameSpaceID_None, nsGkAtoms::orient,
+                               nsGkAtoms::vertical, eCaseMatters) &&
+          GetWritingMode().IsVertical() ==
+            element->AttrValueIs(kNameSpaceID_None, nsGkAtoms::orient,
+                                 nsGkAtoms::block, eCaseMatters));
 }
 
 double
@@ -877,15 +874,22 @@ nsRangeFrame::GetType() const
 bool
 nsRangeFrame::ShouldUseNativeStyle() const
 {
+  nsIFrame* trackFrame = mTrackDiv->GetPrimaryFrame();
+  nsIFrame* progressFrame = mProgressDiv->GetPrimaryFrame();
+  nsIFrame* thumbFrame = mThumbDiv->GetPrimaryFrame();
+
   return (StyleDisplay()->mAppearance == NS_THEME_RANGE) &&
-         !PresContext()->HasAuthorSpecifiedRules(const_cast<nsRangeFrame*>(this),
+         !PresContext()->HasAuthorSpecifiedRules(this,
                                                  (NS_AUTHOR_SPECIFIED_BORDER |
                                                   NS_AUTHOR_SPECIFIED_BACKGROUND)) &&
-         !PresContext()->HasAuthorSpecifiedRules(mTrackDiv->GetPrimaryFrame(),
+         trackFrame &&
+         !PresContext()->HasAuthorSpecifiedRules(trackFrame,
                                                  STYLES_DISABLING_NATIVE_THEMING) &&
-         !PresContext()->HasAuthorSpecifiedRules(mProgressDiv->GetPrimaryFrame(),
+         progressFrame &&
+         !PresContext()->HasAuthorSpecifiedRules(progressFrame,
                                                  STYLES_DISABLING_NATIVE_THEMING) &&
-         !PresContext()->HasAuthorSpecifiedRules(mThumbDiv->GetPrimaryFrame(),
+         thumbFrame &&
+         !PresContext()->HasAuthorSpecifiedRules(thumbFrame,
                                                  STYLES_DISABLING_NATIVE_THEMING);
 }
 

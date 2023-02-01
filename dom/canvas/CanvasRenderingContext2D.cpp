@@ -4004,10 +4004,13 @@ gfxFontGroup *CanvasRenderingContext2D::GetCurrentFontStyle()
       if (presShell && !presShell->IsDestroying()) {
         tp = presShell->GetPresContext()->GetTextPerfMetrics();
       }
+      int32_t perDevPixel, perCSSPixel;
+      GetAppUnitsValues(&perDevPixel, &perCSSPixel);
+      gfxFloat devToCssSize = gfxFloat(perDevPixel) / gfxFloat(perCSSPixel);
       CurrentState().fontGroup =
         gfxPlatform::GetPlatform()->CreateFontGroup(FontFamilyList(eFamily_sans_serif),
                                                     &style, tp,
-                                                    nullptr);
+                                                    nullptr, devToCssSize);
       if (CurrentState().fontGroup) {
         CurrentState().font = kDefaultFontStyle;
       } else {
@@ -4858,7 +4861,8 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& window, double x,
   // Rendering directly is faster and can be done if mTarget supports Azure
   // and does not need alpha blending.
   if (gfxPlatform::GetPlatform()->SupportsAzureContentForDrawTarget(mTarget) &&
-      GlobalAlpha() == 1.0f)
+      GlobalAlpha() == 1.0f &&
+      UsedOperation() == CompositionOp::OP_OVER)
   {
     thebes = new gfxContext(mTarget);
     thebes->SetMatrix(gfxMatrix(matrix._11, matrix._12, matrix._21,
@@ -4903,7 +4907,7 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& window, double x,
     gfx::Rect sourceRect(0, 0, sw, sh);
     mTarget->DrawSurface(source, destRect, sourceRect,
                          DrawSurfaceOptions(gfx::Filter::POINT),
-                         DrawOptions(GlobalAlpha(), CompositionOp::OP_OVER,
+                         DrawOptions(GlobalAlpha(), UsedOperation(),
                                      AntialiasMode::NONE));
     mTarget->Flush();
   } else {
@@ -5322,9 +5326,6 @@ CanvasRenderingContext2D::PutImageData(ImageData& imageData, double dx,
                                 JS::ToInt32(dirtyHeight));
 }
 
-// void putImageData (in ImageData d, in float x, in float y);
-// void putImageData (in ImageData d, in double x, in double y, in double dirtyX, in double dirtyY, in double dirtyWidth, in double dirtyHeight);
-
 nsresult
 CanvasRenderingContext2D::PutImageData_explicit(int32_t x, int32_t y, uint32_t w, uint32_t h,
                                                 dom::Uint8ClampedArray* aArray,
@@ -5592,6 +5593,8 @@ CanvasRenderingContext2D::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
 
       data.mGLContext = glue->GetGLContext();
       data.mFrontbufferGLTex = skiaGLTex;
+      PersistentBufferProvider *provider = GetBufferProvider(aManager);
+      data.mBufferProvider = provider;
     } else {
       PersistentBufferProvider *provider = GetBufferProvider(aManager);
       data.mBufferProvider = provider;
@@ -5642,6 +5645,8 @@ CanvasRenderingContext2D::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
 
     data.mGLContext = glue->GetGLContext();
     data.mFrontbufferGLTex = skiaGLTex;
+    PersistentBufferProvider *provider = GetBufferProvider(aManager);
+    data.mBufferProvider = provider;
   } else {
     PersistentBufferProvider *provider = GetBufferProvider(aManager);
     data.mBufferProvider = provider;

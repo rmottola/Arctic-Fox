@@ -253,7 +253,7 @@ nsPresContext::nsPresContext(nsIDocument* aDocument, nsPresContextType aType)
   mCounterStylesDirty = true;
 
   // if text perf logging enabled, init stats struct
-  PRLogModuleInfo *log = gfxPlatform::GetLog(eGfxLog_textperf);
+  LogModule* log = gfxPlatform::GetLog(eGfxLog_textperf);
   if (MOZ_LOG_TEST(log, LogLevel::Warning)) {
     mTextPerf = new gfxTextPerfMetrics();
   }
@@ -2183,7 +2183,8 @@ nsPresContext::UpdateIsChrome()
 }
 
 /* virtual */ bool
-nsPresContext::HasAuthorSpecifiedRules(nsIFrame *aFrame, uint32_t ruleTypeMask) const
+nsPresContext::HasAuthorSpecifiedRules(const nsIFrame *aFrame,
+                                       uint32_t ruleTypeMask) const
 {
   return
     nsRuleNode::HasAuthorSpecifiedRules(aFrame->StyleContext(),

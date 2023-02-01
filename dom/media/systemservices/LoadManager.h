@@ -16,7 +16,7 @@
 #include "webrtc/common_types.h"
 #include "webrtc/video_engine/include/vie_base.h"
 
-extern PRLogModuleInfo *gLoadManagerLog;
+extern mozilla::LazyLogModule gLoadManagerLog;
 
 namespace mozilla {
 
@@ -50,7 +50,7 @@ private:
                          float aLowLoadThreshold);
     ~LoadManagerSingleton();
 
-    void LoadHasChanged();
+    void LoadHasChanged(webrtc::CPULoadState aNewState);
 
     RefPtr<LoadMonitor> mLoadMonitor;
 
@@ -59,6 +59,9 @@ private:
     Mutex mLock;
     nsTArray<webrtc::CPULoadStateObserver*> mObservers;
     webrtc::CPULoadState mCurrentState;
+    TimeStamp mLastStateChange;
+    float mTimeInState[static_cast<int>(webrtc::kLoadLast)];
+
     // Set when overuse was signaled to us, and hasn't been un-signaled yet.
     bool  mOveruseActive;
     float mLoadSum;

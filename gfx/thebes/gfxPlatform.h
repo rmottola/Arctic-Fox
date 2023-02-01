@@ -337,7 +337,8 @@ public:
     CreateFontGroup(const mozilla::FontFamilyList& aFontFamilyList,
                     const gfxFontStyle *aStyle,
                     gfxTextPerfMetrics* aTextPerf,
-                    gfxUserFontSet *aUserFontSet) = 0;
+                    gfxUserFontSet *aUserFontSet,
+                    gfxFloat aDevToCssSize) = 0;
                                           
     /**
      * Look up a local platform font using the full font face name.
@@ -514,6 +515,9 @@ public:
 
     int32_t GetBidiNumeralOption();
 
+    static void
+    FlushFontAndWordCaches();
+
     /**
      * Returns a 1x1 surface that can be used to create graphics contexts
      * for measuring text etc as if they will be rendered to the screen
@@ -531,7 +535,7 @@ public:
     /**
      * Returns a logger if one is available and logging is enabled
      */
-    static PRLogModuleInfo* GetLog(eGfxLog aWhichLog);
+    static mozilla::LogModule* GetLog(eGfxLog aWhichLog);
 
     int GetScreenDepth() const { return mScreenDepth; }
     mozilla::gfx::IntSize GetScreenSize() const { return mScreenSize; }

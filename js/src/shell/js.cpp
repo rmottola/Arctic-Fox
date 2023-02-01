@@ -55,6 +55,7 @@
 # include "jswin.h"
 #endif
 #include "jswrapper.h"
+#include "shellmoduleloader.out.h"
 
 #include "builtin/ModuleObject.h"
 #include "builtin/TestingFunctions.h"
@@ -74,11 +75,13 @@
 #include "shell/jsoptparse.h"
 #include "shell/OSObject.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/Compression.h"
 #include "vm/Debugger.h"
 #include "vm/HelperThreads.h"
 #include "vm/Monitor.h"
 #include "vm/Shape.h"
 #include "vm/SharedArrayObject.h"
+#include "vm/StringBuffer.h"
 #include "vm/Time.h"
 #include "vm/TypedArrayObject.h"
 #include "vm/WrapperObject.h"
@@ -110,30 +113,53 @@ enum JSShellExitCode {
     EXITCODE_TIMEOUT            = 6
 };
 
-static size_t gStackChunkSize = 8192;
+static const size_t gStackChunkSize = 8192;
 
 /*
  * Note: This limit should match the stack limit set by the browser in
  *       js/xpconnect/src/XPCJSRuntime.cpp
  */
 #if defined(MOZ_ASAN) || (defined(DEBUG) && !defined(XP_WIN))
-static size_t gMaxStackSize = 2 * 128 * sizeof(size_t) * 1024;
+static const size_t gMaxStackSize = 2 * 128 * sizeof(size_t) * 1024;
 #else
-static size_t gMaxStackSize = 128 * sizeof(size_t) * 1024;
+static const size_t gMaxStackSize = 128 * sizeof(size_t) * 1024;
 #endif
 
 /*
  * Limit the timeout to 30 minutes to prevent an overflow on platfoms
  * that represent the time internally in microseconds using 32-bit int.
  */
-static double MAX_TIMEOUT_INTERVAL = 1800.0;
-static double gTimeoutInterval = -1.0;
-static Atomic<bool> gServiceInterrupt;
-static JS::PersistentRootedValue gInterruptFunc;
+static const double MAX_TIMEOUT_INTERVAL = 1800.0;
 
-static bool gLastWarningEnabled = false;
-static JS::PersistentRootedValue gLastWarning;
+// Per-runtime shell state.
+struct ShellRuntime
+{
+    ShellRuntime();
 
+    bool isWorker;
+    double timeoutInterval;
+    Atomic<bool> serviceInterrupt;
+    JS::PersistentRootedValue interruptFunc;
+    bool lastWarningEnabled;
+    JS::PersistentRootedValue lastWarning;
+
+    /*
+     * Watchdog thread state.
+     */
+    PRLock* watchdogLock;
+    PRCondVar* watchdogWakeup;
+    PRThread* watchdogThread;
+    bool watchdogHasTimeout;
+    int64_t watchdogTimeout;
+
+    PRCondVar* sleepWakeup;
+
+    int exitCode;
+    bool quitting;
+    bool gotError;
+};
+
+// Shell state set once at startup.
 static bool enableCodeCoverage = false;
 static bool enableDisassemblyDumps = false;
 static bool offthreadCompilation = false;
@@ -145,11 +171,24 @@ static bool enableUnboxedArrays = false;
 #ifdef JS_GC_ZEAL
 static char gZealStr[128];
 #endif
-
 static bool printTiming = false;
 static const char* jsCacheDir = nullptr;
 static const char* jsCacheAsmJSPath = nullptr;
-static bool jsCachingEnabled = false;
+static FILE* gErrFile = nullptr;
+static FILE* gOutFile = nullptr;
+static bool reportWarnings = true;
+static bool compileOnly = false;
+static bool fuzzingSafe = false;
+static bool disableOOMFunctions = false;
+static const char* moduleLoadPath = ".";
+
+#ifdef DEBUG
+static bool dumpEntrainedVariables = false;
+static bool OOM_printAllocationCount = false;
+#endif
+
+// Shell state this is only accessed on the main thread.
+bool jsCachingEnabled = false;
 mozilla::Atomic<bool> jsCacheOpened(false);
 
 static bool
@@ -159,40 +198,13 @@ static bool
 InitWatchdog(JSRuntime* rt);
 
 static void
-KillWatchdog();
+KillWatchdog(JSRuntime *rt);
 
 static bool
 ScheduleWatchdog(JSRuntime* rt, double t);
 
 static void
 CancelExecution(JSRuntime* rt);
-
-/*
- * Watchdog thread state.
- */
-static PRLock* gWatchdogLock = nullptr;
-static PRCondVar* gWatchdogWakeup = nullptr;
-static PRThread* gWatchdogThread = nullptr;
-static bool gWatchdogHasTimeout = false;
-static int64_t gWatchdogTimeout = 0;
-
-static PRCondVar* gSleepWakeup = nullptr;
-
-static int gExitCode = 0;
-static bool gQuitting = false;
-static bool gGotError = false;
-static FILE* gErrFile = nullptr;
-static FILE* gOutFile = nullptr;
-
-static bool reportWarnings = true;
-static bool compileOnly = false;
-static bool fuzzingSafe = false;
-static bool disableOOMFunctions = false;
-
-#ifdef DEBUG
-static bool dumpEntrainedVariables = false;
-static bool OOM_printAllocationCount = false;
-#endif
 
 static JSContext*
 NewContext(JSRuntime* rt);
@@ -267,6 +279,36 @@ extern JS_EXPORT_API(char*) readline(const char* prompt);
 extern JS_EXPORT_API(void)   add_history(char* line);
 } // extern "C"
 #endif
+
+ShellRuntime::ShellRuntime()
+  : isWorker(false),
+    timeoutInterval(-1.0),
+    serviceInterrupt(false),
+    lastWarningEnabled(false),
+    watchdogLock(nullptr),
+    watchdogWakeup(nullptr),
+    watchdogThread(nullptr),
+    watchdogHasTimeout(false),
+    watchdogTimeout(0),
+    sleepWakeup(nullptr),
+    exitCode(0),
+    quitting(false),
+    gotError(false)
+{}
+
+static ShellRuntime*
+GetShellRuntime(JSRuntime *rt)
+{
+    ShellRuntime* sr = static_cast<ShellRuntime*>(JS_GetRuntimePrivate(rt));
+    MOZ_ASSERT(sr);
+    return sr;
+}
+
+static ShellRuntime*
+GetShellRuntime(JSContext* cx)
+{
+    return GetShellRuntime(cx->runtime());
+}
 
 static char*
 GetLine(FILE* file, const char * prompt)
@@ -371,17 +413,18 @@ GetContextData(JSContext* cx)
 static bool
 ShellInterruptCallback(JSContext* cx)
 {
-    if (!gServiceInterrupt)
+    ShellRuntime* sr = GetShellRuntime(cx);
+    if (!sr->serviceInterrupt)
         return true;
 
-    // Reset gServiceInterrupt. CancelExecution or InterruptIf will set it to
+    // Reset serviceInterrupt. CancelExecution or InterruptIf will set it to
     // true to distinguish watchdog or user triggered interrupts.
     // Do this first to prevent other interrupts that may occur while the
     // user-supplied callback is executing from re-entering the handler.
-    gServiceInterrupt = false;
+    sr->serviceInterrupt = false;
 
     bool result;
-    RootedValue interruptFunc(cx, gInterruptFunc);
+    RootedValue interruptFunc(cx, sr->interruptFunc);
     if (!interruptFunc.isNull()) {
         JS::AutoSaveExceptionState savedExc(cx);
         JSAutoCompartment ac(cx, &interruptFunc.toObject());
@@ -399,8 +442,8 @@ ShellInterruptCallback(JSContext* cx)
         result = false;
     }
 
-    if (!result && gExitCode == 0)
-        gExitCode = EXITCODE_TIMEOUT;
+    if (!result && sr->exitCode == 0)
+        sr->exitCode = EXITCODE_TIMEOUT;
 
     return result;
 }
@@ -433,6 +476,8 @@ SkipUTF8BOM(FILE* file)
 static void
 RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
+
     SkipUTF8BOM(file);
 
     // To support the UNIX #! shell hack, gobble the first line if it starts
@@ -457,9 +502,9 @@ RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
                .setIsRunOnce(true)
                .setNoScriptRval(true);
 
-        gGotError = false;
+        sr->gotError = false;
         (void) JS::Compile(cx, options, file, &script);
-        MOZ_ASSERT_IF(!script, gGotError);
+        MOZ_ASSERT_IF(!script, sr->gotError);
     }
 
     #ifdef DEBUG
@@ -468,12 +513,99 @@ RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
     #endif
     if (script && !compileOnly) {
         if (!JS_ExecuteScript(cx, script)) {
-            if (!gQuitting && gExitCode != EXITCODE_TIMEOUT)
-                gExitCode = EXITCODE_RUNTIME_ERROR;
+            if (!sr->quitting && sr->exitCode != EXITCODE_TIMEOUT)
+                sr->exitCode = EXITCODE_RUNTIME_ERROR;
         }
         int64_t t2 = PRMJ_Now() - t1;
         if (printTiming)
             printf("runtime = %.3f ms\n", double(t2) / PRMJ_USEC_PER_MSEC);
+    }
+}
+
+static bool
+InitModuleLoader(JSContext* cx)
+{
+    // Decompress and evaluate the embedded module loader source to initialize
+    // the module loader for the current compartment.
+
+    uint32_t srcLen = moduleloader::GetRawScriptsSize();
+    ScopedJSFreePtr<char> src(cx->pod_malloc<char>(srcLen));
+    if (!src || !DecompressString(moduleloader::compressedSources, moduleloader::GetCompressedSize(),
+                                  reinterpret_cast<unsigned char*>(src.get()), srcLen))
+    {
+        return false;
+    }
+
+    CompileOptions options(cx);
+    options.setIntroductionType("shell module loader");
+    options.setFileAndLine("shell/ModuleLoader.js", 1);
+    options.setSelfHostingMode(false);
+    options.setCanLazilyParse(false);
+    options.setVersion(JSVERSION_LATEST);
+    options.werrorOption = true;
+    options.strictOption = true;
+
+    RootedValue rv(cx);
+    return Evaluate(cx, options, src, srcLen, &rv);
+}
+
+static bool
+GetLoaderObject(JSContext* cx, MutableHandleObject resultOut)
+{
+    // Look up the |Reflect.Loader| object that has been defined by the module
+    // loader.
+
+    RootedObject object(cx, cx->global());
+    RootedValue value(cx);
+    if (!JS_GetProperty(cx, object, "Reflect", &value) || !value.isObject())
+        return false;
+
+    object = &value.toObject();
+    if (!JS_GetProperty(cx, object, "Loader", &value) || !value.isObject())
+        return false;
+
+    resultOut.set(&value.toObject());
+    return true;
+}
+
+static bool
+GetImportMethod(JSContext* cx, HandleObject loader, MutableHandleFunction resultOut)
+{
+    // Look up the module loader's |import| method.
+
+    RootedValue value(cx);
+    if (!JS_GetProperty(cx, loader, "import", &value) || !value.isObject())
+        return false;
+
+    RootedObject object(cx, &value.toObject());
+    if (!object->is<JSFunction>())
+        return false;
+
+    resultOut.set(&object->as<JSFunction>());
+    return true;
+}
+
+static void
+RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
+{
+    // Exectute a module by calling |Reflect.Loader.import(filename)|.
+
+    ShellRuntime* sr = GetShellRuntime(cx);
+
+    RootedObject loaderObj(cx);
+    MOZ_ALWAYS_TRUE(GetLoaderObject(cx, &loaderObj));
+
+    RootedFunction importFun(cx);
+    MOZ_ALWAYS_TRUE(GetImportMethod(cx, loaderObj, &importFun));
+
+    AutoValueArray<2> args(cx);
+    args[0].setString(JS_NewStringCopyZ(cx, filename));
+    args[1].setUndefined();
+
+    RootedValue value(cx);
+    if (!JS_CallFunction(cx, loaderObj, importFun, args, &value)) {
+        sr->exitCode = EXITCODE_RUNTIME_ERROR;
+        return;
     }
 }
 
@@ -515,6 +647,7 @@ EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
 static void
 ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     int lineno = 1;
     bool hitEOF = false;
 
@@ -530,7 +663,7 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
         CharBuffer buffer(cx);
         do {
             ScheduleWatchdog(cx->runtime(), -1);
-            gServiceInterrupt = false;
+            sr->serviceInterrupt = false;
             errno = 0;
 
             char* line = GetLine(in, startline == lineno ? "js> " : "");
@@ -547,7 +680,7 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
                 return;
 
             lineno++;
-            if (!ScheduleWatchdog(cx->runtime(), gTimeoutInterval)) {
+            if (!ScheduleWatchdog(cx->runtime(), sr->timeoutInterval)) {
                 hitEOF = true;
                 break;
             }
@@ -562,13 +695,19 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
             // Catch the error, report it, and keep going.
             JS_ReportPendingException(cx);
         }
-    } while (!hitEOF && !gQuitting);
+    } while (!hitEOF && !sr->quitting);
 
     fprintf(out, "\n");
 }
 
+enum FileKind
+{
+    FileScript,
+    FileModule
+};
+
 static void
-Process(JSContext* cx, const char* filename, bool forceTTY)
+Process(JSContext* cx, const char* filename, bool forceTTY, FileKind kind = FileScript)
 {
     FILE* file;
     if (forceTTY || !filename || strcmp(filename, "-") == 0) {
@@ -585,9 +724,13 @@ Process(JSContext* cx, const char* filename, bool forceTTY)
 
     if (!forceTTY && !isatty(fileno(file))) {
         // It's not interactive - just execute it.
-        RunFile(cx, filename, file, compileOnly);
+        if (kind == FileScript)
+            RunFile(cx, filename, file, compileOnly);
+        else
+            RunModule(cx, filename, file, compileOnly);
     } else {
         // It's an interactive filehandle; drop into read-eval-print loop.
+        MOZ_ASSERT(kind == FileScript);
         ReadEvalPrintLoop(cx, file, gOutFile, compileOnly);
     }
 }
@@ -1205,12 +1348,14 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
 
         {
             if (saveBytecode) {
-                if (!JS::CompartmentOptionsRef(cx).getSingletonsAsTemplates()) {
+                if (!JS::CompartmentOptionsRef(cx).cloneSingletons()) {
                     JS_ReportErrorNumber(cx, my_GetErrorMessage, nullptr,
                                          JSSMSG_CACHE_SINGLETON_FAILED);
                     return false;
                 }
-                JS::CompartmentOptionsRef(cx).setCloneSingletons(true);
+
+                // cloneSingletons implies that singletons are used as template objects.
+                MOZ_ASSERT(JS::CompartmentOptionsRef(cx).getSingletonsAsTemplates());
             }
 
             if (loadBytecode) {
@@ -1274,8 +1419,13 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
         // replace the current bytecode by the same stream of bytes.
         if (loadBytecode && assertEqBytecode) {
             if (saveLength != loadLength) {
+                char loadLengthStr[16];
+                JS_snprintf(loadLengthStr, sizeof(loadLengthStr), "%u", loadLength);
+                char saveLengthStr[16];
+                JS_snprintf(saveLengthStr, sizeof(saveLengthStr), "%u", saveLength);
+
                 JS_ReportErrorNumber(cx, my_GetErrorMessage, nullptr, JSSMSG_CACHE_EQ_SIZE_FAILED,
-                                     loadLength, saveLength);
+                                     loadLengthStr, saveLengthStr);
                 return false;
             }
 
@@ -1544,6 +1694,8 @@ Help(JSContext* cx, unsigned argc, Value* vp);
 static bool
 Quit(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
+
 #ifdef JS_MORE_DETERMINISTIC
     // Print a message to stderr in more-deterministic builds to help jsfunfuzz
     // find uncatchable-exception bugs.
@@ -1565,8 +1717,8 @@ Quit(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    gExitCode = code;
-    gQuitting = true;
+    sr->exitCode = code;
+    sr->quitting = true;
     return false;
 }
 
@@ -1580,7 +1732,11 @@ StartTimingMutator(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    cx->runtime()->gc.stats.startTimingMutator();
+    if (!cx->runtime()->gc.stats.startTimingMutator()) {
+        JS_ReportError(cx, "StartTimingMutator should only be called from outside of GC");
+        return false;
+    }
+
     args.rval().setUndefined();
     return true;
 }
@@ -2545,8 +2701,24 @@ WorkerMain(void* arg)
         js_delete(input);
         return;
     }
+
+    mozilla::UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
+    if (!sr) {
+        JS_DestroyRuntime(rt);
+        js_delete(input);
+        return;
+    }
+
+    sr->isWorker = true;
+    JS_SetRuntimePrivate(rt, sr.get());
     JS_SetErrorReporter(rt, my_ErrorReporter);
     SetWorkerRuntimeOptions(rt);
+
+    if (!InitWatchdog(rt)) {
+        JS_DestroyRuntime(rt);
+        js_delete(input);
+        return;
+    }
 
     JSContext* cx = NewContext(rt);
     if (!cx) {
@@ -2561,7 +2733,7 @@ WorkerMain(void* arg)
         JSAutoRequest ar(cx);
 
         JS::CompartmentOptions compartmentOptions;
-        compartmentOptions.setVersion(JSVERSION_LATEST);
+        compartmentOptions.setVersion(JSVERSION_DEFAULT);
         RootedObject global(cx, NewGlobalObject(cx, compartmentOptions, nullptr));
         if (!global)
             break;
@@ -2653,6 +2825,7 @@ IsBefore(int64_t t1, int64_t t2)
 static bool
 Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
     int64_t t_ticks;
 
@@ -2673,61 +2846,63 @@ Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
                   ? 0
                   : int64_t(PRMJ_USEC_PER_SEC * t_secs);
     }
-    PR_Lock(gWatchdogLock);
+    PR_Lock(sr->watchdogLock);
     int64_t to_wakeup = PRMJ_Now() + t_ticks;
     for (;;) {
-        PR_WaitCondVar(gSleepWakeup, PR_MillisecondsToInterval(t_ticks / 1000));
-        if (gServiceInterrupt)
+        PR_WaitCondVar(sr->sleepWakeup, PR_MillisecondsToInterval(t_ticks / 1000));
+        if (sr->serviceInterrupt)
             break;
         int64_t now = PRMJ_Now();
         if (!IsBefore(now, to_wakeup))
             break;
         t_ticks = to_wakeup - now;
     }
-    PR_Unlock(gWatchdogLock);
+    PR_Unlock(sr->watchdogLock);
     args.rval().setUndefined();
-    return !gServiceInterrupt;
+    return !sr->serviceInterrupt;
 }
 
 static bool
 InitWatchdog(JSRuntime* rt)
 {
-    MOZ_ASSERT(!gWatchdogThread);
-    gWatchdogLock = PR_NewLock();
-    if (gWatchdogLock) {
-        gWatchdogWakeup = PR_NewCondVar(gWatchdogLock);
-        if (gWatchdogWakeup) {
-            gSleepWakeup = PR_NewCondVar(gWatchdogLock);
-            if (gSleepWakeup)
+    ShellRuntime* sr = GetShellRuntime(rt);
+    MOZ_ASSERT(!sr->watchdogThread);
+    sr->watchdogLock = PR_NewLock();
+    if (sr->watchdogLock) {
+        sr->watchdogWakeup = PR_NewCondVar(sr->watchdogLock);
+        if (sr->watchdogWakeup) {
+            sr->sleepWakeup = PR_NewCondVar(sr->watchdogLock);
+            if (sr->sleepWakeup)
                 return true;
-            PR_DestroyCondVar(gWatchdogWakeup);
+            PR_DestroyCondVar(sr->watchdogWakeup);
         }
-        PR_DestroyLock(gWatchdogLock);
+        PR_DestroyLock(sr->watchdogLock);
     }
     return false;
 }
 
 static void
-KillWatchdog()
+KillWatchdog(JSRuntime* rt)
 {
+    ShellRuntime* sr = GetShellRuntime(rt);
     PRThread* thread;
 
-    PR_Lock(gWatchdogLock);
-    thread = gWatchdogThread;
+    PR_Lock(sr->watchdogLock);
+    thread = sr->watchdogThread;
     if (thread) {
         /*
          * The watchdog thread is running, tell it to terminate waking it up
          * if necessary.
          */
-        gWatchdogThread = nullptr;
-        PR_NotifyCondVar(gWatchdogWakeup);
+        sr->watchdogThread = nullptr;
+        PR_NotifyCondVar(sr->watchdogWakeup);
     }
-    PR_Unlock(gWatchdogLock);
+    PR_Unlock(sr->watchdogLock);
     if (thread)
         PR_JoinThread(thread);
-    PR_DestroyCondVar(gSleepWakeup);
-    PR_DestroyCondVar(gWatchdogWakeup);
-    PR_DestroyLock(gWatchdogLock);
+    PR_DestroyCondVar(sr->sleepWakeup);
+    PR_DestroyCondVar(sr->watchdogWakeup);
+    PR_DestroyLock(sr->watchdogLock);
 }
 
 static void
@@ -2736,24 +2911,25 @@ WatchdogMain(void* arg)
     PR_SetCurrentThreadName("JS Watchdog");
 
     JSRuntime* rt = (JSRuntime*) arg;
+    ShellRuntime* sr = GetShellRuntime(rt);
 
-    PR_Lock(gWatchdogLock);
-    while (gWatchdogThread) {
+    PR_Lock(sr->watchdogLock);
+    while (sr->watchdogThread) {
         int64_t now = PRMJ_Now();
-        if (gWatchdogHasTimeout && !IsBefore(now, gWatchdogTimeout)) {
+        if (sr->watchdogHasTimeout && !IsBefore(now, sr->watchdogTimeout)) {
             /*
              * The timeout has just expired. Request an interrupt callback
              * outside the lock.
              */
-            gWatchdogHasTimeout = false;
-            PR_Unlock(gWatchdogLock);
+            sr->watchdogHasTimeout = false;
+            PR_Unlock(sr->watchdogLock);
             CancelExecution(rt);
-            PR_Lock(gWatchdogLock);
+            PR_Lock(sr->watchdogLock);
 
             /* Wake up any threads doing sleep. */
-            PR_NotifyAllCondVar(gSleepWakeup);
+            PR_NotifyAllCondVar(sr->sleepWakeup);
         } else {
-            if (gWatchdogHasTimeout) {
+            if (sr->watchdogHasTimeout) {
                 /*
                  * Time hasn't expired yet. Simulate an interrupt callback
                  * which doesn't abort execution.
@@ -2762,58 +2938,61 @@ WatchdogMain(void* arg)
             }
 
             uint64_t sleepDuration = PR_INTERVAL_NO_TIMEOUT;
-            if (gWatchdogHasTimeout)
+            if (sr->watchdogHasTimeout)
                 sleepDuration = PR_TicksPerSecond() / 10;
             mozilla::DebugOnly<PRStatus> status =
-              PR_WaitCondVar(gWatchdogWakeup, sleepDuration);
+              PR_WaitCondVar(sr->watchdogWakeup, sleepDuration);
             MOZ_ASSERT(status == PR_SUCCESS);
         }
     }
-    PR_Unlock(gWatchdogLock);
+    PR_Unlock(sr->watchdogLock);
 }
 
 static bool
 ScheduleWatchdog(JSRuntime* rt, double t)
 {
+    ShellRuntime* sr = GetShellRuntime(rt);
+
     if (t <= 0) {
-        PR_Lock(gWatchdogLock);
-        gWatchdogHasTimeout = false;
-        PR_Unlock(gWatchdogLock);
+        PR_Lock(sr->watchdogLock);
+        sr->watchdogHasTimeout = false;
+        PR_Unlock(sr->watchdogLock);
         return true;
     }
 
     int64_t interval = int64_t(ceil(t * PRMJ_USEC_PER_SEC));
     int64_t timeout = PRMJ_Now() + interval;
-    PR_Lock(gWatchdogLock);
-    if (!gWatchdogThread) {
-        MOZ_ASSERT(!gWatchdogHasTimeout);
-        gWatchdogThread = PR_CreateThread(PR_USER_THREAD,
+    PR_Lock(sr->watchdogLock);
+    if (!sr->watchdogThread) {
+        MOZ_ASSERT(!sr->watchdogHasTimeout);
+        sr->watchdogThread = PR_CreateThread(PR_USER_THREAD,
                                           WatchdogMain,
                                           rt,
                                           PR_PRIORITY_NORMAL,
                                           PR_GLOBAL_THREAD,
                                           PR_JOINABLE_THREAD,
                                           0);
-        if (!gWatchdogThread) {
-            PR_Unlock(gWatchdogLock);
+        if (!sr->watchdogThread) {
+            PR_Unlock(sr->watchdogLock);
             return false;
         }
-    } else if (!gWatchdogHasTimeout || IsBefore(timeout, gWatchdogTimeout)) {
-         PR_NotifyCondVar(gWatchdogWakeup);
+    } else if (!sr->watchdogHasTimeout || IsBefore(timeout, sr->watchdogTimeout)) {
+         PR_NotifyCondVar(sr->watchdogWakeup);
     }
-    gWatchdogHasTimeout = true;
-    gWatchdogTimeout = timeout;
-    PR_Unlock(gWatchdogLock);
+    sr->watchdogHasTimeout = true;
+    sr->watchdogTimeout = timeout;
+    PR_Unlock(sr->watchdogLock);
     return true;
 }
 
 static void
 CancelExecution(JSRuntime* rt)
 {
-    gServiceInterrupt = true;
+    ShellRuntime* sr = GetShellRuntime(rt);
+    sr->serviceInterrupt = true;
     JS_RequestInterruptCallback(rt);
 
-    if (!gInterruptFunc.isNull()) {
+    if (!sr->interruptFunc.isNull()) {
         static const char msg[] = "Script runs for too long, terminating.\n";
         fputs(msg, stderr);
     }
@@ -2827,7 +3006,7 @@ SetTimeoutValue(JSContext* cx, double t)
         JS_ReportError(cx, "Excessive timeout value");
         return false;
     }
-    gTimeoutInterval = t;
+    GetShellRuntime(cx)->timeoutInterval = t;
     if (!ScheduleWatchdog(cx->runtime(), t)) {
         JS_ReportError(cx, "Failed to create the watchdog");
         return false;
@@ -2838,10 +3017,11 @@ SetTimeoutValue(JSContext* cx, double t)
 static bool
 Timeout(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() == 0) {
-        args.rval().setNumber(gTimeoutInterval);
+        args.rval().setNumber(sr->timeoutInterval);
         return true;
     }
 
@@ -2860,7 +3040,7 @@ Timeout(JSContext* cx, unsigned argc, Value* vp)
             JS_ReportError(cx, "Second argument must be a timeout function");
             return false;
         }
-        gInterruptFunc = value;
+        sr->interruptFunc = value;
     }
 
     args.rval().setUndefined();
@@ -2878,7 +3058,7 @@ InterruptIf(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (ToBoolean(args[0])) {
-        gServiceInterrupt = true;
+        GetShellRuntime(cx)->serviceInterrupt = true;
         JS_RequestInterruptCallback(cx->runtime());
     }
 
@@ -2895,7 +3075,7 @@ InvokeInterruptCallbackWrapper(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    gServiceInterrupt = true;
+    GetShellRuntime(cx)->serviceInterrupt = true;
     JS_RequestInterruptCallback(cx->runtime());
     bool interruptRv = CheckForInterrupt(cx);
 
@@ -2931,7 +3111,7 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
         JS_ReportError(cx, "Argument must be a function");
         return false;
     }
-    gInterruptFunc = value;
+    GetShellRuntime(cx)->interruptFunc = value;
 
     args.rval().setUndefined();
     return true;
@@ -2940,10 +3120,11 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
 static bool
 EnableLastWarning(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    gLastWarningEnabled = true;
-    gLastWarning.setNull();
+    sr->lastWarningEnabled = true;
+    sr->lastWarning.setNull();
 
     args.rval().setUndefined();
     return true;
@@ -2952,10 +3133,11 @@ EnableLastWarning(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DisableLastWarning(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    gLastWarningEnabled = false;
-    gLastWarning.setNull();
+    sr->lastWarningEnabled = false;
+    sr->lastWarning.setNull();
 
     args.rval().setUndefined();
     return true;
@@ -2964,31 +3146,33 @@ DisableLastWarning(JSContext* cx, unsigned argc, Value* vp)
 static bool
 GetLastWarning(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (!gLastWarningEnabled) {
+    if (!sr->lastWarningEnabled) {
         JS_ReportError(cx, "Call enableLastWarning first.");
         return false;
     }
 
-    if (!JS_WrapValue(cx, &gLastWarning))
+    if (!JS_WrapValue(cx, &sr->lastWarning))
         return false;
 
-    args.rval().set(gLastWarning);
+    args.rval().set(sr->lastWarning);
     return true;
 }
 
 static bool
 ClearLastWarning(JSContext* cx, unsigned argc, Value* vp)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (!gLastWarningEnabled) {
+    if (!sr->lastWarningEnabled) {
         JS_ReportError(cx, "Call enableLastWarning first.");
         return false;
     }
 
-    gLastWarning.setNull();
+    sr->lastWarning.setNull();
 
     args.rval().setUndefined();
     return true;
@@ -3085,11 +3269,12 @@ static bool
 ParseModule(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    if (args.length() < 1) {
+    if (args.length() == 0) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                              JSMSG_MORE_ARGS_NEEDED, "parseModule", "0", "s");
         return false;
     }
+
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
         JS_ReportError(cx, "expected string to compile, got %s", typeName);
@@ -3101,8 +3286,24 @@ ParseModule(JSContext* cx, unsigned argc, Value* vp)
     if (!scriptContents)
         return false;
 
+    mozilla::UniquePtr<char, JS::FreePolicy> filename;
     CompileOptions options(cx);
-    options.setFileAndLine("<string>", 1);
+    if (args.length() > 1) {
+        if (!args[1].isString()) {
+            JS_ReportError(cx, "expected filename string, got %s",
+                           JS_TypeOfValue(cx, args[1]));
+            return false;
+        }
+
+        RootedString str(cx, args[1].toString());
+        filename.reset(JS_EncodeString(cx, str));
+        if (!filename)
+            return false;
+
+        options.setFileAndLine(filename.get(), 1);
+    } else {
+        options.setFileAndLine("<string>", 1);
+    }
 
     AutoStableStringChars stableChars(cx);
     if (!stableChars.initTwoByte(cx, scriptContents))
@@ -3140,6 +3341,14 @@ SetModuleResolveHook(JSContext* cx, unsigned argc, Value* vp)
     Rooted<GlobalObject*> global(cx, cx->global());
     global->setModuleResolveHook(hook);
     args.rval().setUndefined();
+    return true;
+}
+
+static bool
+GetModuleLoadPath(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    args.rval().setString(JS_NewStringCopyZ(cx, moduleLoadPath));
     return true;
 }
 
@@ -3717,7 +3926,7 @@ NewGlobal(JSContext* cx, unsigned argc, Value* vp)
 {
     JSPrincipals* principals = nullptr;
     JS::CompartmentOptions options;
-    options.setVersion(JSVERSION_LATEST);
+    options.setVersion(JSVERSION_DEFAULT);
 
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() == 1 && args[0].isObject()) {
@@ -3733,6 +3942,11 @@ NewGlobal(JSContext* cx, unsigned argc, Value* vp)
             return false;
         if (v.isBoolean())
             options.setInvisibleToDebugger(v.toBoolean());
+
+        if (!JS_GetProperty(cx, opts, "cloneSingletons", &v))
+            return false;
+        if (v.isBoolean())
+            options.setCloneSingletons(v.toBoolean());
 
         if (!JS_GetProperty(cx, opts, "principal", &v))
             return false;
@@ -3880,6 +4094,11 @@ static bool
 SetCachingEnabled(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    if (GetShellRuntime(cx)->isWorker) {
+        JS_ReportError(cx, "Caching is not supported in workers");
+        return false;
+    }
+
     jsCachingEnabled = ToBoolean(args.get(0));
     args.rval().setUndefined();
     return true;
@@ -3901,7 +4120,7 @@ PrintProfilerEvents(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-#if defined(JS_SIMULATOR_ARM)
+#if defined(JS_SIMULATOR_ARM) || defined(JS_SIMULATOR_MIPS64)
 typedef Vector<char16_t, 0, SystemAllocPolicy> StackChars;
 Vector<StackChars, 0, SystemAllocPolicy> stacks;
 
@@ -3916,10 +4135,15 @@ SingleStepCallback(void* arg, jit::Simulator* sim, void* pc)
 
     JS::ProfilingFrameIterator::RegisterState state;
     state.pc = pc;
+#if defined(JS_SIMULATOR_ARM)
     state.sp = (void*)sim->get_register(jit::Simulator::sp);
     state.lr = (void*)sim->get_register(jit::Simulator::lr);
+#elif defined(JS_SIMULATOR_MIPS64)
+    state.sp = (void*)sim->getRegister(jit::Simulator::sp);
+    state.lr = (void*)sim->getRegister(jit::Simulator::ra);
+#endif
 
-    DebugOnly<void*> lastStackAddress = nullptr;
+    mozilla::DebugOnly<void*> lastStackAddress = nullptr;
     StackChars stack;
     uint32_t frameNo = 0;
     for (JS::ProfilingFrameIterator i(rt, state); !i.done(); ++i) {
@@ -3949,7 +4173,7 @@ SingleStepCallback(void* arg, jit::Simulator* sim, void* pc)
 static bool
 EnableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
 {
-#if defined(JS_SIMULATOR_ARM)
+#if defined(JS_SIMULATOR_ARM) || defined(JS_SIMULATOR_MIPS64)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     jit::Simulator* sim = cx->runtime()->simulator();
@@ -3966,7 +4190,7 @@ EnableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DisableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
 {
-#if defined(JS_SIMULATOR_ARM)
+#if defined(JS_SIMULATOR_ARM) || defined(JS_SIMULATOR_MIPS64)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     jit::Simulator* sim = cx->runtime()->simulator();
@@ -4700,6 +4924,11 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "  This hook is used to look up a previously loaded module object.  It should\n"
 "  be implemented by the module loader."),
 
+    JS_FN_HELP("getModuleLoadPath", GetModuleLoadPath, 0, 0,
+"getModuleLoadPath()",
+"  Return any --module-load-path argument passed to the shell.  Used by the\n"
+"  module loader.\n"),
+
     JS_FN_HELP("parse", Parse, 1, 0,
 "parse(code)",
 "  Parses a string, potentially throwing."),
@@ -5127,7 +5356,7 @@ CreateLastWarningObject(JSContext* cx, JSErrorReport* report)
     if (!DefineProperty(cx, warningObj, cx->names().columnNumber, columnVal))
         return false;
 
-    gLastWarning.setObject(*warningObj);
+    GetShellRuntime(cx)->lastWarning.setObject(*warningObj);
     return true;
 }
 
@@ -5148,9 +5377,10 @@ PrintStackTrace(JSContext* cx, HandleValue exn)
     if (!exnObj->is<ErrorObject>())
         return true;
 
+    // Exceptions thrown while compiling top-level script have no stack.
     RootedObject stackObj(cx, exnObj->as<ErrorObject>().stack());
     if (!stackObj)
-        return false;
+        return true;
 
     RootedString stackStr(cx);
     if (!BuildStackString(cx, stackObj, &stackStr, 2))
@@ -5169,7 +5399,9 @@ PrintStackTrace(JSContext* cx, HandleValue exn)
 void
 js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
 {
-    if (report && JSREPORT_IS_WARNING(report->flags) && gLastWarningEnabled) {
+    ShellRuntime* sr = GetShellRuntime(cx);
+
+    if (report && JSREPORT_IS_WARNING(report->flags) && sr->lastWarningEnabled) {
         JS::AutoSaveExceptionState savedExc(cx);
         if (!CreateLastWarningObject(cx, report)) {
             fputs("Unhandled error happened while creating last warning object.\n", gOutFile);
@@ -5183,7 +5415,7 @@ js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* r
     if (JS_IsExceptionPending(cx))
         (void) JS_GetPendingException(cx, &exn);
 
-    gGotError = PrintError(cx, gErrFile, message, report, reportWarnings);
+    sr->gotError = PrintError(cx, gErrFile, message, report, reportWarnings);
     if (!exn.isUndefined()) {
         JS::AutoSaveExceptionState savedExc(cx);
         if (!PrintStackTrace(cx, exn))
@@ -5192,11 +5424,10 @@ js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* r
     }
 
     if (report->exnType != JSEXN_NONE && !JSREPORT_IS_WARNING(report->flags)) {
-        if (report->errorNumber == JSMSG_OUT_OF_MEMORY) {
-            gExitCode = EXITCODE_OUT_OF_MEMORY;
-        } else {
-            gExitCode = EXITCODE_RUNTIME_ERROR;
-        }
+        if (report->errorNumber == JSMSG_OUT_OF_MEMORY)
+            sr->exitCode = EXITCODE_OUT_OF_MEMORY;
+        else
+            sr->exitCode = EXITCODE_RUNTIME_ERROR;
     }
 }
 
@@ -5207,7 +5438,7 @@ my_OOMCallback(JSContext* cx, void* data)
     // memory", which may or may not be caught. Otherwise the engine will just
     // unwind and return null/false, with no exception set.
     if (!JS_IsRunning(cx))
-        gGotError = true;
+        GetShellRuntime(cx)->gotError = true;
 }
 
 static bool
@@ -5872,6 +6103,8 @@ OptionFailure(const char* option, const char* str)
 static int
 ProcessArgs(JSContext* cx, OptionParser* op)
 {
+    ShellRuntime* sr = GetShellRuntime(cx);
+
     if (op->getBoolOption('s'))
         JS::RuntimeOptionsRef(cx).toggleExtraWarnings();
 
@@ -5881,48 +6114,68 @@ ProcessArgs(JSContext* cx, OptionParser* op)
 
     MultiStringRange filePaths = op->getMultiStringOption('f');
     MultiStringRange codeChunks = op->getMultiStringOption('e');
+    MultiStringRange modulePaths = op->getMultiStringOption('m');
 
-    if (filePaths.empty() && codeChunks.empty() && !op->getStringArg("script")) {
+    if (filePaths.empty() &&
+        codeChunks.empty() &&
+        modulePaths.empty() &&
+        !op->getStringArg("script"))
+    {
         Process(cx, nullptr, true); /* Interactive. */
-        return gExitCode;
+        return sr->exitCode;
     }
 
-    while (!filePaths.empty() || !codeChunks.empty()) {
-        size_t fpArgno = filePaths.empty() ? -1 : filePaths.argno();
-        size_t ccArgno = codeChunks.empty() ? -1 : codeChunks.argno();
-        if (fpArgno < ccArgno) {
+    if (const char* path = op->getStringOption("module-load-path"))
+        moduleLoadPath = path;
+
+    if (!modulePaths.empty() && !InitModuleLoader(cx))
+        return EXIT_FAILURE;
+
+    while (!filePaths.empty() || !codeChunks.empty() || !modulePaths.empty()) {
+        size_t fpArgno = filePaths.empty() ? SIZE_MAX : filePaths.argno();
+        size_t ccArgno = codeChunks.empty() ? SIZE_MAX : codeChunks.argno();
+        size_t mpArgno = modulePaths.empty() ? SIZE_MAX : modulePaths.argno();
+
+        if (fpArgno < ccArgno && fpArgno < mpArgno) {
             char* path = filePaths.front();
-            Process(cx, path, false);
-            if (gExitCode)
-                return gExitCode;
+            Process(cx, path, false, FileScript);
+            if (sr->exitCode)
+                return sr->exitCode;
             filePaths.popFront();
-        } else {
+        } else if (ccArgno < fpArgno && ccArgno < mpArgno) {
             const char* code = codeChunks.front();
             RootedValue rval(cx);
             JS::CompileOptions opts(cx);
             opts.setFileAndLine("-e", 1);
             if (!JS::Evaluate(cx, opts, code, strlen(code), &rval))
-                return gExitCode ? gExitCode : EXITCODE_RUNTIME_ERROR;
+                return sr->exitCode ? sr->exitCode : EXITCODE_RUNTIME_ERROR;
             codeChunks.popFront();
-            if (gQuitting)
+            if (sr->quitting)
                 break;
+        } else {
+            MOZ_ASSERT(mpArgno < fpArgno && mpArgno < ccArgno);
+            char* path = modulePaths.front();
+            Process(cx, path, false, FileModule);
+            if (sr->exitCode)
+                return sr->exitCode;
+            modulePaths.popFront();
         }
     }
 
-    if (gQuitting)
-        return gExitCode ? gExitCode : EXIT_SUCCESS;
+    if (sr->quitting)
+        return sr->exitCode ? sr->exitCode : EXIT_SUCCESS;
 
     /* The |script| argument is processed after all options. */
     if (const char* path = op->getStringArg("script")) {
         Process(cx, path, false);
-        if (gExitCode)
-            return gExitCode;
+        if (sr->exitCode)
+            return sr->exitCode;
     }
 
     if (op->getBoolOption('i'))
         Process(cx, nullptr, true);
 
-    return gExitCode ? gExitCode : EXIT_SUCCESS;
+    return sr->exitCode ? sr->exitCode : EXIT_SUCCESS;
 }
 
 static bool
@@ -6133,7 +6386,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     int32_t stopAt = op.getIntOption("arm-sim-stop-at");
     if (stopAt >= 0)
         jit::Simulator::StopSimAt = stopAt;
-#elif defined(JS_SIMULATOR_MIPS32)
+#elif defined(JS_SIMULATOR_MIPS32) || defined(JS_SIMULATOR_MIPS64)
     if (op.getBoolOption("mips-sim-icache-checks"))
         jit::Simulator::ICacheCheckingEnabled = true;
 
@@ -6219,7 +6472,7 @@ Shell(JSContext* cx, OptionParser* op, char** envp)
 
     RootedObject glob(cx);
     JS::CompartmentOptions options;
-    options.setVersion(JSVERSION_LATEST);
+    options.setVersion(JSVERSION_DEFAULT);
     glob = NewGlobalObject(cx, options, nullptr);
     if (!glob)
         return 1;
@@ -6267,11 +6520,14 @@ static void
 PreInit()
 {
 #ifdef XP_WIN
-    // Disable the segfault dialog. We want to fail the tests immediately
-    // instead of hanging automation.
-    UINT prevMode = SetErrorMode(0);
-    UINT newMode = SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX;
-    SetErrorMode(prevMode | newMode);
+    const char* crash_option = getenv("XRE_NO_WINDOWS_CRASH_DIALOG");
+    if (crash_option && strncmp(crash_option, "1", 1)) {
+        // Disable the segfault dialog. We want to fail the tests immediately
+        // instead of hanging automation.
+        UINT newMode = SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX;
+        UINT prevMode = SetErrorMode(newMode);
+        SetErrorMode(prevMode | newMode);
+    }
 #endif
 }
 
@@ -6286,15 +6542,6 @@ main(int argc, char** argv, char** envp)
     JSRuntime* rt;
     JSContext* cx;
     int result;
-#ifdef XP_WIN
-    {
-        const char* crash_option = getenv("XRE_NO_WINDOWS_CRASH_DIALOG");
-        if (crash_option && strncmp(crash_option, "1", 1)) {
-            DWORD oldmode = SetErrorMode(SEM_NOGPFAULTERRORBOX);
-            SetErrorMode(oldmode | SEM_NOGPFAULTERRORBOX);
-        }
-    }
-#endif
 
 #ifdef HAVE_SETLOCALE
     setlocale(LC_ALL, "");
@@ -6315,6 +6562,7 @@ main(int argc, char** argv, char** envp)
     op.setVersion(JS_GetImplementationVersion());
 
     if (!op.addMultiStringOption('f', "file", "PATH", "File path to run")
+        || !op.addMultiStringOption('m', "module", "PATH", "Module path to run")
         || !op.addMultiStringOption('e', "execute", "CODE", "Inline code to run")
         || !op.addBoolOption('i', "shell", "Enter prompt after running code")
         || !op.addBoolOption('c', "compileonly", "Only compile, don't run (syntax checking mode)")
@@ -6443,7 +6691,7 @@ main(int argc, char** argv, char** envp)
                              "simulator.")
         || !op.addIntOption('\0', "arm-sim-stop-at", "NUMBER", "Stop the ARM simulator after the given "
                             "NUMBER of instructions.", -1)
-#elif defined(JS_SIMULATOR_MIPS32)
+#elif defined(JS_SIMULATOR_MIPS32) || defined(JS_SIMULATOR_MIPS64)
 	|| !op.addBoolOption('\0', "mips-sim-icache-checks", "Enable icache flush checks in the MIPS "
                              "simulator.")
         || !op.addIntOption('\0', "mips-sim-stop-at", "NUMBER", "Stop the MIPS simulator after the given "
@@ -6453,6 +6701,7 @@ main(int argc, char** argv, char** envp)
 #ifdef JS_GC_ZEAL
         || !op.addStringOption('z', "gc-zeal", "LEVEL[,N]", gc::ZealModeHelpText)
 #endif
+        || !op.addStringOption('\0', "module-load-path", "DIR", "Set directory to load modules from")
     )
     {
         return EXIT_FAILURE;
@@ -6533,13 +6782,18 @@ main(int argc, char** argv, char** envp)
     if (!rt)
         return 1;
 
+    mozilla::UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
+    if (!sr)
+        return 1;
+
+    JS_SetRuntimePrivate(rt, sr.get());
     JS_SetErrorReporter(rt, my_ErrorReporter);
     JS::SetOutOfMemoryCallback(rt, my_OOMCallback, nullptr);
     if (!SetRuntimeOptions(rt, op))
         return 1;
 
-    gInterruptFunc.init(rt, NullValue());
-    gLastWarning.init(rt, NullValue());
+    sr->interruptFunc.init(rt, NullValue());
+    sr->lastWarning.init(rt, NullValue());
 
     JS_SetGCParameter(rt, JSGC_MAX_BYTES, 0xffffffff);
 
@@ -6597,7 +6851,7 @@ main(int argc, char** argv, char** envp)
 
     DestroyContext(cx, true);
 
-    KillWatchdog();
+    KillWatchdog(rt);
 
     MOZ_ASSERT_IF(!CanUseExtraThreads(), workerThreads.empty());
     for (size_t i = 0; i < workerThreads.length(); i++)

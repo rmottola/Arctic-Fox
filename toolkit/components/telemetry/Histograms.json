@@ -193,13 +193,6 @@
     "n_buckets": 50,
     "description": "Time spent in between cycle collections (seconds)"
   },
-  "CYCLE_COLLECTOR_CONTENT_UNBIND": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": "10000",
-    "n_buckets": 50,
-    "description": "Time spent on one ContentUnbinder (ms)"
-  },
   "CYCLE_COLLECTOR_OOM": {
     "expires_in_version": "never",
     "kind": "flag",
@@ -5779,6 +5772,22 @@
     "n_buckets": "1000",
     "description": "The time (in milliseconds) that it took a 'listAddons' request to go round trip."
   },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_LISTWORKERS_MS": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "jan@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "50",
+    "description": "The time (in milliseconds) that it took a 'listWorkers' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_LISTWORKERS_MS": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "jan@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "50",
+    "description": "The time (in milliseconds) that it took a 'listWorkers' request to go round trip."
+  },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_LISTPROCESSES_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -6281,6 +6290,48 @@
     "kind": "enumerated",
     "n_values": 8,
     "description": "Type for media in getUserMedia calls (0=Camera, 1=Screen, 2=Application, 3=Window, 4=Browser, 5=Microphone, 6=AudioCapture, 7=Other)"
+  },
+  "WEBRTC_LOAD_STATE_RELAXED": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Relaxed load state in calls over 30 seconds."
+  },
+  "WEBRTC_LOAD_STATE_RELAXED_SHORT": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Relaxed load state in calls 5-30 seconds."
+  },
+  "WEBRTC_LOAD_STATE_NORMAL": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Normal load state in calls over 30 seconds."
+  },
+  "WEBRTC_LOAD_STATE_NORMAL_SHORT": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Normal load state in calls over 5-30 seconds."
+  },
+  "WEBRTC_LOAD_STATE_STRESSED": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Stressed load state in calls over 30 seconds."
+  },
+  "WEBRTC_LOAD_STATE_STRESSED_SHORT": {
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "100",
+    "n_buckets": "25",
+    "description": "Percentage of time spent in the Stressed load state in calls 5-30 seconds."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_TRACERDETACH_MS": {
     "expires_in_version": "never",
@@ -9207,6 +9258,13 @@
     "expires_in_version": "55",
     "kind": "count",
     "description": "Attempt to notify ServiceWorker of push notification resubscription."
+  },
+  "D3D11_SYNC_HANDLE_FAILURE": {
+    "alert_emails": ["bschouten@mozilla.com","danderson@mozilla.com","msreckovic@mozilla.com","ashughes@mozilla.com"],
+    "expires_in_version": "50",
+    "releaseChannelCollection": "opt-out",
+    "kind": "count",
+    "description": "Number of times the D3D11 compositor failed to get a texture sync handle."
   },
   "GFX_CRASH": {
     "expires_in_version": "never",

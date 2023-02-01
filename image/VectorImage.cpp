@@ -683,8 +683,6 @@ VectorImage::IsOpaque()
 }
 
 //******************************************************************************
-/* [noscript] SourceSurface getFrame(in uint32_t aWhichFrame,
- *                                   in uint32_t aFlags; */
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 VectorImage::GetFrame(uint32_t aWhichFrame, uint32_t aFlags)
 {
@@ -793,13 +791,6 @@ struct SVGDrawingParameters
 };
 
 //******************************************************************************
-/* [noscript] void draw(in gfxContext aContext,
- *                      [const] in nsIntSize aSize,
- *                      [const] in ImageRegion aRegion,
- *                      in uint32_t aWhichFrame,
- *                      in Filter aFilter,
- *                      [const] in MaybeSVGImageContext aSVGContext,
- *                      in uint32_t aFlags); */
 NS_IMETHODIMP_(DrawResult)
 VectorImage::Draw(gfxContext* aContext,
                   const nsIntSize& aSize,
@@ -1125,8 +1116,6 @@ VectorImage::OnStartRequest(nsIRequest* aRequest, nsISupports* aCtxt)
 }
 
 //******************************************************************************
-/* void onStopRequest(in nsIRequest request, in nsISupports ctxt,
-                      in nsresult status); */
 NS_IMETHODIMP
 VectorImage::OnStopRequest(nsIRequest* aRequest, nsISupports* aCtxt,
                            nsresult aStatus)
@@ -1219,9 +1208,7 @@ VectorImage::OnSVGDocumentError()
 
   if (mProgressTracker) {
     // Notify observers about the error and unblock page load.
-    Progress progress = FLAG_DECODE_COMPLETE |
-                        FLAG_ONLOAD_UNBLOCKED |
-                        FLAG_HAS_ERROR;
+    Progress progress = FLAG_ONLOAD_UNBLOCKED | FLAG_HAS_ERROR;
 
     // Merge in any saved progress from OnImageDataComplete.
     if (mLoadProgress) {
@@ -1237,9 +1224,6 @@ VectorImage::OnSVGDocumentError()
 // nsIStreamListener method
 
 //******************************************************************************
-/* void onDataAvailable(in nsIRequest request, in nsISupports ctxt,
-                        in nsIInputStream inStr, in unsigned long sourceOffset,
-                        in unsigned long count); */
 NS_IMETHODIMP
 VectorImage::OnDataAvailable(nsIRequest* aRequest, nsISupports* aCtxt,
                              nsIInputStream* aInStr, uint64_t aSourceOffset,

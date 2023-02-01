@@ -263,9 +263,8 @@ browser/chrome/browser/skin/classic/browser/feeds/feedIcon.png
 browser/chrome/browser/skin/classic/browser/feeds/videoFeedIcon.png
 chrome/toolkit/skin/classic/mozapps/extensions/category-languages.png
 chrome/toolkit/skin/classic/mozapps/extensions/localeGeneric.png
-chrome/toolkit/skin/classic/mozapps/extensions/category-extensions.png
-chrome/toolkit/skin/classic/mozapps/extensions/extensionGeneric.png
-chrome/toolkit/skin/classic/mozapps/xpinstall/xpinstallItemGeneric.png
+chrome/toolkit/skin/classic/mozapps/extensions/category-extensions.svg
+chrome/toolkit/skin/classic/mozapps/extensions/extensionGeneric.svg
 browser/chrome/devtools/skin/themes/images/noise.png
 browser/chrome/browser/skin/classic/browser/newtab/noise.png
 chrome/toolkit/skin/classic/global/devtools/noise.png

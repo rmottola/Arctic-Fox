@@ -110,7 +110,7 @@ message Node {
         bytes           typeName             = 2;
         uint64          typeNameRef          = 3;
     }
-    
+
     optional uint64     size                 = 4;
     repeated Edge       edges                = 5;
     optional StackFrame allocationStack      = 6;
@@ -123,6 +123,12 @@ message Node {
 
     // JS::ubi::CoarseType. Defaults to Other.
     optional uint32     coarseType           = 9 [default = 0];
+
+    // De-duplicated one-byte string.
+    oneof ScriptFilenameOrRef {
+        bytes           scriptFilename       = 10;
+        uint64          scriptFilenameRef    = 11;
+    }
 }
 
 // A serialized edge from the heap graph.

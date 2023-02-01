@@ -79,6 +79,7 @@ private:
     struct UploadData;
     struct URIData;
     struct WalkData;
+    struct URIFixupData;
 
     class OnWalk;
     class OnWrite;
@@ -90,7 +91,7 @@ private:
     void Cleanup();
     void CleanupLocalFiles();
     nsresult GetValidURIFromObject(nsISupports *aObject, nsIURI **aURI) const;
-    nsresult GetLocalFileFromURI(nsIURI *aURI, nsIFile **aLocalFile) const;
+    static nsresult GetLocalFileFromURI(nsIURI *aURI, nsIFile **aLocalFile);
     static nsresult AppendPathToURI(nsIURI *aURI, const nsAString & aPath);
     nsresult MakeAndStoreLocalFilenameInURIMap(
         nsIURI *aURI, bool aNeedsPersisting, URIData **aData);
@@ -134,24 +135,6 @@ private:
     void CalcTotalProgress();
 
     void SetApplyConversionIfNeeded(nsIChannel *aChannel);
-
-    // Hash table enumerators
-    static PLDHashOperator EnumPersistURIs(
-        const nsACString &aKey, URIData *aData, void* aClosure);
-    static PLDHashOperator EnumCleanupOutputMap(
-        nsISupports *aKey, OutputData *aData, void* aClosure);
-    static PLDHashOperator EnumCleanupUploadList(
-        nsISupports *aKey, UploadData *aData, void* aClosure);
-    static PLDHashOperator EnumCalcProgress(
-        nsISupports *aKey, OutputData *aData, void* aClosure);
-    static PLDHashOperator EnumCalcUploadProgress(
-        nsISupports *aKey, UploadData *aData, void* aClosure);
-    static PLDHashOperator EnumFixRedirect(
-        nsISupports *aKey, OutputData *aData, void* aClosure);
-    static PLDHashOperator EnumCountURIsToPersist(
-        const nsACString &aKey, URIData *aData, void* aClosure);
-    static PLDHashOperator EnumCopyURIsToFlatMap(
-        const nsACString &aKey, URIData *aData, void* aClosure);
 
     nsCOMPtr<nsIURI>          mCurrentDataPath;
     bool                      mCurrentDataPathIsRelative;

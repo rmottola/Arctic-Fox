@@ -18,6 +18,7 @@
 
 class nsIPrincipal;
 class nsIDOMWindow;
+class nsPIDOMWindow;
 
 namespace mozilla {
 namespace dom {
@@ -115,13 +116,14 @@ public:
 
   void Clear(ErrorResult& aRv);
 
-  // This method checks whether the caller can use storage.
+  // The method checks whether the caller can use a storage.
   // CanUseStorage is called before any DOM initiated operation
-  // on storage is about to happen and ensures that the storage's
+  // on a storage is about to happen and ensures that the storage's
   // session-only flag is properly set according the current settings.
-  // It is an optimization, since the privileges check and session-only
-  // state determination are complex and share code (goes hand in hand).
-  static bool CanUseStorage(nsIDOMWindow* aWindow, DOMStorage* aStorage = nullptr);
+  // It is an optimization since the privileges check and session only
+  // state determination are complex and share the code (comes hand in
+  // hand together).
+  static bool CanUseStorage(nsPIDOMWindow* aWindow, DOMStorage* aStorage = nullptr);
 
   bool IsPrivate() const { return mIsPrivate; }
   bool IsSessionOnly() const { return mIsSessionOnly; }

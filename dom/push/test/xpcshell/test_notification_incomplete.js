@@ -5,9 +5,13 @@
 
 const {PushDB, PushService, PushServiceWebSocket} = serviceExports;
 
+const userAgentID = '1ca1cf66-eeb4-4df7-87c1-d5c92906ab90';
+
 function run_test() {
   do_get_profile();
-  setPrefs();
+  setPrefs({
+    userAgentID: userAgentID,
+  });
   disableServiceWorkerEvents(
     'https://example.com/page/1',
     'https://example.com/page/2',
@@ -57,8 +61,8 @@ add_task(function* test_notification_incomplete() {
     ok(false, 'Should not deliver malformed updates');
   }, 'push-notification', false);
 
-  let notificationDefer = Promise.defer();
-  let notificationDone = after(2, notificationDefer.resolve);
+  let notificationDone;
+  let notificationPromise = new Promise(resolve => notificationDone = after(2, resolve));
   let prevHandler = PushServiceWebSocket._handleNotificationReply;
   PushServiceWebSocket._handleNotificationReply = function _handleNotificationReply() {
     notificationDone();
@@ -74,7 +78,7 @@ add_task(function* test_notification_incomplete() {
           this.serverSendMsg(JSON.stringify({
             messageType: 'hello',
             status: 200,
-            uaid: '1ca1cf66-eeb4-4df7-87c1-d5c92906ab90'
+            uaid: userAgentID,
           }));
           this.serverSendMsg(JSON.stringify({
             // Missing "updates" field; should ignore message.
@@ -107,7 +111,7 @@ add_task(function* test_notification_incomplete() {
     }
   });
 
-  yield waitForPromise(notificationDefer.promise, DEFAULT_TIMEOUT,
+  yield waitForPromise(notificationPromise, DEFAULT_TIMEOUT,
     'Timed out waiting for incomplete notifications');
 
   let storeRecords = yield db.getAllKeyIDs();

@@ -469,17 +469,6 @@ LinkModuleToHeap(JSContext* cx, AsmJSModule& module, Handle<ArrayBufferObjectMay
 {
     uint32_t heapLength = heap->byteLength();
 
-    if (IsDeprecatedAsmJSHeapLength(heapLength)) {
-        LinkFail(cx, "ArrayBuffer byteLengths smaller than 64KB are deprecated and "
-                     "will cause a link-time failure in the future");
-
-        // The goal of deprecation is to give apps some time before linking
-        // fails. However, if warnings-as-errors is turned on (which happens as
-        // part of asm.js testing) an exception may be raised.
-        if (cx->isExceptionPending())
-            return false;
-    }
-
     if (!IsValidAsmJSHeapLength(heapLength)) {
         ScopedJSFreePtr<char> msg(
             JS_smprintf("ArrayBuffer byteLength 0x%x is not a valid heap length. The next "
@@ -631,7 +620,6 @@ ChangeHeap(JSContext* cx, AsmJSModule& module, const CallArgs& args)
     }
 
     MOZ_ASSERT(IsValidAsmJSHeapLength(heapLength));
-    MOZ_ASSERT(!IsDeprecatedAsmJSHeapLength(heapLength));
 
     if (!ArrayBufferObject::prepareForAsmJS(cx, newBuffer, module.usesSignalHandlersForOOB()))
         return false;
@@ -749,12 +737,8 @@ CallAsmJS(JSContext* cx, unsigned argc, Value* vp)
         // that the optimized asm.js-to-Ion FFI call path (which we want to be
         // very fast) can avoid doing so. The JitActivation is marked as
         // inactive so stack iteration will skip over it.
-        //
-        // We needn't provide an entry script pointer; that's only used for
-        // reporting entry points to performance-monitoring tools, and asm.js ->
-        // Ion calls will never be entry points.
         AsmJSActivation activation(cx, module);
-        JitActivation jitActivation(cx, /* entryScript */ nullptr, /* active */ false);
+        JitActivation jitActivation(cx, /* active */ false);
 
         // Call the per-exported-function trampoline created by GenerateEntry.
         AsmJSModule::CodePtr enter = module.entryTrampoline(func);

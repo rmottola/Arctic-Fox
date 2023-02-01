@@ -1,4 +1,3 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -20,13 +19,34 @@
   --row-hover-background-color: rgba(76,158,217,0.2);
 }
 
+html, .theme-body, #app, #memory-tool, #memory-tool-container {
+  height: 100%;
+}
+
+.theme-body {
+  overflow: hidden;
+  /* Not sure why .theme-body declares it as `background` and overrides */
+  background-color: var(--theme-toolbar-background) !important;
+}
+
+#memory-tool-container {
+  display: flex;
+  flex-direction: row;
+  --toolbar-height: 20px;
+  /**
+   * If --heap-tree-row-height changes, be sure to change HEAP_TREE_ROW_HEIGHT
+   * in `devtools/client/memory/components/heap.js`.
+   */
+  --heap-tree-row-height: 14px;
+}
+
 /**
  * TODO bug 1213100
  * should generalize toolbar buttons with images in them
  * toolbars.inc.css contains definitions for .devtools-button,
  * I wager that many of the below styles can be rolled into that
  */
-.devtools-button.take-snapshot {
+.devtools-toolbar .devtools-button.take-snapshot {
   margin: 2px 1px;
   padding: 1px;
   border-width: 0px;
@@ -36,7 +56,7 @@
   display: -moz-box;
 }
 
-.devtools-button.take-snapshot::before {
+.devtools-toolbar .devtools-button.take-snapshot::before {
   background-image: url(images/command-screenshot.png);
   -moz-appearance: none;
   width: 16px;
@@ -46,7 +66,7 @@
   background-repeat: no-repeat;
 }
 @media (min-resolution: 1.1dppx) {
-  .devtools-button.take-snapshot::before {
+  .devtools-toolbar .devtools-button.take-snapshot::before {
     background-image: url(images/command-screenshot@2x.png);
   }
 }
@@ -59,7 +79,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  height: 20px;
+  height: var(--toolbar-height);
 }
 
 /**
@@ -87,13 +107,19 @@
   width: 186px;
   list-style-type: none;
   font-size: 12px;
+  height: 100%;
+  overflow-y: scroll;
+  background-color: var(--theme-toolbar-background);
+  color: var(--theme-body-color-alt);
+  border-color: var(--theme-splitter-color);
+  border-style: solid;
+  border-width: 0px 1px 0px 0px;
 }
 
 .list > li {
   height: 40px;
   color: var(--theme-body-color);
-  border-bottom: 1px solid transparent;
-  border-top: 1px solid rgba(128,128,128,0.15);
+  border-bottom: 1px solid rgba(128,128,128,0.15);
   padding: 8px;
   cursor: pointer;
 }
@@ -103,67 +129,202 @@
   color: var(--theme-selection-color);
 }
 
-
-/**
- * Heap View
- */
-
-.heap-view {
+.snapshot-list-item {
   position: relative;
 }
-
-.heap-view .theme-twisty {
-  text-align: end;
-}
-
-.heap-tree-item {
-  list-style-type: none;
-  /* display: none; */
-}
-
-.heap-tree-item[expanded] {
+.snapshot-list-item span {
   display: block;
 }
+.snapshot-list-item .snapshot-state, .snapshot-list-item .snapshot-totals {
+  font-size: 90%;
+  color: var(--theme-body-color-alt);
+  position: absolute;
+}
+.snapshot-list-item .snapshot-state {
+  top: 38px;
+}
+.snapshot-list-item .snapshot-totals {
+  top: 38px;
+}
+.snapshot-list-item .total-bytes {
+  float: left;
+}
+.snapshot-list-item.selected .snapshot-state, .snapshot-list-item.selected .snapshot-totals {
+  /* Text inside a selected item should not be custom colored. */
+  color: inherit !important;
+}
 
-.heap-tree-item:nth-child(2n) {
+/**
+ * Main panel
+ */
+
+#heap-view {
+  flex: 1 1 auto;
+  border-color: var(--theme-splitter-color);
+  color: var(--theme-body-color);
+  border-left-width: 1px;
+}
+
+#heap-view .heap-view-panel {
+  width: 100%;
+  height: 100%;
+  background-color: var(--theme-toolbar-background)
+}
+
+#heap-view .heap-view-panel .snapshot-status, #heap-view .take-snapshot {
+  font-size: 120%;
+  display: block;
+  margin: 65px auto;
+}
+
+#heap-view .heap-view-panel .snapshot-status {
+  width: 500px;
+  text-align: center;
+}
+
+#heap-view .take-snapshot {
+  padding: 5px;
+}
+
+#heap-view .heap-view-panel[data-state="snapshot-state-error"] pre {
+  background-color: var(--theme-body-background);
+  overflow-y: scroll;
+  height: 100px;
+  margin: 20px;
+  padding: 20px;
+}
+
+/**
+ * Heap Tree View
+ */
+
+#heap-view .theme-twisty {
+  float: left;
+}
+
+.tree {
+  height: 100%;
+  overflow-y: scroll;
+  background-color: var(--theme-body-background);
+}
+
+.tree .header {
+  height: 17px;
+  overflow: hidden;
+  color: var(--theme-body-color);
+  background-color: var(--theme-tab-toolbar-background);
+}
+
+.tree span {
+  border-left-color: var(--cell-border-color);
+  border-left-width: 1px;
+}
+
+.tree-node {
+  height: var(--heap-tree-row-height);
+}
+
+.heap-tree-item, .header {
+  list-style-type: none;
+  height: var(--heap-tree-row-height);
+}
+
+.heap-tree-item-field, .header span {
+  float: left;
+}
+
+.tree-node:nth-child(2n) {
   background-color: var(--row-alt-background-color);
 }
 
-.heap-tree-item:hover {
+.tree-node:hover {
   background-color: var(--row-hover-background-color);
 }
 
-.heap-tree-item:focus {
+.tree-node:focus, .heap-tree-item.focused {
   background-color: var(--theme-selection-background);
+  color: var(--theme-selection-color);
 }
 
-.heap-tree-item:focus description {
-  color: var(--theme-selection-color) !important;
+.header {
+  background-color: var(--theme-tab-toolbar-background);
 }
 
-.heap-tree-item:focus .call-tree-cell {
-  -moz-border-end-color: var(--focus-cell-border-color);
-}
-
-
-.heap-tree-cell[type="bytes"], .heap-tree-cell[type="count"] {
-  position: absolute;
-  text-align: right;
-  width: 40px;
-}
-
-.heap-tree-cell[type="name"] {
-  width: 150px;
+.header span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
+  text-align: center;
+  font-size: 90%;
 }
 
-.heap-tree-cell[type="count"] {
-  left: 300px;
+.heap-tree-item-bytes,
+.heap-tree-item-count,
+.heap-tree-item-total-bytes,
+.heap-tree-item-total-count {
+  text-align: right;
+  border-right: var(--cell-border-color) 1px solid;
+  padding-right: 5px;
 }
 
-.heap-tree-cell[type="bytes"] {
-  left: 250px;
+.heap-tree-item-count,
+.heap-tree-item-total-count {
+  width: 5vw;
+}
+
+.heap-tree-item-bytes,
+.heap-tree-item-total-bytes {
+  width: 7vw;
+}
+
+.heap-tree-item-name {
+  padding-left: 5px;
+}
+
+.error::before {
+  content: "";
+  background-image: url(chrome://devtools/skin/themes/images/webconsole.svg);
+  background-repeat: no-repeat;
+  background-size: 72px 60px;
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+
+  background-position: -24px -24px;
+  margin: 2px 5px 0 0;
+  max-height: 12px;
+}
+.theme-light .error::before {
+  background-image: url(chrome://devtools/skin/themes/images/webconsole.svg#light-icons);
+}
+
+/**
+ * Frame View components
+ */
+
+.focused .frame-link-filename,
+.focused .frame-link-column,
+.focused .frame-link-line,
+.focused .frame-link-host,
+.focused .frame-link-colon {
+  color: var(--theme-selection-color);
+}
+
+.frame-link-filename {
+  color: var(--theme-highlight-blue);
+  cursor: pointer;
+}
+
+.frame-link-filename:hover {
+  text-decoration: underline;
+}
+
+.frame-link-column, .frame-link-line, .frame-link-colon {
+  color: var(--theme-highlight-orange);
+}
+
+.frame-link-host {
+  font-size: 90%;
+  margin-left: 5px;
+  color: var(--theme-content-color2);
 }

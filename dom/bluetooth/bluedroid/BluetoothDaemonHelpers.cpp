@@ -25,7 +25,8 @@ Convert(bool aIn, BluetoothScanMode& aOut)
     [false] = SCAN_MODE_CONNECTABLE,
     [true] = SCAN_MODE_CONNECTABLE_DISCOVERABLE
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sScanMode))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sScanMode), bool, BluetoothScanMode)) {
     aOut = SCAN_MODE_NONE; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -42,8 +43,11 @@ Convert(int32_t aIn, BluetoothTypeOfDevice& aOut)
     [0x02] = TYPE_OF_DEVICE_BLE,
     [0x03] = TYPE_OF_DEVICE_DUAL
   };
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(static_cast<size_t>(aIn) >= MOZ_ARRAY_LENGTH(sTypeOfDevice))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !aIn, int32_t, BluetoothTypeOfDevice) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        static_cast<size_t>(aIn) >= MOZ_ARRAY_LENGTH(sTypeOfDevice), int32_t,
+        BluetoothTypeOfDevice)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sTypeOfDevice[aIn];
@@ -58,8 +62,11 @@ Convert(int32_t aIn, BluetoothScanMode& aOut)
     [0x01] = SCAN_MODE_CONNECTABLE,
     [0x02] = SCAN_MODE_CONNECTABLE_DISCOVERABLE
   };
-  if (NS_WARN_IF(aIn < 0) ||
-      NS_WARN_IF(static_cast<size_t>(aIn) >= MOZ_ARRAY_LENGTH(sScanMode))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn < 0, int32_t, BluetoothScanMode) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        static_cast<size_t>(aIn) >= MOZ_ARRAY_LENGTH(sScanMode), int32_t,
+        BluetoothScanMode)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sScanMode[aIn];
@@ -74,7 +81,9 @@ Convert(uint8_t aIn, BluetoothA2dpAudioState& aOut)
     [0x01] = A2DP_AUDIO_STATE_STOPPED,
     [0x02] = A2DP_AUDIO_STATE_STARTED
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAudioState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAudioState), uint8_t,
+        BluetoothA2dpAudioState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sAudioState[aIn];
@@ -90,7 +99,9 @@ Convert(uint8_t aIn, BluetoothA2dpConnectionState& aOut)
     [0x02] = A2DP_CONNECTION_STATE_CONNECTED,
     [0x03] = A2DP_CONNECTION_STATE_DISCONNECTING
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sConnectionState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sConnectionState), uint8_t,
+        BluetoothA2dpConnectionState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sConnectionState[aIn];
@@ -104,7 +115,8 @@ Convert(uint8_t aIn, BluetoothAclState& aOut)
     [0x00] = ACL_STATE_CONNECTED,
     [0x01] = ACL_STATE_DISCONNECTED
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAclState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAclState), uint8_t, BluetoothAclState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sAclState[aIn];
@@ -125,10 +137,14 @@ Convert(uint8_t aIn, BluetoothAvrcpEvent& aOut)
     [0x07] = static_cast<BluetoothAvrcpEvent>(0),
     [0x08] = AVRCP_EVENT_APP_SETTINGS_CHANGED
   };
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(aIn == 0x06) ||
-      NS_WARN_IF(aIn == 0x07) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAvrcpEvent))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !aIn, uint8_t, BluetoothAvrcpEvent) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn == 0x06, uint8_t, BluetoothAvrcpEvent) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn == 0x07, uint8_t, BluetoothAvrcpEvent) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAvrcpEvent), uint8_t, BluetoothAvrcpEvent)) {
     aOut = static_cast<BluetoothAvrcpEvent>(0); // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -149,8 +165,11 @@ Convert(uint8_t aIn, BluetoothAvrcpMediaAttribute& aOut)
     [0x06] = AVRCP_MEDIA_ATTRIBUTE_GENRE,
     [0x07] = AVRCP_MEDIA_ATTRIBUTE_PLAYING_TIME
   };
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAvrcpMediaAttribute))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !aIn, uint8_t, BluetoothAvrcpMediaAttrbiute) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAvrcpMediaAttribute), uint8_t,
+        BluetoothAvrcpMediaAttribute)) {
     // silences compiler warning
     aOut = static_cast<BluetoothAvrcpMediaAttribute>(0);
     return NS_ERROR_ILLEGAL_VALUE;
@@ -169,8 +188,11 @@ Convert(uint8_t aIn, BluetoothAvrcpPlayerAttribute& aOut)
     [0x03] = AVRCP_PLAYER_ATTRIBUTE_SHUFFLE,
     [0x04] = AVRCP_PLAYER_ATTRIBUTE_SCAN
   };
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAvrcpPlayerAttribute))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !aIn, uint8_t, BluetoothAvrcpPlayerAttrbiute) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAvrcpPlayerAttribute), uint8_t,
+        BluetoothAvrcpPlayerAttribute)) {
     // silences compiler warning
     aOut = static_cast<BluetoothAvrcpPlayerAttribute>(0);
     return NS_ERROR_ILLEGAL_VALUE;
@@ -180,21 +202,26 @@ Convert(uint8_t aIn, BluetoothAvrcpPlayerAttribute& aOut)
 }
 
 nsresult
-Convert(uint8_t aIn, BluetoothAvrcpRemoteFeature& aOut)
+Convert(uint8_t aIn, BluetoothAvrcpRemoteFeatureBits& aOut)
 {
-  static const BluetoothAvrcpRemoteFeature sAvrcpRemoteFeature[] = {
-    [0x00] = AVRCP_REMOTE_FEATURE_NONE,
-    [0x01] = AVRCP_REMOTE_FEATURE_METADATA,
-    [0x02] = AVRCP_REMOTE_FEATURE_ABSOLUTE_VOLUME,
-    [0x03] = AVRCP_REMOTE_FEATURE_BROWSE
+  static const uint8_t sAvrcpRemoteFeatureBits[] = {
+    [0] = AVRCP_REMOTE_FEATURE_METADATA,
+    [1] = AVRCP_REMOTE_FEATURE_ABSOLUTE_VOLUME,
+    [2] = AVRCP_REMOTE_FEATURE_BROWSE
   };
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAvrcpRemoteFeature))) {
-    // silences compiler warning
-    aOut = static_cast<BluetoothAvrcpRemoteFeature>(0);
+  uint8_t bits = 0;
+  size_t i;
+  for (i = 0; i < MOZ_ARRAY_LENGTH(sAvrcpRemoteFeatureBits); ++i, aIn >>= 1) {
+    if (aIn & 0x01) {
+      bits |= sAvrcpRemoteFeatureBits[i];
+    }
+  }
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn << i, 'uint8_t', BluetoothAvrcpRemoteFeatureBits)) {
+    aOut = AVRCP_REMOTE_FEATURE_NONE; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
-  aOut = sAvrcpRemoteFeature[aIn];
+  aOut = static_cast<BluetoothAvrcpRemoteFeatureBits>(bits);
   return NS_OK;
 }
 
@@ -206,7 +233,8 @@ Convert(uint8_t aIn, BluetoothBondState& aOut)
     [0x01] = BOND_STATE_BONDING,
     [0x02] = BOND_STATE_BONDED
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sBondState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sBondState), uint8_t, BluetoothBondState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sBondState[aIn];
@@ -222,7 +250,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeAudioState& aOut)
     [0x02] = HFP_AUDIO_STATE_CONNECTED,
     [0x03] = HFP_AUDIO_STATE_DISCONNECTING
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAudioState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAudioState), uint8_t,
+        BluetoothHandsfreeAudioState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sAudioState[aIn];
@@ -238,7 +268,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeCallHoldType& aOut)
     [0x02] = HFP_CALL_HOLD_HOLDACTIVE_ACCEPTHELD,
     [0x03] = HFP_CALL_HOLD_ADDHELDTOCONF
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallHoldType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallHoldType), uint8_t,
+        BluetoothHandsfreeCallHoldType)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sCallHoldType[aIn];
@@ -255,7 +287,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeConnectionState& aOut)
     [0x03] = HFP_CONNECTION_STATE_SLC_CONNECTED,
     [0x04] = HFP_CONNECTION_STATE_DISCONNECTING
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sConnectionState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sConnectionState), uint8_t,
+        BluetoothHandsfreeConnectionState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sConnectionState[aIn];
@@ -269,7 +303,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeNRECState& aOut)
     [0x00] = HFP_NREC_STOPPED,
     [0x01] = HFP_NREC_STARTED
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sNRECState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sNRECState), uint8_t,
+        BluetoothHandsfreeNRECState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sNRECState[aIn];
@@ -283,7 +319,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeVoiceRecognitionState& aOut)
     [0x00] = HFP_VOICE_RECOGNITION_STOPPED,
     [0x01] = HFP_VOICE_RECOGNITION_STARTED
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sState), uint8_t,
+        BluetoothHandsfreeVoiceRecognitionState)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sState[aIn];
@@ -297,7 +335,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeVolumeType& aOut)
     [0x00] = HFP_VOLUME_TYPE_SPEAKER,
     [0x01] = HFP_VOLUME_TYPE_MICROPHONE
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sVolumeType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sVolumeType), uint8_t,
+        BluetoothHandsfreeVolumeType)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sVolumeType[aIn];
@@ -312,7 +352,9 @@ Convert(uint8_t aIn, BluetoothHandsfreeWbsConfig& aOut)
     [0x01] = HFP_WBS_NO,
     [0x02] = HFP_WBS_YES
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sWbsConfig))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sWbsConfig), uint8_t,
+        BluetoothHandsfreeWbsConfig)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sWbsConfig[aIn];
@@ -349,8 +391,11 @@ Convert(uint8_t aIn, BluetoothPropertyType& aOut)
     aOut = PROPERTY_REMOTE_DEVICE_TIMESTAMP;
     return NS_OK;
   }
-  if (NS_WARN_IF(!aIn) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sPropertyType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !aIn, uint8_t, BluetoothPropertyType) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sPropertyType), uint8_t,
+        BluetoothPropertyType)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sPropertyType[aIn];
@@ -367,9 +412,12 @@ Convert(BluetoothSocketType aIn, uint8_t& aOut)
     [BluetoothSocketType::L2CAP] = 0x03
     // EL2CAP not supported
   };
-  if (NS_WARN_IF(aIn == BluetoothSocketType::EL2CAP) ||
-      NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sSocketType)) ||
-      NS_WARN_IF(!sSocketType[aIn])) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn == BluetoothSocketType::EL2CAP, BluetoothSocketType, uint8_t) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sSocketType), BluetoothSocketType, uint8_t) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        !sSocketType[aIn], BluetoothSocketType, uint8_t)) {
     aOut = 0; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -386,7 +434,8 @@ Convert(uint8_t aIn, BluetoothSspVariant& aOut)
     [0x02] = SSP_VARIANT_CONSENT,
     [0x03] = SSP_VARIANT_PASSKEY_NOTIFICATION
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sSspVariant))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sSspVariant), uint8_t, BluetoothSspVariant)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sSspVariant[aIn];
@@ -409,7 +458,8 @@ Convert(uint8_t aIn, BluetoothStatus& aOut)
     [0x09] = STATUS_AUTH_FAILURE,
     [0x0a] = STATUS_RMT_DEV_DOWN
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sStatus))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sStatus), uint8_t, BluetoothStatus)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sStatus[aIn];
@@ -451,53 +501,15 @@ Convert(int32_t aIn, BluetoothGattStatus& aOut)
     [0x0010] = GATT_STATUS_UNSUPPORTED_GROUP_TYPE,
     [0x0011] = GATT_STATUS_INSUFFICIENT_RESOURCES
   };
-  if (NS_WARN_IF(aIn < 0) ||
-      NS_WARN_IF(aIn >= static_cast<ssize_t>(MOZ_ARRAY_LENGTH(sGattStatus)))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn < 0, int32_t, BluetoothGattStatus) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= static_cast<ssize_t>(MOZ_ARRAY_LENGTH(sGattStatus)), int32_t,
+        BluetoothGattStatus)) {
     aOut = GATT_STATUS_UNKNOWN_ERROR;
   } else {
     aOut = sGattStatus[aIn];
   }
-  return NS_OK;
-}
-
-nsresult
-Convert(const nsAString& aIn, BluetoothAddress& aOut)
-{
-  NS_ConvertUTF16toUTF8 bdAddressUTF8(aIn);
-  const char* str = bdAddressUTF8.get();
-
-  for (size_t i = 0; i < MOZ_ARRAY_LENGTH(aOut.mAddr); ++i, ++str) {
-    aOut.mAddr[i] =
-      static_cast<uint8_t>(strtoul(str, const_cast<char**>(&str), 16));
-  }
-
-  return NS_OK;
-}
-
-nsresult
-Convert(const nsAString& aIn, BluetoothPinCode& aOut)
-{
-  if (NS_WARN_IF(aIn.Length() > MOZ_ARRAY_LENGTH(aOut.mPinCode))) {
-    return NS_ERROR_ILLEGAL_VALUE;
-  }
-
-  NS_ConvertUTF16toUTF8 pinCodeUTF8(aIn);
-  const char* str = pinCodeUTF8.get();
-
-  nsAString::size_type i;
-
-  // Fill pin into aOut
-  for (i = 0; i < aIn.Length(); ++i, ++str) {
-    aOut.mPinCode[i] = static_cast<uint8_t>(*str);
-  }
-
-  // Clear remaining bytes in aOut
-  size_t ntrailing = (MOZ_ARRAY_LENGTH(aOut.mPinCode) - aIn.Length()) *
-                     sizeof(aOut.mPinCode[0]);
-  memset(aOut.mPinCode + aIn.Length(), 0, ntrailing);
-
-  aOut.mLength = aIn.Length();
-
   return NS_OK;
 }
 
@@ -510,28 +522,12 @@ Convert(const nsAString& aIn, BluetoothPropertyType& aOut)
     aOut = PROPERTY_ADAPTER_SCAN_MODE;
   } else if (aIn.EqualsLiteral("DiscoverableTimeout")) {
     aOut = PROPERTY_ADAPTER_DISCOVERY_TIMEOUT;
-  } else {
+  } else if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        false, nsAString, BluetoothPropertyType)) {
     BT_LOGR("Invalid property name: %s", NS_ConvertUTF16toUTF8(aIn).get());
     aOut = static_cast<BluetoothPropertyType>(0); // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
-  return NS_OK;
-}
-
-nsresult
-Convert(const nsAString& aIn, BluetoothServiceName& aOut)
-{
-  NS_ConvertUTF16toUTF8 serviceNameUTF8(aIn);
-  const char* str = serviceNameUTF8.get();
-  size_t len = strlen(str);
-
-  if (NS_WARN_IF(len > sizeof(aOut.mName))) {
-    return NS_ERROR_ILLEGAL_VALUE;
-  }
-
-  memcpy(aOut.mName, str, len);
-  memset(aOut.mName + len, 0, sizeof(aOut.mName) - len);
-
   return NS_OK;
 }
 
@@ -545,43 +541,6 @@ Convert(nsresult aIn, BluetoothStatus& aOut)
   } else {
     aOut = STATUS_FAIL;
   }
-  return NS_OK;
-}
-
-nsresult
-Convert(BluetoothAclState aIn, bool& aOut)
-{
-  static const bool sBool[] = {
-    [ACL_STATE_CONNECTED] = true,
-    [ACL_STATE_DISCONNECTED] = false
-  };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sBool))) {
-    return NS_ERROR_ILLEGAL_VALUE;
-  }
-  aOut = sBool[aIn];
-  return NS_OK;
-}
-
-nsresult
-Convert(const BluetoothAddress& aIn, nsAString& aOut)
-{
-  char str[BLUETOOTH_ADDRESS_LENGTH + 1];
-
-  int res = snprintf(str, sizeof(str), "%02x:%02x:%02x:%02x:%02x:%02x",
-                     static_cast<int>(aIn.mAddr[0]),
-                     static_cast<int>(aIn.mAddr[1]),
-                     static_cast<int>(aIn.mAddr[2]),
-                     static_cast<int>(aIn.mAddr[3]),
-                     static_cast<int>(aIn.mAddr[4]),
-                     static_cast<int>(aIn.mAddr[5]));
-  if (NS_WARN_IF(res < 0)) {
-    return NS_ERROR_ILLEGAL_VALUE;
-  } else if (NS_WARN_IF((size_t)res >= sizeof(str))) {
-    return NS_ERROR_OUT_OF_MEMORY; /* string buffer too small */
-  }
-
-  aOut = NS_ConvertUTF8toUTF16(str);
-
   return NS_OK;
 }
 
@@ -603,7 +562,8 @@ Convert(BluetoothAvrcpEvent aIn, uint8_t& aOut)
     [AVRCP_EVENT_PLAY_POS_CHANGED] = 0x05,
     [AVRCP_EVENT_APP_SETTINGS_CHANGED] = 0x08
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), BluetoothAvrcpEvent, uint8_t)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sValue[aIn];
@@ -617,7 +577,9 @@ Convert(BluetoothAvrcpNotification aIn, uint8_t& aOut)
     [AVRCP_NTF_INTERIM] = 0x00,
     [AVRCP_NTF_CHANGED] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), BluetoothAvrcpNotification,
+        uint8_t)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sValue[aIn];
@@ -633,7 +595,8 @@ Convert(BluetoothAvrcpPlayerAttribute aIn, uint8_t& aOut)
     [AVRCP_PLAYER_ATTRIBUTE_SHUFFLE] = 0x03,
     [AVRCP_PLAYER_ATTRIBUTE_SCAN] = 0x04
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), BluetoothAvrcpPlayerAttribute, uint8_t)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sValue[aIn];
@@ -641,10 +604,14 @@ Convert(BluetoothAvrcpPlayerAttribute aIn, uint8_t& aOut)
 }
 
 nsresult
-Convert(BluetoothAvrcpRemoteFeature aIn, unsigned long& aOut)
+Convert(BluetoothAvrcpRemoteFeatureBits aIn, unsigned long& aOut)
 {
-  if (NS_WARN_IF(aIn < std::numeric_limits<unsigned long>::min()) ||
-      NS_WARN_IF(aIn > std::numeric_limits<unsigned long>::max())) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn < std::numeric_limits<unsigned long>::min(),
+        BluetoothAvrcpRemoteFeature, unsigned long) ||
+      MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn > std::numeric_limits<unsigned long>::max(),
+        BluetoothAvrcpRemoteFeature, unsigned long)) {
     aOut = 0; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -662,7 +629,8 @@ Convert(BluetoothAvrcpStatus aIn, uint8_t& aOut)
     [AVRCP_STATUS_INTERNAL_ERROR] = 0x03,
     [AVRCP_STATUS_SUCCESS] = 0x04
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), BluetoothAvrcpStatus, uint8_t)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sValue[aIn];
@@ -676,7 +644,9 @@ Convert(BluetoothHandsfreeAtResponse aIn, uint8_t& aOut)
     [HFP_AT_RESPONSE_ERROR] = 0x00,
     [HFP_AT_RESPONSE_OK] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sAtResponse))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sAtResponse), BluetoothHandsfreeAtResponse,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -691,7 +661,9 @@ Convert(BluetoothHandsfreeCallAddressType aIn, uint8_t& aOut)
     [HFP_CALL_ADDRESS_TYPE_UNKNOWN] = 0x81,
     [HFP_CALL_ADDRESS_TYPE_INTERNATIONAL] = 0x91
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallAddressType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallAddressType),
+        BluetoothHandsfreeCallAddressType, uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -706,7 +678,9 @@ Convert(BluetoothHandsfreeCallDirection aIn, uint8_t& aOut)
     [HFP_CALL_DIRECTION_OUTGOING] = 0x00,
     [HFP_CALL_DIRECTION_INCOMING] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallDirection))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallDirection),
+        BluetoothHandsfreeCallDirection, uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -726,7 +700,9 @@ Convert(BluetoothHandsfreeCallState aIn, uint8_t& aOut)
     [HFP_CALL_STATE_WAITING] = 0x05,
     [HFP_CALL_STATE_IDLE] = 0x06
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallState), BluetoothHandsfreeCallState,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -742,7 +718,8 @@ Convert(BluetoothHandsfreeCallMode aIn, uint8_t& aOut)
     [HFP_CALL_MODE_DATA] = 0x01,
     [HFP_CALL_MODE_FAX] = 0x02
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallMode))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallMode), BluetoothHandsfreeCallMode, uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -757,7 +734,9 @@ Convert(BluetoothHandsfreeCallMptyType aIn, uint8_t& aOut)
     [HFP_CALL_MPTY_TYPE_SINGLE] = 0x00,
     [HFP_CALL_MPTY_TYPE_MULTI] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sCallMptyType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sCallMptyType),
+        BluetoothHandsfreeCallMptyType, uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -772,7 +751,9 @@ Convert(BluetoothHandsfreeNetworkState aIn, uint8_t& aOut)
     [HFP_NETWORK_STATE_NOT_AVAILABLE] = 0x00,
     [HFP_NETWORK_STATE_AVAILABLE] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sNetworkState))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sNetworkState), BluetoothHandsfreeNetworkState,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -787,7 +768,9 @@ Convert(BluetoothHandsfreeServiceType aIn, uint8_t& aOut)
     [HFP_SERVICE_TYPE_HOME] = 0x00,
     [HFP_SERVICE_TYPE_ROAMING] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sServiceType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sServiceType), BluetoothHandsfreeServiceType,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -802,7 +785,9 @@ Convert(BluetoothHandsfreeVolumeType aIn, uint8_t& aOut)
     [HFP_VOLUME_TYPE_SPEAKER] = 0x00,
     [HFP_VOLUME_TYPE_MICROPHONE] = 0x01
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sVolumeType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sVolumeType), BluetoothHandsfreeVolumeType,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -818,7 +803,9 @@ Convert(BluetoothHandsfreeWbsConfig aIn, uint8_t& aOut)
     [HFP_WBS_NO] = 0x01,
     [HFP_WBS_YES] = 0x02
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sWbsConfig))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sWbsConfig), BluetoothHandsfreeWbsConfig,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -845,21 +832,13 @@ Convert(BluetoothPropertyType aIn, uint8_t& aOut)
     [PROPERTY_REMOTE_VERSION_INFO] = 0x0c,
     [PROPERTY_REMOTE_DEVICE_TIMESTAMP] = 0xff
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sPropertyType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sPropertyType), BluetoothPropertyType,
+        uint8_t)) {
     aOut = 0x00; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
   aOut = sPropertyType[aIn];
-  return NS_OK;
-}
-
-nsresult
-Convert(const BluetoothRemoteName& aIn, nsAString& aOut)
-{
-  // We construct an nsCString here because the string
-  // returned from the PDU is not 0-terminated.
-  aOut = NS_ConvertUTF8toUTF16(
-    nsCString(reinterpret_cast<const char*>(aIn.mName), sizeof(aIn.mName)));
   return NS_OK;
 }
 
@@ -871,7 +850,8 @@ Convert(BluetoothScanMode aIn, int32_t& aOut)
     [SCAN_MODE_CONNECTABLE] = 0x01,
     [SCAN_MODE_CONNECTABLE_DISCOVERABLE] = 0x02
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sScanMode))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sScanMode), BluetoothScanMode, int32_t)) {
     aOut = 0; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -888,7 +868,8 @@ Convert(BluetoothSspVariant aIn, uint8_t& aOut)
     [SSP_VARIANT_CONSENT] = 0x02,
     [SSP_VARIANT_PASSKEY_NOTIFICATION] = 0x03
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), BluetoothSspVariant, uint8_t)) {
     aOut = 0; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -912,7 +893,8 @@ Convert(ControlPlayStatus aIn, uint8_t& aOut)
     aOut = 0xff;
     return NS_OK;
   }
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sValue))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sValue), ControlPlayStatus, uint8_t)) {
     aOut = 0; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -930,7 +912,9 @@ Convert(BluetoothGattAuthReq aIn, int32_t& aOut)
     [GATT_AUTH_REQ_SIGNED_NO_MITM] = 0x03,
     [GATT_AUTH_REQ_SIGNED_MITM] = 0x04
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sGattAuthReq))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sGattAuthReq), BluetoothGattAuthReq,
+        int32_t)) {
     aOut = GATT_AUTH_REQ_NONE; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -947,7 +931,9 @@ Convert(BluetoothGattWriteType aIn, int32_t& aOut)
     [GATT_WRITE_TYPE_PREPARE] = 0x03,
     [GATT_WRITE_TYPE_SIGNED] = 0x04
   };
-  if (NS_WARN_IF(aIn >= MOZ_ARRAY_LENGTH(sGattWriteType))) {
+  if (MOZ_HAL_IPC_CONVERT_WARN_IF(
+        aIn >= MOZ_ARRAY_LENGTH(sGattWriteType), BluetoothGattWriteType,
+        int32_t)) {
     aOut = GATT_WRITE_TYPE_NORMAL; // silences compiler warning
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -1070,7 +1056,8 @@ PackPDU(const BluetoothAvrcpElementAttribute& aIn, DaemonSocketPDU& aPDU)
 
   const NS_ConvertUTF16toUTF8 cstr(aIn.mValue);
 
-  if (NS_WARN_IF(cstr.Length() == PR_UINT32_MAX)) {
+  if (MOZ_HAL_IPC_PACK_WARN_IF(
+        cstr.Length() == PR_UINT32_MAX, BluetoothAvrcpElementAttribute)) {
     return NS_ERROR_ILLEGAL_VALUE; /* integer overflow detected */
   }
 
@@ -1260,7 +1247,7 @@ PackPDU(const BluetoothNamedValue& aIn, DaemonSocketPDU& aPDU)
 
     rv = PackPDU(static_cast<uint16_t>(sizeof(int32_t)),
                  PackConversion<bool, BluetoothScanMode>(value), aPDU);
-  } else {
+  } else if (MOZ_HAL_IPC_PACK_WARN_IF(true, BluetoothNamedValue)) {
     BT_LOGR("Invalid property value type");
     rv = NS_ERROR_ILLEGAL_VALUE;
   }
@@ -1296,7 +1283,15 @@ PackPDU(BluetoothScanMode aIn, DaemonSocketPDU& aPDU)
 nsresult
 PackPDU(const BluetoothServiceName& aIn, DaemonSocketPDU& aPDU)
 {
-  return PackPDU(PackArray<uint8_t>(aIn.mName, sizeof(aIn.mName)), aPDU);
+  static const uint8_t sTerminator = '\0';
+
+  nsresult rv =
+    PackPDU(PackArray<uint8_t>(aIn.mName, sizeof(aIn.mName)), aPDU);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+  /* The PDU requries one additional byte for \0 termination */
+  return aPDU.Write(sTerminator);
 }
 
 nsresult
@@ -1431,10 +1426,10 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothAvrcpPlayerSettings& aOut)
 }
 
 nsresult
-UnpackPDU(DaemonSocketPDU& aPDU, BluetoothAvrcpRemoteFeature& aOut)
+UnpackPDU(DaemonSocketPDU& aPDU, BluetoothAvrcpRemoteFeatureBits& aOut)
 {
   return UnpackPDU(
-    aPDU, UnpackConversion<uint8_t, BluetoothAvrcpRemoteFeature>(aOut));
+    aPDU, UnpackConversion<uint8_t, BluetoothAvrcpRemoteFeatureBits>(aOut));
 }
 
 nsresult
@@ -1479,6 +1474,13 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothHandsfreeNRECState& aOut)
 }
 
 nsresult
+UnpackPDU(DaemonSocketPDU& aPDU, BluetoothHandsfreeWbsConfig& aOut)
+{
+  return UnpackPDU(
+    aPDU, UnpackConversion<uint8_t, BluetoothHandsfreeWbsConfig>(aOut));
+}
+
+nsresult
 UnpackPDU(DaemonSocketPDU& aPDU,
           BluetoothHandsfreeVoiceRecognitionState& aOut)
 {
@@ -1512,7 +1514,7 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothProperty& aOut)
       /* fall through */
     case PROPERTY_REMOTE_FRIENDLY_NAME: {
         const uint8_t* data = aPDU.Consume(len);
-        if (NS_WARN_IF(!data)) {
+        if (MOZ_HAL_IPC_UNPACK_WARN_IF(!data, BluetoothProperty)) {
           return NS_ERROR_ILLEGAL_VALUE;
         }
         // We construct an nsCString here because the string
@@ -1522,8 +1524,7 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothProperty& aOut)
       }
       break;
     case PROPERTY_BDADDR:
-      rv = UnpackPDU<BluetoothAddress>(
-        aPDU, UnpackConversion<BluetoothAddress, nsAString>(aOut.mString));
+      rv = UnpackPDU(aPDU, aOut.mBdAddress);
       break;
     case PROPERTY_UUIDS: {
         size_t numUuids = len / MAX_UUID_SIZE;
@@ -1548,17 +1549,8 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothProperty& aOut)
     case PROPERTY_ADAPTER_BONDED_DEVICES: {
         /* unpack addresses */
         size_t numAddresses = len / BLUETOOTH_ADDRESS_BYTES;
-        nsAutoArrayPtr<BluetoothAddress> addresses;
-        UnpackArray<BluetoothAddress> addressArray(addresses, numAddresses);
-        rv = UnpackPDU(aPDU, addressArray);
-        if (NS_FAILED(rv)) {
-          return rv;
-        }
-        /* convert addresses to strings */
-        aOut.mStringArray.SetLength(numAddresses);
-        ConvertArray<BluetoothAddress> convertArray(addressArray.mData,
-                                                    addressArray.mLength);
-        rv = Convert(convertArray, aOut.mStringArray);
+        aOut.mBdAddressArray.SetLength(numAddresses);
+        rv = UnpackPDU(aPDU, aOut.mBdAddressArray);
       }
       break;
     case PROPERTY_REMOTE_RSSI: {
@@ -1729,14 +1721,8 @@ UnpackPDU(DaemonSocketPDU& aPDU, BluetoothGattWriteParam& aOut)
 nsresult
 UnpackPDU(DaemonSocketPDU& aPDU, BluetoothGattNotifyParam& aOut)
 {
-
-  /* unpack address and convert to nsString */
-  BluetoothAddress address;
-  nsresult rv = UnpackPDU(aPDU, address);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-  rv = Convert(address, aOut.mBdAddr);
+  /* unpack address */
+  nsresult rv = UnpackPDU(aPDU, aOut.mBdAddr);
   if (NS_FAILED(rv)) {
     return rv;
   }

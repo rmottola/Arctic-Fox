@@ -13,7 +13,8 @@ from contextlib import contextmanager
 from copy import copy
 from subprocess import list2cmdline, call
 
-from lib.tests import TestCase, get_jitflags
+from lib.tests import RefTestCase, get_jitflags, get_environment_overlay, \
+                      change_env
 from lib.results import ResultsSink
 from lib.progressbar import ProgressBar
 
@@ -211,8 +212,8 @@ def parse_args():
             abspath(dirname(abspath(__file__))),
             '..', '..', 'examples', 'jorendb.js'))
         js_cmd_args.extend(['-d', '-f', debugger_path, '--'])
-    prefix = TestCase.build_js_cmd_prefix(options.js_shell, js_cmd_args,
-                                          debugger_prefix)
+    prefix = RefTestCase.build_js_cmd_prefix(options.js_shell, js_cmd_args,
+                                             debugger_prefix)
 
     # If files with lists of tests to run were specified, add them to the
     # requested tests set.
@@ -275,8 +276,8 @@ def load_tests(options, requested_paths, excluded_paths):
 
     test_dir = dirname(abspath(__file__))
     test_count = manifest.count_tests(test_dir, requested_paths, excluded_paths)
-    test_gen = manifest.load(test_dir, requested_paths, excluded_paths,
-                              xul_tester)
+    test_gen = manifest.load_reftests(test_dir, requested_paths, excluded_paths,
+                                      xul_tester)
 
     if options.make_manifests:
         manifest.make_manifests(options.make_manifests, test_gen)
@@ -332,6 +333,7 @@ def main():
         print('Could not find shell at given path.')
         return 1
     test_count, test_gen = load_tests(options, requested_paths, excluded_paths)
+    test_environment = get_environment_overlay(options.js_shell)
 
     if test_count == 0:
         print('no tests selected')
@@ -340,29 +342,25 @@ def main():
     test_dir = dirname(abspath(__file__))
 
     if options.debug:
-        if len(list(test_gen)) > 1:
+        tests = list(test_gen)
+        if len(tests) > 1:
             print('Multiple tests match command line arguments,'
                   ' debugger can only run one')
-            for tc in test_gen:
+            for tc in tests:
                 print('    {}'.format(tc.path))
             return 2
 
-        cmd = test_gen[0].get_command(TestCase.js_cmd_prefix)
+        cmd = tests[0].get_command(prefix)
         if options.show_cmd:
             print(list2cmdline(cmd))
-        with changedir(test_dir):
+        with changedir(test_dir), change_env(test_environment):
             call(cmd)
         return 0
 
-    with changedir(test_dir):
-        # Force Pacific time zone to avoid failures in Date tests.
-        os.environ['TZ'] = 'PST8PDT'
-        # Force date strings to English.
-        os.environ['LC_TIME'] = 'en_US.UTF-8'
-
+    with changedir(test_dir), change_env(test_environment):
         results = ResultsSink(options, test_count)
         try:
-            for out in run_all_tests(test_gen, prefix, results, options):
+            for out in run_all_tests(test_gen, prefix, results.pb, options):
                 results.push(out)
             results.finish(True)
         except KeyboardInterrupt:

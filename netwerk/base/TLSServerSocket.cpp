@@ -20,8 +20,6 @@
 #include "ScopedNSSTypes.h"
 #include "ssl.h"
 
-extern PRThread *gSocketThread;
-
 namespace mozilla {
 namespace net {
 
@@ -219,6 +217,31 @@ TLSServerSocket::SetRequestClientCertificate(uint32_t aMode)
     default:
       SSL_OptionSet(mFD, SSL_REQUIRE_CERTIFICATE, SSL_REQUIRE_NEVER);
   }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TLSServerSocket::SetCipherSuites(uint16_t* aCipherSuites, uint32_t aLength)
+{
+  // If AsyncListen was already called (and set mListener), it's too late to set
+  // this.
+  if (NS_WARN_IF(mListener)) {
+    return NS_ERROR_IN_PROGRESS;
+  }
+
+  for (uint16_t i = 0; i < SSL_NumImplementedCiphers; ++i) {
+    uint16_t cipher_id = SSL_ImplementedCiphers[i];
+    if (SSL_CipherPrefSet(mFD, cipher_id, false) != SECSuccess) {
+      return mozilla::psm::GetXPCOMFromNSSError(PR_GetError());
+    }
+  }
+
+  for (uint32_t i = 0; i < aLength; ++i) {
+    if (SSL_CipherPrefSet(mFD, aCipherSuites[i], true) != SECSuccess) {
+      return mozilla::psm::GetXPCOMFromNSSError(PR_GetError());
+    }
+  }
+
   return NS_OK;
 }
 

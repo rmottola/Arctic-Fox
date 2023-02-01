@@ -30,25 +30,10 @@ XPCOMUtils.defineLazyGetter(this, "RIL", function () {
   return obj;
 });
 
-// Ril quirk to attach data registration on demand.
-let RILQUIRKS_DATA_REGISTRATION_ON_DEMAND =
-  libcutils.property_get("ro.moz.ril.data_reg_on_demand", "false") == "true";
-
-// Ril quirk to control the uicc/data subscription.
-let RILQUIRKS_SUBSCRIPTION_CONTROL =
-  libcutils.property_get("ro.moz.ril.subscription_control", "false") == "true";
-
 // Ril quirk to always turn the radio off for the client without SIM card
 // except hw default client.
 var RILQUIRKS_RADIO_OFF_WO_CARD =
   libcutils.property_get("ro.moz.ril.radio_off_wo_card", "false") == "true";
-
-// Ril quirk to enable IPv6 protocol/roaming protocol in APN settings.
-let RILQUIRKS_HAVE_IPV6 =
-  libcutils.property_get("ro.moz.ril.ipv6", "false") == "true";
-
-let RILQUIRKS_SIGNAL_EXTRA_INT32 =
-  libcutils.property_get("ro.moz.ril.signal_extra_int", "false") == "true";
 
 const RADIOINTERFACELAYER_CID =
   Components.ID("{2d831c8d-6017-435b-a80c-e5d422810cea}");
@@ -407,7 +392,9 @@ DataCall.prototype = {
   ifname: null,
   addreses: null,
   dnses: null,
-  gateways: null
+  gateways: null,
+  pcscf: null,
+  mtu: -1
 };
 
 function RadioInterfaceLayer() {
@@ -522,23 +509,26 @@ WorkerMessenger.prototype = {
       quirks: {
         callstateExtraUint32:
           libcutils.property_get("ro.moz.ril.callstate_extra_int", "false") === "true",
-        v5Legacy:
-          libcutils.property_get("ro.moz.ril.v5_legacy", "true") === "true",
         requestUseDialEmergencyCall:
           libcutils.property_get("ro.moz.ril.dial_emergency_call", "false") === "true",
         simAppStateExtraFields:
           libcutils.property_get("ro.moz.ril.simstate_extra_field", "false") === "true",
         extraUint2ndCall:
-          libcutils.property_get("ro.moz.ril.extra_int_2nd_call", "false") == "true",
+          libcutils.property_get("ro.moz.ril.extra_int_2nd_call", "false") === "true",
         haveQueryIccLockRetryCount:
-          libcutils.property_get("ro.moz.ril.query_icc_count", "false") == "true",
+          libcutils.property_get("ro.moz.ril.query_icc_count", "false") === "true",
         sendStkProfileDownload:
-          libcutils.property_get("ro.moz.ril.send_stk_profile_dl", "false") == "true",
+          libcutils.property_get("ro.moz.ril.send_stk_profile_dl", "false") === "true",
         smscAddressFormat:
           libcutils.property_get("ro.moz.ril.smsc_address_format", "text"),
-        dataRegistrationOnDemand: RILQUIRKS_DATA_REGISTRATION_ON_DEMAND,
-        subscriptionControl: RILQUIRKS_SUBSCRIPTION_CONTROL,
-        signalExtraInt: RILQUIRKS_SIGNAL_EXTRA_INT32
+        dataRegistrationOnDemand:
+          libcutils.property_get("ro.moz.ril.data_reg_on_demand", "false") === "true",
+        subscriptionControl:
+          libcutils.property_get("ro.moz.ril.subscription_control", "false") === "true",
+        signalExtraInt:
+          libcutils.property_get("ro.moz.ril.signal_extra_int", "false") === "true",
+        availableNetworkExtraStr:
+          libcutils.property_get("ro.moz.ril.avlbl_nw_extra_str", "false") === "true",
       }
     };
 
@@ -777,6 +767,13 @@ RadioInterface.prototype = {
         break;
       case "otastatuschange":
         gMobileConnectionService.notifyOtaStatusChanged(this.clientId, message.status);
+        break;
+      case "deviceidentitieschange":
+        gMobileConnectionService.notifyDeviceIdentitiesChanged(this.clientId,
+                                                               message.deviceIdentities.imei,
+                                                               message.deviceIdentities.imeisv,
+                                                               message.deviceIdentities.esn,
+                                                               message.deviceIdentities.meid);
         break;
       case "radiostatechange":
         // gRadioEnabledController should know the radio state for each client,

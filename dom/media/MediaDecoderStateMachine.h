@@ -107,8 +107,8 @@ class AudioSegment;
 class DecodedStream;
 class TaskQueue;
 
-extern PRLogModuleInfo* gMediaDecoderLog;
-extern PRLogModuleInfo* gMediaSampleLog;
+extern LazyLogModule gMediaDecoderLog;
+extern LazyLogModule gMediaSampleLog;
 
 /*
   The state machine class. This manages the decoding and seeking in the
@@ -166,11 +166,6 @@ public:
     nsCOMPtr<nsIRunnable> runnable =
       NS_NewRunnableMethod(this, &MediaDecoderStateMachine::StartBuffering);
     OwnerThread()->Dispatch(runnable.forget());
-  }
-
-  void DispatchNotifyDataArrived()
-  {
-    mReader->DispatchNotifyDataArrived();
   }
 
   // Notifies the state machine that should minimize the number of samples

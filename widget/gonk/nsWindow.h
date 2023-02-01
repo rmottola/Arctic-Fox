@@ -29,6 +29,10 @@ struct InputContext;
 struct InputContextAction;
 }
 
+namespace mozilla {
+class HwcComposer2D;
+}
+
 class nsScreenGonk;
 
 class nsWindow : public nsBaseWidget
@@ -75,7 +79,7 @@ public:
     {
         return NS_OK;
     }
-    virtual mozilla::LayoutDeviceIntPoint WidgetToScreenOffset();
+    virtual LayoutDeviceIntPoint WidgetToScreenOffset();
     void DispatchTouchInputViaAPZ(mozilla::MultiTouchInput& aInput);
     void DispatchTouchEventForAPZ(const mozilla::MultiTouchInput& aInput,
                                   const ScrollableLayerGuid& aGuid,
@@ -118,7 +122,7 @@ public:
 
     virtual uint32_t GetGLFrameBufferFormat() override;
 
-    virtual nsIntRect GetNaturalBoundsUntyped() override;
+    virtual LayoutDeviceIntRect GetNaturalBounds() override;
     virtual bool NeedsPaint();
 
     virtual Composer2D* GetComposer2D() override;
@@ -164,6 +168,8 @@ private:
     nsAutoPtr<mozilla::MultiTouchInput> mSynthesizedTouchInput;
 
     RefPtr<nsScreenGonk> mScreen;
+
+    RefPtr<mozilla::HwcComposer2D> mComposer2D;
 };
 
 #endif /* nsWindow_h */

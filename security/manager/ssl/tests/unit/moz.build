@@ -9,7 +9,10 @@ TEST_DIRS += [
     'test_cert_keyUsage',
     'test_cert_sha1',
     'test_cert_trust',
+    'test_ev_certs',
+    'test_keysize_ev',
     'test_intermediate_basic_usage_constraints',
+    'test_validity',
 ]
 
 if not CONFIG['MOZ_NO_SMART_CARDS']:

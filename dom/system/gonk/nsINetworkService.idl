@@ -157,7 +157,7 @@ interface nsIDhcpRequestCallback : nsISupports
 /**
  * Provide network services.
  */
-[scriptable, uuid(5d6b1877-890a-4c7f-8403-94d57ceba6cf)]
+[scriptable, uuid(8f689d9f-30c0-4809-8bf6-87120e71f3ee)]
 interface nsINetworkService : nsISupports
 {
   const long MODIFY_ROUTE_ADD    = 0;
@@ -310,8 +310,6 @@ interface nsINetworkService : nsISupports
    *        Number of elements in gateways.
    * @param gateways
    *        Default gateways for setting default route.
-   * @param oldInterfaceName
-   *        The previous network interface name.
    *
    * @param callback
    *        Callback to notify the result of setting default route.
@@ -319,7 +317,6 @@ interface nsINetworkService : nsISupports
   void setDefaultRoute(in DOMString interfaceName,
                        in unsigned long count,
                        [array, size_is(count)] in wstring gateways,
-                       in DOMString oldInterfaceName,
                        in nsINativeCommandCallback callback);
 
   /**
@@ -485,9 +482,9 @@ interface nsINetworkService : nsISupports
                         in nsINativeCommandCallback callback);
 
   /**
-   * Reset all connections
+   * Reset all connections on a specified network interface.
    *
-   * @param networkInterface
+   * @param interfaceName
    *        The network interface name which we want to reset.
    *
    * @param callback
@@ -497,25 +494,25 @@ interface nsINetworkService : nsISupports
                         in nsINativeCommandCallback callback);
 
   /**
-   * Create network (required to call prior to any networking operation)
+   * Create network (required to call prior to any networking operation).
    *
-   * @param networkInterface
-   *        The network interface name which we want to reset.
+   * @param interfaceName
+   *        The network interface name which we want to create network for.
    *
    * @param callback
-   *        Callback to notify the result of resetting connections.
+   *        Callback to notify the result of creating network.
    */
   void createNetwork(in DOMString interfaceName,
                      in nsINativeCommandCallback callback);
 
   /**
-   * Destroy network (required to call prior to any networking operation)
+   * Destroy network.
    *
-   * @param networkInterface
-   *        The network interface name which we want to reset.
+   * @param interfaceName
+   *        The network interface name of the network we want to destroy.
    *
    * @param callback
-   *        Callback to notify the result of resetting connections.
+   *        Callback to notify the result of destroying network.
    */
   void destroyNetwork(in DOMString interfaceName,
                       in nsINativeCommandCallback callback);
@@ -532,4 +529,18 @@ interface nsINetworkService : nsISupports
    *
    */
   jsval getNetId(in DOMString interfaceName);
+
+  /**
+   * Set maximum transmission unit on a network interface.
+   *
+   * @param interfaceName
+   *        The name of the network interface that we want to set mtu.
+   * @param mtu
+   *        Size of maximum tranmission unit.
+   *
+   * @param callback
+   *        Callback to notify the result of setting mtu.
+   */
+  void setMtu(in DOMString interfaceName, in long mtu,
+              in nsINativeCommandCallback callback);
 };

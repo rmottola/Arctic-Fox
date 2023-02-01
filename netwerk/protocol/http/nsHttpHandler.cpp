@@ -29,6 +29,7 @@
 #include "nsCOMPtr.h"
 #include "nsNetCID.h"
 #include "prprf.h"
+#include "mozilla/Snprintf.h"
 #include "nsAsyncRedirectVerifyHelper.h"
 #include "nsSocketTransportService2.h"
 #include "nsAlgorithm.h"
@@ -50,6 +51,7 @@
 #include "nsHttpChannelAuthProvider.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
+#include "nsSocketTransportService2.h"
 
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -71,11 +73,6 @@
 //-----------------------------------------------------------------------------
 #include "mozilla/net/HttpChannelChild.h"
 
-
-#ifdef DEBUG
-// defined by the socket transport service while active
-extern PRThread *gSocketThread;
-#endif
 
 #define UA_PREF_PREFIX          "general.useragent."
 #ifdef XP_WIN
@@ -101,6 +98,8 @@ extern PRThread *gSocketThread;
 
 namespace mozilla {
 namespace net {
+
+LazyLogModule gHttpLog("nsHttp");
 
 static nsresult
 NewURI(const nsACString &aSpec,
@@ -213,8 +212,6 @@ nsHttpHandler::nsHttpHandler()
     , mTCPKeepaliveLongLivedIdleTimeS(600)
     , mEnforceH1Framing(FRAMECHECK_BARELY)
 {
-    gHttpLog = PR_NewLogModule("nsHttp");
-
     LOG(("Creating nsHttpHandler [this=%p].\n", this));
 
     RegisterStrongMemoryReporter(new SpdyZlibReporter());
@@ -1788,9 +1785,9 @@ PrepareAcceptLanguages(const char *i_AcceptLanguages, nsACString &o_AcceptLangua
                     qval_str = "%s%s;q=0.%02u";
                 }
 
-                wrote = PR_snprintf(p2, available, qval_str, comma, token, u);
+                wrote = snprintf(p2, available, qval_str, comma, token, u);
             } else {
-                wrote = PR_snprintf(p2, available, "%s%s", comma, token);
+                wrote = snprintf(p2, available, "%s%s", comma, token);
             }
 
             q -= dec;

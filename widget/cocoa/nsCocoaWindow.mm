@@ -99,6 +99,7 @@ static void RollUpPopups()
 
 nsCocoaWindow::nsCocoaWindow()
 : mParent(nullptr)
+, mAncestorLink(nullptr)
 , mWindow(nil)
 , mDelegate(nil)
 , mSheetWindowParent(nil)
@@ -112,6 +113,7 @@ nsCocoaWindow::nsCocoaWindow()
 , mInFullScreenMode(false)
 , mInFullScreenTransition(false)
 , mModal(false)
+, mFakeModal(false)
 , mSupportsNativeFullScreen(false)
 , mInNativeFullScreenMode(false)
 , mIsAnimationSuppressed(false)
@@ -157,6 +159,7 @@ nsCocoaWindow::~nsCocoaWindow()
     } else {
       nsCocoaWindow* childWindow = static_cast<nsCocoaWindow*>(kid);
       childWindow->mParent = nullptr;
+      childWindow->mAncestorLink = mAncestorLink;
       kid = kid->GetPrevSibling();
     }
   }
@@ -271,6 +274,7 @@ nsresult nsCocoaWindow::Create(nsIWidget *aParent,
   Inherited::BaseCreate(aParent, newBounds, aInitData);
 
   mParent = aParent;
+  mAncestorLink = aParent;
 
   // Applications that use native popups don't want us to create popup windows.
   if ((mWindowType == eWindowType_popup) && UseNativePopupWindows())
@@ -506,6 +510,13 @@ NS_IMETHODIMP nsCocoaWindow::Destroy()
     return NS_OK;
   mOnDestroyCalled = true;
 
+  // SetFakeModal(true) is called for non-modal window opened by modal window.
+  // On Cocoa, it needs corresponding SetFakeModal(false) on destroy to restore
+  // ancestor windows' state.
+  if (mFakeModal) {
+    SetFakeModal(false);
+  }
+
   // If we don't hide here we run into problems with panels, this is not ideal.
   // (Bug 891424)
   Show(false);
@@ -605,7 +616,7 @@ NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
   nsAutoreleasePool localPool;
 
   mModal = aState;
-  nsCocoaWindow *aParent = static_cast<nsCocoaWindow*>(mParent);
+  nsCocoaWindow *ancestor = static_cast<nsCocoaWindow*>(mAncestorLink);
   if (aState) {
     ++gXULModalLevel;
     // When a non-sheet window gets "set modal", make the window(s) that it
@@ -616,16 +627,16 @@ NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
     // ShowModal() (each of these event loops is "exclusive", and can't run at
     // the same time as other (similar) event loops).
     if (mWindowType != eWindowType_sheet) {
-      while (aParent) {
-        if (aParent->mNumModalDescendents++ == 0) {
-          NSWindow *aWindow = aParent->GetCocoaWindow();
-          if (aParent->mWindowType != eWindowType_invisible) {
+      while (ancestor) {
+        if (ancestor->mNumModalDescendents++ == 0) {
+          NSWindow *aWindow = ancestor->GetCocoaWindow();
+          if (ancestor->mWindowType != eWindowType_invisible) {
             [[aWindow standardWindowButton:NSWindowCloseButton] setEnabled:NO];
             [[aWindow standardWindowButton:NSWindowMiniaturizeButton] setEnabled:NO];
             [[aWindow standardWindowButton:NSWindowZoomButton] setEnabled:NO];
           }
         }
-        aParent = static_cast<nsCocoaWindow*>(aParent->mParent);
+        ancestor = static_cast<nsCocoaWindow*>(ancestor->mParent);
       }
       [mWindow setLevel:NSModalPanelWindowLevel];
       nsCocoaWindowList *windowList = new nsCocoaWindowList;
@@ -640,17 +651,17 @@ NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
     --gXULModalLevel;
     NS_ASSERTION(gXULModalLevel >= 0, "Mismatched call to nsCocoaWindow::SetModal(false)!");
     if (mWindowType != eWindowType_sheet) {
-      while (aParent) {
-        if (--aParent->mNumModalDescendents == 0) {
-          NSWindow *aWindow = aParent->GetCocoaWindow();
-          if (aParent->mWindowType != eWindowType_invisible) {
+      while (ancestor) {
+        if (--ancestor->mNumModalDescendents == 0) {
+          NSWindow *aWindow = ancestor->GetCocoaWindow();
+          if (ancestor->mWindowType != eWindowType_invisible) {
             [[aWindow standardWindowButton:NSWindowCloseButton] setEnabled:YES];
             [[aWindow standardWindowButton:NSWindowMiniaturizeButton] setEnabled:YES];
             [[aWindow standardWindowButton:NSWindowZoomButton] setEnabled:YES];
           }
         }
-        NS_ASSERTION(aParent->mNumModalDescendents >= 0, "Widget hierarchy changed while modal!");
-        aParent = static_cast<nsCocoaWindow*>(aParent->mParent);
+        NS_ASSERTION(ancestor->mNumModalDescendents >= 0, "Widget hierarchy changed while modal!");
+        ancestor = static_cast<nsCocoaWindow*>(ancestor->mParent);
       }
       if (gGeckoAppModalWindowList) {
         NS_ASSERTION(gGeckoAppModalWindowList->window == this, "Widget hierarchy changed while modal!");
@@ -665,6 +676,12 @@ NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
     }
   }
   return NS_OK;
+}
+
+NS_IMETHODIMP nsCocoaWindow::SetFakeModal(bool aState)
+{
+    mFakeModal = aState;
+    return SetModal(aState);
 }
 
 // Hide or show this window
@@ -1557,7 +1574,7 @@ NS_IMETHODIMP nsCocoaWindow::Resize(double aWidth, double aHeight, bool aRepaint
                   aWidth, aHeight, aRepaint, true);
 }
 
-NS_IMETHODIMP nsCocoaWindow::GetClientBoundsUntyped(nsIntRect &aRect)
+NS_IMETHODIMP nsCocoaWindow::GetClientBounds(mozilla::LayoutDeviceIntRect& aRect)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -1589,19 +1606,20 @@ nsCocoaWindow::UpdateBounds()
   if (mWindow) {
     frame = [mWindow frame];
   }
-  mBounds = nsCocoaUtils::CocoaRectToGeckoRectDevPix(frame, BackingScaleFactor());
+  mBounds = nsCocoaUtils::CocoaRectToGeckoRectDevPix(
+    frame, BackingScaleFactor()).ToUnknownRect();
 }
 
-NS_IMETHODIMP nsCocoaWindow::GetScreenBoundsUntyped(nsIntRect &aRect)
+NS_IMETHODIMP nsCocoaWindow::GetScreenBounds(LayoutDeviceIntRect &aRect)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
 #ifdef DEBUG
-  nsIntRect r = nsCocoaUtils::CocoaRectToGeckoRectDevPix([mWindow frame], BackingScaleFactor());
-  NS_ASSERTION(mWindow && mBounds == r, "mBounds out of sync!");
+  LayoutDeviceIntRect r = nsCocoaUtils::CocoaRectToGeckoRectDevPix([mWindow frame], BackingScaleFactor());
+  NS_ASSERTION(mWindow && mBounds == r.ToUnknownRect(), "mBounds out of sync!");
 #endif
 
-  aRect = mBounds;
+  aRect = LayoutDeviceIntRect::FromUnknownRect(mBounds);
   return NS_OK;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
@@ -1977,27 +1995,28 @@ LayoutDeviceIntPoint nsCocoaWindow::WidgetToScreenOffset()
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
   NSRect rect = NSZeroRect;
-  nsIntRect r;
+  LayoutDeviceIntRect r;
   if (mWindow) {
     rect = [mWindow contentRectForFrameRect:[mWindow frame]];
   }
   r = nsCocoaUtils::CocoaRectToGeckoRectDevPix(rect, BackingScaleFactor());
 
-  return LayoutDeviceIntPoint::FromUnknownPoint(r.TopLeft());
+  return r.TopLeft();
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0,0));
 }
 
-nsIntPoint nsCocoaWindow::GetClientOffsetUntyped()
+LayoutDeviceIntPoint nsCocoaWindow::GetClientOffset()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  nsIntRect clientRect;
-  GetClientBoundsUntyped(clientRect);
+  LayoutDeviceIntRect clientRect;
+  GetClientBounds(clientRect);
 
-  return clientRect.TopLeft() - mBounds.TopLeft();
+  return clientRect.TopLeft() -
+         LayoutDeviceIntPoint::FromUnknownPoint(mBounds.TopLeft());
 
-  NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(nsIntPoint(0, 0));
+  NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0, 0));
 }
 
 LayoutDeviceIntSize
@@ -2009,12 +2028,12 @@ nsCocoaWindow::ClientToWindowSize(const LayoutDeviceIntSize& aClientSize)
     return LayoutDeviceIntSize(0, 0);
 
   CGFloat backingScale = BackingScaleFactor();
-  nsIntRect r(0, 0, aClientSize.width, aClientSize.height);
+  LayoutDeviceIntRect r(0, 0, aClientSize.width, aClientSize.height);
   NSRect rect = nsCocoaUtils::DevPixelsToCocoaPoints(r, backingScale);
 
   NSRect inflatedRect = [mWindow frameRectForContentRect:rect];
   r = nsCocoaUtils::CocoaRectToGeckoRectDevPix(inflatedRect, backingScale);
-  return LayoutDeviceIntSize(r.width, r.height);
+  return r.Size();
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntSize(0,0));
 }
@@ -2283,16 +2302,8 @@ nsCocoaWindow::NotifyIMEInternal(const IMENotification& aIMENotification)
 {
   switch (aIMENotification.mMessage) {
     case NOTIFY_IME_OF_FOCUS:
-      if (mInputContext.IsPasswordEditor()) {
-        TextInputHandler::EnableSecureEventInput();
-      } else {
-        TextInputHandler::EnsureSecureEventInputDisabled();
-      }
       return NS_OK;
     case NOTIFY_IME_OF_BLUR:
-      // When we're going to be deactive, we must disable the secure event input
-      // mode, see the Carbon Event Manager Reference.
-      TextInputHandler::EnsureSecureEventInputDisabled();
       return NS_OK;
     default:
       return NS_ERROR_NOT_IMPLEMENTED;
@@ -2305,16 +2316,6 @@ nsCocoaWindow::SetInputContext(const InputContext& aContext,
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  if (mWindow &&
-      [mWindow firstResponder] == mWindow &&
-      [mWindow isKeyWindow] &&
-      [[NSApplication sharedApplication] isActive]) {
-    if (aContext.IsPasswordEditor()) {
-      TextInputHandler::EnableSecureEventInput();
-    } else {
-      TextInputHandler::EnsureSecureEventInputDisabled();
-    }
-  }
   mInputContext = aContext;
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
@@ -2551,6 +2552,16 @@ nsCocoaWindow::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
   if ([window isSheet])
     [WindowDelegate paintMenubarForWindow:window];
 
+  nsChildView* mainChildView =
+    static_cast<nsChildView*>([[(BaseWindow*)window mainChildView] widget]);
+  if (mainChildView) {
+    if (mainChildView->GetInputContext().IsPasswordEditor()) {
+      TextInputHandler::EnableSecureEventInput();
+    } else {
+      TextInputHandler::EnsureSecureEventInputDisabled();
+    }
+  }
+
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
@@ -2566,6 +2577,8 @@ nsCocoaWindow::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
   NSWindow* window = [aNotification object];
   if ([window isSheet])
     [WindowDelegate paintMenubarForWindow:[NSApp mainWindow]];
+
+  TextInputHandler::EnsureSecureEventInputDisabled();
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -3310,12 +3323,10 @@ static const NSString* kStateCollectionBehavior = @"collectionBehavior";
 // This class also provides us with a pill button to show/hide the toolbar up to 10.6.
 //
 // Drawing the unified gradient in the titlebar and the toolbar works like this:
-// 1) In the style sheet we set the toolbar's -moz-appearance to toolbar or
-//    -moz-mac-unified-toolbar.
+// 1) In the style sheet we set the toolbar's -moz-appearance to toolbar.
 // 2) When the toolbar is visible and we paint the application chrome
 //    window, the array that Gecko passes nsChildView::UpdateThemeGeometries
-//    will contain an entry for the widget type NS_THEME_TOOLBAR or
-//    NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR.
+//    will contain an entry for the widget type NS_THEME_TOOLBAR.
 // 3) nsChildView::UpdateThemeGeometries finds the toolbar frame's ToolbarWindow
 //    and passes the toolbar frame's height to setUnifiedToolbarHeight.
 // 4) If the toolbar height has changed, a titlebar redraw is triggered and the

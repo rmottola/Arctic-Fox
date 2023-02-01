@@ -35,7 +35,7 @@ class nsAutoRefTraits<SpeexResamplerState> : public nsPointerRefTraits<SpeexResa
 
 namespace mozilla {
 
-extern PRLogModuleInfo* gMediaStreamGraphLog;
+extern LazyLogModule gMediaStreamGraphLog;
 
 namespace dom {
   enum class AudioContextOperation;
@@ -1111,11 +1111,6 @@ public:
   };
   virtual void ProcessInput(GraphTime aFrom, GraphTime aTo, uint32_t aFlags) = 0;
   void SetAutofinishImpl(bool aAutofinish) { mAutofinish = aAutofinish; }
-
-  /**
-   * Forward SetTrackEnabled() to the input MediaStream(s) and translate the ID
-   */
-  virtual void ForwardTrackEnabled(TrackID aOutputID, bool aEnabled) {};
 
   // Only valid after MediaStreamGraphImpl::UpdateStreamOrder() has run.
   // A DelayNode is considered to break a cycle and so this will not return

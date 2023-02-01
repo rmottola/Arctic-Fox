@@ -16,6 +16,7 @@ if CONFIG['MOZ_B2G_BT']:
         ]
 
     SOURCES += [
+        'common/BluetoothCommon.cpp',
         'common/BluetoothHidManager.cpp',
         'common/BluetoothInterface.cpp',
         'common/BluetoothProfileController.cpp',
@@ -36,6 +37,8 @@ if CONFIG['MOZ_B2G_BT']:
         'common/webapi/BluetoothGattService.cpp',
         'common/webapi/BluetoothLeDeviceEvent.cpp',
         'common/webapi/BluetoothManager.cpp',
+        'common/webapi/BluetoothMapRequestHandle.cpp',
+        'common/webapi/BluetoothObexAuthHandle.cpp',
         'common/webapi/BluetoothPairingHandle.cpp',
         'common/webapi/BluetoothPairingListener.cpp',
         'common/webapi/BluetoothPbapRequestHandle.cpp',
@@ -83,6 +86,7 @@ if CONFIG['MOZ_B2G_BT']:
                 'bluedroid/BluetoothDaemonSetupInterface.cpp',
                 'bluedroid/BluetoothDaemonSocketInterface.cpp',
                 'bluedroid/BluetoothGattManager.cpp',
+                'bluedroid/BluetoothMapBMessage.cpp',
                 'bluedroid/BluetoothMapFolder.cpp',
                 'bluedroid/BluetoothMapSmsManager.cpp',
                 'bluedroid/BluetoothOppManager.cpp',
@@ -137,6 +141,7 @@ EXPORTS.mozilla.dom.bluetooth.ipc += [
 ]
 EXPORTS.mozilla.dom.bluetooth += [
     'common/BluetoothCommon.h',
+    'common/BluetoothHashKeys.h',
     'common/webapi/BluetoothAdapter.h',
     'common/webapi/BluetoothClassOfDevice.h',
     'common/webapi/BluetoothDevice.h',
@@ -149,6 +154,8 @@ EXPORTS.mozilla.dom.bluetooth += [
     'common/webapi/BluetoothGattService.h',
     'common/webapi/BluetoothLeDeviceEvent.h',
     'common/webapi/BluetoothManager.h',
+    'common/webapi/BluetoothMapRequestHandle.h',
+    'common/webapi/BluetoothObexAuthHandle.h',
     'common/webapi/BluetoothPairingHandle.h',
     'common/webapi/BluetoothPairingListener.h',
     'common/webapi/BluetoothPbapRequestHandle.h'

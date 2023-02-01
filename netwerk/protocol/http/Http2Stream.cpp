@@ -32,11 +32,6 @@
 #include "nsStandardURL.h"
 #include "prnetdb.h"
 
-#ifdef DEBUG
-// defined by the socket transport service while active
-extern PRThread *gSocketThread;
-#endif
-
 namespace mozilla {
 namespace net {
 
@@ -334,8 +329,20 @@ Http2Stream::WriteSegments(nsAHttpSegmentWriter *writer,
     // won't block other streams. but we should not advance the flow control window
     // so that we'll eventually push back on the sender.
 
+    // with tunnels you need to make sure that this is an underlying connction established
+    // that can be meaningfully giving this signal
+    bool doBuffer = true;
+    if (mIsTunnel) {
+      RefPtr<SpdyConnectTransaction> qiTrans(mTransaction->QuerySpdyConnectTransaction());
+      if (qiTrans) {
+        doBuffer = qiTrans->ConnectedReadyForInput();
+      }
+    }
     // stash this data
-    rv = BufferInput(count, countWritten);
+    if (doBuffer) {
+      rv = BufferInput(count, countWritten);
+      LOG3(("Http2Stream::WriteSegments %p Buffered %X %d\n", this, rv, *countWritten));
+    }
   }
   mSegmentWriter = nullptr;
   return rv;

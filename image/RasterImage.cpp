@@ -174,7 +174,6 @@ RasterImage::Init(const char* aMimeType,
 }
 
 //******************************************************************************
-// [notxpcom] void requestRefresh ([const] in TimeStamp aTime);
 NS_IMETHODIMP_(void)
 RasterImage::RequestRefresh(const TimeStamp& aTime)
 {
@@ -298,31 +297,22 @@ RasterImage::LookupFrameInternal(uint32_t aFrameNum,
     return mAnim->GetCompositedFrame(aFrameNum);
   }
 
-  Maybe<SurfaceFlags> alternateFlags;
-  if (IsOpaque()) {
-    // If we're opaque, we can always substitute a frame that was decoded with a
-    // different decode flag for premultiplied alpha, because that can only
-    // matter for frames with transparency.
-    alternateFlags.emplace(ToSurfaceFlags(aFlags) ^
-                             SurfaceFlags::NO_PREMULTIPLY_ALPHA);
-  }
+  SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
 
-  // We don't want any substitution for sync decodes (except the premultiplied
-  // alpha optimization above), so we use SurfaceCache::Lookup in this case.
+  // We don't want any substitution for sync decodes, so we use
+  // SurfaceCache::Lookup in this case.
   if (aFlags & FLAG_SYNC_DECODE) {
     return SurfaceCache::Lookup(ImageKey(this),
                                 RasterSurfaceKey(aSize,
-                                                 ToSurfaceFlags(aFlags),
-                                                 aFrameNum),
-                                alternateFlags);
+                                                 surfaceFlags,
+                                                 aFrameNum));
   }
 
   // We'll return the best match we can find to the requested frame.
   return SurfaceCache::LookupBestMatch(ImageKey(this),
                                        RasterSurfaceKey(aSize,
-                                                        ToSurfaceFlags(aFlags),
-                                                        aFrameNum),
-                                       alternateFlags);
+                                                        surfaceFlags,
+                                                        aFrameNum));
 }
 
 DrawableFrameRef
@@ -331,6 +321,12 @@ RasterImage::LookupFrame(uint32_t aFrameNum,
                          uint32_t aFlags)
 {
   MOZ_ASSERT(NS_IsMainThread());
+
+  // If we're opaque, we don't need to care about premultiplied alpha, because
+  // that can only matter for frames with transparency.
+  if (IsOpaque()) {
+    aFlags &= ~FLAG_DECODE_NO_PREMULTIPLY_ALPHA;
+  }
 
   IntSize requestedSize = CanDownscaleDuringDecode(aSize, aFlags)
                         ? aSize : mSize;
@@ -560,8 +556,6 @@ RasterImage::CopyFrame(uint32_t aWhichFrame, uint32_t aFlags)
 }
 
 //******************************************************************************
-/* [noscript] SourceSurface getFrame(in uint32_t aWhichFrame,
- *                                   in uint32_t aFlags); */
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 RasterImage::GetFrame(uint32_t aWhichFrame,
                       uint32_t aFlags)
@@ -645,17 +639,11 @@ RasterImage::GetCurrentImage(ImageContainer* aContainer, uint32_t aFlags)
     return MakePair(drawResult, RefPtr<layers::Image>());
   }
 
-  CairoImage::Data cairoData;
-  GetWidth(&cairoData.mSize.width);
-  GetHeight(&cairoData.mSize.height);
-  cairoData.mSourceSurface = surface;
+  IntSize size;
+  GetWidth(&size.width);
+  GetHeight(&size.height);
 
-  RefPtr<layers::Image> image =
-    aContainer->CreateImage(ImageFormat::CAIRO_SURFACE);
-  MOZ_ASSERT(image);
-
-  static_cast<CairoImage*>(image.get())->SetData(cairoData);
-
+  RefPtr<layers::Image> image = new layers::CairoImage(size, surface);
   return MakePair(drawResult, Move(image));
 }
 
@@ -824,14 +812,14 @@ RasterImage::OnAddedFrame(uint32_t aNewFrameCount,
   }
 }
 
-void
+bool
 RasterImage::SetMetadata(const ImageMetadata& aMetadata,
                          bool aFromMetadataDecode)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mError) {
-    return;
+    return true;
   }
 
   if (aMetadata.HasSize()) {
@@ -839,7 +827,7 @@ RasterImage::SetMetadata(const ImageMetadata& aMetadata,
     if (size.width < 0 || size.height < 0) {
       NS_WARNING("Image has negative intrinsic size");
       DoError();
-      return;
+      return true;
     }
 
     MOZ_ASSERT(aMetadata.HasOrientation());
@@ -850,7 +838,7 @@ RasterImage::SetMetadata(const ImageMetadata& aMetadata,
       NS_WARNING("Image changed size or orientation on redecode! "
                  "This should not happen!");
       DoError();
-      return;
+      return true;
     }
 
     // Set the size and flag that we have it.
@@ -872,7 +860,7 @@ RasterImage::SetMetadata(const ImageMetadata& aMetadata,
       // discovered that it actually was during the full decode. This is a
       // rare failure that only occurs for corrupt images. To recover, we need
       // to discard all existing surfaces and redecode.
-      RecoverFromInvalidFrames(mSize, DECODE_FLAGS_DEFAULT);
+      return false;
     }
   }
 
@@ -894,6 +882,8 @@ RasterImage::SetMetadata(const ImageMetadata& aMetadata,
     Set("hotspotX", intwrapx);
     Set("hotspotY", intwrapy);
   }
+
+  return true;
 }
 
 NS_IMETHODIMP
@@ -987,7 +977,6 @@ RasterImage::ResetAnimation()
 }
 
 //******************************************************************************
-// [notxpcom] void setAnimationStartTime ([const] in TimeStamp aTime);
 NS_IMETHODIMP_(void)
 RasterImage::SetAnimationStartTime(const TimeStamp& aTime)
 {
@@ -1295,16 +1284,23 @@ RasterImage::Decode(const IntSize& aSize, uint32_t aFlags)
     decoderFlags |= DecoderFlags::IS_REDECODE;
   }
 
+  SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
+  if (IsOpaque()) {
+    // If there's no transparency, it doesn't matter whether we premultiply
+    // alpha or not.
+    surfaceFlags &= ~SurfaceFlags::NO_PREMULTIPLY_ALPHA;
+  }
+
   // Create a decoder.
   RefPtr<Decoder> decoder;
   if (mAnim) {
     decoder = DecoderFactory::CreateAnimationDecoder(mDecoderType, this,
                                                      mSourceBuffer, decoderFlags,
-                                                     ToSurfaceFlags(aFlags));
+                                                     surfaceFlags);
   } else {
     decoder = DecoderFactory::CreateDecoder(mDecoderType, this, mSourceBuffer,
                                             targetSize, decoderFlags,
-                                            ToSurfaceFlags(aFlags),
+                                            surfaceFlags,
                                             mRequestedSampleSize);
   }
 
@@ -1485,15 +1481,6 @@ RasterImage::DrawInternal(DrawableFrameRef&& aFrameRef,
 }
 
 //******************************************************************************
-/* [noscript] void draw(in gfxContext aContext,
- *                      in Filter aFilter,
- *                      [const] in gfxMatrix aUserSpaceToImageSpace,
- *                      [const] in gfxRect aFill,
- *                      [const] in IntRect aSubimage,
- *                      [const] in IntSize aViewportSize,
- *                      [const] in SVGImageContext aSVGContext,
- *                      in uint32_t aWhichFrame,
- *                      in uint32_t aFlags); */
 NS_IMETHODIMP_(DrawResult)
 RasterImage::Draw(gfxContext* aContext,
                   const IntSize& aSize,
@@ -1741,7 +1728,18 @@ RasterImage::FinalizeDecoder(Decoder* aDecoder)
   }
 
   // Record all the metadata the decoder gathered about this image.
-  SetMetadata(aDecoder->GetImageMetadata(), wasMetadata);
+  bool metadataOK = SetMetadata(aDecoder->GetImageMetadata(), wasMetadata);
+  if (!metadataOK) {
+    // This indicates a serious error that requires us to discard all existing
+    // surfaces and redecode to recover. We'll drop the results from this
+    // decoder on the floor, since they aren't valid.
+    aDecoder->TakeProgress();
+    aDecoder->TakeInvalidRect();
+    RecoverFromInvalidFrames(mSize,
+                             FromSurfaceFlags(aDecoder->GetSurfaceFlags()));
+    return;
+  }
+
   MOZ_ASSERT(mError || mHasSize || !aDecoder->HasSize(),
              "SetMetadata should've gotten a size");
 

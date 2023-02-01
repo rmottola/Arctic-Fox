@@ -629,6 +629,9 @@ js::ReshapeForAllocKind(JSContext* cx, Shape* shape, TaggedProto proto,
     RootedId id(cx);
     RootedShape newShape(cx, EmptyShape::getInitialShape(cx, shape->getObjectClass(),
                                                          proto, nfixed, shape->getObjectFlags()));
+    if (!newShape)
+        return nullptr;
+
     for (unsigned i = 0; i < ids.length(); i++) {
         id = ids[i];
 
@@ -1543,6 +1546,11 @@ NewObjectCache::invalidateEntriesForShape(JSContext* cx, HandleShape shape, Hand
 
     Rooted<GlobalObject*> global(cx, shape->compartment()->unsafeUnbarrieredMaybeGlobal());
     RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, clasp, TaggedProto(proto)));
+    if (!group) {
+        purge();
+        cx->recoverFromOutOfMemory();
+        return;
+    }
 
     EntryIndex entry;
     if (lookupGlobal(clasp, global, kind, &entry))

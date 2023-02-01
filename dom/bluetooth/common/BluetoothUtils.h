@@ -24,6 +24,38 @@ class BluetoothReplyRunnable;
 class BluetoothValue;
 
 //
+// Address/String conversion
+//
+
+void
+AddressToString(const BluetoothAddress& aAddress, nsAString& aString);
+
+nsresult
+StringToAddress(const nsAString& aString, BluetoothAddress& aAddress);
+
+//
+// Pin code/string conversion
+//
+
+nsresult
+StringToPinCode(const nsAString& aString, BluetoothPinCode& aPinCode);
+
+//
+// Remote name/string conversion
+//
+
+void
+RemoteNameToString(const BluetoothRemoteName& aRemoteName, nsAString& aString);
+
+//
+// Service name/string conversion
+//
+
+nsresult
+StringToServiceName(const nsAString& aString,
+                    BluetoothServiceName& aServiceName);
+
+//
 // BluetoothUuid <-> uuid string conversion
 //
 

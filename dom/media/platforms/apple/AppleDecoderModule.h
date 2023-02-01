@@ -32,15 +32,18 @@ public:
                      FlushableTaskQueue* aAudioTaskQueue,
                      MediaDataDecoderCallback* aCallback) override;
 
-  bool SupportsMimeType(const nsACString& aMimeType) override;
+  bool SupportsMimeType(const nsACString& aMimeType) const override;
 
   ConversionRequired
   DecoderNeedsConversion(const TrackInfo& aConfig) const override;
 
   static void Init();
 
+  static bool sCanUseHardwareVideoDecoder;
+
 private:
   static bool sInitialized;
+  static bool sIsCoreMediaAvailable;
   static bool sIsVTAvailable;
   static bool sIsVTHWAvailable;
   static bool sIsVDAAvailable;

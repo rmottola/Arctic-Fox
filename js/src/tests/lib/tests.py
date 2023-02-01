@@ -4,6 +4,7 @@
 # metadata, and know how to run the tests and determine failures.
 
 import datetime, os, sys, time
+from contextlib import contextmanager
 from subprocess import Popen, PIPE
 from threading import Thread
 
@@ -45,7 +46,57 @@ def get_jitflags(variant, **kwargs):
         return kwargs['none']
     return JITFLAGS[variant]
 
-class Test(object):
+
+def get_environment_overlay(js_shell):
+    """
+    Build a dict of additional environment variables that must be set to run
+    tests successfully.
+    """
+    env = {
+        # Force Pacific time zone to avoid failures in Date tests.
+        'TZ': 'PST8PDT',
+        # Force date strings to English.
+        'LC_TIME': 'en_US.UTF-8',
+        # Tell the shell to disable crash dialogs on windows.
+        'XRE_NO_WINDOWS_CRASH_DIALOG': '1',
+    }
+    # Add the binary's directory to the library search path so that we find the
+    # nspr and icu we built, instead of the platform supplied ones (or none at
+    # all on windows).
+    if sys.platform.startswith('linux'):
+        env['LD_LIBRARY_PATH'] = os.path.dirname(js_shell)
+    elif sys.platform.startswith('darwin'):
+        env['DYLD_LIBRARY_PATH'] = os.path.dirname(js_shell)
+    elif sys.platform.startswith('win'):
+        env['PATH'] = os.path.dirname(js_shell)
+    return env
+
+
+@contextmanager
+def change_env(env_overlay):
+    # Apply the overlaid environment and record the current state.
+    prior_env = {}
+    for key, val in env_overlay.items():
+        prior_env[key] = os.environ.get(key, None)
+        if 'PATH' in key and key in os.environ:
+            os.environ[key] = '{}{}{}'.format(val, os.pathsep, os.environ[key])
+        else:
+            os.environ[key] = val
+
+    try:
+        # Execute with the new environment.
+        yield
+
+    finally:
+        # Restore the prior environment.
+        for key, val in prior_env.items():
+            if val is not None:
+                os.environ[key] = val
+            else:
+                del os.environ[key]
+
+
+class RefTest(object):
     """A runnable test."""
     def __init__(self, path):
         self.path = path     # str:  path of JS file relative to tests root dir
@@ -59,19 +110,19 @@ class Test(object):
         if path == '':
             return ['-f', 'shell.js']
         head, base = os.path.split(path)
-        return Test.prefix_command(head) \
+        return RefTest.prefix_command(head) \
             + ['-f', os.path.join(path, 'shell.js')]
 
     def get_command(self, prefix):
         dirname, filename = os.path.split(self.path)
         cmd = prefix + self.jitflags + self.options \
-              + Test.prefix_command(dirname) + ['-f', self.path]
+              + RefTest.prefix_command(dirname) + ['-f', self.path]
         return cmd
 
-class TestCase(Test):
+class RefTestCase(RefTest):
     """A test case consisting of a test and an expected result."""
     def __init__(self, path):
-        Test.__init__(self, path)
+        RefTest.__init__(self, path)
         self.enable = True   # bool: True => run test, False => don't run
         self.expect = True   # bool: expected result, True => pass
         self.random = False  # bool: True => ignore output as 'random'

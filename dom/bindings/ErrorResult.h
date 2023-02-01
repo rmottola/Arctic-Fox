@@ -115,6 +115,11 @@ public:
     AssignErrorCode(rv);
   }
 
+  // Duplicate our current state on the given ErrorResult object.  Any existing
+  // errors or messages on the target will be suppressed before cloning.  Our
+  // own error state remains unchanged.
+  void CloneTo(ErrorResult& aRv) const;
+
   // Use SuppressException when you want to suppress any exception that might be
   // on the ErrorResult.  After this call, the ErrorResult will be back a "no
   // exception thrown" state.
@@ -166,6 +171,17 @@ public:
   void ThrowDOMException(nsresult rv, const nsACString& message = EmptyCString());
   void ReportDOMException(JSContext* cx);
   bool IsDOMException() const { return ErrorCode() == NS_ERROR_DOM_DOMEXCEPTION; }
+
+  // Flag on the ErrorResult that whatever needs throwing has been
+  // thrown on the JSContext already and we should not mess with it.
+  void NoteJSContextException() {
+    mResult = NS_ERROR_DOM_EXCEPTION_ON_JSCONTEXT;
+  }
+  // Check whether the ErrorResult says to just throw whatever is on
+  // the JSContext already.
+  bool IsJSContextException() {
+    return ErrorCode() == NS_ERROR_DOM_EXCEPTION_ON_JSCONTEXT;
+  }
 
   // Report a generic error.  This should only be used if we're not
   // some more specific exception type.
@@ -274,6 +290,8 @@ private:
     MOZ_ASSERT(aRv != NS_ERROR_DOM_DOMEXCEPTION, "Use ThrowDOMException()");
     MOZ_ASSERT(!IsDOMException(), "Don't overwrite DOM exceptions");
     MOZ_ASSERT(aRv != NS_ERROR_XPC_NOT_ENOUGH_ARGS, "May need to bring back ThrowNotEnoughArgsError");
+    MOZ_ASSERT(aRv != NS_ERROR_DOM_EXCEPTION_ON_JSCONTEXT,
+               "Use NoteJSContextException");
     mResult = aRv;
   }
 

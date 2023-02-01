@@ -4,6 +4,15 @@
 #include "mozilla/IntegerTypeTraits.h"
 #include "mozilla/unused.h"
 
+#if defined(XP_WIN)
+#include <processthreadsapi.h>
+#include <windows.h>
+#endif // defined(XP_WIN)
+
+#include "jscompartment.h"
+
+#include "gc/Zone.h"
+
 namespace js {
 
 bool
@@ -467,13 +476,13 @@ uint64_t
 PerformanceGroup::recentCycles(uint64_t iteration) const
 {
     MOZ_ASSERT(iteration == iteration_);
-        return recentCycles_;
-    }
+    return recentCycles_;
+}
 
 void
 PerformanceGroup::addRecentCycles(uint64_t iteration, uint64_t cycles)
 {
-    MOZ_ASSERT(iteration == iteration);
+    MOZ_ASSERT(iteration == iteration_);
     recentCycles_ += cycles;
 }
 
@@ -487,7 +496,7 @@ PerformanceGroup::recentTicks(uint64_t iteration) const
 void
 PerformanceGroup::addRecentTicks(uint64_t iteration, uint64_t ticks)
 {
-    MOZ_ASSERT(iteration == iteration);
+    MOZ_ASSERT(iteration == iteration_);
     recentTicks_ += ticks;
 }
 
@@ -502,7 +511,7 @@ PerformanceGroup::recentCPOW(uint64_t iteration) const
 void
 PerformanceGroup::addRecentCPOW(uint64_t iteration, uint64_t CPOW)
 {
-    MOZ_ASSERT(iteration == iteration);
+    MOZ_ASSERT(iteration == iteration_);
     recentCPOW_ += CPOW;
 }
 

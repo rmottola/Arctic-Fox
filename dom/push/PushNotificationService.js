@@ -36,10 +36,11 @@ PushNotificationService.prototype = {
   _xpcom_factory: XPCOMUtils.generateSingletonFactory(PushNotificationService),
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
                                          Ci.nsISupportsWeakReference,
-                                         Ci.nsIPushNotificationService]),
+                                         Ci.nsIPushNotificationService,
+                                         Ci.nsIPushQuotaManager,]),
 
   register: function register(scope, originAttributes) {
-    return PushService._register({
+    return PushService.register({
       scope: scope,
       originAttributes: originAttributes,
       maxQuota: Infinity,
@@ -47,11 +48,11 @@ PushNotificationService.prototype = {
   },
 
   unregister: function unregister(scope, originAttributes) {
-    return PushService._unregister({scope, originAttributes});
+    return PushService.unregister({scope, originAttributes});
   },
 
   registration: function registration(scope, originAttributes) {
-    return PushService._registration({scope, originAttributes});
+    return PushService.registration({scope, originAttributes});
   },
 
   clearAll: function clearAll() {
@@ -74,6 +75,26 @@ PushNotificationService.prototype = {
         }
         break;
     }
+  },
+
+  // nsIPushQuotaManager methods
+
+  notificationForOriginShown: function(origin) {
+    if (!isParent) {
+      Services.cpmm.sendAsyncMessage("Push:NotificationForOriginShown", origin);
+      return;
+    }
+
+    PushService._notificationForOriginShown(origin);
+  },
+
+  notificationForOriginClosed: function(origin) {
+    if (!isParent) {
+      Services.cpmm.sendAsyncMessage("Push:NotificationForOriginClosed", origin);
+      return;
+    }
+
+    PushService._notificationForOriginClosed(origin);
   }
 };
 

@@ -34,6 +34,10 @@
 #include "ClientLayerManager.h"
 #include "FrameLayerBuilder.h"
 
+#ifdef MOZ_ANDROID_APZ
+#include "AndroidBridge.h"
+#endif
+
 using namespace mozilla::dom;
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
@@ -197,29 +201,14 @@ public:
 
   void ClearRenderFrame() { mRenderFrame = nullptr; }
 
-  virtual void SendAsyncScrollDOMEvent(bool aIsRootContent,
-                                       const CSSRect& aContentRect,
-                                       const CSSSize& aContentSize) override
-  {
-    if (MessageLoop::current() != mUILoop) {
-      mUILoop->PostTask(
-        FROM_HERE,
-        NewRunnableMethod(this,
-                          &RemoteContentController::SendAsyncScrollDOMEvent,
-                          aIsRootContent, aContentRect, aContentSize));
-      return;
-    }
-    if (mRenderFrame && aIsRootContent) {
-      TabParent* browser = TabParent::GetFrom(mRenderFrame->Manager());
-      BrowserElementParent::DispatchAsyncScrollEvent(browser, aContentRect,
-                                                     aContentSize);
-    }
-  }
-
   virtual void PostDelayedTask(Task* aTask, int aDelayMs) override
   {
+#ifdef MOZ_ANDROID_APZ
+    AndroidBridge::Bridge()->PostTaskToUiThread(aTask, aDelayMs);
+#else
     (MessageLoop::current() ? MessageLoop::current() : mUILoop)->
        PostDelayedTask(FROM_HERE, aTask, aDelayMs);
+#endif
   }
 
   virtual bool GetTouchSensitiveRegion(CSSRect* aOutRegion) override
@@ -559,7 +548,7 @@ RenderFrameParent::SetTargetAPZC(uint64_t aInputBlockId,
         = &APZCTreeManager::SetTargetAPZC;
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         GetApzcTreeManager(), setTargetApzcFunc,
-        aInputBlockId, nsTArray<ScrollableLayerGuid>(aTargets)));
+        aInputBlockId, aTargets));
   }
 }
 
@@ -570,7 +559,7 @@ RenderFrameParent::SetAllowedTouchBehavior(uint64_t aInputBlockId,
   if (GetApzcTreeManager()) {
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
         GetApzcTreeManager(), &APZCTreeManager::SetAllowedTouchBehavior,
-        aInputBlockId, nsTArray<TouchBehaviorFlags>(aFlags)));
+        aInputBlockId, aFlags));
   }
 }
 

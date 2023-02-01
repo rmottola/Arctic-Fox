@@ -58,6 +58,7 @@ ImageBridgeParent::ImageBridgeParent(MessageLoop* aLoop,
   : mMessageLoop(aLoop)
   , mTransport(aTransport)
   , mSetChildThreadPriority(false)
+  , mStopped(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
   sMainLoop = MessageLoop::current();
@@ -206,8 +207,11 @@ ReleaseImageBridgeParent(ImageBridgeParent* aImageBridgeParent)
 
 bool ImageBridgeParent::RecvStop()
 {
-  // This message just serves as synchronization between the
+  // This message mostly serves as synchronization between the
   // child and parent threads during shutdown.
+
+  // Can't alloc/dealloc shmems from now on.
+  mStopped = true;
 
   // There is one thing that we need to do here: temporarily addref, so that
   // the handling of this sync message can't race with the destruction of
@@ -322,6 +326,7 @@ ImageBridgeParent::NotifyImageComposites(nsTArray<ImageCompositeNotification>& a
     nsAutoTArray<ImageCompositeNotification,1> notifications;
     notifications.AppendElement(aNotifications[i]);
     uint32_t end = i + 1;
+    MOZ_ASSERT(aNotifications[i].imageContainerParent());
     ProcessId pid = aNotifications[i].imageContainerParent()->OtherPid();
     while (end < aNotifications.Length() &&
            aNotifications[end].imageContainerParent()->OtherPid() == pid) {
@@ -380,6 +385,38 @@ void
 ImageBridgeParent::OnChannelConnected(int32_t aPid)
 {
   mCompositorThreadHolder = GetCompositorThreadHolder();
+}
+
+
+bool
+ImageBridgeParent::AllocShmem(size_t aSize,
+                ipc::SharedMemory::SharedMemoryType aType,
+                ipc::Shmem* aShmem)
+{
+  if (mStopped) {
+    return false;
+  }
+  return PImageBridgeParent::AllocShmem(aSize, aType, aShmem);
+}
+
+bool
+ImageBridgeParent::AllocUnsafeShmem(size_t aSize,
+                      ipc::SharedMemory::SharedMemoryType aType,
+                      ipc::Shmem* aShmem)
+{
+  if (mStopped) {
+    return false;
+  }
+  return PImageBridgeParent::AllocUnsafeShmem(aSize, aType, aShmem);
+}
+
+void
+ImageBridgeParent::DeallocShmem(ipc::Shmem& aShmem)
+{
+  if (mStopped) {
+    return;
+  }
+  PImageBridgeParent::DeallocShmem(aShmem);
 }
 
 bool ImageBridgeParent::IsSameProcess() const

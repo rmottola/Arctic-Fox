@@ -203,9 +203,10 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
     hal::GetCurrentScreenConfiguration(&currentConfig);
     orientation = currentConfig.orientation();
   }
-  IntRect targetBounds = mWidget->GetNaturalBoundsUntyped();
+  LayoutDeviceIntRect targetBounds = mWidget->GetNaturalBounds();
   targetBounds.x = targetBounds.y = 0;
-  mForwarder->BeginTransaction(targetBounds, mTargetRotation, orientation);
+  mForwarder->BeginTransaction(targetBounds.ToUnknownRect(), mTargetRotation,
+                               orientation);
 
   // If we're drawing on behalf of a context with async pan/zoom
   // enabled, then the entire buffer of painted layers might be
@@ -690,17 +691,19 @@ ClientLayerManager::SetIsFirstPaint()
 }
 
 TextureClientPool*
-ClientLayerManager::GetTexturePool(SurfaceFormat aFormat)
+ClientLayerManager::GetTexturePool(SurfaceFormat aFormat, TextureFlags aFlags)
 {
   for (size_t i = 0; i < mTexturePools.Length(); i++) {
-    if (mTexturePools[i]->GetFormat() == aFormat) {
+    if (mTexturePools[i]->GetFormat() == aFormat &&
+        mTexturePools[i]->GetFlags() == aFlags) {
       return mTexturePools[i];
     }
   }
 
   mTexturePools.AppendElement(
-      new TextureClientPool(aFormat, IntSize(gfxPlatform::GetPlatform()->GetTileWidth(),
-                                             gfxPlatform::GetPlatform()->GetTileHeight()),
+      new TextureClientPool(aFormat, aFlags,
+                            IntSize(gfxPlatform::GetPlatform()->GetTileWidth(),
+                                    gfxPlatform::GetPlatform()->GetTileHeight()),
                             gfxPrefs::LayersTileMaxPoolSize(),
                             gfxPrefs::LayersTileShrinkPoolTimeout(),
                             mForwarder));
@@ -710,17 +713,20 @@ ClientLayerManager::GetTexturePool(SurfaceFormat aFormat)
 
 void
 ClientLayerManager::ReturnTextureClientDeferred(TextureClient& aClient) {
-  GetTexturePool(aClient.GetFormat())->ReturnTextureClientDeferred(&aClient);
+  GetTexturePool(aClient.GetFormat(),
+                 aClient.GetFlags())->ReturnTextureClientDeferred(&aClient);
 }
 
 void
 ClientLayerManager::ReturnTextureClient(TextureClient& aClient) {
-  GetTexturePool(aClient.GetFormat())->ReturnTextureClient(&aClient);
+  GetTexturePool(aClient.GetFormat(),
+                 aClient.GetFlags())->ReturnTextureClient(&aClient);
 }
 
 void
 ClientLayerManager::ReportClientLost(TextureClient& aClient) {
-  GetTexturePool(aClient.GetFormat())->ReportClientLost();
+  GetTexturePool(aClient.GetFormat(),
+                 aClient.GetFlags())->ReportClientLost();
 }
 
 void

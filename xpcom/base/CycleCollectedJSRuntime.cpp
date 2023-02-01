@@ -59,7 +59,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/dom/BindingUtils.h"
+#include "mozilla/Telemetry.h"
 #include "mozilla/DebuggerOnGCRunnable.h"
 #include "mozilla/dom/DOMJSClass.h"
 #include "mozilla/dom/Promise.h"
@@ -1137,7 +1137,9 @@ CycleCollectedJSRuntime::RunInMetastableState(already_AddRefed<nsIRunnable>&& aR
   data.mRecursionDepth = RecursionDepth();
 
   // There must be an event running to get here.
+#ifndef MOZ_WIDGET_COCOA
   MOZ_ASSERT(data.mRecursionDepth > mBaseRecursionDepth);
+#endif
 
   mMetastableStateEvents.AppendElement(Move(data));
 }
@@ -1204,7 +1206,7 @@ IncrementalFinalizeRunnable::ReleaseNow(bool aLimited)
           break;
         }
       } else {
-        function.run(UINT32_MAX, function.data);
+        while (!function.run(UINT32_MAX, function.data));
         ++mFinalizeFunctionToRun;
       }
     } while (mFinalizeFunctionToRun < mDeferredFinalizeFunctions.Length());
@@ -1227,6 +1229,7 @@ IncrementalFinalizeRunnable::Run()
     return NS_OK;
   }
 
+  TimeStamp start = TimeStamp::Now();
   ReleaseNow(true);
 
   if (mDeferredFinalizeFunctions.Length()) {
@@ -1235,6 +1238,9 @@ IncrementalFinalizeRunnable::Run()
       ReleaseNow(false);
     }
   }
+
+  uint32_t duration = (uint32_t)((TimeStamp::Now() - start).ToMilliseconds());
+  Telemetry::Accumulate(Telemetry::DEFERRED_FINALIZE_ASYNC, duration);
 
   return NS_OK;
 }

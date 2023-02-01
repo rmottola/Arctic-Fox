@@ -265,6 +265,13 @@ public:
     return !(*this == other);
   }
 
+  bool ExactlyEquals(const Matrix& o) const
+  {
+    return _11 == o._11 && _12 == o._12 &&
+           _21 == o._21 && _22 == o._22 &&
+           _31 == o._31 && _32 == o._32;
+  }
+
   /* Verifies that the matrix contains no Infs or NaNs. */
   bool IsFinite() const
   {
@@ -500,20 +507,24 @@ public:
     return *this;
   }
 
-  Point4D ProjectPoint(const Point& aPoint) const {
+  template<class F>
+  Point4DTyped<UnknownUnits, F>
+  ProjectPoint(const PointTyped<UnknownUnits, F>& aPoint) const {
     // Find a value for z that will transform to 0.
 
     // The transformed value of z is computed as:
     // z' = aPoint.x * _13 + aPoint.y * _23 + z * _33 + _43;
 
     // Solving for z when z' = 0 gives us:
-    float z = -(aPoint.x * _13 + aPoint.y * _23 + _43) / _33;
+    F z = -(aPoint.x * _13 + aPoint.y * _23 + _43) / _33;
 
     // Compute the transformed point
-    return *this * Point4D(aPoint.x, aPoint.y, z, 1);
+    return *this * Point4DTyped<UnknownUnits, F>(aPoint.x, aPoint.y, z, 1);
   }
 
-  Rect ProjectRectBounds(const Rect& aRect, const Rect &aClip) const;
+  template<class F>
+  RectTyped<UnknownUnits, F>
+  ProjectRectBounds(const RectTyped<UnknownUnits, F>& aRect, const RectTyped<UnknownUnits, F>& aClip) const;
 
   /**
    * TransformAndClipBounds transforms aRect as a bounding box, while clipping
@@ -998,6 +1009,36 @@ public:
   void Perspective(float aDepth);
 
   Point3D GetNormalVector() const;
+
+  /**
+   * Returns true if the matrix has any transform other
+   * than a straight translation.
+   */
+  bool HasNonTranslation() const {
+    return !gfx::FuzzyEqual(_11, 1.0) || !gfx::FuzzyEqual(_22, 1.0) ||
+           !gfx::FuzzyEqual(_12, 0.0) || !gfx::FuzzyEqual(_21, 0.0) ||
+           !gfx::FuzzyEqual(_13, 0.0) || !gfx::FuzzyEqual(_23, 0.0) ||
+           !gfx::FuzzyEqual(_31, 0.0) || !gfx::FuzzyEqual(_32, 0.0) ||
+           !gfx::FuzzyEqual(_33, 1.0);
+  }
+
+  /**
+   * Returns true if the matrix is anything other than a straight
+   * translation by integers.
+  */
+  bool HasNonIntegerTranslation() const {
+    return HasNonTranslation() ||
+      !gfx::FuzzyEqual(_41, floor(_41 + 0.5)) ||
+      !gfx::FuzzyEqual(_42, floor(_42 + 0.5)) ||
+      !gfx::FuzzyEqual(_43, floor(_43 + 0.5));
+  }
+
+  /**
+   * Return true if the matrix is with perspective (w).
+   */
+  bool HasPerspectiveComponent() const {
+    return _14 != 0 || _24 != 0 || _34 != 0 || _44 != 1;
+  }
 };
 
 class Matrix5x4

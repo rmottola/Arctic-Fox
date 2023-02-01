@@ -1903,6 +1903,39 @@ CheckForApzAwareEventHandlers(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
   }
 }
 
+/**
+ * True if aDescendant participates the context aAncestor participating.
+ */
+static bool
+Participate3DContextFrame(nsIFrame* aAncestor, nsIFrame* aDescendant) {
+  MOZ_ASSERT(aAncestor != aDescendant);
+  MOZ_ASSERT(aAncestor->Extend3DContext());
+  nsIFrame* frame;
+  for (frame = nsLayoutUtils::GetCrossDocParentFrame(aDescendant);
+       frame && aAncestor != frame;
+       frame = nsLayoutUtils::GetCrossDocParentFrame(frame)) {
+    if (!frame->Extend3DContext()) {
+      return false;
+    }
+  }
+  MOZ_ASSERT(frame == aAncestor);
+  return true;
+}
+
+static void
+WrapSeparatorTransform(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
+                       nsRect& aDirtyRect,
+                       nsDisplayList* aSource, nsDisplayList* aTarget,
+                       int aIndex) {
+  if (!aSource->IsEmpty()) {
+    nsDisplayTransform *sepIdItem =
+      new (aBuilder) nsDisplayTransform(aBuilder, aFrame, aSource,
+                                        aDirtyRect, Matrix4x4(), aIndex);
+    sepIdItem->SetNoExtendContext();
+    aTarget->AppendToTop(sepIdItem);
+  }
+}
+
 void
 nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
                                              const nsRect&         aDirtyRect,
@@ -1965,10 +1998,9 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
   nsRect dirtyRectOutsideTransform = dirtyRect;
   if (isTransformed) {
     const nsRect overflow = GetVisualOverflowRectRelativeToSelf();
-    if (aBuilder->IsForPainting() &&
-        (nsDisplayTransform::ShouldPrerenderTransformedContent(aBuilder,
-                                                               this) ||
-         Extend3DContext() || Combines3DTransformWithAncestors())) {
+    if (Extend3DContext() || Combines3DTransformWithAncestors() ||
+        nsDisplayTransform::ShouldPrerenderTransformedContent(aBuilder,
+                                                              this)) {
       dirtyRect = overflow;
     } else {
       if (overflow.IsEmpty()) {
@@ -2162,6 +2194,36 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
    * we find all the correct children.
    */
   if (isTransformed && !resultList.IsEmpty()) {
+    if (!resultList.IsEmpty() && Extend3DContext()) {
+      // Install dummy nsDisplayTransform as a leaf containing
+      // descendants not participating this 3D rendering context.
+      nsDisplayList nonparticipants;
+      nsDisplayList participants;
+      int index = 1;
+
+      while (nsDisplayItem* item = resultList.RemoveBottom()) {
+        if (item->GetType() == nsDisplayItem::TYPE_TRANSFORM &&
+            Participate3DContextFrame(this, item->Frame())) {
+          // The frame of this item participates the same 3D context.
+          WrapSeparatorTransform(aBuilder, this, dirtyRect,
+                                 &nonparticipants, &participants, index++);
+          participants.AppendToTop(item);
+        } else {
+          // The frame of the item doesn't participate the current
+          // context, or has no transform.
+          //
+          // For items participating but not transformed, they are add
+          // to nonparticipants to get a separator layer for handling
+          // clips, if there is, on an intermediate surface.
+          // \see ContainerLayer::DefaultComputeEffectiveTransforms().
+          nonparticipants.AppendToTop(item);
+        }
+      }
+      WrapSeparatorTransform(aBuilder, this, dirtyRect,
+                             &nonparticipants, &participants, index++);
+      resultList.AppendToTop(&participants);
+    }
+
     // Restore clip state now so nsDisplayTransform is clipped properly.
     clipState.Restore();
     // Revert to the dirtyrect coming in from the parent, without our transform
@@ -2178,51 +2240,6 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     nsDisplayTransform *transformItem =
       new (aBuilder) nsDisplayTransform(aBuilder, this, &resultList, dirtyRect);
     resultList.AppendNewToTop(transformItem);
-
-    /*
-     * Create an additional transform item as a separator layer
-     * between current and parent's 3D context if necessary.
-     *
-     * Separator layers avoid improperly exteding 3D context by
-     * children.
-     */
-    {
-      bool needAdditionalTransform = false;
-      if (Extend3DContext()) {
-        if (outerReferenceFrame->Extend3DContext()) {
-          for (nsIFrame *f = nsLayoutUtils::GetCrossDocParentFrame(this);
-               f && f != outerReferenceFrame && !f->IsTransformed();
-               f = nsLayoutUtils::GetCrossDocParentFrame(f)) {
-            if (!f->Extend3DContext()) {
-              // The first one with transform in it's 3D context chain,
-              // and it is different 3D context with the outer reference
-              // frame.
-              needAdditionalTransform = true;
-              break;
-            }
-          }
-        }
-      } else if (outerReferenceFrame->Extend3DContext() &&
-                 outerReferenceFrame != nsLayoutUtils::GetCrossDocParentFrame(this)) {
-        // The content should be transformed and drawn on a buffer,
-        // then tranformed and drawn again for outerReferenceFrame.
-        // So, a separator layer is required.
-        needAdditionalTransform = true;
-      }
-      if (needAdditionalTransform) {
-        nsRect sepDirty = dirtyRectOutsideTransform;
-        // The separator item is with ID transform and is out of this
-        // frame, so it is in the coordination of the outer reference
-        // frame.  Here translate the dirty rect back.
-        sepDirty.MoveBy(toOuterReferenceFrame);
-        nsDisplayTransform *sepIdItem =
-          new (aBuilder) nsDisplayTransform(aBuilder, this, &resultList,
-                                            sepDirty,
-                                            Matrix4x4(), 1);
-        sepIdItem->SetNoExtendContext();
-        resultList.AppendNewToTop(sepIdItem);
-      }
-    }
   }
 
   /* If we're doing VR rendering, then we need to wrap everything in a nsDisplayVR
@@ -4109,23 +4126,30 @@ nsIFrame::InlinePrefISizeData::ForceBreak(nsRenderingContext *aRenderingContext)
             floats_cur_left = 0,
             floats_cur_right = 0;
 
+    WritingMode wm = lineContainer->GetWritingMode();
+
     for (uint32_t i = 0, i_end = floats.Length(); i != i_end; ++i) {
       const FloatInfo& floatInfo = floats[i];
       const nsStyleDisplay *floatDisp = floatInfo.Frame()->StyleDisplay();
-      if (floatDisp->mBreakType == NS_STYLE_CLEAR_LEFT ||
-          floatDisp->mBreakType == NS_STYLE_CLEAR_RIGHT ||
-          floatDisp->mBreakType == NS_STYLE_CLEAR_BOTH) {
+      uint8_t breakType = floatDisp->PhysicalBreakType(wm);
+      if (breakType == NS_STYLE_CLEAR_LEFT ||
+          breakType == NS_STYLE_CLEAR_RIGHT ||
+          breakType == NS_STYLE_CLEAR_BOTH) {
         nscoord floats_cur = NSCoordSaturatingAdd(floats_cur_left,
                                                   floats_cur_right);
-        if (floats_cur > floats_done)
+        if (floats_cur > floats_done) {
           floats_done = floats_cur;
-        if (floatDisp->mBreakType != NS_STYLE_CLEAR_RIGHT)
+        }
+        if (breakType != NS_STYLE_CLEAR_RIGHT) {
           floats_cur_left = 0;
-        if (floatDisp->mBreakType != NS_STYLE_CLEAR_LEFT)
+        }
+        if (breakType != NS_STYLE_CLEAR_LEFT) {
           floats_cur_right = 0;
+        }
       }
 
-      nscoord &floats_cur = floatDisp->mFloats == NS_STYLE_FLOAT_LEFT
+      uint8_t floatStyle = floatDisp->PhysicalFloats(wm);
+      nscoord& floats_cur = floatStyle == NS_STYLE_FLOAT_LEFT
                               ? floats_cur_left : floats_cur_right;
       nscoord floatWidth = floatInfo.Width();
       // Negative-width floats don't change the available space so they
@@ -4283,6 +4307,9 @@ nsFrame::ComputeSize(nsRenderingContext *aRenderingContext,
                      const LogicalSize& aPadding,
                      ComputeSizeFlags aFlags)
 {
+  MOZ_ASSERT(GetIntrinsicRatio() == nsSize(0,0),
+             "Please override this method and call "
+             "nsLayoutUtils::ComputeSizeWithIntrinsicDimensions instead.");
   LogicalSize result = ComputeAutoSize(aRenderingContext, aWM,
                                        aCBSize, aAvailableISize,
                                        aMargin, aBorder, aPadding,
@@ -4304,9 +4331,12 @@ nsFrame::ComputeSize(nsRenderingContext *aRenderingContext,
   const nsStyleCoord* inlineStyleCoord = &stylePos->ISize(aWM);
   const nsStyleCoord* blockStyleCoord = &stylePos->BSize(aWM);
 
-  bool isFlexItem = IsFlexItem();
+  nsIAtom* parentFrameType = GetParent() ? GetParent()->GetType() : nullptr;
+  bool isGridItem = (parentFrameType == nsGkAtoms::gridContainerFrame &&
+                     !(GetStateBits() & NS_FRAME_OUT_OF_FLOW));
+  bool isFlexItem = (parentFrameType == nsGkAtoms::flexContainerFrame &&
+                     !(GetStateBits() & NS_FRAME_OUT_OF_FLOW));
   bool isInlineFlexItem = false;
- 
   if (isFlexItem) {
     // Flex items use their "flex-basis" property in place of their main-size
     // property (e.g. "width") for sizing purposes, *unless* they have
@@ -4348,14 +4378,14 @@ nsFrame::ComputeSize(nsRenderingContext *aRenderingContext,
         *inlineStyleCoord);
   }
 
-  const nsStyleCoord& maxISizeCoord = stylePos->MaxISize(aWM);
-
   // Flex items ignore their min & max sizing properties in their
   // flex container's main-axis.  (Those properties get applied later in
   // the flexbox algorithm.)
+  const nsStyleCoord& maxISizeCoord = stylePos->MaxISize(aWM);
+  nscoord maxISize = NS_UNCONSTRAINEDSIZE;
   if (maxISizeCoord.GetUnit() != eStyleUnit_None &&
       !(isFlexItem && isInlineFlexItem)) {
-    nscoord maxISize =
+    maxISize =
       nsLayoutUtils::ComputeISizeValue(aRenderingContext, this,
         aCBSize.ISize(aWM), boxSizingAdjust.ISize(aWM), boxSizingToMarginEdgeISize,
         maxISizeCoord);
@@ -4363,7 +4393,6 @@ nsFrame::ComputeSize(nsRenderingContext *aRenderingContext,
   }
 
   const nsStyleCoord& minISizeCoord = stylePos->MinISize(aWM);
-
   nscoord minISize;
   if (minISizeCoord.GetUnit() != eStyleUnit_Auto &&
       !(isFlexItem && isInlineFlexItem)) {
@@ -4371,6 +4400,13 @@ nsFrame::ComputeSize(nsRenderingContext *aRenderingContext,
       nsLayoutUtils::ComputeISizeValue(aRenderingContext, this,
         aCBSize.ISize(aWM), boxSizingAdjust.ISize(aWM), boxSizingToMarginEdgeISize,
         minISizeCoord);
+  } else if (MOZ_UNLIKELY(isGridItem)) {
+    // This implements "Implied Minimum Size of Grid Items".
+    // https://drafts.csswg.org/css-grid/#min-size-auto
+    minISize = std::min(maxISize, GetMinISize(aRenderingContext));
+    if (inlineStyleCoord->IsCoordPercentCalcUnit()) {
+      minISize = std::min(minISize, result.ISize(aWM));
+    }
   } else {
     // Treat "min-width: auto" as 0.
     // NOTE: Technically, "auto" is supposed to behave like "min-content" on
@@ -5576,18 +5612,10 @@ nsIFrame::GetPreEffectsVisualOverflowRect() const
   return r ? *r : GetVisualOverflowRectRelativeToSelf();
 }
 
-inline static bool
-FrameMaintainsOverflow(nsIFrame* aFrame)
-{
-  return (aFrame->GetStateBits() &
-          (NS_FRAME_SVG_LAYOUT | NS_FRAME_IS_NONDISPLAY)) !=
-         (NS_FRAME_SVG_LAYOUT | NS_FRAME_IS_NONDISPLAY);
-}
-
 /* virtual */ bool
 nsFrame::UpdateOverflow()
 {
-  MOZ_ASSERT(FrameMaintainsOverflow(this),
+  MOZ_ASSERT(FrameMaintainsOverflow(),
              "Non-display SVG do not maintain visual overflow rects");
 
   nsRect rect(nsPoint(0, 0), GetSize());
@@ -7606,7 +7634,7 @@ bool
 nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
                                  nsSize aNewSize, nsSize* aOldSize)
 {
-  NS_ASSERTION(FrameMaintainsOverflow(this),
+  NS_ASSERTION(FrameMaintainsOverflow(),
                "Don't call - overflow rects not maintained on these SVG frames");
 
   nsRect bounds(nsPoint(0, 0), aNewSize);
@@ -7764,7 +7792,7 @@ nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, cons
     nsFrameList::Enumerator childFrames(lists.CurrentList());
     for (; !childFrames.AtEnd(); childFrames.Next()) {
       nsIFrame* child = childFrames.get();
-      if (!FrameMaintainsOverflow(child)) {
+      if (!child->FrameMaintainsOverflow()) {
         continue; // frame does not maintain overflow rects
       }
       if (child->HasPerspective()) {
@@ -7812,7 +7840,7 @@ RecomputePreserve3DChildrenOverflow(nsIFrame* aFrame, const nsRect* aBounds)
     nsFrameList::Enumerator childFrames(lists.CurrentList());
     for (; !childFrames.AtEnd(); childFrames.Next()) {
       nsIFrame* child = childFrames.get();
-      if (!FrameMaintainsOverflow(child)) {
+      if (!child->FrameMaintainsOverflow()) {
         continue; // frame does not maintain overflow rects
       }
       if (child->Extend3DContext()) {

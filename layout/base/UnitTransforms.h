@@ -38,9 +38,10 @@ enum class PixelCastJustification : uint8_t {
   // When an OS event is initially constructed, its reference point is
   // technically in screen pixels, as it has not yet accounted for any
   // asynchronous transforms. This justification is for viewing the initial
-  // reference point as a screen point.
-  LayoutDeviceToScreenForUntransformedEvent,
-  // Similar to LayoutDeviceToScreenForUntransformedEvent, PBrowser handles
+  // reference point as a screen point. The reverse is useful when synthetically
+  // created WidgetEvents need to be converted back to InputData.
+  LayoutDeviceIsScreenForUntransformedEvent,
+  // Similar to LayoutDeviceIsScreenForUntransformedEvent, PBrowser handles
   // some widget/tab dimension information as the OS does -- in screen units.
   LayoutDeviceIsScreenForTabDims
 };
@@ -174,7 +175,8 @@ template <typename TargetUnits, typename SourceUnits>
 static Maybe<gfx::IntPointTyped<TargetUnits>> UntransformTo(const gfx::Matrix4x4& aTransform,
                                                 const gfx::IntPointTyped<SourceUnits>& aPoint)
 {
-  gfx::Point4D point = aTransform.ProjectPoint(aPoint.ToUnknownPoint());
+  gfx::Point p = aPoint.ToUnknownPoint();
+  gfx::Point4D point = aTransform.ProjectPoint(p);
   if (!point.HasPositiveWCoord()) {
     return Nothing();
   }

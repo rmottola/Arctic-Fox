@@ -76,8 +76,16 @@ public:
     nsTArray<ImageMemoryCounter> uncached;
 
     for (uint32_t i = 0; i < mKnownLoaders.Length(); i++) {
-      mKnownLoaders[i]->mChromeCache.EnumerateRead(DoRecordCounter, &chrome);
-      mKnownLoaders[i]->mCache.EnumerateRead(DoRecordCounter, &content);
+      for (auto iter = mKnownLoaders[i]->mChromeCache.Iter(); !iter.Done(); iter.Next()) {
+        imgCacheEntry* entry = iter.UserData();
+        RefPtr<imgRequest> req = entry->GetRequest();
+        RecordCounterForRequest(req, &chrome, !entry->HasNoProxies());
+      }
+      for (auto iter = mKnownLoaders[i]->mCache.Iter(); !iter.Done(); iter.Next()) {
+        imgCacheEntry* entry = iter.UserData();
+        RefPtr<imgRequest> req = entry->GetRequest();
+        RecordCounterForRequest(req, &content, !entry->HasNoProxies());
+      }
       MutexAutoLock lock(mKnownLoaders[i]->mUncachedImagesMutex);
       for (auto iter = mKnownLoaders[i]->mUncachedImages.Iter();
            !iter.Done();
@@ -110,8 +118,29 @@ public:
     size_t n = 0;
     for (uint32_t i = 0; i < imgLoader::sMemReporter->mKnownLoaders.Length();
          i++) {
-      imgLoader::sMemReporter->mKnownLoaders[i]->
-        mCache.EnumerateRead(DoRecordCounterUsedDecoded, &n);
+      for (auto iter = imgLoader::sMemReporter->mKnownLoaders[i]->mCache.Iter();
+           !iter.Done();
+           iter.Next()) {
+        imgCacheEntry* entry = iter.UserData();
+        if (entry->HasNoProxies()) {
+          continue;
+        }
+
+        RefPtr<imgRequest> req = entry->GetRequest();
+        RefPtr<Image> image = req->GetImage();
+        if (!image) {
+          continue;
+        }
+
+        // Both this and EntryImageSizes measure images/content/raster/used/decoded
+        // memory.  This function's measurement is secondary -- the result doesn't
+        // go in the "explicit" tree -- so we use moz_malloc_size_of instead of
+        // ImagesMallocSizeOf to prevent DMD from seeing it reported twice.
+        ImageMemoryCounter counter(image, moz_malloc_size_of, /* aIsUsed = */ true);
+
+        n += counter.Values().DecodedHeap();
+        n += counter.Values().DecodedNonHeap();
+      }
     }
     return n;
   }
@@ -406,17 +435,6 @@ private:
                                    aValue, desc, aData);
   }
 
-  static PLDHashOperator DoRecordCounter(const ImageCacheKey&,
-                                         imgCacheEntry* aEntry,
-                                         void* aUserArg)
-  {
-    RefPtr<imgRequest> req = aEntry->GetRequest();
-    RecordCounterForRequest(req,
-                           static_cast<nsTArray<ImageMemoryCounter>*>(aUserArg),
-                           !aEntry->HasNoProxies());
-    return PL_DHASH_NEXT;
-  }
-
   static void RecordCounterForRequest(imgRequest* aRequest,
                                       nsTArray<ImageMemoryCounter>* aArray,
                                       bool aIsUsed)
@@ -429,33 +447,6 @@ private:
     ImageMemoryCounter counter(image, ImagesMallocSizeOf, aIsUsed);
 
     aArray->AppendElement(Move(counter));
-  }
-
-  static PLDHashOperator DoRecordCounterUsedDecoded(const ImageCacheKey&,
-                                                    imgCacheEntry* aEntry,
-                                                    void* aUserArg)
-  {
-    if (aEntry->HasNoProxies()) {
-      return PL_DHASH_NEXT;
-    }
-
-    RefPtr<imgRequest> req = aEntry->GetRequest();
-    RefPtr<Image> image = req->GetImage();
-    if (!image) {
-      return PL_DHASH_NEXT;
-    }
-
-    // Both this and EntryImageSizes measure images/content/raster/used/decoded
-    // memory.  This function's measurement is secondary -- the result doesn't
-    // go in the "explicit" tree -- so we use moz_malloc_size_of instead of
-    // ImagesMallocSizeOf to prevent DMD from seeing it reported twice.
-    ImageMemoryCounter counter(image, moz_malloc_size_of, /* aIsUsed = */ true);
-
-    auto n = static_cast<size_t*>(aUserArg);
-    *n += counter.Values().DecodedHeap();
-    *n += counter.Values().DecodedNonHeap();
-
-    return PL_DHASH_NEXT;
   }
 };
 
@@ -2054,15 +2045,6 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
     return rv;
 }
 
-// imgIRequest loadImage(in nsIURI aURI,
-//                       in nsIURI aInitialDocumentURL,
-//                       in nsIURI aReferrerURI,
-//                       in nsIPrincipal aLoadingPrincipal,
-//                       in nsILoadGroup aLoadGroup,
-//                       in imgINotificationObserver aObserver,
-//                       in nsISupports aCX,
-//                       in nsLoadFlags aLoadFlags,
-//                       in nsISupports cacheKey);
 nsresult
 imgLoader::LoadImage(nsIURI* aURI,
                      nsIURI* aInitialDocumentURI,
@@ -2343,11 +2325,6 @@ imgLoader::LoadImage(nsIURI* aURI,
   return NS_OK;
 }
 
-/* imgIRequest
-loadImageWithChannelXPCOM(in nsIChannel channel,
-                          in imgINotificationObserver aObserver,
-                          in nsISupports cx,
-                          out nsIStreamListener); */
 NS_IMETHODIMP
 imgLoader::LoadImageWithChannelXPCOM(nsIChannel* channel,
                                      imgINotificationObserver* aObserver,
@@ -2862,8 +2839,6 @@ ProxyListener::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
-                       in nsresult status); */
 NS_IMETHODIMP
 ProxyListener::OnStopRequest(nsIRequest* aRequest,
                              nsISupports* ctxt,
@@ -2878,10 +2853,6 @@ ProxyListener::OnStopRequest(nsIRequest* aRequest,
 
 /** nsIStreamListener methods **/
 
-/* void onDataAvailable (in nsIRequest request, in nsISupports ctxt,
-                         in nsIInputStream inStr,
-                         in unsigned long long sourceOffset,
-                         in unsigned long count); */
 NS_IMETHODIMP
 ProxyListener::OnDataAvailable(nsIRequest* aRequest, nsISupports* ctxt,
                                nsIInputStream* inStr, uint64_t sourceOffset,
@@ -3086,8 +3057,6 @@ imgCacheValidator::OnStartRequest(nsIRequest* aRequest, nsISupports* ctxt)
   return mDestListener->OnStartRequest(aRequest, ctxt);
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt,
-                       in nsresult status); */
 NS_IMETHODIMP
 imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
                                  nsISupports* ctxt,
@@ -3106,10 +3075,6 @@ imgCacheValidator::OnStopRequest(nsIRequest* aRequest,
 /** nsIStreamListener methods **/
 
 
-/* void
-   onDataAvailable (in nsIRequest request, in nsISupports ctxt,
-   in nsIInputStream inStr, in unsigned long long sourceOffset,
-   in unsigned long count); */
 NS_IMETHODIMP
 imgCacheValidator::OnDataAvailable(nsIRequest* aRequest, nsISupports* ctxt,
                                    nsIInputStream* inStr,

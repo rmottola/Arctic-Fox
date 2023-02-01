@@ -300,11 +300,6 @@ private:
   bool mSuspended;
 };
 
-static bool UseAudioChannelService()
-{
-  return Preferences::GetBool("media.useAudioChannelService");
-}
-
 static bool UseAudioChannelAPI()
 {
   return Preferences::GetBool("media.useAudioChannelAPI");
@@ -589,10 +584,6 @@ AudioDestinationNode::SetMozAudioChannelType(AudioChannel aValue, ErrorResult& a
 bool
 AudioDestinationNode::CheckAudioChannelPermissions(AudioChannel aValue)
 {
-  if (!Preferences::GetBool("media.useAudioChannelService")) {
-    return true;
-  }
-
   // Only normal channel doesn't need permission.
   if (aValue == AudioChannel::Normal) {
     return true;
@@ -625,23 +616,33 @@ AudioDestinationNode::CheckAudioChannelPermissions(AudioChannel aValue)
   return perm == nsIPermissionManager::ALLOW_ACTION;
 }
 
-void
+nsresult
 AudioDestinationNode::CreateAudioChannelAgent()
 {
-  if (mIsOffline || !UseAudioChannelService()) {
-    return;
+  if (mIsOffline) {
+    return NS_OK;
   }
 
+  nsresult rv = NS_OK;
   if (mAudioChannelAgent) {
-    mAudioChannelAgent->NotifyStoppedPlaying();
+    rv = mAudioChannelAgent->NotifyStoppedPlaying();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
   }
 
   mAudioChannelAgent = new AudioChannelAgent();
-  mAudioChannelAgent->InitWithWeakCallback(GetOwner(),
+  rv = mAudioChannelAgent->InitWithWeakCallback(GetOwner(),
                                            static_cast<int32_t>(mAudioChannel),
                                            this);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
-  WindowAudioCaptureChanged();
+  rv = WindowAudioCaptureChanged();
+  NS_WARN_IF(NS_FAILED(rv));
+  return rv;
+
 }
 
 void
@@ -731,7 +732,8 @@ AudioDestinationNode::InputMuted(bool aMuted)
 
   float volume = 0.0;
   bool muted = true;
-  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
+  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(nsIAudioChannelAgent::AUDIO_AGENT_NOTIFY,
+                                                         &volume, &muted);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }

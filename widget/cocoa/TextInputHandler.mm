@@ -3221,8 +3221,7 @@ IMEInputHandler::FirstRectForCharacterRange(NSRange& aRange,
   if (!rootWindow || !rootView) {
     return rect;
   }
-  rect = nsCocoaUtils::DevPixelsToCocoaPoints(r.ToUnknownRect(),
-                                              mWidget->BackingScaleFactor());
+  rect = nsCocoaUtils::DevPixelsToCocoaPoints(r, mWidget->BackingScaleFactor());
   rect = [rootView convertRect:rect toView:nil];
   rect.origin = [rootWindow convertBaseToScreen:rect.origin];
 
@@ -3577,19 +3576,6 @@ IMEInputHandler::IsFocused()
   return [window firstResponder] == mView &&
          [window isKeyWindow] &&
          [[NSApplication sharedApplication] isActive];
-
-  NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(false);
-}
-
-bool
-IMEInputHandler::IsOrWouldBeFocused()
-{
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
-
-  NS_ENSURE_TRUE(!Destroyed(), false);
-  NSWindow* window = [mView window];
-  NS_ENSURE_TRUE(window, false);
-  return [window firstResponder] == mView;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(false);
 }

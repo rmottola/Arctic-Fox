@@ -52,8 +52,6 @@ public:
   // essentially, this is a sentinel used to represent an invalid or blank
   // tile.
   TileHost()
-  : x(-1)
-  , y(-1)
   {}
 
   // Constructs a TileHost from a gfxSharedReadLock and TextureHost.
@@ -67,8 +65,6 @@ public:
     , mTextureHostOnWhite(aTextureHostOnWhite)
     , mTextureSource(aSource)
     , mTextureSourceOnWhite(aSourceOnWhite)
-    , x(-1)
-    , y(-1)
   {}
 
   TileHost(const TileHost& o) {
@@ -77,9 +73,7 @@ public:
     mTextureSource = o.mTextureSource;
     mTextureSourceOnWhite = o.mTextureSourceOnWhite;
     mSharedLock = o.mSharedLock;
-    mPreviousSharedLock = o.mPreviousSharedLock;
-    x = o.x;
-    y = o.y;
+    mTilePosition = o.mTilePosition;
   }
   TileHost& operator=(const TileHost& o) {
     if (this == &o) {
@@ -90,9 +84,7 @@ public:
     mTextureSource = o.mTextureSource;
     mTextureSourceOnWhite = o.mTextureSourceOnWhite;
     mSharedLock = o.mSharedLock;
-    mPreviousSharedLock = o.mPreviousSharedLock;
-    x = o.x;
-    y = o.y;
+    mTilePosition = o.mTilePosition;
     return *this;
   }
 
@@ -112,13 +104,6 @@ public:
     }
   }
 
-  void ReadUnlockPrevious() {
-    if (mPreviousSharedLock) {
-      mPreviousSharedLock->ReadUnlock();
-      mPreviousSharedLock = nullptr;
-    }
-  }
-
   void Dump(std::stringstream& aStream) {
     aStream << "TileHost(...)"; // fill in as needed
   }
@@ -129,14 +114,12 @@ public:
   }
 
   RefPtr<gfxSharedReadLock> mSharedLock;
-  RefPtr<gfxSharedReadLock> mPreviousSharedLock;
   CompositableTextureHostRef mTextureHost;
   CompositableTextureHostRef mTextureHostOnWhite;
   mutable CompositableTextureSourceRef mTextureSource;
   mutable CompositableTextureSourceRef mTextureSourceOnWhite;
   // This is not strictly necessary but makes debugging whole lot easier.
-  int x;
-  int y;
+  TileIntPoint mTilePosition;
 };
 
 class TiledLayerBufferComposite
@@ -154,6 +137,9 @@ public:
 
   void Clear();
 
+  void MarkTilesForUnlock();
+  void ProcessDelayedUnlocks();
+
   TileHost GetPlaceholderTile() const { return TileHost(); }
 
   // Stores the absolute resolution of the containing frame, calculated
@@ -167,7 +153,9 @@ public:
   static void RecycleCallback(TextureHost* textureHost, void* aClosure);
 
 protected:
+
   CSSToParentLayerScale2D mFrameResolution;
+  nsTArray<RefPtr<gfxSharedReadLock>> mDelayedUnlocks;
 };
 
 /**
@@ -207,19 +195,24 @@ public:
       TextureHost* host = mTiledBuffer.GetTile(0).mTextureHost;
       if (host) {
         MOZ_ASSERT(!mTiledBuffer.GetTile(0).mTextureHostOnWhite, "Component alpha not supported!");
-        LayerRenderState state = host->GetRenderState();
 
-        // Offset by the distance between the start of the valid (visible) region and the top-left
-        // of the tile.
         gfx::IntPoint offset = mTiledBuffer.GetTileOffset(mTiledBuffer.GetPlacement().TilePosition(0));
 
-        state.SetOffset(offset - GetValidRegion().GetBounds().TopLeft());
-        return host->GetRenderState();
+        // Don't try to use HWC if the content doesn't start at the top-left of the tile.
+        if (offset != GetValidRegion().GetBounds().TopLeft()) {
+          return LayerRenderState();
+        }
+
+        LayerRenderState state = host->GetRenderState();
+        state.SetOffset(offset);
+        return state;
       }
     }
     return LayerRenderState();
   }
 
+  // Generate effect for layerscope when using hwc.
+  virtual already_AddRefed<TexturedEffect> GenEffect(const gfx::Filter& aFilter) override;
 
   virtual bool UpdateThebes(const ThebesBufferData& aData,
                             const nsIntRegion& aUpdated,

@@ -4,13 +4,6 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-[NoInterfaceObject]
-interface IterableIterator
-{
-  [Throws]
-  object next();
-};
-
 dictionary IterableKeyOrValueResult {
   any value;
   boolean done = false;

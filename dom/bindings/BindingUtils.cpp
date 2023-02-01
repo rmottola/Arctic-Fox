@@ -135,6 +135,12 @@ ThrowMethodFailed(JSContext* cx, ErrorResult& rv)
     // uncatchable exception.
     return false;
   }
+  if (rv.IsJSContextException()) {
+    // Whatever we need to throw is on the JSContext already.  We
+    // can't assert that there is a pending exception on it, though,
+    // because in the uncatchable exception case there won't be one.
+    return false;
+  }
   if (rv.IsErrorWithMessage()) {
     rv.ReportErrorWithMessage(cx);
     return false;
@@ -458,6 +464,38 @@ ErrorResult::operator=(ErrorResult&& aRHS)
   mResult = aRHS.mResult;
   aRHS.mResult = NS_OK;
   return *this;
+}
+
+void
+ErrorResult::CloneTo(ErrorResult& aRv) const
+{
+  aRv.ClearUnionData();
+  aRv.mResult = mResult;
+#ifdef DEBUG
+  aRv.mMightHaveUnreportedJSException = mMightHaveUnreportedJSException;
+#endif
+
+  if (IsErrorWithMessage()) {
+#ifdef DEBUG
+    aRv.mUnionState = HasMessage;
+#endif
+    aRv.mMessage = new Message();
+    aRv.mMessage->mArgs = mMessage->mArgs;
+    aRv.mMessage->mErrorNumber = mMessage->mErrorNumber;
+  } else if (IsDOMException()) {
+#ifdef DEBUG
+    aRv.mUnionState = HasDOMExceptionInfo;
+#endif
+    aRv.mDOMExceptionInfo = new DOMExceptionInfo(mDOMExceptionInfo->mRv,
+                                                 mDOMExceptionInfo->mMessage);
+  } else if (IsJSException()) {
+#ifdef DEBUG
+    aRv.mUnionState = HasJSException;
+#endif
+    JSContext* cx = nsContentUtils::RootingCxForThread();
+    JS::Rooted<JS::Value> exception(cx, mJSException);
+    aRv.ThrowJSException(cx, exception);
+  }
 }
 
 void

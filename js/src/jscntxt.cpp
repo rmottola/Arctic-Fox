@@ -223,9 +223,8 @@ ReportError(JSContext* cx, const char* message, JSErrorReport* reportp,
     }
 
     if (cx->options().autoJSAPIOwnsErrorReporting() || JS_IsRunning(cx)) {
-        if (ErrorToException(cx, message, reportp, callback, userRef)) {
+        if (ErrorToException(cx, message, reportp, callback, userRef))
             return;
-        }
 
         /*
          * The AutoJSAPI error reporter only allows warnings to be reported so
@@ -233,7 +232,6 @@ ReportError(JSContext* cx, const char* message, JSErrorReport* reportp,
          */
         if (cx->options().autoJSAPIOwnsErrorReporting() && !JSREPORT_IS_WARNING(reportp->flags))
             return;
-
     }
 
     /*
@@ -587,7 +585,7 @@ js::ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
         size_t totalArgsLength = 0;
         size_t argLengths[JS::MaxNumErrorArguments]; /* only {0} thru {9} supported */
         argCount = efs->argCount;
-        MOZ_ASSERT(argCount <= JS::MaxNumErrorArguments);
+        MOZ_RELEASE_ASSERT(argCount <= JS::MaxNumErrorArguments);
         if (argCount > 0) {
             /*
              * Gather the arguments into an array, and accumulate
@@ -654,7 +652,7 @@ js::ExpandErrorArgumentsVA(ExclusiveContext* cx, JSErrorCallback callback,
                     if (*fmt == '{') {
                         if (isdigit(fmt[1])) {
                             int d = JS7_UNDEC(fmt[1]);
-                            MOZ_ASSERT(d < argCount);
+                            MOZ_RELEASE_ASSERT(d < argCount);
                             js_strncpy(out, reportp->messageArgs[d],
                                        argLengths[d]);
                             out += argLengths[d];
@@ -824,7 +822,7 @@ js::CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* reportp
 }
 
 bool
-js::ReportIsNotDefined(JSContext *cx, HandleId id)
+js::ReportIsNotDefined(JSContext* cx, HandleId id)
 {
     JSAutoByteString printable;
     if (ValueToPrintable(cx, IdToValue(id), &printable))
@@ -833,7 +831,7 @@ js::ReportIsNotDefined(JSContext *cx, HandleId id)
 }
 
 bool
-js::ReportIsNotDefined(JSContext *cx, HandlePropertyName name)
+js::ReportIsNotDefined(JSContext* cx, HandlePropertyName name)
 {
     RootedId id(cx, NameToId(name));
     return ReportIsNotDefined(cx, id);
@@ -841,7 +839,7 @@ js::ReportIsNotDefined(JSContext *cx, HandlePropertyName name)
 
 bool
 js::ReportIsNullOrUndefined(JSContext* cx, int spindex, HandleValue v,
-                           HandleString fallback)
+                            HandleString fallback)
 {
     bool ok;
 
@@ -896,8 +894,9 @@ js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNum
                           int spindex, HandleValue v, HandleString fallback,
                           const char* arg1, const char* arg2)
 {
-    bool ok;
     UniquePtr<char[], JS::FreePolicy> bytes;
+    bool ok;
+
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount >= 1);
     MOZ_ASSERT(js_ErrorFormatString[errorNumber].argCount <= 3);
     bytes = DecompileValueGenerator(cx, spindex, v, fallback);
@@ -906,7 +905,6 @@ js::ReportValueErrorFlags(JSContext* cx, unsigned flags, const unsigned errorNum
 
     ok = JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage,
                                       nullptr, errorNumber, bytes.get(), arg1, arg2);
-
     return ok;
 }
 

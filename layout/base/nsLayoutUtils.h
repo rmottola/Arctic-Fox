@@ -273,10 +273,13 @@ public:
    *
    * @param aFrame the frame to start at
    * @param aFrameType the frame type to look for
+   * @param aStopAt a frame to stop at after we checked it
    * @return a frame of the given type or nullptr if no
    *         such ancestor exists
    */
-  static nsIFrame* GetClosestFrameOfType(nsIFrame* aFrame, nsIAtom* aFrameType);
+  static nsIFrame* GetClosestFrameOfType(nsIFrame* aFrame,
+                                         nsIAtom* aFrameType,
+                                         nsIFrame* aStopAt = nullptr);
 
   /**
    * Given a frame, search up the frame tree until we find an
@@ -549,17 +552,31 @@ public:
    * returning aItem->ReferenceFrame() when we can't find another animated
    * geometry root.
    */
+  enum {
+    /**
+     * If the AGR_IGNORE_BACKGROUND_ATTACHMENT_FIXED flag is set, then we
+     * do not do any special processing for background attachment fixed items,
+     * instead treating them like any other frame.
+     */
+    AGR_IGNORE_BACKGROUND_ATTACHMENT_FIXED = 0x01
+  };
   static nsIFrame* GetAnimatedGeometryRootFor(nsDisplayItem* aItem,
-                                              nsDisplayListBuilder* aBuilder);
+                                              nsDisplayListBuilder* aBuilder,
+                                              uint32_t aFlags = 0);
+  /**
+   * Version of GetAnimatedGeometryRootFor that can be called in nsDisplayItem
+   * constructor, and only from there. Not valid for transform items, but they
+   * set their AGR in their constructor.
+   */
+  static nsIFrame* GetAnimatedGeometryRootForInit(nsDisplayItem* aItem,
+                                                  nsDisplayListBuilder* aBuilder);
 
   /**
    * Finds the nearest ancestor frame to aFrame that is considered to have (or
-   * will have) "animated geometry". This could be aFrame. Returns
-   * aStopAtAncestor if no closer ancestor is found.
+   * will have) "animated geometry". This could be aFrame.
    */
   static nsIFrame* GetAnimatedGeometryRootForFrame(nsDisplayListBuilder* aBuilder,
-                                                   nsIFrame* aFrame,
-                                                   const nsIFrame* aStopAtAncestor);
+                                                   nsIFrame* aFrame);
 
   /**
     * GetScrollableFrameFor returns the scrollable frame for a scrolled frame
@@ -600,11 +617,18 @@ public:
      */
     SCROLLABLE_ONLY_ASYNC_SCROLLABLE = 0x04,
     /**
-     * If the SCROLLABLE_ALWAYS_MATCH_ROOT flag is set, then return the
-     * root scrollable frame for the root document (in the current process)
-     * if we don't hit anything else.
+     * If the SCROLLABLE_ALWAYS_MATCH_ROOT flag is set, then we will always
+     * return the root scrollable frame for the root document (in the current
+     * process) if we encounter it, whether or not it is async scrollable or
+     * overflow: hidden.
      */
     SCROLLABLE_ALWAYS_MATCH_ROOT = 0x08,
+    /**
+     * If the SCROLLABLE_FIXEDPOS_FINDS_ROOT flag is set, then for fixed-pos
+     * frames that are in the root document (in the current process) return the
+     * root scrollable frame for that document.
+     */
+    SCROLLABLE_FIXEDPOS_FINDS_ROOT = 0x10
   };
   /**
    * GetNearestScrollableFrame locates the first ancestor of aFrame
@@ -1031,9 +1055,11 @@ public:
    * to force rendering to use the widget's layer manager for testing
    * or speed. PAINT_WIDGET_LAYERS must be set if aRenderingContext is null.
    * If PAINT_DOCUMENT_RELATIVE is used, the visible region is interpreted
-   * as being relative to the document.  (Normally it's relative to the CSS
-   * viewport.) PAINT_TO_WINDOW sets painting to window to true on the display
-   * list builder even if we can't tell that we are painting to the window.
+   * as being relative to the document (normally it's relative to the CSS
+   * viewport) and the document is painted as if no scrolling has occured.
+   * Only considered if nsIPresShell::IgnoringViewportScrolling is true.
+   * PAINT_TO_WINDOW sets painting to window to true on the display list
+   * builder even if we can't tell that we are painting to the window.
    * If PAINT_EXISTING_TRANSACTION is set, then BeginTransaction() has already
    * been called on aFrame's widget's layer manager and should not be
    * called again.
@@ -1314,10 +1340,13 @@ public:
    * variations if that's what matches aAxis) and its padding, border and margin
    * in the corresponding dimension.
    */
-  enum IntrinsicISizeType { MIN_ISIZE, PREF_ISIZE };
+  enum class IntrinsicISizeType { MIN_ISIZE, PREF_ISIZE };
+  static const auto MIN_ISIZE = IntrinsicISizeType::MIN_ISIZE;
+  static const auto PREF_ISIZE = IntrinsicISizeType::PREF_ISIZE;
   enum {
     IGNORE_PADDING = 0x01,
     BAIL_IF_REFLOW_NEEDED = 0x02, // returns NS_INTRINSIC_WIDTH_UNKNOWN if so
+    MIN_INTRINSIC_ISIZE = 0x04, // use min-width/height instead of width/height
   };
   static nscoord IntrinsicForAxis(mozilla::PhysicalAxis aAxis,
                                   nsRenderingContext*   aRenderingContext,
@@ -1333,10 +1362,20 @@ public:
                                        uint32_t            aFlags = 0);
 
   /**
-   * Get the contribution of aFrame for the given physical axis.
+   * Get the definite size contribution of aFrame for the given physical axis.
    * This considers the child's 'min-width' property (or 'min-height' if the
    * given axis is vertical), and its padding, border, and margin in the
-   * corresponding dimension.
+   * corresponding dimension.  If the 'min-' property is 'auto' (and 'overflow'
+   * is 'visible') and the corresponding 'width'/'height' is definite it returns
+   * the "specified / transferred size" for:
+   * https://drafts.csswg.org/css-grid/#min-size-auto
+   * Note that any percentage in 'width'/'height' makes it count as indefinite.
+   * If the 'min-' property is 'auto' and 'overflow' is not 'visible', then it
+   * calculates the result as if the 'min-' computed value is zero.
+   * Otherwise, return NS_UNCONSTRAINEDSIZE.
+   *
+   * @note this behavior is specific to Grid/Flexbox (currently) so aFrame
+   * should be a grid/flex item.
    */
   static nscoord MinSizeContributionForAxis(mozilla::PhysicalAxis aAxis,
                                             nsRenderingContext*   aRC,
@@ -2282,6 +2321,12 @@ public:
   static bool UnsetValueEnabled();
 
   /**
+   * Checks whether support for the CSS grid-template-{columns,rows} 'subgrid X'
+   * value is enabled.
+   */
+  static bool IsGridTemplateSubgridValueEnabled();
+
+  /**
    * Checks whether support for the CSS text-align (and -moz-text-align-last)
    * 'true' value is enabled.
    */
@@ -2684,6 +2729,15 @@ public:
                                           nsRect aDisplayPortBase,
                                           nsRect* aOutDisplayport);
 
+  static nsIScrollableFrame* GetAsyncScrollableAncestorFrame(nsIFrame* aTarget);
+
+  /**
+   * Sets a zero margin display port on all proper ancestors of aFrame that
+   * are async scrollable.
+   */
+  static void SetZeroMarginDisplayPortOnAsyncScrollableAncestors(nsIFrame* aFrame,
+                                                                 RepaintMode aRepaintMode);
+
   static bool IsOutlineStyleAutoEnabled();
 
   static void SetBSizeFromFontMetrics(const nsIFrame* aFrame,
@@ -2775,6 +2829,12 @@ public:
    * @param aSel      Selection to check
    */
   static nsRect GetSelectionBoundingRect(mozilla::dom::Selection* aSel);
+
+  /**
+   * Returns true if the given frame is a scrollframe and it has snap points.
+   */
+  static bool IsScrollFrameWithSnapping(nsIFrame* aFrame);
+
 private:
   static uint32_t sFontSizeInflationEmPerLine;
   static uint32_t sFontSizeInflationMinTwips;

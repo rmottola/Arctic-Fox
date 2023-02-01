@@ -18,6 +18,7 @@
 #include "nsIPrefBranch.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIObserverService.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Services.h"
 #include "mozilla/Likely.h"
 #include "mozilla/PublicSSL.h"
@@ -30,11 +31,11 @@
 using namespace mozilla;
 using namespace mozilla::net;
 
-PRLogModuleInfo *gSocketTransportLog = nullptr;
-PRLogModuleInfo *gUDPSocketLog = nullptr;
+LazyLogModule gSocketTransportLog("nsSocketTransport");
+LazyLogModule gUDPSocketLog("UDPSocket");
 
 nsSocketTransportService *gSocketTransportService = nullptr;
-PRThread                 *gSocketThread           = nullptr;
+Atomic<PRThread*, Relaxed> gSocketThread;
 
 #define SEND_BUFFER_PREF "network.tcp.sendbuffer"
 #define KEEPALIVE_ENABLED_PREF "network.tcp.keepalive.enabled"
@@ -112,9 +113,6 @@ nsSocketTransportService::nsSocketTransportService()
     , mTelemetryEnabledPref(false)
     , mProbedMaxCount(false)
 {
-    gSocketTransportLog = PR_NewLogModule("nsSocketTransport");
-    gUDPSocketLog = PR_NewLogModule("UDPSocket");
-
     NS_ASSERTION(NS_IsMainThread(), "wrong thread");
 
     PR_CallOnce(&gMaxCountInitOnce, DiscoverMaxCount);

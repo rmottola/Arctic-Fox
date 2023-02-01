@@ -19,6 +19,7 @@
 
 class nsIRunnable;
 class nsPIDOMWindow;
+struct PRLogModuleInfo;
 
 namespace mozilla {
 namespace dom {
@@ -45,17 +46,22 @@ public:
 
   static bool IsAudioChannelMutedByDefault();
 
+  static PRLogModuleInfo* GetAudioChannelLog();
+
   /**
    * Any audio channel agent that starts playing should register itself to
    * this service, sharing the AudioChannel.
    */
-  void RegisterAudioChannelAgent(AudioChannelAgent* aAgent, AudioChannel aChannel);
+  void RegisterAudioChannelAgent(AudioChannelAgent* aAgent,
+                                 uint32_t aNotifyPlayback,
+                                 AudioChannel aChannel);
 
   /**
    * Any audio channel agent that stops playing should unregister itself to
    * this service.
    */
-  void UnregisterAudioChannelAgent(AudioChannelAgent* aAgent);
+  void UnregisterAudioChannelAgent(AudioChannelAgent* aAgent,
+                                   uint32_t aNotifyPlayback);
 
   /**
    * Return the state to indicate this audioChannel for his window should keep
@@ -139,6 +145,8 @@ private:
   AudioChannelService();
   ~AudioChannelService();
 
+  static void CreateServiceIfNeeded();
+
   /**
    * Shutdown the singleton.
    */
@@ -170,7 +178,10 @@ private:
   {
     explicit AudioChannelWindow(uint64_t aWindowID)
       : mWindowID(aWindowID)
-    {}
+    {
+      // Workaround for bug1183033, system channel type can always playback.
+      mChannels[(int16_t)AudioChannel::System].mMuted = false;
+    }
 
     uint64_t mWindowID;
     AudioChannelConfig mChannels[NUMBER_OF_AUDIO_CHANNELS];

@@ -221,7 +221,9 @@ ScopeCoordinateFunctionScript(JSScript* script, jsbytecode* pc);
  *     |   |   |
  *     |   |  DeclEnvObject         Holds name of recursive/needsCallObject named lambda
  *     |   |
- *     |  CallObject                Scope of entire function or strict eval
+ *     |  LexicalScopeBase          Shared base for function and modules scopes
+ *     |   |   |
+ *     |   |  CallObject            Scope of entire function or strict eval
  *     |   |
  *     |  ModuleEnvironmentObject   Module top-level scope on run-time scope chain
  *     |
@@ -287,16 +289,42 @@ class ScopeObject : public NativeObject
     }
 };
 
-class CallObject : public ScopeObject
+class LexicalScopeBase : public ScopeObject
+{
+  protected:
+    inline void initRemainingSlotsToUninitializedLexicals(uint32_t begin);
+    inline void initAliasedLexicalsToThrowOnTouch(JSScript* script);
+
+  public:
+    /* Get/set the aliased variable referred to by 'fi'. */
+    const Value& aliasedVar(AliasedFormalIter fi) {
+        return getSlot(fi.scopeSlot());
+    }
+    inline void setAliasedVar(JSContext* cx, AliasedFormalIter fi, PropertyName* name,
+                              const Value& v);
+
+    /*
+     * When an aliased var (var accessed by nested closures) is also aliased by
+     * the arguments object, it must of course exist in one canonical location
+     * and that location is always the CallObject. For this to work, the
+     * ArgumentsObject stores special MagicValue in its array for forwarded-to-
+     * CallObject variables. This MagicValue's payload is the slot of the
+     * CallObject to access.
+     */
+    const Value& aliasedVarFromArguments(const Value& argsValue) {
+        return getSlot(ArgumentsObject::SlotFromMagicScopeSlotValue(argsValue));
+    }
+    inline void setAliasedVarFromArguments(JSContext* cx, const Value& argsValue, jsid id,
+                                           const Value& v);
+};
+
+class CallObject : public LexicalScopeBase
 {
   protected:
     static const uint32_t CALLEE_SLOT = 1;
 
     static CallObject*
     create(JSContext* cx, HandleScript script, HandleObject enclosing, HandleFunction callee);
-
-    inline void initRemainingSlotsToUninitializedLexicals(uint32_t begin);
-    inline void initAliasedLexicalsToThrowOnTouch(JSScript* script);
 
   public:
     static const Class class_;
@@ -347,27 +375,6 @@ class CallObject : public ScopeObject
         return getFixedSlot(CALLEE_SLOT).toObject().as<JSFunction>();
     }
 
-    /* Get/set the aliased variable referred to by 'bi'. */
-    const Value& aliasedVar(AliasedFormalIter fi) {
-        return getSlot(fi.scopeSlot());
-    }
-    inline void setAliasedVar(JSContext* cx, AliasedFormalIter fi, PropertyName* name,
-                              const Value& v);
-
-    /*
-     * When an aliased var (var accessed by nested closures) is also aliased by
-     * the arguments object, it must of course exist in one canonical location
-     * and that location is always the CallObject. For this to work, the
-     * ArgumentsObject stores special MagicValue in its array for forwarded-to-
-     * CallObject variables. This MagicValue's payload is the slot of the
-     * CallObject to access.
-     */
-    const Value& aliasedVarFromArguments(const Value& argsValue) {
-        return getSlot(ArgumentsObject::SlotFromMagicScopeSlotValue(argsValue));
-    }
-    inline void setAliasedVarFromArguments(JSContext* cx, const Value& argsValue, jsid id,
-                                           const Value& v);
-
     /* For jit access. */
     static size_t offsetOfCallee() {
         return getFixedSlotOffset(CALLEE_SLOT);
@@ -378,12 +385,14 @@ class CallObject : public ScopeObject
     }
 };
 
-class ModuleEnvironmentObject : public CallObject
+class ModuleEnvironmentObject : public LexicalScopeBase
 {
-    static const uint32_t MODULE_SLOT = CallObject::CALLEE_SLOT;
+    static const uint32_t MODULE_SLOT = 1;
 
   public:
     static const Class class_;
+
+    static const uint32_t RESERVED_SLOTS = 2;
 
     static ModuleEnvironmentObject* create(ExclusiveContext* cx, HandleModuleObject module);
     ModuleObject& module();
@@ -391,6 +400,10 @@ class ModuleEnvironmentObject : public CallObject
 
     bool createImportBinding(JSContext* cx, HandleAtom importName, HandleModuleObject module,
                              HandleAtom exportName);
+
+    bool hasImportBinding(HandlePropertyName name);
+
+    bool lookupImport(jsid name, ModuleEnvironmentObject** envOut, Shape** shapeOut);
 
   private:
     static bool lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
@@ -1261,9 +1274,9 @@ JSObject::is<js::NestedScopeObject>() const
 
 template<>
 inline bool
-JSObject::is<js::CallObject>() const
+JSObject::is<js::LexicalScopeBase>() const
 {
-    return getClass() == &js::CallObject::class_ ||
+    return is<js::CallObject>() ||
            is<js::ModuleEnvironmentObject>();
 }
 
@@ -1271,7 +1284,7 @@ template<>
 inline bool
 JSObject::is<js::ScopeObject>() const
 {
-    return is<js::CallObject>() ||
+    return is<js::LexicalScopeBase>() ||
            is<js::DeclEnvObject>() ||
            is<js::NestedScopeObject>() ||
            is<js::RuntimeLexicalErrorObject>() ||
@@ -1342,7 +1355,7 @@ IsStaticGlobalLexicalScope(JSObject* scope)
 inline const Value&
 ScopeObject::aliasedVar(ScopeCoordinate sc)
 {
-    MOZ_ASSERT(is<CallObject>() || is<ClonedBlockObject>());
+    MOZ_ASSERT(is<LexicalScopeBase>() || is<ClonedBlockObject>());
     return getSlot(sc.slot());
 }
 
@@ -1437,6 +1450,21 @@ CreateScopeObjectsForScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
 
 bool HasNonSyntacticStaticScopeChain(JSObject* staticScope);
 uint32_t StaticScopeChainLength(JSObject* staticScope);
+
+ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
+
+bool CheckVarNameConflict(JSContext* cx, Handle<ClonedBlockObject*> lexicalScope,
+                          HandlePropertyName name);
+
+bool CheckLexicalNameConflict(JSContext* cx, Handle<ClonedBlockObject*> lexicalScope,
+                              HandleObject varObj, HandlePropertyName name);
+
+bool CheckGlobalDeclarationConflicts(JSContext* cx, HandleScript script,
+                                     Handle<ClonedBlockObject*> lexicalScope,
+                                     HandleObject varObj);
+
+bool CheckEvalDeclarationConflicts(JSContext* cx, HandleScript script,
+                                   HandleObject scopeChain, HandleObject varObj);
 
 #ifdef DEBUG
 void DumpStaticScopeChain(JSScript* script);

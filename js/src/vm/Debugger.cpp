@@ -7099,7 +7099,7 @@ DebuggerObject_getScript(JSContext* cx, unsigned argc, Value* vp)
     }
 
     RootedFunction fun(cx, &obj->as<JSFunction>());
-    if (fun->isBuiltin()) {
+    if (!fun->isInterpreted()) {
         args.rval().setUndefined();
         return true;
     }
@@ -8014,7 +8014,7 @@ DebuggerEnv_getCallee(JSContext* cx, unsigned argc, Value* vp)
         return true;
 
     JSObject& scope = env->as<DebugScopeObject>().scope();
-    if (!scope.is<CallObject>() || scope.is<ModuleEnvironmentObject>())
+    if (!scope.is<CallObject>())
         return true;
 
     CallObject& callobj = scope.as<CallObject>();

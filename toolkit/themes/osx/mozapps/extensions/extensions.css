@@ -67,39 +67,6 @@
 }
 
 
-/*** notification icons ***/
-
-.warning-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-warning.png");
-  width: 16px;
-  height: 15px;
-  margin: 3px 0;
-}
-
-.error-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-error.png");
-  width: 16px;
-  height: 15px;
-  margin: 3px 0;
-}
-
-.pending-icon,
-.info-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-info-positive.png");
-  width: 16px;
-  height: 15px;
-  margin: 3px 0;
-}
-
-.addon-view[pending="disable"] .pending-icon,
-.addon-view[pending="uninstall"] .pending-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-info-negative.png");
-  width: 16px;
-  height: 15px;
-  margin: 3px 0;
-}
-
-
 /*** view alert boxes ***/
 
 .alert-container {
@@ -244,7 +211,7 @@
   list-style-image: url("chrome://mozapps/skin/extensions/category-searchengines.png");
 }
 #category-extension > .category-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/category-extensions.png");
+  list-style-image: url("chrome://mozapps/skin/extensions/category-extensions.svg");
 }
 #category-service > .category-icon {
   list-style-image: url("chrome://mozapps/skin/extensions/category-service.png");

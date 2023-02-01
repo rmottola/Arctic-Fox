@@ -9,6 +9,7 @@
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/BasePrincipal.h"
+#include "mozilla/Services.h"
 #include "mozilla/unused.h"
 #include "nsPermissionManager.h"
 #include "nsPermission.h"
@@ -19,7 +20,6 @@
 #include "nsTArray.h"
 #include "nsReadableUtils.h"
 #include "nsILineInputStream.h"
-#include "nsIIDNService.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsDirectoryServiceDefs.h"
 #include "prprf.h"
@@ -31,7 +31,6 @@
 #include "nsIScriptSecurityManager.h"
 #include "nsIAppsService.h"
 #include "mozIApplication.h"
-#include "mozIApplicationClearPrivateDataParams.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocument.h"
@@ -42,6 +41,7 @@
 #include "nsIConsoleService.h"
 #include "nsINavHistoryService.h"
 #include "nsToolkitCompsCID.h"
+#include "nsIObserverService.h"
 
 static nsPermissionManager *gPermissionManager = nullptr;
 
@@ -166,39 +166,24 @@ GetNextSubDomainForHost(const nsACString& aHost)
   return subDomain;
 }
 
-class AppClearDataObserver final : public nsIObserver {
-  ~AppClearDataObserver() {}
+class ClearOriginDataObserver final : public nsIObserver {
+  ~ClearOriginDataObserver() {}
 
 public:
   NS_DECL_ISUPPORTS
 
   // nsIObserver implementation.
   NS_IMETHODIMP
-  Observe(nsISupports *aSubject, const char *aTopic, const char16_t *data) override
+  Observe(nsISupports* aSubject, const char* aTopic, const char16_t* aData) override
   {
-    MOZ_ASSERT(!nsCRT::strcmp(aTopic, "webapps-clear-data"));
-
-    nsCOMPtr<mozIApplicationClearPrivateDataParams> params =
-      do_QueryInterface(aSubject);
-    if (!params) {
-      NS_ERROR("'webapps-clear-data' notification's subject should be a mozIApplicationClearPrivateDataParams");
-      return NS_ERROR_UNEXPECTED;
-    }
-
-    uint32_t appId;
-    nsresult rv = params->GetAppId(&appId);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    bool browserOnly;
-    rv = params->GetBrowserOnly(&browserOnly);
-    NS_ENSURE_SUCCESS(rv, rv);
+    MOZ_ASSERT(!nsCRT::strcmp(aTopic, "clear-origin-data"));
 
     nsCOMPtr<nsIPermissionManager> permManager = do_GetService("@mozilla.org/permissionmanager;1");
-    return permManager->RemovePermissionsForApp(appId, browserOnly);
+    return permManager->RemovePermissionsWithAttributes(nsDependentString(aData));
   }
 };
 
-NS_IMPL_ISUPPORTS(AppClearDataObserver, nsIObserver)
+NS_IMPL_ISUPPORTS(ClearOriginDataObserver, nsIObserver)
 
 class MOZ_STACK_CLASS UpgradeHostToOriginHelper {
 public:
@@ -585,10 +570,11 @@ NS_IMETHODIMP DeleteFromMozHostListener::HandleCompletion(uint16_t aReason)
 }
 
 /* static */ void
-nsPermissionManager::AppClearDataObserverInit()
+nsPermissionManager::ClearOriginDataObserverInit()
 {
-  nsCOMPtr<nsIObserverService> observerService = do_GetService("@mozilla.org/observer-service;1");
-  observerService->AddObserver(new AppClearDataObserver(), "webapps-clear-data", /* holdsWeak= */ false);
+  nsCOMPtr<nsIObserverService> observerService =
+    mozilla::services::GetObserverService();
+  observerService->AddObserver(new ClearOriginDataObserver(), "clear-origin-data", /* holdsWeak= */ false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -608,7 +594,8 @@ static const char kPermissionChangeNotification[] = PERM_CHANGE_NOTIFICATION;
 NS_IMPL_ISUPPORTS(nsPermissionManager, nsIPermissionManager, nsIObserver, nsISupportsWeakReference)
 
 nsPermissionManager::nsPermissionManager()
- : mLargestID(0)
+ : mMemoryOnlyDB(false)
+ , mLargestID(0)
  , mIsShuttingDown(false)
 {
 }
@@ -648,18 +635,20 @@ nsPermissionManager::GetXPCOMSingleton()
 nsresult
 nsPermissionManager::Init()
 {
-  nsresult rv;
-
-  mObserverService = do_GetService("@mozilla.org/observer-service;1", &rv);
-  if (NS_SUCCEEDED(rv)) {
-    mObserverService->AddObserver(this, "profile-before-change", true);
-    mObserverService->AddObserver(this, "profile-do-change", true);
-    mObserverService->AddObserver(this, "xpcom-shutdown", true);
-  }
+  // If the 'permissions.memory_only' pref is set to true, then don't write any
+  // permission settings to disk, but keep them in a memory-only database.
+  mMemoryOnlyDB = mozilla::Preferences::GetBool("permissions.memory_only", false);
 
   if (IsChildProcess()) {
     // Stop here; we don't need the DB in the child process
     return FetchPermissions();
+  }
+
+  nsCOMPtr<nsIObserverService> observerService =
+    mozilla::services::GetObserverService();
+  if (observerService) {
+    observerService->AddObserver(this, "profile-before-change", true);
+    observerService->AddObserver(this, "profile-do-change", true);
   }
 
   // ignore failure here, since it's non-fatal (we can run fine without
@@ -680,6 +669,23 @@ nsPermissionManager::RefreshPermission() {
   NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
+}
+
+nsresult
+nsPermissionManager::OpenDatabase(nsIFile* aPermissionsFile)
+{
+  nsresult rv;
+  nsCOMPtr<mozIStorageService> storage = do_GetService(MOZ_STORAGE_SERVICE_CONTRACTID);
+  if (!storage) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  // cache a connection to the hosts database
+  if (mMemoryOnlyDB) {
+    rv = storage->OpenSpecialDatabase("memory", getter_AddRefs(mDBConn));
+  } else {
+    rv = storage->OpenDatabase(aPermissionsFile, getter_AddRefs(mDBConn));
+  }
+  return rv;
 }
 
 nsresult
@@ -705,13 +711,10 @@ nsPermissionManager::InitDB(bool aRemoveFile)
     }
   }
 
-  nsCOMPtr<mozIStorageService> storage = do_GetService(MOZ_STORAGE_SERVICE_CONTRACTID);
-  if (!storage)
-    return NS_ERROR_UNEXPECTED;
-
-  // cache a connection to the hosts database
-  rv = storage->OpenDatabase(permissionsFile, getter_AddRefs(mDBConn));
-  if (rv == NS_ERROR_FILE_CORRUPTED) {
+  rv = OpenDatabase(permissionsFile);
+  if (rv == NS_ERROR_UNEXPECTED) {
+    return rv;
+  } else if (rv == NS_ERROR_FILE_CORRUPTED) {
     LogToConsole(NS_LITERAL_STRING("permissions.sqlite is corrupted! Try again!"));
 
     // Add telemetry probe
@@ -722,7 +725,7 @@ nsPermissionManager::InitDB(bool aRemoveFile)
     NS_ENSURE_SUCCESS(rv, rv);
     LogToConsole(NS_LITERAL_STRING("Corrupted permissions.sqlite has been removed."));
 
-    rv = storage->OpenDatabase(permissionsFile, getter_AddRefs(mDBConn));
+    rv = OpenDatabase(permissionsFile);
     NS_ENSURE_SUCCESS(rv, rv);
     LogToConsole(NS_LITERAL_STRING("OpenDatabase to permissions.sqlite is successful!"));
   }
@@ -740,7 +743,7 @@ nsPermissionManager::InitDB(bool aRemoveFile)
     // Add telemetry probe
     mozilla::Telemetry::Accumulate(mozilla::Telemetry::DEFECTIVE_PERMISSIONS_SQL_REMOVED, 1);
 
-    rv = storage->OpenDatabase(permissionsFile, getter_AddRefs(mDBConn));
+    rv = OpenDatabase(permissionsFile);
     NS_ENSURE_SUCCESS(rv, rv);
     LogToConsole(NS_LITERAL_STRING("OpenDatabase to permissions.sqlite is successful!"));
 
@@ -933,9 +936,6 @@ nsPermissionManager::InitDB(bool aRemoveFile)
       break;
     }
   }
-
-  // make operations on the table asynchronous, for performance
-  mDBConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING("PRAGMA synchronous = OFF"));
 
   // cache frequently used statements (for insertion, deletion, and updating)
   rv = mDBConn->CreateAsyncStatement(NS_LITERAL_CSTRING(
@@ -1759,8 +1759,6 @@ NS_IMETHODIMP nsPermissionManager::Observe(nsISupports *aSubject, const char *aT
   } else if (!nsCRT::strcmp(aTopic, "profile-do-change")) {
     // the profile has already changed; init the db from the new location
     InitDB(false);
-  } else if (!nsCRT::strcmp(aTopic, "xpcom-shutdown")) {
-    mObserverService = nullptr;
   }
 
   return NS_OK;
@@ -1828,35 +1826,20 @@ nsPermissionManager::RemoveAllModifiedSince(int64_t aModificationTime)
 }
 
 NS_IMETHODIMP
-nsPermissionManager::RemovePermissionsForApp(uint32_t aAppId, bool aBrowserOnly)
+nsPermissionManager::RemovePermissionsWithAttributes(const nsAString& aPattern)
 {
   ENSURE_NOT_CHILD_PROCESS;
-  NS_ENSURE_ARG(aAppId != nsIScriptSecurityManager::NO_APP_ID);
-
-  // We begin by removing all the permissions from the DB.
-  // After clearing the DB, we call AddInternal() to make sure that all
-  // processes are aware of this change and the representation of the DB in
-  // memory is updated.
-  // We have to get all permissions associated with an application first
-  // because removing entries from the permissions table while iterating over
-  // it is dangerous.
-
-  nsAutoCString sql;
-  sql.AppendLiteral("DELETE FROM moz_hosts WHERE appId=");
-  sql.AppendInt(aAppId);
-
-  if (aBrowserOnly) {
-    sql.AppendLiteral(" AND isInBrowserElement=1");
+  mozilla::OriginAttributesPattern pattern;
+  if (!pattern.Init(aPattern)) {
+    return NS_ERROR_INVALID_ARG;
   }
 
-  nsCOMPtr<mozIStorageAsyncStatement> removeStmt;
-  nsresult rv = mDBConn->CreateAsyncStatement(sql, getter_AddRefs(removeStmt));
-  NS_ENSURE_SUCCESS(rv, rv);
+  return RemovePermissionsWithAttributes(pattern);
+}
 
-  nsCOMPtr<mozIStoragePendingStatement> pending;
-  rv = removeStmt->ExecuteAsync(nullptr, getter_AddRefs(pending));
-  NS_ENSURE_SUCCESS(rv, rv);
-
+nsresult
+nsPermissionManager::RemovePermissionsWithAttributes(mozilla::OriginAttributesPattern& aPattern)
+{
   nsCOMArray<nsIPermission> permissions;
   for (auto iter = mPermissionTable.Iter(); !iter.Done(); iter.Next()) {
     PermissionHashKey* entry = iter.Get();
@@ -1868,12 +1851,7 @@ nsPermissionManager::RemovePermissionsForApp(uint32_t aAppId, bool aBrowserOnly)
       continue;
     }
 
-    uint32_t appId;
-    bool isInBrowserElement;
-    principal->GetAppId(&appId);
-    principal->GetIsInBrowserElement(&isInBrowserElement);
-
-    if (appId != aAppId || (aBrowserOnly && !isInBrowserElement)) {
+    if (!aPattern.Matches(mozilla::BasePrincipal::Cast(principal)->OriginAttributesRef())) {
       continue;
     }
 
@@ -2033,10 +2011,12 @@ void
 nsPermissionManager::NotifyObservers(nsIPermission   *aPermission,
                                      const char16_t *aData)
 {
-  if (mObserverService)
-    mObserverService->NotifyObservers(aPermission,
-                                      kPermissionChangeNotification,
-                                      aData);
+  nsCOMPtr<nsIObserverService> observerService =
+    mozilla::services::GetObserverService();
+  if (observerService)
+    observerService->NotifyObservers(aPermission,
+                                     kPermissionChangeNotification,
+                                     aData);
 }
 
 nsresult
@@ -2290,19 +2270,6 @@ nsPermissionManager::_DoImport(nsIInputStream *inputStream, mozIStorageConnectio
   return NS_OK;
 }
 
-nsresult
-nsPermissionManager::NormalizeToACE(nsCString &aHost)
-{
-  // lazily init the IDN service
-  if (!mIDNService) {
-    nsresult rv;
-    mIDNService = do_GetService(NS_IDNSERVICE_CONTRACTID, &rv);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  return mIDNService->ConvertUTF8toACE(aHost, aHost);
-}
-
 void
 nsPermissionManager::UpdateDB(OperationType aOp,
                               mozIStorageAsyncStatement* aStmt,
@@ -2510,3 +2477,4 @@ nsPermissionManager::FetchPermissions() {
   }
   return NS_OK;
 }
+

@@ -303,29 +303,65 @@ gfxGDIFont::Initialize()
             mMetrics->maxAdvance = mMetrics->aveCharWidth;
         }
 
-        // Cache the width of a single space.
-        SIZE size;
-        GetTextExtentPoint32W(dc.GetDC(), L" ", 1, &size);
-        mMetrics->spaceWidth = ROUND(size.cx);
+        // For fonts with USE_TYPO_METRICS set in the fsSelection field,
+        // let the OS/2 sTypo* metrics override the previous values.
+        // (see http://www.microsoft.com/typography/otspec/os2.htm#fss)
+        // Using the equivalent values from oMetrics provides inconsistent
+        // results with CFF fonts, so we instead rely on OS2Table.
+        gfxFontEntry::AutoTable os2Table(mFontEntry,
+                                         TRUETYPE_TAG('O','S','/','2'));
+        if (os2Table) {
+            uint32_t len;
+            const OS2Table *os2 =
+                reinterpret_cast<const OS2Table*>(hb_blob_get_data(os2Table,
+                                                                   &len));
+            if (len >= offsetof(OS2Table, sTypoLineGap) + sizeof(int16_t)) {
+                const uint16_t kUseTypoMetricsMask = 1 << 7;
+                if ((uint16_t(os2->fsSelection) & kUseTypoMetricsMask)) {
+                    double ascent = int16_t(os2->sTypoAscender);
+                    double descent = int16_t(os2->sTypoDescender);
+                    double lineGap = int16_t(os2->sTypoLineGap);
+                    mMetrics->maxAscent = ROUND(ascent * mFUnitsConvFactor);
+                    mMetrics->maxDescent = -ROUND(descent * mFUnitsConvFactor);
+                    mMetrics->maxHeight =
+                        mMetrics->maxAscent + mMetrics->maxDescent;
+                    mMetrics->internalLeading =
+                        mMetrics->maxHeight - mMetrics->emHeight;
+                    gfxFloat lineHeight =
+                        ROUND((ascent - descent + lineGap) * mFUnitsConvFactor);
+                    lineHeight = std::max(lineHeight, mMetrics->maxHeight);
+                    mMetrics->externalLeading =
+                        lineHeight - mMetrics->maxHeight;
+                }
+            }
+        }
 
-        // Cache the width of digit zero.
-        // XXX MSDN (http://msdn.microsoft.com/en-us/library/ms534223.aspx)
-        // does not say what the failure modes for GetTextExtentPoint32 are -
-        // is it safe to assume it will fail iff the font has no '0'?
-        if (GetTextExtentPoint32W(dc.GetDC(), L"0", 1, &size)) {
+        WORD glyph;
+        SIZE size;
+        DWORD ret = GetGlyphIndicesW(dc.GetDC(), L" ", 1, &glyph,
+                                     GGI_MARK_NONEXISTING_GLYPHS);
+        if (ret != GDI_ERROR && glyph != 0xFFFF) {
+            mSpaceGlyph = glyph;
+            // Cache the width of a single space.
+            GetTextExtentPoint32W(dc.GetDC(), L" ", 1, &size);
+            mMetrics->spaceWidth = ROUND(size.cx);
+        } else {
+            mMetrics->spaceWidth = mMetrics->aveCharWidth;
+        }
+
+        // Cache the width of digit zero, if available.
+        ret = GetGlyphIndicesW(dc.GetDC(), L"0", 1, &glyph,
+                               GGI_MARK_NONEXISTING_GLYPHS);
+        if (ret != GDI_ERROR && glyph != 0xFFFF) {
+            GetTextExtentPoint32W(dc.GetDC(), L"0", 1, &size);
             mMetrics->zeroOrAveCharWidth = ROUND(size.cx);
         } else {
             mMetrics->zeroOrAveCharWidth = mMetrics->aveCharWidth;
         }
 
-        WORD glyph;
-        DWORD ret = GetGlyphIndicesW(dc.GetDC(), L" ", 1, &glyph,
-                                     GGI_MARK_NONEXISTING_GLYPHS);
-        if (ret != GDI_ERROR && glyph != 0xFFFF) {
-            mSpaceGlyph = glyph;
-        }
-
         SanitizeMetrics(mMetrics, GetFontEntry()->mIsBadUnderlineFont);
+    } else {
+        mFUnitsConvFactor = 0.0; // zero-sized font: all values scale to zero
     }
 
     if (IsSyntheticBold()) {

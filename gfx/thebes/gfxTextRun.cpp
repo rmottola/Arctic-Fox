@@ -1532,11 +1532,13 @@ gfxTextRun::Dump(FILE* aOutput) {
 gfxFontGroup::gfxFontGroup(const FontFamilyList& aFontFamilyList,
                            const gfxFontStyle *aStyle,
                            gfxTextPerfMetrics* aTextPerf,
-                           gfxUserFontSet *aUserFontSet)
+                           gfxUserFontSet *aUserFontSet,
+                           gfxFloat aDevToCssSize)
     : mFamilyList(aFontFamilyList)
     , mStyle(*aStyle)
     , mUnderlineOffset(UNDERLINE_OFFSET_NOT_SET)
     , mHyphenWidth(-1)
+    , mDevToCssSize(aDevToCssSize)
     , mUserFontSet(aUserFontSet)
     , mTextPerf(aTextPerf)
     , mPageLang(gfxPlatformFontList::GetFontPrefLangFor(aStyle->language))
@@ -1619,7 +1621,7 @@ gfxFontGroup::AddPlatformFont(const nsAString& aName,
     // Not known in the user font set ==> check system fonts
     if (!family) {
         gfxPlatformFontList* fontList = gfxPlatformFontList::PlatformFontList();
-        family = fontList->FindFamily(aName, &mStyle);
+        family = fontList->FindFamily(aName, &mStyle, mDevToCssSize);
     }
 
     if (family) {
@@ -1719,6 +1721,7 @@ gfxFontGroup::FamilyFace::CheckState(bool& aSkipDrawing)
             case gfxUserFontEntry::STATUS_FAILED:
                 SetInvalid();
                 // fall-thru to the default case
+                MOZ_FALLTHROUGH;
             default:
                 SetLoading(false);
         }
@@ -1895,7 +1898,8 @@ gfxFontGroup *
 gfxFontGroup::Copy(const gfxFontStyle *aStyle)
 {
     gfxFontGroup *fg =
-        new gfxFontGroup(mFamilyList, aStyle, mTextPerf, mUserFontSet);
+        new gfxFontGroup(mFamilyList, aStyle, mTextPerf,
+                         mUserFontSet, mDevToCssSize);
     return fg;
 }
 
@@ -2136,9 +2140,9 @@ gfxFontGroup::InitTextRun(gfxContext *aContext,
         }
     }
 
-    PRLogModuleInfo *log = (mStyle.systemFont ?
-                            gfxPlatform::GetLog(eGfxLog_textrunui) :
-                            gfxPlatform::GetLog(eGfxLog_textrun));
+    LogModule* log = mStyle.systemFont
+                   ? gfxPlatform::GetLog(eGfxLog_textrunui)
+                   : gfxPlatform::GetLog(eGfxLog_textrun);
 
     // variant fallback handling may end up passing through this twice
     bool redo;
@@ -2945,9 +2949,9 @@ void gfxFontGroup::ComputeRanges(nsTArray<gfxTextRange>& aRanges,
     aRanges[lastRangeIndex].end = aLength;
 
 #ifndef RELEASE_BUILD
-    PRLogModuleInfo *log = (mStyle.systemFont ?
-                            gfxPlatform::GetLog(eGfxLog_textrunui) :
-                            gfxPlatform::GetLog(eGfxLog_textrun));
+    LogModule* log = mStyle.systemFont
+                   ? gfxPlatform::GetLog(eGfxLog_textrunui)
+                   : gfxPlatform::GetLog(eGfxLog_textrun);
 
     if (MOZ_UNLIKELY(MOZ_LOG_TEST(log, LogLevel::Debug))) {
         nsAutoCString lang;

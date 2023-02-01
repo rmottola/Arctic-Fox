@@ -1,67 +1,88 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 const { DOM: dom, createClass, createFactory, PropTypes } = require("devtools/client/shared/vendor/react");
 const { connect } = require("devtools/client/shared/vendor/react-redux");
-const { selectSnapshot, takeSnapshot } = require("./actions/snapshot");
+const { breakdowns } = require("./constants");
+const { toggleRecordingAllocationStacks } = require("./actions/allocations");
+const { setBreakdownAndRefresh } = require("./actions/breakdown");
+const { toggleInvertedAndRefresh } = require("./actions/inverted");
+const { selectSnapshotAndRefresh, takeSnapshotAndCensus } = require("./actions/snapshot");
+const { breakdownNameToSpec, getBreakdownDisplayData } = require("./utils");
 const Toolbar = createFactory(require("./components/toolbar"));
 const List = createFactory(require("./components/list"));
 const SnapshotListItem = createFactory(require("./components/snapshot-list-item"));
-
-const stateModel = {
-  /**
-   * {MemoryFront}
-   * Used to communicate with the platform.
-   */
-  front: PropTypes.any,
-
-  /**
-   * {Array<Snapshot>}
-   * List of references to all snapshots taken
-   */
-  snapshots: PropTypes.arrayOf(PropTypes.shape({
-    id: PropTypes.number.isRequired,
-    snapshotId: PropTypes.string,
-    selected: PropTypes.bool.isRequired,
-    status: PropTypes.oneOf([
-      "start",
-      "done",
-      "error",
-    ]).isRequired,
-  }))
-};
-
+const HeapView = createFactory(require("./components/heap"));
+const { app: appModel } = require("./models");
 
 const App = createClass({
   displayName: "memory-tool",
 
-  propTypes: stateModel,
+  propTypes: appModel,
+
+  getDefaultProps() {
+    return {};
+  },
 
   childContextTypes: {
     front: PropTypes.any,
+    heapWorker: PropTypes.any,
+    toolbox: PropTypes.any,
   },
 
   getChildContext() {
     return {
       front: this.props.front,
+      heapWorker: this.props.heapWorker,
+      toolbox: this.props.toolbox,
     }
   },
 
   render() {
-    let { dispatch, snapshots, front } = this.props;
+    let {
+      dispatch,
+      snapshots,
+      front,
+      heapWorker,
+      breakdown,
+      allocations,
+      inverted,
+      toolbox,
+    } = this.props;
+
+    let selectedSnapshot = snapshots.find(s => s.selected);
+
     return (
-      dom.div({ id: "memory-tool" }, [
+      dom.div({ id: "memory-tool" },
 
         Toolbar({
-          buttons: [{
-            className: "take-snapshot",
-            onClick: () => dispatch(takeSnapshot(front))
-          }]
+          breakdowns: getBreakdownDisplayData(),
+          onTakeSnapshotClick: () => dispatch(takeSnapshotAndCensus(front, heapWorker)),
+          onBreakdownChange: breakdown =>
+            dispatch(setBreakdownAndRefresh(heapWorker, breakdownNameToSpec(breakdown))),
+          onToggleRecordAllocationStacks: () =>
+            dispatch(toggleRecordingAllocationStacks(front)),
+          allocations,
+          inverted,
+          onToggleInverted: () =>
+            dispatch(toggleInvertedAndRefresh(heapWorker))
         }),
 
-        List({
-          itemComponent: SnapshotListItem,
-          items: snapshots,
-          onClick: snapshot => dispatch(selectSnapshot(snapshot))
-        })
-      ])
+        dom.div({ id: "memory-tool-container" },
+          List({
+            itemComponent: SnapshotListItem,
+            items: snapshots,
+            onClick: snapshot => dispatch(selectSnapshotAndRefresh(heapWorker, snapshot))
+          }),
+
+          HeapView({
+            snapshot: selectedSnapshot,
+            onSnapshotClick: () => dispatch(takeSnapshotAndCensus(front, heapWorker)),
+            toolbox
+          })
+        )
+      )
     );
   },
 });
@@ -71,7 +92,7 @@ const App = createClass({
  * and passed to components.
  */
 function mapStateToProps (state) {
-  return { snapshots: state.snapshots };
+  return state;
 }
 
 module.exports = connect(mapStateToProps)(App);

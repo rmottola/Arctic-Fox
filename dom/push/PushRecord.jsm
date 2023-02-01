@@ -9,9 +9,13 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 const Cr = Components.results;
 
+Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "Messaging",
+                                  "resource://gre/modules/Messaging.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
@@ -23,18 +27,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 this.EXPORTED_SYMBOLS = ["PushRecord"];
 
 const prefs = new Preferences("dom.push.");
-
-// History transition types that can fire a `pushsubscriptionchange` event
-// when the user visits a site with expired push registrations. Visits only
-// count if the user sees the origin in the address bar. This excludes embedded
-// resources, downloads, and framed links.
-const QUOTA_REFRESH_TRANSITIONS_SQL = [
-  Ci.nsINavHistoryService.TRANSITION_LINK,
-  Ci.nsINavHistoryService.TRANSITION_TYPED,
-  Ci.nsINavHistoryService.TRANSITION_BOOKMARK,
-  Ci.nsINavHistoryService.TRANSITION_REDIRECT_PERMANENT,
-  Ci.nsINavHistoryService.TRANSITION_REDIRECT_TEMPORARY
-].join(",");
 
 function PushRecord(props) {
   this.pushEndpoint = props.pushEndpoint;
@@ -50,8 +42,15 @@ function PushRecord(props) {
 
 PushRecord.prototype = {
   setQuota(suggestedQuota) {
-    this.quota = (!isNaN(suggestedQuota) && suggestedQuota >= 0) ?
-                 suggestedQuota : prefs.get("maxQuotaPerSubscription");
+    if (!isNaN(suggestedQuota) && suggestedQuota >= 0) {
+      this.quota = suggestedQuota;
+    } else {
+      this.resetQuota();
+    }
+  },
+
+  resetQuota() {
+    this.quota = prefs.get("maxQuotaPerSubscription");
   },
 
   updateQuota(lastVisit) {
@@ -66,25 +65,15 @@ PushRecord.prototype = {
       this.quota = 0;
       return;
     }
-    let currentQuota;
     if (lastVisit > this.lastPush) {
       // If the user visited the site since the last time we received a
       // notification, reset the quota.
       let daysElapsed = (Date.now() - lastVisit) / 24 / 60 / 60 / 1000;
-      currentQuota = Math.min(
+      this.quota = Math.min(
         Math.round(8 * Math.pow(daysElapsed, -0.8)),
         prefs.get("maxQuotaPerSubscription")
       );
-      Services.telemetry.getHistogramById("PUSH_API_QUOTA_RESET_TO").add(currentQuota - 1);
-    } else {
-      // The user hasn't visited the site since the last notification.
-      currentQuota = this.quota;
-    }
-    this.quota = Math.max(currentQuota - 1, 0);
-    // We check for ctime > 0 to skip older records that did not have ctime.
-    if (this.isExpired() && this.ctime > 0) {
-      let duration = Date.now() - this.ctime;
-      Services.telemetry.getHistogramById("PUSH_API_QUOTA_EXPIRATION_TIME").add(duration / 1000);
+      Services.telemetry.getHistogramById("PUSH_API_QUOTA_RESET_TO").add(this.quota);
     }
   },
 
@@ -92,6 +81,15 @@ PushRecord.prototype = {
     this.updateQuota(lastVisit);
     this.pushCount++;
     this.lastPush = Date.now();
+  },
+
+  reduceQuota() {
+    this.quota = Math.max(this.quota - 1, 0);
+    // We check for ctime > 0 to skip older records that did not have ctime.
+    if (this.isExpired() && this.ctime > 0) {
+      let duration = Date.now() - this.ctime;
+      Services.telemetry.getHistogramById("PUSH_API_QUOTA_EXPIRATION_TIME").add(duration / 1000);
+    }
   },
 
   /**
@@ -105,9 +103,34 @@ PushRecord.prototype = {
   getLastVisit() {
     if (!this.quotaApplies() || this.isTabOpen()) {
       // If the registration isn't subject to quota, or the user already
-      // has the site open, skip the Places query.
+      // has the site open, skip expensive database queries.
       return Promise.resolve(Date.now());
     }
+
+    if (AppConstants.MOZ_ANDROID_HISTORY) {
+      return Messaging.sendRequestForResult({
+        type: "History:GetPrePathLastVisitedTimeMilliseconds",
+        prePath: this.uri.prePath,
+      }).then(result => {
+        if (result == 0) {
+          return -Infinity;
+        }
+        return result;
+      });
+    }
+
+    // Places History transition types that can fire a
+    // `pushsubscriptionchange` event when the user visits a site with expired push
+    // registrations. Visits only count if the user sees the origin in the address
+    // bar. This excludes embedded resources, downloads, and framed links.
+    const QUOTA_REFRESH_TRANSITIONS_SQL = [
+      Ci.nsINavHistoryService.TRANSITION_LINK,
+      Ci.nsINavHistoryService.TRANSITION_TYPED,
+      Ci.nsINavHistoryService.TRANSITION_BOOKMARK,
+      Ci.nsINavHistoryService.TRANSITION_REDIRECT_PERMANENT,
+      Ci.nsINavHistoryService.TRANSITION_REDIRECT_TEMPORARY
+    ].join(",");
+
     return PlacesUtils.withConnectionWrapper("PushRecord.getLastVisit", db => {
       // We're using a custom query instead of `nsINavHistoryQueryOptions`
       // because the latter doesn't expose a way to filter by transition type:
@@ -170,6 +193,14 @@ PushRecord.prototype = {
     return permission == Ci.nsIPermissionManager.ALLOW_ACTION;
   },
 
+  quotaChanged() {
+    if (!this.hasPermission()) {
+      return Promise.resolve(false);
+    }
+    return this.getLastVisit()
+      .then(lastVisit => lastVisit > this.lastPush);
+  },
+
   quotaApplies() {
     return Number.isFinite(this.quota);
   },
@@ -178,18 +209,16 @@ PushRecord.prototype = {
     return this.quota === 0;
   },
 
-  toRegistration() {
+  matchesOriginAttributes(pattern) {
+    return ChromeUtils.originAttributesMatchPattern(
+      this.principal.originAttributes, pattern);
+  },
+
+  toSubscription() {
     return {
       pushEndpoint: this.pushEndpoint,
       lastPush: this.lastPush,
       pushCount: this.pushCount,
-      p256dhKey: this.p256dhPublicKey,
-    };
-  },
-
-  toRegister() {
-    return {
-      pushEndpoint: this.pushEndpoint,
       p256dhKey: this.p256dhPublicKey,
     };
   },

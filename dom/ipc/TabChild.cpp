@@ -722,6 +722,9 @@ TabChild::Observe(nsISupports *aSubject,
     // In theory a tabChild should contain just 1 top window, but let's double
     // check it comparing the windowID.
     if (window->WindowID() != windowID) {
+      MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
+              ("TabChild, Observe, different windowID, owner ID = %lld, "
+               "ID from wrapper = %lld", window->WindowID(), windowID));
       return NS_OK;
     }
 
@@ -1811,6 +1814,10 @@ TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event,
   WidgetMouseEvent localEvent(event);
   localEvent.widget = mPuppetWidget;
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
+
+  if (event.mFlags.mHandledByAPZ) {
+    mAPZEventState->ProcessMouseEvent(event, aGuid, aInputBlockId);
+  }
   return true;
 }
 
@@ -2024,7 +2031,8 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
     return true;
   }
 
-  mAPZEventState->ProcessTouchEvent(localEvent, aGuid, aInputBlockId, aApzResponse);
+  mAPZEventState->ProcessTouchEvent(localEvent, aGuid, aInputBlockId,
+      aApzResponse, status);
   return true;
 }
 

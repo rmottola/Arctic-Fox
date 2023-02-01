@@ -24,6 +24,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "SearchSuggestionController",
 
 const INBOUND_MESSAGE = "ContentSearch";
 const OUTBOUND_MESSAGE = INBOUND_MESSAGE;
+const MAX_LOCAL_SUGGESTIONS = 3;
+const MAX_SUGGESTIONS = 6;
 
 /**
  * ContentSearch receives messages named INBOUND_MESSAGE and sends messages
@@ -183,15 +185,9 @@ this.ContentSearch = {
     let engine = Services.search.getEngineByName(data.engineName);
     let submission = engine.getSubmission(data.searchString, "", data.whence);
     let browser = msg.target;
-    let newTab;
-    if (data.useNewTab) {
-      newTab = browser.getTabBrowser().addTab();
-      browser = newTab.linkedBrowser;
-    }
+    let win;
     try {
-      browser.loadURIWithFlags(submission.uri.spec,
-                               Ci.nsIWebNavigation.LOAD_FLAGS_NONE, null, null,
-                               submission.postData);
+      win = browser.ownerDocument.defaultView;
     }
     catch (err) {
       // The browser may have been closed between the time its content sent the
@@ -199,10 +195,25 @@ this.ContentSearch = {
       // method on it will throw.
       return Promise.resolve();
     }
-    if (data.useNewTab) {
-      browser.getTabBrowser().selectedTab = newTab;
+
+    let where = win.whereToOpenLink(data.originalEvent);
+
+    // There is a chance that by the time we receive the search message, the user
+    // has switched away from the tab that triggered the search. If, based on the
+    // event, we need to load the search in the same tab that triggered it (i.e.
+    // where == "current"), openUILinkIn will not work because that tab is no
+    // longer the current one. For this case we manually load the URI.
+    if (where == "current") {
+      browser.loadURIWithFlags(submission.uri.spec,
+                               Ci.nsIWebNavigation.LOAD_FLAGS_NONE, null, null,
+                               submission.postData);
+    } else {
+      let params = {
+        postData: submission.postData,
+        inBackground: Services.prefs.getBoolPref("browser.tabs.loadInBackground"),
+      };
+      win.openUILinkIn(submission.uri.spec, where, params);
     }
-    let win = browser.ownerDocument.defaultView;
     win.BrowserSearch.recordSearchInHealthReport(engine, data.whence,
                                                  data.selection || null);
     return Promise.resolve();
@@ -233,10 +244,10 @@ this.ContentSearch = {
     let browserData = this._suggestionDataForBrowser(msg.target, true);
     let { controller } = browserData;
     let ok = SearchSuggestionController.engineOffersSuggestions(engine);
-    controller.maxLocalResults = ok ? 2 : 6;
-    controller.maxRemoteResults = ok ? 6 : 0;
+    controller.maxLocalResults = ok ? MAX_LOCAL_SUGGESTIONS : MAX_SUGGESTIONS;
+    controller.maxRemoteResults = ok ? MAX_SUGGESTIONS : 0;
     controller.remoteTimeout = data.remoteTimeout || undefined;
-    let priv = PrivateBrowsingUtils.isWindowPrivate(msg.target.contentWindow);
+    let priv = PrivateBrowsingUtils.isBrowserPrivate(msg.target);
     // fetch() rejects its promise if there's a pending request, but since we
     // process our event queue serially, there's never a pending request.
     let suggestions = yield controller.fetch(data.searchString, priv, engine);
@@ -257,12 +268,14 @@ this.ContentSearch = {
   }),
 
   _onMessageAddFormHistoryEntry: function (msg, entry) {
-    // There are some tests that use about:home and newtab that trigger a search
-    // and then immediately close the tab.  In those cases, the browser may have
-    // been destroyed by the time we receive this message, and as a result
-    // contentWindow is undefined.
-    if (!msg.target.contentWindow ||
-        PrivateBrowsingUtils.isBrowserPrivate(msg.target)) {
+    let isPrivate = true;
+    try {
+      // isBrowserPrivate assumes that the passed-in browser has all the normal
+      // properties, which won't be true if the browser has been destroyed.
+      // That may be the case here due to the asynchronous nature of messaging.
+      isPrivate = PrivateBrowsingUtils.isBrowserPrivate(msg.target);
+    } catch (err) {}
+    if (isPrivate || entry === "") {
       return Promise.resolve();
     }
     let browserData = this._suggestionDataForBrowser(msg.target, true);
@@ -370,10 +383,12 @@ this.ContentSearch = {
 
   _currentEngineObj: Task.async(function* () {
     let engine = Services.search.currentEngine;
+    let favicon = engine.getIconURLBySize(16, 16);
     let uri1x = engine.getIconURLBySize(65, 26);
     let uri2x = engine.getIconURLBySize(130, 52);
     let obj = {
       name: engine.name,
+      iconBuffer: yield this._arrayBufferFromDataURI(favicon),
       logoBuffer: yield this._arrayBufferFromDataURI(uri1x),
       logo2xBuffer: yield this._arrayBufferFromDataURI(uri2x),
     };

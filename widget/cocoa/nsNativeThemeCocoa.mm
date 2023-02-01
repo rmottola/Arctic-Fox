@@ -90,6 +90,20 @@ extern "C" {
 
 @end
 
+// These two classes don't actually add any behavior over NSButtonCell. Their
+// purpose is to make it easy to distinguish NSCell objects that are used for
+// drawing radio buttons / checkboxes from other cell types.
+// The class names are made up, there are no classes with these names in AppKit.
+// The reason we need them is that calling [cell setButtonType:NSRadioButton]
+// doesn't leave an easy-to-check "marker" on the cell object - there is no
+// -[NSButtonCell buttonType] method.
+@interface RadioButtonCell : NSButtonCell
+@end;
+@implementation RadioButtonCell @end;
+@interface CheckboxCell : NSButtonCell
+@end;
+@implementation CheckboxCell @end;
+
 static void
 DrawFocusRingForCellIfNeeded(NSCell* aCell, NSRect aWithFrame, NSView* aInView)
 {
@@ -120,7 +134,7 @@ DrawFocusRingForCellIfNeeded(NSCell* aCell, NSRect aWithFrame, NSView* aInView)
 }
 
 static bool
-FocusIsDrawnByDrawWithFrame()
+FocusIsDrawnByDrawWithFrame(NSCell* aCell)
 {
 #if defined(MAC_OS_X_VERSION_10_8) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_8
   // When building with the 10.8 SDK or higher, focus rings don't draw as part
@@ -130,9 +144,19 @@ FocusIsDrawnByDrawWithFrame()
   // https://developer.apple.com/library/mac/releasenotes/AppKit/RN-AppKitOlderNotes/#X10_8Notes
   return false;
 #else
-  // On 10.10 and up, this is the case even when building against the 10.7 SDK
-  // or lower.
-  return !nsCocoaFeatures::OnYosemiteOrLater();
+  if (!nsCocoaFeatures::OnYosemiteOrLater()) {
+    // When building with the 10.7 SDK or lower, focus rings always draw as
+    // part of -[NSCell drawWithFrame:inView:] if the build is run on 10.9 or
+    // lower.
+    return true;
+  }
+
+  // On 10.10, whether the focus ring is drawn as part of
+  // -[NSCell drawWithFrame:inView:] depends on the cell type.
+  // Radio buttons and checkboxes draw their own focus rings, other cell
+  // types need -[NSCell drawFocusRingMaskWithFrame:inView:].
+  return [aCell isKindOfClass:[RadioButtonCell class]] ||
+         [aCell isKindOfClass:[CheckboxCell class]];
 #endif
 }
 
@@ -141,7 +165,7 @@ DrawCellIncludingFocusRing(NSCell* aCell, NSRect aWithFrame, NSView* aInView)
 {
   [aCell drawWithFrame:aWithFrame inView:aInView];
 
-  if (!FocusIsDrawnByDrawWithFrame()) {
+  if (!FocusIsDrawnByDrawWithFrame(aCell)) {
     DrawFocusRingForCellIfNeeded(aCell, aWithFrame, aInView);
   }
 }
@@ -287,7 +311,6 @@ static BOOL IsToolbarStyleContainer(nsIFrame* aFrame)
 
   switch (aFrame->StyleDisplay()->mAppearance) {
     case NS_THEME_TOOLBAR:
-    case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
     case NS_THEME_STATUSBAR:
       return YES;
     default:
@@ -322,7 +345,11 @@ static BOOL IsToolbarStyleContainer(nsIFrame* aFrame)
 {
   [super drawWithFrame:rect inView:controlView];
 
-  if (FocusIsDrawnByDrawWithFrame()) {
+  if (FocusIsDrawnByDrawWithFrame(self)) {
+    // For some reason, -[NSSearchFieldCell drawWithFrame:inView] doesn't draw a
+    // focus ring in 64 bit mode, no matter what SDK is used or what OS X version
+    // we're running on. But if FocusIsDrawnByDrawWithFrame(self), then our
+    // caller expects us to draw a focus ring. So we just do that here.
     DrawFocusRingForCellIfNeeded(self, rect, controlView);
   }
 }
@@ -340,11 +367,13 @@ static BOOL IsToolbarStyleContainer(nsIFrame* aFrame)
 #endif
 
 #define HITHEME_ORIENTATION kHIThemeOrientationNormal
-#define MAX_FOCUS_RING_WIDTH 4
+
+static CGFloat kMaxFocusRingWidth = 0; // initialized by the nsNativeThemeCocoa constructor
 
 // These enums are for indexing into the margin array.
 enum {
-  leopardOS = 0
+  leopardOSorlater = 0, // 10.6 - 10.9
+  yosemiteOSorlater = 1 // 10.10+
 };
 
 enum {
@@ -360,7 +389,7 @@ enum {
   bottomMargin
 };
 
-static int EnumSizeForCocoaSize(NSControlSize cocoaControlSize) {
+static size_t EnumSizeForCocoaSize(NSControlSize cocoaControlSize) {
   if (cocoaControlSize == NSMiniControlSize)
     return miniControlSize;
   else if (cocoaControlSize == NSSmallControlSize)
@@ -393,8 +422,9 @@ static void InflateControlRect(NSRect* rect, NSControlSize cocoaControlSize, con
   if (!marginSet)
     return;
 
-  static int osIndex = leopardOS;
-  int controlSize = EnumSizeForCocoaSize(cocoaControlSize);
+  static int osIndex = nsCocoaFeatures::OnYosemiteOrLater() ?
+                         yosemiteOSorlater : leopardOSorlater;
+  size_t controlSize = EnumSizeForCocoaSize(cocoaControlSize);
   const float* buttonMargins = marginSet[osIndex][controlSize];
   rect->origin.x -= buttonMargins[leftMargin];
   rect->origin.y -= buttonMargins[bottomMargin];
@@ -486,10 +516,11 @@ static BOOL IsActive(nsIFrame* aFrame, BOOL aIsToolbarControl)
 
 NS_IMPL_ISUPPORTS_INHERITED(nsNativeThemeCocoa, nsNativeTheme, nsITheme)
 
-
 nsNativeThemeCocoa::nsNativeThemeCocoa()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
+  kMaxFocusRingWidth = nsCocoaFeatures::OnYosemiteOrLater() ? 7 : 4;
 
   // provide a local autorelease pool, as this is called during startup
   // before the main event-loop pool is in place
@@ -509,10 +540,10 @@ nsNativeThemeCocoa::nsNativeThemeCocoa()
   [mPushButtonCell setButtonType:NSMomentaryPushInButton];
   [mPushButtonCell setHighlightsBy:NSPushInCellMask];
 
-  mRadioButtonCell = [[NSButtonCell alloc] initTextCell:nil];
+  mRadioButtonCell = [[RadioButtonCell alloc] initTextCell:nil];
   [mRadioButtonCell setButtonType:NSRadioButton];
 
-  mCheckboxCell = [[NSButtonCell alloc] initTextCell:nil];
+  mCheckboxCell = [[CheckboxCell alloc] initTextCell:nil];
   [mCheckboxCell setButtonType:NSSwitchButton];
   [mCheckboxCell setAllowsMixedState:YES];
 
@@ -656,14 +687,14 @@ static void DrawCellWithScaling(NSCell *cell,
   else {
     float w = ceil(drawRect.size.width);
     float h = ceil(drawRect.size.height);
-    NSRect tmpRect = NSMakeRect(MAX_FOCUS_RING_WIDTH, MAX_FOCUS_RING_WIDTH, w, h);
+    NSRect tmpRect = NSMakeRect(kMaxFocusRingWidth, kMaxFocusRingWidth, w, h);
 
     // inflate to figure out the frame we need to tell NSCell to draw in, to get something that's 0,0,w,h
     InflateControlRect(&tmpRect, controlSize, marginSet);
 
-    // and then, expand by MAX_FOCUS_RING_WIDTH size to make sure we can capture any focus ring
-    w += MAX_FOCUS_RING_WIDTH * 2.0;
-    h += MAX_FOCUS_RING_WIDTH * 2.0;
+    // and then, expand by kMaxFocusRingWidth size to make sure we can capture any focus ring
+    w += kMaxFocusRingWidth * 2.0;
+    h += kMaxFocusRingWidth * 2.0;
 
     int backingScaleFactor = GetBackingScaleFactorForRendering(cgContext);
     CGColorSpaceRef rgb = CGColorSpaceCreateDeviceRGB();
@@ -701,12 +732,12 @@ static void DrawCellWithScaling(NSCell *cell,
     CGImageRef img = CGBitmapContextCreateImage(ctx);
 
     // Drop the image into the original destination rectangle, scaling to fit
-    // Only scale MAX_FOCUS_RING_WIDTH by xscale/yscale when the resulting rect
+    // Only scale kMaxFocusRingWidth by xscale/yscale when the resulting rect
     // doesn't extend beyond the overflow rect
     float xscale = destRect.size.width / drawRect.size.width;
     float yscale = destRect.size.height / drawRect.size.height;
-    float scaledFocusRingX = xscale < 1.0f ? MAX_FOCUS_RING_WIDTH * xscale : MAX_FOCUS_RING_WIDTH;
-    float scaledFocusRingY = yscale < 1.0f ? MAX_FOCUS_RING_WIDTH * yscale : MAX_FOCUS_RING_WIDTH;
+    float scaledFocusRingX = xscale < 1.0f ? kMaxFocusRingWidth * xscale : kMaxFocusRingWidth;
+    float scaledFocusRingY = yscale < 1.0f ? kMaxFocusRingWidth * yscale : kMaxFocusRingWidth;
     CGContextDrawImage(cgContext, CGRectMake(destRect.origin.x - scaledFocusRingX,
                                              destRect.origin.y - scaledFocusRingY,
                                              destRect.size.width + scaledFocusRingX * 2,
@@ -821,13 +852,13 @@ static void DrawCellWithSnapping(NSCell *cell,
   NSControlSize controlSizeY = FindControlSize(rectHeight, controlHeights, snapTolerance);
 
   NSControlSize controlSize = NSRegularControlSize;
-  int sizeIndex = 0;
+  size_t sizeIndex = 0;
 
   // At some sizes, don't scale but snap.
   const NSControlSize smallerControlSize =
     EnumSizeForCocoaSize(controlSizeX) < EnumSizeForCocoaSize(controlSizeY) ?
     controlSizeX : controlSizeY;
-  const int smallerControlSizeIndex = EnumSizeForCocoaSize(smallerControlSize);
+  const size_t smallerControlSizeIndex = EnumSizeForCocoaSize(smallerControlSize);
   const NSSize size = sizes[smallerControlSizeIndex];
   float diffWidth = size.width ? rectWidth - size.width : 0.0f;
   float diffHeight = size.height ? rectHeight - size.height : 0.0f;
@@ -1256,8 +1287,8 @@ RenderTransformedHIThemeControl(CGContextRef aCGContext, const HIRect& aRect,
     aFunc(aCGContext, drawRect, aData);
   } else {
     // Inflate the buffer to capture focus rings.
-    int w = ceil(drawRect.size.width) + 2 * MAX_FOCUS_RING_WIDTH;
-    int h = ceil(drawRect.size.height) + 2 * MAX_FOCUS_RING_WIDTH;
+    int w = ceil(drawRect.size.width) + 2 * kMaxFocusRingWidth;
+    int h = ceil(drawRect.size.height) + 2 * kMaxFocusRingWidth;
 
     int backingScaleFactor = GetBackingScaleFactorForRendering(aCGContext);
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
@@ -1271,7 +1302,7 @@ RenderTransformedHIThemeControl(CGContextRef aCGContext, const HIRect& aRect,
     CGColorSpaceRelease(colorSpace);
 
     CGContextScaleCTM(bitmapctx, backingScaleFactor, backingScaleFactor);
-    CGContextTranslateCTM(bitmapctx, MAX_FOCUS_RING_WIDTH, MAX_FOCUS_RING_WIDTH);
+    CGContextTranslateCTM(bitmapctx, kMaxFocusRingWidth, kMaxFocusRingWidth);
 
     // Set the context's "base transform" to in order to get correctly-sized focus rings.
     CGContextSetBaseCTM(bitmapctx, CGAffineTransformMakeScale(backingScaleFactor, backingScaleFactor));
@@ -1296,7 +1327,7 @@ RenderTransformedHIThemeControl(CGContextRef aCGContext, const HIRect& aRect,
       CGContextScaleCTM(aCGContext, -1.0f, 1.0f);
     }
 
-    HIRect inflatedDrawRect = CGRectMake(-MAX_FOCUS_RING_WIDTH, -MAX_FOCUS_RING_WIDTH, w, h);
+    HIRect inflatedDrawRect = CGRectMake(-kMaxFocusRingWidth, -kMaxFocusRingWidth, w, h);
     CGContextDrawImage(aCGContext, inflatedDrawRect, bitmap);
 
     CGContextSetCTM(aCGContext, ctm);
@@ -2256,17 +2287,36 @@ nsNativeThemeCocoa::DrawResizer(CGContextRef cgContext, const HIRect& aRect,
 
 static void
 DrawVibrancyBackground(CGContextRef cgContext, CGRect inBoxRect,
-                       nsIFrame* aFrame, nsITheme::ThemeGeometryType aThemeGeometryType)
+                       nsIFrame* aFrame, nsITheme::ThemeGeometryType aThemeGeometryType,
+                       int aCornerRadiusIfOpaque = 0)
 {
   ChildView* childView = ChildViewForFrame(aFrame);
   if (childView) {
     NSRect rect = NSRectFromCGRect(inBoxRect);
     NSGraphicsContext* savedContext = [NSGraphicsContext currentContext];
     [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:cgContext flipped:YES]];
+    [NSGraphicsContext saveGraphicsState];
 
-    [[childView vibrancyFillColorForThemeGeometryType:aThemeGeometryType] set];
+    NSColor* fillColor = [childView vibrancyFillColorForThemeGeometryType:aThemeGeometryType];
+    if ([fillColor alphaComponent] == 1.0 && aCornerRadiusIfOpaque > 0) {
+      // The fillColor being opaque means that the system-wide pref "reduce
+      // transparency" is set. In that scenario, we still go through all the
+      // vibrancy rendering paths (VibrancyManager::SystemSupportsVibrancy()
+      // will still return true), but the result just won't look "vibrant".
+      // However, there's one unfortunate change of behavior that this pref
+      // has: It stops the window server from applying window masks. We use
+      // a window mask to get rounded corners on menus. So since the mask
+      // doesn't work in "reduce vibrancy" mode, we need to do our own rounded
+      // corner clipping here.
+      [[NSBezierPath bezierPathWithRoundedRect:rect
+                                       xRadius:aCornerRadiusIfOpaque
+                                       yRadius:aCornerRadiusIfOpaque] addClip];
+    }
+
+    [fillColor set];
     NSRectFill(rect);
 
+    [NSGraphicsContext restoreGraphicsState];
     [NSGraphicsContext setCurrentContext:savedContext];
   }
 }
@@ -2395,7 +2445,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
 
     case NS_THEME_MENUPOPUP:
       if (VibrancyManager::SystemSupportsVibrancy()) {
-        DrawVibrancyBackground(cgContext, macRect, aFrame, eThemeGeometryTypeMenu);
+        DrawVibrancyBackground(cgContext, macRect, aFrame, eThemeGeometryTypeMenu, 4);
       } else {
         HIThemeMenuDrawInfo mdi;
         memset(&mdi, 0, sizeof(mdi));
@@ -2573,7 +2623,6 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
     }
       break;
 
-    case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
     case NS_THEME_TOOLBAR: {
       NSWindow* win = NativeWindowForFrame(aFrame);
       if (ToolbarCanBeUnified(cgContext, macRect, win)) {
@@ -2751,9 +2800,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
       int32_t min = 0;
       int32_t max = 1000;
       bool isVertical = !IsRangeHorizontal(aFrame);
-      bool reverseDir =
-        isVertical ||
-        rangeFrame->StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL;
+      bool reverseDir = isVertical || rangeFrame->IsRightToLeft();
       DrawScale(cgContext, macRect, eventState, isVertical, reverseDir,
                 value, min, max, aFrame);
       break;
@@ -3119,10 +3166,10 @@ nsNativeThemeCocoa::GetWidgetOverflow(nsDeviceContext* aContext, nsIFrame* aFram
     {
       // We assume that the above widgets can draw a focus ring that will be less than
       // or equal to 4 pixels thick.
-      nsIntMargin extraSize = nsIntMargin(MAX_FOCUS_RING_WIDTH,
-                                          MAX_FOCUS_RING_WIDTH,
-                                          MAX_FOCUS_RING_WIDTH,
-                                          MAX_FOCUS_RING_WIDTH);
+      nsIntMargin extraSize = nsIntMargin(kMaxFocusRingWidth,
+                                          kMaxFocusRingWidth,
+                                          kMaxFocusRingWidth,
+                                          kMaxFocusRingWidth);
       nsMargin m(NSIntPixelsToAppUnits(extraSize.top, p2a),
                  NSIntPixelsToAppUnits(extraSize.right, p2a),
                  NSIntPixelsToAppUnits(extraSize.bottom, p2a),
@@ -3483,7 +3530,6 @@ nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType,
     case NS_THEME_WINDOW_TITLEBAR:
     case NS_THEME_TOOLBOX:
     case NS_THEME_TOOLBAR:
-    case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
     case NS_THEME_STATUSBAR:
     case NS_THEME_STATUSBAR_PANEL:
     case NS_THEME_STATUSBAR_RESIZER_PANEL:
@@ -3610,7 +3656,6 @@ nsNativeThemeCocoa::ThemeSupportsWidget(nsPresContext* aPresContext, nsIFrame* a
     case NS_THEME_SPINNER_UP_BUTTON:
     case NS_THEME_SPINNER_DOWN_BUTTON:
     case NS_THEME_TOOLBAR:
-    case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
     case NS_THEME_STATUSBAR:
     case NS_THEME_NUMBER_INPUT:
     case NS_THEME_TEXTFIELD:
@@ -3840,7 +3885,6 @@ nsNativeThemeCocoa::ThemeGeometryTypeForWidget(nsIFrame* aFrame, uint8_t aWidget
     case NS_THEME_WINDOW_TITLEBAR:
       return eThemeGeometryTypeTitlebar;
     case NS_THEME_TOOLBAR:
-    case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
       return eThemeGeometryTypeToolbar;
     case NS_THEME_TOOLBOX:
       return eThemeGeometryTypeToolbox;
@@ -3891,7 +3935,6 @@ nsNativeThemeCocoa::GetWidgetTransparency(nsIFrame* aFrame, uint8_t aWidgetType)
     return eOpaque;
 
   case NS_THEME_TOOLBAR:
-  case NS_THEME_MOZ_MAC_UNIFIED_TOOLBAR:
     return eOpaque;
 
   default:

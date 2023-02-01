@@ -553,6 +553,7 @@ struct IMENotification final
     bool mReversed;
     bool mCausedByComposition;
     bool mCausedBySelectionEvent;
+    bool mOccurredDuringComposition;
 
     void SetWritingMode(const WritingMode& aWritingMode);
     WritingMode GetWritingMode() const;
@@ -593,6 +594,7 @@ struct IMENotification final
       ClearSelectionData();
       mCausedByComposition = false;
       mCausedBySelectionEvent = false;
+      mOccurredDuringComposition = false;
     }
     bool IsValid() const
     {
@@ -605,13 +607,16 @@ struct IMENotification final
       mWritingMode = aOther.mWritingMode;
       mReversed = aOther.mReversed;
       AssignReason(aOther.mCausedByComposition,
-                   aOther.mCausedBySelectionEvent);
+                   aOther.mCausedBySelectionEvent,
+                   aOther.mOccurredDuringComposition);
     }
     void AssignReason(bool aCausedByComposition,
-                      bool aCausedBySelectionEvent)
+                      bool aCausedBySelectionEvent,
+                      bool aOccurredDuringComposition)
     {
       mCausedByComposition = aCausedByComposition;
       mCausedBySelectionEvent = aCausedBySelectionEvent;
+      mOccurredDuringComposition = aOccurredDuringComposition;
     }
   };
 
@@ -669,6 +674,7 @@ struct IMENotification final
     uint32_t mAddedEndOffset;
 
     bool mCausedByComposition;
+    bool mOccurredDuringComposition;
 
     uint32_t OldLength() const
     {
@@ -729,7 +735,8 @@ struct IMENotification final
     TextChangeData(uint32_t aStartOffset,
                    uint32_t aRemovedEndOffset,
                    uint32_t aAddedEndOffset,
-                   bool aCausedByComposition)
+                   bool aCausedByComposition,
+                   bool aOccurredDuringComposition)
     {
       MOZ_ASSERT(aRemovedEndOffset >= aStartOffset,
                  "removed end offset must not be smaller than start offset");
@@ -739,6 +746,7 @@ struct IMENotification final
       mRemovedEndOffset = aRemovedEndOffset;
       mAddedEndOffset = aAddedEndOffset;
       mCausedByComposition = aCausedByComposition;
+      mOccurredDuringComposition = aOccurredDuringComposition;
     }
   };
 
@@ -790,6 +798,18 @@ struct IMENotification final
         return mSelectionChangeData.mCausedByComposition;
       case NOTIFY_IME_OF_TEXT_CHANGE:
         return mTextChangeData.mCausedByComposition;
+      default:
+        return false;
+    }
+  }
+
+  bool OccurredDuringComposition() const
+  {
+    switch (mMessage) {
+      case NOTIFY_IME_OF_SELECTION_CHANGE:
+        return mSelectionChangeData.mOccurredDuringComposition;
+      case NOTIFY_IME_OF_TEXT_CHANGE:
+        return mTextChangeData.mOccurredDuringComposition;
       default:
         return false;
     }

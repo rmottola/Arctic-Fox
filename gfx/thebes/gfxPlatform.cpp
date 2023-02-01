@@ -1774,8 +1774,8 @@ gfxPlatform::GetBidiNumeralOption()
     return mBidiNumeralOption;
 }
 
-static void
-FlushFontAndWordCaches()
+/* static */ void
+gfxPlatform::FlushFontAndWordCaches()
 {
     gfxFontCache *fontCache = gfxFontCache::GetCache();
     if (fontCache) {
@@ -1810,26 +1810,16 @@ gfxPlatform::FontsPrefsChanged(const char *aPref)
 }
 
 
-PRLogModuleInfo*
+mozilla::LogModule*
 gfxPlatform::GetLog(eGfxLog aWhichLog)
 {
     // logs shared across gfx
-    static PRLogModuleInfo *sFontlistLog = nullptr;
-    static PRLogModuleInfo *sFontInitLog = nullptr;
-    static PRLogModuleInfo *sTextrunLog = nullptr;
-    static PRLogModuleInfo *sTextrunuiLog = nullptr;
-    static PRLogModuleInfo *sCmapDataLog = nullptr;
-    static PRLogModuleInfo *sTextPerfLog = nullptr;
-
-    // Assume that if one is initialized, all are initialized
-    if (!sFontlistLog) {
-        sFontlistLog = PR_NewLogModule("fontlist");
-        sFontInitLog = PR_NewLogModule("fontinit");
-        sTextrunLog = PR_NewLogModule("textrun");
-        sTextrunuiLog = PR_NewLogModule("textrunui");
-        sCmapDataLog = PR_NewLogModule("cmapdata");
-        sTextPerfLog = PR_NewLogModule("textperf");
-    }
+    static LazyLogModule sFontlistLog("fontlist");
+    static LazyLogModule sFontInitLog("fontinit");
+    static LazyLogModule sTextrunLog("textrun");
+    static LazyLogModule sTextrunuiLog("textrunui");
+    static LazyLogModule sCmapDataLog("cmapdata");
+    static LazyLogModule sTextPerfLog("textperf");
 
     switch (aWhichLog) {
     case eGfxLog_fontlist:
@@ -2089,7 +2079,6 @@ gfxPlatform::UsesOffMainThreadCompositing()
 
   return result;
 }
-
 
 /***
  * The preference "layout.frame_rate" has 3 meanings depending on the value:

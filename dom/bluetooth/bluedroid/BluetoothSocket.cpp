@@ -386,7 +386,7 @@ public:
     MOZ_ASSERT(mImpl);
   }
 
-  void Accept(int aFd, const nsAString& aBdAddress,
+  void Accept(int aFd, const BluetoothAddress& aBdAddress,
               int aConnectionStatus) override
   {
     MOZ_ASSERT(mImpl->IsConsumerThread());
@@ -590,7 +590,6 @@ BluetoothSocket::BluetoothSocket(BluetoothSocketObserver* aObserver)
   MOZ_COUNT_CTOR_INHERITED(BluetoothSocket, DataSocket);
 
   EnsureBluetoothSocketHalLoad();
-  mDeviceAddress.AssignLiteral(BLUETOOTH_ADDRESS_NONE);
 }
 
 BluetoothSocket::~BluetoothSocket()
@@ -607,7 +606,7 @@ public:
     MOZ_ASSERT(mImpl);
   }
 
-  void Connect(int aFd, const nsAString& aBdAddress,
+  void Connect(int aFd, const BluetoothAddress& aBdAddress,
                int aConnectionStatus) override
   {
     MOZ_ASSERT(mImpl->IsConsumerThread());
@@ -646,7 +645,7 @@ private:
 };
 
 nsresult
-BluetoothSocket::Connect(const nsAString& aDeviceAddress,
+BluetoothSocket::Connect(const BluetoothAddress& aDeviceAddress,
                          const BluetoothUuid& aServiceUuid,
                          BluetoothSocketType aType,
                          int aChannel,
@@ -672,7 +671,7 @@ BluetoothSocket::Connect(const nsAString& aDeviceAddress,
 }
 
 nsresult
-BluetoothSocket::Connect(const nsAString& aDeviceAddress,
+BluetoothSocket::Connect(const BluetoothAddress& aDeviceAddress,
                          const BluetoothUuid& aServiceUuid,
                          BluetoothSocketType aType,
                          int aChannel,
@@ -720,6 +719,12 @@ BluetoothSocket::Listen(const nsAString& aServiceName,
 {
   MOZ_ASSERT(!mImpl);
 
+  BluetoothServiceName serviceName;
+  nsresult rv = StringToServiceName(aServiceName, serviceName);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
   SetConnectionStatus(SOCKET_LISTENING);
 
   mImpl = new DroidSocketImpl(aConsumerLoop, aIOLoop, this);
@@ -729,7 +734,7 @@ BluetoothSocket::Listen(const nsAString& aServiceName,
 
   sBluetoothSocketInterface->Listen(
     aType,
-    aServiceName, aServiceUuid, aChannel,
+    serviceName, aServiceUuid, aChannel,
     aEncrypt, aAuth, res);
 
   return NS_OK;

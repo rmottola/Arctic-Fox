@@ -23,12 +23,12 @@
 #include "ScaledFontWin.h"
 #endif
 
-#ifdef XP_MACOSX
+#ifdef XP_DARWIN
 #include "ScaledFontMac.h"
 #endif
 
 
-#ifdef XP_MACOSX
+#ifdef XP_DARWIN
 #include "DrawTargetCG.h"
 #endif
 
@@ -52,13 +52,11 @@
 
 #include "mozilla/CheckedInt.h"
 
-#if defined(PR_LOGGING)
-GFX2D_API PRLogModuleInfo *
+#if defined(MOZ_LOGGING)
+GFX2D_API mozilla::LogModule*
 GetGFX2DLog()
 {
-  static PRLogModuleInfo *sLog;
-  if (!sLog)
-    sLog = PR_NewLogModule("gfx2d");
+  static mozilla::LazyLogModule sLog("gfx2d");
   return sLog;
 }
 #endif
@@ -358,7 +356,7 @@ Factory::CreateDrawTarget(BackendType aBackend, const IntSize &aSize, SurfaceFor
       }
       break;
     }
-#elif defined XP_MACOSX
+#elif defined XP_DARWIN
   case BackendType::COREGRAPHICS:
   case BackendType::COREGRAPHICS_ACCELERATED:
     {
@@ -441,7 +439,7 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
       break;
     }
 #endif
-#ifdef XP_MACOSX
+#ifdef XP_DARWIN
   case BackendType::COREGRAPHICS:
     {
       RefPtr<DrawTargetCG> newTarget = new DrawTargetCG();
@@ -462,7 +460,7 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
     }
 #endif
   default:
-    gfxDebug() << "Invalid draw target type specified.";
+    gfxCriticalNote << "Invalid draw target type specified: " << (int)aBackend;
     return nullptr;
   }
 
@@ -471,7 +469,7 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
   }
 
   if (!retVal) {
-    gfxDebug() << "Failed to create DrawTarget, Type: " << int(aBackend) << " Size: " << aSize;
+    gfxCriticalNote << "Failed to create DrawTarget, Type: " << int(aBackend) << " Size: " << aSize << ", Data: " << hexa(aData) << ", Stride: " << aStride;
   }
 
   return retVal.forget();
@@ -548,7 +546,7 @@ Factory::CreateScaledFontForNativeFont(const NativeFont &aNativeFont, Float aSiz
     }
 #endif
 #endif
-#ifdef XP_MACOSX
+#ifdef XP_DARWIN
   case NativeFontType::MAC_FONT_FACE:
     {
       return MakeAndAddRef<ScaledFontMac>(static_cast<CGFontRef>(aNativeFont.mFont), aSize);
@@ -850,7 +848,7 @@ Factory::CreateDrawTargetForCairoSurface(cairo_surface_t* aSurface, const IntSiz
   return retVal.forget();
 }
 
-#ifdef XP_MACOSX
+#ifdef XP_DARWIN
 already_AddRefed<DrawTarget>
 Factory::CreateDrawTargetForCairoCGContext(CGContextRef cg, const IntSize& aSize)
 {

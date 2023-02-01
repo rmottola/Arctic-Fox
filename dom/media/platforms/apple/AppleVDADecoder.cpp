@@ -6,6 +6,7 @@
 
 #include <CoreFoundation/CFString.h>
 
+#include "AppleDecoderModule.h"
 #include "AppleUtils.h"
 #include "AppleVDADecoder.h"
 #include "AppleVDALinker.h"
@@ -13,17 +14,20 @@
 #include "mp4_demuxer/H264.h"
 #include "MP4Decoder.h"
 #include "MediaData.h"
-#include "MacIOSurfaceImage.h"
 #include "mozilla/ArrayUtils.h"
 #include "nsAutoPtr.h"
-#include "nsCocoaFeatures.h"
 #include "nsThreadUtils.h"
 #include "mozilla/Logging.h"
 #include "VideoUtils.h"
 #include <algorithm>
 #include "gfxPlatform.h"
 
-extern PRLogModuleInfo* GetPDMLog();
+#ifndef MOZ_WIDGET_UIKIT
+#include "nsCocoaFeatures.h"
+#include "MacIOSurfaceImage.h"
+#endif
+
+extern mozilla::LogModule* GetPDMLog();
 #define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
 //#define LOG_MEDIA_SHA1
 
@@ -42,8 +46,14 @@ AppleVDADecoder::AppleVDADecoder(const VideoInfo& aConfig,
   , mDisplayHeight(aConfig.mDisplay.height)
   , mInputIncoming(0)
   , mIsShutDown(false)
+#ifdef MOZ_WIDGET_UIKIT
+  , mUseSoftwareImages(true)
+  , mIs106(false)
+#else
   , mUseSoftwareImages(false)
   , mIs106(!nsCocoaFeatures::OnLionOrLater())
+  #endif
+  , mQueuedSamples(0)
   , mMonitor("AppleVideoDecoder")
   , mIsFlushing(false)
   , mDecoder(nullptr)
@@ -213,15 +223,13 @@ PlatformCallback(void* decompressionOutputRefCon,
   // FIXME: Distinguish between errors and empty flushed frames.
   if (status != noErr || !image) {
     NS_WARNING("AppleVDADecoder decoder returned no data");
-    return;
-  }
-  MOZ_ASSERT(CFGetTypeID(image) == CVPixelBufferGetTypeID(),
-             "AppleVDADecoder returned an unexpected image type");
-
-  if (infoFlags & kVDADecodeInfo_FrameDropped)
-  {
+    image = nullptr;
+  } else if (infoFlags & kVDADecodeInfo_FrameDropped) {
     NS_WARNING("  ...frame dropped...");
-    return;
+    image = nullptr;
+  } else {
+    MOZ_ASSERT(image || CFGetTypeID(image) == CVPixelBufferGetTypeID(),
+               "AppleVDADecoder returned an unexpected image type");
   }
 
   AppleVDADecoder* decoder =
@@ -257,12 +265,7 @@ PlatformCallback(void* decompressionOutputRefCon,
       byte_offset,
       is_sync_point == 1);
 
-  // Forward the data back to an object method which can access
-  // the correct reader's callback.
-  nsCOMPtr<nsIRunnable> task =
-    NS_NewRunnableMethodWithArgs<CFRefPtr<CVPixelBufferRef>, AppleVDADecoder::AppleFrameRef>(
-      decoder, &AppleVDADecoder::OutputFrame, image, frameRef);
-  decoder->DispatchOutputTask(task.forget());
+  decoder->OutputFrame(image, frameRef);
 }
 
 AppleVDADecoder::AppleFrameRef*
@@ -275,28 +278,30 @@ AppleVDADecoder::CreateAppleFrameRef(const MediaRawData* aSample)
 void
 AppleVDADecoder::DrainReorderedFrames()
 {
+  MonitorAutoLock mon(mMonitor);
   while (!mReorderQueue.IsEmpty()) {
     mCallback->Output(mReorderQueue.Pop().get());
   }
+  mQueuedSamples = 0;
 }
 
 void
 AppleVDADecoder::ClearReorderedFrames()
 {
+  MonitorAutoLock mon(mMonitor);
   while (!mReorderQueue.IsEmpty()) {
     mReorderQueue.Pop();
   }
+  mQueuedSamples = 0;
 }
 
 // Copy and return a decoded frame.
 nsresult
-AppleVDADecoder::OutputFrame(CFRefPtr<CVPixelBufferRef> aImage,
+AppleVDADecoder::OutputFrame(CVPixelBufferRef aImage,
                              AppleVDADecoder::AppleFrameRef aFrameRef)
 {
-  MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
-
-  if (mIsFlushing) {
-    // We are in the process of flushing; ignore frame.
+  if (mIsShutDown || mIsFlushing) {
+    // We are in the process of flushing or shutting down; ignore frame.
     return NS_OK;
   }
 
@@ -307,6 +312,19 @@ AppleVDADecoder::OutputFrame(CFRefPtr<CVPixelBufferRef> aImage,
       aFrameRef.duration.ToMicroseconds(),
       aFrameRef.is_sync_point ? " keyframe" : ""
   );
+
+  if (mQueuedSamples > mMaxRefFrames) {
+    // We had stopped requesting more input because we had received too much at
+    // the time. We can ask for more once again.
+    mCallback->InputExhausted();
+  }
+  MOZ_ASSERT(mQueuedSamples);
+  mQueuedSamples--;
+
+  if (!aImage) {
+    // Image was dropped by decoder.
+    return NS_OK;
+  }
 
   // Where our resulting image will end up.
   RefPtr<VideoData> data;
@@ -373,16 +391,13 @@ AppleVDADecoder::OutputFrame(CFRefPtr<CVPixelBufferRef> aImage,
     // Unlock the returned image data.
     CVPixelBufferUnlockBaseAddress(aImage, kCVPixelBufferLock_ReadOnly);
   } else {
+#ifndef MOZ_WIDGET_UIKIT
     IOSurfacePtr surface = MacIOSurfaceLib::CVPixelBufferGetIOSurface(aImage);
     MOZ_ASSERT(surface, "Decoder didn't return an IOSurface backed buffer");
 
     RefPtr<MacIOSurface> macSurface = new MacIOSurface(surface);
 
-    RefPtr<layers::Image> image =
-      mImageContainer->CreateImage(ImageFormat::MAC_IOSURFACE);
-    layers::MacIOSurfaceImage* videoImage =
-      static_cast<layers::MacIOSurfaceImage*>(image.get());
-    videoImage->SetSurface(macSurface);
+    RefPtr<layers::Image> image = new MacIOSurfaceImage(macSurface);
 
     data =
       VideoData::CreateFromImage(info,
@@ -394,6 +409,9 @@ AppleVDADecoder::OutputFrame(CFRefPtr<CVPixelBufferRef> aImage,
                                  aFrameRef.is_sync_point,
                                  aFrameRef.decode_timestamp.ToMicroseconds(),
                                  visible);
+#else
+    MOZ_ASSERT_UNREACHABLE("No MacIOSurface on iOS");
+#endif
   }
 
   if (!data) {
@@ -404,6 +422,7 @@ AppleVDADecoder::OutputFrame(CFRefPtr<CVPixelBufferRef> aImage,
 
   // Frames come out in DTS order but we need to output them
   // in composition order.
+  MonitorAutoLock mon(mMonitor);
   mReorderQueue.Push(data);
   while (mReorderQueue.Length() > mMaxRefFrames) {
     mCallback->Output(mReorderQueue.Pop().get());
@@ -471,6 +490,8 @@ AppleVDADecoder::SubmitFrame(MediaRawData* aSample)
                        &kCFTypeDictionaryKeyCallBacks,
                        &kCFTypeDictionaryValueCallBacks);
 
+  mQueuedSamples++;
+
   OSStatus rv = VDADecoderDecode(mDecoder,
                                  0,
                                  block,
@@ -478,6 +499,7 @@ AppleVDADecoder::SubmitFrame(MediaRawData* aSample)
 
   if (rv != noErr) {
     NS_WARNING("AppleVDADecoder: Couldn't pass frame to decoder");
+    mCallback->Error();
     return NS_ERROR_FAILURE;
   }
 
@@ -493,7 +515,7 @@ AppleVDADecoder::SubmitFrame(MediaRawData* aSample)
   }
 
   // Ask for more data.
-  if (!mInputIncoming) {
+  if (!mInputIncoming && mQueuedSamples <= mMaxRefFrames) {
     LOG("AppleVDADecoder task queue empty; requesting more data");
     mCallback->InputExhausted();
   }
@@ -520,7 +542,7 @@ AppleVDADecoder::InitializeSession()
                      &mDecoder);
 
   if (rv != noErr) {
-    NS_ERROR("AppleVDADecoder: Couldn't create decoder!");
+    NS_WARNING("AppleVDADecoder: Couldn't create hardware VDA decoder");
     return NS_ERROR_FAILURE;
   }
 
@@ -594,6 +616,7 @@ AppleVDADecoder::CreateOutputConfiguration()
                               &kCFTypeDictionaryValueCallBacks);
   }
 
+#ifndef MOZ_WIDGET_UIKIT
   // Construct IOSurface Properties
   const void* IOSurfaceKeys[] = { MacIOSurfaceLib::kPropIsGlobal };
   const void* IOSurfaceValues[] = { kCFBooleanTrue };
@@ -624,6 +647,9 @@ AppleVDADecoder::CreateOutputConfiguration()
                             ArrayLength(outputKeys),
                             &kCFTypeDictionaryKeyCallBacks,
                             &kCFTypeDictionaryValueCallBacks);
+#else
+  MOZ_ASSERT_UNREACHABLE("No MacIOSurface on iOS");
+#endif
 }
 
 /* static */
@@ -634,7 +660,7 @@ AppleVDADecoder::CreateVDADecoder(
   MediaDataDecoderCallback* aCallback,
   layers::ImageContainer* aImageContainer)
 {
-  if (!gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding()) {
+  if (!AppleDecoderModule::sCanUseHardwareVideoDecoder) {
     // This GPU is blacklisted for hardware decoding.
     return nullptr;
   }

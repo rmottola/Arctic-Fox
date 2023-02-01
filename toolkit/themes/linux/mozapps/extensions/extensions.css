@@ -48,30 +48,6 @@
 }
 
 
-/*** notification icons ***/
-
-.warning-icon {
-  list-style-image: url("moz-icon://stock/gtk-dialog-warning?size=menu");
-  width: 16px;
-  height: 16px;
-  margin: 3px 0;
-}
-
-.error-icon {
-  list-style-image: url("moz-icon://stock/gtk-dialog-error?size=menu");
-  width: 16px;
-  height: 16px;
-  margin: 3px 0;
-}
-
-.pending-icon,
-.info-icon {
-  list-style-image: url("moz-icon://stock/gtk-dialog-info?size=menu");
-  width: 16px;
-  height: 16px;
-  margin: 3px 0;
-}
-
 /*** view alert boxes ***/
 
 .alert-container {
@@ -212,7 +188,7 @@
   list-style-image: url("chrome://mozapps/skin/extensions/category-searchengines.png");
 }
 #category-extension > .category-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/category-extensions.png");
+  list-style-image: url("chrome://mozapps/skin/extensions/category-extensions.svg");
 }
 #category-service > .category-icon {
   list-style-image: url("chrome://mozapps/skin/extensions/category-service.png");

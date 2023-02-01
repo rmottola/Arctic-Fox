@@ -287,15 +287,6 @@ TelephonyParent::CallStateChanged(uint32_t aLength, nsITelephonyCallInfo** aAllI
 }
 
 NS_IMETHODIMP
-TelephonyParent::ConferenceCallStateChanged(uint16_t aCallState)
-{
-  NS_ENSURE_TRUE(!mActorDestroyed, NS_ERROR_FAILURE);
-
-  return SendNotifyConferenceCallStateChanged(aCallState) ? NS_OK
-                                                          : NS_ERROR_FAILURE;
-}
-
-NS_IMETHODIMP
 TelephonyParent::EnumerateCallStateComplete()
 {
   MOZ_CRASH("Not a EnumerateCalls request!");
@@ -329,17 +320,6 @@ TelephonyParent::NotifyConferenceError(const nsAString& aName,
 
   return SendNotifyConferenceError(nsString(aName), nsString(aMessage)) ? NS_OK
                                                                         : NS_ERROR_FAILURE;
-}
-
-NS_IMETHODIMP
-TelephonyParent::NotifyError(uint32_t aClientId,
-                             int32_t aCallIndex,
-                             const nsAString& aError)
-{
-  NS_ENSURE_TRUE(!mActorDestroyed, NS_ERROR_FAILURE);
-
-  return SendNotifyCallError(aClientId, aCallIndex, nsString(aError))
-      ? NS_OK : NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP
@@ -393,12 +373,6 @@ TelephonyRequestParent::CallStateChanged(uint32_t aLength, nsITelephonyCallInfo*
 }
 
 NS_IMETHODIMP
-TelephonyRequestParent::ConferenceCallStateChanged(uint16_t aCallState)
-{
-  MOZ_CRASH("Not a TelephonyParent!");
-}
-
-NS_IMETHODIMP
 TelephonyRequestParent::EnumerateCallStateComplete()
 {
   NS_ENSURE_TRUE(!mActorDestroyed, NS_ERROR_FAILURE);
@@ -427,14 +401,6 @@ TelephonyRequestParent::NotifyCdmaCallWaiting(uint32_t aClientId,
 NS_IMETHODIMP
 TelephonyRequestParent::NotifyConferenceError(const nsAString& aName,
                                               const nsAString& aMessage)
-{
-  MOZ_CRASH("Not a TelephonyParent!");
-}
-
-NS_IMETHODIMP
-TelephonyRequestParent::NotifyError(uint32_t aClientId,
-                                    int32_t aCallIndex,
-                                    const nsAString& aError)
 {
   MOZ_CRASH("Not a TelephonyParent!");
 }

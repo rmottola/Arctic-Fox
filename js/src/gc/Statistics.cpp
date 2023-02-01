@@ -1034,11 +1034,16 @@ Statistics::endSlice()
     MOZ_ASSERT(gcDepth >= 0);
 }
 
-void
+bool
 Statistics::startTimingMutator()
 {
-    // Should only be called from outside of GC
-    MOZ_ASSERT(phaseNestingDepth == 0);
+    if (phaseNestingDepth != 0) {
+        // Should only be called from outside of GC.
+        MOZ_ASSERT(phaseNestingDepth == 1);
+        MOZ_ASSERT(phaseNesting[0] == PHASE_MUTATOR);
+        return false;
+    }
+
     MOZ_ASSERT(suspendedPhaseNestingDepth == 0);
 
     timedGCTime = 0;
@@ -1047,6 +1052,7 @@ Statistics::startTimingMutator()
     timedGCStart = 0;
 
     beginPhase(PHASE_MUTATOR);
+    return true;
 }
 
 bool

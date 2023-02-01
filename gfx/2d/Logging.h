@@ -23,7 +23,7 @@
 #include "Matrix.h"
 
 #if defined(MOZ_LOGGING)
-extern GFX2D_API PRLogModuleInfo *GetGFX2DLog();
+extern GFX2D_API mozilla::LogModule* GetGFX2DLog();
 #endif
 
 namespace mozilla {
@@ -122,9 +122,9 @@ private:
 /// by preference gfx.logging.crash.length (default is six, so by default,
 /// the first as well as the last five would show up in the crash log.)
 ///
-/// On platforms that support PR_LOGGING, the story is slightly more involved.
+/// On platforms that support MOZ_LOGGING, the story is slightly more involved.
 /// In that case, unless gfx.logging.level is set to 4 or higher, the output
-/// is further controlled by "gfx2d" PR logging module.  However, in the case
+/// is further controlled by the "gfx2d" logging module.  However, in the case
 /// where such module would disable the output, in all but gfxDebug cases,
 /// we will still send a printf.
 
@@ -134,7 +134,12 @@ enum class LogReason : int {
   // Start.  Do not insert, always add at end.  If you remove items,
   // make sure the other items retain their values.
   D3D11InvalidCallDeviceRemoved = 0,
-  D3D11InvalidCall = 1,
+  D3D11InvalidCall,
+  D3DLockTimeout,
+  D3D10FinalizeFrame,
+  D3D11FinalizeFrame,
+  D3D10SyncLock,
+  D3D11SyncLock,
   // End
   MustBeLessThanThis = 101,
 };
@@ -568,7 +573,7 @@ typedef Log<LOG_CRITICAL, CriticalLogger> CriticalLog;
 //
 // You should create a (new) enum in the LogReason and use it for the reason
 // parameter to ensure uniqueness.
-#define gfxDevCrash(reason) gfxCriticalError(int(LogOptions::AutoPrefix) | int(LogOptions::AssertOnCall) | int(LogOptions::CrashAction), (reason))
+#define gfxDevCrash(reason) gfxCriticalError(int(gfx::LogOptions::AutoPrefix) | int(gfx::LogOptions::AssertOnCall) | int(gfx::LogOptions::CrashAction), (reason))
 
 // See nsDebug.h and the NS_WARN_IF macro
 

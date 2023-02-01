@@ -14,6 +14,8 @@
 
 #include "builtin/ModuleObject.h"
 
+#include "frontend/ParseNode.h"
+
 #include "vm/ArgumentsObject.h"
 #include "vm/GlobalObject.h"
 #include "vm/ProxyObject.h"
@@ -125,7 +127,7 @@ js::ScopeCoordinateFunctionScript(JSScript* script, jsbytecode* pc)
 void
 ScopeObject::setEnclosingScope(HandleObject obj)
 {
-    MOZ_ASSERT_IF(obj->is<CallObject>() || obj->is<DeclEnvObject>() || obj->is<BlockObject>(),
+    MOZ_ASSERT_IF(obj->is<LexicalScopeBase>() || obj->is<DeclEnvObject>() || obj->is<BlockObject>(),
                   obj->isDelegate());
     setFixedSlot(SCOPE_CHAIN_SLOT, ObjectValue(*obj));
 }
@@ -382,6 +384,15 @@ ModuleEnvironmentObject::create(ExclusiveContext* cx, HandleModuleObject module)
     RootedObject globalLexical(cx, &cx->global()->lexicalScope());
     scope->setEnclosingScope(globalLexical);
 
+    // It is not be possible to add or remove bindings from a module environment
+    // after this point as module code is always strict.
+#ifdef DEBUG
+    for (Shape::Range<NoGC> r(scope->lastProperty()); !r.empty(); r.popFront())
+        MOZ_ASSERT(!r.front().configurable());
+    MOZ_ASSERT(scope->lastProperty()->getObjectFlags() & BaseShape::NOT_EXTENSIBLE);
+    MOZ_ASSERT(!scope->inDictionaryMode());
+#endif
+
     return scope;
 }
 
@@ -398,22 +409,13 @@ ModuleEnvironmentObject::importBindings()
 }
 
 bool
-ModuleEnvironmentObject::createImportBinding(JSContext*cx, HandleAtom importName,
-                                             HandleModuleObject module, HandleAtom exportName)
+ModuleEnvironmentObject::createImportBinding(JSContext* cx, HandleAtom importName,
+                                             HandleModuleObject module, HandleAtom localName)
 {
     RootedId importNameId(cx, AtomToId(importName));
-    RootedId exportNameId(cx, AtomToId(exportName));
-    Rooted<ModuleEnvironmentObject*> env(cx, module->environment());
-
-#ifdef DEBUG
-    bool found = false;
-    if (!HasProperty(cx, env, exportNameId, &found))
-        return false;
-    MOZ_ASSERT(found);
-#endif
-
-    IndirectBinding binding(env, exportNameId);
-    if (!importBindings().putNew(importNameId, binding)) {
+    RootedId localNameId(cx, AtomToId(localName));
+    RootedModuleEnvironmentObject env(cx, module->environment());
+    if (!importBindings().putNew(cx, importNameId, env, localNameId)) {
         ReportOutOfMemory(cx);
         return false;
     }
@@ -421,16 +423,29 @@ ModuleEnvironmentObject::createImportBinding(JSContext*cx, HandleAtom importName
     return true;
 }
 
+bool
+ModuleEnvironmentObject::hasImportBinding(HandlePropertyName name)
+{
+    return importBindings().has(NameToId(name));
+}
+
+bool
+ModuleEnvironmentObject::lookupImport(jsid name, ModuleEnvironmentObject** envOut, Shape** shapeOut)
+{
+    return importBindings().lookup(name, envOut, shapeOut);
+}
+
 /* static */ bool
 ModuleEnvironmentObject::lookupProperty(JSContext* cx, HandleObject obj, HandleId id,
                                         MutableHandleObject objp, MutableHandleShape propp)
 {
-    if (IndirectBindingMap::Ptr p =
-        obj->as<ModuleEnvironmentObject>().importBindings().lookup(id))
-    {
-        RootedObject target(cx, p->value().environment);
-        RootedId name(cx, p->value().localName);
-        return LookupProperty(cx, target, name, objp, propp);
+    const IndirectBindingMap& bindings = obj->as<ModuleEnvironmentObject>().importBindings();
+    Shape* shape;
+    ModuleEnvironmentObject* env;
+    if (bindings.lookup(id, &env, &shape)) {
+        objp.set(env);
+        propp.set(shape);
+        return true;
     }
 
     RootedNativeObject target(cx, &obj->as<NativeObject>());
@@ -457,12 +472,12 @@ ModuleEnvironmentObject::hasProperty(JSContext* cx, HandleObject obj, HandleId i
 ModuleEnvironmentObject::getProperty(JSContext* cx, HandleObject obj, HandleValue receiver,
                                      HandleId id, MutableHandleValue vp)
 {
-    if (IndirectBindingMap::Ptr p =
-        obj->as<ModuleEnvironmentObject>().importBindings().lookup(id))
-    {
-        RootedObject target(cx, p->value().environment);
-        RootedId name(cx, p->value().localName);
-        return GetProperty(cx, target, target, name, vp);
+    const IndirectBindingMap& bindings = obj->as<ModuleEnvironmentObject>().importBindings();
+    Shape* shape;
+    ModuleEnvironmentObject* env;
+    if (bindings.lookup(id, &env, &shape)) {
+        vp.set(env->getSlot(shape->slot()));
+        return true;
     }
 
     RootedNativeObject self(cx, &obj->as<NativeObject>());
@@ -509,8 +524,9 @@ ModuleEnvironmentObject::enumerate(JSContext* cx, HandleObject obj, AutoIdVector
         return false;
     }
 
-    for (auto r = bs.all(); !r.empty(); r.popFront())
-        properties.infallibleAppend(r.front().key());
+    bs.forEachExportedName([&] (jsid name) {
+        properties.infallibleAppend(name);
+    });
 
     for (Shape::Range<NoGC> r(self->lastProperty()); !r.empty(); r.popFront())
         properties.infallibleAppend(r.front().propid());
@@ -1776,9 +1792,7 @@ class DebugScopeProxy : public BaseProxyHandler
 
     static bool isFunctionScope(const JSObject& scope)
     {
-        return scope.is<CallObject>() &&
-               !scope.is<ModuleEnvironmentObject>() &&
-               !scope.as<CallObject>().isForEval();
+        return scope.is<CallObject>() && !scope.as<CallObject>().isForEval();
     }
 
     /*
@@ -2203,7 +2217,7 @@ bool
 DebugScopeObject::isForDeclarative() const
 {
     ScopeObject& s = scope();
-    return s.is<CallObject>() || s.is<BlockObject>() || s.is<DeclEnvObject>();
+    return s.is<LexicalScopeBase>() || s.is<BlockObject>() || s.is<DeclEnvObject>();
 }
 
 bool
@@ -2224,7 +2238,7 @@ DebugScopeObject::isOptimizedOut() const
     if (s.is<ClonedBlockObject>())
         return !s.as<ClonedBlockObject>().staticBlock().needsClone();
 
-    if (s.is<CallObject>() && !s.is<ModuleEnvironmentObject>()) {
+    if (s.is<CallObject>()) {
         return !s.as<CallObject>().isForEval() &&
                !s.as<CallObject>().callee().needsCallObject() &&
                !maybeSnapshot();
@@ -2976,6 +2990,164 @@ js::StaticScopeChainLength(JSObject* staticScope)
     for (StaticScopeIter<NoGC> ssi(staticScope); !ssi.done(); ssi++)
         length++;
     return length;
+}
+
+ModuleEnvironmentObject*
+js::GetModuleEnvironmentForScript(JSScript* script)
+{
+    StaticScopeIter<NoGC> ssi(script->enclosingStaticScope());
+    while (!ssi.done() && ssi.type() != StaticScopeIter<NoGC>::Module)
+        ssi++;
+    if (ssi.done())
+        return nullptr;
+
+    return ssi.module().environment();
+}
+
+bool
+js::CheckLexicalNameConflict(JSContext* cx, Handle<ClonedBlockObject*> lexicalScope,
+                             HandleObject varObj, HandlePropertyName name)
+{
+    mozilla::Maybe<frontend::Definition::Kind> redeclKind;
+    RootedId id(cx, NameToId(name));
+    RootedShape shape(cx);
+    if ((shape = lexicalScope->lookup(cx, name))) {
+        redeclKind = mozilla::Some(shape->writable() ? frontend::Definition::LET
+                                                     : frontend::Definition::CONSTANT);
+    } else if (varObj->isNative() && (shape = varObj->as<NativeObject>().lookup(cx, name))) {
+        if (!shape->configurable())
+            redeclKind = mozilla::Some(frontend::Definition::VAR);
+    } else {
+        Rooted<PropertyDescriptor> desc(cx);
+        if (!GetOwnPropertyDescriptor(cx, varObj, id, &desc))
+            return false;
+        if (desc.object() && desc.hasConfigurable() && !desc.configurable())
+            redeclKind = mozilla::Some(frontend::Definition::VAR);
+    }
+
+    if (redeclKind.isSome()) {
+        ReportRuntimeRedeclaration(cx, name, *redeclKind);
+        return false;
+    }
+
+    return true;
+}
+
+bool
+js::CheckVarNameConflict(JSContext* cx, Handle<ClonedBlockObject*> lexicalScope,
+                         HandlePropertyName name)
+{
+    if (Shape* shape = lexicalScope->lookup(cx, name)) {
+        ReportRuntimeRedeclaration(cx, name, shape->writable() ? frontend::Definition::LET
+                                                               : frontend::Definition::CONSTANT);
+        return false;
+    }
+    return true;
+}
+
+static bool
+CheckVarNameConflict(JSContext* cx, Handle<CallObject*> callObj, HandlePropertyName name)
+{
+    RootedFunction fun(cx, &callObj->callee());
+    RootedScript script(cx, fun->nonLazyScript());
+    uint32_t bodyLevelLexicalsStart = script->bindings.numVars();
+
+    for (BindingIter bi(script); !bi.done(); bi++) {
+        if (name == bi->name() &&
+            bi.isBodyLevelLexical() &&
+            bi.localIndex() >= bodyLevelLexicalsStart)
+        {
+            ReportRuntimeRedeclaration(cx, name,
+                                       bi->kind() == Binding::CONSTANT
+                                       ? frontend::Definition::CONSTANT
+                                       : frontend::Definition::LET);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool
+js::CheckGlobalDeclarationConflicts(JSContext* cx, HandleScript script,
+                                    Handle<ClonedBlockObject*> lexicalScope,
+                                    HandleObject varObj)
+{
+    // Due to the extensibility of the global lexical scope, we must check for
+    // redeclaring a binding.
+    //
+    // In the case of non-syntactic scope chains, we are checking
+    // redeclarations against the non-syntactic lexical scope and the
+    // variables object that the lexical scope corresponds to.
+    RootedPropertyName name(cx);
+    BindingIter bi(script);
+
+    for (uint32_t i = 0; i < script->bindings.numVars(); i++, bi++) {
+        name = bi->name();
+        if (!CheckVarNameConflict(cx, lexicalScope, name))
+            return false;
+    }
+
+    for (uint32_t i = 0; i < script->bindings.numBodyLevelLexicals(); i++, bi++) {
+        name = bi->name();
+        if (!CheckLexicalNameConflict(cx, lexicalScope, varObj, name))
+            return false;
+    }
+
+    return true;
+}
+
+template <class ScopeT>
+static bool
+CheckVarNameConflictsInScope(JSContext* cx, HandleScript script, HandleObject obj)
+{
+    Rooted<ScopeT*> scope(cx);
+
+    // We return true when the scope object is not ScopeT below, because
+    // ScopeT is either ClonedBlockObject or CallObject. No other scope
+    // objects can contain lexical bindings, and there are no other overloads
+    // for CheckVarNameConflict.
+
+    if (obj->is<ScopeT>())
+        scope = &obj->as<ScopeT>();
+    else if (obj->is<DebugScopeObject>() && obj->as<DebugScopeObject>().scope().is<ScopeT>())
+        scope = &obj->as<DebugScopeObject>().scope().as<ScopeT>();
+    else
+        return true;
+
+    RootedPropertyName name(cx);
+
+    for (BindingIter bi(script); !bi.done(); bi++) {
+        name = bi->name();
+        if (!CheckVarNameConflict(cx, scope, name))
+            return false;
+    }
+
+    return true;
+}
+
+bool
+js::CheckEvalDeclarationConflicts(JSContext* cx, HandleScript script,
+                                  HandleObject scopeChain, HandleObject varObj)
+{
+    // We don't need to check body-level lexical bindings for conflict. Eval
+    // scripts always execute under their own lexical scope.
+    if (script->bindings.numVars() == 0)
+        return true;
+
+    RootedObject obj(cx, scopeChain);
+
+    // ES6 18.2.1.2 step d
+    //
+    // Check that a direct eval will not hoist 'var' bindings over lexical
+    // bindings with the same name.
+    while (obj != varObj) {
+        if (!CheckVarNameConflictsInScope<ClonedBlockObject>(cx, script, obj))
+            return false;
+        obj = obj->enclosingScope();
+    }
+
+    return CheckVarNameConflictsInScope<CallObject>(cx, script, varObj);
 }
 
 #ifdef DEBUG

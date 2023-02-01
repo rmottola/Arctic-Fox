@@ -1333,7 +1333,6 @@ nsCSSFontFaceStyleDecl::GetPropertyValue(nsCSSFontDesc aFontDescID,
 }
 
 
-// attribute DOMString cssText;
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::GetCssText(nsAString & aCssText)
 {
@@ -1363,7 +1362,6 @@ nsCSSFontFaceStyleDecl::SetCssText(const nsAString & aCssText)
   return NS_ERROR_NOT_IMPLEMENTED; // bug 443978
 }
 
-// DOMString getPropertyValue (in DOMString propertyName);
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::GetPropertyValue(const nsAString & propertyName,
                                          nsAString & aResult)
@@ -1380,7 +1378,6 @@ nsCSSFontFaceStyleDecl::GetAuthoredPropertyValue(const nsAString& propertyName,
   return GetPropertyValue(nsCSSProps::LookupFontDesc(propertyName), aResult);
 }
 
-// nsIDOMCSSValue getPropertyCSSValue (in DOMString propertyName);
 already_AddRefed<dom::CSSValue>
 nsCSSFontFaceStyleDecl::GetPropertyCSSValue(const nsAString & propertyName,
                                             ErrorResult& aRv)
@@ -1390,7 +1387,6 @@ nsCSSFontFaceStyleDecl::GetPropertyCSSValue(const nsAString & propertyName,
   return nullptr;
 }
 
-// DOMString removeProperty (in DOMString propertyName) raises (DOMException);
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::RemoveProperty(const nsAString & propertyName,
                                        nsAString & aResult)
@@ -1410,7 +1406,6 @@ nsCSSFontFaceStyleDecl::RemoveProperty(const nsAString & propertyName,
   return NS_OK;
 }
 
-// DOMString getPropertyPriority (in DOMString propertyName);
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::GetPropertyPriority(const nsAString & propertyName,
                                             nsAString & aResult)
@@ -1420,8 +1415,6 @@ nsCSSFontFaceStyleDecl::GetPropertyPriority(const nsAString & propertyName,
   return NS_OK;
 }
 
-// void setProperty (in DOMString propertyName, in DOMString value,
-//                   in DOMString priority)  raises (DOMException);
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::SetProperty(const nsAString & propertyName,
                                     const nsAString & value,
@@ -1430,7 +1423,6 @@ nsCSSFontFaceStyleDecl::SetProperty(const nsAString & propertyName,
   return NS_ERROR_NOT_IMPLEMENTED; // bug 443978
 }
 
-// readonly attribute unsigned long length;
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::GetLength(uint32_t *aLength)
 {
@@ -1445,7 +1437,6 @@ nsCSSFontFaceStyleDecl::GetLength(uint32_t *aLength)
   return NS_OK;
 }
 
-// DOMString item (in unsigned long index);
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::Item(uint32_t aIndex, nsAString& aReturn)
 {
@@ -1476,7 +1467,6 @@ nsCSSFontFaceStyleDecl::IndexedGetter(uint32_t index, bool& aFound, nsAString & 
   aFound = false;
 }
 
-// readonly attribute nsIDOMCSSRule parentRule;
 NS_IMETHODIMP
 nsCSSFontFaceStyleDecl::GetParentRule(nsIDOMCSSRule** aParentRule)
 {
