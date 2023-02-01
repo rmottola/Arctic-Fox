@@ -245,8 +245,9 @@
   border-bottom-color: hsl(0,0%,50%);
 }
 
-.ruleview-selector {
+.ruleview-selectorcontainer {
   word-wrap: break-word;
+  cursor: text;
 }
 
 .ruleview-selector-separator, .ruleview-selector-unmatched {
