@@ -371,13 +371,8 @@ function openModalWindow(domWin, uri, args) {
 }
 
 function openTabPrompt(domWin, tabPrompt, args) {
-    let allowFocusSwitch = true;
-    try {
-      allowFocusSwitch = Services.prefs.getBoolPref("prompts.tab_modal.focusSwitch");
-    } catch(e) {}
-    
-    if (allowFocusSwitch)
-        PromptUtils.fireDialogEvent(domWin, "DOMWillOpenModalDialog");
+    let eventDetail = Cu.cloneInto({tabPrompt: true}, domWin);
+    PromptUtils.fireDialogEvent(domWin, "DOMWillOpenModalDialog", null, eventDetail);
 
     let winUtils = domWin.QueryInterface(Ci.nsIInterfaceRequestor)
                          .getInterface(Ci.nsIDOMWindowUtils);
@@ -400,8 +395,7 @@ function openTabPrompt(domWin, tabPrompt, args) {
 
         winUtils.leaveModalState();
 
-        if (allowFocusSwitch)
-            PromptUtils.fireDialogEvent(domWin, "DOMModalDialogClosed");
+        PromptUtils.fireDialogEvent(domWin, "DOMModalDialogClosed");
     }
 
     domWin.addEventListener("pagehide", pagehide);
@@ -447,7 +441,8 @@ function openRemotePrompt(domWin, args, tabPrompt) {
                          .getInterface(Ci.nsITabChild)
                          .messageManager;
 
-    PromptUtils.fireDialogEvent(domWin, "DOMWillOpenModalDialog");
+    let eventDetail = Cu.cloneInto({tabPrompt}, domWin);
+    PromptUtils.fireDialogEvent(domWin, "DOMWillOpenModalDialog", null, eventDetail);
 
     let winUtils = domWin.QueryInterface(Ci.nsIInterfaceRequestor)
                          .getInterface(Ci.nsIDOMWindowUtils);

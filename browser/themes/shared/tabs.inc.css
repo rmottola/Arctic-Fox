@@ -434,35 +434,47 @@
   position: absolute;
 }
 
-.tabbrowser-tab[pinned][titlechanged]:not([visuallyselected="true"]) > .tab-stack > .tab-content {
+.tabbrowser-tab[image] > .tab-stack > .tab-content[attention]:not([visuallyselected="true"]),
+.tabbrowser-tab > .tab-stack > .tab-content[pinned][titlechanged]:not([visuallyselected="true"]) {
   background-image: radial-gradient(farthest-corner at center bottom, rgb(255,255,255) 3%, rgba(186,221,251,0.75) 20%, rgba(127,179,255,0.25) 40%, transparent 70%);
   background-position: center bottom var(--tab-toolbar-navbar-overlap);
   background-repeat: no-repeat;
   background-size: 85% 100%;
 }
 
-/* Background tab separators (3px wide).
-   Also show separators beside the selected tab when dragging it. */
+.tabbrowser-tab[image] > .tab-stack > .tab-content[attention]:not([pinned]):not([visuallyselected="true"]) {
+  background-position: left bottom var(--tab-toolbar-navbar-overlap);
+  background-size: 34px 100%;
+}
+
+.tab-label[attention]:not([visuallyselected="true"]) {
+  font-weight: bold;
+}
+
+/* Tab separators */
+
+.tabbrowser-tab::after,
+.tabbrowser-tab::before {
+  width: 1px;
+  -moz-margin-start: -1px;
+  background-image: linear-gradient(transparent 5px,
+                                    currentColor 5px,
+                                    currentColor calc(100% - 4px),
+                                    transparent calc(100% - 4px));
+  opacity: 0.2;
+}
+
+#TabsToolbar[brighttext] > #tabbrowser-tabs > .tabbrowser-tab::before,
+#TabsToolbar[brighttext] > #tabbrowser-tabs > .tabbrowser-tab::after {
+  opacity: 0.4;
+}
+
+/* Also show separators beside the selected tab when dragging it. */
 #tabbrowser-tabs[movingtab] > .tabbrowser-tab[beforeselected]:not([last-visible-tab])::after,
 .tabbrowser-tab:not([visuallyselected]):not([afterselected-visible]):not([afterhovered]):not([first-visible-tab]):not(:hover)::before,
 #tabbrowser-tabs:not([overflow]) > .tabbrowser-tab[last-visible-tab]:not([visuallyselected]):not([beforehovered]):not(:hover)::after {
-  -moz-margin-start: -1.5px;
-  -moz-margin-end: -1.5px;
-  background-image: url(chrome://browser/skin/tabbrowser/tab-separator.png);
-  background-position: left bottom var(--tab-toolbar-navbar-overlap);
-  background-repeat: no-repeat;
-  background-size: 3px 100%;
   content: "";
   display: -moz-box;
-  width: 3px;
-}
-
-/* Handle a case where the last separator in a customized tab bar with a
-   separated new tab button causes the width of the tab to extend and causes
-   jittering with a small tab curve width (Bug 1111091). */
-#TabsToolbar[currentset]:not([currentset*="tabbrowser-tabs,new-tab-button"]) #tabbrowser-tabs:not([overflow]) > .tabbrowser-tab[last-visible-tab]:not([selected]):not([beforehovered]):not(:hover)::after {
-  -moz-margin-start: -3px;
-  -moz-margin-end: 0;
 }
 
 /* New tab button */
