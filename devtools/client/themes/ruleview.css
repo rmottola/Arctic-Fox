@@ -253,6 +253,23 @@
   color: #888;
 }
 
+
+.ruleview-selectorhighlighter {
+  background: url("chrome://browser/skin/devtools/vview-open-inspector.png") no-repeat 0 0;
+  padding-left: 16px;
+  margin-left: 5px;
+  cursor: pointer;
+}
+
+.ruleview-selectorhighlighter:hover {
+  background-position: -32px 0;
+}
+
+.ruleview-selectorhighlighter:active,
+.ruleview-selectorhighlighter.highlighted {
+  background-position: -16px 0;
+}
+
 #ruleview-add-rule-button::before {
   background-image: url("chrome://devtools/skin/themes/images/add.svg");
   background-size: cover;

@@ -155,7 +155,7 @@
   list-style-image: url("chrome://devtools/skin/themes/images/responsivemode/responsiveui-rotate.png");
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .devtools-responsiveui-close {
     list-style-image: url("chrome://devtools/skin/themes/images/close@2x.png");
   }
@@ -174,7 +174,7 @@
   -moz-image-region: rect(0px,32px,16px,16px);
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .devtools-responsiveui-touch {
     list-style-image: url("chrome://devtools/skin/themes/images/responsivemode/responsiveui-touch@2x.png");
     -moz-image-region: rect(0px,32px,32px,0px);
@@ -189,7 +189,7 @@
   list-style-image: url("chrome://devtools/skin/themes/images/responsivemode/responsiveui-screenshot.png");
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .devtools-responsiveui-screenshot {
     list-style-image: url("chrome://devtools/skin/themes/images/responsivemode/responsiveui-screenshot@2x.png");
   }
@@ -264,6 +264,7 @@
 }
 
 .devtools-responsiveui-home-button {
+  -moz-user-focus: ignore;
   width: 40px;
   height: 30px;
   list-style-image: url("chrome://devtools/skin/themes/images/responsivemode/responsiveui-home.png");
@@ -321,7 +322,7 @@
   border-bottom-left-radius: 12px;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .devtools-responsiveui-resizebarV {
     background-image: url("chrome://devtools/skin/themes/images/responsivemode/responsive-vertical-resizer@2x.png");
   }
