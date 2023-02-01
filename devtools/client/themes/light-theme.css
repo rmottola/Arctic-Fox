@@ -304,7 +304,7 @@ div.CodeMirror span.eval-text {
   background-position: -14px 0;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .theme-twisty, .theme-checkbox {
     background-image: url("chrome://devtools/skin/themes/images/controls@2x.png");
   }
@@ -342,7 +342,7 @@ div.CodeMirror span.eval-text {
   margin-left: -4px;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .theme-tooltip-panel .panel-arrow[side="top"],
   .theme-tooltip-panel .panel-arrow[side="bottom"] {
     list-style-image: url("chrome://devtools/skin/themes/tooltip/arrow-vertical-light@2x.png");
