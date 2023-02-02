@@ -33,6 +33,9 @@ function* spawnTest () {
   ok(markers.some(m => m.name === "Parse HTML" && m.stack != undefined),
      "Should get some Parse HTML markers");
 
+  // Destroy the front before removing tab to ensure no
+  // lingering requests
+  yield front.destroy();
   yield removeTab(target.tab);
   finish();
 }
