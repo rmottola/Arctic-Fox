@@ -288,14 +288,9 @@ Tools.memory = {
   label: l10n("memory.label", memoryStrings),
   panelLabel: l10n("memory.panelLabel", memoryStrings),
   tooltip: l10n("memory.tooltip", memoryStrings),
-  hiddenInOptions: true,
 
   isTargetSupported: function (target) {
-    // TODO 1201907
-    // Once Fx44 lands, we should add a root trait `heapSnapshots`
-    // to indicate that the memory actor can handle this.
-    // Shouldn't make this change until Fx44, however.
-    return true; // target.getTrait("heapSnapshots");
+    return target.getTrait("heapSnapshots");
   },
 
   build: function (frame, target) {
