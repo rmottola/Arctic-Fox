@@ -241,6 +241,8 @@
 #include "gfxVR.h"
 #include "gfxPrefs.h"
 
+#include "mozilla/DocLoadingTimelineMarker.h"
+
 #include "nsISpeculativeConnect.h"
 
 #ifdef MOZ_MEDIA_NAVIGATOR
@@ -5003,8 +5005,8 @@ nsDocument::DispatchContentLoadedEvents()
   nsIDocShell* docShell = this->GetDocShell();
 
   if (timelines && timelines->HasConsumer(docShell)) {
-    timelines->AddMarkerForDocShell(
-      docShell, "document::DOMContentLoaded", MarkerTracingType::TIMESTAMP);
+    timelines->AddMarkerForDocShell(docShell,
+      MakeUnique<DocLoadingTimelineMarker>("document::DOMContentLoaded"));
   }
 
   if (mTiming) {
