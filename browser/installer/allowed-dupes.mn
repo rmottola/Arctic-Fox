@@ -64,7 +64,7 @@ browser/chrome/devtools/skin/images/tool-scratchpad.svg
 browser/chrome/devtools/skin/images/tool-storage.svg
 browser/chrome/devtools/skin/images/tool-styleeditor.svg
 browser/chrome/devtools/skin/promisedebugger.css
-browser/chrome/devtools/skin/themes/variables.css
+browser/chrome/devtools/skin/variables.css
 modules/devtools/Console.jsm
 modules/devtools/Loader.jsm
 modules/devtools/Simulator.jsm
@@ -265,7 +265,7 @@ chrome/toolkit/skin/classic/mozapps/extensions/category-languages.png
 chrome/toolkit/skin/classic/mozapps/extensions/localeGeneric.png
 chrome/toolkit/skin/classic/mozapps/extensions/category-extensions.svg
 chrome/toolkit/skin/classic/mozapps/extensions/extensionGeneric.svg
-browser/chrome/devtools/skin/themes/images/noise.png
+browser/chrome/devtools/skin/images/noise.png
 browser/chrome/browser/skin/classic/browser/newtab/noise.png
 chrome/toolkit/skin/classic/global/devtools/noise.png
 browser/chrome/browser/skin/classic/browser/imagedocument.png
