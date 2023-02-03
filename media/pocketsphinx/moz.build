@@ -46,7 +46,12 @@ SOURCES += [
 
 # Suppress warnings in third-party code.
 if CONFIG['GNU_CC']:
-    CFLAGS += ['-Wno-sign-compare']
+    CFLAGS += [
+        '-Wno-declaration-after-statement',
+        '-Wno-sign-compare',
+    ]
+    if CONFIG['CLANG_CXX']:
+        CFLAGS += ['-Wno-incompatible-pointer-types-discards-qualifiers']
 
 # We allow warnings for third-party code that can be updated from upstream.
 ALLOW_COMPILER_WARNINGS = True
