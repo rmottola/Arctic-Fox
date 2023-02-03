@@ -19,7 +19,4 @@ if '64' not in CONFIG['OS_TEST']:
     if CONFIG['GNU_CC']:
         CFLAGS += ['-O1']
 
-if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
-    NO_VISIBILITY_FLAGS = True
-
 FINAL_LIBRARY = 'xul'
