@@ -1044,8 +1044,8 @@ nsTransparencyMode nsCocoaWindow::GetTransparencyMode()
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(eTransparencyOpaque);
 }
 
-// This is called from nsMenuPopupFrame when making a popup transparent.
-// For other window types, nsChildView::SetTransparencyMode is used.
+// This is called from nsMenuPopupFrame when making a popup transparent, or
+// from nsChildView::SetTransparencyMode for other window types.
 void nsCocoaWindow::SetTransparencyMode(nsTransparencyMode aMode)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
@@ -1053,7 +1053,9 @@ void nsCocoaWindow::SetTransparencyMode(nsTransparencyMode aMode)
   if (!mWindow)
     return;
 
-  BOOL isTransparent = aMode == eTransparencyTransparent;
+  // Transparent windows are only supported on popups.
+  BOOL isTransparent = aMode == eTransparencyTransparent &&
+                       mWindowType == eWindowType_popup;
   BOOL currentTransparency = ![mWindow isOpaque];
   if (isTransparent != currentTransparency) {
     [mWindow setOpaque:!isTransparent];
@@ -2110,7 +2112,11 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
     return NS_OK;
 
   mShadowStyle = aStyle;
-  [mWindow setHasShadow:(aStyle != NS_STYLE_WINDOW_SHADOW_NONE)];
+
+  // Shadowless windows are only supported on popups.
+  if (mWindowType == eWindowType_popup)
+    [mWindow setHasShadow:(aStyle != NS_STYLE_WINDOW_SHADOW_NONE)];
+
   [mWindow setUseMenuStyle:(aStyle == NS_STYLE_WINDOW_SHADOW_MENU)];
   AdjustWindowShadow();
   SetWindowBackgroundBlur();
