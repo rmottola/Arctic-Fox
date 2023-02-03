@@ -1522,7 +1522,9 @@ public:
     void GenerateWarning(const char* fmt, ...);
     void GenerateWarning(const char* fmt, va_list ap);
 
+public:
     UniquePtr<webgl::FormatUsageAuthority> mFormatUsage;
+    virtual UniquePtr<webgl::FormatUsageAuthority> CreateFormatUsage() const = 0;
 
     // Friend list
     friend class WebGLTexture;
