@@ -129,3 +129,8 @@ if CONFIG['MOZ_SIMPLEPUSH']:
 PYTHON_UNIT_TESTS += [
     'mozwebidlcodegen/test/test_mozwebidlcodegen.py',
 ]
+
+if CONFIG['GNU_CC']:
+    CXXFLAGS += [
+        '-Wno-uninitialized',
+    ]
