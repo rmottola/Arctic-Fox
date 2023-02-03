@@ -223,7 +223,7 @@ DEFAULT_GMAKE_FLAGS += \
 	OS_PTHREAD= \
 	$(NULL)
 
-DEFAULT_GMAKE_FLAGS += ARCHFLAG='$(CFLAGS) -DCHECK_FORK_GETPID $(addprefix -DANDROID_VERSION=,$(ANDROID_VERSION)) -include $(topsrcdir)/security/manager/android_stub.h'
+DEFAULT_GMAKE_FLAGS += ARCHFLAG='$(filter-out -W%,$(CFLAGS)) -DCHECK_FORK_GETPID $(addprefix -DANDROID_VERSION=,$(ANDROID_VERSION)) -include $(topsrcdir)/security/manager/android_stub.h'
 endif
 endif
 
@@ -249,7 +249,7 @@ ifdef MOZ_NO_WLZDEFS
 DEFAULT_GMAKE_FLAGS += ZDEFS_FLAG=
 endif
 ifdef MOZ_CFLAGS_NSS
-DEFAULT_GMAKE_FLAGS += XCFLAGS='$(CFLAGS)'
+DEFAULT_GMAKE_FLAGS += XCFLAGS='$(filter-out -W%,$(CFLAGS))'
 DEFAULT_GMAKE_FLAGS += DARWIN_DYLIB_VERSIONS='-compatibility_version 1 -current_version 1 $(LDFLAGS)'
 endif
 ifeq (1_1,$(CLANG_CL)_$(MOZ_ASAN))
