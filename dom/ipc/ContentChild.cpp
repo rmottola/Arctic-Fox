@@ -1387,7 +1387,7 @@ ContentChild::RecvSetProcessSandbox()
         return true;
     }
 #endif
-    SetContentProcessSandbox();
+    SetContentProcessSandbox(-1);
 #elif defined(XP_WIN)
     mozilla::SandboxTarget::Instance()->StartSandbox();
 #elif defined(XP_MACOSX)
