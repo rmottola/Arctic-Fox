@@ -591,6 +591,13 @@ WebGL2Context::InvalidateFramebuffer(GLenum target,
         }
     }
 
+    // InvalidateFramebuffer is a hint to the driver. Should be OK to
+    // skip calls if not supported, for example by OSX 10.9 GL
+    // drivers.
+    static bool invalidateFBSupported = gl->IsSupported(gl::GLFeature::invalidate_framebuffer);
+    if (!invalidateFBSupported)
+        return;
+
     if (!fb && !isDefaultFB) {
         dom::Sequence<GLenum> tmpAttachments;
         if (!TranslateDefaultAttachments(attachments, &tmpAttachments)) {
@@ -642,6 +649,13 @@ WebGL2Context::InvalidateSubFramebuffer(GLenum target, const dom::Sequence<GLenu
             return;
         }
     }
+
+    // InvalidateFramebuffer is a hint to the driver. Should be OK to
+    // skip calls if not supported, for example by OSX 10.9 GL
+    // drivers.
+    static bool invalidateFBSupported = gl->IsSupported(gl::GLFeature::invalidate_framebuffer);
+    if (!invalidateFBSupported)
+        return;
 
     if (!fb && !isDefaultFB) {
         dom::Sequence<GLenum> tmpAttachments;
