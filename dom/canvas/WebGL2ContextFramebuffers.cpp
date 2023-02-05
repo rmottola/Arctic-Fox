@@ -196,9 +196,9 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
     }
 
     GLsizei srcSamples;
-    GLenum srcColorFormat;
-    GLenum srcDepthFormat;
-    GLenum srcStencilFormat;
+    GLenum srcColorFormat = 0;
+    GLenum srcDepthFormat = 0;
+    GLenum srcStencilFormat = 0;
 
     if (mBoundReadFramebuffer) {
         if (!GetFBInfoForBlit(mBoundReadFramebuffer, this, "READ_FRAMEBUFFER",
@@ -227,9 +227,9 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
     }
 
     GLsizei dstSamples;
-    GLenum dstColorFormat;
-    GLenum dstDepthFormat;
-    GLenum dstStencilFormat;
+    GLenum dstColorFormat = 0;
+    GLenum dstDepthFormat = 0;
+    GLenum dstStencilFormat = 0;
 
     if (mBoundDrawFramebuffer) {
         if (!GetFBInfoForBlit(mBoundDrawFramebuffer, this, "DRAW_FRAMEBUFFER",
