@@ -647,8 +647,7 @@ AsyncFetchAndSetIconFromNetwork::OnStopRequest(nsIRequest* aRequest,
 
   nsAutoCString contentType;
   channel->GetContentType(contentType);
-  // Issue #596 - we can't sniff SVG file types by content, so we
-  // rely on the server-supplied MIME type in that case.
+  // Bug 366324 - can't sniff SVG yet, so rely on server-specified type
   if (contentType.EqualsLiteral("image/svg+xml")) {
     mIcon.mimeType.AssignLiteral("image/svg+xml");
   } else {

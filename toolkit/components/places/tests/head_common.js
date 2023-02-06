@@ -842,7 +842,8 @@ function promiseSetIconForPage(aPageURI, aIconURI) {
   PlacesUtils.favicons.setAndFetchFaviconForPage(
     aPageURI, aIconURI, true,
     PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE,
-    () => { deferred.resolve(); });
+    () => { deferred.resolve(); },
+    Services.scriptSecurityManager.getSystemPrincipal());
   return deferred.promise;
 }
 
