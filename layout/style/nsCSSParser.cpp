@@ -981,7 +981,6 @@ protected:
   bool ParseListStyle();
   bool ParseListStyleType(nsCSSValue& aValue);
   bool ParseMargin();
-  bool ParseMarks(nsCSSValue& aValue);
   bool ParseClipPath();
   bool ParseTransform(bool aIsPrefixed);
   bool ParseObjectPosition();
@@ -989,7 +988,6 @@ protected:
   bool ParseOverflow();
   bool ParsePadding();
   bool ParseQuotes();
-  bool ParseSize();
   bool ParseTextAlign(nsCSSValue& aValue,
                       const KTableValue aTable[]);
   bool ParseTextAlign(nsCSSValue& aValue);
@@ -10675,8 +10673,6 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParsePadding();
   case eCSSProperty_quotes:
     return ParseQuotes();
-  case eCSSProperty_size:
-    return ParseSize();
   case eCSSProperty_text_decoration:
     return ParseTextDecoration();
   case eCSSProperty_will_change:
@@ -10813,8 +10809,6 @@ CSSParserImpl::ParseSingleValuePropertyByFunction(nsCSSValue& aValue,
       return ParseImageOrientation(aValue);
     case eCSSProperty_list_style_type:
       return ParseListStyleType(aValue);
-    case eCSSProperty_marks:
-      return ParseMarks(aValue);
     case eCSSProperty_scroll_snap_points_x:
       return ParseScrollSnapPoints(aValue, eCSSProperty_scroll_snap_points_x);
     case eCSSProperty_scroll_snap_points_y:
@@ -13839,31 +13833,6 @@ CSSParserImpl::ParseMargin()
 }
 
 bool
-CSSParserImpl::ParseMarks(nsCSSValue& aValue)
-{
-  if (ParseSingleTokenVariant(aValue, VARIANT_HK,
-                              nsCSSProps::kPageMarksKTable)) {
-    if (eCSSUnit_Enumerated == aValue.GetUnit()) {
-      if (NS_STYLE_PAGE_MARKS_NONE != aValue.GetIntValue() &&
-          false == CheckEndProperty()) {
-        nsCSSValue second;
-        if (ParseEnum(second, nsCSSProps::kPageMarksKTable)) {
-          // 'none' keyword in conjuction with others is not allowed
-          if (NS_STYLE_PAGE_MARKS_NONE != second.GetIntValue()) {
-            aValue.SetIntValue(aValue.GetIntValue() | second.GetIntValue(),
-                               eCSSUnit_Enumerated);
-            return true;
-          }
-        }
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
-bool
 CSSParserImpl::ParseObjectPosition()
 {
   nsCSSValue value;
@@ -13974,28 +13943,6 @@ CSSParserImpl::ParseQuotes()
     }
   }
   AppendValue(eCSSProperty_quotes, value);
-  return true;
-}
-
-bool
-CSSParserImpl::ParseSize()
-{
-  nsCSSValue width, height;
-  if (!ParseSingleTokenVariant(width, VARIANT_AHKL,
-                               nsCSSProps::kPageSizeKTable)) {
-    return false;
-  }
-  if (width.IsLengthUnit()) {
-    ParseSingleTokenVariant(height, VARIANT_LENGTH, nullptr);
-  }
-
-  if (width == height || height.GetUnit() == eCSSUnit_Null) {
-    AppendValue(eCSSProperty_size, width);
-  } else {
-    nsCSSValue pair;
-    pair.SetPairValue(width, height);
-    AppendValue(eCSSProperty_size, pair);
-  }
   return true;
 }
 
