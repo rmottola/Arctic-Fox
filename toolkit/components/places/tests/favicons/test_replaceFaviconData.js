@@ -5,17 +5,17 @@
  * Tests for mozIAsyncFavicons::replaceFaviconData()
  */
 
-let iconsvc = PlacesUtils.favicons;
-let histsvc = PlacesUtils.history;
+var iconsvc = PlacesUtils.favicons;
+var histsvc = PlacesUtils.history;
 
-let originalFavicon = {
+var originalFavicon = {
   file: do_get_file("favicon-normal16.png"),
   uri: uri(do_get_file("favicon-normal16.png")),
   data: readFileData(do_get_file("favicon-normal16.png")),
   mimetype: "image/png"
 };
 
-let uniqueFaviconId = 0;
+var uniqueFaviconId = 0;
 function createFavicon(fileName) {
   let tempdir = Services.dirsvc.get("TmpD", Ci.nsILocalFile);
 
@@ -58,7 +58,7 @@ function run_test() {
   run_next_test();
 };
 
-add_task(function test_replaceFaviconData_validHistoryURI() {
+add_task(function* test_replaceFaviconData_validHistoryURI() {
   do_print("test replaceFaviconData for valid history uri");
 
   let pageURI = uri("http://test1.bar/");
@@ -86,7 +86,7 @@ add_task(function test_replaceFaviconData_validHistoryURI() {
   yield PlacesTestUtils.clearHistory();
 });
 
-add_task(function test_replaceFaviconData_overrideDefaultFavicon() {
+add_task(function* test_replaceFaviconData_overrideDefaultFavicon() {
   do_print("test replaceFaviconData to override a later setAndFetchFaviconForPage");
 
   let pageURI = uri("http://test2.bar/");
@@ -118,7 +118,7 @@ add_task(function test_replaceFaviconData_overrideDefaultFavicon() {
   yield PlacesTestUtils.clearHistory();
 });
 
-add_task(function test_replaceFaviconData_replaceExisting() {
+add_task(function* test_replaceFaviconData_replaceExisting() {
   do_print("test replaceFaviconData to override a previous setAndFetchFaviconForPage");
 
   let pageURI = uri("http://test3.bar");
@@ -155,7 +155,7 @@ add_task(function test_replaceFaviconData_replaceExisting() {
   yield PlacesTestUtils.clearHistory();
 });
 
-add_task(function test_replaceFaviconData_unrelatedReplace() {
+add_task(function* test_replaceFaviconData_unrelatedReplace() {
   do_print("test replaceFaviconData to not make unrelated changes");
 
   let pageURI = uri("http://test4.bar/");
@@ -187,7 +187,7 @@ add_task(function test_replaceFaviconData_unrelatedReplace() {
   yield PlacesTestUtils.clearHistory();
 });
 
-add_task(function test_replaceFaviconData_badInputs() {
+add_task(function* test_replaceFaviconData_badInputs() {
   do_print("test replaceFaviconData to throw on bad inputs");
 
   let favicon = createFavicon("favicon8.png");
@@ -227,7 +227,7 @@ add_task(function test_replaceFaviconData_badInputs() {
   yield PlacesTestUtils.clearHistory();
 });
 
-add_task(function test_replaceFaviconData_twiceReplace() {
+add_task(function* test_replaceFaviconData_twiceReplace() {
   do_print("test replaceFaviconData on multiple replacements");
 
   let pageURI = uri("http://test5.bar/");
