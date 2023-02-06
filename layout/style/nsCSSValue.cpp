@@ -1323,6 +1323,7 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
                                          aResult);
       break;
 
+    case eCSSProperty_align_content:
     case eCSSProperty_justify_content: {
       AppendAlignJustifyValueToString(intValue & NS_STYLE_ALIGN_ALL_BITS, aResult);
       auto fallback = intValue >> NS_STYLE_ALIGN_ALL_SHIFT;
