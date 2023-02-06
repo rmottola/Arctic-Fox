@@ -2923,7 +2923,7 @@ NS_IMETHODIMP
 TabParent::SetDocShellIsActive(bool isActive)
 {
   mDocShellIsActive = isActive;
-  Unused << SendSetDocShellIsActive(isActive);
+  Unused << SendSetDocShellIsActive(isActive, true);
   return NS_OK;
 }
 
@@ -2931,6 +2931,14 @@ NS_IMETHODIMP
 TabParent::GetDocShellIsActive(bool* aIsActive)
 {
   *aIsActive = mDocShellIsActive;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TabParent::SetDocShellIsActiveAndForeground(bool isActive)
+{
+  mDocShellIsActive = isActive;
+  Unused << SendSetDocShellIsActive(isActive, false);
   return NS_OK;
 }
 
