@@ -5783,6 +5783,7 @@ ContentParent::RecvGetAndroidSystemInfo(AndroidSystemInfo* aInfo)
 void
 ContentParent::StartProfiler(nsIProfilerStartParams* aParams)
 {
+#ifdef MOZ_ENABLE_PROFILER_SPS
     if (NS_WARN_IF(!aParams)) {
         return;
     }
@@ -5796,6 +5797,7 @@ ContentParent::StartProfiler(nsIProfilerStartParams* aParams)
     ipcParams.threadFilters() = aParams->GetThreadFilterNames();
 
     Unused << SendStartProfiler(ipcParams);
+#endif
 }
 
 } // namespace dom
