@@ -2502,6 +2502,9 @@ css::ImageValue::~ImageValue()
   mRequests.Enumerate(&ClearRequestHashtable, this);
 }
 
+NS_IMPL_ADDREF(css::ImageValue)
+NS_IMPL_RELEASE(css::ImageValue)
+
 nsCSSValueGradientStop::nsCSSValueGradientStop()
   : mLocation(eCSSUnit_None),
     mColor(eCSSUnit_Null),
