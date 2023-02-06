@@ -1480,6 +1480,8 @@ public:
   nsStyleGridLine mGridColumnEnd;
   nsStyleGridLine mGridRowStart;
   nsStyleGridLine mGridRowEnd;
+  nscoord         mGridColumnGap;       // [reset] coord, calc
+  nscoord         mGridRowGap;          // [reset] coord, calc
 
   // FIXME: Logical-coordinate equivalents to these WidthDepends... and
   // HeightDepends... methods have been introduced (see below); we probably

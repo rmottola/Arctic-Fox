@@ -2560,6 +2560,22 @@ nsComputedDOMStyle::DoGetGridRowEnd()
 }
 
 CSSValue*
+nsComputedDOMStyle::DoGetGridColumnGap()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  val->SetAppUnits(StylePosition()->mGridColumnGap);
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetGridRowGap()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  val->SetAppUnits(StylePosition()->mGridRowGap);
+  return val;
+}
+
+CSSValue*
 nsComputedDOMStyle::DoGetPaddingTop()
 {
   return GetPaddingWidthFor(NS_SIDE_TOP);

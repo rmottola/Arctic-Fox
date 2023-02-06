@@ -1492,6 +1492,8 @@ nsStylePosition::nsStylePosition(const nsStylePosition& aSource)
   , mGridColumnEnd(aSource.mGridColumnEnd)
   , mGridRowStart(aSource.mGridRowStart)
   , mGridRowEnd(aSource.mGridRowEnd)
+  , mGridColumnGap(aSource.mGridColumnGap)
+  , mGridRowGap(aSource.mGridRowGap)
 {
   MOZ_COUNT_CTOR(nsStylePosition);
 }
@@ -1585,7 +1587,9 @@ nsStylePosition::CalcDifference(const nsStylePosition& aOther,
   if (mGridColumnStart != aOther.mGridColumnStart ||
       mGridColumnEnd != aOther.mGridColumnEnd ||
       mGridRowStart != aOther.mGridRowStart ||
-      mGridRowEnd != aOther.mGridRowEnd) {
+      mGridRowEnd != aOther.mGridRowEnd ||
+      mGridColumnGap != aOther.mGridColumnGap ||
+      mGridRowGap != aOther.mGridRowGap) {
     return NS_CombineHint(hint, nsChangeHint_AllReflowHints);
   }
 
