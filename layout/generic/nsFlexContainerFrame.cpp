@@ -3787,7 +3787,9 @@ nsFlexContainerFrame::DoFlexLayout(nsPresContext*           aPresContext,
 
     // Main-Axis Alignment - Flexbox spec section 9.5
     // ==============================================
-    line->PositionItemsInMainAxis(aReflowState.mStylePosition->mJustifyContent,
+    auto justifyContent =
+      aReflowState.mStylePosition->ComputedJustifyContent(aReflowState.mStyleDisplay);
+    line->PositionItemsInMainAxis(justifyContent,
                                   aContentBoxMainSize,
                                   aAxisTracker);
 
