@@ -1480,8 +1480,8 @@ nsHTMLReflowState::CalculateHypotheticalBox(nsPresContext*    aPresContext,
       // We need to compute it. It's important we do this, because if it's
       // percentage-based this computed value may be different from the
       // computed value calculated using the absolute containing block height.
-      boxBSize = ComputeBSizeValue(blockContentSize.BSize(wm),
-                                   insideBoxSizing, styleBSize) +
+      boxBSize = nsLayoutUtils::ComputeBSizeValue(blockContentSize.BSize(wm),
+                                                  insideBoxSizing, styleBSize) +
                  insideBoxSizing + outsideBoxSizing;
     }
 
