@@ -53,7 +53,7 @@
 
 using namespace mozilla;
 
-typedef nsCSSProps::KTableValue KTableValue;
+typedef nsCSSProps::KTableEntry KTableEntry;
 
 // pref-backed bool values (hooked up in nsCSSParser::Startup)
 static bool sOpentypeSVGEnabled;
@@ -766,7 +766,7 @@ protected:
   // property (like "display") for which we emulate a vendor-prefixed value
   // (like "-webkit-box").
   nsCSSKeyword LookupKeywordPrefixAware(nsAString& aKeywordStr,
-                                        const KTableValue aKeywordTable[]);
+                                        const KTableEntry aKeywordTable[]);
 
   bool ShouldUseUnprefixingService() const;
   bool ParsePropertyWithUnprefixingService(const nsAString& aPropertyName,
@@ -939,7 +939,7 @@ protected:
 
   // parsing 'align/justify-items/self' from the css-align spec
   bool ParseAlignJustifyPosition(nsCSSValue& aResult,
-                                 const KTableValue aTable[]);
+                                 const KTableEntry aTable[]);
   bool ParseJustifyItems();
   bool ParseAlignItemsSelfJustifySelf(nsCSSProperty aPropID);
   // parsing 'align/justify-content' from the css-align spec
@@ -959,7 +959,7 @@ protected:
   bool MergeBitmaskValue(int32_t aNewValue, const int32_t aMasks[],
                          int32_t& aMergedValue);
   bool ParseBitmaskValues(nsCSSValue& aValue,
-                          const KTableValue aKeywordTable[],
+                          const KTableEntry aKeywordTable[],
                           const int32_t aMasks[]);
   bool ParseFontVariantEastAsian(nsCSSValue& aValue);
   bool ParseFontVariantLigatures(nsCSSValue& aValue);
@@ -983,7 +983,7 @@ protected:
   bool ParsePadding();
   bool ParseQuotes();
   bool ParseTextAlign(nsCSSValue& aValue,
-                      const KTableValue aTable[]);
+                      const KTableEntry aTable[]);
   bool ParseTextAlign(nsCSSValue& aValue);
   bool ParseTextAlignLast(nsCSSValue& aValue);
   bool ParseTextDecoration();
@@ -1094,28 +1094,28 @@ protected:
   bool ParseColorOpacity(uint8_t& aOpacity);
   bool ParseColorOpacity(float& aOpacity);
   bool ParseEnum(nsCSSValue& aValue,
-                 const KTableValue aKeywordTable[]);
+                 const KTableEntry aKeywordTable[]);
 
   // Variant parsing methods
   CSSParseResult ParseVariant(nsCSSValue& aValue,
                               int32_t aVariantMask,
-                              const KTableValue aKeywordTable[]);
+                              const KTableEntry aKeywordTable[]);
   CSSParseResult ParseVariantWithRestrictions(nsCSSValue& aValue,
                                               int32_t aVariantMask,
-                                              const KTableValue aKeywordTable[],
+                                              const KTableEntry aKeywordTable[],
                                               uint32_t aRestrictions);
   CSSParseResult ParseNonNegativeVariant(nsCSSValue& aValue,
                                          int32_t aVariantMask,
-                                         const KTableValue aKeywordTable[]);
+                                         const KTableEntry aKeywordTable[]);
   CSSParseResult ParseOneOrLargerVariant(nsCSSValue& aValue,
                                          int32_t aVariantMask,
-                                         const KTableValue aKeywordTable[]);
+                                         const KTableEntry aKeywordTable[]);
 
   // Variant parsing methods that are guaranteed to UngetToken any token
   // consumed on failure
   bool ParseSingleTokenVariant(nsCSSValue& aValue,
                                int32_t aVariantMask,
-                               const KTableValue aKeywordTable[])
+                               const KTableEntry aKeywordTable[])
   {
     MOZ_ASSERT(!(aVariantMask & VARIANT_MULTIPLE_TOKENS),
                "use ParseVariant for variants in VARIANT_MULTIPLE_TOKENS");
@@ -1126,7 +1126,7 @@ protected:
   bool ParseSingleTokenVariantWithRestrictions(
       nsCSSValue& aValue,
       int32_t aVariantMask,
-      const KTableValue aKeywordTable[],
+      const KTableEntry aKeywordTable[],
       uint32_t aRestrictions)
   {
     MOZ_ASSERT(!(aVariantMask & VARIANT_MULTIPLE_TOKENS),
@@ -1140,7 +1140,7 @@ protected:
   }
   bool ParseSingleTokenNonNegativeVariant(nsCSSValue& aValue,
                                           int32_t aVariantMask,
-                                          const KTableValue aKeywordTable[])
+                                          const KTableEntry aKeywordTable[])
   {
     MOZ_ASSERT(!(aVariantMask & VARIANT_MULTIPLE_TOKENS),
                "use ParseNonNegativeVariant for variants in "
@@ -1152,7 +1152,7 @@ protected:
   }
   bool ParseSingleTokenOneOrLargerVariant(nsCSSValue& aValue,
                                           int32_t aVariantMask,
-                                          const KTableValue aKeywordTable[])
+                                          const KTableEntry aKeywordTable[])
   {
     MOZ_ASSERT(!(aVariantMask & VARIANT_MULTIPLE_TOKENS),
                "use ParseOneOrLargerVariant for variants in "
@@ -1184,12 +1184,12 @@ protected:
   // that ends with a eCSSKeyword_UNKNOWN marker.
   //
   // |aPropertyKTable| can be used if some of the keywords to exclude
-  // also appear in an existing nsCSSProps::KTableValue,
+  // also appear in an existing nsCSSProps::KTableEntry,
   // to avoid duplicating them.
   bool ParseCustomIdent(nsCSSValue& aValue,
                         const nsAutoString& aIdentValue,
                         const nsCSSKeyword aExcludedKeywords[] = nullptr,
-                        const nsCSSProps::KTableValue aPropertyKTable[] = nullptr);
+                        const nsCSSProps::KTableEntry aPropertyKTable[] = nullptr);
   bool ParseCounter(nsCSSValue& aValue);
   bool ParseAttr(nsCSSValue& aValue);
   bool ParseSymbols(nsCSSValue& aValue);
@@ -6783,7 +6783,7 @@ CSSParserImpl::ParseTreePseudoElement(nsAtomList **aPseudoElementArgs)
 
 nsCSSKeyword
 CSSParserImpl::LookupKeywordPrefixAware(nsAString& aKeywordStr,
-                                        const KTableValue aKeywordTable[])
+                                        const KTableEntry aKeywordTable[])
 {
   nsCSSKeyword keyword = nsCSSKeywords::LookupKeyword(aKeywordStr);
 
@@ -7195,7 +7195,7 @@ static const nsCSSProperty kColumnRuleIDs[] = {
 
 bool
 CSSParserImpl::ParseEnum(nsCSSValue& aValue,
-                         const KTableValue aKeywordTable[])
+                         const KTableEntry aKeywordTable[])
 {
   nsSubstring* ident = NextIdent();
   if (nullptr == ident) {
@@ -7341,7 +7341,7 @@ CSSParserImpl::TranslateDimension(nsCSSValue& aValue,
 CSSParseResult
 CSSParserImpl::ParseVariantWithRestrictions(nsCSSValue& aValue,
                                             int32_t aVariantMask,
-                                            const KTableValue aKeywordTable[],
+                                            const KTableEntry aKeywordTable[],
                                             uint32_t aRestrictions)
 {
   switch (aRestrictions) {
@@ -7363,7 +7363,7 @@ CSSParserImpl::ParseVariantWithRestrictions(nsCSSValue& aValue,
 CSSParseResult
 CSSParserImpl::ParseNonNegativeVariant(nsCSSValue& aValue,
                                        int32_t aVariantMask,
-                                       const KTableValue aKeywordTable[])
+                                       const KTableEntry aKeywordTable[])
 {
   // The variant mask must only contain non-numeric variants or the ones
   // that we specifically handle.
@@ -7405,7 +7405,7 @@ CSSParserImpl::ParseNonNegativeVariant(nsCSSValue& aValue,
 CSSParseResult
 CSSParserImpl::ParseOneOrLargerVariant(nsCSSValue& aValue,
                                        int32_t aVariantMask,
-                                       const KTableValue aKeywordTable[])
+                                       const KTableEntry aKeywordTable[])
 {
   // The variant mask must only contain non-numeric variants or the ones
   // that we specifically handle.
@@ -7435,7 +7435,7 @@ CSSParserImpl::ParseOneOrLargerVariant(nsCSSValue& aValue,
 CSSParseResult
 CSSParserImpl::ParseVariant(nsCSSValue& aValue,
                             int32_t aVariantMask,
-                            const KTableValue aKeywordTable[])
+                            const KTableEntry aKeywordTable[])
 {
   NS_ASSERTION(!(mHashlessColorQuirk && (aVariantMask & VARIANT_COLOR)) ||
                !(aVariantMask & VARIANT_NUMBER),
@@ -7741,7 +7741,7 @@ bool
 CSSParserImpl::ParseCustomIdent(nsCSSValue& aValue,
                                 const nsAutoString& aIdentValue,
                                 const nsCSSKeyword aExcludedKeywords[],
-                                const nsCSSProps::KTableValue aPropertyKTable[])
+                                const nsCSSProps::KTableEntry aPropertyKTable[])
 {
   nsCSSKeyword keyword = nsCSSKeywords::LookupKeyword(aIdentValue);
   if (keyword == eCSSKeyword_UNKNOWN) {
@@ -9436,7 +9436,7 @@ CSSParserImpl::ParseGridGap()
 // $aTable is for <content-position> or <self-position>
 bool
 CSSParserImpl::ParseAlignJustifyPosition(nsCSSValue& aResult,
-                                         const KTableValue aTable[])
+                                         const KTableEntry aTable[])
 {
   nsCSSValue pos, overflowPos;
   int32_t value = 0;
@@ -10781,7 +10781,7 @@ CSSParserImpl::ParseBoxProperty(nsCSSValue& aValue,
     return CSSParseResult::NotFound;
   }
 
-  const KTableValue* kwtable = nsCSSProps::kKeywordTableTable[aPropID];
+  const KTableEntry* kwtable = nsCSSProps::kKeywordTableTable[aPropID];
   uint32_t restrictions = nsCSSProps::ValueRestrictions(aPropID);
 
   return ParseVariantWithRestrictions(aValue, variant, kwtable, restrictions);
@@ -10887,7 +10887,7 @@ CSSParserImpl::ParseSingleValueProperty(nsCSSValue& aValue,
     return CSSParseResult::NotFound;
   }
 
-  const KTableValue* kwtable = nsCSSProps::kKeywordTableTable[aPropID];
+  const KTableEntry* kwtable = nsCSSProps::kKeywordTableTable[aPropID];
   uint32_t restrictions = nsCSSProps::ValueRestrictions(aPropID);
   return ParseVariantWithRestrictions(aValue, variant, kwtable, restrictions);
 }
@@ -12516,7 +12516,7 @@ CSSParserImpl::ParseContent()
 {
   // We need to divide the 'content' keywords into two classes for
   // ParseVariant's sake, so we can't just use nsCSSProps::kContentKTable.
-  static const KTableValue kContentListKWs[] = {
+  static const KTableEntry kContentListKWs[] = {
     { eCSSKeyword_open_quote, NS_STYLE_CONTENT_OPEN_QUOTE },
     { eCSSKeyword_close_quote, NS_STYLE_CONTENT_CLOSE_QUOTE },
     { eCSSKeyword_no_open_quote, NS_STYLE_CONTENT_NO_OPEN_QUOTE },
@@ -12524,7 +12524,7 @@ CSSParserImpl::ParseContent()
     { eCSSKeyword_UNKNOWN, -1 }
   };
 
-  static const KTableValue kContentSolitaryKWs[] = {
+  static const KTableEntry kContentSolitaryKWs[] = {
     { eCSSKeyword__moz_alt_content, NS_STYLE_CONTENT_ALT_CONTENT },
     { eCSSKeyword_UNKNOWN, -1 }
   };
@@ -13009,7 +13009,7 @@ CSSParserImpl::MergeBitmaskValue(int32_t aNewValue,
 
 bool
 CSSParserImpl::ParseBitmaskValues(nsCSSValue& aValue,
-                                  const KTableValue aKeywordTable[],
+                                  const KTableEntry aKeywordTable[],
                                   const int32_t aMasks[])
 {
   // Parse at least one keyword
@@ -13987,7 +13987,7 @@ CSSParserImpl::ParseTextDecoration()
 }
 
 bool
-CSSParserImpl::ParseTextAlign(nsCSSValue& aValue, const KTableValue aTable[])
+CSSParserImpl::ParseTextAlign(nsCSSValue& aValue, const KTableEntry aTable[])
 {
   if (ParseSingleTokenVariant(aValue, VARIANT_INHERIT, nullptr)) {
     // 'inherit', 'initial' and 'unset' must be alone
@@ -15666,7 +15666,7 @@ CSSParserImpl::ParsePaintOrder()
     ((1 << NS_STYLE_PAINT_ORDER_BITWIDTH) > NS_STYLE_PAINT_ORDER_LAST_VALUE,
      "bitfield width insufficient for paint-order constants");
 
-  static const KTableValue kPaintOrderKTable[] = {
+  static const KTableEntry kPaintOrderKTable[] = {
     { eCSSKeyword_normal,  NS_STYLE_PAINT_ORDER_NORMAL },
     { eCSSKeyword_fill,    NS_STYLE_PAINT_ORDER_FILL },
     { eCSSKeyword_stroke,  NS_STYLE_PAINT_ORDER_STROKE },

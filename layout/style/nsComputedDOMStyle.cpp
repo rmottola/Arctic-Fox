@@ -1794,7 +1794,7 @@ nsComputedDOMStyle::DoGetFontVariantPosition()
 CSSValue*
 nsComputedDOMStyle::GetBackgroundList(uint8_t nsStyleBackground::Layer::* aMember,
                                       uint32_t nsStyleBackground::* aCount,
-                                      const KTableValue aTable[])
+                                      const KTableEntry aTable[])
 {
   const nsStyleBackground* bg = StyleBackground();
 
@@ -3313,7 +3313,7 @@ nsComputedDOMStyle::DoGetVerticalAlign()
 
 CSSValue*
 nsComputedDOMStyle::CreateTextAlignValue(uint8_t aAlign, bool aAlignTrue,
-                                         const KTableValue aTable[])
+                                         const KTableEntry aTable[])
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
   val->SetIdent(nsCSSProps::ValueToKeywordEnum(aAlign, aTable));
@@ -4869,7 +4869,7 @@ nsComputedDOMStyle::SetValueToCoord(nsROCSSPrimitiveValue* aValue,
                                     const nsStyleCoord& aCoord,
                                     bool aClampNegativeCalc,
                                     PercentageBaseGetter aPercentageBaseGetter,
-                                    const KTableValue aTable[],
+                                    const KTableEntry aTable[],
                                     nscoord aMinAppUnits,
                                     nscoord aMaxAppUnits)
 {
