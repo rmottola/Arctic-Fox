@@ -42,6 +42,11 @@ struct WindowsThemeName {
 const WindowsThemeName themeStrings[] = {
     { LookAndFeel::eWindowsTheme_Aero,       L"aero" },
     { LookAndFeel::eWindowsTheme_AeroLite,   L"aero-lite" },
+    { LookAndFeel::eWindowsTheme_LunaBlue,   L"luna-blue" },
+    { LookAndFeel::eWindowsTheme_LunaOlive,  L"luna-olive" },
+    { LookAndFeel::eWindowsTheme_LunaSilver, L"luna-silver" },
+    { LookAndFeel::eWindowsTheme_Royale,     L"royale" },
+    { LookAndFeel::eWindowsTheme_Zune,       L"zune" },
     { LookAndFeel::eWindowsTheme_Generic,    L"generic" }
 };
 
