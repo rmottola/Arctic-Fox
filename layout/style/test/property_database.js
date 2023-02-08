@@ -4569,6 +4569,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     alias_for: "transform-style",
+    subproperties: [ "transform-style" ],
   },
   "-moz-border-image": {
     domProp: "MozBorderImage",
