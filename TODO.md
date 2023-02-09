@@ -99,7 +99,7 @@
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1223647: CSP erroneously inherited into dedicated workers. r=cke
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
-- Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
+- 1176968 2015-11-04 remaining parts
 - Bug 1238935 - r=jonco 
 - Bug 1214126 - 5 Parts
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
