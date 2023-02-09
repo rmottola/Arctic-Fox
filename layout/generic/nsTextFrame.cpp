@@ -5077,10 +5077,6 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
                                      nsRect* aVisualOverflowRect,
                                      bool aIncludeTextDecorations)
 {
-  // Text-shadow overflows
-  nsRect shadowRect =
-    nsLayoutUtils::GetTextShadowRectsUnion(*aVisualOverflowRect, this);
-  aVisualOverflowRect->UnionRect(*aVisualOverflowRect, shadowRect);
   bool verticalRun = mTextRun->IsVertical();
   bool useVerticalMetrics = verticalRun && mTextRun->UseCenterBaseline();
   bool inverted = GetWritingMode().IsLineInverted();
@@ -5254,6 +5250,12 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
                     : nsRect(0, topOrLeft, measure, bottomOrRight - topOrLeft));
     }
   }
+
+  // Text-shadow overflows
+  nsRect shadowRect =
+    nsLayoutUtils::GetTextShadowRectsUnion(*aVisualOverflowRect, this);
+  aVisualOverflowRect->UnionRect(*aVisualOverflowRect, shadowRect);
+
   // When this frame is not selected, the text-decoration area must be in
   // frame bounds.
   if (!IsSelected() ||
