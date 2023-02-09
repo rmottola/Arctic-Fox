@@ -6062,8 +6062,9 @@ nsComputedDOMStyle::DoGetAnimationDirection()
     nsROCSSPrimitiveValue* direction = new nsROCSSPrimitiveValue;
     valueList->AppendCSSValue(direction);
     direction->SetIdent(
-      nsCSSProps::ValueToKeywordEnum(animation->GetDirection(),
-                                     nsCSSProps::kAnimationDirectionKTable));
+      nsCSSProps::ValueToKeywordEnum(
+        static_cast<int32_t>(animation->GetDirection()),
+        nsCSSProps::kAnimationDirectionKTable));
   } while (++i < display->mAnimationDirectionCount);
 
   return valueList;
@@ -6084,8 +6085,9 @@ nsComputedDOMStyle::DoGetAnimationFillMode()
     nsROCSSPrimitiveValue* fillMode = new nsROCSSPrimitiveValue;
     valueList->AppendCSSValue(fillMode);
     fillMode->SetIdent(
-      nsCSSProps::ValueToKeywordEnum(animation->GetFillMode(),
-                                     nsCSSProps::kAnimationFillModeKTable));
+      nsCSSProps::ValueToKeywordEnum(
+        static_cast<int32_t>(animation->GetFillMode()),
+        nsCSSProps::kAnimationFillModeKTable));
   } while (++i < display->mAnimationFillModeCount);
 
   return valueList;
