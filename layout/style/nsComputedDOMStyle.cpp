@@ -536,12 +536,15 @@ nsComputedDOMStyle::GetAdjustedValuesForBoxSizing()
 
   nsMargin adjustment;
   switch(stylePos->mBoxSizing) {
-    case NS_STYLE_BOX_SIZING_BORDER:
+    case StyleBoxSizing::Border:
       adjustment += mInnerFrame->GetUsedBorder();
       // fall through
-
-    case NS_STYLE_BOX_SIZING_PADDING:
+    case StyleBoxSizing::Padding:
       adjustment += mInnerFrame->GetUsedPadding();
+      // fall through
+    case StyleBoxSizing::Content:
+      // nothing
+      break;
   }
 
   return adjustment;
@@ -3855,7 +3858,7 @@ nsComputedDOMStyle::DoGetBoxSizing()
 {
   nsROCSSPrimitiveValue *val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StylePosition()->mBoxSizing,
+    nsCSSProps::ValueToKeywordEnum(uint8_t(StylePosition()->mBoxSizing),
                                    nsCSSProps::kBoxSizingKTable));
   return val;
 }
