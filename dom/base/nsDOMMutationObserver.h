@@ -595,7 +595,8 @@ protected:
 
   static void HandleMutationsInternal();
 
-  static void AddCurrentlyHandlingObserver(nsDOMMutationObserver* aObserver);
+  static void AddCurrentlyHandlingObserver(nsDOMMutationObserver* aObserver,
+                                           uint32_t aMutationLevel);
 
   nsCOMPtr<nsPIDOMWindow>                            mOwner;
 
