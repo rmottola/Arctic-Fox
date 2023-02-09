@@ -1080,6 +1080,12 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER   (1 << 1)
 #define NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT    (1 << 2)
 #define NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT   (1 << 3)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT \
+  (NS_STYLE_TEXT_EMPHASIS_POSITION_OVER | \
+   NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT_ZH \
+  (NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER | \
+   NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT)
 
 // text-emphasis-style
 // Note that filled and none here both have zero as their value. This is
