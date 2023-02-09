@@ -1305,6 +1305,7 @@ private:
 class GlyphBufferAzure;
 struct TextRunDrawParams;
 struct FontDrawParams;
+struct EmphasisMarkDrawParams;
 
 class gfxFont {
 
@@ -1598,6 +1599,16 @@ public:
     void Draw(gfxTextRun *aTextRun, uint32_t aStart, uint32_t aEnd,
               gfxPoint *aPt, const TextRunDrawParams& aRunParams,
               uint16_t aOrientation);
+
+    /**
+     * Draw the emphasis marks for the given text run. Its prerequisite
+     * and output are similiar to the method Draw().
+     * @param aPt the baseline origin of the emphasis marks.
+     * @param aParams some drawing parameters, see EmphasisMarkDrawParams.
+     */
+    void DrawEmphasisMarks(gfxTextRun* aShapedText, gfxPoint* aPt,
+                           uint32_t aOffset, uint32_t aCount,
+                           const EmphasisMarkDrawParams& aParams);
 
     /**
      * Measure a run of characters. See gfxTextRun::Metrics.
@@ -2161,6 +2172,15 @@ struct FontDrawParams {
     bool                      isVerticalFont;
     bool                      haveSVGGlyphs;
     bool                      haveColorGlyphs;
+};
+
+struct EmphasisMarkDrawParams {
+    gfxContext* context;
+    gfxFont::Spacing* spacing;
+    gfxTextRun* mark;
+    gfxFloat advance;
+    gfxFloat direction;
+    bool isVertical;
 };
 
 #endif
