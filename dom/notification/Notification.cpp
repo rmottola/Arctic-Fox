@@ -2046,7 +2046,8 @@ Notification::GetData(JSContext* aCx,
 {
   if (mData.isNull() && !mDataAsBase64.IsEmpty()) {
     nsresult rv;
-    auto container = new nsStructuredCloneContainer();
+    RefPtr<nsStructuredCloneContainer> container =
+      new nsStructuredCloneContainer();
     rv = container->InitFromBase64(mDataAsBase64, JS_STRUCTURED_CLONE_VERSION,
                                    aCx);
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -2082,7 +2083,8 @@ Notification::InitFromJSVal(JSContext* aCx, JS::Handle<JS::Value> aData,
   if (!mDataAsBase64.IsEmpty() || aData.isNull()) {
     return;
   }
-  auto dataObjectContainer = new nsStructuredCloneContainer();
+  RefPtr<nsStructuredCloneContainer> dataObjectContainer =
+    new nsStructuredCloneContainer();
   aRv = dataObjectContainer->InitFromJSVal(aData, aCx);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
@@ -2099,7 +2101,8 @@ void Notification::InitFromBase64(JSContext* aCx, const nsAString& aData,
   }
 
   // To and fro to ensure it is valid base64.
-  auto container = new nsStructuredCloneContainer();
+  RefPtr<nsStructuredCloneContainer> container =
+    new nsStructuredCloneContainer();
   aRv = container->InitFromBase64(aData, JS_STRUCTURED_CLONE_VERSION,
                                   aCx);
   if (NS_WARN_IF(aRv.Failed())) {
