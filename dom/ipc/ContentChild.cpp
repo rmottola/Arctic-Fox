@@ -2174,8 +2174,7 @@ ContentChild::ActorDestroy(ActorDestroyReason why)
     // going through the full XPCOM shutdown path, because it doesn't
     // keep persistent state.
     QuickExit();
-#endif
-
+#else
     if (sFirstIdleTask) {
         sFirstIdleTask->Cancel();
     }
@@ -2200,6 +2199,7 @@ ContentChild::ActorDestroy(ActorDestroyReason why)
 #endif
 
     XRE_ShutdownChildProcess();
+#endif // NS_FREE_PERMANENT_DATA
 }
 
 void
