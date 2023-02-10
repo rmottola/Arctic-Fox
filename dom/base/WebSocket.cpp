@@ -338,7 +338,13 @@ WebSocketImpl::PrintErrorOnConsole(const char *aBundleURI,
     RefPtr<PrintErrorOnConsoleRunnable> runnable =
       new PrintErrorOnConsoleRunnable(this, aBundleURI, aError, aFormatStrings,
                                       aFormatStringsLen);
-    runnable->Dispatch(mWorkerPrivate->GetJSContext());
+    ErrorResult rv;
+    runnable->Dispatch(rv);
+    // XXXbz this seems totally broken.  We should be propagating this out, but
+    // none of our callers really propagate anything usefully.  Come to think of
+    // it, why is this a syncrunnable anyway?  Can't this be a fire-and-forget
+    // runnable??
+    rv.SuppressException();
     return;
   }
 
@@ -619,7 +625,11 @@ WebSocketImpl::Disconnect()
   } else {
     RefPtr<DisconnectInternalRunnable> runnable =
       new DisconnectInternalRunnable(this);
-    runnable->Dispatch(mWorkerPrivate->GetJSContext());
+    ErrorResult rv;
+    runnable->Dispatch(rv);
+    // XXXbz this seems totally broken.  We should be propagating this out, but
+    // where to, exactly?
+    rv.SuppressException();
   }
 
   // DontKeepAliveAnyMore() can release the object. So hold a reference to this
@@ -1261,7 +1271,7 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
       new InitRunnable(webSocket->mImpl, aUrl, protocolArray,
                        nsAutoCString(file.get()), lineno, column, aRv,
                        &connectionFailed);
-    runnable->Dispatch(aGlobal.Context());
+    runnable->Dispatch(aRv);
   }
 
   if (NS_WARN_IF(aRv.Failed())) {
@@ -1341,7 +1351,7 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
   } else {
     RefPtr<AsyncOpenRunnable> runnable =
       new AsyncOpenRunnable(webSocket->mImpl, aRv);
-    runnable->Dispatch(aGlobal.Context());
+    runnable->Dispatch(aRv);
   }
 
   if (NS_WARN_IF(aRv.Failed())) {
