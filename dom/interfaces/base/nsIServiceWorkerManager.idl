@@ -21,20 +21,35 @@ interface nsIServiceWorkerUnregisterCallback : nsISupports
   void unregisterFailed();
 };
 
-[scriptable, builtinclass, uuid(f222dcad-3081-4699-bbc6-5615e20749C8)]
+[scriptable, builtinclass, uuid(1a1e71dd-0f78-4e2e-a2db-a946fe02cddf)]
+interface nsIServiceWorkerInfo : nsISupports
+{
+  readonly attribute DOMString scriptSpec;
+  readonly attribute DOMString cacheName;
+};
+
+[scriptable, builtinclass, uuid(e908bc07-0a4c-443f-a546-2109bf1f4A01)]
 interface nsIServiceWorkerRegistrationInfo : nsISupports
 {
   readonly attribute nsIPrincipal principal;
 
   readonly attribute DOMString scope;
   readonly attribute DOMString scriptSpec;
-  readonly attribute DOMString currentWorkerURL;
 
-  readonly attribute DOMString activeCacheName;
-  readonly attribute DOMString waitingCacheName;
+  readonly attribute nsIServiceWorkerInfo installingWorker;
+  readonly attribute nsIServiceWorkerInfo waitingWorker;
+  readonly attribute nsIServiceWorkerInfo activeWorker;
 };
 
-[scriptable, builtinclass, uuid(10f80c8c-7bf5-479e-a8d8-12ef50c802e8)]
+[scriptable, uuid(9e523e7c-ad6f-4df0-8077-c74aebbc679d)]
+interface nsIServiceWorkerManagerListener : nsISupports
+{
+  void onRegister(in nsIServiceWorkerRegistrationInfo aInfo);
+
+  void onUnregister(in nsIServiceWorkerRegistrationInfo aInfo);
+};
+
+[scriptable, builtinclass, uuid(2f61820a-1e9a-4c16-bf1c-ce182c5f5d6d)]
 interface nsIServiceWorkerManager : nsISupports
 {
   /**
@@ -145,6 +160,10 @@ interface nsIServiceWorkerManager : nsISupports
                                      [optional, array, size_is(aDataLength)] in uint8_t aDataBytes);
   void sendPushSubscriptionChangeEvent(in ACString aOriginAttributes,
                                        in ACString scope);
+
+  void addListener(in nsIServiceWorkerManagerListener aListener);
+
+  void removeListener(in nsIServiceWorkerManagerListener aListener);
 };
 
 %{ C++
