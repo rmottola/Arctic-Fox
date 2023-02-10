@@ -706,12 +706,12 @@ public:
   }
 };
 
-class PrefEnabledRunnable final : public WorkerMainThreadRunnable
+class PrefEnabledRunnable final : public WorkerCheckAPIExposureOnMainThreadRunnable
 {
 public:
   PrefEnabledRunnable(WorkerPrivate* aWorkerPrivate,
                       const nsCString& aPrefName)
-    : WorkerMainThreadRunnable(aWorkerPrivate)
+    : WorkerCheckAPIExposureOnMainThreadRunnable(aWorkerPrivate)
     , mEnabled(false)
     , mPrefName(aPrefName)
   { }
@@ -749,9 +749,7 @@ nsPerformance::IsEnabled(JSContext* aCx, JSObject* aGlobal)
   RefPtr<PrefEnabledRunnable> runnable =
     new PrefEnabledRunnable(workerPrivate,
                             NS_LITERAL_CSTRING("dom.enable_user_timing"));
-  runnable->Dispatch(workerPrivate->GetJSContext());
-
-  return runnable->IsEnabled();
+  return runnable->Dispatch() && runnable->IsEnabled();
 }
 
 /* static */ bool
@@ -768,9 +766,8 @@ nsPerformance::IsObserverEnabled(JSContext* aCx, JSObject* aGlobal)
   RefPtr<PrefEnabledRunnable> runnable =
     new PrefEnabledRunnable(workerPrivate,
                             NS_LITERAL_CSTRING("dom.enable_performance_observer"));
-  runnable->Dispatch(workerPrivate->GetJSContext());
 
-  return runnable->IsEnabled();
+  return runnable->Dispatch() && runnable->IsEnabled();
 }
 
 void
