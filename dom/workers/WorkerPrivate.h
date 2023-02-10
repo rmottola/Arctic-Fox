@@ -1293,6 +1293,13 @@ public:
   }
 
   bool
+  DOMServiceWorkerNotificationEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_SERVICEWORKERNOTIFICATION];
+  }
+
+  bool
   DOMCachesTestingEnabled() const
   {
     AssertIsOnWorkerThread();
