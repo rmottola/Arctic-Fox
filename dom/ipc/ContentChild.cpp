@@ -3012,6 +3012,7 @@ ContentChild::AllocPContentPermissionRequestChild(const InfallibleTArray<Permiss
 bool
 ContentChild::DeallocPContentPermissionRequestChild(PContentPermissionRequestChild* actor)
 {
+    nsContentPermissionUtils::NotifyRemoveContentPermissionRequestChild(actor);
     auto child = static_cast<RemotePermissionRequest*>(actor);
     child->IPDLRelease();
     return true;
