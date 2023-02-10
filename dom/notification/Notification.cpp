@@ -1045,6 +1045,8 @@ protected:
     AssertIsOnMainThread();
 
     MOZ_ASSERT(mNotificationRef);
+   notification->mObserver = nullptr;
+
   }
 };
 
