@@ -140,7 +140,7 @@ public:
   void
   ToJSON(nsString& aResult, ErrorResult& aRv) const
   {
-    GetHref(aResult, aRv);
+    GetHref(aResult);
   }
 
   // URLSearchParamsObserver
