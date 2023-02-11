@@ -5106,9 +5106,6 @@ pref("dom.voicemail.enabled", false);
 // parameter omitted.
 pref("dom.voicemail.defaultServiceId", 0);
 
-// DOM BroadcastChannel API.
-pref("dom.broadcastChannel.enabled", true);
-
 // DOM Inter-App Communication API.
 pref("dom.inter-app-communication-api.enabled", false);
 
