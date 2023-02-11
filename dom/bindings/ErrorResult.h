@@ -187,8 +187,8 @@ public:
   // Facilities for throwing a preexisting JS exception value via this
   // ErrorResult.  The contract is that any code which might end up calling
   // ThrowJSException() must call MightThrowJSException() even if no exception
-  // is being thrown.  Code that would call MaybeSetPendingException or
-  // StealJSException as needed must first call WouldReportJSException even if
+  // is being thrown.  Code that conditionally calls ToJSValue on this
+  // ErrorResult only if Failed() must first call WouldReportJSException even if
   // this ErrorResult has not failed.
   //
   // The exn argument to ThrowJSException can be in any compartment.  It does
@@ -223,11 +223,6 @@ public:
   bool IsUncatchableException() const {
     return ErrorCode() == NS_ERROR_UNCATCHABLE_EXCEPTION;
   }
-
-  // StealJSException steals the JS Exception from the object. This method must
-  // be called only if IsJSException() returns true. This method also resets the
-  // error code to NS_OK.
-  void StealJSException(JSContext* cx, JS::MutableHandle<JS::Value> value);
 
   void MOZ_ALWAYS_INLINE MightThrowJSException()
   {
