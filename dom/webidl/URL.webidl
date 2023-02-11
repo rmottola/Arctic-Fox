@@ -18,10 +18,46 @@
  Exposed=(Window,Worker)]
 interface URL {
   [Throws]
+  stringifier;
+
+  [Throws]
+  attribute USVString href;
+
+  [Throws]
+  readonly attribute USVString origin;
+
+  [Throws]
+           attribute USVString protocol;
+
+  [Throws]
+           attribute USVString username;
+
+  [Throws]
+           attribute USVString password;
+
+  [Throws]
+           attribute USVString host;
+
+  [Throws]
+           attribute USVString hostname;
+
+  [Throws]
+           attribute USVString port;
+
+  [Throws]
+           attribute USVString pathname;
+
+  [Throws]
+           attribute USVString search;
+
+  readonly attribute URLSearchParams searchParams;
+
+  [Throws]
+           attribute USVString hash;
+
+  [Throws]
   USVString toJSON();
 };
-URL implements URLUtils;
-URL implements URLUtilsSearchParams;
 
 partial interface URL {
   [Throws]
