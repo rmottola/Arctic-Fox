@@ -1129,6 +1129,7 @@ MediaRecorder::NotifyOwnerDocumentActivityChanged()
     // Stop the session.
     ErrorResult result;
     Stop(result);
+    result.SuppressException();
   }
 }
 
