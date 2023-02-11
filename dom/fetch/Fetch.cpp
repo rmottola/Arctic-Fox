@@ -1009,7 +1009,6 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       FetchUtil::ConsumeArrayBuffer(cx, &arrayBuffer, aResultLength, aResult,
                                     error);
 
-      error.WouldReportJSException();
       if (!error.Failed()) {
         JS::Rooted<JS::Value> val(cx);
         val.setObjectOrNull(arrayBuffer);
@@ -1024,7 +1023,6 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       RefPtr<dom::Blob> blob = FetchUtil::ConsumeBlob(
         DerivedClass()->GetParentObject(), NS_ConvertUTF8toUTF16(mMimeType),
         aResultLength, aResult, error);
-      error.WouldReportJSException();
       if (!error.Failed()) {
         localPromise->MaybeResolve(blob);
         // File takes over ownership.

@@ -160,6 +160,7 @@ public:
   // after true is returned.
   bool MaybeSetPendingException(JSContext* cx)
   {
+    WouldReportJSException();
     if (!Failed()) {
       return false;
     }
