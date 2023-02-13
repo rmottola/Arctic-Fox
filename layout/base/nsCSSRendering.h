@@ -262,6 +262,7 @@ public:
 
   bool IsReady() const { return mPrepareResult == DrawResult::SUCCESS; }
   DrawResult PrepareResult() const { return mPrepareResult; }
+  void SetExtendMode(mozilla::gfx::ExtendMode aMode) { mExtendMode = aMode; }
 
 private:
   /**
@@ -299,6 +300,7 @@ private:
   DrawResult                mPrepareResult;
   nsSize                    mSize; // unscaled size of the image, in app units
   uint32_t                  mFlags;
+  mozilla::gfx::ExtendMode  mExtendMode;
 };
 
 /**
