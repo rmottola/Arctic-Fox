@@ -116,6 +116,16 @@ InterceptedChannelBase::GetConsoleReportCollector(nsIConsoleReportCollector** aC
   return NS_OK;
 }
 
+NS_IMETHODIMP
+InterceptedChannelBase::SetReleaseHandle(nsISupports* aHandle)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!mReleaseHandle);
+  MOZ_ASSERT(aHandle);
+  mReleaseHandle = aHandle;
+  return NS_OK;
+}
+
 InterceptedChannelChrome::InterceptedChannelChrome(nsHttpChannel* aChannel,
                                                    nsINetworkInterceptController* aController,
                                                    nsICacheEntry* aEntry)
@@ -170,6 +180,7 @@ InterceptedChannelChrome::ResetInterception()
   nsresult rv = mChannel->StartRedirectChannelToURI(uri, nsIChannelEventSink::REDIRECT_INTERNAL);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  mReleaseHandle = nullptr;
   mChannel = nullptr;
   return NS_OK;
 }
@@ -263,6 +274,7 @@ InterceptedChannelChrome::FinishSynthesizedResponse(const nsACString& aFinalURLS
       NS_ENSURE_SUCCESS(rv, rv);
     }
   }
+  mReleaseHandle = nullptr;
   mChannel = nullptr;
   return NS_OK;
 }
@@ -282,6 +294,7 @@ InterceptedChannelChrome::Cancel(nsresult aStatus)
   // to cancel which will provide OnStart/OnStopRequest to the channel.
   nsresult rv = mChannel->AsyncAbort(aStatus);
   NS_ENSURE_SUCCESS(rv, rv);
+  mReleaseHandle = nullptr;
   return NS_OK;
 }
 
@@ -347,6 +360,7 @@ InterceptedChannelContent::ResetInterception()
   mSynthesizedInput = nullptr;
 
   mChannel->ResetInterception();
+  mReleaseHandle = nullptr;
   mChannel = nullptr;
   return NS_OK;
 }
@@ -405,6 +419,7 @@ InterceptedChannelContent::FinishSynthesizedResponse(const nsACString& aFinalURL
   }
 
   mResponseBody = nullptr;
+  mReleaseHandle = nullptr;
   mChannel = nullptr;
   mStreamListener = nullptr;
   return NS_OK;
@@ -425,6 +440,7 @@ InterceptedChannelContent::Cancel(nsresult aStatus)
   // to cancel which will provide OnStart/OnStopRequest to the channel.
   nsresult rv = mChannel->AsyncAbort(aStatus);
   NS_ENSURE_SUCCESS(rv, rv);
+  mReleaseHandle = nullptr;
   mChannel = nullptr;
   mStreamListener = nullptr;
   return NS_OK;
