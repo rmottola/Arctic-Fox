@@ -12801,6 +12801,10 @@
         "url": "/dom/nodes/Element-getElementsByClassName.html"
       },
       {
+        "path": "dom/nodes/Element-getElementsByTagName-change-document-HTMLNess.html",
+        "url": "/dom/nodes/Element-getElementsByTagName-change-document-HTMLNess.html"
+      },
+      {
         "path": "dom/nodes/Element-getElementsByTagName.html",
         "url": "/dom/nodes/Element-getElementsByTagName.html"
       },
