@@ -2399,7 +2399,7 @@ ServiceWorkerManager::ReportToAllClients(const nsCString& aScope,
     }
 
     nsCOMPtr<nsIDocument> doc = do_QueryInterface(iter.Key());
-    if (!doc || !doc->GetWindow()) {
+    if (!doc || !doc->IsCurrentActiveDocument() || !doc->GetWindow()) {
       continue;
     }
 
@@ -2423,6 +2423,10 @@ ServiceWorkerManager::ReportToAllClients(const nsCString& aScope,
       nsCOMPtr<nsIDocument> doc = do_QueryReferent(regList->ElementAt(i));
       if (!doc) {
         regList->RemoveElementAt(i);
+        continue;
+      }
+
+      if (!doc->IsCurrentActiveDocument()) {
         continue;
       }
 
