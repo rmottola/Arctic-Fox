@@ -687,7 +687,6 @@ ServiceWorkerRegistrationMainThread::ShowNotification(JSContext* aCx,
                                                       ErrorResult& aRv)
 {
   AssertIsOnMainThread();
-  MOZ_ASSERT(GetOwner());
   nsCOMPtr<nsPIDOMWindow> window = GetOwner();
   if (NS_WARN_IF(!window)) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -722,6 +721,10 @@ ServiceWorkerRegistrationMainThread::GetNotifications(const GetNotificationOptio
 {
   AssertIsOnMainThread();
   nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+  if (NS_WARN_IF(!window)) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
   return Notification::Get(window, aOptions, mScope, aRv);
 }
 
