@@ -191,7 +191,7 @@ NS_IMETHODIMP nsBufferDecoderSupport::GetMaxLength(const char* aSrc,
   length *= mMaxLengthFactor;
 
   if (!length.isValid()) {
-    return NS_ERROR_FAILURE;
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
   *aDestLength = length.value();
@@ -564,7 +564,7 @@ nsEncoderSupport::GetMaxLength(const char16_t* aSrc,
   length *= mMaxLengthFactor;
 
   if (!length.isValid()) {
-    return NS_ERROR_FAILURE;
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
   *aDestLength = length.value();
