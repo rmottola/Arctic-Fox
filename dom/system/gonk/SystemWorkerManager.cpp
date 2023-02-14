@@ -118,7 +118,7 @@ SystemWorkerManager::Shutdown()
   ShutdownAutoMounter();
 
 #ifdef MOZ_B2G_RIL
-  RilConsumer::Shutdown();
+  RilWorker::Shutdown();
 #endif
 
   nsCOMPtr<nsIWifi> wifi(do_QueryInterface(mWifiWorker));
@@ -200,7 +200,7 @@ SystemWorkerManager::RegisterRilWorker(unsigned int aClientId,
     return NS_ERROR_FAILURE;
   }
 
-  return RilConsumer::Register(aClientId, wctd);
+  return RilWorker::Register(aClientId, wctd);
 #endif // MOZ_B2G_RIL
 }
 
