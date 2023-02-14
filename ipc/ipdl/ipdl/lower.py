@@ -5005,7 +5005,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         actorvar = actor.var()
         method = MethodDefn(self.makeDtorMethodDecl(md))
 
-        method.addstmts(self.dtorPrologue(actor.var()))
         method.addstmts(self.dtorPrologue(actorvar))
 
         msgvar, stmts = self.makeMessage(md, errfnSendDtor, actorvar)
