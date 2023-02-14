@@ -264,8 +264,10 @@ RilConsumer::Send(UnixSocketRawData* aRawData)
 void
 RilConsumer::Close()
 {
-  mSocket->Close();
-  mSocket = nullptr;
+  if (mSocket) {
+    mSocket->Close();
+    mSocket = nullptr;
+  }
 }
 
 // |StreamSocketConnector|
