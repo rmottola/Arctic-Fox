@@ -118,13 +118,16 @@ impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
-ARM fixes to check
+# ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
 # Build System - not working
 Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
-Check with Roy Tam:
+# Mac Specific
+Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
+
+# Win specific Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.
