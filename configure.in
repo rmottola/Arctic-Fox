@@ -854,6 +854,8 @@ fi
 MOZ_PATH_PROG(RPMBUILD, rpmbuild, :)
 AC_SUBST(RPMBUILD)
 
+MOZ_PATH_PROG(GENISOIMAGE, genisoimage, :)
+
 if test "$COMPILE_ENVIRONMENT"; then
 
 dnl ========================================================
@@ -8732,6 +8734,8 @@ AC_SUBST(MOZ_SZIP_FLAGS)
 
 AC_DEFINE(MOZ_PHOENIX_EXTENSIONS)
 AC_SUBST(MOZ_PHOENIX_EXTENSIONS)
+
+AC_SUBST(DMG_TOOL)
 
 dnl Host JavaScript runtime, if any, to use during cross compiles.
 AC_SUBST(JS_BINARY)
