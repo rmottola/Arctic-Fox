@@ -5921,6 +5921,74 @@ AC_SUBST(MOZ_GAMEPAD)
 AC_SUBST(MOZ_GAMEPAD_BACKEND)
 
 dnl ========================================================
+dnl = Breakpad crash reporting (on by default on supported platforms)
+dnl ========================================================
+
+case $target in
+i?86-*-mingw*|x86_64-*-mingw*)
+  MOZ_CRASHREPORTER=1
+  ;;
+i?86-apple-darwin*|x86_64-apple-darwin*)
+  if test -z "$MOZ_IOS"; then
+    MOZ_CRASHREPORTER=1
+  fi
+  ;;
+i?86-*-linux*|x86_64-*-linux*|arm-*-linux*)
+  if test "$MOZ_ENABLE_GTK"; then
+    MOZ_CRASHREPORTER=1
+  fi
+  ;;
+*-android*|*-linuxandroid*)
+  MOZ_CRASHREPORTER=1
+  ;;
+*solaris*)
+  MOZ_CRASHREPORTER=1
+  ;;
+esac
+
+dnl = disabled anyway on AF
+MOZ_CRASHREPORTER=
+
+MOZ_ARG_DISABLE_BOOL(crashreporter,
+[  --disable-crashreporter Disable breakpad crash reporting],
+    [MOZ_CRASHREPORTER=],
+    [MOZ_CRASHREPORTER=F # Force enable breakpad])
+
+if test "$OS_ARCH" != "$HOST_OS_ARCH" -a "$OS_ARCH" != "WINNT" -a "$OS_ARCH" != "Darwin"; then
+  if test "$MOZ_CRASHREPORTER" = F; then
+    AC_MSG_ERROR([Cannot --enable-crashreporter, as breakpad tools do not support compiling on $HOST_OS_ARCH while targeting $OS_ARCH.])
+  fi
+  MOZ_CRASHREPORTER=
+fi
+
+if test -n "$MOZ_CRASHREPORTER"; then
+   AC_DEFINE(MOZ_CRASHREPORTER)
+
+  if test "$OS_TARGET" = "Linux" -o "$OS_ARCH" = "SunOS" && \
+    test -z "$SKIP_LIBRARY_CHECKS"; then
+    PKG_CHECK_MODULES(MOZ_GTHREAD, gthread-2.0)
+  fi
+
+  if test "$OS_ARCH" = "WINNT"; then
+    if test -z "$HAVE_64BIT_BUILD"; then
+      MOZ_CRASHREPORTER_INJECTOR=1
+      AC_DEFINE(MOZ_CRASHREPORTER_INJECTOR)
+    fi
+  fi
+fi
+
+MOZ_ARG_WITH_STRING(crashreporter-enable-percent,
+[  --with-crashreporter-enable-percent=NN
+                          Enable sending crash reports by default on NN% of users. (default=100)],
+[ val=`echo $withval | sed 's/[^0-9]//g'`
+    MOZ_CRASHREPORTER_ENABLE_PERCENT="$val"])
+
+if test -z "$MOZ_CRASHREPORTER_ENABLE_PERCENT"; then
+   MOZ_CRASHREPORTER_ENABLE_PERCENT=100
+fi
+AC_DEFINE_UNQUOTED(MOZ_CRASHREPORTER_ENABLE_PERCENT, $MOZ_CRASHREPORTER_ENABLE_PERCENT)
+
+dnl ========================================================
 dnl = libjpeg-turbo configuration
 dnl ========================================================
 MOZ_LIBJPEG_TURBO=
