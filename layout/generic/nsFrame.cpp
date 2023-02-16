@@ -7496,6 +7496,7 @@ UnionBorderBoxes(nsIFrame* aFrame, bool aApplyTransform,
   nsIAtom* fType = aFrame->GetType();
   if (nsFrame::ShouldApplyOverflowClipping(aFrame, disp) ||
       fType == nsGkAtoms::scrollFrame ||
+      fType == nsGkAtoms::listControlFrame ||
       fType == nsGkAtoms::svgOuterSVGFrame) {
     return u;
   }
