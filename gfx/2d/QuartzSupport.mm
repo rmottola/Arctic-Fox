@@ -25,6 +25,7 @@
 - (void)setContentsScale:(double)scale;
 @end
 
+
 CGColorSpaceRef CreateSystemColorSpace() {
   CGColorSpaceRef cspace = ::CGDisplayCopyColorSpace(::CGMainDisplayID());
   if (!cspace) {
