@@ -4623,6 +4623,11 @@ pref("layers.tiles.edge-padding", false);
 #endif
 
 
+#ifdef MOZ_WIDGET_ANDROID
+pref("layers.tiled-drawtarget.enabled", true);
+pref("layers.tiles.edge-padding", true);
+#endif
+
 // same effect as layers.offmainthreadcomposition.enabled, but specifically for
 // use with tests.
 pref("layers.offmainthreadcomposition.testing.enabled", false);
