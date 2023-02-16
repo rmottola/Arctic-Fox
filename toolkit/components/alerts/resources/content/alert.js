@@ -1,16 +1,8 @@
-// -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
-
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-
-const Ci = Components.interfaces;
-const Cc = Components.classes;
-
-var windowMediator = Cc["@mozilla.org/appshell/window-mediator;1"]
-                       .getService(Ci.nsIWindowMediator);
+const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 /*
  * This indicates from which corner of the screen alerts slide in,
@@ -32,6 +24,8 @@ const NS_ALERT_LEFT = 2;
 const NS_ALERT_TOP = 4;
 
 const WINDOW_MARGIN = 10;
+
+Cu.import("resource://gre/modules/Services.jsm");
 
 var gOrigin = 0; // Default value: alert from bottom right.
 var gReplacedWindow = null;
@@ -132,7 +126,7 @@ function moveWindowToReplace(aReplacedAlert) {
 
   // Move windows that come after the replaced alert if the height is different.
   if (heightDelta != 0) {
-    let windows = windowMediator.getEnumerator('alert:alert');
+    let windows = Services.wm.getEnumerator('alert:alert');
     while (windows.hasMoreElements()) {
       let alertWindow = windows.getNext();
       // boolean to determine if the alert window is after the replaced alert.
@@ -162,7 +156,7 @@ function moveWindowToEnd() {
           screen.availTop + screen.availHeight - window.outerHeight;
 
   // Position the window at the end of all alerts.
-  let windows = windowMediator.getEnumerator('alert:alert');
+  let windows = Services.wm.getEnumerator('alert:alert');
   while (windows.hasMoreElements()) {
     let alertWindow = windows.getNext();
     let alertWindowTime = Number(
@@ -193,7 +187,7 @@ function onAlertBeforeUnload() {
   if (!gIsReplaced) {
     // Move other alert windows to fill the gap left by closing alert.
     let heightDelta = window.outerHeight + WINDOW_MARGIN;
-    let windows = windowMediator.getEnumerator('alert:alert');
+    let windows = Services.wm.getEnumerator('alert:alert');
     while (windows.hasMoreElements()) {
       let alertWindow = windows.getNext();
       if (alertWindow != window) {
