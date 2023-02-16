@@ -272,7 +272,6 @@ void nsCocoaUtils::HideOSChromeOnScreen(bool aShouldHide)
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-
 #define NS_APPSHELLSERVICE_CONTRACTID "@mozilla.org/appshell/appShellService;1"
 nsIWidget* nsCocoaUtils::GetHiddenWindowWidget()
 {
