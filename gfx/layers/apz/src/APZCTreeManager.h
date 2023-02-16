@@ -450,8 +450,6 @@ private:
   HitTestingTreeNode* FindTargetNode(HitTestingTreeNode* aNode,
                                      const ScrollableLayerGuid& aGuid,
                                      GuidComparator aComparator);
-  HitTestingTreeNode* FindScrollNode(HitTestingTreeNode* aNode,
-                                     const AsyncDragMetrics& aDragMetrics);
   AsyncPanZoomController* GetAPZCAtPoint(HitTestingTreeNode* aNode,
                                          const ParentLayerPoint& aHitTestPoint,
                                          HitTestResult* aOutHitResult);
@@ -474,11 +472,7 @@ private:
                                   ScrollableLayerGuid* aOutTargetGuid,
                                   uint64_t* aOutInputBlockId);
   void UpdateWheelTransaction(WidgetInputEvent& aEvent);
-  void UpdateZoomConstraintsRecursively(HitTestingTreeNode* aNode,
-                                        const ZoomConstraints& aConstraints);
   void FlushRepaintsToClearScreenToGeckoTransform();
-  void FlushRepaintsRecursively(HitTestingTreeNode* aNode);
-  void FlushPendingRepaintRecursively(HitTestingTreeNode* aNode, uint64_t aLayersId);
 
   already_AddRefed<HitTestingTreeNode> RecycleOrCreateNode(TreeBuildingState& aState,
                                                            AsyncPanZoomController* aApzc,
