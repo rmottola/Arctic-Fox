@@ -1734,7 +1734,7 @@ nsWebBrowser::PaintWindow(nsIWidget* aWidget, nsIntRegion aRegion)
   RefPtr<PaintedLayer> root = layerManager->CreatePaintedLayer();
   if (root) {
     nsIntRect dirtyRect = aRegion.GetBounds();
-    root->SetVisibleRegion(dirtyRect);
+    root->SetVisibleRegion(LayerIntRegion::FromUnknownRegion(dirtyRect));
     layerManager->SetRoot(root);
   }
 

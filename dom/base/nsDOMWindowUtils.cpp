@@ -2565,7 +2565,7 @@ CheckLeafLayers(Layer* aLayer, const nsIntPoint& aOffset, nsIntRegion* aCoveredR
       child = child->GetNextSibling();
     }
   } else {
-    nsIntRegion rgn = aLayer->GetVisibleRegion();
+    nsIntRegion rgn = aLayer->GetVisibleRegion().ToUnknownRegion();
     rgn.MoveBy(offset);
     nsIntRegion tmp;
     tmp.And(rgn, *aCoveredRegion);
@@ -2601,7 +2601,7 @@ nsDOMWindowUtils::LeafLayersPartitionWindow(bool* aResult)
   if (!CheckLeafLayers(root, offset, &coveredRegion)) {
     *aResult = false;
   }
-  if (!coveredRegion.IsEqual(root->GetVisibleRegion())) {
+  if (!coveredRegion.IsEqual(root->GetVisibleRegion().ToUnknownRegion())) {
     *aResult = false;
   }
 #endif
