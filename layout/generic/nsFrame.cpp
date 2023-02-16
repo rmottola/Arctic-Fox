@@ -60,6 +60,7 @@
 
 #include "nsBidiPresUtils.h"
 #include "RubyUtils.h"
+#include "nsAnimationManager.h"
 
 // For triple-click pref
 #include "imgIContainer.h"
@@ -676,7 +677,7 @@ nsFrame::DestroyFrom(nsIFrame* aDestructRoot)
     }
   }
 
-  if (nsLayoutUtils::HasCurrentAnimations(static_cast<nsIFrame*>(this))) {
+  if (HasCSSAnimations()) {
     // If no new frame for this element is created by the end of the
     // restyling process, stop animations for this frame
     RestyleManager::AnimationsWithDestroyedFrame* adf =
@@ -9075,6 +9076,14 @@ nsIFrame::CaretPosition::CaretPosition()
 
 nsIFrame::CaretPosition::~CaretPosition()
 {
+}
+
+bool
+nsFrame::HasCSSAnimations()
+{
+  AnimationCollection* collection =
+    PresContext()->AnimationManager()->GetAnimationCollection(this);
+  return collection && collection->mAnimations.Length() > 0;
 }
 
 // Box layout debugging
