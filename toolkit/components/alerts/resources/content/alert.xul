@@ -48,6 +48,8 @@
             <menupopup position="after_end">
               <menuitem id="disableForOriginMenuItem"
                         oncommand="disableForOrigin();"/>
+              <menuitem id="openSettingsMenuItem"
+                        oncommand="openSettings();"/>
             </menupopup>
           </button>
         </box>
