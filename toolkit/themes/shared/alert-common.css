@@ -10,14 +10,52 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
-#alertNotification {
-  padding: 30px;
-  padding-inline-start: 90px;
-}
-
 #alertBox[hasBodyText] > #alertTextBox,
 #alertBox[hasOrigin] > #alertTitleBox {
   border-bottom: 1px solid ThreeDShadow;
+}
+
+#alertBox[animate] {
+  animation-timing-function: cubic-bezier(.12,1.23,.48,1.09);
+}
+
+#alertBox[animate][clicked] {
+  animation-duration: .6s;
+  animation-name: alert-clicked-animation;
+}
+
+/* This is used if the close button is clicked
+   before the animation has finished. */
+#alertBox[animate][closing] {
+  animation-duration: .6s;
+  animation-name: alert-closing-animation;
+}
+
+@keyframes alert-animation {
+  from {
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes alert-clicked-animation {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes alert-closing-animation {
+  to {
+    opacity: 0;
+  }
 }
 
 #alertImage {
