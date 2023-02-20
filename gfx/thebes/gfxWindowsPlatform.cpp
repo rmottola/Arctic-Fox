@@ -613,10 +613,10 @@ gfxWindowsPlatform::CreateDevice(RefPtr<IDXGIAdapter1> &adapter1,
 void
 gfxWindowsPlatform::VerifyD2DDevice(bool aAttemptForce)
 {
-    if ((!Factory::SupportsD2D1() || !gfxPrefs::Direct2DUse1_1()) && !gfxPrefs::Direct2DAllow1_0()) {
-      return;
-    }
-    
+  if ((!Factory::SupportsD2D1() || !gfxPrefs::Direct2DUse1_1()) && !gfxPrefs::Direct2DAllow1_0()) {
+    return;
+  }
+
 #ifdef CAIRO_HAS_D2D_SURFACE
     if (mD3D10Device) {
         if (SUCCEEDED(mD3D10Device->GetDeviceRemovedReason())) {
