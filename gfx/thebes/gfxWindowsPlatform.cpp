@@ -1762,12 +1762,13 @@ CheckForAdapterMismatch(ID3D11Device *device)
   }
 }
 
-void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
+bool DoesRenderTargetViewNeedsRecreating(ID3D11Device *device)
 {
+    bool result = false;
     // CreateTexture2D is known to crash on lower feature levels, see bugs
     // 1170211 and 1089413.
     if (device->GetFeatureLevel() < D3D_FEATURE_LEVEL_10_0) {
-        return;
+        return true;
     }
 
     RefPtr<ID3D11DeviceContext> deviceContext;
@@ -1789,17 +1790,28 @@ void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
     offscreenTextureDesc.CPUAccessFlags = 0;
     offscreenTextureDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
 
-    HRESULT result = device->CreateTexture2D(&offscreenTextureDesc, NULL, getter_AddRefs(offscreenTexture));
+    HRESULT hr = device->CreateTexture2D(&offscreenTextureDesc, NULL, getter_AddRefs(offscreenTexture));
+    if (FAILED(hr)) {
+        gfxCriticalNote << "DoesRecreatingCreateTexture2DFail";
+        return false;
+    }
 
-    result = offscreenTexture->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)getter_AddRefs(keyedMutex));
-
+    hr = offscreenTexture->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)getter_AddRefs(keyedMutex));
+    if (FAILED(hr)) {
+        gfxCriticalNote << "DoesRecreatingKeyedMutexFailed";
+        return false;
+    }
     D3D11_RENDER_TARGET_VIEW_DESC offscreenRTVDesc;
     offscreenRTVDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     offscreenRTVDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     offscreenRTVDesc.Texture2D.MipSlice = 0;
 
     RefPtr<ID3D11RenderTargetView> offscreenRTView;
-    result = device->CreateRenderTargetView(offscreenTexture, &offscreenRTVDesc, getter_AddRefs(offscreenRTView));
+    hr = device->CreateRenderTargetView(offscreenTexture, &offscreenRTVDesc, getter_AddRefs(offscreenRTView));
+    if (FAILED(hr)) {
+        gfxCriticalNote << "DoesRecreatingCreateRenderTargetViewFailed";
+        return false;
+    }
 
     // Acquire and clear
     keyedMutex->AcquireSync(0, INFINITE);
@@ -1820,7 +1832,11 @@ void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
     desc.MiscFlags = 0;
     desc.BindFlags = 0;
     ID3D11Texture2D* cpuTexture;
-    device->CreateTexture2D(&desc, NULL, &cpuTexture);
+    hr = device->CreateTexture2D(&desc, NULL, &cpuTexture);
+    if (FAILED(hr)) {
+        gfxCriticalNote << "DoesRecreatingCreateCPUTextureFailed";
+        return false;
+    }
 
     deviceContext->CopyResource(cpuTexture, offscreenTexture);
 
@@ -1834,12 +1850,14 @@ void CheckIfRenderTargetViewNeedsRecreating(ID3D11Device *device)
     // match the clear
     if (resultColor != 0xffffff00) {
         gfxCriticalNote << "RenderTargetViewNeedsRecreating";
+        result = true;
     }
 
     keyedMutex->ReleaseSync(0);
 
     // It seems like this may only happen when we're using the NVIDIA gpu
     CheckForAdapterMismatch(device);
+    return result;
 }
 
 
@@ -2053,11 +2071,14 @@ gfxWindowsPlatform::AttemptD3D11DeviceCreation()
     return FeatureStatus::Failed;
   }
 
-  CheckIfRenderTargetViewNeedsRecreating(mD3D11Device);
-
   // Only test this when not using WARP since it can fail and cause
   // GetDeviceRemovedReason to return weird values.
   mCompositorD3D11TextureSharingWorks = ::DoesD3D11TextureSharingWork(mD3D11Device);
+
+  if (!mCompositorD3D11TextureSharingWorks || !DoesRenderTargetViewNeedsRecreating(mD3D11Device)) {
+      gANGLESupportsD3D11 = false;
+  }
+
   mD3D11Device->SetExceptionMode(0);
   mIsWARP = false;
   return FeatureStatus::Available;
