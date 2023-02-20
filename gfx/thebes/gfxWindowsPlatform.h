@@ -254,7 +254,7 @@ public:
     // Create a D3D11 device to be used for DXVA decoding.
     already_AddRefed<ID3D11Device> CreateD3D11DecoderDevice();
     bool CreateD3D11DecoderDeviceHelper(
-      IDXGIAdapter1* aAdapter, mozilla::RefPtr<ID3D11Device>& aDevice,
+      IDXGIAdapter1* aAdapter, RefPtr<ID3D11Device>& aDevice,
       HRESULT& aResOut);
 
     mozilla::layers::ReadbackManagerD3D11* GetReadbackManager();
