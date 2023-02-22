@@ -1683,7 +1683,7 @@ gfxWindowsPlatform::GetDXGIAdapter()
   return mAdapter;
 }
 
-bool DoesD3D11DeviceWork(ID3D11Device *device)
+bool DoesD3D11DeviceWork()
 {
   static bool checked = false;
   static bool result = false;
@@ -2118,7 +2118,7 @@ gfxWindowsPlatform::AttemptD3D11DeviceCreation()
     gfxCriticalError() << "D3D11 device creation failed: " << hexa(hr);
     return FeatureStatus::Failed;
   }
-  if (!DoesD3D11DeviceWork(mD3D11Device)) {
+  if (!DoesD3D11DeviceWork()) {
     mD3D11Device = nullptr;
     return FeatureStatus::Blocked;
   }
@@ -2652,7 +2652,7 @@ gfxWindowsPlatform::CreateD3D11DecoderDevice()
     return nullptr;
   }
 
-  if (FAILED(hr) || !device || !DoesD3D11DeviceWork(device)) {
+  if (FAILED(hr) || !device || !DoesD3D11DeviceWork()) {
     return nullptr;
   }
 
