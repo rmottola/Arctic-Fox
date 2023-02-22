@@ -562,6 +562,7 @@ BackgroundHangMonitor::Startup()
     }
   }
 
+  ThreadStackHelper::Startup();
   BackgroundHangThread::Startup();
   BackgroundHangManager::sInstance = new BackgroundHangManager();
 #endif
@@ -583,8 +584,8 @@ BackgroundHangMonitor::Shutdown()
      we don't want to hold the lock when it's being destroyed. */
   BackgroundHangManager::sInstance->Shutdown();
   BackgroundHangManager::sInstance = nullptr;
-  BackgroundHangManager::sDisabled = true;
   ThreadStackHelper::Shutdown();
+  BackgroundHangManager::sDisabled = true;
 #endif
 }
 
@@ -703,6 +704,12 @@ BackgroundHangMonitor::ThreadHangStatsIterator::ThreadHangStatsIterator()
   : MonitorAutoLock(BackgroundHangManager::sInstance->mLock)
   , mThread(BackgroundHangManager::sInstance->mHangThreads.getFirst())
 {
+#ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
+  MOZ_ASSERT(BackgroundHangManager::sInstance ||
+             BackgroundHangManager::sProhibited ||
+             BackgroundHangManager::sDisabled,
+             "Inconsistent state");
+#endif
 }
 
 Telemetry::ThreadHangStats*
