@@ -2792,6 +2792,220 @@ ReadStack(const char *aFileName, Telemetry::ProcessedStack &aStack)
   aStack = stack;
 }
 
+static JSObject*
+CreateJSTimeHistogram(JSContext* cx, const Telemetry::TimeHistogram& time)
+{
+  /* Create JS representation of TimeHistogram,
+     in the format of Chromium-style histograms. */
+  JS::RootedObject ret(cx, JS_NewPlainObject(cx));
+  if (!ret) {
+    return nullptr;
+  }
+
+  if (!JS_DefineProperty(cx, ret, "min", time.GetBucketMin(0),
+                         JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "max",
+                         time.GetBucketMax(ArrayLength(time) - 1),
+                         JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "histogram_type",
+                         nsITelemetry::HISTOGRAM_EXPONENTIAL,
+                         JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+  // TODO: calculate "sum", "log_sum", and "log_sum_squares"
+  if (!JS_DefineProperty(cx, ret, "sum", 0, JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "log_sum", 0.0, JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "log_sum_squares", 0.0, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+
+  JS::RootedObject ranges(
+    cx, JS_NewArrayObject(cx, ArrayLength(time) + 1));
+  JS::RootedObject counts(
+    cx, JS_NewArrayObject(cx, ArrayLength(time) + 1));
+  if (!ranges || !counts) {
+    return nullptr;
+  }
+  /* In a Chromium-style histogram, the first bucket is an "under" bucket
+     that represents all values below the histogram's range. */
+  if (!JS_DefineElement(cx, ranges, 0, time.GetBucketMin(0), JSPROP_ENUMERATE) ||
+      !JS_DefineElement(cx, counts, 0, 0, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < ArrayLength(time); i++) {
+    if (!JS_DefineElement(cx, ranges, i + 1, time.GetBucketMax(i),
+                          JSPROP_ENUMERATE) ||
+        !JS_DefineElement(cx, counts, i + 1, time[i], JSPROP_ENUMERATE)) {
+      return nullptr;
+    }
+  }
+  if (!JS_DefineProperty(cx, ret, "ranges", ranges, JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "counts", counts, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+  return ret;
+}
+
+static JSObject*
+CreateJSHangStack(JSContext* cx, const Telemetry::HangStack& stack)
+{
+  JS::RootedObject ret(cx, JS_NewArrayObject(cx, stack.length()));
+  if (!ret) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < stack.length(); i++) {
+    JS::RootedString string(cx, JS_NewStringCopyZ(cx, stack[i]));
+    if (!JS_DefineElement(cx, ret, i, string, JSPROP_ENUMERATE)) {
+      return nullptr;
+    }
+  }
+  return ret;
+}
+
+static JSObject*
+CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations)
+{
+  JS::RootedObject annotationsArray(cx, JS_NewArrayObject(cx, 0));
+  if (!annotationsArray) {
+    return nullptr;
+  }
+  size_t annotationIndex = 0;
+  for (const HangAnnotationsPtr *i = annotations.begin(), *e = annotations.end();
+       i != e; ++i) {
+    JS::RootedObject jsAnnotation(cx, JS_NewPlainObject(cx));
+    if (!jsAnnotation) {
+      continue;
+    }
+    const HangAnnotationsPtr& curAnnotations = *i;
+    UniquePtr<HangAnnotations::Enumerator> annotationsEnum =
+      curAnnotations->GetEnumerator();
+    if (!annotationsEnum) {
+      continue;
+    }
+    nsAutoString key;
+    nsAutoString value;
+    while (annotationsEnum->Next(key, value)) {
+      JS::RootedValue jsValue(cx);
+      jsValue.setString(JS_NewUCStringCopyN(cx, value.get(), value.Length()));
+      if (!JS_DefineUCProperty(cx, jsAnnotation, key.get(), key.Length(),
+                               jsValue, JSPROP_ENUMERATE)) {
+        return nullptr;
+      }
+    }
+    if (!JS_SetElement(cx, annotationsArray, annotationIndex, jsAnnotation)) {
+      continue;
+    }
+    ++annotationIndex;
+  }
+  return annotationsArray;
+}
+
+static JSObject*
+CreateJSHangHistogram(JSContext* cx, const Telemetry::HangHistogram& hang)
+{
+  JS::RootedObject ret(cx, JS_NewPlainObject(cx));
+  if (!ret) {
+    return nullptr;
+  }
+
+  JS::RootedObject stack(cx, CreateJSHangStack(cx, hang.GetStack()));
+  JS::RootedObject time(cx, CreateJSTimeHistogram(cx, hang));
+  auto& hangAnnotations = hang.GetAnnotations();
+  JS::RootedObject annotations(cx, CreateJSHangAnnotations(cx, hangAnnotations));
+
+  if (!stack ||
+      !time ||
+      !annotations ||
+      !JS_DefineProperty(cx, ret, "stack", stack, JSPROP_ENUMERATE) ||
+      !JS_DefineProperty(cx, ret, "histogram", time, JSPROP_ENUMERATE) ||
+      (!hangAnnotations.empty() && // <-- Only define annotations when nonempty
+        !JS_DefineProperty(cx, ret, "annotations", annotations, JSPROP_ENUMERATE))) {
+    return nullptr;
+  }
+
+  if (!hang.GetNativeStack().empty()) {
+    JS::RootedObject native(cx, CreateJSHangStack(cx, hang.GetNativeStack()));
+    if (!native ||
+        !JS_DefineProperty(cx, ret, "nativeStack", native, JSPROP_ENUMERATE)) {
+      return nullptr;
+    }
+  }
+  return ret;
+}
+
+static JSObject*
+CreateJSThreadHangStats(JSContext* cx, const Telemetry::ThreadHangStats& thread)
+{
+  JS::RootedObject ret(cx, JS_NewPlainObject(cx));
+  if (!ret) {
+    return nullptr;
+  }
+  JS::RootedString name(cx, JS_NewStringCopyZ(cx, thread.GetName()));
+  if (!name ||
+      !JS_DefineProperty(cx, ret, "name", name, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+
+  JS::RootedObject activity(cx, CreateJSTimeHistogram(cx, thread.mActivity));
+  if (!activity ||
+      !JS_DefineProperty(cx, ret, "activity", activity, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+
+  JS::RootedObject hangs(cx, JS_NewArrayObject(cx, 0));
+  if (!hangs) {
+    return nullptr;
+  }
+  for (size_t i = 0; i < thread.mHangs.length(); i++) {
+    JS::RootedObject obj(cx, CreateJSHangHistogram(cx, thread.mHangs[i]));
+    if (!JS_DefineElement(cx, hangs, i, obj, JSPROP_ENUMERATE)) {
+      return nullptr;
+    }
+  }
+  if (!JS_DefineProperty(cx, ret, "hangs", hangs, JSPROP_ENUMERATE)) {
+    return nullptr;
+  }
+
+  return ret;
+}
+
+NS_IMETHODIMP
+TelemetryImpl::GetThreadHangStats(JSContext* cx, JS::MutableHandle<JS::Value> ret)
+{
+  JS::RootedObject retObj(cx, JS_NewArrayObject(cx, 0));
+  if (!retObj) {
+    return NS_ERROR_FAILURE;
+  }
+  size_t threadIndex = 0;
+
+  if (!BackgroundHangMonitor::IsDisabled()) {
+    /* First add active threads; we need to hold |iter| (and its lock)
+       throughout this method to avoid a race condition where a thread can
+       be recorded twice if the thread is destroyed while this method is
+       running */
+    BackgroundHangMonitor::ThreadHangStatsIterator iter;
+    for (Telemetry::ThreadHangStats* histogram = iter.GetNext();
+         histogram; histogram = iter.GetNext()) {
+      JS::RootedObject obj(cx, CreateJSThreadHangStats(cx, *histogram));
+      if (!JS_DefineElement(cx, retObj, threadIndex++, obj, JSPROP_ENUMERATE)) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+  }
+
+  // Add saved threads next
+  MutexAutoLock autoLock(mThreadHangStatsMutex);
+  for (size_t i = 0; i < mThreadHangStats.length(); i++) {
+    JS::RootedObject obj(cx,
+      CreateJSThreadHangStats(cx, mThreadHangStats[i]));
+    if (!JS_DefineElement(cx, retObj, threadIndex++, obj, JSPROP_ENUMERATE)) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+  ret.setObject(*retObj);
+  return NS_OK;
+}
+
 void
 TelemetryImpl::ReadLateWritesStacks(nsIFile* aProfileDir)
 {
@@ -3409,6 +3623,10 @@ TelemetryImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
   { // Scope for mHangReportsMutex lock
     MutexAutoLock lock(mHangReportsMutex);
     n += mHangReports.SizeOfExcludingThis(aMallocSizeOf);
+  }
+  { // Scope for mThreadHangStatsMutex lock
+    MutexAutoLock lock(mThreadHangStatsMutex);
+    n += mThreadHangStats.sizeOfExcludingThis(aMallocSizeOf);
   }
 
   // It's a bit gross that we measure this other stuff that lives outside of
