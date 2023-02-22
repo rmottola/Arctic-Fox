@@ -707,7 +707,9 @@ BackgroundHangMonitor::UnregisterAnnotator(HangMonitor::Annotator& aAnnotator)
    sure all of that is taken care of for us. */
 BackgroundHangMonitor::ThreadHangStatsIterator::ThreadHangStatsIterator()
   : MonitorAutoLock(BackgroundHangManager::sInstance->mLock)
-  , mThread(BackgroundHangManager::sInstance->mHangThreads.getFirst())
+  , mThread(BackgroundHangManager::sInstance ?
+            BackgroundHangManager::sInstance->mHangThreads.getFirst() :
+            nullptr)
 {
 #ifdef MOZ_ENABLE_BACKGROUND_HANG_MONITOR
   MOZ_ASSERT(BackgroundHangManager::sInstance ||
