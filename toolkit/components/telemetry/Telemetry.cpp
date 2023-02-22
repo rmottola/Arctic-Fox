@@ -39,6 +39,8 @@
 #include "nsIMemoryReporter.h"
 #include "nsISeekableStream.h"
 #include "Telemetry.h"
+#include "TelemetryCommon.h"
+#include "WebrtcTelemetry.h"
 #include "nsTHashtable.h"
 #include "nsHashKeys.h"
 #include "nsBaseHashtable.h"
@@ -66,6 +68,9 @@
 #include "mozilla/PoisonIOInterposer.h"
 #include "mozilla/StartupTimeline.h"
 #include "mozilla/HangMonitor.h"
+#if defined(MOZ_ENABLE_PROFILER_SPS)
+#include "shared-libraries.h"
+#endif
 
 #define EXPIRED_ID "__expired__"
 
@@ -97,39 +102,6 @@ HistogramGet(const char *name, const char *expiration, uint32_t histogramType,
 
 enum reflectStatus
 ReflectHistogramSnapshot(JSContext *cx, JS::Handle<JSObject*> obj, Histogram *h);
-
-template<class EntryType>
-class AutoHashtable : public nsTHashtable<EntryType>
-{
-public:
-  explicit AutoHashtable(uint32_t initLength =
-                         PLDHashTable::kDefaultInitialLength);
-  typedef bool (*ReflectEntryFunc)(EntryType *entry, JSContext *cx, JS::Handle<JSObject*> obj);
-  bool ReflectIntoJS(ReflectEntryFunc entryFunc, JSContext *cx, JS::Handle<JSObject*> obj);
-};
-
-template<class EntryType>
-AutoHashtable<EntryType>::AutoHashtable(uint32_t initLength)
-  : nsTHashtable<EntryType>(initLength)
-{
-}
-
-/**
- * Reflect the individual entries of table into JS, usually by defining
- * some property and value of obj.  entryFunc is called for each entry.
- */
-template<typename EntryType>
-bool
-AutoHashtable<EntryType>::ReflectIntoJS(ReflectEntryFunc entryFunc,
-                                        JSContext *cx, JS::Handle<JSObject*> obj)
-{
-  for (auto iter = this->Iter(); !iter.Done(); iter.Next()) {
-    if (!entryFunc(iter.Get(), cx, obj)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // This class is conceptually a list of ProcessedStack objects, but it represents them
 // more efficiently by keeping a single global list of modules.
@@ -631,6 +603,13 @@ public:
   static void ShutdownTelemetry();
   static void RecordSlowStatement(const nsACString &sql, const nsACString &dbName,
                                   uint32_t delay);
+#if defined(MOZ_ENABLE_PROFILER_SPS)
+  static void RecordChromeHang(uint32_t aDuration,
+                               Telemetry::ProcessedStack &aStack,
+                               int32_t aSystemUptime,
+                               int32_t aFirefoxUptime,
+                               HangAnnotationsPtr aAnnotations);
+#endif
   static void RecordThreadHangStats(Telemetry::ThreadHangStats& aStats);
   static nsresult GetHistogramEnumId(const char *name, Telemetry::ID *id);
   size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf);
@@ -646,6 +625,9 @@ public:
 
   static KeyedHistogram* GetKeyedHistogramById(const nsACString &id);
 
+  static void RecordIceCandidates(const uint32_t iceCandidateBitmask,
+                                  const bool success,
+                                  const bool loop);
 private:
   TelemetryImpl();
   ~TelemetryImpl();
@@ -721,6 +703,8 @@ private:
   nsCOMArray<nsIFetchTelemetryDataCallback> mCallbacks;
   friend class nsFetchTelemetryData;
 
+  WebrtcTelemetry mWebrtcTelemetry;
+
   typedef nsClassHashtable<nsCStringHashKey, KeyedHistogram> KeyedHistogramMapType;
   KeyedHistogramMapType mKeyedHistograms;
 
@@ -761,6 +745,9 @@ public:
   nsresult Add(const nsCString& key, uint32_t aSample);
   void Clear(bool subsession);
 
+  static void RecordIceCandidates(const uint32_t iceCandidateBitmask,
+                                  const bool success,
+                                  const bool loop);
 private:
   typedef nsBaseHashtableET<nsCStringHashKey, Histogram*> KeyedHistogramEntry;
   typedef AutoHashtable<KeyedHistogramEntry> KeyedHistogramMapType;
@@ -2433,6 +2420,14 @@ TelemetryImpl::GetDebugSlowSQL(JSContext *cx, JS::MutableHandle<JS::Value> ret)
 }
 
 NS_IMETHODIMP
+TelemetryImpl::GetWebrtcStats(JSContext *cx, JS::MutableHandle<JS::Value> ret)
+{
+  if (mWebrtcTelemetry.GetWebrtcStats(cx, ret))
+    return NS_OK;
+  return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP
 TelemetryImpl::GetMaximalNumberOfConcurrentThreads(uint32_t *ret)
 {
   *ret = nsThreadManager::get()->GetHighestNumberOfThreads();
@@ -3230,6 +3225,41 @@ TelemetryImpl::RecordSlowStatement(const nsACString &sql,
 }
 
 void
+TelemetryImpl::RecordIceCandidates(const uint32_t iceCandidateBitmask,
+                                   const bool success, const bool loop)
+{
+  if (!sTelemetry)
+    return;
+
+  sTelemetry->mWebrtcTelemetry.RecordIceCandidateMask(iceCandidateBitmask, success, loop);
+}
+
+#if defined(MOZ_ENABLE_PROFILER_SPS)
+void
+TelemetryImpl::RecordChromeHang(uint32_t aDuration,
+                                Telemetry::ProcessedStack &aStack,
+                                int32_t aSystemUptime,
+                                int32_t aFirefoxUptime,
+                                HangAnnotationsPtr aAnnotations)
+{
+  if (!sTelemetry || !sTelemetry->mCanRecordExtended)
+    return;
+
+  HangAnnotationsPtr annotations;
+  // We only pass aAnnotations if it is not empty.
+  if (aAnnotations && !aAnnotations->IsEmpty()) {
+    annotations = Move(aAnnotations);
+  }
+
+  MutexAutoLock hangReportMutex(sTelemetry->mHangReportsMutex);
+
+  sTelemetry->mHangReports.AddHang(aStack, aDuration,
+                                   aSystemUptime, aFirefoxUptime,
+                                   Move(annotations));
+}
+#endif
+
+void
 TelemetryImpl::RecordThreadHangStats(Telemetry::ThreadHangStats& aStats)
 {
   if (!sTelemetry || !sTelemetry->mCanRecordExtended)
@@ -3306,6 +3336,7 @@ TelemetryImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
   // Ignore the hashtables in mAddonMap; they are not significant.
   n += mAddonMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
   n += mHistogramMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  n += mWebrtcTelemetry.SizeOfExcludingThis(aMallocSizeOf);
   { // Scope for mHashMutex lock
     MutexAutoLock lock(mHashMutex);
     n += mPrivateSQL.SizeOfExcludingThis(aMallocSizeOf);
@@ -3404,8 +3435,6 @@ namespace Telemetry {
 void
 Accumulate(ID aHistogram, uint32_t aSample)
 {
-return;
-/*
   if (!TelemetryImpl::CanRecordBase()) {
     return;
   }
@@ -3414,30 +3443,23 @@ return;
   if (NS_SUCCEEDED(rv)) {
     HistogramAdd(*h, aSample, gHistograms[aHistogram].dataset);
   }
-*/
 }
 
 void
 Accumulate(ID aID, const nsCString& aKey, uint32_t aSample)
 {
-return;
-/*
   if (!TelemetryImpl::CanRecordBase()) {
     return;
   }
   const TelemetryHistogram& th = gHistograms[aID];
   KeyedHistogram* keyed = TelemetryImpl::GetKeyedHistogramById(nsDependentCString(th.id()));
   MOZ_ASSERT(keyed);
-
   keyed->Add(aKey, aSample);
-*/
 }
 
 void
 Accumulate(const char* name, uint32_t sample)
 {
-return;
-/*
   if (!TelemetryImpl::CanRecordExtended()) {
     return;
   }
@@ -3452,29 +3474,25 @@ return;
   if (NS_SUCCEEDED(rv)) {
     HistogramAdd(*h, sample, gHistograms[id].dataset);
   }
-*/
 }
 
 void
 AccumulateTimeDelta(ID aHistogram, TimeStamp start, TimeStamp end)
 {
-return;
-/*
   Accumulate(aHistogram,
              static_cast<uint32_t>((end - start).ToMilliseconds()));
-*/
 }
 
 bool
 CanRecordBase()
 {
-  return false; // TelemetryImpl::CanRecordBase();
+  return TelemetryImpl::CanRecordBase();
 }
 
 bool
 CanRecordExtended()
 {
-  return false; // TelemetryImpl::CanRecordExtended();
+  return TelemetryImpl::CanRecordExtended();
 }
 
 base::Histogram*
@@ -3497,9 +3515,14 @@ RecordSlowSQLStatement(const nsACString &statement,
                        const nsACString &dbName,
                        uint32_t delay)
 {
-/*
   TelemetryImpl::RecordSlowStatement(statement, dbName, delay);
-*/
+}
+
+void
+RecordWebrtcIceCandidates(const uint32_t iceCandidateBitmask,
+                          const bool success, const bool loop)
+{
+  TelemetryImpl::RecordIceCandidates(iceCandidateBitmask, success, loop);
 }
 
 void Init()
@@ -3510,11 +3533,23 @@ void Init()
   MOZ_ASSERT(telemetryService);
 }
 
+#if defined(MOZ_ENABLE_PROFILER_SPS)
+void RecordChromeHang(uint32_t duration,
+                      ProcessedStack &aStack,
+                      int32_t aSystemUptime,
+                      int32_t aFirefoxUptime,
+                      HangAnnotationsPtr aAnnotations)
+{
+  TelemetryImpl::RecordChromeHang(duration, aStack,
+                                  aSystemUptime, aFirefoxUptime,
+                                  Move(aAnnotations));
+}
+#endif
+
 void RecordThreadHangStats(ThreadHangStats& aStats)
 {
   TelemetryImpl::RecordThreadHangStats(aStats);
 }
-
 
 ProcessedStack::ProcessedStack()
 {
@@ -3582,6 +3617,60 @@ GetStackAndModules(const std::vector<uintptr_t>& aPCs)
     rawStack.push_back(Frame);
   }
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  // Remove all modules not referenced by a PC on the stack
+  std::sort(rawStack.begin(), rawStack.end(), CompareByPC);
+
+  size_t moduleIndex = 0;
+  size_t stackIndex = 0;
+  size_t stackSize = rawStack.size();
+
+  SharedLibraryInfo rawModules = SharedLibraryInfo::GetInfoForSelf();
+  rawModules.SortByAddress();
+
+  while (moduleIndex < rawModules.GetSize()) {
+    const SharedLibrary& module = rawModules.GetEntry(moduleIndex);
+    uintptr_t moduleStart = module.GetStart();
+    uintptr_t moduleEnd = module.GetEnd() - 1;
+    // the interval is [moduleStart, moduleEnd)
+
+    bool moduleReferenced = false;
+    for (;stackIndex < stackSize; ++stackIndex) {
+      uintptr_t pc = rawStack[stackIndex].mPC;
+      if (pc >= moduleEnd)
+        break;
+
+      if (pc >= moduleStart) {
+        // If the current PC is within the current module, mark
+        // module as used
+        moduleReferenced = true;
+        rawStack[stackIndex].mPC -= moduleStart;
+        rawStack[stackIndex].mModIndex = moduleIndex;
+      } else {
+        // PC does not belong to any module. It is probably from
+        // the JIT. Use a fixed mPC so that we don't get different
+        // stacks on different runs.
+        rawStack[stackIndex].mPC =
+          std::numeric_limits<uintptr_t>::max();
+      }
+    }
+
+    if (moduleReferenced) {
+      ++moduleIndex;
+    } else {
+      // Remove module if no PCs within its address range
+      rawModules.RemoveEntries(moduleIndex, moduleIndex + 1);
+    }
+  }
+
+  for (;stackIndex < stackSize; ++stackIndex) {
+    // These PCs are past the last module.
+    rawStack[stackIndex].mPC = std::numeric_limits<uintptr_t>::max();
+  }
+
+  std::sort(rawStack.begin(), rawStack.end(), CompareByIndex);
+#endif
+
   // Copy the information to the return value.
   ProcessedStack Ret;
   for (std::vector<StackFrame>::iterator i = rawStack.begin(),
@@ -3590,6 +3679,28 @@ GetStackAndModules(const std::vector<uintptr_t>& aPCs)
     ProcessedStack::Frame frame = { rawFrame.mPC, rawFrame.mModIndex };
     Ret.AddFrame(frame);
   }
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  for (unsigned i = 0, n = rawModules.GetSize(); i != n; ++i) {
+    const SharedLibrary &info = rawModules.GetEntry(i);
+    const std::string &name = info.GetName();
+    std::string basename = name;
+#ifdef XP_MACOSX
+    // FIXME: We want to use just the basename as the libname, but the
+    // current profiler addon needs the full path name, so we compute the
+    // basename in here.
+    size_t pos = name.rfind('/');
+    if (pos != std::string::npos) {
+      basename = name.substr(pos + 1);
+    }
+#endif
+    ProcessedStack::Module module = {
+      basename,
+      info.GetBreakpadId()
+    };
+    Ret.AddModule(module);
+  }
+#endif
 
   return Ret;
 }

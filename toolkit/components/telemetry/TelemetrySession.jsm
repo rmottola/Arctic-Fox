@@ -1264,6 +1264,17 @@ var Impl = {
     this._log.trace("assemblePayloadWithMeasurements - reason: " + reason +
                     ", submitting subsession data: " + isSubsession);
 
+    // This allows wrapping data retrieval calls in a try-catch block so that
+    // failures don't break the rest of the ping assembly.
+    const protect = (fn) => {
+      try {
+        return fn();
+      } catch (ex) {
+        this._log.error("assemblePayloadWithMeasurements - caught exception", ex);
+        return null;
+      }
+    };
+
     // Payload common to chrome and content processes.
     let payloadObj = {
       ver: PAYLOAD_VERSION,
@@ -1273,6 +1284,14 @@ var Impl = {
       chromeHangs: Telemetry.chromeHangs,
       log: TelemetryLog.entries(),
     };
+
+    // Add extended set measurements common to chrome & content processes
+    if (Telemetry.canRecordExtended) {
+      payloadObj.chromeHangs = protect(() => Telemetry.chromeHangs);
+      payloadObj.threadHangStats = protect(() => this.getThreadHangStats(Telemetry.threadHangStats));
+      payloadObj.log = protect(() => TelemetryLog.entries());
+      payloadObj.webrtc = protect(() => Telemetry.webrtcStats);
+    }
 
     if (Utils.isContentProcess) {
       return payloadObj;

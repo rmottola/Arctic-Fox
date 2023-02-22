@@ -41,12 +41,13 @@ Structure::
 
       childPayloads: {...}, // only present with e10s; a reduced payload from content processes
 
-      simpleMeasurements: { ... },
-      histograms: {},
-      keyedHistograms: {},
-      chromeHangs: {},
-      threadHangStats: {},
-      log: [],
+      // The following properties may all be null if we fail to collect them.
+      histograms: {...},
+      keyedHistograms: {...},
+      chromeHangs: {...},
+      threadHangStats: [...],
+      log: [...],
+      webrtc: {...},
       fileIOReports: {...},
       lateWrites: {...},
       addonDetails: { ... },
