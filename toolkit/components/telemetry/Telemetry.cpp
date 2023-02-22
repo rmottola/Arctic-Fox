@@ -843,9 +843,6 @@ public:
   nsresult Add(const nsCString& key, uint32_t aSample);
   void Clear(bool subsession);
 
-  static void RecordIceCandidates(const uint32_t iceCandidateBitmask,
-                                  const bool success,
-                                  const bool loop);
 private:
   typedef nsBaseHashtableET<nsCStringHashKey, Histogram*> KeyedHistogramEntry;
   typedef AutoHashtable<KeyedHistogramEntry> KeyedHistogramMapType;
@@ -3827,7 +3824,7 @@ Accumulate(ID aID, const nsCString& aKey, uint32_t aSample)
 void
 Accumulate(const char* name, uint32_t sample)
 {
-  if (!TelemetryImpl::CanRecordExtended()) {
+  if (!TelemetryImpl::CanRecordBase()) {
     return;
   }
   ID id;
