@@ -4174,7 +4174,6 @@ SetProfileDir(nsIFile* aProfD)
   sTelemetryIOObserver->AddPath(profDirPath, NS_LITERAL_STRING("{profile}"));
 }
 
-
 void
 TimeHistogram::Add(PRIntervalTime aTime)
 {
@@ -4183,15 +4182,63 @@ TimeHistogram::Add(PRIntervalTime aTime)
   operator[](index)++;
 }
 
+const char*
+HangStack::InfallibleAppendViaBuffer(const char* aText, size_t aLength)
+{
+  MOZ_ASSERT(this->canAppendWithoutRealloc(1));
+  // Include null-terminator in length count.
+  MOZ_ASSERT(mBuffer.canAppendWithoutRealloc(aLength + 1));
+
+  const char* const entry = mBuffer.end();
+  mBuffer.infallibleAppend(aText, aLength);
+  mBuffer.infallibleAppend('\0'); // Explicitly append null-terminator
+  this->infallibleAppend(entry);
+  return entry;
+}
+
+const char*
+HangStack::AppendViaBuffer(const char* aText, size_t aLength)
+{
+  if (!this->reserve(this->length() + 1)) {
+    return nullptr;
+  }
+
+  // Keep track of the previous buffer in case we need to adjust pointers later.
+  const char* const prevStart = mBuffer.begin();
+  const char* const prevEnd = mBuffer.end();
+
+  // Include null-terminator in length count.
+  if (!mBuffer.reserve(mBuffer.length() + aLength + 1)) {
+    return nullptr;
+  }
+
+  if (prevStart != mBuffer.begin()) {
+    // The buffer has moved; we have to adjust pointers in the stack.
+    for (const char** entry = this->begin(); entry != this->end(); entry++) {
+      if (*entry >= prevStart && *entry < prevEnd) {
+        // Move from old buffer to new buffer.
+        *entry += mBuffer.begin() - prevStart;
+      }
+    }
+  }
+
+  return InfallibleAppendViaBuffer(aText, aLength);
+}
+
 uint32_t
 HangHistogram::GetHash(const HangStack& aStack)
 {
   uint32_t hash = 0;
   for (const char* const* label = aStack.begin();
        label != aStack.end(); label++) {
-    /* We only need to hash the pointer instead of the text content
-       because we are assuming constant pointers */
-    hash = AddToHash(hash, *label);
+    /* If the string is within our buffer, we need to hash its content.
+       Otherwise, the string is statically allocated, and we only need
+       to hash the pointer instead of the content. */
+    if (aStack.IsInBuffer(*label)) {
+      hash = AddToHash(hash, HashString(*label));
+    } else {
+      hash = AddToHash(hash, *label);
+    }
   }
   return hash;
 }
@@ -4205,7 +4252,7 @@ HangHistogram::operator==(const HangHistogram& aOther) const
   if (mStack.length() != aOther.mStack.length()) {
     return false;
   }
-  return PodEqual(mStack.begin(), aOther.mStack.begin(), mStack.length());
+  return mStack == aOther.mStack;
 }
 
 
