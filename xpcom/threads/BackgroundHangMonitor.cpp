@@ -350,6 +350,7 @@ BackgroundHangManager::RunMonitorThread()
   }
 }
 
+
 BackgroundHangThread::BackgroundHangThread(const char* aName,
                                            uint32_t aTimeoutMs,
                                            uint32_t aMaxTimeoutMs)
@@ -630,7 +631,9 @@ BackgroundHangMonitor::NotifyActivity()
     return;
   }
 
-  mThread->NotifyActivity();
+  if (Telemetry::CanRecordExtended()) {
+    mThread->NotifyActivity();
+  }
 #endif
 }
 
@@ -645,7 +648,9 @@ BackgroundHangMonitor::NotifyWait()
     return;
   }
 
-  mThread->NotifyWait();
+  if (Telemetry::CanRecordExtended()) {
+    mThread->NotifyWait();
+  }
 #endif
 }
 
