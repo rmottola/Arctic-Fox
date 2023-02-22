@@ -2862,13 +2862,18 @@ CreateJSHangStack(JSContext* cx, const Telemetry::HangStack& stack)
   return ret;
 }
 
-static JSObject*
-CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations)
+static void
+CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations,
+                        JS::MutableHandleObject returnedObject)
 {
   JS::RootedObject annotationsArray(cx, JS_NewArrayObject(cx, 0));
   if (!annotationsArray) {
-    return nullptr;
+    returnedObject.set(nullptr);
+    return;
   }
+  // We keep track of the annotations we reported in this hash set, so we can
+  // discard duplicated ones.
+  nsTHashtable<nsStringHashKey> reportedAnnotations;
   size_t annotationIndex = 0;
   for (const HangAnnotationsPtr *i = annotations.begin(), *e = annotations.end();
        i != e; ++i) {
@@ -2877,6 +2882,18 @@ CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations)
       continue;
     }
     const HangAnnotationsPtr& curAnnotations = *i;
+    // Build a key to index the current annotations in our hash set.
+    nsAutoString annotationsKey;
+    nsresult rv = ComputeAnnotationsKey(curAnnotations, annotationsKey);
+    if (NS_FAILED(rv)) {
+      continue;
+    }
+    // Check if the annotations are in the set. If that's the case, don't double report.
+    if (reportedAnnotations.GetEntry(annotationsKey)) {
+      continue;
+    }
+    // If not, report them.
+    reportedAnnotations.PutEntry(annotationsKey);
     UniquePtr<HangAnnotations::Enumerator> annotationsEnum =
       curAnnotations->GetEnumerator();
     if (!annotationsEnum) {
@@ -2889,7 +2906,8 @@ CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations)
       jsValue.setString(JS_NewUCStringCopyN(cx, value.get(), value.Length()));
       if (!JS_DefineUCProperty(cx, jsAnnotation, key.get(), key.Length(),
                                jsValue, JSPROP_ENUMERATE)) {
-        return nullptr;
+        returnedObject.set(nullptr);
+        return;
       }
     }
     if (!JS_SetElement(cx, annotationsArray, annotationIndex, jsAnnotation)) {
@@ -2897,7 +2915,9 @@ CreateJSHangAnnotations(JSContext* cx, const HangAnnotationsVector& annotations)
     }
     ++annotationIndex;
   }
-  return annotationsArray;
+  // Return the array using a |MutableHandleObject| to avoid triggering a false
+  // positive rooting issue in the hazard analysis build.
+  returnedObject.set(annotationsArray);
 }
 
 static JSObject*
@@ -2911,7 +2931,8 @@ CreateJSHangHistogram(JSContext* cx, const Telemetry::HangHistogram& hang)
   JS::RootedObject stack(cx, CreateJSHangStack(cx, hang.GetStack()));
   JS::RootedObject time(cx, CreateJSTimeHistogram(cx, hang));
   auto& hangAnnotations = hang.GetAnnotations();
-  JS::RootedObject annotations(cx, CreateJSHangAnnotations(cx, hangAnnotations));
+  JS::RootedObject annotations(cx);
+  CreateJSHangAnnotations(cx, hangAnnotations, &annotations);
 
   if (!stack ||
       !time ||
