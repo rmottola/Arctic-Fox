@@ -161,7 +161,7 @@ PluginModuleChild::PluginModuleChild(bool aIsChrome)
 PluginModuleChild::~PluginModuleChild()
 {
     if (mTransport) {
-        // For some reason IPDL doesn't autmatically delete the channel for a
+        // For some reason IPDL doesn't automatically delete the channel for a
         // bridged protocol (bug 1090570). So we have to do it ourselves. This
         // code is only invoked for PluginModuleChild instances created via
         // bridging; otherwise mTransport is null.
@@ -304,6 +304,8 @@ PluginModuleChild::InitForChrome(const std::string& aPluginFilename,
         return false;
     }
 
+    GetIPCChannel()->SetAbortOnError(true);
+
     // TODO: use PluginPRLibrary here
 
 #if defined(OS_LINUX) || defined(OS_BSD)
@@ -317,9 +319,6 @@ PluginModuleChild::InitForChrome(const std::string& aPluginFilename,
     NS_ASSERTION(mInitializeFunc, "couldn't find NP_Initialize()");
 
 #elif defined(OS_WIN) || defined(OS_MACOSX)
-
-    GetIPCChannel()->SetAbortOnError(true);
-
     mShutdownFunc =
         (NP_PLUGINSHUTDOWN)PR_FindFunctionSymbol(mLibrary, "NP_Shutdown");
 
