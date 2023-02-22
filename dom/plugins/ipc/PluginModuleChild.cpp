@@ -1340,17 +1340,12 @@ void
 _memfree(void* aPtr)
 {
     PLUGIN_LOG_DEBUG_FUNCTION;
-    // Only assert plugin thread here for consistency with in-process plugins.
-    AssertPluginThread();
     free(aPtr);
 }
 
 uint32_t
 _memflush(uint32_t aSize)
 {
-    PLUGIN_LOG_DEBUG_FUNCTION;
-    // Only assert plugin thread here for consistency with in-process plugins.
-    AssertPluginThread();
     return 0;
 }
 
@@ -1409,8 +1404,6 @@ void*
 _memalloc(uint32_t aSize)
 {
     PLUGIN_LOG_DEBUG_FUNCTION;
-    // Only assert plugin thread here for consistency with in-process plugins.
-    AssertPluginThread();
     return moz_xmalloc(aSize);
 }
 
