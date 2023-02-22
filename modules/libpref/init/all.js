@@ -562,6 +562,9 @@ pref("media.video_stats.enabled", true);
 // Whether to enable the audio writing APIs on the audio element
 pref("media.audio_data.enabled", false);
 
+// Weather we allow AMD switchable graphics
+pref("layers.amd-switchable-gfx.enabled", true);
+
 // Whether to use async panning and zooming
 pref("layers.async-pan-zoom.enabled", false);
 
