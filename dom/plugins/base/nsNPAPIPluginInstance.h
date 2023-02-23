@@ -32,6 +32,7 @@ class SharedPluginTexture;
 #include "mozilla/TimeStamp.h"
 #include "mozilla/PluginLibrary.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/WeakPtr.h"
 
 class nsPluginStreamListenerPeer; // browser-initiated stream class
 class nsNPAPIPluginStreamListener; // plugin-initiated stream class
@@ -77,11 +78,13 @@ public:
 };
 
 class nsNPAPIPluginInstance final : public nsIAudioChannelAgentCallback
+                                  , public mozilla::SupportsWeakPtr<nsNPAPIPluginInstance>
 {
 private:
   typedef mozilla::PluginLibrary PluginLibrary;
 
 public:
+  MOZ_DECLARE_WEAKREFERENCE_TYPENAME(nsNPAPIPluginInstance)
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIAUDIOCHANNELAGENTCALLBACK
 
