@@ -2373,12 +2373,18 @@ ContentPermissionPrompt.prototype = {
       return;
     }
 
+    if (!aOptions)
+      aOptions = {};
+    aOptions.displayOrigin = (requestPrincipal.URI instanceof Ci.nsIFileURL) ?
+                             requestPrincipal.URI.path :
+                             requestPrincipal.URI.host;
+
     return chromeWin.PopupNotifications.show(browser, aNotificationId, aMessage, aAnchorId,
                                              mainAction, secondaryActions, aOptions);
   },
 
   _promptGeo : function(aRequest) {
-    var requestingURI = aRequest.principal.URI;
+    var secHistogram = Services.telemetry.getHistogramById("SECURITY_UI");
 
     var message;
 
@@ -2388,23 +2394,25 @@ ContentPermissionPrompt.prototype = {
       action: null,
       expireType: null,
       callback: function() {
-        // Telemetry stub (left here for safety and compatibility reasons)
+        secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_SHARE_LOCATION);
       },
     }];
 
-    if (requestingURI.schemeIs("file")) {
-      message = gBrowserBundle.formatStringFromName("geolocation.shareWithFile",
-                                                    [requestingURI.path], 1);
+    let options = {
+      learnMoreURL: Services.urlFormatter.formatURLPref("browser.geolocation.warning.infoURL"),
+    };
+
+    if (aRequest.principal.URI.schemeIs("file")) {
+      message = gBrowserBundle.GetStringFromName("geolocation.shareWithFile2");
     } else {
-      message = gBrowserBundle.formatStringFromName("geolocation.shareWithSite",
-                                                    [requestingURI.host], 1);
+      message = gBrowserBundle.GetStringFromName("geolocation.shareWithSite2");
       // Always share location action.
       actions.push({
         stringId: "geolocation.alwaysShareLocation",
         action: Ci.nsIPermissionManager.ALLOW_ACTION,
         expireType: null,
         callback: function() {
-          // Telemetry stub (left here for safety and compatibility reasons)
+          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_ALWAYS_SHARE);
         },
       });
 
@@ -2414,24 +2422,19 @@ ContentPermissionPrompt.prototype = {
         action: Ci.nsIPermissionManager.DENY_ACTION,
         expireType: null,
         callback: function() {
-          // Telemetry stub (left here for safety and compatibility reasons)
+          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_NEVER_SHARE);
         },
       });
     }
 
-    var options = {
-                    learnMoreURL: Services.urlFormatter.formatURLPref("browser.geolocation.warning.infoURL"),
-                  };
+    secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST);
 
     this._showPrompt(aRequest, message, "geo", actions, "geolocation",
                      "geo-notification-icon", options);
   },
 
   _promptWebNotifications : function(aRequest) {
-    var requestingURI = aRequest.principal.URI;
-
-    var message = gBrowserBundle.formatStringFromName("webNotifications.showFromSite",
-                                                      [requestingURI.host], 1);
+    var message = gBrowserBundle.GetStringFromName("webNotifications.receiveFromSite");
 
     var actions = [
       {
@@ -2458,13 +2461,9 @@ ContentPermissionPrompt.prototype = {
   },
 
   _promptPointerLock: function CPP_promtPointerLock(aRequest, autoAllow) {
+    let message = gBrowserBundle.GetStringFromName(autoAllow ?
+                                  "pointerLock.autoLock.title3" : "pointerLock.title3");
 
-    let requestingURI = aRequest.principal.URI;
-
-    let originString = requestingURI.schemeIs("file") ? requestingURI.path : requestingURI.host;
-    let message = gBrowserBundle.formatStringFromName(autoAllow ?
-                                  "pointerLock.autoLock.title2" : "pointerLock.title2",
-                                  [originString], 1);
     // If this is an autoAllow info prompt, offer no actions.
     // _showPrompt() will allow the request when it's dismissed.
     let actions = [];
