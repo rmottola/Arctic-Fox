@@ -6,6 +6,7 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 @namespace html url("http://www.w3.org/1999/xhtml");
+@namespace svg url("http://www.w3.org/2000/svg");
 
 %include ../shared/browser.inc
 %include windowsShared.inc
@@ -60,6 +61,10 @@
   --urlbar-dropmarker-2x-region: rect(0, 22px, 28px, 0);
   --urlbar-dropmarker-hover-2x-region: rect(0, 44px, 28px, 22px);
   --urlbar-dropmarker-active-2x-region: rect(0, 66px, 28px, 44px);
+
+  --panel-separator-color: ThreeDLightShadow;
+
+  --urlbar-separator-color: hsla(0,0%,16%,.2);
 }
 
 :root:-moz-lwtheme-brighttext {
@@ -1525,19 +1530,22 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
   background-color: transparent;
   border: none;
   width: auto;
-  list-style-image: url("chrome://browser/skin/urlbar-history-dropmarker.png");
-  -moz-image-region: rect(0px, 11px, 14px, 0px);
+  list-style-image: var(--urlbar-dropmarker-url);
+  -moz-image-region: var(--urlbar-dropmarker-region);
+  transition: opacity 0.15s ease;
+}
+
+#urlbar:not(:hover) > .urlbar-textbox-container > .urlbar-history-dropmarker {
+  opacity: 0;
 }
 
 .urlbar-history-dropmarker:hover {
-  background-image: radial-gradient(circle closest-side, hsla(205,100%,70%,.3), hsla(205,100%,70%,0));
-  -moz-image-region: rect(0px, 22px, 14px, 11px);
+  -moz-image-region: var(--urlbar-dropmarker-hover-region);
 }
 
 .urlbar-history-dropmarker:hover:active,
 .urlbar-history-dropmarker[open="true"] {
-  background-image: radial-gradient(circle closest-side, hsla(205,100%,70%,.1), hsla(205,100%,70%,0));
-  -moz-image-region: rect(0px, 33px, 14px, 22px);
+  -moz-image-region: var(--urlbar-dropmarker-active-region);
 }
 
 @media (min-resolution: 1.1dppx) {
