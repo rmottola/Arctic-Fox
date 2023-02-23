@@ -487,6 +487,14 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info, PRLibrary **outLibrary)
       NS_WARNING(msg.get());
       return NS_ERROR_FAILURE;
     }
+#if defined(MOZ_CRASHREPORTER)
+    // The block above assumes that "fbplugin" is the filename of the plugin
+    // to be blocked, or that the filename starts with "fbplugin_".  But we
+    // don't yet know for sure if this is always true.  So for the time being
+    // record extra information in our crash logs.
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Bug_1086977"),
+                                       fileName);
+#endif
   }
 
   // It's possible that our plugin has 2 entry points that'll give us mime type
@@ -496,6 +504,14 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info, PRLibrary **outLibrary)
 
   // Sadly we have to load the library for this to work.
   rv = LoadPlugin(outLibrary);
+#if defined(MOZ_CRASHREPORTER)
+  if (nsCocoaFeatures::OnYosemiteOrLater()) {
+    // If we didn't crash in LoadPlugin(), change the previous annotation so we
+    // don't sow confusion.
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Bug_1086977"),
+                                       NS_LITERAL_CSTRING("Didn't crash, please ignore"));
+  }
+#endif
   if (NS_FAILED(rv))
     return rv;
 
