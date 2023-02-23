@@ -120,7 +120,9 @@ MediaEngineWebRTC::EnumerateVideoDevices(dom::MediaSourceEnum aMediaSource,
 
 #ifdef MOZ_WIDGET_ANDROID
   // get the JVM
-  JavaVM *jvm = mozilla::AndroidBridge::Bridge()->GetVM();
+  JavaVM* jvm;
+  JNIEnv* const env = jni::GetEnvForThread();
+  MOZ_ALWAYS_TRUE(!env->GetJavaVM(&jvm));
 
   if (webrtc::VideoEngine::SetAndroidObjects(jvm) != 0) {
     LOG(("VieCapture:SetAndroidObjects Failed"));
@@ -245,8 +247,9 @@ MediaEngineWebRTC::EnumerateAudioDevices(dom::MediaSourceEnum aMediaSource,
   jobject context = mozilla::AndroidBridge::Bridge()->GetGlobalContextRef();
 
   // get the JVM
-  JavaVM *jvm = mozilla::AndroidBridge::Bridge()->GetVM();
-  JNIEnv *env = GetJNIForThread();
+  JavaVM* jvm;
+  JNIEnv* const env = jni::GetEnvForThread();
+  MOZ_ALWAYS_TRUE(!env->GetJavaVM(&jvm));
 
   if (webrtc::VoiceEngine::SetAndroidObjects(jvm, env, (void*)context) != 0) {
     LOG(("VoiceEngine:SetAndroidObjects Failed"));

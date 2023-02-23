@@ -1367,7 +1367,7 @@ bool nsPluginInstanceOwner::AddPluginView(const LayoutDeviceRect& aRect /* = Lay
     if (!mJavaView)
       return false;
 
-    mJavaView = (void*)AndroidBridge::GetJNIEnv()->NewGlobalRef((jobject)mJavaView);
+    mJavaView = (void*)jni::GetGeckoThreadEnv()->NewGlobalRef((jobject)mJavaView);
   }
 
   if (AndroidBridge::Bridge())
@@ -1386,7 +1386,7 @@ void nsPluginInstanceOwner::RemovePluginView()
 
   widget::GeckoAppShell::RemovePluginView(
       jni::Object::Ref::From(jobject(mJavaView)), mFullScreen);
-  AndroidBridge::GetJNIEnv()->DeleteGlobalRef((jobject)mJavaView);
+  jni::GetGeckoThreadEnv()->DeleteGlobalRef((jobject)mJavaView);
   mJavaView = nullptr;
 
   if (mFullScreen)
@@ -1461,7 +1461,7 @@ void nsPluginInstanceOwner::ExitFullScreen() {
 }
 
 void nsPluginInstanceOwner::ExitFullScreen(jobject view) {
-  JNIEnv* env = AndroidBridge::GetJNIEnv();
+  JNIEnv* env = jni::GetGeckoThreadEnv();
 
   if (sFullScreenInstance && sFullScreenInstance->mInstance &&
       env->IsSameObject(view, (jobject)sFullScreenInstance->mInstance->GetJavaSurface())) {
