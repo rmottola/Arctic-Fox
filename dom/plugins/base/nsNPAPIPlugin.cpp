@@ -1037,7 +1037,7 @@ NPError
 _destroystream(NPP npp, NPStream *pstream, NPError reason)
 {
   if (!NS_IsMainThread()) {
-    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_write called from the wrong thread\n"));
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_destroystream called from the wrong thread\n"));
     return NPERR_INVALID_PARAM;
   }
   NPN_PLUGIN_LOG(PLUGIN_LOG_NORMAL,
@@ -2631,6 +2631,11 @@ NPError
 _getvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
                 char **value, uint32_t *len)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_getvalueforurl called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance) {
     return NPERR_INVALID_PARAM;
   }
@@ -2689,6 +2694,11 @@ NPError
 _setvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
                 const char *value, uint32_t len)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_setvalueforurl called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance) {
     return NPERR_INVALID_PARAM;
   }
@@ -2700,7 +2710,7 @@ _setvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
   switch (variable) {
   case NPNURLVCookie:
     {
-      if (!url || !value || (0 >= len))
+      if (!value || 0 == len)
         return NPERR_INVALID_PARAM;
 
       nsresult rv = NS_ERROR_FAILURE;
@@ -2745,6 +2755,11 @@ _getauthenticationinfo(NPP instance, const char *protocol, const char *host,
                        char **username, uint32_t *ulen, char **password,
                        uint32_t *plen)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_getauthenticationinfo called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance || !protocol || !host || !scheme || !realm || !username ||
       !ulen || !password || !plen)
     return NPERR_INVALID_PARAM;
@@ -2801,6 +2816,11 @@ _getauthenticationinfo(NPP instance, const char *protocol, const char *host,
 uint32_t
 _scheduletimer(NPP instance, uint32_t interval, NPBool repeat, PluginTimerFunc timerFunc)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_scheduletimer called from the wrong thread\n"));
+    return 0;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst)
     return 0;
@@ -2811,6 +2831,11 @@ _scheduletimer(NPP instance, uint32_t interval, NPBool repeat, PluginTimerFunc t
 void
 _unscheduletimer(NPP instance, uint32_t timerID)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_unscheduletimer called from the wrong thread\n"));
+    return;
+  }
+
 #ifdef MOZ_WIDGET_ANDROID
   // Sometimes Flash calls this with a dead NPP instance. Ensure the one we have
   // here is valid and maps to a nsNPAPIPluginInstance.
@@ -2827,6 +2852,11 @@ _unscheduletimer(NPP instance, uint32_t timerID)
 NPError
 _popupcontextmenu(NPP instance, NPMenu* menu)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_popupcontextmenu called from the wrong thread\n"));
+    return 0;
+  }
+
 #ifdef MOZ_WIDGET_COCOA
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
 
@@ -2876,6 +2906,11 @@ _popupcontextmenu(NPP instance, NPMenu* menu)
 NPBool
 _convertpoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_convertpoint called from the wrong thread\n"));
+    return 0;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst)
     return false;
@@ -2886,6 +2921,11 @@ _convertpoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace so
 void
 _urlredirectresponse(NPP instance, void* notifyData, NPBool allow)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_convertpoint called from the wrong thread\n"));
+    return;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst) {
     return;
