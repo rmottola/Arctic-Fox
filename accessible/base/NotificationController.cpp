@@ -230,7 +230,7 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
     nsIContent* containerElm = containerNode->IsElement() ?
       containerNode->AsElement() : nullptr;
 
-   nsIFrame::RenderedText text = textFrame->GetRenderedText();
+    nsIFrame::RenderedText text = textFrame->GetRenderedText();
 
     // Remove text accessible if rendered text is empty.
     if (textAcc) {
