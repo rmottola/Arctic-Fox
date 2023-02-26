@@ -338,7 +338,7 @@ InvokeState::pushInterpreterFrame(JSContext* cx)
 InterpreterFrame*
 ExecuteState::pushInterpreterFrame(JSContext* cx)
 {
-    return cx->runtime()->interpreterStack().pushExecuteFrame(cx, script_, thisv_, newTargetValue_,
+    return cx->runtime()->interpreterStack().pushExecuteFrame(cx, script_, newTargetValue_,
                                                               scopeChain_, type_, evalInFrame_);
 }
 // MSVC with PGO inlines a lot of functions in RunScript, resulting in large
@@ -642,12 +642,8 @@ js::ExecuteKernel(JSContext* cx, HandleScript script, JSObject& scopeChainArg,
         return true;
     }
 
-    // It doesn't matter what we pass as thisv, global/eval scripts get |this|
-    // from the scope chain. TODO: remove thisv from ExecuteState.
-    RootedValue thisv(cx);
-
     probes::StartExecution(script);
-    ExecuteState state(cx, script, thisv, newTargetValue, scopeChainArg, type, evalInFrame, result);
+    ExecuteState state(cx, script, newTargetValue, scopeChainArg, type, evalInFrame, result);
     bool ok = RunScript(cx, state);
     probes::StopExecution(script);
 
