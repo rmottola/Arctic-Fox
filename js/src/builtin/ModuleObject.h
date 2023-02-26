@@ -174,6 +174,7 @@ class ModuleNamespaceObject : public ProxyObject
         static const char family;
     };
 
+  public:
     static const ProxyHandler proxyHandler;
 };
 
@@ -310,5 +311,12 @@ JSObject* InitImportEntryClass(JSContext* cx, HandleObject obj);
 JSObject* InitExportEntryClass(JSContext* cx, HandleObject obj);
 
 } // namespace js
+
+template<>
+inline bool
+JSObject::is<js::ModuleNamespaceObject>() const
+{
+    return js::IsDerivedProxyObject(this, &js::ModuleNamespaceObject::proxyHandler);
+}
 
 #endif /* builtin_ModuleObject_h */
