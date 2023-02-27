@@ -1146,7 +1146,7 @@ struct ObjectGroupCompartment::PlainObjectEntry
 };
 
 static bool
-CanShareObjectGroup(IdValuePair *properties, size_t nproperties)
+CanShareObjectGroup(IdValuePair* properties, size_t nproperties)
 {
     // Don't reuse groups for objects containing indexed properties, which
     // might end up as dense elements.
