@@ -1343,6 +1343,7 @@ class MacroAssembler : public MacroAssemblerSpecific
         return &failureLabel_;
     }
 
+    bool asmMergeWith(const MacroAssembler& masm);
     void finish();
     void link(JitCode* code);
 
