@@ -1701,7 +1701,8 @@ CASE(EnableInterruptsPseudoOpcode)
     jsbytecode op = *REGS.pc;
 
     if (!script->hasScriptCounts() && cx->compartment()->collectCoverage()) {
-        script->initScriptCounts(cx);
+        if (!script->initScriptCounts(cx))
+            goto error;
         moreInterrupts = true;
     }
 

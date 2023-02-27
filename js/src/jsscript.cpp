@@ -1402,10 +1402,15 @@ JSScript::initScriptCounts(JSContext* cx)
     ScriptCountsMap* map = compartment()->scriptCountsMap;
     if (!map) {
         map = cx->new_<ScriptCountsMap>();
-        if (!map || !map->init()) {
+        if (!map)
+            return false;
+
+        if (!map->init()) {
             js_delete(map);
+            ReportOutOfMemory(cx);
             return false;
         }
+
         compartment()->scriptCountsMap = map;
     }
 
