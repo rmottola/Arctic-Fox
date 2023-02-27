@@ -314,7 +314,7 @@ dnl ========================================================
 
 # Target the Windows 8.1 SDK by default
 WINSDK_TARGETVER=603
-WINVER=600
+WINVER=502
 
 MOZ_ARG_WITH_STRING(windows-version,
 [  --with-windows-version=WINSDK_TARGETVER
@@ -604,7 +604,7 @@ dnl Check for MacOS deployment target version
 dnl ========================================================
 
 MOZ_ARG_ENABLE_STRING(macos-target,
-                      [  --enable-macos-target=VER (default=10.5)
+                      [  --enable-macos-target=VER (default=10.6)
                           Set the minimum MacOS version needed at runtime],
                       [_MACOSX_DEPLOYMENT_TARGET=$enableval])
 
@@ -617,7 +617,7 @@ case "$target" in
     else
         dnl No value specified on the command line or in the environment,
         dnl use architecture minimum.
-        export MACOSX_DEPLOYMENT_TARGET=10.5
+        export MACOSX_DEPLOYMENT_TARGET=10.6
     fi
     ;;
 esac
