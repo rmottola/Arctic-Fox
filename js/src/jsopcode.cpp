@@ -2051,7 +2051,8 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
         compCover.collectCodeCoverageInfo(comp, topScript->sourceObject(), topScript);
     }
 
-    compCover.exportInto(out);
+    bool isEmpty = true;
+    compCover.exportInto(out, &isEmpty);
     if (out.hadOutOfMemory())
         return false;
     return true;
