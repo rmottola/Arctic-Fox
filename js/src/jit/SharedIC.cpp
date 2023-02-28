@@ -3697,8 +3697,8 @@ ICGetPropCallNativeCompiler::generateStubCode(MacroAssembler& masm)
         masm.extractObject(Address(objReg, ScopeObject::offsetOfEnclosingScope()), objReg);
 
     // Push args for vm call.
-    masm.push(objReg);
-    masm.push(callee);
+    masm.Push(objReg);
+    masm.Push(callee);
 
     regs.add(R0);
 
