@@ -1524,8 +1524,14 @@ CodeGeneratorMIPSShared::visitMemoryBarrier(LMemoryBarrier* ins)
 void
 CodeGeneratorMIPSShared::memoryBarrier(MemoryBarrierBits barrier)
 {
-    if (barrier)
-      masm.as_sync();
+    if (barrier == MembarLoadLoad)
+        masm.as_sync(19);
+    else if (barrier == MembarStoreStore)
+        masm.as_sync(4);
+    else if (barrier & MembarSynchronizing)
+        masm.as_sync();
+    else if (barrier)
+        masm.as_sync(16);
 }
 
 void
