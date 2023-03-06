@@ -1128,6 +1128,9 @@ HyperTextAccessible::NativeAttributes()
 nsIAtom*
 HyperTextAccessible::LandmarkRole() const
 {
+  if (!HasOwnContent())
+    return nullptr;
+
   // For the html landmark elements we expose them like we do ARIA landmarks to
   // make AT navigation schemes "just work".
   if (mContent->IsHTMLElement(nsGkAtoms::nav)) {
