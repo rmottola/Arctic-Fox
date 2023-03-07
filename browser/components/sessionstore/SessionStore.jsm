@@ -1855,7 +1855,8 @@ var SessionStoreInternal = {
     }
 
     // Default delay of 2 seconds gives enough time to catch multiple TabShow
-    // events due to changing groups in Panorama.
+    // events. This used to be due to changing groups in 'tab groups'. We
+    // might be able to get rid of this now?
     this.saveStateDelayed(aWindow);
   },
 
@@ -1867,7 +1868,8 @@ var SessionStoreInternal = {
     }
 
     // Default delay of 2 seconds gives enough time to catch multiple TabHide
-    // events due to changing groups in Panorama.
+    // events. This used to be due to changing groups in 'tab groups'. We
+    // might be able to get rid of this now?
     this.saveStateDelayed(aWindow);
   },
 
@@ -2375,10 +2377,7 @@ var SessionStoreInternal = {
         // Restore into that window - pretend it's a followup since we'll already
         // have a focused window.
         //XXXzpao This is going to merge extData together (taking what was in
-        //        winState over what is in the window already. The hack we have
-        //        in _preWindowToRestoreInto will prevent most (all?) Panorama
-        //        weirdness but we will still merge other extData.
-        //        Bug 588217 should make this go away by merging the group data.
+        //        winState over what is in the window already.
         let options = {overwriteTabs: canOverwriteTabs, isFollowUp: true};
         this.restoreWindow(windowToUse, winState, options);
       }
