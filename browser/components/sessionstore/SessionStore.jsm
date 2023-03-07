@@ -2976,8 +2976,24 @@ var SessionStoreInternal = {
         this._windows[aWindow.__SSi].extData[key] = winData.extData[key];
       }
     }
+
+    let newClosedTabsData = winData._closedTabs || [];
+
     if (overwriteTabs || firstWindow) {
-      this._windows[aWindow.__SSi]._closedTabs = winData._closedTabs || [];
+      // Overwrite existing closed tabs data when overwriteTabs=true
+      // or we're the first window to be restored.
+      this._windows[aWindow.__SSi]._closedTabs = newClosedTabsData;
+    } else if (this._max_tabs_undo > 0) {
+      // If we merge tabs, we also want to merge closed tabs data. We'll assume
+      // the restored tabs were closed more recently and append the current list
+      // of closed tabs to the new one...
+      newClosedTabsData =
+        newClosedTabsData.concat(this._windows[aWindow.__SSi]._closedTabs);
+
+      // ... and make sure that we don't exceed the max number of closed tabs
+      // we can restore.
+      this._windows[aWindow.__SSi]._closedTabs =
+        newClosedTabsData.slice(0, this._max_tabs_undo);
     }
 
     // Restore tabs, if any.
