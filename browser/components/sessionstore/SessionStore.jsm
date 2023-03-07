@@ -489,10 +489,6 @@ var SessionStoreInternal = {
 
     this._initPrefs();
     this._initialized = true;
-
-    // this pref is only read at startup, so no need to observe it
-    this._sessionhistory_max_entries =
-      this._prefBranch.getIntPref("sessionhistory.max_entries");
   },
 
   /**
@@ -2376,7 +2372,7 @@ var SessionStoreInternal = {
         if (winState._closedTabs && winState._closedTabs.length) {
           let curWinState = this._windows[windowToUse.__SSi];
           curWinState._closedTabs = curWinState._closedTabs.concat(winState._closedTabs);
-          curWinState._closedTabs.splice(this._prefBranch.getIntPref("sessionstore.max_tabs_undo"), curWinState._closedTabs.length);
+          curWinState._closedTabs.splice(this._max_tabs_undo, curWinState._closedTabs.length);
         }
 
         // Restore into that window - pretend it's a followup since we'll already
