@@ -1546,9 +1546,6 @@ var SessionStoreInternal = {
         delete this._windows[ix];
       }
     }
-    // Remove all pointers so that pending/restoring tabs that were closed
-    // above do not end up in _closedTabs[] again.
-    this._closedTabs.clear();
     // also clear all data about closed windows
     this._closedWindows = [];
     // give the tabbrowsers a chance to clear their histories first
