@@ -3951,9 +3951,9 @@ var SessionStoreInternal = {
    * @param aTab the which has been restored
    */
   _sendTabRestoredNotification: function ssi_sendTabRestoredNotification(aTab) {
-      let event = aTab.ownerDocument.createEvent("Events");
-      event.initEvent("SSTabRestored", true, false);
-      aTab.dispatchEvent(event);
+    let event = aTab.ownerDocument.createEvent("Events");
+    event.initEvent("SSTabRestored", true, false);
+    aTab.dispatchEvent(event);
   },
 
   /**
@@ -4098,47 +4098,6 @@ var SessionStoreInternal = {
    */
   isCurrentEpoch: function (browser, epoch) {
     return this.getCurrentEpoch(browser) == epoch;
-  },
-
-  // A map (xul:browser -> handler) that maps a tab to the
-  // synchronous collection handler object for that tab.
-  // See SyncHandler in content-sessionStore.js.
-  _syncHandlers: new WeakMap(),
-
-  /**
-   * Install the sync handler object from a given tab.
-   */
-  setSyncHandler: function (browser, handler) {
-    this._syncHandlers.set(browser, handler);
-  },
-
-  /**
-   * When a docshell swap happens, a xul:browser element will be
-   * associated with a different content-sessionStore.js script
-   * global. In this case, the sync handler for the element needs to
-   * be swapped just like the docshell.
-   */
-  onSwapDocShells: function (browser, otherBrowser) {
-    // Make sure that one or the other of these has a sync handler,
-    // and let it be |browser|.
-    if (!this._syncHandlers.has(browser)) {
-      [browser, otherBrowser] = [otherBrowser, browser];
-      if (!this._syncHandlers.has(browser)) {
-        return;
-      }
-    }
-
-    // At this point, browser is guaranteed to have a sync handler,
-    // although otherBrowser may not. Perform the swap.
-    let handler = this._syncHandlers.get(browser);
-    if (this._syncHandlers.has(otherBrowser)) {
-      let otherHandler = this._syncHandlers.get(otherBrowser);
-      this._syncHandlers.set(browser, otherHandler);
-      this._syncHandlers.set(otherHandler, handler);
-    } else {
-      this._syncHandlers.set(otherBrowser, handler);
-      this._syncHandlers.delete(browser);
-    }
   },
 
   /**
@@ -4344,19 +4303,6 @@ var DirtyWindows = {
     this._data.clear();
   }
 };
-
-function TabData(obj = null) {
-  if (obj) {
-    if (obj instanceof TabData) {
-      // FIXME: Can we get rid of this?
-      return obj;
-    }
-    for (let [key, value] in Iterator(obj)) {
-      this[key] = value;
-    }
-  }
-  return this;
-}
 
 // The state from the previous session (after restoring pinned tabs). This
 // state is persisted and passed through to the next session during an app
