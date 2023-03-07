@@ -1168,13 +1168,6 @@ var SessionStoreInternal = {
         return;
       }
 
-      let windowType = aWindow.document.documentElement.getAttribute("windowtype");
-
-      // Ignore non-browser windows.
-      if (windowType != "navigator:browser") {
-        return;
-      }
-
       if (this._sessionInitialized) {
         this.initializeWindow(aWindow);
       } else {
@@ -1334,7 +1327,6 @@ var SessionStoreInternal = {
         // save the state without this window to disk
         this.saveStateDelayed();
       });
-
     } else {
       this.cleanUpWindow(aWindow, winData, browsers);
     }
