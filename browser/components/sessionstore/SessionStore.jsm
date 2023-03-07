@@ -451,6 +451,10 @@ var SessionStoreInternal = {
   // Whether session has been initialized
   _sessionInitialized: false,
 
+  // Promise that is resolved when we're ready to initialize
+  // and restore the session.
+  _promiseReadyForInitialization: null,
+
   // Keep busy state counters per window.
   _windowBusyStates: new WeakMap(),
 
@@ -1178,7 +1182,7 @@ var SessionStoreInternal = {
         this._sessionInitialized = true;
 
         TelemetryStopwatch.start("FX_SESSION_RESTORE_STARTUP_ONLOAD_INITIAL_WINDOW_MS");
-	this.initializeWindow(aWindow, initialState);
+        this.initializeWindow(aWindow, initialState);
         TelemetryStopwatch.finish("FX_SESSION_RESTORE_STARTUP_ONLOAD_INITIAL_WINDOW_MS");
 
         // Let everyone know we're done.
