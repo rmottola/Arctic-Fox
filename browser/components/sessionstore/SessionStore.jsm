@@ -730,19 +730,6 @@ var SessionStoreInternal = {
         TabState.update(browser, aMessage.data);
         this.saveStateDelayed(win);
 
-        if (aMessage.data.isFinal) {
-          // If this the final message we need to resolve all pending flush
-          // requests for the given browser as they might have been sent too
-          // late and will never respond. If they have been sent shortly after
-          // switching a browser's remoteness there isn't too much data to skip.
-          TabStateFlusher.resolveAll(browser);
-        } else if (aMessage.data.flushID) {
-          // This is an update kicked off by an async flush request. Notify the
-          // TabStateFlusher so that it can finish the request and notify its
-          // consumer that's waiting for the flush to be done.
-          TabStateFlusher.resolve(browser, aMessage.data.flushID);
-        }
-
         // Handle any updates sent by the child after the tab was closed. This
         // might be the final update as sent by the "unload" handler but also
         // any async update message that was sent before the child unloaded.
