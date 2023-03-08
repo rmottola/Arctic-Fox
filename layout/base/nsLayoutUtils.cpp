@@ -1431,7 +1431,7 @@ nsLayoutUtils::GetAfterFrameForContent(nsIFrame* aFrame,
     LastContinuationWithChild(static_cast<nsContainerFrame*>(
       LastContinuationOrIBSplitSibling(genConParentFrame)));
   nsIFrame* childFrame =
-    lastParentContinuation->GetLastChild(nsIFrame::kPrincipalList);
+    lastParentContinuation->GetChildList(nsIFrame::kPrincipalList).LastChild();
   if (childFrame &&
       childFrame->IsPseudoFrame(aContent) &&
       !childFrame->IsGeneratedContentFrame()) {

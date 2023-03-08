@@ -1,7 +1,7 @@
-# -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 var Ci = Components.interfaces;
 var Cu = Components.utils;
@@ -10,7 +10,6 @@ var Cc = Components.classes;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/NotificationDB.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
-
 
 XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
@@ -205,23 +204,6 @@ var gInitialPages = [
   "about:sessionrestore",
   "about:logopage"
 ];
-
-#include browser-addons.js
-#include browser-devedition.js
-#include browser-feeds.js
-#include browser-fullScreen.js
-#include browser-fullZoom.js
-#include browser-places.js
-#include browser-plugins.js
-#include browser-tabPreviews.js
-#include browser-sidebar.js
-#include browser-tabview.js
-#include browser-thumbnails.js
-#include browser-gestureSupport.js
-
-#ifdef MOZ_SERVICES_SYNC
-#include browser-syncui.js
-#endif
 
 XPCOMUtils.defineLazyGetter(this, "Win7Features", function () {
 #ifdef XP_WIN
@@ -890,6 +872,7 @@ function _loadURIWithFlags(browser, uri, params) {
     // We might lose history that way but at least the browser loaded a page.
     // This might be necessary if SessionStore wasn't initialized yet i.e.
     // when the homepage is a non-remote page.
+    Cu.reportError(e);
     gBrowser.updateBrowserRemotenessByURL(browser, uri);
     browser.webNavigation.loadURIWithOptions(uri, flags, referrer, referrerPolicy,
                                              postData, null, null);
@@ -1060,7 +1043,6 @@ var gBrowserInit = {
 
     // Misc. inits.
     CombinedStopReload.init();
-    allTabs.readPref();
     TabsOnTop.init();
     gPrivateBrowsingUI.init();
     TabsInTitlebar.init();
@@ -1314,7 +1296,6 @@ var gBrowserInit = {
 
     ctrlTab.readPref();
     gPrefService.addObserver(ctrlTab.prefName, ctrlTab, false);
-    gPrefService.addObserver(allTabs.prefName, allTabs, false);
 
     // Initialize the download manager some time after the app starts so that
     // auto-resume downloads begin (such as after crashing or quitting with
@@ -1453,9 +1434,6 @@ var gBrowserInit = {
       // Enable the Restore Last Session command if needed
       RestoreLastSessionObserver.init();
 
-      if ("TabView" in window)
-        TabView.init();
-
       PanicButtonNotifier.init();
     });
     this.delayedStartupFinished = true;
@@ -1505,8 +1483,6 @@ var gBrowserInit = {
 
     // First clean up services initialized in gBrowserInit.onLoad (or those whose
     // uninit methods don't depend on the services having been initialized).
-    
-    allTabs.uninit();
 
     CombinedStopReload.uninit();
 
@@ -1549,10 +1525,7 @@ var gBrowserInit = {
         Win7Features.onCloseWindow();
 
       gPrefService.removeObserver(ctrlTab.prefName, ctrlTab);
-      gPrefService.removeObserver(allTabs.prefName, allTabs);
       ctrlTab.uninit();
-      if ("TabView" in window)
-        TabView.uninit();
       gBrowserThumbnails.uninit();
       FullZoom.destroy();
 
@@ -6638,9 +6611,7 @@ function undoCloseTab(aIndex) {
 
   var tab = null;
   if (SessionStore.getClosedTabCount(window) > (aIndex || 0)) {
-    TabView.prepareUndoCloseTab(blankTabToRemove);
     tab = SessionStore.undoCloseTab(window, aIndex || 0);
-    TabView.afterUndoCloseTab();
 
     if (blankTabToRemove)
       gBrowser.removeTab(blankTabToRemove);
@@ -7569,10 +7540,6 @@ var TabContextMenu = {
     bookmarkAllTabs.hidden = this.contextTab.pinned;
     if (!bookmarkAllTabs.hidden)
       PlacesCommandHook.updateBookmarkAllTabsCommand();
-
-    // Hide "Move to Group" if it's a pinned tab.
-    document.getElementById("context_tabViewMenu").hidden =
-      (this.contextTab.pinned || !TabView.firstUseExperienced);
 
     // Adjust the state of the toggle mute menu item.
     let toggleMute = document.getElementById("context_toggleMuteTab");

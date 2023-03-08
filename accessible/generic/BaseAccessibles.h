@@ -86,7 +86,7 @@ protected:
 };
 
 /**
- * A simple accessible that gets its enumerated role passed into constructor.
+ * A simple accessible that gets its enumerated role.
  */
 template<a11y::role R>
 class EnumRoleAccessible : public AccessibleWrap

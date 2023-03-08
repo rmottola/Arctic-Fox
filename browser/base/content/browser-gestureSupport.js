@@ -1,6 +1,6 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Simple gestures support
 //
@@ -13,7 +13,7 @@
 // chrome-only, we must listen for the simple gesture events during
 // the capturing phase and call stopPropagation on every event.
 
-let gGestureSupport = {
+var gGestureSupport = {
   _currentRotation: 0,
   _lastRotateDelta: 0,
   _rotateMomentumThreshold: .75,
@@ -571,7 +571,7 @@ let gGestureSupport = {
 };
 
 // History Swipe Animation Support (bug 678392)
-let gHistorySwipeAnimation = {
+var gHistorySwipeAnimation = {
 
   active: false,
   isLTR: false,

@@ -62,6 +62,7 @@ public:
 
   virtual void InvalidateChildren() override;
   virtual bool RemoveChild(Accessible* aAccessible) override;
+  virtual Relation RelationByType(RelationType aType) override;
 
   // HyperTextAccessible (static helper method)
 
@@ -139,7 +140,10 @@ public:
                            bool aIsEndOffset) const;
 
   /**
-   * Convert start and end hypertext offsets into DOM range.
+   * Convert start and end hypertext offsets into DOM range.  Note that if
+   * aStartOffset and/or aEndOffset is in generated content such as ::before or
+   * ::after, the result range excludes the generated content.  See also
+   * ClosestNotGeneratedDOMPoint() for more information.
    *
    * @param  aStartOffset  [in] the given start hypertext offset
    * @param  aEndOffset    [in] the given end hypertext offset
@@ -518,6 +522,23 @@ protected:
 
   nsresult SetSelectionRange(int32_t aStartPos, int32_t aEndPos);
 
+  /**
+   * Convert the given DOM point to a DOM point in non-generated contents.
+   *
+   * If aDOMPoint is in ::before, the result is immediately after it.
+   * If aDOMPoint is in ::after, the result is immediately before it.
+   *
+   * @param aDOMPoint       [in] A DOM node and an index of its child. This may
+   *                             be in a generated content such as ::before or
+   *                             ::after.
+   * @param aElementContent [in] An nsIContent representing an element of
+   *                             aDOMPoint.node.
+   * @return                An DOM point which must not be in generated
+   *                        contents.
+   */
+  DOMPoint ClosestNotGeneratedDOMPoint(const DOMPoint& aDOMPoint,
+                                       nsIContent* aElementContent);
+
   // Helpers
   nsresult GetDOMPointByFrameOffset(nsIFrame* aFrame, int32_t aOffset,
                                     Accessible* aAccessible,
@@ -539,6 +560,12 @@ protected:
   void GetSpellTextAttr(nsINode* aNode, int32_t aNodeOffset,
                         uint32_t* aStartOffset, uint32_t* aEndOffset,
                         nsIPersistentProperties* aAttributes);
+
+  /**
+   * Set xml-roles attributes for MathML elements.
+   * @param aAttributes
+   */
+  void SetMathMLXMLRoles(nsIPersistentProperties* aAttributes);
 
 private:
   /**

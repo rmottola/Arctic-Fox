@@ -6147,7 +6147,7 @@ AdjustAppendParentForAfterContent(nsFrameManager* aFrameManager,
       // Ensure that all normal flow children are on the principal child list.
       parent->DrainSelfOverflowList();
 
-      nsIFrame* child = parent->GetLastChild(nsIFrame::kPrincipalList);
+      nsIFrame* child = parent->GetChildList(nsIFrame::kPrincipalList).LastChild();
       if (child && child->IsPseudoFrame(aContainer) &&
           !child->IsGeneratedContentFrame()) {
         // Drill down into non-generated pseudo frames of aContainer.
@@ -6240,7 +6240,7 @@ FindAppendPrevSibling(nsIFrame* aParentFrame, nsIFrame* aAfterFrame)
 
   aParentFrame->DrainSelfOverflowList();
 
-  return aParentFrame->GetLastChild(kPrincipalList);
+  return aParentFrame->GetChildList(kPrincipalList).LastChild();
 }
 
 /**
@@ -12105,7 +12105,7 @@ nsCSSFrameConstructor::WipeContainingBlock(nsFrameConstructorState& aState,
             // Try to find one after all
             nsIFrame* parentPrevCont = aFrame->GetPrevContinuation();
             while (parentPrevCont) {
-              prevSibling = parentPrevCont->GetLastChild(kPrincipalList);
+              prevSibling = parentPrevCont->GetChildList(kPrincipalList).LastChild();
               if (prevSibling) {
                 break;
               }
@@ -12235,8 +12235,8 @@ nsCSSFrameConstructor::WipeContainingBlock(nsFrameConstructorState& aState,
       return false;
     }
 
-    // We might have some inline kids for this block.  Just reconstruct.
-    break;
+    // We might have some inline kids for this block.  Just fall out of the
+    // loop and reconstruct.
   } while (0);
 
   // If we don't have a containing block, start with aFrame and look for one.
