@@ -1056,18 +1056,6 @@ pref("dom.wakelock.enabled", true);
 // Enable webapps add-ons
 pref("dom.apps.customization.enabled", true);
 
-#ifdef MOZ_GRAPHENE
-// Enable touch caret by default
-pref("touchcaret.enabled", true);
-// Enable selection caret by default
-pref("selectioncaret.enabled", true);
-#else
-// Original caret implementation on collapsed selection.
-pref("touchcaret.enabled", false);
-// Original caret implementation on non-collapsed selection.
-pref("selectioncaret.enabled", false);
-#endif
-
 // Enable sync and mozId with Firefox Accounts.
 pref("services.sync.fxaccounts.enabled", true);
 pref("identity.fxaccounts.enabled", true);
