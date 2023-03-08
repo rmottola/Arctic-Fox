@@ -477,6 +477,7 @@ var SessionStoreInternal = {
   },
 
   set canRestoreLastSession(val) {
+    // Cheat a bit; only allow false.
     if (!val) {
       LastSession.clear();
     }
@@ -490,6 +491,7 @@ var SessionStoreInternal = {
       throw new Error("SessionStore.init() must only be called once!");
     }
 
+    TelemetryTimestamps.add("sessionRestoreInitialized");
     OBSERVING.forEach(function(aTopic) {
       Services.obs.addObserver(this, aTopic, true);
     }, this);
@@ -1008,6 +1010,7 @@ var SessionStoreInternal = {
           // Nothing to restore now, notify observers things are complete.
           Services.obs.notifyObservers(null, NOTIFY_WINDOWS_RESTORED, "");
         } else {
+          TelemetryTimestamps.add("sessionRestoreRestoring");
           this._restoreCount = aInitialState.windows ? aInitialState.windows.length : 0;
 
           // global data must be restored before restoreWindow is called so that
