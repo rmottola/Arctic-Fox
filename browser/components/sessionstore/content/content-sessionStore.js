@@ -82,7 +82,7 @@ var EventListener = {
 /**
  * Listens for and handles messages sent by the session store service.
  */
-let MessageListener = {
+var MessageListener = {
 
   MESSAGES: [
     "SessionStore:restoreHistory",
@@ -256,6 +256,9 @@ var SessionHistoryListener = {
     if (!SessionHistory.isEmpty(docShell)) {
       this.collect();
     }
+
+    // Listen for page title changes.
+    addEventListener("DOMTitleChanged", this);
   },
 
   uninit: function () {
@@ -269,6 +272,10 @@ var SessionHistoryListener = {
     if (docShell) {
       MessageQueue.push("history", () => SessionHistory.collect(docShell));
     }
+  },
+
+  handleEvent(event) {
+    this.collect();
   },
 
   onFrameTreeCollected: function () {
