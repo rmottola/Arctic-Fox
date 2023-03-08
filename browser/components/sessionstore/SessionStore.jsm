@@ -2929,6 +2929,10 @@ var SessionStoreInternal = {
         tabbrowser.showTab(tabs[t]);
         numVisibleTabs++;
       }
+
+      if (!!winData.tabs[t].muted != tabs[t].linkedBrowser.audioMuted) {
+        tabs[t].toggleMuteAudio();
+      }
     }
 
     if (!overwriteTabs && firstWindow) {
@@ -3187,6 +3191,10 @@ var SessionStoreInternal = {
       tabbrowser.hideTab(tab);
     } else {
       tabbrowser.showTab(tab);
+    }
+
+    if (!!tabData.muted != browser.audioMuted) {
+      tab.toggleMuteAudio();
     }
 
     if (tabData.lastAccessed) {
