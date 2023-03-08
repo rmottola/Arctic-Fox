@@ -45,3 +45,5 @@ EXTRA_JS_MODULES.sessionstore = [
     'Utils.jsm',
 ]
 
+with Files('**'):
+    BUG_COMPONENT = ('Firefox', 'Session Restore')

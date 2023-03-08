@@ -1483,8 +1483,6 @@ var gBrowserInit = {
 
     // First clean up services initialized in gBrowserInit.onLoad (or those whose
     // uninit methods don't depend on the services having been initialized).
-    
-    allTabs.uninit();
 
     CombinedStopReload.uninit();
 
@@ -1527,7 +1525,6 @@ var gBrowserInit = {
         Win7Features.onCloseWindow();
 
       gPrefService.removeObserver(ctrlTab.prefName, ctrlTab);
-      gPrefService.removeObserver(allTabs.prefName, allTabs);
       ctrlTab.uninit();
       gBrowserThumbnails.uninit();
       FullZoom.destroy();

@@ -428,7 +428,7 @@ pref("dom.ipc.processCount", 100000);
 
 pref("dom.ipc.browser_frames.oop_by_default", false);
 
-#ifndef MOZ_MULET
+#if !defined(MOZ_MULET) && !defined(MOZ_GRAPHENE)
 pref("dom.meta-viewport.enabled", true);
 #endif
 
@@ -1056,11 +1056,17 @@ pref("dom.wakelock.enabled", true);
 // Enable webapps add-ons
 pref("dom.apps.customization.enabled", true);
 
+#ifdef MOZ_GRAPHENE
 // Enable touch caret by default
 pref("touchcaret.enabled", true);
-
 // Enable selection caret by default
 pref("selectioncaret.enabled", true);
+#else
+// Original caret implementation on collapsed selection.
+pref("touchcaret.enabled", false);
+// Original caret implementation on non-collapsed selection.
+pref("selectioncaret.enabled", false);
+#endif
 
 // Enable sync and mozId with Firefox Accounts.
 pref("services.sync.fxaccounts.enabled", true);
@@ -1144,3 +1150,8 @@ pref("extensions.blocklist.enabled", true);
 pref("extensions.blocklist.interval", 86400);
 pref("extensions.blocklist.url", "https://blocklist.addons.mozilla.org/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
 pref("extensions.blocklist.detailsURL", "https://www.mozilla.com/%LOCALE%/blocklist/");
+
+// Because we can't have nice things.
+#ifdef MOZ_GRAPHENE
+#include ../graphene/graphene.js
+#endif
