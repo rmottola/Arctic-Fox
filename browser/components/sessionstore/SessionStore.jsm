@@ -2579,13 +2579,6 @@ var SessionStoreInternal = {
     if (!aWindow)
       return [false, false];
 
-    let event = aWindow.document.createEvent("Events");
-    event.initEvent("SSRestoreIntoWindow", true, true);
-
-    // Check if we can use the window.
-    if (!aWindow.dispatchEvent(event))
-      return [false, false];
-
     // We might be able to overwrite the existing tabs instead of just adding
     // the previous session's tabs to the end. This will be set if possible.
     let canOverwriteTabs = false;
