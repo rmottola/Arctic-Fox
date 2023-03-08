@@ -16,6 +16,9 @@ var Cr = Components.results;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/Timer.jsm", this);
 
+XPCOMUtils.defineLazyModuleGetter(this, "FormData",
+  "resource://gre/modules/FormData.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "DocShellCapabilities",
   "resource:///modules/sessionstore/DocShellCapabilities.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PageStyle",
@@ -26,8 +29,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
   "resource:///modules/sessionstore/SessionHistory.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
   "resource:///modules/sessionstore/SessionStorage.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
-  "resource:///modules/sessionstore/TextAndScrollData.jsm");
 
 Cu.import("resource:///modules/sessionstore/FrameTree.jsm", this);
 var gFrameTree = new FrameTree(this);
@@ -367,6 +368,51 @@ var ScrollPositionListener = {
 };
 
 /**
+ * Listens for changes to input elements. Whenever the value of an input
+ * element changes we will re-collect data for the current frame tree and send
+ * a message to the parent process.
+ *
+ * Causes a SessionStore:update message to be sent that contains the form data
+ * for all reachable frames.
+ *
+ * Example:
+ *   {
+ *     formdata: {url: "http://mozilla.org/", id: {input_id: "input value"}},
+ *     children: [
+ *       null,
+ *       {url: "http://sub.mozilla.org/", id: {input_id: "input value 2"}}
+ *     ]
+ *   }
+ */
+var FormDataListener = {
+  init: function () {
+    addEventListener("input", this, true);
+    addEventListener("change", this, true);
+    gFrameTree.addObserver(this);
+  },
+
+  handleEvent: function (event) {
+    let frame = event.target &&
+                event.target.ownerDocument &&
+                event.target.ownerDocument.defaultView;
+
+    // Don't collect form data for frames created at or after the load event
+    // as SessionStore can't restore form data for those.
+    if (frame && gFrameTree.contains(frame)) {
+      MessageQueue.push("formdata", () => this.collect());
+    }
+  },
+
+  onFrameTreeReset: function () {
+    MessageQueue.push("formdata", () => null);
+  },
+
+  collect: function () {
+    return gFrameTree.map(FormData.collect);
+  }
+};
+
+/**
  * Listens for changes to the page style. Whenever a different page style is
  * selected or author styles are enabled/disabled we send a message with the
  * currently applied style to the chrome process.
@@ -685,6 +731,7 @@ var MessageQueue = {
 
 EventListener.init();
 MessageListener.init();
+FormDataListener.init();
 SyncHandler.init();
 PageStyleListener.init();
 SessionHistoryListener.init();

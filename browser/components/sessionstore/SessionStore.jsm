@@ -1823,18 +1823,6 @@ var SessionStoreInternal = {
   },
 
   /**
-   * Called when a browser sends the "input" notification
-   * @param aWindow
-   *        Window reference
-   * @param aBrowser
-   *        Browser reference
-   */
-  onTabInput: function ssi_onTabInput(aWindow, aBrowser) {
-    TabStateCache.delete(aBrowser);
-    this.saveStateDelayed(aWindow);
-  },
-
-  /**
    * When a tab is selected, save session data
    * @param aWindow
    *        Window reference

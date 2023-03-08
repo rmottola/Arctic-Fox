@@ -22,7 +22,6 @@ EXTRA_COMPONENTS += [
 EXTRA_JS_MODULES.sessionstore = [
     'ContentRestore.jsm',
     'DocShellCapabilities.jsm',
-    'DocumentUtils.jsm',
     'FrameTree.jsm',
     'GlobalState.jsm',
     'PageStyle.jsm',
@@ -43,7 +42,6 @@ EXTRA_JS_MODULES.sessionstore = [
     'TabState.jsm',
     'TabStateCache.jsm',
     'TabStateFlusher.jsm',
-    'TextAndScrollData.jsm',
     'Utils.jsm',
 ]
 
