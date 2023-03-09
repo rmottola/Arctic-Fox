@@ -836,9 +836,6 @@ pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // 1 = perform a soft refresh when restoring a tab (check network)
 // 2 = perform a hard refresh when restoring a tab (bypass cache completely)
 pref("browser.sessionstore.cache_behavior", 0);
-// Pale Moon: Allow exact positioning of windows to previous locations, even
-// if they would be outside of the screen bounds
-pref("browser.sessionstore.exactPos", false);
 
 // allow META refresh by default
 pref("accessibility.blockautorefresh", false);
