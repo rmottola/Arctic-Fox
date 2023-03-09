@@ -277,7 +277,7 @@ nsFileStreamBase::Write(const char *buf, uint32_t count, uint32_t *result)
     *result = cnt;
     return NS_OK;
 }
-    
+
 nsresult
 nsFileStreamBase::WriteFrom(nsIInputStream *inStr, uint32_t count, uint32_t *_retval)
 {
@@ -698,7 +698,7 @@ nsPartialFileInputStream::Init(nsIFile* aFile, uint64_t aStart,
     nsresult rv = nsFileInputStream::Init(aFile, aIOFlags, aPerm,
                                           aBehaviorFlags);
     NS_ENSURE_SUCCESS(rv, rv);
-    
+
     return nsFileInputStream::Seek(NS_SEEK_SET, mStart);
 }
 
@@ -833,7 +833,7 @@ NS_IMPL_ISUPPORTS_INHERITED(nsFileOutputStream,
                             nsFileStreamBase,
                             nsIOutputStream,
                             nsIFileOutputStream)
- 
+
 nsresult
 nsFileOutputStream::Create(nsISupports *aOuter, REFNSIID aIID, void **aResult)
 {
