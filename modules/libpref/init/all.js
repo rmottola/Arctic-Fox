@@ -4624,10 +4624,6 @@ pref("layers.offmainthreadcomposition.frame-rate", -1);
 pref("layers.async-pan-zoom.enabled", true);
 #endif
 
-#ifdef MOZ_WIDGET_UIKIT
-pref("layers.async-pan-zoom.enabled", true);
-#endif
-
 #ifdef XP_MACOSX
 pref("layers.enable-tiles", true);
 pref("layers.tile-width", 512);
