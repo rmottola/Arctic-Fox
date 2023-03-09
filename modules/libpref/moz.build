@@ -46,3 +46,6 @@ DEFINES['MOZ_WIDGET_TOOLKIT'] = CONFIG['MOZ_WIDGET_TOOLKIT']
 if CONFIG['GNU_CXX']:
     CXXFLAGS += ['-Wshadow']
 
+DIST_FILES += [
+    'greprefs.js',
+]
