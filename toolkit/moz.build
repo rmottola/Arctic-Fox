@@ -24,12 +24,16 @@ DIRS += [
 if CONFIG['MOZ_UPDATER'] and CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android':
     DIRS += ['mozapps/update']
 
-if CONFIG['MOZ_MAINTENANCE_SERVICE']:
+if CONFIG['MOZ_MAINTENANCE_SERVICE'] or CONFIG['MOZ_UPDATER'] and CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
 # Including mozapps/update/common-standalone allows the maintenance service
 # to be built so the maintenance service can be used for things other than
 # updating applications.
     DIRS += [
         'mozapps/update/common-standalone',
+    ]
+
+if CONFIG['MOZ_MAINTENANCE_SERVICE']:
+    DIRS += [
         'components/maintenanceservice'
     ]
 
@@ -43,6 +47,21 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     DIRS += ['system/windowsproxy']
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
     DIRS += ['system/androidproxy']
+
+if CONFIG['MOZ_CRASHREPORTER']:
+    DIRS += ['crashreporter']
+elif CONFIG['MOZ_ENABLE_PROFILER_SPS']:
+    # Profiler requires some crashreporter code,
+    # so build it even if crashreporter is disabled.
+    DIRS += [
+    'crashreporter/breakpad-logging',
+    'crashreporter/google-breakpad/src/common',
+    'crashreporter/google-breakpad/src/processor',
+    ]
+    if CONFIG['OS_ARCH'] == 'Darwin':
+        DIRS += ['crashreporter/google-breakpad/src/common/mac']
+    elif CONFIG['OS_ARCH'] == 'Linux':
+        DIRS += ['crashreporter/google-breakpad/src/common/linux']
 
 with Files('mozapps/installer/windows/*'):
     BUG_COMPONENT = ('Toolkit', 'NSIS Installer')
