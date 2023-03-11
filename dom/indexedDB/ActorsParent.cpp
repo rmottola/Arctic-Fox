@@ -15959,22 +15959,6 @@ FileManager::Init(nsIFile* aDirectory,
 nsresult
 FileManager::Invalidate()
 {
-  class MOZ_STACK_CLASS Helper final
-  {
-  public:
-    static PLDHashOperator
-    ClearDBRefs(const uint64_t& aKey, FileInfo*& aValue, void* aUserArg)
-    {
-      MOZ_ASSERT(aValue);
-
-      if (aValue->LockedClearDBRefs()) {
-        return PL_DHASH_NEXT;
-      }
-
-      return PL_DHASH_REMOVE;
-    }
-  };
-
   if (IndexedDatabaseManager::IsClosed()) {
     MOZ_ASSERT(false, "Shouldn't be called after shutdown!");
     return NS_ERROR_UNEXPECTED;
@@ -15985,7 +15969,14 @@ FileManager::Invalidate()
   MOZ_ASSERT(!mInvalidated);
   mInvalidated = true;
 
-  mFileInfos.Enumerate(Helper::ClearDBRefs, nullptr);
+  for (auto iter = mFileInfos.Iter(); !iter.Done(); iter.Next()) {
+    FileInfo* info = iter.Data();
+    MOZ_ASSERT(info);
+
+    if (!info->LockedClearDBRefs()) {
+      iter.Remove();
+    }
+  }
 
   return NS_OK;
 }
