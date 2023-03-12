@@ -424,13 +424,18 @@ PluginContent.prototype = {
         break;
 
       case "PluginInstantiated":
+        Services.telemetry.getKeyedHistogramById('PLUGIN_ACTIVATION_COUNT').add(this._getPluginInfo(plugin).pluginTag.niceName);
         shouldShowNotification = true;
         break;
     }
 
+    if (this._getPluginInfo(plugin).mimetype === "application/x-shockwave-flash") {
+      this._recordFlashPluginTelemetry(eventType, plugin);
+    }
+
     // Show the in-content UI if it's not too big. The crashed plugin handler already did this.
+    let overlay = this.getPluginUI(plugin, "main");
     if (eventType != "PluginCrashed") {
-      let overlay = this.getPluginUI(plugin, "main");
       if (overlay != null) {
         this.setVisibility(plugin, overlay,
                            this.shouldShowOverlay(plugin, overlay));
@@ -454,6 +459,49 @@ PluginContent.prototype = {
 
     if (shouldShowNotification) {
       this._showClickToPlayNotification(plugin, false);
+    }
+  },
+
+  _recordFlashPluginTelemetry: function (eventType, plugin) {
+    if (!Services.telemetry.canRecordExtended) {
+      return;
+    }
+
+    if (!this.flashPluginStats) {
+      this.flashPluginStats = {
+        instancesCount: 0,
+        plugins: new WeakSet()
+      };
+    }
+
+    if (!this.flashPluginStats.plugins.has(plugin)) {
+      // Reporting plugin instance and its dimensions only once.
+      this.flashPluginStats.plugins.add(plugin);
+
+      this.flashPluginStats.instancesCount++;
+
+      let pluginRect = plugin.getBoundingClientRect();
+      Services.telemetry.getHistogramById('FLASH_PLUGIN_WIDTH')
+                       .add(pluginRect.width);
+      Services.telemetry.getHistogramById('FLASH_PLUGIN_HEIGHT')
+                       .add(pluginRect.height);
+      Services.telemetry.getHistogramById('FLASH_PLUGIN_AREA')
+                       .add(pluginRect.width * pluginRect.height);
+
+      let state = this._getPluginInfo(plugin).fallbackType;
+      if (state === null) {
+        state = Ci.nsIObjectLoadingContent.PLUGIN_UNSUPPORTED;
+      }
+      Services.telemetry.getHistogramById('FLASH_PLUGIN_STATES')
+                       .add(state);
+    }
+  },
+
+  _finishRecordingFlashPluginTelemetry: function () {
+    if (this.flashPluginStats) {
+      Services.telemetry.getHistogramById('FLASH_PLUGIN_INSTANCES_ON_PAGE')
+                        .add(this.flashPluginStats.instancesCount);
+    delete this.flashPluginStats;
     }
   },
 
@@ -675,12 +723,15 @@ PluginContent.prototype = {
         continue;
       }
       if (pluginInfo.permissionString == pluginHost.getPermissionStringForType(plugin.actualType)) {
+        let overlay = this.getPluginUI(plugin, "main");
         pluginFound = true;
         if (newState == "block") {
+          if (overlay) {
+            overlay.addEventListener("click", this, true);
+          }
           plugin.reload(true);
         } else {
           if (this.canActivatePlugin(plugin)) {
-            let overlay = this.getPluginUI(plugin, "main");
             if (overlay) {
               overlay.removeEventListener("click", this, true);
             }
@@ -842,6 +893,7 @@ PluginContent.prototype = {
   },
 
   clearPluginCaches: function () {
+    this.pluginData.clear();
     this.pluginCrashData.clear();
   },
 
