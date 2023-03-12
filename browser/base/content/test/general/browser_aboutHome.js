@@ -2,6 +2,14 @@
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
+///////////////////
+//
+// Whitelisting this test.
+// As part of bug 1077403, the leaking uncaught rejection should be fixed.
+//
+thisTestLeaksUncaughtRejectionsAndShouldBeFixed("TypeError: Assert is null");
+
+
 XPCOMUtils.defineLazyModuleGetter(this, "Promise",
   "resource://gre/modules/Promise.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
@@ -10,7 +18,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutHomeUtils",
   "resource:///modules/AboutHome.jsm");
 
 const TEST_CONTENT_HELPER = "chrome://mochitests/content/browser/browser/base/content/test/general/aboutHome_content_script.js";
-let gRightsVersion = Services.prefs.getIntPref("browser.rights.version");
+var gRightsVersion = Services.prefs.getIntPref("browser.rights.version");
 
 registerCleanupFunction(function() {
   // Ensure we don't pollute prefs for next tests.
@@ -20,7 +28,7 @@ registerCleanupFunction(function() {
   Services.prefs.clearUserPref("browser.rights." + gRightsVersion + ".shown");
 });
 
-let gTests = [
+var gTests = [
 
 {
   desc: "Check that clearing cookies does not clear storage",
@@ -405,6 +413,66 @@ let gTests = [
       EventUtils.synthesizeKey("a", { accelKey: true });
       EventUtils.synthesizeKey("VK_DELETE", {});
       ok(table.hidden, "Search suggestion table hidden");
+
+      try {
+        Services.search.removeEngine(engine);
+      } catch (ex) { }
+    });
+  }
+},
+{
+  desc: "Clicking suggestion list while composing",
+  setup: function() {},
+  run: function()
+  {
+    return Task.spawn(function* () {
+      // Add a test engine that provides suggestions and switch to it.
+      let engine = yield promiseNewEngine("searchSuggestionEngine.xml");
+      let p = promiseContentSearchChange(engine.name);
+      Services.search.currentEngine = engine;
+      yield p;
+
+      // Start composition and type "x"
+      let input = gBrowser.contentDocument.getElementById("searchText");
+      input.focus();
+      EventUtils.synthesizeComposition({ type: "compositionstart", data: "" });
+      EventUtils.synthesizeComposition({ type: "compositionupdate", data: "x" });
+      EventUtils.synthesizeCompositionChange({
+        composition: {
+          string: "x",
+          clauses: [
+            { length: 1, attr: EventUtils.COMPOSITION_ATTR_RAWINPUT }
+          ]
+        },
+        caret: { start: 1, length: 0 }
+      });
+
+      // Wait for the search suggestions to become visible.
+      let table =
+        gBrowser.contentDocument.getElementById("searchSuggestionTable");
+      let deferred = Promise.defer();
+      let observer = new MutationObserver(() => {
+        if (input.getAttribute("aria-expanded") == "true") {
+          observer.disconnect();
+          ok(!table.hidden, "Search suggestion table unhidden");
+          deferred.resolve();
+        }
+      });
+      observer.observe(input, {
+        attributes: true,
+        attributeFilter: ["aria-expanded"],
+      });
+      yield deferred.promise;
+
+      // Click the second suggestion.
+      let expectedURL = Services.search.currentEngine.
+                        getSubmission("xbar", null, "homepage").
+                        uri.spec;
+      let loadPromise = waitForDocLoadAndStopIt(expectedURL);
+      let row = table.children[1];
+      EventUtils.sendMouseEvent({ type: "mousedown" }, row, gBrowser.contentWindow);
+      yield loadPromise;
+      ok(input.value == "xbar", "Suggestion is selected");
     });
   }
 },
