@@ -169,6 +169,12 @@ protected:
 
   virtual bool
   DeallocPAsmJSCacheEntryParent(PAsmJSCacheEntryParent* aActor) override;
+
+  virtual PQuotaParent*
+  AllocPQuotaParent() override;
+
+  virtual bool
+  DeallocPQuotaParent(PQuotaParent* aActor) override;
 };
 
 } // namespace ipc
