@@ -28,7 +28,7 @@
 #include "nsError.h"
 #include "nsXPCOMCIDInternal.h"
 #include "nsUnicharInputStream.h"
-#include "nsIFrame.h"
+#include "mozilla/IntegerTypeTraits.h"
 
 #include "mozilla/Logging.h"
 
@@ -46,6 +46,10 @@ GetExpatDriverLog()
     sLog = PR_NewLogModule("expatdriver");
   return sLog;
 }
+
+// Use the same maximum tree depth as Chromium (see
+// https://chromium.googlesource.com/chromium/src/+/f464165c1dedff1c955d3c051c5a9a1c6a0e8f6b/third_party/WebKit/Source/core/xml/parser/XMLDocumentParser.cpp#85).
+static const uint16_t sMaxXMLTreeDepth = 5000;
 
 /***************************** EXPAT CALL BACKS ******************************/
 // The callback handlers that get called from the expat parser.
@@ -344,9 +348,6 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(nsExpatDriver)
 
 NS_IMPL_CYCLE_COLLECTION(nsExpatDriver, mSink, mExtendedSink)
 
-// We store the tagdepth in a PRUint8, so make sure the limit fits in a PRUint8.
-PR_STATIC_ASSERT(MAX_REFLOW_DEPTH <= PR_UINT8_MAX);
-
 nsExpatDriver::nsExpatDriver()
   : mExpatParser(nullptr),
     mInCData(false),
@@ -387,7 +388,12 @@ nsExpatDriver::HandleStartElement(const char16_t *aValue,
   }
 
   if (mSink) {
-    if (++mTagDepth == MAX_REFLOW_DEPTH) {
+    // We store the tagdepth in a PRUint16, so make sure the limit fits in a
+    // PRUint16.
+    static_assert(sMaxXMLTreeDepth <=
+                  mozilla::MaxValue<decltype(nsExpatDriver::mTagDepth)>::value);
+
+    if (++mTagDepth > sMaxXMLTreeDepth) {
       MaybeStopParser(NS_ERROR_HTMLPARSER_HIERARCHYTOODEEP);
       return;
     }
