@@ -7806,7 +7806,7 @@ nsTextFrame::AddInlineMinISizeForFlow(nsRenderingContext *aRenderingContext,
   uint32_t flowEndInTextRun;
   gfxContext* ctx = aRenderingContext->ThebesContext();
   gfxSkipCharsIterator iter =
-    EnsureTextRun(aTextRunType, ctx, aData->lineContainer,
+    EnsureTextRun(aTextRunType, ctx, aData->LineContainer(),
                   aData->line, &flowEndInTextRun);
   gfxTextRun *textRun = GetTextRun(aTextRunType);
   if (!textRun)
@@ -7955,12 +7955,12 @@ nsTextFrame::AddInlineMinISize(nsRenderingContext *aRenderingContext,
     // lastTextRun will only be null for the first text frame.
     if (f == this || f->GetTextRun(trtype) != lastTextRun) {
       nsIFrame* lc;
-      if (aData->lineContainer &&
-          aData->lineContainer != (lc = FindLineContainer(f))) {
+      if (aData->LineContainer() &&
+          aData->LineContainer() != (lc = FindLineContainer(f))) {
         NS_ASSERTION(f != this, "wrong InlineMinISizeData container"
                                 " for first continuation");
         aData->line = nullptr;
-        aData->lineContainer = lc;
+        aData->SetLineContainer(lc);
       }
 
       // This will process all the text frames that share the same textrun as f.
@@ -7980,7 +7980,7 @@ nsTextFrame::AddInlinePrefISizeForFlow(nsRenderingContext *aRenderingContext,
   uint32_t flowEndInTextRun;
   gfxContext* ctx = aRenderingContext->ThebesContext();
   gfxSkipCharsIterator iter =
-    EnsureTextRun(aTextRunType, ctx, aData->lineContainer,
+    EnsureTextRun(aTextRunType, ctx, aData->LineContainer(),
                   aData->line, &flowEndInTextRun);
   gfxTextRun *textRun = GetTextRun(aTextRunType);
   if (!textRun)
@@ -8093,12 +8093,12 @@ nsTextFrame::AddInlinePrefISize(nsRenderingContext *aRenderingContext,
     // lastTextRun will only be null for the first text frame.
     if (f == this || f->GetTextRun(trtype) != lastTextRun) {
       nsIFrame* lc;
-      if (aData->lineContainer &&
-          aData->lineContainer != (lc = FindLineContainer(f))) {
+      if (aData->LineContainer() &&
+          aData->LineContainer() != (lc = FindLineContainer(f))) {
         NS_ASSERTION(f != this, "wrong InlinePrefISizeData container"
                                 " for first continuation");
         aData->line = nullptr;
-        aData->lineContainer = lc;
+        aData->SetLineContainer(lc);
       }
 
       // This will process all the text frames that share the same textrun as f.
