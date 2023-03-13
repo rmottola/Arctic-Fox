@@ -1007,6 +1007,10 @@ protected:
 
   nsString GetInheritedPaymentRequestId();
 
+  // The packageId for a signed packaged iff this docShell is created
+  // for a signed package.
+  nsString mSignedPkg;
+
 private:
   nsCString mForcedCharset;
   nsCString mParentCharset;
