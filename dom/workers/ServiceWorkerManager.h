@@ -526,6 +526,9 @@ private:
                                             WhichServiceWorker aWhichOnes);
 
   void
+  NotifyServiceWorkerRegistrationRemoved(ServiceWorkerRegistrationInfo* aRegistration);
+
+  void
   StartControllingADocument(ServiceWorkerRegistrationInfo* aRegistration,
                             nsIDocument* aDoc,
                             const nsAString& aDocumentId);
