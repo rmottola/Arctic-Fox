@@ -505,29 +505,6 @@ private:
   uint32_t mCount;
 };
 
-PLDHashOperator CollectPrivateContexts(const nsACString& aKey,
-                                       CacheEntryTable* aTable,
-                                       void* aClosure)
-{
-  nsCOMPtr<nsILoadContextInfo> info = CacheFileUtils::ParseKey(aKey);
-  if (info && info->IsPrivate()) {
-    nsTArray<nsCString>* keys = static_cast<nsTArray<nsCString>*>(aClosure);
-    keys->AppendElement(aKey);
-  }
-
-  return PL_DHASH_NEXT;
-}
-
-PLDHashOperator CollectContexts(const nsACString& aKey,
-                                       CacheEntryTable* aTable,
-                                       void* aClosure)
-{
-  nsTArray<nsCString>* keys = static_cast<nsTArray<nsCString>*>(aClosure);
-  keys->AppendElement(aKey);
-
-  return PL_DHASH_NEXT;
-}
-
 } // namespace
 
 void CacheStorageService::DropPrivateBrowsingEntries()
@@ -538,10 +515,17 @@ void CacheStorageService::DropPrivateBrowsingEntries()
     return;
 
   nsTArray<nsCString> keys;
-  sGlobalEntryTables->EnumerateRead(&CollectPrivateContexts, &keys);
+  for (auto iter = sGlobalEntryTables->Iter(); !iter.Done(); iter.Next()) {
+    const nsACString& key = iter.Key();
+    nsCOMPtr<nsILoadContextInfo> info = CacheFileUtils::ParseKey(key);
+    if (info && info->IsPrivate()) {
+      keys.AppendElement(key);
+    }
+  }
 
-  for (uint32_t i = 0; i < keys.Length(); ++i)
+  for (uint32_t i = 0; i < keys.Length(); ++i) {
     DoomStorageEntries(keys[i], nullptr, true, false, nullptr);
+  }
 }
 
 namespace {
@@ -792,7 +776,9 @@ NS_IMETHODIMP CacheStorageService::Clear()
       NS_ENSURE_TRUE(!mShutdown, NS_ERROR_NOT_INITIALIZED);
 
       nsTArray<nsCString> keys;
-      sGlobalEntryTables->EnumerateRead(&CollectContexts, &keys);
+      for (auto iter = sGlobalEntryTables->Iter(); !iter.Done(); iter.Next()) {
+        keys.AppendElement(iter.Key());
+      }
 
       for (uint32_t i = 0; i < keys.Length(); ++i) {
         DoomStorageEntries(keys[i], nullptr, true, false, nullptr);
