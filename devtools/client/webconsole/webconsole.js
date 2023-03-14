@@ -3228,6 +3228,13 @@ JSTerm.prototype = {
     this.lastInputValue && this.setInputValue(this.lastInputValue);
   },
 
+  focus: function() {
+    let inputNode = this.inputNode;
+    if (!inputNode.getAttribute("focused")) {
+      inputNode.focus();
+    }
+  },
+
   /**
    * The JavaScript evaluation response handler.
    *
@@ -3442,6 +3449,7 @@ JSTerm.prototype = {
       bindObjectActor: aOptions.bindObjectActor,
       frameActor: frameActor,
       selectedNodeActor: aOptions.selectedNodeActor,
+      selectedObjectActor: aOptions.selectedObjectActor,
     };
 
     this.webConsoleClient.evaluateJSAsync(aString, onResult, evalOptions);
@@ -3943,6 +3951,7 @@ JSTerm.prototype = {
     this.completeNode.value = "";
     this.resizeInput();
     this._inputChanged = true;
+    this.emit("set-input-value");
   },
 
   /**
