@@ -1241,6 +1241,8 @@ pref("dom.serviceWorkers.enabled", true);
 // Enable Push API.
 pref("dom.push.enabled", true);
 
+pref("dom.serviceWorkers.openWindow.enabled", true);
+
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
