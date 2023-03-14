@@ -918,6 +918,7 @@ class FetchEventRunnable : public ExtendableFunctionalEventWorkerRunnable
   nsTArray<nsCString> mHeaderValues;
   nsCString mSpec;
   nsCString mMethod;
+  nsString mClientId;
   bool mIsReload;
   DebugOnly<bool> mIsHttpChannel;
   RequestMode mRequestMode;
@@ -934,12 +935,13 @@ public:
                      // later on.
                      const nsACString& aScriptSpec,
                      nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo>& aRegistration,
-                     UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                     const nsAString& aDocumentId,
                      bool aIsReload)
     : ExtendableFunctionalEventWorkerRunnable(
         aWorkerPrivate, aKeepAliveToken, aRegistration)
     , mInterceptedChannel(aChannel)
     , mScriptSpec(aScriptSpec)
+    , mClientId(aDocumentId)
     , mIsReload(aIsReload)
     , mIsHttpChannel(false)
     , mRequestMode(RequestMode::No_cors)
@@ -1163,6 +1165,7 @@ private:
     init.mRequest.Value() = request;
     init.mBubbles = false;
     init.mCancelable = true;
+    init.mClientId = mClientId;
     init.mIsReload = mIsReload;
     RefPtr<FetchEvent> event =
       FetchEvent::Constructor(globalObj, NS_LITERAL_STRING("fetch"), init, result);
@@ -1263,7 +1266,7 @@ NS_IMPL_ISUPPORTS_INHERITED(FetchEventRunnable, WorkerRunnable, nsIHttpHeaderVis
 nsresult
 ServiceWorkerPrivate::SendFetchEvent(nsIInterceptedChannel* aChannel,
                                      nsILoadGroup* aLoadGroup,
-                                     UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                                     const nsAString& aDocumentId,
                                      bool aIsReload)
 {
   AssertIsOnMainThread();
@@ -1295,7 +1298,7 @@ ServiceWorkerPrivate::SendFetchEvent(nsIInterceptedChannel* aChannel,
   RefPtr<FetchEventRunnable> r =
     new FetchEventRunnable(mWorkerPrivate, mKeepAliveToken, handle,
                            mInfo->ScriptSpec(), regInfo,
-                           Move(aClientInfo), aIsReload);
+                           aDocumentId, aIsReload);
   rv = r->Init();
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;

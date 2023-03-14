@@ -105,7 +105,7 @@ public:
   nsresult
   SendFetchEvent(nsIInterceptedChannel* aChannel,
                  nsILoadGroup* aLoadGroup,
-                 UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                 const nsAString& aDocumentId,
                  bool aIsReload);
 
   void
