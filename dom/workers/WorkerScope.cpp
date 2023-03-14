@@ -591,7 +591,9 @@ public:
 
     AutoJSAPI jsapi;
     jsapi.Init();
-    runnable->Dispatch(jsapi.cx());
+    if (!runnable->Dispatch(jsapi.cx())) {
+      NS_WARNING("Failed to dispatch SkipWaitingResultRunnable to the worker.");
+    }
     return NS_OK;
   }
 };
