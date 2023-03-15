@@ -4723,7 +4723,8 @@ pref("xpinstall.whitelist.required", true);
 // Only Firefox requires add-on signatures
 pref("xpinstall.signatures.required", false);
 pref("extensions.alwaysUnpack", false);
-pref("extensions.minCompatiblePlatformVersion", "1.8");
+pref("extensions.minCompatiblePlatformVersion", "2.0");
+pref("extensions.webExtensionsMinPlatformVersion", "42.0a1");
 
 pref("network.buffer.cache.count", 24);
 pref("network.buffer.cache.size",  32768);
