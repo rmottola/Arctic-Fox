@@ -4582,7 +4582,13 @@ pref("layers.acceleration.force-enabled", false);
 pref("layers.acceleration.draw-fps", false);
 
 // Enable DEAA antialiasing for transformed layers in the compositor
+#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
+// Desktop prefs
+pref("layers.deaa.enabled", true);
+#else
+// Mobile prefs
 pref("layers.deaa.enabled", false);
+#endif
 
 pref("layers.dump", false);
 #ifdef MOZ_DUMP_PAINTING
