@@ -39,12 +39,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                       allowevents="true"
                       xbl:inherits="tooltiptext=inputtooltiptext,value,type,maxlength,disabled,size,readonly,placeholder,tabindex,accesskey"/>
         </xul:hbox>
+        <xul:dropmarker anonid="historydropmarker"
+                        class="autocomplete-history-dropmarker urlbar-history-dropmarker"
+                        allowevents="true"
+                        xbl:inherits="open,enablehistory,parentfocused=focused"/>
         <children includes="hbox"/>
       </xul:hbox>
-      <xul:dropmarker anonid="historydropmarker"
-                      class="autocomplete-history-dropmarker urlbar-history-dropmarker"
-                      allowevents="true"
-                      xbl:inherits="open,enablehistory,parentfocused=focused"/>
       <xul:popupset anonid="popupset"
                     class="autocomplete-result-popupset"/>
       <children includes="toolbarbutton"/>
@@ -209,10 +209,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // Get the URL from the fixup service:
           let flags = Services.uriFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS |
                       Services.uriFixup.FIXUP_FLAG_ALLOW_KEYWORD_LOOKUP;
-          let uriInfo = Services.uriFixup.getFixupURIInfo(value, flags);
+          let uriInfo;
+          try {
+            uriInfo = Services.uriFixup.getFixupURIInfo(value, flags);
+          } catch (ex) {}
           // Ignore if we couldn't make a URI out of this, the URI resulted in a search,
           // or the URI has a non-http(s)/ftp protocol.
-          if (!uriInfo.fixedURI ||
+          if (!uriInfo ||
+              !uriInfo.fixedURI ||
               uriInfo.keywordProviderName ||
               ["http", "https", "ftp"].indexOf(uriInfo.fixedURI.scheme) == -1) {
             return;
@@ -1489,6 +1493,20 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         }
         document.getAnonymousElementByAttribute(this, "anonid", "center-item-warning-label").value = warningString;
 
+        let chromeWin = window.QueryInterface(Ci.nsIDOMChromeWindow);
+        let isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(chromeWin);
+
+        if (isWindowPrivate) {
+          // TODO: temporary compromise of hiding some privacy leaks, remove once bug 892487 is fixed
+          let allowalways = document.getAnonymousElementByAttribute(this, "anonid", "allowalways");
+          let block = document.getAnonymousElementByAttribute(this, "anonid", "block");
+          let allownow = document.getAnonymousElementByAttribute(this, "anonid", "allownow");
+
+          allowalways.hidden = curState !== "allowalways";
+          block.hidden       = curState !== "block";
+          allownow.hidden    = curState === "allowalways";
+        }
+
         if (url || linkHandler) {
           link.value = linkString;
           if (url) {
@@ -1768,6 +1786,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         <body><![CDATA[
           var action = this._items[0].action;
           var prePath = action.pluginPermissionPrePath;
+          let chromeWin = window.QueryInterface(Ci.nsIDOMChromeWindow);
+          let isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(chromeWin);
 
           let label, linkLabel, linkUrl, button1, button2;
 
@@ -1805,6 +1825,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
             default:
               Cu.reportError(Error("Unexpected blocklist state"));
+            }
+
+            // TODO: temporary compromise, remove this once bug 892487 is fixed
+            if (isWindowPrivate) {
+              this._buttonContainer.hidden = true;
             }
           }
           else if (action.pluginTag.enabledState == Ci.nsIPluginTag.STATE_DISABLED) {
@@ -1860,6 +1885,12 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
             default:
               Cu.reportError(Error("Unexpected blocklist state"));
+            }
+
+            // TODO: temporary compromise, remove this once bug 892487 is fixed
+            if (isWindowPrivate) {
+              button1.default = true;
+              this._secondaryButton.hidden = true;
             }
           }
           this._setupDescription(label, action.pluginName, prePath);

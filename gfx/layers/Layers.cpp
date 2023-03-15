@@ -245,6 +245,7 @@ Layer::Layer(LayerManager* aManager, void* aImplData) :
   mContentFlags(0),
   mUseTileSourceRect(false),
   mIsFixedPosition(false),
+  mTransformIsPerspective(false),
   mFixedPositionData(nullptr),
   mStickyPositionData(nullptr),
   mScrollbarTargetId(FrameMetrics::NULL_SCROLL_ID),
@@ -618,7 +619,7 @@ Layer::GetEffectiveClipRect()
   return GetClipRect();
 }
 
-const nsIntRegion&
+const LayerIntRegion&
 Layer::GetEffectiveVisibleRegion()
 {
   if (LayerComposite* shadow = AsLayerComposite()) {
@@ -1022,7 +1023,7 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
   }
 
   IntPoint offset;
-  aResult = GetEffectiveVisibleRegion();
+  aResult = GetEffectiveVisibleRegion().ToUnknownRegion();
   for (Layer* layer = this; layer; layer = layer->GetParent()) {
     gfx::Matrix matrix;
     if (!layer->GetLocalTransform().Is2D(&matrix) ||
@@ -1059,7 +1060,7 @@ Layer::GetVisibleRegionRelativeToRootLayer(nsIntRegion& aResult,
       // Retreive the translation from sibling to |layer|. The accumulated
       // visible region is currently oriented with |layer|.
       IntPoint siblingOffset = RoundedToInt(siblingMatrix.GetTranslation());
-      nsIntRegion siblingVisibleRegion(sibling->GetEffectiveVisibleRegion());
+      nsIntRegion siblingVisibleRegion(sibling->GetEffectiveVisibleRegion().ToUnknownRegion());
       // Translate the siblings region to |layer|'s origin.
       siblingVisibleRegion.MoveBy(-siblingOffset.x, -siblingOffset.y);
       // Apply the sibling's clip.
@@ -1898,11 +1899,14 @@ Layer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   if (!mTransform.IsIdentity()) {
     AppendToString(aStream, mTransform, " [transform=", "]");
   }
+  if (mTransformIsPerspective) {
+    aStream << " [perspective]";
+  }
   if (!mLayerBounds.IsEmpty()) {
     AppendToString(aStream, mLayerBounds, " [bounds=", "]");
   }
   if (!mVisibleRegion.IsEmpty()) {
-    AppendToString(aStream, mVisibleRegion, " [visible=", "]");
+    AppendToString(aStream, mVisibleRegion.ToUnknownRegion(), " [visible=", "]");
   } else {
     aStream << " [not visible]";
   }
@@ -1917,6 +1921,9 @@ Layer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   }
   if (GetContentFlags() & CONTENT_COMPONENT_ALPHA) {
     aStream << " [componentAlpha]";
+  }
+  if (GetContentFlags() & CONTENT_BACKFACE_HIDDEN) {
+    aStream << " [backfaceHidden]";
   }
   if (GetScrollbarDirection() == VERTICAL) {
     aStream << nsPrintfCString(" [vscrollbar=%lld]", GetScrollbarTargetContainerId()).get();
@@ -2018,7 +2025,7 @@ Layer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
       DumpTransform(s->mutable_transform(), lc->GetShadowTransform());
     }
     if (!lc->GetShadowVisibleRegion().IsEmpty()) {
-      DumpRegion(s->mutable_vregion(), lc->GetShadowVisibleRegion());
+      DumpRegion(s->mutable_vregion(), lc->GetShadowVisibleRegion().ToUnknownRegion());
     }
   }
   // Clip
@@ -2030,8 +2037,8 @@ Layer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
     DumpTransform(layer->mutable_transform(), mTransform);
   }
   // Visible region
-  if (!mVisibleRegion.IsEmpty()) {
-    DumpRegion(layer->mutable_vregion(), mVisibleRegion);
+  if (!mVisibleRegion.ToUnknownRegion().IsEmpty()) {
+    DumpRegion(layer->mutable_vregion(), mVisibleRegion.ToUnknownRegion());
   }
   // EventRegions
   if (!mEventRegions.IsEmpty()) {
@@ -2434,7 +2441,7 @@ PrintInfo(std::stringstream& aStream, LayerComposite* aLayerComposite)
     AppendToString(aStream, aLayerComposite->GetShadowTransform(), " [shadow-transform=", "]");
   }
   if (!aLayerComposite->GetShadowVisibleRegion().IsEmpty()) {
-    AppendToString(aStream, aLayerComposite->GetShadowVisibleRegion(), " [shadow-visible=", "]");
+    AppendToString(aStream, aLayerComposite->GetShadowVisibleRegion().ToUnknownRegion(), " [shadow-visible=", "]");
   }
 }
 
@@ -2447,7 +2454,7 @@ SetAntialiasingFlags(Layer* aLayer, DrawTarget* aTarget)
     return;
   }
 
-  const IntRect& bounds = aLayer->GetVisibleRegion().GetBounds();
+  const IntRect& bounds = aLayer->GetVisibleRegion().ToUnknownRegion().GetBounds();
   gfx::Rect transformedBounds = aTarget->GetTransform().TransformBounds(gfx::Rect(Float(bounds.x), Float(bounds.y),
                                                                                   Float(bounds.width), Float(bounds.height)));
   transformedBounds.RoundOut();

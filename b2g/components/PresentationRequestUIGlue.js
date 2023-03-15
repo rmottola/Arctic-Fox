@@ -4,6 +4,10 @@
 
 "use strict"
 
+function debug(aMsg) {
+  //dump("-*- PresentationRequestUIGlue: " + aMsg + "\n");
+}
+
 const { interfaces: Ci, utils: Cu, classes: Cc } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -26,31 +30,50 @@ function PresentationRequestUIGlue() {
   SystemAppProxy.addEventListener("mozPresentationContentEvent", aEvent => {
     let detail = aEvent.detail;
 
-    if (detail.type != "presentation-receiver-launched") {
-      return;
-    }
+    switch (detail.type) {
+      case "presentation-receiver-launched": {
+        let sessionId = detail.id;
+        let resolver = this._resolvers[sessionId];
+        if (!resolver) {
+          debug("No correspondent resolver for session ID: " + sessionId);
+          return;
+        }
 
-    let sessionId = detail.sessionId;
-    let resolver = this._resolvers[sessionId];
-    if (!resolver) {
-      return;
-    }
+        delete this._resolvers[sessionId];
+        resolver.resolve(detail.frame);
+        break;
+      }
+      case "presentation-receiver-permission-denied": {
+        let sessionId = detail.id;
+        let resolver = this._resolvers[sessionId];
+        if (!resolver) {
+          debug("No correspondent resolver for session ID: " + sessionId);
+          return;
+        }
 
-    delete this._resolvers[sessionId];
-    resolver(detail.frame);
+        delete this._resolvers[sessionId];
+        resolver.reject();
+        break;
+      }
+      default:
+        return;
+      }
   });
 }
 
 PresentationRequestUIGlue.prototype = {
 
   sendRequest: function(aUrl, aSessionId) {
-    SystemAppProxy._sendCustomEvent("mozPresentationChromeEvent",
-                                    { type: "presentation-launch-receiver",
-                                      url: aUrl,
-                                      id: aSessionId });
-
     return new Promise(function(aResolve, aReject) {
-      this._resolvers[aSessionId] = aResolve;
+      this._resolvers[aSessionId] = {
+        resolve: aResolve,
+        reject: aReject,
+      };
+
+      SystemAppProxy._sendCustomEvent("mozPresentationChromeEvent",
+                                      { type: "presentation-launch-receiver",
+                                        url: aUrl,
+                                        id: aSessionId });
     }.bind(this));
   },
 

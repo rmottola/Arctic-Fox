@@ -11,7 +11,10 @@
 <script class="testbody" type="text/javascript">
 function resetStorage() {
   return new Promise(function(resolve, reject) {
-    SpecialPowers.resetStorageForDoc(SpecialPowers.wrap(document), resolve);
+    var qms = SpecialPowers.Services.qms;
+    var request = qms.reset();
+    var cb = SpecialPowers.wrapCallback(resolve);
+    request.callback = cb;
   });
 }
 

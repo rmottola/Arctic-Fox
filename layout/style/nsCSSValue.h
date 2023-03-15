@@ -50,6 +50,18 @@ class CSSStyleSheet;
       cur = dlm_next;                                                          \
     }                                                                          \
   }
+// Ditto, but use NS_RELEASE instead of 'delete' (bug 1221902).
+#define NS_CSS_NS_RELEASE_LIST_MEMBER(type_, ptr_, member_)                    \
+  {                                                                            \
+    type_ *cur = (ptr_)->member_;                                              \
+    (ptr_)->member_ = nullptr;                                                 \
+    while (cur) {                                                              \
+      type_ *dlm_next = cur->member_;                                          \
+      cur->member_ = nullptr;                                                  \
+      NS_RELEASE(cur);                                                         \
+      cur = dlm_next;                                                          \
+    }                                                                          \
+  }
 
 // Clones a linked list iteratively to avoid blowing up the stack.
 // If it fails to clone the entire list then 'to_' is deleted and
@@ -135,11 +147,13 @@ private:
 public:
   // Inherit operator== from URLValue
 
-  nsRefPtrHashtable<nsPtrHashKey<nsISupports>, imgRequestProxy> mRequests; 
+  nsRefPtrHashtable<nsPtrHashKey<nsIDocument>, imgRequestProxy> mRequests;
 
   // Override AddRef and Release to not only log ourselves correctly, but
-  // also so that we delete correctly without a virtual destructor
-  NS_INLINE_DECL_REFCOUNTING(ImageValue)
+  // also so that we delete correctly without a virtual destructor (assuming
+  // callers always call *our* Release method and not our base class's).
+  NS_METHOD_(MozExternalRefCountType) AddRef();
+  NS_METHOD_(MozExternalRefCountType) Release();
 };
 
 struct GridNamedArea {
@@ -752,24 +766,24 @@ protected:
     float      mFloat;
     // Note: the capacity of the buffer may exceed the length of the string.
     // If we're of a string type, mString is not null.
-    nsStringBuffer* mString;
+    nsStringBuffer* MOZ_OWNING_REF mString;
     nscolor    mColor;
-    Array*     mArray;
-    mozilla::css::URLValue* mURL;
-    mozilla::css::ImageValue* mImage;
-    mozilla::css::GridTemplateAreasValue* mGridTemplateAreas;
-    nsCSSValueGradient* mGradient;
-    nsCSSValueTokenStream* mTokenStream;
-    nsCSSValuePair_heap* mPair;
-    nsCSSRect_heap* mRect;
-    nsCSSValueTriplet_heap* mTriplet;
-    nsCSSValueList_heap* mList;
+    Array* MOZ_OWNING_REF mArray;
+    mozilla::css::URLValue* MOZ_OWNING_REF mURL;
+    mozilla::css::ImageValue* MOZ_OWNING_REF mImage;
+    mozilla::css::GridTemplateAreasValue* MOZ_OWNING_REF mGridTemplateAreas;
+    nsCSSValueGradient* MOZ_OWNING_REF mGradient;
+    nsCSSValueTokenStream* MOZ_OWNING_REF mTokenStream;
+    nsCSSValuePair_heap* MOZ_OWNING_REF mPair;
+    nsCSSRect_heap* MOZ_OWNING_REF mRect;
+    nsCSSValueTriplet_heap* MOZ_OWNING_REF mTriplet;
+    nsCSSValueList_heap* MOZ_OWNING_REF mList;
     nsCSSValueList* mListDependent;
-    nsCSSValueSharedList* mSharedList;
-    nsCSSValuePairList_heap* mPairList;
+    nsCSSValueSharedList* MOZ_OWNING_REF mSharedList;
+    nsCSSValuePairList_heap* MOZ_OWNING_REF mPairList;
     nsCSSValuePairList* mPairListDependent;
-    nsCSSValueFloatColor* mFloatColor;
-    mozilla::css::FontFamilyListRefCnt* mFontFamilyList;
+    nsCSSValueFloatColor* MOZ_OWNING_REF mFloatColor;
+    mozilla::css::FontFamilyListRefCnt* MOZ_OWNING_REF mFontFamilyList;
   } mValue;
 };
 

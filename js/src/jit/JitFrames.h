@@ -387,6 +387,9 @@ class JitFrameLayout : public CommonFrameLayout
     static size_t offsetOfThis() {
         return sizeof(JitFrameLayout);
     }
+    static size_t offsetOfEvalNewTarget() {
+        return sizeof(JitFrameLayout);
+    }
     static size_t offsetOfActualArgs() {
         return offsetOfThis() + sizeof(Value);
     }
@@ -395,9 +398,11 @@ class JitFrameLayout : public CommonFrameLayout
     }
 
     Value thisv() {
+        MOZ_ASSERT(CalleeTokenIsFunction(calleeToken()));
         return argv()[0];
     }
     Value* argv() {
+        MOZ_ASSERT(CalleeTokenIsFunction(calleeToken()));
         return (Value*)(this + 1);
     }
     uintptr_t numActualArgs() const {
@@ -495,14 +500,15 @@ class IonDOMExitFrameLayout;
 
 enum ExitFrameTokenValues
 {
-    NativeExitFrameLayoutToken            = 0x0,
-    IonDOMExitFrameLayoutGetterToken      = 0x1,
-    IonDOMExitFrameLayoutSetterToken      = 0x2,
-    IonDOMMethodExitFrameLayoutToken      = 0x3,
-    IonOOLNativeExitFrameLayoutToken      = 0x4,
-    IonOOLPropertyOpExitFrameLayoutToken  = 0x5,
-    IonOOLSetterOpExitFrameLayoutToken    = 0x6,
-    IonOOLProxyExitFrameLayoutToken       = 0x7,
+    CallNativeExitFrameLayoutToken        = 0x0,
+    ConstructNativeExitFrameLayoutToken   = 0x1,
+    IonDOMExitFrameLayoutGetterToken      = 0x2,
+    IonDOMExitFrameLayoutSetterToken      = 0x3,
+    IonDOMMethodExitFrameLayoutToken      = 0x4,
+    IonOOLNativeExitFrameLayoutToken      = 0x5,
+    IonOOLPropertyOpExitFrameLayoutToken  = 0x6,
+    IonOOLSetterOpExitFrameLayoutToken    = 0x7,
+    IonOOLProxyExitFrameLayoutToken       = 0x8,
     LazyLinkExitFrameLayoutToken          = 0xFE,
     ExitFrameLayoutBareToken              = 0xFF
 };
@@ -571,8 +577,6 @@ class NativeExitFrameLayout
     uint32_t hiCalleeResult_;
 
   public:
-    static JitCode* Token() { return (JitCode*)NativeExitFrameLayoutToken; }
-
     static inline size_t Size() {
         return sizeof(NativeExitFrameLayout);
     }
@@ -587,6 +591,25 @@ class NativeExitFrameLayout
         return argc_;
     }
 };
+
+class CallNativeExitFrameLayout : public NativeExitFrameLayout
+{
+  public:
+    static JitCode* Token() { return (JitCode*)CallNativeExitFrameLayoutToken; }
+};
+
+class ConstructNativeExitFrameLayout : public NativeExitFrameLayout
+{
+  public:
+    static JitCode* Token() { return (JitCode*)ConstructNativeExitFrameLayoutToken; }
+};
+
+template<>
+inline bool
+ExitFrameLayout::is<NativeExitFrameLayout>()
+{
+    return is<CallNativeExitFrameLayout>() || is<ConstructNativeExitFrameLayout>();
+}
 
 class IonOOLNativeExitFrameLayout
 {

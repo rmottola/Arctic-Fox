@@ -42,6 +42,7 @@ NS_IMPL_ELEMENT_CLONE(HTMLVideoElement)
 
 HTMLVideoElement::HTMLVideoElement(already_AddRefed<NodeInfo>& aNodeInfo)
   : HTMLMediaElement(aNodeInfo)
+  , mUseScreenWakeLock(true)
 {
 }
 
@@ -186,13 +187,30 @@ double HTMLVideoElement::MozFrameDelay()
 {
   MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
   VideoFrameContainer* container = GetVideoFrameContainer();
-  return container ?  container->GetFrameDelay() : 0;
+  // Hide negative delays. Frame timing tweaks in the compositor (e.g.
+  // adding a bias value to prevent multiple dropped/duped frames when
+  // frame times are aligned with composition times) may produce apparent
+  // negative delay, but we shouldn't report that.
+  return container ? std::max(0.0, container->GetFrameDelay()) : 0.0;
 }
 
 bool HTMLVideoElement::MozHasAudio() const
 {
   MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
   return HasAudio();
+}
+
+bool HTMLVideoElement::MozUseScreenWakeLock() const
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  return mUseScreenWakeLock;
+}
+
+void HTMLVideoElement::SetMozUseScreenWakeLock(bool aValue)
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  mUseScreenWakeLock = aValue;
+  UpdateScreenWakeLock();
 }
 
 JSObject*
@@ -259,14 +277,16 @@ HTMLVideoElement::UpdateScreenWakeLock()
 {
   bool hidden = OwnerDoc()->Hidden();
 
-  if (mScreenWakeLock && (mPaused || hidden)) {
+  if (mScreenWakeLock && (mPaused || hidden || !mUseScreenWakeLock)) {
     ErrorResult rv;
     mScreenWakeLock->Unlock(rv);
+    rv.SuppressException();
     mScreenWakeLock = nullptr;
     return;
   }
 
-  if (!mScreenWakeLock && !mPaused && !hidden && HasVideo()) {
+  if (!mScreenWakeLock && !mPaused && !hidden &&
+      mUseScreenWakeLock && HasVideo()) {
     RefPtr<power::PowerManagerService> pmService =
       power::PowerManagerService::GetInstance();
     NS_ENSURE_TRUE_VOID(pmService);

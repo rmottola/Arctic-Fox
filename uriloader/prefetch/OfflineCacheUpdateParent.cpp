@@ -17,7 +17,8 @@
 
 using namespace mozilla::ipc;
 using mozilla::BasePrincipal;
-using mozilla::OriginAttributes;
+using mozilla::DocShellOriginAttributes;
+using mozilla::PrincipalOriginAttributes;
 using mozilla::dom::TabParent;
 
 //
@@ -52,11 +53,9 @@ NS_IMPL_ISUPPORTS(OfflineCacheUpdateParent,
 // OfflineCacheUpdateParent <public>
 //-----------------------------------------------------------------------------
 
-// TODO: Bug 1191740 - Add OriginAttributes in TabContext
-OfflineCacheUpdateParent::OfflineCacheUpdateParent(uint32_t aAppId,
-                                                   bool aIsInBrowser)
+OfflineCacheUpdateParent::OfflineCacheUpdateParent(const DocShellOriginAttributes& aAttrs)
     : mIPCClosed(false)
-    , mOriginAttributes(aAppId, aIsInBrowser)
+    , mOriginAttributes(aAttrs)
 {
     // Make sure the service has been initialized
     nsOfflineCacheUpdateService::EnsureService();
@@ -95,8 +94,10 @@ OfflineCacheUpdateParent::Schedule(const URIParams& aManifestURI,
 
     bool offlinePermissionAllowed = false;
 
+    PrincipalOriginAttributes principalAttrs;
+    principalAttrs.InheritFromDocShellToDoc(mOriginAttributes, manifestURI);
     nsCOMPtr<nsIPrincipal> principal =
-      BasePrincipal::CreateCodebasePrincipal(manifestURI, mOriginAttributes);
+      BasePrincipal::CreateCodebasePrincipal(manifestURI, principalAttrs);
 
     nsresult rv = service->OfflineAppAllowed(
         principal, nullptr, &offlinePermissionAllowed);

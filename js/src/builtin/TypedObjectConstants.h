@@ -55,7 +55,6 @@
 
 // Slots on scalars, references, and SIMD objects
 #define JS_DESCR_SLOT_TYPE               8  // Type code
-#define JS_DESCR_SLOT_LANES              9
 
 // Slots on array descriptors
 #define JS_DESCR_SLOT_ARRAY_ELEM_TYPE    8
@@ -101,14 +100,13 @@
 #define JS_REFERENCETYPEREPR_OBJECT     1
 #define JS_REFERENCETYPEREPR_STRING     2
 
-// These constants are for use exclusively in JS code.  In C++ code,
-// prefer SimdTypeRepresentation::TYPE_INT32 etc, since that allows
-// you to write a switch which will receive a warning if you omit a
-// case.
-#define JS_SIMDTYPEREPR_INT8          0
-#define JS_SIMDTYPEREPR_INT16         1
-#define JS_SIMDTYPEREPR_INT32         2
-#define JS_SIMDTYPEREPR_FLOAT32       3
-#define JS_SIMDTYPEREPR_FLOAT64       4
+// These constants are for use exclusively in JS code. In C++ code, prefer
+// SimdTypeDescr::Int32x4 etc, since that allows you to write a switch which
+// will receive a warning if you omit a case.
+#define JS_SIMDTYPEREPR_INT8X16         0
+#define JS_SIMDTYPEREPR_INT16X8         1
+#define JS_SIMDTYPEREPR_INT32X4         2
+#define JS_SIMDTYPEREPR_FLOAT32X4       3
+#define JS_SIMDTYPEREPR_FLOAT64X2       4
 
 #endif

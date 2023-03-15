@@ -837,18 +837,6 @@ MacroAssemblerMIPSCompat::add32(Imm32 imm, const Address& dest)
 }
 
 void
-MacroAssemblerMIPSCompat::sub32(Imm32 imm, Register dest)
-{
-    ma_subu(dest, dest, imm);
-}
-
-void
-MacroAssemblerMIPSCompat::sub32(Register src, Register dest)
-{
-    as_subu(dest, dest, src);
-}
-
-void
 MacroAssemblerMIPSCompat::addPtr(Register src, Register dest)
 {
     ma_addu(dest, src);
@@ -1392,6 +1380,14 @@ MacroAssemblerMIPSCompat:: branchTestBoolean(Condition cond, Register tag, Label
 {
     MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
     ma_b(tag, ImmType(JSVAL_TYPE_BOOLEAN), label, cond);
+}
+
+void
+MacroAssemblerMIPSCompat::branchTestBoolean(Condition cond, const Address& address, Label* label)
+{
+    MOZ_ASSERT(cond == Equal || cond == NotEqual);
+    extractTag(address, SecondScratchReg);
+    ma_b(SecondScratchReg, ImmTag(JSVAL_TAG_BOOLEAN), label, cond);
 }
 
 void
@@ -2425,6 +2421,105 @@ MacroAssemblerMIPSCompat::handleFailureWithHandlerTail(void* handler)
     loadPtr(Address(sp, offsetof(ResumeFromException, target)), a1);
     jump(a1);
 }
+
+template<typename T>
+void
+MacroAssemblerMIPSCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem,
+                                                         Register oldval, Register newval,
+                                                         Register temp, Register valueTemp,
+                                                         Register offsetTemp, Register maskTemp,
+                                                         AnyRegister output)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+        compareExchange8SignExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint8:
+        compareExchange8ZeroExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint8Clamped:
+        compareExchange8ZeroExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Int16:
+        compareExchange16SignExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint16:
+        compareExchange16ZeroExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Int32:
+        compareExchange32(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        compareExchange32(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, temp);
+        convertUInt32ToDouble(temp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+MacroAssemblerMIPSCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const Address& mem,
+                                                         Register oldval, Register newval, Register temp,
+                                                         Register valueTemp, Register offsetTemp, Register maskTemp,
+                                                         AnyRegister output);
+template void
+MacroAssemblerMIPSCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
+                                                         Register oldval, Register newval, Register temp,
+                                                         Register valueTemp, Register offsetTemp, Register maskTemp,
+                                                         AnyRegister output);
+
+template<typename T>
+void
+MacroAssemblerMIPSCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const T& mem,
+                                                        Register value, Register temp, Register valueTemp,
+                                                        Register offsetTemp, Register maskTemp,
+                                                        AnyRegister output)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+        atomicExchange8SignExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint8:
+        atomicExchange8ZeroExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint8Clamped:
+        atomicExchange8ZeroExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Int16:
+        atomicExchange16SignExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint16:
+        atomicExchange16ZeroExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Int32:
+        atomicExchange32(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        atomicExchange32(mem, value, valueTemp, offsetTemp, maskTemp, temp);
+        convertUInt32ToDouble(temp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+MacroAssemblerMIPSCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const Address& mem,
+                                                        Register value, Register temp, Register valueTemp,
+                                                        Register offsetTemp, Register maskTemp,
+                                                        AnyRegister output);
+template void
+MacroAssemblerMIPSCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
+                                                        Register value, Register temp, Register valueTemp,
+                                                        Register offsetTemp, Register maskTemp,
+                                                        AnyRegister output);
 
 CodeOffsetLabel
 MacroAssemblerMIPSCompat::toggledJump(Label* label)

@@ -173,7 +173,7 @@ GLBlitHelper::InitTexQuadProgram(BlitType target)
     */
     const char kTexYUVPlanarBlit_FragShaderSource[] = "\
         #ifdef GL_ES                                                        \n\
-        precision mediump float                                             \n\
+        precision mediump float;                                            \n\
         #endif                                                              \n\
         varying vec2 vTexCoord;                                             \n\
         uniform sampler2D uYTexture;                                        \n\
@@ -183,9 +183,9 @@ GLBlitHelper::InitTexQuadProgram(BlitType target)
         uniform vec2 uCbCrTexScale;                                         \n\
         void main()                                                         \n\
         {                                                                   \n\
-            float y = texture2D(uYTexture, vTexCoord * uYTexScale).r;       \n\
-            float cb = texture2D(uCbTexture, vTexCoord * uCbCrTexScale).r;  \n\
-            float cr = texture2D(uCrTexture, vTexCoord * uCbCrTexScale).r;  \n\
+            float y = texture2D(uYTexture, vTexCoord * uYTexScale).a;       \n\
+            float cb = texture2D(uCbTexture, vTexCoord * uCbCrTexScale).a;  \n\
+            float cr = texture2D(uCrTexture, vTexCoord * uCbCrTexScale).a;  \n\
             y = (y - 0.06275) * 1.16438;                                    \n\
             cb = cb - 0.50196;                                              \n\
             cr = cr - 0.50196;                                              \n\
@@ -598,7 +598,7 @@ GLBlitHelper::BindAndUploadYUVTexture(Channel which,
     GLuint& tex = *srcTexArr[which];
     if (!tex) {
         MOZ_ASSERT(needsAllocation);
-        tex = CreateTexture(mGL, LOCAL_GL_LUMINANCE, LOCAL_GL_LUMINANCE, LOCAL_GL_UNSIGNED_BYTE,
+        tex = CreateTexture(mGL, LOCAL_GL_ALPHA, LOCAL_GL_ALPHA, LOCAL_GL_UNSIGNED_BYTE,
                             gfx::IntSize(width, height), false);
     }
     mGL->fActiveTexture(LOCAL_GL_TEXTURE0 + which);
@@ -611,17 +611,17 @@ GLBlitHelper::BindAndUploadYUVTexture(Channel which,
                             0,
                             width,
                             height,
-                            LOCAL_GL_LUMINANCE,
+                            LOCAL_GL_ALPHA,
                             LOCAL_GL_UNSIGNED_BYTE,
                             data);
     } else {
         mGL->fTexImage2D(LOCAL_GL_TEXTURE_2D,
                          0,
-                         LOCAL_GL_LUMINANCE,
+                         LOCAL_GL_ALPHA,
                          width,
                          height,
                          0,
-                         LOCAL_GL_LUMINANCE,
+                         LOCAL_GL_ALPHA,
                          LOCAL_GL_UNSIGNED_BYTE,
                          data);
     }
@@ -732,7 +732,7 @@ GLBlitHelper::BlitEGLImageImage(layers::EGLImageImage* image)
 
     mGL->fDrawArrays(LOCAL_GL_TRIANGLE_STRIP, 0, 4);
 
-    mGL->fBindTexture(LOCAL_GL_TEXTURE_EXTERNAL_OES, oldBinding);
+    mGL->fBindTexture(LOCAL_GL_TEXTURE_2D, oldBinding);
     return true;
 }
 
@@ -908,10 +908,8 @@ GLBlitHelper::BlitImageToTexture(layers::Image* srcImage,
                                  OriginPos destOrigin)
 {
     ScopedFramebufferForTexture autoFBForTex(mGL, destTex, destTarget);
-
-    if (!autoFBForTex.IsComplete()) {
-        MOZ_CRASH("ScopedFramebufferForTexture failed.");
-    }
+    if (!autoFBForTex.IsComplete())
+        return false;
 
     return BlitImageToFramebuffer(srcImage, destSize, autoFBForTex.FB(), destOrigin);
 }
@@ -936,6 +934,18 @@ GLBlitHelper::BlitTextureToFramebuffer(GLuint srcTex, GLuint destFB,
         return;
     }
 
+    DrawBlitTextureToFramebuffer(srcTex, destFB, srcSize, destSize, srcTarget,
+                                 internalFBs);
+}
+
+
+void
+GLBlitHelper::DrawBlitTextureToFramebuffer(GLuint srcTex, GLuint destFB,
+                                           const gfx::IntSize& srcSize,
+                                           const gfx::IntSize& destSize,
+                                           GLenum srcTarget,
+                                           bool internalFBs)
+{
     BlitType type;
     switch (srcTarget) {
     case LOCAL_GL_TEXTURE_2D:
@@ -978,7 +988,8 @@ GLBlitHelper::BlitFramebufferToTexture(GLuint srcFB, GLuint destTex,
                                        GLenum destTarget,
                                        bool internalFBs)
 {
-    MOZ_ASSERT(!srcFB || mGL->fIsFramebuffer(srcFB));
+    // On the Android 4.3 emulator, IsFramebuffer may return false incorrectly.
+    MOZ_ASSERT_IF(mGL->Renderer() != GLRenderer::AndroidEmulator, !srcFB || mGL->fIsFramebuffer(srcFB));
     MOZ_ASSERT(mGL->fIsTexture(destTex));
 
     if (mGL->IsSupported(GLFeature::framebuffer_blit)) {

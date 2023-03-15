@@ -9,7 +9,6 @@ ac_add_options --enable-verify-mar
 export MOZILLA_OFFICIAL=1
 
 #Use ccache
-ac_add_options --with-ccache=/usr/bin/ccache
 
 # Treat warnings as errors (modulo ALLOW_COMPILER_WARNINGS).
 ac_add_options --enable-warnings-as-errors
@@ -18,3 +17,4 @@ ac_add_options --enable-warnings-as-errors
 export MOZ_PACKAGE_JSSHELL=1
 
 . "$topsrcdir/build/mozconfig.common.override"
+. "$topsrcdir/build/mozconfig.cache"

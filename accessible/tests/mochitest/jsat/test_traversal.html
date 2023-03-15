@@ -113,7 +113,7 @@
                               'A esoteric weapon wielded by only the most ' +
                               'formidable warriors, for its unrelenting strict' +
                               ' power is unfathomable.',
-                              '• Lists of Programming Languages', 'Lisp',
+                              '• Lists of Programming Languages', 'Lisp ',
                               '1. Scheme', '2. Racket', '3. Clojure',
                               '4. Standard Lisp', 'link-0', ' Lisp',
                               'checkbox-1-5', ' LeLisp', '• JavaScript',
@@ -129,6 +129,17 @@
 
       queueTraversalSequence(gQueue, docAcc, TraversalRules.Landmark, null,
                              ['header-1', 'main-1', 'footer-1']);
+
+
+      queueTraversalSequence(gQueue, docAcc, TraversalRules.Control, null,
+                             ['input-1-1', 'label-1-2', 'button-1-1',
+                              'radio-1-1', 'radio-1-2', 'input-1-3',
+                              'input-1-4', 'button-1-2', 'checkbox-1-1',
+                              'select-1-1', 'select-1-2', 'checkbox-1-2',
+                              'select-1-3', 'input-1-5', 'button-1-3',
+                              'button-2-1', 'button-2-2', 'button-2-3',
+                              'button-2-4', 'link-0', 'checkbox-1-5',
+                              'link-1', 'link-2', 'link-3', 'switch-1']);
 
       gQueue.invoke();
     }

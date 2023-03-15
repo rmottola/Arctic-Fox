@@ -72,11 +72,9 @@ public:
                    UniquePtr<ServiceWorkerClientInfo>&& aClientInfo);
 
   // This is used to validate the worker script and continue the installation
-  // process. Note that the callback is dispatched to the main thread
-  // ONLY if the evaluation was successful. Failure is handled by the JS
-  // exception handler which will call ServiceWorkerManager::HandleError.
+  // process.
   nsresult
-  ContinueOnSuccessfulScriptEvaluation(nsRunnable* aCallback);
+  CheckScriptEvaluation(LifeCycleEventCallback* aCallback);
 
   nsresult
   SendLifeCycleEvent(const nsAString& aEventType,
@@ -105,7 +103,7 @@ public:
   nsresult
   SendFetchEvent(nsIInterceptedChannel* aChannel,
                  nsILoadGroup* aLoadGroup,
-                 UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                 const nsAString& aDocumentId,
                  bool aIsReload);
 
   void
@@ -128,6 +126,24 @@ public:
   void
   NoteStoppedControllingDocuments();
 
+  WorkerPrivate*
+  GetWorkerPrivate() const
+  {
+    return mWorkerPrivate;
+  }
+
+  void
+  Activated();
+
+  nsresult
+  GetDebugger(nsIWorkerDebugger** aResult);
+
+  nsresult
+  AttachDebugger();
+
+  nsresult
+  DetachDebugger();
+
 private:
   enum WakeUpReason {
     FetchEvent = 0,
@@ -135,7 +151,8 @@ private:
     PushSubscriptionChangeEvent,
     MessageEvent,
     NotificationClickEvent,
-    LifeCycleEvent
+    LifeCycleEvent,
+    AttachEvent
   };
 
   // Timer callbacks
@@ -146,7 +163,10 @@ private:
   TerminateWorkerCallback(nsITimer* aTimer, void *aPrivate);
 
   void
-  ResetIdleTimeout(WakeUpReason aWhy);
+  RenewKeepAliveToken(WakeUpReason aWhy);
+
+  void
+  ResetIdleTimeout();
 
   void
   AddToken();
@@ -184,6 +204,8 @@ private:
   // worker a grace period after each event.
   RefPtr<KeepAliveToken> mKeepAliveToken;
 
+  uint64_t mDebuggerCount;
+
   uint64_t mTokenCount;
 
   // Meant for keeping objects alive while handling requests from the worker
@@ -191,6 +213,10 @@ private:
   // |StoreISupports| and |RemoveISupports|. Note that the array is also
   // cleared whenever the worker is terminated.
   nsTArray<nsCOMPtr<nsISupports>> mSupportsArray;
+
+  // Array of function event worker runnables that are pending due to
+  // the worker activating.  Main thread only.
+  nsTArray<RefPtr<WorkerRunnable>> mPendingFunctionalEvents;
 };
 
 } // namespace workers

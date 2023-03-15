@@ -525,10 +525,12 @@ public:
 
   nsDeviceContext* DeviceContext() { return mDeviceContext; }
   mozilla::EventStateManager* EventStateManager() { return mEventManager; }
-  nsIAtom* GetLanguageFromCharset() { return mLanguage; }
+  nsIAtom* GetLanguageFromCharset() const { return mLanguage; }
+  already_AddRefed<nsIAtom> GetContentLanguage() const;
 
   float TextZoom() { return mTextZoom; }
   void SetTextZoom(float aZoom) {
+    MOZ_ASSERT(aZoom > 0.0f, "invalid zoom factor");
     if (aZoom == mTextZoom)
       return;
 
@@ -1104,26 +1106,26 @@ protected:
       , mMinimumFontSize(0)
       , mDefaultVariableFont(mozilla::eFamily_serif, NS_FONT_STYLE_NORMAL,
                              NS_FONT_WEIGHT_NORMAL,
-                             NS_FONT_STRETCH_NORMAL, 0, 0)
+                             NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultFixedFont(mozilla::eFamily_monospace, NS_FONT_STYLE_NORMAL,
                           NS_FONT_WEIGHT_NORMAL,
-                          NS_FONT_STRETCH_NORMAL, 0, 0)
+                          NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultSerifFont(mozilla::eFamily_serif, NS_FONT_STYLE_NORMAL,
                           NS_FONT_WEIGHT_NORMAL,
-                          NS_FONT_STRETCH_NORMAL, 0, 0)
+                          NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultSansSerifFont(mozilla::eFamily_sans_serif,
                               NS_FONT_STYLE_NORMAL,
                               NS_FONT_WEIGHT_NORMAL,
-                              NS_FONT_STRETCH_NORMAL, 0, 0)
+                              NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultMonospaceFont(mozilla::eFamily_monospace, NS_FONT_STYLE_NORMAL,
                               NS_FONT_WEIGHT_NORMAL,
-                              NS_FONT_STRETCH_NORMAL, 0, 0)
+                              NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultCursiveFont(mozilla::eFamily_cursive, NS_FONT_STYLE_NORMAL,
                             NS_FONT_WEIGHT_NORMAL,
-                            NS_FONT_STRETCH_NORMAL, 0, 0)
+                            NS_FONT_STRETCH_NORMAL, 0)
       , mDefaultFantasyFont(mozilla::eFamily_fantasy, NS_FONT_STYLE_NORMAL,
                             NS_FONT_WEIGHT_NORMAL,
-                            NS_FONT_STRETCH_NORMAL, 0, 0)
+                            NS_FONT_STRETCH_NORMAL, 0)
     {}
 
     size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const {

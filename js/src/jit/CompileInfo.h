@@ -255,7 +255,7 @@ class CompileInfo
     bool constructing() const {
         return constructing_;
     }
-    jsbytecode* osrPc() {
+    jsbytecode* osrPc() const {
         return osrPc_;
     }
     NestedScopeObject* osrStaticScope() const {
@@ -265,7 +265,7 @@ class CompileInfo
         return inlineScriptTree_;
     }
 
-    bool hasOsrAt(jsbytecode* pc) {
+    bool hasOsrAt(jsbytecode* pc) const {
         MOZ_ASSERT(JSOp(*pc) == JSOP_LOOPENTRY);
         return pc == osrPc();
     }

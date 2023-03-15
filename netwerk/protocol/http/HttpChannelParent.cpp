@@ -9,6 +9,7 @@
 
 #include "mozilla/ipc/FileDescriptorSetParent.h"
 #include "mozilla/net/HttpChannelParent.h"
+#include "mozilla/dom/Element.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/net/NeckoParent.h"
 #include "mozilla/unused.h"
@@ -35,9 +36,11 @@
 #include "nsQueryObject.h"
 #include "mozilla/BasePrincipal.h"
 #include "nsCORSListenerProxy.h"
+#include "nsIPrompt.h"
+#include "nsIWindowWatcher.h"
+#include "nsIDocument.h"
 
 using mozilla::BasePrincipal;
-using mozilla::OriginAttributes;
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
 
@@ -295,6 +298,35 @@ HttpChannelParent::GetInterface(const nsIID& aIID, void **result)
     return NS_OK;
   }
 
+  if (mTabParent && aIID.Equals(NS_GET_IID(nsIPrompt))) {
+    nsCOMPtr<Element> frameElement = mTabParent->GetOwnerElement();
+    if (frameElement) {
+      nsresult rv;
+      nsCOMPtr<nsIDOMWindow> win =
+        do_QueryInterface(frameElement->OwnerDoc()->GetWindow(), &rv);
+
+      if (NS_WARN_IF(!NS_SUCCEEDED(rv))) {
+        return rv;
+      }
+
+      nsCOMPtr<nsIWindowWatcher> wwatch =
+        do_GetService(NS_WINDOWWATCHER_CONTRACTID, &rv);
+
+      if (NS_WARN_IF(!NS_SUCCEEDED(rv))) {
+        return rv;
+      }
+
+      nsCOMPtr<nsIPrompt> prompt;
+      rv = wwatch->GetNewPrompter(win, getter_AddRefs(prompt));
+      if (NS_WARN_IF(!NS_SUCCEEDED(rv))) {
+        return rv;
+      }
+
+      prompt.forget(result);
+      return NS_OK;
+    }
+  }
+
   return QueryInterface(aIID, result);
 }
 
@@ -530,11 +562,18 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
 
     if (setChooseApplicationCache) {
-      OriginAttributes attrs;
+      DocShellOriginAttributes docShellAttrs;
       if (mLoadContext) {
-        attrs.CopyFromLoadContext(mLoadContext);
+        bool result = mLoadContext->GetOriginAttributes(docShellAttrs);
+        if (!result) {
+          return SendFailedAsyncOpen(NS_ERROR_FAILURE);
+        }
       }
 
+      NeckoOriginAttributes neckoAttrs;
+      neckoAttrs.InheritFromDocShellToNecko(docShellAttrs);
+      PrincipalOriginAttributes attrs;
+      attrs.InheritFromNecko(neckoAttrs);
       nsCOMPtr<nsIPrincipal> principal =
         BasePrincipal::CreateCodebasePrincipal(uri, attrs);
 
@@ -1148,6 +1187,7 @@ HttpChannelParent::OnStopRequest(nsIRequest *aRequest,
   mChannel->GetEncodedBodySize(&timing.encodedBodySize);
   // decodedBodySize can be computed in the child process so it doesn't need
   // to be passed down.
+  mChannel->GetProtocolVersion(timing.protocolVersion);
 
   if (mIPCClosed || !SendOnStopRequest(aStatusCode, timing))
     return NS_ERROR_UNEXPECTED;

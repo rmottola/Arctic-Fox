@@ -71,8 +71,7 @@ private:
 };
 
 inline XPCShellEnvironment*
-Environment(Handle<JSObject*> global)
-{
+Environment(JS::Handle<JSObject*> global) {
     AutoSafeJSContext cx;
     JSAutoCompartment ac(cx, global);
     Rooted<Value> v(cx);

@@ -80,7 +80,7 @@ function ensure_results(expected, searchTerm)
 /**
  * Asynchronous task that bumps up the rank for an uri.
  */
-function task_setCountRank(aURI, aCount, aRank, aSearch, aBookmark)
+function* task_setCountRank(aURI, aCount, aRank, aSearch, aBookmark)
 {
   // Bump up the visit count for the uri.
   let visits = [];
@@ -174,7 +174,7 @@ function makeResult(aURI, aStyle = "favicon") {
 
 let tests = [
   // Test things without a search term.
-  function() {
+  function*() {
     print("Test 0 same count, diff rank, same term; no search");
     observer.results = [
       makeResult(uri1),
@@ -185,7 +185,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s2);
     yield task_setCountRank(uri2, c1, c2, s2);
   },
-  function() {
+  function*() {
     print("Test 1 same count, diff rank, same term; no search");
     observer.results = [
       makeResult(uri2),
@@ -196,7 +196,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c2, s2);
     yield task_setCountRank(uri2, c1, c1, s2);
   },
-  function() {
+  function*() {
     print("Test 2 diff count, same rank, same term; no search");
     observer.results = [
       makeResult(uri1),
@@ -207,7 +207,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s2);
     yield task_setCountRank(uri2, c2, c1, s2);
   },
-  function() {
+  function*() {
     print("Test 3 diff count, same rank, same term; no search");
     observer.results = [
       makeResult(uri2),
@@ -220,7 +220,7 @@ let tests = [
   },
 
   // Test things with a search term (exact match one, partial other).
-  function() {
+  function*() {
     print("Test 4 same count, same rank, diff term; one exact/one partial search");
     observer.results = [
       makeResult(uri1),
@@ -231,7 +231,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s1);
     yield task_setCountRank(uri2, c1, c1, s2);
   },
-  function() {
+  function*() {
     print("Test 5 same count, same rank, diff term; one exact/one partial search");
     observer.results = [
       makeResult(uri2),
@@ -244,7 +244,7 @@ let tests = [
   },
 
   // Test things with a search term (exact match both).
-  function() {
+  function*() {
     print("Test 6 same count, diff rank, same term; both exact search");
     observer.results = [
       makeResult(uri1),
@@ -255,7 +255,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s1);
     yield task_setCountRank(uri2, c1, c2, s1);
   },
-  function() {
+  function*() {
     print("Test 7 same count, diff rank, same term; both exact search");
     observer.results = [
       makeResult(uri2),
@@ -268,7 +268,7 @@ let tests = [
   },
 
   // Test things with a search term (partial match both).
-  function() {
+  function*() {
     print("Test 8 same count, diff rank, same term; both partial search");
     observer.results = [
       makeResult(uri1),
@@ -279,7 +279,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s2);
     yield task_setCountRank(uri2, c1, c2, s2);
   },
-  function() {
+  function*() {
     print("Test 9 same count, diff rank, same term; both partial search");
     observer.results = [
       makeResult(uri2),
@@ -290,7 +290,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c2, s2);
     yield task_setCountRank(uri2, c1, c1, s2);
   },
-  function() {
+  function*() {
     print("Test 10 same count, same rank, same term, decay first; exact match");
     observer.results = [
       makeResult(uri2),
@@ -302,7 +302,7 @@ let tests = [
     doAdaptiveDecay();
     yield task_setCountRank(uri2, c1, c1, s1);
   },
-  function() {
+  function*() {
     print("Test 11 same count, same rank, same term, decay second; exact match");
     observer.results = [
       makeResult(uri1),
@@ -315,7 +315,7 @@ let tests = [
     yield task_setCountRank(uri1, c1, c1, s1);
   },
   // Test that bookmarks are hidden if the preferences are set right.
-  function() {
+  function*() {
     print("Test 12 same count, diff rank, same term; no search; history only");
     Services.prefs.setBoolPref("browser.urlbar.suggest.history", true);
     Services.prefs.setBoolPref("browser.urlbar.suggest.bookmark", false);
@@ -330,7 +330,7 @@ let tests = [
     yield task_setCountRank(uri2, c1, c2, s2);
   },
   // Test that tags are shown if the preferences are set right.
-  function() {
+  function*() {
     print("Test 13 same count, diff rank, same term; no search; history only with tag");
     Services.prefs.setBoolPref("browser.urlbar.suggest.history", true);
     Services.prefs.setBoolPref("browser.urlbar.suggest.bookmark", false);
@@ -360,7 +360,7 @@ function run_test()
   run_next_test();
 }
 
-add_task(function test_adaptive()
+add_task(function* test_adaptive()
 {
   for (let [, test] in Iterator(tests)) {
     // Cleanup.

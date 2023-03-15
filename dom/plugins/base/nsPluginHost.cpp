@@ -2252,9 +2252,6 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
 
       pluginTag = new nsPluginTag(&info, fileModTime, fromExtension);
       pluginFile.FreePluginInfo(info);
-      if (!pluginTag)
-        return NS_ERROR_OUT_OF_MEMORY;
-
       pluginTag->mLibrary = library;
       uint32_t state;
       rv = pluginTag->GetBlocklistState(&state);
@@ -2443,9 +2440,11 @@ nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged
   MOZ_ASSERT(XRE_IsContentProcess());
 
   dom::ContentChild* cp = dom::ContentChild::GetSingleton();
+  nsresult rv;
   nsTArray<PluginTag> plugins;
   uint32_t parentEpoch;
-  if (!cp->SendFindPlugins(ChromeEpochForContent(), &plugins, &parentEpoch)) {
+  if (!cp->SendFindPlugins(ChromeEpochForContent(), &rv, &plugins, &parentEpoch) ||
+      NS_FAILED(rv)) {
     return NS_ERROR_NOT_AVAILABLE;
   }
 
@@ -2658,7 +2657,7 @@ nsresult nsPluginHost::FindPlugins(bool aCreatePluginList, bool * aPluginsChange
   return NS_OK;
 }
 
-bool
+nsresult
 mozilla::plugins::FindPluginsForContent(uint32_t aPluginEpoch,
                                         nsTArray<PluginTag>* aPlugins,
                                         uint32_t* aNewPluginEpoch)
@@ -2666,11 +2665,10 @@ mozilla::plugins::FindPluginsForContent(uint32_t aPluginEpoch,
   MOZ_ASSERT(XRE_IsParentProcess());
 
   RefPtr<nsPluginHost> host = nsPluginHost::GetInst();
-  host->FindPluginsForContent(aPluginEpoch, aPlugins, aNewPluginEpoch);
-  return true;
+  return host->FindPluginsForContent(aPluginEpoch, aPlugins, aNewPluginEpoch);
 }
 
-void
+nsresult
 nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                     nsTArray<PluginTag>* aPlugins,
                                     uint32_t* aNewPluginEpoch)
@@ -2678,11 +2676,14 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
   MOZ_ASSERT(XRE_IsParentProcess());
 
   // Load plugins so that the epoch is correct.
-  LoadPlugins();
+  nsresult rv = LoadPlugins();
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
   *aNewPluginEpoch = ChromeEpoch();
   if (aPluginEpoch == ChromeEpoch()) {
-    return;
+    return NS_OK;
   }
 
   nsTArray<nsCOMPtr<nsIInternalPluginTag>> plugins;
@@ -2722,6 +2723,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                       tag->mLastModifiedTime,
                                       tag->IsFromExtension()));
   }
+  return NS_OK;
 }
 
 // This function is not relevant for fake plugins.
@@ -3340,8 +3342,6 @@ nsPluginHost::EnsurePrivateDirServiceProvider()
   if (!mPrivateDirServiceProvider) {
     nsresult rv;
     mPrivateDirServiceProvider = new nsPluginDirServiceProvider();
-    if (!mPrivateDirServiceProvider)
-      return NS_ERROR_OUT_OF_MEMORY;
     nsCOMPtr<nsIDirectoryService> dirService(do_GetService(kDirectoryServiceContractID, &rv));
     if (NS_FAILED(rv))
       return rv;

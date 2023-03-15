@@ -18,7 +18,6 @@
 #include "nsFontMetrics.h"
 #include "nsBlockFrame.h"
 #include "nsLineBox.h"
-#include "nsFlexContainerFrame.h"
 #include "nsImageFrame.h"
 #include "nsTableFrame.h"
 #include "nsTableCellFrame.h"
@@ -252,18 +251,21 @@ nsCSSOffsetState::ComputeISizeValue(nscoord aContainingBlockISize,
 
 nscoord
 nsCSSOffsetState::ComputeISizeValue(nscoord aContainingBlockISize,
-                                    uint8_t aBoxSizing,
+                                    StyleBoxSizing aBoxSizing,
                                     const nsStyleCoord& aCoord)
 {
   WritingMode wm = GetWritingMode();
   nscoord inside = 0, outside = ComputedLogicalBorderPadding().IStartEnd(wm) +
                                 ComputedLogicalMargin().IStartEnd(wm);
   switch (aBoxSizing) {
-    case NS_STYLE_BOX_SIZING_BORDER:
+    case StyleBoxSizing::Border:
       inside = ComputedLogicalBorderPadding().IStartEnd(wm);
       break;
-    case NS_STYLE_BOX_SIZING_PADDING:
+    case StyleBoxSizing::Padding:
       inside = ComputedLogicalPadding().IStartEnd(wm);
+      break;
+    case StyleBoxSizing::Content:
+      // nothing
       break;
   }
   outside -= inside;
@@ -274,17 +276,20 @@ nsCSSOffsetState::ComputeISizeValue(nscoord aContainingBlockISize,
 
 nscoord
 nsCSSOffsetState::ComputeBSizeValue(nscoord aContainingBlockBSize,
-                                    uint8_t aBoxSizing,
+                                    StyleBoxSizing aBoxSizing,
                                     const nsStyleCoord& aCoord)
 {
   WritingMode wm = GetWritingMode();
   nscoord inside = 0;
   switch (aBoxSizing) {
-    case NS_STYLE_BOX_SIZING_BORDER:
+    case StyleBoxSizing::Border:
       inside = ComputedLogicalBorderPadding().BStartEnd(wm);
       break;
-    case NS_STYLE_BOX_SIZING_PADDING:
+    case StyleBoxSizing::Padding:
       inside = ComputedLogicalPadding().BStartEnd(wm);
+      break;
+    case StyleBoxSizing::Content:
+      // nothing
       break;
   }
   return nsLayoutUtils::ComputeBSizeValue(aContainingBlockBSize,
@@ -507,10 +512,9 @@ void
 nsHTMLReflowState::InitResizeFlags(nsPresContext* aPresContext, nsIAtom* aFrameType)
 {
   const WritingMode wm = mWritingMode; // just a shorthand
-  bool isIResize = (frame->ISize(wm) !=
-                     ComputedISize() +
-                       ComputedLogicalBorderPadding().IStartEnd(wm)) ||
-                     aPresContext->PresShell()->IsReflowOnZoomPending();
+  bool isIResize =
+    frame->ISize(wm) !=
+      ComputedISize() + ComputedLogicalBorderPadding().IStartEnd(wm);
 
   if ((frame->GetStateBits() & NS_FRAME_FONT_INFLATION_FLOW_ROOT) &&
       nsLayoutUtils::FontSizeInflationEnabled(aPresContext)) {
@@ -1142,11 +1146,15 @@ nsHTMLReflowState::CalculateBorderPaddingMargin(
   nscoord outside = paddingStartEnd + borderStartEnd + marginStartEnd;
   nscoord inside = 0;
   switch (mStylePosition->mBoxSizing) {
-    case NS_STYLE_BOX_SIZING_BORDER:
+    case StyleBoxSizing::Border:
       inside += borderStartEnd;
       // fall through
-    case NS_STYLE_BOX_SIZING_PADDING:
+    case StyleBoxSizing::Padding:
       inside += paddingStartEnd;
+      // fall through
+    case StyleBoxSizing::Content:
+      // nothing
+      break;
   }
   outside -= inside;
   *aInsideBoxSizing = inside;
@@ -1482,8 +1490,8 @@ nsHTMLReflowState::CalculateHypotheticalBox(nsPresContext*    aPresContext,
       // We need to compute it. It's important we do this, because if it's
       // percentage-based this computed value may be different from the
       // computed value calculated using the absolute containing block height.
-      boxBSize = ComputeBSizeValue(blockContentSize.BSize(wm),
-                                   insideBoxSizing, styleBSize) +
+      boxBSize = nsLayoutUtils::ComputeBSizeValue(blockContentSize.BSize(wm),
+                                                  insideBoxSizing, styleBSize) +
                  insideBoxSizing + outsideBoxSizing;
     }
 
@@ -2068,20 +2076,8 @@ IsSideCaption(nsIFrame* aFrame, const nsStyleDisplay* aStyleDisplay,
          captionSide == NS_STYLE_CAPTION_SIDE_RIGHT;
 }
 
-static nsFlexContainerFrame*
-GetFlexContainer(nsIFrame* aFrame)
-{
-  nsIFrame* parent = aFrame->GetParent();
-  if (!parent ||
-      parent->GetType() != nsGkAtoms::flexContainerFrame) {
-    return nullptr;
-  }
-
-  return static_cast<nsFlexContainerFrame*>(parent);
-}
-
-// Flex items resolve block-axis percentage margin & padding against the flex
-// container's block-size (which is the containing block block-size).
+// Flex/grid items resolve block-axis percentage margin & padding against the
+// containing block block-size (also for abs/fixed-pos child frames).
 // For everything else: the CSS21 spec requires that margin and padding
 // percentage values are calculated with respect to the inline-size of the
 // containing block, even for margin & padding in the block axis.
@@ -2091,7 +2087,8 @@ OffsetPercentBasis(const nsIFrame*    aFrame,
                    const LogicalSize& aContainingBlockSize)
 {
   LogicalSize offsetPercentBasis = aContainingBlockSize;
-  if (!aFrame->IsFlexOrGridItem()) {
+  if (MOZ_LIKELY(!aFrame->GetParent() ||
+                 !aFrame->GetParent()->IsFlexOrGridContainer())) {
     offsetPercentBasis.BSize(aWM) = offsetPercentBasis.ISize(aWM);
   } else if (offsetPercentBasis.BSize(aWM) == NS_AUTOHEIGHT) {
     offsetPercentBasis.BSize(aWM) = 0;
@@ -2336,8 +2333,9 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
           ComputeSizeFlags(computeSizeFlags | ComputeSizeFlags::eShrinkWrap);
       }
 
-      const nsFlexContainerFrame* flexContainerFrame = GetFlexContainer(frame);
-      if (flexContainerFrame) {
+      nsIFrame* parent = frame->GetParent();
+      nsIAtom* parentFrameType = parent ? parent->GetType() : nullptr;
+      if (parentFrameType == nsGkAtoms::flexContainerFrame) {
         computeSizeFlags =
           ComputeSizeFlags(computeSizeFlags | ComputeSizeFlags::eShrinkWrap);
 
@@ -2373,11 +2371,13 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
       NS_ASSERTION(ComputedBSize() == NS_UNCONSTRAINEDSIZE ||
                    ComputedBSize() >= 0, "Bogus block-size");
 
-      // Exclude inline tables and flex items from the block margin calculations
+      // Exclude inline tables, side captions, flex and grid items from block
+      // margin calculations.
       if (isBlock &&
           !IsSideCaption(frame, mStyleDisplay, cbwm) &&
           mStyleDisplay->mDisplay != NS_STYLE_DISPLAY_INLINE_TABLE &&
-          !flexContainerFrame) {
+          parentFrameType != nsGkAtoms::flexContainerFrame &&
+          parentFrameType != nsGkAtoms::gridContainerFrame) {
         CalculateBlockSideMargins(aFrameType);
       }
     }

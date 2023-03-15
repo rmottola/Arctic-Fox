@@ -55,12 +55,18 @@ ALLOW_COMPILER_WARNINGS = True
 
 DISABLE_STL_WRAPPING = True
 
-CXXFLAGS += [
-    '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
-        'frameworks/native/include/gui',
-        'frameworks/native/opengl/include',
+if CONFIG['ANDROID_VERSION'] > '15':
+    LOCAL_INCLUDES += [
+        '%' + '%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
+            'frameworks/native/include/gui',
+            'frameworks/native/opengl/include',
+            'system/core/libsuspend/include',
+        ]
+    ]
+
+LOCAL_INCLUDES += [
+    '%' + '%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
         'hardware/libhardware/include',
         'hardware/libhardware_legacy/include',
-        'system/core/libsuspend/include',
     ]
 ]

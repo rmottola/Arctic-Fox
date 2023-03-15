@@ -10,6 +10,8 @@
 #include "jsapi.h"
 #include "jsatom.h"
 
+#include "gc/Zone.h"
+
 #include "js/TraceableVector.h"
 
 #include "vm/NativeObject.h"
@@ -81,6 +83,7 @@ class ExportEntryObject : public NativeObject
 class IndirectBindingMap
 {
   public:
+    explicit IndirectBindingMap(Zone* zone);
     bool init();
 
     void trace(JSTracer* trc);
@@ -112,7 +115,7 @@ class IndirectBindingMap
         RelocatablePtrShape shape;
     };
 
-    typedef HashMap<jsid, Binding, JsidHasher, SystemAllocPolicy> Map;
+    typedef HashMap<jsid, Binding, JsidHasher, ZoneAllocPolicy> Map;
 
     Map map_;
 };
@@ -171,6 +174,7 @@ class ModuleNamespaceObject : public ProxyObject
         static const char family;
     };
 
+  public:
     static const ProxyHandler proxyHandler;
 };
 
@@ -186,7 +190,7 @@ struct FunctionDeclaration
     RelocatablePtrFunction fun;
 };
 
-using FunctionDeclarationVector = TraceableVector<FunctionDeclaration>;
+using FunctionDeclarationVector = TraceableVector<FunctionDeclaration, 0, ZoneAllocPolicy>;
 
 class ModuleObject : public NativeObject
 {
@@ -307,5 +311,12 @@ JSObject* InitImportEntryClass(JSContext* cx, HandleObject obj);
 JSObject* InitExportEntryClass(JSContext* cx, HandleObject obj);
 
 } // namespace js
+
+template<>
+inline bool
+JSObject::is<js::ModuleNamespaceObject>() const
+{
+    return js::IsDerivedProxyObject(this, &js::ModuleNamespaceObject::proxyHandler);
+}
 
 #endif /* builtin_ModuleObject_h */

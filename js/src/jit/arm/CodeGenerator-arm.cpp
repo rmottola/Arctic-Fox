@@ -121,7 +121,7 @@ CodeGeneratorARM::generateOutOfLineCode()
         masm.branch(handler);
     }
 
-    return true;
+    return !masm.oom();
 }
 
 void
@@ -1031,7 +1031,7 @@ CodeGeneratorARM::visitOutOfLineTableSwitch(OutOfLineTableSwitch* ool)
         // The entries of the jump table need to be absolute addresses and thus
         // must be patched after codegen is finished.
         CodeLabel cl = ool->codeLabel(i);
-        cl.src()->bind(caseoffset);
+        cl.target()->use(caseoffset);
         masm.addCodeLabel(cl);
     }
 }
@@ -1085,7 +1085,7 @@ CodeGeneratorARM::emitTableSwitchDispatch(MTableSwitch* mir, Register index, Reg
     OutOfLineTableSwitch* ool = new(alloc()) OutOfLineTableSwitch(alloc(), mir);
     for (int32_t i = 0; i < cases; i++) {
         CodeLabel cl;
-        masm.writeCodePointer(cl.dest());
+        masm.writeCodePointer(cl.patchAt());
         masm.propagateOOM(ool->addCodeLabel(cl));
     }
     addOutOfLineCode(ool, mir);

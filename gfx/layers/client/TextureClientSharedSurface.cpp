@@ -27,9 +27,11 @@ SharedSurfaceTextureClient::SharedSurfaceTextureClient(ISurfaceAllocator* aAlloc
                                                        TextureFlags aFlags,
                                                        UniquePtr<gl::SharedSurface> surf,
                                                        gl::SurfaceFactory* factory)
-  : TextureClient(aAllocator, aFlags | TextureFlags::RECYCLE)
+  : TextureClient(aAllocator,
+                  aFlags | TextureFlags::RECYCLE | surf->GetTextureFlags())
   , mSurf(Move(surf))
-{ }
+{
+}
 
 SharedSurfaceTextureClient::~SharedSurfaceTextureClient()
 {

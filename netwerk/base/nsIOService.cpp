@@ -775,9 +775,7 @@ nsIOService::NewChannelFromURIWithProxyFlagsInternal(nsIURI* aURI,
     // Make sure that all the individual protocolhandlers attach a loadInfo.
     if (aLoadInfo) {
       // make sure we have the same instance of loadInfo on the newly created channel
-      nsCOMPtr<nsILoadInfo> loadInfo;
-      channel->GetLoadInfo(getter_AddRefs(loadInfo));
-
+      nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
       if (aLoadInfo != loadInfo) {
         MOZ_ASSERT(false, "newly created channel must have a loadinfo attached");
         return NS_ERROR_UNEXPECTED;
@@ -1352,23 +1350,6 @@ IsWifiActive()
 #endif
 }
 
-struct EnumeratorParams {
-    nsIOService *service;
-    int32_t     status;
-};
-
-PLDHashOperator
-nsIOService::EnumerateWifiAppsChangingState(const unsigned int &aKey,
-                                            int32_t aValue,
-                                            void *aUserArg)
-{
-    EnumeratorParams *params = reinterpret_cast<EnumeratorParams*>(aUserArg);
-    if (aValue == nsIAppOfflineInfo::WIFI_ONLY) {
-        params->service->NotifyAppOfflineStatus(aKey, params->status);
-    }
-    return PL_DHASH_NEXT;
-}
-
 class
 nsWakeupNotifier : public nsRunnable
 {
@@ -1488,8 +1469,11 @@ nsIOService::Observe(nsISupports *subject,
             int32_t status = wifiActive ?
                 nsIAppOfflineInfo::ONLINE : nsIAppOfflineInfo::OFFLINE;
 
-            EnumeratorParams params = {this, status};
-            mAppsOfflineStatus.EnumerateRead(EnumerateWifiAppsChangingState, &params);
+            for (auto it = mAppsOfflineStatus.Iter(); !it.Done(); it.Next()) {
+                if (it.UserData() == nsIAppOfflineInfo::WIFI_ONLY) {
+                    NotifyAppOfflineStatus(it.Key(), status);
+                }
+            }
         }
 
         mPreviousWifiState = newWifiState;

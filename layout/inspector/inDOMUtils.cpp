@@ -74,7 +74,7 @@ inDOMUtils::GetAllStyleSheets(nsIDOMDocument *aDocument, uint32_t *aLength,
 {
   NS_ENSURE_ARG_POINTER(aDocument);
 
-  nsCOMArray<nsIStyleSheet> sheets;
+  nsTArray<RefPtr<CSSStyleSheet>> sheets;
 
   nsCOMPtr<nsIDocument> document = do_QueryInterface(aDocument);
   MOZ_ASSERT(document);
@@ -109,14 +109,14 @@ inDOMUtils::GetAllStyleSheets(nsIDOMDocument *aDocument, uint32_t *aLength,
     sheets.AppendElement(document->GetStyleSheetAt(i));
   }
 
-  nsISupports** ret = static_cast<nsISupports**>(moz_xmalloc(sheets.Count() *
+  nsISupports** ret = static_cast<nsISupports**>(moz_xmalloc(sheets.Length() *
                                                  sizeof(nsISupports*)));
 
-  for (int32_t i = 0; i < sheets.Count(); i++) {
-    NS_ADDREF(ret[i] = sheets[i]);
+  for (size_t i = 0; i < sheets.Length(); i++) {
+    NS_ADDREF(ret[i] = NS_ISUPPORTS_CAST(nsIDOMCSSStyleSheet*, sheets[i]));
   }
 
-  *aLength = sheets.Count();
+  *aLength = sheets.Length();
   *aSheets = ret;
 
   return NS_OK;
@@ -577,17 +577,13 @@ static void GetKeywordsForProperty(const nsCSSProperty aProperty,
     // Shorthand props have no keywords.
     return;
   }
-  const nsCSSProps::KTableValue *keywordTable =
+  const nsCSSProps::KTableEntry* keywordTable =
     nsCSSProps::kKeywordTableTable[aProperty];
   if (keywordTable) {
-    size_t i = 0;
-    while (nsCSSKeyword(keywordTable[i]) != eCSSKeyword_UNKNOWN) {
-      nsCSSKeyword word = nsCSSKeyword(keywordTable[i]);
+    for (size_t i = 0; keywordTable[i].mKeyword != eCSSKeyword_UNKNOWN; ++i) {
+      nsCSSKeyword word = keywordTable[i].mKeyword;
       InsertNoDuplicates(aArray,
                          NS_ConvertASCIItoUTF16(nsCSSKeywords::GetStringValue(word)));
-      // Increment counter by 2, because in this table every second
-      // element is a nsCSSKeyword.
-      i += 2;
     }
   }
 }

@@ -64,7 +64,7 @@ Event::ConstructorInit(EventTarget* aOwner,
                        WidgetEvent* aEvent)
 {
   SetOwner(aOwner);
-  mIsMainThreadEvent = mOwner || NS_IsMainThread();
+  mIsMainThreadEvent = NS_IsMainThread();
 
   if (mIsMainThreadEvent && !sReturnHighResTimeStampIsSet) {
     Preferences::AddBoolVarCache(&sReturnHighResTimeStamp,
@@ -927,19 +927,20 @@ Event::GetScreenCoords(nsPresContext* aPresContext,
 
   // Doing a straight conversion from LayoutDeviceIntPoint to CSSIntPoint
   // seem incorrect, but it is needed to maintain legacy functionality.
-  if (!aPresContext) {
+  WidgetGUIEvent* guiEvent = aEvent->AsGUIEvent();
+  if (!aPresContext || !(guiEvent && guiEvent->widget)) {
     return CSSIntPoint(aPoint.x, aPoint.y);
   }
 
-  LayoutDeviceIntPoint offset = aPoint;
+  nsPoint pt =
+    LayoutDevicePixel::ToAppUnits(aPoint, aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom());
 
-  WidgetGUIEvent* guiEvent = aEvent->AsGUIEvent();
-  if (guiEvent && guiEvent->widget) {
-    offset += guiEvent->widget->WidgetToScreenOffset();
+  if (aPresContext->PresShell()) {
+    pt = pt.RemoveResolution(aPresContext->PresShell()->GetCumulativeScaleResolution());
   }
 
-  nsPoint pt =
-    LayoutDevicePixel::ToAppUnits(offset, aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom());
+  pt += LayoutDevicePixel::ToAppUnits(guiEvent->widget->WidgetToScreenOffset(),
+                                      aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom());
 
   return CSSPixel::FromAppUnitsRounded(pt);
 }
@@ -1130,7 +1131,7 @@ Event::TimeStamp() const
   MOZ_ASSERT(workerPrivate);
 
   TimeDuration duration =
-    mEvent->timeStamp - workerPrivate->NowBaseTimeStamp();
+    mEvent->timeStamp - workerPrivate->CreationTimeStamp();
   return duration.ToMilliseconds();
 }
 

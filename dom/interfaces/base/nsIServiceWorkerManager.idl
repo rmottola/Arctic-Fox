@@ -21,20 +21,53 @@ interface nsIServiceWorkerUnregisterCallback : nsISupports
   void unregisterFailed();
 };
 
-[scriptable, builtinclass, uuid(e633b73b-a734-4d04-a09c-b7779a439f3f)]
+interface nsIWorkerDebugger;
+
+[scriptable, builtinclass, uuid(76e357ed-208d-4e4c-9165-1c4059707879)]
 interface nsIServiceWorkerInfo : nsISupports
+{
+  readonly attribute DOMString scriptSpec;
+  readonly attribute DOMString cacheName;
+
+  readonly attribute nsIWorkerDebugger debugger;
+
+  void attachDebugger();
+
+  void detachDebugger();
+};
+
+[scriptable, uuid(87e63548-d440-4b8a-b158-65ad1de0211E)]
+interface nsIServiceWorkerRegistrationInfoListener : nsISupports
+{
+  void onChange();
+};
+
+[scriptable, builtinclass, uuid(72faba24-0a1b-4284-bad3-d44c044d6d95)]
+interface nsIServiceWorkerRegistrationInfo : nsISupports
 {
   readonly attribute nsIPrincipal principal;
 
   readonly attribute DOMString scope;
   readonly attribute DOMString scriptSpec;
-  readonly attribute DOMString currentWorkerURL;
 
-  readonly attribute DOMString activeCacheName;
-  readonly attribute DOMString waitingCacheName;
+  readonly attribute nsIServiceWorkerInfo installingWorker;
+  readonly attribute nsIServiceWorkerInfo waitingWorker;
+  readonly attribute nsIServiceWorkerInfo activeWorker;
+
+  void addListener(in nsIServiceWorkerRegistrationInfoListener listener);
+
+  void removeListener(in nsIServiceWorkerRegistrationInfoListener listener);
 };
 
-[scriptable, builtinclass, uuid(10f80c8c-7bf5-479e-a8d8-12ef50c802e8)]
+[scriptable, uuid(9e523e7c-ad6f-4df0-8077-c74aebbc679d)]
+interface nsIServiceWorkerManagerListener : nsISupports
+{
+  void onRegister(in nsIServiceWorkerRegistrationInfo aInfo);
+
+  void onUnregister(in nsIServiceWorkerRegistrationInfo aInfo);
+};
+
+[scriptable, builtinclass, uuid(a03f2b64-7aaf-423a-97b0-e1f733cce0f6)]
 interface nsIServiceWorkerManager : nsISupports
 {
   /**
@@ -73,7 +106,7 @@ interface nsIServiceWorkerManager : nsISupports
    *
    * This MUST only be called once per document!
    */
-  [notxpcom,nostdcall] void MaybeStartControlling(in nsIDocument aDoc);
+  [notxpcom,nostdcall] void MaybeStartControlling(in nsIDocument aDoc, in DOMString aDocumentId);
 
   /**
    * Documents that have called MaybeStartControlling() should call this when
@@ -113,7 +146,7 @@ interface nsIServiceWorkerManager : nsISupports
   DOMString getScopeForUrl(in nsIPrincipal aPrincipal, in DOMString aPath);
 
   // Note: This is meant to be used only by about:serviceworkers.
-  //It returns an array of nsIServiceWorkerInfo.
+  // It returns an array of nsIServiceWorkerRegistrationInfos.
   nsIArray getAllRegistrations();
 
   // Note: This is meant to be used only by about:serviceworkers.
@@ -145,6 +178,12 @@ interface nsIServiceWorkerManager : nsISupports
                                      [optional, array, size_is(aDataLength)] in uint8_t aDataBytes);
   void sendPushSubscriptionChangeEvent(in ACString aOriginAttributes,
                                        in ACString scope);
+
+  void addListener(in nsIServiceWorkerManagerListener aListener);
+
+  void removeListener(in nsIServiceWorkerManagerListener aListener);
+
+  bool shouldReportToWindow(in nsIDOMWindow aWindow, in ACString aScope);
 };
 
 %{ C++

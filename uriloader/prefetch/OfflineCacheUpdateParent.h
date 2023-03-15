@@ -45,7 +45,7 @@ public:
       mIPCClosed = true;
     }
 
-    OfflineCacheUpdateParent(uint32_t aAppId, bool aIsInBrowser);
+    explicit OfflineCacheUpdateParent(const mozilla::DocShellOriginAttributes& aAttrs);
 
     virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 private:
@@ -53,7 +53,7 @@ private:
 
     bool mIPCClosed;
 
-    mozilla::OriginAttributes mOriginAttributes;
+    mozilla::DocShellOriginAttributes mOriginAttributes;
 };
 
 } // namespace docshell

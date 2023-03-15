@@ -12,7 +12,7 @@ interface nsIFetchTelemetryDataCallback : nsISupports
   void complete();
 };
 
-[scriptable, uuid(68e82b42-cad2-411f-857b-b64ea9377929)]
+[scriptable, uuid(fabde631-c128-41c3-b7cb-9eb96f1276ff)]
 interface nsITelemetry : nsISupports
 {
   /**
@@ -106,6 +106,14 @@ interface nsITelemetry : nsISupports
   [implicit_jscontext]
   readonly attribute jsval debugSlowSQL;
 
+  /*
+   * An object containing information about Webrtc related stats. For now it
+   * only contains local and remote ICE candidates avaiable when a Webrtc
+   * PeerConnection gets terminated.
+   */
+  [implicit_jscontext]
+  readonly attribute jsval webrtcStats;
+
   /**
    * A number representing the highest number of concurrent threads
    * reached during this session.
@@ -119,6 +127,23 @@ interface nsITelemetry : nsISupports
    */
   [implicit_jscontext]
   readonly attribute jsval chromeHangs;
+
+  /*
+   * An array of thread hang stats,
+   *   [<thread>, <thread>, ...]
+   * <thread> represents a single thread,
+   *   {"name": "<name>",
+   *    "activity": <time>,
+   *    "hangs": [<hang>, <hang>, ...]}
+   * <time> represents a histogram of time intervals in milliseconds,
+   *   with the same format as histogramSnapshots
+   * <hang> represents a particular hang,
+   *   {"stack": <stack>, "nativeStack": <stack>, "histogram": <time>}
+   * <stack> represents the hang's stack,
+   *   ["<frame_0>", "<frame_1>", ...]
+   */
+  [implicit_jscontext]
+  readonly attribute jsval threadHangStats;
 
   /*
    * An object with two fields: memoryMap and stacks.

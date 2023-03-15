@@ -16,6 +16,11 @@ var Cr = Components.results;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/Timer.jsm", this);
 
+XPCOMUtils.defineLazyModuleGetter(this, "FormData",
+  "resource://gre/modules/FormData.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
+  "resource://gre/modules/Preferences.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "DocShellCapabilities",
   "resource:///modules/sessionstore/DocShellCapabilities.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PageStyle",
@@ -26,8 +31,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionHistory",
   "resource:///modules/sessionstore/SessionHistory.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStorage",
   "resource:///modules/sessionstore/SessionStorage.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "TextAndScrollData",
-  "resource:///modules/sessionstore/TextAndScrollData.jsm");
 
 Cu.import("resource:///modules/sessionstore/FrameTree.jsm", this);
 var gFrameTree = new FrameTree(this);
@@ -38,6 +41,9 @@ XPCOMUtils.defineLazyGetter(this, 'gContentRestore',
 
 // The current epoch.
 var gCurrentEpoch = 0;
+
+// A bound to the size of data to store for DOM Storage.
+const DOM_STORAGE_MAX_CHARS = 10000000; // 10M characters
 
 /**
  * Returns a lazy function that will evaluate the given
@@ -82,7 +88,7 @@ var EventListener = {
 /**
  * Listens for and handles messages sent by the session store service.
  */
-let MessageListener = {
+var MessageListener = {
 
   MESSAGES: [
     "SessionStore:restoreHistory",
@@ -256,6 +262,9 @@ var SessionHistoryListener = {
     if (!SessionHistory.isEmpty(docShell)) {
       this.collect();
     }
+
+    // Listen for page title changes.
+    addEventListener("DOMTitleChanged", this);
   },
 
   uninit: function () {
@@ -269,6 +278,10 @@ var SessionHistoryListener = {
     if (docShell) {
       MessageQueue.push("history", () => SessionHistory.collect(docShell));
     }
+  },
+
+  handleEvent(event) {
+    this.collect();
   },
 
   onFrameTreeCollected: function () {
@@ -356,6 +369,51 @@ var ScrollPositionListener = {
 
   collect: function () {
     return gFrameTree.map(ScrollPosition.collect);
+  }
+};
+
+/**
+ * Listens for changes to input elements. Whenever the value of an input
+ * element changes we will re-collect data for the current frame tree and send
+ * a message to the parent process.
+ *
+ * Causes a SessionStore:update message to be sent that contains the form data
+ * for all reachable frames.
+ *
+ * Example:
+ *   {
+ *     formdata: {url: "http://mozilla.org/", id: {input_id: "input value"}},
+ *     children: [
+ *       null,
+ *       {url: "http://sub.mozilla.org/", id: {input_id: "input value 2"}}
+ *     ]
+ *   }
+ */
+var FormDataListener = {
+  init: function () {
+    addEventListener("input", this, true);
+    addEventListener("change", this, true);
+    gFrameTree.addObserver(this);
+  },
+
+  handleEvent: function (event) {
+    let frame = event.target &&
+                event.target.ownerDocument &&
+                event.target.ownerDocument.defaultView;
+
+    // Don't collect form data for frames created at or after the load event
+    // as SessionStore can't restore form data for those.
+    if (frame && gFrameTree.contains(frame)) {
+      MessageQueue.push("formdata", () => this.collect());
+    }
+  },
+
+  onFrameTreeReset: function () {
+    MessageQueue.push("formdata", () => null);
+  },
+
+  collect: function () {
+    return gFrameTree.map(FormData.collect);
   }
 };
 
@@ -471,9 +529,58 @@ var SessionStorageListener = {
     setTimeout(() => this.collect(), 0);
   },
 
+  // Before DOM Storage can be written to disk, it needs to be serialized
+  // for sending across frames/processes, then again to be sent across
+  // threads, then again to be put in a buffer for the disk. Each of these
+  // serializations is an opportunity to OOM and (depending on the site of
+  // the OOM), either crash, lose all data for the frame or lose all data
+  // for the application.
+  //
+  // In order to avoid this, compute an estimate of the size of the
+  // object, and block SessionStorage items that are too large. As
+  // we also don't want to cause an OOM here, we use a quick and memory-
+  // efficient approximation: we compute the total sum of string lengths
+  // involved in this object.
+  estimateStorageSize: function(collected) {
+    if (!collected) {
+      return 0;
+    }
+
+    let size = 0;
+    for (let host of Object.keys(collected)) {
+      size += host.length;
+      let perHost = collected[host];
+      for (let key of Object.keys(perHost)) {
+        size += key.length;
+        let perKey = perHost[key];
+        size += perKey.length;
+      }
+    }
+
+    return size;
+  },
+
   collect: function () {
     if (docShell) {
-      MessageQueue.push("storage", () => SessionStorage.collect(docShell, gFrameTree));
+      MessageQueue.push("storage", () => {
+        let collected = SessionStorage.collect(docShell, gFrameTree);
+
+        if (collected == null) {
+          return collected;
+        }
+
+        let size = this.estimateStorageSize(collected);
+
+        MessageQueue.push("telemetry", () => ({ FX_SESSION_RESTORE_DOM_STORAGE_SIZE_ESTIMATE_CHARS: size }));
+        if (size > Preferences.get("browser.sessionstore.dom_storage_limit", DOM_STORAGE_MAX_CHARS)) {
+          // Rather than keeping the old storage, which wouldn't match the rest
+          // of the state of the page, empty the storage. DOM storage will be
+          // recollected the next time and stored if it is now small enough.
+          return {};
+        }
+
+        return collected;
+      });
     }
   },
 
@@ -613,6 +720,7 @@ var MessageQueue = {
     let durationMs = Date.now();
 
     let data = {};
+    let telemetry = {};
     for (let [key, id] of this._lastUpdated) {
       // There is no data for the given key anymore because
       // the parent process already marked it as received.
@@ -628,13 +736,18 @@ var MessageQueue = {
         continue;
       }
 
-      data[key] = this._data.get(key)();
+      let value = this._data.get(key)();
+      if (key == "telemetry") {
+        for (let histogramId of Object.keys(value)) {
+          telemetry[histogramId] = value[histogramId];
+        }
+      } else {
+        data[key] = value;
+      }
     }
 
     durationMs = Date.now() - durationMs;
-    let telemetry = {
-      FX_SESSION_RESTORE_CONTENT_COLLECT_DATA_LONGEST_OP_MS: durationMs
-    }
+    telemetry.FX_SESSION_RESTORE_CONTENT_COLLECT_DATA_LONGEST_OP_MS = durationMs;
 
     try {
       // Send all data to the parent process.
@@ -678,6 +791,7 @@ var MessageQueue = {
 
 EventListener.init();
 MessageListener.init();
+FormDataListener.init();
 SyncHandler.init();
 PageStyleListener.init();
 SessionHistoryListener.init();

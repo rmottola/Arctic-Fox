@@ -50,7 +50,17 @@ function connectToDebugger(aCallback)
   client.connect(aCallback.bind(null, dbgState));
 }
 
-function attachConsole(aListeners, aCallback, aAttachToTab)
+function attachConsole(aListeners, aCallback) {
+  _attachConsole(aListeners, aCallback);
+}
+function attachConsoleToTab(aListeners, aCallback) {
+  _attachConsole(aListeners, aCallback, true);
+}
+function attachConsoleToWorker(aListeners, aCallback) {
+  _attachConsole(aListeners, aCallback, true, true);
+}
+
+function _attachConsole(aListeners, aCallback, aAttachToTab, aAttachToWorker)
 {
   function _onAttachConsole(aState, aResponse, aWebConsoleClient)
   {

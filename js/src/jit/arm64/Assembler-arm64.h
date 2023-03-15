@@ -34,14 +34,14 @@ static constexpr ARMRegister ScratchReg64 = { ScratchReg, 64 };
 static constexpr Register ScratchReg2 = { Registers::ip1 };
 static constexpr ARMRegister ScratchReg2_64 = { ScratchReg2, 64 };
 
-static constexpr FloatRegister ScratchDoubleReg = { FloatRegisters::d31 };
-static constexpr FloatRegister ReturnDoubleReg = { FloatRegisters::d0 };
+static constexpr FloatRegister ScratchDoubleReg = { FloatRegisters::d31, FloatRegisters::Double };
+static constexpr FloatRegister ReturnDoubleReg = { FloatRegisters::d0, FloatRegisters::Double };
 
-static constexpr FloatRegister ReturnFloat32Reg = { FloatRegisters::s0 , FloatRegisters::Single };
-static constexpr FloatRegister ScratchFloat32Reg = { FloatRegisters::s31 , FloatRegisters::Single };
+static constexpr FloatRegister ReturnFloat32Reg = { FloatRegisters::s0, FloatRegisters::Single };
+static constexpr FloatRegister ScratchFloat32Reg = { FloatRegisters::s31, FloatRegisters::Single };
 
 static constexpr Register InvalidReg = { Registers::invalid_reg };
-static constexpr FloatRegister InvalidFloatReg = { FloatRegisters::invalid_fpreg };
+static constexpr FloatRegister InvalidFloatReg = { FloatRegisters::invalid_fpreg, FloatRegisters::Single };
 
 static constexpr FloatRegister ReturnInt32x4Reg = InvalidFloatReg;
 static constexpr FloatRegister ReturnFloat32x4Reg = InvalidFloatReg;
@@ -63,9 +63,6 @@ static constexpr Register FramePointer = { Registers::fp };
 static constexpr Register ZeroRegister = { Registers::sp };
 static constexpr ARMRegister ZeroRegister64 = { Registers::sp, 64 };
 static constexpr ARMRegister ZeroRegister32 = { Registers::sp, 32 };
-
-static constexpr FloatRegister ReturnFloatReg = { FloatRegisters::d0 };
-static constexpr FloatRegister ScratchFloatReg = { FloatRegisters::d31 };
 
 static constexpr FloatRegister ReturnSimdReg = InvalidFloatReg;
 static constexpr FloatRegister ScratchSimdReg = InvalidFloatReg;
@@ -142,7 +139,7 @@ static constexpr Register AsmJSIonExitRegD2 = r4;
 static constexpr Register JSReturnReg_Type = r3;
 static constexpr Register JSReturnReg_Data = r2;
 
-static constexpr FloatRegister NANReg = { FloatRegisters::d14 };
+static constexpr FloatRegister NANReg = { FloatRegisters::d14, FloatRegisters::Single };
 // N.B. r8 isn't listed as an aapcs temp register, but we can use it as such because we never
 // use return-structs.
 static constexpr Register CallTempNonArgRegs[] = { r8, r9, r10, r11, r12, r13, r14, r15 };
@@ -180,6 +177,9 @@ class Assembler : public vixl::Assembler
     typedef vixl::Condition Condition;
 
     void finish();
+    bool asmMergeWith(const Assembler& other) {
+        MOZ_CRASH("NYI");
+    }
     void trace(JSTracer* trc);
 
     // Emit the jump table, returning the BufferOffset to the first entry in the table.
@@ -239,22 +239,18 @@ class Assembler : public vixl::Assembler
     void processCodeLabels(uint8_t* rawCode) {
         for (size_t i = 0; i < codeLabels_.length(); i++) {
             CodeLabel label = codeLabels_[i];
-            Bind(rawCode, label.dest(), rawCode + label.src()->offset());
+            Bind(rawCode, label.patchAt(), rawCode + label.target()->offset());
         }
     }
 
-    void Bind(uint8_t* rawCode, AbsoluteLabel* label, const void* address) {
+    void Bind(uint8_t* rawCode, CodeOffsetLabel* label, const void* address) {
         *reinterpret_cast<const void**>(rawCode + label->offset()) = address;
     }
-    bool nextLink(BufferOffset cur, BufferOffset* next) {
-        Instruction* link = getInstructionAt(cur);
-        uint32_t nextLinkOffset = uint32_t(link->ImmPCRawOffset());
-        if (nextLinkOffset == uint32_t(LabelBase::INVALID_OFFSET))
-            return false;
-        *next = BufferOffset(nextLinkOffset + cur.getOffset());
-        return true;
-    }
+
     void retarget(Label* cur, Label* next);
+    void retargetWithOffset(size_t baseOffset, const LabelBase* label, LabelBase* target) {
+        MOZ_CRASH("NYI");
+    }
 
     // The buffer is about to be linked. Ensure any constant pools or
     // excess bookkeeping has been flushed to the instruction stream.
@@ -266,7 +262,9 @@ class Assembler : public vixl::Assembler
         ARMBuffer::PoolEntry pe(curOffset);
         return armbuffer_.poolEntryOffset(pe);
     }
-    size_t labelOffsetToPatchOffset(size_t labelOff) { return labelOff; }
+    size_t labelToPatchOffset(CodeOffsetLabel label) {
+        return label.offset();
+    }
     static uint8_t* PatchableJumpAddress(JitCode* code, uint32_t index) {
         return code->raw() + index;
     }
@@ -321,36 +319,6 @@ class Assembler : public vixl::Assembler
     static uint32_t AlignDoubleArg(uint32_t offset) {
         MOZ_CRASH("AlignDoubleArg()");
     }
-    static Instruction* NextInstruction(Instruction* instruction, uint32_t* count = nullptr) {
-        if (count != nullptr)
-            *count += 4;
-        Instruction* cur = instruction;
-        Instruction* next = cur + 4;
-        // Artificial pool guards can only be B (rather than BR)
-        if (next->IsUncondB()) {
-            uint32_t* snd = (uint32_t*)(instruction + 8);
-            // test both the upper 16 bits, but also bit 15, which should be unset
-            // for an artificial branch guard.
-            if ((*snd & 0xffff8000) == 0xffff0000) {
-                // that was a guard before a pool, step over the pool.
-                int poolSize =  (*snd & 0x7fff);
-                return (Instruction*)(snd + poolSize);
-            }
-        } else if (cur->IsBR() || cur->IsUncondB()) {
-            // natural pool guards can be anything
-            // but they need to have bit 15 set.
-            if ((next->InstructionBits() & 0xffff0000) == 0xffff0000) {
-                int poolSize = (next->InstructionBits() & 0x7fff);
-                Instruction* ret = (next + (poolSize << 2));
-                return ret;
-            }
-        }
-        return (instruction + 4);
-
-    }
-    static uint8_t* NextInstruction(uint8_t* instruction, uint32_t* count = nullptr) {
-        return (uint8_t*)NextInstruction((Instruction*)instruction, count);
-    }
     static uintptr_t GetPointer(uint8_t* ptr) {
         Instruction* i = reinterpret_cast<Instruction*>(ptr);
         uint64_t ret = i->Literal64();
@@ -365,16 +333,10 @@ class Assembler : public vixl::Assembler
     static void TraceJumpRelocations(JSTracer* trc, JitCode* code, CompactBufferReader& reader);
     static void TraceDataRelocations(JSTracer* trc, JitCode* code, CompactBufferReader& reader);
 
-    static int32_t ExtractCodeLabelOffset(uint8_t* code);
     static void PatchInstructionImmediate(uint8_t* code, PatchedImmPtr imm);
 
     static void FixupNurseryObjects(JSContext* cx, JitCode* code, CompactBufferReader& reader,
                                     const ObjectVector& nurseryObjects);
-
-    // Convert a BufferOffset to a final byte offset from the start of the code buffer.
-    size_t toFinalOffset(BufferOffset offset) {
-        return size_t(offset.getOffset());
-    }
 
   public:
     // A Jump table entry is 2 instructions, with 8 bytes of raw data
@@ -430,13 +392,6 @@ class Assembler : public vixl::Assembler
           : jump(jump), extendedTableIndex(extendedTableIndex)
         { }
     };
-
-    // Because ARM and A64 use a code buffer that allows for constant pool insertion,
-    // the actual offset of each jump cannot be known until finalization.
-    // These vectors store the WIP offsets.
-    js::Vector<BufferOffset, 0, SystemAllocPolicy> tmpDataRelocations_;
-    js::Vector<BufferOffset, 0, SystemAllocPolicy> tmpPreBarriers_;
-    js::Vector<JumpRelocation, 0, SystemAllocPolicy> tmpJumpRelocations_;
 
     // Structure for fixing up pc-relative loads/jumps when the machine
     // code gets moved (executable copy, gc, etc.).

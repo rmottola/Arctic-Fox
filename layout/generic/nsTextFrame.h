@@ -276,7 +276,9 @@ public:
   virtual RenderedText GetRenderedText(uint32_t aStartOffset = 0,
                                        uint32_t aEndOffset = UINT32_MAX,
                                        TextOffsetType aOffsetType =
-                                           TextOffsetType::OFFSETS_IN_CONTENT_TEXT) override;
+                                           TextOffsetType::OFFSETS_IN_CONTENT_TEXT,
+                                       TrailingWhitespace aTrimTrailingWhitespace =
+                                           TrailingWhitespace::TRIM_TRAILING_WHITESPACE) override;
 
   nsOverflowAreas RecomputeOverflow(nsIFrame* aBlockFrame);
 
@@ -404,7 +406,8 @@ public:
   void PaintText(nsRenderingContext* aRenderingContext, nsPoint aPt,
                  const nsRect& aDirtyRect, const nsCharClipDisplayItem& aItem,
                  gfxTextContextPaint* aContextPaint = nullptr,
-                 DrawPathCallbacks* aCallbacks = nullptr);
+                 DrawPathCallbacks* aCallbacks = nullptr,
+                 float aOpacity = 1.0f);
   // helper: paint text frame when we're impacted by at least one selection.
   // Return false if the text was not painted and we should continue with
   // the fast path.
@@ -448,6 +451,12 @@ public:
                                      SelectionDetails* aDetails,
                                      SelectionType aSelectionType,
                                      DrawPathCallbacks* aCallbacks);
+
+  void DrawEmphasisMarks(gfxContext* aContext,
+                         mozilla::WritingMode aWM,
+                         const gfxPoint& aTextBaselinePt,
+                         uint32_t aOffset, uint32_t aLength,
+                         PropertyProvider& aProvider);
 
   virtual nscolor GetCaretColorAt(int32_t aOffset) override;
 
@@ -593,6 +602,11 @@ protected:
                                PropertyProvider& aProvider,
                                nsRect* aVisualOverflowRect,
                                bool aIncludeTextDecorations);
+
+  // Update information of emphasis marks, and return the visial
+  // overflow rect of the emphasis marks.
+  nsRect UpdateTextEmphasis(mozilla::WritingMode aWM,
+                            PropertyProvider& aProvider);
 
   void PaintOneShadow(uint32_t aOffset,
                       uint32_t aLength,
@@ -821,6 +835,14 @@ protected:
   void ClearMetrics(nsHTMLReflowMetrics& aMetrics);
 
   NS_DECLARE_FRAME_PROPERTY(JustificationAssignment, nullptr)
+
+  struct EmphasisMarkInfo
+  {
+    nsAutoPtr<gfxTextRun> textRun;
+    gfxFloat advance;
+    gfxFloat baselineOffset;
+  };
+  NS_DECLARE_FRAME_PROPERTY(EmphasisMarkProperty, DeleteValue<EmphasisMarkInfo>)
 };
 
 #endif

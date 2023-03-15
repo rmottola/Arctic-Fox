@@ -1475,20 +1475,6 @@ class LComputeThis : public LInstructionHelper<BOX_PIECES, BOX_PIECES, 0>
     }
 };
 
-class LLoadArrowThis : public LInstructionHelper<BOX_PIECES, 1, 0>
-{
-  public:
-    explicit LLoadArrowThis(const LAllocation& callee) {
-        setOperand(0, callee);
-    }
-
-    LIR_HEADER(LoadArrowThis)
-
-    const LAllocation* callee() {
-        return getOperand(0);
-    }
-};
-
 // Writes a typed argument for a function call to the frame's argument vector.
 class LStackArgT : public LInstructionHelper<0, 1, 0>
 {
@@ -1815,6 +1801,52 @@ class LApplyArgsGeneric : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES +
     const LAllocation* getFunction() {
         return getOperand(0);
     }
+    const LAllocation* getArgc() {
+        return getOperand(1);
+    }
+    static const size_t ThisIndex = 2;
+
+    const LDefinition* getTempObject() {
+        return getTemp(0);
+    }
+    const LDefinition* getTempStackCounter() {
+        return getTemp(1);
+    }
+};
+
+class LApplyArrayGeneric : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES + 2, 2>
+{
+  public:
+    LIR_HEADER(ApplyArrayGeneric)
+
+    LApplyArrayGeneric(const LAllocation& func, const LAllocation& elements,
+                       const LDefinition& tmpobjreg, const LDefinition& tmpcopy)
+    {
+        setOperand(0, func);
+        setOperand(1, elements);
+        setTemp(0, tmpobjreg);
+        setTemp(1, tmpcopy);
+    }
+
+    MApplyArray* mir() const {
+        return mir_->toApplyArray();
+    }
+
+    bool hasSingleTarget() const {
+        return getSingleTarget() != nullptr;
+    }
+    JSFunction* getSingleTarget() const {
+        return mir()->getSingleTarget();
+    }
+
+    const LAllocation* getFunction() {
+        return getOperand(0);
+    }
+    const LAllocation* getElements() {
+        return getOperand(1);
+    }
+    // argc is mapped to the same register as elements: argc becomes
+    // live as elements is dying, all registers are calltemps.
     const LAllocation* getArgc() {
         return getOperand(1);
     }
@@ -4033,13 +4065,12 @@ class LLambda : public LInstructionHelper<1, 1, 1>
     }
 };
 
-class LLambdaArrow : public LInstructionHelper<1, 1 + (2 * BOX_PIECES), 0>
+class LLambdaArrow : public LInstructionHelper<1, 1 + BOX_PIECES, 0>
 {
   public:
     LIR_HEADER(LambdaArrow)
 
-    static const size_t ThisValue = 1;
-    static const size_t NewTargetValue = ThisValue + BOX_PIECES;
+    static const size_t NewTargetValue = 1;
 
     explicit LLambdaArrow(const LAllocation& scopeChain) {
         setOperand(0, scopeChain);
@@ -5505,6 +5536,20 @@ class LLoadFixedSlotT : public LInstructionHelper<1, 1, 0>
     }
     const MLoadFixedSlot* mir() const {
         return mir_->toLoadFixedSlot();
+    }
+};
+
+class LLoadFixedSlotAndUnbox : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(LoadFixedSlotAndUnbox)
+
+    explicit LLoadFixedSlotAndUnbox(const LAllocation& object) {
+        setOperand(0, object);
+    }
+
+    const MLoadFixedSlotAndUnbox* mir() const {
+        return mir_->toLoadFixedSlotAndUnbox();
     }
 };
 

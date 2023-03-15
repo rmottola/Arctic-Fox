@@ -43,7 +43,7 @@ interface nsITabParent;
 
 typedef unsigned long nsLoadFlags;
 
-[scriptable, builtinclass, uuid(b1df6e41-c8dd-45c2-bc18-dd330d986214)]
+[scriptable, builtinclass, uuid(63adb599-6dc9-4746-972e-c22e9018020b)]
 interface nsIDocShell : nsIDocShellTreeItem
 {
   /**
@@ -633,6 +633,12 @@ interface nsIDocShell : nsIDocShellTreeItem
   attribute boolean isActive;
 
   /**
+   * Sets whether a docshell is active, as above, but ensuring it does
+   * not discard its layers
+   */
+  void setIsActiveAndForeground(in boolean aIsActive);
+
+  /**
    * Puts the docshell in prerendering mode. noscript because we want only
    * native code to be able to put a docshell in prerendering.
    */
@@ -821,6 +827,12 @@ interface nsIDocShell : nsIDocShellTreeItem
     * hack, so be careful.
     */
    void setIsBrowserInsideApp(in unsigned long containingAppId);
+
+   /**
+    * Indicate that this docshell corresponds to a signed package with
+    * the given packageId.
+    */
+   void setIsSignedPackage(in AString packageId);
 
   /**
    * Returns the id of the app associated with this docshell.  If this docshell

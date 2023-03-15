@@ -33,6 +33,9 @@ class WorkerPrivate;
 bool
 ServiceWorkerRegistrationVisible(JSContext* aCx, JSObject* aObj);
 
+bool
+ServiceWorkerNotificationAPIVisible(JSContext* aCx, JSObject* aObj);
+
 // This class exists solely so that we can satisfy some WebIDL Func= attribute
 // constraints. Func= converts the function name to a header file to include, in
 // this case "ServiceWorkerRegistration.h".
@@ -61,6 +64,9 @@ public:
 
   virtual void
   InvalidateWorkers(WhichServiceWorker aWhichOnes) = 0;
+
+  virtual void
+  RegistrationRemoved() = 0;
 
   virtual void
   GetScope(nsAString& aScope) const = 0;
@@ -102,9 +108,6 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(ServiceWorkerRegistrationMainThread,
                                            ServiceWorkerRegistrationBase)
-
-  ServiceWorkerRegistrationMainThread(nsPIDOMWindow* aWindow,
-                                      const nsAString& aScope);
 
   already_AddRefed<Promise>
   Update(ErrorResult& aRv);
@@ -152,12 +155,18 @@ public:
   InvalidateWorkers(WhichServiceWorker aWhichOnes) override;
 
   void
+  RegistrationRemoved() override;
+
+  void
   GetScope(nsAString& aScope) const override
   {
     aScope = mScope;
   }
 
 private:
+  friend nsPIDOMWindow;
+  ServiceWorkerRegistrationMainThread(nsPIDOMWindow* aWindow,
+                                      const nsAString& aScope);
   ~ServiceWorkerRegistrationMainThread();
 
   already_AddRefed<workers::ServiceWorker>

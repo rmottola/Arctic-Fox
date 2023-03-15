@@ -39,40 +39,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     MacroAssembler& asMasm();
     const MacroAssembler& asMasm() const;
 
-  private:
-    // These use SystemAllocPolicy since asm.js releases memory after each
-    // function is compiled, and these need to live until after all functions
-    // are compiled.
-    struct Double {
-        double value;
-        NonAssertingLabel uses;
-        explicit Double(double value) : value(value) {}
-    };
-    Vector<Double, 0, SystemAllocPolicy> doubles_;
-
-    typedef HashMap<double, size_t, DefaultHasher<double>, SystemAllocPolicy> DoubleMap;
-    DoubleMap doubleMap_;
-
-    struct Float {
-        float value;
-        NonAssertingLabel uses;
-        explicit Float(float value) : value(value) {}
-    };
-    Vector<Float, 0, SystemAllocPolicy> floats_;
-
-    typedef HashMap<float, size_t, DefaultHasher<float>, SystemAllocPolicy> FloatMap;
-    FloatMap floatMap_;
-
-    struct SimdData {
-        SimdConstant value;
-        NonAssertingLabel uses;
-
-        explicit SimdData(const SimdConstant& v) : value(v) {}
-        SimdConstant::Type type() { return value.type(); }
-    };
-    Vector<SimdData, 0, SystemAllocPolicy> simds_;
-    typedef HashMap<SimdConstant, size_t, SimdConstant, SystemAllocPolicy> SimdMap;
-    SimdMap simdMap_;
+    void bindOffsets(const MacroAssemblerX86Shared::UsesVector&);
 
   public:
     using MacroAssemblerX86Shared::branch32;
@@ -953,6 +920,10 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         cmp32(ToUpper32(operand), Imm32(Upper32Of(GetShiftedTag(JSVAL_TYPE_BOOLEAN))));
         j(cond, label);
     }
+    void branchTestBoolean(Condition cond, const Address& address, Label* label) {
+        MOZ_ASSERT(cond == Equal || cond == NotEqual);
+        branchTestBoolean(cond, Operand(address), label);
+    }
     void branchTestNull(Condition cond, const Operand& operand, Label* label) {
         MOZ_ASSERT(cond == Equal || cond == NotEqual);
         cmp32(ToUpper32(operand), Imm32(Upper32Of(GetShiftedTag(JSVAL_TYPE_NULL))));
@@ -1270,9 +1241,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
 
     void loadConstantDouble(double d, FloatRegister dest);
     void loadConstantFloat32(float f, FloatRegister dest);
-  private:
-    SimdData* getSimdData(const SimdConstant& v);
-  public:
     void loadConstantInt32x4(const SimdConstant& v, FloatRegister dest);
     void loadConstantFloat32x4(const SimdConstant& v, FloatRegister dest);
 

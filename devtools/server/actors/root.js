@@ -95,6 +95,7 @@ function RootActor(aConnection, aParameters) {
   this._onTabListChanged = this.onTabListChanged.bind(this);
   this._onAddonListChanged = this.onAddonListChanged.bind(this);
   this._onWorkerListChanged = this.onWorkerListChanged.bind(this);
+  this._onServiceWorkerRegistrationListChanged = this.onServiceWorkerRegistrationListChanged.bind(this);
   this._extraActors = {};
 
   this._globalActorPool = new ActorPool(this.conn);
@@ -155,6 +156,12 @@ RootActor.prototype = {
     // Trait added in Gecko 38, indicating that all features necessary for
     // grabbing allocations from the MemoryActor are available for the performance tool
     memoryActorAllocations: true,
+    // Added in Gecko 40, indicating that the backend isn't stupid about
+    // sending resumption packets on tab navigation.
+    noNeedToFakeResumptionOnNavigation: true,
+    // Added in Firefox 40. Indicates that the backend supports registering custom
+    // commands through the WebConsoleCommands API.
+    webConsoleCommands: true,
     // Whether root actor exposes tab actors
     // if allowChromeProcess is true, you can fetch a ChromeActor instance
     // to debug chrome and any non-content ressource via getProcess request
@@ -166,7 +173,13 @@ RootActor.prototype = {
     },
     // Whether or not `getProfile()` supports specifying a `startTime`
     // and `endTime` to filter out samples. Fx40+
-    profilerDataFilterable: true
+    profilerDataFilterable: true,
+    // Whether or not the MemoryActor's heap snapshot abilities are
+    // fully equipped to handle heap snapshots for the memory tool. Fx44+
+    heapSnapshots: true,
+    // Whether or not the timeline actor can emit DOMContentLoaded and Load
+    // markers, currently in use by the network monitor. Fx45+
+    documentLoadingMarkers: true
   },
 
   /**
@@ -374,6 +387,37 @@ RootActor.prototype = {
     this._parameters.workerList.onListChanged = null;
   },
 
+  onListServiceWorkerRegistrations: function () {
+    let registrationList = this._parameters.serviceWorkerRegistrationList;
+    if (!registrationList) {
+      return { from: this.actorID, error: "noServiceWorkerRegistrations",
+               message: "This root actor has no service worker registrations." };
+    }
+
+    return registrationList.getList().then(actors => {
+      let pool = new ActorPool(this.conn);
+      for (let actor of actors) {
+        pool.addActor(actor);
+      }
+
+      this.conn.removeActorPool(this._serviceWorkerRegistrationActorPool);
+      this._serviceWorkerRegistrationActorPool = pool;
+      this.conn.addActorPool(this._serviceWorkerRegistrationActorPool);
+
+      registrationList.onListChanged = this._onServiceWorkerRegistrationListChanged;
+
+      return {
+        "from": this.actorID,
+        "registrations": actors.map(actor => actor.form())
+      };
+    });
+  },
+
+  onServiceWorkerRegistrationListChanged: function () {
+    this.conn.send({ from: this.actorID, type: "serviceWorkerRegistrationListChanged" });
+    this._parameters.serviceWorkerRegistrationList.onListChanged = null;
+  },
+
   onListProcesses: function () {
     let processes = [];
     for (let i = 0; i < ppmm.childCount; i++) {
@@ -461,6 +505,7 @@ RootActor.prototype.requestTypes = {
   "getTab": RootActor.prototype.onGetTab,
   "listAddons": RootActor.prototype.onListAddons,
   "listWorkers": RootActor.prototype.onListWorkers,
+  "listServiceWorkerRegistrations": RootActor.prototype.onListServiceWorkerRegistrations,
   "listProcesses": RootActor.prototype.onListProcesses,
   "getProcess": RootActor.prototype.onGetProcess,
   "echo": RootActor.prototype.onEcho,

@@ -906,13 +906,13 @@ MConstant::canProduceFloat32() const
 MDefinition*
 MSimdValueX4::foldsTo(TempAllocator& alloc)
 {
-    DebugOnly<MIRType> scalarType = SimdTypeToScalarType(type());
+    DebugOnly<MIRType> laneType = SimdTypeToLaneType(type());
     bool allConstants = true;
     bool allSame = true;
 
     for (size_t i = 0; i < 4; ++i) {
         MDefinition* op = getOperand(i);
-        MOZ_ASSERT(op->type() == scalarType);
+        MOZ_ASSERT(op->type() == laneType);
         if (!op->isConstantValue())
             allConstants = false;
         if (i > 0 && op != getOperand(i - 1))
@@ -952,11 +952,11 @@ MSimdValueX4::foldsTo(TempAllocator& alloc)
 MDefinition*
 MSimdSplatX4::foldsTo(TempAllocator& alloc)
 {
-    DebugOnly<MIRType> scalarType = SimdTypeToScalarType(type());
+    DebugOnly<MIRType> laneType = SimdTypeToLaneType(type());
     MDefinition* op = getOperand(0);
     if (!op->isConstantValue())
         return this;
-    MOZ_ASSERT(op->type() == scalarType);
+    MOZ_ASSERT(op->type() == laneType);
 
     SimdConstant cst;
     switch (type()) {
@@ -1436,6 +1436,13 @@ MApplyArgs::New(TempAllocator& alloc, JSFunction* target, MDefinition* fun, MDef
     return new(alloc) MApplyArgs(target, fun, argc, self);
 }
 
+MApplyArray*
+MApplyArray::New(TempAllocator& alloc, JSFunction* target, MDefinition* fun, MDefinition* elements,
+                 MDefinition* self)
+{
+    return new(alloc) MApplyArray(target, fun, elements, self);
+}
+
 MDefinition*
 MStringLength::foldsTo(TempAllocator& alloc)
 {
@@ -1552,6 +1559,30 @@ MUnbox::printOpcode(GenericPrinter& out) const
       case TypeBarrier: out.printf(" (typebarrier)"); break;
       default: break;
     }
+}
+
+MDefinition*
+MUnbox::foldsTo(TempAllocator &alloc)
+{
+    if (!input()->isLoadFixedSlot())
+        return this;
+    MLoadFixedSlot* load = input()->toLoadFixedSlot();
+    if (load->type() != MIRType_Value)
+        return this;
+    if (type() != MIRType_Boolean && !IsNumberType(type()))
+        return this;
+    // Only optimize if the load comes immediately before the unbox, so it's
+    // safe to copy the load's dependency field.
+    MInstructionIterator iter(load->block()->begin(load));
+    ++iter;
+    if (*iter != this)
+        return this;
+
+    MLoadFixedSlotAndUnbox* ins = MLoadFixedSlotAndUnbox::New(alloc, load->object(), load->slot(),
+                                                              mode(), type(), bailoutKind());
+    // As GVN runs after the Alias Analysis, we have to set the dependency by hand
+    ins->setDependency(load->dependency());
+    return ins;
 }
 
 void
@@ -4153,6 +4184,14 @@ MNewArray::shouldUseVM() const
 
 bool
 MLoadFixedSlot::mightAlias(const MDefinition* store) const
+{
+    if (store->isStoreFixedSlot() && store->toStoreFixedSlot()->slot() != slot())
+        return false;
+    return true;
+}
+
+bool
+MLoadFixedSlotAndUnbox::mightAlias(const MDefinition* store) const
 {
     if (store->isStoreFixedSlot() && store->toStoreFixedSlot()->slot() != slot())
         return false;

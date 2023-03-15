@@ -111,7 +111,7 @@
   height: 12px;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .ruleview-warning {
     background-image: url(images/alerticon-warning@2x.png);
   }
@@ -189,18 +189,18 @@
 }
 
 .ruleview-bezierswatch {
-  background: url("chrome://devtools/skin/themes/images/cubic-bezier-swatch.png");
+  background: url("chrome://devtools/skin/images/cubic-bezier-swatch.png");
   background-size: 1em;
 }
 
 .ruleview-filterswatch {
-  background: url("chrome://devtools/skin/themes/images/filter-swatch.svg");
+  background: url("chrome://devtools/skin/images/filter-swatch.svg");
   background-size: 1em;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .ruleview-bezierswatch {
-    background: url("chrome://devtools/skin/themes/images/cubic-bezier-swatch@2x.png");
+    background: url("chrome://devtools/skin/images/cubic-bezier-swatch@2x.png");
     background-size: 1em;
   }
 }
@@ -245,40 +245,61 @@
   border-bottom-color: hsl(0,0%,50%);
 }
 
-.ruleview-selector {
+.ruleview-selectorcontainer {
   word-wrap: break-word;
+  cursor: text;
 }
 
 .ruleview-selector-separator, .ruleview-selector-unmatched {
   color: #888;
 }
 
+.ruleview-selector-matched > .ruleview-selector-attribute {
+  /* TODO: Bug 1178535 Awaiting UX feedback on highlight colors */
+}
+
+.ruleview-selector-matched > .ruleview-selector-pseudo-class {
+  /* TODO: Bug 1178535 Awaiting UX feedback on highlight colors */
+}
+
+.ruleview-selector-matched > .ruleview-selector-pseudo-class-lock {
+  font-weight: bold;
+  color: var(--theme-highlight-orange);
+}
+
+.ruleview-selectorhighlighter {
+  background: url("chrome://devtools/skin/images/vview-open-inspector.png") no-repeat 0 0;
+  padding-left: 16px;
+  margin-left: 5px;
+  cursor: pointer;
+}
+
+.ruleview-selectorhighlighter:hover {
+  background-position: -32px 0;
+}
+
+.ruleview-selectorhighlighter:active,
+.ruleview-selectorhighlighter.highlighted {
+  background-position: -16px 0;
+}
+
 #ruleview-add-rule-button::before {
-  background-image: url("chrome://devtools/skin/themes/images/add.svg");
+  background-image: url("chrome://devtools/skin/images/add.svg");
   background-size: cover;
-}
-
-/**
- * These buttons are using opacity instead of background color to indicate
- * the state
- */
-#ruleview-add-rule-button,
-#pseudo-class-panel-toggle,
-.ruleview-overridden-rule-filter {
-  opacity: 0.8;
-}
-
-#ruleview-add-rule-button:not([disabled]):hover,
-#pseudo-class-panel-toggle:hover,
-#pseudo-class-panel-toggle[checked],
-.ruleview-overridden-rule-filter:hover {
-  opacity: 1;
 }
 
 #pseudo-class-panel-toggle::before {
-  background-image: url("chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class");
+  background-image: url("chrome://devtools/skin/images/pseudo-class.svg");
   background-size: cover;
 }
 #pseudo-class-panel-toggle[checked]::before {
-  background-image: url("chrome://devtools/skin/themes/images/pseudo-class.svg#pseudo-class-checked");
+  background-image: url("chrome://devtools/skin/images/pseudo-class.svg#pseudo-class-checked");
+  filter: none !important;
+}
+
+.ruleview-overridden-rule-filter {
+  opacity: 0.8;
+}
+.ruleview-overridden-rule-filter:hover {
+  opacity: 1;
 }

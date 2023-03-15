@@ -1186,7 +1186,7 @@ ExpressionDecompiler::decompilePC(jsbytecode* pc)
       }
       case JSOP_UNDEFINED:
         return write(js_undefined_str);
-      case JSOP_THIS:
+      case JSOP_GLOBALTHIS:
         // |this| could convert to a very long object initialiser, so cite it by
         // its keyword name.
         return write(js_this_str);
@@ -1265,6 +1265,8 @@ ExpressionDecompiler::write(const char* s)
 bool
 ExpressionDecompiler::write(JSString* str)
 {
+    if (str == cx->names().dotThis)
+        return write("this");
     return sprinter.putString(str) >= 0;
 }
 
@@ -1996,17 +1998,11 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
     if (topScripts.length() == 0)
         return true;
 
-    // Sort the information to avoid generating multiple file entries, and to
-    // generate functions in the right order.
-    auto lessFun = [](const JSScript* lhs, const JSScript* rhs) -> bool {
-        return strcmp(lhs->filename(), rhs->filename()) < 0;
-    };
-    std::sort(topScripts.begin(), topScripts.end(), lessFun);
-
     // Collect code coverage info for one compartment.
     coverage::LCovCompartment compCover;
     for (JSScript* topLevel: topScripts) {
         RootedScript topScript(cx, topLevel);
+        compCover.collectSourceFile(comp, &topScript->scriptSourceUnwrap());
 
         // We found the top-level script, visit all the functions reachable
         // from the top-level function, and delazify them.
@@ -2017,6 +2013,7 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
         RootedScript script(cx);
         do {
             script = queue.popCopy();
+            compCover.collectCodeCoverageInfo(comp, script->sourceObject(), script);
 
             // Iterate from the last to the first object in order to have
             // the functions them visited in the opposite order when popping
@@ -2044,12 +2041,10 @@ GenerateLcovInfo(JSContext* cx, JSCompartment* comp, GenericPrinter& out)
                     return false;
             }
         } while (!queue.empty());
-
-        compCover.collectSourceFile(comp, &topScript->scriptSourceUnwrap());
-        compCover.collectCodeCoverageInfo(comp, topScript->sourceObject(), topScript);
     }
 
-    compCover.exportInto(out);
+    bool isEmpty = true;
+    compCover.exportInto(out, &isEmpty);
     if (out.hadOutOfMemory())
         return false;
     return true;

@@ -48,6 +48,7 @@
 #include "graphite2/Font.h"
 
 #include <algorithm>
+#include <cmath>
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -577,9 +578,6 @@ gfxShapedText::SetupClusterBoundaries(uint32_t         aOffset,
         // mark all the rest as cluster-continuations
         while (aString < iter) {
             *glyphs = extendCluster;
-            if (NS_IS_LOW_SURROGATE(*aString)) {
-                glyphs->SetIsLowSurrogate();
-            }
             glyphs++;
             aString++;
         }
@@ -1843,6 +1841,46 @@ gfxFont::DrawGlyphs(gfxShapedText            *aShapedText,
     }
 
     return emittedGlyphs;
+}
+
+// This method is mostly parallel to DrawGlyphs.
+void
+gfxFont::DrawEmphasisMarks(gfxTextRun* aShapedText, gfxPoint* aPt,
+                           uint32_t aOffset, uint32_t aCount,
+                           const EmphasisMarkDrawParams& aParams)
+{
+    gfxFloat& inlineCoord = aParams.isVertical ? aPt->y : aPt->x;
+    uint32_t markLength = aParams.mark->GetLength();
+
+    gfxFloat clusterStart = NAN;
+    bool shouldDrawEmphasisMark = false;
+    for (uint32_t i = 0, idx = aOffset; i < aCount; ++i, ++idx) {
+        if (aParams.spacing) {
+            inlineCoord += aParams.direction * aParams.spacing[i].mBefore;
+        }
+        if (aShapedText->IsClusterStart(idx)) {
+            clusterStart = inlineCoord;
+        }
+        if (aShapedText->CharMayHaveEmphasisMark(idx)) {
+            shouldDrawEmphasisMark = true;
+        }
+        inlineCoord += aParams.direction * aShapedText->GetAdvanceForGlyph(idx);
+        if (shouldDrawEmphasisMark &&
+            (i + 1 == aCount || aShapedText->IsClusterStart(idx + 1))) {
+            MOZ_ASSERT(!std::isnan(clusterStart), "Should have cluster start");
+            gfxFloat clusterAdvance = inlineCoord - clusterStart;
+            // Move the coord backward to get the needed start point.
+            gfxFloat delta = (clusterAdvance + aParams.advance) / 2;
+            inlineCoord -= delta;
+            aParams.mark->Draw(aParams.context, *aPt, DrawMode::GLYPH_FILL,
+                               0, markLength, nullptr, nullptr, nullptr);
+            inlineCoord += delta;
+            shouldDrawEmphasisMark = false;
+        }
+        if (aParams.spacing) {
+            inlineCoord += aParams.direction * aParams.spacing[i].mAfter;
+        }
+    }
 }
 
 void
@@ -3511,9 +3549,14 @@ gfxFont::CreateVerticalMetrics()
             // centered vertical baseline by default.
             gfxFloat halfExtent = 0.5 * gfxFloat(mFUnitsConvFactor) *
                 (int16_t(vhea->ascender) + std::abs(int16_t(vhea->descender)));
-            metrics->maxAscent = halfExtent;
-            metrics->maxDescent = halfExtent;
-            SET_SIGNED(externalLeading, vhea->lineGap);
+            // Some bogus fonts have ascent and descent set to zero in 'vhea'.
+            // In that case we just ignore them and keep our synthetic values
+            // from above.
+            if (halfExtent > 0) {
+                metrics->maxAscent = halfExtent;
+                metrics->maxDescent = halfExtent;
+                SET_SIGNED(externalLeading, vhea->lineGap);
+            }
         }
     }
 

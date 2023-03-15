@@ -58,6 +58,51 @@ static const char16_t kSeparators[] = {
 
 #define NS_BIDI_CONTROL_FRAME ((nsIFrame*)0xfffb1d1)
 
+// Given a style context, return any bidi control character necessary to
+// implement style properties that override directionality (i.e. if it has
+// unicode-bidi:bidi-override or bidi-embed, or text-orientation:upright
+// in vertical writing mode) when applying the bidi algorithm.
+//
+// The aBidiControl parameter specifies which bidi controls we want to
+// consider: override only, or also embed.
+//
+// XXX support for isolates may need to be added for bug 1157726.
+//
+// Returns 0 if no directional control character is implied by the style.
+
+enum WhichBidiControl {
+  kOverride,
+  kOverrideOrEmbed
+};
+
+static char16_t GetBidiControl(nsStyleContext* aStyleContext,
+                               WhichBidiControl aBidiControl)
+{
+  const nsStyleVisibility* vis = aStyleContext->StyleVisibility();
+  if (vis->mWritingMode != NS_STYLE_WRITING_MODE_HORIZONTAL_TB &&
+      vis->mTextOrientation == NS_STYLE_TEXT_ORIENTATION_UPRIGHT) {
+    return kLRO;
+  }
+  const nsStyleTextReset* text = aStyleContext->StyleTextReset();
+  if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_OVERRIDE) {
+    if (NS_STYLE_DIRECTION_RTL == vis->mDirection) {
+      return kRLO;
+    }
+    if (NS_STYLE_DIRECTION_LTR == vis->mDirection) {
+      return kLRO;
+    }
+  } else if (aBidiControl == kOverrideOrEmbed &&
+             text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_EMBED) {
+    if (NS_STYLE_DIRECTION_RTL == vis->mDirection) {
+      return kRLE;
+    }
+    if (NS_STYLE_DIRECTION_LTR == vis->mDirection) {
+      return kLRE;
+    }
+  }
+  return 0;
+}
+
 struct BidiParagraphData {
   nsString            mBuffer;
   nsAutoTArray<char16_t, 16> mEmbeddingStack;
@@ -137,10 +182,12 @@ struct BidiParagraphData {
     mPrevFrame = aBpd->mPrevFrame;
     mParagraphDepth = aBpd->mParagraphDepth + 1;
 
-    const nsStyleTextReset* text = aBDIFrame->StyleTextReset();
-    bool isRTL = (NS_STYLE_DIRECTION_RTL ==
+    char16_t ch = GetBidiControl(aBDIFrame->StyleContext(), kOverride);
+    bool isRTL = ch != kLRO &&
+                 (NS_STYLE_DIRECTION_RTL ==
                   aBDIFrame->StyleVisibility()->mDirection);
 
+    const nsStyleTextReset* text = aBDIFrame->StyleTextReset();
     if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_PLAINTEXT) {
       mParaLevel = NSBIDI_DEFAULT_LTR;
     } else {
@@ -148,8 +195,8 @@ struct BidiParagraphData {
       if (isRTL) ++mParaLevel;
     }
 
-    if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_OVERRIDE) {
-      PushBidiControl(isRTL ? kRLO : kLRO);
+    if (ch != 0) {
+      PushBidiControl(ch);
     }
   }
 
@@ -614,19 +661,9 @@ nsBidiPresUtils::Resolve(nsBlockFrame* aBlockFrame)
 
   // Handle bidi-override being set on the block itself before calling
   // TraverseFrames.
-  const nsStyleTextReset* text = aBlockFrame->StyleTextReset();
-  char16_t ch = 0;
-  if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_OVERRIDE) {
-    const nsStyleVisibility* vis = aBlockFrame->StyleVisibility();
-    if (NS_STYLE_DIRECTION_RTL == vis->mDirection) {
-      ch = kRLO;
-    }
-    else if (NS_STYLE_DIRECTION_LTR == vis->mDirection) {
-      ch = kLRO;
-    }
-    if (ch != 0) {
-      bpd.PushBidiControl(ch);
-    }
+  char16_t ch = GetBidiControl(aBlockFrame->StyleContext(), kOverride);
+  if (ch != 0) {
+    bpd.PushBidiControl(ch);
   }
   for (nsBlockFrame* block = aBlockFrame; block;
        block = static_cast<nsBlockFrame*>(block->GetNextContinuation())) {
@@ -701,44 +738,31 @@ nsBidiPresUtils::ResolveParagraph(nsBlockFrame* aBlockFrame,
 #endif
 #endif
 
-  bool isNonBidi = false;
-
-  nsIFrame* frame0 = frameCount > 0 ? aBpd->FrameAt(0) : nullptr;
-  nsIFrame* frame1 = frameCount > 1 ? aBpd->FrameAt(1) : nullptr;
-
-  // Non-bidi frames
-  if (runCount == 1 && (frameCount == 1 || frameCount == 2) &&
+  if (runCount == 1 && frameCount == 1 &&
       aBpd->mParagraphDepth == 0 && aBpd->GetDirection() == NSBIDI_LTR &&
-      aBpd->GetParaLevel() == 0 &&
-      frame0 != NS_BIDI_CONTROL_FRAME &&
-      !frame0->Properties().Get(nsIFrame::EmbeddingLevelProperty()) &&
-      !frame0->Properties().Get(nsIFrame::BaseLevelProperty())) {
-    // We have a left-to-right frame in a left-to-right paragraph,
+      aBpd->GetParaLevel() == 0) {
+    // We have a single left-to-right frame in a left-to-right paragraph,
     // without bidi isolation from the surrounding text.
-    // The embedding level and base level frame properties aren't
+    // Make sure that the embedding level and base level frame properties aren't
     // set (because if they are this frame used to have some other direction,
-    // so we can't do this optimization)
-    // As long as this is the only frame, or it's followed by a linebreak,
-    // this is a non-bidi paragraph.
-    if (!frame1 || (frame1 != NS_BIDI_CONTROL_FRAME &&
-                    frame1->GetType() == nsGkAtoms::brFrame)) {
-      isNonBidi = true;
-    }
-  }
-
-  if (isNonBidi) {
+    // so we can't do this optimization), and we're done.
+    nsIFrame* frame = aBpd->FrameAt(0);
+    if (frame != NS_BIDI_CONTROL_FRAME &&
+        !frame->Properties().Get(nsIFrame::EmbeddingLevelProperty()) &&
+        !frame->Properties().Get(nsIFrame::BaseLevelProperty())) {
 #ifdef DEBUG
 #ifdef NOISY_BIDI
-    printf("early return for single direction frame %p\n", (void*)frame);
+      printf("early return for single direction frame %p\n", (void*)frame);
 #endif
 #endif
-    return NS_OK;
+      frame->AddStateBits(NS_FRAME_IS_BIDI);
+      return NS_OK;
+    }
   }
 
   nsIFrame* firstFrame = nullptr;
   nsIFrame* lastFrame = nullptr;
 
-  // Bidi frames
   for (; ;) {
     if (fragmentLength <= 0) {
       // Get the next frame from mLogicalFrames
@@ -1012,23 +1036,7 @@ nsBidiPresUtils::TraverseFrames(nsBlockFrame*              aBlockFrame,
         c->DrainSelfOverflowList();
       }
 
-      const nsStyleVisibility* vis = frame->StyleVisibility();
-      const nsStyleTextReset* text = frame->StyleTextReset();
-      if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_OVERRIDE) {
-        if (NS_STYLE_DIRECTION_RTL == vis->mDirection) {
-          ch = kRLO;
-        }
-        else if (NS_STYLE_DIRECTION_LTR == vis->mDirection) {
-          ch = kLRO;
-        }
-      } else if (text->mUnicodeBidi & NS_STYLE_UNICODE_BIDI_EMBED) {
-        if (NS_STYLE_DIRECTION_RTL == vis->mDirection) {
-          ch = kRLE;
-        }
-        else if (NS_STYLE_DIRECTION_LTR == vis->mDirection) {
-          ch = kLRE;
-        }
-      }
+      ch = GetBidiControl(frame->StyleContext(), kOverrideOrEmbed);
 
       // Add a dummy frame pointer representing a bidi control code before the
       // first frame of an element specifying embedding or override
@@ -1183,7 +1191,7 @@ nsBidiPresUtils::TraverseFrames(nsBlockFrame*              aBlockFrame,
     } else {
       // For a non-leaf frame, recurse into TraverseFrames
       nsIFrame* kid = frame->GetFirstPrincipalChild();
-      MOZ_ASSERT(!frame->GetFirstChild(nsIFrame::kOverflowList),
+      MOZ_ASSERT(!frame->GetChildList(nsIFrame::kOverflowList).FirstChild(),
                  "should have drained the overflow list above");
       if (kid) {
         const nsStyleTextReset* text = frame->StyleTextReset();

@@ -96,6 +96,13 @@ public:
    *                    the first of a surrogate pair.
    *                    NS_ERROR_UENC_NOMAPPING if character without mapping
    *                    was encountered and the behavior was set to "signal".
+   *                    In the case of an unmappable BMP character, aDestLength
+   *                    must indicate that the unmappable character was
+   *                    consumed by the encoder (unlike in the decode API!).
+   *                    In the case of an unmappable astral character,
+   *                    aDestLength must indicate that the high surrogate was
+   *                    consumed by the encoder but the low surrogate was not.
+   *                    NS_OK otherwise.
    */
   NS_IMETHOD Convert(const char16_t * aSrc, int32_t * aSrcLength, 
       char * aDest, int32_t * aDestLength) = 0;
@@ -108,7 +115,11 @@ public:
    * @param aDestLength [IN/OUT] the length of destination data buffer; after
    *                    conversion it will contain the number of bytes written
    * @return            NS_OK_UENC_MOREOUTPUT if only  a partial conversion
-   *                    was done; more output space is needed to continue
+   *                    was done; more output space is needed to continue.
+   *                    NS_ERROR_UENC_NOMAPPING if input ended with an unpaired
+   *                    high surrogate, the behavior was "signal" and the
+   *                    encoding can't represent U+FFFD.
+   *                    NS_OK otherwise.
    */
   NS_IMETHOD Finish(char * aDest, int32_t * aDestLength) = 0;
 
@@ -124,9 +135,9 @@ public:
    *                    NS_ERROR_OUT_OF_MEMORY if OOM
    *                    NS_OK if all we have is an approximation
    */
-  MOZ_WARN_UNUSED_RESULT NS_IMETHOD GetMaxLength(const char16_t * aSrc,
+  MOZ_WARN_UNUSED_RESULT NS_IMETHOD GetMaxLength(const char16_t* aSrc,
                                                  int32_t aSrcLength,
-                                                 int32_t * aDestLength) = 0;
+                                                 int32_t* aDestLength) = 0;
 
   /**
    * Resets the charset converter so it may be recycled for a completely 

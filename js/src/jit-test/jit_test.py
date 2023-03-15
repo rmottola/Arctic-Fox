@@ -17,7 +17,8 @@ def add_libdir_to_path():
 add_libdir_to_path()
 
 import jittests
-from tests import get_jitflags, get_environment_overlay, change_env
+from tests import get_jitflags, get_cpu_count, get_environment_overlay, \
+                  change_env
 
 # Python 3.3 added shutil.which, but we can't use that yet.
 def which(name):
@@ -32,18 +33,8 @@ def which(name):
     return name
 
 def main(argv):
-
-    # If no multiprocessing is available, fallback to serial test execution
-    max_jobs_default = 1
-    if jittests.HAVE_MULTIPROCESSING:
-        try:
-            max_jobs_default = jittests.cpu_count()
-        except NotImplementedError:
-            pass
-
     # The [TESTS] optional arguments are paths of test files relative
     # to the jit-test/tests directory.
-
     from optparse import OptionParser
     op = OptionParser(usage='%prog [options] JS_SHELL [TESTS]')
     op.add_option('-s', '--show-cmd', dest='show_cmd', action='store_true',
@@ -90,6 +81,8 @@ def main(argv):
                   help='Retest using test list file [FILE]')
     op.add_option('-g', '--debug', action='store_const', const='gdb', dest='debugger',
                   help='Run a single test under the gdb debugger')
+    op.add_option('-G', '--debug-rr', action='store_const', const='rr', dest='debugger',
+                  help='Run a single test under the rr debugger')
     op.add_option('--debugger', type='string',
                   help='Run a single test under the specified debugger')
     op.add_option('--valgrind', dest='valgrind', action='store_true',
@@ -112,7 +105,7 @@ def main(argv):
                   help='Run tests with all IonMonkey option combinations'
                   ' (ignores --jitflags)')
     op.add_option('-j', '--worker-count', dest='max_jobs', type=int,
-                  default=max_jobs_default,
+                  default=max(1, get_cpu_count()),
                   help='Number of tests to run in parallel (default %default)')
     op.add_option('--remote', action='store_true',
                   help='Run tests on a remote device')
@@ -145,6 +138,9 @@ def main(argv):
                   help='The total number of test chunks.')
     op.add_option('--ignore-timeouts', dest='ignore_timeouts', metavar='FILE',
                   help='Ignore timeouts of tests listed in [FILE]')
+    op.add_option('--test-reflect-stringify', dest="test_reflect_stringify",
+                  help="instead of running tests, use them to test the "
+                  "Reflect.stringify code in specified file")
 
     options, args = op.parse_args(argv)
     if len(args) < 1:
@@ -215,6 +211,10 @@ def main(argv):
     if not options.run_slow:
         test_list = [_ for _ in test_list if not _.slow]
 
+    if options.test_reflect_stringify is not None:
+        for test in test_list:
+            test.test_reflect_stringify = options.test_reflect_stringify
+
     # If chunking is enabled, determine which tests are part of this chunk.
     # This code was adapted from testing/mochitest/runtestsremote.py.
     if options.total_chunks > 1:
@@ -275,19 +275,21 @@ def main(argv):
             debug_cmd = ['gdb', '--args']
         elif options.debugger == 'lldb':
             debug_cmd = ['lldb', '--']
+        elif options.debugger == 'rr':
+            debug_cmd = ['rr', 'record']
         else:
             debug_cmd = options.debugger.split()
 
         with change_env(test_environment):
-            subprocess.call(debug_cmd + tc.command(prefix, jittests.LIB_DIR))
+            subprocess.call(debug_cmd + tc.command(prefix, jittests.LIB_DIR, jittests.MODULE_DIR))
+            if options.debugger == 'rr':
+                subprocess.call(['rr', 'replay'])
         sys.exit()
 
     try:
         ok = None
         if options.remote:
             ok = jittests.run_tests_remote(job_list, prefix, options)
-        elif options.max_jobs > 1 and jittests.HAVE_MULTIPROCESSING:
-            ok = jittests.run_tests_parallel(job_list, prefix, options)
         else:
             with change_env(test_environment):
                 ok = jittests.run_tests(job_list, prefix, options)

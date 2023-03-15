@@ -161,12 +161,14 @@ static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
 #define PREF_DOM_CACHES_TESTING_ENABLED "dom.caches.testing.enabled"
 #define PREF_WORKERS_PERFORMANCE_LOGGING_ENABLED "dom.performance.enable_user_timing_logging"
 #define PREF_DOM_WORKERNOTIFICATION_ENABLED  "dom.webnotifications.enabled"
+#define PREF_DOM_SERVICEWORKERNOTIFICATION_ENABLED  "dom.webnotifications.serviceworker.enabled"
 #define PREF_WORKERS_LATEST_JS_VERSION "dom.workers.latestJSVersion"
 #define PREF_INTL_ACCEPT_LANGUAGES     "intl.accept_languages"
 #define PREF_SERVICEWORKERS_ENABLED    "dom.serviceWorkers.enabled"
 #define PREF_SERVICEWORKERS_TESTING_ENABLED "dom.serviceWorkers.testing.enabled"
 #define PREF_INTERCEPTION_ENABLED      "dom.serviceWorkers.interception.enabled"
 #define PREF_INTERCEPTION_OPAQUE_ENABLED "dom.serviceWorkers.interception.opaque.enabled"
+#define PREF_OPEN_WINDOW_ENABLED       "dom.serviceWorkers.openWindow.enabled"
 #define PREF_PUSH_ENABLED              "dom.push.enabled"
 #define PREF_REQUESTCONTEXT_ENABLED    "dom.requestcontext.enabled"
 #define PREF_OFFSCREENCANVAS_ENABLED   "gfx.offscreencanvas.enabled"
@@ -1915,12 +1917,20 @@ RuntimeService::Init()
                                   reinterpret_cast<void *>(WORKERPREF_DOM_WORKERNOTIFICATION))) ||
       NS_FAILED(Preferences::RegisterCallbackAndCall(
                                   WorkerPrefChanged,
+                                  PREF_DOM_SERVICEWORKERNOTIFICATION_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_DOM_SERVICEWORKERNOTIFICATION))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
                                   PREF_SERVICEWORKERS_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_SERVICEWORKERS))) ||
       NS_FAILED(Preferences::RegisterCallbackAndCall(
                                   WorkerPrefChanged,
                                   PREF_INTERCEPTION_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_INTERCEPTION_ENABLED))) ||
+      NS_FAILED(Preferences::RegisterCallbackAndCall(
+                                  WorkerPrefChanged,
+                                  PREF_OPEN_WINDOW_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_OPEN_WINDOW_ENABLED))) ||
       NS_FAILED(Preferences::RegisterCallbackAndCall(
                                   WorkerPrefChanged,
                                   PREF_INTERCEPTION_OPAQUE_ENABLED,
@@ -2166,6 +2176,10 @@ RuntimeService::Cleanup()
                                   reinterpret_cast<void *>(WORKERPREF_INTERCEPTION_ENABLED))) ||
         NS_FAILED(Preferences::UnregisterCallback(
                                   WorkerPrefChanged,
+                                  PREF_OPEN_WINDOW_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_OPEN_WINDOW_ENABLED))) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
                                   PREF_SERVICEWORKERS_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_SERVICEWORKERS))) ||
         NS_FAILED(Preferences::UnregisterCallback(
@@ -2176,6 +2190,10 @@ RuntimeService::Cleanup()
                                   WorkerPrefChanged,
                                   PREF_DOM_WORKERNOTIFICATION_ENABLED,
                                   reinterpret_cast<void *>(WORKERPREF_DOM_WORKERNOTIFICATION))) ||
+        NS_FAILED(Preferences::UnregisterCallback(
+                                  WorkerPrefChanged,
+                                  PREF_DOM_SERVICEWORKERNOTIFICATION_ENABLED,
+                                  reinterpret_cast<void *>(WORKERPREF_DOM_SERVICEWORKERNOTIFICATION))) ||
         NS_FAILED(Preferences::UnregisterCallback(
                                   WorkerPrefChanged,
                                   PREF_PUSH_ENABLED,
@@ -2697,12 +2715,14 @@ RuntimeService::WorkerPrefChanged(const char* aPrefName, void* aClosure)
     case WORKERPREF_DOM_CACHES:
     case WORKERPREF_DOM_CACHES_TESTING:
     case WORKERPREF_DOM_WORKERNOTIFICATION:
+    case WORKERPREF_DOM_SERVICEWORKERNOTIFICATION:
     case WORKERPREF_PERFORMANCE_LOGGING_ENABLED:
 #ifdef DUMP_CONTROLLED_BY_PREF
     case WORKERPREF_DUMP:
 #endif
     case WORKERPREF_INTERCEPTION_ENABLED:
     case WORKERPREF_INTERCEPTION_OPAQUE_ENABLED:
+    case WORKERPREF_OPEN_WINDOW_ENABLED:
     case WORKERPREF_SERVICEWORKERS:
     case WORKERPREF_SERVICEWORKERS_TESTING:
     case WORKERPREF_PUSH:

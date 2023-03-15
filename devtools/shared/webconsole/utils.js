@@ -19,6 +19,11 @@ loader.lazyImporter(this, "Parser", "resource://devtools/shared/Parser.jsm");
 loader.lazyImporter(this, "VariablesView", "resource://devtools/client/shared/widgets/VariablesView.jsm");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
+XPCOMUtils.defineLazyServiceGetter(this,
+                                   "swm",
+                                   "@mozilla.org/serviceworkers/manager;1",
+                                   "nsIServiceWorkerManager");
+
 // Match the function name from the result of toString() or toSource().
 //
 // Examples:
@@ -57,6 +62,17 @@ var WebConsoleUtils = {
               createInstance(Ci.nsISupportsString);
     str.data = aString;
     return str;
+  },
+
+  /**
+   * Given a message, return one of CONSOLE_WORKER_IDS if it matches
+   * one of those.
+   *
+   * @return string
+   */
+  getWorkerType: function(message) {
+    let id = message ? message.innerID : null;
+    return CONSOLE_WORKER_IDS[CONSOLE_WORKER_IDS.indexOf(id)] || null;
   },
 
   /**
@@ -1449,18 +1465,50 @@ ConsoleAPIListener.prototype =
     // by the XPCOM component which allows us to unwrap the XPCOM interface and
     // access the underlying JSObject.
     let apiMessage = aMessage.wrappedJSObject;
-    if (this.window && CONSOLE_WORKER_IDS.indexOf(apiMessage.innerID) == -1) {
-      let msgWindow = Services.wm.getCurrentInnerWindowWithId(apiMessage.innerID);
-      if (!msgWindow || !isWindowIncluded(this.window, msgWindow)) {
-        // Not the same window!
-        return;
-      }
-    }
-    if (this.consoleID && apiMessage.consoleID != this.consoleID) {
+
+    if (!this.isMessageRelevant(apiMessage)) {
       return;
     }
 
     this.owner.onConsoleAPICall(apiMessage);
+  },
+
+  /**
+   * Given a message, return true if this window should show it and false
+   * if it should be ignored.
+   *
+   * @param message
+   *        The message from the Storage Service
+   * @return bool
+   *         Do we care about this message?
+   */
+  isMessageRelevant: function(message) {
+    let workerType = WebConsoleUtils.getWorkerType(message);
+
+    if (this.window && workerType === "ServiceWorker") {
+      // For messages from Service Workers, message.ID is the
+      // scope, which can be used to determine whether it's controlling
+      // a window.
+      let scope = message.ID;
+
+      if (!swm.shouldReportToWindow(this.window, scope)) {
+        return false;
+      }
+    }
+
+    if (this.window && !workerType) {
+      let msgWindow = Services.wm.getCurrentInnerWindowWithId(message.innerID);
+      if (!msgWindow || !isWindowIncluded(this.window, msgWindow)) {
+        // Not the same window!
+        return false;
+      }
+    }
+
+    if (this.consoleID && message.consoleID !== this.consoleID) {
+      return false;
+    }
+
+    return true;
   },
 
   /**
@@ -1493,9 +1541,9 @@ ConsoleAPIListener.prototype =
       messages = messages.concat(ConsoleAPIStorage.getEvents(id));
     });
 
-    if (this.consoleID) {
-      messages = messages.filter((m) => m.consoleID == this.consoleID);
-    }
+    messages = messages.filter(msg => {
+      return this.isMessageRelevant(msg);
+    });
 
     if (aIncludePrivate) {
       return messages;

@@ -53,7 +53,6 @@ if CONFIG['OS_TARGET'] == 'WINNT':
 if CONFIG['OS_TARGET'] == 'Android':
     SOURCES += ['cubeb_opensl.c']
     SOURCES += ['cubeb_resampler.cpp']
-    SOURCES['cubeb_opensl.c'].flags += ['-Wno-declaration-after-statement']
     DEFINES['USE_OPENSL'] = True
     if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
         SOURCES += [
@@ -61,18 +60,17 @@ if CONFIG['OS_TARGET'] == 'Android':
         ]
         DEFINES['USE_AUDIOTRACK'] = True
 
-if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
-    NO_VISIBILITY_FLAGS = True
-
 FINAL_LIBRARY = 'gkmedias'
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
-    CFLAGS += [
-        '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
-            'frameworks/wilhelm/include',
-            'system/media/wilhelm/include',
+    if CONFIG['ANDROID_VERSION'] >= '17':
+        LOCAL_INCLUDES += [
+            '%' + '%s/frameworks/wilhelm/include' % CONFIG['ANDROID_SOURCE'],
         ]
-    ]
+    else:
+        LOCAL_INCLUDES += [
+            '%' + '%s/system/media/wilhelm/include' % CONFIG['ANDROID_SOURCE'],
+        ]
 
 CFLAGS += CONFIG['MOZ_ALSA_CFLAGS']
 CFLAGS += CONFIG['MOZ_PULSEAUDIO_CFLAGS']

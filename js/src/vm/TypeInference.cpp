@@ -3224,6 +3224,20 @@ js::FillBytecodeTypeMap(JSScript* script, uint32_t* bytecodeMap)
 }
 
 void
+js::TypeMonitorResult(JSContext* cx, JSScript* script, jsbytecode* pc, TypeSet::Type type)
+{
+    AutoEnterAnalysis enter(cx);
+
+    StackTypeSet* types = TypeScript::BytecodeTypes(script, pc);
+    if (types->hasType(type))
+        return;
+
+    InferSpew(ISpewOps, "bytecodeType: %p %05u: %s",
+              script, script->pcToOffset(pc), TypeSet::TypeString(type));
+    types->addType(cx, type);
+}
+
+void
 js::TypeMonitorResult(JSContext* cx, JSScript* script, jsbytecode* pc, const js::Value& rval)
 {
     /* Allow the non-TYPESET scenario to simplify stubs used in compound opcodes. */
@@ -3233,16 +3247,7 @@ js::TypeMonitorResult(JSContext* cx, JSScript* script, jsbytecode* pc, const js:
     if (!script->hasBaselineScript())
         return;
 
-    AutoEnterAnalysis enter(cx);
-
-    TypeSet::Type type = TypeSet::GetValueType(rval);
-    StackTypeSet* types = TypeScript::BytecodeTypes(script, pc);
-    if (types->hasType(type))
-        return;
-
-    InferSpew(ISpewOps, "bytecodeType: %p %05u: %s",
-              script, script->pcToOffset(pc), TypeSet::TypeString(type));
-    types->addType(cx, type);
+    TypeMonitorResult(cx, script, pc, TypeSet::GetValueType(rval));
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -3887,7 +3892,11 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
             continue;
         }
 
-        Value thisv = iter.thisv(cx);
+        // Derived class constructors initialize their this-binding later and
+        // we shouldn't run the definite properties analysis on them.
+        MOZ_ASSERT(!iter.script()->isDerivedClassConstructor());
+
+        Value thisv = iter.thisArgument(cx);
         if (!thisv.isObject() ||
             thisv.toObject().hasLazyGroup() ||
             thisv.toObject().group() != group)

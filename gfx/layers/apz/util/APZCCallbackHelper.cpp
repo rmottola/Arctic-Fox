@@ -210,7 +210,7 @@ APZCCallbackHelper::UpdateRootFrame(FrameMetrics& aMetrics)
     // no-op, but setting the SPCSPS is bad because it can cause a stale value
     // to be returned by window.innerWidth/innerHeight (see bug 1187792).
 
-    float presShellResolution = nsLayoutUtils::GetResolution(shell);
+    float presShellResolution = shell->GetResolution();
 
     // If the pres shell resolution has changed on the content side side
     // the time this repaint request was fired, consider this request out of date
@@ -224,7 +224,7 @@ APZCCallbackHelper::UpdateRootFrame(FrameMetrics& aMetrics)
     // last paint.
     presShellResolution = aMetrics.GetPresShellResolution()
                         * aMetrics.GetAsyncZoom().scale;
-    nsLayoutUtils::SetResolutionAndScaleTo(shell, presShellResolution);
+    shell->SetResolutionAndScaleTo(presShellResolution);
   }
 
   // Do this as late as possible since scrolling can flush layout. It also
@@ -422,21 +422,7 @@ APZCCallbackHelper::ApplyCallbackTransform(const CSSPoint& aInput,
     if (aGuid.mScrollId == FrameMetrics::NULL_SCROLL_ID) {
         return input;
     }
-    nsCOMPtr<nsIContent> content = nsLayoutUtils::FindContentFor(aGuid.mScrollId);
-    if (!content) {
-        return input;
-    }
-
-    // First, scale inversely by the root content document's pres shell
-    // resolution to cancel the scale-to-resolution transform that the
-    // compositor adds to the layer with the pres shell resolution. The points
-    // sent to Gecko by APZ don't have this transform unapplied (unlike other
-    // compositor-side transforms) because APZ doesn't know about it.
-    if (nsIPresShell* shell = GetRootContentDocumentPresShellForContent(content)) {
-        input = input / shell->GetResolution();
-    }
-
-    // Now apply the callback-transform.
+    // Apply the callback-transform.
     // XXX: technically we need to walk all the way up the layer tree from the layer
     // represented by |aGuid.mScrollId| up to the root of the layer tree and apply
     // the input transforms at each level in turn. However, it is quite difficult
@@ -447,9 +433,19 @@ APZCCallbackHelper::ApplyCallbackTransform(const CSSPoint& aInput,
     // some things transformed improperly. In practice we should rarely hit scenarios
     // where any of this matters, so I'm skipping it for now and just doing the single
     // transform for the layer that the input hit.
-    void* property = content->GetProperty(nsGkAtoms::apzCallbackTransform);
-    if (property) {
-        CSSPoint delta = (*static_cast<CSSPoint*>(property));
+    nsCOMPtr<nsIContent> content = nsLayoutUtils::FindContentFor(aGuid.mScrollId);
+    if (content) {
+        void* property = content->GetProperty(nsGkAtoms::apzCallbackTransform);
+        CSSPoint delta = property ? (*static_cast<CSSPoint*>(property)) : CSSPoint(0.0f, 0.0f);
+        // The delta is in root content document coordinate space while the
+        // aInput point is in root document coordinate space so convert the
+        // delta to root document space before adding it to the aInput point.
+        float resolution = 1.0f;
+        if (nsIPresShell* shell = GetRootContentDocumentPresShellForContent(content)) {
+            resolution = shell->GetResolution();
+        }
+        delta.x = delta.x * resolution;
+        delta.y = delta.y * resolution;
         input += delta;
     }
     return input;

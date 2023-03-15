@@ -9,6 +9,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/Maybe.h"
 
 #include "jscntxt.h"
 #include "jscompartment.h"
@@ -51,8 +52,10 @@ using namespace js::selfhosted;
 
 using JS::AutoCheckCannotGC;
 using mozilla::IsInRange;
+using mozilla::Maybe;
 using mozilla::PodMove;
 using mozilla::UniquePtr;
+using mozilla::Maybe;
 
 static void
 selfHosting_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
@@ -165,6 +168,18 @@ intrinsic_GetBuiltinConstructor(JSContext* cx, unsigned argc, Value* vp)
     if (!GetBuiltinConstructor(cx, key, &ctor))
         return false;
     args.rval().setObject(*ctor);
+    return true;
+}
+
+template<typename T>
+static bool
+intrinsic_IsInstanceOfBuiltin(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isObject());
+
+    args.rval().setBoolean(args[0].toObject().is<T>());
     return true;
 }
 
@@ -495,28 +510,6 @@ intrinsic_NewArrayIterator(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-intrinsic_IsArrayIterator(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ArrayIteratorObject>());
-    return true;
-}
-
-static bool
-intrinsic_IsMapIterator(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<MapIteratorObject>());
-    return true;
-}
-
-static bool
 intrinsic_GetNextMapEntryForIterator(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -546,17 +539,6 @@ intrinsic_NewStringIterator(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     args.rval().setObject(*obj);
-    return true;
-}
-
-static bool
-intrinsic_IsStringIterator(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<StringIteratorObject>());
     return true;
 }
 
@@ -612,28 +594,6 @@ intrinsic_ActiveFunction(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-intrinsic_IsListIterator(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ListIteratorObject>());
-    return true;
-}
-
-static bool
-intrinsic_IsStarGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<StarGeneratorObject>());
-    return true;
-}
-
-static bool
 intrinsic_StarGeneratorObjectIsClosed(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -658,17 +618,6 @@ js::intrinsic_IsSuspendedStarGenerator(JSContext* cx, unsigned argc, Value* vp)
 
     StarGeneratorObject& genObj = args[0].toObject().as<StarGeneratorObject>();
     args.rval().setBoolean(!genObj.isClosed() && genObj.isSuspended());
-    return true;
-}
-
-static bool
-intrinsic_IsLegacyGeneratorObject(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<LegacyGeneratorObject>());
     return true;
 }
 
@@ -726,28 +675,6 @@ intrinsic_GeneratorSetClosed(JSContext* cx, unsigned argc, Value* vp)
 
     GeneratorObject* genObj = &args[0].toObject().as<GeneratorObject>();
     genObj->setClosed();
-    return true;
-}
-
-static bool
-intrinsic_IsArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ArrayBufferObject>());
-    return true;
-}
-
-static bool
-intrinsic_IsTypedArray(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<TypedArrayObject>());
     return true;
 }
 
@@ -1280,17 +1207,6 @@ CallNonGenericSelfhostedMethod(JSContext* cx, unsigned argc, Value* vp)
     return CallNonGenericMethod<Test, CallSelfHostedNonGenericMethod>(cx, args);
 }
 
-static bool
-intrinsic_IsWeakSet(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<WeakSetObject>());
-    return true;
-}
-
 /**
  * Returns the default locale as a well-formed, but not necessarily canonicalized,
  * BCP-47 language tag.
@@ -1351,17 +1267,6 @@ intrinsic_ConstructorForTypedArray(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(ctor.isObject());
 
     args.rval().set(ctor);
-    return true;
-}
-
-static bool
-intrinsic_IsModule(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ModuleObject>());
     return true;
 }
 
@@ -1482,17 +1387,6 @@ intrinsic_EvaluateModule(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args.length() == 1);
     RootedModuleObject module(cx, &args[0].toObject().as<ModuleObject>());
     return ModuleObject::evaluate(cx, module, args.rval());
-}
-
-static bool
-intrinsic_IsModuleNamespace(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-
-    args.rval().setBoolean(args[0].toObject().is<ModuleNamespaceObject>());
-    return true;
 }
 
 static bool
@@ -1663,13 +1557,17 @@ static const JSFunctionSpec intrinsic_functions[] = {
           CallNonGenericSelfhostedMethod<Is<ListIteratorObject>>,       2,0),
     JS_FN("ActiveFunction",          intrinsic_ActiveFunction,          0,0),
 
-    JS_INLINABLE_FN("IsArrayIterator", intrinsic_IsArrayIterator,       1,0,
+    JS_INLINABLE_FN("IsArrayIterator",
+                    intrinsic_IsInstanceOfBuiltin<ArrayIteratorObject>, 1,0,
                     IntrinsicIsArrayIterator),
-    JS_INLINABLE_FN("IsMapIterator",   intrinsic_IsMapIterator,         1,0,
+    JS_INLINABLE_FN("IsMapIterator",
+                    intrinsic_IsInstanceOfBuiltin<MapIteratorObject>,   1,0,
                     IntrinsicIsMapIterator),
-    JS_INLINABLE_FN("IsStringIterator",intrinsic_IsStringIterator,      1,0,
+    JS_INLINABLE_FN("IsStringIterator",
+                    intrinsic_IsInstanceOfBuiltin<StringIteratorObject>, 1,0,
                     IntrinsicIsStringIterator),
-    JS_INLINABLE_FN("IsListIterator",intrinsic_IsListIterator,          1,0,
+    JS_INLINABLE_FN("IsListIterator",
+                    intrinsic_IsInstanceOfBuiltin<ListIteratorObject>,  1,0,
                     IntrinsicIsListIterator),
 
     JS_FN("_GetNextMapEntryForIterator", intrinsic_GetNextMapEntryForIterator, 3,0),
@@ -1681,11 +1579,13 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("CallStringIteratorMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<StringIteratorObject>>,     2,0),
 
-    JS_FN("IsStarGeneratorObject",   intrinsic_IsStarGeneratorObject,   1,0),
+    JS_FN("IsStarGeneratorObject",
+          intrinsic_IsInstanceOfBuiltin<StarGeneratorObject>,           1,0),
     JS_FN("StarGeneratorObjectIsClosed", intrinsic_StarGeneratorObjectIsClosed, 1,0),
     JS_FN("IsSuspendedStarGenerator",intrinsic_IsSuspendedStarGenerator,1,0),
 
-    JS_FN("IsLegacyGeneratorObject", intrinsic_IsLegacyGeneratorObject, 1,0),
+    JS_FN("IsLegacyGeneratorObject",
+          intrinsic_IsInstanceOfBuiltin<LegacyGeneratorObject>,         1,0),
     JS_FN("LegacyGeneratorObjectIsClosed", intrinsic_LegacyGeneratorObjectIsClosed, 1,0),
     JS_FN("CloseClosingLegacyGeneratorObject", intrinsic_CloseClosingLegacyGeneratorObject, 1,0),
     JS_FN("ThrowStopIteration",      intrinsic_ThrowStopIteration,      0,0),
@@ -1693,9 +1593,11 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("GeneratorIsRunning",      intrinsic_GeneratorIsRunning,      1,0),
     JS_FN("GeneratorSetClosed",      intrinsic_GeneratorSetClosed,      1,0),
 
-    JS_FN("IsArrayBuffer",           intrinsic_IsArrayBuffer,           1,0),
+    JS_FN("IsArrayBuffer",
+          intrinsic_IsInstanceOfBuiltin<ArrayBufferObject>,             1,0),
 
-    JS_INLINABLE_FN("IsTypedArray",  intrinsic_IsTypedArray,            1,0,
+    JS_INLINABLE_FN("IsTypedArray",
+                    intrinsic_IsInstanceOfBuiltin<TypedArrayObject>,    1,0,
                     IntrinsicIsTypedArray),
     JS_INLINABLE_FN("IsPossiblyWrappedTypedArray",intrinsic_IsPossiblyWrappedTypedArray,1,0,
                     IntrinsicIsPossiblyWrappedTypedArray),
@@ -1722,7 +1624,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("CallStarGeneratorMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<StarGeneratorObject>>, 2, 0),
 
-    JS_FN("IsWeakSet",               intrinsic_IsWeakSet,               1,0),
+    JS_FN("IsWeakSet", intrinsic_IsInstanceOfBuiltin<WeakSetObject>, 1,0),
     JS_FN("CallWeakSetMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<WeakSetObject>>, 2, 0),
 
@@ -1789,7 +1691,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("regexp_test_no_statics", regexp_test_no_statics, 2,0),
     JS_FN("regexp_construct_no_statics", regexp_construct_no_statics, 2,0),
 
-    JS_FN("IsModule", intrinsic_IsModule, 1, 0),
+    JS_FN("IsModule", intrinsic_IsInstanceOfBuiltin<ModuleObject>, 1, 0),
     JS_FN("CallModuleMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<ModuleObject>>, 2, 0),
     JS_FN("HostResolveImportedModule", intrinsic_HostResolveImportedModule, 2, 0),
@@ -1801,7 +1703,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
           intrinsic_InstantiateModuleFunctionDeclarations, 1, 0),
     JS_FN("SetModuleEvaluated", intrinsic_SetModuleEvaluated, 1, 0),
     JS_FN("EvaluateModule", intrinsic_EvaluateModule, 1, 0),
-    JS_FN("IsModuleNamespace", intrinsic_IsModuleNamespace, 1, 0),
+    JS_FN("IsModuleNamespace", intrinsic_IsInstanceOfBuiltin<ModuleNamespaceObject>, 1, 0),
     JS_FN("NewModuleNamespace", intrinsic_NewModuleNamespace, 2, 0),
     JS_FN("AddModuleNamespaceBinding", intrinsic_AddModuleNamespaceBinding, 4, 0),
     JS_FN("ModuleNamespaceExports", intrinsic_ModuleNamespaceExports, 1, 0),
@@ -2094,7 +1996,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
     // different thread than the clone target. In theory, these objects are all
     // tenured and will not be compacted; however, we simply avoid the issue
     // altogether by skipping the cycle-detection when off the main thread.
-    Maybe<AutoCycleDetector> detect;
+    mozilla::Maybe<AutoCycleDetector> detect;
     if (js::CurrentThreadCanAccessZone(selfHostedObject->zoneFromAnyThread())) {
         detect.emplace(cx, selfHostedObject);
         if (!detect->init())

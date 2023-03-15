@@ -922,18 +922,6 @@ MacroAssemblerMIPS64Compat::add32(Imm32 imm, const Address& dest)
 }
 
 void
-MacroAssemblerMIPS64Compat::sub32(Imm32 imm, Register dest)
-{
-    ma_subu(dest, dest, imm);
-}
-
-void
-MacroAssemblerMIPS64Compat::sub32(Register src, Register dest)
-{
-    as_subu(dest, dest, src);
-}
-
-void
 MacroAssemblerMIPS64Compat::addPtr(Register src, Register dest)
 {
     ma_daddu(dest, src);
@@ -1468,6 +1456,14 @@ MacroAssemblerMIPS64Compat:: branchTestBoolean(Condition cond, Register tag, Lab
 {
     MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
     ma_b(tag, ImmTag(JSVAL_TAG_BOOLEAN), label, cond);
+}
+
+void
+MacroAssemblerMIPS64Compat::branchTestBoolean(Condition cond, const Address& address, Label* label)
+{
+    MOZ_ASSERT(cond == Equal || cond == NotEqual);
+    extractTag(address, SecondScratchReg);
+    ma_b(SecondScratchReg, ImmTag(JSVAL_TAG_BOOLEAN), label, cond);
 }
 
 void

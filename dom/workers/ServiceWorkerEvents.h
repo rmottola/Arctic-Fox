@@ -51,9 +51,9 @@ public:
 
 class ExtendableEvent : public Event
 {
+protected:
   nsTArray<RefPtr<Promise>> mPromises;
 
-protected:
   explicit ExtendableEvent(mozilla::dom::EventTarget* aOwner);
   ~ExtendableEvent() {}
 
@@ -90,7 +90,7 @@ public:
   }
 
   void
-  WaitUntil(Promise& aPromise, ErrorResult& aRv);
+  WaitUntil(JSContext* aCx, Promise& aPromise, ErrorResult& aRv);
 
   already_AddRefed<Promise>
   GetPromise();
@@ -107,6 +107,7 @@ class FetchEvent final : public ExtendableEvent
   RefPtr<Request> mRequest;
   nsCString mScriptSpec;
   nsCString mPreventDefaultScriptSpec;
+  nsString mClientId;
   uint32_t mPreventDefaultLineNumber;
   uint32_t mPreventDefaultColumnNumber;
   bool mIsReload;
@@ -147,6 +148,12 @@ public:
   GetRequest_() const
   {
     return mRequest;
+  }
+
+  void
+  GetClientId(nsAString& aClientId) const
+  {
+    aClientId = mClientId;
   }
 
   bool

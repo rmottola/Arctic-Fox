@@ -1205,7 +1205,7 @@ NS_UsePrivateBrowsing(nsIChannel *channel)
 
 bool
 NS_GetOriginAttributes(nsIChannel *aChannel,
-                       mozilla::OriginAttributes &aAttributes)
+                       mozilla::NeckoOriginAttributes &aAttributes)
 {
     nsCOMPtr<nsILoadContext> loadContext;
     NS_QueryNotificationCallbacks(aChannel, loadContext);
@@ -1213,7 +1213,9 @@ NS_GetOriginAttributes(nsIChannel *aChannel,
         return false;
     }
 
-    loadContext->GetOriginAttributes(aAttributes);
+    DocShellOriginAttributes doa;
+    loadContext->GetOriginAttributes(doa);
+    aAttributes.InheritFromDocShellToNecko(doa);
     return true;
 }
 

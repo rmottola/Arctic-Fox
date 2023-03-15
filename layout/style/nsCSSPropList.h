@@ -61,13 +61,12 @@
   CSS_PROP_*] gives the name of the style struct.  Can be used to make
   nsStyle##stylestruct_ and eStyleStruct_##stylestruct_
 
-  -. 'stylestructoffset_' [not used for CSS_PROP_BACKENDONLY] gives the
-  result of offsetof(nsStyle*, member).  Ignored (and generally
-  CSS_PROP_NO_OFFSET, or -1) for properties whose animtype_ is
-  eStyleAnimType_None.
+  -. 'stylestructoffset_' gives the result of offsetof(nsStyle*,
+  member).  Ignored (and generally CSS_PROP_NO_OFFSET, or -1) for
+  properties whose animtype_ is eStyleAnimType_None.
 
-  -. 'animtype_' [not used for CSS_PROP_BACKENDONLY] gives the
-  animation type (see nsStyleAnimType) of this property.
+  -. 'animtype_' gives the animation type (see nsStyleAnimType) of this
+  property.
 
   CSS_PROP_SHORTHAND only takes 1-5.
 
@@ -158,14 +157,6 @@
 #define CSS_PROP_SVG(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, stylestructoffset_, animtype_) CSS_PROP(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, SVG, stylestructoffset_, animtype_)
 #define CSS_PROP_SVGRESET(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, stylestructoffset_, animtype_) CSS_PROP(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, SVGReset, stylestructoffset_, animtype_)
 #define CSS_PROP_VARIABLES(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, stylestructoffset_, animtype_) CSS_PROP(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, Variables, stylestructoffset_, animtype_)
-
-// For properties that are stored in the CSS backend but are not
-// computed.  An includer may define this in addition to CSS_PROP, but
-// otherwise we treat it as the same.
-#ifndef CSS_PROP_BACKENDONLY
-#define CSS_PROP_BACKENDONLY(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_) CSS_PROP(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, BackendOnly, CSS_PROP_NO_OFFSET, eStyleAnimType_None)
-#define DEFINED_CSS_PROP_BACKENDONLY
-#endif
 
 // And similarly for logical properties.  An includer can define
 // CSS_PROP_LOGICAL to capture all logical properties, but otherwise they
@@ -294,10 +285,6 @@
 #define DEFINED_CSS_PROP_VARIABLES
 #endif
 
-#ifndef CSS_PROP_BACKENDONLY
-#define CSS_PROP_BACKENDONLY(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_) /* nothing */
-#define DEFINED_CSS_PROP_BACKENDONLY
-#endif
 #ifndef CSS_PROP_LOGICAL
 #define CSS_PROP_LOGICAL(name_, id_, method_, flags_, pref_, parsevariant_, kwtable_, group_, struct_, stylestructoffset_, animtype_) /* nothing */
 #define DEFINED_CSS_PROP_LOGICAL
@@ -1599,32 +1586,32 @@ CSS_PROP_POSITION(
     align-content,
     align_content,
     AlignContent,
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_PARSE_FUNCTION,
     "",
-    VARIANT_HK,
-    kAlignContentKTable,
-    offsetof(nsStylePosition, mAlignContent),
-    eStyleAnimType_EnumU8)
+    0,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_POSITION(
     align-items,
     align_items,
     AlignItems,
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_PARSE_FUNCTION,
     "",
-    VARIANT_HK,
-    kAlignItemsKTable,
-    offsetof(nsStylePosition, mAlignItems),
-    eStyleAnimType_EnumU8)
+    0,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_POSITION(
     align-self,
     align_self,
     AlignSelf,
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_PARSE_FUNCTION,
     "",
-    VARIANT_HK,
-    kAlignSelfKTable,
-    offsetof(nsStylePosition, mAlignSelf),
-    eStyleAnimType_EnumU8)
+    0,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_SHORTHAND(
     flex,
     flex,
@@ -1714,12 +1701,12 @@ CSS_PROP_POSITION(
     justify-content,
     justify_content,
     JustifyContent,
-    CSS_PROPERTY_PARSE_VALUE,
+    CSS_PROPERTY_PARSE_FUNCTION,
     "",
-    VARIANT_HK,
-    kJustifyContentKTable,
-    offsetof(nsStylePosition, mJustifyContent),
-    eStyleAnimType_EnumU8)
+    0,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_POSITION(
     justify-items,
     justify_items,
@@ -2139,6 +2126,34 @@ CSS_PROP_SHORTHAND(
     CSS_PROPERTY_PARSE_FUNCTION,
     "layout.css.grid.enabled")
 CSS_PROP_POSITION(
+    grid-column-gap,
+    grid_column_gap,
+    GridColumnGap,
+    CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_VALUE_NONNEGATIVE,
+    "layout.css.grid.enabled",
+    VARIANT_HL | VARIANT_CALC,
+    nullptr,
+    offsetof(nsStylePosition, mGridColumnGap),
+    eStyleAnimType_nscoord)
+CSS_PROP_POSITION(
+    grid-row-gap,
+    grid_row_gap,
+    GridRowGap,
+    CSS_PROPERTY_PARSE_VALUE |
+      CSS_PROPERTY_VALUE_NONNEGATIVE,
+    "layout.css.grid.enabled",
+    VARIANT_HL | VARIANT_CALC,
+    nullptr,
+    offsetof(nsStylePosition, mGridRowGap),
+    eStyleAnimType_nscoord)
+CSS_PROP_SHORTHAND(
+    grid-gap,
+    grid_gap,
+    GridGap,
+    CSS_PROPERTY_PARSE_FUNCTION,
+    "layout.css.grid.enabled")
+CSS_PROP_POSITION(
     height,
     height,
     Height,
@@ -2429,15 +2444,6 @@ CSS_PROP_CONTENT(
     nullptr,
     offsetof(nsStyleContent, mMarkerOffset),
     eStyleAnimType_Coord)
-CSS_PROP_BACKENDONLY(
-    marks,
-    marks,
-    Marks,
-    CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_VALUE_PARSER_FUNCTION,
-    "",
-    0,
-    kPageMarksKTable)
 CSS_PROP_LOGICAL(
     max-block-size,
     max_block_size,
@@ -2717,15 +2723,6 @@ CSS_PROP_DISPLAY(
     kOrientKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
-CSS_PROP_BACKENDONLY(
-    orphans,
-    orphans,
-    Orphans,
-    CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_VALUE_AT_LEAST_ONE,
-    "",
-    VARIANT_HI,
-    nullptr)
 CSS_PROP_SHORTHAND(
     outline,
     outline,
@@ -2973,14 +2970,6 @@ CSS_PROP_PADDING(
     nullptr,
     offsetof(nsStylePadding, mPadding),
     eStyleAnimType_Sides_Top)
-CSS_PROP_BACKENDONLY(
-    page,
-    page,
-    Page,
-    CSS_PROPERTY_PARSE_VALUE,
-    "",
-    VARIANT_AUTO | VARIANT_IDENTIFIER,
-    nullptr)
 CSS_PROP_DISPLAY(
     page-break-after,
     page_break_after,
@@ -3186,14 +3175,6 @@ CSS_PROP_DISPLAY(
     kScrollSnapTypeKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
-CSS_PROP_BACKENDONLY(
-    size,
-    size,
-    Size,
-    CSS_PROPERTY_PARSE_FUNCTION,
-    "",
-    0,
-    kPageSizeKTable)
 CSS_PROP_TABLE(
     table-layout,
     table_layout,
@@ -3282,6 +3263,45 @@ CSS_PROP_TEXTRESET(
     kTextDecorationStyleKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_Custom)
+CSS_PROP_SHORTHAND(
+    text-emphasis,
+    text_emphasis,
+    TextEmphasis,
+    CSS_PROPERTY_PARSE_FUNCTION,
+    "layout.css.text-emphasis.enabled")
+CSS_PROP_TEXT(
+    text-emphasis-color,
+    text_emphasis_color,
+    TextEmphasisColor,
+    CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
+    "layout.css.text-emphasis.enabled",
+    VARIANT_HC,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_Custom)
+CSS_PROP_TEXT(
+    text-emphasis-position,
+    text_emphasis_position,
+    TextEmphasisPosition,
+    CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_VALUE_PARSER_FUNCTION,
+    "layout.css.text-emphasis.enabled",
+    0,
+    kTextEmphasisPositionKTable,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
+CSS_PROP_TEXT(
+    text-emphasis-style,
+    text_emphasis_style,
+    TextEmphasisStyle,
+    CSS_PROPERTY_PARSE_VALUE |
+        CSS_PROPERTY_VALUE_PARSER_FUNCTION,
+    "layout.css.text-emphasis.enabled",
+    0,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
 CSS_PROP_TEXT(
     text-indent,
     text_indent,
@@ -3614,15 +3634,6 @@ CSS_PROP_TEXT(
     kWhitespaceKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
-CSS_PROP_BACKENDONLY(
-    widows,
-    widows,
-    Widows,
-    CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_VALUE_AT_LEAST_ONE,
-    "",
-    VARIANT_HI,
-    nullptr)
 CSS_PROP_POSITION(
     width,
     width,
@@ -3637,19 +3648,17 @@ CSS_PROP_POSITION(
     kWidthKTable,
     offsetof(nsStylePosition, mWidth),
     eStyleAnimType_Coord)
-#ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL
 CSS_PROP_USERINTERFACE(
     -moz-window-dragging,
     _moz_window_dragging,
     CSS_PROP_DOMPROP_PREFIXED(WindowDragging),
-    CSS_PROPERTY_INTERNAL |
-        CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS_AND_CHROME,
+    CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
     kWindowDraggingKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
+#ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL
 CSS_PROP_UIRESET(
     -moz-window-shadow,
     _moz_window_shadow,
@@ -4305,10 +4314,6 @@ CSS_PROP_FONT(
 #undef CSS_PROP_SVG
 #undef CSS_PROP_SVGRESET
 #undef CSS_PROP_VARIABLES
-#ifdef DEFINED_CSS_PROP_BACKENDONLY
-#undef CSS_PROP_BACKENDONLY
-#undef DEFINED_CSS_PROP_BACKENDONLY
-#endif
 
 #else /* !defined(USED_CSS_PROP) */
 
@@ -4407,10 +4412,6 @@ CSS_PROP_FONT(
 #ifdef DEFINED_CSS_PROP_VARIABLES
 #undef CSS_PROP_VARIABLES
 #undef DEFINED_CSS_PROP_VARIABLES
-#endif
-#ifdef DEFINED_CSS_PROP_BACKENDONLY
-#undef CSS_PROP_BACKENDONLY
-#undef DEFINED_CSS_PROP_BACKENDONLY
 #endif
 
 #endif /* !defined(USED_CSS_PROP) */

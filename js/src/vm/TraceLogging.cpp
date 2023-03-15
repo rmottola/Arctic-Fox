@@ -133,7 +133,7 @@ TraceLoggerThread::init()
 {
     if (!pointerMap.init())
         return false;
-    if (!extraTextId.init())
+    if (!textIdPayloads.init())
         return false;
     if (!events.init())
         return false;
@@ -187,8 +187,8 @@ TraceLoggerThread::~TraceLoggerThread()
         graph = nullptr;
     }
 
-    if (extraTextId.initialized()) {
-        for (TextIdHashMap::Range r = extraTextId.all(); !r.empty(); r.popFront())
+    if (textIdPayloads.initialized()) {
+        for (TextIdHashMap::Range r = textIdPayloads.all(); !r.empty(); r.popFront())
             js_delete(r.front().value());
     }
 }
@@ -297,7 +297,7 @@ TraceLoggerThread::eventText(uint32_t id)
     if (id < TraceLogger_Last)
         return TLTextIdString(static_cast<TraceLoggerTextId>(id));
 
-    TextIdHashMap::Ptr p = extraTextId.lookup(id);
+    TextIdHashMap::Ptr p = textIdPayloads.lookup(id);
     MOZ_ASSERT(p);
 
     return p->value()->string();
@@ -351,7 +351,7 @@ TraceLoggerThread::extractScriptDetails(uint32_t textId, const char** filename, 
 TraceLoggerEventPayload*
 TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId textId)
 {
-    TextIdHashMap::AddPtr p = extraTextId.lookupForAdd(textId);
+    TextIdHashMap::AddPtr p = textIdPayloads.lookupForAdd(textId);
     if (p)
         return p->value();
 
@@ -359,7 +359,7 @@ TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId textId)
     if (!payload)
         return nullptr;
 
-    if (!extraTextId.add(p, textId, payload))
+    if (!textIdPayloads.add(p, textId, payload))
         return nullptr;
 
     return payload;
@@ -381,7 +381,7 @@ TraceLoggerThread::getOrCreateEventPayload(const char* text)
     MOZ_ASSERT(ret == len);
     MOZ_ASSERT(strlen(str) == len);
 
-    uint32_t textId = extraTextId.count() + TraceLogger_Last;
+    uint32_t textId = nextTextId;
 
     TraceLoggerEventPayload* payload = js_new<TraceLoggerEventPayload>(textId, str);
     if (!payload) {
@@ -389,7 +389,7 @@ TraceLoggerThread::getOrCreateEventPayload(const char* text)
         return nullptr;
     }
 
-    if (!extraTextId.putNew(textId, payload)) {
+    if (!textIdPayloads.putNew(textId, payload)) {
         js_delete(payload);
         return nullptr;
     }
@@ -399,6 +399,8 @@ TraceLoggerThread::getOrCreateEventPayload(const char* text)
 
     if (graph.get())
         graph->addTextId(textId, str);
+
+    nextTextId++;
 
     return payload;
 }
@@ -440,14 +442,14 @@ TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId type, const char* f
     MOZ_ASSERT(ret == len);
     MOZ_ASSERT(strlen(str) == len);
 
-    uint32_t textId = extraTextId.count() + TraceLogger_Last;
+    uint32_t textId = nextTextId;
     TraceLoggerEventPayload* payload = js_new<TraceLoggerEventPayload>(textId, str);
     if (!payload) {
         js_free(str);
         return nullptr;
     }
 
-    if (!extraTextId.putNew(textId, payload)) {
+    if (!textIdPayloads.putNew(textId, payload)) {
         js_delete(payload);
         return nullptr;
     }
@@ -457,6 +459,8 @@ TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId type, const char* f
 
     if (graph.get())
         graph->addTextId(textId, str);
+
+    nextTextId++;
 
     return payload;
 }
@@ -497,7 +501,7 @@ TraceLoggerThread::startEvent(uint32_t id)
     if (!traceLoggerState->isTextIdEnabled(id))
        return;
 
-    logTimestamp(id);
+    log(id);
 }
 
 void
@@ -522,7 +526,7 @@ TraceLoggerThread::stopEvent(uint32_t id)
     if (!traceLoggerState->isTextIdEnabled(id))
         return;
 
-    logTimestamp(TraceLogger_Stop);
+    log(TraceLogger_Stop);
 }
 
 void
@@ -533,6 +537,13 @@ TraceLoggerThread::logTimestamp(TraceLoggerTextId id)
 
 void
 TraceLoggerThread::logTimestamp(uint32_t id)
+{
+    MOZ_ASSERT(id > TraceLogger_LastTreeItem && id < TraceLogger_Last);
+    log(id);
+}
+
+void
+TraceLoggerThread::log(uint32_t id)
 {
     if (enabled == 0)
         return;
@@ -561,7 +572,7 @@ TraceLoggerThread::logTimestamp(uint32_t id)
         }
 
         // Free all TextEvents that have no uses anymore.
-        for (TextIdHashMap::Enum e(extraTextId); !e.empty(); e.popFront()) {
+        for (TextIdHashMap::Enum e(textIdPayloads); !e.empty(); e.popFront()) {
             if (e.front().value()->uses() == 0) {
                 js_delete(e.front().value());
                 e.removeFront();

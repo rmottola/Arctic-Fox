@@ -78,8 +78,6 @@ class ScopeCheckingGetCallback : public nsINotificationStorageCallback
 {
   const nsString mScope;
 public:
-  NS_DECL_ISUPPORTS
-
   explicit ScopeCheckingGetCallback(const nsAString& aScope)
     : mScope(aScope)
   {}
@@ -129,8 +127,6 @@ protected:
 
   nsTArray<NotificationStrings> mStrings;
 };
-
-NS_IMPL_ISUPPORTS(ScopeCheckingGetCallback, nsINotificationStorageCallback)
 
 class NotificationStorageCallback final : public ScopeCheckingGetCallback
 {
@@ -199,7 +195,9 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(NotificationStorageCallback)
 NS_IMPL_CYCLE_COLLECTION(NotificationStorageCallback, mWindow, mPromise);
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(NotificationStorageCallback)
-NS_INTERFACE_MAP_END_INHERITING(ScopeCheckingGetCallback)
+  NS_INTERFACE_MAP_ENTRY(nsINotificationStorageCallback)
+  NS_INTERFACE_MAP_ENTRY(nsISupports)
+NS_INTERFACE_MAP_END
 
 class NotificationGetRunnable final : public nsRunnable
 {
@@ -417,6 +415,22 @@ public:
   }
 };
 
+class ReleaseNotificationRunnable final : public NotificationWorkerRunnable
+{
+  Notification* mNotification;
+public:
+  explicit ReleaseNotificationRunnable(Notification* aNotification)
+    : NotificationWorkerRunnable(aNotification->mWorkerPrivate)
+    , mNotification(aNotification)
+  {}
+
+  void
+  WorkerRunInternal(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    mNotification->ReleaseObject();
+  }
+};
+
 // Create one whenever you require ownership of the notification. Use with
 // UniquePtr<>. See Notification.h for details.
 class NotificationRef final {
@@ -460,18 +474,31 @@ public:
   ~NotificationRef()
   {
     if (Initialized() && mNotification) {
-      if (mNotification->mWorkerPrivate && NS_IsMainThread()) {
-        RefPtr<ReleaseNotificationControlRunnable> r =
-          new ReleaseNotificationControlRunnable(mNotification);
-        AutoSafeJSContext cx;
-        if (!r->Dispatch(cx)) {
-          MOZ_CRASH("Will leak worker thread Notification!");
+      Notification* notification = mNotification;
+      mNotification = nullptr;
+      if (notification->mWorkerPrivate && NS_IsMainThread()) {
+        // Try to pass ownership back to the worker. If the dispatch succeeds we
+        // are guaranteed this runnable will run, and that it will run after queued
+        // event runnables, so event runnables will have a safe pointer to the
+        // Notification.
+        //
+        // If the dispatch fails, the worker isn't running anymore and the event
+        // runnables have already run or been canceled. We can use a control
+        // runnable to release the reference.
+        RefPtr<ReleaseNotificationRunnable> r =
+          new ReleaseNotificationRunnable(notification);
+
+        AutoJSAPI jsapi;
+        jsapi.Init();
+        if (!r->Dispatch(jsapi.cx())) {
+          RefPtr<ReleaseNotificationControlRunnable> r =
+            new ReleaseNotificationControlRunnable(notification);
+          MOZ_ALWAYS_TRUE(r->Dispatch(jsapi.cx()));
         }
       } else {
-        mNotification->AssertIsOnTargetThread();
-        mNotification->ReleaseObject();
+        notification->AssertIsOnTargetThread();
+        notification->ReleaseObject();
       }
-      mNotification = nullptr;
     }
   }
 
@@ -718,6 +745,10 @@ Notification::PrefEnabled(JSContext* aCx, JSObject* aObj)
     return false;
   }
 
+  if (workerPrivate->IsServiceWorker()) {
+    return workerPrivate->DOMServiceWorkerNotificationEnabled();
+  }
+
   return workerPrivate->DOMWorkerNotificationEnabled();
 }
 
@@ -761,8 +792,10 @@ Notification::SetAlertName()
   }
 
   nsAutoString alertName;
-  DebugOnly<nsresult> rv = GetOrigin(GetPrincipal(), alertName);
-  MOZ_ASSERT(NS_SUCCEEDED(rv), "GetOrigin should not have failed");
+  nsresult rv = GetOrigin(GetPrincipal(), alertName);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
 
   // Get the notification name that is unique per origin + tag/ID.
   // The name of the alert is of the form origin#tag/ID.
@@ -859,7 +892,9 @@ Notification::PersistNotification()
 
   nsString origin;
   rv = GetOrigin(GetPrincipal(), origin);
-  MOZ_ASSERT(NS_SUCCEEDED(rv));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   nsString id;
   GetID(id);
@@ -1011,43 +1046,9 @@ protected:
 
     MOZ_ASSERT(mNotificationRef);
     Notification* notification = mNotificationRef->GetNotification();
-    if (!notification) {
-      return;
+    if (notification) {
+      notification->mObserver = nullptr;
     }
-
-    // Try to pass ownership back to the worker. If the dispatch succeeds we
-    // are guaranteed this runnable will run, and that it will run after queued
-    // event runnables, so event runnables will have a safe pointer to the
-    // Notification.
-    //
-    // If the dispatch fails, the worker isn't running anymore and the event
-    // runnables have already run. We can just let the standard NotificationRef
-    // release routine take over when ReleaseNotificationRunnable gets deleted.
-    class ReleaseNotificationRunnable final : public NotificationWorkerRunnable
-    {
-      UniquePtr<NotificationRef> mNotificationRef;
-    public:
-      explicit ReleaseNotificationRunnable(UniquePtr<NotificationRef> aRef)
-        : NotificationWorkerRunnable(aRef->GetNotification()->mWorkerPrivate)
-        , mNotificationRef(Move(aRef))
-      {}
-
-      void
-      WorkerRunInternal(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
-      {
-        UniquePtr<NotificationRef> ref;
-        mozilla::Swap(ref, mNotificationRef);
-        // Gets released at the end of the function.
-      }
-    };
-
-    RefPtr<ReleaseNotificationRunnable> r =
-      new ReleaseNotificationRunnable(Move(mNotificationRef));
-    notification = nullptr;
-
-    AutoJSAPI jsapi;
-    jsapi.Init();
-    r->Dispatch(jsapi.cx());
   }
 };
 
@@ -1238,6 +1239,15 @@ MainThreadNotificationObserver::Observe(nsISupports* aSubject, const char* aTopi
       }
     }
   } else if (!strcmp("alertfinished", aTopic)) {
+    // In b2g-desktop, if the app is closed, closing a notification still
+    // triggers the observer which might be alive even though the owner window
+    // was closed. Keeping this until we remove the close event (Bug 1139363)
+    // from implementation.
+    nsCOMPtr<nsPIDOMWindow> window = notification->GetOwner();
+    if (NS_WARN_IF(!window || !window->IsCurrentInnerWindow())) {
+      return NS_ERROR_FAILURE;
+    }
+
     notification->UnpersistNotification();
     notification->mIsClosed = true;
     notification->DispatchTrustedEvent(NS_LITERAL_STRING("close"));
@@ -1607,8 +1617,8 @@ Notification::GetPermission(nsIGlobalObject* aGlobal, ErrorResult& aRv)
     MOZ_ASSERT(worker);
     RefPtr<GetPermissionRunnable> r =
       new GetPermissionRunnable(worker);
-    if (!r->Dispatch(worker->GetJSContext())) {
-      aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
+    r->Dispatch(aRv);
+    if (aRv.Failed()) {
       return NotificationPermission::Denied;
     }
 
@@ -1843,7 +1853,7 @@ class WorkerGetCallback final : public ScopeCheckingGetCallback
 {
   RefPtr<PromiseWorkerProxy> mPromiseProxy;
 public:
-  NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_ISUPPORTS
 
   WorkerGetCallback(PromiseWorkerProxy* aProxy, const nsAString& aScope)
     : ScopeCheckingGetCallback(aScope), mPromiseProxy(aProxy)
@@ -1877,7 +1887,7 @@ private:
   {}
 };
 
-NS_IMPL_ISUPPORTS_INHERITED0(WorkerGetCallback, ScopeCheckingGetCallback)
+NS_IMPL_ISUPPORTS(WorkerGetCallback, nsINotificationStorageCallback)
 
 class WorkerGetRunnable final : public nsRunnable
 {
@@ -2018,7 +2028,10 @@ Notification::CloseInternal()
 nsresult
 Notification::GetOrigin(nsIPrincipal* aPrincipal, nsString& aOrigin)
 {
-  MOZ_ASSERT(aPrincipal);
+  if (!aPrincipal) {
+    return NS_ERROR_FAILURE;
+  }
+
   uint16_t appStatus = aPrincipal->GetAppStatus();
   uint32_t appId = aPrincipal->GetAppId();
 
@@ -2046,7 +2059,8 @@ Notification::GetData(JSContext* aCx,
 {
   if (mData.isNull() && !mDataAsBase64.IsEmpty()) {
     nsresult rv;
-    auto container = new nsStructuredCloneContainer();
+    RefPtr<nsStructuredCloneContainer> container =
+      new nsStructuredCloneContainer();
     rv = container->InitFromBase64(mDataAsBase64, JS_STRUCTURED_CLONE_VERSION,
                                    aCx);
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -2082,7 +2096,8 @@ Notification::InitFromJSVal(JSContext* aCx, JS::Handle<JS::Value> aData,
   if (!mDataAsBase64.IsEmpty() || aData.isNull()) {
     return;
   }
-  auto dataObjectContainer = new nsStructuredCloneContainer();
+  RefPtr<nsStructuredCloneContainer> dataObjectContainer =
+    new nsStructuredCloneContainer();
   aRv = dataObjectContainer->InitFromJSVal(aData, aCx);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
@@ -2099,7 +2114,8 @@ void Notification::InitFromBase64(JSContext* aCx, const nsAString& aData,
   }
 
   // To and fro to ensure it is valid base64.
-  auto container = new nsStructuredCloneContainer();
+  RefPtr<nsStructuredCloneContainer> container =
+    new nsStructuredCloneContainer();
   aRv = container->InitFromBase64(aData, JS_STRUCTURED_CLONE_VERSION,
                                   aCx);
   if (NS_WARN_IF(aRv.Failed())) {
@@ -2156,11 +2172,13 @@ class CloseNotificationRunnable final
   : public WorkerMainThreadRunnable
 {
   Notification* mNotification;
+  bool mHadObserver;
 
   public:
   explicit CloseNotificationRunnable(Notification* aNotification)
     : WorkerMainThreadRunnable(aNotification->mWorkerPrivate)
     , mNotification(aNotification)
+    , mHadObserver(false)
   {}
 
   bool
@@ -2170,26 +2188,59 @@ class CloseNotificationRunnable final
       // The Notify() take's responsibility of releasing the Notification.
       mNotification->mObserver->ForgetNotification();
       mNotification->mObserver = nullptr;
+      mHadObserver = true;
     }
     mNotification->CloseInternal();
     return true;
+  }
+
+  bool
+  HadObserver()
+  {
+    return mHadObserver;
   }
 };
 
 bool
 NotificationFeature::Notify(JSContext* aCx, Status aStatus)
 {
-  MOZ_ASSERT(aStatus >= Canceling);
+  if (aStatus >= Canceling) {
+    // CloseNotificationRunnable blocks the worker by pushing a sync event loop
+    // on the stack. Meanwhile, WorkerControlRunnables dispatched to the worker
+    // can still continue running. One of these is
+    // ReleaseNotificationControlRunnable that releases the notification,
+    // invalidating the notification and this feature. We hold this reference to
+    // keep the notification valid until we are done with it.
+    //
+    // An example of when the control runnable could get dispatched to the
+    // worker is if a Notification is created and the worker is immediately
+    // closed, but there is no permission to show it so that the main thread
+    // immediately drops the NotificationRef. In this case, this function blocks
+    // on the main thread, but the main thread dispatches the control runnable,
+    // invalidating mNotification.
+    RefPtr<Notification> kungFuDeathGrip = mNotification;
 
-  // Dispatched to main thread, blocks on closing the Notification.
-  RefPtr<CloseNotificationRunnable> r =
-    new CloseNotificationRunnable(mNotification);
-  r->Dispatch(aCx);
+    // Dispatched to main thread, blocks on closing the Notification.
+    RefPtr<CloseNotificationRunnable> r =
+      new CloseNotificationRunnable(mNotification);
+    ErrorResult rv;
+    r->Dispatch(rv);
+    // XXXbz I'm told throwing and returning false from here is pointless (and
+    // also that doing sync stuff from here is really weird), so I guess we just
+    // suppress the exception on rv, if any.
+    rv.SuppressException();
 
-  mNotification->ReleaseObject();
-  // From this point we cannot touch properties of this feature because
-  // ReleaseObject() may have led to the notification going away and the
-  // notification owns this feature!
+    // Only call ReleaseObject() to match the observer's NotificationRef
+    // ownership (since CloseNotificationRunnable asked the observer to drop the
+    // reference to the notification).
+    if (r->HadObserver()) {
+      mNotification->ReleaseObject();
+    }
+
+    // From this point we cannot touch properties of this feature because
+    // ReleaseObject() may have led to the notification going away and the
+    // notification owns this feature!
+  }
   return true;
 }
 
@@ -2200,8 +2251,13 @@ Notification::RegisterFeature()
   mWorkerPrivate->AssertIsOnWorkerThread();
   MOZ_ASSERT(!mFeature);
   mFeature = MakeUnique<NotificationFeature>(this);
-  return mWorkerPrivate->AddFeature(mWorkerPrivate->GetJSContext(),
-                                    mFeature.get());
+  bool added = mWorkerPrivate->AddFeature(mWorkerPrivate->GetJSContext(),
+                                          mFeature.get());
+  if (!added) {
+    mFeature = nullptr;
+  }
+
+  return added;
 }
 
 void
@@ -2307,15 +2363,14 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
     worker->AssertIsOnWorkerThread();
     RefPtr<CheckLoadRunnable> loadChecker =
       new CheckLoadRunnable(worker, NS_ConvertUTF16toUTF8(aScope));
-    if (!loadChecker->Dispatch(worker->GetJSContext())) {
-      aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
+    loadChecker->Dispatch(aRv);
+    if (aRv.Failed()) {
       return nullptr;
     }
 
     if (NS_WARN_IF(NS_FAILED(loadChecker->Result()))) {
       if (loadChecker->Result() == NS_ERROR_NOT_AVAILABLE) {
-        nsAutoString scope(aScope);
-        aRv.ThrowTypeError<MSG_NO_ACTIVE_WORKER>(&scope);
+        aRv.ThrowTypeError<MSG_NO_ACTIVE_WORKER>(aScope);
       } else {
         aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
       }
@@ -2374,14 +2429,14 @@ Notification::CreateAndShow(nsIGlobalObject* aGlobal,
   // Make a structured clone of the aOptions.mData object
   JS::Rooted<JS::Value> data(cx, aOptions.mData);
   notification->InitFromJSVal(cx, data, aRv);
-  if (aRv.Failed()) {
+  if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
   notification->SetScope(aScope);
 
   auto ref = MakeUnique<NotificationRef>(notification);
-  if (!ref->Initialized()) {
+  if (NS_WARN_IF(!ref->Initialized())) {
     aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
     return nullptr;
   }

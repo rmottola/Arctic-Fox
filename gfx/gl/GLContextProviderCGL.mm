@@ -15,6 +15,8 @@
 #include "GeckoProfiler.h"
 #include "mozilla/gfx/MacIOSurface.h"
 
+#include <OpenGL/OpenGL.h>
+
 namespace mozilla {
 namespace gl {
 
@@ -112,6 +114,7 @@ GLContextCGL::MakeCurrentImpl(bool aForce)
 
     if (mContext) {
         [mContext makeCurrentContext];
+        MOZ_ASSERT(IsCurrent());
         // Use non-blocking swap in "ASAP mode".
         // ASAP mode means that rendering is iterated as fast as possible.
         // ASAP mode is entered when layout.frame_rate=0 (requires restart).
@@ -298,6 +301,9 @@ CreateOffscreenFBOContext(CreateContextFlags flags)
     RefPtr<GLContextCGL> glContext = new GLContextCGL(dummyCaps, context,
                                                         true, profile);
 
+    if (gfxPrefs::GLMultithreaded()) {
+        CGLEnable(glContext->GetCGLContext(), kCGLCEMPEngine);
+    }
     return glContext.forget();
 }
 

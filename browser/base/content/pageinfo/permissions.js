@@ -3,8 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 Components.utils.import("resource:///modules/SitePermissions.jsm");
+Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
 
-const nsIQuotaManager = Components.interfaces.nsIQuotaManager;
+const nsIQuotaManagerService = Components.interfaces.nsIQuotaManagerService;
 
 var gPermURI;
 var gUsageRequest;
@@ -185,13 +186,15 @@ function initIndexedDBRow()
 
   row.appendChild(extras);
 
-  var quotaManager = Components.classes["@mozilla.org/dom/quota/manager;1"]
-                               .getService(nsIQuotaManager);
+  var quotaManagerService =
+    Components.classes["@mozilla.org/dom/quota-manager-service;1"]
+              .getService(nsIQuotaManagerService);
   let principal = Components.classes["@mozilla.org/scriptsecuritymanager;1"]
                             .getService(Components.interfaces.nsIScriptSecurityManager)
                             .createCodebasePrincipal(gPermURI, {});
   gUsageRequest =
-    quotaManager.getUsageForPrincipal(principal, onIndexedDBUsageCallback);
+    quotaManagerService.getUsageForPrincipal(principal,
+                                             onIndexedDBUsageCallback);
 
   var status = document.getElementById("indexedDBStatus");
   var button = document.getElementById("indexedDBClear");
@@ -207,8 +210,8 @@ function onIndexedDBClear()
                             .getService(Components.interfaces.nsIScriptSecurityManager)
                             .createCodebasePrincipal(gPermURI, {});
 
-  Components.classes["@mozilla.org/dom/quota/manager;1"]
-            .getService(nsIQuotaManager)
+  Components.classes["@mozilla.org/dom/quota-manager-service;1"]
+            .getService(nsIQuotaManagerService)
             .clearStoragesForPrincipal(principal);
 
   Components.classes["@mozilla.org/serviceworkers/manager;1"]
@@ -219,14 +222,14 @@ function onIndexedDBClear()
   initIndexedDBRow();
 }
 
-function onIndexedDBUsageCallback(principal, usage, fileUsage)
+function onIndexedDBUsageCallback(request)
 {
-  let uri = principal.URI;
+  let uri = request.principal.URI;
   if (!uri.equals(gPermURI)) {
     throw new Error("Callback received for bad URI: " + uri);
   }
 
-  if (usage) {
+  if (request.usage) {
     if (!("DownloadUtils" in window)) {
       Components.utils.import("resource://gre/modules/DownloadUtils.jsm");
     }
@@ -236,24 +239,10 @@ function onIndexedDBUsageCallback(principal, usage, fileUsage)
 
     status.value =
       gBundle.getFormattedString("indexedDBUsage",
-                                 DownloadUtils.convertByteUnits(usage));
+                                 DownloadUtils.convertByteUnits(request.usage));
     status.removeAttribute("hidden");
     button.removeAttribute("hidden");
   }
-}
-
-// XXX copied this from browser-plugins.js - is there a way to share?
-function makeNicePluginName(aName) {
-  if (aName == "Shockwave Flash")
-    return "Adobe Flash";
-
-  // Clean up the plugin name by stripping off any trailing version numbers
-  // or "plugin". EG, "Foo Bar Plugin 1.23_02" --> "Foo Bar"
-  // Do this by first stripping the numbers, etc. off the end, and then
-  // removing "Plugin" (and then trimming to get rid of any whitespace).
-  // (Otherwise, something like "Java(TM) Plug-in 1.7.0_07" gets mangled)
-  let newName = aName.replace(/[\s\d\.\-\_\(\)]+$/, "").replace(/\bplug-?in\b/i, "").trim();
-  return newName;
 }
 
 function fillInPluginPermissionTemplate(aPermissionString, aPluginObject) {
@@ -302,7 +291,7 @@ function initPluginsRow() {
     for (let mimeType of plugin.getMimeTypes()) {
       let permString = pluginHost.getPermissionStringForType(mimeType);
       if (!permissionMap.has(permString)) {
-        var name = makeNicePluginName(plugin.name);
+        let name = BrowserUtils.makeNicePluginName(plugin.name);
         if (permString.startsWith("plugin-vulnerable:")) {
           name += " \u2014 " + vulnerableLabel;
         }

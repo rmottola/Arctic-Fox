@@ -15,6 +15,7 @@
 #include "mozilla/StyleAnimationValue.h" // for StyleAnimationValue, etc
 #include "mozilla/WidgetUtils.h"        // for ComputeTransformForRotation
 #include "mozilla/dom/KeyframeEffect.h" // for KeyframeEffectReadOnly
+#include "mozilla/dom/AnimationEffectReadOnlyBinding.h" // for dom::FillMode
 #include "mozilla/gfx/BaseRect.h"       // for BaseRect
 #include "mozilla/gfx/Point.h"          // for RoundedToInt, PointTyped
 #include "mozilla/gfx/Rect.h"           // for RoundedToInt, RectTyped
@@ -503,7 +504,7 @@ AsyncCompositionManager::AlignFixedAndStickyLayers(Layer* aLayer,
 
 static void
 SampleValue(float aPortion, Animation& aAnimation, StyleAnimationValue& aStart,
-            StyleAnimationValue& aEnd, Animatable* aValue)
+            StyleAnimationValue& aEnd, Animatable* aValue, Layer* aLayer)
 {
   StyleAnimationValue interpolatedValue;
   NS_ASSERTION(aStart.GetUnit() == aEnd.GetUnit() ||
@@ -524,21 +525,21 @@ SampleValue(float aPortion, Animation& aAnimation, StyleAnimationValue& aStart,
   nsPoint origin = data.origin();
   // we expect all our transform data to arrive in device pixels
   Point3D transformOrigin = data.transformOrigin();
-  Point3D perspectiveOrigin = data.perspectiveOrigin();
   nsDisplayTransform::FrameTransformProperties props(interpolatedList,
-                                                     transformOrigin,
-                                                     perspectiveOrigin,
-                                                     data.perspective());
+                                                     transformOrigin);
+
+  // If our parent layer is a perspective layer, then the offset into reference
+  // frame coordinates is already on that layer. If not, then we need to ask
+  // for it to be added here.
+  uint32_t flags = 0;
+  if (!aLayer->GetParent() || !aLayer->GetParent()->GetTransformIsPerspective()) {
+    flags = nsDisplayTransform::OFFSET_BY_ORIGIN;
+  }
+
   Matrix4x4 transform =
     nsDisplayTransform::GetResultingTransformMatrix(props, origin,
                                                     data.appUnitsPerDevPixel(),
-                                                    &data.bounds());
-  Point3D scaledOrigin =
-    Point3D(NS_round(NSAppUnitsToFloatPixels(origin.x, data.appUnitsPerDevPixel())),
-            NS_round(NSAppUnitsToFloatPixels(origin.y, data.appUnitsPerDevPixel())),
-            0.0f);
-
-  transform.PreTranslate(scaledOrigin);
+                                                    flags, &data.bounds());
 
   InfallibleTArray<TransformFunction> functions;
   functions.AppendElement(TransformMatrix(transform));
@@ -583,12 +584,12 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
     // into their start time, hence the delay is effectively zero.
     timing.mDelay = TimeDuration(0);
     timing.mIterationCount = animation.iterationCount();
-    timing.mDirection = animation.direction();
+    timing.mDirection = static_cast<dom::PlaybackDirection>(animation.direction());
     // Animations typically only run on the compositor during their active
     // interval but if we end up sampling them outside that range (for
     // example, while they are waiting to be removed) we currently just
     // assume that we should fill.
-    timing.mFillMode = NS_STYLE_ANIMATION_FILL_MODE_BOTH;
+    timing.mFillMode = dom::FillMode::Both;
 
     ComputedTiming computedTiming =
       dom::KeyframeEffectReadOnly::GetComputedTimingAt(
@@ -616,7 +617,7 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
     // interpolate the property
     Animatable interpolatedValue;
     SampleValue(portion, animation, animData.mStartValues[segmentIndex],
-                animData.mEndValues[segmentIndex], &interpolatedValue);
+                animData.mEndValues[segmentIndex], &interpolatedValue, aLayer);
     LayerComposite* layerComposite = aLayer->AsLayerComposite();
     switch (animation.property()) {
     case eCSSProperty_opacity:
@@ -657,6 +658,7 @@ SampleAPZAnimations(const LayerMetricsWrapper& aLayer, TimeStamp aSampleTime)
   }
 
   if (AsyncPanZoomController* apzc = aLayer.GetApzc()) {
+    apzc->ReportCheckerboard(aSampleTime);
     activeAnimations |= apzc->AdvanceAnimations(aSampleTime);
   }
 
@@ -769,15 +771,32 @@ MoveScrollbarForLayerMargin(Layer* aRoot, FrameMetrics::ViewID aRootScrollId,
 }
 #endif
 
+template <typename Units>
+Maybe<IntRectTyped<Units>>
+IntersectMaybeRects(const Maybe<IntRectTyped<Units>>& a,
+                    const Maybe<IntRectTyped<Units>>& b)
+{
+  if (!a) {
+    return b;
+  } else if (!b) {
+    return a;
+  } else {
+    return Some(a->Intersect(*b));
+  }
+}
+
 bool
 AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer,
-                                                          bool* aOutFoundRoot)
+                                                          bool* aOutFoundRoot,
+                                                          Maybe<ParentLayerIntRect>& aClipDeferredToParent)
 {
+  Maybe<ParentLayerIntRect> clipDeferredFromChildren;
   bool appliedTransform = false;
   for (Layer* child = aLayer->GetFirstChild();
       child; child = child->GetNextSibling()) {
     appliedTransform |=
-      ApplyAsyncContentTransformToTree(child, aOutFoundRoot);
+      ApplyAsyncContentTransformToTree(child, aOutFoundRoot,
+          clipDeferredFromChildren);
   }
 
   Matrix4x4 oldTransform = aLayer->GetTransform();
@@ -884,10 +903,15 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer,
     // move with this APZC.
     if (metrics.HasClipRect()) {
       ParentLayerIntRect clip = metrics.ClipRect();
-      if (asyncClip) {
-        asyncClip = Some(clip.Intersect(*asyncClip));
+      if (aLayer->GetParent() && aLayer->GetParent()->GetTransformIsPerspective()) {
+        // If our parent layer has a perspective transform, we want to apply
+        // our scroll clip to it instead of to this layer (see bug 1168263).
+        // A layer with a perspective transform shouldn't have multiple
+        // children with FrameMetrics, nor a child with multiple FrameMetrics.
+        MOZ_ASSERT(!aClipDeferredToParent);
+        aClipDeferredToParent = Some(clip);
       } else {
-        asyncClip = Some(clip);
+        asyncClip = IntersectMaybeRects(Some(clip), asyncClip);
       }
     }
 
@@ -924,11 +948,12 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer,
                               transformWithoutOverscrollOrOmta, fixedLayerMargins);
   }
 
-  if (hasAsyncTransform) {
-    if (asyncClip) {
-      aLayer->AsLayerComposite()->SetShadowClipRect(asyncClip);
-    }
+  if (hasAsyncTransform || clipDeferredFromChildren) {
+    aLayer->AsLayerComposite()->SetShadowClipRect(
+        IntersectMaybeRects(asyncClip, clipDeferredFromChildren));
+  }
 
+  if (hasAsyncTransform) {
     // Apply the APZ transform on top of GetLocalTransform() here (rather than
     // GetTransform()) in case the OMTA code in SampleAnimations already set a
     // shadow transform; in that case we want to apply ours on top of that one
@@ -1346,7 +1371,8 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame,
     // in Gecko and partially in Java.
     wantNextFrame |= SampleAPZAnimations(LayerMetricsWrapper(root), aCurrentFrame);
     bool foundRoot = false;
-    if (ApplyAsyncContentTransformToTree(root, &foundRoot)) {
+    Maybe<ParentLayerIntRect> clipDeferredFromChildren;
+    if (ApplyAsyncContentTransformToTree(root, &foundRoot, clipDeferredFromChildren)) {
 #if defined(MOZ_ANDROID_APZ)
       MOZ_ASSERT(foundRoot);
       if (foundRoot && mFixedLayerMargins != ScreenMargin()) {

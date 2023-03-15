@@ -23,38 +23,6 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     MacroAssembler& asMasm();
     const MacroAssembler& asMasm() const;
 
-  private:
-    struct Double {
-        double value;
-        AbsoluteLabel uses;
-        Double(double value) : value(value) {}
-    };
-    Vector<Double, 0, SystemAllocPolicy> doubles_;
-    struct Float {
-        float value;
-        AbsoluteLabel uses;
-        Float(float value) : value(value) {}
-    };
-    Vector<Float, 0, SystemAllocPolicy> floats_;
-    struct SimdData {
-        SimdConstant value;
-        AbsoluteLabel uses;
-        SimdData(const SimdConstant& v) : value(v) {}
-        SimdConstant::Type type() { return value.type(); }
-    };
-    Vector<SimdData, 0, SystemAllocPolicy> simds_;
-
-    typedef HashMap<double, size_t, DefaultHasher<double>, SystemAllocPolicy> DoubleMap;
-    DoubleMap doubleMap_;
-    typedef HashMap<float, size_t, DefaultHasher<float>, SystemAllocPolicy> FloatMap;
-    FloatMap floatMap_;
-    typedef HashMap<SimdConstant, size_t, SimdConstant, SystemAllocPolicy> SimdMap;
-    SimdMap simdMap_;
-
-    Double* getDouble(double d);
-    Float* getFloat(float f);
-    SimdData* getSimdData(const SimdConstant& v);
-
   protected:
     MoveResolver moveResolver_;
 
@@ -64,8 +32,7 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         // first push.
         if (address.base == StackPointer)
             return Operand(address.base, address.offset + 4);
-        else 
-            return payloadOf(address);
+        return payloadOf(address);
     }
     Operand payloadOf(const Address& address) {
         return Operand(address.base, address.offset);
@@ -353,6 +320,11 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     Condition testError(Condition cond, Register tag) {
         return testMagic(cond, tag);
     }
+    Condition testBoolean(Condition cond, const Address& address) {
+        MOZ_ASSERT(cond == Equal || cond == NotEqual);
+        cmp32(Operand(ToType(address)), ImmTag(JSVAL_TAG_BOOLEAN));
+        return cond;
+    }
     Condition testInt32(Condition cond, const Operand& operand) {
         MOZ_ASSERT(cond == Equal || cond == NotEqual);
         cmp32(ToType(operand), ImmTag(JSVAL_TAG_INT32));
@@ -620,16 +592,16 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         adcl(Imm32(0), dest.high);
     }
     void subPtr(Imm32 imm, Register dest) {
-        sub32(imm, dest);
+        subl(imm, dest);
     }
     void subPtr(Register src, Register dest) {
-        sub32(src, dest);
+        subl(src, dest);
     }
     void subPtr(const Address& addr, Register dest) {
-        sub32(Operand(addr), dest);
+        subl(Operand(addr), dest);
     }
     void subPtr(Register src, const Address& dest) {
-        sub32(src, Operand(dest));
+        subl(src, Operand(dest));
     }
     void mulBy3(const Register& src, const Register& dest) {
         lea(Operand(src, src, TimesTwo), dest);

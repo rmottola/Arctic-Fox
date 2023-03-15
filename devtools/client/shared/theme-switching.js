@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 (function() {
-  const DEVTOOLS_SKIN_URL = "chrome://devtools/skin/themes/";
+  const DEVTOOLS_SKIN_URL = "chrome://devtools/skin/";
   let documentElement = document.documentElement;
 
   function forceStyle() {
@@ -106,6 +106,17 @@
   Cu.import("resource://devtools/client/framework/gDevTools.jsm");
   const {require} = Components.utils.import("resource://devtools/shared/Loader.jsm", {});
   const StylesheetUtils = require("sdk/stylesheet/utils");
+
+  let os;
+  let platform = navigator.platform;
+  if (platform.startsWith("Win")) {
+    os = "win";
+  } else if (platform.startsWith("Mac")) {
+    os = "mac";
+  } else {
+    os = "linux";
+  }
+  documentElement.setAttribute("platform", os);
 
   if (documentElement.hasAttribute("force-theme")) {
     switchTheme(documentElement.getAttribute("force-theme"));

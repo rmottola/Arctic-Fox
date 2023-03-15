@@ -4,6 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('apz/**'):
+    BUG_COMPONENT = ('Core', 'Panning and Zooming')
+
 EXPORTS += [
     'basic/BasicCanvasLayer.h',
     'basic/BasicImplData.h',
@@ -226,11 +229,12 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
         'opengl/GrallocTextureHost.cpp',
     ]
     LOCAL_INCLUDES += ['/widget/gonk']
-    CXXFLAGS += [
-         '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
-             'system/core/libsync/include'
-         ]
-    ]
+    if CONFIG['ANDROID_VERSION'] >= '21':
+        LOCAL_INCLUDES += [
+             '%' + '%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
+                 'system/core/libsync/include'
+             ]
+        ]
     SOURCES += [
         'ipc/ShadowLayerUtilsGralloc.cpp',
     ]
@@ -402,14 +406,21 @@ if CONFIG['MOZ_DEBUG']:
 if CONFIG['MOZ_ENABLE_D3D10_LAYER']:
     DEFINES['MOZ_ENABLE_D3D10_LAYER'] = True
 
-CXXFLAGS += [
-    '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
-        'frameworks/base/include/media/stagefright',
-        'frameworks/base/include/media/stagefright/openmax',
-        'frameworks/av/include/media/stagefright',
-        'frameworks/native/include/media/openmax',
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    if CONFIG['ANDROID_VERSION'] > '17':
+        includes = [
+            'frameworks/av/include/media/stagefright',
+            'frameworks/native/include/media/openmax',
+        ]
+    else:
+        includes = [
+            'frameworks/base/include/media/stagefright',
+            'frameworks/base/include/media/stagefright/openmax',
+        ]
+
+    LOCAL_INCLUDES += [
+        '%' + '%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in includes
     ]
-]
 
 if CONFIG['ENABLE_TESTS']:
     DIRS += ['apz/test/gtest']

@@ -400,7 +400,8 @@ function setFaviconForHref(href, iconHref) {
       NetUtil.newURI(iconHref),
       true,
       PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE,
-      resolve
+      resolve,
+      Services.scriptSecurityManager.getSystemPrincipal()
     );
   });
 }

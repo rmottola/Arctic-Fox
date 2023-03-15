@@ -11,6 +11,7 @@
 #include "jsobj.h"
 #include "jsweakmap.h"
 
+#include "builtin/ModuleObject.h"
 #include "gc/Barrier.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/ProxyObject.h"
@@ -874,6 +875,8 @@ class StaticBlockObject : public BlockObject
 
 class ClonedBlockObject : public BlockObject
 {
+    static const unsigned THIS_VALUE_SLOT = 1;
+
     static ClonedBlockObject* create(JSContext* cx, Handle<StaticBlockObject*> block,
                                      HandleObject enclosing);
 
@@ -929,7 +932,7 @@ class ClonedBlockObject : public BlockObject
      */
     static ClonedBlockObject* clone(JSContext* cx, Handle<ClonedBlockObject*> block);
 
-    Value thisValue();
+    Value thisValue() const;
 };
 
 // Internal scope object used by JSOP_BINDNAME upon encountering an
@@ -1181,6 +1184,10 @@ class DebugScopeObject : public ProxyObject
     // on exceptional cases.
     bool getMaybeSentinelValue(JSContext* cx, HandleId id, MutableHandleValue vp);
 
+    // Returns true iff this is a function scope with its own this-binding
+    // (all functions except arrow functions and generator expression lambdas).
+    bool isFunctionScopeWithThis();
+
     // Does this debug scope not have a dynamic counterpart or was never live
     // (and thus does not have a synthesized ScopeObject or a snapshot)?
     bool isOptimizedOut() const;
@@ -1258,9 +1265,6 @@ class DebugScopes
     static void onCompartmentUnsetIsDebuggee(JSCompartment* c);
 };
 
-extern bool
-IsDebugScopeSlow(ProxyObject* proxy);
-
 }  /* namespace js */
 
 template<>
@@ -1292,13 +1296,8 @@ JSObject::is<js::ScopeObject>() const
 }
 
 template<>
-inline bool
-JSObject::is<js::DebugScopeObject>() const
-{
-    // Note: don't use is<ProxyObject>() here -- it also matches subclasses!
-    return hasClass(&js::ProxyObject::class_) &&
-           IsDebugScopeSlow(&const_cast<JSObject*>(this)->as<js::ProxyObject>());
-}
+bool
+JSObject::is<js::DebugScopeObject>() const;
 
 template<>
 inline bool
@@ -1452,6 +1451,9 @@ bool HasNonSyntacticStaticScopeChain(JSObject* staticScope);
 uint32_t StaticScopeChainLength(JSObject* staticScope);
 
 ModuleEnvironmentObject* GetModuleEnvironmentForScript(JSScript* script);
+
+bool GetThisValueForDebuggerMaybeOptimizedOut(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc,
+                                              MutableHandleValue res);
 
 bool CheckVarNameConflict(JSContext* cx, Handle<ClonedBlockObject*> lexicalScope,
                           HandlePropertyName name);

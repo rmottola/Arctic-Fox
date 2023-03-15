@@ -18,7 +18,6 @@
 #include "jsopcode.h"
 #include "jstypes.h"
 
-#include "builtin/ModuleObject.h"
 #include "gc/Barrier.h"
 #include "gc/Rooting.h"
 #include "jit/IonCode.h"
@@ -47,6 +46,7 @@ class BreakpointSite;
 class BindingIter;
 class Debugger;
 class LazyScript;
+class ModuleObject;
 class NestedScopeObject;
 class RegExpObject;
 struct SourceCompressionTask;
@@ -333,8 +333,9 @@ class Bindings : public JS::Traceable
     /* Return the initial shape of call objects created for this scope. */
     Shape* callObjShape() const { return callObjShape_; }
 
-    /* Convenience method to get the var index of 'arguments'. */
+    /* Convenience method to get the var index of 'arguments' or 'this'. */
     static BindingIter argumentsBinding(ExclusiveContext* cx, HandleScript script);
+    static BindingIter thisBinding(ExclusiveContext* cx, HandleScript script);
 
     /* Return whether the binding at bindingIndex is aliased. */
     bool bindingIsAliased(uint32_t bindingIndex);
@@ -1161,6 +1162,7 @@ class JSScript : public js::gc::TenuredCell
     bool argsHasVarBinding_:1;
     bool needsArgsAnalysis_:1;
     bool needsArgsObj_:1;
+    bool functionHasThisBinding_:1;
 
     // Whether the arguments object for this script, if it needs one, should be
     // mapped (alias formal parameters).
@@ -1487,6 +1489,10 @@ class JSScript : public js::gc::TenuredCell
 
     bool hasMappedArgsObj() const {
         return hasMappedArgsObj_;
+    }
+
+    bool functionHasThisBinding() const {
+        return functionHasThisBinding_;
     }
 
     /*

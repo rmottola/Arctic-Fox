@@ -591,7 +591,9 @@ public:
 
     AutoJSAPI jsapi;
     jsapi.Init();
-    runnable->Dispatch(jsapi.cx());
+    if (!runnable->Dispatch(jsapi.cx())) {
+      NS_WARNING("Failed to dispatch SkipWaitingResultRunnable to the worker.");
+    }
     return NS_OK;
   }
 };
@@ -632,6 +634,15 @@ ServiceWorkerGlobalScope::InterceptionEnabled(JSContext* aCx, JSObject* aObj)
   MOZ_ASSERT(worker);
   worker->AssertIsOnWorkerThread();
   return worker->InterceptionEnabled();
+}
+
+bool
+ServiceWorkerGlobalScope::OpenWindowEnabled(JSContext* aCx, JSObject* aObj)
+{
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  MOZ_ASSERT(worker);
+  worker->AssertIsOnWorkerThread();
+  return worker->OpenWindowEnabled();
 }
 
 WorkerDebuggerGlobalScope::WorkerDebuggerGlobalScope(

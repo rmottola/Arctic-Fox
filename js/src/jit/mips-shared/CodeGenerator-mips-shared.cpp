@@ -111,10 +111,21 @@ CodeGeneratorMIPSShared::visitTestIAndBranch(LTestIAndBranch* test)
 void
 CodeGeneratorMIPSShared::visitCompare(LCompare* comp)
 {
-    Assembler::Condition cond = JSOpToCondition(comp->mir()->compareType(), comp->jsop());
+    MCompare* mir = comp->mir();
+    Assembler::Condition cond = JSOpToCondition(mir->compareType(), comp->jsop());
     const LAllocation* left = comp->getOperand(0);
     const LAllocation* right = comp->getOperand(1);
     const LDefinition* def = comp->getDef(0);
+
+#ifdef JS_CODEGEN_MIPS64
+    if (mir->compareType() == MCompare::Compare_Object) {
+        if (right->isGeneralReg())
+            masm.cmpPtrSet(cond, ToRegister(left), ToRegister(right), ToRegister(def));
+        else
+            masm.cmpPtrSet(cond, ToRegister(left), ToAddress(right), ToRegister(def));
+        return;
+    }
+#endif
 
     if (right->isConstant())
         masm.cmp32Set(cond, ToRegister(left), Imm32(ToInt32(right)), ToRegister(def));
@@ -127,7 +138,23 @@ CodeGeneratorMIPSShared::visitCompare(LCompare* comp)
 void
 CodeGeneratorMIPSShared::visitCompareAndBranch(LCompareAndBranch* comp)
 {
-    Assembler::Condition cond = JSOpToCondition(comp->cmpMir()->compareType(), comp->jsop());
+    MCompare* mir = comp->cmpMir();
+    Assembler::Condition cond = JSOpToCondition(mir->compareType(), comp->jsop());
+
+#ifdef JS_CODEGEN_MIPS64
+    if (mir->compareType() == MCompare::Compare_Object) {
+        if (comp->right()->isGeneralReg()) {
+            emitBranch(ToRegister(comp->left()), ToRegister(comp->right()), cond,
+                       comp->ifTrue(), comp->ifFalse());
+        } else {
+            masm.loadPtr(ToAddress(comp->right()), ScratchRegister);
+            emitBranch(ToRegister(comp->left()), ScratchRegister, cond,
+                       comp->ifTrue(), comp->ifFalse());
+        }
+        return;
+    }
+#endif
+
     if (comp->right()->isConstant()) {
         emitBranch(ToRegister(comp->left()), Imm32(ToInt32(comp->right())), cond,
                    comp->ifTrue(), comp->ifFalse());
@@ -162,7 +189,7 @@ CodeGeneratorMIPSShared::generateOutOfLineCode()
         masm.branch(handler);
     }
 
-    return true;
+    return !masm.oom();
 }
 
 void
@@ -1084,9 +1111,9 @@ CodeGeneratorMIPSShared::visitCeilF(LCeilF* lir)
     Label performCeil, done;
 
     // If x < -1 or x > 0 then perform ceil.
-    masm.loadConstantFloat32(0, scratch);
+    masm.loadConstantFloat32(0.0f, scratch);
     masm.branchFloat(Assembler::DoubleGreaterThan, input, scratch, &performCeil);
-    masm.loadConstantFloat32(-1, scratch);
+    masm.loadConstantFloat32(-1.0f, scratch);
     masm.branchFloat(Assembler::DoubleLessThanOrEqual, input, scratch, &performCeil);
 
     // If binary value is not zero, the input was not 0, so we bail.
@@ -1497,8 +1524,14 @@ CodeGeneratorMIPSShared::visitMemoryBarrier(LMemoryBarrier* ins)
 void
 CodeGeneratorMIPSShared::memoryBarrier(MemoryBarrierBits barrier)
 {
-    if (barrier)
-      masm.as_sync();
+    if (barrier == MembarLoadLoad)
+        masm.as_sync(19);
+    else if (barrier == MembarStoreStore)
+        masm.as_sync(4);
+    else if (barrier & MembarSynchronizing)
+        masm.as_sync();
+    else if (barrier)
+        masm.as_sync(16);
 }
 
 void
@@ -1727,13 +1760,132 @@ CodeGeneratorMIPSShared::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
 void
 CodeGeneratorMIPSShared::visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins)
 {
-    MOZ_CRASH("NYI");
+    MAsmJSCompareExchangeHeap* mir = ins->mir();
+    Scalar::Type vt = mir->accessType();
+    const LAllocation* ptr = ins->ptr();
+    Register ptrReg = ToRegister(ptr);
+    BaseIndex srcAddr(HeapReg, ptrReg, TimesOne);
+    MOZ_ASSERT(ins->addrTemp()->isBogusTemp());
+
+    Register oldval = ToRegister(ins->oldValue());
+    Register newval = ToRegister(ins->newValue());
+    Register valueTemp = ToRegister(ins->valueTemp());
+    Register offsetTemp = ToRegister(ins->offsetTemp());
+    Register maskTemp = ToRegister(ins->maskTemp());
+
+    uint32_t maybeCmpOffset = 0;
+    if (mir->needsBoundsCheck()) {
+        BufferOffset bo = masm.ma_BoundsCheck(ScratchRegister);
+        maybeCmpOffset = bo.getOffset();
+        masm.ma_b(ptrReg, ScratchRegister, gen->outOfBoundsLabel(), Assembler::AboveOrEqual);
+    }
+    masm.compareExchangeToTypedIntArray(vt == Scalar::Uint32 ? Scalar::Int32 : vt,
+                                        srcAddr, oldval, newval, InvalidReg,
+                                        valueTemp, offsetTemp, maskTemp,
+                                        ToAnyRegister(ins->output()));
+    if (mir->needsBoundsCheck())
+        masm.append(AsmJSHeapAccess(maybeCmpOffset));
+}
+
+void
+CodeGeneratorMIPSShared::visitAsmJSAtomicExchangeHeap(LAsmJSAtomicExchangeHeap* ins)
+{
+    MAsmJSAtomicExchangeHeap* mir = ins->mir();
+    Scalar::Type vt = mir->accessType();
+    Register ptrReg = ToRegister(ins->ptr());
+    Register value = ToRegister(ins->value());
+    BaseIndex srcAddr(HeapReg, ptrReg, TimesOne);
+    MOZ_ASSERT(ins->addrTemp()->isBogusTemp());
+
+    Register valueTemp = ToRegister(ins->valueTemp());
+    Register offsetTemp = ToRegister(ins->offsetTemp());
+    Register maskTemp = ToRegister(ins->maskTemp());
+
+    uint32_t maybeCmpOffset = 0;
+    if (mir->needsBoundsCheck()) {
+        BufferOffset bo = masm.ma_BoundsCheck(ScratchRegister);
+        maybeCmpOffset = bo.getOffset();
+        masm.ma_b(ptrReg, ScratchRegister, gen->outOfBoundsLabel(), Assembler::AboveOrEqual);
+    }
+    masm.atomicExchangeToTypedIntArray(vt == Scalar::Uint32 ? Scalar::Int32 : vt,
+                                       srcAddr, value, InvalidReg, valueTemp,
+                                       offsetTemp, maskTemp, ToAnyRegister(ins->output()));
+    if (mir->needsBoundsCheck())
+        masm.append(AsmJSHeapAccess(maybeCmpOffset));
 }
 
 void
 CodeGeneratorMIPSShared::visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins)
 {
-    MOZ_CRASH("NYI");
+    MOZ_ASSERT(ins->mir()->hasUses());
+    MOZ_ASSERT(ins->addrTemp()->isBogusTemp());
+
+    MAsmJSAtomicBinopHeap* mir = ins->mir();
+    Scalar::Type vt = mir->accessType();
+    Register ptrReg = ToRegister(ins->ptr());
+    Register flagTemp = ToRegister(ins->flagTemp());
+    Register valueTemp = ToRegister(ins->valueTemp());
+    Register offsetTemp = ToRegister(ins->offsetTemp());
+    Register maskTemp = ToRegister(ins->maskTemp());
+    const LAllocation* value = ins->value();
+    AtomicOp op = mir->operation();
+
+    BaseIndex srcAddr(HeapReg, ptrReg, TimesOne);
+
+    uint32_t maybeCmpOffset = 0;
+    if (mir->needsBoundsCheck()) {
+        BufferOffset bo = masm.ma_BoundsCheck(ScratchRegister);
+        maybeCmpOffset = bo.getOffset();
+        masm.ma_b(ptrReg, ScratchRegister, gen->outOfBoundsLabel(), Assembler::AboveOrEqual);
+    }
+    if (value->isConstant())
+        atomicBinopToTypedIntArray(op, vt == Scalar::Uint32 ? Scalar::Int32 : vt,
+                                   Imm32(ToInt32(value)), srcAddr, flagTemp, InvalidReg,
+                                   valueTemp, offsetTemp, maskTemp,
+                                   ToAnyRegister(ins->output()));
+    else
+        atomicBinopToTypedIntArray(op, vt == Scalar::Uint32 ? Scalar::Int32 : vt,
+                                   ToRegister(value), srcAddr, flagTemp, InvalidReg,
+                                   valueTemp, offsetTemp, maskTemp,
+                                   ToAnyRegister(ins->output()));
+    if (mir->needsBoundsCheck())
+        masm.append(AsmJSHeapAccess(maybeCmpOffset));
+}
+
+void
+CodeGeneratorMIPSShared::visitAsmJSAtomicBinopHeapForEffect(LAsmJSAtomicBinopHeapForEffect* ins)
+{
+    MOZ_ASSERT(!ins->mir()->hasUses());
+    MOZ_ASSERT(ins->addrTemp()->isBogusTemp());
+
+    MAsmJSAtomicBinopHeap* mir = ins->mir();
+    Scalar::Type vt = mir->accessType();
+    Register ptrReg = ToRegister(ins->ptr());
+    Register flagTemp = ToRegister(ins->flagTemp());
+    Register valueTemp = ToRegister(ins->valueTemp());
+    Register offsetTemp = ToRegister(ins->offsetTemp());
+    Register maskTemp = ToRegister(ins->maskTemp());
+    const LAllocation* value = ins->value();
+    AtomicOp op = mir->operation();
+
+    BaseIndex srcAddr(HeapReg, ptrReg, TimesOne);
+
+    uint32_t maybeCmpOffset = 0;
+    if (mir->needsBoundsCheck()) {
+        BufferOffset bo = masm.ma_BoundsCheck(ScratchRegister);
+        maybeCmpOffset = bo.getOffset();
+        masm.ma_b(ptrReg, ScratchRegister, gen->outOfBoundsLabel(), Assembler::AboveOrEqual);
+    }
+
+    if (value->isConstant())
+        atomicBinopToTypedIntArray(op, vt, Imm32(ToInt32(value)), srcAddr, flagTemp,
+                                   valueTemp, offsetTemp, maskTemp);
+    else
+        atomicBinopToTypedIntArray(op, vt, ToRegister(value), srcAddr, flagTemp,
+                                   valueTemp, offsetTemp, maskTemp);
+
+    if (mir->needsBoundsCheck())
+        masm.append(AsmJSHeapAccess(maybeCmpOffset));
 }
 
 void
@@ -1877,4 +2029,416 @@ CodeGeneratorMIPSShared::visitNegF(LNegF* ins)
     FloatRegister output = ToFloatRegister(ins->output());
 
     masm.as_negs(output, input);
+}
+
+template<typename S, typename T>
+void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const S& value, const T& mem, Register flagTemp,
+                                                    Register outTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp,
+                                                    AnyRegister output)
+{
+    MOZ_ASSERT(flagTemp != InvalidReg);
+    MOZ_ASSERT_IF(arrayType == Scalar::Uint32, outTemp != InvalidReg);
+
+    // Uint8Clamped is explicitly not supported here
+    switch (arrayType) {
+      case Scalar::Int8:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd8SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub8SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd8SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr8SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor8SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Uint8:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd8ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub8ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd8ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr8ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor8ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Int16:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd16SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub16SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd16SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr16SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor16SignExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Uint16:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd16ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub16ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd16ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr16ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor16ZeroExtend(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Int32:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, output.gpr());
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Uint32:
+        // At the moment, the code in MCallOptimize.cpp requires the output
+        // type to be double for uint32 arrays.  See bug 1077305.
+        MOZ_ASSERT(output.isFloat());
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicFetchAdd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, outTemp);
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicFetchSub32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, outTemp);
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicFetchAnd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, outTemp);
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicFetchOr32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, outTemp);
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicFetchXor32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp, outTemp);
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        masm.convertUInt32ToDouble(outTemp, output.fpu());
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Imm32& value, const Address& mem,
+                                                    Register flagTemp, Register outTemp,
+                                                    Register valueTemp, Register offsetTemp,
+                                                    Register maskTemp, AnyRegister output);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Imm32& value, const BaseIndex& mem,
+                                                    Register flagTemp, Register outTemp,
+                                                    Register valueTemp, Register offsetTemp,
+                                                    Register maskTemp, AnyRegister output);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Register& value, const Address& mem,
+                                                    Register flagTemp, Register outTemp,
+                                                    Register valueTemp, Register offsetTemp,
+                                                    Register maskTemp, AnyRegister output);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Register& value, const BaseIndex& mem,
+                                                    Register flagTemp, Register outTemp,
+                                                    Register valueTemp, Register offsetTemp,
+                                                    Register maskTemp, AnyRegister output);
+
+// Binary operation for effect, result discarded.
+template<typename S, typename T>
+void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType, const S& value,
+                                                    const T& mem, Register flagTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp)
+{
+    MOZ_ASSERT(flagTemp != InvalidReg);
+
+    // Uint8Clamped is explicitly not supported here
+    switch (arrayType) {
+      case Scalar::Int8:
+      case Scalar::Uint8:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicAdd8(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicSub8(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicAnd8(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicOr8(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicXor8(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Int16:
+      case Scalar::Uint16:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicAdd16(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicSub16(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicAnd16(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicOr16(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicXor16(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      case Scalar::Int32:
+      case Scalar::Uint32:
+        switch (op) {
+          case AtomicFetchAddOp:
+            masm.atomicAdd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchSubOp:
+            masm.atomicSub32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchAndOp:
+            masm.atomicAnd32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchOrOp:
+            masm.atomicOr32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          case AtomicFetchXorOp:
+            masm.atomicXor32(value, mem, flagTemp, valueTemp, offsetTemp, maskTemp);
+            break;
+          default:
+            MOZ_CRASH("Invalid typed array atomic operation");
+        }
+        break;
+      default:
+        MOZ_CRASH("Invalid typed array type");
+    }
+}
+
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Imm32& value, const Address& mem,
+                                                    Register flagTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Imm32& value, const BaseIndex& mem,
+                                                    Register flagTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Register& value, const Address& mem,
+                                                    Register flagTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp);
+template void
+CodeGeneratorMIPSShared::atomicBinopToTypedIntArray(AtomicOp op, Scalar::Type arrayType,
+                                                    const Register& value, const BaseIndex& mem,
+                                                    Register flagTemp, Register valueTemp,
+                                                    Register offsetTemp, Register maskTemp);
+
+
+template <typename T>
+static inline void
+AtomicBinopToTypedArray(CodeGeneratorMIPSShared* cg, AtomicOp op,
+                        Scalar::Type arrayType, const LAllocation* value, const T& mem,
+                        Register flagTemp, Register outTemp, Register valueTemp,
+                        Register offsetTemp, Register maskTemp, AnyRegister output)
+{
+    if (value->isConstant())
+        cg->atomicBinopToTypedIntArray(op, arrayType, Imm32(ToInt32(value)), mem, flagTemp, outTemp,
+                                       valueTemp, offsetTemp, maskTemp, output);
+    else
+        cg->atomicBinopToTypedIntArray(op, arrayType, ToRegister(value), mem, flagTemp, outTemp,
+                                       valueTemp, offsetTemp, maskTemp, output);
+}
+
+void
+CodeGeneratorMIPSShared::visitAtomicTypedArrayElementBinop(LAtomicTypedArrayElementBinop* lir)
+{
+    MOZ_ASSERT(lir->mir()->hasUses());
+
+    AnyRegister output = ToAnyRegister(lir->output());
+    Register elements = ToRegister(lir->elements());
+    Register flagTemp = ToRegister(lir->temp1());
+    Register outTemp = lir->temp2()->isBogusTemp() ? InvalidReg : ToRegister(lir->temp2());
+    Register valueTemp = ToRegister(lir->valueTemp());
+    Register offsetTemp = ToRegister(lir->offsetTemp());
+    Register maskTemp = ToRegister(lir->maskTemp());
+    const LAllocation* value = lir->value();
+
+    Scalar::Type arrayType = lir->mir()->arrayType();
+    int width = Scalar::byteSize(arrayType);
+
+    if (lir->index()->isConstant()) {
+        Address mem(elements, ToInt32(lir->index()) * width);
+        AtomicBinopToTypedArray(this, lir->mir()->operation(), arrayType, value, mem, flagTemp, outTemp,
+                                valueTemp, offsetTemp, maskTemp, output);
+    } else {
+        BaseIndex mem(elements, ToRegister(lir->index()), ScaleFromElemWidth(width));
+        AtomicBinopToTypedArray(this, lir->mir()->operation(), arrayType, value, mem, flagTemp, outTemp,
+                                valueTemp, offsetTemp, maskTemp, output);
+    }
+}
+
+template <typename T>
+static inline void
+AtomicBinopToTypedArray(CodeGeneratorMIPSShared* cg, AtomicOp op, Scalar::Type arrayType,
+                        const LAllocation* value, const T& mem, Register flagTemp,
+                        Register valueTemp, Register offsetTemp, Register maskTemp)
+{
+    if (value->isConstant())
+        cg->atomicBinopToTypedIntArray(op, arrayType, Imm32(ToInt32(value)), mem,
+                                       flagTemp, valueTemp, offsetTemp, maskTemp);
+    else
+        cg->atomicBinopToTypedIntArray(op, arrayType, ToRegister(value), mem,
+                                       flagTemp, valueTemp, offsetTemp, maskTemp);
+}
+
+void
+CodeGeneratorMIPSShared::visitAtomicTypedArrayElementBinopForEffect(LAtomicTypedArrayElementBinopForEffect* lir)
+{
+    MOZ_ASSERT(!lir->mir()->hasUses());
+
+    Register elements = ToRegister(lir->elements());
+    Register flagTemp = ToRegister(lir->flagTemp());
+    Register valueTemp = ToRegister(lir->valueTemp());
+    Register offsetTemp = ToRegister(lir->offsetTemp());
+    Register maskTemp = ToRegister(lir->maskTemp());
+    const LAllocation* value = lir->value();
+    Scalar::Type arrayType = lir->mir()->arrayType();
+    int width = Scalar::byteSize(arrayType);
+
+    if (lir->index()->isConstant()) {
+        Address mem(elements, ToInt32(lir->index()) * width);
+        AtomicBinopToTypedArray(this, lir->mir()->operation(), arrayType, value, mem,
+                                flagTemp, valueTemp, offsetTemp, maskTemp);
+    } else {
+        BaseIndex mem(elements, ToRegister(lir->index()), ScaleFromElemWidth(width));
+        AtomicBinopToTypedArray(this, lir->mir()->operation(), arrayType, value, mem,
+                                flagTemp, valueTemp, offsetTemp, maskTemp);
+    }
+}
+
+void
+CodeGeneratorMIPSShared::visitCompareExchangeTypedArrayElement(LCompareExchangeTypedArrayElement* lir)
+{
+    Register elements = ToRegister(lir->elements());
+    AnyRegister output = ToAnyRegister(lir->output());
+    Register temp = lir->temp()->isBogusTemp() ? InvalidReg : ToRegister(lir->temp());
+
+    Register oldval = ToRegister(lir->oldval());
+    Register newval = ToRegister(lir->newval());
+    Register valueTemp = ToRegister(lir->valueTemp());
+    Register offsetTemp = ToRegister(lir->offsetTemp());
+    Register maskTemp = ToRegister(lir->maskTemp());
+
+    Scalar::Type arrayType = lir->mir()->arrayType();
+    int width = Scalar::byteSize(arrayType);
+
+    if (lir->index()->isConstant()) {
+        Address dest(elements, ToInt32(lir->index()) * width);
+        masm.compareExchangeToTypedIntArray(arrayType, dest, oldval, newval, temp,
+                                            valueTemp, offsetTemp, maskTemp, output);
+    } else {
+        BaseIndex dest(elements, ToRegister(lir->index()), ScaleFromElemWidth(width));
+        masm.compareExchangeToTypedIntArray(arrayType, dest, oldval, newval, temp,
+                                            valueTemp, offsetTemp, maskTemp, output);
+    }
+}
+
+void
+CodeGeneratorMIPSShared::visitAtomicExchangeTypedArrayElement(LAtomicExchangeTypedArrayElement* lir)
+{
+    Register elements = ToRegister(lir->elements());
+    AnyRegister output = ToAnyRegister(lir->output());
+    Register temp = lir->temp()->isBogusTemp() ? InvalidReg : ToRegister(lir->temp());
+
+    Register value = ToRegister(lir->value());
+    Register valueTemp = ToRegister(lir->valueTemp());
+    Register offsetTemp = ToRegister(lir->offsetTemp());
+    Register maskTemp = ToRegister(lir->maskTemp());
+
+    Scalar::Type arrayType = lir->mir()->arrayType();
+    int width = Scalar::byteSize(arrayType);
+
+    if (lir->index()->isConstant()) {
+        Address dest(elements, ToInt32(lir->index()) * width);
+        masm.atomicExchangeToTypedIntArray(arrayType, dest, value, temp,
+                                           valueTemp, offsetTemp, maskTemp, output);
+    } else {
+        BaseIndex dest(elements, ToRegister(lir->index()), ScaleFromElemWidth(width));
+        masm.atomicExchangeToTypedIntArray(arrayType, dest, value, temp,
+                                           valueTemp, offsetTemp, maskTemp, output);
+    }
 }

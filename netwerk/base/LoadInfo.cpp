@@ -8,6 +8,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/dom/ToJSValue.h"
+#include "mozIThirdPartyUtil.h"
 #include "nsFrameLoader.h"
 #include "nsIDocShell.h"
 #include "nsIDocument.h"
@@ -16,6 +17,7 @@
 #include "nsISupportsImpl.h"
 #include "nsISupportsUtils.h"
 #include "nsContentUtils.h"
+#include "nsGlobalWindow.h"
 
 namespace mozilla {
 
@@ -39,6 +41,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mParentOuterWindowID(0)
   , mEnforceSecurity(false)
   , mInitialSecurityCheckDone(false)
+  , mIsThirdPartyContext(true)
   , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
@@ -78,13 +81,16 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
 
       nsCOMPtr<nsPIDOMWindow> parent = outerWindow->GetScriptableParent();
       mParentOuterWindowID = parent->WindowID();
+
+      ComputeIsThirdPartyContext(outerWindow);
     }
 
     mUpgradeInsecureRequests = aLoadingContext->OwnerDoc()->GetUpgradeInsecureRequests();
     mUpgradeInsecurePreloads = aLoadingContext->OwnerDoc()->GetUpgradeInsecurePreloads();
   }
 
-  mOriginAttributes = BasePrincipal::Cast(mLoadingPrincipal)->OriginAttributesRef();
+  const PrincipalOriginAttributes attrs = BasePrincipal::Cast(mLoadingPrincipal)->OriginAttributesRef();
+  mOriginAttributes.InheritFromDocToNecko(attrs);
 }
 
 LoadInfo::LoadInfo(const LoadInfo& rhs)
@@ -101,6 +107,7 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
   , mParentOuterWindowID(rhs.mParentOuterWindowID)
   , mEnforceSecurity(rhs.mEnforceSecurity)
   , mInitialSecurityCheckDone(rhs.mInitialSecurityCheckDone)
+  , mIsThirdPartyContext(rhs.mIsThirdPartyContext)
   , mOriginAttributes(rhs.mOriginAttributes)
   , mRedirectChainIncludingInternalRedirects(
       rhs.mRedirectChainIncludingInternalRedirects)
@@ -120,7 +127,8 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    uint64_t aParentOuterWindowID,
                    bool aEnforceSecurity,
                    bool aInitialSecurityCheckDone,
-                   const OriginAttributes& aOriginAttributes,
+                   bool aIsThirdPartyContext,
+                   const NeckoOriginAttributes& aOriginAttributes,
                    nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChainIncludingInternalRedirects,
                    nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain)
   : mLoadingPrincipal(aLoadingPrincipal)
@@ -134,6 +142,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mParentOuterWindowID(aParentOuterWindowID)
   , mEnforceSecurity(aEnforceSecurity)
   , mInitialSecurityCheckDone(aInitialSecurityCheckDone)
+  , mIsThirdPartyContext(aIsThirdPartyContext)
   , mOriginAttributes(aOriginAttributes)
   , mIsFromProcessingFrameAttributes(false)
 {
@@ -148,6 +157,35 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
 
 LoadInfo::~LoadInfo()
 {
+}
+
+void
+LoadInfo::ComputeIsThirdPartyContext(nsPIDOMWindow* aOuterWindow)
+{
+  nsContentPolicyType type =
+    nsContentUtils::InternalContentPolicyTypeToExternal(mInternalContentPolicyType);
+  if (type == nsIContentPolicy::TYPE_DOCUMENT) {
+    // Top-level loads are never third-party.
+    mIsThirdPartyContext = false;
+    return;
+  }
+
+  nsPIDOMWindow* win = aOuterWindow;
+  if (type == nsIContentPolicy::TYPE_SUBDOCUMENT) {
+    // If we're loading a subdocument, aOuterWindow points to the new window.
+    // Check if its parent is third-party (and then we can do the same check for
+    // it as we would do for other sub-resource loads.
+
+    win = aOuterWindow->GetScriptableParent();
+    MOZ_ASSERT(win);
+  }
+
+  nsCOMPtr<mozIThirdPartyUtil> util(do_GetService(THIRDPARTYUTIL_CONTRACTID));
+  if (NS_WARN_IF(!util)) {
+    return;
+  }
+
+  util->IsThirdPartyWindow(win, nullptr, &mIsThirdPartyContext);
 }
 
 NS_IMPL_ISUPPORTS(LoadInfo, nsILoadInfo)
@@ -230,7 +268,7 @@ LoadInfo::SetWithCredentialsSecFlag()
 }
 
 NS_IMETHODIMP
-LoadInfo::GetSecurityMode(uint32_t *aFlags)
+LoadInfo::GetSecurityMode(uint32_t* aFlags)
 {
   *aFlags = (mSecurityFlags &
               (nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS |
@@ -238,6 +276,13 @@ LoadInfo::GetSecurityMode(uint32_t *aFlags)
                nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS |
                nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL |
                nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS));
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetIsInThirdPartyContext(bool* aIsInThirdPartyContext)
+{
+  *aIsInThirdPartyContext = mIsThirdPartyContext;
   return NS_OK;
 }
 
@@ -277,6 +322,14 @@ LoadInfo::GetAllowChrome(bool* aResult)
 {
   *aResult =
     (mSecurityFlags & nsILoadInfo::SEC_ALLOW_CHROME);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetDontFollowRedirects(bool* aResult)
+{
+  *aResult =
+    (mSecurityFlags & nsILoadInfo::SEC_DONT_FOLLOW_REDIRECTS);
   return NS_OK;
 }
 
@@ -356,7 +409,7 @@ NS_IMETHODIMP
 LoadInfo::SetScriptableOriginAttributes(JSContext* aCx,
   JS::Handle<JS::Value> aOriginAttributes)
 {
-  OriginAttributes attrs;
+  NeckoOriginAttributes attrs;
   if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
   }
@@ -366,7 +419,7 @@ LoadInfo::SetScriptableOriginAttributes(JSContext* aCx,
 }
 
 nsresult
-LoadInfo::GetOriginAttributes(mozilla::OriginAttributes* aOriginAttributes)
+LoadInfo::GetOriginAttributes(mozilla::NeckoOriginAttributes* aOriginAttributes)
 {
   NS_ENSURE_ARG(aOriginAttributes);
   *aOriginAttributes = mOriginAttributes;
@@ -374,7 +427,7 @@ LoadInfo::GetOriginAttributes(mozilla::OriginAttributes* aOriginAttributes)
 }
 
 nsresult
-LoadInfo::SetOriginAttributes(const mozilla::OriginAttributes& aOriginAttributes)
+LoadInfo::SetOriginAttributes(const mozilla::NeckoOriginAttributes& aOriginAttributes)
 {
   mOriginAttributes = aOriginAttributes;
   return NS_OK;

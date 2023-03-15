@@ -334,11 +334,11 @@ class SimdTypeDescr : public ComplexTypeDescr
 {
   public:
     enum Type {
-        Int8x16 = JS_SIMDTYPEREPR_INT8,
-        Int16x8 = JS_SIMDTYPEREPR_INT16,
-        Int32x4 = JS_SIMDTYPEREPR_INT32,
-        Float32x4 = JS_SIMDTYPEREPR_FLOAT32,
-        Float64x2 = JS_SIMDTYPEREPR_FLOAT64,
+        Int8x16   = JS_SIMDTYPEREPR_INT8X16,
+        Int16x8   = JS_SIMDTYPEREPR_INT16X8,
+        Int32x4   = JS_SIMDTYPEREPR_INT32X4,
+        Float32x4 = JS_SIMDTYPEREPR_FLOAT32X4,
+        Float64x2 = JS_SIMDTYPEREPR_FLOAT64X2,
         LAST_TYPE = Float64x2
     };
 
@@ -347,22 +347,16 @@ class SimdTypeDescr : public ComplexTypeDescr
     static const Class class_;
     static int32_t size(Type t);
     static int32_t alignment(Type t);
-    static int32_t lanes(Type t);
 
     SimdTypeDescr::Type type() const {
-        return (SimdTypeDescr::Type) getReservedSlot(JS_DESCR_SLOT_TYPE).toInt32();
+        uint32_t t = uint32_t(getReservedSlot(JS_DESCR_SLOT_TYPE).toInt32());
+        MOZ_ASSERT(t <= LAST_TYPE);
+        return SimdTypeDescr::Type(t);
     }
 
     static bool call(JSContext* cx, unsigned argc, Value* vp);
     static bool is(const Value& v);
 };
-
-#define JS_FOR_EACH_SIMD_TYPE_REPR(macro_)               \
-    macro_(SimdTypeDescr::Int8x16, int8_t, int8, 16)     \
-    macro_(SimdTypeDescr::Int16x8, int16_t, int16, 8)    \
-    macro_(SimdTypeDescr::Int32x4, int32_t, int32, 4)    \
-    macro_(SimdTypeDescr::Float32x4, float, float32, 4)  \
-    macro_(SimdTypeDescr::Float64x2, double, float64, 2)
 
 bool IsTypedObjectClass(const Class* clasp); // Defined below
 bool IsTypedObjectArray(JSObject& obj);

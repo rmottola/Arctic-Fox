@@ -32,7 +32,7 @@ ServiceWorkerManagerChild::RecvNotifyRegister(
 
 bool
 ServiceWorkerManagerChild::RecvNotifySoftUpdate(
-                                      const OriginAttributes& aOriginAttributes,
+                                      const PrincipalOriginAttributes& aOriginAttributes,
                                       const nsString& aScope)
 {
   if (mShuttingDown) {
@@ -42,7 +42,7 @@ ServiceWorkerManagerChild::RecvNotifySoftUpdate(
   RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
   MOZ_ASSERT(swm);
 
-  swm->SoftUpdate(aOriginAttributes, NS_ConvertUTF16toUTF8(aScope), nullptr);
+  swm->SoftUpdate(aOriginAttributes, NS_ConvertUTF16toUTF8(aScope));
   return true;
 }
 

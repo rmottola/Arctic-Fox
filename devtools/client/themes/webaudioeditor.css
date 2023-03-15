@@ -30,10 +30,10 @@ svg {
 }
 
 .theme-dark .edgePath path {
-  stroke: #b6babf; /* Grey foreground text */
+  stroke: var(--theme-body-color-alt);
 }
 .theme-light .edgePath path {
-  stroke: #aaaaaa; /* Splitters */
+  stroke: var(--theme-splitter-color);
 }
 
 /* AudioParam connection edges */
@@ -42,26 +42,20 @@ g.edgePath.param-connection {
 }
 
 .theme-dark .edgePath.param-connection path {
-  stroke: #b6babf; /* Grey foreground text */
+  stroke: var(--theme-body-color-alt);
 }
 .theme-light .edgePath.param-connection path {
-  stroke: #aaaaaa; /* Splitters */
+  stroke: var(--theme-splitter-color);
 }
 
 /* Labels in AudioParam connection should have background that match
  * the main background so there's whitespace around the label, on top of the
  * dotted lines. */
-.theme-dark g.edgeLabel rect {
-  fill: #14171a;
+g.edgeLabel rect {
+  fill: var(--theme-body-background);
 }
-.theme-light g.edgeLabel rect {
-  fill: #fcfcfc; /* Background - Editor */
-}
-.theme-dark g.edgeLabel tspan {
+g.edgeLabel tspan {
   fill: var(--theme-body-color-alt);
-}
-.theme-light g.edgeLabel tspan {
-  fill: #585959; /* Grey foreground text */
 }
 
 /* Audio Nodes */
@@ -85,10 +79,10 @@ g.edgePath.param-connection {
  */
 
 .theme-light .nodes g.bypassed rect {
-  fill: url(chrome://devtools/skin/themes/images/filters.svg#bypass-light);
+  fill: url(chrome://devtools/skin/images/filters.svg#bypass-light);
 }
 .theme-dark .nodes g.bypassed rect {
-  fill: url(chrome://devtools/skin/themes/images/filters.svg#bypass-dark);
+  fill: url(chrome://devtools/skin/images/filters.svg#bypass-dark);
 }
 .nodes g.bypassed.selected rect {
   stroke: var(--theme-selection-background);
@@ -187,7 +181,7 @@ text {
   -moz-box-flex: 1;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   #inspector-pane-toggle {
     list-style-image: url(images/debugger-collapse@2x.png);
     -moz-image-region: rect(0px,32px,32px,0px);
@@ -219,11 +213,8 @@ text {
   background-color: transparent;
 }
 
-.theme-dark #audio-node-toolbar toolbarbutton[checked] {
-  background-color: #1d4f73; /* Select Highlight Blue */
-}
-.theme-light #audio-node-toolbar toolbarbutton[checked] {
-  background-color: #4c9ed9; /* Select Highlight Blue */
+#audio-node-toolbar toolbarbutton[checked] {
+  background-color: var(--theme-selection-background);
 }
 
 /* don't invert checked buttons so we can have white icons on light theme */

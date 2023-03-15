@@ -1,4 +1,4 @@
-// Copyright 2013, ARM Limited
+// Copyright 2014, ARM Limited
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -26,6 +26,10 @@
 
 #ifndef VIXL_A64_INSTRUMENT_A64_H_
 #define VIXL_A64_INSTRUMENT_A64_H_
+
+#include "mozilla/Vector.h"
+
+#include "jsalloc.h"
 
 #include "jit/arm64/vixl/Constants-vixl.h"
 #include "jit/arm64/vixl/Decoder-vixl.h"
@@ -95,7 +99,7 @@ class Instrument: public DecoderVisitor {
   void InstrumentLoadStore(const Instruction* instr);
   void InstrumentLoadStorePair(const Instruction* instr);
 
-  std::list<Counter*> counters_;
+  mozilla::Vector<Counter*, 8, js::SystemAllocPolicy> counters_;
 
   FILE *output_stream_;
   uint64_t sample_period_;

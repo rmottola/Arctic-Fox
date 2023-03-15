@@ -125,9 +125,6 @@
       <field name="_outerWindowIDBrowserMap">
         new Map();
       </field>
-      <field name="_outerWindowIDBrowserMap">
-        new Map();
-      </field>
       <field name="arrowKeysShouldWrap" readonly="true">
         this.AppConstants.platform == "macosx";
       </field>
@@ -481,46 +478,11 @@
         <parameter name="aBrowser"/>
         <body>
           <![CDATA[
-            const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
             let browser = (aBrowser || this.mCurrentBrowser);
-            let stack = browser.parentNode;
-            let self = this;
-
-            let promptBox = {
-              appendPrompt : function(args, onCloseCallback) {
-                let newPrompt = document.createElementNS(XUL_NS, "tabmodalprompt");
-                stack.appendChild(newPrompt);
-                browser.setAttribute("tabmodalPromptShowing", true);
-
-                newPrompt.clientTop; // style flush to assure binding is attached
-
-                let tab = self._getTabForContentWindow(browser.contentWindow);
-                newPrompt.init(args, tab, onCloseCallback);
-                return newPrompt;
-              },
-
-              removePrompt : function(aPrompt) {
-                stack.removeChild(aPrompt);
-
-                let prompts = this.listPrompts();
-                if (prompts.length) {
-                  let prompt = prompts[prompts.length - 1];
-                  prompt.Dialog.setDefaultFocus();
-                } else {
-                  browser.removeAttribute("tabmodalPromptShowing");
-                  browser.focus();
-                }
-              },
-
-              listPrompts : function(aPrompt) {
-                let els = stack.getElementsByTagNameNS(XUL_NS, "tabmodalprompt");
-                // NodeList --> real JS array
-                let prompts = Array.slice(els);
-                return prompts;
-              },
-            };
-
-            return promptBox;
+            if (!browser.tabModalPromptBox) {
+              browser.tabModalPromptBox = new TabModalPromptBox(browser);
+            }
+            return browser.tabModalPromptBox;
           ]]>
         </body>
       </method>
@@ -899,19 +861,28 @@
       <method name="setIcon">
         <parameter name="aTab"/>
         <parameter name="aURI"/>
+        <parameter name="aLoadingPrincipal"/>
         <body>
           <![CDATA[
-            var browser = this.getBrowserForTab(aTab);
+            let browser = this.getBrowserForTab(aTab);
             browser.mIconURL = aURI instanceof Ci.nsIURI ? aURI.spec : aURI;
 
             if (aURI && this.mFaviconService) {
-              if (!(aURI instanceof Ci.nsIURI))
+              if (!(aURI instanceof Ci.nsIURI)) {
                 aURI = makeURI(aURI);
-              this.mFaviconService.setAndFetchFaviconForPage(browser.currentURI,
-                                                             aURI, false,
-                                                             PrivateBrowsingUtils.isWindowPrivate(window) ?
-                                                               this.mFaviconService.FAVICON_LOAD_PRIVATE :
-                                                               this.mFaviconService.FAVICON_LOAD_NON_PRIVATE);
+              }
+              // We do not serialize the principal from within SessionStore.jsm,
+              // hence if aLoadingPrincipal is null we default to the
+              // systemPrincipal which will allow the favicon to load.
+              let loadingPrincipal = aLoadingPrincipal
+                ? aLoadingPrincipal
+                : Services.scriptSecurityManager.getSystemPrincipal();
+              let loadType = PrivateBrowsingUtils.isWindowPrivate(window)
+                ? this.mFaviconService.FAVICON_LOAD_PRIVATE
+                : this.mFaviconService.FAVICON_LOAD_NON_PRIVATE;
+
+              this.mFaviconService.setAndFetchFaviconForPage(
+                browser.currentURI, aURI, false, loadType, null, loadingPrincipal);
             }
 
             let sizedIconUrl = browser.mIconURL || "";
@@ -1007,7 +978,7 @@
               if (!this.isFailedIcon(url))
                 icon = url;
             }
-            this.setIcon(aTab, icon);
+            this.setIcon(aTab, icon, browser.contentPrincipal);
           ]]>
         </body>
       </method>
@@ -1194,6 +1165,7 @@
               this.updateTitlebar();
 
               this.mCurrentTab.removeAttribute("titlechanged");
+              this.mCurrentTab.removeAttribute("attention");
             }
 
             // If the new tab is busy, and our current state is not busy, then
@@ -2590,7 +2562,7 @@
               // Workarounds for bug 458697
               // Icon might have been set on DOMLinkAdded, don't override that.
               if (!ourBrowser.mIconURL && otherBrowser.mIconURL)
-                this.setIcon(aOurTab, otherBrowser.mIconURL);
+                this.setIcon(aOurTab, otherBrowser.mIconURL, otherBrowser.contentPrincipal);
               var isBusy = aOtherTab.hasAttribute("busy");
               if (isBusy) {
                 aOurTab.setAttribute("busy", "true");
@@ -4093,8 +4065,8 @@
               break;
             case "sizemodechange":
               if (aEvent.target == window) {
-                this.mCurrentBrowser.docShellIsActive =
-                  (window.windowState != window.STATE_MINIMIZED);
+                this.mCurrentBrowser.setDocShellIsActiveAndForeground(
+                  window.windowState != window.STATE_MINIMIZED);
               }
               break;
           }
@@ -4463,9 +4435,52 @@
           if (!event.isTrusted)
             return;
 
-          // We're about to open a modal dialog, make sure the opening
-          // tab is brought to the front.
-          this.selectedTab = this._getTabForContentWindow(event.target.top);
+          let targetIsWindow = event.target instanceof Window;
+          // We're about to open a modal dialog, so figure out for which tab:
+          // If this is a same-process modal dialog, then we're given its DOM
+          // window as the event's target. For remote dialogs, we're given the
+          // browser, but that's in the originalTarget and not the target,
+          // because it's across the tabbrowser's XBL boundary.
+          let tabForEvent = targetIsWindow ?
+                            this._getTabForContentWindow(event.target.top) :
+                            this.getTabForBrowser(event.originalTarget);
+          // Don't need to act if the tab is already selected:
+          if (tabForEvent.selected)
+            return;
+
+          // If this is a tabprompt, we won't switch tabs
+          // (unless this behaviour has been disabled entirely using the pref)
+          if (event.detail && event.detail.tabPrompt &&
+              Services.prefs.getBoolPref("browser.tabs.dontfocusfordialogs")) {
+            let docPrincipal = targetIsWindow ? event.target.document.nodePrincipal : null;
+            // At least one of these should/will be non-null:
+            let promptPrincipal = event.detail.promptPrincipal || docPrincipal ||
+                                  tabForEvent.linkedBrowser.contentPrincipal;
+            // For null principals, we bail immediately and don't show the checkbox:
+            if (!promptPrincipal || promptPrincipal.isNullPrincipal) {
+              tabForEvent.setAttribute("attention", "true");
+              return;
+            }
+
+            // For non-system/expanded principals, we bail and show the checkbox
+            if (promptPrincipal.URI &&
+                !Services.scriptSecurityManager.isSystemPrincipal(promptPrincipal)) {
+              let permission = Services.perms.testPermissionFromPrincipal(promptPrincipal,
+                                                                          "focus-tab-by-prompt");
+              if (permission != Services.perms.ALLOW_ACTION) {
+                // Tell the prompt box we want to show the user a checkbox:
+                let tabPrompt = this.getTabModalPromptBox(tabForEvent.linkedBrowser);
+                tabPrompt.onNextPromptShowAllowFocusCheckboxFor(promptPrincipal);
+                tabForEvent.setAttribute("attention", "true");
+                return;
+              }
+            }
+            // ... so system and expanded principals, as well as permitted "normal"
+            // URI-based principals, always get to steal focus for the tab when prompting.
+          }
+
+          // if prefs/permissions/origins so dictate, bring tab to the front:
+          this.selectedTab = tabForEvent;
         ]]>
       </handler>
       <handler event="DOMTitleChanged">
@@ -4510,7 +4525,7 @@
           }
 
           tab.removeAttribute("soundplaying");
-          this.setIcon(tab, icon);
+          this.setIcon(tab, icon, browser.contentPrincipal);
         ]]>
       </handler>
       <handler event="DOMAudioPlaybackStarted">
@@ -5952,16 +5967,16 @@
 
     <content context="tabContextMenu">
       <xul:stack class="tab-stack" flex="1">
-        <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged,fadein"
+        <xul:hbox xbl:inherits="pinned,selected,visuallyselected,fadein"
                   class="tab-background">
-          <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged"
+          <xul:hbox xbl:inherits="pinned,selected,visuallyselected"
                     class="tab-background-start"/>
-          <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged"
+          <xul:hbox xbl:inherits="pinned,selected,visuallyselected"
                     class="tab-background-middle"/>
-          <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged"
+          <xul:hbox xbl:inherits="pinned,selected,visuallyselected"
                     class="tab-background-end"/>
         </xul:hbox>
-        <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged"
+        <xul:hbox xbl:inherits="pinned,selected,visuallyselected,titlechanged,attention"
                   class="tab-content" align="center">
           <xul:image xbl:inherits="fadein,pinned,busy,progress,selected,visuallyselected"
                      class="tab-throbber"
@@ -5978,7 +5993,7 @@
                      role="presentation"/>
           <xul:label flex="1"
                      anonid="tab-label"
-                     xbl:inherits="value=visibleLabel,crop,accesskey,fadein,pinned,selected,visuallyselected"
+                     xbl:inherits="value=visibleLabel,crop,accesskey,fadein,pinned,selected,visuallyselected,attention"
                      class="tab-text tab-label"
                      role="presentation"/>
           <xul:image xbl:inherits="soundplaying,pinned,muted,visuallyselected"
@@ -6243,6 +6258,8 @@
           var tabstripBO = tabContainer.mTabstrip.scrollBoxObject;
           for (var i = 0; i < this.childNodes.length; i++) {
             let curTab = this.childNodes[i].tab;
+            if (!curTab) // "Undo close tab", menuseparator, or entries put here by addons.
+              continue;
             let curTabBO = curTab.boxObject;
             if (curTabBO.screenX >= tabstripBO.screenX &&
                 curTabBO.screenX + curTabBO.width <= tabstripBO.screenX + tabstripBO.width)
@@ -6477,6 +6494,8 @@
   <binding id="tabbrowser-browser"
            extends="chrome://global/content/bindings/browser.xml#browser">
     <implementation>
+      <field name="tabModalPromptBox">null</field>
+
       <!-- throws exception for unknown schemes -->
       <method name="loadURIWithFlags">
         <parameter name="aURI"/>
@@ -6505,6 +6524,8 @@
   <binding id="tabbrowser-remote-browser"
            extends="chrome://global/content/bindings/remote-browser.xml#remote-browser">
     <implementation>
+      <field name="tabModalPromptBox">null</field>
+
       <!-- throws exception for unknown schemes -->
       <method name="loadURIWithFlags">
         <parameter name="aURI"/>

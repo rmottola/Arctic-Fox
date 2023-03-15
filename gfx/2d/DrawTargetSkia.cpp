@@ -19,13 +19,9 @@
 
 #include "skia/include/core/SkTypeface.h"
 #include "skia/include/effects/SkGradientShader.h"
-#include "skia/include/effects/SkBlurDrawLooper.h"
-#include "skia/include/effects/SkBlurMaskFilter.h"
 #include "skia/include/core/SkColorFilter.h"
-#include "skia/include/effects/SkDropShadowImageFilter.h"
+#include "skia/include/effects/SkBlurImageFilter.h"
 #include "skia/include/effects/SkLayerRasterizer.h"
-#include "skia/include/effects/SkLayerDrawLooper.h"
-#include "skia/include/effects/SkDashPathEffect.h"
 #include "Logging.h"
 #include "Tools.h"
 #include "DataSurfaceHelpers.h"
@@ -190,7 +186,7 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, TempBitmap& aTmpBitmap
     case PatternType::LINEAR_GRADIENT: {
       const LinearGradientPattern& pat = static_cast<const LinearGradientPattern&>(aPattern);
       GradientStopsSkia *stops = static_cast<GradientStopsSkia*>(pat.mStops.get());
-      SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode);
+      SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode, Axis::BOTH);
 
       if (stops->mCount >= 2) {
         SkPoint points[2];
@@ -219,7 +215,7 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, TempBitmap& aTmpBitmap
     case PatternType::RADIAL_GRADIENT: {
       const RadialGradientPattern& pat = static_cast<const RadialGradientPattern&>(aPattern);
       GradientStopsSkia *stops = static_cast<GradientStopsSkia*>(pat.mStops.get());
-      SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode);
+      SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode, Axis::BOTH);
 
       if (stops->mCount >= 2) {
         SkPoint points[2];
@@ -261,8 +257,10 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, TempBitmap& aTmpBitmap
         mat.preTranslate(rect.x(), rect.y());
       }
 
-      SkShader::TileMode mode = ExtendModeToTileMode(pat.mExtendMode);
-      SkShader* shader = SkShader::CreateBitmapShader(bitmap, mode, mode);
+      SkShader::TileMode xTileMode = ExtendModeToTileMode(pat.mExtendMode, Axis::X_AXIS);
+      SkShader::TileMode yTileMode = ExtendModeToTileMode(pat.mExtendMode, Axis::Y_AXIS);
+
+      SkShader* shader = SkShader::CreateBitmapShader(bitmap, xTileMode, yTileMode);
       SkShader* matrixShader = SkShader::CreateLocalMatrixShader(shader, mat);
       SkSafeUnref(shader);
       SkSafeUnref(aPaint.setShader(matrixShader));
@@ -429,15 +427,37 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
   TempBitmap bitmap = GetBitmapForSurface(aSurface);
 
   SkPaint paint;
-
-  SkAutoTUnref<SkImageFilter> filter(SkDropShadowImageFilter::Create(aOffset.x, aOffset.y,
-                                                                     aSigma, aSigma,
-                                                                     ColorToSkColor(aColor, 1.0)));
-
-  paint.setImageFilter(filter.get());
   paint.setXfermodeMode(GfxOpToSkiaOp(aOperator));
 
-  mCanvas->drawBitmap(bitmap.mBitmap, aDest.x, aDest.y, &paint);
+  // bug 1201272
+  // We can't use the SkDropShadowImageFilter here because it applies the xfer
+  // mode first to render the bitmap to a temporary layer, and then implicitly
+  // uses src-over to composite the resulting shadow.
+  // The canvas spec, however, states that the composite op must be used to
+  // composite the resulting shadow, so we must instead use a SkBlurImageFilter
+  // to blur the image ourselves.
+
+  SkPaint shadowPaint;
+  SkAutoTUnref<SkImageFilter> blurFilter(SkBlurImageFilter::Create(aSigma, aSigma));
+  SkAutoTUnref<SkColorFilter> colorFilter(
+    SkColorFilter::CreateModeFilter(ColorToSkColor(aColor, 1.0), SkXfermode::kSrcIn_Mode));
+
+  shadowPaint.setXfermode(paint.getXfermode());
+  shadowPaint.setImageFilter(blurFilter.get());
+  shadowPaint.setColorFilter(colorFilter.get());
+
+  // drawBitmap implicitly calls saveLayer with a src-over xfer mode if given
+  // an image filter, whereas the supplied xfer mode gets used to render into
+  // the layer, which is the wrong order. We instead must use drawSprite which
+  // applies the image filter directly to the bitmap without rendering it first,
+  // then uses the xfer mode to composite it.
+  IntPoint shadowDest = RoundedToInt(aDest + aOffset);
+  mCanvas->drawSprite(bitmap.mBitmap, shadowDest.x, shadowDest.y, &shadowPaint);
+
+  // Composite the original image after the shadow
+  IntPoint dest = RoundedToInt(aDest);
+  mCanvas->drawSprite(bitmap.mBitmap, dest.x, dest.y, &paint);
+
   mCanvas->restore();
 }
 
@@ -812,6 +832,10 @@ DrawTargetSkia::CopySurface(SourceSurface *aSurface,
 bool
 DrawTargetSkia::Init(const IntSize &aSize, SurfaceFormat aFormat)
 {
+  if (size_t(std::max(aSize.width, aSize.height)) > GetMaxSurfaceSize()) {
+    return false;
+  }
+
   SkAlphaType alphaType = (aFormat == SurfaceFormat::B8G8R8X8) ?
     kOpaque_SkAlphaType : kPremul_SkAlphaType;
 
@@ -819,20 +843,18 @@ DrawTargetSkia::Init(const IntSize &aSize, SurfaceFormat aFormat)
         aSize.width, aSize.height,
         GfxFormatToSkiaColorType(aFormat),
         alphaType);
+  // we need to have surfaces that have a stride aligned to 4 for interop with cairo
+  int stride = (BytesPerPixel(aFormat)*aSize.width + (4-1)) & -4;
 
-  SkAutoTUnref<SkBaseDevice> device(SkBitmapDevice::Create(skiInfo));
-  if (!device) {
-      return false;
-  }
-
-  SkBitmap bitmap = device->accessBitmap(true);
+  SkBitmap bitmap;
+  bitmap.setInfo(skiInfo, stride);
   if (!bitmap.allocPixels()) {
     return false;
   }
 
   bitmap.eraseARGB(0, 0, 0, 0);
 
-  mCanvas.adopt(new SkCanvas(device.get()));
+  mCanvas.adopt(new SkCanvas(bitmap));
   mSize = aSize;
 
   mFormat = aFormat;
@@ -846,6 +868,10 @@ DrawTargetSkia::InitWithGrContext(GrContext* aGrContext,
                                   SurfaceFormat aFormat)
 {
   MOZ_ASSERT(aGrContext, "null GrContext");
+
+  if (size_t(std::max(aSize.width, aSize.height)) > GetMaxSurfaceSize()) {
+    return false;
+  }
 
   mGrContext = aGrContext;
   mSize = aSize;

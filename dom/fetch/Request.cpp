@@ -83,7 +83,7 @@ GetRequestURLFromDocument(nsIDocument* aDocument, const nsAString& aInput,
   nsCOMPtr<nsIURI> resolvedURI;
   aRv = NS_NewURI(getter_AddRefs(resolvedURI), aInput, nullptr, baseURI);
   if (NS_WARN_IF(aRv.Failed())) {
-    aRv.ThrowTypeError<MSG_INVALID_URL>(&aInput);
+    aRv.ThrowTypeError<MSG_INVALID_URL>(aInput);
     return;
   }
 
@@ -92,7 +92,7 @@ GetRequestURLFromDocument(nsIDocument* aDocument, const nsAString& aInput,
   nsAutoCString credentials;
   Unused << resolvedURI->GetUserPass(credentials);
   if (!credentials.IsEmpty()) {
-    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(&aInput);
+    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(aInput);
     return;
   }
 
@@ -122,7 +122,7 @@ GetRequestURLFromChrome(const nsAString& aInput, nsAString& aRequestURL,
   nsCOMPtr<nsIURI> uri;
   aRv = NS_NewURI(getter_AddRefs(uri), aInput, nullptr, nullptr);
   if (NS_WARN_IF(aRv.Failed())) {
-    aRv.ThrowTypeError<MSG_INVALID_URL>(&aInput);
+    aRv.ThrowTypeError<MSG_INVALID_URL>(aInput);
     return;
   }
 
@@ -131,7 +131,7 @@ GetRequestURLFromChrome(const nsAString& aInput, nsAString& aRequestURL,
   nsAutoCString credentials;
   Unused << uri->GetUserPass(credentials);
   if (!credentials.IsEmpty()) {
-    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(&aInput);
+    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(aInput);
     return;
   }
 
@@ -164,7 +164,7 @@ GetRequestURLFromWorker(const GlobalObject& aGlobal, const nsAString& aInput,
   RefPtr<workers::URL> url =
     workers::URL::Constructor(aGlobal, aInput, baseURL, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
-    aRv.ThrowTypeError<MSG_INVALID_URL>(&aInput);
+    aRv.ThrowTypeError<MSG_INVALID_URL>(aInput);
     return;
   }
 
@@ -181,7 +181,7 @@ GetRequestURLFromWorker(const GlobalObject& aGlobal, const nsAString& aInput,
   }
 
   if (!username.IsEmpty() || !password.IsEmpty()) {
-    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(&aInput);
+    aRv.ThrowTypeError<MSG_URL_HAS_CREDENTIALS>(aInput);
     return;
   }
 
@@ -297,7 +297,7 @@ Request::Constructor(const GlobalObject& aGlobal,
     nsresult rv = FetchUtil::GetValidRequestMethod(method, outMethod);
     if (NS_FAILED(rv)) {
       NS_ConvertUTF8toUTF16 label(method);
-      aRv.ThrowTypeError<MSG_INVALID_REQUEST_METHOD>(&label);
+      aRv.ThrowTypeError<MSG_INVALID_REQUEST_METHOD>(label);
       return nullptr;
     }
 
@@ -331,7 +331,7 @@ Request::Constructor(const GlobalObject& aGlobal,
       nsAutoCString method;
       request->GetMethod(method);
       NS_ConvertUTF8toUTF16 label(method);
-      aRv.ThrowTypeError<MSG_INVALID_REQUEST_METHOD>(&label);
+      aRv.ThrowTypeError<MSG_INVALID_REQUEST_METHOD>(label);
       return nullptr;
     }
 

@@ -116,7 +116,7 @@ body {
 }
 
 #element-picker::before {
-  background-image: url("chrome://devtools/skin/themes/images/command-pick.png");
+  background-image: url("chrome://devtools/skin/images/command-pick.png");
 }
 
 .pause-button::before {
@@ -132,9 +132,9 @@ body {
   background-image: url("images/debugger-play.png");
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   #element-picker::before {
-    background-image: url("chrome://devtools/skin/themes/images/command-pick@2x.png");
+    background-image: url("chrome://devtools/skin/images/command-pick@2x.png");
     background-size: 64px;
   }
 
@@ -356,7 +356,7 @@ body {
 }
 
 .animation-target .node-highlighter {
-  background: url("chrome://devtools/skin/themes/images/vview-open-inspector.png") no-repeat 0 0;
+  background: url("chrome://devtools/skin/images/vview-open-inspector.png") no-repeat 0 0;
   padding-left: 16px;
   margin-right: 5px;
   cursor: pointer;
@@ -439,7 +439,7 @@ body {
   background-image: url(images/rewind.png);
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .timeline .toggle::before {
     background-image: url(images/debugger-pause@2x.png);
   }

@@ -64,9 +64,8 @@ protected:
 
 private:
   void EnumeratePrinters();
+  void StartPrintJob();
   static gboolean PrinterEnumerator(GtkPrinter *aPrinter, gpointer aData);
-  static void StartPrintJob(nsDeviceContextSpecGTK *spec,
-                            GtkPrinter *printer);
 };
 
 //-------------------------------------------------------------------------

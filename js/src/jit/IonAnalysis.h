@@ -134,6 +134,7 @@ class LinearSum
       : terms_(other.terms_.allocPolicy()),
         constant_(other.constant_)
     {
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!terms_.appendAll(other.terms_))
           MOZ_CRASH("LinearSum::LinearSum");
     }

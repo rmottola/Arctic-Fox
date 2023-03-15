@@ -2210,7 +2210,6 @@ ComputeRadialGradientLine(nsPresContext* aPresContext,
 }
 
 
-
 static float Interpolate(float aF1, float aF2, float aFrac)
 {
   return aF1 + aFrac * (aF2 - aF1);
@@ -2747,7 +2746,6 @@ nsCSSRendering::PaintGradient(nsPresContext* aPresContext,
   }
 
   ResolveMidpoints(stops);
-
   ResolvePremultipliedAlpha(stops);
 
   bool isRepeat = aGradient->mRepeating || forceRepeatToCoverTiles;
@@ -3446,18 +3444,33 @@ nsCSSRendering::PrepareBackgroundLayer(nsPresContext* aPresContext,
   state.mDestArea = nsRect(imageTopLeft + aBorderArea.TopLeft(), imageSize);
   state.mFillArea = state.mDestArea;
 
+  ExtendMode repeatMode = ExtendMode::CLAMP;
   if (repeatX == NS_STYLE_BG_REPEAT_REPEAT ||
       repeatX == NS_STYLE_BG_REPEAT_ROUND ||
       repeatX == NS_STYLE_BG_REPEAT_SPACE) {
     state.mFillArea.x = bgClipRect.x;
     state.mFillArea.width = bgClipRect.width;
+    repeatMode = ExtendMode::REPEAT_X;
   }
   if (repeatY == NS_STYLE_BG_REPEAT_REPEAT ||
       repeatY == NS_STYLE_BG_REPEAT_ROUND ||
       repeatY == NS_STYLE_BG_REPEAT_SPACE) {
     state.mFillArea.y = bgClipRect.y;
     state.mFillArea.height = bgClipRect.height;
+
+    /***
+     * We're repeating on the X axis already,
+     * so if we have to repeat in the Y axis,
+     * we really need to repeat in both directions.
+     */
+    if (repeatMode == ExtendMode::REPEAT_X) {
+      repeatMode = ExtendMode::REPEAT;
+    } else {
+      repeatMode = ExtendMode::REPEAT_Y;
+    }
   }
+  state.mImageRenderer.SetExtendMode(repeatMode);
+
   state.mFillArea.IntersectRect(state.mFillArea, bgClipRect);
 
   state.mCompositionOp = GetGFXBlendMode(aLayer.mBlendMode);
@@ -4763,6 +4776,7 @@ nsImageRenderer::nsImageRenderer(nsIFrame* aForFrame,
   , mPrepareResult(DrawResult::NOT_READY)
   , mSize(0, 0)
   , mFlags(aFlags)
+  , mExtendMode(ExtendMode::CLAMP)
 {
 }
 
@@ -4885,7 +4899,7 @@ nsImageRenderer::PrepareImage()
       // prefer SurfaceFromElement as it's more reliable.
       mImageElementSurface =
         nsLayoutUtils::SurfaceFromElement(property->GetReferencedElement());
-      if (!mImageElementSurface.mSourceSurface) {
+      if (!mImageElementSurface.GetSourceSurface()) {
         mPaintServerFrame = property->GetReferencedFrame();
         if (!mPaintServerFrame) {
           mPrepareResult = DrawResult::BAD_IMAGE;
@@ -4970,7 +4984,8 @@ nsImageRenderer::ComputeIntrinsicSize()
               appUnitsPerDevPixel));
         }
       } else {
-        NS_ASSERTION(mImageElementSurface.mSourceSurface, "Surface should be ready.");
+        NS_ASSERTION(mImageElementSurface.GetSourceSurface(),
+                     "Surface should be ready.");
         IntSize surfaceSize = mImageElementSurface.mSize;
         result.SetSize(
           nsSize(nsPresContext::CSSPixelsToAppUnits(surfaceSize.width),
@@ -5153,7 +5168,8 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
                                            mImageContainer, imageSize, filter,
                                            aDest, aFill, aRepeatSize,
                                            aAnchor, aDirtyRect,
-                                           ConvertImageRendererToDrawFlags(mFlags));
+                                           ConvertImageRendererToDrawFlags(mFlags),
+                                           mExtendMode);
     }
     case eStyleImageType_Gradient:
     {
@@ -5212,9 +5228,9 @@ nsImageRenderer::DrawableForElement(const nsRect& aImageRect,
 
     return drawable.forget();
   }
-  NS_ASSERTION(mImageElementSurface.mSourceSurface, "Surface should be ready.");
+  NS_ASSERTION(mImageElementSurface.GetSourceSurface(), "Surface should be ready.");
   RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(
-                                mImageElementSurface.mSourceSurface,
+                                mImageElementSurface.GetSourceSurface().get(),
                                 mImageElementSurface.mSize);
   return drawable.forget();
 }

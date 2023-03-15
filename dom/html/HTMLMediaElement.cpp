@@ -2380,6 +2380,7 @@ HTMLMediaElement::WakeLockRelease()
   if (mWakeLock) {
     ErrorResult rv;
     mWakeLock->Unlock(rv);
+    rv.SuppressException();
     mWakeLock = nullptr;
   }
 }

@@ -10,6 +10,8 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     gl_provider = 'WGL'
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     gl_provider = 'CGL'
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'uikit':
+    gl_provider = 'EAGL'
 elif CONFIG['MOZ_WIDGET_GTK']:
     if CONFIG['MOZ_EGL_XRENDER_COMPOSITE']:
         gl_provider = 'EGL'
@@ -86,7 +88,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
     UNIFIED_SOURCES += ['SharedSurfaceGralloc.cpp']
     EXPORTS += ['SharedSurfaceGralloc.h']
     LOCAL_INCLUDES += ['/widget/gonk']
-    CXXFLAGS += ['-I%s/%s' % (CONFIG['ANDROID_SOURCE'], 'hardware/libhardware/include')]
+    LOCAL_INCLUDES += ['%' + '%s/%s' % (CONFIG['ANDROID_SOURCE'], 'hardware/libhardware/include')]
 
 if gl_provider == 'CGL':
     # These files include Mac headers that are unfriendly to unified builds
@@ -105,6 +107,15 @@ if gl_provider == 'CGL':
     SOURCES += [
         'SharedSurfaceIO.cpp',
     ]
+elif gl_provider == 'EAGL':
+    # These files include ObjC headers that are unfriendly to unified builds
+    SOURCES += [
+        'GLContextProviderEAGL.mm',
+    ]
+    EXPORTS += [
+        'GLContextEAGL.h',
+    ]
+
 elif gl_provider == 'GLX':
     # GLContextProviderGLX.cpp needs to be kept out of UNIFIED_SOURCES
     # as it includes X11 headers which cause conflicts.
@@ -161,3 +172,6 @@ LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     del DEFINES['UNICODE']
+
+if CONFIG['CLANG_CXX']:
+    CXXFLAGS += ['-Wshadow']

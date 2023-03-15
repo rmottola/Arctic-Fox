@@ -75,7 +75,20 @@ def exponential_buckets(dmin, dmax, n_buckets):
     return ret_array
 
 always_allowed_keys = ['kind', 'description', 'cpp_guard', 'expires_in_version',
-                       'alert_emails', 'keyed', 'releaseChannelCollection']
+                       'alert_emails', 'keyed', 'releaseChannelCollection',
+                       'bug_numbers']
+
+n_buckets_whitelist = None;
+try:
+    whitelist_path = os.path.join(os.path.abspath(os.path.realpath(os.path.dirname(__file__))), 'bucket-whitelist.json')
+    with open(whitelist_path, 'r') as f:
+        try:
+            n_buckets_whitelist = set(json.load(f))
+        except ValueError, e:
+            raise BaseException, 'error parsing bucket whitelist (%s)' % whitelist_path
+except IOError:
+    n_buckets_whitelist = None
+    print 'Unable to parse whitelist (%s). Assuming all histograms are acceptable.' % whitelist_path
 
 class Histogram:
     """A class for representing a histogram definition."""
@@ -208,7 +221,12 @@ is enabled."""
         table_dispatch(definition['kind'], table,
                        lambda allowed_keys: Histogram.check_keys(name, definition, allowed_keys))
 
+        if ('alert_emails' in definition
+            and not isinstance(definition['alert_emails'], list)):
+            raise KeyError, 'alert_emails must be an array if present (in Histogram %s)' % name
+
         Histogram.check_expiration(name, definition)
+        Histogram.check_bug_numbers(name, definition)
 
     def check_name(self, name):
         if '#' in name:
@@ -229,6 +247,18 @@ is enabled."""
         definition['expires_in_version'] = expiration
 
     @staticmethod
+    def check_bug_numbers(name, definition):
+        bug_numbers = definition.get('bug_numbers')
+        if not bug_numbers:
+            return
+
+        if not isinstance(bug_numbers, list):
+            raise ValueError, 'bug_numbers field for "%s" should be an array' % (name)
+
+        if not all(type(num) is int for num in bug_numbers):
+            raise ValueError, 'bug_numbers array for "%s" should only contain integers' % (name)
+
+    @staticmethod
     def check_keys(name, definition, allowed_keys):
         for key in definition.iterkeys():
             if key not in allowed_keys:
@@ -243,6 +273,11 @@ is enabled."""
         self._low = try_to_coerce_to_number(low)
         self._high = try_to_coerce_to_number(high)
         self._n_buckets = try_to_coerce_to_number(n_buckets)
+        if n_buckets_whitelist is not None and self._n_buckets > 100 and type(self._n_buckets) is int:
+            if self._name not in n_buckets_whitelist:
+                raise KeyError, ('New histogram %s is not permitted to have more than 100 buckets. '
+                                'Histograms with large numbers of buckets use disproportionately high amounts of resources. '
+                                'Contact :vladan or the Perf team if you think an exception ought to be made.' % self._name)
 
     @staticmethod
     def boolean_flag_bucket_parameters(definition):

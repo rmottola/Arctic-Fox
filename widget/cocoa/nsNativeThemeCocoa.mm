@@ -526,24 +526,24 @@ nsNativeThemeCocoa::nsNativeThemeCocoa()
   // before the main event-loop pool is in place
   nsAutoreleasePool pool;
 
-  mDisclosureButtonCell = [[NSButtonCell alloc] initTextCell:nil];
+  mDisclosureButtonCell = [[NSButtonCell alloc] initTextCell:@""];
   [mDisclosureButtonCell setBezelStyle:NSRoundedDisclosureBezelStyle];
   [mDisclosureButtonCell setButtonType:NSPushOnPushOffButton];
   [mDisclosureButtonCell setHighlightsBy:NSPushInCellMask];
   
-  mHelpButtonCell = [[NSButtonCell alloc] initTextCell:nil];
+  mHelpButtonCell = [[NSButtonCell alloc] initTextCell:@""];
   [mHelpButtonCell setBezelStyle:NSHelpButtonBezelStyle];
   [mHelpButtonCell setButtonType:NSMomentaryPushInButton];
   [mHelpButtonCell setHighlightsBy:NSPushInCellMask];
 
-  mPushButtonCell = [[NSButtonCell alloc] initTextCell:nil];
+  mPushButtonCell = [[NSButtonCell alloc] initTextCell:@""];
   [mPushButtonCell setButtonType:NSMomentaryPushInButton];
   [mPushButtonCell setHighlightsBy:NSPushInCellMask];
 
-  mRadioButtonCell = [[RadioButtonCell alloc] initTextCell:nil];
+  mRadioButtonCell = [[RadioButtonCell alloc] initTextCell:@""];
   [mRadioButtonCell setButtonType:NSRadioButton];
 
-  mCheckboxCell = [[CheckboxCell alloc] initTextCell:nil];
+  mCheckboxCell = [[CheckboxCell alloc] initTextCell:@""];
   [mCheckboxCell setButtonType:NSSwitchButton];
   [mCheckboxCell setAllowsMixedState:YES];
 
@@ -768,10 +768,10 @@ struct CellRenderSettings {
   NSSize minimumSizes[3];
 
   // A three-dimensional array,
-  // with the first dimension being the OS version (only Leopard for the moment),
+  // with the first dimension being the OS version ([0] 10.6-10.9, [1] 10.10 and above),
   // the second being the control size (mini, small, regular), and the third
   // being the 4 margin values (left, top, right, bottom).
-  float margins[1][3][4];
+  float margins[2][3][4];
 };
 
 /*
@@ -867,6 +867,8 @@ static void DrawCellWithSnapping(NSCell *cell,
     // Snap to the smaller control size.
     controlSize = smallerControlSize;
     sizeIndex = smallerControlSizeIndex;
+    MOZ_ASSERT(sizeIndex < ArrayLength(settings.naturalSizes));
+
     // Resize and center the drawRect.
     if (sizes[sizeIndex].width) {
       drawRect.origin.x += ceil((destRect.size.width - sizes[sizeIndex].width) / 2);
@@ -885,7 +887,8 @@ static void DrawCellWithSnapping(NSCell *cell,
 
   [cell setControlSize:controlSize];
 
-  NSSize minimumSize = settings.minimumSizes ? settings.minimumSizes[sizeIndex] : NSZeroSize;
+  MOZ_ASSERT(sizeIndex < ArrayLength(settings.minimumSizes));
+  const NSSize minimumSize = settings.minimumSizes[sizeIndex];
   DrawCellWithScaling(cell, cgContext, drawRect, controlSize, sizes[sizeIndex],
                       minimumSize, settings.margins, view, mirrorHorizontal);
 
@@ -994,6 +997,11 @@ static const CellRenderSettings radioSettings = {
       {0, 0, 0, 0},     // mini
       {0, 1, 1, 1},     // small
       {0, 0, 0, 0}      // regular
+    },
+    { // Yosemite
+      {0, 0, 0, 0},     // mini
+      {1, 1, 1, 2},     // small
+      {0, 0, 0, 0}      // regular
     }
   }
 };
@@ -1009,6 +1017,11 @@ static const CellRenderSettings checkboxSettings = {
   },
   {
     { // Leopard
+      {0, 1, 0, 0},     // mini
+      {0, 1, 0, 1},     // small
+      {0, 1, 0, 1}      // regular
+    },
+    { // Yosemite
       {0, 1, 0, 0},     // mini
       {0, 1, 0, 1},     // small
       {0, 1, 0, 1}      // regular
@@ -1065,6 +1078,11 @@ static const CellRenderSettings searchFieldSettings = {
       {0, 0, 0, 0},     // mini
       {0, 0, 0, 0},     // small
       {0, 0, 0, 0}      // regular
+    },
+    { // Yosemite
+      {0, 0, 0, 0},     // mini
+      {0, 0, 0, 0},     // small
+      {0, 0, 0, 0}      // regular
     }
   }
 };
@@ -1094,17 +1112,17 @@ static const NSSize kCheckmarkSize = NSMakeSize(11, 11);
 static const NSSize kMenuarrowSize = nsCocoaFeatures::OnLionOrLater() ?
                                      NSMakeSize(9, 10) : NSMakeSize(8, 10);
 static const NSSize kMenuScrollArrowSize = NSMakeSize(10, 8);
-static const NSString* kCheckmarkImage = @"image.MenuOnState";
-static const NSString* kMenuarrowRightImage = @"image.MenuSubmenu";
-static const NSString* kMenuarrowLeftImage = @"image.MenuSubmenuLeft";
-static const NSString* kMenuDownScrollArrowImage = @"image.MenuScrollDown";
-static const NSString* kMenuUpScrollArrowImage = @"image.MenuScrollUp";
+static NSString* kCheckmarkImage = @"MenuOnState";
+static NSString* kMenuarrowRightImage = @"MenuSubmenu";
+static NSString* kMenuarrowLeftImage = @"MenuSubmenuLeft";
+static NSString* kMenuDownScrollArrowImage = @"MenuScrollDown";
+static NSString* kMenuUpScrollArrowImage = @"MenuScrollUp";
 static const CGFloat kMenuIconIndent = 6.0f;
 
 void
 nsNativeThemeCocoa::DrawMenuIcon(CGContextRef cgContext, const CGRect& aRect,
                                  EventStates inState, nsIFrame* aFrame,
-                                 const NSSize& aIconSize, const NSString* aImageName,
+                                 const NSSize& aIconSize, NSString* aImageName,
                                  bool aCenterHorizontally)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
@@ -1134,10 +1152,16 @@ nsNativeThemeCocoa::DrawMenuIcon(CGContextRef cgContext, const CGRect& aRect,
   NSString* backgroundTypeKey = !otherKeysAndValues ? @"kCUIBackgroundTypeMenu" :
     !isDisabled && isActive ? @"backgroundTypeDark" : @"backgroundTypeLight";
 
+  NSString* imageName = aImageName;
+  if (!nsCocoaFeatures::OnElCapitanOrLater()) {
+    // Pre-10.11, image names are prefixed with "image."
+    imageName = [@"image." stringByAppendingString:aImageName];
+  }
+
   NSMutableArray* keys = [NSMutableArray arrayWithObjects:@"backgroundTypeKey",
     @"imageNameKey", @"state", @"widget", @"is.flipped", nil];
   NSMutableArray* values = [NSMutableArray arrayWithObjects: backgroundTypeKey,
-    aImageName, state, @"image", [NSNumber numberWithBool:YES], nil];
+    imageName, state, @"image", [NSNumber numberWithBool:YES], nil];
 
   if (otherKeysAndValues) { // Earlier versions used one more key-value pair.
     [keys insertObject:@"imageIsGrayscaleKey" atIndex:1];
@@ -1172,6 +1196,11 @@ static const CellRenderSettings pushButtonSettings = {
   },
   {
     { // Leopard
+      {0, 0, 0, 0},    // mini
+      {4, 0, 4, 1},    // small
+      {5, 0, 5, 2}     // regular
+    },
+    { // Yosemite
       {0, 0, 0, 0},    // mini
       {4, 0, 4, 1},    // small
       {5, 0, 5, 2}     // regular
@@ -1443,6 +1472,11 @@ static const CellRenderSettings dropdownSettings = {
       {1, 1, 2, 1},    // mini
       {3, 0, 3, 1},    // small
       {3, 0, 3, 0}     // regular
+    },
+    { // Yosemite
+      {1, 1, 2, 1},    // mini
+      {3, 0, 3, 1},    // small
+      {3, 0, 3, 0}     // regular
     }
   }
 };
@@ -1460,6 +1494,11 @@ static const CellRenderSettings editableMenulistSettings = {
   },
   {
     { // Leopard
+      {0, 0, 2, 2},    // mini
+      {0, 0, 3, 2},    // small
+      {0, 1, 3, 3}     // regular
+    },
+    { // Yosemite
       {0, 0, 2, 2},    // mini
       {0, 0, 3, 2},    // small
       {0, 1, 3, 3}     // regular
@@ -1504,6 +1543,11 @@ static const CellRenderSettings spinnerSettings = {
   },
   {
     { // Leopard
+      {0, 0, 0, 0},    // mini
+      {0, 0, 0, 0},    // small
+      {0, 0, 0, 0}     // regular
+    },
+    { // Yosemite
       {0, 0, 0, 0},    // mini
       {0, 0, 0, 0},    // small
       {0, 0, 0, 0}     // regular
@@ -1673,6 +1717,11 @@ static const CellRenderSettings progressSettings[2][2] = {
           {0, 0, 0, 0},     // mini
           {1, 1, 1, 1},     // small
           {1, 0, 1, 0}      // regular
+        },
+        { // Yosemite
+          {0, 0, 0, 0},     // mini
+          {1, 1, 1, 1},     // small
+          {1, 0, 1, 0}      // regular
         }
       }
     }
@@ -1694,6 +1743,11 @@ static const CellRenderSettings progressSettings[2][2] = {
           {0, 0, 0, 0},     // mini
           {1, 1, 1, 1},     // small
           {1, 1, 1, 1}      // regular
+        },
+        { // Yosemite
+          {0, 0, 0, 0},     // mini
+          {1, 1, 1, 1},     // small
+          {1, 1, 1, 1}      // regular
         }
       }
     },
@@ -1709,6 +1763,11 @@ static const CellRenderSettings progressSettings[2][2] = {
       },
       {
         { // Leopard
+          {0, 0, 0, 0},     // mini
+          {1, 1, 1, 1},     // small
+          {0, 1, 0, 1}      // regular
+        },
+        { // Yosemite
           {0, 0, 0, 0},     // mini
           {1, 1, 1, 1},     // small
           {0, 1, 0, 1}      // regular
@@ -1754,6 +1813,11 @@ static const CellRenderSettings meterSetting = {
   },
   {
     { // Leopard
+      {1, 1, 1, 1},     // mini
+      {1, 1, 1, 1},     // small
+      {1, 1, 1, 1}      // regular
+    },
+    { // Yosemite
       {1, 1, 1, 1},     // mini
       {1, 1, 1, 1},     // small
       {1, 1, 1, 1}      // regular
@@ -2818,6 +2882,8 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
         BOOL isOverlay = nsLookAndFeel::UseOverlayScrollbars();
         BOOL isHorizontal = (aWidgetType == NS_THEME_SCROLLBAR_THUMB_HORIZONTAL);
         BOOL isRolledOver = IsParentScrollbarRolledOver(aFrame);
+        nsIFrame* scrollbarFrame = GetParentScrollbarFrame(aFrame);
+        bool isSmall = (scrollbarFrame && scrollbarFrame->StyleDisplay()->mAppearance == NS_THEME_SCROLLBAR_SMALL);
         if (isOverlay && (!nsCocoaFeatures::OnMountainLionOrLater() || !isRolledOver)) {
           if (isHorizontal) {
             macRect.origin.y += 4;
@@ -2836,7 +2902,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
         RenderWithCoreUILegacy(macRect, cgContext,
                 [NSDictionary dictionaryWithObjectsAndKeys:
                   (isOverlay ? @"kCUIWidgetOverlayScrollBar" : @"scrollbar"), @"widget",
-                  @"regular", @"size",
+                  (isSmall ? @"small" : @"regular"), @"size",
                   (isRolledOver ? @"rollover" : @"normal"), @"state",
                   (isHorizontal ? @"kCUIOrientHorizontal" : @"kCUIOrientVertical"), @"kCUIOrientationKey",
                   (isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""), @"kCUIVariantKey",
@@ -2866,6 +2932,8 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
         BOOL isOverlay = nsLookAndFeel::UseOverlayScrollbars();
         if (!isOverlay || IsParentScrollbarRolledOver(aFrame)) {
           BOOL isHorizontal = (aWidgetType == NS_THEME_SCROLLBAR_TRACK_HORIZONTAL);
+          nsIFrame* scrollbarFrame = GetParentScrollbarFrame(aFrame);
+          bool isSmall = (scrollbarFrame && scrollbarFrame->StyleDisplay()->mAppearance == NS_THEME_SCROLLBAR_SMALL);
           if (isOverlay && !nsCocoaFeatures::OnMountainLionOrLater()) {
             // On OSX 10.7, scrollbars don't grow when hovered.
             // The adjustments below were obtained by trial and error.
@@ -2884,7 +2952,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
           RenderWithCoreUILegacy(macRect, cgContext,
                   [NSDictionary dictionaryWithObjectsAndKeys:
                     (isOverlay ? @"kCUIWidgetOverlayScrollBar" : @"scrollbar"), @"widget",
-                    @"regular", @"size",
+                    (isSmall ? @"small" : @"regular"), @"size",
                     (isHorizontal ? @"kCUIOrientHorizontal" : @"kCUIOrientVertical"), @"kCUIOrientationKey",
                     (isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""), @"kCUIVariantKey",
                     [NSNumber numberWithBool:YES], @"noindicator",
@@ -2975,15 +3043,16 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
 }
 
 nsIntMargin
-nsNativeThemeCocoa::RTLAwareMargin(const nsIntMargin& aMargin, nsIFrame* aFrame)
+nsNativeThemeCocoa::DirectionAwareMargin(const nsIntMargin& aMargin,
+                                         nsIFrame* aFrame)
 {
-  if (IsFrameRTL(aFrame)) {
-    // Return a copy of aMargin w/ right & left reversed:
-    return nsIntMargin(aMargin.top, aMargin.left,
-                       aMargin.bottom, aMargin.right);
-  }
-
-  return aMargin;
+  // Assuming aMargin was originally specified for a horizontal LTR context,
+  // reinterpret the values as logical, and then map to physical coords
+  // according to aFrame's actual writing mode.
+  WritingMode wm = aFrame->GetWritingMode();
+  nsMargin m = LogicalMargin(wm, aMargin.top, aMargin.right, aMargin.bottom,
+                             aMargin.left).GetPhysicalMargin(wm);
+  return nsIntMargin(m.top, m.right, m.bottom, m.left);
 }
 
 static const nsIntMargin kAquaDropdownBorder(1, 22, 2, 5);
@@ -3004,16 +3073,16 @@ nsNativeThemeCocoa::GetWidgetBorder(nsDeviceContext* aContext,
     case NS_THEME_BUTTON:
     {
       if (IsButtonTypeMenu(aFrame)) {
-        *aResult = RTLAwareMargin(kAquaDropdownBorder, aFrame);
+        *aResult = DirectionAwareMargin(kAquaDropdownBorder, aFrame);
       } else {
-        aResult->SizeTo(1, 7, 3, 7);
+        *aResult = DirectionAwareMargin(nsIntMargin(1, 7, 3, 7), aFrame);
       }
       break;
     }
 
     case NS_THEME_TOOLBAR_BUTTON:
     {
-      aResult->SizeTo(1, 4, 1, 4);
+      *aResult = DirectionAwareMargin(nsIntMargin(1, 4, 1, 4), aFrame);
       break;
     }
 
@@ -3028,11 +3097,11 @@ nsNativeThemeCocoa::GetWidgetBorder(nsDeviceContext* aContext,
 
     case NS_THEME_DROPDOWN:
     case NS_THEME_DROPDOWN_BUTTON:
-      *aResult = RTLAwareMargin(kAquaDropdownBorder, aFrame);
+      *aResult = DirectionAwareMargin(kAquaDropdownBorder, aFrame);
       break;
 
     case NS_THEME_DROPDOWN_TEXTFIELD:
-      *aResult = RTLAwareMargin(kAquaComboboxBorder, aFrame);
+      *aResult = DirectionAwareMargin(kAquaComboboxBorder, aFrame);
       break;
 
     case NS_THEME_NUMBER_INPUT:
@@ -3055,7 +3124,7 @@ nsNativeThemeCocoa::GetWidgetBorder(nsDeviceContext* aContext,
       break;
 
     case NS_THEME_SEARCHFIELD:
-      *aResult = RTLAwareMargin(kAquaSearchfieldBorder, aFrame);
+      *aResult = DirectionAwareMargin(kAquaSearchfieldBorder, aFrame);
       break;
 
     case NS_THEME_LISTBOX:
@@ -3546,7 +3615,7 @@ nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType,
     case NS_THEME_METERBAR:
     case NS_THEME_METERBAR_CHUNK:
     case NS_THEME_MAC_VIBRANCY_LIGHT:
-    case NS_THEME_MAC_VIBRANCY_DARK:\
+    case NS_THEME_MAC_VIBRANCY_DARK:
       *aShouldRepaint = false;
       return NS_OK;
   }
@@ -3702,7 +3771,6 @@ nsNativeThemeCocoa::ThemeSupportsWidget(nsPresContext* aPresContext, nsIFrame* a
     case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
     case NS_THEME_SCROLLBAR_NON_DISAPPEARING:
       return !IsWidgetStyled(aPresContext, aFrame, aWidgetType);
-      break;
 
     case NS_THEME_RESIZER:
     {
@@ -3718,8 +3786,8 @@ nsNativeThemeCocoa::ThemeSupportsWidget(nsPresContext* aPresContext, nsIFrame* a
       nsIScrollableFrame* scrollFrame = do_QueryFrame(parentFrame);
       return (!nsLookAndFeel::UseOverlayScrollbars() &&
               scrollFrame && scrollFrame->GetScrollbarVisibility());
-      break;
     }
+
     case NS_THEME_FOCUS_OUTLINE:
       return true;
 
@@ -3746,7 +3814,6 @@ nsNativeThemeCocoa::WidgetIsContainer(uint8_t aWidgetType)
    case NS_THEME_MAC_DISCLOSURE_BUTTON_OPEN:
    case NS_THEME_MAC_DISCLOSURE_BUTTON_CLOSED:
     return false;
-    break;
   }
   return true;
 }

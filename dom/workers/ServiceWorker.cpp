@@ -101,14 +101,11 @@ ServiceWorker::PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
   aRv = workerPrivate->SendMessageEvent(aCx, aMessage, aTransferable, Move(clientInfo));
 }
 
-void
-ServiceWorker::QueueStateChangeEvent(ServiceWorkerState aState)
+WorkerPrivate*
+ServiceWorker::GetWorkerPrivate() const
 {
-  nsCOMPtr<nsIRunnable> r =
-    NS_NewRunnableMethodWithArg<ServiceWorkerState>(this,
-                                                    &ServiceWorker::DispatchStateChange,
-                                                    aState);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  ServiceWorkerPrivate* workerPrivate = mInfo->WorkerPrivate();
+  return workerPrivate->GetWorkerPrivate();
 }
 
 } // namespace workers

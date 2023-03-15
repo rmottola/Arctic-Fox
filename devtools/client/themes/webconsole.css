@@ -26,7 +26,7 @@ a {
 .message > .prefix,
 .message > .timestamp {
   flex: none;
-  color: GrayText;
+  color: var(--theme-comment);
   margin: 3px 6px 0 0;
 }
 
@@ -44,19 +44,17 @@ a {
 
 .message > .icon::before {
   content: "";
-  background-image: url(chrome://devtools/skin/themes/images/webconsole.png);
-  background-position: 8px 8px;
+  background-image: url(chrome://devtools/skin/images/webconsole.svg);
+  background-position: 12px 12px;
   background-repeat: no-repeat;
-  background-size: 48px 40px;
-  width: 8px;
-  height: 8px;
+  background-size: 72px 60px;
+  width: 12px;
+  height: 12px;
   display: inline-block;
 }
 
-@media (min-resolution: 1.25dppx) {
-  .message > .icon::before {
-    background-image: url(chrome://devtools/skin/themes/images/webconsole@2x.png);
-  }
+.theme-light .message > .icon::before {
+  background-image: url(chrome://devtools/skin/images/webconsole.svg#light-icons);
 }
 
 .message > .message-body-wrapper {
@@ -131,11 +129,6 @@ a {
 
 .message-flex-body > .message-location {
   margin-top: 0;
-}
-
-.jsterm-input-container {
-  border-top-width: 1px;
-  border-top-style: solid;
 }
 
 #output-wrapper {
@@ -228,7 +221,7 @@ a {
 }
 
 .message[category=network][severity=error] > .icon::before {
-  background-position: -8px 0;
+  background-position: -12px 0;
 }
 
 .message[category=network] > .message-body {
@@ -255,11 +248,11 @@ a {
 }
 
 .message[category=network].mixed-content .url {
-  color: #FF0000;
+  color: var(--theme-highlight-red);
 }
 
 .message .learn-more-link {
-  color: -moz-nativehyperlinktext;
+  color: var(--theme-highlight-blue);
   margin: 0 6px;
 }
 
@@ -285,11 +278,11 @@ a {
 }
 
 .message[category=cssparser][severity=error] > .icon::before {
-  background-position: -8px -8px;
+  background-position: -12px -12px;
 }
 
 .message[category=cssparser][severity=warn] > .icon::before {
-  background-position: -16px -8px;
+  background-position: -24px -12px;
 }
 
 /* JS styles */
@@ -303,11 +296,11 @@ a {
 }
 
 .message[category=exception][severity=error] > .icon::before {
-  background-position: -8px -16px;
+  background-position: -12px -24px;
 }
 
 .message[category=exception][severity=warn] > .icon::before {
-  background-position: -16px -16px;
+  background-position: -24px -24px;
 }
 
 /* Web Developer styles */
@@ -354,14 +347,26 @@ a {
 }
 
 .message[category=input] > .icon::before {
-  background-position: -32px -24px;
+  background-position: -48px -36px;
 }
 
 .message[category=output] > .icon::before {
-  background-position: -40px -24px;
+  background-position: -60px -36px;
 }
 
 /* JSTerm Styles */
+.jsterm-input-container {
+  background-color: var(--theme-tab-toolbar-background);
+  border-top: 1px solid var(--theme-splitter-color);
+}
+
+.theme-light .jsterm-input-container {
+  /* For light theme use a white background for the input - it looks better
+     than off-white */
+  background-color: #fff;
+  border-top-color: #e0e0e0;
+}
+
 .jsterm-input-node,
 .jsterm-complete-node {
   border: none;
@@ -370,15 +375,23 @@ a {
   background-color: transparent;
 }
 
-.jsterm-input-node {
-  background-image: -moz-image-rect(url("chrome://devtools/skin/themes/images/commandline-icon.png"), 0, 32, 16, 16);
-  background-repeat: no-repeat;
-  background-size: 16px 16px;
+.jsterm-complete-node {
+  color: var(--theme-comment);
 }
 
-@media (min-resolution: 1.25dppx) {
+.jsterm-input-node {
+  /* Always allow scrolling on input - it auto expands in js by setting height,
+     but don't want it to get bigger than the window. 24px = toolbar height. */
+  max-height: calc(90vh - 24px);
+  background-image: -moz-image-rect(url("chrome://devtools/skin/images/commandline-icon.png"), 0, 32, 16, 16);
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  color: var(--theme-content-color1);
+}
+
+@media (min-resolution: 1.1dppx) {
   .jsterm-input-node {
-    background-image: -moz-image-rect(url('chrome://devtools/skin/themes/images/commandline-icon@2x.png'), 0, 64, 32, 32);
+    background-image: -moz-image-rect(url('chrome://devtools/skin/images/commandline-icon@2x.png'), 0, 64, 32, 32);
   }
 }
 
@@ -390,6 +403,9 @@ a {
 .inlined-variables-view .message-body {
   display: flex;
   flex-direction: column;
+  resize: vertical;
+  overflow: auto;
+  min-height: 200px;
 }
 .inlined-variables-view iframe {
   display: block;
@@ -397,7 +413,7 @@ a {
   margin-top: 5px;
   margin-bottom: 15px;
   -moz-margin-end: 15px;
-  border: 1px solid rgba(128, 128, 128, .5);
+  border: 1px solid var(--theme-splitter-color);
   border-radius: 3px;
 }
 
@@ -422,11 +438,11 @@ a {
 }
 
 .message[category=security][severity=error] > .icon::before {
-  background-position: -8px -32px;
+  background-position: -12px -48px;
 }
 
 .message[category=security][severity=warn] > .icon::before {
-  background-position: -16px -32px;
+  background-position: -24px -48px;
 }
 
 .navigation-marker {
@@ -441,6 +457,11 @@ a {
 .navigation-marker .url {
   -moz-padding-end: 9px;
   text-decoration: none;
+  background: var(--theme-body-background);
+}
+
+.theme-light .navigation-marker .url {
+  background: #fff;
 }
 
 .stacktrace {
@@ -450,7 +471,7 @@ a {
   margin: 5px 0 0 0;
   max-height: 10em;
   overflow-y: auto;
-  border: 1px solid rgb(200,200,200);
+  border: 1px solid var(--theme-splitter-color);
   border-radius: 3px;
 }
 
@@ -473,7 +494,7 @@ a {
 .message .theme-twisty {
   display: inline-block;
   vertical-align: middle;
-  margin: 0 3px 0 0;
+  margin: 3px 3px 0 0;
 }
 
 .stacktrace li {
@@ -498,7 +519,7 @@ a {
 
 /* Open DOMNode in inspector button */
 .open-inspector {
-  background: url("chrome://devtools/skin/themes/images/vview-open-inspector.png") no-repeat 0 0;
+  background: url("chrome://devtools/skin/images/vview-open-inspector.png") no-repeat 0 0;
   padding-left: 16px;
   margin-left: 5px;
   cursor: pointer;
@@ -511,49 +532,6 @@ a {
 
 .open-inspector:active {
   background-position: -16px 0;
-}
-
-.jsterm-input-container {
-  background-color: var(--theme-tab-toolbar-background);
-  border-color: var(--theme-body-background);
-}
-
-.jsterm-input-node {
-  color: var(--theme-content-color1);
-}
-
-.jsterm-complete-node {
-  color: var(--theme-comment);
-}
-
-.navigation-marker .url {
-  background: var(--theme-body-background);
-}
-
-.theme-dark .inlined-variables-view iframe {
-  border-color: #333;
-}
-
-.theme-dark .stacktrace {
-  border-color: #333;
-}
-
-.theme-light .jsterm-input-container {
-  /* For light theme use a white background for the input - it looks better
-     than off-white */
-  background-color: #fff;
-  border-color: ThreeDShadow;
-}
-.theme-light .navigation-marker .url {
-  background: #fff;
-}
-
-.theme-light .inlined-variables-view iframe {
-  border-color: #ccc;
-}
-
-.theme-light .stacktrace {
-  border-color: #ccc;
 }
 
 @media (max-width: 500px) {

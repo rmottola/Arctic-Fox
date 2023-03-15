@@ -328,13 +328,10 @@ nsPluginInstanceOwner::nsPluginInstanceOwner()
   mPluginFrame = nullptr;
   mWidgetCreationComplete = false;
 #ifdef XP_MACOSX
-  memset(&mCGPluginPortCopy, 0, sizeof(NP_CGContext));
-  mInCGPaintLevel = 0;
   mSentInitialTopLevelWindowEvent = false;
   mLastWindowIsActive = false;
   mLastContentFocused = false;
   mLastScaleFactor = 1.0;
-  mColorProfile = nullptr;
   mShouldBlurOnActivate = false;
 #endif
   mContentFocused = false;
@@ -1133,9 +1130,6 @@ void nsPluginInstanceOwner::AddToCARefreshTimer() {
 
   if (!sCARefreshListeners) {
     sCARefreshListeners = new nsTArray<nsPluginInstanceOwner*>();
-    if (!sCARefreshListeners) {
-      return;
-    }
   }
 
   if (sCARefreshListeners->Contains(this)) {
@@ -1146,9 +1140,6 @@ void nsPluginInstanceOwner::AddToCARefreshTimer() {
 
   if (!sCATimer) {
     sCATimer = new nsCOMPtr<nsITimer>();
-    if (!sCATimer) {
-      return;
-    }
   }
 
   if (sCARefreshListeners->Length() == 1) {
@@ -1176,91 +1167,6 @@ void nsPluginInstanceOwner::RemoveFromCARefreshTimer() {
   }
 }
 
-void nsPluginInstanceOwner::RenderCoreAnimation(CGContextRef aCGContext,
-                                                int aWidth, int aHeight)
-{
-  if (aWidth == 0 || aHeight == 0)
-    return;
-
-  if (!mCARenderer) {
-    mCARenderer = new nsCARenderer();
-  }
-
-  // aWidth and aHeight are in "display pixels".  In non-HiDPI modes
-  // "display pixels" are device pixels.  But in HiDPI modes each
-  // display pixel corresponds to more than one device pixel.
-  double scaleFactor = 1.0;
-  GetContentsScaleFactor(&scaleFactor);
-
-  if (!mIOSurface ||
-      (mIOSurface->GetWidth() != (size_t)aWidth ||
-       mIOSurface->GetHeight() != (size_t)aHeight ||
-       mIOSurface->GetContentsScaleFactor() != scaleFactor)) {
-    mIOSurface = nullptr;
-
-    // If the renderer is backed by an IOSurface, resize it as required.
-    mIOSurface = MacIOSurface::CreateIOSurface(aWidth, aHeight, scaleFactor);
-    if (mIOSurface) {
-      RefPtr<MacIOSurface> attachSurface = MacIOSurface::LookupSurface(
-                                              mIOSurface->GetIOSurfaceID(),
-                                              scaleFactor);
-      if (attachSurface) {
-        mCARenderer->AttachIOSurface(attachSurface);
-      } else {
-        NS_ERROR("IOSurface attachment failed");
-        mIOSurface = nullptr;
-      }
-    }
-  }
-
-  if (!mColorProfile) {
-    mColorProfile = CreateSystemColorSpace();
-  }
-
-  if (mCARenderer->isInit() == false) {
-    void *caLayer = nullptr;
-    nsresult rv = mInstance->GetValueFromPlugin(NPPVpluginCoreAnimationLayer, &caLayer);
-    if (NS_FAILED(rv) || !caLayer) {
-      return;
-    }
-
-    // We don't run Flash in-process so we can unconditionally disallow
-    // the offliner renderer.
-    mCARenderer->SetupRenderer(caLayer, aWidth, aHeight, scaleFactor,
-                               DISALLOW_OFFLINE_RENDERER);
-
-    // Setting up the CALayer requires resetting the painting otherwise we
-    // get garbage for the first few frames.
-    FixUpPluginWindow(ePluginPaintDisable);
-    FixUpPluginWindow(ePluginPaintEnable);
-  }
-
-  CGImageRef caImage = nullptr;
-  nsresult rt = mCARenderer->Render(aWidth, aHeight, scaleFactor, &caImage);
-  if (rt == NS_OK && mIOSurface && mColorProfile) {
-    nsCARenderer::DrawSurfaceToCGContext(aCGContext, mIOSurface, mColorProfile,
-                                         0, 0, aWidth, aHeight);
-  } else if (rt == NS_OK && caImage != nullptr) {
-    // Significant speed up by resetting the scaling
-    ::CGContextSetInterpolationQuality(aCGContext, kCGInterpolationNone );
-    ::CGContextTranslateCTM(aCGContext, 0, (double) aHeight * scaleFactor);
-    ::CGContextScaleCTM(aCGContext, scaleFactor, -scaleFactor);
-
-    ::CGContextDrawImage(aCGContext, CGRectMake(0,0,aWidth,aHeight), caImage);
-  } else {
-    NS_NOTREACHED("nsCARenderer::Render failure");
-  }
-}
-
-void* nsPluginInstanceOwner::GetPluginPortCopy()
-{
-  if (GetDrawingModel() == NPDrawingModelCoreGraphics ||
-      GetDrawingModel() == NPDrawingModelCoreAnimation ||
-      GetDrawingModel() == NPDrawingModelInvalidatingCoreAnimation)
-    return &mCGPluginPortCopy;
-  return nullptr;
-}
-
 void nsPluginInstanceOwner::SetPluginPort()
 {
   void* pluginPort = GetPluginPort();
@@ -1268,18 +1174,6 @@ void nsPluginInstanceOwner::SetPluginPort()
     return;
   mPluginWindow->window = pluginPort;
 }
-
-void nsPluginInstanceOwner::BeginCGPaint()
-{
-  ++mInCGPaintLevel;
-}
-
-void nsPluginInstanceOwner::EndCGPaint()
-{
-  --mInCGPaintLevel;
-  NS_ASSERTION(mInCGPaintLevel >= 0, "Mismatched call to nsPluginInstanceOwner::EndCGPaint()!");
-}
-
 #endif
 
 // static
@@ -1367,7 +1261,7 @@ bool nsPluginInstanceOwner::AddPluginView(const LayoutDeviceRect& aRect /* = Lay
     if (!mJavaView)
       return false;
 
-    mJavaView = (void*)AndroidBridge::GetJNIEnv()->NewGlobalRef((jobject)mJavaView);
+    mJavaView = (void*)jni::GetGeckoThreadEnv()->NewGlobalRef((jobject)mJavaView);
   }
 
   if (AndroidBridge::Bridge())
@@ -1386,7 +1280,7 @@ void nsPluginInstanceOwner::RemovePluginView()
 
   widget::GeckoAppShell::RemovePluginView(
       jni::Object::Ref::From(jobject(mJavaView)), mFullScreen);
-  AndroidBridge::GetJNIEnv()->DeleteGlobalRef((jobject)mJavaView);
+  jni::GetGeckoThreadEnv()->DeleteGlobalRef((jobject)mJavaView);
   mJavaView = nullptr;
 
   if (mFullScreen)
@@ -1461,7 +1355,7 @@ void nsPluginInstanceOwner::ExitFullScreen() {
 }
 
 void nsPluginInstanceOwner::ExitFullScreen(jobject view) {
-  JNIEnv* env = AndroidBridge::GetJNIEnv();
+  JNIEnv* env = jni::GetGeckoThreadEnv();
 
   if (sFullScreenInstance && sFullScreenInstance->mInstance &&
       env->IsSameObject(view, (jobject)sFullScreenInstance->mInstance->GetJavaSurface())) {
@@ -2506,8 +2400,6 @@ nsPluginInstanceOwner::Destroy()
 
 #ifdef XP_MACOSX
   RemoveFromCARefreshTimer();
-  if (mColorProfile)
-    ::CGColorSpaceRelease(mColorProfile);
 #endif
 
   nsCOMPtr<nsIContent> content = do_QueryReferent(mContent);
@@ -3089,11 +2981,7 @@ void nsPluginInstanceOwner::FixUpPluginWindow(int32_t inPaintState)
     return;
   }
 
-  // If we've already set up a CGContext in nsPluginFrame::PaintPlugin(), we
-  // don't want calls to SetPluginPort() to step on our work.
-  if (mInCGPaintLevel < 1) {
-    SetPluginPort();
-  }
+  SetPluginPort();
 
   nsIntSize widgetClip = mPluginFrame->GetWidgetlessClipRect().Size();
 

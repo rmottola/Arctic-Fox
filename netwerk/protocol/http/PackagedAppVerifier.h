@@ -109,12 +109,14 @@ public:
     return mIsPackageSigned;
   }
 
-  const nsACString& GetPackageOrigin() const
+  const nsACString& GetPackageIdentifier() const
   {
-    return mPackageOrigin;
+    return mPackageIdentifer;
   }
 
-  static const char* kSignedPakOriginMetadataKey;
+  bool WouldVerify() const;
+
+  static const char* kSignedPakIdMetadataKey;
 
 private:
   virtual ~PackagedAppVerifier();
@@ -169,6 +171,9 @@ private:
   // Whether this package app is signed.
   bool mIsPackageSigned;
 
+  // Whether we should bypass verification.
+  bool mBypassVerification;
+
   // The package cache entry (e.g. http://foo.com/app.pak) used to store
   // any necessarry signed package information.
   nsCOMPtr<nsICacheEntry> mPackageCacheEntry;
@@ -191,6 +196,8 @@ private:
 
   // A place to store the computed hashes of each resource.
   nsClassHashtable<nsCStringHashKey, nsCString> mResourceHashStore;
+
+  nsCString mPackageIdentifer;
 }; // class PackagedAppVerifier
 
 } // namespace net

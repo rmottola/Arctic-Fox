@@ -4,7 +4,7 @@
 
 const { Cu } = require("chrome");
 Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
-const STRINGS_URI = "chrome://browser/locale/devtools/memory.properties"
+const STRINGS_URI = "chrome://devtools/locale/memory.properties"
 const L10N = exports.L10N = new ViewHelpers.L10N(STRINGS_URI);
 const { assert } = require("devtools/shared/DevToolsUtils");
 const { Preferences } = require("resource://gre/modules/Preferences.jsm");

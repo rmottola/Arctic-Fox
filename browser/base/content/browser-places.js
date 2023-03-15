@@ -1,6 +1,6 @@
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ////////////////////////////////////////////////////////////////////////////////
 //// StarUI
@@ -1119,6 +1119,16 @@ var BookmarkingUI = {
     return null;
   },
 
+  get notifier() {
+    delete this.notifier;
+    return this.notifier = document.getElementById("bookmarked-notification-anchor");
+  },
+
+  get dropmarkerNotifier() {
+    delete this.dropmarkerNotifier;
+    return this.dropmarkerNotifier = document.getElementById("bookmarked-notification-dropmarker-anchor");
+  },
+
   get broadcaster() {
     delete this.broadcaster;
     let broadcaster = document.getElementById("bookmarkThisPageBroadcaster");
@@ -1491,7 +1501,8 @@ var BookmarkingUI = {
     // Handle special case when the button is in the panel.
     let isBookmarked = this._itemIds.length > 0;
 
-    if (this._currentAreaType == CustomizableUI.TYPE_MENU_PANEL) {
+    if (0) {
+//    if (this._currentAreaType == CustomizableUI.TYPE_MENU_PANEL) {
       this._showSubview();
       return;
     }

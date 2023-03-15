@@ -124,7 +124,6 @@ class Assembler : public AssemblerShared
     static void PatchWrite_NearCall(CodeLocationLabel, CodeLocationLabel) { MOZ_CRASH(); }
     static uint32_t PatchWrite_NearCallSize() { MOZ_CRASH(); }
     static void PatchInstructionImmediate(uint8_t*, PatchedImmPtr) { MOZ_CRASH(); }
-    static int32_t ExtractCodeLabelOffset(uint8_t*) { MOZ_CRASH(); }
 
     static void ToggleToJmp(CodeLocationLabel) { MOZ_CRASH(); }
     static void ToggleToCmp(CodeLocationLabel) { MOZ_CRASH(); }
@@ -147,8 +146,6 @@ class Operand
     Operand (const FloatRegister) { MOZ_CRASH();}
     Operand (Register, Imm32 ) { MOZ_CRASH(); }
     Operand (Register, int32_t ) { MOZ_CRASH(); }
-
-
 };
 
 class MacroAssemblerNone : public Assembler
@@ -166,6 +163,9 @@ class MacroAssemblerNone : public Assembler
 
     size_t numCodeLabels() const { MOZ_CRASH(); }
     CodeLabel codeLabel(size_t) { MOZ_CRASH(); }
+
+    void retargetWithOffset(size_t, const LabelBase*, LabelBase*) { MOZ_CRASH(); }
+    bool asmMergeWith(const MacroAssemblerNone&) { MOZ_CRASH(); }
 
     void trace(JSTracer*) { MOZ_CRASH(); }
     static void TraceJumpRelocations(JSTracer*, JitCode*, CompactBufferReader&) { MOZ_CRASH(); }
@@ -189,7 +189,7 @@ class MacroAssemblerNone : public Assembler
     void nopAlign(size_t) { MOZ_CRASH(); }
     void checkStackAlignment() { MOZ_CRASH(); }
     uint32_t currentOffset() { MOZ_CRASH(); }
-    uint32_t labelOffsetToPatchOffset(uint32_t) { MOZ_CRASH(); }
+    uint32_t labelToPatchOffset(CodeOffsetLabel) { MOZ_CRASH(); }
     CodeOffsetLabel labelForPatch() { MOZ_CRASH(); }
 
     void nop() { MOZ_CRASH(); }
@@ -238,7 +238,6 @@ class MacroAssemblerNone : public Assembler
     template <typename T, typename S> void add32(T, S) { MOZ_CRASH(); }
     template <typename T, typename S> void addPtr(T, S) { MOZ_CRASH(); }
     template <typename T, typename S> void add64(T, S) { MOZ_CRASH(); }
-    template <typename T, typename S> void sub32(T, S) { MOZ_CRASH(); }
     template <typename T, typename S> void subPtr(T, S) { MOZ_CRASH(); }
     void neg32(Register) { MOZ_CRASH(); }
     void mulBy3(Register, Register) { MOZ_CRASH(); }

@@ -1019,6 +1019,18 @@ Declaration::GetValue(nsCSSProperty aProperty, nsAString& aValue,
     // This can express either grid-template-{areas,columns,rows}
     // or grid-auto-{flow,columns,rows}, but not both.
     case eCSSProperty_grid: {
+      const nsCSSValue& columnGapValue =
+        *data->ValueFor(eCSSProperty_grid_column_gap);
+      if (columnGapValue.GetUnit() != eCSSUnit_Pixel ||
+          columnGapValue.GetFloatValue() != 0.0f) {
+        return; // Not serializable, bail.
+      }
+      const nsCSSValue& rowGapValue =
+        *data->ValueFor(eCSSProperty_grid_row_gap);
+      if (rowGapValue.GetUnit() != eCSSUnit_Pixel ||
+          rowGapValue.GetFloatValue() != 0.0f) {
+        return; // Not serializable, bail.
+      }
       const nsCSSValue& areasValue =
         *data->ValueFor(eCSSProperty_grid_template_areas);
       const nsCSSValue& columnsValue =
@@ -1148,6 +1160,45 @@ Declaration::GetValue(nsCSSProperty aProperty, nsAString& aValue,
         if (addSpaceSeparator) {
           aValue.Append(char16_t(' '));
         }
+      }
+      break;
+    }
+    case eCSSProperty_grid_gap: {
+      const nsCSSProperty* subprops =
+        nsCSSProps::SubpropertyEntryFor(aProperty);
+      MOZ_ASSERT(subprops[2] == eCSSProperty_UNKNOWN,
+                 "must have exactly two subproperties");
+
+      nsAutoString val1, val2;
+      AppendValueToString(subprops[0], val1, aSerialization);
+      AppendValueToString(subprops[1], val2, aSerialization);
+      if (val1 == val2) {
+        aValue.Append(val1);
+      } else {
+        aValue.Append(val1);
+        aValue.Append(' ');
+        aValue.Append(val2);
+      }
+      break;
+    }
+    case eCSSProperty_text_emphasis: {
+      const nsCSSValue* emphasisStyle =
+        data->ValueFor(eCSSProperty_text_emphasis_style);
+      const nsCSSValue* emphasisColor =
+        data->ValueFor(eCSSProperty_text_emphasis_color);
+      bool isDefaultColor = emphasisColor->GetUnit() == eCSSUnit_EnumColor &&
+        emphasisColor->GetIntValue() == NS_COLOR_CURRENTCOLOR;
+
+      if (emphasisStyle->GetUnit() != eCSSUnit_None || isDefaultColor) {
+        AppendValueToString(eCSSProperty_text_emphasis_style,
+                            aValue, aSerialization);
+        if (!isDefaultColor) {
+          aValue.Append(char16_t(' '));
+        }
+      }
+      if (!isDefaultColor) {
+        AppendValueToString(eCSSProperty_text_emphasis_color,
+                            aValue, aSerialization);
       }
       break;
     }

@@ -152,6 +152,7 @@ function WorkerActorList(options) {
 
 WorkerActorList.prototype = {
   getList: function () {
+    // Create a set of debuggers.
     let dbgs = new Set();
     let e = wdm.getWorkerDebuggerEnumerator();
     while (e.hasMoreElements()) {
@@ -161,12 +162,14 @@ WorkerActorList.prototype = {
       }
     }
 
+    // Delete each actor for which we don't have a debugger.
     for (let [dbg, ] of this._actors) {
       if (!dbgs.has(dbg)) {
         this._actors.delete(dbg);
       }
     }
 
+    // Create an actor for each debugger for which we don't have one.
     for (let dbg of dbgs) {
       if (!this._actors.has(dbg)) {
         this._actors.set(dbg, new WorkerActor(dbg));
@@ -178,8 +181,12 @@ WorkerActorList.prototype = {
       actors.push(actor);
     }
 
-    this._mustNotify = true;
-    this._checkListening();
+    if (!this._mustNotify) {
+      if (this._onListChanged !== null) {
+        wdm.addListener(this);
+      }
+      this._mustNotify = true;
+    }
 
     return Promise.resolve(actors);
   },
@@ -193,23 +200,24 @@ WorkerActorList.prototype = {
       throw new Error("onListChanged must be either a function or null.");
     }
 
-    this._onListChanged = onListChanged;
-    this._checkListening();
-  },
-
-  _checkListening: function () {
-    if (this._onListChanged !== null && this._mustNotify) {
-      wdm.addListener(this);
-    } else {
-      wdm.removeListener(this);
+    if (this._mustNotify) {
+      if (this._onListChanged === null && onListChanged !== null) {
+        wdm.addListener(this);
+      }
+      if (this._onListChanged !== null && onListChanged === null) {
+        wdm.removeListener(this);
+      }
     }
+    this._onListChanged = onListChanged;
   },
 
   _notifyListChanged: function () {
-    if (this._mustNotify) {
-      this._onListChanged();
-      this._mustNotify = false;
-    }
+     this._onListChanged();
+
+     if (this._onListChanged !== null) {
+       wdm.removeListener(this);
+     }
+     this._mustNotify = false;
   },
 
   onRegister: function (dbg) {
@@ -226,3 +234,106 @@ WorkerActorList.prototype = {
 };
 
 exports.WorkerActorList = WorkerActorList;
+
+function ServiceWorkerRegistrationActor(registration) {
+  this._registration = registration;
+};
+
+ServiceWorkerRegistrationActor.prototype = {
+  actorPrefix: "serviceWorkerRegistration",
+
+  form: function () {
+    return {
+      actor: this.actorID,
+      scope: this._registration.scope
+    };
+  }
+};
+
+function ServiceWorkerRegistrationActorList() {
+  this._actors = new Map();
+  this._onListChanged = null;
+  this._mustNotify = false;
+  this.onRegister = this.onRegister.bind(this);
+  this.onUnregister = this.onUnregister.bind(this);
+};
+
+ServiceWorkerRegistrationActorList.prototype = {
+  getList: function () {
+    // Create a set of registrations.
+    let registrations = new Set();
+    let array = swm.getAllRegistrations();
+    for (let index = 0; index < array.length; ++index) {
+      registrations.add(
+        array.queryElementAt(index, Ci.nsIServiceWorkerRegistrationInfo));
+    }
+
+    // Delete each actor for which we don't have a registration.
+    for (let [registration, ] of this._actors) {
+      if (!registrations.has(registration)) {
+        this._actors.delete(registration);
+      }
+    }
+
+    // Create an actor for each registration for which we don't have one.
+    for (let registration of registrations) {
+      if (!this._actors.has(registration)) {
+        this._actors.set(registration,
+          new ServiceWorkerRegistrationActor(registration));
+      }
+    }
+
+    if (!this._mustNotify) {
+      if (this._onListChanged !== null) {
+        swm.addListener(this);
+      }
+      this._mustNotify = true;
+    }
+
+    let actors = [];
+    for (let [, actor] of this._actors) {
+      actors.push(actor);
+    }
+
+    return Promise.resolve(actors);
+  },
+
+  get onListchanged() {
+    return this._onListchanged;
+  },
+
+  set onListChanged(onListChanged) {
+    if (typeof onListChanged !== "function" && onListChanged !== null) {
+      throw new Error("onListChanged must be either a function or null.");
+    }
+
+    if (this._mustNotify) {
+      if (this._onListChanged === null && onListChanged !== null) {
+        swm.addListener(this);
+      }
+      if (this._onListChanged !== null && onListChanged === null) {
+        swm.removeListener(this);
+      }
+    }
+    this._onListChanged = onListChanged;
+  },
+
+  _notifyListChanged: function () {
+    this._onListChanged();
+
+    if (this._onListChanged !== null) {
+      swm.removeListener(this);
+    }
+    this._mustNotify = false;
+  },
+
+  onRegister: function (registration) {
+    this._notifyListChanged();
+  },
+
+  onUnregister: function (registration) {
+    this._notifyListChanged();
+  }
+};
+
+exports.ServiceWorkerRegistrationActorList = ServiceWorkerRegistrationActorList;

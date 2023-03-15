@@ -75,7 +75,8 @@ jit::NewBaselineFrameInspector(TempAllocator* temp, BaselineFrame* frame, Compil
     // during compilation could capture nursery pointers, so the values' types
     // are recorded instead.
 
-    inspector->thisType = TypeSet::GetMaybeUntrackedValueType(frame->thisValue());
+    if (frame->isNonEvalFunctionFrame())
+        inspector->thisType = TypeSet::GetMaybeUntrackedValueType(frame->thisArgument());
 
     if (frame->scopeChain()->isSingleton())
         inspector->singletonScopeChain = frame->scopeChain();
@@ -1991,8 +1992,8 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_NOT:
         return jsop_not();
 
-      case JSOP_THIS:
-        return jsop_this();
+      case JSOP_FUNCTIONTHIS:
+        return jsop_functionthis();
 
       case JSOP_CALLEE: {
          MDefinition* callee = getCallee();
@@ -4506,15 +4507,6 @@ IonBuilder::processReturn(JSOp op)
         MOZ_CRASH("unknown return op");
     }
 
-    if (script()->isDerivedClassConstructor() &&
-        def->type() != MIRType_Object)
-    {
-        MOZ_ASSERT(info().funMaybeLazy() && info().funMaybeLazy()->isClassConstructor());
-        MCheckReturn* checkRet = MCheckReturn::New(alloc(), def, current->getSlot(info().thisSlot()));
-        current->add(checkRet);
-        def = checkRet;
-    }
-
     MReturn* ret = MReturn::New(alloc(), def);
     current->end(ret);
 
@@ -6362,6 +6354,17 @@ IonBuilder::jsop_funapply(uint32_t argc)
 
     // Fallback to regular call if arg 2 is not definitely |arguments|.
     if (argument->type() != MIRType_MagicOptimizedArguments) {
+        // Optimize fun.apply(self, array) if the length is sane and there are no holes.
+        TemporaryTypeSet* objTypes = argument->resultTypeSet();
+        if (native && native->isNative() && native->native() == fun_apply &&
+            objTypes &&
+            objTypes->getKnownClass(constraints()) == &ArrayObject::class_ &&
+            !objTypes->hasObjectFlags(constraints(), OBJECT_FLAG_LENGTH_OVERFLOW) &&
+            ElementAccessIsPacked(constraints(), argument))
+        {
+            return jsop_funapplyarray(argc);
+        }
+
         CallInfo callInfo(alloc(), false);
         if (!callInfo.init(current, argc))
             return false;
@@ -6377,6 +6380,43 @@ IonBuilder::jsop_funapply(uint32_t argc)
 
     // Use funapply that definitely uses |arguments|
     return jsop_funapplyarguments(argc);
+}
+
+bool
+IonBuilder::jsop_funapplyarray(uint32_t argc)
+{
+    MOZ_ASSERT(argc == 2);
+
+    int funcDepth = -((int)argc + 1);
+
+    // Extract call target.
+    TemporaryTypeSet* funTypes = current->peek(funcDepth)->resultTypeSet();
+    JSFunction* target = getSingleCallTarget(funTypes);
+
+    // Pop the array agument
+    MDefinition* argObj = current->pop();
+
+    MElements* elements = MElements::New(alloc(), argObj);
+    current->add(elements);
+
+    // Pop the |this| argument.
+    MDefinition* argThis = current->pop();
+
+    // Unwrap the (JSFunction *) parameter.
+    MDefinition* argFunc = current->pop();
+
+    // Pop apply function.
+    MDefinition* nativeFunc = current->pop();
+    nativeFunc->setImplicitlyUsedUnchecked();
+
+    MApplyArray* apply = MApplyArray::New(alloc(), target, argFunc, elements, argThis);
+    current->add(apply);
+    current->push(apply);
+    if (!resumeAfter(apply))
+        return false;
+
+    TemporaryTypeSet* types = bytecodeTypes(pc);
+    return pushTypeBarrier(apply, types, BarrierKind::TypeSet);
 }
 
 bool
@@ -6747,14 +6787,6 @@ IonBuilder::jsop_eval(uint32_t argc)
         if (info().funMaybeLazy()->isArrow())
             return abort("Direct eval from arrow function");
 
-        // The 'this' value for the outer and eval scripts must be the
-        // same. This is not guaranteed if a primitive string/number/etc.
-        // is passed through to the eval invoke as the primitive may be
-        // boxed into different objects if accessed via 'this'.
-        MIRType type = thisTypes ? thisTypes->getKnownMIRType() : MIRType_Value;
-        if (type != MIRType_Object && type != MIRType_Null && type != MIRType_Undefined)
-            return abort("Direct eval from script with maybe-primitive 'this'");
-
         CallInfo callInfo(alloc(), /* constructing = */ false);
         if (!callInfo.init(current, argc))
             return false;
@@ -6772,9 +6804,6 @@ IonBuilder::jsop_eval(uint32_t argc)
             TemporaryTypeSet* types = bytecodeTypes(pc);
             return pushTypeBarrier(string, types, BarrierKind::TypeSet);
         }
-
-        current->pushSlot(info().thisSlot());
-        MDefinition* thisValue = current->pop();
 
         if (!jsop_newtarget())
             return false;
@@ -6795,7 +6824,7 @@ IonBuilder::jsop_eval(uint32_t argc)
                 current->add(dynamicName);
 
                 current->push(dynamicName);
-                current->push(thisValue);
+                current->push(constant(UndefinedValue())); // thisv
 
                 CallInfo evalCallInfo(alloc(), /* constructing = */ false);
                 if (!evalCallInfo.init(current, /* argc = */ 0))
@@ -6806,7 +6835,7 @@ IonBuilder::jsop_eval(uint32_t argc)
         }
 
         MInstruction* ins = MCallDirectEval::New(alloc(), scopeChain, string,
-                                                 thisValue, newTargetValue, pc);
+                                                 newTargetValue, pc);
         current->add(ins);
         current->push(ins);
 
@@ -7188,7 +7217,7 @@ IonBuilder::initializeArrayElement(MDefinition* obj, size_t index, MDefinition* 
                 return false;
         }
     } else {
-        if (NeedsPostBarrier(info(), value))
+        if (NeedsPostBarrier(value))
             current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
         if (obj->toNewArray()->convertDoubleElements()) {
@@ -8154,7 +8183,7 @@ IonBuilder::getStaticName(JSObject* staticObject, PropertyName* name, bool* psuc
 
 // Whether a write of the given value may need a post-write barrier for GC purposes.
 bool
-jit::NeedsPostBarrier(CompileInfo& info, MDefinition* value)
+jit::NeedsPostBarrier(MDefinition* value)
 {
     if (!GetJitContext()->runtime->gcNursery().exists())
         return false;
@@ -8203,7 +8232,7 @@ IonBuilder::setStaticName(JSObject* staticObject, PropertyName* name)
     MDefinition* obj = current->pop();
     MOZ_ASSERT(&obj->toConstant()->value().toObject() == staticObject);
 
-    if (NeedsPostBarrier(info(), value))
+    if (NeedsPostBarrier(value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     // If the property has a known type, we may be able to optimize typed stores by not
@@ -9855,17 +9884,11 @@ IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
 
     bool barrier = true;
 
-    if (index->mightBeType(MIRType_Int32)) {
-        // Bail if we might have a barriered write to a dense element, as the
-        // dense element stub doesn't support this yet.
-        if (PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current,
-                                          &object, nullptr, &value, /* canModify = */ true))
-        {
-            trackOptimizationOutcome(TrackedOutcome::NeedsTypeBarrier);
-            return true;
-        }
-        if (index->type() == MIRType_Int32)
-            barrier = false;
+    if (index->type() == MIRType_Int32 &&
+        !PropertyWriteNeedsTypeBarrier(alloc(), constraints(), current,
+                                       &object, nullptr, &value, /* canModify = */ true))
+    {
+        barrier = false;
     }
 
     // We can avoid worrying about holes in the IC if we know a priori we are safe
@@ -9879,10 +9902,10 @@ IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
     bool checkNative = !clasp || !clasp->isNative();
     object = addMaybeCopyElementsForWrite(object, checkNative);
 
-    if (NeedsPostBarrier(info(), value))
+    if (NeedsPostBarrier(value))
         current->add(MPostWriteBarrier::New(alloc(), object, value));
 
-    // Emit SetElementCache.
+    // Emit SetPropertyCache.
     bool strict = JSOp(*pc) == JSOP_STRICTSETELEM;
     MSetPropertyCache* ins =
         MSetPropertyCache::New(alloc(), object, index, value, strict, barrier, guardHoles);
@@ -9911,7 +9934,7 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
     // cannot hit another indexed property on the object or its prototypes.
     bool writeOutOfBounds = !ElementAccessHasExtraIndexedProperty(this, obj);
 
-    if (NeedsPostBarrier(info(), value))
+    if (NeedsPostBarrier(value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     // Ensure id is an integer.
@@ -10242,7 +10265,7 @@ IonBuilder::jsop_rest()
                                                   /* needsHoleCheck = */ false);
         current->add(store);
 
-        if (NeedsPostBarrier(info(), arg))
+        if (NeedsPostBarrier(arg))
             current->add(MPostWriteBarrier::New(alloc(), array, arg));
     }
 
@@ -12017,7 +12040,7 @@ IonBuilder::jsop_setprop(PropertyName* name)
 
     // Add post barrier if needed. The instructions above manage any post
     // barriers they need directly.
-    if (NeedsPostBarrier(info(), value))
+    if (NeedsPostBarrier(value))
         current->add(MPostWriteBarrier::New(alloc(), obj, value));
 
     if (!forceInlineCaches()) {
@@ -12665,10 +12688,8 @@ IonBuilder::jsop_lambda_arrow(JSFunction* fun)
     MOZ_ASSERT(!fun->isNative());
 
     MDefinition* newTargetDef = current->pop();
-    MDefinition* thisDef = current->pop();
-
     MLambdaArrow* ins = MLambdaArrow::New(alloc(), constraints(), current->scopeChain(),
-                                          thisDef, newTargetDef, fun);
+                                          newTargetDef, fun);
     current->add(ins);
     current->push(ins);
 
@@ -12689,7 +12710,7 @@ IonBuilder::jsop_setarg(uint32_t arg)
     // If an arguments object is in use, and it aliases formals, then all SETARGs
     // must go through the arguments object.
     if (info().argsObjAliasesFormals()) {
-        if (NeedsPostBarrier(info(), val))
+        if (NeedsPostBarrier(val))
             current->add(MPostWriteBarrier::New(alloc(), current->argumentsObject(), val));
         current->add(MSetArgumentsObjectArg::New(alloc(), current->argumentsObject(),
                                                  GET_ARGNO(pc), val));
@@ -12852,41 +12873,16 @@ IonBuilder::jsop_checkaliasedlet(ScopeCoordinate sc)
 }
 
 bool
-IonBuilder::jsop_this()
+IonBuilder::jsop_functionthis()
 {
-    if (info().module()) {
-        pushConstant(UndefinedValue());
-        return true;
-    }
-
-    if (!info().funMaybeLazy())
-        return abort("JSOP_THIS outside of a JSFunction.");
-
-    if (info().funMaybeLazy()->isArrow()) {
-        // Arrow functions store their lexical |this| in an extended slot.
-        MLoadArrowThis* thisObj = MLoadArrowThis::New(alloc(), getCallee());
-        current->add(thisObj);
-        current->push(thisObj);
-        return true;
-    }
+    MOZ_ASSERT(info().funMaybeLazy());
+    MOZ_ASSERT(!info().funMaybeLazy()->isArrow());
 
     if (script()->strict() || info().funMaybeLazy()->isSelfHostedBuiltin()) {
         // No need to wrap primitive |this| in strict mode or self-hosted code.
-        MDefinition* thisVal = current->getSlot(info().thisSlot());
-        if (script()->isDerivedClassConstructor()) {
-            MOZ_ASSERT(info().funMaybeLazy()->isClassConstructor());
-            MOZ_ASSERT(script()->strict());
-
-            MLexicalCheck* checkThis = MLexicalCheck::New(alloc(), thisVal, Bailout_UninitializedThis);
-            current->add(checkThis);
-            thisVal = checkThis;
-        }
-
-        current->push(thisVal);
+        current->pushSlot(info().thisSlot());
         return true;
     }
-
-    MOZ_ASSERT(!info().funMaybeLazy()->isClassConstructor());
 
     if (thisTypes && (thisTypes->getKnownMIRType() == MIRType_Object ||
         (thisTypes->empty() && baselineFrame_ && baselineFrame_->thisType.isSomeObject())))
@@ -12910,7 +12906,6 @@ IonBuilder::jsop_this()
     MDefinition* def = current->getSlot(info().thisSlot());
 
     if (def->type() == MIRType_Object) {
-        // If we already computed a |this| object, we can reuse it.
         current->push(def);
         return true;
     }
@@ -12918,8 +12913,6 @@ IonBuilder::jsop_this()
     MComputeThis* thisObj = MComputeThis::New(alloc(), def);
     current->add(thisObj);
     current->push(thisObj);
-
-    current->setSlot(info().thisSlot(), thisObj);
 
     return resumeAfter(thisObj);
 }
@@ -13155,7 +13148,7 @@ IonBuilder::jsop_setaliasedvar(ScopeCoordinate sc)
 
     Shape* shape = ScopeCoordinateToStaticScopeShape(script(), pc);
 
-    if (NeedsPostBarrier(info(), rval))
+    if (NeedsPostBarrier(rval))
         current->add(MPostWriteBarrier::New(alloc(), obj, rval));
 
     MInstruction* store;
@@ -13822,7 +13815,7 @@ IonBuilder::storeReferenceTypedObjectValue(MDefinition* typedObj,
     MInstruction* store = nullptr;  // initialize to silence GCC warning
     switch (type) {
       case ReferenceTypeDescr::TYPE_ANY:
-        if (NeedsPostBarrier(info(), value))
+        if (NeedsPostBarrier(value))
             current->add(MPostWriteBarrier::New(alloc(), typedObj, value));
         store = MStoreElement::New(alloc(), elements, scaledOffset, value, false, adjustment);
         store->toStoreElement()->setNeedsBarrier();

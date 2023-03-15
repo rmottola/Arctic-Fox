@@ -33,6 +33,11 @@ class ServiceWorkerClientInfo final
 public:
   explicit ServiceWorkerClientInfo(nsIDocument* aDoc);
 
+  const nsString& ClientId() const
+  {
+    return mClientId;
+  }
+
 private:
   nsString mClientId;
   uint64_t mWindowId;
@@ -57,6 +62,7 @@ public:
     , mId(aClientInfo.mClientId)
     , mUrl(aClientInfo.mUrl)
     , mWindowId(aClientInfo.mWindowId)
+    , mFrameType(aClientInfo.mFrameType)
   {
     MOZ_ASSERT(aOwner);
   }
@@ -78,6 +84,12 @@ public:
     aUrl.Assign(mUrl);
   }
 
+  mozilla::dom::FrameType
+  FrameType() const
+  {
+    return mFrameType;
+  }
+
   void
   PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
               const Optional<Sequence<JS::Value>>& aTransferable,
@@ -97,6 +109,7 @@ private:
 
 protected:
   uint64_t mWindowId;
+  mozilla::dom::FrameType mFrameType;
 };
 
 } // namespace workers

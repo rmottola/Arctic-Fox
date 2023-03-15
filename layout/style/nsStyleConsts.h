@@ -18,13 +18,12 @@ namespace mozilla {
 namespace css {
 typedef mozilla::Side Side;
 } // namespace css
-} // namespace mozilla
 
 #define NS_FOR_CSS_SIDES(var_) for (mozilla::css::Side var_ = NS_SIDE_TOP; var_ <= NS_SIDE_LEFT; var_++)
-static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
+static inline css::Side operator++(css::Side& side, int) {
     NS_PRECONDITION(side >= NS_SIDE_TOP &&
                     side <= NS_SIDE_LEFT, "Out of range side");
-    side = mozilla::css::Side(side + 1);
+    side = css::Side(side + 1);
     return side;
 }
 
@@ -57,9 +56,11 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
   ((((side_) + !!(second_))*2 + ((side_) + !(parallel_))%2) % 8)
 
 // box-sizing
-#define NS_STYLE_BOX_SIZING_CONTENT       0
-#define NS_STYLE_BOX_SIZING_PADDING       1
-#define NS_STYLE_BOX_SIZING_BORDER        2
+enum class StyleBoxSizing : uint8_t {
+  Content,
+  Padding,
+  Border
+};
 
 // clip-path sizing
 #define NS_STYLE_CLIP_SHAPE_SIZING_NOBOX   0
@@ -243,17 +244,12 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_WILL_CHANGE_SCROLL             (1<<2)
 #define NS_STYLE_WILL_CHANGE_OPACITY            (1<<3)
 
-// See nsStyleDisplay
-#define NS_STYLE_ANIMATION_DIRECTION_NORMAL       0
-#define NS_STYLE_ANIMATION_DIRECTION_REVERSE      1
-#define NS_STYLE_ANIMATION_DIRECTION_ALTERNATE    2
-#define NS_STYLE_ANIMATION_DIRECTION_ALTERNATE_REVERSE    3
-
-// See nsStyleDisplay
-#define NS_STYLE_ANIMATION_FILL_MODE_NONE         0
-#define NS_STYLE_ANIMATION_FILL_MODE_FORWARDS     1
-#define NS_STYLE_ANIMATION_FILL_MODE_BACKWARDS    2
-#define NS_STYLE_ANIMATION_FILL_MODE_BOTH         3
+// See AnimationEffectReadOnly.webidl
+// and mozilla/dom/AnimationEffectReadOnlyBinding.h
+namespace dom {
+enum class PlaybackDirection : uint32_t;
+enum class FillMode : uint32_t;
+}
 
 // See nsStyleDisplay
 #define NS_STYLE_ANIMATION_ITERATION_COUNT_INFINITE 0
@@ -524,30 +520,6 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_JUSTIFY_ALL_SHIFT        NS_STYLE_ALIGN_ALL_SHIFT
 
 // See nsStylePosition
-#define NS_STYLE_ALIGN_CONTENT_FLEX_START       0
-#define NS_STYLE_ALIGN_CONTENT_FLEX_END         1
-#define NS_STYLE_ALIGN_CONTENT_CENTER           2
-#define NS_STYLE_ALIGN_CONTENT_SPACE_BETWEEN    3
-#define NS_STYLE_ALIGN_CONTENT_SPACE_AROUND     4
-#define NS_STYLE_ALIGN_CONTENT_STRETCH          5
-
-// See nsStylePosition
-#define NS_STYLE_ALIGN_ITEMS_FLEX_START         0
-#define NS_STYLE_ALIGN_ITEMS_FLEX_END           1
-#define NS_STYLE_ALIGN_ITEMS_CENTER             2
-#define NS_STYLE_ALIGN_ITEMS_BASELINE           3
-#define NS_STYLE_ALIGN_ITEMS_STRETCH            4
-
-// For convenience/clarity (since we use this default value in multiple places)
-#define NS_STYLE_ALIGN_ITEMS_INITIAL_VALUE      NS_STYLE_ALIGN_ITEMS_STRETCH
-
-// The "align-self" property accepts all of the normal "align-items" values
-// (above) plus a special 'auto' value that computes to the parent's
-// "align-items" value. Our computed style code internally represents 'auto'
-// with this enum until we actually evaluate it:
-#define NS_STYLE_ALIGN_SELF_AUTO                5
-
-// See nsStylePosition
 #define NS_STYLE_FLEX_DIRECTION_ROW             0
 #define NS_STYLE_FLEX_DIRECTION_ROW_REVERSE     1
 #define NS_STYLE_FLEX_DIRECTION_COLUMN          2
@@ -563,12 +535,12 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 // (rather than an internal numerical representation of some keyword).
 #define NS_STYLE_ORDER_INITIAL                  0
 
-// See nsStylePosition
-#define NS_STYLE_JUSTIFY_CONTENT_FLEX_START     0
-#define NS_STYLE_JUSTIFY_CONTENT_FLEX_END       1
-#define NS_STYLE_JUSTIFY_CONTENT_CENTER         2
-#define NS_STYLE_JUSTIFY_CONTENT_SPACE_BETWEEN  3
-#define NS_STYLE_JUSTIFY_CONTENT_SPACE_AROUND   4
+// XXX remove in a later patch after updating flexbox code with the new names
+#define NS_STYLE_JUSTIFY_CONTENT_FLEX_START     NS_STYLE_JUSTIFY_FLEX_START
+#define NS_STYLE_JUSTIFY_CONTENT_FLEX_END       NS_STYLE_JUSTIFY_FLEX_END
+#define NS_STYLE_JUSTIFY_CONTENT_CENTER         NS_STYLE_JUSTIFY_CENTER
+#define NS_STYLE_JUSTIFY_CONTENT_SPACE_BETWEEN  NS_STYLE_JUSTIFY_SPACE_BETWEEN
+#define NS_STYLE_JUSTIFY_CONTENT_SPACE_AROUND   NS_STYLE_JUSTIFY_SPACE_AROUND
 
 // See nsStyleDisplay
 #define NS_STYLE_FLOAT_NONE                     0
@@ -832,9 +804,9 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 
 // See nsStyleText, nsStyleFont
 #define NS_STYLE_TEXT_DECORATION_LINE_NONE         0
-#define NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE    NS_FONT_DECORATION_UNDERLINE
-#define NS_STYLE_TEXT_DECORATION_LINE_OVERLINE     NS_FONT_DECORATION_OVERLINE
-#define NS_STYLE_TEXT_DECORATION_LINE_LINE_THROUGH NS_FONT_DECORATION_LINE_THROUGH
+#define NS_STYLE_TEXT_DECORATION_LINE_UNDERLINE    0x01
+#define NS_STYLE_TEXT_DECORATION_LINE_OVERLINE     0x02
+#define NS_STYLE_TEXT_DECORATION_LINE_LINE_THROUGH 0x04
 #define NS_STYLE_TEXT_DECORATION_LINE_BLINK        0x08
 #define NS_STYLE_TEXT_DECORATION_LINE_PREF_ANCHORS 0x10
 // OVERRIDE_ALL does not occur in stylesheets; it only comes from HTML
@@ -1099,6 +1071,36 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 #define NS_STYLE_TEXT_ANCHOR_MIDDLE             1
 #define NS_STYLE_TEXT_ANCHOR_END                2
 
+// text-emphasis-position
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_OVER    (1 << 0)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER   (1 << 1)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT    (1 << 2)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT   (1 << 3)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT \
+  (NS_STYLE_TEXT_EMPHASIS_POSITION_OVER | \
+   NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT)
+#define NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT_ZH \
+  (NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER | \
+   NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT)
+
+// text-emphasis-style
+// Note that filled and none here both have zero as their value. This is
+// not an problem because:
+// * In specified style, none is represented as eCSSUnit_None.
+// * In computed style, 'filled' always has its shape computed, and thus
+//   the combined value is never zero.
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_NONE           0
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_FILL_MASK      (1 << 3)
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_FILLED         (0 << 3)
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_OPEN           (1 << 3)
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_SHAPE_MASK     7
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_DOT            1
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_CIRCLE         2
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_DOUBLE_CIRCLE  3
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_TRIANGLE       4
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_SESAME         5
+#define NS_STYLE_TEXT_EMPHASIS_STYLE_STRING         255
+
 // text-rendering
 #define NS_STYLE_TEXT_RENDERING_AUTO               0
 #define NS_STYLE_TEXT_RENDERING_OPTIMIZESPEED      1
@@ -1184,5 +1186,7 @@ static inline mozilla::css::Side operator++(mozilla::css::Side& side, int) {
 // scan
 #define NS_STYLE_SCAN_PROGRESSIVE               0
 #define NS_STYLE_SCAN_INTERLACE                 1
+
+} // namespace mozilla
 
 #endif /* nsStyleConsts_h___ */

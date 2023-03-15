@@ -151,10 +151,16 @@ class CodeGenerator : public CodeGeneratorSpecific
                                                 uint32_t numFormals,
                                                 uint32_t unusedStack);
     void visitCallKnown(LCallKnown* call);
-    void emitCallInvokeFunction(LApplyArgsGeneric* apply, Register extraStackSize);
+    template<typename T> void emitApplyGeneric(T* apply);
+    template<typename T> void emitCallInvokeFunction(T* apply, Register extraStackSize);
+    void emitAllocateSpaceForApply(Register argcreg, Register extraStackSpace, Label* end);
+    void emitCopyValuesForApply(Register argvSrcBase, Register argvIndex, Register copyreg,
+                                size_t argvSrcOffset, size_t argvDstOffset);
+    void emitPopArguments(Register extraStackSize);
     void emitPushArguments(LApplyArgsGeneric* apply, Register extraStackSpace);
-    void emitPopArguments(LApplyArgsGeneric* apply, Register extraStackSize);
     void visitApplyArgsGeneric(LApplyArgsGeneric* apply);
+    void emitPushArguments(LApplyArrayGeneric* apply, Register extraStackSpace);
+    void visitApplyArrayGeneric(LApplyArrayGeneric* apply);
     void visitBail(LBail* lir);
     void visitUnreachable(LUnreachable* unreachable);
     void visitEncodeSnapshot(LEncodeSnapshot* lir);
@@ -191,7 +197,6 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitSetArgumentsObjectArg(LSetArgumentsObjectArg* lir);
     void visitReturnFromCtor(LReturnFromCtor* lir);
     void visitComputeThis(LComputeThis* lir);
-    void visitLoadArrowThis(LLoadArrowThis* lir);
     void visitArrayLength(LArrayLength* lir);
     void visitSetArrayLength(LSetArrayLength* lir);
     void visitTypedArrayLength(LTypedArrayLength* lir);
@@ -214,6 +219,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitBoundsCheckRange(LBoundsCheckRange* lir);
     void visitBoundsCheckLower(LBoundsCheckLower* lir);
     void visitLoadFixedSlotV(LLoadFixedSlotV* ins);
+    void visitLoadFixedSlotAndUnbox(LLoadFixedSlotAndUnbox* lir);
     void visitLoadFixedSlotT(LLoadFixedSlotT* ins);
     void visitStoreFixedSlotV(LStoreFixedSlotV* ins);
     void visitStoreFixedSlotT(LStoreFixedSlotT* ins);

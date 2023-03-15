@@ -6,12 +6,20 @@
 
 #include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "WebGLContext.h"
+#include "WebGLFormats.h"
 
 namespace mozilla {
 
 WebGLExtensionTextureFloatLinear::WebGLExtensionTextureFloatLinear(WebGLContext* webgl)
     : WebGLExtensionBase(webgl)
 {
+    auto& fua = webgl->mFormatUsage;
+
+    fua->EditUsage(webgl::EffectiveFormat::RGBA32F)->isFilterable = true;
+    fua->EditUsage(webgl::EffectiveFormat::RGB32F)->isFilterable = true;
+    fua->EditUsage(webgl::EffectiveFormat::Luminance32FAlpha32F)->isFilterable = true;
+    fua->EditUsage(webgl::EffectiveFormat::Luminance32F)->isFilterable = true;
+    fua->EditUsage(webgl::EffectiveFormat::Alpha32F)->isFilterable = true;
 }
 
 WebGLExtensionTextureFloatLinear::~WebGLExtensionTextureFloatLinear()

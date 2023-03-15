@@ -536,12 +536,15 @@ nsComputedDOMStyle::GetAdjustedValuesForBoxSizing()
 
   nsMargin adjustment;
   switch(stylePos->mBoxSizing) {
-    case NS_STYLE_BOX_SIZING_BORDER:
+    case StyleBoxSizing::Border:
       adjustment += mInnerFrame->GetUsedBorder();
       // fall through
-
-    case NS_STYLE_BOX_SIZING_PADDING:
+    case StyleBoxSizing::Padding:
       adjustment += mInnerFrame->GetUsedPadding();
+      // fall through
+    case StyleBoxSizing::Content:
+      // nothing
+      break;
   }
 
   return adjustment;
@@ -1794,7 +1797,7 @@ nsComputedDOMStyle::DoGetFontVariantPosition()
 CSSValue*
 nsComputedDOMStyle::GetBackgroundList(uint8_t nsStyleBackground::Layer::* aMember,
                                       uint32_t nsStyleBackground::* aCount,
-                                      const KTableValue aTable[])
+                                      const KTableEntry aTable[])
 {
   const nsStyleBackground* bg = StyleBackground();
 
@@ -2560,6 +2563,22 @@ nsComputedDOMStyle::DoGetGridRowEnd()
 }
 
 CSSValue*
+nsComputedDOMStyle::DoGetGridColumnGap()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  val->SetAppUnits(StylePosition()->mGridColumnGap);
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetGridRowGap()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  val->SetAppUnits(StylePosition()->mGridRowGap);
+  return val;
+}
+
+CSSValue*
 nsComputedDOMStyle::DoGetPaddingTop()
 {
   return GetPaddingWidthFor(NS_SIDE_TOP);
@@ -3297,7 +3316,7 @@ nsComputedDOMStyle::DoGetVerticalAlign()
 
 CSSValue*
 nsComputedDOMStyle::CreateTextAlignValue(uint8_t aAlign, bool aAlignTrue,
-                                         const KTableValue aTable[])
+                                         const KTableEntry aTable[])
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
   val->SetIdent(nsCSSProps::ValueToKeywordEnum(aAlign, aTable));
@@ -3430,6 +3449,79 @@ nsComputedDOMStyle::DoGetTextDecorationStyle()
                                    nsCSSProps::kTextDecorationStyleKTable));
 
   return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetTextEmphasisColor()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  const nsStyleText* text = StyleText();
+  nscolor color = text->mTextEmphasisColorForeground ?
+    StyleColor()->mColor : text->mTextEmphasisColor;
+  SetToRGBAColor(val, color);
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetTextEmphasisPosition()
+{
+  auto position = StyleText()->mTextEmphasisPosition;
+
+  MOZ_ASSERT(!(position & NS_STYLE_TEXT_EMPHASIS_POSITION_OVER) !=
+             !(position & NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER));
+  nsROCSSPrimitiveValue* first = new nsROCSSPrimitiveValue;
+  first->SetIdent((position & NS_STYLE_TEXT_EMPHASIS_POSITION_OVER) ?
+                  eCSSKeyword_over : eCSSKeyword_under);
+
+  MOZ_ASSERT(!(position & NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT) !=
+             !(position & NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT));
+  nsROCSSPrimitiveValue* second = new nsROCSSPrimitiveValue;
+  second->SetIdent((position & NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT) ?
+                   eCSSKeyword_left : eCSSKeyword_right);
+
+  nsDOMCSSValueList* valueList = GetROCSSValueList(false);
+  valueList->AppendCSSValue(first);
+  valueList->AppendCSSValue(second);
+  return valueList;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetTextEmphasisStyle()
+{
+  auto style = StyleText()->mTextEmphasisStyle;
+  if (style == NS_STYLE_TEXT_EMPHASIS_STYLE_NONE) {
+    nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+    val->SetIdent(eCSSKeyword_none);
+    return val;
+  }
+  if (style == NS_STYLE_TEXT_EMPHASIS_STYLE_STRING) {
+    nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+    nsString tmp;
+    nsStyleUtil::AppendEscapedCSSString(
+      StyleText()->mTextEmphasisStyleString, tmp);
+    val->SetString(tmp);
+    return val;
+  }
+
+  nsROCSSPrimitiveValue* fillVal = new nsROCSSPrimitiveValue;
+  if ((style & NS_STYLE_TEXT_EMPHASIS_STYLE_FILL_MASK) ==
+      NS_STYLE_TEXT_EMPHASIS_STYLE_FILLED) {
+    fillVal->SetIdent(eCSSKeyword_filled);
+  } else {
+    MOZ_ASSERT((style & NS_STYLE_TEXT_EMPHASIS_STYLE_FILL_MASK) ==
+               NS_STYLE_TEXT_EMPHASIS_STYLE_OPEN);
+    fillVal->SetIdent(eCSSKeyword_open);
+  }
+
+  nsROCSSPrimitiveValue* shapeVal = new nsROCSSPrimitiveValue;
+  shapeVal->SetIdent(nsCSSProps::ValueToKeywordEnum(
+    style & NS_STYLE_TEXT_EMPHASIS_STYLE_SHAPE_MASK,
+    nsCSSProps::kTextEmphasisStyleShapeKTable));
+
+  nsDOMCSSValueList* valueList = GetROCSSValueList(false);
+  valueList->AppendCSSValue(fillVal);
+  valueList->AppendCSSValue(shapeVal);
+  return valueList;
 }
 
 CSSValue*
@@ -3766,7 +3858,7 @@ nsComputedDOMStyle::DoGetBoxSizing()
 {
   nsROCSSPrimitiveValue *val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StylePosition()->mBoxSizing,
+    nsCSSProps::ValueToKeywordEnum(uint8_t(StylePosition()->mBoxSizing),
                                    nsCSSProps::kBoxSizingKTable));
   return val;
 }
@@ -3864,52 +3956,6 @@ nsComputedDOMStyle::DoGetBorderImageRepeat()
 }
 
 CSSValue*
-nsComputedDOMStyle::DoGetAlignContent()
-{
-  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
-  val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StylePosition()->mAlignContent,
-                                   nsCSSProps::kAlignContentKTable));
-  return val;
-}
-
-CSSValue*
-nsComputedDOMStyle::DoGetAlignItems()
-{
-  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
-  val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StylePosition()->mAlignItems,
-                                   nsCSSProps::kAlignItemsKTable));
-  return val;
-}
-
-CSSValue*
-nsComputedDOMStyle::DoGetAlignSelf()
-{
-  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
-  uint8_t computedAlignSelf = StylePosition()->mAlignSelf;
-
-  if (computedAlignSelf == NS_STYLE_ALIGN_SELF_AUTO) {
-    // "align-self: auto" needs to compute to parent's align-items value.
-    nsStyleContext* parentStyleContext = mStyleContext->GetParent();
-    if (parentStyleContext) {
-      computedAlignSelf =
-        parentStyleContext->StylePosition()->mAlignItems;
-    } else {
-      // No parent --> use default.
-      computedAlignSelf = NS_STYLE_ALIGN_ITEMS_INITIAL_VALUE;
-    }
-  }
-
-  MOZ_ASSERT(computedAlignSelf != NS_STYLE_ALIGN_SELF_AUTO,
-             "Should have swapped out 'auto' for something non-auto");
-  val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(computedAlignSelf,
-                                   nsCSSProps::kAlignSelfKTable));
-  return val;
-}
-
-CSSValue*
 nsComputedDOMStyle::DoGetFlexBasis()
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
@@ -3975,12 +4021,60 @@ nsComputedDOMStyle::DoGetOrder()
 }
 
 CSSValue*
+nsComputedDOMStyle::DoGetAlignContent()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  nsAutoString str;
+  auto align = StylePosition()->ComputedAlignContent(StyleDisplay());
+  nsCSSValue::AppendAlignJustifyValueToString(align & NS_STYLE_ALIGN_ALL_BITS, str);
+  auto fallback = align >> NS_STYLE_ALIGN_ALL_SHIFT;
+  if (fallback) {
+    str.Append(' ');
+    nsCSSValue::AppendAlignJustifyValueToString(fallback, str);
+  }
+  val->SetString(str);
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetAlignItems()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  nsAutoString str;
+  auto align = StylePosition()->ComputedAlignItems(StyleDisplay());
+  nsCSSValue::AppendAlignJustifyValueToString(align, str);
+  val->SetString(str);
+  return val;
+}
+
+CSSValue*
+nsComputedDOMStyle::DoGetAlignSelf()
+{
+  nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
+  auto align = StylePosition()->
+    ComputedAlignSelf(StyleDisplay(), mStyleContext->GetParent());
+  nsAutoString str;
+  nsCSSValue::AppendAlignJustifyValueToString(align, str);
+  val->SetString(str);
+  return val;
+}
+
+CSSValue*
 nsComputedDOMStyle::DoGetJustifyContent()
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
-  val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StylePosition()->mJustifyContent,
-                                   nsCSSProps::kJustifyContentKTable));
+  nsAutoString str;
+  auto justify = StylePosition()->ComputedJustifyContent(StyleDisplay());
+  nsCSSValue::AppendAlignJustifyValueToString(justify & NS_STYLE_JUSTIFY_ALL_BITS, str);
+  auto fallback = justify >> NS_STYLE_JUSTIFY_ALL_SHIFT;
+  if (fallback) {
+    MOZ_ASSERT(nsCSSProps::ValueToKeywordEnum(fallback & ~NS_STYLE_JUSTIFY_FLAG_BITS,
+                                              nsCSSProps::kAlignSelfPosition)
+               != eCSSKeyword_UNKNOWN, "unknown fallback value");
+    str.Append(' ');
+    nsCSSValue::AppendAlignJustifyValueToString(fallback, str);
+  }
+  val->SetString(str);
   return val;
 }
 
@@ -4851,7 +4945,7 @@ nsComputedDOMStyle::SetValueToCoord(nsROCSSPrimitiveValue* aValue,
                                     const nsStyleCoord& aCoord,
                                     bool aClampNegativeCalc,
                                     PercentageBaseGetter aPercentageBaseGetter,
-                                    const KTableValue aTable[],
+                                    const KTableEntry aTable[],
                                     nscoord aMinAppUnits,
                                     nscoord aMaxAppUnits)
 {
@@ -5971,8 +6065,9 @@ nsComputedDOMStyle::DoGetAnimationDirection()
     nsROCSSPrimitiveValue* direction = new nsROCSSPrimitiveValue;
     valueList->AppendCSSValue(direction);
     direction->SetIdent(
-      nsCSSProps::ValueToKeywordEnum(animation->GetDirection(),
-                                     nsCSSProps::kAnimationDirectionKTable));
+      nsCSSProps::ValueToKeywordEnum(
+        static_cast<int32_t>(animation->GetDirection()),
+        nsCSSProps::kAnimationDirectionKTable));
   } while (++i < display->mAnimationDirectionCount);
 
   return valueList;
@@ -5993,8 +6088,9 @@ nsComputedDOMStyle::DoGetAnimationFillMode()
     nsROCSSPrimitiveValue* fillMode = new nsROCSSPrimitiveValue;
     valueList->AppendCSSValue(fillMode);
     fillMode->SetIdent(
-      nsCSSProps::ValueToKeywordEnum(animation->GetFillMode(),
-                                     nsCSSProps::kAnimationFillModeKTable));
+      nsCSSProps::ValueToKeywordEnum(
+        static_cast<int32_t>(animation->GetFillMode()),
+        nsCSSProps::kAnimationFillModeKTable));
   } while (++i < display->mAnimationFillModeCount);
 
   return valueList;

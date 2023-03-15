@@ -20,16 +20,16 @@
 
 using namespace mozilla;
 
-static const nsCSSProps::KTableValue kOrientationKeywords[] = {
-  eCSSKeyword_portrait,                 NS_STYLE_ORIENTATION_PORTRAIT,
-  eCSSKeyword_landscape,                NS_STYLE_ORIENTATION_LANDSCAPE,
-  eCSSKeyword_UNKNOWN,                  -1
+static const nsCSSProps::KTableEntry kOrientationKeywords[] = {
+  { eCSSKeyword_portrait,                 NS_STYLE_ORIENTATION_PORTRAIT },
+  { eCSSKeyword_landscape,                NS_STYLE_ORIENTATION_LANDSCAPE },
+  { eCSSKeyword_UNKNOWN,                  -1 }
 };
 
-static const nsCSSProps::KTableValue kScanKeywords[] = {
-  eCSSKeyword_progressive,              NS_STYLE_SCAN_PROGRESSIVE,
-  eCSSKeyword_interlace,                NS_STYLE_SCAN_INTERLACE,
-  eCSSKeyword_UNKNOWN,                  -1
+static const nsCSSProps::KTableEntry kScanKeywords[] = {
+  { eCSSKeyword_progressive,              NS_STYLE_SCAN_PROGRESSIVE },
+  { eCSSKeyword_interlace,                NS_STYLE_SCAN_INTERLACE },
+  { eCSSKeyword_UNKNOWN,                  -1 }
 };
 
 #ifdef XP_WIN
@@ -42,6 +42,11 @@ struct WindowsThemeName {
 const WindowsThemeName themeStrings[] = {
     { LookAndFeel::eWindowsTheme_Aero,       L"aero" },
     { LookAndFeel::eWindowsTheme_AeroLite,   L"aero-lite" },
+    { LookAndFeel::eWindowsTheme_LunaBlue,   L"luna-blue" },
+    { LookAndFeel::eWindowsTheme_LunaOlive,  L"luna-olive" },
+    { LookAndFeel::eWindowsTheme_LunaSilver, L"luna-silver" },
+    { LookAndFeel::eWindowsTheme_Royale,     L"royale" },
+    { LookAndFeel::eWindowsTheme_Zune,       L"zune" },
     { LookAndFeel::eWindowsTheme_Generic,    L"generic" }
 };
 

@@ -1,7 +1,7 @@
-# -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Removes a doorhanger notification if all of the installs it was notifying
 // about have ended in some way.
@@ -90,14 +90,9 @@ const gXPInstallObserver = {
 
     // Make notifications persist a minimum of 30 seconds
     var options = {
-      timeout: Date.now() + 30000
+      displayURI: installInfo.originatingURI,
+      timeout: Date.now() + 30000,
     };
-
-    try {
-      options.displayOrigin = installInfo.originatingURI.host;
-    } catch (e) {
-      // originatingURI might be missing or 'host' might throw for non-nsStandardURL nsIURIs.
-    }
 
     let cancelInstallation = () => {
       if (installInfo) {
@@ -236,14 +231,9 @@ const gXPInstallObserver = {
     var notificationID = aTopic;
     // Make notifications persist a minimum of 30 seconds
     var options = {
-      timeout: Date.now() + 30000
+      displayURI: installInfo.originatingURI,
+      timeout: Date.now() + 30000,
     };
-
-    try {
-      options.displayOrigin = installInfo.originatingURI.host;
-    } catch (e) {
-      // originatingURI might be missing or 'host' might throw for non-nsStandardURL nsIURIs.
-    }
 
     switch (aTopic) {
     case "addon-install-disabled": {
@@ -337,7 +327,13 @@ const gXPInstallObserver = {
     case "addon-install-failed": {
       // TODO This isn't terribly ideal for the multiple failure case
       for (let install of installInfo.installs) {
-        let host = options.displayOrigin;
+        let host;
+        try {
+          host  = options.displayURI.host;
+        } catch (e) {
+          // displayURI might be missing or 'host' might throw for non-nsStandardURL nsIURIs.
+        }
+
         if (!host)
           host = (install.sourceURI instanceof Ci.nsIStandardURL) &&
                  install.sourceURI.host;

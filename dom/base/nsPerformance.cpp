@@ -11,6 +11,7 @@
 #include "nsDOMNavigationTiming.h"
 #include "nsContentUtils.h"
 #include "nsIScriptSecurityManager.h"
+#include "nsGlobalWindow.h"
 #include "nsIDOMWindow.h"
 #include "nsILoadInfo.h"
 #include "nsIURI.h"
@@ -29,7 +30,10 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/TimeStamp.h"
+#include "SharedWorker.h"
+#include "ServiceWorker.h"
 #include "js/HeapAPI.h"
+#include "GeckoProfiler.h"
 #include "WorkerPrivate.h"
 #include "WorkerRunnable.h"
 
@@ -499,12 +503,7 @@ nsPerformance::Navigation()
 DOMHighResTimeStamp
 nsPerformance::Now() const
 {
-  double nowTimeMs = GetDOMTiming()->TimeStampToDOMHighRes(TimeStamp::Now());
-  // Round down to the nearest 5us, because if the timer is too accurate people
-  // can do nasty timing attacks with it.  See similar code in the worker
-  // Performance implementation.
-  const double maxResolutionMs = 0.005;
-  return floor(nowTimeMs / maxResolutionMs) * maxResolutionMs;
+  return RoundTime(GetDOMTiming()->TimeStampToDOMHighRes(TimeStamp::Now()));
 }
 
 JSObject*
@@ -706,12 +705,12 @@ public:
   }
 };
 
-class PrefEnabledRunnable final : public WorkerMainThreadRunnable
+class PrefEnabledRunnable final : public WorkerCheckAPIExposureOnMainThreadRunnable
 {
 public:
   PrefEnabledRunnable(WorkerPrivate* aWorkerPrivate,
                       const nsCString& aPrefName)
-    : WorkerMainThreadRunnable(aWorkerPrivate)
+    : WorkerCheckAPIExposureOnMainThreadRunnable(aWorkerPrivate)
     , mEnabled(false)
     , mPrefName(aPrefName)
   { }
@@ -749,9 +748,7 @@ nsPerformance::IsEnabled(JSContext* aCx, JSObject* aGlobal)
   RefPtr<PrefEnabledRunnable> runnable =
     new PrefEnabledRunnable(workerPrivate,
                             NS_LITERAL_CSTRING("dom.enable_user_timing"));
-  runnable->Dispatch(workerPrivate->GetJSContext());
-
-  return runnable->IsEnabled();
+  return runnable->Dispatch() && runnable->IsEnabled();
 }
 
 /* static */ bool
@@ -768,9 +765,8 @@ nsPerformance::IsObserverEnabled(JSContext* aCx, JSObject* aGlobal)
   RefPtr<PrefEnabledRunnable> runnable =
     new PrefEnabledRunnable(workerPrivate,
                             NS_LITERAL_CSTRING("dom.enable_performance_observer"));
-  runnable->Dispatch(workerPrivate->GetJSContext());
 
-  return runnable->IsEnabled();
+  return runnable->Dispatch() && runnable->IsEnabled();
 }
 
 void
@@ -801,15 +797,16 @@ nsPerformance::InsertUserEntry(PerformanceEntry* aEntry)
   PerformanceBase::InsertUserEntry(aEntry);
 }
 
-DOMHighResTimeStamp
-nsPerformance::DeltaFromNavigationStart(DOMHighResTimeStamp aTime)
+TimeStamp
+nsPerformance::CreationTimeStamp() const
 {
-  // If the time we're trying to convert is equal to zero, it hasn't been set
-  // yet so just return 0.
-  if (aTime == 0) {
-    return 0;
-  }
-  return aTime - GetDOMTiming()->GetNavigationStart();
+  return GetDOMTiming()->GetNavigationStartTimeStamp();
+}
+
+DOMHighResTimeStamp
+nsPerformance::CreationTime() const
+{
+  return GetDOMTiming()->GetNavigationStart();
 }
 
 // PerformanceBase
@@ -921,6 +918,48 @@ PerformanceBase::ClearResourceTimings()
   mResourceEntries.Clear();
 }
 
+DOMHighResTimeStamp
+PerformanceBase::TranslateTime(DOMHighResTimeStamp aTime,
+                               const WindowOrWorkerOrSharedWorkerOrServiceWorker& aTimeSource,
+                               ErrorResult& aRv)
+{
+  TimeStamp otherCreationTimeStamp;
+
+  if (aTimeSource.IsWindow()) {
+    RefPtr<nsPerformance> performance = aTimeSource.GetAsWindow().GetPerformance();
+    if (NS_WARN_IF(!performance)) {
+      aRv.Throw(NS_ERROR_FAILURE);
+    }
+    otherCreationTimeStamp = performance->CreationTimeStamp();
+  } else if (aTimeSource.IsWorker()) {
+    otherCreationTimeStamp = aTimeSource.GetAsWorker().CreationTimeStamp();
+  } else if (aTimeSource.IsSharedWorker()) {
+    SharedWorker& sharedWorker = aTimeSource.GetAsSharedWorker();
+    WorkerPrivate* workerPrivate = sharedWorker.GetWorkerPrivate();
+    otherCreationTimeStamp = workerPrivate->CreationTimeStamp();
+  } else if (aTimeSource.IsServiceWorker()) {
+    ServiceWorker& serviceWorker = aTimeSource.GetAsServiceWorker();
+    WorkerPrivate* workerPrivate = serviceWorker.GetWorkerPrivate();
+    otherCreationTimeStamp = workerPrivate->CreationTimeStamp();
+  } else {
+    MOZ_CRASH("This should not be possible.");
+  }
+
+  return RoundTime(
+    aTime + (otherCreationTimeStamp - CreationTimeStamp()).ToMilliseconds());
+}
+
+DOMHighResTimeStamp
+PerformanceBase::RoundTime(double aTime) const
+{
+  // Round down to the nearest 5us, because if the timer is too accurate people
+  // can do nasty timing attacks with it.  See similar code in the worker
+  // Performance implementation.
+  const double maxResolutionMs = 0.005;
+  return floor(aTime / maxResolutionMs) * maxResolutionMs;
+}
+
+
 void
 PerformanceBase::Mark(const nsAString& aName, ErrorResult& aRv)
 {
@@ -937,6 +976,10 @@ PerformanceBase::Mark(const nsAString& aName, ErrorResult& aRv)
   RefPtr<PerformanceMark> performanceMark =
     new PerformanceMark(GetAsISupports(), aName, Now());
   InsertUserEntry(performanceMark);
+
+  if (profiler_is_active()) {
+    PROFILER_MARKER(NS_ConvertUTF16toUTF8(aName).get());
+  }
 }
 
 void
@@ -971,7 +1014,7 @@ PerformanceBase::ResolveTimestampFromName(const nsAString& aName,
     return 0;
   }
 
-  return DeltaFromNavigationStart(ts);
+  return ts - CreationTime();
 }
 
 void

@@ -13,8 +13,8 @@ from contextlib import contextmanager
 from copy import copy
 from subprocess import list2cmdline, call
 
-from lib.tests import RefTestCase, get_jitflags, get_environment_overlay, \
-                      change_env
+from lib.tests import RefTestCase, get_jitflags, get_cpu_count, \
+                      get_environment_overlay, change_env
 from lib.results import ResultsSink
 from lib.progressbar import ProgressBar
 
@@ -22,37 +22,6 @@ if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
     from lib.tasks_unix import run_all_tests
 else:
     from lib.tasks_win import run_all_tests
-
-
-def get_cpu_count():
-    """
-    Guess at a reasonable parallelism count to set as the default for the
-    current machine and run.
-    """
-    # Python 2.6+
-    try:
-        import multiprocessing
-        return multiprocessing.cpu_count()
-    except (ImportError, NotImplementedError):
-        pass
-
-    # POSIX
-    try:
-        res = int(os.sysconf('SC_NPROCESSORS_ONLN'))
-        if res > 0:
-            return res
-    except (AttributeError, ValueError):
-        pass
-
-    # Windows
-    try:
-        res = int(os.environ['NUMBER_OF_PROCESSORS'])
-        if res > 0:
-            return res
-    except (KeyError, ValueError):
-        pass
-
-    return 1
 
 
 @contextmanager
@@ -114,6 +83,9 @@ def parse_args():
     harness_og.add_option('--passthrough', action='store_true',
                           help='Run tests with stdin/stdout attached to'
                           ' caller.')
+    harness_og.add_option('--test-reflect-stringify', dest="test_reflect_stringify",
+                          help="instead of running tests, use them to test the "
+                          "Reflect.stringify code in specified file")
     harness_og.add_option('--valgrind', action='store_true',
                           help='Run tests in valgrind.')
     harness_og.add_option('--valgrind-args', default='',
@@ -278,6 +250,18 @@ def load_tests(options, requested_paths, excluded_paths):
     test_count = manifest.count_tests(test_dir, requested_paths, excluded_paths)
     test_gen = manifest.load_reftests(test_dir, requested_paths, excluded_paths,
                                       xul_tester)
+
+    if options.test_reflect_stringify is not None:
+        def trs_gen(tests):
+            for test in tests:
+                test.test_reflect_stringify = options.test_reflect_stringify
+                # Even if the test is not normally expected to pass, we still
+                # expect reflect-stringify to be able to handle it.
+                test.expect = True
+                test.random = False
+                test.slow = False
+                yield test
+        test_gen = trs_gen(test_gen)
 
     if options.make_manifests:
         manifest.make_manifests(options.make_manifests, test_gen)

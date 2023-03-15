@@ -167,9 +167,8 @@ if '86' not in ost and 'arm' not in ost and 'mips' not in ost:
         'src/base/atomicops_internals_mutex.cc',
     ]
 
-include('/ipc/chromium/chromium-config.mozbuild')
+CXXFLAGS += CONFIG['TK_CFLAGS']
 
-# XXX: We should fix these warnings.
-ALLOW_COMPILER_WARNINGS = True
+include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'

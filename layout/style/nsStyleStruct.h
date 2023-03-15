@@ -117,9 +117,18 @@ struct nsStyleFont {
            nsChangeHint_ReflowChangesSizeOrPosition |
            nsChangeHint_ClearAncestorIntrinsics;
   }
-  static nsChangeHint CalcFontDifference(const nsFont& aFont1, const nsFont& aFont2);
 
+  /**
+   * Return aSize multiplied by the current text zoom factor (in aPresContext).
+   * aSize is allowed to be negative, but the caller is expected to deal with
+   * negative results.  The result is clamped to nscoord_MIN .. nscoord_MAX.
+   */
   static nscoord ZoomText(nsPresContext* aPresContext, nscoord aSize);
+  /**
+   * Return aSize divided by the current text zoom factor (in aPresContext).
+   * aSize is allowed to be negative, but the caller is expected to deal with
+   * negative results.  The result is clamped to nscoord_MIN .. nscoord_MAX.
+   */
   static nscoord UnZoomText(nsPresContext* aPresContext, nscoord aSize);
   static already_AddRefed<nsIAtom> GetLanguage(nsPresContext* aPresContext);
 
@@ -1397,6 +1406,31 @@ struct nsStylePosition {
   typedef nsStyleBackground::Position Position;
 
   /**
+   * Return the computed value for 'align-content' given our 'display' value in
+   * aDisplay.
+   */
+  uint16_t ComputedAlignContent(const nsStyleDisplay* aDisplay) const;
+
+  /**
+   * Return the computed value for 'align-items' given our 'display' value in
+   * aDisplay.
+   */
+  uint8_t ComputedAlignItems(const nsStyleDisplay* aDisplay) const;
+
+  /**
+   * Return the computed value for 'align-self' given our 'display' value in
+   * aDisplay and the parent StyleContext aParent (or null for the root).
+   */
+  uint8_t ComputedAlignSelf(const nsStyleDisplay* aDisplay,
+                            nsStyleContext* aParent) const;
+
+  /**
+   * Return the computed value for 'justify-content' given our 'display' value
+   * in aDisplay.
+   */
+  uint16_t ComputedJustifyContent(const nsStyleDisplay* aDisplay) const;
+
+  /**
    * Return the computed value for 'justify-items' given our 'display' value in
    * aDisplay and the parent StyleContext aParent (or null for the root).
    */
@@ -1424,22 +1458,22 @@ struct nsStylePosition {
   nsStyleCoord  mGridAutoRowsMin;       // [reset] coord, percent, enum, calc, flex
   nsStyleCoord  mGridAutoRowsMax;       // [reset] coord, percent, enum, calc, flex
   uint8_t       mGridAutoFlow;          // [reset] enumerated. See nsStyleConsts.h
-  uint8_t       mBoxSizing;             // [reset] see nsStyleConsts.h
-  uint8_t       mAlignContent;          // [reset] see nsStyleConsts.h
-  uint8_t       mAlignItems;            // [reset] see nsStyleConsts.h
-  uint8_t       mAlignSelf;             // [reset] see nsStyleConsts.h
+  mozilla::StyleBoxSizing mBoxSizing;   // [reset] see nsStyleConsts.h
 private:
   friend class nsRuleNode;
   // Helper for the ComputedAlign/Justify* methods.
   uint8_t MapLeftRightToStart(uint8_t aAlign, mozilla::LogicalAxis aAxis,
                               const nsStyleDisplay* aDisplay) const;
 
+  uint16_t      mAlignContent;          // [reset] fallback value in the high byte
+  uint8_t       mAlignItems;            // [reset] see nsStyleConsts.h
+  uint8_t       mAlignSelf;             // [reset] see nsStyleConsts.h
+  uint16_t      mJustifyContent;        // [reset] fallback value in the high byte
   uint8_t       mJustifyItems;          // [reset] see nsStyleConsts.h
   uint8_t       mJustifySelf;           // [reset] see nsStyleConsts.h
 public:
   uint8_t       mFlexDirection;         // [reset] see nsStyleConsts.h
   uint8_t       mFlexWrap;              // [reset] see nsStyleConsts.h
-  uint8_t       mJustifyContent;        // [reset] see nsStyleConsts.h
   uint8_t       mObjectFit;             // [reset] see nsStyleConsts.h
   int32_t       mOrder;                 // [reset] integer
   float         mFlexGrow;              // [reset] float
@@ -1455,6 +1489,8 @@ public:
   nsStyleGridLine mGridColumnEnd;
   nsStyleGridLine mGridRowStart;
   nsStyleGridLine mGridRowEnd;
+  nscoord         mGridColumnGap;       // [reset] coord, calc
+  nscoord         mGridRowGap;          // [reset] coord, calc
 
   // FIXME: Logical-coordinate equivalents to these WidthDepends... and
   // HeightDepends... methods have been introduced (see below); we probably
@@ -1668,7 +1704,7 @@ protected:
 };
 
 struct nsStyleText {
-  nsStyleText(void);
+  explicit nsStyleText(nsPresContext* aPresContext);
   nsStyleText(const nsStyleText& aOther);
   ~nsStyleText(void);
 
@@ -1699,6 +1735,7 @@ struct nsStyleText {
   uint8_t mTextAlignLast;               // [inherited] see nsStyleConsts.h
   bool mTextAlignTrue : 1;              // [inherited] see nsStyleConsts.h
   bool mTextAlignLastTrue : 1;          // [inherited] see nsStyleConsts.h
+  bool mTextEmphasisColorForeground : 1;// [inherited] whether text-emphasis-color is currentColor
   uint8_t mTextTransform;               // [inherited] see nsStyleConsts.h
   uint8_t mWhiteSpace;                  // [inherited] see nsStyleConsts.h
   uint8_t mWordBreak;                   // [inherited] see nsStyleConsts.h
@@ -1709,7 +1746,10 @@ struct nsStyleText {
   uint8_t mTextSizeAdjust;              // [inherited] see nsStyleConsts.h
   uint8_t mTextCombineUpright;          // [inherited] see nsStyleConsts.h
   uint8_t mControlCharacterVisibility;  // [inherited] see nsStyleConsts.h
+  uint8_t mTextEmphasisPosition;        // [inherited] see nsStyleConsts.h
+  uint8_t mTextEmphasisStyle;           // [inherited] see nsStyleConsts.h
   int32_t mTabSize;                     // [inherited] see nsStyleConsts.h
+  nscolor mTextEmphasisColor;           // [inherited]
 
   nsStyleCoord mWordSpacing;            // [inherited] coord, percent, calc
   nsStyleCoord mLetterSpacing;          // [inherited] coord, normal
@@ -1717,6 +1757,8 @@ struct nsStyleText {
   nsStyleCoord mTextIndent;             // [inherited] coord, percent, calc
 
   RefPtr<nsCSSShadowArray> mTextShadow; // [inherited] nullptr in case of a zero-length
+
+  nsString mTextEmphasisStyleString;    // [inherited]
 
   bool WhiteSpaceIsSignificant() const {
     return mWhiteSpace == NS_STYLE_WHITESPACE_PRE ||
@@ -1753,6 +1795,10 @@ struct nsStyleText {
            mWordWrap == NS_STYLE_WORDWRAP_BREAK_WORD;
   }
 
+  bool HasTextEmphasis() const {
+    return !mTextEmphasisStyleString.IsEmpty();
+  }
+
   // These are defined in nsStyleStructInlines.h.
   inline bool HasTextShadow() const;
   inline nsCSSShadowArray* GetTextShadow() const;
@@ -1764,6 +1810,8 @@ struct nsStyleText {
   inline bool NewlineIsSignificant(const nsTextFrame* aContextFrame) const;
   inline bool WhiteSpaceCanWrap(const nsIFrame* aContextFrame) const;
   inline bool WordCanWrap(const nsIFrame* aContextFrame) const;
+
+  mozilla::LogicalSide TextEmphasisSide(mozilla::WritingMode aWM) const;
 };
 
 struct nsStyleImageOrientation {
@@ -2095,8 +2143,8 @@ struct StyleAnimation {
   float GetDelay() const { return mDelay; }
   float GetDuration() const { return mDuration; }
   const nsString& GetName() const { return mName; }
-  uint8_t GetDirection() const { return mDirection; }
-  uint8_t GetFillMode() const { return mFillMode; }
+  dom::PlaybackDirection GetDirection() const { return mDirection; }
+  dom::FillMode GetFillMode() const { return mFillMode; }
   uint8_t GetPlayState() const { return mPlayState; }
   float GetIterationCount() const { return mIterationCount; }
 
@@ -2105,8 +2153,8 @@ struct StyleAnimation {
   void SetDelay(float aDelay) { mDelay = aDelay; }
   void SetDuration(float aDuration) { mDuration = aDuration; }
   void SetName(const nsSubstring& aName) { mName = aName; }
-  void SetDirection(uint8_t aDirection) { mDirection = aDirection; }
-  void SetFillMode(uint8_t aFillMode) { mFillMode = aFillMode; }
+  void SetDirection(dom::PlaybackDirection aDirection) { mDirection = aDirection; }
+  void SetFillMode(dom::FillMode aFillMode) { mFillMode = aFillMode; }
   void SetPlayState(uint8_t aPlayState) { mPlayState = aPlayState; }
   void SetIterationCount(float aIterationCount)
     { mIterationCount = aIterationCount; }
@@ -2122,8 +2170,8 @@ private:
   float mDuration;
   float mDelay;
   nsString mName; // empty string for 'none'
-  uint8_t mDirection;
-  uint8_t mFillMode;
+  dom::PlaybackDirection mDirection;
+  dom::FillMode mFillMode;
   uint8_t mPlayState;
   float mIterationCount; // mozilla::PositiveInfinity<float>() means infinite
 };

@@ -833,7 +833,6 @@ AsyncCallbackAutoLock::~AsyncCallbackAutoLock()
   }
 }
 
-
 NPP NPPStack::sCurrentNPP = nullptr;
 
 const char *
@@ -883,7 +882,6 @@ _geturl(NPP npp, const char* relativeURL, const char* target)
       (strncmp(relativeURL, "https:", 6) != 0) &&
       (strncmp(relativeURL, "ftp:", 4) != 0)) {
     nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *) npp->ndata;
-
 
     const char *name = nullptr;
     RefPtr<nsPluginHost> host = nsPluginHost::GetInst();
@@ -1037,7 +1035,7 @@ NPError
 _destroystream(NPP npp, NPStream *pstream, NPError reason)
 {
   if (!NS_IsMainThread()) {
-    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_write called from the wrong thread\n"));
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_destroystream called from the wrong thread\n"));
     return NPERR_INVALID_PARAM;
   }
   NPN_PLUGIN_LOG(PLUGIN_LOG_NORMAL,
@@ -1946,7 +1944,7 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
     return NPERR_GENERIC_ERROR;
 #endif
 
-#if defined(XP_WIN) || (MOZ_WIDGET_GTK == 2) || defined(MOZ_WIDGET_QT)
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_QT)
   case NPNVnetscapeWindow: {
     if (!npp || !npp->ndata)
       return NPERR_INVALID_INSTANCE_ERROR;
@@ -2105,9 +2103,7 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
         return NPERR_NO_ERROR;
       }
     }
-    else {
-      return NPERR_GENERIC_ERROR;
-    }
+    return NPERR_GENERIC_ERROR;
   }
 
 #ifndef NP_NO_QUICKDRAW
@@ -2336,14 +2332,13 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
 
   // we no longer hand out any XPCOM objects
   case NPNVDOMElement:
-    // fall through
   case NPNVDOMWindow:
-    // fall through
   case NPNVserviceManager:
     // old XPCOM objects, no longer supported, but null out the out
     // param to avoid crashing plugins that still try to use this.
     *(nsISupports**)result = nullptr;
-    // fall through
+    MOZ_FALLTHROUGH;
+
   default:
     NPN_PLUGIN_LOG(PLUGIN_LOG_NORMAL, ("NPN_getvalue unhandled get value: %d\n", variable));
     return NPERR_GENERIC_ERROR;
@@ -2631,6 +2626,11 @@ NPError
 _getvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
                 char **value, uint32_t *len)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_getvalueforurl called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance) {
     return NPERR_INVALID_PARAM;
   }
@@ -2689,6 +2689,11 @@ NPError
 _setvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
                 const char *value, uint32_t len)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_setvalueforurl called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance) {
     return NPERR_INVALID_PARAM;
   }
@@ -2700,7 +2705,7 @@ _setvalueforurl(NPP instance, NPNURLVariable variable, const char *url,
   switch (variable) {
   case NPNURLVCookie:
     {
-      if (!url || !value || (0 >= len))
+      if (!value || 0 == len)
         return NPERR_INVALID_PARAM;
 
       nsresult rv = NS_ERROR_FAILURE;
@@ -2745,6 +2750,11 @@ _getauthenticationinfo(NPP instance, const char *protocol, const char *host,
                        char **username, uint32_t *ulen, char **password,
                        uint32_t *plen)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_getauthenticationinfo called from the wrong thread\n"));
+    return NPERR_GENERIC_ERROR;
+  }
+
   if (!instance || !protocol || !host || !scheme || !realm || !username ||
       !ulen || !password || !plen)
     return NPERR_INVALID_PARAM;
@@ -2801,6 +2811,11 @@ _getauthenticationinfo(NPP instance, const char *protocol, const char *host,
 uint32_t
 _scheduletimer(NPP instance, uint32_t interval, NPBool repeat, PluginTimerFunc timerFunc)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_scheduletimer called from the wrong thread\n"));
+    return 0;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst)
     return 0;
@@ -2811,6 +2826,11 @@ _scheduletimer(NPP instance, uint32_t interval, NPBool repeat, PluginTimerFunc t
 void
 _unscheduletimer(NPP instance, uint32_t timerID)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_unscheduletimer called from the wrong thread\n"));
+    return;
+  }
+
 #ifdef MOZ_WIDGET_ANDROID
   // Sometimes Flash calls this with a dead NPP instance. Ensure the one we have
   // here is valid and maps to a nsNPAPIPluginInstance.
@@ -2827,6 +2847,11 @@ _unscheduletimer(NPP instance, uint32_t timerID)
 NPError
 _popupcontextmenu(NPP instance, NPMenu* menu)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_popupcontextmenu called from the wrong thread\n"));
+    return 0;
+  }
+
 #ifdef MOZ_WIDGET_COCOA
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
 
@@ -2876,6 +2901,11 @@ _popupcontextmenu(NPP instance, NPMenu* menu)
 NPBool
 _convertpoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double *destX, double *destY, NPCoordinateSpace destSpace)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_convertpoint called from the wrong thread\n"));
+    return 0;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst)
     return false;
@@ -2886,6 +2916,11 @@ _convertpoint(NPP instance, double sourceX, double sourceY, NPCoordinateSpace so
 void
 _urlredirectresponse(NPP instance, void* notifyData, NPBool allow)
 {
+  if (!NS_IsMainThread()) {
+    NPN_PLUGIN_LOG(PLUGIN_LOG_ALWAYS,("NPN_convertpoint called from the wrong thread\n"));
+    return;
+  }
+
   nsNPAPIPluginInstance *inst = (nsNPAPIPluginInstance *)instance->ndata;
   if (!inst) {
     return;

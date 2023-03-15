@@ -1,4 +1,4 @@
-// Copyright 2013 ARM Limited
+// Copyright 2014, ARM Limited
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,10 @@
 #ifdef JS_SIMULATOR_ARM64
 
 #include "jit/arm64/vixl/Debugger-vixl.h"
+
+#include "mozilla/Vector.h"
+
+#include "jsalloc.h"
 
 namespace vixl {
 
@@ -62,6 +66,8 @@ class Token {
 
   static Token* Tokenize(const char* arg);
 };
+
+typedef mozilla::Vector<Token*, 0, js::SystemAllocPolicy> TokenVector;
 
 // Tokens often hold one value.
 template<typename T> class ValueToken : public Token {
@@ -123,11 +129,11 @@ class FPRegisterToken : public ValueToken<const FPRegister> {
 class IdentifierToken : public ValueToken<char*> {
  public:
   explicit IdentifierToken(const char* name) {
-    int size = strlen(name) + 1;
-    value_ = new char[size];
+    size_t size = strlen(name) + 1;
+    value_ = (char*)js_malloc(size);
     strncpy(value_, name, size);
   }
-  virtual ~IdentifierToken() { delete[] value_; }
+  virtual ~IdentifierToken() { js_free(value_); }
 
   virtual bool IsIdentifier() const { return true; }
   virtual bool CanAddressMemory() const { return strcmp(value(), "pc") == 0; }
@@ -164,7 +170,7 @@ class AddressToken : public ValueToken<uint8_t*> {
 // Format: n.
 class IntegerToken : public ValueToken<int64_t> {
  public:
-  explicit IntegerToken(int value) : ValueToken<int64_t>(value) {}
+  explicit IntegerToken(int64_t value) : ValueToken<int64_t>(value) {}
 
   virtual bool IsInteger() const { return true; }
   virtual void Print(FILE* out = stdout) const;
@@ -226,11 +232,11 @@ template<typename T> class Format : public FormatToken {
 class UnknownToken : public Token {
  public:
   explicit UnknownToken(const char* arg) {
-    int size = strlen(arg) + 1;
-    unknown_ = new char[size];
+    size_t size = strlen(arg) + 1;
+    unknown_ = (char*)js_malloc(size);
     strncpy(unknown_, arg, size);
   }
-  virtual ~UnknownToken() { delete[] unknown_; }
+  virtual ~UnknownToken() { js_free(unknown_); }
 
   virtual bool IsUnknown() const { return true; }
   virtual void Print(FILE* out = stdout) const;
@@ -246,7 +252,7 @@ class DebugCommand {
  public:
   explicit DebugCommand(Token* name) : name_(IdentifierToken::Cast(name)) {}
   DebugCommand() : name_(NULL) {}
-  virtual ~DebugCommand() { delete name_; }
+  virtual ~DebugCommand() { js_delete(name_); }
 
   const char* name() { return name_->value(); }
   // Run the command on the given debugger. The command returns true if
@@ -272,7 +278,7 @@ class HelpCommand : public DebugCommand {
 
   virtual bool Run(Debugger* debugger);
 
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -286,7 +292,7 @@ class ContinueCommand : public DebugCommand {
 
   virtual bool Run(Debugger* debugger);
 
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -298,13 +304,13 @@ class StepCommand : public DebugCommand {
  public:
   StepCommand(Token* name, IntegerToken* count)
       : DebugCommand(name), count_(count) {}
-  virtual ~StepCommand() { delete count_; }
+  virtual ~StepCommand() { js_delete(count_); }
 
   int64_t count() { return count_->value(); }
   virtual bool Run(Debugger* debugger);
   virtual void Print(FILE* out = stdout);
 
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -316,7 +322,7 @@ class StepCommand : public DebugCommand {
 
 class DisasmCommand : public DebugCommand {
  public:
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -329,8 +335,8 @@ class PrintCommand : public DebugCommand {
   PrintCommand(Token* name, Token* target, FormatToken* format)
       : DebugCommand(name), target_(target), format_(format) {}
   virtual ~PrintCommand() {
-    delete target_;
-    delete format_;
+    js_delete(target_);
+    js_delete(format_);
   }
 
   Token* target() { return target_; }
@@ -338,7 +344,7 @@ class PrintCommand : public DebugCommand {
   virtual bool Run(Debugger* debugger);
   virtual void Print(FILE* out = stdout);
 
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -357,9 +363,9 @@ class ExamineCommand : public DebugCommand {
                  IntegerToken* count)
       : DebugCommand(name), target_(target), format_(format), count_(count) {}
   virtual ~ExamineCommand() {
-    delete target_;
-    delete format_;
-    delete count_;
+    js_delete(target_);
+    js_delete(format_);
+    js_delete(count_);
   }
 
   Token* target() { return target_; }
@@ -368,7 +374,7 @@ class ExamineCommand : public DebugCommand {
   virtual bool Run(Debugger* debugger);
   virtual void Print(FILE* out = stdout);
 
-  static DebugCommand* Build(std::vector<Token*> args);
+  static DebugCommand* Build(TokenVector&& args);
 
   static const char* kHelp;
   static const char* kAliases[];
@@ -383,26 +389,26 @@ class ExamineCommand : public DebugCommand {
 // Commands which name does not match any of the known commnand.
 class UnknownCommand : public DebugCommand {
  public:
-  explicit UnknownCommand(std::vector<Token*> args) : args_(args) {}
+  explicit UnknownCommand(TokenVector&& args) : args_(Move(args)) {}
   virtual ~UnknownCommand();
 
   virtual bool Run(Debugger* debugger);
 
  private:
-  std::vector<Token*> args_;
+  TokenVector args_;
 };
 
 // Commands which name match a known command but the syntax is invalid.
 class InvalidCommand : public DebugCommand {
  public:
-  InvalidCommand(std::vector<Token*> args, int index, const char* cause)
-      : args_(args), index_(index), cause_(cause) {}
+  InvalidCommand(TokenVector&& args, int index, const char* cause)
+      : args_(Move(args)), index_(index), cause_(cause) {}
   virtual ~InvalidCommand();
 
   virtual bool Run(Debugger* debugger);
 
  private:
-  std::vector<Token*> args_;
+  TokenVector args_;
   int index_;
   const char* cause_;
 };
@@ -530,9 +536,15 @@ Debugger::Debugger(Decoder* decoder, FILE* stream)
       pending_request_(false),
       steps_(0),
       last_command_(NULL) {
-  disasm_ = new PrintDisassembler(stdout);
-  printer_ = new Decoder();
+  disasm_ = js_new<PrintDisassembler>(stdout);
+  printer_ = js_new<Decoder>();
   printer_->AppendVisitor(disasm_);
+}
+
+
+Debugger::~Debugger() {
+  js_delete(disasm_);
+  js_delete(printer_);
 }
 
 
@@ -541,6 +553,7 @@ void Debugger::Run() {
   while (pc_ != kEndOfSimAddress) {
     if (pending_request()) RunDebuggerShell();
     ExecuteInstruction();
+    LogAllWrittenRegisters();
   }
 }
 
@@ -585,7 +598,7 @@ void Debugger::PrintMemory(const uint8_t* address,
       printf("\n%p: ", current);
     }
 
-    uint64_t data = MemoryRead<uint64_t>(current);
+    uint64_t data = Memory::Read<uint64_t>(current);
     format->PrintData(&data);
     printf(" ");
   }
@@ -615,14 +628,14 @@ void Debugger::PrintRegister(const Register& target_reg,
 }
 
 
+// TODO(all): fix this for vector registers.
 void Debugger::PrintFPRegister(const FPRegister& target_fpreg,
                                const FormatToken* format) {
-  const uint64_t fpreg_size = target_fpreg.size();
+  const unsigned fpreg_size = target_fpreg.size();
   const uint64_t format_size = format->SizeOf() * 8;
   const uint64_t count = fpreg_size / format_size;
   const uint64_t mask = 0xffffffffffffffff >> (64 - format_size);
-  const uint64_t fpreg_value = fpreg<uint64_t>(fpreg_size,
-                                               target_fpreg.code());
+  const uint64_t fpreg_value = vreg<uint64_t>(fpreg_size, target_fpreg.code());
   VIXL_ASSERT(count > 0);
 
   if (target_fpreg.Is32Bits()) {
@@ -645,7 +658,8 @@ void Debugger::VisitException(const Instruction* instr) {
     case BRK:
       DoBreakpoint(instr);
       return;
-    case HLT:   // Fall through.
+    case HLT:
+      VIXL_FALLTHROUGH();
     default: Simulator::VisitException(instr);
   }
 }
@@ -823,7 +837,7 @@ Token* Token::Tokenize(const char* arg) {
     return token;
   }
 
-  return new UnknownToken(arg);
+  return js_new<UnknownToken>(arg);
 }
 
 
@@ -856,14 +870,14 @@ Token* RegisterToken::Tokenize(const char* arg) {
     // Is it a X register or alias?
     for (const char** current = kXAliases[i]; *current != NULL; current++) {
       if (strcmp(arg, *current) == 0) {
-        return new RegisterToken(Register::XRegFromCode(i));
+        return js_new<RegisterToken>(Register::XRegFromCode(i));
       }
     }
 
     // Is it a W register or alias?
     for (const char** current = kWAliases[i]; *current != NULL; current++) {
       if (strcmp(arg, *current) == 0) {
-        return new RegisterToken(Register::WRegFromCode(i));
+        return js_new<RegisterToken>(Register::WRegFromCode(i));
       }
     }
   }
@@ -897,14 +911,18 @@ Token* FPRegisterToken::Tokenize(const char* arg) {
         return NULL;
       }
 
-      FPRegister fpreg = NoFPReg;
+      VRegister fpreg = NoVReg;
       switch (*arg) {
-        case 's': fpreg = FPRegister::SRegFromCode(code); break;
-        case 'd': fpreg = FPRegister::DRegFromCode(code); break;
+        case 's':
+          fpreg = VRegister::SRegFromCode(static_cast<unsigned>(code));
+          break;
+        case 'd':
+          fpreg = VRegister::DRegFromCode(static_cast<unsigned>(code));
+          break;
         default: VIXL_UNREACHABLE();
       }
 
-      return new FPRegisterToken(fpreg);
+      return js_new<FPRegisterToken>(fpreg);
   }
 
   return NULL;
@@ -935,7 +953,7 @@ Token* IdentifierToken::Tokenize(const char* arg) {
   }
 
   if (*cursor == '\0') {
-    return new IdentifierToken(arg);
+    return js_new<IdentifierToken>(arg);
   }
 
   return NULL;
@@ -964,7 +982,7 @@ Token* AddressToken::Tokenize(const char* arg) {
   }
 
   uint8_t* address = reinterpret_cast<uint8_t*>(ptr);
-  return new AddressToken(address);
+  return js_new<AddressToken>(address);
 }
 
 
@@ -979,12 +997,12 @@ Token* IntegerToken::Tokenize(const char* arg) {
     return NULL;
   }
 
-  return new IntegerToken(value);
+  return js_new<IntegerToken>(value);
 }
 
 
 Token* FormatToken::Tokenize(const char* arg) {
-  int length = strlen(arg);
+  size_t length = strlen(arg);
   switch (arg[0]) {
     case 'x':
     case 's':
@@ -993,7 +1011,8 @@ Token* FormatToken::Tokenize(const char* arg) {
       if (length == 1) return NULL;
       break;
     case 'i':
-      if (length == 1) return new Format<uint32_t>("%08" PRIx32, 'i');
+      if (length == 1) return js_new<Format<uint32_t>>("%08" PRIx32, 'i');
+      VIXL_FALLTHROUGH();
     default: return NULL;
   }
 
@@ -1019,32 +1038,32 @@ Token* FormatToken::Tokenize(const char* arg) {
   switch (arg[0]) {
     case 'x':
       switch (count) {
-        case 8: return new Format<uint8_t>("%02" PRIx8, 'x');
-        case 16: return new Format<uint16_t>("%04" PRIx16, 'x');
-        case 32: return new Format<uint32_t>("%08" PRIx32, 'x');
-        case 64: return new Format<uint64_t>("%016" PRIx64, 'x');
+        case 8: return js_new<Format<uint8_t>>("%02" PRIx8, 'x');
+        case 16: return js_new<Format<uint16_t>>("%04" PRIx16, 'x');
+        case 32: return js_new<Format<uint32_t>>("%08" PRIx32, 'x');
+        case 64: return js_new<Format<uint64_t>>("%016" PRIx64, 'x');
         default: return NULL;
       }
     case 's':
       switch (count) {
-        case 8: return new Format<int8_t>("%4" PRId8, 's');
-        case 16: return new Format<int16_t>("%6" PRId16, 's');
-        case 32: return new Format<int32_t>("%11" PRId32, 's');
-        case 64: return new Format<int64_t>("%20" PRId64, 's');
+        case 8: return js_new<Format<int8_t>>("%4" PRId8, 's');
+        case 16: return js_new<Format<int16_t>>("%6" PRId16, 's');
+        case 32: return js_new<Format<int32_t>>("%11" PRId32, 's');
+        case 64: return js_new<Format<int64_t>>("%20" PRId64, 's');
         default: return NULL;
       }
     case 'u':
       switch (count) {
-        case 8: return new Format<uint8_t>("%3" PRIu8, 'u');
-        case 16: return new Format<uint16_t>("%5" PRIu16, 'u');
-        case 32: return new Format<uint32_t>("%10" PRIu32, 'u');
-        case 64: return new Format<uint64_t>("%20" PRIu64, 'u');
+        case 8: return js_new<Format<uint8_t>>("%3" PRIu8, 'u');
+        case 16: return js_new<Format<uint16_t>>("%5" PRIu16, 'u');
+        case 32: return js_new<Format<uint32_t>>("%10" PRIu32, 'u');
+        case 64: return js_new<Format<uint64_t>>("%20" PRIu64, 'u');
         default: return NULL;
       }
     case 'f':
       switch (count) {
-        case 32: return new Format<float>("%13g", 'f');
-        case 64: return new Format<double>("%13g", 'f');
+        case 32: return js_new<Format<float>>("%13g", 'f');
+        case 64: return js_new<Format<double>>("%13g", 'f');
         default: return NULL;
       }
     default:
@@ -1083,7 +1102,7 @@ bool DebugCommand::Match(const char* name, const char** aliases) {
 
 
 DebugCommand* DebugCommand::Parse(char* line) {
-  std::vector<Token*> args;
+  TokenVector args;
 
   for (char* chunk = strtok(line, " \t");
        chunk != NULL;
@@ -1094,35 +1113,35 @@ DebugCommand* DebugCommand::Parse(char* line) {
       Token* format = FormatToken::Tokenize(dot + 1);
       if (format != NULL) {
         *dot = '\0';
-        args.push_back(Token::Tokenize(chunk));
-        args.push_back(format);
+        args.append(Token::Tokenize(chunk));
+        args.append(format);
       } else {
         // Error while parsing the format, push the UnknownToken so an error
         // can be accurately reported.
-        args.push_back(Token::Tokenize(chunk));
+        args.append(Token::Tokenize(chunk));
       }
     } else {
-      args.push_back(Token::Tokenize(chunk));
+      args.append(Token::Tokenize(chunk));
     }
   }
 
-  if (args.size() == 0) {
+  if (args.empty()) {
     return NULL;
   }
 
   if (!args[0]->IsIdentifier()) {
-    return new InvalidCommand(args, 0, "command name is not valid");
+    return js_new<InvalidCommand>(Move(args), 0, "command name is not valid");
   }
 
   const char* name = IdentifierToken::Cast(args[0])->value();
   #define RETURN_IF_MATCH(Command)       \
   if (Match(name, Command::kAliases)) {  \
-    return Command::Build(args);         \
+    return Command::Build(Move(args));   \
   }
   DEBUG_COMMAND_LIST(RETURN_IF_MATCH);
   #undef RETURN_IF_MATCH
 
-  return new UnknownCommand(args);
+  return js_new<UnknownCommand>(Move(args));
 }
 
 
@@ -1160,12 +1179,12 @@ bool HelpCommand::Run(Debugger* debugger) {
 }
 
 
-DebugCommand* HelpCommand::Build(std::vector<Token*> args) {
-  if (args.size() != 1) {
-    return new InvalidCommand(args, -1, "too many arguments");
+DebugCommand* HelpCommand::Build(TokenVector&& args) {
+  if (args.length() != 1) {
+    return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  return new HelpCommand(args[0]);
+  return js_new<HelpCommand>(args[0]);
 }
 
 
@@ -1177,12 +1196,12 @@ bool ContinueCommand::Run(Debugger* debugger) {
 }
 
 
-DebugCommand* ContinueCommand::Build(std::vector<Token*> args) {
-  if (args.size() != 1) {
-    return new InvalidCommand(args, -1, "too many arguments");
+DebugCommand* ContinueCommand::Build(TokenVector&& args) {
+  if (args.length() != 1) {
+    return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  return new ContinueCommand(args[0]);
+  return js_new<ContinueCommand>(args[0]);
 }
 
 
@@ -1205,52 +1224,52 @@ void StepCommand::Print(FILE* out) {
 }
 
 
-DebugCommand* StepCommand::Build(std::vector<Token*> args) {
+DebugCommand* StepCommand::Build(TokenVector&& args) {
   IntegerToken* count = NULL;
-  switch (args.size()) {
+  switch (args.length()) {
     case 1: {  // step [1]
-      count = new IntegerToken(1);
+      count = js_new<IntegerToken>(1);
       break;
     }
     case 2: {  // step n
       Token* first = args[1];
       if (!first->IsInteger()) {
-        return new InvalidCommand(args, 1, "expects int");
+        return js_new<InvalidCommand>(Move(args), 1, "expects int");
       }
       count = IntegerToken::Cast(first);
       break;
     }
     default:
-      return new InvalidCommand(args, -1, "too many arguments");
+      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  return new StepCommand(args[0], count);
+  return js_new<StepCommand>(args[0], count);
 }
 
 
-DebugCommand* DisasmCommand::Build(std::vector<Token*> args) {
+DebugCommand* DisasmCommand::Build(TokenVector&& args) {
   IntegerToken* count = NULL;
-  switch (args.size()) {
+  switch (args.length()) {
     case 1: {  // disasm [10]
-      count = new IntegerToken(10);
+      count = js_new<IntegerToken>(10);
       break;
     }
     case 2: {  // disasm n
       Token* first = args[1];
       if (!first->IsInteger()) {
-        return new InvalidCommand(args, 1, "expects int");
+        return js_new<InvalidCommand>(Move(args), 1, "expects int");
       }
 
       count = IntegerToken::Cast(first);
       break;
     }
     default:
-      return new InvalidCommand(args, -1, "too many arguments");
+      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  Token* target = new IdentifierToken("pc");
-  FormatToken* format = new Format<uint32_t>("%08" PRIx32, 'i');
-  return new ExamineCommand(args[0], target, format, count);
+  Token* target = js_new<IdentifierToken>("pc");
+  FormatToken* format = js_new<Format<uint32_t>>("%08" PRIx32, 'i');
+  return js_new<ExamineCommand>(args[0], target, format, count);
 }
 
 
@@ -1270,7 +1289,7 @@ bool PrintCommand::Run(Debugger* debugger) {
     if (strcmp(identifier, "regs") == 0) {
       debugger->PrintRegisters();
     } else if (strcmp(identifier, "fpregs") == 0) {
-      debugger->PrintFPRegisters();
+      debugger->PrintVRegisters();
     } else if (strcmp(identifier, "sysregs") == 0) {
       debugger->PrintSystemRegisters();
     } else if (strcmp(identifier, "pc") == 0) {
@@ -1308,16 +1327,16 @@ bool PrintCommand::Run(Debugger* debugger) {
 }
 
 
-DebugCommand* PrintCommand::Build(std::vector<Token*> args) {
-  if (args.size() < 2) {
-    return new InvalidCommand(args, -1, "too few arguments");
+DebugCommand* PrintCommand::Build(TokenVector&& args) {
+  if (args.length() < 2) {
+    return js_new<InvalidCommand>(Move(args), -1, "too few arguments");
   }
 
   Token* target = args[1];
   if (!target->IsRegister() &&
       !target->IsFPRegister() &&
       !target->IsIdentifier()) {
-    return new InvalidCommand(args, 1, "expects reg or identifier");
+    return js_new<InvalidCommand>(Move(args), 1, "expects reg or identifier");
   }
 
   FormatToken* format = NULL;
@@ -1332,18 +1351,18 @@ DebugCommand* PrintCommand::Build(std::vector<Token*> args) {
   // If the target is an identifier there must be no format. This is checked
   // in the switch statement below.
 
-  switch (args.size()) {
+  switch (args.length()) {
     case 2: {
       if (target->IsRegister()) {
         switch (target_size) {
-          case 4: format = new Format<uint32_t>("%08" PRIx32, 'x'); break;
-          case 8: format = new Format<uint64_t>("%016" PRIx64, 'x'); break;
+          case 4: format = js_new<Format<uint32_t>>("%08" PRIx32, 'x'); break;
+          case 8: format = js_new<Format<uint64_t>>("%016" PRIx64, 'x'); break;
           default: VIXL_UNREACHABLE();
         }
       } else if (target->IsFPRegister()) {
         switch (target_size) {
-          case 4: format = new Format<float>("%8g", 'f'); break;
-          case 8: format = new Format<double>("%8g", 'f'); break;
+          case 4: format = js_new<Format<float>>("%8g", 'f'); break;
+          case 8: format = js_new<Format<double>>("%8g", 'f'); break;
           default: VIXL_UNREACHABLE();
         }
       }
@@ -1351,27 +1370,27 @@ DebugCommand* PrintCommand::Build(std::vector<Token*> args) {
     }
     case 3: {
       if (target->IsIdentifier()) {
-        return new InvalidCommand(args, 2,
+        return js_new<InvalidCommand>(Move(args), 2,
             "format is only allowed with registers");
       }
 
       Token* second = args[2];
       if (!second->IsFormat()) {
-        return new InvalidCommand(args, 2, "expects format");
+        return js_new<InvalidCommand>(Move(args), 2, "expects format");
       }
       format = FormatToken::Cast(second);
 
       if (format->SizeOf() > target_size) {
-        return new InvalidCommand(args, 2, "format too wide");
+        return js_new<InvalidCommand>(Move(args), 2, "format too wide");
       }
 
       break;
     }
     default:
-      return new InvalidCommand(args, -1, "too many arguments");
+      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  return new PrintCommand(args[0], target, format);
+  return js_new<PrintCommand>(args[0], target, format);
 }
 
 
@@ -1397,23 +1416,23 @@ void ExamineCommand::Print(FILE* out) {
 }
 
 
-DebugCommand* ExamineCommand::Build(std::vector<Token*> args) {
-  if (args.size() < 2) {
-    return new InvalidCommand(args, -1, "too few arguments");
+DebugCommand* ExamineCommand::Build(TokenVector&& args) {
+  if (args.length() < 2) {
+    return js_new<InvalidCommand>(Move(args), -1, "too few arguments");
   }
 
   Token* target = args[1];
   if (!target->CanAddressMemory()) {
-    return new InvalidCommand(args, 1, "expects address");
+    return js_new<InvalidCommand>(Move(args), 1, "expects address");
   }
 
   FormatToken* format = NULL;
   IntegerToken* count = NULL;
 
-  switch (args.size()) {
+  switch (args.length()) {
     case 2: {  // mem addr[.x64] [10]
-      format = new Format<uint64_t>("%016" PRIx64, 'x');
-      count = new IntegerToken(10);
+      format = js_new<Format<uint64_t>>("%016" PRIx64, 'x');
+      count = js_new<IntegerToken>(10);
       break;
     }
     case 3: {  // mem addr.format [10]
@@ -1421,13 +1440,13 @@ DebugCommand* ExamineCommand::Build(std::vector<Token*> args) {
       Token* second = args[2];
       if (second->IsFormat()) {
         format = FormatToken::Cast(second);
-        count = new IntegerToken(10);
+        count = js_new<IntegerToken>(10);
         break;
       } else if (second->IsInteger()) {
-        format = new Format<uint64_t>("%016" PRIx64, 'x');
+        format = js_new<Format<uint64_t>>("%016" PRIx64, 'x');
         count = IntegerToken::Cast(second);
       } else {
-        return new InvalidCommand(args, 2, "expects format or integer");
+        return js_new<InvalidCommand>(Move(args), 2, "expects format or integer");
       }
       VIXL_UNREACHABLE();
       break;
@@ -1436,24 +1455,24 @@ DebugCommand* ExamineCommand::Build(std::vector<Token*> args) {
       Token* second = args[2];
       Token* third = args[3];
       if (!second->IsFormat() || !third->IsInteger()) {
-        return new InvalidCommand(args, -1, "expects addr[.format] [n]");
+        return js_new<InvalidCommand>(Move(args), -1, "expects addr[.format] [n]");
       }
       format = FormatToken::Cast(second);
       count = IntegerToken::Cast(third);
       break;
     }
     default:
-      return new InvalidCommand(args, -1, "too many arguments");
+      return js_new<InvalidCommand>(Move(args), -1, "too many arguments");
   }
 
-  return new ExamineCommand(args[0], target, format, count);
+  return js_new<ExamineCommand>(args[0], target, format, count);
 }
 
 
 UnknownCommand::~UnknownCommand() {
-  const int size = args_.size();
-  for (int i = 0; i < size; ++i) {
-    delete args_[i];
+  const size_t size = args_.length();
+  for (size_t i = 0; i < size; ++i) {
+    js_delete(args_[i]);
   }
 }
 
@@ -1463,8 +1482,8 @@ bool UnknownCommand::Run(Debugger* debugger) {
   USE(debugger);
 
   printf(" ** Unknown Command:");
-  const int size = args_.size();
-  for (int i = 0; i < size; ++i) {
+  const size_t size = args_.length();
+  for (size_t i = 0; i < size; ++i) {
     printf(" ");
     args_[i]->Print(stdout);
   }
@@ -1475,9 +1494,9 @@ bool UnknownCommand::Run(Debugger* debugger) {
 
 
 InvalidCommand::~InvalidCommand() {
-  const int size = args_.size();
-  for (int i = 0; i < size; ++i) {
-    delete args_[i];
+  const size_t size = args_.length();
+  for (size_t i = 0; i < size; ++i) {
+    js_delete(args_[i]);
   }
 }
 
@@ -1487,10 +1506,10 @@ bool InvalidCommand::Run(Debugger* debugger) {
   USE(debugger);
 
   printf(" ** Invalid Command:");
-  const int size = args_.size();
-  for (int i = 0; i < size; ++i) {
+  const size_t size = args_.length();
+  for (size_t i = 0; i < size; ++i) {
     printf(" ");
-    if (i == index_) {
+    if (i == static_cast<size_t>(index_)) {
       printf(">>");
       args_[i]->Print(stdout);
       printf("<<");

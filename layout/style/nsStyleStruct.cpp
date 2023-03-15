@@ -28,6 +28,7 @@
 #include "imgIContainer.h"
 #include "CounterStyleManager.h"
 
+#include "mozilla/dom/AnimationEffectReadOnlyBinding.h" // for PlaybackDirection
 #include "mozilla/Likely.h"
 #include "nsIURI.h"
 #include "nsIDocument.h"
@@ -172,17 +173,13 @@ nsChangeHint nsStyleFont::CalcDifference(const nsStyleFont& aOther) const
   MOZ_ASSERT(mAllowZoom == aOther.mAllowZoom,
              "expected mAllowZoom to be the same on both nsStyleFonts");
   if (mSize != aOther.mSize ||
+      mFont != aOther.mFont ||
       mLanguage != aOther.mLanguage ||
       mExplicitLanguage != aOther.mExplicitLanguage ||
       mMathVariant != aOther.mMathVariant ||
       mMathDisplay != aOther.mMathDisplay ||
       mMinFontSizeRatio != aOther.mMinFontSizeRatio) {
     return NS_STYLE_HINT_REFLOW;
-  }
-
-  nsChangeHint hint = CalcFontDifference(mFont, aOther.mFont);
-  if (hint) {
-    return hint;
   }
 
   // XXX Should any of these cause a non-nsChangeHint_NeutralChange change?
@@ -200,64 +197,32 @@ nsChangeHint nsStyleFont::CalcDifference(const nsStyleFont& aOther) const
 /* static */ nscoord
 nsStyleFont::ZoomText(nsPresContext *aPresContext, nscoord aSize)
 {
-  return nscoord(float(aSize) * aPresContext->TextZoom());
+  // aSize can be negative (e.g.: calc(-1px)) so we can't assert that here.
+  // The caller is expected deal with that.
+  return NSCoordSaturatingMultiply(aSize, aPresContext->TextZoom());
 }
 
 /* static */ nscoord
 nsStyleFont::UnZoomText(nsPresContext *aPresContext, nscoord aSize)
 {
-  return nscoord(float(aSize) / aPresContext->TextZoom());
+  // aSize can be negative (e.g.: calc(-1px)) so we can't assert that here.
+  // The caller is expected deal with that.
+  return NSCoordSaturatingMultiply(aSize, 1.0 / aPresContext->TextZoom());
 }
 
 /* static */ already_AddRefed<nsIAtom>
 nsStyleFont::GetLanguage(nsPresContext* aPresContext)
 {
-  nsAutoString language;
-  aPresContext->Document()->GetContentLanguage(language);
-  language.StripWhitespace();
-
-  // Content-Language may be a comma-separated list of language codes,
-  // in which case the HTML5 spec says to treat it as unknown
-  if (!language.IsEmpty() &&
-      !language.Contains(char16_t(','))) {
-    return do_GetAtom(language);
-    // NOTE:  This does *not* count as an explicit language; in other
-    // words, it doesn't trigger language-specific hyphenation.
-  } else {
+  RefPtr<nsIAtom> language = aPresContext->GetContentLanguage();
+  if (!language) {
     // we didn't find a (usable) Content-Language, so we fall back
     // to whatever the presContext guessed from the charset
-    return do_AddRef(aPresContext->GetLanguageFromCharset());
+    // NOTE this should not be used elsewhere, because we want websites
+    // to use UTF-8 with proper language tag, instead of relying on
+    // deriving language from charset. See bug 1040668 comment 67.
+    language = aPresContext->GetLanguageFromCharset();
   }
-}
-
-nsChangeHint nsStyleFont::CalcFontDifference(const nsFont& aFont1, const nsFont& aFont2)
-{
-  if ((aFont1.size == aFont2.size) && 
-      (aFont1.sizeAdjust == aFont2.sizeAdjust) && 
-      (aFont1.style == aFont2.style) &&
-      (aFont1.weight == aFont2.weight) &&
-      (aFont1.stretch == aFont2.stretch) &&
-      (aFont1.smoothing == aFont2.smoothing) &&
-      (aFont1.fontlist == aFont2.fontlist) &&
-      (aFont1.kerning == aFont2.kerning) &&
-      (aFont1.synthesis == aFont2.synthesis) &&
-      (aFont1.variantAlternates == aFont2.variantAlternates) &&
-      (aFont1.alternateValues == aFont2.alternateValues) &&
-      (aFont1.featureValueLookup == aFont2.featureValueLookup) &&
-      (aFont1.variantCaps == aFont2.variantCaps) &&
-      (aFont1.variantEastAsian == aFont2.variantEastAsian) &&
-      (aFont1.variantLigatures == aFont2.variantLigatures) &&
-      (aFont1.variantNumeric == aFont2.variantNumeric) &&
-      (aFont1.variantPosition == aFont2.variantPosition) &&
-      (aFont1.fontFeatureSettings == aFont2.fontFeatureSettings) &&
-      (aFont1.languageOverride == aFont2.languageOverride) &&
-      (aFont1.systemFont == aFont2.systemFont)) {
-    if ((aFont1.decorations == aFont2.decorations)) {
-      return NS_STYLE_HINT_NONE;
-    }
-    return nsChangeHint_RepaintFrame;
-  }
-  return NS_STYLE_HINT_REFLOW;
+  return language.forget();
 }
 
 static bool IsFixedData(const nsStyleSides& aSides, bool aEnumOK)
@@ -1430,15 +1395,15 @@ nsStylePosition::nsStylePosition(void)
   mGridAutoRowsMax.SetAutoValue();
 
   mGridAutoFlow = NS_STYLE_GRID_AUTO_FLOW_ROW;
-  mBoxSizing = NS_STYLE_BOX_SIZING_CONTENT;
-  mAlignContent = NS_STYLE_ALIGN_CONTENT_STRETCH;
-  mAlignItems = NS_STYLE_ALIGN_ITEMS_INITIAL_VALUE;
-  mAlignSelf = NS_STYLE_ALIGN_SELF_AUTO;
+  mBoxSizing = StyleBoxSizing::Content;
+  mAlignContent = NS_STYLE_ALIGN_AUTO;
+  mAlignItems = NS_STYLE_ALIGN_AUTO;
+  mAlignSelf = NS_STYLE_ALIGN_AUTO;
+  mJustifyContent = NS_STYLE_JUSTIFY_AUTO;
   mJustifyItems = NS_STYLE_JUSTIFY_AUTO;
   mJustifySelf = NS_STYLE_JUSTIFY_AUTO;
   mFlexDirection = NS_STYLE_FLEX_DIRECTION_ROW;
   mFlexWrap = NS_STYLE_FLEX_WRAP_NOWRAP;
-  mJustifyContent = NS_STYLE_JUSTIFY_CONTENT_FLEX_START;
   mObjectFit = NS_STYLE_OBJECT_FIT_FILL;
   mOrder = NS_STYLE_ORDER_INITIAL;
   mFlexGrow = 0.0f;
@@ -1475,11 +1440,11 @@ nsStylePosition::nsStylePosition(const nsStylePosition& aSource)
   , mAlignContent(aSource.mAlignContent)
   , mAlignItems(aSource.mAlignItems)
   , mAlignSelf(aSource.mAlignSelf)
+  , mJustifyContent(aSource.mJustifyContent)
   , mJustifyItems(aSource.mJustifyItems)
   , mJustifySelf(aSource.mJustifySelf)
   , mFlexDirection(aSource.mFlexDirection)
   , mFlexWrap(aSource.mFlexWrap)
-  , mJustifyContent(aSource.mJustifyContent)
   , mObjectFit(aSource.mObjectFit)
   , mOrder(aSource.mOrder)
   , mFlexGrow(aSource.mFlexGrow)
@@ -1492,6 +1457,8 @@ nsStylePosition::nsStylePosition(const nsStylePosition& aSource)
   , mGridColumnEnd(aSource.mGridColumnEnd)
   , mGridRowStart(aSource.mGridRowStart)
   , mGridRowEnd(aSource.mGridRowEnd)
+  , mGridColumnGap(aSource.mGridColumnGap)
+  , mGridRowGap(aSource.mGridRowGap)
 {
   MOZ_COUNT_CTOR(nsStylePosition);
 }
@@ -1585,7 +1552,9 @@ nsStylePosition::CalcDifference(const nsStylePosition& aOther,
   if (mGridColumnStart != aOther.mGridColumnStart ||
       mGridColumnEnd != aOther.mGridColumnEnd ||
       mGridRowStart != aOther.mGridRowStart ||
-      mGridRowEnd != aOther.mGridRowEnd) {
+      mGridRowEnd != aOther.mGridRowEnd ||
+      mGridColumnGap != aOther.mGridColumnGap ||
+      mGridRowGap != aOther.mGridRowGap) {
     return NS_CombineHint(hint, nsChangeHint_AllReflowHints);
   }
 
@@ -1675,22 +1644,6 @@ nsStylePosition::WidthCoordDependsOnContainer(const nsStyleCoord &aCoord)
            aCoord.GetIntValue() == NS_STYLE_WIDTH_AVAILABLE));
 }
 
-static nsStyleContext*
-GetAlignmentContainer(nsStyleContext* aParent,
-                      const nsStylePosition** aPosition,
-                      const nsStyleDisplay** aDisplay)
-{
-  while (aParent &&
-         aParent->StyleDisplay()->mDisplay == NS_STYLE_DISPLAY_CONTENTS) {
-    aParent = aParent->GetParent();
-  }
-  if (aParent) {
-    *aPosition = aParent->StylePosition();
-    *aDisplay = aParent->StyleDisplay();
-  }
-  return aParent;
-}
-
 uint8_t
 nsStylePosition::MapLeftRightToStart(uint8_t aAlign, LogicalAxis aAxis,
                                      const nsStyleDisplay* aDisplay) const
@@ -1712,12 +1665,76 @@ nsStylePosition::MapLeftRightToStart(uint8_t aAlign, LogicalAxis aAxis,
   return aAlign;
 }
 
+uint16_t
+nsStylePosition::ComputedAlignContent(const nsStyleDisplay* aDisplay) const
+{
+  uint8_t val = mAlignContent & NS_STYLE_ALIGN_ALL_BITS;
+  val = MapLeftRightToStart(val, eLogicalAxisBlock, aDisplay);
+  uint8_t fallback = mAlignContent >> NS_STYLE_ALIGN_ALL_SHIFT;
+  fallback = MapLeftRightToStart(fallback, eLogicalAxisBlock, aDisplay);
+  return (uint16_t(fallback) << NS_STYLE_ALIGN_ALL_SHIFT) | uint16_t(val);
+}
+
+uint8_t
+nsStylePosition::ComputedAlignItems(const nsStyleDisplay* aDisplay) const
+{
+  if (mAlignItems != NS_STYLE_ALIGN_AUTO) {
+    return MapLeftRightToStart(mAlignItems, eLogicalAxisBlock, aDisplay);
+  }
+  return aDisplay->IsFlexOrGridDisplayType() ? NS_STYLE_ALIGN_STRETCH
+                                             : NS_STYLE_ALIGN_START;
+}
+
+uint8_t
+nsStylePosition::ComputedAlignSelf(const nsStyleDisplay* aDisplay,
+                                   nsStyleContext* aParent) const
+{
+  if (mAlignSelf != NS_STYLE_ALIGN_AUTO) {
+    return MapLeftRightToStart(mAlignSelf, eLogicalAxisBlock, aDisplay);
+  }
+  if (MOZ_UNLIKELY(aDisplay->IsAbsolutelyPositionedStyle())) {
+    return NS_STYLE_ALIGN_AUTO;
+  }
+  if (MOZ_LIKELY(aParent)) {
+    auto parentAlignItems = aParent->StylePosition()->
+      ComputedAlignItems(aParent->StyleDisplay());
+    MOZ_ASSERT(!(parentAlignItems & NS_STYLE_ALIGN_LEGACY),
+               "align-items can't have 'legacy'");
+    return MapLeftRightToStart(parentAlignItems, eLogicalAxisBlock, aDisplay);
+  }
+  return NS_STYLE_ALIGN_START;
+}
+
+uint16_t
+nsStylePosition::ComputedJustifyContent(const nsStyleDisplay* aDisplay) const
+{
+  switch (aDisplay->mDisplay) {
+    case NS_STYLE_DISPLAY_FLEX:
+    case NS_STYLE_DISPLAY_INLINE_FLEX:
+      // For flex containers, css-align-3 says the justify-content value
+      // "'stretch' computes to 'flex-start'."
+      // https://drafts.csswg.org/css-align-3/#propdef-justify-content
+      // XXX maybe map 'auto' too? (ISSUE 8 in the spec)
+      // https://drafts.csswg.org/css-align-3/#content-distribution
+      if ((mJustifyContent & NS_STYLE_ALIGN_ALL_BITS) ==
+          NS_STYLE_JUSTIFY_STRETCH) {
+        return NS_STYLE_JUSTIFY_FLEX_START;
+      }
+      break;
+  }
+  uint8_t val = mJustifyContent & NS_STYLE_JUSTIFY_ALL_BITS;
+  val = MapLeftRightToStart(val, eLogicalAxisInline, aDisplay);
+  uint8_t fallback = mJustifyContent >> NS_STYLE_JUSTIFY_ALL_SHIFT;
+  fallback = MapLeftRightToStart(fallback, eLogicalAxisInline, aDisplay);
+  return (uint16_t(fallback) << NS_STYLE_JUSTIFY_ALL_SHIFT) | uint16_t(val);
+}
+
 uint8_t
 nsStylePosition::ComputedJustifyItems(const nsStyleDisplay* aDisplay,
                                       nsStyleContext* aParent) const
 {
   if (mJustifyItems != NS_STYLE_JUSTIFY_AUTO) {
-    return mJustifyItems;
+    return MapLeftRightToStart(mJustifyItems, eLogicalAxisInline, aDisplay);
   }
   if (MOZ_LIKELY(aParent)) {
     auto inheritedJustifyItems =
@@ -1735,12 +1752,8 @@ uint8_t
 nsStylePosition::ComputedJustifySelf(const nsStyleDisplay* aDisplay,
                                      nsStyleContext* aParent) const
 {
-  const nsStylePosition* containerPos = this;
-  const nsStyleDisplay* containerDisp = aDisplay;
-  GetAlignmentContainer(aParent, &containerPos, &containerDisp);
   if (mJustifySelf != NS_STYLE_JUSTIFY_AUTO) {
-    return containerPos->MapLeftRightToStart(mJustifySelf, eLogicalAxisInline,
-                                             containerDisp);
+    return MapLeftRightToStart(mJustifySelf, eLogicalAxisInline, aDisplay);
   }
   if (MOZ_UNLIKELY(aDisplay->IsAbsolutelyPositionedStyle())) {
     return NS_STYLE_JUSTIFY_AUTO;
@@ -1749,8 +1762,8 @@ nsStylePosition::ComputedJustifySelf(const nsStyleDisplay* aDisplay,
     auto inheritedJustifyItems = aParent->StylePosition()->
       ComputedJustifyItems(aParent->StyleDisplay(), aParent->GetParent());
     inheritedJustifyItems &= ~NS_STYLE_JUSTIFY_LEGACY;
-    return containerPos->MapLeftRightToStart(inheritedJustifyItems,
-                                             eLogicalAxisInline, containerDisp);
+    return MapLeftRightToStart(inheritedJustifyItems, eLogicalAxisInline,
+                               aDisplay);
   }
   return NS_STYLE_JUSTIFY_START;
 }
@@ -2702,8 +2715,8 @@ mozilla::StyleAnimation::SetInitialValues()
   mDuration = 0.0;
   mDelay = 0.0;
   mName = EmptyString();
-  mDirection = NS_STYLE_ANIMATION_DIRECTION_NORMAL;
-  mFillMode = NS_STYLE_ANIMATION_FILL_MODE_NONE;
+  mDirection = dom::PlaybackDirection::Normal;
+  mFillMode = dom::FillMode::None;
   mPlayState = NS_STYLE_ANIMATION_PLAY_STATE_RUNNING;
   mIterationCount = 1.0f;
 }
@@ -3542,13 +3555,14 @@ AreShadowArraysEqual(nsCSSShadowArray* lhs,
 // nsStyleText
 //
 
-nsStyleText::nsStyleText(void)
+nsStyleText::nsStyleText(nsPresContext* aPresContext)
 { 
   MOZ_COUNT_CTOR(nsStyleText);
   mTextAlign = NS_STYLE_TEXT_ALIGN_DEFAULT;
   mTextAlignLast = NS_STYLE_TEXT_ALIGN_AUTO;
   mTextAlignTrue = false;
   mTextAlignLastTrue = false;
+  mTextEmphasisColorForeground = true;
   mTextTransform = NS_STYLE_TEXT_TRANSFORM_NONE;
   mWhiteSpace = NS_STYLE_WHITESPACE_NORMAL;
   mWordBreak = NS_STYLE_WORDBREAK_NORMAL;
@@ -3558,6 +3572,13 @@ nsStyleText::nsStyleText(void)
   mRubyPosition = NS_STYLE_RUBY_POSITION_OVER;
   mTextSizeAdjust = NS_STYLE_TEXT_SIZE_ADJUST_AUTO;
   mTextCombineUpright = NS_STYLE_TEXT_COMBINE_UPRIGHT_NONE;
+  mTextEmphasisStyle = NS_STYLE_TEXT_EMPHASIS_STYLE_NONE;
+  nsCOMPtr<nsIAtom> language = aPresContext->GetContentLanguage();
+  mTextEmphasisPosition = language &&
+    nsStyleUtil::MatchesLanguagePrefix(language, MOZ_UTF16("zh")) ?
+    NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT_ZH :
+    NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT;
+  mTextEmphasisColor = aPresContext->DefaultColor();
   mControlCharacterVisibility = nsCSSParser::ControlCharVisibilityDefault();
 
   mWordSpacing.SetCoordValue(0);
@@ -3574,6 +3595,7 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
     mTextAlignLast(aSource.mTextAlignLast),
     mTextAlignTrue(false),
     mTextAlignLastTrue(false),
+    mTextEmphasisColorForeground(aSource.mTextEmphasisColorForeground),
     mTextTransform(aSource.mTextTransform),
     mWhiteSpace(aSource.mWhiteSpace),
     mWordBreak(aSource.mWordBreak),
@@ -3584,12 +3606,16 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
     mTextSizeAdjust(aSource.mTextSizeAdjust),
     mTextCombineUpright(aSource.mTextCombineUpright),
     mControlCharacterVisibility(aSource.mControlCharacterVisibility),
+    mTextEmphasisPosition(aSource.mTextEmphasisPosition),
+    mTextEmphasisStyle(aSource.mTextEmphasisStyle),
     mTabSize(aSource.mTabSize),
+    mTextEmphasisColor(aSource.mTextEmphasisColor),
     mWordSpacing(aSource.mWordSpacing),
     mLetterSpacing(aSource.mLetterSpacing),
     mLineHeight(aSource.mLineHeight),
     mTextIndent(aSource.mTextIndent),
-    mTextShadow(aSource.mTextShadow)
+    mTextShadow(aSource.mTextShadow),
+    mTextEmphasisStyleString(aSource.mTextEmphasisStyleString)
 {
   MOZ_COUNT_CTOR(nsStyleText);
 }
@@ -3636,7 +3662,45 @@ nsChangeHint nsStyleText::CalcDifference(const nsStyleText& aOther) const
            nsChangeHint_SchedulePaint |
            nsChangeHint_RepaintFrame;
   }
+
+  if (mTextEmphasisPosition != aOther.mTextEmphasisPosition ||
+      mTextEmphasisStyle != aOther.mTextEmphasisStyle ||
+      mTextEmphasisStyleString != aOther.mTextEmphasisStyleString) {
+    return nsChangeHint_UpdateOverflow |
+           nsChangeHint_SchedulePaint |
+           nsChangeHint_RepaintFrame;
+  }
+
+  MOZ_ASSERT(!mTextEmphasisColorForeground ||
+             !aOther.mTextEmphasisColorForeground ||
+             mTextEmphasisColor == aOther.mTextEmphasisColor,
+             "If the text-emphasis-color are both foreground color, "
+             "mTextEmphasisColor should also be identical");
+  if (mTextEmphasisColorForeground != aOther.mTextEmphasisColorForeground ||
+      mTextEmphasisColor != aOther.mTextEmphasisColor) {
+    return nsChangeHint_SchedulePaint |
+           nsChangeHint_RepaintFrame;
+  }
+
   return NS_STYLE_HINT_NONE;
+}
+
+LogicalSide
+nsStyleText::TextEmphasisSide(WritingMode aWM) const
+{
+  MOZ_ASSERT(
+    (!(mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT) !=
+     !(mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_RIGHT)) &&
+    (!(mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_OVER) !=
+     !(mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_UNDER)));
+  Side side = aWM.IsVertical() ?
+    (mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_LEFT
+     ? eSideLeft : eSideRight) :
+    (mTextEmphasisPosition & NS_STYLE_TEXT_EMPHASIS_POSITION_OVER
+     ? eSideTop : eSideBottom);
+  LogicalSide result = aWM.LogicalSideForPhysicalSide(side);
+  MOZ_ASSERT(IsBlock(result));
+  return result;
 }
 
 //-----------------------

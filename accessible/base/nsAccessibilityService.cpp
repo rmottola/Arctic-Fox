@@ -1091,7 +1091,9 @@ nsAccessibilityService::GetOrCreateAccessible(nsINode* aNode,
 
   // Create accessible for visible text frames.
   if (content->IsNodeOfType(nsINode::eTEXT)) {
-    nsIFrame::RenderedText text = frame->GetRenderedText();
+    nsIFrame::RenderedText text = frame->GetRenderedText(0,
+        UINT32_MAX, nsIFrame::TextOffsetType::OFFSETS_IN_CONTENT_TEXT,
+        nsIFrame::TrailingWhitespace::DONT_TRIM_TRAILING_WHITESPACE);
     // Ignore not rendered text nodes and whitespace text nodes between table
     // cells.
     if (text.mString.IsEmpty() ||
@@ -1661,7 +1663,10 @@ nsAccessibilityService::CreateAccessibleByFrameType(nsIFrame* aFrame,
       newAcc = new HTMLSpinnerAccessible(aContent, document);
       break;
     case eHTMLTableType:
-      newAcc = new HTMLTableAccessibleWrap(aContent, document);
+      if (aContent->IsHTMLElement(nsGkAtoms::table))
+        newAcc = new HTMLTableAccessibleWrap(aContent, document);
+      else
+        newAcc = new HyperTextAccessibleWrap(aContent, document);
       break;
     case eHTMLTableCellType:
       // Accessible HTML table cell should be a child of accessible HTML table

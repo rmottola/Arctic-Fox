@@ -237,7 +237,6 @@ pref("browser.shell.checkDefaultBrowser", true);
 pref("browser.shell.shortcutFavicons",true);
 pref("browser.shell.skipDefaultBrowserCheck", true);
 pref("browser.shell.defaultBrowserCheckCount", 0);
-pref("browser.shell.windows10DefaultBrowserABTest", -1);
 
 // 0 = blank, 1 = home (browser.startup.homepage), 2 = last visited page, 3 = resume previous browser session
 // The behavior of option 3 is detailed at: http://wiki.mozilla.org/Session_Restore
@@ -464,6 +463,8 @@ pref("browser.tabs.showAudioPlayingIcon", false);
 #else
 pref("browser.tabs.showAudioPlayingIcon", true);
 #endif
+
+pref("browser.tabs.dontfocusfordialogs", true);
 
 pref("browser.allTabs.previews", false);
 pref("browser.ctrlTab.previews", false);
@@ -835,9 +836,6 @@ pref("browser.sessionstore.cleanup.forget_closed_after", 1209600000);
 // 1 = perform a soft refresh when restoring a tab (check network)
 // 2 = perform a hard refresh when restoring a tab (bypass cache completely)
 pref("browser.sessionstore.cache_behavior", 0);
-// Pale Moon: Allow exact positioning of windows to previous locations, even
-// if they would be outside of the screen bounds
-pref("browser.sessionstore.exactPos", false);
 
 // allow META refresh by default
 pref("accessibility.blockautorefresh", false);
@@ -1131,9 +1129,6 @@ pref("browser.menu.showCharacterEncoding", "chrome://browser/locale/browser.prop
 
 // Allow using tab-modal prompts when possible.
 pref("prompts.tab_modal.enabled", true);
-// Allow tab-modal prompts to switch tab focus
-pref("prompts.tab_modal.focusSwitch", true);
-
 // Whether the Panorama should animate going in/out of tabs
 pref("browser.panorama.animate_zoom", true);
 
@@ -1245,6 +1240,8 @@ pref("dom.serviceWorkers.enabled", true);
 
 // Enable Push API.
 pref("dom.push.enabled", true);
+
+pref("dom.serviceWorkers.openWindow.enabled", true);
 
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);

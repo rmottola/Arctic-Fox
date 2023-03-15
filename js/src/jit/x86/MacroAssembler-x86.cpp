@@ -90,30 +90,6 @@ MacroAssemblerX86::convertUInt64ToDouble(Register64 src, Register temp, FloatReg
     vhaddpd(dest128, dest128);
 }
 
-MacroAssemblerX86::Double*
-MacroAssemblerX86::getDouble(double d)
-{
-    if (!doubleMap_.initialized()) {
-        enoughMemory_ &= doubleMap_.init();
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    size_t doubleIndex;
-    DoubleMap::AddPtr p = doubleMap_.lookupForAdd(d);
-    if (p) {
-        doubleIndex = p->value();
-    } else {
-        doubleIndex = doubles_.length();
-        enoughMemory_ &= doubles_.append(Double(d));
-        enoughMemory_ &= doubleMap_.add(p, d, doubleIndex);
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    Double& dbl = doubles_[doubleIndex];
-    MOZ_ASSERT(!dbl.uses.bound());
-    return &dbl;
-}
-
 void
 MacroAssemblerX86::loadConstantDouble(double d, FloatRegister dest)
 {
@@ -122,8 +98,8 @@ MacroAssemblerX86::loadConstantDouble(double d, FloatRegister dest)
     Double* dbl = getDouble(d);
     if (!dbl)
         return;
-    masm.vmovsd_mr(reinterpret_cast<const void*>(dbl->uses.prev()), dest.encoding());
-    dbl->uses.setPrev(masm.size());
+    masm.vmovsd_mr(nullptr, dest.encoding());
+    dbl->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -132,32 +108,8 @@ MacroAssemblerX86::addConstantDouble(double d, FloatRegister dest)
     Double* dbl = getDouble(d);
     if (!dbl)
         return;
-    masm.vaddsd_mr(reinterpret_cast<const void*>(dbl->uses.prev()), dest.encoding(), dest.encoding());
-    dbl->uses.setPrev(masm.size());
-}
-
-MacroAssemblerX86::Float*
-MacroAssemblerX86::getFloat(float f)
-{
-    if (!floatMap_.initialized()) {
-        enoughMemory_ &= floatMap_.init();
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    size_t floatIndex;
-    FloatMap::AddPtr p = floatMap_.lookupForAdd(f);
-    if (p) {
-        floatIndex = p->value();
-    } else {
-        floatIndex = floats_.length();
-        enoughMemory_ &= floats_.append(Float(f));
-        enoughMemory_ &= floatMap_.add(p, f, floatIndex);
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    Float& flt = floats_[floatIndex];
-    MOZ_ASSERT(!flt.uses.bound());
-    return &flt;
+    masm.vaddsd_mr(nullptr, dest.encoding(), dest.encoding());
+    dbl->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -168,8 +120,8 @@ MacroAssemblerX86::loadConstantFloat32(float f, FloatRegister dest)
     Float* flt = getFloat(f);
     if (!flt)
         return;
-    masm.vmovss_mr(reinterpret_cast<const void*>(flt->uses.prev()), dest.encoding());
-    flt->uses.setPrev(masm.size());
+    masm.vmovss_mr(nullptr, dest.encoding());
+    flt->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -178,32 +130,8 @@ MacroAssemblerX86::addConstantFloat32(float f, FloatRegister dest)
     Float* flt = getFloat(f);
     if (!flt)
         return;
-    masm.vaddss_mr(reinterpret_cast<const void*>(flt->uses.prev()), dest.encoding(), dest.encoding());
-    flt->uses.setPrev(masm.size());
-}
-
-MacroAssemblerX86::SimdData*
-MacroAssemblerX86::getSimdData(const SimdConstant& v)
-{
-    if (!simdMap_.initialized()) {
-        enoughMemory_ &= simdMap_.init();
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    size_t index;
-    SimdMap::AddPtr p = simdMap_.lookupForAdd(v);
-    if (p) {
-        index = p->value();
-    } else {
-        index = simds_.length();
-        enoughMemory_ &= simds_.append(SimdData(v));
-        enoughMemory_ &= simdMap_.add(p, v, index);
-        if (!enoughMemory_)
-            return nullptr;
-    }
-    SimdData& simd = simds_[index];
-    MOZ_ASSERT(!simd.uses.bound());
-    return &simd;
+    masm.vaddss_mr(nullptr, dest.encoding(), dest.encoding());
+    flt->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -216,8 +144,8 @@ MacroAssemblerX86::loadConstantInt32x4(const SimdConstant& v, FloatRegister dest
     if (!i4)
         return;
     MOZ_ASSERT(i4->type() == SimdConstant::Int32x4);
-    masm.vmovdqa_mr(reinterpret_cast<const void*>(i4->uses.prev()), dest.encoding());
-    i4->uses.setPrev(masm.size());
+    masm.vmovdqa_mr(nullptr, dest.encoding());
+    i4->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -230,8 +158,8 @@ MacroAssemblerX86::loadConstantFloat32x4(const SimdConstant& v, FloatRegister de
     if (!f4)
         return;
     MOZ_ASSERT(f4->type() == SimdConstant::Float32x4);
-    masm.vmovaps_mr(reinterpret_cast<const void*>(f4->uses.prev()), dest.encoding());
-    f4->uses.setPrev(masm.size());
+    masm.vmovaps_mr(nullptr, dest.encoding());
+    f4->uses.append(CodeOffsetLabel(masm.size()));
 }
 
 void
@@ -239,20 +167,22 @@ MacroAssemblerX86::finish()
 {
     if (!doubles_.empty())
         masm.haltingAlign(sizeof(double));
-    for (size_t i = 0; i < doubles_.length(); i++) {
-        CodeLabel cl(doubles_[i].uses);
-        writeDoubleConstant(doubles_[i].value, cl.src());
-        addCodeLabel(cl);
+    for (const Double& d : doubles_) {
+        CodeOffsetLabel cst(masm.currentOffset());
+        for (CodeOffsetLabel use : d.uses)
+            addCodeLabel(CodeLabel(use, cst));
+        masm.doubleConstant(d.value);
         if (!enoughMemory_)
             return;
     }
 
     if (!floats_.empty())
         masm.haltingAlign(sizeof(float));
-    for (size_t i = 0; i < floats_.length(); i++) {
-        CodeLabel cl(floats_[i].uses);
-        writeFloatConstant(floats_[i].value, cl.src());
-        addCodeLabel(cl);
+    for (const Float& f : floats_) {
+        CodeOffsetLabel cst(masm.currentOffset());
+        for (CodeOffsetLabel use : f.uses)
+            addCodeLabel(CodeLabel(use, cst));
+        masm.floatConstant(f.value);
         if (!enoughMemory_)
             return;
     }
@@ -260,15 +190,15 @@ MacroAssemblerX86::finish()
     // SIMD memory values must be suitably aligned.
     if (!simds_.empty())
         masm.haltingAlign(SimdMemoryAlignment);
-    for (size_t i = 0; i < simds_.length(); i++) {
-        CodeLabel cl(simds_[i].uses);
-        SimdData& v = simds_[i];
+    for (const SimdData& v : simds_) {
+        CodeOffsetLabel cst(masm.currentOffset());
+        for (CodeOffsetLabel use : v.uses)
+            addCodeLabel(CodeLabel(use, cst));
         switch (v.type()) {
-          case SimdConstant::Int32x4:   writeInt32x4Constant(v.value, cl.src());   break;
-          case SimdConstant::Float32x4: writeFloat32x4Constant(v.value, cl.src()); break;
+          case SimdConstant::Int32x4:   masm.int32x4Constant(v.value.asInt32x4());     break;
+          case SimdConstant::Float32x4: masm.float32x4Constant(v.value.asFloat32x4()); break;
           default: MOZ_CRASH("unexpected SimdConstant type");
         }
-        addCodeLabel(cl);
         if (!enoughMemory_)
             return;
     }

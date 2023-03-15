@@ -517,8 +517,10 @@ Factory::GetMaxSurfaceSize(BackendType aType)
   case BackendType::COREGRAPHICS_ACCELERATED:
     return DrawTargetCG::GetMaxSurfaceSize();
 #endif
+#ifdef USE_SKIA
   case BackendType::SKIA:
-    return INT_MAX;
+    return DrawTargetSkia::GetMaxSurfaceSize();
+#endif
 #ifdef WIN32
   case BackendType::DIRECT2D:
     return DrawTargetD2D::GetMaxSurfaceSize();
@@ -878,18 +880,15 @@ Factory::CreateWrappingDataSourceSurface(uint8_t *aData, int32_t aStride,
                                          const IntSize &aSize,
                                          SurfaceFormat aFormat)
 {
-  MOZ_ASSERT(aData);
   if (aSize.width <= 0 || aSize.height <= 0) {
     return nullptr;
   }
+  MOZ_ASSERT(aData);
 
   RefPtr<SourceSurfaceRawData> newSurf = new SourceSurfaceRawData();
 
-  if (newSurf->InitWrappingData(aData, aSize, aStride, aFormat, false)) {
-    return newSurf.forget();
-  }
-
-  return nullptr;
+  newSurf->InitWrappingData(aData, aSize, aStride, aFormat, false);
+  return newSurf.forget();
 }
 
 already_AddRefed<DataSourceSurface>

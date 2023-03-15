@@ -99,7 +99,7 @@
 - Bug 1223916 - 2015-11-14 Prohibit direct method calls at the parser level in 
 - Bug 1223647: CSP erroneously inherited into dedicated workers. r=cke
 - Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
-- Bug 1169268 - 2015-10-27 - Don't crash when pasting files. r=ndeakin 
+- 1176968 2015-11-04 remaining parts
 - Bug 1238935 - r=jonco 
 - Bug 1214126 - 5 Parts
 - Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
@@ -118,13 +118,16 @@ impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
-ARM fixes to check
+# ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
 
 # Build System - not working
 Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
-Check with Roy Tam:
+# Mac Specific
+Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
+
+# Win specific Check with Roy Tam:
 - Bug 1129633 - part 2. In prefs, set win8 provider to RELEASE-only. 
 - Bug 1129633 - part1. Use win8 geolocation with a fallback to MLS
 - bug 1139012 - telemetry for MLS vs win8 geolocation response.

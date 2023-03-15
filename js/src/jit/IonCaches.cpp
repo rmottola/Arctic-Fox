@@ -883,13 +883,15 @@ GenerateReadUnboxed(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 static bool
 EmitGetterCall(JSContext* cx, MacroAssembler& masm,
                IonCache::StubAttacher& attacher, JSObject* obj,
-               JSObject* holder, HandleShape shape,
+               JSObject* holder, HandleShape shape, bool holderIsReceiver,
                LiveRegisterSet liveRegs, Register object,
                TypedOrValueRegister output,
                void* returnAddr)
 {
     MOZ_ASSERT(output.hasValue());
     MacroAssembler::AfterICSaveLive aic = masm.icSaveLive(liveRegs);
+
+    MOZ_ASSERT_IF(obj != holder, !holderIsReceiver);
 
     // Remaining registers should basically be free, but we need to use |object| still
     // so leave it alone.
@@ -975,7 +977,7 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
         masm.moveStackPtrTo(argIdReg);
 
         // Push the holder.
-        if (obj == holder) {
+        if (holderIsReceiver) {
             // When the holder is also the current receiver, we just have a shape guard,
             // so we might end up with a random object which is also guaranteed to have
             // this JSGetterOp.
@@ -1108,7 +1110,8 @@ GenerateCallGetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
         masm.pop(object);
 
     // Now we're good to go to invoke the native call.
-    if (!EmitGetterCall(cx, masm, attacher, obj, holder, shape, liveRegs, object,
+    bool holderIsReceiver = (obj == holder);
+    if (!EmitGetterCall(cx, masm, attacher, obj, holder, shape, holderIsReceiver, liveRegs, object,
                         output, returnAddr))
         return false;
 
@@ -1853,10 +1856,12 @@ GetPropertyIC::tryAttachDOMProxyUnshadowed(JSContext* cx, HandleScript outerScri
             // EmitGetterCall() expects |obj| to be the object the property is
             // on to do some checks. Since we actually looked at checkObj, and
             // no extra guards will be generated, we can just pass that instead.
+            // The holderIsReceiver check needs to use |obj| though.
             MOZ_ASSERT(canCache == CanAttachCallGetter);
             MOZ_ASSERT(!idempotent());
-            if (!EmitGetterCall(cx, masm, attacher, checkObj, holder, shape, liveRegs_,
-                                object(), output(), returnAddr))
+            bool holderIsReceiver = (obj == holder);
+            if (!EmitGetterCall(cx, masm, attacher, checkObj, holder, shape, holderIsReceiver,
+                                liveRegs_, object(), output(), returnAddr))
             {
                 return false;
             }
@@ -2045,12 +2050,16 @@ ValueToNameOrSymbolId(JSContext* cx, HandleValue idval, MutableHandleId id, bool
     if (!ValueToId<CanGC>(cx, idval, id))
         return false;
 
-    if (!JSID_IS_STRING(id) && !JSID_IS_SYMBOL(id))
+    if (!JSID_IS_STRING(id) && !JSID_IS_SYMBOL(id)) {
+        id.set(JSID_VOID);
         return true;
+    }
 
     uint32_t dummy;
-    if (JSID_IS_STRING(id) && JSID_TO_ATOM(id)->isIndex(&dummy))
+    if (JSID_IS_STRING(id) && JSID_TO_ATOM(id)->isIndex(&dummy)) {
+        id.set(JSID_VOID);
         return true;
+    }
 
     *nameOrSymbol = true;
     return true;
@@ -2242,8 +2251,8 @@ CheckTypeSetForWrite(MacroAssembler& masm, JSObject* obj, jsid id,
 {
     TypedOrValueRegister valReg = value.reg();
     ObjectGroup* group = obj->group();
-    if (group->unknownProperties())
-        return;
+    MOZ_ASSERT(!group->unknownProperties());
+
     HeapTypeSet* propTypes = group->maybeGetProperty(id);
     MOZ_ASSERT(propTypes);
 
@@ -2263,11 +2272,9 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
 
     // Guard that the incoming value is in the type set for the property
     // if a type barrier is required.
-    if (needsTypeBarrier) {
-        // We can't do anything that would change the HeapTypeSet, so
-        // just guard that it's already there.
-        if (checkTypeset)
-            CheckTypeSetForWrite(masm, obj, shape->propid(), tempReg, value, failures);
+    if (checkTypeset) {
+        MOZ_ASSERT(needsTypeBarrier);
+        CheckTypeSetForWrite(masm, obj, shape->propid(), tempReg, value, failures);
     }
 
     NativeObject::slotsSizeMustNotOverflow();
@@ -2614,11 +2621,13 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     // Remaining registers should basically be free, but we need to use |object| still
     // so leave it alone.  And of course we need our value, if it's not a constant.
     AllocatableRegisterSet regSet(RegisterSet::All());
-    regSet.take(AnyRegister(object));
     if (!value.constant())
-        regSet.takeUnchecked(value.reg());
+        regSet.take(value.reg());
+    bool valueAliasesObject = !regSet.has(object);
+    if (!valueAliasesObject)
+        regSet.take(object);
 
-    regSet.takeUnchecked(tempReg);
+    regSet.take(tempReg);
 
     // This is a slower stub path, and we're going to be doing a call anyway.  Don't need
     // to try so hard to not use the stack.  Scratch regs are just taken from the register
@@ -2702,7 +2711,8 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
             masm.Push(value.value());
         } else {
             masm.Push(value.reg());
-            regSet.add(value.reg());
+            if (!valueAliasesObject)
+                regSet.add(value.reg());
         }
 
         // OK, now we can grab our remaining registers and grab the pointer to
@@ -3136,8 +3146,9 @@ IsPropertySetInlineable(NativeObject* obj, HandleId id, MutableHandleShape pshap
     if (!pshape->writable())
         return false;
 
-    if (needsTypeBarrier)
-        return CanInlineSetPropTypeCheck(obj, id, val, checkTypeset);
+    *checkTypeset = false;
+    if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, id, val, checkTypeset))
+        return false;
 
     return true;
 }
@@ -3204,10 +3215,10 @@ IsPropertyAddInlineable(JSContext* cx, NativeObject* obj, HandleId id, ConstantO
     if (obj->group()->newScript() && !obj->group()->newScript()->analyzed())
         return false;
 
-    if (needsTypeBarrier)
-        return CanInlineSetPropTypeCheck(obj, id, val, checkTypeset);
-
     *checkTypeset = false;
+    if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, id, val, checkTypeset))
+        return false;
+
     return true;
 }
 
@@ -3294,6 +3305,7 @@ CanAttachSetUnboxed(JSContext* cx, HandleObject obj, HandleId id, ConstantOrRegi
 
     const UnboxedLayout::Property* property = obj->as<UnboxedPlainObject>().layout().lookup(id);
     if (property) {
+        *checkTypeset = false;
         if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, id, val, checkTypeset))
             return false;
         *unboxedOffset = property->offset;
@@ -3319,6 +3331,7 @@ CanAttachSetUnboxedExpando(JSContext* cx, HandleObject obj, HandleId id, Constan
     if (!shape || !shape->hasDefaultSetter() || !shape->hasSlot() || !shape->writable())
         return false;
 
+    *checkTypeset = false;
     if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, id, val, checkTypeset))
         return false;
 
@@ -3339,7 +3352,7 @@ CanAttachAddUnboxedExpando(JSContext* cx, HandleObject obj, HandleShape oldShape
         return false;
 
     Shape* newShape = expando->lastProperty();
-    if (newShape->propid() != id || newShape->previous() != oldShape)
+    if (newShape->isEmptyShape() || newShape->propid() != id || newShape->previous() != oldShape)
         return false;
 
     MOZ_ASSERT(newShape->hasDefaultSetter() && newShape->hasSlot() && newShape->writable());
@@ -3347,6 +3360,7 @@ CanAttachAddUnboxedExpando(JSContext* cx, HandleObject obj, HandleShape oldShape
     if (PrototypeChainShadowsPropertyAdd(cx, obj, id))
         return false;
 
+    *checkTypeset = false;
     if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, id, val, checkTypeset))
         return false;
 
@@ -3431,7 +3445,7 @@ SetPropertyIC::tryAttachNative(JSContext* cx, HandleScript outerScript, IonScrip
 
     RootedShape shape(cx);
     RootedObject holder(cx);
-    bool checkTypeset;
+    bool checkTypeset = false;
     NativeSetPropCacheability canCache = CanAttachNativeSetProp(cx, obj, id, value(), needsTypeBarrier(),
                                                                 &holder, &shape, &checkTypeset);
     switch (canCache) {
@@ -3532,6 +3546,9 @@ SetPropertyIC::tryAttachAddSlot(JSContext* cx, HandleScript outerScript, IonScri
     MOZ_ASSERT(!*emitted);
 
     if (!canAttachStub())
+        return true;
+
+    if (!JSID_IS_STRING(id) && !JSID_IS_SYMBOL(id))
         return true;
 
     // A GC may have caused cache.value() to become stale as it is not traced.
@@ -3929,7 +3946,7 @@ static void
 GenerateGetTypedOrUnboxedArrayElement(JSContext* cx, MacroAssembler& masm,
                                       IonCache::StubAttacher& attacher,
                                       HandleObject array, const Value& idval, Register object,
-                                      TypedOrValueRegister index, TypedOrValueRegister output,
+                                      ConstantOrRegister index, TypedOrValueRegister output,
                                       bool allowDoubleResult)
 {
     MOZ_ASSERT(GetPropertyIC::canAttachTypedOrUnboxedArrayElement(array, idval, output));
@@ -3945,49 +3962,54 @@ GenerateGetTypedOrUnboxedArrayElement(JSContext* cx, MacroAssembler& masm,
     if (idval.isString()) {
         MOZ_ASSERT(GetIndexFromString(idval.toString()) != UINT32_MAX);
 
-        // Part 1: Get the string into a register
-        Register str;
-        if (index.hasValue()) {
-            ValueOperand val = index.valueReg();
-            masm.branchTestString(Assembler::NotEqual, val, &failures);
-
-            str = masm.extractString(val, indexReg);
+        if (index.constant()) {
+            MOZ_ASSERT(idval == index.value());
+            masm.move32(Imm32(GetIndexFromString(idval.toString())), indexReg);
         } else {
-            MOZ_ASSERT(!index.typedReg().isFloat());
-            str = index.typedReg().gpr();
+            // Part 1: Get the string into a register
+            Register str;
+            if (index.reg().hasValue()) {
+                ValueOperand val = index.reg().valueReg();
+                masm.branchTestString(Assembler::NotEqual, val, &failures);
+
+                str = masm.extractString(val, indexReg);
+            } else {
+                MOZ_ASSERT(!index.reg().typedReg().isFloat());
+                str = index.reg().typedReg().gpr();
+            }
+
+            // Part 2: Call to translate the str into index
+            AllocatableRegisterSet regs(RegisterSet::Volatile());
+            LiveRegisterSet save(regs.asLiveSet());
+            masm.PushRegsInMask(save);
+            regs.takeUnchecked(str);
+
+            Register temp = regs.takeAnyGeneral();
+
+            masm.setupUnalignedABICall(temp);
+            masm.passABIArg(str);
+            masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, GetIndexFromString));
+            masm.mov(ReturnReg, indexReg);
+
+            LiveRegisterSet ignore;
+            ignore.add(indexReg);
+            masm.PopRegsInMaskIgnore(save, ignore);
+
+            masm.branch32(Assembler::Equal, indexReg, Imm32(UINT32_MAX), &failures);
         }
-
-        // Part 2: Call to translate the str into index
-        AllocatableRegisterSet regs(RegisterSet::Volatile());
-        LiveRegisterSet save(regs.asLiveSet());
-        masm.PushRegsInMask(save);
-        regs.takeUnchecked(str);
-
-        Register temp = regs.takeAnyGeneral();
-
-        masm.setupUnalignedABICall(temp);
-        masm.passABIArg(str);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, GetIndexFromString));
-        masm.mov(ReturnReg, indexReg);
-
-        LiveRegisterSet ignore;
-        ignore.add(indexReg);
-        masm.PopRegsInMaskIgnore(save, ignore);
-
-        masm.branch32(Assembler::Equal, indexReg, Imm32(UINT32_MAX), &failures);
-
     } else {
         MOZ_ASSERT(idval.isInt32());
+        MOZ_ASSERT(!index.constant());
 
-        if (index.hasValue()) {
-            ValueOperand val = index.valueReg();
+        if (index.reg().hasValue()) {
+            ValueOperand val = index.reg().valueReg();
             masm.branchTestInt32(Assembler::NotEqual, val, &failures);
 
             // Unbox the index.
             masm.unboxInt32(val, indexReg);
         } else {
-            MOZ_ASSERT(!index.typedReg().isFloat());
-            indexReg = index.typedReg().gpr();
+            MOZ_ASSERT(!index.reg().typedReg().isFloat());
+            indexReg = index.reg().typedReg().gpr();
         }
     }
 
@@ -4061,7 +4083,7 @@ GetPropertyIC::tryAttachTypedOrUnboxedArrayElement(JSContext* cx, HandleScript o
 
     MacroAssembler masm(cx, ion, outerScript, profilerLeavePc_);
     StubAttacher attacher(*this);
-    GenerateGetTypedOrUnboxedArrayElement(cx, masm, attacher, obj, idval, object(), id().reg(),
+    GenerateGetTypedOrUnboxedArrayElement(cx, masm, attacher, obj, idval, object(), id(),
                                           output(), allowDoubleResult_);
     return linkAndAttachStub(cx, masm, attacher, ion, "typed array",
                              JS::TrackedOutcome::ICGetElemStub_TypedArray);
@@ -4182,7 +4204,8 @@ GetPropertyIC::tryAttachArgumentsElement(JSContext* cx, HandleScript outerScript
 }
 
 static bool
-IsDenseElementSetInlineable(JSObject* obj, const Value& idval)
+IsDenseElementSetInlineable(JSObject* obj, const Value& idval, ConstantOrRegister val,
+                            bool needsTypeBarrier, bool* checkTypeset)
 {
     if (!obj->is<ArrayObject>())
         return false;
@@ -4209,6 +4232,10 @@ IsDenseElementSetInlineable(JSObject* obj, const Value& idval)
 
         curObj = curObj->getProto();
     }
+
+    *checkTypeset = false;
+    if (needsTypeBarrier && !CanInlineSetPropTypeCheck(obj, JSID_VOID, val, checkTypeset))
+        return false;
 
     return true;
 }
@@ -4279,7 +4306,7 @@ static bool
 GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& attacher,
                         JSObject* obj, const Value& idval, bool guardHoles, Register object,
                         TypedOrValueRegister index, ConstantOrRegister value, Register tempToUnboxIndex,
-                        Register temp)
+                        Register temp, bool needsTypeBarrier, bool checkTypeset)
 {
     MOZ_ASSERT(obj->isNative());
     MOZ_ASSERT(idval.isInt32());
@@ -4291,6 +4318,14 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
     if (!shape)
         return false;
     masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
+
+    // Guard that the incoming value is in the type set for the property
+    // if a type barrier is required.
+    if (needsTypeBarrier) {
+        masm.branchTestObjGroup(Assembler::NotEqual, object, obj->group(), &failures);
+        if (checkTypeset)
+            CheckTypeSetForWrite(masm, obj, JSID_VOID, temp, value, &failures);
+    }
 
     // Ensure the index is an int32 value.
     Register indexReg;
@@ -4379,7 +4414,11 @@ SetPropertyIC::tryAttachDenseElement(JSContext* cx, HandleScript outerScript, Io
     MOZ_ASSERT(!*emitted);
     MOZ_ASSERT(canAttachStub());
 
-    if (hasDenseStub() || !IsDenseElementSetInlineable(obj, idval))
+    if (hasDenseStub())
+        return true;
+
+    bool checkTypeset = false;
+    if (!IsDenseElementSetInlineable(obj, idval, value(), needsTypeBarrier(), &checkTypeset))
         return true;
 
     *emitted = true;
@@ -4388,7 +4427,8 @@ SetPropertyIC::tryAttachDenseElement(JSContext* cx, HandleScript outerScript, Io
     StubAttacher attacher(*this);
     if (!GenerateSetDenseElement(cx, masm, attacher, obj, idval,
                                  guardHoles(), object(), id().reg(),
-                                 value(), tempToUnboxIndex(), temp()))
+                                 value(), tempToUnboxIndex(), temp(),
+                                 needsTypeBarrier(), checkTypeset))
     {
         return false;
     }
@@ -4659,12 +4699,8 @@ BindNameIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex,
     HandlePropertyName name = cache.name();
 
     RootedObject holder(cx);
-    if (scopeChain->is<GlobalObject>()) {
-        holder = scopeChain;
-    } else {
-        if (!LookupNameUnqualified(cx, name, scopeChain, &holder))
-            return nullptr;
-    }
+    if (!LookupNameUnqualified(cx, name, scopeChain, &holder))
+        return nullptr;
 
     // Stop generating new stubs once we hit the stub count limit, see
     // GetPropertyCache.

@@ -63,6 +63,18 @@ void Accumulate(ID id, const nsCString& key, uint32_t sample = 1);
 void Accumulate(const char* name, uint32_t sample);
 
 /**
+ * Adds a sample to a histogram defined in TelemetryHistograms.h.
+ * This function is here to support telemetry measurements from Java,
+ * where we have only names and not numeric IDs.  You should almost
+ * certainly be using the by-enum-id version instead of this one.
+ *
+ * @param name - histogram name
+ * @param key - the string key
+ * @param sample - sample - (optional) value to record, defaults to 1.
+ */
+void Accumulate(const char *name, const nsCString& key, uint32_t sample = 1);
+
+/**
  * Adds time delta in milliseconds to a histogram defined in TelemetryHistograms.h
  *
  * @param id - histogram id
@@ -175,20 +187,6 @@ private:
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
 
-class ThreadHangStats;
-
-/**
- * Move a ThreadHangStats to Telemetry storage. Normally Telemetry queries
- * for active ThreadHangStats through BackgroundHangMonitor, but once a
- * thread exits, the thread's copy of ThreadHangStats needs to be moved to
- * inside Telemetry using this function.
- *
- * @param aStats ThreadHangStats to save; the data inside aStats
- *               will be moved and aStats should be treated as
- *               invalid after this function returns
- */
-void RecordThreadHangStats(ThreadHangStats& aStats);
-
 /**
  * Indicates whether Telemetry base data recording is turned on. Added for future uses.
  */
@@ -211,6 +209,18 @@ void RecordSlowSQLStatement(const nsACString &statement,
                             const nsACString &dbName,
                             uint32_t delay);
 
+/**
+ * Record Webrtc ICE candidate type combinations in a 17bit bitmask
+ *
+ * @param iceCandidateBitmask - the bitmask representing local and remote ICE
+ *                              candidate types present for the connection
+ * @param success - did the peer connection connected
+ * @param loop - was this a Firefox Hello AKA Loop call
+ */
+void
+RecordWebrtcIceCandidates(const uint32_t iceCandidateBitmask,
+                          const bool success,
+                          const bool loop);
 /**
  * Initialize I/O Reporting
  * Initially this only records I/O for files in the binary directory.
@@ -253,6 +263,28 @@ class ProcessedStack;
  * @param aFirefoxUptime - Firefox uptime at the time of the hang, in minutes
  * @param aAnnotations - Any annotations to be added to the report
  */
+#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
+void RecordChromeHang(uint32_t aDuration,
+                      ProcessedStack &aStack,
+                      int32_t aSystemUptime,
+                      int32_t aFirefoxUptime,
+                      mozilla::UniquePtr<mozilla::HangMonitor::HangAnnotations>
+                              aAnnotations);
+#endif
+
+class ThreadHangStats;
+
+/**
+ * Move a ThreadHangStats to Telemetry storage. Normally Telemetry queries
+ * for active ThreadHangStats through BackgroundHangMonitor, but once a
+ * thread exits, the thread's copy of ThreadHangStats needs to be moved to
+ * inside Telemetry using this function.
+ *
+ * @param aStats ThreadHangStats to save; the data inside aStats
+ *               will be moved and aStats should be treated as
+ *               invalid after this function returns
+ */
+void RecordThreadHangStats(ThreadHangStats& aStats);
 
 /**
  * Record a failed attempt at locking the user's profile.

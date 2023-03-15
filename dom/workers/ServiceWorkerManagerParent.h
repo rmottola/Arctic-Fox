@@ -11,11 +11,11 @@
 
 namespace mozilla {
 
-class OriginAttributes;
+class PrincipalOriginAttributes;
 
 namespace ipc {
 class BackgroundParentImpl;
-}
+} // namespace ipc
 
 namespace dom {
 namespace workers {
@@ -42,7 +42,7 @@ private:
   virtual bool RecvUnregister(const PrincipalInfo& aPrincipalInfo,
                               const nsString& aScope) override;
 
-  virtual bool RecvPropagateSoftUpdate(const OriginAttributes& aOriginAttributes,
+  virtual bool RecvPropagateSoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
                                        const nsString& aScope) override;
 
   virtual bool RecvPropagateUnregister(const PrincipalInfo& aPrincipalInfo,
@@ -63,8 +63,8 @@ private:
   uint64_t mID;
 };
 
-} // workers namespace
-} // dom namespace
-} // mozilla namespace
+} // namespace workers
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_ServiceWorkerManagerParent_h

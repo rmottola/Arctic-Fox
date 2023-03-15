@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -55,12 +56,16 @@ UpdategDisableXULCache()
 static void
 DisableXULCacheChangedCallback(const char* aPref, void* aClosure)
 {
+    bool wasEnabled = !gDisableXULCache;
     UpdategDisableXULCache();
 
-    // Flush the cache, regardless
-    nsXULPrototypeCache* cache = nsXULPrototypeCache::GetInstance();
-    if (cache)
-        cache->Flush();
+    if (wasEnabled && gDisableXULCache) {
+        nsXULPrototypeCache* cache = nsXULPrototypeCache::GetInstance();
+        if (cache) {
+            // AbortCaching() calls Flush() for us.
+            cache->AbortCaching();
+        }
+    }
 }
 
 //----------------------------------------------------------------------
@@ -234,56 +239,33 @@ nsXULPrototypeCache::PutXBLDocumentInfo(nsXBLDocumentInfo* aDocumentInfo)
     return NS_OK;
 }
 
-static PLDHashOperator
-FlushSkinXBL(nsIURI* aKey, RefPtr<nsXBLDocumentInfo>& aDocInfo, void* aClosure)
-{
-  nsAutoCString str;
-  aKey->GetPath(str);
-
-  PLDHashOperator ret = PL_DHASH_NEXT;
-
-  if (!strncmp(str.get(), "/skin", 5)) {
-    ret = PL_DHASH_REMOVE;
-  }
-
-  return ret;
-}
-
-static PLDHashOperator
-FlushSkinSheets(nsIURI* aKey, RefPtr<CSSStyleSheet>& aSheet, void* aClosure)
-{
-  nsAutoCString str;
-  aSheet->GetSheetURI()->GetPath(str);
-
-  PLDHashOperator ret = PL_DHASH_NEXT;
-
-  if (!strncmp(str.get(), "/skin", 5)) {
-    // This is a skin binding. Add the key to the list.
-    ret = PL_DHASH_REMOVE;
-  }
-  return ret;
-}
-
-static PLDHashOperator
-FlushScopedSkinStylesheets(nsIURI* aKey, RefPtr<nsXBLDocumentInfo> &aDocInfo, void* aClosure)
-{
-  aDocInfo->FlushSkinStylesheets();
-  return PL_DHASH_NEXT;
-}
-
 void
 nsXULPrototypeCache::FlushSkinFiles()
 {
   // Flush out skin XBL files from the cache.
-  mXBLDocTable.Enumerate(FlushSkinXBL, nullptr);
+  for (auto iter = mXBLDocTable.Iter(); !iter.Done(); iter.Next()) {
+    nsAutoCString str;
+    iter.Key()->GetPath(str);
+    if (strncmp(str.get(), "/skin", 5) == 0) {
+      iter.Remove();
+    }
+  }
 
   // Now flush out our skin stylesheets from the cache.
-  mStyleSheetTable.Enumerate(FlushSkinSheets, nullptr);
+  for (auto iter = mStyleSheetTable.Iter(); !iter.Done(); iter.Next()) {
+    nsAutoCString str;
+    iter.Data()->GetSheetURI()->GetPath(str);
+    if (strncmp(str.get(), "/skin", 5) == 0) {
+      iter.Remove();
+    }
+  }
 
   // Iterate over all the remaining XBL and make sure cached
   // scoped skin stylesheets are flushed and refetched by the
   // prototype bindings.
-  mXBLDocTable.Enumerate(FlushScopedSkinStylesheets, nullptr);
+  for (auto iter = mXBLDocTable.Iter(); !iter.Done(); iter.Next()) {
+    iter.Data()->FlushSkinStylesheets();
+  }
 }
 
 void
@@ -308,8 +290,6 @@ nsXULPrototypeCache::IsEnabled()
     return !gDisableXULCache;
 }
 
-static bool gDisableXULDiskCache = false;           // enabled by default
-
 void
 nsXULPrototypeCache::AbortCaching()
 {
@@ -322,7 +302,7 @@ nsXULPrototypeCache::AbortCaching()
     Flush();
 
     // Clear the cache set
-    mCacheURITable.Clear();
+    mStartupCacheURITable.Clear();
 }
 
 
@@ -427,7 +407,7 @@ nsXULPrototypeCache::FinishOutputStream(nsIURI* uri)
                                     &len);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    if (!mCacheURITable.GetEntry(uri)) {
+    if (!mStartupCacheURITable.GetEntry(uri)) {
         nsAutoCString spec(kXULCachePrefix);
         rv = PathifyURI(uri, spec);
         if (NS_FAILED(rv))
@@ -435,7 +415,7 @@ nsXULPrototypeCache::FinishOutputStream(nsIURI* uri)
         rv = sc->PutBuffer(spec.get(), buf, len);
         if (NS_SUCCEEDED(rv)) {
             mOutputStreamTable.Remove(uri);
-            mCacheURITable.RemoveEntry(uri);
+            mStartupCacheURITable.PutEntry(uri);
         }
     }
 
@@ -470,22 +450,6 @@ nsXULPrototypeCache::HasData(nsIURI* uri, bool* exists)
     return NS_OK;
 }
 
-static void
-CachePrefChangedCallback(const char* aPref, void* aClosure)
-{
-    bool wasEnabled = !gDisableXULDiskCache;
-    gDisableXULDiskCache =
-        Preferences::GetBool(kDisableXULCachePref,
-                             gDisableXULDiskCache);
-
-    if (wasEnabled && gDisableXULDiskCache) {
-        nsXULPrototypeCache* cache = nsXULPrototypeCache::GetInstance();
-
-        if (cache)
-            cache->AbortCaching();
-    }
-}
-
 nsresult
 nsXULPrototypeCache::BeginCaching(nsIURI* aURI)
 {
@@ -500,13 +464,7 @@ nsXULPrototypeCache::BeginCaching(nsIURI* aURI)
     if (!startupCache)
         return NS_ERROR_FAILURE;
 
-    gDisableXULDiskCache =
-        Preferences::GetBool(kDisableXULCachePref, gDisableXULDiskCache);
-
-    Preferences::RegisterCallback(CachePrefChangedCallback,
-                                  kDisableXULCachePref);
-
-    if (gDisableXULDiskCache)
+    if (gDisableXULCache)
         return NS_ERROR_NOT_AVAILABLE;
 
     // Get the chrome directory to validate against the one stored in the
@@ -558,6 +516,7 @@ nsXULPrototypeCache::BeginCaching(nsIURI* aURI)
             // XXX This blows away work that other consumers (like
             // mozJSComponentLoader) have done, need more fine-grained control.
             startupCache->InvalidateCache();
+            mStartupCacheURITable.Clear();
             rv = NS_ERROR_UNEXPECTED;
         }
     } else if (rv != NS_ERROR_NOT_AVAILABLE)
@@ -612,13 +571,10 @@ nsXULPrototypeCache::BeginCaching(nsIURI* aURI)
         // Failed again, just bail.
         if (NS_FAILED(rv)) {
             startupCache->InvalidateCache();
+            mStartupCacheURITable.Clear();
             return NS_ERROR_FAILURE;
         }
     }
-
-    // Success!  Insert this URI into the mCacheURITable
-    // and commit locals to globals.
-    mCacheURITable.PutEntry(aURI);
 
     return NS_OK;
 }

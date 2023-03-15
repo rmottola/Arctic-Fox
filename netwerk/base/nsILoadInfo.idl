@@ -18,15 +18,15 @@ interface nsIPrincipal;
 %}
 
 [ref] native const_nsIPrincipalArray(const nsTArray<nsCOMPtr<nsIPrincipal>>);
-native OriginAttributes(mozilla::OriginAttributes);
-[ref] native const_OriginAttributesRef(const mozilla::OriginAttributes);
+native NeckoOriginAttributes(mozilla::NeckoOriginAttributes);
+[ref] native const_OriginAttributesRef(const mozilla::NeckoOriginAttributes);
 
 typedef unsigned long nsSecurityFlags;
 
 /**
  * An nsILoadOwner represents per-load information about who started the load.
  */
-[scriptable, builtinclass, uuid(542b38c6-1c7b-4630-bd6b-9fee0d1b474d)]
+[scriptable, builtinclass, uuid(5a2dce9f-accd-45ae-98cc-319dec0ae4f0)]
 interface nsILoadInfo : nsISupports
 {
   /**
@@ -127,9 +127,22 @@ interface nsILoadInfo : nsISupports
   const unsigned long SEC_ABOUT_BLANK_INHERITS = (1<<8);
 
   /**
-   * Allow chrome: to bypass security checks.
+   * Allow access to chrome: packages that are content accessible.
    */
   const unsigned long SEC_ALLOW_CHROME = (1<<9);
+
+  /**
+   * Don't follow redirects. Instead the redirect response is returned
+   * as a successful response for the channel.
+   *
+   * Redirects not initiated by a server response, i.e. REDIRECT_INTERNAL and
+   * REDIRECT_STS_UPGRADE, are still followed.
+   *
+   * Note: If this flag is set and the channel response is a redirect, then
+   * the response body might not be available.
+   * This can happen if the redirect was cached.
+   */
+  const unsigned long SEC_DONT_FOLLOW_REDIRECTS = (1<<10);
 
   /**
    * The loadingPrincipal is the principal that is responsible for the load.
@@ -220,6 +233,14 @@ interface nsILoadInfo : nsISupports
   [infallible] readonly attribute unsigned long securityMode;
 
   /**
+   * True if this request is embedded in a context that can't be third-party
+   * (i.e. an iframe embedded in a cross-origin parent window). If this is
+   * false, then this request may be third-party if it's a third-party to
+   * loadingPrincipal.
+   */
+  [infallible] readonly attribute boolean isInThirdPartyContext;
+
+  /**
    * Determines whether credentials are sent with CORS requests.
    * Using this flag requires SEC_REQUIRE_CORS_DATA_INHERITS also to be set.
    */
@@ -251,6 +272,11 @@ interface nsILoadInfo : nsISupports
    * when calling CheckLoadURIWithPrincipal().
    */
   [infallible] readonly attribute boolean allowChrome;
+
+  /**
+   * Returns true if SEC_DONT_FOLLOW_REDIRECTS is set.
+   */
+  [infallible] readonly attribute boolean dontFollowRedirects;
 
   /**
    * The external contentPolicyType of the channel, used for security checks
@@ -317,22 +343,22 @@ interface nsILoadInfo : nsISupports
   [infallible] readonly attribute unsigned long long parentOuterWindowID;
 
   /**
-   * Customized OriginAttributes within LoadInfo to allow overwriting of the
+   * Customized NeckoOriginAttributes within LoadInfo to allow overwriting of the
    * default originAttributes from the loadingPrincipal.
    */
   [implicit_jscontext, binaryname(ScriptableOriginAttributes)]
   attribute jsval originAttributes;
 
   [noscript, nostdcall, binaryname(GetOriginAttributes)]
-  OriginAttributes binaryGetOriginAttributes();
+  NeckoOriginAttributes binaryGetOriginAttributes();
 
   [noscript, nostdcall, binaryname(SetOriginAttributes)]
   void binarySetOriginAttributes(in const_OriginAttributesRef aOriginAttrs);
 
 %{ C++
-  inline mozilla::OriginAttributes GetOriginAttributes()
+  inline mozilla::NeckoOriginAttributes GetOriginAttributes()
   {
-    mozilla::OriginAttributes result;
+    mozilla::NeckoOriginAttributes result;
     mozilla::DebugOnly<nsresult> rv = GetOriginAttributes(&result);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     return result;

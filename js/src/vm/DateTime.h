@@ -200,6 +200,16 @@ class DateTimeInfo
     void sanityCheck();
 };
 
+/**
+ * ICU's default time zone, used for various date/time formatting operations
+ * that include the local time in the representation, is allowed to go stale
+ * for unfortunate performance reasons.  Call this function when an up-to-date
+ * default time zone is required, to resync ICU's default time zone with
+ * reality.
+ */
+extern void
+ResyncICUDefaultTimeZone();
+
 }  /* namespace js */
 
 #endif /* vm_DateTime_h */

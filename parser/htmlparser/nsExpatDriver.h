@@ -120,7 +120,7 @@ private:
   // Necko
   bool             mIsFinalChunk;
 
-  PRUint8          mTagDepth;
+  uint16_t          mTagDepth;
 
   nsresult         mInternalState;
 

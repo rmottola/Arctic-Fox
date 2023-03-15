@@ -19,28 +19,24 @@
 using namespace mozilla;
 
 nsFont::nsFont(const FontFamilyList& aFontlist, uint8_t aStyle,
-               uint16_t aWeight, int16_t aStretch,
-               uint8_t aDecoration, nscoord aSize)
+               uint16_t aWeight, int16_t aStretch, nscoord aSize)
   : fontlist(aFontlist)
 {
   Init();
   style = aStyle;
   weight = aWeight;
   stretch = aStretch;
-  decorations = aDecoration;
   size = aSize;
 }
 
 nsFont::nsFont(FontFamilyType aGenericType, uint8_t aStyle,
-               uint16_t aWeight, int16_t aStretch, uint8_t aDecoration,
-               nscoord aSize)
+               uint16_t aWeight, int16_t aStretch, nscoord aSize)
   : fontlist(aGenericType)
 {
   Init();
   style = aStyle;
   weight = aWeight;
   stretch = aStretch;
-  decorations = aDecoration;
   size = aSize;
 }
 
@@ -68,7 +64,6 @@ nsFont::nsFont(const nsFont& aOther)
   systemFont = aOther.systemFont;
   weight = aOther.weight;
   stretch = aOther.stretch;
-  decorations = aOther.decorations;
   smoothing = aOther.smoothing;
   size = aOther.size;
   sizeAdjust = aOther.sizeAdjust;
@@ -94,7 +89,7 @@ nsFont::~nsFont()
 {
 }
 
-bool nsFont::BaseEquals(const nsFont& aOther) const
+bool nsFont::Equals(const nsFont& aOther) const
 {
   if ((style == aOther.style) &&
       (systemFont == aOther.systemFont) &&
@@ -121,15 +116,6 @@ bool nsFont::BaseEquals(const nsFont& aOther) const
   return false;
 }
 
-bool nsFont::Equals(const nsFont& aOther) const
-{
-  if (BaseEquals(aOther) &&
-      (decorations == aOther.decorations)) {
-    return true;
-  }
-  return false;
-}
-
 nsFont& nsFont::operator=(const nsFont& aOther)
 {
   fontlist = aOther.fontlist;
@@ -137,7 +123,6 @@ nsFont& nsFont::operator=(const nsFont& aOther)
   systemFont = aOther.systemFont;
   weight = aOther.weight;
   stretch = aOther.stretch;
-  decorations = aOther.decorations;
   smoothing = aOther.smoothing;
   size = aOther.size;
   sizeAdjust = aOther.sizeAdjust;

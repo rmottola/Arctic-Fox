@@ -224,6 +224,28 @@ this.TraversalRules = { // jshint ignore:line
         Filters.IGNORE;
     }, null, true),
 
+  /* A rule for Android's section navigation, lands on landmarks, regions, and
+     on headings to aid navigation of traditionally structured documents */
+  Section: new BaseTraversalRule(
+    [],
+    function Section_match(aAccessible) {
+      if (aAccessible.role === Roles.HEADING) {
+        return Filters.MATCH;
+      }
+
+      let matchedRole = Utils.matchRoles(aAccessible, [
+        'banner',
+        'complementary',
+        'contentinfo',
+        'main',
+        'navigation',
+        'search',
+        'region'
+        ]);
+
+      return matchedRole ? Filters.MATCH : Filters.IGNORE;
+    }, null, true),
+
   Entry: new BaseTraversalRule(
     [Roles.ENTRY,
      Roles.PASSWORD_TEXT]),
@@ -272,6 +294,36 @@ this.TraversalRules = { // jshint ignore:line
       } else {
         return Filters.IGNORE;
       }
+    }),
+
+  /* For TalkBack's "Control" granularity. Form conrols and links */
+  Control: new BaseTraversalRule(
+    [Roles.PUSHBUTTON,
+     Roles.SPINBUTTON,
+     Roles.TOGGLE_BUTTON,
+     Roles.BUTTONDROPDOWN,
+     Roles.BUTTONDROPDOWNGRID,
+     Roles.COMBOBOX,
+     Roles.LISTBOX,
+     Roles.ENTRY,
+     Roles.PASSWORD_TEXT,
+     Roles.PAGETAB,
+     Roles.RADIOBUTTON,
+     Roles.RADIO_MENU_ITEM,
+     Roles.SLIDER,
+     Roles.CHECKBUTTON,
+     Roles.CHECK_MENU_ITEM,
+     Roles.SWITCH,
+     Roles.LINK,
+     Roles.MENUITEM],
+    function Control_match(aAccessible)
+    {
+      // We want to ignore anchors, only focus real links.
+      if (aAccessible.role == Roles.LINK &&
+          !Utils.getState(aAccessible).contains(States.LINKED)) {
+        return Filters.IGNORE;
+      }
+      return Filters.MATCH;
     }),
 
   List: new BaseTraversalRule(

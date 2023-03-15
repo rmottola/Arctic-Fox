@@ -458,7 +458,7 @@ label.requests-menu-status-code {
   background: none;
   box-shadow: none;
   border-color: transparent;
-  list-style-image: url("chrome://devtools/skin/themes/images/debugger-collapse.png");
+  list-style-image: url("chrome://devtools/skin/images/debugger-collapse.png");
   -moz-image-region: rect(0px,16px,16px,0px);
 }
 
@@ -468,21 +468,21 @@ label.requests-menu-status-code {
 }
 
 #details-pane-toggle[pane-collapsed] {
-  list-style-image: url("chrome://devtools/skin/themes/images/debugger-expand.png");
+  list-style-image: url("chrome://devtools/skin/images/debugger-expand.png");
 }
 
 #details-pane-toggle:active {
   -moz-image-region: rect(0px,32px,16px,16px);
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   #details-pane-toggle {
-    list-style-image: url("chrome://devtools/skin/themes/images/debugger-collapse@2x.png");
+    list-style-image: url("chrome://devtools/skin/images/debugger-collapse@2x.png");
     -moz-image-region: rect(0px,32px,32px,0px);
   }
 
   #details-pane-toggle[pane-collapsed] {
-    list-style-image: url("chrome://devtools/skin/themes/images/debugger-expand@2x.png");
+    list-style-image: url("chrome://devtools/skin/images/debugger-expand@2x.png");
   }
 
   #details-pane-toggle:active {
@@ -604,7 +604,7 @@ label.requests-menu-status-code {
   height: 12px;
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   .security-warning-icon {
     background-image: url(images/alerticon-warning@2x.png);
   }

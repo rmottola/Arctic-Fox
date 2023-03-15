@@ -191,8 +191,6 @@ private:
   WorkerType mWorkerType;
   TimeStamp mCreationTimeStamp;
   DOMHighResTimeStamp mCreationTimeHighRes;
-  TimeStamp mNowBaseTimeStamp;
-  DOMHighResTimeStamp mNowBaseTimeHighRes;
 
 protected:
   // The worker is owned by its thread, which is represented here.  This is set
@@ -549,19 +547,9 @@ public:
     return mCreationTimeStamp;
   }
 
-  DOMHighResTimeStamp CreationTimeHighRes() const
+  DOMHighResTimeStamp CreationTime() const
   {
     return mCreationTimeHighRes;
-  }
-
-  TimeStamp NowBaseTimeStamp() const
-  {
-    return mNowBaseTimeStamp;
-  }
-
-  DOMHighResTimeStamp NowBaseTimeHighRes() const
-  {
-    return mNowBaseTimeHighRes;
   }
 
   nsIPrincipal*
@@ -1279,6 +1267,13 @@ public:
   }
 
   bool
+  OpenWindowEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_OPEN_WINDOW_ENABLED];
+  }
+
+  bool
   OpaqueInterceptionEnabled() const
   {
     AssertIsOnWorkerThread();
@@ -1290,6 +1285,13 @@ public:
   {
     AssertIsOnWorkerThread();
     return mPreferences[WORKERPREF_DOM_WORKERNOTIFICATION];
+  }
+
+  bool
+  DOMServiceWorkerNotificationEnabled() const
+  {
+    AssertIsOnWorkerThread();
+    return mPreferences[WORKERPREF_DOM_SERVICEWORKERNOTIFICATION];
   }
 
   bool

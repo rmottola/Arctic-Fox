@@ -55,12 +55,8 @@ public:
   void
   DispatchStateChange(ServiceWorkerState aState)
   {
-    SetState(aState);
     DOMEventTargetHelper::DispatchTrustedEvent(NS_LITERAL_STRING("statechange"));
   }
-
-  void
-  QueueStateChangeEvent(ServiceWorkerState aState);
 
 #ifdef XP_WIN
 #undef PostMessage
@@ -70,6 +66,9 @@ public:
   PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
               const Optional<Sequence<JS::Value>>& aTransferable,
               ErrorResult& aRv);
+
+  WorkerPrivate*
+  GetWorkerPrivate() const;
 
 private:
   // This class can only be created from the ServiceWorkerManager.

@@ -29,9 +29,6 @@ if CONFIG['HOST_OS_ARCH'] != 'WINNT':
     # while the program here is in C.
     HostProgram('nsinstall_real', c_only=True)
 
-if CONFIG['GKMEDIAS_SHARED_LIBRARY']:
-    DEFINES['GKMEDIAS_SHARED_LIBRARY'] = True
-
 if CONFIG['MOZ_SHARED_ICU']:
     DEFINES['MOZ_SHARED_ICU'] = True
 

@@ -396,16 +396,6 @@ LIRGenerator::visitComputeThis(MComputeThis* ins)
 }
 
 void
-LIRGenerator::visitLoadArrowThis(MLoadArrowThis* ins)
-{
-    MOZ_ASSERT(ins->type() == MIRType_Value);
-    MOZ_ASSERT(ins->callee()->type() == MIRType_Object);
-
-    LLoadArrowThis* lir = new(alloc()) LLoadArrowThis(useRegister(ins->callee()));
-    defineBox(lir, ins);
-}
-
-void
 LIRGenerator::visitArrowNewTarget(MArrowNewTarget* ins)
 {
     MOZ_ASSERT(ins->type() == MIRType_Value);
@@ -538,6 +528,38 @@ LIRGenerator::visitApplyArgs(MApplyArgs* apply)
 }
 
 void
+LIRGenerator::visitApplyArray(MApplyArray* apply)
+{
+    MOZ_ASSERT(apply->getFunction()->type() == MIRType_Object);
+
+    // Assert if we cannot build a rectifier frame.
+    MOZ_ASSERT(CallTempReg0 != ArgumentsRectifierReg);
+    MOZ_ASSERT(CallTempReg1 != ArgumentsRectifierReg);
+
+    // Assert if the return value is already erased.
+    MOZ_ASSERT(CallTempReg2 != JSReturnReg_Type);
+    MOZ_ASSERT(CallTempReg2 != JSReturnReg_Data);
+
+    LApplyArrayGeneric* lir = new(alloc()) LApplyArrayGeneric(
+        useFixed(apply->getFunction(), CallTempReg3),
+        useFixed(apply->getElements(), CallTempReg0),
+        tempFixed(CallTempReg1),  // object register
+        tempFixed(CallTempReg2)); // stack counter register
+
+    MDefinition* self = apply->getThis();
+    useBoxFixed(lir, LApplyArrayGeneric::ThisIndex, self, CallTempReg4, CallTempReg5);
+
+    // Bailout is needed in the case of possible non-JSFunction callee
+    // too many values in the array, or empty space at the end of the
+    // array.  I'm going to use NonJSFunctionCallee for the code even
+    // if that is not an adequate description.
+    assignSnapshot(lir, Bailout_NonJSFunctionCallee);
+
+    defineReturn(lir, apply);
+    assignSafepoint(lir, apply);
+}
+
+void
 LIRGenerator::visitBail(MBail* bail)
 {
     LBail* lir = new(alloc()) LBail();
@@ -616,12 +638,10 @@ LIRGenerator::visitCallDirectEval(MCallDirectEval* ins)
     MDefinition* string = ins->getString();
     MOZ_ASSERT(string->type() == MIRType_String);
 
-    MDefinition* thisValue = ins->getThisValue();
     MDefinition* newTargetValue = ins->getNewTargetValue();
 
     LInstruction* lir = new(alloc()) LCallDirectEval(useRegisterAtStart(scopeChain),
                                                      useRegisterAtStart(string));
-    useBoxAtStart(lir, LCallDirectEval::ThisValue, thisValue);
     useBoxAtStart(lir, LCallDirectEval::NewTarget, newTargetValue);
 
     defineReturn(lir, ins);
@@ -2195,11 +2215,9 @@ void
 LIRGenerator::visitLambdaArrow(MLambdaArrow* ins)
 {
     MOZ_ASSERT(ins->scopeChain()->type() == MIRType_Object);
-    MOZ_ASSERT(ins->thisDef()->type() == MIRType_Value);
     MOZ_ASSERT(ins->newTargetDef()->type() == MIRType_Value);
 
     LLambdaArrow* lir = new(alloc()) LLambdaArrow(useRegister(ins->scopeChain()));
-    useBox(lir, LLambdaArrow::ThisValue, ins->thisDef());
     useBox(lir, LLambdaArrow::NewTargetValue, ins->newTargetDef());
     define(lir, ins);
     assignSafepoint(lir, ins);
@@ -3206,6 +3224,19 @@ LIRGenerator::visitLoadFixedSlot(MLoadFixedSlot* ins)
         LLoadFixedSlotT* lir = new(alloc()) LLoadFixedSlotT(useRegisterForTypedLoad(obj, type));
         define(lir, ins);
     }
+}
+
+void
+LIRGenerator::visitLoadFixedSlotAndUnbox(MLoadFixedSlotAndUnbox* ins)
+{
+    MDefinition* obj = ins->object();
+    MOZ_ASSERT(obj->type() == MIRType_Object);
+
+    LLoadFixedSlotAndUnbox* lir = new(alloc()) LLoadFixedSlotAndUnbox(useRegisterAtStart(obj));
+    if (ins->fallible())
+        assignSnapshot(lir, ins->bailoutKind());
+
+    define(lir, ins);
 }
 
 void

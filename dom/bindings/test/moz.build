@@ -47,3 +47,8 @@ LOCAL_INCLUDES += [
     '/js/xpconnect/src',
     '/js/xpconnect/wrappers',
 ]
+
+if CONFIG['GNU_CC']:
+    CXXFLAGS += [
+        '-Wno-uninitialized',
+    ]

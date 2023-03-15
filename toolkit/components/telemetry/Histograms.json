@@ -89,9 +89,25 @@
     "kind": "boolean",
     "description": "blocklist.xml has been loaded synchronously *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
+  "CHECKERBOARDED_CSSPIXELS_MS": {
+    "alert_emails": ["kgupta@mozilla.com"],
+    "bug_numbers": [1221694],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "3840 * 2160 * 16",
+    "n_buckets": 50,
+    "description": "Magnitude of checkerboarding in CSSPixel-milliseconds per scrollable frame per composite"
+  },
   "COMPOSITE_TIME" : {
     "expires_in_version": "never",
     "description": "Composite times in milliseconds",
+    "kind": "exponential",
+    "high": "1000",
+    "n_buckets": 50
+  },
+  "COMPOSITE_FRAME_ROUNDTRIP_TIME" : {
+    "expires_in_version": "never",
+    "description": "Time from vsync to finishing a composite in milliseconds.",
     "kind": "exponential",
     "high": "1000",
     "n_buckets": 50
@@ -4038,17 +4054,21 @@
     "description": "Average paint duration during any tab open/close animation (excluding tabstrip scroll)"
   },
   "FX_REFRESH_DRIVER_CHROME_FRAME_DELAY_MS": {
-    "expires_in_version": "default",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": "10000",
     "n_buckets": 50,
+    "bug_numbers": [1220699],
     "description": "Delay in ms between the target and the actual handling time of the frame at refresh driver in the chrome process."
   },
   "FX_REFRESH_DRIVER_CONTENT_FRAME_DELAY_MS": {
-    "expires_in_version": "default",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": "10000",
     "n_buckets": 50,
+    "bug_numbers": [1221674],
     "description": "Delay in ms between the target and the actual handling time of the frame at refresh driver in the content process."
   },
   "FX_TAB_SWITCH_UPDATE_MS": {
@@ -4282,6 +4302,14 @@
     "kind": "count",
     "description": "Count of messages sent by SessionRestore from child frames to the parent and that cannot be transmitted as they eat up too much memory."
   },
+  "FX_SESSION_RESTORE_DOM_STORAGE_SIZE_ESTIMATE_CHARS": {
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "high": "30000000",
+    "n_buckets": 20,
+    "extended_statistics_ok": true,
+    "description": "Session restore: Number of characters in DOM Storage for a tab. Pages without DOM Storage or with an empty DOM Storage are ignored."
+  },
   "FX_URLBAR_SELECTED_RESULT_INDEX": {
     "expires_in_version": "45",
     "kind": "enumerated",
@@ -4310,60 +4338,10 @@
     "kind": "flag",
     "description": "Whether the character encoding menu was used to override an encoding in this session."
   },
-  "DECODER_INSTANTIATED_HZ": {
-    "expires_in_version": "default",
-    "kind": "flag",
-    "description": "Whether the decoder for HZ has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_ISO2022CN": {
-    "expires_in_version": "40",
-    "kind": "flag",
-    "description": "Whether the decoder for ISO-2022-CN has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_ISO2022KR": {
-    "expires_in_version": "40",
-    "kind": "flag",
-    "description": "Whether the decoder for ISO-2022-KR has been instantiated in this session."
-  },
   "DECODER_INSTANTIATED_ISO2022JP": {
     "expires_in_version": "never",
     "kind": "flag",
     "description": "Whether the decoder for ISO-2022-JP has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_JOHAB": {
-    "expires_in_version": "32",
-    "kind": "flag",
-    "description": "Whether the decoder for JOHAB has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_T61": {
-    "expires_in_version": "32",
-    "kind": "flag",
-    "description": "Whether the decoder for T.61 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM850": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM850 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM852": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM852 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM855": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM855 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM857": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM857 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM862": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM862 has been instantiated in this session."
   },
   "DECODER_INSTANTIATED_IBM866": {
     "expires_in_version": "never",
@@ -4434,31 +4412,6 @@
     "expires_in_version": "never",
     "kind": "flag",
     "description": "Whether the decoder for MACGURMUKHI has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_ISOIR111": {
-    "expires_in_version": "38",
-    "kind": "flag",
-    "description": "Whether the decoder for ISOIR111 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_ARMSCII8": {
-    "expires_in_version": "default",
-    "kind": "flag",
-    "description": "Whether the decoder for ARMSCII8 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_VISCII": {
-    "expires_in_version": "40",
-    "kind": "flag",
-    "description": "Whether the decoder for VISCII has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_VIETTCVN5712": {
-    "expires_in_version": "40",
-    "kind": "flag",
-    "description": "Whether the decoder for VIETTCVN5712 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_VIETVPS": {
-    "expires_in_version": "40",
-    "kind": "flag",
-    "description": "Whether the decoder for VIETVPS has been instantiated in this session."
   },
   "DECODER_INSTANTIATED_KOI8R": {
     "expires_in_version": "never",
@@ -4717,6 +4670,7 @@
     "kind": "linear",
     "high": "13",
     "n_buckets": 12,
+    "bug_numbers": [1162538],
     "description": "Number of directories in the archive at scan"
   },
   "TELEMETRY_ARCHIVE_OLDEST_DIRECTORY_AGE": {
@@ -4725,6 +4679,7 @@
     "kind": "linear",
     "high": "13",
     "n_buckets": 12,
+    "bug_numbers": [1162538],
     "description": "The age of the oldest Telemetry archive directory in months"
   },
   "TELEMETRY_ARCHIVE_SCAN_PING_COUNT": {
@@ -4733,12 +4688,14 @@
     "kind": "exponential",
     "high": "100000",
     "n_buckets": 100,
+    "bug_numbers": [1162538],
     "description": "Number of Telemetry pings in the archive at scan"
   },
   "TELEMETRY_ARCHIVE_SESSION_PING_COUNT": {
     "alert_emails": ["telemetry-client-dev@mozilla.com"],
     "expires_in_version": "never",
     "kind": "count",
+    "bug_numbers": [1162538],
     "description": "Number of Telemetry pings added to the archive during the session"
   },
   "TELEMETRY_ARCHIVE_SIZE_MB": {
@@ -4747,6 +4704,7 @@
     "kind": "linear",
     "high": "300",
     "n_buckets": 60,
+    "bug_numbers": [1162538],
     "description": "The size of the Telemetry archive (MB)"
   },
   "TELEMETRY_ARCHIVE_EVICTED_OVER_QUOTA": {
@@ -4755,6 +4713,7 @@
     "kind": "exponential",
     "high": "100000",
     "n_buckets": 100,
+    "bug_numbers": [1162538],
     "description": "Number of Telemetry pings evicted from the archive during cleanup, because they were over the quota"
   },
   "TELEMETRY_ARCHIVE_EVICTED_OLD_DIRS": {
@@ -4763,6 +4722,7 @@
     "kind": "linear",
     "high": "13",
     "n_buckets": 12,
+    "bug_numbers": [1162538],
     "description": "Number of Telemetry directories evicted from the archive during cleanup, because they were too old"
   },
   "TELEMETRY_ARCHIVE_EVICTING_DIRS_MS": {
@@ -4771,6 +4731,7 @@
     "kind": "exponential",
     "high": "300000",
     "n_buckets": 20,
+    "bug_numbers": [1162538],
     "description": "Time (ms) it takes for evicting old directories"
   },
   "TELEMETRY_ARCHIVE_CHECKING_OVER_QUOTA_MS": {
@@ -4779,6 +4740,7 @@
     "kind": "exponential",
     "high": "300000",
     "n_buckets": 20,
+    "bug_numbers": [1162538],
     "description": "Time (ms) it takes for checking if the archive is over-quota"
   },
   "TELEMETRY_ARCHIVE_EVICTING_OVER_QUOTA_MS": {
@@ -4787,6 +4749,7 @@
     "kind": "exponential",
     "high": "300000",
     "n_buckets": 20,
+    "bug_numbers": [1162538],
     "description": "Time (ms) it takes for evicting over-quota pings"
   },
   "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
@@ -5428,13 +5391,33 @@
     "kind": "boolean",
     "description": "Count the number of times the user clicked 'allow' on the hidden-plugin infobar."
   },
-  "POPUP_NOTIFICATION_MAINACTION_TRIGGERED_MS": {
-    "expires_in_version": "40",
-    "kind": "linear",
-    "low": 25,
-    "high": "80 * 25",
-    "n_buckets": "80 + 1",
-    "description": "The time (in milliseconds) after showing a PopupNotification that the mainAction was first triggered"
+  "POPUP_NOTIFICATION_STATS": {
+    "alert_emails": ["firefox-dev@mozilla.org"],
+    "expires_in_version": "48",
+    "kind": "enumerated",
+    "keyed": true,
+    "n_values": 40,
+    "description": "(Bug 1207089) Usage of popup notifications, keyed by ID (0 = Offered, 1..4 = Action, 5 = Click outside, 6 = Leave page, 7 = Use 'X', 8 = Not now, 10 = Open submenu, 11 = Learn more. Add 20 if happened after reopen.)"
+  },
+  "POPUP_NOTIFICATION_MAIN_ACTION_MS": {
+    "alert_emails": ["firefox-dev@mozilla.org"],
+    "expires_in_version": "48",
+    "kind": "exponential",
+    "keyed": true,
+    "low": 100,
+    "high": 600000,
+    "n_buckets": 40,
+    "description": "(Bug 1207089) Time in ms between initially requesting a popup notification and triggering the main action, keyed by ID"
+  },
+  "POPUP_NOTIFICATION_DISMISSAL_MS": {
+    "alert_emails": ["firefox-dev@mozilla.org"],
+    "expires_in_version": "48",
+    "kind": "exponential",
+    "keyed": true,
+    "low": 200,
+    "high": 20000,
+    "n_buckets": 50,
+    "description": "(Bug 1207089) Time in ms between displaying a popup notification and dismissing it without an action the first time, keyed by ID"
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_RELOAD_MS": {
     "expires_in_version": "never",
@@ -5744,6 +5727,22 @@
     "n_buckets": "1000",
     "description": "The time (in milliseconds) that it took a 'listTabs' request to go round trip."
   },
+  "DEVTOOLS_DEBUGGER_RDP_LOCAL_LISTSERVICEWORKERREGISTRATIONS_MS": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "ejpbruel@mozilla.com"],
+    "expires_in_version": "50",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "100",
+    "description": "The time (in milliseconds) that it took a 'listServiceWorkerRegistrations' request to go round trip."
+  },
+  "DEVTOOLS_DEBUGGER_RDP_REMOTE_LISTSERVICEWORKERREGISTRATIONS_MS": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "ejpbruel@mozilla.com"],
+    "expires_in_version": "50",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": "100",
+    "description": "The time (in milliseconds) that it took a 'listServiceWorkerRegistrations' request to go round trip."
+  },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_PROTOCOLDESCRIPTION_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -6014,18 +6013,6 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "The number of failed ICE Connections (0) vs. number of successful ICE connections (1)."
-  },
-  "WEBRTC_CANDIDATE_TYPES_GIVEN_SUCCESS": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 128,
-    "description": "A bitpattern indicating what types of candidates were present. Bit 0: Remote server reflexive. Bit 1: Remote relayed. Bit 2: Local server reflexive. Bits 3-6: Local UDP, TCP, TLS, and HTTPS relay respectively."
-  },
-  "WEBRTC_CANDIDATE_TYPES_GIVEN_FAILURE": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 128,
-    "description": "Identical to WEBRTC_CANDIDATE_TYPES_GIVEN_SUCCEESS, except recorded only when ICE fails on the stream in question."
   },
   "WEBRTC_STUN_RATE_LIMIT_EXCEEDED_BY_TYPE_GIVEN_SUCCESS": {
     "expires_in_version": "never",
@@ -7237,13 +7224,6 @@
     "kind": "boolean",
     "description": "The result of the startup default desktop browser check."
   },
-  "WIN_10_DEFAULT_BROWSER_AB_TEST": {
-    "alert_emails": ["jwein@mozilla.com"],
-    "expires_in_version": "45",
-    "kind": "enumerated",
-    "n_values": 4,
-    "description": "A/B test of different default browser dialogs on Windows 10 (0=openas-notdefault, 1=openas-default, 2=modernsettings-notdefault, 3=modernsettings-default)."
-  },
   "BROWSER_IS_ASSIST_DEFAULT": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -7267,6 +7247,14 @@
     "kind": "enumerated",
     "n_values": 10,
     "description": "How often would blocked mixed content be allowed if HSTS upgrades were allowed? 0=display/no-HSTS, 1=display/HSTS, 2=active/no-HSTS, 3=active/HSTS"
+  },
+  "COOKIE_SCHEME_SECURITY": {
+    "alert_emails": ["seceng@mozilla.org"],
+    "expires_in_version": "50",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "How often are secure cookies set from non-secure origins, and vice-versa? 0=nonsecure/http, 1=nonsecure/https, 2=secure/http, 3=secure/https"
   },
   "NTLM_MODULE_USED_2": {
     "expires_in_version": "never",
@@ -8853,18 +8841,6 @@
     "kind": "boolean",
     "description": "The number of failed ICE Connections (0) vs. number of successful ICE connections (1)."
   },
-  "LOOP_CANDIDATE_TYPES_GIVEN_SUCCESS": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 128,
-    "description": "A bitpattern indicating what types of candidates were present. Bit 0: Remote server reflexive. Bit 1: Remote relayed. Bit 2: Local server reflexive. Bits 3-6: Local UDP, TCP, TLS, and HTTPS relay respectively."
-  },
-  "LOOP_CANDIDATE_TYPES_GIVEN_FAILURE": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 128,
-    "description": "Identical to LOOP_CANDIDATE_TYPES_GIVEN_SUCCEESS, except recorded only when ICE fails on the stream in question."
-  },
   "LOOP_VIDEO_QUALITY_INBOUND_BANDWIDTH_KBITS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -9272,5 +9248,96 @@
     "n_values": 100,
     "releaseChannelCollection": "opt-out",
     "description": "Graphics Crash Reason (...)"
+  },
+  "PLUGIN_ACTIVATION_COUNT": {
+    "alert_emails": ["cpeterson@mozilla.com"],
+    "expires_in_version": "48",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Counts number of times a certain plugin has been activated."
+  },
+  "YOUTUBE_EMBED_SEEN": {
+    "alert_emails": ["cpeterson@mozilla.com"],
+    "expires_in_version": "48",
+    "kind": "flag",
+    "description": "Flag activated whenever a youtube flash embed is seen during a session."
+  },
+  "WEBFONT_DOWNLOAD_TIME": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Time to download a webfont (ms)"
+  },
+  "WEBFONT_DOWNLOAD_TIME_AFTER_START": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "60000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Time after navigationStart webfont download completed (ms)"
+  },
+  "WEBFONT_FONTTYPE": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "description": "Font format type (woff/woff2/ttf/...)"
+  },
+  "WEBFONT_SRCTYPE": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 5,
+    "description": "Font src type loaded (1 = local, 2 = url, 3 = data)"
+  },
+  "WEBFONT_PER_PAGE": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of fonts loaded at page load"
+  },
+  "WEBFONT_SIZE_PER_PAGE": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "5000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Size of all fonts loaded at page load (kb)"
+  },
+  "WEBFONT_SIZE": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "5000",
+    "n_buckets": 50,
+    "extended_statistics_ok": true,
+    "description": "Size of font loaded (kb)"
+  },
+  "WEBFONT_COMPRESSION_WOFF": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Compression ratio of WOFF data (%)"
+  },
+  "WEBFONT_COMPRESSION_WOFF2": {
+    "alert_emails": ["jdaggett@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 50,
+    "description": "Compression ratio of WOFF2 data (%)"
+  },
+  "WEBRTC_ICE_CHECKING_RATE": {
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
+    "kind": "boolean",
+    "bug_numbers": [1188391],
+    "description": "The number of ICE connections which immediately failed (0) vs. reached at least checking state (1)."
   }
 }

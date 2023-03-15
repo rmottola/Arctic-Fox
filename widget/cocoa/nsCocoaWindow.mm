@@ -453,20 +453,19 @@ nsresult nsCocoaWindow::CreateNativeWindow(const NSRect &aRect,
 
   if (mWindowType == eWindowType_invisible) {
     [mWindow setLevel:kCGDesktopWindowLevelKey];
-  } else if (mWindowType == eWindowType_popup) {
-    SetPopupWindowLevel();
-    [mWindow setHasShadow:YES];
   }
 
-  [mWindow setBackgroundColor:[NSColor clearColor]];
-#ifdef MOZ_B2G
-  // In B2G, we don't create popups and we need OMTC to work (because out of
-  // process compositing depends on it). Therefore, we don't need our windows
-  // to be transparent.
-  [mWindow setOpaque:YES];
-#else
-  [mWindow setOpaque:NO];
-#endif
+  if (mWindowType == eWindowType_popup) {
+    SetPopupWindowLevel();
+    [mWindow setHasShadow:YES];
+    [mWindow setBackgroundColor:[NSColor clearColor]];
+    [mWindow setOpaque:NO];
+  } else {
+    // Make sure that regular windows are opaque from the start, so that
+    // nsChildView::ComputeShouldAccelerate returns true for them.
+    [mWindow setOpaque:YES];
+  }
+
   [mWindow setContentMinSize:NSMakeSize(60, 60)];
   [mWindow disableCursorRects];
 
@@ -1045,8 +1044,8 @@ nsTransparencyMode nsCocoaWindow::GetTransparencyMode()
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(eTransparencyOpaque);
 }
 
-// This is called from nsMenuPopupFrame when making a popup transparent.
-// For other window types, nsChildView::SetTransparencyMode is used.
+// This is called from nsMenuPopupFrame when making a popup transparent, or
+// from nsChildView::SetTransparencyMode for other window types.
 void nsCocoaWindow::SetTransparencyMode(nsTransparencyMode aMode)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
@@ -1054,7 +1053,9 @@ void nsCocoaWindow::SetTransparencyMode(nsTransparencyMode aMode)
   if (!mWindow)
     return;
 
-  BOOL isTransparent = aMode == eTransparencyTransparent;
+  // Transparent windows are only supported on popups.
+  BOOL isTransparent = aMode == eTransparencyTransparent &&
+                       mWindowType == eWindowType_popup;
   BOOL currentTransparency = ![mWindow isOpaque];
   if (isTransparent != currentTransparency) {
     [mWindow setOpaque:!isTransparent];
@@ -1729,9 +1730,6 @@ nsCocoaWindow::BackingScaleFactorChanged()
   if (presShell) {
     presShell->BackingScaleFactorChanged();
   }
-  // When the backing scale factor changes, so does our size in device pixels
-  // (though not in display pixels).
-  ReportSizeEvent();
 }
 
 int32_t
@@ -2111,7 +2109,11 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
     return NS_OK;
 
   mShadowStyle = aStyle;
-  [mWindow setHasShadow:(aStyle != NS_STYLE_WINDOW_SHADOW_NONE)];
+
+  // Shadowless windows are only supported on popups.
+  if (mWindowType == eWindowType_popup)
+    [mWindow setHasShadow:(aStyle != NS_STYLE_WINDOW_SHADOW_NONE)];
+
   [mWindow setUseMenuStyle:(aStyle == NS_STYLE_WINDOW_SHADOW_MENU)];
   AdjustWindowShadow();
   SetWindowBackgroundBlur();

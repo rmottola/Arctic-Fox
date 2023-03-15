@@ -8,7 +8,6 @@
 #include "TouchManager.h"
 #include "nsPresShell.h"
 
-bool TouchManager::gPreventMouseEvents = false;
 nsRefPtrHashtable<nsUint32HashKey, dom::Touch>* TouchManager::gCaptureTouchList;
 
 /*static*/ void
@@ -74,21 +73,23 @@ EvictTouchPoint(RefPtr<dom::Touch>& aTouch,
   }
 }
 
-static PLDHashOperator
-AppendToTouchList(const uint32_t& aKey, RefPtr<dom::Touch>& aData, void *aTouchList)
+static void
+AppendToTouchList(WidgetTouchEvent::TouchArray* aTouchList)
 {
-  WidgetTouchEvent::TouchArray* touches =
-    static_cast<WidgetTouchEvent::TouchArray*>(aTouchList);
-  aData->mChanged = false;
-  touches->AppendElement(aData);
-  return PL_DHASH_NEXT;
+  for (auto iter = TouchManager::gCaptureTouchList->Iter();
+       !iter.Done();
+       iter.Next()) {
+    RefPtr<dom::Touch>& touch = iter.Data();
+    touch->mChanged = false;
+    aTouchList->AppendElement(touch);
+  }
 }
 
 void
 TouchManager::EvictTouches()
 {
   WidgetTouchEvent::AutoTouchArray touches;
-  gCaptureTouchList->Enumerate(&AppendToTouchList, &touches);
+  AppendToTouchList(&touches);
   for (uint32_t i = 0; i < touches.Length(); ++i) {
     EvictTouchPoint(touches[i], mDocument);
   }
@@ -110,7 +111,7 @@ TouchManager::PreHandleEvent(WidgetEvent* aEvent,
       // queue
       if (touchEvent->touches.Length() == 1) {
         WidgetTouchEvent::AutoTouchArray touches;
-        gCaptureTouchList->Enumerate(&AppendToTouchList, (void *)&touches);
+        AppendToTouchList(&touches);
         for (uint32_t i = 0; i < touches.Length(); ++i) {
           EvictTouchPoint(touches[i]);
         }
@@ -182,9 +183,6 @@ TouchManager::PreHandleEvent(WidgetEvent* aEvent,
             }
           }
         } else {
-          if (gPreventMouseEvents) {
-            *aStatus = nsEventStatus_eConsumeNoDefault;
-          }
           return false;
         }
       }
@@ -218,7 +216,7 @@ TouchManager::PreHandleEvent(WidgetEvent* aEvent,
         gCaptureTouchList->Remove(id);
       }
       // add any touches left in the touch list, but ensure changed=false
-      gCaptureTouchList->Enumerate(&AppendToTouchList, (void *)&touches);
+      AppendToTouchList(&touches);
       break;
     }
     default:

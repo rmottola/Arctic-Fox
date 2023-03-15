@@ -444,6 +444,7 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
 
     void branchTestBoolean(Condition cond, const ValueOperand& value, Label* label);
     void branchTestBoolean(Condition cond, Register tag, Label* label);
+    void branchTestBoolean(Condition cond, const Address& address, Label* label);
     void branchTestBoolean(Condition cond, const BaseIndex& src, Label* label);
 
     void branch32(Condition cond, Register lhs, Register rhs, Label* label) {
@@ -1094,8 +1095,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void add64(Imm32 imm, Register64 dest) {
         ma_daddu(dest.reg, imm);
     }
-    void sub32(Imm32 imm, Register dest);
-    void sub32(Register src, Register dest);
 
     void incrementInt32Value(const Address& addr) {
         add32(Imm32(1), addr);
@@ -1119,7 +1118,7 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
             break;
           case NonZero:
           case Zero:
-            sub32(src, dest);
+            ma_subu(dest, src);
             ma_b(dest, dest, overflow, cond);
             break;
           default:

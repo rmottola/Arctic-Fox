@@ -1,3 +1,8 @@
+MOZ_AUTOMATION_BUILD_SYMBOLS=0
+MOZ_AUTOMATION_PACKAGE_TESTS=0
+MOZ_AUTOMATION_UPLOAD_SYMBOLS=0
+MOZ_AUTOMATION_UPDATE_PACKAGING=0
+MOZ_AUTOMATION_SDK=0
 . $topsrcdir/build/macosx/mozconfig.common
 
 ac_add_options --enable-application=b2g/dev
@@ -22,3 +27,4 @@ export MOZ_PACKAGE_JSSHELL=1
 MOZTTDIR=$topsrcdir/moztt
 
 . "$topsrcdir/build/mozconfig.common.override"
+. "$topsrcdir/build/mozconfig.cache"

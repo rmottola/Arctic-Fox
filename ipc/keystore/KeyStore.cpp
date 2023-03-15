@@ -110,7 +110,7 @@ status_t BnKeystoreService::onTransact(uint32_t code, const Parcel& data, Parcel
         reply->writeInt32(dataLength);
         void* buf = reply->writeInplace(dataLength);
         memcpy(buf, data, dataLength);
-        moz_free(data);
+        free(data);
       } else {
         reply->writeInt32(-1);
       }
@@ -128,7 +128,7 @@ status_t BnKeystoreService::onTransact(uint32_t code, const Parcel& data, Parcel
         reply->writeInt32(dataLength);
         void* buf = reply->writeInplace(dataLength);
         memcpy(buf, data, dataLength);
-        moz_free(data);
+        free(data);
       } else {
         reply->writeInt32(-1);
       }
@@ -138,15 +138,15 @@ status_t BnKeystoreService::onTransact(uint32_t code, const Parcel& data, Parcel
     case SIGN: {
       CHECK_INTERFACE(IKeystoreService, data, reply);
       String16 name = data.readString16();
-      size_t signDataSize = data.readInt32();
+      ssize_t signDataSize = data.readInt32();
       const uint8_t *signData = nullptr;
-      if (signDataSize >= 0 && signDataSize <= data.dataAvail()) {
+      if (signDataSize >= 0 && (size_t)signDataSize <= data.dataAvail()) {
         signData = (const uint8_t *)data.readInplace(signDataSize);
       }
 
       uint8_t *signResult = nullptr;
       size_t signResultSize;
-      int32_t ret = sign(name, signData, signDataSize, &signResult,
+      int32_t ret = sign(name, signData, (size_t)signDataSize, &signResult,
                          &signResultSize);
 
       reply->writeNoException();
@@ -154,7 +154,7 @@ status_t BnKeystoreService::onTransact(uint32_t code, const Parcel& data, Parcel
         reply->writeInt32(signResultSize);
         void* buf = reply->writeInplace(signResultSize);
         memcpy(buf, signResult, signResultSize);
-        moz_free(signResult);
+        free(signResult);
       } else {
         reply->writeInt32(-1);
       }
@@ -326,7 +326,7 @@ FormatCaData(const char *aCaData, int aCaDataLength,
   size_t bufSize = strlen(CA_BEGIN) + strlen(CA_END) + strlen(CA_TAILER) * 2 +
                    strlen(aName) * 2 + aCaDataLength + aCaDataLength/CA_LINE_SIZE
                    + 2;
-  char *buf = (char *)moz_malloc(bufSize);
+  char *buf = (char *)malloc(bufSize);
   if (!buf) {
     *aFormatData = nullptr;
     return;
@@ -571,7 +571,7 @@ ResponseCode getPublicKey(const char *aKeyName, const uint8_t **aKeyData,
   }
 
   size_t bufSize = keyItem->len;
-  char *buf = (char *)moz_malloc(bufSize);
+  char *buf = (char *)malloc(bufSize);
   if (!buf) {
     return SYSTEM_ERROR;
   }
@@ -647,7 +647,7 @@ ResponseCode signData(const char *aKeyName, const uint8_t *data, size_t length,
     return SYSTEM_ERROR;
   }
 
-  uint8_t *buf = (uint8_t *)moz_malloc(signItem->len);
+  uint8_t *buf = (uint8_t *)malloc(signItem->len);
   if (!buf) {
     return SYSTEM_ERROR;
   }
@@ -926,7 +926,7 @@ KeyStore::ReceiveSocketData(int aIndex, nsAutoPtr<UnixSocketBuffer>& aMessage)
           SendResponse(SUCCESS);
           SendData(data, (int)dataLength);
 
-          moz_free((void *)data);
+          free((void *)data);
         }
 
         ResetHandlerInfo();

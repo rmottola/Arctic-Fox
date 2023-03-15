@@ -57,6 +57,16 @@ XPCOMUtils.defineLazyGetter(this, "SMALLPNG_DATA_URI", function() {
          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAA" +
          "AAAA6fptVAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJggg==");
 });
+XPCOMUtils.defineLazyGetter(this, "SMALLSVG_DATA_URI", function() {
+  return NetUtil.newURI(
+         "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5" +
+         "3My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiBmaWxs" +
+         "PSIjNDI0ZTVhIj4NCiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iN" +
+         "DQiIHN0cm9rZT0iIzQyNGU1YSIgc3Ryb2tlLXdpZHRoPSIxMSIgZmlsbD" +
+         "0ibm9uZSIvPg0KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjI0LjYiIHI9IjY" +
+         "uNCIvPg0KICA8cmVjdCB4PSI0NSIgeT0iMzkuOSIgd2lkdGg9IjEwLjEi" +
+         "IGhlaWdodD0iNDEuOCIvPg0KPC9zdmc%2BDQo%3D");
+});
 
 function LOG(aMsg) {
   aMsg = ("*** PLACES TESTS: " + aMsg);
@@ -64,10 +74,10 @@ function LOG(aMsg) {
   print(aMsg);
 }
 
-let gTestDir = do_get_cwd();
+var gTestDir = do_get_cwd();
 
 // Initialize profile.
-let gProfD = do_get_profile();
+var gProfD = do_get_profile();
 
 // Remove any old database.
 clearDB();
@@ -92,7 +102,7 @@ function uri(aSpec) NetUtil.newURI(aSpec);
  *
  * @return The database connection or null if unable to get one.
  */
-let gDBConn;
+var gDBConn;
 function DBConn(aForceNewConnection) {
   if (!aForceNewConnection) {
     let db = PlacesUtils.history.QueryInterface(Ci.nsPIPlacesDatabase)
@@ -373,7 +383,7 @@ function promiseTopicObserved(aTopic)
 /**
  * Simulates a Places shutdown.
  */
-let shutdownPlaces = function() {
+var shutdownPlaces = function() {
   do_print("shutdownPlaces: starting");
   let promise = new Promise(resolve => {
     Services.obs.addObserver(resolve, "places-connection-closed", false);
@@ -832,7 +842,8 @@ function promiseSetIconForPage(aPageURI, aIconURI) {
   PlacesUtils.favicons.setAndFetchFaviconForPage(
     aPageURI, aIconURI, true,
     PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE,
-    () => { deferred.resolve(); });
+    () => { deferred.resolve(); },
+    Services.scriptSecurityManager.getSystemPrincipal());
   return deferred.promise;
 }
 

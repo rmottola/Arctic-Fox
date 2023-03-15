@@ -126,38 +126,6 @@ ThrowInvalidThis(JSContext* aCx, const JS::CallArgs& aArgs,
 }
 
 bool
-ThrowMethodFailed(JSContext* cx, ErrorResult& rv)
-{
-  if (rv.IsUncatchableException()) {
-    // Nuke any existing exception on aCx, to make sure we're uncatchable.
-    JS_ClearPendingException(cx);
-    // Don't do any reporting.  Just return false, to create an
-    // uncatchable exception.
-    return false;
-  }
-  if (rv.IsJSContextException()) {
-    // Whatever we need to throw is on the JSContext already.  We
-    // can't assert that there is a pending exception on it, though,
-    // because in the uncatchable exception case there won't be one.
-    return false;
-  }
-  if (rv.IsErrorWithMessage()) {
-    rv.ReportErrorWithMessage(cx);
-    return false;
-  }
-  if (rv.IsJSException()) {
-    rv.ReportJSException(cx);
-    return false;
-  }
-  if (rv.IsDOMException()) {
-    rv.ReportDOMException(cx);
-    return false;
-  }
-  rv.ReportGenericError(cx);
-  return false;
-}
-
-bool
 ThrowNoSetterArg(JSContext* aCx, prototypes::ID aProtoId)
 {
   nsPrintfCString errorMessage("%s attribute setter",
@@ -222,9 +190,9 @@ ErrorResult::DeserializeMessage(const IPC::Message* aMsg, void** aIter)
 }
 
 void
-ErrorResult::ReportErrorWithMessage(JSContext* aCx)
+ErrorResult::SetPendingExceptionWithMessage(JSContext* aCx)
 {
-  MOZ_ASSERT(mMessage, "ReportErrorWithMessage() can be called only once");
+  MOZ_ASSERT(mMessage, "SetPendingExceptionWithMessage() can be called only once");
   MOZ_ASSERT(mUnionState == HasMessage);
 
   Message* message = mMessage;
@@ -241,6 +209,7 @@ ErrorResult::ReportErrorWithMessage(JSContext* aCx)
                               argCount > 0 ? args : nullptr);
 
   ClearMessage();
+  mResult = NS_OK;
 }
 
 void
@@ -280,7 +249,7 @@ ErrorResult::ThrowJSException(JSContext* cx, JS::Handle<JS::Value> exn)
 }
 
 void
-ErrorResult::ReportJSException(JSContext* cx)
+ErrorResult::SetPendingJSException(JSContext* cx)
 {
   MOZ_ASSERT(!mMightHaveUnreportedJSException,
              "Why didn't you tell us you planned to handle JS exceptions?");
@@ -295,25 +264,6 @@ ErrorResult::ReportJSException(JSContext* cx)
   // what, go ahead and unroot mJSException.
   js::RemoveRawValueRoot(cx, &mJSException);
 
-  // We no longer have a useful exception but we do want to signal that an error
-  // occured.
-  mResult = NS_ERROR_FAILURE;
-#ifdef DEBUG
-  mUnionState = HasNothing;
-#endif // DEBUG
-}
-
-void
-ErrorResult::StealJSException(JSContext* cx,
-                              JS::MutableHandle<JS::Value> value)
-{
-  MOZ_ASSERT(!mMightHaveUnreportedJSException,
-             "Must call WouldReportJSException unconditionally in all codepaths that might call StealJSException");
-  MOZ_ASSERT(IsJSException(), "No exception to steal");
-  MOZ_ASSERT(mUnionState == HasJSException);
-
-  value.set(mJSException);
-  js::RemoveRawValueRoot(cx, &mJSException);
   mResult = NS_OK;
 #ifdef DEBUG
   mUnionState = HasNothing;
@@ -373,14 +323,16 @@ ErrorResult::ThrowDOMException(nsresult rv, const nsACString& message)
 }
 
 void
-ErrorResult::ReportDOMException(JSContext* cx)
+ErrorResult::SetPendingDOMException(JSContext* cx)
 {
-  MOZ_ASSERT(mDOMExceptionInfo, "ReportDOMException() can be called only once");
+  MOZ_ASSERT(mDOMExceptionInfo,
+             "SetPendingDOMException() can be called only once");
   MOZ_ASSERT(mUnionState == HasDOMExceptionInfo);
 
   dom::Throw(cx, mDOMExceptionInfo->mRv, mDOMExceptionInfo->mMessage);
 
   ClearDOMExceptionInfo();
+  mResult = NS_OK;
 }
 
 void
@@ -414,12 +366,13 @@ ErrorResult::ClearUnionData()
 }
 
 void
-ErrorResult::ReportGenericError(JSContext* cx)
+ErrorResult::SetPendingGenericErrorException(JSContext* cx)
 {
   MOZ_ASSERT(!IsErrorWithMessage());
   MOZ_ASSERT(!IsJSException());
   MOZ_ASSERT(!IsDOMException());
   dom::Throw(cx, ErrorCode());
+  mResult = NS_OK;
 }
 
 ErrorResult&
@@ -506,6 +459,39 @@ ErrorResult::SuppressException()
   // We don't use AssignErrorCode, because we want to override existing error
   // states, which AssignErrorCode is not allowed to do.
   mResult = NS_OK;
+}
+
+void
+ErrorResult::SetPendingException(JSContext* cx)
+{
+  if (IsUncatchableException()) {
+    // Nuke any existing exception on cx, to make sure we're uncatchable.
+    JS_ClearPendingException(cx);
+    // Don't do any reporting.  Just return, to create an
+    // uncatchable exception.
+    mResult = NS_OK;
+    return;
+  }
+  if (IsJSContextException()) {
+    // Whatever we need to throw is on the JSContext already.  We
+    // can't assert that there is a pending exception on it, though,
+    // because in the uncatchable exception case there won't be one.
+    mResult = NS_OK;
+    return;
+  }
+  if (IsErrorWithMessage()) {
+    SetPendingExceptionWithMessage(cx);
+    return;
+  }
+  if (IsJSException()) {
+    SetPendingJSException(cx);
+    return;
+  }
+  if (IsDOMException()) {
+    SetPendingDOMException(cx);
+    return;
+  }
+  SetPendingGenericErrorException(cx);
 }
 
 namespace dom {
@@ -1564,7 +1550,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 
     // For non-global instance Xrays there are no other properties, so return
     // here for them.
-    if (type != eGlobalInstance || !GlobalPropertiesAreOwn()) {
+    if (type != eGlobalInstance) {
       return true;
     }
   } else if (type == eInterface) {
@@ -1587,7 +1573,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 
     // The properties for globals live on the instance, so return here as there
     // are no properties on their interface prototype object.
-    if (type == eGlobalInterfacePrototype && GlobalPropertiesAreOwn()) {
+    if (type == eGlobalInterfacePrototype) {
       return true;
     }
   }
@@ -1674,14 +1660,14 @@ XrayOwnPropertyKeys(JSContext* cx, JS::Handle<JSObject*> wrapper,
   if (IsInstance(type)) {
     ADD_KEYS_IF_DEFINED(unforgeableMethod);
     ADD_KEYS_IF_DEFINED(unforgeableAttribute);
-    if (type == eGlobalInstance && GlobalPropertiesAreOwn()) {
+    if (type == eGlobalInstance) {
       ADD_KEYS_IF_DEFINED(method);
       ADD_KEYS_IF_DEFINED(attribute);
     }
   } else if (type == eInterface) {
     ADD_KEYS_IF_DEFINED(staticMethod);
     ADD_KEYS_IF_DEFINED(staticAttribute);
-  } else if (type != eGlobalInterfacePrototype || !GlobalPropertiesAreOwn()) {
+  } else if (type != eGlobalInterfacePrototype) {
     MOZ_ASSERT(IsInterfacePrototype(type));
     ADD_KEYS_IF_DEFINED(method);
     ADD_KEYS_IF_DEFINED(attribute);
@@ -1772,7 +1758,7 @@ XrayOwnPropertyKeys(JSContext* cx, JS::Handle<JSObject*> wrapper,
     }
   }
 
-  return (type == eGlobalInterfacePrototype && GlobalPropertiesAreOwn()) ||
+  return type == eGlobalInterfacePrototype ||
          XrayOwnNativePropertyKeys(cx, wrapper, nativePropertyHooks, type,
                                    obj, flags, props);
 }
@@ -2778,10 +2764,10 @@ ConvertExceptionToPromise(JSContext* cx,
   JS_ClearPendingException(cx);
   ErrorResult rv;
   RefPtr<Promise> promise = Promise::Reject(global, exn, rv);
-  if (rv.Failed()) {
-    // We just give up.  Make sure to not leak memory on the
-    // ErrorResult, but then just put the original exception back.
-    ThrowMethodFailed(cx, rv);
+  if (rv.MaybeSetPendingException(cx)) {
+    // We just give up.  We put the exception from the ErrorResult on
+    // the JSContext just to make sure to not leak memory on the
+    // ErrorResult, but now just put the original exception back.
     JS_SetPendingException(cx, exn);
     return false;
   }

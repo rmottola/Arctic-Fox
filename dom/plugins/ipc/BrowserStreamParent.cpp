@@ -9,6 +9,7 @@
 #include "PluginInstanceParent.h"
 #include "nsNPAPIPlugin.h"
 
+#include "mozilla/UniquePtr.h"
 #include "mozilla/unused.h"
 
 // How much data are we willing to send across the wire
@@ -35,6 +36,7 @@ BrowserStreamParent::BrowserStreamParent(PluginInstanceParent* npp,
 
 BrowserStreamParent::~BrowserStreamParent()
 {
+  mStream->pdata = nullptr;
 }
 
 void
@@ -51,7 +53,6 @@ BrowserStreamParent::RecvAsyncNPP_NewStreamResult(const NPError& rv,
   PluginAsyncSurrogate* surrogate = mNPP->GetAsyncSurrogate();
   MOZ_ASSERT(surrogate);
   surrogate->AsyncCallArriving();
-  RefPtr<nsNPAPIPluginStreamListener> streamListener = mStreamListener.forget();
   if (mState == DEFERRING_DESTROY) {
     // We've been asked to destroy ourselves before init was complete.
     mState = DYING;
@@ -61,10 +62,10 @@ BrowserStreamParent::RecvAsyncNPP_NewStreamResult(const NPError& rv,
 
   NPError error = rv;
   if (error == NPERR_NO_ERROR) {
-    if (!streamListener) {
+    if (!mStreamListener) {
       return false;
     }
-    if (streamListener->SetStreamType(stype)) {
+    if (mStreamListener->SetStreamType(stype)) {
       mState = ALIVE;
     } else {
       error = NPERR_GENERIC_ERROR;
@@ -109,7 +110,7 @@ BrowserStreamParent::AnswerNPN_RequestRead(const IPCByteRanges& ranges,
   if (ranges.Length() > INT32_MAX)
     return false;
 
-  nsAutoArrayPtr<NPByteRange> rp(new NPByteRange[ranges.Length()]);
+  UniquePtr<NPByteRange[]> rp(new NPByteRange[ranges.Length()]);
   for (uint32_t i = 0; i < ranges.Length(); ++i) {
     rp[i].offset = ranges[i].offset;
     rp[i].length = ranges[i].length;
@@ -117,7 +118,7 @@ BrowserStreamParent::AnswerNPN_RequestRead(const IPCByteRanges& ranges,
   }
   rp[ranges.Length() - 1].next = nullptr;
 
-  *result = mNPP->mNPNIface->requestread(mStream, rp);
+  *result = mNPP->mNPNIface->requestread(mStream, rp.get());
   return true;
 }
 

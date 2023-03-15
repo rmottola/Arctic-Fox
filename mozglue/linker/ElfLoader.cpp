@@ -517,6 +517,10 @@ ElfLoader::~ElfLoader()
 {
   LibHandleList list;
 
+  if (!Singleton.IsShutdownExpected()) {
+    MOZ_CRASH("Unexpected shutdown");
+  }
+
   /* Release self_elf and libc */
   self_elf = nullptr;
 #if defined(ANDROID)

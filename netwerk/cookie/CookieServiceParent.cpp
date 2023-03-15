@@ -10,6 +10,7 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "nsCookieService.h"
+#include "nsIChannel.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIPrivateBrowsingChannel.h"
 #include "nsNetCID.h"
@@ -18,7 +19,8 @@
 
 using namespace mozilla::ipc;
 using mozilla::BasePrincipal;
-using mozilla::OriginAttributes;
+using mozilla::NeckoOriginAttributes;
+using mozilla::PrincipalOriginAttributes;
 using mozilla::dom::PContentParent;
 using mozilla::net::NeckoParent;
 
@@ -27,13 +29,14 @@ namespace {
 // Ignore failures from this function, as they only affect whether we do or
 // don't show a dialog box in private browsing mode if the user sets a pref.
 void
-CreateDummyChannel(nsIURI* aHostURI, uint32_t aAppId, bool aInMozBrowser,
-                   bool aIsPrivate, nsIChannel **aChannel)
+CreateDummyChannel(nsIURI* aHostURI, NeckoOriginAttributes& aAttrs, bool aIsPrivate,
+                   nsIChannel** aChannel)
 {
-  MOZ_ASSERT(aAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID);
+  MOZ_ASSERT(aAttrs.mAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID);
 
-  // TODO: Bug 1165267 - Use OriginAttributes for nsCookieService 
-  OriginAttributes attrs(aAppId, aInMozBrowser);
+  PrincipalOriginAttributes attrs;
+  attrs.InheritFromNecko(aAttrs);
+
   nsCOMPtr<nsIPrincipal> principal =
     BasePrincipal::CreateCodebasePrincipal(aHostURI, attrs);
   if (!principal) {
@@ -66,31 +69,28 @@ namespace net {
 
 MOZ_WARN_UNUSED_RESULT
 bool
-CookieServiceParent::GetAppInfoFromParams(const IPC::SerializedLoadContext &aLoadContext,
-                                          uint32_t& aAppId,
-                                          bool& aIsInBrowserElement,
-                                          bool& aIsPrivate)
+CookieServiceParent::GetOriginAttributesFromParams(const IPC::SerializedLoadContext &aLoadContext,
+                                                   NeckoOriginAttributes& aAttrs,
+                                                   bool& aIsPrivate)
 {
-  aAppId = NECKO_NO_APP_ID;
-  aIsInBrowserElement = false;
   aIsPrivate = false;
 
-  OriginAttributes attrs;
+  DocShellOriginAttributes docShellAttrs;
   const char* error = NeckoParent::GetValidatedAppInfo(aLoadContext,
                                                        Manager()->Manager(),
-                                                       attrs);
+                                                       docShellAttrs);
   if (error) {
-    NS_WARNING(nsPrintfCString("CookieServiceParent: GetAppInfoFromParams: "
+    NS_WARNING(nsPrintfCString("CookieServiceParent: GetOriginAttributesFromParams: "
                                "FATAL error: %s: KILLING CHILD PROCESS\n",
                                error).get());
     return false;
   }
 
-  aAppId = attrs.mAppId;
-  aIsInBrowserElement = attrs.mInBrowser;
   if (aLoadContext.IsPrivateBitValid()) {
     aIsPrivate = aLoadContext.mUsePrivateBrowsing;
   }
+
+  aAttrs.InheritFromDocShellToNecko(docShellAttrs);
   return true;
 }
 
@@ -133,16 +133,15 @@ CookieServiceParent::RecvGetCookieString(const URIParams& aHost,
   if (!hostURI)
     return false;
 
-  uint32_t appId;
-  bool isInBrowserElement, isPrivate;
-  bool valid = GetAppInfoFromParams(aLoadContext, appId,
-                                    isInBrowserElement, isPrivate);
+  NeckoOriginAttributes attrs;
+  bool isPrivate;
+  bool valid = GetOriginAttributesFromParams(aLoadContext, attrs, isPrivate);
   if (!valid) {
     return false;
   }
 
-  mCookieService->GetCookieStringInternal(hostURI, aIsForeign, aFromHttp, appId,
-                                          isInBrowserElement, isPrivate, *aResult);
+  mCookieService->GetCookieStringInternal(hostURI, aIsForeign, aFromHttp, attrs,
+                                          isPrivate, *aResult);
   return true;
 }
 
@@ -164,10 +163,9 @@ CookieServiceParent::RecvSetCookieString(const URIParams& aHost,
   if (!hostURI)
     return false;
 
-  uint32_t appId;
-  bool isInBrowserElement, isPrivate;
-  bool valid = GetAppInfoFromParams(aLoadContext, appId,
-                                    isInBrowserElement, isPrivate);
+  NeckoOriginAttributes attrs;
+  bool isPrivate;
+  bool valid = GetOriginAttributesFromParams(aLoadContext, attrs, isPrivate);
   if (!valid) {
     return false;
   }
@@ -180,14 +178,13 @@ CookieServiceParent::RecvSetCookieString(const URIParams& aHost,
   // with aIsForeign before we have to worry about nsCookiePermission trying
   // to use the channel to inspect it.
   nsCOMPtr<nsIChannel> dummyChannel;
-  CreateDummyChannel(hostURI, appId, isInBrowserElement,
-                     isPrivate, getter_AddRefs(dummyChannel));
+  CreateDummyChannel(hostURI, attrs, isPrivate, getter_AddRefs(dummyChannel));
 
   // NB: dummyChannel could be null if something failed in CreateDummyChannel.
   nsDependentCString cookieString(aCookieString, 0);
   mCookieService->SetCookieStringInternal(hostURI, aIsForeign, cookieString,
-                                          aServerTime, aFromHttp, appId,
-                                          isInBrowserElement, isPrivate, dummyChannel);
+                                          aServerTime, aFromHttp, attrs,
+                                          isPrivate, dummyChannel);
   return true;
 }
 

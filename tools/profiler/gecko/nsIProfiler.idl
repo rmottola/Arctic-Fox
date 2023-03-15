@@ -2,7 +2,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
- 
+
 #include "nsISupports.idl"
 
 %{C++
@@ -12,9 +12,25 @@ class nsCString;
 
 [ref] native StringArrayRef(const nsTArray<nsCString>);
 
-[scriptable, uuid(921e1223-b1ea-4906-bb26-a846e6b6835b)]
+/**
+ * Start-up parameters for subprocesses are passed through nsIObserverService,
+ * which, unfortunately, means we need to implement nsISupports in order to
+ * go through it.
+ */
+[uuid(0a175ba7-8fcf-4ce9-9c4b-ccc6272f4425)]
+interface nsIProfilerStartParams : nsISupports
+{
+  attribute uint32_t entries;
+  attribute double interval;
+
+  [noscript, notxpcom, nostdcall] StringArrayRef getFeatures();
+  [noscript, notxpcom, nostdcall] StringArrayRef getThreadFilterNames();
+};
+
+[scriptable, uuid(b373b360-c997-448a-b60d-4985b70dc810)]
 interface nsIProfiler : nsISupports
 {
+  boolean CanProfile();
   void StartProfiler(in uint32_t aEntries, in double aInterval,
                       [array, size_is(aFeatureCount)] in string aFeatures,
                       in uint32_t aFeatureCount,
@@ -44,6 +60,12 @@ interface nsIProfiler : nsISupports
   boolean IsActive();
   void GetFeatures(out uint32_t aCount, [retval, array, size_is(aCount)] out string aFeatures);
 
+  /**
+   * The starting parameters that were sent to the profiler for sampling.
+   * If the profiler is not currently sampling, this will return null.
+   */
+  readonly attribute nsIProfilerStartParams startParams;
+
   void GetBufferInfo(out uint32_t aCurrentPosition, out uint32_t aTotalSize,
                      out uint32_t aGeneration);
 
@@ -70,19 +92,4 @@ interface nsIProfiler : nsISupports
    * Dump the collected profile to a file.
    */
   void dumpProfileToFile(in string aFilename);
-};
-
-/**
- * Start-up parameters for subprocesses are passed through nsIObserverService,
- * which, unfortunately, means we need to implement nsISupports in order to
- * go through it.
- */
-[uuid(0a175ba7-8fcf-4ce9-9c4b-ccc6272f4425)]
-interface nsIProfilerStartParams : nsISupports
-{
-  attribute uint32_t entries;
-  attribute double interval;
-
-  [noscript, notxpcom, nostdcall] StringArrayRef getFeatures();
-  [noscript, notxpcom, nostdcall] StringArrayRef getThreadFilterNames();
 };

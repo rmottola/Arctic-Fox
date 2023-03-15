@@ -143,6 +143,17 @@ StrokeOptionsToPaint(SkPaint& aPaint, const StrokeOptions &aOptions)
 
     for (uint32_t i = 0; i < dashCount; i++) {
       pattern[i] = SkFloatToScalar(aOptions.mDashPattern[i % aOptions.mDashLength]);
+      // bugs 1002466 & 1214309 - Dash intervals that are (close to) zero
+      // are skipped, ignoring other stroke settings. Nudge the dash interval
+      // to be just large enough that it is not interpreted as degenerate.
+      // Ideally this value would just be SK_ScalarNearlyZero, the smallest
+      // reasonable value that is not zero. But error in FP operations may
+      // cause dash intervals to result in a value less than this and still
+      // be skipped. To give some headroom to allow the value to still come
+      // out greater-than-but-still-close-to SK_ScalarNearlyZero, fudge it
+      // upward by *33/32.
+      if (pattern[i] == 0)
+          pattern[i] = SkScalarMulDiv(SK_ScalarNearlyZero, 33, 32);
     }
 
     SkDashPathEffect* dash = SkDashPathEffect::Create(&pattern.front(),
@@ -280,7 +291,7 @@ SkRectToRect(const SkRect &aRect)
 }
 
 static inline SkShader::TileMode
-ExtendModeToTileMode(ExtendMode aMode)
+ExtendModeToTileMode(ExtendMode aMode, Axis aAxis)
 {
   switch (aMode)
   {
@@ -290,6 +301,18 @@ ExtendModeToTileMode(ExtendMode aMode)
       return SkShader::kRepeat_TileMode;
     case ExtendMode::REFLECT:
       return SkShader::kMirror_TileMode;
+    case ExtendMode::REPEAT_X:
+    {
+      return aAxis == Axis::X_AXIS
+             ? SkShader::kRepeat_TileMode
+             : SkShader::kClamp_TileMode;
+    }
+    case ExtendMode::REPEAT_Y:
+    {
+      return aAxis == Axis::Y_AXIS
+             ? SkShader::kRepeat_TileMode
+             : SkShader::kClamp_TileMode;
+    }
   }
   return SkShader::kClamp_TileMode;
 }

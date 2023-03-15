@@ -113,6 +113,8 @@ public:
 private:
   static bool sPluginHasFocus;
 
+  static InputContextAction::Cause sLastContextActionCause;
+
 #ifdef NS_ENABLE_TSF
   static decltype(SetInputScopes)* sSetInputScopes;
   static void SetInputScopeForIMM32(nsWindow* aWindow,
@@ -131,6 +133,8 @@ private:
   static bool WStringStartsWithCaseInsensitive(const std::wstring& aHaystack,
                                                const std::wstring& aNeedle);
   static bool IsKeyboardPresentOnSlate();
+  static bool IsInTabletMode();
+  static bool AutoInvokeOnScreenKeyboardInDesktopMode();
 
   /**
    * Show the Windows on-screen keyboard. Only allowed for

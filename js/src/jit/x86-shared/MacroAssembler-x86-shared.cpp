@@ -232,6 +232,143 @@ template void
 MacroAssemblerX86Shared::atomicExchangeToTypedIntArray(Scalar::Type arrayType, const BaseIndex& mem,
                                                        Register value, Register temp, AnyRegister output);
 
+MacroAssemblerX86Shared::Float*
+MacroAssemblerX86Shared::getFloat(float f)
+{
+    if (!floatMap_.initialized()) {
+        enoughMemory_ &= floatMap_.init();
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    size_t floatIndex;
+    if (FloatMap::AddPtr p = floatMap_.lookupForAdd(f)) {
+        floatIndex = p->value();
+    } else {
+        floatIndex = floats_.length();
+        enoughMemory_ &= floats_.append(Float(f));
+        if (!enoughMemory_)
+            return nullptr;
+        enoughMemory_ &= floatMap_.add(p, f, floatIndex);
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    return &floats_[floatIndex];
+}
+
+MacroAssemblerX86Shared::Double*
+MacroAssemblerX86Shared::getDouble(double d)
+{
+    if (!doubleMap_.initialized()) {
+        enoughMemory_ &= doubleMap_.init();
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    size_t doubleIndex;
+    if (DoubleMap::AddPtr p = doubleMap_.lookupForAdd(d)) {
+        doubleIndex = p->value();
+    } else {
+        doubleIndex = doubles_.length();
+        enoughMemory_ &= doubles_.append(Double(d));
+        if (!enoughMemory_)
+            return nullptr;
+        enoughMemory_ &= doubleMap_.add(p, d, doubleIndex);
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    return &doubles_[doubleIndex];
+}
+
+MacroAssemblerX86Shared::SimdData*
+MacroAssemblerX86Shared::getSimdData(const SimdConstant& v)
+{
+    if (!simdMap_.initialized()) {
+        enoughMemory_ &= simdMap_.init();
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    size_t index;
+    if (SimdMap::AddPtr p = simdMap_.lookupForAdd(v)) {
+        index = p->value();
+    } else {
+        index = simds_.length();
+        enoughMemory_ &= simds_.append(SimdData(v));
+        if (!enoughMemory_)
+            return nullptr;
+        enoughMemory_ &= simdMap_.add(p, v, index);
+        if (!enoughMemory_)
+            return nullptr;
+    }
+    return &simds_[index];
+}
+
+static bool
+AppendShiftedUses(const MacroAssemblerX86Shared::UsesVector& old, size_t delta,
+                  MacroAssemblerX86Shared::UsesVector* vec)
+{
+    for (CodeOffsetLabel use : old) {
+        use.offsetBy(delta);
+        if (!vec->append(use))
+            return false;
+    }
+    return true;
+}
+
+bool
+MacroAssemblerX86Shared::asmMergeWith(const MacroAssemblerX86Shared& other)
+{
+    size_t sizeBefore = masm.size();
+
+    if (!Assembler::asmMergeWith(other))
+        return false;
+
+    if (!doubleMap_.initialized() && !doubleMap_.init())
+        return false;
+    if (!floatMap_.initialized() && !floatMap_.init())
+        return false;
+    if (!simdMap_.initialized() && !simdMap_.init())
+        return false;
+
+    for (const Double& d : other.doubles_) {
+        size_t index;
+        if (DoubleMap::AddPtr p = doubleMap_.lookupForAdd(d.value)) {
+            index = p->value();
+        } else {
+            index = doubles_.length();
+            if (!doubles_.append(Double(d.value)) || !doubleMap_.add(p, d.value, index))
+                return false;
+        }
+        if (!AppendShiftedUses(d.uses, sizeBefore, &doubles_[index].uses))
+            return false;
+    }
+
+    for (const Float& f : other.floats_) {
+        size_t index;
+        if (FloatMap::AddPtr p = floatMap_.lookupForAdd(f.value)) {
+            index = p->value();
+        } else {
+            index = floats_.length();
+            if (!floats_.append(Float(f.value)) || !floatMap_.add(p, f.value, index))
+                return false;
+        }
+        if (!AppendShiftedUses(f.uses, sizeBefore, &floats_[index].uses))
+            return false;
+    }
+
+    for (const SimdData& s : other.simds_) {
+        size_t index;
+        if (SimdMap::AddPtr p = simdMap_.lookupForAdd(s.value)) {
+            index = p->value();
+        } else {
+            index = simds_.length();
+            if (!simds_.append(SimdData(s.value)) || !simdMap_.add(p, s.value, index))
+                return false;
+        }
+        if (!AppendShiftedUses(s.uses, sizeBefore, &simds_[index].uses))
+            return false;
+    }
+
+    return true;
+}
 
 //{{{ check_macroassembler_style
 // ===============================================================
@@ -486,9 +623,9 @@ MacroAssembler::pushFakeReturnAddress(Register scratch)
 {
     CodeLabel cl;
 
-    mov(cl.dest(), scratch);
+    mov(cl.patchAt(), scratch);
     Push(scratch);
-    bind(cl.src());
+    use(cl.target());
     uint32_t retAddr = currentOffset();
 
     addCodeLabel(cl);

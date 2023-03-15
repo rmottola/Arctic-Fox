@@ -23,8 +23,12 @@
 #include "nsPluginsDirUtils.h"
 
 #include "nsILocalFileMac.h"
+#include "mozilla/UniquePtr.h"
 
 #include "nsCocoaFeatures.h"
+#if defined(MOZ_CRASHREPORTER)
+#include "nsExceptionHandler.h"
+#endif
 
 #include <string.h>
 #include <stdio.h>
@@ -38,7 +42,6 @@
 
 typedef NS_NPAPIPLUGIN_CALLBACK(const char *, NP_GETMIMEDESCRIPTION) ();
 typedef NS_NPAPIPLUGIN_CALLBACK(OSErr, BP_GETSUPPORTEDMIMETYPES) (BPSupportedMIMETypes *mimeInfo, UInt32 flags);
-
 
 /*
 ** Returns a CFBundleRef if the path refers to a Mac OS X bundle directory.
@@ -235,16 +238,16 @@ static void ParsePlistPluginInfo(nsPluginInfo& info, CFBundleRef bundle)
   memset(info.fMimeDescriptionArray, 0, mimeDataArraySize);
 
   // Allocate memory for mime dictionary keys and values
-  nsAutoArrayPtr<CFTypeRef> keys(new CFTypeRef[mimeDictKeyCount]);
+  mozilla::UniquePtr<CFTypeRef[]> keys(new CFTypeRef[mimeDictKeyCount]);
   if (!keys)
     return;
-  nsAutoArrayPtr<CFTypeRef> values(new CFTypeRef[mimeDictKeyCount]);
+  mozilla::UniquePtr<CFTypeRef[]> values(new CFTypeRef[mimeDictKeyCount]);
   if (!values)
     return;
   
   info.fVariantCount = 0;
 
-  ::CFDictionaryGetKeysAndValues(mimeDict, keys, values);
+  ::CFDictionaryGetKeysAndValues(mimeDict, keys.get(), values.get());
   for (int i = 0; i < mimeDictKeyCount; i++) {
     CFTypeRef mimeString = keys[i];
     if (!mimeString || ::CFGetTypeID(mimeString) != ::CFStringGetTypeID()) {
@@ -484,6 +487,14 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info, PRLibrary **outLibrary)
       NS_WARNING(msg.get());
       return NS_ERROR_FAILURE;
     }
+#if defined(MOZ_CRASHREPORTER)
+    // The block above assumes that "fbplugin" is the filename of the plugin
+    // to be blocked, or that the filename starts with "fbplugin_".  But we
+    // don't yet know for sure if this is always true.  So for the time being
+    // record extra information in our crash logs.
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Bug_1086977"),
+                                       fileName);
+#endif
   }
 
   // It's possible that our plugin has 2 entry points that'll give us mime type
@@ -493,6 +504,14 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info, PRLibrary **outLibrary)
 
   // Sadly we have to load the library for this to work.
   rv = LoadPlugin(outLibrary);
+#if defined(MOZ_CRASHREPORTER)
+  if (nsCocoaFeatures::OnYosemiteOrLater()) {
+    // If we didn't crash in LoadPlugin(), change the previous annotation so we
+    // don't sow confusion.
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Bug_1086977"),
+                                       NS_LITERAL_CSTRING("Didn't crash, please ignore"));
+  }
+#endif
   if (NS_FAILED(rv))
     return rv;
 
