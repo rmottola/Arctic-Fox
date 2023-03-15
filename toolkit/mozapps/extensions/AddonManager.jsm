@@ -33,6 +33,11 @@ const PREF_EM_CHECK_UPDATE_SECURITY   = "extensions.checkUpdateSecurity";
 const PREF_EM_UPDATE_BACKGROUND_URL   = "extensions.update.background.url";
 const PREF_APP_UPDATE_ENABLED         = "app.update.enabled";
 const PREF_APP_UPDATE_AUTO            = "app.update.auto";
+const PREF_EM_HOTFIX_ID               = "extensions.hotfix.id";
+const PREF_EM_HOTFIX_LASTVERSION      = "extensions.hotfix.lastVersion";
+const PREF_EM_HOTFIX_URL              = "extensions.hotfix.url";
+const PREF_EM_CERT_CHECKATTRIBUTES    = "extensions.hotfix.cert.checkAttributes";
+const PREF_EM_HOTFIX_CERTS            = "extensions.hotfix.certs.";
 const PREF_MATCH_OS_LOCALE            = "intl.locale.matchOS";
 const PREF_SELECTED_LOCALE            = "general.useragent.locale";
 const UNKNOWN_XPCOM_ABI               = "unknownABI";
@@ -620,6 +625,7 @@ var gCheckUpdateSecurityDefault = true;
 var gCheckUpdateSecurity = gCheckUpdateSecurityDefault;
 var gUpdateEnabled = true;
 var gAutoUpdateDefault = true;
+var gHotfixID = null;
 var gShutdownBarrier = null;
 var gRepoShutdownState = "";
 var gShutdownInProgress = false;
@@ -895,6 +901,11 @@ var AddonManagerInternal = {
         gAutoUpdateDefault = Services.prefs.getBoolPref(PREF_EM_AUTOUPDATE_DEFAULT);
       } catch (e) {}
       Services.prefs.addObserver(PREF_EM_AUTOUPDATE_DEFAULT, this, false);
+
+      try {
+        gHotfixID = Services.prefs.getCharPref(PREF_EM_HOTFIX_ID);
+      } catch (e) {}
+      Services.prefs.addObserver(PREF_EM_HOTFIX_ID, this, false);
 
       let defaultProvidersEnabled = true;
       try {
@@ -1173,6 +1184,7 @@ var AddonManagerInternal = {
     Services.prefs.removeObserver(PREF_EM_CHECK_UPDATE_SECURITY, this);
     Services.prefs.removeObserver(PREF_EM_UPDATE_ENABLED, this);
     Services.prefs.removeObserver(PREF_EM_AUTOUPDATE_DEFAULT, this);
+    Services.prefs.removeObserver(PREF_EM_HOTFIX_ID, this);
 
     let savedError = null;
     // Only shut down providers if they've been started.
@@ -1288,6 +1300,14 @@ var AddonManagerInternal = {
         }
 
         this.callManagerListeners("onUpdateModeChanged");
+        break;
+      }
+      case PREF_EM_HOTFIX_ID: {
+        try {
+          gHotfixID = Services.prefs.getCharPref(PREF_EM_HOTFIX_ID);
+        } catch(e) {
+          gHotfixID = null;
+        }
         break;
       }
     }
@@ -1407,6 +1427,10 @@ var AddonManagerInternal = {
         let updates = [];
 
         for (let addon of allAddons) {
+          if (addon.id == hotfixID) {
+            continue;
+          }
+
           // Check all add-ons for updates so that any compatibility updates will
           // be applied
           updates.push(new Promise((resolve, reject) => {
@@ -2682,6 +2706,10 @@ var AddonManagerInternal = {
       Services.prefs.setBoolPref(PREF_EM_UPDATE_ENABLED, aValue);
     return aValue;
   },
+
+  get hotfixID() {
+    return gHotfixID;
+  },
 };
 
 /**
@@ -2713,7 +2741,11 @@ this.AddonManagerPrivate = {
 
   backgroundUpdateTimerHandler() {
     // Don't call through to the real update check if no checks are enabled.
-    if (!AddonManagerInternal.updateEnabled) {
+    let checkHotfix = AddonManagerInternal.hotfixID &&
+                      Services.prefs.getBoolPref(PREF_APP_UPDATE_ENABLED) &&
+                      Services.prefs.getBoolPref(PREF_APP_UPDATE_AUTO);
+
+    if (!AddonManagerInternal.updateEnabled && !checkHotfix) {
       logger.info("Skipping background update check");
       return;
     }
@@ -3215,6 +3247,10 @@ this.AddonManager = {
 
   set autoUpdateDefault(aValue) {
     AddonManagerInternal.autoUpdateDefault = aValue;
+  },
+
+  get hotfixID() {
+    return AddonManagerInternal.hotfixID;
   },
 
   escapeAddonURI: function AM_escapeAddonURI(aAddon, aUri, aAppVersion) {
