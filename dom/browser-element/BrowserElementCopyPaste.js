@@ -84,6 +84,13 @@ var CopyPasteAssistent = {
       detail.rect.left += currentRect.left;
       detail.rect.right += currentRect.left;
       currentWindow = currentWindow.realFrameElement.ownerDocument.defaultView;
+
+      let targetDocShell = currentWindow
+          .QueryInterface(Ci.nsIInterfaceRequestor)
+          .getInterface(Ci.nsIWebNavigation);
+      if(targetDocShell.isBrowserOrApp) {
+        break;
+      }
     }
 
     sendAsyncMsg('caretstatechanged', detail);
