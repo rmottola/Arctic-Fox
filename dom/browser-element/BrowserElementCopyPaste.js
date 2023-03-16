@@ -8,7 +8,9 @@
 
 dump("###################################### BrowserElementCopyPaste.js loaded\n");
 
-let CopyPasteAssistent = {
+var { classes: Cc, interfaces: Ci, results: Cr, utils: Cu }  = Components;
+
+var CopyPasteAssistent = {
   COMMAND_MAP: {
     'cut': 'cmd_cut',
     'copy': 'cmd_copyAndCollapseToEnd',
