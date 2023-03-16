@@ -24,6 +24,7 @@ using mozilla::Unused;
 using mozilla::ipc::FileDescriptor;
 
 // ----------------------------------------------------------------------------
+
 // The inner stream class.  This is where all of the real work is done.  As
 // an invariant Inner::Close() must be called before ~Inner().  This is
 // guaranteed by our outer ReadStream class.
@@ -107,7 +108,7 @@ private:
   Atomic<State> mState;
   Atomic<bool> mHasEverBeenRead;
 
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(cache::ReadStream::Inner)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(cache::ReadStream::Inner, override)
 };
 
 // ----------------------------------------------------------------------------
