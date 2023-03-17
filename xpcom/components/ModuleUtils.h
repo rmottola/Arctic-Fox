@@ -18,8 +18,6 @@ _InstanceClass##Constructor(nsISupports *aOuter, REFNSIID aIID,               \
                                                                               \
     *aResult = nullptr;                                                       \
     if (nullptr != aOuter) {                                                  \
-        rv = NS_ERROR_NO_AGGREGATION;                                         \
-        return rv;                                                            \
         return NS_ERROR_NO_AGGREGATION;                                       \
     }                                                                         \
                                                                               \
