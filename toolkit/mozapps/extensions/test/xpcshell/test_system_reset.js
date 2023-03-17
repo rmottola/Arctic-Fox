@@ -287,3 +287,50 @@ add_task(function* test_bad_app_cert() {
 
   yield promiseShutdownManager();
 });
+
+// An add-on with a bad certificate should cause us to use the default set
+add_task(function* test_bad_profile_cert() {
+  let file = do_get_file("data/system_addons/app3/features/system1@tests.mozilla.org.xpi");
+  file.copyTo(featureDir, file.leafName);
+
+  // Inject it into the system set
+  let addonSet = {
+    schema: 1,
+    directory: featureDir.leafName,
+    addons: {
+      "system1@tests.mozilla.org": {
+        version: "2.0"
+      },
+      "system2@tests.mozilla.org": {
+        version: "1.0"
+      },
+      "system3@tests.mozilla.org": {
+        version: "1.0"
+      },
+    }
+  };
+  Services.prefs.setCharPref(PREF_SYSTEM_ADDON_SET, JSON.stringify(addonSet));
+
+  startupManager(false);
+
+  yield check_installed(false, "1.0", "1.0", null);
+
+  yield promiseShutdownManager();
+});
+
+// Switching to app defaults that contain a bad certificate should ignore the
+// bad add-on
+add_task(function* test_bad_app_cert() {
+  gAppInfo.version = "3";
+  distroDir.leafName = "app3";
+  startupManager();
+
+  // Add-on will still be present just not active
+  let addon = yield promiseAddonByID("system1@tests.mozilla.org");
+  do_check_neq(addon, null);
+  do_check_eq(addon.signedState, AddonManager.SIGNEDSTATE_SIGNED);
+
+  yield check_installed(false, null, null, "1.0");
+
+  yield promiseShutdownManager();
+});

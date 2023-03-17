@@ -1600,7 +1600,7 @@ this.XPIDatabaseReconcile = {
         // Load the manifest from the add-on.
         let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
         file.persistentDescriptor = aAddonState.descriptor;
-        aNewAddon = syncLoadManifestFromFile(file);
+        aNewAddon = syncLoadManifestFromFile(file, aInstallLocation);
       }
       // The add-on in the manifest should match the add-on ID.
       if (aNewAddon.id != aId) {
@@ -1621,7 +1621,6 @@ this.XPIDatabaseReconcile = {
     }
 
     // Update the AddonInternal properties.
-    aNewAddon._installLocation = aInstallLocation;
     aNewAddon.installDate = aAddonState.mtime;
     aNewAddon.updateDate = aAddonState.mtime;
 
@@ -1724,7 +1723,7 @@ this.XPIDatabaseReconcile = {
       if (!aNewAddon) {
         let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
         file.persistentDescriptor = aAddonState.descriptor;
-        aNewAddon = syncLoadManifestFromFile(file);
+        aNewAddon = syncLoadManifestFromFile(file, aInstallLocation);
         applyBlocklistChanges(aOldAddon, aNewAddon);
 
         // Carry over any pendingUninstall state to add-ons modified directly
@@ -1752,7 +1751,6 @@ this.XPIDatabaseReconcile = {
     }
 
     // Set the additional properties on the new AddonInternal
-    aNewAddon._installLocation = aInstallLocation;
     aNewAddon.updateDate = aAddonState.mtime;
 
     // Update the database
@@ -1810,7 +1808,7 @@ this.XPIDatabaseReconcile = {
         SIGNED_TYPES.has(aOldAddon.type)) {
       let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
       file.persistentDescriptor = aAddonState.descriptor;
-      let manifest = syncLoadManifestFromFile(file);
+      let manifest = syncLoadManifestFromFile(file, aInstallLocation);
       aOldAddon.signedState = manifest.signedState;
     }
     // This updates the addon's JSON cached data in place
