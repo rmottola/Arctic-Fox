@@ -95,7 +95,7 @@ static const ManifestDirective kParsingTable[] = {
     &nsComponentManagerImpl::ManifestManifest, nullptr, XPTONLY_MANIFEST
   },
   {
-    "binary-component", 1, false, true, false, false, false,
+    "binary-component", 1, true, true, false, false, false,
     &nsComponentManagerImpl::ManifestBinaryComponent, nullptr, nullptr
   },
   {
