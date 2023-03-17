@@ -134,7 +134,8 @@ static const ManifestDirective kParsingTable[] = {
     "style",            2, false, false, true, false, false,
     nullptr, &nsChromeRegistry::ManifestStyle, nullptr
   },
-  { // NB: note that while skin manifests can use this, they are only allowed
+  {
+    // NB: note that while skin manifests can use this, they are only allowed
     // to use it for chrome://../skin/ URLs
     "override",         2, false, false, true, true, false,
     nullptr, &nsChromeRegistry::ManifestOverride, nullptr
