@@ -602,6 +602,7 @@ load 1221874-1.html
 load 1222783.xhtml
 load 1223568-1.html
 load 1223568-2.html
+pref(layout.css.grid.enabled,true) load 1225376.html
 load details-display-none-summary-1.html
 load details-display-none-summary-2.html
 load details-display-none-summary-3.html
