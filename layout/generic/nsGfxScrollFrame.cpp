@@ -4736,9 +4736,8 @@ ScrollFrameHelper::ReflowFinished()
     // later is less janky.
     return false;
   }
-  
+
   nsAutoScriptBlocker scriptBlocker;
-  
   ScrollToRestoredPosition();
 
   // Clamp current scroll position to new bounds. Normally this won't
@@ -4755,7 +4754,6 @@ ScrollFrameHelper::ReflowFinished()
   if (!mUpdateScrollbarAttributes) {
     return false;
   }
-
   mUpdateScrollbarAttributes = false;
 
   // Update scrollbar attributes.
