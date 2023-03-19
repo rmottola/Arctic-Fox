@@ -4025,7 +4025,7 @@ nsComputedDOMStyle::DoGetAlignContent()
 {
   nsROCSSPrimitiveValue* val = new nsROCSSPrimitiveValue;
   nsAutoString str;
-  auto align = StylePosition()->ComputedAlignContent(StyleDisplay());
+  auto align = StylePosition()->ComputedAlignContent();
   nsCSSValue::AppendAlignJustifyValueToString(align & NS_STYLE_ALIGN_ALL_BITS, str);
   auto fallback = align >> NS_STYLE_ALIGN_ALL_SHIFT;
   if (fallback) {

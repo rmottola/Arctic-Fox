@@ -1645,41 +1645,10 @@ nsStylePosition::WidthCoordDependsOnContainer(const nsStyleCoord &aCoord)
 }
 
 uint8_t
-nsStylePosition::MapLeftRightToStart(uint8_t aAlign, LogicalAxis aAxis,
-                                     const nsStyleDisplay* aDisplay) const
-{
-  auto val = aAlign & ~NS_STYLE_ALIGN_FLAG_BITS;
-  if (val == NS_STYLE_ALIGN_LEFT || val == NS_STYLE_ALIGN_RIGHT) {
-    switch (aDisplay->mDisplay) {
-    case NS_STYLE_DISPLAY_FLEX:
-    case NS_STYLE_DISPLAY_INLINE_FLEX:
-      // XXX TODO
-      // NOTE: make sure to strip off 'legacy' bit when mapping to 'start'
-      break;
-    default:
-      if (aAxis == eLogicalAxisBlock) {
-        return NS_STYLE_ALIGN_START | (aAlign & NS_STYLE_ALIGN_FLAG_BITS);
-      }
-    }
-  }
-  return aAlign;
-}
-
-uint16_t
-nsStylePosition::ComputedAlignContent(const nsStyleDisplay* aDisplay) const
-{
-  uint8_t val = mAlignContent & NS_STYLE_ALIGN_ALL_BITS;
-  val = MapLeftRightToStart(val, eLogicalAxisBlock, aDisplay);
-  uint8_t fallback = mAlignContent >> NS_STYLE_ALIGN_ALL_SHIFT;
-  fallback = MapLeftRightToStart(fallback, eLogicalAxisBlock, aDisplay);
-  return (uint16_t(fallback) << NS_STYLE_ALIGN_ALL_SHIFT) | uint16_t(val);
-}
-
-uint8_t
 nsStylePosition::ComputedAlignItems(const nsStyleDisplay* aDisplay) const
 {
   if (mAlignItems != NS_STYLE_ALIGN_AUTO) {
-    return MapLeftRightToStart(mAlignItems, eLogicalAxisBlock, aDisplay);
+    return mAlignItems;
   }
   return aDisplay->IsFlexOrGridDisplayType() ? NS_STYLE_ALIGN_STRETCH
                                              : NS_STYLE_ALIGN_START;
@@ -1687,10 +1656,10 @@ nsStylePosition::ComputedAlignItems(const nsStyleDisplay* aDisplay) const
 
 uint8_t
 nsStylePosition::ComputedAlignSelf(const nsStyleDisplay* aDisplay,
-                                   nsStyleContext* aParent) const
+                                   nsStyleContext*       aParent) const
 {
   if (mAlignSelf != NS_STYLE_ALIGN_AUTO) {
-    return MapLeftRightToStart(mAlignSelf, eLogicalAxisBlock, aDisplay);
+    return mAlignSelf;
   }
   if (MOZ_UNLIKELY(aDisplay->IsAbsolutelyPositionedStyle())) {
     return NS_STYLE_ALIGN_AUTO;
@@ -1700,7 +1669,7 @@ nsStylePosition::ComputedAlignSelf(const nsStyleDisplay* aDisplay,
       ComputedAlignItems(aParent->StyleDisplay());
     MOZ_ASSERT(!(parentAlignItems & NS_STYLE_ALIGN_LEGACY),
                "align-items can't have 'legacy'");
-    return MapLeftRightToStart(parentAlignItems, eLogicalAxisBlock, aDisplay);
+    return parentAlignItems;
   }
   return NS_STYLE_ALIGN_START;
 }
@@ -1722,19 +1691,15 @@ nsStylePosition::ComputedJustifyContent(const nsStyleDisplay* aDisplay) const
       }
       break;
   }
-  uint8_t val = mJustifyContent & NS_STYLE_JUSTIFY_ALL_BITS;
-  val = MapLeftRightToStart(val, eLogicalAxisInline, aDisplay);
-  uint8_t fallback = mJustifyContent >> NS_STYLE_JUSTIFY_ALL_SHIFT;
-  fallback = MapLeftRightToStart(fallback, eLogicalAxisInline, aDisplay);
-  return (uint16_t(fallback) << NS_STYLE_JUSTIFY_ALL_SHIFT) | uint16_t(val);
+  return mJustifyContent;
 }
 
 uint8_t
 nsStylePosition::ComputedJustifyItems(const nsStyleDisplay* aDisplay,
-                                      nsStyleContext* aParent) const
+                                      nsStyleContext*       aParent) const
 {
   if (mJustifyItems != NS_STYLE_JUSTIFY_AUTO) {
-    return MapLeftRightToStart(mJustifyItems, eLogicalAxisInline, aDisplay);
+    return mJustifyItems;
   }
   if (MOZ_LIKELY(aParent)) {
     auto inheritedJustifyItems =
@@ -1750,10 +1715,10 @@ nsStylePosition::ComputedJustifyItems(const nsStyleDisplay* aDisplay,
 
 uint8_t
 nsStylePosition::ComputedJustifySelf(const nsStyleDisplay* aDisplay,
-                                     nsStyleContext* aParent) const
+                                     nsStyleContext*       aParent) const
 {
   if (mJustifySelf != NS_STYLE_JUSTIFY_AUTO) {
-    return MapLeftRightToStart(mJustifySelf, eLogicalAxisInline, aDisplay);
+    return mJustifySelf;
   }
   if (MOZ_UNLIKELY(aDisplay->IsAbsolutelyPositionedStyle())) {
     return NS_STYLE_JUSTIFY_AUTO;
@@ -1761,9 +1726,7 @@ nsStylePosition::ComputedJustifySelf(const nsStyleDisplay* aDisplay,
   if (MOZ_LIKELY(aParent)) {
     auto inheritedJustifyItems = aParent->StylePosition()->
       ComputedJustifyItems(aParent->StyleDisplay(), aParent->GetParent());
-    inheritedJustifyItems &= ~NS_STYLE_JUSTIFY_LEGACY;
-    return MapLeftRightToStart(inheritedJustifyItems, eLogicalAxisInline,
-                               aDisplay);
+    return inheritedJustifyItems & ~NS_STYLE_JUSTIFY_LEGACY;
   }
   return NS_STYLE_JUSTIFY_START;
 }
