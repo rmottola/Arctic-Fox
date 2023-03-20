@@ -591,7 +591,8 @@ MediaStreamGraphImpl::CreateOrDestroyAudioStreams(MediaStream* aStream)
     return;
   }
 
-  if (!aStream->GetStreamBuffer().GetAndResetTracksDirty()) {
+  if (!aStream->GetStreamBuffer().GetAndResetTracksDirty() &&
+      !aStream->mAudioOutputStreams.IsEmpty()) {
     return;
   }
 
