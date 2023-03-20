@@ -3081,7 +3081,8 @@ MediaStreamGraphImpl::ApplyAudioContextOperationImpl(
     } else if (!audioTrackPresent && CurrentDriver()->Switching()) {
       MOZ_ASSERT(CurrentDriver()->NextDriver()->AsAudioCallbackDriver());
       CurrentDriver()->NextDriver()->AsAudioCallbackDriver()->
-        EnqueueStreamAndPromiseForOperation(aStream, aPromise, aOperation);
+        EnqueueStreamAndPromiseForOperation(aDestinationStream, aPromise,
+                                            aOperation);
     } else {
       // We are closing or suspending an AudioContext, but something else is
       // using the audio stream, we can resolve the promise now.
