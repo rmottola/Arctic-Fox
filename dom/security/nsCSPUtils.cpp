@@ -665,6 +665,11 @@ nsCSPKeywordSrc::allows(enum CSPKeyword aKeyword, const nsAString& aHashOrNonce)
 void
 nsCSPKeywordSrc::toString(nsAString& outStr) const
 {
+  if (mInvalidated) {
+    MOZ_ASSERT(mKeyword == CSP_UNSAFE_INLINE,
+               "can only ignore 'unsafe-inline' within toString()");
+    return;
+  }
   outStr.AppendASCII(CSP_EnumToKeyword(mKeyword));
 }
 
@@ -672,8 +677,8 @@ void
 nsCSPKeywordSrc::invalidate()
 {
   mInvalidated = true;
-  NS_ASSERTION(mInvalidated == CSP_UNSAFE_INLINE,
-               "invalidate 'unsafe-inline' only within script-src");
+  MOZ_ASSERT(mKeyword == CSP_UNSAFE_INLINE,
+             "invalidate 'unsafe-inline' only within script-src");
 }
 
 /* ===== nsCSPNonceSrc ==================== */
@@ -1150,8 +1155,13 @@ nsCSPPolicy::allows(nsContentPolicyType aContentType,
     }
   }
 
-  // Only match {nonce,hash}-source on specific directives (not default-src)
+  // {nonce,hash}-source should not consult default-src:
+  //   * return false if default-src is specified
+  //   * but allow the load if default-src is *not* specified (Bug 1198422)
   if (aKeyword == CSP_NONCE || aKeyword == CSP_HASH) {
+     if (!defaultDir) {
+       return true;
+     }
     return false;
   }
 
