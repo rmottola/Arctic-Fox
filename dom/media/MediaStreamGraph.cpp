@@ -1228,10 +1228,10 @@ MediaStreamGraphImpl::UpdateMainThreadState()
 bool
 MediaStreamGraphImpl::OneIteration(GraphTime aStateEnd)
 {
-  MaybeProduceMemoryReport();
-
   // Process graph message from the main thread for this iteration.
   RunMessagesInQueue();
+
+  MaybeProduceMemoryReport();
 
   GraphTime stateEnd = std::min(aStateEnd, mEndTime);
   UpdateGraph(stateEnd);
