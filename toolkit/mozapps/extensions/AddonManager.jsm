@@ -55,7 +55,11 @@ const FILE_BLOCKLIST                  = "blocklist.xml";
 
 const BRANCH_REGEXP                   = /^([^\.]+\.[0-9]+[a-z]*).*/gi;
 const PREF_EM_CHECK_COMPATIBILITY_BASE = "extensions.checkCompatibility";
+#ifdef MOZ_COMPATIBILITY_NIGHTLY
+var PREF_EM_CHECK_COMPATIBILITY = PREF_EM_CHECK_COMPATIBILITY_BASE + ".nightly";
+#else
 var PREF_EM_CHECK_COMPATIBILITY;
+#endif
 
 const TOOLKIT_ID                      = "toolkit@mozilla.org";
 
@@ -873,8 +877,10 @@ var AddonManagerInternal = {
         this.validateBlocklist();
       }
 
+#ifndef MOZ_COMPATIBILITY_NIGHTLY
       PREF_EM_CHECK_COMPATIBILITY = PREF_EM_CHECK_COMPATIBILITY_BASE + "." +
                                     Services.appinfo.version.replace(BRANCH_REGEXP, "$1");
+#endif
 
       try {
         gCheckCompatibility = Services.prefs.getBoolPref(PREF_EM_CHECK_COMPATIBILITY);
