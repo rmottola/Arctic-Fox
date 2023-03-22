@@ -161,10 +161,6 @@ const RDFURI_INSTALL_MANIFEST_ROOT    = "urn:mozilla:install-manifest";
 const PREFIX_NS_EM                    = "http://www.mozilla.org/2004/em-rdf#";
 
 const TOOLKIT_ID                      = "toolkit@mozilla.org";
-#ifdef MOZ_PHOENIX_EXTENSIONS
-const FIREFOX_ID                      = "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
-const FIREFOX_APPCOMPATVERSION        = "27.9"
-#endif
 
 const XPI_SIGNATURE_CHECK_PERIOD      = 24 * 60 * 60;
 
@@ -6527,14 +6523,6 @@ AddonInternal.prototype = {
       version = aAppVersion;
       this.native = true;
     }
-#ifdef MOZ_PHOENIX_EXTENSIONS
-    else if (app.id == FIREFOX_ID) {
-     version = FIREFOX_APPCOMPATVERSION;
-      if (this.type == "locale")
-        //Never allow language packs in Firefox compatibility mode
-        return false;
-    }
-#endif
     else if (app.id == TOOLKIT_ID)
       version = aPlatformVersion
 
@@ -6557,11 +6545,7 @@ AddonInternal.prototype = {
 
       // Extremely old extensions should not be compatible by default.
       let minCompatVersion;
-#ifdef MOZ_PHOENIX_EXTENSIONS
-      if (app.id == Services.appinfo.ID || app.id == FIREFOX_ID)
-#else
       if (app.id == Services.appinfo.ID)
-#endif
         minCompatVersion = XPIProvider.minCompatibleAppVersion;
       else if (app.id == TOOLKIT_ID)
         minCompatVersion = XPIProvider.minCompatiblePlatformVersion;
@@ -6585,16 +6569,6 @@ AddonInternal.prototype = {
       if (targetApp.id == TOOLKIT_ID)
         app = targetApp;
     }
-#ifdef MOZ_PHOENIX_EXTENSIONS
-    //Special case: check for Firefox TargetApps. this has to be done AFTER
-    //the initial check to make sure appinfo.ID is preferred, even if
-    //Firefox is listed before it in the install manifest.
-    for (let targetApp of this.targetApplications) {
-      if (targetApp.id == FIREFOX_ID) //Firefox GUID
-        return targetApp;
-    }
-#endif
-    // Return toolkit ID if toolkit.
     return app;
   },
 

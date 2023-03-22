@@ -22,9 +22,6 @@ const PREFIX_ITEM           = "urn:mozilla:item:";
 const PREFIX_EXTENSION      = "urn:mozilla:extension:";
 const PREFIX_THEME          = "urn:mozilla:theme:";
 const TOOLKIT_ID            = "toolkit@mozilla.org"
-#ifdef MOZ_PHOENIX_EXTENSIONS
-const FIREFOX_ID            = "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
-#endif
 const XMLURI_PARSE_ERROR    = "http://www.mozilla.org/newlayout/xml/parsererror.xml"
 
 const PREF_UPDATE_REQUIREBUILTINCERTS = "extensions.update.requireBuiltInCerts";
@@ -795,12 +792,6 @@ function matchesVersions(aUpdate, aAppVersion, aPlatformVersion,
       return (Services.vc.compare(aAppVersion, app.minVersion) >= 0) &&
              (aIgnoreMaxVersion || (Services.vc.compare(aAppVersion, app.maxVersion) <= 0));
     }
-#ifdef MOZ_PHOENIX_EXTENSIONS
-    if (app.id == FIREFOX_ID) {
-      return (Services.vc.compare(aAppVersion, app.minVersion) >= 0) &&
-             (aIgnoreMaxVersion || (Services.vc.compare(aAppVersion, app.maxVersion) <= 0));
-    }
-#endif
     if (app.id == TOOLKIT_ID) {
       result = (Services.vc.compare(aPlatformVersion, app.minVersion) >= 0) &&
                (aIgnoreMaxVersion || (Services.vc.compare(aPlatformVersion, app.maxVersion) <= 0));
@@ -861,12 +852,7 @@ this.AddonUpdateChecker = {
         if (aIgnoreCompatibility) {
           for (let targetApp of update.targetApplications) {
             let id = targetApp.id;
-#ifdef MOZ_PHOENIX_EXTENSIONS
-             if (id == Services.appinfo.ID || id == FIREFOX_ID ||
-                 id == TOOLKIT_ID)
-#else
             if (id == Services.appinfo.ID || id == TOOLKIT_ID)
-#endif
               return update;
           }
         }

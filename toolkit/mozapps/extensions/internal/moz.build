@@ -34,7 +34,3 @@ if CONFIG['MOZ_ADDON_SIGNING']:
 
 if CONFIG['MOZ_REQUIRE_SIGNING']:
     DEFINES['MOZ_REQUIRE_SIGNING'] = 1
-
-# Apperently this needs to be defined because it isn't picked up automagically any more
-if CONFIG['MOZ_PHOENIX_EXTENSIONS']:
-    DEFINES['MOZ_PHOENIX_EXTENSIONS'] = 1
