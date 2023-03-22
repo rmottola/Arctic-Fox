@@ -929,8 +929,6 @@ this.AddonUpdateChecker = {
    */
   checkForUpdates: function AUC_checkForUpdates(aId, aUpdateKey, aUrl,
                                                 aObserver) {
-    // Exclude default theme
-    if (aId != "{972ce4c6-7e08-4474-a285-3208198ce6fd}")
-      return new UpdateParser(aId, aUpdateKey, aUrl, aObserver);
+    return new UpdateParser(aId, aUpdateKey, aUrl, aObserver);
   }
 };

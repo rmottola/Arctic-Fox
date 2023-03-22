@@ -358,6 +358,8 @@ function DBAddonInternalPrototype()
 {
   this.applyCompatibilityUpdate =
     function(aUpdate, aSyncCompatibility) {
+      let wasCompatible = this.isCompatible;
+
       this.targetApplications.forEach(function(aTargetApp) {
         aUpdate.targetApplications.forEach(function(aUpdateTarget) {
           if (aTargetApp.id == aUpdateTarget.id && (aSyncCompatibility ||
@@ -373,7 +375,9 @@ function DBAddonInternalPrototype()
         this.multiprocessCompatible = aUpdate.multiprocessCompatible;
         XPIDatabase.saveChanges();
       }
-      XPIProvider.updateAddonDisabledState(this);
+
+      if (wasCompatible != this.isCompatible)
+        XPIProvider.updateAddonDisabledState(this);
     };
 
   this.toJSON =

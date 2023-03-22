@@ -1265,7 +1265,7 @@ function defineSyncGUID(aAddon) {
  * @return an AddonInternal object
  * @throws if the directory does not contain a valid install manifest
  */
-let loadManifestFromDir = Task.async(function* loadManifestFromDir(aDir, aInstallLocation) {
+var loadManifestFromDir = Task.async(function* loadManifestFromDir(aDir, aInstallLocation) {
   function getFileSize(aFile) {
     if (aFile.isSymlink())
       return 0;
@@ -3058,13 +3058,13 @@ this.XPIProvider = {
             continue;
 
           let signedState = yield verifyBundleSignedState(addon._sourceBundle, addon);
-          if (signedState == addon.signedState)
-            continue;
 
-          addon.signedState = signedState;
-          AddonManagerPrivate.callAddonListeners("onPropertyChanged",
-                                                 createWrapper(addon),
-                                                 ["signedState"]);
+          if (signedState != addon.signedState) {
+            addon.signedState = signedState;
+            AddonManagerPrivate.callAddonListeners("onPropertyChanged",
+                                                   createWrapper(addon),
+                                                   ["signedState"]);
+          }
 
           let disabled = XPIProvider.updateAddonDisabledState(addon);
           if (disabled !== undefined)

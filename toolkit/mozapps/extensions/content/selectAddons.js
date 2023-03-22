@@ -73,6 +73,9 @@ var gChecking = {
       }
 
       aAddons = aAddons.filter(function gChecking_filterAddons(aAddon) {
+        if (aAddon.id == AddonManager.hotfixID) {
+          return false;
+        }
         if (aAddon.type == "plugin" || aAddon.type == "service")
           return false;
 

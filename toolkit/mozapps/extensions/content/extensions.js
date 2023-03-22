@@ -879,7 +879,6 @@ var gViewController = {
       }
     },
 
-/* Plugincheck service is currently N/A for Pale Moon
     cmd_pluginCheck: {
       isEnabled: function cmd_pluginCheck_isEnabled() {
         return true;
@@ -888,7 +887,6 @@ var gViewController = {
         openURL(Services.urlFormatter.formatURLPref("plugins.update.url"));
       }
     },
-*/
 
     cmd_toggleAutoUpdateDefault: {
       isEnabled: function cmd_toggleAutoUpdateDefault_isEnabled() {
