@@ -2283,6 +2283,27 @@ var AddonManagerInternal = {
   },
 
   /**
+   * Starts installation of a temporary add-on from a local directory.
+   * @param  aDirectory
+   *         The directory of the add-on to be temporarily installed
+   * @return a Promise that rejects if the add-on is not restartless
+   *         or an add-on with the same ID is already temporarily installed
+   */
+  installTemporaryAddon: function AMI_installTemporaryAddon(aFile) {
+    if (!gStarted)
+      throw Components.Exception("AddonManager is not initialized",
+                                 Cr.NS_ERROR_NOT_INITIALIZED);
+
+    if (!(aFile instanceof Ci.nsIFile))
+      throw Components.Exception("aFile must be a nsIFile",
+                                 Cr.NS_ERROR_INVALID_ARG);
+
+    return AddonManagerInternal._getProviderByName("XPIProvider")
+                               .installTemporaryAddon(aFile);
+  },
+
+
+  /**
    * Gets an icon from the icon set provided by the add-on
    * that is closest to the specified size.
    *
@@ -3023,8 +3044,10 @@ this.AddonManager = {
   SCOPE_APPLICATION: 4,
   // Installed for all users of the computer.
   SCOPE_SYSTEM: 8,
+  // Installed temporarily
+  SCOPE_TEMPORARY: 16,
   // The combination of all scopes.
-  SCOPE_ALL: 15,
+  SCOPE_ALL: 31,
 
   // Add-on type is expected to be displayed in the UI in a list.
   VIEW_TYPE_LIST: "list",
@@ -3198,6 +3221,10 @@ this.AddonManager = {
     AddonManagerInternal.installAddonsFromWebpage(aType, aBrowser,
                                                   ensurePrincipal(aInstallingPrincipal),
                                                   aInstalls);
+  },
+
+  installTemporaryAddon: function AM_installTemporaryAddon(aDirectory) {
+    return AddonManagerInternal.installTemporaryAddon(aDirectory);
   },
 
   addManagerListener: function AM_addManagerListener(aListener) {
