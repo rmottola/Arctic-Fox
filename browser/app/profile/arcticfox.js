@@ -1111,6 +1111,13 @@ pref("services.sync.prefs.sync.spellchecker.dictionary", true);
 pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
 #endif
 
+// Developer edition preferences
+#ifdef MOZ_DEV_EDITION
+sticky_pref("lightweightThemes.selectedThemeID", "firefox-devedition@mozilla.org");
+sticky_pref("browser.devedition.theme.enabled", true);
+#else
+sticky_pref("lightweightThemes.selectedThemeID", "");
+#endif
 
 // Enable the JSON View tool (an inspector for application/json documents)
 #ifdef MOZ_DEV_EDITION
