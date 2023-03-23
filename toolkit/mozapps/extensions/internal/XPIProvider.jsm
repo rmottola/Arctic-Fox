@@ -756,7 +756,9 @@ function createAddonDetails(id, aAddon) {
   return {
     id: id || aAddon.id,
     type: aAddon.type,
-    version: aAddon.version
+    version: aAddon.version,
+    multiprocessCompatible: aAddon.multiprocessCompatible,
+    runInSafeMode: aAddon.runInSafeMode,
   };
 }
 
@@ -4729,30 +4731,16 @@ this.XPIProvider = {
    *
    * @param  aAddon
    *         The DBAddonInternal to uninstall
-   * @param  aForcePending
-   *         Force this addon into the pending uninstall state, even if
-   *         it isn't marked as requiring a restart (used e.g. while the
-   *         add-on manager is open and offering an "undo" button)
    * @throws if the addon cannot be uninstalled because it is in an install
    *         location that does not allow it
    */
-  uninstallAddon: function XPI_uninstallAddon(aAddon, aForcePending) {
+  uninstallAddon: function XPI_uninstallAddon(aAddon) {
     if (!(aAddon.inDatabase))
       throw new Error("Cannot uninstall addon " + aAddon.id + " because it is not installed");
 
     if (aAddon._installLocation.locked)
       throw new Error("Cannot uninstall addon " + aAddon.id
           + " from locked install location " + aAddon._installLocation.name);
-
-    // Inactive add-ons don't require a restart to uninstall
-    let requiresRestart = this.uninstallRequiresRestart(aAddon);
-
-    // if makePending is true, we don't actually apply the uninstall,
-    // we just mark the addon as having a pending uninstall
-    let makePending = aForcePending || requiresRestart;
-
-    if (makePending && aAddon.pendingUninstall)
-      throw new Error("Add-on is already marked to be uninstalled");
 
     aAddon._hasResourceCache.clear();
 
@@ -4761,11 +4749,12 @@ this.XPIProvider = {
       aAddon._updateCheck.cancel();
     }
 
-    let wasPending = aAddon.pendingUninstall;
+    // Inactive add-ons don't require a restart to uninstall
+    let requiresRestart = this.uninstallRequiresRestart(aAddon);
 
-    if (makePending) {
-      // We create an empty directory in the staging directory to indicate
-      // that an uninstall is necessary on next startup.
+    if (requiresRestart) {
+      // We create an empty directory in the staging directory to indicate that
+      // an uninstall is necessary on next startup.
       let stage = aAddon._installLocation.getStagingDir();
       stage.append(aAddon.id);
       if (!stage.exists())
@@ -4789,16 +4778,8 @@ this.XPIProvider = {
       return;
 
     let wrapper = aAddon.wrapper;
-
-    // If the add-on wasn't already pending uninstall then notify listeners.
-    if (!wasPending) {
-      // Passing makePending as the requiresRestart parameter is a little
-      // strange as in some cases this operation can complete without a restart
-      // so really this is now saying that the uninstall isn't going to happen
-      // immediately but will happen later.
-      AddonManagerPrivate.callAddonListeners("onUninstalling", wrapper,
-                                             makePending);
-    }
+    AddonManagerPrivate.callAddonListeners("onUninstalling", wrapper,
+                                           requiresRestart);
 
     // Reveal the highest priority add-on with the same ID
     function revealAddon(aAddon) {
@@ -4836,7 +4817,7 @@ this.XPIProvider = {
       }
     }
 
-    if (!makePending) {
+    if (!requiresRestart) {
       if (aAddon.bootstrap) {
         if (aAddon.active) {
           this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "shutdown",
