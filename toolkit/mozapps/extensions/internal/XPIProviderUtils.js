@@ -2093,7 +2093,8 @@ this.XPIDatabaseReconcile = {
           version: currentAddon.version,
           type: currentAddon.type,
           descriptor: currentAddon._sourceBundle.persistentDescriptor,
-          multiprocessCompatible: currentAddon.multiprocessCompatible
+          multiprocessCompatible: currentAddon.multiprocessCompatible,
+          runInSafeMode: canRunInSafeMode(currentAddon),
         };
       }
 
