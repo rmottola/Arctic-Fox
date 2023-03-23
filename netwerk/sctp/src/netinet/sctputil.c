@@ -1316,7 +1316,7 @@ sctp_iterator_work(struct sctp_iterator *it)
 	if (it->inp == NULL) {
 		/* iterator is complete */
 done_with_iterator:
-        sctp_it_ctl.cur_it = NULL;
+                sctp_it_ctl.cur_it = NULL;
 		SCTP_ITERATOR_UNLOCK();
 		SCTP_INP_INFO_RUNLOCK();
 		if (it->function_atend != NULL) {
