@@ -235,7 +235,7 @@ nsJSUtils::EvaluateString(JSContext* aCx,
   if (!ok) {
     rv = NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW;
     if (!aCompileOptions.noScriptRval) {
-      aRetValue.setUndefined();    
+      aRetValue.setUndefined();
     }
   }
 
@@ -329,6 +329,12 @@ JSObject* GetDefaultScopeFromJSContext(JSContext *cx)
 
 bool nsAutoJSString::init(const JS::Value &v)
 {
-  return init(nsContentUtils::RootingCxForThread(), v);
+  JSContext* cx = nsContentUtils::RootingCxForThread();
+  if (!init(nsContentUtils::RootingCxForThread(), v)) {
+    JS_ClearPendingException(cx);
+    return false;
+  }
+
+  return true;
 }
 
