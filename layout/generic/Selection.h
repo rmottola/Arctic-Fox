@@ -13,6 +13,7 @@
 #include "mozilla/TextRange.h"
 #include "nsISelection.h"
 #include "nsISelectionController.h"
+#include "nsISelectionListener.h"
 #include "nsISelectionPrivate.h"
 #include "nsRange.h"
 #include "nsThreadUtils.h"
@@ -67,6 +68,8 @@ public:
   NS_DECL_NSISELECTIONPRIVATE
 
   virtual Selection* AsSelection() override { return this; }
+
+  nsresult EndBatchChangesInternal(int16_t aReason = nsISelectionListener::NO_REASON);
 
   nsIDocument* GetParentObject() const;
 
@@ -358,7 +361,7 @@ public:
   ~SelectionBatcher()
   {
     if (mSelection) {
-      mSelection->EndBatchChanges();
+      mSelection->EndBatchChangesInternal();
     }
   }
 };
