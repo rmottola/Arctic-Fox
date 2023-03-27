@@ -598,7 +598,7 @@ public:
    * for the themed widget
    */
   void RegisterThemeGeometry(uint8_t aWidgetType,
-                             const nsIntRect& aRect) {
+                             const mozilla::LayoutDeviceIntRect& aRect) {
     if (mIsPaintingToWindow) {
       mThemeGeometries.AppendElement(ThemeGeometry(aWidgetType, aRect));
     }

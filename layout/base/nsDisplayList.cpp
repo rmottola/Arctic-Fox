@@ -2211,7 +2211,9 @@ RegisterThemeGeometry(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
     nsIFrame* displayRoot = nsLayoutUtils::GetDisplayRootFrame(aFrame);
     nsRect borderBox(aFrame->GetOffsetTo(displayRoot), aFrame->GetSize());
     aBuilder->RegisterThemeGeometry(aType,
-        borderBox.ToNearestPixels(aFrame->PresContext()->AppUnitsPerDevPixel()));
+      LayoutDeviceIntRect::FromUnknownRect(
+        borderBox.ToNearestPixels(
+          aFrame->PresContext()->AppUnitsPerDevPixel())));
   }
 }
 

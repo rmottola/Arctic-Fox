@@ -2408,7 +2408,7 @@ FindFirstRectOfType(const nsTArray<nsIWidget::ThemeGeometry>& aThemeGeometries,
   for (uint32_t i = 0; i < aThemeGeometries.Length(); ++i) {
     const nsIWidget::ThemeGeometry& g = aThemeGeometries[i];
     if (g.mType == aThemeGeometryType) {
-      return LayoutDeviceIntRect::FromUnknownRect(g.mRect);
+      return g.mRect;
     }
   }
   return LayoutDeviceIntRect();
@@ -2449,11 +2449,11 @@ nsChildView::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometri
   [win placeFullScreenButton:[mView convertRect:DevPixelsToCocoaPoints(fullScreenButtonRect) toView:nil]];
 }
 
-static nsIntRegion
+static LayoutDeviceIntRegion
 GatherThemeGeometryRegion(const nsTArray<nsIWidget::ThemeGeometry>& aThemeGeometries,
                           nsITheme::ThemeGeometryType aThemeGeometryType)
 {
-  nsIntRegion region;
+  LayoutDeviceIntRegion region;
   for (size_t i = 0; i < aThemeGeometries.Length(); ++i) {
     const nsIWidget::ThemeGeometry& g = aThemeGeometries[i];
     if (g.mType == aThemeGeometryType) {
@@ -2492,17 +2492,17 @@ nsChildView::UpdateVibrancy(const nsTArray<ThemeGeometry>& aThemeGeometries)
     return;
   }
 
-  nsIntRegion sheetRegion =
+  LayoutDeviceIntRegion sheetRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeSheet);
-  nsIntRegion vibrantLightRegion =
+  LayoutDeviceIntRegion vibrantLightRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeVibrancyLight);
-  nsIntRegion vibrantDarkRegion =
+  LayoutDeviceIntRegion vibrantDarkRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeVibrancyDark);
-  nsIntRegion menuRegion =
+  LayoutDeviceIntRegion menuRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeMenu);
-  nsIntRegion tooltipRegion =
+  LayoutDeviceIntRegion tooltipRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeTooltip);
-  nsIntRegion highlightedMenuItemRegion =
+  LayoutDeviceIntRegion highlightedMenuItemRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeHighlightedMenuItem);
 
   MakeRegionsNonOverlapping(sheetRegion, vibrantLightRegion, vibrantDarkRegion,
