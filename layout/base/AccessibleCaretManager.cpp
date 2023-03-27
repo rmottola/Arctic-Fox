@@ -182,7 +182,7 @@ AccessibleCaretManager::HasNonEmptyTextContent(nsINode* aNode) const
 void
 AccessibleCaretManager::UpdateCaretsForCursorMode(UpdateCaretsHint aHint)
 {
-  AC_LOG("%s, selection: %p", __FUNCTION__, GetSelection());
+  AC_LOG("%s: selection: %p", __FUNCTION__, GetSelection());
 
   int32_t offset = 0;
   nsIFrame* frame = nullptr;
@@ -249,21 +249,24 @@ AccessibleCaretManager::UpdateCaretsForSelectionMode(UpdateCaretsHint aHint)
     return;
   }
 
-  auto updateSingleCaret = [](AccessibleCaret * aCaret, nsIFrame * aFrame,
-                              int32_t aOffset)->PositionChangedResult
+  auto updateSingleCaret = [](AccessibleCaret* aCaret, nsIFrame* aFrame,
+                              int32_t aOffset) -> PositionChangedResult
   {
     PositionChangedResult result = aCaret->SetPosition(aFrame, aOffset);
     aCaret->SetSelectionBarEnabled(true);
+
     switch (result) {
-    case PositionChangedResult::NotChanged:
-      // Do nothing
-      break;
-    case PositionChangedResult::Changed:
-      aCaret->SetAppearance(Appearance::Normal);
-      break;
-    case PositionChangedResult::Invisible:
-      aCaret->SetAppearance(Appearance::NormalNotShown);
-      break;
+      case PositionChangedResult::NotChanged:
+        // Do nothing
+        break;
+
+      case PositionChangedResult::Changed:
+        aCaret->SetAppearance(Appearance::Normal);
+        break;
+
+      case PositionChangedResult::Invisible:
+        aCaret->SetAppearance(Appearance::NormalNotShown);
+        break;
     }
     return result;
   };
