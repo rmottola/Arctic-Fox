@@ -313,7 +313,7 @@ void nsView::DoResetWidgetBounds(bool aMoveOnly,
   if (invisiblePopup) {
     // We're going to hit the early exit below, avoid calling CalcWidgetBounds.
   } else {
-    newBounds = LayoutDeviceIntRect::FromUnknownRect(CalcWidgetBounds(type));
+    newBounds = CalcWidgetBounds(type);
   }
 
   bool curVisibility = widget->IsVisible();
