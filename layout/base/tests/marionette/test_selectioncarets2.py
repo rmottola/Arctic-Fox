@@ -40,15 +40,17 @@ class CommonCaretsTestCase2(object):
         pref_name = repr(pref_name)
         if isinstance(value, bool):
             value = 'true' if value else 'false'
+            func = 'setBoolPref'
         elif isinstance(value, int):
             value = str(value)
+            func = 'setIntPref'
         else:
             value = repr(value)
+            func = 'setCharPref'
 
-        script = '''SpecialPowers.pushPrefEnv({"set": [[%s, %s]]}, marionetteScriptFinished);''' % (
-            pref_name, value)
-
-        self.marionette.execute_async_script(script)
+        with self.marionette.using_context('chrome'):
+            script = 'Services.prefs.%s(%s, %s)' % (func, pref_name, value)
+            self.marionette.execute_script(script)
 
 
 class SelectionCaretsTestCase2(CommonCaretsTestCase2, MarionetteTestCase):
