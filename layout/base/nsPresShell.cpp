@@ -2329,7 +2329,8 @@ PresShell::CheckVisibilityContent(nsIContent* aNode, int16_t aStartOffset,
 NS_IMETHODIMP
 PresShell::GetSelectionCaretsVisibility(bool* aOutVisibility)
 {
-  *aOutVisibility = (SelectionCaretPrefEnabled() && mSelectionCarets->GetVisibility());
+  *aOutVisibility = (SelectionCaretPrefEnabled() &&
+    mSelectionCarets && mSelectionCarets->GetVisibility());
   return NS_OK;
 }
 
