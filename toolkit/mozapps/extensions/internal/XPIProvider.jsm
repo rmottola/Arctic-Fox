@@ -5062,7 +5062,7 @@ AddonInstall.prototype = {
     }
 
     let self = this;
-    this.loadManifest().then(() => {
+    this.loadManifest(this.file).then(() => {
       XPIDatabase.getVisibleAddonForID(self.addon.id, function(aAddon) {
         self.existingAddon = aAddon;
         if (aAddon)
@@ -5098,6 +5098,10 @@ AddonInstall.prototype = {
       logger.warn("Invalid XPI", message);
       this.state = AddonManager.STATE_DOWNLOAD_FAILED;
       this.error = error;
+      AddonManagerPrivate.callInstallListeners("onNewInstall",
+                                               self.listeners,
+                                               self.wrapper);
+
       aCallback(this);
     });
   },
@@ -5322,97 +5326,58 @@ AddonInstall.prototype = {
    * @param  aZipReader
    *         An open nsIZipReader for the multi-package XPI's files. This will
    *         be closed before this method returns.
-   * @param  aCallback
-   *         A function to call when all of the add-on manifests have been
-   *         loaded. Because this loadMultipackageManifests is an internal API
-   *         we don't exception-wrap this callback
    */
   _loadMultipackageManifests: Task.async(function*(aZipReader) {
     let files = [];
     let entries = aZipReader.findEntries("(*.[Xx][Pp][Ii]|*.[Jj][Aa][Rr])");
     while (entries.hasMore()) {
       let entryName = entries.getNext();
-      var target = getTemporaryFile();
+      let file = getTemporaryFile();
       try {
-        aZipReader.extract(entryName, target);
-        files.push(target);
+        aZipReader.extract(entryName, file);
+        files.push({ entryName, file });
       }
       catch (e) {
         logger.warn("Failed to extract " + entryName + " from multi-package " +
              "XPI", e);
-        target.remove(false);
+        file.remove(false);
       }
     }
 
     aZipReader.close();
 
     if (files.length == 0) {
-      throw new Error("Multi-package XPI does not contain any packages " +
-                      "to install");
+      return Promise.reject([AddonManager.ERROR_CORRUPT_FILE,
+                             "Multi-package XPI does not contain any packages to install"]);
     }
 
     let addon = null;
 
-    // Find the first file that has a valid install manifest and use it for
+    // Find the first file that is a valid install and use it for
     // the add-on that this AddonInstall instance will install.
-    while (files.length > 0) {
+    for (let { entryName, file } of files) {
       this.removeTemporaryFile();
-      this.file = files.shift();
-      this.ownsTempFile = true;
       try {
-        addon = yield loadManifestFromZipFile(this.file);
-        break;
+        yield this.loadManifest(file);
+        logger.debug("Base multi-package XPI install came from " + entryName);
+        this.file = file;
+        this.ownsTempFile = true;
+
+        yield this._createLinkedInstalls(files.filter(f => f.file != file));
+        return;
       }
       catch (e) {
-        logger.warn(this.file.leafName + " cannot be installed from multi-package " +
-             "XPI", e);
+        // _createLinkedInstalls will log errors when it tries to process this
+        // file
       }
     }
 
-    if (!addon) {
-      // No valid add-on was found
-      return;
-    }
+    // No valid add-on was found, delete all the temporary files
+    for (let { file } of files)
+      file.remove(true);
 
-    this.addon = addon;
-
-    this.updateAddonURIs();
-
-    this.addon._install = this;
-    this.name = this.addon.selectedLocale.name || this.addon.defaultLocale.name;
-    this.type = this.addon.type;
-    this.version = this.addon.version;
-
-    // Setting the iconURL to something inside the XPI locks the XPI and
-    // makes it impossible to delete on Windows.
-    //let newIcon = createWrapper(this.addon).iconURL;
-    //if (newIcon)
-    //  this.iconURL = newIcon;
-
-    // Create new AddonInstall instances for every remaining file
-    if (files.length > 0) {
-      this.linkedInstalls = [];
-      let self = this;
-      for (let file of files) {
-        let install = yield new Promise(resolve => AddonInstall.createInstall(resolve, file));
-
-        // Ignore bad add-ons (createInstall will have logged the error)
-        if (install.state == AddonManager.STATE_DOWNLOAD_FAILED) {
-          // Manually remove the temporary file
-          file.remove(true);
-        }
-        else {
-          // Make the new install own its temporary file
-          install.ownsTempFile = true;
-
-          self.linkedInstalls.push(install)
-
-          install.sourceURI = self.sourceURI;
-          install.releaseNotesURI = self.releaseNotesURI;
-          install.updateAddonURIs();
-        }
-      }
-    }
+    return Promise.reject([AddonManager.ERROR_CORRUPT_FILE,
+                           "Multi-package XPI does not contain any valid packages to install"]);
   }),
 
   /**
@@ -5428,7 +5393,7 @@ AddonInstall.prototype = {
     let zipreader = Cc["@mozilla.org/libjar/zip-reader;1"].
                     createInstance(Ci.nsIZipReader);
     try {
-      zipreader.open(this.file);
+      zipreader.open(file);
     }
     catch (e) {
       zipreader.close();
@@ -5750,7 +5715,7 @@ AddonInstall.prototype = {
         }
 
         let self = this;
-        this.loadManifest().then(() => {
+        this.loadManifest(this.file).then(() => {
           if (self.addon.isCompatible) {
             self.downloadCompleted();
           }
@@ -5839,9 +5804,10 @@ AddonInstall.prototype = {
         self.install();
 
         if (self.linkedInstalls) {
-          self.linkedInstalls.forEach(function(aInstall) {
-            aInstall.install();
-          });
+          for (let install of self.linkedInstalls) {
+            if (install.state == AddonManager.STATE_DOWNLOADED)
+              install.install();
+          }
         }
       }
     });
