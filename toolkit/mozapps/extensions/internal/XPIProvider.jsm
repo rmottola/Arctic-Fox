@@ -7716,13 +7716,10 @@ Object.assign(MutableDirectoryInstallLocation.prototype, {
 function SystemAddonInstallLocation(aName, aDirectory, aScope, aResetSet) {
   this._baseDir = aDirectory;
 
-  if (aResetSet) {
-    this._addonSet = { schema: 1, addons: {} };
-    this._saveAddonSet(this._addonSet);
-  }
-  else {
-    this._addonSet = this._loadAddonSet();
-  }
+  if (aResetSet)
+    this.resetAddonSet();
+
+  this._addonSet = this._loadAddonSet();
 
   this._directory = null;
   if (this._addonSet.directory) {
