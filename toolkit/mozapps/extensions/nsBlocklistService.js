@@ -321,6 +321,8 @@ function Blocklist() {
   gPref.addObserver("extensions.blocklist.", this, false);
   gPref.addObserver(PREF_EM_LOGGING_ENABLED, this, false);
   this.wrappedJSObject = this;
+  // requests from child processes come in here, see receiveMessage.
+  Services.ppmm.addMessageListener("Blocklist::getPluginBlocklistState", this);
 }
 
 Blocklist.prototype = {
@@ -342,12 +344,17 @@ Blocklist.prototype = {
   _addonEntries: null,
   _pluginEntries: null,
 
+  shutdown: function () {
+    Services.obs.removeObserver(this, "xpcom-shutdown");
+    Services.ppmm.removeMessageListener("Blocklist::getPluginBlocklistState", this);
+    gPref.removeObserver("extensions.blocklist.", this);
+    gPref.removeObserver(PREF_EM_LOGGING_ENABLED, this);
+  },
+
   observe: function Blocklist_observe(aSubject, aTopic, aData) {
     switch (aTopic) {
     case "xpcom-shutdown":
-      Services.obs.removeObserver(this, "xpcom-shutdown");
-      gPref.removeObserver("extensions.blocklist.", this);
-      gPref.removeObserver(PREF_EM_LOGGING_ENABLED, this);
+      this.shutdown();
       break;
     case "nsPref:changed":
       switch (aData) {
@@ -370,6 +377,18 @@ Blocklist.prototype = {
       Services.obs.removeObserver(this, "sessionstore-windows-restored");
       this._preloadBlocklist();
       break;
+    }
+  },
+
+  // Message manager message handlers
+  receiveMessage: function (aMsg) {
+    switch (aMsg.name) {
+      case "Blocklist::getPluginBlocklistState":
+        return this.getPluginBlocklistState(aMsg.data.addonData,
+                                            aMsg.data.appVersion,
+                                            aMsg.data.toolkitVersion);
+      default:
+        throw new Error("Unknown blocklist message received from content: " + aMsg.name);
     }
   },
 

@@ -22,6 +22,7 @@ EXTRA_COMPONENTS += [
     'amInstallTrigger.js',
     'amWebInstallListener.js',
     'nsBlocklistService.js',
+    'nsBlocklistServiceContent.js',
 ]
 
 EXTRA_PP_COMPONENTS += [
