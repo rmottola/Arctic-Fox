@@ -322,7 +322,7 @@ function Blocklist() {
   gPref.addObserver(PREF_EM_LOGGING_ENABLED, this, false);
   this.wrappedJSObject = this;
   // requests from child processes come in here, see receiveMessage.
-  Services.ppmm.addMessageListener("Blocklist::getPluginBlocklistState", this);
+  Services.ppmm.addMessageListener("Blocklist:getPluginBlocklistState", this);
 }
 
 Blocklist.prototype = {
@@ -346,7 +346,7 @@ Blocklist.prototype = {
 
   shutdown: function () {
     Services.obs.removeObserver(this, "xpcom-shutdown");
-    Services.ppmm.removeMessageListener("Blocklist::getPluginBlocklistState", this);
+    Services.ppmm.removeMessageListener("Blocklist:getPluginBlocklistState", this);
     gPref.removeObserver("extensions.blocklist.", this);
     gPref.removeObserver(PREF_EM_LOGGING_ENABLED, this);
   },
@@ -383,7 +383,7 @@ Blocklist.prototype = {
   // Message manager message handlers
   receiveMessage: function (aMsg) {
     switch (aMsg.name) {
-      case "Blocklist::getPluginBlocklistState":
+      case "Blocklist:getPluginBlocklistState":
         return this.getPluginBlocklistState(aMsg.data.addonData,
                                             aMsg.data.appVersion,
                                             aMsg.data.toolkitVersion);
@@ -1210,6 +1210,11 @@ Blocklist.prototype = {
     return blockEntry.infoURL;
   },
 
+  _notifyObserversBlocklistUpdated: function () {
+    Services.obs.notifyObservers(this, "blocklist-updated", "");
+    Services.ppmm.broadcastAsyncMessage("Blocklist:blocklistInvalidated", {});
+  },
+
   _blocklistUpdated: function Blocklist_blocklistUpdated(oldAddonEntries, oldPluginEntries) {
     if (AppConstants.MOZ_B2G) {
       return;
@@ -1318,7 +1323,7 @@ Blocklist.prototype = {
       }
 
       if (addonList.length == 0) {
-        Services.obs.notifyObservers(self, "blocklist-updated", "");
+        self._notifyObserversBlocklistUpdated();
         return;
       }
 
@@ -1330,7 +1335,7 @@ Blocklist.prototype = {
         } catch (e) {
           LOG(e);
         }
-        Services.obs.notifyObservers(self, "blocklist-updated", "");
+        self._notifyObserversBlocklistUpdated();
         return;
       }
 
@@ -1364,7 +1369,7 @@ Blocklist.prototype = {
         if (args.restart)
           restartApp();
 
-        Services.obs.notifyObservers(self, "blocklist-updated", "");
+        self._notifyObserversBlocklistUpdated();
         Services.obs.removeObserver(applyBlocklistChanges, "addon-blocklist-closed");
       }
 
