@@ -739,8 +739,11 @@ this.Extension = function(addonData)
  *
  * To make things easier, the value of "background" and "files"[] can
  * be a function, which is converted to source that is run.
+ *
+ * The generated extension is stored in the system temporary directory,
+ * and an nsIFile object pointing to it is returned.
  */
-this.Extension.generate = function(id, data)
+this.Extension.generateXPI = function(id, data)
 {
   let manifest = data.manifest;
   if (!manifest) {
@@ -820,6 +823,17 @@ this.Extension.generate = function(id, data)
 
   zipW.close();
 
+  return file;
+};
+
+/**
+ * Generates a new extension using |Extension.generateXPI|, and initializes a
+ * new |Extension| instance which will execute it.
+ */
+this.Extension.generate = function(id, data)
+{
+  let file = this.generateXPI(id, data);
+
   flushJarCache(file);
   Services.ppmm.broadcastAsyncMessage("Extension:FlushJarCache", {path: file.path});
 
@@ -831,7 +845,7 @@ this.Extension.generate = function(id, data)
     resourceURI: jarURI,
     cleanupFile: file
   });
-}
+};
 
 Extension.prototype = extend(Object.create(ExtensionData.prototype), {
   on(hook, f) {
