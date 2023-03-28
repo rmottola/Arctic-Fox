@@ -1519,6 +1519,12 @@ gTmpD.append("temp");
 gTmpD.create(AM_Ci.nsIFile.DIRECTORY_TYPE, FileUtils.PERMS_DIRECTORY);
 registerDirectory("TmpD", gTmpD);
 
+// Create a replacement app directory for the tests.
+const gAppDirForAddons = gProfD.clone();
+gAppDirForAddons.append("appdir-addons");
+gAppDirForAddons.create(AM_Ci.nsIFile.DIRECTORY_TYPE, FileUtils.PERMS_DIRECTORY);
+registerDirectory("XREAddonAppDir", gAppDirForAddons);
+
 // Write out an empty blocklist.xml file to the profile to ensure nothing
 // is blocklisted by default
 var blockFile = gProfD.clone();
@@ -1581,6 +1587,10 @@ do_register_cleanup(function addon_cleanup() {
     do_throw("Found unexpected file in temporary directory: " + entry.leafName);
   }
   dirEntries.close();
+
+  try {
+    gAppDirForAddons.remove(true);
+  } catch (ex) { do_print("Got exception removing addon app dir, " + ex); }
 
   var testDir = gProfD.clone();
   testDir.append("extensions");
