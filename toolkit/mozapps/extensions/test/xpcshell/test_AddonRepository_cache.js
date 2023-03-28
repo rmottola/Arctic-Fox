@@ -401,7 +401,7 @@ const WITH_EXTENSION_CACHE = [{
   sourceURI:              NetUtil.newURI(ADDON_FILES[2]).spec
 }];
 
-let gDBFile = gProfD.clone();
+var gDBFile = gProfD.clone();
 gDBFile.append(FILE_DATABASE);
 
 /*
