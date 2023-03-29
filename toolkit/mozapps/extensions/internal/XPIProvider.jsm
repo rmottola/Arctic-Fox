@@ -3237,19 +3237,6 @@ this.XPIProvider = {
           // install location.
           if (!manifest) {
             logger.debug("Processing uninstall of " + id + " in " + aLocation.name);
-
-            try {
-              let addonFile = aLocation.getLocationForID(id);
-              let addonToUninstall = loadManifestFromFile(addonFile, aLocation);
-              if (addonToUninstall.bootstrap) {
-                this.callBootstrapMethod(addonToUninstall, addonToUninstall._sourceBundle,
-                                         "uninstall", BOOTSTRAP_REASONS.ADDON_UNINSTALL);
-              }
-            }
-            catch (e) {
-              logger.warn("Failed to call uninstall for " + id, e);
-            }
-
             try {
               aLocation.uninstallAddon(id);
               seenFiles.push(stageDirEntry.leafName);
@@ -7759,6 +7746,7 @@ Object.assign(MutableDirectoryInstallLocation.prototype, {
  */
 function SystemAddonInstallLocation(aName, aDirectory, aScope, aResetSet) {
   this._baseDir = aDirectory;
+  this._nextDir = null;
 
   if (aResetSet)
     this.resetAddonSet();
