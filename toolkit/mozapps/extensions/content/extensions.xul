@@ -89,7 +89,7 @@
     <command id="cmd_back"/>
     <command id="cmd_forward"/>
     <command id="cmd_enableCheckCompatibility"/>
-<!--    <command id="cmd_pluginCheck"/> -->
+    <command id="cmd_pluginCheck"/>
     <command id="cmd_enableUpdateSecurity"/>
     <command id="cmd_toggleAutoUpdateDefault"/>
     <command id="cmd_resetAddonAutoUpdate"/>
