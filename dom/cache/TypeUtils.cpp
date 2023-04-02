@@ -202,7 +202,7 @@ TypeUtils::ToCacheResponseWithoutBody(CacheResponse& aOut,
 {
   aOut.type() = aIn.Type();
 
-  aIn.GetUrl(aOut.url());
+  aIn.GetUnfilteredUrl(aOut.url());
 
   if (aOut.url() != EmptyCString()) {
     // Pass all Response URL schemes through... The spec only requires we take
@@ -349,9 +349,13 @@ TypeUtils::ToInternalRequest(const CacheRequest& aIn)
   RefPtr<InternalHeaders> internalHeaders =
     ToInternalHeaders(aIn.headers(), aIn.headersGuard());
   ErrorResult result;
-  internalRequest->Headers()->SetGuard(aIn.headersGuard(), result);
-  MOZ_ASSERT(!result.Failed());
+
+  // Be careful to fill the headers before setting the guard in order to
+  // correctly re-create the original headers.
   internalRequest->Headers()->Fill(*internalHeaders, result);
+  MOZ_ASSERT(!result.Failed());
+
+  internalRequest->Headers()->SetGuard(aIn.headersGuard(), result);
   MOZ_ASSERT(!result.Failed());
 
   nsCOMPtr<nsIInputStream> stream = ReadStream::Create(aIn.body());

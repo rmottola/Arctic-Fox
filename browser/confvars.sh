@@ -52,7 +52,6 @@ if test "$MOZ_OFFICIAL_BRANDING"; then
   fi
 fi
 
-MOZ_PHOENIX_EXTENSIONS=1
 MOZ_BROWSER_STATUSBAR=1
 
 #Enable devtools by default. Can be disabled with --disable-devtools in mozconfig.

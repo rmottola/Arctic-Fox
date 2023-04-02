@@ -17,46 +17,44 @@ include $(topsrcdir)/toolkit/mozapps/installer/upload-files.mk
 # Clear out DIST_FILES if it was set by upload-files.mk (for Android builds)
 DIST_FILES =
 
-# Log file from the 'make upload' step. We need this to parse out the URLs of
-# the uploaded files.
-AUTOMATION_UPLOAD_OUTPUT = $(DIST)/automation-upload.txt
-
 # Helper variables to convert from MOZ_AUTOMATION_* variables to the
 # corresponding the make target
-tier_BUILD_SYMBOLS = buildsymbols
-tier_L10N_CHECK = l10n-check
-tier_PRETTY_L10N_CHECK = pretty-l10n-check
-tier_INSTALLER = installer
-tier_PRETTY_INSTALLER = pretty-installer
-tier_PACKAGE = package
-tier_PRETTY_PACKAGE = pretty-package
-tier_PACKAGE_TESTS = package-tests
-tier_PRETTY_PACKAGE_TESTS = pretty-package-tests
-tier_UPDATE_PACKAGING = update-packaging
-tier_PRETTY_UPDATE_PACKAGING = pretty-update-packaging
-tier_UPLOAD_SYMBOLS = uploadsymbols
-tier_UPLOAD = upload
+tier_MOZ_AUTOMATION_BUILD_SYMBOLS = buildsymbols
+tier_MOZ_AUTOMATION_L10N_CHECK = l10n-check
+tier_MOZ_AUTOMATION_PRETTY_L10N_CHECK = pretty-l10n-check
+tier_MOZ_AUTOMATION_INSTALLER = installer
+tier_MOZ_AUTOMATION_PRETTY_INSTALLER = pretty-installer
+tier_MOZ_AUTOMATION_PACKAGE = package
+tier_MOZ_AUTOMATION_PRETTY_PACKAGE = pretty-package
+tier_MOZ_AUTOMATION_PACKAGE_TESTS = package-tests
+tier_MOZ_AUTOMATION_PRETTY_PACKAGE_TESTS = pretty-package-tests
+tier_MOZ_AUTOMATION_UPDATE_PACKAGING = update-packaging
+tier_MOZ_AUTOMATION_PRETTY_UPDATE_PACKAGING = pretty-update-packaging
+tier_MOZ_AUTOMATION_UPLOAD_SYMBOLS = uploadsymbols
+tier_MOZ_AUTOMATION_UPLOAD = upload
+tier_MOZ_AUTOMATION_SDK = sdk
 
 # Automation build steps. Everything in MOZ_AUTOMATION_TIERS also gets used in
 # TIERS for mach display. As such, the MOZ_AUTOMATION_TIERS are roughly sorted
 # here in the order that they will be executed (since mach doesn't know of the
 # dependencies between them).
 moz_automation_symbols = \
-  PACKAGE_TESTS \
-  PRETTY_PACKAGE_TESTS \
-  BUILD_SYMBOLS \
-  UPLOAD_SYMBOLS \
-  PACKAGE \
-  PRETTY_PACKAGE \
-  INSTALLER \
-  PRETTY_INSTALLER \
-  UPDATE_PACKAGING \
-  PRETTY_UPDATE_PACKAGING \
-  L10N_CHECK \
-  PRETTY_L10N_CHECK \
-  UPLOAD \
+  MOZ_AUTOMATION_PACKAGE_TESTS \
+  MOZ_AUTOMATION_PRETTY_PACKAGE_TESTS \
+  MOZ_AUTOMATION_BUILD_SYMBOLS \
+  MOZ_AUTOMATION_UPLOAD_SYMBOLS \
+  MOZ_AUTOMATION_PACKAGE \
+  MOZ_AUTOMATION_PRETTY_PACKAGE \
+  MOZ_AUTOMATION_INSTALLER \
+  MOZ_AUTOMATION_PRETTY_INSTALLER \
+  MOZ_AUTOMATION_UPDATE_PACKAGING \
+  MOZ_AUTOMATION_PRETTY_UPDATE_PACKAGING \
+  MOZ_AUTOMATION_L10N_CHECK \
+  MOZ_AUTOMATION_PRETTY_L10N_CHECK \
+  MOZ_AUTOMATION_UPLOAD \
+  MOZ_AUTOMATION_SDK \
   $(NULL)
-MOZ_AUTOMATION_TIERS := $(foreach sym,$(moz_automation_symbols),$(if $(filter 1,$(MOZ_AUTOMATION_$(sym))),$(tier_$(sym))))
+MOZ_AUTOMATION_TIERS := $(foreach sym,$(moz_automation_symbols),$(if $(filter 1,$($(sym))),$(tier_$(sym))))
 
 # Dependencies between automation build steps
 automation/uploadsymbols: automation/buildsymbols
@@ -76,15 +74,17 @@ automation/upload: automation/package
 automation/upload: automation/package-tests
 automation/upload: automation/buildsymbols
 automation/upload: automation/update-packaging
+automation/upload: automation/sdk
 
 # automation/{pretty-}package should depend on build (which is implicit due to
 # the way client.mk invokes automation/build), but buildsymbols changes the
 # binaries/libs, and that's what we package/test.
 automation/pretty-package: automation/buildsymbols
 
-# The installer and packager both run stage-package, and may conflict
+# The installer, sdk and packager all run stage-package, and may conflict
 # with each other.
 automation/installer: automation/package
+automation/sdk: automation/installer automation/package
 
 # The 'pretty' versions of targets run before the regular ones to avoid
 # conflicts in writing to the same files.
@@ -95,11 +95,7 @@ automation/l10n-check: automation/pretty-l10n-check
 automation/update-packaging: automation/pretty-update-packaging
 
 automation/build: $(addprefix automation/,$(MOZ_AUTOMATION_TIERS))
-	$(PYTHON) $(topsrcdir)/build/gen_mach_buildprops.py --complete-mar-file $(DIST)/$(COMPLETE_MAR) $(addprefix --partial-mar-file ,$(wildcard $(DIST)/$(PARTIAL_MAR))) --upload-output $(AUTOMATION_UPLOAD_OUTPUT) --upload-files $(abspath $(UPLOAD_FILES)) --package $(PACKAGE)
-
-# We need the log from make upload to grep it for urls in order to set
-# properties.
-AUTOMATION_EXTRA_CMDLINE-upload = 2>&1 | tee $(AUTOMATION_UPLOAD_OUTPUT)
+	@echo Automation steps completed.
 
 # Note: We have to force -j1 here, at least until bug 1036563 is fixed.
 AUTOMATION_EXTRA_CMDLINE-l10n-check = -j1

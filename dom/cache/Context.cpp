@@ -839,19 +839,21 @@ already_AddRefed<Context>
 Context::Create(Manager* aManager, nsIThread* aTarget,
                 Action* aInitAction, Context* aOldContext)
 {
-  RefPtr<Context> context = new Context(aManager, aTarget);
-  context->Init(aInitAction, aOldContext);
+  RefPtr<Context> context = new Context(aManager, aTarget, aInitAction);
+  context->Init(aOldContext);
   return context.forget();
 }
 
-Context::Context(Manager* aManager, nsIThread* aTarget)
+Context::Context(Manager* aManager, nsIThread* aTarget, Action* aInitAction)
   : mManager(aManager)
   , mTarget(aTarget)
   , mData(new Data(aTarget))
   , mState(STATE_CONTEXT_PREINIT)
   , mOrphanedData(false)
+  , mInitAction(aInitAction)
 {
   MOZ_ASSERT(mManager);
+  MOZ_ASSERT(mTarget);
 }
 
 void
@@ -879,10 +881,11 @@ Context::CancelAll()
 {
   NS_ASSERT_OWNINGTHREAD(Context);
 
-  // In PREINIT state we have not dispatch the init runnable yet.  Just
+  // In PREINIT state we have not dispatch the init action yet.  Just
   // forget it.
   if (mState == STATE_CONTEXT_PREINIT) {
-    mInitRunnable = nullptr;
+    MOZ_ASSERT(!mInitRunnable);
+    mInitAction = nullptr;
 
   // In INIT state we have dispatched the runnable, but not received the
   // async completion yet.  Cancel the runnable, but don't forget about it
@@ -971,14 +974,9 @@ Context::~Context()
 }
 
 void
-Context::Init(Action* aInitAction, Context* aOldContext)
+Context::Init(Context* aOldContext)
 {
   NS_ASSERT_OWNINGTHREAD(Context);
-  MOZ_ASSERT(!mInitRunnable);
-
-  // Do this here to avoid doing an AddRef() in the constructor
-  mInitRunnable = new QuotaInitRunnable(this, mManager, mData, mTarget,
-                                        aInitAction);
 
   if (aOldContext) {
     aOldContext->SetNextContext(this);
@@ -997,10 +995,17 @@ Context::Start()
   // In this case, just do nothing here.
   if (mState == STATE_CONTEXT_CANCELED) {
     MOZ_ASSERT(!mInitRunnable);
+    MOZ_ASSERT(!mInitAction);
     return;
   }
 
   MOZ_ASSERT(mState == STATE_CONTEXT_PREINIT);
+  MOZ_ASSERT(!mInitRunnable);
+
+  mInitRunnable = new QuotaInitRunnable(this, mManager, mData, mTarget,
+                                        mInitAction);
+  mInitAction = nullptr;
+
   mState = STATE_CONTEXT_INIT;
 
   nsresult rv = mInitRunnable->Dispatch();
@@ -1049,7 +1054,15 @@ Context::OnQuotaInit(nsresult aRv, const QuotaInfo& aQuotaInfo,
   MOZ_ASSERT(!mDirectoryLock);
   mDirectoryLock = aDirectoryLock;
 
-  if (mState == STATE_CONTEXT_CANCELED || NS_FAILED(aRv)) {
+  // If we opening the context failed, but we were not explicitly canceled,
+  // still treat the entire context as canceled.  We don't want to allow
+  // new actions to be dispatched.  We also cannot leave the context in
+  // the INIT state after failing to open.
+  if (NS_FAILED(aRv)) {
+    mState = STATE_CONTEXT_CANCELED;
+  }
+
+  if (mState == STATE_CONTEXT_CANCELED) {
     for (uint32_t i = 0; i < mPendingActions.Length(); ++i) {
       mPendingActions[i].mAction->CompleteOnInitiatingThread(aRv);
     }

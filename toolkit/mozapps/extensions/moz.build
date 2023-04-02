@@ -22,6 +22,7 @@ EXTRA_COMPONENTS += [
     'amInstallTrigger.js',
     'amWebInstallListener.js',
     'nsBlocklistService.js',
+    'nsBlocklistServiceContent.js',
 ]
 
 EXTRA_PP_COMPONENTS += [
@@ -29,18 +30,11 @@ EXTRA_PP_COMPONENTS += [
 ]
 
 EXTRA_JS_MODULES += [
+    'AddonManager.jsm',
     'ChromeManifestParser.jsm',
     'DeferredSave.jsm',
     'LightweightThemeManager.jsm',
 ]
-
-EXTRA_PP_JS_MODULES += [
-    'AddonManager.jsm'
-]
-
-# Additional debugging info is exposed in debug builds
-if CONFIG['MOZ_EM_DEBUG']:
-    DEFINES['MOZ_EM_DEBUG'] = 1
 
 JAR_MANIFESTS += ['jar.mn']
 

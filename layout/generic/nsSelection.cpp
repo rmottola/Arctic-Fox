@@ -56,7 +56,6 @@ static NS_DEFINE_CID(kFrameTraversalCID, NS_FRAMETRAVERSAL_CID);
 #include "SelectionCarets.h"
 
 #include "AccessibleCaretEventHub.h"
-#include "AccessibleCaretManager.h"
 
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TextEvents.h"
@@ -2251,11 +2250,14 @@ nsFrameSelection::StartBatchChanges()
 }
 
 void
-nsFrameSelection::EndBatchChanges()
+nsFrameSelection::EndBatchChanges(int16_t aReason)
 {
   mBatching--;
   NS_ASSERTION(mBatching >=0,"Bad mBatching");
-  if (mBatching == 0 && mChangesDuringBatching){
+
+  if (mBatching == 0 && mChangesDuringBatching) {
+    int16_t postReason = PopReason() | aReason;
+    PostReason(postReason);
     mChangesDuringBatching = false;
     NotifySelectionListeners(nsISelectionController::SELECTION_NORMAL);
   }
@@ -6052,9 +6054,15 @@ Selection::StartBatchChanges()
 NS_IMETHODIMP
 Selection::EndBatchChanges()
 {
-  if (mFrameSelection)
-    mFrameSelection->EndBatchChanges();
+  return EndBatchChangesInternal();
+}
 
+nsresult
+Selection::EndBatchChangesInternal(int16_t aReason)
+{
+  if (mFrameSelection) {
+    mFrameSelection->EndBatchChanges(aReason);
+  }
   return NS_OK;
 }
 

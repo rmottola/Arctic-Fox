@@ -585,13 +585,14 @@ nsViewManager::InvalidateWidgetArea(nsView *aWidgetView,
         // plugin widgets are basically invisible
 #ifndef XP_MACOSX
         // GetBounds should compensate for chrome on a toplevel widget
-        nsIntRect bounds;
-        childWidget->GetBoundsUntyped(bounds);
+        LayoutDeviceIntRect bounds;
+        childWidget->GetBounds(bounds);
 
         nsTArray<nsIntRect> clipRects;
         childWidget->GetWindowClipRegion(&clipRects);
         for (uint32_t i = 0; i < clipRects.Length(); ++i) {
-          nsRect rr = ToAppUnits(clipRects[i] + bounds.TopLeft(), AppUnitsPerDevPixel());
+          nsRect rr = ToAppUnits(clipRects[i] + bounds.TopLeft().ToUnknownPoint(),
+                                 AppUnitsPerDevPixel());
           children.Or(children, rr - aWidgetView->ViewToWidgetOffset());
           children.SimplifyInward(20);
         }
@@ -606,7 +607,7 @@ nsViewManager::InvalidateWidgetArea(nsView *aWidgetView,
   if (!leftOver.IsEmpty()) {
     const nsRect* r;
     for (nsRegionRectIterator iter(leftOver); (r = iter.Next());) {
-      nsIntRect bounds = ViewToWidget(aWidgetView, *r);
+      LayoutDeviceIntRect bounds = ViewToWidget(aWidgetView, *r);
       widget->Invalidate(bounds);
     }
   }
@@ -1062,7 +1063,8 @@ nsViewManager::GetRootWidget(nsIWidget **aWidget)
   *aWidget = nullptr;
 }
 
-nsIntRect nsViewManager::ViewToWidget(nsView *aView, const nsRect &aRect) const
+LayoutDeviceIntRect
+nsViewManager::ViewToWidget(nsView* aView, const nsRect& aRect) const
 {
   NS_ASSERTION(aView->GetViewManager() == this, "wrong view manager");
 
@@ -1070,7 +1072,8 @@ nsIntRect nsViewManager::ViewToWidget(nsView *aView, const nsRect &aRect) const
   nsRect rect = aRect + aView->ViewToWidgetOffset();
 
   // finally, convert to device coordinates.
-  return rect.ToOutsidePixels(AppUnitsPerDevPixel());
+  return LayoutDeviceIntRect::FromUnknownRect(
+    rect.ToOutsidePixels(AppUnitsPerDevPixel()));
 }
 
 void

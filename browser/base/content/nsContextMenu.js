@@ -1308,15 +1308,11 @@ nsContextMenu.prototype = {
     // * this.principal - as the loadingPrincipal
     // for now lets use systemPrincipal to bypass mixedContentBlocker
     // checks after redirects, see bug: 1136055
-    var ioService = Cc["@mozilla.org/network/io-service;1"].
-                    getService(Ci.nsIIOService);
-    var principal = Services.scriptSecurityManager.getSystemPrincipal();
-    var channel = ioService.newChannelFromURI2(makeURI(linkURL),
-                                               null, // aLoadingNode
-                                               principal, // aLoadingPrincipal
-                                               null, // aTriggeringPrincipal
-                                               Ci.nsILoadInfo.SEC_NORMAL,
-                                               Ci.nsIContentPolicy.TYPE_OTHER);
+    var channel = NetUtil.newChannel({
+                    uri: makeURI(linkURL),
+                    loadUsingSystemPrincipal: true
+                  });
+
     if (linkDownload)
       channel.contentDispositionFilename = linkDownload;
     if (channel instanceof Ci.nsIPrivateBrowsingChannel) {
@@ -1349,7 +1345,7 @@ nsContextMenu.prototype = {
                            timer.TYPE_ONE_SHOT);
 
     // kick off the channel with our proxy object as the listener
-    channel.asyncOpen(new saveAsListener(), null);
+    channel.asyncOpen2(new saveAsListener());
   },
 
   // Save URL of clicked-on link.

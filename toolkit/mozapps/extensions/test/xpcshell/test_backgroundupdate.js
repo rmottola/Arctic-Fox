@@ -92,6 +92,10 @@ function run_test_2() {
                              "http://localhost:" + gPort +"/data/test_backgroundupdate.rdf");
   restartManager();
 
+  // Do hotfix checks
+  Services.prefs.setCharPref("extensions.hotfix.id", "hotfix@tests.mozilla.org");
+  Services.prefs.setCharPref("extensions.hotfix.url", "http://localhost:" + gPort + "/missing.rdf");
+
   let installCount = 0;
   let completeCount = 0;
   let sawCompleteNotification = false;

@@ -4,6 +4,8 @@
 
 const ID = "webextension1@tests.mozilla.org";
 
+const PREF_SELECTED_LOCALE = "general.useragent.locale";
+
 const profileDir = gProfD.clone();
 profileDir.append("extensions");
 
@@ -34,6 +36,16 @@ add_task(function*() {
 
   do_check_eq(GlobalManager.count, 1);
   do_check_true(GlobalManager.extensionMap.has(ID));
+
+  let chromeReg = AM_Cc["@mozilla.org/chrome/chrome-registry;1"].
+                  getService(AM_Ci.nsIChromeRegistry);
+  try {
+    chromeReg.convertChromeURL(NetUtil.newURI("chrome://webex/content/webex.xul"));
+    do_throw("Chrome manifest should not have been registered");
+  }
+  catch (e) {
+    // Expected the chrome url to not be registered
+  }
 
   let addon = yield promiseAddonByID(ID);
   do_check_neq(addon, null);
@@ -132,6 +144,33 @@ add_task(function*() {
   yield promiseRestartManager();
 });
 
+add_task(function* test_manifest_localization() {
+  const ID = "webextension3@tests.mozilla.org";
+
+  yield promiseInstallAllFiles([do_get_addon("webextension_3")], true);
+
+  let addon = yield promiseAddonByID(ID);
+
+  equal(addon.name, "Web Extension foo");
+  equal(addon.description, "Descripton bar of add-on");
+
+  Services.prefs.setCharPref(PREF_SELECTED_LOCALE, "fr-FR");
+  yield promiseRestartManager();
+
+  addon = yield promiseAddonByID(ID);
+
+  equal(addon.name, "Web Extension le foo");
+  equal(addon.description, "Descripton le bar of add-on");
+
+  Services.prefs.setCharPref(PREF_SELECTED_LOCALE, "de");
+  yield promiseRestartManager();
+
+  addon = yield promiseAddonByID(ID);
+
+  equal(addon.name, "Web Extension foo");
+  equal(addon.description, "Descripton bar of add-on");
+});
+
 // Missing ID should cause a failure
 add_task(function*() {
   writeWebManifestForExtension({
@@ -194,6 +233,28 @@ add_task(function*() {
 
   let file = getFileForAddon(profileDir, ID);
   do_check_false(file.exists());
+
+  yield promiseRestartManager();
+});
+
+// install.rdf should be read before manifest.json
+add_task(function*() {
+
+  yield Promise.all([
+    promiseInstallAllFiles([do_get_addon("webextension_2")], true)
+  ]);
+
+  yield promiseRestartManager();
+
+  let installrdf_id = "first-webextension2@tests.mozilla.org";
+  let first_addon = yield promiseAddonByID(installrdf_id);
+  do_check_neq(first_addon, null);
+  do_check_false(first_addon.appDisabled);
+  do_check_true(first_addon.isActive);
+
+  let manifestjson_id= "last-webextension2@tests.mozilla.org";
+  let last_addon = yield promiseAddonByID(manifestjson_id);
+  do_check_eq(last_addon, null);
 
   yield promiseRestartManager();
 });

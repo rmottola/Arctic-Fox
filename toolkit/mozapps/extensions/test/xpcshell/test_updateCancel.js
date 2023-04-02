@@ -50,7 +50,7 @@ function makeCancelListener() {
 }
 
 // Set up the HTTP server so that we can control when it responds
-let httpReceived = Promise.defer();
+var httpReceived = Promise.defer();
 function dataHandler(aRequest, aResponse) {
   asyncResponse = aResponse;
   aResponse.processAsync();
@@ -134,9 +134,6 @@ add_task(function shutdown_during_check() {
   let data = loadFile(file);
   response.write(data);
   response.finish();
-
-  // trying to cancel again should return false, i.e. nothing to cancel
-  do_check_false(a1.cancelUpdate());
 
   yield testserver.stop(Promise.defer().resolve);
 });

@@ -330,10 +330,10 @@ nsWindow::SynthesizeNativeTouchPoint(uint32_t aPointerId,
 }
 
 NS_IMETHODIMP
-nsWindow::Create(nsIWidget *aParent,
-                 void *aNativeParent,
-                 const nsIntRect &aRect,
-                 nsWidgetInitData *aInitData)
+nsWindow::Create(nsIWidget* aParent,
+                 void* aNativeParent,
+                 const LayoutDeviceIntRect& aRect,
+                 nsWidgetInitData* aInitData)
 {
     BaseCreate(aParent, aRect, aInitData);
 
@@ -347,7 +347,7 @@ nsWindow::Create(nsIWidget *aParent,
 
     mScreen = static_cast<nsScreenGonk*>(screen.get());
 
-    mBounds = aRect;
+    mBounds = aRect.ToUnknownRect();
 
     mParent = (nsWindow *)aParent;
     mVisible = false;
@@ -458,7 +458,7 @@ nsWindow::Resize(double aX,
     }
 
     if (aRepaint) {
-        Invalidate(mBounds);
+        Invalidate(LayoutDeviceIntRect::FromUnknownRect(mBounds));
     }
 
     return NS_OK;
@@ -498,7 +498,7 @@ nsWindow::ConfigureChildren(const nsTArray<nsIWidget::Configuration>&)
 }
 
 NS_IMETHODIMP
-nsWindow::Invalidate(const nsIntRect &aRect)
+nsWindow::Invalidate(const LayoutDeviceIntRect& aRect)
 {
     nsWindow *top = mParent;
     while (top && top->mParent) {
@@ -818,7 +818,7 @@ nsWindow::BringToTop()
         mWidgetListener->WindowActivated();
     }
 
-    Invalidate(mBounds);
+    Invalidate(LayoutDeviceIntRect::FromUnknownRect(mBounds));
 }
 
 void

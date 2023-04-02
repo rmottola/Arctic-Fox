@@ -21471,6 +21471,12 @@
     "deleted": [],
     "items": {
       "testharness": {
+        "js/builtins/Promise-subclassing.html": [
+          {
+            "path": "js/builtins/Promise-subclassing.html",
+            "url": "/js/builtins/Promise-subclassing.html"
+          }
+        ],
         "content-security-policy/media-src/media-src-7_1.html": [
           {
             "path": "content-security-policy/media-src/media-src-7_1.html",

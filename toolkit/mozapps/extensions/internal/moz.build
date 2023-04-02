@@ -6,13 +6,17 @@
 
 EXTRA_JS_MODULES.addons += [
     'AddonLogging.jsm',
+    'AddonRepository.jsm',
     'AddonRepository_SQLiteMigrator.jsm',
+    'AddonUpdateChecker.jsm',
     'Content.js',
     'GMPProvider.jsm',
     'LightweightThemeImageOptimizer.jsm',
     'ProductAddonChecker.jsm',
     'SpellCheckDictionaryBootstrap.js',
     'WebExtensionBootstrap.js',
+    'XPIProvider.jsm',
+    'XPIProviderUtils.js',
 ]
 
 # Don't ship unused providers on Android
@@ -22,26 +26,11 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android':
     ]
 
 EXTRA_PP_JS_MODULES.addons += [
-    'AddonRepository.jsm',
-    'AddonUpdateChecker.jsm',
-    'XPIProvider.jsm',
-    'XPIProviderUtils.js',
+    'AddonConstants.jsm',
 ]
-
-# This is used in multiple places, so is defined here to avoid it getting
-# out of sync.
-DEFINES['MOZ_EXTENSIONS_DB_SCHEMA'] = 17
-
-# Additional debugging info is exposed in debug builds
-if CONFIG['MOZ_EM_DEBUG']:
-    DEFINES['MOZ_EM_DEBUG'] = 1
 
 if CONFIG['MOZ_ADDON_SIGNING']:
     DEFINES['MOZ_ADDON_SIGNING'] = 1
 
 if CONFIG['MOZ_REQUIRE_SIGNING']:
     DEFINES['MOZ_REQUIRE_SIGNING'] = 1
-
-# Apperently this needs to be defined because it isn't picked up automagically any more
-if CONFIG['MOZ_PHOENIX_EXTENSIONS']:
-    DEFINES['MOZ_PHOENIX_EXTENSIONS'] = 1

@@ -109,12 +109,10 @@ static const char *kPrefYoutubeRewrite = "plugins.rewrite_youtube_embeds";
 using namespace mozilla;
 using namespace mozilla::dom;
 
-static PRLogModuleInfo*
+static LogModule*
 GetObjectLog()
 {
-  static PRLogModuleInfo *sLog;
-  if (!sLog)
-    sLog = PR_NewLogModule("objlc");
+  static LazyLogModule sLog("objlc");
   return sLog;
 }
 
@@ -551,6 +549,11 @@ IsPluginEnabledByExtension(nsIURI* uri, nsCString& mimeType)
   GetExtensionFromURI(uri, ext);
 
   if (ext.IsEmpty()) {
+    return false;
+  }
+
+  // Disables any native PDF plugins, when internal PDF viewer is enabled.
+  if (ext.EqualsIgnoreCase("pdf") && nsContentUtils::IsPDFJSEnabled()) {
     return false;
   }
 
@@ -2786,6 +2789,13 @@ nsObjectLoadingContent::GetTypeOfContent(const nsCString& aMIMEType)
 
   if ((caps & eSupportImages) && IsSupportedImage(aMIMEType)) {
     return eType_Image;
+  }
+
+  // Faking support of the PDF content as a document for EMBED tags
+  // when internal PDF viewer is enabled.
+  if (aMIMEType.LowerCaseEqualsLiteral("application/pdf") &&
+      nsContentUtils::IsPDFJSEnabled()) {
+    return eType_Document;
   }
 
   // SVGs load as documents, but are their own capability

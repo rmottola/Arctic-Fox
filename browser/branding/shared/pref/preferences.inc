@@ -5,7 +5,7 @@
 
 pref("startup.homepage_welcome_url","about:");
 
-pref("app.vendorURL", "https://github.com/wicknix/Arctic-Fox/wiki");
+pref("app.vendorURL", "https://github.com/rmottola/Arctic-Fox/wiki");
 pref("browser.getdevtools.url","https://addons.palemoon.org/extensions/web-development/");
 
 // User Interface

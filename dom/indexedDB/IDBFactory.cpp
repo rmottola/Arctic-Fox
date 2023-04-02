@@ -319,6 +319,7 @@ IDBFactory::CreateForJSInternal(JSContext* aCx,
   if (aPrincipalInfo->type() != PrincipalInfo::TContentPrincipalInfo &&
       aPrincipalInfo->type() != PrincipalInfo::TSystemPrincipalInfo) {
     NS_WARNING("IndexedDB not allowed for this principal!");
+    aPrincipalInfo = nullptr;
     *aFactory = nullptr;
     return NS_OK;
   }

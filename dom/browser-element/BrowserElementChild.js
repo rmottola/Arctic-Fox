@@ -4,7 +4,7 @@
 
 "use strict";
 
-let { classes: Cc, interfaces: Ci, results: Cr, utils: Cu }  = Components;
+var { classes: Cc, interfaces: Ci, results: Cr, utils: Cu }  = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 
 function debug(msg) {
@@ -41,11 +41,19 @@ if (!('BrowserElementIsPreloaded' in this)) {
       } catch (e) {
       }
     }
+  }
 
+  if(Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+    // general content apps
+    if (isTopBrowserElement(docShell)) {
+      Services.scriptloader.loadSubScript("chrome://global/content/BrowserElementCopyPaste.js");
+    }
+  } else {
+    // rocketbar in system app and other in-process case (ex. B2G desktop client)
     Services.scriptloader.loadSubScript("chrome://global/content/BrowserElementCopyPaste.js");
   }
 
-  if (Services.prefs.getIntPref("dom.w3c_touch_events.enabled") == 1) {
+  if (Services.prefs.getIntPref("dom.w3c_touch_events.enabled") != 0) {
     if (docShell.asyncPanZoomEnabled === false) {
       Services.scriptloader.loadSubScript("chrome://global/content/BrowserElementPanningAPZDisabled.js");
       ContentPanningAPZDisabled.init();

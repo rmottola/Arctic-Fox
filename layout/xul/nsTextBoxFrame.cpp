@@ -457,6 +457,8 @@ nsTextBoxFrame::DrawText(nsRenderingContext& aRenderingContext,
 
     RefPtr<nsFontMetrics> fontMet;
     nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet));
+    fontMet->SetVertical(wm.IsVertical());
+    fontMet->SetTextOrientation(StyleVisibility()->mTextOrientation);
 
     nscoord offset;
     nscoord size;
@@ -636,7 +638,8 @@ nsTextBoxFrame::CalculateTitleForWidth(nsPresContext*      aPresContext,
                                               aRenderingContext);
     if (titleWidth <= aWidth) {
         mCroppedTitle = mTitle;
-        if (HasRTLChars(mTitle)) {
+        if (HasRTLChars(mTitle) ||
+            StyleVisibility()->mDirection == NS_STYLE_DIRECTION_RTL) {
             mState |= NS_FRAME_IS_BIDI;
         }
         return titleWidth;  // fits, done.

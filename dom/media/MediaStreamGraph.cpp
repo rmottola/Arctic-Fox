@@ -591,7 +591,8 @@ MediaStreamGraphImpl::CreateOrDestroyAudioStreams(MediaStream* aStream)
     return;
   }
 
-  if (!aStream->GetStreamBuffer().GetAndResetTracksDirty()) {
+  if (!aStream->GetStreamBuffer().GetAndResetTracksDirty() &&
+      !aStream->mAudioOutputStreams.IsEmpty()) {
     return;
   }
 
@@ -1228,10 +1229,10 @@ MediaStreamGraphImpl::UpdateMainThreadState()
 bool
 MediaStreamGraphImpl::OneIteration(GraphTime aStateEnd)
 {
-  MaybeProduceMemoryReport();
-
   // Process graph message from the main thread for this iteration.
   RunMessagesInQueue();
+
+  MaybeProduceMemoryReport();
 
   GraphTime stateEnd = std::min(aStateEnd, mEndTime);
   UpdateGraph(stateEnd);
@@ -2178,6 +2179,7 @@ SourceMediaStream::AddTrackInternal(TrackID aID, TrackRate aRate, StreamTime aSt
   TrackData* data = track_data->AppendElement();
   data->mID = aID;
   data->mInputRate = aRate;
+  data->mResamplerChannelCount = 0;
   data->mStart = aStart;
   data->mEndOfFlushedData = aStart;
   data->mCommands = TRACK_CREATE;
@@ -2424,6 +2426,7 @@ MediaInputPort::Init()
 void
 MediaInputPort::Disconnect()
 {
+  GraphImpl()->AssertOnGraphThreadOrNotRunning();
   NS_ASSERTION(!mSource == !mDest,
                "mSource must either both be null or both non-null");
   if (!mSource)
@@ -3075,6 +3078,14 @@ MediaStreamGraphImpl::ApplyAudioContextOperationImpl(
         mMixer.RemoveCallback(CurrentDriver()->AsAudioCallbackDriver());
         CurrentDriver()->SwitchAtNextIteration(driver);
       }
+      // We are closing or suspending an AudioContext, but we just got resumed.
+      // Queue the operation on the next driver so that the ordering is
+      // preserved.
+    } else if (!audioTrackPresent && CurrentDriver()->Switching()) {
+      MOZ_ASSERT(CurrentDriver()->NextDriver()->AsAudioCallbackDriver());
+      CurrentDriver()->NextDriver()->AsAudioCallbackDriver()->
+        EnqueueStreamAndPromiseForOperation(aDestinationStream, aPromise,
+                                            aOperation);
     } else {
       // We are closing or suspending an AudioContext, but something else is
       // using the audio stream, we can resolve the promise now.

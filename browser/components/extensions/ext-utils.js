@@ -6,6 +6,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
+Cu.import("resource://gre/modules/AddonManager.jsm");
+
+const INTEGER = /^[1-9]\d*$/;
+
 var {
   EventManager,
 } = ExtensionUtils;
@@ -18,38 +22,48 @@ var {
 // Manages icon details for toolbar buttons in the |pageAction| and
 // |browserAction| APIs.
 global.IconDetails = {
-  // Accepted icon sizes.
-  SIZES: ["19", "38"],
-
   // Normalizes the various acceptable input formats into an object
-  // with two properties, "19" and "38", containing icon URLs.
+  // with icon size as key and icon URL as value.
+  //
+  // If a context is specified (function is called from an extension):
+  // Throws an error if an invalid icon size was provided or the
+  // extension is not allowed to load the specified resources.
+  //
+  // If no context is specified, instead of throwing an error, this
+  // function simply logs a warning message.
   normalize(details, extension, context=null, localize=false) {
     let result = {};
 
-    if (details.imageData) {
-      let imageData = details.imageData;
+    try {
+      if (details.imageData) {
+        let imageData = details.imageData;
 
-      if (imageData instanceof Cu.getGlobalForObject(imageData).ImageData) {
-        imageData = {"19": imageData};
-      }
+        if (imageData instanceof Cu.getGlobalForObject(imageData).ImageData) {
+          imageData = {"19": imageData};
+        }
 
-      for (let size of this.SIZES) {
-        if (size in imageData) {
+        for (let size of Object.keys(imageData)) {
+          if (!INTEGER.test(size)) {
+            throw new Error(`Invalid icon size ${size}, must be an integer`);
+          }
+
           result[size] = this.convertImageDataToPNG(imageData[size], context);
         }
       }
-    }
 
-    if (details.path) {
-      let path = details.path;
-      if (typeof path != "object") {
-        path = {"19": path};
-      }
+      if (details.path) {
+        let path = details.path;
+        if (typeof path != "object") {
+          path = {"19": path};
+        }
 
-      let baseURI = context ? context.uri : extension.baseURI;
+        let baseURI = context ? context.uri : extension.baseURI;
 
-      for (let size of this.SIZES) {
-        if (size in path) {
+        for (let size of Object.keys(path)) {
+          if (!INTEGER.test(size)) {
+            throw new Error(`Invalid icon size ${size}, must be an integer`);
+          }
+
           let url = path[size];
           if (localize) {
             url = extension.localize(url);
@@ -60,22 +74,23 @@ global.IconDetails = {
           // The Chrome documentation specifies these parameters as
           // relative paths. We currently accept absolute URLs as well,
           // which means we need to check that the extension is allowed
-          // to load them.
-          try {
-            Services.scriptSecurityManager.checkLoadURIStrWithPrincipal(
-              extension.principal, url,
-              Services.scriptSecurityManager.DISALLOW_SCRIPT);
-          } catch (e if !context) {
-            // If there's no context, it's because we're handling this
-            // as a manifest directive. Log a warning rather than
-            // raising an error, but don't accept the URL in any case.
-            extension.manifestError(`Access to URL '${url}' denied`);
-            continue;
-          }
+          // to load them. This will throw an error if it's not allowed.
+          Services.scriptSecurityManager.checkLoadURIStrWithPrincipal(
+            extension.principal, url,
+            Services.scriptSecurityManager.DISALLOW_SCRIPT);
 
           result[size] = url;
         }
       }
+    } catch (e) {
+      // Function is called from extension code, delegate error.
+      if (context) {
+        throw e;
+      }
+      // If there's no context, it's because we're handling this
+      // as a manifest directive. Log a warning rather than
+      // raising an error.
+      extension.manifestError(`Invalid icon data: ${e}`);
     }
 
     return result;
@@ -86,12 +101,7 @@ global.IconDetails = {
   getURL(icons, window, extension) {
     const DEFAULT = "chrome://browser/content/extension.svg";
 
-    // Use the higher resolution image if we're doing any up-scaling
-    // for high resolution monitors.
-    let res = window.devicePixelRatio;
-    let size = res > 1 ? "38" : "19";
-
-    return icons[size] || icons["19"] || icons["38"] || DEFAULT;
+    return AddonManager.getPreferredIconURL({icons: icons}, 18, window) || DEFAULT;
   },
 
   convertImageDataToPNG(imageData, context) {
@@ -167,7 +177,10 @@ global.openPanel = (node, popupURL, extension) => {
     GlobalManager.injectInDocShell(browser.docShell, extension, context);
     browser.setAttribute("src", context.uri.spec);
 
-    let contentLoadListener = () => {
+    let contentLoadListener = event => {
+      if (event.target != browser.contentDocument) {
+        return;
+      }
       browser.removeEventListener("load", contentLoadListener, true);
 
       let contentViewer = browser.docShell.contentViewer;
@@ -336,7 +349,7 @@ global.TabManager = {
     if (!window.gBrowser) {
       return [];
     }
-    return [ for (tab of window.gBrowser.tabs) this.convert(extension, tab) ];
+    return Array.map(window.gBrowser.tabs, tab => this.convert(extension, tab));
   },
 };
 
@@ -417,7 +430,7 @@ global.WindowListManager = {
     }
   },
 
-  addOpenListener(listener, fireOnExisting = true) {
+  addOpenListener(listener) {
     if (this._openListeners.length == 0 && this._closeListeners.length == 0) {
       Services.ww.registerNotification(this);
     }
@@ -426,8 +439,6 @@ global.WindowListManager = {
     for (let window of this.browserWindows(true)) {
       if (window.document.readyState != "complete") {
         window.addEventListener("load", this);
-      } else if (fireOnExisting) {
-        listener(window);
       }
     }
   },
@@ -454,8 +465,8 @@ global.WindowListManager = {
   },
 
   handleEvent(event) {
+    event.currentTarget.removeEventListener(event.type, this);
     let window = event.target.defaultView;
-    window.removeEventListener("load", this.loadListener);
     if (window.document.documentElement.getAttribute("windowtype") != "navigator:browser") {
       return;
     }
@@ -497,7 +508,9 @@ global.AllWindowEvents = {
       return WindowListManager.addCloseListener(listener);
     }
 
-    let needOpenListener = this._listeners.size == 0;
+    if (this._listeners.size == 0) {
+      WindowListManager.addOpenListener(this.openListener);
+    }
 
     if (!this._listeners.has(type)) {
       this._listeners.set(type, new Set());
@@ -505,10 +518,7 @@ global.AllWindowEvents = {
     let list = this._listeners.get(type);
     list.add(listener);
 
-    if (needOpenListener) {
-      WindowListManager.addOpenListener(this.openListener, false);
-    }
-
+    // Register listener on all existing windows.
     for (let window of WindowListManager.browserWindows()) {
       this.addWindowListener(window, type, listener);
     }
@@ -523,13 +533,14 @@ global.AllWindowEvents = {
 
     let listeners = this._listeners.get(type);
     listeners.delete(listener);
-    if (listeners.length == 0) {
+    if (listeners.size == 0) {
       this._listeners.delete(type);
       if (this._listeners.size == 0) {
         WindowListManager.removeOpenListener(this.openListener);
       }
     }
 
+    // Unregister listener from all existing windows.
     for (let window of WindowListManager.browserWindows()) {
       if (type == "progress") {
         window.gBrowser.removeTabsProgressListener(listener);

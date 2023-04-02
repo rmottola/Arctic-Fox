@@ -40,6 +40,12 @@ caches.open(name).then(function(openCache) {
   resultList.every(function(result) {
     ok(!!result, 'Responses should now be in cache for each URL.');
   });
+  return cache.matchAll();
+}).then(function(resultList) {
+  is(urlList.length + 1, resultList.length, 'Expected number of results');
+  resultList.every(function(result) {
+    ok(!!result, 'Responses should now be in cache for each URL.');
+  });
   return caches.delete(name);
 }).then(function() {
   testDone();

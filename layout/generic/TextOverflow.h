@@ -9,9 +9,9 @@
 
 #include "nsDisplayList.h"
 #include "nsTHashtable.h"
-#include "nsAutoPtr.h" 
+#include "nsAutoPtr.h"
 #include "mozilla/Likely.h"
-#include "WritingModes.h" 
+#include "mozilla/WritingModes.h"
 #include <algorithm>
 
 class nsIScrollableFrame;

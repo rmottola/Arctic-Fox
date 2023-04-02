@@ -21,7 +21,7 @@ const ORIGIN_TOP_RIGHT = 1;
 const ORIGIN_BOTTOM_LEFT = 2;
 
 this.LightweightThemeImageOptimizer = {
-  optimize: function LWTIO_optimize(aThemeData, aScreen) {
+  optimize: function(aThemeData, aScreen) {
     let data = Utils.createCopy(aThemeData);
     if (!data.headerURL) {
       return data;
@@ -38,7 +38,7 @@ this.LightweightThemeImageOptimizer = {
     return data;
   },
 
-  purge: function LWTIO_purge() {
+  purge: function() {
     let dir = FileUtils.getDir("ProfD", ["lwtheme"]);
     dir.followLinks = false;
     try {
@@ -52,8 +52,7 @@ Object.freeze(LightweightThemeImageOptimizer);
 var ImageCropper = {
   _inProgress: {},
 
-  getCroppedImageURL:
-  function ImageCropper_getCroppedImageURL(aImageURL, aScreen, aOrigin) {
+  getCroppedImageURL: function(aImageURL, aScreen, aOrigin) {
     // We can crop local files, only.
     if (!aImageURL.startsWith("file://")) {
       return aImageURL;
@@ -94,7 +93,7 @@ var ImageCropper = {
     return aImageURL;
   },
 
-  _crop: function ImageCropper_crop(aURI, aTargetFile, aScreen, aOrigin) {
+  _crop: function(aURI, aTargetFile, aScreen, aOrigin) {
     let inProgress = this._inProgress;
     inProgress[aTargetFile.path] = true;
 
@@ -102,7 +101,7 @@ var ImageCropper = {
       delete inProgress[aTargetFile.path];
     }
 
-    ImageFile.read(aURI, function crop_readImageFile(aInputStream, aContentType) {
+    ImageFile.read(aURI, function(aInputStream, aContentType) {
       if (aInputStream && aContentType) {
         let image = ImageTools.decode(aInputStream, aContentType);
         if (image && image.width && image.height) {
@@ -120,12 +119,12 @@ var ImageCropper = {
 };
 
 var ImageFile = {
-  read: function ImageFile_read(aURI, aCallback) {
+  read: function(aURI, aCallback) {
     this._netUtil.asyncFetch({
       uri: aURI,
       loadUsingSystemPrincipal: true,
       contentPolicyType: Ci.nsIContentPolicy.TYPE_INTERNAL_IMAGE
-    }, function read_asyncFetch(aInputStream, aStatus, aRequest) {
+    }, function(aInputStream, aStatus, aRequest) {
         if (Components.isSuccessCode(aStatus) && aRequest instanceof Ci.nsIChannel) {
           let channel = aRequest.QueryInterface(Ci.nsIChannel);
           aCallback(aInputStream, channel.contentType);
@@ -135,9 +134,9 @@ var ImageFile = {
       });
   },
 
-  write: function ImageFile_write(aFile, aInputStream, aCallback) {
+  write: function(aFile, aInputStream, aCallback) {
     let fos = FileUtils.openSafeFileOutputStream(aFile);
-    this._netUtil.asyncCopy(aInputStream, fos, function write_asyncCopy(aResult) {
+    this._netUtil.asyncCopy(aInputStream, fos, function(aResult) {
       FileUtils.closeSafeFileOutputStream(fos);
 
       // Remove the file if writing was not successful.
@@ -156,7 +155,7 @@ XPCOMUtils.defineLazyModuleGetter(ImageFile, "_netUtil",
   "resource://gre/modules/NetUtil.jsm", "NetUtil");
 
 var ImageTools = {
-  decode: function ImageTools_decode(aInputStream, aContentType) {
+  decode: function(aInputStream, aContentType) {
     let outParam = {value: null};
 
     try {
@@ -166,7 +165,7 @@ var ImageTools = {
     return outParam.value;
   },
 
-  encode: function ImageTools_encode(aImage, aScreen, aOrigin, aContentType) {
+  encode: function(aImage, aScreen, aOrigin, aContentType) {
     let stream;
     let width = Math.min(aImage.width, aScreen.width);
     let height = Math.min(aImage.height, aScreen.height);
@@ -185,7 +184,7 @@ XPCOMUtils.defineLazyServiceGetter(ImageTools, "_imgTools",
   "@mozilla.org/image/tools;1", "imgITools");
 
 var Utils = {
-  createCopy: function Utils_createCopy(aData) {
+  createCopy: function(aData) {
     let copy = {};
     for (let [k, v] in Iterator(aData)) {
       copy[k] = v;

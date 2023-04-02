@@ -136,11 +136,6 @@ public:
     nsCOMPtr<nsILoadGroup> loadGroup = proxy->GetWorkerPrivate()->GetLoadGroup();
     MOZ_ASSERT(loadGroup);
     RefPtr<FetchDriver> fetch = new FetchDriver(mRequest, principal, loadGroup);
-    nsIDocument* doc = proxy->GetWorkerPrivate()->GetDocument();
-    if (doc) {
-      fetch->SetDocument(doc);
-    }
-
     nsresult rv = fetch->Fetch(mResolver);
     // Right now we only support async fetch, which should never directly fail.
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -662,17 +657,15 @@ public:
 
     uint8_t* nonconstResult = const_cast<uint8_t*>(aResult);
     if (mFetchBody->mWorkerPrivate) {
-      // This way if the runnable dispatch fails, the body is still released.
-      AutoFailConsumeBody<Derived> autoFail(mFetchBody);
       RefPtr<ContinueConsumeBodyRunnable<Derived>> r =
         new ContinueConsumeBodyRunnable<Derived>(mFetchBody,
                                         aStatus,
                                         aResultLength,
                                         nonconstResult);
       AutoSafeJSContext cx;
-      if (r->Dispatch(cx)) {
-        autoFail.DontFail();
-      } else {
+      if (!r->Dispatch(cx)) {
+        // XXXcatalinb: The worker is shutting down, the pump will be canceled
+        // by FetchBodyFeature::Notify.
         NS_WARNING("Could not dispatch ConsumeBodyRunnable");
         // Return failure so that aResult is freed.
         return NS_ERROR_FAILURE;
@@ -742,10 +735,12 @@ class FetchBodyFeature final : public workers::WorkerFeature
   // This is addrefed before the feature is created, and is released in ContinueConsumeBody()
   // so we can hold a rawptr.
   FetchBody<Derived>* mBody;
+  bool mWasNotified;
 
 public:
   explicit FetchBodyFeature(FetchBody<Derived>* aBody)
     : mBody(aBody)
+    , mWasNotified(false)
   { }
 
   ~FetchBodyFeature()
@@ -754,7 +749,10 @@ public:
   bool Notify(JSContext* aCx, workers::Status aStatus) override
   {
     MOZ_ASSERT(aStatus > workers::Running);
-    mBody->ContinueConsumeBody(NS_BINDING_ABORTED, 0, nullptr);
+    if (!mWasNotified) {
+      mWasNotified = true;
+      mBody->ContinueConsumeBody(NS_BINDING_ABORTED, 0, nullptr);
+    }
     return true;
   }
 };
