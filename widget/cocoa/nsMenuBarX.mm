@@ -573,12 +573,14 @@ NSMenuItem* nsMenuBarX::CreateNativeAppMenuItem(nsMenuX* inMenu, const nsAString
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NIL;
 
   nsCOMPtr<nsIDocument> doc = inMenu->Content()->GetUncomposedDoc();
-  if (!doc)
+  if (!doc) {
     return nil;
+  }
 
   nsCOMPtr<nsIDOMDocument> domdoc(do_QueryInterface(doc));
-  if (!domdoc)
+  if (!domdoc) {
     return nil;
+  }
 
   // Get information from the gecko menu item
   nsAutoString label;
@@ -637,7 +639,7 @@ NSMenuItem* nsMenuBarX::CreateNativeAppMenuItem(nsMenuX* inMenu, const nsAString
   MenuItemInfo * info = [[MenuItemInfo alloc] initWithMenuGroupOwner:this];
   [newMenuItem setRepresentedObject:info];
   [info release];
-  
+
   return newMenuItem;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
