@@ -759,6 +759,7 @@ public:
   }
 
 private:
+  explicit
   WorkerThreadRuntimePrivate(WorkerPrivate* aWorkerPrivate)
     : mWorkerPrivate(aWorkerPrivate)
   {
