@@ -91,7 +91,7 @@ class SdpHelper {
     nsresult CopyStickyParams(const SdpMediaSection& source,
                               SdpMediaSection* dest);
     bool HasRtcp(SdpMediaSection::Protocol proto) const;
-    SdpMediaSection::Protocol GetProtocolForMediaType(
+    static SdpMediaSection::Protocol GetProtocolForMediaType(
         SdpMediaSection::MediaType type);
     void appendSdpParseErrors(
           const std::vector<std::pair<size_t, std::string> >& aErrors,
