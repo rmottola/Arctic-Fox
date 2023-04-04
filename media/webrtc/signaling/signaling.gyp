@@ -203,7 +203,6 @@
         '$(NSPR_CFLAGS)',
         '$(NSS_CFLAGS)',
         '$(MOZ_PIXMAN_CFLAGS)',
-        '$(WARNINGS_AS_ERRORS)',
       ],
 
 
