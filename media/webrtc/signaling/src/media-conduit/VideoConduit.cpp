@@ -1512,7 +1512,7 @@ int WebrtcVideoConduit::SendRTCPPacket(int channel, const void* data, size_t len
     CSFLogDebug(logTag, "%s Sent RTCP Packet ", __FUNCTION__);
     return len;
   } else if(mTransmitterTransport &&
-            (mTransmitterTransport->SendRtpPacket(data, len) == NS_OK)) {
+            (mTransmitterTransport->SendRtcpPacket(data, len) == NS_OK)) {
       CSFLogDebug(logTag, "%s Sent RTCP Packet (sender report) ", __FUNCTION__);
       return len;
   } else {
