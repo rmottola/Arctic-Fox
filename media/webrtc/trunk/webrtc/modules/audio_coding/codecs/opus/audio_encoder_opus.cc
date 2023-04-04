@@ -13,6 +13,8 @@
 #include "webrtc/base/checks.h"
 #include "webrtc/modules/audio_coding/codecs/opus/interface/opus_interface.h"
 
+#include <limits>
+
 namespace webrtc {
 
 namespace {
