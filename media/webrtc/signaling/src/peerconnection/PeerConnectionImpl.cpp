@@ -1060,9 +1060,13 @@ PeerConnectionImpl::ConfigureJsepSessionCodecs() {
 
           }
 
-          videoCodec.mUseTmmbr = false;
+          // TMMBR is enabled from a pref in about:config
+          bool useTmmbr = false;
           branch->GetBoolPref("media.navigator.video.use_tmmbr",
-            &videoCodec.mUseTmmbr);
+            &useTmmbr);
+          if (useTmmbr) {
+            videoCodec.EnableTmmbr();
+          }
         }
         break;
       case SdpMediaSection::kText:
