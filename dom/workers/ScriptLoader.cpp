@@ -1859,11 +1859,11 @@ ScriptExecutorRunnable::LogExceptionToConsole(JSContext* aCx,
     return;
   }
 
-  nsRefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
+  RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
   xpcReport->Init(report.report(), report.message(),
                   aWorkerPrivate->IsChromeWorker(), aWorkerPrivate->WindowID());
 
-  nsRefPtr<AsyncErrorReporter> r = new AsyncErrorReporter(xpcReport);
+  RefPtr<AsyncErrorReporter> r = new AsyncErrorReporter(xpcReport);
   NS_DispatchToMainThread(r);
 }
 
