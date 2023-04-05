@@ -2282,8 +2282,7 @@ struct InterfaceShimEntry {
 // interface that has interface constants that sites might be getting off
 // of Ci.
 const InterfaceShimEntry kInterfaceShimMap[] =
-{ { "nsIDOMFileReader", "FileReader" },
-  { "nsIXMLHttpRequest", "XMLHttpRequest" },
+{ { "nsIXMLHttpRequest", "XMLHttpRequest" },
   { "nsIDOMDOMException", "DOMException" },
   { "nsIDOMNode", "Node" },
   { "nsIDOMCSSPrimitiveValue", "CSSPrimitiveValue" },
