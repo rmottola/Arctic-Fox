@@ -27,7 +27,7 @@ namespace mozilla {
 
 namespace ipc {
 class PrincipalInfo;
-}
+} // namespace ipc
 
 namespace dom {
 

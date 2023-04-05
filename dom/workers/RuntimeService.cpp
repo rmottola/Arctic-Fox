@@ -2709,6 +2709,13 @@ WorkerThreadPrimaryRunnable::Run()
     }
 
     {
+#ifdef MOZ_ENABLE_PROFILER_SPS
+      PseudoStack* stack = mozilla_get_pseudo_stack();
+      if (stack) {
+        stack->sampleRuntime(rt);
+      }
+#endif
+
       {
         JSAutoRequest ar(cx);
 
