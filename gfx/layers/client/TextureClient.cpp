@@ -196,18 +196,9 @@ TextureChild::ActorDestroy(ActorDestroyReason why)
   mKeep = nullptr;
 }
 
-ClientTexture::ClientTexture(TextureData* aData, TextureFlags aFlags, ISurfaceAllocator* aAllocator)
-: TextureClient(aAllocator, aFlags)
-, mData(aData)
-, mOpenMode(OpenMode::OPEN_NONE)
-#ifdef DEBUG
-, mExpectedDtRefs(0)
-#endif
-, mIsLocked(false)
-{}
 
 bool
-ClientTexture::Lock(OpenMode aMode)
+TextureClient::Lock(OpenMode aMode)
 {
   MOZ_ASSERT(mValid);
   MOZ_ASSERT(!mIsLocked);
@@ -222,7 +213,7 @@ ClientTexture::Lock(OpenMode aMode)
 }
 
 void
-ClientTexture::Unlock()
+TextureClient::Unlock()
 {
   MOZ_ASSERT(mValid);
   MOZ_ASSERT(mIsLocked);
@@ -251,27 +242,27 @@ ClientTexture::Unlock()
 }
 
 bool
-ClientTexture::HasInternalBuffer() const
+TextureClient::HasInternalBuffer() const
 {
   MOZ_ASSERT(mValid);
   return mData->HasInternalBuffer();
 }
 
 gfx::IntSize
-ClientTexture::GetSize() const
+TextureClient::GetSize() const
 {
   MOZ_ASSERT(mValid);
   return mData->GetSize();
 }
 
 gfx::SurfaceFormat
-ClientTexture::GetFormat() const
+TextureClient::GetFormat() const
 {
   MOZ_ASSERT(mValid);
   return mData->GetFormat();
 }
 
-ClientTexture::~ClientTexture()
+TextureClient::~TextureClient()
 {
   if (ShouldDeallocateInDestructor()) {
     mData->Deallocate(mAllocator);
@@ -282,13 +273,13 @@ ClientTexture::~ClientTexture()
 }
 
 void
-ClientTexture::FinalizeOnIPDLThread()
+TextureClient::FinalizeOnIPDLThread()
 {
   mData->FinalizeOnIPDLThread(this);
 }
 
 void
-ClientTexture::UpdateFromSurface(gfx::SourceSurface* aSurface)
+TextureClient::UpdateFromSurface(gfx::SourceSurface* aSurface)
 {
   MOZ_ASSERT(mValid);
   MOZ_ASSERT(mIsLocked);
@@ -313,12 +304,12 @@ ClientTexture::UpdateFromSurface(gfx::SourceSurface* aSurface)
       return;
     }
   }
-  NS_WARNING("ClientTexture::UpdateFromSurface failed");
+  NS_WARNING("TextureClient::UpdateFromSurface failed");
 }
 
 
 already_AddRefed<TextureClient>
-ClientTexture::CreateSimilar(TextureFlags aFlags, TextureAllocationFlags aAllocFlags) const
+TextureClient::CreateSimilar(TextureFlags aFlags, TextureAllocationFlags aAllocFlags) const
 {
   MOZ_ASSERT(mValid);
   TextureData* data = mData->CreateSimilar(mAllocator, aFlags, aAllocFlags);
@@ -326,11 +317,11 @@ ClientTexture::CreateSimilar(TextureFlags aFlags, TextureAllocationFlags aAllocF
     return nullptr;
   }
 
-  return MakeAndAddRef<ClientTexture>(data, aFlags, mAllocator);
+  return MakeAndAddRef<TextureClient>(data, aFlags, mAllocator);
 }
 
 gfx::DrawTarget*
-ClientTexture::BorrowDrawTarget()
+TextureClient::BorrowDrawTarget()
 {
   MOZ_ASSERT(mValid);
   MOZ_ASSERT(mIsLocked);
@@ -358,7 +349,7 @@ ClientTexture::BorrowDrawTarget()
 }
 
 bool
-ClientTexture::BorrowMappedData(MappedTextureData& aMap)
+TextureClient::BorrowMappedData(MappedTextureData& aMap)
 {
   MOZ_ASSERT(mValid);
 
@@ -373,21 +364,21 @@ ClientTexture::BorrowMappedData(MappedTextureData& aMap)
 }
 
 bool
-ClientTexture::BorrowMappedYCbCrData(MappedYCbCrTextureData& aMap)
+TextureClient::BorrowMappedYCbCrData(MappedYCbCrTextureData& aMap)
 {
   MOZ_ASSERT(mValid);
   return mData->BorrowMappedYCbCrData(aMap);
 }
 
 bool
-ClientTexture::ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor)
+TextureClient::ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor)
 {
   MOZ_ASSERT(mValid);
   return mData->Serialize(aOutDescriptor);
 }
 
 void
-ClientTexture::WaitForBufferOwnership(bool aWaitReleaseFence)
+TextureClient::WaitForBufferOwnership(bool aWaitReleaseFence)
 {
   if (mRemoveFromCompositableWaiter) {
     mRemoveFromCompositableWaiter->WaitComplete();
@@ -587,7 +578,7 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
     if (gfxWindowsPlatform::GetPlatform()->GetD3D9Device()) {
       TextureData* data = D3D9TextureData::Create(aSize, aFormat, aAllocFlags);
       if (data) {
-        return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
+        return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
       }
     }
   }
@@ -598,7 +589,7 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
       NS_IsMainThread()) {
     TextureData* data = DIBTextureData::Create(aSize, aFormat, aAllocator);
     if (data) {
-      return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
+      return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
     }
   }
 #endif
@@ -638,20 +629,6 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
   }
 #endif
 
-  MOZ_ASSERT(!texture || texture->CanExposeDrawTarget(), "texture cannot expose a DrawTarget?");
-
-  if (texture && texture->AllocateForSurface(aSize, aAllocFlags)) {
-    return texture.forget();
-  }
-
-  if (aAllocFlags & ALLOC_DISALLOW_BUFFERTEXTURECLIENT) {
-    return nullptr;
-  }
-
-  if (texture) {
-    NS_WARNING("Failed to allocate a TextureClient, falling back to BufferTextureClient.");
-  }
-
   // Can't do any better than a buffer texture client.
   return TextureClient::CreateForRawBufferAccess(aAllocator, aFormat, aSize,
                                                  moz2DBackend, aTextureFlags, aAllocFlags);
@@ -682,7 +659,7 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return MakeAndAddRef<ClientTexture>(texData, aTextureFlags, aAllocator);
+  return MakeAndAddRef<TextureClient>(texData, aTextureFlags, aAllocator);
 }
 
 // static
@@ -709,7 +686,7 @@ TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
+  return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
 }
 
 // static
@@ -730,25 +707,26 @@ TextureClient::CreateWithBufferSize(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
+  return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
 }
 
-TextureClient::TextureClient(ISurfaceAllocator* aAllocator, TextureFlags aFlags)
-  : mAllocator(aAllocator)
-  , mFlags(aFlags)
-  , mShared(false)
-  , mValid(true)
-  , mAddedToCompositableClient(false)
+TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, ISurfaceAllocator* aAllocator)
+: mAllocator(aAllocator)
+, mActor(nullptr)
+, mData(aData)
+, mFlags(aFlags)
+, mOpenMode(OpenMode::OPEN_NONE)
+#ifdef DEBUG
+, mExpectedDtRefs(0)
+#endif
+, mIsLocked(false)
+, mShared(false)
+, mValid(true)
+, mAddedToCompositableClient(false)
 #ifdef GFX_DEBUG_TRACK_CLIENTS_IN_POOL
-  , mPoolTracker(nullptr)
+, mPoolTracker(nullptr)
 #endif
 {}
-
-TextureClient::~TextureClient()
-{
-  // All the destruction code that may lead to virtual method calls must
-  // be in Finalize() which is called just before the destructor.
-}
 
 void
 TextureClient::KeepUntilFullDeallocation(UniquePtr<KeepAlive> aKeep, bool aMainThreadOnly)
@@ -839,10 +817,6 @@ TextureClient::Finalize()
 bool
 TextureClient::ShouldDeallocateInDestructor() const
 {
-  if (!IsAllocated()) {
-    return false;
-  }
-
   // If we're meant to be deallocated by the host,
   // but we haven't been shared yet or
   // TextureFlags::DEALLOCATE_CLIENT is set, then we should
@@ -943,7 +917,7 @@ TextureClient::CreateWithData(TextureData* aData, TextureFlags aFlags, ISurfaceA
   if (!aData) {
     return nullptr;
   }
-  return MakeAndAddRef<ClientTexture>(aData, aFlags, aAllocator);
+  return MakeAndAddRef<TextureClient>(aData, aFlags, aAllocator);
 }
 
 bool
