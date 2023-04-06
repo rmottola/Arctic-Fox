@@ -413,7 +413,7 @@ protected:
 
   virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
                                               TouchPointerState aPointerState,
-                                              nsIntPoint aPointerScreenPoint,
+                                              ScreenIntPoint aPointerScreenPoint,
                                               double aPointerPressure,
                                               uint32_t aPointerOrientation,
                                               nsIObserver* aObserver) override

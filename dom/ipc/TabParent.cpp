@@ -1634,7 +1634,7 @@ TabParent::RecvSynthesizeNativeMouseScrollEvent(const LayoutDeviceIntPoint& aPoi
 bool
 TabParent::RecvSynthesizeNativeTouchPoint(const uint32_t& aPointerId,
                                           const TouchPointerState& aPointerState,
-                                          const nsIntPoint& aPointerScreenPoint,
+                                          const ScreenIntPoint& aPointerScreenPoint,
                                           const double& aPointerPressure,
                                           const uint32_t& aPointerOrientation,
                                           const uint64_t& aObserverId)
@@ -1649,7 +1649,7 @@ TabParent::RecvSynthesizeNativeTouchPoint(const uint32_t& aPointerId,
 }
 
 bool
-TabParent::RecvSynthesizeNativeTouchTap(const nsIntPoint& aPointerScreenPoint,
+TabParent::RecvSynthesizeNativeTouchTap(const ScreenIntPoint& aPointerScreenPoint,
                                         const bool& aLongTap,
                                         const uint64_t& aObserverId)
 {
