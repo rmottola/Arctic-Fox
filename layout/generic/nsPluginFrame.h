@@ -44,9 +44,12 @@ class LayerManager;
 
 typedef nsFrame nsPluginFrameSuper;
 
+class PluginFrameDidCompositeObserver;
+
 class nsPluginFrame : public nsPluginFrameSuper,
                       public nsIObjectFrame,
-                      public nsIReflowCallback {
+                      public nsIReflowCallback
+{
 public:
   typedef mozilla::LayerState LayerState;
   typedef mozilla::layers::Layer Layer;
@@ -323,6 +326,8 @@ private:
   // This is only non-null while we have a plugin registered for geometry
   // updates.
   RefPtr<nsRootPresContext> mRootPresContextRegisteredWith;
+
+  nsAutoPtr<PluginFrameDidCompositeObserver> mDidCompositeObserver;
 
   // Tracks windowed plugin visibility during scroll operations. See
   // SetScrollVisibility.

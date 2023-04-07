@@ -249,6 +249,14 @@ nsPluginInstanceOwner::GetImageContainer()
 }
 
 void
+nsPluginInstanceOwner::DidComposite()
+{
+  if (mInstance) {
+    mInstance->DidComposite();
+  }
+}
+
+void
 nsPluginInstanceOwner::SetBackgroundUnknown()
 {
   if (mInstance) {
