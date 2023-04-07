@@ -20,16 +20,17 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
 Cu.import("resource://gre/modules/ObjectUtils.jsm");
 Cu.import("resource://gre/modules/TelemetryController.jsm", this);
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 const Utils = TelemetryUtils;
 
 XPCOMUtils.defineLazyModuleGetter(this, "ctypes",
                                   "resource://gre/modules/ctypes.jsm");
-#ifndef MOZ_WIDGET_GONK
-Cu.import("resource://gre/modules/AddonManager.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
-                                  "resource://gre/modules/LightweightThemeManager.jsm");
-#endif
+if (AppConstants.platform !== "gonk") {
+  Cu.import("resource://gre/modules/AddonManager.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
+                                    "resource://gre/modules/LightweightThemeManager.jsm");
+}
 XPCOMUtils.defineLazyModuleGetter(this, "ProfileAge",
                                   "resource://gre/modules/ProfileAge.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
@@ -40,7 +41,7 @@ const CHANGE_THROTTLE_INTERVAL_MS = 5 * 60 * 1000;
 /**
  * This is a policy object used to override behavior for testing.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
 };
 
@@ -262,7 +263,6 @@ function getGfxAdapter(aSuffix = "") {
   };
 }
 
-#ifdef XP_WIN
 /**
  * Gets the service pack information on Windows platforms. This was copied from
  * nsUpdateService.js.
@@ -270,6 +270,12 @@ function getGfxAdapter(aSuffix = "") {
  * @return An object containing the service pack major and minor versions.
  */
 function getServicePack() {
+  const UNKNOWN_SERVICE_PACK = {major: null, minor: null};
+
+  if (AppConstants.platform !== "win") {
+    return UNKNOWN_SERVICE_PACK;
+  }
+
   const BYTE = ctypes.uint8_t;
   const WORD = ctypes.uint16_t;
   const DWORD = ctypes.uint32_t;
@@ -312,15 +318,11 @@ function getServicePack() {
       minor: winVer.wServicePackMinor,
     };
   } catch (e) {
-    return {
-      major: null,
-      minor: null,
-    };
+    return UNKNOWN_SERVICE_PACK;
   } finally {
     kernel32.close();
   }
 }
-#endif
 
 /**
  * Encapsulates the asynchronous magic interfacing with the addon manager. The builder
@@ -436,12 +438,12 @@ EnvironmentAddonBuilder.prototype = {
   _updateAddons: Task.async(function* () {
     this._environment._log.trace("_updateAddons");
     let personaId = null;
-#ifndef MOZ_WIDGET_GONK
-    let theme = LightweightThemeManager.currentTheme;
-    if (theme) {
-      personaId = theme.id;
+    if (AppConstants.platform !== "gonk") {
+      let theme = LightweightThemeManager.currentTheme;
+      if (theme) {
+        personaId = theme.id;
+      }
     }
-#endif
 
     let addons = {
       activeAddons: yield this._getActiveAddons(),
@@ -656,20 +658,20 @@ function EnvironmentCache() {
   // Build the remaining asynchronous parts of the environment. Don't register change listeners
   // until the initial environment has been built.
 
-#ifdef MOZ_WIDGET_GONK
-  this._addonBuilder = {
-    watchForChanges: function() {}
-  }
   let p = [];
-#else
-  this._addonBuilder = new EnvironmentAddonBuilder(this);
+  if (AppConstants.platform === "gonk") {
+    this._addonBuilder = {
+      watchForChanges: function() {}
+    };
+  } else {
+    this._addonBuilder = new EnvironmentAddonBuilder(this);
+    p = [ this._addonBuilder.init() ];
+  }
 
-  let p = [ this._addonBuilder.init() ];
-#endif
-#ifndef MOZ_WIDGET_ANDROID
-  this._currentEnvironment.profile = {};
-  p.push(this._updateProfile());
-#endif
+  if (AppConstants.platform !== "android") {
+    this._currentEnvironment.profile = {};
+    p.push(this._updateProfile());
+  }
 
   let setup = () => {
     this._initTask = null;
@@ -952,9 +954,9 @@ EnvironmentCache.prototype = {
    * @returns null on error, true if we are the default browser, or false otherwise.
    */
   _isDefaultBrowser: function () {
-#ifdef MOZ_WIDGET_GONK
-    return true;
-#else
+    if (AppConstants.platform === "gonk") {
+      return true;
+    }
     if (!("@mozilla.org/browser/shell-service;1" in Cc)) {
       this._log.info("_isDefaultBrowser - Could not obtain browser shell service");
       return null;
@@ -978,7 +980,6 @@ EnvironmentCache.prototype = {
     }
 */
     return null;
-#endif
   },
 
   /**
@@ -992,9 +993,6 @@ EnvironmentCache.prototype = {
 
     this._currentEnvironment.settings = {
       blocklistEnabled: Preferences.get(PREF_BLOCKLIST_ENABLED, true),
-#ifndef MOZ_WIDGET_ANDROID
-      isDefaultBrowser: this._isDefaultBrowser(),
-#endif
       e10sEnabled: Preferences.get(PREF_E10S_ENABLED, false),
       telemetryEnabled: Preferences.get(PREF_TELEMETRY_ENABLED, false),
       isInOptoutSample: TelemetryController.isInOptoutSample,
@@ -1006,6 +1004,16 @@ EnvironmentCache.prototype = {
       },
       userPrefs: this._getPrefData(),
     };
+
+    if (AppConstants.platform !== "gonk") {
+      this._currentEnvironment.settings.addonCompatibilityCheckEnabled =
+        AddonManager.checkCompatibility;
+    }
+
+    if (AppConstants.platform !== "android") {
+      this._currentEnvironment.settings.isDefaultBrowser =
+        this._isDefaultBrowser();
+    }
 
     this._updateSearchEngine();
   },
@@ -1083,12 +1091,16 @@ EnvironmentCache.prototype = {
     return cpuData;
   },
 
-#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
   /**
    * Get the device information, if we are on a portable device.
-   * @return Object containing the device information data.
+   * @return Object containing the device information data, or null if
+   * not a portable device.
    */
   _getDeviceData: function () {
+    if (["gonk", "android"].indexOf(AppConstants.platform) === -1) {
+      return null;
+    }
+
     return {
       model: getSysinfoProperty("device", null),
       manufacturer: getSysinfoProperty("manufacturer", null),
@@ -1096,30 +1108,28 @@ EnvironmentCache.prototype = {
       isTablet: getSysinfoProperty("tablet", null),
     };
   },
-#endif
 
   /**
    * Get the OS information.
    * @return Object containing the OS data.
    */
   _getOSData: function () {
-#ifdef XP_WIN
-    // Try to get service pack information.
-    let servicePack = getServicePack();
-#endif
-
-    return {
+    let data = {
       name: getSysinfoProperty("name", null),
       version: getSysinfoProperty("version", null),
-#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
-      kernelVersion: getSysinfoProperty("kernel_version", null),
-#elif defined(XP_WIN)
-      servicePackMajor: servicePack.major,
-      servicePackMinor: servicePack.minor,
-      installYear: getSysinfoProperty("installYear", null),
-#endif
       locale: getSystemLocale(),
     };
+
+    if (["gonk", "android"].indexOf(AppConstants.platform) !== -1) {
+      data.kernelVersion = getSysinfoProperty("kernel_version", null);
+    } else if (AppConstants.platform === "win") {
+      let servicePack = getServicePack();
+      data.servicePackMajor = servicePack.major;
+      data.servicePackMinor = servicePack.minor;
+      data.installYear = getSysinfoProperty("installYear", null);
+    }
+
+    return data;
   },
 
   /**
@@ -1159,14 +1169,14 @@ EnvironmentCache.prototype = {
       features: {},
     };
 
-#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_GTK)
-    let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo);
-    try {
-      gfxData.monitors = gfxInfo.getMonitors();
-    } catch (e) {
-      this._log.error("nsIGfxInfo.getMonitors() caught error", e);
+    if (["gonk", "android", "linux"].indexOf(AppConstants.platform) === -1) {
+      let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo);
+      try {
+        gfxData.monitors = gfxInfo.getMonitors();
+      } catch (e) {
+        this._log.error("nsIGfxInfo.getMonitors() caught error", e);
+      }
     }
-#endif
 
     try {
       let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo);
@@ -1213,20 +1223,22 @@ EnvironmentCache.prototype = {
       virtualMB = Math.round(virtualMB / 1024 / 1024);
     }
 
-    return {
+    let data = {
       memoryMB: memoryMB,
       virtualMaxMB: virtualMB,
-#ifdef XP_WIN
-      isWow64: getSysinfoProperty("isWow64", null),
-#endif
       cpu: this._getCpuData(),
-#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
-      device: this._getDeviceData(),
-#endif
       os: this._getOSData(),
       hdd: this._getHDDData(),
       gfx: this._getGFXData(),
     };
+
+    if (AppConstants.platform === "win") {
+      data.isWow64 = getSysinfoProperty("isWow64", null);
+    } else if (["gonk", "android"].indexOf(AppConstants.platform) !== -1) {
+      data.device = this._getDeviceData();
+    }
+
+    return data;
   },
 
   _onEnvironmentChange: function (what, oldEnvironment) {
