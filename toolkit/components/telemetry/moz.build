@@ -38,6 +38,7 @@ EXTRA_JS_MODULES += [
     'TelemetrySend.jsm',
     'TelemetryStopwatch.jsm',
     'TelemetryStorage.jsm',
+    'TelemetryTimestamps.jsm',
     'TelemetryUtils.jsm',
     'ThirdPartyCookieProbe.jsm',
     'UITelemetry.jsm',
