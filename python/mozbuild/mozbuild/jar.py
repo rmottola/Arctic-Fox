@@ -223,7 +223,7 @@ class JarMaker(object):
                      )
         p.add_option('--relativesrcdir', type='string',
                      help='relativesrcdir to be used for localization')
-        p.add_option('-j', type='string', help='jarfile directory')
+        p.add_option('-d', type='string', help='base directory')
         p.add_option('--root-manifest-entry-appid', type='string',
                      help='add an app id specific root chrome manifest entry.'
                      )
@@ -353,7 +353,7 @@ class JarMaker(object):
             chromebasepath = 'jar:' + chromebasepath + '.jar!'
         chromebasepath += '/'
 
-        jarfile = os.path.join(jardir, jarinfo.name)
+        jarfile = os.path.join(jardir, 'chrome', jarinfo.name)
         jf = None
         if self.outputFormat == 'jar':
             # jar
@@ -571,4 +571,4 @@ def main(args=None):
         infile = sys.stdin
     else:
         (infile, ) = args
-    jm.makeJar(infile, options.j)
+    jm.makeJar(infile, options.d)
