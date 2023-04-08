@@ -1801,7 +1801,7 @@ EmitExtractLane(FunctionCompiler& f, AsmType type, MDefinition** def)
 }
 
 static AsmType
-AsmSimdTypeToScalarType(AsmType simd)
+AsmSimdTypeToLaneType(AsmType simd)
 {
     switch (simd) {
       case AsmType::Int32x4:   return AsmType::Int32;
@@ -1835,7 +1835,7 @@ EmitSimdReplaceLane(FunctionCompiler& f, AsmType simdType, MDefinition** def)
     }
 
     MDefinition* scalar;
-    if (!EmitExpr(f, AsmSimdTypeToScalarType(simdType), &scalar))
+    if (!EmitExpr(f, AsmSimdTypeToLaneType(simdType), &scalar))
         return false;
     *def = f.insertElementSimd(vector, scalar, lane, MIRTypeFromAsmType(simdType));
     return true;
@@ -1938,7 +1938,7 @@ static bool
 EmitSimdSplat(FunctionCompiler& f, AsmType type, MDefinition** def)
 {
     MDefinition* in;
-    if (!EmitExpr(f, AsmSimdTypeToScalarType(type), &in))
+    if (!EmitExpr(f, AsmSimdTypeToLaneType(type), &in))
         return false;
     *def = f.splatSimd(in, MIRTypeFromAsmType(type));
     return true;
