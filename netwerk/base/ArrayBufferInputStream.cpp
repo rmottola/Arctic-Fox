@@ -89,13 +89,32 @@ ArrayBufferInputStream::ReadSegments(nsWriteSegmentFun writer, void *closure,
   while (mPos < mBufferLength) {
     uint32_t remaining = mBufferLength - mPos;
     MOZ_ASSERT(mArrayBuffer);
-    uint32_t count = std::min(aCount, remaining);
+    uint32_t byteLength = JS_GetArrayBufferByteLength(mArrayBuffer->get());
+    if (byteLength == 0) {
+      mClosed = true;
+      return NS_BASE_STREAM_CLOSED;
+    }
+
+    char buffer[8192];
+    uint32_t count = std::min(std::min(aCount, remaining), uint32_t(mozilla::ArrayLength(buffer)));
     if (count == 0) {
       break;
     }
 
+    // It is just barely possible that writer() will detach the ArrayBuffer's
+    // data, setting its length to zero. Or move the data to a different memory
+    // area. (This would only happen in a subclass that passed something other
+    // than NS_CopySegmentToBuffer as 'writer'). So copy the data out into a
+    // holding area before passing it to writer().
+    {
+      JS::AutoCheckCannotGC nogc;
+      bool isShared;
+      char* src = (char*) JS_GetArrayBufferData(mArrayBuffer->get(), &isShared, nogc) + mOffset + mPos;
+      MOZ_ASSERT(!isShared);    // Because ArrayBuffer
+      memcpy(buffer, src, count);
+    }
     uint32_t written;
-    nsresult rv = writer(this, closure, &mArrayBuffer[0] + mPos, 0, count, &written);
+    nsresult rv = writer(this, closure, buffer, 0, count, &written);
     if (NS_FAILED(rv)) {
       // InputStreams do not propagate errors to caller.
       return NS_OK;
