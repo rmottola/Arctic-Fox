@@ -75,7 +75,6 @@ enum State {
     D(ScopeObject*) \
     D(ScriptSourceObject*) \
     D(SharedArrayBufferObject*) \
-    D(SharedTypedArrayObject*) \
     D(ImportEntryObject*) \
     D(ExportEntryObject*) \
     D(JSScript*) \
