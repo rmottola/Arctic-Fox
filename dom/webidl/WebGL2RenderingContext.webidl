@@ -352,12 +352,12 @@ interface WebGL2RenderingContext : WebGLRenderingContext
 
     void texImage3D(GLenum target, GLint level, GLenum internalformat, GLsizei width,
                     GLsizei height, GLsizei depth, GLint border, GLenum format,
-                    GLenum type, (ArrayBufferView or SharedArrayBufferView)? pixels);
+                    GLenum type, ArrayBufferView? pixels);
     [Throws] // Can't actually throw.
     void texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                        GLint zoffset, GLsizei width, GLsizei height, GLsizei depth,
                        GLenum format, GLenum type,
-                       (ArrayBufferView or SharedArrayBufferView)? pixels);
+                       ArrayBufferView? pixels);
     [Throws] // Can't actually throw.
     void texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                        GLint zoffset, GLenum format, GLenum type, ImageData? data);
@@ -378,11 +378,11 @@ interface WebGL2RenderingContext : WebGLRenderingContext
 
     void compressedTexImage3D(GLenum target, GLint level, GLenum internalformat,
                               GLsizei width, GLsizei height, GLsizei depth, GLint border,
-                              (ArrayBufferView or SharedArrayBufferView) data);
+                              ArrayBufferView data);
     void compressedTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                                  GLint zoffset, GLsizei width, GLsizei height,
                                  GLsizei depth, GLenum format,
-                                 (ArrayBufferView or SharedArrayBufferView) data);
+                                 ArrayBufferView data);
 
     /* Programs and shaders */
     [WebGLHandlesContextLoss] GLint getFragDataLocation(WebGLProgram? program, DOMString name);
