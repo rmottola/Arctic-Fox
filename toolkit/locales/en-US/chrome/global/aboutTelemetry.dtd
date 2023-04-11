@@ -127,3 +127,7 @@ Older ping &gt;&gt;
 <!ENTITY aboutTelemetry.filterText "
   Filter (strings or /regexp/)
 ">
+
+<!ENTITY aboutTelemetry.payloadChoiceHeader "
+  Payload
+">
