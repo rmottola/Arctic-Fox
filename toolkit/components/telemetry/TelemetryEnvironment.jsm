@@ -1047,9 +1047,6 @@ EnvironmentCache.prototype = {
     } catch (e) {}
 
     this._currentEnvironment.settings = {
-#ifndef MOZ_WIDGET_GONK
-      addonCompatibilityCheckEnabled: AddonManager.checkCompatibility,
-#endif
       blocklistEnabled: Preferences.get(PREF_BLOCKLIST_ENABLED, true),
       e10sEnabled: Services.appinfo.browserTabsRemoteAutostart,
       telemetryEnabled: Utils.isTelemetryEnabled,
