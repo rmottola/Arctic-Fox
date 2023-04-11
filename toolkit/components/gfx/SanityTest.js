@@ -140,7 +140,7 @@ function testCompositor(win, ctx) {
   return testPassed;
 }
 
-let listener = {
+var listener = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver]),
 
   win: null,
@@ -244,11 +244,11 @@ SanityTest.prototype = {
     }
 
     function checkPref(pref, value, reason) {
-      var prefValue = Preferences.get(pref, "");
+      var prefValue = Preferences.get(pref, undefined);
       if (prefValue == value) {
         return true;
       }
-      if (value == "") {
+      if (prefValue === undefined) {
         reportTestReason(REASON_FIRST_RUN);
       } else {
         reportTestReason(reason);
