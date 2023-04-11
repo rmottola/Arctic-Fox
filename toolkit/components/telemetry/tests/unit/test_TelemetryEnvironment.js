@@ -26,6 +26,9 @@ var gHttpRoot = null;
 // The URL of the data directory, on the webserver.
 var gDataRoot = null;
 
+var gNow = new Date(2010, 1, 1, 12, 0, 0);
+fakeNow(gNow);
+
 const PLATFORM_VERSION = "1.9.2";
 const APP_VERSION = "1";
 const APP_ID = "xpcshell@tests.mozilla.org";
@@ -42,7 +45,6 @@ const PARTNER_ID = "NicePartner-ID-3785";
 const GFX_VENDOR_ID = "0xabcd";
 const GFX_DEVICE_ID = "0x1234";
 
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 // The profile reset date, in milliseconds (Today)
 const PROFILE_RESET_DATE_MS = Date.now();
 // The profile creation date, in milliseconds (Yesterday).
@@ -177,10 +179,6 @@ function spoofPartnerInfo() {
   for (let pref in prefsToSpoof) {
     Preferences.set(pref, prefsToSpoof[pref]);
   }
-}
-
-function truncateToDays(aMsec) {
-  return Math.floor(aMsec / MILLISECONDS_PER_DAY);
 }
 
 /**
@@ -726,6 +724,207 @@ add_task(function* test_prefWatch_prefReset() {
   TelemetryEnvironment.unregisterChangeListener("testWatchPrefs_reset");
 });
 
+add_task(function* test_addonsWatch_InterestingChange() {
+  const ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
+  const ADDON_ID = "tel-restartless-xpi@tests.mozilla.org";
+  // We only expect a single notification for each install, uninstall, enable, disable.
+  const EXPECTED_NOTIFICATIONS = 4;
+
+  let deferred = PromiseUtils.defer();
+  let receivedNotifications = 0;
+
+  let registerCheckpointPromise = (aExpected) => {
+    gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+    fakeNow(gNow);
+    return new Promise(resolve => TelemetryEnvironment.registerChangeListener(
+      "testWatchAddons_Changes" + aExpected, (reason, data) => {
+        Assert.equal(reason, "addons-changed");
+        receivedNotifications++;
+        resolve();
+      }));
+  };
+
+  let assertCheckpoint = (aExpected) => {
+    Assert.equal(receivedNotifications, aExpected);
+    TelemetryEnvironment.unregisterChangeListener("testWatchAddons_Changes" + aExpected);
+  };
+
+  // Test for receiving one notification after each change.
+  let checkpointPromise = registerCheckpointPromise(1);
+  yield AddonTestUtils.installXPIFromURL(ADDON_INSTALL_URL);
+  yield checkpointPromise;
+  assertCheckpoint(1);
+  Assert.ok(ADDON_ID in TelemetryEnvironment.currentEnvironment.addons.activeAddons);
+
+  checkpointPromise = registerCheckpointPromise(2);
+  let addon = yield AddonTestUtils.getAddonById(ADDON_ID);
+  addon.userDisabled = true;
+  yield checkpointPromise;
+  assertCheckpoint(2);
+  Assert.ok(!(ADDON_ID in TelemetryEnvironment.currentEnvironment.addons.activeAddons));
+
+  checkpointPromise = registerCheckpointPromise(3);
+  addon.userDisabled = false;
+  yield checkpointPromise;
+  assertCheckpoint(3);
+  Assert.ok(ADDON_ID in TelemetryEnvironment.currentEnvironment.addons.activeAddons);
+
+  checkpointPromise = registerCheckpointPromise(4);
+  yield AddonTestUtils.uninstallAddonByID(ADDON_ID);
+  yield checkpointPromise;
+  assertCheckpoint(4);
+  Assert.ok(!(ADDON_ID in TelemetryEnvironment.currentEnvironment.addons.activeAddons));
+
+  Assert.equal(receivedNotifications, EXPECTED_NOTIFICATIONS,
+               "We must only receive the notifications we expect.");
+});
+
+add_task(function* test_pluginsWatch_Add() {
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+
+  Assert.equal(TelemetryEnvironment.currentEnvironment.addons.activePlugins.length, 1);
+
+  let newPlugin = new PluginTag(PLUGIN2_NAME, PLUGIN2_DESC, PLUGIN2_VERSION, true);
+  gInstalledPlugins.push(newPlugin);
+
+  let deferred = PromiseUtils.defer();
+  let receivedNotifications = 0;
+  let callback = (reason, data) => {
+    receivedNotifications++;
+    Assert.equal(reason, "addons-changed");
+    deferred.resolve();
+  };
+  TelemetryEnvironment.registerChangeListener("testWatchPlugins_Add", callback);
+
+  Services.obs.notifyObservers(null, PLUGIN_UPDATED_TOPIC, null);
+  yield deferred.promise;
+
+  Assert.equal(TelemetryEnvironment.currentEnvironment.addons.activePlugins.length, 2);
+
+  TelemetryEnvironment.unregisterChangeListener("testWatchPlugins_Add");
+
+  Assert.equal(receivedNotifications, 1, "We must only receive one notification.");
+});
+
+add_task(function* test_pluginsWatch_Remove() {
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+
+  // Find the test plugin.
+  let plugin = gInstalledPlugins.find(plugin => (plugin.name == PLUGIN2_NAME));
+  Assert.ok(plugin, "The test plugin must exist.");
+
+  // Remove it from the PluginHost.
+  gInstalledPlugins = gInstalledPlugins.filter(p => p != plugin);
+
+  let deferred = PromiseUtils.defer();
+  let receivedNotifications = 0;
+  let callback = () => {
+    receivedNotifications++;
+    deferred.resolve();
+  };
+  TelemetryEnvironment.registerChangeListener("testWatchPlugins_Remove", callback);
+
+  Services.obs.notifyObservers(null, PLUGIN_UPDATED_TOPIC, null);
+  yield deferred.promise;
+
+  TelemetryEnvironment.unregisterChangeListener("testWatchPlugins_Remove");
+
+  Assert.equal(receivedNotifications, 1, "We must only receive one notification.");
+});
+
+add_task(function* test_addonsWatch_NotInterestingChange() {
+  // We are not interested to dictionary addons changes.
+  const DICTIONARY_ADDON_INSTALL_URL = gDataRoot + "dictionary.xpi";
+  const INTERESTING_ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
+
+  gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(gNow);
+
+  let receivedNotification = false;
+  let deferred = PromiseUtils.defer();
+  TelemetryEnvironment.registerChangeListener("testNotInteresting",
+    () => {
+      Assert.ok(!receivedNotification, "Should not receive multiple notifications");
+      receivedNotification = true;
+      deferred.resolve();
+    });
+
+  yield AddonTestUtils.installXPIFromURL(DICTIONARY_ADDON_INSTALL_URL);
+  yield AddonTestUtils.installXPIFromURL(INTERESTING_ADDON_INSTALL_URL);
+
+  yield deferred.promise;
+  Assert.ok(!("telemetry-dictionary@tests.mozilla.org" in
+              TelemetryEnvironment.currentEnvironment.addons.activeAddons),
+            "Dictionaries should not appear in active addons.");
+
+  TelemetryEnvironment.unregisterChangeListener("testNotInteresting");
+});
+
+add_task(function* test_addonsAndPlugins() {
+  const ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
+  const ADDON_ID = "tel-restartless-xpi@tests.mozilla.org";
+  const ADDON_INSTALL_DATE = truncateToDays(Date.now());
+  const EXPECTED_ADDON_DATA = {
+    blocklisted: false,
+    description: "A restartless addon which gets enabled without a reboot.",
+    name: "XPI Telemetry Restartless Test",
+    userDisabled: false,
+    appDisabled: false,
+    version: "1.0",
+    scope: 1,
+    type: "extension",
+    foreignInstall: false,
+    hasBinaryComponents: false,
+    installDay: ADDON_INSTALL_DATE,
+    updateDay: ADDON_INSTALL_DATE,
+    signedState: mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_MISSING : AddonManager.SIGNEDSTATE_NOT_REQUIRED,
+  };
+
+  const EXPECTED_PLUGIN_DATA = {
+    name: FLASH_PLUGIN_NAME,
+    version: FLASH_PLUGIN_VERSION,
+    description: FLASH_PLUGIN_DESC,
+    blocklisted: false,
+    disabled: false,
+    clicktoplay: true,
+  };
+
+  // Install an addon so we have some data.
+  yield AddonTestUtils.installXPIFromURL(ADDON_INSTALL_URL);
+
+  let data = TelemetryEnvironment.currentEnvironment;
+  checkEnvironmentData(data);
+
+  // Check addon data.
+  Assert.ok(ADDON_ID in data.addons.activeAddons, "We must have one active addon.");
+  let targetAddon = data.addons.activeAddons[ADDON_ID];
+  for (let f in EXPECTED_ADDON_DATA) {
+    Assert.equal(targetAddon[f], EXPECTED_ADDON_DATA[f], f + " must have the correct value.");
+  }
+
+  // Check theme data.
+  let theme = data.addons.theme;
+  Assert.equal(theme.id, (PERSONA_ID + PERSONA_ID_SUFFIX));
+  Assert.equal(theme.name, PERSONA_NAME);
+  Assert.equal(theme.description, PERSONA_DESCRIPTION);
+
+  // Check plugin data.
+  Assert.equal(data.addons.activePlugins.length, 1, "We must have only one active plugin.");
+  let targetPlugin = data.addons.activePlugins[0];
+  for (let f in EXPECTED_PLUGIN_DATA) {
+    Assert.equal(targetPlugin[f], EXPECTED_PLUGIN_DATA[f], f + " must have the correct value.");
+  }
+
+  // Check plugin mime types.
+  Assert.ok(targetPlugin.mimeTypes.find(m => m == PLUGIN_MIME_TYPE1));
+  Assert.ok(targetPlugin.mimeTypes.find(m => m == PLUGIN_MIME_TYPE2));
+  Assert.ok(!targetPlugin.mimeTypes.find(m => m == "Not There."));
+
+  let personaId = (gIsGonk) ? null : PERSONA_ID;
+  Assert.equal(data.addons.persona, personaId, "The correct Persona Id must be reported.");
+
 add_task(function* test_signedAddon() {
   const ADDON_INSTALL_URL = gDataRoot + "signed.xpi";
   const ADDON_ID = "tel-signed-xpi@tests.mozilla.org";
@@ -769,6 +968,37 @@ add_task(function* test_signedAddon() {
   }
 });
 
+add_task(function* test_addonsFieldsLimit() {
+  const ADDON_INSTALL_URL = gDataRoot + "long-fields.xpi";
+  const ADDON_ID = "tel-longfields-xpi@tests.mozilla.org";
+
+  // Set the clock in the future so our changes don't get throttled.
+  gNow = fakeNow(futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE));
+
+  // Install the addon and wait for the TelemetryEnvironment to pick it up.
+  let deferred = PromiseUtils.defer();
+  TelemetryEnvironment.registerChangeListener("test_longFieldsAddon", deferred.resolve);
+  yield AddonTestUtils.installXPIFromURL(ADDON_INSTALL_URL);
+  yield deferred.promise;
+  TelemetryEnvironment.unregisterChangeListener("test_longFieldsAddon");
+
+  let data = TelemetryEnvironment.currentEnvironment;
+  checkEnvironmentData(data);
+
+  // Check that the addon is available and that the string fields are limited.
+  Assert.ok(ADDON_ID in data.addons.activeAddons, "Add-on should be in the environment.");
+  let targetAddon = data.addons.activeAddons[ADDON_ID];
+
+  // TelemetryEnvironment limits the length of string fields for activeAddons to 100 chars,
+  // to mitigate misbehaving addons.
+  Assert.lessOrEqual(targetAddon.version.length, 100,
+               "The version string must have been limited");
+  Assert.lessOrEqual(targetAddon.name.length, 100,
+               "The name string must have been limited");
+  Assert.lessOrEqual(targetAddon.description.length, 100,
+               "The description string must have been limited");
+});
+
 add_task(function* test_changeThrottling() {
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   const PREFS_TO_WATCH = new Map([
@@ -807,194 +1037,6 @@ add_task(function* test_changeThrottling() {
 
   // Unregister the listener.
   TelemetryEnvironment.unregisterChangeListener("testWatchPrefs_throttling");
-});
-
-add_task(function* test_addonsWatch_InterestingChange() {
-  const ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
-  const ADDON_ID = "tel-restartless-xpi@tests.mozilla.org";
-  // We only expect a single notification for each install, uninstall, enable, disable.
-  const EXPECTED_NOTIFICATIONS = 4;
-
-  yield TelemetryEnvironment.init();
-  let deferred = PromiseUtils.defer();
-  let receivedNotifications = 0;
-
-  let registerCheckpointPromise = (aExpected) => {
-    return new Promise(resolve => TelemetryEnvironment.registerChangeListener(
-      "testWatchAddons_Changes" + aExpected, () => {
-        receivedNotifications++;
-        resolve();
-      }));
-  };
-
-  let assertCheckpoint = (aExpected) => {
-    Assert.equal(receivedNotifications, aExpected);
-    TelemetryEnvironment.unregisterChangeListener("testWatchAddons_Changes" + aExpected);
-  };
-
-  // Test for receiving one notification after each change.
-  let checkpointPromise = registerCheckpointPromise(1);
-  yield AddonTestUtils.installXPIFromURL(ADDON_INSTALL_URL);
-  yield checkpointPromise;
-  assertCheckpoint(1);
-  
-  checkpointPromise = registerCheckpointPromise(2);
-  let addon = yield AddonTestUtils.getAddonById(ADDON_ID);
-  addon.userDisabled = true;
-  yield checkpointPromise;
-  assertCheckpoint(2);
-
-  checkpointPromise = registerCheckpointPromise(3);
-  addon.userDisabled = false;
-  yield checkpointPromise;
-  assertCheckpoint(3);
-
-  checkpointPromise = registerCheckpointPromise(4);
-  yield AddonTestUtils.uninstallAddonByID(ADDON_ID);
-  yield checkpointPromise;
-  assertCheckpoint(4);
-
-  yield TelemetryEnvironment.shutdown();
-
-  Assert.equal(receivedNotifications, EXPECTED_NOTIFICATIONS,
-               "We must only receive the notifications we expect.");
-});
-
-add_task(function* test_pluginsWatch_Add() {
-  yield TelemetryEnvironment.init();
-
-  let newPlugin = new PluginTag(PLUGIN2_NAME, PLUGIN2_DESC, PLUGIN2_VERSION, true);
-  gInstalledPlugins.push(newPlugin);
-
-  let deferred = PromiseUtils.defer();
-  let receivedNotifications = 0;
-  let callback = () => {
-    receivedNotifications++;
-    deferred.resolve();
-  };
-  TelemetryEnvironment.registerChangeListener("testWatchPlugins_Add", callback);
-
-  Services.obs.notifyObservers(null, PLUGIN_UPDATED_TOPIC, null);
-  yield deferred.promise;
-
-  TelemetryEnvironment.unregisterChangeListener("testWatchPlugins_Add");
-  yield TelemetryEnvironment.shutdown();
-
-  Assert.equal(receivedNotifications, 1, "We must only receive one notification.");
-});
-
-add_task(function* test_pluginsWatch_Remove() {
-  yield TelemetryEnvironment.init();
-
-  // Find the test plugin.
-  let plugin = gInstalledPlugins.find(plugin => (plugin.name == PLUGIN2_NAME));
-  Assert.ok(plugin, "The test plugin must exist.");
-
-  // Remove it from the PluginHost.
-  gInstalledPlugins = gInstalledPlugins.filter(p => p != plugin);
-
-  let deferred = PromiseUtils.defer();
-  let receivedNotifications = 0;
-  let callback = () => {
-    receivedNotifications++;
-    deferred.resolve();
-  };
-  TelemetryEnvironment.registerChangeListener("testWatchPlugins_Remove", callback);
-
-  Services.obs.notifyObservers(null, PLUGIN_UPDATED_TOPIC, null);
-  yield deferred.promise;
-
-  TelemetryEnvironment.unregisterChangeListener("testWatchPlugins_Remove");
-  yield TelemetryEnvironment.shutdown();
-
-  Assert.equal(receivedNotifications, 1, "We must only receive one notification.");
-});
-
-add_task(function* test_addonsWatch_NotInterestingChange() {
-  // We are not interested to dictionary addons changes.
-  const DICTIONARY_ADDON_INSTALL_URL = gDataRoot + "dictionary.xpi";
-  const INTERESTING_ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
-  yield TelemetryEnvironment.init();
-
-  let receivedNotifications = 0;
-  TelemetryEnvironment.registerChangeListener("testNotInteresting",
-                                              () => receivedNotifications++);
-
-  yield AddonTestUtils.installXPIFromURL(DICTIONARY_ADDON_INSTALL_URL);
-  yield AddonTestUtils.installXPIFromURL(INTERESTING_ADDON_INSTALL_URL);
-
-  Assert.equal(receivedNotifications, 1, "We must receive only one notification.");
-
-  TelemetryEnvironment.unregisterChangeListener("testNotInteresting");
-  yield TelemetryEnvironment.shutdown();
-});
-
-add_task(function* test_addonsAndPlugins() {
-  const ADDON_INSTALL_URL = gDataRoot + "restartless.xpi";
-  const ADDON_ID = "tel-restartless-xpi@tests.mozilla.org";
-  const ADDON_INSTALL_DATE = truncateToDays(Date.now());
-  const EXPECTED_ADDON_DATA = {
-    blocklisted: false,
-    description: "A restartless addon which gets enabled without a reboot.",
-    name: "XPI Telemetry Restartless Test",
-    userDisabled: false,
-    appDisabled: false,
-    version: "1.0",
-    scope: 1,
-    type: "extension",
-    foreignInstall: false,
-    hasBinaryComponents: false,
-    installDay: ADDON_INSTALL_DATE,
-    updateDay: ADDON_INSTALL_DATE,
-    signedState: mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_MISSING : AddonManager.SIGNEDSTATE_NOT_REQUIRED,
-  };
-
-  const EXPECTED_PLUGIN_DATA = {
-    name: FLASH_PLUGIN_NAME,
-    version: FLASH_PLUGIN_VERSION,
-    description: FLASH_PLUGIN_DESC,
-    blocklisted: false,
-    disabled: false,
-    clicktoplay: true,
-  };
-
-  yield TelemetryEnvironment.init();
-
-  // Install an addon so we have some data.
-  yield AddonTestUtils.installXPIFromURL(ADDON_INSTALL_URL);
-
-  let data = yield TelemetryEnvironment.getEnvironmentData();
-  checkEnvironmentData(data);
-
-  // Check addon data.
-  Assert.ok(ADDON_ID in data.addons.activeAddons, "We must have one active addon.");
-  let targetAddon = data.addons.activeAddons[ADDON_ID];
-  for (let f in EXPECTED_ADDON_DATA) {
-    Assert.equal(targetAddon[f], EXPECTED_ADDON_DATA[f], f + " must have the correct value.");
-  }
-
-  // Check theme data.
-  let theme = data.addons.theme;
-  Assert.equal(theme.id, (PERSONA_ID + PERSONA_ID_SUFFIX));
-  Assert.equal(theme.name, PERSONA_NAME);
-  Assert.equal(theme.description, PERSONA_DESCRIPTION);
-
-  // Check plugin data.
-  Assert.equal(data.addons.activePlugins.length, 1, "We must have only one active plugin.");
-  let targetPlugin = data.addons.activePlugins[0];
-  for (let f in EXPECTED_PLUGIN_DATA) {
-    Assert.equal(targetPlugin[f], EXPECTED_PLUGIN_DATA[f], f + " must have the correct value.");
-  }
-
-  // Check plugin mime types.
-  Assert.ok(targetPlugin.mimeTypes.find(m => m == PLUGIN_MIME_TYPE1));
-  Assert.ok(targetPlugin.mimeTypes.find(m => m == PLUGIN_MIME_TYPE2));
-  Assert.ok(!targetPlugin.mimeTypes.find(m => m == "Not There."));
-
-  let personaId = (gIsGonk) ? null : PERSONA_ID;
-  Assert.equal(data.addons.persona, personaId, "The correct Persona Id must be reported.");
-
-  yield TelemetryEnvironment.shutdown();
 });
 
 add_task(function* test_defaultSearchEngine() {
