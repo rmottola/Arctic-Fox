@@ -170,6 +170,7 @@ const EXPERIMENTS_CHANGED_TOPIC = "experiments-changed";
 const SEARCH_ENGINE_MODIFIED_TOPIC = "browser-search-engine-modified";
 const SEARCH_SERVICE_TOPIC = "browser-search-service";
 const COMPOSITOR_CREATED_TOPIC = "compositor:created";
+const DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC = "distribution-customization-complete";
 
 /**
  * Get the current browser.
@@ -679,6 +680,7 @@ function EnvironmentCache() {
   this._updateSettings();
   // Fill in the default search engine, if the search provider is already initialized.
   this._updateSearchEngine();
+  this._addObservers();
 
   // Build the remaining asynchronous parts of the environment. Don't register change listeners
   // until the initial environment has been built.
@@ -702,7 +704,6 @@ function EnvironmentCache() {
     this._initTask = null;
     this._startWatchingPrefs();
     this._addonBuilder.watchForChanges();
-    this._addObservers();
     this._updateGraphicsFeatures();
     return this.currentEnvironment;
   };
@@ -843,6 +844,7 @@ EnvironmentCache.prototype = {
     Services.obs.addObserver(this, SEARCH_ENGINE_MODIFIED_TOPIC, false);
 //    Services.obs.addObserver(this, SEARCH_SERVICE_TOPIC, false);
     Services.obs.addObserver(this, COMPOSITOR_CREATED_TOPIC, false);
+    Services.obs.addObserver(this, DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC, false);
   },
 
   _removeObservers: function () {
@@ -850,6 +852,9 @@ EnvironmentCache.prototype = {
     Services.obs.removeObserver(this, SEARCH_ENGINE_MODIFIED_TOPIC);
 //    Services.obs.removeObserver(this, SEARCH_SERVICE_TOPIC);
     Services.obs.removeObserver(this, COMPOSITOR_CREATED_TOPIC);
+    try {
+      Services.obs.removeObserver(this, DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC);
+    } catch(ex) {};
   },
 
   observe: function (aSubject, aTopic, aData) {
@@ -874,6 +879,12 @@ EnvironmentCache.prototype = {
         // least one off-main-thread-composited window. Thus we wait for the
         // first compositor to be created and then query nsIGfxInfo again.
         this._updateGraphicsFeatures();
+        break;
+      case DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC:
+        // Distribution customizations are applied after final-ui-startup. query
+        // partner prefs again when they are ready.
+        this._updatePartner();
+        Services.obs.removeObserver(this, aTopic);
         break;
     }
   },
@@ -952,6 +963,13 @@ EnvironmentCache.prototype = {
     } catch (e) {
       this._log.error("nsIGfxInfo.getFeatures() caught error", e);
     }
+  },
+
+  /**
+   * Update the partner prefs.
+   */
+  _updatePartner: function() {
+    this._currentEnvironment.partner = this._getPartner();
   },
 
   /**
