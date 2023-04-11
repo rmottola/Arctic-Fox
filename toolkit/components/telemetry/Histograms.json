@@ -8765,6 +8765,14 @@
     "high": "4000000",
     "n_buckets": 20
   },
+  "GRAPHICS_SANITY_TEST_REASON": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "expires_in_version": "43",
+    "kind": "enumerated",
+    "n_values": 20,
+    "releaseChannelCollection": "opt-out",
+    "description": "Reports why a graphics sanity test was run. 0=First Run, 1=App Updated, 2=Device Change, 3=Driver Change."
+  },
   "PERMISSIONS_SQL_CORRUPTED": {
     "expires_in_version": "never",
     "kind": "count",
