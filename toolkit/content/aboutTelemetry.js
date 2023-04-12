@@ -1041,7 +1041,7 @@ var Histogram = {
   },
 
   processHistogram: function(aHgram, aName) {
-    const values = [for (k of Object.keys(aHgram.values)) aHgram.values[k]];
+    const values = Object.keys(aHgram.values).map(k => aHgram.values[k]);
     if (!values.length) {
       // If we have no values collected for this histogram, just return
       // zero values so we still render it.
@@ -1058,7 +1058,7 @@ var Histogram = {
     const average = Math.round(aHgram.sum * 10 / sample_count) / 10;
     const max_value = Math.max(...values);
 
-    const labelledValues = [for (k of Object.keys(aHgram.values)) [Number(k), aHgram.values[k]]];
+    const labelledValues = Object.keys(aHgram.values).map(k => [Number(k), aHgram.values[k]]);
 
     let result = {
       values: labelledValues,
@@ -1097,7 +1097,7 @@ var Histogram = {
     if (aHgram.values.length) {
       labelPadTo = String(aHgram.values[aHgram.values.length - 1][0]).length;
     }
-    let maxBarValue = aOptions.exponential ? this.getLogValue(aHgram.max_value) : aHgram.max;
+    let maxBarValue = aOptions.exponential ? this.getLogValue(aHgram.max) : aHgram.max;
 
     for (let [label, value] of aHgram.values) {
       let barValue = aOptions.exponential ? this.getLogValue(value) : value;
