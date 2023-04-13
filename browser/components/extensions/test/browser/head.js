@@ -1,4 +1,4 @@
-let {CustomizableUI} = Cu.import("resource:///modules/CustomizableUI.jsm");
+var {CustomizableUI} = Cu.import("resource:///modules/CustomizableUI.jsm");
 
 function makeWidgetId(id)
 {
@@ -6,7 +6,7 @@ function makeWidgetId(id)
   return id.replace(/[^a-z0-9_-]/g, "_");
 }
 
-function* focusWindow(win)
+var focusWindow = Task.async(function* focusWindow(win)
 {
   let fm = Cc["@mozilla.org/focus-manager;1"].getService(Ci.nsIFocusManager);
   if (fm.activeWindow == win) {
@@ -22,4 +22,28 @@ function* focusWindow(win)
 
   win.focus();
   yield promise;
+});
+
+function clickBrowserAction(extension, win = window) {
+  let browserActionId = makeWidgetId(extension.id) + "-browser-action";
+  let elem = win.document.getElementById(browserActionId);
+
+  EventUtils.synthesizeMouseAtCenter(elem, {}, win);
+  return new Promise(SimpleTest.executeSoon);
+}
+
+function clickPageAction(extension, win = window) {
+  // This would normally be set automatically on navigation, and cleared
+  // when the user types a value into the URL bar, to show and hide page
+  // identity info and icons such as page action buttons.
+  //
+  // Unfortunately, that doesn't happen automatically in browser chrome
+  // tests.
+  SetPageProxyState("valid");
+
+  let pageActionId = makeWidgetId(extension.id) + "-page-action";
+  let elem = win.document.getElementById(pageActionId);
+
+  EventUtils.synthesizeMouse(elem, 8, 8, {}, win);
+  return new Promise(SimpleTest.executeSoon);
 }

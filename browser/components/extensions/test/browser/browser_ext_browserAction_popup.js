@@ -22,7 +22,7 @@ add_task(function* testPageActionPopup() {
       "background": {
         "page": "data/background.html"
       },
-      "page_action": {
+      "browser_action": {
         "default_popup": "popup-a.html"
       }
     },
@@ -41,8 +41,6 @@ add_task(function* testPageActionPopup() {
       "data/background.html": `<script src="background.js"></script>`,
 
       "data/background.js": function() {
-        var tabId;
-
         var tests = [
           () => {
             sendClick({ expectEvent: false, expectPopup: "a" });
@@ -51,21 +49,21 @@ add_task(function* testPageActionPopup() {
             sendClick({ expectEvent: false, expectPopup: "a" });
           },
           () => {
-            browser.pageAction.setPopup({ tabId, popup: "popup-b.html" });
+            browser.browserAction.setPopup({ popup: "popup-b.html" });
             sendClick({ expectEvent: false, expectPopup: "b" });
           },
           () => {
             sendClick({ expectEvent: false, expectPopup: "b" });
           },
           () => {
-            browser.pageAction.setPopup({ tabId, popup: "" });
+            browser.browserAction.setPopup({ popup: "" });
             sendClick({ expectEvent: true, expectPopup: null });
           },
           () => {
             sendClick({ expectEvent: true, expectPopup: null });
           },
           () => {
-            browser.pageAction.setPopup({ tabId, popup: "/popup-a.html" });
+            browser.browserAction.setPopup({ popup: "/popup-a.html" });
             sendClick({ expectEvent: false, expectPopup: "a" });
           },
         ];
@@ -88,7 +86,7 @@ add_task(function* testPageActionPopup() {
           browser.test.sendMessage("next-test");
         });
 
-        browser.pageAction.onClicked.addListener(() => {
+        browser.browserAction.onClicked.addListener(() => {
           if (expect.event) {
             browser.test.succeed("expected click event received");
           } else {
@@ -108,25 +106,19 @@ add_task(function* testPageActionPopup() {
             var test = tests.shift();
             test();
           } else {
-            browser.test.notifyPass("pageaction-tests-done");
+            browser.test.notifyPass("browseraction-tests-done");
           }
         });
 
-        browser.tabs.query({ active: true, currentWindow: true }, tabs => {
-          tabId = tabs[0].id;
-
-          browser.pageAction.show(tabId);
-          browser.test.sendMessage("next-test");
-        });
+        browser.test.sendMessage("next-test");
       },
     },
   });
 
-  let pageActionId = makeWidgetId(extension.id) + "-page-action";
   let panelId = makeWidgetId(extension.id) + "-panel";
 
   extension.onMessage("send-click", () => {
-    clickPageAction(extension);
+    clickBrowserAction(extension);
   });
 
   extension.onMessage("next-test", Task.async(function* () {
@@ -143,65 +135,10 @@ add_task(function* testPageActionPopup() {
   }));
 
 
-  yield extension.startup();
-  yield extension.awaitFinish("pageaction-tests-done");
+  yield Promise.all([extension.startup(), extension.awaitFinish("browseraction-tests-done")]);
 
   yield extension.unload();
-
-  let node = document.getElementById(pageActionId);
-  is(node, undefined, "pageAction image removed from document");
 
   let panel = document.getElementById(panelId);
-  is(panel, undefined, "pageAction panel removed from document");
-});
-
-
-add_task(function* testPageActionSecurity() {
-  const URL = "chrome://browser/content/browser.xul";
-
-  let matchURLForbidden = url => ({
-    message: new RegExp(`Loading extension.*Access to.*'${URL}' denied`),
-  });
-
-  let messages = [/Access to restricted URI denied/,
-                  /Access to restricted URI denied/];
-
-  let waitForConsole = new Promise(resolve => {
-    // Not necessary in browser-chrome tests, but monitorConsole gripes
-    // if we don't call it.
-    SimpleTest.waitForExplicitFinish();
-
-    SimpleTest.monitorConsole(resolve, messages);
-  });
-
-  let extension = ExtensionTestUtils.loadExtension({
-    manifest: {
-      "browser_action": { "default_popup": URL },
-      "page_action": { "default_popup": URL },
-    },
-
-    background: function () {
-      browser.tabs.query({ active: true, currentWindow: true }, tabs => {
-        var tabId = tabs[0].id;
-
-        browser.pageAction.show(tabId);
-        browser.test.sendMessage("ready");
-      });
-    },
-  });
-
-  yield extension.startup();
-  yield extension.awaitMessage("ready");
-
-  yield clickBrowserAction(extension);
-  yield clickPageAction(extension);
-
-  yield extension.unload();
-
-  let pageActionId = makeWidgetId(extension.id) + "-page-action";
-  let node = document.getElementById(pageActionId);
-  is(node, undefined, "pageAction image removed from document");
-
-  SimpleTest.endMonitorConsole();
-  yield waitForConsole;
+  is(panel, undefined, "browserAction panel removed from document");
 });
