@@ -404,7 +404,7 @@ global.WindowManager = {
     };
 
     if (getInfo && getInfo.populate) {
-      results.tabs = TabManager.getTabs(extension, window);
+      result.tabs = TabManager.for(extension).getTabs(window);
     }
 
     return result;
