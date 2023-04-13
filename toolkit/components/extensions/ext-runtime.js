@@ -16,7 +16,7 @@ extensions.registerAPI((extension, context) => {
         };
       }).api(),
 
-      onInstalled: ignoreEvent(),
+      onInstalled: ignoreEvent(context, "runtime.onInstalled"),
 
       onMessage: context.messenger.onMessage("runtime.onMessage"),
 
