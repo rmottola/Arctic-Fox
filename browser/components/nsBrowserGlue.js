@@ -545,6 +545,7 @@ BrowserGlue.prototype = {
     ExtensionManagement.registerScript("chrome://browser/content/ext-contextMenus.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-tabs.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-windows.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-bookmarks.js");
 
     this._flashHangCount = 0;
   },
