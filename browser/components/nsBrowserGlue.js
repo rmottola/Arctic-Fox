@@ -2283,6 +2283,9 @@ AboutNewTabService.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIAboutNewTabService]),
 
   get newTabURL() {
+    if (Services.prefs.getBoolPref("browser.newtabpage.remote")) {
+      return "about:remote-newtab";
+    }
     return this._newTabURL;
   },
 
