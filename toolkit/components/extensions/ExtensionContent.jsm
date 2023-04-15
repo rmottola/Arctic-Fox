@@ -31,9 +31,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   runSafeSyncWithoutClone,
+  LocaleData,
   MessageBroker,
   Messenger,
-  ignoreEvent,
   injectAPI,
   flushJarCache,
 } = ExtensionUtils;
@@ -106,6 +106,9 @@ function Script(options)
 
   this.matches_ = new MatchPattern(this.options.matches);
   this.exclude_matches_ = new MatchPattern(this.options.exclude_matches || null);
+  // TODO: MatchPattern should pre-mangle host-only patterns so that we
+  // don't need to call a separate match function.
+  this.matches_host_ = new MatchPattern(this.options.matchesHost || null);
 
   // TODO: Support glob patterns.
 }
@@ -113,7 +116,7 @@ function Script(options)
 Script.prototype = {
   matches(window) {
     let uri = window.document.documentURIObject;
-    if (!this.matches_.matches(uri)) {
+    if (!(this.matches_.matches(uri) || this.matches_host_.matchesIgnoringPath(uri))) {
       return false;
     }
 
@@ -123,6 +126,16 @@ Script.prototype = {
 
     if (!this.options.all_frames && window.top != window) {
       return false;
+    }
+
+    if ("innerWindowID" in this.options) {
+      let innerWindowID = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                                .getInterface(Ci.nsIDOMWindowUtils)
+                                .currentInnerWindowID;
+
+      if (innerWindowID !== this.options.innerWindowID) {
+        return false;
+      }
     }
 
     // TODO: match_about_blank.
@@ -446,6 +459,8 @@ function BrowserExtensionContent(data)
   this.webAccessibleResources = data.webAccessibleResources;
   this.whiteListedHosts = data.whiteListedHosts;
 
+  this.localeData = new LocaleData(data.localeData);
+
   this.manifest = data.manifest;
   this.baseURI = Services.io.newURI(data.baseURL, null, null);
 
@@ -462,6 +477,14 @@ BrowserExtensionContent.prototype = {
     if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
       ExtensionManagement.shutdownExtension(this.uuid);
     }
+  },
+
+  localizeMessage(...args) {
+    return this.localeData.localizeMessage(...args);
+  },
+
+  localize(...args) {
+    return this.localeData.localize(...args);
   },
 };
 
@@ -551,7 +574,6 @@ this.ExtensionContent = {
   receiveMessage({target, name, data}) {
     switch (name) {
     case "Extension:Execute":
-      data.options.matches = "<all_urls>";
       let script = new Script(data.options);
       let {extensionId} = data;
       DocumentManager.executeScript(target, extensionId, script);

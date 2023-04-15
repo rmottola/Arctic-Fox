@@ -48,6 +48,7 @@ Cu.import("resource://gre/modules/ExtensionManagement.jsm");
 // in browser/, mobile/, or b2g/.
 ExtensionManagement.registerScript("chrome://extensions/content/ext-alarms.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-backgroundPage.js");
+ExtensionManagement.registerScript("chrome://extensions/content/ext-cookies.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-notifications.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-i18n.js");
 ExtensionManagement.registerScript("chrome://extensions/content/ext-idle.js");
@@ -60,11 +61,13 @@ ExtensionManagement.registerScript("chrome://extensions/content/ext-test.js");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
+  LocaleData,
   MessageBroker,
   Messenger,
   injectAPI,
   extend,
   flushJarCache,
+  instanceOf,
 } = ExtensionUtils;
 
 const LOGGER_ID_BASE = "addons.webextension.";
@@ -210,6 +213,29 @@ ExtensionPage.prototype = {
     return this.contentWindow;
   },
 
+  get principal() {
+    return this.contentWindow.document.nodePrincipal;
+  },
+
+  checkLoadURL(url, options = {}) {
+    let ssm = Services.scriptSecurityManager;
+
+    let flags = ssm.STANDARD;
+    if (!options.allowScript) {
+      flags |= ssm.DISALLOW_SCRIPT;
+    }
+    if (!options.allowInheritsPrincipal) {
+      flags |= ssm.DISALLOW_INHERIT_PRINCIPAL;
+    }
+
+    try {
+      ssm.checkLoadURIStrWithPrincipal(this.principal, url, flags);
+    } catch (e) {
+      return false;
+    }
+    return true;
+  },
+
   callOnClose(obj) {
     this.onClose.add(obj);
   },
@@ -324,7 +350,7 @@ var GlobalManager = {
       if (event.target != docShell.contentViewer.DOMDocument) {
         return;
       }
-      eventHandler.removeEventListener("unload", listener);
+      eventHandler.removeEventListener("unload", listener, true);
       context.unload();
     };
     eventHandler.addEventListener("unload", listener, true);
@@ -345,12 +371,7 @@ this.ExtensionData = function(rootURI)
 
   this.manifest = null;
   this.id = null;
-  // Map(locale-name -> message-map)
-  // Contains a key for each loaded locale, each of which is a
-  // JSON-compatible object with a property for each message
-  // in that locale.
-  this.localeMessages = new Map();
-  this.selectedLocale = null;
+  this.localeData = null;
   this._promiseLocales = null;
 
   this.errors = [];
@@ -371,96 +392,6 @@ ExtensionData.prototype = {
   packagingError(message) {
     this.errors.push(message);
     this.logger.error(`Loading extension '${this.id}': ${message}`);
-  },
-
-  // https://developer.chrome.com/extensions/i18n
-  localizeMessage(message, substitutions, locale = this.selectedLocale) {
-    let messages = {};
-    if (this.localeMessages.has(locale)) {
-      messages = this.localeMessages.get(locale);
-    }
-
-    if (message in messages) {
-      let str = messages[message].message;
-
-      if (!substitutions) {
-        substitutions = [];
-      } else if (!Array.isArray(substitutions)) {
-        substitutions = [substitutions];
-      }
-
-      // https://developer.chrome.com/extensions/i18n-messages
-      // |str| may contain substrings of the form $1 or $PLACEHOLDER$.
-      // In the former case, we replace $n with substitutions[n - 1].
-      // In the latter case, we consult the placeholders array.
-      // The placeholder may itself use $n to refer to substitutions.
-      let replacer = (matched, name) => {
-        if (name.length == 1 && name[0] >= '1' && name[0] <= '9') {
-          return substitutions[parseInt(name) - 1];
-        } else {
-          let content = messages[message].placeholders[name].content;
-          if (content[0] == '$') {
-            return replacer(matched, content[1]);
-          } else {
-            return content;
-          }
-        }
-      };
-      return str.replace(/\$([A-Za-z_@]+)\$/, replacer)
-                .replace(/\$([0-9]+)/, replacer)
-                .replace(/\$\$/, "$");
-    }
-
-    // Check for certain pre-defined messages.
-    if (message == "@@extension_id") {
-      if ("uuid" in this) {
-        // Per Chrome, this isn't available before an ID is guaranteed
-        // to have been assigned, namely, in manifest files.
-        // This should only be present in instances of the |Extension|
-        // subclass.
-        return this.uuid;
-      }
-    } else if (message == "@@ui_locale") {
-      return Locale.getLocale();
-    } else if (message == "@@bidi_dir") {
-      return "ltr"; // FIXME
-    }
-
-    Cu.reportError(`Unknown localization message ${message}`);
-    return "??";
-  },
-
-  // Localize a string, replacing all |__MSG_(.*)__| tokens with the
-  // matching string from the current locale, as determined by
-  // |this.selectedLocale|.
-  //
-  // This may not be called before calling either |initLocale| or
-  // |initAllLocales|.
-  localize(str, locale = this.selectedLocale) {
-    if (!str) {
-      return str;
-    }
-
-    return str.replace(/__MSG_([A-Za-z0-9@_]+?)__/g, (matched, message) => {
-      return this.localizeMessage(message, [], locale);
-    });
-  },
-
-  // If a "default_locale" is specified in that manifest, returns it
-  // as a Gecko-compatible locale string. Otherwise, returns null.
-  get defaultLocale() {
-    if ("default_locale" in this.manifest) {
-      return this.normalizeLocaleCode(this.manifest.default_locale);
-    }
-
-    return null;
-  },
-
-  // Normalizes a Chrome-compatible locale code to the appropriate
-  // Gecko-compatible variant. Currently, this means simply
-  // replacing underscores with hyphens.
-  normalizeLocaleCode(locale) {
-    return String.replace(locale, /_/g, "-");
   },
 
   readDirectory: Task.async(function* (path) {
@@ -567,6 +498,31 @@ ExtensionData.prototype = {
     });
   },
 
+  localizeMessage(...args) {
+    return this.localeData.localizeMessage(...args);
+  },
+
+  localize(...args) {
+    return this.localeData.localize(...args);
+  },
+
+  // If a "default_locale" is specified in that manifest, returns it
+  // as a Gecko-compatible locale string. Otherwise, returns null.
+  get defaultLocale() {
+    if ("default_locale" in this.manifest) {
+      return this.normalizeLocaleCode(this.manifest.default_locale);
+    }
+
+    return null;
+  },
+
+  // Normalizes a Chrome-compatible locale code to the appropriate
+  // Gecko-compatible variant. Currently, this means simply
+  // replacing underscores with hyphens.
+  normalizeLocaleCode(locale) {
+    return String.replace(locale, /_/g, "-");
+  },
+
   // Reads the locale file for the given Gecko-compatible locale code, and
   // stores its parsed contents in |this.localeMessages.get(locale)|.
   readLocaleFile: Task.async(function* (locale) {
@@ -574,15 +530,13 @@ ExtensionData.prototype = {
     let dir = locales.get(locale);
     let file = `_locales/${dir}/messages.json`;
 
-    let messages = {};
     try {
-      messages = yield this.readJSON(file);
+      let messages = yield this.readJSON(file);
+      return this.localeData.addLocale(locale, messages, this);
     } catch (e) {
       this.packagingError(`Loading locale file ${file}: ${e}`);
+      return new Map();
     }
-
-    this.localeMessages.set(locale, messages);
-    return messages;
   }),
 
   // Reads the list of locales available in the extension, and returns a
@@ -617,6 +571,7 @@ ExtensionData.prototype = {
   // as returned by |readLocaleFile|.
   initAllLocales: Task.async(function* () {
     let locales = yield this.promiseLocales();
+    this.localeData = new LocaleData({ defaultLocale: this.defaultLocale, locales });
 
     yield Promise.all(Array.from(locales.keys(),
                                  locale => this.readLocaleFile(locale)));
@@ -626,30 +581,42 @@ ExtensionData.prototype = {
       if (!locales.has(defaultLocale)) {
         this.manifestError('Value for "default_locale" property must correspond to ' +
                            'a directory in "_locales/". Not found: ' +
-                           JSON.stringify(`_locales/${default_locale}/`));
+                           JSON.stringify(`_locales/${this.manifest.default_locale}/`));
       }
-    } else if (this.localeMessages.size) {
+    } else if (locales.size) {
       this.manifestError('The "default_locale" property is required when a ' +
                          '"_locales/" directory is present.');
     }
 
-    return this.localeMessages;
+    return this.localeData.messages;
   }),
 
   // Reads the locale file for the given Gecko-compatible locale code, or the
   // default locale if no locale code is given, and sets it as the currently
   // selected locale on success.
   //
+  // Pre-loads the default locale for fallback message processing, regardless
+  // of the locale specified.
+  //
   // If no locales are unavailable, resolves to |null|.
   initLocale: Task.async(function* (locale = this.defaultLocale) {
+    this.localeData = new LocaleData({ defaultLocale: this.defaultLocale });
+
     if (locale == null) {
       return null;
     }
 
-    let localeData = yield this.readLocaleFile(locale);
+    let promises = [this.readLocaleFile(locale)];
 
-    this.selectedLocale = locale;
-    return localeData;
+    let { defaultLocale } = this;
+    if (locale != defaultLocale && !this.localeData.has(defaultLocale)) {
+      promises.push(this.readLocaleFile(defaultLocale));
+    }
+
+    let results = yield Promise.all(promises);
+
+    this.localeData.selectedLocale = locale;
+    return results[0];
   }),
 };
 
@@ -782,7 +749,7 @@ this.Extension.generateXPI = function(id, data)
     files[bgScript] = data.background;
   }
 
-  provide(files, ["manifest.json"], JSON.stringify(manifest));
+  provide(files, ["manifest.json"], manifest);
 
   let ZipWriter = Components.Constructor("@mozilla.org/zipwriter;1", "nsIZipWriter");
   let zipW = new ZipWriter();
@@ -812,6 +779,8 @@ this.Extension.generateXPI = function(id, data)
     let script = files[filename];
     if (typeof(script) == "function") {
       script = "(" + script.toString() + ")()";
+    } else if (typeof(script) == "object") {
+      script = JSON.stringify(script);
     }
 
     let stream = Cc["@mozilla.org/io/string-input-stream;1"].createInstance(Ci.nsIStringInputStream);
@@ -890,6 +859,7 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
       content_scripts: this.manifest.content_scripts || [],
       webAccessibleResources: this.webAccessibleResources,
       whiteListedHosts: this.whiteListedHosts.serialize(),
+      localeData: this.localeData.serialize(),
     };
   },
 
@@ -913,10 +883,10 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
 
     let whitelist = [];
     for (let perm of permissions) {
-      if (perm.match(/:\/\//)) {
-        whitelist.push(perm);
-      } else {
+      if (/^\w+(\.\w+)*$/.test(perm)) {
         this.permissions.add(perm);
+      } else {
+        whitelist.push(perm);
       }
     }
     this.whiteListedHosts = new MatchPattern(whitelist);
@@ -956,7 +926,7 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
     if (locale === undefined) {
       let locales = yield this.promiseLocales();
 
-      let localeList = Object.keys(locales).map(locale => {
+      let localeList = Array.from(locales.keys(), locale => {
         return { name: locale, locales: [locale] };
       });
 
@@ -987,7 +957,7 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
 
       return this.runManifest(this.manifest);
     }).catch(e => {
-      dump(`Extension error: ${e} ${e.filename}:${e.lineNumber}\n`);
+      dump(`Extension error: ${e} ${e.filename || e.fileName}:${e.lineNumber}\n`);
       Cu.reportError(e);
       throw e;
     });

@@ -236,7 +236,7 @@ var Settings = {
           Cu.import("resource://gre/modules/Messaging.jsm");
           Messaging.sendRequest({
             type: "Settings:Show",
-            resource: "preferences_vendor",
+            resource: "preferences_privacy",
           });
         } else {
           // Show the data choices preferences on desktop.
@@ -298,7 +298,10 @@ var PingPicker = {
             .addEventListener("click", () => this._movePingIndex(-1), false);
     document.getElementById("older-ping")
             .addEventListener("click", () => this._movePingIndex(1), false);
-
+    document.getElementById("show-raw-ping")
+            .addEventListener("click", () => this._showRawPingData(), false);
+    document.getElementById("hide-raw-ping")
+            .addEventListener("click", () => this._hideRawPingData(), false);
     document.getElementById("choose-payload")
             .addEventListener("change", () => displayPingData(gPingData), false);
   },
@@ -325,6 +328,9 @@ var PingPicker = {
   _updateCurrentPingData: function() {
     const subsession = document.getElementById("show-subsession-data").checked;
     const ping = TelemetryController.getCurrentPingData(subsession);
+    if (!ping) {
+      return;
+    }
     displayPingData(ping, true);
   },
 
@@ -366,10 +372,10 @@ var PingPicker = {
         return d;
       };
 
-      this._weeks = [for (startTime of weekStartDates.values()) {
+      this._weeks = Array.from(weekStartDates.values(), startTime => ({
         startDate: new Date(startTime),
         endDate: plusOneWeek(new Date(startTime)),
-      }];
+      }));
 
       // Render the archive data.
       this._renderWeeks();
@@ -447,6 +453,16 @@ var PingPicker = {
 
     this._renderPingList(ping.id);
     this._updateArchivedPingData();
+  },
+
+  _showRawPingData: function() {
+    let pre = document.getElementById("raw-ping-data");
+    pre.textContent = JSON.stringify(gPingData, null, 2);
+    document.getElementById("raw-ping-data-section").classList.remove("hidden");
+  },
+
+  _hideRawPingData: function() {
+    document.getElementById("raw-ping-data-section").classList.add("hidden");
   },
 };
 
@@ -915,11 +931,11 @@ var ThreadHangStats = {
   /**
    * Renders raw thread hang stats data
    */
-  render: function() {
+  render: function(aPayload) {
     let div = document.getElementById("thread-hang-stats");
     removeAllChildNodes(div);
 
-    let stats = aPing.payload.threadHangStats;
+    let stats = aPayload.threadHangStats;
     setHasData("thread-hang-stats-section", stats && (stats.length > 0));
     if (!stats) {
       return;
@@ -949,7 +965,8 @@ var ThreadHangStats = {
       let hangDiv = Histogram.render(
         div, hangName, hang.histogram, {exponential: true});
       let stackDiv = document.createElement("div");
-      hang.stack.forEach((frame) => {
+      let stack = hang.nativeStack || hang.stack;
+      stack.forEach((frame) => {
         stackDiv.appendChild(document.createTextNode(frame));
         // Leave an extra <br> at the end of the stack listing
         stackDiv.appendChild(document.createElement("br"));
@@ -1024,7 +1041,7 @@ var Histogram = {
   },
 
   processHistogram: function(aHgram, aName) {
-    const values = [for (k of Object.keys(aHgram.values)) aHgram.values[k]];
+    const values = Object.keys(aHgram.values).map(k => aHgram.values[k]);
     if (!values.length) {
       // If we have no values collected for this histogram, just return
       // zero values so we still render it.
@@ -1041,7 +1058,7 @@ var Histogram = {
     const average = Math.round(aHgram.sum * 10 / sample_count) / 10;
     const max_value = Math.max(...values);
 
-    const labelledValues = [for (k of Object.keys(aHgram.values)) [Number(k), aHgram.values[k]]];
+    const labelledValues = Object.keys(aHgram.values).map(k => [Number(k), aHgram.values[k]]);
 
     let result = {
       values: labelledValues,
@@ -1080,7 +1097,7 @@ var Histogram = {
     if (aHgram.values.length) {
       labelPadTo = String(aHgram.values[aHgram.values.length - 1][0]).length;
     }
-    let maxBarValue = aOptions.exponential ? this.getLogValue(aHgram.max_value) : aHgram.max;
+    let maxBarValue = aOptions.exponential ? this.getLogValue(aHgram.max) : aHgram.max;
 
     for (let [label, value] of aHgram.values) {
       let barValue = aOptions.exponential ? this.getLogValue(value) : value;
@@ -1090,7 +1107,7 @@ var Histogram = {
               + " ".repeat(Math.max(0, labelPadTo - String(label).length)) + label // Right-aligned label
               + " |" + "#".repeat(Math.round(MAX_BAR_CHARS * barValue / maxBarValue)) // Bar
               + "  " + value // Value
-              + "  " + Math.round(100 * value / aHgram.sum) + "%"; // Percentage
+              + "  " + Math.round(100 * value / aHgram.sample_count) + "%"; // Percentage
 
       // Construct the HTML labels + bars
       let belowEm = Math.round(MAX_BAR_HEIGHT * (barValue / maxBarValue) * 10) / 10;
@@ -1260,7 +1277,9 @@ var KeyValueTable = {
   renderBody: function KeyValueTable_renderBody(aTable, aMeasurements) {
     for (let [key, value] of Iterator(aMeasurements)) {
       // use .valueOf() to unbox Number, String, etc. objects
-      if ((typeof value == "object") && (typeof value.valueOf() == "object")) {
+      if (value &&
+         (typeof value == "object") &&
+         (typeof value.valueOf() == "object")) {
         value = RenderObject(value);
       }
 
@@ -1555,7 +1574,7 @@ function renderPayloadList(ping) {
 
   for (; payloadIndex <= ping.payload.childPayloads.length; ++payloadIndex) {
     option = document.createElement("option");
-    text = bundle.formatStringFromName("childPayload", [payloadIndex], 1);
+    text = bundle.formatStringFromName("childPayloadN", [payloadIndex], 1);
     content = document.createTextNode(text);
     option.appendChild(content);
     option.setAttribute("value", payloadIndex);
@@ -1589,9 +1608,6 @@ function displayPingData(ping, updatePayloadList = false) {
   // Show chrome hang stacks
   ChromeHangs.render(ping);
 
-  // Show thread hang stats
-  ThreadHangStats.render(ping);
-
   // Render Addon details.
   AddonDetails.render(ping);
 
@@ -1604,6 +1620,9 @@ function displayPingData(ping, updatePayloadList = false) {
   if (payloadIndex > 0) {
     payload = ping.payload.childPayloads[payloadIndex - 1];
   }
+
+  // Show thread hang stats
+  ThreadHangStats.render(payload);
 
   // Show simple measurements
   let simpleMeasurements = sortStartupMilestones(payload.simpleMeasurements);
@@ -1619,10 +1638,10 @@ function displayPingData(ping, updatePayloadList = false) {
 
   LateWritesSingleton.renderLateWrites(payload.lateWrites);
 
-  // Show basic system info gathered
+  // Show basic session info gathered
   hasData = Object.keys(ping.payload.info).length > 0;
-  setHasData("system-info-section", hasData);
-  let infoSection = document.getElementById("system-info");
+  setHasData("session-info-section", hasData);
+  let infoSection = document.getElementById("session-info");
   removeAllChildNodes(infoSection);
 
   if (hasData) {
@@ -1656,14 +1675,17 @@ function displayPingData(ping, updatePayloadList = false) {
   let keyedDiv = document.getElementById("keyed-histograms");
   removeAllChildNodes(keyedDiv);
 
+  setHasData("keyed-histograms-section", false);
   let keyedHistograms = payload.keyedHistograms;
-  hasData = Object.keys(keyedHistograms).length > 0;
-  setHasData("keyed-histograms-section", hasData);
-
-  if (hasData) {
+  if (keyedHistograms) {
+    let hasData = false;
     for (let [id, keyed] of Iterator(keyedHistograms)) {
-      KeyedHistogram.render(keyedDiv, id, keyed, {unpacked: true});
+      if (Object.keys(keyed).length > 0) {
+        hasData = true;
+        KeyedHistogram.render(keyedDiv, id, keyed, {unpacked: true});
+      }
     }
+    setHasData("keyed-histograms-section", hasData);
   }
 
   // Show addon histogram data

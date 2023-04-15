@@ -11,7 +11,6 @@ Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
   DefaultWeakMap,
-  ignoreEvent,
   runSafe,
 } = ExtensionUtils;
 
@@ -33,6 +32,8 @@ function BrowserAction(options, extension)
   this.id = makeWidgetId(extension.id) + "-browser-action";
   this.widget = null;
 
+  this.tabManager = TabManager.for(extension);
+
   let title = extension.localize(options.default_title || "");
   let popup = extension.localize(options.default_popup || "");
   if (popup) {
@@ -40,6 +41,7 @@ function BrowserAction(options, extension)
   }
 
   this.defaults = {
+    enabled: true,
     title: title,
     badgeText: "",
     badgeBackgroundColor: null,
@@ -74,6 +76,7 @@ BrowserAction.prototype = {
         node.addEventListener("command", event => {
           let tab = tabbrowser.selectedTab;
           let popup = this.getProperty(tab, "popup");
+          this.tabManager.addActiveTabPermission(tab);
           if (popup) {
             this.togglePopup(node, popup);
           } else {
@@ -112,6 +115,12 @@ BrowserAction.prototype = {
       node.setAttribute("badge", tabData.badgeText);
     } else {
       node.removeAttribute("badge");
+    }
+
+    if (tabData.enabled) {
+      node.removeAttribute("disabled");
+    } else {
+      node.setAttribute("disabled", "true");
     }
 
     let badgeNode = node.ownerDocument.getAnonymousElementByAttribute(node,
@@ -207,6 +216,16 @@ extensions.registerAPI((extension, context) => {
           browserActionOf(extension).off("click", listener);
         };
       }).api(),
+
+      enable: function(tabId) {
+        let tab = tabId ? TabManager.getTab(tabId) : null;
+        browserActionOf(extension).setProperty(tab, "enabled", true);
+      },
+
+      disable: function(tabId) {
+        let tab = tabId ? TabManager.getTab(tabId) : null;
+        browserActionOf(extension).setProperty(tab, "enabled", false);
+      },
 
       setTitle: function(details) {
         let tab = details.tabId ? TabManager.getTab(details.tabId) : null;

@@ -106,3 +106,5 @@ fuzzy-if(azureQuartz,2,128) fuzzy-if(d2d,12,21) == 784573-1.html 784573-1-ref.ht
 == 1074733-1.html 1074733-1-ref.html
 fuzzy-if(Mulet,45,2) == 1107096-invisibles.html 1107096-invisibles-ref.html
 == 1151821-1.html 1151821-1-ref.html
+== 1201272-1.html 1201272-1-ref.html
+== 1224976-1.html 1224976-1-ref.html

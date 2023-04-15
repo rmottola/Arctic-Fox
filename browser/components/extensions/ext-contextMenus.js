@@ -3,7 +3,7 @@ Cu.import("resource://gre/modules/MatchPattern.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-let {
+var {
   EventManager,
   contextMenuItems,
   runSafe
@@ -13,13 +13,13 @@ let {
 // Map[Extension -> Map[ID -> MenuItem]]
 // Note: we want to enumerate all the menu items so
 // this cannot be a weak map.
-let contextMenuMap = new Map();
+var contextMenuMap = new Map();
 
 // Not really used yet, will be used for event pages.
-let onClickedCallbacksMap = new WeakMap();
+var onClickedCallbacksMap = new WeakMap();
 
 // If id is not specified for an item we use an integer.
-let nextID = 0;
+var nextID = 0;
 
 function contextMenuObserver(subject, topic, data) {
   subject = subject.wrappedJSObject;
@@ -33,8 +33,8 @@ function contextMenuObserver(subject, topic, data) {
 // calculated in nsContextMenu.jsm we simple reuse its flags here.
 // For remote processes there is a gContextMenuContentData where all
 // the important info is stored from the child process. We get
-// this data in |contentData|.
-let menuBuilder = {
+// this data in |contextData|.
+var menuBuilder = {
   build: function(contextData) {
     // TODO: icons should be set for items
     let xulMenu = contextData.menu;
@@ -43,8 +43,11 @@ let menuBuilder = {
     for (let [ext, menuItemMap] of contextMenuMap) {
       let parentMap = new Map();
       let topLevelItems = new Set();
-      for (let [id, item] of menuItemMap) {
-        dump(id + " : " + item + "\n");
+      for (let entry of menuItemMap) {
+        // We need a closure over |item|, and we don't currently get a
+        // fresh binding per loop if we declare it in the loop head.
+        let [id, item] = entry;
+
         if (item.enabledForContext(contextData)) {
           let element;
           if (item.isMenu) {
@@ -79,15 +82,13 @@ let menuBuilder = {
             topLevelItems.add(element);
           }
 
-          if (item.onclick) {
-            function clickHandlerForItem(item) {
-              return event => {
-                let clickData = item.getClickData(contextData, event);
-                runSafe(item.extContext, item.onclick, clickData);
-              }
+          element.addEventListener("command", event => {
+            item.tabManager.addActiveTabPermission();
+            if (item.onclick) {
+              let clickData = item.getClickData(contextData, event);
+              runSafe(item.extContext, item.onclick, clickData);
             }
-            element.addEventListener("command", clickHandlerForItem(item));
-          }
+          });
         }
       }
       if (topLevelItems.size > 1) {
@@ -97,7 +98,7 @@ let menuBuilder = {
         top.setAttribute("ext-type", "top-level-menu");
         let menupopup = doc.createElement("menupopup");
         top.appendChild(menupopup);
-        for (i of topLevelItems) {
+        for (let i of topLevelItems) {
           menupopup.appendChild(i);
         }
         xulMenu.appendChild(top);
@@ -165,6 +166,8 @@ function MenuItem(extension, extContext, createProperties)
 {
   this.extension = extension;
   this.extContext = extContext;
+
+  this.tabManager = TabManager.for(extension);
 
   this.init(createProperties);
 }
@@ -323,13 +326,13 @@ MenuItem.prototype = {
     }
 
     if (this.documentUrlMatchPattern &&
-        !this.documentUrlMatchPattern.matches(contentData.documentURIObject)) {
+        !this.documentUrlMatchPattern.matches(contextData.documentURIObject)) {
       return false;
     }
 
     if (this.targetUrlPatterns &&
         (contextData.onImage || contextData.onAudio || contextData.onVideo) &&
-        !this.targetUrlPatterns.matches(contentData.mediaURL)) {
+        !this.targetUrlPatterns.matches(contextData.mediaURL)) {
       // TODO: double check if mediaURL is always set when we need it
       return false;
     }
@@ -338,7 +341,7 @@ MenuItem.prototype = {
   },
 };
 
-let extCount = 0;
+var extCount = 0;
 extensions.on("startup", (type, extension) => {
   contextMenuMap.set(extension, new Map());
   if (++extCount == 1) {

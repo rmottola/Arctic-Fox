@@ -10,3 +10,4 @@ browser.jar:
     content/browser/ext-pageAction.js
     content/browser/ext-tabs.js
     content/browser/ext-windows.js
+    content/browser/ext-bookmarks.js

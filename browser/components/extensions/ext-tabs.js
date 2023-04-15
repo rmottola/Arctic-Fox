@@ -1,7 +1,17 @@
-XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
-                                  "resource:///modules/NewTabURL.jsm");
+"use strict";
+
+XPCOMUtils.defineLazyServiceGetter(this, "aboutNewTabService",
+                                   "@mozilla.org/browser/aboutnewtab-service;1",
+                                   "nsIAboutNewTabService");
+
+XPCOMUtils.defineLazyModuleGetter(this, "MatchPattern",
+                                  "resource://gre/modules/MatchPattern.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "Services",
+                                  "resource://gre/modules/Services.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
+
 var {
   EventManager,
   ignoreEvent,
@@ -193,10 +203,16 @@ extensions.registerAPI((extension, context) => {
           },
 
           onLocationChange(browser, webProgress, request, locationURI, flags) {
+            if (!webProgress.isTopLevel) {
+              return;
+            }
             let gBrowser = browser.ownerDocument.defaultView.gBrowser;
             let tab = gBrowser.getTabForBrowser(browser);
             let tabId = TabManager.getId(tab);
-            let [needed, changeInfo] = sanitize(extension, {url: locationURI.spec});
+            let [needed, changeInfo] = sanitize(extension, {
+              status: webProgress.isLoadingDocument ? "loading" : "complete",
+              url: locationURI.spec
+            });
             if (needed) {
               fire(tabId, changeInfo, TabManager.convert(extension, tab));
             }
@@ -216,7 +232,7 @@ extensions.registerAPI((extension, context) => {
         };
       }).api(),
 
-      onReplaced: ignoreEvent(),
+      onReplaced: ignoreEvent(context, "tabs.onReplaced"),
 
       onRemoved: new EventManager(context, "tabs.onRemoved", fire => {
         let tabListener = event => {
@@ -249,7 +265,7 @@ extensions.registerAPI((extension, context) => {
           createProperties = {};
         }
 
-        let url = createProperties.url || NewTabURL.get();
+        let url = createProperties.url || aboutNewTabService.newTabURL;
         url = extension.baseURI.resolve(url);
 
         function createInWindow(window) {
@@ -362,6 +378,14 @@ extensions.registerAPI((extension, context) => {
         runSafe(context, callback, TabManager.convert(extension, tab));
       },
 
+      getCurrent(callback) {
+        let tab;
+        if (context.tabId) {
+          tab = TabManager.convert(extension, TabManager.getTab(context.tabId));
+        }
+        runSafe(context, callback, tab);
+      },
+
       getAllInWindow: function(...args) {
         let window, callback;
         if (args.length == 1) {
@@ -383,8 +407,13 @@ extensions.registerAPI((extension, context) => {
           queryInfo = {};
         }
 
+        let pattern = null;
+        if (queryInfo.url) {
+          pattern = new MatchPattern(queryInfo.url);
+        }
+
         function matches(window, tab) {
-          let props = ["active", "pinned", "highlighted", "status", "title", "url", "index"];
+          let props = ["active", "pinned", "highlighted", "status", "title", "index"];
           for (let prop of props) {
             if (prop in queryInfo && queryInfo[prop] != tab[prop]) {
               return false;
@@ -420,17 +449,16 @@ extensions.registerAPI((extension, context) => {
             }
           }
 
+          if (pattern && !pattern.matches(Services.io.newURI(tab.url, null, null))) {
+            return false;
+          }
+
           return true;
         }
 
         let result = [];
-        let e = Services.wm.getEnumerator("navigator:browser");
-        while (e.hasMoreElements()) {
-          let window = e.getNext();
-          if (window.document.readyState != "complete") {
-            continue;
-          }
-          let tabs = TabManager.getTabs(extension, window);
+        for (let window of WindowListManager.browserWindows()) {
+          let tabs = TabManager.for(extension).getTabs(window);
           for (let tab of tabs) {
             if (matches(window, tab)) {
               result.push(tab);
@@ -444,12 +472,38 @@ extensions.registerAPI((extension, context) => {
         let tab = tabId ? TabManager.getTab(tabId) : TabManager.activeTab;
         let mm = tab.linkedBrowser.messageManager;
 
-        let options = {js: [], css: []};
+        let options = {
+          js: [],
+          css: [],
+
+          // We need to send the inner window ID to make sure we only
+          // execute the script if the window is currently navigated to
+          // the document that we expect.
+          //
+          // TODO: When we add support for callbacks, non-matching
+          // window IDs and insufficient permissions need to result in a
+          // callback with |lastError| set.
+          innerWindowID: tab.linkedBrowser.innerWindowID,
+        };
+
+        if (TabManager.for(extension).hasActiveTabPermission(tab)) {
+          // If we have the "activeTab" permission for this tab, ignore
+          // the host whitelist.
+          options.matchesHost = ["<all_urls>"];
+        } else {
+          options.matchesHost = extension.whiteListedHosts.serialize();
+        }
+
         if (details.code) {
           options[kind + 'Code'] = details.code;
         }
         if (details.file) {
-          options[kind].push(extension.baseURI.resolve(details.file));
+          let url = context.uri.resolve(details.file);
+          if (extension.isExtensionURL(url)) {
+            // We should really set |lastError| here, and go straight to
+            // the callback, but we don't have |lastError| yet.
+            options[kind].push(url);
+          }
         }
         if (details.allFrames) {
           options.all_frames = details.allFrames;
