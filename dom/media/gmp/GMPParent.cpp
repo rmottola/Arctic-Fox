@@ -187,16 +187,18 @@ GMPParent::LoadProcess()
   return NS_OK;
 }
 
+// static
 void
-AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
+GMPParent::AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  RefPtr<GeckoMediaPluginServiceParent> service =
-    GeckoMediaPluginServiceParent::GetSingleton();
-  if (service) {
-    service->AsyncShutdownComplete(parent);
-  }
+  MOZ_ASSERT(parent->mService);
+#if defined(MOZ_CRASHREPORTER)
+  parent->mService->SetAsyncShutdownPluginState(parent, 'G',
+    NS_LITERAL_CSTRING("Timed out waiting for async shutdown"));
+#endif
+  parent->mService->AsyncShutdownComplete(parent);
 }
 
 nsresult
