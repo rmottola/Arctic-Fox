@@ -470,8 +470,7 @@ GMPParent::ChildTerminated()
     // PluginTerminated removes the GMP from the GMPService.
     // On shutdown we can have this case where it is already been
     // removed so there is no harm in not trying to remove it again.
-    //LOGD("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__);
-    LOGD("%s: GMPThread() returned nullptr.", __FUNCTION__);
+    LOGD("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__);
   } else {
     gmpThread->Dispatch(NS_NewRunnableMethodWithArg<RefPtr<GMPParent>>(
                          mService,
