@@ -19,8 +19,6 @@ XPCOMUtils.defineLazyGetter(this, "gPingsArchivePath", function() {
   return OS.Path.join(OS.Constants.Path.profileDir, "datareporting", "archived");
 });
 
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
-
 /**
  * Fakes the archive storage quota.
  * @param {Integer} aArchiveQuota The new quota, in bytes.

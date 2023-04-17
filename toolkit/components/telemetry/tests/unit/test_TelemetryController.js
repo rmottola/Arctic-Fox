@@ -1,4 +1,3 @@
-
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ 
 */
@@ -34,8 +33,6 @@ const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
 const PREF_FHR_SERVICE_ENABLED = "datareporting.healthreport.service.enabled";
 const PREF_UNIFIED = PREF_BRANCH + "unified";
 const PREF_OPTOUT_SAMPLE = PREF_BRANCH + "optoutSample";
-
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 
 var gClientID = null;
 

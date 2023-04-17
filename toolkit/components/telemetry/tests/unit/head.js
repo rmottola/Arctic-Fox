@@ -18,6 +18,8 @@ const gIsLinux = AppConstants.platform == "linux";
 
 const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 
+const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
+
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
 const MILLISECONDS_PER_DAY = 24 * MILLISECONDS_PER_HOUR;
@@ -355,6 +357,16 @@ function truncateToDays(aMsec) {
 // false otherwise.
 function promiseRejects(promise) {
   return promise.then(() => false, () => true);
+}
+
+// Short-hand for retrieving the histogram with that id.
+function getHistogram(histogramId) {
+  return Telemetry.getHistogramById(histogramId);
+}
+
+// Short-hand for retrieving the snapshot of the Histogram with that id.
+function getSnapshot(histogramId) {
+  return Telemetry.getHistogramById(histogramId).snapshot();
 }
 
 if (runningInParent) {
