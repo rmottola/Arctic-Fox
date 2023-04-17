@@ -117,7 +117,7 @@ var Policy = {
  */
 function waitForAll(it) {
   let dummy = () => {};
-  let promises = [for (p of it) p.catch(dummy)];
+  let promises = Array.from(it, p => p.catch(dummy));
   return Promise.all(promises);
 }
 
@@ -695,7 +695,10 @@ var TelemetryStorageImpl = {
       this._log.trace("loadArchivedPing - loading ping from: " + pathCompressed);
       yield* checkSize(pathCompressed);
       return yield this.loadPingFile(pathCompressed, /*compressed*/ true);
-    } catch (ex if ex.becauseNoSuchFile) {
+    } catch (ex) {
+      if (!ex.becauseNoSuchFile) {
+        throw ex;
+      }
       // If that fails, look for the uncompressed version.
       this._log.trace("loadArchivedPing - compressed ping not found, loading: " + path);
       yield* checkSize(path);
@@ -831,11 +834,11 @@ var TelemetryStorageImpl = {
     let startTimeStamp = Policy.now().getTime();
 
     // Build an ordered list, from newer to older, of archived pings.
-    let pingList = [for (p of this._archivedPings) {
+    let pingList = Array.from(this._archivedPings, p => ({
       id: p[0],
       timestampCreated: p[1].timestampCreated,
       type: p[1].type,
-    }];
+    }));
 
     pingList.sort((a, b) => b.timestampCreated - a.timestampCreated);
 
@@ -974,10 +977,10 @@ var TelemetryStorageImpl = {
     let startTimeStamp = Policy.now().getTime();
 
     // Build an ordered list, from newer to older, of pending pings.
-    let pingList = [for (p of this._pendingPings) {
+    let pingList = Array.from(this._pendingPings, p => ({
       id: p[0],
       lastModificationDate: p[1].lastModificationDate,
-    }];
+    }));
 
     pingList.sort((a, b) => b.lastModificationDate - a.lastModificationDate);
 
@@ -1180,7 +1183,10 @@ var TelemetryStorageImpl = {
         options.compression = "lz4";
       }
       yield OS.File.writeAtomic(filePath, pingString, options);
-    } catch(e if e.becauseExists) {
+    } catch(e) {
+      if (!e.becauseExists) {
+        throw e;
+      }
     }
   }),
 
@@ -1265,7 +1271,10 @@ var TelemetryStorageImpl = {
     let fileSize = 0;
     try {
       fileSize = (yield OS.File.stat(info.path)).size;
-    } catch (e if e instanceof OS.File.Error && e.becauseNoSuchFile) {
+    } catch (e) {
+      if (!(e instanceof OS.File.Error) || !e.becauseNoSuchFile) {
+        throw e;
+      }
       // Fall through and let |loadPingFile| report the error.
     }
 
@@ -1486,10 +1495,10 @@ var TelemetryStorageImpl = {
   }),
 
   _buildPingList: function() {
-    const list = [for (p of this._pendingPings) {
+    const list = Array.from(this._pendingPings, p => ({
       id: p[0],
       lastModificationDate: p[1].lastModificationDate,
-    }];
+    }));
 
     list.sort((a, b) => b.lastModificationDate - a.lastModificationDate);
     return list;
@@ -1634,10 +1643,12 @@ var TelemetryStorageImpl = {
     let ping = null;
     try {
       ping = yield this.loadPingFile(gAbortedSessionFilePath);
-    } catch (ex if ex.becauseNoSuchFile) {
-      this._log.trace("loadAbortedSessionPing - no such file");
     } catch (ex) {
-      this._log.error("loadAbortedSessionPing - error removing ping", ex)
+      if (ex.becauseNoSuchFile) {
+        this._log.trace("loadAbortedSessionPing - no such file");
+      } else {
+        this._log.error("loadAbortedSessionPing - error loading ping", ex)
+      }
     }
     return ping;
   }),
@@ -1647,10 +1658,12 @@ var TelemetryStorageImpl = {
       try {
         yield OS.File.remove(gAbortedSessionFilePath, { ignoreAbsent: false });
         this._log.trace("removeAbortedSessionPing - success");
-      } catch (ex if ex.becauseNoSuchFile) {
-        this._log.trace("removeAbortedSessionPing - no such file");
       } catch (ex) {
-        this._log.error("removeAbortedSessionPing - error removing ping", ex)
+        if (ex.becauseNoSuchFile) {
+          this._log.trace("removeAbortedSessionPing - no such file");
+        } else {
+          this._log.error("removeAbortedSessionPing - error removing ping", ex)
+        }
       }
     }.bind(this)));
   },
@@ -1679,10 +1692,12 @@ var TelemetryStorageImpl = {
       try {
         yield OS.File.remove(gDeletionPingFilePath, { ignoreAbsent: false });
         this._log.trace("removeDeletionPing - success");
-      } catch (ex if ex.becauseNoSuchFile) {
-        this._log.trace("removeDeletionPing - no such file");
       } catch (ex) {
-        this._log.error("removeDeletionPing - error removing ping", ex)
+        if (ex.becauseNoSuchFile) {
+          this._log.trace("removeDeletionPing - no such file");
+        } else {
+          this._log.error("removeDeletionPing - error removing ping", ex)
+        }
       }
     }.bind(this)));
   }),
