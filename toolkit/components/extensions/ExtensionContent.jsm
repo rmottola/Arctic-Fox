@@ -269,7 +269,6 @@ ExtensionContext.prototype = {
 
   callOnClose(obj) {
     this.onClose.add(obj);
-    Cu.nukeSandbox(this.sandbox);
   },
 
   forgetOnClose(obj) {
@@ -280,6 +279,7 @@ ExtensionContext.prototype = {
     for (let obj of this.onClose) {
       obj.close();
     }
+    Cu.nukeSandbox(this.sandbox);
   },
 };
 
