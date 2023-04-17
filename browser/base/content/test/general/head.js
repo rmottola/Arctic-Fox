@@ -7,6 +7,27 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
   "resource://gre/modules/PlacesUtils.jsm");
 
+/**
+ * Wait for a <notification> to be closed then call the specified callback.
+ */
+function waitForNotificationClose(notification, cb) {
+  let parent = notification.parentNode;
+
+  let observer = new MutationObserver(function onMutatations(mutations) {
+    for (let mutation of mutations) {
+      for (let i = 0; i < mutation.removedNodes.length; i++) {
+        let node = mutation.removedNodes.item(i);
+        if (node != notification) {
+          continue;
+        }
+        observer.disconnect();
+        cb();
+      }
+    }
+  });
+  observer.observe(parent, {childList: true});
+}
+
 function closeAllNotifications () {
   let notificationBox = document.getElementById("global-notificationbox");
 
