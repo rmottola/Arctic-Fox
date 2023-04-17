@@ -670,33 +670,6 @@
     "extended_statistics_ok": true,
     "description": "Time(ms) spent on reading family names from all fonts"
   },
-  "DWRITEFONT_INITFONTLIST_TOTAL": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList Total (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_INITFONTLIST_INIT": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList init (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_INITFONTLIST_GDI": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList GdiInterop object (ms)",
-    "cpp_guard": "XP_WIN"
-  },
   "DWRITEFONT_DELAYEDINITFONTLIST_TOTAL": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -715,12 +688,6 @@
     "description": "gfxDWriteFontList::DelayedInitFontList Font Family Count",
     "cpp_guard": "XP_WIN"
   },
-  "DWRITEFONT_DELAYEDINITFONTLIST_GDI_TABLE": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "gfxDWriteFontList::DelayedInitFontList GDI Table Access",
-    "cpp_guard": "XP_WIN"
-  },
   "DWRITEFONT_DELAYEDINITFONTLIST_COLLECT": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -728,15 +695,6 @@
     "n_buckets": 10,
     "extended_statistics_ok": true,
     "description": "gfxDWriteFontList::DelayedInitFontList GetSystemFontCollection (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_DELAYEDINITFONTLIST_ITERATE": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::DelayedInitFontList iterate over families (ms)",
     "cpp_guard": "XP_WIN"
   },
   "DWRITEFONT_INIT_PROBLEM": {
@@ -1388,6 +1346,14 @@
     "kind": "enumerated",
     "n_values": 16,
     "description": "SSL Handshake Key Exchange Algorithm for resumed handshake (null=0, rsa=1, dh=2, fortezza=3, ecdh=4)"
+  },
+  "SSL_OBSERVED_END_ENTITY_CERTIFICATE_LIFETIME": {
+    "expires_in_version": "55",
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "kind": "enumerated",
+    "n_values": 125,
+    "releaseChannelCollection": "opt-out",
+    "description": "The lifetime of accepted HTTPS server certificates, in weeks, up to 2 years. Bucket 105 is all end-entity HTTPS server certificates with a lifetime > 2 years."
   },
   "WEBSOCKETS_HANDSHAKE_TYPE": {
     "expires_in_version": "never",
