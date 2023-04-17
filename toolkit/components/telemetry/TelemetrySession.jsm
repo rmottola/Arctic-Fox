@@ -1252,8 +1252,6 @@ var Impl = {
       simpleMeasurements: simpleMeasurements,
       histograms: this.getHistograms(isSubsession, clearSubsession),
       keyedHistograms: this.getKeyedHistograms(isSubsession, clearSubsession),
-      chromeHangs: Telemetry.chromeHangs,
-      log: TelemetryLog.entries(),
     };
 
     // Add extended set measurements common to chrome & content processes
@@ -1273,20 +1271,21 @@ var Impl = {
 
     // Add extended set measurements for chrome process.
     if (Telemetry.canRecordExtended) {
-      payloadObj.slowSQL = Telemetry.slowSQL;
-      payloadObj.fileIOReports = Telemetry.fileIOReports;
-      payloadObj.lateWrites = Telemetry.lateWrites;
+      payloadObj.slowSQL = protect(() => Telemetry.slowSQL);
+      payloadObj.fileIOReports = protect(() => Telemetry.fileIOReports);
+      payloadObj.lateWrites = protect(() => Telemetry.lateWrites);
 
       // Add the addon histograms if they are present
-      let addonHistograms = this.getAddonHistograms();
-      if (Object.keys(addonHistograms).length > 0) {
+      let addonHistograms = protect(() => this.getAddonHistograms());
+      if (addonHistograms && Object.keys(addonHistograms).length > 0) {
         payloadObj.addonHistograms = addonHistograms;
       }
 
-      payloadObj.addonDetails = AddonManagerPrivate.getTelemetryDetails();
-      payloadObj.UIMeasurements = UITelemetry.getUIMeasurements();
+      payloadObj.addonDetails = protect(() => AddonManagerPrivate.getTelemetryDetails());
+      payloadObj.UIMeasurements = protect(() => UITelemetry.getUIMeasurements());
 
-      if (Object.keys(this._slowSQLStartup).length != 0 &&
+      if (this._slowSQLStartup &&
+          Object.keys(this._slowSQLStartup).length != 0 &&
           (Object.keys(this._slowSQLStartup.mainThread).length ||
            Object.keys(this._slowSQLStartup.otherThreads).length)) {
         payloadObj.slowSQLStartup = this._slowSQLStartup;
@@ -1294,7 +1293,7 @@ var Impl = {
     }
 
     if (this._childTelemetry.length) {
-      payloadObj.childPayloads = this.getChildPayloads();
+      payloadObj.childPayloads = protect(() => this.getChildPayloads());
     }
 
     return payloadObj;
