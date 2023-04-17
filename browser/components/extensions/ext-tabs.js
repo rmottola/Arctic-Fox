@@ -550,6 +550,10 @@ extensions.registerAPI((extension, context) => {
 
       sendMessage: function(tabId, message, options, responseCallback) {
         let tab = TabManager.getTab(tabId);
+        if (!tab) {
+          // ignore sendMessage to non existent tab id
+          return;
+        }
         let mm = tab.linkedBrowser.messageManager;
 
         let recipient = {extensionId: extension.id};
