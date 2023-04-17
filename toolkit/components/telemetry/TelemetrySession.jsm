@@ -1476,6 +1476,8 @@ var Impl = {
 
    /**
     * Save both the "saved-session" and the "shutdown" pings to disk.
+    * This needs to be called after TelemetrySend shuts down otherwise pings
+    * would be sent instead of getting persisted to disk.
     */
   saveShutdownPings: function() {
     this._log.trace("saveShutdownPings");
@@ -1491,9 +1493,8 @@ var Impl = {
       let options = {
         addClientId: true,
         addEnvironment: true,
-        overwrite: true,
       };
-      p.push(TelemetryController.addPendingPing(getPingType(shutdownPayload), shutdownPayload, options)
+      p.push(TelemetryController.submitExternalPing(getPingType(shutdownPayload), shutdownPayload, options)
                                 .catch(e => this._log.error("saveShutdownPings - failed to submit shutdown ping", e)));
      }
 
@@ -1506,7 +1507,7 @@ var Impl = {
         addClientId: true,
         addEnvironment: true,
       };
-      p.push(TelemetryController.addPendingPing(getPingType(payload), payload, options)
+      p.push(TelemetryController.submitExternalPing(getPingType(payload), payload, options)
                                 .catch (e => this._log.error("saveShutdownPings - failed to submit saved-session ping", e)));
     }
 
