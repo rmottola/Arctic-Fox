@@ -19,6 +19,9 @@
 this.EXPORTED_SYMBOLS = [
   "AddonsProvider",
   "AppInfoProvider",
+#ifdef MOZ_CRASHREPORTER
+  "CrashesProvider",
+#endif
   "HealthReportProvider",
   "HotfixProvider",
   "PlacesProvider",
@@ -1044,6 +1047,238 @@ AddonsProvider.prototype = Object.freeze({
   },
 });
 
+#ifdef MOZ_CRASHREPORTER
+
+function DailyCrashesMeasurement1() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement1.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 1,
+
+  fields: {
+    pending: DAILY_COUNTER_FIELD,
+    submitted: DAILY_COUNTER_FIELD,
+  },
+});
+
+function DailyCrashesMeasurement2() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement2.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 2,
+
+  fields: {
+    mainCrash: DAILY_LAST_NUMERIC_FIELD,
+  },
+});
+
+function DailyCrashesMeasurement3() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement3.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 3,
+
+  fields: {
+    "main-crash": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang": DAILY_LAST_NUMERIC_FIELD,
+  },
+});
+
+function DailyCrashesMeasurement4() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement4.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 4,
+
+  fields: {
+    "main-crash": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+  },
+});
+
+function DailyCrashesMeasurement5() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement5.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 5,
+
+  fields: {
+    "main-crash": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+  },
+});
+
+function DailyCrashesMeasurement6() {
+  Metrics.Measurement.call(this);
+}
+
+DailyCrashesMeasurement6.prototype = Object.freeze({
+  __proto__: Metrics.Measurement.prototype,
+
+  name: "crashes",
+  version: 6,
+
+  fields: {
+    "main-crash": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-oom": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "main-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "content-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "plugin-hang-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash-submission-succeeded": DAILY_LAST_NUMERIC_FIELD,
+    "gmplugin-crash-submission-failed": DAILY_LAST_NUMERIC_FIELD,
+  },
+});
+
+this.CrashesProvider = function () {
+  Metrics.Provider.call(this);
+
+  // So we can unit test.
+  this._manager = Services.crashmanager;
+};
+
+CrashesProvider.prototype = Object.freeze({
+  __proto__: Metrics.Provider.prototype,
+
+  name: "org.mozilla.crashes",
+
+  measurementTypes: [
+    DailyCrashesMeasurement1,
+    DailyCrashesMeasurement2,
+    DailyCrashesMeasurement3,
+    DailyCrashesMeasurement4,
+    DailyCrashesMeasurement5,
+    DailyCrashesMeasurement6,
+  ],
+
+  pullOnly: true,
+
+  collectDailyData: function () {
+    return this.storage.enqueueTransaction(this._populateCrashCounts.bind(this));
+  },
+
+  _populateCrashCounts: function () {
+    this._log.info("Grabbing crash counts from crash manager.");
+    let crashCounts = yield this._manager.getCrashCountsByDay();
+
+    // TODO: CrashManager no longer stores submissions as crashes, but we still
+    // want to send the submission data to FHR. As a temporary workaround, we
+    // populate |crashCounts| with the submission data to match past behaviour.
+    // See bug 1056160.
+    let crashes = yield this._manager.getCrashes();
+    for (let crash of crashes) {
+      for (let [submissionID, submission] of crash.submissions) {
+        if (!submission.responseDate) {
+          continue;
+        }
+
+        let day = Metrics.dateToDays(submission.responseDate);
+        if (!crashCounts.has(day)) {
+          crashCounts.set(day, new Map());
+        }
+
+        let succeeded =
+          submission.result == this._manager.SUBMISSION_RESULT_OK;
+        let type = crash.type + "-submission-" + (succeeded ? "succeeded" :
+                                                              "failed");
+
+        let count = (crashCounts.get(day).get(type) || 0) + 1;
+        crashCounts.get(day).set(type, count);
+      }
+    }
+
+    let m = this.getMeasurement("crashes", 6);
+    let fields = DailyCrashesMeasurement6.prototype.fields;
+
+    for (let [day, types] of crashCounts) {
+      let date = Metrics.daysToDate(day);
+      for (let [type, count] of types) {
+        if (!(type in fields)) {
+          this._log.warn("Unknown crash type encountered: " + type);
+          continue;
+        }
+
+        yield m.setDailyLastNumeric(type, count, date);
+      }
+    }
+  },
+});
+
+#endif
+
 /**
  * Records data from update hotfixes.
  *
@@ -1329,7 +1564,7 @@ SearchCountMeasurementBase.prototype = Object.freeze({
    * data.
    */
   shouldIncludeField: function (name) {
-    return name.contains(".");
+    return name.includes(".");
   },
 
   /**
