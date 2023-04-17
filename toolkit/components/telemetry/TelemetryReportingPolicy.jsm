@@ -19,8 +19,8 @@ Cu.import("resource://services-common/observers.js", this);
 
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetrySend",
                                   "resource://gre/modules/TelemetrySend.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateChannel",
-                                  "resource://gre/modules/UpdateChannel.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                  "resource://gre/modules/UpdateUtils.jsm");
 
 const LOGGER_NAME = "Toolkit.Telemetry";
 const LOGGER_PREFIX = "TelemetryReportingPolicy::";
@@ -66,7 +66,7 @@ const NOTIFICATION_DELAY_NEXT_RUNS_MSEC = 10 * 1000; // 10s
  * Tests override properties on this object to allow for control of behavior
  * that would otherwise be very hard to cover.
  */
-let Policy = {
+var Policy = {
   now: () => new Date(),
   setShowInfobarTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
   clearShowInfobarTimeout: (id) => clearTimeout(id),
@@ -164,7 +164,7 @@ this.TelemetryReportingPolicy = {
   },
 };
 
-let TelemetryReportingPolicyImpl = {
+var TelemetryReportingPolicyImpl = {
   _logger: null,
   // Keep track of the notification status if user wasn't notified already.
   _notificationInProgress: false,
@@ -245,7 +245,7 @@ let TelemetryReportingPolicyImpl = {
     // use the general minimum policy version.
     let channel = "";
     try {
-      channel = UpdateChannel.get(false);
+      channel = UpdateUtils.getUpdateChannel(false);
     } catch(e) {
       this._log.error("minimumPolicyVersion - Unable to retrieve the current channel.");
       return minPolicyVersion;
