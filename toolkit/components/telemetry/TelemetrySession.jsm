@@ -867,7 +867,6 @@ var Impl = {
     }
 
     ret.pingsOverdue = TelemetrySend.overduePingsCount;
-    ret.pingsDiscarded = TelemetrySend.discardedPingsCount;
 
     return ret;
   },
