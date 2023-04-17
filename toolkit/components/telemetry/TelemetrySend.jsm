@@ -112,6 +112,20 @@ function isDeletionPing(aPing) {
   return isV4PingFormat(aPing) && (aPing.type == PING_TYPE_DELETION);
 }
 
+/**
+ * Save the provided ping as a pending ping. If it's a deletion ping, save it
+ * to a special location.
+ * @param {Object} aPing The ping to save.
+ * @return {Promise} A promise resolved when the ping is saved.
+ */
+function savePing(aPing) {
+  if (isDeletionPing(aPing)) {
+    return TelemetryStorage.saveDeletionPing(aPing);
+  } else {
+    return TelemetryStorage.savePendingPing(aPing);
+  }
+}
+
 function tomorrow(date) {
   let d = new Date(date);
   d.setDate(d.getDate() + 1);
@@ -686,7 +700,7 @@ var TelemetrySendImpl = {
       // Sending is disabled or throttled, add this to the persisted pending pings.
       this._log.trace("submitPing - can't send ping now, persisting to disk - " +
                       "canSendNow: " + this.canSendNow);
-      return TelemetryStorage.savePendingPing(ping);
+      return savePing(ping);
     }
 
     // Let the scheduler trigger sending pings if possible.
@@ -761,11 +775,7 @@ var TelemetrySendImpl = {
         } catch (ex) {
           this._log.info("sendPings - ping " + ping.id + " not sent, saving to disk", ex);
           // Deletion pings must be saved to a special location.
-          if (isDeletionPing(ping)) {
-            yield TelemetryStorage.saveDeletionPing(ping);
-          } else {
-            yield TelemetryStorage.savePendingPing(ping);
-          }
+          yield savePing(ping);
         } finally {
           this._currentPings.delete(ping.id);
         }
@@ -1066,7 +1076,7 @@ var TelemetrySendImpl = {
   _persistCurrentPings: Task.async(function*() {
     for (let [id, ping] of this._currentPings) {
       try {
-        yield TelemetryStorage.savePendingPing(ping);
+        yield savePing(ping);
         this._log.trace("_persistCurrentPings - saved ping " + id);
       } catch (ex) {
         this._log.error("_persistCurrentPings - failed to save ping " + id, ex);
