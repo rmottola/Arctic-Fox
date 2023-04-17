@@ -913,6 +913,18 @@ var Impl = {
     return ret;
   },
 
+  getThreadHangStats: function getThreadHangStats(stats) {
+    this._log.trace("getThreadHangStats");
+
+    stats.forEach((thread) => {
+      thread.activity = this.packHistogram(thread.activity);
+      thread.hangs.forEach((hang) => {
+        hang.histogram = this.packHistogram(hang.histogram);
+      });
+    });
+    return stats;
+  },
+
   /**
    * Descriptive metadata
    *
@@ -1452,7 +1464,6 @@ var Impl = {
     default:
       throw new Error("Telemetry.receiveMessage: bad message name");
     }
-    return Promise.resolve();
   },
 
   _processUUID: generateUUID(),
