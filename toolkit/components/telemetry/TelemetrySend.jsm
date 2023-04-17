@@ -532,8 +532,6 @@ var SendScheduler = {
 var TelemetrySendImpl = {
   _sendingEnabled: false,
   _logger: null,
-  // Timer for scheduled ping sends.
-  _pingSendTimer: null,
   // This tracks all pending ping requests to the server.
   _pendingPingRequests: new Map(),
   // This tracks all the pending async ping activity.
