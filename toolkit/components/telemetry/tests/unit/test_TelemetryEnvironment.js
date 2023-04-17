@@ -1096,9 +1096,7 @@ add_task(function* test_defaultSearchEngine() {
   resProt.setSubstitution("search-plugins",
                           Services.io.newURI(url, null, null));
 
-  // Initialize the search service and disable geoip lookup, so we don't get unwanted
-  // network connections.
-  Preferences.set("browser.search.geoip.url", "");
+  // Initialize the search service.
   yield new Promise(resolve => Services.search.init(resolve));
 
   // Our default engine from the JAR file has an identifier. Check if it is correctly
