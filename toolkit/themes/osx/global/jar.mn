@@ -5,7 +5,6 @@
 #include ../../shared/jar.inc.mn
 
 toolkit.jar:
-% skin global classic/1.0 %skin/classic/global/
   skin/classic/global/10pct_transparent_grey.png
   skin/classic/global/50pct_transparent_grey.png
   skin/classic/global/about.css                                      (../../shared/about.css)
@@ -90,7 +89,6 @@ toolkit.jar:
 * skin/classic/global/console/console.css                            (console/console.css)
   skin/classic/global/dirListing/dirListing.css                      (dirListing/dirListing.css)
   skin/classic/global/dirListing/folder.png                          (dirListing/folder.png)
-  skin/classic/global/dirListing/local.png                           (dirListing/folder.png)
   skin/classic/global/dirListing/remote.png                          (dirListing/remote.png)
   skin/classic/global/dirListing/up.png                              (dirListing/up.png)
   skin/classic/global/icons/autocomplete-dropmarker.png              (icons/autocomplete-dropmarker.png)
@@ -222,3 +220,4 @@ toolkit.jar:
 #if MOZ_BUILD_APP == browser
 [browser/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}] chrome.jar:
 #endif
+% override chrome://global/skin/dirListing/local.png                 chrome://global/skin/dirListing/folder.png

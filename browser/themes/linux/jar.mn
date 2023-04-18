@@ -122,13 +122,10 @@ browser.jar:
 #endif
   skin/classic/browser/tabbrowser/alltabs.png         (tabbrowser/alltabs.png)
   skin/classic/browser/tabbrowser/connecting.png      (tabbrowser/connecting.png)
-  skin/classic/browser/tabbrowser/crashed.svg         (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/loading.png         (tabbrowser/loading.png)
   skin/classic/browser/tabbrowser/tab.png             (tabbrowser/tab.png)
   skin/classic/browser/tabbrowser/tab-overflow-border.png (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png (tabbrowser/tabDragIndicator.png)
-  skin/classic/browser/tabbrowser/tab-audio.svg       (../shared/tabbrowser/tab-audio.svg)
-  skin/classic/browser/tabbrowser/tab-audio-small.svg (../shared/tabbrowser/tab-audio-small.svg)
 #ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/sync-16-throbber.png
   skin/classic/browser/sync-16.png

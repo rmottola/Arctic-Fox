@@ -18,7 +18,7 @@ task:
         --config-file ./mozharness/configs/b2g/mulet_config.py
         --config-file ./mozharness_configs/remove_executables.py
         --installer-url {{build_url}}
-        --test-url {{tests_url}}
+        --test-packages-url {{test_packages_url}}
         --download-symbols ondemand
         --test-suite reftest
         --test-manifest tests/layout/reftests/reftest.list

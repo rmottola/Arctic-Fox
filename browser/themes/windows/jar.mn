@@ -159,13 +159,10 @@ browser.jar:
   skin/classic/browser/tabbrowser/newtab-glass.png             (tabbrowser/newtab-glass.png)
   skin/classic/browser/tabbrowser/newtab-inverted.png          (tabbrowser/newtab-inverted.png)
   skin/classic/browser/tabbrowser/connecting.png               (tabbrowser/connecting.png)
-  skin/classic/browser/tabbrowser/crashed.svg                  (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/loading.png                  (tabbrowser/loading.png)
   skin/classic/browser/tabbrowser/tab-arrow-left.png           (tabbrowser/tab-arrow-left.png)
   skin/classic/browser/tabbrowser/tab-arrow-left-glass.png     (tabbrowser/tab-arrow-left-glass.png)
   skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
-  skin/classic/browser/tabbrowser/tab-audio.svg                (../shared/tabbrowser/tab-audio.svg)
-  skin/classic/browser/tabbrowser/tab-audio-small.svg          (../shared/tabbrowser/tab-audio-small.svg)
   skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
 #ifdef MOZ_SERVICES_SYNC
