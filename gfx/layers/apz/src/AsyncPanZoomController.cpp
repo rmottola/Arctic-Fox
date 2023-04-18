@@ -2767,7 +2767,7 @@ bool AsyncPanZoomController::UpdateAnimation(const TimeStamp& aSampleTime,
 
   if (mAnimation) {
     bool continueAnimation = mAnimation->Sample(mFrameMetrics, sampleTimeDelta);
-    *aOutDeferredTasks = mAnimation->TakeDeferredTasks();
+    mAnimation->TakeDeferredTasks(*aOutDeferredTasks);
     if (continueAnimation) {
       if (mPaintThrottler->TimeSinceLastRequest(aSampleTime) >
           mAnimation->mRepaintInterval) {
