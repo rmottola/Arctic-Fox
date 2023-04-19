@@ -28,7 +28,7 @@ class LocalesMixin(ChunkingMixin):
         """
         self.abs_dirs = None
         self.locales = None
-        self.goanna_locale_revisions = None
+        self.gecko_locale_revisions = None
 
     def query_locales(self):
         if self.locales is not None:
@@ -187,8 +187,17 @@ class LocalesMixin(ChunkingMixin):
         revs = self.vcs_checkout_repos(repo_list=locale_repos,
                                        parent_dir=parent_dir,
                                        tag_override=c.get('tag_override'))
-        self.goanna_locale_revisions = revs
+        self.gecko_locale_revisions = revs
 
+    def query_l10n_repo(self):
+        # Find the name of our repository
+        mozilla_dir = self.config['mozilla_dir']
+        repo = None
+        for repository in self.config['repos']:
+            if repository.get('dest') == mozilla_dir:
+                repo = repository['repo']
+                break
+        return repo
 
 # GaiaLocalesMixin {{{1
 class GaiaLocalesMixin(object):
