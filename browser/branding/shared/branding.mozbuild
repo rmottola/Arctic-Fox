@@ -10,7 +10,7 @@ DIST_SUBDIR = 'browser'
 export('DIST_SUBDIR')
 
 JS_PREFERENCE_FILES += [
-    'pref/palemoon-branding.js',
+    '../arcticfox/pref/palemoon-branding.js',
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
