@@ -219,7 +219,9 @@ def parse_commit(message, jobs):
                 'dependents': extract_tests_from_platform(
                     jobs['tests'], platform_builds, build_task, tests
                 ),
-                'additional-parameters': additional_parameters
+                'additional-parameters': additional_parameters,
+                'build_name': platform,
+                'build_type': build_type,
             })
 
     return result
