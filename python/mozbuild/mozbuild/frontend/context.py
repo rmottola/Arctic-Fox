@@ -1254,7 +1254,7 @@ VARIABLES = {
            BRANDING_FILES.dir['baz.png'].source = 'quux.png'
         """, None),
 
-    'RESOURCE_FILES': (HierarchicalStringListWithFlagsFactory({'preprocess': bool}), list,
+    'RESOURCE_FILES': (HierarchicalStringList, list,
         """List of resources to be exported, and in which subdirectories.
 
         ``RESOURCE_FILES`` is used to list the resource files to be exported to
@@ -1267,13 +1267,6 @@ VARIABLES = {
 
            RESOURCE_FILES += ['foo.res']
            RESOURCE_FILES.fonts += ['bar.res']
-
-        Added files also have a 'preprocess' attribute, which will cause the
-        affected file to be run through the preprocessor, using any ``DEFINES``
-        set. It is used like this::
-
-           RESOURCE_FILES.fonts += ['baz.res.in']
-           RESOURCE_FILES.fonts['baz.res.in'].preprocess = True
         """, None),
 
     'SDK_LIBRARY': (bool, bool,
