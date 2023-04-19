@@ -3,7 +3,7 @@ $inherits:
   from: 'tasks/tests/b2g_unittest_base.yml'
 task:
   metadata:
-    name: '[TC] Gaia Build Test'
+    name: '[TC] - Gaia Build Test'
     description: Gaia Build Test test run
 
   payload:
@@ -12,11 +12,13 @@ task:
       - ./bin/pull_gaia.sh &&
       - >
         python ./mozharness/scripts/gaia_build_integration.py
+        --application firefox
         --no-read-buildbot-config
         --config-file ./mozharness/configs/b2g/gaia_integration_config.py
         --config-file ./mozharness_configs/gaia_integration_override.py
         --config-file ./mozharness_configs/remove_executables.py
         --installer-url {{build_url}}
+        --no-pull
         --test-packages-url {{test_packages_url}}
         --download-symbols ondemand
         --gaia-repo https://hg.mozilla.org/integration/gaia-central
@@ -29,6 +31,10 @@ task:
         expires: '{{#from_now}}1 year{{/from_now}}'
 
   extra:
+    treeherderEnv:
+      - production
+      - staging
     treeherder:
+      groupSymbol: "?"
       symbol: 'Gb'
       productName: b2g

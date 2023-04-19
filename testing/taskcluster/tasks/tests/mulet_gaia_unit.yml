@@ -3,25 +3,29 @@ $inherits:
   from: 'tasks/tests/b2g_unittest_base.yml'
 task:
   metadata:
-    name: '[TC] Gaia Build Test'
-    description: Gaia Build Test test run
+    name: '[TC] Mulet Gaia Unit Test'
+    description: Mulet Gaia Unit Test
 
   payload:
     command:
-      - entrypoint # entrypoint ensures we are running in xvfb
+      - entrypoint
       - ./bin/pull_gaia.sh &&
       - >
-        python ./mozharness/scripts/gaia_build_integration.py
+        python ./mozharness/scripts/gaia_unit.py
+        --application firefox
         --no-read-buildbot-config
-        --config-file ./mozharness/configs/b2g/gaia_integration_config.py
+        --config-file b2g/gaia_unit_production_config.py
         --config-file ./mozharness_configs/gaia_integration_override.py
         --config-file ./mozharness_configs/remove_executables.py
+        --no-pull
         --installer-url {{build_url}}
         --test-packages-url {{test_packages_url}}
         --download-symbols ondemand
-        --gaia-repo https://hg.mozilla.org/integration/gaia-central
+        --gaia-repo {{gaia_head_repository}}
         --gaia-dir /home/worker
         --xre-url https://queue.taskcluster.net/v1/task/wXAHAaxDQpqxoWF1iljJjg/runs/0/artifacts/public/cache/xulrunner-sdk-40.zip
+        --total-chunk={{total_chunks}}
+        --this-chunk={{chunk}}
     artifacts:
       'public/build':
         type: directory
@@ -29,6 +33,12 @@ task:
         expires: '{{#from_now}}1 year{{/from_now}}'
 
   extra:
+    treeherderEnv:
+      - production
+      - staging
+    chunks:
+      total: 10
     treeherder:
-      symbol: 'Gb'
-      productName: b2g
+      groupSymbol: Gu
+      groupName: Mulet gaia unit tests
+      symbol: {{chunk}}
