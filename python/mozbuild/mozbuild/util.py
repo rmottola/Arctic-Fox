@@ -482,6 +482,8 @@ class HierarchicalStringList(object):
     __slots__ = ('_strings', '_children')
 
     def __init__(self):
+        # Please change ContextDerivedTypedHierarchicalStringList in context.py
+        # if you make changes here.
         self._strings = StrictOrderingOnAppendList()
         self._children = {}
 
@@ -566,6 +568,8 @@ class HierarchicalStringList(object):
         self._set_exportvariable(name, value)
 
     def _get_exportvariable(self, name):
+        # Please change ContextDerivedTypedHierarchicalStringList in context.py
+        # if you make changes here.
         child = self._children.get(name)
         if not child:
             child = self._children[name] = HierarchicalStringList()
