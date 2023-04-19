@@ -14,6 +14,6 @@ JS_PREFERENCE_FILES += [
     'simple-prefs.js',
 ]
 
-DIST_FILES += [
+FINAL_TARGET_PP_FILES += [
     'application.ini',
 ]
