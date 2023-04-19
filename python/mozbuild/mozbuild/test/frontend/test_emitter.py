@@ -12,6 +12,7 @@ from mozunit import main
 from mozbuild.frontend.data import (
     AndroidResDirs,
     BrandingFiles,
+    ChromeManifestEntry,
     ConfigFileSubstitution,
     Defines,
     DirectoryTraversal,
@@ -26,6 +27,7 @@ from mozbuild.frontend.data import (
     LocalInclude,
     Program,
     Resources,
+    SharedLibrary,
     SimpleProgram,
     Sources,
     StaticLibrary,
@@ -40,6 +42,7 @@ from mozbuild.frontend.reader import (
     BuildReaderError,
     SandboxValidationError,
 )
+from mozpack.chrome import manifest
 
 from mozbuild.test.common import MockConfig
 
@@ -278,45 +281,6 @@ class TestEmitterBasic(unittest.TestCase):
         with self.assertRaisesRegexp(SandboxValidationError,
             'Cannot install files to the root of TEST_HARNESS_FILES'):
             objs = self.read_topsrcdir(reader)
-
-    def test_resources(self):
-        reader = self.reader('resources')
-        objs = self.read_topsrcdir(reader)
-
-        self.assertEqual(len(objs), 2)
-        self.assertIsInstance(objs[0], Defines)
-        self.assertIsInstance(objs[1], Resources)
-
-        resources = objs[1].resources
-        self.assertEqual(resources._strings, ['foo.res', 'bar.res', 'baz.res',
-                                              'foo_p.res.in', 'bar_p.res.in', 'baz_p.res.in'])
-
-        self.assertIn('mozilla', resources._children)
-        mozilla = resources._children['mozilla']
-        self.assertEqual(mozilla._strings, ['mozilla1.res', 'mozilla2.res',
-                                            'mozilla1_p.res.in', 'mozilla2_p.res.in'])
-
-        self.assertIn('dom', mozilla._children)
-        dom = mozilla._children['dom']
-        self.assertEqual(dom._strings, ['dom1.res', 'dom2.res', 'dom3.res'])
-
-        self.assertIn('gfx', mozilla._children)
-        gfx = mozilla._children['gfx']
-        self.assertEqual(gfx._strings, ['gfx.res'])
-
-        self.assertIn('vpx', resources._children)
-        vpx = resources._children['vpx']
-        self.assertEqual(vpx._strings, ['mem.res', 'mem2.res'])
-
-        self.assertIn('nspr', resources._children)
-        nspr = resources._children['nspr']
-        self.assertIn('private', nspr._children)
-        private = nspr._children['private']
-        self.assertEqual(private._strings, ['pprio.res', 'pprthred.res'])
-
-        self.assertIn('overwrite', resources._children)
-        overwrite = resources._children['overwrite']
-        self.assertEqual(overwrite._strings, ['new.res'])
 
     def test_branding_files(self):
         reader = self.reader('branding-files')
@@ -887,6 +851,24 @@ class TestEmitterBasic(unittest.TestCase):
             '/dir3',
         ]
         self.assertEquals([p.full_path for p in objs[0].paths], expected)
+
+    def test_binary_components(self):
+        """Test that IS_COMPONENT/NO_COMPONENTS_MANIFEST work properly."""
+        reader = self.reader('binary-components')
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 3)
+        self.assertIsInstance(objs[0], ChromeManifestEntry)
+        self.assertEqual(objs[0].path,
+                         'dist/bin/components/components.manifest')
+        self.assertIsInstance(objs[0].entry, manifest.ManifestBinaryComponent)
+        self.assertEqual(objs[0].entry.base, 'dist/bin/components')
+        self.assertEqual(objs[0].entry.relpath, objs[1].lib_name)
+        self.assertIsInstance(objs[1], SharedLibrary)
+        self.assertEqual(objs[1].basename, 'foo')
+        self.assertIsInstance(objs[2], SharedLibrary)
+        self.assertEqual(objs[2].basename, 'bar')
+
 
 if __name__ == '__main__':
     main()
