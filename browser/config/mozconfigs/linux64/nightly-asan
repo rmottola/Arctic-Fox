@@ -1,14 +1,13 @@
-# Use at least -O1 for optimization to avoid stack space
-# exhaustions caused by Clang function inlining.
-ac_add_options --enable-debug
-ac_add_options --enable-optimize="-O1"
+# We still need to build with debug symbols
+ac_add_options --disable-debug
+ac_add_options --enable-optimize="-O2 -gline-tables-only"
 
 # ASan specific options on Linux
 ac_add_options --enable-valgrind
 
 . $topsrcdir/build/unix/mozconfig.asan
 
-export PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/usr/share/pkgconfig
+export PKG_CONFIG_LIBDIR=/usr/lib64/pkgconfig:/usr/share/pkgconfig
 . $topsrcdir/build/unix/mozconfig.gtk
 
 # Package js shell.
