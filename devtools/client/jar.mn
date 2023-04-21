@@ -285,7 +285,7 @@ devtools.jar:
 *   skin/floating-scrollbars.css (themes/floating-scrollbars.css)
     skin/floating-scrollbars-light.css (themes/floating-scrollbars-light.css)
 *   skin/inspector.css (themes/inspector.css)
-*   skin/timeline.css (themes/timeline.css)
+    skin/timeline.css (themes/timeline.css)
     skin/images/profiler-stopwatch.svg (themes/images/profiler-stopwatch.svg)
     skin/images/profiler-stopwatch-checked.svg (themes/images/profiler-stopwatch-checked.svg)
     skin/images/sort-arrows.svg       (themes/images/sort-arrows.svg)
