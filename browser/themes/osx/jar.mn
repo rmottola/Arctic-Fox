@@ -86,7 +86,7 @@ browser.jar:
   skin/classic/browser/webRTC-sharingScreen-menubar.png
   skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
-* skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
+  skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
   skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
@@ -97,7 +97,7 @@ browser.jar:
   skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
   skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
   skin/classic/browser/downloads/download-summary.png       (downloads/download-summary.png)
-* skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
+  skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
   skin/classic/browser/feeds/feedIcon.png                   (feeds/feedIcon.png)
   skin/classic/browser/feeds/feedIcon16.png                 (feeds/feedIcon16.png)
   skin/classic/browser/feeds/feed-icons-16.png              (feeds/feed-icons-16.png)
@@ -106,7 +106,7 @@ browser.jar:
   skin/classic/browser/newtab/newTab.css                    (newtab/newTab.css)
   skin/classic/browser/newtab/noise.png                     (newtab/noise.png)
   skin/classic/browser/places/places.css                    (places/places.css)
-* skin/classic/browser/places/organizer.css                 (places/organizer.css)
+  skin/classic/browser/places/organizer.css                 (places/organizer.css)
   skin/classic/browser/places/editBookmark.png              (places/editBookmark.png)
   skin/classic/browser/places/bookmark.png                  (places/bookmark.png)
   skin/classic/browser/places/query.png                     (places/query.png)
