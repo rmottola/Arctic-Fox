@@ -16,6 +16,7 @@
 # faststripe              windows + faststripe (no native theme components)
 
 toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
+app = CONFIG['MOZ_BUILD_APP']
 
 if toolkit == 'cocoa':
     DIRS += ['osx']
