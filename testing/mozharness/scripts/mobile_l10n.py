@@ -224,7 +224,7 @@ class MobileSingleLocale(MockMixin, LocalesMixin, ReleaseMixin,
         """
         if self.revision:
             return self.revision
-        r = re.compile(r"goanna_revision ([0-9a-f]{12}\+?)")
+        r = re.compile(r"gecko_revision ([0-9a-f]+\+?)")
         output = self._query_make_ident_output()
         for line in output.splitlines():
             m = r.match(line)
