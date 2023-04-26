@@ -193,8 +193,8 @@ checksum:
 
 
 upload: checksum
-	$(PYTHON) $(MOZILLA_DIR)/build/upload.py --base-path $(DIST) \
-		--package $(PACKAGE) \
+	$(PYTHON) -u $(MOZILLA_DIR)/build/upload.py --base-path $(DIST) \
+		--package '$(PACKAGE)' \
 		--properties-file $(DIST)/mach_build_properties.json \
 		$(UPLOAD_FILES) \
 		$(CHECKSUM_FILES)
