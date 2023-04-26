@@ -30,6 +30,7 @@ Var AddQuickLaunchSC
 Var AddDesktopSC
 Var InstallMaintenanceService
 Var PageName
+Var PreventRebootRequired
 
 ; By defining NO_STARTMENU_DIR an installer that doesn't provide an option for
 ; an application's Start Menu PROGRAMS directory and doesn't define the
@@ -90,6 +91,7 @@ VIAddVersionKey "OriginalFilename" "setup.exe"
 !insertmacro RegCleanAppHandler
 !insertmacro RegCleanMain
 !insertmacro RegCleanUninstall
+!insertmacro RemovePrecompleteEntries
 !insertmacro SetAppLSPCategories
 !insertmacro SetBrandNameVars
 !insertmacro UpdateShortcutAppModelIDs
@@ -185,7 +187,42 @@ Section "-InstallStartCleanup"
   SetOutPath "$INSTDIR"
   ${StartInstallLog} "${BrandFullName}" "${AB_CD}" "${AppVersion}" "${GREVersion}"
 
-  ; Delete the app exe to prevent launching the app while we are installing.
+  StrCpy $R9 "true"
+  StrCpy $PreventRebootRequired "false"
+  ${GetParameters} $R8
+  ${GetOptions} "$R8" "/INI=" $R7
+  ${Unless} ${Errors}
+    ; The configuration file must also exist
+    ${If} ${FileExists} "$R7"
+      ReadINIStr $R9 $R7 "Install" "RemoveDistributionDir"
+      ReadINIStr $R8 $R7 "Install" "PreventRebootRequired"
+      ${If} $R8 == "true"
+        StrCpy $PreventRebootRequired "true"
+      ${EndIf}
+    ${EndIf}
+  ${EndUnless}
+
+  ; Remove directories and files we always control before parsing the uninstall
+  ; log so empty directories can be removed.
+  ${If} ${FileExists} "$INSTDIR\updates"
+    RmDir /r "$INSTDIR\updates"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\updated"
+    RmDir /r "$INSTDIR\updated"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\defaults\shortcuts"
+    RmDir /r "$INSTDIR\defaults\shortcuts"
+  ${EndIf}
+  ; Only remove the distribution directory if it exists and if the installer
+  ; isn't launched with an ini file that has RemoveDistributionDir=false in the
+  ; install section.
+  ${If} ${FileExists} "$INSTDIR\distribution"
+  ${AndIf} $R9 != "false"
+    RmDir /r "$INSTDIR\distribution"
+  ${EndIf}
+
+  ; Delete the app exe if present to prevent launching the app while we are
+  ; installing.
   ClearErrors
   ${DeleteFile} "$INSTDIR\${FileMainEXE}"
   ${If} ${Errors}
@@ -204,6 +241,28 @@ Section "-InstallStartCleanup"
   ${CleanUpdateDirectories} "Mozilla\Firefox" "Mozilla\updates"
 
   ${RemoveDeprecatedFiles}
+  ${RemovePrecompleteEntries} "false"
+
+  ${If} ${FileExists} "$INSTDIR\defaults\pref\channel-prefs.js"
+    Delete "$INSTDIR\defaults\pref\channel-prefs.js"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\defaults\pref"
+    RmDir "$INSTDIR\defaults\pref"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\defaults"
+    RmDir "$INSTDIR\defaults"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\uninstall"
+    ; Remove the uninstall directory that we control
+    RmDir /r "$INSTDIR\uninstall"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\update-settings.ini"
+    Delete "$INSTDIR\update-settings.ini"
+  ${EndIf}
+
+  ; Explictly remove empty webapprt dir in case it exists (bug 757978).
+  RmDir "$INSTDIR\webapprt\components"
+  RmDir "$INSTDIR\webapprt"
 
   ${InstallStartCleanupCommon}
 SectionEnd
@@ -214,8 +273,6 @@ Section "-Application" APP_IDX
   SetDetailsPrint both
   DetailPrint $(STATUS_INSTALL_APP)
   SetDetailsPrint none
-
-  RmDir /r /REBOOTOK "$INSTDIR\${TO_BE_DELETED}"
 
   ${LogHeader} "Installing Main Files"
   ${CopyFilesFromDir} "$EXEDIR\core" "$INSTDIR" \
@@ -236,18 +293,6 @@ Section "-Application" APP_IDX
     ${LogUninstall} "DLLReg: \AccessibleMarshal.dll"
     ${LogMsg} "Registered: $INSTDIR\AccessibleMarshal.dll"
   ${EndIf}
-
-  ; Write extra files created by the application to the uninstall log so they
-  ; will be removed when the application is uninstalled. To remove an empty
-  ; directory write a bogus filename to the deepest directory and all empty
-  ; parent directories will be removed.
-  ${LogUninstall} "File: \components\compreg.dat"
-  ${LogUninstall} "File: \components\xpti.dat"
-  ${LogUninstall} "File: \active-update.xml"
-  ${LogUninstall} "File: \install.log"
-  ${LogUninstall} "File: \install_status.log"
-  ${LogUninstall} "File: \install_wizard.log"
-  ${LogUninstall} "File: \updates.xml"
 
   ClearErrors
 
@@ -314,17 +359,17 @@ Section "-Application" APP_IDX
   ; it doesn't cause problems always add them.
   ${SetUninstallKeys}
 
-  ; On install always add the PaleMoonHTML and PaleMoonURL keys.
-  ; An empty string is used for the 5th param because PaleMoonHTML is not a
+  ; On install always add the FirefoxHTML and FirefoxURL keys.
+  ; An empty string is used for the 5th param because FirefoxHTML is not a
   ; protocol handler.
   ${GetLongPath} "$INSTDIR\${FileMainEXE}" $8
   StrCpy $2 "$\"$8$\" -osint -url $\"%1$\""
 
-  ; In Win8, the delegate execute handler picks up the value in PaleMoonURL and
-  ; PaleMoonHTML to launch the desktop browser when it needs to.
-  ${AddDisabledDDEHandlerValues} "PaleMoonHTML" "$2" "$8,1" \
+  ; In Win8, the delegate execute handler picks up the value in FirefoxURL and
+  ; FirefoxHTML to launch the desktop browser when it needs to.
+  ${AddDisabledDDEHandlerValues} "FirefoxHTML" "$2" "$8,1" \
                                  "${AppRegName} Document" ""
-  ${AddDisabledDDEHandlerValues} "PaleMoonURL" "$2" "$8,1" "${AppRegName} URL" \
+  ${AddDisabledDDEHandlerValues} "FirefoxURL" "$2" "$8,1" "${AppRegName} URL" \
                                  "true"
 
   ; For pre win8, the following keys should only be set if we can write to HKLM.
@@ -361,6 +406,11 @@ Section "-Application" APP_IDX
     ${Else}
       WriteRegDWORD HKCU "$0" "IconsVisible" 0
     ${EndIf}
+  ${If} ${AtLeastWin8}
+    ${RemoveDEHRegistration} ${DELEGATE_EXECUTE_HANDLER_ID} \
+                             $AppUserModelID \
+                             "FirefoxURL" \
+                             "FirefoxHTML"
   ${EndIf}
 
   ; These need special handling on uninstall since they may be overwritten by
@@ -501,10 +551,17 @@ Section "-InstallEndCleanup"
   ${GetShortcutsLogPath} $0
   WriteIniStr "$0" "TASKBAR" "Migrated" "true"
 
+  ; Add the Firewall entries during install
+  Call AddFirewallEntries
+
   ; Refresh desktop icons
   System::Call "shell32::SHChangeNotify(i ${SHCNE_ASSOCCHANGED}, i ${SHCNF_DWORDFLUSH}, i 0, i 0)"
 
   ${InstallEndCleanupCommon}
+
+  ${If} $PreventRebootRequired == "true"
+    SetRebootFlag false
+  ${EndIf}
 
   ${If} ${RebootFlag}
     ; When a reboot is required give SHChangeNotify time to finish the
@@ -776,9 +833,7 @@ Function leaveShortcuts
     Abort
   ${EndIf}
   ${MUI_INSTALLOPTIONS_READ} $AddDesktopSC "shortcuts.ini" "Field 2" "State"
-
-  ; If we have a Metro browser and are Win8, then we don't have a Field 3
-    ${MUI_INSTALLOPTIONS_READ} $AddStartMenuSC "shortcuts.ini" "Field 3" "State"
+  ${MUI_INSTALLOPTIONS_READ} $AddStartMenuSC "shortcuts.ini" "Field 3" "State"
 
   ; Don't install the quick launch shortcut on Windows 7
   ${Unless} ${AtLeastWin7}
@@ -1015,6 +1070,25 @@ Function .onInit
     WriteINIStr "$PLUGINSDIR\shortcuts.ini" "Field 4" Bottom "70"
     WriteINIStr "$PLUGINSDIR\shortcuts.ini" "Field 4" State  "1"
   ${EndUnless}
+
+  ; Setup the components.ini file for the Components Page
+  WriteINIStr "$PLUGINSDIR\components.ini" "Settings" NumFields "2"
+
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Type   "label"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Text   "$(OPTIONAL_COMPONENTS_DESC)"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Left   "0"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Right  "-1"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Top    "5"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 1" Bottom "25"
+
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Type   "checkbox"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Text   "$(MAINTENANCE_SERVICE_CHECKBOX_DESC)"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Left   "0"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Right  "-1"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Top    "27"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Bottom "37"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" State  "1"
+  WriteINIStr "$PLUGINSDIR\components.ini" "Field 2" Flags  "GROUP"
 
   ; There must always be a core directory.
   ${GetSize} "$EXEDIR\core\" "/S=0K" $R5 $R7 $R8
