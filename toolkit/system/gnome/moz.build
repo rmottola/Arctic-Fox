@@ -22,7 +22,7 @@ if CONFIG['MOZ_ENABLE_GIO']:
         'nsPackageKitService.cpp'
     ]
 
-XPCOMBinaryComponent('mozgnome')
+FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
     '/toolkit/components/build/',
