@@ -180,6 +180,8 @@ class RemovedFiles(GeneratedFile):
 
     def handle_line(self, str):
         f = str.strip()
+        if not f:
+            return
         if self.copier.contains(f):
             errors.error('Removal of packaged file(s): %s' % f)
         self.content += f + '\n'
@@ -345,8 +347,7 @@ def main():
         sink.close(args.manifest is not None)
 
         if args.removals:
-            lines = [l.lstrip() for l in open(args.removals).readlines()]
-            removals_in = StringIO(''.join(lines))
+            removals_in = StringIO(open(args.removals).read())
             removals_in.name = args.removals
             removals = RemovedFiles(copier)
             preprocess(removals_in, removals, defines)
