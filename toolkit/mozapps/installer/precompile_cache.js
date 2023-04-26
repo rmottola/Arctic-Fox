@@ -6,9 +6,9 @@
 
 // see http://mxr.mozilla.org/mozilla-central/source/services/sync/Weave.js#76
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/Services.jsm");
 
@@ -28,9 +28,13 @@ function jar_entries(jarReader, pattern) {
 }
 
 function dir_entries(baseDir, subpath, ext) {
-  var dir = baseDir.clone();
-  dir.append(subpath);
-  var enumerator = dir.directoryEntries;
+  try {
+    var dir = baseDir.clone();
+    dir.append(subpath);
+    var enumerator = dir.directoryEntries;
+  } catch (e) {
+    return [];
+  }
   var entries = [];
   while (enumerator.hasMoreElements()) {
     var file = enumerator.getNext().QueryInterface(Ci.nsIFile);
