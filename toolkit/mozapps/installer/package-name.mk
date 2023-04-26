@@ -122,8 +122,8 @@ PKG_SRCPACK_PATH = source/
 endif # MOZ_PKG_PRETTYNAMES
 
 # Symbol package naming
-SYMBOL_FULL_ARCHIVE_BASENAME = $(PKG_BASENAME).crash-symbols-full
-SYMBOL_ARCHIVE_BASENAME = $(PKG_BASENAME).crash-symbols
+SYMBOL_FULL_ARCHIVE_BASENAME = $(PKG_BASENAME).crashreporter-symbols-full
+SYMBOL_ARCHIVE_BASENAME = $(PKG_BASENAME).crashreporter-symbols
 
 # Code coverage package naming
 CODE_COVERAGE_ARCHIVE_BASENAME = $(PKG_BASENAME).code-coverage-gcno

@@ -890,6 +890,7 @@ def group_unified_files(files, unified_prefix, unified_suffix,
 
 def pair(iterable):
     '''Given an iterable, returns an iterable pairing its items.
+
     For example,
         list(pair([1,2,3,4,5,6]))
     returns
@@ -905,6 +906,7 @@ VARIABLES_RE = re.compile('\$\((\w+)\)')
 def expand_variables(s, variables):
     '''Given a string with $(var) variable references, replace those references
     with the corresponding entries from the given `variables` dict.
+
     If a variable value is not a string, it is iterated and its items are
     joined with a whitespace.'''
     result = ''

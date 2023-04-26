@@ -427,10 +427,9 @@ class Automation(object):
         stackFixerFunction = lambda line: stackFixerModule.fixSymbols(line)
         del sys.path[0]
 
-      # With indirect browser runs, this script launches the test harness which launches the browser.
-      # The test harness hands back the real browser process id via log output which we need to
+      # With metro browser runs this script launches the metro test harness which launches the browser.
+      # The metro test harness hands back the real browser process id via log output which we need to
       # pick up on and parse out. This variable tracks the real browser process id if we find it.
-      # XXX: Previously used by metro. Do we still need this?
       browserProcessId = -1
 
       (line, didTimeout) = self.readWithTimeout(logsource, timeout)

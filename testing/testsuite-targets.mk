@@ -389,6 +389,7 @@ include $(topsrcdir)/toolkit/mozapps/installer/package-name.mk
 
 ifndef UNIVERSAL_BINARY
 PKG_STAGE = $(DIST)/test-stage
+
 stage-all: \
   stage-config \
   stage-mach \
@@ -473,6 +474,11 @@ endef
 
 $(foreach name,$(TEST_PKGS),$(eval $(call package_archive,$(name))))
 
+ifeq ($(MOZ_BUILD_APP),mobile/android)
+stage-all: stage-android
+stage-all: stage-instrumentation-tests
+endif
+
 ifeq ($(MOZ_BUILD_APP),mobile/android/b2gdroid)
 stage-all: stage-android
 endif
@@ -534,6 +540,8 @@ endif
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/watcher/Watcher.apk $(PKG_STAGE)/bin
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/fencp/FenCP.apk $(PKG_STAGE)/bin
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/ffxcp/FfxCP.apk $(PKG_STAGE)/bin
+	$(NSINSTALL) $(topsrcdir)/mobile/android/fonts $(DEPTH)/_tests/reftest
+	$(NSINSTALL) $(topsrcdir)/mobile/android/fonts $(DEPTH)/_tests/testing/mochitest
 
 stage-jetpack: make-stage-dir
 	$(MAKE) -C $(DEPTH)/addon-sdk stage-tests-package

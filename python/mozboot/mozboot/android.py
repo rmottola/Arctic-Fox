@@ -7,13 +7,15 @@ from __future__ import print_function
 
 import errno
 import os
+import stat
 import subprocess
+import sys
 
 # These are the platform and build-tools versions for building
 # mobile/android, respectively. Try to keep these in synch with the
 # build system and Mozilla's automation.
-ANDROID_PLATFORM = 'android-21'
-ANDROID_BUILD_TOOLS_VERSION = '21.1.2'
+ANDROID_TARGET_SDK = '23'
+ANDROID_BUILD_TOOLS_VERSION = '23.0.1'
 
 # These are the "Android packages" needed for building Firefox for Android.
 # Use |android list sdk --extended| to see these identifiers.
@@ -21,9 +23,9 @@ ANDROID_PACKAGES = [
     'tools',
     'platform-tools',
     'build-tools-%s' % ANDROID_BUILD_TOOLS_VERSION,
-    ANDROID_PLATFORM,
-    'extra-android-support',
-    'extra-google-google_play_services',
+    'android-%s' % ANDROID_TARGET_SDK,
+    'extra-google-m2repository',
+    'extra-android-m2repository',
 ]
 
 ANDROID_NDK_EXISTS = '''
@@ -80,6 +82,7 @@ def check_output(*args, **kwargs):
 
     return fn(*args, **kwargs)
 
+
 def list_missing_android_packages(android_tool, packages):
     '''
     Use the given |android| tool to return the sub-list of Android
@@ -91,7 +94,7 @@ def list_missing_android_packages(android_tool, packages):
     # but packages that are installed don't appear in the list of
     # available packages.
     lines = check_output([android_tool,
-        'list', 'sdk', '--no-ui', '--extended']).splitlines()
+                          'list', 'sdk', '--no-ui', '--extended']).splitlines()
 
     # Lines look like: 'id: 59 or "extra-google-simulators"'
     for line in lines:
@@ -110,6 +113,7 @@ def list_missing_android_packages(android_tool, packages):
                 missing.append(package)
 
     return missing
+
 
 def install_mobile_android_sdk_or_ndk(url, path):
     '''
@@ -144,17 +148,34 @@ def install_mobile_android_sdk_or_ndk(url, path):
         file = url.split('/')[-1]
 
         os.chdir(path)
+        abspath = os.path.join(download_path, file)
         if file.endswith('.tar.gz') or file.endswith('.tgz'):
-            cmd = ['tar', 'zvxf']
+            cmd = ['tar', 'zvxf', abspath]
         elif file.endswith('.tar.bz2'):
-            cmd = ['tar', 'jvxf']
-        elif file.endswitch('.zip'):
-            cmd = ['unzip']
+            cmd = ['tar', 'jvxf', abspath]
+        elif file.endswith('.zip'):
+            cmd = ['unzip', abspath]
+        elif file.endswith('.bin'):
+            # Execute the .bin file, which unpacks the content.
+            mode = os.stat(path).st_mode
+            os.chmod(abspath, mode | stat.S_IXUSR)
+            cmd = [abspath]
         else:
             raise NotImplementedError("Don't know how to unpack file: %s" % file)
-        subprocess.check_call(cmd + [os.path.join(download_path, file)])
+
+        print('Unpacking %s...' % abspath)
+
+        with open(os.devnull, "w") as stdout:
+            # These unpack commands produce a ton of output; ignore it.  The
+            # .bin files are 7z archives; there's no command line flag to quiet
+            # output, so we use this hammer.
+            subprocess.check_call(cmd, stdout=stdout)
+
+        print('Unpacking %s... DONE' % abspath)
+
     finally:
         os.chdir(old_path)
+
 
 def ensure_android_sdk_and_ndk(path, sdk_path, sdk_url, ndk_path, ndk_url):
     '''
@@ -178,6 +199,7 @@ def ensure_android_sdk_and_ndk(path, sdk_path, sdk_url, ndk_path, ndk_url):
     else:
         install_mobile_android_sdk_or_ndk(sdk_url, path)
 
+
 def ensure_android_packages(android_tool, packages=None):
     '''
     Use the given android tool (like 'android') to install required Android
@@ -187,7 +209,10 @@ def ensure_android_packages(android_tool, packages=None):
     if not packages:
         packages = ANDROID_PACKAGES
 
-    missing = list_missing_android_packages(android_tool, packages=packages)
+    # Bug 1171232: The |android| tool behaviour has changed; we no longer can
+    # see what packages are installed easily.  Force installing everything until
+    # we find a way to actually see the missing packages.
+    missing = packages
     if not missing:
         print(NOT_INSTALLING_ANDROID_PACKAGES % ', '.join(packages))
         return
@@ -196,13 +221,28 @@ def ensure_android_packages(android_tool, packages=None):
     # may be prompted to agree to the Android license.
     print(INSTALLING_ANDROID_PACKAGES % ', '.join(missing))
     subprocess.check_call([android_tool,
-        'update', 'sdk', '--no-ui',
-        '--filter', ','.join(missing)])
+                           'update', 'sdk', '--no-ui', '--all',
+                           '--filter', ','.join(missing)])
 
-    # Let's verify.
-    failing = list_missing_android_packages(android_tool, packages=packages)
+    # Bug 1171232: The |android| tool behaviour has changed; we no longer can
+    # see what packages are installed easily.  Don't check until we find a way
+    # to actually verify.
+    failing = []
     if failing:
         raise Exception(MISSING_ANDROID_PACKAGES % (', '.join(missing), ', '.join(failing)))
 
+
 def suggest_mozconfig(sdk_path=None, ndk_path=None):
     print(MOBILE_ANDROID_MOZCONFIG_TEMPLATE % (sdk_path, ndk_path))
+
+
+def android_ndk_url(os_name, ver='r10e'):
+    # Produce a URL like 'https://dl.google.com/android/ndk/android-ndk-r10e-linux-x86_64.bin'.
+    base_url = 'https://dl.google.com/android/ndk/android-ndk'
+
+    if sys.maxsize > 2**32:
+        arch = 'x86_64'
+    else:
+        arch = 'x86'
+
+    return '%s-%s-%s-%s.bin' % (base_url, ver, os_name, arch)
