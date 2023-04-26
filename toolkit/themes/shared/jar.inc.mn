@@ -21,6 +21,7 @@ toolkit.jar:
   skin/classic/global/aboutSupport.css                     (../../shared/aboutSupport.css)
   skin/classic/global/appPicker.css                        (../../shared/appPicker.css)
   skin/classic/global/config.css                           (../../shared/config.css)
+  skin/classic/global/icons/info.svg                       (../../shared/incontent-icons/info.svg)
   skin/classic/global/icons/warning.svg                    (../../shared/incontent-icons/warning.svg)
   skin/classic/global/alerts/alert-common.css              (../../shared/alert-common.css)
   skin/classic/global/menu/shared-menu-check@2x.png        (../../shared/menu-check@2x.png)
