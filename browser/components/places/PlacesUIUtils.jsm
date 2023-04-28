@@ -89,7 +89,7 @@ this.PlacesUIUtils = {
    * Makes a URI from a spec, and do fixup
    * @param   aSpec
    *          The string spec of the URI
-   * @returns A URI object for the spec.
+   * @return A URI object for the spec.
    */
   createFixedURI: function PUIU_createFixedURI(aSpec) {
     return URIFixup.createFixupURI(aSpec, Ci.nsIURIFixup.FIXUP_FLAG_NONE);
@@ -344,8 +344,8 @@ this.PlacesUIUtils = {
    *          The index within the container the item was dropped or pasted at
    * @param   copy
    *          The drag action was copy, so don't move folders or links.
-   * @returns An object implementing nsITransaction that can perform
-   *          the move/insert.
+   * @return An object implementing nsITransaction that can perform
+   *         the move/insert.
    */
   makeTransaction:
   function PUIU_makeTransaction(data, type, container, index, copy)
@@ -445,62 +445,6 @@ this.PlacesUIUtils = {
     return PlacesTransactions.NewBookmark({ uri: NetUtil.newURI(aData.uri)
                                           , title: title
                                           , parentGuid: aNewParentGuid
-                                          , index: aIndex });
-  },
-
-  /**
-   * ********* PlacesTransactions version of the function defined above ********
-   *
-   * Constructs a Places Transaction for the drop or paste of a blob of data
-   * into a container.
-   *
-   * @param aData
-   *        The unwrapped data blob of dropped or pasted data.
-   * @param aType
-   *        The content type of the data.
-   * @param aNewParentGuid
-   *        GUID of the container the data was dropped or pasted into.
-   * @param aIndex
-   *        The index within the container the item was dropped or pasted at.
-   * @param aCopy
-   *        The drag action was copy, so don't move folders or links.
-   *
-   * @returns a Places Transaction that can be passed to
-   *          PlacesTranactions.transact for performing the move/insert command.
-   */
-  getTransactionForData: function(aData, aType, aNewParentGuid, aIndex, aCopy) {
-    if (this.SUPPORTED_FLAVORS.indexOf(aData.type) == -1)
-      throw new Error(`Unsupported '${aData.type}' data type`);
-
-    if ("itemGuid" in aData) {
-      if (this.PLACES_FLAVORS.indexOf(aData.type) == -1)
-        throw new Error (`itemGuid unexpectedly set on ${aData.type} data`);
-
-      let info = { GUID: aData.itemGuid
-                 , newParentGUID: aNewParentGuid
-                 , newIndex: aIndex };
-      if (aCopy)
-        return PlacesTransactions.Copy(info);
-      return PlacesTransactions.Move(info);
-    }
-
-    // Since it's cheap and harmless, we allow the paste of separators and
-    // bookmarks from builds that use legacy transactions (i.e. when itemGuid
-    // was not set on PLACES_FLAVORS data). Containers are a different story,
-    // and thus disallowed.
-    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER)
-      throw new Error("Can't copy a container from a legacy-transactions build");
-
-    if (aData.type == PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR) {
-      return PlacesTransactions.NewSeparator({ parentGUID: aNewParentGuid
-                                             , index: aIndex });
-    }
-
-    let title = aData.type != PlacesUtils.TYPE_UNICODE ? aData.title
-                                                       : aData.uri;
-    return PlacesTransactions.NewBookmark({ uri: NetUtil.newURI(aData.uri)
-                                          , title: title
-                                          , parentGUID: aNewParentGuid
                                           , index: aIndex });
   },
 
@@ -631,8 +575,8 @@ this.PlacesUIUtils = {
    * element.
    * @param   doc
    *          A DOM Document to get a description for
-   * @returns A description string if a META element was discovered with a
-   *          "description" or "httpequiv" attribute, empty string otherwise.
+   * @return A description string if a META element was discovered with a
+   *         "description" or "httpequiv" attribute, empty string otherwise.
    */
   getDescriptionFromDocument: function PUIU_getDescriptionFromDocument(doc) {
     var metaElements = doc.getElementsByTagName("META");
@@ -649,7 +593,7 @@ this.PlacesUIUtils = {
    * Retrieve the description of an item
    * @param aItemId
    *        item identifier
-   * @returns the description of the given item, or an empty string if it is
+   * @return the description of the given item, or an empty string if it is
    * not set.
    */
   getItemDescription: function PUIU_getItemDescription(aItemId) {
@@ -679,7 +623,7 @@ this.PlacesUIUtils = {
       // direct non-bookmark children of bookmark folders.
       return !PlacesUtils.nodeIsFolder(parentNode);
     }
-    
+
     // Generally it's always possible to remove children of a query.
     if (PlacesUtils.nodeIsQuery(parentNode))
       return true;
@@ -825,7 +769,7 @@ this.PlacesUIUtils = {
       var uriList = PlacesUtils.toISupportsString(urls.join("|"));
       var args = Cc["@mozilla.org/supports-array;1"].
                   createInstance(Ci.nsISupportsArray);
-      args.AppendElement(uriList);      
+      args.AppendElement(uriList);
       browserWindow = Services.ww.openWindow(aWindow,
                                              "chrome://browser/content/browser.xul",
                                              null, "chrome,dialog=no,all", args);
@@ -1250,7 +1194,7 @@ this.PlacesUIUtils = {
    * or an empty string if not.
    *
    * @param aItemId id of a container
-   * @returns the name of the query, or empty string if not a left-pane query
+   * @return the name of the query, or empty string if not a left-pane query
    */
   getLeftPaneQueryNameFromId: function PUIU_getLeftPaneQueryNameFromId(aItemId) {
     var queryName = "";
@@ -1453,18 +1397,6 @@ PlacesUIUtils.URI_FLAVORS = [PlacesUtils.TYPE_X_MOZ_URL,
 PlacesUIUtils.SUPPORTED_FLAVORS = [...PlacesUIUtils.PLACES_FLAVORS,
                                    ...PlacesUIUtils.URI_FLAVORS];
 
-
-PlacesUIUtils.PLACES_FLAVORS = [PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER,
-                                PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR,
-                                PlacesUtils.TYPE_X_MOZ_PLACE];
-
-PlacesUIUtils.URI_FLAVORS = [PlacesUtils.TYPE_X_MOZ_URL,
-                             TAB_DROP_TYPE,
-                             PlacesUtils.TYPE_UNICODE],
-
-PlacesUIUtils.SUPPORTED_FLAVORS = [...PlacesUIUtils.PLACES_FLAVORS,
-                                   ...PlacesUIUtils.URI_FLAVORS];
-
 XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF",
                                    "@mozilla.org/rdf/rdf-service;1",
                                    "nsIRDFService");
@@ -1582,7 +1514,7 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ptm", function() {
      *        id of the bookmark where to set Load-in-sidebar annotation.
      * @param aLoadInSidebar
      *        boolean value.
-     * @returns nsITransaction object.
+     * @return nsITransaction object.
      */
     setLoadInSidebar: function(aItemId, aLoadInSidebar)
     {
@@ -1601,7 +1533,7 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ptm", function() {
     *        id of the item to edit.
     * @param aDescription
     *        new description.
-    * @returns nsITransaction object.
+    * @return nsITransaction object.
     */
     editItemDescription: function(aItemId, aDescription)
     {

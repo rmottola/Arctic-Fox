@@ -768,7 +768,7 @@ PlacesController.prototype = {
 
     let txn = PlacesTransactions.NewSeparator({ parentGuid: yield ip.promiseGuid()
                                               , index: ip.index });
-    let guid = yield PlacesTransactions.transact(txn);
+    let guid = yield txn.transact();
     let itemId = yield PlacesUtils.promiseItemId(guid);
     // Select the new item.
     this._view.selectItems([itemId], false);
@@ -794,7 +794,7 @@ PlacesController.prototype = {
       return;
     }
     let guid = yield PlacesUtils.promiseItemGuid(itemId);
-    yield PlacesTransactions.transact(PlacesTransactions.SortByName(guid));
+    yield PlacesTransactions.SortByName(guid).transact();
   }),
 
   /**
@@ -1582,11 +1582,10 @@ PlacesController.prototype = {
       if (ip.isTag) {
         let uris = [for (item of items) if ("uri" in item)
                     NetUtil.newURI(item.uri)];
-        yield PlacesTransactions.transact(
-          PlacesTransactions.Tag({ uris: uris, tag: ip.tagName }));
+        yield PlacesTransactions.Tag({ uris: uris, tag: ip.tagName }).transact();
       }
       else {
-        yield PlacesTransactions.transact(function *() {
+        yield PlacesTransactions.batch(function* () {
           let insertionIndex = ip.index;
           let parent = yield ip.promiseGuid();
 
@@ -1934,7 +1933,7 @@ var PlacesControllerDragHelper = {
     }
 
     if (PlacesUIUtils.useAsyncTransactions) {
-      yield PlacesTransactions.transact(transactions);
+      yield PlacesTransactions.batch(transactions);
     }
     else {
       let txn = new PlacesAggregatedTransaction("DropItems", transactions);
