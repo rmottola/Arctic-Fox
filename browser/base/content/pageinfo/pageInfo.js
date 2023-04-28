@@ -108,10 +108,18 @@ pageInfoTreeView.prototype = {
         this,
         this.data,
         treecol.index,
-        function textComparator(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); },
+        function textComparator(a, b) { return (a || "").toLowerCase().localeCompare((b || "").toLowerCase()); },
         this.sortcol,
         this.sortdir
       );
+
+    Array.forEach(tree.columns, function(col) {
+      col.element.removeAttribute("sortActive");
+      col.element.removeAttribute("sortDirection");
+    });
+    treecol.element.setAttribute("sortActive", "true");
+    treecol.element.setAttribute("sortDirection", this.sortdir ?
+                                                  "ascending" : "descending");
 
     this.sortcol = treecol.index;
   },
@@ -122,7 +130,7 @@ pageInfoTreeView.prototype = {
   isContainer: function(index) { return false; },
   isContainerOpen: function(index) { return false; },
   isSeparator: function(index) { return false; },
-  isSorted: function() { },
+  isSorted: function() { return this.sortcol > -1 },
   canDrop: function(index, orientation) { return false; },
   drop: function(row, orientation) { return false; },
   getParentIndex: function(index) { return 0; },
@@ -196,10 +204,11 @@ gImageView.onPageMediaSort = function(columnname) {
   var treecol = tree.columns.getNamedColumn(columnname);
 
   var comparator;
-  if (treecol.index == COL_IMAGE_SIZE || treecol.index == COL_IMAGE_COUNT) {
+  var index = treecol.index;
+  if (index == COL_IMAGE_SIZE || index == COL_IMAGE_COUNT) {
     comparator = function numComparator(a, b) { return a - b; };
   } else {
-    comparator = function textComparator(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); };
+    comparator = function textComparator(a, b) { return (a || "").toLowerCase().localeCompare((b || "").toLowerCase()); };
   }
 
   this.sortdir =
@@ -207,13 +216,21 @@ gImageView.onPageMediaSort = function(columnname) {
       tree,
       this,
       this.data,
-      treecol.index,
+      index,
       comparator,
       this.sortcol,
       this.sortdir
     );
 
-  this.sortcol = treecol.index;
+  Array.forEach(tree.columns, function(col) {
+    col.element.removeAttribute("sortActive");
+    col.element.removeAttribute("sortDirection");
+  });
+  treecol.element.setAttribute("sortActive", "true");
+  treecol.element.setAttribute("sortDirection", this.sortdir ?
+                                                "ascending" : "descending");
+
+  this.sortcol = index;
 };
 
 var gImageHash = { };
