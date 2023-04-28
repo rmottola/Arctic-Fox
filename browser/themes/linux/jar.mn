@@ -42,7 +42,6 @@ browser.jar:
   skin/classic/browser/Info.png
   skin/classic/browser/mask.png                             (../shared/mask.png)
   skin/classic/browser/mask@2x.png                          (../shared/mask@2x.png)
-  skin/classic/browser/in-content/common.css                    (../shared/in-content/common.css)
   skin/classic/browser/KUI-close.png
   skin/classic/browser/bad-content-blocked-16.png
   skin/classic/browser/bad-content-blocked-64.png
