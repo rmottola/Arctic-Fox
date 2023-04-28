@@ -2637,6 +2637,7 @@ var BrowserOnClick = {
     mm.addMessageListener("Browser:EnableOnlineMode", this);
     mm.addMessageListener("Browser:SendSSLErrorReport", this);
     mm.addMessageListener("Browser:SetSSLErrorReportAuto", this);
+    mm.addMessageListener("Browser:SSLErrorGoBack", this);
   },
 
   uninit: function () {
@@ -2646,6 +2647,7 @@ var BrowserOnClick = {
     mm.removeMessageListener("Browser:EnableOnlineMode", this);
     mm.removeMessageListener("Browser:SendSSLErrorReport", this);
     mm.removeMessageListener("Browser:SetSSLErrorReportAuto", this);
+    mm.removeMessageListener("Browser:SSLErrorGoBack", this);
   },
 
   handleEvent: function (event) {
@@ -2692,6 +2694,9 @@ var BrowserOnClick = {
       break;
       case "Browser:SetSSLErrorReportAuto":
         Services.prefs.setBoolPref("security.ssl.errorReporting.automatic", msg.json.automatic);
+      break;
+      case "Browser:SSLErrorGoBack":
+        goBackFromErrorPage();
       break;
     }
   },
