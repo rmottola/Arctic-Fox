@@ -243,11 +243,18 @@ Cc["@mozilla.org/eventlistenerservice;1"]
   .getService(Ci.nsIEventListenerService)
   .addSystemEventListener(global, "contextmenu", handleContentContextMenu, false);
 
+// Values for telemtery bins: see TLS_ERROR_REPORT_UI in Histograms.json
+const TLS_ERROR_REPORT_TELEMETRY_UI_SHOWN = 0;
+const TLS_ERROR_REPORT_TELEMETRY_EXPANDED = 1;
+const TLS_ERROR_REPORT_TELEMETRY_SUCCESS  = 6;
+const TLS_ERROR_REPORT_TELEMETRY_FAILURE  = 7;
+
 var AboutNetErrorListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSendReport', this, false, true);
+    chromeGlobal.addEventListener('AboutNetErrorUIExpanded', this, false, true);
   },
 
   get isAboutNetError() {
@@ -268,6 +275,10 @@ var AboutNetErrorListener = {
       break;
     case "AboutNetErrorSendReport":
       this.onSendReport(aEvent);
+      break;
+    case "AboutNetErrorUIExpanded":
+      sendAsyncMessage("Browser:SSLErrorReportTelemetry",
+                       {reportStatus: TLS_ERROR_REPORT_TELEMETRY_EXPANDED});
       break;
     }
   },
@@ -325,17 +336,20 @@ var AboutNetErrorListener = {
           // show the retry button
           retryBtn.style.removeProperty("display");
           reportSendingMsg.style.display = "none";
+          sendAsyncMessage("Browser:SSLErrorReportTelemetry",
+                           {reportStatus: TLS_ERROR_REPORT_TELEMETRY_FAILURE});
           break;
         case "complete":
           // Show a success indicator
           reportSentMsg.style.removeProperty("display");
           reportSendingMsg.style.display = "none";
+          sendAsyncMessage("Browser:SSLErrorReportTelemetry",
+                           {reportStatus: TLS_ERROR_REPORT_TELEMETRY_SUCCESS});
           break;
         }
       }
     });
 
-    let failedChannel = docShell.failedChannel;
     let location = contentDoc.location.href;
 
     let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
@@ -350,7 +364,7 @@ var AboutNetErrorListener = {
     sendAsyncMessage("Browser:SendSSLErrorReport", {
         elementId: evt.target.id,
         documentURI: contentDoc.documentURI,
-        location: contentDoc.location,
+        location: {hostname: contentDoc.location.hostname, port: contentDoc.location.port},
         securityInfo: serializedSecurityInfo
       });
   }
