@@ -293,7 +293,7 @@ PlacesController.prototype = {
       this.reloadSelectedLivemark();
       break;
     case "placesCmd_sortBy:name":
-      this.sortFolderByName().then(null, Cu.reportError);
+      this.sortFolderByName().then(null, Components.utils.reportError);
       break;
     case "placesCmd_createBookmark":
       let node = this._view.selectedNode;
@@ -342,7 +342,7 @@ PlacesController.prototype = {
         if (nodes[i] == root)
           return false;
 
-      if (!PlacesUIUtils.canUserRemove(nodes[i]))
+        if (!PlacesUIUtils.canUserRemove(nodes[i]))
           return false;
       }
     }
@@ -1601,7 +1601,7 @@ PlacesController.prototype = {
               doCopy = true;
             }
             let guid = yield PlacesUIUtils.getTransactionForData(
-              item, type, parent, insertionIndex, doCopy);
+              item, type, parent, insertionIndex, doCopy).transact();
             itemsToSelect.push(yield PlacesUtils.promiseItemId(guid));
 
             // Adjust index to make sure items are pasted in the correct
