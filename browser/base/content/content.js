@@ -13,6 +13,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource:///modules/ContentWebRTC.jsm");
 Cu.import("resource://gre/modules/InlineSpellChecker.jsm");
 Cu.import("resource://gre/modules/InlineSpellCheckerContent.jsm");
+Cu.import("resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
   "resource://gre/modules/BrowserUtils.jsm");
@@ -837,8 +838,7 @@ var PageInfoListener = {
     sendAsyncMessage("PageInfo:data", pageInfoData);
 
     // Separate step so page info dialog isn't blank while waiting for this to finish.
-    let pageInfoMediaData = {imageViewRows: this.getMediaInfo(document, window, strings)};
-    sendAsyncMessage("PageInfo:mediaData", pageInfoMediaData);
+    this.getMediaInfo(document, window, strings);
   },
 
   getMetaInfo: function(document) {
