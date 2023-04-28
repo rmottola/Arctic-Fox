@@ -1912,8 +1912,8 @@ var PlacesControllerDragHelper = {
         // If this is not a copy, check for safety that we can move the source,
         // otherwise report an error and fallback to a copy.
         if (!doCopy && !PlacesControllerDragHelper.canMoveUnwrappedNode(unwrapped)) {
-          Components.utils.reportError("Tried to move an unmovable Places node, " +
-                                       "reverting to a copy operation.");
+          Components.utils.reportError("Tried to move an unmovable Places " +
+                                       "node, reverting to a copy operation.");
           doCopy = true;
         }
         if (PlacesUIUtils.useAsyncTransactions) {
