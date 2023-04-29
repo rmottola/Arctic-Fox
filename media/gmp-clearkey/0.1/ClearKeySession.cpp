@@ -19,7 +19,6 @@
 #include "ClearKeyUtils.h"
 #include "ClearKeyStorage.h"
 #include "gmp-task-utils.h"
-
 #include "gmp-api/gmp-decryption.h"
 #include "Endian.h"
 #include <assert.h>
@@ -70,6 +69,11 @@ ClearKeySession::Init(uint32_t aCreateSessionToken,
       mCallback->RejectPromise(aPromiseId, kGMPAbortError, message, strlen(message));
       return;
     }
+  } else if (aInitDataType == "webm" && aInitDataSize == 16) {
+    // "webm" initData format is simply the raw bytes of the keyId.
+    vector<uint8_t> keyId;
+    keyId.assign(aInitData, aInitData+aInitDataSize);
+    mKeyIds.push_back(keyId);
   }
 
   if (!mKeyIds.size()) {
