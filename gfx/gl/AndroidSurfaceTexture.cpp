@@ -11,6 +11,7 @@
 #include <android/log.h>
 #include "AndroidSurfaceTexture.h"
 #include "gfxImageSurface.h"
+#include "gfxPrefs.h"
 #include "AndroidBridge.h"
 #include "nsThreadUtils.h"
 #include "mozilla/gfx/Matrix.h"
