@@ -71,7 +71,6 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     gcIncomingGrayPointers(nullptr),
     gcPreserveJitCode(options.preserveJitCode()),
     debugModeBits(0),
-    rngState(0),
     watchpointMap(nullptr),
     scriptCountsMap(nullptr),
     debugScriptMap(nullptr),
