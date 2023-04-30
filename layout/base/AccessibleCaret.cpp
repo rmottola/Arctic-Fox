@@ -254,6 +254,7 @@ AccessibleCaret::SetPosition(nsIFrame* aFrame, int32_t aOffset)
 
   if (imaginaryCaretRectInFrame.IsEmpty()) {
     // Don't bother to set the caret position since it's invisible.
+    mImaginaryCaretRect = nsRect();
     return PositionChangedResult::Invisible;
   }
 
