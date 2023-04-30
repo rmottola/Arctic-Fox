@@ -1092,7 +1092,9 @@ Animation::GetCollection() const
   MOZ_ASSERT(targetElement,
              "An animation with an animation manager must have a target");
 
-  return manager->GetAnimations(targetElement, targetPseudoType, false);
+  return manager->GetAnimationCollection(targetElement,
+                                         targetPseudoType,
+                                         false /* aCreateIfNeeded */);
 }
 
 void
