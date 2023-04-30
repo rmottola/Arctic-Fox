@@ -1561,7 +1561,8 @@ protected:
       }
       return NS_OK;
     }
-    nsRootPresContext* mPresContext;
+    // The lifetime of this reference is handled by an nsRevocableEventPtr
+    nsRootPresContext* MOZ_NON_OWNING_REF mPresContext;
   };
 
   friend class nsPresContext;
