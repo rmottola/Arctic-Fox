@@ -54,6 +54,7 @@
 #include "ImageContainer.h"
 #include "nsCanvasFrame.h"
 #include "StickyScrollContainer.h"
+#include "mozilla/AnimationUtils.h"
 #include "mozilla/EventStates.h"
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/PendingAnimationTracker.h"
@@ -5374,8 +5375,7 @@ nsDisplayOpacity::CanUseAsyncAnimations(nsDisplayListBuilder* aBuilder)
   if (nsLayoutUtils::IsAnimationLoggingEnabled()) {
     nsCString message;
     message.AppendLiteral("Performance warning: Async animation disabled because frame was not marked active for opacity animation");
-    AnimationCollection::LogAsyncAnimationFailure(message,
-                                                  Frame()->GetContent());
+    AnimationUtils::LogAsyncAnimationFailure(message, Frame()->GetContent());
   }
   return false;
 }
@@ -5426,8 +5426,7 @@ nsDisplayTransform::ShouldPrerenderTransformedContent(nsDisplayListBuilder* aBui
     if (aLogAnimations) {
       nsCString message;
       message.AppendLiteral("Performance warning: Async animation disabled because frame was not marked active for transform animation");
-      AnimationCollection::LogAsyncAnimationFailure(message,
-                                                    aFrame->GetContent());
+      AnimationUtils::LogAsyncAnimationFailure(message, aFrame->GetContent());
     }
     return false;
   }
@@ -5466,8 +5465,7 @@ nsDisplayTransform::ShouldPrerenderTransformedContent(nsDisplayListBuilder* aBui
     message.AppendLiteral(") is larger than the max allowable value (");
     message.AppendInt(nsPresContext::AppUnitsToIntCSSPixels(maxInAppUnits));
     message.Append(')');
-    AnimationCollection::LogAsyncAnimationFailure(message,
-                                                  aFrame->GetContent());
+    AnimationUtils::LogAsyncAnimationFailure(message, aFrame->GetContent());
   }
   return false;
 }
