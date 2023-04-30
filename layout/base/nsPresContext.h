@@ -1215,6 +1215,10 @@ protected:
 
   bool IsChromeSlow() const;
 
+  bool InitTimer(nsCOMPtr<nsITimer>& aTimer,
+                 nsTimerCallbackFunc aCallback,
+                 uint32_t aDelay);
+
   // IMPORTANT: The ownership implicit in the following member variables
   // has been explicitly checked.  If you add any members to this class,
   // please make the ownership explicit (pinkerton, scc).
