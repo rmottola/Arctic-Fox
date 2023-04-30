@@ -946,6 +946,7 @@ Animation::UpdateEffect()
 {
   if (mEffect) {
     UpdateRelevance();
+    mEffect->NotifyAnimationTimingUpdated();
   }
 }
 
