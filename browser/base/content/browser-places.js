@@ -1116,7 +1116,11 @@ var BookmarkingUI = {
       // Anchor to the icon, so the panel looks more natural.
       return this.star;
     }
-    return null;
+
+    let star = this.star;
+    return star ? document.getAnonymousElementByAttribute(star, "class",
+                                                          "toolbarbutton-icon")
+                : null;
   },
 
   get notifier() {
@@ -1307,6 +1311,7 @@ var BookmarkingUI = {
   },
 
   _hasBookmarksObserver: false,
+  _itemIds: [],
   uninit: function BUI_uninit() {
     this._uninitView();
 
