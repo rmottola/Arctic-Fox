@@ -272,6 +272,9 @@
               retryBtn.addEventListener('click', sendErrorReport, false);
             }
           }
+          if (getErrorCode() == "weakCryptoUsed") {
+            showWeakCryptoAdvanced();
+          }
         }.bind(this), true, true);
 
         var event = new CustomEvent("AboutNetErrorLoad", {bubbles:true});
@@ -411,6 +414,7 @@
         <h1 id="et_cspBlocked">&cspBlocked.title;</h1>
         <h1 id="et_remoteXUL">&remoteXUL.title;</h1>
         <h1 id="et_corruptedContentError">&corruptedContentError.title;</h1>
+        <h1 id="et_weakCryptoUsed">&weakCryptoUsed.title;</h1>
       </div>
       <div id="errorDescriptionsContainer">
         <div id="ed_generic">&generic.longDesc;</div>
@@ -438,6 +442,7 @@
         <div id="ed_cspBlocked">&cspBlocked.longDesc;</div>
         <div id="ed_remoteXUL">&remoteXUL.longDesc;</div>
         <div id="ed_corruptedContentError">&corruptedContentError.longDesc;</div>
+        <div id="ed_weakCryptoUsed">&weakCryptoUsed.longDesc2;</div>
       </div>
     </div>
 

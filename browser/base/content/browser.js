@@ -2644,6 +2644,7 @@ var BrowserOnClick = {
     mm.addMessageListener("Browser:SendSSLErrorReport", this);
     mm.addMessageListener("Browser:SetSSLErrorReportAuto", this);
     mm.addMessageListener("Browser:SSLErrorReportTelemetry", this);
+    mm.addMessageListener("Browser:OverrideWeakCrypto", this);
     mm.addMessageListener("Browser:SSLErrorGoBack", this);
   },
 
@@ -2655,6 +2656,7 @@ var BrowserOnClick = {
     mm.removeMessageListener("Browser:SendSSLErrorReport", this);
     mm.removeMessageListener("Browser:SetSSLErrorReportAuto", this);
     mm.removeMessageListener("Browser:SSLErrorReportTelemetry", this);
+    mm.removeMessageListener("Browser:OverrideWeakCrypto", this);
     mm.removeMessageListener("Browser:SSLErrorGoBack", this);
   },
 
