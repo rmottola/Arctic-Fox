@@ -406,7 +406,7 @@ public:
     return intervals;
   }
 
-  SelfType operator+ (const ElemType& aInterval)
+  SelfType operator+ (const ElemType& aInterval) const
   {
     SelfType intervals(*this);
     intervals.Add(aInterval);
@@ -447,7 +447,14 @@ public:
     return *this;
   }
 
-  SelfType operator- (const ElemType& aInterval)
+  SelfType operator- (const SelfType& aInterval) const
+  {
+    SelfType intervals(*this);
+    intervals -= aInterval;
+    return intervals;
+  }
+
+  SelfType operator- (const ElemType& aInterval) const
   {
     SelfType intervals(*this);
     intervals -= aInterval;
