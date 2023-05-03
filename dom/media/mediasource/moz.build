@@ -32,4 +32,8 @@ UNIFIED_SOURCES += [
     'TrackBuffersManager.cpp',
 ]
 
+TEST_DIRS += [
+    'gtest',
+]
+
 FINAL_LIBRARY = 'xul'
