@@ -318,7 +318,7 @@ TrackBuffersManager::CompleteResetParserState()
     // Recreate our input buffer. We can't directly assign the initData buffer
     // to mInputBuffer as it will get modified in the Segment Parser Loop.
     mInputBuffer = new MediaByteBuffer;
-    mInputBuffer->AppendElements(*mInitData, fallible);
+    mInputBuffer->AppendElements(*mInitData);
   }
   RecreateParser(true);
 
