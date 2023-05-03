@@ -8,6 +8,7 @@ Library('stagefright_gtest')
 
 SOURCES += [
     'TestInterval.cpp',
+    'TestParser.cpp',
 ]
 
 FINAL_LIBRARY = 'xul-gtest'
