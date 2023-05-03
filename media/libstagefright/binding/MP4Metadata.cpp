@@ -269,7 +269,7 @@ MP4Metadata::CheckTrack(const char* aMimeType,
                         int32_t aIndex) const
 {
   sp<MediaSource> track = mPrivate->mMetadataExtractor->getTrack(aIndex);
-  if (!track.get() || track->start() != OK) {
+  if (!track.get()) {
     return nullptr;
   }
 
@@ -284,8 +284,6 @@ MP4Metadata::CheckTrack(const char* aMimeType,
     info->Update(aMetaData, aMimeType);
     e = Move(info);
   }
-
-  track->stop();
 
   if (e && e->IsValid()) {
     return e;
@@ -323,7 +321,7 @@ MP4Metadata::ReadTrackIndex(FallibleTArray<Index::Indice>& aDest, mozilla::Track
     return false;
   }
   sp<MediaSource> track = mPrivate->mMetadataExtractor->getTrack(trackNumber);
-  if (!track.get() || track->start() != OK) {
+  if (!track.get()) {
     return false;
   }
   sp<MetaData> metadata =
@@ -333,8 +331,6 @@ MP4Metadata::ReadTrackIndex(FallibleTArray<Index::Indice>& aDest, mozilla::Track
     mediaTime = 0;
   }
   bool rv = ConvertIndex(aDest, track->exportIndex(), mediaTime);
-
-  track->stop();
 
   return rv;
 }
