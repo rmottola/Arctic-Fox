@@ -507,6 +507,7 @@ pref("media.peerconnection.capture_delay", 50);
 pref("media.getusermedia.playout_delay", 50);
 #endif
 #endif
+pref("media.mediasource.webm.audio.enabled", true);
 
 #if !defined(ANDROID)
 pref("media.getusermedia.screensharing.enabled", true);
