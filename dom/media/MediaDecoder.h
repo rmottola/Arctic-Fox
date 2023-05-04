@@ -632,9 +632,6 @@ private:
   // position.
   int64_t GetDownloadPosition();
 
-  // Drop reference to state machine.  Only called during shutdown dance.
-  virtual void BreakCycles();
-
   // Notifies the element that decoding has failed.
   void DecodeError();
 
@@ -800,6 +797,8 @@ private:
   {
     SetMediaSeekable(false);
   }
+
+  void FinishShutdown();
 
   MediaEventProducer<void> mDataArrivedEvent;
 

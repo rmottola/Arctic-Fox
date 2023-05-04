@@ -605,13 +605,16 @@ MediaDecoder::Shutdown()
   // necessary to unblock the state machine thread if it's blocked, so
   // the asynchronous shutdown in nsDestroyStateMachine won't deadlock.
   if (mDecoderStateMachine) {
-    mDecoderStateMachine->DispatchShutdown();
     mTimedMetadataListener.Disconnect();
     mMetadataLoadedListener.Disconnect();
     mFirstFrameLoadedListener.Disconnect();
     mOnPlaybackEvent.Disconnect();
     mOnSeekingStart.Disconnect();
     mOnMediaNotSeekable.Disconnect();
+
+    mDecoderStateMachine->BeginShutdown()->Then(
+      AbstractThread::MainThread(), __func__, this,
+      &MediaDecoder::FinishShutdown, &MediaDecoder::FinishShutdown);
   }
 
   // Force any outstanding seek and byterange requests to complete
@@ -656,6 +659,14 @@ MediaDecoder::OnPlaybackEvent(MediaEventType aEvent)
       Invalidate();
       break;
   }
+}
+
+void
+MediaDecoder::FinishShutdown()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  mDecoderStateMachine->BreakCycles();
+  SetStateMachine(nullptr);
 }
 
 MediaResourceCallback*
@@ -1532,13 +1543,6 @@ MediaDecoderStateMachine*
 MediaDecoder::GetStateMachine() const {
   MOZ_ASSERT(NS_IsMainThread());
   return mDecoderStateMachine;
-}
-
-// Drop reference to state machine.  Only called during shutdown dance.
-void
-MediaDecoder::BreakCycles() {
-  MOZ_ASSERT(NS_IsMainThread());
-  SetStateMachine(nullptr);
 }
 
 void
