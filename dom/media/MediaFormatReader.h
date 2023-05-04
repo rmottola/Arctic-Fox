@@ -17,6 +17,8 @@
 
 namespace mozilla {
 
+class CDMProxy;
+
 class MediaFormatReader final : public MediaDecoderReader
 {
   typedef TrackInfo::TrackType TrackType;
@@ -89,6 +91,10 @@ public:
   {
     return mTrackDemuxersMayBlock;
   }
+
+#ifdef MOZ_EME
+  void SetCDMProxy(CDMProxy* aProxy) override;
+#endif
 
 private:
   bool HasVideo() { return mVideo.mTrackDemuxer; }
@@ -423,6 +429,10 @@ private:
 
   RefPtr<VideoFrameContainer> mVideoFrameContainer;
   layers::ImageContainer* GetImageContainer();
+
+#ifdef MOZ_EME
+  RefPtr<CDMProxy> mCDMProxy;
+#endif
 
 #if defined(READER_DORMANT_HEURISTIC)
   const bool mDormantEnabled;

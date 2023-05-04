@@ -184,6 +184,10 @@ destroying the MediaDecoder object.
 #if !defined(MediaDecoder_h_)
 #define MediaDecoder_h_
 
+#ifdef MOZ_EME
+#include "mozilla/CDMProxy.h"
+#endif
+
 #include "mozilla/Atomics.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/ReentrantMonitor.h"
@@ -640,6 +644,16 @@ private:
 
   MediaDecoderOwner* GetOwner() override;
 
+#ifdef MOZ_EME
+  typedef MozPromise<RefPtr<CDMProxy>, bool /* aIgnored */, /* IsExclusive = */ true> CDMProxyPromise;
+
+  // Resolved when a CDMProxy is available and the capabilities are known or
+  // rejected when this decoder is about to shut down.
+  RefPtr<CDMProxyPromise> RequestCDMProxy() const;
+
+  void SetCDMProxy(CDMProxy* aProxy);
+#endif
+
   void EnsureTelemetryReported();
 
 #ifdef MOZ_RAW
@@ -813,8 +827,12 @@ private:
 
   RefPtr<ResourceCallback> mResourceCallback;
 
-protected:
+#ifdef MOZ_EME
+  MozPromiseHolder<CDMProxyPromise> mCDMProxyPromiseHolder;
+  RefPtr<CDMProxyPromise> mCDMProxyPromise;
+#endif
 
+protected:
   virtual void CallSeek(const SeekTarget& aTarget);
 
   // Returns true if heuristic dormant is supported.

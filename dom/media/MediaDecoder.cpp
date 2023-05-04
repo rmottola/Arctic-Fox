@@ -496,6 +496,9 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
   , mLogicalPosition(0.0)
   , mDuration(std::numeric_limits<double>::quiet_NaN())
   , mResourceCallback(new ResourceCallback())
+#ifdef MOZ_EME
+  , mCDMProxyPromise(mCDMProxyPromiseHolder.Ensure(__func__))
+#endif
   , mIgnoreProgressData(false)
   , mInfiniteStream(false)
   , mOwner(aOwner)
@@ -600,6 +603,10 @@ MediaDecoder::Shutdown()
   mShuttingDown = true;
 
   mResourceCallback->Disconnect();
+
+#ifdef MOZ_EME
+  mCDMProxyPromiseHolder.RejectIfExists(true, __func__);
+#endif
 
   // This changes the decoder state to SHUTDOWN and does other things
   // necessary to unblock the state machine thread if it's blocked, so
@@ -1586,6 +1593,34 @@ MediaDecoder::CanPlayThrough()
   NS_ENSURE_TRUE(mDecoderStateMachine, false);
   return mDecoderStateMachine->IsRealTime() || GetStatistics().CanPlayThrough();
 }
+
+#ifdef MOZ_EME
+RefPtr<MediaDecoder::CDMProxyPromise>
+MediaDecoder::RequestCDMProxy() const
+{
+  return mCDMProxyPromise;
+}
+
+void
+MediaDecoder::SetCDMProxy(CDMProxy* aProxy)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  RefPtr<CDMProxy> proxy = aProxy;
+  {
+    CDMCaps::AutoLock caps(aProxy->Capabilites());
+    if (!caps.AreCapsKnown()) {
+      RefPtr<MediaDecoder> self = this;
+      nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
+        self->mCDMProxyPromiseHolder.ResolveIfExists(proxy, __func__);
+      });
+      caps.CallOnMainThreadWhenCapsAvailable(r);
+      return;
+    }
+  }
+  mCDMProxyPromiseHolder.ResolveIfExists(proxy, __func__);
+}
+#endif
 
 #ifdef MOZ_RAW
 bool

@@ -1316,6 +1316,10 @@ MediaDecoderStateMachine::Shutdown()
   mPendingSeek.RejectIfExists(__func__);
   mCurrentSeek.RejectIfExists(__func__);
 
+#ifdef MOZ_EME
+  mCDMProxyPromise.DisconnectIfExists();
+#endif
+
   if (IsPlaying()) {
     StopPlayback();
   }
@@ -1958,7 +1962,11 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
   // thus get the metadata). We could fix this if we could compute the start
   // time by demuxing without necessaring decoding.
   bool waitingForCDM =
+#ifdef MOZ_EME
+    mInfo.IsEncrypted() && !mCDMProxy;
+#else
     false;
+#endif
   mNotifyMetadataBeforeFirstFrame = mDuration.Ref().isSome() || waitingForCDM;
   if (mNotifyMetadataBeforeFirstFrame) {
     EnqueueLoadedMetadataEvent();
@@ -2857,6 +2865,27 @@ void MediaDecoderStateMachine::OnMediaSinkAudioError()
   // no sense to play an audio-only file without sound output.
   DecodeError();
 }
+
+#ifdef MOZ_EME
+void
+MediaDecoderStateMachine::OnCDMProxyReady(RefPtr<CDMProxy> aProxy)
+{
+  MOZ_ASSERT(OnTaskQueue());
+  mCDMProxyPromise.Complete();
+  mCDMProxy = aProxy;
+  mReader->SetCDMProxy(aProxy);
+  if (mState == DECODER_STATE_WAIT_FOR_CDM) {
+    StartDecoding();
+  }
+}
+
+void
+MediaDecoderStateMachine::OnCDMProxyNotReady()
+{
+  MOZ_ASSERT(OnTaskQueue());
+  mCDMProxyPromise.Complete();
+}
+#endif
 
 void
 MediaDecoderStateMachine::SetAudioCaptured(bool aCaptured)

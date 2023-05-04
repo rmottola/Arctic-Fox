@@ -18,6 +18,10 @@
 
 #include <algorithm>
 
+#ifdef MOZ_EME
+#include "mozilla/CDMProxy.h"
+#endif
+
 using namespace mozilla::media;
 
 using mozilla::layers::Image;
@@ -186,11 +190,54 @@ MediaFormatReader::Init()
   return NS_OK;
 }
 
+#ifdef MOZ_EME
+class DispatchKeyNeededEvent : public nsRunnable {
+public:
+  DispatchKeyNeededEvent(AbstractMediaDecoder* aDecoder,
+                         nsTArray<uint8_t>& aInitData,
+                         const nsString& aInitDataType)
+    : mDecoder(aDecoder)
+    , mInitData(aInitData)
+    , mInitDataType(aInitDataType)
+  {
+  }
+  NS_IMETHOD Run() {
+    // Note: Null check the owner, as the decoder could have been shutdown
+    // since this event was dispatched.
+    MediaDecoderOwner* owner = mDecoder->GetOwner();
+    if (owner) {
+      owner->DispatchEncrypted(mInitData, mInitDataType);
+    }
+    mDecoder = nullptr;
+    return NS_OK;
+  }
+private:
+  RefPtr<AbstractMediaDecoder> mDecoder;
+  nsTArray<uint8_t> mInitData;
+  nsString mInitDataType;
+};
+
+void
+MediaFormatReader::SetCDMProxy(CDMProxy* aProxy)
+{
+  RefPtr<CDMProxy> proxy = aProxy;
+  RefPtr<MediaFormatReader> self = this;
+  nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
+    MOZ_ASSERT(self->OnTaskQueue());
+    self->mCDMProxy = proxy;
+  });
+  OwnerThread()->Dispatch(r.forget());
+}
+#endif // MOZ_EME
+
 bool
 MediaFormatReader::IsWaitingOnCDMResource() {
   MOZ_ASSERT(OnTaskQueue());
-  // EME Stub
+#ifdef MOZ_EME
+  return IsEncrypted() && !mCDMProxy;
+#else
   return false;
+#endif
 }
 
 RefPtr<MediaDecoderReader::MetadataPromise>
@@ -260,6 +307,13 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
   mIsEncrypted = crypto && crypto->IsEncrypted();
 
   if (mDecoder && crypto && crypto->IsEncrypted()) {
+#ifdef MOZ_EME
+    // Try and dispatch 'encrypted'. Won't go if ready state still HAVE_NOTHING.
+    for (uint32_t i = 0; i < crypto->mInitDatas.Length(); i++) {
+      NS_DispatchToMainThread(
+        new DispatchKeyNeededEvent(mDecoder, crypto->mInitDatas[i].mInitData, NS_LITERAL_STRING("cenc")));
+    }
+#endif // MOZ_EME
     mInfo.mCrypto = *crypto;
   }
 
@@ -301,8 +355,13 @@ MediaFormatReader::EnsureDecodersCreated()
     mPlatform = new PDMFactory();
     NS_ENSURE_TRUE(mPlatform, false);
     if (IsEncrypted()) {
+#ifdef MOZ_EME
+      MOZ_ASSERT(mCDMProxy);
+      mPlatform->SetCDMProxy(mCDMProxy);
+#else
       // EME not supported.
       return false;
+#endif
     }
   }
 
