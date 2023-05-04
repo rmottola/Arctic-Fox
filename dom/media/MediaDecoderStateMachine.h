@@ -224,6 +224,15 @@ public:
     return mMetadataManager.TimedMetadataEvent();
   }
 
+  MediaEventSourceExc<nsAutoPtr<MediaInfo>,
+                      nsAutoPtr<MetadataTags>,
+                      MediaDecoderEventVisibility>&
+  MetadataLoadedEvent() { return mMetadataLoadedEvent; }
+
+  MediaEventSourceExc<nsAutoPtr<MediaInfo>,
+                      MediaDecoderEventVisibility>&
+  FirstFrameLoadedEvent() { return mFirstFrameLoadedEvent; }
+
   // Immutable after construction - may be called on any thread.
   bool IsRealTime() const { return mRealTime; }
 
@@ -1189,6 +1198,12 @@ private:
 
   MediaEventListener mAudioQueueListener;
   MediaEventListener mVideoQueueListener;
+
+  MediaEventProducerExc<nsAutoPtr<MediaInfo>,
+                        nsAutoPtr<MetadataTags>,
+                        MediaDecoderEventVisibility> mMetadataLoadedEvent;
+  MediaEventProducerExc<nsAutoPtr<MediaInfo>,
+                        MediaDecoderEventVisibility> mFirstFrameLoadedEvent;
 
   // True if audio is offloading.
   // Playback will not start when audio is offloading.

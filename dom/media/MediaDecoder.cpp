@@ -607,6 +607,8 @@ MediaDecoder::Shutdown()
   if (mDecoderStateMachine) {
     mDecoderStateMachine->DispatchShutdown();
     mTimedMetadataListener.Disconnect();
+    mMetadataLoadedListener.Disconnect();
+    mFirstFrameLoadedListener.Disconnect();
   }
 
   // Force any outstanding seek and byterange requests to complete
@@ -686,6 +688,10 @@ MediaDecoder::SetStateMachineParameters()
   }
   mTimedMetadataListener = mDecoderStateMachine->TimedMetadataEvent().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnMetadataUpdate);
+  mMetadataLoadedListener = mDecoderStateMachine->MetadataLoadedEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::MetadataLoaded);
+  mFirstFrameLoadedListener = mDecoderStateMachine->FirstFrameLoadedEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::FirstFrameLoaded);
 }
 
 void
