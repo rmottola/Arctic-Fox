@@ -611,6 +611,7 @@ MediaDecoder::Shutdown()
     mFirstFrameLoadedListener.Disconnect();
     mOnPlaybackEvent.Disconnect();
     mOnSeekingStart.Disconnect();
+    mOnMediaNotSeekable.Disconnect();
   }
 
   // Force any outstanding seek and byterange requests to complete
@@ -722,6 +723,8 @@ MediaDecoder::SetStateMachineParameters()
     AbstractThread::MainThread(), this, &MediaDecoder::OnPlaybackEvent);
   mOnSeekingStart = mDecoderStateMachine->OnSeekingStart().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::SeekingStarted);
+  mOnMediaNotSeekable = mDecoderStateMachine->OnMediaNotSeekable().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::OnMediaNotSeekable);
 }
 
 void
@@ -835,6 +838,7 @@ MediaDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
               aInfo->mAudio.mChannels, aInfo->mAudio.mRate,
               aInfo->HasAudio(), aInfo->HasVideo());
 
+  SetMediaSeekable(aInfo->mMediaSeekable);
   mInfo = aInfo.forget();
   ConstructMediaTracks();
 

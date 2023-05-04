@@ -467,7 +467,7 @@ public:
   virtual void SetElementVisibility(bool aIsVisible) {}
 
   // Set a flag indicating whether seeking is supported
-  virtual void SetMediaSeekable(bool aMediaSeekable) override;
+  void SetMediaSeekable(bool aMediaSeekable);
 
   // Returns true if this media supports seeking. False for example for WebM
   // files without an index and chained ogg files.
@@ -796,6 +796,11 @@ private:
 
   void OnPlaybackEvent(MediaEventType aEvent);
 
+  void OnMediaNotSeekable()
+  {
+    SetMediaSeekable(false);
+  }
+
   MediaEventProducer<void> mDataArrivedEvent;
 
   // The state machine object for handling the decoding. It is safe to
@@ -915,6 +920,7 @@ protected:
 
   MediaEventListener mOnPlaybackEvent;
   MediaEventListener mOnSeekingStart;
+  MediaEventListener mOnMediaNotSeekable;
 
 protected:
   // Whether the state machine is shut down.
