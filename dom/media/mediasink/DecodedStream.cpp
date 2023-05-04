@@ -201,44 +201,9 @@ DecodedStreamData::SetPlaying(bool aPlaying)
   }
 }
 
-class OutputStreamListener : public MediaStreamListener {
-  typedef MediaStreamListener::MediaStreamGraphEvent MediaStreamGraphEvent;
-public:
-  explicit OutputStreamListener(OutputStreamData* aOwner) : mOwner(aOwner) {}
-
-  void NotifyEvent(MediaStreamGraph* aGraph, MediaStreamGraphEvent event) override
-  {
-    if (event == EVENT_FINISHED) {
-      nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(
-        this, &OutputStreamListener::DoNotifyFinished);
-      aGraph->DispatchToMainThreadAfterStreamStateUpdate(r.forget());
-    }
-  }
-
-  void Forget()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    mOwner = nullptr;
-  }
-
-private:
-  void DoNotifyFinished()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    if (mOwner) {
-      // Remove the finished stream so it won't block the decoded stream.
-      mOwner->Remove();
-    }
-  }
-
-  // Main thread only
-  OutputStreamData* mOwner;
-};
-
 OutputStreamData::~OutputStreamData()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  mListener->Forget();
   // Break the connection to the input stream if necessary.
   if (mPort) {
     mPort->Destroy();
@@ -250,8 +215,6 @@ OutputStreamData::Init(OutputStreamManager* aOwner, ProcessedMediaStream* aStrea
 {
   mOwner = aOwner;
   mStream = aStream;
-  mListener = new OutputStreamListener(this);
-  aStream->AddListener(mListener);
 }
 
 void
@@ -282,13 +245,6 @@ OutputStreamData::Disconnect()
     mPort = nullptr;
   }
   return true;
-}
-
-void
-OutputStreamData::Remove()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  mOwner->Remove(mStream);
 }
 
 MediaStreamGraph*
