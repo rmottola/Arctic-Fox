@@ -15,7 +15,6 @@
  */
 
 #include "GonkGPSGeolocationProvider.h"
-#include "mozstumbler/MozStumbler.h"
 
 #include <pthread.h>
 #include <hardware/gps.h>
@@ -40,6 +39,7 @@
 #include "mozilla/dom/SettingChangeNotificationBinding.h"
 
 #ifdef MOZ_B2G_RIL
+#include "mozstumbler/MozStumbler.h"
 #include "nsIIccInfo.h"
 #include "nsIMobileConnectionInfo.h"
 #include "nsIMobileConnectionService.h"
@@ -143,7 +143,9 @@ GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
   RefPtr<UpdateLocationEvent> event = new UpdateLocationEvent(somewhere);
   NS_DispatchToMainThread(event);
 
+#ifdef MOZ_B2G_RIL
   MozStumble(somewhere);
+#endif
 }
 
 void
