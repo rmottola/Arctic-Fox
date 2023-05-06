@@ -7,7 +7,6 @@
 #define MOZILLA_GFX_PATHHELPERS_H_
 
 #include "2D.h"
-#include "mozilla/Constants.h"
 #include "UserData.h"
 
 #include <cmath>
