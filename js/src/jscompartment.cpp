@@ -658,13 +658,13 @@ JSCompartment::sweepAfterMinorGC()
     globalWriteBarriered = false;
 
     if (innerViews.needsSweepAfterMinorGC())
-        innerViews.sweepAfterMinorGC(runtimeFromMainThread());
+        innerViews.sweepAfterMinorGC();
 }
 
 void
 JSCompartment::sweepInnerViews()
 {
-    innerViews.sweep(runtimeFromAnyThread());
+    innerViews.sweep();
 }
 
 void

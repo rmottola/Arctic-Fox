@@ -10,6 +10,7 @@
 #include "jsobj.h"
 
 #include "builtin/TypedObjectConstants.h"
+#include "js/GCHashTable.h"
 #include "vm/Runtime.h"
 #include "vm/SharedMem.h"
 
@@ -503,6 +504,12 @@ class InnerViewTable
     friend class ArrayBufferObject;
 
   private:
+    struct MapGCPolicy {
+        static bool needsSweep(JSObject** key, ViewVector* value) {
+            return InnerViewTable::sweepEntry(key, *value);
+        }
+    };
+
     // This key is a raw pointer and not a ReadBarriered because the post-
     // barrier would hold nursery-allocated entries live unconditionally. It is
     // a very common pattern in low-level and performance-oriented JavaScript
@@ -511,10 +518,11 @@ class InnerViewTable
     // performance regression. Thus, it is vital that nursery pointers in this
     // map not be held live. Special support is required in the minor GC,
     // implemented in sweepAfterMinorGC.
-    typedef HashMap<JSObject*,
-                    ViewVector,
-                    MovableCellHasher<JSObject*>,
-                    SystemAllocPolicy> Map;
+    typedef GCHashMap<JSObject*,
+                      ViewVector,
+                      MovableCellHasher<JSObject*>,
+                      SystemAllocPolicy,
+                      MapGCPolicy> Map;
 
     // For all objects sharing their storage with some other view, this maps
     // the object to the list of such views. All entries in this map are weak.
@@ -531,7 +539,7 @@ class InnerViewTable
     bool nurseryKeysValid;
 
     // Sweep an entry during GC, returning whether the entry should be removed.
-    bool sweepEntry(JSObject** pkey, ViewVector& views);
+    static bool sweepEntry(JSObject** pkey, ViewVector& views);
 
     bool addView(JSContext* cx, ArrayBufferObject* obj, ArrayBufferViewObject* view);
     ViewVector* maybeViewsUnbarriered(ArrayBufferObject* obj);
@@ -544,8 +552,8 @@ class InnerViewTable
 
     // Remove references to dead objects in the table and update table entries
     // to reflect moved objects.
-    void sweep(JSRuntime* rt);
-    void sweepAfterMinorGC(JSRuntime* rt);
+    void sweep();
+    void sweepAfterMinorGC();
 
     bool needsSweepAfterMinorGC() {
         return !nurseryKeys.empty() || !nurseryKeysValid;
