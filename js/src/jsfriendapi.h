@@ -2578,7 +2578,7 @@ struct ScriptEnvironmentPreparer {
 };
 
 extern JS_FRIEND_API(void)
-PrepareScriptEnvironmentAndInvoke(JSRuntime* rt, JS::HandleObject scope,
+PrepareScriptEnvironmentAndInvoke(JSContext* cx, JS::HandleObject scope,
                                   ScriptEnvironmentPreparer::Closure& closure);
 
 JS_FRIEND_API(void)
