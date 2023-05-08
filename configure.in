@@ -6358,6 +6358,14 @@ AC_SUBST(NSS_NO_LIBPKIX)
 dnl ========================================================
 dnl = Sandboxing support
 dnl ========================================================
+if test -n "$MOZ_TSAN"; then
+    # Bug 1182565: TSan conflicts with sandboxing on Linux.
+    case $OS_TARGET in
+    Linux|Android)
+        MOZ_SANDBOX=
+        ;;
+    esac
+fi
 MOZ_ARG_ENABLE_BOOL(sandbox,
 [  --enable-sandbox        Enable sandboxing support],
     MOZ_SANDBOX=1,
