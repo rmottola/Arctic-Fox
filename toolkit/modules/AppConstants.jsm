@@ -80,6 +80,13 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_SERVICES_CLOUDSYNC:
+#ifdef MOZ_SERVICES_CLOUDSYNC
+  true,
+#else
+  false,
+#endif
+
   MOZ_UPDATER:
 #ifdef MOZ_UPDATER
   true,
