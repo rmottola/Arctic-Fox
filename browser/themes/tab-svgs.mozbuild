@@ -19,3 +19,4 @@ def generate_svg(svg_name, script_function):
 
 generate_svg('tab-selected-end.svg', 'tab_side_end')
 generate_svg('tab-selected-start.svg', 'tab_side_start')
+
