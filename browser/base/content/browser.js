@@ -4237,10 +4237,6 @@ var XULBrowserWindow = {
     return true;
   },
 
-  shouldAddToSessionHistory: function(aDocShell, aURI) {
-    return aURI.spec != NewTabURL.get();
-  },
-
   onProgressChange: function (aWebProgress, aRequest,
                               aCurSelfProgress, aMaxSelfProgress,
                               aCurTotalProgress, aMaxTotalProgress) {
