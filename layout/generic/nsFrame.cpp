@@ -3154,8 +3154,7 @@ nsFrame::SelectByTypeAtPoint(nsPresContext* aPresContext,
     return NS_ERROR_FAILURE;
 
   nsFrame* frame = static_cast<nsFrame*>(theFrame);
-  return frame->PeekBackwardAndForward(aBeginAmountType, aEndAmountType, 
-                                       offset, aPresContext,
+  return frame->PeekBackwardAndForward(aBeginAmountType, aEndAmountType, offset,
                                        aBeginAmountType != eSelectWord,
                                        aSelectFlags);
 }
@@ -3214,7 +3213,6 @@ nsresult
 nsFrame::PeekBackwardAndForward(nsSelectionAmount aAmountBack,
                                 nsSelectionAmount aAmountForward,
                                 int32_t aStartPos,
-                                nsPresContext* aPresContext,
                                 bool aJumpLines,
                                 uint32_t aSelectFlags)
 {
