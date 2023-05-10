@@ -1042,6 +1042,7 @@ var gBrowserInit = {
 #endif
 
     // Misc. inits.
+    TabletModeUpdater.init();
     CombinedStopReload.init();
     TabsOnTop.init();
     gPrivateBrowsingUI.init();
@@ -1509,6 +1510,10 @@ var gBrowserInit = {
     TabsInTitlebar.uninit();
 
     ToolbarIconColor.uninit();
+
+    TabletModeUpdater.uninit();
+
+    gTabletModePageCounter.finish();
 
     BrowserOnClick.uninit();
 
@@ -4401,6 +4406,7 @@ var XULBrowserWindow = {
 
         // Update starring UI
         BookmarkingUI.updateStarState();
+        gTabletModePageCounter.inc();
       }
 
       // Show or hide browser chrome based on the whitelist
@@ -5029,7 +5035,7 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
     if (popup.id != "toolbar-context-menu")
       menuItem.setAttribute("key", toolbar.getAttribute("key"));
 
-      popup.insertBefore(menuItem, firstMenuItem);
+    popup.insertBefore(menuItem, firstMenuItem);
 
     menuItem.addEventListener("command", onViewToolbarCommand, false);
   }
@@ -5390,6 +5396,57 @@ function updateAppButtonDisplay() {
 #endif
 }
 #endif
+
+var TabletModeUpdater = {
+  init() {
+    if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+      this.update(WindowsUIUtils.inTabletMode);
+      Services.obs.addObserver(this, "tablet-mode-change", false);
+    }
+  },
+
+  uninit() {
+    if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+      Services.obs.removeObserver(this, "tablet-mode-change");
+    }
+  },
+
+  observe(subject, topic, data) {
+    this.update(data == "tablet-mode");
+  },
+
+  update(isInTabletMode) {
+    if (isInTabletMode) {
+      document.documentElement.setAttribute("tabletmode", "true");
+    } else {
+      document.documentElement.removeAttribute("tabletmode");
+    }
+    TabsInTitlebar.updateAppearance(true);
+  },
+};
+
+var gTabletModePageCounter = {
+  inc() {
+    if (!AppConstants.isPlatformAndVersionAtLeast("win", "10.0")) {
+      this.inc = () => {};
+      return;
+    }
+    this.inc = this._realInc;
+    this.inc();
+  },
+
+  _desktopCount: 0,
+  _tabletCount: 0,
+  _realInc() {
+    let inTabletMode = document.documentElement.hasAttribute("tabletmode");
+    this[inTabletMode ? "_tabletCount" : "_desktopCount"]++;
+  },
+
+  finish() {
+    Services.telemetry.getKeyedHistogramById("FX_TABLETMODE_PAGE_LOAD").add("tablet", this._tabletCount);
+    Services.telemetry.getKeyedHistogramById("FX_TABLETMODE_PAGE_LOAD").add("desktop", this._desktopCount);
+  },
+};
 
 #ifdef CAN_DRAW_IN_TITLEBAR
 function onTitlebarMaxClick() {

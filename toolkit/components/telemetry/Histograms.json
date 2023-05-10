@@ -4286,6 +4286,14 @@
     "extended_statistics_ok": true,
     "description": "Session restore: Number of characters in DOM Storage for a tab. Pages without DOM Storage or with an empty DOM Storage are ignored."
   },
+  "FX_TABLETMODE_PAGE_LOAD": {
+    "expires_in_version": "47",
+    "kind": "exponential",
+    "high": 100000,
+    "n_buckets": 30,
+    "keyed": true,
+    "description": "Number of toplevel location changes in tablet and desktop mode (only used on win10 where tablet mode is available)"
+  },
   "FX_URLBAR_SELECTED_RESULT_INDEX": {
     "expires_in_version": "45",
     "kind": "enumerated",
