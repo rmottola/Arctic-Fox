@@ -143,6 +143,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
   , mInternalContentPolicyType(aContentPolicyType)
+  , mTainting(LoadTainting::Basic)
   , mUpgradeInsecureRequests(aUpgradeInsecureRequests)
   , mUpgradeInsecurePreloads(aUpgradeInsecurePreloads)
   , mInnerWindowID(aInnerWindowID)
