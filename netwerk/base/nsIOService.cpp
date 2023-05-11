@@ -1057,7 +1057,7 @@ nsIOService::SetOffline(bool offline)
             if (observerService && mConnectivity) {
                 observerService->NotifyObservers(subject,
                                                  NS_IOSERVICE_OFFLINE_STATUS_TOPIC,
-                                                 NS_LITERAL_STRING(NS_IOSERVICE_ONLINE).get());
+                                                 MOZ_UTF16(NS_IOSERVICE_ONLINE));
             }
         }
     }
@@ -1141,7 +1141,7 @@ nsIOService::SetConnectivityInternal(bool aConnectivity)
         observerService->NotifyObservers(
             static_cast<nsIIOService *>(this),
             NS_IOSERVICE_OFFLINE_STATUS_TOPIC,
-            NS_LITERAL_STRING(NS_IOSERVICE_ONLINE).get());
+            MOZ_UTF16(NS_IOSERVICE_ONLINE));
     } else {
         // If we were previously online and lost connectivity
         // send the OFFLINE notification
