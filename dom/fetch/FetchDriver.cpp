@@ -254,6 +254,8 @@ FetchDriver::HttpFetch()
   MOZ_ASSERT(mLoadGroup);
   nsCOMPtr<nsIChannel> chan;
 
+  nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL | credentialsFlag |
+    bypassFlag | nsIChannel::LOAD_CLASSIFY_URI;
   if (mDocument) {
     MOZ_ASSERT(mDocument->NodePrincipal() == mPrincipal);
     rv = NS_NewChannel(getter_AddRefs(chan),
@@ -264,7 +266,7 @@ FetchDriver::HttpFetch()
                        mRequest->ContentPolicyType(),
                        mLoadGroup,
                        nullptr, /* aCallbacks */
-                       nsIRequest::LOAD_NORMAL | credentialsFlag | bypassFlag,
+                       loadFlags,
                        ios);
   } else {
     rv = NS_NewChannel(getter_AddRefs(chan),
@@ -275,7 +277,7 @@ FetchDriver::HttpFetch()
                        mRequest->ContentPolicyType(),
                        mLoadGroup,
                        nullptr, /* aCallbacks */
-                       nsIRequest::LOAD_NORMAL | credentialsFlag | bypassFlag,
+                       loadFlags,
                        ios);
   }
   NS_ENSURE_SUCCESS(rv, rv);
