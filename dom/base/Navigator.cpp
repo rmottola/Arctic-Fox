@@ -1181,7 +1181,8 @@ Navigator::SendBeacon(const nsAString& aUrl,
   rv = NS_NewChannel(getter_AddRefs(channel),
                      uri,
                      doc,
-                     nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS,
+                     nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS |
+                     nsILoadInfo::SEC_REQUIRE_CORS_WITH_CREDENTIALS,
                      nsIContentPolicy::TYPE_BEACON);
 
   if (NS_FAILED(rv)) {
@@ -1318,9 +1319,7 @@ Navigator::SendBeacon(const nsAString& aUrl,
     }
     nsTArray<nsCString> unsafeHeaders;
     unsafeHeaders.AppendElement(NS_LITERAL_CSTRING("Content-Type"));
-    rv = internalChannel->SetCorsPreflightParameters(unsafeHeaders,
-                                                     true,
-                                                     doc->NodePrincipal());
+    rv = internalChannel->SetCorsPreflightParameters(unsafeHeaders);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       aRv.Throw(rv);
       return false;
