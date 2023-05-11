@@ -364,7 +364,7 @@ function runTest() {
   yield undefined;
 
 
-  // use chrome XHR and access URI properties from chrome privileged script
+  // use the systemXHR special privilege
   SpecialPowers.addPermission("systemXHR", true, document);
   xhr = new XMLHttpRequest({mozAnon: false, mozSystem: true});
   xhr.open("GET", "http://mochi.test:8888/tests/dom/base/test/file_XHRDocURI.xml");
@@ -377,8 +377,7 @@ function runTest() {
       baseURI: "http://mochi.test:8888/tests/dom/base/test/file_XHRDocURI.xml",
       elementBaseURI: "http://www.example.com/"
     };
-    var xml = SpecialPowers.wrap(xhr.responseXML);
-    testChromeXMLDocURI(xml, expects);
+    testXMLDocURI(xhr.responseXML, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }
@@ -397,8 +396,7 @@ function runTest() {
       documentURI: "http://mochi.test:8888/tests/dom/base/test/file_XHRDocURI.html",
       baseURI: "http://mochi.test:8888/tests/dom/base/test/file_XHRDocURI.html"
     };
-    var doc = SpecialPowers.wrap(xhr.response);
-    testChromeHTMLDocURI(doc, "http://mochi.test:8888/tests/dom/base/test/file_XHRDocURI.html", expects);
+    testHTMLDocURI(xhr.response, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }
@@ -417,8 +415,7 @@ function runTest() {
       baseURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.xml",
       elementBaseURI: "http://www.example.com/"
     };
-    var xml = SpecialPowers.wrap(xhr.responseXML);
-    testChromeXMLDocURI(xml, expects);
+    testXMLDocURI(xhr.responseXML, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }
@@ -437,8 +434,7 @@ function runTest() {
       documentURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.html",
       baseURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.html"
     };
-    var doc = SpecialPowers.wrap(xhr.response);
-    testChromeHTMLDocURI(doc, "http://example.com/tests/dom/base/test/file_XHRDocURI.html", expects);
+    testHTMLDocURI(xhr.response, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }
@@ -457,8 +453,7 @@ function runTest() {
       baseURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.xml",
       elementBaseURI: "http://www.example.com/"
     };
-    var xml = SpecialPowers.wrap(xhr.responseXML);
-    testChromeXMLDocURI(xml, expects);
+    testXMLDocURI(xhr.responseXML, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }
@@ -477,8 +472,7 @@ function runTest() {
       documentURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.html",
       baseURI: "http://example.com/tests/dom/base/test/file_XHRDocURI.html"
     };
-    var doc = SpecialPowers.wrap(xhr.response);
-    testChromeHTMLDocURI(doc, "http://example.com/tests/dom/base/test/file_XHRDocURI.html", expects);
+    testHTMLDocURI(xhr.response, expects);
     if (xhr.readyState == 4) {
       gen.next();
     }

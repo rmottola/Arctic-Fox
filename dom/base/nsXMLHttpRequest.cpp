@@ -123,11 +123,10 @@ using namespace mozilla::dom;
 #define XML_HTTP_REQUEST_PARSEBODY      (1 << 9)  // Internal
 #define XML_HTTP_REQUEST_SYNCLOOPING    (1 << 10) // Internal
 #define XML_HTTP_REQUEST_BACKGROUND     (1 << 13) // Internal
-#define XML_HTTP_REQUEST_USE_XSITE_AC   (1 << 14) // Internal
-#define XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND (1 << 15) // Internal
-#define XML_HTTP_REQUEST_AC_WITH_CREDENTIALS (1 << 16) // Internal
-#define XML_HTTP_REQUEST_TIMED_OUT (1 << 17) // Internal
-#define XML_HTTP_REQUEST_DELETED (1 << 18) // Internal
+#define XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND (1 << 14) // Internal
+#define XML_HTTP_REQUEST_AC_WITH_CREDENTIALS (1 << 15) // Internal
+#define XML_HTTP_REQUEST_TIMED_OUT (1 << 16) // Internal
+#define XML_HTTP_REQUEST_DELETED (1 << 17) // Internal
 
 #define XML_HTTP_REQUEST_LOADSTATES         \
   (XML_HTTP_REQUEST_UNSENT |                \
@@ -1067,9 +1066,22 @@ nsXMLHttpRequest::GetResponse(JSContext* aCx,
 }
 
 bool
-nsXMLHttpRequest::IsDeniedCrossSiteRequest()
+nsXMLHttpRequest::IsCrossSiteCORSRequest()
 {
-  if ((mState & XML_HTTP_REQUEST_USE_XSITE_AC) && mChannel) {
+  if (!mChannel) {
+    return false;
+  }
+
+  nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
+  MOZ_ASSERT(loadInfo);
+
+  return loadInfo->GetTainting() == LoadTainting::CORS;
+}
+
+bool
+nsXMLHttpRequest::IsDeniedCrossSiteCORSRequest()
+{
+  if (IsCrossSiteCORSRequest()) {
     nsresult rv;
     mChannel->GetStatus(&rv);
     if (NS_FAILED(rv)) {
@@ -1091,7 +1103,7 @@ nsXMLHttpRequest::GetResponseURL(nsAString& aUrl)
 
   // Make sure we don't leak responseURL information from denied cross-site
   // requests.
-  if (IsDeniedCrossSiteRequest()) {
+  if (IsDeniedCrossSiteCORSRequest()) {
     return;
   }
 
@@ -1119,7 +1131,7 @@ nsXMLHttpRequest::Status()
 {
   // Make sure we don't leak status information from denied cross-site
   // requests.
-  if (IsDeniedCrossSiteRequest()) {
+  if (IsDeniedCrossSiteCORSRequest()) {
     return 0;
   }
 
@@ -1169,7 +1181,7 @@ nsXMLHttpRequest::GetStatusText(nsCString& aStatusText)
 
   // Make sure we don't leak status information from denied cross-site
   // requests.
-  if (IsDeniedCrossSiteRequest()) {
+  if (IsDeniedCrossSiteCORSRequest()) {
     return;
   }
 
@@ -1264,7 +1276,7 @@ nsXMLHttpRequest::IsSafeHeader(const nsACString& header, nsIHttpChannel* httpCha
     return false;
   }
   // if this is not a CORS call all headers are safe
-  if (!(mState & XML_HTTP_REQUEST_USE_XSITE_AC)){
+  if (!IsCrossSiteCORSRequest()) {
     return true;
   }
   // Check for dangerous headers
@@ -1530,17 +1542,6 @@ nsXMLHttpRequest::IsSystemXHR()
   return mIsSystem || nsContentUtils::IsSystemPrincipal(mPrincipal);
 }
 
-void
-nsXMLHttpRequest::CheckChannelForCrossSiteRequest(nsIChannel* aChannel)
-{
-  // A system XHR (chrome code or a web app with the right permission) can
-  // load anything, and same-origin loads are always allowed.
-  if (!IsSystemXHR() &&
-      !nsContentUtils::CheckMayLoad(mPrincipal, aChannel, true)) {
-    mState |= XML_HTTP_REQUEST_USE_XSITE_AC;
-  }
-}
-
 NS_IMETHODIMP
 nsXMLHttpRequest::Open(const nsACString& method, const nsACString& url,
                        bool async, const nsAString& user,
@@ -1712,8 +1713,7 @@ nsXMLHttpRequest::Open(const nsACString& inMethod, const nsACString& url,
 
   NS_ENSURE_SUCCESS(rv, rv);
 
-  mState &= ~(XML_HTTP_REQUEST_USE_XSITE_AC |
-              XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND);
+  mState &= ~XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND;
 
   nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(mChannel));
   if (httpChannel) {
@@ -1920,12 +1920,6 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
     return NS_OK;
   }
 
-  // Always treat tainted channels as cross-origin.
-  nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
-  if (loadInfo && loadInfo->GetTainting() != LoadTainting::Basic) {
-    mState |= XML_HTTP_REQUEST_USE_XSITE_AC;
-  }
-
   // Don't do anything if we have been aborted
   if (mState & XML_HTTP_REQUEST_UNSENT)
     return NS_OK;
@@ -2121,7 +2115,11 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
       mResponseXML->ForceEnableXULXBL();
     }
 
-    if (mState & XML_HTTP_REQUEST_USE_XSITE_AC) {
+    nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
+    MOZ_ASSERT(loadInfo);
+    bool isCrossSite = loadInfo->GetTainting() != LoadTainting::Basic;
+
+    if (isCrossSite) {
       nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(mResponseXML);
       if (htmlDoc) {
         htmlDoc->DisableCookieAccess();
@@ -2140,7 +2138,7 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
 
     rv = mResponseXML->StartDocumentLoad(kLoadAsData, channel, loadGroup,
                                          nullptr, getter_AddRefs(listener),
-                                         !(mState & XML_HTTP_REQUEST_USE_XSITE_AC));
+                                         !isCrossSite);
     NS_ENSURE_SUCCESS(rv, rv);
 
     mXMLParserStreamListener = listener;
@@ -2806,8 +2804,6 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
 
   ResetResponse();
 
-  CheckChannelForCrossSiteRequest(mChannel);
-
   bool withCredentials = !!(mState & XML_HTTP_REQUEST_AC_WITH_CREDENTIALS);
 
   if (!IsSystemXHR() && withCredentials) {
@@ -3310,46 +3306,6 @@ nsXMLHttpRequest::ChangeState(uint32_t aState, bool aBroadcast)
   return rv;
 }
 
-/*
- * Simple helper class that just forwards the redirect callback back
- * to the nsXMLHttpRequest.
- */
-class AsyncVerifyRedirectCallbackForwarder final : public nsIAsyncVerifyRedirectCallback
-{
-public:
-  explicit AsyncVerifyRedirectCallbackForwarder(nsXMLHttpRequest* xhr)
-    : mXHR(xhr)
-  {
-  }
-
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_CLASS(AsyncVerifyRedirectCallbackForwarder)
-
-  // nsIAsyncVerifyRedirectCallback implementation
-  NS_IMETHOD OnRedirectVerifyCallback(nsresult result) override
-  {
-    mXHR->OnRedirectVerifyCallback(result);
-
-    return NS_OK;
-  }
-
-private:
-  ~AsyncVerifyRedirectCallbackForwarder() {}
-
-  RefPtr<nsXMLHttpRequest> mXHR;
-};
-
-NS_IMPL_CYCLE_COLLECTION(AsyncVerifyRedirectCallbackForwarder, mXHR)
-
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(AsyncVerifyRedirectCallbackForwarder)
-  NS_INTERFACE_MAP_ENTRY(nsISupports)
-  NS_INTERFACE_MAP_ENTRY(nsIAsyncVerifyRedirectCallback)
-NS_INTERFACE_MAP_END
-
-NS_IMPL_CYCLE_COLLECTING_ADDREF(AsyncVerifyRedirectCallbackForwarder)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(AsyncVerifyRedirectCallbackForwarder)
-
-
 /////////////////////////////////////////////////////
 // nsIChannelEventSink methods:
 //
@@ -3361,23 +3317,17 @@ nsXMLHttpRequest::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
 {
   NS_PRECONDITION(aNewChannel, "Redirect without a channel?");
 
-  nsresult rv;
-
-  if (!NS_IsInternalSameURIRedirect(aOldChannel, aNewChannel, aFlags)) {
-    CheckChannelForCrossSiteRequest(aNewChannel);
-  }
-
   // Prepare to receive callback
   mRedirectCallback = callback;
   mNewRedirectChannel = aNewChannel;
 
   if (mChannelEventSink) {
-    RefPtr<AsyncVerifyRedirectCallbackForwarder> fwd =
-      new AsyncVerifyRedirectCallbackForwarder(this);
+    nsCOMPtr<nsIAsyncVerifyRedirectCallback> fwd =
+      EnsureXPCOMifier();
 
-    rv = mChannelEventSink->AsyncOnChannelRedirect(aOldChannel,
-                                                   aNewChannel,
-                                                   aFlags, fwd);
+    nsresult rv = mChannelEventSink->AsyncOnChannelRedirect(aOldChannel,
+                                                            aNewChannel,
+                                                            aFlags, fwd);
     if (NS_FAILED(rv)) {
         mRedirectCallback = nullptr;
         mNewRedirectChannel = nullptr;
@@ -3388,7 +3338,7 @@ nsXMLHttpRequest::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
   return NS_OK;
 }
 
-void
+nsresult
 nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
 {
   NS_ASSERTION(mRedirectCallback, "mRedirectCallback not set in callback");
@@ -3400,13 +3350,12 @@ nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
     nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(mChannel));
     if (httpChannel) {
       // Ensure all original headers are duplicated for the new channel (bug #553888)
-      for (uint32_t i = mModifiedRequestHeaders.Length(); i > 0; ) {
-        --i;
-        if (mModifiedRequestHeaders[i].value.IsEmpty()) {
-          httpChannel->SetEmptyRequestHeader(mModifiedRequestHeaders[i].header);
+      for (RequestHeader& requestHeader : mModifiedRequestHeaders) {
+        if (requestHeader.value.IsEmpty()) {
+          httpChannel->SetEmptyRequestHeader(requestHeader.header);
         } else {
-          httpChannel->SetRequestHeader(mModifiedRequestHeaders[i].header,
-                                        mModifiedRequestHeaders[i].value,
+          httpChannel->SetRequestHeader(requestHeader.header,
+                                        requestHeader.value,
                                         false);
         }
       }
@@ -3419,6 +3368,8 @@ nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
 
   mRedirectCallback->OnRedirectVerifyCallback(result);
   mRedirectCallback = nullptr;
+
+  return result;
 }
 
 /////////////////////////////////////////////////////
@@ -3522,7 +3473,7 @@ nsXMLHttpRequest::OnStatus(nsIRequest *aRequest, nsISupports *aContext, nsresult
 bool
 nsXMLHttpRequest::AllowUploadProgress()
 {
-  return !(mState & XML_HTTP_REQUEST_USE_XSITE_AC) ||
+  return !IsCrossSiteCORSRequest() ||
     (mState & XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND);
 }
 
@@ -3583,7 +3534,7 @@ nsXMLHttpRequest::GetInterface(const nsIID & aIID, void **aResult)
     // If authentication fails, XMLHttpRequest origin and
     // the request URL are same origin, ...
     /* Disabled - bug: 799540
-    if (mState & XML_HTTP_REQUEST_USE_XSITE_AC) {
+    if (IsCrossSiteCORSRequest()) {
       showPrompt = false;
     }
     */
@@ -3790,6 +3741,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsXMLHttpRequestXPCOMifier)
   NS_INTERFACE_MAP_ENTRY(nsIStreamListener)
   NS_INTERFACE_MAP_ENTRY(nsIRequestObserver)
   NS_INTERFACE_MAP_ENTRY(nsIChannelEventSink)
+  NS_INTERFACE_MAP_ENTRY(nsIAsyncVerifyRedirectCallback)
   NS_INTERFACE_MAP_ENTRY(nsIProgressEventSink)
   NS_INTERFACE_MAP_ENTRY(nsIInterfaceRequestor)
   NS_INTERFACE_MAP_ENTRY(nsITimerCallback)

@@ -73,6 +73,7 @@ private:
            nsIPrincipal* aTriggeringPrincipal,
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType,
+           LoadTainting aTainting,
            bool aUpgradeInsecureRequests,
            bool aUpgradeInsecurePreloads,
            uint64_t aInnerWindowID,
