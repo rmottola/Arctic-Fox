@@ -2693,9 +2693,6 @@ pref("layout.css.grid-template-subgrid-value.enabled", false);
 // Is support for CSS contain enabled?
 pref("layout.css.contain.enabled", false);
 
-// Is support for CSS Ruby enabled?
-pref("layout.css.ruby.enabled", true);
-
 // Is support for CSS display:contents enabled?
 pref("layout.css.display-contents.enabled", true);
 
