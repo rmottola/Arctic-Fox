@@ -1177,7 +1177,7 @@ nsDisplayListBuilder::AdjustWindowDraggingRegion(nsIFrame* aFrame)
     return;
   }
 
-  Matrix4x4 referenceFrameToRootReferenceFrame;
+  LayoutDeviceToLayoutDeviceMatrix4x4 referenceFrameToRootReferenceFrame;
 
   // The const_cast is for nsLayoutUtils::GetTransformToAncestor.
   nsIFrame* referenceFrame = const_cast<nsIFrame*>(FindReferenceFrameFor(aFrame));
@@ -1187,7 +1187,8 @@ nsDisplayListBuilder::AdjustWindowDraggingRegion(nsIFrame* aFrame)
     // the horizontal flip transform that's applied to the urlbar textbox in
     // RTL mode - it should be able to exclude itself from the draggable region.
     referenceFrameToRootReferenceFrame =
-      nsLayoutUtils::GetTransformToAncestor(referenceFrame, mReferenceFrame);
+      ViewAs<LayoutDeviceToLayoutDeviceMatrix4x4>(
+          nsLayoutUtils::GetTransformToAncestor(referenceFrame, mReferenceFrame));
     Matrix referenceFrameToRootReferenceFrame2d;
     if (!referenceFrameToRootReferenceFrame.Is2D(&referenceFrameToRootReferenceFrame2d) ||
         !referenceFrameToRootReferenceFrame2d.IsRectilinear()) {
