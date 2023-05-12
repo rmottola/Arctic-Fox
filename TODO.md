@@ -73,6 +73,7 @@
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
+- Bug 1238935 - r=jonco 
 - Bug 1238290 - 2016-01-09 - fix bad necko deps on unified_sources r=valentin.gosu
 - bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - 1245241 remaining 4 parts
@@ -96,17 +97,8 @@
 - Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
-- Bug 1223647: CSP erroneously inherited into dedicated workers. r=cke
-- Bug 1160307 - 2015-11-05 - capture async stack frames on Javascript timeline marke
-- 1176968 2015-11-04 remaining parts
-- Bug 1238935 - r=jonco 
-- Bug 1214126 - 5 Parts
-- Bug 1216227 - 2015-10-20 - do bucketed page-load-per-window counts to assess table
-- Bug 1208385 part 1 - Store a pointer to the owning animation on each ¿ 
-- 1214508 - SharedStubs - Part 3: Enable the getprop stubs in ionmon
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
-- Bug 1226909 multipart AsyncOpen2 
 - 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
@@ -118,9 +110,6 @@ Bug 875648 - Use Downloads.jsm functions to get download directories
 
 # ARM fixes to check
 - https://bugzilla.mozilla.org/show_bug.cgi?id=1179514
-
-# Build System - not working
-Bug 1137364 - part 2 - move browser themes icon installation to FINAL
 
 # Mac Specific
 Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
