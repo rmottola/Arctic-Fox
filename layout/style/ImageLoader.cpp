@@ -333,13 +333,6 @@ void InvalidateImagesCallback(nsIFrame* aFrame,
   }
   aItem->Invalidate();
   aFrame->SchedulePaint();
-
-  // Update ancestor rendering observers (-moz-element etc)
-  nsIFrame *f = aFrame;
-  while (f && !f->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT)) {
-    nsSVGEffects::InvalidateDirectRenderingObservers(f);
-    f = nsLayoutUtils::GetCrossDocParentFrame(f);
-  }
 }
 
 void
@@ -360,6 +353,14 @@ ImageLoader::DoRedraw(FrameSet* aFrameSet, bool aForcePaint)
         frame->InvalidateFrame();
       } else {
         FrameLayerBuilder::IterateRetainedDataFor(frame, InvalidateImagesCallback);
+
+        // Update ancestor rendering observers (-moz-element etc)
+        nsIFrame *f = frame;
+        while (f && !f->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT)) {
+          nsSVGEffects::InvalidateDirectRenderingObservers(f);
+          f = nsLayoutUtils::GetCrossDocParentFrame(f);
+        }
+
         if (aForcePaint) {
           frame->SchedulePaint();
         }
