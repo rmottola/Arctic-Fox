@@ -94,6 +94,7 @@ TEST(ImageDecodeToSurface, GIF) { RunDecodeToSurface(GreenGIFTestCase()); }
 TEST(ImageDecodeToSurface, JPG) { RunDecodeToSurface(GreenJPGTestCase()); }
 TEST(ImageDecodeToSurface, BMP) { RunDecodeToSurface(GreenBMPTestCase()); }
 TEST(ImageDecodeToSurface, ICO) { RunDecodeToSurface(GreenICOTestCase()); }
+TEST(ImageDecodeToSurface, Icon) { RunDecodeToSurface(GreenIconTestCase()); }
 
 TEST(ImageDecodeToSurface, AnimatedGIF)
 {
