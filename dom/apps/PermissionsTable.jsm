@@ -651,7 +651,7 @@ this.AllPossiblePermissions = [];
     AllPossiblePermissions.concat(["indexedDB", "offline-app", "pin-app"]);
 })();
 
-this.isExplicitInPermissionsTable = function(aPermName, aIntStatus, aAppKind) {
+this.isExplicitInPermissionsTable = function(aPermName, aIntStatus) {
 
   // Check to see if the 'webapp' is app/privileged/certified.
   let appStatus;
