@@ -173,28 +173,6 @@ nsICODecoder::FixBitmapWidth(int8_t* bih)
   return true;
 }
 
-// The BMP information header's bits per pixel should be trusted
-// more than what we have.  Usually the ICO's BPP is set to 0.
-int32_t
-nsICODecoder::ReadBPP(const char* aBIH)
-{
-  const int8_t* bih = reinterpret_cast<const int8_t*>(aBIH);
-  int32_t bitsPerPixel;
-  memcpy(&bitsPerPixel, bih + 14, sizeof(bitsPerPixel));
-  NativeEndian::swapFromLittleEndianInPlace(&bitsPerPixel, 1);
-  return bitsPerPixel;
-}
-
-int32_t
-nsICODecoder::ReadBIHSize(const char* aBIH)
-{
-  const int8_t* bih = reinterpret_cast<const int8_t*>(aBIH);
-  int32_t headerSize;
-  memcpy(&headerSize, bih, sizeof(headerSize));
-  NativeEndian::swapFromLittleEndianInPlace(&headerSize, 1);
-  return headerSize;
-}
-
 LexerTransition<ICOState>
 nsICODecoder::ReadHeader(const char* aData)
 {
@@ -205,8 +183,7 @@ nsICODecoder::ReadHeader(const char* aData)
   mIsCursor = (aData[2] == 2);
 
   // The fifth and sixth bytes specify the number of resources in the file.
-  mNumIcons =
-    LittleEndian::readUint16(reinterpret_cast<const uint16_t*>(aData + 4));
+  mNumIcons = LittleEndian::readUint16(aData + 4);
   if (mNumIcons == 0) {
     return Transition::Terminate(ICOState::SUCCESS); // Nothing to do.
   }
@@ -240,19 +217,14 @@ nsICODecoder::ReadDirEntry(const char* aData)
 
   // Read the directory entry.
   IconDirEntry e;
-  memset(&e, 0, sizeof(e));
-  memcpy(&e.mWidth, aData, sizeof(e.mWidth));
-  memcpy(&e.mHeight, aData + 1, sizeof(e.mHeight));
-  memcpy(&e.mColorCount, aData + 2, sizeof(e.mColorCount));
-  memcpy(&e.mReserved, aData + 3, sizeof(e.mReserved));
-  memcpy(&e.mPlanes, aData + 4, sizeof(e.mPlanes));
-  e.mPlanes = LittleEndian::readUint16(&e.mPlanes);
-  memcpy(&e.mBitCount, aData + 6, sizeof(e.mBitCount));
-  e.mBitCount = LittleEndian::readUint16(&e.mBitCount);
-  memcpy(&e.mBytesInRes, aData + 8, sizeof(e.mBytesInRes));
-  e.mBytesInRes = LittleEndian::readUint32(&e.mBytesInRes);
-  memcpy(&e.mImageOffset, aData + 12, sizeof(e.mImageOffset));
-  e.mImageOffset = LittleEndian::readUint32(&e.mImageOffset);
+  e.mWidth       = aData[0];
+  e.mHeight      = aData[1];
+  e.mColorCount  = aData[2];
+  e.mReserved    = aData[3];
+  e.mPlanes      = LittleEndian::readUint16(aData + 4);
+  e.mBitCount    = LittleEndian::readUint16(aData + 6);
+  e.mBytesInRes  = LittleEndian::readUint32(aData + 8);
+  e.mImageOffset = LittleEndian::readUint32(aData + 12);
 
   // Determine if this is the biggest resource we've seen so far. We always use
   // the biggest resource for the intrinsic size, and if we're not downscaling,
@@ -359,7 +331,7 @@ nsICODecoder::SniffResource(const char* aData)
                                     toRead);
   } else {
     // Make sure we have a sane size for the bitmap information header.
-    int32_t bihSize = ReadBIHSize(aData);
+    int32_t bihSize = LittleEndian::readUint32(aData);
     if (bihSize != static_cast<int32_t>(BITMAPINFOSIZE)) {
       return Transition::Terminate(ICOState::FAILURE);
     }
@@ -396,8 +368,8 @@ nsICODecoder::ReadBIH(const char* aData)
   memcpy(mBIHraw + PNGSIGNATURESIZE, aData, BITMAPINFOSIZE - PNGSIGNATURESIZE);
 
   // Extract the BPP from the BIH header; it should be trusted over the one
-  // we have from the ICO header.
-  mBPP = ReadBPP(mBIHraw);
+  // we have from the ICO header which is usually set to 0.
+  mBPP = LittleEndian::readUint16(mBIHraw + 14);
 
   // The ICO format when containing a BMP does not include the 14 byte
   // bitmap file header. So we create the BMP decoder via the constructor that
