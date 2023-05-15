@@ -160,7 +160,7 @@ imgRequestProxy::Init(imgRequest* aOwner,
   NS_PRECONDITION(!GetOwner() && !mListener,
                   "imgRequestProxy is already initialized");
 
-  LOG_SCOPE_WITH_PARAM(GetImgLog(), "imgRequestProxy::Init", "request",
+  LOG_SCOPE_WITH_PARAM(gImgLog, "imgRequestProxy::Init", "request",
                        aOwner);
 
   MOZ_ASSERT(mAnimationConsumers == 0, "Cannot have animation before Init");
@@ -303,7 +303,7 @@ imgRequestProxy::Cancel(nsresult status)
     return NS_ERROR_FAILURE;
   }
 
-  LOG_SCOPE(GetImgLog(), "imgRequestProxy::Cancel");
+  LOG_SCOPE(gImgLog, "imgRequestProxy::Cancel");
 
   mCanceled = true;
 
@@ -334,7 +334,7 @@ imgRequestProxy::CancelAndForgetObserver(nsresult aStatus)
     return NS_ERROR_FAILURE;
   }
 
-  LOG_SCOPE(GetImgLog(), "imgRequestProxy::CancelAndForgetObserver");
+  LOG_SCOPE(gImgLog, "imgRequestProxy::CancelAndForgetObserver");
 
   mCanceled = true;
 
@@ -633,7 +633,7 @@ imgRequestProxy::PerformClone(imgINotificationObserver* aObserver,
 {
   NS_PRECONDITION(aClone, "Null out param");
 
-  LOG_SCOPE(GetImgLog(), "imgRequestProxy::Clone");
+  LOG_SCOPE(gImgLog, "imgRequestProxy::Clone");
 
   *aClone = nullptr;
   RefPtr<imgRequestProxy> clone = aAllocFn(this);
@@ -783,7 +783,7 @@ imgRequestProxy::Notify(int32_t aType, const mozilla::gfx::IntRect* aRect)
   MOZ_ASSERT(aType != imgINotificationObserver::LOAD_COMPLETE,
              "Should call OnLoadComplete");
 
-  LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::Notify", "type",
+  LOG_FUNC_WITH_PARAM(gImgLog, "imgRequestProxy::Notify", "type",
                       NotificationTypeToString(aType));
 
   if (!mListener || mCanceled) {
@@ -799,10 +799,10 @@ imgRequestProxy::Notify(int32_t aType, const mozilla::gfx::IntRect* aRect)
 void
 imgRequestProxy::OnLoadComplete(bool aLastPart)
 {
-  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
+  if (MOZ_LOG_TEST(gImgLog, LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
-    LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::OnLoadComplete",
+    LOG_FUNC_WITH_PARAM(gImgLog, "imgRequestProxy::OnLoadComplete",
                         "name", name.get());
   }
 
@@ -845,10 +845,10 @@ imgRequestProxy::OnLoadComplete(bool aLastPart)
 void
 imgRequestProxy::BlockOnload()
 {
-  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
+  if (MOZ_LOG_TEST(gImgLog, LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
-    LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::BlockOnload",
+    LOG_FUNC_WITH_PARAM(gImgLog, "imgRequestProxy::BlockOnload",
                         "name", name.get());
   }
 
@@ -861,10 +861,10 @@ imgRequestProxy::BlockOnload()
 void
 imgRequestProxy::UnblockOnload()
 {
-  if (MOZ_LOG_TEST(GetImgLog(), LogLevel::Debug)) {
+  if (MOZ_LOG_TEST(gImgLog, LogLevel::Debug)) {
     nsAutoCString name;
     GetName(name);
-    LOG_FUNC_WITH_PARAM(GetImgLog(), "imgRequestProxy::UnblockOnload",
+    LOG_FUNC_WITH_PARAM(gImgLog, "imgRequestProxy::UnblockOnload",
                         "name", name.get());
   }
 
