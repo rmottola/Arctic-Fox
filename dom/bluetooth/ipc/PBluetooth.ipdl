@@ -417,6 +417,15 @@ struct GattServerSendResponseRequest
   BluetoothGattResponse response;
 };
 
+struct GattServerSendIndicationRequest
+{
+  nsString appUuid;
+  nsString address;
+  BluetoothAttributeHandle characteristicHandle;
+  bool confirm;
+  uint8_t[] value;
+};
+
 union Request
 {
   GetAdaptersRequest;
@@ -486,6 +495,7 @@ union Request
   GattServerStartServiceRequest;
   GattServerStopServiceRequest;
   GattServerSendResponseRequest;
+  GattServerSendIndicationRequest;
 };
 
 protocol PBluetooth

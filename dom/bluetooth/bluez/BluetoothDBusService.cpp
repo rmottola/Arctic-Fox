@@ -4659,6 +4659,17 @@ BluetoothDBusService::GattServerStopServiceInternal(
 }
 
 void
+BluetoothDBusService::GattServerSendIndicationInternal(
+  const nsAString& aAppUuid,
+  const nsAString& aAddress,
+  const BluetoothAttributeHandle& aCharacteristicHandle,
+  bool aConfirm,
+  const nsTArray<uint8_t>& aValue,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
 BluetoothDBusService::GattServerSendResponseInternal(
   const nsAString& aAppUuid,
   const nsAString& aAddress,

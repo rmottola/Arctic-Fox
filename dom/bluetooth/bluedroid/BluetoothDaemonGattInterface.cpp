@@ -949,7 +949,8 @@ BluetoothDaemonGattModule::ServerDeleteServiceCmd(
 
 nsresult
 BluetoothDaemonGattModule::ServerSendIndicationCmd(
-  int aServerIf, int aAttributeHandle, int aConnId, int aLength, bool aConfirm,
+  int aServerIf, const BluetoothAttributeHandle& aCharacteristicHandle,
+  int aConnId, int aLength, bool aConfirm,
   uint8_t* aValue, BluetoothGattResultHandler* aRes)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -959,7 +960,7 @@ BluetoothDaemonGattModule::ServerSendIndicationCmd(
                         0));
 
   nsresult rv = PackPDU(PackConversion<int, int32_t>(aServerIf),
-                        PackConversion<int, int32_t>(aAttributeHandle),
+                        aCharacteristicHandle,
                         PackConversion<int, int32_t>(aConnId),
                         PackConversion<int, int32_t>(aLength),
                         PackConversion<bool, int32_t>(aConfirm),
@@ -2798,14 +2799,14 @@ BluetoothDaemonGattInterface::DeleteService(
 
 void
 BluetoothDaemonGattInterface::SendIndication(
-  int aServerIf, int aAttributeHandle, int aConnId,
-  const nsTArray<uint8_t>& aValue, bool aConfirm,
+  int aServerIf, const BluetoothAttributeHandle& aCharacteristicHandle,
+  int aConnId, const nsTArray<uint8_t>& aValue, bool aConfirm,
   BluetoothGattResultHandler* aRes)
 {
   MOZ_ASSERT(mModule);
 
   nsresult rv = mModule->ServerSendIndicationCmd(
-    aServerIf, aAttributeHandle, aConnId,
+    aServerIf, aCharacteristicHandle, aConnId,
     aValue.Length() * sizeof(uint8_t), aConfirm,
     const_cast<uint8_t*>(aValue.Elements()), aRes);
 
