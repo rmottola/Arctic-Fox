@@ -3797,7 +3797,7 @@ BluetoothGattManager::RequestWriteNotification(
   value.AppendElements(aValue, aLength);
   AppendNamedValue(properties, "Value", value);
 
-  bs->DistributeSignal(NS_LITERAL_STRING("WrtieRequested"),
+  bs->DistributeSignal(NS_LITERAL_STRING("WriteRequested"),
                        server->mAppUuid,
                        properties);
 }
