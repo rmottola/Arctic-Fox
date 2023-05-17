@@ -575,9 +575,6 @@ class BluetoothAvrcpResultHandler
 public:
   virtual void OnError(BluetoothStatus aStatus);
 
-  virtual void Init();
-  virtual void Cleanup();
-
   virtual void GetPlayStatusRsp();
 
   virtual void ListPlayerAppAttrRsp();
@@ -602,9 +599,8 @@ protected:
 class BluetoothAvrcpInterface
 {
 public:
-  virtual void Init(BluetoothAvrcpNotificationHandler* aNotificationHandler,
-                    BluetoothAvrcpResultHandler* aRes) = 0;
-  virtual void Cleanup(BluetoothAvrcpResultHandler* aRes) = 0;
+  virtual void SetNotificationHandler(
+    BluetoothAvrcpNotificationHandler* aNotificationHandler) = 0;
 
   virtual void GetPlayStatusRsp(ControlPlayStatus aPlayStatus,
                                 uint32_t aSongLen, uint32_t aSongPos,

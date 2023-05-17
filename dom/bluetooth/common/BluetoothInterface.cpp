@@ -578,14 +578,6 @@ BluetoothAvrcpResultHandler::OnError(BluetoothStatus aStatus)
 }
 
 void
-BluetoothAvrcpResultHandler::Init()
-{ }
-
-void
-BluetoothAvrcpResultHandler::Cleanup()
-{ }
-
-void
 BluetoothAvrcpResultHandler::GetPlayStatusRsp()
 { }
 
