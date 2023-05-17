@@ -101,10 +101,6 @@ protected:
     const BluetoothAddress&, uint32_t, uint8_t>
     AudioConfigNotification;
 
-  class ConnectionStateInitOp;
-  class AudioStateInitOp;
-  class AudioConfigInitOp;
-
   void ConnectionStateNtf(const DaemonSocketPDUHeader& aHeader,
                           DaemonSocketPDU& aPDU);
 

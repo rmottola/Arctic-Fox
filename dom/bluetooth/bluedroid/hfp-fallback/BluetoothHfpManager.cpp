@@ -212,7 +212,7 @@ void
 BluetoothHfpManager::HandleBackendError()
 {
   /**
-   * TODO: 
+   * TODO:
    *   Reset connection state and audio state to DISCONNECTED to handle backend
    *   error. The state change triggers UI status bar update as ordinary
    *   bluetooth turn-off sequence.
