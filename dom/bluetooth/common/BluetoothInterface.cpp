@@ -384,7 +384,7 @@ BluetoothAvrcpNotificationHandler::RegisterNotificationNotification(
 
 void
 BluetoothAvrcpNotificationHandler::RemoteFeatureNotification(
-  const nsAString& aBdAddr, unsigned long aFeatures)
+  const BluetoothAddress& aBdAddr, unsigned long aFeatures)
 { }
 
 void
