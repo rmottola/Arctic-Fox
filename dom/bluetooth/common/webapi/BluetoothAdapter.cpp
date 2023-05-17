@@ -1658,30 +1658,6 @@ BluetoothAdapter::DispatchAttributeEvent(const Sequence<nsString>& aTypes)
 }
 
 void
-BluetoothAdapter::DispatchAttributeEvent(const nsTArray<nsString>& aTypes)
-{
-  NS_ENSURE_TRUE_VOID(aTypes.Length());
-
-  AutoJSAPI jsapi;
-  NS_ENSURE_TRUE_VOID(jsapi.Init(GetOwner()));
-  JSContext* cx = jsapi.cx();
-  JS::Rooted<JS::Value> value(cx);
-
-  if (!ToJSValue(cx, aTypes, &value)) {
-    JS_ClearPendingException(cx);
-    return;
-  }
-
-  RootedDictionary<BluetoothAttributeEventInit> init(cx);
-  init.mAttrs = value;
-  RefPtr<BluetoothAttributeEvent> event =
-    BluetoothAttributeEvent::Constructor(this,
-                                         NS_LITERAL_STRING("attributechanged"),
-                                         init);
-  DispatchTrustedEvent(event);
-}
-
-void
 BluetoothAdapter::DispatchDeviceEvent(const nsAString& aType,
                                       const BluetoothDeviceEventInit& aInit)
 {
@@ -2051,13 +2027,6 @@ BluetoothAdapter::SendMediaMetaData(
     return nullptr;
   }
 
-  ControlPlayStatus playStatus;
-  auto rv = StringToControlPlayStatus(aMediaPlayStatus.mPlayStatus, playStatus);
-  if (NS_FAILED(rv)) {
-    aRv.Throw(rv);
-    return nullptr;
-  }
-
   RefPtr<DOMRequest> request = new DOMRequest(win);
   RefPtr<BluetoothReplyRunnable> results =
     new BluetoothVoidReplyRunnable(request);
@@ -2085,6 +2054,13 @@ BluetoothAdapter::SendMediaPlayStatus(
   nsCOMPtr<nsPIDOMWindow> win = GetOwner();
   if (!win) {
     aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  ControlPlayStatus playStatus;
+  auto rv = StringToControlPlayStatus(aMediaPlayStatus.mPlayStatus, playStatus);
+  if (NS_FAILED(rv)) {
+    aRv.Throw(rv);
     return nullptr;
   }
 
