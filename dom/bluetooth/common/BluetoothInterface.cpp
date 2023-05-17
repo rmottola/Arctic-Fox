@@ -481,14 +481,6 @@ BluetoothA2dpResultHandler::OnError(BluetoothStatus aStatus)
 }
 
 void
-BluetoothA2dpResultHandler::Init()
-{ }
-
-void
-BluetoothA2dpResultHandler::Cleanup()
-{ }
-
-void
 BluetoothA2dpResultHandler::Connect()
 { }
 
