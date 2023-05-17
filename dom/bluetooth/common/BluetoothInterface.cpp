@@ -686,14 +686,6 @@ BluetoothGattResultHandler::OnError(BluetoothStatus aStatus)
 }
 
 void
-BluetoothGattResultHandler::Init()
-{ }
-
-void
-BluetoothGattResultHandler::Cleanup()
-{ }
-
-void
 BluetoothGattResultHandler::RegisterClient()
 { }
 
