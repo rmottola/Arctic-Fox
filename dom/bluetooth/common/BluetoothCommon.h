@@ -334,6 +334,13 @@ enum BluetoothBondState {
   BOND_STATE_BONDED
 };
 
+/* Physical transport for GATT connections to remote dual-mode devices */
+enum BluetoothTransport {
+  TRANSPORT_AUTO,   /* No preference of physical transport */
+  TRANSPORT_BREDR,  /* Prefer BR/EDR transport */
+  TRANSPORT_LE      /* Prefer LE transport */
+};
+
 enum BluetoothTypeOfDevice {
   TYPE_OF_DEVICE_BREDR,
   TYPE_OF_DEVICE_BLE,
@@ -521,6 +528,15 @@ enum BluetoothServiceClass {
   PBAP_PSE         = 0x112f,
   MAP_MAS          = 0x1132,
   MAP_MNS          = 0x1133
+};
+
+struct BluetoothActivityEnergyInfo {
+  uint8_t mStatus;
+  uint8_t mStackState;  /* stack reported state */
+  uint64_t mTxTime;     /* in ms */
+  uint64_t mRxTime;     /* in ms */
+  uint64_t mIdleTime;   /* in ms */
+  uint64_t mEnergyUsed; /* a product of mA, V and ms */
 };
 
 struct BluetoothUuid {
@@ -801,6 +817,12 @@ enum BluetoothHandsfreeVoiceRecognitionState {
 enum BluetoothHandsfreeVolumeType {
   HFP_VOLUME_TYPE_SPEAKER,
   HFP_VOLUME_TYPE_MICROPHONE
+};
+
+enum BluetoothHandsfreeWbsConfig {
+  HFP_WBS_NONE, /* Neither CVSD nor mSBC codec, but other optional codec.*/
+  HFP_WBS_NO,   /* CVSD */
+  HFP_WBS_YES   /* mSBC */
 };
 
 enum BluetoothHandsfreeWbsConfig {
