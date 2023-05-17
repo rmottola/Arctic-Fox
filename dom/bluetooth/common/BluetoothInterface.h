@@ -1053,7 +1053,7 @@ public:
   /* Adapter Properties */
 
   virtual void GetAdapterProperties(BluetoothResultHandler* aRes) = 0;
-  virtual void GetAdapterProperty(const nsAString& aName,
+  virtual void GetAdapterProperty(BluetoothPropertyType,
                                   BluetoothResultHandler* aRes) = 0;
   virtual void SetAdapterProperty(const BluetoothNamedValue& aProperty,
                                   BluetoothResultHandler* aRes) = 0;
@@ -1063,7 +1063,7 @@ public:
   virtual void GetRemoteDeviceProperties(const BluetoothAddress& aRemoteAddr,
                                          BluetoothResultHandler* aRes) = 0;
   virtual void GetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
-                                       const nsAString& aName,
+                                       BluetoothPropertyType aType,
                                        BluetoothResultHandler* aRes) = 0;
   virtual void SetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
                                        const BluetoothNamedValue& aProperty,

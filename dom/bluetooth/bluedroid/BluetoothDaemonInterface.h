@@ -56,7 +56,7 @@ public:
   /* Adapter Properties */
 
   void GetAdapterProperties(BluetoothResultHandler* aRes) override;
-  void GetAdapterProperty(const nsAString& aName,
+  void GetAdapterProperty(BluetoothPropertyType aType,
                           BluetoothResultHandler* aRes) override;
   void SetAdapterProperty(const BluetoothNamedValue& aProperty,
                           BluetoothResultHandler* aRes) override;
@@ -66,7 +66,7 @@ public:
   void GetRemoteDeviceProperties(const BluetoothAddress& aRemoteAddr,
                                  BluetoothResultHandler* aRes) override;
   void GetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
-                               const nsAString& aName,
+                               BluetoothPropertyType aType,
                                BluetoothResultHandler* aRes) override;
   void SetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
                                const BluetoothNamedValue& aProperty,
