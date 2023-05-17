@@ -229,14 +229,14 @@ public:
    * Stops an ongoing Bluetooth LE device scan.
    */
   virtual void
-  StopLeScanInternal(const nsAString& aScanUuid,
+  StopLeScanInternal(const BluetoothUuid& aScanUuid,
                      BluetoothReplyRunnable* aRunnable) = 0;
 
   /**
    * Starts a Bluetooth LE device scan.
    */
   virtual void
-  StartLeScanInternal(const nsTArray<nsString>& aServiceUuids,
+  StartLeScanInternal(const nsTArray<BluetoothUuid>& aServiceUuids,
                       BluetoothReplyRunnable* aRunnable) = 0;
 
   /**
@@ -481,7 +481,7 @@ public:
    * Connect to a remote GATT server. (platform specific implementation)
    */
   virtual void
-  ConnectGattClientInternal(const nsAString& aAppUuid,
+  ConnectGattClientInternal(const BluetoothUuid& aAppUuid,
                             const BluetoothAddress& aDeviceAddress,
                             BluetoothReplyRunnable* aRunnable) = 0;
 
@@ -490,7 +490,7 @@ public:
    * (platform specific implementation)
    */
   virtual void
-  DisconnectGattClientInternal(const nsAString& aAppUuid,
+  DisconnectGattClientInternal(const BluetoothUuid& aAppUuid,
                                const BluetoothAddress& aDeviceAddress,
                                BluetoothReplyRunnable* aRunnable) = 0;
 
@@ -499,7 +499,7 @@ public:
    * server. (platform specific implementation)
    */
   virtual void
-  DiscoverGattServicesInternal(const nsAString& aAppUuid,
+  DiscoverGattServicesInternal(const BluetoothUuid& aAppUuid,
                                BluetoothReplyRunnable* aRunnable) = 0;
 
   /**
@@ -507,7 +507,7 @@ public:
    * (platform specific implementation)
    */
   virtual void
-  GattClientStartNotificationsInternal(const nsAString& aAppUuid,
+  GattClientStartNotificationsInternal(const BluetoothUuid& aAppUuid,
                                        const BluetoothGattServiceId& aServId,
                                        const BluetoothGattId& aCharId,
                                        BluetoothReplyRunnable* aRunnable) = 0;
@@ -517,7 +517,7 @@ public:
    * (platform specific implementation)
    */
   virtual void
-  GattClientStopNotificationsInternal(const nsAString& aAppUuid,
+  GattClientStopNotificationsInternal(const BluetoothUuid& aAppUuid,
                                       const BluetoothGattServiceId& aServId,
                                       const BluetoothGattId& aCharId,
                                       BluetoothReplyRunnable* aRunnable) = 0;
@@ -543,7 +543,7 @@ public:
    */
   virtual void
   GattClientReadCharacteristicValueInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothGattServiceId& aServiceId,
     const BluetoothGattId& aCharacteristicId,
     BluetoothReplyRunnable* aRunnable) = 0;
@@ -554,7 +554,7 @@ public:
    */
   virtual void
   GattClientWriteCharacteristicValueInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothGattServiceId& aServiceId,
     const BluetoothGattId& aCharacteristicId,
     const BluetoothGattWriteType& aWriteType,
@@ -567,7 +567,7 @@ public:
    */
   virtual void
   GattClientReadDescriptorValueInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothGattServiceId& aServiceId,
     const BluetoothGattId& aCharacteristicId,
     const BluetoothGattId& aDescriptorId,
@@ -579,7 +579,7 @@ public:
    */
   virtual void
   GattClientWriteDescriptorValueInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothGattServiceId& aServiceId,
     const BluetoothGattId& aCharacteristicId,
     const BluetoothGattId& aDescriptorId,
@@ -588,13 +588,13 @@ public:
 
   virtual void
   GattServerConnectPeripheralInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAddress& aAddress,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerDisconnectPeripheralInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAddress& aAddress,
     BluetoothReplyRunnable* aRunnable) = 0;
 
@@ -607,21 +607,21 @@ public:
 
   virtual void
   GattServerAddServiceInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothGattServiceId& aServiceId,
     uint16_t aHandleCount,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerAddIncludedServiceInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     const BluetoothAttributeHandle& aIncludedServiceHandle,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerAddCharacteristicInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     const BluetoothUuid& aCharacteristicUuid,
     BluetoothGattAttrPerm aPermissions,
@@ -630,7 +630,7 @@ public:
 
   virtual void
   GattServerAddDescriptorInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     const BluetoothAttributeHandle& aCharacteristicHandle,
     const BluetoothUuid& aDescriptorUuid,
@@ -639,25 +639,25 @@ public:
 
   virtual void
   GattServerRemoveServiceInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerStartServiceInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerStopServiceInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAttributeHandle& aServiceHandle,
     BluetoothReplyRunnable* aRunnable) = 0;
 
   virtual void
   GattServerSendResponseInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAddress& aAddress,
     uint16_t aStatus,
     int32_t aRequestId,
@@ -666,7 +666,7 @@ public:
 
   virtual void
   GattServerSendIndicationInternal(
-    const nsAString& aAppUuid,
+    const BluetoothUuid& aAppUuid,
     const BluetoothAddress& aAddress,
     const BluetoothAttributeHandle& aCharacteristicHandle,
     bool aConfirm,
