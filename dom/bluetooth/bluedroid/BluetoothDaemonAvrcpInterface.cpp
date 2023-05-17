@@ -881,8 +881,8 @@ BluetoothDaemonAvrcpInterface::Init(
   }
 
   nsresult rv = mModule->RegisterModule(
-    BluetoothDaemonAvrcpModule::SERVICE_ID,
-    BluetoothDaemonAvrcpModule::MAX_NUM_CLIENTS, 0x00, res);
+    SETUP_SERVICE_ID_AVRCP, 0x00, BluetoothDaemonAvrcpModule::MAX_NUM_CLIENTS,
+    res);
 
   if (NS_FAILED(rv) && aRes) {
     DispatchError(aRes, rv);
@@ -936,8 +936,7 @@ BluetoothDaemonAvrcpInterface::Cleanup(
   MOZ_ASSERT(mModule);
 
   nsresult rv = mModule->UnregisterModule(
-    BluetoothDaemonAvrcpModule::SERVICE_ID,
-    new CleanupResultHandler(mModule, aRes));
+    SETUP_SERVICE_ID_AVRCP, new CleanupResultHandler(mModule, aRes));
   if (NS_FAILED(rv)) {
     DispatchError(aRes, rv);
   }

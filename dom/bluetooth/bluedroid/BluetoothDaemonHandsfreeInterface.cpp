@@ -1518,8 +1518,7 @@ BluetoothDaemonHandsfreeInterface::Init(
   }
 
   nsresult rv = mModule->RegisterModule(
-    BluetoothDaemonHandsfreeModule::SERVICE_ID, MODE_NARROWBAND_SPEECH,
-    aMaxNumClients, res);
+    SETUP_SERVICE_ID_HANDSFREE, MODE_NARROWBAND_SPEECH, aMaxNumClients, res);
 
   if (NS_FAILED(rv) && aRes) {
     DispatchError(aRes, rv);
@@ -1542,7 +1541,6 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
-    BT_LOGR("%s:%d", __func__, __LINE__);
     if (mRes) {
       mRes->OnError(aStatus);
     }
@@ -1552,7 +1550,6 @@ public:
   {
     MOZ_ASSERT(NS_IsMainThread());
 
-    BT_LOGR("%s:%d", __func__, __LINE__);
     // Clear notification handler _after_ module has been
     // unregistered. While unregistering the module, we might
     // still receive notifications.
@@ -1572,11 +1569,9 @@ void
 BluetoothDaemonHandsfreeInterface::Cleanup(
   BluetoothHandsfreeResultHandler* aRes)
 {
-  BT_LOGR("%s:%d", __func__, __LINE__);
   nsresult rv = mModule->UnregisterModule(
-    BluetoothDaemonHandsfreeModule::SERVICE_ID,
-    new CleanupResultHandler(mModule, aRes));
-  BT_LOGR("%s:%d", __func__, __LINE__);
+    SETUP_SERVICE_ID_HANDSFREE, new CleanupResultHandler(mModule, aRes));
+
   if (NS_FAILED(rv)) {
     DispatchError(aRes, rv);
   }
