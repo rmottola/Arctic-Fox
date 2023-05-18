@@ -47,6 +47,7 @@ exports["test process restart"] = function*(assert) {
   let tabs = getTabs(window);
   assert.equal(tabs.length, 1, "Should have just the one tab to start with");
   let tab = tabs[0];
+  let browser = getBrowserForTab(tab);
 
   let loader = new Loader(module);
   let { processes, frames } = yield waitForProcesses(loader);
@@ -60,6 +61,7 @@ exports["test process restart"] = function*(assert) {
   let frameDetach = promiseEventOnItemAndContainer(assert, remoteFrame, frames, 'detach');
   let frameAttach = promiseTabFrameAttach(frames);
   let processDetach = promiseEventOnItemAndContainer(assert, remoteProcess, processes, 'detach');
+  let browserLoad = promiseDOMEvent(browser, "load", true);
   setTabURL(tab, LOCAL_URI);
   // The load should kill the remote frame
   yield frameDetach;
@@ -68,10 +70,12 @@ exports["test process restart"] = function*(assert) {
   assert.equal(newFrame.process, localProcess, "New frame should be in the local process");
   // And kill the process
   yield processDetach;
+  yield browserLoad;
 
   frameDetach = promiseEventOnItemAndContainer(assert, newFrame, frames, 'detach');
   let processAttach = promiseEvent(processes, 'attach');
   frameAttach = promiseTabFrameAttach(frames);
+  browserLoad = promiseDOMEvent(browser, "load", true);
   setTabURL(tab, REMOTE_URI);
   // The load should kill the remote frame
   yield frameDetach;
@@ -81,8 +85,11 @@ exports["test process restart"] = function*(assert) {
   // And create a new frame in the remote process
   [newFrame] = yield frameAttach;
   assert.equal(newFrame.process, remoteProcess, "New frame should be in the remote process");
+  yield browserLoad;
 
+  browserLoad = promiseDOMEvent(browser, "load", true);
   setTabURL(tab, "about:blank");
+  yield browserLoad;
 
   loader.unload();
 };
