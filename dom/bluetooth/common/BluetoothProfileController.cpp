@@ -40,7 +40,7 @@ public:
     MOZ_ASSERT(aController);
   }
 
-protected:
+private:
   virtual ~CheckProfileStatusCallback()
   {
     mController = nullptr;

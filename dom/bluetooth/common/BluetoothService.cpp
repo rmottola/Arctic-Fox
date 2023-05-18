@@ -160,8 +160,9 @@ public:
     return NS_OK;
   }
 
-protected:
-  ~StartupTask() { }
+private:
+  ~StartupTask()
+  { }
 };
 
 NS_IMPL_ISUPPORTS(BluetoothService::StartupTask, nsISettingsServiceCallback);
