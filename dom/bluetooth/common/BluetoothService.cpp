@@ -119,7 +119,7 @@ GetAllBluetoothActors(InfallibleTArray<BluetoothParent*>& aActors)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 BluetoothService::ToggleBtAck::ToggleBtAck(bool aEnabled)
   : mEnabled(aEnabled)
@@ -573,8 +573,6 @@ BluetoothService::HandleShutdown()
   // bluetooth is going away, and then we wait for them to acknowledge. Then we
   // close down all the bluetooth machinery.
 
-  sInShutdown = true;
-
   Cleanup();
 
   AutoInfallibleTArray<BluetoothParent*, 10> childActors;
@@ -674,6 +672,13 @@ BluetoothService::Observe(nsISupports* aSubject, const char* aTopic,
   }
 
   if (!strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID)) {
+    /**
+     * |sInShutdown| flag should be set for instances created in content
+     * processes or parent processes. Please see bug 1199653 for detailed
+     * information.
+     */
+    sInShutdown = true;
+
     return HandleShutdown();
   }
 
