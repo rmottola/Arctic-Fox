@@ -47,5 +47,5 @@ MessagePortChild::ActorDestroy(ActorDestroyReason aWhy)
   }
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

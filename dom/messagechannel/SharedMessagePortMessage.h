@@ -65,7 +65,7 @@ private:
   ~SharedMessagePortMessage();
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_SharedMessagePortMessage_h
