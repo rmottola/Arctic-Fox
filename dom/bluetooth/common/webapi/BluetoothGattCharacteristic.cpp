@@ -289,8 +289,6 @@ void
 BluetoothGattCharacteristic::GetValue(JSContext* cx,
                                       JS::MutableHandle<JSObject*> aValue) const
 {
-  MOZ_ASSERT(aValue);
-
   aValue.set(mValue.IsEmpty()
              ? nullptr
              : ArrayBuffer::Create(cx, mValue.Length(), mValue.Elements()));
