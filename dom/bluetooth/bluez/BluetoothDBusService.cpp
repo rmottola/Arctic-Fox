@@ -4442,6 +4442,14 @@ BluetoothDBusService::ReplyTovCardListing(
 }
 
 void
+BluetoothDBusService::ReplyTovCardListing(
+  Blob* aBlob,
+  uint16_t aPhonebookSize,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
 BluetoothDBusService::ReplyToMapFolderListing(long aMasId,
   const nsAString& aFolderlists,
   BluetoothReplyRunnable* aRunnable)
@@ -4504,15 +4512,6 @@ BluetoothDBusService::ReplyToMapMessageUpdate(long aMasId, bool aStatus,
   BluetoothReplyRunnable* aRunnable)
 {
 }
-
-void
-BluetoothDBusService::ReplyTovCardListing(
-  Blob* aBlob,
-  uint16_t aPhonebookSize,
-  BluetoothReplyRunnable* aRunnable)
-{
-}
-
 
 void
 BluetoothDBusService::GattServerConnectPeripheralInternal(
