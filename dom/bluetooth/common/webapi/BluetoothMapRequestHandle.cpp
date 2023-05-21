@@ -41,7 +41,7 @@ BluetoothMapRequestHandle::Create(nsPIDOMWindow* aOwner)
 {
   MOZ_ASSERT(aOwner);
 
-  nsRefPtr<BluetoothMapRequestHandle> handle =
+  RefPtr<BluetoothMapRequestHandle> handle =
     new BluetoothMapRequestHandle(aOwner);
 
   return handle.forget();
@@ -57,7 +57,7 @@ BluetoothMapRequestHandle::ReplyToFolderListing(long aMasId,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -66,20 +66,8 @@ BluetoothMapRequestHandle::ReplyToFolderListing(long aMasId,
     return nullptr;
   }
 
-  if (XRE_GetProcessType() == GeckoProcessType_Default) {
-    // In-process reply
-    bs->ReplyToMapFolderListing(aMasId, aFolderlists,
-      new BluetoothVoidReplyRunnable(nullptr, promise));
-  } else {
-    ContentChild *cc = ContentChild::GetSingleton();
-    if (!cc) {
-      aRv.Throw(NS_ERROR_FAILURE);
-      return nullptr;
-    }
-
-    bs->ReplyToMapFolderListing(aMasId, aFolderlists,
-      new BluetoothVoidReplyRunnable(nullptr, promise));
-  }
+  bs->ReplyToMapFolderListing(aMasId, aFolderlists,
+    new BluetoothVoidReplyRunnable(nullptr, promise));
 
   return promise.forget();
 }
@@ -98,7 +86,7 @@ BluetoothMapRequestHandle::ReplyToMessagesListing(long aMasId,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -141,7 +129,7 @@ BluetoothMapRequestHandle::ReplyToGetMessage(long aMasId, Blob& aBlob,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -185,7 +173,7 @@ BluetoothMapRequestHandle::ReplyToSetMessageStatus(long aMasId,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -212,7 +200,7 @@ BluetoothMapRequestHandle::ReplyToSendMessage(long aMasId,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
@@ -238,7 +226,7 @@ BluetoothMapRequestHandle::ReplyToMessageUpdate(long aMasId,
     return nullptr;
   }
 
-  nsRefPtr<Promise> promise = Promise::Create(global, aRv);
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
   BluetoothService* bs = BluetoothService::Get();
