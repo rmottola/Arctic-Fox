@@ -32,6 +32,7 @@ class ProxyAccessibleWrap : public AccessibleWrap
 
 class HyperTextProxyAccessibleWrap : public HyperTextAccessibleWrap
 {
+public:
   HyperTextProxyAccessibleWrap(ProxyAccessible* aProxy) :
     HyperTextAccessibleWrap(nullptr, nullptr)
   {
