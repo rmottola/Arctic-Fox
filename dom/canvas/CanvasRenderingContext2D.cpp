@@ -1238,7 +1238,7 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
   mTarget->DrawSurface(snapshot, r, r);
 
   // Restore the clips and transform
-  for (uint32_t i = 0; i < CurrentState().clipsPushed.size(); i++) {
+  for (uint32_t i = 0; i < CurrentState().clipsPushed.Length(); i++) {
     mTarget->PushClip(CurrentState().clipsPushed[i]);
   }
 
@@ -1729,7 +1729,7 @@ CanvasRenderingContext2D::Restore()
 
   TransformWillUpdate();
 
-  for (uint32_t i = 0; i < CurrentState().clipsPushed.size(); i++) {
+  for (uint32_t i = 0; i < CurrentState().clipsPushed.Length(); i++) {
     mTarget->PopClip();
   }
 
@@ -2862,7 +2862,7 @@ CanvasRenderingContext2D::Clip(const CanvasWindingRule& winding)
   }
 
   mTarget->PushClip(mPath);
-  CurrentState().clipsPushed.push_back(mPath);
+  CurrentState().clipsPushed.AppendElement(mPath);
 }
 
 void
@@ -2877,7 +2877,7 @@ CanvasRenderingContext2D::Clip(const CanvasPath& path, const CanvasWindingRule& 
   }
 
   mTarget->PushClip(gfxpath);
-  CurrentState().clipsPushed.push_back(gfxpath);
+  CurrentState().clipsPushed.AppendElement(gfxpath);
 }
 
 void

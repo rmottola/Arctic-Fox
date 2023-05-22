@@ -997,7 +997,7 @@ protected:
       return std::min(SIGMA_MAX, shadowBlur / 2.0f);
     }
 
-    std::vector<RefPtr<mozilla::gfx::Path> > clipsPushed;
+    nsTArray<RefPtr<mozilla::gfx::Path> > clipsPushed;
 
     RefPtr<gfxFontGroup> fontGroup;
     nsCOMPtr<nsIAtom> fontLanguage;
