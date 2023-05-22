@@ -5202,6 +5202,11 @@ if test -n "$MOZ_FMP4"; then
     AC_DEFINE(MOZ_FMP4)
 fi;
 
+if test "$MOZ_WIDGET_TOOLKIT" = "gonk" -a -n "$MOZ_FMP4" -a "$ANDROID_VERSION" -ge "18"; then
+    MOZ_GONK_MEDIACODEC=1
+    AC_SUBST(MOZ_GONK_MEDIACODEC)
+fi
+
 dnl ========================================================
 dnl = Enable media plugin support
 dnl ========================================================
