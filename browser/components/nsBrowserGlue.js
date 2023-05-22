@@ -13,6 +13,9 @@ const XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
                                   "resource:///modules/AboutHome.jsm");
 
@@ -2277,9 +2280,11 @@ AboutNewTabService.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIAboutNewTabService]),
 
   get newTabURL() {
-    if (Services.prefs.getBoolPref("browser.newtabpage.remote")) {
+
+    if (!AppConstants.RELEASE_BUILD && Services.prefs.getBoolPref("browser.newtabpage.remote")) {
       return "about:remote-newtab";
     }
+
     return this._newTabURL;
   },
 
