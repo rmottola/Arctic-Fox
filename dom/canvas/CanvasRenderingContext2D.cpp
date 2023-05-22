@@ -275,8 +275,16 @@ public:
       } else {
         mode = ExtendMode::REPEAT;
       }
+
+      Filter filter;
+      if (state.imageSmoothingEnabled) {
+        filter = Filter::GOOD;
+      } else {
+        filter = Filter::POINT;
+      }
+
       mPattern.InitSurfacePattern(state.patternStyles[aStyle]->mSurface, mode,
-                                  state.patternStyles[aStyle]->mTransform);
+                                  state.patternStyles[aStyle]->mTransform, filter);
     }
 
     return *mPattern.GetPattern();
