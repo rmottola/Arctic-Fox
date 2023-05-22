@@ -21,5 +21,3 @@ SOURCES += [
 
 FINAL_LIBRARY = 'xul'
 
-if CONFIG['OS_ARCH'] == 'WINNT':
-    DEFINES['NOMINMAX'] = True
