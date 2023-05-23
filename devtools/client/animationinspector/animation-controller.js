@@ -90,7 +90,9 @@ var getServerTraits = Task.async(function*(target) {
     { name: "hasTargetNode", actor: "domwalker",
       method: "getNodeFromActor" },
     { name: "hasSetCurrentTimes", actor: "animations",
-      method: "setCurrentTimes" }
+      method: "setCurrentTimes" },
+    { name: "hasGetFrames", actor: "animationplayer",
+      method: "getFrames" }
   ];
 
   let traits = {};
