@@ -214,12 +214,22 @@ Animation::SetCurrentTime(const TimeDuration& aSeekTime)
 void
 Animation::SetPlaybackRate(double aPlaybackRate)
 {
+  if (aPlaybackRate == mPlaybackRate) {
+    return;
+  }
+
+  AutoMutationBatchForAnimation mb(*this);
+
   Nullable<TimeDuration> previousTime = GetCurrentTime();
   mPlaybackRate = aPlaybackRate;
   if (!previousTime.IsNull()) {
     ErrorResult rv;
     SetCurrentTime(previousTime.Value());
     MOZ_ASSERT(!rv.Failed(), "Should not assert for non-null time");
+  }
+
+  if (IsRelevant()) {
+    nsNodeUtils::AnimationChanged(this);
   }
 }
 
