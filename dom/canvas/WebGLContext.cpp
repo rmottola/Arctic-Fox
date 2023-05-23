@@ -921,6 +921,7 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
     AssertCachedBindings();
     AssertCachedState();
 
+    reporter.SetSuccessful();
     return NS_OK;
 }
 
@@ -1723,7 +1724,7 @@ WebGLContext::GetSurfaceSnapshot(bool* out_premultAlpha)
     if (!srcPremultAlpha) {
         if (out_premultAlpha) {
             *out_premultAlpha = false;
-        } else {
+        } else if(hasAlpha) {
             gfxUtils::PremultiplyDataSurface(surf, surf);
         }
     }
