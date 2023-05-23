@@ -554,6 +554,7 @@ AnimationsTimeline.prototype = {
     this.destroyTimeBlocks();
     this.animationsEl.innerHTML = "";
   },
+
   onScrubberMouseDown: function(e) {
     this.moveScrubberTo(e.pageX);
     this.win.addEventListener("mouseup", this.onScrubberMouseUp);
