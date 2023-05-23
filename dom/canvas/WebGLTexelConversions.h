@@ -345,7 +345,7 @@ MOZ_ALWAYS_INLINE void
 unpack(const SrcType* __restrict src,
        DstType* __restrict dst)
 {
-    MOZ_ASSERT(false, "Unimplemented texture format conversion");
+    MOZ_CRASH("Unimplemented texture format conversion");
 }
 
 template<> MOZ_ALWAYS_INLINE void
@@ -553,7 +553,7 @@ MOZ_ALWAYS_INLINE void
 pack(const SrcType* __restrict src,
      DstType* __restrict dst)
 {
-    MOZ_ASSERT(false, "Unimplemented texture format conversion");
+    MOZ_CRASH("Unimplemented texture format conversion");
 }
 
 template<> MOZ_ALWAYS_INLINE void
@@ -813,6 +813,15 @@ pack<WebGLTexelFormat::RGB32F, WebGLTexelPremultiplicationOp::Premultiply, float
 }
 
 template<> MOZ_ALWAYS_INLINE void
+pack<WebGLTexelFormat::RGB32F, WebGLTexelPremultiplicationOp::Unpremultiply, float, float>(const float* __restrict src, float* __restrict dst)
+{
+    float scaleFactor = src[3] ? 1.0f / src[3] : 1.0f;
+    dst[0] = src[0] * scaleFactor;
+    dst[1] = src[1] * scaleFactor;
+    dst[2] = src[2] * scaleFactor;
+}
+
+template<> MOZ_ALWAYS_INLINE void
 pack<WebGLTexelFormat::RGBA32F, WebGLTexelPremultiplicationOp::None, float, float>(const float* __restrict src, float* __restrict dst)
 {
     dst[0] = src[0];
@@ -829,6 +838,16 @@ pack<WebGLTexelFormat::RGBA32F, WebGLTexelPremultiplicationOp::Premultiply, floa
     dst[1] = src[1] * scaleFactor;
     dst[2] = src[2] * scaleFactor;
     dst[3] = src[3];
+}
+
+template<> MOZ_ALWAYS_INLINE void
+pack<WebGLTexelFormat::RGBA32F, WebGLTexelPremultiplicationOp::Unpremultiply, float, float>(const float* __restrict src, float* __restrict dst)
+{
+  float scaleFactor = src[3] ? 1.0f / src[3] : 1.0f;
+  dst[0] = src[0] * scaleFactor;
+  dst[1] = src[1] * scaleFactor;
+  dst[2] = src[2] * scaleFactor;
+  dst[3] = src[3];
 }
 
 template<> MOZ_ALWAYS_INLINE void
