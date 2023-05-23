@@ -809,6 +809,8 @@ Animation::NotifyEffectTimingUpdated()
 void
 Animation::DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior)
 {
+  AutoMutationBatchForAnimation mb(*this);
+
   bool abortedPause = mPendingState == PendingState::PausePending;
 
   Nullable<TimeDuration> currentTime = GetCurrentTime();
@@ -870,6 +872,9 @@ Animation::DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior)
   }
 
   UpdateTiming(SeekFlag::NoSeek, SyncNotifyFlag::Async);
+  if (IsRelevant()) {
+    nsNodeUtils::AnimationChanged(this);
+  }
 }
 
 // https://w3c.github.io/web-animations/#pause-an-animation
