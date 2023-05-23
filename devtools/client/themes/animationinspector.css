@@ -249,10 +249,10 @@ body {
 
 .animation-timeline .animation .time-block {
   position: absolute;
-  top: 0;
+  top: 2px;
   left: var(--timeline-sidebar-width);
   right: 0;
-  height: 100%;
+  height: var(--timeline-animation-height);
 }
 
 /* Animation iterations */
