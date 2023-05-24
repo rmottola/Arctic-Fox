@@ -2221,13 +2221,6 @@ public:
                                   nsCSSPseudoElements::Type &aPseudoTypeResult);
 
   /**
-   * Returns true if the frame has animations or transitions that can be
-   * performed on the compositor.
-   */
-  static bool HasAnimationsForCompositor(const nsIFrame* aFrame,
-                                         nsCSSProperty aProperty);
-
-  /**
    * Returns true if the frame has current (i.e. running or scheduled-to-run)
    * animations or transitions for the property.
    */
