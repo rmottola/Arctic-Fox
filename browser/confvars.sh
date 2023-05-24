@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 MOZ_APP_BASENAME=ArcticFox
-MOZ_APP_VENDOR=org.wicknix
+MOZ_APP_VENDOR=org.multix
 MOZ_UPDATER=1
 MOZ_PHOENIX=1
 
