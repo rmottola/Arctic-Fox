@@ -1263,6 +1263,8 @@ void
 IonScript::Destroy(FreeOp* fop, IonScript* script)
 {
     script->unlinkFromRuntime(fop);
+    // Frees the potential event we have set.
+    script->traceLoggerScriptEvent_ = TraceLoggerEvent();
     fop->free_(script);
 }
 
