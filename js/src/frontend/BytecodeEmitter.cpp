@@ -5459,7 +5459,7 @@ BytecodeEmitter::emitIterator()
 }
 
 bool
-BytecodeEmitter::emitForInOrOfVariables(ParseNode* pn, bool* letDecl)
+BytecodeEmitter::emitForInOrOfVariables(ParseNode* pn, bool* letBlockScope)
 {
     // ES6 specifies that loop variables get a fresh binding in each iteration.
     // This is currently implemented for C-style for(;;) loops, but not
@@ -5470,8 +5470,8 @@ BytecodeEmitter::emitForInOrOfVariables(ParseNode* pn, bool* letDecl)
     // get a ReferenceError due to the TDZ violation. This is not yet
     // implemented. See bug 1069480.
 
-    *letDecl = pn->isKind(PNK_LEXICALSCOPE);
-    MOZ_ASSERT_IF(*letDecl, pn->isLexical());
+    *letBlockScope = pn->isKind(PNK_LEXICALSCOPE);
+    MOZ_ASSERT_IF(*letBlockScope, pn->isLexical());
 
     // If the left part is 'var x', emit code to define x if necessary using a
     // prologue opcode, but do not emit a pop. If it is 'let x', enterBlockScope
@@ -5483,7 +5483,7 @@ BytecodeEmitter::emitForInOrOfVariables(ParseNode* pn, bool* letDecl)
     // parsed with single lexical scope for the entire comprehension. In this
     // case we must initialize the lets to not trigger dead zone checks via
     // InitializeVars.
-    if (!*letDecl) {
+    if (!*letBlockScope) {
         emittingForInit = true;
         if (pn->isKind(PNK_VAR)) {
             if (!emitVariables(pn, DefineVars))
@@ -5518,8 +5518,8 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn)
     ParseNode* forBody = pn ? pn->pn_right : nullptr;
 
     ParseNode* loopDecl = forHead ? forHead->pn_kid1 : nullptr;
-    bool letDecl = false;
-    if (loopDecl && !emitForInOrOfVariables(loopDecl, &letDecl))
+    bool letBlockScope = false;
+    if (loopDecl && !emitForInOrOfVariables(loopDecl, &letBlockScope))
         return false;
 
     if (type == StmtType::FOR_OF_LOOP) {
@@ -5541,7 +5541,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn)
     // Initialize let bindings with undefined when entering, as the name
     // assigned to is a plain assignment.
     StmtInfoBCE letStmt(cx);
-    if (letDecl) {
+    if (letBlockScope) {
         if (!enterBlockScope(&letStmt, loopDecl->pn_objbox, JSOP_UNDEFINED, 0))
             return false;
     }
@@ -5643,7 +5643,7 @@ BytecodeEmitter::emitForOf(StmtType type, ParseNode* pn)
     if (!tryNoteList.append(JSTRY_FOR_OF, stackDepth, top, offset()))
         return false;
 
-    if (letDecl) {
+    if (letBlockScope) {
         if (!leaveNestedScope(&letStmt))
             return false;
     }
@@ -5665,8 +5665,8 @@ BytecodeEmitter::emitForIn(ParseNode* pn)
     ParseNode* forBody = pn->pn_right;
 
     ParseNode* loopDecl = forHead->pn_kid1;
-    bool letDecl = false;
-    if (loopDecl && !emitForInOrOfVariables(loopDecl, &letDecl))
+    bool letBlockScope = false;
+    if (loopDecl && !emitForInOrOfVariables(loopDecl, &letBlockScope))
         return false;
 
     /* Compile the object expression to the right of 'in'. */
@@ -5691,7 +5691,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn)
     // Initialize let bindings with undefined when entering, as the name
     // assigned to is a plain assignment.
     StmtInfoBCE letStmt(cx);
-    if (letDecl) {
+    if (letBlockScope) {
         if (!enterBlockScope(&letStmt, loopDecl->pn_objbox, JSOP_UNDEFINED, 0))
             return false;
     }
@@ -5771,7 +5771,7 @@ BytecodeEmitter::emitForIn(ParseNode* pn)
     if (!emit1(JSOP_ENDITER))
         return false;
 
-    if (letDecl) {
+    if (letBlockScope) {
         if (!leaveNestedScope(&letStmt))
             return false;
     }
@@ -5974,7 +5974,7 @@ BytecodeEmitter::emitFor(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitComprehensionForInOrOfVariables(ParseNode* pn, bool* letDecl)
+BytecodeEmitter::emitComprehensionForInOrOfVariables(ParseNode* pn, bool* letBlockScope)
 {
     // ES6 specifies that loop variables get a fresh binding in each iteration.
     // This is currently implemented for C-style for(;;) loops, but not
@@ -5985,8 +5985,8 @@ BytecodeEmitter::emitComprehensionForInOrOfVariables(ParseNode* pn, bool* letDec
     // get a ReferenceError due to the TDZ violation. This is not yet
     // implemented. See bug 1069480.
 
-    *letDecl = pn->isKind(PNK_LEXICALSCOPE);
-    MOZ_ASSERT_IF(*letDecl, pn->isLexical());
+    *letBlockScope = pn->isKind(PNK_LEXICALSCOPE);
+    MOZ_ASSERT_IF(*letBlockScope, pn->isLexical());
 
     // If the left part is 'var x', emit code to define x if necessary using a
     // prologue opcode, but do not emit a pop. If it is 'let x', enterBlockScope
@@ -5998,7 +5998,7 @@ BytecodeEmitter::emitComprehensionForInOrOfVariables(ParseNode* pn, bool* letDec
     // parsed with single lexical scope for the entire comprehension. In this
     // case we must initialize the lets to not trigger dead zone checks via
     // InitializeVars.
-    if (!*letDecl) {
+    if (!*letBlockScope) {
         emittingForInit = true;
         if (pn->isKind(PNK_VAR)) {
             if (!emitVariables(pn, DefineVars))
@@ -6019,18 +6019,17 @@ BytecodeEmitter::emitComprehensionForOf(ParseNode* pn)
 {
     MOZ_ASSERT(pn->isKind(PNK_COMPREHENSIONFOR));
 
-    ParseNode* forHead = pn ? pn->pn_left : nullptr;
+    ParseNode* forHead = pn->pn_left;
     MOZ_ASSERT(forHead->isKind(PNK_FOROF));
 
-    ParseNode* forHeadExpr = forHead ? forHead->pn_kid3 : nullptr;
-
-    ParseNode* forBody = pn ? pn->pn_right : nullptr;
+    ParseNode* forHeadExpr = forHead->pn_kid3;
+    ParseNode* forBody = pn->pn_right;
 
     ptrdiff_t top = offset();
 
-    ParseNode* loopDecl = forHead ? forHead->pn_kid1 : nullptr;
-    bool letDecl = false;
-    if (loopDecl && !emitComprehensionForInOrOfVariables(loopDecl, &letDecl))
+    ParseNode* loopDecl = forHead->pn_kid1;
+    bool letBlockScope = false;
+    if (loopDecl && !emitComprehensionForInOrOfVariables(loopDecl, &letBlockScope))
         return false;
 
     // For-of loops run with two values on the stack: the iterator and the
@@ -6050,7 +6049,7 @@ BytecodeEmitter::emitComprehensionForOf(ParseNode* pn)
     // Initialize let bindings with undefined when entering, as the name
     // assigned to is a plain assignment.
     StmtInfoBCE letStmt(cx);
-    if (letDecl) {
+    if (letBlockScope) {
         if (!enterBlockScope(&letStmt, loopDecl->pn_objbox, JSOP_UNDEFINED, 0))
             return false;
     }
@@ -6132,7 +6131,7 @@ BytecodeEmitter::emitComprehensionForOf(ParseNode* pn)
     if (!tryNoteList.append(JSTRY_FOR_OF, stackDepth, top, offset()))
         return false;
 
-    if (letDecl) {
+    if (letBlockScope) {
         if (!leaveNestedScope(&letStmt))
             return false;
     }
@@ -6154,8 +6153,8 @@ BytecodeEmitter::emitComprehensionForIn(ParseNode* pn)
     ParseNode* forBody = pn->pn_right;
 
     ParseNode* loopDecl = forHead->pn_kid1;
-    bool letDecl = false;
-    if (loopDecl && !emitComprehensionForInOrOfVariables(loopDecl, &letDecl))
+    bool letBlockScope = false;
+    if (loopDecl && !emitComprehensionForInOrOfVariables(loopDecl, &letBlockScope))
         return false;
 
     /* Compile the object expression to the right of 'in'. */
@@ -6180,7 +6179,7 @@ BytecodeEmitter::emitComprehensionForIn(ParseNode* pn)
     // Initialize let bindings with undefined when entering, as the name
     // assigned to is a plain assignment.
     StmtInfoBCE letStmt(cx);
-    if (letDecl) {
+    if (letBlockScope) {
         if (!enterBlockScope(&letStmt, loopDecl->pn_objbox, JSOP_UNDEFINED, 0))
             return false;
     }
@@ -6260,7 +6259,7 @@ BytecodeEmitter::emitComprehensionForIn(ParseNode* pn)
     if (!emit1(JSOP_ENDITER))
         return false;
 
-    if (letDecl) {
+    if (letBlockScope) {
         if (!leaveNestedScope(&letStmt))
             return false;
     }
