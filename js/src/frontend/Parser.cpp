@@ -128,8 +128,12 @@ SharedContext::computeAllowSyntax(JSObject* staticScope)
             // Any function supports new.target.
             allowNewTarget_ = true;
             allowSuperProperty_ = it.fun().allowSuperProperty();
-            if (it.maybeFunctionBox())
+            if (it.maybeFunctionBox()) {
                 superScopeAlreadyNeedsHomeObject_ = it.maybeFunctionBox()->needsHomeObject();
+                allowSuperCall_ = it.maybeFunctionBox()->isDerivedClassConstructor();
+            } else {
+                allowSuperCall_ = it.fun().isDerivedClassConstructor();
+            }
             break;
         }
     }
@@ -7333,11 +7337,6 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
         if (!tokenStream.peekToken(&ignored, TokenStream::Operand))
             return null();
 
-        if (pc->sc->isFunctionBox() && pc->sc->asFunctionBox()->isDerivedClassConstructor()) {
-            report(ParseError, false, null(), JSMSG_DISABLED_DERIVED_CLASS, "arrow functions");
-            return null();
-        }
-
         Node arrowFunc = functionDef(inHandling, yieldHandling, nullptr, Arrow, NotGenerator);
         if (!arrowFunc)
             return null();
@@ -8755,7 +8754,7 @@ Parser<ParseHandler>::memberExpr(YieldHandling yieldHandling, TripledotHandling 
                    tt == TOK_NO_SUBS_TEMPLATE)
         {
             if (handler.isSuperBase(lhs)) {
-                if (!pc->sc->isFunctionBox() || !pc->sc->asFunctionBox()->isDerivedClassConstructor()) {
+                if (!pc->sc->allowSuperCall()) {
                     report(ParseError, false, null(), JSMSG_BAD_SUPERCALL);
                     return null();
                 }
