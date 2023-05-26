@@ -389,6 +389,7 @@ PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
   , mUuidGen(MakeUnique<PCUuidGenerator>())
   , mNumAudioStreams(0)
   , mNumVideoStreams(0)
+  , mHaveConfiguredCodecs(false)
   , mHaveDataStream(false)
   , mAddCandidateErrorCount(0)
   , mTrickle(true) // TODO(ekr@rtfm.com): Use pref
@@ -926,6 +927,11 @@ class CompareCodecPriority {
 
 nsresult
 PeerConnectionImpl::ConfigureJsepSessionCodecs() {
+  if (mHaveConfiguredCodecs) {
+    return NS_OK;
+  }
+  mHaveConfiguredCodecs = true;
+
 #if !defined(MOZILLA_XPCOMRT_API)
   nsresult res;
   nsCOMPtr<nsIPrefService> prefs =
@@ -1017,15 +1023,15 @@ PeerConnectionImpl::ConfigureJsepSessionCodecs() {
 
             int32_t maxBr = 0; // Unlimited
             branch->GetIntPref("media.navigator.video.h264.max_br", &maxBr);
-            videoCodec.mMaxBr = maxBr;
+            videoCodec.mConstraints.maxBr = maxBr;
 
             int32_t maxMbps = 0; // Unlimited
 #ifdef MOZ_WEBRTC_OMX
+            // Level 1.2; but let's allow CIF@30 or QVGA@30+ by default
             maxMbps = 11880;
 #endif
-            branch->GetIntPref("media.navigator.video.h264.max_mbps",
-                               &maxMbps);
-            videoCodec.mMaxBr = maxMbps;
+            branch->GetIntPref("media.navigator.video.h264.max_mbps", &maxMbps);
+            videoCodec.mConstraints.maxMbps = maxMbps;
 
             // Might disable it, but we set up other params anyway
             videoCodec.mEnabled = h264Enabled;
@@ -1049,20 +1055,24 @@ PeerConnectionImpl::ConfigureJsepSessionCodecs() {
             if (maxFs <= 0) {
               maxFs = 12288; // We must specify something other than 0
             }
-            videoCodec.mMaxFs = maxFs;
+            videoCodec.mConstraints.maxFs = maxFs;
 
             int32_t maxFr = 0;
             branch->GetIntPref("media.navigator.video.max_fr", &maxFr);
             if (maxFr <= 0) {
               maxFr = 60; // We must specify something other than 0
             }
-            videoCodec.mMaxFr = maxFr;
+            videoCodec.mConstraints.maxFps = maxFr;
 
           }
 
-          videoCodec.mUseTmmbr = false;
+          // TMMBR is enabled from a pref in about:config
+          bool useTmmbr = false;
           branch->GetBoolPref("media.navigator.video.use_tmmbr",
-            &videoCodec.mUseTmmbr);
+            &useTmmbr);
+          if (useTmmbr) {
+            videoCodec.EnableTmmbr();
+          }
         }
         break;
       case SdpMediaSection::kText:
@@ -1132,27 +1142,18 @@ PeerConnectionImpl::GetDatachannelParameters(
     MOZ_ASSERT(sendDataChannel == recvDataChannel);
 
     if (sendDataChannel) {
+      // This will release assert if there is no such index, and that's ok
+      const JsepTrackEncoding& encoding =
+        trackPair.mSending->GetNegotiatedDetails()->GetEncoding(0);
 
-      if (!trackPair.mSending->GetNegotiatedDetails()->GetCodecCount()) {
+      if (encoding.GetCodecs().empty()) {
         CSFLogError(logTag, "%s: Negotiated m=application with no codec. "
                             "This is likely to be broken.",
                             __FUNCTION__);
         return NS_ERROR_FAILURE;
       }
 
-      for (size_t i = 0;
-           i < trackPair.mSending->GetNegotiatedDetails()->GetCodecCount();
-           ++i) {
-        const JsepCodecDescription* codec;
-        nsresult res =
-          trackPair.mSending->GetNegotiatedDetails()->GetCodec(i, &codec);
-
-        if (NS_FAILED(res)) {
-          CSFLogError(logTag, "%s: Failed getting codec for m=application.",
-                              __FUNCTION__);
-          continue;
-        }
-
+      for (const JsepCodecDescription* codec : encoding.GetCodecs()) {
         if (codec->mType != SdpMediaSection::kApplication) {
           CSFLogError(logTag, "%s: Codec type for m=application was %u, this "
                               "is a bug.",
@@ -1184,6 +1185,63 @@ PeerConnectionImpl::GetDatachannelParameters(
 
   *datachannelCodec = nullptr;
   *level = 0;
+  return NS_OK;
+}
+
+/* static */
+void
+PeerConnectionImpl::DeferredAddTrackToJsepSession(
+    const std::string& pcHandle,
+    SdpMediaSection::MediaType type,
+    const std::string& streamId,
+    const std::string& trackId)
+{
+  PeerConnectionWrapper wrapper(pcHandle);
+
+  if (wrapper.impl()) {
+    if (!PeerConnectionCtx::GetInstance()->isReady()) {
+      MOZ_CRASH("Why is DeferredAddTrackToJsepSession being executed when the "
+                "PeerConnectionCtx isn't ready?");
+    }
+    wrapper.impl()->AddTrackToJsepSession(type, streamId, trackId);
+  }
+}
+
+nsresult
+PeerConnectionImpl::AddTrackToJsepSession(SdpMediaSection::MediaType type,
+                                          const std::string& streamId,
+                                          const std::string& trackId)
+{
+  if (!PeerConnectionCtx::GetInstance()->isReady()) {
+    // We are not ready to configure codecs for this track. We need to defer.
+    PeerConnectionCtx::GetInstance()->queueJSEPOperation(
+        WrapRunnableNM(DeferredAddTrackToJsepSession,
+                       mHandle,
+                       type,
+                       streamId,
+                       trackId));
+    return NS_OK;
+  }
+
+  nsresult res = ConfigureJsepSessionCodecs();
+  if (NS_FAILED(res)) {
+    CSFLogError(logTag, "Failed to configure codecs");
+    return res;
+  }
+
+  res = mJsepSession->AddTrack(
+      new JsepTrack(type, streamId, trackId, sdp::kSend));
+
+  if (NS_FAILED(res)) {
+    std::string errorString = mJsepSession->GetLastError();
+    CSFLogError(logTag, "%s (%s) : pc = %s, error = %s",
+                __FUNCTION__,
+                type == SdpMediaSection::kAudio ? "audio" : "video",
+                mHandle.c_str(),
+                errorString.c_str());
+    return NS_ERROR_FAILURE;
+  }
+
   return NS_OK;
 }
 
@@ -1312,7 +1370,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
           mozilla::SdpMediaSection::kApplication,
           streamId,
           trackId,
-          JsepTrack::kJsepTrackSending));
+          sdp::kSend));
 
     rv = mJsepSession->AddTrack(track);
     if (NS_FAILED(rv)) {
@@ -2053,6 +2111,13 @@ PeerConnectionImpl::GetStreamId(const DOMMediaStream& aStream)
 #endif
 }
 
+void
+PeerConnectionImpl::OnMediaError(const std::string& aError)
+{
+  CSFLogError(logTag, "Encountered media error! %s", aError.c_str());
+  // TODO: Let content know about this somehow.
+}
+
 nsresult
 PeerConnectionImpl::AddTrack(MediaStreamTrack& aTrack,
                              const Sequence<OwningNonNull<DOMMediaStream>>& aStreams)
@@ -2063,6 +2128,7 @@ PeerConnectionImpl::AddTrack(MediaStreamTrack& aTrack,
     CSFLogError(logTag, "%s: At least one stream arg required", __FUNCTION__);
     return NS_ERROR_FAILURE;
   }
+
   return AddTrack(aTrack, aStreams[0]);
 }
 
@@ -2091,16 +2157,9 @@ PeerConnectionImpl::AddTrack(MediaStreamTrack& aTrack,
   }
 
   if (aTrack.AsAudioStreamTrack()) {
-    res = mJsepSession->AddTrack(new JsepTrack(
-        mozilla::SdpMediaSection::kAudio,
-        streamId,
-        trackId,
-        JsepTrack::kJsepTrackSending));
+    res = AddTrackToJsepSession(SdpMediaSection::kAudio, streamId, trackId);
     if (NS_FAILED(res)) {
-      std::string errorString = mJsepSession->GetLastError();
-      CSFLogError(logTag, "%s (audio) : pc = %s, error = %s",
-                  __FUNCTION__, mHandle.c_str(), errorString.c_str());
-      return NS_ERROR_FAILURE;
+      return res;
     }
     mNumAudioStreams++;
   }
@@ -2114,16 +2173,9 @@ PeerConnectionImpl::AddTrack(MediaStreamTrack& aTrack,
     }
 #endif
 
-    res = mJsepSession->AddTrack(new JsepTrack(
-        mozilla::SdpMediaSection::kVideo,
-        streamId,
-        trackId,
-        JsepTrack::kJsepTrackSending));
+    res = AddTrackToJsepSession(SdpMediaSection::kVideo, streamId, trackId);
     if (NS_FAILED(res)) {
-      std::string errorString = mJsepSession->GetLastError();
-      CSFLogError(logTag, "%s (video) : pc = %s, error = %s",
-                  __FUNCTION__, mHandle.c_str(), errorString.c_str());
-      return NS_ERROR_FAILURE;
+      return res;
     }
     mNumVideoStreams++;
   }

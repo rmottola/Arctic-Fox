@@ -3,7 +3,6 @@
 
 const INT_MAX = 0x7FFFFFFF;
 
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 Cu.import("resource://gre/modules/Services.jsm", this);
 
 function test_expired_histogram() {
@@ -395,7 +394,7 @@ function numberRange(lower, upper)
 function test_keyed_boolean_histogram()
 {
   const KEYED_ID = "test::keyed::boolean";
-  let KEYS = ["key"+(i+1) for (i of numberRange(0, 2))];
+  let KEYS = numberRange(0, 2).map(i => "key" + (i + 1));
   KEYS.push("漢語");
   let histogramBase = {
     "min": 1,
@@ -407,7 +406,7 @@ function test_keyed_boolean_histogram()
     "ranges": [0, 1, 2],
     "counts": [0, 1, 0]
   };
-  let testHistograms = [JSON.parse(JSON.stringify(histogramBase)) for (i of numberRange(0, 3))];
+  let testHistograms = numberRange(0, 3).map(i => JSON.parse(JSON.stringify(histogramBase)));
   let testKeys = [];
   let testSnapShot = {};
 
@@ -447,7 +446,7 @@ function test_keyed_boolean_histogram()
 function test_keyed_count_histogram()
 {
   const KEYED_ID = "test::keyed::count";
-  const KEYS = ["key"+(i+1) for (i of numberRange(0, 5))];
+  const KEYS = numberRange(0, 5).map(i => "key" + (i + 1));
   let histogramBase = {
     "min": 1,
     "max": 2,
@@ -458,7 +457,7 @@ function test_keyed_count_histogram()
     "ranges": [0, 1, 2],
     "counts": [1, 0, 0]
   };
-  let testHistograms = [JSON.parse(JSON.stringify(histogramBase)) for (i of numberRange(0, 5))];
+  let testHistograms = numberRange(0, 5).map(i => JSON.parse(JSON.stringify(histogramBase)));
   let testKeys = [];
   let testSnapShot = {};
 
@@ -631,6 +630,11 @@ function test_instantiate() {
 }
 
 function test_subsession() {
+  if (gIsAndroid) {
+    // We don't support subsessions yet on Android.
+    return;
+  }
+
   const ID = "TELEMETRY_TEST_COUNT";
   const FLAG = "TELEMETRY_TEST_FLAG";
   let h = Telemetry.getHistogramById(ID);
@@ -714,6 +718,11 @@ function test_subsession() {
 }
 
 function test_keyed_subsession() {
+  if (gIsAndroid) {
+    // We don't support subsessions yet on Android.
+    return;
+  }
+
   let h = Telemetry.getKeyedHistogramById("TELEMETRY_TEST_KEYED_FLAG");
   const KEY = "foo";
 

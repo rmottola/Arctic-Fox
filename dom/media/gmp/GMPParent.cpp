@@ -187,16 +187,18 @@ GMPParent::LoadProcess()
   return NS_OK;
 }
 
+// static
 void
-AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
+GMPParent::AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure)
 {
   NS_WARNING("Timed out waiting for GMP async shutdown!");
   GMPParent* parent = reinterpret_cast<GMPParent*>(aClosure);
-  RefPtr<GeckoMediaPluginServiceParent> service =
-    GeckoMediaPluginServiceParent::GetSingleton();
-  if (service) {
-    service->AsyncShutdownComplete(parent);
-  }
+  MOZ_ASSERT(parent->mService);
+#if defined(MOZ_CRASHREPORTER)
+  parent->mService->SetAsyncShutdownPluginState(parent, 'G',
+    NS_LITERAL_CSTRING("Timed out waiting for async shutdown"));
+#endif
+  parent->mService->AsyncShutdownComplete(parent);
 }
 
 nsresult
@@ -468,8 +470,7 @@ GMPParent::ChildTerminated()
     // PluginTerminated removes the GMP from the GMPService.
     // On shutdown we can have this case where it is already been
     // removed so there is no harm in not trying to remove it again.
-    //LOGD("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__);
-    LOGD("%s: GMPThread() returned nullptr.", __FUNCTION__);
+    LOGD("%s::%s: GMPThread() returned nullptr.", __CLASS__, __FUNCTION__);
   } else {
     gmpThread->Dispatch(NS_NewRunnableMethodWithArg<RefPtr<GMPParent>>(
                          mService,
@@ -865,8 +866,13 @@ GMPParent::ReadGMPMetaData()
       }
     }
 
-    if (cap->mAPIName.EqualsLiteral(GMP_API_DECRYPTOR) ||
-        cap->mAPIName.EqualsLiteral(GMP_API_DECRYPTOR_COMPAT)) {
+    // We support the current GMPDecryptor version, and the previous.
+    // We Adapt the previous to the current in the GMPContentChild.
+    if (cap->mAPIName.EqualsLiteral(GMP_API_DECRYPTOR_BACKWARDS_COMPAT)) {
+      cap->mAPIName.AssignLiteral(GMP_API_DECRYPTOR);
+    }
+
+    if (cap->mAPIName.EqualsLiteral(GMP_API_DECRYPTOR)) {
       mCanDecrypt = true;
 
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
@@ -893,19 +899,21 @@ GMPParent::ReadGMPMetaData()
 bool
 GMPParent::CanBeSharedCrossNodeIds() const
 {
-  return mNodeId.IsEmpty() &&
-    // XXX bug 1159300 hack -- maybe remove after openh264 1.4
-    // We don't want to use CDM decoders for non-encrypted playback
-    // just yet; especially not for WebRTC. Don't allow CDMs to be used
-    // without a node ID.
-    !mCanDecrypt;
+  return !mAsyncShutdownInProgress &&
+         mNodeId.IsEmpty() &&
+         // XXX bug 1159300 hack -- maybe remove after openh264 1.4
+         // We don't want to use CDM decoders for non-encrypted playback
+         // just yet; especially not for WebRTC. Don't allow CDMs to be used
+         // without a node ID.
+         !mCanDecrypt;
 }
 
 bool
 GMPParent::CanBeUsedFrom(const nsACString& aNodeId) const
 {
-  return (mNodeId.IsEmpty() && State() == GMPStateNotLoaded) ||
-         mNodeId == aNodeId;
+  return !mAsyncShutdownInProgress &&
+         ((mNodeId.IsEmpty() && State() == GMPStateNotLoaded) ||
+          mNodeId == aNodeId);
 }
 
 void
@@ -1062,6 +1070,12 @@ GMPParent::Bridge(GMPServiceParent* aGMPServiceParent)
   }
   ++mGMPContentChildCount;
   return true;
+}
+
+nsString
+GMPParent::GetPluginBaseName() const
+{
+  return NS_LITERAL_STRING("gmp-") + mName;
 }
 
 } // namespace gmp

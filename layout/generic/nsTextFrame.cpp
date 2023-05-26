@@ -52,6 +52,7 @@
 #include "nsExpirationTracker.h"
 #include "nsUnicodeProperties.h"
 #include "nsStyleUtil.h"
+#include "nsRubyFrame.h"
 
 #include "nsTextFragment.h"
 #include "nsGkAtoms.h"
@@ -4790,9 +4791,9 @@ nsDisplayText::Paint(nsDisplayListBuilder* aBuilder,
   extraVisible.Inflate(appUnitsPerDevPixel, appUnitsPerDevPixel);
   nsTextFrame* f = static_cast<nsTextFrame*>(mFrame);
 
-  gfxContext* ctx = aCtx->ThebesContext();
-  gfxContextAutoDisableSubpixelAntialiasing disable(ctx,
+  DrawTargetAutoDisableSubpixelAntialiasing disable(aCtx->GetDrawTarget(),
                                                     mDisableSubpixelAA);
+  gfxContext* ctx = aCtx->ThebesContext();
   gfxContextAutoSaveRestore save(ctx);
 
   gfxRect pixelVisible =
@@ -5116,27 +5117,6 @@ GetInflationForTextDecorations(nsIFrame* aFrame, nscoord aInflationMinFontSize)
   return nsLayoutUtils::FontSizeInflationInner(aFrame, aInflationMinFontSize);
 }
 
-static already_AddRefed<nsFontMetrics>
-GetFontMetricsOfEmphasisMarks(nsStyleContext* aStyleContext, float aInflation)
-{
-  nsPresContext* pc = aStyleContext->PresContext();
-  WritingMode wm(aStyleContext);
-  gfxFont::Orientation orientation = wm.IsVertical() && !wm.IsSideways() ?
-                                     gfxFont::eVertical : gfxFont::eHorizontal;
-
-  const nsStyleFont* styleFont = aStyleContext->StyleFont();
-  nsFont font = styleFont->mFont;
-  font.size = NSToCoordRound(font.size * aInflation * 0.5f);
-
-  RefPtr<nsFontMetrics> fm;
-  pc->DeviceContext()->GetMetricsFor(font, styleFont->mLanguage,
-                                     styleFont->mExplicitLanguage,
-                                     orientation, pc->GetUserFontSet(),
-                                     pc->GetTextPerfMetrics(),
-                                     *getter_AddRefs(fm));
-  return fm.forget();
-}
-
 static gfxTextRun*
 GenerateTextRunForEmphasisMarks(nsTextFrame* aFrame, nsFontMetrics* aFontMetrics,
                                 WritingMode aWM, const nsStyleText* aStyleText)
@@ -5155,6 +5135,19 @@ GenerateTextRunForEmphasisMarks(nsTextFrame* aFrame, nsFontMetrics* aFontMetrics
                           ctx, appUnitsPerDevUnit, flags, nullptr);
 }
 
+static nsRubyFrame*
+FindRubyAncestor(nsTextFrame* aFrame)
+{
+  for (nsIFrame* frame = aFrame->GetParent();
+       frame && frame->IsFrameOfType(nsIFrame::eLineParticipant);
+       frame = frame->GetParent()) {
+    if (frame->GetType() == nsGkAtoms::rubyFrame) {
+      return static_cast<nsRubyFrame*>(frame);
+    }
+  }
+  return nullptr;
+}
+
 nsRect
 nsTextFrame::UpdateTextEmphasis(WritingMode aWM, PropertyProvider& aProvider)
 {
@@ -5164,8 +5157,9 @@ nsTextFrame::UpdateTextEmphasis(WritingMode aWM, PropertyProvider& aProvider)
     return nsRect();
   }
 
-  RefPtr<nsFontMetrics> fm =
-    GetFontMetricsOfEmphasisMarks(StyleContext(), GetFontSizeInflation());
+  RefPtr<nsFontMetrics> fm;
+  nsLayoutUtils::GetFontMetricsOfEmphasisMarks(
+    StyleContext(), getter_AddRefs(fm), GetFontSizeInflation());
   EmphasisMarkInfo* info = new EmphasisMarkInfo;
   info->textRun =
     GenerateTextRunForEmphasisMarks(this, fm, aWM, styleText);
@@ -5188,14 +5182,18 @@ nsTextFrame::UpdateTextEmphasis(WritingMode aWM, PropertyProvider& aProvider)
   nscoord absOffset = (side == eLogicalSideBStart) != aWM.IsLineInverted() ?
     baseFontMetrics->MaxAscent() + fm->MaxDescent() :
     baseFontMetrics->MaxDescent() + fm->MaxAscent();
-  // XXX emphasis marks should be drawn outside ruby, see bug 1224013.
+  nscoord startLeading = 0;
+  nscoord endLeading = 0;
+  if (nsRubyFrame* ruby = FindRubyAncestor(this)) {
+    ruby->GetBlockLeadings(startLeading, endLeading);
+  }
   if (side == eLogicalSideBStart) {
-    info->baselineOffset = -absOffset;
-    overflowRect.BStart(aWM) = -overflowRect.BSize(aWM);
+    info->baselineOffset = -absOffset - startLeading;
+    overflowRect.BStart(aWM) = -overflowRect.BSize(aWM) - startLeading;
   } else {
     MOZ_ASSERT(side == eLogicalSideBEnd);
-    info->baselineOffset = absOffset;
-    overflowRect.BStart(aWM) = frameSize.BSize(aWM);
+    info->baselineOffset = absOffset + endLeading;
+    overflowRect.BStart(aWM) = frameSize.BSize(aWM) + endLeading;
   }
 
   Properties().Set(EmphasisMarkProperty(), info);

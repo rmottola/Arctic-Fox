@@ -157,10 +157,10 @@ nsScriptLoader::~nsScriptLoader()
   // subtree in the meantime and therefore aren't actually going away.
   for (uint32_t j = 0; j < mPendingChildLoaders.Length(); ++j) {
     mPendingChildLoaders[j]->RemoveExecuteBlocker();
-  }  
+  }
 }
 
-NS_IMPL_ISUPPORTS(nsScriptLoader, nsIStreamLoaderObserver)
+NS_IMPL_ISUPPORTS(nsScriptLoader, nsISupports)
 
 // Helper method for checking if the script element is an event-handler
 // This means that it has both a for-attribute and a event-attribute.
@@ -269,37 +269,6 @@ nsScriptLoader::ShouldLoadScript(nsIDocument* aDocument,
   return NS_OK;
 }
 
-class ContextMediator : public nsIStreamLoaderObserver
-{
-public:
-  explicit ContextMediator(nsScriptLoader *aScriptLoader, nsISupports *aContext)
-  : mScriptLoader(aScriptLoader)
-  , mContext(aContext) {}
-
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSISTREAMLOADEROBSERVER
-
-private:
-  virtual ~ContextMediator() {}
-  RefPtr<nsScriptLoader> mScriptLoader;
-  nsCOMPtr<nsISupports>  mContext;
-};
-
-NS_IMPL_ISUPPORTS(ContextMediator, nsIStreamLoaderObserver)
-
-NS_IMETHODIMP
-ContextMediator::OnStreamComplete(nsIStreamLoader* aLoader,
-                                  nsISupports* aContext,
-                                  nsresult aStatus,
-                                  uint32_t aStringLen,
-                                  const uint8_t* aString)
-{
-  // pass arguments through except for the aContext,
-  // we have to mediate and use mContext instead.
-  return mScriptLoader->OnStreamComplete(aLoader, mContext, aStatus,
-                                         aStringLen, aString);
-}
-
 nsresult
 nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
                           bool aScriptFromHead)
@@ -331,7 +300,7 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
     ? nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL
     : nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS;
   if (aRequest->mCORSMode == CORS_USE_CREDENTIALS) {
-    securityFlags |= nsILoadInfo::SEC_REQUIRE_CORS_WITH_CREDENTIALS;
+    securityFlags |= nsILoadInfo::SEC_COOKIES_INCLUDE;
   }
   securityFlags |= nsILoadInfo::SEC_ALLOW_CHROME;
 
@@ -383,10 +352,10 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
     timedChannel->SetInitiatorType(NS_LITERAL_STRING("script"));
   }
 
-  RefPtr<ContextMediator> mediator = new ContextMediator(this, aRequest);
+  RefPtr<nsScriptLoadHandler> handler = new nsScriptLoadHandler(this, aRequest);
 
-  nsCOMPtr<nsIStreamLoader> loader;
-  rv = NS_NewStreamLoader(getter_AddRefs(loader), mediator);
+  nsCOMPtr<nsIIncrementalStreamLoader> loader;
+  rv = NS_NewIncrementalStreamLoader(getter_AddRefs(loader), handler);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return channel->AsyncOpen2(loader);
@@ -1433,8 +1402,8 @@ nsScriptLoader::ConvertToUTF16(nsIChannel* aChannel, const uint8_t* aData,
   return rv;
 }
 
-NS_IMETHODIMP
-nsScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader,
+nsresult
+nsScriptLoader::OnStreamComplete(nsIIncrementalStreamLoader* aLoader,
                                  nsISupports* aContext,
                                  nsresult aStatus,
                                  uint32_t aStringLen,
@@ -1530,7 +1499,7 @@ nsScriptLoader::NumberOfProcessors()
 
 nsresult
 nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
-                                     nsIStreamLoader* aLoader,
+                                     nsIIncrementalStreamLoader* aLoader,
                                      nsresult aStatus,
                                      uint32_t aStringLen,
                                      const uint8_t* aString)
@@ -1736,4 +1705,42 @@ nsScriptLoader::MaybeRemovedDeferRequests()
     return true;
   }
   return false;
+}
+
+//////////////////////////////////////////////////////////////
+//
+//////////////////////////////////////////////////////////////
+
+nsScriptLoadHandler::nsScriptLoadHandler(nsScriptLoader *aScriptLoader,
+                                         nsScriptLoadRequest *aRequest)
+  : mScriptLoader(aScriptLoader),
+    mRequest(aRequest)
+{}
+
+nsScriptLoadHandler::~nsScriptLoadHandler()
+{}
+
+NS_IMPL_ISUPPORTS(nsScriptLoadHandler, nsIIncrementalStreamLoaderObserver)
+
+NS_IMETHODIMP
+nsScriptLoadHandler::OnIncrementalData(nsIIncrementalStreamLoader* aLoader,
+                                       nsISupports* aContext,
+                                       uint32_t aDataLength,
+                                       const uint8_t* aData,
+                                       uint32_t *aConsumedLength)
+{
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsScriptLoadHandler::OnStreamComplete(nsIIncrementalStreamLoader* aLoader,
+                                      nsISupports* aContext,
+                                      nsresult aStatus,
+                                      uint32_t aStringLen,
+                                      const uint8_t* aString)
+{
+  // pass arguments through except for the aContext,
+  // we have to mediate and use mRequest instead.
+  return mScriptLoader->OnStreamComplete(aLoader, mRequest, aStatus,
+                                         aStringLen, aString);
 }

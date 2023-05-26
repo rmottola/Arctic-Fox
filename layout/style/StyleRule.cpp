@@ -1207,7 +1207,7 @@ DOMCSSDeclarationImpl::SetCSSDeclaration(css::Declaration* aDecl)
   }
 
   if (owningDoc) {
-    owningDoc->StyleRuleChanged(sheet, mRule, mRule);
+    owningDoc->StyleRuleChanged(sheet, mRule);
   }
   return NS_OK;
 }

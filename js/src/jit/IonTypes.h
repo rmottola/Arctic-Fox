@@ -105,6 +105,10 @@ enum BailoutKind
     Bailout_NonSimdInt32x4Input,
     Bailout_NonSimdFloat32x4Input,
 
+    // Atomic operations require shared memory, bail out if the typed array
+    // maps unshared memory.
+    Bailout_NonSharedTypedArrayInput,
+
     // For the initial snapshot when entering a function.
     Bailout_InitialState,
 
@@ -213,6 +217,8 @@ BailoutKindString(BailoutKind kind)
         return "Bailout_NonSimdInt32x4Input";
       case Bailout_NonSimdFloat32x4Input:
         return "Bailout_NonSimdFloat32x4Input";
+      case Bailout_NonSharedTypedArrayInput:
+        return "Bailout_NonSharedTypedArrayInput";
       case Bailout_InitialState:
         return "Bailout_InitialState";
       case Bailout_Debugger:
@@ -265,11 +271,14 @@ class SimdConstant {
         Undefined = -1
     };
 
+    typedef int32_t I32x4[4];
+    typedef float F32x4[4];
+
   private:
     Type type_;
     union {
-        int32_t i32x4[4];
-        float f32x4[4];
+        I32x4 i32x4;
+        F32x4 f32x4;
     } u;
 
     bool defined() const {
@@ -303,7 +312,7 @@ class SimdConstant {
         cst.fillInt32x4(x, y, z, w);
         return cst;
     }
-    static SimdConstant CreateX4(int32_t* array) {
+    static SimdConstant CreateX4(const int32_t* array) {
         SimdConstant cst;
         cst.fillInt32x4(array[0], array[1], array[2], array[3]);
         return cst;
@@ -318,7 +327,7 @@ class SimdConstant {
         cst.fillFloat32x4(x, y, z, w);
         return cst;
     }
-    static SimdConstant CreateX4(float* array) {
+    static SimdConstant CreateX4(const float* array) {
         SimdConstant cst;
         cst.fillFloat32x4(array[0], array[1], array[2], array[3]);
         return cst;
@@ -346,11 +355,12 @@ class SimdConstant {
         return type_;
     }
 
-    const int32_t* asInt32x4() const {
+    const I32x4& asInt32x4() const {
         MOZ_ASSERT(defined() && type_ == Int32x4);
         return u.i32x4;
     }
-    const float* asFloat32x4() const {
+
+    const F32x4& asFloat32x4() const {
         MOZ_ASSERT(defined() && type_ == Float32x4);
         return u.f32x4;
     }

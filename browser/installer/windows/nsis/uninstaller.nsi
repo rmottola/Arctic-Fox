@@ -32,6 +32,7 @@ RequestExecutionLevel user
  "Software\Microsoft\Windows\CurrentVersion\Uninstall\MozillaMaintenanceService"
 
 Var TmpVal
+Var MaintCertKey
 
 ; Other included files may depend upon these includes!
 ; The following includes are provided by NSIS.
@@ -98,6 +99,7 @@ VIAddVersionKey "OriginalFilename" "helper.exe"
 !insertmacro un.RegCleanUninstall
 !insertmacro un.RegCleanProtocolHandler
 !insertmacro un.RemoveQuotesFromPath
+!insertmacro un.RemovePrecompleteEntries
 !insertmacro un.SetAppLSPCategories
 !insertmacro un.SetBrandNameVars
 
@@ -146,7 +148,7 @@ ShowUnInstDetails nevershow
 !insertmacro MUI_UNPAGE_WELCOME
 
 ; Custom Uninstall Confirm Page
-UninstPage custom un.preConfirm un.leaveConfirm
+UninstPage custom un.preConfirm
 
 ; Remove Files Page
 !insertmacro MUI_UNPAGE_INSTFILES
@@ -238,23 +240,34 @@ Section "Uninstall"
     ${un.SetAppLSPCategories}
   ${EndIf}
 
-  ${un.RegCleanAppHandler} "PaleMoonURL"
-  ${un.RegCleanAppHandler} "PaleMoonHTML"
+  ${If} ${AtLeastWin8}
+    ${RemoveDEHRegistration} ${DELEGATE_EXECUTE_HANDLER_ID} \
+                             $AppUserModelID \
+                             "FirefoxURL" \
+                             "FirefoxHTML"
+  ${EndIf}
+
+  ${un.RegCleanAppHandler} "FirefoxURL"
+  ${un.RegCleanAppHandler} "FirefoxHTML"
   ${un.RegCleanProtocolHandler} "ftp"
   ${un.RegCleanProtocolHandler} "http"
   ${un.RegCleanProtocolHandler} "https"
 
   ClearErrors
-  ReadRegStr $R9 HKCR "PaleMoonHTML" ""
-  ; Don't clean up the file handlers if the PaleMoonHTML key still exists since
+  ReadRegStr $R9 HKCR "FirefoxHTML" ""
+  ; Don't clean up the file handlers if the FirefoxHTML key still exists since
   ; there should be a second installation that may be the default file handler
   ${If} ${Errors}
-    ${un.RegCleanFileHandler}  ".htm"   "PaleMoonHTML"
-    ${un.RegCleanFileHandler}  ".html"  "PaleMoonHTML"
-    ${un.RegCleanFileHandler}  ".shtml" "PaleMoonHTML"
-    ${un.RegCleanFileHandler}  ".xht"   "PaleMoonHTML"
-    ${un.RegCleanFileHandler}  ".xhtml" "PaleMoonHTML"
-    ${un.RegCleanFileHandler}  ".webm"  "PaleMoonHTML"
+    ${un.RegCleanFileHandler}  ".htm"   "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".html"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".shtml" "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".xht"   "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".xhtml" "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".oga"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".ogg"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".ogv"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".pdf"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".webm"  "FirefoxHTML"
   ${EndIf}
 
   SetShellVarContext all  ; Set SHCTX to HKLM
@@ -335,30 +348,45 @@ Section "Uninstall"
   ${If} ${FileExists} "$INSTDIR\distribution"
     RmDir /r /REBOOTOK "$INSTDIR\distribution"
   ${EndIf}
-  ${If} ${FileExists} "$INSTDIR\removed-files"
-    Delete /REBOOTOK "$INSTDIR\removed-files"
-  ${EndIf}
 
   ; Remove files that may be left behind by the application in the
   ; VirtualStore directory.
   ${un.CleanVirtualStore}
 
-  ; Parse the uninstall log to unregister dll's and remove all installed
-  ; files / directories this install is responsible for.
-  ${un.ParseUninstallLog}
+  ; Only unregister the dll if the registration points to this installation
+  ReadRegStr $R1 HKCR "CLSID\{0D68D6D0-D93D-4D08-A30D-F00DD1F45B24}\InProcServer32" ""
+  ${If} "$INSTDIR\AccessibleMarshal.dll" == "$R1"
+    ${UnregisterDLL} "$INSTDIR\AccessibleMarshal.dll"
+  ${EndIf}
 
-  ; Remove the uninstall directory that we control
-  RmDir /r /REBOOTOK "$INSTDIR\uninstall"
+  ${un.RemovePrecompleteEntries} "false"
 
-  ; Explictly remove empty webapprt dir in case it exists
-  ; See bug 757978
+  ${If} ${FileExists} "$INSTDIR\defaults\pref\channel-prefs.js"
+    Delete /REBOOTOK "$INSTDIR\defaults\pref\channel-prefs.js"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\defaults\pref"
+    RmDir /REBOOTOK "$INSTDIR\defaults\pref"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\defaults"
+    RmDir /REBOOTOK "$INSTDIR\defaults"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\uninstall"
+    ; Remove the uninstall directory that we control
+    RmDir /r /REBOOTOK "$INSTDIR\uninstall"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\install.log"
+    Delete /REBOOTOK "$INSTDIR\install.log"
+  ${EndIf}
+  ${If} ${FileExists} "$INSTDIR\update-settings.ini"
+    Delete /REBOOTOK "$INSTDIR\update-settings.ini"
+  ${EndIf}
+
+  ; Explictly remove empty webapprt dir in case it exists (bug 757978).
   RmDir "$INSTDIR\webapprt\components"
   RmDir "$INSTDIR\webapprt"
 
-  RmDir /r /REBOOTOK "$INSTDIR\${TO_BE_DELETED}"
-
   ; Remove the installation directory if it is empty
-  ${RemoveDir} "$INSTDIR"
+  RmDir "$INSTDIR"
 
   ; If firefox.exe was successfully deleted yet we still need to restart to
   ; remove other files create a dummy firefox.exe.moz-delete to prevent the
@@ -453,7 +481,7 @@ Function un.preConfirm
   ${EndIf}
 
   ; Setup the unconfirm.ini file for the Custom Uninstall Confirm Page
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Settings" NumFields "5"
+  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Settings" NumFields "3"
 
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 1" Type   "label"
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 1" Text   "$(UN_CONFIRM_UNINSTALLED_FROM)"
@@ -473,44 +501,22 @@ Function un.preConfirm
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 2" Bottom "30"
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 2" flags  "READONLY"
 
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Type   "checkbox"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Text   "$(UN_REMOVE_PROFILES)"
+  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Type   "label"
+  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Text   "$(UN_CONFIRM_CLICK)"
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Left   "0"
   WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Right  "-1"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Top    "40"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Bottom "50"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" State  "0"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" flags  "NOTIFY"
-
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Type   "text"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" State   "$(UN_REMOVE_PROFILES_DESC)"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Left   "0"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Right  "-1"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Top    "52"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Bottom "120"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" flags  "MULTILINE|READONLY"
-
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Type   "label"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Text   "$(UN_CONFIRM_CLICK)"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Left   "0"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Right  "-1"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Top    "130"
-  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 5" Bottom "150"
+  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Top    "130"
+  WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Bottom "150"
 
   ${If} "$TmpVal" == "true"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Type   "label"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Text   "$(SUMMARY_REBOOT_REQUIRED_UNINSTALL)"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Left   "0"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Right  "-1"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Top    "35"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 6" Bottom "45"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Type   "label"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Text   "$(SUMMARY_REBOOT_REQUIRED_UNINSTALL)"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Left   "0"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Right  "-1"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Top    "35"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Bottom "45"
 
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Settings" NumFields "6"
-
-    ; To insert this control reset Top / Bottom for controls below this one
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Top    "55"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 3" Bottom "65"
-    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Field 4" Top    "67"
+    WriteINIStr "$PLUGINSDIR\unconfirm.ini" "Settings" NumFields "4"
   ${EndIf}
 
   !insertmacro MUI_HEADER_TEXT "$(UN_CONFIRM_PAGE_TITLE)" "$(UN_CONFIRM_PAGE_SUBTITLE)"
@@ -518,71 +524,11 @@ Function un.preConfirm
   ; focus. This sets the focus to the Install button instead.
   !insertmacro MUI_INSTALLOPTIONS_INITDIALOG "unconfirm.ini"
   GetDlgItem $0 $HWNDPARENT 1
-  ${MUI_INSTALLOPTIONS_READ} $1 "unconfirm.ini" "Field 4" "HWND"
-  SetCtlColors $1 0x000000 0xFFFFEE
-  ShowWindow $1 ${SW_HIDE}
   System::Call "user32::SetFocus(i r0, i 0x0007, i,i)i"
   ${MUI_INSTALLOPTIONS_READ} $1 "unconfirm.ini" "Field 2" "HWND"
   SendMessage $1 ${WM_SETTEXT} 0 "STR:$INSTDIR"
   !insertmacro MUI_INSTALLOPTIONS_SHOW
 FunctionEnd
-
-Function un.leaveConfirm
-  ${MUI_INSTALLOPTIONS_READ} $0 "unconfirm.ini" "Settings" "State"
-  StrCmp $0 "3" +1 continue
-  ${MUI_INSTALLOPTIONS_READ} $0 "unconfirm.ini" "Field 3" "State"
-  ${MUI_INSTALLOPTIONS_READ} $1 "unconfirm.ini" "Field 4" "HWND"
-  StrCmp $0 1 +1 +3
-  ShowWindow $1 ${SW_SHOW}
-  Abort
-
-  ShowWindow $1 ${SW_HIDE}
-  Abort
-
-  continue:
-
-  ; Try to delete the app executable and if we can't delete it try to find the
-  ; app's message window and prompt the user to close the app. This allows
-  ; running an instance that is located in another directory. If for whatever
-  ; reason there is no message window we will just rename the app's files and
-  ; then remove them on restart if they are in use.
-  ClearErrors
-  ${DeleteFile} "$INSTDIR\${FileMainEXE}"
-  ${If} ${Errors}
-    ${un.ManualCloseAppPrompt} "${WindowClass}" "$(WARN_MANUALLY_CLOSE_APP_UNINSTALL)"
-  ${EndIf}
-FunctionEnd
-
-!ifndef NO_UNINSTALL_SURVEY
-Function un.preFinish
-  ; Do not modify the finish page if there is a reboot pending
-  ${Unless} ${RebootFlag}
-    ; Setup the survey controls, functions, etc.
-    StrCpy $TmpVal "SOFTWARE\Microsoft\IE Setup\Setup"
-    ClearErrors
-    ReadRegStr $0 HKLM $TmpVal "Path"
-    ${If} ${Errors}
-      !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecial.ini" "settings" "NumFields" "3"
-    ${Else}
-      ExpandEnvStrings $0 "$0" ; this value will usually contain %programfiles%
-      ${If} $0 != "\"
-        StrCpy $0 "$0\"
-      ${EndIf}
-      StrCpy $0 "$0\iexplore.exe"
-      ClearErrors
-      GetFullPathName $TmpVal $0
-      ${If} ${Errors}
-        !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecial.ini" "settings" "NumFields" "3"
-      ${Else}
-        ; When we add an optional action to the finish page the cancel button
-        ; is enabled. This disables it and leaves the finish button as the
-        ; only choice.
-        !insertmacro MUI_INSTALLOPTIONS_WRITE "ioSpecial.ini" "settings" "cancelenabled" "0"
-      ${EndIf}
-    ${EndIf}
-  ${EndUnless}
-FunctionEnd
-!endif
 
 ################################################################################
 # Initialization Functions

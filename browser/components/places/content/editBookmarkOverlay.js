@@ -56,12 +56,13 @@ var gEditItemOverlay = {
                             PlacesUIUtils.isContentsReadOnly(parent);
       }
     }
+    let focusedElement = aInitInfo.focusedElement;
 
     return this._paneInfo = { itemId, itemGuid, isItem,
                               isURI, uri, title,
                               isBookmark, isFolderShortcut, isParentReadOnly,
                               bulkTagging, uris,
-                              visibleRows, postData, isTag };
+                              visibleRows, postData, isTag, focusedElement };
   },
 
   get initialized() {
@@ -181,7 +182,7 @@ var gEditItemOverlay = {
     let { itemId, itemGuid, isItem,
           isURI, uri, title,
           isBookmark, bulkTagging, uris,
-          visibleRows } = this._setPaneInfo(aInfo);
+          visibleRows, focusedElement } = this._setPaneInfo(aInfo);
 
     let showOrCollapse =
       (rowId, isAppropriateForInput, nameInHiddenRows = null) => {
@@ -252,6 +253,24 @@ var gEditItemOverlay = {
       window.addEventListener("unload", this, false);
       this._observersAdded = true;
     }
+
+    // The focusedElement possible values are:
+    //  * preferred: focus the field that the user touched first the last
+    //    time the pane was shown (either namePicker or tagsField)
+    //  * first: focus the first non collapsed textbox
+    // Note: since all controls are collapsed by default, we don't get the
+    // default XUL dialog behavior, that selects the first control, so we set
+    // the focus explicitly.
+    let elt;
+    if (focusedElement === "preferred") {
+      elt = this._element(gPrefService.getCharPref("browser.bookmarks.editDialog.firstEditField"));
+    } else if (focusedElement === "first") {
+      elt = document.querySelector("textbox:not([collapsed=true])");
+    }
+    if (elt) {
+      elt.focus();
+      elt.select();
+    }
   },
 
   /**
@@ -270,7 +289,7 @@ var gEditItemOverlay = {
     for (let uri of uris) {
       let curentURITags = PlacesUtils.tagging.getTagsForURI(uri);
       for (let tag of commonTags) {
-        if (curentURITags.indexOf(tag) == -1) {
+        if (!curentURITags.includes(tag)) {
           commonTags.delete(tag)
           if (commonTags.size == 0)
             return this._paneInfo.cachedCommonTags = [];
@@ -434,8 +453,8 @@ var gEditItemOverlay = {
     if (aCurrentTags.length == 0)
       return { newTags: inputTags, removedTags: [] };
 
-    let removedTags = aCurrentTags.filter(t => inputTags.indexOf(t) == -1);
-    let newTags = inputTags.filter(t => aCurrentTags.indexOf(t) == -1);
+    let removedTags = aCurrentTags.filter(t => !inputTags.includes(t));
+    let newTags = inputTags.filter(t => !aCurrentTags.includes(t));
     return { removedTags, newTags };
   },
 
@@ -854,7 +873,7 @@ var gEditItemOverlay = {
       let elt = document.createElement("listitem");
       elt.setAttribute("type", "checkbox");
       elt.setAttribute("label", tag);
-      if (tagsInField.indexOf(tag) != -1)
+      if (tagsInField.includes(tag))
         elt.setAttribute("checked", "true");
       tagsSelector.appendChild(elt);
       if (selectedTag === tag)

@@ -8,11 +8,17 @@
 // button can be clicked. Check that when it is, the current animations
 // displayed in the timeline get their playstates changed accordingly, and check
 // that the scrubber resumes/stops moving.
+// Also checks that the button goes to the right state when the scrubber has
+// reached the end of the timeline: continues to be in playing mode for infinite
+// animations, goes to paused mode otherwise.
+// And test that clicking the button once the scrubber has reached the end of
+// the timeline does the right thing.
 
 add_task(function*() {
   yield addTab(TEST_URL_ROOT + "doc_simple_animation.html");
 
-  let {panel} = yield openAnimationInspector();
+  let {panel, inspector} = yield openAnimationInspector();
+  let timeline = panel.animationsTimelineComponent;
   let btn = panel.playTimelineButtonEl;
 
   ok(btn, "The play/pause button exists");
@@ -20,48 +26,69 @@ add_task(function*() {
      "The play/pause button is in its playing state");
 
   info("Click on the button to pause all timeline animations");
-  yield clickPlayPauseButton(panel);
+  yield clickTimelinePlayPauseButton(panel);
 
   ok(btn.classList.contains("paused"),
      "The play/pause button is in its paused state");
-  yield checkIfScrubberMoving(panel, false);
+  yield assertScrubberMoving(panel, false);
 
   info("Click again on the button to play all timeline animations");
-  yield clickPlayPauseButton(panel);
+  yield clickTimelinePlayPauseButton(panel);
 
   ok(!btn.classList.contains("paused"),
      "The play/pause button is in its playing state again");
-  yield checkIfScrubberMoving(panel, true);
+  yield assertScrubberMoving(panel, true);
+
+  // Some animations on the test page are infinite, so the scrubber won't stop
+  // at the end of the timeline, and the button should remain in play mode.
+  info("Select an infinite animation, reload the page and wait for the " +
+       "animation to complete");
+  yield selectNode(".multi", inspector);
+  yield reloadTab(inspector);
+  yield waitForOutOfBoundScrubber(timeline);
+
+  ok(!btn.classList.contains("paused"),
+     "The button is in its playing state still, animations are infinite.");
+  yield assertScrubberMoving(panel, true);
+
+  info("Click on the button after the scrubber has moved out of bounds");
+  yield clickTimelinePlayPauseButton(panel);
+
+  ok(btn.classList.contains("paused"),
+     "The button can be paused after the scrubber has moved out of bounds");
+  yield assertScrubberMoving(panel, false);
+
+  // For a finite animation though, once the scrubber reaches the end of the
+  // timeline, it should go back to paused mode.
+  info("Select a finite animation, reload the page and wait for the " +
+       "animation to complete");
+  yield selectNode(".negative-delay", inspector);
+  yield reloadTab(inspector);
+  yield waitForOutOfBoundScrubber(timeline);
+
+  ok(btn.classList.contains("paused"),
+     "The button is in paused state once finite animations are done");
+  yield assertScrubberMoving(panel, false);
+
+  info("Click again on the button to play the animation from the start again");
+  yield clickTimelinePlayPauseButton(panel);
+
+  ok(!btn.classList.contains("paused"),
+     "Clicking the button once finite animations are done should restart them");
+  yield assertScrubberMoving(panel, true);
 });
 
-function* clickPlayPauseButton(panel) {
-  let onUiUpdated = panel.once(panel.UI_UPDATED_EVENT);
-
-  let btn = panel.playTimelineButtonEl;
-  let win = btn.ownerDocument.defaultView;
-  EventUtils.sendMouseEvent({type: "click"}, btn, win);
-
-  yield onUiUpdated;
-  yield waitForAllAnimationTargets(panel);
-}
-
-function* checkIfScrubberMoving(panel, isMoving) {
-  let timeline = panel.animationsTimelineComponent;
-  let scrubberEl = timeline.scrubberEl;
-
-  if (isMoving) {
-    // If we expect the scrubber to move, just wait for a couple of
-    // timeline-data-changed events and compare times.
-    let {time: time1} = yield timeline.once("timeline-data-changed");
-    let {time: time2} = yield timeline.once("timeline-data-changed");
-    ok(time2 > time1, "The scrubber is moving");
-  } else {
-    // If instead we expect the scrubber to remain at its position, just wait
-    // for some time. A relatively long timeout is used because the test page
-    // has long running animations, so the scrubber doesn't move that quickly.
-    let startOffset = scrubberEl.offsetLeft;
-    yield new Promise(r => setTimeout(r, 2000));
-    let endOffset = scrubberEl.offsetLeft;
-    is(startOffset, endOffset, "The scrubber is not moving");
-  }
+function waitForOutOfBoundScrubber({win, scrubberEl}) {
+  return new Promise(resolve => {
+    function check() {
+      let pos = scrubberEl.getBoxQuads()[0].bounds.right;
+      let width = win.document.documentElement.offsetWidth;
+      if (pos >= width) {
+        setTimeout(resolve, 50);
+      } else {
+        setTimeout(check, 50);
+      }
+    }
+    check();
+  });
 }

@@ -141,6 +141,7 @@ namespace jit {
     _(JSOP_DELNAME)            \
     _(JSOP_GETIMPORT)          \
     _(JSOP_GETINTRINSIC)       \
+    _(JSOP_BINDVAR)            \
     _(JSOP_DEFVAR)             \
     _(JSOP_DEFCONST)           \
     _(JSOP_DEFLET)             \
@@ -156,6 +157,7 @@ namespace jit {
     _(JSOP_INITALIASEDLEXICAL) \
     _(JSOP_UNINITIALIZED)      \
     _(JSOP_CALL)               \
+    _(JSOP_CALLITER)           \
     _(JSOP_FUNCALL)            \
     _(JSOP_FUNAPPLY)           \
     _(JSOP_NEW)                \
@@ -226,15 +228,15 @@ class BaselineCompiler : public BaselineCompilerSpecific
     NonAssertingLabel           postBarrierSlot_;
 
     // Native code offset right before the scope chain is initialized.
-    CodeOffsetLabel prologueOffset_;
+    CodeOffset prologueOffset_;
 
     // Native code offset right before the frame is popped and the method
     // returned from.
-    CodeOffsetLabel epilogueOffset_;
+    CodeOffset epilogueOffset_;
 
     // Native code offset right after debug prologue and epilogue, or
     // equivalent positions when debug mode is off.
-    CodeOffsetLabel postDebugPrologueOffset_;
+    CodeOffset postDebugPrologueOffset_;
 
     // For each INITIALYIELD or YIELD op, this Vector maps the yield index
     // to the bytecode offset of the next op.

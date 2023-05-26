@@ -44,12 +44,24 @@ Show subsession data
 Choose ping:
 ">
 
-<!ENTITY aboutTelemetry.showPreviousPing "
-&lt;&lt; Previous ping
+<!ENTITY aboutTelemetry.showNewerPing "
+&lt;&lt; Newer ping
 ">
 
-<!ENTITY aboutTelemetry.showNextPing "
-Next ping &gt;&gt;
+<!ENTITY aboutTelemetry.showOlderPing "
+Older ping &gt;&gt;
+">
+
+<!ENTITY aboutTelemetry.rawPingData "
+Raw ping data ...
+">
+
+<!ENTITY aboutTelemetry.archiveWeekHeader "
+Week
+">
+
+<!ENTITY aboutTelemetry.archivePingHeader "
+Ping
 ">
 
 <!ENTITY aboutTelemetry.generalDataSection "
@@ -96,8 +108,8 @@ Next ping &gt;&gt;
   Late Writes
 ">
 
-<!ENTITY aboutTelemetry.systemInfoSection "
-  System Information
+<!ENTITY aboutTelemetry.sessionInfoSection "
+  Session Information
 ">
 
 <!ENTITY aboutTelemetry.addonHistogramsSection "
@@ -126,4 +138,8 @@ Next ping &gt;&gt;
 
 <!ENTITY aboutTelemetry.filterText "
   Filter (strings or /regexp/)
+">
+
+<!ENTITY aboutTelemetry.payloadChoiceHeader "
+  Payload
 ">

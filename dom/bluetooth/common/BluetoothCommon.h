@@ -263,7 +263,7 @@ extern bool gBluetoothDebugFlag;
 #define MAP_MESSAGES_LISTING_REQ_ID          "mapmessageslistingreq"
 #define MAP_GET_MESSAGE_REQ_ID               "mapgetmessagereq"
 #define MAP_SET_MESSAGE_STATUS_REQ_ID        "mapsetmessagestatusreq"
-#define MAP_PUSH_MESSAGE_REQ_ID              "mappushmessagereq"
+#define MAP_SEND_MESSAGE_REQ_ID              "mapsendmessagereq"
 #define MAP_FOLDER_LISTING_REQ_ID            "mapfolderlistingreq"
 #define MAP_MESSAGE_UPDATE_REQ_ID            "mapmessageupdatereq"
 
@@ -320,6 +320,7 @@ enum BluetoothStatus {
   STATUS_UNHANDLED,
   STATUS_AUTH_FAILURE,
   STATUS_RMT_DEV_DOWN,
+  STATUS_AUTH_REJECTED,
   NUM_STATUS
 };
 
@@ -332,6 +333,30 @@ enum BluetoothBondState {
   BOND_STATE_NONE,
   BOND_STATE_BONDING,
   BOND_STATE_BONDED
+};
+
+enum BluetoothSetupServiceId {
+  SETUP_SERVICE_ID_SETUP,
+  SETUP_SERVICE_ID_CORE,
+  SETUP_SERVICE_ID_SOCKET,
+  SETUP_SERVICE_ID_HID,
+  SETUP_SERVICE_ID_PAN,
+  SETUP_SERVICE_ID_HANDSFREE,
+  SETUP_SERVICE_ID_A2DP,
+  SETUP_SERVICE_ID_HEALTH,
+  SETUP_SERVICE_ID_AVRCP,
+  SETUP_SERVICE_ID_GATT,
+  SETUP_SERVICE_ID_HANDSFREE_CLIENT,
+  SETUP_SERVICE_ID_MAP_CLIENT,
+  SETUP_SERVICE_ID_AVRCP_CONTROLLER,
+  SETUP_SERVICE_ID_A2DP_SINK
+};
+
+/* Physical transport for GATT connections to remote dual-mode devices */
+enum BluetoothTransport {
+  TRANSPORT_AUTO,   /* No preference of physical transport */
+  TRANSPORT_BREDR,  /* Prefer BR/EDR transport */
+  TRANSPORT_LE      /* Prefer LE transport */
 };
 
 enum BluetoothTypeOfDevice {
@@ -650,6 +675,24 @@ struct BluetoothUuid {
 struct BluetoothPinCode {
   uint8_t mPinCode[16]; /* not \0-terminated */
   uint8_t mLength;
+
+  BluetoothPinCode()
+    : mLength(0)
+  {
+    std::fill(mPinCode, mPinCode + MOZ_ARRAY_LENGTH(mPinCode), 0);
+  }
+
+  bool operator==(const BluetoothPinCode& aRhs) const
+  {
+    MOZ_ASSERT(mLength <= MOZ_ARRAY_LENGTH(mPinCode));
+    return (mLength == aRhs.mLength) &&
+            std::equal(aRhs.mPinCode, aRhs.mPinCode + aRhs.mLength, mPinCode);
+  }
+
+  bool operator!=(const BluetoothPinCode& aRhs) const
+  {
+    return !operator==(aRhs);
+  }
 };
 
 struct BluetoothServiceName {
@@ -710,6 +753,68 @@ struct BluetoothProperty {
 
   /* PROPERTY_REMOTE_VERSION_INFO */
   BluetoothRemoteInfo mRemoteInfo;
+
+  BluetoothProperty()
+    : mType(PROPERTY_UNKNOWN)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const BluetoothAddress& aBdAddress)
+    : mType(aType)
+    , mBdAddress(aBdAddress)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const nsAString& aString)
+    : mType(aType)
+    , mString(aString)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const nsTArray<BluetoothUuid>& aUuidArray)
+    : mType(aType)
+    , mUuidArray(aUuidArray)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const nsTArray<BluetoothAddress>& aBdAddressArray)
+    : mType(aType)
+    , mBdAddressArray(aBdAddressArray)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType, uint32_t aUint32)
+    : mType(aType)
+    , mUint32(aUint32)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType, int32_t aInt32)
+    : mType(aType)
+    , mInt32(aInt32)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             BluetoothTypeOfDevice aTypeOfDevice)
+    : mType(aType)
+    , mTypeOfDevice(aTypeOfDevice)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const BluetoothServiceRecord& aServiceRecord)
+    : mType(aType)
+    , mServiceRecord(aServiceRecord)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             BluetoothScanMode aScanMode)
+    : mType(aType)
+    , mScanMode(aScanMode)
+  { }
+
+  explicit BluetoothProperty(BluetoothPropertyType aType,
+                             const BluetoothRemoteInfo& aRemoteInfo)
+    : mType(aType)
+    , mRemoteInfo(aRemoteInfo)
+  { }
 };
 
 enum BluetoothSocketType {

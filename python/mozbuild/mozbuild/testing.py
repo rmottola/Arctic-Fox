@@ -72,7 +72,8 @@ class TestMetadata(object):
         for path in sorted(self._tests_by_flavor.get(flavor, [])):
             yield self._tests_by_path[path]
 
-    def resolve_tests(self, paths=None, flavor=None, subsuite=None, under_path=None):
+    def resolve_tests(self, paths=None, flavor=None, subsuite=None, under_path=None,
+                      tags=None):
         """Resolve tests from an identifier.
 
         This is a generator of dicts describing each test.
@@ -80,8 +81,10 @@ class TestMetadata(object):
         ``paths`` can be an iterable of values to use to identify tests to run.
         If an entry is a known test file, tests associated with that file are
         returned (there may be multiple configurations for a single file). If
-        an entry is a directory, all tests in that directory are returned. If
-        the string appears in a known test file, that test file is considered.
+        an entry is a directory, or a prefix of a directory containing tests,
+        all tests in that directory are returned. If the string appears in a
+        known test file, that test file is considered. If the path contains
+        a wildcard pattern, tests matching that pattern are returned.
 
         If ``under_path`` is a string, it will be used to filter out tests that
         aren't in the specified path prefix relative to topsrcdir or the
@@ -93,7 +96,13 @@ class TestMetadata(object):
 
         If ``subsuite`` is a string, it will be used to filter returned tests
         to only be in the subsuite specified.
+
+        If ``tags`` are specified, they will be used to filter returned tests
+        to only those with a matching tag.
         """
+        if tags:
+            tags = set(tags)
+
         def fltr(tests):
             for test in tests:
                 if flavor:
@@ -102,6 +111,9 @@ class TestMetadata(object):
                     continue
 
                 if subsuite and test.get('subsuite') != subsuite:
+                    continue
+
+                if tags and not (tags & set(test.get('tags', '').split())):
                     continue
 
                 if under_path \
@@ -123,8 +135,15 @@ class TestMetadata(object):
                 candidate_paths |= set(self._tests_by_path.keys())
                 continue
 
-            # If the path is a directory, pull in all tests in that directory.
-            if path in self._test_dirs:
+            if '*' in path:
+                candidate_paths |= {p for p in self._tests_by_path
+                                    if mozpath.match(p, path)}
+                continue
+
+            # If the path is a directory, or the path is a prefix of a directory
+            # containing tests, pull in all tests in that directory.
+            if (path in self._test_dirs or
+                any(p.startswith(path) for p in self._tests_by_path)):
                 candidate_paths |= {p for p in self._tests_by_path
                                     if p.startswith(path)}
                 continue

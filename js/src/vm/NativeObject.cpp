@@ -37,6 +37,13 @@ static const ObjectElements emptyElementsHeader(0, 0);
 HeapSlot* const js::emptyObjectElements =
     reinterpret_cast<HeapSlot*>(uintptr_t(&emptyElementsHeader) + sizeof(ObjectElements));
 
+static const ObjectElements emptyElementsHeaderShared(0, 0, ObjectElements::SharedMemory::IsShared);
+
+/* Objects with no elements share one empty set of elements. */
+HeapSlot* const js::emptyObjectElementsShared =
+    reinterpret_cast<HeapSlot*>(uintptr_t(&emptyElementsHeaderShared) + sizeof(ObjectElements));
+
+
 #ifdef DEBUG
 
 bool
@@ -56,7 +63,8 @@ ObjectElements::ConvertElementsToDoubles(JSContext* cx, uintptr_t elementsPtr)
      * elements converted to doubles, and arrays never have empty elements.
      */
     HeapSlot* elementsHeapPtr = (HeapSlot*) elementsPtr;
-    MOZ_ASSERT(elementsHeapPtr != emptyObjectElements);
+    MOZ_ASSERT(elementsHeapPtr != emptyObjectElements &&
+               elementsHeapPtr != emptyObjectElementsShared);
 
     ObjectElements* header = ObjectElements::fromElements(elementsHeapPtr);
     MOZ_ASSERT(!header->shouldConvertDoubleElements());
@@ -1360,7 +1368,7 @@ js::NativeDefineProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId 
     // Step 2.
     if (!shape) {
         if (!obj->nonProxyIsExtensible())
-            return result.fail(JSMSG_OBJECT_NOT_EXTENSIBLE);
+            return result.fail(JSMSG_CANT_DEFINE_PROP_OBJECT_NOT_EXTENSIBLE);
 
         // Fill in missing desc fields with defaults.
         CompletePropertyDescriptor(&desc);
@@ -1738,7 +1746,7 @@ Detecting(JSContext* cx, JSScript* script, jsbytecode* pc)
 
     // General case: a branch or equality op follows the access.
     JSOp op = JSOp(*pc);
-    if (js_CodeSpec[op].format & JOF_DETECTING)
+    if (CodeSpec[op].format & JOF_DETECTING)
         return true;
 
     jsbytecode* endpc = script->codeEnd();
@@ -1756,7 +1764,7 @@ Detecting(JSContext* cx, JSScript* script, jsbytecode* pc)
         // Special case #2: don't warn about (obj.prop == undefined).
         JSAtom* atom = script->getAtom(GET_UINT32_INDEX(pc));
         if (atom == cx->names().undefined &&
-            (pc += js_CodeSpec[op].length) < endpc) {
+            (pc += CodeSpec[op].length) < endpc) {
             op = JSOp(*pc);
             return op == JSOP_EQ || op == JSOP_NE || op == JSOP_STRICTEQ || op == JSOP_STRICTNE;
         }
@@ -1836,7 +1844,7 @@ GetNonexistentProperty(JSContext* cx, HandleNativeObject obj, HandleId id,
         return true;
 
     // Do not warn about tests like (obj[prop] == undefined).
-    pc += js_CodeSpec[*pc].length;
+    pc += CodeSpec[*pc].length;
     if (Detecting(cx, script, pc))
         return true;
 
@@ -2188,8 +2196,6 @@ SetDenseOrTypedArrayElement(JSContext* cx, HandleNativeObject obj, uint32_t inde
         if (index < len) {
             if (obj->is<TypedArrayObject>())
                 TypedArrayObject::setElement(obj->as<TypedArrayObject>(), index, d);
-            else
-                SharedTypedArrayObject::setElement(obj->as<SharedTypedArrayObject>(), index, d);
         }
         return result.succeed();
     }

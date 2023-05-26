@@ -46,9 +46,9 @@ function Deferred()  {
   Object.freeze(this);
 }
 
-let bluetoothManager;
+var bluetoothManager;
 
-let pendingEmulatorCmdCount = 0;
+var pendingEmulatorCmdCount = 0;
 
 /**
  * Push required permissions and test if |navigator.mozBluetooth| exists.
@@ -753,15 +753,13 @@ function addEventHandlerForPairingRequest(aAdapter, aSpecifiedBdAddress) {
 
     let device = evt.device;
     if (!aSpecifiedBdAddress || device.address == aSpecifiedBdAddress) {
-      let confirm = true;
-
-      evt.handle.setPairingConfirmation(confirm).then(
+      evt.handle.accept().then(
         function onResolve() {
-          log("  - 'setPairingConfirmation' resolve.");
+          log("  - 'accept' resolve.");
           cleanupPairingListener(aAdapter.pairingReqs);
         },
         function onReject() {
-          log("  - 'setPairingConfirmation' reject.");
+          log("  - 'accept' reject.");
           cleanupPairingListener(aAdapter.pairingReqs);
         });
     }
@@ -772,7 +770,15 @@ function addEventHandlerForPairingRequest(aAdapter, aSpecifiedBdAddress) {
 
     let device = evt.device;
     if (!aSpecifiedBdAddress || device.address == aSpecifiedBdAddress) {
-      cleanupPairingListener(aAdapter.pairingReqs);
+      evt.handle.accept().then(
+        function onResolve() {
+          log("  - 'accept' resolve.");
+          cleanupPairingListener(aAdapter.pairingReqs);
+        },
+        function onReject() {
+          log("  - 'accept' reject.");
+          cleanupPairingListener(aAdapter.pairingReqs);
+        });
     }
   };
 }
@@ -831,6 +837,10 @@ function cleanUp() {
 
 function startBluetoothTestBase(aPermissions, aTestCaseMain) {
   ensureBluetoothManager(aPermissions)
+    .then(function() {
+      log("Wait for creating bluetooth adapter...");
+      return waitForManagerStateChanged(bluetoothManager);
+    })
     .then(aTestCaseMain)
     .then(cleanUp, function() {
       ok(false, "Unhandled rejected promise.");
@@ -879,3 +889,22 @@ function startBluetoothTest(aReenable, aTestCaseMain) {
       });
   });
 }
+
+function waitForManagerStateChanged(aManager) {
+  let deferred = Promise.defer();
+
+  aManager.onattributechanged = function(evt) {
+    for (var i in evt.attrs) {
+      switch (evt.attrs[i]) {
+        case 'defaultAdapter':
+          deferred.resolve(evt);
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  return deferred.promise;
+}
+

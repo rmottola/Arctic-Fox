@@ -70,8 +70,6 @@
 
 #define DEFAULT_SHUTDOWN_TIMER_MS 5000
 
-bool gBluetoothDebugFlag = false;
-
 using namespace mozilla;
 using namespace mozilla::dom;
 USING_BLUETOOTH_NAMESPACE
@@ -119,7 +117,7 @@ GetAllBluetoothActors(InfallibleTArray<BluetoothParent*>& aActors)
   }
 }
 
-} // anonymous namespace
+} // namespace
 
 BluetoothService::ToggleBtAck::ToggleBtAck(bool aEnabled)
   : mEnabled(aEnabled)
@@ -162,8 +160,9 @@ public:
     return NS_OK;
   }
 
-protected:
-  ~StartupTask() { }
+private:
+  ~StartupTask()
+  { }
 };
 
 NS_IMPL_ISUPPORTS(BluetoothService::StartupTask, nsISettingsServiceCallback);
@@ -242,8 +241,7 @@ BluetoothService::Cleanup()
 
 void
 BluetoothService::RegisterBluetoothSignalHandler(
-                                              const nsAString& aNodeName,
-                                              BluetoothSignalObserver* aHandler)
+  const nsAString& aNodeName, BluetoothSignalObserver* aHandler)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aHandler);
@@ -334,6 +332,48 @@ BluetoothService::DistributeSignal(const nsAString& aName,
 {
   BluetoothSignal signal(nsString(aName), nsString(aPath), aValue);
   DistributeSignal(signal);
+}
+
+void
+BluetoothService::DistributeSignal(const nsAString& aName,
+                                   const BluetoothAddress& aAddress)
+{
+  nsAutoString path;
+  AddressToString(aAddress, path);
+
+  DistributeSignal(aName, path);
+}
+
+void
+BluetoothService::DistributeSignal(const nsAString& aName,
+                                   const BluetoothAddress& aAddress,
+                                   const BluetoothValue& aValue)
+{
+  nsAutoString path;
+  AddressToString(aAddress, path);
+
+  DistributeSignal(aName, path, aValue);
+}
+
+void
+BluetoothService::DistributeSignal(const nsAString& aName,
+                                   const BluetoothUuid& aUuid)
+{
+  nsAutoString path;
+  UuidToString(aUuid, path);
+
+  DistributeSignal(aName, path);
+}
+
+void
+BluetoothService::DistributeSignal(const nsAString& aName,
+                                   const BluetoothUuid& aUuid,
+                                   const BluetoothValue& aValue)
+{
+  nsAutoString path;
+  UuidToString(aUuid, path);
+
+  DistributeSignal(aName, path, aValue);
 }
 
 void
@@ -532,8 +572,6 @@ BluetoothService::HandleShutdown()
   // bluetooth is going away, and then we wait for them to acknowledge. Then we
   // close down all the bluetooth machinery.
 
-  sInShutdown = true;
-
   Cleanup();
 
   AutoInfallibleTArray<BluetoothParent*, 10> childActors;
@@ -633,6 +671,13 @@ BluetoothService::Observe(nsISupports* aSubject, const char* aTopic,
   }
 
   if (!strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID)) {
+    /**
+     * |sInShutdown| flag should be set for instances created in content
+     * processes or parent processes. Please see bug 1199653 for detailed
+     * information.
+     */
+    sInShutdown = true;
+
     return HandleShutdown();
   }
 

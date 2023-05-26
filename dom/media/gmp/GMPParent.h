@@ -123,6 +123,7 @@ public:
   const nsCString& GetDisplayName() const;
   const nsCString& GetVersion() const;
   const uint32_t GetPluginId() const;
+  nsString GetPluginBaseName() const;
 
   // Returns true if a plugin can be or is being used across multiple NodeIds.
   bool CanBeSharedCrossNodeIds() const;
@@ -183,6 +184,7 @@ private:
   }
 
 
+  static void AbortWaitingForGMPAsyncShutdown(nsITimer* aTimer, void* aClosure);
   nsresult EnsureAsyncShutdownTimeoutSet();
 
   GMPState mState;

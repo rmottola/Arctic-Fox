@@ -69,7 +69,7 @@ CaptivePortalService::PerformCheck()
   LOG(("CaptivePortalService::PerformCheck - Calling CheckCaptivePortal\n"));
   mRequestInProgress = true;
   mCaptivePortalDetector->CheckCaptivePortal(
-    NS_LITERAL_STRING(kInterfaceName).get(), this);
+    MOZ_UTF16(kInterfaceName), this);
   return NS_OK;
 }
 
@@ -160,7 +160,7 @@ CaptivePortalService::Stop()
   mRequestInProgress = false;
   mStarted = false;
   if (mCaptivePortalDetector) {
-    mCaptivePortalDetector->Abort(NS_LITERAL_STRING(kInterfaceName).get());
+    mCaptivePortalDetector->Abort(MOZ_UTF16(kInterfaceName));
   }
   mCaptivePortalDetector = nullptr;
   return NS_OK;
@@ -277,7 +277,7 @@ CaptivePortalService::Prepare()
   LOG(("CaptivePortalService::Prepare\n"));
   // XXX: Finish preparation shouldn't be called until dns and routing is available.
   if (mCaptivePortalDetector) {
-    mCaptivePortalDetector->FinishPreparation(NS_LITERAL_STRING(kInterfaceName).get());
+    mCaptivePortalDetector->FinishPreparation(MOZ_UTF16(kInterfaceName));
   }
   return NS_OK;
 }

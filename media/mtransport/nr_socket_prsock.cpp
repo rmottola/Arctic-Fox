@@ -127,7 +127,8 @@ private:
   ~SingletonThreadHolder()
   {
     r_log(LOG_GENERIC,LOG_DEBUG,"Deleting SingletonThreadHolder");
-    if (NS_WARN_IF(mThread)) {
+    MOZ_ASSERT(!mThread, "SingletonThreads should be Released and shut down before exit!");
+    if (mThread) {
       mThread->Shutdown();
       mThread = nullptr;
     }
@@ -136,7 +137,7 @@ private:
   DISALLOW_COPY_ASSIGN(SingletonThreadHolder);
 
 public:
-  // Must be threadsafe for ClearOnShutdown
+  // Must be threadsafe for StaticRefPtr/ClearOnShutdown
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SingletonThreadHolder)
 
   explicit SingletonThreadHolder(const nsCSubstring& aName)
@@ -182,7 +183,8 @@ public:
             mThread.get());
       mThread->Shutdown();
       mThread = nullptr;
-      // It'd be nice to use a timer instead...
+      // It'd be nice to use a timer instead...  But be careful of
+      // xpcom-shutdown-threads in that case
     }
     r_log(LOG_GENERIC,LOG_DEBUG,"ReleaseUse: %lu", (unsigned long) count);
     return count;

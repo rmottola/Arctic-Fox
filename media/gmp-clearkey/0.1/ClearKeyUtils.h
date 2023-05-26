@@ -20,7 +20,8 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
-#include "gmp-decryption.h"
+#include <assert.h>
+#include "gmp-api/gmp-decryption.h"
 
 #define CLEARKEY_KEY_LEN ((size_t)16)
 
@@ -53,8 +54,14 @@ public:
   static void DecryptAES(const std::vector<uint8_t>& aKey,
                          std::vector<uint8_t>& aData, std::vector<uint8_t>& aIV);
 
-  static void ParseInitData(const uint8_t* aInitData, uint32_t aInitDataSize,
-                            std::vector<Key>& aOutKeys);
+  static void ParseCENCInitData(const uint8_t* aInitData,
+                                uint32_t aInitDataSize,
+                                std::vector<Key>& aOutKeyIds);
+
+  static bool ParseKeyIdsInitData(const uint8_t* aInitData,
+                                  uint32_t aInitDataSize,
+                                  std::vector<KeyId>& aOutKeyIds,
+                                  std::string& aOutSessionType);
 
   static void MakeKeyRequest(const std::vector<KeyId>& aKeyIds,
                              std::string& aOutRequest,
@@ -73,6 +80,34 @@ inline bool
 Contains(const Container& aContainer, const Element& aElement)
 {
   return aContainer.find(aElement) != aContainer.end();
+}
+
+class AutoLock {
+public:
+  explicit AutoLock(GMPMutex* aMutex)
+    : mMutex(aMutex)
+  {
+    assert(aMutex);
+    if (mMutex) {
+      mMutex->Acquire();
+    }
+  }
+  ~AutoLock() {
+    if (mMutex) {
+      mMutex->Release();
+    }
+  }
+private:
+  GMPMutex* mMutex;
+};
+
+GMPMutex* GMPCreateMutex();
+
+template<typename T>
+inline void
+Assign(std::vector<T>& aVec, const T* aData, size_t aLength)
+{
+  aVec.assign(aData, aData + aLength);
 }
 
 #endif // __ClearKeyUtils_h__

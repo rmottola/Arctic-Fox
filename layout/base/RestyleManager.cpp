@@ -1320,19 +1320,10 @@ RestyleManager::AttributeChanged(Element* aElement,
 /* static */ uint64_t
 RestyleManager::GetMaxAnimationGenerationForFrame(nsIFrame* aFrame)
 {
-  nsIContent* content = aFrame->GetContent();
-  if (!content || !content->IsElement()) {
-    return 0;
-  }
-
-  nsCSSPseudoElements::Type pseudoType =
-    aFrame->StyleContext()->GetPseudoType();
   AnimationCollection* transitions =
-    aFrame->PresContext()->TransitionManager()->GetAnimations(
-      content->AsElement(), pseudoType, false /* don't create */);
+    aFrame->PresContext()->TransitionManager()->GetAnimationCollection(aFrame);
   AnimationCollection* animations =
-    aFrame->PresContext()->AnimationManager()->GetAnimations(
-      content->AsElement(), pseudoType, false /* don't create */);
+    aFrame->PresContext()->AnimationManager()->GetAnimationCollection(aFrame);
 
   return std::max(transitions ? transitions->mAnimationGeneration : 0,
                   animations ? animations->mAnimationGeneration : 0);
@@ -1995,8 +1986,8 @@ VerifySameTree(nsStyleContext* aContext1, nsStyleContext* aContext2)
 }
 
 static void
-VerifyContextParent(nsPresContext* aPresContext, nsIFrame* aFrame,
-                    nsStyleContext* aContext, nsStyleContext* aParentContext)
+VerifyContextParent(nsIFrame* aFrame, nsStyleContext* aContext,
+                    nsStyleContext* aParentContext)
 {
   // get the contexts not provided
   if (!aContext) {
@@ -2056,11 +2047,10 @@ VerifyContextParent(nsPresContext* aPresContext, nsIFrame* aFrame,
 }
 
 static void
-VerifyStyleTree(nsPresContext* aPresContext, nsIFrame* aFrame,
-                nsStyleContext* aParentContext)
+VerifyStyleTree(nsIFrame* aFrame, nsStyleContext* aParentContext)
 {
   nsStyleContext*  context = aFrame->StyleContext();
-  VerifyContextParent(aPresContext, aFrame, context, nullptr);
+  VerifyContextParent(aFrame, context, nullptr);
 
   nsIFrame::ChildListIterator lists(aFrame);
   for (; !lists.IsDone(); lists.Next()) {
@@ -2075,15 +2065,15 @@ VerifyStyleTree(nsPresContext* aPresContext, nsIFrame* aFrame,
 
           // recurse to out of flow frame, letting the parent context get resolved
           do {
-            VerifyStyleTree(aPresContext, outOfFlowFrame, nullptr);
+            VerifyStyleTree(outOfFlowFrame, nullptr);
           } while ((outOfFlowFrame = outOfFlowFrame->GetNextContinuation()));
 
           // verify placeholder using the parent frame's context as
           // parent context
-          VerifyContextParent(aPresContext, child, nullptr, nullptr);
+          VerifyContextParent(child, nullptr, nullptr);
         }
         else { // regular frame
-          VerifyStyleTree(aPresContext, child, nullptr);
+          VerifyStyleTree(child, nullptr);
         }
       }
     }
@@ -2094,7 +2084,7 @@ VerifyStyleTree(nsPresContext* aPresContext, nsIFrame* aFrame,
   for (nsStyleContext* extraContext;
        (extraContext = aFrame->GetAdditionalStyleContext(contextIndex));
        ++contextIndex) {
-    VerifyContextParent(aPresContext, aFrame, extraContext, context);
+    VerifyContextParent(aFrame, extraContext, context);
   }
 }
 
@@ -2104,7 +2094,7 @@ RestyleManager::DebugVerifyStyleTree(nsIFrame* aFrame)
   if (aFrame) {
     nsStyleContext* context = aFrame->StyleContext();
     nsStyleContext* parentContext = context->GetParent();
-    VerifyStyleTree(mPresContext, aFrame, parentContext);
+    VerifyStyleTree(aFrame, parentContext);
   }
 }
 
@@ -2522,7 +2512,7 @@ RestyleManager::ReparentStyleContext(nsIFrame* aFrame)
         }
       }
 #ifdef DEBUG
-      VerifyStyleTree(mPresContext, aFrame, newParentContext);
+      VerifyStyleTree(aFrame, newParentContext);
 #endif
     }
   }

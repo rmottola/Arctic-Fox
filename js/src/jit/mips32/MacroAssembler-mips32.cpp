@@ -890,9 +890,9 @@ MacroAssemblerMIPSCompat::movePtr(ImmPtr imm, Register dest)
     movePtr(ImmWord(uintptr_t(imm.value)), dest);
 }
 void
-MacroAssemblerMIPSCompat::movePtr(AsmJSImmPtr imm, Register dest)
+MacroAssemblerMIPSCompat::movePtr(wasm::SymbolicAddress imm, Register dest)
 {
-    append(AsmJSAbsoluteLink(CodeOffsetLabel(nextOffset().getOffset()), imm.kind()));
+    append(AsmJSAbsoluteLink(CodeOffset(nextOffset().getOffset()), imm));
     ma_liPatchable(dest, ImmWord(-1));
 }
 
@@ -964,10 +964,10 @@ MacroAssemblerMIPSCompat::load32(AbsoluteAddress address, Register dest)
 }
 
 void
-MacroAssemblerMIPSCompat::load32(AsmJSAbsoluteAddress address, Register dest)
+MacroAssemblerMIPSCompat::load32(wasm::SymbolicAddress address, Register dest)
 {
-    movePtr(AsmJSImmPtr(address.kind()), ScratchRegister);
-    load32(Address(ScratchRegister, 0), dest);
+    movePtr(address, ScratchRegister);
+    load32(Address(ScratchRegister, 0), address);
 }
 
 void
@@ -990,9 +990,9 @@ MacroAssemblerMIPSCompat::loadPtr(AbsoluteAddress address, Register dest)
 }
 
 void
-MacroAssemblerMIPSCompat::loadPtr(AsmJSAbsoluteAddress address, Register dest)
+MacroAssemblerMIPSCompat::loadPtr(wasm::SymbolicAddress address, Register dest)
 {
-    movePtr(AsmJSImmPtr(address.kind()), ScratchRegister);
+    movePtr(address, ScratchRegister);
     loadPtr(Address(ScratchRegister, 0), dest);
 }
 
@@ -2521,19 +2521,19 @@ MacroAssemblerMIPSCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, 
                                                         Register offsetTemp, Register maskTemp,
                                                         AnyRegister output);
 
-CodeOffsetLabel
+CodeOffset
 MacroAssemblerMIPSCompat::toggledJump(Label* label)
 {
-    CodeOffsetLabel ret(nextOffset().getOffset());
+    CodeOffset ret(nextOffset().getOffset());
     ma_b(label);
     return ret;
 }
 
-CodeOffsetLabel
+CodeOffset
 MacroAssemblerMIPSCompat::toggledCall(JitCode* target, bool enabled)
 {
     BufferOffset bo = nextOffset();
-    CodeOffsetLabel offset(bo.getOffset());
+    CodeOffset offset(bo.getOffset());
     addPendingJump(bo, ImmPtr(target->raw()), Relocation::JITCODE);
     ma_liPatchable(ScratchRegister, ImmPtr(target->raw()));
     if (enabled) {

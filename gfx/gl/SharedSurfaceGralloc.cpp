@@ -71,7 +71,7 @@ SharedSurface_Gralloc::Create(GLContext* prodGL,
         return Move(ret);
     }
 
-    RefPtr<TextureClient> grallocTC = new ClientTexture(texData, flags, allocator);
+    RefPtr<TextureClient> grallocTC = new TextureClient(texData, flags, allocator);
 
     sp<GraphicBuffer> buffer = texData->GetGraphicBuffer();
 
@@ -279,7 +279,7 @@ SharedSurface_Gralloc::WaitForBufferOwnership()
 bool
 SharedSurface_Gralloc::ToSurfaceDescriptor(layers::SurfaceDescriptor* const out_descriptor)
 {
-    mTextureClient->MarkShared();
+    mTextureClient->mWorkaroundAnnoyingSharedSurfaceOwnershipIssues = true;
     return mTextureClient->ToSurfaceDescriptor(*out_descriptor);
 }
 

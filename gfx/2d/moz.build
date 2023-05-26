@@ -32,6 +32,7 @@ EXPORTS.mozilla.gfx += [
     'JobScheduler_win32.h',
     'Logging.h',
     'Matrix.h',
+    'MatrixFwd.h',
     'NumericTools.h',
     'PathHelpers.h',
     'PatternHelpers.h',
@@ -151,6 +152,7 @@ UNIFIED_SOURCES += [
     'Matrix.cpp',
     'Path.cpp',
     'PathCairo.cpp',
+    'PathHelpers.cpp',
     'PathRecording.cpp',
     'Quaternion.cpp',
     'RecordedEvent.cpp',
@@ -159,10 +161,6 @@ UNIFIED_SOURCES += [
     'ScaledFontCairo.cpp',
     'SourceSurfaceCairo.cpp',
     'SourceSurfaceRawData.cpp',
-]
-
-SOURCES += [
-    'PathHelpers.cpp', # Uses _USE_MATH_DEFINES
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
@@ -187,17 +185,6 @@ for var in ('USE_CAIRO', 'MOZ2D_HAS_MOZ_CAIRO'):
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
     DEFINES['MOZ_ENABLE_FREETYPE'] = True
-
-if CONFIG['MOZ_DEBUG']:
-    DEFINES['GFX_LOG_DEBUG'] = True
-    DEFINES['GFX_LOG_WARNING'] = True
-
-# Define the GFX_LOG_WARNING in release builds (available, but controlled by a
-# preference), though we may want to consider only doing it in the nightly
-# build, if the size of gfxWarning() code ends up making a difference.
-# See bug 1074952.
-# if CONFIG['NIGHTLY_BUILD']:
-DEFINES['GFX_LOG_WARNING'] = True
 
 CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
 

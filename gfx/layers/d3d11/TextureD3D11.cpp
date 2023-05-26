@@ -214,18 +214,21 @@ static void UnlockD3DTexture(T* aTexture)
 }
 
 DXGITextureData::DXGITextureData(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                                 bool aNeedsClear, bool aNeedsClearWhite)
+                                 bool aNeedsClear, bool aNeedsClearWhite,
+                                 bool aIsForOutOfBandContent)
 : mSize(aSize)
 , mFormat(aFormat)
 , mNeedsClear(aNeedsClear)
 , mNeedsClearWhite(aNeedsClearWhite)
 , mHasSynchronization(false)
+, mIsForOutOfBandContent(aIsForOutOfBandContent)
 {}
 
 D3D11TextureData::D3D11TextureData(ID3D11Texture2D* aTexture,
                                    gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                                   bool aNeedsClear, bool aNeedsClearWhite)
-: DXGITextureData(aSize, aFormat, aNeedsClear, aNeedsClearWhite)
+                                   bool aNeedsClear, bool aNeedsClearWhite,
+                                   bool aIsForOutOfBandContent)
+: DXGITextureData(aSize, aFormat, aNeedsClear, aNeedsClearWhite, aIsForOutOfBandContent)
 , mTexture(aTexture)
 {
   MOZ_ASSERT(aTexture);
@@ -248,8 +251,9 @@ D3D11TextureData::~D3D11TextureData()
 
 D3D10TextureData::D3D10TextureData(ID3D10Texture2D* aTexture,
                  gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                 bool aNeedsClear, bool aNeedsClearWhite)
-: DXGITextureData(aSize, aFormat, aNeedsClear, aNeedsClearWhite)
+                 bool aNeedsClear, bool aNeedsClearWhite,
+                 bool aIsForOutOfBandContent)
+: DXGITextureData(aSize, aFormat, aNeedsClear, aNeedsClearWhite, aIsForOutOfBandContent)
 , mTexture(aTexture)
 {
   MOZ_ASSERT(aTexture);
@@ -277,7 +281,7 @@ D3D11TextureData::Lock(OpenMode aMode, FenceHandle*)
     return false;
   }
 
-  if (NS_IsMainThread()) {
+  if (NS_IsMainThread() && !mIsForOutOfBandContent) {
     if (!PrepareDrawTargetInLock(aMode)) {
       Unlock();
       return false;
@@ -294,7 +298,7 @@ D3D10TextureData::Lock(OpenMode aMode, FenceHandle*)
     return false;
   }
 
-  if (NS_IsMainThread()) {
+  if (NS_IsMainThread() && !mIsForOutOfBandContent) {
     if (!PrepareDrawTargetInLock(aMode)) {
       Unlock();
       return false;
@@ -343,7 +347,7 @@ D3D10TextureData::Unlock()
 void
 D3D11TextureData::SyncWithObject(SyncObject* aSyncObject)
 {
-  if (!aSyncObject || !NS_IsMainThread()) {
+  if (!aSyncObject || !NS_IsMainThread() || mIsForOutOfBandContent) {
     // When off the main thread we sync using a keyed mutex per texture.
     return;
   }
@@ -424,27 +428,17 @@ DXGITextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocationF
   gfxWindowsPlatform* windowsPlatform = gfxWindowsPlatform::GetPlatform();
   // When we're not on the main thread we're not going to be using Direct2D
   // to access the contents of this texture client so we will always use D3D11.
-  bool haveD3d11Backend = windowsPlatform->GetContentBackendFor(LayersBackend::LAYERS_D3D11) == BackendType::DIRECT2D1_1 || !NS_IsMainThread();
+  bool useD3D11 =
+    windowsPlatform->GetContentBackendFor(LayersBackend::LAYERS_D3D11) == BackendType::DIRECT2D1_1 ||
+    !NS_IsMainThread() ||
+    (aFlags & ALLOC_FOR_OUT_OF_BAND_CONTENT);
 
-  if (haveD3d11Backend) {
+  if (useD3D11) {
     return D3D11TextureData::Create(aSize, aFormat, aFlags);
   } else {
     return D3D10TextureData::Create(aSize, aFormat, aFlags);
   }
 }
-
-already_AddRefed<TextureClient>
-CreateDXGITextureClient(IntSize aSize, SurfaceFormat aFormat,
-                        TextureFlags aTextureFlags, TextureAllocationFlags aAllocFlags,
-                        ISurfaceAllocator* aAllocator)
-{
-  TextureData* data = DXGITextureData::Create(aSize, aFormat, aAllocFlags);
-  if (!data) {
-    return nullptr;
-  }
-  return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
-}
-
 
 DXGITextureData*
 D3D11TextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocationFlags aFlags,
@@ -463,7 +457,7 @@ D3D11TextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocation
                                 D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
 
   newDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-  if (!NS_IsMainThread()) {
+  if (!NS_IsMainThread() || !!(aFlags & ALLOC_FOR_OUT_OF_BAND_CONTENT)) {
     // On the main thread we use the syncobject to handle synchronization.
     newDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
   }
@@ -478,7 +472,8 @@ D3D11TextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocation
                                      new TextureMemoryMeasurer(newDesc.Width * newDesc.Height * 4));
   return new D3D11TextureData(texture11, aSize, aFormat,
                               aFlags & ALLOC_CLEAR_BUFFER,
-                              aFlags & ALLOC_CLEAR_BUFFER_WHITE);
+                              aFlags & ALLOC_CLEAR_BUFFER_WHITE,
+                              aFlags & ALLOC_FOR_OUT_OF_BAND_CONTENT);
 }
 
 void
@@ -497,7 +492,7 @@ CreateD3D11TextureClientWithDevice(IntSize aSize, SurfaceFormat aFormat,
   if (!data) {
     return nullptr;
   }
-  return MakeAndAddRef<ClientTexture>(data, aTextureFlags, aAllocator);
+  return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
 }
 
 TextureData*
@@ -531,7 +526,8 @@ D3D10TextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocation
 
   return new D3D10TextureData(texture10, aSize, aFormat,
                               aFlags & ALLOC_CLEAR_BUFFER,
-                              aFlags & ALLOC_CLEAR_BUFFER_WHITE);
+                              aFlags & ALLOC_CLEAR_BUFFER_WHITE,
+                              false /* aIsForOutOfBandContent */);
 }
 
 void
@@ -652,26 +648,6 @@ DXGIYCbCrTextureData::Serialize(SurfaceDescriptor& aOutDescriptor)
     GetSize(), mSizeY, mSizeCbCr
   );
   return true;
-}
-
-class YCbCrKeepAliveD3D11 : public KeepAlive
-{
-public:
-  YCbCrKeepAliveD3D11(RefPtr<IUnknown> aTextures[3])
-  {
-    mTextures[0] = aTextures[0];
-    mTextures[1] = aTextures[1];
-    mTextures[2] = aTextures[2];
-  }
-
-protected:
-  RefPtr<IUnknown> mTextures[3];
-};
-
-void
-DXGIYCbCrTextureData::FinalizeOnIPDLThread(TextureClient* aWrapper)
-{
-  aWrapper->KeepUntilFullDeallocation(MakeUnique<YCbCrKeepAliveD3D11>(mHoldRefs));
 }
 
 void
@@ -810,18 +786,6 @@ D3D10TextureData::UpdateFromSurface(gfx::SourceSurface* aSurface)
   srcSurf->Unmap();
 
   return true;
-}
-
-void
-D3D11TextureData::FinalizeOnIPDLThread(TextureClient* aWrapper)
-{
-  aWrapper->KeepUntilFullDeallocation(MakeUnique<TKeepAlive<ID3D11Texture2D>>(mTexture));
-}
-
-void
-D3D10TextureData::FinalizeOnIPDLThread(TextureClient* aWrapper)
-{
-  aWrapper->KeepUntilFullDeallocation(MakeUnique<TKeepAlive<ID3D10Texture2D>>(mTexture));
 }
 
 DXGITextureHostD3D11::DXGITextureHostD3D11(TextureFlags aFlags,

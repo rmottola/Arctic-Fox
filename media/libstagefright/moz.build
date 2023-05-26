@@ -1,4 +1,4 @@
-# /*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -70,6 +70,10 @@ EXPORTS.demuxer += [
     'binding/include/demuxer/TrackDemuxer.h',
 ]
 
+EXPORTS += [
+    'binding/include/mp4parse.h',
+]
+
 SOURCES += [
     'frameworks/av/media/libstagefright/foundation/hexdump.cpp',
     'frameworks/av/media/libstagefright/MetaData.cpp',
@@ -78,6 +82,11 @@ SOURCES += [
     'system/core/libutils/String8.cpp',
     'system/core/libutils/VectorImpl.cpp',
 ]
+
+if CONFIG['MOZ_RUST']:
+    SOURCES += [
+        'binding/MP4Metadata.rs',
+    ]
 
 UNIFIED_SOURCES += [
     'binding/Adts.cpp',

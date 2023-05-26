@@ -44,6 +44,7 @@ using mozilla::DefaultXDisplay;
 #include "nsIFocusManager.h"
 #include "nsFocusManager.h"
 #include "nsIDOMDragEvent.h"
+#include "nsIScriptSecurityManager.h"
 #include "nsIScrollableFrame.h"
 #include "nsIDocShell.h"
 #include "ImageContainer.h"
@@ -245,6 +246,14 @@ nsPluginInstanceOwner::GetImageContainer()
 #endif
 
   return container.forget();
+}
+
+void
+nsPluginInstanceOwner::DidComposite()
+{
+  if (mInstance) {
+    mInstance->DidComposite();
+  }
 }
 
 void
@@ -471,7 +480,8 @@ NS_IMETHODIMP nsPluginInstanceOwner::GetURL(const char *aURL,
                                             const char *aTarget,
                                             nsIInputStream *aPostStream,
                                             void *aHeadersData,
-                                            uint32_t aHeadersDataLen)
+                                            uint32_t aHeadersDataLen,
+                                            bool aDoCheckLoadURIChecks)
 {
   nsCOMPtr<nsIContent> content = do_QueryReferent(mContent);
   if (!content) {
@@ -503,16 +513,34 @@ NS_IMETHODIMP nsPluginInstanceOwner::GetURL(const char *aURL,
   nsCOMPtr<nsILinkHandler> lh = do_QueryInterface(container);
   NS_ENSURE_TRUE(lh, NS_ERROR_FAILURE);
 
-  nsAutoString  unitarget;
-  unitarget.AssignASCII(aTarget); // XXX could this be nonascii?
+  nsAutoString unitarget;
+  if ((0 == PL_strcmp(aTarget, "newwindow")) ||
+      (0 == PL_strcmp(aTarget, "_new"))) {
+    unitarget.AssignASCII("_blank");
+  }
+  else if (0 == PL_strcmp(aTarget, "_current")) {
+    unitarget.AssignASCII("_self");
+  }
+  else {
+    unitarget.AssignASCII(aTarget); // XXX could this be nonascii?
+  }
 
   nsCOMPtr<nsIURI> baseURI = GetBaseURI();
 
   // Create an absolute URL
   nsCOMPtr<nsIURI> uri;
   nsresult rv = NS_NewURI(getter_AddRefs(uri), aURL, baseURI);
-
   NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
+
+  if (aDoCheckLoadURIChecks) {
+    nsCOMPtr<nsIScriptSecurityManager> secMan(
+      do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv));
+    NS_ENSURE_TRUE(secMan, NS_ERROR_FAILURE);
+
+    rv = secMan->CheckLoadURIWithPrincipal(content->NodePrincipal(), uri,
+                                           nsIScriptSecurityManager::STANDARD);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
 
   nsCOMPtr<nsIInputStream> headersDataStream;
   if (aPostStream && aHeadersData) {
@@ -1014,6 +1042,21 @@ NPBool nsPluginInstanceOwner::ConvertPoint(double sourceX, double sourceY, NPCoo
 #else
   return false;
 #endif
+}
+
+NPError nsPluginInstanceOwner::InitAsyncSurface(NPSize *size, NPImageFormat format,
+                                                void *initData, NPAsyncSurface *surface)
+{
+  return NPERR_INCOMPATIBLE_VERSION_ERROR;
+}
+
+NPError nsPluginInstanceOwner::FinalizeAsyncSurface(NPAsyncSurface *)
+{
+  return NPERR_INCOMPATIBLE_VERSION_ERROR;
+}
+
+void nsPluginInstanceOwner::SetCurrentAsyncSurface(NPAsyncSurface *, NPRect*)
+{
 }
 
 NS_IMETHODIMP nsPluginInstanceOwner::GetTagType(nsPluginTagType *result)
@@ -2984,7 +3027,7 @@ void nsPluginInstanceOwner::FixUpPluginWindow(int32_t inPaintState)
 
   SetPluginPort();
 
-  nsIntSize widgetClip = mPluginFrame->GetWidgetlessClipRect().Size();
+  LayoutDeviceIntSize widgetClip = mPluginFrame->GetWidgetlessClipRect().Size();
 
   mPluginWindow->x = 0;
   mPluginWindow->y = 0;

@@ -7,6 +7,10 @@
 # be specified once. As a result, the source file paths are relative
 # to the location of the actual manifest.
 
+toolkit.jar:
+% skin global classic/1.0 %skin/classic/global/
+% skin help classic/1.0 %skin/classic/help/
+% skin mozapps classic/1.0 %skin/classic/mozapps/
   skin/classic/global/about.css                            (../../shared/about.css)
   skin/classic/global/aboutCache.css                       (../../shared/aboutCache.css)
   skin/classic/global/aboutCacheEntry.css                  (../../shared/aboutCacheEntry.css)
@@ -17,6 +21,7 @@
   skin/classic/global/aboutSupport.css                     (../../shared/aboutSupport.css)
   skin/classic/global/appPicker.css                        (../../shared/appPicker.css)
   skin/classic/global/config.css                           (../../shared/config.css)
+  skin/classic/global/icons/info.svg                       (../../shared/incontent-icons/info.svg)
   skin/classic/global/icons/warning.svg                    (../../shared/incontent-icons/warning.svg)
   skin/classic/global/alerts/alert-common.css              (../../shared/alert-common.css)
   skin/classic/global/menu/shared-menu-check@2x.png        (../../shared/menu-check@2x.png)
@@ -38,3 +43,4 @@
   skin/classic/global/reader/RM-Reading-List-24x24.svg     (../../shared/reader/RM-Reading-List-24x24.svg)
   skin/classic/global/reader/RM-Type-Controls-24x24.svg    (../../shared/reader/RM-Type-Controls-24x24.svg)
   skin/classic/global/reader/RM-Type-Controls-Arrow.svg    (../../shared/reader/RM-Type-Controls-Arrow.svg)
+

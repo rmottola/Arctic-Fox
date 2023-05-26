@@ -6,6 +6,7 @@ from mozpack.copier import (
     FileCopier,
     FilePurger,
     FileRegistry,
+    FileRegistrySubtree,
     Jarrer,
 )
 from mozpack.files import (
@@ -26,7 +27,7 @@ from mozpack.test.test_files import (
 )
 
 
-class TestFileRegistry(MatchTestTemplate, unittest.TestCase):
+class BaseTestFileRegistry(MatchTestTemplate):
     def add(self, path):
         self.registry.add(path, GeneratedFile(path))
 
@@ -38,18 +39,8 @@ class TestFileRegistry(MatchTestTemplate, unittest.TestCase):
             self.assertFalse(self.registry.contains(pattern))
         self.assertEqual(self.registry.match(pattern), result)
 
-    def test_partial_paths(self):
-        cases = {
-            'foo/bar/baz/zot': ['foo/bar/baz', 'foo/bar', 'foo'],
-            'foo/bar': ['foo'],
-            'bar': [],
-        }
-        reg = FileRegistry()
-        for path, parts in cases.iteritems():
-            self.assertEqual(reg._partial_paths(path), parts)
-
-    def test_file_registry(self):
-        self.registry = FileRegistry()
+    def do_test_file_registry(self, registry):
+        self.registry = registry
         self.registry.add('foo', GeneratedFile('foo'))
         bar = GeneratedFile('bar')
         self.registry.add('bar', bar)
@@ -101,8 +92,8 @@ class TestFileRegistry(MatchTestTemplate, unittest.TestCase):
         self.add('foo/.foo')
         self.assertTrue(self.registry.contains('foo/.foo'))
 
-    def test_registry_paths(self):
-        self.registry = FileRegistry()
+    def do_test_registry_paths(self, registry):
+        self.registry = registry
 
         # Can't add a file if it requires a directory in place of a
         # file we also require.
@@ -128,6 +119,23 @@ class TestFileRegistry(MatchTestTemplate, unittest.TestCase):
         # Drop the count of things that require bar/ to 0.
         self.registry.remove('bar/zot')
         self.registry.add('bar/zot', GeneratedFile('barzot'))
+
+class TestFileRegistry(BaseTestFileRegistry, unittest.TestCase):
+    def test_partial_paths(self):
+        cases = {
+            'foo/bar/baz/zot': ['foo/bar/baz', 'foo/bar', 'foo'],
+            'foo/bar': ['foo'],
+            'bar': [],
+        }
+        reg = FileRegistry()
+        for path, parts in cases.iteritems():
+            self.assertEqual(reg._partial_paths(path), parts)
+
+    def test_file_registry(self):
+        self.do_test_file_registry(FileRegistry())
+
+    def test_registry_paths(self):
+        self.do_test_registry_paths(FileRegistry())
 
     def test_required_directories(self):
         self.registry = FileRegistry()
@@ -155,6 +163,26 @@ class TestFileRegistry(MatchTestTemplate, unittest.TestCase):
 
         self.registry.add('x/y/z', GeneratedFile('xyz'))
         self.assertEqual(self.registry.required_directories(), {'x', 'x/y'})
+
+
+class TestFileRegistrySubtree(BaseTestFileRegistry, unittest.TestCase):
+    def test_file_registry_subtree_base(self):
+        registry = FileRegistry()
+        self.assertEqual(registry, FileRegistrySubtree('', registry))
+        self.assertNotEqual(registry, FileRegistrySubtree('base', registry))
+
+    def create_registry(self):
+        registry = FileRegistry()
+        registry.add('foo/bar', GeneratedFile('foo/bar'))
+        registry.add('baz/qux', GeneratedFile('baz/qux'))
+        return FileRegistrySubtree('base/root', registry)
+
+    def test_file_registry_subtree(self):
+        self.do_test_file_registry(self.create_registry())
+
+    def test_registry_paths_subtree(self):
+        registry = FileRegistry()
+        self.do_test_registry_paths(self.create_registry())
 
 
 class TestFileCopier(TestWithTmpDir):
@@ -392,6 +420,50 @@ class TestFileCopier(TestWithTmpDir):
         # But we do have an erroneous record of an optional file
         # existing when it does not.
         self.assertIn(self.tmppath('dest/foo/bar'), result.existing_files)
+
+    def test_remove_unaccounted_file_registry(self):
+        """Test FileCopier.copy(remove_unaccounted=FileRegistry())"""
+
+        dest = self.tmppath('dest')
+
+        copier = FileCopier()
+        copier.add('foo/bar/baz', GeneratedFile('foobarbaz'))
+        copier.add('foo/bar/qux', GeneratedFile('foobarqux'))
+        copier.add('foo/hoge/fuga', GeneratedFile('foohogefuga'))
+        copier.add('foo/toto/tata', GeneratedFile('footototata'))
+
+        os.makedirs(os.path.join(dest, 'bar'))
+        with open(os.path.join(dest, 'bar', 'bar'), 'w') as fh:
+            fh.write('barbar');
+        os.makedirs(os.path.join(dest, 'foo', 'toto'))
+        with open(os.path.join(dest, 'foo', 'toto', 'toto'), 'w') as fh:
+            fh.write('foototototo');
+
+        result = copier.copy(dest, remove_unaccounted=False)
+
+        self.assertEqual(self.all_files(dest),
+                         set(copier.paths()) | { 'foo/toto/toto', 'bar/bar'})
+        self.assertEqual(self.all_dirs(dest),
+                         {'foo/bar', 'foo/hoge', 'foo/toto', 'bar'})
+
+        copier2 = FileCopier()
+        copier2.add('foo/hoge/fuga', GeneratedFile('foohogefuga'))
+
+        # We expect only files copied from the first copier to be removed,
+        # not the extra file that was there beforehand.
+        result = copier2.copy(dest, remove_unaccounted=copier)
+
+        self.assertEqual(self.all_files(dest),
+                         set(copier2.paths()) | { 'foo/toto/toto', 'bar/bar'})
+        self.assertEqual(self.all_dirs(dest),
+                         {'foo/hoge', 'foo/toto', 'bar'})
+        self.assertEqual(result.updated_files,
+                         {self.tmppath('dest/foo/hoge/fuga')})
+        self.assertEqual(result.existing_files, set())
+        self.assertEqual(result.removed_files, {self.tmppath(p) for p in
+            ('dest/foo/bar/baz', 'dest/foo/bar/qux', 'dest/foo/toto/tata')})
+        self.assertEqual(result.removed_directories,
+                         {self.tmppath('dest/foo/bar')})
 
 
 class TestFilePurger(TestWithTmpDir):

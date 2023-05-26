@@ -85,9 +85,14 @@ function addTab(url) {
 
 /**
  * Reload the current tab location.
+ * @param {InspectorPanel} inspector The instance of InspectorPanel currently
+ * loaded in the toolbox
  */
-function reloadTab() {
-  return executeInContent("devtools:test:reload", {}, {}, false);
+function* reloadTab(inspector) {
+  let onNewRoot = inspector.once("new-root");
+  yield executeInContent("devtools:test:reload", {}, {}, false);
+  yield onNewRoot;
+  yield inspector.once("inspector-updated");
 }
 
 /**
@@ -449,3 +454,109 @@ var waitForAllAnimationTargets = Task.async(function*(panel) {
   }));
   return targets;
 });
+
+/**
+ * Check the scrubber element in the timeline is moving.
+ * @param {AnimationPanel} panel
+ * @param {Boolean} isMoving
+ */
+function* assertScrubberMoving(panel, isMoving) {
+  let timeline = panel.animationsTimelineComponent;
+  let scrubberEl = timeline.scrubberEl;
+
+  if (isMoving) {
+    // If we expect the scrubber to move, just wait for a couple of
+    // timeline-data-changed events and compare times.
+    let {time: time1} = yield timeline.once("timeline-data-changed");
+    let {time: time2} = yield timeline.once("timeline-data-changed");
+    ok(time2 > time1, "The scrubber is moving");
+  } else {
+    // If instead we expect the scrubber to remain at its position, just wait
+    // for some time and make sure timeline-data-changed isn't emitted.
+    let hasMoved = false;
+    timeline.once("timeline-data-changed", () => hasMoved = true);
+    yield new Promise(r => setTimeout(r, 500));
+    ok(!hasMoved, "The scrubber is not moving");
+  }
+}
+
+/**
+ * Click the play/pause button in the timeline toolbar and wait for animations
+ * to update.
+ * @param {AnimationsPanel} panel
+ */
+function* clickTimelinePlayPauseButton(panel) {
+  let onUiUpdated = panel.once(panel.UI_UPDATED_EVENT);
+
+  let btn = panel.playTimelineButtonEl;
+  let win = btn.ownerDocument.defaultView;
+  EventUtils.sendMouseEvent({type: "click"}, btn, win);
+
+  yield onUiUpdated;
+  yield waitForAllAnimationTargets(panel);
+}
+
+/**
+ * Click the rewind button in the timeline toolbar and wait for animations to
+ * update.
+ * @param {AnimationsPanel} panel
+ */
+function* clickTimelineRewindButton(panel) {
+  let onUiUpdated = panel.once(panel.UI_UPDATED_EVENT);
+
+  let btn = panel.rewindTimelineButtonEl;
+  let win = btn.ownerDocument.defaultView;
+  EventUtils.sendMouseEvent({type: "click"}, btn, win);
+
+  yield onUiUpdated;
+  yield waitForAllAnimationTargets(panel);
+}
+
+/**
+ * Select a rate inside the playback rate selector in the timeline toolbar and
+ * wait for animations to update.
+ * @param {AnimationsPanel} panel
+ * @param {Number} rate The new rate value to be selected
+ */
+function* changeTimelinePlaybackRate(panel, rate) {
+  let onUiUpdated = panel.once(panel.UI_UPDATED_EVENT);
+
+  let select = panel.rateSelectorEl.firstChild;
+  let win = select.ownerDocument.defaultView;
+
+  // Get the right option.
+  let option = [...select.options].filter(o => o.value === rate + "")[0];
+  if (!option) {
+    ok(false,
+       "Could not find an option for rate " + rate + " in the rate selector. " +
+       "Values are: " + [...select.options].map(o => o.value));
+    return;
+  }
+
+  // Simulate the right events to select the option in the drop-down.
+  EventUtils.synthesizeMouseAtCenter(select, {type: "mousedown"}, win);
+  EventUtils.synthesizeMouseAtCenter(option, {type: "mouseup"}, win);
+
+  yield onUiUpdated;
+  yield waitForAllAnimationTargets(panel);
+
+  // Simulate a mousemove outside of the rate selector area to avoid subsequent
+  // tests from failing because of unwanted mouseover events.
+  EventUtils.synthesizeMouseAtCenter(win.document.querySelector("#timeline-toolbar"),
+                                     {type: "mousemove"}, win);
+}
+
+/**
+ * Prevent the toolbox common highlighter from making backend requests.
+ * @param {Toolbox} toolbox
+ */
+function disableHighlighter(toolbox) {
+  toolbox._highlighter = {
+    showBoxModel: () => new Promise(r => r()),
+    hideBoxModel: () => new Promise(r => r()),
+    pick: () => new Promise(r => r()),
+    cancelPick: () => new Promise(r => r()),
+    destroy: () => {},
+    traits: {}
+  };
+}

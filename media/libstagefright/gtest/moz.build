@@ -8,6 +8,24 @@ Library('stagefright_gtest')
 
 SOURCES += [
     'TestInterval.cpp',
+    'TestParser.cpp',
+]
+
+TEST_HARNESS_FILES.gtest += [
+    'test_case_1156505.mp4',
+    'test_case_1181213.mp4',
+    'test_case_1181215.mp4',
+    'test_case_1181220.mp4',
+    'test_case_1181223.mp4',
+    'test_case_1181719.mp4',
+    'test_case_1185230.mp4',
+    'test_case_1187067.mp4',
+    'test_case_1200326.mp4',
+    'test_case_1204580.mp4',
+    'test_case_1216748.mp4',
 ]
 
 FINAL_LIBRARY = 'xul-gtest'
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wshadow']

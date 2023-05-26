@@ -379,7 +379,7 @@ MediaCacheStream::MediaCacheStream(ChannelMediaResource* aClient)
     mPinCount(0),
     mCurrentMode(MODE_PLAYBACK),
     mMetadataInPartialBlockBuffer(false),
-    mPartialBlockBuffer(new int64_t[BLOCK_SIZE/sizeof(int64_t)])
+    mPartialBlockBuffer(MakeUnique<int64_t[]>(BLOCK_SIZE/sizeof(int64_t)))
 {
 }
 
@@ -393,7 +393,7 @@ size_t MediaCacheStream::SizeOfExcludingThis(
   size += mReadaheadBlocks.SizeOfExcludingThis(aMallocSizeOf);
   size += mMetadataBlocks.SizeOfExcludingThis(aMallocSizeOf);
   size += mPlayedBlocks.SizeOfExcludingThis(aMallocSizeOf);
-  size += mPartialBlockBuffer.SizeOfExcludingThis(aMallocSizeOf);
+  size += aMallocSizeOf(mPartialBlockBuffer.get());
 
   return size;
 }
@@ -1842,7 +1842,7 @@ MediaCacheStream::FlushPartialBlockInternal(bool aNotifyAll,
     // Write back the partial block
     memset(reinterpret_cast<char*>(mPartialBlockBuffer.get()) + blockOffset, 0,
            BLOCK_SIZE - blockOffset);
-    gMediaCache->AllocateAndWriteBlock(this, mPartialBlockBuffer,
+    gMediaCache->AllocateAndWriteBlock(this, mPartialBlockBuffer.get(),
         mMetadataInPartialBlockBuffer ? MODE_METADATA : MODE_PLAYBACK);
   }
 
@@ -2441,7 +2441,7 @@ MediaCacheStream::InitAsClone(MediaCacheStream* aOriginal)
   return NS_OK;
 }
 
-nsresult MediaCacheStream::GetCachedRanges(nsTArray<MediaByteRange>& aRanges)
+nsresult MediaCacheStream::GetCachedRanges(MediaByteRangeSet& aRanges)
 {
   // Take the monitor, so that the cached data ranges can't grow while we're
   // trying to loop over them.
@@ -2456,7 +2456,7 @@ nsresult MediaCacheStream::GetCachedRanges(nsTArray<MediaByteRange>& aRanges)
     int64_t endOffset = GetCachedDataEndInternal(startOffset);
     NS_ASSERTION(startOffset < endOffset, "Buffered range must end after its start");
     // Bytes [startOffset..endOffset] are cached.
-    aRanges.AppendElement(MediaByteRange(startOffset, endOffset));
+    aRanges += MediaByteRange(startOffset, endOffset);
     startOffset = GetNextCachedDataInternal(endOffset);
     NS_ASSERTION(startOffset == -1 || startOffset > endOffset,
       "Must have advanced to start of next range, or hit end of stream");

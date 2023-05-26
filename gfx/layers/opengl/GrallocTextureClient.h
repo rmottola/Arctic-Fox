@@ -89,7 +89,7 @@ public:
                 TextureFlags aFlags = TextureFlags::DEFAULT,
                 TextureAllocationFlags aAllocFlags = ALLOC_DEFAULT) const override;
 
-  // use ClientTexture's default implementation
+  // use TextureClient's default implementation
   virtual bool UpdateFromSurface(gfx::SourceSurface* aSurface) override;
 
   /// Hold android::MediaBuffer.
@@ -106,6 +106,8 @@ public:
   virtual void WaitForFence(FenceHandle* aFence) override;
 
   ~GrallocTextureData();
+
+  virtual TextureFlags GetTextureFlags() const override;
 
 protected:
   GrallocTextureData(MaybeMagicGrallocBufferHandle aGrallocHandle,
@@ -127,10 +129,6 @@ protected:
 };
 
 gfx::SurfaceFormat SurfaceFormatForPixelFormat(android::PixelFormat aFormat);
-
-already_AddRefed<TextureClient> CreateGrallocTextureClientForDrawing(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                                                                     gfx::BackendType aMoz2dBackend, TextureFlags aFlags,
-                                                                     ISurfaceAllocator* aAllocator);
 
 } // namespace layers
 } // namespace mozilla

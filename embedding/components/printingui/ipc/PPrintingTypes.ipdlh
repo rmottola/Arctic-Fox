@@ -53,14 +53,9 @@ struct PrintData {
   double paperWidth;
   double paperHeight;
   short paperSizeUnit;
-  nsString plexName;
-  nsString colorspace;
-  nsString resolutionName;
-  bool downloadFonts;
   bool printReversed;
   bool printInColor;
   int32_t orientation;
-  nsString printCommand;
   int32_t numCopies;
   nsString printerName;
   bool printToFile;
@@ -81,6 +76,7 @@ struct PrintData {
   bool isFramesetFrameSelected;
   bool isIFrameSelected;
   bool isRangeSelection;
+  uint8_t[] devModeData;
 
   /**
    * GTK-specific things. Some of these might look like dupes of the

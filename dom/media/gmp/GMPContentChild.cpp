@@ -118,13 +118,17 @@ GMPContentChild::RecvPGMPDecryptorConstructor(PGMPDecryptorChild* aActor)
 
   void* session = nullptr;
   GMPErr err = mGMPChild->GetAPI(GMP_API_DECRYPTOR, host, &session);
-  if (err != GMPNoErr && !session) {
-    // XXX to remove in bug 1147692
-    err = mGMPChild->GetAPI(GMP_API_DECRYPTOR_COMPAT, host, &session);
-  }
-
   if (err != GMPNoErr || !session) {
-    return false;
+    // We Adapt the previous GMPDecryptor version to the current, so that
+    // Gecko thinks it's only talking to the current version. Helpfully,
+    // v7 is ABI compatible with v8, it only has different enumerations.
+    // If the GMP uses a v8-only enum value in an IPDL message, the IPC
+    // layer will terminate, so we rev'd the API version to signal to the
+    // GMP that it's safe to use the new enum values.
+    err = mGMPChild->GetAPI(GMP_API_DECRYPTOR_BACKWARDS_COMPAT, host, &session);
+    if (err != GMPNoErr || !session) {
+      return false;
+    }
   }
 
   child->Init(static_cast<GMPDecryptor*>(session));

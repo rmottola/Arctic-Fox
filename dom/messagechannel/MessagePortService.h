@@ -46,7 +46,7 @@ public:
 private:
   ~MessagePortService() {}
 
-  void CloseAll(const nsID& aUUID);
+  void CloseAll(const nsID& aUUID, bool aForced = false);
   void MaybeShutdown();
 
   class MessagePortServiceData;
@@ -60,7 +60,7 @@ private:
   nsClassHashtable<nsIDHashKey, MessagePortServiceData> mPorts;
 };
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla
 
 #endif // mozilla_dom_MessagePortService_h

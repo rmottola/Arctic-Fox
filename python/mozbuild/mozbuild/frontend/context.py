@@ -24,7 +24,6 @@ from collections import (
 )
 from mozbuild.util import (
     HierarchicalStringList,
-    HierarchicalStringListWithFlagsFactory,
     KeyedDefaultDict,
     List,
     memoize,
@@ -521,6 +520,30 @@ def ContextDerivedTypedRecord(*fields):
     _TypedRecord._fields = dict(fields)
     return _TypedRecord
 
+
+@memoize
+def ContextDerivedTypedHierarchicalStringList(type):
+    """Specialized HierarchicalStringList for use with ContextDerivedValue
+    types."""
+    class _TypedListWithItems(ContextDerivedValue, HierarchicalStringList):
+        __slots__ = ('_strings', '_children', '_context')
+
+        def __init__(self, context):
+            self._strings = ContextDerivedTypedList(
+                type, StrictOrderingOnAppendList)(context)
+            self._children = {}
+            self._context = context
+
+        def _get_exportvariable(self, name):
+            child = self._children.get(name)
+            if not child:
+                child = self._children[name] = _TypedListWithItems(
+                    self._context)
+            return child
+
+    return _TypedListWithItems
+
+
 BugzillaComponent = TypedNamedTuple('BugzillaComponent',
                         [('product', unicode), ('component', unicode)])
 
@@ -977,7 +1000,7 @@ VARIABLES = {
         break the build in subtle ways.
         """, 'misc'),
 
-    'FINAL_TARGET_FILES': (HierarchicalStringList, list,
+    'FINAL_TARGET_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """List of files to be installed into the application directory.
 
         ``FINAL_TARGET_FILES`` will copy (or symlink, if the platform supports it)
@@ -997,51 +1020,15 @@ VARIABLES = {
         disabled.
         """, None),
 
-    'DIST_FILES': (StrictOrderingOnAppendList, list,
-        """Additional files to place in ``FINAL_TARGET`` (typically ``dist/bin``).
-
-        Unlike ``FINAL_TARGET_FILES``, these files are preprocessed.
+    'FINAL_TARGET_PP_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
+        """Like ``FINAL_TARGET_FILES``, with preprocessing.
         """, 'libs'),
 
-    'EXTRA_COMPONENTS': (StrictOrderingOnAppendList, list,
-        """Additional component files to distribute.
+    'TESTING_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
+        """List of files to be installed in the _tests directory.
 
-       This variable contains a list of files to copy into
-       ``$(FINAL_TARGET)/components/``.
-        """, 'misc'),
-
-    'EXTRA_JS_MODULES': (HierarchicalStringList, list,
-        """Additional JavaScript files to distribute.
-
-        This variable contains a list of files to copy into
-        ``$(FINAL_TARGET)/modules.
-        """, 'misc'),
-
-    'EXTRA_PP_JS_MODULES': (HierarchicalStringList, list,
-        """Additional JavaScript files to distribute.
-
-        This variable contains a list of files to copy into
-        ``$(FINAL_TARGET)/modules``, after preprocessing.
-        """, 'misc'),
-
-    'TESTING_JS_MODULES': (HierarchicalStringList, list,
-        """JavaScript modules to install in the test-only destination.
-
-        Some JavaScript modules (JSMs) are test-only and not distributed
-        with Firefox. This variable defines them.
-
-        To install modules in a subdirectory, use properties of this
-        variable to control the final destination. e.g.
-
-        ``TESTING_JS_MODULES.foo += ['module.jsm']``.
+        This works similarly to FINAL_TARGET_FILES.
         """, None),
-
-    'EXTRA_PP_COMPONENTS': (StrictOrderingOnAppendList, list,
-        """Javascript XPCOM files.
-
-       This variable contains a list of files to preprocess.  Generated
-       files will be installed in the ``/components`` directory of the distribution.
-        """, 'misc'),
 
     'FINAL_LIBRARY': (unicode, unicode,
         """Library in which the objects of the current directory will be linked.
@@ -1103,13 +1090,6 @@ VARIABLES = {
 
         This variable should not be populated directly. Instead, it should
         populated by calling add_java_jar().
-        """, 'libs'),
-
-    'JS_PREFERENCE_FILES': (StrictOrderingOnAppendList, list,
-        """Exported javascript files.
-
-        A list of files copied into the dist directory for packaging and installation.
-        Path will be defined for gre or application prefs dir based on what is building.
         """, 'libs'),
 
     'LIBRARY_DEFINES': (OrderedDict, dict,
@@ -1211,7 +1191,7 @@ VARIABLES = {
         This variable can only be used on Linux.
         """, None),
 
-    'BRANDING_FILES': (HierarchicalStringListWithFlagsFactory({'source': unicode}), list,
+    'BRANDING_FILES': (HierarchicalStringList, list,
         """List of files to be installed into the branding directory.
 
         ``BRANDING_FILES`` will copy (or symlink, if the platform supports it)
@@ -1223,35 +1203,6 @@ VARIABLES = {
 
            BRANDING_FILES += ['foo.png']
            BRANDING_FILES.images.subdir += ['bar.png']
-
-        If the source and destination have different file names, add the
-        destination name to the list and set the ``source`` property on the
-        entry, like so::
-
-           BRANDING_FILES.dir += ['baz.png']
-           BRANDING_FILES.dir['baz.png'].source = 'quux.png'
-        """, None),
-
-    'RESOURCE_FILES': (HierarchicalStringListWithFlagsFactory({'preprocess': bool}), list,
-        """List of resources to be exported, and in which subdirectories.
-
-        ``RESOURCE_FILES`` is used to list the resource files to be exported to
-        ``dist/bin/res``, but it can be used for other files as well. This variable
-        behaves as a list when appending filenames for resources in the top-level
-        directory. Files can also be appended to a field to indicate which
-        subdirectory they should be exported to. For example, to export
-        ``foo.res`` to the top-level directory, and ``bar.res`` to ``fonts/``,
-        append to ``RESOURCE_FILES`` like so::
-
-           RESOURCE_FILES += ['foo.res']
-           RESOURCE_FILES.fonts += ['bar.res']
-
-        Added files also have a 'preprocess' attribute, which will cause the
-        affected file to be run through the preprocessor, using any ``DEFINES``
-        set. It is used like this::
-
-           RESOURCE_FILES.fonts += ['baz.res.in']
-           RESOURCE_FILES.fonts['baz.res.in'].preprocess = True
         """, None),
 
     'SDK_LIBRARY': (bool, bool,
@@ -1299,7 +1250,7 @@ VARIABLES = {
         complete.
         """, None),
 
-    'CONFIGURE_SUBST_FILES': (StrictOrderingOnAppendList, list,
+    'CONFIGURE_SUBST_FILES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Output files that will be generated using configure-like substitution.
 
         This is a substitute for ``AC_OUTPUT`` in autoconf. For each path in this
@@ -1309,7 +1260,7 @@ VARIABLES = {
         ``AC_SUBST`` variables declared during configure.
         """, None),
 
-    'CONFIGURE_DEFINE_FILES': (StrictOrderingOnAppendList, list,
+    'CONFIGURE_DEFINE_FILES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Output files generated from configure/config.status.
 
         This is a substitute for ``AC_CONFIG_HEADER`` in autoconf. This is very
@@ -1317,7 +1268,7 @@ VARIABLES = {
         into account the values of ``AC_DEFINE`` instead of ``AC_SUBST``.
         """, None),
 
-    'EXPORTS': (HierarchicalStringList, list,
+    'EXPORTS': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """List of files to be exported, and in which subdirectories.
 
         ``EXPORTS`` is generally used to list the include files to be exported to
@@ -1330,6 +1281,10 @@ VARIABLES = {
 
            EXPORTS += ['foo.h']
            EXPORTS.mozilla.dom += ['bar.h']
+
+        Entries in ``EXPORTS`` are paths, so objdir paths may be used, but
+        any files listed from the objdir must also be listed in
+        ``GENERATED_FILES``.
         """, None),
 
     'PROGRAM' : (unicode, unicode,
@@ -1484,6 +1439,14 @@ VARIABLES = {
 
     'MOCHITEST_MANIFESTS': (StrictOrderingOnAppendList, list,
         """List of manifest files defining mochitest tests.
+        """, None),
+
+    'MOCHITEST_WEBAPPRT_CONTENT_MANIFESTS': (StrictOrderingOnAppendList, list,
+        """List of manifest files defining webapprt mochitest content tests.
+        """, None),
+
+    'MOCHITEST_WEBAPPRT_CHROME_MANIFESTS': (StrictOrderingOnAppendList, list,
+        """List of manifest files defining webapprt mochitest chrome tests.
         """, None),
 
     'REFTEST_MANIFESTS': (StrictOrderingOnAppendList, list,
@@ -1708,6 +1671,11 @@ VARIABLES = {
     'NO_EXPAND_LIBS': (bool, bool,
         """Forces to build a real static library, and no corresponding fake
            library.
+        """, None),
+
+    'NO_COMPONENTS_MANIFEST': (bool, bool,
+        """Do not create a binary-component manifest entry for the
+        corresponding XPCOMBinaryComponent.
         """, None),
 }
 
@@ -1965,6 +1933,73 @@ SPECIAL_VARIABLES = {
 
         Access to an unknown variable will return None.
         """),
+
+    'EXTRA_COMPONENTS': (lambda context: context['FINAL_TARGET_FILES'].components._strings, list,
+        """Additional component files to distribute.
+
+       This variable contains a list of files to copy into
+       ``$(FINAL_TARGET)/components/``.
+        """),
+
+    'EXTRA_PP_COMPONENTS': (lambda context: context['FINAL_TARGET_PP_FILES'].components._strings, list,
+        """Javascript XPCOM files.
+
+       This variable contains a list of files to preprocess.  Generated
+       files will be installed in the ``/components`` directory of the distribution.
+        """),
+
+    'JS_PREFERENCE_FILES': (lambda context: context['FINAL_TARGET_FILES'].defaults.pref._strings, list,
+        """Exported javascript files.
+
+        A list of files copied into the dist directory for packaging and installation.
+        Path will be defined for gre or application prefs dir based on what is building.
+        """),
+
+    'JS_PREFERENCE_PP_FILES': (lambda context: context['FINAL_TARGET_PP_FILES'].defaults.pref._strings, list,
+        """Like JS_PREFERENCE_FILES, preprocessed..
+        """),
+
+    'RESOURCE_FILES': (lambda context: context['FINAL_TARGET_FILES'].res, list,
+        """List of resources to be exported, and in which subdirectories.
+
+        ``RESOURCE_FILES`` is used to list the resource files to be exported to
+        ``dist/bin/res``, but it can be used for other files as well. This variable
+        behaves as a list when appending filenames for resources in the top-level
+        directory. Files can also be appended to a field to indicate which
+        subdirectory they should be exported to. For example, to export
+        ``foo.res`` to the top-level directory, and ``bar.res`` to ``fonts/``,
+        append to ``RESOURCE_FILES`` like so::
+
+           RESOURCE_FILES += ['foo.res']
+           RESOURCE_FILES.fonts += ['bar.res']
+        """),
+
+    'EXTRA_JS_MODULES': (lambda context: context['FINAL_TARGET_FILES'].modules, list,
+        """Additional JavaScript files to distribute.
+
+        This variable contains a list of files to copy into
+        ``$(FINAL_TARGET)/modules.
+        """),
+
+    'EXTRA_PP_JS_MODULES': (lambda context: context['FINAL_TARGET_PP_FILES'].modules, list,
+        """Additional JavaScript files to distribute.
+
+        This variable contains a list of files to copy into
+        ``$(FINAL_TARGET)/modules``, after preprocessing.
+        """),
+
+    'TESTING_JS_MODULES': (lambda context: context['TESTING_FILES'].modules, list,
+        """JavaScript modules to install in the test-only destination.
+
+        Some JavaScript modules (JSMs) are test-only and not distributed
+        with Firefox. This variable defines them.
+
+        To install modules in a subdirectory, use properties of this
+        variable to control the final destination. e.g.
+
+        ``TESTING_JS_MODULES.foo += ['module.jsm']``.
+        """),
+
 }
 
 # Deprecation hints.
@@ -2106,6 +2141,16 @@ DEPRECATION_HINTS = {
         instead of
 
             GENERATED_INCLUDES += [ 'foo' ]
+    ''',
+
+    'DIST_FILES': '''
+        Please use
+
+            FINAL_TARGET_PP_FILES += [ 'foo' ]
+
+        instead of
+
+            DIST_FILES += [ 'foo' ]
     ''',
 }
 

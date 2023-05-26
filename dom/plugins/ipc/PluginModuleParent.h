@@ -43,6 +43,10 @@ class PCrashReporterParent;
 class CrashReporterParent;
 } // namespace dom
 
+namespace layers {
+class TextureClientRecycleAllocator;
+} // namespace layers
+
 namespace plugins {
 //-----------------------------------------------------------------------------
 
@@ -243,6 +247,7 @@ protected:
     virtual nsresult AsyncSetWindow(NPP aInstance, NPWindow* aWindow) override;
     virtual nsresult GetImageContainer(NPP aInstance, mozilla::layers::ImageContainer** aContainer) override;
     virtual nsresult GetImageSize(NPP aInstance, nsIntSize* aSize) override;
+    virtual void DidComposite(NPP aInstance) override;
     virtual bool IsOOP() override { return true; }
     virtual nsresult SetBackgroundUnknown(NPP instance) override;
     virtual nsresult BeginUpdateBackground(NPP instance,
@@ -290,6 +295,8 @@ public:
 
     void InitAsyncSurrogates();
 
+    layers::TextureClientRecycleAllocator* EnsureTextureAllocator();
+
 protected:
     void NotifyFlashHang();
     void NotifyPluginCrashed();
@@ -336,6 +343,8 @@ protected:
     nsTArray<RefPtr<PluginAsyncSurrogate>> mSurrogateInstances;
     nsresult          mAsyncNewRv;
     uint32_t          mRunID;
+
+    RefPtr<layers::TextureClientRecycleAllocator> mTextureAllocator;
 };
 
 class PluginModuleContentParent : public PluginModuleParent

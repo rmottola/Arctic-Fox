@@ -11,7 +11,6 @@
 #include "AudioSinkFilter.h"
 #include "SourceFilter.h"
 #include "SampleSink.h"
-#include "MediaResource.h"
 #include "VideoUtils.h"
 
 using namespace mozilla::media;
@@ -191,6 +190,7 @@ DirectShowReader::ReadMetadata(MediaInfo* aInfo,
 
   DWORD seekCaps = 0;
   hr = mMediaSeeking->GetCapabilities(&seekCaps);
+  mInfo.mMediaSeekable = SUCCEEDED(hr) && (AM_SEEKING_CanSeekAbsolute & seekCaps);
 
   int64_t duration = mMP3FrameParser.GetDuration();
   if (SUCCEEDED(hr)) {
@@ -209,15 +209,6 @@ DirectShowReader::ReadMetadata(MediaInfo* aInfo,
   *aTags = nullptr;
 
   return NS_OK;
-}
-
-bool
-DirectShowReader::IsMediaSeekable()
-{
-  DWORD seekCaps = 0;
-  HRESULT hr = mMediaSeeking->GetCapabilities(&seekCaps);
-  return ((AM_SEEKING_CanSeekAbsolute & seekCaps) ==
-          AM_SEEKING_CanSeekAbsolute);
 }
 
 inline float
@@ -384,17 +375,19 @@ DirectShowReader::NotifyDataArrivedInternal()
   }
 
   AutoPinned<MediaResource> resource(mDecoder->GetResource());
-  nsTArray<MediaByteRange> byteRanges;
+  MediaByteRangeSet byteRanges;
   nsresult rv = resource->GetCachedRanges(byteRanges);
 
   if (NS_FAILED(rv)) {
     return;
   }
 
-  IntervalSet<int64_t> intervals;
-  for (auto& range : byteRanges) {
-    intervals += mFilter.NotifyDataArrived(range.Length(), range.mStart);
+  if (byteRanges == mLastCachedRanges) {
+    return;
   }
+  MediaByteRangeSet intervals = byteRanges - mLastCachedRanges;
+  mLastCachedRanges = byteRanges;
+
   for (const auto& interval : intervals) {
     RefPtr<MediaByteBuffer> bytes =
       resource->MediaReadAt(interval.mStart, interval.Length());

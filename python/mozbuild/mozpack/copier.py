@@ -76,7 +76,7 @@ class FileRegistry(object):
     def match(self, pattern):
         '''
         Return the list of paths, stored in the container, matching the
-        given pattern. See the mozpath.match documentation for a
+        given pattern. See the mozpack.path.match documentation for a
         description of the handled patterns.
         '''
         if '*' in pattern:
@@ -92,7 +92,7 @@ class FileRegistry(object):
     def remove(self, pattern):
         '''
         Remove paths matching the given pattern from the container. See the
-        mozpath.match documentation for a description of the handled
+        mozpack.path.match documentation for a description of the handled
         patterns.
         '''
         items = self.match(pattern)
@@ -122,7 +122,7 @@ class FileRegistry(object):
     def contains(self, pattern):
         '''
         Return whether the container contains paths matching the given
-        pattern. See the mozpath.match documentation for a description of
+        pattern. See the mozpack.path.match documentation for a description of
         the handled patterns.
         '''
         return len(self.match(pattern)) > 0
@@ -150,6 +150,52 @@ class FileRegistry(object):
         directory).
         '''
         return set(k for k, v in self._required_directories.items() if v > 0)
+
+
+class FileRegistrySubtree(object):
+    '''A proxy class to give access to a subtree of an existing FileRegistry.
+
+    Note this doesn't implement the whole FileRegistry interface.'''
+    def __new__(cls, base, registry):
+        if not base:
+            return registry
+        return object.__new__(cls)
+
+    def __init__(self, base, registry):
+        self._base = base
+        self._registry = registry
+
+    def _get_path(self, path):
+        # mozpath.join will return a trailing slash if path is empty, and we
+        # don't want that.
+        return mozpath.join(self._base, path) if path else self._base
+
+    def add(self, path, content):
+        return self._registry.add(self._get_path(path), content)
+
+    def match(self, pattern):
+        return [mozpath.relpath(p, self._base)
+                for p in self._registry.match(self._get_path(pattern))]
+
+    def remove(self, pattern):
+        return self._registry.remove(self._get_path(pattern))
+
+    def paths(self):
+        return [p for p, f in self]
+
+    def __len__(self):
+        return len(self.paths())
+
+    def contains(self, pattern):
+        return self._registry.contains(self._get_path(pattern))
+
+    def __getitem__(self, path):
+        return self._registry[self._get_path(path)]
+
+    def __iter__(self):
+        for p, f in self._registry:
+            if mozpath.basedir(p, [self._base]):
+                yield mozpath.relpath(p, self._base), f
 
 
 class FileCopyResult(object):
@@ -285,41 +331,50 @@ class FileCopier(FileRegistry):
                 os.umask(umask)
                 os.chmod(d, 0777 & ~umask)
 
-        # While we have remove_unaccounted, it doesn't apply to empty
-        # directories because it wouldn't make sense: an empty directory
-        # is empty, so removing it should have no effect.
-        existing_dirs = set()
-        existing_files = set()
-        for root, dirs, files in os.walk(destination):
-            # We need to perform the same symlink detection as above. os.walk()
-            # doesn't follow symlinks into directories by default, so we need
-            # to check dirs (we can't wait for root).
-            if have_symlinks:
-                filtered = []
-                for d in dirs:
-                    full = os.path.join(root, d)
-                    st = os.lstat(full)
-                    if stat.S_ISLNK(st.st_mode):
-                        # This directory symlink is not a required
-                        # directory: any such symlink would have been
-                        # removed and a directory created above.
-                        if remove_all_directory_symlinks:
-                            os.remove(full)
-                            result.removed_files.add(os.path.normpath(full))
+        if isinstance(remove_unaccounted, FileRegistry):
+            existing_files = set(os.path.normpath(os.path.join(destination, p))
+                                 for p in remove_unaccounted.paths())
+            existing_dirs = set(os.path.normpath(os.path.join(destination, p))
+                                for p in remove_unaccounted
+                                         .required_directories())
+            existing_dirs |= {os.path.normpath(destination)}
+        else:
+            # While we have remove_unaccounted, it doesn't apply to empty
+            # directories because it wouldn't make sense: an empty directory
+            # is empty, so removing it should have no effect.
+            existing_dirs = set()
+            existing_files = set()
+            for root, dirs, files in os.walk(destination):
+                # We need to perform the same symlink detection as above.
+                # os.walk() doesn't follow symlinks into directories by
+                # default, so we need to check dirs (we can't wait for root).
+                if have_symlinks:
+                    filtered = []
+                    for d in dirs:
+                        full = os.path.join(root, d)
+                        st = os.lstat(full)
+                        if stat.S_ISLNK(st.st_mode):
+                            # This directory symlink is not a required
+                            # directory: any such symlink would have been
+                            # removed and a directory created above.
+                            if remove_all_directory_symlinks:
+                                os.remove(full)
+                                result.removed_files.add(
+                                    os.path.normpath(full))
+                            else:
+                                existing_files.add(os.path.normpath(full))
                         else:
-                            existing_files.add(os.path.normpath(full))
-                    else:
-                        filtered.append(d)
+                            filtered.append(d)
 
-                dirs[:] = filtered
+                    dirs[:] = filtered
 
-            existing_dirs.add(os.path.normpath(root))
+                existing_dirs.add(os.path.normpath(root))
 
-            for d in dirs:
-                existing_dirs.add(os.path.normpath(os.path.join(root, d)))
+                for d in dirs:
+                    existing_dirs.add(os.path.normpath(os.path.join(root, d)))
 
-            for f in files:
-                existing_files.add(os.path.normpath(os.path.join(root, f)))
+                for f in files:
+                    existing_files.add(os.path.normpath(os.path.join(root, f)))
 
         # Now we reconcile the state of the world against what we want.
 
@@ -374,10 +429,25 @@ class FileCopier(FileRegistry):
 
         # Remove empty directories that aren't required.
         for d in sorted(remove_dirs, key=len, reverse=True):
-            # Permissions may not allow deletion. So ensure write access is
-            # in place before attempting delete.
-            os.chmod(d, 0700)
-            os.rmdir(d)
+            try:
+                try:
+                    os.rmdir(d)
+                except OSError as e:
+                    if e.errno in (errno.EPERM, errno.EACCES):
+                        # Permissions may not allow deletion. So ensure write
+                        # access is in place before attempting to rmdir again.
+                        os.chmod(d, 0700)
+                        os.rmdir(d)
+                    else:
+                        raise
+            except OSError as e:
+                # If remove_unaccounted is a # FileRegistry, then we have a
+                # list of directories that may not be empty, so ignore rmdir
+                # ENOTEMPTY errors for them.
+                if (isinstance(remove_unaccounted, FileRegistry) and
+                        e.errno == errno.ENOTEMPTY):
+                    continue
+                raise
             result.removed_directories.add(d)
 
         return result

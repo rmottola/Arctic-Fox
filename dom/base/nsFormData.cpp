@@ -25,7 +25,8 @@ namespace {
 
 // Implements steps 3 and 4 of the "create an entry" algorithm of FormData.
 already_AddRefed<File>
-CreateNewFileInstance(Blob& aBlob, const Optional<nsAString>& aFilename)
+CreateNewFileInstance(Blob& aBlob, const Optional<nsAString>& aFilename,
+                      ErrorResult& aRv)
 {
   // Step 3 "If value is a Blob object and not a File object, set value to
   // a new File object, representing the same bytes, whose name attribute value
@@ -47,10 +48,15 @@ CreateNewFileInstance(Blob& aBlob, const Optional<nsAString>& aFilename)
     filename = NS_LITERAL_STRING("blob");
   }
 
-  return aBlob.ToFile(filename);
+  RefPtr<File> file = aBlob.ToFile(filename, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  return file.forget();
 }
 
-} // anonymous namespace
+} // namespace
 
 // -------------------------------------------------------------------------
 // nsISupports
@@ -61,7 +67,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsFormData)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOwner)
 
   for (uint32_t i = 0, len = tmp->mFormData.Length(); i < len; ++i) {
-    ImplCycleCollectionUnlink(tmp->mFormData[i].fileValue);
+    ImplCycleCollectionUnlink(tmp->mFormData[i].value);
   }
 
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
@@ -71,8 +77,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsFormData)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOwner)
 
   for (uint32_t i = 0, len = tmp->mFormData.Length(); i < len; ++i) {
-   ImplCycleCollectionTraverse(cb,tmp->mFormData[i].fileValue,
-                               "mFormData[i].fileValue", 0);
+    ImplCycleCollectionTraverse(cb, tmp->mFormData[i].value,
+                                "mFormData[i].GetAsFile()", 0);
   }
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
@@ -101,16 +107,22 @@ nsFormData::GetEncodedSubmission(nsIURI* aURI,
 }
 
 void
-nsFormData::Append(const nsAString& aName, const nsAString& aValue)
+nsFormData::Append(const nsAString& aName, const nsAString& aValue,
+                   ErrorResult& aRv)
 {
   AddNameValuePair(aName, aValue);
 }
 
 void
 nsFormData::Append(const nsAString& aName, Blob& aBlob,
-                   const Optional<nsAString>& aFilename)
+                   const Optional<nsAString>& aFilename,
+                   ErrorResult& aRv)
 {
-  RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename);
+  RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
   AddNameFilePair(aName, file);
 }
 
@@ -127,23 +139,12 @@ nsFormData::Delete(const nsAString& aName)
 }
 
 void
-nsFormData::ExtractValue(const FormDataTuple& aTuple,
-                         OwningFileOrUSVString* aOutValue)
-{
-  if (aTuple.valueIsFile) {
-    aOutValue->SetAsFile() = aTuple.fileValue;
-  } else {
-    aOutValue->SetAsUSVString() = aTuple.stringValue;
-  }
-}
-
-void
 nsFormData::Get(const nsAString& aName,
                 Nullable<OwningFileOrUSVString>& aOutValue)
 {
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
     if (aName.Equals(mFormData[i].name)) {
-      ExtractValue(mFormData[i], &aOutValue.SetValue());
+      aOutValue.SetValue() = mFormData[i].value;
       return;
     }
   }
@@ -158,7 +159,7 @@ nsFormData::GetAll(const nsAString& aName,
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
     if (aName.Equals(mFormData[i].name)) {
       OwningFileOrUSVString* element = aValues.AppendElement();
-      ExtractValue(mFormData[i], element);
+      *element = mFormData[i].value;
     }
   }
 }
@@ -207,26 +208,52 @@ nsFormData::RemoveAllOthersAndGetFirstFormDataTuple(const nsAString& aName)
 
 void
 nsFormData::Set(const nsAString& aName, Blob& aBlob,
-                const Optional<nsAString>& aFilename)
+                const Optional<nsAString>& aFilename,
+                ErrorResult& aRv)
 {
   FormDataTuple* tuple = RemoveAllOthersAndGetFirstFormDataTuple(aName);
   if (tuple) {
-    RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename);
+    RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename, aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return;
+    }
+
     SetNameFilePair(tuple, aName, file);
   } else {
-    Append(aName, aBlob, aFilename);
+    Append(aName, aBlob, aFilename, aRv);
   }
 }
 
 void
-nsFormData::Set(const nsAString& aName, const nsAString& aValue)
+nsFormData::Set(const nsAString& aName, const nsAString& aValue,
+                ErrorResult& aRv)
 {
   FormDataTuple* tuple = RemoveAllOthersAndGetFirstFormDataTuple(aName);
   if (tuple) {
     SetNameValuePair(tuple, aName, aValue);
   } else {
-    Append(aName, aValue);
+    Append(aName, aValue, aRv);
   }
+}
+
+uint32_t
+nsFormData::GetIterableLength() const
+{
+  return mFormData.Length();
+}
+
+const nsAString&
+nsFormData::GetKeyAtIndex(uint32_t aIndex) const
+{
+  MOZ_ASSERT(aIndex < mFormData.Length());
+  return mFormData[aIndex].name;
+}
+
+const OwningFileOrUSVString&
+nsFormData::GetValueAtIndex(uint32_t aIndex) const
+{
+  MOZ_ASSERT(aIndex < mFormData.Length());
+  return mFormData[aIndex].value;
 }
 
 // -------------------------------------------------------------------------
@@ -252,7 +279,12 @@ nsFormData::Append(const nsAString& aName, nsIVariant* aValue)
     RefPtr<Blob> blob = static_cast<Blob*>(domBlob.get());
     if (domBlob) {
       Optional<nsAString> temp;
-      Append(aName, *blob, temp);
+      ErrorResult rv;
+      Append(aName, *blob, temp, rv);
+      if (NS_WARN_IF(rv.Failed())) {
+        return rv.StealNSResult();
+      }
+
       return NS_OK;
     }
   }
@@ -265,7 +297,12 @@ nsFormData::Append(const nsAString& aName, nsIVariant* aValue)
   nsString valAsString;
   valAsString.Adopt(stringData, stringLen);
 
-  Append(aName, valAsString);
+  ErrorResult error;
+  Append(aName, valAsString, error);
+  if (NS_WARN_IF(error.Failed())) {
+    return error.StealNSResult();
+  }
+
   return NS_OK;
 }
 
@@ -297,11 +334,13 @@ nsFormData::GetSendInfo(nsIInputStream** aBody, uint64_t* aContentLength,
   nsFSMultipartFormData fs(NS_LITERAL_CSTRING("UTF-8"), nullptr);
 
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
-    if (mFormData[i].valueIsFile) {
-      fs.AddNameFilePair(mFormData[i].name, mFormData[i].fileValue);
-    }
-    else {
-      fs.AddNameValuePair(mFormData[i].name, mFormData[i].stringValue);
+    if (mFormData[i].value.IsFile()) {
+      fs.AddNameFilePair(mFormData[i].name, mFormData[i].value.GetAsFile());
+    } else if (mFormData[i].value.IsUSVString()) {
+      fs.AddNameValuePair(mFormData[i].name,
+                          mFormData[i].value.GetAsUSVString());
+    } else {
+      fs.AddNameFilePair(mFormData[i].name, nullptr);
     }
   }
 

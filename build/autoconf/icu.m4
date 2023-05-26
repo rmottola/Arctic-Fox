@@ -20,10 +20,10 @@ if test -n "$MOZ_NATIVE_ICU"; then
     PKG_CHECK_MODULES(MOZ_ICU, icu-i18n >= 50.1)
     MOZ_SHARED_ICU=1
 else
-    MOZ_ICU_CFLAGS='-I$(topsrcdir)/intl/icu/source/common -I$(topsrcdir)/intl/icu/source/i18n'
-    AC_SUBST_LIST(MOZ_ICU_CFLAGS)
+    MOZ_ICU_INCLUDES="/intl/icu/source/common /intl/icu/source/i18n"
 fi
 
+AC_SUBST_LIST(MOZ_ICU_INCLUDES)
 AC_SUBST(MOZ_NATIVE_ICU)
 
 MOZ_ARG_WITH_STRING(intl-api,
@@ -99,13 +99,7 @@ if test -n "$USE_ICU"; then
                     MOZ_ICU_DBG_SUFFIX=d
                 fi
                 ;;
-            Android)
-                if test -z "$gonkdir"; then
-                    AC_MSG_ERROR([ECMAScript Internationalization API is not yet supported on this platform])
-                fi
-                ICU_LIB_NAMES="icui18n icuuc icudata"
-                ;;
-            Darwin|Linux|DragonFly|FreeBSD|NetBSD|OpenBSD|GNU/kFreeBSD|SunOS)
+            Darwin|Linux|DragonFly|FreeBSD|NetBSD|OpenBSD|GNU/kFreeBSD|SunOS|Android)
                 ICU_LIB_NAMES="icui18n icuuc icudata"
                 ;;
             *)
@@ -278,6 +272,8 @@ if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
 
         if test -n "$gonkdir"; then
             ICU_CXXFLAGS="-I$gonkdir/abi/cpp/include $ICU_CXXFLAGS"
+        elif test "$OS_TARGET" = Android -a "$MOZ_ANDROID_CXX_STL" = mozstlport; then
+            ICU_CXXFLAGS="-I$_topsrcdir/build/gabi++/include $ICU_CXXFLAGS"
         fi
 
         if test -z "$MOZ_SHARED_ICU"; then

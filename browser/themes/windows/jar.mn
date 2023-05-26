@@ -29,7 +29,6 @@ browser.jar:
   skin/classic/browser/Geolocation-16.png
   skin/classic/browser/Geolocation-64.png
   skin/classic/browser/Info.png
-  skin/classic/browser/in-content/common.css                  (../shared/in-content/common.css)
   skin/classic/browser/identity.png
   skin/classic/browser/imagedocument.png					
   skin/classic/browser/identity-icons-generic.png
@@ -64,7 +63,6 @@ browser.jar:
   skin/classic/browser/Privacy-64.png
   skin/classic/browser/privatebrowsing-light.png
   skin/classic/browser/privatebrowsing-dark.png
-  skin/classic/browser/reload-stop-go.png
   skin/classic/browser/sanitize.png
   skin/classic/browser/reload-stop-go.png
   skin/classic/browser/reload-stop-go@2x.png
@@ -105,7 +103,7 @@ browser.jar:
   skin/classic/browser/downloads/download-notification-start.png (downloads/download-notification-start.png)
   skin/classic/browser/downloads/download-summary.png          (downloads/download-summary.png)
   skin/classic/browser/downloads/downloads.css                 (downloads/downloads.css)
-* skin/classic/browser/downloads/indicator.css                 (downloads/indicator.css)
+  skin/classic/browser/downloads/indicator.css                 (downloads/indicator.css)
   skin/classic/browser/feeds/feedIcon.png                      (feeds/feedIcon.png)
   skin/classic/browser/feeds/feedIcon16.png                    (feeds/feedIcon16.png)
   skin/classic/browser/feeds/feed-icons-16.png                 (feeds/feed-icons-16.png)
@@ -159,13 +157,10 @@ browser.jar:
   skin/classic/browser/tabbrowser/newtab-glass.png             (tabbrowser/newtab-glass.png)
   skin/classic/browser/tabbrowser/newtab-inverted.png          (tabbrowser/newtab-inverted.png)
   skin/classic/browser/tabbrowser/connecting.png               (tabbrowser/connecting.png)
-  skin/classic/browser/tabbrowser/crashed.svg                  (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/loading.png                  (tabbrowser/loading.png)
   skin/classic/browser/tabbrowser/tab-arrow-left.png           (tabbrowser/tab-arrow-left.png)
   skin/classic/browser/tabbrowser/tab-arrow-left-glass.png     (tabbrowser/tab-arrow-left-glass.png)
   skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
-  skin/classic/browser/tabbrowser/tab-audio.svg                (../shared/tabbrowser/tab-audio.svg)
-  skin/classic/browser/tabbrowser/tab-audio-small.svg          (../shared/tabbrowser/tab-audio-small.svg)
   skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
 #ifdef MOZ_SERVICES_SYNC
@@ -182,7 +177,7 @@ browser.jar:
   skin/classic/browser/syncQuota.css
 #endif
 
-../extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/chrome.jar:
+[extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}] chrome.jar:
 % override chrome://browser/skin/page-livemarks.png                   chrome://browser/skin/feeds/feedIcon16.png
 % override chrome://browser/skin/feeds/audioFeedIcon.png              chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/audioFeedIcon16.png            chrome://browser/skin/feeds/feedIcon16.png

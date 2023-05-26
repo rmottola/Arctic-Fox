@@ -1,30 +1,28 @@
+/* -*- Mode: indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set sts=2 sw=2 et tw=80: */
+"use strict";
+
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 Cu.import("resource://gre/modules/MatchPattern.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-let {
+var {
   EventManager,
-  contextMenuItems,
-  runSafe
+  runSafe,
 } = ExtensionUtils;
 
 
 // Map[Extension -> Map[ID -> MenuItem]]
 // Note: we want to enumerate all the menu items so
 // this cannot be a weak map.
-let contextMenuMap = new Map();
+var contextMenuMap = new Map();
 
 // Not really used yet, will be used for event pages.
-let onClickedCallbacksMap = new WeakMap();
+var onClickedCallbacksMap = new WeakMap();
 
 // If id is not specified for an item we use an integer.
-let nextID = 0;
-
-function contextMenuObserver(subject, topic, data) {
-  subject = subject.wrappedJSObject;
-  menuBuilder.build(subject);
-}
+var nextID = 0;
 
 // When a new contextMenu is opened, this function is called and
 // we populate the |xulMenu| with all the items from extensions
@@ -33,8 +31,8 @@ function contextMenuObserver(subject, topic, data) {
 // calculated in nsContextMenu.jsm we simple reuse its flags here.
 // For remote processes there is a gContextMenuContentData where all
 // the important info is stored from the child process. We get
-// this data in |contentData|.
-let menuBuilder = {
+// this data in |contextData|.
+var menuBuilder = {
   build: function(contextData) {
     // TODO: icons should be set for items
     let xulMenu = contextData.menu;
@@ -43,8 +41,11 @@ let menuBuilder = {
     for (let [ext, menuItemMap] of contextMenuMap) {
       let parentMap = new Map();
       let topLevelItems = new Set();
-      for (let [id, item] of menuItemMap) {
-        dump(id + " : " + item + "\n");
+      for (let entry of menuItemMap) {
+        // We need a closure over |item|, and we don't currently get a
+        // fresh binding per loop if we declare it in the loop head.
+        let [id, item] = entry;
+
         if (item.enabledForContext(contextData)) {
           let element;
           if (item.isMenu) {
@@ -79,15 +80,13 @@ let menuBuilder = {
             topLevelItems.add(element);
           }
 
-          if (item.onclick) {
-            function clickHandlerForItem(item) {
-              return event => {
-                let clickData = item.getClickData(contextData, event);
-                runSafe(item.extContext, item.onclick, clickData);
-              }
+          element.addEventListener("command", event => { // eslint-disable-line mozilla/balanced-listeners
+            item.tabManager.addActiveTabPermission();
+            if (item.onclick) {
+              let clickData = item.getClickData(contextData, event);
+              runSafe(item.extContext, item.onclick, clickData);
             }
-            element.addEventListener("command", clickHandlerForItem(item));
-          }
+          });
         }
       }
       if (topLevelItems.size > 1) {
@@ -97,7 +96,7 @@ let menuBuilder = {
         top.setAttribute("ext-type", "top-level-menu");
         let menupopup = doc.createElement("menupopup");
         top.appendChild(menupopup);
-        for (i of topLevelItems) {
+        for (let i of topLevelItems) {
           menupopup.appendChild(i);
         }
         xulMenu.appendChild(top);
@@ -123,6 +122,11 @@ let menuBuilder = {
   },
 
   _itemsToCleanUp: new Set(),
+};
+
+function contextMenuObserver(subject, topic, data) {
+  subject = subject.wrappedJSObject;
+  menuBuilder.build(subject);
 }
 
 function getContexts(contextData) {
@@ -131,40 +135,41 @@ function getContexts(contextData) {
   contexts.add("page");
 
   if (contextData.inFrame) {
-    contexts.add("frame")
+    contexts.add("frame");
   }
 
   if (contextData.isTextSelected) {
-    contexts.add("selection")
+    contexts.add("selection");
   }
 
   if (contextData.onLink) {
-    contexts.add("link")
+    contexts.add("link");
   }
 
   if (contextData.onEditableArea) {
-    contexts.add("editable")
+    contexts.add("editable");
   }
 
   if (contextData.onImage) {
-    contexts.add("image")
+    contexts.add("image");
   }
 
   if (contextData.onVideo) {
-    contexts.add("video")
+    contexts.add("video");
   }
 
   if (contextData.onAudio) {
-    contexts.add("audio")
+    contexts.add("audio");
   }
 
   return contexts;
 }
 
-function MenuItem(extension, extContext, createProperties)
-{
+function MenuItem(extension, extContext, createProperties) {
   this.extension = extension;
   this.extContext = extContext;
+
+  this.tabManager = TabManager.for(extension);
 
   this.init(createProperties);
 }
@@ -172,7 +177,7 @@ function MenuItem(extension, extContext, createProperties)
 MenuItem.prototype = {
   // init is called from the MenuItem ctor and from update. The |update|
   // flag is for the later case.
-  init(createProperties, update=false) {
+  init(createProperties, update = false) {
     let item = this;
     // return true if the prop was set on |this|
     function parseProp(propName, defaultValue = null) {
@@ -211,8 +216,8 @@ MenuItem.prototype = {
       let found = false;
       let menuMap = contextMenuMap.get(this.extension);
       if (menuMap.has(this.parentId)) {
-          found = true;
-          menuMap.get(this.parentId).isMenu = true;
+        found = true;
+        menuMap.get(this.parentId).isMenu = true;
       }
       if (!found) {
         throw new Error("MenuItem with this parentId not found");
@@ -262,7 +267,7 @@ MenuItem.prototype = {
 
     let toRemove = new Set();
     toRemove.add(this.id);
-    for (let [id, item] of menuMap) {
+    for (let [, item] of menuMap) {
       if (hasAncestorWithId(item, this.id)) {
         toRemove.add(item.id);
       }
@@ -285,7 +290,7 @@ MenuItem.prototype = {
     }
 
     let clickData = {
-      menuItemId: this.id
+      menuItemId: this.id,
     };
 
     function setIfDefined(argName, value) {
@@ -315,7 +320,7 @@ MenuItem.prototype = {
     for (let c of this.contexts) {
       if (contexts.has(c)) {
         enabled = true;
-        break
+        break;
       }
     }
     if (!enabled) {
@@ -323,13 +328,13 @@ MenuItem.prototype = {
     }
 
     if (this.documentUrlMatchPattern &&
-        !this.documentUrlMatchPattern.matches(contentData.documentURIObject)) {
+        !this.documentUrlMatchPattern.matches(contextData.documentURIObject)) {
       return false;
     }
 
     if (this.targetUrlPatterns &&
         (contextData.onImage || contextData.onAudio || contextData.onVideo) &&
-        !this.targetUrlPatterns.matches(contentData.mediaURL)) {
+        !this.targetUrlPatterns.matches(contextData.mediaURL)) {
       // TODO: double check if mediaURL is always set when we need it
       return false;
     }
@@ -338,7 +343,8 @@ MenuItem.prototype = {
   },
 };
 
-let extCount = 0;
+var extCount = 0;
+/* eslint-disable mozilla/balanced-listeners */
 extensions.on("startup", (type, extension) => {
   contextMenuMap.set(extension, new Map());
   if (++extCount == 1) {
@@ -355,6 +361,7 @@ extensions.on("shutdown", (type, extension) => {
                                 "on-build-contextmenu");
   }
 });
+/* eslint-enable mozilla/balanced-listeners */
 
 extensions.registerPrivilegedAPI("contextMenus", (extension, context) => {
   return {
@@ -389,7 +396,7 @@ extensions.registerPrivilegedAPI("contextMenus", (extension, context) => {
       },
 
       removeAll: function(callback) {
-        for (let [id, menuItem] of contextMenuMap.get(extension)) {
+        for (let [, menuItem] of contextMenuMap.get(extension)) {
           menuItem.remove();
         }
         if (callback) {

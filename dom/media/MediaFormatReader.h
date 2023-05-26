@@ -17,6 +17,8 @@
 
 namespace mozilla {
 
+class CDMProxy;
+
 class MediaFormatReader final : public MediaDecoderReader
 {
   typedef TrackInfo::TrackType TrackType;
@@ -46,11 +48,6 @@ public:
 
   RefPtr<SeekPromise>
   Seek(int64_t aTime, int64_t aUnused) override;
-
-  bool IsMediaSeekable() override
-  {
-    return mSeekable;
-  }
 
 protected:
   void NotifyDataArrivedInternal() override;
@@ -94,6 +91,10 @@ public:
   {
     return mTrackDemuxersMayBlock;
   }
+
+#ifdef MOZ_EME
+  void SetCDMProxy(CDMProxy* aProxy) override;
+#endif
 
 private:
   bool HasVideo() { return mVideo.mTrackDemuxer; }
@@ -390,9 +391,6 @@ private:
   // True if we've read the streams' metadata.
   bool mInitDone;
   MozPromiseHolder<MetadataPromise> mMetadataPromise;
-  // Accessed from multiple thread, in particular the MediaDecoderStateMachine,
-  // however the value doesn't change after reading the metadata.
-  bool mSeekable;
   bool IsEncrypted()
   {
     return mIsEncrypted;
@@ -431,6 +429,10 @@ private:
 
   RefPtr<VideoFrameContainer> mVideoFrameContainer;
   layers::ImageContainer* GetImageContainer();
+
+#ifdef MOZ_EME
+  RefPtr<CDMProxy> mCDMProxy;
+#endif
 
 #if defined(READER_DORMANT_HEURISTIC)
   const bool mDormantEnabled;

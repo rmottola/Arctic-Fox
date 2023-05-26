@@ -48,7 +48,7 @@ EXPORTS += [
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
     SOURCES += [
-	    'D3D11ShareHandleImage.cpp',
+        'D3D11ShareHandleImage.cpp',
     ]
     UNIFIED_SOURCES += [
         'D3D9SurfaceImage.cpp',
@@ -177,6 +177,7 @@ EXPORTS.mozilla.layers += [
     'opengl/TextureHostOGL.h',
     'PersistentBufferProvider.h',
     'RenderTrace.h',
+    'TextureWrapperImage.h',
     'TransactionIdAllocator.h',
     'YCbCrImageDataSerializer.h',
 ]
@@ -348,6 +349,7 @@ UNIFIED_SOURCES += [
     'ReadbackProcessor.cpp',
     'RenderTrace.cpp',
     'RotatedBuffer.cpp',
+    'TextureWrapperImage.cpp',
     'YCbCrImageDataSerializer.cpp',
 ]
 

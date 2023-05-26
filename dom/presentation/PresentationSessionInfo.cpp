@@ -12,6 +12,7 @@
 #include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
+#include "nsContentUtils.h"
 #include "nsIDocShell.h"
 #include "nsIFrameLoader.h"
 #include "nsIMutableArray.h"
@@ -37,14 +38,11 @@ using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::services;
 
-inline static PRLogModuleInfo*
-GetPresentationSessionInfoLog()
-{
-  static PRLogModuleInfo* log = PR_NewLogModule("PresentationSessionInfo");
-  return log;
-}
+
+static LazyLogModule gPresentationSessionInfoLog("PresentationSessionInfo");
+
 #undef LOG
-#define LOG(...) MOZ_LOG(GetPresentationSessionInfoLog(), mozilla::LogLevel::Error, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(gPresentationSessionInfoLog, mozilla::LogLevel::Error, (__VA_ARGS__))
 
 
 /*

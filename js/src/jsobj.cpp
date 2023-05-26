@@ -689,9 +689,9 @@ NewObjectCache::fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto 
     return fill(entry, clasp, proto.raw(), kind, obj);
 }
 
-static bool
-NewObjectWithTaggedProtoIsCachable(ExclusiveContext* cxArg, Handle<TaggedProto> proto,
-                                   NewObjectKind newKind, const Class* clasp)
+bool
+js::NewObjectWithTaggedProtoIsCachable(ExclusiveContext* cxArg, Handle<TaggedProto> proto,
+                                       NewObjectKind newKind, const Class* clasp)
 {
     return cxArg->isJSContext() &&
            proto.isObject() &&
@@ -883,11 +883,9 @@ js::NewObjectScriptedCall(JSContext* cx, MutableHandleObject pobj)
 JSObject*
 js::CreateThis(JSContext* cx, const Class* newclasp, HandleObject callee)
 {
-    RootedValue protov(cx);
-    if (!GetProperty(cx, callee, callee, cx->names().prototype, &protov))
+    RootedObject proto(cx);
+    if (!GetPrototypeFromConstructor(cx, callee, &proto))
         return nullptr;
-
-    RootedObject proto(cx, protov.isObjectOrNull() ? protov.toObjectOrNull() : nullptr);
     gc::AllocKind kind = NewObjectGCKind(newclasp);
     return NewObjectWithClassProto(cx, newclasp, proto, kind);
 }
@@ -990,16 +988,35 @@ js::CreateThisForFunctionWithProto(JSContext* cx, HandleObject callee, HandleObj
     return res;
 }
 
+bool
+js::GetPrototypeFromConstructor(JSContext* cx, HandleObject newTarget, MutableHandleObject proto)
+{
+    RootedValue protov(cx);
+    if (!GetProperty(cx, newTarget, newTarget, cx->names().prototype, &protov))
+        return false;
+    proto.set(protov.isObject() ? &protov.toObject() : nullptr);
+    return true;
+}
+
+bool
+js::GetPrototypeFromCallableConstructor(JSContext* cx, const CallArgs& args, MutableHandleObject proto)
+{
+    RootedObject newTarget(cx);
+    if (args.isConstructing())
+        newTarget = &args.newTarget().toObject();
+    else
+        newTarget = &args.callee();
+    return GetPrototypeFromConstructor(cx, newTarget, proto);
+}
+
 JSObject*
 js::CreateThisForFunction(JSContext* cx, HandleObject callee, HandleObject newTarget,
                           NewObjectKind newKind)
 {
-    RootedValue protov(cx);
-    if (!GetProperty(cx, newTarget, newTarget, cx->names().prototype, &protov))
-        return nullptr;
     RootedObject proto(cx);
-    if (protov.isObject())
-        proto = &protov.toObject();
+    if (!GetPrototypeFromConstructor(cx, newTarget, &proto))
+        return nullptr;
+
     JSObject* obj = CreateThisForFunctionWithProto(cx, callee, newTarget, proto, newKind);
 
     if (obj && newKind == SingletonObject) {
@@ -2215,11 +2232,12 @@ js::LookupNameUnqualified(JSContext* cx, HandlePropertyName name, HandleObject s
 
     // See note above RuntimeLexicalErrorObject.
     if (pobj == scope) {
-        if (IsUninitializedLexicalSlot(scope, shape)) {
+        if (name != cx->names().dotThis && IsUninitializedLexicalSlot(scope, shape)) {
             scope = RuntimeLexicalErrorObject::create(cx, scope, JSMSG_UNINITIALIZED_LEXICAL);
             if (!scope)
                 return false;
         } else if (scope->is<ScopeObject>() && !scope->is<DeclEnvObject>() && !shape->writable()) {
+            MOZ_ASSERT(name != cx->names().dotThis);
             scope = RuntimeLexicalErrorObject::create(cx, scope, JSMSG_BAD_CONST_ASSIGN);
             if (!scope)
                 return false;
@@ -3483,7 +3501,7 @@ js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
 
         if (jsbytecode* pc = i.pc()) {
             fprintf(stderr, "  pc = %p\n", pc);
-            fprintf(stderr, "  current op: %s\n", js_CodeName[*pc]);
+            fprintf(stderr, "  current op: %s\n", CodeName[*pc]);
             MaybeDumpObject("staticScope", i.script()->getStaticBlockScope(pc));
         }
         if (i.isNonEvalFunctionFrame())
@@ -3565,7 +3583,7 @@ JSObject::allocKindForTenure(const js::Nursery& nursery) const
      * Typed arrays in the nursery may have a lazily allocated buffer, make
      * sure there is room for the array's fixed data when moving the array.
      */
-    if (is<TypedArrayObject>() && !as<TypedArrayObject>().buffer()) {
+    if (is<TypedArrayObject>() && !as<TypedArrayObject>().hasBuffer()) {
         size_t nbytes = as<TypedArrayObject>().byteLength();
         return GetBackgroundAllocKind(TypedArrayObject::AllocKindForLazyBuffer(nbytes));
     }

@@ -20,11 +20,11 @@ add_task(function* testPageActionPopup() {
   let extension = ExtensionTestUtils.loadExtension({
     manifest: {
       "background": {
-        "page": "data/background.html"
+        "page": "data/background.html",
       },
       "page_action": {
-        "default_popup": "popup-a.html"
-      }
+        "default_popup": "popup-a.html",
+      },
     },
 
     files: {
@@ -41,9 +41,10 @@ add_task(function* testPageActionPopup() {
       "data/background.html": `<script src="background.js"></script>`,
 
       "data/background.js": function() {
-        var tabId;
+        let tabId;
 
-        var tests = [
+        let sendClick;
+        let tests = [
           () => {
             sendClick({ expectEvent: false, expectPopup: "a" });
           },
@@ -70,11 +71,11 @@ add_task(function* testPageActionPopup() {
           },
         ];
 
-        var expect = {};
-        function sendClick({ expectEvent, expectPopup }) {
+        let expect = {};
+        sendClick = ({ expectEvent, expectPopup }) => {
           expect = { event: expectEvent, popup: expectPopup };
           browser.test.sendMessage("send-click");
-        }
+        };
 
         browser.runtime.onMessage.addListener(msg => {
           if (expect.popup) {
@@ -105,7 +106,7 @@ add_task(function* testPageActionPopup() {
           }
 
           if (tests.length) {
-            var test = tests.shift();
+            let test = tests.shift();
             test();
           } else {
             browser.test.notifyPass("pageaction-tests-done");
@@ -126,10 +127,7 @@ add_task(function* testPageActionPopup() {
   let panelId = makeWidgetId(extension.id) + "-panel";
 
   extension.onMessage("send-click", () => {
-    let image = document.getElementById(pageActionId);
-
-    let evt = new MouseEvent("click", {});
-    image.dispatchEvent(evt);
+    clickPageAction(extension);
   });
 
   extension.onMessage("next-test", Task.async(function* () {
@@ -146,7 +144,8 @@ add_task(function* testPageActionPopup() {
   }));
 
 
-  yield Promise.all([extension.startup(), extension.awaitFinish("pageaction-tests-done")]);
+  yield extension.startup();
+  yield extension.awaitFinish("pageaction-tests-done");
 
   yield extension.unload();
 
@@ -160,10 +159,6 @@ add_task(function* testPageActionPopup() {
 
 add_task(function* testPageActionSecurity() {
   const URL = "chrome://browser/content/browser.xul";
-
-  let matchURLForbidden = url => ({
-    message: new RegExp(`Loading extension.*Access to.*'${URL}' denied`),
-  });
 
   let messages = [/Access to restricted URI denied/,
                   /Access to restricted URI denied/];
@@ -182,9 +177,9 @@ add_task(function* testPageActionSecurity() {
       "page_action": { "default_popup": URL },
     },
 
-    background: function () {
+    background: function() {
       browser.tabs.query({ active: true, currentWindow: true }, tabs => {
-        var tabId = tabs[0].id;
+        let tabId = tabs[0].id;
 
         browser.pageAction.show(tabId);
         browser.test.sendMessage("ready");
@@ -192,21 +187,15 @@ add_task(function* testPageActionSecurity() {
     },
   });
 
-  yield Promise.all([extension.startup(), extension.awaitMessage("ready")]);
+  yield extension.startup();
+  yield extension.awaitMessage("ready");
 
-  let browserActionId = makeWidgetId(extension.id) + "-browser-action";
-  let pageActionId = makeWidgetId(extension.id) + "-page-action";
-
-  let browserAction = document.getElementById(browserActionId);
-  let evt = new CustomEvent("command", {});
-  browserAction.dispatchEvent(evt);
-
-  let pageAction = document.getElementById(pageActionId);
-  evt = new MouseEvent("click", {});
-  pageAction.dispatchEvent(evt);
+  yield clickBrowserAction(extension);
+  yield clickPageAction(extension);
 
   yield extension.unload();
 
+  let pageActionId = makeWidgetId(extension.id) + "-page-action";
   let node = document.getElementById(pageActionId);
   is(node, undefined, "pageAction image removed from document");
 

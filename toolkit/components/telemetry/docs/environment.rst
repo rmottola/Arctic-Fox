@@ -32,6 +32,7 @@ Structure::
         hotfixVersion: <string>, // e.g. "20141211.01"
       },
       settings: {
+        addonCompatibilityCheckEnabled: <bool>, // Whether application compatibility is respected for add-ons
         blocklistEnabled: <bool>, // true on failure
         isDefaultBrowser: <bool>, // null on failure, not available on Android
         defaultSearchEngine: <string>, // e.g. "yahoo"
@@ -40,7 +41,7 @@ Structure::
           loadPath: <string>, // where the engine line is located; missing if no default
           submissionURL: <string> // missing if no default or for user-installed engines
         },
-        e10sEnabled: <bool>, // false on failure
+        e10sEnabled: <bool>, // whether e10s is on, i.e. browser tabs open by default in a different process
         telemetryEnabled: <bool>, // false on failure
         isInOptoutSample: <bool>, // whether this client is part of the opt-out sample
         locale: <string>, // e.g. "it", null on failure
@@ -61,7 +62,7 @@ Structure::
         creationDate: <integer>, // integer days since UNIX epoch, e.g. 16446
         resetDate: <integer>, // integer days since UNIX epoch, e.g. 16446 - optional
       },
-      partner: {
+      partner: { // This section may not be immediately available on startup
         distributionId: <string>, // pref "distribution.id", null on failure
         distributionVersion: <string>, // pref "distribution.version", null on failure
         partnerId: <string>, // pref mozilla.partner.id, null on failure
@@ -272,3 +273,35 @@ The object contains:
   For privacy, we don't record this for user-installed engines.
 
 ``loadPath`` and ``submissionURL`` are not present if ``name`` is ``NONE``.
+
+searchCohort
+~~~~~~~~~~~~
+
+If the user has been enrolled into a search default change experiment, this contains the string identifying the experiment the user is taking part in. Most user profiles will never be part of any search default change experiment, and will not send this value.
+
+userPrefs
+~~~~~~~~~
+
+This object contains user preferences.
+
+Each key in the object is the name of a preference. A key's value depends on the policy with which the preference was collected. There are two such policies, "value" and "state". For preferences collected under the "value" policy, the value will be the preference's value. For preferences collected under the "state" policy, the value will be an opaque marker signifying only that the preference has a user value. The "state" policy is therefore used when user privacy is a concern.
+
+The following is a partial list of collected preferences.
+
+- ``browser.search.suggest.enabled``: The "master switch" for search suggestions everywhere in Firefox (search bar, urlbar, etc.). Defaults to true.
+
+- ``browser.urlbar.suggest.searches``: True if search suggestions are enabled in the urlbar. Defaults to false.
+
+- ``browser.urlbar.unifiedcomplete``: True if the urlbar's UnifiedComplete back-end is enabled.
+
+- ``browser.urlbar.userMadeSearchSuggestionsChoice``: True if the user has clicked Yes or No in the urlbar's opt-in notification. Defaults to false.
+
+partner
+~~~~~~~
+
+If the user is using a partner repack, this contains information identifying the repack being used, otherwise "partnerNames" will be an empty array and other entries will be null. The information may be missing when the profile just becomes available. In Firefox for desktop, the information along with other customizations defined in distribution.ini are processed later in the startup phase, and will be fully applied when "distribution-customization-complete" notification is sent.
+
+activeAddons
+~~~~~~~~~~~~
+
+Starting from Firefox 44, the length of the following string fields: ``name``, ``description`` and ``version`` is limited to 100 characters. The same limitation applies to the same fields in ``theme`` and ``activePlugins``.

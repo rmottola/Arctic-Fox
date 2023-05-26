@@ -24,6 +24,9 @@ flags:
     - aries-ota
     - aries-eng
 
+  post-build:
+    - upload-symbols
+    
   tests:
     - cppunit
     - crashtest

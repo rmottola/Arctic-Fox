@@ -134,13 +134,20 @@ struct AnimationProperty
   // **NOTE**: For CSS animations, we only bother setting mWinsInCascade
   // accurately for properties that we can animate on the compositor.
   // For other properties, we make it always be true.
+  // **NOTE 2**: This member is not included when comparing AnimationProperty
+  // objects for equality.
   bool mWinsInCascade;
 
   InfallibleTArray<AnimationPropertySegment> mSegments;
 
+  // NOTE: This operator does *not* compare the mWinsInCascade member.
+  // This is because AnimationProperty objects are compared when recreating
+  // CSS animations to determine if mutation observer change records need to
+  // be created or not. However, at the point when these objects are compared
+  // the mWinsInCascade will not have been set on the new objects so we ignore
+  // this member to avoid generating spurious change records.
   bool operator==(const AnimationProperty& aOther) const {
     return mProperty == aOther.mProperty &&
-           mWinsInCascade == aOther.mWinsInCascade &&
            mSegments == aOther.mSegments;
   }
   bool operator!=(const AnimationProperty& aOther) const {
@@ -212,6 +219,7 @@ public:
   const AnimationTiming& Timing() const { return mTiming; }
   AnimationTiming& Timing() { return mTiming; }
   void SetTiming(const AnimationTiming& aTiming);
+  void NotifyAnimationTimingUpdated() { UpdateTargetRegistration(); }
 
   Nullable<TimeDuration> GetLocalTime() const;
 
@@ -249,6 +257,7 @@ public:
   bool IsInEffect() const;
 
   void SetAnimation(Animation* aAnimation);
+  Animation* GetAnimation() const { return mAnimation; }
 
   const AnimationProperty*
   GetAnimationOfProperty(nsCSSProperty aProperty) const;
@@ -278,9 +287,22 @@ public:
 
   bool CanThrottle() const;
 
-  // Returns true |aProperty| can be run on compositor for |aFrame|.
-  static bool CanAnimatePropertyOnCompositor(const nsIFrame* aFrame,
-                                             nsCSSProperty aProperty);
+  // Returns true if this effect, applied to |aFrame|, contains
+  // properties that mean we shouldn't run *any* compositor animations on this
+  // element.
+  //
+  // For example, if we have an animation of geometric properties like 'left'
+  // and 'top' on an element, we force all 'transform' and 'opacity' animations
+  // running at the same time on the same element to run on the main thread.
+  //
+  // Similarly, some transform animations cannot be run on the compositor and
+  // when that is the case we simply disable all compositor animations
+  // on the same element.
+  //
+  // Bug 1218620 - It seems like we don't need to be this restrictive. Wouldn't
+  // it be ok to do 'opacity' animations on the compositor in either case?
+  bool ShouldBlockCompositorAnimations(const nsIFrame* aFrame) const;
+
   nsIDocument* GetRenderedDocument() const;
   nsPresContext* GetPresContext() const;
 
@@ -289,6 +311,17 @@ public:
 protected:
   virtual ~KeyframeEffectReadOnly();
   void ResetIsRunningOnCompositor();
+
+  // This effect is registered with its target element so long as:
+  //
+  // (a) It has a target element, and
+  // (b) It is "relevant" (i.e. yet to finish but not idle, or finished but
+  //     filling forwards)
+  //
+  // As a result, we need to make sure this gets called whenever anything
+  // changes with regards to this effects's timing including changes to the
+  // owning Animation's timing.
+  void UpdateTargetRegistration();
 
   static AnimationTiming ConvertKeyframeEffectOptions(
     const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions);

@@ -5,7 +5,7 @@
 
 #include "StreamFunctions.h"
 #include "nsZipDataStream.h"
-#include "nsIStringStream.h"
+#include "nsStringStream.h"
 #include "nsISeekableStream.h"
 #include "nsDeflateConverter.h"
 #include "nsNetUtil.h"
@@ -14,6 +14,8 @@
 
 #define ZIP_METHOD_STORE 0
 #define ZIP_METHOD_DEFLATE 8
+
+using namespace mozilla;
 
 /**
  * nsZipDataStream handles the writing an entry's into the zip file.
@@ -68,7 +70,7 @@ NS_IMETHODIMP nsZipDataStream::OnDataAvailable(nsIRequest *aRequest,
     if (!mOutput)
         return NS_ERROR_NOT_INITIALIZED;
 
-    nsAutoArrayPtr<char> buffer(new char[aCount]);
+    auto buffer = MakeUnique<char[]>(aCount);
     NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
 
     nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
@@ -132,12 +134,12 @@ nsresult nsZipDataStream::ProcessData(nsIRequest *aRequest,
                           reinterpret_cast<const unsigned char*>(aBuffer),
                           aCount);
 
-    nsresult rv;
-    nsCOMPtr<nsIStringInputStream> stream =
-             do_CreateInstance("@mozilla.org/io/string-input-stream;1", &rv);
+    MOZ_ASSERT(aCount <= INT32_MAX);
+    nsCOMPtr<nsIInputStream> stream;
+    nsresult rv = NS_NewByteInputStream(getter_AddRefs(stream),
+					aBuffer, aCount);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    stream->ShareData(aBuffer, aCount);
     rv = mOutput->OnDataAvailable(aRequest, aContext, stream, aOffset, aCount);
     mHeader->mUSize += aCount;
 
@@ -152,7 +154,7 @@ nsresult nsZipDataStream::ReadStream(nsIInputStream *aStream)
     nsresult rv = OnStartRequest(nullptr, nullptr);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsAutoArrayPtr<char> buffer(new char[4096]);
+    auto buffer = MakeUnique<char[]>(4096);
     NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
 
     uint32_t read = 0;

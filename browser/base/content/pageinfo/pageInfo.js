@@ -108,10 +108,18 @@ pageInfoTreeView.prototype = {
         this,
         this.data,
         treecol.index,
-        function textComparator(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); },
+        function textComparator(a, b) { return (a || "").toLowerCase().localeCompare((b || "").toLowerCase()); },
         this.sortcol,
         this.sortdir
       );
+
+    Array.forEach(tree.columns, function(col) {
+      col.element.removeAttribute("sortActive");
+      col.element.removeAttribute("sortDirection");
+    });
+    treecol.element.setAttribute("sortActive", "true");
+    treecol.element.setAttribute("sortDirection", this.sortdir ?
+                                                  "ascending" : "descending");
 
     this.sortcol = treecol.index;
   },
@@ -122,7 +130,7 @@ pageInfoTreeView.prototype = {
   isContainer: function(index) { return false; },
   isContainerOpen: function(index) { return false; },
   isSeparator: function(index) { return false; },
-  isSorted: function() { },
+  isSorted: function() { return this.sortcol > -1 },
   canDrop: function(index, orientation) { return false; },
   drop: function(row, orientation) { return false; },
   getParentIndex: function(index) { return 0; },
@@ -196,10 +204,11 @@ gImageView.onPageMediaSort = function(columnname) {
   var treecol = tree.columns.getNamedColumn(columnname);
 
   var comparator;
-  if (treecol.index == COL_IMAGE_SIZE || treecol.index == COL_IMAGE_COUNT) {
+  var index = treecol.index;
+  if (index == COL_IMAGE_SIZE || index == COL_IMAGE_COUNT) {
     comparator = function numComparator(a, b) { return a - b; };
   } else {
-    comparator = function textComparator(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); };
+    comparator = function textComparator(a, b) { return (a || "").toLowerCase().localeCompare((b || "").toLowerCase()); };
   }
 
   this.sortdir =
@@ -207,13 +216,21 @@ gImageView.onPageMediaSort = function(columnname) {
       tree,
       this,
       this.data,
-      treecol.index,
+      index,
       comparator,
       this.sortcol,
       this.sortdir
     );
 
-  this.sortcol = treecol.index;
+  Array.forEach(tree.columns, function(col) {
+    col.element.removeAttribute("sortActive");
+    col.element.removeAttribute("sortDirection");
+  });
+  treecol.element.setAttribute("sortActive", "true");
+  treecol.element.setAttribute("sortDirection", this.sortdir ?
+                                                "ascending" : "descending");
+
+  this.sortcol = index;
 };
 
 var gImageHash = { };
@@ -350,7 +367,7 @@ function loadPageInfo(frameOuterWindowID)
   mm.sendAsyncMessage("PageInfo:getData", {strings: gStrings,
                       frameOuterWindowID: frameOuterWindowID});
 
-  let pageInfoData = null;
+  let pageInfoData;
 
   // Get initial pageInfoData needed to display the general, feeds, permission and security tabs.
   mm.addMessageListener("PageInfo:data", function onmessage(message) {
@@ -375,12 +392,22 @@ function loadPageInfo(frameOuterWindowID)
   });
 
   // Get the media elements from content script to setup the media tab.
-  mm.addMessageListener("PageInfo:mediaData", function onmessage(message){
-    mm.removeMessageListener("PageInfo:mediaData", onmessage);
-    makeMediaTab(message.data.imageViewRows);
+  mm.addMessageListener("PageInfo:mediaData", function onmessage(message) {
+    // Page info window was closed.
+    if (window.closed) {
+      mm.removeMessageListener("PageInfo:mediaData", onmessage);
+      return;
+    }
 
-    // Loop through onFinished and execute the functions on it.
-    onFinished.forEach(function(func) { func(pageInfoData); });
+    // The page info media fetching has been completed.
+    if (message.data.isComplete) {
+      mm.removeMessageListener("PageInfo:mediaData", onmessage);
+      onFinished.forEach(function(func) { func(pageInfoData); });
+      return;
+    }
+
+    addImage(message.data.imageViewRow);
+    selectImage();
   });
 
   /* Call registered overlay init functions */
@@ -510,8 +537,7 @@ function openCacheEntry(key, cb)
     },
     onCacheEntryAvailable: function(entry, isNew, appCache, status) {
       cb(entry);
-    },
-    get mainThreadOnly() { return true; }
+    }
   };
   diskStorage.asyncOpenURI(Services.io.newURI(key, null, null), "", nsICacheStorage.OPEN_READONLY, checkCacheListener);
 }
@@ -575,18 +601,10 @@ function makeGeneralTab(metaViewRows, docInfo)
   });
 }
 
-function makeMediaTab(imageViewRows)
+function addImage(imageViewRow)
 {
-  // Call addImage passing in the image rows to add to the view on the Media Tab.
-  for (let image of imageViewRows) {
-    let [url, type, alt, elem, isBg] = image;
-    addImage(url, type, alt, elem, isBg);
-  }
-  selectImage();
-}
+  let [url, type, alt, elem, isBg] = imageViewRow;
 
-function addImage(url, type, alt, elem, isBg)
-{
   if (!url)
     return;
 
@@ -889,6 +907,14 @@ function makePreview(row)
       // "width" and "height" attributes must be set to newImage,
       // even if there is no "width" or "height attribute in item;
       // otherwise, the preview image cannot be displayed correctly.
+      // Since the image might have been loaded out-of-process, we expect
+      // the item to tell us its width / height dimensions. Failing that
+      // the item should tell us the natural dimensions of the image. Finally
+      // failing that, we'll assume that the image was never loaded in the
+      // other process (this can be true for favicons, for example), and so
+      // we'll assume that we can use the natural dimensions of the newImage
+      // we just created. If the natural dimensions of newImage are not known
+      // then the image is probably broken.
       if (!isBG) {
         newImage.width = ("width" in item && item.width) || newImage.naturalWidth;
         newImage.height = ("height" in item && item.height) || newImage.naturalHeight;
@@ -896,8 +922,8 @@ function makePreview(row)
       else {
         // the Width and Height of an HTML tag should not be used for its background image
         // (for example, "table" can have "width" or "height" attributes)
-        newImage.width = newImage.naturalWidth;
-        newImage.height = newImage.naturalHeight;
+        newImage.width = item.naturalWidth || newImage.naturalWidth;
+        newImage.height = item.naturalHeight || newImage.naturalHeight;
       }
 
       if (item.SVGImageElement) {

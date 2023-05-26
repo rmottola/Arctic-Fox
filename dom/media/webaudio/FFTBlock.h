@@ -79,10 +79,11 @@ public:
   {
     EnsureFFT();
 #if defined(MOZ_LIBAV_FFT)
-    AlignedTArray<FFTSample> complex(mFFTSize);
-    PodCopy(complex.Elements(), aData, mFFTSize);
-    av_rdft_calc(mAvRDFT, complex.Elements());
-    PodCopy((FFTSample*)mOutputBuffer.Elements(), complex.Elements(), mFFTSize);
+    PodCopy(mOutputBuffer.Elements()->f, aData, mFFTSize);
+    av_rdft_calc(mAvRDFT, mOutputBuffer.Elements()->f);
+    // Recover packed Nyquist.
+    mOutputBuffer[mFFTSize / 2].r = mOutputBuffer[0].i;
+    mOutputBuffer[0].i = 0.0f;
 #else
 #ifdef BUILD_ARM_NEON
     if (mozilla::supports_neon()) {
@@ -109,15 +110,13 @@ public:
     EnsureIFFT();
 #if defined(MOZ_LIBAV_FFT)
     {
-      PodCopy(aDataOut, (float*)mOutputBuffer.Elements(), mFFTSize);
-      av_rdft_calc(mAvIRDFT, aDataOut);
-      // TODO: Once bug 877662 lands, change this to use SSE.
       // Even though this function doesn't scale, the libav forward transform
       // gives a value that needs scaling by 2 in order for things to turn out
       // similar to how we expect from kissfft/openmax.
-      for (uint32_t i = 0; i < mFFTSize; ++i) {
-        aDataOut[i] *= 2.0;
-      }
+      AudioBufferCopyWithScale(mOutputBuffer.Elements()->f, 2.0f,
+                               aDataOut, mFFTSize);
+      aDataOut[1] = 2.0f * mOutputBuffer[mFFTSize/2].r; // Packed Nyquist
+      av_rdft_calc(mAvIRDFT, aDataOut);
     }
 #else
 #ifdef BUILD_ARM_NEON
@@ -133,54 +132,21 @@ public:
     }
 #endif
   }
-  // Inverse-transform the FFTSize()/2+1 points of data in each
-  // of aRealDataIn and aImagDataIn and store the resulting
-  // FFTSize() points in aRealDataOut.
-  void PerformInverseFFT(float* aRealDataIn,
-                         float *aImagDataIn,
-                         float *aRealDataOut)
-  {
-    EnsureIFFT();
-    const uint32_t inputSize = mFFTSize / 2 + 1;
-#if defined(MOZ_LIBAV_FFT)
-    AlignedTArray<FFTSample> inputBuffer(inputSize * 2);
-    for (uint32_t i = 0; i < inputSize; ++i) {
-      inputBuffer[2*i] = aRealDataIn[i];
-      inputBuffer[(2*i)+1] = aImagDataIn[i];
-    }
-    av_rdft_calc(mAvIRDFT, inputBuffer.Elements());
-    PodCopy(aRealDataOut, inputBuffer.Elements(), FFTSize());
-    // TODO: Once bug 877662 lands, change this to use SSE.
-    for (uint32_t i = 0; i < mFFTSize; ++i) {
-      aRealDataOut[i] /= mFFTSize;
-    }
-#else
-    AlignedTArray<ComplexU> inputBuffer(inputSize);
-    for (uint32_t i = 0; i < inputSize; ++i) {
-      inputBuffer[i].r = aRealDataIn[i];
-      inputBuffer[i].i = aImagDataIn[i];
-    }
-#if defined(BUILD_ARM_NEON)
-    if (mozilla::supports_neon()) {
-      omxSP_FFTInv_CCSToR_F32_Sfs(inputBuffer.Elements()->f,
-                                  aRealDataOut, mOmxIFFT);
-    } else
-#endif
-    {
-      kiss_fftri(mKissIFFT, &(inputBuffer.Elements()->c), aRealDataOut);
-      for (uint32_t i = 0; i < mFFTSize; ++i) {
-        aRealDataOut[i] /= mFFTSize;
-      }
-    }
-#endif
-  }
 
   void Multiply(const FFTBlock& aFrame)
   {
+    uint32_t halfSize = mFFTSize / 2;
+    // DFTs are not packed.
+    MOZ_ASSERT(mOutputBuffer[0].i == 0);
+    MOZ_ASSERT(aFrame.mOutputBuffer[0].i == 0);
+
     BufferComplexMultiply(mOutputBuffer.Elements()->f,
                           aFrame.mOutputBuffer.Elements()->f,
                           mOutputBuffer.Elements()->f,
-                          mFFTSize / 2 + 1);
+                          halfSize);
+    mOutputBuffer[halfSize].r *= aFrame.mOutputBuffer[halfSize].r;
+    // This would have been set to NaN if either real component was NaN.
+    mOutputBuffer[0].i = 0.0f;
   }
 
   // Perform a forward FFT on |aData|, assuming zeros after dataSize samples,
@@ -217,7 +183,15 @@ public:
   {
     return mOutputBuffer[aIndex].r;
   }
+  float& RealData(uint32_t aIndex)
+  {
+    return mOutputBuffer[aIndex].r;
+  }
   float ImagData(uint32_t aIndex) const
+  {
+    return mOutputBuffer[aIndex].i;
+  }
+  float& ImagData(uint32_t aIndex)
   {
     return mOutputBuffer[aIndex].i;
   }
@@ -341,7 +315,8 @@ private:
   AlignedTArray<ComplexU> mOutputBuffer;
   uint32_t mFFTSize;
 };
-}
+
+} // namespace mozilla
 
 #endif
 

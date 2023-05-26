@@ -188,6 +188,9 @@ public:
 
   SelfType Span(const SelfType& aOther) const
   {
+    if (IsEmpty()) {
+      return aOther;
+    }
     SelfType result(*this);
     if (aOther.mStart < mStart) {
       result.mStart = aOther.mStart;
@@ -403,7 +406,7 @@ public:
     return intervals;
   }
 
-  SelfType operator+ (const ElemType& aInterval)
+  SelfType operator+ (const ElemType& aInterval) const
   {
     SelfType intervals(*this);
     intervals.Add(aInterval);
@@ -444,7 +447,14 @@ public:
     return *this;
   }
 
-  SelfType operator- (const ElemType& aInterval)
+  SelfType operator- (const SelfType& aInterval) const
+  {
+    SelfType intervals(*this);
+    intervals -= aInterval;
+    return intervals;
+  }
+
+  SelfType operator- (const ElemType& aInterval) const
   {
     SelfType intervals(*this);
     intervals -= aInterval;
@@ -655,6 +665,23 @@ public:
   typename ContainerType::const_iterator end() const
   {
     return mIntervals.end();
+  }
+
+  ElemType& LastInterval()
+  {
+    MOZ_ASSERT(!mIntervals.IsEmpty());
+    return mIntervals.LastElement();
+  }
+
+  const ElemType& LastInterval() const
+  {
+    MOZ_ASSERT(!mIntervals.IsEmpty());
+    return mIntervals.LastElement();
+  }
+
+  void Clear()
+  {
+    mIntervals.Clear();
   }
 
 protected:

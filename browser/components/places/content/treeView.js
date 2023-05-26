@@ -279,7 +279,7 @@ PlacesTreeView.prototype = {
       return 0;
 
     // Inserting the new elements into the rows array in one shot (by
-    // Array.concat) is faster than resizing the array (by splice) on each loop
+    // Array.prototype.concat) is faster than resizing the array (by splice) on each loop
     // iteration.
     let cc = aContainer.childCount;
     let newElements = new Array(cc);
@@ -1187,7 +1187,7 @@ PlacesTreeView.prototype = {
       properties = "";
       let itemId = node.itemId;
       let nodeType = node.type;
-      if (PlacesUtils.containerTypes.indexOf(nodeType) != -1) {
+      if (PlacesUtils.containerTypes.includes(nodeType)) {
         if (nodeType == Ci.nsINavHistoryResultNode.RESULT_TYPE_QUERY) {
           properties += " query";
           if (PlacesUtils.nodeIsTagQuery(node))
@@ -1395,8 +1395,10 @@ PlacesTreeView.prototype = {
     // parameters into a container id and index within the container,
     // since this information is specific to the tree view.
     let ip = this._getInsertionPoint(aRow, aOrientation);
-    if (ip)
-      PlacesControllerDragHelper.onDrop(ip, aDataTransfer);
+    if (ip) {
+      PlacesControllerDragHelper.onDrop(ip, aDataTransfer)
+                                .then(null, Components.utils.reportError);
+    }
 
     PlacesControllerDragHelper.currentDropTarget = null;
   },

@@ -861,34 +861,38 @@ MacroAssembler::Pop(const ValueOperand& val)
 // ===============================================================
 // Simple call functions.
 
-CodeOffsetLabel
+CodeOffset
 MacroAssembler::call(Register reg)
 {
     as_jalr(reg);
     as_nop();
-    return CodeOffsetLabel(currentOffset());
+    return CodeOffset(currentOffset());
 }
 
-CodeOffsetLabel
+CodeOffset
 MacroAssembler::call(Label* label)
 {
     ma_bal(label);
-    return CodeOffsetLabel(currentOffset());
+    return CodeOffset(currentOffset());
 }
 
-CodeOffsetLabel
+CodeOffset
 MacroAssembler::callWithPatch()
 {
-    MOZ_CRASH("NYI");
+    addLongJump(nextOffset());
+    ma_liPatchable(ScratchRegister, ImmWord(0));
+    return call(ScratchRegister);
 }
+
 void
 MacroAssembler::patchCall(uint32_t callerOffset, uint32_t calleeOffset)
 {
-    MOZ_CRASH("NYI");
+    BufferOffset li(callerOffset - 6 * sizeof(uint32_t));
+    Assembler::UpdateLoad64Value(editSrc(li), calleeOffset);
 }
 
 void
-MacroAssembler::call(AsmJSImmPtr target)
+MacroAssembler::call(wasm::SymbolicAddress target)
 {
     movePtr(target, CallReg);
     call(CallReg);

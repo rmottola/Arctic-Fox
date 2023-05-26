@@ -201,44 +201,9 @@ DecodedStreamData::SetPlaying(bool aPlaying)
   }
 }
 
-class OutputStreamListener : public MediaStreamListener {
-  typedef MediaStreamListener::MediaStreamGraphEvent MediaStreamGraphEvent;
-public:
-  explicit OutputStreamListener(OutputStreamData* aOwner) : mOwner(aOwner) {}
-
-  void NotifyEvent(MediaStreamGraph* aGraph, MediaStreamGraphEvent event) override
-  {
-    if (event == EVENT_FINISHED) {
-      nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(
-        this, &OutputStreamListener::DoNotifyFinished);
-      aGraph->DispatchToMainThreadAfterStreamStateUpdate(r.forget());
-    }
-  }
-
-  void Forget()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    mOwner = nullptr;
-  }
-
-private:
-  void DoNotifyFinished()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    if (mOwner) {
-      // Remove the finished stream so it won't block the decoded stream.
-      mOwner->Remove();
-    }
-  }
-
-  // Main thread only
-  OutputStreamData* mOwner;
-};
-
 OutputStreamData::~OutputStreamData()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  mListener->Forget();
   // Break the connection to the input stream if necessary.
   if (mPort) {
     mPort->Destroy();
@@ -250,8 +215,6 @@ OutputStreamData::Init(OutputStreamManager* aOwner, ProcessedMediaStream* aStrea
 {
   mOwner = aOwner;
   mStream = aStream;
-  mListener = new OutputStreamListener(this);
-  aStream->AddListener(mListener);
 }
 
 void
@@ -282,13 +245,6 @@ OutputStreamData::Disconnect()
     mPort = nullptr;
   }
   return true;
-}
-
-void
-OutputStreamData::Remove()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  mOwner->Remove(mStream);
 }
 
 MediaStreamGraph*
@@ -499,8 +455,7 @@ DecodedStream::CreateData(MozPromiseHolder<GenericPromise>&& aPromise)
 
   // No need to create a source stream when there are no output streams. This
   // happens when RemoveOutput() is called immediately after StartPlayback().
-  // Also we don't create a source stream when MDSM has begun shutdown.
-  if (!mOutputStreamManager.Graph() || mShuttingDown) {
+  if (!mOutputStreamManager.Graph()) {
     // Resolve the promise to indicate the end of playback.
     aPromise.Resolve(true, __func__);
     return;
@@ -521,16 +476,30 @@ DecodedStream::CreateData(MozPromiseHolder<GenericPromise>&& aPromise)
       return NS_OK;
     }
   private:
+    virtual ~R()
+    {
+      // mData is not transferred when dispatch fails and Run() is not called.
+      // We need to dispatch a task to ensure DecodedStreamData is destroyed
+      // properly on the main thread.
+      if (mData) {
+        DecodedStreamData* data = mData.release();
+        RefPtr<DecodedStream> self = mThis.forget();
+        nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
+          self->mOutputStreamManager.Disconnect();
+          delete data;
+        });
+        AbstractThread::MainThread()->Dispatch(r.forget());
+      }
+    }
     RefPtr<DecodedStream> mThis;
     Method mMethod;
     UniquePtr<DecodedStreamData> mData;
   };
 
   // Post a message to ensure |mData| is only updated on the worker thread.
-  // Note this must be done before MDSM's shutdown since dispatch could fail
-  // when the worker thread is shut down.
+  // Note this could fail when MDSM begin to shut down the worker thread.
   nsCOMPtr<nsIRunnable> r = new R(this, &DecodedStream::OnDataCreated, data);
-  mOwnerThread->Dispatch(r.forget());
+  mOwnerThread->Dispatch(r.forget(), AbstractThread::DontAssertDispatchSuccess);
 }
 
 bool
@@ -649,6 +618,9 @@ SendStreamAudio(DecodedStreamData* aStream, int64_t aStartTime,
                 MediaData* aData, AudioSegment* aOutput,
                 uint32_t aRate, double aVolume)
 {
+  // The amount of audio frames that is used to fuzz rounding errors.
+  static const int64_t AUDIO_FUZZ_FRAMES = 1;
+
   MOZ_ASSERT(aData);
   AudioData* audio = aData->As<AudioData>();
   // This logic has to mimic AudioSink closely to make sure we write
@@ -660,11 +632,11 @@ SendStreamAudio(DecodedStreamData* aStream, int64_t aStartTime,
   if (!audioWrittenOffset.isValid() ||
       !frameOffset.isValid() ||
       // ignore packet that we've already processed
-      frameOffset.value() + audio->mFrames <= audioWrittenOffset.value()) {
+      audio->GetEndTime() <= aStream->mNextAudioTime) {
     return;
   }
 
-  if (audioWrittenOffset.value() < frameOffset.value()) {
+  if (audioWrittenOffset.value() + AUDIO_FUZZ_FRAMES < frameOffset.value()) {
     int64_t silentFrames = frameOffset.value() - audioWrittenOffset.value();
     // Write silence to catch up
     AudioSegment silence;
@@ -674,20 +646,17 @@ SendStreamAudio(DecodedStreamData* aStream, int64_t aStartTime,
     aOutput->AppendFrom(&silence);
   }
 
-  MOZ_ASSERT(audioWrittenOffset.value() >= frameOffset.value());
-
-  int64_t offset = audioWrittenOffset.value() - frameOffset.value();
-  size_t framesToWrite = audio->mFrames - offset;
-
+  // Always write the whole sample without truncation to be consistent with
+  // DecodedAudioDataSink::PlayFromAudioQueue()
   audio->EnsureAudioBuffer();
   RefPtr<SharedBuffer> buffer = audio->mAudioBuffer;
   AudioDataValue* bufferData = static_cast<AudioDataValue*>(buffer->Data());
   nsAutoTArray<const AudioDataValue*, 2> channels;
   for (uint32_t i = 0; i < audio->mChannels; ++i) {
-    channels.AppendElement(bufferData + i * audio->mFrames + offset);
+    channels.AppendElement(bufferData + i * audio->mFrames);
   }
-  aOutput->AppendFrames(buffer.forget(), channels, framesToWrite);
-  aStream->mAudioFramesWritten += framesToWrite;
+  aOutput->AppendFrames(buffer.forget(), channels, audio->mFrames);
+  aStream->mAudioFramesWritten += audio->mFrames;
   aOutput->ApplyVolume(aVolume);
 
   aStream->mNextAudioTime = audio->GetEndTime();

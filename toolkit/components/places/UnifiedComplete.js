@@ -857,53 +857,16 @@ Search.prototype = {
     }
     queries.push(this._searchQuery);
 
-    // When actions are enabled, we run a series of heuristics to determine what
-    // the first result should be - which is always a special result.
-    // |hasFirstResult| is used to keep track of whether we've obtained such a
-    // result yet, so we can skip further heuristics and not add any additional
-    // special results.
-    let hasFirstResult = false;
+    // Add the first heuristic result, if any.  Set _addingHeuristicFirstMatch
+    // to true so that when the result is added, "heuristic" can be included in
+    // its style.
+    this._addingHeuristicFirstMatch = true;
+    yield this._matchFirstHeuristicResult(conn);
+    this._addingHeuristicFirstMatch = false;
 
-    if (this._searchTokens.length > 0) {
-      // This may be a Places keyword.
-      hasFirstResult = yield this._matchPlacesKeyword();
-    }
-
-    if (this.pending && this._enableActions && !hasFirstResult) {
-      // If it's not a Places keyword, then it may be a search engine
-      // with an alias - which works like a keyword.
-      hasFirstResult = yield this._matchSearchEngineAlias();
-    }
-
-    let shouldAutofill = this._shouldAutofill;
-    if (this.pending && !hasFirstResult && shouldAutofill) {
-      // It may also look like a URL we know from the database.
-      hasFirstResult = yield this._matchKnownUrl(conn);
-    }
-
-    if (this.pending && !hasFirstResult && shouldAutofill) {
-      // Or it may look like a URL we know about from search engines.
-      hasFirstResult = yield this._matchSearchEngineUrl();
-    }
-
-    if (this.pending && this._enableActions && !hasFirstResult) {
-      // If we don't have a result that matches what we know about, then
-      // we use a fallback for things we don't know about.
-
-      // We may not have auto-filled, but this may still look like a URL.
-      // However, even if the input is a valid URL, we may not want to use
-      // it as such. This can happen if the host would require whitelisting,
-      // but isn't in the whitelist.
-      hasFirstResult = yield this._matchUnknownUrl();
-    }
-
-    if (this.pending && this._enableActions && !hasFirstResult) {
-      // When all else fails, we search using the current search engine.
-      hasFirstResult = yield this._matchCurrentSearchEngine();
-    }
-
-    // IMPORTANT: No other first result heuristics should run after this point.
-
+    // We sleep a little between adding the heuristicFirstMatch and matching
+    // any other searches so we aren't kicking off potentially expensive
+    // searches on every keystroke.
     yield this._sleep(Prefs.delay);
     if (!this.pending)
       return;
@@ -914,6 +877,12 @@ Search.prototype = {
 
     for (let [query, params] of queries) {
       yield conn.executeCached(query, params, this._onResultRow.bind(this));
+      if (!this.pending)
+        return;
+    }
+
+    if (this._enableActions && this.hasBehavior("openpage")) {
+      yield this._matchRemoteTabs();
       if (!this.pending)
         return;
     }
@@ -936,6 +905,68 @@ Search.prototype = {
     yield Promise.all(this._remoteMatchesPromises);
   }),
 
+  *_matchFirstHeuristicResult(conn) {
+    // We always try to make the first result a special "heuristic" result.  The
+    // heuristics below determine what type of result it will be, if any.
+
+    if (this._searchTokens.length > 0) {
+      // This may be a Places keyword.
+      let matched = yield this._matchPlacesKeyword();
+      if (matched) {
+        return;
+      }
+    }
+
+    if (this.pending && this._enableActions) {
+      // If it's not a Places keyword, then it may be a search engine
+      // with an alias - which works like a keyword.
+      let matched = yield this._matchSearchEngineAlias();
+      if (matched) {
+        return;
+      }
+    }
+
+    let shouldAutofill = this._shouldAutofill;
+    if (this.pending && shouldAutofill) {
+      // It may also look like a URL we know from the database.
+      let matched = yield this._matchKnownUrl(conn);
+      if (matched) {
+        return;
+      }
+    }
+
+    if (this.pending && shouldAutofill) {
+      // Or it may look like a URL we know about from search engines.
+      let matched = yield this._matchSearchEngineUrl();
+      if (matched) {
+        return;
+      }
+    }
+
+    if (this.pending && this._enableActions) {
+      // If we don't have a result that matches what we know about, then
+      // we use a fallback for things we don't know about.
+
+      // We may not have auto-filled, but this may still look like a URL.
+      // However, even if the input is a valid URL, we may not want to use
+      // it as such. This can happen if the host would require whitelisting,
+      // but isn't in the whitelist.
+      let matched = yield this._matchUnknownUrl();
+      if (matched) {
+        return;
+      }
+    }
+
+    if (this.pending && this._enableActions && this._originalSearchString) {
+      // When all else fails, and the search string is non-empty, we search
+      // using the current search engine.
+      let matched = yield this._matchCurrentSearchEngine();
+      if (matched) {
+        return;
+      }
+    }
+  },
+
   *_matchSearchSuggestions() {
     // Limit the string sent for search suggestions to a maximum length.
     let searchString = this._searchTokens.join(" ")
@@ -955,6 +986,9 @@ Search.prototype = {
       );
     let promise = this._searchSuggestionController.fetchCompletePromise
       .then(() => {
+        // The search has been canceled already.
+        if (!this._searchSuggestionController)
+          return;
         if (this._searchSuggestionController.resultsCount >= 0 &&
             this._searchSuggestionController.resultsCount < 2) {
           // The original string is used to properly compare with the next search.
@@ -1264,7 +1298,7 @@ Search.prototype = {
     // when searching for "Firefox".
     let terms = parseResult.terms.toLowerCase();
     if (this._searchTokens.length > 0 &&
-        this._searchTokens.every(token => terms.indexOf(token) == -1)) {
+        this._searchTokens.every(token => !terms.includes(token))) {
       return;
     }
 

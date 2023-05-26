@@ -21,6 +21,7 @@
 #include "prio.h"
 #include "plstr.h"
 #include "mozilla/Logging.h"
+#include "mozilla/UniquePtrExtensions.h"
 #include "stdlib.h"
 #include "nsWildCard.h"
 #include "nsZipArchive.h"
@@ -443,6 +444,7 @@ nsresult nsZipArchive::ExtractFile(nsZipItem *item, const char *outname,
     uint32_t count = 0;
     uint8_t* buf = cursor.Read(&count);
     if (!buf) {
+      nsZipArchive::sFileCorruptedReason = "nsZipArchive: Read() failed to return a buffer";
       rv = NS_ERROR_FILE_CORRUPTED;
       break;
     } else if (count == 0) {
@@ -643,22 +645,28 @@ MOZ_WIN_MEM_TRY_BEGIN
       }
   }
 
-  if (!centralOffset)
+  if (!centralOffset) {
+    nsZipArchive::sFileCorruptedReason = "nsZipArchive: no central offset";
     return NS_ERROR_FILE_CORRUPTED;
+  }
 
   buf = startp + centralOffset;
 
   // avoid overflow of startp + centralOffset.
-  if (buf < startp)
+  if (buf < startp) {
+    nsZipArchive::sFileCorruptedReason = "nsZipArchive: overflow looking for central directory";
     return NS_ERROR_FILE_CORRUPTED;
+  }
 
   //-- Read the central directory headers
   uint32_t sig = 0;
   while (buf + int32_t(sizeof(uint32_t)) <= endp &&
          (sig = xtolong(buf)) == CENTRALSIG) {
     // Make sure there is enough data available.
-    if (endp - buf < ZIPCENTRAL_SIZE)
+    if (endp - buf < ZIPCENTRAL_SIZE) {
+      nsZipArchive::sFileCorruptedReason = "nsZipArchive: central directory too small";
       return NS_ERROR_FILE_CORRUPTED;
+    }
 
     // Read the fixed-size data.
     ZipCentral* central = (ZipCentral*)buf;
@@ -671,9 +679,13 @@ MOZ_WIN_MEM_TRY_BEGIN
     // Sanity check variable sizes and refuse to deal with
     // anything too big: it's likely a corrupt archive.
     if (namelen < 1 ||
-        namelen > kMaxNameLength ||
-        buf >= buf + diff || // No overflow
+        namelen > kMaxNameLength) {
+      nsZipArchive::sFileCorruptedReason = "nsZipArchive: namelen out of range";
+      return NS_ERROR_FILE_CORRUPTED;
+    }
+    if (buf >= buf + diff || // No overflow
         buf >= endp - diff) {
+      nsZipArchive::sFileCorruptedReason = "nsZipArchive: overflow looking for next item";
       return NS_ERROR_FILE_CORRUPTED;
     }
 
@@ -696,8 +708,10 @@ MOZ_WIN_MEM_TRY_BEGIN
     sig = 0;
   } /* while reading central directory records */
 
-  if (sig != ENDSIG)
+  if (sig != ENDSIG) {
+    nsZipArchive::sFileCorruptedReason = "nsZipArchive: unexpected sig";
     return NS_ERROR_FILE_CORRUPTED;
+  }
 
   // Make the comment available for consumers.
   if (endp - buf >= ZIPEND_SIZE) {
@@ -873,6 +887,8 @@ int64_t nsZipArchive::SizeOfMapping()
 
 nsZipArchive::nsZipArchive()
   : mRefCnt(0)
+  , mCommentPtr(nullptr)
+  , mCommentLen(0)
   , mBuiltSynthetics(false)
 {
   zipLog.AddRef();
@@ -900,12 +916,12 @@ nsZipArchive::~nsZipArchive()
 // nsZipFind constructor and destructor
 //------------------------------------------
 
-nsZipFind::nsZipFind(nsZipArchive* aZip, char* aPattern, bool aRegExp) : 
-  mArchive(aZip),
-  mPattern(aPattern),
-  mItem(0),
-  mSlot(0),
-  mRegExp(aRegExp)
+nsZipFind::nsZipFind(nsZipArchive* aZip, char* aPattern, bool aRegExp)
+  : mArchive(aZip)
+  , mPattern(aPattern)
+  , mItem(nullptr)
+  , mSlot(0)
+  , mRegExp(aRegExp)
 {
   MOZ_COUNT_CTOR(nsZipFind);
 }
@@ -996,6 +1012,13 @@ static PRTime GetModTime(uint16_t aDate, uint16_t aTime)
 
   return PR_ImplodeTime(&time);
 }
+
+nsZipItem::nsZipItem()
+  : next(nullptr)
+  , central(nullptr)
+  , nameLength(0)
+  , isSynthetic(false)
+{}
 
 uint32_t nsZipItem::LocalOffset()
 {
@@ -1092,11 +1115,13 @@ bool nsZipItem::IsSymlink()
 }
 #endif
 
-nsZipCursor::nsZipCursor(nsZipItem *item, nsZipArchive *aZip, uint8_t* aBuf, uint32_t aBufSize, bool doCRC) :
-  mItem(item),
-  mBuf(aBuf),
-  mBufSize(aBufSize),
-  mDoCRC(doCRC)
+nsZipCursor::nsZipCursor(nsZipItem *item, nsZipArchive *aZip, uint8_t* aBuf,
+                         uint32_t aBufSize, bool doCRC)
+  : mItem(item)
+  , mBuf(aBuf)
+  , mBufSize(aBufSize)
+  , mCRC(0)
+  , mDoCRC(doCRC)
 {
   if (mItem->Compression() == DEFLATED) {
 #ifdef DEBUG
@@ -1168,8 +1193,10 @@ MOZ_WIN_MEM_TRY_CATCH(return nullptr)
   return buf;
 }
 
-nsZipItemPtr_base::nsZipItemPtr_base(nsZipArchive *aZip, const char * aEntryName, bool doCRC) :
-  mReturnBuf(nullptr)
+nsZipItemPtr_base::nsZipItemPtr_base(nsZipArchive *aZip,
+                                     const char * aEntryName, bool doCRC)
+  : mReturnBuf(nullptr)
+  , mReadlen(0)
 {
   // make sure the ziparchive hangs around
   mZipHandle = aZip->GetFD();
@@ -1181,13 +1208,13 @@ nsZipItemPtr_base::nsZipItemPtr_base(nsZipArchive *aZip, const char * aEntryName
   uint32_t size = 0;
   if (item->Compression() == DEFLATED) {
     size = item->RealSize();
-    mAutoBuf = new (fallible) uint8_t[size];
+    mAutoBuf = MakeUniqueFallible<uint8_t[]>(size);
     if (!mAutoBuf) {
       return;
     }
   }
 
-  nsZipCursor cursor(item, aZip, mAutoBuf, size, doCRC);
+  nsZipCursor cursor(item, aZip, mAutoBuf.get(), size, doCRC);
   mReturnBuf = cursor.Read(&mReadlen);
   if (!mReturnBuf) {
     return;
@@ -1199,3 +1226,6 @@ nsZipItemPtr_base::nsZipItemPtr_base(nsZipArchive *aZip, const char * aEntryName
     return;
   }
 }
+
+/* static */ const char*
+nsZipArchive::sFileCorruptedReason = nullptr;

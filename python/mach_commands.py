@@ -212,13 +212,13 @@ class MachCommands(MachCommandBase):
         cmd_args = [binary,
             '--ext', ext,  # This keeps ext as a single argument.
         ] + args
-        # Path must come after arguments.  Path is '.' due to cwd below.
-        cmd_args += ['.']
+        # Path must come after arguments.
+        cmd_args += [path]
 
         return self.run_process(cmd_args,
-            cwd=path,
             pass_thru=True,  # Allow user to run eslint interactively.
             ensure_exit_code=False,  # Don't throw on non-zero exit code.
+            require_unix_environment=True # eslint is not a valid Win32 binary.
         )
     def eslint_setup(self, update_only=False):
         """Ensure eslint is optimally configured.
@@ -239,25 +239,41 @@ class MachCommands(MachCommandBase):
             return 1
 
         # Install eslint.
-        print("Installing eslint...")
-        with open(os.devnull, "w") as fnull:
-            subprocess.call([npmPath, "install", "eslint", "-g"],
-                            stdout=fnull, stderr=fnull)
+        success = self.callProcess("eslint",
+                                   [npmPath, "install", "eslint", "-g"])
+        if not success:
+            return 1
 
         # Install eslint-plugin-mozilla.
-        print("")
-        print("Installing eslint-plugin-mozilla...")
-        with open(os.devnull, "w") as fnull:
-            subprocess.call([npmPath, "link"],
-                            cwd="testing/eslint-plugin-mozilla",
-                            stdout=fnull, stderr=fnull)
+        success = self.callProcess("eslint-plugin-mozilla",
+                                   [npmPath, "link"],
+                                   "testing/eslint-plugin-mozilla")
+        if not success:
+            return 1
 
         # Install eslint-plugin-react.
-        print("")
-        print("Installing eslint-plugin-react...")
-        with open(os.devnull, "w") as fnull:
-            subprocess.call([npmPath, "install", "-g", "eslint-plugin-react"],
-                            stdout=fnull, stderr=fnull)
+        success = self.callProcess("eslint-plugin-react",
+                                   [npmPath, "install", "eslint-plugin-react", "-g"])
+        if not success:
+            return 1
+
+        print("\nESLint and approved plugins installed successfully!")
+
+    def callProcess(self, name, cmd, cwd=None):
+        print("\nInstalling %s using \"%s\"..." % (name, " ".join(cmd)))
+
+        try:
+            with open(os.devnull, "w") as fnull:
+                subprocess.check_call(cmd, cwd=cwd, stdout=fnull)
+        except subprocess.CalledProcessError:
+            if cwd:
+                print("\nError installing %s in the %s folder, aborting." % (name, cwd))
+            else:
+                print("\nError installing %s, aborting." % name)
+
+            return False
+
+        return True
 
     def getPossibleNodePathsWin(self):
         """
@@ -266,30 +282,29 @@ class MachCommands(MachCommandBase):
         if platform.system() != "Windows":
             return []
 
-        return {
+        return list({
             "%s\\nodejs" % os.environ.get("SystemDrive"),
             os.path.join(os.environ.get("ProgramFiles"), "nodejs"),
             os.path.join(os.environ.get("PROGRAMW6432"), "nodejs"),
             os.path.join(os.environ.get("PROGRAMFILES"), "nodejs")
-        }
+        })
 
     def getNodeOrNpmPath(self, filename):
         """
         Return the nodejs or npm path.
         """
-        try:
-            appPath = which.which(filename)
-            return appPath
-        except which.WhichError:
-            pass
-
         if platform.system() == "Windows":
-            try:
-                for ext in ["", ".cmd", ".exe"]:
+            for ext in [".cmd", ".exe", ""]:
+                try:
                     nodeOrNpmPath = which.which(filename + ext,
                                                 path=self.getPossibleNodePathsWin())
                     if self.is_valid(nodeOrNpmPath):
                         return nodeOrNpmPath
+                except which.WhichError:
+                    pass
+        else:
+            try:
+                return which.which(filename)
             except which.WhichError:
                 pass
 
@@ -302,7 +317,7 @@ class MachCommands(MachCommandBase):
             appPaths = self.getPossibleNodePathsWin()
 
             for p in appPaths:
-                print("  - " + p)
+                print("  - %s" % p)
         elif platform.system() == "Darwin":
             print("  - /usr/local/bin/node")
         elif platform.system() == "Linux":
@@ -315,5 +330,5 @@ class MachCommands(MachCommandBase):
             with open(os.devnull, "w") as fnull:
                 subprocess.check_call([path, "--version"], stdout=fnull)
                 return True
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, WindowsError):
             return False

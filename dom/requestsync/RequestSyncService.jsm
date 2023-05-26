@@ -7,7 +7,7 @@
 const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 function debug(s) {
-  dump('DEBUG RequestSyncService: ' + s + '\n');
+  //dump('DEBUG RequestSyncService: ' + s + '\n');
 }
 
 const RSYNCDB_VERSION = 1;
@@ -46,6 +46,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "secMan",
                                    "@mozilla.org/scriptsecuritymanager;1",
                                    "nsIScriptSecurityManager");
 
+XPCOMUtils.defineLazyServiceGetter(this, "powerManagerService",
+                                   "@mozilla.org/power/powermanagerservice;1",
+                                   "nsIPowerManagerService");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AlarmService",
                                   "resource://gre/modules/AlarmService.jsm");
 
@@ -75,6 +79,10 @@ this.RequestSyncService = {
   _timers: {},
   _pendingRequests: {},
 
+  // This array contains functions to be executed after the scheduling of the
+  // current task or immediately if there are not scheduling in progress.
+  _afterSchedulingTasks: [],
+
   // Initialization of the RequestSyncService.
   init: function() {
     debug("init");
@@ -93,16 +101,16 @@ this.RequestSyncService = {
     // Any incoming message will be stored and processed when the async
     // operation is completed.
 
-    let self = this;
     this.dbTxn("readonly", function(aStore) {
-      aStore.openCursor().onsuccess = function(event) {
+      aStore.openCursor().onsuccess = event => {
         let cursor = event.target.result;
         if (cursor) {
-          self.addRegistration(cursor.value);
-          cursor.continue();
+          this.addRegistration(cursor.value, function() {
+            cursor.continue();
+          });
         }
       }
-    },
+    }.bind(this),
     function() {
       debug("initialization done");
     },
@@ -126,11 +134,10 @@ this.RequestSyncService = {
     this.close();
 
     // Removing all the registrations will delete the pending timers.
-    let self = this;
     this.forEachRegistration(function(aObj) {
-      let key = self.principalToKey(aObj.principal);
-      self.removeRegistrationInternal(aObj.data.task, key);
-    });
+      let key = this.principalToKey(aObj.principal);
+      this.removeRegistrationInternal(aObj.data.task, key);
+    }.bind(this));
   },
 
   observe: function(aSubject, aTopic, aData) {
@@ -138,15 +145,21 @@ this.RequestSyncService = {
 
     switch (aTopic) {
       case 'xpcom-shutdown':
-        this.shutdown();
+        this.executeAfterScheduling(function() {
+          this.shutdown();
+        }.bind(this));
         break;
 
       case 'clear-origin-data':
-        this.clearData(aData);
+        this.executeAfterScheduling(function() {
+          this.clearData(aData);
+        }.bind(this));
         break;
 
       case 'wifi-state-changed':
-        this.wifiStateChanged(aSubject == 'enabled');
+        this.executeAfterScheduling(function() {
+          this.wifiStateChanged(aSubject == 'enabled');
+        }.bind(this));
         break;
 
       default:
@@ -207,7 +220,7 @@ this.RequestSyncService = {
   },
 
   // Add a task to the _registrations map and create the timer if it's needed.
-  addRegistration: function(aObj) {
+  addRegistration: function(aObj, aCb) {
     debug('addRegistration');
 
     let key = this.principalToKey(aObj.principal);
@@ -215,8 +228,12 @@ this.RequestSyncService = {
       this._registrations[key] = {};
     }
 
-    this.scheduleTimer(aObj);
-    this._registrations[key][aObj.data.task] = aObj;
+    this.scheduleTimer(aObj, function() {
+      this._registrations[key][aObj.data.task] = aObj;
+      if (aCb) {
+        aCb();
+      }
+    }.bind(this));
   },
 
   // Remove a task from the _registrations map and delete the timer if it's
@@ -288,31 +305,45 @@ this.RequestSyncService = {
 
     switch (aMessage.name) {
       case "RequestSync:Register":
-        this.register(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.register(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSync:Unregister":
-        this.unregister(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.unregister(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSync:Registrations":
-        this.registrations(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.registrations(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSync:Registration":
-        this.registration(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.registration(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSyncManager:Registrations":
-        this.managerRegistrations(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.managerRegistrations(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSyncManager:SetPolicy":
-        this.managerSetPolicy(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.managerSetPolicy(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       case "RequestSyncManager:RunTask":
-        this.managerRunTask(aMessage.target, aMessage.data, principal);
+        this.executeAfterScheduling(function() {
+          this.managerRunTask(aMessage.target, aMessage.data, principal);
+        }.bind(this));
         break;
 
       default:
@@ -388,9 +419,10 @@ this.RequestSyncService = {
       aStore.put(data, data.dbKey);
     },
     function() {
-      self.addRegistration(data);
-      aTarget.sendAsyncMessage("RequestSync:Register:Return",
-                               { requestID: aData.requestID });
+      self.addRegistration(data, function() {
+        aTarget.sendAsyncMessage("RequestSync:Register:Return",
+                                 { requestID: aData.requestID });
+      });
     },
     function() {
       aTarget.sendAsyncMessage("RequestSync:Register:Return",
@@ -523,9 +555,10 @@ this.RequestSyncService = {
     }
 
     this.updateObjectInDB(toSave, function() {
-      self.scheduleTimer(toSave);
-      aTarget.sendAsyncMessage("RequestSyncManager:SetPolicy:Return",
-                               { requestID: aData.requestID });
+      self.scheduleTimer(toSave, function() {
+        aTarget.sendAsyncMessage("RequestSyncManager:SetPolicy:Return",
+                                 { requestID: aData.requestID });
+      });
     });
   },
 
@@ -566,7 +599,7 @@ this.RequestSyncService = {
 
     // Storing the requestID into the task for the callback.
     this.storePendingRequest(task, aTarget, aData.requestID);
-    this.timeout(task);
+    this.timeout(task, null);
   },
 
   // We cannot expose the full internal object to content but just a subset.
@@ -599,29 +632,60 @@ this.RequestSyncService = {
   },
 
   // Creation of the timer for a particular task object.
-  scheduleTimer: function(aObj) {
+  scheduleTimer: function(aObj, aCb) {
     debug("scheduleTimer");
+
+    aCb = aCb || function() {};
 
     this.removeTimer(aObj);
 
     // A  registration can be already inactive if it was 1 shot.
     if (!aObj.active) {
+      aCb();
       return;
     }
 
     if (aObj.data.state == RSYNC_STATE_DISABLED) {
+      aCb();
       return;
     }
 
     // WifiOnly check.
     if (aObj.data.state == RSYNC_STATE_WIFIONLY && !this._wifi) {
+      aCb();
       return;
     }
 
-    this.createTimer(aObj);
+    if (this.scheduling) {
+      dump("ERROR!! RequestSyncService - ScheduleTimer called into ScheduleTimer.\n");
+      aCb();
+      return;
+    }
+
+    this.scheduling = true;
+
+    this.createTimer(aObj, function() {
+      this.scheduling = false;
+
+      while (this._afterSchedulingTasks.length) {
+        var cb = this._afterSchedulingTasks.shift();
+        cb();
+      }
+
+      aCb();
+    }.bind(this));
   },
 
-  timeout: function(aObj) {
+  executeAfterScheduling: function(aCb) {
+    if (!this.scheduling) {
+      aCb();
+      return;
+    }
+
+    this._afterSchedulingTasks.push(aCb);
+  },
+
+  timeout: function(aObj, aWakeLock) {
     debug("timeout");
 
     if (this._activeTask) {
@@ -630,6 +694,7 @@ this.RequestSyncService = {
       if (this._queuedTasks.indexOf(aObj) == -1) {
         this._queuedTasks.push(aObj);
       }
+      this.maybeReleaseWakeLock(aWakeLock);
       return;
     }
 
@@ -637,7 +702,9 @@ this.RequestSyncService = {
     if (!app) {
       dump("ERROR!! RequestSyncService - Failed to retrieve app data from a principal.\n");
       aObj.active = false;
-      this.updateObjectInDB(aObj);
+      this.updateObjectInDB(aObj, () => {
+        this.maybeReleaseWakeLock(aWakeLock);
+      });
       return;
     }
 
@@ -646,19 +713,24 @@ this.RequestSyncService = {
 
     // Maybe need to be rescheduled?
     if (this.hasPendingMessages('request-sync', manifestURL, pageURL)) {
-      this.scheduleTimer(aObj);
+      this.scheduleTimer(aObj, () => {
+        this.maybeReleaseWakeLock(aWakeLock);
+      });
       return;
     }
 
     this.removeTimer(aObj);
-    this._activeTask = aObj;
 
     if (!manifestURL || !pageURL) {
       dump("ERROR!! RequestSyncService - Failed to create URI for the page or the manifest\n");
       aObj.active = false;
-      this.updateObjectInDB(aObj);
+      this.updateObjectInDB(aObj, () => {
+        this.maybeReleaseWakeLock(aWakeLock);
+      });
       return;
     }
+
+    this._activeTask = aObj;
 
     // We don't want to run more than 1 task at the same time. We do this using
     // the promise created by sendMessage(). But if the task takes more than
@@ -667,6 +739,14 @@ this.RequestSyncService = {
 
     let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 
+    // We need a wakelock to keep the device alive and we want to release it
+    // only when all the steps are fully completely. This can involve calling
+    // timeout() again if we have something in _queuedTasks. In this scenario
+    // we want to reuse the same wakelock and we receive it as param.
+    // The Wakelock is passed to operationCompleted() because we want to wait
+    // until the data is written into IDB and maybe until all the pending next
+    // tasks are executed too.
+    let wakeLock = aWakeLock ? aWakeLock : powerManagerService.newWakeLock("cpu");
     let done = false;
     let self = this;
     function taskCompleted() {
@@ -674,7 +754,7 @@ this.RequestSyncService = {
 
       if (!done) {
         done = true;
-        self.operationCompleted();
+        self.operationCompleted(wakeLock);
       }
 
       timer.cancel();
@@ -708,11 +788,12 @@ this.RequestSyncService = {
     });
   },
 
-  operationCompleted: function() {
+  operationCompleted: function(aWakeLock) {
     debug("operationCompleted");
 
     if (!this._activeTask) {
       dump("ERROR!! RequestSyncService - OperationCompleted called without an active task\n");
+      aWakeLock.unlock();
       return;
     }
 
@@ -727,30 +808,29 @@ this.RequestSyncService = {
                                    { requestID: pendingRequests[i].requestID });
     }
 
-    let self = this;
     this.updateObjectInDB(this._activeTask, function() {
-      // SchedulerTimer creates a timer and a nsITimer cannot be cloned. This
-      // is the reason why this operation has to be done after storing the task
-      // into IDB.
-      if (!self._activeTask.data.oneShot) {
-        self.scheduleTimer(self._activeTask);
+      if (!this._activeTask.data.oneShot) {
+        this.scheduleTimer(this._activeTask, function() {
+          this.processNextTask(aWakeLock);
+        }.bind(this));
+      } else {
+        this.processNextTask(aWakeLock);
       }
-
-      self.processNextTask();
-    });
+    }.bind(this));
   },
 
-  processNextTask: function() {
+  processNextTask: function(aWakeLock) {
     debug("processNextTask");
 
     this._activeTask = null;
 
     if (this._queuedTasks.length == 0) {
+      aWakeLock.unlock();
       return;
     }
 
     let task = this._queuedTasks.shift();
-    this.timeout(task);
+    this.timeout(task, aWakeLock);
   },
 
   hasPendingMessages: function(aMessageName, aManifestURL, aPageURL) {
@@ -835,36 +915,37 @@ this.RequestSyncService = {
 
   wifiStateChanged: function(aEnabled) {
     debug("onWifiStateChanged");
+
     this._wifi = aEnabled;
 
     if (!this._wifi) {
       // Disable all the wifiOnly tasks.
-      let self = this;
       this.forEachRegistration(function(aObj) {
-        if (aObj.data.state == RSYNC_STATE_WIFIONLY && self.hasTimer(aObj)) {
-          self.removeTimer(aObj);
+        if (aObj.data.state == RSYNC_STATE_WIFIONLY && this.hasTimer(aObj)) {
+          this.removeTimer(aObj);
 
           // It can be that this task has been already schedulated.
-          self.removeTaskFromQueue(aObj);
+          this.removeTaskFromQueue(aObj);
         }
-      });
+      }.bind(this));
       return;
     }
 
     // Enable all the tasks.
-    let self = this;
     this.forEachRegistration(function(aObj) {
-      if (aObj.active && !self.hasTimer(aObj)) {
+      if (aObj.active && !this.hasTimer(aObj)) {
         if (!aObj.data.wifiOnly) {
           dump("ERROR - Found a disabled task that is not wifiOnly.");
         }
 
-        self.scheduleTimer(aObj);
+        this.scheduleTimer(aObj);
       }
-    });
+    }.bind(this));
   },
 
-  createTimer: function(aObj) {
+  createTimer: function(aObj, aCb) {
+    aCb = aCb || function() {};
+
     let interval = aObj.data.minInterval;
     if (aObj.data.overwrittenMinInterval > 0) {
       interval = aObj.data.overwrittenMinInterval;
@@ -873,8 +954,12 @@ this.RequestSyncService = {
     AlarmService.add(
       { date: new Date(Date.now() + interval * 1000),
         ignoreTimezone: false },
-      () => this.timeout(aObj),
-      aTimerId => this._timers[aObj.dbKey] = aTimerId);
+      () => this.timeout(aObj, null),
+      function(aTimerId) {
+        this._timers[aObj.dbKey] = aTimerId;
+        aCb();
+      }.bind(this),
+      () => aCb());
   },
 
   hasTimer: function(aObj) {
@@ -905,6 +990,12 @@ this.RequestSyncService = {
     let requests = this._pendingRequests[aObj.dbKey];
     delete this._pendingRequests[aObj.dbKey];
     return requests;
+  },
+
+  maybeReleaseWakeLock: function(aWakeLock) {
+    if (aWakeLock) {
+      aWakeLock.unlock();
+    }
   }
 }
 

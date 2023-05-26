@@ -177,6 +177,7 @@ def parse_commit(message, jobs):
     parser.add_argument('-b', dest='build_types')
     parser.add_argument('-p', nargs='?', dest='platforms', const='all', default='all')
     parser.add_argument('-u', nargs='?', dest='tests', const='all', default='all')
+    parser.add_argument('-i', '--interactive', dest='interactive', action='store_true', default=False)
     args, unknown = parser.parse_known_args(parts[1:])
 
     # Then builds...
@@ -212,13 +213,25 @@ def parse_commit(message, jobs):
             else:
                 additional_parameters = {}
 
+            # Generate list of post build tasks that run on this build
+            post_build_jobs = []
+            for job_flag in jobs['flags']['post-build']:
+                job = jobs['post-build'][job_flag]
+                if 'allowed_build_tasks' in job and build_task not in job['allowed_build_tasks']:
+                    continue
+                post_build_jobs.append(copy.deepcopy(job))
+
             # Node for this particular build type
             result.append({
                 'task': build_task,
+                'post-build': post_build_jobs,
                 'dependents': extract_tests_from_platform(
                     jobs['tests'], platform_builds, build_task, tests
                 ),
-                'additional-parameters': additional_parameters
+                'additional-parameters': additional_parameters,
+                'build_name': platform,
+                'build_type': build_type,
+                'interactive': args.interactive,
             })
 
     return result

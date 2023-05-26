@@ -12,7 +12,6 @@ const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/debug.js", this);
 Cu.import("resource://gre/modules/Log.jsm");
-Cu.import("resource://gre/modules/osfile.jsm", this);
 Cu.import("resource://gre/modules/Services.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
@@ -22,6 +21,7 @@ Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
 Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
 Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 const Utils = TelemetryUtils;
 
@@ -44,11 +44,7 @@ const REASON_SHUTDOWN = "shutdown";
 const ENVIRONMENT_CHANGE_LISTENER = "TelemetrySession::onEnvironmentChange";
 
 const MS_IN_ONE_HOUR  = 60 * 60 * 1000;
-const MIN_SUBSESSION_LENGTH_MS = 10 * 60 * 1000;
-
-// This is the HG changeset of the Histogram.json file, used to associate
-// submitted ping data with its histogram definition (bug 832007)
-#expand const HISTOGRAMS_FILE_VERSION = "__HISTOGRAMS_FILE_VERSION__";
+const MIN_SUBSESSION_LENGTH_MS = Preferences.get("toolkit.telemetry.minSubsessionLength", 10 * 60) * 1000;
 
 const LOGGER_NAME = "Toolkit.Telemetry";
 const LOGGER_PREFIX = "TelemetrySession" + (Utils.isContentProcess ? "#content::" : "::");
@@ -66,8 +62,6 @@ const MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD = "Telemetry:GetChildPayload";
 const DATAREPORTING_DIRECTORY = "datareporting";
 const ABORTED_SESSION_FILE_NAME = "aborted-session-ping";
 
-const SESSION_STATE_FILE_NAME = "session-state.json";
-
 // Whether the FHR/Telemetry unification features are enabled.
 // Changing this pref requires a restart.
 const IS_UNIFIED_TELEMETRY = Preferences.get(PREF_UNIFIED, false);
@@ -75,30 +69,24 @@ const IS_UNIFIED_TELEMETRY = Preferences.get(PREF_UNIFIED, false);
 // Maximum number of content payloads that we are willing to store.
 const MAX_NUM_CONTENT_PAYLOADS = 10;
 
-// Do not gather data more than once a minute
-const TELEMETRY_INTERVAL = 60000;
+// Do not gather data more than once a minute (ms)
+const TELEMETRY_INTERVAL = 60 * 1000;
 // Delay before intializing telemetry (ms)
-const TELEMETRY_DELAY = 60000;
+const TELEMETRY_DELAY = Preferences.get("toolkit.telemetry.initDelay", 60) * 1000;
 // Delay before initializing telemetry if we're testing (ms)
 const TELEMETRY_TEST_DELAY = 100;
 // Execute a scheduler tick every 5 minutes.
-const SCHEDULER_TICK_INTERVAL_MS = 5 * 60 * 1000;
+const SCHEDULER_TICK_INTERVAL_MS = Preferences.get("toolkit.telemetry.scheduler.tickInterval", 5 * 60) * 1000;
 // When user is idle, execute a scheduler tick every 60 minutes.
-const SCHEDULER_TICK_IDLE_INTERVAL_MS = 60 * 60 * 1000;
-// The maximum number of times a scheduled operation can fail.
-const SCHEDULER_RETRY_ATTEMPTS = 3;
+const SCHEDULER_TICK_IDLE_INTERVAL_MS = Preferences.get("toolkit.telemetry.scheduler.idleTickInterval", 60 * 60) * 1000;
 
 // The tolerance we have when checking if it's midnight (15 minutes).
 const SCHEDULER_MIDNIGHT_TOLERANCE_MS = 15 * 60 * 1000;
 
-// Coalesce the daily and aborted-session pings if they are both due within
-// two minutes from each other.
-const SCHEDULER_COALESCE_THRESHOLD_MS = 2 * 60 * 1000;
-
 // Seconds of idle time before pinging.
 // On idle-daily a gather-telemetry notification is fired, during it probes can
 // start asynchronous tasks to gather data.
-const IDLE_TIMEOUT_SECONDS = 5 * 60;
+const IDLE_TIMEOUT_SECONDS = Preferences.get("toolkit.telemetry.idleTimeout", 5 * 60);
 
 // The frequency at which we persist session data to the disk to prevent data loss
 // in case of aborted sessions (currently 5 minutes).
@@ -151,8 +139,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry",
                                   "resource://gre/modules/UITelemetry.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryEnvironment",
                                   "resource://gre/modules/TelemetryEnvironment.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "CommonUtils",
-                                  "resource://services-common/utils.js");
 
 function generateUUID() {
   let str = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator).generateUUID().toString();
@@ -160,11 +146,21 @@ function generateUUID() {
   return str.substring(1, str.length - 1);
 }
 
+function getMsSinceProcessStart() {
+  try {
+    return Telemetry.msSinceProcessStart();
+  } catch (ex) {
+    // If this fails return a special value.
+    return -1;
+  }
+}
+
 /**
  * This is a policy object used to override behavior for testing.
  */
 var Policy = {
   now: () => new Date(),
+  monotonicNow: getMsSinceProcessStart,
   generateSessionUUID: () => generateUUID(),
   generateSubsessionUUID: () => generateUUID(),
   setSchedulerTickTimeout: (callback, delayMs) => setTimeout(callback, delayMs),
@@ -200,7 +196,8 @@ function toLocalTimeISOString(date) {
   }
 
   let sign = (n) => n >= 0 ? "+" : "-";
-  let tzOffset = date.getTimezoneOffset();
+  // getTimezoneOffset counter-intuitively returns -60 for UTC+1.
+  let tzOffset = - date.getTimezoneOffset();
 
   // YYYY-MM-DDThh:mm:ss.sTZD (eg 1997-07-16T19:20:30.45+01:00)
   return    padNumber(date.getFullYear(), 4)
@@ -208,10 +205,10 @@ function toLocalTimeISOString(date) {
     + "-" + padNumber(date.getDate(), 2)
     + "T" + padNumber(date.getHours(), 2)
     + ":" + padNumber(date.getMinutes(), 2)
-    + ":" + padNumber(date.getSeconds(), 2);
+    + ":" + padNumber(date.getSeconds(), 2)
     + "." + date.getMilliseconds()
-    + sign(tzOffset) + Math.abs(Math.floor(tzOffset / 60))
-    + ":" + Math.abs(tzOffset % 60);
+    + sign(tzOffset) + padNumber(Math.floor(Math.abs(tzOffset / 60)), 2)
+    + ":" + padNumber(Math.abs(tzOffset % 60), 2);
 }
 
 /**
@@ -262,97 +259,6 @@ var processInfo = {
 };
 
 /**
- * This object allows the serialisation of asynchronous tasks. This is particularly
- * useful to serialise write access to the disk in order to prevent race conditions
- * to corrupt the data being written.
- * We are using this to synchronize saving to the file that TelemetrySession persists
- * its state in.
- */
-function SaveSerializer() {
-  this._queuedOperations = [];
-  this._queuedInProgress = false;
-  this._log = Log.repository.getLoggerWithMessagePrefix(LOGGER_NAME, LOGGER_PREFIX);
-}
-
-SaveSerializer.prototype = {
-  /**
-   * Enqueues an operation to a list to serialise their execution in order to prevent race
-   * conditions. Useful to serialise access to disk.
-   *
-   * @param {Function} aFunction The task function to enqueue. It must return a promise.
-   * @return {Promise} A promise resolved when the enqueued task completes.
-   */
-  enqueueTask: function (aFunction) {
-    let promise = new Promise((resolve, reject) =>
-      this._queuedOperations.push([aFunction, resolve, reject]));
-
-    if (this._queuedOperations.length == 1) {
-      this._popAndPerformQueuedOperation();
-    }
-    return promise;
-  },
-
-  /**
-   * Make sure to flush all the pending operations.
-   * @return {Promise} A promise resolved when all the pending operations have completed.
-   */
-  flushTasks: function () {
-    let dummyTask = () => new Promise(resolve => resolve());
-    return this.enqueueTask(dummyTask);
-  },
-
-  /**
-   * Pop a task from the queue, executes it and continue to the next one.
-   * This function recursively pops all the tasks.
-   */
-  _popAndPerformQueuedOperation: function () {
-    if (!this._queuedOperations.length || this._queuedInProgress) {
-      return;
-    }
-
-    this._log.trace("_popAndPerformQueuedOperation - Performing queued operation.");
-    let [func, resolve, reject] = this._queuedOperations.shift();
-    let promise;
-
-    try {
-      this._queuedInProgress = true;
-      promise = func();
-    } catch (ex) {
-      this._log.warn("_popAndPerformQueuedOperation - Queued operation threw during execution. ",
-                     ex);
-      this._queuedInProgress = false;
-      reject(ex);
-      this._popAndPerformQueuedOperation();
-      return;
-    }
-
-    if (!promise || typeof(promise.then) != "function") {
-      let msg = "Queued operation did not return a promise: " + func;
-      this._log.warn("_popAndPerformQueuedOperation - " + msg);
-
-      this._queuedInProgress = false;
-      reject(new Error(msg));
-      this._popAndPerformQueuedOperation();
-      return;
-    }
-
-    promise.then(result => {
-        this._log.trace("_popAndPerformQueuedOperation - Queued operation completed.");
-        this._queuedInProgress = false;
-        resolve(result);
-        this._popAndPerformQueuedOperation();
-      },
-      error => {
-        this._log.warn("_popAndPerformQueuedOperation - Failure when performing queued operation.",
-                       error);
-        this._queuedInProgress = false;
-        reject(error);
-        this._popAndPerformQueuedOperation();
-      });
-  },
-};
-
-/**
  * TelemetryScheduler contains a single timer driving all regularly-scheduled
  * Telemetry related jobs. Having a single place with this logic simplifies
  * reasoning about scheduling actions in a single place, making it easier to
@@ -367,9 +273,6 @@ var TelemetryScheduler = {
   _lastTickTime: 0,
 
   _log: null,
-
-  // The number of times a daily ping fails.
-  _dailyPingRetryAttempts: 0,
 
   // The timer which drives the scheduler.
   _schedulerTimer: null,
@@ -528,42 +431,26 @@ var TelemetryScheduler = {
     }
     this._lastTickTime = now;
 
-    // Check if aborted-session ping is due.
-    let isAbortedPingDue =
-      (now - this._lastSessionCheckpointTime) >= ABORTED_SESSION_UPDATE_INTERVAL_MS;
-    // Check if daily ping is due.
-    let shouldSendDaily = this._isDailyPingDue(nowDate);
-    // We can combine the daily-ping and the aborted-session ping in the following cases:
-    // - If both the daily and the aborted session pings are due (a laptop that wakes
-    //   up after a few hours).
-    // - If either the daily ping is due and the other one would follow up shortly
-    //   (whithin the coalescence threshold).
-    let nextSessionCheckpoint =
-      this._lastSessionCheckpointTime + ABORTED_SESSION_UPDATE_INTERVAL_MS;
-    let combineActions = (shouldSendDaily && isAbortedPingDue) || (shouldSendDaily &&
-                          Utils.areTimesClose(now, nextSessionCheckpoint,
-                                                       SCHEDULER_COALESCE_THRESHOLD_MS));
+    // Check if the daily ping is due.
+    const shouldSendDaily = this._isDailyPingDue(nowDate);
 
-    if (combineActions) {
-      this._log.trace("_schedulerTickLogic - Combining pings.");
-      // Send the daily ping and also save its payload as an aborted-session ping.
-      return Impl._sendDailyPing(true).then(() => this._dailyPingSucceeded(now),
-                                            () => this._dailyPingFailed(now));
-    } else if (shouldSendDaily) {
+    if (shouldSendDaily) {
       this._log.trace("_schedulerTickLogic - Daily ping due.");
-      return Impl._sendDailyPing().then(() => this._dailyPingSucceeded(now),
-                                        () => this._dailyPingFailed(now));
-    } else if (isAbortedPingDue) {
+      this._lastDailyPingTime = now;
+      return Impl._sendDailyPing();
+    }
+
+    // Check if the aborted-session ping is due. If a daily ping was saved above, it was
+    // already duplicated as an aborted-session ping.
+    const isAbortedPingDue =
+      (now - this._lastSessionCheckpointTime) >= ABORTED_SESSION_UPDATE_INTERVAL_MS;
+    if (isAbortedPingDue) {
       this._log.trace("_schedulerTickLogic - Aborted session ping due.");
       return this._saveAbortedPing(now);
     }
 
     // No ping is due.
     this._log.trace("_schedulerTickLogic - No ping due.");
-    // It's possible, because of sleeps, that we're no longer within midnight tolerance for
-    // daily pings. Because of that, daily retry attempts would not be 0 on the next midnight.
-    // Reset that count on do-nothing ticks.
-    this._dailyPingRetryAttempts = 0;
     return Promise.resolve();
   },
 
@@ -594,33 +481,6 @@ var TelemetryScheduler = {
     }
 
     this._rescheduleTimeout();
-  },
-
-  /**
-   * Called when a scheduled operation successfully completes (ping sent or saved).
-   * @param {Number} now The current time, in milliseconds.
-   */
-  _dailyPingSucceeded: function(now) {
-    this._log.trace("_dailyPingSucceeded");
-    this._lastDailyPingTime = now;
-    this._dailyPingRetryAttempts = 0;
-  },
-
-  /**
-   * Called when a scheduled operation fails (ping sent or saved).
-   * @param {Number} now The current time, in milliseconds.
-   */
-  _dailyPingFailed: function(now) {
-    this._log.error("_dailyPingFailed");
-    this._dailyPingRetryAttempts++;
-
-    // If we reach the maximum number of retry attempts for a daily ping, log the error
-    // and skip this daily ping.
-    if (this._dailyPingRetryAttempts >= SCHEDULER_RETRY_ATTEMPTS) {
-      this._log.error("_pingFailed - The daily ping failed too many times. Skipping it.");
-      this._dailyPingRetryAttempts = 0;
-      this._lastDailyPingTime = now;
-    }
   },
 
   /**
@@ -714,10 +574,12 @@ this.TelemetrySession = Object.freeze({
   reset: function() {
     Impl._sessionId = null;
     Impl._subsessionId = null;
+    Impl._previousSessionId = null;
     Impl._previousSubsessionId = null;
     Impl._subsessionCounter = 0;
     Impl._profileSubsessionCounter = 0;
     Impl._subsessionStartActiveTicks = 0;
+    Impl._subsessionStartTimeMonotonic = 0;
     this.uninstall();
     return this.setup();
   },
@@ -784,6 +646,8 @@ var Impl = {
   _sessionId: null,
   // Random subsession id.
   _subsessionId: null,
+  // Session id of the previous session, null on first run.
+  _previousSessionId: null,
   // Subsession id of the previous subsession (even if it was in a different session),
   // null on first run.
   _previousSubsessionId: null,
@@ -793,14 +657,15 @@ var Impl = {
   _profileSubsessionCounter: 0,
   // Date of the last session split
   _subsessionStartDate: null,
+  // Start time of the current subsession using a monotonic clock for the subsession
+  // length measurements.
+  _subsessionStartTimeMonotonic: 0,
   // The active ticks counted when the subsession starts
   _subsessionStartActiveTicks: 0,
   // A task performing delayed initialization of the chrome process
   _delayedInitTask: null,
   // The deferred promise resolved when the initialization task completes.
   _delayedInitTaskDeferred: null,
-  // Used to serialize session state writes to disk.
-  _stateSaveSerializer: new SaveSerializer(),
 
   get _log() {
     if (!this._logger) {
@@ -890,12 +755,6 @@ var Impl = {
     for (let ioCounter in this._startupIO)
       ret[ioCounter] = this._startupIO[ioCounter];
 
-    let hasPingBeenSent = false;
-    try {
-      hasPingBeenSent = Telemetry.getHistogramById("TELEMETRY_SUCCESS").snapshot().sum > 0;
-    } catch(e) {
-    }
-
     ret.savedPings = TelemetryStorage.pendingPingCount;
 
     ret.activeTicks = -1;
@@ -914,7 +773,6 @@ var Impl = {
     }
 
     ret.pingsOverdue = TelemetrySend.overduePingsCount;
-    ret.pingsDiscarded = TelemetrySend.discardedPingsCount;
 
     return ret;
   },
@@ -1055,6 +913,18 @@ var Impl = {
     return ret;
   },
 
+  getThreadHangStats: function getThreadHangStats(stats) {
+    this._log.trace("getThreadHangStats");
+
+    stats.forEach((thread) => {
+      thread.activity = this.packHistogram(thread.activity);
+      thread.hangs.forEach((hang) => {
+        hang.histogram = this.packHistogram(hang.histogram);
+      });
+    });
+    return stats;
+  },
+
   /**
    * Descriptive metadata
    *
@@ -1066,15 +936,13 @@ var Impl = {
   getMetadata: function getMetadata(reason) {
     this._log.trace("getMetadata - Reason " + reason);
 
-    let sessionStartDate = toLocalTimeISOString(Utils.truncateToDays(this._sessionStartDate));
-    let subsessionStartDate = toLocalTimeISOString(Utils.truncateToDays(this._subsessionStartDate));
-    // Compute the subsession length in milliseconds, then convert to seconds.
-    let subsessionLength =
-      Math.floor((Policy.now() - this._subsessionStartDate.getTime()) / 1000);
+    const sessionStartDate = toLocalTimeISOString(Utils.truncateToDays(this._sessionStartDate));
+    const subsessionStartDate = toLocalTimeISOString(Utils.truncateToDays(this._subsessionStartDate));
+    const monotonicNow = Policy.monotonicNow();
 
     let ret = {
       reason: reason,
-      revision: HISTOGRAMS_FILE_VERSION,
+      revision: AppConstants.SOURCE_REVISION_URL,
       asyncPluginInit: Preferences.get(PREF_ASYNC_PLUGIN_INIT, false),
 
       // Date.getTimezoneOffset() unintuitively returns negative values if we are ahead of
@@ -1084,6 +952,7 @@ var Impl = {
 
       sessionId: this._sessionId,
       subsessionId: this._subsessionId,
+      previousSessionId: this._previousSessionId,
       previousSubsessionId: this._previousSubsessionId,
 
       subsessionCounter: this._subsessionCounter,
@@ -1091,7 +960,13 @@ var Impl = {
 
       sessionStartDate: sessionStartDate,
       subsessionStartDate: subsessionStartDate,
-      subsessionLength: subsessionLength,
+
+      // Compute the session and subsession length in seconds.
+      // We use monotonic clocks as Date() is affected by jumping clocks (leading
+      // to negative lengths and other issues).
+      sessionLength: Math.floor(monotonicNow / 1000),
+      subsessionLength:
+        Math.floor((monotonicNow - this._subsessionStartTimeMonotonic) / 1000),
     };
 
     // TODO: Remove this when bug 1124128 lands.
@@ -1166,7 +1041,8 @@ var Impl = {
 
     b("MEMORY_VSIZE", "vsize");
     b("MEMORY_VSIZE_MAX_CONTIGUOUS", "vsizeMaxContiguous");
-    b("MEMORY_RESIDENT", "residentFast");
+    b("MEMORY_RESIDENT_FAST", "residentFast");
+    b("MEMORY_UNIQUE", "residentUnique");
     b("MEMORY_HEAP_ALLOCATED", "heapAllocated");
     p("MEMORY_HEAP_COMMITTED_UNUSED_RATIO", "heapOverheadRatio");
     b("MEMORY_JS_GC_HEAP", "JSMainRuntimeGCHeap");
@@ -1175,8 +1051,8 @@ var Impl = {
     c("MEMORY_JS_COMPARTMENTS_USER", "JSMainRuntimeCompartmentsUser");
     b("MEMORY_IMAGES_CONTENT_USED_UNCOMPRESSED", "imagesContentUsedUncompressed");
     b("MEMORY_STORAGE_SQLITE", "storageSQLite");
-    cc("MEMORY_EVENTS_VIRTUAL", "lowMemoryEventsVirtual");
-    cc("MEMORY_EVENTS_PHYSICAL", "lowMemoryEventsPhysical");
+    cc("LOW_MEMORY_EVENTS_VIRTUAL", "lowMemoryEventsVirtual");
+    cc("LOW_MEMORY_EVENTS_PHYSICAL", "lowMemoryEventsPhysical");
     c("GHOST_WINDOWS", "ghostWindows");
     cc("PAGE_FAULTS_HARD", "pageFaultsHard");
 
@@ -1232,7 +1108,7 @@ var Impl = {
   },
 
   getChildPayloads: function getChildPayloads() {
-    return [for (child of this._childTelemetry) child.payload];
+    return this._childTelemetry.map(child => child.payload);
   },
 
   /**
@@ -1279,10 +1155,8 @@ var Impl = {
     let payloadObj = {
       ver: PAYLOAD_VERSION,
       simpleMeasurements: simpleMeasurements,
-      histograms: this.getHistograms(isSubsession, clearSubsession),
-      keyedHistograms: this.getKeyedHistograms(isSubsession, clearSubsession),
-      chromeHangs: Telemetry.chromeHangs,
-      log: TelemetryLog.entries(),
+      histograms: protect(() => this.getHistograms(isSubsession, clearSubsession)),
+      keyedHistograms: protect(() => this.getKeyedHistograms(isSubsession, clearSubsession)),
     };
 
     // Add extended set measurements common to chrome & content processes
@@ -1302,14 +1176,21 @@ var Impl = {
 
     // Add extended set measurements for chrome process.
     if (Telemetry.canRecordExtended) {
-      payloadObj.slowSQL = Telemetry.slowSQL;
-      payloadObj.fileIOReports = Telemetry.fileIOReports;
-      payloadObj.lateWrites = Telemetry.lateWrites;
-      payloadObj.addonHistograms = this.getAddonHistograms();
-      payloadObj.addonDetails = AddonManagerPrivate.getTelemetryDetails();
-      payloadObj.UIMeasurements = UITelemetry.getUIMeasurements();
+      payloadObj.slowSQL = protect(() => Telemetry.slowSQL);
+      payloadObj.fileIOReports = protect(() => Telemetry.fileIOReports);
+      payloadObj.lateWrites = protect(() => Telemetry.lateWrites);
 
-      if (Object.keys(this._slowSQLStartup).length != 0 &&
+      // Add the addon histograms if they are present
+      let addonHistograms = protect(() => this.getAddonHistograms());
+      if (addonHistograms && Object.keys(addonHistograms).length > 0) {
+        payloadObj.addonHistograms = addonHistograms;
+      }
+
+      payloadObj.addonDetails = protect(() => AddonManagerPrivate.getTelemetryDetails());
+      payloadObj.UIMeasurements = protect(() => UITelemetry.getUIMeasurements());
+
+      if (this._slowSQLStartup &&
+          Object.keys(this._slowSQLStartup).length != 0 &&
           (Object.keys(this._slowSQLStartup.mainThread).length ||
            Object.keys(this._slowSQLStartup.otherThreads).length)) {
         payloadObj.slowSQLStartup = this._slowSQLStartup;
@@ -1317,7 +1198,7 @@ var Impl = {
     }
 
     if (this._childTelemetry.length) {
-      payloadObj.childPayloads = this.getChildPayloads();
+      payloadObj.childPayloads = protect(() => this.getChildPayloads());
     }
 
     return payloadObj;
@@ -1328,6 +1209,7 @@ var Impl = {
    */
   startNewSubsession: function () {
     this._subsessionStartDate = Policy.now();
+    this._subsessionStartTimeMonotonic = Policy.monotonicNow();
     this._previousSubsessionId = this._subsessionId;
     this._subsessionId = Policy.generateSubsessionUUID();
     this._subsessionCounter++;
@@ -1336,12 +1218,13 @@ var Impl = {
 
   getSessionPayload: function getSessionPayload(reason, clearSubsession) {
     this._log.trace("getSessionPayload - reason: " + reason + ", clearSubsession: " + clearSubsession);
-#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
-    clearSubsession = false;
-    const isSubsession = false;
-#else
-    const isSubsession = !this._isClassicReason(reason);
-#endif
+
+    const isMobile = ["gonk", "android"].indexOf(AppConstants.platform) !== -1;
+    const isSubsession = isMobile ? false : !this._isClassicReason(reason);
+
+    if (isMobile) {
+      clearSubsession = false;
+    }
 
     let measurements =
       this.getSimpleMeasurements(reason == REASON_SAVED_SESSION, isSubsession, clearSubsession);
@@ -1352,7 +1235,7 @@ var Impl = {
       this.startNewSubsession();
       // Persist session data to disk (don't wait until it completes).
       let sessionData = this._getSessionDataObject();
-      this._stateSaveSerializer.enqueueTask(() => this._saveSessionData(sessionData));
+      TelemetryStorage.saveSessionData(sessionData);
     }
 
     return payload;
@@ -1446,9 +1329,9 @@ var Impl = {
                                       () => this._getState());
 
     Services.obs.addObserver(this, "sessionstore-windows-restored", false);
-#ifdef MOZ_WIDGET_ANDROID
-    Services.obs.addObserver(this, "application-background", false);
-#endif
+    if (AppConstants.platform === "android") {
+      Services.obs.addObserver(this, "application-background", false);
+    }
     Services.obs.addObserver(this, "xul-window-visible", false);
     this._hasWindowRestoredObserver = true;
     this._hasXulWindowVisibleObserver = true;
@@ -1466,7 +1349,7 @@ var Impl = {
         yield this._loadSessionData();
         // Update the session data to keep track of new subsessions created before
         // the initialization.
-        yield this._saveSessionData(this._getSessionDataObject());
+        yield TelemetryStorage.saveSessionData(this._getSessionDataObject());
 
         this.attachObservers();
         this.gatherMemory();
@@ -1581,7 +1464,6 @@ var Impl = {
     default:
       throw new Error("Telemetry.receiveMessage: bad message name");
     }
-    return Promise.resolve();
   },
 
   _processUUID: generateUUID(),
@@ -1596,41 +1478,44 @@ var Impl = {
 
    /**
     * Save both the "saved-session" and the "shutdown" pings to disk.
+    * This needs to be called after TelemetrySend shuts down otherwise pings
+    * would be sent instead of getting persisted to disk.
     */
-  saveShutdownPings: Task.async(function*() {
+  saveShutdownPings: function() {
     this._log.trace("saveShutdownPings");
 
-    if (IS_UNIFIED_TELEMETRY) {
-      try {
-        let shutdownPayload = this.getSessionPayload(REASON_SHUTDOWN, false);
+    // We don't wait for "shutdown" pings to be written to disk before gathering the
+    // "saved-session" payload. Instead we append the promises to this list and wait
+    // on both to be saved after kicking off their collection.
+    let p = [];
 
-        let options = {
-          addClientId: true,
-          addEnvironment: true,
-          overwrite: true,
-        };
-        yield TelemetryController.addPendingPing(getPingType(shutdownPayload), shutdownPayload, options);
-      } catch (ex) {
-        this._log.error("saveShutdownPings - failed to submit shutdown ping", ex);
-      }
+    if (IS_UNIFIED_TELEMETRY) {
+      let shutdownPayload = this.getSessionPayload(REASON_SHUTDOWN, false);
+
+      let options = {
+        addClientId: true,
+        addEnvironment: true,
+      };
+      p.push(TelemetryController.submitExternalPing(getPingType(shutdownPayload), shutdownPayload, options)
+                                .catch(e => this._log.error("saveShutdownPings - failed to submit shutdown ping", e)));
      }
 
     // As a temporary measure, we want to submit saved-session too if extended Telemetry is enabled
     // to keep existing performance analysis working.
     if (Telemetry.canRecordExtended) {
-      try {
-        let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
+      let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
 
-        let options = {
-          addClientId: true,
-          addEnvironment: true,
-        };
-        yield TelemetryController.addPendingPing(getPingType(payload), payload, options);
-      } catch (ex) {
-        this._log.error("saveShutdownPings - failed to submit saved-session ping", ex);
-      }
+      let options = {
+        addClientId: true,
+        addEnvironment: true,
+      };
+      p.push(TelemetryController.submitExternalPing(getPingType(payload), payload, options)
+                                .catch (e => this._log.error("saveShutdownPings - failed to submit saved-session ping", e)));
     }
-  }),
+
+    // Wait on pings to be saved.
+    return Promise.all(p);
+  },
 
 
   testSavePendingPing: function testSaveHistograms() {
@@ -1657,9 +1542,9 @@ var Impl = {
       Services.obs.removeObserver(this, "xul-window-visible");
       this._hasXulWindowVisibleObserver = false;
     }
-#ifdef MOZ_WIDGET_ANDROID
-    Services.obs.removeObserver(this, "application-background", false);
-#endif
+    if (AppConstants.platform === "android") {
+      Services.obs.removeObserver(this, "application-background", false);
+    }
   },
 
   getPayload: function getPayload(reason, clearSubsession) {
@@ -1760,23 +1645,25 @@ var Impl = {
       }).bind(this), Ci.nsIThread.DISPATCH_NORMAL);
       break;
 
-#ifdef MOZ_WIDGET_ANDROID
-    // On Android, we can get killed without warning once we are in the background,
-    // but we may also submit data and/or come back into the foreground without getting
-    // killed. To deal with this, we save the current session data to file when we are
-    // put into the background. This handles the following post-backgrounding scenarios:
-    // 1) We are killed immediately. In this case the current session data (which we
-    //    save to a file) will be loaded and submitted on a future run.
-    // 2) We submit the data while in the background, and then are killed. In this case
-    //    the file that we saved will be deleted by the usual process in
-    //    finishPingRequest after it is submitted.
-    // 3) We submit the data, and then come back into the foreground. Same as case (2).
-    // 4) We do not submit the data, but come back into the foreground. In this case
-    //    we have the option of either deleting the file that we saved (since we will either
-    //    send the live data while in the foreground, or create the file again on the next
-    //    backgrounding), or not (in which case we will delete it on submit, or overwrite
-    //    it on the next backgrounding). Not deleting it is faster, so that's what we do.
     case "application-background":
+      if (AppConstants.platform !== "android") {
+        break;
+      }
+      // On Android, we can get killed without warning once we are in the background,
+      // but we may also submit data and/or come back into the foreground without getting
+      // killed. To deal with this, we save the current session data to file when we are
+      // put into the background. This handles the following post-backgrounding scenarios:
+      // 1) We are killed immediately. In this case the current session data (which we
+      //    save to a file) will be loaded and submitted on a future run.
+      // 2) We submit the data while in the background, and then are killed. In this case
+      //    the file that we saved will be deleted by the usual process in
+      //    finishPingRequest after it is submitted.
+      // 3) We submit the data, and then come back into the foreground. Same as case (2).
+      // 4) We do not submit the data, but come back into the foreground. In this case
+      //    we have the option of either deleting the file that we saved (since we will either
+      //    send the live data while in the foreground, or create the file again on the next
+      //    backgrounding), or not (in which case we will delete it on submit, or overwrite
+      //    it on the next backgrounding). Not deleting it is faster, so that's what we do.
       if (Telemetry.isOfficialTelemetry) {
         let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
         let options = {
@@ -1787,7 +1674,6 @@ var Impl = {
         TelemetryController.addPendingPing(getPingType(payload), payload, options);
       }
       break;
-#endif
     }
   },
 
@@ -1814,7 +1700,6 @@ var Impl = {
       if (Telemetry.isOfficialTelemetry || testing) {
         return Task.spawn(function*() {
           yield this.saveShutdownPings();
-          yield this._stateSaveSerializer.flushTasks();
 
           if (IS_UNIFIED_TELEMETRY) {
             yield TelemetryController.removeAbortedSessionPing();
@@ -1852,11 +1737,9 @@ var Impl = {
 
   /**
    * Gather and send a daily ping.
-   * @param {Boolean} [saveAsAborted=false] Also saves the payload as an aborted-session
-   *                  ping.
    * @return {Promise} Resolved when the ping is sent.
    */
-  _sendDailyPing: function(saveAsAborted = false) {
+  _sendDailyPing: function() {
     this._log.trace("_sendDailyPing");
     let payload = this.getSessionPayload(REASON_DAILY, true);
 
@@ -1866,42 +1749,44 @@ var Impl = {
     };
 
     let promise = TelemetryController.submitExternalPing(getPingType(payload), payload, options);
-    // If required, also save the payload as an aborted session.
-    if (saveAsAborted && IS_UNIFIED_TELEMETRY) {
-      let abortedPromise = this._saveAbortedSessionPing(payload);
-      promise = promise.then(() => abortedPromise);
+
+    // Also save the payload as an aborted session. If we delay this, aborted-session can
+    // lag behind for the profileSubsessionCounter and other state, complicating analysis.
+    if (IS_UNIFIED_TELEMETRY) {
+      this._saveAbortedSessionPing(payload)
+          .catch(e => this._log.error("_sendDailyPing - Failed to save the aborted session ping", e));
     }
+
     return promise;
   },
 
-  /**
-   * Loads session data from the session data file.
-   * @return {Promise<boolean>} A promise which is resolved with a true argument when
-   *                            loading has completed, with false otherwise.
+  /** Loads session data from the session data file.
+   * @return {Promise<object>} A promise which is resolved with an object when
+   *                            loading has completed, with null otherwise.
    */
   _loadSessionData: Task.async(function* () {
-    let dataFile = OS.Path.join(OS.Constants.Path.profileDir, DATAREPORTING_DIRECTORY,
-                                SESSION_STATE_FILE_NAME);
+    let data = yield TelemetryStorage.loadSessionData();
 
-    // Try to load the "profileSubsessionCounter" from the state file.
-    try {
-      let data = yield CommonUtils.readJSON(dataFile);
-      if (data &&
-          "profileSubsessionCounter" in data &&
-          typeof(data.profileSubsessionCounter) == "number" &&
-          "subsessionId" in data) {
-        this._previousSubsessionId = data.subsessionId;
-        // Add |_subsessionCounter| to the |_profileSubsessionCounter| to account for
-        // new subsession while loading still takes place. This will always be exactly
-        // 1 - the current subsessions.
-        this._profileSubsessionCounter = data.profileSubsessionCounter +
-                                         this._subsessionCounter;
-        return true;
-      }
-    } catch (e) {
-      this._log.info("_loadSessionData - Cannot load session data file " + dataFile, e);
+    if (!data) {
+      return null;
     }
-    return false;
+
+    if (!("profileSubsessionCounter" in data) ||
+        !(typeof(data.profileSubsessionCounter) == "number") ||
+        !("subsessionId" in data) || !("sessionId" in data)) {
+      this._log.error("_loadSessionData - session data is invalid");
+      Telemetry.getHistogramById("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").add(1);
+      return null;
+    }
+
+    this._previousSessionId = data.sessionId;
+    this._previousSubsessionId = data.subsessionId;
+    // Add |_subsessionCounter| to the |_profileSubsessionCounter| to account for
+    // new subsession while loading still takes place. This will always be exactly
+    // 1 - the current subsessions.
+    this._profileSubsessionCounter = data.profileSubsessionCounter +
+                                     this._subsessionCounter;
+    return data;
   }),
 
   /**
@@ -1909,25 +1794,11 @@ var Impl = {
    */
   _getSessionDataObject: function() {
     return {
+      sessionId: this._sessionId,
       subsessionId: this._subsessionId,
       profileSubsessionCounter: this._profileSubsessionCounter,
     };
   },
-
-  /**
-   * Saves session data to disk.
-   */
-  _saveSessionData: Task.async(function* (sessionData) {
-    let dataDir = OS.Path.join(OS.Constants.Path.profileDir, DATAREPORTING_DIRECTORY);
-    yield OS.File.makeDir(dataDir);
-
-    let filePath = OS.Path.join(dataDir, SESSION_STATE_FILE_NAME);
-    try {
-      yield CommonUtils.writeJSON(sessionData, filePath);
-    } catch(e) {
-      this._log.error("_saveSessionData - Failed to write session data to " + filePath, e);
-    }
-  }),
 
   _onEnvironmentChange: function(reason, oldEnvironment) {
     this._log.trace("_onEnvironmentChange", reason);
@@ -1970,9 +1841,7 @@ var Impl = {
    *                 If not provided, a new payload is gathered.
    */
   _saveAbortedSessionPing: function(aProvidedPayload = null) {
-    const FILE_PATH = OS.Path.join(OS.Constants.Path.profileDir, DATAREPORTING_DIRECTORY,
-                                   ABORTED_SESSION_FILE_NAME);
-    this._log.trace("_saveAbortedSessionPing - ping path: " + FILE_PATH);
+    this._log.trace("_saveAbortedSessionPing");
 
     let payload = null;
     if (aProvidedPayload) {

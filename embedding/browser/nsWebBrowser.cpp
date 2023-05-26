@@ -360,7 +360,10 @@ nsWebBrowser::SetParentURIContentListener(
 NS_IMETHODIMP
 nsWebBrowser::GetContentDOMWindow(nsIDOMWindow** aResult)
 {
-  NS_ENSURE_STATE(mDocShell);
+  if (!mDocShell) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
   nsCOMPtr<nsIDOMWindow> retval = mDocShell->GetWindow();
   retval.forget(aResult);
   return *aResult ? NS_OK : NS_ERROR_FAILURE;
@@ -1726,7 +1729,7 @@ nsWebBrowser::WindowLowered(nsIWidget* aWidget)
 }
 
 bool
-nsWebBrowser::PaintWindow(nsIWidget* aWidget, nsIntRegion aRegion)
+nsWebBrowser::PaintWindow(nsIWidget* aWidget, LayoutDeviceIntRegion aRegion)
 {
   LayerManager* layerManager = aWidget->GetLayerManager();
   NS_ASSERTION(layerManager, "Must be in paint event");
@@ -1734,7 +1737,7 @@ nsWebBrowser::PaintWindow(nsIWidget* aWidget, nsIntRegion aRegion)
   layerManager->BeginTransaction();
   RefPtr<PaintedLayer> root = layerManager->CreatePaintedLayer();
   if (root) {
-    nsIntRect dirtyRect = aRegion.GetBounds();
+    nsIntRect dirtyRect = aRegion.GetBounds().ToUnknownRect();
     root->SetVisibleRegion(LayerIntRegion::FromUnknownRegion(dirtyRect));
     layerManager->SetRoot(root);
   }

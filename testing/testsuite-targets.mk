@@ -389,10 +389,13 @@ include $(topsrcdir)/toolkit/mozapps/installer/package-name.mk
 
 ifndef UNIVERSAL_BINARY
 PKG_STAGE = $(DIST)/test-stage
-package-tests: \
+
+stage-all: \
   stage-config \
   stage-mach \
+  stage-extensions \
   stage-mochitest \
+  stage-talos \
   stage-reftest \
   stage-xpcshell \
   stage-jstests \
@@ -406,9 +409,10 @@ package-tests: \
   stage-web-platform-tests \
   stage-luciddream \
   test-packages-manifest \
+  test-packages-manifest-tc \
   $(NULL)
 ifdef MOZ_WEBRTC
-package-tests: stage-steeplechase
+stage-all: stage-steeplechase
 endif
 else
 # This staging area has been built for us by universal/flight.mk
@@ -419,11 +423,20 @@ TEST_PKGS := \
   cppunittest \
   mochitest \
   reftest \
+  talos \
   xpcshell \
   web-platform \
   $(NULL)
 
 PKG_ARG = --$(1) '$(PKG_BASENAME).$(1).tests.zip'
+
+test-packages-manifest-tc:
+	$(PYTHON) $(topsrcdir)/build/gen_test_packages_manifest.py \
+      --jsshell $(JSSHELL_NAME) \
+      --dest-file $(MOZ_TEST_PACKAGES_FILE_TC) \
+      --use-short-names \
+      $(call PKG_ARG,common) \
+      $(foreach pkg,$(TEST_PKGS),$(call PKG_ARG,$(pkg)))
 
 test-packages-manifest:
 	@rm -f $(MOZ_TEST_PACKAGES_FILE)
@@ -436,27 +449,42 @@ endif
       $(call PKG_ARG,common) \
       $(foreach pkg,$(TEST_PKGS),$(call PKG_ARG,$(pkg)))
 
-package-tests:
+package-tests-prepare-dest:
 	@rm -f '$(DIST)/$(PKG_PATH)$(TEST_PACKAGE)'
 ifndef UNIVERSAL_BINARY
 	$(NSINSTALL) -D $(DIST)/$(PKG_PATH)
 endif
-# Exclude harness specific directories when generating the common zip.
-	$(MKDIR) -p $(abspath $(DIST))/$(PKG_PATH) && \
 	cd $(PKG_STAGE) && \
-	  zip -rq9D '$(abspath $(DIST))/$(PKG_PATH)$(TEST_PACKAGE)' \
-	  * -x \*/.mkdir.done \*.pyc $(foreach name,$(TEST_PKGS),$(name)\*) && \
-	$(foreach name,$(TEST_PKGS),rm -f '$(DIST)/$(PKG_PATH)$(PKG_BASENAME).'$(name)'.tests.zip' && \
-                                zip -rq9D '$(abspath $(DIST))/$(PKG_PATH)$(PKG_BASENAME).'$(name)'.tests.zip' \
-                                $(name) -x \*/.mkdir.done \*.pyc ;)
+	  zip -rq9D $(abspath $(DIST))/$(PKG_PATH)mozharness.zip mozharness
+package-tests: package-tests-mozharness
 
-ifeq ($(MOZ_WIDGET_TOOLKIT),android)
-package-tests: stage-android
-package-tests: stage-instrumentation-tests
+package-tests-common: stage-all package-tests-prepare-dest
+	  * -x \*/.mkdir.done \*.pyc $(foreach name,$(TEST_PKGS),$(name)\*)
+package-tests: package-tests-common
+
+define package_archive
+package-tests-$(1): stage-all package-tests-prepare-dest
+	rm -f '$$(DIST)/$$(PKG_PATH)$$(PKG_BASENAME).$(1).tests.zip' && \
+		cd $$(abspath $(PKG_STAGE)) && \
+		zip -rq9D '$$(abspath $$(DIST))/$$(PKG_PATH)$$(PKG_BASENAME).$(1).tests.zip' \
+		$(1) -x \*/.mkdir.done \*.pyc ;
+.PHONY += package-tests-$(1)
+package-tests: package-tests-$(1)
+endef
+
+$(foreach name,$(TEST_PKGS),$(eval $(call package_archive,$(name))))
+
+ifeq ($(MOZ_BUILD_APP),mobile/android)
+stage-all: stage-android
+stage-all: stage-instrumentation-tests
+endif
+
+ifeq ($(MOZ_BUILD_APP),mobile/android/b2gdroid)
+stage-all: stage-android
 endif
 
 ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
-package-tests: stage-b2g
+stage-all: stage-b2g
 endif
 
 make-stage-dir:
@@ -489,6 +517,11 @@ ifeq ($(MOZ_BUILD_APP),mobile/android)
 	$(NSINSTALL) $(DEPTH)/mobile/android/base/fennec_ids.txt $(PKG_STAGE)/mochitest
 endif
 
+TALOS_DIR=$(PKG_STAGE)/talos
+stage-talos: make-stage-dir
+	$(NSINSTALL) -D $(TALOS_DIR)
+	@(cd $(topsrcdir)/testing/talos && tar $(TAR_CREATE_FLAGS) - *) | (cd $(TALOS_DIR)/ && tar -xf -)
+
 stage-reftest: make-stage-dir
 	$(MAKE) -C $(DEPTH)/layout/tools/reftest stage-package
 
@@ -507,6 +540,8 @@ endif
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/watcher/Watcher.apk $(PKG_STAGE)/bin
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/fencp/FenCP.apk $(PKG_STAGE)/bin
 	$(NSINSTALL) $(DEPTH)/build/mobile/sutagent/android/ffxcp/FfxCP.apk $(PKG_STAGE)/bin
+	$(NSINSTALL) $(topsrcdir)/mobile/android/fonts $(DEPTH)/_tests/reftest
+	$(NSINSTALL) $(topsrcdir)/mobile/android/fonts $(DEPTH)/_tests/testing/mochitest
 
 stage-jetpack: make-stage-dir
 	$(MAKE) -C $(DEPTH)/addon-sdk stage-tests-package
@@ -597,6 +632,14 @@ stage-web-platform-tests: make-stage-dir
 stage-instrumentation-tests: make-stage-dir
 	$(MAKE) -C $(DEPTH)/testing/instrumentation stage-package
 
+TEST_EXTENSIONS := \
+    specialpowers@mozilla.org.xpi \
+	$(NULL)
+
+stage-extensions: make-stage-dir
+	$(NSINSTALL) -D $(PKG_STAGE)/extensions/
+	@$(foreach ext,$(TEST_EXTENSIONS), cp -RL $(DIST)/xpi-stage/$(ext) $(PKG_STAGE)/extensions;)
+
 .PHONY: \
   mochitest \
   mochitest-plain \
@@ -609,10 +652,15 @@ stage-instrumentation-tests: make-stage-dir
   xpcshell-tests \
   jstestbrowser \
   package-tests \
+  package-tests-prepare-dest \
+  package-tests-mozharness \
+  package-tests-common \
   make-stage-dir \
+  stage-all \
   stage-b2g \
   stage-config \
   stage-mochitest \
+  stage-talos \
   stage-reftest \
   stage-xpcshell \
   stage-jstests \
@@ -627,5 +675,6 @@ stage-instrumentation-tests: make-stage-dir
   stage-instrumentation-tests \
   stage-luciddream \
   test-packages-manifest \
+  test-packages-manifest-tc \
   $(NULL)
 

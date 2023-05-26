@@ -23,16 +23,18 @@ MessagePortChild::RecvStopSendingDataConfirmed()
 bool
 MessagePortChild::RecvEntangled(nsTArray<MessagePortMessage>&& aMessages)
 {
-  MOZ_ASSERT(mPort);
-  mPort->Entangled(aMessages);
+  if (mPort) {
+    mPort->Entangled(aMessages);
+  }
   return true;
 }
 
 bool
 MessagePortChild::RecvReceiveData(nsTArray<MessagePortMessage>&& aMessages)
 {
-  MOZ_ASSERT(mPort);
-  mPort->MessagesReceived(aMessages);
+  if (mPort) {
+    mPort->MessagesReceived(aMessages);
+  }
   return true;
 }
 
@@ -45,5 +47,5 @@ MessagePortChild::ActorDestroy(ActorDestroyReason aWhy)
   }
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

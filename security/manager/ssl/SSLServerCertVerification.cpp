@@ -31,7 +31,7 @@
 // transport service thread, we must always call the CERT_*Verify* cert
 // functions on another thread. To accomplish this, our auth cert hook
 // dispatches a SSLServerCertVerificationJob to a pool of background threads,
-// and then immediatley return SECWouldBlock to libssl. These jobs are where
+// and then immediately returns SECWouldBlock to libssl. These jobs are where
 // the CERT_*Verify* functions are actually called.
 //
 // When our auth cert hook returns SECWouldBlock, libssl will carry on the
@@ -462,16 +462,6 @@ CertErrorRunnable::CheckCertOverrides()
                                                mDefaultErrorCodeToReport);
   }
 
-  nsCOMPtr<nsISSLSocketControl> sslSocketControl = do_QueryInterface(
-    NS_ISUPPORTS_CAST(nsITransportSecurityInfo*, mInfoObject));
-  if (sslSocketControl &&
-      sslSocketControl->GetBypassAuthentication()) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
-           ("[%p][%p] Bypass Auth in CheckCertOverrides\n",
-            mFdForLogging, this));
-    return new SSLServerCertVerificationResult(mInfoObject, 0);
-  }
-
   int32_t port;
   mInfoObject->GetPort(&port);
 
@@ -580,6 +570,8 @@ CertErrorRunnable::CheckCertOverrides()
   // First, deliver the technical details of the broken SSL status.
 
   // Try to get a nsIBadCertListener2 implementation from the socket consumer.
+  nsCOMPtr<nsISSLSocketControl> sslSocketControl = do_QueryInterface(
+    NS_ISUPPORTS_CAST(nsITransportSecurityInfo*, mInfoObject));
   if (sslSocketControl) {
     nsCOMPtr<nsIInterfaceRequestor> cb;
     sslSocketControl->GetNotificationCallbacks(getter_AddRefs(cb));
@@ -1151,6 +1143,50 @@ GatherRootCATelemetry(const ScopedCERTCertList& certList)
                                rootCert);
 }
 
+// These time are appoximate, i.e., doesn't account for leap seconds, etc
+const uint64_t ONE_WEEK_IN_SECONDS = (7 * (24 * 60 *60));
+const uint64_t ONE_YEAR_IN_WEEKS   = 52;
+
+// Gathers telemetry on the certificate lifetimes we observe in the wild
+void
+GatherEndEntityTelemetry(const ScopedCERTCertList& certList)
+{
+  CERTCertListNode* endEntityNode = CERT_LIST_HEAD(certList);
+  PR_ASSERT(endEntityNode);
+  if (!endEntityNode) {
+    return;
+  }
+
+  CERTCertificate * endEntityCert = endEntityNode->cert;
+  PR_ASSERT(endEntityCert);
+  if (!endEntityCert) {
+    return;
+  }
+
+  PRTime notBefore;
+  PRTime notAfter;
+
+  if (CERT_GetCertTimes(endEntityCert, &notBefore, &notAfter) != SECSuccess) {
+    return;
+  }
+
+  PR_ASSERT(notAfter > notBefore);
+  if (notAfter <= notBefore) {
+    return;
+  }
+
+  uint64_t durationInWeeks = (notAfter - notBefore)
+    / PR_USEC_PER_SEC
+    / ONE_WEEK_IN_SECONDS;
+
+  if (durationInWeeks > (2 * ONE_YEAR_IN_WEEKS)) {
+    durationInWeeks = (2 * ONE_YEAR_IN_WEEKS) + 1;
+  }
+
+  Telemetry::Accumulate(Telemetry::SSL_OBSERVED_END_ENTITY_CERTIFICATE_LIFETIME,
+      durationInWeeks);
+}
+
 // There are various things that we want to measure about certificate
 // chains that we accept.  This is a single entry point for all of them.
 void
@@ -1159,6 +1195,7 @@ GatherSuccessfulValidationTelemetry(const ScopedCERTCertList& certList)
   GatherBaselineRequirementsTelemetry(certList);
   GatherEKUTelemetry(certList);
   GatherRootCATelemetry(certList);
+  GatherEndEntityTelemetry(certList);
 }
 
 SECStatus
@@ -1484,6 +1521,14 @@ AuthCertificateHook(void* arg, PRFileDesc* fd, PRBool checkSig, PRBool isServer)
 
   if (BlockServerCertChangeForSpdy(socketInfo, serverCert) != SECSuccess)
     return SECFailure;
+
+  nsCOMPtr<nsISSLSocketControl> sslSocketControl = do_QueryInterface(
+    NS_ISUPPORTS_CAST(nsITransportSecurityInfo*, socketInfo));
+  if (sslSocketControl && sslSocketControl->GetBypassAuthentication()) {
+    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
+            ("[%p] Bypass Auth in AuthCertificateHook\n", fd));
+    return SECSuccess;
+  }
 
   bool onSTSThread;
   nsresult nrv;

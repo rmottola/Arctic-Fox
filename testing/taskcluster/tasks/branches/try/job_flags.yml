@@ -117,6 +117,14 @@ builds:
       opt:
         task: tasks/builds/b2g_dolphin_512_eng.yml
 
+post-build:
+  upload-symbols:
+    allowed_build_tasks:
+      - tasks/builds/opt_linux64.yml
+      - tasks/builds/dbg_linux64.yml
+      - tasks/builds/android_api_11.yml
+    task: tasks/post-builds/upload_symbols.yml
+
 tests:
   cppunit:
     allowed_build_tasks:

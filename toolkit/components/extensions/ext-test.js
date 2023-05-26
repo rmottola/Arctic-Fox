@@ -1,16 +1,29 @@
+"use strict";
+
 Components.utils.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
 } = ExtensionUtils;
 
+// WeakMap[Extension -> Set(callback)]
 var messageHandlers = new WeakMap();
 
+/* eslint-disable mozilla/balanced-listeners */
+extensions.on("startup", (type, extension) => {
+  messageHandlers.set(extension, new Set());
+});
+
+extensions.on("shutdown", (type, extension) => {
+  messageHandlers.delete(extension);
+});
+
 extensions.on("test-message", (type, extension, ...args) => {
-  let fire = messageHandlers.get(extension);
-  if (fire) {
-    fire(...args);
+  let handlers = messageHandlers.get(extension);
+  for (let handler of handlers) {
+    handler(...args);
   }
 });
+/* eslint-enable mozilla/balanced-listeners */
 
 extensions.registerAPI((extension, context) => {
   return {
@@ -40,11 +53,11 @@ extensions.registerAPI((extension, context) => {
       },
 
       assertTrue: function(value, msg) {
-        extension.emit("test-result", value ? true : false, msg);
+        extension.emit("test-result", Boolean(value), msg);
       },
 
       assertFalse: function(value, msg) {
-        extension.emit("test-result", !value ? true : false, msg);
+        extension.emit("test-result", !value, msg);
       },
 
       assertEq: function(expected, actual, msg) {
@@ -52,9 +65,11 @@ extensions.registerAPI((extension, context) => {
       },
 
       onMessage: new EventManager(context, "test.onMessage", fire => {
-        messageHandlers.set(extension, fire);
+        let handlers = messageHandlers.get(extension);
+        handlers.add(fire);
+
         return () => {
-          messageHandlers.delete(extension);
+          handlers.delete(fire);
         };
       }).api(),
     },

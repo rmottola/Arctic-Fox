@@ -7,6 +7,7 @@
 #include "MediaDecoderStateMachine.h"
 #include "AbstractMediaDecoder.h"
 #include "SoftwareWebMVideoDecoder.h"
+#include "nsContentUtils.h"
 #include "WebMReader.h"
 #include "WebMBufferedParser.h"
 #include "gfx2DGlue.h"
@@ -402,15 +403,11 @@ WebMReader::RetrieveWebMMetadata(MediaInfo* aInfo)
     }
   }
 
+  mInfo.mMediaSeekable = nestegg_has_cues(mContext);
+
   *aInfo = mInfo;
 
   return NS_OK;
-}
-
-bool
-WebMReader::IsMediaSeekable()
-{
-  return mContext && nestegg_has_cues(mContext);
 }
 
 bool WebMReader::DecodeAudioPacket(NesteggPacketHolder* aHolder)
@@ -749,7 +746,7 @@ media::TimeIntervals WebMReader::GetBuffered()
 
   // Either we the file is not fully cached, or we couldn't find a duration in
   // the WebM bitstream.
-  nsTArray<MediaByteRange> ranges;
+  MediaByteRangeSet ranges;
   nsresult res = resource->GetCachedRanges(ranges);
   NS_ENSURE_SUCCESS(res, media::TimeIntervals::Invalid());
 
@@ -788,7 +785,7 @@ void WebMReader::NotifyDataArrivedInternal()
 {
   MOZ_ASSERT(OnTaskQueue());
   AutoPinned<MediaResource> resource(mDecoder->GetResource());
-  nsTArray<MediaByteRange> byteRanges;
+  MediaByteRangeSet byteRanges;
   nsresult rv = resource->GetCachedRanges(byteRanges);
 
   if (NS_FAILED(rv)) {

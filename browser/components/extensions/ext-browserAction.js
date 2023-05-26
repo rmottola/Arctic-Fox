@@ -10,28 +10,24 @@ Cu.import("resource://devtools/shared/event-emitter.js");
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
-  DefaultWeakMap,
-  ignoreEvent,
   runSafe,
 } = ExtensionUtils;
 
 // WeakMap[Extension -> BrowserAction]
 var browserActionMap = new WeakMap();
 
-function browserActionOf(extension)
-{
+function browserActionOf(extension) {
   return browserActionMap.get(extension);
 }
 
-var nextActionId = 0;
-
 // Responsible for the browser_action section of the manifest as well
 // as the associated popup.
-function BrowserAction(options, extension)
-{
+function BrowserAction(options, extension) {
   this.extension = extension;
   this.id = makeWidgetId(extension.id) + "-browser-action";
   this.widget = null;
+
+  this.tabManager = TabManager.for(extension);
 
   let title = extension.localize(options.default_title || "");
   let popup = extension.localize(options.default_popup || "");
@@ -40,6 +36,7 @@ function BrowserAction(options, extension)
   }
 
   this.defaults = {
+    enabled: true,
     title: title,
     badgeText: "",
     badgeBackgroundColor: null,
@@ -71,9 +68,10 @@ BrowserAction.prototype = {
 
         let tabbrowser = document.defaultView.gBrowser;
 
-        node.addEventListener("command", event => {
+        node.addEventListener("command", event => { // eslint-disable-line mozilla/balanced-listeners
           let tab = tabbrowser.selectedTab;
           let popup = this.getProperty(tab, "popup");
+          this.tabManager.addActiveTabPermission(tab);
           if (popup) {
             this.togglePopup(node, popup);
           } else {
@@ -85,8 +83,8 @@ BrowserAction.prototype = {
       },
     });
 
-    this.tabContext.on("tab-select",
-                       (evt, tab) => { this.updateWindow(tab.ownerDocument.defaultView); })
+    this.tabContext.on("tab-select", // eslint-disable-line mozilla/balanced-listeners
+                       (evt, tab) => { this.updateWindow(tab.ownerDocument.defaultView); });
 
     this.widget = widget;
   },
@@ -114,8 +112,14 @@ BrowserAction.prototype = {
       node.removeAttribute("badge");
     }
 
+    if (tabData.enabled) {
+      node.removeAttribute("disabled");
+    } else {
+      node.setAttribute("disabled", "true");
+    }
+
     let badgeNode = node.ownerDocument.getAnonymousElementByAttribute(node,
-                                        'class', 'toolbarbutton-badge');
+                                        "class", "toolbarbutton-badge");
     if (badgeNode) {
       let color = tabData.badgeBackgroundColor;
       if (Array.isArray(color)) {
@@ -181,6 +185,7 @@ BrowserAction.prototype = {
   },
 };
 
+/* eslint-disable mozilla/balanced-listeners */
 extensions.on("manifest_browser_action", (type, directive, extension, manifest) => {
   let browserAction = new BrowserAction(manifest.browser_action, extension);
   browserAction.build();
@@ -193,6 +198,7 @@ extensions.on("shutdown", (type, extension) => {
     browserActionMap.delete(extension);
   }
 });
+/* eslint-enable mozilla/balanced-listeners */
 
 extensions.registerAPI((extension, context) => {
   return {
@@ -207,6 +213,16 @@ extensions.registerAPI((extension, context) => {
           browserActionOf(extension).off("click", listener);
         };
       }).api(),
+
+      enable: function(tabId) {
+        let tab = tabId ? TabManager.getTab(tabId) : null;
+        browserActionOf(extension).setProperty(tab, "enabled", true);
+      },
+
+      disable: function(tabId) {
+        let tab = tabId ? TabManager.getTab(tabId) : null;
+        browserActionOf(extension).setProperty(tab, "enabled", false);
+      },
 
       setTitle: function(details) {
         let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
@@ -254,7 +270,6 @@ extensions.registerAPI((extension, context) => {
       },
 
       setBadgeBackgroundColor: function(details) {
-        let color = details.color;
         let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
         browserActionOf(extension).setProperty(tab, "badgeBackgroundColor", details.color);
       },
@@ -264,6 +279,6 @@ extensions.registerAPI((extension, context) => {
         let color = browserActionOf(extension).getProperty(tab, "badgeBackgroundColor");
         runSafe(context, callback, color);
       },
-    }
+    },
   };
 });

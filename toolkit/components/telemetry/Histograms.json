@@ -423,15 +423,25 @@
     "kind": "flag",
     "description": "XUL cache was disabled"
   },
-  "MEMORY_RESIDENT": {
+  "MEMORY_RESIDENT_FAST": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
     "low": "32 * 1024",
     "high": "16 * 1024 * 1024",
-    "n_buckets": 200,
-    "extended_statistics_ok": true,
+    "n_buckets": 100,
+    "bug_numbers": [1226196],
     "description": "Resident memory size (KB)"
+  },
+  "MEMORY_UNIQUE": {
+    "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
+    "bug_numbers": [1198209],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": "32 * 1024",
+    "high": "16 * 1024 * 1024",
+    "n_buckets": 100,
+    "description": "Unique Set Size (KB)"
   },
   "MEMORY_VSIZE": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
@@ -670,33 +680,6 @@
     "extended_statistics_ok": true,
     "description": "Time(ms) spent on reading family names from all fonts"
   },
-  "DWRITEFONT_INITFONTLIST_TOTAL": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList Total (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_INITFONTLIST_INIT": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList init (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_INITFONTLIST_GDI": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::InitFontList GdiInterop object (ms)",
-    "cpp_guard": "XP_WIN"
-  },
   "DWRITEFONT_DELAYEDINITFONTLIST_TOTAL": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -715,12 +698,6 @@
     "description": "gfxDWriteFontList::DelayedInitFontList Font Family Count",
     "cpp_guard": "XP_WIN"
   },
-  "DWRITEFONT_DELAYEDINITFONTLIST_GDI_TABLE": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "gfxDWriteFontList::DelayedInitFontList GDI Table Access",
-    "cpp_guard": "XP_WIN"
-  },
   "DWRITEFONT_DELAYEDINITFONTLIST_COLLECT": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -728,15 +705,6 @@
     "n_buckets": 10,
     "extended_statistics_ok": true,
     "description": "gfxDWriteFontList::DelayedInitFontList GetSystemFontCollection (ms)",
-    "cpp_guard": "XP_WIN"
-  },
-  "DWRITEFONT_DELAYEDINITFONTLIST_ITERATE": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "30000",
-    "n_buckets": 10,
-    "extended_statistics_ok": true,
-    "description": "gfxDWriteFontList::DelayedInitFontList iterate over families (ms)",
     "cpp_guard": "XP_WIN"
   },
   "DWRITEFONT_INIT_PROBLEM": {
@@ -1388,6 +1356,14 @@
     "kind": "enumerated",
     "n_values": 16,
     "description": "SSL Handshake Key Exchange Algorithm for resumed handshake (null=0, rsa=1, dh=2, fortezza=3, ecdh=4)"
+  },
+  "SSL_OBSERVED_END_ENTITY_CERTIFICATE_LIFETIME": {
+    "expires_in_version": "55",
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "kind": "enumerated",
+    "n_values": 125,
+    "releaseChannelCollection": "opt-out",
+    "description": "The lifetime of accepted HTTPS server certificates, in weeks, up to 2 years. Bucket 105 is all end-entity HTTPS server certificates with a lifetime > 2 years."
   },
   "WEBSOCKETS_HANDSHAKE_TYPE": {
     "expires_in_version": "never",
@@ -4310,6 +4286,14 @@
     "extended_statistics_ok": true,
     "description": "Session restore: Number of characters in DOM Storage for a tab. Pages without DOM Storage or with an empty DOM Storage are ignored."
   },
+  "FX_TABLETMODE_PAGE_LOAD": {
+    "expires_in_version": "47",
+    "kind": "exponential",
+    "high": 100000,
+    "n_buckets": 30,
+    "keyed": true,
+    "description": "Number of toplevel location changes in tablet and desktop mode (only used on win10 where tablet mode is available)"
+  },
   "FX_URLBAR_SELECTED_RESULT_INDEX": {
     "expires_in_version": "45",
     "kind": "enumerated",
@@ -4752,24 +4736,105 @@
     "bug_numbers": [1162538],
     "description": "Time (ms) it takes for evicting over-quota pings"
   },
-  "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
-    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+  "TELEMETRY_PENDING_LOAD_FAILURE_READ": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
     "expires_in_version": "never",
     "kind": "count",
-    "description": "Count of discarded content payloads."
+    "description": "Number of pending Telemetry pings that failed to load from the disk"
+  },
+  "TELEMETRY_PENDING_LOAD_FAILURE_PARSE": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of pending Telemetry pings that failed to parse once loaded from the disk"
+  },
+  "TELEMETRY_PENDING_PINGS_SIZE_MB": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "17",
+    "n_buckets": 16,
+    "description": "The size of the Telemetry pending pings directory (MB). The special value 17 is used to indicate over quota pings."
+  },
+  "TELEMETRY_PENDING_PINGS_AGE": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "365",
+    "n_buckets": 30,
+    "description": "The age, in days, of the pending pings."
+  },
+  "TELEMETRY_PENDING_PINGS_EVICTED_OVER_QUOTA": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "100000",
+    "n_buckets": 100,
+    "description": "Number of Telemetry pings evicted from the pending pings directory during cleanup, because they were over the quota"
+  },
+  "TELEMETRY_PENDING_EVICTING_OVER_QUOTA_MS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "300000",
+    "n_buckets": 20,
+    "description": "Time (ms) it takes for evicting over-quota pending pings"
+  },
+  "TELEMETRY_PENDING_CHECKING_OVER_QUOTA_MS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "300000",
+    "n_buckets": 20,
+    "description": "Time (ms) it takes for checking if the pending pings are over-quota"
+  },
+  "TELEMETRY_PING_SIZE_EXCEEDED_SEND": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of Telemetry pings discarded before sending because they exceeded the maximum size"
+  },
+  "TELEMETRY_PING_SIZE_EXCEEDED_PENDING": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of Telemetry pending pings discarded because they exceeded the maximum size"
+  },
+  "TELEMETRY_PING_SIZE_EXCEEDED_ARCHIVED": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of archived Telemetry pings discarded because they exceeded the maximum size"
+  },
+  "TELEMETRY_DISCARDED_PENDING_PINGS_SIZE_MB": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "30",
+    "n_buckets": 29,
+    "description": "The size (MB) of the Telemetry pending pings exceeding the maximum file size"
+  },
+  "TELEMETRY_DISCARDED_ARCHIVED_PINGS_SIZE_MB": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "30",
+    "n_buckets": 29,
+    "description": "The size (MB) of the Telemetry archived, compressed, pings exceeding the maximum file size"
+  },
+  "TELEMETRY_DISCARDED_SEND_PINGS_SIZE_MB": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "high": "30",
+    "n_buckets": 29,
+    "description": "The size (MB) of the ping data submitted to Telemetry exceeding the maximum size"
   },
   "TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "count",
     "description": "Count of discarded content payloads."
-  },
-  "TELEMETRY_FILES_EVICTED": {
-    "alert_emails": ["perf-telemetry-alerts@mozilla.com", "rvitillo@mozilla.com"],
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 30,
-    "description": "Number of telemetry pings evicted at startup"
   },
   "TELEMETRY_COMPRESS": {
     "expires_in_version": "never",
@@ -4814,6 +4879,36 @@
     "kind": "count",
     "keyed": true,
     "description": "Count of individual invalid ping types that were submitted to Telemetry."
+  },
+  "TELEMETRY_SESSIONDATA_FAILED_LOAD": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "Set if Telemetry failed to load the session data from disk."
+  },
+  "TELEMETRY_SESSIONDATA_FAILED_PARSE": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "Set if Telemetry failed to parse the session data loaded from disk."
+  },
+  "TELEMETRY_SESSIONDATA_FAILED_VALIDATION": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "Set if Telemetry failed to validate the session data loaded from disk."
+  },
+  "TELEMETRY_SESSIONDATA_FAILED_SAVE": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "flag",
+    "description": "Set if Telemetry failed to save the session data to disk."
+  },
+  "TELEMETRY_PING_EVICTED_FOR_SERVER_ERRORS": {
+    "alert_emails": ["telemetry-client-dev@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Number of Telemetry ping files evicted due to server errors (4XX HTTP code received)"
   },
   "TELEMETRY_TEST_FLAG": {
     "expires_in_version": "never",
@@ -5207,12 +5302,6 @@
     "expires_in_version": "never",
     "kind": "flag",
     "description": "Whether enablePrivilege has ever been called during the current session"
-  },
-  "READ_SAVED_PING_SUCCESS": {
-    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Successfully reading a saved ping file"
   },
   "TOUCH_ENABLED_DEVICE": {
     "expires_in_version": "never",
@@ -5926,6 +6015,12 @@
     "high": "10000",
     "n_buckets": "1000",
     "description": "The time (in milliseconds) that it took a 'reconfigure thread' request to go round trip."
+  },
+  "MEDIA_RUST_MP4PARSE_SUCCESS": {
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "(Bug 1220885) Whether the rust mp4 demuxer successfully parsed a stream segment.",
+    "cpp_guard": "MOZ_RUST_MP4PARSE"
   },
   "MEDIA_WMF_DECODE_ERROR": {
     "expires_in_version": "50",
@@ -7639,6 +7734,12 @@
     "kind": "flag",
     "description": "a testing histogram; not meant to be touched"
   },
+  "TLS_ERROR_REPORT_UI": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 15,
+    "description": "User interaction with the TLS Error Reporter in about:neterror (0=Error seen, 1='auto' checked, 2='auto' unchecked, 3=Sent manually, 4=Sent automatically, 5=Send success, 6=Send failure, 7=Report section expanded)"
+  },
   "CERT_OCSP_ENABLED": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -8257,6 +8358,13 @@
     "extended_statistics_ok": true,
     "description": "Sanitize: Time it takes to sanitize the open windows list (ms)"
   },
+  "MEDIA_CODEC_USED": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "never",
+    "keyed": true,
+    "kind": "count",
+    "description": "Count of use of audio/video codecs in HTMLMediaElements and WebAudio. Those with 'resource' prefix are approximate; report based on HTTP ContentType or sniffing. Those with 'webaudio' prefix are for WebAudio."
+  },
   "FX_SANITIZE_TOTAL": {
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
     "expires_in_version": "40",
@@ -8757,6 +8865,14 @@
     "low": "2000000",
     "high": "4000000",
     "n_buckets": 20
+  },
+  "GRAPHICS_SANITY_TEST_REASON": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "expires_in_version": "43",
+    "kind": "enumerated",
+    "n_values": 20,
+    "releaseChannelCollection": "opt-out",
+    "description": "Reports why a graphics sanity test was run. 0=First Run, 1=App Updated, 2=Device Change, 3=Driver Change."
   },
   "PERMISSIONS_SQL_CORRUPTED": {
     "expires_in_version": "never",

@@ -257,6 +257,7 @@
     _(StoreTypedArrayElementHole)   \
     _(StoreTypedArrayElementStatic) \
     _(AtomicIsLockFree)             \
+    _(GuardSharedTypedArray)        \
     _(CompareExchangeTypedArrayElement) \
     _(AtomicExchangeTypedArrayElement) \
     _(AtomicTypedArrayElementBinop) \
@@ -276,6 +277,7 @@
     _(GetPropertyPolymorphicV)      \
     _(GetPropertyPolymorphicT)      \
     _(BindNameCache)                \
+    _(CallBindVar)                  \
     _(CallGetProperty)              \
     _(GetNameCache)                 \
     _(CallGetIntrinsicValue)        \

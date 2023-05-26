@@ -376,7 +376,7 @@ public:
     ZoneStatsExtras()
     {}
 
-    nsAutoCString pathPrefix;
+    nsCString pathPrefix;
 
 private:
     ZoneStatsExtras(const ZoneStatsExtras& other) = delete;
@@ -391,8 +391,8 @@ public:
       : sizeOfXPCPrivate(0)
     {}
 
-    nsAutoCString jsPathPrefix;
-    nsAutoCString domPathPrefix;
+    nsCString jsPathPrefix;
+    nsCString domPathPrefix;
     nsCOMPtr<nsIURI> location;
     size_t sizeOfXPCPrivate;
 

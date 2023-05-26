@@ -27,6 +27,8 @@
 #include "mozilla/dom/HTMLMediaElement.h"
 #include "mozilla/dom/VideoTrack.h"
 #include "mozilla/dom/VideoTrackList.h"
+#include "nsPrintfCString.h"
+#include "mozilla/Telemetry.h"
 
 using namespace mozilla::dom;
 using namespace mozilla::layers;
@@ -494,9 +496,13 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
   , mLogicalPosition(0.0)
   , mDuration(std::numeric_limits<double>::quiet_NaN())
   , mResourceCallback(new ResourceCallback())
+#ifdef MOZ_EME
+  , mCDMProxyPromise(mCDMProxyPromiseHolder.Ensure(__func__))
+#endif
   , mIgnoreProgressData(false)
   , mInfiniteStream(false)
   , mOwner(aOwner)
+  , mFrameStats(new FrameStatistics())
   , mVideoFrameContainer(aOwner->GetVideoFrameContainer())
   , mPlaybackStatistics(new MediaChannelStatistics())
   , mPinnedForSeek(false)
@@ -552,6 +558,7 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
                      "MediaDecoder::mDecoderPosition (Canonical)")
   , mMediaSeekable(AbstractThread::MainThread(), true,
                    "MediaDecoder::mMediaSeekable (Canonical)")
+  , mTelemetryReported(false)
 {
   MOZ_COUNT_CTOR(MediaDecoder);
   MOZ_ASSERT(NS_IsMainThread());
@@ -597,12 +604,24 @@ MediaDecoder::Shutdown()
 
   mResourceCallback->Disconnect();
 
+#ifdef MOZ_EME
+  mCDMProxyPromiseHolder.RejectIfExists(true, __func__);
+#endif
+
   // This changes the decoder state to SHUTDOWN and does other things
   // necessary to unblock the state machine thread if it's blocked, so
   // the asynchronous shutdown in nsDestroyStateMachine won't deadlock.
   if (mDecoderStateMachine) {
-    mDecoderStateMachine->DispatchShutdown();
     mTimedMetadataListener.Disconnect();
+    mMetadataLoadedListener.Disconnect();
+    mFirstFrameLoadedListener.Disconnect();
+    mOnPlaybackEvent.Disconnect();
+    mOnSeekingStart.Disconnect();
+    mOnMediaNotSeekable.Disconnect();
+
+    mDecoderStateMachine->BeginShutdown()->Then(
+      AbstractThread::MainThread(), __func__, this,
+      &MediaDecoder::FinishShutdown, &MediaDecoder::FinishShutdown);
   }
 
   // Force any outstanding seek and byterange requests to complete
@@ -624,6 +643,37 @@ MediaDecoder::~MediaDecoder()
   MediaMemoryTracker::RemoveMediaDecoder(this);
   UnpinForSeek();
   MOZ_COUNT_DTOR(MediaDecoder);
+}
+
+void
+MediaDecoder::OnPlaybackEvent(MediaEventType aEvent)
+{
+  switch (aEvent) {
+    case MediaEventType::PlaybackStarted:
+      mPlaybackStatistics->Start();
+      break;
+    case MediaEventType::PlaybackStopped:
+      mPlaybackStatistics->Stop();
+      ComputePlaybackRate();
+      break;
+    case MediaEventType::PlaybackEnded:
+      PlaybackEnded();
+      break;
+    case MediaEventType::DecodeError:
+      DecodeError();
+      break;
+    case MediaEventType::Invalidate:
+      Invalidate();
+      break;
+  }
+}
+
+void
+MediaDecoder::FinishShutdown()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  mDecoderStateMachine->BreakCycles();
+  SetStateMachine(nullptr);
 }
 
 MediaResourceCallback*
@@ -682,6 +732,17 @@ MediaDecoder::SetStateMachineParameters()
   }
   mTimedMetadataListener = mDecoderStateMachine->TimedMetadataEvent().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnMetadataUpdate);
+  mMetadataLoadedListener = mDecoderStateMachine->MetadataLoadedEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::MetadataLoaded);
+  mFirstFrameLoadedListener = mDecoderStateMachine->FirstFrameLoadedEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::FirstFrameLoaded);
+
+  mOnPlaybackEvent = mDecoderStateMachine->OnPlaybackEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::OnPlaybackEvent);
+  mOnSeekingStart = mDecoderStateMachine->OnSeekingStart().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::SeekingStarted);
+  mOnMediaNotSeekable = mDecoderStateMachine->OnMediaNotSeekable().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::OnMediaNotSeekable);
 }
 
 void
@@ -789,15 +850,13 @@ MediaDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
                              MediaDecoderEventVisibility aEventVisibility)
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  if (mShuttingDown) {
-    return;
-  }
+  MOZ_ASSERT(!mShuttingDown);
 
   DECODER_LOG("MetadataLoaded, channels=%u rate=%u hasAudio=%d hasVideo=%d",
               aInfo->mAudio.mChannels, aInfo->mAudio.mRate,
               aInfo->HasAudio(), aInfo->HasVideo());
 
+  SetMediaSeekable(aInfo->mMediaSeekable);
   mInfo = aInfo.forget();
   ConstructMediaTracks();
 
@@ -808,6 +867,42 @@ MediaDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
     mFiredMetadataLoaded = true;
     mOwner->MetadataLoaded(mInfo, nsAutoPtr<const MetadataTags>(aTags.forget()));
   }
+
+  EnsureTelemetryReported();
+}
+
+void
+MediaDecoder::EnsureTelemetryReported()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (mTelemetryReported || !mInfo) {
+    // Note: sometimes we get multiple MetadataLoaded calls (for example
+    // for chained ogg). So we ensure we don't report duplicate results for
+    // these resources.
+    return;
+  }
+
+  nsTArray<nsCString> codecs;
+  if (mInfo->HasAudio() && !mInfo->mAudio.GetAsAudioInfo()->mMimeType.IsEmpty()) {
+    codecs.AppendElement(mInfo->mAudio.GetAsAudioInfo()->mMimeType);
+  }
+  if (mInfo->HasVideo() && !mInfo->mVideo.GetAsVideoInfo()->mMimeType.IsEmpty()) {
+    codecs.AppendElement(mInfo->mVideo.GetAsVideoInfo()->mMimeType);
+  }
+  if (codecs.IsEmpty()) {
+    if (mResource->GetContentType().IsEmpty()) {
+      NS_WARNING("Somehow the resource's content type is empty");
+      return;
+    }
+    codecs.AppendElement(nsPrintfCString("resource; %s", mResource->GetContentType().get()));
+  }
+  for (const nsCString& codec : codecs) {
+    DECODER_LOG("Telemetry MEDIA_CODEC_USED= '%s'", codec.get());
+    Telemetry::Accumulate(Telemetry::ID::MEDIA_CODEC_USED, codec);
+  }
+
+  mTelemetryReported = true;
 }
 
 const char*
@@ -830,10 +925,7 @@ MediaDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
                                MediaDecoderEventVisibility aEventVisibility)
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  if (mShuttingDown) {
-    return;
-  }
+  MOZ_ASSERT(!mShuttingDown);
 
   DECODER_LOG("FirstFrameLoaded, channels=%u rate=%u hasAudio=%d hasVideo=%d mPlayState=%s mIsDormant=%d",
               aInfo->mAudio.mChannels, aInfo->mAudio.mRate,
@@ -1460,13 +1552,6 @@ MediaDecoder::GetStateMachine() const {
   return mDecoderStateMachine;
 }
 
-// Drop reference to state machine.  Only called during shutdown dance.
-void
-MediaDecoder::BreakCycles() {
-  MOZ_ASSERT(NS_IsMainThread());
-  SetStateMachine(nullptr);
-}
-
 void
 MediaDecoder::FireTimeUpdate()
 {
@@ -1508,6 +1593,34 @@ MediaDecoder::CanPlayThrough()
   NS_ENSURE_TRUE(mDecoderStateMachine, false);
   return mDecoderStateMachine->IsRealTime() || GetStatistics().CanPlayThrough();
 }
+
+#ifdef MOZ_EME
+RefPtr<MediaDecoder::CDMProxyPromise>
+MediaDecoder::RequestCDMProxy() const
+{
+  return mCDMProxyPromise;
+}
+
+void
+MediaDecoder::SetCDMProxy(CDMProxy* aProxy)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  RefPtr<CDMProxy> proxy = aProxy;
+  {
+    CDMCaps::AutoLock caps(aProxy->Capabilites());
+    if (!caps.AreCapsKnown()) {
+      RefPtr<MediaDecoder> self = this;
+      nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
+        self->mCDMProxyPromiseHolder.ResolveIfExists(proxy, __func__);
+      });
+      caps.CallOnMainThreadWhenCapsAvailable(r);
+      return;
+    }
+  }
+  mCDMProxyPromiseHolder.ResolveIfExists(proxy, __func__);
+}
+#endif
 
 #ifdef MOZ_RAW
 bool
@@ -1568,16 +1681,6 @@ MediaDecoder::IsOmxEnabled()
 {
   return Preferences::GetBool("media.omx.enabled", false);
 }
-
-bool
-MediaDecoder::IsOmxAsyncEnabled()
-{
-#if ANDROID_VERSION >= 16
-  return Preferences::GetBool("media.omx.async.enabled", false);
-#else
-  return false;
-#endif
-}
 #endif
 
 #ifdef MOZ_ANDROID_OMX
@@ -1585,14 +1688,6 @@ bool
 MediaDecoder::IsAndroidMediaEnabled()
 {
   return Preferences::GetBool("media.plugins.enabled");
-}
-#endif
-
-#ifdef MOZ_APPLEMEDIA
-bool
-MediaDecoder::IsAppleMP3Enabled()
-{
-  return Preferences::GetBool("media.apple.mp3.enabled");
 }
 #endif
 

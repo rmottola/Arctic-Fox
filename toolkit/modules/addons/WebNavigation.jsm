@@ -19,7 +19,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 // getFrames, getAllFrames
 // onCreatedNavigationTarget, onHistoryStateUpdated
 
-let Manager = {
+var Manager = {
   listeners: new Map(),
 
   init() {
@@ -66,17 +66,17 @@ let Manager = {
 
   receiveMessage({name, data, target}) {
     switch (name) {
-    case "Extension:StateChange":
-      this.onStateChange(target, data);
-      break;
+      case "Extension:StateChange":
+        this.onStateChange(target, data);
+        break;
 
-    case "Extension:LocationChange":
-      this.onLocationChange(target, data);
-      break;
+      case "Extension:LocationChange":
+        this.onLocationChange(target, data);
+        break;
 
-    case "Extension:DOMContentLoaded":
-      this.onLoad(target, data);
-      break;
+      case "Extension:DOMContentLoaded":
+        this.onLoad(target, data);
+        break;
     }
   },
 
@@ -143,15 +143,15 @@ const EVENTS = [
   "onErrorOccurred",
   "onReferenceFragmentUpdated",
 
-  //"onCreatedNavigationTarget",
-  //"onHistoryStateUpdated",
+  // "onCreatedNavigationTarget",
+  // "onHistoryStateUpdated",
 ];
 
-let WebNavigation = {};
+var WebNavigation = {};
 
 for (let event of EVENTS) {
   WebNavigation[event] = {
     addListener: Manager.addListener.bind(Manager, event),
     removeListener: Manager.removeListener.bind(Manager, event),
-  }
+  };
 }

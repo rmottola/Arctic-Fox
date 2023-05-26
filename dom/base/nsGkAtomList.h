@@ -294,6 +294,7 @@ GK_ATOM(destructor, "destructor")
 GK_ATOM(details, "details")
 GK_ATOM(deviceAspectRatio, "device-aspect-ratio")
 GK_ATOM(deviceHeight, "device-height")
+GK_ATOM(devicePixelRatio, "device-pixel-ratio")
 GK_ATOM(deviceWidth, "device-width")
 GK_ATOM(dfn, "dfn")
 GK_ATOM(dialog, "dialog")
@@ -2102,6 +2103,9 @@ GK_ATOM(ongamepaddisconnected, "ongamepaddisconnected")
 GK_ATOM(animationsProperty, "AnimationsProperty")        // FrameAnimations*
 GK_ATOM(animationsOfBeforeProperty, "AnimationsOfBeforeProperty") // FrameAnimations*
 GK_ATOM(animationsOfAfterProperty, "AnimationsOfAfterProperty") // FrameAnimations*
+GK_ATOM(animationEffectsProperty, "AnimationEffectsProperty") // EffectSet*
+GK_ATOM(animationEffectsForBeforeProperty, "AnimationsEffectsForBeforeProperty") // EffectSet*
+GK_ATOM(animationEffectsForAfterProperty, "AnimationsEffectsForAfterProperty") // EffectSet*
 GK_ATOM(transitionsProperty, "TransitionsProperty")        // FrameTransitions*
 GK_ATOM(transitionsOfBeforeProperty, "TransitionsOfBeforeProperty") // FrameTransitions*
 GK_ATOM(transitionsOfAfterProperty, "TransitionsOfAfterProperty") // FrameTransitions*

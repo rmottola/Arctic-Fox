@@ -7,6 +7,7 @@
 #include "GMPLoader.h"
 #include <stdio.h>
 #include "mozilla/Attributes.h"
+#include "mozilla/UniquePtr.h"
 #include "gmp-entrypoints.h"
 #include "prlink.h"
 #include "prenv.h"
@@ -17,9 +18,17 @@
 #ifdef XP_WIN
 #include "windows.h"
 #ifdef MOZ_SANDBOX
-#include "mozilla/Scoped.h"
 #include <intrin.h>
 #include <assert.h>
+#endif
+#endif
+
+#ifdef XP_MACOSX
+#include <assert.h>
+#ifdef HASH_NODE_ID_WITH_DEVICE_ID
+#include <unistd.h>
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
 #endif
 #endif
 
@@ -35,31 +44,6 @@
 #include "rlz/lib/machine_id.h"
 #include "rlz/lib/string_utils.h"
 #include "sha256.h"
-#endif
-
-#if defined(XP_WIN) && defined(MOZ_SANDBOX)
-namespace {
-
-// Scoped type used by Load
-struct ScopedActCtxHandleTraits
-{
-  typedef HANDLE type;
-
-  static type empty()
-  {
-    return INVALID_HANDLE_VALUE;
-  }
-
-  static void release(type aActCtxHandle)
-  {
-    if (aActCtxHandle != INVALID_HANDLE_VALUE) {
-      ReleaseActCtx(aActCtxHandle);
-    }
-  }
-};
-typedef mozilla::Scoped<ScopedActCtxHandleTraits> ScopedActCtxHandle;
-
-} // namespace
 #endif
 
 namespace mozilla {
@@ -135,6 +119,57 @@ GetStackAfterCurrentFrame(uint8_t** aOutTop, uint8_t** aOutBottom)
 }
 #endif
 
+#if defined(XP_MACOSX) && defined(HASH_NODE_ID_WITH_DEVICE_ID)
+static mach_vm_address_t
+RegionContainingAddress(mach_vm_address_t aAddress)
+{
+  mach_port_t task;
+  kern_return_t kr = task_for_pid(mach_task_self(), getpid(), &task);
+  if (kr != KERN_SUCCESS) {
+    return 0;
+  }
+
+  mach_vm_address_t address = aAddress;
+  mach_vm_size_t size;
+  vm_region_basic_info_data_64_t info;
+  mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+  mach_port_t object_name;
+  kr = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
+                      reinterpret_cast<vm_region_info_t>(&info), &count,
+                      &object_name);
+  if (kr != KERN_SUCCESS || size == 0
+      || address > aAddress || address + size <= aAddress) {
+    // mach_vm_region failed, or couldn't find region at given address.
+    return 0;
+  }
+
+  return address;
+}
+
+MOZ_NEVER_INLINE
+static bool
+GetStackAfterCurrentFrame(uint8_t** aOutTop, uint8_t** aOutBottom)
+{
+  mach_vm_address_t stackFrame =
+    reinterpret_cast<mach_vm_address_t>(__builtin_frame_address(0));
+  *aOutTop = reinterpret_cast<uint8_t*>(stackFrame);
+  // Kernel code shows that stack is always a single region.
+  *aOutBottom = reinterpret_cast<uint8_t*>(RegionContainingAddress(stackFrame));
+  return *aOutBottom && (*aOutBottom < *aOutTop);
+}
+#endif
+
+#ifdef HASH_NODE_ID_WITH_DEVICE_ID
+static void SecureMemset(void* start, uint8_t value, size_t size)
+{
+  // Inline instructions equivalent to RtlSecureZeroMemory().
+  for (size_t i = 0; i < size; ++i) {
+    volatile uint8_t* p = static_cast<volatile uint8_t*>(start) + i;
+    *p = value;
+  }
+}
+#endif
+
 bool
 GMPLoaderImpl::Load(const char* aUTF8LibPath,
                     uint32_t aUTF8LibPathLen,
@@ -145,7 +180,7 @@ GMPLoaderImpl::Load(const char* aUTF8LibPath,
   std::string nodeId;
 #ifdef HASH_NODE_ID_WITH_DEVICE_ID
   if (aOriginSaltLen > 0) {
-    string16 deviceId;
+    std::vector<uint8_t> deviceId;
     int volumeId;
     if (!rlz_lib::GetRawMachineId(&deviceId, &volumeId)) {
       return false;
@@ -154,7 +189,7 @@ GMPLoaderImpl::Load(const char* aUTF8LibPath,
     SHA256Context ctx;
     SHA256_Begin(&ctx);
     SHA256_Update(&ctx, (const uint8_t*)aOriginSalt, aOriginSaltLen);
-    SHA256_Update(&ctx, (const uint8_t*)deviceId.c_str(), deviceId.size() * sizeof(string16::value_type));
+    SHA256_Update(&ctx, deviceId.data(), deviceId.size());
     SHA256_Update(&ctx, (const uint8_t*)&volumeId, sizeof(int));
     uint8_t digest[SHA256_LENGTH] = {0};
     unsigned int digestLen = 0;
@@ -163,11 +198,11 @@ GMPLoaderImpl::Load(const char* aUTF8LibPath,
     // Overwrite all data involved in calculation as it could potentially
     // identify the user, so there's no chance a GMP can read it and use
     // it for identity tracking.
-    memset(&ctx, 0, sizeof(ctx));
-    memset(aOriginSalt, 0, aOriginSaltLen);
-    volumeId = 0;
-    memset(&deviceId[0], '*', sizeof(string16::value_type) * deviceId.size());
-    deviceId = L"";
+    SecureMemset(&ctx, 0, sizeof(ctx));
+    SecureMemset(aOriginSalt, 0, aOriginSaltLen);
+    SecureMemset(&volumeId, 0, sizeof(volumeId));
+    SecureMemset(deviceId.data(), '*', deviceId.size());
+    deviceId.clear();
 
     if (!rlz_lib::BytesToString(digest, SHA256_LENGTH, &nodeId)) {
       return false;
@@ -198,30 +233,6 @@ GMPLoaderImpl::Load(const char* aUTF8LibPath,
     nodeId = std::string(aOriginSalt, aOriginSalt + aOriginSaltLen);
   }
 
-#ifdef XP_WIN
-  int pathLen = MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, nullptr, 0);
-  if (pathLen == 0) {
-    return false;
-  }
-
-  nsAutoArrayPtr<wchar_t> widePath(new wchar_t[pathLen]);
-  if (MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, widePath, pathLen) == 0) {
-    return false;
-  }
-
-#ifdef MOZ_SANDBOX
-  // If the GMP DLL is a side-by-side assembly with static imports then the DLL
-  // loader will attempt to create an activation context which will fail because
-  // of the sandbox. If we create an activation context before we start the
-  // sandbox then this one will get picked up by the DLL loader.
-  ACTCTX actCtx = { sizeof(actCtx) };
-  actCtx.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-  actCtx.lpSource = widePath;
-  actCtx.lpResourceName = ISOLATIONAWARE_MANIFEST_RESOURCE_ID;
-  ScopedActCtxHandle actCtxHandle(CreateActCtx(&actCtx));
-#endif
-#endif
-
   // Start the sandbox now that we've generated the device bound node id.
   // This must happen after the node id is bound to the device id, as
   // generating the device id requires privileges.
@@ -232,7 +243,17 @@ GMPLoaderImpl::Load(const char* aUTF8LibPath,
   // Load the GMP.
   PRLibSpec libSpec;
 #ifdef XP_WIN
-  libSpec.value.pathname_u = widePath;
+  int pathLen = MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, nullptr, 0);
+  if (pathLen == 0) {
+    return false;
+  }
+
+  auto widePath = MakeUnique<wchar_t[]>(pathLen);
+  if (MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, widePath.get(), pathLen) == 0) {
+    return false;
+  }
+
+  libSpec.value.pathname_u = widePath.get();
   libSpec.type = PR_LibSpec_PathnameU;
 #else
   libSpec.value.pathname = aUTF8LibPath;

@@ -54,10 +54,9 @@ public:
 
 protected:
   virtual void NotifyDataArrivedInternal() override;
+
 public:
   layers::ImageContainer* GetImageContainer() { return mDecoder->GetImageContainer(); }
-
-  virtual bool IsMediaSeekable() override;
 
 private:
   bool HasAudio() { return mInfo.HasAudio(); }
@@ -256,7 +255,7 @@ private:
   int fpsDen;
 
   MediaResourceIndex mResource;
-  NotifyDataArrivedFilter mFilter;
+  MediaByteRangeSet mLastCachedRanges;
 };
 
 } // namespace mozilla

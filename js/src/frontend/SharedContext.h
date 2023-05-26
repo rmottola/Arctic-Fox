@@ -214,6 +214,7 @@ class SharedContext
 
     bool allowNewTarget_;
     bool allowSuperProperty_;
+    bool allowSuperCall_;
     bool inWith_;
     bool needsThisTDZChecks_;
     bool superScopeAlreadyNeedsHomeObject_;
@@ -229,6 +230,7 @@ class SharedContext
         thisBinding_(ThisBinding::Global),
         allowNewTarget_(false),
         allowSuperProperty_(false),
+        allowSuperCall_(false),
         inWith_(false),
         needsThisTDZChecks_(false),
         superScopeAlreadyNeedsHomeObject_(false)
@@ -256,6 +258,7 @@ class SharedContext
 
     bool allowNewTarget()              const { return allowNewTarget_; }
     bool allowSuperProperty()          const { return allowSuperProperty_; }
+    bool allowSuperCall()              const { return allowSuperCall_; }
     bool inWith()                      const { return inWith_; }
     bool needsThisTDZChecks()          const { return needsThisTDZChecks_; }
 
@@ -596,6 +599,12 @@ class MOZ_STACK_CLASS StmtInfoStack
 
     StmtInfo* innermost() const { return innermostStmt_; }
     StmtInfo* innermostScopeStmt() const { return innermostScopeStmt_; }
+    StmtInfo* innermostNonLabel() const {
+        StmtInfo* stmt = innermost();
+        while (stmt && stmt->type == StmtType::LABEL)
+            stmt = stmt->enclosing;
+        return stmt;
+    }
 
     void push(StmtInfo* stmt, StmtType type) {
         stmt->type = type;

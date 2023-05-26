@@ -1208,6 +1208,23 @@ public:
                                                 float aSizeInflation = 1.0f);
 
   /**
+   * Get the font metrics of emphasis marks corresponding to the given
+   * style data. The result is same as GetFontMetricsForStyleContext
+   * except that the font size is scaled down to 50%.
+   * @param aStyleContext the style data
+   * @param aFontMetrics the font metrics result
+   * @param aInflation number to multiple font size by
+   * @return success or failure code
+   */
+  static nsresult GetFontMetricsOfEmphasisMarks(nsStyleContext* aStyleContext,
+                                                nsFontMetrics** aFontMetrics,
+                                                float aInflation)
+  {
+    return GetFontMetricsForStyleContext(aStyleContext, aFontMetrics,
+                                         aInflation * 0.5f);
+  }
+
+  /**
    * Find the immediate child of aParent whose frame subtree contains
    * aDescendantFrame. Returns null if aDescendantFrame is not a descendant
    * of aParent.
@@ -2204,13 +2221,6 @@ public:
                                   nsCSSPseudoElements::Type &aPseudoTypeResult);
 
   /**
-   * Returns true if the frame has animations or transitions that can be
-   * performed on the compositor.
-   */
-  static bool HasAnimationsForCompositor(const nsIFrame* aFrame,
-                                         nsCSSProperty aProperty);
-
-  /**
    * Returns true if the frame has current (i.e. running or scheduled-to-run)
    * animations or transitions for the property.
    */
@@ -2218,14 +2228,7 @@ public:
                                             nsCSSProperty aProperty);
 
   /**
-   * Returns true if the frame has any current animations.
-   * A current animation is any animation that has not yet finished playing
-   * including paused animations.
-   */
-  static bool HasCurrentAnimations(const nsIFrame* aFrame);
-
-  /**
-   * Returns true if the frame has any current transitions.
+   * Returns true if the frame has any current CSS transitions.
    * A current transition is any transition that has not yet finished playing
    * including paused transitions.
    */

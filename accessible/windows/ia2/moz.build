@@ -50,9 +50,4 @@ FINAL_LIBRARY = 'xul'
 if CONFIG['GNU_CXX']:
     CXXFLAGS += ['-Wshadow']
 
-# The midl generated code include Windows headers which defines min and max
-# macros which conflicts with std::min/max.  Suppress the macros:
-if CONFIG['OS_ARCH'] == 'WINNT':
-    DEFINES['NOMINMAX'] = True
-
 include('/ipc/chromium/chromium-config.mozbuild')

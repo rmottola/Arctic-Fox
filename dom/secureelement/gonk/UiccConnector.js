@@ -33,7 +33,7 @@ XPCOMUtils.defineLazyGetter(this, "SE", function() {
 });
 
 // set to true in se_consts.js to see debug messages
-let DEBUG = SE.DEBUG_CONNECTOR;
+var DEBUG = SE.DEBUG_CONNECTOR;
 function debug(s) {
   if (DEBUG) {
     dump("-*- UiccConnector: " + s + "\n");
@@ -328,7 +328,7 @@ UiccConnector.prototype = {
   unregisterListener: function(listener) {
     let idx = this._SEListeners.indexOf(listener);
     if (idx !== -1) {
-      this._listeners.splice(idx, 1);
+      this._SEListeners.splice(idx, 1);
     }
   },
 

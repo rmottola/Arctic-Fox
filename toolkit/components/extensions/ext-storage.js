@@ -1,3 +1,5 @@
+"use strict";
+
 var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorage",
@@ -6,7 +8,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorage",
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
-  ignoreEvent,
   runSafe,
 } = ExtensionUtils;
 

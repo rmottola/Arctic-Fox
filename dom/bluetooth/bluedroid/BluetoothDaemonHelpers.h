@@ -62,6 +62,37 @@ struct BluetoothAvrcpEventParamPair {
     , mParam(aParam)
   { }
 
+  size_t GetLength()
+  {
+    size_t size;
+
+    switch(mEvent) {
+      case AVRCP_EVENT_PLAY_STATUS_CHANGED:
+        /* PackPDU casts ControlPlayStatus to uint8_t */
+        size = sizeof(static_cast<uint8_t>(mParam.mPlayStatus));
+        break;
+      case AVRCP_EVENT_TRACK_CHANGE:
+        size = sizeof(mParam.mTrack);
+        break;
+      case AVRCP_EVENT_TRACK_REACHED_END:
+      case AVRCP_EVENT_TRACK_REACHED_START:
+        /* no data to pack */
+        size = 0;
+        break;
+      case AVRCP_EVENT_PLAY_POS_CHANGED:
+        size = sizeof(mParam.mSongPos);
+        break;
+      case AVRCP_EVENT_APP_SETTINGS_CHANGED:
+        size = (sizeof(mParam.mIds[0]) + sizeof(mParam.mValues[0])) * mParam.mNumAttr;
+        break;
+      default:
+        size = 0;
+        break;
+    }
+
+    return size;
+  }
+
   BluetoothAvrcpEvent mEvent;
   const BluetoothAvrcpNotificationParam& mParam;
 };
@@ -146,10 +177,10 @@ nsresult
 Convert(int32_t aIn, BluetoothGattStatus& aOut);
 
 nsresult
-Convert(const nsAString& aIn, BluetoothPropertyType& aOut);
+Convert(const BluetoothAttributeHandle& aIn, int32_t& aOut);
 
 nsresult
-Convert(const BluetoothAttributeHandle& aIn, int32_t& aOut);
+Convert(const BluetoothAttributeHandle& aIn, uint16_t& aOut);
 
 nsresult
 Convert(BluetoothAvrcpEvent aIn, uint8_t& aOut);
@@ -203,6 +234,9 @@ nsresult
 Convert(BluetoothScanMode aIn, uint8_t& aOut);
 
 nsresult
+Convert(BluetoothSetupServiceId aIn, uint8_t& aOut);
+
+nsresult
 Convert(BluetoothSocketType aIn, uint8_t& aOut);
 
 nsresult
@@ -213,6 +247,9 @@ Convert(ControlPlayStatus aIn, uint8_t& aOut);
 
 nsresult
 Convert(BluetoothGattAuthReq aIn, int32_t& aOut);
+
+nsresult
+Convert(BluetoothGattAuthReq aIn, uint8_t& aOut);
 
 nsresult
 Convert(BluetoothGattWriteType aIn, int32_t& aOut);
@@ -290,7 +327,7 @@ nsresult
 PackPDU(const BluetoothHandsfreeWbsConfig& aIn, DaemonSocketPDU& aPDU);
 
 nsresult
-PackPDU(const BluetoothNamedValue& aIn, DaemonSocketPDU& aPDU);
+PackPDU(const BluetoothProperty& aIn, DaemonSocketPDU& aPDU);
 
 nsresult
 PackPDU(const BluetoothPinCode& aIn, DaemonSocketPDU& aPDU);
@@ -300,6 +337,9 @@ PackPDU(BluetoothPropertyType aIn, DaemonSocketPDU& aPDU);
 
 nsresult
 PackPDU(const BluetoothServiceName& aIn, DaemonSocketPDU& aPDU);
+
+nsresult
+PackPDU(BluetoothSetupServiceId aIn, DaemonSocketPDU& aPDU);
 
 nsresult
 PackPDU(BluetoothSocketType aIn, DaemonSocketPDU& aPDU);

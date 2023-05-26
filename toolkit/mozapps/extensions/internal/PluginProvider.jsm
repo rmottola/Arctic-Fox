@@ -39,7 +39,8 @@ function getIDHashForString(aStr) {
 
   // convert the binary hash data to a hex string.
   let binary = hasher.finish(false);
-  let hash = [toHexString(binary.charCodeAt(i)) for (i in binary)].join("").toLowerCase();
+  let hash = Array.from(binary, c => toHexString(c.charCodeAt(0)));
+  hash = hash.join("").toLowerCase();
   return "{" + hash.substr(0, 8) + "-" +
                hash.substr(8, 4) + "-" +
                hash.substr(12, 4) + "-" +
@@ -449,7 +450,7 @@ PluginWrapper.prototype = {
 
   get pluginFullpath() {
     let paths = [];
-    for (let tag of aTags)
+    for (let tag of pluginFor(this).tags)
       paths.push(tag.fullpath);
     return paths;
   },
@@ -499,7 +500,9 @@ PluginWrapper.prototype = {
       dir = Services.dirsvc.get("Home", Ci.nsIFile);
       if (path.startsWith(dir.path))
         return AddonManager.SCOPE_USER;
-    } catch (e if (e.result && e.result == Components.results.NS_ERROR_FAILURE)) {
+    } catch (e) {
+      if (!e.result || e.result != Components.results.NS_ERROR_FAILURE)
+        throw e;
       // Do nothing: missing "Home".
     }
 

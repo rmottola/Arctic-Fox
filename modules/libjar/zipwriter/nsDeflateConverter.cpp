@@ -5,16 +5,18 @@
 
 #include "StreamFunctions.h"
 #include "nsDeflateConverter.h"
-#include "nsIStringStream.h"
+#include "nsStringStream.h"
 #include "nsIInputStreamPump.h"
 #include "nsComponentManagerUtils.h"
 #include "nsMemory.h"
-#include "nsAutoPtr.h"
 #include "plstr.h"
+#include "mozilla/UniquePtr.h"
 
 #define ZLIB_TYPE "deflate"
 #define GZIP_TYPE "gzip"
 #define X_GZIP_TYPE "x-gzip"
+
+using namespace mozilla;
 
 /**
  * nsDeflateConverter is a stream converter applies the deflate compression
@@ -104,7 +106,7 @@ NS_IMETHODIMP nsDeflateConverter::OnDataAvailable(nsIRequest *aRequest,
     if (!mListener)
         return NS_ERROR_NOT_INITIALIZED;
 
-    nsAutoArrayPtr<char> buffer(new char[aCount]);
+    auto buffer = MakeUnique<char[]>(aCount);
     NS_ENSURE_TRUE(buffer, NS_ERROR_OUT_OF_MEMORY);
 
     nsresult rv = ZW_ReadData(aInputStream, buffer.get(), aCount);
@@ -168,12 +170,12 @@ nsresult nsDeflateConverter::PushAvailableData(nsIRequest *aRequest,
     if (bytesToWrite == 0)
         return NS_OK;
 
-    nsresult rv;
-    nsCOMPtr<nsIStringInputStream> stream =
-             do_CreateInstance("@mozilla.org/io/string-input-stream;1", &rv);
+    MOZ_ASSERT(bytesToWrite <= INT32_MAX);
+    nsCOMPtr<nsIInputStream> stream;
+    nsresult rv = NS_NewByteInputStream(getter_AddRefs(stream),
+					(char*)mWriteBuffer, bytesToWrite);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    stream->ShareData((char*)mWriteBuffer, bytesToWrite);
     rv = mListener->OnDataAvailable(aRequest, mContext, stream, mOffset,
                                     bytesToWrite);
 

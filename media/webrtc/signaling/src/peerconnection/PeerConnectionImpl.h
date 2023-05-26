@@ -626,6 +626,8 @@ public:
   static std::string GetStreamId(const DOMMediaStream& aStream);
   static std::string GetTrackId(const dom::MediaStreamTrack& track);
 
+  void OnMediaError(const std::string& aError);
+
 private:
   virtual ~PeerConnectionImpl();
   PeerConnectionImpl(const PeerConnectionImpl&rhs);
@@ -670,6 +672,15 @@ private:
   nsresult GetDatachannelParameters(
       const mozilla::JsepApplicationCodecDescription** codec,
       uint16_t* level) const;
+
+  static void DeferredAddTrackToJsepSession(const std::string& pcHandle,
+                                            SdpMediaSection::MediaType type,
+                                            const std::string& streamId,
+                                            const std::string& trackId);
+
+  nsresult AddTrackToJsepSession(SdpMediaSection::MediaType type,
+                                 const std::string& streamId,
+                                 const std::string& trackId);
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   static void GetStatsForPCObserver_s(
@@ -775,6 +786,7 @@ private:
   // Bug 840728.
   int mNumAudioStreams;
   int mNumVideoStreams;
+  bool mHaveConfiguredCodecs;
 
   bool mHaveDataStream;
 

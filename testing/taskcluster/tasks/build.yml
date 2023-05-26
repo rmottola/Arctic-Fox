@@ -57,6 +57,9 @@ task:
       MOZHARNESS_REF: '{{mozharness_ref}}'
 
   extra:
+    build_product: '{{build_product}}'
+    build_name: '{{build_name}}'
+    build_type: '{{build_type}}'
     index:
       rank: {{pushlog_id}}
     treeherder:

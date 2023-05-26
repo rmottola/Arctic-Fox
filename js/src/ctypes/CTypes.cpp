@@ -9,6 +9,7 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/NumericLimits.h"
+#include "mozilla/Vector.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -40,6 +41,7 @@
 #include "builtin/TypedObject.h"
 #include "ctypes/Library.h"
 #include "gc/Zone.h"
+#include "js/Vector.h"
 
 #include "jsatominlines.h"
 #include "jsobjinlines.h"
@@ -2687,7 +2689,7 @@ jsvalToPtrExplicit(JSContext* cx, Value val, uintptr_t* result)
 
 template<class IntegerType, class CharType, size_t N, class AP>
 void
-IntegerToString(IntegerType i, int radix, Vector<CharType, N, AP>& result)
+IntegerToString(IntegerType i, int radix, mozilla::Vector<CharType, N, AP>& result)
 {
   JS_STATIC_ASSERT(NumericLimits<IntegerType>::is_exact);
 
@@ -3114,7 +3116,9 @@ ImplicitConvert(JSContext* cx,
       void* ptr;
       {
           JS::AutoCheckCannotGC nogc;
-          ptr = JS_GetArrayBufferData(valObj, nogc);
+          bool isShared;
+          ptr = JS_GetArrayBufferData(valObj, &isShared, nogc);
+          MOZ_ASSERT(!isShared); // Because ArrayBuffer
       }
       if (!ptr) {
         return ConvError(cx, targetType, val, convType, funObj, argIndex,
@@ -3122,6 +3126,12 @@ ImplicitConvert(JSContext* cx,
       }
       *static_cast<void**>(buffer) = ptr;
       break;
+    } else if (val.isObject() && JS_IsSharedArrayBufferObject(valObj)) {
+      // CTypes has not yet opted in to allowing shared memory pointers
+      // to escape.  Exporting a pointer to the shared buffer without
+      // indicating sharedness would expose client code to races.
+      return ConvError(cx, targetType, val, convType, funObj, argIndex,
+                       arrObj, arrIndex);
     } else if (val.isObject() && JS_IsArrayBufferViewObject(valObj)) {
       // Same as ArrayBuffer, above, though note that this will take the
       // offset of the view into account.
@@ -3136,7 +3146,14 @@ ImplicitConvert(JSContext* cx,
       void* ptr;
       {
           JS::AutoCheckCannotGC nogc;
-          ptr = JS_GetArrayBufferViewData(valObj, nogc);
+          bool isShared;
+          ptr = JS_GetArrayBufferViewData(valObj, &isShared, nogc);
+          if (isShared) {
+              // Opt out of shared memory, for now.  Exporting a
+              // pointer to the shared buffer without indicating
+              // sharedness would expose client code to races.
+              ptr = nullptr;
+          }
       }
       if (!ptr) {
         return ConvError(cx, targetType, val, convType, funObj, argIndex,
@@ -3249,10 +3266,12 @@ ImplicitConvert(JSContext* cx,
         }
 
         memcpy(buffer, intermediate.get(), arraySize);
-      } else if (cls == ESClass_ArrayBuffer) {
+      } else if (cls == ESClass_ArrayBuffer || cls == ESClass_SharedArrayBuffer) {
         // Check that array is consistent with type, then
         // copy the array.
-        uint32_t sourceLength = JS_GetArrayBufferByteLength(valObj);
+        const bool bufferShared = cls == ESClass_SharedArrayBuffer;
+        uint32_t sourceLength = bufferShared ? JS_GetSharedArrayBufferByteLength(valObj)
+            : JS_GetArrayBufferByteLength(valObj);
         size_t elementSize = CType::GetSize(baseType);
         size_t arraySize = elementSize * targetLength;
         if (arraySize != size_t(sourceLength)) {
@@ -3260,12 +3279,20 @@ ImplicitConvert(JSContext* cx,
           return ArrayLengthMismatch(cx, arraySize, targetType,
                                      size_t(sourceLength), val, convType);
         }
+        SharedMem<void*> target = SharedMem<void*>::unshared(buffer);
         JS::AutoCheckCannotGC nogc;
-        memcpy(buffer, JS_GetArrayBufferData(valObj, nogc), sourceLength);
+        bool isShared;
+        SharedMem<void*> src =
+            (bufferShared ?
+             SharedMem<void*>::shared(JS_GetSharedArrayBufferData(valObj, &isShared, nogc)) :
+             SharedMem<void*>::unshared(JS_GetArrayBufferData(valObj, &isShared, nogc)));
+        MOZ_ASSERT(isShared == bufferShared);
+        jit::AtomicOperations::memcpySafeWhenRacy(target, src, sourceLength);
         break;
       } else if (JS_IsTypedArrayObject(valObj)) {
         // Check that array is consistent with type, then
-        // copy the array.
+        // copy the array.  It is OK to copy from shared to unshared
+        // or vice versa.
         if (!CanConvertTypedArrayItemTo(baseType, valObj, cx)) {
           return ConvError(cx, targetType, val, convType, funObj, argIndex,
                            arrObj, arrIndex);
@@ -3279,8 +3306,12 @@ ImplicitConvert(JSContext* cx,
           return ArrayLengthMismatch(cx, arraySize, targetType,
                                      size_t(sourceLength), val, convType);
         }
+        SharedMem<void*> target = SharedMem<void*>::unshared(buffer);
         JS::AutoCheckCannotGC nogc;
-        memcpy(buffer, JS_GetArrayBufferViewData(valObj, nogc), sourceLength);
+        bool isShared;
+        SharedMem<void*> src =
+            SharedMem<void*>::shared(JS_GetArrayBufferViewData(valObj, &isShared, nogc));
+        jit::AtomicOperations::memcpySafeWhenRacy(target, src, sourceLength);
         break;
       } else {
         // Don't implicitly convert to string. Users can implicitly convert
@@ -3659,7 +3690,7 @@ BuildTypeSource(JSContext* cx,
 
     const FieldInfoHash* fields = StructType::GetFieldInfo(typeObj);
     size_t length = fields->count();
-    Array<const FieldInfoHash::Entry*, 64> fieldsArray;
+    Vector<const FieldInfoHash::Entry*, 64, SystemAllocPolicy> fieldsArray;
     if (!fieldsArray.resize(length))
       break;
 
@@ -3817,7 +3848,7 @@ BuildDataSource(JSContext* cx,
     // be able to ImplicitConvert successfully.
     const FieldInfoHash* fields = StructType::GetFieldInfo(typeObj);
     size_t length = fields->count();
-    Array<const FieldInfoHash::Entry*, 64> fieldsArray;
+    Vector<const FieldInfoHash::Entry*, 64, SystemAllocPolicy> fieldsArray;
     if (!fieldsArray.resize(length))
       return false;
 
@@ -6524,7 +6555,7 @@ FunctionType::ConstructData(JSContext* cx,
   return JS_FreezeObject(cx, dataObj);
 }
 
-typedef Array<AutoValue, 16> AutoValueAutoArray;
+typedef Vector<AutoValue, 16, SystemAllocPolicy> AutoValueAutoArray;
 
 static bool
 ConvertArgument(JSContext* cx,
@@ -6946,7 +6977,12 @@ CClosure::ClosureStub(ffi_cif* cif, void* result, void** args, void* userData)
   ArgClosure argClosure(cif, result, args, static_cast<ClosureInfo*>(userData));
   JSRuntime* rt = argClosure.cinfo->rt;
   RootedObject fun(rt, argClosure.cinfo->jsfnObj);
-  (void) js::PrepareScriptEnvironmentAndInvoke(rt, fun, argClosure);
+
+  // Arbitrarily choose a cx in which to run this code. This is bad, as
+  // JSContexts are stateful and have options. The hope is to eliminate
+  // JSContexts (see bug 650361).
+  js::PrepareScriptEnvironmentAndInvoke(rt->contextList.getFirst(), fun,
+                                        argClosure);
 }
 
 bool CClosure::ArgClosure::operator()(JSContext* cx)
@@ -7039,11 +7075,14 @@ bool CClosure::ArgClosure::operator()(JSContext* cx)
       size_t copySize = CType::GetSize(fninfo->mReturnType);
       MOZ_ASSERT(copySize <= rvSize);
       memcpy(result, cinfo->errResult, copySize);
+
+      // We still want to return false here, so that
+      // PrepareScriptEnvironmentAndInvoke will report the exception.
     } else {
       // Bad case: not much we can do here. The rv is already zeroed out, so we
       // just return and hope for the best.
-      return false;
     }
+    return false;
   }
 
   // Small integer types must be returned as a word-sized ffi_arg. Coerce it

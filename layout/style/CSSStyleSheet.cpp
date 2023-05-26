@@ -471,13 +471,16 @@ nsMediaQuery::AppendToString(nsAString& aString) const
     aString.Append('(');
 
     const nsMediaExpression &expr = mExpressions[i];
+    const nsMediaFeature *feature = expr.mFeature;
+    if (feature->mReqFlags & nsMediaFeature::eHasWebkitPrefix) {
+      aString.AppendLiteral("-webkit-");
+    }
     if (expr.mRange == nsMediaExpression::eMin) {
       aString.AppendLiteral("min-");
     } else if (expr.mRange == nsMediaExpression::eMax) {
       aString.AppendLiteral("max-");
     }
 
-    const nsMediaFeature *feature = expr.mFeature;
     aString.Append(nsDependentAtomString(*feature->mName));
 
     if (expr.mValue.GetUnit() != eCSSUnit_Null) {
@@ -701,7 +704,7 @@ nsMediaList::GetMediaText(nsAString& aMediaText)
   }                                                            \
   /* XXXldb Pass something meaningful? */                      \
   if (doc) {                                                   \
-    doc->StyleRuleChanged(sheet, nullptr, nullptr);              \
+    doc->StyleRuleChanged(sheet, nullptr);                     \
   }
 
 
@@ -1732,11 +1735,17 @@ CSSStyleSheet::SubjectSubsumesInnerPrincipal()
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
-  // Now make sure we set the principal of our inner to the
-  // subjectPrincipal.  That means we need a unique inner, of
-  // course.  But we don't want to do that if we're not complete
-  // yet.  Luckily, all the callers of this method throw anyway if
-  // not complete, so we can just do that here too.
+  // Now make sure we set the principal of our inner to the subjectPrincipal.
+  // We do this because we're in a situation where the caller would not normally
+  // be able to access the sheet, but the sheet has opted in to being read.
+  // Unfortunately, that means it's also opted in to being _edited_, and if the
+  // caller now makes edits to the sheet we want the resulting resource loads,
+  // if any, to look as if they are coming from the caller's principal, not the
+  // original sheet principal.
+  //
+  // That means we need a unique inner, of course.  But we don't want to do that
+  // if we're not complete yet.  Luckily, all the callers of this method throw
+  // anyway if not complete, so we can just do that here too.
   if (!mInner->mComplete) {
     return NS_ERROR_DOM_INVALID_ACCESS_ERR;
   }

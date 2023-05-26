@@ -36,7 +36,7 @@ class SdpHelper {
                                     size_t level);
 
     bool MsectionIsDisabled(const SdpMediaSection& msection) const;
-    void DisableMsection(Sdp* sdp, SdpMediaSection* msection) const;
+    static void DisableMsection(Sdp* sdp, SdpMediaSection* msection);
 
     // Maps each mid to the m-section that is the master of its bundle.
     // Mids that do not appear in an a=group:BUNDLE do not appear here.
@@ -81,9 +81,6 @@ class SdpHelper {
                            Sdp* sdp) const;
 
     std::string GetCNAME(const SdpMediaSection& msection) const;
-    void SetSsrcs(const std::vector<uint32_t>& ssrcs,
-                  const std::string& cname,
-                  SdpMediaSection* msection) const;
 
     SdpMediaSection* FindMsectionByMid(Sdp& sdp,
                                        const std::string& mid) const;
@@ -94,7 +91,7 @@ class SdpHelper {
     nsresult CopyStickyParams(const SdpMediaSection& source,
                               SdpMediaSection* dest);
     bool HasRtcp(SdpMediaSection::Protocol proto) const;
-    SdpMediaSection::Protocol GetProtocolForMediaType(
+    static SdpMediaSection::Protocol GetProtocolForMediaType(
         SdpMediaSection::MediaType type);
     void appendSdpParseErrors(
           const std::vector<std::pair<size_t, std::string> >& aErrors,

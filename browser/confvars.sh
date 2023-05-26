@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 MOZ_APP_BASENAME=ArcticFox
-MOZ_APP_VENDOR=org.wicknix
+MOZ_APP_VENDOR=org.multix
 MOZ_UPDATER=1
 MOZ_PHOENIX=1
 
@@ -41,6 +41,7 @@ MOZ_WEBGL_CONFORMANT=1
 MOZ_ACTIVITIES=1
 MOZ_JSDOWNLOADS=1
 MOZ_WEBM_ENCODER=1
+MOZ_RUST_MP4PARSE=1
 
 # Enable checking that add-ons are signed by the trusted root
 MOZ_ADDON_SIGNING=1

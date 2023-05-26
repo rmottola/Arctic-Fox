@@ -187,10 +187,13 @@ BluetoothDevice::FetchUuids(ErrorResult& aRv)
   // Ensure BluetoothService is available
   BluetoothService* bs = BluetoothService::Get();
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
-
+  BluetoothAddress address;
+  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(StringToAddress(mAddress, address)),
+                        promise,
+                        NS_ERROR_DOM_INVALID_STATE_ERR);
   BT_ENSURE_TRUE_REJECT(
     NS_SUCCEEDED(
-      bs->FetchUuidsInternal(mAddress, new FetchUuidsTask(promise, this))),
+      bs->FetchUuidsInternal(address, new FetchUuidsTask(promise, this))),
     promise, NS_ERROR_DOM_OPERATION_ERR);
 
   return promise.forget();
@@ -384,19 +387,23 @@ BluetoothDevice::UpdatePropertiesFromAdvData(const nsTArray<uint8_t>& aAdvData)
             dataLength -= 2;
           }
 
-          char uuidStr[36];
+          char uuidStr[37]; // one more char to be null-terminated
           if (type == GAP_INCOMPLETE_UUID16 || type == GAP_COMPLETE_UUID16) {
             // Convert 16-bits UUID into string.
-            sprintf(uuidStr, "0000%04x-0000-1000-8000-00805f9b34fb", uuid[0]);
-          } else if (type == GAP_INCOMPLETE_UUID32 || type == GAP_COMPLETE_UUID32) {
+            snprintf(uuidStr, sizeof(uuidStr),
+                     "0000%04x-0000-1000-8000-00805f9b34fb", uuid[0]);
+          } else if (type == GAP_INCOMPLETE_UUID32 ||
+                     type == GAP_COMPLETE_UUID32) {
             // Convert 32-bits UUID into string.
-            sprintf(uuidStr, "%04x%04x-0000-1000-8000-00805f9b34fb",
-              uuid[1], uuid[0]);
-          } else if (type == GAP_INCOMPLETE_UUID128 || type == GAP_COMPLETE_UUID128) {
+            snprintf(uuidStr, sizeof(uuidStr),
+                     "%04x%04x-0000-1000-8000-00805f9b34fb", uuid[1], uuid[0]);
+          } else if (type == GAP_INCOMPLETE_UUID128 ||
+                     type == GAP_COMPLETE_UUID128) {
             // Convert 128-bits UUID into string.
-            sprintf(uuidStr, "%04x%04x-%04x-%04x-%04x-%04x%04x%04x",
-              uuid[7], uuid[6], uuid[5], uuid[4],
-              uuid[3], uuid[2], uuid[1], uuid[0]);
+            snprintf(uuidStr, sizeof(uuidStr),
+                     "%04x%04x-%04x-%04x-%04x-%04x%04x%04x",
+                     uuid[7], uuid[6], uuid[5], uuid[4],
+                     uuid[3], uuid[2], uuid[1], uuid[0]);
           }
           nsString uuidNsString;
           uuidNsString.AssignLiteral(uuidStr);

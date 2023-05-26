@@ -8,13 +8,14 @@
 #include "nsIObserverService.h"
 #include "nsISupportsPrimitives.h"
 #include "nsPackageKitService.h"
-#include "nsStringAPI.h"
+#include "nsString.h"
 #include "prlink.h"
 #include "mozilla/unused.h"
 #include "mozilla/UniquePtr.h"
 
 #include <glib.h>
 #include <glib-object.h>
+#include <limits>
 
 using namespace mozilla;
 

@@ -224,5 +224,5 @@ SharedMessagePortMessage::FromMessagesToSharedParent(
   return true;
 }
 
-} // dom namespace
-} // mozilla namespace
+} // namespace dom
+} // namespace mozilla

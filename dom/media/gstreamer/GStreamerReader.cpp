@@ -468,12 +468,15 @@ nsresult GStreamerReader::ReadMetadata(MediaInfo* aInfo,
   /* report the duration */
   gint64 duration;
 
+  bool isMediaSeekable = false;
+
   if (isMP3 && mMP3FrameParser.IsMP3()) {
     // The MP3FrameParser has reported a duration; use that over the gstreamer
     // reported duration for inter-platform consistency.
     mUseParserDuration = true;
     mLastParserDuration = mMP3FrameParser.GetDuration();
     mInfo.mMetadataDuration.emplace(TimeUnit::FromMicroseconds(mLastParserDuration));
+    isMediaSeekable = true;
   } else {
     LOG(LogLevel::Debug, "querying duration");
     // Otherwise use the gstreamer duration.
@@ -488,8 +491,11 @@ nsresult GStreamerReader::ReadMetadata(MediaInfo* aInfo,
       LOG(LogLevel::Debug, "have duration %" GST_TIME_FORMAT, GST_TIME_ARGS(duration));
       duration = GST_TIME_AS_USECONDS (duration);
       mInfo.mMetadataDuration.emplace(TimeUnit::FromMicroseconds(duration));
+      isMediaSeekable = true;
     }
   }
+
+  mInfo.mMediaSeekable = isMediaSeekable;
 
   int n_video = 0, n_audio = 0;
   g_object_get(mPlayBin, "n-video", &n_video, "n-audio", &n_audio, nullptr);
@@ -516,28 +522,6 @@ nsresult GStreamerReader::ReadMetadata(MediaInfo* aInfo,
   gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
 
   return NS_OK;
-}
-
-bool
-GStreamerReader::IsMediaSeekable()
-{
-  if (mUseParserDuration) {
-    return true;
-  }
-
-  gint64 duration;
-#if GST_VERSION_MAJOR >= 1
-  if (gst_element_query_duration(GST_ELEMENT(mPlayBin), GST_FORMAT_TIME,
-                                 &duration)) {
-#else
-  GstFormat format = GST_FORMAT_TIME;
-  if (gst_element_query_duration(GST_ELEMENT(mPlayBin), &format, &duration) &&
-      format == GST_FORMAT_TIME) {
-#endif
-    return true;
-  }
-
-  return false;
 }
 
 nsresult GStreamerReader::CheckSupportedFormats()
@@ -885,7 +869,7 @@ media::TimeIntervals GStreamerReader::GetBuffered()
   GstFormat format = GST_FORMAT_TIME;
 #endif
   AutoPinned<MediaResource> resource(mDecoder->GetResource());
-  nsTArray<MediaByteRange> ranges;
+  MediaByteRangeSet ranges;
   resource->GetCachedRanges(ranges);
 
   if (resource->IsDataCachedToEndOfResource(0)) {
@@ -1286,17 +1270,18 @@ void GStreamerReader::NotifyDataArrivedInternal()
   }
 
   AutoPinned<MediaResource> resource(mResource.GetResource());
-  nsTArray<MediaByteRange> byteRanges;
+  MediaByteRangeSet byteRanges;
   nsresult rv = resource->GetCachedRanges(byteRanges);
 
   if (NS_FAILED(rv)) {
     return;
   }
-
-  IntervalSet<int64_t> intervals;
-  for (auto& range : byteRanges) {
-    intervals += mFilter.NotifyDataArrived(range.Length(), range.mStart);
+  if (byteRanges == mLastCachedRanges) {
+    return;
   }
+  MediaByteRangeSet intervals = byteRanges - mLastCachedRanges;
+  mLastCachedRanges = byteRanges;
+
   for (const auto& interval : intervals) {
     RefPtr<MediaByteBuffer> bytes =
       resource->MediaReadAt(interval.mStart, interval.Length());

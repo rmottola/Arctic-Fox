@@ -1,19 +1,22 @@
-const Ci = Components.interfaces;
+"use strict";
 
-function getWindowId(window)
-{
+/* globals docShell */
+
+var Ci = Components.interfaces;
+
+Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+
+function getWindowId(window) {
   return window.QueryInterface(Ci.nsIInterfaceRequestor)
                .getInterface(Ci.nsIDOMWindowUtils)
                .outerWindowID;
 }
 
-function getParentWindowId(window)
-{
+function getParentWindowId(window) {
   return getWindowId(window.parent);
 }
 
-function loadListener(event)
-{
+function loadListener(event) {
   let document = event.target;
   let window = document.defaultView;
   let url = document.documentURI;
@@ -27,7 +30,7 @@ addMessageListener("Extension:DisableWebNavigation", () => {
   removeEventListener("DOMContentLoaded", loadListener);
 });
 
-let WebProgressListener = {
+var WebProgressListener = {
   init: function() {
     let webProgress = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
                               .getInterface(Ci.nsIWebProgress);
@@ -81,18 +84,10 @@ let WebProgressListener = {
     sendAsyncMessage("Extension:LocationChange", data);
   },
 
-  QueryInterface: function QueryInterface(aIID) {
-    if (aIID.equals(Ci.nsIWebProgressListener) ||
-        aIID.equals(Ci.nsISupportsWeakReference) ||
-        aIID.equals(Ci.nsISupports)) {
-        return this;
-    }
-
-    throw Components.results.NS_ERROR_NO_INTERFACE;
-  }
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener, Ci.nsISupportsWeakReference]),
 };
 
-let disabled = false;
+var disabled = false;
 WebProgressListener.init();
 addEventListener("unload", () => {
   if (!disabled) {

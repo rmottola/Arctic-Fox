@@ -28,7 +28,6 @@ browser.jar:
   skin/classic/browser/Geolocation-16.png
   skin/classic/browser/Geolocation-64.png
   skin/classic/browser/Info.png
-  skin/classic/browser/in-content/common.css                (../shared/in-content/common.css)
   skin/classic/browser/identity.png
   skin/classic/browser/imagedocument.png 
   skin/classic/browser/identity-icons-generic.png
@@ -76,7 +75,6 @@ browser.jar:
   skin/classic/browser/urlbar-arrow.png
   skin/classic/browser/urlbar-popup-blocked.png
   skin/classic/browser/urlbar-history-dropmarker.png
-  skin/classic/browser/reader-mode-16.png             (../shared/reader/reader-mode-16.png)
   skin/classic/browser/reader-mode-16@2x.png          (../shared/reader/reader-mode-16@2x.png)
   skin/classic/browser/webapps-16.png
   skin/classic/browser/webapps-64.png
@@ -86,9 +84,8 @@ browser.jar:
   skin/classic/browser/webRTC-sharingMicrophone-menubar@2x.png
   skin/classic/browser/webRTC-sharingScreen-menubar.png
   skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
-  skin/classic/browser/webRTC-indicator.css
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
-* skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
+  skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
   skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
@@ -99,7 +96,7 @@ browser.jar:
   skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
   skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
   skin/classic/browser/downloads/download-summary.png       (downloads/download-summary.png)
-* skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
+  skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
   skin/classic/browser/feeds/feedIcon.png                   (feeds/feedIcon.png)
   skin/classic/browser/feeds/feedIcon16.png                 (feeds/feedIcon16.png)
   skin/classic/browser/feeds/feed-icons-16.png              (feeds/feed-icons-16.png)
@@ -108,7 +105,7 @@ browser.jar:
   skin/classic/browser/newtab/newTab.css                    (newtab/newTab.css)
   skin/classic/browser/newtab/noise.png                     (newtab/noise.png)
   skin/classic/browser/places/places.css                    (places/places.css)
-* skin/classic/browser/places/organizer.css                 (places/organizer.css)
+  skin/classic/browser/places/organizer.css                 (places/organizer.css)
   skin/classic/browser/places/editBookmark.png              (places/editBookmark.png)
   skin/classic/browser/places/bookmark.png                  (places/bookmark.png)
   skin/classic/browser/places/query.png                     (places/query.png)
@@ -157,15 +154,12 @@ browser.jar:
 #endif
   skin/classic/browser/tabbrowser/alltabs.png                  (tabbrowser/alltabs.png)
   skin/classic/browser/tabbrowser/alltabs-inverted.png         (tabbrowser/alltabs-inverted.png)
-  skin/classic/browser/tabbrowser/crashed.svg                            (../shared/tabbrowser/crashed.svg)
   skin/classic/browser/tabbrowser/newtab.png                   (tabbrowser/newtab.png)
   skin/classic/browser/tabbrowser/newtab-inverted.png          (tabbrowser/newtab-inverted.png)
   skin/classic/browser/tabbrowser/connecting.png               (tabbrowser/connecting.png)
   skin/classic/browser/tabbrowser/loading.png                  (tabbrowser/loading.png)
   skin/classic/browser/tabbrowser/tab-arrow-left.png           (tabbrowser/tab-arrow-left.png)
   skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
-  skin/classic/browser/tabbrowser/tab-audio.svg                (../shared/tabbrowser/tab-audio.svg)
-  skin/classic/browser/tabbrowser/tab-audio-small.svg          (../shared/tabbrowser/tab-audio-small.svg)
   skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
 #ifdef MOZ_SERVICES_SYNC
@@ -184,7 +178,7 @@ browser.jar:
   skin/classic/browser/yosemite/thumburger.png              (customizableui/thumburger-yosemite.png)
   skin/classic/browser/yosemite/thumburger@2x.png           (customizableui/thumburger-yosemite@2x.png)
 
-../extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/chrome.jar:
+[extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}] chrome.jar:
 % override chrome://browser/skin/feeds/audioFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/audioFeedIcon16.png                 chrome://browser/skin/feeds/feedIcon16.png
 % override chrome://browser/skin/feeds/videoFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png

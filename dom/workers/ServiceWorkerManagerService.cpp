@@ -229,6 +229,6 @@ ServiceWorkerManagerService::PropagateRemoveAll(uint64_t aParentID)
 #endif
 }
 
-} // workers namespace
-} // dom namespace
-} // mozilla namespace
+} // namespace workers
+} // namespace dom
+} // namespace mozilla

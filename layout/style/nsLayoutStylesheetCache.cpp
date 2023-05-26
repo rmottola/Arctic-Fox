@@ -27,6 +27,8 @@
 #include "nsIChromeRegistry.h"
 #include "nsISimpleEnumerator.h"
 #include "nsISubstitutingProtocolHandler.h"
+#include "zlib.h"
+#include "nsZipArchive.h"
 #endif
 
 using namespace mozilla;
@@ -126,12 +128,6 @@ CSSStyleSheet*
 nsLayoutStylesheetCache::UASheet()
 {
   EnsureGlobal();
-
-  if (!gStyleCache->mUASheet) {
-    LoadSheetURL("resource://gre-resources/ua.css",
-                 gStyleCache->mUASheet, eAgentSheetFeatures);
-  }
-
   return gStyleCache->mUASheet;
 }
 
@@ -139,12 +135,6 @@ CSSStyleSheet*
 nsLayoutStylesheetCache::HTMLSheet()
 {
   EnsureGlobal();
-
-  if (!gStyleCache->mHTMLSheet) {
-    LoadSheetURL("resource://gre-resources/html.css",
-                 gStyleCache->mHTMLSheet, eAgentSheetFeatures);
-  }
-
   return gStyleCache->mHTMLSheet;
 }
 
@@ -361,12 +351,16 @@ nsLayoutStylesheetCache::nsLayoutStylesheetCache()
   // per-profile, since they're profile-invariant.
   LoadSheetURL("resource://gre-resources/counterstyles.css",
                mCounterStylesSheet, eAgentSheetFeatures);
+  LoadSheetURL("resource://gre-resources/html.css",
+               mHTMLSheet, eAgentSheetFeatures);
   LoadSheetURL("chrome://global/content/minimal-xul.css",
                mMinimalXULSheet, eAgentSheetFeatures);
   LoadSheetURL("resource://gre-resources/quirk.css",
                mQuirkSheet, eAgentSheetFeatures);
   LoadSheetURL("resource://gre/res/svg.css",
                mSVGSheet, eAgentSheetFeatures);
+  LoadSheetURL("resource://gre-resources/ua.css",
+               mUASheet, eAgentSheetFeatures);
   LoadSheetURL("chrome://global/content/xul.css",
                mXULSheet, eAgentSheetFeatures);
 
@@ -405,8 +399,8 @@ nsLayoutStylesheetCache::EnsureGlobal()
   // on (such as a pref that enables a property that a UA style sheet uses),
   // register DependentPrefChanged as a callback to ensure that the relevant
   // style sheets will be re-parsed.
-  Preferences::RegisterCallback(&DependentPrefChanged,
-                                "layout.css.ruby.enabled");
+  // Preferences::RegisterCallback(&DependentPrefChanged,
+  //                               "layout.css.example-pref.enabled");
 }
 
 void
@@ -469,6 +463,30 @@ nsLayoutStylesheetCache::LoadSheetFile(nsIFile* aFile,
 }
 
 #ifdef MOZ_CRASHREPORTER
+static inline nsresult
+ComputeCRC32(nsIFile* aFile, uint32_t* aResult)
+{
+  PRFileDesc* fd;
+  nsresult rv = aFile->OpenNSPRFileDesc(PR_RDONLY, 0, &fd);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  uint32_t crc = crc32(0, nullptr, 0);
+
+  unsigned char buf[512];
+  int32_t n;
+  while ((n = PR_Read(fd, buf, sizeof(buf))) > 0) {
+    crc = crc32(crc, buf, n);
+  }
+  PR_Close(fd);
+
+  if (n < 0) {
+    return NS_ERROR_FAILURE;
+  }
+
+  *aResult = crc;
+  return NS_OK;
+}
+
 static void
 ListInterestingFiles(nsString& aAnnotation, nsIFile* aFile,
                      const nsTArray<nsString>& aInterestingFilenames)
@@ -488,7 +506,14 @@ ListInterestingFiles(nsString& aAnnotation, nsIFile* aFile,
       } else {
         aAnnotation.AppendLiteral("???");
       }
-      aAnnotation.AppendLiteral(" bytes)\n");
+      aAnnotation.AppendLiteral(" bytes, crc32 = ");
+      uint32_t crc;
+      nsresult rv = ComputeCRC32(aFile, &crc);
+      if (NS_SUCCEEDED(rv)) {
+        aAnnotation.AppendPrintf("0x%08x)\n", crc);
+      } else {
+        aAnnotation.AppendPrintf("error 0x%08x)\n", uint32_t(rv));
+      }
       return;
     }
   }
@@ -552,6 +577,14 @@ AnnotateCrashReport(nsIURI* aURI)
   annotation.AppendLiteral("Error loading sheet: ");
   annotation.Append(NS_ConvertUTF8toUTF16(spec).get());
   annotation.Append('\n');
+
+  annotation.AppendLiteral("NS_ERROR_FILE_CORRUPTION reason: ");
+  if (nsZipArchive::sFileCorruptedReason) {
+    annotation.Append(NS_ConvertUTF8toUTF16(nsZipArchive::sFileCorruptedReason).get());
+    annotation.Append('\n');
+  } else {
+    annotation.AppendLiteral("(none)\n");
+  }
 
   // The jar: or file: URL that the sheet's resource: or chrome: URL
   // resolves to.
@@ -739,6 +772,9 @@ nsLayoutStylesheetCache::LoadSheet(nsIURI* aURI,
   }
 
 
+#ifdef MOZ_CRASHREPORTER
+  nsZipArchive::sFileCorruptedReason = nullptr;
+#endif
   nsresult rv = gCSSLoader->LoadSheetSync(aURI, aParsingMode, true,
                                           getter_AddRefs(aSheet));
   if (NS_FAILED(rv)) {
@@ -767,10 +803,7 @@ nsLayoutStylesheetCache::DependentPrefChanged(const char* aPref, void* aData)
   // to be re-parsed by dropping the sheet from gCSSLoader's cache then
   // setting our cached sheet pointer to null.  This will only work for sheets
   // that are loaded lazily.
-
-  // for layout.css.ruby.enabled
-  InvalidateSheet(gStyleCache->mUASheet);
-  InvalidateSheet(gStyleCache->mHTMLSheet);
+  // InvalidateSheet(gStyleCache->mSomeLazilyLoadedSheet);
 }
 
 /* static */ void

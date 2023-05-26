@@ -23,6 +23,7 @@
 #include "nsIProtocolHandler.h"
 #include "nsIStandardURL.h"
 #include "nsIStreamLoader.h"
+#include "nsIIncrementalStreamLoader.h"
 #include "nsIURI.h"
 #include "nsIURIWithPrincipal.h"
 #include "nsIWritablePropertyBag2.h"
@@ -86,6 +87,18 @@ net_EnsureIOService(nsIIOService **ios, nsCOMPtr<nsIIOService> &grip)
         *ios = grip;
     }
     return rv;
+}
+
+INLINE_IF_EXTERN nsresult
+NS_URIChainHasFlags(nsIURI   *uri,
+                    uint32_t  flags,
+                    bool     *result)
+{
+    nsresult rv;
+    nsCOMPtr<nsINetUtil> util = do_GetNetUtil(&rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    return util->URIChainHasFlags(uri, flags, result);
 }
 
 INLINE_IF_EXTERN nsresult

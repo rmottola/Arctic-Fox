@@ -70,7 +70,7 @@ CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph, Mac
     osrEntryOffset_(0),
     skipArgCheckEntryOffset_(0),
 #ifdef CHECK_OSIPOINT_REGISTERS
-    checkOsiPointRegisters(js_JitOptions.checkOsiPointRegisters),
+    checkOsiPointRegisters(JitOptions.checkOsiPointRegisters),
 #endif
     frameDepth_(graph->paddedLocalSlotsSize() + graph->argumentsSize()),
     frameInitialAdjustment_(0)
@@ -264,7 +264,7 @@ CodeGeneratorShared::addNativeToBytecodeEntry(const BytecodeSite* site)
     // Otherwise, some native code was generated for the previous bytecode site.
     // Add a new entry for code that is about to be generated.
     NativeToBytecode entry;
-    entry.nativeOffset = CodeOffsetLabel(nativeOffset);
+    entry.nativeOffset = CodeOffset(nativeOffset);
     entry.tree = tree;
     entry.pc = pc;
     if (!nativeToBytecodeList_.append(entry))
@@ -308,7 +308,7 @@ CodeGeneratorShared::dumpNativeToBytecodeEntry(uint32_t idx)
                  nativeDelta,
                  ref.pc - script->code(),
                  pcDelta,
-                 js_CodeName[JSOp(*ref.pc)],
+                 CodeName[JSOp(*ref.pc)],
                  script->filename(), script->lineno());
 
     for (tree = tree->caller(); tree; tree = tree->caller()) {
@@ -343,8 +343,8 @@ CodeGeneratorShared::addTrackedOptimizationsEntry(const TrackedOptimizations* op
     // If we're generating code for a new set of optimizations, add a new
     // entry.
     NativeToTrackedOptimizations entry;
-    entry.startOffset = CodeOffsetLabel(nativeOffset);
-    entry.endOffset = CodeOffsetLabel(nativeOffset);
+    entry.startOffset = CodeOffset(nativeOffset);
+    entry.endOffset = CodeOffset(nativeOffset);
     entry.optimizations = optimizations;
     return trackedOptimizations_.append(entry);
 }
@@ -360,7 +360,7 @@ CodeGeneratorShared::extendTrackedOptimizationsEntry(const TrackedOptimizations*
     MOZ_ASSERT(entry.optimizations == optimizations);
     MOZ_ASSERT_IF(!masm.oom(), nativeOffset >= entry.endOffset.offset());
 
-    entry.endOffset = CodeOffsetLabel(nativeOffset);
+    entry.endOffset = CodeOffset(nativeOffset);
 
     // If we generated no code, remove the last entry.
     if (nativeOffset == entry.startOffset.offset())
@@ -1157,9 +1157,7 @@ class StoreOp
         else if (reg.isSingle())
             masm.storeFloat32(reg, dump);
 #if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64)
-        else if (reg.isInt32x4())
-            masm.storeUnalignedInt32x4(reg, dump);
-        else if (reg.isFloat32x4())
+        else if (reg.isSimd128())
             masm.storeUnalignedFloat32x4(reg, dump);
 #endif
         else
@@ -1468,7 +1466,7 @@ CodeGeneratorShared::visitOutOfLineTruncateSlow(OutOfLineTruncateSlow* ool)
     masm.setupUnalignedABICall(dest);
     masm.passABIArg(src, MoveOp::DOUBLE);
     if (gen->compilingAsmJS())
-        masm.callWithABI(AsmJSImm_ToInt32);
+        masm.callWithABI(wasm::SymbolicAddress::ToInt32);
     else
         masm.callWithABI(BitwiseCast<void*, int32_t(*)(double)>(JS::ToInt32));
     masm.storeCallResult(dest);
@@ -1522,7 +1520,7 @@ CodeGeneratorShared::emitAsmJSCall(LAsmJSCall* ins)
         masm.call(mir->desc(), ToRegister(ins->getOperand(mir->dynamicCalleeOperandIndex())));
         break;
       case MAsmJSCall::Callee::Builtin:
-        masm.call(AsmJSImmPtr(callee.builtin()));
+        masm.call(BuiltinToImmediate(callee.builtin()));
         break;
     }
 
@@ -1737,7 +1735,7 @@ CodeGeneratorShared::emitTracelogScript(bool isStart)
 
     masm.Push(logger);
 
-    CodeOffsetLabel patchLogger = masm.movWithPatch(ImmPtr(nullptr), logger);
+    CodeOffset patchLogger = masm.movWithPatch(ImmPtr(nullptr), logger);
     masm.propagateOOM(patchableTraceLoggers_.append(patchLogger));
 
     Address enabledAddress(logger, TraceLoggerThread::offsetOfEnabled());
@@ -1745,7 +1743,7 @@ CodeGeneratorShared::emitTracelogScript(bool isStart)
 
     masm.Push(script);
 
-    CodeOffsetLabel patchScript = masm.movWithPatch(ImmWord(0), script);
+    CodeOffset patchScript = masm.movWithPatch(ImmWord(0), script);
     masm.propagateOOM(patchableTLScripts_.append(patchScript));
 
     if (isStart)
@@ -1772,7 +1770,7 @@ CodeGeneratorShared::emitTracelogTree(bool isStart, uint32_t textId)
 
     masm.Push(logger);
 
-    CodeOffsetLabel patchLocation = masm.movWithPatch(ImmPtr(nullptr), logger);
+    CodeOffset patchLocation = masm.movWithPatch(ImmPtr(nullptr), logger);
     masm.propagateOOM(patchableTraceLoggers_.append(patchLocation));
 
     Address enabledAddress(logger, TraceLoggerThread::offsetOfEnabled());

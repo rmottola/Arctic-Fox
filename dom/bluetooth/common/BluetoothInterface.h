@@ -33,12 +33,12 @@ protected:
 class BluetoothSetupInterface
 {
 public:
-  virtual void RegisterModule(uint8_t aId,
+  virtual void RegisterModule(BluetoothSetupServiceId aId,
                               uint8_t aMode,
                               uint32_t aMaxNumClients,
                               BluetoothSetupResultHandler* aRes) = 0;
 
-  virtual void UnregisterModule(uint8_t aId,
+  virtual void UnregisterModule(BluetoothSetupServiceId aId,
                                 BluetoothSetupResultHandler* aRes) = 0;
 
   virtual void Configuration(const BluetoothConfigurationParameter* aParam,
@@ -47,6 +47,188 @@ public:
 
 protected:
   virtual ~BluetoothSetupInterface();
+};
+
+//
+// Bluetooth Core Interface
+//
+
+class BluetoothCoreNotificationHandler
+{
+public:
+  virtual void AdapterStateChangedNotification(bool aState);
+  virtual void AdapterPropertiesNotification(
+    BluetoothStatus aStatus, int aNumProperties,
+    const BluetoothProperty* aProperties);
+
+  virtual void RemoteDevicePropertiesNotification(
+    BluetoothStatus aStatus, const BluetoothAddress& aBdAddr,
+    int aNumProperties, const BluetoothProperty* aProperties);
+
+  virtual void DeviceFoundNotification(
+    int aNumProperties, const BluetoothProperty* aProperties);
+
+  virtual void DiscoveryStateChangedNotification(bool aState);
+
+  virtual void PinRequestNotification(const BluetoothAddress& aRemoteBdAddr,
+                                      const BluetoothRemoteName& aBdName,
+                                      uint32_t aCod);
+  virtual void SspRequestNotification(const BluetoothAddress& aRemoteBdAddr,
+                                      const BluetoothRemoteName& aBdName,
+                                      uint32_t aCod,
+                                      BluetoothSspVariant aPairingVariant,
+                                      uint32_t aPassKey);
+
+  virtual void BondStateChangedNotification(
+    BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr,
+    BluetoothBondState aState);
+  virtual void AclStateChangedNotification(
+    BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr,
+    BluetoothAclState aState);
+
+  virtual void DutModeRecvNotification(uint16_t aOpcode,
+                                       const uint8_t* aBuf, uint8_t aLen);
+  virtual void LeTestModeNotification(BluetoothStatus aStatus,
+                                      uint16_t aNumPackets);
+
+  virtual void EnergyInfoNotification(const BluetoothActivityEnergyInfo& aInfo);
+
+protected:
+  BluetoothCoreNotificationHandler();
+  virtual ~BluetoothCoreNotificationHandler();
+};
+
+class BluetoothCoreResultHandler
+  : public mozilla::ipc::DaemonSocketResultHandler
+{
+public:
+  virtual void OnError(BluetoothStatus aStatus);
+
+  virtual void Enable();
+  virtual void Disable();
+
+  virtual void GetAdapterProperties();
+  virtual void GetAdapterProperty();
+  virtual void SetAdapterProperty();
+
+  virtual void GetRemoteDeviceProperties();
+  virtual void GetRemoteDeviceProperty();
+  virtual void SetRemoteDeviceProperty();
+
+  virtual void GetRemoteServiceRecord();
+  virtual void GetRemoteServices();
+
+  virtual void StartDiscovery();
+  virtual void CancelDiscovery();
+
+  virtual void CreateBond();
+  virtual void RemoveBond();
+  virtual void CancelBond();
+
+  virtual void GetConnectionState();
+
+  virtual void PinReply();
+  virtual void SspReply();
+
+  virtual void DutModeConfigure();
+  virtual void DutModeSend();
+
+  virtual void LeTestMode();
+
+  virtual void ReadEnergyInfo();
+
+protected:
+  virtual ~BluetoothCoreResultHandler() { }
+};
+
+class BluetoothCoreInterface
+{
+public:
+  virtual void SetNotificationHandler(
+    BluetoothCoreNotificationHandler* aNotificationHandler) = 0;
+
+  /* Enable/Disable */
+
+  virtual void Enable(BluetoothCoreResultHandler* aRes) = 0;
+  virtual void Disable(BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Adapter Properties */
+
+  virtual void GetAdapterProperties(BluetoothCoreResultHandler* aRes) = 0;
+  virtual void GetAdapterProperty(BluetoothPropertyType,
+                                  BluetoothCoreResultHandler* aRes) = 0;
+  virtual void SetAdapterProperty(const BluetoothProperty& aProperty,
+                                  BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Remote Device Properties */
+
+  virtual void GetRemoteDeviceProperties(const BluetoothAddress& aRemoteAddr,
+                                         BluetoothCoreResultHandler* aRes) = 0;
+  virtual void GetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
+                                       BluetoothPropertyType aType,
+                                       BluetoothCoreResultHandler* aRes) = 0;
+  virtual void SetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
+                                       const BluetoothProperty& aProperty,
+                                       BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Remote Services */
+
+  virtual void GetRemoteServiceRecord(const BluetoothAddress& aRemoteAddr,
+                                      const BluetoothUuid& aUuid,
+                                      BluetoothCoreResultHandler* aRes) = 0;
+  virtual void GetRemoteServices(const BluetoothAddress& aRemoteAddr,
+                                 BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Discovery */
+
+  virtual void StartDiscovery(BluetoothCoreResultHandler* aRes) = 0;
+  virtual void CancelDiscovery(BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Bonds */
+
+  virtual void CreateBond(const BluetoothAddress& aBdAddr,
+                          BluetoothTransport aTransport,
+                          BluetoothCoreResultHandler* aRes) = 0;
+  virtual void RemoveBond(const BluetoothAddress& aBdAddr,
+                          BluetoothCoreResultHandler* aRes) = 0;
+  virtual void CancelBond(const BluetoothAddress& aBdAddr,
+                          BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Connection */
+
+  virtual void GetConnectionState(const BluetoothAddress& aBdAddr,
+                                  BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Authentication */
+
+  virtual void PinReply(const BluetoothAddress& aBdAddr, bool aAccept,
+                        const BluetoothPinCode& aPinCode,
+                        BluetoothCoreResultHandler* aRes) = 0;
+
+  virtual void SspReply(const BluetoothAddress& aBdAddr,
+                        BluetoothSspVariant aVariant,
+                        bool aAccept, uint32_t aPasskey,
+                        BluetoothCoreResultHandler* aRes) = 0;
+
+  /* DUT Mode */
+
+  virtual void DutModeConfigure(bool aEnable,
+                                BluetoothCoreResultHandler* aRes) = 0;
+  virtual void DutModeSend(uint16_t aOpcode, uint8_t* aBuf, uint8_t aLen,
+                           BluetoothCoreResultHandler* aRes) = 0;
+
+  /* LE Mode */
+
+  virtual void LeTestMode(uint16_t aOpcode, uint8_t* aBuf, uint8_t aLen,
+                          BluetoothCoreResultHandler* aRes) = 0;
+
+  /* Energy Info */
+
+  virtual void ReadEnergyInfo(BluetoothCoreResultHandler* aRes) = 0;
+
+protected:
+  BluetoothCoreInterface();
+  virtual ~BluetoothCoreInterface();
 };
 
 //
@@ -174,9 +356,6 @@ class BluetoothHandsfreeResultHandler
 public:
   virtual void OnError(BluetoothStatus aStatus);
 
-  virtual void Init();
-  virtual void Cleanup();
-
   virtual void Connect();
   virtual void Disconnect();
   virtual void ConnectAudio();
@@ -205,10 +384,8 @@ protected:
 class BluetoothHandsfreeInterface
 {
 public:
-  virtual void Init(
-    BluetoothHandsfreeNotificationHandler* aNotificationHandler,
-    int aMaxNumClients, BluetoothHandsfreeResultHandler* aRes) = 0;
-  virtual void Cleanup(BluetoothHandsfreeResultHandler* aRes) = 0;
+  virtual void SetNotificationHandler(
+    BluetoothHandsfreeNotificationHandler* aNotificationHandler) = 0;
 
   /* Connect / Disconnect */
 
@@ -314,8 +491,6 @@ class BluetoothA2dpResultHandler
 public:
   virtual void OnError(BluetoothStatus aStatus);
 
-  virtual void Init();
-  virtual void Cleanup();
   virtual void Connect();
   virtual void Disconnect();
 
@@ -326,9 +501,8 @@ protected:
 class BluetoothA2dpInterface
 {
 public:
-  virtual void Init(BluetoothA2dpNotificationHandler* aNotificationHandler,
-                    BluetoothA2dpResultHandler* aRes) = 0;
-  virtual void Cleanup(BluetoothA2dpResultHandler* aRes) = 0;
+  virtual void SetNotificationHandler(
+    BluetoothA2dpNotificationHandler* aNotificationHandler) = 0;
 
   virtual void Connect(const BluetoothAddress& aBdAddr,
                        BluetoothA2dpResultHandler* aRes) = 0;
@@ -381,7 +555,7 @@ public:
                                    uint32_t aParam);
 
   virtual void
-  RemoteFeatureNotification(const nsAString& aBdAddr,
+  RemoteFeatureNotification(const BluetoothAddress& aBdAddr,
                             unsigned long aFeatures);
 
   virtual void
@@ -400,9 +574,6 @@ class BluetoothAvrcpResultHandler
 {
 public:
   virtual void OnError(BluetoothStatus aStatus);
-
-  virtual void Init();
-  virtual void Cleanup();
 
   virtual void GetPlayStatusRsp();
 
@@ -428,9 +599,8 @@ protected:
 class BluetoothAvrcpInterface
 {
 public:
-  virtual void Init(BluetoothAvrcpNotificationHandler* aNotificationHandler,
-                    BluetoothAvrcpResultHandler* aRes) = 0;
-  virtual void Cleanup(BluetoothAvrcpResultHandler* aRes) = 0;
+  virtual void SetNotificationHandler(
+    BluetoothAvrcpNotificationHandler* aNotificationHandler) = 0;
 
   virtual void GetPlayStatusRsp(ControlPlayStatus aPlayStatus,
                                 uint32_t aSongLen, uint32_t aSongPos,
@@ -682,9 +852,6 @@ class BluetoothGattResultHandler
 public:
   virtual void OnError(BluetoothStatus aStatus);
 
-  virtual void Init();
-  virtual void Cleanup();
-
   virtual void RegisterClient();
   virtual void UnregisterClient();
 
@@ -742,9 +909,8 @@ protected:
 class BluetoothGattInterface
 {
 public:
-  virtual void Init(BluetoothGattNotificationHandler* aNotificationHandler,
-                    BluetoothGattResultHandler* aRes) = 0;
-  virtual void Cleanup(BluetoothGattResultHandler* aRes) = 0;
+  virtual void SetNotificationHandler(
+    BluetoothGattNotificationHandler* aNotificationHandler) = 0;
 
   /* Register / Unregister */
   virtual void RegisterClient(const BluetoothUuid& aUuid,
@@ -926,13 +1092,13 @@ public:
                              BluetoothGattResultHandler* aRes) = 0;
 
   /* Send an indication or a notification */
-  virtual void SendIndication(int aServerIf,
-                              int aAttributeHandle,
-                              int aConnId,
-                              const nsTArray<uint8_t>& aValue,
-                              bool aConfirm, /* true: indication */
-                                             /* false: notification */
-                              BluetoothGattResultHandler* aRes) = 0;
+  virtual void SendIndication(
+    int aServerIf,
+    const BluetoothAttributeHandle& aCharacteristicHandle,
+    int aConnId,
+    const nsTArray<uint8_t>& aValue,
+    bool aConfirm, /* true: indication; false: notification */
+    BluetoothGattResultHandler* aRes) = 0;
 
   /* Send a response for an incoming indication */
   virtual void SendResponse(int aConnId,
@@ -947,49 +1113,12 @@ protected:
 };
 
 //
-// Bluetooth Core Interface
+// Bluetooth Interface
 //
 
 class BluetoothNotificationHandler
 {
 public:
-  virtual void AdapterStateChangedNotification(bool aState);
-  virtual void AdapterPropertiesNotification(
-    BluetoothStatus aStatus, int aNumProperties,
-    const BluetoothProperty* aProperties);
-
-  virtual void RemoteDevicePropertiesNotification(
-    BluetoothStatus aStatus, const BluetoothAddress& aBdAddr,
-    int aNumProperties, const BluetoothProperty* aProperties);
-
-  virtual void DeviceFoundNotification(
-    int aNumProperties, const BluetoothProperty* aProperties);
-
-  virtual void DiscoveryStateChangedNotification(bool aState);
-
-  virtual void PinRequestNotification(const BluetoothAddress& aRemoteBdAddr,
-                                      const BluetoothRemoteName& aBdName,
-                                      uint32_t aCod);
-  virtual void SspRequestNotification(const BluetoothAddress& aRemoteBdAddr,
-                                      const BluetoothRemoteName& aBdName,
-                                      uint32_t aCod,
-                                      BluetoothSspVariant aPairingVariant,
-                                      uint32_t aPassKey);
-
-  virtual void BondStateChangedNotification(
-    BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr,
-    BluetoothBondState aState);
-  virtual void AclStateChangedNotification(
-    BluetoothStatus aStatus, const BluetoothAddress& aRemoteBdAddr,
-    BluetoothAclState aState);
-
-  virtual void DutModeRecvNotification(uint16_t aOpcode,
-                                       const uint8_t* aBuf, uint8_t aLen);
-  virtual void LeTestModeNotification(BluetoothStatus aStatus,
-                                      uint16_t aNumPackets);
-
-  virtual void EnergyInfoNotification(const BluetoothActivityEnergyInfo& aInfo);
-
   virtual void BackendErrorNotification(bool aCrashed);
 
 protected:
@@ -1005,38 +1134,6 @@ public:
 
   virtual void Init();
   virtual void Cleanup();
-  virtual void Enable();
-  virtual void Disable();
-
-  virtual void GetAdapterProperties();
-  virtual void GetAdapterProperty();
-  virtual void SetAdapterProperty();
-
-  virtual void GetRemoteDeviceProperties();
-  virtual void GetRemoteDeviceProperty();
-  virtual void SetRemoteDeviceProperty();
-
-  virtual void GetRemoteServiceRecord();
-  virtual void GetRemoteServices();
-
-  virtual void StartDiscovery();
-  virtual void CancelDiscovery();
-
-  virtual void CreateBond();
-  virtual void RemoveBond();
-  virtual void CancelBond();
-
-  virtual void GetConnectionState();
-
-  virtual void PinReply();
-  virtual void SspReply();
-
-  virtual void DutModeConfigure();
-  virtual void DutModeSend();
-
-  virtual void LeTestMode();
-
-  virtual void ReadEnergyInfo();
 
 protected:
   virtual ~BluetoothResultHandler() { }
@@ -1051,86 +1148,10 @@ public:
                     BluetoothResultHandler* aRes) = 0;
   virtual void Cleanup(BluetoothResultHandler* aRes) = 0;
 
-  virtual void Enable(BluetoothResultHandler* aRes) = 0;
-  virtual void Disable(BluetoothResultHandler* aRes) = 0;
-
-  /* Adapter Properties */
-
-  virtual void GetAdapterProperties(BluetoothResultHandler* aRes) = 0;
-  virtual void GetAdapterProperty(const nsAString& aName,
-                                  BluetoothResultHandler* aRes) = 0;
-  virtual void SetAdapterProperty(const BluetoothNamedValue& aProperty,
-                                  BluetoothResultHandler* aRes) = 0;
-
-  /* Remote Device Properties */
-
-  virtual void GetRemoteDeviceProperties(const BluetoothAddress& aRemoteAddr,
-                                         BluetoothResultHandler* aRes) = 0;
-  virtual void GetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
-                                       const nsAString& aName,
-                                       BluetoothResultHandler* aRes) = 0;
-  virtual void SetRemoteDeviceProperty(const BluetoothAddress& aRemoteAddr,
-                                       const BluetoothNamedValue& aProperty,
-                                       BluetoothResultHandler* aRes) = 0;
-
-  /* Remote Services */
-
-  virtual void GetRemoteServiceRecord(const BluetoothAddress& aRemoteAddr,
-                                      const BluetoothUuid& aUuid,
-                                      BluetoothResultHandler* aRes) = 0;
-  virtual void GetRemoteServices(const BluetoothAddress& aRemoteAddr,
-                                 BluetoothResultHandler* aRes) = 0;
-
-  /* Discovery */
-
-  virtual void StartDiscovery(BluetoothResultHandler* aRes) = 0;
-  virtual void CancelDiscovery(BluetoothResultHandler* aRes) = 0;
-
-  /* Bonds */
-
-  virtual void CreateBond(const BluetoothAddress& aBdAddr,
-                          BluetoothTransport aTransport,
-                          BluetoothResultHandler* aRes) = 0;
-  virtual void RemoveBond(const BluetoothAddress& aBdAddr,
-                          BluetoothResultHandler* aRes) = 0;
-  virtual void CancelBond(const BluetoothAddress& aBdAddr,
-                          BluetoothResultHandler* aRes) = 0;
-
-  /* Connection */
-
-  virtual void GetConnectionState(const BluetoothAddress& aBdAddr,
-                                  BluetoothResultHandler* aRes) = 0;
-
-  /* Authentication */
-
-  virtual void PinReply(const BluetoothAddress& aBdAddr, bool aAccept,
-                        const BluetoothPinCode& aPinCode,
-                        BluetoothResultHandler* aRes) = 0;
-
-  virtual void SspReply(const BluetoothAddress& aBdAddr,
-                        BluetoothSspVariant aVariant,
-                        bool aAccept, uint32_t aPasskey,
-                        BluetoothResultHandler* aRes) = 0;
-
-  /* DUT Mode */
-
-  virtual void DutModeConfigure(bool aEnable,
-                                BluetoothResultHandler* aRes) = 0;
-  virtual void DutModeSend(uint16_t aOpcode, uint8_t* aBuf, uint8_t aLen,
-                           BluetoothResultHandler* aRes) = 0;
-
-  /* LE Mode */
-
-  virtual void LeTestMode(uint16_t aOpcode, uint8_t* aBuf, uint8_t aLen,
-                          BluetoothResultHandler* aRes) = 0;
-
-  /* Energy Info */
-
-  virtual void ReadEnergyInfo(BluetoothResultHandler* aRes) = 0;
-
   /* Profile Interfaces */
 
   virtual BluetoothSetupInterface* GetBluetoothSetupInterface() = 0;
+  virtual BluetoothCoreInterface* GetBluetoothCoreInterface() = 0;
   virtual BluetoothSocketInterface* GetBluetoothSocketInterface() = 0;
   virtual BluetoothHandsfreeInterface* GetBluetoothHandsfreeInterface() = 0;
   virtual BluetoothA2dpInterface* GetBluetoothA2dpInterface() = 0;

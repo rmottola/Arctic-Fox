@@ -56,15 +56,47 @@ const uint32_t USE_ROLE_STRING = 0;
 static gAccessibles = 0;
 #endif
 
+#ifdef _WIN64
+IDSet AccessibleWrap::sIDGen;
+
+static const uint32_t kNoID = 0;
+#endif
+
 static const int32_t kIEnumVariantDisconnected = -1;
 
 ////////////////////////////////////////////////////////////////////////////////
 // AccessibleWrap
 ////////////////////////////////////////////////////////////////////////////////
+AccessibleWrap::AccessibleWrap(nsIContent* aContent, DocAccessible* aDoc) :
+  Accessible(aContent, aDoc)
+#ifdef _WIN64
+  , mID(kNoID)
+#endif
+{
+}
+
+AccessibleWrap::~AccessibleWrap()
+{
+#ifdef _WIN64
+  if (mID != kNoID)
+    sIDGen.ReleaseID(mID);
+#endif
+}
 
 ITypeInfo* AccessibleWrap::gTypeInfo = nullptr;
 
 NS_IMPL_ISUPPORTS_INHERITED0(AccessibleWrap, Accessible)
+
+void
+AccessibleWrap::Shutdown()
+{
+#ifdef _WIN64
+  if (mID != kNoID)
+    static_cast<DocAccessibleWrap*>(mDoc)->RemoveID(mID);
+#endif
+
+  Accessible::Shutdown();
+}
 
 //-----------------------------------------------------
 // IUnknown interface methods - see iunknown.h for documentation
@@ -83,21 +115,17 @@ AccessibleWrap::QueryInterface(REFIID iid, void** ppv)
 
   if (IID_IUnknown == iid)
     *ppv = static_cast<IAccessible*>(this);
-
-  if (!*ppv && IsProxy())
-    return E_NOINTERFACE;
-
-  if (IID_IDispatch == iid || IID_IAccessible == iid)
+  else if (IID_IDispatch == iid || IID_IAccessible == iid)
     *ppv = static_cast<IAccessible*>(this);
-  else if (IID_IEnumVARIANT == iid) {
+  else if (IID_IEnumVARIANT == iid && !IsProxy()) {
     // Don't support this interface for leaf elements.
     if (!HasChildren() || nsAccUtils::MustPrune(this))
       return E_NOINTERFACE;
 
     *ppv = static_cast<IEnumVARIANT*>(new ChildrenEnumVariant(this));
-  } else if (IID_IServiceProvider == iid)
+  } else if (IID_IServiceProvider == iid && !IsProxy())
     *ppv = new ServiceProvider(this);
-  else if (IID_ISimpleDOMNode == iid) {
+  else if (IID_ISimpleDOMNode == iid && !IsProxy()) {
     if (IsDefunct() || (!HasOwnContent() && !IsDoc()))
       return E_NOINTERFACE;
 
@@ -110,7 +138,7 @@ AccessibleWrap::QueryInterface(REFIID iid, void** ppv)
       return hr;
   }
 
-  if (nullptr == *ppv) {
+  if (nullptr == *ppv && !IsProxy()) {
     HRESULT hr = ia2AccessibleComponent::QueryInterface(iid, ppv);
     if (SUCCEEDED(hr))
       return hr;
@@ -122,7 +150,7 @@ AccessibleWrap::QueryInterface(REFIID iid, void** ppv)
       return hr;
   }
 
-  if (nullptr == *ppv) {
+  if (nullptr == *ppv && !IsProxy()) {
     HRESULT hr = ia2AccessibleValue::QueryInterface(iid, ppv);
     if (SUCCEEDED(hr))
       return hr;
@@ -1255,10 +1283,23 @@ AccessibleWrap::GetChildIDFor(Accessible* aAccessible)
   // so that the 3rd party application can call back and get the IAccessible
   // the event occurred on.
 
-  // Yes, this means we're only compatibible with 32 bit
-  // MSAA is only available for 32 bit windows, so it's okay
-  // XXX: bug 606080
-  return aAccessible ? - NS_PTR_TO_INT32(aAccessible->UniqueID()) : 0;
+#ifdef _WIN64
+  if (!aAccessible || !aAccessible->Document())
+    return 0;
+
+  uint32_t* id = & static_cast<AccessibleWrap*>(aAccessible)->mID;
+  if (*id != kNoID)
+    return *id;
+
+  *id = sIDGen.GetID();
+  DocAccessibleWrap* doc =
+    static_cast<DocAccessibleWrap*>(aAccessible->Document());
+  doc->AddID(*id, static_cast<AccessibleWrap*>(aAccessible));
+
+  return *id;
+#else
+  return - reinterpret_cast<intptr_t>(aAccessible);
+#endif
 }
 
 HWND
@@ -1308,6 +1349,25 @@ AccessibleWrap::NativeAccessible(Accessible* aAccessible)
   return static_cast<IDispatch*>(msaaAccessible);
 }
 
+#ifdef _WIN64
+static Accessible*
+GetAccessibleInSubtree(DocAccessible* aDoc, uint32_t aID)
+{
+  Accessible* child = static_cast<DocAccessibleWrap*>(aDoc)->GetAccessibleByID(aID);
+  if (child)
+    return child;
+
+  uint32_t childDocCount = aDoc->ChildDocumentCount();
+  for (uint32_t i = 0; i < childDocCount; i++) {
+    child = GetAccessibleInSubtree(aDoc->GetChildDocumentAt(i), aID);
+    if (child)
+      return child;
+  }
+
+    return nullptr;
+  }
+#endif
+
 Accessible*
 AccessibleWrap::GetXPAccessibleFor(const VARIANT& aVarChild)
 {
@@ -1343,7 +1403,11 @@ AccessibleWrap::GetXPAccessibleFor(const VARIANT& aVarChild)
 
     DocAccessible* document = Document();
     Accessible* child =
+#ifdef _WIN64
+    GetAccessibleInSubtree(document, static_cast<uint32_t>(aVarChild.lVal));
+#else
       document->GetAccessibleByUniqueIDInSubtree(uniqueID);
+#endif
 
     // If it is a document then just return an accessible.
     if (IsDoc())

@@ -17,6 +17,8 @@ class BluetoothAvrcpManager : public BluetoothProfileManagerBase
                             , public BluetoothAvrcpNotificationHandler
 {
 public:
+  static const int MAX_NUM_CLIENTS;
+
   BT_DECL_PROFILE_MGR_BASE
   virtual void GetName(nsACString& aName)
   {
@@ -60,12 +62,12 @@ protected:
   virtual ~BluetoothAvrcpManager();
 
 private:
-  class CleanupAvrcpResultHandler;
-  class CleanupAvrcpResultHandlerRunnable;
   class ConnectRunnable;
+  class DeinitProfileResultHandlerRunnable;
   class DisconnectRunnable;
-  class InitAvrcpResultHandler;
-  class OnErrorProfileResultHandlerRunnable;
+  class InitProfileResultHandlerRunnable;
+  class RegisterModuleResultHandler;
+  class UnregisterModuleResultHandler;
 
   BluetoothAvrcpManager();
 
@@ -101,7 +103,7 @@ private:
     BluetoothAvrcpEvent aEvent, uint32_t aParam) override;
 
   void RemoteFeatureNotification(
-    const nsAString& aBdAddr, unsigned long aFeatures) override;
+    const BluetoothAddress& aBdAddr, unsigned long aFeatures) override;
 
   void VolumeChangeNotification(uint8_t aVolume, uint8_t aCType) override;
 

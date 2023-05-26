@@ -20,6 +20,10 @@ EXPORTS += [
 ]
 
 if CONFIG['MOZ_WEBRTC']:
+    if CONFIG['OS_TARGET'] == 'WINNT':
+        DEFINES['WEBRTC_WIN'] = True
+    else:
+        DEFINES['WEBRTC_POSIX'] = True
     EXPORTS += ['AudioOutputObserver.h',
                 'MediaEngineRemoteVideoSource.h',
                 'MediaEngineWebRTC.h']
@@ -84,9 +88,6 @@ if CONFIG['GNU_CC'] or CONFIG['CLANG_CL']:
     ]
 
 FINAL_LIBRARY = 'xul'
-if CONFIG['OS_ARCH'] == 'WINNT':
-    DEFINES['NOMINMAX'] = True
-
 
 if CONFIG['_MSC_VER']:
     CXXFLAGS += [

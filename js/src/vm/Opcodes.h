@@ -1474,7 +1474,16 @@
      *   Stack: val => val
      */ \
     macro(JSOP_SETINTRINSIC,  144, "setintrinsic",  NULL, 5,  1,  1, JOF_ATOM|JOF_NAME|JOF_SET|JOF_DETECTING) \
-    macro(JSOP_UNUSED145,     145, "unused145",     NULL, 1,  0,  0, JOF_BYTE) \
+    /*
+     * Like JSOP_CALL, but used as part of for-of and destructuring bytecode
+     * to provide better error messages.
+     *   Category: Statements
+     *   Type: Function
+     *   Operands: uint16_t argc (must be 0)
+     *   Stack: callee, this => rval
+     *   nuses: 2
+     */ \
+    macro(JSOP_CALLITER,      145, "calliter",      NULL, 3, -1,  1, JOF_UINT16|JOF_INVOKE|JOF_TYPESET) \
     /*
      * Initialize a non-configurable, non-writable, non-enumerable data-property on an object.
      *
@@ -2036,7 +2045,15 @@
     macro(JSOP_UNUSED210,     210, "unused210",    NULL,  1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED211,     211, "unused211",    NULL,  1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED212,     212, "unused212",    NULL,  1,  0,  0,  JOF_BYTE) \
-    macro(JSOP_UNUSED213,     213, "unused213",    NULL,  1,  0,  0,  JOF_BYTE) \
+    /*
+     * Pushes the nearest 'var' environment.
+     *
+     *   Category: Variables and Scopes
+     *   Type: Free Variables
+     *   Operands:
+     *   Stack: => scope
+     */ \
+    macro(JSOP_BINDVAR,       213, "bindvar",      NULL,  1,  0,  1,  JOF_BYTE) \
     /*
      * Pushes the global scope onto the stack if the script doesn't have a
      * non-syntactic global scope.  Otherwise will act like JSOP_BINDNAME.

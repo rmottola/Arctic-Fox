@@ -281,7 +281,7 @@ nsView* nsViewManager::GetDisplayRootFor(nsView* aView)
    aContext may be null, in which case layers should be used for
    rendering.
 */
-void nsViewManager::Refresh(nsView *aView, const nsIntRegion& aRegion)
+void nsViewManager::Refresh(nsView* aView, const LayoutDeviceIntRegion& aRegion)
 {
   NS_ASSERTION(aView->GetViewManager() == this, "wrong view manager");
 
@@ -291,6 +291,7 @@ void nsViewManager::Refresh(nsView *aView, const nsIntRegion& aRegion)
 
   // damageRegion is the damaged area, in twips, relative to the view origin
   nsRegion damageRegion = aRegion.ToAppUnits(AppUnitsPerDevPixel());
+
   // move region from widget coordinates into view coordinates
   damageRegion.MoveBy(-aView->ViewToWidgetOffset());
 
@@ -588,11 +589,11 @@ nsViewManager::InvalidateWidgetArea(nsView *aWidgetView,
         LayoutDeviceIntRect bounds;
         childWidget->GetBounds(bounds);
 
-        nsTArray<nsIntRect> clipRects;
+        nsTArray<LayoutDeviceIntRect> clipRects;
         childWidget->GetWindowClipRegion(&clipRects);
         for (uint32_t i = 0; i < clipRects.Length(); ++i) {
-          nsRect rr = ToAppUnits(clipRects[i] + bounds.TopLeft().ToUnknownPoint(),
-                                 AppUnitsPerDevPixel());
+          nsRect rr = LayoutDeviceIntRect::ToAppUnits(
+            clipRects[i] + bounds.TopLeft(), AppUnitsPerDevPixel());
           children.Or(children, rr - aWidgetView->ViewToWidgetOffset());
           children.SimplifyInward(20);
         }
@@ -714,7 +715,8 @@ void nsViewManager::WillPaintWindow(nsIWidget* aWidget)
   }
 }
 
-bool nsViewManager::PaintWindow(nsIWidget* aWidget, nsIntRegion aRegion)
+bool nsViewManager::PaintWindow(nsIWidget* aWidget,
+                                LayoutDeviceIntRegion aRegion)
 {
   if (!aWidget || !mContext)
     return false;

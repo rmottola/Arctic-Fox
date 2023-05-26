@@ -588,7 +588,7 @@ LIRGenerator::visitAssertFloat32(MAssertFloat32* assertion)
     MIRType type = assertion->input()->type();
     DebugOnly<bool> checkIsFloat32 = assertion->mustBeFloat32();
 
-    if (type != MIRType_Value && !js_JitOptions.eagerCompilation) {
+    if (type != MIRType_Value && !JitOptions.eagerCompilation) {
         MOZ_ASSERT_IF(checkIsFloat32, type == MIRType_Float32);
         MOZ_ASSERT_IF(!checkIsFloat32, type != MIRType_Float32);
     }
@@ -3365,6 +3365,16 @@ LIRGenerator::visitBindNameCache(MBindNameCache* ins)
 }
 
 void
+LIRGenerator::visitCallBindVar(MCallBindVar* ins)
+{
+    MOZ_ASSERT(ins->scopeChain()->type() == MIRType_Object);
+    MOZ_ASSERT(ins->type() == MIRType_Object);
+
+    LCallBindVar* lir = new(alloc()) LCallBindVar(useRegister(ins->scopeChain()));
+    define(lir, ins);
+}
+
+void
 LIRGenerator::visitGuardObjectIdentity(MGuardObjectIdentity* ins)
 {
     LGuardObjectIdentity* guard = new(alloc()) LGuardObjectIdentity(useRegister(ins->obj()),
@@ -3399,6 +3409,16 @@ LIRGenerator::visitGuardString(MGuardString* ins)
     // is guaranteed to be a string.
     MOZ_ASSERT(ins->input()->type() == MIRType_String);
     redefine(ins, ins->input());
+}
+
+void
+LIRGenerator::visitGuardSharedTypedArray(MGuardSharedTypedArray* ins)
+{
+    MOZ_ASSERT(ins->input()->type() == MIRType_Object);
+    LGuardSharedTypedArray* guard =
+        new(alloc()) LGuardSharedTypedArray(useRegister(ins->obj()), temp());
+    assignSnapshot(guard, Bailout_NonSharedTypedArrayInput);
+    add(guard, ins);
 }
 
 void
@@ -3848,10 +3868,8 @@ LIRGenerator::visitAsmJSReturn(MAsmJSReturn* ins)
         lir->setOperand(0, useFixed(rval, ReturnFloat32Reg));
     else if (rval->type() == MIRType_Double)
         lir->setOperand(0, useFixed(rval, ReturnDoubleReg));
-    else if (rval->type() == MIRType_Int32x4)
-        lir->setOperand(0, useFixed(rval, ReturnInt32x4Reg));
-    else if (rval->type() == MIRType_Float32x4)
-        lir->setOperand(0, useFixed(rval, ReturnFloat32x4Reg));
+    else if (IsSimdType(rval->type()))
+        lir->setOperand(0, useFixed(rval, ReturnSimd128Reg));
     else if (rval->type() == MIRType_Int32)
         lir->setOperand(0, useFixed(rval, ReturnReg));
     else
@@ -4039,7 +4057,7 @@ LIRGenerator::visitSimdConvert(MSimdConvert* ins)
     if (ins->type() == MIRType_Int32x4) {
         MOZ_ASSERT(input->type() == MIRType_Float32x4);
         LFloat32x4ToInt32x4* lir = new(alloc()) LFloat32x4ToInt32x4(use, temp());
-        if (!gen->conversionErrorLabel())
+        if (!gen->compilingAsmJS())
             assignSnapshot(lir, Bailout_BoundsCheck);
         define(lir, ins);
     } else if (ins->type() == MIRType_Float32x4) {

@@ -15,7 +15,6 @@
 
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/DOMError.h"
-#include "mozilla/dom/DOMException.h"
 #include "mozilla/dom/MediaStreamError.h"
 #include "mozilla/dom/PromiseBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -414,9 +413,7 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(Promise)
   if (tmp->IsBlack()) {
-    if (tmp->mResult.isObject()) {
-      JS::ExposeObjectToActiveJS(&(tmp->mResult.toObject()));
-    }
+    JS::ExposeValueToActiveJS(tmp->mResult);
     if (tmp->mAllocationStack) {
       JS::ExposeObjectToActiveJS(tmp->mAllocationStack);
     }
@@ -677,6 +674,7 @@ Promise::CreateFunction(JSContext* aCx, Promise* aPromise, int32_t aTask)
     return nullptr;
   }
 
+  JS::ExposeValueToActiveJS(promiseObj);
   js::SetFunctionNativeReserved(obj, SLOT_PROMISE, promiseObj);
   js::SetFunctionNativeReserved(obj, SLOT_DATA, JS::Int32Value(aTask));
 
@@ -704,6 +702,7 @@ Promise::CreateThenableFunction(JSContext* aCx, Promise* aPromise, uint32_t aTas
     return nullptr;
   }
 
+  JS::ExposeValueToActiveJS(promiseObj);
   js::SetFunctionNativeReserved(obj, SLOT_PROMISE, promiseObj);
 
   return obj;
@@ -2222,30 +2221,10 @@ Promise::RejectInternal(JSContext* aCx,
 void
 Promise::Settle(JS::Handle<JS::Value> aValue, PromiseState aState)
 {
-#ifdef MOZ_CRASHREPORTER
-  if (!mGlobal && mFullfillmentStack) {
-    AutoJSAPI jsapi;
-    jsapi.Init();
-    JSContext* cx = jsapi.cx();
-    JS::RootedObject stack(cx, mFullfillmentStack);
-    JSAutoCompartment ac(cx, stack);
-    JS::RootedString stackJSString(cx);
-    if (JS::BuildStackString(cx, stack, &stackJSString)) {
-      nsAutoJSString stackString;
-      if (stackString.init(cx, stackJSString)) {
-        // Put the string in the crash report here, since we're about to crash
-        CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("cced_promise_stack"),
-                                           NS_ConvertUTF16toUTF8(stackString));
-      } else {
-        JS_ClearPendingException(cx);
-      }
-    } else {
-      JS_ClearPendingException(cx);
-    }
-  }
-#endif
-
-  if (mGlobal->IsDying()) {
+  MOZ_ASSERT(mGlobal,
+             "We really should have a global here.  Except we sometimes don't "
+             "in the wild for some odd reason");
+  if (!mGlobal || mGlobal->IsDying()) {
     return;
   }
 
@@ -2661,10 +2640,6 @@ PromiseWorkerProxy::CustomWriteHandler(JSContext* aCx,
 // Specializations of MaybeRejectBrokenly we actually support.
 template<>
 void Promise::MaybeRejectBrokenly(const RefPtr<DOMError>& aArg) {
-  MaybeSomething(aArg, &Promise::MaybeReject);
-}
-template<>
-void Promise::MaybeRejectBrokenly(const RefPtr<DOMException>& aArg) {
   MaybeSomething(aArg, &Promise::MaybeReject);
 }
 template<>

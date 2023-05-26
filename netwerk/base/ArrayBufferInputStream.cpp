@@ -39,9 +39,9 @@ ArrayBufferInputStream::SetData(JS::Handle<JS::Value> aBuffer,
   mArrayBuffer = mozilla::MakeUnique<char[]>(mBufferLength);
 
   JS::AutoCheckCannotGC nogc;
-  char* src = (char*) JS_GetArrayBufferData(arrayBuffer, nogc) + offset;
+  bool isShared;
+  char* src = (char*) JS_GetArrayBufferData(arrayBuffer, &isShared, nogc) + offset;
   memcpy(&mArrayBuffer[0], src, mBufferLength);
-
   return NS_OK;
 }
 

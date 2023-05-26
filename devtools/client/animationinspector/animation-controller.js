@@ -87,10 +87,14 @@ var getServerTraits = Task.async(function*(target) {
      method: "stopAnimationPlayerUpdates" },
     { name: "hasSetPlaybackRate", actor: "animationplayer",
       method: "setPlaybackRate" },
+    { name: "hasSetPlaybackRates", actor: "animations",
+      method: "setPlaybackRates" },
     { name: "hasTargetNode", actor: "domwalker",
       method: "getNodeFromActor" },
     { name: "hasSetCurrentTimes", actor: "animations",
-      method: "setCurrentTimes" }
+      method: "setCurrentTimes" },
+    { name: "hasGetFrames", actor: "animationplayer",
+      method: "getFrames" }
   ];
 
   let traits = {};
@@ -279,6 +283,23 @@ var AnimationsController = {
           yield animation.pause();
         }
         yield animation.setCurrentTime(time);
+      }
+    }
+  }),
+
+  /**
+   * Set all known animations' playback rates to the provided rate.
+   * @param {Number} rate.
+   * @return {Promise} Resolves when the rate has been set.
+   */
+  setPlaybackRateAll: Task.async(function*(rate) {
+    if (this.traits.hasSetPlaybackRates) {
+      // If the backend can set all playback rates at the same time, use that.
+      yield this.animationsFront.setPlaybackRates(this.animationPlayers, rate);
+    } else if (this.traits.hasSetPlaybackRate) {
+      // Otherwise, fall back to setting each rate individually.
+      for (let animation of this.animationPlayers) {
+        yield animation.setPlaybackRate(rate);
       }
     }
   }),

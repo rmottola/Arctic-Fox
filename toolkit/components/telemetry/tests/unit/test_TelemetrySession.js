@@ -55,13 +55,12 @@ const PR_TRUNCATE = 0x20;
 const RW_OWNER = parseInt("0600", 8);
 
 const NUMBER_OF_THREADS_TO_LAUNCH = 30;
-let gNumberOfThreadsLaunched = 0;
+var gNumberOfThreadsLaunched = 0;
 
 const MS_IN_ONE_HOUR  = 60 * 60 * 1000;
 const MS_IN_ONE_DAY   = 24 * MS_IN_ONE_HOUR;
 
 const PREF_BRANCH = "toolkit.telemetry.";
-const PREF_ENABLED = PREF_BRANCH + "enabled";
 const PREF_SERVER = PREF_BRANCH + "server";
 const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
 const PREF_FHR_SERVICE_ENABLED = "datareporting.healthreport.service.enabled";
@@ -70,13 +69,11 @@ const DATAREPORTING_DIR = "datareporting";
 const ABORTED_PING_FILE_NAME = "aborted-session-ping";
 const ABORTED_SESSION_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
-
 XPCOMUtils.defineLazyGetter(this, "DATAREPORTING_PATH", function() {
   return OS.Path.join(OS.Constants.Path.profileDir, DATAREPORTING_DIR);
 });
 
-let gClientID = null;
+var gClientID = null;
 
 function generateUUID() {
   let str = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator).generateUUID().toString();
@@ -102,7 +99,7 @@ function sendPing() {
   }
 }
 
-let clearPendingPings = Task.async(function*() {
+var clearPendingPings = Task.async(function*() {
   const pending = yield TelemetryStorage.loadPendingPingList();
   for (let p of pending) {
     yield TelemetryStorage.removePendingPing(p.id);
@@ -198,16 +195,21 @@ function checkPayloadInfo(data) {
   const ALLOWED_REASONS = [
     "environment-change", "shutdown", "daily", "saved-session", "test-ping"
   ];
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   let numberCheck = arg => { return (typeof arg == "number"); };
   let positiveNumberCheck = arg => { return numberCheck(arg) && (arg >= 0); };
   let stringCheck = arg => { return (typeof arg == "string") && (arg != ""); };
-  let isoDateCheck = arg => { return stringCheck(arg) && !Number.isNaN(Date.parse(arg)); }
   let revisionCheck = arg => {
     return (Services.appinfo.isOfficial) ? stringCheck(arg) : (typeof arg == "string");
   };
   let uuidCheck = arg => {
     return UUID_REGEX.test(arg);
+  };
+  let isoDateCheck = arg => {
+    // We expect use of this version of the ISO format:
+    // 2015-04-12T18:51:19.1+00:00
+    const isoDateRegEx = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}$/;
+    return stringCheck(arg) && !Number.isNaN(Date.parse(arg)) &&
+           isoDateRegEx.test(arg);
   };
 
   const EXPECTED_INFO_FIELDS_TYPES = {
@@ -216,7 +218,8 @@ function checkPayloadInfo(data) {
     timezoneOffset: numberCheck,
     sessionId: uuidCheck,
     subsessionId: uuidCheck,
-    // Special case: previousSubsessionId is null on first run.
+    // Special cases: previousSessionId and previousSubsessionId are null on first run.
+    previousSessionId: (arg) => { return (arg) ? uuidCheck(arg) : true; },
     previousSubsessionId: (arg) => { return (arg) ? uuidCheck(arg) : true; },
     subsessionCounter: positiveNumberCheck,
     profileSubsessionCounter: positiveNumberCheck,
@@ -282,12 +285,10 @@ function checkPayload(payload, reason, successfulPings, savedPings) {
   const TELEMETRY_TEST_COUNT = "TELEMETRY_TEST_COUNT";
   const TELEMETRY_TEST_KEYED_FLAG = "TELEMETRY_TEST_KEYED_FLAG";
   const TELEMETRY_TEST_KEYED_COUNT = "TELEMETRY_TEST_KEYED_COUNT";
-  const READ_SAVED_PING_SUCCESS = "READ_SAVED_PING_SUCCESS";
 
   if (successfulPings > 0) {
     Assert.ok(TELEMETRY_PING in payload.histograms);
   }
-  Assert.ok(READ_SAVED_PING_SUCCESS in payload.histograms);
   Assert.ok(TELEMETRY_TEST_FLAG in payload.histograms);
   Assert.ok(TELEMETRY_TEST_COUNT in payload.histograms);
 
@@ -341,9 +342,6 @@ function checkPayload(payload, reason, successfulPings, savedPings) {
     let tc = payload.histograms[TELEMETRY_SUCCESS];
     Assert.equal(uneval(tc), uneval(expected_tc));
   }
-
-  let h = payload.histograms[READ_SAVED_PING_SUCCESS];
-  Assert.equal(h.values[0], 1);
 
   // The ping should include data from memory reporters.  We can't check that
   // this data is correct, because we can't control the values returned by the
@@ -435,7 +433,7 @@ function run_test() {
   do_get_profile();
   loadAddonManager(APP_ID, APP_NAME, APP_VERSION, PLATFORM_VERSION);
 
-  Services.prefs.setBoolPref(PREF_ENABLED, true);
+  Services.prefs.setBoolPref(PREF_TELEMETRY_ENABLED, true);
   Services.prefs.setBoolPref(PREF_FHR_UPLOAD_ENABLED, true);
 
   // Make it look like we've previously failed to lock a profile a couple times.
@@ -487,17 +485,6 @@ add_task(function* test_expiredHistogram() {
   do_check_eq(TelemetrySession.getPayload()["histograms"]["TELEMETRY_TEST_EXPIRED"], undefined);
 });
 
-// Checks that an invalid histogram file is deleted if TelemetryStorage fails to parse it.
-add_task(function* test_runInvalidJSON() {
-  let pingFile = getSavedPingFile("invalid-histograms.dat");
-
-  writeStringToFile(pingFile, "this.is.invalid.JSON");
-  do_check_true(pingFile.exists());
-
-  yield TelemetryStorage.testLoadHistograms(pingFile);
-  do_check_false(pingFile.exists());
-});
-
 // Sends a ping to a non existing server. If we remove this test, we won't get
 // all the histograms we need in the main ping.
 add_task(function* test_noServerPing() {
@@ -517,6 +504,7 @@ add_task(function* test_simplePing() {
   let now = new Date(2020, 1, 1, 12, 0, 0);
   let expectedDate = new Date(2020, 1, 1, 0, 0, 0);
   fakeNow(now);
+  const monotonicStart = fakeMonotonicNow(5000);
 
   const expectedSessionUUID = "bd314d15-95bf-4356-b682-b6c4a8942202";
   const expectedSubsessionUUID = "3e2e5f6c-74ba-4e4d-a93f-a48af238a8c7";
@@ -527,6 +515,7 @@ add_task(function* test_simplePing() {
   // now fake the session duration.
   const SESSION_DURATION_IN_MINUTES = 15;
   fakeNow(new Date(2020, 1, 1, 12, SESSION_DURATION_IN_MINUTES, 0));
+  fakeMonotonicNow(monotonicStart + SESSION_DURATION_IN_MINUTES * 60 * 1000);
 
   yield sendPing();
   let ping = yield PingServer.promiseNextPing();
@@ -570,7 +559,7 @@ add_task(function* test_saveLoadPing() {
   }
 
   // We decode both requests to check for the |reason|.
-  let pings = [for (req of requests) decodeRequestPayload(req)];
+  let pings = Array.from(requests, decodeRequestPayload);
 
   // Check we have the correct two requests. Ordering is not guaranteed. The ping type
   // is encoded in the URL.
@@ -585,6 +574,11 @@ add_task(function* test_saveLoadPing() {
 });
 
 add_task(function* test_checkSubsessionHistograms() {
+  if (gIsAndroid) {
+    // We don't support subsessions yet on Android.
+    return;
+  }
+
   let now = new Date(2020, 1, 1, 12, 0, 0);
   let expectedDate = new Date(2020, 1, 1, 0, 0, 0);
   fakeNow(now);
@@ -816,6 +810,11 @@ add_task(function* test_checkSubsessionData() {
 });
 
 add_task(function* test_dailyCollection() {
+  if (gIsAndroid) {
+    // We don't do daily collections yet on Android.
+    return;
+  }
+
   let now = new Date(2030, 1, 1, 12, 0, 0);
   let nowDay = new Date(2030, 1, 1, 0, 0, 0);
   let schedulerTickCallback = null;
@@ -1016,6 +1015,11 @@ add_task(function* test_dailyOverdue() {
 });
 
 add_task(function* test_environmentChange() {
+  if (gIsAndroid) {
+    // We don't split subsessions on environment changes yet on Android.
+    return;
+  }
+
   let now = new Date(2040, 1, 1, 12, 0, 0);
   let timerCallback = null;
   let timerDelay = null;
@@ -1030,7 +1034,7 @@ add_task(function* test_environmentChange() {
   Preferences.reset(PREF_TEST);
 
   const PREFS_TO_WATCH = new Map([
-    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+    [PREF_TEST, {what: TelemetryEnvironment.RECORD_PREF_VALUE}],
   ]);
 
   // Setup.
@@ -1087,21 +1091,6 @@ add_task(function* test_environmentChange() {
   Assert.deepEqual(ping.payload.keyedHistograms[KEYED_ID], {});
 });
 
-// Checks that an expired histogram file is deleted when loaded.
-add_task(function* test_pruneOldPingFile() {
-  const id = generateUUID();
-  const path = OS.Path.join(TelemetryStorage.pingDirectoryPath, id);
-  yield OS.File.writeAtomic(path, "{}", {noOverwrite: false});
-
-  // fake a time 14 days & 1m earlier
-  const now = new Date().getTime();
-  const fakeMtime = now - (14 * 24 * 60 * 60 * 1000 + 60000);
-  OS.File.setDates(path, null, fakeMtime);
-
-  yield TelemetryController.reset();
-  Assert.ok(!(yield OS.File.exists(path)), "File should have been removed.");
-});
-
 add_task(function* test_savedPingsOnShutdown() {
   // On desktop, we expect both "saved-session" and "shutdown" pings. We only expect
   // the former on Android.
@@ -1134,10 +1123,14 @@ add_task(function* test_savedSessionData() {
   // Create the directory which will contain the data file, if it doesn't already
   // exist.
   yield OS.File.makeDir(DATAREPORTING_PATH);
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_LOAD").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_PARSE").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").clear();
 
   // Write test data to the session data file.
   const dataFilePath = OS.Path.join(DATAREPORTING_PATH, "session-state.json");
   const sessionState = {
+    sessionId: null,
     subsessionId: null,
     profileSubsessionCounter: 3785,
   };
@@ -1146,19 +1139,28 @@ add_task(function* test_savedSessionData() {
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   Preferences.reset(PREF_TEST);
   const PREFS_TO_WATCH = new Map([
-    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+    [PREF_TEST, {what: TelemetryEnvironment.RECORD_PREF_VALUE}],
   ]);
 
   // We expect one new subsession when starting TelemetrySession and one after triggering
   // an environment change.
   const expectedSubsessions = sessionState.profileSubsessionCounter + 2;
-  const expectedUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
-  fakeGenerateUUID(generateUUID, () => expectedUUID);
+  const expectedSessionUUID = "ff602e52-47a1-b7e8-4c1a-ffffffffc87a";
+  const expectedSubsessionUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
+  fakeGenerateUUID(() => expectedSessionUUID, () => expectedSubsessionUUID);
+
+  if (gIsAndroid) {
+    // We don't support subsessions yet on Android, so skip the next checks.
+    return;
+  }
 
   // Start TelemetrySession so that it loads the session data file.
   yield TelemetrySession.reset();
-  // Watch a test preference, trigger and environment change and wait for it to propagate.
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_LOAD").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_PARSE").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").sum);
 
+  // Watch a test preference, trigger and environment change and wait for it to propagate.
   // _watchPreferences triggers a subsession notification
   fakeNow(new Date(2050, 1, 1, 12, 0, 0));
   TelemetryEnvironment._watchPreferences(PREFS_TO_WATCH);
@@ -1175,7 +1177,8 @@ add_task(function* test_savedSessionData() {
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
   Assert.equal(data.profileSubsessionCounter, expectedSubsessions);
-  Assert.equal(data.subsessionId, expectedUUID);
+  Assert.equal(data.sessionId, expectedSessionUUID);
+  Assert.equal(data.subsessionId, expectedSubsessionUUID);
 });
 
 add_task(function* test_sessionData_ShortSession() {
@@ -1189,14 +1192,22 @@ add_task(function* test_sessionData_ShortSession() {
   // Shut down Telemetry and remove the session state file.
   yield TelemetrySession.shutdown();
   yield OS.File.remove(SESSION_STATE_PATH, { ignoreAbsent: true });
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_LOAD").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_PARSE").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").clear();
 
-  const expectedUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
-  fakeGenerateUUID(generateUUID, () => expectedUUID);
+  const expectedSessionUUID = "ff602e52-47a1-b7e8-4c1a-ffffffffc87a";
+  const expectedSubsessionUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
+  fakeGenerateUUID(() => expectedSessionUUID, () => expectedSubsessionUUID);
 
   // We intentionally don't wait for the setup to complete and shut down to simulate
   // short sessions. We expect the profile subsession counter to be 1.
   TelemetrySession.reset();
   yield TelemetrySession.shutdown();
+
+  Assert.equal(1, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_LOAD").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_PARSE").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").sum);
 
   // Restore the UUID generation functions.
   fakeGenerateUUID(generateUUID, generateUUID);
@@ -1208,16 +1219,36 @@ add_task(function* test_sessionData_ShortSession() {
   // We expect 2 profile subsession counter updates.
   let payload = TelemetrySession.getPayload();
   Assert.equal(payload.info.profileSubsessionCounter, 2);
-  Assert.equal(payload.info.previousSubsessionId, expectedUUID);
+  Assert.equal(payload.info.previousSessionId, expectedSessionUUID);
+  Assert.equal(payload.info.previousSubsessionId, expectedSubsessionUUID);
+  Assert.equal(1, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_LOAD").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_PARSE").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").sum);
 });
 
 add_task(function* test_invalidSessionData() {
   // Create the directory which will contain the data file, if it doesn't already
   // exist.
   yield OS.File.makeDir(DATAREPORTING_PATH);
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_LOAD").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_PARSE").clear();
+  getHistogram("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").clear();
 
-  // Write test data to the session data file.
+  // Write test data to the session data file. This should fail to parse.
   const dataFilePath = OS.Path.join(DATAREPORTING_PATH, "session-state.json");
+  const unparseableData = "{asdf:@äü";
+  OS.File.writeAtomic(dataFilePath, unparseableData,
+                      {encoding: "utf-8", tmpPath: dataFilePath + ".tmp"});
+
+  // Start TelemetrySession so that it loads the session data file.
+  yield TelemetrySession.reset();
+
+  // The session data file should not load. Only expect the current subsession.
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_LOAD").sum);
+  Assert.equal(1, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_PARSE").sum);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").sum);
+
+  // Write test data to the session data file. This should fail validation.
   const sessionState = {
     profileSubsessionCounter: "not-a-number?",
     someOtherField: 12,
@@ -1226,18 +1257,26 @@ add_task(function* test_invalidSessionData() {
 
   // The session data file should not load. Only expect the current subsession.
   const expectedSubsessions = 1;
-  const expectedUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
-  fakeGenerateUUID(() => expectedUUID, () => expectedUUID);
+  const expectedSessionUUID = "ff602e52-47a1-b7e8-4c1a-ffffffffc87a";
+  const expectedSubsessionUUID = "009fd1ad-b85e-4817-b3e5-000000003785";
+  fakeGenerateUUID(() => expectedSessionUUID, () => expectedSubsessionUUID);
+
   // Start TelemetrySession so that it loads the session data file.
   yield TelemetrySession.reset();
+
   let payload = TelemetrySession.getPayload();
   Assert.equal(payload.info.profileSubsessionCounter, expectedSubsessions);
+  Assert.equal(0, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_LOAD").sum);
+  Assert.equal(1, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_PARSE").sum);
+  Assert.equal(1, getSnapshot("TELEMETRY_SESSIONDATA_FAILED_VALIDATION").sum);
+
   yield TelemetrySession.shutdown();
 
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
   Assert.equal(data.profileSubsessionCounter, expectedSubsessions);
-  Assert.equal(data.subsessionId, expectedUUID);
+  Assert.equal(data.sessionId, expectedSessionUUID);
+  Assert.equal(data.subsessionId, expectedSubsessionUUID);
 });
 
 add_task(function* test_pingExtendedStats() {
@@ -1502,7 +1541,7 @@ add_task(function* test_schedulerEnvironmentReschedules() {
   const PREF_TEST = "toolkit.telemetry.test.pref1";
   Preferences.reset(PREF_TEST);
   const PREFS_TO_WATCH = new Map([
-    [PREF_TEST, TelemetryEnvironment.RECORD_PREF_VALUE],
+    [PREF_TEST, {what: TelemetryEnvironment.RECORD_PREF_VALUE}],
   ]);
 
   yield clearPendingPings();

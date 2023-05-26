@@ -18,6 +18,7 @@
 #include "nsDOMNavigationTiming.h"
 #include "nsGlobalWindow.h"
 #include "nsJSUtils.h"
+#include "nsNetUtil.h"
 #include "nsPerformance.h"
 #include "ScriptSettings.h"
 #include "WorkerPrivate.h"
@@ -34,14 +35,11 @@
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsILoadContext.h"
 #include "nsIProgrammingLanguage.h"
+#include "nsISensitiveInfoHiddenURI.h"
 #include "nsIServiceManager.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIWebNavigation.h"
 #include "nsIXPConnect.h"
-
-#ifdef MOZ_ENABLE_PROFILER_SPS
-#include "nsIProfiler.h"
-#endif
 
 // The maximum allowed number of concurrent timers per page.
 #define MAX_PAGE_TIMERS 10000
@@ -240,7 +238,7 @@ public:
   }
 
 private:
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     AssertIsOnMainThread();
 
@@ -311,7 +309,9 @@ private:
 
     MOZ_ASSERT(aWindow->IsInnerWindow());
     nsPIDOMWindow* outerWindow = aWindow->GetOuterWindow();
-    MOZ_ASSERT(outerWindow);
+    if (NS_WARN_IF(!outerWindow)) {
+      return;
+    }
 
     RunConsole(jsapi.cx(), outerWindow, aWindow);
   }
@@ -697,9 +697,13 @@ Console::Console(nsPIDOMWindow* aWindow)
     MOZ_ASSERT(mWindow->IsInnerWindow());
     mInnerID = mWindow->WindowID();
 
+    // Without outerwindow any console message coming from this object will not
+    // shown in the devtools webconsole. But this should be fine because
+    // probably we are shutting down, or the window is CCed/GCed.
     nsPIDOMWindow* outerWindow = mWindow->GetOuterWindow();
-    MOZ_ASSERT(outerWindow);
-    mOuterID = outerWindow->WindowID();
+    if (outerWindow) {
+      mOuterID = outerWindow->WindowID();
+    }
   }
 
   if (NS_IsMainThread()) {
@@ -828,23 +832,6 @@ Console::TimeStamp(JSContext* aCx, const JS::Handle<JS::Value> aData)
   if (aData.isString() && !data.AppendElement(aData, fallible)) {
     return;
   }
-
-#ifdef MOZ_ENABLE_PROFILER_SPS
-  if (aData.isString() && NS_IsMainThread()) {
-    if (!mProfiler) {
-      mProfiler = do_GetService("@mozilla.org/tools/profiler;1");
-    }
-    if (mProfiler) {
-      bool active = false;
-      if (NS_SUCCEEDED(mProfiler->IsActive(&active)) && active) {
-        nsAutoJSString stringValue;
-        if (stringValue.init(aCx, aData)) {
-          mProfiler->AddMarker(NS_ConvertUTF16toUTF8(stringValue).get());
-        }
-      }
-    }
-  }
-#endif
 
   Method(aCx, MethodTimeStamp, NS_LITERAL_STRING("timeStamp"), data);
 }
@@ -1222,6 +1209,19 @@ Console::ProcessCallData(ConsoleCallData* aData)
 
   event.mLevel = aData->mMethodString;
   event.mFilename = frame.mFilename;
+
+  nsCOMPtr<nsIURI> filenameURI;
+  nsAutoCString pass;
+  if (NS_SUCCEEDED(NS_NewURI(getter_AddRefs(filenameURI), frame.mFilename)) &&
+      NS_SUCCEEDED(filenameURI->GetPassword(pass)) && !pass.IsEmpty()) {
+    nsCOMPtr<nsISensitiveInfoHiddenURI> safeURI = do_QueryInterface(filenameURI);
+    nsAutoCString spec;
+    if (safeURI &&
+        NS_SUCCEEDED(safeURI->GetSensitiveInfoHiddenSpec(spec))) {
+      CopyUTF8toUTF16(spec, event.mFilename);
+    }
+  }
+
   event.mLineNumber = frame.mLineNumber;
   event.mColumnNumber = frame.mColumnNumber;
   event.mFunctionName = frame.mFunctionName;
@@ -1389,7 +1389,7 @@ FlushOutput(JSContext* aCx, Sequence<JS::Value>& aSequence, nsString &aOutput)
   return true;
 }
 
-} // anonymous namespace
+} // namespace
 
 bool
 Console::ProcessArguments(JSContext* aCx,
@@ -1519,6 +1519,12 @@ Console::ProcessArguments(JSContext* aCx,
 
       case 'c':
       {
+        // If there isn't any output but there's already a style, then
+        // discard the previous style and use the next one instead.
+        if (output.IsEmpty() && !aStyles.IsEmpty()) {
+          aStyles.TruncateLength(aStyles.Length() - 1);
+        }
+
         if (!FlushOutput(aCx, aSequence, output)) {
           return false;
         }

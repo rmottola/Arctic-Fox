@@ -32,19 +32,18 @@ EXTRA_COMPONENTS += [
 
 EXTRA_JS_MODULES += [
     'TelemetryArchive.jsm',
+    'TelemetryController.jsm',
+    'TelemetryEnvironment.jsm',
     'TelemetryLog.jsm',
+    'TelemetryReportingPolicy.jsm',
     'TelemetrySend.jsm',
+    'TelemetrySession.jsm',
     'TelemetryStopwatch.jsm',
     'TelemetryStorage.jsm',
+    'TelemetryTimestamps.jsm',
     'TelemetryUtils.jsm',
     'ThirdPartyCookieProbe.jsm',
     'UITelemetry.jsm',
-]
-
-EXTRA_PP_JS_MODULES += [
-    'TelemetryController.jsm',
-    'TelemetryEnvironment.jsm',
-    'TelemetrySession.jsm',
 ]
 
 TESTING_JS_MODULES += [

@@ -70,15 +70,15 @@ var Frames = {
 
   receiveMessage({name, data}) {
     switch (name) {
-    case "Extension:TopWindowID":
-      // FIXME: Need to handle the case where the content process
-      // crashes. Right now we leak its top window IDs.
-      this.topWindowIds.add(data.windowId);
-      break;
+      case "Extension:TopWindowID":
+        // FIXME: Need to handle the case where the content process
+        // crashes. Right now we leak its top window IDs.
+        this.topWindowIds.add(data.windowId);
+        break;
 
-    case "Extension:RemoveTopWindowID":
-      this.topWindowIds.delete(data.windowId);
-      break;
+      case "Extension:RemoveTopWindowID":
+        this.topWindowIds.delete(data.windowId);
+        break;
     }
   },
 };
@@ -135,6 +135,7 @@ var Service = {
 
     this.uuidMap.set(uuid, extension);
     this.aps.setAddonLoadURICallback(extension.id, this.checkAddonMayLoad.bind(this, extension));
+    this.aps.setAddonLocalizeCallback(extension.id, extension.localize.bind(extension));
   },
 
   // Called when an extension is unloaded.
@@ -142,6 +143,7 @@ var Service = {
     let extension = this.uuidMap.get(uuid);
     this.uuidMap.delete(uuid);
     this.aps.setAddonLoadURICallback(extension.id, null);
+    this.aps.setAddonLocalizeCallback(extension.id, null);
 
     let handler = Services.io.getProtocolHandler("moz-extension");
     handler.QueryInterface(Ci.nsISubstitutingProtocolHandler);
@@ -159,7 +161,7 @@ var Service = {
     }
 
     let path = uri.path;
-    if (path.length > 0 && path[0] == '/') {
+    if (path.length > 0 && path[0] == "/") {
       path = path.substr(1);
     }
     return extension.webAccessibleResources.has(path);

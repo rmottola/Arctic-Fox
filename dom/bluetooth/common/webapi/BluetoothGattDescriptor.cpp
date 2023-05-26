@@ -167,8 +167,6 @@ void
 BluetoothGattDescriptor::GetValue(JSContext* cx,
                                   JS::MutableHandle<JSObject*> aValue) const
 {
-  MOZ_ASSERT(aValue);
-
   aValue.set(mValue.IsEmpty()
              ? nullptr
              : ArrayBuffer::Create(cx, mValue.Length(), mValue.Elements()));
@@ -234,6 +232,12 @@ BluetoothGattDescriptor::ReadValue(ErrorResult& aRv)
   RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
+  BluetoothUuid appUuid;
+  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(StringToUuid(
+                        mCharacteristic->Service()->GetAppUuid(), appUuid)),
+                        promise,
+                        NS_ERROR_DOM_OPERATION_ERR);
+
   if (mAttRole == ATT_SERVER_ROLE) {
     promise->MaybeResolve(mValue);
     return promise.forget();
@@ -243,7 +247,7 @@ BluetoothGattDescriptor::ReadValue(ErrorResult& aRv)
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
   bs->GattClientReadDescriptorValueInternal(
-    mCharacteristic->Service()->GetAppUuid(),
+    appUuid,
     mCharacteristic->Service()->GetServiceId(),
     mCharacteristic->GetCharacteristicId(),
     mDescriptorId,
@@ -265,6 +269,12 @@ BluetoothGattDescriptor::WriteValue(
   RefPtr<Promise> promise = Promise::Create(global, aRv);
   NS_ENSURE_TRUE(!aRv.Failed(), nullptr);
 
+  BluetoothUuid appUuid;
+  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(StringToUuid(
+                        mCharacteristic->Service()->GetAppUuid(), appUuid)),
+                        promise,
+                        NS_ERROR_DOM_OPERATION_ERR);
+
   aValue.ComputeLengthAndData();
 
   if (mAttRole == ATT_SERVER_ROLE) {
@@ -282,7 +292,7 @@ BluetoothGattDescriptor::WriteValue(
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
   bs->GattClientWriteDescriptorValueInternal(
-    mCharacteristic->Service()->GetAppUuid(),
+    appUuid,
     mCharacteristic->Service()->GetServiceId(),
     mCharacteristic->GetCharacteristicId(),
     mDescriptorId,
@@ -290,30 +300,4 @@ BluetoothGattDescriptor::WriteValue(
     new BluetoothVoidReplyRunnable(nullptr, promise));
 
   return promise.forget();
-}
-
-void
-BluetoothGattDescriptor::GetValue(JSContext* cx,
-                                  JS::MutableHandle<JSObject*> aValue) const
-{
-  MOZ_ASSERT(aValue);
-
-  aValue.set(mValue.IsEmpty()
-             ? nullptr
-             : ArrayBuffer::Create(cx, mValue.Length(), mValue.Elements()));
-}
-
-already_AddRefed<Promise>
-BluetoothGattDescriptor::ReadValue(ErrorResult& aRv)
-{
-  // TODO: This will be implemented by later patch set in the same bug.
-  return nullptr;
-}
-
-already_AddRefed<Promise>
-BluetoothGattDescriptor::WriteValue(
-  const RootedTypedArray<ArrayBuffer>& aValue, ErrorResult& aRv)
-{
-  // TODO: This will be implemented by later patch set in the same bug.
-  return nullptr;
 }

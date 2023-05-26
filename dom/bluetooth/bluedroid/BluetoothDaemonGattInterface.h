@@ -64,17 +64,8 @@ public:
     // TODO: Add L support
   };
 
-  static const int MAX_NUM_CLIENTS;
-
   virtual nsresult Send(DaemonSocketPDU* aPDU,
                         DaemonSocketResultHandler* aRes) = 0;
-
-  virtual nsresult RegisterModule(uint8_t aId, uint8_t aMode,
-                                  uint32_t aMaxNumClients,
-                                  BluetoothSetupResultHandler* aRes) = 0;
-
-  virtual nsresult UnregisterModule(uint8_t aId,
-                                    BluetoothSetupResultHandler* aRes) = 0;
 
   void SetNotificationHandler(
     BluetoothGattNotificationHandler* aNotificationHandler);
@@ -287,13 +278,14 @@ public:
     BluetoothGattResultHandler* aRes);
 
   /* Send an indication or a notification */
-  nsresult ServerSendIndicationCmd(int aServerIf,
-                                   int aAttributeHandle,
-                                   int aConnId,
-                                   int aLength,
-                                   bool aConfirm,
-                                   uint8_t* aValue,
-                                   BluetoothGattResultHandler* aRes);
+  nsresult ServerSendIndicationCmd(
+    int aServerIf,
+    const BluetoothAttributeHandle& aCharacteristicHandle,
+    int aConnId,
+    int aLength,
+    bool aConfirm,
+    uint8_t* aValue,
+    BluetoothGattResultHandler* aRes);
 
   /* Send a response for an incoming indication */
   nsresult ServerSendResponseCmd(int aConnId,
@@ -680,14 +672,12 @@ protected:
     BluetoothGattStatus, int>
     ServerResponseConfirmationNotification;
 
-  class ClientScanResultInitOp;
-  class ClientConnectDisconnectInitOp;
-  class ClientReadRemoteRssiInitOp;
   class ClientGetDeviceTypeInitOp;
+  class ClientScanResultInitOp;
   class ServerConnectionInitOp;
-  class ServerRequestReadInitOp;
   class ServerRequestWriteInitOp;
-  class ServerRequestExecuteWriteInitOp;
+  class ServerCharacteristicAddedInitOp;
+  class ServerDescriptorAddedInitOp;
 
   void ClientRegisterNtf(const DaemonSocketPDUHeader& aHeader,
                                DaemonSocketPDU& aPDU);
@@ -801,9 +791,8 @@ public:
   BluetoothDaemonGattInterface(BluetoothDaemonGattModule* aModule);
   ~BluetoothDaemonGattInterface();
 
-  void Init(BluetoothGattNotificationHandler* aNotificationHandler,
-            BluetoothGattResultHandler* aRes) override;
-  void Cleanup(BluetoothGattResultHandler* aRes) override;
+  void SetNotificationHandler(
+    BluetoothGattNotificationHandler* aNotificationHandler) override;
 
   /* Register / Unregister */
   void RegisterClient(const BluetoothUuid& aUuid,
@@ -981,7 +970,7 @@ public:
   /* Send an indication or a notification */
   void SendIndication(
     int aServerIf,
-    int aAttributeHandle,
+    const BluetoothAttributeHandle& aCharacteristicHandle,
     int aConnId,
     const nsTArray<uint8_t>& aValue,
     bool aConfirm, /* true: indication, false: notification */

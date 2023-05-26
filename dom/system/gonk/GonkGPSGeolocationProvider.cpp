@@ -15,12 +15,13 @@
  */
 
 #include "GonkGPSGeolocationProvider.h"
-#include "mozstumbler/MozStumbler.h"
 
+#include <cmath>
 #include <pthread.h>
 #include <hardware/gps.h>
 
-#include "mozilla/Constants.h"
+#include "GeolocationUtil.h"
+#include "mozstumbler/MozStumbler.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 #include "nsContentUtils.h"
@@ -38,6 +39,7 @@
 #include "mozilla/dom/SettingChangeNotificationBinding.h"
 
 #ifdef MOZ_B2G_RIL
+#include "mozstumbler/MozStumbler.h"
 #include "nsIIccInfo.h"
 #include "nsIMobileConnectionInfo.h"
 #include "nsIMobileConnectionService.h"
@@ -88,71 +90,6 @@ AGpsCallbacks GonkGPSGeolocationProvider::mAGPSCallbacks;
 AGpsRilCallbacks GonkGPSGeolocationProvider::mAGPSRILCallbacks;
 #endif // MOZ_B2G_RIL
 
-double CalculateDeltaInMeter(double aLat, double aLon, double aLastLat, double aLastLon)
-{
-  // Use spherical law of cosines to calculate difference
-  // Not quite as correct as the Haversine but simpler and cheaper
-  const double radsInDeg = M_PI / 180.0;
-  const double rNewLat = aLat * radsInDeg;
-  const double rNewLon = aLon * radsInDeg;
-  const double rOldLat = aLastLat * radsInDeg;
-  const double rOldLon = aLastLon * radsInDeg;
-  // WGS84 equatorial radius of earth = 6378137m
-  double cosDelta = (sin(rNewLat) * sin(rOldLat)) +
-                    (cos(rNewLat) * cos(rOldLat) * cos(rOldLon - rNewLon));
-  if (cosDelta > 1.0) {
-    cosDelta = 1.0;
-  } else if (cosDelta < -1.0) {
-    cosDelta = -1.0;
-  }
-  return acos(cosDelta) * 6378137;
-}
-
-class RequestCellInfoEvent : public nsRunnable {
-  public:
-    RequestCellInfoEvent(StumblerInfo *callback)
-      : mRequestCallback(callback)
-      {}
-
-    NS_IMETHOD Run() {
-      MOZ_ASSERT(NS_IsMainThread());
-      // Get Cell Info
-      nsCOMPtr<nsIMobileConnectionService> service =
-        do_GetService(NS_MOBILE_CONNECTION_SERVICE_CONTRACTID);
-
-      if (!service) {
-        nsContentUtils::LogMessageToConsole("Stumbler-can not get nsIMobileConnectionService \n");
-        return NS_OK;
-      }
-      nsCOMPtr<nsIMobileConnection> connection;
-      uint32_t numberOfRilServices = 1, cellInfoNum = 0;
-
-      service->GetNumItems(&numberOfRilServices);
-      for (uint32_t rilNum = 0; rilNum < numberOfRilServices; rilNum++) {
-        service->GetItemByServiceId(rilNum /* Client Id */, getter_AddRefs(connection));
-        if (!connection) {
-          nsContentUtils::LogMessageToConsole("Stumbler-can not get nsIMobileConnection by ServiceId %d \n", rilNum);
-        } else {
-          cellInfoNum++;
-          connection->GetCellInfoList(mRequestCallback);
-        }
-      }
-      mRequestCallback->SetCellInfoResponsesExpected(cellInfoNum);
-
-      // Get Wifi AP Info
-      nsCOMPtr<nsIInterfaceRequestor> ir = do_GetService("@mozilla.org/telephony/system-worker-manager;1");
-      nsCOMPtr<nsIWifi> wifi = do_GetInterface(ir);
-      if (!wifi) {
-        mRequestCallback->SetWifiInfoResponseReceived();
-        nsContentUtils::LogMessageToConsole("Stumbler-can not get nsIWifi interface\n");
-        return NS_OK;
-      }
-      wifi->GetWifiScanResults(mRequestCallback);
-      return NS_OK;
-    }
-  private:
-    RefPtr<StumblerInfo> mRequestCallback;
-};
 
 void
 GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
@@ -182,6 +119,11 @@ GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
 
   MOZ_ASSERT(location);
 
+  const float kImpossibleAccuracy_m = 0.001;
+  if (location->accuracy < kImpossibleAccuracy_m) {
+    return;
+  }
+
   RefPtr<nsGeoPosition> somewhere = new nsGeoPosition(location->latitude,
                                                         location->longitude,
                                                         location->altitude,
@@ -206,35 +148,9 @@ GonkGPSGeolocationProvider::LocationCallback(GpsLocation* location)
   RefPtr<UpdateLocationEvent> event = new UpdateLocationEvent(somewhere);
   NS_DispatchToMainThread(event);
 
-  const double kMinChangeInMeters = 30;
-  static int64_t lastTime_ms = 0;
-  static double sLastLat = 0;
-  static double sLastLon = 0;
-  double delta = -1.0;
-  int64_t timediff = (PR_Now() / PR_USEC_PER_MSEC) - lastTime_ms;
-
-  if (0 != sLastLon || 0 != sLastLat) {
-    delta = CalculateDeltaInMeter(location->latitude, location->longitude, sLastLat, sLastLon);
-  }
-  if (gDebug_isLoggingEnabled) {
-    nsContentUtils::LogMessageToConsole("Stumbler-Location. [%f , %f] time_diff:%lld, delta : %f\n",
-      location->longitude, location->latitude, timediff, delta);
-  }
-
-  // Consecutive GPS locations must be 30 meters and 3 seconds apart
-  if (lastTime_ms == 0 || ((timediff >= STUMBLE_INTERVAL_MS) && (delta > kMinChangeInMeters))){
-    lastTime_ms = (PR_Now() / PR_USEC_PER_MSEC);
-    sLastLat = location->latitude;
-    sLastLon = location->longitude;
-    RefPtr<StumblerInfo> requestCallback = new StumblerInfo(somewhere);
-    RefPtr<RequestCellInfoEvent> runnable = new RequestCellInfoEvent(requestCallback);
-    NS_DispatchToMainThread(runnable);
-  } else {
-    if (gDebug_isLoggingEnabled) {
-      nsContentUtils::LogMessageToConsole(
-        "Stumbler-GPS locations less than 30 meters and 3 seconds. Ignore!\n");
-    }
-  }
+#ifdef MOZ_B2G_RIL
+  MozStumble(somewhere);
+#endif
 }
 
 void
@@ -680,6 +596,33 @@ GonkGPSGeolocationProvider::RequestSetID(uint32_t flags)
   mAGpsRilInterface->set_set_id(type, idBytes.get());
 }
 
+namespace {
+int
+ConvertToGpsRefLocationType(const nsAString& aConnectionType)
+{
+  const char* GSM_TYPES[] = { "gsm", "gprs", "edge" };
+  const char* UMTS_TYPES[] = { "umts", "hspda", "hsupa", "hspa", "hspa+" };
+
+  for (auto type: GSM_TYPES) {
+    if (aConnectionType.EqualsASCII(type)) {
+        return AGPS_REF_LOCATION_TYPE_GSM_CELLID;
+    }
+  }
+
+  for (auto type: UMTS_TYPES) {
+    if (aConnectionType.EqualsASCII(type)) {
+      return AGPS_REF_LOCATION_TYPE_UMTS_CELLID;
+    }
+  }
+
+  if (gDebug_isLoggingEnabled) {
+    nsContentUtils::LogMessageToConsole("geo: Unsupported connection type %s\n",
+                                        NS_ConvertUTF16toUTF8(aConnectionType).get());
+  }
+  return AGPS_REF_LOCATION_TYPE_GSM_CELLID;
+}
+} // namespace
+
 void
 GonkGPSGeolocationProvider::SetReferenceLocation()
 {
@@ -692,9 +635,6 @@ GonkGPSGeolocationProvider::SetReferenceLocation()
 
   AGpsRefLocation location;
 
-  // TODO: Bug 772750 - get mobile connection technology from rilcontext
-  location.type = AGPS_REF_LOCATION_TYPE_UMTS_CELLID;
-
   nsCOMPtr<nsIMobileConnectionService> service =
     do_GetService(NS_MOBILE_CONNECTION_SERVICE_CONTRACTID);
   if (!service) {
@@ -703,14 +643,19 @@ GonkGPSGeolocationProvider::SetReferenceLocation()
   }
 
   nsCOMPtr<nsIMobileConnection> connection;
-  // TODO: Bug 878748 - B2G GPS: acquire correct RadioInterface instance in
-  // MultiSIM configuration
-  service->GetItemByServiceId(0 /* Client Id */, getter_AddRefs(connection));
+  service->GetItemByServiceId(mRilDataServiceId, getter_AddRefs(connection));
   NS_ENSURE_TRUE_VOID(connection);
 
   nsCOMPtr<nsIMobileConnectionInfo> voice;
   connection->GetVoice(getter_AddRefs(voice));
   if (voice) {
+    nsAutoString connectionType;
+    nsresult rv = voice->GetType(connectionType);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return;
+    }
+    location.type = ConvertToGpsRefLocationType(connectionType);
+
     nsCOMPtr<nsIMobileNetworkInfo> networkInfo;
     voice->GetNetwork(getter_AddRefs(networkInfo));
     if (networkInfo) {
@@ -1181,9 +1126,7 @@ GonkGPSGeolocationProvider::Observe(nsISupports* aSubject,
             }
 
             nsCOMPtr<nsIMobileConnection> connection;
-            // TODO: Bug 878748 - B2G GPS: acquire correct RadioInterface instance in
-            // MultiSIM configuration
-            service->GetItemByServiceId(0 /* Client Id */, getter_AddRefs(connection));
+            service->GetItemByServiceId(mRilDataServiceId, getter_AddRefs(connection));
             if (!connection) {
               break;
             }

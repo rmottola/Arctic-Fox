@@ -46,9 +46,7 @@ browser/chrome/devtools/modules/devtools/client/jsonview/css/controls.png
 browser/chrome/devtools/modules/devtools/client/jsonview/css/controls@2x.png
 browser/chrome/devtools/modules/devtools/client/memory/initializer.js
 browser/chrome/devtools/modules/devtools/client/projecteditor/lib/helpers/readdir.js
-browser/chrome/devtools/modules/devtools/client/themes/common.css
 browser/chrome/devtools/modules/devtools/client/themes/variables.css
-browser/chrome/devtools/skin/common.css
 browser/chrome/devtools/skin/images/command-scratchpad.svg
 browser/chrome/devtools/skin/images/controls.png
 browser/chrome/devtools/skin/images/controls@2x.png
@@ -623,3 +621,14 @@ browser/chrome/devtools/skin/themes/images/vview-edit@2x.png
 #Windows ArcticFox exceptions
 chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png
 chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric.png
+# marionette
+chrome/marionette/content/MockPermissionPrompt.jsm
+chrome/marionette/modules/MockPermissionPrompt.jsm
+chrome/marionette/content/MockPaymentsUIGlue.jsm
+chrome/marionette/modules/MockPaymentsUIGlue.jsm
+chrome/marionette/content/MockColorPicker.jsm
+chrome/marionette/modules/MockColorPicker.jsm
+chrome/marionette/content/MockFilePicker.jsm
+chrome/marionette/modules/MockFilePicker.jsm
+chrome/marionette/content/Assert.jsm
+chrome/marionette/modules/Assert.jsm

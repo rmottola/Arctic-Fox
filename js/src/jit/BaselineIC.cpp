@@ -1757,7 +1757,7 @@ DoGetElemFallback(JSContext* cx, BaselineFrame* frame, ICGetElem_Fallback* stub_
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(frame->script());
     JSOp op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "GetElem(%s)", js_CodeName[op]);
+    FallbackICSpew(cx, stub, "GetElem(%s)", CodeName[op]);
 
     MOZ_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
 
@@ -2363,7 +2363,7 @@ LoadTypedThingLength(MacroAssembler& masm, TypedThingLayout layout, Register obj
 {
     switch (layout) {
       case Layout_TypedArray:
-        masm.unboxInt32(Address(obj, TypedArrayLayout::lengthOffset()), result);
+        masm.unboxInt32(Address(obj, TypedArrayObject::lengthOffset()), result);
         break;
       case Layout_OutlineTypedObject:
       case Layout_InlineTypedObject:
@@ -2735,7 +2735,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(script);
     JSOp op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "SetElem(%s)", js_CodeName[JSOp(*pc)]);
+    FallbackICSpew(cx, stub, "SetElem(%s)", CodeName[JSOp(*pc)]);
 
     MOZ_ASSERT(op == JSOP_SETELEM ||
                op == JSOP_STRICTSETELEM ||
@@ -4164,7 +4164,7 @@ DoGetNameFallback(JSContext* cx, BaselineFrame* frame, ICGetName_Fallback* stub_
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(script);
     mozilla::DebugOnly<JSOp> op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "GetName(%s)", js_CodeName[JSOp(*pc)]);
+    FallbackICSpew(cx, stub, "GetName(%s)", CodeName[JSOp(*pc)]);
 
     MOZ_ASSERT(op == JSOP_GETNAME || op == JSOP_GETGNAME);
 
@@ -4323,7 +4323,7 @@ DoBindNameFallback(JSContext* cx, BaselineFrame* frame, ICBindName_Fallback* stu
 {
     jsbytecode* pc = stub->icEntry()->pc(frame->script());
     mozilla::DebugOnly<JSOp> op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "BindName(%s)", js_CodeName[JSOp(*pc)]);
+    FallbackICSpew(cx, stub, "BindName(%s)", CodeName[JSOp(*pc)]);
 
     MOZ_ASSERT(op == JSOP_BINDNAME || op == JSOP_BINDGNAME);
 
@@ -4371,7 +4371,7 @@ DoGetIntrinsicFallback(JSContext* cx, BaselineFrame* frame, ICGetIntrinsic_Fallb
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(script);
     mozilla::DebugOnly<JSOp> op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "GetIntrinsic(%s)", js_CodeName[JSOp(*pc)]);
+    FallbackICSpew(cx, stub, "GetIntrinsic(%s)", CodeName[JSOp(*pc)]);
 
     MOZ_ASSERT(op == JSOP_GETINTRINSIC);
 
@@ -4698,7 +4698,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(script);
     JSOp op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "SetProp(%s)", js_CodeName[op]);
+    FallbackICSpew(cx, stub, "SetProp(%s)", CodeName[op]);
 
     MOZ_ASSERT(op == JSOP_SETPROP ||
                op == JSOP_STRICTSETPROP ||
@@ -5690,7 +5690,7 @@ GetTemplateObjectForNative(JSContext* cx, Native native, const CallArgs& args,
 
     if (native == StringConstructor) {
         RootedString emptyString(cx, cx->runtime()->emptyString);
-        res.set(StringObject::create(cx, emptyString, TenuredObject));
+        res.set(StringObject::create(cx, emptyString, /* proto = */ nullptr, TenuredObject));
         return !!res;
     }
 
@@ -6094,7 +6094,7 @@ DoCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_, uint
     RootedScript script(cx, frame->script());
     jsbytecode* pc = stub->icEntry()->pc(script);
     JSOp op = JSOp(*pc);
-    FallbackICSpew(cx, stub, "Call(%s)", js_CodeName[op]);
+    FallbackICSpew(cx, stub, "Call(%s)", CodeName[op]);
 
     MOZ_ASSERT(argc == GET_ARGC(pc));
     bool constructing = (op == JSOP_NEW);
@@ -6153,10 +6153,16 @@ DoCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_, uint
         res.set(vp[0]);
     } else {
         MOZ_ASSERT(op == JSOP_CALL ||
+                   op == JSOP_CALLITER ||
                    op == JSOP_FUNCALL ||
                    op == JSOP_FUNAPPLY ||
                    op == JSOP_EVAL ||
                    op == JSOP_STRICTEVAL);
+        if (op == JSOP_CALLITER && callee.isPrimitive()) {
+            MOZ_ASSERT(argc == 0, "thisv must be on top of the stack");
+            ReportValueError(cx, JSMSG_NOT_ITERABLE, -1, thisv, nullptr);
+            return false;
+        }
         if (!Invoke(cx, thisv, callee, argc, args, res))
             return false;
     }
@@ -6200,7 +6206,7 @@ DoSpreadCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_
     jsbytecode* pc = stub->icEntry()->pc(script);
     JSOp op = JSOp(*pc);
     bool constructing = (op == JSOP_SPREADNEW);
-    FallbackICSpew(cx, stub, "SpreadCall(%s)", js_CodeName[op]);
+    FallbackICSpew(cx, stub, "SpreadCall(%s)", CodeName[op]);
 
     // Ensure vp array is rooted - we may GC in here.
     AutoArrayRooter vpRoot(cx, 3 + constructing, vp);

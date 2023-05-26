@@ -19,9 +19,6 @@ XPCOMUtils.defineLazyGetter(this, "gPingsArchivePath", function() {
   return OS.Path.join(OS.Constants.Path.profileDir, "datareporting", "archived");
 });
 
-const PREF_TELEMETRY_ENABLED = "toolkit.telemetry.enabled";
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
-
 /**
  * Fakes the archive storage quota.
  * @param {Integer} aArchiveQuota The new quota, in bytes.
@@ -109,7 +106,7 @@ add_task(function* test_archivedPings() {
   }
 
   // Check loading the archived pings.
-  let ids = [for (p of PINGS) p.id];
+  let ids = PINGS.map(p => p.id);
   let checkLoadingPings = Task.async(function*() {
     for (let data of PINGS) {
       let ping = yield TelemetryArchive.promiseArchivedPingById(data.id);

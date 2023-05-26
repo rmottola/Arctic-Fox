@@ -6,6 +6,8 @@
 
 const EXPORTED_SYMBOLS = ["WebRequest"];
 
+/* exported WebRequest */
+
 const Ci = Components.interfaces;
 const Cc = Components.classes;
 const Cu = Components.utils;
@@ -37,7 +39,7 @@ function parseExtra(extra, allowed) {
   if (extra) {
     for (let ex of extra) {
       if (allowed.indexOf(ex) == -1) {
-        throw `Invalid option ${ex}`;
+        throw new Error(`Invalid option ${ex}`);
       }
     }
   }
@@ -81,7 +83,7 @@ var ContentPolicyManager = {
           windowId: msg.data.windowId,
           parentWindowId: msg.data.parentWindowId,
           type: msg.data.type,
-          browser: browser
+          browser: browser,
         });
       } catch (e) {
         Cu.reportError(e);
@@ -122,9 +124,9 @@ var ContentPolicyManager = {
 };
 ContentPolicyManager.init();
 
-function StartStopListener(manager)
-{
+function StartStopListener(manager, loadContext) {
   this.manager = manager;
+  this.loadContext = loadContext;
   this.orig = null;
 }
 
@@ -134,19 +136,19 @@ StartStopListener.prototype = {
                                          Ci.nsISupports]),
 
   onStartRequest: function(request, context) {
-    this.manager.onStartRequest(request);
+    this.manager.onStartRequest(request, this.loadContext);
     return this.orig.onStartRequest(request, context);
   },
 
   onStopRequest(request, context, statusCode) {
     let result = this.orig.onStopRequest(request, context, statusCode);
-    this.manager.onStopRequest(request);
+    this.manager.onStopRequest(request, this.loadContext);
     return result;
   },
 
   onDataAvailable(...args) {
     return this.orig.onDataAvailable(...args);
-  }
+  },
 };
 
 var HttpObserverManager = {
@@ -229,12 +231,14 @@ var HttpObserverManager = {
   },
 
   observe(subject, topic, data) {
+    let channel = subject.QueryInterface(Ci.nsIHttpChannel);
+
     if (topic == "http-on-modify-request") {
-      this.modify(subject, topic, data);
+      this.modify(channel, topic, data);
     } else if (topic == "http-on-examine-response" ||
                topic == "http-on-examine-cached-response" ||
                topic == "http-on-examine-merged-response") {
-      this.examine(subject, topic, data);
+      this.examine(channel, topic, data);
     }
   },
 
@@ -243,10 +247,8 @@ var HttpObserverManager = {
            WebRequestCommon.urlMatches(uri, filter.urls);
   },
 
-  runChannelListener(request, kind) {
+  runChannelListener(channel, loadContext, kind) {
     let listeners = this.listeners[kind];
-    let channel = request.QueryInterface(Ci.nsIHttpChannel);
-    let loadContext = this.getLoadContext(channel);
     let browser = loadContext ? loadContext.topFrameElement : null;
     let loadInfo = channel.loadInfo;
     let policyType = loadInfo ?
@@ -307,7 +309,7 @@ var HttpObserverManager = {
       }
       if (opts.requestHeaders && result.requestHeaders) {
         // Start by clearing everything.
-        for (let {name, value} of requestHeaders) {
+        for (let {name} of requestHeaders) {
           channel.setRequestHeader(name, "", false);
         }
 
@@ -317,7 +319,7 @@ var HttpObserverManager = {
       }
       if (opts.responseHeaders && result.responseHeaders) {
         // Start by clearing everything.
-        for (let {name, value} of responseHeaders) {
+        for (let {name} of responseHeaders) {
           channel.setResponseHeader(name, "", false);
         }
 
@@ -326,33 +328,38 @@ var HttpObserverManager = {
         }
       }
     }
+
+    return true;
   },
 
-  modify(subject, topic, data) {
-    if (this.runChannelListener(subject, "modify")) {
-      this.runChannelListener(subject, "afterModify");
+  modify(channel, topic, data) {
+    let loadContext = this.getLoadContext(channel);
+
+    if (this.runChannelListener(channel, loadContext, "modify")) {
+      this.runChannelListener(channel, loadContext, "afterModify");
     }
   },
 
-  examine(subject, topic, data) {
-    let channel = subject.QueryInterface(Ci.nsIHttpChannel);
+  examine(channel, topic, data) {
+    let loadContext = this.getLoadContext(channel);
+
     if (this.listeners.onStart.size || this.listeners.onStop.size) {
       if (channel instanceof Components.interfaces.nsITraceableChannel) {
-        let listener = new StartStopListener(this);
-        let orig = subject.setNewListener(listener);
+        let listener = new StartStopListener(this, loadContext);
+        let orig = channel.setNewListener(listener);
         listener.orig = orig;
       }
     }
 
-    this.runChannelListener(subject, "headersReceived");
+    this.runChannelListener(channel, loadContext, "headersReceived");
   },
 
-  onStartRequest(request) {
-    this.runChannelListener(request, "onStart");
+  onStartRequest(channel, loadContext) {
+    this.runChannelListener(channel, loadContext, "onStart");
   },
 
-  onStopRequest(request) {
-    this.runChannelListener(request, "onStop");
+  onStopRequest(channel, loadContext) {
+    this.runChannelListener(channel, loadContext, "onStop");
   },
 };
 
@@ -366,7 +373,7 @@ var onBeforeRequest = {
 
   removeListener(callback) {
     ContentPolicyManager.removeListener(callback);
-  }
+  },
 };
 
 var onBeforeSendHeaders = {
@@ -378,7 +385,7 @@ var onBeforeSendHeaders = {
 
   removeListener(callback) {
     HttpObserverManager.removeListener("modify", callback);
-  }
+  },
 };
 
 var onSendHeaders = {
@@ -390,7 +397,7 @@ var onSendHeaders = {
 
   removeListener(callback) {
     HttpObserverManager.removeListener("afterModify", callback);
-  }
+  },
 };
 
 var onHeadersReceived = {
@@ -402,7 +409,7 @@ var onHeadersReceived = {
 
   removeListener(callback) {
     HttpObserverManager.removeListener("headersReceived", callback);
-  }
+  },
 };
 
 var onResponseStarted = {
@@ -414,7 +421,7 @@ var onResponseStarted = {
 
   removeListener(callback) {
     HttpObserverManager.removeListener("onStart", callback);
-  }
+  },
 };
 
 var onCompleted = {
@@ -426,7 +433,7 @@ var onCompleted = {
 
   removeListener(callback) {
     HttpObserverManager.removeListener("onStop", callback);
-  }
+  },
 };
 
 var WebRequest = {

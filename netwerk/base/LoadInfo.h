@@ -61,6 +61,7 @@ public:
   // when a separate request is made with the same security properties.
   already_AddRefed<nsILoadInfo> CloneForNewRequest() const;
 
+  void SetIsPreflight();
   void SetIsFromProcessingFrameAttributes();
 
 private:
@@ -72,6 +73,7 @@ private:
            nsIPrincipal* aTriggeringPrincipal,
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType,
+           LoadTainting aTainting,
            bool aUpgradeInsecureRequests,
            bool aUpgradeInsecurePreloads,
            uint64_t aInnerWindowID,
@@ -82,7 +84,10 @@ private:
            bool aIsThirdPartyRequest,
            const NeckoOriginAttributes& aOriginAttributes,
            nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChainIncludingInternalRedirects,
-           nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain);
+           nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain,
+           const nsTArray<nsCString>& aUnsafeHeaders,
+           bool aForcePreflight,
+           bool aIsPreflight);
   LoadInfo(const LoadInfo& rhs);
 
   friend nsresult
@@ -97,7 +102,7 @@ private:
   // This function is the *only* function which can change the securityflags
   // of a loadinfo. It only exists because of the XHR code. Don't call it
   // from anywhere else!
-  void SetWithCredentialsSecFlag();
+  void SetIncludeCookiesSecFlag();
   friend class ::nsXMLHttpRequest;
 
   // if you add a member, please also update the copy constructor
@@ -118,6 +123,9 @@ private:
   NeckoOriginAttributes            mOriginAttributes;
   nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChainIncludingInternalRedirects;
   nsTArray<nsCOMPtr<nsIPrincipal>> mRedirectChain;
+  nsTArray<nsCString>              mCorsUnsafeHeaders;
+  bool                             mForcePreflight;
+  bool                             mIsPreflight;
 
   // Is true if this load was triggered by processing the attributes of the
   // browsing context container.
