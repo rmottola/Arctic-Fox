@@ -845,9 +845,17 @@ GeckoMediaPluginServiceParent::SelectPluginForAPI(const nsACString& aNodeId,
         return gmp;
       }
 
-      // This GMP has the correct type but has the wrong nodeId; hold on to it
-      // in case we need to clone it.
-      gmpToClone = gmp;
+      if (!gmpToClone ||
+          (gmpToClone->IsMarkedForDeletion() && !gmp->IsMarkedForDeletion())) {
+        // This GMP has the correct type but has the wrong nodeId; hold on to it
+        // in case we need to clone it.
+        // Prefer GMPs in-use for the case where an upgraded plugin version is
+        // waiting for the old one to die. If the old plugin is in use, we
+        // should continue using it so that any persistent state remains
+        // consistent. Otherwise, just check that the plugin isn't scheduled
+        // for deletion.
+        gmpToClone = gmp;
+      }
       // Loop around and try the next plugin; it may be usable from aNodeId.
       index++;
     }
@@ -1142,7 +1150,6 @@ nsresult
 GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
                                          const nsAString& aTopLevelOrigin,
                                          bool aInPrivateBrowsing,
-                                         const nsACString& aVersion,
                                          nsACString& aOutId)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
@@ -1171,8 +1178,7 @@ GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
   }
 
   const uint32_t hash = AddToHash(HashString(aOrigin),
-                                  HashString(aTopLevelOrigin),
-                                  HashString(aVersion));
+                                  HashString(aTopLevelOrigin));
 
   if (aInPrivateBrowsing) {
     // For PB mode, we store the node id, indexed by the origin pair,
@@ -1292,11 +1298,10 @@ NS_IMETHODIMP
 GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
                                          const nsAString& aTopLevelOrigin,
                                          bool aInPrivateBrowsing,
-                                         const nsACString& aVersion,
                                          UniquePtr<GetNodeIdCallback>&& aCallback)
 {
   nsCString nodeId;
-  nsresult rv = GetNodeId(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, aVersion, nodeId);
+  nsresult rv = GetNodeId(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, nodeId);
   aCallback->Done(rv, nodeId);
   return rv;
 }
@@ -1663,11 +1668,10 @@ bool
 GMPServiceParent::RecvGetGMPNodeId(const nsString& aOrigin,
                                    const nsString& aTopLevelOrigin,
                                    const bool& aInPrivateBrowsing,
-                                   const nsCString& aVersion,
                                    nsCString* aID)
 {
   nsresult rv = mService->GetNodeId(aOrigin, aTopLevelOrigin,
-                                    aInPrivateBrowsing, aVersion, *aID);
+                                    aInPrivateBrowsing, *aID);
   return NS_SUCCEEDED(rv);
 }
 

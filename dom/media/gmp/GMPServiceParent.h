@@ -42,7 +42,6 @@ public:
   NS_IMETHOD GetNodeId(const nsAString& aOrigin,
                        const nsAString& aTopLevelOrigin,
                        bool aInPrivateBrowsingMode,
-                       const nsACString& aVersion,
                        UniquePtr<GetNodeIdCallback>&& aCallback) override;
 
   NS_DECL_MOZIGECKOMEDIAPLUGINCHROMESERVICE
@@ -73,8 +72,7 @@ private:
                                   size_t* aOutPluginIndex);
 
   nsresult GetNodeId(const nsAString& aOrigin, const nsAString& aTopLevelOrigin,
-                     bool aInPrivateBrowsing, const nsACString& aVersion,
-                     nsACString& aOutId);
+                     bool aInPrivateBrowsing, nsACString& aOutId);
 
   void UnloadPlugins();
   void CrashPlugins();
@@ -215,7 +213,6 @@ public:
   virtual bool RecvGetGMPNodeId(const nsString& aOrigin,
                                 const nsString& aTopLevelOrigin,
                                 const bool& aInPrivateBrowsing,
-                                const nsCString& aVersion,
                                 nsCString* aID) override;
   static bool RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
                                             nsTArray<nsCString>&& aTags,
