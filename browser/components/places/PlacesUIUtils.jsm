@@ -1222,17 +1222,9 @@ this.PlacesUIUtils = {
   },
 
   shouldShowTabsFromOtherComputersMenuitem: function() {
-    // If Sync isn't configured yet, then don't show the menuitem.
-    return Weave.Status.checkSetup() != Weave.CLIENT_NOT_CONFIGURED &&
-           Weave.Svc.Prefs.get("firstSync", "") != "notReady";
-  },
-
-  shouldEnableTabsFromOtherComputersMenuitem: function() {
-    // The tabs engine might never be inited (if services.sync.registerEngines
-    // is modified), so make sure we avoid undefined errors.
-    return Weave.Service.isLoggedIn &&
-           Weave.Service.engineManager.get("tabs") &&
-           Weave.Service.engineManager.get("tabs").enabled;
+    let weaveOK = Weave.Status.checkSetup() != Weave.CLIENT_NOT_CONFIGURED &&
+                  Weave.Svc.Prefs.get("firstSync", "") != "notReady";
+    return weaveOK;
   },
 
   /**
