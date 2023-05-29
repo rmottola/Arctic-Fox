@@ -341,6 +341,9 @@ IsAACContentType(const nsAString& aContentType);
 bool
 IsAACCodecString(const nsAString& aCodec);
 
+void
+LogToBrowserConsole(const nsAString& aMsg);
+
 } // end namespace mozilla
 
 #endif
