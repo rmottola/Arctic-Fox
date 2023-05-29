@@ -107,7 +107,7 @@ var debug = Cu.import("resource://gre/modules/AndroidLog.jsm", {})
               .AndroidLog.d.bind(null, "Webapps");
 #else
 // Elsewhere, report debug messages only if dom.mozApps.debug is set to true.
-let debug;
+var debug;
 function debugPrefObserver() {
   debug = Services.prefs.getBoolPref("dom.mozApps.debug")
             ? (aMsg) => dump("-*- Webapps.jsm : " + aMsg + "\n")
@@ -132,7 +132,9 @@ function supportSystemMessages() {
 // Minimum delay between two progress events while downloading, in ms.
 const MIN_PROGRESS_EVENT_DELAY = 1500;
 
-const chromeWindowType = "navigator:browser";
+const WEBAPP_RUNTIME = Services.appinfo.ID == "webapprt@mozilla.org";
+
+const chromeWindowType = WEBAPP_RUNTIME ? "webapprt:webapp" : "navigator:browser";
 
 XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
                                    "@mozilla.org/parentprocessmessagemanager;1",
@@ -175,8 +177,10 @@ XPCOMUtils.defineLazyGetter(this, "permMgr", function() {
 #elifdef ANDROID
   const DIRECTORY_NAME = "webappsDir";
 #else
-  // Mulet, B2G Desktop, etc.
-  const DIRECTORY_NAME = "ProfD";
+  // If we're executing in the context of the webapp runtime, the data files
+  // are in a different directory (currently the Firefox profile that installed
+  // the webapp); otherwise, they're in the current profile.
+  const DIRECTORY_NAME = WEBAPP_RUNTIME ? "WebappRegD" : "ProfD";
 #endif
 
 // We'll use this to identify privileged apps that have been preinstalled
@@ -2039,8 +2043,12 @@ this.DOMApplicationRegistry = {
         },
         id: aApp.id
       });
+      let appURI = NetUtil.newURI(aApp.origin, null, null);
+      let principal =
+        Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                               {appId: aApp.localId});
       let cacheUpdate = updateSvc.scheduleAppUpdate(
-        appcacheURI, docURI, aApp.localId, false, aProfileDir);
+        appcacheURI, docURI, principal, aApp.localId, false, aProfileDir);
 
       // We save the download details for potential further usage like
       // cancelling it.
@@ -2189,8 +2197,12 @@ this.DOMApplicationRegistry = {
           new ManifestHelper(manifest, aData.origin, aData.manifestURL);
         debug("onlyCheckAppCache - launch updateSvc.checkForUpdate for " +
               helper.fullAppcachePath());
+        let appURI = NetUtil.newURI(aApp.origin, null, null);
+        let principal =
+          Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                                 {appId: aApp.localId});
         updateSvc.checkForUpdate(Services.io.newURI(helper.fullAppcachePath(), null, null),
-                                 app.localId, false, updateObserver);
+                                 principal, app.localId, false, updateObserver);
       });
       return;
     }
@@ -2458,9 +2470,13 @@ this.DOMApplicationRegistry = {
             manifest.fullAppcachePath());
 
       let updateDeferred = Promise.defer();
+      let appURI = NetUtil.newURI(aApp.origin, null, null);
+      let principal =
+        Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                               {appId: aApp.localId});
 
       updateSvc.checkForUpdate(Services.io.newURI(manifest.fullAppcachePath(), null, null),
-                               aApp.localId, false,
+                               principal, aApp.localId, false,
                                (aSubject, aTopic, aData) => updateDeferred.resolve(aTopic));
 
       let topic = yield updateDeferred.promise;
