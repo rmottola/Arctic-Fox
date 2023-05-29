@@ -448,7 +448,7 @@ void
 HomeScreenPrefCallback(const char* aPrefName, void* /* aClosure */)
 {
   MOZ_ASSERT(XRE_IsParentProcess() && NS_IsMainThread());
-  nsRefPtr<DataStoreService> service = DataStoreService::Get();
+  RefPtr<DataStoreService> service = DataStoreService::Get();
   if (!service) {
     return;
   }
