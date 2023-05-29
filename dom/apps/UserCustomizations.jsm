@@ -35,6 +35,7 @@ function log(aStr) {
 
 this.UserCustomizations = {
   extensions: new Map(), // id -> extension. Needed to disable extensions.
+  appId: new Set(),
 
   register: function(aApp) {
     if (!this._enabled || !aApp.enabled || aApp.role != "addon") {
@@ -52,7 +53,10 @@ this.UserCustomizations = {
     });
 
     this.extensions.set(aApp.manifestURL, extension);
-    extension.startup();
+    extension.startup().then(() => {
+      let uri = Services.io.newURI(aApp.origin, null, null);
+      this.appId.add(uri.host);
+    });
   },
 
   unregister: function(aApp) {
@@ -64,7 +68,13 @@ this.UserCustomizations = {
     if (this.extensions.has(aApp.manifestURL)) {
       this.extensions.get(aApp.manifestURL).shutdown();
       this.extensions.delete(aApp.manifestURL);
+      let uri = Services.io.newURI(aApp.origin, null, null);
+      this.appId.delete(uri.host);
     }
+  },
+
+  isFromExtension: function(aURI) {
+    return this.appId.has(aURI.host);
   },
 
   // Checks that this is a valid extension manifest.
