@@ -150,6 +150,10 @@ AppsService.prototype = {
     return UserCustomizations.isFromExtension(aURI);
   },
 
+  updateDataStoreEntriesFromLocalId: function(aLocalId) {
+    return DOMApplicationRegistry.updateDataStoreEntriesFromLocalId(aLocalId);
+  },
+
   classID : APPS_SERVICE_CID,
   QueryInterface : XPCOMUtils.generateQI([Ci.nsIAppsService])
 }

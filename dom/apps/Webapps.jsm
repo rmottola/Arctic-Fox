@@ -4799,6 +4799,13 @@ this.DOMApplicationRegistry = {
     return OS.Path.dirname(this.appsFile);
   },
 
+  updateDataStoreEntriesFromLocalId: function(aLocalId) {
+    let app = appsService.getAppByLocalId(aLocalId);
+    if (app) {
+      this.updateDataStoreForApp(app.id);
+    }
+  },
+
   _isLaunchable: function(aApp) {
     return true;
   },
