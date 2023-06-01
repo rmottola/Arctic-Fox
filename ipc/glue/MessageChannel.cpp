@@ -1484,9 +1484,6 @@ MessageChannel::MaybeUndeferIncall()
     IPC_ASSERT(mDeferred.top().interrupt_remote_stack_depth_guess() <= stackDepth,
                "fatal logic error");
 
-    if (mDeferred.top().interrupt_remote_stack_depth_guess() < RemoteViewOfStackDepth(stackDepth))
-        return;
-
     // maybe time to process this message
     Message call = mDeferred.top();
     mDeferred.pop();
