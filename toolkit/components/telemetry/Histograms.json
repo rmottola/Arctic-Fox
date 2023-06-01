@@ -5172,6 +5172,12 @@
     "keyed" : true,
     "description" : "Exceptions thrown by add-ons"
   },
+  "IPC_TRANSACTION_CANCEL": {
+    "alert_emails": ["billm@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "True when an IPC transaction is canceled"
+  },
   "IPC_SAME_PROCESS_MESSAGE_COPY_OOM_KB": {
      "expires_in_version": "50",
      "kind": "exponential",
