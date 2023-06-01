@@ -32,7 +32,7 @@ pref("browser.altClickSave", true); //SBaD,M! (#2)
 // ===| Application Update Service |===========================================
 
 pref("app.update.auto", false);
-pref("app.update.url", "https://github.com/wicknix/Arctic-Fox/wiki");
+pref("app.update.url", "https://github.com/rmottola/Arctic-Fox/wiki");
 
 // The time interval between the downloading of mar file chunks in the
 // background (in seconds)
