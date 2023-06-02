@@ -84,15 +84,10 @@
 - Bug 1160971 - 4 parts
 - Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
-- rest of 1198458
-- Bug 1198458: Rollup of changes previously applied to media/webrtc/tru
-- Bug 1198458: Webrtc updated to branch 43
 - 1227567 - Optimise module namespace imports in Ion where we have
 - update SKIA 1082598
 - remaining 1151214
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
-- Bug 1214508 - 2015-11-17: SharedStubs - Part 1: Move the getprop stubs in to share
-- Bug 1177310 - 2015-11-25- TabStateFlusher Promises should always resolve.
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
@@ -172,17 +167,14 @@ https://github.com/classilla/tenfourfox/issues/526
 
 ## JS Sputnik checks:
 
+2023-06-02:
+Tests To run: 16436 | Total tests ran: 16436 | Pass: 15224 | Fail: 1212 | Failed to load: 0
+
 2023-04-01:
 * Tests To run: 16436 | Total tests ran: 16436 | Pass: 15188 | Fail: 1248 | Failed to load: 0
 
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
-* Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
-* Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4452 | Fail: 600 | Failed to load: 0
-* AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
 
 2021-09-13:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6095 | Fail: 881 | Failed to load: 0 - Hangs on "iter-close"
-* Harness: Tests To run: 55 | Total tests ran: 55 | Pass: 55 | Fail: 0 | Failed to load: 0
-* Language: Tests To run: 5052 | Total tests ran: 5052 | Pass: 4466 | Fail: 586 | Failed to load: 0
-* AnnexB: Tests To run: 81 | Total tests ran: 81 | Pass: 79 | Fail: 2 | Failed to load: 0
