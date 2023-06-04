@@ -47,9 +47,11 @@ public:
                                     nsACString& aOutVersion) override;
   NS_IMETHOD GetNodeId(const nsAString& aOrigin,
                        const nsAString& aTopLevelOrigin,
+                       const nsAString& aGMPName,
                        bool aInPrivateBrowsingMode,
-                       const nsACString& aVersion,
                        UniquePtr<GetNodeIdCallback>&& aCallback) override;
+  NS_IMETHOD UpdateTrialCreateState(const nsAString& aKeySystem,
+                                    uint32_t aState) override;
 
   NS_DECL_NSIOBSERVER
 

@@ -137,12 +137,12 @@ class GetNodeIdDone : public GetServiceChildCallback
 {
 public:
   GetNodeIdDone(const nsAString& aOrigin, const nsAString& aTopLevelOrigin,
-                bool aInPrivateBrowsing, const nsACString& aVersion,
-                UniquePtr<GetNodeIdCallback>&& aCallback)
+                const nsAString& aGMPName,
+                bool aInPrivateBrowsing, UniquePtr<GetNodeIdCallback>&& aCallback)
     : mOrigin(aOrigin),
       mTopLevelOrigin(aTopLevelOrigin),
+      mGMPName(aGMPName),
       mInPrivateBrowsing(aInPrivateBrowsing),
-      mVersion(aVersion),
       mCallback(Move(aCallback))
   {
   }
@@ -156,8 +156,8 @@ public:
 
     nsCString outId;
     if (!aGMPServiceChild->SendGetGMPNodeId(mOrigin, mTopLevelOrigin,
-                                            mInPrivateBrowsing, mVersion,
-                                            &outId)) {
+                                            mGMPName,
+                                            mInPrivateBrowsing, &outId)) {
       mCallback->Done(NS_ERROR_FAILURE, EmptyCString());
       return;
     }
@@ -168,21 +168,54 @@ public:
 private:
   nsString mOrigin;
   nsString mTopLevelOrigin;
+  nsString mGMPName;
   bool mInPrivateBrowsing;
-  nsCString mVersion;
   UniquePtr<GetNodeIdCallback> mCallback;
 };
 
 NS_IMETHODIMP
 GeckoMediaPluginServiceChild::GetNodeId(const nsAString& aOrigin,
                                         const nsAString& aTopLevelOrigin,
+                                        const nsAString& aGMPName,
                                         bool aInPrivateBrowsing,
-                                        const nsACString& aVersion,
                                         UniquePtr<GetNodeIdCallback>&& aCallback)
 {
   UniquePtr<GetServiceChildCallback> callback(
-    new GetNodeIdDone(aOrigin, aTopLevelOrigin, aInPrivateBrowsing, aVersion,
-                      Move(aCallback)));
+    new GetNodeIdDone(aOrigin, aTopLevelOrigin, aGMPName, aInPrivateBrowsing, Move(aCallback)));
+  GetServiceChild(Move(callback));
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+GeckoMediaPluginServiceChild::UpdateTrialCreateState(const nsAString& aKeySystem,
+                                                     uint32_t aState)
+{
+  if (NS_GetCurrentThread() != mGMPThread) {
+    mGMPThread->Dispatch(NS_NewRunnableMethodWithArgs<nsString, uint32_t>(
+      this, &GeckoMediaPluginServiceChild::UpdateTrialCreateState,
+      aKeySystem, aState), NS_DISPATCH_NORMAL);
+    return NS_OK;
+  }
+
+  class Callback : public GetServiceChildCallback
+  {
+  public:
+    Callback(const nsAString& aKeySystem, uint32_t aState)
+      : mKeySystem(aKeySystem)
+      , mState(aState)
+    { }
+
+    virtual void Done(GMPServiceChild* aService) override
+    {
+      aService->SendUpdateGMPTrialCreateState(mKeySystem, mState);
+    }
+
+  private:
+    nsString mKeySystem;
+    uint32_t mState;
+  };
+
+  UniquePtr<GetServiceChildCallback> callback(new Callback(aKeySystem, aState));
   GetServiceChild(Move(callback));
   return NS_OK;
 }

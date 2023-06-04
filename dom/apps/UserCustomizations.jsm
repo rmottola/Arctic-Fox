@@ -35,6 +35,7 @@ function log(aStr) {
 
 this.UserCustomizations = {
   extensions: new Map(), // id -> extension. Needed to disable extensions.
+  appId: new Set(),
 
   register: function(aApp) {
     if (!this._enabled || !aApp.enabled || aApp.role != "addon") {
@@ -52,7 +53,16 @@ this.UserCustomizations = {
     });
 
     this.extensions.set(aApp.manifestURL, extension);
-    extension.startup();
+    let uri = Services.io.newURI(aApp.origin, null, null);
+    debug(`Adding ${uri.host} to appId set`);
+    this.appId.add(uri.host);
+
+    extension.startup()
+      .then(() => { })
+      .catch((err) => {
+        debug(`extension.startup failed: ${err}`);
+        this.appId.delete(uri.host);
+      });
   },
 
   unregister: function(aApp) {
@@ -64,7 +74,13 @@ this.UserCustomizations = {
     if (this.extensions.has(aApp.manifestURL)) {
       this.extensions.get(aApp.manifestURL).shutdown();
       this.extensions.delete(aApp.manifestURL);
+      let uri = Services.io.newURI(aApp.origin, null, null);
+      this.appId.delete(uri.host);
     }
+  },
+
+  isFromExtension: function(aURI) {
+    return this.appId.has(aURI.host);
   },
 
   // Checks that this is a valid extension manifest.
@@ -145,9 +161,6 @@ this.UserCustomizations = {
   },
 
   init: function() {
-    // XXX : For testing purposes. Will not commit.
-    AppsUtils.allowUnsignedAddons = true;
-
     this._enabled = false;
     try {
       this._enabled = Services.prefs.getBoolPref("dom.apps.customization.enabled");

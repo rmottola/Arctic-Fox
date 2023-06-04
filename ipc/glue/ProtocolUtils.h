@@ -131,19 +131,15 @@ class ProtocolCloneContext
   typedef mozilla::dom::ContentParent ContentParent;
   typedef mozilla::net::NeckoParent NeckoParent;
 
-  ContentParent* mContentParent;
+  RefPtr<ContentParent> mContentParent;
   NeckoParent* mNeckoParent;
 
 public:
-  ProtocolCloneContext()
-    : mContentParent(nullptr)
-    , mNeckoParent(nullptr)
-  {}
+  ProtocolCloneContext();
 
-  void SetContentParent(ContentParent* aContentParent)
-  {
-    mContentParent = aContentParent;
-  }
+  ~ProtocolCloneContext();
+
+  void SetContentParent(ContentParent* aContentParent);
 
   ContentParent* GetContentParent() { return mContentParent; }
 

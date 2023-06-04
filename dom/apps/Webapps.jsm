@@ -88,6 +88,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "ImportExport",
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
                                   "resource://gre/modules/AppConstants.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "Messaging",
+                                  "resource://gre/modules/Messaging.jsm");
+
 #ifdef MOZ_WIDGET_GONK
 XPCOMUtils.defineLazyGetter(this, "libcutils", function() {
   Cu.import("resource://gre/modules/systemlibs.js");
@@ -100,14 +103,18 @@ XPCOMUtils.defineLazyGetter(this, "libcutils", function() {
 // from the AndroidLog module so it gets the "debug" priority and a log tag.
 // We always report debug messages on Android because it's unnecessary
 // to restrict reporting, per bug 1003469.
-let debug = Cu.import("resource://gre/modules/AndroidLog.jsm", {})
+var debug = Cu.import("resource://gre/modules/AndroidLog.jsm", {})
               .AndroidLog.d.bind(null, "Webapps");
 #else
 // Elsewhere, report debug messages only if dom.mozApps.debug is set to true.
-// The pref is only checked once, on startup, so restart after changing it.
-let debug = Services.prefs.getBoolPref("dom.mozApps.debug")
-              ? (aMsg) => dump("-*- Webapps.jsm : " + aMsg + "\n")
-              : (aMsg) => {};
+var debug;
+function debugPrefObserver() {
+  debug = Services.prefs.getBoolPref("dom.mozApps.debug")
+            ? (aMsg) => dump("-*- Webapps.jsm : " + aMsg + "\n")
+            : (aMsg) => {};
+}
+debugPrefObserver();
+Services.prefs.addObserver("dom.mozApps.debug", debugPrefObserver, false);
 #endif
 
 function getNSPRErrorCode(err) {
@@ -125,7 +132,9 @@ function supportSystemMessages() {
 // Minimum delay between two progress events while downloading, in ms.
 const MIN_PROGRESS_EVENT_DELAY = 1500;
 
-const chromeWindowType = "navigator:browser";
+const WEBAPP_RUNTIME = Services.appinfo.ID == "webapprt@mozilla.org";
+
+const chromeWindowType = WEBAPP_RUNTIME ? "webapprt:webapp" : "navigator:browser";
 
 XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
                                    "@mozilla.org/parentprocessmessagemanager;1",
@@ -168,8 +177,10 @@ XPCOMUtils.defineLazyGetter(this, "permMgr", function() {
 #elifdef ANDROID
   const DIRECTORY_NAME = "webappsDir";
 #else
-  // Mulet, B2G Desktop, etc.
-  const DIRECTORY_NAME = "ProfD";
+  // If we're executing in the context of the webapp runtime, the data files
+  // are in a different directory (currently the Firefox profile that installed
+  // the webapp); otherwise, they're in the current profile.
+  const DIRECTORY_NAME = WEBAPP_RUNTIME ? "WebappRegD" : "ProfD";
 #endif
 
 // We'll use this to identify privileged apps that have been preinstalled
@@ -181,9 +192,10 @@ const STORE_ID_PENDING_PREFIX = "#unknownID#";
 
 this.DOMApplicationRegistry = {
   // pseudo-constants for the different application kinds.
-  get kPackaged()       "packaged",
-  get kHosted()         "hosted",
-  get kHostedAppcache() "hosted-appcache",
+  get kPackaged()       { return "packaged"; },
+  get kHosted()         { return "hosted"; },
+  get kHostedAppcache() { return "hosted-appcache"; },
+  get kAndroid()        { return "android-native"; },
 
   // Path to the webapps.json file where we store the registry data.
   appsFile: null,
@@ -248,6 +260,11 @@ this.DOMApplicationRegistry = {
                                         this.getFullAppByManifestURL.bind(this));
 
     MessageBroadcaster.init(this.getAppByManifestURL);
+
+    if (AppConstants.MOZ_B2GDROID) {
+      Cu.import("resource://gre/modules/AndroidUtils.jsm");
+      AndroidUtils.init(this);
+    }
   },
 
   // loads the current registry, that could be empty on first run.
@@ -457,7 +474,9 @@ this.DOMApplicationRegistry = {
   }),
 
   appKind: function(aApp, aManifest) {
-    if (aApp.origin.startsWith("app://")) {
+    if (aApp.origin.startsWith("android://")) {
+      return this.kAndroid;
+    } if (aApp.origin.startsWith("app://")) {
       return this.kPackaged;
     } else {
       // Hosted apps, can be appcached or not.
@@ -515,7 +534,10 @@ this.DOMApplicationRegistry = {
 
   // Installs a 3rd party app.
   installPreinstalledApp: function installPreinstalledApp(aId) {
-#ifdef MOZ_WIDGET_GONK
+    if (!AppConstants.MOZ_B2GDROID && AppConstants.platform !== "gonk") {
+      return false;
+    }
+
     // In some cases, the app might be already installed under a different ID but
     // with the same manifestURL. In that case, the only content of the webapp will
     // be the id of the old version, which is the one we'll keep.
@@ -618,7 +640,6 @@ this.DOMApplicationRegistry = {
       zipReader.close();
     }
     return isPreinstalled;
-#endif
   },
 
   // For hosted apps, uninstall an app served from http:// if we have
@@ -786,6 +807,10 @@ this.DOMApplicationRegistry = {
           yield this.installSystemApps();
         }
 
+        if (AppConstants.MOZ_B2GDROID) {
+          yield AndroidUtils.installAndroidApps();
+        }
+
         // At first run, install preloaded apps and set up their permissions.
         for (let id in this.webapps) {
           let isPreinstalled = this.installPreinstalledApp(id);
@@ -798,7 +823,7 @@ this.DOMApplicationRegistry = {
         }
         // Need to update the persisted list of apps since
         // installPreinstalledApp() removes the ones failing to install.
-        this._saveApps();
+        yield this._saveApps();
 
         Services.prefs.setBoolPref("dom.apps.reset-permissions", true);
       }
@@ -1351,22 +1376,22 @@ this.DOMApplicationRegistry = {
     this.registryReady.then( () => {
       switch (aMessage.name) {
         case "Webapps:Install": {
-#ifdef MOZ_WIDGET_ANDROID
-          Services.obs.notifyObservers(mm, "webapps-runtime-install", JSON.stringify(msg));
-#else
-          this.doInstall(msg, mm);
-#endif
+          if (AppConstants.platform == "android" && !AppConstants.MOZ_B2GDROID) {
+            Services.obs.notifyObservers(mm, "webapps-runtime-install", JSON.stringify(msg));
+          } else {
+            this.doInstall(msg, mm);
+          }
           break;
         }
         case "Webapps:GetSelf":
           this.getSelf(msg, mm);
           break;
         case "Webapps:Uninstall":
-#ifdef MOZ_WIDGET_ANDROID
-          Services.obs.notifyObservers(mm, "webapps-runtime-uninstall", JSON.stringify(msg));
-#else
-          this.doUninstall(msg, mm);
-#endif
+          if (AppConstants.platform == "android" && !AppConstants.MOZ_B2GDROID) {
+            Services.obs.notifyObservers(mm, "webapps-runtime-uninstall", JSON.stringify(msg));
+          } else {
+            this.doUninstall(msg, mm);
+          }
           break;
         case "Webapps:Launch":
           this.doLaunch(msg, mm);
@@ -1384,11 +1409,11 @@ this.DOMApplicationRegistry = {
           this.getNotInstalled(msg, mm);
           break;
         case "Webapps:InstallPackage": {
-#ifdef MOZ_WIDGET_ANDROID
-          Services.obs.notifyObservers(mm, "webapps-runtime-install-package", JSON.stringify(msg));
-#else
-          this.doInstallPackage(msg, mm);
-#endif
+          if (AppConstants.platform == "android" && !AppConstants.MOZ_B2GDROID) {
+            Services.obs.notifyObservers(mm, "webapps-runtime-install-package", JSON.stringify(msg));
+          } else {
+            this.doInstallPackage(msg, mm);
+          }
           break;
         }
         case "Webapps:Download":
@@ -1646,6 +1671,19 @@ this.DOMApplicationRegistry = {
     // yet fully installed.
     if (app.installState == "pending") {
       aOnFailure("PENDING_APP_NOT_LAUNCHABLE");
+      return;
+    }
+
+    // Delegate native android apps launch.
+    if (this.kAndroid == app.kind) {
+      debug("Launching android app " + app.origin);
+      let [packageName, className] =
+        AndroidUtils.getPackageAndClassFromManifestURL(aManifestURL);
+      debug("  " + packageName + " " + className);
+      Messaging.sendRequest({ type: "Apps:Launch",
+                              packagename: packageName,
+                              classname: className });
+      aOnSuccess();
       return;
     }
 
@@ -2005,8 +2043,12 @@ this.DOMApplicationRegistry = {
         },
         id: aApp.id
       });
+      let appURI = NetUtil.newURI(aApp.origin, null, null);
+      let principal =
+        Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                               {appId: aApp.localId});
       let cacheUpdate = updateSvc.scheduleAppUpdate(
-        appcacheURI, docURI, aApp.localId, false, aProfileDir);
+        appcacheURI, docURI, principal, aApp.localId, false, aProfileDir);
 
       // We save the download details for potential further usage like
       // cancelling it.
@@ -2095,8 +2137,9 @@ this.DOMApplicationRegistry = {
     }
 
     // If the app is packaged and its manifestURL has an app:// scheme,
-    // then we can't have an update.
-    if (app.kind == this.kPackaged && app.manifestURL.startsWith("app://")) {
+    // or if it's a native Android app then we can't have an update.
+    if (app.kind == this.kAndroid ||
+        (app.kind == this.kPackaged && app.manifestURL.startsWith("app://"))) {
       sendError("NOT_UPDATABLE");
       return;
     }
@@ -2154,8 +2197,12 @@ this.DOMApplicationRegistry = {
           new ManifestHelper(manifest, aData.origin, aData.manifestURL);
         debug("onlyCheckAppCache - launch updateSvc.checkForUpdate for " +
               helper.fullAppcachePath());
+        let appURI = NetUtil.newURI(aApp.origin, null, null);
+        let principal =
+          Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                                 {appId: aApp.localId});
         updateSvc.checkForUpdate(Services.io.newURI(helper.fullAppcachePath(), null, null),
-                                 app.localId, false, updateObserver);
+                                 principal, app.localId, false, updateObserver);
       });
       return;
     }
@@ -2423,9 +2470,13 @@ this.DOMApplicationRegistry = {
             manifest.fullAppcachePath());
 
       let updateDeferred = Promise.defer();
+      let appURI = NetUtil.newURI(aApp.origin, null, null);
+      let principal =
+        Services.scriptSecurityManager.createCodebasePrincipal(appURI,
+                                                               {appId: aApp.localId});
 
       updateSvc.checkForUpdate(Services.io.newURI(manifest.fullAppcachePath(), null, null),
-                               aApp.localId, false,
+                               principal, aApp.localId, false,
                                (aSubject, aTopic, aData) => updateDeferred.resolve(aTopic));
 
       let topic = yield updateDeferred.promise;
@@ -2827,8 +2878,10 @@ this.DOMApplicationRegistry = {
   _setupApp: function(aData, aId) {
     let app = aData.app;
 
-    // app can be uninstalled
-    app.removable = true;
+    // app can be uninstalled by default.
+    if (app.removable === undefined) {
+      app.removable = true;
+    }
 
     if (aData.isPackage) {
       // Override the origin with the correct id.
@@ -2861,7 +2914,8 @@ this.DOMApplicationRegistry = {
       appObject.downloading = true;
       appObject.downloadSize = aLocaleManifest.size;
       appObject.readyToApplyDownload = false;
-    } else if (appObject.kind == this.kHosted) {
+    } else if (appObject.kind == this.kHosted ||
+               appObject.kind == this.kAndroid) {
       appObject.installState = "installed";
       appObject.downloadAvailable = false;
       appObject.downloading = false;
@@ -2916,8 +2970,6 @@ this.DOMApplicationRegistry = {
     this._saveWidgetsFullPath(aLocaleManifest, app);
 
     app.appStatus = AppsUtils.getAppManifestStatus(aManifest);
-
-    app.removable = true;
 
     // Reuse the app ID if the scheme is "app".
     let uri = Services.io.newURI(app.origin, null, null);
@@ -3016,6 +3068,7 @@ this.DOMApplicationRegistry = {
     let appObject = this._cloneApp(aData, app, manifest, jsonManifest, id, localId);
 
     this.webapps[id] = appObject;
+    this._manifestCache[id] = jsonManifest;
 
     // For package apps, the permissions are not in the mini-manifest, so
     // don't update the permissions yet.
@@ -3746,16 +3799,24 @@ this.DOMApplicationRegistry = {
     // true.
     if (useReviewerCerts) {
       let manifestPath = Services.io.newURI(aManifestURL, null, null).path;
+      let isReviewer = false;
+      // There are different reviewer paths for apps & addons so we keep
+      // them in a comma separated preference.
+      try {
+        let reviewerPaths =
+          Services.prefs.getCharPref("dom.apps.reviewer_paths").split(",");
+        isReviewer = reviewerPaths.some(path => { return manifestPath.startsWith(path); });
+      } catch(e) {}
 
       switch (aInstallOrigin) {
         case "https://marketplace.firefox.com":
-          root = manifestPath.startsWith("/reviewers/")
+          root = isReviewer
                ? Ci.nsIX509CertDB.AppMarketplaceProdReviewersRoot
                : Ci.nsIX509CertDB.AppMarketplaceProdPublicRoot;
           break;
 
         case "https://marketplace-dev.allizom.org":
-          root = manifestPath.startsWith("/reviewers/")
+          root = isReviewer
                ? Ci.nsIX509CertDB.AppMarketplaceDevReviewersRoot
                : Ci.nsIX509CertDB.AppMarketplaceDevPublicRoot;
           break;
@@ -4118,31 +4179,36 @@ this.DOMApplicationRegistry = {
   },
 
   doUninstall: Task.async(function*(aData, aMm) {
-    // The yields here could get stuck forever, so we only hold
-    // a weak reference to the message manager while yielding, to avoid
-    // leaking the whole page associationed with the message manager.
-    aMm = Cu.getWeakReference(aMm);
-
     let response = "Webapps:Uninstall:Return:OK";
 
     try {
       aData.app = yield this._getAppWithManifest(aData.manifestURL);
 
-      let prefName = "dom.mozApps.auto_confirm_uninstall";
-      if (Services.prefs.prefHasUserValue(prefName) &&
-          Services.prefs.getBoolPref(prefName)) {
-        yield this._uninstallApp(aData.app);
+      if (this.kAndroid == aData.app.kind) {
+        debug("Uninstalling android app " + aData.app.origin);
+        let [packageName, className] =
+          AndroidUtils.getPackageAndClassFromManifestURL(aData.manifestURL);
+        Messaging.sendRequest({ type: "Apps:Uninstall",
+                                packagename: packageName,
+                                classname: className });
+        // We have to wait for Android's uninstall before sending the
+        // uninstall event, so fake an error here.
+        response = "Webapps:Uninstall:Return:KO";
       } else {
-        yield this._promptForUninstall(aData);
+        let prefName = "dom.mozApps.auto_confirm_uninstall";
+        if (Services.prefs.prefHasUserValue(prefName) &&
+            Services.prefs.getBoolPref(prefName)) {
+          yield this._uninstallApp(aData.app);
+        } else {
+          yield this._promptForUninstall(aData);
+        }
       }
     } catch (error) {
       aData.error = error;
       response = "Webapps:Uninstall:Return:KO";
     }
 
-    if ((aMm = aMm.get())) {
-      aMm.sendAsyncMessage(response, this.formatMessage(aData));
-    }
+    aMm.sendAsyncMessage(response, this.formatMessage(aData));
   }),
 
   uninstall: function(aManifestURL) {
@@ -4731,6 +4797,13 @@ this.DOMApplicationRegistry = {
 
   getWebAppsBasePath: function() {
     return OS.Path.dirname(this.appsFile);
+  },
+
+  updateDataStoreEntriesFromLocalId: function(aLocalId) {
+    let app = appsService.getAppByLocalId(aLocalId);
+    if (app) {
+      this.updateDataStoreForApp(app.id);
+    }
   },
 
   _isLaunchable: function(aApp) {

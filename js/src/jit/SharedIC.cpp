@@ -493,6 +493,12 @@ ICStub::trace(JSTracer* trc)
         TraceEdge(trc, &callStub->getter(), "baseline-getpropcallnativeglobal-stub-getter");
         break;
       }
+      case ICStub::GetProp_ModuleNamespace: {
+        ICGetProp_ModuleNamespace* nsStub = toGetProp_ModuleNamespace();
+        TraceEdge(trc, &nsStub->getNamespace(), "baseline-getprop-modulenamespace-stub-namespace");
+        TraceEdge(trc, &nsStub->environment(), "baseline-getprop-modulenamespace-stub-environment");
+        break;
+      }
       case ICStub::SetProp_Native: {
         ICSetProp_Native* propStub = toSetProp_Native();
         TraceEdge(trc, &propStub->shape(), "baseline-setpropnative-stub-shape");
@@ -2560,7 +2566,7 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
                                                 isTemporarilyUnoptimizable);
 
     // Try handling scripted getters.
-    if (cacheableCall && isScripted && !isDOMProxy) {
+    if (cacheableCall && isScripted && !isDOMProxy && engine == ICStubCompiler::Engine::Baseline) {
         RootedFunction callee(cx, &shape->getterObject()->as<JSFunction>());
         MOZ_ASSERT(callee->hasScript());
 
@@ -2573,7 +2579,7 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(NativeObj/ScriptedGetter %s:%" PRIuSIZE ") stub",
                 callee->nonLazyScript()->filename(), callee->nonLazyScript()->lineno());
 
-        ICGetProp_CallScripted::Compiler compiler(cx, engine, monitorStub, obj, holder, callee,
+        ICGetProp_CallScripted::Compiler compiler(cx, monitorStub, obj, holder, callee,
                                                   script->pcToOffset(pc));
         ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
         if (!newStub)
@@ -2783,6 +2789,48 @@ TryAttachTypedObjectGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fa
 
     ICGetProp_TypedObject::Compiler compiler(cx, engine, monitorStub, obj->maybeShape(),
                                              fieldOffset, &fieldDescr->as<SimpleTypeDescr>());
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    if (!newStub)
+        return false;
+    stub->addNewStub(newStub);
+
+    *attached = true;
+    return true;
+}
+
+static bool
+TryAttachModuleNamespaceGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallback* stub,
+                                    ICStubCompiler::Engine engine, HandlePropertyName name,
+                                    HandleValue val, bool* attached)
+{
+    MOZ_ASSERT(!*attached);
+
+    if (!ModuleNamespaceObject::isInstance(val))
+        return true;
+
+    Rooted<ModuleNamespaceObject*> ns(cx, &val.toObject().as<ModuleNamespaceObject>());
+
+    RootedModuleEnvironmentObject env(cx);
+    RootedShape shape(cx);
+    if (!ns->bindings().lookup(NameToId(name), env.address(), shape.address()))
+        return true;
+
+    // Don't emit a stub until the target binding has been initialized.
+    if (env->getSlot(shape->slot()).isMagic(JS_UNINITIALIZED_LEXICAL))
+        return true;
+
+    ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
+
+    bool isFixedSlot;
+    uint32_t offset;
+    GetFixedOrDynamicSlotOffset(shape, &isFixedSlot, &offset);
+
+    // Instantiate this property for singleton holders, for use during Ion compilation.
+    if (IsIonEnabled(cx))
+        EnsureTrackPropertyTypes(cx, env, shape->propid());
+
+    ICGetProp_ModuleNamespace::Compiler compiler(cx, engine, monitorStub,
+                                                 ns, env, isFixedSlot, offset);
     ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
     if (!newStub)
         return false;
@@ -3062,6 +3110,11 @@ DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_
         return true;
 
     if (!TryAttachTypedObjectGetPropStub(cx, script, stub, engine, name, val, &attached))
+        return false;
+    if (attached)
+        return true;
+
+    if (!TryAttachModuleNamespaceGetPropStub(cx, script, stub, engine, name, val, &attached))
         return false;
     if (attached)
         return true;
@@ -3515,6 +3568,8 @@ ICGetPropNativeDoesNotExistCompiler::generateStubCode(MacroAssembler& masm)
 bool
 ICGetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
 {
+    MOZ_ASSERT(engine_ == Engine::Baseline);
+
     Label failure;
     Label failureLeaveStubFrame;
     AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
@@ -4272,6 +4327,41 @@ ICGetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
     else
         EmitReturnFromIC(masm);
 
+    masm.bind(&failure);
+    EmitStubGuardFailure(masm);
+
+    return true;
+}
+
+bool
+ICGetProp_ModuleNamespace::Compiler::generateStubCode(MacroAssembler& masm)
+{
+    Label failure;
+
+    AllocatableGeneralRegisterSet regs(availableGeneralRegs(1));
+
+    Register scratch = regs.takeAnyExcluding(ICTailCallReg);
+
+    // Guard on namespace object.
+    masm.branchTestObject(Assembler::NotEqual, R0, &failure);
+    Register object = masm.extractObject(R0, ExtractTemp0);
+    masm.loadPtr(Address(ICStubReg, ICGetProp_ModuleNamespace::offsetOfNamespace()), scratch);
+    masm.branchPtr(Assembler::NotEqual, object, scratch, &failure);
+
+    // Determine base pointer for load.
+    Register loadBase = regs.takeAnyExcluding(ICTailCallReg);
+    masm.loadPtr(Address(ICStubReg, ICGetProp_ModuleNamespace::offsetOfEnvironment()), loadBase);
+    if (!isFixedSlot_)
+        masm.loadPtr(Address(loadBase, NativeObject::offsetOfSlots()), loadBase);
+
+    // Load the property.
+    masm.load32(Address(ICStubReg, ICGetProp_ModuleNamespace::offsetOfOffset()), scratch);
+    masm.loadValue(BaseIndex(loadBase, scratch, TimesOne), R0);
+
+    // Enter type monitor IC to type-check result.
+    EmitEnterTypeMonitorIC(masm);
+
+    // Failure case - jump to next stub
     masm.bind(&failure);
     EmitStubGuardFailure(masm);
 

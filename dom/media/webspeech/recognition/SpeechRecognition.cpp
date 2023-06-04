@@ -21,8 +21,11 @@
 #include "endpointer.h"
 
 #include "mozilla/dom/SpeechRecognitionEvent.h"
+#include "nsContentUtils.h"
 #include "nsIDocument.h"
 #include "nsIObserverService.h"
+#include "nsIPermissionManager.h"
+#include "nsIPrincipal.h"
 #include "nsPIDOMWindow.h"
 #include "nsServiceManagerUtils.h"
 #include "nsQueryObject.h"
@@ -125,9 +128,9 @@ SpeechRecognition::SpeechRecognition(nsPIDOMWindow* aOwnerWindow)
   }
 
   mEndpointer.set_speech_input_complete_silence_length(
-      Preferences::GetInt(PREFERENCE_ENDPOINTER_SILENCE_LENGTH, 500000));
+      Preferences::GetInt(PREFERENCE_ENDPOINTER_SILENCE_LENGTH, 1250000));
   mEndpointer.set_long_speech_input_complete_silence_length(
-      Preferences::GetInt(PREFERENCE_ENDPOINTER_LONG_SILENCE_LENGTH, 1000000));
+      Preferences::GetInt(PREFERENCE_ENDPOINTER_LONG_SILENCE_LENGTH, 2500000));
   mEndpointer.set_long_speech_length(
       Preferences::GetInt(PREFERENCE_ENDPOINTER_SILENCE_LENGTH, 3 * 1000000));
   Reset();
@@ -156,11 +159,26 @@ SpeechRecognition::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 bool
 SpeechRecognition::IsAuthorized(JSContext* aCx, JSObject* aGlobal)
 {
-  bool inCertifiedApp = IsInCertifiedApp(aCx, aGlobal);
+  nsCOMPtr<nsIPrincipal> principal = nsContentUtils::ObjectPrincipal(aGlobal);
+  
+  nsresult rv;
+  nsCOMPtr<nsIPermissionManager> mgr = do_GetService(NS_PERMISSIONMANAGER_CONTRACTID, &rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+
+  uint32_t speechRecognition = nsIPermissionManager::UNKNOWN_ACTION;
+  rv = mgr->TestExactPermissionFromPrincipal(principal, "speech-recognition", &speechRecognition);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+
+  bool hasPermission = (speechRecognition == nsIPermissionManager::ALLOW_ACTION);
+
   bool enableTests = Preferences::GetBool(TEST_PREFERENCE_ENABLE);
   bool enableRecognitionEnable = Preferences::GetBool(TEST_PREFERENCE_RECOGNITION_ENABLE);
   bool enableRecognitionForceEnable = Preferences::GetBool(TEST_PREFERENCE_RECOGNITION_FORCE_ENABLE);
-  return (inCertifiedApp || enableRecognitionForceEnable || enableTests) && enableRecognitionEnable;
+  return (hasPermission || enableRecognitionForceEnable || enableTests) && enableRecognitionEnable;
 }
 
 already_AddRefed<SpeechRecognition>

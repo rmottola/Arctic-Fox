@@ -599,7 +599,17 @@ NeckoParent::AllocPRemoteOpenFileParent(const SerializedLoadContext& aSerialized
       }
     }
 
+    nsCOMPtr<nsIURI> appUri = DeserializeURI(aAppURI);
+
     if (!haveValidBrowser) {
+      // Extension loads come from chrome and have no valid browser, so we check
+      // for these early on.
+      bool fromExtension = false;
+      if (NS_SUCCEEDED(appsService->IsExtensionResource(appUri, &fromExtension)) &&
+          fromExtension) {
+        RemoteOpenFileParent* parent = new RemoteOpenFileParent(fileURL);
+        return parent;
+      }
       return nullptr;
     }
 
@@ -610,7 +620,6 @@ NeckoParent::AllocPRemoteOpenFileParent(const SerializedLoadContext& aSerialized
     // Check if we load the whitelisted app uri for the neterror page.
     bool netErrorWhiteList = false;
 
-    nsCOMPtr<nsIURI> appUri = DeserializeURI(aAppURI);
     if (appUri) {
       nsAdoptingString netErrorURI;
       netErrorURI = Preferences::GetString("b2g.neterror.url");

@@ -570,7 +570,7 @@ class MessageChannel : HasResultCodes
      public:
        explicit AutoEnterTransaction(MessageChannel *aChan, int32_t aMsgSeqno)
         : mChan(aChan),
-          mNewTransaction(0),
+          mNewTransaction(INT32_MAX),
           mOldTransaction(mChan->mCurrentTransaction)
        {
            mChan->mMonitor->AssertCurrentThreadOwns();

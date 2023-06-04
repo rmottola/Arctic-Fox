@@ -153,6 +153,10 @@ RemotePages.prototype = {
 
     this.listener.removeMessageListener(name, callback);
   },
+
+  portsForBrowser: function(browser) {
+    return [...this.messagePorts].filter(port => port.browser == browser);
+  },
 };
 
 
@@ -389,7 +393,7 @@ function ChildMessagePort(contentFrame, window) {
   // Tell the main process to set up its side of the message pipe.
   this.messageManager.sendAsyncMessage("RemotePage:InitPort", {
     portID: portID,
-    url: window.location.toString(),
+    url: window.document.documentURI.replace(/[\#|\?].*$/, ""),
   });
 }
 
@@ -490,7 +494,8 @@ this.RemotePageManager = {
 var registeredURLs = new Set();
 
 var observer = (window) => {
-  let url = window.location.toString();
+  // Strip the hash from the URL, because it's not part of the origin.
+  let url = window.document.documentURI.replace(/[\#|\?].*$/, "");
   if (!registeredURLs.has(url))
     return;
 

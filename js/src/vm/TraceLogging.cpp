@@ -144,9 +144,6 @@ TraceLoggerThread::init()
     if (!events.ensureSpaceBeforeAdd(3))
         return false;
 
-    enabled = 1;
-    logTimestamp(TraceLogger_Enable);
-
     return true;
 }
 
@@ -352,8 +349,10 @@ TraceLoggerEventPayload*
 TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId textId)
 {
     TextIdHashMap::AddPtr p = textIdPayloads.lookupForAdd(textId);
-    if (p)
+    if (p) {
+        MOZ_ASSERT(p->value()->textId() == textId); // Sanity check.
         return p->value();
+    }
 
     TraceLoggerEventPayload* payload = js_new<TraceLoggerEventPayload>(textId, (char*)nullptr);
     if (!payload)
@@ -369,8 +368,10 @@ TraceLoggerEventPayload*
 TraceLoggerThread::getOrCreateEventPayload(const char* text)
 {
     PointerHashMap::AddPtr p = pointerMap.lookupForAdd((const void*)text);
-    if (p)
+    if (p) {
+        MOZ_ASSERT(p->value()->textId() < nextTextId); // Sanity check.
         return p->value();
+    }
 
     size_t len = strlen(text);
     char* str = js_pod_malloc<char>(len + 1);
@@ -422,8 +423,10 @@ TraceLoggerThread::getOrCreateEventPayload(TraceLoggerTextId type, const char* f
         return getOrCreateEventPayload(type);
 
     PointerHashMap::AddPtr p = pointerMap.lookupForAdd(ptr);
-    if (p)
+    if (p) {
+        MOZ_ASSERT(p->value()->textId() < nextTextId); // Sanity check.
         return p->value();
+    }
 
     // Compute the length of the string to create.
     size_t lenFilename = strlen(filename);
@@ -571,7 +574,20 @@ TraceLoggerThread::log(uint32_t id)
             entryStop.textId = TraceLogger_Stop;
         }
 
-        // Free all TextEvents that have no uses anymore.
+        // Remove the item in the pointerMap for which the payloads
+        // have no uses anymore
+        for (PointerHashMap::Enum e(pointerMap); !e.empty(); e.popFront()) {
+            if (e.front().value()->uses() != 0)
+                continue;
+
+            TextIdHashMap::Ptr p = textIdPayloads.lookup(e.front().value()->textId());
+            MOZ_ASSERT(p);
+            textIdPayloads.remove(p);
+
+            e.removeFront();
+        }
+
+        // Free all payloads that have no uses anymore.
         for (TextIdHashMap::Enum e(textIdPayloads); !e.empty(); e.popFront()) {
             if (e.front().value()->uses() == 0) {
                 js_delete(e.front().value());
@@ -645,8 +661,22 @@ TraceLoggerThreadState::init()
             "usage: TLLOG=option,option,option,... where options can be:\n"
             "\n"
             "Collections:\n"
-            "  Default        Output all default\n"
-            "  IonCompiler    Output all information about compilation\n"
+            "  Default        Output all default. It includes:\n"
+            "                 AnnotateScripts, Bailout, Baseline, BaselineCompilation, GC,\n"
+            "                 GCAllocation, GCSweeping, Interpreter, IonCompilation, IonLinking,\n"
+            "                 IonMonkey, MinorGC, ParserCompileFunction, ParserCompileScript,\n"
+            "                 ParserCompileLazy, ParserCompileModule, IrregexpCompile,\n"
+            "                 IrregexpExecute, Scripts, Engine\n"
+            "\n"
+            "  IonCompiler    Output all information about compilation. It includes:\n"
+            "                 IonCompilation, IonLinking, PruneUnusedBranches, FoldTests,\n"
+            "                 SplitCriticalEdges, RenumberBlocks, ScalarReplacement, \n"
+            "                 DominatorTree, PhiAnalysis, MakeLoopsContiguous, ApplyTypes, \n"
+            "                 EagerSimdUnbox, AliasAnalysis, GVN, LICM, Sincos, RangeAnalysis, \n"
+            "                 LoopUnrolling, EffectiveAddressAnalysis, AlignmentMaskAnalysis, \n"
+            "                 EliminateDeadCode, ReorderInstructions, EdgeCaseAnalysis, \n"
+            "                 EliminateRedundantChecks, AddKeepAliveInstructions, GenerateLIR, \n"
+            "                 RegisterAllocation, GenerateCode, Scripts\n"
             "\n"
             "Specific log items:\n"
         );
@@ -858,8 +888,8 @@ TraceLoggerThreadState::forMainThread(PerThreadData* mainThread)
         if (graphSpewingEnabled)
             logger->initGraph();
 
-        if (!mainThreadEnabled)
-            logger->disable();
+        if (mainThreadEnabled)
+            logger->enable();
     }
 
     return mainThread->traceLogger;
@@ -897,8 +927,8 @@ TraceLoggerThreadState::forThread(PRThread* thread)
     if (graphSpewingEnabled)
         logger->initGraph();
 
-    if (!offThreadEnabled)
-        logger->disable();
+    if (offThreadEnabled)
+        logger->enable();
 
     return logger;
 }
@@ -987,4 +1017,17 @@ TraceLoggerEvent::~TraceLoggerEvent()
 {
     if (payload_)
         payload_->release();
+}
+
+TraceLoggerEvent&
+TraceLoggerEvent::operator=(const TraceLoggerEvent& other)
+{
+    if (hasPayload())
+        payload()->release();
+    if (other.hasPayload())
+        other.payload()->use();
+
+    payload_ = other.payload_;
+
+    return *this;
 }
