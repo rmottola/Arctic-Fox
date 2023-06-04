@@ -455,7 +455,7 @@ public:
                      nsRenderingContext* aCtx) override
   {
     nsCanvasFrame* frame = static_cast<nsCanvasFrame*>(mFrame);
-    frame->PaintFocus(*aCtx, ToReferenceFrame());
+    frame->PaintFocus(aCtx->GetDrawTarget(), ToReferenceFrame());
   }
 
   NS_DISPLAY_DECL_NAME("CanvasFocus", TYPE_CANVAS_FOCUS)
@@ -558,7 +558,7 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 }
 
 void
-nsCanvasFrame::PaintFocus(nsRenderingContext& aRenderingContext, nsPoint aPt)
+nsCanvasFrame::PaintFocus(DrawTarget* aDrawTarget, nsPoint aPt)
 {
   nsRect focusRect(aPt, GetSize());
 
@@ -579,7 +579,7 @@ nsCanvasFrame::PaintFocus(nsRenderingContext& aRenderingContext, nsPoint aPt)
     return;
   }
 
-  nsCSSRendering::PaintFocus(PresContext(), aRenderingContext,
+  nsCSSRendering::PaintFocus(PresContext(), aDrawTarget,
                              focusRect, color->mColor);
 }
 
