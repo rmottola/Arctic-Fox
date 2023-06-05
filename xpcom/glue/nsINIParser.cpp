@@ -24,6 +24,8 @@
 #define READ_BINARYMODE "r"
 #endif
 
+using namespace mozilla;
+
 #ifdef XP_WIN
 inline FILE*
 TS_tfopen(const char* aPath, const wchar_t* aMode)
@@ -122,7 +124,7 @@ nsINIParser::InitFromFILE(FILE* aFd)
   }
 
   /* malloc an internal buf the size of the file */
-  mFileContents = new char[flen + 2];
+  mFileContents = MakeUnique<char[]>(flen + 2);
   if (!mFileContents) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -132,7 +134,7 @@ nsINIParser::InitFromFILE(FILE* aFd)
     return NS_BASE_STREAM_OSERROR;
   }
 
-  int rd = fread(mFileContents, sizeof(char), flen, aFd);
+  int rd = fread(mFileContents.get(), sizeof(char), flen, aFd);
   if (rd != flen) {
     return NS_BASE_STREAM_OSERROR;
   }
@@ -171,13 +173,13 @@ nsINIParser::InitFromFILE(FILE* aFd)
       return NS_ERROR_FAILURE;
     }
 
-    nsAutoArrayPtr<char> utf8Buffer(new char[flen]);
+    UniquePtr<char[]> utf8Buffer(new char[flen]);
     if (WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPWSTR>(buffer), -1,
-                            utf8Buffer, flen, nullptr, nullptr) == 0) {
+                            utf8Buffer.get(), flen, nullptr, nullptr) == 0) {
       return NS_ERROR_FAILURE;
     }
-    mFileContents = utf8Buffer.forget();
-    buffer = mFileContents;
+    mFileContents = Move(utf8Buffer);
+    buffer = mFileContents.get();
   }
 #endif
 
@@ -241,13 +243,13 @@ nsINIParser::InitFromFILE(FILE* aFd)
         break;
       }
       if (!v->next) {
-        v->next = new INIValue(key, token);
+        v->next = MakeUnique<INIValue>(key, token);
         if (!v->next) {
           return NS_ERROR_OUT_OF_MEMORY;
         }
         break;
       }
-      v = v->next;
+      v = v->next.get();
     }
     NS_ASSERTION(v, "v should never be null coming out of this loop");
   }
@@ -268,7 +270,7 @@ nsINIParser::GetString(const char* aSection, const char* aKey,
       return NS_OK;
     }
 
-    val = val->next;
+    val = val->next.get();
   }
 
   return NS_ERROR_FAILURE;
@@ -292,7 +294,7 @@ nsINIParser::GetString(const char* aSection, const char* aKey,
       return NS_OK;
     }
 
-    val = val->next;
+    val = val->next.get();
   }
 
   return NS_ERROR_FAILURE;
@@ -317,7 +319,7 @@ nsINIParser::GetStrings(const char* aSection,
 
   for (mSections.Get(aSection, &val);
        val;
-       val = val->next) {
+       val = val->next.get()) {
 
     if (!aCB(val->key, val->value, aClosure)) {
       return NS_OK;
