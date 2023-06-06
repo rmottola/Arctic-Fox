@@ -1134,6 +1134,9 @@ BacktrackingAllocator::mergeAndQueueRegisters()
             LiveRange* range = LiveRange::get(*iter);
             LiveBundle* bundle = range->bundle();
             if (range == bundle->firstRange()) {
+                if (!alloc().ensureBallast())
+                    return false;
+
                 SpillSet* spill = SpillSet::New(alloc());
                 if (!spill)
                     return false;
