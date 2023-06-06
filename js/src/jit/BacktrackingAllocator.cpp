@@ -2222,7 +2222,7 @@ const char*
 LiveRange::toString() const
 {
     // Not reentrant!
-    static char buf[2000];
+    static char buf[10000];
 
     char* cursor = buf;
     char* end = cursor + sizeof(buf);
@@ -2257,7 +2257,7 @@ const char*
 LiveBundle::toString() const
 {
     // Not reentrant!
-    static char buf[2000];
+    static char buf[10000];
 
     char* cursor = buf;
     char* end = cursor + sizeof(buf);
