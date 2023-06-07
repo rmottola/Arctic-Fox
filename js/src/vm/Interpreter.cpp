@@ -1775,7 +1775,6 @@ CASE(JSOP_NOP)
 CASE(JSOP_UNUSED14)
 CASE(JSOP_UNUSED65)
 CASE(JSOP_BACKPATCH)
-CASE(JSOP_UNUSED163)
 CASE(JSOP_UNUSED177)
 CASE(JSOP_UNUSED178)
 CASE(JSOP_UNUSED179)
@@ -2457,10 +2456,9 @@ CASE(JSOP_TOID)
      * but we need to avoid the observable stringification the second time.
      * There must be an object value below the id, which will not be popped.
      */
-    ReservedRooted<Value> objval(&rootValue0, REGS.sp[-2]);
     ReservedRooted<Value> idval(&rootValue1, REGS.sp[-1]);
     MutableHandleValue res = REGS.stackHandleAt(-1);
-    if (!ToIdOperation(cx, script, REGS.pc, objval, idval, res))
+    if (!ToIdOperation(cx, script, REGS.pc, idval, res))
         goto error;
 }
 END_CASE(JSOP_TOID)
@@ -3926,6 +3924,14 @@ CASE(JSOP_CLASSCONSTRUCTOR)
     PUSH_OBJECT(*constructor);
 }
 END_CASE(JSOP_CLASSCONSTRUCTOR)
+
+CASE(JSOP_CHECKOBJCOERCIBLE)
+{
+    ReservedRooted<Value> checkVal(&rootValue0, REGS.sp[-1]);
+    if (checkVal.isNullOrUndefined() && !ToObjectFromStack(cx, checkVal))
+        goto error;
+}
+END_CASE(JSOP_CHECKOBJCOERCIBLE)
 
 DEFAULT()
 {

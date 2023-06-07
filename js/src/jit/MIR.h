@@ -5376,11 +5376,11 @@ class MTypeOf
 };
 
 class MToId
-  : public MBinaryInstruction,
+  : public MUnaryInstruction,
     public BoxInputsPolicy::Data
 {
-    MToId(MDefinition* object, MDefinition* index)
-      : MBinaryInstruction(object, index)
+    explicit MToId(MDefinition* index)
+      : MUnaryInstruction(index)
     {
         setResultType(MIRType_Value);
     }
@@ -5388,8 +5388,8 @@ class MToId
   public:
     INSTRUCTION_HEADER(ToId)
 
-    static MToId* New(TempAllocator& alloc, MDefinition* object, MDefinition* index) {
-        return new(alloc) MToId(object, index);
+    static MToId* New(TempAllocator& alloc, MDefinition* index) {
+        return new(alloc) MToId(index);
     }
 };
 
@@ -13370,6 +13370,29 @@ class MDebugger : public MNullaryInstruction
 
     static MDebugger* New(TempAllocator& alloc) {
         return new(alloc) MDebugger();
+    }
+};
+
+class MCheckObjCoercible
+  : public MUnaryInstruction,
+    public BoxInputsPolicy::Data
+{
+    explicit MCheckObjCoercible(MDefinition* toCheck)
+      : MUnaryInstruction(toCheck)
+    {
+        setGuard();
+        setResultType(MIRType_Value);
+        setResultTypeSet(toCheck->resultTypeSet());
+    }
+
+  public:
+    INSTRUCTION_HEADER(CheckObjCoercible)
+    static MCheckObjCoercible* New(TempAllocator& alloc, MDefinition* toCheck) {
+        return new(alloc) MCheckObjCoercible(toCheck);
+    }
+
+    MDefinition* checkValue() {
+        return getOperand(0);
     }
 };
 

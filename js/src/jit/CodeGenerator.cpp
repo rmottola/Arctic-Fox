@@ -9063,7 +9063,7 @@ CodeGenerator::visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool)
     masm.jump(ool->rejoin());
 }
 
-typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue, HandleValue,
+typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue,
                        MutableHandleValue);
 static const VMFunction ToIdInfo = FunctionInfo<ToIdFn>(ToIdOperation);
 
@@ -9078,7 +9078,6 @@ CodeGenerator::visitToIdV(LToIdV* lir)
     OutOfLineCode* ool = oolCallVM(ToIdInfo, lir,
                                    ArgList(ImmGCPtr(current->mir()->info().script()),
                                            ImmPtr(lir->mir()->resumePoint()->pc()),
-                                           ToValue(lir, LToIdV::Object),
                                            ToValue(lir, LToIdV::Index)),
                                    StoreValueTo(out));
 
@@ -10369,6 +10368,22 @@ CodeGenerator::visitCheckReturn(LCheckReturn* ins)
     masm.branchTestMagicValue(Assembler::Equal, thisValue, JS_UNINITIALIZED_LEXICAL, &bail);
     bailoutFrom(&bail, ins->snapshot());
     masm.bind(&noChecks);
+}
+
+typedef bool (*ThrowObjCoercibleFn)(JSContext*, HandleValue);
+static const VMFunction ThrowObjectCoercibleInfo = FunctionInfo<ThrowObjCoercibleFn>(ThrowObjectCoercible);
+
+void
+CodeGenerator::visitCheckObjCoercible(LCheckObjCoercible* ins)
+{
+    ValueOperand checkValue = ToValue(ins, LCheckObjCoercible::CheckValue);
+    Label fail, done;
+    masm.branchTestNull(Assembler::Equal, checkValue, &fail);
+    masm.branchTestUndefined(Assembler::NotEqual, checkValue, &done);
+    masm.bind(&fail);
+    pushArg(checkValue);
+    callVM(ThrowObjectCoercibleInfo, ins);
+    masm.bind(&done);
 }
 
 void
