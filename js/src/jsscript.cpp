@@ -3962,8 +3962,7 @@ JSScript::traceChildren(JSTracer* trc)
 void
 LazyScript::finalize(FreeOp* fop)
 {
-    if (table_)
-        fop->free_(table_);
+    fop->free_(table_);
 }
 
 size_t
