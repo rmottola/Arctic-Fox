@@ -7168,6 +7168,13 @@ BytecodeEmitter::emitSelfHostedCallFunction(ParseNode* pn)
     if (!emitTree(funNode))
         return false;
 
+#ifdef DEBUG
+    if (pn2->name() != cx->names().callContentFunction) {
+        if (!emit1(JSOP_DEBUGCHECKSELFHOSTED))
+            return false;
+    }
+#endif
+
     ParseNode* thisArg = funNode->pn_next;
     if (!emitTree(thisArg))
         return false;
@@ -7268,8 +7275,11 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
 
             // Calls to "forceInterpreter", "callFunction" or "resumeGenerator"
             // in self-hosted code generate inline bytecode.
-            if (pn2->name() == cx->names().callFunction)
+            if (pn2->name() == cx->names().callFunction ||
+                pn2->name() == cx->names().callContentFunction)
+            {
                 return emitSelfHostedCallFunction(pn);
+            }
             if (pn2->name() == cx->names().resumeGenerator)
                 return emitSelfHostedResumeGenerator(pn);
             if (pn2->name() == cx->names().forceInterpreter)
