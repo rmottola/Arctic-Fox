@@ -13233,8 +13233,7 @@ class MCompareExchangeTypedArrayElement
     }
     bool isByteArray() const {
         return (arrayType_ == Scalar::Int8 ||
-                arrayType_ == Scalar::Uint8 ||
-                arrayType_ == Scalar::Uint8Clamped);
+                arrayType_ == Scalar::Uint8);
     }
     MDefinition* elements() {
         return getOperand(0);
@@ -13288,8 +13287,7 @@ class MAtomicExchangeTypedArrayElement
 
     bool isByteArray() const {
         return (arrayType_ == Scalar::Int8 ||
-                arrayType_ == Scalar::Uint8 ||
-                arrayType_ == Scalar::Uint8Clamped);
+                arrayType_ == Scalar::Uint8);
     }
     MDefinition* elements() {
         return getOperand(0);
@@ -13340,8 +13338,7 @@ class MAtomicTypedArrayElementBinop
 
     bool isByteArray() const {
         return (arrayType_ == Scalar::Int8 ||
-                arrayType_ == Scalar::Uint8 ||
-                arrayType_ == Scalar::Uint8Clamped);
+                arrayType_ == Scalar::Uint8);
     }
     AtomicOp operation() const {
         return op_;

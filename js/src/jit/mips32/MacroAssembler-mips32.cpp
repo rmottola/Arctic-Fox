@@ -2434,9 +2434,6 @@ MacroAssemblerMIPSCompat::compareExchangeToTypedIntArray(Scalar::Type arrayType,
       case Scalar::Uint8:
         compareExchange8ZeroExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
         break;
-      case Scalar::Uint8Clamped:
-        compareExchange8ZeroExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
-        break;
       case Scalar::Int16:
         compareExchange16SignExtend(mem, oldval, newval, valueTemp, offsetTemp, maskTemp, output.gpr());
         break;
@@ -2481,9 +2478,6 @@ MacroAssemblerMIPSCompat::atomicExchangeToTypedIntArray(Scalar::Type arrayType, 
         atomicExchange8SignExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
         break;
       case Scalar::Uint8:
-        atomicExchange8ZeroExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
-        break;
-      case Scalar::Uint8Clamped:
         atomicExchange8ZeroExtend(mem, value, valueTemp, offsetTemp, maskTemp, output.gpr());
         break;
       case Scalar::Int16:
