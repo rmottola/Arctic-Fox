@@ -1099,7 +1099,7 @@ public:
    */
   float FontSizeInflation();
 
-  net::ReferrerPolicy GetReferrerPolicy();
+  net::ReferrerPolicy GetReferrerPolicyAsEnum();
 
 protected:
   /*
