@@ -82,7 +82,6 @@
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
 - Bug 1160971 - 4 parts
-- Bug 1233176 - 2015-12-22 - Scalar Replacement: Initialize properties with the defa
 - Bug 1231109 - Drop FreeBSD checks for unsupported versions. r=jld
 - 1227567 - Optimise module namespace imports in Ion where we have
 - update SKIA 1082598
@@ -94,7 +93,6 @@
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
-- 1185106 - at least part 0 to 4 for TFF
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 
