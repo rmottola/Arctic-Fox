@@ -1652,14 +1652,6 @@ IMEStateManager::GetTextCompositionFor(nsIWidget* aWidget)
 // static
 already_AddRefed<TextComposition>
 IMEStateManager::GetTextCompositionFor(
-                   const WidgetKeyboardEvent* aKeyboardEvent)
-{
-  return GetTextCompositionFor(aKeyboardEvent->widget);
-}
-
-// static
-already_AddRefed<TextComposition>
-IMEStateManager::GetTextCompositionFor(
                    const WidgetCompositionEvent* aCompositionEvent)
 {
   if (!sTextCompositions) {
@@ -1667,6 +1659,18 @@ IMEStateManager::GetTextCompositionFor(
   }
   RefPtr<TextComposition> textComposition =
     sTextCompositions->GetCompositionFor(aCompositionEvent);
+  return textComposition.forget();
+}
+
+// static
+already_AddRefed<TextComposition>
+IMEStateManager::GetTextCompositionFor(nsPresContext* aPresContext)
+{
+  if (!sTextCompositions) {
+    return nullptr;
+  }
+  RefPtr<TextComposition> textComposition =
+    sTextCompositions->GetCompositionFor(aPresContext);
   return textComposition.forget();
 }
 
