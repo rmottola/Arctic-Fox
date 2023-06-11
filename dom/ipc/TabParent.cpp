@@ -2338,6 +2338,7 @@ TabParent::RecvEndIMEComposition(const bool& aCancel,
 {
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) {
+    *aNoCompositionEvent = false;
     return true;
   }
   *aNoCompositionEvent =
