@@ -159,6 +159,7 @@ elif CONFIG['GNU_CXX']:
     ]
     CXXFLAGS += [
         '-Wno-format',
+        '-Wno-format-security',
         '-Wno-multichar',
         '-Wno-sign-compare',
         '-Wno-unused',
@@ -167,4 +168,5 @@ elif CONFIG['GNU_CXX']:
         CXXFLAGS += [
             '-Wno-mismatched-tags',
             '-Wno-tautological-constant-out-of-range-compare',
+            '-Wno-unreachable-code-return',
         ]
