@@ -1020,9 +1020,12 @@ void nsXULWindow::OnChromeLoaded()
         nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
         docShellAsItem->GetTreeOwner(getter_AddRefs(treeOwner));
         if (treeOwner) {
-          int32_t width, height;
-          cv->GetContentSize(&width, &height);
-          treeOwner->SizeShellTo(docShellAsItem, width, height);
+          // GetContentSize can fail, so initialise |width| and |height| to be
+          // on the safe side.
+          int32_t width = 0, height = 0;
+          if (NS_SUCCEEDED(cv->GetContentSize(&width, &height))) {
+            treeOwner->SizeShellTo(docShellAsItem, width, height);
+          }
         }
       }
     }
@@ -1476,7 +1479,7 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
 
   bool isFullscreen = false;
   if (nsPIDOMWindow* domWindow = mDocShell->GetWindow()) {
-    domWindow->GetFullScreen(&isFullscreen);
+    isFullscreen = domWindow->GetFullScreen();
   }
 
   // get our size, position and mode to persist
