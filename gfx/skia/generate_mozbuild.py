@@ -144,17 +144,17 @@ if CONFIG['GNU_CXX']:
         '-Wno-sign-compare',
         '-Wno-unused-function',
     ]
-if CONFIG['GNU_CXX'] and not CONFIG['CLANG_CXX']:
-    CXXFLAGS += [
-	    '-Wno-logical-op',
-		'-Wno-maybe-uninitialized',
-	]
-if CONFIG['CLANG_CXX']:
+    if CONFIG['CLANG_CXX']:
         CXXFLAGS += [
             '-Wno-implicit-fallthrough',
             '-Wno-inconsistent-missing-override',
             '-Wno-macro-redefined',
             '-Wno-unused-private-field',
+        ]
+    else:
+        CXXFLAGS += [
+            '-Wno-logical-op',
+            '-Wno-maybe-uninitialized',
         ]
     if CONFIG['CPU_ARCH'] == 'arm':
         SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += ['-fomit-frame-pointer']
