@@ -1266,7 +1266,7 @@ NS_IMETHODIMP
 nsDirectoryViewerFactory::CreateInstance(const char *aCommand,
                                          nsIChannel* aChannel,
                                          nsILoadGroup* aLoadGroup,
-                                         const nsACString& aContentType,
+                                         const nsACString& aContentType, 
                                          nsIDocShell* aContainer,
                                          nsISupports* aExtraInfo,
                                          nsIStreamListener** aDocListenerResult,
