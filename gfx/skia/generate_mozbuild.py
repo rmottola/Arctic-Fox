@@ -100,33 +100,31 @@ elif CONFIG['CLANG_CL']:
     SOURCES['skia/src/opts/SkOpts_sse41.cpp'].flags += ['-msse4.1']
     SOURCES['skia/src/opts/SkOpts_avx.cpp'].flags += ['-mavx']
 
-if CONFIG['GNU_CXX'] and CONFIG['CPU_ARCH'] == 'arm':
-    SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += ['-fomit-frame-pointer']
-
 DEFINES['SKIA_IMPLEMENTATION'] = 1
 
-# Suppress warnings in third-party code.
-if CONFIG['GNU_CXX'] or CONFIG['CLANG_CL']:
+if CONFIG['GNU_CXX']:
     CXXFLAGS += [
         '-Wno-deprecated-declarations',
         '-Wno-overloaded-virtual',
         '-Wno-sign-compare',
         '-Wno-unused-function',
     ]
-if CONFIG['GNU_CXX'] and not CONFIG['CLANG_CXX'] and not CONFIG['CLANG_CL']:
-    CXXFLAGS += [
-        '-Wno-logical-op',
-        '-Wno-maybe-uninitialized',
-    ]
-if CONFIG['CLANG_CXX'] or CONFIG['CLANG_CL']:
-    CXXFLAGS += [
-        '-Wno-implicit-fallthrough',
-        '-Wno-inconsistent-missing-override',
-        '-Wno-macro-redefined',
-        '-Wno-unused-private-field',
-    ]
-    # work around inline function linking bug with template arguments
-    SOURCES['skia/src/gpu/GrResourceCache.cpp'].flags += ['-fkeep-inline-functions']
+    if CONFIG['CLANG_CXX']:
+        CXXFLAGS += [
+            '-Wno-implicit-fallthrough',
+            '-Wno-inconsistent-missing-override',
+            '-Wno-macro-redefined',
+            '-Wno-unused-private-field',
+        ]
+        # work around inline function linking bug with template arguments
+        SOURCES['skia/src/gpu/GrResourceCache.cpp'].flags += ['-fkeep-inline-functions']
+    else:
+        CXXFLAGS += [
+            '-Wno-logical-op',
+            '-Wno-maybe-uninitialized',
+        ]
+    if CONFIG['CPU_ARCH'] == 'arm':
+        SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += ['-fomit-frame-pointer']
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'android', 'gonk', 'qt'):
     CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']

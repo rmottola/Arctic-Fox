@@ -69,7 +69,7 @@ class SkScalerContext_Mac;
 // provide a wrapper here that will return an empty array if need be.
 // RM - Try to use that on 10.5
 static CFArrayRef SkCTFontManagerCopyAvailableFontFamilyNames() {
-#if defned(SK_BUILD_FOR_IOS) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+#if defined(SK_BUILD_FOR_IOS) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
     return CFArrayCreate(nullptr, nullptr, 0, nullptr);
 #else
     return CTFontManagerCopyAvailableFontFamilyNames();
