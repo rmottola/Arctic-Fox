@@ -3,6 +3,7 @@
 import os
 
 import locale
+from collections import defaultdict
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 header = """
@@ -282,42 +283,28 @@ def generate_separated_sources(platform_sources):
   })
 
   for plat in platform_sources.keys():
-    if not separated.has_key(plat):
-      separated[plat] = set()
-
     for value in platform_sources[plat]:
       if isblacklisted(value):
         continue
 
-      if value.find('_SSE') > 0 or value.find('_SSSE') > 0 or value.find('_SSE4') > 0 : #lol
-        separated['intel'].add(value)
+      if value in separated['common']:
         continue
 
-      if value.find('_neon') > 0:
-        separated['neon'].add(value)
-        continue
+      key = plat
 
-      if value.find('_arm') > 0:
-        separated['arm'].add(value)
-        continue
+      if '_SSE' in value or '_SSSE' in value:
+        key = 'intel'
+      elif '_neon' in value:
+        key = 'neon'
+      elif '_arm' in value:
+        key = 'arm'
+      elif '_none' in value:
+        key = 'none'
+      elif all(value in platform_sources.get(p, {})
+               for p in platforms if p != plat):
+        key = 'common'
 
-      if value.find('_none') > 0:
-        separated['none'].add(value)
-        continue
-
-      found = True
-      for other in platforms:
-        if other == plat or not platform_sources.has_key(other):
-          continue
-
-        if not value in platform_sources[other]:
-          found = False
-          break;
-
-      if found:
-        separated['common'].add(value)
-      else:
-        separated[plat].add(value)
+      separated[key].add(value)
 
   return separated
 
@@ -331,7 +318,7 @@ def write_cflags(f, values, subsearch, cflag, indent):
     for _ in range(indent):
         f.write(' ')
 
-  val_list = uniq(sorted(map(lambda val: val.replace('../', 'trunk/'), values), key=lambda x: x.lower()))
+  val_list = uniq(sorted(values, key=lambda x: x.lower()))
 
   if len(val_list) == 0:
     return
@@ -394,7 +381,7 @@ def write_list(f, name, values, indent):
     for _ in range(indent):
         f.write(' ')
 
-  val_list = uniq(sorted(map(lambda val: val.replace('../', 'trunk/'), values), key=lambda x: x.lower()))
+  val_list = uniq(sorted(values, key=lambda x: x.lower()))
 
   if len(val_list) == 0:
     return

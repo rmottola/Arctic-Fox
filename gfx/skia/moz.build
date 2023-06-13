@@ -556,7 +556,6 @@ else:
         'skia/src/opts/SkTextureCompression_opts_none.cpp',
         'skia/src/opts/SkUtils_opts_none.cpp',
         'skia/src/opts/SkXfermode_opts_none.cpp',
-        'skia/src/ports/SkDiscardableMemory_none.cpp',
     ]
 
 
