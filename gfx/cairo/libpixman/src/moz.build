@@ -141,7 +141,7 @@ if CONFIG['GNU_CC']:
         '-Wno-address',
         '-Wno-sign-compare',
         '-Wno-missing-field-initializers',
-		'-Wno-unused',
+	'-Wno-unused',
     ]
     if CONFIG['CLANG_CXX']:
         CFLAGS += [
