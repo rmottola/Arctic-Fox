@@ -19,3 +19,5 @@ LOCAL_INCLUDES += [
     '../unicharutil',
 ]
 
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wshadow']
