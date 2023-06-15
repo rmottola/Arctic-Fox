@@ -199,6 +199,7 @@ nsCookiePermission::CanSetCookie(nsIURI     *aURI,
   switch (perm) {
   case nsICookiePermission::ACCESS_SESSION:
     *aIsSession = true;
+    MOZ_FALLTHROUGH;
 
   case nsICookiePermission::ACCESS_ALLOW:
     *aResult = true;
