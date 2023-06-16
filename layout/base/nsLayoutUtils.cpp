@@ -6907,7 +6907,7 @@ nsLayoutUtils::IsReallyFixedPos(nsIFrame* aFrame)
 nsLayoutUtils::SurfaceFromElementResult
 nsLayoutUtils::SurfaceFromOffscreenCanvas(OffscreenCanvas* aOffscreenCanvas,
                                           uint32_t aSurfaceFlags,
-                                          RefPtr<DrawTarget>& aTarget);
+                                          RefPtr<DrawTarget>& aTarget)
 {
   SurfaceFromElementResult result;
 
