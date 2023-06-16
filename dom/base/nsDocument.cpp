@@ -315,8 +315,6 @@ nsIdentifierMapEntry::AddContentChangeCallback(nsIDocument::IDTargetObserver aCa
 {
   if (!mChangeCallbacks) {
     mChangeCallbacks = new nsTHashtable<ChangeCallbackEntry>;
-    if (!mChangeCallbacks)
-      return;
   }
 
   ChangeCallback cc = { aCallback, aData, aForImage };
@@ -1240,9 +1238,6 @@ IMPL_SHIM(nsIApplicationCacheContainer)
         return NS_NOINTERFACE;                                             \
       }                                                                    \
       nsCOMPtr<_i> shim = new _i##Shim(this, real);                        \
-      if (!shim) {                                                         \
-        return NS_ERROR_OUT_OF_MEMORY;                                     \
-      }                                                                    \
       shim.forget(aSink);                                                  \
       return NS_OK;                                                        \
     }                                                                      \
@@ -9986,8 +9981,6 @@ nsIDocument::RegisterActivityObserver(nsISupports* aSupports)
 {
   if (!mActivityObservers) {
     mActivityObservers = new nsTHashtable<nsPtrHashKey<nsISupports> >();
-    if (!mActivityObservers)
-      return;
   }
   mActivityObservers->PutEntry(aSupports);
 }
