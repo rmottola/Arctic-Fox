@@ -506,7 +506,7 @@ StructuredCloneHolder::WriteFullySerializableObjects(JSContext* aCx,
 
   // Handle Key cloning
   {
-    CryptoKey* key;
+    CryptoKey* key = nullptr;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(CryptoKey, aObj, key))) {
       MOZ_ASSERT(NS_IsMainThread());
       return JS_WriteUint32Pair(aWriter, SCTAG_DOM_WEBCRYPTO_KEY, 0) &&
@@ -517,7 +517,7 @@ StructuredCloneHolder::WriteFullySerializableObjects(JSContext* aCx,
 #ifdef MOZ_WEBRTC
   {
     // Handle WebRTC Certificate cloning
-    RTCCertificate* cert;
+    RTCCertificate* cert = nullptr;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(RTCCertificate, aObj, cert))) {
       MOZ_ASSERT(NS_IsMainThread());
       return JS_WriteUint32Pair(aWriter, SCTAG_DOM_RTC_CERTIFICATE, 0) &&
@@ -537,7 +537,7 @@ StructuredCloneHolder::WriteFullySerializableObjects(JSContext* aCx,
 
 #ifdef MOZ_NFC
   {
-    MozNDEFRecord* ndefRecord;
+    MozNDEFRecord* ndefRecord = nullptr;
     if (NS_SUCCEEDED(UNWRAP_OBJECT(MozNDEFRecord, aObj, ndefRecord))) {
       MOZ_ASSERT(NS_IsMainThread());
       return JS_WriteUint32Pair(aWriter, SCTAG_DOM_NFC_NDEF, 0) &&
