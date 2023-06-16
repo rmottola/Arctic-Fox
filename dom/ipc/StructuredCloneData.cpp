@@ -46,7 +46,7 @@ StructuredCloneData::Copy(const StructuredCloneData& aData)
   MOZ_ASSERT(BlobImpls().IsEmpty());
   BlobImpls().AppendElements(aData.BlobImpls());
 
-  MOZ_ASSERT(GetImages().IsEmpty());
+  MOZ_ASSERT(GetSurfaces().IsEmpty());
 
   return true;
 }
