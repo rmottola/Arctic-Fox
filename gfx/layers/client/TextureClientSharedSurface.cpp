@@ -139,7 +139,7 @@ SharedSurfaceTextureClient::~SharedSurfaceTextureClient()
   TextureData* data = mData;
   mData = nullptr;
 
-  ForceRemove();
+  Destroy();
 
   if (data) {
     // Destroy mData right away without doing the proper deallocation handshake,

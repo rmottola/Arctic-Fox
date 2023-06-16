@@ -78,7 +78,7 @@ struct TextureDeallocParams
   bool syncDeallocation;
 };
 
-void TextureClientDeallocation(TextureDeallocParams params);
+void DeallocateTextureClient(TextureDeallocParams params);
 
 /**
  * TextureChild is the content-side incarnation of the PTexture IPDL actor.
@@ -175,7 +175,7 @@ private:
   bool mOwnsTextureData;
 
   friend class TextureClient;
-  friend void TextureClientDeallocation(TextureDeallocParams params);
+  friend void DeallocateTextureClient(TextureDeallocParams params);
 };
 
 
@@ -214,10 +214,10 @@ TextureChild::ActorDestroy(ActorDestroyReason why)
   }
 }
 
-void TextureClientDeallocationSyncProxy(TextureDeallocParams params,
+void DeallocateTextureClientSyncProxy(TextureDeallocParams params,
                                         ReentrantMonitor* aBarrier, bool* aDone)
 {
-  TextureClientDeallocation(params);
+  DeallocateTextureClient(params);
   ReentrantMonitorAutoEnter autoMon(*aBarrier);
   *aDone = true;
   aBarrier->NotifyAll();
@@ -228,7 +228,7 @@ void TextureClientDeallocationSyncProxy(TextureDeallocParams params,
 /// This funciton takes care of dispatching work to the right thread using
 /// a synchronous proxy if needed, and handles client/host deallocation.
 void
-TextureClientDeallocation(TextureDeallocParams params)
+DeallocateTextureClient(TextureDeallocParams params)
 {
   TextureChild* actor = params.actor;
   MessageLoop* ipdlMsgLoop = nullptr;
@@ -247,17 +247,17 @@ TextureClientDeallocation(TextureDeallocParams params)
   if (ipdlMsgLoop && MessageLoop::current() != ipdlMsgLoop) {
     if (params.syncDeallocation) {
       bool done = false;
-      ReentrantMonitor barrier("TextureClientDeallocation");
+      ReentrantMonitor barrier("DeallocateTextureClient");
       ReentrantMonitorAutoEnter autoMon(barrier);
       ipdlMsgLoop->PostTask(FROM_HERE,
-        NewRunnableFunction(TextureClientDeallocationSyncProxy,
+        NewRunnableFunction(DeallocateTextureClientSyncProxy,
                             params, &barrier, &done));
       while (!done) {
         barrier.Wait();
       }
     } else {
       ipdlMsgLoop->PostTask(FROM_HERE,
-        NewRunnableFunction(TextureClientDeallocation, params));
+        NewRunnableFunction(DeallocateTextureClient, params));
     }
     // The work has been forwarded to the IPDL thread, we are done.
     return;
@@ -305,7 +305,7 @@ TextureClientDeallocation(TextureDeallocParams params)
   }
 }
 
-void TextureClient::ForceRemove(bool aForceSync)
+void TextureClient::Destroy(bool aForceSync)
 {
   MOZ_ASSERT(!IsLocked());
 
@@ -335,7 +335,7 @@ void TextureClient::ForceRemove(bool aForceSync)
     // client side, but having asynchronous deallocate in some of the cases will
     // be a worthwhile optimization.
     params.syncDeallocation = !!(mFlags & TextureFlags::DEALLOCATE_CLIENT) || aForceSync;
-    TextureClientDeallocation(params);
+    DeallocateTextureClient(params);
   }
 }
 
@@ -406,7 +406,7 @@ TextureClient::GetFormat() const
 
 TextureClient::~TextureClient()
 {
-  ForceRemove(false);
+  Destroy(false);
 }
 
 void
