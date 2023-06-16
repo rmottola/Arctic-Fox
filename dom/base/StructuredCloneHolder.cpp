@@ -385,8 +385,7 @@ StructuredCloneHolder::FreeBuffer(uint64_t* aBuffer,
 /* static */ JSObject*
 StructuredCloneHolder::ReadFullySerializableObjects(JSContext* aCx,
                                                     JSStructuredCloneReader* aReader,
-                                                    uint32_t aTag,
-                                                    uint32_t aIndex)
+                                                    uint32_t aTag)
 {
   if (aTag == SCTAG_DOM_IMAGEDATA) {
     return ReadStructuredCloneImageData(aCx, aReader);
@@ -980,7 +979,7 @@ StructuredCloneHolder::CustomReadHandler(JSContext* aCx,
                                             parent, GetImages(), aIndex);
    }
 
-  return ReadFullySerializableObjects(aCx, aReader, aTag, aIndex);
+  return ReadFullySerializableObjects(aCx, aReader, aTag);
 }
 
 bool
