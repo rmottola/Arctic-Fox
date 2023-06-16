@@ -240,7 +240,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
       }
 #endif
     default:
-      MOZ_CRASH("Unsupported Surface type");
+      MOZ_CRASH("GFX: Unsupported Surface type host");
   }
 }
 
