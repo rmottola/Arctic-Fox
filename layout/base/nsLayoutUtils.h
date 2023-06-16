@@ -74,6 +74,7 @@ class Element;
 class HTMLImageElement;
 class HTMLCanvasElement;
 class HTMLVideoElement;
+class OffscreenCanvas;
 class Selection;
 } // namespace dom
 namespace gfx {
@@ -2121,6 +2122,11 @@ public:
     const RefPtr<mozilla::gfx::SourceSurface>& GetSourceSurface();
   };
 
+  // This function can be called on any thread.
+  static SurfaceFromElementResult
+  SurfaceFromOffscreenCanvas(mozilla::dom::OffscreenCanvas *aOffscreenCanvas,
+                             uint32_t aSurfaceFlags = 0,
+                             RefPtr<DrawTarget>& aTarget);
   static SurfaceFromElementResult SurfaceFromElement(mozilla::dom::Element *aElement,
                                                      uint32_t aSurfaceFlags,
                                                      RefPtr<DrawTarget>& aTarget);
