@@ -8,6 +8,7 @@ import difflib
 import errno
 import os
 import shutil
+import stat
 import sys
 import which
 import subprocess
@@ -26,6 +27,12 @@ from .config import (
     MercurialConfig,
 )
 
+FILE_PERMISSIONS_WARNING = '''
+Your hgrc file is currently readable by others.
+
+Sensitive information such as your Bugzilla credentials could be
+stolen if others have access to this file/machine.
+'''.strip()
 
 INITIAL_MESSAGE = '''
 I'm going to help you ensure your Mercurial is configured for optimal
@@ -382,6 +389,19 @@ class MercurialSetupWizard(object):
                     'written the following:\n')
                 c.write(sys.stdout)
                 return 1
+
+        # Config file may contain sensitive content, such as passwords.
+        # Prompt to remove global permissions.
+        mode = os.stat(config_path).st_mode
+        if mode & (stat.S_IRWXG | stat.S_IRWXO):
+            print(FILE_PERMISSIONS_WARNING)
+            if self._prompt_yn('Remove permissions for others to read '
+                               'your hgrc file'):
+                # We don't care about sticky and set UID bits because this is
+                # a regular file.
+                mode = mode & stat.S_IRWXU
+                print('Changing permissions of %s' % config_path)
+                os.chmod(config_path, mode)
 
         print(FINISHED)
         return 0
