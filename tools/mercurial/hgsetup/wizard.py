@@ -53,11 +53,15 @@ MISSING_USERNAME = '''
 You don't have a username defined in your Mercurial config file. In order to
 send patches to Mozilla, you'll need to attach a name and email address. If you
 aren't comfortable giving us your full name, pseudonames are acceptable.
+
+(Relevant config option: ui.username)
 '''.strip()
 
 BAD_DIFF_SETTINGS = '''
 Mozilla developers produce patches in a standard format, but your Mercurial is
 not configured to produce patches in that format.
+
+(Relevant config options: diff.git, diff.showfunc, diff.unified)
 '''.strip()
 
 MQ_INFO = '''
@@ -66,6 +70,8 @@ alternative to the recommended bookmark-based development workflow.
 
 If you are a newcomer to Mercurial or are coming from Git, it is
 recommended to avoid mq.
+
+(Relevant config option: extensions.mq)
 
 Would you like to activate the mq extension
 '''.strip()
@@ -76,6 +82,8 @@ bzexport that makes it easy to upload patches from the command line via the
 |hg bzexport| command. More info is available at
 https://hg.mozilla.org/hgcustom/version-control-tools/file/default/hgext/bzexport/README
 
+(Relevant config option: extensions.bzexport)
+
 Would you like to activate bzexport
 '''.strip()
 
@@ -83,6 +91,8 @@ MQEXT_INFO = '''
 The mqext extension adds a number of features, including automatically committing
 changes to your mq patch queue. More info is available at
 https://hg.mozilla.org/hgcustom/version-control-tools/file/default/hgext/mqext/README.txt
+
+(Relevant config option: extensions.mqext)
 
 Would you like to activate mqext
 '''.strip()
@@ -92,6 +102,8 @@ The qimportbz extension
 (https://hg.mozilla.org/hgcustom/version-control-tools/file/default/hgext/qimportbz/README) makes it possible to
 import patches from Bugzilla using a friendly bz:// URL handler. e.g.
 |hg qimport bz://123456|.
+
+(Relevant config option: extensions.qimportbz)
 
 Would you like to activate qimportbz
 '''.strip()
@@ -155,6 +167,8 @@ BZPOST_INFO = '''
 The bzpost extension automatically records the URLs of pushed commits to
 referenced Bugzilla bugs after push.
 
+(Relevant config option: extensions.bzpost)
+
 Would you like to activate bzpost
 '''.strip()
 
@@ -179,6 +193,8 @@ The firefoxtree extension is *strongly* recommended if you:
 a) aggregate multiple Firefox repositories into a single local repo
 b) perform head/bookmark-based development (as opposed to mq)
 
+(Relevant config option: extensions.firefoxtree)
+
 Would you like to activate firefoxtree
 '''.strip()
 
@@ -189,15 +205,12 @@ The push-to-try extension generates a temporary commit with a given
 try syntax and pushes it to the try server. The extension is intended
 to be used in concert with other tools generating try syntax so that
 they can push to try without depending on mq or other workarounds.
+
+(Relevant config option: extensions.push-to-try)
+
 Would you like to activate push-to-try
 '''.strip()
 
-FILE_PERMISSIONS_WARNING = '''
-Your hgrc file is currently readable by others.
-
-Sensitive information such as your Bugzilla credentials could be
-stolen if others have access to this file/machine.
-'''.strip()
 
 BUNDLECLONE_MINIMUM_VERSION = LooseVersion('3.1')
 
@@ -206,9 +219,17 @@ The bundleclone extension makes cloning faster and saves server resources.
 
 We highly recommend you activate this extension.
 
+(Relevant config option: extensions.bundleclone)
+
 Would you like to activate bundleclone
 '''.strip()
 
+FILE_PERMISSIONS_WARNING = '''
+Your hgrc file is currently readable by others.
+
+Sensitive information such as your Bugzilla credentials could be
+stolen if others have access to this file/machine.
+'''.strip()
 
 MULTIPLE_VCT = '''
 *** WARNING ***
