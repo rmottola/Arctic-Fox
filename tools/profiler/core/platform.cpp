@@ -78,7 +78,6 @@ const char* PROFILER_FEATURES = "MOZ_PROFILING_FEATURES";
  * a problem if 2^32 events happen between samples that we need
  * to know are associated with different events */
 
-
 // Values harvested from env vars, that control the profiler.
 static int sUnwindInterval;   /* in milliseconds */
 static int sUnwindStackScan;  /* max # of dubious frames allowed */
@@ -101,7 +100,6 @@ static const char * gGeckoThreadName = "GeckoMain";
 void Sampler::Startup() {
   sRegisteredThreads = new std::vector<ThreadInfo*>();
   sRegisteredThreadsMutex = OS::CreateMutex("sRegisteredThreads mutex");
-
 
   // We could create the sLUL object and read unwind info into it at
   // this point.  That would match the lifetime implied by destruction
@@ -209,8 +207,6 @@ void ProfilerMarker::StreamJSON(SpliceableJSONWriter& aWriter,
   aWriter.EndArray();
 }
 
-
-#if !defined(ANDROID)
 /* Has MOZ_PROFILER_VERBOSE been set? */
 
 // Verbosity control for the profiler.  The aim is to check env var
@@ -234,7 +230,6 @@ bool moz_profiler_verbose()
 
   return profiler_verbosity == ProfilerVerbosity::VERBOSE;
 }
-#endif
 
 void moz_profiler_set_verbosity(ProfilerVerbosity pv)
 {
@@ -242,6 +237,7 @@ void moz_profiler_set_verbosity(ProfilerVerbosity pv)
               pv == ProfilerVerbosity::VERBOSE);
    profiler_verbosity = pv;
 }
+
 
 bool set_profiler_interval(const char* interval) {
   if (interval) {
@@ -348,6 +344,10 @@ void profiler_usage() {
   LOG( "SPS: ");
   LOG( "SPS:   MOZ_PROFILER_STACK_SCAN=<number>   (default is zero)");
   LOG( "SPS:   The number of dubious (stack-scanned) frames allowed");
+  LOG( "SPS: ");
+  LOG( "SPS:   MOZ_PROFILER_LUL_TEST");
+  LOG( "SPS:   If set to any value, runs LUL unit tests at startup of");
+  LOG( "SPS:   the unwinder thread, and prints a short summary of results.");
   LOG( "SPS: ");
   LOGF("SPS:   This platform %s native unwinding.",
        is_native_unwinding_avail() ? "supports" : "does not support");
@@ -741,6 +741,8 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
                            const char** aThreadNameFilters, uint32_t aFilterCount)
 
 {
+  LOG("BEGIN mozilla_sampler_start");
+
   if (!stack_key_initialized)
     profiler_init(nullptr);
 
@@ -839,18 +841,23 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
       os->NotifyObservers(params, "profiler-started", nullptr);
     }
   }
+#endif
+
+  LOG("END   mozilla_sampler_start");
 }
 
 void mozilla_sampler_stop()
 {
+  LOG("BEGIN mozilla_sampler_stop");
+
   if (!stack_key_initialized)
     return;
 
   GeckoSampler *t = tlsTicker.get();
   if (!t) {
+    LOG("END   mozilla_sampler_stop-early");
     return;
   }
-#endif
 
   bool disableJS = t->ProfileJS();
 
@@ -884,6 +891,7 @@ void mozilla_sampler_stop()
   }
 #endif
 
+  LOG("END   mozilla_sampler_stop");
 }
 
 bool mozilla_sampler_is_paused() {
