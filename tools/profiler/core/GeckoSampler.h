@@ -7,6 +7,7 @@
 #define GeckoSampler_h
 
 #include "platform.h"
+#include "ProfileEntry.h"
 #include "mozilla/Vector.h"
 #include "ThreadProfile.h"
 #include "ThreadInfo.h"
