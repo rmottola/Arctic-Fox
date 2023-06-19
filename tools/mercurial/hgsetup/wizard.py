@@ -258,6 +258,22 @@ is in.)
 Would you like to install the `hg wip` alias?
 '''.strip()
 
+HGWATCHMAN_MINIMUM_VERSION = LooseVersion('3.5.2')
+
+HGWATCHMAN_INFO = '''
+The hgwatchman extension integrates the watchman filesystem watching
+tool with Mercurial. Commands like `hg status`, `hg diff`, and
+`hg commit` that need to examine filesystem state can query watchman
+and obtain filesystem state nearly instantaneously. The result is much
+faster command execution.
+
+When installed, the hgwatchman extension will launch a background
+watchman file watching daemon for accessed Mercurial repositories. It
+should "just work."
+
+Would you like to install hgwatchman
+'''.strip()
+
 FILE_PERMISSIONS_WARNING = '''
 Your hgrc file is currently readable by others.
 
@@ -370,9 +386,29 @@ class MercurialSetupWizard(object):
             'rewriting via the "histedit" command (similar to '
             '`git rebase -i`)')
 
-        self.prompt_native_extension(c, 'mq', MQ_INFO)
+        # hgwatchman is provided by MozillaBuild and we don't yet support
+        # Linux/BSD.
+        if ('hgwatchman' not in c.extensions
+            and sys.platform.startswith('darwin')
+            and hg_version >= HGWATCHMAN_MINIMUM_VERSION
+            and self._prompt_yn(HGWATCHMAN_INFO)):
+            # Unlike other extensions, we need to run an installer
+            # to compile a Python C extension.
+            try:
+                subprocess.check_output(
+                    ['make', 'local'],
+                    cwd=self.updater.hgwatchman_dir,
+                    stderr=subprocess.STDOUT)
 
-        self.prompt_external_extension(c, 'bzexport', BZEXPORT_INFO)
+                ext_path = os.path.join(self.updater.hgwatchman_dir,
+                                        'hgwatchman')
+                if self.can_use_extension(c, 'hgwatchman', ext_path):
+                    c.activate_extension('hgwatchman', ext_path)
+            except subprocess.CalledProcessError as e:
+                print('Error compiling hgwatchman; will not install hgwatchman')
+                print(e.output)
+
+        self.prompt_native_extension(c, 'mq', MQ_INFO)
 
         if 'reviewboard' not in c.extensions:
             if hg_version < REVIEWBOARD_MINIMUM_VERSION:
@@ -385,6 +421,8 @@ class MercurialSetupWizard(object):
                     'you can easily initiate code reviews against Mozilla '
                     'projects',
                     path=p)
+
+        self.prompt_external_extension(c, 'bzexport', BZEXPORT_INFO)
 
         if hg_version >= BZPOST_MINIMUM_VERSION:
             self.prompt_external_extension(c, 'bzpost', BZPOST_INFO)
