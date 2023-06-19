@@ -136,6 +136,7 @@
 #include "nsIMutable.h"
 #include "nsIObserverService.h"
 #include "nsIPresShell.h"
+#include "nsIRemoteWindowContext.h"
 #include "nsIScriptError.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISiteSecurityService.h"
@@ -1686,6 +1687,47 @@ StaticAutoPtr<LinkedList<SystemMessageHandledListener> >
 
 NS_IMPL_ISUPPORTS(SystemMessageHandledListener,
                   nsITimerCallback)
+
+
+class RemoteWindowContext final : public nsIRemoteWindowContext
+                                , public nsIInterfaceRequestor
+{
+public:
+    explicit RemoteWindowContext(TabParent* aTabParent)
+    : mTabParent(aTabParent)
+    {
+    }
+
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIINTERFACEREQUESTOR
+    NS_DECL_NSIREMOTEWINDOWCONTEXT
+
+private:
+    ~RemoteWindowContext();
+    RefPtr<TabParent> mTabParent;
+};
+
+NS_IMPL_ISUPPORTS(RemoteWindowContext, nsIRemoteWindowContext, nsIInterfaceRequestor)
+
+RemoteWindowContext::~RemoteWindowContext()
+{
+}
+
+NS_IMETHODIMP
+RemoteWindowContext::GetInterface(const nsIID& aIID, void** aSink)
+{
+    return QueryInterface(aIID, aSink);
+}
+
+NS_IMETHODIMP
+RemoteWindowContext::OpenURI(nsIURI* aURI, uint32_t aFlags)
+{
+    URIParams uri;
+    SerializeURI(aURI, uri);
+
+    Unused << mTabParent->SendOpenURI(uri, aFlags);
+    return NS_OK;
+}
 
 } // namespace
 
@@ -4317,7 +4359,8 @@ ContentParent::RecvAccumulateMixedContentHSTS(const URIParams& aURI, const bool&
 }
 
 bool
-ContentParent::RecvLoadURIExternal(const URIParams& uri)
+ContentParent::RecvLoadURIExternal(const URIParams& uri,
+                                   PBrowserParent* windowContext)
 {
     nsCOMPtr<nsIExternalProtocolService> extProtService(do_GetService(NS_EXTERNALPROTOCOLSERVICE_CONTRACTID));
     if (!extProtService) {
@@ -4327,7 +4370,10 @@ ContentParent::RecvLoadURIExternal(const URIParams& uri)
     if (!ourURI) {
         return false;
     }
-    extProtService->LoadURI(ourURI, nullptr);
+
+    RefPtr<RemoteWindowContext> context =
+        new RemoteWindowContext(static_cast<TabParent*>(windowContext));
+    extProtService->LoadURI(ourURI, context);
     return true;
 }
 
