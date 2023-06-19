@@ -23,8 +23,8 @@ from mozversioncontrol import get_hg_path, get_hg_version
 from .update import MercurialUpdater
 from .config import (
     config_file,
-    HgIncludeException,
     MercurialConfig,
+    ParseException,
 )
 
 
@@ -308,7 +308,7 @@ class MercurialSetupWizard(object):
                 print(error.message)
 
             return 1
-        except HgIncludeException as e:
+        except ParseException as e:
             print('Error importing existing Mercurial config: %s\n' % config_path)
             print(e.message)
 
