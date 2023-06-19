@@ -95,10 +95,10 @@ bool moz_profiler_verbose();
 
 #else
 # define LOG(text) \
-    do { if (moz_profiler_verbose()) printf("Profiler: %s\n", text); \
+    do { if (moz_profiler_verbose()) fprintf(stderr, "Profiler: %s\n", text); \
     } while (0)
 # define LOGF(format, ...) \
-    do { if (moz_profiler_verbose()) printf("Profiler: " format         \
+    do { if (moz_profiler_verbose()) fprintf(stderr, "Profiler: " format \
                                              "\n", __VA_ARGS__);        \
     } while (0)
 
@@ -267,6 +267,8 @@ bool set_profiler_entries(const char*);
 bool set_profiler_scan(const char*);
 bool is_native_unwinding_avail();
 
+void set_tls_stack_top(void* stackTop);
+
 // ----------------------------------------------------------------------------
 // Sampler
 //
@@ -376,7 +378,7 @@ class Sampler {
 
   static bool RegisterCurrentThread(const char* aName,
                                     PseudoStack* aPseudoStack,
-                                    bool aIsMainThread);
+                                    bool aIsMainThread, void* stackTop);
   static void UnregisterCurrentThread();
 
   static void Startup();
