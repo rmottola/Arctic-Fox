@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "platform.h"
+#include "PlatformMacros.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/UniquePtr.h"
 #include "GeckoProfiler.h"
@@ -38,12 +39,32 @@
   #include "AndroidBridge.h"
 #endif
 
-#ifdef SPS_STANDALONE
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+#include "GeneratedJNINatives.h"
+#endif
+
+#ifndef SPS_STANDALONE
 #if defined(SPS_PLAT_amd64_linux) || defined(SPS_PLAT_x86_linux)
 # define USE_LUL_STACKWALK
 # include "lul/LulMain.h"
 # include "lul/platform-linux-lul.h"
 #endif
+#endif
+
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+class GeckoJavaSampler : public widget::GeckoJavaSampler::Natives<GeckoJavaSampler>
+{
+private:
+  GeckoJavaSampler();
+
+public:
+  static double GetProfilerTime() {
+    if (!profiler_is_active()) {
+      return 0.0;
+    }
+    return profiler_time();
+  };
+};
 #endif
 
 mozilla::ThreadLocal<PseudoStack *> tlsPseudoStack;
@@ -478,6 +499,12 @@ void mozilla_sampler_init(void* stackTop)
 
 #ifndef SPS_STANDALONE
   set_stderr_callback(mozilla_sampler_log);
+#endif
+
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+  if (mozilla::jni::IsAvailable()) {
+    GeckoJavaSampler::Init();
+  }
 #endif
 
   // We can't open pref so we use an environment variable
