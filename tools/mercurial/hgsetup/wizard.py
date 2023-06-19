@@ -199,6 +199,16 @@ Sensitive information such as your Bugzilla credentials could be
 stolen if others have access to this file/machine.
 '''.strip()
 
+BUNDLECLONE_MINIMUM_VERSION = LooseVersion('3.1')
+
+BUNDLECLONE_INFO = '''
+The bundleclone extension makes cloning faster and saves server resources.
+
+We highly recommend you activate this extension.
+
+Would you like to activate bundleclone
+'''.strip()
+
 
 MULTIPLE_VCT = '''
 *** WARNING ***
@@ -329,6 +339,9 @@ class MercurialSetupWizard(object):
 
         if hg_version >= PUSHTOTRY_MINIMUM_VERSION:
             self.prompt_external_extension(c, 'push-to-try', PUSHTOTRY_INFO)
+
+        if hg_version >= BUNDLECLONE_MINIMUM_VERSION:
+            self.prompt_external_extension(c, 'bundleclone', BUNDLECLONE_INFO)
 
         if 'mq' in c.extensions:
             self.prompt_external_extension(c, 'mqext', MQEXT_INFO)
