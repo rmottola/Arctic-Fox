@@ -4887,9 +4887,10 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
       }
       int32_t leafSeparatorIndex = path.RFind(FILE_PATH_SEPARATOR);
       nsDependentSubstring dirname = Substring(path, 0, leafSeparatorIndex);
-      nsDependentSubstring basename = Substring(path, leafSeparatorIndex);
       fs = MakeOrReuseFileSystem(dirname, fs, window);
-      filesAndDirsSeq[i].SetAsDirectory() = new Directory(fs, basename);
+      nsAutoString dompath(NS_LITERAL_STRING(FILESYSTEM_DOM_PATH_SEPARATOR));
+      dompath.Append(Substring(path, leafSeparatorIndex + 1));
+      filesAndDirsSeq[i].SetAsDirectory() = new Directory(fs, dompath);
     } else {
       filesAndDirsSeq[i].SetAsFile() = filesAndDirs[i];
     }
