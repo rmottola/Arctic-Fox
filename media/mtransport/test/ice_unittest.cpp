@@ -83,6 +83,13 @@ namespace {
 
 enum TrickleMode { TRICKLE_NONE, TRICKLE_SIMULATE, TRICKLE_REAL };
 
+const unsigned int ICE_TEST_PEER_OFFERER = (1 << 0);
+const unsigned int ICE_TEST_PEER_SET_PRIORITIES = (1 << 1);
+const unsigned int ICE_TEST_PEER_ALLOW_LOOPBACK = (1 << 2);
+const unsigned int ICE_TEST_PEER_ENABLED_TCP = (1 << 3);
+const unsigned int ICE_TEST_PEER_ALLOW_LINK_LOCAL = (1 << 4);
+const unsigned int ICE_TEST_PEER_HIDE_NON_DEFAULT = (1 << 5);
+
 typedef std::string (*CandidateFilter)(const std::string& candidate);
 
 static std::string IsRelayCandidate(const std::string& candidate) {
@@ -794,7 +801,8 @@ class IceTestPeer : public sigslot::has_slots<> {
     if (candidate.empty()) {
       return;
     }
-    std::cerr << "Candidate initialized: " << candidate << std::endl;
+    std::cerr << "Candidate for stream " << stream->name() << " initialized: "
+      << candidate << std::endl;
     candidates_[stream->name()].push_back(candidate);
 
     // If we are connected, then try to trickle to the
@@ -1141,9 +1149,15 @@ class IceGatherTest : public ::testing::Test {
     NrIceCtx::internal_DeinitializeGlobal();
   }
 
-  void EnsurePeer() {
+  void EnsurePeer(const unsigned int flags = ICE_TEST_PEER_OFFERER) {
     if (!peer_) {
-      peer_ = new IceTestPeer("P1", true, false);
+      peer_ = new IceTestPeer("P1",
+                              flags & ICE_TEST_PEER_OFFERER,
+                              flags & ICE_TEST_PEER_SET_PRIORITIES,
+                              flags & ICE_TEST_PEER_ALLOW_LOOPBACK,
+                              flags & ICE_TEST_PEER_ENABLED_TCP,
+                              flags & ICE_TEST_PEER_ALLOW_LINK_LOCAL,
+                              flags & ICE_TEST_PEER_HIDE_NON_DEFAULT);
       peer_->AddStream(1);
     }
   }
@@ -1214,7 +1228,7 @@ class IceGatherTest : public ::testing::Test {
       const std::string& fake_addr,
       uint16_t fake_port,
       const std::string& fqdn = std::string()) {
-    EnsurePeer();
+    EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
     std::vector<NrIceStunServer> stun_servers;
     AddStunServerWithResponse(fake_addr, fake_port, fqdn, "tcp", &stun_servers);
     peer_->SetStunServers(stun_servers);
@@ -1225,7 +1239,7 @@ class IceGatherTest : public ::testing::Test {
       uint16_t fake_udp_port,
       const std::string& fake_tcp_addr,
       uint16_t fake_tcp_port) {
-    EnsurePeer();
+    EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
     std::vector<NrIceStunServer> stun_servers;
     AddStunServerWithResponse(fake_udp_addr,
                               fake_udp_port,
@@ -1662,10 +1676,11 @@ TEST_F(IceGatherTest, TestGatherFakeStunServerTcpHostnameNoResolver) {
     return;
   }
 
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   peer_->SetStunServer(g_stun_server_hostname, kDefaultStunServerPort,
     kNrIceTransportTcp);
   Gather();
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " TCP "));
 }
 
 TEST_F(IceGatherTest, TestGatherFakeStunServerIpAddress) {
@@ -1728,7 +1743,7 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressTcp) {
     return;
   }
 
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   peer_->SetStunServer(g_stun_server_address, kDefaultStunServerPort,
     kNrIceTransportTcp);
   peer_->SetDNSResolver();
@@ -1754,7 +1769,7 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerHostname) {
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameTcp) {
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   peer_->SetStunServer(g_stun_server_hostname, kDefaultStunServerPort,
     kNrIceTransportTcp);
   peer_->SetDNSResolver();
@@ -1773,7 +1788,7 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameBothUdpTcp) {
 
   std::vector<NrIceStunServer> stun_servers;
 
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   stun_servers.push_back(*NrIceStunServer::Create(g_stun_server_hostname,
     kDefaultStunServerPort, kNrIceTransportUdp));
   stun_servers.push_back(*NrIceStunServer::Create(g_stun_server_hostname,
@@ -1781,6 +1796,8 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerHostnameBothUdpTcp) {
   peer_->SetStunServers(stun_servers);
   peer_->SetDNSResolver();
   Gather();
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " UDP "));
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " TCP "));
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressBothUdpTcp) {
@@ -1790,7 +1807,7 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressBothUdpTcp) {
 
   std::vector<NrIceStunServer> stun_servers;
 
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   stun_servers.push_back(*NrIceStunServer::Create(g_stun_server_address,
     kDefaultStunServerPort, kNrIceTransportUdp));
   stun_servers.push_back(*NrIceStunServer::Create(g_stun_server_address,
@@ -1798,6 +1815,8 @@ TEST_F(IceGatherTest, TestGatherDNSStunServerIpAddressBothUdpTcp) {
   peer_->SetStunServers(stun_servers);
   peer_->SetDNSResolver();
   Gather();
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " UDP "));
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " TCP "));
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunBogusHostname) {
@@ -1805,14 +1824,16 @@ TEST_F(IceGatherTest, TestGatherDNSStunBogusHostname) {
   peer_->SetStunServer(kBogusStunServerHostname, kDefaultStunServerPort);
   peer_->SetDNSResolver();
   Gather();
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " UDP "));
 }
 
 TEST_F(IceGatherTest, TestGatherDNSStunBogusHostnameTcp) {
-  EnsurePeer();
+  EnsurePeer(ICE_TEST_PEER_OFFERER | ICE_TEST_PEER_ENABLED_TCP);
   peer_->SetStunServer(kBogusStunServerHostname, kDefaultStunServerPort,
     kNrIceTransportTcp);
   peer_->SetDNSResolver();
   Gather();
+  ASSERT_TRUE(StreamHasMatchingCandidate(0, " TCP "));
 }
 
 TEST_F(IceGatherTest, TestDefaultCandidate) {
