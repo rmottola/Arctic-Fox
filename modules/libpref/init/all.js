@@ -4618,6 +4618,9 @@ pref("layers.tiled-drawtarget.enabled", true);
 pref("layers.tiles.edge-padding", false);
 #endif
 
+#ifdef MOZ_WIDGET_GONK
+pref("layers.tiled-drawtarget.enabled", true);
+#endif
 
 #ifdef MOZ_WIDGET_ANDROID
 pref("layers.tiled-drawtarget.enabled", true);
