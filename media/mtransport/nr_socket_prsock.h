@@ -209,7 +209,7 @@ public:
     NR_CLOSED,
   };
 
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NrSocketIpc)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NrSocketIpc, override)
 
   NS_IMETHODIMP CallListenerError(const nsACString &message,
                                   const nsACString &filename,
