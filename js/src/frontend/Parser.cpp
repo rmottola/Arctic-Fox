@@ -855,7 +855,7 @@ template <typename ParseHandler>
 void
 Parser<ParseHandler>::trace(JSTracer* trc)
 {
-    traceListHead->trace(trc);
+    ObjectBox::TraceList(trc, traceListHead);
 }
 
 void
