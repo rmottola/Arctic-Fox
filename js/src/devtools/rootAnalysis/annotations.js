@@ -135,9 +135,6 @@ var ignoreFunctions = {
     "JSObject* js::GetWeakmapKeyDelegate(JSObject*)" : true, // FIXME: mark with AutoSuppressGCAnalysis instead
     "uint8 NS_IsMainThread()" : true,
 
-    // Bug 1056410 - devirtualization prevents the standard nsISupports::Release heuristic from working
-    "uint32 nsXPConnect::Release()" : true,
-
     // Has an indirect call under it by the name "__f", which seemed too
     // generic to ignore by itself.
     "void* std::_Locale_impl::~_Locale_impl(int32)" : true,
