@@ -990,9 +990,6 @@ TokenStream::checkForKeyword(const KeywordInfo* kw, TokenKind* ttp)
     if (kw->tokentype == TOK_RESERVED)
         return reportError(JSMSG_RESERVED_ID, kw->chars);
 
-    if (kw->tokentype == TOK_RESERVED)
-        return reportError(JSMSG_RESERVED_ID, kw->chars);
-
     if (kw->tokentype == TOK_STRICT_RESERVED)
         return reportStrictModeError(JSMSG_RESERVED_ID, kw->chars);
 
