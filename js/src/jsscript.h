@@ -1138,6 +1138,7 @@ class JSScript : public js::gc::TenuredCell
     bool failedBoundsCheck_:1; /* script has had hoisted bounds checks fail */
     bool failedShapeGuard_:1; /* script has had hoisted shape guard fail */
     bool hadFrequentBailouts_:1;
+    bool hadOverflowBailout_:1;
     bool uninlineable_:1;    /* explicitly marked as uninlineable */
 
     // Idempotent cache has triggered invalidation.
@@ -1410,6 +1411,9 @@ class JSScript : public js::gc::TenuredCell
     bool hadFrequentBailouts() const {
         return hadFrequentBailouts_;
     }
+    bool hadOverflowBailout() const {
+        return hadOverflowBailout_;
+    }
     bool uninlineable() const {
         return uninlineable_;
     }
@@ -1423,6 +1427,7 @@ class JSScript : public js::gc::TenuredCell
     void setFailedBoundsCheck() { failedBoundsCheck_ = true; }
     void setFailedShapeGuard() { failedShapeGuard_ = true; }
     void setHadFrequentBailouts() { hadFrequentBailouts_ = true; }
+    void setHadOverflowBailout() { hadOverflowBailout_ = true; }
     void setUninlineable() { uninlineable_ = true; }
     void setInvalidatedIdempotentCache() { invalidatedIdempotentCache_ = true; }
     void setFailedLexicalCheck() { failedLexicalCheck_ = true; }
