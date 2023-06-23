@@ -1184,6 +1184,14 @@ PlacesToolbar.prototype = {
     }
   },
 
+  updateOverflowStatus: function() {
+    if (this._rootElt.scrollLeftMin != this._rootElt.scrollLeftMax) {
+      this._onOverflow();
+    } else {
+      this._onUnderflow();
+    }
+  },
+
   updateChevron: function PT_updateChevron() {
     // If the chevron is collapsed there's nothing to update.
     if (this._chevron.collapsed)
