@@ -6,7 +6,16 @@
  */
 
 #include "TouchManager.h"
+
+#include "mozilla/TouchEvents.h"
+#include "mozilla/dom/EventTarget.h"
+#include "nsIFrame.h"
 #include "nsPresShell.h"
+#include "nsView.h"
+
+namespace mozilla {
+
+using EventTarget = ::mozilla::dom::EventTarget;
 
 nsRefPtrHashtable<nsUint32HashKey, dom::Touch>* TouchManager::gCaptureTouchList;
 
@@ -224,3 +233,5 @@ TouchManager::PreHandleEvent(WidgetEvent* aEvent,
   }
   return true;
 }
+
+} // namespace mozilla
