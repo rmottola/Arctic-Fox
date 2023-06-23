@@ -1305,6 +1305,11 @@ BrowserElementParent.prototype = {
         this._sendAsyncMsg('copypaste-do-command', { command: data });
       }
       break;
+    case 'back-docommand':
+      if (this._isAlive() && this._frameLoader.visible) {
+          this.goBack();
+      }
+      break;
     default:
       debug('Unknown topic: ' + topic);
       break;
