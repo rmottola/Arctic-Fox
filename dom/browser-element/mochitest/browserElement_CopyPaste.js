@@ -1,13 +1,13 @@
 /* Any copyright is dedicated to the public domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-// Test that "cut, copy, paste, selectall" and selectionstatechanged event works from inside an <iframe mozbrowser>.
+// Test that "cut, copy, paste, selectall" and caretstatechanged event works from inside an <iframe mozbrowser>.
 "use strict";
 
 SimpleTest.waitForExplicitFinish();
 SimpleTest.requestFlakyTimeout("untriaged");
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.setSelectionChangeEnabledPref(true);
+browserElementTestHelpers.setAccessibleCaretEnabledPref(true);
 browserElementTestHelpers.addPermission();
 const { Services } = SpecialPowers.Cu.import('resource://gre/modules/Services.jsm');
 
@@ -21,6 +21,7 @@ var defaultData;
 var pasteData;
 var focusScript;
 var createEmbededFrame = false;
+var testSelectionChange = false;
 
 function copyToClipboard(str) {
   gTextarea.value = str;
@@ -183,22 +184,20 @@ function isChildProcess() {
 function testSelectAll(e) {
   // Skip mozbrowser test if we're at child process.
   if (!isChildProcess()) {
-    iframeOuter.addEventListener("mozbrowserselectionstatechanged", function selectchangeforselectall(e) {
-      if (e.detail.states.indexOf('selectall') == 0) {
-        iframeOuter.removeEventListener("mozbrowserselectionstatechanged", selectchangeforselectall, true);
-        ok(true, "got mozbrowserselectionstatechanged event." + stateMeaning);
-        ok(e.detail, "event.detail is not null." + stateMeaning);
-        ok(e.detail.width != 0, "event.detail.width is not zero" + stateMeaning);
-        ok(e.detail.height != 0, "event.detail.height is not zero" + stateMeaning);
-        ok(e.detail.states, "event.detail.state " + e.detail.states);
-        SimpleTest.executeSoon(function() { testCopy1(e); });
-      }
+    let eventName = "mozbrowsercaretstatechanged";
+    iframeOuter.addEventListener(eventName, function caretchangeforselectall(e) {
+      iframeOuter.removeEventListener(eventName, caretchangeforselectall, true);
+      ok(true, "got mozbrowsercaretstatechanged event." + stateMeaning);
+      ok(e.detail, "event.detail is not null." + stateMeaning);
+      ok(e.detail.width != 0, "event.detail.width is not zero" + stateMeaning);
+      ok(e.detail.height != 0, "event.detail.height is not zero" + stateMeaning);
+      SimpleTest.executeSoon(function() { testCopy1(e); });
     }, true);
   }
 
   mm.addMessageListener('content-focus', function messageforfocus(msg) {
     mm.removeMessageListener('content-focus', messageforfocus);
-    // test selectall command, after calling this the selectionstatechanged event should be fired.
+    // test selectall command, after calling this the caretstatechanged event should be fired.
     doCommand('selectall');
     if (isChildProcess()) {
       SimpleTest.executeSoon(function() { testCopy1(e); });
