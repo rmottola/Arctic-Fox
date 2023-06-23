@@ -328,7 +328,7 @@ function MozNFCImpl() {
 }
 MozNFCImpl.prototype = {
   _nfcContentHelper: null,
-  _window: null,
+  window: null,
   _rfState: null,
   _contentObj: null,
   nfcPeer: null,
@@ -337,7 +337,7 @@ MozNFCImpl.prototype = {
 
   init: function init(aWindow) {
     debug("MozNFCImpl init called");
-    this._window = aWindow;
+    this.window = aWindow;
     this.defineEventHandlerGetterSetter("ontagfound");
     this.defineEventHandlerGetterSetter("ontaglost");
     this.defineEventHandlerGetterSetter("onpeerready");
@@ -358,7 +358,7 @@ MozNFCImpl.prototype = {
     // Get the AppID and pass it to ContentHelper
     let appID = appsService.getAppLocalIdByManifestURL(manifestUrl);
 
-    let callback = new NfcCallback(this._window);
+    let callback = new NfcCallback(this.window);
     this._nfcContentHelper.checkP2PRegistration(appID, callback);
     return callback.promise;
   },
@@ -374,19 +374,19 @@ MozNFCImpl.prototype = {
   },
 
   startPoll: function startPoll() {
-    let callback = new NfcCallback(this._window);
+    let callback = new NfcCallback(this.window);
     this._nfcContentHelper.changeRFState(RFState.DISCOVERY, callback);
     return callback.promise;
   },
 
   stopPoll: function stopPoll() {
-    let callback = new NfcCallback(this._window);
+    let callback = new NfcCallback(this.window);
     this._nfcContentHelper.changeRFState(RFState.LISTEN, callback);
     return callback.promise;
   },
 
   powerOff: function powerOff() {
-    let callback = new NfcCallback(this._window);
+    let callback = new NfcCallback(this.window);
     this._nfcContentHelper.changeRFState(RFState.IDLE, callback);
     return callback.promise;
   },
@@ -411,7 +411,7 @@ MozNFCImpl.prototype = {
       return;
     }
 
-    let appId = this._window.document.nodePrincipal.appId;
+    let appId = this.window.document.nodePrincipal.appId;
     this._nfcContentHelper.registerTargetForPeerReady(appId);
   },
 
@@ -420,7 +420,7 @@ MozNFCImpl.prototype = {
       return;
     }
 
-    let appId = this._window.document.nodePrincipal.appId;
+    let appId = this.window.document.nodePrincipal.appId;
     this._nfcContentHelper.unregisterTargetForPeerReady(appId);
   },
 
@@ -437,7 +437,7 @@ MozNFCImpl.prototype = {
    */
   handleTagFound: function handleTagFound(sessionToken, tagInfo, ndefInfo, records) {
     if (this.hasDeadWrapper()) {
-      dump("this._window or this.__DOM_IMPL__ is a dead wrapper.");
+      dump("this.window or this.__DOM_IMPL__ is a dead wrapper.");
       return false;
     }
 
@@ -450,8 +450,8 @@ MozNFCImpl.prototype = {
       return false;
     }
 
-    let tagImpl = new MozNFCTagImpl(this._window, sessionToken, tagInfo, ndefInfo);
-    let tag = this._window.MozNFCTag._create(this._window, tagImpl);
+    let tagImpl = new MozNFCTagImpl(this.window, sessionToken, tagInfo, ndefInfo);
+    let tag = this.window.MozNFCTag._create(this.window, tagImpl);
 
     tagImpl._contentObj = tag;
     this.nfcTag = tag;
@@ -460,7 +460,7 @@ MozNFCImpl.prototype = {
     let ndefRecords = records ? [] : null;
     for (let i = 0; i < length; i++) {
       let record = records[i];
-      ndefRecords.push(new this._window.MozNDEFRecord({tnf: record.tnf,
+      ndefRecords.push(new this.window.MozNDEFRecord({tnf: record.tnf,
                                                        type: record.type,
                                                        id: record.id,
                                                        payload: record.payload}));
@@ -473,7 +473,7 @@ MozNFCImpl.prototype = {
     };
 
     debug("fire ontagfound " + sessionToken);
-    let tagEvent = new this._window.MozNFCTagEvent("tagfound", eventData);
+    let tagEvent = new this.window.MozNFCTagEvent("tagfound", eventData);
     this.__DOM_IMPL__.dispatchEvent(tagEvent);
 
     // If defaultPrevented is false, means we need to take the default action
@@ -494,7 +494,7 @@ MozNFCImpl.prototype = {
 
   handleTagLost: function handleTagLost(sessionToken) {
     if (this.hasDeadWrapper()) {
-      dump("this._window or this.__DOM_IMPL__ is a dead wrapper.");
+      dump("this.window or this.__DOM_IMPL__ is a dead wrapper.");
       return false;
     }
 
@@ -511,7 +511,7 @@ MozNFCImpl.prototype = {
     this.nfcTag = null;
 
     debug("fire ontaglost " + sessionToken);
-    let event = new this._window.Event("taglost");
+    let event = new this.window.Event("taglost");
     this.__DOM_IMPL__.dispatchEvent(event);
 
     return true;
@@ -530,7 +530,7 @@ MozNFCImpl.prototype = {
    */
   handlePeerFound: function handlePeerFound(sessionToken, isPeerReady) {
     if (this.hasDeadWrapper()) {
-      dump("this._window or this.__DOM_IMPL__ is a dead wrapper.");
+      dump("this.window or this.__DOM_IMPL__ is a dead wrapper.");
       return false;
     }
 
@@ -545,8 +545,8 @@ MozNFCImpl.prototype = {
       return false;
     }
 
-    let peerImpl = new MozNFCPeerImpl(this._window, sessionToken);
-    this.nfcPeer = this._window.MozNFCPeer._create(this._window, peerImpl);
+    let peerImpl = new MozNFCPeerImpl(this.window, sessionToken);
+    this.nfcPeer = this.window.MozNFCPeer._create(this.window, peerImpl);
 
     let eventType;
     let eventData = {
@@ -561,7 +561,7 @@ MozNFCImpl.prototype = {
     }
 
     debug("fire on" + eventType + " " + sessionToken);
-    let event = new this._window.MozNFCPeerEvent(eventType, eventData);
+    let event = new this.window.MozNFCPeerEvent(eventType, eventData);
     this.__DOM_IMPL__.dispatchEvent(event);
 
     // For peerready we don't take the default action.
@@ -587,7 +587,7 @@ MozNFCImpl.prototype = {
 
   handlePeerLost: function handlePeerLost(sessionToken) {
     if (this.hasDeadWrapper()) {
-      dump("this._window or this.__DOM_IMPL__ is a dead wrapper.");
+      dump("this.window or this.__DOM_IMPL__ is a dead wrapper.");
       return false;
     }
 
@@ -604,7 +604,7 @@ MozNFCImpl.prototype = {
     this.nfcPeer = null;
 
     debug("fire onpeerlost");
-    let event = new this._window.Event("peerlost");
+    let event = new this.window.Event("peerlost");
     this.__DOM_IMPL__.dispatchEvent(event);
 
     return true;
@@ -631,7 +631,7 @@ MozNFCImpl.prototype = {
   },
 
   checkPermissions: function checkPermissions(perms) {
-    let principal = this._window.document.nodePrincipal;
+    let principal = this.window.document.nodePrincipal;
     for (let perm of perms) {
       let permValue =
         Services.perms.testExactPermissionFromPrincipal(principal, perm);
@@ -646,7 +646,7 @@ MozNFCImpl.prototype = {
   },
 
   hasDeadWrapper: function hasDeadWrapper() {
-    return Cu.isDeadWrapper(this._window) || Cu.isDeadWrapper(this.__DOM_IMPL__);
+    return Cu.isDeadWrapper(this.window) || Cu.isDeadWrapper(this.__DOM_IMPL__);
   },
 
   classID: Components.ID("{6ff2b290-2573-11e3-8224-0800200c9a66}"),
