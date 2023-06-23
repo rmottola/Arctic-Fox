@@ -107,7 +107,7 @@ NfcCallback.prototype = {
 };
 
 // Should be mapped to the NFCTagType defined in MozNFCTag.webidl.
-let TagType = {
+var TagType = {
   TYPE1: "Type1",
   TYPE2: "Type2",
   TYPE3: "Type3",
@@ -314,7 +314,7 @@ MozNFCPeerImpl.prototype = {
 };
 
 // Should be mapped to the RFState defined in WebIDL.
-let RFState = {
+var RFState = {
   IDLE: "idle",
   LISTEN: "listen",
   DISCOVERY: "discovery"
@@ -414,7 +414,7 @@ MozNFCImpl.prototype = {
   notifyUserAcceptedP2P: function notifyUserAcceptedP2P(manifestUrl) {
     let appID = appsService.getAppLocalIdByManifestURL(manifestUrl);
     // Notify chrome process of user's acknowledgement
-    this._nfcContentHelper.notifyUserAcceptedP2P(appID);
+    this._nfcContentHelper.notifyUserAcceptedP2P(appID, this._tabId);
   },
 
   notifySendFileStatus: function notifySendFileStatus(status, requestId) {
