@@ -252,6 +252,7 @@ function BrowserElementParent() {
   Services.obs.addObserver(this, 'oop-frameloader-crashed', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'copypaste-docommand', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'ask-children-to-execute-copypaste-command', /* ownsWeak = */ true);
+  Services.obs.addObserver(this, 'back-docommand', /* ownsWeak = */ true);
 
   this.proxyCallHandler = new BrowserElementParentProxyCallHandler();
 }
