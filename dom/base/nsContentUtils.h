@@ -2577,6 +2577,13 @@ public:
    */
   static StorageAccess StorageAllowedForPrincipal(nsIPrincipal* aPrincipal);
 
+  /*
+   * Serializes a HTML nsINode into its markup representation.
+   */
+  static bool SerializeNodeToMarkup(nsINode* aRoot,
+                                    bool aDescendentsOnly,
+                                    nsAString& aOut);
+
 private:
   static bool InitializeEventTable();
 
