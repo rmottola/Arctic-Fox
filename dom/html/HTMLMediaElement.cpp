@@ -737,6 +737,9 @@ void HTMLMediaElement::AbortExistingLoads()
   mDownloadSuspendedByCache = false;
   mMediaInfo = MediaInfo();
   mIsEncrypted = false;
+#ifdef MOZ_EME
+  mPendingEncryptedInitData.mInitDatas.Clear();
+#endif // MOZ_EME
   mSourcePointer = nullptr;
 
   mTags = nullptr;
@@ -3382,7 +3385,11 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
                                          mPlayingThroughTheAudioChannel);
 
   mMediaInfo = *aInfo;
-  mIsEncrypted = aInfo->IsEncrypted();
+  mIsEncrypted = aInfo->IsEncrypted()
+#ifdef MOZ_EME
+                 || mPendingEncryptedInitData.IsEncrypted()
+#endif // MOZ_EME
+                 ;
   mTags = aTags.forget();
   mLoadedDataFired = false;
   ChangeReadyState(nsIDOMHTMLMediaElement::HAVE_METADATA);
@@ -4824,9 +4831,150 @@ NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
   return NS_OK;
 }
 
+#ifdef MOZ_EME
+MediaKeys*
+HTMLMediaElement::GetMediaKeys() const
+{
+  return mMediaKeys;
+}
+
+bool
+HTMLMediaElement::ContainsRestrictedContent()
+{
+  return GetMediaKeys() != nullptr;
+}
+
+already_AddRefed<Promise>
+HTMLMediaElement::SetMediaKeys(mozilla::dom::MediaKeys* aMediaKeys,
+                               ErrorResult& aRv)
+{
+  if (MozAudioCaptured()) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIGlobalObject> global =
+    do_QueryInterface(OwnerDoc()->GetInnerWindow());
+  if (!global) {
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
+  RefPtr<DetailedPromise> promise = DetailedPromise::Create(global, aRv,
+    NS_LITERAL_CSTRING("HTMLMediaElement.setMediaKeys"));
+  if (aRv.Failed()) {
+    return nullptr;
+  }
+  if (mMediaKeys == aMediaKeys) {
+    promise->MaybeResolve(JS::UndefinedHandleValue);
+    return promise.forget();
+  }
+  if (aMediaKeys && aMediaKeys->IsBoundToMediaElement()) {
+    promise->MaybeReject(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR,
+                         NS_LITERAL_CSTRING("MediaKeys object is already bound to another HTMLMediaElement"));
+    return promise.forget();
+  }
+  if (mMediaKeys) {
+    // Existing MediaKeys object. Shut it down.
+    mMediaKeys->Shutdown();
+    mMediaKeys = nullptr;
+  }
+  if (mDecoder &&
+      !mMediaSource &&
+      Preferences::GetBool("media.eme.mse-only", true)) {
+    ShutdownDecoder();
+    promise->MaybeReject(NS_ERROR_DOM_NOT_SUPPORTED_ERR,
+                         NS_LITERAL_CSTRING("EME not supported on non-MSE streams"));
+    return promise.forget();
+  }
+
+  mMediaKeys = aMediaKeys;
+  if (mMediaKeys) {
+    if (NS_FAILED(mMediaKeys->Bind(this))) {
+      promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR,
+                           NS_LITERAL_CSTRING("Failed to bind MediaKeys object to HTMLMediaElement"));
+      mMediaKeys = nullptr;
+      return promise.forget();
+    }
+    if (mDecoder) {
+      mDecoder->SetCDMProxy(mMediaKeys->GetCDMProxy());
+    }
+  }
+  promise->MaybeResolve(JS::UndefinedHandleValue);
+  return promise.forget();
+}
+
+EventHandlerNonNull*
+HTMLMediaElement::GetOnencrypted()
+{
+  EventListenerManager *elm = GetExistingListenerManager();
+  return elm ? elm->GetEventHandler(nsGkAtoms::onencrypted, EmptyString())
+              : nullptr;
+}
+
+void
+HTMLMediaElement::SetOnencrypted(EventHandlerNonNull* handler)
+{
+  EventListenerManager *elm = GetOrCreateListenerManager();
+  if (elm) {
+    elm->SetEventHandler(nsGkAtoms::onencrypted, EmptyString(), handler);
+  }
+}
+
+void
+HTMLMediaElement::DispatchEncrypted(const nsTArray<uint8_t>& aInitData,
+                                    const nsAString& aInitDataType)
+{
+  if (mReadyState == nsIDOMHTMLMediaElement::HAVE_NOTHING) {
+    // Ready state not HAVE_METADATA (yet), don't dispatch encrypted now.
+    // Queueing for later dispatch in MetadataLoaded.
+    mPendingEncryptedInitData.AddInitData(aInitDataType, aInitData);
+    return;
+  }
+
+  RefPtr<MediaEncryptedEvent> event;
+  if (IsCORSSameOrigin()) {
+    event = MediaEncryptedEvent::Constructor(this, aInitDataType, aInitData);
+  } else {
+    event = MediaEncryptedEvent::Constructor(this);
+  }
+
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
+    new AsyncEventDispatcher(this, event);
+  asyncDispatcher->PostDOMEvent();
+}
+
+bool
+HTMLMediaElement::IsEventAttributeName(nsIAtom* aName)
+{
+  return aName == nsGkAtoms::onencrypted ||
+         nsGenericHTMLElement::IsEventAttributeName(aName);
+}
+
+already_AddRefed<nsIPrincipal>
+HTMLMediaElement::GetTopLevelPrincipal()
+{
+  RefPtr<nsIPrincipal> principal;
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(OwnerDoc()->GetParentObject());
+  if (!window) {
+    return nullptr;
+  }
+  window = window->GetOuterWindow();
+  nsCOMPtr<nsPIDOMWindow> top = window->GetTop();
+  if (!top) {
+    return nullptr;
+  }
+  nsIDocument* doc = top->GetExtantDoc();
+  if (!doc) {
+    return nullptr;
+  }
+  principal = doc->NodePrincipal();
+  return principal.forget();
+}
+#endif // MOZ_EME
+
 NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
 {
-   MOZ_ASSERT(mAudioChannelAgent);
+  MOZ_ASSERT(mAudioChannelAgent);
 
   if (!OwnerDoc()->GetInnerWindow()) {
     return NS_OK;
