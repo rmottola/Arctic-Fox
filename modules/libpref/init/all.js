@@ -635,6 +635,8 @@ pref("apz.velocity_bias", "1.0");
 pref("apz.velocity_relevance_time_ms", 150);
 pref("apz.x_stationary_size_multiplier", "3.0");
 pref("apz.y_stationary_size_multiplier", "3.5");
+pref("apz.x_skate_highmem_adjust", "0.0");
+pref("apz.y_skate_highmem_adjust", "0.0");
 pref("apz.zoom_animation_duration_ms", 250);
 
 #ifdef XP_MACOSX
@@ -643,6 +645,8 @@ pref("apz.smooth_scroll_repaint_interval", 16);
 pref("apz.pan_repaint_interval", 16);
 pref("apz.x_skate_size_multiplier", "2.5");
 pref("apz.y_skate_size_multiplier", "3.5");
+pref("apz.x_skate_highmem_adjust", "1.0");
+pref("apz.y_skate_highmem_adjust", "2.5");
 #else
 pref("apz.fling_repaint_interval", 75);
 pref("apz.smooth_scroll_repaint_interval", 75);
