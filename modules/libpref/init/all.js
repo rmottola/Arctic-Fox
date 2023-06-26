@@ -645,8 +645,6 @@ pref("apz.smooth_scroll_repaint_interval", 16);
 pref("apz.pan_repaint_interval", 16);
 pref("apz.x_skate_size_multiplier", "2.5");
 pref("apz.y_skate_size_multiplier", "3.5");
-pref("apz.x_skate_highmem_adjust", "1.0");
-pref("apz.y_skate_highmem_adjust", "2.5");
 #else
 pref("apz.fling_repaint_interval", 75);
 pref("apz.smooth_scroll_repaint_interval", 75);
