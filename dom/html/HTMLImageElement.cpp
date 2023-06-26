@@ -1002,7 +1002,7 @@ HTMLImageElement::PictureSourceSrcsetChanged(nsIContent *aSourceNode,
     mResponsiveSelector->SetCandidatesFromSourceSet(aNewValue);
   }
 
-  if (!mInDocResponsiveContent) {
+  if (!mInDocResponsiveContent && IsInComposedDoc()) {
     nsIDocument* doc = GetOurOwnerDoc();
     if (doc) {
       doc->AddResponsiveContent(this);
