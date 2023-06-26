@@ -170,7 +170,6 @@ APZCTreeManager::UpdateHitTestingTree(CompositorParent* aCompositor,
       [&state] (HitTestingTreeNode* aNode)
       {
         state.mNodesToDestroy.AppendElement(aNode);
-        return TraversalFlag::Continue;
       });
   mRootNode = nullptr;
 
@@ -669,7 +668,6 @@ APZCTreeManager::FlushApzRepaints(uint64_t aLayersId)
               apzc->FlushRepaintIfPending();
             }
           }
-	  return TraversalFlag::Continue;
         });
   }
   const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(aLayersId);
@@ -1277,7 +1275,6 @@ APZCTreeManager::FlushRepaintsToClearScreenToGeckoTransform()
           MOZ_ASSERT(aNode->GetApzc());
           aNode->GetApzc()->FlushRepaintForNewInputBlock();
         }
-	return TraversalFlag::Continue;
       });
 }
 
@@ -1310,7 +1307,6 @@ APZCTreeManager::ClearTree()
       [&nodesToDestroy](HitTestingTreeNode* aNode)
       {
         nodesToDestroy.AppendElement(aNode);
-        return TraversalFlag::Continue;
       });
 
   for (size_t i = 0; i < nodesToDestroy.Length(); i++) {
