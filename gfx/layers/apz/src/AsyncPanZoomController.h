@@ -832,11 +832,6 @@ private:
 
   PanGestureBlockState* CurrentPanGestureBlock();
 
-  /* ===================================================================
-   * The functions and members in this section are used to manage
-   * pan gestures.
-   */
-
 private:
   /* ===================================================================
    * The functions and members in this section are used to manage
@@ -891,6 +886,8 @@ private:
 
   // Returns whether overscroll is allowed during an event.
   bool AllowScrollHandoffInCurrentBlock() const;
+
+  void AcknowledgeScrollUpdate() const;
 
   /* ===================================================================
    * The functions and members in this section are used to make ancestor chains
