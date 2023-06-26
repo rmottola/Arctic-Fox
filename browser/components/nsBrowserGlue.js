@@ -2465,7 +2465,7 @@ ContentPermissionPrompt.prototype = {
 
     var actions = [
       {
-        stringId: "webNotifications.alwaysShow",
+        stringId: "webNotifications.alwaysReceive",
         action: Ci.nsIPermissionManager.ALLOW_ACTION,
         expireType: null,
         callback: function() {},
