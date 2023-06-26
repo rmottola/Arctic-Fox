@@ -146,14 +146,22 @@ private:
 
 class TestAPZCTreeManager : public APZCTreeManager {
 public:
-  TestAPZCTreeManager() {}
+  explicit TestAPZCTreeManager(MockContentControllerDelayed* aMcc) : mcc(aMcc) {}
 
   RefPtr<InputQueue> GetInputQueue() const {
     return mInputQueue;
   }
 
 protected:
-  AsyncPanZoomController* MakeAPZCInstance(uint64_t aLayersId, GeckoContentController* aController) override;
+  AsyncPanZoomController* NewAPZCInstance(uint64_t aLayersId,
+                                          GeckoContentController* aController) override;
+
+  TimeStamp GetFrameTime() override {
+    return mcc->Time();
+  }
+
+private:
+  RefPtr<MockContentControllerDelayed> mcc;
 };
 
 class TestAsyncPanZoomController : public AsyncPanZoomController {
@@ -161,7 +169,8 @@ public:
   TestAsyncPanZoomController(uint64_t aLayersId, MockContentControllerDelayed* aMcc,
                              TestAPZCTreeManager* aTreeManager,
                              GestureBehavior aBehavior = DEFAULT_GESTURES)
-    : AsyncPanZoomController(aLayersId, aTreeManager, aTreeManager->GetInputQueue(), aMcc, aBehavior)
+    : AsyncPanZoomController(aLayersId, aTreeManager, aTreeManager->GetInputQueue(),
+        aMcc, aBehavior)
     , mWaitForMainThread(false)
     , mcc(aMcc)
   {}
@@ -237,10 +246,6 @@ public:
     mWaitForMainThread = true;
   }
 
-  TimeStamp GetFrameTime() const {
-    return mcc->Time();
-  }
-
   static TimeStamp GetStartupTime() {
     static TimeStamp sStartupTime = TimeStamp::Now();
     return sStartupTime;
@@ -252,7 +257,8 @@ private:
 };
 
 AsyncPanZoomController*
-TestAPZCTreeManager::MakeAPZCInstance(uint64_t aLayersId, GeckoContentController* aController)
+TestAPZCTreeManager::NewAPZCInstance(uint64_t aLayersId,
+                                     GeckoContentController* aController)
 {
   MockContentControllerDelayed* mcc = static_cast<MockContentControllerDelayed*>(aController);
   return new TestAsyncPanZoomController(aLayersId, mcc, this,
@@ -287,7 +293,7 @@ protected:
     APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mcc = new NiceMock<MockContentControllerDelayed>();
-    tm = new TestAPZCTreeManager();
+    tm = new TestAPZCTreeManager(mcc);
     apzc = new TestAsyncPanZoomController(0, mcc, tm, mGestureBehavior);
     apzc->SetFrameMetrics(TestFrameMetrics());
   }
@@ -418,7 +424,7 @@ CreatePinchGestureInput(PinchGestureInput::PinchGestureType aType,
 }
 
 template<class InputReceiver> static void
-SetDefaultAllowedTouchBehavior(const nsRefPtr<InputReceiver>& aTarget,
+SetDefaultAllowedTouchBehavior(const RefPtr<InputReceiver>& aTarget,
                                uint64_t aInputBlockId,
                                int touchPoints = 1)
 {
@@ -1866,7 +1872,7 @@ protected:
     APZThreadUtils::SetControllerThread(MessageLoop::current());
 
     mcc = new NiceMock<MockContentControllerDelayed>();
-    manager = new TestAPZCTreeManager();
+    manager = new TestAPZCTreeManager(mcc);
   }
 
   virtual void TearDown() {
@@ -3321,89 +3327,3 @@ public:
 private:
   TaskRunMetrics& mMetrics;
 };
-
-class APZTaskThrottlerTester : public ::testing::Test {
-public:
-  APZTaskThrottlerTester()
-  {
-    now = TimeStamp::Now();
-    throttler = MakeUnique<TaskThrottler>(now, TimeDuration::FromMilliseconds(100));
-  }
-
-protected:
-  TimeStamp Advance(int aMillis = 5)
-  {
-    now = now + TimeDuration::FromMilliseconds(aMillis);
-    return now;
-  }
-
-  UniquePtr<CancelableTask> NewTask()
-  {
-    return MakeUnique<MockTask>(metrics);
-  }
-
-  TimeStamp now;
-  UniquePtr<TaskThrottler> throttler;
-  TaskRunMetrics metrics;
-};
-
-TEST_F(APZTaskThrottlerTester, BasicTest) {
-  // Check that posting the first task runs right away
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 1
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-
-  // Check that posting the second task doesn't run until the first one is done
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 2
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  throttler->TaskComplete(Advance());                           // for task 1
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-  EXPECT_EQ(0, metrics.GetAndClearCancelCount());
-
-  // Check that tasks are coalesced: dispatch 5 tasks
-  // while there is still one outstanding, and ensure
-  // that only one of the 5 runs
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 3
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 4
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 5
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 6
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 7
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  EXPECT_EQ(4, metrics.GetAndClearCancelCount());
-
-  throttler->TaskComplete(Advance());                           // for task 2
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-  throttler->TaskComplete(Advance());                           // for task 7 (tasks 3..6 were cancelled)
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  EXPECT_EQ(0, metrics.GetAndClearCancelCount());
-}
-
-TEST_F(APZTaskThrottlerTester, TimeoutTest) {
-  // Check that posting the first task runs right away
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 1
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-
-  // Because we let 100ms pass, the second task should
-  // run immediately even though the first one isn't
-  // done yet
-  throttler->PostTask(FROM_HERE, NewTask(), Advance(100));      // task 2; task 1 is assumed lost
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-  throttler->TaskComplete(Advance());                           // for task 1, but TaskThrottler thinks it's for task 2
-  throttler->TaskComplete(Advance());                           // for task 2, TaskThrottler ignores it
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  EXPECT_EQ(0, metrics.GetAndClearCancelCount());
-
-  // This time queue up a few tasks before the timeout expires
-  // and ensure cancellation still works as expected
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 3
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 4
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 5
-  throttler->PostTask(FROM_HERE, NewTask(), Advance());         // task 6
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  throttler->PostTask(FROM_HERE, NewTask(), Advance(100));      // task 7; task 3 is assumed lost
-  EXPECT_EQ(1, metrics.GetAndClearRunCount());
-  EXPECT_EQ(3, metrics.GetAndClearCancelCount());               // tasks 4..6 should have been cancelled
-  throttler->TaskComplete(Advance());                           // for task 7
-  EXPECT_EQ(0, metrics.GetAndClearRunCount());
-  EXPECT_EQ(0, metrics.GetAndClearCancelCount());
-}
