@@ -3378,13 +3378,13 @@ void AsyncPanZoomController::ZoomToRect(CSSRect aRect) {
 }
 
 TouchBlockState*
-AsyncPanZoomController::CurrentTouchBlock()
+AsyncPanZoomController::CurrentTouchBlock() const
 {
   return GetInputQueue()->CurrentTouchBlock();
 }
 
 PanGestureBlockState*
-AsyncPanZoomController::CurrentPanGestureBlock()
+AsyncPanZoomController::CurrentPanGestureBlock() const
 {
   return GetInputQueue()->CurrentPanGestureBlock();
 }
@@ -3412,7 +3412,7 @@ AsyncPanZoomController::CancelAnimationAndGestureState()
 }
 
 bool
-AsyncPanZoomController::HasReadyTouchBlock()
+AsyncPanZoomController::HasReadyTouchBlock() const
 {
   return GetInputQueue()->HasReadyTouchBlock();
 }
