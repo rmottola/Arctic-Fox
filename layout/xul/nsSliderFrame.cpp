@@ -945,6 +945,10 @@ nsSliderFrame::StartAPZDrag()
                                IsHorizontal() ? AsyncDragMetrics::HORIZONTAL :
                                                 AsyncDragMetrics::VERTICAL);
 
+  if (!nsLayoutUtils::GetDisplayPort(scrollableContent)) {
+    return false;
+  }
+
   // When we start an APZ drag, we wont get mouse events for the drag.
   // APZ will consume them all and only notify us of the new scroll position.
   this->GetNearestWidget()->StartAsyncScrollbarDrag(dragMetrics);
