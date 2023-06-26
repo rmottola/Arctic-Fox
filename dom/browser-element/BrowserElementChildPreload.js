@@ -621,6 +621,7 @@ BrowserElementChild.prototype = {
     let handlers = {
       'icon': this._iconChangedHandler.bind(this),
       'apple-touch-icon': this._iconChangedHandler.bind(this),
+      'apple-touch-icon-precomposed': this._iconChangedHandler.bind(this),
       'search': this._openSearchHandler,
       'manifest': this._manifestChangedHandler
     };
