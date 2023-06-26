@@ -1011,6 +1011,10 @@ pref("apz.fling_curve_threshold_inches_per_ms", "0.01");
 pref("apz.fling_friction", "0.00238");
 pref("apz.max_velocity_inches_per_ms", "0.07");
 
+#ifdef MOZ_WIDGET_GONK
+pref("apz.touch_move_tolerance", "0.03");
+#endif
+
 // Tweak default displayport values to reduce the risk of running out of
 // memory when zooming in
 pref("apz.x_skate_size_multiplier", "1.25");
