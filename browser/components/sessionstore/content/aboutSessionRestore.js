@@ -222,11 +222,13 @@ function getBrowserWindow() {
 }
 
 function toggleRowChecked(aIx) {
+  function isChecked(aItem) {
+    return aItem.checked;
+  }
+
   var item = gTreeData[aIx];
   item.checked = !item.checked;
   treeView.treeBox.invalidateRow(aIx);
-
-  function isChecked(aItem) aItem.checked;
 
   if (treeView.isContainer(aIx)) {
     // (un)check all tabs of this window as well
