@@ -130,6 +130,7 @@ private:
   // Monitor protecting members below accessed from multiple threads.
   Monitor mMonitor;
   media::TimeUnit mNextRandomAccessPoint;
+  Maybe<media::TimeUnit> mLastSeek;
 };
 
 } // namespace mozilla
