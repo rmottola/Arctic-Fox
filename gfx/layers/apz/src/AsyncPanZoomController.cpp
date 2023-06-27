@@ -915,7 +915,7 @@ AsyncPanZoomController::Destroy()
 {
   APZThreadUtils::AssertOnCompositorThread();
 
-  CancelAnimation();
+  CancelAnimation(CancelAnimationFlags::RequestSnap);
 
   { // scope the lock
     MonitorAutoLock lock(mRefPtrMonitor);
@@ -1550,6 +1550,10 @@ nsEventStatus AsyncPanZoomController::OnScaleEnd(const PinchGestureInput& aEvent
     } else {
       ClearOverscroll();
     }
+    // Along with clearing the overscroll, we also want to snap to the nearest
+    // snap point as appropriate, so ask the main thread (which knows about such
+    // things) to handle it.
+    RequestSnap();
 
     ScheduleComposite();
     RequestContentRepaint();
@@ -2592,6 +2596,11 @@ void AsyncPanZoomController::CancelAnimation(CancelAnimationFlags aFlags) {
     ClearOverscroll();
     repaint = true;
   }
+  // Similar to relieving overscroll, we also need to snap to any snap points
+  // if appropriate, so ask the main thread to do that.
+  if (aFlags & CancelAnimationFlags::RequestSnap) {
+    RequestSnap();
+  }
   if (repaint) {
     RequestContentRepaint();
     ScheduleComposite();
@@ -3430,7 +3439,7 @@ AsyncPanZoomController::CancelAnimationAndGestureState()
 {
   mX.CancelGesture();
   mY.CancelGesture();
-  CancelAnimation();
+  CancelAnimation(CancelAnimationFlags::RequestSnap);
 }
 
 bool
