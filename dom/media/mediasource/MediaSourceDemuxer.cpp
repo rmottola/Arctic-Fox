@@ -27,8 +27,8 @@ MediaSourceDemuxer::MediaSourceDemuxer()
   MOZ_ASSERT(NS_IsMainThread());
 }
 
-// Gap allowed between frames. Due to inaccuracies in determining buffer end
-// frames (see Mozilla bug 1065207). This value is based on the end of frame
+// Due to inaccuracies in determining buffer end
+// frames (Bug 1065207). This value is based on the end of frame
 // default value used in Blink, kDefaultBufferDurationInMs.
 const TimeUnit MediaSourceDemuxer::EOS_FUZZ = media::TimeUnit::FromMicroseconds(125000);
 
