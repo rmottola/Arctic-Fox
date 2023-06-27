@@ -1244,6 +1244,7 @@ MediaFormatReader::Flush(TrackType aTrack)
 
   auto& decoder = GetDecoderData(aTrack);
   if (!decoder.mDecoder) {
+    decoder.ResetState();
     return;
   }
 
