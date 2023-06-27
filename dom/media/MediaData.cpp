@@ -476,9 +476,9 @@ VideoData::Create(const VideoInfo& aInfo,
 
 MediaRawData::MediaRawData()
   : MediaData(RAW_DATA, 0)
+  , mCrypto(mCryptoInternal)
   , mData(nullptr)
   , mSize(0)
-  , mCrypto(mCryptoInternal)
   , mBuffer(nullptr)
   , mCapacity(0)
 {
@@ -486,15 +486,17 @@ MediaRawData::MediaRawData()
 
 MediaRawData::MediaRawData(const uint8_t* aData, size_t aSize)
   : MediaData(RAW_DATA, 0)
+  , mCrypto(mCryptoInternal)
   , mData(nullptr)
   , mSize(0)
-  , mCrypto(mCryptoInternal)
   , mBuffer(nullptr)
   , mCapacity(0)
 {
   if (!EnsureCapacity(aSize)) {
     return;
   }
+
+  // We ensure sufficient capacity above so this shouldn't fail.
   memcpy(mData, aData, aSize);
   mSize = aSize;
 }
@@ -515,6 +517,7 @@ MediaRawData::Clone() const
     if (!s->EnsureCapacity(mSize)) {
       return nullptr;
     }
+
     memcpy(s->mData, mData, mSize);
     s->mSize = mSize;
   }
@@ -535,6 +538,7 @@ MediaRawData::EnsureCapacity(size_t aSize)
   if (!newBuffer) {
     return false;
   }
+
   // Find alignment address.
   const uintptr_t alignmask = RAW_DATA_ALIGNMENT;
   uint8_t* newData = reinterpret_cast<uint8_t*>(
@@ -557,7 +561,6 @@ size_t
 MediaRawData::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
 {
   size_t size = aMallocSizeOf(this);
-
   size += aMallocSizeOf(mBuffer.get());
   return size;
 }
@@ -592,6 +595,7 @@ MediaRawDataWriter::SetSize(size_t aSize)
   if (aSize > mTarget->mSize && !EnsureSize(aSize)) {
     return false;
   }
+
   mTarget->mSize = aSize;
   return true;
 }
@@ -619,6 +623,7 @@ MediaRawDataWriter::Replace(const uint8_t* aData, size_t aSize)
   if (!EnsureSize(aSize)) {
     return false;
   }
+
   memcpy(mTarget->mData, aData, aSize);
   mTarget->mSize = aSize;
   return true;
