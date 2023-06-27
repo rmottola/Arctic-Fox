@@ -17,12 +17,14 @@ runWithMSE(function(ms, el) {
     ok(true, "Receive a sourceopen event");
     var audiosb = ms.addSourceBuffer("audio/mp4");
     var videosb = ms.addSourceBuffer("video/mp4");
+    // ensure tracks end at approximately the same time to ensure ended event is
+    // always fired (bug 1233639).
+    audiosb.appendWindowEnd = 3.9;
+    videosb.appendWindowEnd = 3.9;
     fetchAndLoad(audiosb, 'bipbop/bipbop_audio', ['init'], '.mp4')
-    .then(fetchAndLoad.bind(null, audiosb, 'bipbop/bipbop_audio', range(1, 5), '.m4s'))
-    .then(fetchAndLoad.bind(null, audiosb, 'bipbop/bipbop_audio', range(6, 12), '.m4s'))
     .then(fetchAndLoad.bind(null, videosb, 'bipbop/bipbop_video', ['init'], '.mp4'))
+    .then(fetchAndLoad.bind(null, audiosb, 'bipbop/bipbop_audio', range(1, 5), '.m4s'))
     .then(fetchAndLoad.bind(null, videosb, 'bipbop/bipbop_video', range(1, 6), '.m4s'))
-    .then(fetchAndLoad.bind(null, videosb, 'bipbop/bipbop_video', range(7, 14), '.m4s'))
     .then(function() {
       // HTMLMediaElement fires 'waiting' if somebody invokes |play()| before the MDSM
       // has notified it of available data. Make sure that we get 'playing' before
@@ -37,23 +39,12 @@ runWithMSE(function(ms, el) {
       el.play();
       return p;
     }).then(function() {
-      // currentTime is based on the current video frame, so if the audio ends just before
-      // the next video frame, currentTime can be up to 1 frame's worth earlier than
-      // min(audioEnd, videoEnd).
-      // 0.0465 is the length of the last audio frame.
-      ok(el.currentTime >= (Math.min(audiosb.buffered.end(0), videosb.buffered.end(0)) - 0.0465),
-         "Got a waiting event at " + el.currentTime);
-      info("Loading more data");
       var p = once(el, 'ended');
-      var loads = Promise.all([fetchAndLoad(audiosb, 'bipbop/bipbop_audio', [5], '.m4s'),
-                               fetchAndLoad(videosb, 'bipbop/bipbop_video', [6], '.m4s')]);
-      loads.then(() => ms.endOfStream());
+      ms.endOfStream();
       return p;
     }).then(function() {
-      // These fuzz factors are bigger than they should be. We should investigate
-      // and fix them in bug 1137574.
-      isfuzzy(el.duration, 10.1, 0.1, "Video has correct duration: " + el.duration);
-      isfuzzy(el.currentTime, el.duration, 0.1, "Video has correct currentTime.");
+      is(el.duration, 3.854512, "Video has correct duration: " + el.duration);
+      is(el.currentTime, el.duration, "Video has correct currentTime.");
       SimpleTest.finish();
     });
   });
