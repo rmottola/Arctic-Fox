@@ -35,7 +35,6 @@ static mozilla::LazyLogModule sFormatDecoderLog("MediaFormatReader");
 
 namespace mozilla {
 
-#ifdef PR_LOGGING
 static const char*
 TrackTypeToStr(TrackInfo::TrackType aTrack)
 {
@@ -53,7 +52,6 @@ TrackTypeToStr(TrackInfo::TrackType aTrack)
     return "Unknown";
   }
 }
-#endif
 
 MediaFormatReader::MediaFormatReader(AbstractMediaDecoder* aDecoder,
                                      MediaDataDemuxer* aDemuxer,
