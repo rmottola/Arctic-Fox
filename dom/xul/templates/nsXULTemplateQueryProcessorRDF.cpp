@@ -382,8 +382,6 @@ nsXULTemplateQueryProcessorRDF::CompileQuery(nsIXULTemplateBuilder* aBuilder,
     query->SetQueryNode(aQueryNode);
 
     nsInstantiationNode* instnode = new nsInstantiationNode(this, query);
-    if (!instnode)
-        return NS_ERROR_OUT_OF_MEMORY;
 
     // this and other functions always add nodes to mAllTests first. That
     // way if something fails, the node will just sit harmlessly in mAllTests
@@ -481,8 +479,6 @@ nsXULTemplateQueryProcessorRDF::GenerateResults(nsISupports* aDatasource,
                 seed.AddAssignment(query->mRefVariable, refResource);
 
                 InstantiationSet* instantiations = new InstantiationSet();
-                if (!instantiations)
-                    return NS_ERROR_OUT_OF_MEMORY;
                 instantiations->Append(seed);
 
                 // if the propagation caused a match, then the results will be
@@ -506,8 +502,6 @@ nsXULTemplateQueryProcessorRDF::GenerateResults(nsISupports* aDatasource,
     if (! results) {
         // no results were found so create an empty set
         results = new nsXULTemplateResultSetRDF(this, query, nullptr);
-        if (! results)
-            return NS_ERROR_OUT_OF_MEMORY;
     }
 
     results.swap(*aResults);
@@ -892,8 +886,6 @@ nsXULTemplateQueryProcessorRDF::Propagate(nsIRDFResource* aSource,
             rdftestnode->CanPropagate(aSource, aProperty, aTarget, seed);
 
             InstantiationSet* instantiations = new InstantiationSet();
-            if (!instantiations)
-                return NS_ERROR_OUT_OF_MEMORY;
             instantiations->Append(seed);
 
             rv = rdftestnode->Constrain(*instantiations);
@@ -1165,11 +1157,8 @@ nsXULTemplateQueryProcessorRDF::CompileExtendedQuery(nsRDFQuery* aQuery,
                                                      TestNode** aLastNode)
 {
     // Compile an extended query's children
-
     nsContentTestNode* idnode =
         new nsContentTestNode(this, aQuery->mRefVariable);
-    if (! idnode)
-        return NS_ERROR_OUT_OF_MEMORY;
 
     aQuery->SetRoot(idnode);
     nsresult rv = mAllTests.Add(idnode);
@@ -1372,11 +1361,9 @@ nsXULTemplateQueryProcessorRDF::CompileTripleCondition(nsRDFQuery* aQuery,
         return NS_OK;
     }
 
-    if (! testnode)
-        return NS_ERROR_OUT_OF_MEMORY;
-
     // add testnode to mAllTests first. If adding to mRDFTests fails, just
     // leave it in the list so that it can be deleted later.
+    MOZ_ASSERT(testnode);
     nsresult rv = mAllTests.Add(testnode);
     if (NS_FAILED(rv)) {
         delete testnode;
@@ -1430,9 +1417,6 @@ nsXULTemplateQueryProcessorRDF::CompileMemberCondition(nsRDFQuery* aQuery,
                                    containervar,
                                    childvar);
 
-    if (! testnode)
-        return NS_ERROR_OUT_OF_MEMORY;
-
     // add testnode to mAllTests first. If adding to mRDFTests fails, just
     // leave it in the list so that it can be deleted later.
     nsresult rv = mAllTests.Add(testnode);
@@ -1457,8 +1441,6 @@ nsXULTemplateQueryProcessorRDF::AddDefaultSimpleRules(nsRDFQuery* aQuery,
     nsContentTestNode* idnode =
         new nsContentTestNode(this,
                               aQuery->mRefVariable);
-    if (! idnode)
-        return NS_ERROR_OUT_OF_MEMORY;
 
     // Create (?container ^member ?member)
     nsRDFConMemberTestNode* membernode =
@@ -1466,11 +1448,6 @@ nsXULTemplateQueryProcessorRDF::AddDefaultSimpleRules(nsRDFQuery* aQuery,
                                    this,
                                    aQuery->mRefVariable,
                                    aQuery->mMemberVariable);
-
-    if (! membernode) {
-        delete idnode;
-        return NS_ERROR_OUT_OF_MEMORY;
-    }
 
     // add nodes to mAllTests first. If later calls fail, just leave them in
     // the list so that they can be deleted later.
@@ -1580,9 +1557,6 @@ nsXULTemplateQueryProcessorRDF::CompileSimpleQuery(nsRDFQuery* aQuery,
                                                     iscontainer,
                                                     isempty);
 
-            if (! testnode)
-                return NS_ERROR_OUT_OF_MEMORY;
-
             rv = mAllTests.Add(testnode);
             if (NS_FAILED(rv)) {
                 delete testnode;
@@ -1620,9 +1594,6 @@ nsXULTemplateQueryProcessorRDF::CompileSimpleQuery(nsRDFQuery* aQuery,
 
             testnode = new nsRDFPropertyTestNode(prevnode, this,
                                                  aQuery->mMemberVariable, property, target);
-            if (! testnode)
-                return NS_ERROR_OUT_OF_MEMORY;
-
             rv = mAllTests.Add(testnode);
             if (NS_FAILED(rv)) {
                 delete testnode;
@@ -1702,9 +1673,6 @@ nsXULTemplateQueryProcessorRDF::AddMemoryElements(const Instantiation& aInst,
         nsCOMArray<nsXULTemplateResultRDF>* arr;
         if (!mMemoryElementToResultMap.Get(hash, &arr)) {
             arr = new nsCOMArray<nsXULTemplateResultRDF>();
-            if (!arr)
-                return NS_ERROR_OUT_OF_MEMORY;
-
             mMemoryElementToResultMap.Put(hash, arr);
         }
 
