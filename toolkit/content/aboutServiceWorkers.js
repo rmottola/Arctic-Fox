@@ -4,7 +4,7 @@
 
 'use strict';
 
-const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
@@ -15,8 +15,8 @@ const bundle = Services.strings.createBundle(
 const brandBundle = Services.strings.createBundle(
   "chrome://branding/locale/brand.properties");
 
-let gSWM;
-let gSWCount = 0;
+var gSWM;
+var gSWCount = 0;
 
 function init() {
   let enabled = Services.prefs.getBoolPref("dom.serviceWorkers.enabled");
@@ -119,9 +119,9 @@ function display(info, pushNotificationService) {
   let currentWorkerURL = info.activeWorker ? info.activeWorker.scriptSpec : "";
   createItem(bundle.GetStringFromName('currentWorkerURL'), currentWorkerURL, true);
   let activeCacheName = info.activeWorker ? info.activeWorker.cacheName : "";
-  createItem(bundle.GetStringFromName('activeCacheName'), info.activeCacheName);
+  createItem(bundle.GetStringFromName('activeCacheName'), activeCacheName);
   let waitingCacheName = info.waitingWorker ? info.waitingWorker.cacheName : "";
-  createItem(bundle.GetStringFromName('waitingCacheName'), info.waitingCacheName);
+  createItem(bundle.GetStringFromName('waitingCacheName'), waitingCacheName);
 
   let pushItem = createItem(bundle.GetStringFromName('pushEndpoint'), bundle.GetStringFromName('waiting'));
   if (pushNotificationService) {
