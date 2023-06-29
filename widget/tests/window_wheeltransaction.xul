@@ -1026,6 +1026,7 @@ function initElements()
   resetScrollPosition(gSubView1);
   resetScrollPosition(gSubView2);
   resetScrollPosition(gSubView3);
+  _getDOMWindowUtils(window).advanceTimeAndRefresh(0);
 
   runNextTestStep();
 }
