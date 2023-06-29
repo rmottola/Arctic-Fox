@@ -6107,10 +6107,16 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
           nsCSSProps::LookupProperty(buffer,
                                      nsCSSProps::eEnabledForAllContent);
         if (prop != eCSSProperty_UNKNOWN &&
-            nsCSSProps::PropHasFlags(prop,
-                                     CSS_PROPERTY_CREATES_STACKING_CONTEXT))
-        {
-          display->mWillChangeBitField |= NS_STYLE_WILL_CHANGE_STACKING_CONTEXT;
+            prop != eCSSPropertyExtra_variable) {
+          if (nsCSSProps::PropHasFlags(prop,
+                CSS_PROPERTY_CREATES_STACKING_CONTEXT)) {
+            display->mWillChangeBitField |=
+              NS_STYLE_WILL_CHANGE_STACKING_CONTEXT;
+          }
+          if (nsCSSProps::PropHasFlags(prop, CSS_PROPERTY_FIXPOS_CB)) {
+            display->mWillChangeBitField |=
+              NS_STYLE_WILL_CHANGE_FIXPOS_CB;
+          }
         }
       }
     }
