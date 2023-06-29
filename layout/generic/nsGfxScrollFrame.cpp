@@ -2092,6 +2092,12 @@ ScrollFrameHelper::ScrollToWithOrigin(nsPoint aScrollPosition,
 
   nsRect range = aRange ? *aRange : nsRect(aScrollPosition, nsSize(0, 0));
 
+  if (aMode != nsIScrollableFrame::SMOOTH_MSD) {
+    // If we get a non-smooth-scroll, reset the cached APZ scroll destination,
+    // so that we know to process the next smooth-scroll destined for APZ.
+    mApzSmoothScrollDestination = Nothing();
+  }
+
   if (aMode == nsIScrollableFrame::INSTANT) {
     // Asynchronous scrolling is not allowed, so we'll kill any existing
     // async-scrolling process and do an instant scroll.
@@ -2121,10 +2127,31 @@ ScrollFrameHelper::ScrollToWithOrigin(nsPoint aScrollPosition,
         }
 
         if (nsLayoutUtils::AsyncPanZoomEnabled(mOuter)) {
+          if (mApzSmoothScrollDestination == Some(mDestination) &&
+              mScrollGeneration == sScrollGenerationCounter) {
+            // If we already sent APZ a smooth-scroll request to this
+            // destination with this generation (i.e. it was the last request
+            // we sent), then don't send another one because it is redundant.
+            // This is to avoid a scenario where pages do repeated scrollBy
+            // calls, incrementing the generation counter, and blocking APZ from
+            // syncing the scroll offset back to the main thread.
+            // Note that if we get two smooth-scroll requests to the same
+            // destination with some other scroll in between,
+            // mApzSmoothScrollDestination will get reset to Nothing() and so
+            // we shouldn't have the problem where this check discards a
+            // legitimate smooth-scroll.
+            // Note: if there are two separate scrollframes both getting smooth
+            // scrolled at the same time, sScrollGenerationCounter can get
+            // incremented and this early-exit won't get taken. Bug 1231177 is
+            // on file for this.
+            return;
+          }
+
           // The animation will be handled in the compositor, pass the
           // information needed to start the animation and skip the main-thread
           // animation for this scroll.
           mLastSmoothScrollOrigin = aOrigin;
+          mApzSmoothScrollDestination = Some(mDestination);
           mScrollGeneration = ++sScrollGenerationCounter;
 
           if (!nsLayoutUtils::GetDisplayPort(mOuter->GetContent())) {
@@ -4187,18 +4214,30 @@ void ScrollFrameHelper::CurPosAttributeChanged(nsIContent* aContent)
 
 /* ============= Scroll events ========== */
 
-NS_IMETHODIMP
-ScrollFrameHelper::ScrollEvent::Run()
+ScrollFrameHelper::ScrollEvent::ScrollEvent(ScrollFrameHelper* aHelper)
+  : mHelper(aHelper)
 {
-  if (mHelper)
-    mHelper->FireScrollEvent();
-  return NS_OK;
+  mDriver = mHelper->mOuter->PresContext()->RefreshDriver();
+  mDriver->AddRefreshObserver(this, Flush_Style);
+}
+
+ScrollFrameHelper::ScrollEvent::~ScrollEvent()
+{
+  mDriver->RemoveRefreshObserver(this, Flush_Style);
+  mDriver = nullptr;
+}
+
+void
+ScrollFrameHelper::ScrollEvent::WillRefresh(mozilla::TimeStamp aTime)
+{
+  mHelper->FireScrollEvent();
 }
 
 void
 ScrollFrameHelper::FireScrollEvent()
 {
-  mScrollEvent.Forget();
+  MOZ_ASSERT(mScrollEvent);
+  mScrollEvent = nullptr;
 
   ActiveLayerTracker::SetCurrentScrollHandlerFrame(mOuter);
   WidgetGUIEvent event(true, eScroll, nullptr);
@@ -4224,14 +4263,11 @@ ScrollFrameHelper::FireScrollEvent()
 void
 ScrollFrameHelper::PostScrollEvent()
 {
-  if (mScrollEvent.IsPending())
+  if (mScrollEvent)
     return;
 
-  nsRootPresContext* rpc = mOuter->PresContext()->GetRootPresContext();
-  if (!rpc)
-    return;
+  // The ScrollEvent constructor registers itself with the refresh driver.
   mScrollEvent = new ScrollEvent(this);
-  rpc->AddWillPaintObserver(mScrollEvent.get());
 }
 
 NS_IMETHODIMP
