@@ -1260,6 +1260,14 @@
 
             this.tabContainer._setPositionalAttributes();
 
+            if (!gMultiProcessBrowser) {
+              let event = new CustomEvent("TabSwitchDone", {
+                bubbles: true,
+                cancelable: true
+              });
+              this.dispatchEvent(event);
+            }
+
             if (!aForceUpdate)
               TelemetryStopwatch.finish("FX_TAB_SWITCH_UPDATE_MS");
           ]]>
@@ -1301,6 +1309,7 @@
             return;
           }
         }
+
         // Focus the find bar if it was previously focused for that tab.
         if (gFindBarInitialized && !gFindBar.hidden &&
             this.selectedTab._findBarFocused) {
@@ -1314,11 +1323,13 @@
             document.activeElement != document.documentElement)
           return;
 
-	// We're now committed to focusing the content area.
-	let fm = Services.focus;
+        // We're now committed to focusing the content area.
+        let fm = Services.focus;
         let focusFlags = fm.FLAG_NOSCROLL;
+
         if (!gMultiProcessBrowser) {
           let newFocusedElement = fm.getFocusedElementForWindow(window.content, true, {});
+
           // for anchors, use FLAG_SHOWRING so that it is clear what link was
           // last clicked when switching back to that tab
           if (newFocusedElement &&
@@ -1326,20 +1337,25 @@
                newFocusedElement.getAttributeNS("http://www.w3.org/1999/xlink", "type") == "simple"))
             focusFlags |= fm.FLAG_SHOWRING;
         }
+
         fm.setFocus(newBrowser, focusFlags);
         ]]></body>
       </method>
 
       <method name="_tabAttrModified">
         <parameter name="aTab"/>
+        <parameter name="aChanged"/>
         <body><![CDATA[
           if (aTab.closing)
             return;
 
-          // This event should be dispatched when any of these attributes change:
-          // label, crop, busy, image, selected
-          var event = document.createEvent("Events");
-          event.initEvent("TabAttrModified", true, false);
+          let event = new CustomEvent("TabAttrModified", {
+            bubbles: true,
+            cancelable: false,
+            detail: {
+              changed: aChanged,
+            }
+          });
           aTab.dispatchEvent(event);
         ]]></body>
       </method>
@@ -1350,7 +1366,7 @@
           <![CDATA[
             aTab.label = this.mStringBundle.getString("tabs.connecting");
             aTab.crop = "end";
-            this._tabAttrModified(aTab);
+            this._tabAttrModified(aTab, ["label", "crop"]);
           ]]>
         </body>
       </method>
@@ -1395,7 +1411,7 @@
 
             aTab.label = title;
             aTab.crop = crop;
-            this._tabAttrModified(aTab);
+            this._tabAttrModified(aTab, ["label", "crop"]);
 
             if (aTab.selected)
               this.updateTitlebar();
@@ -4347,6 +4363,10 @@
           if (gMultiProcessBrowser) {
             messageManager.removeMessageListener("DOMTitleChanged", this);
             messageManager.removeMessageListener("contextmenu", this);
+
+            if (this._switcher) {
+              this._switcher.destroy();
+            }
           }
         ]]>
       </destructor>
@@ -6489,6 +6509,47 @@
     </implementation>
   </binding>
 
+  <binding id="tabbrowser-tabpanels"
+           extends="chrome://global/content/bindings/tabbox.xml#tabpanels">
+    <implementation>
+      <field name="_selectedIndex">0</field>
+
+      <property name="selectedIndex">
+        <getter>
+        <![CDATA[
+          return this._selectedIndex;
+        ]]>
+        </getter>
+
+        <setter>
+        <![CDATA[
+          if (val < 0 || val >= this.childNodes.length)
+            return val;
+
+          let toTab = this.getRelatedElement(this.childNodes[val]);
+          let fromTab = this._selectedPanel ? this.getRelatedElement(this._selectedPanel)
+                                            : null;
+
+          gBrowser._getSwitcher().requestTab(toTab);
+
+          var panel = this._selectedPanel;
+          var newPanel = this.childNodes[val];
+          this._selectedPanel = newPanel;
+          if (this._selectedPanel != panel) {
+            var event = document.createEvent("Events");
+            event.initEvent("select", true, true);
+            this.dispatchEvent(event);
+
+            this._selectedIndex = val;
+          }
+
+          return val;
+        ]]>
+        </setter>
+      </property>
+    </implementation>
+  </binding>
+
   <binding id="tabbrowser-browser"
            extends="chrome://global/content/bindings/browser.xml#browser">
     <implementation>
@@ -6546,48 +6607,6 @@
           ]]>
         </body>
       </method>
-    </implementation>
-  </binding>
-
-  <binding id="tabbrowser-tabpanels"
-           extends="chrome://global/content/bindings/tabbox.xml#tabpanels">
-    <implementation>
-      <field name="_selectedIndex">0</field>
-
-      <property name="selectedIndex">
-        <getter>
-        <![CDATA[
-          return this._selectedIndex;
-        ]]>
-        </getter>
-
-        <setter>
-        <![CDATA[
-          if (val < 0 || val >= this.childNodes.length)
-            return val;
-
-          let toTab = this.getRelatedElement(this.childNodes[val]);
-          let fromTab = this._selectedPanel ? this.getRelatedElement(this._selectedPanel)
-                                            : null;
-
-          gBrowser._getSwitcher().requestTab(toTab);
-
-          var panel = this._selectedPanel;
-          this._selectedPanel = this.childNodes[val];
-          if (this._selectedPanel != panel) {
-            var event = document.createEvent("Events");
-            event.initEvent("select", true, true);
-	    event.fromTab = fromTab;
-	    event.toTab = toTab;
-            this.dispatchEvent(event);
-
-            this._selectedIndex = val;
-          }
-
-          return val;
-        ]]>
-        </setter>
-      </property>
     </implementation>
   </binding>
 
