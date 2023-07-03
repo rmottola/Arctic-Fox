@@ -347,12 +347,12 @@ MediaDocument::LinkStylesheet(const nsAString& aStylesheet)
 nsresult
 MediaDocument::LinkScript(const nsAString& aScript)
 {
-  nsRefPtr<mozilla::dom::NodeInfo> nodeInfo;
+  RefPtr<mozilla::dom::NodeInfo> nodeInfo;
   nodeInfo = mNodeInfoManager->GetNodeInfo(nsGkAtoms::script, nullptr,
                                            kNameSpaceID_XHTML,
                                            nsIDOMNode::ELEMENT_NODE);
 
-  nsRefPtr<nsGenericHTMLElement> script = NS_NewHTMLScriptElement(nodeInfo.forget());
+  RefPtr<nsGenericHTMLElement> script = NS_NewHTMLScriptElement(nodeInfo.forget());
   NS_ENSURE_TRUE(script, NS_ERROR_OUT_OF_MEMORY);
 
   script->SetAttr(kNameSpaceID_None, nsGkAtoms::type,
