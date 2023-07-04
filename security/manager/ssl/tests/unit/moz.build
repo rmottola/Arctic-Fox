@@ -6,14 +6,16 @@
 
 DIRS += ['tlsserver']
 TEST_DIRS += [
-    'test_cert_eku',
+    'bad_certs',
+    'ocsp_certs',
     'test_cert_eku',
     'test_cert_keyUsage',
     'test_cert_sha1',
     'test_cert_trust',
     'test_ev_certs',
-    'test_keysize_ev',
     'test_intermediate_basic_usage_constraints',
+    'test_keysize_ev',
+    'test_onecrl',
     'test_validity',
 ]
 
