@@ -80,20 +80,20 @@ var data = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
 stream.write(data, data.length);
 stream.close();
 
-let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+var registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
 const XULAPPINFO_CONTRACTID = "@mozilla.org/xre/app-info;1";
 const XULAPPINFO_CID = Components.ID("{c763b610-9d49-455a-bbd2-ede71682a1ac}");
 registrar.registerFactory(XULAPPINFO_CID, "XULAppInfo",
                           XULAPPINFO_CONTRACTID, XULAppInfoFactory);
 
-let revocations = profile.clone();
+var revocations = profile.clone();
 revocations.append("revocations.txt");
 if (!revocations.exists()) {
   let existing = do_get_file("test_onecrl/sample_revocations.txt", false);
   existing.copyTo(profile,"revocations.txt");
 }
 
-let certDB = Cc["@mozilla.org/security/x509certdb;1"]
+var certDB = Cc["@mozilla.org/security/x509certdb;1"]
                .getService(Ci.nsIX509CertDB);
 
 // set up a test server to serve the blocklist.xml
