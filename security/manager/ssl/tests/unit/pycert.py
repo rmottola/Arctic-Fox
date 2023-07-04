@@ -34,6 +34,7 @@ authorityInformationAccess:<OCSP URI>
 certificatePolicies:<policy OID>
 nameConstraints:{permitted,excluded}:[<dNSName|directoryName>,...]
 nsCertType:sslServer
+TLSFeature:[<TLSFeature>,...]
 
 Where:
   [] indicates an optional field or component of a field
@@ -464,6 +465,8 @@ class Certificate(object):
             self.addNameConstraints(value, critical)
         elif extensionType == 'nsCertType':
             self.addNSCertType(value, critical)
+        elif extensionType == 'TLSFeature':
+            self.addTLSFeature(value, critical)
         else:
             raise UnknownExtensionTypeError(extensionType)
 
@@ -592,17 +595,25 @@ class Certificate(object):
         if certType != 'sslServer':
             raise UnknownNSCertTypeError(certType)
         self.addExtension(univ.ObjectIdentifier('2.16.840.1.113730.1.1'), univ.BitString("'01'B"),
-            critical)
+                          critical)
 
-    def addCertificatePolicies(self, policyOID):
-        policies = rfc2459.CertificatePolicies()
-        policy = rfc2459.PolicyInformation()
-        if policyOID == 'any':
-            policyOID = '2.5.29.32.0'
-        policyIdentifier = rfc2459.CertPolicyId(policyOID)
-        policy.setComponentByName('policyIdentifier', policyIdentifier)
-        policies.setComponentByPosition(0, policy)
-        self.addExtension(rfc2459.id_ce_certificatePolicies, policies)
+    def addTLSFeature(self, features, critical):
+        namedFeatures = {'OCSPMustStaple': 5}
+        featureList = [f.strip() for f in features.split(',')]
+        sequence = univ.Sequence()
+        for feature in featureList:
+            featureValue = 0
+            try:
+                featureValue = int(feature)
+            except ValueError:
+                try:
+                    featureValue = namedFeatures[feature]
+                except:
+                    raise UnknownTLSFeature(feature)
+            sequence.setComponentByPosition(len(sequence),
+                                            univ.Integer(featureValue))
+        self.addExtension(univ.ObjectIdentifier('1.3.6.1.5.5.7.1.24'), sequence,
+                          critical)
 
     def getVersion(self):
         return rfc2459.Version(self.versionValue).subtype(
