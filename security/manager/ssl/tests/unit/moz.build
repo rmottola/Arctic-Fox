@@ -18,6 +18,7 @@ TEST_DIRS += [
     'test_intermediate_basic_usage_constraints',
     'test_keysize_ev',
     'test_onecrl',
+    'test_pinning_dynamic',
     'test_validity',
 ]
 
