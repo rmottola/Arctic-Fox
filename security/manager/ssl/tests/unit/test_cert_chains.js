@@ -20,9 +20,15 @@ function test_cert_equals() {
   let certB = constructCertFromFile("tlsserver/default-ee.pem");
   let certC = constructCertFromFile("tlsserver/expired-ee.pem");
 
-  do_check_false(certA == certB);
-  do_check_true(certA.equals(certB));
-  do_check_false(certA.equals(certC));
+  ok(certA != certB,
+     "Cert objects constructed from the same file should not be equal" +
+     " according to the equality operators");
+  ok(certA.equals(certB),
+     "equals() on cert objects constructed from the same cert file should" +
+     " return true");
+  ok(!certA.equals(certC),
+     "equals() on cert objects constructed from files for different certs" +
+     " should return false");
 }
 
 function test_bad_cert_list_serialization() {
@@ -59,7 +65,8 @@ function test_cert_list_serialization() {
   // Deserialize from the string and compare to the original object
   let deserialized = serHelper.deserializeObject(serialized);
   deserialized.QueryInterface(Ci.nsIX509CertList);
-  do_check_true(certList.equals(deserialized));
+  ok(certList.equals(deserialized),
+     "Deserialized cert list should equal the original");
 }
 
 function test_security_info_serialization(securityInfo, expectedErrorCode) {
@@ -71,10 +78,14 @@ function test_security_info_serialization(securityInfo, expectedErrorCode) {
   // Deserialize from the string and compare to the original object
   let deserialized = serHelper.deserializeObject(serialized);
   deserialized.QueryInterface(Ci.nsITransportSecurityInfo);
-  do_check_eq(securityInfo.securityState, deserialized.securityState);
-  do_check_eq(securityInfo.errorMessage, deserialized.errorMessage);
-  do_check_eq(securityInfo.errorCode, expectedErrorCode);
-  do_check_eq(deserialized.errorCode, expectedErrorCode);
+  equal(securityInfo.securityState, deserialized.securityState,
+        "Original and deserialized security state should match");
+  equal(securityInfo.errorMessage, deserialized.errorMessage,
+        "Original and deserialized error message should match");
+  equal(securityInfo.errorCode, expectedErrorCode,
+        "Original and expected error code should match");
+  equal(deserialized.errorCode, expectedErrorCode,
+        "Deserialized and expected error code should match");
 }
 
 function run_test() {
@@ -105,7 +116,8 @@ function run_test() {
     function withSecurityInfo(aTransportSecurityInfo) {
       aTransportSecurityInfo.QueryInterface(Ci.nsITransportSecurityInfo);
       test_security_info_serialization(aTransportSecurityInfo, 0);
-      do_check_eq(aTransportSecurityInfo.failedCertChain, null);
+      equal(aTransportSecurityInfo.failedCertChain, null,
+            "failedCertChain for a successful connection should be null");
     }
   );
 
@@ -117,9 +129,13 @@ function run_test() {
     function withSecurityInfo(securityInfo) {
       securityInfo.QueryInterface(Ci.nsITransportSecurityInfo);
       test_security_info_serialization(securityInfo, SEC_ERROR_EXPIRED_CERTIFICATE);
-      do_check_neq(securityInfo.failedCertChain, null);
+      notEqual(securityInfo.failedCertChain, null,
+               "failedCertChain should not be null for an overrideable" +
+               " connection failure");
       let originalCertChain = build_cert_chain(["expired-ee", "test-ca"]);
-      do_check_true(originalCertChain.equals(securityInfo.failedCertChain));
+      ok(originalCertChain.equals(securityInfo.failedCertChain),
+         "failedCertChain should equal the original cert chain for an" +
+         " overrideable connection failure");
     }
   );
 
@@ -131,9 +147,13 @@ function run_test() {
     function withSecurityInfo(securityInfo) {
       securityInfo.QueryInterface(Ci.nsITransportSecurityInfo);
       test_security_info_serialization(securityInfo, SEC_ERROR_INADEQUATE_KEY_USAGE);
-      do_check_neq(securityInfo.failedCertChain, null);
+      notEqual(securityInfo.failedCertChain, null,
+               "failedCertChain should not be null for a non-overrideable" +
+               " connection failure");
       let originalCertChain = build_cert_chain(["inadequatekeyusage-ee", "test-ca"]);
-      do_check_true(originalCertChain.equals(securityInfo.failedCertChain));
+      ok(originalCertChain.equals(securityInfo.failedCertChain),
+         "failedCertChain should equal the original cert chain for a" +
+         " non-overrideable connection failure");
     }
   );
 
