@@ -18,6 +18,7 @@ subject:<subject distinguished name specification>
 [subjectKey:<key specification>]
 [signature:{sha256WithRSAEncryption,sha1WithRSAEncryption,
             md5WithRSAEncryption,ecdsaWithSHA256}]
+[serialNumber:<integer in the interval [1, 127]>]
 [extension:<extension name:<extension-specific data>>]
 [...]
 
@@ -69,6 +70,13 @@ a nameConstraints extension, the implicit form may not be used.
 
 If an extension name has '[critical]' after it, it will be marked as
 critical. Otherwise (by default), it will not be marked as critical.
+
+TLSFeature values can either consist of a named value (currently only
+'OCSPMustStaple' which corresponds to status_request) or a numeric TLS
+feature value (see rfc7633 for more information).
+
+If a serial number is not explicitly specified, it is automatically
+generated based on the contents of the certificate.
 """
 
 from pyasn1.codec.der import decoder
@@ -108,9 +116,15 @@ class NameConstraints(univ.Sequence):
     )
 
 
-class UnknownBaseError(Exception):
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+
+class UnknownBaseError(Error):
     """Base class for handling unexpected input in this module."""
     def __init__(self, value):
+        super(UnknownBaseError, self).__init__()
         self.value = value
         self.category = 'input'
 
@@ -189,6 +203,25 @@ class UnknownNSCertTypeError(UnknownBaseError):
     def __init__(self, value):
         UnknownBaseError.__init__(self, value)
         self.category = 'nsCertType'
+
+
+class UnknownTLSFeature(UnknownBaseError):
+    """Helper exception type to handle unknown TLS Features."""
+
+    def __init__(self, value):
+        UnknownBaseError.__init__(self, value)
+        self.category = 'TLSFeature'
+
+
+class InvalidSerialNumber(Error):
+    """Exception type to handle invalid serial numbers."""
+
+    def __init__(self, value):
+        super(InvalidSerialNumber, self).__init__()
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
 
 
 def getASN1Tag(asn1Type):
@@ -298,7 +331,17 @@ def datetimeToTime(dt):
     time.setComponentByName('generalTime', useful.GeneralizedTime(dt.strftime('%Y%m%d%H%M%SZ')))
     return time
 
-class Certificate:
+def serialBytesToString(serialBytes):
+    """Takes a list of integers in the interval [0, 255] and returns
+    the corresponding serial number string."""
+    serialBytesLen = len(serialBytes)
+    if serialBytesLen > 127:
+        raise InvalidSerialNumber("{} bytes is too long".format(serialBytesLen))
+    # Prepend the ASN.1 INTEGER tag and length bytes.
+    stringBytes = [getASN1Tag(univ.Integer), serialBytesLen] + serialBytes
+    return ''.join(chr(b) for b in stringBytes)
+
+class Certificate(object):
     """Utility class for reading a certificate specification and
     generating a signed x509 certificate"""
 
@@ -315,8 +358,12 @@ class Certificate:
         self.extensions = None
         self.subjectKey = pykey.keyFromSpecification('default')
         self.issuerKey = pykey.keyFromSpecification('default')
+        self.serialNumber = None
         self.decodeParams(paramStream)
-        self.serialNumber = self.generateSerialNumber()
+        # If a serial number wasn't specified, generate one based on
+        # the certificate contents.
+        if not self.serialNumber:
+            self.serialNumber = self.generateSerialNumber()
 
     def generateSerialNumber(self):
         """Generates a serial number for this certificate based on its
@@ -342,10 +389,7 @@ class Certificate:
         # significant byte is set (to prevent a leading zero byte,
         # which also wouldn't be valid).
         serialBytes[0] |= 0x01
-        # Now prepend the ASN.1 INTEGER tag and length bytes.
-        serialBytes.insert(0, len(serialBytes))
-        serialBytes.insert(0, getASN1Tag(univ.Integer))
-        return ''.join(chr(b) for b in serialBytes)
+        return serialBytesToString(serialBytes)
 
     def decodeParams(self, paramStream):
         for line in paramStream.readlines():
@@ -370,6 +414,13 @@ class Certificate:
             self.setupKey('subject', value)
         elif param == 'signature':
             self.signature = value
+        elif param == 'serialNumber':
+            serialNumber = int(value)
+            # Ensure only serial numbers that conform to the rules listed in
+            # generateSerialNumber() are permitted.
+            if serialNumber < 1 or serialNumber > 127:
+                raise InvalidSerialNumber(value)
+            self.serialNumber = serialBytesToString([serialNumber])
         else:
             raise UnknownParameterTypeError(param)
 
