@@ -9,7 +9,7 @@
 // in the new trust bits being ignored.
 
 do_get_profile();
-let certDB = Cc["@mozilla.org/security/x509certdb;1"]
+var certDB = Cc["@mozilla.org/security/x509certdb;1"]
                .getService(Ci.nsIX509CertDB);
 
 function load_cert(cert, trust) {
@@ -31,9 +31,9 @@ function getDERString(cert)
 function run_test() {
   load_cert("ca", "CTu,CTu,CTu");
   load_cert("int-limited-depth", "CTu,CTu,CTu");
-  let file = "test_intermediate_basic_usage_constraints/ee-int-limited-depth.der";
-  let cert_der = readFile(do_get_file(file));
-  let ee = certDB.constructX509(cert_der, cert_der.length);
+  let file = "test_intermediate_basic_usage_constraints/ee-int-limited-depth.pem";
+  let cert_pem = readFile(do_get_file(file));
+  let ee = certDB.constructX509FromBase64(pemToBase64(cert_pem));
   checkCertErrorGeneric(certDB, ee, PRErrorCodeSuccess,
                         certificateUsageSSLServer);
   // Change the already existing intermediate certificate's trust using
