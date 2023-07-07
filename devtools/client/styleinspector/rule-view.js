@@ -4,10 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* globals overlays, Services, EventEmitter, StyleInspectorMenu,
-   clipboardHelper, _strings, domUtils, AutocompletePopup, loader,
-   osString */
-
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
@@ -3423,8 +3419,9 @@ TextPropertyEditor.prototype = {
                                  !this.isValid() ||
                                  !this.prop.overridden;
 
-    if (this.prop.overridden || !this.prop.enabled ||
-        !this.prop.isKnownProperty()) {
+    if (!this.editing &&
+        (this.prop.overridden || !this.prop.enabled ||
+         !this.prop.isKnownProperty())) {
       this.element.classList.add("ruleview-overridden");
     } else {
       this.element.classList.remove("ruleview-overridden");
@@ -3809,7 +3806,7 @@ TextPropertyEditor.prototype = {
    * value of this property before editing.
    */
   _onSwatchRevert: function() {
-    this._previewValue(this.prop.value);
+    this._previewValue(this.prop.value, true);
     this.update();
   },
 
@@ -3865,11 +3862,13 @@ TextPropertyEditor.prototype = {
    *
    * @param {String} value
    *        The value to set the current property to.
+   * @param {Boolean} reverting
+   *        True if we're reverting the previously previewed value
    */
-  _previewValue: function(value) {
+  _previewValue: function(value, reverting = false) {
     // Since function call is throttled, we need to make sure we are still
     // editing, and any selector modifications have been completed
-    if (!this.editing || this.ruleEditor.isEditing) {
+    if (!reverting && (!this.editing || this.ruleEditor.isEditing)) {
       return;
     }
 
