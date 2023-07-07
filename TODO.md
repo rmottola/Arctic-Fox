@@ -87,6 +87,7 @@
 - update SKIA 1082598
 - remaining 1151214
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
+- Bug 1207146 - 2015-12-04 - Add a link to expert technical information in the cert 
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
@@ -95,6 +96,8 @@
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
+- bug 1220223 - 2015-10-30 don't load PKCS11 modules in safe mode
+- bug 1218596 - 2015-10-27 remove nsPSMInitPanic and other unnecessary
 
 
 impacting download and shutdown:
