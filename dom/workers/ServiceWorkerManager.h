@@ -480,6 +480,10 @@ public:
   NS_IMETHOD
   RemoveRegistrationEventListener(const nsAString& aScope,
                                   ServiceWorkerRegistrationListener* aListener);
+
+  void
+  MaybeCheckNavigationUpdate(nsIDocument* aDoc);
+
 private:
   ServiceWorkerManager();
   ~ServiceWorkerManager();
