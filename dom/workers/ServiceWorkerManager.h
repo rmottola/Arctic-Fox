@@ -57,6 +57,15 @@ class ServiceWorkerRegistrationInfo final
 {
   uint32_t mControlledDocumentsCounter;
 
+  enum
+  {
+    NoUpdate,
+    NeedTimeCheckAndUpdate,
+    NeedUpdate
+  } mUpdateState;
+
+  uint64_t mLastUpdateCheckTime;
+
   virtual ~ServiceWorkerRegistrationInfo();
 
 public:
@@ -75,8 +84,6 @@ public:
   RefPtr<ServiceWorkerInfo> mInstallingWorker;
 
   nsTArray<nsCOMPtr<nsIServiceWorkerRegistrationInfoListener>> mListeners;
-
-  uint64_t mLastUpdateCheckTime;
 
   // According to the spec, Soft Update shouldn't queue an update job
   // if the registration queue is not empty. Because our job queue
@@ -152,6 +159,15 @@ public:
 
   void
   NotifyListenersOnChange();
+
+  void
+  MaybeScheduleTimeCheckAndUpdate();
+
+  void
+  MaybeScheduleUpdate();
+
+  bool
+  CheckAndClearIfUpdateNeeded();
 };
 
 class ServiceWorkerUpdateFinishCallback
@@ -319,6 +335,7 @@ class ServiceWorkerManager final
   friend class ServiceWorkerScriptJobBase;
   friend class ServiceWorkerRegistrationInfo;
   friend class ServiceWorkerUnregisterJob;
+  friend class UpdateTimerCallback;
 
 public:
   NS_DECL_ISUPPORTS
@@ -663,6 +680,12 @@ private:
   void
   RemoveNavigationInterception(const nsACString& aScope,
                                nsIInterceptedChannel* aChannel);
+
+  void
+  ScheduleUpdateTimer(nsIPrincipal* aPrincipal, const nsACString& aScope);
+
+  void
+  UpdateTimerFired(nsIPrincipal* aPrincipal, const nsACString& aScope);
 };
 
 } // namespace workers
