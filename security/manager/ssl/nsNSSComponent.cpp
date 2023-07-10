@@ -228,7 +228,6 @@ nsNSSComponent::nsNSSComponent()
   NS_ASSERTION( (0 == mInstanceCount), "nsNSSComponent is a singleton, but instantiated multiple times!");
   ++mInstanceCount;
   mShutdownObjectList = nsNSSShutDownList::construct();
-  mIsNetworkDown = false;
 }
 
 void
@@ -1292,10 +1291,6 @@ nsNSSComponent::RandomUpdate(void* entropy, int32_t bufLen)
   return NS_OK;
 }
 
-static const char* const PROFILE_CHANGE_NET_TEARDOWN_TOPIC
-  = "profile-change-net-teardown";
-static const char* const PROFILE_CHANGE_NET_RESTORE_TOPIC
-  = "profile-change-net-restore";
 static const char* const PROFILE_BEFORE_CHANGE_TOPIC = "profile-before-change";
 static const char* const PROFILE_DO_CHANGE_TOPIC = "profile-do-change";
 
@@ -1305,7 +1300,7 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
 {
   if (nsCRT::strcmp(aTopic, PROFILE_BEFORE_CHANGE_TOPIC) == 0) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("receiving profile change topic\n"));
-    DoProfileBeforeChange(aSubject);
+    DoProfileBeforeChange();
   }
   else if (nsCRT::strcmp(aTopic, PROFILE_DO_CHANGE_TOPIC) == 0) {
     if (someData && NS_LITERAL_STRING("startup").Equals(someData)) {
@@ -1316,9 +1311,7 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
       // it again. We use the same cleanup functionality used when switching
       // profiles. The order of function calls must correspond to the order
       // of notifications sent by Profile Manager (nsProfile).
-      DoProfileChangeNetTeardown();
-      DoProfileBeforeChange(aSubject);
-      DoProfileChangeNetRestore();
+      DoProfileBeforeChange();
     }
 
     bool needsInit = true;
@@ -1402,14 +1395,6 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
     }
     if (clearSessionCache)
       SSL_ClearSessionCache();
-  }
-  else if (nsCRT::strcmp(aTopic, PROFILE_CHANGE_NET_TEARDOWN_TOPIC) == 0) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("receiving network teardown topic\n"));
-    DoProfileChangeNetTeardown();
-  }
-  else if (nsCRT::strcmp(aTopic, PROFILE_CHANGE_NET_RESTORE_TOPIC) == 0) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("receiving network restore topic\n"));
-    DoProfileChangeNetRestore();
   }
 
   return NS_OK;
@@ -1497,25 +1482,13 @@ nsNSSComponent::RegisterObservers()
   observerService->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
   observerService->AddObserver(this, PROFILE_BEFORE_CHANGE_TOPIC, false);
   observerService->AddObserver(this, PROFILE_DO_CHANGE_TOPIC, false);
-  observerService->AddObserver(this, PROFILE_CHANGE_NET_TEARDOWN_TOPIC, false);
-  observerService->AddObserver(this, PROFILE_CHANGE_NET_RESTORE_TOPIC, false);
 
   return NS_OK;
 }
 
 void
-nsNSSComponent::DoProfileChangeNetTeardown()
+nsNSSComponent::DoProfileBeforeChange()
 {
-  if (mCertVerificationThread)
-    mCertVerificationThread->requestExit();
-  mIsNetworkDown = true;
-}
-
-void
-nsNSSComponent::DoProfileBeforeChange(nsISupports* aSubject)
-{
-  NS_ASSERTION(mIsNetworkDown, "nsNSSComponent relies on profile manager to wait for synchronous shutdown of all network activity");
-
   bool needsCleanup = true;
 
   {
@@ -1532,15 +1505,6 @@ nsNSSComponent::DoProfileBeforeChange(nsISupports* aSubject)
   if (needsCleanup) {
     ShutdownNSS();
   }
-}
-
-void
-nsNSSComponent::DoProfileChangeNetRestore()
-{
-  // XXX this doesn't work well, since nothing expects null pointers
-  deleteBackgroundThreads();
-  createBackgroundThreads();
-  mIsNetworkDown = false;
 }
 
 NS_IMETHODIMP
