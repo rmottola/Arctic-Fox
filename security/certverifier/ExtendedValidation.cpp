@@ -1317,7 +1317,7 @@ IdentityInfoInit()
         continue;
       }
 #endif
-      //PR_NOT_REACHED("Could not find EV root in NSS storage");
+      PR_NOT_REACHED("Could not find EV root in NSS storage");
       continue;
     }
 
