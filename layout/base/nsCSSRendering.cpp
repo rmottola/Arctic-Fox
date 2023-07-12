@@ -1381,8 +1381,9 @@ nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
       shadowContext->SetMatrix(
         shadowContext->CurrentMatrix().Translate(devPixelOffset));
 
-      nsRect nativeRect;
-      nativeRect.IntersectRect(frameRect, aDirtyRect);
+      nsRect nativeRect = aDirtyRect;
+      nativeRect.MoveBy(-nsPoint(shadowItem->mXOffset, shadowItem->mYOffset));
+      nativeRect.IntersectRect(frameRect, nativeRect);
       nsRenderingContext wrapperCtx(shadowContext);
       aPresContext->GetTheme()->DrawWidgetBackground(&wrapperCtx, aForFrame,
           styleDisplay->mAppearance, aFrameArea, nativeRect);
