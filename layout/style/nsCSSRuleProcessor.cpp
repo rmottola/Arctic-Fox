@@ -1934,10 +1934,8 @@ static bool SelectorMatches(Element* aElement,
               break;
             }
           }
-
-          return false;
         }
-        break;
+        return false;
 
       case nsCSSPseudoClasses::ePseudoClass_mozBoundElement:
         if (aTreeMatchContext.mScopedRoot != aElement) {
