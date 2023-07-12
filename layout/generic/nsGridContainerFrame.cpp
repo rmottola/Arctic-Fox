@@ -1347,7 +1347,8 @@ nsGridContainerFrame::ResolveLineRangeHelper(
       return LinePair(kAutoLine, 1); // XXX subgrid explicit size instead of 1?
     }
 
-    auto end = ResolveLine(aEnd, aEnd.mInteger, 0, aLineNameList, aAreaStart,
+    uint32_t from = aEnd.mInteger < 0 ? aExplicitGridEnd : 0;
+    auto end = ResolveLine(aEnd, aEnd.mInteger, from, aLineNameList, aAreaStart,
                            aAreaEnd, aExplicitGridEnd, eLineRangeSideEnd,
                            aStyle);
     int32_t span = aStart.mInteger == 0 ? 1 : aStart.mInteger;
@@ -1380,9 +1381,10 @@ nsGridContainerFrame::ResolveLineRangeHelper(
       return LinePair(start, 1); // XXX subgrid explicit size instead of 1?
     }
   } else {
-    start = ResolveLine(aStart, aStart.mInteger, 0, aLineNameList, aAreaStart,
-                        aAreaEnd, aExplicitGridEnd, eLineRangeSideStart,
-                        aStyle);
+    uint32_t from = aStart.mInteger < 0 ? aExplicitGridEnd : 0;
+    start = ResolveLine(aStart, aStart.mInteger, from, aLineNameList,
+                        aAreaStart, aAreaEnd, aExplicitGridEnd,
+                        eLineRangeSideStart, aStyle);
     if (aEnd.IsAuto()) {
       // A "definite line / auto" should resolve the auto to 'span 1'.
       // The error handling in ResolveLineRange will make that happen and also
@@ -1391,14 +1393,14 @@ nsGridContainerFrame::ResolveLineRangeHelper(
     }
   }
 
-  uint32_t from = 0;
+  uint32_t from;
   int32_t nth = aEnd.mInteger == 0 ? 1 : aEnd.mInteger;
   if (aEnd.mHasSpan) {
     if (MOZ_UNLIKELY(start < 0)) {
       if (aEnd.mLineName.IsEmpty()) {
         return LinePair(start, start + nth);
       }
-      // Fall through and start searching from the start of the grid (from=0).
+      from = 0;
     } else {
       if (start >= int32_t(aExplicitGridEnd)) {
         // The start is at or after the last explicit line, thus all lines
@@ -1407,6 +1409,8 @@ nsGridContainerFrame::ResolveLineRangeHelper(
       }
       from = start;
     }
+  } else {
+    from = aEnd.mInteger < 0 ? aExplicitGridEnd : 0;
   }
   auto end = ResolveLine(aEnd, nth, from, aLineNameList, aAreaStart,
                          aAreaEnd, aExplicitGridEnd, eLineRangeSideEnd, aStyle);
