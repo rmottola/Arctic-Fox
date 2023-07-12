@@ -1018,7 +1018,6 @@ AlignJustifySelf(uint8_t aAlignment, bool aOverflowSafe, LogicalAxis aAxis,
           nscoord bpInAxis = aAxis == eLogicalAxisBlock ? bp.BStartEnd(wm)
                                                         : bp.IStartEnd(wm);
           nscoord contentSize = size - bpInAxis;
-          NS_ASSERTION(contentSize >= 0, "huh?");
           const nscoord unstretchedContentSize = contentSize;
           contentSize += gap;
           nscoord max = aAxis == eLogicalAxisBlock ? aRS.ComputedMaxBSize()
@@ -1029,7 +1028,8 @@ AlignJustifySelf(uint8_t aAlignment, bool aOverflowSafe, LogicalAxis aAxis,
           }
           // |gap| is now how much the content size is actually allowed to grow.
           didResize = gap > 0;
-          if (didResize) {
+          // (nscoord overflow can make |contentSize| negative, bug 1225118)
+          if (didResize && MOZ_LIKELY(contentSize >= 0)) {
             (aAxis == eLogicalAxisBlock ? aContentSize->BSize(wm)
                                         : aContentSize->ISize(wm)) = contentSize;
             if (MOZ_UNLIKELY(!aSameSide)) {
