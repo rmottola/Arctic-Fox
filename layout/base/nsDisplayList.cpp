@@ -5122,7 +5122,7 @@ nsDisplayTransform::ComputePerspectiveMatrix(const nsIFrame* aFrame,
   }
   nscoord perspective = cbDisplay->mChildPerspective.GetCoordValue();
   if (perspective <= 0) {
-    return false;
+    return true;
   }
 
   TransformReferenceBox refBox(cbFrame);
