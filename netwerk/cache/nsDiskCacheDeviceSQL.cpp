@@ -1308,6 +1308,7 @@ AppendJARIdentifier(nsACString &_result, NeckoOriginAttributes const *aOriginAtt
 {
   nsAutoCString suffix;
   aOriginAttributes->CreateSuffix(suffix);
+  _result.Append('#');
   _result.Append(suffix);
 }
 
