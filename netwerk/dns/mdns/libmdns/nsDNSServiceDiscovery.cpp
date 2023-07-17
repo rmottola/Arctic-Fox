@@ -155,6 +155,13 @@ RegisterRequest::Cancel(nsresult aReason)
 
 NS_IMPL_ISUPPORTS(nsDNSServiceDiscovery, nsIDNSServiceDiscovery)
 
+nsDNSServiceDiscovery::~nsDNSServiceDiscovery()
+{
+#ifdef MOZ_WIDGET_GONK
+  StopService();
+#endif
+}
+
 nsresult
 nsDNSServiceDiscovery::Init()
 {
