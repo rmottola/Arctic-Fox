@@ -79,8 +79,8 @@ SpdySession31::SpdySession31(nsISocketTransport *aSocketTransport)
 
   LOG3(("SpdySession31::SpdySession31 %p serial=0x%X\n", this, mSerial));
 
-  mInputFrameBuffer = new char[mInputFrameBufferSize];
-  mOutputQueueBuffer = new char[mOutputQueueSize];
+  mInputFrameBuffer = MakeUnique<char[]>(mInputFrameBufferSize);
+  mOutputQueueBuffer = MakeUnique<char[]>(mOutputQueueSize);
   zlibInit();
 
   mPushAllowance = gHttpHandler->SpdyPushAllowance();
@@ -644,7 +644,7 @@ nsresult
 SpdySession31::UncompressAndDiscard(uint32_t offset,
                                     uint32_t blockLen)
 {
-  char *blockStart = mInputFrameBuffer + offset;
+  char *blockStart = &mInputFrameBuffer[offset];
   unsigned char trash[2048];
   mDownstreamZlib.avail_in = blockLen;
   mDownstreamZlib.next_in = reinterpret_cast<unsigned char *>(blockStart);
@@ -1122,7 +1122,7 @@ SpdySession31::HandleSynStream(SpdySession31 *self)
   // Uncompress the response headers into a stream specific buffer, leaving them
   // in spdy format for the time being.
   rv = pushedStream->Uncompress(&self->mDownstreamZlib,
-                                self->mInputFrameBuffer + 18,
+                                &self->mInputFrameBuffer[18],
                                 self->mInputFrameDataSize - 10);
   if (NS_FAILED(rv)) {
     LOG(("SpdySession31::HandleSynStream uncompress failed\n"));
@@ -1226,7 +1226,7 @@ SpdySession31::HandleSynReply(SpdySession31 *self)
   // the session becuase the session compression context will become
   // inconsistent if all of the compressed data is not processed.
   rv = self->mInputFrameDataStream->Uncompress(&self->mDownstreamZlib,
-                                               self->mInputFrameBuffer + 12,
+                                               &self->mInputFrameBuffer[12],
                                                self->mInputFrameDataSize - 4);
 
   if (NS_FAILED(rv)) {
@@ -1593,7 +1593,7 @@ SpdySession31::HandleHeaders(SpdySession31 *self)
   // the session becuase the session compression context will become
   // inconsistent if all of the compressed data is not processed.
   rv = self->mInputFrameDataStream->Uncompress(&self->mDownstreamZlib,
-                                               self->mInputFrameBuffer + 12,
+                                               &self->mInputFrameBuffer[12],
                                                self->mInputFrameDataSize - 4);
   if (NS_FAILED(rv)) {
     LOG(("SpdySession31::HandleHeaders uncompress failed\n"));
@@ -1963,7 +1963,7 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
     MOZ_ASSERT(mInputFrameBufferUsed < 8,
                "Frame Buffer Used Too Large for State");
 
-    rv = NetworkRead(writer, mInputFrameBuffer + mInputFrameBufferUsed,
+    rv = NetworkRead(writer, &mInputFrameBuffer[mInputFrameBufferUsed],
                      8 - mInputFrameBufferUsed, countWritten);
 
     if (NS_FAILED(rv)) {
@@ -1976,7 +1976,7 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
     }
 
     LogIO(this, nullptr, "Reading Frame Header",
-          mInputFrameBuffer + mInputFrameBufferUsed, *countWritten);
+          &mInputFrameBuffer[mInputFrameBufferUsed], *countWritten);
 
     mInputFrameBufferUsed += *countWritten;
 
@@ -2200,7 +2200,7 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
   MOZ_ASSERT(mInputFrameBufferUsed == 8,
              "Frame Buffer Header Not Present");
 
-  rv = NetworkRead(writer, mInputFrameBuffer + 8 + mInputFrameDataRead,
+  rv = NetworkRead(writer, &mInputFrameBuffer[8 + mInputFrameDataRead],
                    mInputFrameDataSize - mInputFrameDataRead, countWritten);
 
   if (NS_FAILED(rv)) {
@@ -2213,7 +2213,7 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
   }
 
   LogIO(this, nullptr, "Reading Control Frame",
-        mInputFrameBuffer + 8 + mInputFrameDataRead, *countWritten);
+        &mInputFrameBuffer[8 + mInputFrameDataRead], *countWritten);
 
   mInputFrameDataRead += *countWritten;
 
