@@ -2997,7 +2997,7 @@ gfxWindowsPlatform::CreateHardwareVsyncSource()
 bool
 gfxWindowsPlatform::SupportsApzTouchInput() const
 {
-  int value = Preferences::GetInt("dom.w3c_touch_events.enabled", 0);
+  int value = gfxPrefs::TouchEventsEnabled();
   return value == 1 || value == 2;
 }
 
