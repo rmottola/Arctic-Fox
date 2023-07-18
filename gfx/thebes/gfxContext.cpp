@@ -68,7 +68,6 @@ PatternFromState::operator mozilla::gfx::Pattern&()
 gfxContext::gfxContext(DrawTarget *aTarget, const Point& aDeviceOffset)
   : mPathIsRect(false)
   , mTransformChanged(false)
-  , mRefCairo(nullptr)
   , mDT(aTarget)
   , mOriginalDT(aTarget)
 {
@@ -98,9 +97,6 @@ gfxContext::ContextForDrawTarget(DrawTarget* aTarget)
 
 gfxContext::~gfxContext()
 {
-  if (mRefCairo) {
-    cairo_destroy(mRefCairo);
-  }
   for (int i = mStateStack.Length() - 1; i >= 0; i--) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       mDT->PopClip();
@@ -136,25 +132,38 @@ gfxContext::CurrentSurface(gfxFloat *dx, gfxFloat *dy)
   return nullptr;
 }
 
-cairo_t *
-gfxContext::GetCairo()
+static void
+DestroyRefCairo(void* aData)
 {
-  if (mDT->GetBackendType() == BackendType::CAIRO) {
-    cairo_t *ctx =
-      (cairo_t*)mDT->GetNativeSurface(NativeSurfaceType::CAIRO_CONTEXT);
-    if (ctx) {
-      return ctx;
+  cairo_t* refCairo = static_cast<cairo_t*>(aData);
+  MOZ_ASSERT(refCairo);
+  cairo_destroy(refCairo);
+}
+
+/* static */ cairo_t *
+gfxContext::RefCairo(DrawTarget* aDT)
+{
+  // DrawTargets that don't use a Cairo backend can be given a 1x1 "reference"
+  // |cairo_t*|, stored in the DrawTarget's user data, for doing font-related
+  // operations.
+  static UserDataKey sRefCairo;
+
+  cairo_t* refCairo = nullptr;
+  if (aDT->GetBackendType() == BackendType::CAIRO) {
+    refCairo = static_cast<cairo_t*>
+      (aDT->GetNativeSurface(NativeSurfaceType::CAIRO_CONTEXT));
+    if (refCairo) {
+      return refCairo;
     }
   }
 
-  if (mRefCairo) {
-    // Set transform!
-    return mRefCairo;
+  refCairo = static_cast<cairo_t*>(aDT->GetUserData(&sRefCairo));
+  if (!refCairo) {
+    refCairo = cairo_create(gfxPlatform::GetPlatform()->ScreenReferenceSurface()->CairoSurface());
+    aDT->AddUserData(&sRefCairo, refCairo, DestroyRefCairo);
   }
 
-  mRefCairo = cairo_create(gfxPlatform::GetPlatform()->ScreenReferenceSurface()->CairoSurface()); 
-
-  return mRefCairo;
+  return refCairo;
 }
 
 void
@@ -1373,7 +1382,7 @@ gfxContext::GetRoundOffsetsToPixels(bool *aRoundX, bool *aRoundY)
     // Print backends set CAIRO_HINT_METRICS_OFF.
     *aRoundY = true;
 
-    cairo_t *cr = GetCairo();
+    cairo_t *cr = gfxContext::RefCairo(GetDrawTarget());
     cairo_scaled_font_t *scaled_font = cairo_get_scaled_font(cr);
 
     // bug 1198921 - this sometimes fails under Windows for whatver reason
