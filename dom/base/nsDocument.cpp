@@ -315,8 +315,6 @@ nsIdentifierMapEntry::AddContentChangeCallback(nsIDocument::IDTargetObserver aCa
 {
   if (!mChangeCallbacks) {
     mChangeCallbacks = new nsTHashtable<ChangeCallbackEntry>;
-    if (!mChangeCallbacks)
-      return;
   }
 
   ChangeCallback cc = { aCallback, aData, aForImage };
@@ -1240,9 +1238,6 @@ IMPL_SHIM(nsIApplicationCacheContainer)
         return NS_NOINTERFACE;                                             \
       }                                                                    \
       nsCOMPtr<_i> shim = new _i##Shim(this, real);                        \
-      if (!shim) {                                                         \
-        return NS_ERROR_OUT_OF_MEMORY;                                     \
-      }                                                                    \
       shim.forget(aSink);                                                  \
       return NS_OK;                                                        \
     }                                                                      \
@@ -1440,6 +1435,7 @@ nsIDocument::nsIDocument()
     mPostedFlushUserFontSet(false),
     mPartID(0),
     mDidFireDOMContentLoaded(true),
+    mHasScrollLinkedEffect(false),
     mUserHasInteracted(false)
 {
   SetInDocument();
@@ -1560,6 +1556,8 @@ nsDocument::~nsDocument()
         mixedContentLevel = MIXED_DISPLAY_CONTENT;
       }
       Accumulate(Telemetry::MIXED_CONTENT_PAGE_LOAD, mixedContentLevel);
+
+      Accumulate(Telemetry::SCROLL_LINKED_EFFECT_FOUND, mHasScrollLinkedEffect);
     }
   }
 
@@ -2319,6 +2317,11 @@ nsDocument::ResetStylesheetsToURI(nsIURI* aURI)
   RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eUserSheet], SheetType::User);
   RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eAuthorSheet], SheetType::Doc);
 
+  nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
+  if (sheetService) {
+    RemoveStyleSheetsFromStyleSets(*sheetService->AuthorStyleSheets(), SheetType::Doc);
+  }
+
   // Release all the sheets
   mStyleSheets.Clear();
   mOnDemandBuiltInUASheets.Clear();
@@ -2652,23 +2655,12 @@ nsDocument::ApplySettingsFromCSP(bool aSpeculative)
   }
 
   // 2) apply settings from speculative csp
-  nsCOMPtr<nsIContentSecurityPolicy> preloadCsp;
-  rv = NodePrincipal()->GetPreloadCsp(getter_AddRefs(preloadCsp));
-  if (preloadCsp) {
-    // Set up any Referrer Policy specified by CSP
-    bool hasReferrerPolicy = false;
-    uint32_t referrerPolicy = mozilla::net::RP_Default;
-    rv = preloadCsp->GetReferrerPolicy(&referrerPolicy, &hasReferrerPolicy);
+  if (!mUpgradeInsecurePreloads) {
+    nsCOMPtr<nsIContentSecurityPolicy> preloadCsp;
+    rv = NodePrincipal()->GetPreloadCsp(getter_AddRefs(preloadCsp));
     NS_ENSURE_SUCCESS_VOID(rv);
-    if (hasReferrerPolicy) {
-      // please note that referrer policy spec defines that the latest
-      // policy awlays wins, hence we can safely overwrite the policy here.
-      mReferrerPolicy = static_cast<ReferrerPolicy>(referrerPolicy);
-      mReferrerPolicySet = true;
-    }
-    if (!mUpgradeInsecurePreloads) {
-      rv = preloadCsp->GetUpgradeInsecureRequests(&mUpgradeInsecurePreloads);
-      NS_ENSURE_SUCCESS_VOID(rv);
+    if (preloadCsp) {
+      preloadCsp->GetUpgradeInsecureRequests(&mUpgradeInsecurePreloads);
     }
   }
 }
@@ -5048,6 +5040,14 @@ nsDocument::DispatchContentLoadedEvents()
     nsContentUtils::DispatchChromeEvent(this, static_cast<nsIDocument*>(this),
                                         NS_LITERAL_STRING("MozApplicationManifest"),
                                         true, true);
+  }
+
+  if (mMaybeServiceWorkerControlled) {
+    using mozilla::dom::workers::ServiceWorkerManager;
+    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    if (swm) {
+      swm->MaybeCheckNavigationUpdate(this);
+    }
   }
 
   UnblockOnload(true);
@@ -9997,8 +9997,6 @@ nsIDocument::RegisterActivityObserver(nsISupports* aSupports)
 {
   if (!mActivityObservers) {
     mActivityObservers = new nsTHashtable<nsPtrHashKey<nsISupports> >();
-    if (!mActivityObservers)
-      return;
   }
   mActivityObservers->PutEntry(aSupports);
 }
@@ -13105,14 +13103,8 @@ nsIDocument::CreateHTMLElement(nsIAtom* aTag)
 nsresult
 nsIDocument::GenerateDocumentId(nsAString& aId)
 {
-  nsresult rv;
-  nsCOMPtr<nsIUUIDGenerator> uuidgen = do_GetService("@mozilla.org/uuid-generator;1", &rv);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
   nsID id;
-  rv = uuidgen->GenerateUUIDInPlace(&id);
+  nsresult rv = nsContentUtils::GenerateUUIDInPlace(id);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -13302,6 +13294,20 @@ nsIDocument::Fonts()
     GetUserFontSet();  // this will cause the user font set to be created/updated
   }
   return mFontFaceSet;
+}
+
+void
+nsIDocument::ReportHasScrollLinkedEffect()
+{
+  if (mHasScrollLinkedEffect) {
+    // We already did this once for this document, don't do it again.
+    return;
+  }
+  mHasScrollLinkedEffect = true;
+  nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                  NS_LITERAL_CSTRING("Async Pan/Zoom"),
+                                  this, nsContentUtils::eLAYOUT_PROPERTIES,
+                                  "ScrollLinkedEffectFound");
 }
 
 Selection*

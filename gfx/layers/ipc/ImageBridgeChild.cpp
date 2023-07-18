@@ -198,7 +198,7 @@ static void ImageBridgeShutdownStep1(ReentrantMonitor *aBarrier, bool *aDone)
     for (int i = textures.Length() - 1; i >= 0; --i) {
       RefPtr<TextureClient> client = TextureClient::AsTextureClient(textures[i]);
       if (client) {
-        client->ForceRemove();
+        client->Destroy();
       }
     }
     sImageBridgeChildSingleton->SendWillStop();

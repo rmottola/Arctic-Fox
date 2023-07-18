@@ -115,6 +115,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "File",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "FileReader",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "FileReaderSync",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Headers",
@@ -140,6 +142,8 @@ var interfaceNamesInGlobalScope =
     "IDBVersionChangeEvent",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "ImageBitmap",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "ImageBitmapRenderingContext",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "ImageData",
 // IMPORTANT: Do not change this list without review from a DOM peer!

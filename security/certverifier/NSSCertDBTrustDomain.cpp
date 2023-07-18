@@ -914,7 +914,8 @@ NSSCertDBTrustDomain::CheckValidityIsAcceptable(Time notBefore, Time notAfter,
     return Success;
   }
 
-  Duration DURATION_39_MONTHS((3 * 365 + 3 * 31) * Time::ONE_DAY_IN_SECONDS);
+  Duration DURATION_27_MONTHS_PLUS_SLOP((2 * 365 + 3 * 31 + 7) *
+                                        Time::ONE_DAY_IN_SECONDS);
   Duration maxValidityDuration(UINT64_MAX);
   Duration validityDuration(notBefore, notAfter);
 
@@ -922,12 +923,9 @@ NSSCertDBTrustDomain::CheckValidityIsAcceptable(Time notBefore, Time notAfter,
     case ValidityCheckingMode::CheckingOff:
       return Success;
     case ValidityCheckingMode::CheckForEV:
-      // The EV Guidelines say the maximum is 27 months, but we use a higher
-      // limit here:
-      //  a) To (hopefully) minimize compatibility breakage.
-      //  b) Because there was some talk about raising the limit to 39 months to
-      //     match the BR limit.
-      maxValidityDuration = DURATION_39_MONTHS;
+      // The EV Guidelines say the maximum is 27 months, but we use a slightly
+      // higher limit here to (hopefully) minimize compatibility breakage.
+      maxValidityDuration = DURATION_27_MONTHS_PLUS_SLOP;
       break;
     default:
       PR_NOT_REACHED("We're not handling every ValidityCheckingMode type");
@@ -975,7 +973,7 @@ nss_addEscape(const char* string, char quote)
 } // unnamed namespace
 
 SECStatus
-InitializeNSS(const char* dir, bool readOnly)
+InitializeNSS(const char* dir, bool readOnly, bool loadPKCS11Modules)
 {
   // The NSS_INIT_NOROOTINIT flag turns off the loading of the root certs
   // module by NSS_Initialize because we will load it in InstallLoadableRoots
@@ -985,6 +983,9 @@ InitializeNSS(const char* dir, bool readOnly)
   uint32_t flags = NSS_INIT_NOROOTINIT | NSS_INIT_OPTIMIZESPACE;
   if (readOnly) {
     flags |= NSS_INIT_READONLY;
+  }
+  if (!loadPKCS11Modules) {
+    flags |= NSS_INIT_NOMODDB;
   }
   return ::NSS_Initialize(dir, "", "", SECMOD_DB, flags);
 }

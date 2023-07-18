@@ -230,9 +230,6 @@ nsContainerFrame*
 NS_NewDocElementBoxFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 
 nsIFrame*
-NS_NewThumbFrame (nsIPresShell* aPresShell, nsStyleContext* aContext);
-
-nsIFrame*
 NS_NewDeckFrame (nsIPresShell* aPresShell, nsStyleContext* aContext);
 
 nsIFrame*
@@ -3158,10 +3155,56 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
                                false, scrollFrame);
   }
 
-  nsContainerFrame* blockFrame =
-    NS_NewBlockFormattingContext(mPresShell, fieldsetContentStyle);
-  InitAndRestoreFrame(aState, content,
-    scrollFrame ? scrollFrame : fieldsetFrame, blockFrame);
+  nsContainerFrame* absPosContainer = nullptr;
+  if (fieldsetFrame->IsAbsPosContaininingBlock()) {
+    absPosContainer = fieldsetFrame;
+  }
+
+  // Create the inner ::-moz-fieldset-content frame.
+  nsContainerFrame* contentFrameTop;
+  nsContainerFrame* contentFrame;
+  auto parent = scrollFrame ? scrollFrame : fieldsetFrame;
+  switch (fieldsetContentDisplay->mDisplay) {
+    case NS_STYLE_DISPLAY_FLEX:
+      contentFrame = NS_NewFlexContainerFrame(mPresShell, fieldsetContentStyle);
+      InitAndRestoreFrame(aState, content, parent, contentFrame);
+      contentFrameTop = contentFrame;
+      break;
+    case NS_STYLE_DISPLAY_GRID:
+      contentFrame = NS_NewGridContainerFrame(mPresShell, fieldsetContentStyle);
+      InitAndRestoreFrame(aState, content, parent, contentFrame);
+      contentFrameTop = contentFrame;
+      break;
+    default: {
+      MOZ_ASSERT(fieldsetContentDisplay->mDisplay == NS_STYLE_DISPLAY_BLOCK,
+                 "bug in nsRuleNode::ComputeDisplayData?");
+
+      nsContainerFrame* columnSetFrame = nullptr;
+      RefPtr<nsStyleContext> innerSC = fieldsetContentStyle;
+      const nsStyleColumn* columns = fieldsetContentStyle->StyleColumn();
+      if (columns->mColumnCount != NS_STYLE_COLUMN_COUNT_AUTO ||
+          columns->mColumnWidth.GetUnit() != eStyleUnit_Auto) {
+        columnSetFrame =
+          NS_NewColumnSetFrame(mPresShell, fieldsetContentStyle, nsFrameState(0));
+        InitAndRestoreFrame(aState, content, parent, columnSetFrame);
+        innerSC = mPresShell->StyleSet()->ResolveAnonymousBoxStyle(
+                    nsCSSAnonBoxes::columnContent, fieldsetContentStyle);
+        if (absPosContainer) {
+          absPosContainer = columnSetFrame;
+        }
+      }
+      contentFrame = NS_NewBlockFrame(mPresShell, innerSC);
+      if (columnSetFrame) {
+        InitAndRestoreFrame(aState, content, columnSetFrame, contentFrame);
+        SetInitialSingleChild(columnSetFrame, contentFrame);
+        contentFrameTop = columnSetFrame;
+      } else {
+        InitAndRestoreFrame(aState, content, parent, contentFrame);
+        contentFrameTop = contentFrame;
+      }
+      break;
+    }
+  }
 
   aState.AddChild(fieldsetFrame, aFrameItems, content, styleContext, aParentFrame);
 
@@ -3169,16 +3212,16 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
   nsFrameConstructorSaveState absoluteSaveState;
   nsFrameItems                childItems;
 
-  blockFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
-  if (fieldsetFrame->IsAbsPosContaininingBlock()) {
-    aState.PushAbsoluteContainingBlock(blockFrame, fieldsetFrame, absoluteSaveState);
+  contentFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
+  if (absPosContainer) {
+    aState.PushAbsoluteContainingBlock(contentFrame, absPosContainer, absoluteSaveState);
   }
 
-  ProcessChildren(aState, content, styleContext, blockFrame, true,
+  ProcessChildren(aState, content, styleContext, contentFrame, true,
                   childItems, true, aItem.mPendingBinding);
 
   nsFrameItems fieldsetKids;
-  fieldsetKids.AddChild(scrollFrame ? scrollFrame : blockFrame);
+  fieldsetKids.AddChild(scrollFrame ? scrollFrame : contentFrameTop);
 
   for (nsFrameList::Enumerator e(childItems); !e.AtEnd(); e.Next()) {
     nsIFrame* child = e.get();
@@ -3194,18 +3237,18 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
       fieldsetKids.InsertFrame(fieldsetFrame, nullptr, child);
       if (scrollFrame) {
         StickyScrollContainer::NotifyReparentedFrameAcrossScrollFrameBoundary(
-            child, blockFrame);
+            child, contentFrame);
       }
       break;
     }
   }
 
   if (isScrollable) {
-    FinishBuildingScrollFrame(scrollFrame, blockFrame);
+    FinishBuildingScrollFrame(scrollFrame, contentFrameTop);
   }
 
   // Set the inner frame's initial child lists
-  blockFrame->SetInitialChildList(kPrincipalList, childItems);
+  contentFrame->SetInitialChildList(kPrincipalList, childItems);
 
   // Set the outer frame's initial child list
   fieldsetFrame->SetInitialChildList(kPrincipalList, fieldsetKids);
@@ -3382,7 +3425,8 @@ IsFrameForFieldSet(nsIFrame* aFrame, nsIAtom* aFrameType)
 {
   nsIAtom* pseudo = aFrame->StyleContext()->GetPseudo();
   if (pseudo == nsCSSAnonBoxes::fieldsetContent ||
-      pseudo == nsCSSAnonBoxes::scrolledContent) {
+      pseudo == nsCSSAnonBoxes::scrolledContent ||
+      pseudo == nsCSSAnonBoxes::columnContent) {
     return IsFrameForFieldSet(aFrame->GetParent(), aFrame->GetParent()->GetType());
   }
   return aFrameType == nsGkAtoms::fieldSetFrame;
@@ -4073,7 +4117,10 @@ nsCSSFrameConstructor::GetAnonymousContent(nsIContent* aParent,
     return NS_OK;
 
   nsresult rv = creator->CreateAnonymousContent(aContent);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_FAILED(rv)) {
+    // CreateAnonymousContent failed, e.g. because the page has a <use> loop.
+    return rv;
+  }
 
   uint32_t count = aContent.Length();
   for (uint32_t i=0; i < count; i++) {
@@ -5152,7 +5199,8 @@ nsCSSFrameConstructor::FindSVGData(Element* aElement,
   }
 
   if ((aTag != nsGkAtoms::svg && !parentIsSVG) ||
-      (aTag == nsGkAtoms::desc || aTag == nsGkAtoms::title)) {
+      (aTag == nsGkAtoms::desc || aTag == nsGkAtoms::title ||
+       aTag == nsGkAtoms::metadata)) {
     // Sections 5.1 and G.4 of SVG 1.1 say that SVG elements other than
     // svg:svg not contained within svg:svg are incorrect, although they
     // don't seem to specify error handling.  Ignore them, since many of
@@ -5163,7 +5211,7 @@ nsCSSFrameConstructor::FindSVGData(Element* aElement,
     // Style mutation can't change this situation, so don't bother
     // adding to the undisplayed content map.
     //
-    // We don't currently handle any UI for desc/title
+    // We don't currently handle any UI for desc/title/metadata
     return &sSuppressData;
   }
 
@@ -10278,18 +10326,26 @@ nsCSSFrameConstructor::WrapItemsInPseudoParent(nsIContent* aParentContent,
                               wrapperStyle,
                               true, nullptr);
 
+  const nsStyleDisplay* disp = newItem->mStyleContext->StyleDisplay();
   // Here we're cheating a tad... technically, table-internal items should be
   // inline if aParentFrame is inline, but they'll get wrapped in an
   // inline-table in the end, so it'll all work out.  In any case, arguably
   // we don't need to maintain this state at this point... but it's better
   // to, I guess.
   newItem->mIsAllInline = newItem->mHasInlineEnds =
-    newItem->mStyleContext->StyleDisplay()->IsInlineOutsideStyle();
+    disp->IsInlineOutsideStyle();
 
-  // Table pseudo frames always induce line boundaries around their
-  // contents.
-  newItem->mChildItems.SetLineBoundaryAtStart(true);
-  newItem->mChildItems.SetLineBoundaryAtEnd(true);
+  bool isRuby = disp->IsRubyDisplayType();
+  // All types of ruby frames need a block frame to provide line layout,
+  // hence they are always line participant.
+  newItem->mIsLineParticipant = isRuby;
+
+  if (!isRuby) {
+    // Table pseudo frames always induce line boundaries around their
+    // contents.
+    newItem->mChildItems.SetLineBoundaryAtStart(true);
+    newItem->mChildItems.SetLineBoundaryAtEnd(true);
+  }
   // The parent of the items in aItems is also the parent of the items
   // in mChildItems
   newItem->mChildItems.SetParentHasNoXBLChildren(

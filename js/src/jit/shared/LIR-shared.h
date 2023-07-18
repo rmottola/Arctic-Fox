@@ -1180,33 +1180,39 @@ class LAsmJSInterruptCheck : public LInstructionHelper<0, 0, 0>
 
 class LInterruptCheck : public LInstructionHelper<0, 0, 0>
 {
-  public:
-    LIR_HEADER(InterruptCheck)
-};
-
-// Alternative to LInterruptCheck which does not emit an explicit check of the
-// interrupt flag but relies on the loop backedge being patched via a signal
-// handler.
-class LInterruptCheckImplicit : public LInstructionHelper<0, 0, 0>
-{
     Label* oolEntry_;
 
-  public:
-    LIR_HEADER(InterruptCheckImplicit)
+    // Whether this is an implicit interrupt check. Implicit interrupt checks
+    // use a patchable backedge and signal handlers instead of an explicit
+    // rt->interrupt check.
+    bool implicit_;
 
-    LInterruptCheckImplicit()
-      : oolEntry_(nullptr)
+  public:
+    LIR_HEADER(InterruptCheck)
+
+    LInterruptCheck()
+      : oolEntry_(nullptr),
+        implicit_(false)
     {}
 
     Label* oolEntry() {
+        MOZ_ASSERT(implicit_);
         return oolEntry_;
     }
 
     void setOolEntry(Label* oolEntry) {
+        MOZ_ASSERT(implicit_);
         oolEntry_ = oolEntry;
     }
     MInterruptCheck* mir() const {
         return mir_->toInterruptCheck();
+    }
+
+    void setImplicit() {
+        implicit_ = true;
+    }
+    bool implicit() const {
+        return implicit_;
     }
 };
 
@@ -1276,7 +1282,7 @@ class LTypeOfV : public LInstructionHelper<1, BOX_PIECES, 1>
     }
 };
 
-class LToIdV : public LInstructionHelper<BOX_PIECES, 2 * BOX_PIECES, 1>
+class LToIdV : public LInstructionHelper<BOX_PIECES, BOX_PIECES, 1>
 {
   public:
     LIR_HEADER(ToIdV)
@@ -1286,8 +1292,7 @@ class LToIdV : public LInstructionHelper<BOX_PIECES, 2 * BOX_PIECES, 1>
         setTemp(0, temp);
     }
 
-    static const size_t Object = 0;
-    static const size_t Index = BOX_PIECES;
+    static const size_t Index = 0;
 
     MToId* mir() const {
         return mir_->toToId();
@@ -7395,6 +7400,22 @@ class LCheckReturn : public LCallInstructionHelper<BOX_PIECES, 2 * BOX_PIECES, 0
     static const size_t ThisValue = BOX_PIECES;
 
     LIR_HEADER(CheckReturn)
+};
+
+class LCheckObjCoercible : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES, 0>
+{
+  public:
+    static const size_t CheckValue = 0;
+
+    LIR_HEADER(CheckObjCoercible)
+};
+
+class LDebugCheckSelfHosted : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES, 0>
+{
+  public:
+    static const size_t CheckValue = 0;
+
+    LIR_HEADER(DebugCheckSelfHosted)
 };
 
 } // namespace jit

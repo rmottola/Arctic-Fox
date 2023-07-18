@@ -236,8 +236,6 @@ public:
     return SubjectPrincipal();
   }
 
-  static bool     IsImageSrcSetDisabled();
-
   static bool LookupBindingMember(JSContext* aCx, nsIContent *aContent,
                                   JS::Handle<jsid> aId,
                                   JS::MutableHandle<JSPropertyDescriptor> aDesc);
@@ -1670,6 +1668,11 @@ public:
   static nsIWindowProvider*
   GetWindowProviderForContentProcess();
 
+  // Returns the browser window with the most recent time stamp that is
+  // not in private browsing mode.
+  static already_AddRefed<nsPIDOMWindow>
+  GetMostRecentNonPBWindow();
+
   /**
    * Call this function if !IsSafeToRunScript() and we fail to run the script
    * (rather than using AddScriptRunner as we usually do). |aDocument| is
@@ -2571,6 +2574,13 @@ public:
    * (if that is possible, the caller should use StorageAllowedForWindow)
    */
   static StorageAccess StorageAllowedForPrincipal(nsIPrincipal* aPrincipal);
+
+  /*
+   * Serializes a HTML nsINode into its markup representation.
+   */
+  static bool SerializeNodeToMarkup(nsINode* aRoot,
+                                    bool aDescendentsOnly,
+                                    nsAString& aOut);
 
 private:
   static bool InitializeEventTable();

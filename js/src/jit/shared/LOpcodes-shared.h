@@ -326,7 +326,6 @@
     _(CallInstanceOf)               \
     _(InterruptCheck)               \
     _(AsmJSInterruptCheck)          \
-    _(InterruptCheckImplicit)       \
     _(GetDOMProperty)               \
     _(GetDOMMemberV)                \
     _(GetDOMMemberT)                \
@@ -367,6 +366,8 @@
     _(Debugger)                     \
     _(NewTarget)                    \
     _(ArrowNewTarget)               \
-    _(CheckReturn)
+    _(CheckReturn)                  \
+    _(CheckObjCoercible)            \
+    _(DebugCheckSelfHosted)
 
 #endif /* jit_shared_LOpcodes_shared_h */

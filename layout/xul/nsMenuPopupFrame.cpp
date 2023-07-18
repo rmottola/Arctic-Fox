@@ -829,7 +829,7 @@ nsMenuPopupFrame::InitializePopupWithAnchorAlign(nsIContent* aAnchorContent,
 }
 
 void
-nsMenuPopupFrame::ShowPopup(bool aIsContextMenu, bool aSelectFirstItem)
+nsMenuPopupFrame::ShowPopup(bool aIsContextMenu)
 {
   mIsContextMenu = aIsContextMenu;
 

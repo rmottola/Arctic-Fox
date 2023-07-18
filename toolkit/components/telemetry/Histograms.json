@@ -1365,6 +1365,14 @@
     "releaseChannelCollection": "opt-out",
     "description": "The lifetime of accepted HTTPS server certificates, in weeks, up to 2 years. Bucket 105 is all end-entity HTTPS server certificates with a lifetime > 2 years."
   },
+  "KEYGEN_GENERATED_KEY_TYPE": {
+    "expires_in_version": "50",
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "kind": "count",
+    "keyed": "true",
+    "releaseChannelCollection": "opt-out",
+    "description": "The number of times we generate a key via keygen, keyed on algorithm and keysize. Keys include RSA with key size (512, 1024, 2048, possibly others), secp384r1, secp256r1, and 'other_ec'."
+  },
   "WEBSOCKETS_HANDSHAKE_TYPE": {
     "expires_in_version": "never",
     "kind": "enumerated",
@@ -9378,6 +9386,13 @@
     "keyed": true,
     "releaseChannelCollection": "opt-out",
     "description": "Counts number of times a certain plugin has been activated."
+  },
+  "SCROLL_LINKED_EFFECT_FOUND": {
+    "alert_emails": ["kgupta@mozilla.com"],
+    "bug_numbers": [1229052],
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "Attempt to determine prevalence of scroll-linked effects on the web."
   },
   "YOUTUBE_EMBED_SEEN": {
     "alert_emails": ["cpeterson@mozilla.com"],

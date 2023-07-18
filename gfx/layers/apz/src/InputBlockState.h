@@ -48,6 +48,9 @@ public:
 
   bool IsTargetConfirmed() const;
 
+  void SetScrolledApzc(AsyncPanZoomController* aApzc);
+  AsyncPanZoomController* GetScrolledApzc() const;
+
 protected:
   virtual void UpdateTargetApzc(const RefPtr<AsyncPanZoomController>& aTargetApzc);
 
@@ -55,6 +58,13 @@ private:
   RefPtr<AsyncPanZoomController> mTargetApzc;
   bool mTargetConfirmed;
   const uint64_t mBlockId;
+
+  // The APZC that was actually scrolled by events in this input block.
+  // This is used in configurations where a single input block is only
+  // allowed to scroll a single APZC (configurations where gfxPrefs::
+  // APZAllowImmediateHandoff() is false).
+  // Set the first time an input event in this block scrolls an APZC.
+  RefPtr<AsyncPanZoomController> mScrolledApzc;
 protected:
   RefPtr<const OverscrollHandoffChain> mOverscrollHandoffChain;
 
@@ -431,6 +441,23 @@ public:
   bool TouchActionAllowsPanningY() const;
   bool TouchActionAllowsPanningXY() const;
 
+  /**
+   * Notifies the input block of an incoming touch event so that the block can
+   * update its internal slop state. "Slop" refers to the area around the
+   * initial touchstart where we drop touchmove events so that content doesn't
+   * see them. The |aApzcCanConsumeEvents| parameter is factored into how large
+   * the slop area is - if this is true the slop area is larger.
+   * @return true iff the provided event is a touchmove in the slop area and
+   *         so should not be sent to content.
+   */
+  bool UpdateSlopState(const MultiTouchInput& aInput,
+                       bool aApzcCanConsumeEvents);
+
+  /**
+   * Returns the number of touch points currently active.
+   */
+  uint32_t GetActiveTouchCount() const;
+
   bool HasEvents() const override;
   void DropEvents() override;
   void HandleEvents() override;
@@ -443,6 +470,8 @@ private:
   bool mAllowedTouchBehaviorSet;
   bool mDuringFastFling;
   bool mSingleTapOccurred;
+  bool mInSlop;
+  ScreenIntPoint mSlopOrigin;
   nsTArray<MultiTouchInput> mEvents;
   // A reference to the InputQueue's touch counter
   TouchCounter& mTouchCounter;

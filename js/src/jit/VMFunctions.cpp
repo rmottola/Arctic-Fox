@@ -34,8 +34,7 @@ using namespace js::jit;
 namespace js {
 namespace jit {
 
-// Don't explicitly initialize, it's not guaranteed that this initializer will
-// run before the constructors for static VMFunctions.
+// Statics are initialized to null.
 /* static */ VMFunction* VMFunction::functions;
 
 AutoDetectInvalidation::AutoDetectInvalidation(JSContext* cx, MutableHandleValue rval)
@@ -48,11 +47,6 @@ AutoDetectInvalidation::AutoDetectInvalidation(JSContext* cx, MutableHandleValue
 void
 VMFunction::addToFunctions()
 {
-    static bool initialized = false;
-    if (!initialized) {
-        initialized = true;
-        functions = nullptr;
-    }
     this->next = functions;
     functions = this;
 }
@@ -485,9 +479,9 @@ InterruptCheck(JSContext* cx)
     gc::MaybeVerifyBarriers(cx);
 
     {
-        JitRuntime* jrt = cx->runtime()->jitRuntime();
-        JitRuntime::AutoMutateBackedges amb(jrt);
-        jrt->patchIonBackedges(cx->runtime(), JitRuntime::BackedgeLoopHeader);
+        JSRuntime* rt = cx->runtime();
+        JitRuntime::AutoPreventBackedgePatching apbp(rt);
+        rt->jitRuntime()->patchIonBackedges(rt, JitRuntime::BackedgeLoopHeader);
     }
 
     return CheckForInterrupt(cx);
@@ -1309,6 +1303,15 @@ bool
 BaselineThrowUninitializedThis(JSContext* cx, BaselineFrame* frame)
 {
     return ThrowUninitializedThis(cx, frame);
+}
+
+
+bool
+ThrowObjectCoercible(JSContext* cx, HandleValue v)
+{
+    MOZ_ASSERT(v.isUndefined() || v.isNull());
+    MOZ_ALWAYS_FALSE(ToObjectSlow(cx, v, false));
+    return false;
 }
 
 bool

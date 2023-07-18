@@ -389,29 +389,6 @@ nsStyleContext::FindChildWithRules(const nsIAtom* aPseudoTag,
   return result.forget();
 }
 
-/* static */ bool
-nsStyleContext::ListContainsStyleContextThatUsesGrandancestorStyle(const nsStyleContext* aHead)
-{
-  if (aHead) {
-    const nsStyleContext* child = aHead;
-    do {
-      if (child->UsesGrandancestorStyle()) {
-        return true;
-      }
-      child = child->mNextSibling;
-    } while (child != aHead);
-  }
-
-  return false;
-}
-
-bool
-nsStyleContext::HasChildThatUsesGrandancestorStyle() const
-{
-  return ListContainsStyleContextThatUsesGrandancestorStyle(mEmptyChild) ||
-         ListContainsStyleContextThatUsesGrandancestorStyle(mChild);
-}
-
 const void* nsStyleContext::StyleData(nsStyleStructID aSID)
 {
   const void* cachedData = GetCachedStyleData(aSID);
@@ -627,8 +604,9 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
     // This is covering the <div align="right"><table>...</table></div> case.
     // In this case, we don't want to inherit the text alignment into the table.
     const nsStyleText* text = StyleText();
-    
-    if (text->mTextAlign == NS_STYLE_TEXT_ALIGN_MOZ_CENTER ||
+
+    if (text->mTextAlign == NS_STYLE_TEXT_ALIGN_MOZ_LEFT ||
+        text->mTextAlign == NS_STYLE_TEXT_ALIGN_MOZ_CENTER ||
         text->mTextAlign == NS_STYLE_TEXT_ALIGN_MOZ_RIGHT)
     {
       nsStyleText* uniqueText = (nsStyleText*)GetUniqueStyleData(eStyleStruct_Text);
@@ -654,8 +632,9 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
       displayVal = NS_STYLE_DISPLAY_BLOCK;
     }
     if (displayVal != disp->mDisplay) {
-      nsStyleDisplay *mutable_display =
+      nsStyleDisplay* mutable_display =
         static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
+      disp = mutable_display;
 
       // If we're in this code, then mOriginalDisplay doesn't matter
       // for purposes of the cascade (because this nsStyleDisplay
@@ -718,8 +697,9 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
                        "We shouldn't be changing the display value of "
                        "positioned content (and we should have already "
                        "converted its display value to be block-level...)");
-          nsStyleDisplay *mutable_display =
+          nsStyleDisplay* mutable_display =
             static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
+          disp = mutable_display;
           mutable_display->mDisplay = displayVal;
         }
       }
@@ -730,8 +710,9 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
       uint8_t displayVal = disp->mDisplay;
       nsRuleNode::EnsureInlineDisplay(displayVal);
       if (displayVal != disp->mDisplay) {
-        nsStyleDisplay *mutable_display =
+        nsStyleDisplay* mutable_display =
           static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
+        disp = mutable_display;
         mutable_display->mDisplay = displayVal;
       }
     }
@@ -781,8 +762,9 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
     // and text-orientation) here; just the writing-mode property is enough.
     if (StyleVisibility()->mWritingMode !=
         mParent->StyleVisibility()->mWritingMode) {
-      nsStyleDisplay *mutable_display =
+      nsStyleDisplay* mutable_display =
         static_cast<nsStyleDisplay*>(GetUniqueStyleData(eStyleStruct_Display));
+      disp = mutable_display;
       mutable_display->mOriginalDisplay = mutable_display->mDisplay =
         NS_STYLE_DISPLAY_INLINE_BLOCK;
     }
@@ -1563,8 +1545,8 @@ nsStyleContext::LogStyleContextTree(bool aFirst, uint32_t aStructs)
   if (IsStyleIfVisited()) {
     flags.AppendLiteral("IS_STYLE_IF_VISITED ");
   }
-  if (UsesGrandancestorStyle()) {
-    flags.AppendLiteral("USES_GRANDANCESTOR_STYLE ");
+  if (HasChildThatUsesGrandancestorStyle()) {
+    flags.AppendLiteral("CHILD_USES_GRANDANCESTOR_STYLE ");
   }
   if (IsShared()) {
     flags.AppendLiteral("IS_SHARED ");

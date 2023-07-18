@@ -811,28 +811,26 @@ void nsNSSCertificateDB::DisplayCertificateAlert(nsIInterfaceRequestor *ctx,
     return;
   }
 
-  nsPSMUITracker tracker;
-  if (!tracker.isUIForbidden()) {
+  nsCOMPtr<nsIInterfaceRequestor> my_ctx = ctx;
+  if (!my_ctx) {
+    my_ctx = new PipUIContext();
+  }
 
-    nsCOMPtr<nsIInterfaceRequestor> my_ctx = ctx;
-    if (!my_ctx)
-      my_ctx = new PipUIContext();
+  // This shall be replaced by embedding ovverridable prompts
+  // as discussed in bug 310446, and should make use of certToShow.
 
-    // This shall be replaced by embedding ovverridable prompts
-    // as discussed in bug 310446, and should make use of certToShow.
+  nsresult rv;
+  nsCOMPtr<nsINSSComponent> nssComponent(do_GetService(kNSSComponentCID, &rv));
+  if (NS_SUCCEEDED(rv)) {
+    nsAutoString tmpMessage;
+    nssComponent->GetPIPNSSBundleString(stringID, tmpMessage);
 
-    nsresult rv;
-    nsCOMPtr<nsINSSComponent> nssComponent(do_GetService(kNSSComponentCID, &rv));
-    if (NS_SUCCEEDED(rv)) {
-      nsAutoString tmpMessage;
-      nssComponent->GetPIPNSSBundleString(stringID, tmpMessage);
-
-      nsCOMPtr<nsIPrompt> prompt (do_GetInterface(my_ctx));
-      if (!prompt)
-        return;
-    
-      prompt->Alert(nullptr, tmpMessage.get());
+    nsCOMPtr<nsIPrompt> prompt (do_GetInterface(my_ctx));
+    if (!prompt) {
+      return;
     }
+
+    prompt->Alert(nullptr, tmpMessage.get());
   }
 }
 
@@ -926,6 +924,7 @@ loser:
 NS_IMETHODIMP 
 nsNSSCertificateDB::DeleteCertificate(nsIX509Cert *aCert)
 {
+  NS_ENSURE_ARG_POINTER(aCert);
   nsNSSShutDownPreventionLock locker;
   if (isAlreadyShutDown()) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -964,6 +963,7 @@ nsNSSCertificateDB::SetCertTrust(nsIX509Cert *cert,
                                  uint32_t type,
                                  uint32_t trusted)
 {
+  NS_ENSURE_ARG_POINTER(cert);
   nsNSSShutDownPreventionLock locker;
   if (isAlreadyShutDown()) {
     return NS_ERROR_NOT_AVAILABLE;

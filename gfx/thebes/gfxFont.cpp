@@ -549,9 +549,9 @@ gfxFontShaper::MergeFontFeatures(
 }
 
 void
-gfxShapedText::SetupClusterBoundaries(uint32_t         aOffset,
+gfxShapedText::SetupClusterBoundaries(uint32_t        aOffset,
                                       const char16_t *aString,
-                                      uint32_t         aLength)
+                                      uint32_t        aLength)
 {
     CompressedGlyph *glyphs = GetCharacterGlyphs() + aOffset;
 
@@ -562,8 +562,15 @@ gfxShapedText::SetupClusterBoundaries(uint32_t         aOffset,
 
     // the ClusterIterator won't be able to tell us if the string
     // _begins_ with a cluster-extender, so we handle that here
-    if (aLength && IsClusterExtender(*aString)) {
-        *glyphs = extendCluster;
+    if (aLength) {
+        uint32_t ch = *aString;
+        if (aLength > 1 && NS_IS_HIGH_SURROGATE(ch) &&
+            NS_IS_LOW_SURROGATE(aString[1])) {
+            ch = SURROGATE_TO_UCS4(ch, aString[1]);
+        }
+        if (IsClusterExtender(ch)) {
+            *glyphs = extendCluster;
+        }
     }
 
     while (!iter.AtEnd()) {
@@ -2389,10 +2396,15 @@ gfxFont::NotifyGlyphsChanged()
     }
 }
 
-static bool
+// If aChar is a "word boundary" for shaped-word caching purposes, return it;
+// else return 0.
+static char16_t
 IsBoundarySpace(char16_t aChar, char16_t aNextChar)
 {
-    return (aChar == ' ' || aChar == 0x00A0) && !IsClusterExtender(aNextChar);
+    if ((aChar == ' ' || aChar == 0x00A0) && !IsClusterExtender(aNextChar)) {
+        return aChar;
+    }
+    return 0;
 }
 
 #ifdef __GNUC__
@@ -2822,7 +2834,7 @@ gfxFont::SplitAndInitTextRun(gfxContext *aContext,
     for (uint32_t i = 0; i <= aRunLength; ++i) {
         T ch = nextCh;
         nextCh = (i < aRunLength - 1) ? aString[i + 1] : '\n';
-        bool boundary = IsBoundarySpace(ch, nextCh);
+        T boundary = IsBoundarySpace(ch, nextCh);
         bool invalid = !boundary && gfxFontGroup::IsInvalidChar(ch);
         uint32_t length = i - wordStart;
 
@@ -2884,16 +2896,20 @@ gfxFont::SplitAndInitTextRun(gfxContext *aContext,
                     gfxTextRunFactory::TEXT_ORIENT_VERTICAL_UPRIGHT :
                     gfxTextRunFactory::TEXT_ORIENT_VERTICAL_SIDEWAYS_RIGHT;
             }
-            if (!aTextRun->SetSpaceGlyphIfSimple(this, aContext,
-                                                 aRunStart + i, ch,
-                                                 orientation))
-            {
-                static const uint8_t space = ' ';
+            if (boundary != ' ' ||
+                !aTextRun->SetSpaceGlyphIfSimple(this, aRunStart + i, ch,
+                                                 orientation)) {
+                // Currently, the only "boundary" characters we recognize are
+                // space and no-break space, which are both 8-bit, so we force
+                // that flag (below). If we ever change IsBoundarySpace, we
+                // may need to revise this.
+                // Avoid tautological-constant-out-of-range-compare in 8-bit:
+                DebugOnly<char16_t> boundary16 = boundary;
+                NS_ASSERTION(boundary16 < 256, "unexpected boundary!");
                 gfxShapedWord *sw =
-                    GetShapedWord(aContext,
-                                  &space, 1,
-                                  gfxShapedWord::HashMix(0, ' '), aRunScript, aVertical,
-                                  appUnitsPerDevUnit,
+                    GetShapedWord(aContext, &boundary, 1,
+                                  gfxShapedWord::HashMix(0, boundary),
+                                  aRunScript, aVertical, appUnitsPerDevUnit,
                                   flags | gfxTextRunFactory::TEXT_IS_8BIT, tp);
                 if (sw) {
                     aTextRun->CopyGlyphDataFrom(sw, aRunStart + i);
@@ -3208,7 +3224,8 @@ gfxFont::SetupGlyphExtents(gfxContext *aContext,
     glyph.x = 0;
     glyph.y = 0;
     cairo_text_extents_t extents;
-    cairo_glyph_extents(aContext->GetCairo(), &glyph, 1, &extents);
+    cairo_glyph_extents(gfxContext::RefCairo(aContext->GetDrawTarget()),
+                        &glyph, 1, &extents);
 
     const Metrics& fontMetrics = GetMetrics(eHorizontal);
     int32_t appUnitsPerDevUnit = aExtents->GetAppUnitsPerDevUnit();

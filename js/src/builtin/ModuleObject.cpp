@@ -16,9 +16,6 @@
 using namespace js;
 using namespace js::frontend;
 
-typedef JS::Rooted<ImportEntryObject*> RootedImportEntry;
-typedef JS::Rooted<ExportEntryObject*> RootedExportEntry;
-
 template<typename T, Value ValueGetter(T* obj)>
 static bool
 ModuleValueGetterImpl(JSContext* cx, const CallArgs& args)
@@ -121,7 +118,7 @@ ImportEntryObject::create(JSContext* cx,
     if (!obj)
         return nullptr;
 
-    RootedImportEntry self(cx, &obj->as<ImportEntryObject>());
+    RootedImportEntryObject self(cx, &obj->as<ImportEntryObject>());
     self->initReservedSlot(ModuleRequestSlot, StringValue(moduleRequest));
     self->initReservedSlot(ImportNameSlot, StringValue(importName));
     self->initReservedSlot(LocalNameSlot, StringValue(localName));
@@ -194,7 +191,7 @@ ExportEntryObject::create(JSContext* cx,
     if (!obj)
         return nullptr;
 
-    RootedExportEntry self(cx, &obj->as<ExportEntryObject>());
+    RootedExportEntryObject self(cx, &obj->as<ExportEntryObject>());
     self->initReservedSlot(ExportNameSlot, StringOrNullValue(maybeExportName));
     self->initReservedSlot(ModuleRequestSlot, StringOrNullValue(maybeModuleRequest));
     self->initReservedSlot(ImportNameSlot, StringOrNullValue(maybeImportName));
@@ -896,8 +893,9 @@ js::InitModuleClasses(JSContext* cx, HandleObject obj)
 ///////////////////////////////////////////////////////////////////////////
 // ModuleBuilder
 
-ModuleBuilder::ModuleBuilder(JSContext* cx)
+ModuleBuilder::ModuleBuilder(JSContext* cx, HandleModuleObject module)
   : cx_(cx),
+    module_(cx, module),
     requestedModules_(cx, AtomVector(cx)),
     importedBoundNames_(cx, AtomVector(cx)),
     importEntries_(cx, ImportEntryVector(cx)),
@@ -908,7 +906,7 @@ ModuleBuilder::ModuleBuilder(JSContext* cx)
 {}
 
 bool
-ModuleBuilder::buildAndInit(frontend::ParseNode* moduleNode, HandleModuleObject module)
+ModuleBuilder::buildAndInit(frontend::ParseNode* moduleNode)
 {
     MOZ_ASSERT(moduleNode->isKind(PNK_MODULE));
 
@@ -940,21 +938,21 @@ ModuleBuilder::buildAndInit(frontend::ParseNode* moduleNode, HandleModuleObject 
     }
 
     for (const auto& e : exportEntries_) {
-        RootedExportEntry exp(cx_, e);
+        RootedExportEntryObject exp(cx_, e);
         if (!exp->moduleRequest()) {
-            RootedImportEntry importEntry(cx_, importEntryFor(exp->localName()));
+            RootedImportEntryObject importEntry(cx_, importEntryFor(exp->localName()));
             if (!importEntry) {
-                if (!localExportEntries_.append(exp))
+                if (!appendLocalExportEntry(exp))
                     return false;
             } else {
                 if (importEntry->importName() == cx_->names().star) {
-                    if (!localExportEntries_.append(exp))
+                    if (!appendLocalExportEntry(exp))
                         return false;
                 } else {
                     RootedAtom exportName(cx_, exp->exportName());
                     RootedAtom moduleRequest(cx_, importEntry->moduleRequest());
                     RootedAtom importName(cx_, importEntry->importName());
-                    RootedExportEntry exportEntry(cx_);
+                    RootedExportEntryObject exportEntry(cx_);
                     exportEntry = ExportEntryObject::create(cx_,
                                                             exportName,
                                                             moduleRequest,
@@ -994,13 +992,26 @@ ModuleBuilder::buildAndInit(frontend::ParseNode* moduleNode, HandleModuleObject 
     if (!starExportEntries)
         return false;
 
-    module->initImportExportData(requestedModules,
+    module_->initImportExportData(requestedModules,
                                  importEntries,
                                  localExportEntries,
                                  indirectExportEntries,
                                  starExportEntries);
 
     return true;
+}
+
+bool
+ModuleBuilder::appendLocalExportEntry(HandleExportEntryObject exp)
+{
+    if (!module_->initialEnvironment().lookup(cx_, AtomToId(exp->localName()))) {
+        JSAutoByteString str;
+        str.encodeLatin1(cx_, exp->localName());
+        JS_ReportErrorNumber(cx_, GetErrorMessage, nullptr, JSMSG_MISSING_EXPORT, str.ptr());
+        return false;
+    }
+
+    return localExportEntries_.append(exp);
 }
 
 bool
@@ -1025,7 +1036,7 @@ ModuleBuilder::processImport(frontend::ParseNode* pn)
         if (!importedBoundNames_.append(localName))
             return false;
 
-        RootedImportEntry importEntry(cx_);
+        RootedImportEntryObject importEntry(cx_);
         importEntry = ImportEntryObject::create(cx_, module, importName, localName);
         if (!importEntry || !importEntries_.append(importEntry))
             return false;
@@ -1049,7 +1060,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
             MOZ_ASSERT(spec->isKind(PNK_EXPORT_SPEC));
             RootedAtom localName(cx_, spec->pn_left->pn_atom);
             RootedAtom exportName(cx_, spec->pn_right->pn_atom);
-            if (!appendLocalExportEntry(exportName, localName))
+            if (!appendExportEntry(exportName, localName))
                 return false;
         }
         break;
@@ -1058,7 +1069,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
           RootedFunction func(cx_, kid->pn_funbox->function());
           RootedAtom localName(cx_, func->atom());
           RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
-          if (!appendLocalExportEntry(exportName, localName))
+          if (!appendExportEntry(exportName, localName))
               return false;
           break;
       }
@@ -1068,7 +1079,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
           MOZ_ASSERT(cls.names());
           RootedAtom localName(cx_, cls.names()->innerBinding()->pn_atom);
           RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
-          if (!appendLocalExportEntry(exportName, localName))
+          if (!appendExportEntry(exportName, localName))
               return false;
           break;
       }
@@ -1083,7 +1094,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
               MOZ_ASSERT(var->isKind(PNK_NAME));
               RootedAtom localName(cx_, var->pn_atom);
               RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
-              if (!appendLocalExportEntry(exportName, localName))
+              if (!appendExportEntry(exportName, localName))
                   return false;
           }
           break;
@@ -1093,7 +1104,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
         MOZ_ASSERT(isDefault);
         RootedAtom localName(cx_, cx_->names().starDefaultStar);
         RootedAtom exportName(cx_, cx_->names().default_);
-        if (!appendLocalExportEntry(exportName, localName))
+        if (!appendExportEntry(exportName, localName))
             return false;
         break;
     }
@@ -1115,12 +1126,12 @@ ModuleBuilder::processExportFrom(frontend::ParseNode* pn)
         if (spec->isKind(PNK_EXPORT_SPEC)) {
             RootedAtom bindingName(cx_, spec->pn_left->pn_atom);
             RootedAtom exportName(cx_, spec->pn_right->pn_atom);
-            if (!appendIndirectExportEntry(exportName, module, bindingName))
+            if (!appendExportFromEntry(exportName, module, bindingName))
                 return false;
         } else {
             MOZ_ASSERT(spec->isKind(PNK_EXPORT_BATCH_SPEC));
             RootedAtom importName(cx_, cx_->names().star);
-            if (!appendIndirectExportEntry(nullptr, module, importName))
+            if (!appendExportFromEntry(nullptr, module, importName))
                 return false;
         }
     }
@@ -1139,7 +1150,7 @@ ModuleBuilder::importEntryFor(JSAtom* localName)
 }
 
 bool
-ModuleBuilder::appendLocalExportEntry(HandleAtom exportName, HandleAtom localName)
+ModuleBuilder::appendExportEntry(HandleAtom exportName, HandleAtom localName)
 {
     Rooted<ExportEntryObject*> exportEntry(cx_);
     exportEntry = ExportEntryObject::create(cx_, exportName, nullptr, nullptr, localName);
@@ -1147,8 +1158,8 @@ ModuleBuilder::appendLocalExportEntry(HandleAtom exportName, HandleAtom localNam
 }
 
 bool
-ModuleBuilder::appendIndirectExportEntry(HandleAtom exportName, HandleAtom moduleRequest,
-                                         HandleAtom importName)
+ModuleBuilder::appendExportFromEntry(HandleAtom exportName, HandleAtom moduleRequest,
+                                     HandleAtom importName)
 {
     Rooted<ExportEntryObject*> exportEntry(cx_);
     exportEntry = ExportEntryObject::create(cx_, exportName, moduleRequest, importName, nullptr);

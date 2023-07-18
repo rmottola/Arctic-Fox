@@ -26,6 +26,7 @@
 
 #include "jsscriptinlines.h"
 
+#include "jit/BaselineFrameInfo-inl.h"
 #include "jit/MacroAssembler-inl.h"
 #include "vm/Interpreter-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -238,13 +239,11 @@ BaselineCompiler::compile()
 
     // All barriers are emitted off-by-default, toggle them on if needed.
     if (cx->zone()->needsIncrementalBarrier())
-        baselineScript->toggleBarriers(true);
+        baselineScript->toggleBarriers(true, DontReprotect);
 
     // If profiler instrumentation is enabled, toggle instrumentation on.
     if (cx->runtime()->jitRuntime()->isProfilerInstrumentationEnabled(cx->runtime()))
         baselineScript->toggleProfilerInstrumentation(true);
-
-    AutoWritableJitCode awjc(code);
 
     // Patch IC loads using IC entries.
     for (size_t i = 0; i < icLoadLabels_.length(); i++) {
@@ -3588,8 +3587,7 @@ BaselineCompiler::emit_JSOP_RETRVAL()
     return emitReturn();
 }
 
-typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue, HandleValue,
-                       MutableHandleValue);
+typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue, MutableHandleValue);
 static const VMFunction ToIdInfo = FunctionInfo<ToIdFn>(js::ToIdOperation);
 
 bool
@@ -3605,10 +3603,7 @@ BaselineCompiler::emit_JSOP_TOID()
 
     prepareVMCall();
 
-    masm.loadValue(frame.addressOfStackValue(frame.peek(-2)), R1);
-
     pushArg(R0);
-    pushArg(R1);
     pushArg(ImmPtr(pc));
     pushArg(ImmGCPtr(script));
 
@@ -3618,6 +3613,32 @@ BaselineCompiler::emit_JSOP_TOID()
     masm.bind(&done);
     frame.pop(); // Pop index.
     frame.push(R0);
+    return true;
+}
+
+typedef bool (*ThrowObjectCoercibleFn)(JSContext*, HandleValue);
+static const VMFunction ThrowObjectCoercibleInfo = FunctionInfo<ThrowObjectCoercibleFn>(ThrowObjectCoercible);
+
+bool
+BaselineCompiler::emit_JSOP_CHECKOBJCOERCIBLE()
+{
+    frame.syncStack(0);
+    masm.loadValue(frame.addressOfStackValue(frame.peek(-1)), R0);
+
+    Label fail, done;
+
+    masm.branchTestUndefined(Assembler::Equal, R0, &fail);
+    masm.branchTestNull(Assembler::NotEqual, R0, &done);
+
+    masm.bind(&fail);
+    prepareVMCall();
+
+    pushArg(R0);
+
+    if (!callVM(ThrowObjectCoercibleInfo))
+        return false;
+
+    masm.bind(&done);
     return true;
 }
 
@@ -4239,3 +4260,22 @@ BaselineCompiler::emit_JSOP_RESUME()
     return true;
 }
 
+typedef bool (*CheckSelfHostedFn)(JSContext*, HandleValue);
+static const VMFunction CheckSelfHostedInfo = FunctionInfo<CheckSelfHostedFn>(js::Debug_CheckSelfHosted);
+
+bool
+BaselineCompiler::emit_JSOP_DEBUGCHECKSELFHOSTED()
+{
+#ifdef DEBUG
+    frame.syncStack(0);
+
+    masm.loadValue(frame.addressOfStackValue(frame.peek(-1)), R0);
+
+    prepareVMCall();
+    pushArg(R0);
+    if (!callVM(CheckSelfHostedInfo))
+        return false;
+#endif
+    return true;
+
+}

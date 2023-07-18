@@ -301,6 +301,8 @@ public:
     virtual bool RecvLoadURL(const nsCString& aURI,
                              const BrowserConfiguration& aConfiguration,
                              const ShowInfo& aInfo) override;
+    virtual bool RecvOpenURI(const URIParams& aURI,
+                             const uint32_t& aFlags) override;
     virtual bool RecvCacheFileDescriptor(const nsString& aPath,
                                          const FileDescriptor& aFileDescriptor)
                                          override;
@@ -501,6 +503,10 @@ public:
     virtual bool RecvHandleAccessKey(nsTArray<uint32_t>&& aCharCodes,
                                      const bool& aIsTrusted,
                                      const int32_t& aModifierMask) override;
+
+    virtual bool RecvAudioChannelChangeNotification(const uint32_t& aAudioChannel,
+                                                    const float& aVolume,
+                                                    const bool& aMuted) override;
 
     /**
      * Native widget remoting protocol for use with windowed plugins with e10s.

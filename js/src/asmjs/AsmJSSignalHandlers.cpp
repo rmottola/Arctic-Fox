@@ -58,22 +58,22 @@ RuntimeForCurrentThread()
 // report dialog via Breakpad. To guard against this we watch for such
 // recursion and fall through to the next handler immediately rather than
 // trying to handle it.
-class AutoSetHandlingSignal
+class AutoSetHandlingSegFault
 {
     JSRuntime* rt;
 
   public:
-    explicit AutoSetHandlingSignal(JSRuntime* rt)
+    explicit AutoSetHandlingSegFault(JSRuntime* rt)
       : rt(rt)
     {
-        MOZ_ASSERT(!rt->handlingSignal);
-        rt->handlingSignal = true;
+        MOZ_ASSERT(!rt->handlingSegFault);
+        rt->handlingSegFault = true;
     }
 
-    ~AutoSetHandlingSignal()
+    ~AutoSetHandlingSegFault()
     {
-        MOZ_ASSERT(rt->handlingSignal);
-        rt->handlingSignal = false;
+        MOZ_ASSERT(rt->handlingSegFault);
+        rt->handlingSegFault = false;
     }
 };
 
@@ -745,11 +745,11 @@ HandleFault(PEXCEPTION_POINTERS exception)
     if (record->NumberParameters < 2)
         return false;
 
-    // Don't allow recursive handling of signals, see AutoSetHandlingSignal.
+    // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
     JSRuntime* rt = RuntimeForCurrentThread();
-    if (!rt || rt->handlingSignal)
+    if (!rt || rt->handlingSegFault)
         return false;
-    AutoSetHandlingSignal handling(rt);
+    AutoSetHandlingSegFault handling(rt);
 
     AsmJSActivation* activation = rt->asmJSActivationStack();
     if (!activation)
@@ -854,10 +854,10 @@ struct ExceptionRequest
 static bool
 HandleMachException(JSRuntime* rt, const ExceptionRequest& request)
 {
-    // Don't allow recursive handling of signals, see AutoSetHandlingSignal.
-    if (rt->handlingSignal)
+    // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
+    if (rt->handlingSegFault)
         return false;
-    AutoSetHandlingSignal handling(rt);
+    AutoSetHandlingSegFault handling(rt);
 
     // Get the port of the JSRuntime's thread from the message.
     mach_port_t rtThread = request.body.thread.name;
@@ -1102,11 +1102,11 @@ HandleFault(int signum, siginfo_t* info, void* ctx)
     uint8_t** ppc = ContextToPC(context);
     uint8_t* pc = *ppc;
 
-    // Don't allow recursive handling of signals, see AutoSetHandlingSignal.
+    // Don't allow recursive handling of signals, see AutoSetHandlingSegFault.
     JSRuntime* rt = RuntimeForCurrentThread();
-    if (!rt || rt->handlingSignal)
+    if (!rt || rt->handlingSegFault)
         return false;
-    AutoSetHandlingSignal handling(rt);
+    AutoSetHandlingSegFault handling(rt);
 
     AsmJSActivation* activation = rt->asmJSActivationStack();
     if (!activation)
@@ -1174,7 +1174,7 @@ RedirectIonBackedgesToInterruptCheck(JSRuntime* rt)
         // thus not in a JIT iloop. We assume that the interrupt flag will be
         // checked at least once before entering JIT code (if not, no big deal;
         // the browser will just request another interrupt in a second).
-        if (!jitRuntime->mutatingBackedgeList())
+        if (!jitRuntime->preventBackedgePatching())
             jitRuntime->patchIonBackedges(rt, jit::JitRuntime::BackedgeInterruptCheck);
     }
 }
@@ -1215,8 +1215,10 @@ static const int sInterruptSignal = SIGVTALRM;
 static void
 JitInterruptHandler(int signum, siginfo_t* info, void* context)
 {
-    if (JSRuntime* rt = RuntimeForCurrentThread())
+    if (JSRuntime* rt = RuntimeForCurrentThread()) {
         RedirectJitCodeToInterruptCheck(rt, (CONTEXT*)context);
+        rt->finishHandlingJitInterrupt();
+    }
 }
 #endif
 
@@ -1292,7 +1294,7 @@ js::EnsureSignalHandlersInstalled(JSRuntime* rt)
 # else
     // SA_NODEFER allows us to reenter the signal handler if we crash while
     // handling the signal, and fall through to the Breakpad handler by testing
-    // handlingSignal.
+    // handlingSegFault.
     struct sigaction faultHandler;
     faultHandler.sa_flags = SA_SIGINFO | SA_NODEFER;
     faultHandler.sa_sigaction = &AsmJSFaultHandler;
@@ -1323,11 +1325,17 @@ js::InterruptRunningJitCode(JSRuntime* rt)
     if (!rt->canUseSignalHandlers())
         return;
 
+    // Do nothing if we're already handling an interrupt here, to avoid races
+    // below and in JitRuntime::patchIonBackedges.
+    if (!rt->startHandlingJitInterrupt())
+        return;
+
     // If we are on runtime's main thread, then: pc is not in asm.js code (so
     // nothing to do for asm.js) and we can patch Ion backedges without any
     // special synchronization.
     if (rt == RuntimeForCurrentThread()) {
         RedirectIonBackedgesToInterruptCheck(rt);
+        rt->finishHandlingJitInterrupt();
         return;
     }
 
@@ -1348,6 +1356,7 @@ js::InterruptRunningJitCode(JSRuntime* rt)
         }
         ResumeThread(thread);
     }
+    rt->finishHandlingJitInterrupt();
 #else
     // On Unix, we instead deliver an async signal to the main thread which
     // halts the thread and callers our JitInterruptHandler (which has already

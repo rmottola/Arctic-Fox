@@ -1031,7 +1031,7 @@ nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
     SetURL(aSource.mURL);
   } else if (aSource.mType == NS_STYLE_CLIP_PATH_SHAPE) {
     SetBasicShape(aSource.mBasicShape, aSource.mSizingBox);
-  } else if (aSource.mType == NS_STYLE_CLIP_PATH_SHAPE) {
+  } else if (aSource.mType == NS_STYLE_CLIP_PATH_BOX) {
     SetSizingBox(aSource.mSizingBox);
   }
 }
@@ -2638,14 +2638,18 @@ mozilla::StyleTransition::SetInitialValues()
 }
 
 void
-mozilla::StyleTransition::SetUnknownProperty(const nsAString& aUnknownProperty)
+mozilla::StyleTransition::SetUnknownProperty(nsCSSProperty aProperty,
+                                             const nsAString& aPropertyString)
 {
-  NS_ASSERTION(nsCSSProps::LookupProperty(aUnknownProperty,
-                                          nsCSSProps::eEnabledForAllContent) ==
-                 eCSSProperty_UNKNOWN,
-               "should be unknown property");
-  mProperty = eCSSProperty_UNKNOWN;
-  mUnknownProperty = do_GetAtom(aUnknownProperty);
+  MOZ_ASSERT(nsCSSProps::LookupProperty(aPropertyString,
+                                        nsCSSProps::eEnabledForAllContent) ==
+               aProperty,
+             "property and property string should match");
+  MOZ_ASSERT(aProperty == eCSSProperty_UNKNOWN ||
+             aProperty == eCSSPropertyExtra_variable,
+             "should be either unknown or custom property");
+  mProperty = aProperty;
+  mUnknownProperty = do_GetAtom(aPropertyString);
 }
 
 bool
@@ -2912,6 +2916,9 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
       NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
     } else {
       NS_UpdateHint(hint, nsChangeHint_UpdateOpacityLayer);
+      if ((mOpacity == 1.0f) != (aOther.mOpacity == 1.0f)) {
+        NS_UpdateHint(hint, nsChangeHint_UpdateUsesOpacity);
+      }
     }
   }
 
@@ -2997,12 +3004,17 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
   // test above handles relevant changes in the
   // NS_STYLE_WILL_CHANGE_TRANSFORM bit, which in turn handles frame 
   // reconstruction for changes in the containing block of 
-  // fixed-positioned elements.  Other than that, all changes to 
-  // 'will-change' can be handled by a repaint.
+  // fixed-positioned elements.
   uint8_t willChangeBitsChanged =
     mWillChangeBitField ^ aOther.mWillChangeBitField;
-  if (willChangeBitsChanged) {
+  if (willChangeBitsChanged & (NS_STYLE_WILL_CHANGE_STACKING_CONTEXT |
+                               NS_STYLE_WILL_CHANGE_SCROLL |
+                               NS_STYLE_WILL_CHANGE_OPACITY)) {
     NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
+  }
+
+  if (willChangeBitsChanged & NS_STYLE_WILL_CHANGE_FIXPOS_CB) {
+    NS_UpdateHint(hint, nsChangeHint_UpdateContainingBlock);
   }
 
   // Note:  Our current behavior for handling changes to the
@@ -3628,15 +3640,10 @@ nsChangeHint nsStyleText::CalcDifference(const nsStyleText& aOther) const
            nsChangeHint_RepaintFrame;
   }
 
-  if (!AreShadowArraysEqual(mTextShadow, aOther.mTextShadow)) {
-    return nsChangeHint_UpdateSubtreeOverflow |
-           nsChangeHint_SchedulePaint |
-           nsChangeHint_RepaintFrame;
-  }
-
-  if (mTextEmphasisStyle != aOther.mTextEmphasisStyle ||
+  if (!AreShadowArraysEqual(mTextShadow, aOther.mTextShadow) ||
+      mTextEmphasisStyle != aOther.mTextEmphasisStyle ||
       mTextEmphasisStyleString != aOther.mTextEmphasisStyleString) {
-    return nsChangeHint_UpdateOverflow |
+    return nsChangeHint_UpdateSubtreeOverflow |
            nsChangeHint_SchedulePaint |
            nsChangeHint_RepaintFrame;
   }

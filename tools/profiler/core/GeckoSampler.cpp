@@ -38,6 +38,7 @@
 #include "nsDirectoryServiceDefs.h"
 #include "nsIObserverService.h"
 #include "mozilla/Services.h"
+#include "PlatformMacros.h"
 #include "nsTArray.h"
 
 #include "mozilla/ProfileGatherer.h"
@@ -246,6 +247,8 @@ GeckoSampler::GeckoSampler(double aInterval, int aEntrySize,
     mozilla::tasktracer::StartLogging();
   }
 #endif
+
+  mGatherer = new mozilla::ProfileGatherer(this);
 }
 
 GeckoSampler::~GeckoSampler()
@@ -278,6 +281,10 @@ GeckoSampler::~GeckoSampler()
 #if defined(XP_WIN)
   delete mIntelPowerGadget;
 #endif
+
+  // Cancel any in-flight async profile gatherering
+  // requests
+  mGatherer->Cancel();
 }
 
 void GeckoSampler::HandleSaveRequest()
@@ -398,35 +405,18 @@ JSObject* GeckoSampler::ToJSObject(JSContext *aCx, double aSinceTime)
   {
     UniquePtr<char[]> buf = ToJSON(aSinceTime);
     NS_ConvertUTF8toUTF16 js_string(nsDependentCString(buf.get()));
-    bool rv = JS_ParseJSON(aCx, static_cast<const char16_t*>(js_string.get()),
-                           js_string.Length(), &val);
-    if (!rv) {
-#ifdef NIGHTLY_BUILD
-      // XXXshu: Temporary code to help debug malformed JSON. See bug 1172157.
-      nsCOMPtr<nsIFile> path;
-      nsresult rv = NS_GetSpecialDirectory("TmpD", getter_AddRefs(path));
-      if (!NS_FAILED(rv)) {
-        rv = path->Append(NS_LITERAL_STRING("bad-profile.json"));
-        if (!NS_FAILED(rv)) {
-          nsCString cpath;
-          rv = path->GetNativePath(cpath);
-          if (!NS_FAILED(rv)) {
-            std::ofstream stream;
-            stream.open(cpath.get());
-            if (stream.is_open()) {
-              stream << buf.get();
-              stream.close();
-              printf_stderr("Malformed profiler JSON dumped to %s! "
-                            "Please upload to https://bugzil.la/1172157\n",
-                            cpath.get());
-            }
-          }
-        }
-      }
-#endif
-    }
+    MOZ_ALWAYS_TRUE(JS_ParseJSON(aCx, static_cast<const char16_t*>(js_string.get()),
+                                 js_string.Length(), &val));
   }
   return &val.toObject();
+}
+
+void GeckoSampler::GetGatherer(nsISupports** aRetVal)
+{
+  if (!aRetVal || NS_WARN_IF(!mGatherer)) {
+    return;
+  }
+  NS_ADDREF(*aRetVal = mGatherer);
 }
 #endif
 
@@ -440,17 +430,11 @@ UniquePtr<char[]> GeckoSampler::ToJSON(double aSinceTime)
 void GeckoSampler::ToJSObjectAsync(double aSinceTime,
                                   mozilla::dom::Promise* aPromise)
 {
-  if (NS_WARN_IF(mGatherer)) {
+  if (NS_WARN_IF(!mGatherer)) {
     return;
   }
 
-  mGatherer = new mozilla::ProfileGatherer(this, aSinceTime, aPromise);
-  mGatherer->Start();
-}
-
-void GeckoSampler::ProfileGathered()
-{
-  mGatherer = nullptr;
+  mGatherer->Start(aSinceTime, aPromise);
 }
 
 struct SubprocessClosure {
@@ -579,7 +563,11 @@ void GeckoSampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
       if (ProfileJava()) {
         mozilla::widget::GeckoJavaSampler::PauseJavaProfiling();
 
-        BuildJavaThreadJSObject(aWriter);
+        aWriter.Start();
+        {
+          BuildJavaThreadJSObject(aWriter);
+        }
+        aWriter.End();
 
         mozilla::widget::GeckoJavaSampler::UnpauseJavaProfiling();
       }
@@ -853,6 +841,17 @@ void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, Native
     if (nativeIndex >= 0)
       nativeStackAddr = (uint8_t *) aNativeStack.sp_array[nativeIndex];
 
+    // If there's a native stack entry which has the same SP as a
+    // pseudo stack entry, pretend we didn't see the native stack
+    // entry.  Ditto for a native stack entry which has the same SP as
+    // a JS stack entry.  In effect this means pseudo or JS entries
+    // trump conflicting native entries.
+    if (nativeStackAddr && (pseudoStackAddr == nativeStackAddr || jsStackAddr == nativeStackAddr)) {
+      nativeStackAddr = nullptr;
+      nativeIndex--;
+      MOZ_ASSERT(pseudoStackAddr || jsStackAddr);
+    }
+
     // Sanity checks.
     MOZ_ASSERT_IF(pseudoStackAddr, pseudoStackAddr != jsStackAddr &&
                                    pseudoStackAddr != nativeStackAddr);
@@ -944,10 +943,6 @@ void StackWalkCallback(uint32_t aFrameNumber, void* aPC, void* aSP,
 
 void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
 {
-#ifndef XP_MACOSX
-  uintptr_t thread = GetThreadHandle(aSample->threadProfile->GetPlatformData());
-  MOZ_ASSERT(thread);
-#endif
   void* pc_array[1000];
   void* sp_array[1000];
   NativeStack nativeStack = {
@@ -964,11 +959,8 @@ void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSampl
   StackWalkCallback(/* frameNumber */ 0, aSample->pc, aSample->sp, &nativeStack);
 
   uint32_t maxFrames = uint32_t(nativeStack.size - nativeStack.count);
-#ifdef XP_MACOSX
-  pthread_t pt = GetProfiledThread(aSample->threadProfile->GetPlatformData());
-  void *stackEnd = reinterpret_cast<void*>(-1);
-  if (pt)
-    stackEnd = static_cast<char*>(pthread_get_stackaddr_np(pt));
+#if defined(XP_MACOSX) || defined(XP_WIN)
+  void *stackEnd = aSample->threadProfile->GetStackTop();
   bool rv = true;
   if (aSample->fp >= aSample->sp && aSample->fp <= stackEnd)
     rv = FramePointerStackWalk(StackWalkCallback, /* skipFrames */ 0,
@@ -976,15 +968,9 @@ void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSampl
                                reinterpret_cast<void**>(aSample->fp), stackEnd);
 #else
   void *platformData = nullptr;
-#ifdef XP_WIN
-  if (aSample->isSamplingCurrentThread) {
-    // In this case we want MozStackWalk to know that it's walking the
-    // current thread's stack, so we pass 0 as the thread handle.
-    thread = 0;
-  }
-  platformData = aSample->context;
-#endif // XP_WIN
 
+  uintptr_t thread = GetThreadHandle(aSample->threadProfile->GetPlatformData());
+  MOZ_ASSERT(thread);
   bool rv = MozStackWalk(StackWalkCallback, /* skipFrames */ 0, maxFrames,
                              &nativeStack, thread, platformData);
 #endif
@@ -992,6 +978,75 @@ void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSampl
     mergeStacksIntoProfile(aProfile, aSample, nativeStack);
 }
 #endif
+
+
+#ifdef USE_EHABI_STACKWALK
+void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
+{
+  void *pc_array[1000];
+  void *sp_array[1000];
+  NativeStack nativeStack = {
+    pc_array,
+    sp_array,
+    mozilla::ArrayLength(pc_array),
+    0
+  };
+
+  const mcontext_t *mcontext = &reinterpret_cast<ucontext_t *>(aSample->context)->uc_mcontext;
+  mcontext_t savedContext;
+  PseudoStack *pseudoStack = aProfile.GetPseudoStack();
+
+  nativeStack.count = 0;
+  // The pseudostack contains an "EnterJIT" frame whenever we enter
+  // JIT code with profiling enabled; the stack pointer value points
+  // the saved registers.  We use this to unwind resume unwinding
+  // after encounting JIT code.
+  for (uint32_t i = pseudoStack->stackSize(); i > 0; --i) {
+    // The pseudostack grows towards higher indices, so we iterate
+    // backwards (from callee to caller).
+    volatile StackEntry &entry = pseudoStack->mStack[i - 1];
+    if (!entry.isJs() && strcmp(entry.label(), "EnterJIT") == 0) {
+      // Found JIT entry frame.  Unwind up to that point (i.e., force
+      // the stack walk to stop before the block of saved registers;
+      // note that it yields nondecreasing stack pointers), then restore
+      // the saved state.
+      uint32_t *vSP = reinterpret_cast<uint32_t*>(entry.stackAddress());
+
+      nativeStack.count += EHABIStackWalk(*mcontext,
+                                          /* stackBase = */ vSP,
+                                          sp_array + nativeStack.count,
+                                          pc_array + nativeStack.count,
+                                          nativeStack.size - nativeStack.count);
+
+      memset(&savedContext, 0, sizeof(savedContext));
+      // See also: struct EnterJITStack in js/src/jit/arm/Trampoline-arm.cpp
+      savedContext.arm_r4 = *vSP++;
+      savedContext.arm_r5 = *vSP++;
+      savedContext.arm_r6 = *vSP++;
+      savedContext.arm_r7 = *vSP++;
+      savedContext.arm_r8 = *vSP++;
+      savedContext.arm_r9 = *vSP++;
+      savedContext.arm_r10 = *vSP++;
+      savedContext.arm_fp = *vSP++;
+      savedContext.arm_lr = *vSP++;
+      savedContext.arm_sp = reinterpret_cast<uint32_t>(vSP);
+      savedContext.arm_pc = savedContext.arm_lr;
+      mcontext = &savedContext;
+    }
+  }
+
+  // Now unwind whatever's left (starting from either the last EnterJIT
+  // frame or, if no EnterJIT was found, the original registers).
+  nativeStack.count += EHABIStackWalk(*mcontext,
+                                      aProfile.GetStackTop(),
+                                      sp_array + nativeStack.count,
+                                      pc_array + nativeStack.count,
+                                      nativeStack.size - nativeStack.count);
+
+  mergeStacksIntoProfile(aProfile, aSample, nativeStack);
+}
+#endif
+
 
 #ifdef USE_LUL_STACKWALK
 void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
@@ -1097,6 +1152,7 @@ void GeckoSampler::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSampl
 }
 #endif
 
+
 static
 void doSampleStackTrace(ThreadProfile &aProfile, TickSample *aSample, bool aAddLeafAddresses)
 {
@@ -1132,7 +1188,8 @@ void GeckoSampler::InplaceTick(TickSample* sample)
 
   PseudoStack* stack = currThreadProfile.GetPseudoStack();
 
-#if defined(USE_NS_STACKWALK)
+#if defined(USE_NS_STACKWALK) || defined(USE_EHABI_STACKWALK) || \
+    defined(USE_LUL_STACKWALK)
   if (mUseStackWalk) {
     doNativeBacktrace(currThreadProfile, sample);
   } else {
@@ -1199,7 +1256,7 @@ SyncProfile* NewSyncProfile()
   return profile;
 }
 
-} // anonymous namespace
+} // namespace
 
 SyncProfile* GeckoSampler::GetBacktrace()
 {

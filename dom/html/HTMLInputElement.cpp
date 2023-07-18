@@ -295,20 +295,25 @@ NS_IMPL_ISUPPORTS(UploadLastDir::ContentPrefCallback, nsIContentPrefCallback2)
 NS_IMETHODIMP
 UploadLastDir::ContentPrefCallback::HandleCompletion(uint16_t aReason)
 {
-  nsCOMPtr<nsIFile> localFile = do_CreateInstance(NS_LOCAL_FILE_CONTRACTID);
-  NS_ENSURE_STATE(localFile);
+  nsCOMPtr<nsIFile> localFile;
+  nsAutoString prefStr;
 
-  if (aReason == nsIContentPrefCallback2::COMPLETE_ERROR ||
-      !mResult) {
-    // Default to "desktop" directory for each platform
-    nsCOMPtr<nsIFile> homeDir;
-    NS_GetSpecialDirectory(NS_OS_DESKTOP_DIR, getter_AddRefs(homeDir));
-    localFile = do_QueryInterface(homeDir);
-  } else {
-    nsAutoString prefStr;
-    nsCOMPtr<nsIVariant> pref;
-    mResult->GetValue(getter_AddRefs(pref));
-    pref->GetAsAString(prefStr);
+  if (aReason == nsIContentPrefCallback2::COMPLETE_ERROR || !mResult) {
+    prefStr = Preferences::GetString("dom.input.fallbackUploadDir");
+    if (prefStr.IsEmpty()) {
+      // If no custom directory was set through the pref, default to
+      // "desktop" directory for each platform.
+      NS_GetSpecialDirectory(NS_OS_DESKTOP_DIR, getter_AddRefs(localFile));
+    }
+  }
+
+  if (!localFile) {
+    if (prefStr.IsEmpty() && mResult) {
+      nsCOMPtr<nsIVariant> pref;
+      mResult->GetValue(getter_AddRefs(pref));
+      pref->GetAsAString(prefStr);
+    }
+    localFile = do_CreateInstance(NS_LOCAL_FILE_CONTRACTID);
     localFile->InitWithPath(prefStr);
   }
 
@@ -2145,10 +2150,13 @@ HTMLInputElement::MozSetFileNameArray(const char16_t** aFileNames, uint32_t aLen
   }
 
   Sequence<nsString> list;
+  nsString* names = list.AppendElements(aLength, fallible);
+  if (!names) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
   for (uint32_t i = 0; i < aLength; ++i) {
-    if (!list.AppendElement(nsDependentString(aFileNames[i]), fallible)) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
+    const char16_t* filename = aFileNames[i];
+    names[i].Rebind(filename, nsCharTraits<char16_t>::length(filename));
   }
 
   ErrorResult rv;
@@ -4884,10 +4892,17 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
       }
       int32_t leafSeparatorIndex = path.RFind(FILE_PATH_SEPARATOR);
       nsDependentSubstring dirname = Substring(path, 0, leafSeparatorIndex);
-      nsDependentSubstring basename = Substring(path, leafSeparatorIndex);
       fs = MakeOrReuseFileSystem(dirname, fs, window);
-      filesAndDirsSeq[i].SetAsDirectory() = new Directory(fs, basename);
+      nsAutoString dompath(NS_LITERAL_STRING(FILESYSTEM_DOM_PATH_SEPARATOR));
+      dompath.Append(Substring(path, leafSeparatorIndex + 1));
+      RefPtr<Directory> directory = new Directory(fs, dompath);
+      // In future we could refactor SetFilePickerFiltersFromAccept to return a
+      // semicolon separated list of file extensions and include that in the
+      // filter string passed here.
+      directory->SetContentFilters(NS_LITERAL_STRING("filter-out-sensitive"));
+      filesAndDirsSeq[i].SetAsDirectory() = directory;
     } else {
+      // This file was directly selected by the user, so don't filter it.
       filesAndDirsSeq[i].SetAsFile() = filesAndDirs[i];
     }
   }

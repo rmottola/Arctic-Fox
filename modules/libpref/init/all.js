@@ -321,11 +321,11 @@ pref("media.wakelock_timeout", 2000);
 // opened as top-level documents, as opposed to inside a media element.
 pref("media.play-stand-alone", true);
 
-pref("media.hardware-video-decoding.enabled", true);
-
 // Whether we should delay actioning a "play()" JS function call and autoplay
 // attribute until the media element's owner document is visible.
 pref("media.block-play-until-visible", false);
+
+pref("media.hardware-video-decoding.enabled", true);
 
 pref("media.decoder.heuristic.dormant.enabled", true);
 pref("media.decoder.heuristic.dormant.timeout", 60000);
@@ -379,15 +379,12 @@ pref("media.raw.enabled", true);
 #endif
 pref("media.ogg.enabled", true);
 pref("media.opus.enabled", true);
-#ifdef MOZ_WAVE
 pref("media.wave.enabled", true);
-#endif
-#ifdef MOZ_WEBM
 pref("media.webm.enabled", true);
 #if defined(MOZ_FMP4) && defined(MOZ_WMF)
 pref("media.webm.intel_decoder.enabled", true);
 #endif
-#endif
+
 #ifdef MOZ_GSTREAMER
 pref("media.gstreamer.enabled", true);
 pref("media.gstreamer.enable-blacklist", true);
@@ -457,13 +454,17 @@ pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[]");
 pref("media.peerconnection.ice.loopback", false); // Set only for testing in offline environments.
 pref("media.peerconnection.ice.tcp", false);
+pref("media.peerconnection.ice.tcp_so_sock_count", 0); // Disable SO gathering
 pref("media.peerconnection.ice.link_local", false); // Set only for testing IPV6 in networks that don't assign IPV6 addresses
+pref("media.peerconnection.ice.force_interface", ""); // Limit to only a single interface
 pref("media.peerconnection.ice.relay_only", false); // Limit candidates to TURN
 pref("media.peerconnection.use_document_iceservers", true);
 pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
 pref("media.peerconnection.ice.stun_client_maximum_transmits", 7);
 pref("media.peerconnection.ice.trickle_grace_period", 5000);
+pref("media.peerconnection.ice.default_address_only", false);
+
 // These values (aec, agc, and noice) are from media/webrtc/trunk/webrtc/common_types.h
 // kXxxUnchanged = 0, kXxxDefault = 1, and higher values are specific to each
 // setting (for Xxx = Ec, Agc, or Ns).  Defaults are all set to kXxxDefault here.
@@ -581,6 +582,7 @@ pref("layout.event-regions.enabled", false);
 // APZ preferences. For documentation/details on what these prefs do, check
 // gfx/layers/apz/src/AsyncPanZoomController.cpp.
 pref("apz.allow_checkerboarding", true);
+pref("apz.allow_immediate_handoff", true);
 pref("apz.allow_zooming", false);
 
 // Whether to lock touch scrolling to one axis at a time
@@ -593,7 +595,6 @@ pref("apz.axis_lock.breakout_threshold", "0.03125");  // 1/32 inches
 pref("apz.axis_lock.breakout_angle", "0.3926991");    // PI / 8 (22.5 degrees)
 pref("apz.axis_lock.direct_pan_angle", "1.047197");   // PI / 3 (60 degrees)
 pref("apz.content_response_timeout", 300);
-pref("apz.cross_slide.enabled", false);
 pref("apz.drag.enabled", false);
 pref("apz.danger_zone_x", 50);
 pref("apz.danger_zone_y", 100);
@@ -614,7 +615,6 @@ pref("apz.max_velocity_inches_per_ms", "-1.0");
 pref("apz.max_velocity_queue_size", 5);
 pref("apz.min_skate_speed", "1.0");
 pref("apz.minimap.enabled", false);
-pref("apz.num_paint_duration_samples", 3);
 pref("apz.overscroll.enabled", false);
 pref("apz.overscroll.min_pan_distance_ratio", "1.0");
 pref("apz.overscroll.stretch_factor", "0.5");
@@ -628,11 +628,13 @@ pref("apz.printtree", false);
 
 pref("apz.test.logging_enabled", false);
 pref("apz.touch_start_tolerance", "0.2222222");  // 0.2222222 came from 1.0/4.5
-pref("apz.use_paint_duration", true);
+pref("apz.touch_move_tolerance", "0.0");
 pref("apz.velocity_bias", "1.0");
 pref("apz.velocity_relevance_time_ms", 150);
 pref("apz.x_stationary_size_multiplier", "3.0");
 pref("apz.y_stationary_size_multiplier", "3.5");
+pref("apz.x_skate_highmem_adjust", "0.0");
+pref("apz.y_skate_highmem_adjust", "0.0");
 pref("apz.zoom_animation_duration_ms", 250);
 
 #ifdef XP_MACOSX
@@ -1351,7 +1353,6 @@ pref("editor.positioning.offset",            0);
 
 // Scripts & Windows prefs
 pref("dom.disable_beforeunload",            false);
-pref("dom.disable_image_src_set",           false);
 pref("dom.disable_window_flip",             false);
 pref("dom.disable_window_move_resize",      false);
 pref("dom.disable_window_status_change",    false);
@@ -2009,6 +2010,13 @@ pref("network.dnsCacheExpirationGracePeriod", 300);
 // This preference can be used to turn off DNS prefetch.
 pref("network.dns.disablePrefetch", true);
 
+// This preference controls whether .onion hostnames are
+// rejected before being given to DNS. RFC 7686
+pref("network.dns.blockDotOnion", true);
+
+// These domains are treated as localhost equivalent
+pref("network.dns.localDomains", "");
+
 // Contols whether or not "localhost" should resolve when offline
 pref("network.dns.offline-localhost", true);
 
@@ -2300,6 +2308,9 @@ pref("security.mixed_content.block_display_content", false);
 
 // Sub-resource integrity
 pref("security.sri.enable", false);
+
+// OCSP must-staple
+pref("security.ssl.enable_ocsp_must_staple", true);
 
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
@@ -2951,7 +2962,7 @@ pref("font.minimum-size.ko", 0);
 pref("font.size.variable.ko", 16);
 pref("font.size.fixed.ko", 16);
 
-pref("font.default.th", "serif");
+pref("font.default.th", "sans-serif");
 pref("font.minimum-size.th", 0);
 pref("font.size.variable.th", 16);
 pref("font.size.fixed.th", 13);
@@ -3068,7 +3079,10 @@ pref("font.size.fixed.zh-TW", 16);
 
 // mathml.css sets font-size to "inherit" and font-family to "serif" so only
 // font.name.*.x-math and font.minimum-size.x-math are really relevant.
+pref("font.default.x-math", "serif");
 pref("font.minimum-size.x-math", 0);
+pref("font.size.variable.x-math", 16);
+pref("font.size.fixed.x-math", 13);
 
 /*
  * A value greater than zero enables font size inflation for
@@ -4476,10 +4490,15 @@ pref("webgl.max-warnings-per-context", 32);
 pref("webgl.enable-draft-extensions", false);
 pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
-pref("webgl.enable-prototype-webgl2", false);
 pref("webgl.disable-fail-if-major-performance-caveat", false);
 pref("webgl.disable-DOM-blit-uploads", false);
 pref("webgl.webgl2-compat-mode", false);
+
+#ifdef NIGHTLY_BUILD
+pref("webgl.enable-prototype-webgl2", true);
+#else
+pref("webgl.enable-prototype-webgl2", false);
+#endif
 
 #ifdef RELEASE_BUILD
 // Keep this disabled on Release and Beta for now. (see bug 1171228)
@@ -4615,6 +4634,9 @@ pref("layers.tiled-drawtarget.enabled", true);
 pref("layers.tiles.edge-padding", false);
 #endif
 
+#ifdef MOZ_WIDGET_GONK
+pref("layers.tiled-drawtarget.enabled", true);
+#endif
 
 #ifdef MOZ_WIDGET_ANDROID
 pref("layers.tiled-drawtarget.enabled", true);
@@ -5117,59 +5139,31 @@ pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,tes
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.downloadBlockTable", "");
 pref("urlclassifier.downloadAllowTable", "");
-pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256");
+pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-forbid-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
 // checks.
 pref("urlclassifier.trackingTable", "test-track-simple,mozpub-track-digest256");
 pref("urlclassifier.trackingWhitelistTable", "test-trackwhite-simple,mozpub-trackwhite-digest256");
-pref("browser.trackingprotection.updateURL", "https://tracking.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
-pref("browser.trackingprotection.gethashURL", "https://tracking.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+
+// The table and global pref for blocking access to sites forbidden by policy
+pref("browser.safebrowsing.forbiddenURIs.enabled", false);
+pref("urlclassifier.forbiddenTable", "test-forbid-simple");
+
+pref("browser.safebrowsing.provider.mozilla.lists", "mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256");
+pref("browser.safebrowsing.provider.mozilla.updateURL", "https://shavar.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+pref("browser.safebrowsing.provider.mozilla.gethashURL", "https://shavar.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+
 // Turn off Spatial navigation by default.
 pref("snav.enabled", false);
-
-// Original caret implementation on collapsed selection.
-pref("touchcaret.enabled", false);
-
-// This will inflate the size of the touch caret frame when checking if user
-// clicks on the caret or not. In app units.
-pref("touchcaret.inflatesize.threshold", 40);
-
-// We'll start to increment time when user release the control of touch caret.
-// When time exceed this expiration time, we'll hide touch caret.
-// In milliseconds. (0 means disable this feature)
-pref("touchcaret.expiration.time", 3000);
-
-// Original caret implementation on non-collapsed selection.
-pref("selectioncaret.enabled", false);
-
-// This will inflate size of selection caret frame when we checking if
-// user click on selection caret or not. In app units.
-pref("selectioncaret.inflatesize.threshold", 40);
-
-// Selection carets do not affect caret visibility.
-pref("selectioncaret.visibility.affectscaret", false);
-
-// Selection caret visibility does not observe composition
-// selections generated by soft keyboard managers.
-pref("selectioncaret.observes.compositions", false);
-
-// The Touch caret by default observes the b2g visibility rules, and
-// not the extended Android visibility rules that allow for touchcaret
-// display in empty editable fields, for example.
-pref("touchcaret.extendedvisibility", false);
-
-// Desktop and b2g don't need to open or close the Android
-// TextSelection (Actionbar) utility.
-pref("caret.manages-android-actionbar", false);
 
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", false);
 
 // CSS attributes of the AccessibleCaret in CSS pixels.
-pref("layout.accessiblecaret.width", "44.0");
-pref("layout.accessiblecaret.height", "47.0");
-pref("layout.accessiblecaret.margin-left", "-23.5");
+pref("layout.accessiblecaret.width", "34.0");
+pref("layout.accessiblecaret.height", "36.0");
+pref("layout.accessiblecaret.margin-left", "-18.5");
 pref("layout.accessiblecaret.bar.width", "2.0");
 
 // Timeout in milliseconds to hide the accessiblecaret under cursor mode while
@@ -5183,6 +5177,9 @@ pref("layout.accessiblecaret.use_long_tap_injector", true);
 // Selection change notifications generated by Javascript, or misc internal
 // events hide AccessibleCarets by default.
 pref("layout.accessiblecaret.extendedvisibility", false);
+
+// Optionally provide haptic feedback on longPress selection events.
+pref("layout.accessiblecaret.hapticfeedback", false);
 
 // Wakelock is disabled by default.
 pref("dom.wakelock.enabled", false);
@@ -5305,7 +5302,7 @@ pref("browser.search.official", true);
 //pref("media.gmp-manager.url.override", "");
 
 // Update service URL for GMP install/updates:
-pref("media.gmp-manager.url", "https://aus4.mozilla.org/update/3/GMP/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+pref("media.gmp-manager.url", "https://aus5.mozilla.org/update/3/GMP/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
 
 // When |media.gmp-manager.cert.requireBuiltIn| is true or not specified the
 // final certificate and all certificates the connection is redirected to before
@@ -5330,10 +5327,10 @@ pref("media.gmp-manager.cert.requireBuiltIn", true);
 // IMPORTANT! app.update.certs.* prefs should also be updated if these
 // are updated.
 pref("media.gmp-manager.cert.checkAttributes", true);
-pref("media.gmp-manager.certs.1.issuerName", "CN=DigiCert Secure Server CA,O=DigiCert Inc,C=US");
-pref("media.gmp-manager.certs.1.commonName", "aus4.mozilla.org");
-pref("media.gmp-manager.certs.2.issuerName", "CN=Thawte SSL CA,O=\"Thawte, Inc.\",C=US");
-pref("media.gmp-manager.certs.2.commonName", "aus4.mozilla.org");
+pref("media.gmp-manager.certs.1.issuerName", "CN=DigiCert SHA2 Secure Server CA,O=DigiCert Inc,C=US");
+pref("media.gmp-manager.certs.1.commonName", "aus5.mozilla.org");
+pref("media.gmp-manager.certs.2.issuerName", "CN=thawte SSL CA - G2,O=\"thawte, Inc.\",C=US");
+pref("media.gmp-manager.certs.2.commonName", "aus5.mozilla.org");
 #endif
 
 // Whether or not to perform reader mode article parsing on page load.
@@ -5433,3 +5430,6 @@ pref("dom.requestcache.enabled", false);
 pref("dom.requestcontext.enabled", false);
 
 pref("dom.mozKillSwitch.enabled", false);
+
+// Allow customization of the fallback directory for file uploads
+pref("dom.input.fallbackUploadDir", "");

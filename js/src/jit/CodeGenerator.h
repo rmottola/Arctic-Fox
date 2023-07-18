@@ -345,12 +345,11 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitNewTarget(LNewTarget* ins);
     void visitArrowNewTarget(LArrowNewTarget* ins);
     void visitCheckReturn(LCheckReturn* ins);
+    void visitCheckObjCoercible(LCheckObjCoercible* ins);
+    void visitDebugCheckSelfHosted(LDebugCheckSelfHosted* ins);
 
     void visitCheckOverRecursed(LCheckOverRecursed* lir);
     void visitCheckOverRecursedFailure(CheckOverRecursedFailure* ool);
-
-    void visitInterruptCheckImplicit(LInterruptCheckImplicit* ins);
-    void visitOutOfLineInterruptCheckImplicit(OutOfLineInterruptCheckImplicit* ins);
 
     void visitUnboxFloatingPoint(LUnboxFloatingPoint* lir);
     void visitOutOfLineUnboxFloatingPoint(OutOfLineUnboxFloatingPoint* ool);
@@ -385,6 +384,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     void emitAssertObjectOrStringResult(Register input, MIRType type, const TemporaryTypeSet* typeset);
 
     void visitInterruptCheck(LInterruptCheck* lir);
+    void visitOutOfLineInterruptCheckImplicit(OutOfLineInterruptCheckImplicit* ins);
     void visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir);
     void visitRecompileCheck(LRecompileCheck* ins);
 

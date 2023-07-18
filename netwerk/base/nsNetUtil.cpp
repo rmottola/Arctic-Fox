@@ -606,7 +606,6 @@ NS_NewStreamLoaderInternal(nsIStreamLoader        **outStream,
                            nsIPrincipal            *aLoadingPrincipal,
                            nsSecurityFlags          aSecurityFlags,
                            nsContentPolicyType      aContentPolicyType,
-                           nsISupports             *aContext /* = nullptr */,
                            nsILoadGroup            *aLoadGroup /* = nullptr */,
                            nsIInterfaceRequestor   *aCallbacks /* = nullptr */,
                            nsLoadFlags              aLoadFlags /* = nsIRequest::LOAD_NORMAL */,
@@ -631,7 +630,7 @@ NS_NewStreamLoaderInternal(nsIStreamLoader        **outStream,
   }
   rv = NS_NewStreamLoader(outStream, aObserver);
   NS_ENSURE_SUCCESS(rv, rv);
-  return channel->AsyncOpen(*outStream, aContext);
+  return channel->AsyncOpen2(*outStream);
 }
 
 
@@ -642,7 +641,6 @@ NS_NewStreamLoader(nsIStreamLoader        **outStream,
                    nsINode                 *aLoadingNode,
                    nsSecurityFlags          aSecurityFlags,
                    nsContentPolicyType      aContentPolicyType,
-                   nsISupports             *aContext /* = nullptr */,
                    nsILoadGroup            *aLoadGroup /* = nullptr */,
                    nsIInterfaceRequestor   *aCallbacks /* = nullptr */,
                    nsLoadFlags              aLoadFlags /* = nsIRequest::LOAD_NORMAL */,
@@ -656,7 +654,6 @@ NS_NewStreamLoader(nsIStreamLoader        **outStream,
                                     aLoadingNode->NodePrincipal(),
                                     aSecurityFlags,
                                     aContentPolicyType,
-                                    aContext,
                                     aLoadGroup,
                                     aCallbacks,
                                     aLoadFlags,
@@ -670,7 +667,6 @@ NS_NewStreamLoader(nsIStreamLoader        **outStream,
                    nsIPrincipal            *aLoadingPrincipal,
                    nsSecurityFlags          aSecurityFlags,
                    nsContentPolicyType      aContentPolicyType,
-                   nsISupports             *aContext /* = nullptr */,
                    nsILoadGroup            *aLoadGroup /* = nullptr */,
                    nsIInterfaceRequestor   *aCallbacks /* = nullptr */,
                    nsLoadFlags              aLoadFlags /* = nsIRequest::LOAD_NORMAL */,
@@ -683,7 +679,6 @@ NS_NewStreamLoader(nsIStreamLoader        **outStream,
                                     aLoadingPrincipal,
                                     aSecurityFlags,
                                     aContentPolicyType,
-                                    aContext,
                                     aLoadGroup,
                                     aCallbacks,
                                     aLoadFlags,
@@ -956,8 +951,8 @@ NS_ParseResponseContentType(const nsACString &rawContentType,
     NS_ENSURE_SUCCESS(rv, rv);
     nsCString charset;
     bool hadCharset;
-    rv = util->ParseRequestContentType(rawContentType, charset, &hadCharset,
-                                       contentType);
+    rv = util->ParseResponseContentType(rawContentType, charset, &hadCharset,
+                                        contentType);
     if (NS_SUCCEEDED(rv) && hadCharset)
         contentCharset = charset;
     return rv;
@@ -1129,6 +1124,22 @@ NS_BufferOutputStream(nsIOutputStream *aOutputStream,
 
     bos = aOutputStream;
     return bos.forget();
+}
+
+already_AddRefed<nsIInputStream>
+NS_BufferInputStream(nsIInputStream *aInputStream,
+                      uint32_t aBufferSize)
+{
+    NS_ASSERTION(aInputStream, "No input stream given!");
+
+    nsCOMPtr<nsIInputStream> bis;
+    nsresult rv = NS_NewBufferedInputStream(getter_AddRefs(bis), aInputStream,
+                                            aBufferSize);
+    if (NS_SUCCEEDED(rv))
+        return bis.forget();
+
+    bis = aInputStream;
+    return bis.forget();
 }
 
 nsresult

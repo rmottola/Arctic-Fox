@@ -17041,6 +17041,13 @@
         "url": "/infrastructure/failing-test.html"
       },
       {
+        "path": "innerText/getter.html",
+        "url": "/innerText/getter.html"
+      },
+      {
+        "path": "innerText/setter.html",
+        "url": "/innerText/setter.html"
+      },
         "path": "js/builtins/Array.DefineOwnProperty.html",
         "url": "/js/builtins/Array.DefineOwnProperty.html"
       },

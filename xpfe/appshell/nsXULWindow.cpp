@@ -472,8 +472,13 @@ NS_IMETHODIMP nsXULWindow::Destroy()
   // destroyed window. This is especially necessary when the eldest window
   // in a stack of modal windows is destroyed first. It happens.
   ExitModalLoop(NS_OK);
+  // XXX: Skip unmapping the window on Linux due to GLX hangs on the compositor
+  // thread with NVIDIA driver 310.32. We don't need to worry about user
+  // interactions with destroyed windows on X11 either.
+#ifndef MOZ_WIDGET_GTK
   if (mWindow)
     mWindow->Show(false);
+#endif
 
 #if defined(XP_WIN)
   // We need to explicitly set the focus on Windows, but 
@@ -1020,9 +1025,12 @@ void nsXULWindow::OnChromeLoaded()
         nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
         docShellAsItem->GetTreeOwner(getter_AddRefs(treeOwner));
         if (treeOwner) {
-          int32_t width, height;
-          cv->GetContentSize(&width, &height);
-          treeOwner->SizeShellTo(docShellAsItem, width, height);
+          // GetContentSize can fail, so initialise |width| and |height| to be
+          // on the safe side.
+          int32_t width = 0, height = 0;
+          if (NS_SUCCEEDED(cv->GetContentSize(&width, &height))) {
+            treeOwner->SizeShellTo(docShellAsItem, width, height);
+          }
         }
       }
     }
@@ -1506,6 +1514,7 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
     docShellElement->GetId(windowElementId);
   }
 
+  bool shouldPersist = !isFullscreen && ownerXULDoc;
   ErrorResult rv;
   // (only for size elements which are persisted)
   if ((mPersistentAttributesDirty & PAD_POSITION) && gotRestoredBounds) {
@@ -1513,15 +1522,17 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%d", NSToIntRound(rect.x / scale.scale));
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(SCREENX_ATTRIBUTE, sizeString, rv);
-      if (ownerXULDoc) // force persistence in case the value didn't change
+      if (shouldPersist) {
         ownerXULDoc->Persist(windowElementId, SCREENX_ATTRIBUTE);
+      }
     }
     if (persistString.Find("screenY") >= 0) {
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%d", NSToIntRound(rect.y / scale.scale));
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(SCREENY_ATTRIBUTE, sizeString, rv);
-      if (ownerXULDoc)
+      if (shouldPersist) {
         ownerXULDoc->Persist(windowElementId, SCREENY_ATTRIBUTE);
+      }
     }
   }
 
@@ -1530,15 +1541,17 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%d", NSToIntRound(rect.width / scale.scale));
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(WIDTH_ATTRIBUTE, sizeString, rv);
-      if (ownerXULDoc)
+      if (shouldPersist) {
         ownerXULDoc->Persist(windowElementId, WIDTH_ATTRIBUTE);
+      }
     }
     if (persistString.Find("height") >= 0) {
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%d", NSToIntRound(rect.height / scale.scale));
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(HEIGHT_ATTRIBUTE, sizeString, rv);
-      if (ownerXULDoc)
+      if (shouldPersist) {
         ownerXULDoc->Persist(windowElementId, HEIGHT_ATTRIBUTE);
+      }
     }
   }
 
@@ -1553,8 +1566,9 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
       else
         sizeString.Assign(SIZEMODE_NORMAL);
       docShellElement->SetAttribute(MODE_ATTRIBUTE, sizeString, rv);
-      if (ownerXULDoc && persistString.Find("sizemode") >= 0)
+      if (shouldPersist && persistString.Find("sizemode") >= 0) {
         ownerXULDoc->Persist(windowElementId, MODE_ATTRIBUTE);
+      }
     }
     if (persistString.Find("zlevel") >= 0) {
       uint32_t zLevel;
@@ -1564,7 +1578,9 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
         PR_snprintf(sizeBuf, sizeof(sizeBuf), "%lu", (unsigned long)zLevel);
         sizeString.AssignWithConversion(sizeBuf);
         docShellElement->SetAttribute(ZLEVEL_ATTRIBUTE, sizeString, rv);
-        ownerXULDoc->Persist(windowElementId, ZLEVEL_ATTRIBUTE);
+        if (shouldPersist) {
+          ownerXULDoc->Persist(windowElementId, ZLEVEL_ATTRIBUTE);
+        }
       }
     }
   }

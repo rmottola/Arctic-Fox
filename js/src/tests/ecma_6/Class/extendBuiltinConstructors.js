@@ -1,5 +1,3 @@
-var test = `
-
 function testBuiltinInstanceIsInstanceOf(instance, builtin, class_) {
     assertEq(instance instanceof class_, true);
     assertEq(instance instanceof builtin, true);
@@ -103,10 +101,8 @@ testBuiltin(Array, 3.0);
 testBuiltin(Array, "non-length one-arg");
 testBuiltin(Array, 5, 10, 15, "these are elements");
 
-`;
-
-if (classesEnabled())
-    eval(test);
+if (this.SharedArrayBuffer)
+    testBuiltin(SharedArrayBuffer);
 
 if (typeof reportCompare === 'function')
     reportCompare(0,0,"OK");

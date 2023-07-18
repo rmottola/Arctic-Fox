@@ -124,11 +124,6 @@ public:
                                  nsIURI* aDocumentURI,
                                  const nsTArray<RefPtr<mozilla::dom::NodeInfo>> *aNodeInfos) = 0;
 
-#ifdef NS_BUILD_REFCNT_LOGGING
-    virtual const char* ClassName() = 0;
-    virtual uint32_t ClassSize() = 0;
-#endif
-
     /**
      * The prototype document must call ReleaseSubtree when it is going
      * away.  This makes the parents through the tree stop owning their
@@ -165,11 +160,6 @@ public:
     {
         Unlink();
     }
-
-#ifdef NS_BUILD_REFCNT_LOGGING
-    virtual const char* ClassName() override { return "nsXULPrototypeElement"; }
-    virtual uint32_t ClassSize() override { return sizeof(*this); }
-#endif
 
     virtual void ReleaseSubtree() override
     {
@@ -218,11 +208,6 @@ class nsXULPrototypeScript : public nsXULPrototypeNode
 public:
     nsXULPrototypeScript(uint32_t aLineNo, uint32_t version);
     virtual ~nsXULPrototypeScript();
-
-#ifdef NS_BUILD_REFCNT_LOGGING
-    virtual const char* ClassName() override { return "nsXULPrototypeScript"; }
-    virtual uint32_t ClassSize() override { return sizeof(*this); }
-#endif
 
     virtual nsresult Serialize(nsIObjectOutputStream* aStream,
                                nsXULPrototypeDocument* aProtoDoc,
@@ -298,11 +283,6 @@ public:
     {
     }
 
-#ifdef NS_BUILD_REFCNT_LOGGING
-    virtual const char* ClassName() override { return "nsXULPrototypeText"; }
-    virtual uint32_t ClassSize() override { return sizeof(*this); }
-#endif
-
     virtual nsresult Serialize(nsIObjectOutputStream* aStream,
                                nsXULPrototypeDocument* aProtoDoc,
                                const nsTArray<RefPtr<mozilla::dom::NodeInfo>> *aNodeInfos) override;
@@ -325,11 +305,6 @@ public:
     virtual ~nsXULPrototypePI()
     {
     }
-
-#ifdef NS_BUILD_REFCNT_LOGGING
-    virtual const char* ClassName() override { return "nsXULPrototypePI"; }
-    virtual uint32_t ClassSize() override { return sizeof(*this); }
-#endif
 
     virtual nsresult Serialize(nsIObjectOutputStream* aStream,
                                nsXULPrototypeDocument* aProtoDoc,
@@ -401,7 +376,7 @@ public:
 
     virtual bool PerformAccesskey(bool aKeyCausesActivation,
                                   bool aIsTrustedEvent) override;
-    nsresult ClickWithInputSource(uint16_t aInputSource);
+    nsresult ClickWithInputSource(uint16_t aInputSource, bool aIsTrustedEvent);
 
     virtual nsIContent *GetBindingParent() const override;
     virtual bool IsNodeOfType(uint32_t aFlags) const override;
@@ -437,6 +412,7 @@ public:
     virtual mozilla::EventStates IntrinsicState() const override;
 
     nsresult GetFrameLoader(nsIFrameLoader** aFrameLoader);
+    nsresult GetParentApplication(mozIApplication** aApplication);
     nsresult SetIsPrerendered();
     nsresult SwapFrameLoaders(nsIFrameLoaderOwner* aOtherOwner);
 

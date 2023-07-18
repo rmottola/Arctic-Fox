@@ -160,7 +160,15 @@ InputQueue::ReceiveTouchInput(const RefPtr<AsyncPanZoomController>& aTarget,
     INPQ_LOG("dropping event due to block %p being in fast motion\n", block);
     result = nsEventStatus_eConsumeNoDefault;
   } else if (target && target->ArePointerEventsConsumable(block, aEvent.AsMultiTouchInput().mTouches.Length())) {
-    result = nsEventStatus_eConsumeDoDefault;
+    if (block->UpdateSlopState(aEvent.AsMultiTouchInput(), true)) {
+      INPQ_LOG("dropping event due to block %p being in slop\n", block);
+      result = nsEventStatus_eConsumeNoDefault;
+    } else {
+      result = nsEventStatus_eConsumeDoDefault;
+    }
+  } else if (block->UpdateSlopState(aEvent.AsMultiTouchInput(), false)) {
+    INPQ_LOG("dropping event due to block %p being in mini-slop\n", block);
+    result = nsEventStatus_eConsumeNoDefault;
   }
   if (!MaybeHandleCurrentBlock(block, aEvent)) {
     block->AddEvent(aEvent.AsMultiTouchInput());
@@ -653,7 +661,9 @@ InputQueue::ProcessInputBlocks() {
       curBlock->DropEvents();
     } else if (curBlock->IsDefaultPrevented()) {
       curBlock->DropEvents();
-      target->ResetInputState();
+      if (curBlock->AsTouchBlock()) {
+        target->ResetTouchInputState();
+      }
     } else {
       UpdateActiveApzc(curBlock->GetTargetApzc());
       curBlock->HandleEvents();
@@ -679,7 +689,7 @@ void
 InputQueue::UpdateActiveApzc(const RefPtr<AsyncPanZoomController>& aNewActive) {
   if (mLastActiveApzc && mLastActiveApzc != aNewActive
       && mTouchCounter.GetActiveTouchCount() > 0) {
-    mLastActiveApzc->ResetInputState();
+    mLastActiveApzc->ResetTouchInputState();
   }
   mLastActiveApzc = aNewActive;
 }

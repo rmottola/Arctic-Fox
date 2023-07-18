@@ -1308,6 +1308,7 @@ AppendJARIdentifier(nsACString &_result, NeckoOriginAttributes const *aOriginAtt
 {
   nsAutoCString suffix;
   aOriginAttributes->CreateSuffix(suffix);
+  _result.Append('#');
   _result.Append(suffix);
 }
 
@@ -1907,6 +1908,9 @@ nsOfflineCacheDevice::EvictEntries(const char *clientID)
 
     rv = statement->Execute();
     NS_ENSURE_SUCCESS(rv, rv);
+
+    // TODO - Should update internal hashtables.
+    // Low priority, since this API is not widely used.
   }
   else
   {
@@ -1923,6 +1927,11 @@ nsOfflineCacheDevice::EvictEntries(const char *clientID)
 
     rv = statement->Execute();
     NS_ENSURE_SUCCESS(rv, rv);
+
+    MutexAutoLock lock(mLock);
+    mCaches.Clear();
+    mActiveCaches.Clear();
+    mActiveCachesByGroup.Clear();
   }
 
   evictionObserver.Apply();

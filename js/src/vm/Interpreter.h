@@ -491,6 +491,9 @@ DefaultClassConstructor(JSContext* cx, unsigned argc, Value* vp);
 bool
 DefaultDerivedClassConstructor(JSContext* cx, unsigned argc, Value* vp);
 
+bool
+Debug_CheckSelfHosted(JSContext* cx, HandleValue v);
+
 }  /* namespace js */
 
 #endif /* vm_Interpreter_h */

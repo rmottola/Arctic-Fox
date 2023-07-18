@@ -480,7 +480,8 @@ DocAccessible::Shutdown()
   mChildDocuments.Clear();
 
   // XXX thinking about ordering?
-  if (IPCAccessibilityActive()) {
+  if (mIPCDoc) {
+    MOZ_ASSERT(IPCAccessibilityActive());
     mIPCDoc->Shutdown();
     MOZ_ASSERT(!mIPCDoc);
   }
@@ -1347,10 +1348,12 @@ DocAccessible::ContentInserted(nsIContent* aContainerNode,
     // null (document element is inserted or removed).
     Accessible* container = aContainerNode ?
       GetAccessibleOrContainer(aContainerNode) : this;
-
-    mNotificationController->ScheduleContentInsertion(container,
-                                                      aStartChildNode,
-                                                      aEndChildNode);
+    if (container) {
+      // Ignore notification if the container node is no longer in the DOM tree.
+      mNotificationController->ScheduleContentInsertion(container,
+                                                        aStartChildNode,
+                                                        aEndChildNode);
+    }
   }
 }
 
@@ -1982,7 +1985,8 @@ DocAccessible::ValidateARIAOwned()
     nsTArray<RefPtr<Accessible> >* children = it.UserData();
 
     // Owner is about to die, put children back if applicable.
-    if (!owner->IsInDocument()) {
+    if (!mAccessibleCache.GetWeak(reinterpret_cast<void*>(owner)) ||
+        !owner->IsInDocument()) {
       PutChildrenBack(children, 0);
       it.Remove();
       continue;
@@ -2020,6 +2024,9 @@ void
 DocAccessible::DoARIAOwnsRelocation(Accessible* aOwner)
 {
   nsTArray<RefPtr<Accessible> >* children = mARIAOwnsHash.LookupOrAdd(aOwner);
+
+  MOZ_ASSERT(aOwner, "aOwner must be a valid pointer");
+  MOZ_ASSERT(aOwner->Elm(), "aOwner->Elm() must be a valid pointer");
 
   IDRefsIterator iter(this, aOwner->Elm(), nsGkAtoms::aria_owns);
   Accessible* child = nullptr;
@@ -2160,7 +2167,7 @@ void
 DocAccessible::PutChildrenBack(nsTArray<RefPtr<Accessible> >* aChildren,
                                uint32_t aStartIdx)
 {
-  nsTArray<Accessible*> containers;
+  nsTArray<RefPtr<Accessible> > containers;
   for (auto idx = aStartIdx; idx < aChildren->Length(); idx++) {
     Accessible* child = aChildren->ElementAt(idx);
 
@@ -2197,7 +2204,11 @@ DocAccessible::PutChildrenBack(nsTArray<RefPtr<Accessible> >* aChildren,
   // And put it back where it belongs to.
   aChildren->RemoveElementsAt(aStartIdx, aChildren->Length() - aStartIdx);
   for (uint32_t idx = 0; idx < containers.Length(); idx++) {
-    UpdateTreeOnInsertion(containers[idx]);
+    NS_ASSERTION(containers[idx]->IsInDocument(),
+                 "A container has been destroyed.");
+    if (containers[idx]->IsInDocument()) {
+      UpdateTreeOnInsertion(containers[idx]);
+    }
   }
 }
 

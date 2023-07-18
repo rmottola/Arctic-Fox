@@ -19,6 +19,7 @@
 #include "nsIReflowCallback.h"
 #include "nsBoxLayoutState.h"
 #include "nsQueryFrame.h"
+#include "nsRefreshDriver.h"
 #include "nsExpirationTracker.h"
 #include "TextOverflow.h"
 #include "ScrollVelocityQueue.h"
@@ -101,13 +102,16 @@ public:
 
   bool IsSmoothScrollingEnabled();
 
-  class ScrollEvent : public nsRunnable {
+  class ScrollEvent : public nsARefreshObserver {
   public:
-    NS_DECL_NSIRUNNABLE
-    explicit ScrollEvent(ScrollFrameHelper *helper) : mHelper(helper) {}
-    void Revoke() { mHelper = nullptr; }
+    NS_INLINE_DECL_REFCOUNTING(ScrollEvent, override)
+    explicit ScrollEvent(ScrollFrameHelper *helper);
+    void WillRefresh(mozilla::TimeStamp aTime) override;
+  protected:
+    virtual ~ScrollEvent();
   private:
     ScrollFrameHelper *mHelper;
+    RefPtr<nsRefreshDriver> mDriver;
   };
 
   class AsyncScrollPortEvent : public nsRunnable {
@@ -417,7 +421,7 @@ public:
   nsCOMPtr<nsIContent> mScrollCornerContent;
   nsCOMPtr<nsIContent> mResizerContent;
 
-  nsRevocableEventPtr<ScrollEvent> mScrollEvent;
+  RefPtr<ScrollEvent> mScrollEvent;
   nsRevocableEventPtr<AsyncScrollPortEvent> mAsyncScrollPortEvent;
   nsRevocableEventPtr<ScrolledAreaEvent> mScrolledAreaEvent;
   nsIFrame* mHScrollbarBox;
@@ -432,6 +436,7 @@ public:
   nsTArray<nsIScrollPositionListener*> mListeners;
   nsIAtom* mLastScrollOrigin;
   nsIAtom* mLastSmoothScrollOrigin;
+  Maybe<nsPoint> mApzSmoothScrollDestination;
   uint32_t mScrollGeneration;
   nsRect mScrollPort;
   // Where we're currently scrolling to, if we're scrolling asynchronously.

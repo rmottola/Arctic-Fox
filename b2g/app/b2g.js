@@ -562,7 +562,7 @@ pref("app.update.incompatible.mode", 0);
 pref("app.update.staging.enabled", true);
 pref("app.update.service.enabled", true);
 
-pref("app.update.url", "https://aus4.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%PRODUCT_DEVICE%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
+pref("app.update.url", "https://aus5.mozilla.org/update/3/%PRODUCT%/%VERSION%/%BUILD_ID%/%PRODUCT_DEVICE%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
 pref("app.update.channel", "@MOZ_UPDATE_CHANNEL@");
 
 // Interval at which update manifest is fetched.  In units of seconds.
@@ -1011,6 +1011,10 @@ pref("apz.fling_curve_threshold_inches_per_ms", "0.01");
 pref("apz.fling_friction", "0.00238");
 pref("apz.max_velocity_inches_per_ms", "0.07");
 
+#ifdef MOZ_WIDGET_GONK
+pref("apz.touch_move_tolerance", "0.03");
+#endif
+
 // Tweak default displayport values to reduce the risk of running out of
 // memory when zooming in
 pref("apz.x_skate_size_multiplier", "1.25");
@@ -1101,12 +1105,6 @@ pref("dom.mozSettings.allowForceReadOnly", false);
 
 // RequestSync API is enabled by default on B2G.
 pref("dom.requestSync.enabled", true);
-
-// Use vsync aligned rendering
-pref("gfx.vsync.hw-vsync.enabled", true);
-pref("gfx.vsync.compositor", true);
-pref("gfx.touch.resample", true);
-pref("gfx.vsync.refreshdriver", true);
 
 // Comma separated list of activity names that can only be provided by
 // the system app in dev mode.

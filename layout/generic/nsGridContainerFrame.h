@@ -86,10 +86,21 @@ public:
     StateBits mState;
   };
 
-  // @see nsAbsoluteContainingBlock::Reflow about this magic number
-  static const nscoord VERY_LIKELY_A_GRID_CONTAINER = -123456789;
-
   NS_DECLARE_FRAME_PROPERTY(GridItemContainingBlockRect, DeleteValue<nsRect>)
+
+  NS_DECLARE_FRAME_PROPERTY(GridColTrackSizes, DeleteValue<nsTArray<nscoord>>)
+
+  const nsTArray<nscoord>* GetComputedTemplateColumns()
+  {
+    return static_cast<nsTArray<nscoord>*>(Properties().Get(GridColTrackSizes()));
+  }
+
+  NS_DECLARE_FRAME_PROPERTY(GridRowTrackSizes, DeleteValue<nsTArray<nscoord>>)
+
+  const nsTArray<nscoord>* GetComputedTemplateRows()
+  {
+    return static_cast<nsTArray<nscoord>*>(Properties().Get(GridRowTrackSizes()));
+  }
 
 protected:
   static const uint32_t kAutoLine;
@@ -161,17 +172,19 @@ protected:
      * Resolve this auto range to start at aStart, making it definite.
      * Precondition: this range IsAuto()
      */
-    void ResolveAutoPosition(uint32_t aStart)
+    void ResolveAutoPosition(uint32_t aStart, uint32_t aExplicitGridOffset)
     {
       MOZ_ASSERT(IsAuto(), "Why call me?");
       mStart = aStart;
       mEnd += aStart;
-      // Clamping per http://dev.w3.org/csswg/css-grid/#overlarge-grids :
-      if (MOZ_UNLIKELY(mStart >= kTranslatedMaxLine)) {
-        mEnd = kTranslatedMaxLine;
+      // Clamping to where kMaxLine is in the explicit grid, per
+      // http://dev.w3.org/csswg/css-grid/#overlarge-grids :
+      uint32_t translatedMax = aExplicitGridOffset + nsStyleGridLine::kMaxLine;
+      if (MOZ_UNLIKELY(mStart >= translatedMax)) {
+        mEnd = translatedMax;
         mStart = mEnd - 1;
-      } else if (MOZ_UNLIKELY(mEnd > kTranslatedMaxLine)) {
-        mEnd = kTranslatedMaxLine;
+      } else if (MOZ_UNLIKELY(mEnd > translatedMax)) {
+        mEnd = translatedMax;
       }
     }
     /**
@@ -233,15 +246,14 @@ protected:
   };
 
   /**
-   * Return aLine if it's inside the aMin..aMax range (inclusive), otherwise
-   * return kAutoLine.  If the range is empty (aMin == aMax, i.e. there are
-   * no tracks in the grid) then aLine is outside.
+   * Return aLine if it's inside the aMin..aMax range (inclusive),
+   * otherwise return kAutoLine.
    */
   static int32_t
   AutoIfOutside(int32_t aLine, int32_t aMin, int32_t aMax)
   {
     MOZ_ASSERT(aMin <= aMax);
-    if (aLine < aMin || aLine > aMax || aMin == aMax) {
+    if (aLine < aMin || aLine > aMax) {
       return kAutoLine;
     }
     return aLine;

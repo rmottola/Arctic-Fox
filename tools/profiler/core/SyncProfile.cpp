@@ -9,7 +9,6 @@
 SyncProfile::SyncProfile(ThreadInfo* aInfo, int aEntrySize)
   : ThreadProfile(aInfo, new ProfileBuffer(aEntrySize))
   , mOwnerState(REFERENCED)
-  , mUtb(nullptr)
 {
   MOZ_COUNT_CTOR(SyncProfile);
 }

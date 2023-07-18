@@ -32,6 +32,7 @@
 #include "platform.h"
 #include "GeckoSampler.h"
 #include "ThreadResponsiveness.h"
+#include "ProfileEntry.h"
 
 // Memory profile
 #include "nsMemoryReporterManager.h"

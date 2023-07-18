@@ -19,7 +19,7 @@ class nsRenderingContext;
 class nsFloatManager;
 class nsLineLayout;
 class nsIPercentBSizeObserver;
-struct nsHypotheticalBox;
+struct nsHypotheticalPosition;
 
 /**
  * @return aValue clamped to [aMinValue, aMaxValue].
@@ -583,6 +583,7 @@ public:
                                         // but its in a paginated environment
                                         // (e.g. columns), it should always
                                         // reflow its placeholder children.
+    uint16_t mShrinkWrap:1; // stores the COMPUTE_SIZE_SHRINK_WRAP ctor flag
   } mFlags;
 
   // Logical and physical accessors for the resize flags. All users should go
@@ -673,7 +674,11 @@ public:
 
     // Indicates that the calling function will initialize the reflow state, and
     // that the constructor should not call Init().
-    CALLER_WILL_INIT = (1<<1)
+    CALLER_WILL_INIT = (1<<1),
+
+    // The caller wants shrink-wrap behavior (i.e. ComputeSizeFlags::eShrinkWrap
+    // will be passed to ComputeSize()).
+    COMPUTE_SIZE_SHRINK_WRAP = (1<<2),
   };
 
   // This method initializes various data members. It is automatically
@@ -918,14 +923,14 @@ protected:
 
   // Calculate a "hypothetical box" position where the placeholder frame
   // (for a position:fixed/absolute element) would have been placed if it were
-  // positioned statically. The hypothetical box will have a writing mode with
-  // the same block direction as the absolute containing block (cbrs->frame),
-  // though it may differ in inline-bidi direction.
-  void CalculateHypotheticalBox(nsPresContext*    aPresContext,
-                                nsIFrame*         aPlaceholderFrame,
-                                const nsHTMLReflowState* cbrs,
-                                nsHypotheticalBox& aHypotheticalBox,
-                                nsIAtom*          aFrameType);
+  // positioned statically. The hypothetical box position will have a writing
+  // mode with the same block direction as the absolute containing block
+  // (cbrs->frame), though it may differ in inline direction.
+  void CalculateHypotheticalPosition(nsPresContext* aPresContext,
+                                     nsIFrame* aPlaceholderFrame,
+                                     const nsHTMLReflowState* cbrs,
+                                     nsHypotheticalPosition& aHypotheticalPos,
+                                     nsIAtom* aFrameType);
 
   void InitAbsoluteConstraints(nsPresContext* aPresContext,
                                const nsHTMLReflowState* cbrs,

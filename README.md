@@ -58,8 +58,7 @@ If you are under memory pressure, try:
 ## Resources
 
  * [Mozilla Source Code Directory Structure and links to project pages](https://developer.mozilla.org/en/Mozilla_Source_Code_Directory_Structure)
- * [Build Arctic Fox for Windows](https://forum.palemoon.org/viewtopic.php?f=19&t=13556)
- * [Build Arctic Fox for Linux](https://developer.palemoon.org/Developer_Guide:Build_Instructions/Pale_Moon/Linux)
+ * [Build Arctic Fox](https://github.com/rmottola/Arctic-Fox/wiki/Build-Instructions)
  
  ## Downloads and Add-ons
   See the *WIKI* tab for prebuilt binary download links.

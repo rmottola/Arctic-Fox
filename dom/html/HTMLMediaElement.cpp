@@ -369,8 +369,18 @@ NS_IMETHODIMP HTMLMediaElement::MediaLoadListener::OnStartRequest(nsIRequest* aR
   nsresult rv = aRequest->GetStatus(&status);
   NS_ENSURE_SUCCESS(rv, rv);
   if (NS_FAILED(status)) {
-    if (element)
+    if (element) {
+      // Handle media not loading error because source was a tracking URL.
+      // We make a note of this media node by including it in a dedicated
+      // array of blocked tracking nodes under its parent document.
+      if (status == NS_ERROR_TRACKING_URI) {
+        nsIDocument* ownerDoc = element->OwnerDoc();
+        if (ownerDoc) {
+          ownerDoc->AddBlockedTrackingNode(element);
+        }
+      }
       element->NotifyLoadError();
+    }
     return status;
   }
 
@@ -727,6 +737,9 @@ void HTMLMediaElement::AbortExistingLoads()
   mDownloadSuspendedByCache = false;
   mMediaInfo = MediaInfo();
   mIsEncrypted = false;
+#ifdef MOZ_EME
+  mPendingEncryptedInitData.mInitDatas.Clear();
+#endif // MOZ_EME
   mSourcePointer = nullptr;
 
   mTags = nullptr;
@@ -959,8 +972,13 @@ void HTMLMediaElement::NotifyMediaTrackEnabled(MediaTrack* aTrack)
   if (!aTrack) {
     return;
   }
+#ifdef DEBUG
+  nsString id;
+  aTrack->GetId(id);
 
-  LOG(LogLevel::Debug, ("MediaElement %p MediaStreamTrack %p enabled", this));
+  LOG(LogLevel::Debug, ("MediaElement %p MediaStreamTrack enabled with id %s",
+                        this, NS_ConvertUTF16toUTF8(id).get()));
+#endif
 
   // TODO: We are dealing with single audio track and video track for now.
   if (AudioTrack* track = aTrack->AsAudioTrack()) {
@@ -1243,7 +1261,7 @@ nsresult HTMLMediaElement::LoadResource()
     return NS_OK;
   }
 
- if (mMediaSource) {
+  if (mMediaSource) {
     RefPtr<MediaSourceDecoder> decoder = new MediaSourceDecoder(this);
     if (!mMediaSource->Attach(decoder)) {
       // TODO: Handle failure: run "If the media data cannot be fetched at
@@ -1285,6 +1303,7 @@ nsresult HTMLMediaElement::LoadResource()
                               nullptr,   // aCallbacks
                               nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY |
                               nsIChannel::LOAD_MEDIA_SNIFFER_OVERRIDES_CONTENT_TYPE |
+                              nsIChannel::LOAD_CLASSIFY_URI |
                               nsIChannel::LOAD_CALL_CONTENT_SNIFFERS);
 
   NS_ENSURE_SUCCESS(rv,rv);
@@ -1851,6 +1870,11 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
     aGraph = MediaStreamGraph::GetInstance(graphDriverType, mAudioChannel);
   }
 
+  if (!mOutputStreams.IsEmpty() &&
+      aGraph != mOutputStreams[0].mStream->GetInputStream()->Graph()) {
+    return nullptr;
+  }
+
   OutputMediaStream* out = mOutputStreams.AppendElement();
   out->mStream = DOMMediaStream::CreateTrackUnionStream(window, aGraph);
   RefPtr<nsIPrincipal> principal = GetCurrentPrincipal();
@@ -1926,26 +1950,43 @@ typedef nsTHashtable<MediaElementSetForURI> MediaElementURITable;
 static MediaElementURITable* gElementTable;
 
 #ifdef DEBUG
+static bool
+URISafeEquals(nsIURI* a1, nsIURI* a2)
+{
+  if (!a1 || !a2) {
+    // Consider two empty URIs *not* equal!
+    return false;
+  }
+  bool equal = false;
+  nsresult rv = a1->Equals(a2, &equal);
+  return NS_SUCCEEDED(rv) && equal;
+}
 // Returns the number of times aElement appears in the media element table
 // for aURI. If this returns other than 0 or 1, there's a bug somewhere!
 static unsigned
 MediaElementTableCount(HTMLMediaElement* aElement, nsIURI* aURI)
 {
-  if (!gElementTable || !aElement || !aURI) {
+  if (!gElementTable || !aElement) {
     return 0;
   }
-  MediaElementSetForURI* entry = gElementTable->GetEntry(aURI);
-  if (!entry) {
-    return 0;
-  }
-  uint32_t count = 0;
-  for (uint32_t i = 0; i < entry->mElements.Length(); ++i) {
-    HTMLMediaElement* elem = entry->mElements[i];
-    if (elem == aElement) {
-      count++;
+  uint32_t uriCount = 0;
+  uint32_t otherCount = 0;
+  for (auto it = gElementTable->ConstIter(); !it.Done(); it.Next()) {
+    MediaElementSetForURI* entry = it.Get();
+    uint32_t count = 0;
+    for (const auto& elem : entry->mElements) {
+      if (elem == aElement) {
+        count++;
+      }
+    }
+    if (URISafeEquals(aURI, entry->GetKey())) {
+      uriCount = count;
+    } else {
+      otherCount += count;
     }
   }
-  return count;
+  NS_ASSERTION(otherCount == 0, "Should not have entries for unknown URIs");
+  return uriCount;
 }
 #endif
 
@@ -3344,7 +3385,11 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
                                          mPlayingThroughTheAudioChannel);
 
   mMediaInfo = *aInfo;
-  mIsEncrypted = aInfo->IsEncrypted();
+  mIsEncrypted = aInfo->IsEncrypted()
+#ifdef MOZ_EME
+                 || mPendingEncryptedInitData.IsEncrypted()
+#endif // MOZ_EME
+                 ;
   mTags = aTags.forget();
   mLoadedDataFired = false;
   ChangeReadyState(nsIDOMHTMLMediaElement::HAVE_METADATA);
@@ -4710,8 +4755,7 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
   }
 
   // If we are actually playing...
-  if (mReadyState >= nsIDOMHTMLMediaElement::HAVE_CURRENT_DATA &&
-      !IsPlaybackEnded()) {
+  if (IsCurrentlyPlaying()) {
     return true;
   }
 
@@ -4776,7 +4820,7 @@ HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
 
 NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
 {
-  NS_ENSURE_TRUE(nsContentUtils::IsCallerChrome(), NS_ERROR_NOT_AVAILABLE);
+  MOZ_ASSERT(NS_IsMainThread());
 
   UpdateChannelMuteState(aVolume, aMuted);
 
@@ -4787,9 +4831,150 @@ NS_IMETHODIMP HTMLMediaElement::WindowVolumeChanged(float aVolume, bool aMuted)
   return NS_OK;
 }
 
+#ifdef MOZ_EME
+MediaKeys*
+HTMLMediaElement::GetMediaKeys() const
+{
+  return mMediaKeys;
+}
+
+bool
+HTMLMediaElement::ContainsRestrictedContent()
+{
+  return GetMediaKeys() != nullptr;
+}
+
+already_AddRefed<Promise>
+HTMLMediaElement::SetMediaKeys(mozilla::dom::MediaKeys* aMediaKeys,
+                               ErrorResult& aRv)
+{
+  if (MozAudioCaptured()) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIGlobalObject> global =
+    do_QueryInterface(OwnerDoc()->GetInnerWindow());
+  if (!global) {
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
+  RefPtr<DetailedPromise> promise = DetailedPromise::Create(global, aRv,
+    NS_LITERAL_CSTRING("HTMLMediaElement.setMediaKeys"));
+  if (aRv.Failed()) {
+    return nullptr;
+  }
+  if (mMediaKeys == aMediaKeys) {
+    promise->MaybeResolve(JS::UndefinedHandleValue);
+    return promise.forget();
+  }
+  if (aMediaKeys && aMediaKeys->IsBoundToMediaElement()) {
+    promise->MaybeReject(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR,
+                         NS_LITERAL_CSTRING("MediaKeys object is already bound to another HTMLMediaElement"));
+    return promise.forget();
+  }
+  if (mMediaKeys) {
+    // Existing MediaKeys object. Shut it down.
+    mMediaKeys->Shutdown();
+    mMediaKeys = nullptr;
+  }
+  if (mDecoder &&
+      !mMediaSource &&
+      Preferences::GetBool("media.eme.mse-only", true)) {
+    ShutdownDecoder();
+    promise->MaybeReject(NS_ERROR_DOM_NOT_SUPPORTED_ERR,
+                         NS_LITERAL_CSTRING("EME not supported on non-MSE streams"));
+    return promise.forget();
+  }
+
+  mMediaKeys = aMediaKeys;
+  if (mMediaKeys) {
+    if (NS_FAILED(mMediaKeys->Bind(this))) {
+      promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR,
+                           NS_LITERAL_CSTRING("Failed to bind MediaKeys object to HTMLMediaElement"));
+      mMediaKeys = nullptr;
+      return promise.forget();
+    }
+    if (mDecoder) {
+      mDecoder->SetCDMProxy(mMediaKeys->GetCDMProxy());
+    }
+  }
+  promise->MaybeResolve(JS::UndefinedHandleValue);
+  return promise.forget();
+}
+
+EventHandlerNonNull*
+HTMLMediaElement::GetOnencrypted()
+{
+  EventListenerManager *elm = GetExistingListenerManager();
+  return elm ? elm->GetEventHandler(nsGkAtoms::onencrypted, EmptyString())
+              : nullptr;
+}
+
+void
+HTMLMediaElement::SetOnencrypted(EventHandlerNonNull* handler)
+{
+  EventListenerManager *elm = GetOrCreateListenerManager();
+  if (elm) {
+    elm->SetEventHandler(nsGkAtoms::onencrypted, EmptyString(), handler);
+  }
+}
+
+void
+HTMLMediaElement::DispatchEncrypted(const nsTArray<uint8_t>& aInitData,
+                                    const nsAString& aInitDataType)
+{
+  if (mReadyState == nsIDOMHTMLMediaElement::HAVE_NOTHING) {
+    // Ready state not HAVE_METADATA (yet), don't dispatch encrypted now.
+    // Queueing for later dispatch in MetadataLoaded.
+    mPendingEncryptedInitData.AddInitData(aInitDataType, aInitData);
+    return;
+  }
+
+  RefPtr<MediaEncryptedEvent> event;
+  if (IsCORSSameOrigin()) {
+    event = MediaEncryptedEvent::Constructor(this, aInitDataType, aInitData);
+  } else {
+    event = MediaEncryptedEvent::Constructor(this);
+  }
+
+  RefPtr<AsyncEventDispatcher> asyncDispatcher =
+    new AsyncEventDispatcher(this, event);
+  asyncDispatcher->PostDOMEvent();
+}
+
+bool
+HTMLMediaElement::IsEventAttributeName(nsIAtom* aName)
+{
+  return aName == nsGkAtoms::onencrypted ||
+         nsGenericHTMLElement::IsEventAttributeName(aName);
+}
+
+already_AddRefed<nsIPrincipal>
+HTMLMediaElement::GetTopLevelPrincipal()
+{
+  RefPtr<nsIPrincipal> principal;
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(OwnerDoc()->GetParentObject());
+  if (!window) {
+    return nullptr;
+  }
+  window = window->GetOuterWindow();
+  nsCOMPtr<nsPIDOMWindow> top = window->GetTop();
+  if (!top) {
+    return nullptr;
+  }
+  nsIDocument* doc = top->GetExtantDoc();
+  if (!doc) {
+    return nullptr;
+  }
+  principal = doc->NodePrincipal();
+  return principal.forget();
+}
+#endif // MOZ_EME
+
 NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
 {
-   MOZ_ASSERT(mAudioChannelAgent);
+  MOZ_ASSERT(mAudioChannelAgent);
 
   if (!OwnerDoc()->GetInnerWindow()) {
     return NS_OK;
@@ -4804,7 +4989,7 @@ NS_IMETHODIMP HTMLMediaElement::WindowAudioCaptureChanged()
       uint64_t id = window->WindowID();
       MediaStreamGraph* msg =
         MediaStreamGraph::GetInstance(MediaStreamGraph::AUDIO_THREAD_DRIVER,
-                                      AudioChannel::Normal);
+                                      mAudioChannel);
 
       if (GetSrcMediaStream()) {
         mCaptureStreamPort = msg->ConnectToCaptureStream(id, GetSrcMediaStream());
@@ -4922,6 +5107,27 @@ bool
 HTMLMediaElement::ComputedMuted() const
 {
   return (mMuted & MUTED_BY_AUDIO_CHANNEL);
+}
+
+bool
+HTMLMediaElement::IsCurrentlyPlaying() const
+{
+  // We have playable data, but we still need to check whether data is "real"
+  // current data.
+  if (mReadyState >= nsIDOMHTMLMediaElement::HAVE_CURRENT_DATA &&
+      !IsPlaybackEnded()) {
+
+    // Restart the video after ended, it needs to seek to the new position.
+    // In b2g, the cache is not large enough to store whole video data, so we
+    // need to download data again. In this case, although the ready state is
+    // "HAVE_CURRENT_DATA", it is the previous old data. Actually we are not
+    // yet have enough currently data.
+    if (mDecoder && mDecoder->IsSeeking() && !mPlayingBeforeSeek) {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 } // namespace dom

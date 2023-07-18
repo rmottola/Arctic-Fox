@@ -70,14 +70,14 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/LinuxSignal.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/DebugOnly.h"
+#include "ProfileEntry.h"
 #include "nsThreadUtils.h"
 #include "GeckoSampler.h"
 #include "ThreadResponsiveness.h"
 
 #if defined(__ARM_EABI__) && defined(ANDROID)
  // Should also work on other Android and ARM Linux, but not tested there yet.
-#define USE_EHABI_STACKWALK
-#include "EHABIStackWalk.h"
 # define USE_EHABI_STACKWALK
 # include "EHABIStackWalk.h"
 #elif defined(SPS_PLAT_amd64_linux) || defined(SPS_PLAT_x86_linux)
@@ -117,8 +117,6 @@ static void sLUL_initialization_routine(void)
   read_procmaps(sLUL);
 }
 #endif
-
-using namespace mozilla;
 
 /* static */ Thread::tid_t
 Thread::GetCurrentId()
@@ -361,8 +359,9 @@ static void* SignalSender(void* arg) {
           printf_stderr("profiler failed to signal tid=%d\n", threadId);
 #ifdef DEBUG
           abort();
-#endif
+#else
           continue;
+#endif
         }
 
         // Wait for the signal handler to run before moving on to the next one

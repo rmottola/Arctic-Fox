@@ -12,11 +12,13 @@
 #include "nsGkAtoms.h"
 #include "nsIScrollableFrame.h"
 #include "nsSubDocumentFrame.h"
+#include "nsCanvasFrame.h"
 #include "nsAbsoluteContainingBlock.h"
 #include "GeckoProfiler.h"
 #include "nsIMozBrowserFrame.h"
 
 using namespace mozilla;
+typedef nsAbsoluteContainingBlock::AbsPosReflowFlags AbsPosReflowFlags;
 
 ViewportFrame*
 NS_NewViewportFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
@@ -91,6 +93,22 @@ ShouldInTopLayerForFullscreen(Element* aElement)
 }
 #endif // DEBUG
 
+static void
+BuildDisplayListForTopLayerFrame(nsDisplayListBuilder* aBuilder,
+                                 nsIFrame* aFrame,
+                                 nsDisplayList* aList)
+{
+  nsRect dirty;
+  nsDisplayListBuilder::OutOfFlowDisplayData*
+    savedOutOfFlowData = nsDisplayListBuilder::GetOutOfFlowData(aFrame);
+  if (savedOutOfFlowData) {
+    dirty = savedOutOfFlowData->mDirtyRect;
+  }
+  nsDisplayList list;
+  aFrame->BuildDisplayListForStackingContext(aBuilder, dirty, &list);
+  aList->AppendToTop(&list);
+}
+
 void
 ViewportFrame::BuildDisplayListForTopLayer(nsDisplayListBuilder* aBuilder,
                                            nsDisplayList* aList)
@@ -123,16 +141,16 @@ ViewportFrame::BuildDisplayListForTopLayer(nsDisplayListBuilder* aBuilder,
         continue;
       }
       MOZ_ASSERT(frame->GetParent() == this);
+      BuildDisplayListForTopLayerFrame(aBuilder, frame, aList);
+    }
+  }
 
-      nsRect dirty;
-      nsDisplayListBuilder::OutOfFlowDisplayData*
-        savedOutOfFlowData = nsDisplayListBuilder::GetOutOfFlowData(frame);
-      if (savedOutOfFlowData) {
-        dirty = savedOutOfFlowData->mDirtyRect;
+  nsIPresShell* shell = PresContext()->PresShell();
+  if (nsCanvasFrame* canvasFrame = shell->GetCanvasFrame()) {
+    if (Element* container = canvasFrame->GetCustomContentContainer()) {
+      if (nsIFrame* frame = container->GetPrimaryFrame()) {
+        BuildDisplayListForTopLayerFrame(aBuilder, frame, aList);
       }
-      nsDisplayList list;
-      frame->BuildDisplayListForStackingContext(aBuilder, dirty, &list);
-      aList->AppendToTop(&list);
     }
   }
 }
@@ -333,10 +351,10 @@ ViewportFrame::Reflow(nsPresContext*           aPresContext,
     if (rootScrollFrame && !rootScrollFrame->IsIgnoringViewportClipping()) {
       overflowAreas = nullptr;
     }
+    AbsPosReflowFlags flags =
+      AbsPosReflowFlags::eCBWidthAndHeightChanged; // XXX could be optimized
     GetAbsoluteContainingBlock()->Reflow(this, aPresContext, reflowState, aStatus,
-                                         rect,
-                                         false, true, true, // XXX could be optimized
-                                         overflowAreas);
+                                         rect, flags, overflowAreas);
   }
 
   if (mFrames.NotEmpty()) {

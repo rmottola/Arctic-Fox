@@ -297,10 +297,10 @@ public:
   // pointers) with a certain buffer size. It's unfortunate that we need this.
   // providing format and sizes could let us do more optimization.
   static already_AddRefed<TextureClient>
-  CreateWithBufferSize(ISurfaceAllocator* aAllocator,
-                       gfx::SurfaceFormat aFormat,
-                       size_t aSize,
-                       TextureFlags aTextureFlags);
+  CreateForYCbCrWithBufferSize(ISurfaceAllocator* aAllocator,
+                               gfx::SurfaceFormat aFormat,
+                               size_t aSize,
+                               TextureFlags aTextureFlags);
 
   // Creates and allocates a TextureClient of the same type.
   already_AddRefed<TextureClient>
@@ -397,7 +397,7 @@ public:
    * to be used appropriately since the latter are also there to map/numap data.
    */
   bool HasSynchronization() const { return false; }
- 
+
   /**
    * Indicates whether the TextureClient implementation is backed by an
    * in-memory buffer. The consequence of this is that locking the
@@ -503,7 +503,7 @@ public:
    * If sync is true, the destruction will be synchronous regardless of the
    * texture's flags (bad for performance, use with care).
    */
-  void ForceRemove(bool sync = false);
+  void Destroy(bool sync = false);
 
   virtual void SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle)
   {
@@ -534,6 +534,9 @@ public:
 
   /**
    * This function waits until the buffer is no longer being used.
+   *
+   * XXX - Ideally we shouldn't need this method because Lock the right
+   * thing already.
    */
   virtual void WaitForBufferOwnership(bool aWaitReleaseFence = true);
 

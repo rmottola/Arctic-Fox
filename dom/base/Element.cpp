@@ -546,6 +546,16 @@ Element::GetClassList(nsISupports** aClassList)
   NS_ADDREF(*aClassList = ClassList());
 }
 
+void
+Element::GetAttributeNames(nsTArray<nsString>& aResult)
+{
+  uint32_t count = mAttrsAndChildren.AttrCount();
+  for (uint32_t i = 0; i < count; ++i) {
+    const nsAttrName* name = mAttrsAndChildren.AttrNameAt(i);
+    name->GetQualifiedName(*aResult.AppendElement());
+  }
+}
+
 already_AddRefed<nsIHTMLCollection>
 Element::GetElementsByTagName(const nsAString& aLocalName)
 {
@@ -3659,11 +3669,11 @@ Element::FontSizeInflation()
 }
 
 net::ReferrerPolicy
-Element::GetReferrerPolicy()
+Element::GetReferrerPolicyAsEnum()
 {
   if (Preferences::GetBool("network.http.enablePerElementReferrer", false) &&
       IsHTMLElement()) {
-    const nsAttrValue* referrerValue = GetParsedAttr(nsGkAtoms::referrer);
+    const nsAttrValue* referrerValue = GetParsedAttr(nsGkAtoms::referrerpolicy);
     if (referrerValue && referrerValue->Type() == nsAttrValue::eEnum) {
       return net::ReferrerPolicy(referrerValue->GetEnumValue());
     }

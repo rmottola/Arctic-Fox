@@ -742,9 +742,9 @@ Transform(const gfxImageSurface* aDest,
   SkPaint paint;
   paint.setXfermodeMode(SkXfermode::kSrc_Mode);
   paint.setAntiAlias(true);
-  paint.setFilterLevel(SkPaint::kLow_FilterLevel);
+  paint.setFilterQuality(kLow_SkFilterQuality);
   SkRect destRect = SkRect::MakeXYWH(0, 0, srcSize.width, srcSize.height);
-  destCanvas.drawBitmapRectToRect(src, nullptr, destRect, &paint);
+  destCanvas.drawBitmapRect(src, destRect, &paint);
 }
 #else
 static pixman_transform
@@ -955,8 +955,7 @@ InstallLayerClipPreserves3D(gfxContext* aTarget, Layer* aLayer)
     Matrix4x4();
   Matrix transform;
   if (!transform3d.CanDraw2D(&transform)) {
-    MOZ_CRASH("We should not have a 3D transform that CanDraw2D() is false!");
-    return;
+    gfxDevCrash(LogReason::CannotDraw3D) << "GFX: We should not have a 3D transform that CanDraw2D() is false!";
   }
   gfxMatrix oldTransform = aTarget->CurrentMatrix();
   transform *= ToMatrix(oldTransform);

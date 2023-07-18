@@ -541,19 +541,6 @@ static struct nsMyTrustedEVInfo myTrustedEVInfos[] = {
     nullptr
   },
   {
-    // CN=Buypass Class 3 CA 1,O=Buypass AS-983163327,C=NO
-    "2.16.578.1.26.1.3.3",
-    "Buypass EV OID",
-    SEC_OID_UNKNOWN,
-    { 0xB7, 0xB1, 0x2B, 0x17, 0x1F, 0x82, 0x1D, 0xAA, 0x99, 0x0C, 0xD0,
-      0xFE, 0x50, 0x87, 0xB1, 0x28, 0x44, 0x8B, 0xA8, 0xE5, 0x18, 0x4F,
-      0x84, 0xC5, 0x1E, 0x02, 0xB5, 0xC8, 0xFB, 0x96, 0x2B, 0x24 },
-    "MEsxCzAJBgNVBAYTAk5PMR0wGwYDVQQKDBRCdXlwYXNzIEFTLTk4MzE2MzMyNzEd"
-    "MBsGA1UEAwwUQnV5cGFzcyBDbGFzcyAzIENBIDE=",
-    "Ag==",
-    nullptr
-  },
-  {
     // CN=Buypass Class 3 Root CA,O=Buypass AS-983163327,C=NO
     "2.16.578.1.26.1.3.3",
     "Buypass EV OID",
@@ -1105,7 +1092,133 @@ static struct nsMyTrustedEVInfo myTrustedEVInfos[] = {
     "cnVzdC5uZXQgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkgKDIwNDgp",
     "OGPe+A==",
     nullptr
-  }
+  },
+  {
+    // CN=Staat der Nederlanden EV Root CA,O=Staat der Nederlanden,C=NL
+    "2.16.528.1.1003.1.2.7",
+    "Staat der Nederlanden EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x4D, 0x24, 0x91, 0x41, 0x4C, 0xFE, 0x95, 0x67, 0x46, 0xEC, 0x4C,
+      0xEF, 0xA6, 0xCF, 0x6F, 0x72, 0xE2, 0x8A, 0x13, 0x29, 0x43, 0x2F,
+      0x9D, 0x8A, 0x90, 0x7A, 0xC4, 0xCB, 0x5D, 0xAD, 0xC1, 0x5A },
+    "MFgxCzAJBgNVBAYTAk5MMR4wHAYDVQQKDBVTdGFhdCBkZXIgTmVkZXJsYW5kZW4x"
+    "KTAnBgNVBAMMIFN0YWF0IGRlciBOZWRlcmxhbmRlbiBFViBSb290IENB",
+    "AJiWjQ==",
+    nullptr
+  },
+  {
+    // CN=Entrust Root Certification Authority - G2,OU="(c) 2009 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+    "2.16.840.1.114028.10.1.2",
+    "Entrust EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x43, 0xDF, 0x57, 0x74, 0xB0, 0x3E, 0x7F, 0xEF, 0x5F, 0xE4, 0x0D,
+      0x93, 0x1A, 0x7B, 0xED, 0xF1, 0xBB, 0x2E, 0x6B, 0x42, 0x73, 0x8C,
+      0x4E, 0x6D, 0x38, 0x41, 0x10, 0x3D, 0x3A, 0xA7, 0xF3, 0x39 },
+    "MIG+MQswCQYDVQQGEwJVUzEWMBQGA1UEChMNRW50cnVzdCwgSW5jLjEoMCYGA1UE"
+    "CxMfU2VlIHd3dy5lbnRydXN0Lm5ldC9sZWdhbC10ZXJtczE5MDcGA1UECxMwKGMp"
+    "IDIwMDkgRW50cnVzdCwgSW5jLiAtIGZvciBhdXRob3JpemVkIHVzZSBvbmx5MTIw"
+    "MAYDVQQDEylFbnRydXN0IFJvb3QgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkgLSBH"
+    "Mg==",
+    "SlOMKA==",
+    nullptr
+  },
+  {
+    // CN=Entrust Root Certification Authority - EC1,OU="(c) 2012 Entrust, Inc. - for authorized use only",OU=See www.entrust.net/legal-terms,O="Entrust, Inc.",C=US
+    "2.16.840.1.114028.10.1.2",
+    "Entrust EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x02, 0xED, 0x0E, 0xB2, 0x8C, 0x14, 0xDA, 0x45, 0x16, 0x5C, 0x56,
+      0x67, 0x91, 0x70, 0x0D, 0x64, 0x51, 0xD7, 0xFB, 0x56, 0xF0, 0xB2,
+      0xAB, 0x1D, 0x3B, 0x8E, 0xB0, 0x70, 0xE5, 0x6E, 0xDF, 0xF5 },
+    "MIG/MQswCQYDVQQGEwJVUzEWMBQGA1UEChMNRW50cnVzdCwgSW5jLjEoMCYGA1UE"
+    "CxMfU2VlIHd3dy5lbnRydXN0Lm5ldC9sZWdhbC10ZXJtczE5MDcGA1UECxMwKGMp"
+    "IDIwMTIgRW50cnVzdCwgSW5jLiAtIGZvciBhdXRob3JpemVkIHVzZSBvbmx5MTMw"
+    "MQYDVQQDEypFbnRydXN0IFJvb3QgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkgLSBF"
+    "QzE=",
+    "AKaLeSkAAAAAUNCR+Q==",
+    nullptr
+  },
+  {
+    // CN=CFCA EV ROOT,O=China Financial Certification Authority,C=CN
+    "2.16.156.112554.3",
+    "CFCA EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x5C, 0xC3, 0xD7, 0x8E, 0x4E, 0x1D, 0x5E, 0x45, 0x54, 0x7A, 0x04,
+      0xE6, 0x87, 0x3E, 0x64, 0xF9, 0x0C, 0xF9, 0x53, 0x6D, 0x1C, 0xCC,
+      0x2E, 0xF8, 0x00, 0xF3, 0x55, 0xC4, 0xC5, 0xFD, 0x70, 0xFD },
+    "MFYxCzAJBgNVBAYTAkNOMTAwLgYDVQQKDCdDaGluYSBGaW5hbmNpYWwgQ2VydGlm"
+    "aWNhdGlvbiBBdXRob3JpdHkxFTATBgNVBAMMDENGQ0EgRVYgUk9PVA==",
+    "GErM1g==",
+    nullptr
+  },
+  {
+    // CN=Certification Authority of WoSign G2,O=WoSign CA Limited,C=CN
+    "1.3.6.1.4.1.36305.2",
+    "WoSign EV OID",
+    SEC_OID_UNKNOWN,
+    { 0xD4, 0x87, 0xA5, 0x6F, 0x83, 0xB0, 0x74, 0x82, 0xE8, 0x5E, 0x96,
+      0x33, 0x94, 0xC1, 0xEC, 0xC2, 0xC9, 0xE5, 0x1D, 0x09, 0x03, 0xEE,
+      0x94, 0x6B, 0x02, 0xC3, 0x01, 0x58, 0x1E, 0xD9, 0x9E, 0x16 },
+    "MFgxCzAJBgNVBAYTAkNOMRowGAYDVQQKExFXb1NpZ24gQ0EgTGltaXRlZDEtMCsG"
+    "A1UEAxMkQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkgb2YgV29TaWduIEcy",
+    "ayXaioidfLwPBbOxemFFRA==",
+    nullptr
+  },
+  {
+    // CN=CA WoSign ECC Root,O=WoSign CA Limited,C=CN
+    "1.3.6.1.4.1.36305.2",
+    "WoSign EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x8B, 0x45, 0xDA, 0x1C, 0x06, 0xF7, 0x91, 0xEB, 0x0C, 0xAB, 0xF2,
+      0x6B, 0xE5, 0x88, 0xF5, 0xFB, 0x23, 0x16, 0x5C, 0x2E, 0x61, 0x4B,
+      0xF8, 0x85, 0x56, 0x2D, 0x0D, 0xCE, 0x50, 0xB2, 0x9B, 0x02 },
+    "MEYxCzAJBgNVBAYTAkNOMRowGAYDVQQKExFXb1NpZ24gQ0EgTGltaXRlZDEbMBkG"
+    "A1UEAxMSQ0EgV29TaWduIEVDQyBSb290",
+    "aEpYcIBr8I8C+vbe6LCQkA==",
+    nullptr
+  },
+  {
+    // CN=TÜRKTRUST Elektronik Sertifika Hizmet Sağlayıcısı H6,O=TÜRKTRUST Bilgi İletişim ve Bilişim Güvenliği Hizmetleri A...,L=Ankara,C=TR
+    "2.16.792.3.0.3.1.1.5",
+    "TurkTrust EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x8D, 0xE7, 0x86, 0x55, 0xE1, 0xBE, 0x7F, 0x78, 0x47, 0x80, 0x0B,
+      0x93, 0xF6, 0x94, 0xD2, 0x1D, 0x36, 0x8C, 0xC0, 0x6E, 0x03, 0x3E,
+      0x7F, 0xAB, 0x04, 0xBB, 0x5E, 0xB9, 0x9D, 0xA6, 0xB7, 0x00 },
+    "MIGxMQswCQYDVQQGEwJUUjEPMA0GA1UEBwwGQW5rYXJhMU0wSwYDVQQKDERUw5xS"
+    "S1RSVVNUIEJpbGdpIMSwbGV0acWfaW0gdmUgQmlsacWfaW0gR8O8dmVubGnEn2kg"
+    "SGl6bWV0bGVyaSBBLsWeLjFCMEAGA1UEAww5VMOcUktUUlVTVCBFbGVrdHJvbmlr"
+    "IFNlcnRpZmlrYSBIaXptZXQgU2HEn2xhecSxY8Sxc8SxIEg2",
+    "faHyZeyK",
+    nullptr
+  },
+  {
+    // OU=Security Communication RootCA2,O="SECOM Trust Systems CO.,LTD.",C=JP
+    "1.2.392.200091.100.721.1",
+    "SECOM EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x51, 0x3B, 0x2C, 0xEC, 0xB8, 0x10, 0xD4, 0xCD, 0xE5, 0xDD, 0x85,
+      0x39, 0x1A, 0xDF, 0xC6, 0xC2, 0xDD, 0x60, 0xD8, 0x7B, 0xB7, 0x36,
+      0xD2, 0xB5, 0x21, 0x48, 0x4A, 0xA4, 0x7A, 0x0E, 0xBE, 0xF6 },
+    "MF0xCzAJBgNVBAYTAkpQMSUwIwYDVQQKExxTRUNPTSBUcnVzdCBTeXN0ZW1zIENP"
+    "LixMVEQuMScwJQYDVQQLEx5TZWN1cml0eSBDb21tdW5pY2F0aW9uIFJvb3RDQTI=",
+    "AA==",
+    nullptr
+  },
+  {
+    // CN=OISTE WISeKey Global Root GB CA,OU=OISTE Foundation Endorsed,O=WISeKey,C=CH
+    "2.16.756.5.14.7.4.8",
+    "WISeKey EV OID",
+    SEC_OID_UNKNOWN,
+    { 0x6B, 0x9C, 0x08, 0xE8, 0x6E, 0xB0, 0xF7, 0x67, 0xCF, 0xAD, 0x65,
+      0xCD, 0x98, 0xB6, 0x21, 0x49, 0xE5, 0x49, 0x4A, 0x67, 0xF5, 0x84,
+      0x5E, 0x7B, 0xD1, 0xED, 0x01, 0x9F, 0x27, 0xB8, 0x6B, 0xD6 },
+    "MG0xCzAJBgNVBAYTAkNIMRAwDgYDVQQKEwdXSVNlS2V5MSIwIAYDVQQLExlPSVNU"
+    "RSBGb3VuZGF0aW9uIEVuZG9yc2VkMSgwJgYDVQQDEx9PSVNURSBXSVNlS2V5IEds"
+    "b2JhbCBSb290IEdCIENB",
+    "drEgUnTwhYdGs/gjGvbCwA==",
+    nullptr
+  },
 };
 
 static SECOidTag
@@ -1193,8 +1306,9 @@ IdentityInfoInit()
 
     // If an entry is missing in the NSS root database, it may be because the
     // root database is out of sync with what we expect (e.g. a different
-    // version of system NSS is installed). We will just silently avoid
-    // treating that root cert as EV.
+    // version of system NSS is installed). We assert on debug builds, but
+    // silently continue on release builds. In both cases, the root cert does
+    // not get EV treatment.
     if (!entry.cert) {
 #ifdef DEBUG
       // The debug CA structs are at positions 0 to NUM_TEST_EV_ROOTS - 1, and
@@ -1203,7 +1317,7 @@ IdentityInfoInit()
         continue;
       }
 #endif
-      //PR_NOT_REACHED("Could not find EV root in NSS storage");
+      PR_NOT_REACHED("Could not find EV root in NSS storage");
       continue;
     }
 

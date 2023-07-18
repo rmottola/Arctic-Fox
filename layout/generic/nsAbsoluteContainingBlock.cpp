@@ -113,36 +113,27 @@ nsAbsoluteContainingBlock::Reflow(nsContainerFrame*        aDelegatingFrame,
                                   const nsHTMLReflowState& aReflowState,
                                   nsReflowStatus&          aReflowStatus,
                                   const nsRect&            aContainingBlock,
-                                  bool                     aConstrainHeight,
-                                  bool                     aCBWidthChanged,
-                                  bool                     aCBHeightChanged,
+                                  AbsPosReflowFlags        aFlags,
                                   nsOverflowAreas*         aOverflowAreas)
 {
   nsReflowStatus reflowStatus = NS_FRAME_COMPLETE;
 
-  bool reflowAll = aReflowState.ShouldReflowAllKids();
-
-  // The 'width' check below is an optimization to avoid the virtual GetType()
-  // call in most cases.  'aContainingBlock' isn't used for grid items,
-  // each item has its own CB on a frame property instead.
-  // @see nsGridContainerFrame::ReflowChildren
-  const bool isGrid =
-    aContainingBlock.width == nsGridContainerFrame::VERY_LIKELY_A_GRID_CONTAINER &&
-    aDelegatingFrame->GetType() == nsGkAtoms::gridContainerFrame;
-
+  const bool reflowAll = aReflowState.ShouldReflowAllKids();
+  const bool isGrid = !!(aFlags & AbsPosReflowFlags::eIsGridContainerCB);
   nsIFrame* kidFrame;
   nsOverflowContinuationTracker tracker(aDelegatingFrame, true);
   for (kidFrame = mAbsoluteFrames.FirstChild(); kidFrame; kidFrame = kidFrame->GetNextSibling()) {
     bool kidNeedsReflow = reflowAll || NS_SUBTREE_DIRTY(kidFrame) ||
-      FrameDependsOnContainer(kidFrame, aCBWidthChanged, aCBHeightChanged);
+      FrameDependsOnContainer(kidFrame,
+                              !!(aFlags & AbsPosReflowFlags::eCBWidthChanged),
+                              !!(aFlags & AbsPosReflowFlags::eCBHeightChanged));
     if (kidNeedsReflow && !aPresContext->HasPendingInterrupt()) {
       // Reflow the frame
       nsReflowStatus  kidStatus = NS_FRAME_COMPLETE;
       const nsRect& cb = isGrid ? nsGridContainerFrame::GridItemCB(kidFrame)
                                 : aContainingBlock;
       ReflowAbsoluteFrame(aDelegatingFrame, aPresContext, aReflowState, cb,
-                          aConstrainHeight, kidFrame, kidStatus,
-                          aOverflowAreas);
+                          aFlags, kidFrame, kidStatus, aOverflowAreas);
       nsIFrame* nextFrame = kidFrame->GetNextInFlow();
       if (!NS_FRAME_IS_FULLY_COMPLETE(kidStatus) &&
           aDelegatingFrame->IsFrameOfType(nsIFrame::eCanContainOverflowContainers)) {
@@ -354,7 +345,7 @@ nsAbsoluteContainingBlock::ReflowAbsoluteFrame(nsIFrame*                aDelegat
                                                nsPresContext*           aPresContext,
                                                const nsHTMLReflowState& aReflowState,
                                                const nsRect&            aContainingBlock,
-                                               bool                     aConstrainBSize,
+                                               AbsPosReflowFlags        aFlags,
                                                nsIFrame*                aKidFrame,
                                                nsReflowStatus&          aStatus,
                                                nsOverflowAreas*         aOverflowAreas)
@@ -404,7 +395,7 @@ nsAbsoluteContainingBlock::ReflowAbsoluteFrame(nsIFrame*                aDelegat
   const LogicalMargin margin =
     kidReflowState.ComputedLogicalMargin().ConvertTo(outerWM, wm);
   bool constrainBSize = (aReflowState.AvailableBSize() != NS_UNCONSTRAINEDSIZE)
-    && aConstrainBSize
+    && (aFlags & AbsPosReflowFlags::eConstrainHeight)
        // Don't split if told not to (e.g. for fixed frames)
     && (aDelegatingFrame->GetType() != nsGkAtoms::inlineFrame)
        //XXX we don't handle splitting frames for inline absolute containing blocks yet

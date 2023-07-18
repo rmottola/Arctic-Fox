@@ -1668,7 +1668,14 @@
      *   Stack: =>
      */ \
     macro(JSOP_DEFLET,        162,"deflet",     NULL,     5,  0,  0,  JOF_ATOM) \
-    macro(JSOP_UNUSED163,     163,"unused163",  NULL,     1,  0,  1,  JOF_BYTE) \
+    /*
+     * Throw if the value on the stack is not coerscible to an object (is |null| or |undefined|).
+     *   Category: Literals
+     *   Type: Object
+     *   Operands:
+     *   Stack: val => val
+     */ \
+    macro(JSOP_CHECKOBJCOERCIBLE, 163, "checkobjcoercible", NULL, 1,  1,  1, JOF_BYTE) \
     /*
      * Find the function to invoke with |super()| on the scope chain.
      *
@@ -1802,7 +1809,15 @@
      *   Stack: => val
      */ \
     macro(JSOP_GETIMPORT,     176,"getimport",  NULL,     5,  0,  1,  JOF_ATOM|JOF_NAME|JOF_TYPESET) \
-    macro(JSOP_UNUSED177,     177,"unused177",  NULL,     1,  0,  0,  JOF_BYTE) \
+    /*
+     * Examines the top stack value, asserting that it's either a self-hosted
+     * function or a self-hosted intrinsic. This opcode does nothing in a
+     * non-debug build.
+     *   Category: Other
+     *   Operands:
+     *   Stack: checkVal => checkVal
+     */ \
+    macro(JSOP_DEBUGCHECKSELFHOSTED, 177,"debug-checkselfhosted",  NULL, 1,  1,  1,  JOF_BYTE) \
     macro(JSOP_UNUSED178,     178,"unused178",  NULL,     1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED179,     179,"unused179",  NULL,     1,  0,  0,  JOF_BYTE) \
     macro(JSOP_UNUSED180,     180,"unused180",  NULL,     1,  0,  0,  JOF_BYTE) \
@@ -2122,15 +2137,12 @@
     macro(JSOP_REST,          224, "rest",         NULL,  1,  0,  1,  JOF_BYTE|JOF_TYPESET) \
     \
     /*
-     * First, throw a TypeError if baseValue is null or undefined. Then,
-     * replace the top-of-stack value propertyNameValue with
-     * ToPropertyKey(propertyNameValue). This opcode implements ES6 12.3.2.1
-     * steps 7-10.  It is also used to implement computed property names; in
-     * that case, baseValue is always an object, so the first step is a no-op.
+     * Replace the top-of-stack value propertyNameValue with
+     * ToPropertyKey(propertyNameValue).
      *   Category: Literals
      *   Type: Object
      *   Operands:
-     *   Stack: baseValue, propertyNameValue => baseValue, propertyKey
+     *   Stack: propertyNameValue => propertyKey
      */ \
     macro(JSOP_TOID,          225, "toid",         NULL,  1,  1,  1,  JOF_BYTE) \
     \

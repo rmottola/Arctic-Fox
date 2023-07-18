@@ -27,6 +27,7 @@
 #include "nsIPresShell.h"
 #include "nsFontMetrics.h"
 #include "gfxFont.h"
+#include "nsCSSAnonBoxes.h"
 #include "nsCSSPseudoElements.h"
 #include "nsThemeConstants.h"
 #include "PLDHashTable.h"
@@ -1703,29 +1704,18 @@ nsRuleNode::PropagateGrandancestorBit(nsStyleContext* aContext,
 {
   MOZ_ASSERT(aContext);
   MOZ_ASSERT(aContextInheritedFrom &&
-             aContextInheritedFrom != aContext &&
-             aContextInheritedFrom != aContext->GetParent(),
-             "aContextInheritedFrom must be an ancestor of aContext's parent");
+             aContextInheritedFrom != aContext,
+             "aContextInheritedFrom must be an ancestor of aContext");
 
-  aContext->AddStyleBit(NS_STYLE_USES_GRANDANCESTOR_STYLE);
-
-  nsStyleContext* context = aContext->GetParent();
-  if (!context) {
-    return;
-  }
-
-  for (;;) {
-    nsStyleContext* parent = context->GetParent();
-    if (!parent) {
+  for (nsStyleContext* context = aContext->GetParent();
+       context != aContextInheritedFrom;
+       context = context->GetParent()) {
+    if (!context) {
       MOZ_ASSERT(false, "aContextInheritedFrom must be an ancestor of "
                         "aContext's parent");
       break;
     }
-    if (parent == aContextInheritedFrom) {
-      break;
-    }
-    context->AddStyleBit(NS_STYLE_USES_GRANDANCESTOR_STYLE);
-    context = parent;
+    context->AddStyleBit(NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE);
   }
 }
 
@@ -5229,8 +5219,9 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
         nsCSSProperty prop =
           nsCSSProps::LookupProperty(propertyStr,
                                      nsCSSProps::eEnabledForAllContent);
-        if (prop == eCSSProperty_UNKNOWN) {
-          transition->SetUnknownProperty(propertyStr);
+        if (prop == eCSSProperty_UNKNOWN ||
+            prop == eCSSPropertyExtra_variable) {
+          transition->SetUnknownProperty(prop, propertyStr);
         } else {
           transition->SetProperty(prop);
         }
@@ -5735,8 +5726,14 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
   // positioned, the position value should be computed to 'absolute' per
   // the Fullscreen API spec.
   if (display->mTopLayer != NS_STYLE_TOP_LAYER_NONE &&
-      !display->IsAbsolutelyPositionedStyle()) {
-    display->mPosition = NS_STYLE_POSITION_ABSOLUTE;
+      // XXX We currently only support fixed top layer element. But per
+      // spec it should check IsAbsolutelyPositionedStyle() instead.
+      // This should be fixed as soon as we support <dialog> element
+      // in bug 840640. We have to restrict it now because addons may
+      // mess with UA-only styles and cause crashes. See bug 1230508.
+      display->mPosition != NS_STYLE_POSITION_FIXED) {
+    // XXX And we should set other values to absolute instead of fixed.
+    display->mPosition = NS_STYLE_POSITION_FIXED;
     // We cannot cache this struct because otherwise it may be used as
     // an aStartStruct for some other elements.
     conditions.SetUncacheable();
@@ -5971,6 +5968,24 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       conditions.SetUncacheable();
     }
 
+    // Inherit a <fieldset> grid/flex display type into its anon content frame.
+    if (pseudo == nsCSSAnonBoxes::fieldsetContent) {
+      MOZ_ASSERT(display->mDisplay == NS_STYLE_DISPLAY_BLOCK,
+                 "forms.css should have set 'display:block'");
+      switch (parentDisplay->mDisplay) {
+        case NS_STYLE_DISPLAY_GRID:
+        case NS_STYLE_DISPLAY_INLINE_GRID:
+          display->mDisplay = NS_STYLE_DISPLAY_GRID;
+          conditions.SetUncacheable();
+          break;
+        case NS_STYLE_DISPLAY_FLEX:
+        case NS_STYLE_DISPLAY_INLINE_FLEX:
+          display->mDisplay = NS_STYLE_DISPLAY_FLEX;
+          conditions.SetUncacheable();
+          break;
+      }
+    }
+
     if (nsCSSPseudoElements::firstLetter == pseudo) {
       // a non-floating first-letter must be inline
       // XXX this fix can go away once bug 103189 is fixed correctly
@@ -6088,10 +6103,18 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
           nsCSSProps::LookupProperty(buffer,
                                      nsCSSProps::eEnabledForAllContent);
         if (prop != eCSSProperty_UNKNOWN &&
-            nsCSSProps::PropHasFlags(prop,
-                                     CSS_PROPERTY_CREATES_STACKING_CONTEXT))
-        {
-          display->mWillChangeBitField |= NS_STYLE_WILL_CHANGE_STACKING_CONTEXT;
+            prop != eCSSPropertyExtra_variable) {
+          if (nsCSSProps::PropHasFlags(prop,
+                CSS_PROPERTY_CREATES_STACKING_CONTEXT)) {
+            display->mWillChangeBitField |=
+              NS_STYLE_WILL_CHANGE_STACKING_CONTEXT;
+          }
+          if (nsCSSProps::PropHasFlags(prop, CSS_PROPERTY_FIXPOS_CB)) {
+            display->mWillChangeBitField |= NS_STYLE_WILL_CHANGE_FIXPOS_CB;
+          }
+          if (nsCSSProps::PropHasFlags(prop, CSS_PROPERTY_ABSPOS_CB)) {
+            display->mWillChangeBitField |= NS_STYLE_WILL_CHANGE_ABSPOS_CB;
+          }
         }
       }
     }
@@ -7801,11 +7824,11 @@ SetGridTrackList(const nsCSSValue& aValue,
       // starting with a <line-names> (sub list of identifiers),
       // and alternating between that and <track-size>.
       aResult.mIsSubgrid = false;
-      for (;;) {
+      for (int32_t line = 1;  ; ++line) {
         AppendGridLineNames(item->mValue, aResult);
         item = item->mNext;
 
-        if (!item) {
+        if (!item || line == nsStyleGridLine::kMaxLine) {
           break;
         }
 
@@ -8045,7 +8068,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
     if (MOZ_LIKELY(parentContext)) {
       nsStyleContext* grandparentContext = parentContext->GetParent();
       if (MOZ_LIKELY(grandparentContext)) {
-        aContext->AddStyleBit(NS_STYLE_USES_GRANDANCESTOR_STYLE);
+        parentContext->AddStyleBit(NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE);
       }
       pos->mAlignSelf =
         parentPos->ComputedAlignSelf(parentContext->StyleDisplay(),
@@ -8105,7 +8128,7 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
     if (MOZ_LIKELY(parentContext)) {
       nsStyleContext* grandparentContext = parentContext->GetParent();
       if (MOZ_LIKELY(grandparentContext)) {
-        aContext->AddStyleBit(NS_STYLE_USES_GRANDANCESTOR_STYLE);
+        parentContext->AddStyleBit(NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE);
       }
       pos->mJustifySelf =
         parentPos->ComputedJustifySelf(parentContext->StyleDisplay(),

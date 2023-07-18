@@ -89,9 +89,52 @@ LIRGenerator::visitIsConstructing(MIsConstructing* ins)
     define(new(alloc()) LIsConstructing(), ins);
 }
 
+static void
+TryToUseImplicitInterruptCheck(MIRGraph& graph, MBasicBlock* backedge)
+{
+    // Implicit interrupt checks require asm.js signal handlers to be installed.
+    if (!GetJitContext()->runtime->canUseSignalHandlers())
+        return;
+
+    // To avoid triggering expensive interrupts (backedge patching) in
+    // requestMajorGC and requestMinorGC, use an implicit interrupt check only
+    // if the loop body can not trigger GC or affect GC state like the store
+    // buffer. We do this by checking there are no safepoints attached to LIR
+    // instructions inside the loop.
+
+    MBasicBlockIterator block = graph.begin(backedge->loopHeaderOfBackedge());
+    LInterruptCheck* check = nullptr;
+    while (true) {
+        LBlock* lir = block->lir();
+        for (LInstructionIterator iter = lir->begin(); iter != lir->end(); iter++) {
+            if (iter->isInterruptCheck()) {
+                if (!check) {
+                    MOZ_ASSERT(*block == backedge->loopHeaderOfBackedge());
+                    check = iter->toInterruptCheck();
+                }
+                continue;
+            }
+
+            MOZ_ASSERT_IF(iter->isPostWriteBarrierO() || iter->isPostWriteBarrierV(),
+                          iter->safepoint());
+
+            if (iter->safepoint())
+                return;
+        }
+        if (*block == backedge)
+            break;
+        block++;
+    }
+
+    check->setImplicit();
+}
+
 void
 LIRGenerator::visitGoto(MGoto* ins)
 {
+    if (!gen->compilingAsmJS() && ins->block()->isLoopBackedge())
+        TryToUseImplicitInterruptCheck(graph, ins->block());
+
     add(new(alloc()) LGoto(ins->target()));
 }
 
@@ -1097,8 +1140,7 @@ void
 LIRGenerator::visitToId(MToId* ins)
 {
     LToIdV* lir = new(alloc()) LToIdV(tempDouble());
-    useBox(lir, LToIdV::Object, ins->lhs());
-    useBox(lir, LToIdV::Index, ins->rhs());
+    useBox(lir, LToIdV::Index, ins->input());
     defineBox(lir, ins);
     assignSafepoint(lir, ins);
 }
@@ -2305,19 +2347,7 @@ LIRGenerator::visitFunctionEnvironment(MFunctionEnvironment* ins)
 void
 LIRGenerator::visitInterruptCheck(MInterruptCheck* ins)
 {
-    // Implicit interrupt checks require asm.js signal handlers to be installed.
-    // They also require writable JIT code: reprotecting in patchIonBackedges
-    // would be expensive and using AutoWritableJitCode in the signal handler
-    // is complicated because there could be another AutoWritableJitCode on the
-    // stack.
-    LInstructionHelper<0, 0, 0>* lir;
-    if (GetJitContext()->runtime->canUseSignalHandlers() &&
-        !ExecutableAllocator::nonWritableJitCode)
-    {
-        lir = new(alloc()) LInterruptCheckImplicit();
-    } else {
-        lir = new(alloc()) LInterruptCheck();
-    }
+    LInstruction* lir = new(alloc()) LInterruptCheck();
     add(lir, ins);
     assignSafepoint(lir, ins);
 }
@@ -4329,6 +4359,32 @@ LIRGenerator::visitCheckReturn(MCheckReturn* ins)
     assignSnapshot(lir, Bailout_BadDerivedConstructorReturn);
     add(lir, ins);
     redefine(ins, retVal);
+}
+
+void
+LIRGenerator::visitCheckObjCoercible(MCheckObjCoercible* ins)
+{
+    MDefinition* checkVal = ins->checkValue();
+    MOZ_ASSERT(checkVal->type() == MIRType_Value);
+
+    LCheckObjCoercible* lir = new(alloc()) LCheckObjCoercible();
+    useBoxAtStart(lir, LCheckObjCoercible::CheckValue, checkVal);
+    redefine(ins, checkVal);
+    add(lir, ins);
+    assignSafepoint(lir, ins);
+}
+
+void
+LIRGenerator::visitDebugCheckSelfHosted(MDebugCheckSelfHosted* ins)
+{
+    MDefinition* checkVal = ins->checkValue();
+    MOZ_ASSERT(checkVal->type() == MIRType_Value);
+
+    LDebugCheckSelfHosted* lir = new (alloc()) LDebugCheckSelfHosted();
+    useBoxAtStart(lir, LDebugCheckSelfHosted::CheckValue, checkVal);
+    redefine(ins, checkVal);
+    add(lir, ins);
+    assignSafepoint(lir, ins);
 }
 
 static void

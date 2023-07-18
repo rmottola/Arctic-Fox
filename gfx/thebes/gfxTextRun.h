@@ -390,13 +390,6 @@ public:
                                  bool aCanWordWrap,
                                  gfxBreakPriority *aBreakPriority);
 
-    /**
-     * Update the reference context.
-     * XXX this is a hack. New text frame does not call this. Use only
-     * temporarily for old text frame.
-     */
-    void SetContext(gfxContext *aContext) {}
-
     // Utility getters
 
     void *GetUserData() const { return mUserData; }
@@ -514,9 +507,8 @@ public:
     // Returns true if it was able to set simple glyph data for the space;
     // if it returns false, the caller needs to fall back to some other
     // means to create the necessary (detailed) glyph data.
-    bool SetSpaceGlyphIfSimple(gfxFont *aFont, gfxContext *aContext,
-                               uint32_t aCharIndex, char16_t aSpaceChar,
-                               uint16_t aOrientation);
+    bool SetSpaceGlyphIfSimple(gfxFont *aFont, uint32_t aCharIndex,
+                               char16_t aSpaceChar, uint16_t aOrientation);
 
     // Record the positions of specific characters that layout may need to
     // detect in the textrun, even though it doesn't have an explicit copy

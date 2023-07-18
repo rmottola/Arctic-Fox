@@ -416,11 +416,10 @@ GlobalObject::initSelfHostingBuiltins(JSContext* cx, Handle<GlobalObject*> globa
     return InitBareBuiltinCtor(cx, global, JSProto_Array) &&
            InitBareBuiltinCtor(cx, global, JSProto_TypedArray) &&
            InitBareBuiltinCtor(cx, global, JSProto_Uint8Array) &&
-           InitBareBuiltinCtor(cx, global, JSProto_Uint32Array) &&
            InitBareWeakMapCtor(cx, global) &&
            InitStopIterationClass(cx, global) &&
            InitSelfHostingCollectionIteratorFunctions(cx, global) &&
-           JS_DefineFunctions(cx, global, builtins);
+           DefineFunctions(cx, global, builtins, AsIntrinsic);
 }
 
 /* static */ bool

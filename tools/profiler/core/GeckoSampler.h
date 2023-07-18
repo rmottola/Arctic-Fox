@@ -7,6 +7,7 @@
 #define GeckoSampler_h
 
 #include "platform.h"
+#include "ProfileEntry.h"
 #include "mozilla/Vector.h"
 #include "ThreadProfile.h"
 #include "ThreadInfo.h"
@@ -103,6 +104,7 @@ class GeckoSampler: public Sampler {
   void ToStreamAsJSON(std::ostream& stream, double aSinceTime = 0);
 #ifndef SPS_STANDALONE
   virtual JSObject *ToJSObject(JSContext *aCx, double aSinceTime = 0);
+  void GetGatherer(nsISupports** aRetVal);
 #endif
   mozilla::UniquePtr<char[]> ToJSON(double aSinceTime = 0);
   virtual void ToJSObjectAsync(double aSinceTime = 0, mozilla::dom::Promise* aPromise = 0);
@@ -125,8 +127,6 @@ class GeckoSampler: public Sampler {
   const FeatureList& Features() { return mFeatures; }
 
   void GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration);
-
-  void ProfileGathered();
 
 protected:
   // Called within a signal. This function must be reentrant

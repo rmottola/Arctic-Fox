@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "platform.h"
+#include "PlatformMacros.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/UniquePtr.h"
 #include "GeckoProfiler.h"
@@ -30,16 +31,40 @@
 #endif
 #include "ProfilerMarkers.h"
 
+#ifdef MOZ_TASK_TRACER
+#include "GeckoTaskTracer.h"
+#endif
+
 #if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
   #include "AndroidBridge.h"
 #endif
 
-#ifdef SPS_STANDALONE
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+#include "GeneratedJNINatives.h"
+#endif
+
+#ifndef SPS_STANDALONE
 #if defined(SPS_PLAT_amd64_linux) || defined(SPS_PLAT_x86_linux)
 # define USE_LUL_STACKWALK
 # include "lul/LulMain.h"
 # include "lul/platform-linux-lul.h"
 #endif
+#endif
+
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+class GeckoJavaSampler : public widget::GeckoJavaSampler::Natives<GeckoJavaSampler>
+{
+private:
+  GeckoJavaSampler();
+
+public:
+  static double GetProfilerTime() {
+    if (!profiler_is_active()) {
+      return 0.0;
+    }
+    return profiler_time();
+  };
+};
 #endif
 
 mozilla::ThreadLocal<PseudoStack *> tlsPseudoStack;
@@ -74,7 +99,6 @@ const char* PROFILER_FEATURES = "MOZ_PROFILING_FEATURES";
  * a problem if 2^32 events happen between samples that we need
  * to know are associated with different events */
 
-
 // Values harvested from env vars, that control the profiler.
 static int sUnwindInterval;   /* in milliseconds */
 static int sUnwindStackScan;  /* max # of dubious frames allowed */
@@ -97,7 +121,6 @@ static const char * gGeckoThreadName = "GeckoMain";
 void Sampler::Startup() {
   sRegisteredThreads = new std::vector<ThreadInfo*>();
   sRegisteredThreadsMutex = OS::CreateMutex("sRegisteredThreads mutex");
-
 
   // We could create the sLUL object and read unwind info into it at
   // this point.  That would match the lifetime implied by destruction
@@ -205,8 +228,6 @@ void ProfilerMarker::StreamJSON(SpliceableJSONWriter& aWriter,
   aWriter.EndArray();
 }
 
-
-#if !defined(ANDROID)
 /* Has MOZ_PROFILER_VERBOSE been set? */
 
 // Verbosity control for the profiler.  The aim is to check env var
@@ -230,7 +251,6 @@ bool moz_profiler_verbose()
 
   return profiler_verbosity == ProfilerVerbosity::VERBOSE;
 }
-#endif
 
 void moz_profiler_set_verbosity(ProfilerVerbosity pv)
 {
@@ -238,6 +258,7 @@ void moz_profiler_set_verbosity(ProfilerVerbosity pv)
               pv == ProfilerVerbosity::VERBOSE);
    profiler_verbosity = pv;
 }
+
 
 bool set_profiler_interval(const char* interval) {
   if (interval) {
@@ -345,6 +366,10 @@ void profiler_usage() {
   LOG( "SPS:   MOZ_PROFILER_STACK_SCAN=<number>   (default is zero)");
   LOG( "SPS:   The number of dubious (stack-scanned) frames allowed");
   LOG( "SPS: ");
+  LOG( "SPS:   MOZ_PROFILER_LUL_TEST");
+  LOG( "SPS:   If set to any value, runs LUL unit tests at startup of");
+  LOG( "SPS:   the unwinder thread, and prints a short summary of results.");
+  LOG( "SPS: ");
   LOGF("SPS:   This platform %s native unwinding.",
        is_native_unwinding_avail() ? "supports" : "does not support");
   LOG( "SPS: ");
@@ -437,6 +462,10 @@ void mozilla_sampler_init(void* stackTop)
   if (stack_key_initialized)
     return;
 
+#ifdef MOZ_TASK_TRACER
+  mozilla::tasktracer::InitTaskTracer();
+#endif
+
 #ifdef SPS_STANDALONE
   mozilla::TimeStamp::Startup();
 #endif
@@ -470,6 +499,12 @@ void mozilla_sampler_init(void* stackTop)
 
 #ifndef SPS_STANDALONE
   set_stderr_callback(mozilla_sampler_log);
+#endif
+
+#if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
+  if (mozilla::jni::IsAvailable()) {
+    GeckoJavaSampler::Init();
+  }
 #endif
 
   // We can't open pref so we use an environment variable
@@ -537,6 +572,10 @@ void mozilla_sampler_shutdown()
   PseudoStack *stack = tlsPseudoStack.get();
   stack->deref();
   tlsPseudoStack.set(nullptr);
+
+#ifdef MOZ_TASK_TRACER
+  mozilla::tasktracer::ShutdownTaskTracer();
+#endif
 }
 
 void mozilla_sampler_save()
@@ -613,6 +652,26 @@ void mozilla_sampler_get_profiler_start_params(int* aEntrySize,
   for (size_t i = 0; i < featureList.length(); ++i) {
     (*aFeatures)[i] = featureList[i].c_str();
   }
+}
+
+void mozilla_sampler_get_gatherer(nsISupports** aRetVal)
+{
+  if (!aRetVal) {
+    return;
+  }
+
+  if (NS_WARN_IF(!profiler_is_active())) {
+    *aRetVal = nullptr;
+    return;
+  }
+
+  GeckoSampler *t = tlsTicker.get();
+  if (NS_WARN_IF(!t)) {
+    *aRetVal = nullptr;
+    return;
+  }
+
+  t->GetGatherer(aRetVal);
 }
 
 #endif
@@ -709,6 +768,8 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
                            const char** aThreadNameFilters, uint32_t aFilterCount)
 
 {
+  LOG("BEGIN mozilla_sampler_start");
+
   if (!stack_key_initialized)
     profiler_init(nullptr);
 
@@ -807,18 +868,23 @@ void mozilla_sampler_start(int aProfileEntries, double aInterval,
       os->NotifyObservers(params, "profiler-started", nullptr);
     }
   }
+#endif
+
+  LOG("END   mozilla_sampler_start");
 }
 
 void mozilla_sampler_stop()
 {
+  LOG("BEGIN mozilla_sampler_stop");
+
   if (!stack_key_initialized)
     return;
 
   GeckoSampler *t = tlsTicker.get();
   if (!t) {
+    LOG("END   mozilla_sampler_stop-early");
     return;
   }
-#endif
 
   bool disableJS = t->ProfileJS();
 
@@ -852,6 +918,7 @@ void mozilla_sampler_stop()
   }
 #endif
 
+  LOG("END   mozilla_sampler_stop");
 }
 
 bool mozilla_sampler_is_paused() {
@@ -928,11 +995,6 @@ void mozilla_sampler_frame_number(int frameNumber)
   sFrameNumber = frameNumber;
 }
 
-void mozilla_sampler_print_location2()
-{
-  // FIXME
-}
-
 void mozilla_sampler_lock()
 {
   profiler_stop();
@@ -952,7 +1014,7 @@ void mozilla_sampler_unlock()
 #endif
 }
 
-bool mozilla_sampler_register_thread(const char* aName, void* stackTop)
+bool mozilla_sampler_register_thread(const char* aName, void* aGuessStackTop)
 {
   if (sInitCount == 0) {
     return false;
@@ -971,6 +1033,7 @@ bool mozilla_sampler_register_thread(const char* aName, void* stackTop)
   PseudoStack* stack = PseudoStack::create();
   tlsPseudoStack.set(stack);
   bool isMainThread = is_main_thread_name(aName);
+  void* stackTop = GetStackTop(aGuessStackTop);
   return Sampler::RegisterCurrentThread(aName, stack, isMainThread, stackTop);
 }
 

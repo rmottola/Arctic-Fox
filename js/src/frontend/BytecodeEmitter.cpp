@@ -2783,27 +2783,31 @@ BytecodeEmitter::emitNameIncDec(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitElemOperands(ParseNode* pn, JSOp op)
+BytecodeEmitter::emitElemOperands(ParseNode* pn, EmitElemOption opts)
 {
     MOZ_ASSERT(pn->isArity(PN_BINARY));
 
     if (!emitTree(pn->pn_left))
         return false;
 
-    if (op == JSOP_CALLELEM && !emit1(JSOP_DUP))
-        return false;
+    if (opts == EmitElemOption::IncDec) {
+        if (!emit1(JSOP_CHECKOBJCOERCIBLE))
+            return false;
+    } else if (opts == EmitElemOption::Call) {
+        if (!emit1(JSOP_DUP))
+            return false;
+    }
 
     if (!emitTree(pn->pn_right))
         return false;
 
-    bool isSetElem = op == JSOP_SETELEM || op == JSOP_STRICTSETELEM;
-    if (isSetElem && !emit2(JSOP_PICK, 2))
+    if (opts == EmitElemOption::Set && !emit2(JSOP_PICK, 2))
         return false;
     return true;
 }
 
 bool
-BytecodeEmitter::emitSuperElemOperands(ParseNode* pn, SuperElemOptions opts)
+BytecodeEmitter::emitSuperElemOperands(ParseNode* pn, EmitElemOption opts)
 {
     MOZ_ASSERT(pn->isKind(PNK_ELEM) && pn->as<PropertyByValue>().isSuper());
 
@@ -2817,13 +2821,13 @@ BytecodeEmitter::emitSuperElemOperands(ParseNode* pn, SuperElemOptions opts)
 
     // We need to convert the key to an object id first, so that we do not do
     // it inside both the GETELEM and the SETELEM.
-    if (opts == SuperElem_IncDec && !emit1(JSOP_TOID))
+    if (opts == EmitElemOption::IncDec && !emit1(JSOP_TOID))
         return false;
 
     if (!emitGetThisForSuperBase(pn->pn_left))
         return false;
 
-    if (opts == SuperElem_Call) {
+    if (opts == EmitElemOption::Call) {
         if (!emit1(JSOP_SWAP))
             return false;
 
@@ -2835,7 +2839,7 @@ BytecodeEmitter::emitSuperElemOperands(ParseNode* pn, SuperElemOptions opts)
     if (!emit1(JSOP_SUPERBASE))
         return false;
 
-    if (opts == SuperElem_Set && !emit2(JSOP_PICK, 3))
+    if (opts == EmitElemOption::Set && !emit2(JSOP_PICK, 3))
         return false;
 
     return true;
@@ -2854,17 +2858,23 @@ BytecodeEmitter::emitElemOpBase(JSOp op)
 bool
 BytecodeEmitter::emitElemOp(ParseNode* pn, JSOp op)
 {
-    return emitElemOperands(pn, op) && emitElemOpBase(op);
+    EmitElemOption opts = EmitElemOption::Get;
+    if (op == JSOP_CALLELEM)
+        opts = EmitElemOption::Call;
+    else if (op == JSOP_SETELEM || op == JSOP_STRICTSETELEM)
+        opts = EmitElemOption::Set;
+
+    return emitElemOperands(pn, opts) && emitElemOpBase(op);
 }
 
 bool
 BytecodeEmitter::emitSuperElemOp(ParseNode* pn, JSOp op, bool isCall)
 {
-    SuperElemOptions opts = SuperElem_Get;
+    EmitElemOption opts = EmitElemOption::Get;
     if (isCall)
-        opts = SuperElem_Call;
+        opts = EmitElemOption::Call;
     else if (op == JSOP_SETELEM_SUPER || op == JSOP_STRICTSETELEM_SUPER)
-        opts = SuperElem_Set;
+        opts = EmitElemOption::Set;
 
     if (!emitSuperElemOperands(pn, opts))
         return false;
@@ -2885,10 +2895,10 @@ BytecodeEmitter::emitElemIncDec(ParseNode* pn)
     bool isSuper = pn->pn_kid->as<PropertyByValue>().isSuper();
 
     if (isSuper) {
-        if (!emitSuperElemOperands(pn->pn_kid, SuperElem_IncDec))
+        if (!emitSuperElemOperands(pn->pn_kid, EmitElemOption::IncDec))
             return false;
     } else {
-        if (!emitElemOperands(pn->pn_kid, JSOP_GETELEM))
+        if (!emitElemOperands(pn->pn_kid, EmitElemOption::IncDec))
             return false;
     }
 
@@ -4403,13 +4413,25 @@ BytecodeEmitter::emitVariables(ParseNode* pn, VarEmitOption emitOption)
              * i' to be hoisted out of the loop.
              */
             MOZ_ASSERT(binding->isOp(JSOP_NOP));
-            MOZ_ASSERT(emitOption != DefineVars && emitOption != AnnexB);
+            MOZ_ASSERT(emitOption != DefineVars);
+            MOZ_ASSERT_IF(emitOption == AnnexB, binding->pn_left->isKind(PNK_NAME));
 
-            /*
-             * To allow the front end to rewrite var f = x; as f = x; when a
-             * function f(){} precedes the var, detect simple name assignment
-             * here and initialize the name.
-             */
+            // To allow the front end to rewrite |var f = x;| as |f = x;| when a
+            // |function f(){}| precedes the var, detect simple name assignment
+            // here and initialize the name.
+            //
+            // There is a corner case where a function declaration synthesizes
+            // an Annex B declaration, which in turn gets rewritten later as a
+            // simple assignment due to hoisted function declaration of the
+            // same name. For example,
+            //
+            // {
+            //   // Synthesizes an Annex B declaration because no 'f' binding
+            //   // yet exists. This later gets rewritten as an assignment when
+            //   // the outer function 'f' gets hoisted.
+            //   function f() {}
+            // }
+            // function f() {}
             if (binding->pn_left->isKind(PNK_NAME)) {
                 if (!emitSingleVariable(pn, binding->pn_left, binding->pn_right, emitOption))
                     return false;
@@ -6719,6 +6741,16 @@ BytecodeEmitter::emitReturn(ParseNode* pn)
     if (!emit1((isGenerator || isDerivedClassConstructor) ? JSOP_SETRVAL : JSOP_RETURN))
         return false;
 
+    // Make sure that we emit this before popping the blocks in prepareForNonLocalJump,
+    // to ensure that the error is thrown while the scope-chain is still intact.
+    if (isDerivedClassConstructor) {
+        BindingIter bi = Bindings::thisBinding(cx, script);
+        if (!emitLoadFromTopScope(bi))
+            return false;
+        if (!emit1(JSOP_CHECKRETURN))
+            return false;
+    }
+
     NonLocalExitScope nle(this);
 
     if (!nle.prepareForNonLocalJump(nullptr))
@@ -6736,11 +6768,6 @@ BytecodeEmitter::emitReturn(ParseNode* pn)
             return false;
     } else if (isDerivedClassConstructor) {
         MOZ_ASSERT(code()[top] == JSOP_SETRVAL);
-        BindingIter bi = Bindings::thisBinding(cx, script);
-        if (!emitLoadFromTopScope(bi))
-            return false;
-        if (!emit1(JSOP_CHECKRETURN))
-            return false;
         if (!emit1(JSOP_RETRVAL))
             return false;
     } else if (top + static_cast<ptrdiff_t>(JSOP_RETURN_LENGTH) != offset()) {
@@ -7137,6 +7164,18 @@ BytecodeEmitter::emitDeleteExpression(ParseNode* node)
 }
 
 bool
+BytecodeEmitter::emitDebugOnlyCheckSelfHosted()
+{
+#ifdef DEBUG
+    if (emitterMode == BytecodeEmitter::SelfHosting) {
+        if (!emit1(JSOP_DEBUGCHECKSELFHOSTED))
+            return false;
+    }
+#endif
+    return true;
+}
+
+bool
 BytecodeEmitter::emitSelfHostedCallFunction(ParseNode* pn)
 {
     // Special-casing of callFunction to emit bytecode that directly
@@ -7148,15 +7187,27 @@ BytecodeEmitter::emitSelfHostedCallFunction(ParseNode* pn)
     //
     // argc is set to the amount of actually emitted args and the
     // emitting of args below is disabled by setting emitArgs to false.
+    ParseNode* pn2 = pn->pn_head;
+    const char* errorName = pn2->name() == cx->names().callFunction ?
+                            "callFunction" : "callContentFunction";
     if (pn->pn_count < 3) {
-        reportError(pn, JSMSG_MORE_ARGS_NEEDED, "callFunction", "1", "s");
+        reportError(pn, JSMSG_MORE_ARGS_NEEDED, errorName, "2", "s");
         return false;
     }
 
-    ParseNode* pn2 = pn->pn_head;
+    if (pn->getOp() != JSOP_CALL) {
+        reportError(pn, JSMSG_NOT_CONSTRUCTOR, errorName);
+        return false;
+    }
+
     ParseNode* funNode = pn2->pn_next;
     if (!emitTree(funNode))
         return false;
+
+    if (pn2->name() != cx->names().callContentFunction) {
+        if (!emitDebugOnlyCheckSelfHosted())
+            return false;
+    }
 
     ParseNode* thisArg = funNode->pn_next;
     if (!emitTree(thisArg))
@@ -7256,10 +7307,14 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
             // We shouldn't see foo(bar) = x in self-hosted code.
             MOZ_ASSERT(!(pn->pn_xflags & PNX_SETCALL));
 
-            // Calls to "forceInterpreter", "callFunction" or "resumeGenerator"
-            // in self-hosted code generate inline bytecode.
-            if (pn2->name() == cx->names().callFunction)
+            // Calls to "forceInterpreter", "callFunction",
+            // "callContentFunction", or "resumeGenerator" in self-hosted
+            // code generate inline bytecode.
+            if (pn2->name() == cx->names().callFunction ||
+                pn2->name() == cx->names().callContentFunction)
+            {
                 return emitSelfHostedCallFunction(pn);
+            }
             if (pn2->name() == cx->names().resumeGenerator)
                 return emitSelfHostedResumeGenerator(pn);
             if (pn2->name() == cx->names().forceInterpreter)
@@ -7277,6 +7332,10 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
             if (!emitPropOp(pn2, callop ? JSOP_CALLPROP : JSOP_GETPROP))
                 return false;
         }
+
+        if (!emitDebugOnlyCheckSelfHosted())
+            return false;
+
         break;
       case PNK_ELEM:
         if (pn2->as<PropertyByValue>().isSuper()) {
@@ -7290,6 +7349,10 @@ BytecodeEmitter::emitCallOrNew(ParseNode* pn)
                     return false;
             }
         }
+
+        if (!emitDebugOnlyCheckSelfHosted())
+            return false;
+
         break;
       case PNK_FUNCTION:
         /*

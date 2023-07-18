@@ -545,6 +545,10 @@ gfxPlatform::Init()
     #error "No gfxPlatform implementation available"
 #endif
 
+#ifdef USE_SKIA
+    SkGraphics::Init();
+#endif
+
 #ifdef MOZ_GL_DEBUG
     GLContext::StaticInit();
 #endif
@@ -777,7 +781,7 @@ gfxPlatform::~gfxPlatform()
 #ifdef USE_SKIA
     // must do Skia cleanup before Cairo cleanup, because Skia may be referencing
     // Cairo objects e.g. through SkCairoFTTypeface
-    SkGraphics::Term();
+    SkGraphics::PurgeFontCache();
 #endif
 
 #if MOZ_TREE_CAIRO
@@ -814,7 +818,7 @@ gfxPlatform::CreateDrawTargetForUpdateSurface(gfxASurface *aSurface, const IntSi
     return Factory::CreateDrawTargetForCairoCGContext(static_cast<gfxQuartzSurface*>(aSurface)->GetCGContext(), aSize);
   }
 #endif
-  MOZ_CRASH("unused function");
+  MOZ_CRASH("GFX: unused function");
   return nullptr;
 }
 

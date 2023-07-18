@@ -311,6 +311,9 @@ include table-bordercollapse/reftest.list
 # table-dom/
 include table-dom/reftest.list
 
+# table-html/
+include table-html/reftest.list
+
 include table-overflow/reftest.list
 
 # table-width/
@@ -372,6 +375,9 @@ include ../xul/reftest/reftest.list
 
 # xul grid
 include ../xul/grid/reftests/reftest.list
+
+# -webkit-gradient expressions
+include webkit-gradient/reftest.list
 
 # writing-mode
 include writing-mode/reftest.list

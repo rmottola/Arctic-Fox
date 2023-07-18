@@ -163,7 +163,7 @@ public:
   // true, the line should not be broken inside, which means inlines act
   // as if nowrap is set, <br> is suppressed, and blocks are inlinized.
   // This bit is propogated to all children of line partitipants. It is
-  // currenlty used by ruby to make its content frames unbreakable.
+  // currently used by ruby to make its content frames unbreakable.
   // NOTE: for nsTextFrame, use nsTextFrame::ShouldSuppressLineBreak()
   // instead of this method.
   bool ShouldSuppressLineBreak() const
@@ -247,39 +247,18 @@ public:
     }
   }
 
-  // Does this style context, or any of its descendants, have any style values
-  // that were computed based on this style context's grandparent style context
-  // or any of the grandparent's ancestors?
-  bool UsesGrandancestorStyle() const
-    { return !!(mBits & NS_STYLE_USES_GRANDANCESTOR_STYLE); }
+  // Does any descendant of this style context have any style values
+  // that were computed based on this style context's ancestors?
+  bool HasChildThatUsesGrandancestorStyle() const
+    { return !!(mBits & NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE); }
 
   // Is this style context shared with a sibling or cousin?
   // (See nsStyleSet::GetContext.)
   bool IsShared() const
     { return !!(mBits & NS_STYLE_IS_SHARED); }
 
-  // Does this style context have any children that return true for
-  // UsesGrandancestorStyle()?
-  bool HasChildThatUsesGrandancestorStyle() const;
-
   // Tell this style context to cache aStruct as the struct for aSID
   void SetStyle(nsStyleStructID aSID, void* aStruct);
-
-  // Setters for inherit structs only, since rulenode only sets those eagerly.
-  #define STYLE_STRUCT_INHERITED(name_, checkdata_cb_)                      \
-    void SetStyle##name_ (nsStyle##name_ * aStruct) {                       \
-      void *& slot =                                                        \
-        mCachedInheritedData.mStyleStructs[eStyleStruct_##name_];           \
-      NS_ASSERTION(!slot ||                                                 \
-                   (mBits &                                                 \
-                    nsCachedStyleData::GetBitForSID(eStyleStruct_##name_)), \
-                   "Going to leak styledata");                              \
-      slot = aStruct;                                                       \
-    }
-#define STYLE_STRUCT_RESET(name_, checkdata_cb_) /* nothing */
-  #include "nsStyleStructList.h"
-  #undef STYLE_STRUCT_RESET
-  #undef STYLE_STRUCT_INHERITED
 
   /**
    * Returns whether this style context has cached style data for a
@@ -302,7 +281,7 @@ public:
 
   /*
    * Get the style data for a style struct.  This is the most important
-   * member function of nsIStyleContext.  It fills in a const pointer
+   * member function of nsStyleContext.  It fills in a const pointer
    * to a style data struct that is appropriate for the style context's
    * frame.  This struct may be shared with other contexts (either in
    * the rule tree or the style context tree), so it should not be
@@ -333,7 +312,7 @@ public:
   #undef STYLE_STRUCT
 
   /**
-   * PeekStyle* is like GetStyle* but doesn't trigger style
+   * PeekStyle* is like Style* but doesn't trigger style
    * computation if the data is not cached on either the style context
    * or the rule node.
    *
@@ -489,10 +468,6 @@ private:
   void* CreateEmptyStyleData(const nsStyleStructID& aSID);
 
   void ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup);
-
-  // Helper function for HasChildThatUsesGrandancestorStyle.
-  static bool ListContainsStyleContextThatUsesGrandancestorStyle(
-                                                   const nsStyleContext* aHead);
 
 #ifdef DEBUG
   struct AutoCheckDependency {

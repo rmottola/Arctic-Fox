@@ -11,6 +11,7 @@ TESTING_JS_MODULES += [
 ]
 
 BROWSER_CHROME_MANIFESTS += [
+    'content/test/alerts/browser.ini',
     'content/test/referrer/browser.ini',
 ]
 

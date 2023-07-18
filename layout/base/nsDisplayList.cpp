@@ -687,7 +687,7 @@ nsDisplayListBuilder::WrapAGRForFrame(nsIFrame* aAnimatedGeometryRoot,
 
   AnimatedGeometryRoot* result = nullptr;
   if (!mFrameToAnimatedGeometryRootMap.Get(aAnimatedGeometryRoot, &result)) {
-    MOZ_ASSERT(aAnimatedGeometryRoot != RootReferenceFrame());
+    MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(RootReferenceFrame(), aAnimatedGeometryRoot));
     AnimatedGeometryRoot* parent = aParent;
     if (!parent) {
       nsIFrame* parentFrame = nsLayoutUtils::GetCrossDocParentFrame(aAnimatedGeometryRoot);
@@ -706,7 +706,7 @@ nsDisplayListBuilder::WrapAGRForFrame(nsIFrame* aAnimatedGeometryRoot,
 AnimatedGeometryRoot*
 nsDisplayListBuilder::FindAnimatedGeometryRootFor(nsIFrame* aFrame)
 {
-  if (!IsForPainting()) {
+  if (!IsPaintingToWindow()) {
     return &mRootAGR;
   }
   if (aFrame == mCurrentFrame) {
@@ -1081,8 +1081,16 @@ IsStickyFrameActive(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame, nsIFrame* 
 bool
 nsDisplayListBuilder::IsAnimatedGeometryRoot(nsIFrame* aFrame, nsIFrame** aParent)
 {
-  if (aFrame == mReferenceFrame)
+  if (aFrame == mReferenceFrame) {
     return true;
+  }
+  if (!IsPaintingToWindow()) {
+    if (aParent) {
+      *aParent = nsLayoutUtils::GetCrossDocParentFrame(aFrame);
+    }
+    return false;
+  }
+
   if (nsLayoutUtils::IsPopup(aFrame))
     return true;
   if (ActiveLayerTracker::IsOffsetOrMarginStyleAnimated(aFrame))
@@ -1135,6 +1143,7 @@ nsDisplayListBuilder::IsAnimatedGeometryRoot(nsIFrame* aFrame, nsIFrame** aParen
 nsIFrame*
 nsDisplayListBuilder::FindAnimatedGeometryRootFrameFor(nsIFrame* aFrame)
 {
+  MOZ_ASSERT(nsLayoutUtils::IsAncestorFrameCrossDoc(RootReferenceFrame(), aFrame));
   nsIFrame* cursor = aFrame;
   while (cursor != RootReferenceFrame()) {
     nsIFrame* next;
@@ -1728,10 +1737,13 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
 
   // If this is the content process, we ship plugin geometry updates over with layer
   // updates, so calculate that now before we call EndTransaction.
-  if (rootPresContext &&
-      aBuilder->WillComputePluginGeometry() &&
-      XRE_IsContentProcess()) {
-    rootPresContext->ComputePluginGeometryUpdates(aBuilder->RootReferenceFrame(), aBuilder, this);
+  if (rootPresContext && XRE_IsContentProcess()) {
+    if (aBuilder->WillComputePluginGeometry()) {
+      rootPresContext->ComputePluginGeometryUpdates(aBuilder->RootReferenceFrame(), aBuilder, this);
+    }
+    // The layer system caches plugin configuration information for forwarding
+    // with layer updates which needs to get set during reflow. This must be
+    // called even if there are no windowed plugins in the page.
     rootPresContext->CollectPluginGeometryUpdates(layerManager);
   }
 
@@ -1878,9 +1890,11 @@ void nsDisplayList::HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
   if (aState->mInPreserves3D) {
     // Collect leaves of the current 3D rendering context.
     for (item = GetBottom(); item; item = item->GetAbove()) {
-      MOZ_ASSERT(item->GetType() == nsDisplayTransform::TYPE_TRANSFORM);
+      MOZ_ASSERT(item->GetType() == nsDisplayTransform::TYPE_TRANSFORM ||
+                 item->GetType() == nsDisplayTransform::TYPE_PERSPECTIVE);
       if (item->Frame()->Extend3DContext() &&
-          !static_cast<nsDisplayTransform*>(item)->IsTransformSeparator()) {
+          (item->GetType() == nsDisplayTransform::TYPE_PERSPECTIVE ||
+           !static_cast<nsDisplayTransform*>(item)->IsTransformSeparator())) {
         item->HitTest(aBuilder, aRect, aState, aOutFrames);
       } else {
         // One of leaves in the current 3D rendering context.
@@ -2526,8 +2540,17 @@ nsDisplayBackgroundImage::CanOptimizeToImageLayer(LayerManager* aManager,
     return false;
   }
 
-  // We currently can't handle tiled or partial backgrounds.
-  if (!state.mDestArea.IsEqualEdges(state.mFillArea)) {
+  // We currently can't handle tiled backgrounds.
+  if (!state.mDestArea.Contains(state.mFillArea)) {
+    return false;
+  }
+
+  // For 'contain' and 'cover', we allow any pixel of the image to be sampled
+  // because there isn't going to be any spriting/atlasing going on.
+  bool allowPartialImages =
+    (layer.mSize.mWidthType == nsStyleBackground::Size::eContain ||
+     layer.mSize.mWidthType == nsStyleBackground::Size::eCover);
+  if (!allowPartialImages && !state.mFillArea.Contains(state.mDestArea)) {
     return false;
   }
 
@@ -4737,11 +4760,13 @@ nsDisplayScrollInfoLayer::ComputeFrameMetrics(Layer* aLayer,
                     mScrollFrame->GetPosition() +
                     mScrollFrame->GetOffsetToCrossDoc(ReferenceFrame());
 
-  return UniquePtr<FrameMetrics>(new FrameMetrics(
-    nsLayoutUtils::ComputeFrameMetrics(
+  FrameMetrics metrics = nsLayoutUtils::ComputeFrameMetrics(
       mScrolledFrame, mScrollFrame, mScrollFrame->GetContent(),
       ReferenceFrame(), aLayer,
-      mScrollParentId, viewport, Nothing(), false, params)));
+      mScrollParentId, viewport, Nothing(), false, params);
+  metrics.SetIsScrollInfoLayer(true);
+
+  return UniquePtr<FrameMetrics>(new FrameMetrics(metrics));
 }
 
 void
@@ -4885,6 +4910,7 @@ nsDisplayTransform::nsDisplayTransform(nsDisplayListBuilder* aBuilder,
 void
 nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
 {
+  mAnimatedGeometryRootForChildren = mAnimatedGeometryRoot;
   if (mFrame == aBuilder->RootReferenceFrame()) {
     return;
   }
@@ -4892,7 +4918,6 @@ nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
   mReferenceFrame =
     aBuilder->FindReferenceFrameFor(outerFrame);
   mToReferenceFrame = mFrame->GetOffsetToCrossDoc(mReferenceFrame);
-  mAnimatedGeometryRootForChildren = mAnimatedGeometryRoot;
   if (nsLayoutUtils::IsFixedPosFrameInDisplayPort(mFrame)) {
     // This is an odd special case. If we are both IsFixedPosFrameInDisplayPort
     // and transformed that we are our own AGR parent.
@@ -4900,7 +4925,7 @@ nsDisplayTransform::SetReferenceFrameToAncestor(nsDisplayListBuilder* aBuilder)
     // determine if we are inside a fixed pos subtree. If we use the outer AGR
     // from outside the fixed pos subtree FLB can't tell that we are fixed pos.
     mAnimatedGeometryRoot = mAnimatedGeometryRootForChildren;
-  } else {
+  } else if (mAnimatedGeometryRoot->mParentAGR) {
     mAnimatedGeometryRoot = mAnimatedGeometryRoot->mParentAGR;
   }
   mVisibleRect = aBuilder->GetDirtyRect() + mToReferenceFrame;
@@ -5099,7 +5124,7 @@ nsDisplayTransform::ComputePerspectiveMatrix(const nsIFrame* aFrame,
   }
   nscoord perspective = cbDisplay->mChildPerspective.GetCoordValue();
   if (perspective <= 0) {
-    return false;
+    return true;
   }
 
   TransformReferenceBox refBox(cbFrame);

@@ -380,13 +380,12 @@ void NrIceCtx::trickle_cb(void *arg, nr_ice_ctx *ice_ctx,
 
 RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
                                   bool offerer,
-                                  bool set_interface_priorities,
                                   bool allow_loopback,
                                   bool tcp_enabled,
                                   bool allow_link_local,
+                                  bool hide_non_default,
                                   Policy policy) {
-
-  RefPtr<NrIceCtx> ctx = new NrIceCtx(name, offerer, policy);
+   RefPtr<NrIceCtx> ctx = new NrIceCtx(name, offerer, policy);
 
   // Initialize the crypto callbacks and logging stuff
   if (!initialized) {
@@ -406,37 +405,11 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
     NR_reg_set_uchar((char *)NR_ICE_REG_PREF_TYPE_HOST_TCP, 125);
     NR_reg_set_uchar((char *)NR_ICE_REG_PREF_TYPE_RELAYED_TCP, 0);
 
-    if (set_interface_priorities) {
-      NR_reg_set_uchar((char *)"ice.pref.interface.rl0", 255);
-      NR_reg_set_uchar((char *)"ice.pref.interface.wi0", 254);
-      NR_reg_set_uchar((char *)"ice.pref.interface.lo0", 253);
-      NR_reg_set_uchar((char *)"ice.pref.interface.en1", 252);
-      NR_reg_set_uchar((char *)"ice.pref.interface.en0", 251);
-      NR_reg_set_uchar((char *)"ice.pref.interface.eth0", 252);
-      NR_reg_set_uchar((char *)"ice.pref.interface.eth1", 251);
-      NR_reg_set_uchar((char *)"ice.pref.interface.eth2", 249);
-      NR_reg_set_uchar((char *)"ice.pref.interface.ppp", 250);
-      NR_reg_set_uchar((char *)"ice.pref.interface.ppp0", 249);
-      NR_reg_set_uchar((char *)"ice.pref.interface.en2", 248);
-      NR_reg_set_uchar((char *)"ice.pref.interface.en3", 247);
-      NR_reg_set_uchar((char *)"ice.pref.interface.em0", 251);
-      NR_reg_set_uchar((char *)"ice.pref.interface.em1", 252);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet0", 240);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet1", 241);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet3", 239);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet4", 238);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet5", 237);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet6", 236);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet7", 235);
-      NR_reg_set_uchar((char *)"ice.pref.interface.vmnet8", 234);
-      NR_reg_set_uchar((char *)"ice.pref.interface.virbr0", 233);
-      NR_reg_set_uchar((char *)"ice.pref.interface.wlan0", 232);
-    }
-
     int32_t stun_client_maximum_transmits = 7;
     int32_t ice_trickle_grace_period = 5000;
     int32_t ice_tcp_so_sock_count = 3;
     int32_t ice_tcp_listen_backlog = 10;
+    nsAutoCString force_net_interface;
 #ifndef MOZILLA_XPCOMRT_API
     nsresult res;
     nsCOMPtr<nsIPrefService> prefs =
@@ -457,6 +430,9 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
         branch->GetIntPref(
             "media.peerconnection.ice.tcp_listen_backlog",
             &ice_tcp_listen_backlog);
+        branch->GetCharPref(
+            "media.peerconnection.ice.force_interface",
+            getter_Copies(force_net_interface));
       }
     }
 #endif
@@ -464,8 +440,6 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
                      stun_client_maximum_transmits);
     NR_reg_set_uint4((char *)NR_ICE_REG_TRICKLE_GRACE_PERIOD,
                      ice_trickle_grace_period);
-    NR_reg_set_int4((char *)NR_ICE_REG_ICE_TCP_SO_SOCK_COUNT,
-                     ice_tcp_so_sock_count);
     NR_reg_set_int4((char *)NR_ICE_REG_ICE_TCP_SO_SOCK_COUNT,
                      ice_tcp_so_sock_count);
     NR_reg_set_int4((char *)NR_ICE_REG_ICE_TCP_LISTEN_BACKLOG,
@@ -480,6 +454,11 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
     if (allow_link_local) {
       NR_reg_set_char((char *)NR_STUN_REG_PREF_ALLOW_LINK_LOCAL_ADDRS, 1);
     }
+    if (force_net_interface.Length() > 0) {
+      // Stupid cast.... but needed
+      const nsCString& flat = PromiseFlatCString(static_cast<nsACString&>(force_net_interface));
+      NR_reg_set_string((char *)NR_ICE_REG_PREF_FORCE_INTERFACE_NAME, const_cast<char*>(flat.get()));
+    }
   }
 
   // Create the ICE context
@@ -488,6 +467,12 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
   UINT4 flags = offerer ? NR_ICE_CTX_FLAGS_OFFERER:
       NR_ICE_CTX_FLAGS_ANSWERER;
   flags |= NR_ICE_CTX_FLAGS_AGGRESSIVE_NOMINATION;
+  if (policy == ICE_POLICY_RELAY) {
+    flags |= NR_ICE_CTX_FLAGS_RELAY_ONLY;
+  }
+
+  if (hide_non_default)
+    flags |= NR_ICE_CTX_FLAGS_ONLY_DEFAULT_ADDRS;
 
   r = nr_ice_ctx_create(const_cast<char *>(name.c_str()), flags,
                         &ctx->ctx_);
@@ -496,7 +481,6 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
     return nullptr;
   }
 
-#ifdef USE_INTERFACE_PRIORITIZER
   nr_interface_prioritizer *prioritizer = CreateInterfacePrioritizer();
   if (!prioritizer) {
     MOZ_MTLOG(LogLevel::Error, "Couldn't create interface prioritizer.");
@@ -508,7 +492,6 @@ RefPtr<NrIceCtx> NrIceCtx::Create(const std::string& name,
     MOZ_MTLOG(LogLevel::Error, "Couldn't set interface prioritizer.");
     return nullptr;
   }
-#endif  // USE_INTERFACE_PRIORITIZER
 
   if (ctx->generating_trickle()) {
     r = nr_ice_ctx_set_trickle_cb(ctx->ctx_, &NrIceCtx::trickle_cb, ctx);
@@ -727,6 +710,9 @@ abort:
 
 nsresult NrIceCtx::StartGathering() {
   ASSERT_ON_THREAD(sts_target_);
+  if (policy_ == ICE_POLICY_NONE) {
+    return NS_OK;
+  }
   SetGatheringState(ICE_CTX_GATHER_STARTED);
   // This might start gathering for the first time, or again after
   // renegotiation, or might do nothing at all if gathering has already
@@ -801,6 +787,11 @@ nsresult NrIceCtx::ParseGlobalAttributes(std::vector<std::string> attrs) {
 nsresult NrIceCtx::StartChecks() {
   int r;
 
+  if (policy_ == ICE_POLICY_NONE) {
+    MOZ_MTLOG(ML_ERROR, "Couldn't start peer checks because policy == none");
+    SetConnectionState(ICE_CTX_FAILED);
+    return NS_ERROR_FAILURE;
+  }
   r=nr_ice_peer_ctx_pair_candidates(peer_);
   if (r) {
     MOZ_MTLOG(ML_ERROR, "Couldn't pair candidates on "

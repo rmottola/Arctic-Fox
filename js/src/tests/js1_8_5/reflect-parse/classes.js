@@ -1,15 +1,5 @@
 // |reftest| skip-if(!xulRuntime.shell)
 // Classes
-function classesEnabled() {
-    try {
-        Reflect.parse("class foo { constructor() { } }");
-        return true;
-    } catch (e) {
-        assertEq(e instanceof SyntaxError, true);
-        return false;
-    }
-}
-
 function testClasses() {
     function methodFun(id, kind, generator, args, body = []) {
         assertEq(generator && kind === "method", generator);
@@ -489,6 +479,8 @@ function testClasses() {
     assertClassError("class NAME { static *y", SyntaxError);
     assertClassError("class NAME { static get", SyntaxError);
     assertClassError("class NAME { static get y", SyntaxError);
+    assertClassError("class NAME { static }", SyntaxError);
+    assertClassError("class NAME { static ;", SyntaxError);
     assertClassError("class NAME extends", SyntaxError);
     assertClassError("class NAME { constructor() { super", SyntaxError);
     assertClassError("class NAME { constructor() { super.", SyntaxError);
@@ -509,7 +501,4 @@ function testClasses() {
 
 }
 
-if (classesEnabled())
-    runtest(testClasses);
-else if (typeof reportCompare === 'function')
-    reportCompare(true, true);
+runtest(testClasses);

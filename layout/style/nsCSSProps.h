@@ -255,6 +255,22 @@ static_assert((CSS_PROPERTY_PARSE_PROPERTY_MASK &
 // CSS_PROP_LIST_EXCLUDE_INTERNAL section of nsCSSPropList.h.
 #define CSS_PROPERTY_INTERNAL                     (1<<28)
 
+// This property has values that can establish a containing block for
+// fixed positioned and absolutely positioned elements.
+// This should be set for any properties that can cause an element to be
+// such a containing block, as implemented in
+// nsStyleDisplay::IsFixedPosContainingBlock.
+#define CSS_PROPERTY_FIXPOS_CB                    (1<<29)
+
+// This property has values that can establish a containing block for
+// absolutely positioned elements.
+// This should be set for any properties that can cause an element to be
+// such a containing block, as implemented in
+// nsStyleDisplay::IsAbsPosContainingBlock.
+// It does not need to be set for properties that also have
+// CSS_PROPERTY_FIXPOS_CB set.
+#define CSS_PROPERTY_ABSPOS_CB                    (1<<30)
+
 /**
  * Types of animatable values.
  */

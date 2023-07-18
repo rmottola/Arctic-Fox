@@ -259,33 +259,6 @@ namespace dom {
 // nsISupports interface
 //
 
-static PLDHashOperator
-TraverseTemplateBuilders(nsISupports* aKey, nsIXULTemplateBuilder* aData,
-                         void* aContext)
-{
-    nsCycleCollectionTraversalCallback *cb =
-        static_cast<nsCycleCollectionTraversalCallback*>(aContext);
-
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb, "mTemplateBuilderTable key");
-    cb->NoteXPCOMChild(aKey);
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb, "mTemplateBuilderTable value");
-    cb->NoteXPCOMChild(aData);
-
-    return PL_DHASH_NEXT;
-}
-
-static PLDHashOperator
-TraverseObservers(nsIURI* aKey, nsIObserver* aData, void* aContext)
-{
-    nsCycleCollectionTraversalCallback *cb =
-        static_cast<nsCycleCollectionTraversalCallback*>(aContext);
-
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(*cb, "mOverlayLoadObservers/mPendingOverlayLoadNotifications value");
-    cb->NoteXPCOMChild(aData);
-
-    return PL_DHASH_NEXT;
-}
-
 NS_IMPL_CYCLE_COLLECTION_CLASS(XULDocument)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(XULDocument, XMLDocument)
@@ -296,20 +269,38 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(XULDocument, XMLDocument)
 
     // An element will only have a template builder as long as it's in the
     // document, so we'll traverse the table here instead of from the element.
-    if (tmp->mTemplateBuilderTable)
-        tmp->mTemplateBuilderTable->EnumerateRead(TraverseTemplateBuilders, &cb);
+    if (tmp->mTemplateBuilderTable) {
+        for (auto iter = tmp->mTemplateBuilderTable->Iter();
+             !iter.Done();
+             iter.Next()) {
+            NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mTemplateBuilderTable key");
+            cb.NoteXPCOMChild(iter.Key());
+            NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mTemplateBuilderTable value");
+            cb.NoteXPCOMChild(iter.UserData());
+        }
+    }
 
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCurrentPrototype)
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMasterPrototype)
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCommandDispatcher)
-    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPrototypes);
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPrototypes)
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocalStore)
 
     if (tmp->mOverlayLoadObservers) {
-        tmp->mOverlayLoadObservers->EnumerateRead(TraverseObservers, &cb);
+        for (auto iter = tmp->mOverlayLoadObservers->Iter();
+             !iter.Done();
+             iter.Next()) {
+            NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mOverlayLoadObservers value");
+            cb.NoteXPCOMChild(iter.Data());
+        }
     }
     if (tmp->mPendingOverlayLoadNotifications) {
-        tmp->mPendingOverlayLoadNotifications->EnumerateRead(TraverseObservers, &cb);
+        for (auto iter = tmp->mPendingOverlayLoadNotifications->Iter();
+             !iter.Done();
+             iter.Next()) {
+            NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mPendingOverlayLoadNotifications value");
+            cb.NoteXPCOMChild(iter.Data());
+        }
     }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -916,6 +907,23 @@ XULDocument::AttributeWillChange(nsIDocument* aDocument,
     }
 }
 
+static bool
+ShouldPersistAttribute(Element* aElement, nsIAtom* aAttribute)
+{
+    if (aElement->IsXULElement(nsGkAtoms::window)) {
+        // The following attributes of xul:window should be handled in
+        // nsXULWindow::SavePersistentAttributes instead of here.
+        if (aAttribute == nsGkAtoms::screenX ||
+            aAttribute == nsGkAtoms::screenY ||
+            aAttribute == nsGkAtoms::width ||
+            aAttribute == nsGkAtoms::height ||
+            aAttribute == nsGkAtoms::sizemode) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void
 XULDocument::AttributeChanged(nsIDocument* aDocument,
                               Element* aElement, int32_t aNameSpaceID,
@@ -995,14 +1003,14 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
     // XXX Namespace handling broken :-(
     nsAutoString persist;
     aElement->GetAttr(kNameSpaceID_None, nsGkAtoms::persist, persist);
-    if (!persist.IsEmpty()) {
+    // Persistence of attributes of xul:window is handled in nsXULWindow.
+    if (ShouldPersistAttribute(aElement, aAttribute) && !persist.IsEmpty() &&
         // XXXldb This should check that it's a token, not just a substring.
-        if (persist.Find(nsDependentAtomString(aAttribute)) >= 0) {
-            nsContentUtils::AddScriptRunner(NS_NewRunnableMethodWithArgs
-              <nsIContent*, int32_t, nsIAtom*>
-              (this, &XULDocument::DoPersist, aElement, kNameSpaceID_None,
-               aAttribute));
-        }
+        persist.Find(nsDependentAtomString(aAttribute)) >= 0) {
+        nsContentUtils::AddScriptRunner(NS_NewRunnableMethodWithArgs
+            <nsIContent*, int32_t, nsIAtom*>
+            (this, &XULDocument::DoPersist, aElement, kNameSpaceID_None,
+            aAttribute));
     }
 }
 
@@ -2534,25 +2542,12 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
     if (aIsDynamic)
         mResolutionPhase = nsForwardReference::eStart;
 
-    // Chrome documents are allowed to load overlays from anywhere.
-    // In all other cases, the overlay is only allowed to load if
-    // the master document and prototype document have the same origin.
-
-    bool documentIsChrome = IsChromeURI(mDocumentURI);
-    if (!documentIsChrome) {
-        // Make sure we're allowed to load this overlay.
-        rv = NodePrincipal()->CheckMayLoad(aURI, true, false);
-        if (NS_FAILED(rv)) {
-            *aFailureFromContent = true;
-            return rv;
-        }
-    }
-
     // Look in the prototype cache for the prototype document with
     // the specified overlay URI. Only use the cache if the containing
     // document is chrome otherwise it may not have a system principal and
     // the cached document will, see bug 565610.
     bool overlayIsChrome = IsChromeURI(aURI);
+    bool documentIsChrome = IsChromeURI(mDocumentURI);
     mCurrentPrototype = overlayIsChrome && documentIsChrome ?
         nsXULPrototypeCache::GetInstance()->GetPrototype(aURI) : nullptr;
 
@@ -2636,12 +2631,13 @@ XULDocument::LoadOverlayInternal(nsIURI* aURI, bool aIsDynamic,
         rv = NS_NewChannel(getter_AddRefs(channel),
                            aURI,
                            NodePrincipal(),
+                           nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS |
                            nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL,
                            nsIContentPolicy::TYPE_OTHER,
                            group);
 
         if (NS_SUCCEEDED(rv)) {
-            rv = channel->AsyncOpen(listener, nullptr);
+            rv = channel->AsyncOpen2(listener);
         }
 
         if (NS_FAILED(rv)) {
@@ -3236,19 +3232,6 @@ XULDocument::LoadScript(nsXULPrototypeScript* aScriptProto, bool* aBlock)
         }
     }
 
-    // Allow security manager and content policies to veto the load. Note that
-    // at this point we already lost context information of the script.
-    rv = nsScriptLoader::ShouldLoadScript(
-                            this,
-                            static_cast<nsIDocument*>(this),
-                            aScriptProto->mSrcURI,
-                            NS_LITERAL_STRING("application/x-javascript"),
-                            false);
-    if (NS_FAILED(rv)) {
-      *aBlock = false;
-      return rv;
-    }
-
     // Release script objects from FastLoad since we decided against using them
     aScriptProto->UnlinkJSObjects();
 
@@ -3258,7 +3241,7 @@ XULDocument::LoadScript(nsXULPrototypeScript* aScriptProto, bool* aBlock)
                  "still loading a script when starting another load?");
     mCurrentScriptProto = aScriptProto;
 
-    if (aScriptProto->mSrcLoading) {
+    if (isChromeDoc && aScriptProto->mSrcLoading) {
         // Another XULDocument load has started, which is still in progress.
         // Remember to ResumeWalk this document when the load completes.
         mNextSrcLoadWaiter = aScriptProto->mSrcLoadWaiters;
@@ -3274,9 +3257,8 @@ XULDocument::LoadScript(nsXULPrototypeScript* aScriptProto, bool* aBlock)
                                 aScriptProto->mSrcURI,
                                 this, // aObserver
                                 this, // aRequestingContext
-                                nsILoadInfo::SEC_NORMAL,
-                                nsIContentPolicy::TYPE_OTHER,
-                                nullptr, // aContext
+                                nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS,
+                                nsIContentPolicy::TYPE_INTERNAL_SCRIPT,
                                 group);
 
         if (NS_FAILED(rv)) {

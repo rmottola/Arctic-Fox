@@ -23,3 +23,6 @@ testInitialEnvironment('export default function x() {};', ['x']);
 testInitialEnvironment('export default 1;', ['*default*']);
 testInitialEnvironment('export default class { constructor() {} };', ['*default*']);
 testInitialEnvironment('export default function() {};', ['*default*']);
+testInitialEnvironment("class x { constructor() {} }", ['x']);
+testInitialEnvironment('export default class x { constructor() {} };', ['x']);
+testInitialEnvironment('export default class { constructor() {} };', ['*default*']);

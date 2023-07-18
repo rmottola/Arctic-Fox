@@ -34,11 +34,7 @@
             let findString = this.findbar._findField;
             if (!findString.value)
               return;
-#ifdef XP_MACOSX
-            if (aEvent.metaKey) {
-#else
-            if (aEvent.ctrlKey) {
-#endif
+            if (aEvent.getModifierState("Accel")) {
               this.findbar.getElement("highlight").click();
               return;
             }
@@ -73,6 +69,14 @@
         // document.
         if (this.findbar._isIMEComposing) {
           return;
+        }
+
+        if (this._hadValue && !this.value) {
+          this._willfullyDeleted = true;
+          this._hadValue = false;
+        } else if (this.value.trim()) {
+          this._hadValue = true;
+          this._willfullyDeleted = false;
         }
         this.findbar._find(this.value);
       ]]></handler>
@@ -110,12 +114,14 @@
         findbar.browser.finder.enableSelection();
       ]]></handler>
 
-#ifdef XP_MACOSX
       <handler event="focus"><![CDATA[
-        let findbar = this.findbar;
-        findbar._onFindFieldFocus();
+        let { AppConstants } =
+            Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
+        if (AppConstants.platform == "macosx") {
+          let findbar = this.findbar;
+          findbar._onFindFieldFocus();
+        }
       ]]></handler>
-#endif
 
       <handler event="compositionstart"><![CDATA[
         // Don't close the find toolbar while IME is composing.
@@ -909,6 +915,13 @@
           if (!this._findFailedString ||
               !val.startsWith(this._findFailedString))
           {
+            // Getting here means the user commanded a find op. Make sure any
+            // initial prefilling is ignored if it hasn't happened yet.
+            if (this._startFindDeferred) {
+              this._startFindDeferred.resolve();
+              this._startFindDeferred = null;
+            }
+
             this._enableFindButtons(val);
             if (this.getElement("highlight").checked)
               this._setHighlightTimeout();
@@ -1067,6 +1080,13 @@
             // NB: We have to focus this._findField here so tests that send
             // key events can open and close the find bar synchronously.
             this._findField.focus();
+
+            // (e10s) since we focus lets also select it, otherwise that would
+            // only happen in this.onCurrentSelection and, because it is async,
+            // there's a chance keypresses could come inbetween, leading to
+            // jumbled up queries.
+            this._findField.select();
+
             this.browser.finder.getInitialSelection();
             return startFindPromise;
           }
@@ -1150,8 +1170,10 @@
             return;
 
           let clipboardSearchString = this._browser.finder.clipboardSearchString;
-          if (clipboardSearchString && this._findField.value != clipboardSearchString) {
+          if (clipboardSearchString && this._findField.value != clipboardSearchString &&
+              !this._findField._willfullyDeleted) {
             this._findField.value = clipboardSearchString;
+            this._findField._hadValue = true;
             // Changing the search string makes the previous status invalid, so
             // we better clear it here.
             this._updateStatusUI();
@@ -1177,13 +1199,19 @@
       <method name="onFindResult">
         <parameter name="aData"/>
         <body><![CDATA[
+          if (aData.result == this.nsITypeAheadFind.FIND_NOTFOUND) {
+            // If an explicit Find Again command fails, re-open the toolbar.
+            if (aData.storeResult && this.open()) {
+              this._findField.select();
+              this._findField.focus();
+            }
+            this._findFailedString = aData.searchString;
+          } else {
+            this._findFailedString = null;
+          }
+
           this._updateStatusUI(aData.result, aData.findBackwards);
           this._updateStatusUIBar(aData.linkURL);
-
-          if (aData.result == this.nsITypeAheadFind.FIND_NOTFOUND)
-            this._findFailedString = aData.searchString;
-          else
-            this._findFailedString = null;
 
           if (this._findMode != this.FIND_NORMAL)
             this._setFindCloseTimeout();
@@ -1224,13 +1252,18 @@
         <parameter name="aSelectionString" />
         <parameter name="aIsInitialSelection" />
         <body><![CDATA[
-#ifdef XP_MACOSX
-          if (aIsInitialSelection && !aSelectionString) {
+          // Ignore the prefill if the user has already typed in the findbar,
+          // it would have been overwritten anyway. See bug 1198465.
+          if (aIsInitialSelection && !this._startFindDeferred)
+            return;
+
+          let { AppConstants } =
+              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
+          if (AppConstants.platform == "macosx" && aIsInitialSelection && !aSelectionString) {
             let clipboardSearchString = this.browser.finder.clipboardSearchString;
             if (clipboardSearchString)
               aSelectionString = clipboardSearchString;
           }
-#endif
 
           if (aSelectionString)
             this._findField.value = aSelectionString;
@@ -1239,10 +1272,9 @@
             this._enableFindButtons(!!this._findField.value);
             this._findField.select();
             this._findField.focus();
-            if (this._startFindDeferred) {
-              this._startFindDeferred.resolve();
-              this._startFindDeferred = null;
-            }
+
+            this._startFindDeferred.resolve();
+            this._startFindDeferred = null;
           }
         ]]></body>
       </method>

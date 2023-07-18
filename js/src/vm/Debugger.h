@@ -43,7 +43,7 @@ class DebuggerMemory;
 
 typedef HashSet<ReadBarrieredGlobalObject,
                 MovableCellHasher<ReadBarrieredGlobalObject>,
-                SystemAllocPolicy> WeakGlobalObjectSet;
+                RuntimeAllocPolicy> WeakGlobalObjectSet;
 
 /*
  * A weakmap from GC thing keys to JSObject values that supports the keys being
@@ -260,6 +260,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     // Return true if this Debugger observed a debuggee that participated in the
     // GC identified by the given GC number. Return false otherwise.
+    // May return false negatives if we have hit OOM.
     bool observedGC(uint64_t majorGCNumber) const {
         return observedGCs.has(majorGCNumber);
     }
@@ -340,7 +341,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     // The set of GC numbers for which one or more of this Debugger's observed
     // debuggees participated in.
-    js::HashSet<uint64_t> observedGCs;
+    using GCNumberSet = HashSet<uint64_t, DefaultHasher<uint64_t>, RuntimeAllocPolicy>;
+    GCNumberSet observedGCs;
 
     using TenurePromotionsLog = js::TraceableFifo<TenurePromotionsLogEntry>;
     TenurePromotionsLog tenurePromotionsLog;
@@ -446,10 +448,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * lost events.
      */
 #ifdef NIGHTLY_BUILD
-    uint32_t traceLoggerLastDrainedId;
+    uint32_t traceLoggerLastDrainedSize;
     uint32_t traceLoggerLastDrainedIteration;
 #endif
-    uint32_t traceLoggerScriptedCallsLastDrainedId;
+    uint32_t traceLoggerScriptedCallsLastDrainedSize;
     uint32_t traceLoggerScriptedCallsLastDrainedIteration;
 
     class FrameRange;

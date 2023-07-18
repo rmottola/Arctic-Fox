@@ -1446,7 +1446,7 @@ JitCompartment::generateRegExpExecStub(JSContext* cx)
 #endif
 
     if (cx->zone()->needsIncrementalBarrier())
-        code->togglePreBarriers(true);
+        code->togglePreBarriers(true, DontReprotect);
 
     return code;
 }
@@ -1579,7 +1579,7 @@ JitCompartment::generateRegExpTestStub(JSContext* cx)
 #endif
 
     if (cx->zone()->needsIncrementalBarrier())
-        code->togglePreBarriers(true);
+        code->togglePreBarriers(true, DontReprotect);
 
     return code;
 }
@@ -1966,9 +1966,9 @@ class OutOfLineInterruptCheckImplicit : public OutOfLineCodeBase<CodeGenerator>
 {
   public:
     LBlock* block;
-    LInterruptCheckImplicit* lir;
+    LInterruptCheck* lir;
 
-    OutOfLineInterruptCheckImplicit(LBlock* block, LInterruptCheckImplicit* lir)
+    OutOfLineInterruptCheckImplicit(LBlock* block, LInterruptCheck* lir)
       : block(block), lir(lir)
     { }
 
@@ -2008,16 +2008,6 @@ CodeGenerator::visitOutOfLineInterruptCheckImplicit(OutOfLineInterruptCheckImpli
     callVM(InterruptCheckInfo, ool->lir);
     restoreLive(ool->lir);
     masm.jump(ool->rejoin());
-}
-
-void
-CodeGenerator::visitInterruptCheckImplicit(LInterruptCheckImplicit* lir)
-{
-    OutOfLineInterruptCheckImplicit* ool = new(alloc()) OutOfLineInterruptCheckImplicit(current, lir);
-    addOutOfLineCode(ool, lir->mir());
-
-    lir->setOolEntry(ool->entry());
-    masm.bind(ool->rejoin());
 }
 
 void
@@ -8172,7 +8162,7 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
     // read barriers which were skipped while compiling the script off thread.
     Linker linker(masm);
     AutoFlushICache afc("IonLink");
-    JitCode* code = linker.newCode<CanGC>(cx, ION_CODE);
+    JitCode* code = linker.newCode<CanGC>(cx, ION_CODE, !patchableBackedges_.empty());
     if (!code)
         return false;
 
@@ -8217,6 +8207,8 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
                     (const IonTrackedOptimizationsAttemptsTable*) optsAttemptsTableAddr;
                 entry.initTrackedOptimizations(optsRegionTable, optsTypesTable, optsAttemptsTable,
                                                allTypes);
+            } else {
+                cx->recoverFromOutOfMemory();
             }
         }
 
@@ -8259,60 +8251,57 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
     // Adopt fallback shared stubs from the compiler into the ion script.
     ionScript->adoptFallbackStubs(&stubSpace_);
 
-    {
-        AutoWritableJitCode awjc(code);
-        Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, invalidateEpilogueData_),
+    Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, invalidateEpilogueData_),
+                                       ImmPtr(ionScript),
+                                       ImmPtr((void*)-1));
+
+    for (size_t i = 0; i < ionScriptLabels_.length(); i++) {
+        Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, ionScriptLabels_[i]),
                                            ImmPtr(ionScript),
                                            ImmPtr((void*)-1));
-
-        for (size_t i = 0; i < ionScriptLabels_.length(); i++) {
-            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, ionScriptLabels_[i]),
-                                               ImmPtr(ionScript),
-                                               ImmPtr((void*)-1));
-        }
+    }
 
 #ifdef JS_TRACE_LOGGING
-        TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-        for (uint32_t i = 0; i < patchableTraceLoggers_.length(); i++) {
-            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, patchableTraceLoggers_[i]),
-                                               ImmPtr(logger),
-                                               ImmPtr(nullptr));
-        }
-
-        if (patchableTLScripts_.length() > 0) {
-            MOZ_ASSERT(TraceLogTextIdEnabled(TraceLogger_Scripts));
-            TraceLoggerEvent event(logger, TraceLogger_Scripts, script);
-            ionScript->setTraceLoggerEvent(event);
-            uint32_t textId = event.payload()->textId();
-            for (uint32_t i = 0; i < patchableTLScripts_.length(); i++) {
-                Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, patchableTLScripts_[i]),
-                                                   ImmPtr((void*) uintptr_t(textId)),
-                                                   ImmPtr((void*)0));
-            }
-        }
-#endif
-        // Patch shared stub IC loads using IC entries
-        for (size_t i = 0; i < sharedStubs_.length(); i++) {
-            CodeOffset label = sharedStubs_[i].label;
-
-            IonICEntry& entry = ionScript->sharedStubList()[i];
-            entry = sharedStubs_[i].entry;
-            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, label),
-                                               ImmPtr(&entry),
-                                               ImmPtr((void*)-1));
-
-            MOZ_ASSERT(entry.hasStub());
-            MOZ_ASSERT(entry.firstStub()->isFallback());
-
-            entry.firstStub()->toFallbackStub()->fixupICEntry(&entry);
-        }
-
-        // for generating inline caches during the execution.
-        if (runtimeData_.length())
-            ionScript->copyRuntimeData(&runtimeData_[0]);
-        if (cacheList_.length())
-            ionScript->copyCacheEntries(&cacheList_[0], masm);
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    for (uint32_t i = 0; i < patchableTraceLoggers_.length(); i++) {
+        Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, patchableTraceLoggers_[i]),
+                                           ImmPtr(logger),
+                                           ImmPtr(nullptr));
     }
+
+    if (patchableTLScripts_.length() > 0) {
+        MOZ_ASSERT(TraceLogTextIdEnabled(TraceLogger_Scripts));
+        TraceLoggerEvent event(logger, TraceLogger_Scripts, script);
+        ionScript->setTraceLoggerEvent(event);
+        uint32_t textId = event.payload()->textId();
+        for (uint32_t i = 0; i < patchableTLScripts_.length(); i++) {
+            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, patchableTLScripts_[i]),
+                                               ImmPtr((void*) uintptr_t(textId)),
+                                               ImmPtr((void*)0));
+        }
+    }
+#endif
+    // Patch shared stub IC loads using IC entries
+    for (size_t i = 0; i < sharedStubs_.length(); i++) {
+        CodeOffset label = sharedStubs_[i].label;
+
+        IonICEntry& entry = ionScript->sharedStubList()[i];
+        entry = sharedStubs_[i].entry;
+        Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, label),
+                                           ImmPtr(&entry),
+                                           ImmPtr((void*)-1));
+
+        MOZ_ASSERT(entry.hasStub());
+        MOZ_ASSERT(entry.firstStub()->isFallback());
+
+        entry.firstStub()->toFallbackStub()->fixupICEntry(&entry);
+    }
+
+    // for generating inline caches during the execution.
+    if (runtimeData_.length())
+        ionScript->copyRuntimeData(&runtimeData_[0]);
+    if (cacheList_.length())
+        ionScript->copyCacheEntries(&cacheList_[0], masm);
 
     JitSpew(JitSpew_Codegen, "Created IonScript %p (raw %p)",
             (void*) ionScript, (void*) code->raw());
@@ -8363,7 +8352,7 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
     // since a GC can occur during code generation. All barriers are emitted
     // off-by-default, and are toggled on here if necessary.
     if (cx->zone()->needsIncrementalBarrier())
-        ionScript->toggleBarriers(true);
+        ionScript->toggleBarriers(true, DontReprotect);
 
     // Attach any generated script counts to the script.
     if (IonScriptCounts* counts = extractScriptCounts())
@@ -9063,7 +9052,7 @@ CodeGenerator::visitOutOfLineTypeOfV(OutOfLineTypeOfV* ool)
     masm.jump(ool->rejoin());
 }
 
-typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue, HandleValue,
+typedef bool (*ToIdFn)(JSContext*, HandleScript, jsbytecode*, HandleValue,
                        MutableHandleValue);
 static const VMFunction ToIdInfo = FunctionInfo<ToIdFn>(ToIdOperation);
 
@@ -9078,7 +9067,6 @@ CodeGenerator::visitToIdV(LToIdV* lir)
     OutOfLineCode* ool = oolCallVM(ToIdInfo, lir,
                                    ArgList(ImmGCPtr(current->mir()->info().script()),
                                            ImmPtr(lir->mir()->resumePoint()->pc()),
-                                           ToValue(lir, LToIdV::Object),
                                            ToValue(lir, LToIdV::Index)),
                                    StoreValueTo(out));
 
@@ -10211,6 +10199,15 @@ CodeGenerator::visitAssertRangeV(LAssertRangeV* ins)
 void
 CodeGenerator::visitInterruptCheck(LInterruptCheck* lir)
 {
+    if (lir->implicit()) {
+        OutOfLineInterruptCheckImplicit* ool = new(alloc()) OutOfLineInterruptCheckImplicit(current, lir);
+        addOutOfLineCode(ool, lir->mir());
+
+        lir->setOolEntry(ool->entry());
+        masm.bind(ool->rejoin());
+        return;
+    }
+
     OutOfLineCode* ool = oolCallVM(InterruptCheckInfo, lir, ArgList(), StoreNothing());
 
     AbsoluteAddress interruptAddr(GetJitContext()->runtime->addressOfInterruptUint32());
@@ -10369,6 +10366,33 @@ CodeGenerator::visitCheckReturn(LCheckReturn* ins)
     masm.branchTestMagicValue(Assembler::Equal, thisValue, JS_UNINITIALIZED_LEXICAL, &bail);
     bailoutFrom(&bail, ins->snapshot());
     masm.bind(&noChecks);
+}
+
+typedef bool (*ThrowObjCoercibleFn)(JSContext*, HandleValue);
+static const VMFunction ThrowObjectCoercibleInfo = FunctionInfo<ThrowObjCoercibleFn>(ThrowObjectCoercible);
+
+void
+CodeGenerator::visitCheckObjCoercible(LCheckObjCoercible* ins)
+{
+    ValueOperand checkValue = ToValue(ins, LCheckObjCoercible::CheckValue);
+    Label fail, done;
+    masm.branchTestNull(Assembler::Equal, checkValue, &fail);
+    masm.branchTestUndefined(Assembler::NotEqual, checkValue, &done);
+    masm.bind(&fail);
+    pushArg(checkValue);
+    callVM(ThrowObjectCoercibleInfo, ins);
+    masm.bind(&done);
+}
+
+typedef bool (*CheckSelfHostedFn)(JSContext*, HandleValue);
+static const VMFunction CheckSelfHostedInfo = FunctionInfo<CheckSelfHostedFn>(js::Debug_CheckSelfHosted);
+
+void
+CodeGenerator::visitDebugCheckSelfHosted(LDebugCheckSelfHosted* ins)
+{
+    ValueOperand checkValue = ToValue(ins, LDebugCheckSelfHosted::CheckValue);
+    pushArg(checkValue);
+    callVM(CheckSelfHostedInfo, ins);
 }
 
 void

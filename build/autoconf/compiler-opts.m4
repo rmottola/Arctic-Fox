@@ -46,7 +46,7 @@ case "$target" in
     fi
     ;;
 *-darwin*)
-    # GCC on darwin is based on gcc 4.2 and we don't support it anymore. (LIES! Works fine.)
+    # GCC on darwin is based on gcc 4.2 and we don't support it anymore.
     if test -z "$CC"; then
         MOZ_PATH_PROGS(CC, clang)
     fi
@@ -56,7 +56,10 @@ case "$target" in
     IS_GCC=$($CC -v 2>&1 | grep gcc)
     if test -n "$IS_GCC"
     then
-      echo Mac gcc is known to be broken on OS X, please use clang or macports gcc if you have problems.
+      echo gcc is known to be broken on OS X, please use clang.
+      echo see http://developer.mozilla.org/en-US/docs/Developer_Guide/Build_Instructions/Mac_OS_X_Prerequisites
+      echo for more information.
+      exit 1
     fi
     ;;
 esac

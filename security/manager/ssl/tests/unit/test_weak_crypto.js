@@ -103,6 +103,8 @@ function storeCertOverride(port, cert) {
 }
 
 function startClient(port, expectedResult, options = {}) {
+  let SSL_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SSL_ERROR_BASE;
+  let SSL_ERROR_BAD_CERT_ALERT = SSL_ERROR_BASE + 17;
   let transport =
     socketTransportService.createTransport(["ssl"], 1, "127.0.0.1", port, null);
   if (options.isPrivate) {
@@ -111,7 +113,8 @@ function startClient(port, expectedResult, options = {}) {
   let input;
   let output;
 
-  let deferred = Promise.defer();
+  let inputDeferred = Promise.defer();
+  let outputDeferred = Promise.defer();
 
   let handler = {
 
@@ -122,48 +125,46 @@ function startClient(port, expectedResult, options = {}) {
     },
 
     onInputStreamReady: function(input) {
+      let errorCode = Cr.NS_OK;
       try {
         let data = NetUtil.readInputStreamToString(input, input.available());
         equal(data, "HELLO", "Echoed data received");
         input.close();
         output.close();
-        deferred.resolve();
       } catch (e) {
-        deferred.reject(e);
+        errorCode = e.result;
+      }
+      try {
+        equal(errorCode, expectedResult,
+              "Actual and expected connection result should match");
+        inputDeferred.resolve();
+      } catch (e) {
+        inputDeferred.reject(e);
       }
     },
 
     onOutputStreamReady: function(output) {
       try {
-        try {
-          output.write("HELLO", 5);
-        } catch (e) {
-          if (e.result == Cr.NS_BASE_STREAM_WOULD_BLOCK) {
-            output.asyncWait(handler, 0, 0, Services.tm.currentThread);
-            return;
-          }
-          equal(e.result, expectedResult,
-                "Actual and expected connection result should match");
-          output.close();
-          deferred.resolve();
-          return;
-        }
-        equal(Cr.NS_OK, expectedResult, "Connection should succeed");
+        output.write("HELLO", 5);
         do_print("Output to server written");
+        outputDeferred.resolve();
         input = transport.openInputStream(0, 0, 0);
         input.asyncWait(handler, 0, 0, Services.tm.currentThread);
       } catch (e) {
-        deferred.reject(e);
+        let errorCode = -1 * (e.result & 0xFFFF);
+        if (errorCode == SSL_ERROR_BAD_CERT_ALERT) {
+          do_print("Server doesn't like client cert");
+        }
+        outputDeferred.reject(e);
       }
     }
 
   };
 
   transport.setEventSink(handler, Services.tm.currentThread);
-  output = transport.openOutputStream(Ci.nsITransport.OPEN_UNBUFFERED, 0, 0);
-  output.QueryInterface(Ci.nsIAsyncOutputStream);
+  output = transport.openOutputStream(0, 0, 0);
 
-  return deferred.promise;
+  return Promise.all([inputDeferred.promise, outputDeferred.promise]);
 }
 
 function run_test() {

@@ -537,7 +537,13 @@ nsWindow::GetNativeData(uint32_t aDataType)
     case NS_NATIVE_WINDOW:
         // Called before primary display's EGLSurface creation.
         return mScreen->GetNativeWindow();
+    case NS_NATIVE_OPENGL_CONTEXT:
+        return mScreen->GetGLContext().take();
+    case NS_RAW_NATIVE_IME_CONTEXT:
+        // There is only one IME context on Gonk.
+        return NS_ONLY_ONE_NATIVE_IME_CONTEXT;
     }
+
     return nullptr;
 }
 
@@ -579,8 +585,6 @@ nsWindow::SetInputContext(const InputContext& aContext,
 NS_IMETHODIMP_(InputContext)
 nsWindow::GetInputContext()
 {
-    // There is only one IME context on Gonk.
-    mInputContext.mNativeIMEContext = nullptr;
     return mInputContext;
 }
 
@@ -747,7 +751,7 @@ nsWindow::GetDefaultScaleInternal()
     if (dpi < 200.0) {
         return 1.0; // mdpi devices.
     }
-    if (dpi < 300.0) {
+    if (dpi < 280.0) {
         return 1.5; // hdpi devices.
     }
     // xhdpi devices and beyond.

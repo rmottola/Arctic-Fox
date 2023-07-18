@@ -9,8 +9,8 @@
 
 % override chrome://global/locale/aboutCertError.dtd     chrome://b2g-l10n/locale/aboutCertError.dtd
 % override chrome://global/locale/appstrings.properties  chrome://b2g-l10n/locale/appstrings.properties
-* locale/@AB_CD@/b2g-l10n/aboutCertError.dtd       (%chrome/overrides/aboutCertError.dtd)
-* locale/@AB_CD@/b2g-l10n/appstrings.properties    (%chrome/overrides/appstrings.properties)
+  locale/@AB_CD@/b2g-l10n/aboutCertError.dtd       (%chrome/overrides/aboutCertError.dtd)
+  locale/@AB_CD@/b2g-l10n/appstrings.properties    (%chrome/overrides/appstrings.properties)
 #ifdef MOZ_GRAPHENE
   locale/@AB_CD@/b2g-l10n/graphene.properties (%chrome/graphene.properties)
 #endif
@@ -49,6 +49,7 @@ relativesrcdir toolkit/locales:
 % override chrome://mozapps/locale/update/updates.properties chrome://b2g-l10n/locale/overrides/update/updates.properties
 % override chrome://global/locale/aboutSupport.dtd chrome://b2g-l10n/locale/overrides/global/aboutSupport.dtd
 % override chrome://global/locale/aboutSupport.properties chrome://b2g-l10n/locale/overrides/global/aboutSupport.properties
+% override chrome://global/locale/mozilla.dtd chrome://b2g-l10n/locale/overrides/global/mozilla.dtd
 % override chrome://global/locale/aboutTelemetry.dtd chrome://b2g-l10n/locale/overrides/global/aboutTelemetry.dtd
 % override chrome://global/locale/aboutTelemetry.properties chrome://b2g-l10n/locale/overrides/global/aboutTelemetry.properties
 % override chrome://global/locale/aboutWebrtc.properties chrome://b2g-l10n/locale/overrides/global/aboutWebrtc.properties

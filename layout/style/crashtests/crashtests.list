@@ -26,7 +26,7 @@ load 431705-1.xul
 load 432561-1.html
 load 437170-1.html
 load 437532-1.html
-skip load 439184-1.html # skip until we figure out how to test this
+load 439184-1.html
 load 444237-1.html
 load 444848-1.html 
 load 447776-1.html
@@ -70,6 +70,8 @@ load 601437-1.html
 load 601439-1.html
 load 605689-1.html
 load 611922-1.html
+load 621596-1.html
+load 622314-1.xhtml
 load 637242.xhtml
 load 645142.html
 == 645951-1.html 645951-1-ref.html
@@ -102,7 +104,7 @@ load 927734-1.html
 load 930270-1.html
 load 930270-2.html
 load 945048-1.html
-pref(layers.offmainthreadcomposition.async-animations,true) load 972199-1.html
+load 972199-1.html
 load 989965-1.html
 load 992333-1.html
 pref(dom.webcomponents.enabled,true) load 1017798-1.html
@@ -122,6 +124,10 @@ load 1167782-1.html
 load 1186768-1.xhtml
 load 1200568-1.html
 load 1206105-1.html
+load 1223688-1.html
+load 1223694-1.html
+load 1226400-1.html
+load 1227501-1.html
 load border-image-visited-link.html
 load font-face-truncated-src.html 
 load large_border_image_width.html

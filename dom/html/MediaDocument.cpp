@@ -59,7 +59,7 @@ MediaDocumentStreamListener::OnStartRequest(nsIRequest* request, nsISupports *ct
     return mNextStream->OnStartRequest(request, ctxt);
   }
 
-  return NS_BINDING_ABORTED;
+  return NS_ERROR_PARSED_DATA_CACHED;
 }
 
 NS_IMETHODIMP
@@ -342,6 +342,26 @@ MediaDocument::LinkStylesheet(const nsAString& aStylesheet)
 
   Element* head = GetHeadElement();
   return head->AppendChildTo(link, false);
+}
+
+nsresult
+MediaDocument::LinkScript(const nsAString& aScript)
+{
+  RefPtr<mozilla::dom::NodeInfo> nodeInfo;
+  nodeInfo = mNodeInfoManager->GetNodeInfo(nsGkAtoms::script, nullptr,
+                                           kNameSpaceID_XHTML,
+                                           nsIDOMNode::ELEMENT_NODE);
+
+  RefPtr<nsGenericHTMLElement> script = NS_NewHTMLScriptElement(nodeInfo.forget());
+  NS_ENSURE_TRUE(script, NS_ERROR_OUT_OF_MEMORY);
+
+  script->SetAttr(kNameSpaceID_None, nsGkAtoms::type,
+                  NS_LITERAL_STRING("text/javascript;version=1.8"), true);
+
+  script->SetAttr(kNameSpaceID_None, nsGkAtoms::src, aScript, true);
+
+  Element* head = GetHeadElement();
+  return head->AppendChildTo(script, false);
 }
 
 void 

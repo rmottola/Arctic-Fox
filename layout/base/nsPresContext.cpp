@@ -2852,11 +2852,10 @@ nsPresContext::GetPrimaryFrameFor(nsIContent* aContent)
   return nullptr;
 }
 
-
 size_t
 nsPresContext::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 {
-  return mPropertyTable.SizeOfExcludingThis(aMallocSizeOf);
+  return mPropertyTable.SizeOfExcludingThis(aMallocSizeOf) +
          mLangGroupFontPrefs.SizeOfExcludingThis(aMallocSizeOf);
 
   // Measurement of other members may be added later if DMD finds it is
@@ -3209,6 +3208,12 @@ nsRootPresContext::CollectPluginGeometryUpdates(LayerManager* aLayerManager)
   mozilla::layers::ClientLayerManager* clm = aLayerManager->AsClientLayerManager();
 
   nsTArray<nsIWidget::Configuration> configurations;
+  // If there aren't any plugins to configure, clear the plugin data cache
+  // in the layer system.
+  if (!mRegisteredPlugins.Count() && clm) {
+    clm->StorePluginWidgetConfigurations(configurations);
+    return;
+  }
   PluginGetGeometryUpdate(mRegisteredPlugins, &configurations);
   if (configurations.IsEmpty()) {
     PluginDidSetGeometry(mRegisteredPlugins);

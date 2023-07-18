@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+"use strict";
+
+var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -21,6 +23,14 @@ window.onload = function() {
   if (anchor) {
     let baseURL = Services.urlFormatter.formatURLPref("app.support.baseURL");
     anchor.setAttribute("href", baseURL + "troubleshooting");
+  }
+
+  // wire up click handlers for the radio buttons if they exist.
+  for (let radioId of ["radioRestoreAll", "radioRestoreChoose"]) {
+    let button = document.getElementById(radioId);
+    if (button) {
+      button.addEventListener("click", updateTabListVisibility);
+    }
   }
 
   // the crashed session state is kept inside a textbox so that SessionStore picks it up
@@ -43,21 +53,31 @@ window.onload = function() {
   document.getElementById("errorTryAgain").focus();
 };
 
+function isTreeViewVisible() {
+  let tabList = document.querySelector(".tree-container");
+  return tabList.hasAttribute("available");
+}
+
 function initTreeView() {
+  // If we aren't visible we initialize as we are made visible (and it's OK
+  // to initialize multiple times)
+  if (!isTreeViewVisible()) {
+    return;
+  }
   var tabList = document.getElementById("tabList");
   var winLabel = tabList.getAttribute("_window_label");
 
   gTreeData = [];
   gStateObject.windows.forEach(function(aWinData, aIx) {
     var winState = {
-      label: winLabel.replace("%S", (aIx + 1)),
+      label: aWinData.tabGroupsMigrationTitle || winLabel.replace("%S", (aIx + 1)),
       open: true,
       checked: true,
       ix: aIx
     };
     winState.tabs = aWinData.tabs.map(function(aTabData) {
       var entry = aTabData.entries[aTabData.index - 1] || { url: "about:blank" };
-      var iconURL = aTabData.attributes && aTabData.attributes.image || null;
+      var iconURL = aTabData.image || null;
       // don't initiate a connection just to fetch a favicon (see bug 462863)
       if (/^https?:/.test(iconURL))
         iconURL = "moz-anno:favicon:" + iconURL;
@@ -78,31 +98,45 @@ function initTreeView() {
 }
 
 // User actions
+function updateTabListVisibility() {
+  let tabList = document.querySelector(".tree-container");
+  let container = document.querySelector(".container");
+  if (document.getElementById("radioRestoreChoose").checked) {
+    tabList.setAttribute("available", "true");
+    container.classList.add("restore-chosen");
+  } else {
+    tabList.removeAttribute("available");
+    container.classList.remove("restore-chosen");
+  }
+  initTreeView();
+}
 
 function restoreSession() {
   document.getElementById("errorTryAgain").disabled = true;
 
-  if (!gTreeData.some(aItem => aItem.checked)) {
-    // This should only be possible when we have no "cancel" button, and thus
-    // the "Restore session" button always remains enabled.  In that case and
-    // when nothing is selected, we just want a new session.
-    startNewSession();
-    return;
-  }
+  if (isTreeViewVisible()) {
+    if (!gTreeData.some(aItem => aItem.checked)) {
+      // This should only be possible when we have no "cancel" button, and thus
+      // the "Restore session" button always remains enabled.  In that case and
+      // when nothing is selected, we just want a new session.
+      startNewSession();
+      return;
+    }
 
-  // remove all unselected tabs from the state before restoring it
-  var ix = gStateObject.windows.length - 1;
-  for (var t = gTreeData.length - 1; t >= 0; t--) {
-    if (treeView.isContainer(t)) {
-      if (gTreeData[t].checked === 0)
-        // this window will be restored partially
-        gStateObject.windows[ix].tabs =
-          gStateObject.windows[ix].tabs.filter(function(aTabData, aIx)
-                                                 gTreeData[t].tabs[aIx].checked);
-      else if (!gTreeData[t].checked)
-        // this window won't be restored at all
-        gStateObject.windows.splice(ix, 1);
-      ix--;
+    // remove all unselected tabs from the state before restoring it
+    var ix = gStateObject.windows.length - 1;
+    for (var t = gTreeData.length - 1; t >= 0; t--) {
+      if (treeView.isContainer(t)) {
+        if (gTreeData[t].checked === 0)
+          // this window will be restored partially
+          gStateObject.windows[ix].tabs =
+            gStateObject.windows[ix].tabs.filter((aTabData, aIx) =>
+                                                   gTreeData[t].tabs[aIx].checked);
+        else if (!gTreeData[t].checked)
+          // this window won't be restored at all
+          gStateObject.windows.splice(ix, 1);
+        ix--;
+      }
     }
   }
   var stateString = JSON.stringify(gStateObject);
@@ -188,11 +222,13 @@ function getBrowserWindow() {
 }
 
 function toggleRowChecked(aIx) {
+  function isChecked(aItem) {
+    return aItem.checked;
+  }
+
   var item = gTreeData[aIx];
   item.checked = !item.checked;
   treeView.treeBox.invalidateRow(aIx);
-
-  function isChecked(aItem) aItem.checked;
 
   if (treeView.isContainer(aIx)) {
     // (un)check all tabs of this window as well

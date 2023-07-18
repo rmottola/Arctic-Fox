@@ -55,22 +55,21 @@ using ::google::protobuf::io::ZeroCopyInputStream;
 
 using JS::ubi::AtomOrTwoByteChars;
 
+MallocSizeOf
+GetCurrentThreadDebuggerMallocSizeOf()
+{
+  auto ccrt = CycleCollectedJSRuntime::Get();
+  MOZ_ASSERT(ccrt);
+  auto rt = ccrt->Runtime();
+  MOZ_ASSERT(rt);
+  auto mallocSizeOf = JS::dbg::GetDebuggerMallocSizeOf(rt);
+  MOZ_ASSERT(mallocSizeOf);
+  return mallocSizeOf;
+}
+
 /*** Cycle Collection Boilerplate *****************************************************************/
 
-NS_IMPL_CYCLE_COLLECTION_CLASS(HeapSnapshot)
-
-NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HeapSnapshot)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mParent)
-NS_IMPL_CYCLE_COLLECTION_UNLINK_END
-
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(HeapSnapshot)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParent)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
-
-NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(HeapSnapshot)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
-NS_IMPL_CYCLE_COLLECTION_TRACE_END
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(HeapSnapshot, mParent)
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(HeapSnapshot)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(HeapSnapshot)
@@ -495,7 +494,7 @@ HeapSnapshot::TakeCensus(JSContext* cx, JS::HandleObject options,
     return;
   }
 
-  JS::ubi::CensusHandler handler(census, rootCount);
+  JS::ubi::CensusHandler handler(census, rootCount, GetCurrentThreadDebuggerMallocSizeOf());
 
   {
     JS::AutoCheckCannotGC nogc;
@@ -517,11 +516,48 @@ HeapSnapshot::TakeCensus(JSContext* cx, JS::HandleObject options,
     }
   }
 
-  if (NS_WARN_IF(!handler.report(rval))) {
+  if (NS_WARN_IF(!handler.report(cx, rval))) {
     rv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return;
   }
 }
+
+void
+HeapSnapshot::DescribeNode(JSContext* cx, JS::HandleObject breakdown, uint64_t nodeId,
+                           JS::MutableHandleValue rval, ErrorResult& rv) {
+  MOZ_ASSERT(breakdown);
+  JS::RootedValue breakdownVal(cx, JS::ObjectValue(*breakdown));
+  JS::ubi::CountTypePtr rootType = JS::ubi::ParseBreakdown(cx, breakdownVal);
+  if (NS_WARN_IF(!rootType)) {
+    rv.Throw(NS_ERROR_UNEXPECTED);
+    return;
+  }
+
+  JS::ubi::RootedCount rootCount(cx, rootType->makeCount());
+  if (NS_WARN_IF(!rootCount)) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
+
+  JS::ubi::Node::Id id(nodeId);
+  Maybe<JS::ubi::Node> node = getNodeById(id);
+  if (NS_WARN_IF(node.isNothing())) {
+    rv.Throw(NS_ERROR_INVALID_ARG);
+    return;
+  }
+
+  MallocSizeOf mallocSizeOf = GetCurrentThreadDebuggerMallocSizeOf();
+  if (NS_WARN_IF(!rootCount->count(mallocSizeOf, *node))) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
+
+  if (NS_WARN_IF(!rootCount->report(cx, rval))) {
+    rv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
+}
+
 
 already_AddRefed<DominatorTree>
 HeapSnapshot::ComputeDominatorTree(ErrorResult& rv)

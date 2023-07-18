@@ -1260,6 +1260,14 @@
 
             this.tabContainer._setPositionalAttributes();
 
+            if (!gMultiProcessBrowser) {
+              let event = new CustomEvent("TabSwitchDone", {
+                bubbles: true,
+                cancelable: true
+              });
+              this.dispatchEvent(event);
+            }
+
             if (!aForceUpdate)
               TelemetryStopwatch.finish("FX_TAB_SWITCH_UPDATE_MS");
           ]]>
@@ -1301,6 +1309,7 @@
             return;
           }
         }
+
         // Focus the find bar if it was previously focused for that tab.
         if (gFindBarInitialized && !gFindBar.hidden &&
             this.selectedTab._findBarFocused) {
@@ -1314,11 +1323,13 @@
             document.activeElement != document.documentElement)
           return;
 
-	// We're now committed to focusing the content area.
-	let fm = Services.focus;
+        // We're now committed to focusing the content area.
+        let fm = Services.focus;
         let focusFlags = fm.FLAG_NOSCROLL;
+
         if (!gMultiProcessBrowser) {
           let newFocusedElement = fm.getFocusedElementForWindow(window.content, true, {});
+
           // for anchors, use FLAG_SHOWRING so that it is clear what link was
           // last clicked when switching back to that tab
           if (newFocusedElement &&
@@ -1326,20 +1337,25 @@
                newFocusedElement.getAttributeNS("http://www.w3.org/1999/xlink", "type") == "simple"))
             focusFlags |= fm.FLAG_SHOWRING;
         }
+
         fm.setFocus(newBrowser, focusFlags);
         ]]></body>
       </method>
 
       <method name="_tabAttrModified">
         <parameter name="aTab"/>
+        <parameter name="aChanged"/>
         <body><![CDATA[
           if (aTab.closing)
             return;
 
-          // This event should be dispatched when any of these attributes change:
-          // label, crop, busy, image, selected
-          var event = document.createEvent("Events");
-          event.initEvent("TabAttrModified", true, false);
+          let event = new CustomEvent("TabAttrModified", {
+            bubbles: true,
+            cancelable: false,
+            detail: {
+              changed: aChanged,
+            }
+          });
           aTab.dispatchEvent(event);
         ]]></body>
       </method>
@@ -1350,7 +1366,7 @@
           <![CDATA[
             aTab.label = this.mStringBundle.getString("tabs.connecting");
             aTab.crop = "end";
-            this._tabAttrModified(aTab);
+            this._tabAttrModified(aTab, ["label", "crop"]);
           ]]>
         </body>
       </method>
@@ -1376,14 +1392,12 @@
                 // At this point, we now have a URI.
                 // Let's try to unescape it using a character set
                 // in case the URI is not ASCII.
-                if (!gMultiProcessBrowser) {
-                  try {
-                    var characterSet = browser.contentDocument.characterSet;
-                    const textToSubURI = Components.classes["@mozilla.org/intl/texttosuburi;1"]
-                                                   .getService(Components.interfaces.nsITextToSubURI);
-                    title = textToSubURI.unEscapeNonAsciiURI(characterSet, title);
-                  } catch(ex) { /* Do nothing. */ }
-                }
+                try {
+                  var characterSet = browser.characterSet;
+                  const textToSubURI = Components.classes["@mozilla.org/intl/texttosuburi;1"]
+                                                 .getService(Components.interfaces.nsITextToSubURI);
+                  title = textToSubURI.unEscapeNonAsciiURI(characterSet, title);
+                } catch(ex) { /* Do nothing. */ }
 
                 crop = "center";
 
@@ -1397,7 +1411,7 @@
 
             aTab.label = title;
             aTab.crop = crop;
-            this._tabAttrModified(aTab);
+            this._tabAttrModified(aTab, ["label", "crop"]);
 
             if (aTab.selected)
               this.updateTitlebar();
@@ -4083,7 +4097,7 @@
             case "DOMTitleChanged": {
               let tab = this.getTabForBrowser(browser);
               if (!tab || tab.hasAttribute("pending"))
-                return;
+                return undefined;
               let titleChanged = this.setTabTitle(tab);
               if (titleChanged && !tab.selected && !tab.hasAttribute("busy"))
                 tab.setAttribute("titlechanged", "true");
@@ -4144,7 +4158,7 @@
             case "DOMWebNotificationClicked": {
               let tab = this.getTabForBrowser(browser);
               if (!tab)
-                return;
+                return undefined;
               this.selectedTab = tab;
               window.focus();
               break;
@@ -4152,7 +4166,7 @@
             case "Browser:Init": {
               let tab = this.getTabForBrowser(browser);
               if (!tab)
-                return;
+                return undefined;
 
               this._outerWindowIDBrowserMap.set(browser.outerWindowID, browser);
               browser.messageManager.sendAsyncMessage("Browser:AppTab", { isAppTab: tab.pinned })
@@ -4349,6 +4363,10 @@
           if (gMultiProcessBrowser) {
             messageManager.removeMessageListener("DOMTitleChanged", this);
             messageManager.removeMessageListener("contextmenu", this);
+
+            if (this._switcher) {
+              this._switcher.destroy();
+            }
           }
         ]]>
       </destructor>
@@ -4709,6 +4727,15 @@
       <field name="_beforeHoveredTab">null</field>
       <field name="_afterHoveredTab">null</field>
       <field name="_hoveredTab">null</field>
+
+      <property name="_isCustomizing" readonly="true">
+        <getter>
+          let root = document.documentElement;
+          return root.getAttribute("customizing") == "true" ||
+                 root.getAttribute("customize-exiting") == "true";
+        </getter>
+      </property>
+
       <method name="_setPositionalAttributes">
         <body><![CDATA[
           let visibleTabs = this.tabbrowser.visibleTabs;
@@ -5251,11 +5278,10 @@
 
       <method name="_getDragTargetTab">
         <parameter name="event"/>
+        <parameter name="isLink"/>
         <body><![CDATA[
           let tab = event.target.localName == "tab" ? event.target : null;
-          if (tab &&
-              (event.type == "drop" || event.type == "dragover") &&
-              event.dataTransfer.dropEffect == "link") {
+          if (tab && isLink) {
             let boxObject = tab.boxObject;
             if (event.screenX < boxObject.screenX + boxObject.width * .25 ||
                 event.screenX > boxObject.screenX + boxObject.width * .75)
@@ -5267,9 +5293,10 @@
 
       <method name="_getDropIndex">
         <parameter name="event"/>
+        <parameter name="isLink"/>
         <body><![CDATA[
           var tabs = this.childNodes;
-          var tab = this._getDragTargetTab(event);
+          var tab = this._getDragTargetTab(event, isLink);
           if (window.getComputedStyle(this, null).direction == "ltr") {
             for (let i = tab ? tab._tPos : 0; i < tabs.length; i++)
               if (event.screenX < tabs[i].boxObject.screenX + tabs[i].boxObject.width / 2)
@@ -5283,19 +5310,18 @@
         ]]></body>
       </method>
 
-      <method name="_setEffectAllowedForDataTransfer">
+      <method name="_getDropEffectForTabDrag">
         <parameter name="event"/>
         <body><![CDATA[
           var dt = event.dataTransfer;
           // Disallow dropping multiple items
           if (dt.mozItemCount > 1)
-            return dt.effectAllowed = "none";
+            return "none";
 
           var types = dt.mozTypesAt(0);
-          var sourceNode = null;
           // tabs are always added as the first type
           if (types[0] == TAB_DROP_TYPE) {
-            var sourceNode = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+            let sourceNode = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
             if (sourceNode instanceof XULElement &&
                 sourceNode.localName == "tab" &&
                 sourceNode.ownerDocument.defaultView instanceof ChromeWindow &&
@@ -5305,22 +5331,20 @@
               // and vice versa.
               if (PrivateBrowsingUtils.isWindowPrivate(window) !=
                   PrivateBrowsingUtils.isWindowPrivate(sourceNode.ownerDocument.defaultView))
-                return dt.effectAllowed = "none";
+                return "none";
 
               if (window.gMultiProcessBrowser !=
                   sourceNode.ownerDocument.defaultView.gMultiProcessBrowser)
-                return dt.effectAllowed = "none";
+                return "none";
 
-              let copyModifier = this.tabbrowser.AppConstants.platform == "macosx" ? event.altKey : event.ctrlKey;
-              return dt.effectAllowed = copyModifier ? "copy" : "move";
+              return dt.dropEffect == "copy" ? "copy" : "move";
             }
           }
 
           if (browserDragAndDrop.canDropLink(event)) {
-            // Here we need to do this manually
-            return dt.effectAllowed = dt.dropEffect = "link";
+            return "link";
           }
-          return dt.effectAllowed = "none";
+          return "none";
         ]]></body>
       </method>
 
@@ -5547,8 +5571,8 @@
       ]]></handler>
 
       <handler event="dragstart"><![CDATA[
-        var tab = this._getDragTargetTab(event);
-        if (!tab)
+        var tab = this._getDragTargetTab(event, false);
+        if (!tab || this._isCustomizing)
           return;
 
         let dt = event.dataTransfer;
@@ -5614,7 +5638,7 @@
       ]]></handler>
 
       <handler event="dragover"><![CDATA[
-        var effects = this._setEffectAllowedForDataTransfer(event);
+        var effects = this._getDropEffectForTabDrag(event);
 
         var ind = this._tabDropIndicator;
         if (effects == "" || effects == "none") {
@@ -5655,7 +5679,7 @@
         this._finishAnimateTabMove();
 
         if (effects == "link") {
-          let tab = this._getDragTargetTab(event);
+          let tab = this._getDragTargetTab(event, true);
           if (tab) {
             if (!this._dragTime)
               this._dragTime = Date.now();
@@ -5681,7 +5705,7 @@
           newMargin = (pixelsToScroll > 0) ? maxMargin : minMargin;
         }
         else {
-          let newIndex = this._getDropIndex(event);
+          let newIndex = this._getDropIndex(event, effects == "link");
           if (newIndex == this.childNodes.length) {
             let tabRect = this.childNodes[newIndex-1].getBoundingClientRect();
             if (ltr)
@@ -5712,7 +5736,7 @@
         var dt = event.dataTransfer;
         var dropEffect = dt.dropEffect;
         var draggedTab;
-        if (dropEffect != "link") { // copy or move
+        if (dt.mozTypesAt(0)[0] == TAB_DROP_TYPE) { // tab copy or move
           draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
           // not our drop then
           if (!draggedTab)
@@ -5723,7 +5747,7 @@
         event.stopPropagation();
         if (draggedTab && dropEffect == "copy") {
           // copy the dropped tab (wherever it's from)
-          let newIndex = this._getDropIndex(event);
+          let newIndex = this._getDropIndex(event, false);
           let newTab = this.tabbrowser.duplicateTab(draggedTab);
           this.tabbrowser.moveTabTo(newTab, newIndex);
           if (draggedTab.parentNode != this || event.shiftKey)
@@ -5742,9 +5766,18 @@
           // swap the dropped tab with a new one we create and then close
           // it in the other window (making it seem to have moved between
           // windows)
-          let newIndex = this._getDropIndex(event);
+          let newIndex = this._getDropIndex(event, false);
           let newTab = this.tabbrowser.addTab("about:blank");
           let newBrowser = this.tabbrowser.getBrowserForTab(newTab);
+          let draggedBrowserURL = draggedTab.linkedBrowser.currentURI.spec;
+
+          // If we're an e10s browser window, an exception will be thrown
+          // if we attempt to drag a non-remote browser in, so we need to
+          // ensure that the remoteness of the newly created browser is
+          // appropriate for the URL of the tab being dragged in.
+          this.tabbrowser.updateBrowserRemotenessByURL(newBrowser,
+                                                       draggedBrowserURL);
+
           // Stop the about:blank load
           newBrowser.stop();
           // make sure it has a docshell
@@ -5783,10 +5816,10 @@
           if (event.shiftKey)
             bgLoad = !bgLoad;
 
-          let tab = this._getDragTargetTab(event);
+          let tab = this._getDragTargetTab(event, true);
           if (!tab || dropEffect == "copy") {
             // We're adding a new tab.
-            let newIndex = this._getDropIndex(event);
+            let newIndex = this._getDropIndex(event, true);
             let newTab = this.tabbrowser.loadOneTab(url, {inBackground: bgLoad, allowThirdPartyFixup: true});
             this.tabbrowser.moveTabTo(newTab, newIndex);
           } else {
@@ -5818,7 +5851,7 @@
 
         var dt = event.dataTransfer;
         var draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
-        if (dt.mozUserCancelled || dt.dropEffect != "none") {
+        if (dt.mozUserCancelled || dt.dropEffect != "none" || this._isCustomizing) {
           delete draggedTab._dragData;
           return;
         }
@@ -6008,6 +6041,35 @@
     </content>
 
     <implementation>
+
+      <property name="_visuallySelected">
+        <setter>
+          <![CDATA[
+          if (val)
+            this.setAttribute("visuallyselected", "true");
+          else
+            this.removeAttribute("visuallyselected");
+          this.parentNode.tabbrowser._tabAttrModified(this, ["visuallyselected"]);
+
+          this._setPositionAttributes(val);
+
+          return val;
+          ]]>
+        </setter>
+      </property>
+
+      <property name="_logicallySelected">
+        <setter>
+          <![CDATA[
+          if (val)
+            this.setAttribute("selected", "true");
+          else
+            this.removeAttribute("selected");
+
+          return val;
+          ]]>
+        </setter>
+      </property>
 
       <property name="_logicallySelected">
         <setter>
@@ -6491,6 +6553,47 @@
     </implementation>
   </binding>
 
+  <binding id="tabbrowser-tabpanels"
+           extends="chrome://global/content/bindings/tabbox.xml#tabpanels">
+    <implementation>
+      <field name="_selectedIndex">0</field>
+
+      <property name="selectedIndex">
+        <getter>
+        <![CDATA[
+          return this._selectedIndex;
+        ]]>
+        </getter>
+
+        <setter>
+        <![CDATA[
+          if (val < 0 || val >= this.childNodes.length)
+            return val;
+
+          let toTab = this.getRelatedElement(this.childNodes[val]);
+          let fromTab = this._selectedPanel ? this.getRelatedElement(this._selectedPanel)
+                                            : null;
+
+          gBrowser._getSwitcher().requestTab(toTab);
+
+          var panel = this._selectedPanel;
+          var newPanel = this.childNodes[val];
+          this._selectedPanel = newPanel;
+          if (this._selectedPanel != panel) {
+            var event = document.createEvent("Events");
+            event.initEvent("select", true, true);
+            this.dispatchEvent(event);
+
+            this._selectedIndex = val;
+          }
+
+          return val;
+        ]]>
+        </setter>
+      </property>
+    </implementation>
+  </binding>
+
   <binding id="tabbrowser-browser"
            extends="chrome://global/content/bindings/browser.xml#browser">
     <implementation>
@@ -6548,48 +6651,6 @@
           ]]>
         </body>
       </method>
-    </implementation>
-  </binding>
-
-  <binding id="tabbrowser-tabpanels"
-           extends="chrome://global/content/bindings/tabbox.xml#tabpanels">
-    <implementation>
-      <field name="_selectedIndex">0</field>
-
-      <property name="selectedIndex">
-        <getter>
-        <![CDATA[
-          return this._selectedIndex;
-        ]]>
-        </getter>
-
-        <setter>
-        <![CDATA[
-          if (val < 0 || val >= this.childNodes.length)
-            return val;
-
-          let toTab = this.getRelatedElement(this.childNodes[val]);
-          let fromTab = this._selectedPanel ? this.getRelatedElement(this._selectedPanel)
-                                            : null;
-
-          gBrowser._getSwitcher().requestTab(toTab);
-
-          var panel = this._selectedPanel;
-          this._selectedPanel = this.childNodes[val];
-          if (this._selectedPanel != panel) {
-            var event = document.createEvent("Events");
-            event.initEvent("select", true, true);
-	    event.fromTab = fromTab;
-	    event.toTab = toTab;
-            this.dispatchEvent(event);
-
-            this._selectedIndex = val;
-          }
-
-          return val;
-        ]]>
-        </setter>
-      </property>
     </implementation>
   </binding>
 

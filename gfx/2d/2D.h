@@ -317,8 +317,13 @@ class DrawTargetCaptureImpl;
  * This is the base class for source surfaces. These objects are surfaces
  * which may be used as a source in a SurfacePattern or a DrawSurface call.
  * They cannot be drawn to directly.
+ *
+ * Although SourceSurface has thread-safe refcount, some SourceSurface cannot
+ * be used on random threads at the same time. Only DataSourceSurface can be
+ * used on random threads now. This will be fixed in the future. Eventually
+ * all SourceSurface should be thread-safe.
  */
-class SourceSurface : public RefCounted<SourceSurface>
+class SourceSurface : public external::AtomicRefCounted<SourceSurface>
 {
 public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurface)
@@ -1158,6 +1163,11 @@ public:
                                int32_t limit = 0,
                                int32_t allocLimit = 0);
 
+  /**
+   * Make sure that the given buffer size doesn't exceed the allocation limit.
+   */
+  static bool CheckBufferSize(int32_t bufSize);
+
   /** Make sure the given dimension satisfies the CheckSurfaceSize and is
    * within 8k limit.  The 8k value is chosen a bit randomly.
    */
@@ -1227,6 +1237,11 @@ public:
   static already_AddRefed<DataSourceSurface>
     CreateWrappingDataSourceSurface(uint8_t *aData, int32_t aStride,
                                     const IntSize &aSize, SurfaceFormat aFormat);
+
+  static void
+    CopyDataSourceSurface(DataSourceSurface* aSource,
+                          DataSourceSurface* aDest);
+
 
   static already_AddRefed<DrawEventRecorder>
     CreateEventRecorderForFile(const char *aFilename);

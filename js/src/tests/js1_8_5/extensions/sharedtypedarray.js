@@ -30,10 +30,10 @@ function testSharedArrayBuffer() {
     SharedArrayBuffer.prototype.abracadabra = "no wishing for wishes!";
     assertEq(b.abracadabra, "no wishing for wishes!");
 
-    // can "convert" a buffer (really works as an assertion)
-    assertEq(SharedArrayBuffer(b), b);
+    // SharedArrayBuffer is not a conversion operator, not even for instances of itself
+    assertThrowsInstanceOf(() => SharedArrayBuffer(b), TypeError);
 
-    // can't convert any other object
+    // can't convert any other object either
     assertThrowsInstanceOf(() => SharedArrayBuffer({}), TypeError);
 
     // byteLength can be invoked as per normal, indirectly
@@ -191,10 +191,44 @@ function testClone2() {
     assertEq(ia2[10], 37);
 }
 
+function testApplicable() {
+    var sab = b;
+    var x;
+
+    // Just make sure we can create all the view types on shared memory.
+
+    x = new Int32Array(sab);
+    assertEq(x.length, sab.byteLength / Int32Array.BYTES_PER_ELEMENT);
+    x = new Uint32Array(sab);
+    assertEq(x.length, sab.byteLength / Uint32Array.BYTES_PER_ELEMENT);
+
+    x = new Int16Array(sab);
+    assertEq(x.length, sab.byteLength / Int16Array.BYTES_PER_ELEMENT);
+    x = new Uint16Array(sab);
+    assertEq(x.length, sab.byteLength / Uint16Array.BYTES_PER_ELEMENT);
+
+    x = new Int8Array(sab);
+    assertEq(x.length, sab.byteLength / Int8Array.BYTES_PER_ELEMENT);
+    x = new Uint8Array(sab);
+    assertEq(x.length, sab.byteLength / Uint8Array.BYTES_PER_ELEMENT);
+
+    // Though the atomic operations are illegal on Uint8ClampedArray and the
+    // float arrays, they can still be used to create views on shared memory.
+
+    x = new Uint8ClampedArray(sab);
+    assertEq(x.length, sab.byteLength / Uint8ClampedArray.BYTES_PER_ELEMENT);
+
+    x = new Float32Array(sab);
+    assertEq(x.length, sab.byteLength / Float32Array.BYTES_PER_ELEMENT);
+    x = new Float64Array(sab);
+    assertEq(x.length, sab.byteLength / Float64Array.BYTES_PER_ELEMENT);
+}
+
 testSharedArrayBuffer();
 testSharedTypedArray();
 testSharedTypedArrayMethods();
 testClone1();
 testClone2();
+testApplicable();
 
 reportCompare(0, 0, 'ok');

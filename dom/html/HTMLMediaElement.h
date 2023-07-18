@@ -569,6 +569,27 @@ public:
 
   // XPCOM MozPreservesPitch() is OK
 
+#ifdef MOZ_EME
+  MediaKeys* GetMediaKeys() const;
+
+  already_AddRefed<Promise> SetMediaKeys(MediaKeys* mediaKeys,
+                                         ErrorResult& aRv);
+
+  mozilla::dom::EventHandlerNonNull* GetOnencrypted();
+  void SetOnencrypted(mozilla::dom::EventHandlerNonNull* listener);
+
+  void DispatchEncrypted(const nsTArray<uint8_t>& aInitData,
+                         const nsAString& aInitDataType) override;
+
+  bool IsEventAttributeName(nsIAtom* aName) override;
+
+  // Returns the principal of the "top level" document; the origin displayed
+  // in the URL bar of the browser window.
+  already_AddRefed<nsIPrincipal> GetTopLevelPrincipal();
+
+  bool ContainsRestrictedContent();
+#endif // MOZ_EME
+
   bool MozAutoplayEnabled() const
   {
     return mAutoplayEnabled;
@@ -1043,6 +1064,9 @@ protected:
   // A method to check if we are playing through the AudioChannel.
   bool IsPlayingThroughTheAudioChannel() const;
 
+  // A method to check whether we are currently playing.
+  bool IsCurrentlyPlaying() const;
+
   // Update the audio channel playing state
   void UpdateAudioChannelPlayingState();
 
@@ -1385,6 +1409,11 @@ protected:
   // True if the media has encryption information.
   bool mIsEncrypted;
 
+#ifdef MOZ_EME
+  // Init Data that needs to be sent in 'encrypted' events in MetadataLoaded().
+  EncryptionInfo mPendingEncryptedInitData;
+#endif // MOZ_EME
+
   // True if the media's channel's download has been suspended.
   Watchable<bool> mDownloadSuspendedByCache;
 
@@ -1430,10 +1459,6 @@ protected:
 
   ElementInTreeState mElementInTreeState;
 
-  // Media elements also have a default playback start position, which must
-  // initially be set to zero seconds. This time is used to allow the element to
-  // be seeked even before the media is loaded.
-  double mDefaultPlaybackStartPosition;
 public:
   // Helper class to measure times for MSE telemetry stats
   class TimeDurationAccumulator {
@@ -1483,6 +1508,11 @@ private:
 
   // True if the first frame has been successfully loaded.
   bool mFirstFrameLoaded;
+
+  // Media elements also have a default playback start position, which must
+  // initially be set to zero seconds. This time is used to allow the element to
+  // be seeked even before the media is loaded.
+  double mDefaultPlaybackStartPosition;
 };
 
 } // namespace dom

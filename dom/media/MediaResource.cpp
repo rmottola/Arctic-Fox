@@ -826,6 +826,7 @@ ChannelMediaResource::RecreateChannel()
 {
   nsLoadFlags loadFlags =
     nsICachingChannel::LOAD_BYPASS_LOCAL_CACHE_IF_BUSY |
+    nsIChannel::LOAD_CLASSIFY_URI |
     (mLoadInBackground ? nsIRequest::LOAD_BACKGROUND : 0);
 
   MediaDecoderOwner* owner = mCallback->GetMediaOwner();
@@ -1390,6 +1391,8 @@ already_AddRefed<MediaResource> FileMediaResource::CloneData(MediaResourceCallba
   nsContentPolicyType contentPolicyType = element->IsHTMLElement(nsGkAtoms::audio) ?
     nsIContentPolicy::TYPE_INTERNAL_AUDIO : nsIContentPolicy::TYPE_INTERNAL_VIDEO;
 
+  nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL | nsIChannel::LOAD_CLASSIFY_URI;
+
   nsCOMPtr<nsIChannel> channel;
   nsresult rv =
     NS_NewChannel(getter_AddRefs(channel),
@@ -1397,7 +1400,9 @@ already_AddRefed<MediaResource> FileMediaResource::CloneData(MediaResourceCallba
                   element,
                   securityFlags,
                   contentPolicyType,
-                  loadGroup);
+                  loadGroup,
+                  nullptr,  // aCallbacks
+                  loadFlags);
 
   if (NS_FAILED(rv))
     return nullptr;

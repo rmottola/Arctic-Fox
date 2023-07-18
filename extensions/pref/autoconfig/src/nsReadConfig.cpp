@@ -158,11 +158,6 @@ nsresult nsReadConfig::readConfigFile()
         if (NS_FAILED(rv)) 
             return rv;
 
-        // Evaluate platform specific directives
-        rv = openAndEvaluateJSFile("platform.js", 0, false, false);
-        if (NS_FAILED(rv)) 
-            return rv;
-
         mRead = true;
     }
     // If the lockFileName is nullptr return ok, because no lockFile will be used
@@ -265,11 +260,11 @@ nsresult nsReadConfig::openAndEvaluateJSFile(const char *aFileName, int32_t obsc
         rv = NS_NewChannel(getter_AddRefs(channel),
                            uri,
                            nsContentUtils::GetSystemPrincipal(),
-                           nsILoadInfo::SEC_NORMAL,
+                           nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                            nsIContentPolicy::TYPE_OTHER);
         NS_ENSURE_SUCCESS(rv, rv);
 
-        rv = channel->Open(getter_AddRefs(inStr));
+        rv = channel->Open2(getter_AddRefs(inStr));
         NS_ENSURE_SUCCESS(rv, rv);
     }
 

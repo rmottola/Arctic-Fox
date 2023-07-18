@@ -987,17 +987,6 @@ TokenStream::putIdentInTokenbuf(const char16_t* identStart)
 bool
 TokenStream::checkForKeyword(const KeywordInfo* kw, TokenKind* ttp)
 {
-    if (kw->tokentype == TOK_RESERVED
-#ifndef JS_HAS_CLASSES
-        || kw->tokentype == TOK_CLASS
-        || kw->tokentype == TOK_EXTENDS
-        || kw->tokentype == TOK_SUPER
-#endif
-        )
-    {
-        return reportError(JSMSG_RESERVED_ID, kw->chars);
-    }
-
     if (kw->tokentype == TOK_RESERVED)
         return reportError(JSMSG_RESERVED_ID, kw->chars);
 
@@ -1597,6 +1586,8 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
                     reflags = RegExpFlag(reflags | MultilineFlag);
                 else if (c == 'y' && !(reflags & StickyFlag))
                     reflags = RegExpFlag(reflags | StickyFlag);
+                else if (c == 'u' && !(reflags & UnicodeFlag))
+                    reflags = RegExpFlag(reflags | UnicodeFlag);
                 else
                     break;
                 getChar();

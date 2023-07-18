@@ -87,6 +87,18 @@ InputBlockState::IsTargetConfirmed() const
   return mTargetConfirmed;
 }
 
+void
+InputBlockState::SetScrolledApzc(AsyncPanZoomController* aApzc)
+{
+  mScrolledApzc = aApzc;
+}
+
+AsyncPanZoomController*
+InputBlockState::GetScrolledApzc() const
+{
+  return mScrolledApzc;
+}
+
 CancelableBlockState::CancelableBlockState(const RefPtr<AsyncPanZoomController>& aTargetApzc,
                                            bool aTargetConfirmed)
   : InputBlockState(aTargetApzc, aTargetConfirmed)
@@ -104,9 +116,7 @@ CancelableBlockState::SetContentResponse(bool aPreventDefault)
   }
   TBS_LOG("%p got content response %d with timer expired %d\n",
     this, aPreventDefault, mContentResponseTimerExpired);
-  if (!mContentResponseTimerExpired) {
-    mPreventDefault = aPreventDefault;
-  }
+  mPreventDefault = aPreventDefault;
   mContentResponded = true;
   return true;
 }
@@ -639,6 +649,7 @@ TouchBlockState::TouchBlockState(const RefPtr<AsyncPanZoomController>& aTargetAp
   , mAllowedTouchBehaviorSet(false)
   , mDuringFastFling(false)
   , mSingleTapOccurred(false)
+  , mInSlop(false)
   , mTouchCounter(aCounter)
 {
   TBS_LOG("Creating %p\n", this);
@@ -843,6 +854,43 @@ TouchBlockState::TouchActionAllowsPanningXY() const
   TouchBehaviorFlags flags = mAllowedTouchBehaviors[0];
   return (flags & AllowedTouchBehavior::HORIZONTAL_PAN)
       && (flags & AllowedTouchBehavior::VERTICAL_PAN);
+}
+
+bool
+TouchBlockState::UpdateSlopState(const MultiTouchInput& aInput,
+                                 bool aApzcCanConsumeEvents)
+{
+  if (aInput.mType == MultiTouchInput::MULTITOUCH_START) {
+    // this is by definition the first event in this block. If it's the first
+    // touch, then we enter a slop state.
+    mInSlop = (aInput.mTouches.Length() == 1);
+    if (mInSlop) {
+      mSlopOrigin = aInput.mTouches[0].mScreenPoint;
+      TBS_LOG("%p entering slop with origin %s\n", this, Stringify(mSlopOrigin).c_str());
+    }
+    return false;
+  }
+  if (mInSlop) {
+    ScreenCoord threshold = aApzcCanConsumeEvents
+        ? AsyncPanZoomController::GetTouchStartTolerance()
+        : ScreenCoord(gfxPrefs::APZTouchMoveTolerance() * APZCTreeManager::GetDPI());
+    bool stayInSlop = (aInput.mType == MultiTouchInput::MULTITOUCH_MOVE) &&
+        (aInput.mTouches.Length() == 1) &&
+        ((aInput.mTouches[0].mScreenPoint - mSlopOrigin).Length() < threshold);
+    if (!stayInSlop) {
+      // we're out of the slop zone, and will stay out for the remainder of
+      // this block
+      TBS_LOG("%p exiting slop\n", this);
+      mInSlop = false;
+    }
+  }
+  return mInSlop;
+}
+
+uint32_t
+TouchBlockState::GetActiveTouchCount() const
+{
+  return mTouchCounter.GetActiveTouchCount();
 }
 
 } // namespace layers

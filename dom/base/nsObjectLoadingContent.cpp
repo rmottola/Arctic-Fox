@@ -1214,6 +1214,17 @@ nsObjectLoadingContent::GetFrameLoader()
 }
 
 NS_IMETHODIMP
+nsObjectLoadingContent::GetParentApplication(mozIApplication** aApplication)
+{
+  if (!aApplication) {
+    return NS_ERROR_FAILURE;
+  }
+
+  *aApplication = nullptr;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsObjectLoadingContent::SetIsPrerendered()
 {
   return NS_ERROR_NOT_IMPLEMENTED;
@@ -2998,9 +3009,6 @@ nsObjectLoadingContent::AsyncStartPluginInstance()
   }
 
   nsCOMPtr<nsIRunnable> event = new nsAsyncInstantiateEvent(this);
-  if (!event) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
   nsresult rv = NS_DispatchToCurrentThread(event);
   if (NS_SUCCEEDED(rv)) {
     // Track pending events

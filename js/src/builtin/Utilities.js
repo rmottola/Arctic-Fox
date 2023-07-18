@@ -27,7 +27,7 @@
 // Assertions, defined here instead of in the header above to make `assert`
 // invisible to C++.
 #ifdef DEBUG
-#define assert(b, info) if (!(b)) AssertionFailed(info)
+#define assert(b, info) if (!(b)) AssertionFailed(__FILE__ + ":" + __LINE__ + ": " + info)
 #else
 #define assert(b, info) // Elided assertion.
 #endif
@@ -142,7 +142,7 @@ function GetIterator(obj, method) {
         method = GetMethod(obj, std_iterator);
 
     // Steps 3-4.
-    var iterator = callFunction(method, obj);
+    var iterator = callContentFunction(method, obj);
 
     // Step 5.
     if (!IsObject(iterator))

@@ -787,6 +787,7 @@ MediaDecoder::Seek(double aTime, SeekTarget::Type aSeekType)
 
   UpdateDormantState(false /* aDormantTimeout */, true /* aActivity */);
 
+  MOZ_ASSERT(!mIsDormant, "should be out of dormant by now");
   MOZ_ASSERT(aTime >= 0.0, "Cannot seek to a negative value.");
 
   int64_t timeUsecs = 0;
@@ -1642,21 +1643,17 @@ MediaDecoder::IsOggEnabled()
   return Preferences::GetBool("media.ogg.enabled");
 }
 
-#ifdef MOZ_WAVE
 bool
 MediaDecoder::IsWaveEnabled()
 {
   return Preferences::GetBool("media.wave.enabled");
 }
-#endif
 
-#ifdef MOZ_WEBM
 bool
 MediaDecoder::IsWebMEnabled()
 {
   return Preferences::GetBool("media.webm.enabled");
 }
-#endif
 
 #ifdef NECKO_PROTOCOL_rtsp
 bool

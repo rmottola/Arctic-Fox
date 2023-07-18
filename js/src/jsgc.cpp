@@ -348,8 +348,7 @@ static const AllocKind IncrementalPhaseStrings[] = {
 };
 
 static const AllocKind IncrementalPhaseScripts[] = {
-    AllocKind::SCRIPT,
-    AllocKind::LAZY_SCRIPT
+    AllocKind::SCRIPT
 };
 
 static const AllocKind IncrementalPhaseJitCode[] = {
@@ -377,6 +376,10 @@ static const AllocKind BackgroundPhaseObjects[] = {
     AllocKind::OBJECT16_BACKGROUND
 };
 
+static const AllocKind BackgroundPhaseScripts[] = {
+    AllocKind::LAZY_SCRIPT
+};
+
 static const AllocKind BackgroundPhaseStringsAndSymbols[] = {
     AllocKind::FAT_INLINE_STRING,
     AllocKind::STRING,
@@ -391,6 +394,7 @@ static const AllocKind BackgroundPhaseShapes[] = {
 };
 
 static const FinalizePhase BackgroundFinalizePhases[] = {
+    PHASE(BackgroundPhaseScripts, gcstats::PHASE_SWEEP_SCRIPT),
     PHASE(BackgroundPhaseObjects, gcstats::PHASE_SWEEP_OBJECT),
     PHASE(BackgroundPhaseStringsAndSymbols, gcstats::PHASE_SWEEP_STRING),
     PHASE(BackgroundPhaseShapes, gcstats::PHASE_SWEEP_SHAPE)
@@ -3130,7 +3134,11 @@ GCRuntime::requestMajorGC(JS::gcreason::Reason reason)
         return;
 
     majorGCTriggerReason = reason;
-    rt->requestInterrupt(JSRuntime::RequestInterruptUrgent);
+
+    // There's no need to use RequestInterruptUrgent here. It's slower because
+    // it has to interrupt (looping) Ion code, but loops in Ion code that
+    // affect GC will have an explicit interrupt check.
+    rt->requestInterrupt(JSRuntime::RequestInterruptCanWait);
 }
 
 void
@@ -3141,7 +3149,9 @@ GCRuntime::requestMinorGC(JS::gcreason::Reason reason)
         return;
 
     minorGCTriggerReason = reason;
-    rt->requestInterrupt(JSRuntime::RequestInterruptUrgent);
+
+    // See comment in requestMajorGC.
+    rt->requestInterrupt(JSRuntime::RequestInterruptCanWait);
 }
 
 bool
@@ -5543,8 +5553,10 @@ GCRuntime::endSweepPhase(bool destroyingRuntime)
             SweepScriptData(rt);
 
         /* Clear out any small pools that we're hanging on to. */
-        if (jit::JitRuntime* jitRuntime = rt->jitRuntime())
+        if (jit::JitRuntime* jitRuntime = rt->jitRuntime()) {
             jitRuntime->execAlloc().purge();
+            jitRuntime->backedgeExecAlloc().purge();
+        }
 
         /*
          * This removes compartments from rt->compartment, so we do it last to make

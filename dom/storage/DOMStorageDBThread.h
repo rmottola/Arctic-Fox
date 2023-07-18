@@ -10,6 +10,7 @@
 #include "prthread.h"
 #include "prinrval.h"
 #include "nsTArray.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Monitor.h"
 #include "mozilla/storage/StatementCache.h"
 #include "nsString.h"
@@ -292,7 +293,7 @@ private:
 
   // Whether DB has already been open, avoid races between main thread reads
   // and pending DB init in the background I/O thread
-  bool mDBReady;
+  Atomic<bool, ReleaseAcquire> mDBReady;
 
   // State of the database initiation
   nsresult mStatus;
@@ -300,14 +301,14 @@ private:
   // List of scopes having data, for optimization purposes only
   nsTHashtable<nsCStringHashKey> mScopesHavingData;
 
-  StatementCache mWorkerStatements;
-  StatementCache mReaderStatements;
-
   // Connection used by the worker thread for all read and write ops
   nsCOMPtr<mozIStorageConnection> mWorkerConnection;
 
   // Connection used only on the main thread for sync read operations
   nsCOMPtr<mozIStorageConnection> mReaderConnection;
+
+  StatementCache mWorkerStatements;
+  StatementCache mReaderStatements;
 
   // Time the first pending operation has been added to the pending operations
   // list

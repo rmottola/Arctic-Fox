@@ -1435,11 +1435,17 @@ nsLineLayout::PlaceFrame(PerFrameData* pfd, nsHTMLReflowMetrics& aMetrics)
 {
   WritingMode lineWM = mRootSpan->mWritingMode;
 
-  // Record ascent and update max-ascent and max-descent values
-  if (aMetrics.BlockStartAscent() == nsHTMLReflowMetrics::ASK_FOR_BASELINE) {
-    pfd->mAscent = pfd->mFrame->GetLogicalBaseline(lineWM);
+  // If the frame's block direction does not match the line's, we can't use
+  // its ascent; instead, treat it as a block with baseline at the block-end
+  // edge (or block-begin in the case of an "inverted" line).
+  if (pfd->mFrame->GetWritingMode().GetBlockDir() != lineWM.GetBlockDir()) {
+    pfd->mAscent = lineWM.IsLineInverted() ? 0 : aMetrics.BSize(lineWM);
   } else {
-    pfd->mAscent = aMetrics.BlockStartAscent();
+    if (aMetrics.BlockStartAscent() == nsHTMLReflowMetrics::ASK_FOR_BASELINE) {
+      pfd->mAscent = pfd->mFrame->GetLogicalBaseline(lineWM);
+    } else {
+      pfd->mAscent = aMetrics.BlockStartAscent();
+    }
   }
 
   // Advance to next inline coordinate
@@ -2199,9 +2205,18 @@ nsLineLayout::VerticalAlignFrames(PerSpanData* psd)
       // "raises" the box by the given distance while a negative value
       // "lowers" the box by the given distance (with zero being the
       // baseline). Since Y coordinates increase towards the bottom of
-      // the screen we reverse the sign.
-      nscoord revisedBaselineBCoord = baselineBCoord - offset;
-      pfd->mBounds.BStart(lineWM) = revisedBaselineBCoord - pfd->mAscent;
+      // the screen we reverse the sign, unless the line orientation is
+      // inverted relative to block direction.
+      nscoord revisedBaselineBCoord = baselineBCoord - offset *
+        lineWM.FlowRelativeToLineRelativeFactor();
+      if (lineWM.IsVertical() && !lineWM.IsSideways()) {
+        // If we're using a dominant center baseline, we align with the center
+        // of the frame being placed (bug 1133945).
+        pfd->mBounds.BStart(lineWM) =
+          revisedBaselineBCoord - pfd->mBounds.BSize(lineWM)/2;
+      } else {
+        pfd->mBounds.BStart(lineWM) = revisedBaselineBCoord - pfd->mAscent;
+      }
       pfd->mBlockDirAlign = VALIGN_OTHER;
     }
 
@@ -2958,7 +2973,7 @@ FindNearestRubyBaseAncestor(nsIFrame* aFrame)
   // XXX It is possible that no ruby base ancestor is found because of
   // some edge cases like form control or canvas inside ruby text.
   // See bug 1138092 comment 4.
-  NS_ASSERTION(aFrame, "No ruby base ancestor?");
+  NS_WARN_IF_FALSE(aFrame, "no ruby base ancestor?");
   return aFrame;
 }
 

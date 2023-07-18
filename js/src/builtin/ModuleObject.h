@@ -54,6 +54,9 @@ class ImportEntryObject : public NativeObject
     JSAtom* localName();
 };
 
+typedef Rooted<ImportEntryObject*> RootedImportEntryObject;
+typedef Handle<ImportEntryObject*> HandleImportEntryObject;
+
 class ExportEntryObject : public NativeObject
 {
   public:
@@ -79,6 +82,9 @@ class ExportEntryObject : public NativeObject
     JSAtom* importName();
     JSAtom* localName();
 };
+
+typedef Rooted<ExportEntryObject*> RootedExportEntryObject;
+typedef Handle<ExportEntryObject*> HandleExportEntryObject;
 
 class IndirectBindingMap
 {
@@ -268,9 +274,9 @@ class ModuleObject : public NativeObject
 class MOZ_STACK_CLASS ModuleBuilder
 {
   public:
-    explicit ModuleBuilder(JSContext* cx);
+    explicit ModuleBuilder(JSContext* cx, HandleModuleObject module);
 
-    bool buildAndInit(frontend::ParseNode* pn, HandleModuleObject module);
+    bool buildAndInit(frontend::ParseNode* pn);
 
   private:
     using AtomVector = TraceableVector<JSAtom*>;
@@ -281,8 +287,8 @@ class MOZ_STACK_CLASS ModuleBuilder
     using RootedExportEntryVector = JS::Rooted<ExportEntryVector> ;
 
     JSContext* cx_;
+    RootedModuleObject module_;
     RootedAtomVector requestedModules_;
-
     RootedAtomVector importedBoundNames_;
     RootedImportEntryVector importEntries_;
     RootedExportEntryVector exportEntries_;
@@ -296,11 +302,13 @@ class MOZ_STACK_CLASS ModuleBuilder
 
     ImportEntryObject* importEntryFor(JSAtom* localName);
 
-    bool appendLocalExportEntry(HandleAtom exportName, HandleAtom localName);
-    bool appendIndirectExportEntry(HandleAtom exportName, HandleAtom moduleRequest,
-                                   HandleAtom importName);
+    bool appendExportEntry(HandleAtom exportName, HandleAtom localName);
+    bool appendExportFromEntry(HandleAtom exportName, HandleAtom moduleRequest,
+                               HandleAtom importName);
 
     bool maybeAppendRequestedModule(HandleAtom module);
+
+    bool appendLocalExportEntry(HandleExportEntryObject exp);
 
     template <typename T>
     ArrayObject* createArray(const TraceableVector<T>& vector);

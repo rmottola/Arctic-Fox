@@ -142,8 +142,8 @@ SigSysHandler(int nr, siginfo_t *info, void *void_context)
 
   // TODO, someday when this is enabled on MIPS: include the two extra
   // args in the error message.
-  SANDBOX_LOG_ERROR("seccomp sandbox violation: pid %d, syscall %lu,"
-                    " args %lu %lu %lu %lu %lu %lu.  Killing process.",
+  SANDBOX_LOG_ERROR("seccomp sandbox violation: pid %d, syscall %d,"
+                    " args %d %d %d %d %d %d.  Killing process.",
                     pid, syscall_nr,
                     args[0], args[1], args[2], args[3], args[4], args[5]);
 
@@ -420,8 +420,8 @@ BroadcastSetThreadSandbox(const sock_fprog* aFilter)
         }
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
-        if (now.tv_sec > timeLimit.tv_nsec ||
-            (now.tv_sec == timeLimit.tv_nsec &&
+        if (now.tv_sec > timeLimit.tv_sec ||
+            (now.tv_sec == timeLimit.tv_sec &&
              now.tv_nsec > timeLimit.tv_nsec)) {
           SANDBOX_LOG_ERROR("Thread %d unresponsive for %d seconds."
                             "  Killing process.",
@@ -513,6 +513,21 @@ SetCurrentProcessSandbox(UniquePtr<sandbox::bpf_dsl::Policy> aPolicy)
 void
 SandboxEarlyInit(GeckoProcessType aType, bool aIsNuwa)
 {
+  // Bug 1168555: Nuwa isn't reliably single-threaded at this point;
+  // it starts an IPC I/O thread and then shuts it down before calling
+  // the plugin-container entry point, but that thread may not have
+  // finished exiting.  If/when any type of sandboxing is used for the
+  // Nuwa process (e.g., unsharing the network namespace there instead
+  // of for each content process, to save memory), this will need to be
+  // changed by moving the SandboxEarlyInit call to an earlier point.
+  if (aIsNuwa) {
+    return;
+  }
+
+  const SandboxInfo info = SandboxInfo::Get();
+  if (info.Test(SandboxInfo::kUnexpectedThreads)) {
+    return;
+  }
   MOZ_RELEASE_ASSERT(IsSingleThreaded());
 
   // Which kinds of resource isolation (of those that need to be set
@@ -527,9 +542,13 @@ SandboxEarlyInit(GeckoProcessType aType, bool aIsNuwa)
     return;
 #ifdef MOZ_GMP_SANDBOX
   case GeckoProcessType_GMPlugin:
+    if (!info.Test(SandboxInfo::kEnabledForMedia)) {
+      break;
+    }
     canUnshareNet = true;
     canUnshareIPC = true;
-    canChroot = true;
+    // Need seccomp-bpf to intercept open().
+    canChroot = info.Test(SandboxInfo::kHasSeccompBPF);
     break;
 #endif
     // In the future, content processes will be able to use some of
@@ -544,9 +563,22 @@ SandboxEarlyInit(GeckoProcessType aType, bool aIsNuwa)
     return;
   }
 
+  {
+    LinuxCapabilities existingCaps;
+    if (existingCaps.GetCurrent() && existingCaps.AnyEffective()) {
+      SANDBOX_LOG_ERROR("PLEASE DO NOT RUN THIS AS ROOT.  Strange things may"
+                        " happen when capabilities are dropped.");
+    }
+  }
+
   // If capabilities can't be gained, then nothing can be done.
-  const SandboxInfo info = SandboxInfo::Get();
   if (!info.Test(SandboxInfo::kHasUserNamespaces)) {
+    // Drop any existing capabilities; unsharing the user namespace
+    // would implicitly drop them, so if we're running in a broken
+    // configuration where that would matter (e.g., running as root
+    // from a non-root-owned mode-0700 directory) this means it will
+    // break the same way on all kernels and be easier to troubleshoot.
+    LinuxCapabilities().SetCurrent();
     return;
   }
 

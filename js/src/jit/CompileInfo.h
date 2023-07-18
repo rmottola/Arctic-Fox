@@ -200,6 +200,7 @@ class CompileInfo
                 InlineScriptTree* inlineScriptTree)
       : script_(script), fun_(fun), osrPc_(osrPc), constructing_(constructing),
         analysisMode_(analysisMode), scriptNeedsArgsObj_(scriptNeedsArgsObj),
+        hadOverflowBailout_(script->hadOverflowBailout()),
         mayReadFrameArgsDirectly_(script->mayReadFrameArgsDirectly()),
         inlineScriptTree_(inlineScriptTree)
     {
@@ -553,6 +554,12 @@ class CompileInfo
         return mayReadFrameArgsDirectly_;
     }
 
+    // Check previous bailout states to prevent doing the same bailout in the
+    // next compilation.
+    bool hadOverflowBailout() const {
+        return hadOverflowBailout_;
+    }
+
   private:
     unsigned nimplicit_;
     unsigned nargs_;
@@ -574,6 +581,10 @@ class CompileInfo
     bool scriptNeedsArgsObj_;
 
     bool mayReadFrameArgsDirectly_;
+
+    // Record the state of previous bailouts in order to prevent compiling the
+    // same function identically the next time.
+    bool hadOverflowBailout_;
 
     InlineScriptTree* inlineScriptTree_;
 };
