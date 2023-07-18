@@ -89,15 +89,14 @@
 - Bug 1232269 - 2015-12-22 - Use the correct receiver when calling an own getter or
 - Bug 1207146 - 2015-12-04 - Add a link to expert technical information in the cert 
 - Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
-- Bug 1197620 - Part 3: Terminate *all* animations if corresponding ele
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
 - Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
 - Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
-- bug 1220223 - 2015-10-30 don't load PKCS11 modules in safe mode
-- bug 1218596 - 2015-10-27 remove nsPSMInitPanic and other unnecessary
+
+- Bug 1232822 (part 6 and others) - Move RefCairo() from gfxContext to gfxFont. 
 
 
 impacting download and shutdown:
@@ -121,16 +120,9 @@ Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
 
 ### FIXME / TODO
 - Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
-- fix devtools structure, from browser/themes/osx/devtools to browser/devtools
-Specifically check for duplicates:
-  browser/themes/osx/devtools/server
-  browser/themes/osx/devtools/shared/inspector/
 
 Shell Service not working? present but fails.
 Check TelemetryEnvironment.jsm _isDefaultBrowser
-
-
-Remove hack of parserequestcontenttype in nsNetUtil.cpp
 
 
 Fallible hacks:
@@ -167,6 +159,9 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 https://github.com/classilla/tenfourfox/issues/526
 
 ## JS Sputnik checks:
+
+2021-07-18:
+Tests To run: 16436 | Total tests ran: 16436 | Pass: 15436 | Fail: 1000 | Failed to load: 0
 
 2023-06-02:
 Tests To run: 16436 | Total tests ran: 16436 | Pass: 15224 | Fail: 1212 | Failed to load: 0
