@@ -35,9 +35,20 @@ add_task(function* init() {
     addon.uninstall()
   });
 
-  Services.prefs.setIntPref("browser.addon-watch.interval", 1000);
+  Preferences.set("browser.addon-watch.warmup-ms", 0);
+  Preferences.set("browser.addon-watch.occurrences-between-alerts", 0);
+  Preferences.set("browser.addon-watch.delay-between-alerts-ms", 0);
+  Preferences.set("browser.addon-watch.max-simultaneous-reports", 10000);
+  Preferences.set("browser.addon-watch.deactivate-after-idle-ms", 100000000);
   registerCleanupFunction(() => {
-    Services.prefs.clearUserPref("browser.addon-watch.interval");
+    for (let k of [
+      "browser.addon-watch.warmup-ms",
+      "browser.addon-watch.occurrences-between-alerts",
+      "browser.addon-watch.delay-between-alerts-ms",
+      "browser.addon-watch.max-simultaneous-reports"
+    ]) {
+      Preferences.reset(k);
+    }
   });
 
   let oldCanRecord = Services.telemetry.canRecord;
@@ -49,11 +60,28 @@ add_task(function* init() {
 
 // Utility function to burn some resource, trigger a reaction of the add-on watcher
 // and check both its notification and telemetry.
-let burn_rubber = Task.async(function*({histogramName, topic, expectedReason, prefs, expectedMinSum}) {
+let burn_rubber = Task.async(function*({histogramName, topic, expectedMinSum}) {
   try {
-    for  (let key of Object.keys(prefs)) {
-      Services.prefs.setIntPref(key, prefs[key]);
-    }
+    info("Preparing add-on watcher");
+
+    let detected = false;
+    AddonWatcher.init(id => {
+      Assert.equal(id, ADDON_ID, "The add-on watcher has detected the misbehaving addon");
+      detected = true;
+    });
+
+    let histogram = Services.telemetry.getKeyedHistogramById(histogramName);
+    histogram.clear();
+    let snap1 = histogram.snapshot(ADDON_ID);
+    Assert.equal(snap1.sum, 0, `Histogram ${histogramName} is initially empty for the add-on`);
+
+    let histogramUpdated = false;
+    do {
+      info(`Burning some CPU with ${topic}. This should cause an add-on watcher notification`);
+      yield new Promise(resolve => setTimeout(resolve, 100));
+      Services.obs.notifyObservers(null, topic, "");
+      yield new Promise(resolve => setTimeout(resolve, 100));
+
     info("Preparing add-on watcher");
     let wait = new Promise(resolve => AddonWatcher.init((id, reason) => {
       Assert.equal(id, ADDON_ID, "The add-on watcher has detected the misbehaving addon");
@@ -80,8 +108,14 @@ let burn_rubber = Task.async(function*({histogramName, topic, expectedReason, pr
 
     Assert.equal(reason, expectedReason, "Reason is valid");
     let snap2 = histogram.snapshot(ADDON_ID);
+      histogramUpdated = snap2.sum > 0;
+      info(`For the moment, histogram ${histogramName} shows ${snap2.sum} => ${histogramUpdated}`);
+      info(`For the moment, we have ${detected?"":"NOT"}detected the slow add-on`);
+    } while (!histogramUpdated || !detected);
 
-    Assert.ok(snap2.sum >= expectedMinSum, `Histogram ${histogramName} recorded a gravity of ${snap2.sum}, expecting at least ${expectedMinSum}.`);
+
+    let snap3 = histogram.snapshot(ADDON_ID);
+    Assert.ok(snap3.sum >= expectedMinSum, `Histogram ${histogramName} recorded a gravity of ${snap3.sum}, expecting at least ${expectedMinSum}.`);
   } finally {
     AddonWatcher.uninit();
     for  (let key of Object.keys(prefs)) {
@@ -94,31 +128,24 @@ let burn_rubber = Task.async(function*({histogramName, topic, expectedReason, pr
 // the add-on is misbehaving.
 add_task(function* test_burn_CPU() {
   yield burn_rubber({
-    prefs: {
-      "browser.addon-watch.limits.longestDuration": 2,
-      "browser.addon-watch.limits.totalCPOWTime": -1,
-    },
-    histogramName: "MISBEHAVING_ADDONS_JANK_LEVEL",
+    histogramName: "PERF_MONITORING_SLOW_ADDON_JANK_US",
     topic: "test-addonwatcher-burn-some-cpu",
-    expectedReason: "longestDuration",
     expectedMinSum: 7,
   });
 });
 
 // Test that burning content CPU will cause the add-on watcher to notice that
 // the add-on is misbehaving.
-add_task(function* test_burn_CPU() {
+/*
+Blocked by bug 1227283.
+add_task(function* test_burn_content_CPU() {
   yield burn_rubber({
-    prefs: {
-      "browser.addon-watch.limits.longestDuration": 2,
-      "browser.addon-watch.limits.totalCPOWTime": -1,
-    },
-    histogramName: "MISBEHAVING_ADDONS_JANK_LEVEL",
+    histogramName: "PERF_MONITORING_SLOW_ADDON_JANK_US",
     topic: "test-addonwatcher-burn-some-content-cpu",
-    expectedReason: "longestDuration",
     expectedMinSum: 7,
   });
 });
+*/
 
 // Test that burning CPOW will cause the add-on watcher to notice that
 // the add-on is misbehaving.

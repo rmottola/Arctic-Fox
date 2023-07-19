@@ -4960,21 +4960,18 @@
      "n_buckets": 10,
      "description": "Whenever the same-process MessageManager cannot be sent through sendAsyncMessage as it would cause an OOM, the size of the message content, in kb."
   },
-  "MISBEHAVING_ADDONS_CPOW_TIME_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "low": 1,
-    "high": 10000,
-    "n_buckets": 20,
-    "keyed": true,
-    "description": "Time spent by an add-on performing blocking cross-process communications (ms, keyed by add-on ID, updated every 15s by default)"
-  },
-  "MISBEHAVING_ADDONS_JANK_LEVEL": {
+  "SLOW_ADDON_WARNING_STATES": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": 10,
-    "keyed": true,
-    "description": "Longest blocking operation performed by the add-on (log2(duration in ms), keyed by add-on, updated every 15s by default)"
+    "n_values": 20,
+    "description": "The states the Slow Add-on Warning goes through. 0: Displayed the warning. 1: User clicked on 'Disable add-on'. 2: User clicked 'Ignore add-on for now'. 3: User clicked 'Ignore add-on permanently'. 4: User closed notification. Other values are reserved for future uses."
+  },
+  "SLOW_ADDON_WARNING_RESPONSE_TIME": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "86400000",
+    "n_buckets": 30,
+    "description": "Time elapsed between before responding to Slow Add-on Warning UI (ms). Not updated if the user doesn't respond at all."
   },
   "SEARCH_COUNTS": {
     "expires_in_version": "never",
@@ -8858,6 +8855,24 @@
     "high": "100",
     "n_buckets": "20",
     "description": "Proportion (%) of reschedulings of the main process to another CPU during the execution of code inside a JS compartment. Updated while we are measuring jank."
+  },
+  "PERF_MONITORING_SLOW_ADDON_JANK_US": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": 1,
+    "high": 10000000,
+    "n_buckets": 20,
+    "keyed": true,
+    "description": "Contiguous time spent by an add-on blocking the main loop (microseconds, keyed by add-on ID)."
+  },
+  "PERF_MONITORING_SLOW_ADDON_CPOW_US": {
+    "expires_in_version": "70",
+    "kind": "exponential",
+    "low": 1,
+    "high": 10000000,
+    "n_buckets": 20,
+    "keyed": true,
+    "description": "Contiguous time spent by an add-on blocking the main loop by performing a blocking cross-process call (microseconds, keyed by add-on ID)."
   },
   "FXA_CONFIGURED": {
     "alert_emails": ["fx-team@mozilla.com"],
