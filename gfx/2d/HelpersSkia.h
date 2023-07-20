@@ -156,9 +156,9 @@ StrokeOptionsToPaint(SkPaint& aPaint, const StrokeOptions &aOptions)
           pattern[i] = SkScalarMulDiv(SK_ScalarNearlyZero, 33, 32);
     }
 
-    SkDashPathEffect* dash = SkDashPathEffect::Create(&pattern.front(),
-                                                      dashCount,
-                                                      SkFloatToScalar(aOptions.mDashOffset));
+    SkPathEffect* dash = SkDashPathEffect::Create(&pattern.front(),
+                                                  dashCount,
+                                                  SkFloatToScalar(aOptions.mDashOffset));
     SkSafeUnref(aPaint.setPathEffect(dash));
   }
 
