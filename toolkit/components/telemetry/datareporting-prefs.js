@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 pref("datareporting.policy.dataSubmissionEnabled", true);
-pref("datareporting.policy.firstRunTime", "0");
 pref("datareporting.policy.dataSubmissionPolicyNotifiedTime", "0");
 pref("datareporting.policy.dataSubmissionPolicyAcceptedVersion", 0);
 pref("datareporting.policy.dataSubmissionPolicyBypassNotification", false);
