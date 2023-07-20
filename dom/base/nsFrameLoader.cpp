@@ -1788,6 +1788,23 @@ nsFrameLoader::MaybeCreateDocShell()
     mDocShell->SetName(frameName);
   }
 
+  //Grab the userContextId from owner if XUL
+  nsAutoString userContextIdStr;
+  if (namespaceID == kNameSpaceID_XUL) {
+    if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
+      mOwnerContent->GetAttr(kNameSpaceID_None,
+                             nsGkAtoms::usercontextid,
+                             userContextIdStr);
+    }
+  }
+
+  if (!userContextIdStr.IsEmpty()) {
+    nsresult err;
+    nsDocShell * ds = nsDocShell::Cast(mDocShell);
+    ds->SetUserContextId(userContextIdStr.ToInteger(&err));
+    NS_ENSURE_SUCCESS(err, err);
+  }
+
   // Inform our docShell that it has a new child.
   // Note: This logic duplicates a lot of logic in
   // nsSubDocumentFrame::AttributeChanged.  We should fix that.
@@ -3065,6 +3082,23 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
 
   // Populate packageId to signedPkg.
   attrs.mSignedPkg = NS_ConvertUTF8toUTF16(aPackageId);
+
+  // set the userContextId on the attrs before we pass them into
+  // the tab context
+  if (mOwnerContent) {
+    nsAutoString userContextIdStr;
+    if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
+      mOwnerContent->GetAttr(kNameSpaceID_None,
+                             nsGkAtoms::usercontextid,
+                             userContextIdStr);
+    }
+    if (!userContextIdStr.IsEmpty()) {
+      nsresult err;
+      uint32_t userContextId = userContextIdStr.ToInteger(&err);
+      NS_ENSURE_SUCCESS(err, err);
+      attrs.mUserContextId = userContextId;
+    }
+  }
 
   bool tabContextUpdated =
     aTabContext->SetTabContext(ownApp, containingApp, attrs, signedPkgOrigin);
