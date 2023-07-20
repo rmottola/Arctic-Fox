@@ -58,7 +58,7 @@ const PROPERTIES_META = [...PROPERTIES_META_IMMUTABLE, "windowId", "title", "nam
 // How long we wait for children processes to respond.
 const MAX_WAIT_FOR_CHILD_PROCESS_MS = 5000;
 
-let isContent = Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT;
+var isContent = Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT;
 /**
  * Access to a low-level performance probe.
  *
@@ -183,7 +183,7 @@ function lastNonZero(array) {
 /**
  * The actual Probes implemented by SpiderMonkey.
  */
-let Probes = {
+var Probes = {
   /**
    * A probe measuring jank.
    *
@@ -358,7 +358,7 @@ PerformanceMonitor.prototype = {
    * The names of probes activated in this monitor.
    */
   get probeNames() {
-    return [for (probe of this._probes) probe.name];
+    return this._probes.map(probe => probe.name);
   },
 
   /**
@@ -418,11 +418,13 @@ PerformanceMonitor.prototype = {
       probes = this._probes;
     }
     return Task.spawn(function*() {
-      let collected = yield Process.broadcastAndCollect("collect", {probeNames: [for (probe of probes) probe.name]});
-      return new Snapshot({
-        xpcom: performanceStatsService.getSnapshot(),
-        childProcesses: collected,
-        probes
+      let childProcesses = yield Process.broadcastAndCollect("collect", {probeNames: probes.map(p => p.name)});
+      let xpcom = performanceStatsService.getSnapshot();
+      return new ApplicationSnapshot({
+        xpcom,
+        childProcesses,
+        probes,
+        date: Cu.now()
       });
     });
   },
@@ -597,7 +599,134 @@ PerformanceData.prototype = {
    * @return {PerformanceDiff} The performance usage between `to` and `this`.
    */
   subtract: function(to = null) {
-    return new PerformanceDiff(this, to);
+    return (new PerformanceDiffLeaf(this, to));
+  }
+};
+
+function PerformanceData(timestamp) {
+  this._parent = null;
+  this._content = new Map();
+  this._all = [];
+  this._timestamp = timestamp;
+}
+PerformanceData.prototype = {
+  addChild: function(stat) {
+    if (!(stat instanceof PerformanceDataLeaf)) {
+      throw new TypeError(); // FIXME
+    }
+    if (!stat.isChildProcess) {
+      throw new TypeError(); // FIXME
+    }
+    this._content.set(stat.groupId, stat);
+    this._all.push(stat);
+    stat.owner = this;
+  },
+  setParent: function(stat) {
+    if (!(stat instanceof PerformanceDataLeaf)) {
+      throw new TypeError(); // FIXME
+    }
+    if (stat.isChildProcess) {
+      throw new TypeError(); // FIXME
+    }
+    this._parent = stat;
+    this._all.push(stat);
+    stat.owner = this;
+  },
+  equals: function(to) {
+    if (this._parent && !to._parent) {
+      return false;
+    }
+    if (!this._parent && to._parent) {
+      return false;
+    }
+    if (this._content.size != to._content.size) {
+      return false;
+    }
+    if (this._parent && !this._parent.equals(to._parent)) {
+      return false;
+    }
+    for (let [k, v] of this._content) {
+      let v2 = to._content.get(k);
+      if (!v2) {
+        return false;
+      }
+      if (!v.equals(v2)) {
+        return false;
+      }
+    }
+    return true;
+  },
+  subtract: function(to = null) {
+    return (new PerformanceDiff(this, to));
+  },
+  get addonId() {
+    return this._all[0].addonId;
+  },
+  get title() {
+    return this._all[0].title;
+  }
+};
+
+function PerformanceDiff(current, old = null) {
+  this.addonId = current.addonId;
+  this.title = current.title;
+  this.windowId = current.windowId;
+  this.deltaT = old ? current._timestamp - old._timestamp : Infinity;
+  this._all = [];
+
+  // Handle the parent, if any.
+  if (current._parent) {
+    this._parent = old?current._parent.subtract(old._parent):current._parent;
+    this._all.push(this._parent);
+    this._parent.owner = this;
+  } else {
+    this._parent = null;
+  }
+
+  // Handle the children, if any.
+  this._content = new Map();
+  for (let [k, stat] of current._content) {
+    let diff = stat.subtract(old ? old._content.get(k) : null);
+    this._content.set(k, diff);
+    this._all.push(diff);
+    diff.owner = this;
+  }
+
+  // Now consolidate data
+  for (let k of Object.keys(Probes)) {
+    if (!(k in this._all[0])) {
+      // The stats don't contain data from this probe.
+      continue;
+    }
+    let data = this._all.map(item => item[k]);
+    let probe = Probes[k];
+    this[k] = probe.compose(data);
+  }
+}
+PerformanceDiff.prototype = {
+  toString: function() {
+    return `[PerformanceDiff] ${this.key}`;
+  },
+  get windowIds() {
+    return this._all.map(item => item.windowId).filter(x => !!x);
+  },
+  get groupIds() {
+    return this._all.map(item => item.groupId);
+  },
+  get key() {
+    if (this.addonId) {
+      return this.addonId;
+    }
+    if (this._parent) {
+      return this._parent.windowId;
+    }
+    return this._all[0].groupId;
+  },
+  get names() {
+    return this._all.map(item => item.name);
+  },
+  get processes() {
+    return this._all.map(item => ({ isChildProcess: item.isChildProcess, processId: item.processId}));
   }
 };
 
@@ -670,7 +799,7 @@ function Snapshot({xpcom, childProcesses, probes}) {
 /**
  * Communication with other processes
  */
-let Process = {
+var Process = {
   // `true` once communications have been initialized
   _initialized: false,
 
