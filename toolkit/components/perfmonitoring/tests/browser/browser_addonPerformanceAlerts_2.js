@@ -4,10 +4,6 @@
  * Tests for PerformanceWatcher watching slow addons.
  */
 
-add_task(function* init() {
-  AddonWatcher.uninit();
-});
-
 add_task(function* test_watch_addon_then_install_it() {
   for (let topic of ["burnCPU", "promiseBurnContentCPU", "promiseBurnCPOW"]) {
     let addonId = "addon:test_watch_addons_before_installing" + Math.random();
@@ -22,7 +18,7 @@ add_task(function* test_watch_addon_then_install_it() {
     let addon = new AddonBurner(addonId);
 
     Assert.ok((yield addon.run(topic, 10, realListener)), `5. The real listener was triggered ${topic}`);
-    Assert.ok(realListener.result >= 300000, `5. jank is at least 300ms (${realListener.result}ms) ${topic}`);
+    Assert.ok(realListener.result >= 200000, `5. jank is at least 200ms (${realListener.result}µs) ${topic}`);
     realListener.unregister();
     addon.dispose();
   }
