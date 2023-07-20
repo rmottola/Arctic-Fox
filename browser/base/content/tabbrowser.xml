@@ -3397,6 +3397,13 @@
 
               this.updateDisplay();
 
+              // It's possible for updateDisplay to trigger one of our own event
+              // handlers, which might cause finish() to already have been called.
+              // Check for that before calling finish() again.
+              if (!this.tabbrowser._switcher) {
+                return;
+              }
+
               if (numPending == 0) {
                 this.finish();
               }
