@@ -17,4 +17,4 @@
 #
 # Modifying this file will now automatically clobber the buildbot machines \o/
 
-Bug 1178892 requires clobber for profiler file moves.
+Bug 1237983 - Investigate and remove the Bagheera Client implementation.

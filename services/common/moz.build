@@ -30,9 +30,7 @@ EXTRA_PP_JS_MODULES['services-common'] += [
 ]
 
 TESTING_JS_MODULES.services.common += [
-    'modules-testing/bagheeraserver.js',
     'modules-testing/logging.js',
-    'modules-testing/storageserver.js',
     'modules-testing/utils.js',
 ]
 
