@@ -24,7 +24,6 @@ EXTRA_JS_MODULES['services-common'] += [
 
 EXTRA_PP_JS_MODULES['services-common'] += [
     'async.js',
-    'bagheeraclient.js',
     'observers.js',
     'rest.js',
 ]
