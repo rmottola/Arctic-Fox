@@ -262,7 +262,7 @@ HttpBaseChannel::SetLoadGroup(nsILoadGroup *aLoadGroup)
 
   mLoadGroup = aLoadGroup;
   mProgressSink = nullptr;
-  mPrivateBrowsing = NS_UsePrivateBrowsing(this);
+  UpdatePrivateBrowsing();
   return NS_OK;
 }
 
@@ -420,7 +420,7 @@ HttpBaseChannel::SetNotificationCallbacks(nsIInterfaceRequestor *aCallbacks)
   mCallbacks = aCallbacks;
   mProgressSink = nullptr;
 
-  mPrivateBrowsing = NS_UsePrivateBrowsing(this);
+  UpdatePrivateBrowsing();
   return NS_OK;
 }
 
