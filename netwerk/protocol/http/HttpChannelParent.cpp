@@ -66,6 +66,7 @@ HttpChannelParent::HttpChannelParent(const PBrowserOrId& iframeEmbedding,
   , mSuspendedForDiversion(false)
   , mShouldIntercept(false)
   , mShouldSuspendIntercept(false)
+  , mSuspendAfterSynthesizeResponse(false)
   , mNestedFrameId(0)
 {
   LOG(("Creating HttpChannelParent [this=%p]\n", this));
@@ -132,7 +133,9 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.loadInfo(), a.synthesizedResponseHead(),
                        a.synthesizedSecurityInfoSerialization(),
                        a.cacheKey(), a.schedulingContextID(), a.preflightArgs(),
-                       a.initialRwin(), a.allowStaleCacheContent());
+                       a.initialRwin(),
+                       a.suspendAfterSynthesizeResponse(),
+                       a.allowStaleCacheContent());
   }
   case HttpChannelCreationArgs::THttpChannelConnectArgs:
   {
@@ -276,6 +279,14 @@ HttpChannelParent::SynthesizeResponse(nsIInterceptedChannel* aChannel)
 
   mSynthesizedResponseHead = nullptr;
 
+  // Suspend now even though the FinishSynthesizeResponse runnable has
+  // not executed.  We want to suspend after we get far enough to trigger
+  // the synthesis, but not actually allow the nsHttpChannel to trigger
+  // any OnStartRequests().
+  if (mSuspendAfterSynthesizeResponse) {
+    mChannel->Suspend();
+  }
+
   MaybeFlushPendingDiversion();
 }
 
@@ -377,6 +388,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const nsCString&           aSchedulingContextID,
                                  const OptionalCorsPreflightArgs& aCorsPreflightArgs,
                                  const uint32_t&            aInitialRwin,
+                                 const bool&                aSuspendAfterSynthesizeResponse,
                                  const bool&                aAllowStaleCacheContent)
 {
   nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
@@ -591,6 +603,8 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   nsID schedulingContextID;
   schedulingContextID.Parse(aSchedulingContextID.BeginReading());
   mChannel->SetSchedulingContextID(schedulingContextID);
+
+  mSuspendAfterSynthesizeResponse = aSuspendAfterSynthesizeResponse;
 
   if (loadInfo && loadInfo->GetEnforceSecurity()) {
     rv = mChannel->AsyncOpen2(mParentListener);

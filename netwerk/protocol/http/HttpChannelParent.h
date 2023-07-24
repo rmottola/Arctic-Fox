@@ -129,6 +129,7 @@ protected:
                    const nsCString&           aSchedulingContextID,
                    const OptionalCorsPreflightArgs& aCorsPreflightArgs,
                    const uint32_t&            aInitialRwin,
+                   const bool&                aSuspendAfterSynthesizeResponse,
                    const bool&                aAllowStaleCacheContent);
 
   virtual bool RecvSetPriority(const uint16_t& priority) override;
@@ -239,6 +240,8 @@ private:
   bool mShouldIntercept : 1;
   // Set if this channel should suspend on interception.
   bool mShouldSuspendIntercept : 1;
+  // Set if this channel should be suspended after synthesizing a response.
+  bool mSuspendAfterSynthesizeResponse : 1;
 
   dom::TabId mNestedFrameId;
 
