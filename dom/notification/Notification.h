@@ -349,7 +349,7 @@ protected:
     }
   }
 
-  static const NotificationDirection StringToDirection(const nsAString& aDirection)
+  static NotificationDirection StringToDirection(const nsAString& aDirection)
   {
     if (aDirection.EqualsLiteral("ltr")) {
       return NotificationDirection::Ltr;
