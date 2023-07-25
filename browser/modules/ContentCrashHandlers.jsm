@@ -8,7 +8,7 @@ var Cc = Components.classes;
 var Ci = Components.interfaces;
 var Cu = Components.utils;
 
-this.EXPORTED_SYMBOLS = [ "TabCrashReporter", "PluginCrashReporter" ];
+this.EXPORTED_SYMBOLS = [ "TabCrashHandler", "PluginCrashReporter" ];
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -16,7 +16,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "CrashSubmit",
   "resource://gre/modules/CrashSubmit.jsm");
 
-this.TabCrashReporter = {
+this.TabCrashHandler = {
   init: function () {
     if (this.initialized)
       return;

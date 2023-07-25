@@ -111,10 +111,10 @@ if (AppConstants.E10S_TESTING_ONLY) {
 }
 
 XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
-                                  "resource:///modules/ContentCrashReporters.jsm");
+                                  "resource:///modules/ContentCrashHandlers.jsm");
 if (AppConstants.MOZ_CRASHREPORTER) {
   XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
-                                    "resource:///modules/ContentCrashReporters.jsm");
+                                    "resource:///modules/ContentCrashHandlers.jsm");
 }
 
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",

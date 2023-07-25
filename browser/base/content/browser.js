@@ -178,12 +178,13 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
 XPCOMUtils.defineLazyModuleGetter(this, "gWebRTCUI",
   "resource:///modules/webrtcUI.jsm", "webrtcUI");
 
-#ifdef MOZ_CRASHREPORTER
-XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
-  "resource:///modules/ContentCrashReporters.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
-  "resource:///modules/ContentCrashReporters.jsm");
-#endif
+XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
+  "resource:///modules/ContentCrashHandlers.jsm");
+
+if (AppConstants.MOZ_CRASHREPORTER) {
+  XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
+    "resource:///modules/ContentCrashHandlers.jsm");
+}
 
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
   "resource:///modules/FormValidationHandler.jsm");
