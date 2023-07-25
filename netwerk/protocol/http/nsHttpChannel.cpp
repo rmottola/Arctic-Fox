@@ -89,6 +89,8 @@
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 #include "nsICompressConvStats.h"
+#include "nsCORSListenerProxy.h"
+#include "nsISocketProvider.h"
 
 namespace mozilla { namespace net {
 
