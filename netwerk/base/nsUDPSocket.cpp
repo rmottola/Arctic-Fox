@@ -29,7 +29,6 @@
 #include "nsIDNSRecord.h"
 #include "nsIDNSService.h"
 #include "nsICancelable.h"
-#include "ClosingService.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "NetStatistics.h"
@@ -657,7 +656,6 @@ nsUDPSocket::InitWithAddress(const NetAddr *aAddr, nsIPrincipal *aPrincipal,
 
   // create proxy via NetworkActivityMonitor
   NetworkActivityMonitor::AttachIOLayer(mFD);
-  ClosingService::AttachIOLayer(mFD);
 
   // wait until AsyncListen is called before polling the socket for
   // client connections.
