@@ -342,6 +342,8 @@ public:
         return mSchedulingContextService.get();
     }
 
+    void ShutdownConnectionManager();
+
 private:
     virtual ~nsHttpHandler();
 
