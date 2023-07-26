@@ -3059,7 +3059,7 @@ IonBuilder::inlineSimdBool32x4(CallInfo& callInfo, JSNative native)
         return inlineBinarySimd<MSimdBinaryBitwise>(callInfo, native, MSimdBinaryBitwise::OP##_,   \
                                                     SimdTypeDescr::Bool32x4);
 
-    BITWISE_COMMONX4_SIMD_OP(INLINE_SIMD_BITWISE_)
+    FOREACH_BITWISE_SIMD_BINOP(INLINE_SIMD_BITWISE_)
 #undef INLINE_SIMD_BITWISE_
 
     if (native == js::simd_bool32x4_extractLane)
@@ -3091,7 +3091,7 @@ IonBuilder::inlineSimdInt32x4(CallInfo& callInfo, JSNative native)
         return inlineBinarySimd<MSimdBinaryArith>(callInfo, native, MSimdBinaryArith::Op_##OP,   \
                                                   SimdTypeDescr::Int32x4);
 
-    ARITH_COMMONX4_SIMD_OP(INLINE_INT32X4_SIMD_ARITH_)
+    FOREACH_NUMERIC_SIMD_BINOP(INLINE_INT32X4_SIMD_ARITH_)
 #undef INLINE_INT32X4_SIMD_ARITH_
 
 #define INLINE_SIMD_BITWISE_(OP)                                                                 \
@@ -3099,7 +3099,7 @@ IonBuilder::inlineSimdInt32x4(CallInfo& callInfo, JSNative native)
         return inlineBinarySimd<MSimdBinaryBitwise>(callInfo, native, MSimdBinaryBitwise::OP##_, \
                                                     SimdTypeDescr::Int32x4);
 
-    BITWISE_COMMONX4_SIMD_OP(INLINE_SIMD_BITWISE_)
+    FOREACH_BITWISE_SIMD_BINOP(INLINE_SIMD_BITWISE_)
 #undef INLINE_SIMD_BITWISE_
 
     if (native == js::simd_int32x4_shiftLeftByScalar)
@@ -3113,7 +3113,7 @@ IonBuilder::inlineSimdInt32x4(CallInfo& callInfo, JSNative native)
     if (native == js::simd_int32x4_##OP)                                                           \
         return inlineCompSimd(callInfo, native, MSimdBinaryComp::OP, SimdTypeDescr::Int32x4);
 
-    COMP_COMMONX4_TO_BOOL32X4_SIMD_OP(INLINE_SIMD_COMPARISON_)
+    FOREACH_COMP_SIMD_OP(INLINE_SIMD_COMPARISON_)
 #undef INLINE_SIMD_COMPARISON_
 
     if (native == js::simd_int32x4_extractLane)
@@ -3138,11 +3138,8 @@ IonBuilder::inlineSimdInt32x4(CallInfo& callInfo, JSNative native)
     if (native == js::simd_int32x4_check)
         return inlineSimdCheck(callInfo, native, SimdTypeDescr::Int32x4);
 
-    typedef bool IsElementWise;
     if (native == js::simd_int32x4_select)
-        return inlineSimdSelect(callInfo, native, IsElementWise(true), SimdTypeDescr::Int32x4);
-    if (native == js::simd_int32x4_selectBits)
-        return inlineSimdSelect(callInfo, native, IsElementWise(false), SimdTypeDescr::Int32x4);
+        return inlineSimdSelect(callInfo, native, SimdTypeDescr::Int32x4);
 
     if (native == js::simd_int32x4_swizzle)
         return inlineSimdShuffle(callInfo, native, SimdTypeDescr::Int32x4, 1, 4);
@@ -3179,23 +3176,15 @@ IonBuilder::inlineSimdFloat32x4(CallInfo& callInfo, JSNative native)
         return inlineBinarySimd<MSimdBinaryArith>(callInfo, native, MSimdBinaryArith::Op_##OP,   \
                                                   SimdTypeDescr::Float32x4);
 
-    ARITH_COMMONX4_SIMD_OP(INLINE_FLOAT32X4_SIMD_ARITH_)
-    BINARY_ARITH_FLOAT32X4_SIMD_OP(INLINE_FLOAT32X4_SIMD_ARITH_)
+    FOREACH_NUMERIC_SIMD_BINOP(INLINE_FLOAT32X4_SIMD_ARITH_)
+    FOREACH_FLOAT_SIMD_BINOP(INLINE_FLOAT32X4_SIMD_ARITH_)
 #undef INLINE_FLOAT32X4_SIMD_ARITH_
-
-#define INLINE_SIMD_BITWISE_(OP)                                                                 \
-    if (native == js::simd_float32x4_##OP)                                                       \
-        return inlineBinarySimd<MSimdBinaryBitwise>(callInfo, native, MSimdBinaryBitwise::OP##_, \
-                                                    SimdTypeDescr::Float32x4);
-
-    BITWISE_COMMONX4_SIMD_OP(INLINE_SIMD_BITWISE_)
-#undef INLINE_SIMD_BITWISE_
 
 #define INLINE_SIMD_COMPARISON_(OP)                                                                \
     if (native == js::simd_float32x4_##OP)                                                         \
         return inlineCompSimd(callInfo, native, MSimdBinaryComp::OP, SimdTypeDescr::Float32x4);
 
-    COMP_COMMONX4_TO_BOOL32X4_SIMD_OP(INLINE_SIMD_COMPARISON_)
+    FOREACH_COMP_SIMD_OP(INLINE_SIMD_COMPARISON_)
 #undef INLINE_SIMD_COMPARISON_
 
     if (native == js::simd_float32x4_extractLane)
@@ -3207,12 +3196,9 @@ IonBuilder::inlineSimdFloat32x4(CallInfo& callInfo, JSNative native)
     if (native == js::simd_float32x4_##OP)                                                         \
         return inlineUnarySimd(callInfo, native, MSimdUnaryArith::OP, SimdTypeDescr::Float32x4);
 
-    UNARY_ARITH_FLOAT32X4_SIMD_OP(INLINE_SIMD_FLOAT32X4_UNARY_)
+    FOREACH_FLOAT_SIMD_UNOP(INLINE_SIMD_FLOAT32X4_UNARY_)
     INLINE_SIMD_FLOAT32X4_UNARY_(neg)
 #undef INLINE_SIMD_FLOAT32X4_UNARY_
-
-    if (native == js::simd_float32x4_not)
-        return inlineUnarySimd(callInfo, native, MSimdUnaryArith::not_, SimdTypeDescr::Float32x4);
 
     typedef bool IsCast;
     if (native == js::simd_float32x4_fromInt32x4)
@@ -3226,9 +3212,8 @@ IonBuilder::inlineSimdFloat32x4(CallInfo& callInfo, JSNative native)
     if (native == js::simd_float32x4_check)
         return inlineSimdCheck(callInfo, native, SimdTypeDescr::Float32x4);
 
-    typedef bool IsElementWise;
     if (native == js::simd_float32x4_select)
-        return inlineSimdSelect(callInfo, native, IsElementWise(true), SimdTypeDescr::Float32x4);
+        return inlineSimdSelect(callInfo, native, SimdTypeDescr::Float32x4);
 
     if (native == js::simd_float32x4_swizzle)
         return inlineSimdShuffle(callInfo, native, SimdTypeDescr::Float32x4, 1, 4);
@@ -3522,8 +3507,7 @@ IonBuilder::inlineSimdConvert(CallInfo& callInfo, JSNative native, bool isCast,
 }
 
 IonBuilder::InliningStatus
-IonBuilder::inlineSimdSelect(CallInfo& callInfo, JSNative native, bool isElementWise,
-                             SimdTypeDescr::Type type)
+IonBuilder::inlineSimdSelect(CallInfo& callInfo, JSNative native, SimdTypeDescr::Type type)
 {
     InlineTypedObject* templateObj = nullptr;
     if (!checkInlineSimd(callInfo, native, type, 3, &templateObj))
@@ -3532,7 +3516,7 @@ IonBuilder::inlineSimdSelect(CallInfo& callInfo, JSNative native, bool isElement
     // See comment in inlineBinarySimd
     MIRType mirType = SimdTypeDescrToMIRType(type);
     MSimdSelect* ins = MSimdSelect::New(alloc(), callInfo.getArg(0), callInfo.getArg(1),
-                                        callInfo.getArg(2), mirType, isElementWise);
+                                        callInfo.getArg(2), mirType);
     return boxSimd(callInfo, ins, templateObj);
 }
 
