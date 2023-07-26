@@ -4731,6 +4731,7 @@ CodeGenerator::visitSimdBox(LSimdBox* lir)
 
     Address objectData(object, InlineTypedObject::offsetOfDataStart());
     switch (type) {
+      case MIRType_Bool32x4:
       case MIRType_Int32x4:
         masm.storeUnalignedInt32x4(in, objectData);
         break;
@@ -4799,6 +4800,9 @@ CodeGenerator::visitSimdUnbox(LSimdUnbox* lir)
     // Convert the SIMD MIRType to a SimdTypeDescr::Type.
     js::SimdTypeDescr::Type type;
     switch (lir->mir()->type()) {
+      case MIRType_Bool32x4:
+        type = js::SimdTypeDescr::Bool32x4;
+        break;
       case MIRType_Int32x4:
         type = js::SimdTypeDescr::Int32x4;
         break;
@@ -4820,6 +4824,7 @@ CodeGenerator::visitSimdUnbox(LSimdUnbox* lir)
     // Load the value from the data of the InlineTypedObject.
     Address objectData(object, InlineTypedObject::offsetOfDataStart());
     switch (lir->mir()->type()) {
+      case MIRType_Bool32x4:
       case MIRType_Int32x4:
         masm.loadUnalignedInt32x4(objectData, simd);
         break;
