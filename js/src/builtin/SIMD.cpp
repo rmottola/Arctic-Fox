@@ -1120,7 +1120,7 @@ TypedArrayFromArgs(JSContext* cx, const CallArgs& args,
         return ErrorBadArgs(cx);
 
     JSObject& argobj = args[0].toObject();
-    if (!IsAnyTypedArray(&argobj))
+    if (!argobj.is<TypedArrayObject>())
         return ErrorBadArgs(cx);
 
     typedArray.set(&argobj);
@@ -1129,9 +1129,9 @@ TypedArrayFromArgs(JSContext* cx, const CallArgs& args,
     if (!ToInt32(cx, args[1], &index))
         return false;
 
-    *byteStart = index * AnyTypedArrayBytesPerElement(typedArray);
-    if (*byteStart < 0 ||
-        (uint32_t(*byteStart) + NumElem * sizeof(VElem)) > AnyTypedArrayByteLength(typedArray))
+    *byteStart = index * typedArray->as<TypedArrayObject>().bytesPerElement();
+    if (*byteStart < 0 || (uint32_t(*byteStart) + NumElem * sizeof(VElem)) >
+                          typedArray->as<TypedArrayObject>().byteLength())
     {
         // Keep in sync with AsmJS OnOutOfBounds function.
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_INDEX);
@@ -1164,7 +1164,8 @@ Load(JSContext* cx, unsigned argc, Value* vp)
     if (!result)
         return false;
 
-    SharedMem<Elem*> src = AnyTypedArrayViewData(typedArray).addBytes(byteStart).cast<Elem*>();
+    SharedMem<Elem*> src =
+        typedArray->as<TypedArrayObject>().viewDataEither().addBytes(byteStart).cast<Elem*>();
     Elem* dst = reinterpret_cast<Elem*>(result->typedMem());
     jit::AtomicOperations::podCopySafeWhenRacy(SharedMem<Elem*>::unshared(dst), src, NumElem);
 
@@ -1191,7 +1192,8 @@ Store(JSContext* cx, unsigned argc, Value* vp)
         return ErrorBadArgs(cx);
 
     Elem* src = TypedObjectMemory<Elem*>(args[2]);
-    SharedMem<Elem*> dst = AnyTypedArrayViewData(typedArray).addBytes(byteStart).cast<Elem*>();
+    SharedMem<Elem*> dst =
+        typedArray->as<TypedArrayObject>().viewDataEither().addBytes(byteStart).cast<Elem*>();
     js::jit::AtomicOperations::podCopySafeWhenRacy(dst, SharedMem<Elem*>::unshared(src), NumElem);
 
     args.rval().setObject(args[2].toObject());
