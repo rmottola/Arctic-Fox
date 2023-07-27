@@ -615,7 +615,7 @@ var EventTargetInterposition = new Interposition("EventTargetInterposition");
 EventTargetInterposition.methods.addEventListener =
   function(addon, target, type, listener, useCapture, wantsUntrusted) {
     let delayed = CompatWarning.delayedWarning(
-      "Registering an event listener on content DOM nodes" +
+      `Registering a ${type} event listener on content DOM nodes` +
         " needs to happen in the content process.",
       addon, CompatWarning.warnings.DOM_events);
 
@@ -818,7 +818,7 @@ function makeDummyContentWindow(browser) {
 }
 
 RemoteBrowserElementInterposition.getters.contentWindow = function(addon, target) {
-  CompatWarning.warn("Direct access to content objects will no longer work in the chrome process.",
+  CompatWarning.warn("Direct access to browser.contentWindow will no longer work in the chrome process.",
                      addon, CompatWarning.warnings.content);
 
   // If we don't have a CPOW yet, just return something we can use for
@@ -846,7 +846,7 @@ function getContentDocument(addon, browser)
 }
 
 RemoteBrowserElementInterposition.getters.contentDocument = function(addon, target) {
-  CompatWarning.warn("Direct access to content objects will no longer work in the chrome process.",
+  CompatWarning.warn("Direct access to browser.contentDocument will no longer work in the chrome process.",
                      addon, CompatWarning.warnings.content);
 
   return getContentDocument(addon, target);
@@ -856,7 +856,7 @@ var TabBrowserElementInterposition = new Interposition("TabBrowserElementInterpo
                                                        EventTargetInterposition);
 
 TabBrowserElementInterposition.getters.contentWindow = function(addon, target) {
-  CompatWarning.warn("Direct access to content objects will no longer work in the chrome process.",
+  CompatWarning.warn("Direct access to gBrowser.contentWindow will no longer work in the chrome process.",
                      addon, CompatWarning.warnings.content);
 
   if (!target.selectedBrowser.contentWindowAsCPOW) {
@@ -866,7 +866,7 @@ TabBrowserElementInterposition.getters.contentWindow = function(addon, target) {
 };
 
 TabBrowserElementInterposition.getters.contentDocument = function(addon, target) {
-  CompatWarning.warn("Direct access to content objects will no longer work in the chrome process.",
+  CompatWarning.warn("Direct access to gBrowser.contentDocument will no longer work in the chrome process.",
                      addon, CompatWarning.warnings.content);
 
   let browser = target.selectedBrowser;
@@ -944,7 +944,7 @@ var ChromeWindowInterposition = new Interposition("ChromeWindowInterposition",
 // that should be using content instead.
 ChromeWindowInterposition.getters.content =
 ChromeWindowInterposition.getters._content = function(addon, target) {
-  CompatWarning.warn("Direct access to content objects will no longer work in the chrome process.",
+  CompatWarning.warn("Direct access to chromeWindow.content will no longer work in the chrome process.",
                      addon, CompatWarning.warnings.content);
 
   let browser = target.gBrowser.selectedBrowser;
