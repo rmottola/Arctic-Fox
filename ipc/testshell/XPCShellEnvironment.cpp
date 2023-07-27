@@ -513,8 +513,9 @@ XPCShellEnvironment::Init()
     }
 
     JS::CompartmentOptions options;
-    options.setZone(JS::SystemZone)
-           .setVersion(JSVERSION_LATEST);
+    options.creationOptions().setZone(JS::SystemZone);
+    options.behaviors().setVersion(JSVERSION_LATEST);
+
     nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
     rv = xpc->InitClassesWithNewWrappedGlobal(cx,
                                               static_cast<nsIGlobalObject *>(backstagePass),
