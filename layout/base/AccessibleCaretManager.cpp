@@ -299,7 +299,7 @@ AccessibleCaretManager::UpdateCaretsForCursorMode(UpdateCaretsHint aHint)
 void
 AccessibleCaretManager::UpdateCaretsForSelectionMode(UpdateCaretsHint aHint)
 {
-  AC_LOG("%s, selection: %p", __FUNCTION__, GetSelection());
+  AC_LOG("%s: selection: %p", __FUNCTION__, GetSelection());
 
   int32_t startOffset = 0;
   nsIFrame* startFrame = FindFirstNodeWithFrame(false, &startOffset);
