@@ -1861,8 +1861,10 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
         return InliningStatus_NotInlined;
 
     JSContext* cx = GetJitContext()->cx;
-    if (!cx->compartment()->jitCompartment()->ensureRegExpMatcherStubExists(cx))
+    if (!cx->compartment()->jitCompartment()->ensureRegExpMatcherStubExists(cx)) {
+        oom();
         return InliningStatus_Error;
+    }
 
     callInfo.setImplicitlyUsedUnchecked();
 
@@ -1913,8 +1915,10 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
         return InliningStatus_NotInlined;
 
     JSContext* cx = GetJitContext()->cx;
-    if (!cx->compartment()->jitCompartment()->ensureRegExpTesterStubExists(cx))
+    if (!cx->compartment()->jitCompartment()->ensureRegExpTesterStubExists(cx)) {
+        oom();
         return InliningStatus_Error;
+    }
 
     callInfo.setImplicitlyUsedUnchecked();
 
