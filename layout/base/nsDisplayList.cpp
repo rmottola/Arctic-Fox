@@ -3199,6 +3199,8 @@ nsRegion
 nsDisplayBackgroundColor::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                           bool* aSnap)
 {
+  *aSnap = false;
+
   if (mColor.a != 1) {
     return nsRegion();
   }
