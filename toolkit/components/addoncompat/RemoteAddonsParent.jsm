@@ -369,11 +369,12 @@ var ObserverInterposition = new Interposition("ObserverInterposition");
 ObserverInterposition.methods.addObserver =
   function(addon, target, observer, topic, ownsWeak) {
     if (TOPIC_WHITELIST.indexOf(topic) >= 0) {
+      CompatWarning.warn(`${topic} observer should be added from the child process only.`,
+                         addon, CompatWarning.warnings.observers);
+
       ObserverParent.addObserver(addon, observer, topic);
     }
 
-    CompatWarning.warn(`${topic} observer should be added from the child process only.`,
-                       addon, CompatWarning.warnings.observers);
     target.addObserver(observer, topic, ownsWeak);
   };
 
@@ -440,7 +441,7 @@ var EventTargetParent = {
     return [browser, window];
   },
 
-  addEventListener: function(addon, target, type, listener, useCapture, wantsUntrusted) {
+  addEventListener: function(addon, target, type, listener, useCapture, wantsUntrusted, delayedWarning) {
     let newTarget = this.redirectEventTarget(target);
     if (!newTarget) {
       return;
@@ -471,7 +472,8 @@ var EventTargetParent = {
     forType.push({listener: listener,
                   target: target,
                   wantsUntrusted: wantsUntrusted,
-                  useCapture: useCapture});
+                  useCapture: useCapture,
+                  delayedWarning: delayedWarning});
   },
 
   removeEventListener: function(addon, target, type, listener, useCapture) {
@@ -521,8 +523,11 @@ var EventTargetParent = {
 
       // Make a copy in case they call removeEventListener in the listener.
       let handlers = [];
-      for (let {listener, target, wantsUntrusted, useCapture} of forType) {
+      for (let {listener, target, wantsUntrusted, useCapture, delayedWarning} of forType) {
         if ((wantsUntrusted || isTrusted) && useCapture == capturing) {
+          // Issue a warning for this listener.
+          delayedWarning();
+
           handlers.push([listener, target]);
         }
       }
@@ -609,10 +614,12 @@ var EventTargetInterposition = new Interposition("EventTargetInterposition");
 
 EventTargetInterposition.methods.addEventListener =
   function(addon, target, type, listener, useCapture, wantsUntrusted) {
-    CompatWarning.warn("Registering an event listener on content DOM nodes" +
-                        " needs to happen in the content process.",
-                       addon, CompatWarning.warnings.DOM_events);
-    EventTargetParent.addEventListener(addon, target, type, listener, useCapture, wantsUntrusted);
+    let delayed = CompatWarning.delayedWarning(
+      "Registering an event listener on content DOM nodes" +
+        " needs to happen in the content process.",
+      addon, CompatWarning.warnings.DOM_events);
+
+    EventTargetParent.addEventListener(addon, target, type, listener, useCapture, wantsUntrusted, delayed);
     target.addEventListener(type, makeFilteringListener(type, listener), useCapture, wantsUntrusted);
   };
 
