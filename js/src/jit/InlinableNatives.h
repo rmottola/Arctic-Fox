@@ -65,8 +65,9 @@
     _(MathTrunc)                    \
     _(MathCbrt)                     \
                                     \
-    _(RegExpExec)                   \
-    _(RegExpTest)                   \
+    _(RegExpMatcher)                \
+    _(RegExpTester)                 \
+    _(IsRegExpObject)               \
                                     \
     _(String)                       \
     _(StringSplit)                  \

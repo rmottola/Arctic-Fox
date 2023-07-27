@@ -1888,11 +1888,11 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
 template <typename CharT>
 RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const CharT* chars, size_t start,
-                      size_t length, MatchPairs* matches)
+                      size_t length, MatchPairs* matches, size_t* endIndex)
 {
     typedef void (*RegExpCodeSignature)(InputOutputData*);
 
-    InputOutputData data(chars, chars + length, start, matches);
+    InputOutputData data(chars, chars + length, start, matches, endIndex);
 
     RegExpCodeSignature function = reinterpret_cast<RegExpCodeSignature>(codeBlock->raw());
 
@@ -1906,11 +1906,11 @@ irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const CharT* chars
 
 template RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const Latin1Char* chars, size_t start,
-                      size_t length, MatchPairs* matches);
+                      size_t length, MatchPairs* matches, size_t* endIndex);
 
 template RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const char16_t* chars, size_t start,
-                      size_t length, MatchPairs* matches);
+                      size_t length, MatchPairs* matches, size_t* endIndex);
 
 // -------------------------------------------------------------------
 // Tree to graph conversion
