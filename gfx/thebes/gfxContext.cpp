@@ -102,10 +102,6 @@ gfxContext::~gfxContext()
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       mDT->PopClip();
     }
-
-    if (mStateStack[i].clipWasReset) {
-      break;
-    }
   }
   mDT->Flush();
   MOZ_COUNT_DTOR(gfxContext);
@@ -174,7 +170,6 @@ gfxContext::Save()
 {
   CurrentState().transform = mTransform;
   mStateStack.AppendElement(AzureState(CurrentState()));
-  CurrentState().clipWasReset = false;
   CurrentState().pushedClips.Clear();
 }
 
@@ -183,11 +178,6 @@ gfxContext::Restore()
 {
   for (unsigned int c = 0; c < CurrentState().pushedClips.Length(); c++) {
     mDT->PopClip();
-  }
-
-  if (CurrentState().clipWasReset &&
-      CurrentState().drawTarget == mStateStack[mStateStack.Length() - 2].drawTarget) {
-    PushClipsToDT(mDT);
   }
 
   mStateStack.RemoveElementAt(mStateStack.Length() - 1);
@@ -643,9 +633,6 @@ gfxContext::HasComplexClip() const
         return true;
       }
     }
-    if (mStateStack[i].clipWasReset) {
-      break;
-    }
   }
   return false;
 }
@@ -653,15 +640,7 @@ gfxContext::HasComplexClip() const
 bool
 gfxContext::ExportClip(ClipExporter& aExporter)
 {
-  unsigned int lastReset = 0;
-  for (int i = mStateStack.Length() - 1; i > 0; i--) {
-    if (mStateStack[i].clipWasReset) {
-      lastReset = i;
-      break;
-    }
-  }
-
-  for (unsigned int i = lastReset; i < mStateStack.Length(); i++) {
+  for (unsigned int i = 0; i < mStateStack.Length(); i++) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       AzureState::PushedClip &clip = mStateStack[i].pushedClips[c];
       gfx::Matrix transform = clip.transform;
@@ -687,20 +666,12 @@ gfxContext::ExportClip(ClipExporter& aExporter)
 bool
 gfxContext::ClipContainsRect(const gfxRect& aRect)
 {
-  unsigned int lastReset = 0;
-  for (int i = mStateStack.Length() - 2; i > 0; i--) {
-    if (mStateStack[i].clipWasReset) {
-      lastReset = i;
-      break;
-    }
-  }
-
   // Since we always return false when the clip list contains a
   // non-rectangular clip or a non-rectilinear transform, our 'total' clip
   // is always a rectangle if we hit the end of this function.
   Rect clipBounds(0, 0, Float(mDT->GetSize().width), Float(mDT->GetSize().height));
 
-  for (unsigned int i = lastReset; i < mStateStack.Length(); i++) {
+  for (unsigned int i = 0; i < mStateStack.Length(); i++) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       AzureState::PushedClip &clip = mStateStack[i].pushedClips[c];
       if (clip.path || !clip.transform.IsRectilinear()) {
@@ -1180,22 +1151,10 @@ gfxContext::FillAzure(const Pattern& aPattern, Float aOpacity)
 void
 gfxContext::PushClipsToDT(DrawTarget *aDT)
 {
-  // Tricky, we have to restore all clips -since the last time- the clip
-  // was reset. If we didn't reset the clip, just popping the clips we
-  // added was fine.
-  unsigned int lastReset = 0;
-  for (int i = mStateStack.Length() - 2; i > 0; i--) {
-    if (mStateStack[i].clipWasReset) {
-      lastReset = i;
-      break;
-    }
-  }
-
   // Don't need to save the old transform, we'll be setting a new one soon!
 
-  // Push all clips from the last state on the stack where the clip was
-  // reset to the clip before ours.
-  for (unsigned int i = lastReset; i < mStateStack.Length() - 1; i++) {
+  // Push all clips from the bottom of the stack to the clip before ours.
+  for (unsigned int i = 0; i < mStateStack.Length() - 1; i++) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       aDT->SetTransform(mStateStack[i].pushedClips[c].transform * GetDeviceTransform());
       if (mStateStack[i].pushedClips[c].path) {
@@ -1295,17 +1254,9 @@ gfxContext::ChangeTransform(const Matrix &aNewMatrix, bool aUpdatePatternTransfo
 Rect
 gfxContext::GetAzureDeviceSpaceClipBounds()
 {
-  unsigned int lastReset = 0;
-  for (int i = mStateStack.Length() - 1; i > 0; i--) {
-    if (mStateStack[i].clipWasReset) {
-      lastReset = i;
-      break;
-    }
-  }
-
   Rect rect(CurrentState().deviceOffset.x, CurrentState().deviceOffset.y,
             Float(mDT->GetSize().width), Float(mDT->GetSize().height));
-  for (unsigned int i = lastReset; i < mStateStack.Length(); i++) {
+  for (unsigned int i = 0; i < mStateStack.Length(); i++) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
       AzureState::PushedClip &clip = mStateStack[i].pushedClips[c];
       if (clip.path) {
