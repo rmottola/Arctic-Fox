@@ -3448,7 +3448,7 @@ nsGridContainerFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     BuildDisplayListForChild(aBuilder, child, aDirtyRect, childLists,
                              ::GetDisplayFlagsForGridItem(child));
   }
-  positionedDescendants.SortByCSSOrder(aBuilder);
+  positionedDescendants.SortByCSSOrder();
   aLists.PositionedDescendants()->AppendToTop(&positionedDescendants);
 }
 
