@@ -545,18 +545,6 @@ gfxContext::CurrentMiterLimit() const
   return CurrentState().strokeOptions.mMiterLimit;
 }
 
-void
-gfxContext::SetFillRule(FillRule rule)
-{
-  CurrentState().fillRule = rule;
-}
-
-FillRule
-gfxContext::CurrentFillRule() const
-{
-  return CurrentState().fillRule;
-}
-
 // clipping
 void
 gfxContext::Clip(const Rect& rect)
@@ -1050,18 +1038,18 @@ gfxContext::EnsurePath()
       Matrix mat = mTransform;
       mat.Invert();
       mat = mPathTransform * mat;
-      mPathBuilder = mPath->TransformedCopyToBuilder(mat, CurrentState().fillRule);
+      mPathBuilder = mPath->TransformedCopyToBuilder(mat);
       mPath = mPathBuilder->Finish();
       mPathBuilder = nullptr;
 
       mTransformChanged = false;
     }
 
-    if (CurrentState().fillRule == mPath->GetFillRule()) {
+    if (FillRule::FILL_WINDING == mPath->GetFillRule()) {
       return;
     }
 
-    mPathBuilder = mPath->CopyToBuilder(CurrentState().fillRule);
+    mPathBuilder = mPath->CopyToBuilder();
 
     mPath = mPathBuilder->Finish();
     mPathBuilder = nullptr;
@@ -1082,13 +1070,13 @@ gfxContext::EnsurePathBuilder()
 
   if (mPath) {
     if (!mTransformChanged) {
-      mPathBuilder = mPath->CopyToBuilder(CurrentState().fillRule);
+      mPathBuilder = mPath->CopyToBuilder();
       mPath = nullptr;
     } else {
       Matrix invTransform = mTransform;
       invTransform.Invert();
       Matrix toNewUS = mPathTransform * invTransform;
-      mPathBuilder = mPath->TransformedCopyToBuilder(toNewUS, CurrentState().fillRule);
+      mPathBuilder = mPath->TransformedCopyToBuilder(toNewUS);
     }
     return;
   }
@@ -1096,7 +1084,7 @@ gfxContext::EnsurePathBuilder()
   DebugOnly<PathBuilder*> oldPath = mPathBuilder.get();
 
   if (!mPathBuilder) {
-    mPathBuilder = mDT->CreatePathBuilder(CurrentState().fillRule);
+    mPathBuilder = mDT->CreatePathBuilder(FillRule::FILL_WINDING);
 
     if (mPathIsRect) {
       mPathBuilder->MoveTo(mRect.TopLeft());
@@ -1119,7 +1107,7 @@ gfxContext::EnsurePathBuilder()
     Matrix toNewUS = mPathTransform * invTransform;
 
     RefPtr<Path> path = mPathBuilder->Finish();
-    mPathBuilder = path->TransformedCopyToBuilder(toNewUS, CurrentState().fillRule);
+    mPathBuilder = path->TransformedCopyToBuilder(toNewUS);
   }
 
   mPathIsRect = false;
@@ -1228,8 +1216,8 @@ gfxContext::ChangeTransform(const Matrix &aNewMatrix, bool aUpdatePatternTransfo
       mRect = toNewUS.TransformBounds(mRect);
       mRect.NudgeToIntegers();
     } else {
-      mPathBuilder = mDT->CreatePathBuilder(CurrentState().fillRule);
-      
+      mPathBuilder = mDT->CreatePathBuilder(FillRule::FILL_WINDING);
+
       mPathBuilder->MoveTo(toNewUS * mRect.TopLeft());
       mPathBuilder->LineTo(toNewUS * mRect.TopRight());
       mPathBuilder->LineTo(toNewUS * mRect.BottomRight());
