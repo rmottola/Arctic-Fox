@@ -3209,8 +3209,7 @@ ComputeWhereToScroll(int16_t aWhereToScroll,
  *
  * This needs to work even if aRect has a width or height of zero.
  */
-static void ScrollToShowRect(nsIFrame*                aFrame,
-                             nsIScrollableFrame*      aFrameAsScrollable,
+static void ScrollToShowRect(nsIScrollableFrame*      aFrameAsScrollable,
                              const nsRect&            aRect,
                              nsIPresShell::ScrollAxis aVertical,
                              nsIPresShell::ScrollAxis aHorizontal,
@@ -3430,7 +3429,7 @@ PresShell::ScrollFrameRectIntoView(nsIFrame*                aFrame,
         nsMargin padding = container->GetUsedPadding();
         targetRect.Inflate(padding);
       }
-      ScrollToShowRect(container, sf, targetRect - sf->GetScrolledFrame()->GetPosition(),
+      ScrollToShowRect(sf, targetRect - sf->GetScrolledFrame()->GetPosition(),
                        aVertical, aHorizontal, aFlags);
       nsPoint newPosition = sf->GetScrollPosition();
       // If the scroll position increased, that means our content moved up,
@@ -4416,8 +4415,7 @@ PresShell::RecordStyleSheetChange(CSSStyleSheet* aStyleSheet)
 }
 
 void
-PresShell::StyleSheetAdded(nsIDocument* aDocument,
-                           CSSStyleSheet* aStyleSheet,
+PresShell::StyleSheetAdded(CSSStyleSheet* aStyleSheet,
                            bool aDocumentSheet)
 {
   // We only care when enabled sheets are added
@@ -4429,8 +4427,7 @@ PresShell::StyleSheetAdded(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleSheetRemoved(nsIDocument* aDocument,
-                             CSSStyleSheet* aStyleSheet,
+PresShell::StyleSheetRemoved(CSSStyleSheet* aStyleSheet,
                              bool aDocumentSheet)
 {
   // We only care when enabled sheets are removed
@@ -4442,9 +4439,7 @@ PresShell::StyleSheetRemoved(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleSheetApplicableStateChanged(nsIDocument* aDocument,
-                                            CSSStyleSheet* aStyleSheet,
-                                            bool aApplicable)
+PresShell::StyleSheetApplicableStateChanged(CSSStyleSheet* aStyleSheet)
 {
   if (aStyleSheet->HasRules()) {
     RecordStyleSheetChange(aStyleSheet);
@@ -4452,25 +4447,19 @@ PresShell::StyleSheetApplicableStateChanged(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleRuleChanged(nsIDocument* aDocument,
-                            CSSStyleSheet* aStyleSheet,
-                            mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleChanged(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
 
 void
-PresShell::StyleRuleAdded(nsIDocument* aDocument,
-                          CSSStyleSheet* aStyleSheet,
-                          mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleAdded(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
 
 void
-PresShell::StyleRuleRemoved(nsIDocument* aDocument,
-                            CSSStyleSheet* aStyleSheet,
-                            mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleRemoved(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
