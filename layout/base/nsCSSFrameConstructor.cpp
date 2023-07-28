@@ -4533,7 +4533,6 @@ nsCSSFrameConstructor::BuildScrollFrame(nsFrameConstructorState& aState,
 const nsCSSFrameConstructor::FrameConstructionData*
 nsCSSFrameConstructor::FindDisplayData(const nsStyleDisplay* aDisplay,
                                        Element* aElement,
-                                       nsIFrame* aParentFrame,
                                        nsStyleContext* aStyleContext)
 {
   PR_STATIC_ASSERT(eParentTypeCount < (1 << (32 - FCDATA_PARENT_TYPE_OFFSET)));
@@ -5049,7 +5048,6 @@ nsCSSFrameConstructor::ConstructFrameWithAnonymousChild(
                                    nsFrameConstructorState& aState,
                                    FrameConstructionItem&   aItem,
                                    nsContainerFrame*        aParentFrame,
-                                   const nsStyleDisplay*    aDisplay,
                                    nsFrameItems&            aFrameItems,
                                    ContainerFrameCreationFunc aConstructor,
                                    ContainerFrameCreationFunc aInnerConstructor,
@@ -5120,7 +5118,7 @@ nsCSSFrameConstructor::ConstructOuterSVG(nsFrameConstructorState& aState,
                                          nsFrameItems&            aFrameItems)
 {
   return ConstructFrameWithAnonymousChild(
-      aState, aItem, aParentFrame, aDisplay, aFrameItems,
+      aState, aItem, aParentFrame, aFrameItems,
       NS_NewSVGOuterSVGFrame, NS_NewSVGOuterSVGAnonChildFrame,
       nsCSSAnonBoxes::mozSVGOuterSVGAnonChild, true);
 }
@@ -5133,7 +5131,7 @@ nsCSSFrameConstructor::ConstructMarker(nsFrameConstructorState& aState,
                                        nsFrameItems&            aFrameItems)
 {
   return ConstructFrameWithAnonymousChild(
-      aState, aItem, aParentFrame, aDisplay, aFrameItems,
+      aState, aItem, aParentFrame, aFrameItems,
       NS_NewSVGMarkerFrame, NS_NewSVGMarkerAnonChildFrame,
       nsCSSAnonBoxes::mozSVGMarkerAnonChild, false);
 }
@@ -5690,7 +5688,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
 
     // And general display types
     if (!data) {
-      data = FindDisplayData(display, element, aParentFrame, styleContext);
+      data = FindDisplayData(display, element, styleContext);
     }
 
     NS_ASSERTION(data, "Should have frame construction data now");
@@ -7452,7 +7450,6 @@ bool NotifyListBoxBody(nsPresContext*    aPresContext,
                          nsIContent*        aChild,
                          // Only used for the removed notification
                          nsIContent*        aOldNextSibling,
-                         nsIDocument*       aDocument,
                          nsIFrame*          aChildFrame,
                          content_operation  aOperation)
 {
@@ -7564,8 +7561,7 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
       if (NotifyListBoxBody(mPresShell->GetPresContext(), aContainer,
                             // The insert case in NotifyListBoxBody
                             // doesn't use "old next sibling".
-                            aStartChild, nullptr,
-                            mDocument, nullptr, CONTENT_INSERTED)) {
+                            aStartChild, nullptr, nullptr, CONTENT_INSERTED)) {
         return NS_OK;
       }
     } else {
@@ -8167,7 +8163,7 @@ nsCSSFrameConstructor::ContentRemoved(nsIContent*  aContainer,
   nsPresContext* presContext = mPresShell->GetPresContext();
 #ifdef MOZ_XUL
   if (NotifyListBoxBody(presContext, aContainer, aChild, aOldNextSibling,
-                        mDocument, childFrame, CONTENT_REMOVED)) {
+                        childFrame, CONTENT_REMOVED)) {
     if (aFlags == REMOVE_DESTROY_FRAMES) {
       CaptureStateForFramesOf(aChild, mTempFrameTreeState);
     }
@@ -10619,7 +10615,7 @@ nsCSSFrameConstructor::ProcessChildren(nsFrameConstructorState& aState,
                "can't be both block and box");
 
   if (haveFirstLetterStyle) {
-    WrapFramesInFirstLetterFrame(aContent, aFrame, aFrameItems);
+    WrapFramesInFirstLetterFrame(aFrame, aFrameItems);
   }
   if (haveFirstLineStyle) {
     WrapFramesInFirstLineFrame(aState, aContent, aFrame, nullptr,
@@ -11001,7 +10997,6 @@ static bool IsFirstLetterContent(nsIContent* aContent)
 void
 nsCSSFrameConstructor::CreateFloatingLetterFrame(
   nsFrameConstructorState& aState,
-  nsContainerFrame* aBlockFrame,
   nsIContent* aTextContent,
   nsIFrame* aTextFrame,
   nsContainerFrame* aParentFrame,
@@ -11120,7 +11115,7 @@ nsCSSFrameConstructor::CreateLetterFrame(nsContainerFrame* aBlockFrame,
     const nsStyleDisplay* display = sc->StyleDisplay();
     if (display->IsFloatingStyle() && !aParentFrame->IsSVGText()) {
       // Make a floating first-letter frame
-      CreateFloatingLetterFrame(state, aBlockFrame, aTextContent, textFrame,
+      CreateFloatingLetterFrame(state, aTextContent, textFrame,
                                 aParentFrame, sc, aResult);
     }
     else {
@@ -11148,7 +11143,6 @@ nsCSSFrameConstructor::CreateLetterFrame(nsContainerFrame* aBlockFrame,
 
 void
 nsCSSFrameConstructor::WrapFramesInFirstLetterFrame(
-  nsIContent*              aBlockContent,
   nsContainerFrame*        aBlockFrame,
   nsFrameItems&            aBlockFrames)
 {
@@ -11256,8 +11250,7 @@ FindFirstLetterFrame(nsIFrame* aFrame, nsIFrame::ChildListID aListID)
 nsresult
 nsCSSFrameConstructor::RemoveFloatingFirstLetterFrames(
   nsIPresShell* aPresShell,
-  nsIFrame* aBlockFrame,
-  bool* aStopLooking)
+  nsIFrame* aBlockFrame)
 {
   // Look for the first letter frame on the kFloatList, then kPushedFloatsList.
   nsIFrame* floatFrame =
@@ -11432,9 +11425,8 @@ nsCSSFrameConstructor::RemoveLetterFrames(nsIPresShell* aPresShell,
   bool stopLooking = false;
   nsresult rv;
   do {
-    rv = RemoveFloatingFirstLetterFrames(aPresShell,
-                                         continuation, &stopLooking);
-    if (NS_SUCCEEDED(rv) && !stopLooking) {
+    rv = RemoveFloatingFirstLetterFrames(aPresShell, continuation);
+    if (NS_SUCCEEDED(rv)) {
       rv = RemoveFirstLetterFrames(aPresShell,
                                    continuation, aBlockFrame, &stopLooking);
     }

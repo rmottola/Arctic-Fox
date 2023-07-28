@@ -1512,7 +1512,6 @@ private:
                                   nsFrameConstructorState& aState,
                                   FrameConstructionItem&   aItem,
                                   nsContainerFrame*        aParentFrame,
-                                  const nsStyleDisplay*    aDisplay,
                                   nsFrameItems&            aFrameItems,
                                   ContainerFrameCreationFunc aConstructor,
                                   ContainerFrameCreationFunc aInnerConstructor,
@@ -1549,7 +1548,7 @@ private:
      changes, make this static */
   const FrameConstructionData*
     FindDisplayData(const nsStyleDisplay* aDisplay, Element* aElement,
-                    nsIFrame* aParentFrame, nsStyleContext* aStyleContext);
+                    nsStyleContext* aStyleContext);
 
   /**
    * Construct a scrollable block frame
@@ -1877,7 +1876,6 @@ private:
   // Methods support :first-letter style
 
   void CreateFloatingLetterFrame(nsFrameConstructorState& aState,
-                                 nsContainerFrame*        aBlockFrame,
                                  nsIContent*              aTextContent,
                                  nsIFrame*                aTextFrame,
                                  nsContainerFrame*        aParentFrame,
@@ -1890,8 +1888,7 @@ private:
                          nsContainerFrame*        aParentFrame,
                          nsFrameItems&            aResult);
 
-  void WrapFramesInFirstLetterFrame(nsIContent*       aBlockContent,
-                                    nsContainerFrame* aBlockFrame,
+  void WrapFramesInFirstLetterFrame(nsContainerFrame* aBlockFrame,
                                     nsFrameItems&     aBlockFrames);
 
   /**
@@ -1912,9 +1909,6 @@ private:
    * @param aTextFrame returns the textframe that had the first-letter
    * @param aPrevFrame returns the previous sibling of aTextFrame
    * @param aLetterFrames returns the frames that were created
-   * @param aStopLooking returns whether we should stop looking for a
-   *                     first-letter either because it was found or won't be
-   *                     found
    */
   void WrapFramesInFirstLetterFrame(nsContainerFrame*  aBlockFrame,
                                     nsContainerFrame*  aBlockContinuation,
@@ -1940,8 +1934,7 @@ private:
 
   // Special remove method for those pesky floating first-letter frames
   nsresult RemoveFloatingFirstLetterFrames(nsIPresShell*    aPresShell,
-                                           nsIFrame*        aBlockFrame,
-                                           bool*          aStopLooking);
+                                           nsIFrame*        aBlockFrame);
 
   // Capture state for the frame tree rooted at the frame associated with the
   // content object, aContent

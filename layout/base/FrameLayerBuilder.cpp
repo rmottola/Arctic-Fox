@@ -1098,7 +1098,7 @@ public:
    * @param aTextContentFlags if any child layer has CONTENT_COMPONENT_ALPHA,
    * set *aTextContentFlags to CONTENT_COMPONENT_ALPHA
    */
-  void Finish(uint32_t *aTextContentFlags, LayerManagerData* aData,
+  void Finish(uint32_t *aTextContentFlags,
               const nsIntRect& aContainerPixelBounds,
               nsDisplayList* aChildItems, bool& aHasComponentAlphaChildren);
 
@@ -1347,7 +1347,6 @@ protected:
    *                               item returned true from ShouldFixToViewport.
    */
   PaintedLayerData NewPaintedLayerData(nsDisplayItem* aItem,
-                                       const nsIntRect& aVisibleRect,
                                        AnimatedGeometryRoot* aAnimatedGeometryRoot,
                                        const DisplayItemScrollClip* aScrollClip,
                                        const nsPoint& aTopLeft,
@@ -3574,7 +3573,6 @@ PaintedLayerData::AccumulateEventRegions(ContainerState* aState, nsDisplayLayerE
 
 PaintedLayerData
 ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
-                                    const nsIntRect& aVisibleRect,
                                     AnimatedGeometryRoot* aAnimatedGeometryRoot,
                                     const DisplayItemScrollClip* aScrollClip,
                                     const nsPoint& aTopLeft,
@@ -4207,9 +4205,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
        * No need to allocate geometry for items that aren't
        * part of a PaintedLayer.
        */
-      mLayerBuilder->AddLayerDisplayItem(ownLayer, item,
-                                         layerState,
-                                         topLeft, nullptr);
+      mLayerBuilder->AddLayerDisplayItem(ownLayer, item, layerState, nullptr);
     } else {
       bool forceOwnLayer = shouldFixToViewport;
       PaintedLayerData* paintedLayerData =
@@ -4217,8 +4213,8 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
                                                   itemVisibleRect, forceOwnLayer,
                                                   item->Frame()->BackfaceIsHidden(),
                                                   [&]() {
-          return NewPaintedLayerData(item, itemVisibleRect, animatedGeometryRoot,
-                                     agrScrollClip, topLeft, shouldFixToViewport);
+          return NewPaintedLayerData(item, animatedGeometryRoot, agrScrollClip,
+                                     topLeft, shouldFixToViewport);
         });
 
       if (itemType == nsDisplayItem::TYPE_LAYER_EVENT_REGIONS) {
@@ -4452,7 +4448,7 @@ FrameLayerBuilder::AddPaintedDisplayItem(PaintedLayerData* aLayerData,
     }
   }
 
-  AddLayerDisplayItem(layer, aItem, aLayerState, aTopLeft, tempManager);
+  AddLayerDisplayItem(layer, aItem, aLayerState, tempManager);
 
   PaintedLayerItemsEntry* entry = mPaintedLayerItems.PutEntry(layer);
   if (entry) {
@@ -4632,7 +4628,6 @@ void
 FrameLayerBuilder::AddLayerDisplayItem(Layer* aLayer,
                                        nsDisplayItem* aItem,
                                        LayerState aLayerState,
-                                       const nsPoint& aTopLeft,
                                        BasicLayerManager* aManager)
 {
   if (aLayer->Manager() != mRetainingManager)
@@ -4943,7 +4938,7 @@ ContainerState::PostprocessRetainedLayers(nsIntRegion* aOpaqueRegionForContainer
 }
 
 void
-ContainerState::Finish(uint32_t* aTextContentFlags, LayerManagerData* aData,
+ContainerState::Finish(uint32_t* aTextContentFlags,
                        const nsIntRect& aContainerPixelBounds,
                        nsDisplayList* aChildItems, bool& aHasComponentAlphaChildren)
 {
@@ -5351,7 +5346,7 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
     bool hasComponentAlphaChildren = false;
     pixBounds = state.ScaleToOutsidePixels(bounds, false);
     appUnitsPerDevPixel = state.GetAppUnitsPerDevPixel();
-    state.Finish(&flags, data, pixBounds, aChildren, hasComponentAlphaChildren);
+    state.Finish(&flags, pixBounds, aChildren, hasComponentAlphaChildren);
 
     if (hasComponentAlphaChildren &&
         !(flags & Layer::CONTENT_DISABLE_FLATTENING) &&
