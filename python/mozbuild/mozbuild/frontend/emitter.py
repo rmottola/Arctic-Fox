@@ -651,6 +651,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         components = []
         for var, cls in (
+            ('BRANDING_FILES', BrandingFiles),
             ('EXPORTS', Exports),
             ('FINAL_TARGET_FILES', FinalTargetFiles),
             ('FINAL_TARGET_PP_FILES', FinalTargetPreprocessedFiles),
@@ -724,10 +725,6 @@ class TreeMetadataEmitter(LoggingMixin):
                 yield ChromeManifestEntry(context, 'chrome.manifest',
                                           Manifest('components',
                                                    mozpath.basename(c)))
-
-        branding_files = context.get('BRANDING_FILES')
-        if branding_files:
-            yield BrandingFiles(context, branding_files)
 
         for obj in self._handle_libraries(context):
             yield obj

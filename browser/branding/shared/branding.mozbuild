@@ -9,38 +9,40 @@ DIRS += ['content', 'locales']
 DIST_SUBDIR = 'browser'
 export('DIST_SUBDIR')
 
-JS_PREFERENCE_PP_FILES += [
-    '../arcticfox/pref/firefox-branding.js',
-]
+@template
+def FirefoxBranding():
+    JS_PREFERENCE_PP_FILES += [
+        '../arcticfox/pref/firefox-branding.js',
+    ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
-    BRANDING_FILES += [
-        '../shared/newtab.ico',
-        '../shared/newwindow.ico',
-        '../shared/pbmode.ico',
-        'appname.bmp',
-        'branding.nsi',
-        'document.ico',
-        'firefox.ico',
-        'wizHeader.bmp',
-        'wizHeaderRTL.bmp',
-        'wizWatermark.bmp',
-    ]
-elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
-    BRANDING_FILES += [
-        '../shared/background.png',
-        'disk.icns',
-        'document.icns',
-        'dsstore',
-        'firefox.icns',
-    ]
-elif CONFIG['MOZ_WIDGET_GTK']:
-    BRANDING_FILES += [
-        'default16.png',
-        'default32.png',
-        'default48.png',
-        'mozicon128.png',
-    ]
+    if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+        BRANDING_FILES += [
+            '../shared/newtab.ico',
+            '../shared/newwindow.ico',
+            '../shared/pbmode.ico',
+            'appname.bmp',
+            'branding.nsi',
+            'document.ico',
+            'firefox.ico',
+            'wizHeader.bmp',
+            'wizHeaderRTL.bmp',
+            'wizWatermark.bmp',
+        ]
+    elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
+        BRANDING_FILES += [
+            '../shared/background.png',
+            'disk.icns',
+            'document.icns',
+            'dsstore',
+            'firefox.icns',
+        ]
+    elif CONFIG['MOZ_WIDGET_GTK']:
+        BRANDING_FILES += [
+            'default16.png',
+            'default32.png',
+            'default48.png',
+            'mozicon128.png',
+        ]
 
 DEFINES['MOZ_APP_VERSION'] = CONFIG['MOZ_APP_VERSION']
 DEFINES['MOZ_BRANDING_DIRECTORY'] = CONFIG['MOZ_BRANDING_DIRECTORY']
