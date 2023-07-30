@@ -313,7 +313,7 @@ class LinkageWrongKindError(Exception):
 class Linkable(ContextDerived):
     """Generic context derived container object for programs and libraries"""
     __slots__ = (
-        'defines',
+        'lib_defines',
         'linked_libraries',
         'linked_system_libs',
     )
@@ -322,7 +322,7 @@ class Linkable(ContextDerived):
         ContextDerived.__init__(self, context)
         self.linked_libraries = []
         self.linked_system_libs = []
-        self.defines = Defines(context, {})
+        self.lib_defines = Defines(context, {})
 
     def link_library(self, obj):
         assert isinstance(obj, BaseLibrary)
