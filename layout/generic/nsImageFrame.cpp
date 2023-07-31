@@ -1205,7 +1205,8 @@ nsImageFrame::DisplayAltText(nsPresContext*      aPresContext,
 
       rv = nsBidiPresUtils::RenderText(str, maxFit, dir,
                                        aPresContext, aRenderingContext,
-                                       aRenderingContext, *fm, x, y);
+                                       aRenderingContext.GetDrawTarget(),
+                                       *fm, x, y);
     }
     if (NS_FAILED(rv)) {
       nsLayoutUtils::DrawUniDirString(str, maxFit,

@@ -48,7 +48,7 @@ gfxCoreTextShaper::~gfxCoreTextShaper()
 }
 
 bool
-gfxCoreTextShaper::ShapeText(gfxContext      *aContext,
+gfxCoreTextShaper::ShapeText(DrawTarget      *aDrawTarget,
                              const char16_t *aText,
                              uint32_t         aOffset,
                              uint32_t         aLength,

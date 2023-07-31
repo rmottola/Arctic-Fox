@@ -213,10 +213,10 @@ MergeCharactersInTextRun(gfxTextRun* aDest, gfxTextRun* aSrc,
 
 gfxTextRunFactory::Parameters
 GetParametersForInner(nsTransformedTextRun* aTextRun, uint32_t* aFlags,
-    gfxContext* aRefContext)
+                      DrawTarget* aRefDrawTarget)
 {
   gfxTextRunFactory::Parameters params =
-    { aRefContext, nullptr, nullptr,
+    { aRefDrawTarget, nullptr, nullptr,
       nullptr, 0, aTextRun->GetAppUnitsPerDevUnit()
     };
   *aFlags = aTextRun->GetFlags() & ~gfxFontGroup::TEXT_IS_PERSISTENT;
@@ -613,7 +613,8 @@ nsCaseTransformTextRunFactory::TransformString(
 
 void
 nsCaseTransformTextRunFactory::RebuildTextRun(nsTransformedTextRun* aTextRun,
-    gfxContext* aRefContext, gfxMissingFontRecorder *aMFR)
+                                              DrawTarget* aRefDrawTarget,
+                                              gfxMissingFontRecorder* aMFR)
 {
   nsAutoString convertedString;
   nsAutoTArray<bool,50> charsToMergeArray;
@@ -633,7 +634,7 @@ nsCaseTransformTextRunFactory::RebuildTextRun(nsTransformedTextRun* aTextRun,
 
   uint32_t flags;
   gfxTextRunFactory::Parameters innerParams =
-      GetParametersForInner(aTextRun, &flags, aRefContext);
+    GetParametersForInner(aTextRun, &flags, aRefDrawTarget);
   gfxFontGroup* fontGroup = aTextRun->GetFontGroup();
 
   nsAutoPtr<nsTransformedTextRun> transformedChild;
@@ -660,7 +661,7 @@ nsCaseTransformTextRunFactory::RebuildTextRun(nsTransformedTextRun* aTextRun,
   child->SetPotentialLineBreaks(0, canBreakBeforeArray.Length(),
                                 canBreakBeforeArray.Elements());
   if (transformedChild) {
-    transformedChild->FinishSettingProperties(aRefContext, aMFR);
+    transformedChild->FinishSettingProperties(aRefDrawTarget, aMFR);
   }
 
   if (mergeNeeded) {
