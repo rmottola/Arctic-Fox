@@ -2006,7 +2006,7 @@ MacroAssembler::convertTypedOrValueToInt(TypedOrValueRegister src, FloatRegister
 }
 
 bool
-MacroAssembler::asmMergeWith(const MacroAssembler& other)
+MacroAssembler::asmMergeWith(MacroAssembler& other)
 {
     size_t sizeBeforeMerge = size();
 

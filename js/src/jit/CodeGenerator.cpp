@@ -8076,7 +8076,6 @@ CodeGenerator::generateAsmJS(AsmJSFunctionOffsets* offsets)
                        target);
     }
 
-
     if (!generateBody())
         return false;
 
@@ -8092,7 +8091,6 @@ CodeGenerator::generateAsmJS(AsmJSFunctionOffsets* offsets)
         masm.jump(masm.asmStackOverflowLabel());
     }
 
-
 #if defined(JS_ION_PERF)
     // Note the end of the inline code and start of the OOL code.
     gen->perfSpewer().noteEndInlineCode(masm);
@@ -8100,10 +8098,6 @@ CodeGenerator::generateAsmJS(AsmJSFunctionOffsets* offsets)
 
     if (!generateOutOfLineCode())
         return false;
-
-    // Flush constant pools now so that pool hints encoded in the code stream
-    // get converted into actual instructions.
-    masm.flushBuffer();
 
     offsets->end = masm.currentOffset();
 
