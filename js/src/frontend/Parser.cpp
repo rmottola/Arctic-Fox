@@ -807,10 +807,11 @@ Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun,
 
 template <typename ParseHandler>
 ModuleBox::ModuleBox(ExclusiveContext* cx, ObjectBox* traceListHead, ModuleObject* module,
-                     ParseContext<ParseHandler>* outerpc)
+                     ModuleBuilder& builder, ParseContext<ParseHandler>* outerpc)
   : ObjectBox(module, traceListHead),
     SharedContext(cx, Directives(true), false),
     bindings(),
+    builder(builder),
     exportNames(cx)
 {
     computeThisBinding(staticScope());
@@ -818,7 +819,7 @@ ModuleBox::ModuleBox(ExclusiveContext* cx, ObjectBox* traceListHead, ModuleObjec
 
 template <typename ParseHandler>
 ModuleBox*
-Parser<ParseHandler>::newModuleBox(Node pn, HandleModuleObject module)
+Parser<ParseHandler>::newModuleBox(Node pn, HandleModuleObject module, ModuleBuilder& builder)
 {
     MOZ_ASSERT(module);
 
@@ -830,7 +831,7 @@ Parser<ParseHandler>::newModuleBox(Node pn, HandleModuleObject module)
      */
     ParseContext<ParseHandler>* outerpc = nullptr;
     ModuleBox* modbox =
-        alloc.new_<ModuleBox>(context, traceListHead, module, outerpc);
+        alloc.new_<ModuleBox>(context, traceListHead, module, builder, outerpc);
     if (!modbox) {
         ReportOutOfMemory(context);
         return nullptr;
@@ -845,7 +846,7 @@ Parser<ParseHandler>::newModuleBox(Node pn, HandleModuleObject module)
 
 template <>
 ModuleBox*
-Parser<SyntaxParseHandler>::newModuleBox(Node pn, HandleModuleObject module)
+Parser<SyntaxParseHandler>::newModuleBox(Node pn, HandleModuleObject module, ModuleBuilder& builder)
 {
     MOZ_ALWAYS_FALSE(abortIfSyntaxParser());
     return nullptr;
@@ -958,7 +959,7 @@ Parser<ParseHandler>::standaloneModule(HandleModuleObject module, ModuleBuilder&
     if (!mn)
         return null();
 
-    ModuleBox* modulebox = newModuleBox(mn, module);
+    ModuleBox* modulebox = newModuleBox(mn, module, builder);
     if (!modulebox)
         return null();
     handler.setModuleBox(mn, modulebox);
@@ -4924,9 +4925,9 @@ Parser<SyntaxParseHandler>::namedImportsOrNamespaceImport(TokenKind tt, Node imp
     return false;
 }
 
-template<typename ParseHandler>
-typename ParseHandler::Node
-Parser<ParseHandler>::importDeclaration()
+template<>
+ParseNode*
+Parser<FullParseHandler>::importDeclaration()
 {
     MOZ_ASSERT(tokenStream.currentToken().type == TOK_IMPORT);
 
@@ -5012,7 +5013,12 @@ Parser<ParseHandler>::importDeclaration()
     if (!MatchOrInsertSemicolonAfterNonExpression(tokenStream))
         return null();
 
-    return handler.newImportDeclaration(importSpecSet, moduleSpec, TokenPos(begin, pos().end));
+    ParseNode* node =
+        handler.newImportDeclaration(importSpecSet, moduleSpec, TokenPos(begin, pos().end));
+    if (!node || !pc->sc->asModuleBox()->builder.processImport(node))
+        return null();
+
+    return node;
 }
 
 template<>
@@ -5181,7 +5187,11 @@ Parser<FullParseHandler>::exportDeclaration()
             if (!MatchOrInsertSemicolonAfterNonExpression(tokenStream))
                 return null();
 
-            return handler.newExportFromDeclaration(begin, kid, moduleSpec);
+            ParseNode* node = handler.newExportFromDeclaration(begin, kid, moduleSpec);
+            if (!node || !pc->sc->asModuleBox()->builder.processExportFrom(node))
+                return null();
+
+            return node;
         }
 
         tokenStream.ungetToken();
@@ -5223,7 +5233,12 @@ Parser<FullParseHandler>::exportDeclaration()
         if (!MatchOrInsertSemicolonAfterNonExpression(tokenStream))
             return null();
 
-        return handler.newExportFromDeclaration(begin, kid, moduleSpec);
+        ParseNode* node = handler.newExportFromDeclaration(begin, kid, moduleSpec);
+        if (!node || !pc->sc->asModuleBox()->builder.processExportFrom(node))
+            return null();
+
+        return node;
+
       }
 
       case TOK_FUNCTION:
@@ -5290,7 +5305,11 @@ Parser<FullParseHandler>::exportDeclaration()
             break;
         }
 
-        return handler.newExportDefaultDeclaration(kid, binding, TokenPos(begin, pos().end));
+        ParseNode* node = handler.newExportDefaultDeclaration(kid, binding, TokenPos(begin, pos().end));
+        if (!node || !pc->sc->asModuleBox()->builder.processExport(node))
+            return null();
+
+        return node;
       }
 
       case TOK_LET:
@@ -5307,7 +5326,11 @@ Parser<FullParseHandler>::exportDeclaration()
         return null();
     }
 
-    return handler.newExportDeclaration(kid, TokenPos(begin, pos().end));
+    ParseNode* node = handler.newExportDeclaration(kid, TokenPos(begin, pos().end));
+    if (!node || !pc->sc->asModuleBox()->builder.processExport(node))
+        return null();
+
+    return node;
 }
 
 template<>
