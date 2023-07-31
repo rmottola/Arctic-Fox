@@ -1748,13 +1748,13 @@ AsmJSModule::heapLength() const
     return maybeHeap_ ? maybeHeap_->byteLength() : 0;
 }
 
-bool
-AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
+void
+AsmJSModule::setProfilingEnabled(bool enabled, JSContext* cx)
 {
     MOZ_ASSERT(isDynamicallyLinked());
 
     if (profilingEnabled_ == enabled)
-        return true;
+        return;
 
     // When enabled, generate profiling labels for every name in names_ that is
     // the name of some Function CodeRange. This involves malloc() so do it now
@@ -1763,7 +1763,7 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
     if (enabled) {
         if (!profilingLabels_.resize(names_.length())) {
             ReportOutOfMemory(cx);
-            return false;
+            return;
         }
         const char* filename = scriptSource_->filename();
         JS::AutoCheckCannotGC nogc;
@@ -1778,7 +1778,7 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
                 : JS_smprintf("%hs (%s:%u)", name->twoByteChars(nogc), filename, lineno));
             if (!label) {
                 ReportOutOfMemory(cx);
-                return false;
+                return;
             }
             profilingLabels_[cr.functionNameIndex()].reset(label.get());
         }
@@ -1952,7 +1952,6 @@ AsmJSModule::setProfilingEnabled(JSContext* cx, bool enabled)
     }
 
     profilingEnabled_ = enabled;
-    return true;
 }
 
 static bool

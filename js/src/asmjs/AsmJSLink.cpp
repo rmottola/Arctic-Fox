@@ -693,7 +693,7 @@ CallAsmJS(JSContext* cx, unsigned argc, Value* vp)
     // stack since this would leave the module in a state where profiling is
     // enabled but the stack isn't unwindable.
     if (module.profilingEnabled() != cx->runtime()->spsProfiler.enabled() && !module.active())
-        module.setProfilingEnabled(cx, cx->runtime()->spsProfiler.enabled());
+        module.setProfilingEnabled(cx->runtime()->spsProfiler.enabled(), cx);
 
     // The calling convention for an external call into asm.js is to pass an
     // array of 16-byte values where each value contains either a coerced int32
