@@ -1190,5 +1190,4 @@ ModuleBox::trace(JSTracer* trc)
 {
     ObjectBox::trace(trc);
     bindings.trace(trc);
-    exportNames.trace(trc);
 }
