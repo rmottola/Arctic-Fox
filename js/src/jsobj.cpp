@@ -3657,7 +3657,7 @@ js::DumpBacktrace(JSContext* cx)
             i.isInterp() ? 'i' :
             i.isBaseline() ? 'b' :
             i.isIon() ? 'I' :
-            i.isAsmJS() ? 'A' :
+            i.isWasm() ? 'W' :
             '?';
 
         sprinter.printf("#%d %14p %c   %s:%d (%p @ %d)\n",
