@@ -555,7 +555,6 @@ enum class SymbolicAddress
     RuntimeInterruptUint32,
     StackLimit,
     ReportOverRecursed,
-    OnDetached,
     OnOutOfBounds,
     OnImpreciseConversion,
     HandleExecutionInterrupt,
