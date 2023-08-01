@@ -239,7 +239,7 @@ ExecutableAllocator::systemRelease(const ExecutablePool::Allocation& alloc)
 void
 ExecutableAllocator::reprotectRegion(void* start, size_t size, ProtectionSetting setting)
 {
-    MOZ_ASSERT(nonWritableJitCode);
+    MOZ_ASSERT(NON_WRITABLE_JIT_CODE);
     MOZ_ASSERT(pageSize);
 
     // Calculate the start of the page containing this region,
@@ -262,8 +262,9 @@ ExecutableAllocator::reprotectRegion(void* start, size_t size, ProtectionSetting
 /* static */ unsigned
 ExecutableAllocator::initialProtectionFlags(ProtectionSetting protection)
 {
-    if (!nonWritableJitCode)
-        return PAGE_EXECUTE_READWRITE;
-
+#ifdef NON_WRITABLE_JIT_CODE
     return (protection == Writable) ? PAGE_READWRITE : PAGE_EXECUTE_READ;
+#else
+    return PAGE_EXECUTE_READWRITE;
+#endif
 }
