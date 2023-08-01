@@ -3067,7 +3067,6 @@ wasm::IonCompileFunction(IonCompileTask* task)
 
     // Compile MIR graph
     {
-
         jit::SpewBeginFunction(&mir, nullptr);
         jit::AutoSpewEndFunction spewEndFunction(&mir);
 
