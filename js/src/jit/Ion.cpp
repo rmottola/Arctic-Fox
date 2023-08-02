@@ -2792,7 +2792,7 @@ jit::SetEnterJitData(JSContext* cx, EnterJitData& data, RunState& state, AutoVal
         data.calleeToken = CalleeToToken(state.script());
 
         if (state.script()->isForEval() &&
-            !(state.asExecute()->type() & InterpreterFrame::GLOBAL))
+            !(state.asExecute()->type() & InterpreterFrame::GLOBAL_OR_MODULE))
         {
             ScriptFrameIter iter(cx);
             if (iter.isFunctionFrame())
