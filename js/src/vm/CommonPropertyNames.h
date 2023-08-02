@@ -38,6 +38,7 @@
     macro(BYTES_PER_ELEMENT, BYTES_PER_ELEMENT, "BYTES_PER_ELEMENT") \
     macro(call, call, "call") \
     macro(callContentFunction, callContentFunction, "callContentFunction") \
+    macro(std_Function_apply, std_Function_apply, "std_Function_apply") \
     macro(callee, callee, "callee") \
     macro(caller, caller, "caller") \
     macro(callFunction, callFunction, "callFunction") \
