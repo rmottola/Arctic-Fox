@@ -2773,7 +2773,7 @@ DebugScopes::updateLiveScopes(JSContext* cx)
         if (frame.scopeChain()->compartment() != cx->compartment())
             continue;
 
-        if (frame.isFunctionFrame() && frame.callee()->isGenerator())
+        if (frame.isNonEvalFunctionFrame() && frame.callee()->isGenerator())
             continue;
 
         if (!frame.isDebuggee())
@@ -2958,7 +2958,7 @@ GetDebugScopeForMissing(JSContext* cx, const ScopeIter& si)
         // For example, |let ({} = "") { yield evalInFrame("foo"); }|.
         MOZ_ASSERT_IF(si.staticBlock().numVariables() > 0 &&
                       si.withinInitialFrame() &&
-                      si.initialFrame().isFunctionFrame(),
+                      si.initialFrame().isNonEvalFunctionFrame(),
                       !si.initialFrame().callee()->isGenerator());
 
         Rooted<StaticBlockObject*> staticBlock(cx, &si.staticBlock());
