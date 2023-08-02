@@ -402,7 +402,7 @@ js::GetOutermostEnclosingFunctionOfScriptedCaller(JSContext* cx)
     if (iter.done())
         return nullptr;
 
-    if (!iter.isNonEvalFunctionFrame())
+    if (!iter.isFunctionFrame())
         return nullptr;
 
     RootedFunction curr(cx, iter.callee(cx));
@@ -726,7 +726,7 @@ FormatFrame(JSContext* cx, const ScriptFrameIter& iter, char* buf, int num,
 
     RootedValue thisVal(cx);
     if (iter.hasUsableAbstractFramePtr() &&
-        iter.isNonEvalFunctionFrame() &&
+        iter.isFunctionFrame() &&
         fun && !fun->isArrow() && !fun->isDerivedClassConstructor())
     {
         if (!GetFunctionThis(cx, iter.abstractFramePtr(), &thisVal))
