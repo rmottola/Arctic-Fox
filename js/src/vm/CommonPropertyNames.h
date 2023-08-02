@@ -61,6 +61,9 @@
     macro(currencyDisplay, currencyDisplay, "currencyDisplay") \
     macro(DateTimeFormat, DateTimeFormat, "DateTimeFormat") \
     macro(DateTimeFormatFormatGet, DateTimeFormatFormatGet, "Intl_DateTimeFormat_format_get") \
+    macro(DateTimeFormatFormatToPartsGet, DateTimeFormatFormatToPartsGet, "Intl_DateTimeFormat_formatToParts_get") \
+    macro(day, day, "day") \
+    macro(dayperiod, dayperiod, "dayperiod") \
     macro(decodeURI, decodeURI, "decodeURI") \
     macro(decodeURIComponent, decodeURIComponent, "decodeURIComponent") \
     macro(default_, default_, "default") \
@@ -83,6 +86,7 @@
     macro(entries, entries, "entries") \
     macro(enumerable, enumerable, "enumerable") \
     macro(enumerate, enumerate, "enumerate") \
+    macro(era, era, "era") \
     macro(escape, escape, "escape") \
     macro(eval, eval, "eval") \
     macro(false, false_, "false") \
@@ -101,6 +105,7 @@
     macro(forceInterpreter, forceInterpreter, "forceInterpreter") \
     macro(forEach, forEach, "forEach") \
     macro(format, format, "format") \
+    macro(formatToParts, formatToParts, "formatToParts") \
     macro(frame, frame, "frame") \
     macro(from, from, "from") \
     macro(gcCycleNumber, gcCycleNumber, "gcCycleNumber") \
@@ -115,6 +120,7 @@
     macro(has, has, "has") \
     macro(hasOwn, hasOwn, "hasOwn") \
     macro(hasOwnProperty, hasOwnProperty, "hasOwnProperty") \
+    macro(hour, hour, "hour") \
     macro(ignoreCase, ignoreCase, "ignoreCase") \
     macro(ignorePunctuation, ignorePunctuation, "ignorePunctuation") \
     macro(includes, includes, "includes") \
@@ -159,8 +165,10 @@
     macro(minimumFractionDigits, minimumFractionDigits, "minimumFractionDigits") \
     macro(minimumIntegerDigits, minimumIntegerDigits, "minimumIntegerDigits") \
     macro(minimumSignificantDigits, minimumSignificantDigits, "minimumSignificantDigits") \
+    macro(minute, minute, "minute") \
     macro(missingArguments, missingArguments, "missingArguments") \
     macro(module, module, "module") \
+    macro(month, month, "month") \
     macro(multiline, multiline, "multiline") \
     macro(name, name, "name") \
     macro(NaN, NaN, "NaN") \
@@ -207,7 +215,9 @@
     macro(revoke, revoke, "revoke") \
     macro(script, script, "script") \
     macro(scripts, scripts, "scripts") \
+    macro(second, second, "second") \
     macro(sensitivity, sensitivity, "sensitivity") \
+    macro(separator, separator, "separator") \
     macro(set, set, "set") \
     macro(shape, shape, "shape") \
     macro(size, size, "size") \
@@ -228,6 +238,7 @@
     macro(throw, throw_, "throw") \
     macro(timestamp, timestamp, "timestamp") \
     macro(timeZone, timeZone, "timeZone") \
+    macro(timeZoneName, timeZoneName, "timeZoneName") \
     macro(toGMTString, toGMTString, "toGMTString") \
     macro(toISOString, toISOString, "toISOString") \
     macro(toJSON, toJSON, "toJSON") \
@@ -236,6 +247,7 @@
     macro(toString, toString, "toString") \
     macro(toUTCString, toUTCString, "toUTCString") \
     macro(true, true_, "true") \
+    macro(type, type, "type") \
     macro(unescape, unescape, "unescape") \
     macro(uneval, uneval, "uneval") \
     macro(unicode, unicode, "unicode") \
@@ -262,7 +274,9 @@
     macro(void0, void0, "(void 0)") \
     macro(watch, watch, "watch") \
     macro(WeakSet_add, WeakSet_add, "WeakSet_add") \
+    macro(weekday, weekday, "weekday") \
     macro(writable, writable, "writable") \
+    macro(year, year, "year") \
     macro(yield, yield, "yield") \
     macro(raw, raw, "raw") \
     /* Type names must be contiguous and ordered; see js::TypeName. */ \
