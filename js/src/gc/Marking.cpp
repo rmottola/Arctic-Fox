@@ -413,20 +413,13 @@ template <typename T>
 JS_PUBLIC_API(void)
 JS::TraceEdge(JSTracer* trc, JS::Heap<T>* thingp, const char* name)
 {
-    DispatchToTracer(trc, ConvertToBase(thingp->unsafeGet()), name);
-}
-
-template <typename T>
-JS_PUBLIC_API(void)
-JS::TraceNullableEdge(JSTracer* trc, JS::Heap<T>* thingp, const char* name)
-{
     MOZ_ASSERT(thingp);
     if (InternalGCMethods<T>::isMarkable(thingp->get()))
         DispatchToTracer(trc, ConvertToBase(thingp->unsafeGet()), name);
 }
 
 JS_PUBLIC_API(void)
-JS::TraceNullableEdge(JSTracer* trc, JS::TenuredHeap<JSObject*>* thingp, const char* name)
+JS::TraceEdge(JSTracer* trc, JS::TenuredHeap<JSObject*>* thingp, const char* name)
 {
     MOZ_ASSERT(thingp);
     if (JSObject* ptr = thingp->getPtr()) {
@@ -470,13 +463,6 @@ js::TraceRoot(JSTracer* trc, T* thingp, const char* name)
 }
 
 template <typename T>
-JS_PUBLIC_API(void)
-JS::UnsafeTraceRoot(JSTracer* trc, T* thingp, const char* name)
-{
-    js::TraceRoot(trc, thingp, name);
-}
-
-template <typename T>
 void
 js::TraceRoot(JSTracer* trc, ReadBarriered<T>* thingp, const char* name)
 {
@@ -497,6 +483,14 @@ void
 js::TraceNullableRoot(JSTracer* trc, ReadBarriered<T>* thingp, const char* name)
 {
     TraceNullableRoot(trc, thingp->unsafeGet(), name);
+}
+
+template <typename T>
+JS_PUBLIC_API(void)
+JS::UnsafeTraceRoot(JSTracer* trc, T* thingp, const char* name)
+{
+    MOZ_ASSERT(thingp);
+    js::TraceNullableRoot(trc, thingp, name);
 }
 
 template <typename T>
@@ -540,8 +534,6 @@ FOR_EACH_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS)
 
 #define INSTANTIATE_PUBLIC_TRACE_FUNCTIONS(type) \
     template JS_PUBLIC_API(void) JS::TraceEdge<type>(JSTracer*, JS::Heap<type>*, const char*); \
-    template JS_PUBLIC_API(void) JS::TraceNullableEdge<type>(JSTracer*, JS::Heap<type>*, \
-                                                             const char*); \
     template JS_PUBLIC_API(void) JS::UnsafeTraceRoot<type>(JSTracer*, type*, const char*); \
     template JS_PUBLIC_API(void) js::UnsafeTraceManuallyBarrieredEdge<type>(JSTracer*, type*, \
                                                                             const char*);
