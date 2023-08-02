@@ -2966,15 +2966,7 @@ JitProfilingFrameIterator::JitProfilingFrameIterator(
             return;
     }
 
-    // In some rare cases (e.g. baseline eval frame), the callee script may
-    // not have a baselineScript.  Treat this is an empty frame-sequence and
-    // move on.
-    if (!frameScript()->hasBaselineScript()) {
-        type_ = JitFrame_Entry;
-        fp_ = nullptr;
-        returnAddressToFp_ = nullptr;
-        return;
-    }
+    MOZ_ASSERT(frameScript()->hasBaselineScript());
 
     // If nothing matches, for now just assume we are at the start of the last frame's
     // baseline jit code.
