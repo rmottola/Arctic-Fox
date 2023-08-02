@@ -1167,7 +1167,7 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool lambdaParen)
     } else {
         MOZ_ASSERT(!fun->isExprBody());
 
-        if (fun->isNative() && fun->native() == js::DefaultDerivedClassConstructor) {
+        if (fun->infallibleIsDefaultClassConstructor(cx) && fun->isDerivedClassConstructor()) {
             if (!out.append("(...args) {\n    ") ||
                 !out.append("super(...args);\n}"))
             {
@@ -1365,6 +1365,25 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
 
     args.rval().set(args2.rval());
     return true;
+}
+
+bool
+JSFunction::infallibleIsDefaultClassConstructor(JSContext* cx) const
+{
+    if (!isSelfHostedBuiltin())
+        return false;
+
+    bool isDefault = false;
+    if (isInterpretedLazy()) {
+        JSAtom* name = &getExtendedSlot(LAZY_FUNCTION_NAME_SLOT).toString()->asAtom();
+        isDefault = name == cx->names().DefaultDerivedClassConstructor;
+    } else {
+        isDefault = nonLazyScript()->isDefaultClassConstructor();
+    }
+
+    MOZ_ASSERT_IF(isDefault, isConstructor());
+    MOZ_ASSERT_IF(isDefault, isClassConstructor());
+    return isDefault;
 }
 
 static const uint32_t JSSLOT_BOUND_FUNCTION_TARGET     = 0;
@@ -2107,6 +2126,7 @@ js::NewNativeConstructor(ExclusiveContext* cx, Native native, unsigned nargs, Ha
 JSFunction*
 js::NewScriptedFunction(ExclusiveContext* cx, unsigned nargs,
                         JSFunction::Flags flags, HandleAtom atom,
+                        HandleObject proto /* = nullptr */,
                         gc::AllocKind allocKind /* = AllocKind::FUNCTION */,
                         NewObjectKind newKind /* = GenericObject */,
                         HandleObject enclosingDynamicScopeArg /* = nullptr */)
@@ -2115,7 +2135,7 @@ js::NewScriptedFunction(ExclusiveContext* cx, unsigned nargs,
     if (!enclosingDynamicScope)
         enclosingDynamicScope = &cx->global()->lexicalScope();
     return NewFunctionWithProto(cx, nullptr, nargs, flags, enclosingDynamicScope,
-                                atom, nullptr, allocKind, newKind);
+                                atom, proto, allocKind, newKind);
 }
 
 #ifdef DEBUG
@@ -2405,6 +2425,7 @@ js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
     if (!native)
         fun = NewScriptedFunction(cx, nargs,
                                   JSFunction::INTERPRETED_LAZY, atom,
+                                  /* proto = */ nullptr,
                                   allocKind, GenericObject, obj);
     else if (flags & JSFUN_CONSTRUCTOR)
         fun = NewNativeConstructor(cx, native, nargs, atom, allocKind);

@@ -1195,6 +1195,7 @@ class JSScript : public js::gc::TenuredCell
     bool needsHomeObject_:1;
 
     bool isDerivedClassConstructor_:1;
+    bool isDefaultClassConstructor_:1;
 
     // Add padding so JSScript is gc::Cell aligned. Make padding protected
     // instead of private to suppress -Wunused-private-field compiler warnings.
@@ -1426,6 +1427,9 @@ class JSScript : public js::gc::TenuredCell
     bool failedLexicalCheck() const {
         return failedLexicalCheck_;
     }
+    bool isDefaultClassConstructor() const {
+        return isDefaultClassConstructor_;
+    }
 
     void setFailedBoundsCheck() { failedBoundsCheck_ = true; }
     void setFailedShapeGuard() { failedShapeGuard_ = true; }
@@ -1434,6 +1438,7 @@ class JSScript : public js::gc::TenuredCell
     void setUninlineable() { uninlineable_ = true; }
     void setInvalidatedIdempotentCache() { invalidatedIdempotentCache_ = true; }
     void setFailedLexicalCheck() { failedLexicalCheck_ = true; }
+    void setIsDefaultClassConstructor() { isDefaultClassConstructor_ = true; }
 
     bool hasScriptCounts() const { return hasScriptCounts_; }
 
