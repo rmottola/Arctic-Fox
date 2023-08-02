@@ -78,8 +78,6 @@
                                     \
     _(ObjectCreate)                 \
                                     \
-    _(CallBoundFunction)            \
-                                    \
     _(SimdInt32x4)                  \
     _(SimdFloat32x4)                \
     _(SimdBool32x4)                 \

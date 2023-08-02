@@ -6272,6 +6272,9 @@ IonBuilder::createThis(JSFunction* target, MDefinition* callee, MDefinition* new
         return magic;
     }
 
+    if (target->isBoundFunction())
+        return constant(MagicValue(JS_UNINITIALIZED_LEXICAL));
+
     if (target->isDerivedClassConstructor()) {
         MOZ_ASSERT(target->isClassConstructor());
         return constant(MagicValue(JS_UNINITIALIZED_LEXICAL));
