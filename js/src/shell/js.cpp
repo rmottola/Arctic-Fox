@@ -99,12 +99,10 @@ using namespace js::shell;
 
 using mozilla::ArrayLength;
 using mozilla::Atomic;
-using mozilla::MakeUnique;
 using mozilla::Maybe;
 using mozilla::NumberEqualsInt32;
 using mozilla::PodCopy;
 using mozilla::PodEqual;
-using mozilla::UniquePtr;
 
 enum JSShellExitCode {
     EXITCODE_RUNTIME_ERROR      = 3,
@@ -598,7 +596,7 @@ RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
     RootedFunction importFun(cx);
     MOZ_ALWAYS_TRUE(GetImportMethod(cx, loaderObj, &importFun));
 
-    AutoValueArray<2> args(cx);
+    JS::AutoValueArray<2> args(cx);
     args[0].setString(JS_NewStringCopyZ(cx, filename));
     args[1].setUndefined();
 
@@ -2726,7 +2724,7 @@ WorkerMain(void* arg)
         return;
     }
 
-    mozilla::UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
+    UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
     if (!sr) {
         JS_DestroyRuntime(rt);
         js_delete(input);
@@ -3310,7 +3308,7 @@ ParseModule(JSContext* cx, unsigned argc, Value* vp)
     if (!scriptContents)
         return false;
 
-    mozilla::UniquePtr<char, JS::FreePolicy> filename;
+    UniquePtr<char, JS::FreePolicy> filename;
     CompileOptions options(cx);
     if (args.length() > 1) {
         if (!args[1].isString()) {
@@ -4109,12 +4107,12 @@ WithSourceHook(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    UniquePtr<ShellSourceHook> hook =
-        MakeUnique<ShellSourceHook>(cx, args[0].toObject().as<JSFunction>());
+    mozilla::UniquePtr<ShellSourceHook> hook =
+        mozilla::MakeUnique<ShellSourceHook>(cx, args[0].toObject().as<JSFunction>());
     if (!hook)
         return false;
 
-    UniquePtr<SourceHook> savedHook = js::ForgetSourceHook(cx->runtime());
+    mozilla::UniquePtr<SourceHook> savedHook = js::ForgetSourceHook(cx->runtime());
     js::SetSourceHook(cx->runtime(), Move(hook));
 
     RootedObject fun(cx, &args[1].toObject());
@@ -6852,7 +6850,7 @@ main(int argc, char** argv, char** envp)
     if (!rt)
         return 1;
 
-    mozilla::UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
+    UniquePtr<ShellRuntime> sr = MakeUnique<ShellRuntime>();
     if (!sr)
         return 1;
 
