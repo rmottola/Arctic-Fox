@@ -2226,6 +2226,7 @@ CanProduceNegativeZero(MDefinition* def) {
         case MDefinition::Op_Constant:
             if (def->type() == MIRType_Double && def->constantValue().toDouble() == -0.0)
                 return true;
+            MOZ_FALLTHROUGH;
         case MDefinition::Op_BitAnd:
         case MDefinition::Op_BitOr:
         case MDefinition::Op_BitXor:
@@ -2304,7 +2305,7 @@ NeedNegativeZeroCheck(MDefinition* def)
             if (rhs->id() < lhs->id() && CanProduceNegativeZero(lhs))
                 return true;
 
-            /* Fall through...  */
+            MOZ_FALLTHROUGH;
           }
           case MDefinition::Op_StoreElement:
           case MDefinition::Op_StoreElementHole:
@@ -3083,7 +3084,7 @@ MTypeOf::foldsTo(TempAllocator& alloc)
             type = JSTYPE_OBJECT;
             break;
         }
-        // FALL THROUGH
+        MOZ_FALLTHROUGH;
       default:
         return this;
     }
@@ -3368,9 +3369,10 @@ MToInt32::foldsTo(TempAllocator& alloc)
           case MIRType_Float32:
           case MIRType_Double:
             int32_t ival;
-            // Only the value within the range of Int32 can be substitued as constant.
+            // Only the value within the range of Int32 can be substituted as constant.
             if (mozilla::NumberEqualsInt32(val.toNumber(), &ival))
                 return MConstant::New(alloc, Int32Value(ival));
+            break;
           default:
             break;
         }

@@ -6047,7 +6047,8 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         lastMarkSlice = false;
 
         incrementalState = MARK_ROOTS;
-        /* fall through */
+
+        MOZ_FALLTHROUGH;
 
       case MARK_ROOTS:
         if (!beginMarkPhase(reason)) {
@@ -6063,7 +6064,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         if (isIncremental && zeal == ZealIncrementalRootsThenFinish)
             break;
 
-        /* fall through */
+        MOZ_FALLTHROUGH;
 
       case MARK:
         AutoGCRooter::traceAllWrappers(&marker);
@@ -6109,7 +6110,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         if (isIncremental && zeal == ZealIncrementalMultipleSlices)
             break;
 
-        /* fall through */
+        MOZ_FALLTHROUGH;
 
       case SWEEP:
         AutoGCRooter::traceAllWrappers(&marker);
@@ -6125,6 +6126,8 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         /* Yield before compacting since it is not incremental. */
         if (isCompacting && isIncremental)
             break;
+
+        MOZ_FALLTHROUGH;
 
       case COMPACT:
         if (isCompacting) {
