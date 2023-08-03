@@ -482,7 +482,7 @@ struct ParseTask
     PersistentRootedScript script;
 
     // Holds the ScriptSourceObject generated for the script compilation.
-    ScriptSourceObject* sourceObject;
+    PersistentRooted<ScriptSourceObject*> sourceObject;
 
     // Any errors or warnings produced during compilation. These are reported
     // when finishing the script.
