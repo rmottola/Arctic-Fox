@@ -7413,7 +7413,7 @@ JS::GCDescription::formatSliceMessage(JSRuntime* rt) const
     UniqueChars cstr = rt->gc.stats.formatCompactSliceMessage();
 
     size_t nchars = strlen(cstr.get());
-    UniquePtr<char16_t, JS::FreePolicy> out(js_pod_malloc<char16_t>(nchars + 1));
+    UniqueTwoByteChars out(js_pod_malloc<char16_t>(nchars + 1));
     if (!out)
         return nullptr;
     out.get()[nchars] = 0;
@@ -7428,7 +7428,7 @@ JS::GCDescription::formatSummaryMessage(JSRuntime* rt) const
     UniqueChars cstr = rt->gc.stats.formatCompactSummaryMessage();
 
     size_t nchars = strlen(cstr.get());
-    UniquePtr<char16_t, JS::FreePolicy> out(js_pod_malloc<char16_t>(nchars + 1));
+    UniqueTwoByteChars out(js_pod_malloc<char16_t>(nchars + 1));
     if (!out)
         return nullptr;
     out.get()[nchars] = 0;
@@ -7449,7 +7449,7 @@ JS::GCDescription::formatJSON(JSRuntime* rt, uint64_t timestamp) const
     UniqueChars cstr = rt->gc.stats.formatJsonMessage(timestamp);
 
     size_t nchars = strlen(cstr.get());
-    UniquePtr<char16_t, JS::FreePolicy> out(js_pod_malloc<char16_t>(nchars + 1));
+    UniqueTwoByteChars out(js_pod_malloc<char16_t>(nchars + 1));
     if (!out)
         return nullptr;
     out.get()[nchars] = 0;

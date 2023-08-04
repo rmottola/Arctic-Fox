@@ -3689,8 +3689,7 @@ js::ArrayInfo(JSContext* cx, unsigned argc, Value* vp)
     for (unsigned i = 0; i < args.length(); i++) {
         HandleValue arg = args[i];
 
-        UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, arg, nullptr);
+        UniqueChars bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, arg, nullptr);
         if (!bytes)
             return false;
         if (arg.isPrimitive() ||
