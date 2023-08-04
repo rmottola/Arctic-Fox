@@ -5933,6 +5933,8 @@ JS_PUBLIC_API(bool)
 DescribeScriptedCaller(JSContext* cx, UniqueChars* filename, unsigned* lineno,
                        unsigned* column)
 {
+    if (filename)
+        filename->reset();
     if (lineno)
         *lineno = 0;
     if (column)
@@ -5947,7 +5949,7 @@ DescribeScriptedCaller(JSContext* cx, UniqueChars* filename, unsigned* lineno,
     if (i.activation()->scriptedCallerIsHidden())
         return false;
 
-    if (filename) {
+    if (filename && i.filename()) {
         UniqueChars copy = make_string_copy(i.filename());
         if (!copy)
             return false;
