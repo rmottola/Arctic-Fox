@@ -3401,7 +3401,10 @@ JS::NewFunctionFromSpec(JSContext* cx, const JSFunctionSpec* fs, HandleId id)
         {
             return nullptr;
         }
-        return &funVal.toObject().as<JSFunction>();
+        JSFunction* fun = &funVal.toObject().as<JSFunction>();
+        if (fs->flags & JSFUN_HAS_REST)
+            fun->setHasRest();
+        return fun;
     }
 
     RootedAtom atom(cx, IdToFunctionName(cx, id));
