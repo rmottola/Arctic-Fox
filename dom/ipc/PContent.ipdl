@@ -365,6 +365,15 @@ struct VolumeInfo {
   bool isHotSwappable;
 };
 
+struct DeviceStorageAreaInfo {
+  nsString music;
+  nsString pictures;
+  nsString videos;
+  nsString sdcard;
+  nsString apps;
+  nsString crashes;
+};
+
 struct ClipboardCapabilities {
   bool supportsSelectionClipboard;
   bool supportsFindClipboard;
@@ -595,6 +604,8 @@ child:
     ScreenSizeChanged(IntSize size);
 
     Volumes(VolumeInfo[] volumes);
+
+    DeviceStorageAreas(DeviceStorageAreaInfo areaInfo);
 
     FlushMemory(nsString reason);
 
