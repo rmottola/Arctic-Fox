@@ -45,7 +45,6 @@ InputContextAction::Cause IMEHandler::sLastContextActionCause =
 #ifdef NS_ENABLE_TSF
 bool IMEHandler::sIsInTSFMode = false;
 bool IMEHandler::sIsIMMEnabled = true;
-bool IMEHandler::sShowingOnScreenKeyboard = false;
 decltype(SetInputScopes)* IMEHandler::sSetInputScopes = nullptr;
 #endif // #ifdef NS_ENABLE_TSF
 
@@ -550,7 +549,7 @@ IMEHandler::MaybeShowOnScreenKeyboard()
   if (sPluginHasFocus ||
       !IsWin8OrLater() ||
       !Preferences::GetBool(kOskEnabled, true) ||
-      sShowingOnScreenKeyboard ||
+      GetOnScreenKeyboardWindow() ||
       IMEHandler::IsKeyboardPresentOnSlate()) {
     return;
   }
@@ -575,8 +574,7 @@ void
 IMEHandler::MaybeDismissOnScreenKeyboard()
 {
   if (sPluginHasFocus ||
-      !IsWin8OrLater() ||
-      !sShowingOnScreenKeyboard) {
+      !IsWin8OrLater()) {
     return;
   }
 
@@ -898,7 +896,6 @@ IMEHandler::ShowOnScreenKeyboard()
                 nullptr,
                 nullptr,
                 SW_SHOW);
-  sShowingOnScreenKeyboard = true;
 }
 
 // Based on DismissVirtualKeyboard() in Chromium's base/win/win_util.cc.
@@ -906,15 +903,23 @@ IMEHandler::ShowOnScreenKeyboard()
 void
 IMEHandler::DismissOnScreenKeyboard()
 {
-  sShowingOnScreenKeyboard = false;
+  // Dismiss the virtual keyboard if it's open
+  HWND osk = GetOnScreenKeyboardWindow();
+  if (osk) {
+    ::PostMessage(osk, WM_SYSCOMMAND, SC_CLOSE, 0);
+  }
+}
 
-  // Dismiss the virtual keyboard by generating the ESC keystroke
-  // programmatically.
+// static
+HWND
+IMEHandler::GetOnScreenKeyboardWindow()
+{
   const wchar_t kOSKClassName[] = L"IPTip_Main_Window";
   HWND osk = ::FindWindowW(kOSKClassName, nullptr);
   if (::IsWindow(osk) && ::IsWindowEnabled(osk)) {
-    ::PostMessage(osk, WM_SYSCOMMAND, SC_CLOSE, 0);
+    return osk;
   }
+  return nullptr;
 }
 
 } // namespace widget
