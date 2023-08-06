@@ -2723,6 +2723,14 @@ IMMHandler::OnKeyDownEvent(nsWindow* aWindow,
   }
 }
 
+// static
+void
+IMMHandler::SetCandidateWindow(nsWindow* aWindow, CANDIDATEFORM* aForm)
+{
+  IMEContext context(aWindow);
+  ImmSetCandidateWindow(context.get(), aForm);
+}
+
 /******************************************************************************
  * IMMHandler::Selection
  ******************************************************************************/
