@@ -1082,11 +1082,10 @@ IMMHandler::OnChar(nsWindow* aWindow,
  * message handlers for plug-in
  ****************************************************************************/
 
-bool
+void
 IMMHandler::OnIMEStartCompositionOnPlugin(nsWindow* aWindow,
                                           WPARAM wParam,
-                                          LPARAM lParam,
-                                          MSGResult& aResult)
+                                          LPARAM lParam)
 {
   MOZ_LOG(gIMMLog, LogLevel::Info,
     ("IMM: OnIMEStartCompositionOnPlugin, hWnd=%08x, mIsComposingOnPlugin=%s",
@@ -1098,17 +1097,12 @@ IMMHandler::OnIMEStartCompositionOnPlugin(nsWindow* aWindow,
   // On widnowless plugin, we should assume that the focused editor is always
   // in horizontal writing mode.
   AdjustCompositionFont(aWindow, context, WritingMode());
-  aResult.mConsumed =
-    aWindow->DispatchPluginEvent(WM_IME_STARTCOMPOSITION, wParam, lParam,
-                                 false);
-  return true;
 }
 
-bool
+void
 IMMHandler::OnIMECompositionOnPlugin(nsWindow* aWindow,
                                      WPARAM wParam,
-                                     LPARAM lParam,
-                                     MSGResult& aResult)
+                                     LPARAM lParam)
 {
   MOZ_LOG(gIMMLog, LogLevel::Info,
     ("IMM: OnIMECompositionOnPlugin, hWnd=%08x, lParam=%08x, "
@@ -1122,6 +1116,7 @@ IMMHandler::OnIMECompositionOnPlugin(nsWindow* aWindow,
   if (IS_COMMITTING_LPARAM(lParam)) {
     mIsComposingOnPlugin = false;
     mComposingWindow = nullptr;
+    return;
   }
   // Continue composition if there is still a string being composed.
   if (IS_COMPOSING_LPARAM(lParam)) {
@@ -1130,16 +1125,12 @@ IMMHandler::OnIMECompositionOnPlugin(nsWindow* aWindow,
     IMEContext context(aWindow);
     SetIMERelatedWindowsPosOnPlugin(aWindow, context);
   }
-  aResult.mConsumed =
-    aWindow->DispatchPluginEvent(WM_IME_COMPOSITION, wParam, lParam, true);
-  return true;
 }
 
-bool
+void
 IMMHandler::OnIMEEndCompositionOnPlugin(nsWindow* aWindow,
                                         WPARAM wParam,
-                                        LPARAM lParam,
-                                        MSGResult& aResult)
+                                        LPARAM lParam)
 {
   MOZ_LOG(gIMMLog, LogLevel::Info,
     ("IMM: OnIMEEndCompositionOnPlugin, hWnd=%08x, mIsComposingOnPlugin=%s",
@@ -1152,11 +1143,6 @@ IMMHandler::OnIMEEndCompositionOnPlugin(nsWindow* aWindow,
     ::DestroyCaret();
     mNativeCaretIsCreated = false;
   }
-
-  aResult.mConsumed =
-    aWindow->DispatchPluginEvent(WM_IME_ENDCOMPOSITION, wParam, lParam,
-                                 false);
-  return true;
 }
 
 bool
@@ -1225,6 +1211,12 @@ IMMHandler::OnCharOnPlugin(nsWindow* aWindow,
                            LPARAM lParam,
                            MSGResult& aResult)
 {
+  NS_WARNING("OnCharOnPlugin");
+  if (mIsComposing) {
+    aWindow->NotifyIME(REQUEST_TO_COMMIT_COMPOSITION);
+    return true;
+  }
+
   // We should never consume char message on windowless plugin.
   aResult.mConsumed = false;
   if (IsIMECharRecordsEmpty()) {
@@ -2729,6 +2721,33 @@ IMMHandler::SetCandidateWindow(nsWindow* aWindow, CANDIDATEFORM* aForm)
 {
   IMEContext context(aWindow);
   ImmSetCandidateWindow(context.get(), aForm);
+}
+
+// staitc
+void
+IMMHandler::DefaultProcOfPluginEvent(nsWindow* aWindow, const NPEvent* aEvent)
+{
+  switch (aEvent->event) {
+    case WM_IME_STARTCOMPOSITION:
+      EnsureHandlerInstance();
+      gIMMHandler->OnIMEStartCompositionOnPlugin(aWindow, aEvent->wParam,
+                                                 aEvent->lParam);
+      break;
+
+    case WM_IME_COMPOSITION:
+      if (gIMMHandler) {
+        gIMMHandler->OnIMECompositionOnPlugin(aWindow, aEvent->wParam,
+                                              aEvent->lParam);
+      }
+      break;
+
+    case WM_IME_ENDCOMPOSITION:
+      if (gIMMHandler) {
+        gIMMHandler->OnIMEEndCompositionOnPlugin(aWindow, aEvent->wParam,
+                                                 aEvent->lParam);
+      }
+      break;
+  }
 }
 
 /******************************************************************************
