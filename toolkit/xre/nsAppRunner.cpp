@@ -4595,7 +4595,7 @@ mozilla::BrowserTabsRemoteAutostart()
       LogE10sBlockedReason("Safe mode");
     } else if (disabledForA11y) {
       status = kE10sDisabledForAccessibility;
-      LogE10sBlockedReason("An accessibility tool is active");
+      LogE10sBlockedReason("An accessibility tool is or was active. See bug 1115956.");
     } else if (disabledForVR) {
       LogE10sBlockedReason("Experimental VR interfaces are enabled");
     } else {
