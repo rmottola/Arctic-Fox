@@ -1235,7 +1235,7 @@ PluginInstanceParent::CreateBackground(const nsIntSize& aSize)
         gfxSharedImageSurface::CreateUnsafe(
             this,
             mozilla::gfx::IntSize(aSize.width, aSize.height),
-            gfxImageFormat::RGB24);
+            mozilla::gfx::SurfaceFormat::X8R8G8B8_UINT32);
     return !!mBackground;
 #else
     return false;
