@@ -54,7 +54,7 @@ class ImageLayer;
 class ImageContainer;
 } // namespace layers
 namespace gfx {
-class VRHMDInfo;
+class VRDeviceProxy;
 } // namespace gfx
 } // namespace mozilla
 
@@ -4288,7 +4288,7 @@ public:
 class nsDisplayVR : public nsDisplayOwnLayer {
 public:
   nsDisplayVR(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-              nsDisplayList* aList, mozilla::gfx::VRHMDInfo* aHMD);
+              nsDisplayList* aList, mozilla::gfx::VRDeviceProxy* aHMD);
 
   virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
                                    LayerManager* aManager,
@@ -4302,7 +4302,7 @@ public:
                                              const ContainerLayerParameters& aContainerParameters) override;
 
 protected:
-  RefPtr<mozilla::gfx::VRHMDInfo> mHMD;
+  RefPtr<mozilla::gfx::VRDeviceProxy> mHMD;
 };
 
 #endif /*NSDISPLAYLIST_H_*/
