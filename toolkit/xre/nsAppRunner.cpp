@@ -102,6 +102,8 @@
 #include "cairo/cairo-features.h"
 #include "mozilla/WindowsVersion.h"
 
+#include "gfxPrefs.h"
+
 #ifndef PROCESS_DEP_ENABLE
 #define PROCESS_DEP_ENABLE 0x1
 #endif
@@ -2113,6 +2115,10 @@ ShowProfileManager(nsIToolkitProfileService* aProfileSvc,
     ScopedXPCOMStartup xpcom;
     rv = xpcom.Initialize();
     NS_ENSURE_SUCCESS(rv, rv);
+
+    // Initialize the graphics prefs, some of the paths need them before
+    // any other graphics is initialized (e.g., showing the profile chooser.)
+    gfxPrefs::GetSingleton();
 
     rv = xpcom.SetWindowCreator(aNative);
     NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
