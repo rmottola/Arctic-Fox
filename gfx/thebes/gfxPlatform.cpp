@@ -2272,9 +2272,7 @@ gfxPlatform::GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layer
   if (useAcceleration) {
     GetAcceleratedCompositorBackends(aBackends);
   }
-  if (SupportsBasicCompositor()) {
-    aBackends.AppendElement(LayersBackend::LAYERS_BASIC);
-  }
+  aBackends.AppendElement(LayersBackend::LAYERS_BASIC);
 }
 
 void
