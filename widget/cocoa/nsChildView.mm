@@ -2641,7 +2641,7 @@ nsChildView::SwipeFinished()
 }
 
 already_AddRefed<gfx::DrawTarget>
-nsChildView::StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion)
+nsChildView::StartRemoteDrawingInRegion(LayoutDeviceIntRegion& aInvalidRegion)
 {
   // should have created the GLPresenter in InitCompositor.
   MOZ_ASSERT(mGLPresenter);
@@ -2653,7 +2653,7 @@ nsChildView::StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion)
     }
   }
 
-  LayoutDeviceIntRegion dirtyRegion(LayoutDeviceIntRegion::FromUnknownRegion(aInvalidRegion));
+  LayoutDeviceIntRegion dirtyRegion(aInvalidRegion);
   LayoutDeviceIntSize renderSize =
     LayoutDeviceIntSize::FromUnknownSize(mBounds.Size());
 
@@ -2670,7 +2670,7 @@ nsChildView::StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion)
     return nullptr;
   }
 
-  aInvalidRegion = mBasicCompositorImage->GetUpdateRegion().ToUnknownRegion();
+  aInvalidRegion = mBasicCompositorImage->GetUpdateRegion();
 
   return drawTarget.forget();
 }
