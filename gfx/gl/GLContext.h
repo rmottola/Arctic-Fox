@@ -339,7 +339,6 @@ public:
 protected:
     bool mInitialized;
     bool mIsOffscreen;
-    bool mIsGlobalSharedContext;
     bool mContextLost;
 
     /**
