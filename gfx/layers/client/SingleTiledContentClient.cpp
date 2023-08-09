@@ -58,6 +58,7 @@ ClientSingleTiledLayerBuffer::ClientSingleTiledLayerBuffer(ClientTiledPaintedLay
                                                            ClientLayerManager* aManager)
   : ClientTiledLayerBuffer(aPaintedLayer, aCompositableClient)
   , mManager(aManager)
+  , mFormat(gfx::SurfaceFormat::UNKNOWN)
 {
 }
 
@@ -108,6 +109,7 @@ ClientSingleTiledLayerBuffer::GetSurfaceDescriptorTiles()
 already_AddRefed<TextureClient>
 ClientSingleTiledLayerBuffer::GetTextureClient()
 {
+  MOZ_ASSERT(mFormat != gfx::SurfaceFormat::UNKNOWN);
   return mCompositableClient->CreateTextureClientForDrawing(
     gfx::ImageFormatToSurfaceFormat(mFormat), mSize, BackendSelector::Content,
     TextureFlags::DISALLOW_BIGIMAGE | TextureFlags::IMMEDIATE_UPLOAD);
