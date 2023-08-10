@@ -3379,12 +3379,19 @@ NS_METHOD nsWindow::EnableDragDrop(bool aEnable)
 
 NS_METHOD nsWindow::CaptureMouse(bool aCapture)
 {
+  TRACKMOUSEEVENT mTrack;
+  mTrack.cbSize = sizeof(TRACKMOUSEEVENT);
+  mTrack.dwHoverTime = 0;
+  mTrack.hwndTrack = mWnd;
   if (aCapture) {
+    mTrack.dwFlags = TME_CANCEL | TME_LEAVE;
     ::SetCapture(mWnd);
   } else {
+    mTrack.dwFlags = TME_LEAVE;
     ::ReleaseCapture();
   }
   sIsInMouseCapture = aCapture;
+  TrackMouseEvent(&mTrack);
   return NS_OK;
 }
 
@@ -5081,7 +5088,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
 
     case WM_MOUSEMOVE:
     {
-      if (!mMousePresent) {
+      if (!mMousePresent && !sIsInMouseCapture) {
         // First MOUSEMOVE over the client area. Ask for MOUSELEAVE
         TRACKMOUSEEVENT mTrack;
         mTrack.cbSize = sizeof(TRACKMOUSEEVENT);
