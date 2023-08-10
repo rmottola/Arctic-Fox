@@ -3761,7 +3761,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   RefPtr<gfxContext> targetContext = new gfxContext(dt);
 
   // Set up the clip region.
-  LayoutDeviceIntRegion::RectIterator iter(region);
+  LayoutDeviceIntRegion::OldRectIterator iter(region);
   targetContext->NewPath();
   for (;;) {
     const LayoutDeviceIntRect* r = iter.Next();
@@ -4640,7 +4640,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                        CGRect (^aRectConverter)(const LayoutDeviceIntRect&))
 {
   nsTArray<CGRect> rects;
-  LayoutDeviceIntRegion::RectIterator iter(aRegion);
+  LayoutDeviceIntRegion::OldRectIterator iter(aRegion);
   for (;;) {
     const LayoutDeviceIntRect* r = iter.Next();
     if (!r) {
