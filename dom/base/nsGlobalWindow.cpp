@@ -6096,6 +6096,13 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
     }
   }
 
+  // If we didn't setup the widget, we may need to manually set this
+  // flag, or the assertion in FinishFullscreenChange is violated.
+  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
+    if (!presShell->IsInFullscreenChange()) {
+      presShell->SetIsInFullscreenChange(true);
+    }
+  }
   FinishFullscreenChange(aFullScreen);
   return NS_OK;
 }
