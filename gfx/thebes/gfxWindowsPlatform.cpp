@@ -424,12 +424,6 @@ gfxWindowsPlatform::~gfxWindowsPlatform()
     CoUninitialize();
 }
 
-double
-gfxWindowsPlatform::GetDPIScale()
-{
-  return WinUtils::LogToPhysFactor();
-}
-
 bool
 gfxWindowsPlatform::CanUseHardwareVideoDecoding()
 {
