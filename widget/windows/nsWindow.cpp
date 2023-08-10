@@ -5928,8 +5928,6 @@ nsWindow::ClientMarginHitTestPoint(int32_t mx, int32_t my)
 TimeStamp
 nsWindow::GetMessageTimeStamp(LONG aEventTime)
 {
-  DWORD eventTime = static_cast<DWORD>(aEventTime);
-
   CurrentWindowsTimeGetter getCurrentTime;
   return TimeConverter().GetTimeStampFromSystemTime(aEventTime,
                                                     getCurrentTime);
