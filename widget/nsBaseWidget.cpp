@@ -1325,9 +1325,9 @@ NS_METHOD nsBaseWidget::MoveClient(double aX, double aY)
 {
   LayoutDeviceIntPoint clientOffset(GetClientOffset());
 
-  // GetClientOffset returns device pixels; scale back to display pixels
+  // GetClientOffset returns device pixels; scale back to desktop pixels
   // if that's what this widget uses for the Move/Resize APIs
-  CSSToLayoutDeviceScale scale = BoundsUseDisplayPixels()
+  CSSToLayoutDeviceScale scale = BoundsUseDesktopPixels()
                                     ? GetDefaultScale()
                                     : CSSToLayoutDeviceScale(1.0);
   aX -= clientOffset.x * 1.0 / scale.scale;
@@ -1346,9 +1346,9 @@ NS_METHOD nsBaseWidget::ResizeClient(double aWidth,
   LayoutDeviceIntRect clientBounds;
   GetClientBounds(clientBounds);
 
-  // GetClientBounds and mBounds are device pixels; scale back to display pixels
+  // GetClientBounds and mBounds are device pixels; scale back to desktop pixels
   // if that's what this widget uses for the Move/Resize APIs
-  CSSToLayoutDeviceScale scale = BoundsUseDisplayPixels()
+  CSSToLayoutDeviceScale scale = BoundsUseDesktopPixels()
                                     ? GetDefaultScale()
                                     : CSSToLayoutDeviceScale(1.0);
   double invScale = 1.0 / scale.scale;
@@ -1370,7 +1370,7 @@ NS_METHOD nsBaseWidget::ResizeClient(double aX,
   LayoutDeviceIntRect clientBounds;
   GetClientBounds(clientBounds);
 
-  double scale = BoundsUseDisplayPixels() ? 1.0 / GetDefaultScale().scale : 1.0;
+  double scale = BoundsUseDesktopPixels() ? 1.0 / GetDefaultScale().scale : 1.0;
   aWidth = mBounds.width * scale + (aWidth - clientBounds.width * scale);
   aHeight = mBounds.height * scale + (aHeight - clientBounds.height * scale);
 
