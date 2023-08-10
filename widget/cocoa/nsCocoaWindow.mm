@@ -1630,8 +1630,8 @@ nsCocoaWindow::UpdateBounds()
   if (mWindow) {
     frame = [mWindow frame];
   }
-  mBounds = nsCocoaUtils::CocoaRectToGeckoRectDevPix(
-    frame, BackingScaleFactor()).ToUnknownRect();
+  mBounds =
+    nsCocoaUtils::CocoaRectToGeckoRectDevPix(frame, BackingScaleFactor());
 }
 
 NS_IMETHODIMP nsCocoaWindow::GetScreenBounds(LayoutDeviceIntRect &aRect)
@@ -1640,10 +1640,10 @@ NS_IMETHODIMP nsCocoaWindow::GetScreenBounds(LayoutDeviceIntRect &aRect)
 
 #ifdef DEBUG
   LayoutDeviceIntRect r = nsCocoaUtils::CocoaRectToGeckoRectDevPix([mWindow frame], BackingScaleFactor());
-  NS_ASSERTION(mWindow && mBounds == r.ToUnknownRect(), "mBounds out of sync!");
+  NS_ASSERTION(mWindow && mBounds == r, "mBounds out of sync!");
 #endif
 
-  aRect = LayoutDeviceIntRect::FromUnknownRect(mBounds);
+  aRect = mBounds;
   return NS_OK;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
@@ -2035,8 +2035,7 @@ LayoutDeviceIntPoint nsCocoaWindow::GetClientOffset()
   LayoutDeviceIntRect clientRect;
   GetClientBounds(clientRect);
 
-  return clientRect.TopLeft() -
-         LayoutDeviceIntPoint::FromUnknownPoint(mBounds.TopLeft());
+  return clientRect.TopLeft() - mBounds.TopLeft();
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(LayoutDeviceIntPoint(0, 0));
 }
