@@ -1076,7 +1076,7 @@ GetDisplayPortImpl(nsIContent* aContent, nsRect *aResult, float aMultiplier)
 }
 
 bool
-nsLayoutUtils::GetDisplayPortRelativeToScrollPort(nsIContent* aContent, nsRect *aResult)
+nsLayoutUtils::GetDisplayPort(nsIContent* aContent, nsRect *aResult)
 {
   if (gfxPrefs::UseLowPrecisionBuffer()) {
     return GetDisplayPortImpl(aContent, aResult, 1.0f / gfxPrefs::LowPrecisionResolution());
@@ -1098,7 +1098,7 @@ bool
 nsLayoutUtils::GetDisplayPortRelativeToScrollFrame(nsIContent* aContent, nsRect *aResult)
 {
   MOZ_ASSERT(aResult);
-  bool usingDisplayPort = GetDisplayPortRelativeToScrollPort(aContent, aResult);
+  bool usingDisplayPort = GetDisplayPort(aContent, aResult);
   if (usingDisplayPort) {
     TranslateFromScrollPortToScrollFrame(aContent, aResult);
   }
@@ -1107,7 +1107,7 @@ nsLayoutUtils::GetDisplayPortRelativeToScrollFrame(nsIContent* aContent, nsRect 
 
 bool
 nsLayoutUtils::HasDisplayPort(nsIContent* aContent) {
-  return GetDisplayPortRelativeToScrollPort(aContent, nullptr);
+  return GetDisplayPort(aContent, nullptr);
 }
 
 /* static */ bool
@@ -8552,7 +8552,7 @@ nsLayoutUtils::ComputeFrameMetrics(nsIFrame* aForFrame,
     }
     scrollId = nsLayoutUtils::FindOrCreateIDFor(aContent);
     nsRect dp;
-    if (nsLayoutUtils::GetDisplayPortRelativeToScrollPort(aContent, &dp)) {
+    if (nsLayoutUtils::GetDisplayPort(aContent, &dp)) {
       metrics.SetDisplayPort(CSSRect::FromAppUnits(dp));
       nsLayoutUtils::LogTestDataForPaint(aLayer->Manager(), scrollId, "displayport",
           metrics.GetDisplayPort());
