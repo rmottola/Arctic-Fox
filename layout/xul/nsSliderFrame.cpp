@@ -945,7 +945,7 @@ nsSliderFrame::StartAPZDrag()
                                IsHorizontal() ? AsyncDragMetrics::HORIZONTAL :
                                                 AsyncDragMetrics::VERTICAL);
 
-  if (!nsLayoutUtils::GetDisplayPort(scrollableContent)) {
+  if (!nsLayoutUtils::HasDisplayPort(scrollableContent)) {
     return false;
   }
 
