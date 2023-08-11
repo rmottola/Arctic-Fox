@@ -5594,8 +5594,8 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect)
   if (scrollFrame) {
     nsRect displayPort;
     bool usingDisplayport =
-      nsLayoutUtils::GetDisplayPortRelativeToScrollFrameForVisibilityTesting(
-        aFrame->GetContent(), &displayPort);
+      nsLayoutUtils::GetDisplayPortForVisibilityTesting(
+        aFrame->GetContent(), &displayPort, RelativeTo::ScrollFrame);
     if (usingDisplayport) {
       rect = displayPort;
     } else {
@@ -5698,7 +5698,7 @@ PresShell::UpdateImageVisibility()
   if (rootScroll) {
     nsIContent* content = rootScroll->GetContent();
     if (content) {
-      Unused << nsLayoutUtils::GetDisplayPortRelativeToScrollFrame(content, &updateRect);
+      Unused << nsLayoutUtils::GetDisplayPort(content, &updateRect, RelativeTo::ScrollFrame);
     }
 
     if (IgnoringViewportScrolling()) {
