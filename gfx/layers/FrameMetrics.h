@@ -418,9 +418,9 @@ public:
     return mDisplayPortMargins;
   }
 
-  void SetUseDisplayPortMargins()
+  void SetUseDisplayPortMargins(bool aValue)
   {
-    mUseDisplayPortMargins = true;
+    mUseDisplayPortMargins = aValue;
   }
 
   bool GetUseDisplayPortMargins() const
@@ -513,9 +513,9 @@ public:
     return mAllowVerticalScrollWithWheel;
   }
 
-  void SetAllowVerticalScrollWithWheel()
+  void SetAllowVerticalScrollWithWheel(bool aValue)
   {
-    mAllowVerticalScrollWithWheel = true;
+    mAllowVerticalScrollWithWheel = aValue;
   }
 
   void SetClipRect(const Maybe<ParentLayerIntRect>& aClipRect)

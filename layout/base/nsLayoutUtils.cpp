@@ -8559,7 +8559,7 @@ nsLayoutUtils::ComputeFrameMetrics(nsIFrame* aForFrame,
     if (!aScrollFrame->GetParent() ||
         EventStateManager::CanVerticallyScrollFrameWithWheel(aScrollFrame->GetParent()))
     {
-      metrics.SetAllowVerticalScrollWithWheel();
+      metrics.SetAllowVerticalScrollWithWheel(true);
     }
 
     metrics.SetUsesContainerScrolling(scrollableFrame->UsesContainerScrolling());
