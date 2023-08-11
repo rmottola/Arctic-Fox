@@ -395,7 +395,6 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   }
 
   if (collection) {
-    collection->mStyleRule = nullptr;
     collection->mStyleRuleRefreshTime = TimeStamp();
     EffectSet* effectSet =
       EffectSet::GetEffectSet(aElement, aStyleContext->GetPseudoType());
