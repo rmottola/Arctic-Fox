@@ -1988,9 +1988,8 @@ DumpRect(layerscope::LayersPacket::Layer::Rect* aLayerRect,
 static void
 DumpRegion(layerscope::LayersPacket::Layer::Region* aLayerRegion, const nsIntRegion& aRegion)
 {
-  nsIntRegionRectIterator it(aRegion);
-  while (const IntRect* sr = it.Next()) {
-    DumpRect(aLayerRegion->add_r(), *sr);
+  for (auto iter = aRegion.RectIter(); !iter.Done(); iter.Next()) {
+    DumpRect(aLayerRegion->add_r(), iter.Get());
   }
 }
 
