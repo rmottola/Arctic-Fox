@@ -808,13 +808,6 @@ gfxUtils::ClampToScaleFactor(gfxFloat aVal)
   return scale;
 }
 
-
-/*static*/ void
-gfxUtils::PathFromRegion(gfxContext* aContext, const nsIntRegion& aRegion)
-{
-  PathFromRegionInternal(aContext, aRegion);
-}
-
 gfxMatrix
 gfxUtils::TransformRectToRect(const gfxRect& aFrom, const gfxPoint& aToTopLeft,
                               const gfxPoint& aToTopRight, const gfxPoint& aToBottomRight)
