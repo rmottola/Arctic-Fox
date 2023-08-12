@@ -158,7 +158,7 @@ PrintDisplayItemTo(nsDisplayListBuilder* aBuilder, nsDisplayItem* aItem,
           clip.ToString().get(),
           DisplayItemScrollClip::ToString(aItem->ScrollClip()).get(),
           aItem->IsUniform(aBuilder, &color) ? " uniform" : "",
-          aItem->ReferenceFrame(), aItem->GetAnimatedGeometryRoot());
+          aItem->ReferenceFrame(), aItem->GetAnimatedGeometryRoot()->mFrame);
 
   nsRegionRectIterator iter(opaque);
   for (const nsRect* r = iter.Next(); r; r = iter.Next()) {
