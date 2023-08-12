@@ -673,17 +673,10 @@ Animation::HasLowerCompositeOrderThan(const Animation& aOther) const
 
 void
 Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
-                        nsCSSPropertySet& aSetProperties,
-                        bool& aStyleChanging)
+                        nsCSSPropertySet& aSetProperties)
 {
   if (!mEffect) {
     return;
-  }
-
-  AnimationPlayState playState = PlayState();
-  if (playState == AnimationPlayState::Running ||
-      playState == AnimationPlayState::Pending) {
-    aStyleChanging = true;
   }
 
   if (!IsInEffect()) {
@@ -725,6 +718,7 @@ Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
   // afterwards. This is purely to prevent visual flicker. Other behavior
   // such as dispatching events continues to rely on the regular timeline time.
   bool updatedHoldTime = false;
+  AnimationPlayState playState = PlayState();
   {
     AutoRestore<Nullable<TimeDuration>> restoreHoldTime(mHoldTime);
 
