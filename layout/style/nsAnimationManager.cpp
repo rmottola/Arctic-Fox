@@ -395,7 +395,6 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   }
 
   if (collection) {
-    collection->mStyleRuleRefreshTime = TimeStamp();
     EffectSet* effectSet =
       EffectSet::GetEffectSet(aElement, aStyleContext->GetPseudoType());
     if (effectSet) {
@@ -524,8 +523,7 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
                                          aStyleContext->GetPseudoType(),
                                          aStyleContext);
 
-  TimeStamp refreshTime = mPresContext->RefreshDriver()->MostRecentRefresh();
-  collection->EnsureStyleRuleFor(refreshTime);
+  collection->EnsureStyleRuleFor();
   // We don't actually dispatch the pending events now.  We'll either
   // dispatch them the next time we get a refresh driver notification
   // or the next time somebody calls
