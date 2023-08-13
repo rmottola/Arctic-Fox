@@ -4552,16 +4552,20 @@ enum {
   kE10sDisabledForMacGfx = 5,
 };
 
+#ifdef XP_WIN
 const char* kAccessibilityLastRunDatePref = "accessibility.lastLoadDate";
 const char* kAccessibilityLoadedLastSessionPref = "accessibility.loadedInLastSession";
+#endif // XP_WIN
 const char* kForceEnableE10sPref = "browser.tabs.remote.force-enable";
 
+#ifdef XP_WIN
 static inline uint32_t
 PRTimeToSeconds(PRTime t_usec)
 {
   PRTime usec_per_sec = PR_USEC_PER_SEC;
   return uint32_t(t_usec /= usec_per_sec);
 }
+#endif // XP_WIN
 
 bool
 mozilla::BrowserTabsRemoteAutostart()
@@ -4599,7 +4603,7 @@ mozilla::BrowserTabsRemoteAutostart()
       disabledForA11y = true;
     }
   }
-#endif
+#endif // XP_WIN
 
   bool optInPref = Preferences::GetBool("browser.tabs.remote.autostart", false);
   bool trialPref = Preferences::GetBool("browser.tabs.remote.autostart.2", false);
@@ -4674,6 +4678,8 @@ mozilla::BrowserTabsRemoteAutostart()
   // Uber override pref for manual testing purposes
   if (Preferences::GetBool(kForceEnableE10sPref, false)) {
     gBrowserTabsRemoteAutostart = true;
+    prefEnabled = true;
+    status = kE10sEnabledByUser;
   }
 
   mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_AUTOSTART, gBrowserTabsRemoteAutostart);

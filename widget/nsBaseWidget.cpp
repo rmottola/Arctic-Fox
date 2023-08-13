@@ -1777,6 +1777,7 @@ nsBaseWidget::GetTextEventDispatcher()
 
 #ifdef ACCESSIBILITY
 
+#ifdef XP_WIN
 // defined in nsAppRunner.cpp
 extern const char* kAccessibilityLastRunDatePref;
 
@@ -1786,6 +1787,7 @@ PRTimeToSeconds(PRTime t_usec)
   PRTime usec_per_sec = PR_USEC_PER_SEC;
   return uint32_t(t_usec /= usec_per_sec);
 }
+#endif
 
 a11y::Accessible*
 nsBaseWidget::GetRootAccessible()
@@ -1805,8 +1807,10 @@ nsBaseWidget::GetRootAccessible()
   nsCOMPtr<nsIAccessibilityService> accService =
     services::GetAccessibilityService();
   if (accService) {
+#ifdef XP_WIN
     uint32_t now = PRTimeToSeconds(PR_Now());
     Preferences::SetInt(kAccessibilityLastRunDatePref, now);
+#endif
     return accService->GetRootDocumentAccessible(presShell, nsContentUtils::IsSafeToRunScript());
   }
 
