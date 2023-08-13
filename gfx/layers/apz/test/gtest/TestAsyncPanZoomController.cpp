@@ -233,7 +233,7 @@ public:
     }
   }
 
-  bool SampleContentTransformForFrame(ViewTransform* aOutTransform,
+  bool SampleContentTransformForFrame(AsyncTransform* aOutTransform,
                                       ParentLayerPoint& aScrollOffset,
                                       const TimeDuration& aIncrement = TimeDuration::FromMilliseconds(0)) {
     mcc->AdvanceBy(aIncrement);
@@ -340,7 +340,7 @@ protected:
   {
     const TimeDuration increment = TimeDuration::FromMilliseconds(1);
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     mcc->AdvanceBy(increment);
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
   }
@@ -355,7 +355,7 @@ protected:
     const TimeDuration increment = TimeDuration::FromMilliseconds(1);
     bool recoveredFromOverscroll = false;
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     while (apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut)) {
       // The reported scroll offset should be the same throughout.
       EXPECT_EQ(aExpectedScrollOffset, pointOut);
@@ -1018,11 +1018,11 @@ TEST_F(APZCBasicTester, Overzoom) {
 
 TEST_F(APZCBasicTester, SimpleTransform) {
   ParentLayerPoint pointOut;
-  ViewTransform viewTransformOut;
+  AsyncTransform viewTransformOut;
   apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
 
   EXPECT_EQ(ParentLayerPoint(), pointOut);
-  EXPECT_EQ(ViewTransform(), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(), viewTransformOut);
 }
 
 
@@ -1080,7 +1080,7 @@ TEST_F(APZCBasicTester, ComplexTransform) {
   layers[1]->SetFrameMetrics(childMetrics);
 
   ParentLayerPoint pointOut;
-  ViewTransform viewTransformOut;
+  AsyncTransform viewTransformOut;
 
   // Both the parent and child layer should behave exactly the same here, because
   // the CSS transform on the child layer does not affect the SampleContentTransformForFrame code
@@ -1089,39 +1089,39 @@ TEST_F(APZCBasicTester, ComplexTransform) {
   apzc->SetFrameMetrics(metrics);
   apzc->NotifyLayersUpdated(metrics, true);
   apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1), ParentLayerPoint()), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1), ParentLayerPoint()), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(60, 60), pointOut);
 
   childApzc->SetFrameMetrics(childMetrics);
   childApzc->NotifyLayersUpdated(childMetrics, true);
   childApzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1), ParentLayerPoint()), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1), ParentLayerPoint()), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(60, 60), pointOut);
 
   // do an async scroll by 5 pixels and check the transform
   metrics.ScrollBy(CSSPoint(5, 0));
   apzc->SetFrameMetrics(metrics);
   apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1), ParentLayerPoint(-30, 0)), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1), ParentLayerPoint(-30, 0)), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(90, 60), pointOut);
 
   childMetrics.ScrollBy(CSSPoint(5, 0));
   childApzc->SetFrameMetrics(childMetrics);
   childApzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1), ParentLayerPoint(-30, 0)), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1), ParentLayerPoint(-30, 0)), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(90, 60), pointOut);
 
   // do an async zoom of 1.5x and check the transform
   metrics.ZoomBy(1.5f);
   apzc->SetFrameMetrics(metrics);
   apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1.5), ParentLayerPoint(-45, 0)), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1.5), ParentLayerPoint(-45, 0)), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(135, 90), pointOut);
 
   childMetrics.ZoomBy(1.5f);
   childApzc->SetFrameMetrics(childMetrics);
   childApzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
-  EXPECT_EQ(ViewTransform(LayerToParentLayerScale(1.5), ParentLayerPoint(-45, 0)), viewTransformOut);
+  EXPECT_EQ(AsyncTransform(LayerToParentLayerScale(1.5), ParentLayerPoint(-45, 0)), viewTransformOut);
   EXPECT_EQ(ParentLayerPoint(135, 90), pointOut);
 
   childApzc->Destroy();
@@ -1141,7 +1141,7 @@ protected:
     int touchStart = 50;
     int touchEnd = 10;
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
 
     nsTArray<uint32_t> allowedTouchBehaviors;
     allowedTouchBehaviors.AppendElement(aBehavior);
@@ -1152,10 +1152,10 @@ protected:
 
     if (aShouldTriggerScroll) {
       EXPECT_EQ(ParentLayerPoint(0, -(touchEnd-touchStart)), pointOut);
-      EXPECT_NE(ViewTransform(), viewTransformOut);
+      EXPECT_NE(AsyncTransform(), viewTransformOut);
     } else {
       EXPECT_EQ(ParentLayerPoint(), pointOut);
-      EXPECT_EQ(ViewTransform(), viewTransformOut);
+      EXPECT_EQ(AsyncTransform(), viewTransformOut);
     }
 
     // Clear the fling from the previous pan, or stopping it will
@@ -1167,7 +1167,7 @@ protected:
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
 
     EXPECT_EQ(ParentLayerPoint(), pointOut);
-    EXPECT_EQ(ViewTransform(), viewTransformOut);
+    EXPECT_EQ(AsyncTransform(), viewTransformOut);
   }
 
   void DoPanWithPreventDefaultTest()
@@ -1177,7 +1177,7 @@ protected:
     int touchStart = 50;
     int touchEnd = 10;
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     uint64_t blockId = 0;
 
     // Pan down
@@ -1191,7 +1191,7 @@ protected:
 
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
     EXPECT_EQ(ParentLayerPoint(), pointOut);
-    EXPECT_EQ(ViewTransform(), viewTransformOut);
+    EXPECT_EQ(AsyncTransform(), viewTransformOut);
 
     apzc->AssertStateIsReset();
   }
@@ -1244,7 +1244,7 @@ TEST_F(APZCBasicTester, Fling) {
   int touchStart = 50;
   int touchEnd = 10;
   ParentLayerPoint pointOut;
-  ViewTransform viewTransformOut;
+  AsyncTransform viewTransformOut;
 
   // Fling down. Each step scroll further down
   Pan(apzc, mcc, touchStart, touchEnd);
@@ -1411,7 +1411,7 @@ TEST_F(APZCBasicTester, OverScrollAbort) {
   EXPECT_TRUE(apzc->IsOverscrolled());
 
   ParentLayerPoint pointOut;
-  ViewTransform viewTransformOut;
+  AsyncTransform viewTransformOut;
 
   // This sample call will run to the end of the fling animation
   // and will schedule the overscroll animation.
@@ -1468,7 +1468,7 @@ protected:
 
     // Advance the fling animation by timeDelta milliseconds.
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut, TimeDuration::FromMilliseconds(timeDelta));
 
     // Deliver a tap to abort the fling. Ensure that we get a HandleSingleTap
@@ -1505,7 +1505,7 @@ protected:
 
     // Sample the fling a couple of times to ensure it's going.
     ParentLayerPoint point, finalPoint;
-    ViewTransform viewTransform;
+    AsyncTransform viewTransform;
     apzc->SampleContentTransformForFrame(&viewTransform, point, TimeDuration::FromMilliseconds(10));
     apzc->SampleContentTransformForFrame(&viewTransform, finalPoint, TimeDuration::FromMilliseconds(10));
     EXPECT_GT(finalPoint.y, point.y);
@@ -1704,11 +1704,11 @@ protected:
     EXPECT_EQ(nsEventStatus_eConsumeDoDefault, status);
 
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut);
 
     EXPECT_EQ(ParentLayerPoint(), pointOut);
-    EXPECT_EQ(ViewTransform(), viewTransformOut);
+    EXPECT_EQ(AsyncTransform(), viewTransformOut);
 
     apzc->AssertStateIsReset();
   }
@@ -1933,7 +1933,7 @@ protected:
   void SampleAnimationsOnce() {
     const TimeDuration increment = TimeDuration::FromMilliseconds(1);
     ParentLayerPoint pointOut;
-    ViewTransform viewTransformOut;
+    AsyncTransform viewTransformOut;
     mcc->AdvanceBy(increment);
 
     for (const RefPtr<Layer>& layer : layers) {
@@ -2592,7 +2592,7 @@ TEST_F(APZHitTestingTester, TestRepaintFlushOnWheelEvents) {
     EXPECT_EQ(nsEventStatus_eConsumeDoDefault, manager->ReceiveInputEvent(swi, nullptr, nullptr));
     EXPECT_EQ(origin, swi.mOrigin);
 
-    ViewTransform viewTransform;
+    AsyncTransform viewTransform;
     ParentLayerPoint point;
     apzcroot->SampleContentTransformForFrame(&viewTransform, point);
     EXPECT_EQ(0, point.x);
