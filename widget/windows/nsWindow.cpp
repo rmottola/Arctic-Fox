@@ -3674,6 +3674,7 @@ nsWindow::OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect)
   return NS_OK;
 }
 
+#if 0
 NS_IMETHODIMP
 nsWindow::OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
                                          double aOriginalDeltaY,
@@ -3759,6 +3760,7 @@ nsWindow::OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
   }
   return NS_OK;
 }
+#endif
 
 already_AddRefed<mozilla::gfx::DrawTarget>
 nsWindow::StartRemoteDrawing()
