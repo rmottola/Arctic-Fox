@@ -1,0 +1,848 @@
+diff --git a/accessible/atk/AccessibleWrap.cpp b/accessible/atk/AccessibleWrap.cpp
+index 2f0159f001cb..543bc4f336fb 100644
+--- a/accessible/atk/AccessibleWrap.cpp
++++ b/accessible/atk/AccessibleWrap.cpp
+@@ -677,7 +677,7 @@ getRoleCB(AtkObject *aAtkObj)
+ #include "RoleMap.h"
+     default:
+       MOZ_CRASH("Unknown role.");
+-  };
++  }
+ 
+ #undef ROLE
+ 
+diff --git a/accessible/windows/ia2/ia2Accessible.cpp b/accessible/windows/ia2/ia2Accessible.cpp
+index b55c90efde7d..f655417800a9 100644
+--- a/accessible/windows/ia2/ia2Accessible.cpp
++++ b/accessible/windows/ia2/ia2Accessible.cpp
+@@ -251,7 +251,7 @@ ia2Accessible::role(long* aRole)
+ #include "RoleMap.h"
+     default:
+       MOZ_CRASH("Unknown role.");
+-  };
++  }
+ 
+ #undef ROLE
+ 
+diff --git a/accessible/windows/msaa/AccessibleWrap.cpp b/accessible/windows/msaa/AccessibleWrap.cpp
+index 4032f1b16fc2..249784d886e1 100644
+--- a/accessible/windows/msaa/AccessibleWrap.cpp
++++ b/accessible/windows/msaa/AccessibleWrap.cpp
+@@ -452,7 +452,7 @@ AccessibleWrap::get_accRole(
+ #include "RoleMap.h"
+     default:
+       MOZ_CRASH("Unknown role.");
+-  };
++  }
+ 
+ #undef ROLE
+ 
+diff --git a/accessible/xpcom/xpcAccessible.cpp b/accessible/xpcom/xpcAccessible.cpp
+index 1952da872bd6..ba0937d9ea75 100644
+--- a/accessible/xpcom/xpcAccessible.cpp
++++ b/accessible/xpcom/xpcAccessible.cpp
+@@ -346,7 +346,7 @@ xpcAccessible::GetBounds(int32_t* aX, int32_t* aY,
+   *aX = rect.x;
+   *aY = rect.y;
+   *aWidth = rect.width;
+-  *aHeight = rect.height;;
++  *aHeight = rect.height;
+ 
+   return NS_OK;
+ }
+diff --git a/dom/base/nsGlobalWindow.cpp b/dom/base/nsGlobalWindow.cpp
+index a7ed4e3fbfb6..02be10503074 100644
+--- a/dom/base/nsGlobalWindow.cpp
++++ b/dom/base/nsGlobalWindow.cpp
+@@ -11043,7 +11043,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
+       fireMozStorageChanged = mLocalStorage == changingStorage;
+       if (fireMozStorageChanged) {
+         eventType.AssignLiteral("MozLocalStorageChanged");
+-      };
++      }
+       break;
+     }
+     default:
+diff --git a/dom/base/nsObjectLoadingContent.cpp b/dom/base/nsObjectLoadingContent.cpp
+index ef8aad101a92..e5981fffba97 100644
+--- a/dom/base/nsObjectLoadingContent.cpp
++++ b/dom/base/nsObjectLoadingContent.cpp
+@@ -1437,7 +1437,7 @@ nsObjectLoadingContent::ObjectState() const
+         case eFallbackVulnerableNoUpdate:
+           return NS_EVENT_STATE_VULNERABLE_NO_UPDATE;
+       }
+-  };
++  }
+   NS_NOTREACHED("unknown type?");
+   return NS_EVENT_STATE_LOADING;
+ }
+@@ -2422,7 +2422,7 @@ nsObjectLoadingContent::LoadObject(bool aNotify,
+     case eType_Null:
+       // Handled below, silence compiler warnings
+     break;
+-  };
++  }
+ 
+   //
+   // Loaded, handle notifications and fallback
+diff --git a/dom/cache/DBSchema.cpp b/dom/cache/DBSchema.cpp
+index 5edf0933fe8b..fa83a268a58a 100644
+--- a/dom/cache/DBSchema.cpp
++++ b/dom/cache/DBSchema.cpp
+@@ -1256,7 +1256,7 @@ MatchByVaryHeader(mozIStorageConnection* aConn,
+     ErrorResult errorResult;
+ 
+     cachedHeaders->Append(name, value, errorResult);
+-    if (errorResult.Failed()) { return errorResult.StealNSResult(); };
++    if (errorResult.Failed()) { return errorResult.StealNSResult(); }
+   }
+   if (NS_WARN_IF(NS_FAILED(rv))) { return rv; }
+ 
+diff --git a/dom/canvas/MurmurHash3.cpp b/dom/canvas/MurmurHash3.cpp
+index fe395f159195..269a22761ca3 100644
+--- a/dom/canvas/MurmurHash3.cpp
++++ b/dom/canvas/MurmurHash3.cpp
+@@ -140,7 +140,7 @@ void MurmurHash3_x86_32 ( const void * key, int len,
+   case 2: k1 ^= tail[1] << 8;
+   case 1: k1 ^= tail[0];
+           k1 *= c1; k1 = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
+-  };
++  }
+ 
+   //----------
+   // finalization
+@@ -233,7 +233,7 @@ void MurmurHash3_x86_128 ( const void * key, const int len,
+   case  2: k1 ^= tail[ 1] << 8;
+   case  1: k1 ^= tail[ 0] << 0;
+            k1 *= c1; k1  = ROTL32(k1,15); k1 *= c2; h1 ^= k1;
+-  };
++  }
+ 
+   //----------
+   // finalization
+@@ -318,7 +318,7 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
+   case  2: k1 ^= uint64_t(tail[ 1]) << 8;
+   case  1: k1 ^= uint64_t(tail[ 0]) << 0;
+            k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+-  };
++  }
+ 
+   //----------
+   // finalization
+diff --git a/dom/filesystem/GetDirectoryListingTask.cpp b/dom/filesystem/GetDirectoryListingTask.cpp
+index 04c3fd5b28a5..7a450753a3b0 100644
+--- a/dom/filesystem/GetDirectoryListingTask.cpp
++++ b/dom/filesystem/GetDirectoryListingTask.cpp
+@@ -192,7 +192,7 @@ GetDirectoryListingTask::Work()
+                    NS_FAILED(currFile->IsSpecial(&isSpecial))) ||
+         isLink || isSpecial) {
+       continue;
+-    };
++    }
+     if (NS_WARN_IF(NS_FAILED(currFile->IsFile(&isFile)) ||
+                    NS_FAILED(currFile->IsDirectory(&isDir))) ||
+         !(isFile || isDir)) {
+diff --git a/dom/ipc/ContentChild.cpp b/dom/ipc/ContentChild.cpp
+index 60a3fc3d8d22..bf29d698c5c1 100644
+--- a/dom/ipc/ContentChild.cpp
++++ b/dom/ipc/ContentChild.cpp
+@@ -1804,7 +1804,7 @@ ContentChild::SendPMobileConnectionConstructor(PMobileConnectionChild* aActor,
+   static_cast<MobileConnectionChild*>(aActor)->AddRef();
+   return PContentChild::SendPMobileConnectionConstructor(aActor, aClientId);
+ #else
+-  MOZ_CRASH("No support for mobileconnection on this platform!");;
++  MOZ_CRASH("No support for mobileconnection on this platform!");
+ #endif
+ }
+ 
+@@ -1815,7 +1815,7 @@ ContentChild::AllocPMobileConnectionChild(const uint32_t& aClientId)
+   MOZ_CRASH("No one should be allocating PMobileConnectionChild actors");
+   return nullptr;
+ #else
+-  MOZ_CRASH("No support for mobileconnection on this platform!");;
++  MOZ_CRASH("No support for mobileconnection on this platform!");
+ #endif
+ }
+ 
+diff --git a/dom/media/ogg/OggCodecState.cpp b/dom/media/ogg/OggCodecState.cpp
+index 8184053ec710..aa059481c873 100644
+--- a/dom/media/ogg/OggCodecState.cpp
++++ b/dom/media/ogg/OggCodecState.cpp
+@@ -1448,7 +1448,7 @@ bool SkeletonState::DecodeFisbone(ogg_packet* aPacket)
+     }
+     msgLength--;
+     msgProbe++;
+-  };
++  }
+ 
+   if (!mMsgFieldStore.Contains(serialno)) {
+     mMsgFieldStore.Put(serialno, field.forget());
+diff --git a/dom/media/omx/AudioOffloadPlayer.h b/dom/media/omx/AudioOffloadPlayer.h
+index 0ff600898062..50fed70a1b4c 100644
+--- a/dom/media/omx/AudioOffloadPlayer.h
++++ b/dom/media/omx/AudioOffloadPlayer.h
+@@ -91,7 +91,7 @@ class AudioOffloadPlayer : public AudioOffloadPlayerBase
+   int64_t GetMediaTimeUs() override;
+ 
+   // To update progress bar when the element is visible
+-  void SetElementVisibility(bool aIsVisible) override;;
++  void SetElementVisibility(bool aIsVisible) override;
+ 
+   // Update ready state based on current play state. Not checking data
+   // availability since offloading is currently done only when whole compressed
+diff --git a/dom/network/TCPServerSocketParent.cpp b/dom/network/TCPServerSocketParent.cpp
+index 39d689ae4ff6..218dad97b431 100644
+--- a/dom/network/TCPServerSocketParent.cpp
++++ b/dom/network/TCPServerSocketParent.cpp
+@@ -72,7 +72,7 @@ TCPServerSocketParent::GetAppId()
+   } else {
+     return nsIScriptSecurityManager::UNKNOWN_APP_ID;
+   }
+-};
++}
+ 
+ bool
+ TCPServerSocketParent::GetInBrowser()
+@@ -113,7 +113,7 @@ TCPServerSocketParent::SendCallbackAccept(TCPSocketParent *socket)
+     }
+     else {
+       NS_ERROR("Sending data from PTCPSocketParent was failed.");
+-    };
++    }
+   }
+   else {
+     NS_ERROR("The member value for NeckoParent is wrong.");
+diff --git a/dom/plugins/ipc/BrowserStreamParent.cpp b/dom/plugins/ipc/BrowserStreamParent.cpp
+index 0d0a006d4505..e82ba161ad05 100644
+--- a/dom/plugins/ipc/BrowserStreamParent.cpp
++++ b/dom/plugins/ipc/BrowserStreamParent.cpp
+@@ -135,7 +135,7 @@ BrowserStreamParent::RecvNPN_DestroyStream(const NPReason& reason)
+   default:
+     NS_ERROR("Unexpected state");
+     return false;
+-  };
++  }
+ 
+   mNPP->mNPNIface->destroystream(mNPP->mNPP, mStream, reason);
+   return true;
+diff --git a/editor/libeditor/nsHTMLEditor.cpp b/editor/libeditor/nsHTMLEditor.cpp
+index dcbe2cf79a81..ac13194f78b4 100644
+--- a/editor/libeditor/nsHTMLEditor.cpp
++++ b/editor/libeditor/nsHTMLEditor.cpp
+@@ -1177,7 +1177,7 @@ nsHTMLEditor::CollapseSelectionToDeepestNonTableFirstChild(
+       break;
+     }
+     node = child;
+-  };
++  }
+ 
+   selection->Collapse(node, 0);
+ }
+@@ -2703,7 +2703,7 @@ nsHTMLEditor::SetHTMLBackgroundColor(const nsAString& aColor)
+           if (NS_FAILED(res)) break;
+ 
+           GetNextSelectedCell(nullptr, getter_AddRefs(cell));
+-        };
++        }
+         return res;
+       }
+     }
+diff --git a/editor/libeditor/nsTableEditor.cpp b/editor/libeditor/nsTableEditor.cpp
+index d24ae9c1d991..8049f1375893 100644
+--- a/editor/libeditor/nsTableEditor.cpp
++++ b/editor/libeditor/nsTableEditor.cpp
+@@ -259,7 +259,7 @@ nsHTMLEditor::GetFirstRow(nsIDOMElement* aTableElement, nsIDOMNode** aRowNode)
+     NS_ENSURE_SUCCESS(res, res);
+ 
+     tableChild = nextChild;
+-  };
++  }
+   // If here, row was not found
+   return NS_EDITOR_ELEMENT_NOT_FOUND;
+ }
+@@ -360,7 +360,7 @@ nsHTMLEditor::GetLastCellInRow(nsIDOMNode* aRowNode, nsIDOMNode** aCellNode)
+     NS_ENSURE_SUCCESS(res, res);
+ 
+     rowChild = previousChild;
+-  };
++  }
+   if (rowChild)
+   {
+     *aCellNode = rowChild.get();
+diff --git a/editor/txmgr/nsTransactionStack.cpp b/editor/txmgr/nsTransactionStack.cpp
+index f9425f390f96..e75b7979ad55 100644
+--- a/editor/txmgr/nsTransactionStack.cpp
++++ b/editor/txmgr/nsTransactionStack.cpp
+@@ -79,7 +79,7 @@ nsTransactionStack::Clear()
+ {
+   while (!mDeque.empty()) {
+     RefPtr<nsTransactionItem> tx = mType == FOR_UNDO ? Pop() : PopBottom();
+-  };
++  }
+ }
+ 
+ void
+diff --git a/embedding/components/find/nsWebBrowserFind.cpp b/embedding/components/find/nsWebBrowserFind.cpp
+index 6bee42149afd..64406156d511 100644
+--- a/embedding/components/find/nsWebBrowserFind.cpp
++++ b/embedding/components/find/nsWebBrowserFind.cpp
+@@ -186,7 +186,7 @@ nsWebBrowserFind::FindNext(bool* aResult)
+     if (curItem.get() == startingItem.get()) {
+       doFind = true; // start looking in frames after this one
+     }
+-  };
++  }
+ 
+   if (!mWrapFind) {
+     // remember where we left off
+diff --git a/extensions/auth/nsAuthGSSAPI.cpp b/extensions/auth/nsAuthGSSAPI.cpp
+index a07c8abfa26a..f63b30eff6a9 100644
+--- a/extensions/auth/nsAuthGSSAPI.cpp
++++ b/extensions/auth/nsAuthGSSAPI.cpp
+@@ -144,7 +144,7 @@ gssInit()
+             libSpec.type = PR_LibSpec_Pathname;
+             libSpec.value.pathname = verLibNames[i];
+             lib = PR_LoadLibraryWithFlags(libSpec, PR_LD_GLOBAL);
+-        };
++        }
+ 
+ #else
+         
+diff --git a/gfx/thebes/gfxFontEntry.cpp b/gfx/thebes/gfxFontEntry.cpp
+index 3c7ae153ddea..7dd5d9e573b8 100644
+--- a/gfx/thebes/gfxFontEntry.cpp
++++ b/gfx/thebes/gfxFontEntry.cpp
+@@ -1403,7 +1403,7 @@ gfxFontFamily::CheckForSimpleFamily()
+     // already checked this family
+     if (mIsSimpleFamily) {
+         return;
+-    };
++    }
+ 
+     uint32_t count = mAvailableFonts.Length();
+     if (count > 4 || count == 0) {
+diff --git a/hal/Hal.cpp b/hal/Hal.cpp
+index e5e1e1d07f71..3117721b4692 100644
+--- a/hal/Hal.cpp
++++ b/hal/Hal.cpp
+@@ -1150,7 +1150,7 @@ GetFMBandSettings(FMRadioCountry aCountry) {
+     default:
+       MOZ_ASSERT(0);
+       break;
+-    };
++    }
+     return settings;
+ }
+ 
+diff --git a/js/src/jit/JitFrames.cpp b/js/src/jit/JitFrames.cpp
+index b7a469afe6eb..260667c0af66 100644
+--- a/js/src/jit/JitFrames.cpp
++++ b/js/src/jit/JitFrames.cpp
+@@ -1198,7 +1198,7 @@ MarkBailoutFrame(JSTracer* trc, const JitFrameIterator& frame)
+         if (!snapIter.moreInstructions())
+             break;
+         snapIter.nextInstruction();
+-    };
++    }
+ 
+ }
+ 
+diff --git a/js/src/jit/Lowering.cpp b/js/src/jit/Lowering.cpp
+index 6c639990a082..fbae3458861a 100644
+--- a/js/src/jit/Lowering.cpp
++++ b/js/src/jit/Lowering.cpp
+@@ -4068,7 +4068,7 @@ LIRGenerator::visitSimdUnbox(MSimdUnbox* ins)
+         break;
+       default:
+         MOZ_CRASH("Unexpected SIMD Type.");
+-    };
++    }
+ 
+     LSimdUnbox* lir = new(alloc()) LSimdUnbox(in, temp());
+     assignSnapshot(lir, kind);
+diff --git a/js/src/jit/MCallOptimize.cpp b/js/src/jit/MCallOptimize.cpp
+index 0633dd1779d3..eec7497bb568 100644
+--- a/js/src/jit/MCallOptimize.cpp
++++ b/js/src/jit/MCallOptimize.cpp
+@@ -3327,7 +3327,7 @@ IonBuilder::canInlineSimd(CallInfo& callInfo, JSNative native, unsigned numArgs,
+ 
+     JSObject* templateObject = inspector->getTemplateObjectForNative(pc, native);
+     if (!templateObject)
+-        return false;;
++        return false;
+ 
+     *templateObj = &templateObject->as<InlineTypedObject>();
+     return true;
+diff --git a/js/src/jit/mips32/Simulator-mips32.cpp b/js/src/jit/mips32/Simulator-mips32.cpp
+index 56e4f6748ba4..2aaef9786f15 100644
+--- a/js/src/jit/mips32/Simulator-mips32.cpp
++++ b/js/src/jit/mips32/Simulator-mips32.cpp
+@@ -281,7 +281,7 @@ SimInstruction::isForbiddenInBranchDelay() const
+         break;
+       default:
+         return false;
+-    };
++    }
+ }
+ 
+ bool
+@@ -446,7 +446,7 @@ SimInstruction::instructionType() const
+         return kJumpType;
+       default:
+         return kUnsupported;
+-    };
++    }
+     return kUnsupported;
+ }
+ 
+@@ -2231,7 +2231,7 @@ Simulator::configureTypeRegister(SimInstruction* instr,
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       case op_cop1x:
+         break;
+@@ -2367,7 +2367,7 @@ Simulator::configureTypeRegister(SimInstruction* instr,
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       case op_special2:
+         switch (instr->functionFieldRaw()) {
+@@ -2379,7 +2379,7 @@ Simulator::configureTypeRegister(SimInstruction* instr,
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       case op_special3:
+         switch (instr->functionFieldRaw()) {
+@@ -2405,11 +2405,11 @@ Simulator::configureTypeRegister(SimInstruction* instr,
+           }
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       default:
+         MOZ_CRASH();
+-    };
++    }
+ }
+ 
+ void
+@@ -2775,7 +2775,7 @@ Simulator::decodeTypeRegister(SimInstruction* instr)
+                 break;
+               default:
+                 MOZ_CRASH();
+-            };
++            }
+             break;
+           case rs_l:
+             switch (instr->functionFieldRaw()) {
+@@ -2797,7 +2797,7 @@ Simulator::decodeTypeRegister(SimInstruction* instr)
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       case op_cop1x:
+         switch (instr->functionFieldRaw()) {
+@@ -2817,7 +2817,7 @@ Simulator::decodeTypeRegister(SimInstruction* instr)
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+       case op_special:
+         switch (instr->functionFieldRaw()) {
+@@ -2897,7 +2897,7 @@ Simulator::decodeTypeRegister(SimInstruction* instr)
+             break;
+           default:  // For other special opcodes we do the default operation.
+             setRegister(rd_reg, alu_out);
+-          };
++          }
+           break;
+       case op_special2:
+         switch (instr->functionFieldRaw()) {
+@@ -2923,14 +2923,14 @@ Simulator::decodeTypeRegister(SimInstruction* instr)
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+         // Unimplemented opcodes raised an error in the configuration step before,
+         // so we can use the default here to set the destination register in common
+         // cases.
+       default:
+         setRegister(rd_reg, alu_out);
+-      };
++      }
+ }
+ 
+ // Type 2: instructions using a 16 bytes immediate. (e.g. addi, beq).
+@@ -2992,7 +2992,7 @@ Simulator::decodeTypeImmediate(SimInstruction* instr)
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         break;
+         // ------------- op_regimm class.
+       case op_regimm:
+@@ -3011,7 +3011,7 @@ Simulator::decodeTypeImmediate(SimInstruction* instr)
+             break;
+           default:
+             MOZ_CRASH();
+-        };
++        }
+         switch (instr->rtFieldRaw()) {
+           case rt_bltz:
+           case rt_bltzal:
+@@ -3030,7 +3030,7 @@ Simulator::decodeTypeImmediate(SimInstruction* instr)
+             }
+           default:
+             break;
+-        };
++        }
+         break;  // case op_regimm.
+         // ------------- Branch instructions.
+         // When comparing to zero, the encoding of rt field is always 0, so we don't
+@@ -3163,7 +3163,7 @@ Simulator::decodeTypeImmediate(SimInstruction* instr)
+         break;
+       default:
+         MOZ_CRASH();
+-    };
++    }
+ 
+     // ---------- Raise exceptions triggered.
+     signalExceptions();
+@@ -3239,7 +3239,7 @@ Simulator::decodeTypeImmediate(SimInstruction* instr)
+         break;
+       default:
+         break;
+-    };
++    }
+ 
+ 
+     if (execute_branch_delay_instruction) {
+diff --git a/layout/base/nsPresShell.cpp b/layout/base/nsPresShell.cpp
+index ee4479629e7b..81d3ed65a0bb 100644
+--- a/layout/base/nsPresShell.cpp
++++ b/layout/base/nsPresShell.cpp
+@@ -9470,7 +9470,7 @@ CompareTrees(nsPresContext* aFirstPresContext, nsIFrame* aFirstFrame,
+     const nsFrameList& kids1 = !lists1.IsDone() ? lists1.CurrentList() : nsFrameList();
+     const nsFrameList& kids2 = !lists2.IsDone() ? lists2.CurrentList() : nsFrameList();
+     int32_t l1 = kids1.GetLength();
+-    int32_t l2 = kids2.GetLength();;
++    int32_t l2 = kids2.GetLength();
+     if (l1 != l2) {
+       ok = false;
+       LogVerifyMessage(kids1.FirstChild(), kids2.FirstChild(),
+diff --git a/layout/base/nsRefreshDriver.cpp b/layout/base/nsRefreshDriver.cpp
+index 5933e45114a0..46597f4976dd 100644
+--- a/layout/base/nsRefreshDriver.cpp
++++ b/layout/base/nsRefreshDriver.cpp
+@@ -1427,7 +1427,7 @@ static void GetProfileTimelineSubDocShells(nsDocShell* aRootDocShell,
+     }
+ 
+     aShells.AppendElement(shell);
+-  };
++  }
+ }
+ 
+ static void
+diff --git a/layout/generic/nsSelection.cpp b/layout/generic/nsSelection.cpp
+index 29ba1c107078..fad6ec2cc8bd 100644
+--- a/layout/generic/nsSelection.cpp
++++ b/layout/generic/nsSelection.cpp
+@@ -2777,14 +2777,14 @@ nsFrameSelection::AddCellsToSelection(nsIContent *aTableContent,
+         col ++;
+       else
+         col--;
+-    };
++    }
+     if (row == aEndRowIndex) break;
+ 
+     if (aStartRowIndex < aEndRowIndex)
+       row++;
+     else
+       row--;
+-  };
++  }
+   return result;
+ }
+ 
+diff --git a/layout/tables/nsTableFrame.cpp b/layout/tables/nsTableFrame.cpp
+index 6d737aefa272..1e61f03b8a7e 100644
+--- a/layout/tables/nsTableFrame.cpp
++++ b/layout/tables/nsTableFrame.cpp
+@@ -7530,7 +7530,7 @@ nsTableFrame::InvalidateTableFrame(nsIFrame* aFrame,
+              aOrigVisualOverflow.Size() != visualOverflow.Size()){
+     aFrame->InvalidateFrameWithRect(aOrigVisualOverflow);
+     aFrame->InvalidateFrame();
+-    parent->InvalidateFrameWithRect(aOrigRect);;
++    parent->InvalidateFrameWithRect(aOrigRect);
+     parent->InvalidateFrame();
+   }
+ }
+diff --git a/other-licenses/7zstub/src/7zip/Bundles/SFXSetup-moz/ExtractCallback.cpp b/other-licenses/7zstub/src/7zip/Bundles/SFXSetup-moz/ExtractCallback.cpp
+index caec696a213a..8a06ec138405 100644
+--- a/other-licenses/7zstub/src/7zip/Bundles/SFXSetup-moz/ExtractCallback.cpp
++++ b/other-licenses/7zstub/src/7zip/Bundles/SFXSetup-moz/ExtractCallback.cpp
+@@ -205,7 +205,7 @@ STDMETHODIMP CExtractCallbackImp::PrepareOperation(Int32 askExtractMode)
+     case NArchive::NExtract::NAskMode::kExtract:
+       _extractMode = true;
+       break;
+-  };
++  }
+   return S_OK;
+ }
+ 
+diff --git a/security/manager/ssl/nsNSSCertificate.cpp b/security/manager/ssl/nsNSSCertificate.cpp
+index 29bad77827a2..7f8aa7a05a5c 100644
+--- a/security/manager/ssl/nsNSSCertificate.cpp
++++ b/security/manager/ssl/nsNSSCertificate.cpp
+@@ -1147,7 +1147,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
+       break;
+     default:
+       return NS_ERROR_INVALID_ARG;
+-  };
++  }
+ 
+   ScopedNSSCMSMessage cmsg(NSS_CMSMessage_Create(nullptr));
+   if (!cmsg) {
+diff --git a/security/sandbox/chromium/sandbox/win/src/sandbox_nt_util.cc b/security/sandbox/chromium/sandbox/win/src/sandbox_nt_util.cc
+index 12dd7d8c88c7..8162a194d645 100644
+--- a/security/sandbox/chromium/sandbox/win/src/sandbox_nt_util.cc
++++ b/security/sandbox/chromium/sandbox/win/src/sandbox_nt_util.cc
+@@ -55,7 +55,7 @@ void* AllocateNearTo(void* source, size_t size) {
+ 
+     // Try 100 MB higher.
+     base = reinterpret_cast<char*>(base) + 100 * 0x100000;
+-  };
++  }
+ 
+   if (attempts == 41)
+     return NULL;
+diff --git a/toolkit/components/downloads/ApplicationReputation.cpp b/toolkit/components/downloads/ApplicationReputation.cpp
+index 0e037550c969..d187e3550f30 100644
+--- a/toolkit/components/downloads/ApplicationReputation.cpp
++++ b/toolkit/components/downloads/ApplicationReputation.cpp
+@@ -666,7 +666,7 @@ PendingLookup::StartLookup()
+   nsresult rv = DoLookupInternal();
+   if (NS_FAILED(rv)) {
+     return OnComplete(false, NS_OK);
+-  };
++  }
+   return rv;
+ }
+ 
+diff --git a/toolkit/components/filewatcher/NativeFileWatcherWin.cpp b/toolkit/components/filewatcher/NativeFileWatcherWin.cpp
+index dd9098abc142..e895c6862983 100644
+--- a/toolkit/components/filewatcher/NativeFileWatcherWin.cpp
++++ b/toolkit/components/filewatcher/NativeFileWatcherWin.cpp
+@@ -480,7 +480,7 @@ NativeFileWatcherIOTask::RunInternal()
+     }
+ 
+     rawNotificationBuffer += notificationInfo->NextEntryOffset;
+-  };
++  }
+ 
+   // We need to keep watching for further changes.
+   nsresult rv = AddDirectoryToWatchList(changedRes);
+diff --git a/toolkit/components/telemetry/Telemetry.cpp b/toolkit/components/telemetry/Telemetry.cpp
+index f8123bb502ff..f30237bc63a8 100644
+--- a/toolkit/components/telemetry/Telemetry.cpp
++++ b/toolkit/components/telemetry/Telemetry.cpp
+@@ -2349,7 +2349,7 @@ TelemetryImpl::CreateHistogramSnapshots(JSContext *cx,
+       DebugOnly<nsresult> rv = GetHistogramByEnumId(Telemetry::ID(i), &h);
+       MOZ_ASSERT(NS_SUCCEEDED(rv));
+     }
+-  };
++  }
+ 
+   StatisticsRecorder::Histograms hs;
+   StatisticsRecorder::GetHistograms(&hs);
+diff --git a/toolkit/crashreporter/client/crashreporter.cpp b/toolkit/crashreporter/client/crashreporter.cpp
+index 8c4d522e59c3..69d2c3686633 100644
+--- a/toolkit/crashreporter/client/crashreporter.cpp
++++ b/toolkit/crashreporter/client/crashreporter.cpp
+@@ -641,7 +641,7 @@ int main(int argc, char** argv)
+       paramName.str("");
+       paramName << "MOZ_CRASHREPORTER_RESTART_ARG_" << i++;
+       param = getenv(paramName.str().c_str());
+-    };
++    }
+ 
+     // allow override of the server url via environment variable
+     //XXX: remove this in the far future when our robot
+diff --git a/tools/profiler/tasktracer/GeckoTaskTracer.cpp b/tools/profiler/tasktracer/GeckoTaskTracer.cpp
+index e1a855c1827f..3bbc8989f1a2 100644
+--- a/tools/profiler/tasktracer/GeckoTaskTracer.cpp
++++ b/tools/profiler/tasktracer/GeckoTaskTracer.cpp
+@@ -139,7 +139,7 @@ CreateSourceEvent(SourceEventType aType)
+ #include "SourceEventTypeMap.h"
+     default:
+       MOZ_CRASH("Unknown SourceEvent.");
+-  };
++  }
+ #undef CREATE_SOURCE_EVENT_NAME
+ 
+   // Log a fake dispatch and start for this source event.
+diff --git a/widget/GfxInfoBase.cpp b/widget/GfxInfoBase.cpp
+index bd64f2ffcfbb..3e24ac895991 100644
+--- a/widget/GfxInfoBase.cpp
++++ b/widget/GfxInfoBase.cpp
+@@ -155,7 +155,7 @@ GetPrefNameForFeature(int32_t aFeature)
+       break;
+     default:
+       break;
+-  };
++  }
+ 
+   return name;
+ }
+diff --git a/widget/gonk/libdisplay/GonkDisplayJB.cpp b/widget/gonk/libdisplay/GonkDisplayJB.cpp
+index 61b10dc268bd..197b85a47977 100644
+--- a/widget/gonk/libdisplay/GonkDisplayJB.cpp
++++ b/widget/gonk/libdisplay/GonkDisplayJB.cpp
+@@ -398,7 +398,7 @@ GonkDisplayJB::NotifyBootAnimationStopped()
+ void
+ GonkDisplayJB::PowerOnDisplay(int aDpy)
+ {
+-    MOZ_ASSERT(mHwc);;
++    MOZ_ASSERT(mHwc);
+ #if ANDROID_VERSION >= 21
+     if (mHwc->common.version >= HWC_DEVICE_API_VERSION_1_4) {
+         mHwc->setPowerMode(mHwc, aDpy, HWC_POWER_MODE_NORMAL);
+diff --git a/widget/gtk/nsLookAndFeel.cpp b/widget/gtk/nsLookAndFeel.cpp
+index 52edfb2d1729..a88340605913 100644
+--- a/widget/gtk/nsLookAndFeel.cpp
++++ b/widget/gtk/nsLookAndFeel.cpp
+@@ -363,7 +363,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor& aColor)
+ #else
+     case eColorID_threeddarkshadow:
+         // Hardcode to black
+-        aColor = NS_RGB(0x00,0x00,0x00);;
++        aColor = NS_RGB(0x00,0x00,0x00);
+         break;
+ 
+     case eColorID__moz_eventreerow:
+diff --git a/widget/windows/GfxInfo.cpp b/widget/windows/GfxInfo.cpp
+index 6769051dc2c3..992fd43814f8 100644
+--- a/widget/windows/GfxInfo.cpp
++++ b/widget/windows/GfxInfo.cpp
+@@ -811,7 +811,7 @@ WindowsVersionToOperatingSystem(int32_t aWindowsVersion)
+     case kWindowsUnknown:
+     default:
+       return DRIVER_OS_UNKNOWN;
+-    };
++    }
+ }
+ 
+ const nsTArray<GfxDriverInfo>&
+diff --git a/widget/windows/InkCollector.cpp b/widget/windows/InkCollector.cpp
+index 44647438929e..3cee40f6a1ef 100644
+--- a/widget/windows/InkCollector.cpp
++++ b/widget/windows/InkCollector.cpp
+@@ -216,7 +216,7 @@ HRESULT InkCollectorEvent::Invoke(DISPID aDispIdMember, REFIID /*aRiid*/,
+       }
+       break;
+     }
+-  };
++  }
+   return S_OK;
+ }
+ 
+diff --git a/widget/windows/nsWindow.cpp b/widget/windows/nsWindow.cpp
+index 360e8338fff1..0b4c7962492e 100644
+--- a/widget/windows/nsWindow.cpp
++++ b/widget/windows/nsWindow.cpp
+@@ -6306,7 +6306,7 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
+       default:
+           MOZ_LOG(gWindowsLog, LogLevel::Info, ("*** mSizeMode: ??????\n"));
+         break;
+-    };
++    }
+ #endif
+ 
+     if (mWidgetListener)
+diff --git a/xpcom/base/nsConsoleService.cpp b/xpcom/base/nsConsoleService.cpp
+index 6b6dbc88ecd8..722f71a1ac6d 100644
+--- a/xpcom/base/nsConsoleService.cpp
++++ b/xpcom/base/nsConsoleService.cpp
+@@ -383,7 +383,7 @@ nsConsoleService::GetMessageArray(uint32_t* aCount,
+     nsCOMPtr<nsIConsoleMessage> m = e->Get();
+     m.forget(&messageArray[i]);
+     i++;
+-  };
++  }
+ 
+   MOZ_ASSERT(i == mCurrentSize);
+ 
+diff --git a/xpcom/base/nsDebugImpl.cpp b/xpcom/base/nsDebugImpl.cpp
+index afc3fbe4947e..1e74a95b6969 100644
+--- a/xpcom/base/nsDebugImpl.cpp
++++ b/xpcom/base/nsDebugImpl.cpp
+@@ -324,7 +324,7 @@ NS_DebugBreak(uint32_t aSeverity, const char* aStr, const char* aExpr,
+ 
+     default:
+       aSeverity = NS_DEBUG_WARNING;
+-  };
++  }
+ 
+ #  define PrintToBuffer(...) PR_sxprintf(StuffFixedBuffer, &buf, __VA_ARGS__)
+ 
+diff --git a/xpcom/glue/nsStringAPI.cpp b/xpcom/glue/nsStringAPI.cpp
+index 1d7f8bf3e75b..c2fa1bd25aff 100644
+--- a/xpcom/glue/nsStringAPI.cpp
++++ b/xpcom/glue/nsStringAPI.cpp
+@@ -522,7 +522,7 @@ nsAString::AppendInt(int aInt, int32_t aRadix)
+     default:
+       NS_ERROR("Unrecognized radix");
+       fmt = "";
+-  };
++  }
+ 
+   char buf[20];
+   int len = snprintf(buf, sizeof(buf), fmt, aInt);
+@@ -1002,7 +1002,7 @@ nsACString::AppendInt(int aInt, int32_t aRadix)
+     default:
+       NS_ERROR("Unrecognized radix");
+       fmt = "";
+-  };
++  }
+ 
+   char buf[20];
+   int len = snprintf(buf, sizeof(buf), fmt, aInt);
+diff --git a/xpcom/io/nsStorageStream.cpp b/xpcom/io/nsStorageStream.cpp
+index ec6ec8cb4817..c610c7a8fd98 100644
+--- a/xpcom/io/nsStorageStream.cpp
++++ b/xpcom/io/nsStorageStream.cpp
+@@ -199,7 +199,7 @@ nsStorageStream::Write(const char* aBuffer, uint32_t aCount,
+     mWriteCursor += count;
+     LOG(("nsStorageStream [%p] Writing mWriteCursor=%x mSegmentEnd=%x count=%d\n",
+          this, mWriteCursor, mSegmentEnd, count));
+-  };
++  }
+ 
+ out:
+   *aNumWritten = aCount - remaining;
+@@ -476,7 +476,7 @@ nsStorageInputStream::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
+     remainingCapacity -= bytesConsumed;
+     mReadCursor += bytesConsumed;
+     mLogicalCursor += bytesConsumed;
+-  };
++  }
+ 
+ out:
+   *aNumRead = aCount - remainingCapacity;
