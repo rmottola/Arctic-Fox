@@ -879,10 +879,12 @@ public:
 };
 
 TEST_F(APZCPinchTester, Pinch_DefaultGestures_NoTouchAction) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
   DoPinchTest(true);
 }
 
 TEST_F(APZCPinchGestureDetectorTester, Pinch_UseGestureDetector_NoTouchAction) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
   DoPinchTest(true);
 }
 
@@ -1307,6 +1309,7 @@ protected:
 };
 
 TEST_F(APZCPanningTester, Pan) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
   DoPanTest(true, true, mozilla::layers::AllowedTouchBehavior::NONE);
 }
 
@@ -1824,6 +1827,7 @@ protected:
 };
 
 TEST_F(APZCLongPressTester, LongPress) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
   DoLongPressTest(mozilla::layers::AllowedTouchBehavior::NONE);
 }
 
@@ -1835,6 +1839,7 @@ TEST_F(APZCLongPressTester, LongPressWithTouchAction) {
 }
 
 TEST_F(APZCLongPressTester, LongPressPreventDefault) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
   DoLongPressPreventDefaultTest(mozilla::layers::AllowedTouchBehavior::NONE);
 }
 
@@ -2617,6 +2622,8 @@ TEST_F(APZHitTestingTester, ComplexMultiLayerTree) {
 }
 
 TEST_F(APZHitTestingTester, TestRepaintFlushOnNewInputBlock) {
+  SCOPED_GFX_PREF(TouchActionEnabled, bool, false);
+
   // The main purpose of this test is to verify that touch-start events (or anything
   // that starts a new input block) don't ever get untransformed. This should always
   // hold because the APZ code should flush repaints when we start a new input block
@@ -2830,7 +2837,7 @@ protected:
     const float kAcceleration = 100.0f;
     SCOPED_GFX_PREF(APZFlingAccelBaseMultiplier, float, kAcceleration);
 
-    nsRefPtr<TestAsyncPanZoomController> childApzc = ApzcOf(layers[1]);
+    RefPtr<TestAsyncPanZoomController> childApzc = ApzcOf(layers[1]);
 
     // Pan once, enough to fully scroll the scrollgrab parent and then scroll
     // and fling the child.
