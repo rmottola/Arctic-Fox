@@ -24,7 +24,7 @@ namespace mozilla {
 
 namespace layers {
 class ImageContainer;
-}
+} // namespace layers
 
 class MediaEngineDefault;
 
@@ -190,7 +190,7 @@ public:
                                      nsTArray<RefPtr<MediaEngineVideoSource> >*) override;
   virtual void EnumerateAudioDevices(dom::MediaSourceEnum,
                                      nsTArray<RefPtr<MediaEngineAudioSource> >*) override;
-  virtual void Shutdown() {
+  virtual void Shutdown() override {
     MutexAutoLock lock(mMutex);
 
     mVSources.Clear();
