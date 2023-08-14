@@ -1569,7 +1569,7 @@ GeckoMediaPluginServiceParent::ForgetThisSiteOnGMPThread(const nsACString& aSite
 
   struct OriginFilter : public DirectoryFilter {
     explicit OriginFilter(const nsACString& aSite) : mSite(aSite) {}
-    virtual bool operator()(nsIFile* aPath) {
+    bool operator()(nsIFile* aPath) override {
       return MatchOrigin(aPath, mSite);
     }
   private:
@@ -1606,7 +1606,7 @@ GeckoMediaPluginServiceParent::ClearRecentHistoryOnGMPThread(PRTime aSince)
     }
 
     // |aPath| is $profileDir/gmp/$platform/$gmpName/id/$originHash/
-    virtual bool operator()(nsIFile* aPath) {
+    bool operator()(nsIFile* aPath) override {
       if (IsModifiedAfter(aPath)) {
         return true;
       }
