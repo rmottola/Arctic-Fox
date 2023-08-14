@@ -138,7 +138,7 @@ AudioNodeStream::SetStreamTimeParameter(uint32_t aIndex, AudioContext* aContext,
       : ControlMessage(aStream), mStreamTime(aStreamTime),
         mRelativeToStream(aRelativeToStream), mIndex(aIndex)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->
           SetStreamTimeParameterImpl(mIndex, mRelativeToStream, mStreamTime);
@@ -170,7 +170,7 @@ AudioNodeStream::SetDoubleParameter(uint32_t aIndex, double aValue)
     Message(AudioNodeStream* aStream, uint32_t aIndex, double aValue)
       : ControlMessage(aStream), mValue(aValue), mIndex(aIndex)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           SetDoubleParameter(mIndex, mValue);
@@ -191,7 +191,7 @@ AudioNodeStream::SetInt32Parameter(uint32_t aIndex, int32_t aValue)
     Message(AudioNodeStream* aStream, uint32_t aIndex, int32_t aValue)
       : ControlMessage(aStream), mValue(aValue), mIndex(aIndex)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           SetInt32Parameter(mIndex, mValue);
@@ -217,7 +217,7 @@ AudioNodeStream::SendTimelineEvent(uint32_t aIndex,
         mSampleRate(aStream->SampleRate()),
         mIndex(aIndex)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           RecvTimelineEvent(mIndex, mEvent);
@@ -238,7 +238,7 @@ AudioNodeStream::SetThreeDPointParameter(uint32_t aIndex, const ThreeDPoint& aVa
     Message(AudioNodeStream* aStream, uint32_t aIndex, const ThreeDPoint& aValue)
       : ControlMessage(aStream), mValue(aValue), mIndex(aIndex)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           SetThreeDPointParameter(mIndex, mValue);
@@ -260,7 +260,7 @@ AudioNodeStream::SetBuffer(already_AddRefed<ThreadSharedFloatArrayBufferList>&& 
             already_AddRefed<ThreadSharedFloatArrayBufferList>& aBuffer)
       : ControlMessage(aStream), mBuffer(aBuffer)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->
           SetBuffer(mBuffer.forget());
@@ -283,7 +283,7 @@ AudioNodeStream::SetRawArrayData(nsTArray<float>& aData)
     {
       mData.SwapElements(aData);
     }
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->Engine()->SetRawArrayData(mData);
     }
@@ -310,7 +310,7 @@ AudioNodeStream::SetChannelMixingParameters(uint32_t aNumberOfChannels,
         mChannelCountMode(aChannelCountMode),
         mChannelInterpretation(aChannelInterpretation)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->
         SetChannelMixingParametersImpl(mNumberOfChannels, mChannelCountMode,
@@ -335,7 +335,7 @@ AudioNodeStream::SetPassThrough(bool aPassThrough)
     Message(AudioNodeStream* aStream, bool aPassThrough)
       : ControlMessage(aStream), mPassThrough(aPassThrough)
     {}
-    virtual void Run() override
+    void Run() override
     {
       static_cast<AudioNodeStream*>(mStream)->mPassThrough = mPassThrough;
     }
@@ -382,7 +382,7 @@ class AudioNodeStream::AdvanceAndResumeMessage final : public ControlMessage {
 public:
   AdvanceAndResumeMessage(AudioNodeStream* aStream, StreamTime aAdvance) :
     ControlMessage(aStream), mAdvance(aAdvance) {}
-  virtual void Run() override
+  void Run() override
   {
     auto ns = static_cast<AudioNodeStream*>(mStream);
     ns->mBufferStartTime -= mAdvance;
@@ -718,7 +718,7 @@ class AudioNodeStream::CheckForInactiveMessage final : public ControlMessage
 public:
   explicit CheckForInactiveMessage(AudioNodeStream* aStream) :
     ControlMessage(aStream) {}
-  virtual void Run() override
+  void Run() override
   {
     auto ns = static_cast<AudioNodeStream*>(mStream);
     ns->CheckForInactive();
