@@ -2805,8 +2805,7 @@ POfflineCacheUpdateChild*
 ContentChild::AllocPOfflineCacheUpdateChild(const URIParams& manifestURI,
                                             const URIParams& documentURI,
                                             const PrincipalInfo& aLoadingPrincipalInfo,
-                                            const bool& stickDocument,
-                                            const TabId& aTabId)
+                                            const bool& stickDocument)
 {
   NS_RUNTIMEABORT("unused");
   return nullptr;
