@@ -81,6 +81,9 @@ class FinishInjectorInitTask;
 class PluginModuleParent
     : public PPluginModuleParent
     , public PluginLibrary
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    , public CrashReporter::InjectorCrashCallback
+#endif
 {
 protected:
     typedef mozilla::PluginLibrary PluginLibrary;
@@ -369,6 +372,10 @@ class PluginModuleContentParent : public PluginModuleParent
   private:
     virtual bool ShouldContinueFromReplyTimeout() override;
     virtual void OnExitedSyncSend() override;
+
+#ifdef MOZ_CRASHREPORTER_INJECTOR
+    void OnCrash(DWORD processID) override {}
+#endif
 
     static PluginModuleContentParent* sSavedModuleParent;
 
