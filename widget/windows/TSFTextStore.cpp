@@ -1231,6 +1231,7 @@ TSFTextStore::TSFTextStore()
   , mDeferClearingLockedContent(false)
   , mNativeCaretIsCreated(false)
   , mDeferNotifyingTSF(false)
+  , mDestroyed(false)
 {
   for (int32_t i = 0; i < NUM_OF_SUPPORTED_ATTRS; i++) {
     mRequestedAttrs[i] = false;
@@ -1314,6 +1315,8 @@ TSFTextStore::Destroy()
      "mComposition.IsComposing()=%s",
      this, GetLockFlagNameStr(mLock).get(),
      GetBoolName(mComposition.IsComposing())));
+
+  mDestroyed = true;
 
   if (mLock) {
     mPendingDestroy = true;
@@ -1476,13 +1479,19 @@ TSFTextStore::RequestLock(DWORD dwLockFlags,
 {
   MOZ_LOG(sTextStoreLog, LogLevel::Info,
     ("TSF: 0x%p TSFTextStore::RequestLock(dwLockFlags=%s, phrSession=0x%p), "
-     "mLock=%s", this, GetLockFlagNameStr(dwLockFlags).get(), phrSession,
-     GetLockFlagNameStr(mLock).get()));
+     "mLock=%s, mDestroyed=%s", this, GetLockFlagNameStr(dwLockFlags).get(),
+     phrSession, GetLockFlagNameStr(mLock).get(), GetBoolName(mDestroyed)));
 
   if (!mSink) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
       ("TSF: 0x%p   TSFTextStore::RequestLock() FAILED due to "
        "any sink not stored", this));
+    return E_FAIL;
+  }
+  if (mDestroyed) {
+    MOZ_LOG(sTextStoreLog, LogLevel::Error,
+      ("TSF: 0x%p   TSFTextStore::RequestLock() FAILED due to "
+       "being destroyed", this));
     return E_FAIL;
   }
   if (!phrSession) {
