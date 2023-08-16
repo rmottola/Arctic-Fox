@@ -1183,8 +1183,7 @@ PluginInstanceParent::BeginUpdateBackground(const nsIntRect& aRect,
 }
 
 nsresult
-PluginInstanceParent::EndUpdateBackground(gfxContext* aCtx,
-                                          const nsIntRect& aRect)
+PluginInstanceParent::EndUpdateBackground(const nsIntRect& aRect)
 {
     PLUGIN_LOG_DEBUG(
         ("[InstanceParent][%p] EndUpdateBackground for <x=%d,y=%d, w=%d,h=%d>",
