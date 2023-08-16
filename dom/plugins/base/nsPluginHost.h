@@ -364,6 +364,8 @@ private:
   uint32_t ChromeEpochForContent();
   void SetChromeEpochForContent(uint32_t aEpoch);
 
+  void UpdateInMemoryPluginInfo(nsPluginTag* aPluginTag);
+
   // On certain platforms, we only want to load certain plugins. This function
   // centralizes loading rules.
   bool ShouldAddPlugin(nsPluginTag* aPluginTag);
