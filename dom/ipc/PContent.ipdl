@@ -220,6 +220,15 @@ union DeviceStorageParams
   DeviceStorageUnmountParams;
 };
 
+struct DeviceStorageLocationInfo {
+  nsString music;
+  nsString pictures;
+  nsString videos;
+  nsString sdcard;
+  nsString apps;
+  nsString crashes;
+};
+
 struct FMRadioRequestEnableParams
 {
   double frequency;
@@ -364,15 +373,6 @@ struct VolumeInfo {
   bool isUnmounting;
   bool isRemovable;
   bool isHotSwappable;
-};
-
-struct DeviceStorageAreaInfo {
-  nsString music;
-  nsString pictures;
-  nsString videos;
-  nsString sdcard;
-  nsString apps;
-  nsString crashes;
 };
 
 struct ClipboardCapabilities {
@@ -606,8 +606,6 @@ child:
     ScreenSizeChanged(IntSize size);
 
     Volumes(VolumeInfo[] volumes);
-
-    DeviceStorageAreas(DeviceStorageAreaInfo areaInfo);
 
     FlushMemory(nsString reason);
 
@@ -1178,6 +1176,9 @@ parent:
 
     sync GetDeviceStorageLocation(nsString type)
         returns (nsString path);
+
+    sync GetDeviceStorageLocations()
+	returns (DeviceStorageLocationInfo info);
 
     sync GetAndroidSystemInfo()
         returns (AndroidSystemInfo info);

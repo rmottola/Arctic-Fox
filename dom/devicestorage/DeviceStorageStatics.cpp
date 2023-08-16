@@ -112,6 +112,30 @@ DeviceStorageStatics::InitDirs()
   sMutex.AssertCurrentThreadOwns();
   DS_LOG_INFO("");
 
+#if !defined(MOZ_WIDGET_GONK)
+  if (!XRE_IsParentProcess()) {
+    // For gonk, we have the parent process forward the directory information
+    // to the child using ContentParent::ForwardKnownInfo. On desktop, this
+    // winds up slowing down the startup (in particular ts_paint), so rather
+    // than penalize all e10s processes, we do a synchronous IPC call here,
+    // which only penalizes child processes which actually use DeviceStorage.
+
+    dom::ContentChild* child = dom::ContentChild::GetSingleton();
+    DeviceStorageLocationInfo locationInfo;
+    child->SendGetDeviceStorageLocations(&locationInfo);
+
+    NS_NewLocalFile(locationInfo.apps(),     true, getter_AddRefs(sInstance->mDirs[TYPE_APPS]));
+    NS_NewLocalFile(locationInfo.crashes(),  true, getter_AddRefs(sInstance->mDirs[TYPE_CRASHES]));
+    NS_NewLocalFile(locationInfo.pictures(), true, getter_AddRefs(sInstance->mDirs[TYPE_PICTURES]));
+    NS_NewLocalFile(locationInfo.videos(),   true, getter_AddRefs(sInstance->mDirs[TYPE_VIDEOS]));
+    NS_NewLocalFile(locationInfo.music(),    true, getter_AddRefs(sInstance->mDirs[TYPE_MUSIC]));
+    NS_NewLocalFile(locationInfo.sdcard(),   true, getter_AddRefs(sInstance->mDirs[TYPE_SDCARD]));
+
+    sInstance->mInitialized = true;
+    return;
+  }
+#endif
+
   nsCOMPtr<nsIProperties> dirService
     = do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID);
   MOZ_ASSERT(dirService);
@@ -276,44 +300,20 @@ DeviceStorageStatics::Shutdown()
 }
 
 /* static */ void
-DeviceStorageStatics::GetDeviceStorageAreasForIPC(
-  DeviceStorageAreaInfo& aAreaInfo)
+DeviceStorageStatics::GetDeviceStorageLocationsForIPC(
+  DeviceStorageLocationInfo* aLocationInfo)
 {
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
 
   InitializeDirs();
 
-  GetDirPath(TYPE_APPS,     aAreaInfo.apps());
-  GetDirPath(TYPE_CRASHES,  aAreaInfo.crashes());
-  GetDirPath(TYPE_PICTURES, aAreaInfo.pictures());
-  GetDirPath(TYPE_VIDEOS,   aAreaInfo.videos());
-  GetDirPath(TYPE_MUSIC,    aAreaInfo.music());
-  GetDirPath(TYPE_SDCARD,   aAreaInfo.sdcard());
-}
-
-/* static */ void
-DeviceStorageStatics::RecvDeviceStorageAreasFromParent(
-  const DeviceStorageAreaInfo& aAreaInfo)
-{
-  if (XRE_IsParentProcess()) {
-    // We are the parent. Therefore our info is already correct.
-    return;
-  }
-
-  StaticMutexAutoLock lock(sMutex);
-  if (NS_WARN_IF(!sInstance)) {
-    return;
-  }
-
-  NS_NewLocalFile(aAreaInfo.apps(),     true, getter_AddRefs(sInstance->mDirs[TYPE_APPS]));
-  NS_NewLocalFile(aAreaInfo.crashes(),  true, getter_AddRefs(sInstance->mDirs[TYPE_CRASHES]));
-  NS_NewLocalFile(aAreaInfo.pictures(), true, getter_AddRefs(sInstance->mDirs[TYPE_PICTURES]));
-  NS_NewLocalFile(aAreaInfo.videos(),   true, getter_AddRefs(sInstance->mDirs[TYPE_VIDEOS]));
-  NS_NewLocalFile(aAreaInfo.music(),    true, getter_AddRefs(sInstance->mDirs[TYPE_MUSIC]));
-  NS_NewLocalFile(aAreaInfo.sdcard(),   true, getter_AddRefs(sInstance->mDirs[TYPE_SDCARD]));
-
-  sInstance->mInitialized = true;
+  GetDirPath(TYPE_APPS,     aLocationInfo->apps());
+  GetDirPath(TYPE_CRASHES,  aLocationInfo->crashes());
+  GetDirPath(TYPE_PICTURES, aLocationInfo->pictures());
+  GetDirPath(TYPE_VIDEOS,   aLocationInfo->videos());
+  GetDirPath(TYPE_MUSIC,    aLocationInfo->music());
+  GetDirPath(TYPE_SDCARD,   aLocationInfo->sdcard());
 }
 
 /* static */ already_AddRefed<nsIFile>

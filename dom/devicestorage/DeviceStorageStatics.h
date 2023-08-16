@@ -40,8 +40,7 @@ public:
   static void GetWritableName(nsString& aName);
   static void SetWritableName(const nsAString& aName);
 
-  static void GetDeviceStorageAreasForIPC(DeviceStorageAreaInfo& aAreaInfo);
-  static void RecvDeviceStorageAreasFromParent(const DeviceStorageAreaInfo& aAreaInfo);
+  static void GetDeviceStorageLocationsForIPC(DeviceStorageLocationInfo* aLocationInfo);
 
   static bool HasOverrideRootDir();
   static already_AddRefed<nsIFile> GetAppsDir();
