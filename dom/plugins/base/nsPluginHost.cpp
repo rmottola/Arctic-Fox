@@ -2462,7 +2462,8 @@ nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged
                                                tag.isFlashPlugin(),
                                                tag.supportsAsyncInit(),
                                                tag.lastModifiedTime(),
-                                               tag.isFromExtension());
+                                               tag.isFromExtension(),
+                                               tag.sandboxLevel());
       AddPluginTag(pluginTag);
     }
   }
@@ -2709,7 +2710,8 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                       tag->FileName(),
                                       tag->Version(),
                                       tag->mLastModifiedTime,
-                                      tag->IsFromExtension()));
+                                      tag->IsFromExtension(),
+                                      tag->mSandboxLevel));
   }
   return NS_OK;
 }
