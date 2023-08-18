@@ -695,7 +695,7 @@ nsSpeechTask::DestroyAudioChannelAgent()
 NS_IMETHODIMP
 nsSpeechTask::WindowVolumeChanged(float aVolume, bool aMuted)
 {
-  SetAudioOutputVolume(mVolume * aVolume * aMuted);
+  SetAudioOutputVolume(aMuted ? 0.0 : mVolume * aVolume);
   return NS_OK;
 }
 
@@ -707,7 +707,7 @@ nsSpeechTask::WindowAudioCaptureChanged()
 }
 
 void
-nsSpeechTask::SetAudioOutputVolume(uint32_t aVolume)
+nsSpeechTask::SetAudioOutputVolume(float aVolume)
 {
   if (mStream) {
     mStream->SetAudioOutputVolume(this, aVolume);
