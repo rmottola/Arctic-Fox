@@ -407,8 +407,7 @@ nsSVGOuterSVGFrame::Reflow(nsPresContext*           aPresContext,
     if (svgElem->HasViewBoxOrSyntheticViewBox()) {
       nsIFrame* anonChild = PrincipalChildList().FirstChild();
       anonChild->AddStateBits(NS_FRAME_IS_DIRTY);
-      for (nsIFrame* child = anonChild->PrincipalChildList().FirstChild(); child;
-           child = child->GetNextSibling()) {
+      for (nsIFrame* child : anonChild->PrincipalChildList()) {
         child->AddStateBits(NS_FRAME_IS_DIRTY);
       }
     }

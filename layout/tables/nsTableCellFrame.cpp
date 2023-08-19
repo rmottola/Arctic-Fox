@@ -700,8 +700,7 @@ nsTableCellFrame::CellHasVisibleContent(nscoord       height,
     return true;
   if (tableFrame->IsBorderCollapse())
     return true;
-  nsIFrame* innerFrame = kidFrame->PrincipalChildList().FirstChild();
-  while(innerFrame) {
+  for (nsIFrame* innerFrame : kidFrame->PrincipalChildList()) {
     nsIAtom* frameType = innerFrame->GetType();
     if (nsGkAtoms::textFrame == frameType) {
        nsTextFrame* textFrame = static_cast<nsTextFrame*>(innerFrame);
@@ -716,8 +715,7 @@ nsTableCellFrame::CellHasVisibleContent(nscoord       height,
       if (floatFrame)
         return true;
     }
-    innerFrame = innerFrame->GetNextSibling();
-  }	
+  }
   return false;
 }
 
