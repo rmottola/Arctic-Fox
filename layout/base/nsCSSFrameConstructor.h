@@ -1299,7 +1299,7 @@ protected:
   static nsIFrame* CreatePlaceholderFrameFor(nsIPresShell*     aPresShell,
                                              nsIContent*       aContent,
                                              nsIFrame*         aFrame,
-                                             nsStyleContext*   aStyleContext,
+                                             nsStyleContext*   aParentStyle,
                                              nsContainerFrame* aParentFrame,
                                              nsIFrame*         aPrevInFlow,
                                              nsFrameState      aTypeBit);

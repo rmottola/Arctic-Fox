@@ -1204,11 +1204,12 @@ nsFrameConstructorState::AddChild(nsIFrame* aNewFrame,
   if (placeholderType) {
     NS_ASSERTION(frameItems != &aFrameItems,
                  "Putting frame in-flow _and_ want a placeholder?");
+    nsStyleContext* parentContext = aStyleContext->GetParent();
     nsIFrame* placeholderFrame =
       nsCSSFrameConstructor::CreatePlaceholderFrameFor(mPresShell,
                                                        aContent,
                                                        aNewFrame,
-                                                       aStyleContext,
+                                                       parentContext,
                                                        aParentFrame,
                                                        nullptr,
                                                        placeholderType);
@@ -2914,13 +2915,13 @@ nsIFrame*
 nsCSSFrameConstructor::CreatePlaceholderFrameFor(nsIPresShell*     aPresShell,
                                                  nsIContent*       aContent,
                                                  nsIFrame*         aFrame,
-                                                 nsStyleContext*   aStyleContext,
+                                                 nsStyleContext*   aParentStyle,
                                                  nsContainerFrame* aParentFrame,
                                                  nsIFrame*         aPrevInFlow,
                                                  nsFrameState      aTypeBit)
 {
   RefPtr<nsStyleContext> placeholderStyle = aPresShell->StyleSet()->
-    ResolveStyleForNonElement(aStyleContext->GetParent());
+    ResolveStyleForNonElement(aParentStyle);
 
   // The placeholder frame gets a pseudo style context
   nsPlaceholderFrame* placeholderFrame =
@@ -8864,7 +8865,8 @@ nsCSSFrameConstructor::CreateContinuingFrame(nsPresContext*    aPresContext,
     nsIFrame* oofContFrame =
       CreateContinuingFrame(aPresContext, oofFrame, aParentFrame);
     newFrame =
-      CreatePlaceholderFrameFor(shell, content, oofContFrame, styleContext,
+      CreatePlaceholderFrameFor(shell, content, oofContFrame,
+                                styleContext->GetParent(),
                                 aParentFrame, aFrame,
                                 aFrame->GetStateBits() & PLACEHOLDER_TYPE_MASK);
   } else if (nsGkAtoms::fieldSetFrame == frameType) {
