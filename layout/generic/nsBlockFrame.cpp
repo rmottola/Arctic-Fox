@@ -6846,18 +6846,12 @@ void
 nsBlockFrame::SetInitialChildList(ChildListID     aListID,
                                   nsFrameList&    aChildList)
 {
-  NS_ASSERTION(aListID != kPrincipalList ||
-               (GetStateBits() & (NS_BLOCK_FRAME_HAS_INSIDE_BULLET |
-                                  NS_BLOCK_FRAME_HAS_OUTSIDE_BULLET)) == 0,
-               "how can we have a bullet already?");
-
-  if (kAbsoluteList == aListID) {
-    nsContainerFrame::SetInitialChildList(aListID, aChildList);
-  }
-  else if (kFloatList == aListID) {
+  if (kFloatList == aListID) {
     mFloats.SetFrames(aChildList);
-  }
-  else {
+  } else if (kPrincipalList == aListID) {
+    NS_ASSERTION((GetStateBits() & (NS_BLOCK_FRAME_HAS_INSIDE_BULLET |
+                                    NS_BLOCK_FRAME_HAS_OUTSIDE_BULLET)) == 0,
+                 "how can we have a bullet already?");
 
 #ifdef DEBUG
     // The only times a block that is an anonymous box is allowed to have a
@@ -6918,6 +6912,8 @@ nsBlockFrame::SetInitialChildList(ChildListID     aListID,
         style->IsBullet(),
         styleList->mListStylePosition == NS_STYLE_LIST_STYLE_POSITION_INSIDE);
     }
+  } else {
+    nsContainerFrame::SetInitialChildList(aListID, aChildList);
   }
 }
 
