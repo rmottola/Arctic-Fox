@@ -700,7 +700,7 @@ nsTableCellFrame::CellHasVisibleContent(nscoord       height,
     return true;
   if (tableFrame->IsBorderCollapse())
     return true;
-  nsIFrame* innerFrame = kidFrame->GetFirstPrincipalChild();
+  nsIFrame* innerFrame = kidFrame->PrincipalChildList().FirstChild();
   while(innerFrame) {
     nsIAtom* frameType = innerFrame->GetType();
     if (nsGkAtoms::textFrame == frameType) {

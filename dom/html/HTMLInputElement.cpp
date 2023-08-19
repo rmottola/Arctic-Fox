@@ -2886,7 +2886,7 @@ HTMLInputElement::Focus(ErrorResult& aError)
   // tab to the next one.
   nsIFrame* frame = GetPrimaryFrame();
   if (frame) {
-    for (nsIFrame* childFrame = frame->GetFirstPrincipalChild();
+    for (nsIFrame* childFrame = frame->PrincipalChildList().FirstChild();
          childFrame;
          childFrame = childFrame->GetNextSibling()) {
       // See if the child is a button control.

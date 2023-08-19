@@ -3111,7 +3111,7 @@ nsCSSRendering::ComputeBackgroundPositioningArea(nsPresContext* aPresContext,
   }
 
   if (MOZ_UNLIKELY(frameType == nsGkAtoms::canvasFrame)) {
-    geometryFrame = aForFrame->GetFirstPrincipalChild();
+    geometryFrame = aForFrame->PrincipalChildList().FirstChild();
     // geometryFrame might be null if this canvas is a page created
     // as an overflow container (e.g. the in-flow content has already
     // finished and this page only displays the continuations of

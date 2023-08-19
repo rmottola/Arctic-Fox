@@ -426,7 +426,7 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   }
 
   nsIFrame* kid;
-  for (kid = GetFirstPrincipalChild(); kid; kid = kid->GetNextSibling()) {
+  for (kid = PrincipalChildList().FirstChild(); kid; kid = kid->GetNextSibling()) {
     // Put our child into its own pseudo-stack.
     BuildDisplayListForChild(aBuilder, kid, aDirtyRect, aLists);
   }
