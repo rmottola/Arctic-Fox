@@ -39,6 +39,23 @@ class Shmem;
 
 namespace layers {
 
+static int sShmemCreationCounter = 0;
+
+static void ResetShmemCounter()
+{
+  sShmemCreationCounter = 0;
+}
+
+static void ShmemAllocated(LayerTransactionChild* aProtocol)
+{
+  sShmemCreationCounter++;
+  if (sShmemCreationCounter > 256) {
+    aProtocol->SendSyncWithCompositor();
+    ResetShmemCounter();
+    MOZ_PERFORMANCE_WARNING("gfx", "The number of shmem allocations is too damn high!");
+  }
+}
+
 using namespace mozilla::gfx;
 using namespace mozilla::gl;
 using namespace mozilla::ipc;
@@ -499,6 +516,8 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
 {
   *aSent = false;
 
+  ResetShmemCounter();
+
   MOZ_ASSERT(aId);
 
   PROFILER_LABEL("ShadowLayerForwarder", "EndTransaction",
@@ -687,6 +706,8 @@ ShadowLayerForwarder::AllocShmem(size_t aSize,
       !mShadowManager->IPCOpen()) {
     return false;
   }
+
+  ShmemAllocated(mShadowManager);
   return mShadowManager->AllocShmem(aSize, aType, aShmem);
 }
 bool
@@ -699,6 +720,7 @@ ShadowLayerForwarder::AllocUnsafeShmem(size_t aSize,
       !mShadowManager->IPCOpen()) {
     return false;
   }
+  ShmemAllocated(mShadowManager);
   return mShadowManager->AllocUnsafeShmem(aSize, aType, aShmem);
 }
 void
