@@ -49,6 +49,8 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/ShadowRoot.h"
 #include "mozilla/dom/EncodingUtils.h"
+#include "nsContainerFrame.h"
+#include "nsBlockFrame.h"
 #include "nsComputedDOMStyle.h"
 
 using namespace mozilla;
@@ -1365,10 +1367,6 @@ nsHTMLCopyEncoder::SetSelection(nsISelection* aSelection)
     return NS_ERROR_NULL_POINTER;
   range->GetCommonAncestorContainer(getter_AddRefs(commonParent));
 
-  // Thunderbird's msg compose code abuses the HTML copy encoder and gets
-  // confused if mIsTextWidget ends up becoming true, so for now we skip
-  // this logic in Thunderbird.
-#ifndef MOZ_THUNDERBIRD
   for (nsCOMPtr<nsIContent> selContent(do_QueryInterface(commonParent));
        selContent;
        selContent = selContent->GetParent())
@@ -1379,6 +1377,20 @@ nsHTMLCopyEncoder::SetSelection(nsISelection* aSelection)
       mIsTextWidget = true;
       break;
     }
+#ifdef MOZ_THUNDERBIRD
+    else if (selContent->IsElement()) {
+      RefPtr<nsStyleContext> styleContext =
+        nsComputedDOMStyle::GetStyleContextForElementNoFlush(
+          selContent->AsElement(), nullptr, nullptr);
+      if (styleContext) {
+        const nsStyleText* textStyle = styleContext->StyleText();
+        if (textStyle->mWhiteSpace == NS_STYLE_WHITESPACE_PRE_WRAP) {
+          mIsTextWidget = true;
+        }
+      }
+    }
+    break;
+#endif
   }
 
   // normalize selection if we are not in a widget
@@ -1388,11 +1400,7 @@ nsHTMLCopyEncoder::SetSelection(nsISelection* aSelection)
     mMimeType.AssignLiteral("text/plain");
     return NS_OK;
   }
-#endif
 
-  // XXX For better performance, we should try to get rid of the
-  // Selection object here. See BMO bug 1245883
-  
   // also consider ourselves in a text widget if we can't find an html document
   nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(mDocument);
   if (!(htmlDoc && mDocument->IsHTMLDocument())) {
