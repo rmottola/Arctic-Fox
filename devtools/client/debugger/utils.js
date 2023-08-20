@@ -106,7 +106,7 @@ const SourceUtils = {
   clearCache: function() {
     this._labelsCache.clear();
     this._groupsCache.clear();
-    this._minifiedCache.clear();
+    this._minifiedCache = new WeakMap();
   },
 
   /**
