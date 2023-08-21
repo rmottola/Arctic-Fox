@@ -232,7 +232,7 @@ FrameLayerBuilder::DisplayItemData::BeginUpdate(Layer* aLayer, LayerState aState
   }
 }
 
-static nsIFrame* sDestroyedFrame = nullptr;
+static const nsIFrame* sDestroyedFrame = nullptr;
 FrameLayerBuilder::DisplayItemData::~DisplayItemData()
 {
   MOZ_COUNT_DTOR(FrameLayerBuilder::DisplayItemData);
@@ -1707,7 +1707,7 @@ GetTranslationForPaintedLayer(PaintedLayer* aLayer)
  */
 
 /* static */ void
-FrameLayerBuilder::RemoveFrameFromLayerManager(nsIFrame* aFrame,
+FrameLayerBuilder::RemoveFrameFromLayerManager(const nsIFrame* aFrame,
                                                void* aPropertyValue)
 {
   MOZ_RELEASE_ASSERT(!sDestroyedFrame);
