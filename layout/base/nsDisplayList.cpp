@@ -6250,6 +6250,18 @@ void
 nsDisplayTransform::WriteDebugInfo(std::stringstream& aStream)
 {
   AppendToString(aStream, GetTransform());
+  if (IsTransformSeparator()) {
+    aStream << " transform-separator";
+  }
+  if (IsLeafOf3DContext()) {
+    aStream << " 3d-context-leaf";
+  }
+  if (mFrame->Extend3DContext()) {
+    aStream << " extends-3d-context";
+  }
+  if (mFrame->Combines3DTransformWithAncestors()) {
+    aStream << " combines-3d-with-ancestors";
+  }
 }
 
 nsDisplayPerspective::nsDisplayPerspective(nsDisplayListBuilder* aBuilder,
@@ -6260,7 +6272,10 @@ nsDisplayPerspective::nsDisplayPerspective(nsDisplayListBuilder* aBuilder,
   , mList(aBuilder, aPerspectiveFrame, aList)
   , mTransformFrame(aTransformFrame)
   , mIndex(aBuilder->AllocatePerspectiveItemIndex())
-{}
+{
+  MOZ_ASSERT(mList.GetChildren()->Count() == 1);
+  MOZ_ASSERT(mList.GetChildren()->GetTop()->GetType() == TYPE_TRANSFORM);
+}
 
 already_AddRefed<Layer>
 nsDisplayPerspective::BuildLayer(nsDisplayListBuilder *aBuilder,
