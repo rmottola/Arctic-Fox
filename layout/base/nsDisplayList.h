@@ -4037,6 +4037,9 @@ public:
    *        specify a value.
    * @param aFlags OFFSET_BY_ORIGIN The resulting matrix will be translated
    *        by aOrigin. This translation is applied *before* the CSS transform.
+   * @param aFlags BASIS_AT_ORIGIN The resulting matrix will have its basis
+   *        changed to be at aOrigin. This is mutually exclusive with
+   *        OFFSET_BY_ORIGIN.
    * @param aFlags INCLUDE_PRESERVE3D_ANCESTORS The computed transform will
    *        include the transform of any ancestors participating in the same
    *        3d rendering context.
@@ -4045,8 +4048,9 @@ public:
    */
   enum {
     OFFSET_BY_ORIGIN = 1 << 0,
-    INCLUDE_PRESERVE3D_ANCESTORS = 1 << 1,
-    INCLUDE_PERSPECTIVE = 1 << 2,
+    BASIS_AT_ORIGIN = 1 << 1,
+    INCLUDE_PRESERVE3D_ANCESTORS = 1 << 2,
+    INCLUDE_PERSPECTIVE = 1 << 3,
   };
   static Matrix4x4 GetResultingTransformMatrix(const nsIFrame* aFrame,
                                                const nsPoint& aOrigin,
