@@ -2577,14 +2577,9 @@ nsComputedDOMStyle::GetGridTemplateColumnsRows(const nsStyleGridTemplate& aTrack
           AppendGridLineNames(valueList, aTrackList.mRepeatAutoLineNameListBefore);
         }
 
-        // XXXdholbert The |tmpTrackSize| RefPtr variable below can go away once
-        // we fix bug 1234676 and can make GetGridTrackSize return an
-        // already_AddRefed value.
-        RefPtr<CSSValue> tmpTrackSize =
+        valueList->AppendCSSValue(
           GetGridTrackSize(aTrackList.mMinTrackSizingFunctions[i],
-                           aTrackList.mMaxTrackSizingFunctions[i]);
-
-        valueList->AppendCSSValue(tmpTrackSize.forget());
+                           aTrackList.mMaxTrackSizingFunctions[i]));
         if (!aTrackList.mRepeatAutoLineNameListAfter.IsEmpty()) {
           AppendGridLineNames(valueList, aTrackList.mRepeatAutoLineNameListAfter);
         }
@@ -2592,13 +2587,9 @@ nsComputedDOMStyle::GetGridTemplateColumnsRows(const nsStyleGridTemplate& aTrack
         end->SetString(NS_LITERAL_STRING(")"));
         valueList->AppendCSSValue(end.forget());
       } else {
-        // XXXdholbert The |tmpTrackSize| RefPtr variable below can go away once
-        // we fix bug 1234676 and make GetGridTrackSize return an
-        // already_AddRefed value.
-        RefPtr<CSSValue> tmpTrackSize =
+        valueList->AppendCSSValue(
           GetGridTrackSize(aTrackList.mMinTrackSizingFunctions[i],
-                           aTrackList.mMaxTrackSizingFunctions[i]);
-        valueList->AppendCSSValue(tmpTrackSize.forget());
+                           aTrackList.mMaxTrackSizingFunctions[i]));
       }
     }
   }
@@ -3486,19 +3477,12 @@ nsComputedDOMStyle::CreateTextAlignValue(uint8_t aAlign, bool aAlignTrue,
     return val.forget();
   }
 
-  // XXXdholbert Really we should store |val| in a RefPtr right away, and our
-  // return-type should be already_AddRefed. See bug 1234676.  For now, we only
-  // put it in a RefPtr (for the benefit of AppendCSSValue) after we know we're
-  // not returning it directly.
-  RefPtr<nsROCSSPrimitiveValue> refcountedVal = val;
-  val = nullptr; // (to avoid accidental reuse/misuse)
-
   RefPtr<nsROCSSPrimitiveValue> first = new nsROCSSPrimitiveValue;
   first->SetIdent(eCSSKeyword_unsafe);
 
   RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
   valueList->AppendCSSValue(first.forget());
-  valueList->AppendCSSValue(refcountedVal.forget());
+  valueList->AppendCSSValue(val.forget());
   return valueList.forget();
 }
 
@@ -3556,17 +3540,12 @@ nsComputedDOMStyle::DoGetTextDecoration()
 
   RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
 
-  // XXXdholbert The |tmp| RefPtr variable below can go away once we fix bug
-  // 1234676 and make the DoGet* functions return an already_AddRefed value.
-  RefPtr<CSSValue> tmp = DoGetTextDecorationLine();
-  valueList->AppendCSSValue(tmp.forget());
+  valueList->AppendCSSValue(DoGetTextDecorationLine());
   if (!isInitialStyle) {
-    tmp = DoGetTextDecorationStyle();
-    valueList->AppendCSSValue(tmp.forget());
+    valueList->AppendCSSValue(DoGetTextDecorationStyle());
   }
   if (!isForegroundColor) {
-    tmp = DoGetTextDecorationColor();
-    valueList->AppendCSSValue(tmp.forget());
+    valueList->AppendCSSValue(DoGetTextDecorationColor());
   }
 
   return valueList.forget();
@@ -5424,17 +5403,10 @@ nsComputedDOMStyle::GetSVGPaintFor(bool aFill)
       RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
       RefPtr<nsROCSSPrimitiveValue> fallback = new nsROCSSPrimitiveValue;
 
-      // XXXdholbert Really we should store |val| in a RefPtr right away, and
-      // our return-type should be already_AddRefed. See bug 1234676.  For now,
-      // we only put it in a RefPtr (for the benefit of AppendCSSValue) after
-      // we know we're not returning it directly.
-      RefPtr<nsROCSSPrimitiveValue> refcountedVal = val;
-      val = nullptr; // (to avoid accidental reuse/misuse)
-
-      refcountedVal->SetURI(paint->mPaint.mPaintServer);
+      val->SetURI(paint->mPaint.mPaintServer);
       SetToRGBAColor(fallback, paint->mFallbackColor);
 
-      valueList->AppendCSSValue(refcountedVal.forget());
+      valueList->AppendCSSValue(val.forget());
       valueList->AppendCSSValue(fallback.forget());
       return valueList.forget();
     }
