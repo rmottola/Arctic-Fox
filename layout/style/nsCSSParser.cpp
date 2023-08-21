@@ -985,7 +985,8 @@ protected:
   bool ParseAlignJustifyPosition(nsCSSValue& aResult,
                                  const KTableEntry aTable[]);
   bool ParseJustifyItems();
-  bool ParseAlignItemsSelfJustifySelf(nsCSSProperty aPropID);
+  bool ParseAlignItems();
+  bool ParseAlignJustifySelf(nsCSSProperty aPropID);
   // parsing 'align/justify-content' from the css-align spec
   bool ParseAlignJustifyContent(nsCSSProperty aPropID);
 
@@ -9652,7 +9653,7 @@ CSSParserImpl::ParseAlignJustifyPosition(nsCSSValue& aResult,
   return true;
 }
 
-// auto | stretch | <baseline-position> |
+// auto | normal | stretch | <baseline-position> |
 // [ <self-position> && <overflow-position>? ] |
 // [ legacy && [ left | right | center ] ]
 bool
@@ -9668,7 +9669,7 @@ CSSParserImpl::ParseJustifyItems()
       value.SetIntValue(value.GetIntValue() | legacy.GetIntValue(),
                         eCSSUnit_Enumerated);
     } else {
-      if (!ParseEnum(value, nsCSSProps::kAlignAutoStretchBaseline)) {
+      if (!ParseEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
         if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
             value.GetUnit() == eCSSUnit_Null) {
           return false;
@@ -9690,14 +9691,32 @@ CSSParserImpl::ParseJustifyItems()
   return true;
 }
 
-// auto | stretch | <baseline-position> |
+// normal | stretch | <baseline-position> |
 // [ <overflow-position>? && <self-position> ] 
 bool
-CSSParserImpl::ParseAlignItemsSelfJustifySelf(nsCSSProperty aPropID)
+CSSParserImpl::ParseAlignItems()
 {
   nsCSSValue value;
   if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
-    if (!ParseEnum(value, nsCSSProps::kAlignAutoStretchBaseline)) {
+    if (!ParseEnum(value, nsCSSProps::kAlignNormalStretchBaseline)) {
+      if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
+          value.GetUnit() == eCSSUnit_Null) {
+        return false;
+      }
+    }
+  }
+  AppendValue(eCSSProperty_align_items, value);
+  return true;
+}
+
+// auto | normal | stretch | <baseline-position> |
+// [ <overflow-position>? && <self-position> ] 
+bool
+CSSParserImpl::ParseAlignJustifySelf(nsCSSProperty aPropID)
+{
+  nsCSSValue value;
+  if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
+    if (!ParseEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
       if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
           value.GetUnit() == eCSSUnit_Null) {
         return false;
@@ -9708,7 +9727,7 @@ CSSParserImpl::ParseAlignItemsSelfJustifySelf(nsCSSProperty aPropID)
   return true;
 }
 
-// auto | <baseline-position> | [ <content-distribution> ||
+// normal | <baseline-position> | [ <content-distribution> ||
 //   [ <overflow-position>? && <content-position> ] ]
 // (the part after the || is called <*-position> below)
 bool
@@ -9716,7 +9735,7 @@ CSSParserImpl::ParseAlignJustifyContent(nsCSSProperty aPropID)
 {
   nsCSSValue value;
   if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
-    if (!ParseEnum(value, nsCSSProps::kAlignAutoBaseline)) {
+    if (!ParseEnum(value, nsCSSProps::kAlignNormalBaseline)) {
       nsCSSValue fallbackValue;
       if (!ParseEnum(value, nsCSSProps::kAlignContentDistribution)) {
         if (!ParseAlignJustifyPosition(fallbackValue,
@@ -9739,7 +9758,8 @@ CSSParserImpl::ParseAlignJustifyContent(nsCSSProperty aPropID)
       }
       if (fallbackValue.GetUnit() != eCSSUnit_Null) {
         auto fallback = fallbackValue.GetIntValue();
-        value.SetIntValue(value.GetIntValue() | (fallback << 8),
+        value.SetIntValue(value.GetIntValue() |
+                            (fallback << NS_STYLE_ALIGN_ALL_SHIFT),
                           eCSSUnit_Enumerated);
       }
     }
@@ -11335,15 +11355,15 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
   case eCSSProperty_align_content:
     return ParseAlignJustifyContent(aPropID);
   case eCSSProperty_align_items:
-    return ParseAlignItemsSelfJustifySelf(aPropID);
+    return ParseAlignItems();
   case eCSSProperty_align_self:
-    return ParseAlignItemsSelfJustifySelf(aPropID);
+    return ParseAlignJustifySelf(aPropID);
   case eCSSProperty_justify_content:
     return ParseAlignJustifyContent(aPropID);
   case eCSSProperty_justify_items:
     return ParseJustifyItems();
   case eCSSProperty_justify_self:
-    return ParseAlignItemsSelfJustifySelf(aPropID);
+    return ParseAlignJustifySelf(aPropID);
   case eCSSProperty_list_style:
     return ParseListStyle();
   case eCSSProperty_margin:
