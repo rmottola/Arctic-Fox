@@ -6303,7 +6303,7 @@ nsDisplayPerspective::GetLayerState(nsDisplayListBuilder* aBuilder,
                                     LayerManager* aManager,
                                     const ContainerLayerParameters& aParameters)
 {
-  return LAYER_ACTIVE;
+  return LAYER_ACTIVE_FORCE;
 }
 
 nsDisplayItemGeometry*
