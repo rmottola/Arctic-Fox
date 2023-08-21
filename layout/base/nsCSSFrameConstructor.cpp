@@ -1879,13 +1879,7 @@ IsTablePseudo(nsIFrame* aFrame)
 static bool
 IsRubyPseudo(nsIFrame* aFrame)
 {
-  nsIAtom* pseudoType = aFrame->StyleContext()->GetPseudo();
-  return pseudoType &&
-    (pseudoType == nsCSSAnonBoxes::ruby ||
-     pseudoType == nsCSSAnonBoxes::rubyBase ||
-     pseudoType == nsCSSAnonBoxes::rubyText ||
-     pseudoType == nsCSSAnonBoxes::rubyBaseContainer ||
-     pseudoType == nsCSSAnonBoxes::rubyTextContainer);
+  return RubyUtils::IsRubyPseudo(aFrame->StyleContext()->GetPseudo());
 }
 
 static bool
