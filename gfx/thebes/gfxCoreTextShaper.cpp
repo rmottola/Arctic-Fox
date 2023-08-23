@@ -252,6 +252,12 @@ gfxCoreTextShaper::ShapeText(DrawTarget      *aDrawTarget,
     for (uint32_t runIndex = 0; runIndex < numRuns; runIndex++) {
         CTRunRef aCTRun =
             (CTRunRef)::CFArrayGetValueAtIndex(glyphRuns, runIndex);
+        // If the range is purely within bidi-wrapping text, ignore it.
+        CFRange range = ::CTRunGetStringRange(aCTRun);
+        if (range.location + range.length <= startOffset ||
+            range.location - startOffset >= aLength) {
+            continue;
+        }
         CFDictionaryRef runAttr = ::CTRunGetAttributes(aCTRun);
         if (runAttr != attrObj) {
             // If Core Text manufactured a new dictionary, this may indicate
@@ -264,7 +270,6 @@ gfxCoreTextShaper::ShapeText(DrawTarget      *aDrawTarget,
             if (font1 != font2) {
                 // ...except that if the fallback was only for a variation
                 // selector that is otherwise unsupported, we just ignore it.
-                CFRange range = ::CTRunGetStringRange(aCTRun);
                 if (range.length == 1 &&
                     gfxFontUtils::IsVarSelector(aText[range.location -
                                                       startOffset])) {
