@@ -4429,7 +4429,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   if (!nsCocoaFeatures::OnLionOrLater()) {
     return false;
   }
-
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
   // This method checks whether the AppleEnableSwipeNavigateWithScrolls global
   // preference is set.  If it isn't, fluid swipe tracking is disabled, and a
   // horizontal two-finger gesture is always a scroll (even in Safari).  This
@@ -4458,6 +4458,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   CGFloat deltaX = [anEvent scrollingDeltaX];
   CGFloat deltaY = [anEvent scrollingDeltaY];
   return std::abs(deltaX) > std::abs(deltaY) * 8;
+#endif
 }
 
 - (void)setUsingOMTCompositor:(BOOL)aUseOMTC
