@@ -662,22 +662,6 @@ nsMediaFeatures::features[] = {
       GetSystemMetric
     },
     {
-      &nsGkAtoms::_moz_windows_accent_color_applies,
-      nsMediaFeature::eMinMaxNotAllowed,
-      nsMediaFeature::eBoolInteger,
-      nsMediaFeature::eNoRequirements,
-      { &nsGkAtoms::windows_accent_color_applies },
-      GetSystemMetric
-    },
-    {
-      &nsGkAtoms::_moz_windows_accent_color_is_dark,
-      nsMediaFeature::eMinMaxNotAllowed,
-      nsMediaFeature::eBoolInteger,
-      nsMediaFeature::eNoRequirements,
-      { &nsGkAtoms::windows_accent_color_is_dark },
-      GetSystemMetric
-    },
-    {
         &nsGkAtoms::_moz_windows_compositor,
         nsMediaFeature::eMinMaxNotAllowed,
         nsMediaFeature::eBoolInteger,
