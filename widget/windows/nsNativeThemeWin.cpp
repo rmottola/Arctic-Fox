@@ -951,37 +951,50 @@ nsNativeThemeWin::GetThemePartAndState(nsIFrame* aFrame, uint8_t aWidgetType,
     case NS_THEME_TEXTFIELD_MULTILINE: {
       EventStates eventState = GetContentState(aFrame, aWidgetType);
 
-      /* Note: the NOSCROLL type has a rounded corner in each
-       * corner.  The more specific HSCROLL, VSCROLL, HVSCROLL types
-       * have side and/or top/bottom edges rendered as straight
-       * horizontal lines with sharp corners to accommodate a
-       * scrollbar.  However, the scrollbar gets rendered on top of
-       * this for us, so we don't care, and can just use NOSCROLL
-       * here.
-       */
-      aPart = TFP_EDITBORDER_NOSCROLL;
-
-      if (!aFrame) {
-        aState = TFS_EDITBORDER_NORMAL;
-      } else if (IsDisabled(aFrame, eventState)) {
-        aState = TFS_EDITBORDER_DISABLED;
-      } else if (IsReadOnly(aFrame)) {
-        /* no special read-only state */
-        aState = TFS_EDITBORDER_NORMAL;
-      } else {
-        nsIContent* content = aFrame->GetContent();
-
-        /* XUL textboxes don't get focused themselves, because they have child
-         * html:input.. but we can check the XUL focused attributes on them
+      if (IsVistaOrLater()) {
+        /* Note: the NOSCROLL type has a rounded corner in each
+         * corner.  The more specific HSCROLL, VSCROLL, HVSCROLL types
+         * have side and/or top/bottom edges rendered as straight
+         * horizontal lines with sharp corners to accommodate a
+         * scrollbar.  However, the scrollbar gets rendered on top of
+         * this for us, so we don't care, and can just use NOSCROLL
+         * here.
          */
-        if (content && content->IsXULElement() && IsFocused(aFrame))
-          aState = TFS_EDITBORDER_FOCUSED;
-        else if (eventState.HasAtLeastOneOfStates(NS_EVENT_STATE_ACTIVE | NS_EVENT_STATE_FOCUS))
-          aState = TFS_EDITBORDER_FOCUSED;
-        else if (eventState.HasState(NS_EVENT_STATE_HOVER))
-          aState = TFS_EDITBORDER_HOVER;
-        else
+        aPart = TFP_EDITBORDER_NOSCROLL;
+
+        if (!aFrame) {
           aState = TFS_EDITBORDER_NORMAL;
+        } else if (IsDisabled(aFrame, eventState)) {
+          aState = TFS_EDITBORDER_DISABLED;
+        } else if (IsReadOnly(aFrame)) {
+          /* no special read-only state */
+          aState = TFS_EDITBORDER_NORMAL;
+        } else {
+          nsIContent* content = aFrame->GetContent();
+
+          /* XUL textboxes don't get focused themselves, because they have child
+           * html:input.. but we can check the XUL focused attributes on them
+           */
+          if (content && content->IsXULElement() && IsFocused(aFrame))
+            aState = TFS_EDITBORDER_FOCUSED;
+          else if (eventState.HasAtLeastOneOfStates(NS_EVENT_STATE_ACTIVE | NS_EVENT_STATE_FOCUS))
+            aState = TFS_EDITBORDER_FOCUSED;
+          else if (eventState.HasState(NS_EVENT_STATE_HOVER))
+            aState = TFS_EDITBORDER_HOVER;
+          else
+            aState = TFS_EDITBORDER_NORMAL;
+        }
+      } else {
+        aPart = TFP_TEXTFIELD;
+        
+        if (!aFrame)
+          aState = TS_NORMAL;
+        else if (IsDisabled(aFrame, eventState))
+          aState = TS_DISABLED;
+        else if (IsReadOnly(aFrame))
+          aState = TFS_READONLY;
+        else
+          aState = StandardGetState(aFrame, aWidgetType, true);
       }
 
       return NS_OK;
