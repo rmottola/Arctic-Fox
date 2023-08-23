@@ -361,7 +361,16 @@ nsLookAndFeel::GetIntImpl(IntID aID, int32_t &aResult)
         // High contrast is a misnomer under Win32 -- any theme can be used with it,
         // e.g. normal contrast with large fonts, low contrast, etc.
         // The high contrast flag really means -- use this theme and don't override it.
-        aResult = nsUXThemeData::IsHighContrastOn();
+        if (XRE_IsContentProcess()) {
+          // If we're running in the content process, then the parent should
+          // have sent us the accessibility state when nsLookAndFeel
+          // initialized, and stashed it in the mUseAccessibilityTheme cache.
+          aResult = mUseAccessibilityTheme;
+        } else {
+          // Otherwise, we can ask the OS to see if we're using High Contrast
+          // mode.
+          aResult = nsUXThemeData::IsHighContrastOn();
+        }
         break;
     case eIntID_ScrollArrowStyle:
         aResult = eScrollArrowStyle_Single;
