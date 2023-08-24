@@ -2181,7 +2181,8 @@ class JS_PUBLIC_API(CompartmentCreationOptions)
         mergeable_(false),
         preserveJitCode_(false),
         cloneSingletons_(false),
-        experimentalDateTimeFormatFormatToPartsEnabled_(false)
+        experimentalDateTimeFormatFormatToPartsEnabled_(false),
+        sharedMemoryAndAtomics_(false)
     {
         zone_.spec = JS::FreshZone;
     }
@@ -2261,6 +2262,8 @@ class JS_PUBLIC_API(CompartmentCreationOptions)
         return *this;
     }
 
+    bool getSharedMemoryAndAtomicsEnabled() const;
+    CompartmentCreationOptions& setSharedMemoryAndAtomicsEnabled(bool flag);
 
   private:
     JSAddonId* addonId_;
@@ -2274,6 +2277,7 @@ class JS_PUBLIC_API(CompartmentCreationOptions)
     bool preserveJitCode_;
     bool cloneSingletons_;
     bool experimentalDateTimeFormatFormatToPartsEnabled_;
+    bool sharedMemoryAndAtomics_;
 };
 
 /**
