@@ -360,11 +360,14 @@ DecodeSignatureSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
 
     uint32_t sectionStart;
     if (!d.startSection(&sectionStart))
-        return Fail(cx, d, "expected decl section byte size");
+        return Fail(cx, d, "expected signature section byte size");
 
     uint32_t numSigs;
     if (!d.readVarU32(&numSigs))
-        return Fail(cx, d, "expected number of declarations");
+        return Fail(cx, d, "expected number of signatures");
+
+    if (numSigs > MaxSigs)
+        return Fail(cx, d, "too many signatures");
 
     if (!init->sigs.resize(numSigs))
         return false;
@@ -373,6 +376,9 @@ DecodeSignatureSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
         uint32_t numArgs;
         if (!d.readVarU32(&numArgs))
             return Fail(cx, d, "bad number of signature args");
+
+        if (numArgs > MaxArgsPerFunc)
+            return Fail(cx, d, "too many arguments in signature");
 
         ExprType result;
         if (!DecodeExprType(cx, d, &result))
@@ -424,6 +430,9 @@ DecodeDeclarationSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
     uint32_t numDecls;
     if (!d.readVarU32(&numDecls))
         return Fail(cx, d, "expected number of declarations");
+
+    if (numDecls > MaxFuncs)
+        return Fail(cx, d, "too many functions");
 
     if (!init->funcSigs.resize(numDecls))
         return false;
@@ -503,6 +512,9 @@ DecodeImportSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init, Import
     if (!d.readVarU32(&numImports))
         return Fail(cx, d, "expected number of imports");
 
+    if (numImports > MaxImports)
+        return Fail(cx, d, "too many imports");
+
     for (uint32_t i = 0; i < numImports; i++) {
         if (!DecodeImport(cx, d, init, imports))
             return false;
@@ -563,6 +575,9 @@ DecodeExportsSection(JSContext* cx, Decoder& d, ModuleGenerator& mg, ExportMap* 
     uint32_t numExports;
     if (!d.readVarU32(&numExports))
         return Fail(cx, d, "expected number of exports");
+
+    if (numExports > MaxExports)
+        return Fail(cx, d, "too many exports");
 
     for (uint32_t i = 0; i < numExports; i++) {
         if (!DecodeExport(cx, d, mg, exportMap))
