@@ -61,12 +61,6 @@ IsSimdType(ValType vt)
     return vt == ValType::I32x4 || vt == ValType::F32x4 || vt == ValType::B32x4;
 }
 
-static inline bool
-IsSimdBoolType(ValType vt)
-{
-    return vt == ValType::B32x4;
-}
-
 static inline jit::MIRType
 ToMIRType(ValType vt)
 {
@@ -175,6 +169,12 @@ static inline bool
 IsSimdType(ExprType et)
 {
     return IsVoid(et) ? false : IsSimdType(ValType(et));
+}
+
+static inline bool
+IsSimdBoolType(ExprType vt)
+{
+    return vt == ExprType::B32x4;
 }
 
 static inline jit::MIRType
