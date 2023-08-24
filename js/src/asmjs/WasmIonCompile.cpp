@@ -3006,11 +3006,16 @@ wasm::IonCompileFunction(IonCompileTask* task)
         if (!f.init())
             return false;
 
+        MDefinition* last = nullptr;
         while (!f.done()) {
-            MDefinition* _;
-            if (!EmitExprStmt(f, &_))
+            if (!EmitExprStmt(f, &last))
                 return false;
         }
+
+        if (IsVoid(f.sig().ret()))
+            f.returnVoid();
+        else
+            f.returnExpr(last);
 
         f.checkPostconditions();
     }
