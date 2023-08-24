@@ -1767,10 +1767,10 @@ ObjectGroupCompartment::clearTables()
 }
 
 /* static */ bool
-ObjectGroupCompartment::PlainObjectGCPolicy::needsSweep(PlainObjectKey* key,
-                                                        PlainObjectEntry* entry)
+ObjectGroupCompartment::PlainObjectTableSweepPolicy::needsSweep(PlainObjectKey* key,
+                                                                PlainObjectEntry* entry)
 {
-    if (!(KeyPolicy::needsSweep(key) || entry->needsSweep(key->nproperties)))
+    if (!(DefaultGCPolicy<PlainObjectKey>::needsSweep(key) || entry->needsSweep(key->nproperties)))
         return false;
     js_free(key->properties);
     js_free(entry->types);
