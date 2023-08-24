@@ -267,16 +267,18 @@ DecodeBlock(FunctionDecoder& f, ExprType expected)
 }
 
 static bool
-DecodeUnaryOperator(FunctionDecoder& f, ExprType expected)
+DecodeUnaryOperator(FunctionDecoder& f, ExprType expected, ExprType type)
 {
-    return DecodeExpr(f, expected);
+    return CheckType(f, type, expected) &&
+           DecodeExpr(f, expected);
 }
 
 static bool
-DecodeBinaryOperator(FunctionDecoder& f, ExprType expected)
+DecodeBinaryOperator(FunctionDecoder& f, ExprType expected, ExprType type)
 {
-    return DecodeExpr(f, expected) &&
-           DecodeExpr(f, expected);
+    return CheckType(f, type, expected) &&
+           DecodeExpr(f, type) &&
+           DecodeExpr(f, type);
 }
 
 static bool
@@ -320,6 +322,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::I32Clz:
       case Expr::I32Ctz:
       case Expr::I32Popcnt:
+        return DecodeUnaryOperator(f, expected, ExprType::I32);
       case Expr::F32Abs:
       case Expr::F32Neg:
       case Expr::F32Ceil:
@@ -327,6 +330,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::F32Trunc:
       case Expr::F32Nearest:
       case Expr::F32Sqrt:
+        return DecodeUnaryOperator(f, expected, ExprType::F32);
       case Expr::F64Abs:
       case Expr::F64Neg:
       case Expr::F64Ceil:
@@ -334,7 +338,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::F64Trunc:
       case Expr::F64Nearest:
       case Expr::F64Sqrt:
-        return DecodeUnaryOperator(f, expected);
+        return DecodeUnaryOperator(f, expected, ExprType::F64);
       case Expr::I32Add:
       case Expr::I32Sub:
       case Expr::I32Mul:
@@ -348,6 +352,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::I32Shl:
       case Expr::I32ShrS:
       case Expr::I32ShrU:
+        return DecodeBinaryOperator(f, expected, ExprType::I32);
       case Expr::F32Add:
       case Expr::F32Sub:
       case Expr::F32Mul:
@@ -355,6 +360,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::F32Min:
       case Expr::F32Max:
       case Expr::F32CopySign:
+        return DecodeBinaryOperator(f, expected, ExprType::F32);
       case Expr::F64Add:
       case Expr::F64Sub:
       case Expr::F64Mul:
@@ -362,7 +368,7 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
       case Expr::F64Min:
       case Expr::F64Max:
       case Expr::F64CopySign:
-        return DecodeBinaryOperator(f, expected);
+        return DecodeBinaryOperator(f, expected, ExprType::F64);
       case Expr::I32Eq:
       case Expr::I32Ne:
       case Expr::I32LtS:
