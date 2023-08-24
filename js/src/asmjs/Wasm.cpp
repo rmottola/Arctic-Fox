@@ -264,6 +264,13 @@ DecodeBlock(FunctionDecoder& f, ExprType expected)
 }
 
 static bool
+DecodeBinaryOperator(FunctionDecoder& f, ExprType expected)
+{
+    return DecodeExpr(f, expected) &&
+           DecodeExpr(f, expected);
+}
+
+static bool
 DecodeExpr(FunctionDecoder& f, ExprType expected)
 {
     Expr expr;
@@ -285,6 +292,8 @@ DecodeExpr(FunctionDecoder& f, ExprType expected)
         return DecodeSetLocal(f, expected);
       case Expr::Block:
         return DecodeBlock(f, expected);
+      case Expr::I32Add:
+        return DecodeBinaryOperator(f, expected);
       default:
         break;
     }
