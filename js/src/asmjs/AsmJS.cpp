@@ -56,6 +56,7 @@ using mozilla::Compression::LZ4;
 using mozilla::HashGeneric;
 using mozilla::IsNaN;
 using mozilla::IsNegativeZero;
+using mozilla::Maybe;
 using mozilla::Move;
 using mozilla::PodCopy;
 using mozilla::PodEqual;
@@ -397,7 +398,7 @@ class js::AsmJSModule final : public Module
     AsmJSModule(UniqueModuleData base,
                 UniqueStaticLinkData link,
                 UniqueAsmJSModuleData module)
-      : Module(Move(base), AsmJSBool::IsAsmJS),
+      : Module(Move(base)),
         link_(Move(link)),
         module_(Move(module))
     {}
@@ -1790,7 +1791,7 @@ class MOZ_STACK_CLASS ModuleValidator
             return false;
         }
 
-        return mg_.init(Move(genData));
+        return mg_.init(Move(genData), ModuleKind::AsmJS);
     }
 
     ExclusiveContext* cx() const             { return cx_; }
@@ -2233,7 +2234,7 @@ class MOZ_STACK_CLASS ModuleValidator
         return true;
     }
     bool finishFunctionBodies() {
-        return mg_.finishFuncs();
+        return mg_.finishFuncDefs();
     }
     bool finish(MutableHandle<WasmModuleObject*> moduleObj, SlowFunctionVector* slowFuncs) {
         HeapUsage heap = arrayViews_.empty()
@@ -2596,7 +2597,7 @@ class MOZ_STACK_CLASS FunctionValidator
     ParseNode*        fn_;
 
     FunctionGenerator fg_;
-    Encoder           encoder_;
+    Maybe<Encoder>    encoder_;
 
     LocalMap          locals_;
     LabelMap          labels_;
@@ -2618,15 +2619,18 @@ class MOZ_STACK_CLASS FunctionValidator
     ParseNode* fn() const             { return fn_; }
 
     bool init(PropertyName* name, unsigned line, unsigned column) {
-        UniqueBytecode recycled;
-        return m_.mg().startFunc(name, line, column, &recycled, &fg_) &&
-               encoder_.init(Move(recycled)) &&
-               locals_.init() &&
-               labels_.init();
+        if (!locals_.init() || !labels_.init())
+            return false;
+
+        if (!m_.mg().startFuncDef(name, line, column, &fg_))
+            return false;
+
+        encoder_.emplace(fg_.bytecode());
+        return true;
     }
 
     bool finish(uint32_t funcIndex, unsigned generateTime) {
-        return m_.mg().finishFunc(funcIndex, encoder().finish(), generateTime, &fg_);
+        return m_.mg().finishFuncDef(funcIndex, generateTime, &fg_);
     }
 
     bool fail(ParseNode* pn, const char* str) {
@@ -2710,7 +2714,8 @@ class MOZ_STACK_CLASS FunctionValidator
     size_t numLocals() const { return locals_.count(); }
 
     /************************************************* Packing interface */
-    Encoder& encoder() { return encoder_; }
+
+    Encoder& encoder() { return *encoder_; }
 
     bool noteLineCol(ParseNode* pn) {
         uint32_t line, column;
