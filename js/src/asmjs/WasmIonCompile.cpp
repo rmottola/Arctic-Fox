@@ -2113,7 +2113,7 @@ EmitTernary(FunctionCompiler& f, ExprType type, MDefinition** def)
     if (!f.joinIfElse(thenBlocks))
         return false;
 
-    MOZ_ASSERT(ifTrue->type() == ifFalse->type(), "both sides of a ternary have the same type");
+    MOZ_ASSERT_IF(ifTrue && ifFalse, ifTrue->type() == ifFalse->type());
 
     *def = f.popPhiOutput();
     return true;
