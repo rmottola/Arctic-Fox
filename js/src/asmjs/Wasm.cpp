@@ -548,6 +548,8 @@ typedef UniquePtr<DynamicLinkData> UniqueDynamicLinkData;
 /*****************************************************************************/
 // wasm decoding and generation
 
+typedef HashSet<const DeclaredSig*, SigHashPolicy> SigSet;
+
 static bool
 DecodeSignatureSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
 {
@@ -566,6 +568,10 @@ DecodeSignatureSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
         return Fail(cx, d, "too many signatures");
 
     if (!init->sigs.resize(numSigs))
+        return false;
+
+    SigSet dupSet(cx);
+    if (!dupSet.init())
         return false;
 
     for (uint32_t sigIndex = 0; sigIndex < numSigs; sigIndex++) {
@@ -590,6 +596,13 @@ DecodeSignatureSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
         }
 
         init->sigs[sigIndex] = Sig(Move(args), result);
+
+        SigSet::AddPtr p = dupSet.lookupForAdd(init->sigs[sigIndex]);
+        if (p)
+            return Fail(cx, d, "duplicate signature");
+
+        if (!dupSet.add(p, &init->sigs[sigIndex]))
+            return false;
     }
 
     if (!d.finishSection(sectionStart))
