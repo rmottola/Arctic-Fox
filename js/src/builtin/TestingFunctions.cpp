@@ -19,6 +19,7 @@
 #include "jswrapper.h"
 
 #include "asmjs/AsmJS.h"
+#include "asmjs/Wasm.h"
 #include "jit/InlinableNatives.h"
 #include "jit/JitFrameIterator.h"
 #include "js/Debug.h"
@@ -3673,6 +3674,9 @@ js::DefineTestingFunctions(JSContext* cx, HandleObject obj, bool fuzzingSafe_,
         fuzzingSafe = true;
 
     disableOOMFunctions = disableOOMFunctions_;
+
+    if (!wasm::DefineTestingFunctions(cx, obj))
+        return false;
 
     if (!JS_DefineProperties(cx, obj, TestingProperties))
         return false;
