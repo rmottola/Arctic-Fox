@@ -1564,8 +1564,8 @@ PrimitiveArrayTypedObjectType(JSObject* obj)
 static Scalar::Type
 TypedThingElementType(JSObject* obj)
 {
-    return obj->is<TypedArrayObject>()
-           ? obj->as<TypedArrayObject>().type()
+    return IsAnyTypedArray(obj)
+           ? AnyTypedArrayType(obj)
            : PrimitiveArrayTypedObjectType(obj);
 }
 
@@ -1581,7 +1581,7 @@ TypedThingRequiresFloatingPoint(JSObject* obj)
 static bool
 IsNativeDenseElementAccess(HandleObject obj, HandleValue key)
 {
-    if (obj->isNative() && key.isInt32() && key.toInt32() >= 0 && !obj->is<TypedArrayObject>())
+    if (obj->isNative() && key.isInt32() && key.toInt32() >= 0 && !IsAnyTypedArray(obj.get()))
         return true;
     return false;
 }
@@ -1591,7 +1591,7 @@ IsNativeOrUnboxedDenseElementAccess(HandleObject obj, HandleValue key)
 {
     if (!obj->isNative() && !obj->is<UnboxedArrayObject>())
         return false;
-    if (key.isInt32() && key.toInt32() >= 0 && !obj->is<TypedArrayObject>())
+    if (key.isInt32() && key.toInt32() >= 0 && !IsAnyTypedArray(obj.get()))
         return true;
     return false;
 }
@@ -1706,7 +1706,7 @@ TryAttachGetElemStub(JSContext* cx, JSScript* script, jsbytecode* pc, ICGetElem_
     }
 
     // Check for TypedArray[int] => Number and TypedObject[int] => Number accesses.
-    if ((obj->is<TypedArrayObject>() || IsPrimitiveArrayTypedObject(obj)) &&
+    if ((IsAnyTypedArray(obj.get()) || IsPrimitiveArrayTypedObject(obj)) &&
         rhs.isNumber() &&
         res.isNumber() &&
         !TypedArrayGetElemStubExists(stub, obj))
@@ -2850,7 +2850,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
         return true;
     }
 
-    if ((obj->is<TypedArrayObject>() || IsPrimitiveArrayTypedObject(obj)) &&
+    if ((IsAnyTypedArray(obj.get()) || IsPrimitiveArrayTypedObject(obj)) &&
         index.isNumber() &&
         rhs.isNumber())
     {
@@ -2862,8 +2862,8 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
 
         bool expectOutOfBounds;
         double idx = index.toNumber();
-        if (obj->is<TypedArrayObject>()) {
-            expectOutOfBounds = (idx < 0 || idx >= double(obj->as<TypedArrayObject>().length()));
+        if (IsAnyTypedArray(obj)) {
+            expectOutOfBounds = (idx < 0 || idx >= double(AnyTypedArrayLength(obj)));
         } else {
             // Typed objects throw on out of bounds accesses. Don't attach
             // a stub in this case.

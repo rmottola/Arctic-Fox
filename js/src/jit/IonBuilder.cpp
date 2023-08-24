@@ -8998,7 +8998,7 @@ JSObject*
 IonBuilder::getStaticTypedArrayObject(MDefinition* obj, MDefinition* index)
 {
     Scalar::Type arrayType;
-    if (!ElementAccessIsTypedArray(constraints(), obj, index, &arrayType)) {
+    if (!ElementAccessIsAnyTypedArray(constraints(), obj, index, &arrayType)) {
         trackOptimizationOutcome(TrackedOutcome::AccessNotTypedArray);
         return nullptr;
     }
@@ -9043,7 +9043,7 @@ IonBuilder::getElemTryTypedStatic(bool* emitted, MDefinition* obj, MDefinition* 
         return true;
 
     // LoadTypedArrayElementStatic currently treats uint32 arrays as int32.
-    Scalar::Type viewType = tarrObj->as<TypedArrayObject>().type();
+    Scalar::Type viewType = AnyTypedArrayType(tarrObj);
     if (viewType == Scalar::Uint32) {
         trackOptimizationOutcome(TrackedOutcome::StaticTypedArrayUint32);
         return true;
@@ -9093,7 +9093,7 @@ IonBuilder::getElemTryTypedArray(bool* emitted, MDefinition* obj, MDefinition* i
     MOZ_ASSERT(*emitted == false);
 
     Scalar::Type arrayType;
-    if (!ElementAccessIsTypedArray(constraints(), obj, index, &arrayType)) {
+    if (!ElementAccessIsAnyTypedArray(constraints(), obj, index, &arrayType)) {
         trackOptimizationOutcome(TrackedOutcome::AccessNotTypedArray);
         return true;
     }
@@ -9455,7 +9455,7 @@ IonBuilder::addTypedArrayLengthAndData(MDefinition* obj,
         tarr = obj->resultTypeSet()->maybeSingleton();
 
     if (tarr) {
-        SharedMem<void*> data = tarr->as<TypedArrayObject>().viewDataEither();
+        SharedMem<void*> data = AnyTypedArrayViewData(tarr);
         // Bug 979449 - Optimistically embed the elements and use TI to
         //              invalidate if we move them.
         bool isTenured = !tarr->runtimeFromMainThread()->gc.nursery.isInside(data);
@@ -9469,7 +9469,7 @@ IonBuilder::addTypedArrayLengthAndData(MDefinition* obj,
 
                 obj->setImplicitlyUsedUnchecked();
 
-                int32_t len = AssertedCast<int32_t>(tarr->as<TypedArrayObject>().length());
+                int32_t len = AssertedCast<int32_t>(AnyTypedArrayLength(tarr));
                 *length = MConstant::New(alloc(), Int32Value(len));
                 current->add(*length);
 
@@ -9799,11 +9799,10 @@ IonBuilder::setElemTryTypedStatic(bool* emitted, MDefinition* object,
     if (!tarrObj)
         return true;
 
-    SharedMem<void*> viewData = tarrObj->as<TypedArrayObject>().viewDataEither();
-    if (tarrObj->runtimeFromMainThread()->gc.nursery.isInside(viewData))
+    if (tarrObj->runtimeFromMainThread()->gc.nursery.isInside(AnyTypedArrayViewData(tarrObj)))
         return true;
 
-    Scalar::Type viewType = tarrObj->as<TypedArrayObject>().type();
+    Scalar::Type viewType = AnyTypedArrayType(tarrObj);
     MDefinition* ptr = convertShiftToMaskForStaticTypedArray(index, viewType);
     if (!ptr)
         return true;
@@ -9844,7 +9843,7 @@ IonBuilder::setElemTryTypedArray(bool* emitted, MDefinition* object,
     MOZ_ASSERT(*emitted == false);
 
     Scalar::Type arrayType;
-    if (!ElementAccessIsTypedArray(constraints(), object, index, &arrayType)) {
+    if (!ElementAccessIsAnyTypedArray(constraints(), object, index, &arrayType)) {
         trackOptimizationOutcome(TrackedOutcome::AccessNotTypedArray);
         return true;
     }
