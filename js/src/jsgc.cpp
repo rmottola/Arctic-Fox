@@ -1758,6 +1758,11 @@ GCRuntime::setSliceCallback(JS::GCSliceCallback callback) {
     return stats.setSliceCallback(callback);
 }
 
+JS::GCNurseryCollectionCallback
+GCRuntime::setNurseryCollectionCallback(JS::GCNurseryCollectionCallback callback) {
+    return stats.setNurseryCollectionCallback(callback);
+}
+
 bool
 GCRuntime::addRoot(Value* vp, const char* name)
 {
@@ -7490,6 +7495,12 @@ JS_PUBLIC_API(JS::GCSliceCallback)
 JS::SetGCSliceCallback(JSRuntime* rt, GCSliceCallback callback)
 {
     return rt->gc.setSliceCallback(callback);
+}
+
+JS_PUBLIC_API(JS::GCNurseryCollectionCallback)
+JS::SetGCNurseryCollectionCallback(JSRuntime* rt, GCNurseryCollectionCallback callback)
+{
+    return rt->gc.setNurseryCollectionCallback(callback);
 }
 
 JS_PUBLIC_API(void)
