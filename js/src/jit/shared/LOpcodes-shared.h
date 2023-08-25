@@ -224,6 +224,8 @@
     _(MonitorTypes)                 \
     _(PostWriteBarrierO)            \
     _(PostWriteBarrierV)            \
+    _(PostWriteElementBarrierO)     \
+    _(PostWriteElementBarrierV)     \
     _(InitializedLength)            \
     _(SetInitializedLength)         \
     _(UnboxedArrayLength)           \
