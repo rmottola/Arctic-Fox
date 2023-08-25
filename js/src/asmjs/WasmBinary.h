@@ -727,6 +727,7 @@ typedef Vector<uint32_t, 0, SystemAllocPolicy> Uint32Vector;
 class FuncBytecode
 {
     // Function metadata
+    ModuleKind kind_;
     const DeclaredSig& sig_;
     ValTypeVector locals_;
     uint32_t lineOrBytecode_;
@@ -745,8 +746,10 @@ class FuncBytecode
                  ValTypeVector&& locals,
                  uint32_t lineOrBytecode,
                  Uint32Vector&& callSiteLineNums,
-                 unsigned generateTime)
-      : sig_(sig),
+                 unsigned generateTime,
+                 ModuleKind kind)
+      : kind_(kind),
+        sig_(sig),
         locals_(Move(locals)),
         lineOrBytecode_(lineOrBytecode),
         callSiteLineNums_(Move(callSiteLineNums)),
@@ -767,6 +770,7 @@ class FuncBytecode
     ValType localType(size_t i) const { return locals_[i]; }
 
     unsigned generateTime() const { return generateTime_; }
+    bool isAsmJS() const { return kind_ == ModuleKind::AsmJS; }
 };
 
 typedef UniquePtr<FuncBytecode> UniqueFuncBytecode;
