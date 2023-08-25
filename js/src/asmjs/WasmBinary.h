@@ -66,7 +66,7 @@ enum class Expr : uint16_t
     Unreachable,
 
     // Calls
-    CallInternal,
+    Call,
     CallIndirect,
     CallImport,
 
