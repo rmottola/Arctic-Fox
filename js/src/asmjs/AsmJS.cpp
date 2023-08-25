@@ -5688,7 +5688,7 @@ CheckConditional(FunctionValidator& f, ParseNode* ternary, Type* type)
 {
     MOZ_ASSERT(ternary->isKind(PNK_CONDITIONAL));
 
-    if (!f.writeOp(Expr::Ternary))
+    if (!f.writeOp(Expr::IfElse))
         return false;
 
     ParseNode* cond = TernaryKid1(ternary);
