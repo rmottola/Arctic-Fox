@@ -1817,6 +1817,43 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
     if (!obj)
         return false;
 
+    ComparatorMatchResult comp = MatchNumericComparator(cx, fval);
+    if (comp == Match_Failure)
+        return false;
+
+    if (!fval.isNull() && comp == Match_None) {
+        /*
+         * Non-optimized user supplied comparators perform much better when
+         * called from within a self-hosted sorting function.
+         */
+        RootedAtom selfHostedSortAtom(cx, Atomize(cx, "ArraySort", 9));
+        RootedPropertyName selfHostedSortName(cx, selfHostedSortAtom->asPropertyName());
+        RootedValue selfHostedSortValue(cx);
+
+        if (!GlobalObject::getIntrinsicValue(cx, cx->global(), selfHostedSortName,
+            &selfHostedSortValue)) {
+            return false;
+        }
+
+        MOZ_ASSERT(selfHostedSortValue.isObject());
+        MOZ_ASSERT(selfHostedSortValue.toObject().is<JSFunction>());
+
+        InvokeArgs iargs(cx);
+
+        if (!iargs.init(1))
+            return false;
+
+        iargs.setCallee(selfHostedSortValue);
+        iargs.setThis(args.thisv());
+        iargs[0].set(fval);
+
+        if (!Invoke(cx, iargs))
+            return false;
+
+        args.rval().set(iargs.rval());
+        return true;
+    }
+
     uint32_t len;
     if (!GetLengthProperty(cx, obj, &len))
         return false;
@@ -1865,6 +1902,7 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
         undefs = 0;
         bool allStrings = true;
         bool allInts = true;
+        bool extraIndexed = ObjectMayHaveExtraIndexedProperties(obj);
         RootedValue v(cx);
         for (uint32_t i = 0; i < len; i++) {
             if (!CheckForInterrupt(cx))
@@ -1897,9 +1935,7 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
         }
 
         /* Here len == n + undefs + number_of_holes. */
-        bool defaultOrMatch;
         if (fval.isNull()) {
-            defaultOrMatch = true;
             /*
              * Sort using the default comparator converting all elements to
              * strings.
@@ -1919,32 +1955,17 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
                     return false;
             }
         } else {
-            ComparatorMatchResult comp = MatchNumericComparator(cx, fval);
-            if (comp == Match_Failure)
-                return false;
-
-            defaultOrMatch = comp != Match_None;
-            if (comp != Match_None) {
-                if (allInts) {
-                    JS_ALWAYS_TRUE(vec.resize(n * 2));
-                    if (!MergeSort(vec.begin(), n, vec.begin() + n, SortComparatorInt32s[comp]))
-                        return false;
-                } else {
-                    if (!SortNumerically(cx, &vec, n, comp))
-                        return false;
-                }
-            } else {
-                FastInvokeGuard fig(cx, fval);
+            if (allInts) {
                 JS_ALWAYS_TRUE(vec.resize(n * 2));
-                if (!MergeSort(vec.begin(), n, vec.begin() + n,
-                               SortComparatorFunction(cx, fval, fig)))
-                {
+                if (!MergeSort(vec.begin(), n, vec.begin() + n, SortComparatorInt32s[comp]))
                     return false;
-                }
+            } else {
+                if (!SortNumerically(cx, &vec, n, comp))
+                    return false;
             }
         }
 
-        ShouldUpdateTypes updateTypes = (allStrings || allInts) && defaultOrMatch
+        ShouldUpdateTypes updateTypes = !extraIndexed && (allStrings || allInts)
                                         ? ShouldUpdateTypes::DontUpdate
                                         : ShouldUpdateTypes::Update;
         if (!InitArrayElements(cx, obj, 0, uint32_t(n), vec.begin(), updateTypes))
