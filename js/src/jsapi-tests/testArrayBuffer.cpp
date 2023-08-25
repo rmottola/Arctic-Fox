@@ -165,7 +165,7 @@ static void GC(JSContext* cx)
     JS_GC(JS_GetRuntime(cx)); // Trigger another to wait for background finalization to end
 }
 
-bool isNeutered(JS::HandleObject obj) {
+bool hasDetachedBuffer(JS::HandleObject obj) {
     JS::RootedValue v(cx);
     return JS_GetProperty(cx, obj, "byteLength", &v) && v.toInt32() == 0;
 }

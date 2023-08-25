@@ -301,7 +301,7 @@ ArrayBufferObject::neuter(JSContext* cx, Handle<ArrayBufferObject*> buffer,
         buffer->setNewOwnedData(cx->runtime()->defaultFreeOp(), newContents);
 
     buffer->setByteLength(0);
-    buffer->setIsNeutered();
+    buffer->setIsDetached();
     return true;
 }
 
@@ -1159,7 +1159,7 @@ JS_IsNeuteredArrayBufferObject(JSObject* obj)
     if (!obj)
         return false;
 
-    return obj->is<ArrayBufferObject>() && obj->as<ArrayBufferObject>().isNeutered();
+    return obj->is<ArrayBufferObject>() && obj->as<ArrayBufferObject>().isDetached();
 }
 
 JS_FRIEND_API(JSObject*)
@@ -1221,7 +1221,7 @@ JS_StealArrayBufferContents(JSContext* cx, HandleObject objArg)
     }
 
     Rooted<ArrayBufferObject*> buffer(cx, &obj->as<ArrayBufferObject>());
-    if (buffer->isNeutered()) {
+    if (buffer->isDetached()) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_DETACHED);
         return nullptr;
     }
