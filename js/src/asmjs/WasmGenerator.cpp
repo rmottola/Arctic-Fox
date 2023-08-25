@@ -489,7 +489,7 @@ ModuleGenerator::finishFuncDef(uint32_t funcIndex, unsigned generateTime, Functi
                                      Move(fg->bytecode_),
                                      Move(fg->locals_),
                                      fg->lineOrBytecode_,
-                                     Move(fg->callSourceCoords_),
+                                     Move(fg->callSiteLineNums_),
                                      generateTime);
     if (!func)
         return false;
