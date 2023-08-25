@@ -51,8 +51,8 @@ js::gcstats::ExplainInvocationKind(JSGCInvocationKind gckind)
          return "Shrinking";
 }
 
-const char*
-js::gcstats::ExplainReason(JS::gcreason::Reason reason)
+JS_PUBLIC_API(const char*)
+JS::gcreason::ExplainReason(JS::gcreason::Reason reason)
 {
     switch (reason) {
 #define SWITCH_REASON(name)                         \
