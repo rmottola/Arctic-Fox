@@ -1925,7 +1925,7 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
         // Do nothing, bailout will resume before the argument monitor ICs.
         break;
       case Bailout_BoundsCheck:
-      case Bailout_Neutered:
+      case Bailout_Detached:
         if (!HandleBoundsCheckFailure(cx, outerScript, innerScript))
             return false;
         break;

@@ -101,7 +101,7 @@ BEGIN_TEST(testArrayBuffer_bug720949_steal)
 }
 END_TEST(testArrayBuffer_bug720949_steal)
 
-// Varying number of views of a buffer, to test the neutering weak pointers
+// Varying number of views of a buffer, to test the detachment weak pointers
 BEGIN_TEST(testArrayBuffer_bug720949_viewList)
 {
     JS::RootedObject buffer(cx);
@@ -139,7 +139,7 @@ BEGIN_TEST(testArrayBuffer_bug720949_viewList)
         GC(cx);
         view2 = JS_NewUint8ArrayWithBuffer(cx, buffer, 1, 200);
 
-        // Neuter
+        // Detach
         void* contents = JS_StealArrayBufferContents(cx, buffer);
         CHECK(contents != nullptr);
         JS_free(nullptr, contents);
