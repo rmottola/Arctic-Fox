@@ -619,6 +619,7 @@ typedef enum JSExnType {
         JSEXN_SYNTAXERR,
         JSEXN_TYPEERR,
         JSEXN_URIERR,
+        JSEXN_DEBUGGEEWOULDRUN,
         JSEXN_LIMIT
 } JSExnType;
 
