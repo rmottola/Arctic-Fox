@@ -1953,7 +1953,7 @@ class JSScript : public js::gc::TenuredCell
     void finalize(js::FreeOp* fop);
     void fixupAfterMovingGC() {}
 
-    static inline js::ThingRootKind rootKind() { return js::THING_ROOT_SCRIPT; }
+    static const JS::TraceKind TraceKind = JS::TraceKind::Script;
 
     void traceChildren(JSTracer* trc);
 
@@ -2395,7 +2395,7 @@ class LazyScript : public gc::TenuredCell
     void finalize(js::FreeOp* fop);
     void fixupAfterMovingGC() {}
 
-    static inline js::ThingRootKind rootKind() { return js::THING_ROOT_LAZY_SCRIPT; }
+    static const JS::TraceKind TraceKind = JS::TraceKind::LazyScript;
 
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf)
     {
