@@ -136,7 +136,8 @@ BackgroundHangManager::Observe(nsISupports* aSubject, const char* aTopic, const 
 class BackgroundHangThread : public LinkedListElement<BackgroundHangThread>
 {
 private:
-  static ThreadLocal<BackgroundHangThread*> sTlsKey;
+  static MOZ_THREAD_LOCAL(BackgroundHangThread*) sTlsKey;
+  static bool sTlsKeyInitialized;
 
   BackgroundHangThread(const BackgroundHangThread&);
   BackgroundHangThread& operator=(const BackgroundHangThread&);
@@ -204,8 +205,8 @@ StaticRefPtr<BackgroundHangManager> BackgroundHangManager::sInstance;
 bool BackgroundHangManager::sProhibited = false;
 bool BackgroundHangManager::sDisabled = false;
 
-ThreadLocal<BackgroundHangThread*> BackgroundHangThread::sTlsKey;
-
+MOZ_THREAD_LOCAL(BackgroundHangThread*) BackgroundHangThread::sTlsKey;
+bool BackgroundHangThread::sTlsKeyInitialized;
 
 BackgroundHangManager::BackgroundHangManager()
   : mShutdown(false)
@@ -368,7 +369,7 @@ BackgroundHangThread::BackgroundHangThread(const char* aName,
   , mWaiting(true)
   , mStats(aName)
 {
-  if (sTlsKey.initialized()) {
+  if (sTlsKeyInitialized) {
     sTlsKey.set(this);
   }
   // Lock here because LinkedList is not thread-safe
@@ -389,7 +390,7 @@ BackgroundHangThread::~BackgroundHangThread()
   autoLock.Notify();
 
   // We no longer have a thread
-  if (sTlsKey.initialized()) {
+  if (sTlsKeyInitialized) {
     sTlsKey.set(nullptr);
   }
 
@@ -485,7 +486,7 @@ BackgroundHangThread::FindThread()
     return nullptr;
   }
 
-  if (sTlsKey.initialized()) {
+  if (sTlsKeyInitialized) {
     // Use TLS if available
     MOZ_ASSERT(!BackgroundHangManager::sProhibited,
                "BackgroundHandleManager is not initialized");

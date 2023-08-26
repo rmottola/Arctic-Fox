@@ -598,7 +598,7 @@ public:
     }
 
 private:
-    static ThreadLocal<EGLContext> sCurrentContext;
+    static MOZ_THREAD_LOCAL(EGLContext) sCurrentContext;
 public:
 
 #else
