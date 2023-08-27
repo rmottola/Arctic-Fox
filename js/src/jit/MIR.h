@@ -2352,6 +2352,11 @@ class MSimdShift
         return new(alloc) MSimdShift(left, right, op);
     }
 
+    // Get the relevant right shift operation given the signedness of a type.
+    static Operation rshForSign(SimdSign sign) {
+        return sign == SimdSign::Unsigned ? ursh : rsh;
+    }
+
     AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
