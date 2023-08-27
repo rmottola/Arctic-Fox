@@ -5717,7 +5717,7 @@ GetTemplateObjectForNative(JSContext* cx, Native native, const CallArgs& args,
             ADD_INT32X4_SIMD_OP_NAME_(fromFloat32x4)
             ADD_INT32X4_SIMD_OP_NAME_(fromFloat32x4Bits))
         {
-            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr<Int32x4>(cx, global));
+            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr(cx, global, SimdType::Int32x4));
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
         }
@@ -5728,7 +5728,7 @@ GetTemplateObjectForNative(JSContext* cx, Native native, const CallArgs& args,
             FOREACH_COMP_SIMD_OP(ADD_INT32X4_SIMD_OP_NAME_)
             FOREACH_COMP_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_))
         {
-            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr<Bool32x4>(cx, global));
+            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr(cx, global, SimdType::Bool32x4));
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
         }
@@ -5740,7 +5740,7 @@ GetTemplateObjectForNative(JSContext* cx, Native native, const CallArgs& args,
             ADD_FLOAT32X4_SIMD_OP_NAME_(fromInt32x4Bits)
             ION_COMMONX4_SIMD_OP(ADD_FLOAT32X4_SIMD_OP_NAME_))
         {
-            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr<Float32x4>(cx, global));
+            Rooted<SimdTypeDescr*> descr(cx, GlobalObject::getOrCreateSimdTypeDescr(cx, global, SimdType::Float32x4));
             res.set(cx->compartment()->jitCompartment()->getSimdTemplateObjectFor(cx, descr));
             return !!res;
         }
