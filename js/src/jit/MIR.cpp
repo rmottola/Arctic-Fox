@@ -4880,19 +4880,19 @@ MTableSwitch::foldsTo(TempAllocator& alloc)
 MDefinition*
 MArrayJoin::foldsTo(TempAllocator& alloc)
 {
-    // :TODO: Enable this optimization after fixing Bug 977966 test cases.
-    return this;
-
     MDefinition* arr = array();
 
     if (!arr->isStringSplit())
         return this;
 
-    this->setRecoveredOnBailout();
+    setRecoveredOnBailout();
     if (arr->hasLiveDefUses()) {
-        this->setNotRecoveredOnBailout();
+        setNotRecoveredOnBailout();
         return this;
     }
+
+    // The MStringSplit won't generate any code.
+    arr->setRecoveredOnBailout();
 
     // We're replacing foo.split(bar).join(baz) by
     // foo.replace(bar, baz).  MStringSplit could be recovered by
@@ -4903,8 +4903,9 @@ MArrayJoin::foldsTo(TempAllocator& alloc)
     MDefinition* pattern = arr->toStringSplit()->separator();
     MDefinition* replacement = sep();
 
-    setNotRecoveredOnBailout();
-    return MStringReplace::New(alloc, string, pattern, replacement);
+    MStringReplace *substr = MStringReplace::New(alloc, string, pattern, replacement);
+    substr->setFlatReplacement();
+    return substr;
 }
 
 MConvertUnboxedObjectToNative*

@@ -7660,8 +7660,10 @@ class MStringReplace
 {
   private:
 
+    bool isFlatReplacement_;
+
     MStringReplace(MDefinition* string, MDefinition* pattern, MDefinition* replacement)
-      : MStrReplace< StringPolicy<1> >(string, pattern, replacement)
+      : MStrReplace< StringPolicy<1> >(string, pattern, replacement), isFlatReplacement_(false)
     {
     }
 
@@ -7672,7 +7674,20 @@ class MStringReplace
         return new(alloc) MStringReplace(string, pattern, replacement);
     }
 
+    void setFlatReplacement() {
+        MOZ_ASSERT(!isFlatReplacement_);
+        isFlatReplacement_ = true;
+    }
+
+    bool isFlatReplacement() const {
+        return isFlatReplacement_;
+    }
+
     bool congruentTo(const MDefinition* ins) const override {
+        if (!ins->isStringReplace())
+            return false;
+        if (isFlatReplacement_ != ins->toStringReplace()->isFlatReplacement())
+            return false;
         return congruentIfOperandsEqual(ins);
     }
 
@@ -7682,6 +7697,8 @@ class MStringReplace
 
     bool writeRecoverData(CompactBufferWriter& writer) const override;
     bool canRecoverOnBailout() const override {
+        if (isFlatReplacement_)
+            return false;
         if (pattern()->isRegExp())
             return !pattern()->toRegExp()->source()->global();
         return false;
