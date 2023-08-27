@@ -3830,6 +3830,7 @@ GetPropertyIC::tryAttachDenseElement(JSContext* cx, HandleScript outerScript, Io
 /* static */ bool
 GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, TypedOrValueRegister output)
 {
+
     if (!idval.isInt32() || idval.toInt32() < 0)
         return false;
 
@@ -3842,7 +3843,7 @@ GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, Typed
     if (obj->as<NativeObject>().getDenseInitializedLength() == 0)
         return false;
 
-    while (obj) {
+    do {
         if (obj->isIndexed())
             return false;
 
@@ -3861,7 +3862,7 @@ GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, Typed
             return false;
 
         obj = proto;
-    }
+    } while (obj);
 
     return true;
 }
