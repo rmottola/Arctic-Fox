@@ -712,6 +712,9 @@ nsSpeechTask::SetAudioOutputVolume(float aVolume)
   if (mStream) {
     mStream->SetAudioOutputVolume(this, aVolume);
   }
+  if (mIndirectAudio) {
+    mCallback->OnVolumeChanged(aVolume);
+  }
 }
 
 } // namespace dom
