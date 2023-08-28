@@ -1104,7 +1104,7 @@ struct InitialShapeEntry
 
 using InitialShapeSet = js::GCHashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy>;
 
-struct StackShape : public JS::Traceable
+struct StackShape
 {
     /* For performance, StackShape only roots when absolutely necessary. */
     UnownedBaseShape* base;

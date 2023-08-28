@@ -2518,7 +2518,7 @@ JS_FreezeObject(JSContext* cx, JS::Handle<JSObject*> obj);
 
 namespace JS {
 
-struct PropertyDescriptor : public Traceable {
+struct PropertyDescriptor {
     JSObject* obj;
     unsigned attrs;
     JSGetterOp getter;
