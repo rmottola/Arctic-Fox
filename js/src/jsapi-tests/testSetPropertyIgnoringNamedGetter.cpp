@@ -16,21 +16,21 @@ class CustomProxyHandler : public DirectProxyHandler {
     CustomProxyHandler() : DirectProxyHandler(nullptr) {}
 
     bool getPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
-                               MutableHandle<JSPropertyDescriptor> desc) const override
+                               MutableHandle<PropertyDescriptor> desc) const override
     {
         return impl(cx, proxy, id, desc, false);
     }
 
     bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
-                                  MutableHandle<JSPropertyDescriptor> desc) const override
+                                  MutableHandle<PropertyDescriptor> desc) const override
     {
         return impl(cx, proxy, id, desc, true);
     }
 
-    bool set(JSContext *cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
-             ObjectOpResult &result) const override
+    bool set(JSContext* cx, HandleObject proxy, HandleId id, HandleValue v, HandleValue receiver,
+             ObjectOpResult& result) const override
     {
-        Rooted<JSPropertyDescriptor> desc(cx);
+        Rooted<PropertyDescriptor> desc(cx);
         if (!DirectProxyHandler::getPropertyDescriptor(cx, proxy, id, &desc))
             return false;
         return SetPropertyIgnoringNamedGetter(cx, proxy, id, v, receiver, desc, result);
@@ -38,7 +38,7 @@ class CustomProxyHandler : public DirectProxyHandler {
 
   private:
     bool impl(JSContext* cx, HandleObject proxy, HandleId id,
-              MutableHandle<JSPropertyDescriptor> desc, bool ownOnly) const
+              MutableHandle<PropertyDescriptor> desc, bool ownOnly) const
     {
         if (JSID_IS_STRING(id)) {
             bool match;

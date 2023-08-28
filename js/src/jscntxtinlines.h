@@ -133,7 +133,7 @@ class CompartmentChecker
     void check(AbstractFramePtr frame);
     void check(SavedStacks* stacks);
 
-    void check(Handle<JSPropertyDescriptor> desc) {
+    void check(Handle<PropertyDescriptor> desc) {
         check(desc.object());
         if (desc.hasGetterObject())
             check(desc.getterObject());

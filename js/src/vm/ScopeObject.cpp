@@ -496,7 +496,7 @@ ModuleEnvironmentObject::setProperty(JSContext* cx, HandleObject obj, HandleId i
 
 /* static */ bool
 ModuleEnvironmentObject::getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                                                  MutableHandle<JSPropertyDescriptor> desc)
+                                                  MutableHandle<PropertyDescriptor> desc)
 {
     // We never call this hook on scope objects.
     MOZ_CRASH();
@@ -747,7 +747,7 @@ with_SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
 
 static bool
 with_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                              MutableHandle<JSPropertyDescriptor> desc)
+                              MutableHandle<PropertyDescriptor> desc)
 {
     MOZ_ASSERT(!JSID_IS_ATOM(id, cx->names().dotThis));
     RootedObject actual(cx, &obj->as<DynamicWithObject>().object());
@@ -1340,7 +1340,7 @@ lexicalError_SetProperty(JSContext* cx, HandleObject obj, HandleId id, HandleVal
 
 static bool
 lexicalError_GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                                      MutableHandle<JSPropertyDescriptor> desc)
+                                      MutableHandle<PropertyDescriptor> desc)
 {
     ReportRuntimeLexicalErrorId(cx, obj->as<RuntimeLexicalErrorObject>().errorNumber(), id);
     return false;
