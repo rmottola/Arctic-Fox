@@ -4364,13 +4364,14 @@ js::gc::MarkingValidator::nonIncrementalMark()
         if (!WeakMapBase::saveZoneMarkedWeakMaps(zone, markedWeakMaps))
             return;
 
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         for (gc::WeakKeyTable::Range r = zone->gcWeakKeys.all(); !r.empty(); r.popFront()) {
-            AutoEnterOOMUnsafeRegion oomUnsafe;
             if (!savedWeakKeys.put(Move(r.front().key), Move(r.front().value)))
                 oomUnsafe.crash("saving weak keys table for validator");
         }
 
-        zone->gcWeakKeys.clear();
+        if (!zone->gcWeakKeys.clear())
+            oomUnsafe.crash("clearing weak keys table for validator");
     }
 
     /*
@@ -4441,7 +4442,9 @@ js::gc::MarkingValidator::nonIncrementalMark()
 
     for (GCZonesIter zone(runtime); !zone.done(); zone.next()) {
         WeakMapBase::unmarkZone(zone);
-        zone->gcWeakKeys.clear();
+        AutoEnterOOMUnsafeRegion oomUnsafe;
+        if (!zone->gcWeakKeys.clear())
+            oomUnsafe.crash("clearing weak keys table for validator");
     }
 
     WeakMapBase::restoreMarkedWeakMaps(markedWeakMaps);
@@ -5130,7 +5133,9 @@ GCRuntime::beginSweepingZoneGroup()
         zone->gcWeakRefs.clear();
 
         /* No need to look up any more weakmap keys from this zone group. */
-        zone->gcWeakKeys.clear();
+        AutoEnterOOMUnsafeRegion oomUnsafe;
+        if (!zone->gcWeakKeys.clear())
+            oomUnsafe.crash("clearing weak keys in beginSweepingZoneGroup()");
     }
 
     FreeOp fop(rt);
