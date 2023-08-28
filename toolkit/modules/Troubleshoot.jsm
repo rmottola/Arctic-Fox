@@ -329,11 +329,10 @@ var dataProviders = {
                      QueryInterface(Ci.nsIInterfaceRequestor).
                      getInterface(Ci.nsIDOMWindowUtils);
       try {
-        // Error-state windows need to be skipped
-        if (winUtils.layerManagerType == "None" ||
-            winUtils.layerManagerType == "Reserved") {
+        // NOTE: windowless browser's windows should not be reported in the graphics troubleshoot report
+        if (winUtils.layerManagerType == "None") {
           continue;
-        }      
+        }
         data.numTotalWindows++;
         data.windowLayerManagerType = winUtils.layerManagerType;
         data.windowLayerManagerRemote = winUtils.layerManagerRemote;
