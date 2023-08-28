@@ -8305,7 +8305,7 @@ class CGResolveHook(CGAbstractClassHook):
 
     def generate_code(self):
         return dedent("""
-            JS::Rooted<JSPropertyDescriptor> desc(cx);
+            JS::Rooted<JS::PropertyDescriptor> desc(cx);
             if (!self->DoResolve(cx, obj, id, &desc)) {
               return false;
             }
@@ -10371,7 +10371,7 @@ class CGResolveOwnProperty(CGAbstractStaticMethod):
                 Argument('JS::Handle<JSObject*>', 'wrapper'),
                 Argument('JS::Handle<JSObject*>', 'obj'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('JS::MutableHandle<JSPropertyDescriptor>', 'desc'),
+                Argument('JS::MutableHandle<JS::PropertyDescriptor>', 'desc'),
                 ]
         CGAbstractStaticMethod.__init__(self, descriptor, "ResolveOwnProperty",
                                         "bool", args)
@@ -10390,7 +10390,7 @@ class CGResolveOwnPropertyViaResolve(CGAbstractBindingMethod):
                 Argument('JS::Handle<JSObject*>', 'wrapper'),
                 Argument('JS::Handle<JSObject*>', 'obj'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('JS::MutableHandle<JSPropertyDescriptor>', 'desc')]
+                Argument('JS::MutableHandle<JS::PropertyDescriptor>', 'desc')]
         CGAbstractBindingMethod.__init__(self, descriptor,
                                          "ResolveOwnPropertyViaResolve",
                                          args, getThisObj="",
@@ -10406,7 +10406,7 @@ class CGResolveOwnPropertyViaResolve(CGAbstractBindingMethod):
               // to avoid re-resolving the properties if someone deletes
               // them.
               JSAutoCompartment ac(cx, obj);
-              JS::Rooted<JSPropertyDescriptor> objDesc(cx);
+              JS::Rooted<JS::PropertyDescriptor> objDesc(cx);
               if (!self->DoResolve(cx, obj, id, &objDesc)) {
                 return false;
               }
@@ -10842,7 +10842,7 @@ class CGDOMJSProxyHandler_getOwnPropDescriptor(ClassMethod):
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
                 Argument('bool', 'ignoreNamedProps'),
-                Argument('JS::MutableHandle<JSPropertyDescriptor>', 'desc')]
+                Argument('JS::MutableHandle<JS::PropertyDescriptor>', 'desc')]
         ClassMethod.__init__(self, "getOwnPropDescriptor", "bool", args,
                              virtual=True, override=True, const=True)
         self.descriptor = descriptor
@@ -10958,7 +10958,7 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
         args = [Argument('JSContext*', 'cx'),
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('JS::Handle<JSPropertyDescriptor>', 'desc'),
+                Argument('JS::Handle<JS::PropertyDescriptor>', 'desc'),
                 Argument('JS::ObjectOpResult&', 'opresult'),
                 Argument('bool*', 'defined')]
         ClassMethod.__init__(self, "defineProperty", "bool", args, virtual=True, override=True, const=True)

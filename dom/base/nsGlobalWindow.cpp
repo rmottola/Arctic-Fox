@@ -651,12 +651,12 @@ public:
   virtual bool getOwnPropertyDescriptor(JSContext* cx,
                                         JS::Handle<JSObject*> proxy,
                                         JS::Handle<jsid> id,
-                                        JS::MutableHandle<JSPropertyDescriptor> desc)
+                                        JS::MutableHandle<JS::PropertyDescriptor> desc)
                                         const override;
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
-                              JS::Handle<JSPropertyDescriptor> desc,
+                              JS::Handle<JS::PropertyDescriptor> desc,
                               JS::ObjectOpResult &result) const override;
   virtual bool ownPropertyKeys(JSContext *cx,
                                JS::Handle<JSObject*> proxy,
@@ -686,7 +686,7 @@ public:
   virtual bool getPropertyDescriptor(JSContext* cx,
                                      JS::Handle<JSObject*> proxy,
                                      JS::Handle<jsid> id,
-                                     JS::MutableHandle<JSPropertyDescriptor> desc)
+                                     JS::MutableHandle<JS::PropertyDescriptor> desc)
                                      const override;
   virtual bool hasOwn(JSContext *cx, JS::Handle<JSObject*> proxy,
                       JS::Handle<jsid> id, bool *bp) const override;
@@ -775,7 +775,7 @@ bool
 nsOuterWindowProxy::getPropertyDescriptor(JSContext* cx,
                                           JS::Handle<JSObject*> proxy,
                                           JS::Handle<jsid> id,
-                                          JS::MutableHandle<JSPropertyDescriptor> desc) const
+                                          JS::MutableHandle<JS::PropertyDescriptor> desc) const
 {
   // The only thing we can do differently from js::Wrapper is shadow stuff with
   // our indexed properties, so we can just try getOwnPropertyDescriptor and if
@@ -796,7 +796,7 @@ bool
 nsOuterWindowProxy::getOwnPropertyDescriptor(JSContext* cx,
                                              JS::Handle<JSObject*> proxy,
                                              JS::Handle<jsid> id,
-                                             JS::MutableHandle<JSPropertyDescriptor> desc)
+                                             JS::MutableHandle<JS::PropertyDescriptor> desc)
                                              const
 {
   bool found;
@@ -819,7 +819,7 @@ bool
 nsOuterWindowProxy::defineProperty(JSContext* cx,
                                    JS::Handle<JSObject*> proxy,
                                    JS::Handle<jsid> id,
-                                   JS::Handle<JSPropertyDescriptor> desc,
+                                   JS::Handle<JS::PropertyDescriptor> desc,
                                    JS::ObjectOpResult &result) const
 {
   int32_t index = GetArrayIndexFromId(cx, id);
@@ -4205,7 +4205,7 @@ nsGlobalWindow::GetSupportedNames(nsTArray<nsString>& aNames)
 bool
 nsGlobalWindow::DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObj,
                           JS::Handle<jsid> aId,
-                          JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                          JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   MOZ_ASSERT(IsInnerWindow());
 

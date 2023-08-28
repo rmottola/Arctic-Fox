@@ -1172,7 +1172,8 @@ static bool
 XrayResolveAttribute(JSContext* cx, JS::Handle<JSObject*> wrapper,
                      JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
                      const Prefable<const JSPropertySpec>* attributes, jsid* attributeIds,
-                     const JSPropertySpec* attributeSpecs, JS::MutableHandle<JSPropertyDescriptor> desc,
+                     const JSPropertySpec* attributeSpecs,
+                     JS::MutableHandle<JS::PropertyDescriptor> desc,
                      bool& cacheOnHolder)
 {
   for (; attributes->specs; ++attributes) {
@@ -1222,7 +1223,7 @@ XrayResolveMethod(JSContext* cx, JS::Handle<JSObject*> wrapper,
                   const Prefable<const JSFunctionSpec>* methods,
                   jsid* methodIds,
                   const JSFunctionSpec* methodSpecs,
-                  JS::MutableHandle<JSPropertyDescriptor> desc,
+                  JS::MutableHandle<JS::PropertyDescriptor> desc,
                   bool& cacheOnHolder)
 {
   const Prefable<const JSFunctionSpec>* method;
@@ -1273,7 +1274,7 @@ XrayResolveMethod(JSContext* cx, JS::Handle<JSObject*> wrapper,
 static bool
 XrayResolveUnforgeableProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                                JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                               JS::MutableHandle<JSPropertyDescriptor> desc,
+                               JS::MutableHandle<JS::PropertyDescriptor> desc,
                                bool& cacheOnHolder,
                                const NativeProperties* nativeProperties)
 {
@@ -1315,7 +1316,7 @@ XrayResolveUnforgeableProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 static bool
 XrayResolveProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                     JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                    JS::MutableHandle<JSPropertyDescriptor> desc,
+                    JS::MutableHandle<JS::PropertyDescriptor> desc,
                     bool& cacheOnHolder, DOMObjectType type,
                     const NativeProperties* nativeProperties)
 {
@@ -1406,7 +1407,7 @@ static bool
 ResolvePrototypeOrConstructor(JSContext* cx, JS::Handle<JSObject*> wrapper,
                               JS::Handle<JSObject*> obj,
                               size_t protoAndIfaceCacheIndex, unsigned attrs,
-                              JS::MutableHandle<JSPropertyDescriptor> desc,
+                              JS::MutableHandle<JS::PropertyDescriptor> desc,
                               bool& cacheOnHolder)
 {
   JS::Rooted<JSObject*> global(cx, js::GetGlobalForObjectCrossCompartment(obj));
@@ -1446,7 +1447,7 @@ DEBUG_CheckXBLCallable(JSContext *cx, JSObject *obj)
 }
 
 static void
-DEBUG_CheckXBLLookup(JSContext *cx, JSPropertyDescriptor *desc)
+DEBUG_CheckXBLLookup(JSContext *cx, JS::PropertyDescriptor *desc)
 {
     if (!desc->obj)
         return;
@@ -1470,7 +1471,7 @@ DEBUG_CheckXBLLookup(JSContext *cx, JSPropertyDescriptor *desc)
 /* static */ bool
 XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                        JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                       JS::MutableHandle<JSPropertyDescriptor> desc,
+                       JS::MutableHandle<JS::PropertyDescriptor> desc,
                        bool& cacheOnHolder)
 {
   cacheOnHolder = false;
@@ -1600,7 +1601,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 bool
 XrayDefineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                    JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                   JS::Handle<JSPropertyDescriptor> desc,
+                   JS::Handle<JS::PropertyDescriptor> desc,
                    JS::ObjectOpResult &result, bool *defined)
 {
   if (!js::IsProxy(obj))
