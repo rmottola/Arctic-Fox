@@ -1412,6 +1412,21 @@ BytecodeEmitter::computeHops(ParseNode* pn, BytecodeEmitter** bceOfDefOut)
     return hops;
 }
 
+uint32_t
+BytecodeEmitter::computeHopsToEnclosingFunction()
+{
+    StaticScopeIter<NoGC> ssi(innermostStaticScope());
+
+    uint32_t hops = 0;
+    while (ssi.type() != StaticScopeIter<NoGC>::Function) {
+        if (ssi.hasSyntacticDynamicScopeObject())
+            hops++;
+        ssi++;
+    }
+
+    return hops;
+}
+
 bool
 BytecodeEmitter::isAliasedName(BytecodeEmitter* bceOfDef, ParseNode* pn)
 {
@@ -3446,7 +3461,7 @@ BytecodeEmitter::emitCreateFunctionThis()
         return false;
 
     BindingIter bi = Bindings::thisBinding(cx, script);
-    if (!emitStoreToTopScope(bi))
+    if (!emitStoreToEnclosingFunctionScope(bi))
         return false;
     if (!emit1(JSOP_POP))
         return false;
@@ -3555,7 +3570,7 @@ BytecodeEmitter::emitFunctionScript(ParseNode* body)
         if (!emit1(JSOP_ARGUMENTS))
             return false;
         BindingIter bi = Bindings::argumentsBinding(cx, script);
-        if (!emitStoreToTopScope(bi))
+        if (!emitStoreToEnclosingFunctionScope(bi))
             return false;
         if (!emit1(JSOP_POP))
             return false;
@@ -3623,7 +3638,7 @@ BytecodeEmitter::emitFunctionScript(ParseNode* body)
 
     if (sc->isFunctionBox() && sc->asFunctionBox()->isDerivedClassConstructor()) {
         BindingIter bi = Bindings::thisBinding(cx, script);
-        if (!emitLoadFromTopScope(bi))
+        if (!emitLoadFromEnclosingFunctionScope(bi))
             return false;
         if (!emit1(JSOP_CHECKRETURN))
             return false;
@@ -6667,11 +6682,11 @@ BytecodeEmitter::emitThisLiteral(ParseNode* pn)
 }
 
 bool
-BytecodeEmitter::emitLoadFromTopScope(BindingIter& bi)
+BytecodeEmitter::emitLoadFromEnclosingFunctionScope(BindingIter& bi)
 {
     if (script->bindingIsAliased(bi)) {
         ScopeCoordinate sc;
-        sc.setHops(0);
+        sc.setHops(computeHopsToEnclosingFunction());
         sc.setSlot(0);
         MOZ_ALWAYS_TRUE(lookupAliasedNameSlot(bi->name(), &sc));
         return emitAliasedVarOp(JSOP_GETALIASEDVAR, sc, DontCheckLexical);
@@ -6681,11 +6696,11 @@ BytecodeEmitter::emitLoadFromTopScope(BindingIter& bi)
 }
 
 bool
-BytecodeEmitter::emitStoreToTopScope(BindingIter& bi)
+BytecodeEmitter::emitStoreToEnclosingFunctionScope(BindingIter& bi)
 {
     if (script->bindingIsAliased(bi)) {
         ScopeCoordinate sc;
-        sc.setHops(0);
+        sc.setHops(computeHopsToEnclosingFunction());
         sc.setSlot(0);  // initialize to silence GCC warning
         MOZ_ALWAYS_TRUE(lookupAliasedNameSlot(bi->name(), &sc));
         return emitAliasedVarOp(JSOP_SETALIASEDVAR, sc, DontCheckLexical);
@@ -6744,7 +6759,7 @@ BytecodeEmitter::emitReturn(ParseNode* pn)
     // to ensure that the error is thrown while the scope-chain is still intact.
     if (isDerivedClassConstructor) {
         BindingIter bi = Bindings::thisBinding(cx, script);
-        if (!emitLoadFromTopScope(bi))
+        if (!emitLoadFromEnclosingFunctionScope(bi))
             return false;
         if (!emit1(JSOP_CHECKRETURN))
             return false;
