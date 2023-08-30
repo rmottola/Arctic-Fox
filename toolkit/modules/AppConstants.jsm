@@ -52,6 +52,13 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_DEV_EDITION:
+#ifdef MOZ_DEV_EDITION
+  true,
+#else
+  false,
+#endif
+
   MOZ_SERVICES_HEALTHREPORT:
 #ifdef MOZ_SERVICES_HEALTHREPORT
   true,
@@ -73,6 +80,13 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_SAFE_BROWSING:
+#ifdef MOZ_SAFE_BROWSING
+  true,
+#else
+  false,
+#endif
+
   MOZ_SANDBOX:
 #ifdef MOZ_SANDBOX
   true,
@@ -82,6 +96,13 @@ this.AppConstants = Object.freeze({
 
   MOZ_TELEMETRY_REPORTING:
 #ifdef MOZ_TELEMETRY_REPORTING
+  true,
+#else
+  false,
+#endif
+
+  MOZ_TELEMETRY_ON_BY_DEFAULT:
+#ifdef MOZ_TELEMETRY_ON_BY_DEFAULT
   true,
 #else
   false,
@@ -212,8 +233,36 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_NATIVE_NSS:
+#ifdef MOZ_NATIVE_NSS
+  true,
+#else
+  false,
+#endif
+
   MOZ_PLACES:
 #ifdef MOZ_PLACES
+  true,
+#else
+  false,
+#endif
+
+  MOZ_REQUIRE_SIGNING:
+#ifdef MOZ_REQUIRE_SIGNING
+  true,
+#else
+  false,
+#endif
+
+  MENUBAR_CAN_AUTOHIDE:
+#ifdef MENUBAR_CAN_AUTOHIDE
+  true,
+#else
+  false,
+#endif
+
+  CAN_DRAW_IN_TITLEBAR:
+#ifdef CAN_DRAW_IN_TITLEBAR
   true,
 #else
   false,
