@@ -668,6 +668,7 @@ var settingsToObserve = {
   'layers.async-pan-zoom.enabled': false,
 #endif
   'mms.debugging.enabled': false,
+  'network.debugging.enabled': false,
   'privacy.donottrackheader.enabled': false,
   'ril.debugging.enabled': false,
   'ril.radio.disabled': false,
