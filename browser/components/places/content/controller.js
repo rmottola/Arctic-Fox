@@ -1580,8 +1580,7 @@ PlacesController.prototype = {
     let itemsToSelect = [];
     if (PlacesUIUtils.useAsyncTransactions) {
       if (ip.isTag) {
-        let uris = [for (item of items) if ("uri" in item)
-                    NetUtil.newURI(item.uri)];
+        let uris = items.filter(item => "uri" in item).map(item => NetUtil.newURI(item.uri));
         yield PlacesTransactions.Tag({ uris: uris, tag: ip.tagName }).transact();
       }
       else {
