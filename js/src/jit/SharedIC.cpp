@@ -696,9 +696,10 @@ ICMonitoredFallbackStub::initMonitoringChain(JSContext* cx, ICStubSpace* space,
 }
 
 bool
-ICMonitoredFallbackStub::addMonitorStubForValue(JSContext* cx, JSScript* script, HandleValue val, ICStubCompiler::Engine engine)
+ICMonitoredFallbackStub::addMonitorStubForValue(JSContext* cx, SharedStubInfo* stub,
+                                                HandleValue val)
 {
-    return fallbackMonitorStub_->addMonitorStubForValue(cx, script, val, engine);
+    return fallbackMonitorStub_->addMonitorStubForValue(cx, stub, val);
 }
 
 bool
@@ -854,7 +855,7 @@ ICStubCompiler::leaveStubFrame(MacroAssembler& masm, bool calledIntoIon)
 }
 
 void
-ICStubCompiler::pushFramePtr(MacroAssembler& masm, Register scratch)
+ICStubCompiler::pushStubPayload(MacroAssembler& masm, Register scratch)
 {
     if (engine_ == Engine::IonMonkey) {
         masm.push(Imm32(0));
@@ -870,9 +871,9 @@ ICStubCompiler::pushFramePtr(MacroAssembler& masm, Register scratch)
 }
 
 void
-ICStubCompiler::PushFramePtr(MacroAssembler& masm, Register scratch)
+ICStubCompiler::PushStubPayload(MacroAssembler& masm, Register scratch)
 {
-    pushFramePtr(masm, scratch);
+    pushStubPayload(masm, scratch);
     masm.adjustFrame(sizeof(intptr_t));
 }
 
@@ -901,22 +902,35 @@ ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, Val
     return true;
 }
 
-static ICStubCompiler::Engine
-SharedStubEngine(BaselineFrame* frame)
+SharedStubInfo::SharedStubInfo(JSContext* cx, void* payload, ICEntry* icEntry)
+  : maybeFrame_(nullptr),
+    outerScript_(cx),
+    innerScript_(cx),
+    icEntry_(icEntry)
 {
-    return frame ? ICStubCompiler::Engine::Baseline : ICStubCompiler::Engine::IonMonkey;
+    if (payload) {
+        maybeFrame_ = (BaselineFrame*) payload;
+        outerScript_ = maybeFrame_->script();
+        innerScript_ = maybeFrame_->script();
+    } else {
+        IonICEntry* entry = (IonICEntry*) icEntry;
+        innerScript_ = entry->script();
+        // outerScript_ is initialized lazily.
+    }
 }
 
-template<typename T>
-static JSScript*
-SharedStubScript(BaselineFrame* frame, T* stub)
+HandleScript
+SharedStubInfo::outerScript(JSContext* cx)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    if (engine == ICStubCompiler::Engine::Baseline)
-        return frame->script();
-
-    IonICEntry* entry = (IonICEntry*) stub->icEntry();
-    return entry->script();
+    if (!outerScript_) {
+        js::jit::JitActivationIterator iter(cx->runtime());
+        JitFrameIterator it(iter);
+        MOZ_ASSERT(it.isExitFrame());
+        ++it;
+        MOZ_ASSERT(it.isIonJS());
+        outerScript_ = it.script();
+    }
+    return outerScript_;
 }
 
 //
@@ -924,16 +938,16 @@ SharedStubScript(BaselineFrame* frame, T* stub)
 //
 
 static bool
-DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallback* stub_,
+DoBinaryArithFallback(JSContext* cx, void* payload, ICBinaryArith_Fallback* stub_,
                       HandleValue lhs, HandleValue rhs, MutableHandleValue ret)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    RootedScript script(cx, SharedStubScript(frame, stub_));
+    SharedStubInfo info(cx, payload, stub_->icEntry());
+    ICStubCompiler::Engine engine = info.engine();
 
     // This fallback stub may trigger debug mode toggling.
-    DebugModeOSRVolatileStub<ICBinaryArith_Fallback*> stub(engine, frame, stub_);
+    DebugModeOSRVolatileStub<ICBinaryArith_Fallback*> stub(engine, info.maybeFrame(), stub_);
 
-    jsbytecode* pc = stub->icEntry()->pc(script);
+    jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
     FallbackICSpew(cx, stub, "BinaryArith(%s,%d,%d)", CodeName[op],
             int(lhs.isDouble() ? JSVAL_TYPE_DOUBLE : lhs.extractNonDoubleType()),
@@ -1034,7 +1048,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
             JitSpew(JitSpew_BaselineIC, "  Generating %s(String, String) stub", CodeName[op]);
             MOZ_ASSERT(ret.isString());
             ICBinaryArith_StringConcat::Compiler compiler(cx, engine);
-            ICStub* strcatStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* strcatStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!strcatStub)
                 return false;
             stub->addNewStub(strcatStub);
@@ -1047,7 +1061,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
                     lhs.isString() ? "Object" : "String");
             MOZ_ASSERT(ret.isString());
             ICBinaryArith_StringObjectConcat::Compiler compiler(cx, engine, lhs.isString());
-            ICStub* strcatStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* strcatStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!strcatStub)
                 return false;
             stub->addNewStub(strcatStub);
@@ -1064,7 +1078,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
                 lhs.isBoolean() ? "Boolean" : "Int32", rhs.isBoolean() ? "Boolean" : "Int32");
         ICBinaryArith_BooleanWithInt32::Compiler compiler(cx, op, engine,
                                                           lhs.isBoolean(), rhs.isBoolean());
-        ICStub* arithStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* arithStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!arithStub)
             return false;
         stub->addNewStub(arithStub);
@@ -1094,7 +1108,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
             JitSpew(JitSpew_BaselineIC, "  Generating %s(Double, Double) stub", CodeName[op]);
 
             ICBinaryArith_Double::Compiler compiler(cx, op, engine);
-            ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!doubleStub)
                 return false;
             stub->addNewStub(doubleStub);
@@ -1112,7 +1126,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
         JitSpew(JitSpew_BaselineIC, "  Generating %s(Int32, Int32%s) stub", CodeName[op],
                 allowDouble ? " => Double" : "");
         ICBinaryArith_Int32::Compiler compilerInt32(cx, op, engine, allowDouble);
-        ICStub* int32Stub = compilerInt32.getStub(compilerInt32.getStubSpace(script));
+        ICStub* int32Stub = compilerInt32.getStub(compilerInt32.getStubSpace(info.outerScript(cx)));
         if (!int32Stub)
             return false;
         stub->addNewStub(int32Stub);
@@ -1131,7 +1145,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
                         lhs.isDouble() ? "Double" : "Int32",
                         lhs.isDouble() ? "Int32" : "Double");
             ICBinaryArith_DoubleWithInt32::Compiler compiler(cx, op, engine, lhs.isDouble());
-            ICStub* optStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* optStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!optStub)
                 return false;
             stub->addNewStub(optStub);
@@ -1146,7 +1160,7 @@ DoBinaryArithFallback(JSContext* cx, BaselineFrame* frame, ICBinaryArith_Fallbac
     return true;
 }
 
-typedef bool (*DoBinaryArithFallbackFn)(JSContext*, BaselineFrame*, ICBinaryArith_Fallback*,
+typedef bool (*DoBinaryArithFallbackFn)(JSContext*, void*, ICBinaryArith_Fallback*,
                                         HandleValue, HandleValue, MutableHandleValue);
 static const VMFunction DoBinaryArithFallbackInfo =
     FunctionInfo<DoBinaryArithFallbackFn>(DoBinaryArithFallback, TailCall, PopValues(2));
@@ -1167,7 +1181,7 @@ ICBinaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoBinaryArithFallbackInfo, masm);
 }
@@ -1482,16 +1496,17 @@ ICBinaryArith_DoubleWithInt32::Compiler::generateStubCode(MacroAssembler& masm)
 //
 
 static bool
-DoUnaryArithFallback(JSContext* cx, BaselineFrame* frame, ICUnaryArith_Fallback* stub_,
+DoUnaryArithFallback(JSContext* cx, void* payload, ICUnaryArith_Fallback* stub_,
                      HandleValue val, MutableHandleValue res)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    RootedScript script(cx, SharedStubScript(frame, stub_));
+    SharedStubInfo info(cx, payload, stub_->icEntry());
+    ICStubCompiler::Engine engine = info.engine();
+    HandleScript script = info.innerScript();
 
     // This fallback stub may trigger debug mode toggling.
-    DebugModeOSRVolatileStub<ICUnaryArith_Fallback*> stub(engine, frame, stub_);
+    DebugModeOSRVolatileStub<ICUnaryArith_Fallback*> stub(engine, info.maybeFrame(), stub_);
 
-    jsbytecode* pc = stub->icEntry()->pc(script);
+    jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
     FallbackICSpew(cx, stub, "UnaryArith(%s)", CodeName[op]);
 
@@ -1526,7 +1541,7 @@ DoUnaryArithFallback(JSContext* cx, BaselineFrame* frame, ICUnaryArith_Fallback*
     if (val.isInt32() && res.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating %s(Int32 => Int32) stub", CodeName[op]);
         ICUnaryArith_Int32::Compiler compiler(cx, op, engine);
-        ICStub* int32Stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* int32Stub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!int32Stub)
             return false;
         stub->addNewStub(int32Stub);
@@ -1540,7 +1555,7 @@ DoUnaryArithFallback(JSContext* cx, BaselineFrame* frame, ICUnaryArith_Fallback*
         stub->unlinkStubsWithKind(cx, ICStub::UnaryArith_Int32);
 
         ICUnaryArith_Double::Compiler compiler(cx, op, engine);
-        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!doubleStub)
             return false;
         stub->addNewStub(doubleStub);
@@ -1550,7 +1565,7 @@ DoUnaryArithFallback(JSContext* cx, BaselineFrame* frame, ICUnaryArith_Fallback*
     return true;
 }
 
-typedef bool (*DoUnaryArithFallbackFn)(JSContext*, BaselineFrame*, ICUnaryArith_Fallback*,
+typedef bool (*DoUnaryArithFallbackFn)(JSContext*, void*, ICUnaryArith_Fallback*,
                                        HandleValue, MutableHandleValue);
 static const VMFunction DoUnaryArithFallbackInfo =
     FunctionInfo<DoUnaryArithFallbackFn>(DoUnaryArithFallback, TailCall, PopValues(1));
@@ -1569,7 +1584,7 @@ ICUnaryArith_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoUnaryArithFallbackInfo, masm);
 }
@@ -1618,16 +1633,16 @@ ICUnaryArith_Double::Compiler::generateStubCode(MacroAssembler& masm)
 //
 
 static bool
-DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_, HandleValue lhs,
+DoCompareFallback(JSContext* cx, void* payload, ICCompare_Fallback* stub_, HandleValue lhs,
                   HandleValue rhs, MutableHandleValue ret)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    RootedScript script(cx, SharedStubScript(frame, stub_));
+    SharedStubInfo info(cx, payload, stub_->icEntry());
+    ICStubCompiler::Engine engine = info.engine();
 
     // This fallback stub may trigger debug mode toggling.
-    DebugModeOSRVolatileStub<ICCompare_Fallback*> stub(engine, frame, stub_);
+    DebugModeOSRVolatileStub<ICCompare_Fallback*> stub(engine, info.maybeFrame(), stub_);
 
-    jsbytecode* pc = stub->icEntry()->pc(script);
+    jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
 
     FallbackICSpew(cx, stub, "Compare(%s)", CodeName[op]);
@@ -1698,7 +1713,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
     if (lhs.isInt32() && rhs.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating %s(Int32, Int32) stub", CodeName[op]);
         ICCompare_Int32::Compiler compiler(cx, op, engine);
-        ICStub* int32Stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* int32Stub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!int32Stub)
             return false;
 
@@ -1716,7 +1731,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
         stub->unlinkStubsWithKind(cx, ICStub::Compare_Int32);
 
         ICCompare_Double::Compiler compiler(cx, op, engine);
-        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!doubleStub)
             return false;
 
@@ -1731,7 +1746,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
                     rhs.isUndefined() ? "Number" : "Undefined",
                     rhs.isUndefined() ? "Undefined" : "Number");
         ICCompare_NumberWithUndefined::Compiler compiler(cx, op, engine, lhs.isUndefined());
-        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* doubleStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!doubleStub)
             return false;
 
@@ -1742,7 +1757,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
     if (lhs.isBoolean() && rhs.isBoolean()) {
         JitSpew(JitSpew_BaselineIC, "  Generating %s(Boolean, Boolean) stub", CodeName[op]);
         ICCompare_Boolean::Compiler compiler(cx, op, engine);
-        ICStub* booleanStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* booleanStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!booleanStub)
             return false;
 
@@ -1755,7 +1770,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
                     rhs.isInt32() ? "Boolean" : "Int32",
                     rhs.isInt32() ? "Int32" : "Boolean");
         ICCompare_Int32WithBoolean::Compiler compiler(cx, op, engine, lhs.isInt32());
-        ICStub* optStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* optStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!optStub)
             return false;
 
@@ -1767,7 +1782,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
         if (lhs.isString() && rhs.isString() && !stub->hasStub(ICStub::Compare_String)) {
             JitSpew(JitSpew_BaselineIC, "  Generating %s(String, String) stub", CodeName[op]);
             ICCompare_String::Compiler compiler(cx, op, engine);
-            ICStub* stringStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* stringStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!stringStub)
                 return false;
 
@@ -1779,7 +1794,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
             MOZ_ASSERT(!stub->hasStub(ICStub::Compare_Object));
             JitSpew(JitSpew_BaselineIC, "  Generating %s(Object, Object) stub", CodeName[op]);
             ICCompare_Object::Compiler compiler(cx, op, engine);
-            ICStub* objectStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* objectStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!objectStub)
                 return false;
 
@@ -1797,7 +1812,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
             bool compareWithNull = lhs.isNull() || rhs.isNull();
             ICCompare_ObjectWithUndefined::Compiler compiler(cx, op, engine,
                                                              lhsIsUndefined, compareWithNull);
-            ICStub* objectStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* objectStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
             if (!objectStub)
                 return false;
 
@@ -1811,7 +1826,7 @@ DoCompareFallback(JSContext* cx, BaselineFrame* frame, ICCompare_Fallback* stub_
     return true;
 }
 
-typedef bool (*DoCompareFallbackFn)(JSContext*, BaselineFrame*, ICCompare_Fallback*,
+typedef bool (*DoCompareFallbackFn)(JSContext*, void*, ICCompare_Fallback*,
                                     HandleValue, HandleValue, MutableHandleValue);
 static const VMFunction DoCompareFallbackInfo =
     FunctionInfo<DoCompareFallbackFn>(DoCompareFallback, TailCall, PopValues(2));
@@ -1832,7 +1847,7 @@ ICCompare_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
     return tailCallVM(DoCompareFallbackInfo, masm);
 }
 
@@ -2070,10 +2085,9 @@ ICCompare_Int32WithBoolean::Compiler::generateStubCode(MacroAssembler& masm)
 //
 
 static bool
-TryAttachMagicArgumentsGetPropStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
-                                   ICStubCompiler::Engine engine, HandlePropertyName name,
-                                   HandleValue val, HandleValue res,
-                                   bool* attached)
+TryAttachMagicArgumentsGetPropStub(JSContext* cx, SharedStubInfo* info,
+                                   ICGetProp_Fallback* stub, HandlePropertyName name,
+                                   HandleValue val, HandleValue res, bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
@@ -2082,15 +2096,15 @@ TryAttachMagicArgumentsGetPropStub(JSContext* cx, JSScript* script, ICGetProp_Fa
 
     // Try handling arguments.callee on optimized arguments.
     if (name == cx->names().callee) {
-        MOZ_ASSERT(script->hasMappedArgsObj());
+        MOZ_ASSERT(info->script()->hasMappedArgsObj());
 
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(MagicArgs.callee) stub");
 
         // Unlike ICGetProp_ArgumentsLength, only magic argument stubs are
         // supported at the moment.
         ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
-        ICGetProp_ArgumentsCallee::Compiler compiler(cx, engine, monitorStub);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_ArgumentsCallee::Compiler compiler(cx, info->engine(), monitorStub);
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
         stub->addNewStub(newStub);
@@ -2103,8 +2117,8 @@ TryAttachMagicArgumentsGetPropStub(JSContext* cx, JSScript* script, ICGetProp_Fa
 }
 
 static bool
-TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
-                    ICStubCompiler::Engine engine, HandleValue val,
+TryAttachLengthStub(JSContext* cx, SharedStubInfo* info,
+                    ICGetProp_Fallback* stub, HandleValue val,
                     HandleValue res, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -2112,8 +2126,8 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
     if (val.isString()) {
         MOZ_ASSERT(res.isInt32());
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(String.length) stub");
-        ICGetProp_StringLength::Compiler compiler(cx, engine);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_StringLength::Compiler compiler(cx, info->engine());
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2124,8 +2138,8 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
 
     if (val.isMagic(JS_OPTIMIZED_ARGUMENTS) && res.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(MagicArgs.length) stub");
-        ICGetProp_ArgumentsLength::Compiler compiler(cx, engine, ICGetProp_ArgumentsLength::Magic);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_ArgumentsLength::Compiler compiler(cx, info->engine(), ICGetProp_ArgumentsLength::Magic);
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2141,8 +2155,8 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
 
     if (obj->is<ArrayObject>() && res.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(Array.length) stub");
-        ICGetProp_ArrayLength::Compiler compiler(cx, engine);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_ArrayLength::Compiler compiler(cx, info->engine());
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2153,8 +2167,8 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
 
     if (obj->is<UnboxedArrayObject>() && res.isInt32()) {
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(UnboxedArray.length) stub");
-        ICGetProp_UnboxedArrayLength::Compiler compiler(cx, engine);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_UnboxedArrayLength::Compiler compiler(cx, info->engine());
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2169,8 +2183,8 @@ TryAttachLengthStub(JSContext* cx, JSScript* script, ICGetProp_Fallback* stub,
         ICGetProp_ArgumentsLength::Which which = ICGetProp_ArgumentsLength::Mapped;
         if (obj->is<UnmappedArgumentsObject>())
             which = ICGetProp_ArgumentsLength::Unmapped;
-        ICGetProp_ArgumentsLength::Compiler compiler(cx, engine, which);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_ArgumentsLength::Compiler compiler(cx, info->engine(), which);
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2372,8 +2386,8 @@ GetFixedOrDynamicSlotOffset(Shape* shape, bool* isFixed, uint32_t* offset)
 
 
 static bool
-TryAttachNativeGetValuePropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
-                                ICGetProp_Fallback* stub, ICStubCompiler::Engine engine,
+TryAttachNativeGetValuePropStub(JSContext* cx, SharedStubInfo* info,
+                                ICGetProp_Fallback* stub,
                                 HandlePropertyName name,
                                 HandleValue val, HandleShape oldShape,
                                 HandleValue res, bool* attached)
@@ -2411,9 +2425,9 @@ TryAttachNativeGetValuePropStub(JSContext* cx, HandleScript script, jsbytecode* 
 
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(Native %s) stub",
                     (obj == holder) ? "direct" : "prototype");
-        ICGetPropNativeCompiler compiler(cx, kind, engine, monitorStub, obj, holder,
+        ICGetPropNativeCompiler compiler(cx, kind, info->engine(), monitorStub, obj, holder,
                                          name, isFixedSlot, offset);
-        ICGetPropNativeStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetPropNativeStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2535,10 +2549,10 @@ UpdateExistingGetPropCallStubs(ICFallbackStub* fallbackStub,
 }
 
 static bool
-TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
-                                   ICGetProp_Fallback* stub, ICStubCompiler::Engine engine,
-                                   HandlePropertyName name, HandleValue val, HandleValue res,
-                                   bool* attached, bool* isTemporarilyUnoptimizable)
+TryAttachNativeGetAccessorPropStub(JSContext* cx, SharedStubInfo* info,
+                                   ICGetProp_Fallback* stub, HandlePropertyName name,
+                                   HandleValue val, HandleValue res, bool* attached,
+                                   bool* isTemporarilyUnoptimizable)
 {
     MOZ_ASSERT(!*attached);
     MOZ_ASSERT(!*isTemporarilyUnoptimizable);
@@ -2568,7 +2582,9 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
                                                 isDOMProxy);
 
     // Try handling scripted getters.
-    if (cacheableCall && isScripted && !isDOMProxy && engine == ICStubCompiler::Engine::Baseline) {
+    if (cacheableCall && isScripted && !isDOMProxy &&
+        info->engine() == ICStubCompiler::Engine::Baseline)
+    {
         RootedFunction callee(cx, &shape->getterObject()->as<JSFunction>());
         MOZ_ASSERT(callee->hasScript());
 
@@ -2582,8 +2598,8 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
                 callee->nonLazyScript()->filename(), callee->nonLazyScript()->lineno());
 
         ICGetProp_CallScripted::Compiler compiler(cx, monitorStub, obj, holder, callee,
-                                                  script->pcToOffset(pc));
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+                                                  info->pcOffset());
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
 
@@ -2598,9 +2614,9 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
 
         JitSpew(JitSpew_BaselineIC, "  Generating GetProp(DOMProxyProxy) stub");
         Rooted<ProxyObject*> proxy(cx, &obj->as<ProxyObject>());
-        ICGetProp_DOMProxyShadowed::Compiler compiler(cx, engine, monitorStub, proxy, name,
-                                                      script->pcToOffset(pc));
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetProp_DOMProxyShadowed::Compiler compiler(cx, info->engine(), monitorStub, proxy, name,
+                                                      info->pcOffset());
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!newStub)
             return false;
         stub->addNewStub(newStub);
@@ -2664,9 +2680,9 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
             kind = ICStub::GetProp_CallDOMProxyNative;
         }
         Rooted<ProxyObject*> proxy(cx, &obj->as<ProxyObject>());
-        ICGetPropCallDOMProxyNativeCompiler compiler(cx, kind, engine, monitorStub, proxy, holder,
-                                                     callee, script->pcToOffset(pc));
-        newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICGetPropCallDOMProxyNativeCompiler compiler(cx, kind, info->engine(), monitorStub, proxy, holder,
+                                                     callee, info->pcOffset());
+        newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     } else {
         if (UpdateExistingGetPropCallStubs(stub, ICStub::GetProp_CallNative,
                                            holder.as<NativeObject>(), obj, callee))
@@ -2675,10 +2691,10 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
             return true;
         }
 
-        ICGetPropCallNativeCompiler compiler(cx, ICStub::GetProp_CallNative, engine,
+        ICGetPropCallNativeCompiler compiler(cx, ICStub::GetProp_CallNative, info->engine(),
                                              monitorStub, obj, holder, callee,
-                                             script->pcToOffset(pc), outerClass);
-        newStub = compiler.getStub(compiler.getStubSpace(script));
+                                             info->pcOffset(), outerClass);
+        newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     }
     if (!newStub)
         return false;
@@ -2688,8 +2704,8 @@ TryAttachNativeGetAccessorPropStub(JSContext* cx, HandleScript script, jsbytecod
 }
 
 static bool
-TryAttachUnboxedGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallback* stub,
-                            ICStubCompiler::Engine engine, HandlePropertyName name,
+TryAttachUnboxedGetPropStub(JSContext* cx, SharedStubInfo* info,
+                            ICGetProp_Fallback* stub, HandlePropertyName name,
                             HandleValue val, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -2707,10 +2723,10 @@ TryAttachUnboxedGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallba
 
     ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
 
-    ICGetProp_Unboxed::Compiler compiler(cx, engine, monitorStub, obj->group(),
+    ICGetProp_Unboxed::Compiler compiler(cx, info->engine(), monitorStub, obj->group(),
                                          property->offset + UnboxedPlainObject::offsetOfData(),
                                          property->type);
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
     stub->addNewStub(newStub);
@@ -2722,8 +2738,8 @@ TryAttachUnboxedGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallba
 }
 
 static bool
-TryAttachUnboxedExpandoGetPropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
-                                   ICGetProp_Fallback* stub, ICStubCompiler::Engine engine,
+TryAttachUnboxedExpandoGetPropStub(JSContext* cx, SharedStubInfo* info,
+                                   ICGetProp_Fallback* stub,
                                    HandlePropertyName name, HandleValue val,
                                    bool* attached)
 {
@@ -2747,9 +2763,9 @@ TryAttachUnboxedExpandoGetPropStub(JSContext* cx, HandleScript script, jsbytecod
 
     ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
 
-    ICGetPropNativeCompiler compiler(cx, ICStub::GetProp_Native, engine, monitorStub, obj, obj,
+    ICGetPropNativeCompiler compiler(cx, ICStub::GetProp_Native, info->engine(), monitorStub, obj, obj,
                                      name, isFixedSlot, offset);
-    ICGetPropNativeStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICGetPropNativeStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
 
@@ -2761,8 +2777,8 @@ TryAttachUnboxedExpandoGetPropStub(JSContext* cx, HandleScript script, jsbytecod
 }
 
 static bool
-TryAttachTypedObjectGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallback* stub,
-                                ICStubCompiler::Engine engine, HandlePropertyName name,
+TryAttachTypedObjectGetPropStub(JSContext* cx, SharedStubInfo* info,
+                                ICGetProp_Fallback* stub, HandlePropertyName name,
                                 HandleValue val, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -2789,9 +2805,9 @@ TryAttachTypedObjectGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fa
     uint32_t fieldOffset = structDescr->fieldOffset(fieldIndex);
     ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
 
-    ICGetProp_TypedObject::Compiler compiler(cx, engine, monitorStub, obj->maybeShape(),
+    ICGetProp_TypedObject::Compiler compiler(cx, info->engine(), monitorStub, obj->maybeShape(),
                                              fieldOffset, &fieldDescr->as<SimpleTypeDescr>());
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
     stub->addNewStub(newStub);
@@ -2801,8 +2817,8 @@ TryAttachTypedObjectGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fa
 }
 
 static bool
-TryAttachModuleNamespaceGetPropStub(JSContext* cx, HandleScript script, ICGetProp_Fallback* stub,
-                                    ICStubCompiler::Engine engine, HandlePropertyName name,
+TryAttachModuleNamespaceGetPropStub(JSContext* cx, SharedStubInfo* info,
+                                    ICGetProp_Fallback* stub, HandlePropertyName name,
                                     HandleValue val, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -2831,9 +2847,9 @@ TryAttachModuleNamespaceGetPropStub(JSContext* cx, HandleScript script, ICGetPro
     if (IsIonEnabled(cx))
         EnsureTrackPropertyTypes(cx, env, shape->propid());
 
-    ICGetProp_ModuleNamespace::Compiler compiler(cx, engine, monitorStub,
+    ICGetProp_ModuleNamespace::Compiler compiler(cx, info->engine(), monitorStub,
                                                  ns, env, isFixedSlot, offset);
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
     stub->addNewStub(newStub);
@@ -2843,16 +2859,15 @@ TryAttachModuleNamespaceGetPropStub(JSContext* cx, HandleScript script, ICGetPro
 }
 
 static bool
-TryAttachPrimitiveGetPropStub(JSContext* cx, HandleScript script, jsbytecode* pc,
-                              ICGetProp_Fallback* stub, ICStubCompiler::Engine engine,
-                              HandlePropertyName name, HandleValue val,
-                              HandleValue res, bool* attached)
+TryAttachPrimitiveGetPropStub(JSContext* cx, SharedStubInfo* info,
+                              ICGetProp_Fallback* stub, HandlePropertyName name,
+                              HandleValue val, HandleValue res, bool* attached)
 {
     MOZ_ASSERT(!*attached);
 
     JSValueType primitiveType;
     RootedNativeObject proto(cx);
-    Rooted<GlobalObject*> global(cx, &script->global());
+    Rooted<GlobalObject*> global(cx, &info->script()->global());
     if (val.isString()) {
         primitiveType = JSVAL_TYPE_STRING;
         proto = GlobalObject::getOrCreateStringPrototype(cx, global);
@@ -2887,9 +2902,9 @@ TryAttachPrimitiveGetPropStub(JSContext* cx, HandleScript script, jsbytecode* pc
     ICStub* monitorStub = stub->fallbackMonitorStub()->firstMonitorStub();
 
     JitSpew(JitSpew_BaselineIC, "  Generating GetProp_Primitive stub");
-    ICGetProp_Primitive::Compiler compiler(cx, engine, monitorStub, primitiveType, proto,
+    ICGetProp_Primitive::Compiler compiler(cx, info->engine(), monitorStub, primitiveType, proto,
                                            isFixedSlot, offset);
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
 
@@ -2943,9 +2958,8 @@ CheckHasNoSuchProperty(JSContext* cx, HandleObject obj, HandlePropertyName name,
 }
 
 static bool
-TryAttachNativeGetPropDoesNotExistStub(JSContext* cx, HandleScript script,
-                                       jsbytecode* pc, ICGetProp_Fallback* stub,
-                                       ICStubCompiler::Engine engine,
+TryAttachNativeGetPropDoesNotExistStub(JSContext* cx, SharedStubInfo* info,
+                                       ICGetProp_Fallback* stub,
                                        HandlePropertyName name, HandleValue val,
                                        bool* attached)
 {
@@ -2957,7 +2971,7 @@ TryAttachNativeGetPropDoesNotExistStub(JSContext* cx, HandleScript script,
     RootedObject obj(cx, &val.toObject());
 
     // Don't attach stubs for CALLPROP since those need NoSuchMethod handling.
-    if (JSOp(*pc) == JSOP_CALLPROP)
+    if (JSOp(*info->pc()) == JSOP_CALLPROP)
         return true;
 
     // Check if does-not-exist can be confirmed on property.
@@ -2974,8 +2988,8 @@ TryAttachNativeGetPropDoesNotExistStub(JSContext* cx, HandleScript script,
 
     // Confirmed no-such-property.  Add stub.
     JitSpew(JitSpew_BaselineIC, "  Generating GetProp_NativeDoesNotExist stub");
-    ICGetPropNativeDoesNotExistCompiler compiler(cx, engine, monitorStub, obj, protoChainDepth);
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICGetPropNativeDoesNotExistCompiler compiler(cx, info->engine(), monitorStub, obj, protoChainDepth);
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
     if (!newStub)
         return false;
 
@@ -3015,16 +3029,17 @@ ComputeGetPropResult(JSContext* cx, BaselineFrame* frame, JSOp op, HandlePropert
 }
 
 static bool
-DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_,
+DoGetPropFallback(JSContext* cx, void* payload, ICGetProp_Fallback* stub_,
                   MutableHandleValue val, MutableHandleValue res)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    RootedScript script(cx, SharedStubScript(frame, stub_));
+    SharedStubInfo info(cx, payload, stub_->icEntry());
+    ICStubCompiler::Engine engine = info.engine();
+    HandleScript script = info.innerScript();
 
     // This fallback stub may trigger debug mode toggling.
-    DebugModeOSRVolatileStub<ICGetProp_Fallback*> stub(engine, frame, stub_);
+    DebugModeOSRVolatileStub<ICGetProp_Fallback*> stub(engine, info.maybeFrame(), stub_);
 
-    jsbytecode* pc = stub->icEntry()->pc(script);
+    jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
     FallbackICSpew(cx, stub, "GetProp(%s)", CodeName[op]);
 
@@ -3044,30 +3059,30 @@ DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_
 
     RootedPropertyName name(cx, script->getName(pc));
 
-    // After the  Genericstub was added, we should never reach the Fallbackstub again.
+    // After the Genericstub was added, we should never reach the Fallbackstub again.
     MOZ_ASSERT(!stub->hasStub(ICStub::GetProp_Generic));
 
     if (stub->numOptimizedStubs() >= ICGetProp_Fallback::MAX_OPTIMIZED_STUBS) {
         // Discard all stubs in this IC and replace with generic getprop stub.
-        for(ICStubIterator iter = stub->beginChain(); !iter.atEnd(); iter++)
+        for (ICStubIterator iter = stub->beginChain(); !iter.atEnd(); iter++)
             iter.unlink(cx);
         ICGetProp_Generic::Compiler compiler(cx, engine,
                                              stub->fallbackMonitorStub()->firstMonitorStub());
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(info.outerScript(cx)));
         if (!newStub)
             return false;
         stub->addNewStub(newStub);
         attached = true;
     }
 
-    if (!attached && !TryAttachNativeGetAccessorPropStub(cx, script, pc, stub, engine, name, val,
-                                                         res, &attached,
+    if (!attached && !TryAttachNativeGetAccessorPropStub(cx, &info, stub, name, val, res, &attached,
                                                          &isTemporarilyUnoptimizable))
     {
         return false;
     }
 
-    if (!ComputeGetPropResult(cx, frame, op, name, val, res))
+
+    if (!ComputeGetPropResult(cx, info.maybeFrame(), op, name, val, res))
         return false;
 
     TypeScript::Monitor(cx, script, pc, res);
@@ -3077,52 +3092,54 @@ DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_
         return true;
 
     // Add a type monitor stub for the resulting value.
-    if (!stub->addMonitorStubForValue(cx, script, res, engine))
+    if (!stub->addMonitorStubForValue(cx, &info, res))
         return false;
 
     if (attached)
         return true;
 
     if (op == JSOP_LENGTH) {
-        if (!TryAttachLengthStub(cx, script, stub, engine, val, res, &attached))
+        if (!TryAttachLengthStub(cx, &info, stub, val, res, &attached))
             return false;
         if (attached)
             return true;
     }
 
-    if (!TryAttachMagicArgumentsGetPropStub(cx, script, stub, engine, name, val, res, &attached))
+    if (!TryAttachMagicArgumentsGetPropStub(cx, &info, stub, name, val,
+                                            res, &attached))
         return false;
     if (attached)
         return true;
 
-    if (!TryAttachNativeGetValuePropStub(cx, script, pc, stub, engine, name, val, oldShape,
+
+    if (!TryAttachNativeGetValuePropStub(cx, &info, stub, name, val, oldShape,
                                          res, &attached))
         return false;
     if (attached)
         return true;
 
-    if (!TryAttachUnboxedGetPropStub(cx, script, stub, engine, name, val, &attached))
+    if (!TryAttachUnboxedGetPropStub(cx, &info, stub, name, val, &attached))
         return false;
     if (attached)
         return true;
 
-    if (!TryAttachUnboxedExpandoGetPropStub(cx, script, pc, stub, engine, name, val, &attached))
+    if (!TryAttachUnboxedExpandoGetPropStub(cx, &info, stub, name, val, &attached))
         return false;
     if (attached)
         return true;
 
-    if (!TryAttachTypedObjectGetPropStub(cx, script, stub, engine, name, val, &attached))
+    if (!TryAttachTypedObjectGetPropStub(cx, &info, stub, name, val, &attached))
         return false;
     if (attached)
         return true;
 
-    if (!TryAttachModuleNamespaceGetPropStub(cx, script, stub, engine, name, val, &attached))
+    if (!TryAttachModuleNamespaceGetPropStub(cx, &info, stub, name, val, &attached))
         return false;
     if (attached)
         return true;
 
     if (val.isString() || val.isNumber() || val.isBoolean()) {
-        if (!TryAttachPrimitiveGetPropStub(cx, script, pc, stub, engine, name, val, res, &attached))
+        if (!TryAttachPrimitiveGetPropStub(cx, &info, stub, name, val, res, &attached))
             return false;
         if (attached)
             return true;
@@ -3130,7 +3147,7 @@ DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_
 
     if (res.isUndefined()) {
         // Try attaching property-not-found optimized stub for undefined results.
-        if (!TryAttachNativeGetPropDoesNotExistStub(cx, script, pc, stub, engine, name, val,
+        if (!TryAttachNativeGetPropDoesNotExistStub(cx, &info, stub, name, val,
                                                     &attached))
         {
             return false;
@@ -3146,7 +3163,7 @@ DoGetPropFallback(JSContext* cx, BaselineFrame* frame, ICGetProp_Fallback* stub_
     return true;
 }
 
-typedef bool (*DoGetPropFallbackFn)(JSContext*, BaselineFrame*, ICGetProp_Fallback*,
+typedef bool (*DoGetPropFallbackFn)(JSContext*, void*, ICGetProp_Fallback*,
                                     MutableHandleValue, MutableHandleValue);
 static const VMFunction DoGetPropFallbackInfo =
     FunctionInfo<DoGetPropFallbackFn>(DoGetPropFallback, TailCall, PopValues(1));
@@ -3164,7 +3181,7 @@ ICGetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     if (!tailCallVM(DoGetPropFallbackInfo, masm))
         return false;
@@ -4154,18 +4171,19 @@ ICGetProp_Generic::Clone(JSContext* cx, ICStubSpace* space, ICStub* firstMonitor
 }
 
 static bool
-DoGetPropGeneric(JSContext* cx, BaselineFrame* frame, ICGetProp_Generic* stub,
+DoGetPropGeneric(JSContext* cx, void* payload, ICGetProp_Generic* stub,
                  MutableHandleValue val, MutableHandleValue res)
 {
     ICFallbackStub* fallback = stub->getChainFallback();
-    RootedScript script(cx, SharedStubScript(frame, fallback));
-    jsbytecode* pc = fallback->icEntry()->pc(script);
+    SharedStubInfo info(cx, payload, fallback->icEntry());
+    HandleScript script = info.innerScript();
+    jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
     RootedPropertyName name(cx, script->getName(pc));
-    return ComputeGetPropResult(cx, frame, op, name, val, res);
+    return ComputeGetPropResult(cx, info.maybeFrame(), op, name, val, res);
 }
 
-typedef bool (*DoGetPropGenericFn)(JSContext*, BaselineFrame*, ICGetProp_Generic*, MutableHandleValue, MutableHandleValue);
+typedef bool (*DoGetPropGenericFn)(JSContext*, void*, ICGetProp_Generic*, MutableHandleValue, MutableHandleValue);
 static const VMFunction DoGetPropGenericInfo = FunctionInfo<DoGetPropGenericFn>(DoGetPropGeneric);
 
 bool
@@ -4184,7 +4202,7 @@ ICGetProp_Generic::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.Push(R0);
     masm.Push(ICStubReg);
-    PushFramePtr(masm, R0.scratchReg());
+    PushStubPayload(masm, R0.scratchReg());
 
     if (!callVM(DoGetPropGenericInfo, masm))
         return false;
@@ -4601,7 +4619,7 @@ ICGetProp_DOMProxyShadowed::Clone(JSContext* cx, ICStubSpace* space, ICStub* fir
 //
 
 bool
-ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, HandleValue val, ICStubCompiler::Engine engine)
+ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, SharedStubInfo* info, HandleValue val)
 {
     bool wasDetachedMonitorChain = lastMonitorStubPtrAddr_ == nullptr;
     MOZ_ASSERT_IF(wasDetachedMonitorChain, numOptimizedMonitorStubs_ == 0);
@@ -4628,9 +4646,9 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
             }
         }
 
-        ICTypeMonitor_PrimitiveSet::Compiler compiler(cx, engine, existingStub, type);
+        ICTypeMonitor_PrimitiveSet::Compiler compiler(cx, info->engine(), existingStub, type);
         ICStub* stub = existingStub ? compiler.updateStub()
-                                    : compiler.getStub(compiler.getStubSpace(script));
+                                    : compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!stub) {
             ReportOutOfMemory(cx);
             return false;
@@ -4657,7 +4675,7 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
         }
 
         ICTypeMonitor_SingleObject::Compiler compiler(cx, obj);
-        ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* stub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!stub) {
             ReportOutOfMemory(cx);
             return false;
@@ -4681,7 +4699,7 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
         }
 
         ICTypeMonitor_ObjectGroup::Compiler compiler(cx, group);
-        ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* stub = compiler.getStub(compiler.getStubSpace(info->outerScript(cx)));
         if (!stub) {
             ReportOutOfMemory(cx);
             return false;
@@ -4718,11 +4736,11 @@ ICTypeMonitor_Fallback::addMonitorStubForValue(JSContext* cx, JSScript* script, 
 }
 
 static bool
-DoTypeMonitorFallback(JSContext* cx, BaselineFrame* frame, ICTypeMonitor_Fallback* stub,
+DoTypeMonitorFallback(JSContext* cx, void* payload, ICTypeMonitor_Fallback* stub,
                       HandleValue value, MutableHandleValue res)
 {
-    ICStubCompiler::Engine engine = SharedStubEngine(frame);
-    RootedScript script(cx, SharedStubScript(frame, stub));
+    SharedStubInfo info(cx, payload, stub->icEntry());
+    HandleScript script = info.innerScript();
     jsbytecode* pc = stub->icEntry()->pc(script);
     TypeFallbackICSpew(cx, stub, "TypeMonitor");
 
@@ -4741,7 +4759,7 @@ DoTypeMonitorFallback(JSContext* cx, BaselineFrame* frame, ICTypeMonitor_Fallbac
         // In derived class constructors (including nested arrows/eval), the
         // |this| argument or GETALIASEDVAR can return the magic TDZ value.
         MOZ_ASSERT(value.isMagic(JS_UNINITIALIZED_LEXICAL));
-        MOZ_ASSERT(frame->isFunctionFrame() || frame->isEvalFrame());
+        MOZ_ASSERT(info.frame()->isFunctionFrame() || info.frame()->isEvalFrame());
         MOZ_ASSERT(stub->monitorsThis() ||
                    *GetNextPc(pc) == JSOP_CHECKTHIS ||
                    *GetNextPc(pc) == JSOP_CHECKRETURN);
@@ -4765,7 +4783,7 @@ DoTypeMonitorFallback(JSContext* cx, BaselineFrame* frame, ICTypeMonitor_Fallbac
             TypeScript::Monitor(cx, script, pc, value);
     }
 
-    if (!stub->addMonitorStubForValue(cx, script, value, engine))
+    if (!stub->addMonitorStubForValue(cx, &info, value))
         return false;
 
     // Copy input value to res.
@@ -4773,7 +4791,7 @@ DoTypeMonitorFallback(JSContext* cx, BaselineFrame* frame, ICTypeMonitor_Fallbac
     return true;
 }
 
-typedef bool (*DoTypeMonitorFallbackFn)(JSContext*, BaselineFrame*, ICTypeMonitor_Fallback*,
+typedef bool (*DoTypeMonitorFallbackFn)(JSContext*, void*, ICTypeMonitor_Fallback*,
                                         HandleValue, MutableHandleValue);
 static const VMFunction DoTypeMonitorFallbackInfo =
     FunctionInfo<DoTypeMonitorFallbackFn>(DoTypeMonitorFallback, TailCall);
@@ -4788,7 +4806,7 @@ ICTypeMonitor_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoTypeMonitorFallbackInfo, masm);
 }
@@ -4875,7 +4893,7 @@ ICTypeMonitor_ObjectGroup::Compiler::generateStubCode(MacroAssembler& masm)
 }
 
 bool
-ICUpdatedStub::addUpdateStubForValue(JSContext* cx, HandleScript script, HandleObject obj,
+ICUpdatedStub::addUpdateStubForValue(JSContext* cx, HandleScript outerScript, HandleObject obj,
                                      HandleId id, HandleValue val)
 {
     if (numOptimizedStubs_ >= MAX_OPTIMIZED_STUBS) {
@@ -4906,7 +4924,7 @@ ICUpdatedStub::addUpdateStubForValue(JSContext* cx, HandleScript script, HandleO
 
         ICTypeUpdate_PrimitiveSet::Compiler compiler(cx, existingStub, type);
         ICStub* stub = existingStub ? compiler.updateStub()
-                                    : compiler.getStub(compiler.getStubSpace(script));
+                                    : compiler.getStub(compiler.getStubSpace(outerScript));
         if (!stub)
             return false;
         if (!existingStub) {
@@ -4930,7 +4948,7 @@ ICUpdatedStub::addUpdateStubForValue(JSContext* cx, HandleScript script, HandleO
         }
 
         ICTypeUpdate_SingleObject::Compiler compiler(cx, obj);
-        ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* stub = compiler.getStub(compiler.getStubSpace(outerScript));
         if (!stub)
             return false;
 
@@ -4951,7 +4969,7 @@ ICUpdatedStub::addUpdateStubForValue(JSContext* cx, HandleScript script, HandleO
         }
 
         ICTypeUpdate_ObjectGroup::Compiler compiler(cx, group);
-        ICStub* stub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* stub = compiler.getStub(compiler.getStubSpace(outerScript));
         if (!stub)
             return false;
 

@@ -270,7 +270,7 @@ ICWarmUpCounter_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         // Push stub pointer.
         masm.push(ICStubReg);
 
-        pushFramePtr(masm, R0.scratchReg());
+        pushStubPayload(masm, R0.scratchReg());
 
         if (!callVM(DoWarmUpCounterFallbackInfo, masm))
             return false;
@@ -397,7 +397,7 @@ DoTypeUpdateFallback(JSContext* cx, BaselineFrame* frame, ICUpdatedStub* stub, H
         MOZ_CRASH("Invalid stub");
     }
 
-    return stub->addUpdateStubForValue(cx, script, obj, id, value);
+    return stub->addUpdateStubForValue(cx, script /* = outerScript */, obj, id, value);
 }
 
 typedef bool (*DoTypeUpdateFallbackFn)(JSContext*, BaselineFrame*, ICUpdatedStub*, HandleValue,
@@ -562,7 +562,7 @@ ICNewArray_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg()); // length
     masm.push(ICStubReg); // stub.
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoNewArrayInfo, masm);
 }
@@ -631,7 +631,8 @@ DoNewObject(JSContext* cx, BaselineFrame* frame, ICNewObject_Fallback* stub, Mut
                     return false;
 
                 ICStubSpace* space =
-                    ICStubCompiler::StubSpaceForKind(ICStub::NewObject_WithTemplate, script);
+                    ICStubCompiler::StubSpaceForKind(ICStub::NewObject_WithTemplate, script,
+                                                     ICStubCompiler::Engine::Baseline);
                 ICStub* templateStub = ICStub::New<ICNewObject_WithTemplate>(cx, space, code);
                 if (!templateStub)
                     return false;
@@ -661,7 +662,7 @@ ICNewObject_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg); // stub.
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoNewObjectInfo, masm);
 }
@@ -764,7 +765,7 @@ ICToBool_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     // Push arguments.
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(fun, masm);
 }
@@ -1754,6 +1755,8 @@ static bool
 DoGetElemFallback(JSContext* cx, BaselineFrame* frame, ICGetElem_Fallback* stub_, HandleValue lhs,
                   HandleValue rhs, MutableHandleValue res)
 {
+    SharedStubInfo info(cx, frame, stub_->icEntry());
+
     // This fallback stub may trigger debug mode toggling.
     DebugModeOSRVolatileStub<ICGetElem_Fallback*> stub(frame, stub_);
 
@@ -1821,8 +1824,7 @@ DoGetElemFallback(JSContext* cx, BaselineFrame* frame, ICGetElem_Fallback* stub_
         return true;
 
     // Add a type monitor stub for the resulting value.
-    if (!stub->addMonitorStubForValue(cx, frame->script(), res,
-        ICStubCompiler::Engine::Baseline))
+    if (!stub->addMonitorStubForValue(cx, &info, res))
     {
         return false;
     }
@@ -1862,7 +1864,7 @@ ICGetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoGetElemFallbackInfo, masm);
 }
@@ -2736,6 +2738,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
     DebugModeOSRVolatileStub<ICSetElem_Fallback*> stub(frame, stub_);
 
     RootedScript script(cx, frame->script());
+    RootedScript outerScript(cx, script);
     jsbytecode* pc = stub->icEntry()->pc(script);
     JSOp op = JSOp(*pc);
     FallbackICSpew(cx, stub, "SetElem(%s)", CodeName[JSOp(*pc)]);
@@ -2817,11 +2820,11 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
                         "(shape=%p, group=%p, protoDepth=%u)",
                         shape.get(), group.get(), protoDepth);
                 ICSetElemDenseOrUnboxedArrayAddCompiler compiler(cx, obj, protoDepth);
-                ICUpdatedStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+                ICUpdatedStub* newStub = compiler.getStub(compiler.getStubSpace(outerScript));
                 if (!newStub)
                     return false;
                 if (compiler.needsUpdateStubs() &&
-                    !newStub->addUpdateStubForValue(cx, script, obj, JSID_VOIDHANDLE, rhs))
+                    !newStub->addUpdateStubForValue(cx, outerScript, obj, JSID_VOIDHANDLE, rhs))
                 {
                     return false;
                 }
@@ -2836,11 +2839,11 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
                         "  Generating SetElem_DenseOrUnboxedArray stub (shape=%p, group=%p)",
                         shape.get(), group.get());
                 ICSetElem_DenseOrUnboxedArray::Compiler compiler(cx, shape, group);
-                ICUpdatedStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+                ICUpdatedStub* newStub = compiler.getStub(compiler.getStubSpace(outerScript));
                 if (!newStub)
                     return false;
                 if (compiler.needsUpdateStubs() &&
-                    !newStub->addUpdateStubForValue(cx, script, obj, JSID_VOIDHANDLE, rhs))
+                    !newStub->addUpdateStubForValue(cx, outerScript, obj, JSID_VOIDHANDLE, rhs))
                 {
                     return false;
                 }
@@ -2892,7 +2895,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
                     "  Generating SetElem_TypedArray stub (shape=%p, type=%u, oob=%s)",
                     shape, type, expectOutOfBounds ? "yes" : "no");
             ICSetElem_TypedArray::Compiler compiler(cx, shape, type, expectOutOfBounds);
-            ICStub* typedArrayStub = compiler.getStub(compiler.getStubSpace(script));
+            ICStub* typedArrayStub = compiler.getStub(compiler.getStubSpace(outerScript));
             if (!typedArrayStub)
                 return false;
 
@@ -2941,7 +2944,7 @@ ICSetElem_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.push(R0.scratchReg());
 
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoSetElemFallbackInfo, masm);
 }
@@ -3515,7 +3518,7 @@ ICSetElem_TypedArray::Compiler::generateStubCode(MacroAssembler& masm)
 //
 
 static bool
-TryAttachDenseInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
+TryAttachDenseInStub(JSContext* cx, HandleScript outerScript, ICIn_Fallback* stub,
                      HandleValue key, HandleObject obj, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -3525,7 +3528,7 @@ TryAttachDenseInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
 
     JitSpew(JitSpew_BaselineIC, "  Generating In(Native[Int32] dense) stub");
     ICIn_Dense::Compiler compiler(cx, obj->as<NativeObject>().lastProperty());
-    ICStub* denseStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* denseStub = compiler.getStub(compiler.getStubSpace(outerScript));
     if (!denseStub)
         return false;
 
@@ -3535,7 +3538,7 @@ TryAttachDenseInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
 }
 
 static bool
-TryAttachNativeInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
+TryAttachNativeInStub(JSContext* cx, HandleScript outerScript, ICIn_Fallback* stub,
                       HandleValue key, HandleObject obj, bool* attached)
 {
     MOZ_ASSERT(!*attached);
@@ -3556,7 +3559,7 @@ TryAttachNativeInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
         JitSpew(JitSpew_BaselineIC, "  Generating In(Native %s) stub",
                     (obj == holder) ? "direct" : "prototype");
         ICInNativeCompiler compiler(cx, kind, obj, holder, name);
-        ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+        ICStub* newStub = compiler.getStub(compiler.getStubSpace(outerScript));
         if (!newStub)
             return false;
 
@@ -3569,7 +3572,7 @@ TryAttachNativeInStub(JSContext* cx, HandleScript script, ICIn_Fallback* stub,
 }
 
 static bool
-TryAttachNativeInDoesNotExistStub(JSContext* cx, HandleScript script,
+TryAttachNativeInDoesNotExistStub(JSContext* cx, HandleScript outerScript,
                                   ICIn_Fallback* stub, HandleValue key,
                                   HandleObject obj, bool* attached)
 {
@@ -3593,7 +3596,7 @@ TryAttachNativeInDoesNotExistStub(JSContext* cx, HandleScript script,
     // Confirmed no-such-property. Add stub.
     JitSpew(JitSpew_BaselineIC, "  Generating In_NativeDoesNotExist stub");
     ICInNativeDoesNotExistCompiler compiler(cx, obj, name, protoChainDepth);
-    ICStub* newStub = compiler.getStub(compiler.getStubSpace(script));
+    ICStub* newStub = compiler.getStub(compiler.getStubSpace(outerScript));
     if (!newStub)
         return false;
 
@@ -3672,7 +3675,7 @@ ICIn_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoInFallbackInfo, masm);
 }
@@ -4162,6 +4165,8 @@ static bool
 DoGetNameFallback(JSContext* cx, BaselineFrame* frame, ICGetName_Fallback* stub_,
                   HandleObject scopeChain, MutableHandleValue res)
 {
+    SharedStubInfo info(cx, frame, stub_->icEntry());
+
     // This fallback stub may trigger debug mode toggling.
     DebugModeOSRVolatileStub<ICGetName_Fallback*> stub(frame, stub_);
 
@@ -4208,7 +4213,7 @@ DoGetNameFallback(JSContext* cx, BaselineFrame* frame, ICGetName_Fallback* stub_
         return true;
 
     // Add a type monitor stub for the resulting value.
-    if (!stub->addMonitorStubForValue(cx, script, res, ICStubCompiler::Engine::Baseline))
+    if (!stub->addMonitorStubForValue(cx, &info, res))
         return false;
     if (attached)
         return true;
@@ -4241,7 +4246,7 @@ ICGetName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoGetNameFallbackInfo, masm);
 }
@@ -4356,7 +4361,7 @@ ICBindName_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoBindNameFallbackInfo, masm);
 }
@@ -4415,7 +4420,7 @@ ICGetIntrinsic_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoGetIntrinsicFallbackInfo, masm);
 }
@@ -4855,7 +4860,7 @@ ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     if (!tailCallVM(DoSetPropFallbackInfo, masm))
         return false;
@@ -6128,6 +6133,8 @@ static bool
 DoCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_, uint32_t argc,
                Value* vp, MutableHandleValue res)
 {
+    SharedStubInfo info(cx, frame, stub_->icEntry());
+
     // This fallback stub may trigger debug mode toggling.
     DebugModeOSRVolatileStub<ICCall_Fallback*> stub(frame, stub_);
 
@@ -6219,14 +6226,13 @@ DoCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_, uint
 
     // Attach a new TypeMonitor stub for this value.
     ICTypeMonitor_Fallback* typeMonFbStub = stub->fallbackMonitorStub();
-    if (!typeMonFbStub->addMonitorStubForValue(cx, script, res,
-        ICStubCompiler::Engine::Baseline))
+    if (!typeMonFbStub->addMonitorStubForValue(cx, &info, res))
     {
         return false;
     }
 
     // Add a type monitor stub for the resulting value.
-    if (!stub->addMonitorStubForValue(cx, script, res, ICStubCompiler::Engine::Baseline))
+    if (!stub->addMonitorStubForValue(cx, &info, res))
         return false;
 
     // If 'callee' is a potential Call_StringSplit, try to attach an
@@ -6243,6 +6249,8 @@ static bool
 DoSpreadCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_, Value* vp,
                      MutableHandleValue res)
 {
+    SharedStubInfo info(cx, frame, stub_->icEntry());
+
     // This fallback stub may trigger debug mode toggling.
     DebugModeOSRVolatileStub<ICCall_Fallback*> stub(frame, stub_);
 
@@ -6278,13 +6286,13 @@ DoSpreadCallFallback(JSContext* cx, BaselineFrame* frame, ICCall_Fallback* stub_
 
     // Attach a new TypeMonitor stub for this value.
     ICTypeMonitor_Fallback* typeMonFbStub = stub->fallbackMonitorStub();
-    if (!typeMonFbStub->addMonitorStubForValue(cx, script, res,
-        ICStubCompiler::Engine::Baseline))
+    if (!typeMonFbStub->addMonitorStubForValue(cx, &info, res))
     {
         return false;
     }
+
     // Add a type monitor stub for the resulting value.
-    if (!stub->addMonitorStubForValue(cx, script, res, ICStubCompiler::Engine::Baseline))
+    if (!stub->addMonitorStubForValue(cx, &info, res))
         return false;
 
     if (!handled)
@@ -6648,7 +6656,7 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
         masm.push(masm.getStackPointer());
         masm.push(ICStubReg);
 
-        PushFramePtr(masm, R0.scratchReg());
+        PushStubPayload(masm, R0.scratchReg());
 
         if (!callVM(DoSpreadCallFallbackInfo, masm))
             return false;
@@ -6672,7 +6680,7 @@ ICCall_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
 
-    PushFramePtr(masm, R0.scratchReg());
+    PushStubPayload(masm, R0.scratchReg());
 
     if (!callVM(DoCallFallbackInfo, masm))
         return false;
@@ -7837,7 +7845,7 @@ ICIteratorNew_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoIteratorNewFallbackInfo, masm);
 }
@@ -7893,7 +7901,7 @@ ICIteratorMore_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.unboxObject(R0, R0.scratchReg());
     masm.push(R0.scratchReg());
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoIteratorMoreFallbackInfo, masm);
 }
@@ -8084,7 +8092,7 @@ ICInstanceOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     masm.pushValue(R1);
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoInstanceOfFallbackInfo, masm);
 }
@@ -8207,7 +8215,7 @@ ICTypeOf_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
     masm.pushValue(R0);
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoTypeOfFallbackInfo, masm);
 }
@@ -8311,7 +8319,7 @@ ICRetSub_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
 
         masm.pushValue(R1);
         masm.push(ICStubReg);
-        pushFramePtr(masm, scratch);
+        pushStubPayload(masm, scratch);
 
         if (!callVM(DoRetSubFallbackInfo, masm))
             return false;
@@ -8897,7 +8905,7 @@ ICRest_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     masm.push(ICStubReg);
-    pushFramePtr(masm, R0.scratchReg());
+    pushStubPayload(masm, R0.scratchReg());
 
     return tailCallVM(DoRestFallbackInfo, masm);
 }
