@@ -1712,6 +1712,7 @@ Engine.prototype = {
       aEngine._shortName = sanitizeName(aEngine.name);
 
     aEngine._id = "[profile]/" + aEngine._shortName + ".xml";
+    aEngine._loadPath = aEngine.getAnonymizedLoadPath(null, aEngine._uri);
 
     if (engineToUpdate) {
       // Keep track of the last modified date, so that we can make conditional
@@ -2245,18 +2246,25 @@ Engine.prototype = {
                               .QueryInterface(Ci.nsISubstitutingProtocolHandler)
                               .resolveURI(uri));
       }
-      if (uri.schemeIs("chrome")) {
-        let packageName = uri.hostPort;
+      let scheme = uri.scheme;
+      let packageName = "";
+      if (scheme == "chrome") {
+        packageName = uri.hostPort;
         uri = gChromeReg.convertChromeURL(uri);
-        if (uri instanceof Ci.nsINestedURI) {
-          prefix = "jar:";
-          suffix = "!" + packageName + "/" + leafName;
-          uri = uri.innermostURI;
-        }
-        uri.QueryInterface(Ci.nsIFileURL)
+      }
+      if (uri instanceof Ci.nsINestedURI) {
+        prefix = "jar:";
+        suffix = "!" + packageName + "/" + leafName;
+        uri = uri.innermostURI;
+      }
+      if (uri instanceof Ci.nsIFileURL) {
         file = uri.file;
       } else {
-        return "[" + uri.scheme + "]/" + leafName;
+        let path = "[" + scheme + "]";
+        if (/^(?:https?|ftp)$/.test(scheme)) {
+          path += uri.host;
+        }
+        return path + "/" + leafName;
       }
     }
 
