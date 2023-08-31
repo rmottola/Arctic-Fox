@@ -1386,6 +1386,11 @@ class MacroAssembler : public MacroAssemblerSpecific
         push(scratch);
     }
 
+    void PushBaselineFramePtr(Register framePtr, Register scratch) {
+        loadBaselineFramePtr(framePtr, scratch);
+        Push(scratch);
+    }
+
   private:
     void handleFailure();
 
