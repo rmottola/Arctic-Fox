@@ -18,7 +18,6 @@
  */
 
 function run_test() {
-  removeMetadata();
   updateAppInfo();
   useHttpServer();
 
@@ -30,6 +29,7 @@ add_task(function* test_save_sorted_engines() {
     { name: "Test search engine", xmlFileName: "engine.xml" },
     { name: "A second test engine", xmlFileName: "engine2.xml"},
   ]);
+  yield promiseAfterCache();
 
   let search = Services.search;
 

@@ -9,9 +9,9 @@
  *
  * Ensure that :
  * - nothing explodes;
- * - if we change the order, search-metadata.json is created;
- * - this search-medata.json can be parsed;
- * - the order stored in search-metadata.json is consistent.
+ * - if we change the order, search.json is updated;
+ * - this search.json can be parsed;
+ * - the order stored in search.json is consistent.
  *
  * Notes:
  * - we install the search engines of test "test_downloadAndAddEngines.js"
@@ -20,7 +20,6 @@
  */
 
 function run_test() {
-  removeMetadata();
   updateAppInfo();
   do_load_manifest("data/chrome.manifest");
   useHttpServer();
@@ -33,6 +32,7 @@ add_task(function* test_nodb_pluschanges() {
     { name: "Test search engine", xmlFileName: "engine.xml" },
     { name: "A second test engine", xmlFileName: "engine2.xml"},
   ]);
+  yield promiseAfterCache();
 
   let search = Services.search;
 
