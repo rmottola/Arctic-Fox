@@ -31,7 +31,7 @@
  * Screen real estate is limited so when there are too many thumbnails to fit
  * on the screen, the taskbar stops displaying thumbnails and instead displays
  * just the title, icon and close button in a similar fashion to previous
- * versions of the taskbar. If there are still too many previews to fit on the 
+ * versions of the taskbar. If there are still too many previews to fit on the
  * screen, the taskbar resorts to a scroll up and scroll down button pair to let
  * the user scroll through the list of tabs. Since this is undoubtedly
  * inconvenient for users with many tabs, the AeroPeek objects turns off all of
@@ -516,14 +516,14 @@ TabWindow.prototype = {
     let previews = this.previews;
     let tabs = this.tabbrowser.tabs;
 
-    // Previews are internally stored using a map, so we need to iterate over
-    // the tabbrowser's array of tabs to retrieve previews in the same order.
+    // Previews are internally stored using a map, so we need to iterate the
+    // tabbrowser's array of tabs to retrieve previews in the same order.
     let inorder = [previews.get(t) for (t of tabs) if (previews.has(t))];
 
-    // Since the internal taskbar array has not yet been updated, we must force
-    // the sorting order of our local array on it.  To do so, we must walk
-    // the local array backwards, because otherwise we would send move requests
-    // in the wrong order.  See bug 522610 for details.
+    // Since the internal taskbar array has not yet been updated we must force
+    // on it the sorting order of our local array.  To do so we must walk
+    // the local array backwards, otherwise we would send move requests in the
+    // wrong order.  See bug 522610 for details.
     for (let i = inorder.length - 1; i >= 0; i--) {
       inorder[i].move(inorder[i + 1] || null);
     }
