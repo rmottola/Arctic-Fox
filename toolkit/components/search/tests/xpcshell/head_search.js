@@ -440,7 +440,7 @@ let addTestEngines = Task.async(function* (aItems) {
 
       if (item.xmlFileName) {
         Services.search.addEngine(gDataUrl + item.xmlFileName,
-                                  Ci.nsISearchEngine.DATA_XML, null, false);
+                                  null, null, false);
       } else {
         Services.search.addEngineWithDetails(item.name, ...item.details);
       }
