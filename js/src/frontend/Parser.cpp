@@ -769,11 +769,10 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
 }
 
 bool
-FunctionBox::initStaticScope(StaticScope* enclosingStaticScope)
+FunctionBox::initStaticScope(Handle<StaticScope*> enclosingScope)
 {
     RootedFunction fun(context, function());
-    Rooted<StaticScope*> enclosing(context, enclosingStaticScope);
-    staticScope_ = StaticFunctionScope::create(context, fun, enclosing);
+    staticScope_ = StaticFunctionScope::create(context, fun, enclosingScope);
     return staticScope_ != nullptr;
 }
 
@@ -783,7 +782,7 @@ Parser<ParseHandler>::newFunctionBox(Node fn, JSFunction* fun,
                                      ParseContext<ParseHandler>* outerpc,
                                      Directives inheritedDirectives,
                                      GeneratorKind generatorKind,
-                                     StaticScope* enclosingStaticScope)
+                                     Handle<StaticScope*> enclosingStaticScope)
 {
     MOZ_ASSERT_IF(outerpc, enclosingStaticScope == outerpc->innermostStaticScope());
     MOZ_ASSERT(fun);
