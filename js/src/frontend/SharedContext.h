@@ -443,7 +443,7 @@ class ModuleBox : public ObjectBox, public SharedContext
 
     ObjectBox* toObjectBox() override { return this; }
     ModuleObject* module() const { return &object->as<ModuleObject>(); }
-    JSObject* staticScope() const override { return module(); }
+    JSObject* staticScope() const override { return module()->staticScope(); }
 
     void trace(JSTracer* trc) override;
 };

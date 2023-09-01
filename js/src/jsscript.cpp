@@ -4065,7 +4065,7 @@ JSScript::innermostStaticScopeInScript(jsbytecode* pc)
     if (JSObject* scope = getStaticBlockScope(pc))
         return scope;
     if (module())
-        return module();
+        return module()->staticScope();
     return functionNonDelazifying();
 }
 
