@@ -42,7 +42,6 @@
 #include "vm/Debugger.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
-#include "vm/ScopeObject.h"
 #include "vm/Shape.h"
 #include "vm/StringBuffer.h"
 #include "vm/WrapperObject.h"
@@ -536,8 +535,8 @@ fun_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
 
 template<XDRMode mode>
 bool
-js::XDRInterpretedFunction(XDRState<mode>* xdr, Handle<StaticScope*> enclosingScope,
-                           HandleScript enclosingScript, MutableHandleFunction objp)
+js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
+                           MutableHandleFunction objp)
 {
     enum FirstWordFlag {
         HasAtom             = 0x1,
@@ -653,12 +652,10 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, Handle<StaticScope*> enclosingSc
 }
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, Handle<StaticScope*>, HandleScript,
-                           MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, Handle<StaticScope*>, HandleScript,
-                           MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
 
 /* ES6 (04-25-16) 19.2.3.6 Function.prototype [ @@hasInstance ] */
 bool
@@ -840,14 +837,15 @@ static JSObject*
 CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
 {
     Rooted<GlobalObject*> self(cx, cx->global());
-    RootedObject objectProto(cx, &self->getPrototype(JSProto_Object).toObject());
 
-    // Bizarrely, |Function.prototype| must be an interpreted function, so
-    // give it the guts to be one.
-    Rooted<ClonedBlockObject*> globalLexicalEnv(cx, &self->lexicalScope());
+    RootedObject objectProto(cx, &self->getPrototype(JSProto_Object).toObject());
+    /*
+     * Bizarrely, |Function.prototype| must be an interpreted function, so
+     * give it the guts to be one.
+     */
     JSObject* functionProto_ =
         NewFunctionWithProto(cx, nullptr, 0, JSFunction::INTERPRETED,
-                             globalLexicalEnv, nullptr, objectProto, AllocKind::FUNCTION,
+                             self, nullptr, objectProto, AllocKind::FUNCTION,
                              SingletonObject);
     if (!functionProto_)
         return nullptr;
@@ -875,12 +873,8 @@ CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
     if (!sourceObject || !ScriptSourceObject::initFromOptions(cx, sourceObject, options))
         return nullptr;
 
-    Rooted<StaticScope*> globalScope(cx, &globalLexicalEnv->staticBlock());
-    Rooted<StaticScope*> funScope(cx, StaticFunctionScope::create(cx, functionProto, globalScope));
-    if (!funScope)
-        return nullptr;
     RootedScript script(cx, JSScript::Create(cx,
-                                             funScope,
+                                             /* enclosingScope = */ nullptr,
                                              /* savedCallerFun = */ false,
                                              options,
                                              sourceObject,
@@ -1527,7 +1521,7 @@ JSFunction::createScriptForLazilyInterpretedFunction(JSContext* cx, HandleFuncti
         }
 
         if (script) {
-            Rooted<StaticScope*> enclosingScope(cx, lazy->enclosingScope());
+            RootedObject enclosingScope(cx, lazy->enclosingScope());
             RootedScript clonedScript(cx, CloneScriptIntoFunction(cx, enclosingScope, fun, script));
             if (!clonedScript)
                 return false;
@@ -2134,7 +2128,7 @@ js::CloneFunctionReuseScript(JSContext* cx, HandleFunction fun, HandleObject par
 
 JSFunction*
 js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject parent,
-                           Handle<StaticScope*> newStaticScope,
+                           HandleObject newStaticScope,
                            gc::AllocKind allocKind /* = FUNCTION */,
                            HandleObject proto /* = nullptr */)
 {

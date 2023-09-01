@@ -3471,9 +3471,8 @@ CreateNonSyntacticScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
 
     staticScopeObj.set(&globalLexical->staticBlock());
     if (!scopeChain.empty()) {
-        Rooted<StaticNonSyntacticScope*> scope(cx,
-            StaticNonSyntacticScope::create(cx, staticScopeObj));
-        if (!scope)
+        staticScopeObj.set(StaticNonSyntacticScope::create(cx, staticScopeObj));
+        if (!staticScopeObj)
             return false;
 
         // The XPConnect subscript loader, which may pass in its own dynamic
@@ -3494,11 +3493,10 @@ CreateNonSyntacticScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
         // TODOshu: disallow the subscript loader from using non-distinguished
         // objects as dynamic scopes.
         dynamicScopeObj.set(
-            cx->compartment()->getOrCreateNonSyntacticLexicalScope(cx, scope, dynamicScopeObj));
+            cx->compartment()->getOrCreateNonSyntacticLexicalScope(cx, staticScopeObj,
+                                                                   dynamicScopeObj));
         if (!dynamicScopeObj)
             return false;
-
-        staticScopeObj.set(scope);
     }
 
     return true;
@@ -3512,7 +3510,7 @@ IsFunctionCloneable(HandleFunction fun)
 
     // If a function was compiled to be lexically nested inside some other
     // script, we cannot clone it without breaking the compiler's assumptions.
-    if (StaticScope* scope = fun->nonLazyScript()->enclosingStaticScope()) {
+    if (JSObject* scope = fun->nonLazyScript()->enclosingStaticScope()) {
         // If the script is directly under the global scope, we can clone it.
         if (IsStaticGlobalLexicalScope(scope))
             return true;
@@ -3529,7 +3527,7 @@ IsFunctionCloneable(HandleFunction fun)
             if (block.needsClone())
                 return false;
 
-            StaticScope* enclosing = block.enclosingScope();
+            JSObject* enclosing = block.enclosingStaticScope();
 
             // If the script is an indirect eval that is immediately scoped
             // under the global, we can clone it.
