@@ -3428,7 +3428,7 @@ js::CheckEvalDeclarationConflicts(JSContext* cx, HandleScript script,
 void
 js::DumpStaticScopeChain(JSScript* script)
 {
-    DumpStaticScopeChain(script->enclosingStaticScope());
+    DumpStaticScopeChain(script->staticScope());
 }
 
 void
