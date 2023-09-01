@@ -550,14 +550,13 @@ class CompileInfo
         return true;
     }
 
-    bool mayReadFrameArgsDirectly() const {
-        return mayReadFrameArgsDirectly_;
-    }
-
     // Check previous bailout states to prevent doing the same bailout in the
     // next compilation.
     bool hadOverflowBailout() const {
         return hadOverflowBailout_;
+    }
+    bool mayReadFrameArgsDirectly() const {
+        return mayReadFrameArgsDirectly_;
     }
 
   private:
@@ -580,11 +579,11 @@ class CompileInfo
     // thread, so cache a value here and use it throughout for consistency.
     bool scriptNeedsArgsObj_;
 
-    bool mayReadFrameArgsDirectly_;
-
     // Record the state of previous bailouts in order to prevent compiling the
     // same function identically the next time.
     bool hadOverflowBailout_;
+
+    bool mayReadFrameArgsDirectly_;
 
     InlineScriptTree* inlineScriptTree_;
 };

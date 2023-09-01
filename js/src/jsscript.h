@@ -1643,10 +1643,6 @@ class JSScript : public js::gc::TenuredCell
      */
     inline void ensureNonLazyCanonicalFunction(JSContext* cx);
 
-    // Returns true if the script may read formal arguments on the stack
-    // directly, via lazy arguments or a rest parameter.
-    bool mayReadFrameArgsDirectly();
-
     js::ModuleObject* module() const {
         return module_;
     }
@@ -1658,6 +1654,10 @@ class JSScript : public js::gc::TenuredCell
     bool isGlobalCode() const {
         return isGlobalOrEvalCode() && !isForEval();
     }
+
+    // Returns true if the script may read formal arguments on the stack
+    // directly, via lazy arguments or a rest parameter.
+    bool mayReadFrameArgsDirectly();
 
     JSFlatString* sourceData(JSContext* cx);
 
