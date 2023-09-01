@@ -901,7 +901,7 @@ js::Disassemble1(JSContext* cx, HandleScript script, jsbytecode* pc,
       }
 
       case JOF_REGEXP: {
-        JSObject* obj = script->getRegExp(GET_UINT32_INDEX(pc));
+        js::RegExpObject* obj = script->getRegExp(pc);
         JSAutoByteString bytes;
         RootedValue v(cx, ObjectValue(*obj));
         if (!ToDisassemblySource(cx, v, &bytes))
