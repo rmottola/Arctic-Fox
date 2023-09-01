@@ -613,7 +613,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSObject* getHook(Hook hook) const;
     bool hasAnyLiveHooks() const;
 
-    static bool slowPathCheckNoExecute(JSContext* cx);
+    static bool slowPathCheckNoExecute(JSContext* cx, HandleScript script);
     static JSTrapStatus slowPathOnEnterFrame(JSContext* cx, AbstractFramePtr frame);
     static bool slowPathOnLeaveFrame(JSContext* cx, AbstractFramePtr frame, bool ok);
     static JSTrapStatus slowPathOnDebuggerStatement(JSContext* cx, AbstractFramePtr frame);
@@ -723,7 +723,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static void findZoneEdges(JS::Zone* v, gc::ComponentFinder<JS::Zone>& finder);
 
     // Checks it the current compartment is allowed to execute code.
-    static inline bool checkNoExecute(JSContext* cx);
+    static inline bool checkNoExecute(JSContext* cx, HandleScript script);
 
     /*
      * JSTrapStatus Overview
