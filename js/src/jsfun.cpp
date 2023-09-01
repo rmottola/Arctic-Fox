@@ -536,8 +536,8 @@ fun_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
 
 template<XDRMode mode>
 bool
-js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, HandleScript enclosingScript,
-                           MutableHandleFunction objp)
+js::XDRInterpretedFunction(XDRState<mode>* xdr, Handle<StaticScope*> enclosingScope,
+                           HandleScript enclosingScript, MutableHandleFunction objp)
 {
     enum FirstWordFlag {
         HasAtom             = 0x1,
@@ -653,10 +653,12 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
 }
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_ENCODE>*, Handle<StaticScope*>, HandleScript,
+                           MutableHandleFunction);
 
 template bool
-js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, HandleObject, HandleScript, MutableHandleFunction);
+js::XDRInterpretedFunction(XDRState<XDR_DECODE>*, Handle<StaticScope*>, HandleScript,
+                           MutableHandleFunction);
 
 /* ES6 (04-25-16) 19.2.3.6 Function.prototype [ @@hasInstance ] */
 bool
@@ -1525,7 +1527,7 @@ JSFunction::createScriptForLazilyInterpretedFunction(JSContext* cx, HandleFuncti
         }
 
         if (script) {
-            RootedObject enclosingScope(cx, lazy->enclosingScope());
+            Rooted<StaticScope*> enclosingScope(cx, lazy->enclosingScope());
             RootedScript clonedScript(cx, CloneScriptIntoFunction(cx, enclosingScope, fun, script));
             if (!clonedScript)
                 return false;
@@ -2132,7 +2134,7 @@ js::CloneFunctionReuseScript(JSContext* cx, HandleFunction fun, HandleObject par
 
 JSFunction*
 js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject parent,
-                           HandleObject newStaticScope,
+                           Handle<StaticScope*> newStaticScope,
                            gc::AllocKind allocKind /* = FUNCTION */,
                            HandleObject proto /* = nullptr */)
 {
