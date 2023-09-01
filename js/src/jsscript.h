@@ -50,6 +50,7 @@ class LazyScript;
 class ModuleObject;
 class NestedStaticScope;
 class StaticScope;
+class StaticFunctionScope;
 class RegExpObject;
 struct SourceCompressionTask;
 class Shape;
@@ -1011,7 +1012,22 @@ class JSScript : public js::gc::TenuredCell
 
     js::HeapPtrFunction function_;
     js::HeapPtr<js::ModuleObject*> module_;
-    js::HeapPtrObject   enclosingStaticScope_;
+
+    // The static scope this script runs in.
+    //
+    // Specifically, it depends on the case:
+    //
+    // *   direct eval: staticScope_ is the StaticEvalScope for the eval call.
+    //
+    // *   function script: staticScope_ is function_'s StaticFunctionScope.
+    //
+    // *   module script: staticScope_ is module_'s StaticModuleScope.
+    //
+    // *   plain old global script or indirect eval: staticScope_ is the static
+    //     global lexical scope (regardless of whether the script uses any
+    //     global lexical bindings).
+    //
+    js::HeapPtr<js::StaticScope*> staticScope_;
 
     /*
      * Information attached by Ion. Nexto a valid IonScript this could be
@@ -1221,7 +1237,7 @@ class JSScript : public js::gc::TenuredCell
 
   public:
     static JSScript* Create(js::ExclusiveContext* cx,
-                            js::HandleObject enclosingScope, bool savedCallerFun,
+                            js::HandleObject staticScope, bool savedCallerFun,
                             const JS::ReadOnlyCompileOptions& options,
                             js::HandleObject sourceObject, uint32_t sourceStart,
                             uint32_t sourceEnd);
@@ -1706,10 +1722,13 @@ class JSScript : public js::gc::TenuredCell
     inline js::GlobalObject& global() const;
     js::GlobalObject& uninlinedGlobal() const;
 
-    /* See StaticScopeIter comment. */
-    JSObject* enclosingStaticScope() const {
-        return enclosingStaticScope_;
-    }
+    js::StaticScope* staticScope() const { return staticScope_; }
+
+    /*
+     * The static scope this script runs in, skipping the StaticFunctionScope
+     * if this is a non-eval function script.
+     */
+    inline JSObject* enclosingStaticScope() const;
 
     // Switch the script over from the off-thread compartment's static
     // global lexical scope to the main thread compartment's.
@@ -2149,8 +2168,9 @@ class LazyScript : public gc::TenuredCell
     // Original function with which the lazy script is associated.
     HeapPtrFunction function_;
 
-    // Function or block chain in which the script is nested, or nullptr.
-    HeapPtrObject enclosingScope_;
+    // Static scope of this function. (All lazy scripts are for functions;
+    // global scripts and eval scripts are never lazified.)
+    HeapPtr<StaticFunctionScope*> staticScope_;
 
     // ScriptSourceObject, or nullptr if the script in which this is nested
     // has not been compiled yet. This is never a CCW; we don't clone
@@ -2202,13 +2222,14 @@ class LazyScript : public gc::TenuredCell
     uint32_t lineno_;
     uint32_t column_;
 
-    LazyScript(JSFunction* fun, void* table, uint64_t packedFields,
+    LazyScript(JSFunction* fun, StaticFunctionScope* funScope, void* table, uint64_t packedFields,
                uint32_t begin, uint32_t end, uint32_t lineno, uint32_t column);
 
     // Create a LazyScript without initializing the freeVariables and the
     // innerFunctions. To be GC-safe, the caller must initialize both vectors
     // with valid atoms and functions.
     static LazyScript* CreateRaw(ExclusiveContext* cx, HandleFunction fun,
+                                 Handle<StaticFunctionScope*> funScope,
                                  uint64_t packedData, uint32_t begin, uint32_t end,
                                  uint32_t lineno, uint32_t column);
 
@@ -2217,6 +2238,7 @@ class LazyScript : public gc::TenuredCell
     // innerFunctions. To be GC-safe, the caller must initialize both vectors
     // with valid atoms and functions.
     static LazyScript* CreateRaw(ExclusiveContext* cx, HandleFunction fun,
+                                 Handle<StaticFunctionScope*> funScope,
                                  uint32_t numFreeVariables, uint32_t numInnerFunctions,
                                  JSVersion version, uint32_t begin, uint32_t end,
                                  uint32_t lineno, uint32_t column);
@@ -2231,7 +2253,7 @@ class LazyScript : public gc::TenuredCell
     // The sourceObjectScript argument must be non-null and is the script that
     // should be used to get the sourceObject_ of this lazyScript.
     static LazyScript* Create(ExclusiveContext* cx, HandleFunction fun,
-                              HandleScript script, HandleObject enclosingScope,
+                              HandleScript script, Handle<StaticFunctionScope*> funScope,
                               HandleScript sourceObjectScript,
                               uint64_t packedData, uint32_t begin, uint32_t end,
                               uint32_t lineno, uint32_t column);
@@ -2256,9 +2278,8 @@ class LazyScript : public gc::TenuredCell
         return bool(script_);
     }
 
-    JSObject* enclosingScope() const {
-        return enclosingScope_;
-    }
+    StaticFunctionScope* staticScope() const { return staticScope_; }
+    JSObject* enclosingScope() const;
 
     // Switch the script over from the off-thread compartment's static
     // global lexical scope to the main thread compartment's.
@@ -2277,7 +2298,7 @@ class LazyScript : public gc::TenuredCell
         return (p_.version == JS_BIT(8) - 1) ? JSVERSION_UNKNOWN : JSVersion(p_.version);
     }
 
-    void setParent(JSObject* enclosingScope, ScriptSourceObject* sourceObject);
+    void initSource(ScriptSourceObject* sourceObject);
 
     uint32_t numFreeVariables() const {
         return p_.numFreeVariables;
