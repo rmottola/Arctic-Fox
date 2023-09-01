@@ -30,7 +30,7 @@ EXTRA_JS_MODULES += [
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
     'PluginContent.jsm',
-    'QuotaManager.jsm',
+    'ProcessHangMonitor.jsm',
     'ReaderParent.jsm',
     'RecentWindow.jsm',
     'Sanitizer.jsm',
@@ -38,10 +38,6 @@ EXTRA_JS_MODULES += [
     'SitePermissions.jsm',
     'TabCrashReporter.jsm',
     'webrtcUI.jsm',
-]
-
-EXTRA_PP_JS_MODULES += [
-    'ProcessHangMonitor.jsm'
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
