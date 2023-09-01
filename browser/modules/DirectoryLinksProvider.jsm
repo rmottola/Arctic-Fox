@@ -501,6 +501,7 @@ var DirectoryLinksProvider = {
   handleSuggestedTileBlock: function DirectoryLinksProvider_handleSuggestedTileBlock() {
     this._updateFrequencyCapSettings({url: FAKE_SUGGESTED_BLOCK_URL});
     this._writeFrequencyCapFile();
+    this._updateSuggestedTile();
   },
 
   /**
