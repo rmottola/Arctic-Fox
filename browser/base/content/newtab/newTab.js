@@ -63,7 +63,6 @@ const TILES_EXPLAIN_LINK = "https://support.mozilla.org/kb/how-do-tiles-work-fir
 #include updater.js
 #include undo.js
 #include search.js
-#include intro.js
 
 // Everything is loaded. Initialize the New Tab Page.
 gPage.init();

@@ -1143,14 +1143,22 @@ pref("browser.panorama.animate_zoom", true);
 // Activates preloading of the new tab url.
 pref("browser.newtab.preload", false);
 
+// Remembers if the about:newtab intro has been shown
+// NOTE: This preference is unused but was not removed in case
+//       this information will be valuable in the future.
+pref("browser.newtabpage.introShown", false);
+
 // Toggles the content of 'about:newtab'. Shows the grid when enabled.
 pref("browser.newtabpage.enabled", true);
 
-// number of columns of newtab grid
-pref("browser.newtabpage.columns", 4);
+// Toggles the enhanced content of 'about:newtab'. Shows sponsored tiles.
+sticky_pref("browser.newtabpage.enhanced", false);
 
 // number of rows of newtab grid
 pref("browser.newtabpage.rows", 4);
+
+// number of columns of newtab grid
+pref("browser.newtabpage.columns", 4);
 
 // activates the remote-hosted newtab page
 pref("browser.newtabpage.remote", false);
