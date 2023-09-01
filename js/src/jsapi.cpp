@@ -3463,7 +3463,7 @@ JS::NewFunctionFromSpec(JSContext* cx, const JSFunctionSpec* fs, HandleId id)
 static bool
 CreateNonSyntacticScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
                              MutableHandleObject dynamicScopeObj,
-                             MutableHandle<StaticScopeObject*> staticScopeObj)
+                             MutableHandle<StaticScope*> staticScopeObj)
 {
     Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
     if (!js::CreateScopeObjectsForScopeChain(cx, scopeChain, globalLexical, dynamicScopeObj))
@@ -3471,7 +3471,7 @@ CreateNonSyntacticScopeChain(JSContext* cx, AutoObjectVector& scopeChain,
 
     staticScopeObj.set(&globalLexical->staticBlock());
     if (!scopeChain.empty()) {
-        staticScopeObj.set(StaticNonSyntacticScopeObjects::create(cx, staticScopeObj));
+        staticScopeObj.set(StaticNonSyntacticScope::create(cx, staticScopeObj));
         if (!staticScopeObj)
             return false;
 
@@ -3517,13 +3517,13 @@ IsFunctionCloneable(HandleFunction fun)
 
         // If the script already deals with non-syntactic scopes, we can clone
         // it.
-        if (scope->is<StaticNonSyntacticScopeObjects>())
+        if (scope->is<StaticNonSyntacticScope>())
             return true;
 
         // 'eval' scopes are always scoped immediately under a non-extensible
         // lexical scope.
-        if (scope->is<StaticBlockObject>()) {
-            StaticBlockObject& block = scope->as<StaticBlockObject>();
+        if (scope->is<StaticBlockScope>()) {
+            StaticBlockScope& block = scope->as<StaticBlockScope>();
             if (block.needsClone())
                 return false;
 
@@ -3531,8 +3531,8 @@ IsFunctionCloneable(HandleFunction fun)
 
             // If the script is an indirect eval that is immediately scoped
             // under the global, we can clone it.
-            if (enclosing->is<StaticEvalObject>())
-                return !enclosing->as<StaticEvalObject>().isNonGlobal();
+            if (enclosing->is<StaticEvalScope>())
+                return !enclosing->as<StaticEvalScope>().isNonGlobal();
         }
 
         // Any other enclosing static scope (e.g., function, block) cannot be
@@ -3545,7 +3545,7 @@ IsFunctionCloneable(HandleFunction fun)
 
 static JSObject*
 CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject dynamicScope,
-                    Handle<StaticScopeObject*> staticScope)
+                    Handle<StaticScope*> staticScope)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -3614,7 +3614,7 @@ JS_PUBLIC_API(JSObject*)
 JS::CloneFunctionObject(JSContext* cx, HandleObject funobj)
 {
     Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
-    Rooted<StaticScopeObject*> staticLexical(cx, &globalLexical->staticBlock());
+    Rooted<StaticScope*> staticLexical(cx, &globalLexical->staticBlock());
     return CloneFunctionObject(cx, funobj, globalLexical, staticLexical);
 }
 
@@ -3622,7 +3622,7 @@ extern JS_PUBLIC_API(JSObject*)
 JS::CloneFunctionObject(JSContext* cx, HandleObject funobj, AutoObjectVector& scopeChain)
 {
     RootedObject dynamicScope(cx);
-    Rooted<StaticScopeObject*> staticScope(cx);
+    Rooted<StaticScope*> staticScope(cx);
     if (!CreateNonSyntacticScopeChain(cx, scopeChain, &dynamicScope, &staticScope))
         return nullptr;
 
@@ -3967,9 +3967,9 @@ Compile(JSContext* cx, const ReadOnlyCompileOptions& options, SyntacticScopeOpti
     CHECK_REQUEST(cx);
     AutoLastFrameCheck lfc(cx);
 
-    Rooted<StaticScopeObject*> staticScope(cx, &cx->global()->lexicalScope().staticBlock());
+    Rooted<StaticScope*> staticScope(cx, &cx->global()->lexicalScope().staticBlock());
     if (scopeOption == HasNonSyntacticScope) {
-        staticScope = StaticNonSyntacticScopeObjects::create(cx, staticScope);
+        staticScope = StaticNonSyntacticScope::create(cx, staticScope);
         if (!staticScope)
             return false;
     }
@@ -4237,7 +4237,7 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
 
 /*
  * enclosingStaticScope is a static enclosing scope, if any (e.g. a
- * StaticWithObject).  If the enclosing scope is the global scope, this must be
+ * StaticWithScope).  If the enclosing scope is the global scope, this must be
  * null.
  *
  * enclosingDynamicScope is a dynamic scope to use, if it's not the global.
@@ -4247,7 +4247,7 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
                 const char* name, unsigned nargs, const char* const* argnames,
                 SourceBufferHolder& srcBuf,
                 HandleObject enclosingDynamicScope,
-                Handle<StaticScopeObject*> enclosingStaticScope,
+                Handle<StaticScope*> enclosingStaticScope,
                 MutableHandleFunction fun)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
@@ -4296,7 +4296,7 @@ JS::CompileFunction(JSContext* cx, AutoObjectVector& scopeChain,
                     SourceBufferHolder& srcBuf, MutableHandleFunction fun)
 {
     RootedObject dynamicScopeObj(cx);
-    Rooted<StaticScopeObject*> staticScopeObj(cx);
+    Rooted<StaticScope*> staticScopeObj(cx);
     if (!CreateNonSyntacticScopeChain(cx, scopeChain, &dynamicScopeObj, &staticScopeObj))
         return false;
 
@@ -4376,7 +4376,7 @@ static bool
 ExecuteScript(JSContext* cx, AutoObjectVector& scopeChain, HandleScript scriptArg, Value* rval)
 {
     RootedObject dynamicScope(cx);
-    Rooted<StaticScopeObject*> staticScope(cx);
+    Rooted<StaticScope*> staticScope(cx);
     if (!CreateNonSyntacticScopeChain(cx, scopeChain, &dynamicScope, &staticScope))
         return false;
 
@@ -4425,7 +4425,7 @@ JS::CloneAndExecuteScript(JSContext* cx, HandleScript scriptArg)
     RootedScript script(cx, scriptArg);
     Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
     if (script->compartment() != cx->compartment()) {
-        Rooted<StaticScopeObject*> staticLexical(cx, &globalLexical->staticBlock());
+        Rooted<StaticScope*> staticLexical(cx, &globalLexical->staticBlock());
         script = CloneGlobalScript(cx, staticLexical, script);
         if (!script)
             return false;
@@ -4438,7 +4438,7 @@ JS::CloneAndExecuteScript(JSContext* cx, HandleScript scriptArg)
 static const unsigned LARGE_SCRIPT_LENGTH = 500*1024;
 
 static bool
-Evaluate(JSContext* cx, HandleObject scope, Handle<StaticScopeObject*> staticScope,
+Evaluate(JSContext* cx, HandleObject scope, Handle<StaticScope*> staticScope,
          const ReadOnlyCompileOptions& optionsArg,
          SourceBufferHolder& srcBuf, MutableHandleValue rval)
 {
@@ -4487,7 +4487,7 @@ Evaluate(JSContext* cx, AutoObjectVector& scopeChain, const ReadOnlyCompileOptio
          SourceBufferHolder& srcBuf, MutableHandleValue rval)
 {
     RootedObject dynamicScope(cx);
-    Rooted<StaticScopeObject*> staticScope(cx);
+    Rooted<StaticScope*> staticScope(cx);
     if (!CreateNonSyntacticScopeChain(cx, scopeChain, &dynamicScope, &staticScope))
         return false;
     return ::Evaluate(cx, dynamicScope, staticScope, optionsArg, srcBuf, rval);
@@ -4499,7 +4499,7 @@ Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
 {
   SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
   Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
-  Rooted<StaticScopeObject*> staticLexical(cx, &globalLexical->staticBlock());
+  Rooted<StaticScope*> staticLexical(cx, &globalLexical->staticBlock());
   return ::Evaluate(cx, globalLexical, staticLexical, optionsArg, srcBuf, rval);
 }
 
@@ -4517,7 +4517,7 @@ JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& options,
 
     SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::GiveOwnership);
     Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
-    Rooted<StaticScopeObject*> staticLexical(cx, &globalLexical->staticBlock());
+    Rooted<StaticScope*> staticLexical(cx, &globalLexical->staticBlock());
     bool ok = ::Evaluate(cx, globalLexical, staticLexical, options, srcBuf, rval);
     return ok;
 }
@@ -4543,7 +4543,7 @@ JS::Evaluate(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
              SourceBufferHolder& srcBuf, MutableHandleValue rval)
 {
     Rooted<ClonedBlockObject*> globalLexical(cx, &cx->global()->lexicalScope());
-    Rooted<StaticScopeObject*> staticLexical(cx, &globalLexical->staticBlock());
+    Rooted<StaticScope*> staticLexical(cx, &globalLexical->staticBlock());
     return ::Evaluate(cx, globalLexical, staticLexical, optionsArg, srcBuf, rval);
 }
 

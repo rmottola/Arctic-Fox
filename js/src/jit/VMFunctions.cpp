@@ -1011,7 +1011,7 @@ GlobalHasLiveOnDebuggerStatement(JSContext* cx)
 }
 
 bool
-PushBlockScope(JSContext* cx, BaselineFrame* frame, Handle<StaticBlockObject*> block)
+PushBlockScope(JSContext* cx, BaselineFrame* frame, Handle<StaticBlockScope*> block)
 {
     return frame->pushBlock(cx, block);
 }
@@ -1054,7 +1054,7 @@ DebugLeaveBlock(JSContext* cx, BaselineFrame* frame, jsbytecode* pc)
 }
 
 bool
-EnterWith(JSContext* cx, BaselineFrame* frame, HandleValue val, Handle<StaticWithObject*> templ)
+EnterWith(JSContext* cx, BaselineFrame* frame, HandleValue val, Handle<StaticWithScope*> templ)
 {
     return EnterWithOperation(cx, frame, val, templ);
 }
