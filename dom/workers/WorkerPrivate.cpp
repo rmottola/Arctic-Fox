@@ -2304,6 +2304,8 @@ WorkerPrivateParent<Derived>::DisableDebugger()
   if (NS_FAILED(UnregisterWorkerDebugger(self->mDebugger))) {
     NS_WARNING("Failed to unregister worker debugger!");
   }
+
+  self->mDebugger = nullptr;
 }
 
 template <class Derived>
@@ -2551,6 +2553,8 @@ WorkerPrivateParent<Derived>::Freeze(JSContext* aCx, nsPIDOMWindow* aWindow)
     }
   }
 
+  DisableDebugger();
+
   RefPtr<FreezeRunnable> runnable =
     new FreezeRunnable(ParentAsWorkerPrivate());
   if (!runnable->Dispatch(aCx)) {
@@ -2616,6 +2620,8 @@ WorkerPrivateParent<Derived>::Thaw(JSContext* aCx, nsPIDOMWindow* aWindow)
       return true;
     }
   }
+
+  EnableDebugger();
 
   // Execute queued runnables before waking up the worker, otherwise the worker
   // could post new messages before we run those that have been queued.
@@ -3550,8 +3556,7 @@ WorkerDebugger::WorkerDebugger(WorkerPrivate* aWorkerPrivate)
   mCondVar(mMutex, "WorkerDebugger::mCondVar"),
   mWorkerPrivate(aWorkerPrivate),
   mIsEnabled(false),
-  mIsInitialized(false),
-  mIsFrozen(false)
+  mIsInitialized(false)
 {
   mWorkerPrivate->AssertIsOnParentThread();
 }
@@ -3602,21 +3607,6 @@ WorkerDebugger::GetIsChrome(bool* aResult)
   }
 
   *aResult = mWorkerPrivate->IsChromeWorker();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-WorkerDebugger::GetIsFrozen(bool* aResult)
-{
-  AssertIsOnMainThread();
-
-  MutexAutoLock lock(mMutex);
-
-  if (!mWorkerPrivate) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  *aResult = mIsFrozen;
   return NS_OK;
 }
 
@@ -3830,52 +3820,6 @@ WorkerDebugger::Disable()
   }
 
   NotifyIsEnabled(false);
-}
-
-void
-WorkerDebugger::Freeze()
-{
-  mWorkerPrivate->AssertIsOnWorkerThread();
-
-  nsCOMPtr<nsIRunnable> runnable =
-    NS_NewRunnableMethod(this, &WorkerDebugger::FreezeOnMainThread);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
-}
-
-void
-WorkerDebugger::FreezeOnMainThread()
-{
-  AssertIsOnMainThread();
-
-  mIsFrozen = true;
-
-  for (size_t index = 0; index < mListeners.Length(); ++index) {
-    mListeners[index]->OnFreeze();
-  }
-}
-
-void
-WorkerDebugger::Thaw()
-{
-  mWorkerPrivate->AssertIsOnWorkerThread();
-
-  nsCOMPtr<nsIRunnable> runnable =
-    NS_NewRunnableMethod(this, &WorkerDebugger::ThawOnMainThread);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
-}
-
-void
-WorkerDebugger::ThawOnMainThread()
-{
-  AssertIsOnMainThread();
-
-  mIsFrozen = false;
-
-  for (size_t index = 0; index < mListeners.Length(); ++index) {
-    mListeners[index]->OnThaw();
-  }
 }
 
 void
@@ -5060,7 +5004,6 @@ WorkerPrivate::FreezeInternal(JSContext* aCx)
   NS_ASSERTION(!mFrozen, "Already frozen!");
 
   mFrozen = true;
-  mDebugger->Freeze();
   return true;
 }
 
@@ -5072,7 +5015,6 @@ WorkerPrivate::ThawInternal(JSContext* aCx)
   NS_ASSERTION(mFrozen, "Not yet frozen!");
 
   mFrozen = false;
-  mDebugger->Thaw();
   return true;
 }
 
