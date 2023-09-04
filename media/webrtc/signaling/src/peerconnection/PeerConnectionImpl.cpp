@@ -186,6 +186,7 @@ public:
   virtual void NotifyTracksAvailable(DOMMediaStream* aStream) override
   {
     MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(aStream);
 
     PeerConnectionWrapper wrapper(mPcHandle);
 
@@ -198,6 +199,13 @@ public:
 
     std::string streamId = PeerConnectionImpl::GetStreamId(*aStream);
     bool notifyStream = true;
+
+    Sequence<OwningNonNull<DOMMediaStream>> streams;
+    if (!streams.AppendElement(OwningNonNull<DOMMediaStream>(*aStream),
+                               fallible)) {
+      MOZ_ASSERT(false);
+      return;
+    }
 
     for (size_t i = 0; i < tracks.Length(); i++) {
       std::string trackId;
@@ -230,7 +238,7 @@ public:
 
       JSErrorResult jrv;
       CSFLogInfo(logTag, "Calling OnAddTrack(%s)", trackId.c_str());
-      mObserver->OnAddTrack(*tracks[i], jrv);
+      mObserver->OnAddTrack(*tracks[i], streams, jrv);
       if (jrv.Failed()) {
         CSFLogError(logTag, ": OnAddTrack(%u) failed! Error: %u",
                     static_cast<unsigned>(i),
