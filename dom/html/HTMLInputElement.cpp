@@ -2519,6 +2519,9 @@ HTMLInputElement::UpdateFileList()
     }
   }
 
+  // Make sure we (lazily) create a new Promise for GetFilesAndDirectories:
+  mFilesAndDirectoriesPromise = nullptr;
+
   return NS_OK;
 }
 
@@ -4855,6 +4858,10 @@ MakeOrReuseFileSystem(const nsAString& aNewLocalRootPath,
 already_AddRefed<Promise>
 HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
 {
+  if (mFilesAndDirectoriesPromise) {
+    return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
+  }
+
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);
   if (!global) {
@@ -4908,6 +4915,11 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
   }
 
   p->MaybeResolve(filesAndDirsSeq);
+
+  // Cache the Promise so that repeat getFilesAndDirectories() calls return
+  // the same Promise and array of File and Directory objects until the user
+  // picks different files/directories:
+  mFilesAndDirectoriesPromise = p;
 
   return p.forget();
 }
