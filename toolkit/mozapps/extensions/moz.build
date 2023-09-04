@@ -39,11 +39,13 @@ EXTRA_JS_MODULES += [
 JAR_MANIFESTS += ['jar.mn']
 
 EXPORTS.mozilla += [
+    'AddonContentPolicy.h',
     'AddonPathService.h',
 ]
 
 UNIFIED_SOURCES += [
-    'AddonPathService.cpp'
+    'AddonContentPolicy.cpp',
+    'AddonPathService.cpp',
 ]
 
 FINAL_LIBRARY = 'xul'
