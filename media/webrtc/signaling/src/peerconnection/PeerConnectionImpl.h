@@ -704,6 +704,8 @@ private:
   void RecordLongtermICEStatistics();
 
   void OnNegotiationNeeded();
+  static void MaybeFireNegotiationNeeded_static(const std::string& pcHandle);
+  void MaybeFireNegotiationNeeded();
 
   // Timecard used to measure processing time. This should be the first class
   // attribute so that we accurately measure the time required to instantiate
@@ -796,7 +798,7 @@ private:
 
   bool mTrickle;
 
-  bool mShouldSuppressNegotiationNeeded;
+  bool mNegotiationNeeded;
 
   // storage for Telemetry data
   uint16_t mMaxReceiving[SdpMediaSection::kMediaTypes];
