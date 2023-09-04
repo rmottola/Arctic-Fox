@@ -228,7 +228,7 @@ private:
 
 NS_IMPL_ISUPPORTS(SimpleEnumerator, nsISimpleEnumerator)
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 nsFilePickerProxy::GetDomfiles(nsISimpleEnumerator** aDomfiles)
