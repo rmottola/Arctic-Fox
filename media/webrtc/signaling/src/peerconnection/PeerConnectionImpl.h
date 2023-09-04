@@ -800,6 +800,8 @@ private:
 
   bool mNegotiationNeeded;
 
+  bool mPrivateWindow;
+
   // storage for Telemetry data
   uint16_t mMaxReceiving[SdpMediaSection::kMediaTypes];
   uint16_t mMaxSending[SdpMediaSection::kMediaTypes];
