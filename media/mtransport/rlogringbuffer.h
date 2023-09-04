@@ -120,5 +120,3 @@ class RLogRingBuffer {
 } // namespace mozilla
 
 #endif // rlogringbuffer_h__
-
-
