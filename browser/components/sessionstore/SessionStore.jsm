@@ -3187,6 +3187,10 @@ var SessionStoreInternal = {
       tabbrowser.showTab(tab);
     }
 
+    if (tabData.userContextId) {
+      tab.setUserContextId(tabData.userContextId);
+    }
+
     if (!!tabData.muted != browser.audioMuted) {
       tab.toggleMuteAudio();
     }
