@@ -630,7 +630,7 @@ var MessageQueue = {
   set timeoutDisabled(val) {
     this._timeoutDisabled = val;
 
-    if (!val && this._timeout) {
+    if (val && this._timeout) {
       clearTimeout(this._timeout);
       this._timeout = null;
     }
