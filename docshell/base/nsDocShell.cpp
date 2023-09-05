@@ -12121,11 +12121,10 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
   NS_ENSURE_TRUE(aEntry, NS_ERROR_FAILURE);
 
   NS_ENSURE_SUCCESS(aEntry->GetURI(getter_AddRefs(uri)), NS_ERROR_FAILURE);
-
   NS_ENSURE_SUCCESS(aEntry->GetOriginalURI(getter_AddRefs(originalURI)),
                     NS_ERROR_FAILURE);
   NS_ENSURE_SUCCESS(aEntry->GetLoadReplace(&loadReplace),
-                      NS_ERROR_FAILURE);
+                    NS_ERROR_FAILURE);
   NS_ENSURE_SUCCESS(aEntry->GetReferrerURI(getter_AddRefs(referrerURI)),
                     NS_ERROR_FAILURE);
   NS_ENSURE_SUCCESS(aEntry->GetReferrerPolicy(&referrerPolicy),
@@ -14076,7 +14075,9 @@ nsDocShell::GetAsyncPanZoomEnabled(bool* aOut)
     return NS_OK;
   }
 
-  *aOut = false;
+  // If we don't have a presShell, fall back to the default platform value of
+  // whether or not APZ is enabled.
+  *aOut = gfxPlatform::AsyncPanZoomEnabled();
   return NS_OK;
 }
 
