@@ -1161,9 +1161,8 @@ XrayCreateFunction(JSContext* cx, JS::Handle<JSObject*> wrapper,
   js::SetFunctionNativeReserved(obj, XRAY_DOM_FUNCTION_PARENT_WRAPPER_SLOT,
                                 JS::ObjectValue(*wrapper));
 #ifdef DEBUG
-  js::SetFunctionNativeReserved(obj, XRAY_DOM_FUNCTION_NATIVE_SLOT_FOR_ASSERT,
-                                JS::PrivateValue(JS_FUNC_TO_DATA_PTR(void *,
-                                                                     native.op)));
+  js::SetFunctionNativeReserved(obj, XRAY_DOM_FUNCTION_NATIVE_SLOT_FOR_SELF,
+                                JS::ObjectValue(*obj));
 #endif
   return obj;
 }
