@@ -650,7 +650,7 @@ var MessageQueue = {
   },
 
   observe(subject, topic, data) {
-    if (topic == TIMEOUT_DISABLED_PREF) {
+    if (topic == "nsPref:changed" && data == TIMEOUT_DISABLED_PREF) {
       this.timeoutDisabled =
         Services.prefs.getBoolPref(TIMEOUT_DISABLED_PREF);
     }
