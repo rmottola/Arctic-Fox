@@ -489,13 +489,6 @@ ModuleNamespaceObject::ProxyHandler::delete_(JSContext* cx, HandleObject proxy, 
 }
 
 bool
-ModuleNamespaceObject::ProxyHandler::enumerate(JSContext* cx, HandleObject proxy,
-                                               MutableHandleObject objp) const
-{
-    return BaseProxyHandler::enumerate(cx, proxy, objp);
-}
-
-bool
 ModuleNamespaceObject::ProxyHandler::ownPropertyKeys(JSContext* cx, HandleObject proxy,
                                                      AutoIdVector& props) const
 {
