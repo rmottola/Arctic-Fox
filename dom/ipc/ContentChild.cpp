@@ -1805,7 +1805,7 @@ ContentChild::SendPMobileConnectionConstructor(PMobileConnectionChild* aActor,
   static_cast<MobileConnectionChild*>(aActor)->AddRef();
   return PContentChild::SendPMobileConnectionConstructor(aActor, aClientId);
 #else
-  MOZ_CRASH("No support for mobileconnection on this platform!");;
+  MOZ_CRASH("No support for mobileconnection on this platform!");
 #endif
 }
 
@@ -1816,7 +1816,7 @@ ContentChild::AllocPMobileConnectionChild(const uint32_t& aClientId)
   MOZ_CRASH("No one should be allocating PMobileConnectionChild actors");
   return nullptr;
 #else
-  MOZ_CRASH("No support for mobileconnection on this platform!");;
+  MOZ_CRASH("No support for mobileconnection on this platform!");
 #endif
 }
 

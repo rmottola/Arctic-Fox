@@ -455,7 +455,7 @@ AccessibleWrap::get_accRole(
 #include "RoleMap.h"
     default:
       MOZ_CRASH("Unknown role.");
-  };
+  }
 
 #undef ROLE
 
