@@ -7631,7 +7631,10 @@ class MRegExp : public MNullaryInstruction
 
 class MRegExpMatcher
   : public MAryInstruction<4>,
-    public NoTypePolicy::Data
+    public Mix4Policy<ObjectPolicy<0>,
+                      StringPolicy<1>,
+                      IntPolicy<2>,
+                      BooleanPolicy<3> >::Data
 {
   private:
 
@@ -7684,7 +7687,10 @@ class MRegExpMatcher
 
 class MRegExpTester
   : public MAryInstruction<4>,
-    public NoTypePolicy::Data
+    public Mix4Policy<ObjectPolicy<0>,
+                      StringPolicy<1>,
+                      IntPolicy<2>,
+                      BooleanPolicy<3> >::Data
 {
   private:
 
