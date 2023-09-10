@@ -242,7 +242,7 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(input->type()) && input->type() == type);
-        MInstruction* ins = MSimdUnaryArith::NewAsmJS(alloc(), input, op);
+        MInstruction* ins = MSimdUnaryArith::New(alloc(), input, op);
         curBlock_->add(ins);
         return ins;
     }
@@ -314,8 +314,8 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(vec->type()) && vec->type() == type);
-        MOZ_ASSERT(!IsSimdType(val->type()));
-        MSimdInsertElement* ins = MSimdInsertElement::NewAsmJS(alloc(), vec, val, lane);
+        MOZ_ASSERT(SimdTypeToLaneArgumentType(vec->type()) == val->type());
+        MSimdInsertElement* ins = MSimdInsertElement::New(alloc(), vec, val, lane);
         curBlock_->add(ins);
         return ins;
     }
@@ -328,7 +328,7 @@ class FunctionCompiler
         MOZ_ASSERT(IsSimdType(mask->type()));
         MOZ_ASSERT(IsSimdType(lhs->type()) && rhs->type() == lhs->type());
         MOZ_ASSERT(lhs->type() == type);
-        MSimdSelect* ins = MSimdSelect::NewAsmJS(alloc(), mask, lhs, rhs);
+        MSimdSelect* ins = MSimdSelect::New(alloc(), mask, lhs, rhs);
         curBlock_->add(ins);
         return ins;
     }
@@ -338,7 +338,7 @@ class FunctionCompiler
         if (inDeadCode())
             return nullptr;
 
-        MSimdAllTrue* ins = MSimdAllTrue::NewAsmJS(alloc(), boolVector);
+        MSimdAllTrue* ins = MSimdAllTrue::New(alloc(), boolVector, MIRType_Int32);
         curBlock_->add(ins);
         return ins;
     }
@@ -348,7 +348,7 @@ class FunctionCompiler
         if (inDeadCode())
             return nullptr;
 
-        MSimdAnyTrue* ins = MSimdAnyTrue::NewAsmJS(alloc(), boolVector);
+        MSimdAnyTrue* ins = MSimdAnyTrue::New(alloc(), boolVector, MIRType_Int32);
         curBlock_->add(ins);
         return ins;
     }
@@ -372,7 +372,8 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(type));
-        MSimdSplatX4* ins = MSimdSplatX4::NewAsmJS(alloc(), v, type);
+        MOZ_ASSERT(SimdTypeToLaneArgumentType(type) == v->type());
+        MSimdSplatX4* ins = MSimdSplatX4::New(alloc(), v, type);
         curBlock_->add(ins);
         return ins;
     }
@@ -623,7 +624,7 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(type));
-        T* ins = T::NewAsmJS(alloc(), type, x, y, z, w);
+        T* ins = T::New(alloc(), type, x, y, z, w);
         curBlock_->add(ins);
         return ins;
     }
