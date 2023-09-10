@@ -3436,7 +3436,7 @@ IonBuilder::inlineSimdBinary(CallInfo& callInfo, JSNative native, typename T::Op
     MDefinition* lhs = unboxSimd(callInfo.getArg(0), type);
     MDefinition* rhs = unboxSimd(callInfo.getArg(1), type);
 
-    T* ins = T::New(alloc(), lhs, rhs, op, lhs->type());
+    T* ins = T::New(alloc(), lhs, rhs, op);
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3451,7 +3451,7 @@ IonBuilder::inlineSimdShift(CallInfo& callInfo, JSNative native, MSimdShift::Ope
 
     MDefinition* vec = unboxSimd(callInfo.getArg(0), type);
 
-    MInstruction* ins = MSimdShift::New(alloc(), vec, callInfo.getArg(1), op, vec->type());
+    MInstruction* ins = MSimdShift::New(alloc(), vec, callInfo.getArg(1), op);
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3465,8 +3465,8 @@ IonBuilder::inlineSimdComp(CallInfo& callInfo, JSNative native, MSimdBinaryComp:
 
     MDefinition* lhs = unboxSimd(callInfo.getArg(0), type);
     MDefinition* rhs = unboxSimd(callInfo.getArg(1), type);
-    MInstruction* ins = MSimdBinaryComp::AddLegalized(alloc(), current, lhs, rhs, op, lhs->type(),
-                                                      GetSimdSign(type));
+    MInstruction* ins =
+      MSimdBinaryComp::AddLegalized(alloc(), current, lhs, rhs, op, GetSimdSign(type));
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3480,7 +3480,7 @@ IonBuilder::inlineSimdUnary(CallInfo& callInfo, JSNative native, MSimdUnaryArith
 
     MDefinition* arg = unboxSimd(callInfo.getArg(0), type);
 
-    MSimdUnaryArith* ins = MSimdUnaryArith::New(alloc(), arg, op, arg->type());
+    MSimdUnaryArith* ins = MSimdUnaryArith::New(alloc(), arg, op);
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3531,7 +3531,7 @@ IonBuilder::inlineSimdExtractLane(CallInfo& callInfo, JSNative native, SimdType 
         laneType = MIRType_Double;
 
     MSimdExtractElement* ins =
-      MSimdExtractElement::New(alloc(), orig, vecType, laneType, SimdLane(lane), sign);
+      MSimdExtractElement::New(alloc(), orig, laneType, SimdLane(lane), sign);
     current->add(ins);
     current->push(ins);
     callInfo.setImplicitlyUsedUnchecked();
@@ -3563,8 +3563,7 @@ IonBuilder::inlineSimdReplaceLane(CallInfo& callInfo, JSNative native, SimdType 
     if (SimdTypeToLaneType(vecType) == MIRType_Boolean)
         value = convertToBooleanSimdLane(value);
 
-    MSimdInsertElement* ins =
-      MSimdInsertElement::New(alloc(), orig, value, vecType, SimdLane(lane));
+    MSimdInsertElement* ins = MSimdInsertElement::New(alloc(), orig, value, SimdLane(lane));
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3585,7 +3584,7 @@ IonBuilder::inlineSimdConvert(CallInfo& callInfo, JSNative native, bool isCast, 
     MInstruction* ins;
     if (isCast) {
         // Signed/Unsigned doesn't matter for bitcasts.
-        ins = MSimdReinterpretCast::New(alloc(), arg, arg->type(), mirType);
+        ins = MSimdReinterpretCast::New(alloc(), arg, mirType);
     } else {
         // Exactly one of fromType, toType must be an integer type.
         SimdSign sign = GetSimdSign(fromType);
@@ -3593,7 +3592,7 @@ IonBuilder::inlineSimdConvert(CallInfo& callInfo, JSNative native, bool isCast, 
             sign = GetSimdSign(toType);
 
         // Possibly expand into multiple instructions.
-        ins = MSimdConvert::AddLegalized(alloc(), current, arg, arg->type(), mirType, sign);
+        ins = MSimdConvert::AddLegalized(alloc(), current, arg, mirType, sign);
     }
 
     return boxSimd(callInfo, ins, templateObj);
@@ -3610,7 +3609,7 @@ IonBuilder::inlineSimdSelect(CallInfo& callInfo, JSNative native, SimdType type)
     MDefinition* tval = unboxSimd(callInfo.getArg(1), type);
     MDefinition* fval = unboxSimd(callInfo.getArg(2), type);
 
-    MSimdSelect* ins = MSimdSelect::New(alloc(), mask, tval, fval, tval->type());
+    MSimdSelect* ins = MSimdSelect::New(alloc(), mask, tval, fval);
     return boxSimd(callInfo, ins, templateObj);
 }
 
@@ -3653,9 +3652,9 @@ IonBuilder::inlineSimdAnyAllTrue(CallInfo& callInfo, bool IsAllTrue, JSNative na
 
     MUnaryInstruction* ins;
     if (IsAllTrue)
-        ins = MSimdAllTrue::New(alloc(), arg, arg->type());
+        ins = MSimdAllTrue::New(alloc(), arg);
     else
-        ins = MSimdAnyTrue::New(alloc(), arg, arg->type());
+        ins = MSimdAnyTrue::New(alloc(), arg);
 
     current->add(ins);
     current->push(ins);
