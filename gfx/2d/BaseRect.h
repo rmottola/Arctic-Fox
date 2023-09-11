@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <ostream>
+#include <limits>
 
 #include "mozilla/Assertions.h"
 #include "mozilla/FloatingPoint.h"
