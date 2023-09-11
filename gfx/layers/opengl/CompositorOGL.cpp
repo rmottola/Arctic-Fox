@@ -454,8 +454,6 @@ CompositorOGL::PrepareViewport(CompositingRenderTargetOGL* aRenderTarget)
   // Set the viewport correctly.
   mGLContext->fViewport(0, 0, size.width, size.height);
 
-  mRenderBounds = Rect(0, 0, size.width, size.height);
-
   mViewportSize = size;
 
   if (!aRenderTarget->HasComplexProjection()) {
@@ -990,7 +988,9 @@ CompositorOGL::DrawQuad(const Rect& aRect,
   }
 
   IntPoint offset = mCurrentRenderTarget->GetOrigin();
-  Rect renderBound = mRenderBounds;
+  IntSize size = mCurrentRenderTarget->GetSize();
+
+  Rect renderBound(0, 0, size.width, size.height);
   renderBound.IntersectRect(renderBound, aClipRect);
   renderBound.MoveBy(offset);
 
@@ -1004,7 +1004,8 @@ CompositorOGL::DrawQuad(const Rect& aRect,
   // Inflate a small size to avoid some numerical imprecision issue.
   destRect.Inflate(1, 1);
   destRect.MoveBy(-offset);
-  if (!mRenderBounds.Intersects(destRect)) {
+  renderBound = Rect(0, 0, size.width, size.height);
+  if (!renderBound.Intersects(destRect)) {
     return;
   }
 
