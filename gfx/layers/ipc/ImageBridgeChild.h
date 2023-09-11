@@ -252,6 +252,9 @@ public:
                                 const nsIntRect& aPictureRect) override;
 #endif
 
+  virtual bool DestroyInTransaction(PTextureChild* aTexture, bool synchronously) override;
+  virtual bool DestroyInTransaction(PCompositableChild* aCompositable, bool synchronously) override;
+
   virtual void RemoveTextureFromCompositable(CompositableClient* aCompositable,
                                              TextureClient* aTexture) override;
 
@@ -308,6 +311,8 @@ public:
   virtual void SendPendingAsyncMessges() override;
 
   void MarkShutDown();
+
+  void FallbackDestroyActors();
 protected:
   ImageBridgeChild();
   bool DispatchAllocShmemInternal(size_t aSize,

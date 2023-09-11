@@ -17,6 +17,7 @@
 #include "gfxPlatform.h"                // for gfxImageFormat, gfxPlatform
 #include "gfxSharedImageSurface.h"      // for gfxSharedImageSurface
 #include "ipc/IPCMessageUtils.h"        // for gfxContentType, null_t
+#include "IPDLActor.h"
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
 #include "mozilla/gfx/Point.h"          // for IntSize
 #include "mozilla/layers/CompositableClient.h"  // for CompositableClient, etc
@@ -65,6 +66,7 @@ class ClientTiledLayerBuffer;
 typedef nsTArray<SurfaceDescriptor> BufferArray;
 typedef std::vector<Edit> EditVector;
 typedef std::set<ShadowableLayer*> ShadowableLayerSet;
+typedef nsTArray<OpDestroy> OpDestroyVector;
 
 class Transaction
 {
@@ -135,13 +137,15 @@ public:
     mCset.clear();
     mPaints.clear();
     mMutants.clear();
+    mDestroyedActors.Clear();
     mOpen = false;
     mSwapRequired = false;
     mRotationChanged = false;
   }
 
   bool Empty() const {
-    return mCset.empty() && mPaints.empty() && mMutants.empty();
+    return mCset.empty() && mPaints.empty() && mMutants.empty()
+           && mDestroyedActors.IsEmpty();
   }
   bool RotationChanged() const {
     return mRotationChanged;
@@ -150,8 +154,29 @@ public:
 
   bool Opened() const { return mOpen; }
 
+  void FallbackDestroyActors()
+  {
+    for (auto& actor : mDestroyedActors) {
+      switch (actor.type()) {
+      case OpDestroy::TPTextureChild: {
+        DebugOnly<bool> ok = TextureClient::DestroyFallback(actor.get_PTextureChild());
+        MOZ_ASSERT(ok);
+        break;
+      }
+      case OpDestroy::TPCompositableChild: {
+        DebugOnly<bool> ok = CompositableClient::DestroyFallback(actor.get_PCompositableChild());
+        MOZ_ASSERT(ok);
+        break;
+      }
+      default: MOZ_CRASH();
+      }
+    }
+    mDestroyedActors.Clear();
+  }
+
   EditVector mCset;
   EditVector mPaints;
+  OpDestroyVector mDestroyedActors;
   ShadowableLayerSet mMutants;
   gfx::IntRect mTargetBounds;
   ScreenRotation mTargetRotation;
@@ -192,6 +217,9 @@ ShadowLayerForwarder::ShadowLayerForwarder()
 ShadowLayerForwarder::~ShadowLayerForwarder()
 {
   MOZ_ASSERT(mTxn->Finished(), "unfinished transaction?");
+  if (!mTxn->mDestroyedActors.IsEmpty()) {
+    mTxn->FallbackDestroyActors();
+  }
   delete mTxn;
   if (mShadowManager) {
     mShadowManager->SetForwarder(nullptr);
@@ -432,6 +460,33 @@ ShadowLayerForwarder::UseOverlaySource(CompositableClient* aCompositable,
 }
 #endif
 
+static bool
+AddOpDestroy(Transaction* aTxn, const OpDestroy& op, bool synchronously)
+{
+  if (!aTxn->Opened()) {
+    return false;
+  }
+
+  aTxn->mDestroyedActors.AppendElement(op);
+  if (synchronously) {
+    aTxn->MarkSyncTransaction();
+  }
+
+  return true;
+}
+
+bool
+ShadowLayerForwarder::DestroyInTransaction(PTextureChild* aTexture, bool synchronously)
+{
+  return AddOpDestroy(mTxn, OpDestroy(aTexture), synchronously);
+}
+
+bool
+ShadowLayerForwarder::DestroyInTransaction(PCompositableChild* aCompositable, bool synchronously)
+{
+  return AddOpDestroy(mTxn, OpDestroy(aCompositable), synchronously);
+}
+
 void
 ShadowLayerForwarder::RemoveTextureFromCompositable(CompositableClient* aCompositable,
                                                     TextureClient* aTexture)
@@ -450,8 +505,6 @@ ShadowLayerForwarder::RemoveTextureFromCompositable(CompositableClient* aComposi
   if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
     mTxn->MarkSyncTransaction();
   }
-  // Hold texture until transaction complete.
-  HoldUntilTransaction(aTexture);
 }
 
 void
@@ -666,11 +719,13 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     RenderTraceScope rendertrace3("Forward Transaction", "000093");
     if (!HasShadowManager() ||
         !mShadowManager->IPCOpen() ||
-        !mShadowManager->SendUpdate(cset, aId, targetConfig, mPluginWindowData,
+        !mShadowManager->SendUpdate(cset, mTxn->mDestroyedActors,
+                                    aId, targetConfig, mPluginWindowData,
                                     mIsFirstPaint, aScheduleComposite,
                                     aPaintSequenceNumber, aIsRepeatTransaction,
                                     aTransactionStart, mPaintSyncId, aReplies)) {
       MOZ_LAYERS_LOG(("[LayersForwarder] WARNING: sending transaction failed!"));
+      mTxn->FallbackDestroyActors();
       return false;
     }
   } else {
@@ -680,11 +735,13 @@ ShadowLayerForwarder::EndTransaction(InfallibleTArray<EditReply>* aReplies,
     RenderTraceScope rendertrace3("Forward NoSwap Transaction", "000093");
     if (!HasShadowManager() ||
         !mShadowManager->IPCOpen() ||
-        !mShadowManager->SendUpdateNoSwap(cset, aId, targetConfig, mPluginWindowData,
+        !mShadowManager->SendUpdateNoSwap(cset, mTxn->mDestroyedActors,
+                                          aId, targetConfig, mPluginWindowData,
                                           mIsFirstPaint, aScheduleComposite,
                                           aPaintSequenceNumber, aIsRepeatTransaction,
                                           aTransactionStart, mPaintSyncId)) {
       MOZ_LAYERS_LOG(("[LayersForwarder] WARNING: sending transaction failed!"));
+      mTxn->FallbackDestroyActors();
       return false;
     }
   }
