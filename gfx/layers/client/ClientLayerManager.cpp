@@ -591,15 +591,6 @@ ClientLayerManager::ForwardTransaction(bool aScheduleComposite)
     mForwarder->GetSyncObject()->FinalizeFrame();
   }
 
-  if (!mTransactionIdAllocator) {
-    // We are being called without a transaction ID manager.
-    // Probably incorrect application init. Clean up as well as we are
-    // able to at this point and return.
-    mForwarder->RemoveTexturesIfNecessary();
-    mKeepAlive.Clear();
-    return;
-  }
-
   mPhase = PHASE_FORWARD;
 
   mLatestTransactionId = mTransactionIdAllocator->GetTransactionId();
