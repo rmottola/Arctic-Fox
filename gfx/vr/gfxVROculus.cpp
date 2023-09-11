@@ -247,6 +247,7 @@ FromFovPort(const ovrFovPort& aFOV)
 HMDInfoOculus::HMDInfoOculus(ovrSession aSession)
   : VRHMDInfo(VRHMDType::Oculus, false)
   , mSession(aSession)
+  , mInputFrameID(0)
 {
   MOZ_ASSERT(sizeof(HMDInfoOculus::DistortionVertex) == sizeof(VRDistortionVertex),
              "HMDInfoOculus::DistortionVertex must match the size of VRDistortionVertex");
@@ -346,7 +347,7 @@ HMDInfoOculus::KeepSensorTracking()
 void
 HMDInfoOculus::NotifyVsync(const mozilla::TimeStamp& aVsyncTimestamp)
 {
-
+  ++mInputFrameID;
 }
 
 void
@@ -519,7 +520,7 @@ HMDInfoOculus::DestroyRenderTargetSet(RenderTargetSet *aRTSet)
 }
 
 void
-HMDInfoOculus::SubmitFrame(RenderTargetSet *aRTSet)
+HMDInfoOculus::SubmitFrame(RenderTargetSet *aRTSet, int32_t aInputFrameID)
 {
   RenderTargetSetOculus *rts = static_cast<RenderTargetSetOculus*>(aRTSet);
   MOZ_ASSERT(rts->hmd != nullptr);
@@ -548,7 +549,7 @@ HMDInfoOculus::SubmitFrame(RenderTargetSet *aRTSet)
   do_CalcEyePoses(rts->hmd->mLastTrackingState.HeadPose.ThePose, hmdToEyeViewOffset, layer.RenderPose);
 
   ovrLayerHeader *layers = &layer.Header;
-  ovrResult orv = ovr_SubmitFrame(mSession, 0, nullptr, &layers, 1);
+  ovrResult orv = ovr_SubmitFrame(mSession, aInputFrameID, nullptr, &layers, 1);
   //printf_stderr("Submitted frame %d, result: %d\n", rts->textureSet->CurrentIndex, orv);
   if (orv != ovrSuccess) {
     // not visible? failed?
