@@ -95,8 +95,6 @@ private:
 
   SpeechSynthesisChild* mSpeechSynthChild;
 
-  RefPtr<ProcessedMediaStream> mStream;
-
   bool mUseGlobalQueue;
 
   nsTArray<RefPtr<GlobalQueueItem>> mGlobalQueue;
