@@ -294,6 +294,7 @@ public:
                               MozGetUserMediaDevicesSuccessCallback& aOnSuccess,
                               NavigatorUserMediaErrorCallback& aOnError,
                               uint64_t aInnerWindowID,
+                              const nsAString& aCallID,
                               ErrorResult& aRv);
 #endif // MOZ_MEDIA_NAVIGATOR
 
