@@ -1862,7 +1862,7 @@ nsNPAPIPluginInstance::WindowVolumeChanged(float aVolume, bool aMuted)
 }
 
 NS_IMETHODIMP
-nsNPAPIPluginInstance::WindowAudioCaptureChanged()
+nsNPAPIPluginInstance::WindowAudioCaptureChanged(bool aCapture)
 {
   return NS_OK;
 }
