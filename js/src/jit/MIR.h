@@ -1619,11 +1619,6 @@ class MSimdConvert
 
   public:
     INSTRUCTION_HEADER(SimdConvert)
-    static MSimdConvert* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType toType)
-    {
-        // AsmJS only has signed integer vectors for now.
-        return new(alloc) MSimdConvert(obj, toType, SimdSign::Signed);
-    }
 
     static MSimdConvert* New(TempAllocator& alloc, MDefinition* obj, MIRType toType, SimdSign sign)
     {
@@ -1671,10 +1666,6 @@ class MSimdReinterpretCast
 
   public:
     INSTRUCTION_HEADER(SimdReinterpretCast)
-    static MSimdReinterpretCast* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType toType)
-    {
-        return new(alloc) MSimdReinterpretCast(obj, toType);
-    }
 
     static MSimdReinterpretCast* New(TempAllocator& alloc, MDefinition* obj, MIRType toType)
     {
@@ -1731,15 +1722,6 @@ class MSimdExtractElement
 
   public:
     INSTRUCTION_HEADER(SimdExtractElement)
-
-    static MSimdExtractElement* NewAsmJS(TempAllocator& alloc, MDefinition* obj, MIRType type,
-                                         SimdLane lane)
-    {
-        // Only signed integer types in AsmJS so far.
-        SimdSign sign =
-          IsIntegerSimdType(obj->type()) ? SimdSign::Signed : SimdSign::NotApplicable;
-        return new (alloc) MSimdExtractElement(obj, type, lane, sign);
-    }
 
     static MSimdExtractElement* New(TempAllocator& alloc, MDefinition* obj, MIRType scalarType,
                                     SimdLane lane, SimdSign sign)
@@ -2222,14 +2204,6 @@ class MSimdBinaryComp
 
   public:
     INSTRUCTION_HEADER(SimdBinaryComp)
-    static MSimdBinaryComp* NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right,
-                                     Operation op)
-    {
-        // AsmJS only has signed vectors for now.
-        SimdSign sign =
-          IsIntegerSimdType(left->type()) ? SimdSign::Signed : SimdSign::NotApplicable;
-        return new (alloc) MSimdBinaryComp(left, right, op, sign);
-    }
 
     static MSimdBinaryComp* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
                                 Operation op, SimdSign sign)
@@ -2327,12 +2301,6 @@ class MSimdBinaryArith
         return new(alloc) MSimdBinaryArith(left, right, op);
     }
 
-    static MSimdBinaryArith* NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right,
-                                      Operation op)
-    {
-        return New(alloc, left, right, op);
-    }
-
     AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
@@ -2392,12 +2360,6 @@ class MSimdBinaryBitwise
         return new(alloc) MSimdBinaryBitwise(left, right, op);
     }
 
-    static MSimdBinaryBitwise* NewAsmJS(TempAllocator& alloc, MDefinition* left,
-                                        MDefinition* right, Operation op)
-    {
-        return new(alloc) MSimdBinaryBitwise(left, right, op);
-    }
-
     AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
@@ -2440,12 +2402,6 @@ class MSimdShift
 
   public:
     INSTRUCTION_HEADER(SimdShift)
-    static MSimdShift* NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right,
-                                Operation op)
-    {
-        MOZ_ASSERT(left->type() == MIRType_Int32x4 && right->type() == MIRType_Int32);
-        return new(alloc) MSimdShift(left, right, op);
-    }
 
     static MSimdShift* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
                            Operation op)
