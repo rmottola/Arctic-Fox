@@ -145,6 +145,8 @@ class FunctionCompiler
                 return false;
         }
 
+        addInterruptCheck();
+
         return true;
     }
 
@@ -590,6 +592,9 @@ class FunctionCompiler
 
     void addInterruptCheck()
     {
+        if (mg_.args().useSignalHandlersForInterrupt)
+            return;
+
         if (inDeadCode())
             return;
 
@@ -2363,22 +2368,6 @@ EmitSimdOp(FunctionCompiler& f, ExprType type, SimdOperation op, MDefinition** d
 }
 
 static bool
-EmitInterruptCheck(FunctionCompiler& f)
-{
-    f.addInterruptCheck();
-    return true;
-}
-
-static bool
-EmitInterruptCheckLoop(FunctionCompiler& f)
-{
-    if (!EmitInterruptCheck(f))
-        return false;
-    MDefinition* _;
-    return EmitExprStmt(f, &_);
-}
-
-static bool
 EmitWhile(FunctionCompiler& f, const LabelVector* maybeLabels)
 {
     size_t headId = f.nextId();
@@ -2394,6 +2383,8 @@ EmitWhile(FunctionCompiler& f, const LabelVector* maybeLabels)
     MBasicBlock* afterLoop;
     if (!f.branchAndStartLoopBody(condDef, &afterLoop))
         return false;
+
+    f.addInterruptCheck();
 
     MDefinition* _;
     if (!EmitExprStmt(f, &_))
@@ -2430,6 +2421,8 @@ EmitFor(FunctionCompiler& f, Expr expr, const LabelVector* maybeLabels)
     if (!f.branchAndStartLoopBody(condDef, &afterLoop))
         return false;
 
+    f.addInterruptCheck();
+
     MDefinition* _;
     if (!EmitExprStmt(f, &_))
         return false;
@@ -2454,6 +2447,8 @@ EmitDoWhile(FunctionCompiler& f, const LabelVector* maybeLabels)
     MBasicBlock* loopEntry;
     if (!f.startPendingLoop(headId, &loopEntry))
         return false;
+
+    f.addInterruptCheck();
 
     MDefinition* _;
     if (!EmitExprStmt(f, &_))
@@ -2707,10 +2702,6 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::AtomicsFence:
         f.memoryBarrier(MembarFull);
         return true;
-      case Expr::InterruptCheckHead:
-        return EmitInterruptCheck(f);
-      case Expr::InterruptCheckLoop:
-        return EmitInterruptCheckLoop(f);
       // Common
       case Expr::GetLocal:
         return EmitGetLocal(f, type, def);
