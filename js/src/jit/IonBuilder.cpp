@@ -2552,8 +2552,8 @@ IonBuilder::processDoWhileCondEnd(CFGState& state)
         return ControlStatus_Error;
 
     // Test for do {} while(false) and don't create a loop in that case.
-    if (vins->isConstantValue() && !vins->constantValue().isMagic()) {
-        if (!vins->constantToBoolean()) {
+    if (MConstant* vinsConst = vins->maybeConstantValue()) {
+        if (!IsMagicType(vinsConst->type()) && !vinsConst->valueToBoolean()) {
             current->end(MGoto::New(alloc(), successor));
             current = nullptr;
 
@@ -3666,7 +3666,7 @@ IonBuilder::improveTypesAtCompare(MCompare* ins, bool trueBranch, MTest* test)
     }
 
     if ((ins->lhs()->isTypeOf() || ins->rhs()->isTypeOf()) &&
-        (ins->lhs()->isConstantValue() || ins->rhs()->isConstantValue()))
+        (ins->lhs()->isConstant() || ins->rhs()->isConstant()))
     {
         return improveTypesAtTypeOfCompare(ins, trueBranch, test);
     }
@@ -3678,8 +3678,8 @@ bool
 IonBuilder::improveTypesAtTypeOfCompare(MCompare* ins, bool trueBranch, MTest* test)
 {
     MTypeOf* typeOf = ins->lhs()->isTypeOf() ? ins->lhs()->toTypeOf() : ins->rhs()->toTypeOf();
-    const Value* constant =
-        ins->lhs()->isConstant() ? ins->lhs()->constantVp() : ins->rhs()->constantVp();
+    MConstant* constantDef = ins->lhs()->isConstant() ? ins->lhs()->toConstant() : ins->rhs()->toConstant();
+    const Value* constant = constantDef->vp();
 
     if (!constant->isString())
         return true;
@@ -4843,8 +4843,8 @@ IonBuilder::arithTrySharedStub(bool* emitted, JSOp op,
     switch (actualOp) {
       case JSOP_NEG:
       case JSOP_BITNOT:
-        MOZ_ASSERT_IF(op == JSOP_MUL, left->isConstantValue() &&
-                                      left->constantValue().toInt32() == -1);
+        MOZ_ASSERT_IF(op == JSOP_MUL,
+                      left->maybeConstantValue() && left->maybeConstantValue()->value().toInt32() == -1);
         MOZ_ASSERT_IF(op != JSOP_MUL, !left);
 
         stub = MUnarySharedStub::New(alloc(), right);
@@ -6851,10 +6851,10 @@ IonBuilder::jsop_eval(uint32_t argc)
         // name on the scope chain and the eval is performing a call on that
         // value. Use a dynamic scope chain lookup rather than a full eval.
         if (string->isConcat() &&
-            string->getOperand(1)->isConstantValue() &&
-            string->getOperand(1)->constantValue().isString())
+            string->getOperand(1)->type() == MIRType_String &&
+            string->getOperand(1)->maybeConstantValue())
         {
-            JSAtom* atom = &string->getOperand(1)->constantValue().toString()->asAtom();
+            JSAtom* atom = &string->getOperand(1)->maybeConstantValue()->value().toString()->asAtom();
 
             if (StringEqualsAscii(atom, "()")) {
                 MDefinition* name = string->getOperand(0);
@@ -8944,11 +8944,9 @@ IonBuilder::getElemTryGetProp(bool* emitted, MDefinition* obj, MDefinition* inde
 
     MOZ_ASSERT(*emitted == false);
 
-    if (!index->isConstantValue())
-        return true;
-
+    MConstant* indexConst = index->maybeConstantValue();
     jsid id;
-    if (!ValueToIdPure(index->constantValue(), &id))
+    if (!indexConst || !ValueToIdPure(indexConst->value(), &id))
         return true;
 
     if (id != IdToTypeId(id))
@@ -9214,10 +9212,11 @@ IonBuilder::getElemTryArgumentsInlined(bool* emitted, MDefinition* obj, MDefinit
     MOZ_ASSERT(!info().argsObjAliasesFormals());
 
     // When the id is constant, we can just return the corresponding inlined argument
-    if (index->isConstantValue() && index->constantValue().isInt32()) {
+    MConstant* indexConst = index->maybeConstantValue();
+    if (indexConst && indexConst->type() == MIRType_Int32) {
         MOZ_ASSERT(inliningDepth_ > 0);
 
-        int32_t id = index->constantValue().toInt32();
+        int32_t id = indexConst->value().toInt32();
         index->setImplicitlyUsedUnchecked();
 
         if (id < (int32_t)inlineCallInfo_->argc() && id >= 0)
@@ -9454,12 +9453,15 @@ IonBuilder::addTypedArrayLengthAndData(MDefinition* obj,
                                        MInstruction** length, MInstruction** elements)
 {
     MOZ_ASSERT((index != nullptr) == (elements != nullptr));
+
     JSObject* tarr = nullptr;
 
-    if (obj->isConstantValue() && obj->constantValue().isObject())
-        tarr = &obj->constantValue().toObject();
-    else if (obj->resultTypeSet())
-        tarr = obj->resultTypeSet()->maybeSingleton();
+    if (MConstant* objConst = obj->maybeConstantValue()) {
+        if (objConst->type() == MIRType_Object)
+            tarr = &objConst->value().toObject();
+    } else if (TemporaryTypeSet* types = obj->resultTypeSet()) {
+        tarr = types->maybeSingleton();
+    }
 
     if (tarr) {
         SharedMem<void*> data = tarr->as<TypedArrayObject>().viewDataEither();
@@ -9516,18 +9518,20 @@ IonBuilder::convertShiftToMaskForStaticTypedArray(MDefinition* id,
 
     // If the index is an already shifted constant, undo the shift to get the
     // absolute offset being accessed.
-    if (id->isConstantValue() && id->constantValue().isInt32()) {
-        int32_t index = id->constantValue().toInt32();
-        MConstant* offset = MConstant::New(alloc(), Int32Value(index << TypedArrayShift(viewType)));
-        current->add(offset);
-        return offset;
+    if (MConstant* idConst = id->maybeConstantValue()) {
+        if (idConst->type() == MIRType_Int32) {
+            int32_t index = idConst->value().toInt32();
+            MConstant* offset = MConstant::New(alloc(), Int32Value(index << TypedArrayShift(viewType)));
+            current->add(offset);
+            return offset;
+        }
     }
 
     if (!id->isRsh() || id->isEffectful())
         return nullptr;
-    if (!id->getOperand(1)->isConstantValue())
+    if (!id->getOperand(1)->maybeConstantValue())
         return nullptr;
-    const Value& value = id->getOperand(1)->constantValue();
+    const Value& value = id->getOperand(1)->maybeConstantValue()->value();
     if (!value.isInt32() || uint32_t(value.toInt32()) != TypedArrayShift(viewType))
         return nullptr;
 
@@ -13345,7 +13349,7 @@ IonBuilder::inTryFold(bool* emitted, MDefinition* obj, MDefinition* id)
     MOZ_ASSERT(!*emitted);
 
     jsid propId;
-    if (!id->isConstantValue() || !ValueToIdPure(id->constantValue(), &propId))
+    if (!id->maybeConstantValue() || !ValueToIdPure(id->maybeConstantValue()->value(), &propId))
         return true;
 
     if (propId != IdToTypeId(propId))
