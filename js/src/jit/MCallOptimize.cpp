@@ -459,7 +459,7 @@ IonBuilder::inlineArray(CallInfo& callInfo)
         trackOptimizationOutcome(TrackedOutcome::ArrayRange);
 
         // Negative lengths generate a RangeError, unhandled by the inline path.
-        initLength = arg->toConstant()->value().toInt32();
+        initLength = arg->toConstant()->toInt32();
         if (initLength > NativeObject::MAX_DENSE_ELEMENTS_COUNT)
             return InliningStatus_NotInlined;
         MOZ_ASSERT(initLength <= INT32_MAX);
@@ -1287,7 +1287,7 @@ IonBuilder::inlineMathPowHelper(MDefinition* lhs, MDefinition* rhs, MIRType outp
 
     // Optimize some constant powers.
     if (rhs->isConstant()) {
-        double pow = rhs->toConstant()->value().toNumber();
+        double pow = rhs->toConstant()->toNumber();
 
         // Math.pow(x, 0.5) is a sqrt with edge-case detection.
         if (pow == 0.5) {
@@ -1493,7 +1493,7 @@ IonBuilder::inlineMathMinMax(CallInfo& callInfo, bool max)
             // Don't force a double MMinMax for arguments that would be a NOP
             // when doing an integer MMinMax.
             if (arg->isConstant()) {
-                double cte = arg->toConstant()->value().toDouble();
+                double cte = arg->toConstant()->toNumber();
                 // min(int32, cte >= INT32_MAX) = int32
                 if (cte >= INT32_MAX && !max)
                     break;
@@ -1576,16 +1576,13 @@ IonBuilder::inlineConstantStringSplit(CallInfo& callInfo)
     if (!callInfo.getArg(0)->isConstant())
         return InliningStatus_NotInlined;
 
-    const js::Value* argval = callInfo.getArg(0)->toConstant()->vp();
-    if (!argval->isString())
+    MConstant* argval = callInfo.getArg(0)->toConstant();
+    if (argval->type() != MIRType_String)
         return InliningStatus_NotInlined;
 
-    const js::Value* strval = callInfo.thisArg()->toConstant()->vp();
-    if (!strval->isString())
+    MConstant* strval = callInfo.thisArg()->toConstant();
+    if (strval->type() != MIRType_String)
         return InliningStatus_NotInlined;
-
-    MOZ_ASSERT(callInfo.getArg(0)->type() == MIRType_String);
-    MOZ_ASSERT(callInfo.thisArg()->type() == MIRType_String);
 
     // Check if exist a template object in stub.
     JSString* stringThis = nullptr;
@@ -1766,10 +1763,10 @@ IonBuilder::inlineConstantCharCodeAt(CallInfo& callInfo)
         return InliningStatus_NotInlined;
     }
 
-    const js::Value* strval = callInfo.thisArg()->maybeConstantValue()->vp();
-    const js::Value* idxval = callInfo.getArg(0)->maybeConstantValue()->vp();
+    MConstant* strval = callInfo.thisArg()->maybeConstantValue();
+    MConstant* idxval = callInfo.getArg(0)->maybeConstantValue();
 
-    if (!strval->isString() || !idxval->isInt32())
+    if (strval->type() != MIRType_String || idxval->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
 
     JSString* str = strval->toString();
@@ -2434,7 +2431,7 @@ IonBuilder::inlineUnsafeSetReservedSlot(CallInfo& callInfo)
     MDefinition* arg = callInfo.getArg(1);
     if (!arg->isConstant())
         return InliningStatus_NotInlined;
-    uint32_t slot = arg->toConstant()->value().toPrivateUint32();
+    uint32_t slot = uint32_t(arg->toConstant()->toInt32());
 
     callInfo.setImplicitlyUsedUnchecked();
 
@@ -2465,7 +2462,7 @@ IonBuilder::inlineUnsafeGetReservedSlot(CallInfo& callInfo, MIRType knownValueTy
     MDefinition* arg = callInfo.getArg(1);
     if (!arg->isConstant())
         return InliningStatus_NotInlined;
-    uint32_t slot = arg->toConstant()->value().toPrivateUint32();
+    uint32_t slot = uint32_t(arg->toConstant()->toInt32());
 
     callInfo.setImplicitlyUsedUnchecked();
 
@@ -2653,7 +2650,7 @@ IonBuilder::inlineAssertFloat32(CallInfo& callInfo)
     MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
     MOZ_ASSERT(secondArg->isConstant());
 
-    bool mustBeFloat32 = secondArg->toConstant()->value().toBoolean();
+    bool mustBeFloat32 = secondArg->toConstant()->toBoolean();
     current->add(MAssertFloat32::New(alloc(), callInfo.getArg(0), mustBeFloat32));
 
     MConstant* undefined = MConstant::New(alloc(), UndefinedValue());
@@ -2683,7 +2680,7 @@ IonBuilder::inlineAssertRecoveredOnBailout(CallInfo& callInfo)
     MOZ_ASSERT(secondArg->type() == MIRType_Boolean);
     MOZ_ASSERT(secondArg->isConstant());
 
-    bool mustBeRecovered = secondArg->toConstant()->value().toBoolean();
+    bool mustBeRecovered = secondArg->toConstant()->toBoolean();
     MAssertRecoveredOnBailout* assert =
         MAssertRecoveredOnBailout::New(alloc(), callInfo.getArg(0), mustBeRecovered);
     current->add(assert);
@@ -3516,7 +3513,7 @@ IonBuilder::inlineSimdExtractLane(CallInfo& callInfo, JSNative native, SimdType 
     MDefinition* arg = callInfo.getArg(1);
     if (!arg->isConstant() || arg->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
-    int32_t lane = arg->toConstant()->value().toInt32();
+    int32_t lane = arg->toConstant()->toInt32();
     if (lane < 0 || lane >= 4)
         return InliningStatus_NotInlined;
 
@@ -3550,7 +3547,7 @@ IonBuilder::inlineSimdReplaceLane(CallInfo& callInfo, JSNative native, SimdType 
     if (!arg->isConstant() || arg->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
 
-    int32_t lane = arg->toConstant()->value().toInt32();
+    int32_t lane = arg->toConstant()->toInt32();
     if (lane < 0 || lane >= 4)
         return InliningStatus_NotInlined;
 
