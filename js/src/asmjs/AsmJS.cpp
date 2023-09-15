@@ -1244,12 +1244,13 @@ class Type
         return isInt32x4() || isFloat32x4() || isBool32x4();
     }
 
-    bool isVarType() const {
+    // Check if this is one of the valid types for a function argument.
+    bool isArgType() const {
         return isInt() || isFloat() || isDouble() || isSimd();
     }
 
     ValType checkedValueType() const {
-        MOZ_ASSERT(isVarType());
+        MOZ_ASSERT(isArgType());
         if (isInt())
             return ValType::I32;
         else if (isFloat())
@@ -4291,9 +4292,9 @@ CheckFunctionSignature(ModuleValidator& m, ParseNode* usepn, Sig&& sig, Property
 }
 
 static bool
-CheckIsVarType(FunctionValidator& f, ParseNode* argNode, Type type)
+CheckIsArgType(FunctionValidator& f, ParseNode* argNode, Type type)
 {
-    if (!type.isVarType())
+    if (!type.isArgType())
         return f.failf(argNode, "%s is not a subtype of int, float or double", type.toChars());
     return true;
 }
@@ -4311,7 +4312,7 @@ CheckInternalCall(FunctionValidator& f, ParseNode* callNode, PropertyName* calle
         return false;
 
     ValTypeVector args;
-    if (!CheckCallArgs<CheckIsVarType>(f, callNode, &args))
+    if (!CheckCallArgs<CheckIsArgType>(f, callNode, &args))
         return false;
 
     ModuleValidator::Func* callee;
@@ -4394,7 +4395,7 @@ CheckFuncPtrCall(FunctionValidator& f, ParseNode* callNode, ExprType ret, Type* 
         return f.failf(indexNode, "%s is not a subtype of intish", indexType.toChars());
 
     ValTypeVector args;
-    if (!CheckCallArgs<CheckIsVarType>(f, callNode, &args))
+    if (!CheckCallArgs<CheckIsArgType>(f, callNode, &args))
         return false;
 
     Sig sig(Move(args), ret);
