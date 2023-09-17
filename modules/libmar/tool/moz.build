@@ -27,6 +27,7 @@ if CONFIG['MOZ_ENABLE_SIGNMAR']:
 
 for var in ('MAR_CHANNEL_ID', 'MOZ_APP_VERSION'):
     DEFINES[var] = '"%s"' % CONFIG[var]
+    HOST_DEFINES[var] = DEFINES[var]
 
 if CONFIG['MOZ_ENABLE_SIGNMAR']:
     USE_LIBS += [
@@ -56,11 +57,6 @@ if CONFIG['HOST_OS_ARCH'] == 'WINNT':
     HOST_OS_LIBS += [
         'ws2_32',
     ]
-
-HOST_CFLAGS += [
-    #TODO: bug 1200360 - don't pass make variables here
-    '$(DEFINES)',
-]
 
 HOST_DEFINES['NO_SIGN_VERIFY'] = True
 
