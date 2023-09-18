@@ -308,11 +308,6 @@ protected:
 
     void GenerateFontListKey(const nsAString& aKeyName, nsAString& aResult);
 
-    static PLDHashOperator
-        HashEnumFuncForFamilies(nsStringHashKey::KeyType aKey,
-                                RefPtr<gfxFontFamily>& aFamilyEntry,
-                                void* aUserArg);
-
     virtual void GetFontFamilyNames(nsTArray<nsString>& aFontFamilyNames);
 
     nsILanguageAtomService* GetLangService();
