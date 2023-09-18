@@ -26,11 +26,11 @@
 
 #include "js/CallArgs.h"
 #include "js/Class.h"
+#include "js/GCVector.h"
 #include "js/HashTable.h"
 #include "js/Id.h"
 #include "js/Principals.h"
 #include "js/RootingAPI.h"
-#include "js/TraceableVector.h"
 #include "js/TracingAPI.h"
 #include "js/Utility.h"
 #include "js/Value.h"
@@ -218,9 +218,9 @@ typedef AutoVectorRooter<Value> AutoValueVector;
 typedef AutoVectorRooter<jsid> AutoIdVector;
 typedef AutoVectorRooter<JSObject*> AutoObjectVector;
 
-using ValueVector = js::TraceableVector<JS::Value>;
-using IdVector = js::TraceableVector<jsid>;
-using ScriptVector = js::TraceableVector<JSScript*>;
+using ValueVector = js::GCVector<JS::Value>;
+using IdVector = js::GCVector<jsid>;
+using ScriptVector = js::GCVector<JSScript*>;
 
 template<class Key, class Value>
 class MOZ_RAII AutoHashMapRooter : protected AutoGCRooter
@@ -564,6 +564,9 @@ typedef enum JSGCStatus {
 typedef void
 (* JSGCCallback)(JSRuntime* rt, JSGCStatus status, void* data);
 
+typedef void
+(* JSObjectsTenuredCallback)(JSRuntime* rt, void* data);
+
 typedef enum JSFinalizeStatus {
     /**
      * Called when preparing to sweep a group of compartments, before anything
@@ -616,6 +619,7 @@ typedef enum JSExnType {
         JSEXN_SYNTAXERR,
         JSEXN_TYPEERR,
         JSEXN_URIERR,
+        JSEXN_DEBUGGEEWOULDRUN,
         JSEXN_LIMIT
 } JSExnType;
 
@@ -837,7 +841,9 @@ class MOZ_STACK_CLASS SourceBufferHolder final
  */
 #define JSFUN_GENERIC_NATIVE   0x800
 
-#define JSFUN_FLAGS_MASK       0xe00    /* | of all the JSFUN_* flags */
+#define JSFUN_HAS_REST        0x1000    /* function has ...rest parameter. */
+
+#define JSFUN_FLAGS_MASK      0x1e00    /* | of all the JSFUN_* flags */
 
 /*
  * If set, will allow redefining a non-configurable property, but only on a
@@ -1092,9 +1098,16 @@ class JS_PUBLIC_API(RuntimeOptions) {
         nativeRegExp_(true),
         unboxedArrays_(false),
         asyncStack_(true),
+        throwOnDebuggeeWouldRun_(true),
+        dumpStackOnDebuggeeWouldRun_(false),
         werror_(false),
         strictMode_(false),
-        extraWarnings_(false)
+        extraWarnings_(false),
+#ifdef RELEASE_BUILD
+        matchFlagArgument_(true)
+#else
+        matchFlagArgument_(false)
+#endif
     {
     }
 
@@ -1156,6 +1169,18 @@ class JS_PUBLIC_API(RuntimeOptions) {
         return *this;
     }
 
+    bool throwOnDebuggeeWouldRun() const { return throwOnDebuggeeWouldRun_; }
+    RuntimeOptions& setThrowOnDebuggeeWouldRun(bool flag) {
+        throwOnDebuggeeWouldRun_ = flag;
+        return *this;
+    }
+
+    bool dumpStackOnDebuggeeWouldRun() const { return dumpStackOnDebuggeeWouldRun_; }
+    RuntimeOptions& setDumpStackOnDebuggeeWouldRun(bool flag) {
+        dumpStackOnDebuggeeWouldRun_ = flag;
+        return *this;
+    }
+
     bool werror() const { return werror_; }
     RuntimeOptions& setWerror(bool flag) {
         werror_ = flag;
@@ -1186,6 +1211,12 @@ class JS_PUBLIC_API(RuntimeOptions) {
         return *this;
     }
 
+    bool matchFlagArgument() const { return matchFlagArgument_; }
+    RuntimeOptions& setMatchFlagArgument(bool flag) {
+        matchFlagArgument_ = flag;
+        return *this;
+    }
+
   private:
     bool baseline_ : 1;
     bool ion_ : 1;
@@ -1194,9 +1225,12 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool nativeRegExp_ : 1;
     bool unboxedArrays_ : 1;
     bool asyncStack_ : 1;
+    bool throwOnDebuggeeWouldRun_ : 1;
+    bool dumpStackOnDebuggeeWouldRun_ : 1;
     bool werror_ : 1;
     bool strictMode_ : 1;
     bool extraWarnings_ : 1;
+    bool matchFlagArgument_ : 1;
 };
 
 JS_PUBLIC_API(RuntimeOptions&)
@@ -1646,6 +1680,10 @@ JS_MaybeGC(JSContext* cx);
 extern JS_PUBLIC_API(void)
 JS_SetGCCallback(JSRuntime* rt, JSGCCallback cb, void* data);
 
+extern JS_PUBLIC_API(void)
+JS_SetObjectsTenuredCallback(JSRuntime* rt, JSObjectsTenuredCallback cb,
+                             void* data);
+
 extern JS_PUBLIC_API(bool)
 JS_AddFinalizeCallback(JSRuntime* rt, JSFinalizeCallback cb, void* data);
 
@@ -1718,9 +1756,6 @@ typedef enum JSGCParamKey {
     /** Number of times GC has been invoked. Includes both major and minor GC. */
     JSGC_NUMBER = 4,
 
-    /** Max size of the code cache in bytes. */
-    JSGC_MAX_CODE_CACHE_BYTES = 5,
-
     /** Select GC mode. */
     JSGC_MODE = 6,
 
@@ -1786,7 +1821,7 @@ typedef enum JSGCParamKey {
     JSGC_MAX_EMPTY_CHUNK_COUNT = 22,
 
     /** Whether compacting GC is enabled. */
-    JSGC_COMPACTING_ENABLED = 23
+    JSGC_COMPACTING_ENABLED = 23,
 } JSGCParamKey;
 
 extern JS_PUBLIC_API(void)
@@ -1797,12 +1832,6 @@ JS_SetGGCMode(JSRuntime* rt, bool enabled);
 
 extern JS_PUBLIC_API(uint32_t)
 JS_GetGCParameter(JSRuntime* rt, JSGCParamKey key);
-
-extern JS_PUBLIC_API(void)
-JS_SetGCParameterForThread(JSContext* cx, JSGCParamKey key, uint32_t value);
-
-extern JS_PUBLIC_API(uint32_t)
-JS_GetGCParameterForThread(JSContext* cx, JSGCParamKey key);
 
 extern JS_PUBLIC_API(void)
 JS_SetGCParametersBasedOnAvailableMemory(JSRuntime* rt, uint32_t availMem);
@@ -2151,7 +2180,128 @@ enum ZoneSpecifier {
     SystemZone = 1
 };
 
-class JS_PUBLIC_API(CompartmentOptions)
+/**
+ * CompartmentCreationOptions specifies options relevant to creating a new
+ * compartment, that are either immutable characteristics of that compartment
+ * or that are discarded after the compartment has been created.
+ *
+ * Access to these options on an existing compartment is read-only: if you
+ * need particular selections, make them before you create the compartment.
+ */
+class JS_PUBLIC_API(CompartmentCreationOptions)
+{
+  public:
+    CompartmentCreationOptions()
+      : addonId_(nullptr),
+        traceGlobal_(nullptr),
+        invisibleToDebugger_(false),
+        mergeable_(false),
+        preserveJitCode_(false),
+        cloneSingletons_(false),
+        experimentalDateTimeFormatFormatToPartsEnabled_(false),
+        sharedMemoryAndAtomics_(false)
+    {
+        zone_.spec = JS::FreshZone;
+    }
+
+    // A null add-on ID means that the compartment is not associated with an
+    // add-on.
+    JSAddonId* addonIdOrNull() const { return addonId_; }
+    CompartmentCreationOptions& setAddonId(JSAddonId* id) {
+        addonId_ = id;
+        return *this;
+    }
+
+    JSTraceOp getTrace() const {
+        return traceGlobal_;
+    }
+    CompartmentCreationOptions& setTrace(JSTraceOp op) {
+        traceGlobal_ = op;
+        return *this;
+    }
+
+    void* zonePointer() const {
+        MOZ_ASSERT(uintptr_t(zone_.pointer) > uintptr_t(JS::SystemZone));
+        return zone_.pointer;
+    }
+    ZoneSpecifier zoneSpecifier() const { return zone_.spec; }
+    CompartmentCreationOptions& setZone(ZoneSpecifier spec);
+    CompartmentCreationOptions& setSameZoneAs(JSObject* obj);
+
+    // Certain scopes (i.e. XBL compilation scopes) are implementation details
+    // of the embedding, and references to them should never leak out to script.
+    // This flag causes the this compartment to skip firing onNewGlobalObject
+    // and makes addDebuggee a no-op for this global.
+    bool invisibleToDebugger() const { return invisibleToDebugger_; }
+    CompartmentCreationOptions& setInvisibleToDebugger(bool flag) {
+        invisibleToDebugger_ = flag;
+        return *this;
+    }
+
+    // Compartments used for off-thread compilation have their contents merged
+    // into a target compartment when the compilation is finished. This is only
+    // allowed if this flag is set. The invisibleToDebugger flag must also be
+    // set for such compartments.
+    bool mergeable() const { return mergeable_; }
+    CompartmentCreationOptions& setMergeable(bool flag) {
+        mergeable_ = flag;
+        return *this;
+    }
+
+    // Determines whether this compartment should preserve JIT code on
+    // non-shrinking GCs.
+    bool preserveJitCode() const { return preserveJitCode_; }
+    CompartmentCreationOptions& setPreserveJitCode(bool flag) {
+        preserveJitCode_ = flag;
+        return *this;
+    }
+
+    bool cloneSingletons() const { return cloneSingletons_; }
+    CompartmentCreationOptions& setCloneSingletons(bool flag) {
+        cloneSingletons_ = flag;
+        return *this;
+    }
+
+    // ECMA-402 is considering adding a "formatToParts" DateTimeFormat method,
+    // that exposes not just a formatted string but its ordered subcomponents.
+    // The method, its semantics, and its name are all well short of being
+    // finalized, so for now it's exposed *only* if requested.
+    //
+    // Until "formatToParts" is included in a final specification edition, it's
+    // subject to change or removal at any time.  Do *not* rely on it in
+    // mission-critical code that can't be changed if ECMA-402 decides not to
+    // accept the method in its current form.
+    bool experimentalDateTimeFormatFormatToPartsEnabled() const {
+        return experimentalDateTimeFormatFormatToPartsEnabled_;
+    }
+    CompartmentCreationOptions& setExperimentalDateTimeFormatFormatToPartsEnabled(bool flag) {
+        experimentalDateTimeFormatFormatToPartsEnabled_ = flag;
+        return *this;
+    }
+
+    bool getSharedMemoryAndAtomicsEnabled() const;
+    CompartmentCreationOptions& setSharedMemoryAndAtomicsEnabled(bool flag);
+
+  private:
+    JSAddonId* addonId_;
+    JSTraceOp traceGlobal_;
+    union {
+        ZoneSpecifier spec;
+        void* pointer; // js::Zone* is not exposed in the API.
+    } zone_;
+    bool invisibleToDebugger_;
+    bool mergeable_;
+    bool preserveJitCode_;
+    bool cloneSingletons_;
+    bool experimentalDateTimeFormatFormatToPartsEnabled_;
+    bool sharedMemoryAndAtomics_;
+};
+
+/**
+ * CompartmentBehaviors specifies behaviors of a compartment that can be
+ * changed after the compartment's been created.
+ */
+class JS_PUBLIC_API(CompartmentBehaviors)
 {
   public:
     class Override {
@@ -2182,65 +2332,32 @@ class JS_PUBLIC_API(CompartmentOptions)
         Mode mode_;
     };
 
-    explicit CompartmentOptions()
+    CompartmentBehaviors()
       : version_(JSVERSION_UNKNOWN)
-      , invisibleToDebugger_(false)
-      , mergeable_(false)
       , discardSource_(false)
       , disableLazyParsing_(false)
-      , cloneSingletons_(false)
-      , traceGlobal_(nullptr)
       , singletonsAsTemplates_(true)
-      , addonId_(nullptr)
-      , preserveJitCode_(false)
     {
-        zone_.spec = JS::FreshZone;
     }
 
     JSVersion version() const { return version_; }
-    CompartmentOptions& setVersion(JSVersion aVersion) {
+    CompartmentBehaviors& setVersion(JSVersion aVersion) {
         MOZ_ASSERT(aVersion != JSVERSION_UNKNOWN);
         version_ = aVersion;
-        return *this;
-    }
-
-    // Certain scopes (i.e. XBL compilation scopes) are implementation details
-    // of the embedding, and references to them should never leak out to script.
-    // This flag causes the this compartment to skip firing onNewGlobalObject
-    // and makes addDebuggee a no-op for this global.
-    bool invisibleToDebugger() const { return invisibleToDebugger_; }
-    CompartmentOptions& setInvisibleToDebugger(bool flag) {
-        invisibleToDebugger_ = flag;
-        return *this;
-    }
-
-    // Compartments used for off-thread compilation have their contents merged
-    // into a target compartment when the compilation is finished. This is only
-    // allowed if this flag is set.  The invisibleToDebugger flag must also be
-    // set for such compartments.
-    bool mergeable() const { return mergeable_; }
-    CompartmentOptions& setMergeable(bool flag) {
-        mergeable_ = flag;
         return *this;
     }
 
     // For certain globals, we know enough about the code that will run in them
     // that we can discard script source entirely.
     bool discardSource() const { return discardSource_; }
-    CompartmentOptions& setDiscardSource(bool flag) {
+    CompartmentBehaviors& setDiscardSource(bool flag) {
         discardSource_ = flag;
         return *this;
     }
 
     bool disableLazyParsing() const { return disableLazyParsing_; }
-    CompartmentOptions& setDisableLazyParsing(bool flag) {
+    CompartmentBehaviors& setDisableLazyParsing(bool flag) {
         disableLazyParsing_ = flag;
-        return *this;
-    }
-
-    bool cloneSingletons() const { return cloneSingletons_; }
-    CompartmentOptions& setCloneSingletons(bool flag) {
-        cloneSingletons_ = flag;
         return *this;
     }
 
@@ -2248,74 +2365,87 @@ class JS_PUBLIC_API(CompartmentOptions)
     bool extraWarnings(JSContext* cx) const;
     Override& extraWarningsOverride() { return extraWarningsOverride_; }
 
-    void* zonePointer() const {
-        MOZ_ASSERT(uintptr_t(zone_.pointer) > uintptr_t(JS::SystemZone));
-        return zone_.pointer;
-    }
-    ZoneSpecifier zoneSpecifier() const { return zone_.spec; }
-    CompartmentOptions& setZone(ZoneSpecifier spec);
-    CompartmentOptions& setSameZoneAs(JSObject* obj);
-
-    void setSingletonsAsValues() {
-        singletonsAsTemplates_ = false;
-    }
     bool getSingletonsAsTemplates() const {
         return singletonsAsTemplates_;
     }
-
-    // A null add-on ID means that the compartment is not associated with an
-    // add-on.
-    JSAddonId* addonIdOrNull() const { return addonId_; }
-    CompartmentOptions& setAddonId(JSAddonId* id) {
-        addonId_ = id;
-        return *this;
-    }
-
-    CompartmentOptions& setTrace(JSTraceOp op) {
-        traceGlobal_ = op;
-        return *this;
-    }
-    JSTraceOp getTrace() const {
-        return traceGlobal_;
-    }
-
-    bool preserveJitCode() const { return preserveJitCode_; }
-    CompartmentOptions& setPreserveJitCode(bool flag) {
-        preserveJitCode_ = flag;
+    CompartmentBehaviors& setSingletonsAsValues() {
+        singletonsAsTemplates_ = false;
         return *this;
     }
 
   private:
     JSVersion version_;
-    bool invisibleToDebugger_;
-    bool mergeable_;
     bool discardSource_;
     bool disableLazyParsing_;
-    bool cloneSingletons_;
     Override extraWarningsOverride_;
-    union {
-        ZoneSpecifier spec;
-        void* pointer; // js::Zone* is not exposed in the API.
-    } zone_;
-    JSTraceOp traceGlobal_;
 
     // To XDR singletons, we need to ensure that all singletons are all used as
     // templates, by making JSOP_OBJECT return a clone of the JSScript
     // singleton, instead of returning the value which is baked in the JSScript.
     bool singletonsAsTemplates_;
-
-    JSAddonId* addonId_;
-    bool preserveJitCode_;
 };
 
-JS_PUBLIC_API(CompartmentOptions&)
-CompartmentOptionsRef(JSCompartment* compartment);
+/**
+ * CompartmentOptions specifies compartment characteristics: both those that
+ * can't be changed on a compartment once it's been created
+ * (CompartmentCreationOptions), and those that can be changed on an existing
+ * compartment (CompartmentBehaviors).
+ */
+class JS_PUBLIC_API(CompartmentOptions)
+{
+  public:
+    explicit CompartmentOptions()
+      : creationOptions_(),
+        behaviors_()
+    {}
 
-JS_PUBLIC_API(CompartmentOptions&)
-CompartmentOptionsRef(JSObject* obj);
+    CompartmentOptions(const CompartmentCreationOptions& compartmentCreation,
+                       const CompartmentBehaviors& compartmentBehaviors)
+      : creationOptions_(compartmentCreation),
+        behaviors_(compartmentBehaviors)
+    {}
 
-JS_PUBLIC_API(CompartmentOptions&)
-CompartmentOptionsRef(JSContext* cx);
+    // CompartmentCreationOptions specify fundamental compartment
+    // characteristics that must be specified when the compartment is created,
+    // that can't be changed after the compartment is created.
+    CompartmentCreationOptions& creationOptions() {
+        return creationOptions_;
+    }
+    const CompartmentCreationOptions& creationOptions() const {
+        return creationOptions_;
+    }
+
+    // CompartmentBehaviors specify compartment characteristics that can be
+    // changed after the compartment is created.
+    CompartmentBehaviors& behaviors() {
+        return behaviors_;
+    }
+    const CompartmentBehaviors& behaviors() const {
+        return behaviors_;
+    }
+
+  private:
+    CompartmentCreationOptions creationOptions_;
+    CompartmentBehaviors behaviors_;
+};
+
+JS_PUBLIC_API(const CompartmentCreationOptions&)
+CompartmentCreationOptionsRef(JSCompartment* compartment);
+
+JS_PUBLIC_API(const CompartmentCreationOptions&)
+CompartmentCreationOptionsRef(JSObject* obj);
+
+JS_PUBLIC_API(const CompartmentCreationOptions&)
+CompartmentCreationOptionsRef(JSContext* cx);
+
+JS_PUBLIC_API(CompartmentBehaviors&)
+CompartmentBehaviorsRef(JSCompartment* compartment);
+
+JS_PUBLIC_API(CompartmentBehaviors&)
+CompartmentBehaviorsRef(JSObject* obj);
+
+JS_PUBLIC_API(CompartmentBehaviors&)
+CompartmentBehaviorsRef(JSContext* cx);
 
 /**
  * During global creation, we fire notifications to callbacks registered
@@ -2402,27 +2532,27 @@ JS_FreezeObject(JSContext* cx, JS::Handle<JSObject*> obj);
 
 /*** Property descriptors ************************************************************************/
 
-struct JSPropertyDescriptor : public JS::Traceable {
+namespace JS {
+
+struct PropertyDescriptor {
     JSObject* obj;
     unsigned attrs;
     JSGetterOp getter;
     JSSetterOp setter;
     JS::Value value;
 
-    JSPropertyDescriptor()
+    PropertyDescriptor()
       : obj(nullptr), attrs(0), getter(nullptr), setter(nullptr), value(JS::UndefinedValue())
     {}
 
-    static void trace(JSPropertyDescriptor* self, JSTracer* trc) { self->trace(trc); }
+    static void trace(PropertyDescriptor* self, JSTracer* trc) { self->trace(trc); }
     void trace(JSTracer* trc);
 };
-
-namespace JS {
 
 template <typename Outer>
 class PropertyDescriptorOperations
 {
-    const JSPropertyDescriptor& desc() const { return static_cast<const Outer*>(this)->get(); }
+    const PropertyDescriptor& desc() const { return static_cast<const Outer*>(this)->get(); }
 
     bool has(unsigned bit) const {
         MOZ_ASSERT(bit != 0);
@@ -2554,7 +2684,7 @@ class PropertyDescriptorOperations
 template <typename Outer>
 class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<Outer>
 {
-    JSPropertyDescriptor& desc() { return static_cast<Outer*>(this)->get(); }
+    PropertyDescriptor& desc() { return static_cast<Outer*>(this)->get(); }
 
   public:
     void clear() {
@@ -2577,7 +2707,7 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
         setSetter(setterOp);
     }
 
-    void assign(JSPropertyDescriptor& other) {
+    void assign(PropertyDescriptor& other) {
         object().set(other.obj);
         setAttributes(other.attrs);
         setGetter(other.getter);
@@ -2665,18 +2795,18 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
 namespace js {
 
 template <>
-class RootedBase<JSPropertyDescriptor>
-  : public JS::MutablePropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor>>
+class RootedBase<JS::PropertyDescriptor>
+  : public JS::MutablePropertyDescriptorOperations<JS::Rooted<JS::PropertyDescriptor>>
 {};
 
 template <>
-class HandleBase<JSPropertyDescriptor>
-  : public JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor>>
+class HandleBase<JS::PropertyDescriptor>
+  : public JS::PropertyDescriptorOperations<JS::Handle<JS::PropertyDescriptor>>
 {};
 
 template <>
-class MutableHandleBase<JSPropertyDescriptor>
-  : public JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor>>
+class MutableHandleBase<JS::PropertyDescriptor>
+  : public JS::MutablePropertyDescriptorOperations<JS::MutableHandle<JS::PropertyDescriptor>>
 {};
 
 } /* namespace js */
@@ -2687,7 +2817,7 @@ extern JS_PUBLIC_API(bool)
 ObjectToCompletePropertyDescriptor(JSContext* cx,
                                    JS::HandleObject obj,
                                    JS::HandleValue descriptor,
-                                   JS::MutableHandle<JSPropertyDescriptor> desc);
+                                   JS::MutableHandle<PropertyDescriptor> desc);
 
 } // namespace JS
 
@@ -2774,15 +2904,15 @@ JS_SetImmutablePrototype(JSContext* cx, JS::HandleObject obj, bool* succeeded);
  */
 extern JS_PUBLIC_API(bool)
 JS_GetOwnPropertyDescriptorById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                                JS::MutableHandle<JSPropertyDescriptor> desc);
+                                JS::MutableHandle<JS::PropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char* name,
-                            JS::MutableHandle<JSPropertyDescriptor> desc);
+                            JS::MutableHandle<JS::PropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_GetOwnUCPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char16_t* name,
-                              JS::MutableHandle<JSPropertyDescriptor> desc);
+                              JS::MutableHandle<JS::PropertyDescriptor> desc);
 
 /**
  * Like JS_GetOwnPropertyDescriptorById, but also searches the prototype chain
@@ -2792,11 +2922,11 @@ JS_GetOwnUCPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char16_
  */
 extern JS_PUBLIC_API(bool)
 JS_GetPropertyDescriptorById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                             JS::MutableHandle<JSPropertyDescriptor> desc);
+                             JS::MutableHandle<JS::PropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_GetPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char* name,
-                         JS::MutableHandle<JSPropertyDescriptor> desc);
+                         JS::MutableHandle<JS::PropertyDescriptor> desc);
 
 /**
  * Define a property on obj.
@@ -2811,7 +2941,7 @@ JS_GetPropertyDescriptor(JSContext* cx, JS::HandleObject obj, const char* name,
  */
 extern JS_PUBLIC_API(bool)
 JS_DefinePropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                      JS::Handle<JSPropertyDescriptor> desc,
+                      JS::Handle<JS::PropertyDescriptor> desc,
                       JS::ObjectOpResult& result);
 
 /**
@@ -2820,7 +2950,7 @@ JS_DefinePropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
  */
 extern JS_PUBLIC_API(bool)
 JS_DefinePropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                      JS::Handle<JSPropertyDescriptor> desc);
+                      JS::Handle<JS::PropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_DefinePropertyById(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
@@ -2872,12 +3002,12 @@ JS_DefineProperty(JSContext* cx, JS::HandleObject obj, const char* name, double 
 
 extern JS_PUBLIC_API(bool)
 JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
-                    JS::Handle<JSPropertyDescriptor> desc,
+                    JS::Handle<JS::PropertyDescriptor> desc,
                     JS::ObjectOpResult& result);
 
 extern JS_PUBLIC_API(bool)
 JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
-                    JS::Handle<JSPropertyDescriptor> desc);
+                    JS::Handle<JS::PropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_DefineUCProperty(JSContext* cx, JS::HandleObject obj, const char16_t* name, size_t namelen,
@@ -3216,21 +3346,18 @@ Call(JSContext* cx, JS::HandleValue thisv, JS::HandleObject funObj, const JS::Ha
  */
 extern JS_PUBLIC_API(bool)
 Construct(JSContext* cx, JS::HandleValue fun, HandleObject newTarget,
-          const JS::HandleValueArray &args, MutableHandleValue rval);
+          const JS::HandleValueArray &args, MutableHandleObject objp);
 
 /**
  * Invoke a constructor. This is the C++ equivalent of
  * `rval = new fun(...args)`.
- *
- * The value left in rval on success is always an object in practice,
- * though at the moment this is not enforced by the C++ type system.
  *
  * Implements: ES6 7.3.13 Construct(F, [argumentsList], [newTarget]), when
  * newTarget is omitted.
  */
 extern JS_PUBLIC_API(bool)
 Construct(JSContext* cx, JS::HandleValue fun, const JS::HandleValueArray& args,
-          MutableHandleValue rval);
+          MutableHandleObject objp);
 
 } /* namespace JS */
 
@@ -3350,7 +3477,7 @@ JS_CreateMappedArrayBufferContents(int fd, size_t offset, size_t length);
  * Release the allocated resource of mapped array buffer contents before the
  * object is created.
  * If a new object has been created by JS_NewMappedArrayBufferWithContents()
- * with this content, then JS_NeuterArrayBuffer() should be used instead to
+ * with this content, then JS_DetachArrayBuffer() should be used instead to
  * release the resource used by the object.
  */
 extern JS_PUBLIC_API(void)
@@ -5142,7 +5269,7 @@ JS_NewObjectForConstructor(JSContext* cx, const JSClass* clasp, const JS::CallAr
 #define JS_DEFAULT_ZEAL_FREQ 100
 
 extern JS_PUBLIC_API(void)
-JS_GetGCZeal(JSContext* cx, uint8_t* zeal, uint32_t* frequency, uint32_t* nextScheduled);
+JS_GetGCZealBits(JSContext* cx, uint32_t* zealBits, uint32_t* frequency, uint32_t* nextScheduled);
 
 extern JS_PUBLIC_API(void)
 JS_SetGCZeal(JSContext* cx, uint8_t zeal, uint32_t frequency);
@@ -5165,7 +5292,8 @@ JS_SetOffthreadIonCompilationEnabled(JSRuntime* rt, bool enabled);
     Register(ION_ENABLE, "ion.enable")                                     \
     Register(BASELINE_ENABLE, "baseline.enable")                           \
     Register(OFFTHREAD_COMPILATION_ENABLE, "offthread-compilation.enable") \
-    Register(SIGNALS_ENABLE, "signals.enable")
+    Register(SIGNALS_ENABLE, "signals.enable")                             \
+    Register(JUMP_THRESHOLD, "jump-threshold")
 
 typedef enum JSJitCompilerOption {
 #define JIT_COMPILER_DECLARE(key, str) \
@@ -5213,26 +5341,6 @@ JS_IsIdentifier(const char16_t* chars, size_t length);
 namespace JS {
 
 /**
- * AutoFilename encapsulates a pointer to a C-string and keeps the C-string
- * alive for as long as the associated AutoFilename object is alive.
- */
-class MOZ_STACK_CLASS JS_PUBLIC_API(AutoFilename)
-{
-    void* scriptSource_;
-
-    AutoFilename(const AutoFilename&) = delete;
-    void operator=(const AutoFilename&) = delete;
-
-  public:
-    AutoFilename() : scriptSource_(nullptr) {}
-    ~AutoFilename() { reset(nullptr); }
-
-    const char* get() const;
-
-    void reset(void* newScriptSource);
-};
-
-/**
  * Return the current filename, line number and column number of the most
  * currently running frame. Returns true if a scripted frame was found, false
  * otherwise.
@@ -5241,7 +5349,7 @@ class MOZ_STACK_CLASS JS_PUBLIC_API(AutoFilename)
  * record, this will also return false.
  */
 extern JS_PUBLIC_API(bool)
-DescribeScriptedCaller(JSContext* cx, AutoFilename* filename = nullptr,
+DescribeScriptedCaller(JSContext* cx, UniqueChars* filename = nullptr,
                        unsigned* lineno = nullptr, unsigned* column = nullptr);
 
 extern JS_PUBLIC_API(JSObject*)

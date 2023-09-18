@@ -292,13 +292,13 @@ nsInlineFrame::ComputeSize(nsRenderingContext *aRenderingContext,
 }
 
 nsRect
-nsInlineFrame::ComputeTightBounds(gfxContext* aContext) const
+nsInlineFrame::ComputeTightBounds(DrawTarget* aDrawTarget) const
 {
   // be conservative
   if (StyleContext()->HasTextDecorationLines()) {
     return GetVisualOverflowRect();
   }
-  return ComputeSimpleTightBounds(aContext);
+  return ComputeSimpleTightBounds(aDrawTarget);
 }
 
 void
@@ -659,7 +659,7 @@ nsInlineFrame::ReflowFrames(nsPresContext* aPresContext,
       // so nsFirstLetterFrame::Reflow can destroy them safely (bug 401042).
       nsIFrame* realFrame = nsPlaceholderFrame::GetRealFrameFor(frame);
       if (realFrame->GetType() == nsGkAtoms::letterFrame) {
-        nsIFrame* child = realFrame->GetFirstPrincipalChild();
+        nsIFrame* child = realFrame->PrincipalChildList().FirstChild();
         if (child) {
           NS_ASSERTION(child->GetType() == nsGkAtoms::textFrame,
                        "unexpected frame type");

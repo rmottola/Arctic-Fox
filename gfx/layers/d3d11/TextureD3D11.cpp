@@ -120,7 +120,12 @@ TextureSourceD3D11::GetShaderResourceView()
   if (!mSRV && mTexture) {
     RefPtr<ID3D11Device> device;
     mTexture->GetDevice(getter_AddRefs(device));
-    HRESULT hr = device->CreateShaderResourceView(mTexture, nullptr, getter_AddRefs(mSRV));
+
+    // see comment in CompositingRenderTargetD3D11 constructor
+    CD3D11_SHADER_RESOURCE_VIEW_DESC srvDesc(D3D11_SRV_DIMENSION_TEXTURE2D, mFormatOverride);
+    D3D11_SHADER_RESOURCE_VIEW_DESC *desc = mFormatOverride == DXGI_FORMAT_UNKNOWN ? nullptr : &srvDesc;
+
+    HRESULT hr = device->CreateShaderResourceView(mTexture, desc, getter_AddRefs(mSRV));
     if (FAILED(hr)) {
       gfxCriticalNote << "[D3D11] TextureSourceD3D11:GetShaderResourceView CreateSRV failure " << gfx::hexa(hr);
       return nullptr;
@@ -1047,18 +1052,17 @@ DataTextureSourceD3D11::Update(DataSourceSurface* aSurface,
     }
 
     if (regionToUpdate) {
-      nsIntRegionRectIterator iter(*regionToUpdate);
-      const IntRect *iterRect;
-      while ((iterRect = iter.Next())) {
+      for (auto iter = regionToUpdate->RectIter(); !iter.Done(); iter.Next()) {
+        const IntRect& rect = iter.Get();
         D3D11_BOX box;
         box.front = 0;
         box.back = 1;
-        box.left = iterRect->x;
-        box.top = iterRect->y;
-        box.right = iterRect->XMost();
-        box.bottom = iterRect->YMost();
+        box.left = rect.x;
+        box.top = rect.y;
+        box.right = rect.XMost();
+        box.bottom = rect.YMost();
 
-        void* data = map.mData + map.mStride * iterRect->y + BytesPerPixel(aSurface->GetFormat()) * iterRect->x;
+        void* data = map.mData + map.mStride * rect.y + BytesPerPixel(aSurface->GetFormat()) * rect.x;
 
         mCompositor->GetDC()->UpdateSubresource(mTexture, 0, &box, data, map.mStride, map.mStride * mSize.height);
       }
@@ -1165,7 +1169,8 @@ DataTextureSourceD3D11::SetCompositor(Compositor* aCompositor)
 }
 
 CompositingRenderTargetD3D11::CompositingRenderTargetD3D11(ID3D11Texture2D* aTexture,
-                                                           const gfx::IntPoint& aOrigin)
+                                                           const gfx::IntPoint& aOrigin,
+                                                           DXGI_FORMAT aFormatOverride)
   : CompositingRenderTarget(aOrigin)
 {
   MOZ_ASSERT(aTexture);
@@ -1175,7 +1180,15 @@ CompositingRenderTargetD3D11::CompositingRenderTargetD3D11(ID3D11Texture2D* aTex
   RefPtr<ID3D11Device> device;
   mTexture->GetDevice(getter_AddRefs(device));
 
-  HRESULT hr = device->CreateRenderTargetView(mTexture, nullptr, getter_AddRefs(mRTView));
+  mFormatOverride = aFormatOverride;
+
+  // If we happen to have a typeless underlying DXGI surface, we need to be explicit
+  // about the format here. (Such a surface could come from an external source, such
+  // as the Oculus compositor)
+  CD3D11_RENDER_TARGET_VIEW_DESC rtvDesc(D3D11_RTV_DIMENSION_TEXTURE2D, mFormatOverride);
+  D3D11_RENDER_TARGET_VIEW_DESC *desc = aFormatOverride == DXGI_FORMAT_UNKNOWN ? nullptr : &rtvDesc;
+
+  HRESULT hr = device->CreateRenderTargetView(mTexture, desc, getter_AddRefs(mRTView));
 
   if (FAILED(hr)) {
     LOGD3D11("Failed to create RenderTargetView.");

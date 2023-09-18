@@ -32,6 +32,7 @@ using mozilla::plugins::PluginInstanceParent;
 #include "mozilla/gfx/DataSurfaceHelpers.h"
 #include "mozilla/gfx/Tools.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/UniquePtrExtensions.h"
 #include "nsGfxCIID.h"
 #include "gfxContext.h"
 #include "prmem.h"
@@ -69,7 +70,7 @@ using namespace mozilla::plugins;
  *
  **************************************************************/
 
-static nsAutoPtr<uint8_t>  sSharedSurfaceData;
+static UniquePtr<uint8_t[]> sSharedSurfaceData;
 static IntSize             sSharedSurfaceSize;
 
 struct IconMetrics {
@@ -151,11 +152,11 @@ EnsureSharedSurfaceSize(IntSize size)
 
   if (!sSharedSurfaceData || (WORDSSIZE(size) > WORDSSIZE(sSharedSurfaceSize))) {
     sSharedSurfaceSize = size;
-    sSharedSurfaceData = nullptr;
-    sSharedSurfaceData = (uint8_t *)malloc(WORDSSIZE(sSharedSurfaceSize) * 4);
+    sSharedSurfaceData =
+      MakeUniqueFallible<uint8_t[]>(WORDSSIZE(sSharedSurfaceSize) * 4);
   }
 
-  return (sSharedSurfaceData != nullptr);
+  return !sSharedSurfaceData;
 }
 
 nsIWidgetListener* nsWindow::GetPaintListener()
@@ -354,7 +355,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
             targetSurfaceImage = new gfxImageSurface(sSharedSurfaceData.get(),
                                                      surfaceSize,
                                                      surfaceSize.width * 4,
-                                                     gfxImageFormat::RGB24);
+                                                     SurfaceFormat::X8R8G8B8_UINT32);
 
             if (targetSurfaceImage && !targetSurfaceImage->CairoStatus()) {
               targetSurfaceImage->SetDeviceOffset(gfxPoint(-ps.rcPaint.left, -ps.rcPaint.top));

@@ -527,6 +527,9 @@ class _ConvertToCxxType(TypeVisitor):
     def visitFDType(self, s):
         return Type(self.typename(s))
 
+    def visitEndpointType(self, s):
+        return Type(self.typename(s))
+
     def visitProtocolType(self, p): assert 0
     def visitMessageType(self, m): assert 0
     def visitVoidType(self, v): assert 0
@@ -553,7 +556,7 @@ def _cxxConstRefType(ipdltype, side):
 
 def _cxxMoveRefType(ipdltype, side):
     t = _cxxBareType(ipdltype, side)
-    if ipdltype.isIPDL() and (ipdltype.isArray() or ipdltype.isShmem()):
+    if ipdltype.isIPDL() and (ipdltype.isArray() or ipdltype.isShmem() or ipdltype.isEndpoint()):
         t.ref = 2
         return t
     return _cxxConstRefType(ipdltype, side)
@@ -574,7 +577,7 @@ def _cxxConstPtrToType(ipdltype, side):
         t.ptrconstptr = 1
         return t
     t.const = 1
-    t.ptrconst = 1
+    t.ptr = 1
     return t
 
 def _allocMethod(ptype, side):
@@ -1117,9 +1120,6 @@ class Protocol(ipdl.ast.Protocol):
     def createSharedMemory(self):
         return ExprVar('CreateSharedMemory')
 
-    def adoptSharedMemory(self):
-        return ExprVar('AdoptSharedMemory')
-
     def lookupSharedMemory(self):
         return ExprVar('LookupSharedMemory')
 
@@ -1358,6 +1358,8 @@ with some new IPDL/C++ nodes that are tuned for C++ codegen."""
                                         'ProtocolId'),
                                 Typedef(Type('mozilla::ipc::Transport'),
                                         'Transport'),
+                                Typedef(Type('mozilla::ipc::Endpoint'),
+                                        'Endpoint', ['FooSide']),
                                 Typedef(Type('mozilla::ipc::TransportDescriptor'),
                                         'TransportDescriptor') ])
         self.protocolName = None
@@ -1566,6 +1568,14 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
 
     def visitProtocol(self, p):
         self.cppIncludeHeaders.append(_protocolHeaderName(self.protocol, ''))
+
+        # Forward declare our own actors.
+        self.hdrfile.addthings([
+            Whitespace.NL,
+            _makeForwardDeclForActor(p.decl.type, 'Parent'),
+            _makeForwardDeclForActor(p.decl.type, 'Child')
+        ])
+
         bridges = ProcessGraph.bridgesOf(p.decl.type)
         for bridge in bridges:
             ppt, pside = bridge.parent.ptype, _otherSide(bridge.parent.side)
@@ -1610,6 +1620,10 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
             odecl, odefn = _splitFuncDeclDefn(self.genOpenFunc(o))
             ns.addstmts([ odecl, Whitespace.NL ])
             self.funcDefns.append(odefn)
+
+        edecl, edefn = _splitFuncDeclDefn(self.genEndpointFunc())
+        ns.addstmts([ edecl, Whitespace.NL ])
+        self.funcDefns.append(edefn)
 
         # state information
         stateenum = TypeEnum('State')
@@ -1711,6 +1725,36 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
                    _sideToTransportMode(localside),
                    _protocolId(p.decl.type),
                    ExprVar(_messageStartName(p.decl.type) + 'Child')
+                   ])))
+        return openfunc
+
+
+    # Generate code for PFoo::CreateEndpoints.
+    def genEndpointFunc(self):
+        p = self.protocol.decl.type
+        tparent = _cxxBareType(ActorType(p), 'Parent', fq=1)
+        tchild = _cxxBareType(ActorType(p), 'Child', fq=1)
+        methodvar = ExprVar('CreateEndpoints')
+        rettype = Type.NSRESULT
+        parentpidvar = ExprVar('aParentDestPid')
+        childpidvar = ExprVar('aChildDestPid')
+        parentvar = ExprVar('aParent')
+        childvar = ExprVar('aChild')
+
+        openfunc = MethodDefn(MethodDecl(
+            methodvar.name,
+            params=[ Decl(Type('base::ProcessId'), parentpidvar.name),
+                     Decl(Type('base::ProcessId'), childpidvar.name),
+                     Decl(Type('mozilla::ipc::Endpoint<' + tparent.name + '>', ptr=1), parentvar.name),
+                     Decl(Type('mozilla::ipc::Endpoint<' + tchild.name + '>', ptr=1), childvar.name) ],
+            ret=rettype))
+        openfunc.addstmt(StmtReturn(ExprCall(
+            ExprVar('mozilla::ipc::CreateEndpoints'),
+            args=[ _backstagePass(),
+                   parentpidvar, childpidvar,
+                   _protocolId(p),
+                   ExprVar(_messageStartName(p) + 'Child'),
+                   parentvar, childvar
                    ])))
         return openfunc
 
@@ -3627,12 +3671,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                      Decl(Type.BOOL, unsafevar.name),
                      Decl(_shmemIdType(ptr=1), idvar.name) ],
             virtual=1))
-        adoptshmem = MethodDefn(MethodDecl(
-            p.adoptSharedMemory().name,
-            ret=Type.BOOL,
-            params=[ Decl(_rawShmemType(ptr=1), rawvar.name),
-                     Decl(_shmemIdType(ptr=1), idvar.name) ],
-            virtual=1))
         lookupshmem = MethodDefn(MethodDecl(
             p.lookupSharedMemory().name,
             ret=_rawShmemType(ptr=1),
@@ -3749,48 +3787,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                 StmtReturn(rawsegmentvar)
             ])
 
-            # SharedMemory* AdoptSharedMemory(SharedMemory*, id_t*):
-            #   Shmem s(seg, [nextshmemid]);
-            #   Message descriptor;
-            #   if (!s->ShareTo(subprocess, mId, descriptor) ||
-            #       !Send(descriptor))
-            #     return false;
-            #   mShmemMap.Add(seg, id);
-            #   seg->AddRef();
-            #   return true;
-
-            # XXX this is close to the same code as above, could be
-            # refactored
-            descriptorvar = ExprVar('descriptor')
-            adoptshmem.addstmts([
-                StmtDecl(
-                    Decl(_shmemType(), shmemvar.name),
-                    initargs=[ _shmemBackstagePass(),
-                               rawvar,
-                               p.nextShmemIdExpr(self.side) ]),
-                StmtDecl(Decl(Type('Message', ptr=1), descriptorvar.name),
-                         init=_shmemShareTo(shmemvar,
-                                            p.callOtherPid(),
-                                            p.routingId()))
-            ])
-            failif = StmtIf(ExprNot(descriptorvar))
-            failif.addifstmt(StmtReturn.FALSE)
-            adoptshmem.addstmt(failif)
-
-            failif = StmtIf(ExprNot(ExprCall(
-                ExprSelect(p.channelVar(), p.channelSel(), 'Send'),
-                args=[ descriptorvar ])))
-            adoptshmem.addstmt(failif)
-
-            adoptshmem.addstmts([
-                StmtExpr(ExprAssn(ExprDeref(idvar), _shmemId(shmemvar))),
-                StmtExpr(ExprCall(
-                    ExprSelect(p.shmemMapVar(), '.', 'AddWithID'),
-                    args=[ rawvar, ExprDeref(idvar) ])),
-                StmtExpr(ExprCall(ExprSelect(rawvar, '->', 'AddRef'))),
-                StmtReturn.TRUE
-            ])
-
             # SharedMemory* Lookup(id)
             lookupshmem.addstmt(StmtReturn(ExprCall(
                 ExprSelect(p.shmemMapVar(), '.', 'Lookup'),
@@ -3889,9 +3885,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             createshmem.addstmt(StmtReturn(ExprCall(
                 ExprSelect(p.managerVar(), '->', p.createSharedMemory().name),
                 [ sizevar, typevar, unsafevar, idvar ])))
-            adoptshmem.addstmt(StmtReturn(ExprCall(
-                ExprSelect(p.managerVar(), '->', p.adoptSharedMemory().name),
-                [ rawvar, idvar ])))
             lookupshmem.addstmt(StmtReturn(ExprCall(
                 ExprSelect(p.managerVar(), '->', p.lookupSharedMemory().name),
                 [ idvar ])))
@@ -4044,7 +4037,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                  unregister,
                  removemanagee,
                  createshmem,
-                 adoptshmem,
                  lookupshmem,
                  istracking,
                  destroyshmem,
@@ -4107,52 +4099,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         # bool AllocUnsafeShmem(size_t size, Type type, Shmem* outmem):
         allocUnsafeShmem = allocShmemMethod('AllocUnsafeShmem', True)
 
-        # bool AdoptShmem(Shmem& aMem, Shmem* aOutmem):
-        #   SharedMemory* rawmem = aMem.Segment();
-        #   if (!rawmem || IsTrackingSharedMemory(rawmem)) {
-        #     NS_WARNING("bad Shmem"); // or NS_RUNTIMEABORT on child side
-        #     return false;
-        #   }
-        #   id_t id
-        #   if (!AdoptSharedMemory(rawmem, &id))
-        #     return false
-        #   *aOutmem = Shmem(rawmem, id);
-        #   return true;
-        adoptShmem = MethodDefn(MethodDecl(
-            'AdoptShmem',
-            params=[ Decl(_shmemType(const=1, ref=1), memvar.name),
-                     Decl(_shmemType(ptr=1), outmemvar.name) ],
-            ret=Type.BOOL))
-
-        adoptShmem.addstmt(StmtDecl(Decl(_rawShmemType(ptr=1), rawvar.name),
-                                    init=_shmemSegment(memvar)))
-        ifbad = StmtIf(ExprBinary(
-            ExprNot(rawvar), '||',
-            ExprCall(ExprVar('IsTrackingSharedMemory'), args=[ rawvar ])))
-        badShmemActions = []
-        if (self.side == 'child'):
-            badShmemActions.append(_runtimeAbort('bad Shmem'));
-        else:
-            badShmemActions.append(_printWarningMessage('bad Shmem'));
-        badShmemActions.append(StmtReturn.FALSE);
-        ifbad.addifstmts(badShmemActions)
-
-        adoptShmem.addstmt(ifbad)
-
-        ifadoptfails = StmtIf(ExprNot(ExprCall(
-            p.adoptSharedMemory(), args=[ rawvar, ExprAddrOf(idvar) ])))
-        ifadoptfails.addifstmt(StmtReturn.FALSE)
-
-        adoptShmem.addstmts([
-            Whitespace.NL,
-            StmtDecl(Decl(_shmemIdType(), idvar.name)),
-            ifadoptfails,
-            Whitespace.NL,
-            StmtExpr(ExprAssn(ExprDeref(outmemvar),
-                              _shmemCtor(rawvar, idvar))),
-            StmtReturn.TRUE
-        ])
-
         # bool DeallocShmem(Shmem& mem):
         #   bool ok = DestroySharedMemory(mem);
         ##ifdef DEBUG
@@ -4170,6 +4116,12 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         okvar = ExprVar('ok')
 
         ifbad = StmtIf(ExprNot(okvar))
+        badShmemActions = []
+        if (self.side == 'child'):
+            badShmemActions.append(_runtimeAbort('bad Shmem'));
+        else:
+            badShmemActions.append(_printWarningMessage('bad Shmem'));
+        badShmemActions.append(StmtReturn.FALSE);
         ifbad.addifstmts(badShmemActions)
 
         deallocShmem.addstmts([
@@ -4187,8 +4139,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                  allocShmem,
                  Whitespace.NL,
                  allocUnsafeShmem,
-                 Whitespace.NL,
-                 adoptShmem,
                  Whitespace.NL,
                  deallocShmem,
                  Whitespace.NL ]
@@ -4410,7 +4360,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                                          args=[ msgvar, itervar, var ])))
 
         self.cls.addstmts([ write, Whitespace.NL, read, Whitespace.NL ])
-
 
     def implementActorPickling(self, actortype):
         # Note that we pickle based on *protocol* type and *not* actor

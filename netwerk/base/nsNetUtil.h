@@ -17,6 +17,7 @@
 #include "nsIIOService.h"
 #include "mozilla/Services.h"
 #include "nsNetCID.h"
+#include "nsServiceManagerUtils.h"
 
 class nsIURI;
 class nsIPrincipal;
@@ -978,6 +979,16 @@ bool NS_IsReasonableHTTPHeaderValue(const nsACString &aValue);
  * 2.2.
  */
 bool NS_IsValidHTTPToken(const nsACString &aToken);
+
+/**
+ * Return true if the given request must be upgraded to HTTPS.
+ */
+nsresult NS_ShouldSecureUpgrade(nsIURI* aURI,
+                                nsILoadInfo* aLoadInfo,
+                                nsIPrincipal* aChannelResultPrincipal,
+                                bool aPrivateBrowsing,
+                                bool aAllowSTS,
+                                bool& aShouldUpgrade);
 
 namespace mozilla {
 namespace net {

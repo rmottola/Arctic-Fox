@@ -1261,7 +1261,7 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
     }
 
     unsigned lineno, column;
-    JS::AutoFilename file;
+    JS::UniqueChars file;
     if (!JS::DescribeScriptedCaller(aGlobal.Context(), &file, &lineno,
                                     &column)) {
       NS_WARNING("Failed to get line number and filename in workers.");
@@ -1496,7 +1496,7 @@ WebSocketImpl::Init(JSContext* aCx,
     MOZ_ASSERT(aCx);
 
     unsigned lineno, column;
-    JS::AutoFilename file;
+    JS::UniqueChars file;
     if (JS::DescribeScriptedCaller(aCx, &file, &lineno, &column)) {
       mScriptFile = file.get();
       mScriptLine = lineno;
@@ -2552,6 +2552,9 @@ public:
   bool
   PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   {
+    // We don't call WorkerRunnable::PreDispatch because it would assert the
+    // wrong thing about which thread we're on.
+    AssertIsOnMainThread();
     return true;
   }
 
@@ -2559,6 +2562,9 @@ public:
   PostDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aDispatchResult)
   {
+    // We don't call WorkerRunnable::PostDispatch because it would assert the
+    // wrong thing about which thread we're on.
+    AssertIsOnMainThread();
   }
 
 private:
@@ -2723,6 +2729,10 @@ public:
   bool
   PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   {
+    // We don't call WorkerRunnable::PreDispatch because it would assert the
+    // wrong thing about which thread we're on.  We're on whichever thread the
+    // channel implementation is running on (probably the main thread or socket
+    // transport thread).
     return true;
   }
 
@@ -2730,6 +2740,10 @@ public:
   PostDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aDispatchResult)
   {
+    // We don't call WorkerRunnable::PreDispatch because it would assert the
+    // wrong thing about which thread we're on.  We're on whichever thread the
+    // channel implementation is running on (probably the main thread or socket
+    // transport thread).
   }
 
 private:

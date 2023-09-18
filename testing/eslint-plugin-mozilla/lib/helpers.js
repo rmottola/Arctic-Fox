@@ -6,8 +6,8 @@
  */
 "use strict";
 
-var escope = require("eslint/node_modules/escope");
-var espree = require("eslint/node_modules/espree");
+var escope = require("escope");
+var espree = require("espree");
 
 var regexes = [
   /^(?:Cu|Components\.utils)\.import\(".*\/(.*?)\.jsm?"\);?$/,
@@ -167,28 +167,64 @@ module.exports = {
       tolerant: true,
       ecmaFeatures: {
         arrowFunctions: true,
-        blockBindings: true,
-        destructuring: true,
-        regexYFlag: true,
-        regexUFlag: true,
-        templateStrings: true,
         binaryLiterals: true,
-        octalLiterals: true,
-        unicodeCodePointEscapes: true,
+        blockBindings: true,
+        classes: true,
         defaultParams: true,
-        restParams: true,
+        destructuring: true,
         forOf: true,
+        generators: true,
+        globalReturn: true,
+        modules: true,
         objectLiteralComputedProperties: true,
+        objectLiteralDuplicateProperties: true,
         objectLiteralShorthandMethods: true,
         objectLiteralShorthandProperties: true,
-        objectLiteralDuplicateProperties: true,
-        generators: true,
+        octalLiterals: true,
+        regexUFlag: true,
+        regexYFlag: true,
+        restParams: true,
         spread: true,
         superInFunctions: true,
-        classes: true,
-        modules: true,
-        globalReturn: true
+        templateStrings: true,
+        unicodeCodePointEscapes: true,
       }
     };
+  },
+
+  /**
+   * Check whether the context is the global scope.
+   *
+   * @param {ASTContext} context
+   *        The current context.
+   *
+   * @return {Boolean}
+   *         True or false
+   */
+  getIsGlobalScope: function(context) {
+    var ancestors = context.getAncestors();
+    var parent = ancestors.pop();
+
+    if (parent.type == "ExpressionStatement") {
+      parent = ancestors.pop();
+    }
+
+    return parent.type == "Program";
+  },
+
+  /**
+   * Check whether we are in a browser mochitest.
+   *
+   * @param  {RuleContext} scope
+   *         You should pass this from within a rule
+   *         e.g. helpers.getIsBrowserMochitest(this)
+   *
+   * @return {Boolean}
+   *         True or false
+   */
+  getIsBrowserMochitest: function(scope) {
+    var pathAndFilename = scope.getFilename();
+
+    return /.*[\\/]browser_.+\.js$/.test(pathAndFilename);
   }
 };

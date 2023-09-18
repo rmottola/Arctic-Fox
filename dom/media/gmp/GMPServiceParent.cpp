@@ -9,9 +9,6 @@
 #include "mozilla/Logging.h"
 #include "GMPParent.h"
 #include "GMPVideoDecoderParent.h"
-#ifdef MOZ_EME
-#include "mozilla/dom/GMPVideoDecoderTrialCreator.h"
-#endif
 #include "nsIObserverService.h"
 #include "GeckoChildProcessHost.h"
 #include "mozilla/Preferences.h"
@@ -1394,22 +1391,6 @@ GeckoMediaPluginServiceParent::GetNodeId(const nsAString& aOrigin,
   return rv;
 }
 
-NS_IMETHODIMP
-GeckoMediaPluginServiceParent::UpdateTrialCreateState(const nsAString& aKeySystem,
-                                                      uint32_t aState)
-{
-#ifdef MOZ_EME
-  nsString keySystem(aKeySystem);
-  NS_DispatchToMainThread(NS_NewRunnableFunction([keySystem, aState] {
-    mozilla::dom::GMPVideoDecoderTrialCreator::UpdateTrialCreateState(keySystem, aState);
-  }));
-
-  return NS_OK;
-#else
-  return NS_ERROR_FAILURE;
-#endif
-}
-
 static bool
 ExtractHostName(const nsACString& aOrigin, nsACString& aOutData)
 {
@@ -1588,7 +1569,7 @@ GeckoMediaPluginServiceParent::ForgetThisSiteOnGMPThread(const nsACString& aSite
 
   struct OriginFilter : public DirectoryFilter {
     explicit OriginFilter(const nsACString& aSite) : mSite(aSite) {}
-    virtual bool operator()(nsIFile* aPath) {
+    bool operator()(nsIFile* aPath) override {
       return MatchOrigin(aPath, mSite);
     }
   private:
@@ -1625,7 +1606,7 @@ GeckoMediaPluginServiceParent::ClearRecentHistoryOnGMPThread(PRTime aSince)
     }
 
     // |aPath| is $profileDir/gmp/$platform/$gmpName/id/$originHash/
-    virtual bool operator()(nsIFile* aPath) {
+    bool operator()(nsIFile* aPath) override {
       if (IsModifiedAfter(aPath)) {
         return true;
       }
@@ -1736,14 +1717,6 @@ GMPServiceParent::RecvGetGMPNodeId(const nsString& aOrigin,
   nsresult rv = mService->GetNodeId(aOrigin, aTopLevelOrigin, aGMPName,
                                     aInPrivateBrowsing, *aID);
   return NS_SUCCEEDED(rv);
-}
-
-bool
-GMPServiceParent::RecvUpdateGMPTrialCreateState(const nsString& aKeySystem,
-                                                const uint32_t& aState)
-{
-  mService->UpdateTrialCreateState(aKeySystem, aState);
-  return true;
 }
 
 /* static */

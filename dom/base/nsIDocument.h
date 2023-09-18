@@ -104,10 +104,6 @@ class ImageLoader;
 class Rule;
 } // namespace css
 
-namespace gfx {
-class VRHMDInfo;
-} // namespace gfx
-
 namespace dom {
 class AnonymousContent;
 class Attr;

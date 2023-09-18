@@ -377,7 +377,7 @@ gc::VerifyBarriers(JSRuntime* rt, VerifierType type)
 void
 gc::GCRuntime::maybeVerifyPreBarriers(bool always)
 {
-    if (zealMode != ZealVerifierPreValue)
+    if (!hasZealMode(ZealMode::VerifierPre))
         return;
 
     if (rt->mainThread.suppressGC)

@@ -80,7 +80,7 @@ struct CGBlockScopeList {
     Vector<CGBlockScopeNote> list;
     explicit CGBlockScopeList(ExclusiveContext* cx) : list(cx) {}
 
-    bool append(uint32_t scopeObject, uint32_t offset, bool inPrologue, uint32_t parent);
+    bool append(uint32_t scopeObjectIndex, uint32_t offset, bool inPrologue, uint32_t parent);
     uint32_t findEnclosingScope(uint32_t index);
     void recordEnd(uint32_t index, uint32_t offset, bool inPrologue);
     size_t length() const { return list.length(); }
@@ -183,8 +183,6 @@ struct BytecodeEmitter
     CGConstList     constList;      /* constants to be included with the script */
 
     CGObjectList    objectList;     /* list of emitted objects */
-    CGObjectList    regexpList;     /* list of emitted regexp that will be
-                                       cloned during execution */
     CGTryNoteList   tryNoteList;    /* list of emitted try notes */
     CGBlockScopeList blockScopeList;/* list of emitted block scope notes */
 
@@ -386,7 +384,7 @@ struct BytecodeEmitter
     bool enterBlockScope(StmtInfoBCE* stmtInfo, ObjectBox* objbox, JSOp initialValueOp,
                          unsigned alreadyPushed = 0);
 
-    bool computeAliasedSlots(Handle<StaticBlockObject*> blockObj);
+    bool computeAliasedSlots(Handle<StaticBlockScope*> blockScope);
 
     bool lookupAliasedName(HandleScript script, PropertyName* name, uint32_t* pslot,
                            ParseNode* pn = nullptr);
@@ -396,7 +394,7 @@ struct BytecodeEmitter
     // fixed part of a stack frame.  Outside a function, there are no fixed vars,
     // but block-scoped locals still form part of the fixed part of a stack frame
     // and are thus addressable via GETLOCAL and friends.
-    void computeLocalOffset(Handle<StaticBlockObject*> blockObj);
+    void computeLocalOffset(Handle<StaticBlockScope*> blockScope);
 
     bool flushPops(int* npops);
 
@@ -435,10 +433,12 @@ struct BytecodeEmitter
     bool emitSetThis(ParseNode* pn);
 
     // These functions are used to emit GETLOCAL/GETALIASEDVAR or
-    // SETLOCAL/SETALIASEDVAR for a particular binding. The CallObject must be
-    // on top of the scope chain.
-    bool emitLoadFromTopScope(BindingIter& bi);
-    bool emitStoreToTopScope(BindingIter& bi);
+    // SETLOCAL/SETALIASEDVAR for a particular binding on a function's
+    // CallObject.
+    bool emitLoadFromEnclosingFunctionScope(BindingIter& bi);
+    bool emitStoreToEnclosingFunctionScope(BindingIter& bi);
+
+    uint32_t computeHopsToEnclosingFunction();
 
     bool emitJump(JSOp op, ptrdiff_t off, ptrdiff_t* jumpOffset = nullptr);
     bool emitCall(JSOp op, uint16_t argc, ParseNode* pn = nullptr);
@@ -575,7 +575,7 @@ struct BytecodeEmitter
 
     // Pops iterator from the top of the stack. Pushes the result of |.next()|
     // onto the stack.
-    bool emitIteratorNext(ParseNode* pn);
+    bool emitIteratorNext(ParseNode* pn, bool allowSelfHosted = false);
 
     // Check if the value on top of the stack is "undefined". If so, replace
     // that value on the stack with the value defined by |defaultExpr|.
@@ -607,11 +607,15 @@ struct BytecodeEmitter
 
     bool emitConditionalExpression(ConditionalExpression& conditional);
 
+    bool isRestParameter(ParseNode* pn, bool* result);
+    bool emitOptimizeSpread(ParseNode* arg0, ptrdiff_t* jmp, bool* emitted);
+
     bool emitCallOrNew(ParseNode* pn);
     bool emitDebugOnlyCheckSelfHosted();
     bool emitSelfHostedCallFunction(ParseNode* pn);
     bool emitSelfHostedResumeGenerator(ParseNode* pn);
     bool emitSelfHostedForceInterpreter(ParseNode* pn);
+    bool emitSelfHostedAllowContentSpread(ParseNode* pn);
 
     bool emitComprehensionFor(ParseNode* compFor);
     bool emitComprehensionForIn(ParseNode* pn);
@@ -633,25 +637,21 @@ struct BytecodeEmitter
     bool emitLexicalInitialization(ParseNode* pn, JSOp globalDefOp);
 
     bool pushInitialConstants(JSOp op, unsigned n);
-    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockObject*> blockObj);
+    bool initializeBlockScopedLocalsFromStack(Handle<StaticBlockScope*> blockScope);
 
+    // Emit bytecode for the spread operator.
+    //
     // emitSpread expects the current index (I) of the array, the array itself
     // and the iterator to be on the stack in that order (iterator on the bottom).
     // It will pop the iterator and I, then iterate over the iterator by calling
     // |.next()| and put the results into the I-th element of array with
     // incrementing I, then push the result I (it will be original I +
     // iteration count). The stack after iteration will look like |ARRAY INDEX|.
-    bool emitSpread();
+    bool emitSpread(bool allowSelfHosted = false);
 
-    // If type is StmtType::FOR_OF_LOOP, emit bytecode for a for-of loop.
-    // pn should be PNK_FOR, and pn->pn_left should be PNK_FOROF.
-    //
-    // If type is StmtType::SPREAD, emit bytecode for spread operator.
-    // pn should be nullptr.
-    //
-    // Please refer the comment above emitSpread for additional information about
-    // stack convention.
-    bool emitForOf(StmtType type, ParseNode* pn);
+    // Emit bytecode for a for-of loop.  pn should be PNK_FOR, and pn->pn_left
+    // should be PNK_FOROF.
+    bool emitForOf(ParseNode* pn);
 
     bool emitClass(ParseNode* pn);
     bool emitSuperPropLHS(ParseNode* superBase, bool isCall = false);

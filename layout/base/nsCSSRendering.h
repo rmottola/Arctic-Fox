@@ -377,8 +377,7 @@ struct nsCSSRendering {
   static void PaintBoxShadowInner(nsPresContext* aPresContext,
                                   nsRenderingContext& aRenderingContext,
                                   nsIFrame* aForFrame,
-                                  const nsRect& aFrameArea,
-                                  const nsRect& aDirtyRect);
+                                  const nsRect& aFrameArea);
 
   static void PaintBoxShadowOuter(nsPresContext* aPresContext,
                                   nsRenderingContext& aRenderingContext,
@@ -856,6 +855,7 @@ protected:
  */
 class nsContextBoxBlur {
   typedef mozilla::gfx::Color Color;
+  typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef mozilla::gfx::RectCornerRadii RectCornerRadii;
 
 public:
@@ -1004,7 +1004,7 @@ public:
                     mozilla::gfx::Point aShadowOffset);
 
 protected:
-  static void GetBlurAndSpreadRadius(gfxContext* aContext,
+  static void GetBlurAndSpreadRadius(DrawTarget* aDestDrawTarget,
                                      int32_t aAppUnitsPerDevPixel,
                                      nscoord aBlurRadius,
                                      nscoord aSpreadRadius,

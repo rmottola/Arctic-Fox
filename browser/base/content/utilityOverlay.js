@@ -1,9 +1,10 @@
-# -*- indent-tabs-mode: nil; js-indent-level: 4 -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 // Services = object with smart getters for common XPCOM services
+Components.utils.import("resource://gre/modules/AppConstants.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
@@ -435,11 +436,10 @@ function gatherTextUnder ( root )
       // Add this text to our collection.
       text += " " + node.data;
     } else if ( node instanceof HTMLImageElement) {
-      // If it has an alt= attribute, use that.
+      // If it has an "alt" attribute, add that.
       var altText = node.getAttribute( "alt" );
       if ( altText && altText != "" ) {
-        text = altText;
-        break;
+        text += " " + altText;
       }
     }
     // Find next node to test.
@@ -459,10 +459,8 @@ function gatherTextUnder ( root )
       }
     }
   }
-  // Strip leading whitespace.
-  text = text.replace( /^\s+/, "" );
-  // Strip trailing whitespace.
-  text = text.replace( /\s+$/, "" );
+  // Strip leading and tailing whitespace.
+  text = text.trim();
   // Compress remaining whitespace.
   text = text.replace( /\s+/g, " " );
   return text;
@@ -484,8 +482,13 @@ function isBidiEnabled() {
   if (getBoolPref("bidi.browser.ui", false))
     return true;
 
-  // if the pref isn't set, check for an RTL locale and force the pref to true
-  // if we find one.
+  // then check intl.uidirection.<locale>
+  var chromeReg = Components.classes["@mozilla.org/chrome/chrome-registry;1"].
+                  getService(Components.interfaces.nsIXULChromeRegistry);
+  if (chromeReg.isLocaleRTL("global"))
+    return true;
+
+  // now see if the system locale is an RTL one.
   var rv = false;
 
   try {
@@ -497,6 +500,7 @@ function isBidiEnabled() {
       case "ar-":
       case "he-":
       case "fa-":
+      case "ug-":
       case "ur-":
       case "syr":
         rv = true;
@@ -579,7 +583,7 @@ function openFeedbackPage()
 function buildHelpMenu()
 {
   // Enable/disable the "Report Web Forgery" menu item.
-  if (typeof gSafeBrowsing != "undefined")
+  if (typeof gSafeBrowsing != "undefined" && AppConstants.MOZ_SAFE_BROWSING)
     gSafeBrowsing.setReportPhishingMenu();
 }
 
@@ -600,17 +604,14 @@ function makeURLAbsolute(aBase, aUrl)
   return makeURI(aUrl, null, makeURI(aBase)).spec;
 }
 
-
 /**
  * openNewTabWith: opens a new tab with the given URL.
  *
  * @param aURL
  *        The URL to open (as a string).
  * @param aDocument
- *        The document from which the URL came, or null. This is used to set the
- *        referrer header and to do a security check of whether the document is
- *        allowed to reference the URL. If null, there will be no referrer
- *        header and no security check.
+ *        Note this parameter is now ignored. There is no security check & no
+ *        referrer header derived from aDocument (null case).
  * @param aPostData
  *        Form POST data, or null.
  * @param aEvent
@@ -621,22 +622,18 @@ function makeURLAbsolute(aBase, aUrl)
  *        (e.g., Google's I Feel Lucky) for interpretation. This parameter may
  *        be undefined in which case it is treated as false.
  * @param [optional] aReferrer
- *        If aDocument is null, then this will be used as the referrer.
- *        There will be no security check.
+ *        This will be used as the referrer. There will be no security check.
  * @param [optional] aReferrerPolicy
  *        Referrer policy - Ci.nsIHttpChannel.REFERRER_POLICY_*.
  */ 
 function openNewTabWith(aURL, aDocument, aPostData, aEvent,
                         aAllowThirdPartyFixup, aReferrer, aReferrerPolicy) {
-  if (aDocument)
-    urlSecurityCheck(aURL, aDocument.nodePrincipal);
 
   // As in openNewWindowWith(), we want to pass the charset of the
   // current document over to a new tab.
-  var originCharset = aDocument && aDocument.characterSet;
-  if (!originCharset &&
-      document.documentElement.getAttribute("windowtype") == "navigator:browser")
-    originCharset = window.content.document.characterSet;
+  let originCharset = null;
+  if (document.documentElement.getAttribute("windowtype") == "navigator:browser")
+    originCharset = gBrowser.selectedBrowser.characterSet;
 
   openLinkIn(aURL, aEvent && aEvent.shiftKey ? "tabshifted" : "tab",
              { charset: originCharset,
@@ -647,24 +644,25 @@ function openNewTabWith(aURL, aDocument, aPostData, aEvent,
              });
 }
 
-function openNewWindowWith(aURL, aDocument, aPostData, aAllowThirdPartyFixup, aReferrer) {
-  if (aDocument)
-    urlSecurityCheck(aURL, aDocument.nodePrincipal);
-
-  // if and only if the current window is a browser window and it has a
-  // document with a character set, then extract the current charset menu
-  // setting from the current document and use it to initialize the new browser
-  // window...
-  var originCharset = aDocument && aDocument.characterSet;
-  if (!originCharset &&
-      document.documentElement.getAttribute("windowtype") == "navigator:browser")
-    originCharset = window.content.document.characterSet;
+/**
+ * @param aDocument
+ *        Note this parameter is ignored. See openNewTabWith()
+ */
+function openNewWindowWith(aURL, aDocument, aPostData, aAllowThirdPartyFixup,
+                           aReferrer, aReferrerPolicy) {
+  // Extract the current charset menu setting from the current document and
+  // use it to initialize the new browser window...
+  let originCharset = null;
+  if (document.documentElement.getAttribute("windowtype") == "navigator:browser")
+    originCharset = gBrowser.selectedBrowser.characterSet;
 
   openLinkIn(aURL, "window",
              { charset: originCharset,
                postData: aPostData,
                allowThirdPartyFixup: aAllowThirdPartyFixup,
-               referrerURI: aDocument ? aDocument.documentURIObject : aReferrer });
+               referrerURI: aReferrer,
+               referrerPolicy: aReferrerPolicy,
+             });
 }
 
 // aCalledFromModal is optional

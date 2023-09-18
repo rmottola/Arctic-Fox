@@ -514,13 +514,11 @@
           var searchService =
             Components.classes["@mozilla.org/browser/search-service;1"]
                       .getService(Components.interfaces.nsIBrowserSearchService);
-          // We only detect OpenSearch files
-          var type = Components.interfaces.nsISearchEngine.DATA_XML;
           // Select the installed engine if the installation succeeds
           var installCallback = {
             onSuccess: engine => this.currentEngine = engine
           }
-          searchService.addEngine(target.getAttribute("uri"), type,
+          searchService.addEngine(target.getAttribute("uri"), null,
                                   target.getAttribute("src"), false,
                                   installCallback);
         }

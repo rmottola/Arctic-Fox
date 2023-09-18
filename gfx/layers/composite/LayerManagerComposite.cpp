@@ -432,7 +432,7 @@ LayerManagerComposite::UpdateAndRender()
 
   // We don't want our debug overlay to cause more frames to happen
   // so we will invalidate after we've decided if something changed.
-  InvalidateDebugOverlay(mRenderBounds);
+  InvalidateDebugOverlay(invalid, mRenderBounds);
 
   if (!didEffectiveTransforms) {
     // The results of our drawing always go directly into a pixel buffer,
@@ -520,23 +520,18 @@ LayerManagerComposite::RootLayer() const
 #endif
 
 void
-LayerManagerComposite::InvalidateDebugOverlay(const IntRect& aBounds)
+LayerManagerComposite::InvalidateDebugOverlay(nsIntRegion& aInvalidRegion, const IntRect& aBounds)
 {
   bool drawFps = gfxPrefs::LayersDrawFPS();
   bool drawFrameCounter = gfxPrefs::DrawFrameCounter();
   bool drawFrameColorBars = gfxPrefs::CompositorDrawColorBars();
 
   if (drawFps || drawFrameCounter) {
-    AddInvalidRegion(nsIntRect(0, 0, 256, 256));
+    aInvalidRegion.Or(aInvalidRegion, nsIntRect(0, 0, 256, 256));
   }
   if (drawFrameColorBars) {
-    AddInvalidRegion(nsIntRect(0, 0, 10, aBounds.height));
+    aInvalidRegion.Or(aInvalidRegion, nsIntRect(0, 0, 10, aBounds.height));
   }
-
-  if (drawFrameColorBars) {
-    AddInvalidRegion(nsIntRect(0, 0, 10, aBounds.height));
-  }
-
 }
 
 static uint16_t sFrameCount = 0;
@@ -813,7 +808,9 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion)
   if (!mTarget && !haveLayerEffects &&
       gfxPrefs::Composer2DCompositionEnabled() &&
       composer2D && composer2D->HasHwc() && composer2D->TryRenderWithHwc(mRoot,
-          mCompositor->GetWidget(), mGeometryChanged))
+          mCompositor->GetWidget(),
+          mGeometryChanged,
+          mCompositor->HasImageHostOverlays()))
   {
     LayerScope::SetHWComposed();
     if (mFPS) {
@@ -875,10 +872,9 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion)
   RootLayer()->RenderLayer(clipRect.ToUnknownRect());
 
   if (!mRegionToClear.IsEmpty()) {
-    nsIntRegionRectIterator iter(mRegionToClear);
-    const IntRect *r;
-    while ((r = iter.Next())) {
-      mCompositor->ClearRect(Rect(r->x, r->y, r->width, r->height));
+    for (auto iter = mRegionToClear.RectIter(); !iter.Done(); iter.Next()) {
+      const IntRect& r = iter.Get();
+      mCompositor->ClearRect(Rect(r.x, r.y, r.width, r.height));
     }
   }
 
@@ -1144,14 +1140,14 @@ SubtractTransformedRegion(nsIntRegion& aRegion,
 
   // For each rect in the region, find out its bounds in screen space and
   // subtract it from the screen region.
-  nsIntRegionRectIterator it(aRegionToSubtract);
-  while (const IntRect* rect = it.Next()) {
-    Rect incompleteRect = aTransform.TransformAndClipBounds(IntRectToRect(*rect),
+  for (auto iter = aRegionToSubtract.RectIter(); !iter.Done(); iter.Next()) {
+    const IntRect& rect = iter.Get();
+    Rect incompleteRect = aTransform.TransformAndClipBounds(IntRectToRect(rect),
                                                             Rect::MaxIntRect());
     aRegion.Sub(aRegion, IntRect(incompleteRect.x,
-                                   incompleteRect.y,
-                                   incompleteRect.width,
-                                   incompleteRect.height));
+                                 incompleteRect.y,
+                                 incompleteRect.width,
+                                 incompleteRect.height));
   }
 }
 
@@ -1436,26 +1432,6 @@ LayerManagerComposite::AutoAddMaskEffect::~AutoAddMaskEffect()
   }
 
   mCompositable->RemoveMaskEffect();
-}
-
-already_AddRefed<DrawTarget>
-LayerManagerComposite::CreateDrawTarget(const IntSize &aSize,
-                                        SurfaceFormat aFormat)
-{
-#ifdef XP_MACOSX
-  // We don't want to accelerate if the surface is too small which indicates
-  // that it's likely used for an icon/static image. We also don't want to
-  // accelerate anything that is above the maximum texture size of weakest gpu.
-  // Safari uses 5000 area as the minimum for acceleration, we decided 64^2 is more logical.
-  bool useAcceleration = aSize.width <= 4096 && aSize.height <= 4096 &&
-                         aSize.width > 64 && aSize.height > 64 &&
-                         gfxPlatformMac::GetPlatform()->UseAcceleratedCanvas();
-  if (useAcceleration) {
-    return Factory::CreateDrawTarget(BackendType::COREGRAPHICS_ACCELERATED,
-                                     aSize, aFormat);
-  }
-#endif
-  return LayerManager::CreateDrawTarget(aSize, aFormat);
 }
 
 LayerComposite::LayerComposite(LayerManagerComposite *aManager)

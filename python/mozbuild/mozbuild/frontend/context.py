@@ -281,6 +281,19 @@ class SubContext(Context, ContextDerivedValue):
         self._sandbox().pop_subcontext(self)
 
 
+class InitializedDefines(ContextDerivedValue, OrderedDict):
+    def __init__(self, context, value=None):
+        OrderedDict.__init__(self)
+        for define in context.config.substs.get('MOZ_DEBUG_DEFINES', '').split():
+            assert define[:2] == "-D"
+            pair = define[2:].split('=', 1)
+            if len(pair) == 1:
+                pair.append(1)
+            self[pair[0]] = pair[1]
+        if value:
+            self.update(value)
+
+
 class FinalTargetValue(ContextDerivedValue, unicode):
     def __new__(cls, context, value=""):
         if not value:
@@ -935,7 +948,7 @@ VARIABLES = {
         indicating extra files the output depends on.
         """, 'export'),
 
-    'DEFINES': (OrderedDict, dict,
+    'DEFINES': (InitializedDefines, dict,
         """Dictionary of compiler defines to declare.
 
         These are passed in to the compiler as ``-Dkey='value'`` for string
@@ -1191,7 +1204,17 @@ VARIABLES = {
         This variable can only be used on Linux.
         """, None),
 
-    'BRANDING_FILES': (HierarchicalStringList, list,
+    'SYMBOLS_FILE': (SourcePath, unicode,
+        """A file containing a list of symbols to export from a shared library.
+
+        The given file contains a list of symbols to be exported, and is
+        preprocessed.
+        A special marker "@DATA@" must be added after a symbol name if it
+        points to data instead of code, so that the Windows linker can treat
+        them correctly.
+        """, None),
+
+    'BRANDING_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """List of files to be installed into the branding directory.
 
         ``BRANDING_FILES`` will copy (or symlink, if the platform supports it)
@@ -1316,7 +1339,7 @@ VARIABLES = {
         will be made explicit.
         """, None),
 
-    'JAR_MANIFESTS': (StrictOrderingOnAppendList, list,
+    'JAR_MANIFESTS': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """JAR manifest files that should be processed as part of the build.
 
         JAR manifests are files in the tree that define how to package files
@@ -1575,7 +1598,7 @@ VARIABLES = {
            appear in the moz.build file.
         """, None),
 
-    'HOST_DEFINES': (OrderedDict, dict,
+    'HOST_DEFINES': (InitializedDefines, dict,
         """Dictionary of compiler defines to declare for host compilation.
         See ``DEFINES`` for specifics.
         """, None),

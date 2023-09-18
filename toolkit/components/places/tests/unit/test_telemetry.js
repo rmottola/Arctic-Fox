@@ -97,7 +97,7 @@ add_task(function* test_execute()
     onSearchComplete: function() {},
     setSelectedIndex: function() {},
     get searchCount() { return this.searches.length; },
-    getSearchAt: function(aIndex) this.searches[aIndex],
+    getSearchAt: function(aIndex) { return this.searches[aIndex]; },
     QueryInterface: XPCOMUtils.generateQI([
       Ci.nsIAutoCompleteInput,
       Ci.nsIAutoCompletePopup,
@@ -121,7 +121,7 @@ add_task(function* test_execute()
     let validate = histograms[histogramId];
     let snapshot = Services.telemetry.getHistogramById(histogramId).snapshot();
     validate(snapshot.sum);
-    do_check_true(snapshot.counts.reduce(function(a, b) a + b) > 0);
+    do_check_true(snapshot.counts.reduce((a, b) => a + b) > 0);
   }
 });
 

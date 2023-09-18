@@ -63,12 +63,12 @@ nsRubyBaseContainerFrame::GetFrameName(nsAString& aResult) const
 
 static gfxBreakPriority
 LineBreakBefore(nsIFrame* aFrame,
-                nsRenderingContext* aRenderingContext,
+                DrawTarget* aDrawTarget,
                 nsIFrame* aLineContainerFrame,
                 const nsLineList::iterator* aLine)
 {
   for (nsIFrame* child = aFrame; child;
-       child = child->GetFirstPrincipalChild()) {
+       child = child->PrincipalChildList().FirstChild()) {
     if (!child->CanContinueTextRun()) {
       // It is not an inline element. We can break before it.
       return gfxBreakPriority::eNormalBreak;
@@ -79,8 +79,7 @@ LineBreakBefore(nsIFrame* aFrame,
 
     auto textFrame = static_cast<nsTextFrame*>(child);
     gfxSkipCharsIterator iter =
-      textFrame->EnsureTextRun(nsTextFrame::eInflated,
-                               aRenderingContext->ThebesContext(),
+      textFrame->EnsureTextRun(nsTextFrame::eInflated, aDrawTarget,
                                aLineContainerFrame, aLine);
     iter.SetOriginalOffset(textFrame->GetContentOffset());
     uint32_t pos = iter.GetSkippedOffset();
@@ -208,7 +207,8 @@ nsRubyBaseContainerFrame::AddInlineMinISize(
         nsIFrame* baseFrame = enumerator.GetFrameAtLevel(0);
         if (baseFrame) {
           gfxBreakPriority breakPriority =
-            LineBreakBefore(baseFrame, aRenderingContext, nullptr, nullptr);
+            LineBreakBefore(baseFrame, aRenderingContext->GetDrawTarget(),
+                            nullptr, nullptr);
           if (breakPriority != gfxBreakPriority::eNoBreak) {
             aData->OptionallyBreak();
           }
@@ -241,7 +241,7 @@ nsRubyBaseContainerFrame::AddInlinePrefISize(
   }
   for (uint32_t i = 0, iend = textContainers.Length(); i < iend; i++) {
     if (textContainers[i]->IsSpanContainer()) {
-      nsIFrame* frame = textContainers[i]->GetFirstPrincipalChild();
+      nsIFrame* frame = textContainers[i]->PrincipalChildList().FirstChild();
       nsIFrame::InlinePrefISizeData data;
       frame->AddInlinePrefISize(aRenderingContext, &data);
       MOZ_ASSERT(data.prevLines == 0, "Shouldn't have prev lines");
@@ -582,7 +582,7 @@ nsRubyBaseContainerFrame::ReflowOneColumn(const ReflowState& aReflowState,
       aReflowState.mAllowLineBreak : aReflowState.mAllowInitialLineBreak;
     if (allowBreakBefore) {
       gfxBreakPriority breakPriority = LineBreakBefore(
-        aColumn.mBaseFrame, baseReflowState.rendContext,
+        aColumn.mBaseFrame, baseReflowState.rendContext->GetDrawTarget(),
         baseReflowState.mLineLayout->LineContainerFrame(),
         baseReflowState.mLineLayout->GetLine());
       if (breakPriority != gfxBreakPriority::eNoBreak) {
@@ -789,7 +789,7 @@ nsRubyBaseContainerFrame::ReflowSpans(const ReflowState& aReflowState)
       continue;
     }
 
-    nsIFrame* rtFrame = container->GetFirstPrincipalChild();
+    nsIFrame* rtFrame = container->PrincipalChildList().FirstChild();
     nsReflowStatus reflowStatus;
     bool pushedFrame;
     nsLineLayout* lineLayout = aReflowState.mTextReflowStates[i]->mLineLayout;

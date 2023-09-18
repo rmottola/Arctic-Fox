@@ -24,14 +24,13 @@
 using namespace mozilla;
 using namespace mozilla::dom;
 using namespace JS;
-using namespace js;
 
 namespace xpc {
 
 bool
 IsReflector(JSObject* obj)
 {
-    obj = CheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
+    obj = js::CheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
     if (!obj)
         return false;
     return IS_WN_REFLECTOR(obj) || dom::IsDOMObject(obj);
@@ -345,8 +344,10 @@ FunctionForwarder(JSContext* cx, unsigned argc, Value* vp)
 
         RootedValue fval(cx, ObjectValue(*unwrappedFun));
         if (args.isConstructing()) {
-            if (!JS::Construct(cx, fval, args, args.rval()))
+            RootedObject obj(cx);
+            if (!JS::Construct(cx, fval, args, &obj))
                 return false;
+            args.rval().setObject(*obj);
         } else {
             if (!JS_CallFunctionValue(cx, thisObj, fval, args, args.rval()))
                 return false;
@@ -408,8 +409,8 @@ ExportFunction(JSContext* cx, HandleValue vfunction, HandleValue vscope, HandleV
     // * We must subsume the scope we are exporting to.
     // * We must subsume the function being exported, because the function
     //   forwarder manually circumvents security wrapper CALL restrictions.
-    targetScope = CheckedUnwrap(targetScope);
-    funObj = CheckedUnwrap(funObj);
+    targetScope = js::CheckedUnwrap(targetScope);
+    funObj = js::CheckedUnwrap(funObj);
     if (!targetScope || !funObj) {
         JS_ReportError(cx, "Permission denied to export function into scope");
         return false;

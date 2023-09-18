@@ -24,7 +24,7 @@
 #include "builtin/ModuleObject.h"
 #include "builtin/Object.h"
 #include "builtin/RegExp.h"
-#include "builtin/SIMD.h"
+#include "builtin/SelfHostingDefines.h"
 #include "builtin/SymbolObject.h"
 #include "builtin/TypedObject.h"
 #include "builtin/WeakMapObject.h"
@@ -283,20 +283,21 @@ GlobalObject::new_(JSContext* cx, const Class* clasp, JSPrincipals* principals,
 
     JSRuntime* rt = cx->runtime();
 
+    auto zoneSpecifier = options.creationOptions().zoneSpecifier();
     Zone* zone;
-    if (options.zoneSpecifier() == JS::SystemZone)
+    if (zoneSpecifier == JS::SystemZone)
         zone = rt->gc.systemZone;
-    else if (options.zoneSpecifier() == JS::FreshZone)
+    else if (zoneSpecifier == JS::FreshZone)
         zone = nullptr;
     else
-        zone = static_cast<Zone*>(options.zonePointer());
+        zone = static_cast<Zone*>(options.creationOptions().zonePointer());
 
     JSCompartment* compartment = NewCompartment(cx, zone, principals, options);
     if (!compartment)
         return nullptr;
 
     // Lazily create the system zone.
-    if (!rt->gc.systemZone && options.zoneSpecifier() == JS::SystemZone) {
+    if (!rt->gc.systemZone && zoneSpecifier == JS::SystemZone) {
         rt->gc.systemZone = compartment->zone();
         rt->gc.systemZone->isSystem = true;
     }
@@ -689,8 +690,12 @@ GlobalObject::getSelfHostedFunction(JSContext* cx, Handle<GlobalObject*> global,
     }
 
     RootedFunction fun(cx);
-    if (!cx->runtime()->createLazySelfHostedFunctionClone(cx, selfHostedName, name, nargs, &fun))
+    if (!cx->runtime()->createLazySelfHostedFunctionClone(cx, selfHostedName, name, nargs,
+                                                          /* proto = */ nullptr,
+                                                          SingletonObject, &fun))
+    {
         return false;
+    }
     funVal.setObject(*fun);
 
     return GlobalObject::addIntrinsicValue(cx, global, selfHostedName, funVal);

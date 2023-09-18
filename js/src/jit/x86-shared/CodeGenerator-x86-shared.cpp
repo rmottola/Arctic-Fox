@@ -287,6 +287,7 @@ CodeGeneratorX86Shared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
               // StackPointer is SIMD-aligned and ABIArgGenerator guarantees
               // stack offsets are SIMD-aligned.
               case MIRType_Int32x4:
+              case MIRType_Bool32x4:
                 masm.storeAlignedInt32x4(ToFloatRegister(ins->arg()), dst);
                 return;
               case MIRType_Float32x4:
@@ -337,7 +338,10 @@ CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck* oolCheck)
     MOZ_ASSERT(oolCheck->offset() != 0,
                "An access without a constant offset doesn't need a separate OffsetBoundsCheck");
     masm.cmp32(oolCheck->ptrReg(), Imm32(-uint32_t(oolCheck->offset())));
-    masm.j(Assembler::Below, oolCheck->outOfBounds());
+    if (oolCheck->maybeOutOfBounds())
+        masm.j(Assembler::Below, oolCheck->maybeOutOfBounds());
+    else
+        masm.j(Assembler::Below, wasm::JumpTarget::OutOfBounds);
 
 #ifdef JS_CODEGEN_X64
     // In order to get the offset to wrap properly, we must sign-extend the
@@ -352,7 +356,7 @@ CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck* oolCheck)
 uint32_t
 CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access,
                                                    const MInstruction* mir,
-                                                   Register ptr, Label* fail)
+                                                   Register ptr, Label* maybeFail)
 {
     // Emit a bounds-checking branch for |access|.
 
@@ -365,8 +369,8 @@ CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* acces
     // this case, we need a second branch, which we emit out of line since it's
     // unlikely to be needed in normal programs.
     if (access->offset() != 0) {
-        OffsetBoundsCheck* oolCheck = new(alloc()) OffsetBoundsCheck(fail, ptr, access->offset());
-        fail = oolCheck->entry();
+        auto oolCheck = new(alloc()) OffsetBoundsCheck(maybeFail, ptr, access->offset());
+        maybeFail = oolCheck->entry();
         pass = oolCheck->rejoin();
         addOutOfLineCode(oolCheck, mir);
     }
@@ -376,13 +380,64 @@ CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* acces
     // field, so -access->endOffset() will turn into
     // (heapLength - access->endOffset()), allowing us to test whether the end
     // of the access is beyond the end of the heap.
-    uint32_t maybeCmpOffset = masm.cmp32WithPatch(ptr, Imm32(-access->endOffset())).offset();
-    masm.j(Assembler::Above, fail);
+    uint32_t cmpOffset = masm.cmp32WithPatch(ptr, Imm32(-access->endOffset())).offset();
+    if (maybeFail)
+        masm.j(Assembler::Above, maybeFail);
+    else
+        masm.j(Assembler::Above, wasm::JumpTarget::OutOfBounds);
 
     if (pass)
         masm.bind(pass);
 
-    return maybeCmpOffset;
+    return cmpOffset;
+}
+
+uint32_t
+CodeGeneratorX86Shared::maybeEmitThrowingAsmJSBoundsCheck(const MAsmJSHeapAccess* access,
+                                                          const MInstruction* mir,
+                                                          const LAllocation* ptr)
+{
+    if (!gen->needsAsmJSBoundsCheckBranch(access))
+        return wasm::HeapAccess::NoLengthCheck;
+
+    return emitAsmJSBoundsCheckBranch(access, mir, ToRegister(ptr), nullptr);
+}
+
+uint32_t
+CodeGeneratorX86Shared::maybeEmitAsmJSLoadBoundsCheck(const MAsmJSLoadHeap* mir, LAsmJSLoadHeap* ins,
+                                                      OutOfLineLoadTypedArrayOutOfBounds** ool)
+{
+    MOZ_ASSERT(!Scalar::isSimdType(mir->accessType()));
+    *ool = nullptr;
+
+    if (!gen->needsAsmJSBoundsCheckBranch(mir))
+        return wasm::HeapAccess::NoLengthCheck;
+
+    if (mir->isAtomicAccess())
+        return maybeEmitThrowingAsmJSBoundsCheck(mir, mir, ins->ptr());
+
+    *ool = new(alloc()) OutOfLineLoadTypedArrayOutOfBounds(ToAnyRegister(ins->output()),
+                                                           mir->accessType());
+
+    addOutOfLineCode(*ool, mir);
+    return emitAsmJSBoundsCheckBranch(mir, mir, ToRegister(ins->ptr()), (*ool)->entry());
+}
+
+uint32_t
+CodeGeneratorX86Shared::maybeEmitAsmJSStoreBoundsCheck(const MAsmJSStoreHeap* mir, LAsmJSStoreHeap* ins,
+                                                       Label** rejoin)
+{
+    MOZ_ASSERT(!Scalar::isSimdType(mir->accessType()));
+    *rejoin = nullptr;
+
+    if (!gen->needsAsmJSBoundsCheckBranch(mir))
+        return wasm::HeapAccess::NoLengthCheck;
+
+    if (mir->isAtomicAccess())
+        return maybeEmitThrowingAsmJSBoundsCheck(mir, mir, ins->ptr());
+
+    *rejoin = alloc().lifoAlloc()->newInfallible<Label>();
+    return emitAsmJSBoundsCheckBranch(mir, mir, ToRegister(ins->ptr()), *rejoin);
 }
 
 void
@@ -2278,8 +2333,7 @@ CodeGeneratorX86Shared::visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIn
     static const SimdConstant Int32MaxX4 = SimdConstant::SplatX4(2147483647.f);
     static const SimdConstant Int32MinX4 = SimdConstant::SplatX4(-2147483648.f);
 
-    Label bail;
-    Label* onConversionError = gen->compilingAsmJS() ? masm.asmOnConversionErrorLabel() : &bail;
+    Label onConversionError;
 
     FloatRegister input = ool->input();
     Register temp = ool->temp();
@@ -2289,26 +2343,113 @@ CodeGeneratorX86Shared::visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIn
     masm.vcmpleps(Operand(input), scratch, scratch);
     masm.vmovmskps(scratch, temp);
     masm.cmp32(temp, Imm32(15));
-    masm.j(Assembler::NotEqual, onConversionError);
+    masm.j(Assembler::NotEqual, &onConversionError);
 
     masm.loadConstantFloat32x4(Int32MaxX4, scratch);
     masm.vcmpleps(Operand(input), scratch, scratch);
     masm.vmovmskps(scratch, temp);
     masm.cmp32(temp, Imm32(0));
-    masm.j(Assembler::NotEqual, onConversionError);
+    masm.j(Assembler::NotEqual, &onConversionError);
 
     masm.jump(ool->rejoin());
 
-    if (bail.used()) {
-        masm.bind(&bail);
+    if (gen->compilingAsmJS()) {
+        masm.bindLater(&onConversionError, wasm::JumpTarget::ConversionError);
+    } else {
+        masm.bind(&onConversionError);
         bailout(ool->ins()->snapshot());
     }
+}
+
+// Convert Float32x4 to Uint32x4.
+//
+// If any input lane value is out of range or NaN, bail out.
+void
+CodeGeneratorX86Shared::visitFloat32x4ToUint32x4(LFloat32x4ToUint32x4* ins)
+{
+    FloatRegister in = ToFloatRegister(ins->input());
+    FloatRegister out = ToFloatRegister(ins->output());
+    Register temp = ToRegister(ins->tempR());
+    FloatRegister tempF = ToFloatRegister(ins->tempF());
+
+    // Classify lane values into 4 disjoint classes:
+    //
+    //   N-lanes:             in < -0.0
+    //   A-lanes:     -0.0 <= in <= 0x0.ffffffp31
+    //   B-lanes: 0x1.0p31 <= in <= 0x0.ffffffp32
+    //   V-lanes: 0x1.0p32 <= in, or isnan(in)
+    //
+    // We need to bail out to throw a RangeError if we see any N-lanes or
+    // V-lanes.
+    //
+    // For A-lanes and B-lanes, we make two float -> int32 conversions:
+    //
+    //   A = cvttps2dq(in)
+    //   B = cvttps2dq(in - 0x1.0p31f)
+    //
+    // Note that the subtraction for the B computation is exact for B-lanes.
+    // There is no rounding, so B is the low 31 bits of the correctly converted
+    // result.
+    //
+    // The cvttps2dq instruction produces 0x80000000 when the input is NaN or
+    // out of range for a signed int32_t. This conveniently provides the missing
+    // high bit for B, so the desired result is A for A-lanes and A|B for
+    // B-lanes.
+
+    ScratchSimd128Scope scratch(masm);
+
+    // First we need to filter out N-lanes. We need to use a floating point
+    // comparison to do that because cvttps2dq maps the negative range
+    // [-0x0.ffffffp0;-0.0] to 0. We can't simply look at the sign bits of in
+    // because -0.0 is a valid input.
+    // TODO: It may be faster to let ool code deal with -0.0 and skip the
+    // vcmpleps here.
+    masm.zeroFloat32x4(scratch);
+    masm.vcmpleps(Operand(in), scratch, scratch);
+    masm.vmovmskps(scratch, temp);
+    masm.cmp32(temp, Imm32(15));
+    bailoutIf(Assembler::NotEqual, ins->snapshot());
+
+    // TODO: If the majority of lanes are A-lanes, it could be faster to compute
+    // A first, use vmovmskps to check for any non-A-lanes and handle them in
+    // ool code. OTOH, we we're wrong about the lane distribution, that would be
+    // slower.
+
+    // Compute B in |scratch|.
+    static const float Adjust = 0x80000000; // 0x1.0p31f for the benefit of MSVC.
+    static const SimdConstant Bias = SimdConstant::SplatX4(-Adjust);
+    masm.loadConstantFloat32x4(Bias, scratch);
+    masm.packedAddFloat32(Operand(in), scratch);
+    masm.convertFloat32x4ToInt32x4(scratch, scratch);
+
+    // Compute A in |out|. This is the last time we use |in| and the first time
+    // we use |out|, so we can tolerate if they are the same register.
+    masm.convertFloat32x4ToInt32x4(in, out);
+
+    // Since we filtered out N-lanes, we can identify A-lanes by the sign bits
+    // in A: Any A-lanes will be positive in A, and B-lanes and V-lanes will be
+    // 0x80000000 in A. Compute a mask of non-A-lanes into |tempF|.
+    masm.zeroFloat32x4(tempF);
+    masm.packedGreaterThanInt32x4(Operand(out), tempF);
+
+    // Clear the A-lanes in B.
+    masm.bitwiseAndX4(Operand(tempF), scratch);
+
+    // Compute the final result: A for A-lanes, A|B for B-lanes.
+    masm.bitwiseOrX4(Operand(scratch), out);
+
+    // We still need to filter out the V-lanes. They would show up as 0x80000000
+    // in both A and B. Since we cleared the valid A-lanes in B, the V-lanes are
+    // the remaining negative lanes in B.
+    masm.vmovmskps(scratch, temp);
+    masm.cmp32(temp, Imm32(0));
+    bailoutIf(Assembler::NotEqual, ins->snapshot());
 }
 
 void
 CodeGeneratorX86Shared::visitSimdValueInt32x4(LSimdValueInt32x4* ins)
 {
-    MOZ_ASSERT(ins->mir()->type() == MIRType_Int32x4);
+    MOZ_ASSERT(ins->mir()->type() == MIRType_Int32x4 || ins->mir()->type() == MIRType_Bool32x4);
 
     FloatRegister output = ToFloatRegister(ins->output());
     if (AssemblerX86Shared::HasSSE41()) {
@@ -2359,7 +2500,8 @@ CodeGeneratorX86Shared::visitSimdSplatX4(LSimdSplatX4* ins)
     JS_STATIC_ASSERT(sizeof(float) == sizeof(int32_t));
 
     switch (mir->type()) {
-      case MIRType_Int32x4: {
+      case MIRType_Int32x4:
+      case MIRType_Bool32x4: {
         Register r = ToRegister(ins->getOperand(0));
         masm.vmovd(r, output);
         masm.vpshufd(0, output, output);
@@ -2397,13 +2539,10 @@ CodeGeneratorX86Shared::visitSimdReinterpretCast(LSimdReinterpretCast* ins)
     }
 }
 
+// Extract an integer lane from the vector register |input| and place it in |output|.
 void
-CodeGeneratorX86Shared::visitSimdExtractElementI(LSimdExtractElementI* ins)
+CodeGeneratorX86Shared::emitSimdExtractLane(FloatRegister input, Register output, unsigned lane)
 {
-    FloatRegister input = ToFloatRegister(ins->input());
-    Register output = ToRegister(ins->output());
-
-    SimdLane lane = ins->lane();
     if (lane == LaneX) {
         // The value we want to extract is in the low double-word
         masm.moveLowInt32(input, output);
@@ -2411,10 +2550,41 @@ CodeGeneratorX86Shared::visitSimdExtractElementI(LSimdExtractElementI* ins)
         masm.vpextrd(lane, input, output);
     } else {
         uint32_t mask = MacroAssembler::ComputeShuffleMask(lane);
-        ScratchSimd128Scope scratch(masm);
-        masm.shuffleInt32(mask, input, scratch);
-        masm.moveLowInt32(scratch, output);
+        masm.shuffleInt32(mask, input, ScratchSimd128Reg);
+        masm.moveLowInt32(ScratchSimd128Reg, output);
     }
+}
+
+void
+CodeGeneratorX86Shared::visitSimdExtractElementB(LSimdExtractElementB* ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    emitSimdExtractLane(input, output, ins->lane());
+
+    // We need to generate a 0/1 value. We have 0/-1.
+    masm.and32(Imm32(1), output);
+}
+
+void
+CodeGeneratorX86Shared::visitSimdExtractElementI(LSimdExtractElementI* ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    emitSimdExtractLane(input, output, ins->lane());
+}
+
+void
+CodeGeneratorX86Shared::visitSimdExtractElementU2D(LSimdExtractElementU2D* ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    FloatRegister output = ToFloatRegister(ins->output());
+    Register temp = ToRegister(ins->temp());
+
+    emitSimdExtractLane(input, temp, ins->lane());
+    masm.convertUInt32ToDouble(temp, output);
 }
 
 void
@@ -2499,13 +2669,25 @@ CodeGeneratorX86Shared::visitSimdInsertElementF(LSimdInsertElementF* ins)
 }
 
 void
-CodeGeneratorX86Shared::visitSimdSignMaskX4(LSimdSignMaskX4* ins)
+CodeGeneratorX86Shared::visitSimdAllTrue(LSimdAllTrue* ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
     Register output = ToRegister(ins->output());
 
-    // For Float32x4 and Int32x4.
     masm.vmovmskps(input, output);
+    masm.cmp32(output, Imm32(0xf));
+    masm.emitSet(Assembler::Zero, output);
+}
+
+void
+CodeGeneratorX86Shared::visitSimdAnyTrue(LSimdAnyTrue* ins)
+{
+    FloatRegister input = ToFloatRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    masm.vmovmskps(input, output);
+    masm.cmp32(output, Imm32(0x0));
+    masm.emitSet(Assembler::NonZero, output);
 }
 
 template <class T, class Reg> void
@@ -3308,19 +3490,18 @@ CodeGeneratorX86Shared::visitSimdSelect(LSimdSelect* ins)
         masm.vmovaps(mask, temp);
 
     MSimdSelect* mir = ins->mir();
-    if (mir->isElementWise()) {
-        if (AssemblerX86Shared::HasAVX()) {
-            masm.vblendvps(mask, onTrue, onFalse, output);
-            return;
-        }
 
-        // SSE4.1 has plain blendvps which can do this, but it is awkward
-        // to use because it requires the mask to be in xmm0.
-
-        // Propagate sign to all bits of mask vector, if necessary.
-        if (!mir->mask()->isSimdBinaryComp())
-            masm.packedRightShiftByScalar(Imm32(31), temp);
+    if (AssemblerX86Shared::HasAVX()) {
+        masm.vblendvps(mask, onTrue, onFalse, output);
+        return;
     }
+
+    // SSE4.1 has plain blendvps which can do this, but it is awkward
+    // to use because it requires the mask to be in xmm0.
+
+    // Propagate sign to all bits of mask vector, if necessary.
+    if (!mir->mask()->isSimdBinaryComp())
+        masm.packedRightShiftByScalar(Imm32(31), temp);
 
     masm.bitwiseAndX4(Operand(temp), output);
     masm.bitwiseAndNotX4(Operand(onFalse), temp);

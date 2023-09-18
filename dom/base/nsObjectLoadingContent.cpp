@@ -1436,7 +1436,7 @@ nsObjectLoadingContent::ObjectState() const
         case eFallbackVulnerableNoUpdate:
           return NS_EVENT_STATE_VULNERABLE_NO_UPDATE;
       }
-  };
+  }
   NS_NOTREACHED("unknown type?");
   return NS_EVENT_STATE_LOADING;
 }
@@ -2469,7 +2469,7 @@ nsObjectLoadingContent::LoadObject(bool aNotify,
     case eType_Null:
       // Handled below, silence compiler warnings
     break;
-  };
+  }
 
   //
   // Loaded, handle notifications and fallback
@@ -3144,6 +3144,7 @@ nsObjectLoadingContent::DoStopPlugin(nsPluginInstanceOwner* aInstanceOwner,
 NS_IMETHODIMP
 nsObjectLoadingContent::StopPluginInstance()
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
   // Clear any pending events
   mPendingInstantiateEvent = nullptr;
   mPendingCheckPluginStopEvent = nullptr;
@@ -3332,12 +3333,17 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
     sPrefsInitialized = true;
   }
 
-  if (XRE_IsParentProcess() &&
-      BrowserTabsRemoteAutostart()) {
-    // Plugins running OOP from the chrome process along with plugins running
-    // OOP from the content process will hang. Let's prevent that situation.
-    aReason = eFallbackDisabled;
-    return false;
+  if (BrowserTabsRemoteAutostart()) {
+    bool shouldLoadInParent = nsPluginHost::ShouldLoadTypeInParent(mContentType);
+    bool inParent = XRE_IsParentProcess();
+
+    if (shouldLoadInParent != inParent) {
+      // Plugins need to be locked to either the parent process or the content
+      // process. If a plugin is locked to one process type, it can't be used in
+      // the other. Otherwise we'll get hangs.
+      aReason = eFallbackDisabled;
+      return false;
+    }
   }
 
   RefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();
@@ -3787,7 +3793,7 @@ nsObjectLoadingContent::TeardownProtoChain()
 bool
 nsObjectLoadingContent::DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObject,
                                   JS::Handle<jsid> aId,
-                                  JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                                  JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   // We don't resolve anything; we just try to make sure we're instantiated.
   // This purposefully does not fire for chrome/xray resolves, see bug 967694

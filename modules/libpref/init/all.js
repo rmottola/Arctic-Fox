@@ -617,15 +617,20 @@ pref("apz.min_skate_speed", "1.0");
 pref("apz.minimap.enabled", false);
 pref("apz.overscroll.enabled", false);
 pref("apz.overscroll.min_pan_distance_ratio", "1.0");
-pref("apz.overscroll.stretch_factor", "0.5");
-pref("apz.overscroll.spring_stiffness", "0.001");
 pref("apz.overscroll.spring_friction", "0.015");
+pref("apz.overscroll.spring_stiffness", "0.0018");
 pref("apz.overscroll.stop_distance_threshold", "5.0");
 pref("apz.overscroll.stop_velocity_threshold", "0.01");
+pref("apz.overscroll.stretch_factor", "0.35");
 
 // Whether to print the APZC tree for debugging
 pref("apz.printtree", false);
 
+#ifdef NIGHTLY_BUILD
+pref("apz.record_checkerboarding", true);
+#else
+pref("apz.record_checkerboarding", false);
+#endif
 pref("apz.test.logging_enabled", false);
 pref("apz.touch_start_tolerance", "0.2222222");  // 0.2222222 came from 1.0/4.5
 pref("apz.touch_move_tolerance", "0.0");
@@ -1333,6 +1338,13 @@ pref("print.print_edge_left", 0);
 pref("print.print_edge_right", 0);
 pref("print.print_edge_bottom", 0);
 
+// Print via the parent process. This is only used when e10s is enabled.
+#if defined(XP_WIN)
+pref("print.print_via_parent", true);
+#else
+pref("print.print_via_parent", false);
+#endif
+
 // Pref used by the spellchecker extension to control the
 // maximum number of misspelled words that will be underlined
 // in a document.
@@ -1497,6 +1509,9 @@ pref("javascript.options.mem.gc_min_empty_chunk_count", 1);
 pref("javascript.options.mem.gc_max_empty_chunk_count", 30);
 
 pref("javascript.options.showInConsole", false);
+
+pref("javascript.options.throw_on_debuggee_would_run", false);
+pref("javascript.options.dump_stack_on_debuggee_would_run", false);
 
 // advanced prefs
 pref("advanced.mailftp",                    false);
@@ -1791,6 +1806,10 @@ pref("network.ftp.control.qos", 0);
 
 // The max time to spend on xpcom events between two polls in ms.
 pref("network.sts.max_time_for_events_between_two_polls", 100);
+
+// During shutdown we limit PR_Close calls. If time exceeds this pref (in ms)
+// let sockets just leak.
+pref("network.sts.max_time_for_pr_close_during_shutdown", 5000);
 // </http>
 
 // 2147483647 == PR_INT32_MAX == ~2 GB
@@ -2650,6 +2669,11 @@ pref("layout.css.prefixes.gradients", true);
 // Are webkit-prefixed properties & property-values supported?
 pref("layout.css.prefixes.webkit", false);
 
+// Are "-webkit-{min|max}-device-pixel-ratio" media queries supported?
+// (Note: this pref has no effect if the master 'layout.css.prefixes.webkit'
+// pref is set to false.)
+pref("layout.css.prefixes.device-pixel-ratio-webkit", false);
+
 // Is the CSS Unprefixing Service enabled? (This service emulates support
 // for certain vendor-prefixed properties & values, for sites on a "fixlist".)
 pref("layout.css.unprefixing-service.enabled", true);
@@ -2909,7 +2933,7 @@ pref("dom.ipc.plugins.asyncInit.enabled", true);
 #endif
 
 // Allow the AsyncDrawing mode to be used for plugins.
-pref("dom.ipc.plugins.asyncdrawing.enabled", false);
+pref("dom.ipc.plugins.asyncdrawing.enabled", true);
 
 pref("dom.ipc.processCount", 1);
 
@@ -3493,9 +3517,6 @@ pref("plugin.scan.WindowsMediaPlayer", "7.0");
 // Which is currently HKLM\Software\MozillaPlugins\xxxPLIDxxx\Path
 pref("plugin.scan.plid.all", true);
 
-// Allow the new AsyncDrawing mode to be used for plugins.
-pref("plugin.allow.asyncdrawing", false);
-
 // Help Windows NT, 2000, and XP dialup a RAS connection
 // when a network address is unreachable.
 pref("network.autodial-helper.enabled", true);
@@ -3575,6 +3596,16 @@ pref("ui.panel.default_level_parent", false);
 
 pref("mousewheel.system_scroll_override_on_root_content.enabled", true);
 
+// Enable system settings cache for mouse wheel message handling.
+// Note that even if this pref is set to true, Gecko may not cache the system
+// settings if Gecko detects that the cache won't be refreshed properly when
+// the settings are changed.
+pref("mousewheel.system_settings_cache.enabled", true);
+
+// This is a pref to test system settings cache for mouse wheel message
+// handling.  If this is set to true, Gecko forcibly use the cache.
+pref("mousewheel.system_settings_cache.force_enabled", false);
+
 // High resolution scrolling with supported mouse drivers on Vista or later.
 pref("mousewheel.enable_pixel_scrolling", true);
 
@@ -3607,9 +3638,9 @@ pref("ui.osk.enabled", true);
 pref("ui.osk.detect_physical_keyboard", true);
 // Path to TabTip.exe on local machine. Cached for performance reasons.
 pref("ui.osk.on_screen_keyboard_path", "");
-// Only show the on-screen keyboard when Windows is in Tablet mode. Setting
-// this pref to false will allow the OSK to show in regular non-tablet mode.
-pref("ui.osk.require_tablet_mode", true);
+// Only try to show the on-screen keyboard on Windows 10 and later. Setting
+// this pref to false will allow the OSK to show on Windows 8 and 8.1.
+pref("ui.osk.require_win10", false);
 // This pref stores the "reason" that the on-screen keyboard was either
 // shown or not shown when focus is moved to an editable text field. It is
 // used to help debug why the keyboard is either not appearing when expected
@@ -4647,9 +4678,6 @@ pref("layers.tiles.edge-padding", true);
 // use with tests.
 pref("layers.offmainthreadcomposition.testing.enabled", false);
 
-// whether to allow use of the basic compositor
-pref("layers.offmainthreadcomposition.force-basic", false);
-
 // Whether to animate simple opacity and transforms on the compositor
 #ifdef RELEASE_BUILD
 pref("layers.offmainthreadcomposition.async-animations", false);
@@ -4664,17 +4692,23 @@ pref("layers.bufferrotation.enabled", true);
 
 pref("layers.componentalpha.enabled", true);
 
+// Use the DT-backend implemented PushLayer
+pref("gfx.content.use-native-pushlayer", false);
+
 #ifdef ANDROID
 pref("gfx.apitrace.enabled",false);
 #endif
 
 #ifdef MOZ_X11
+pref("gfx.content.use-native-pushlayer", true);
 #ifdef MOZ_WIDGET_GTK
 pref("gfx.xrender.enabled",true);
 #endif
 #endif
 
 #ifdef XP_WIN
+pref("gfx.content.use-native-pushlayer", true);
+
 // Whether to disable the automatic detection and use of direct2d.
 pref("gfx.direct2d.disabled", false);
 pref("gfx.direct2d.use1_1", true);

@@ -8,6 +8,7 @@
 #include "ContentHelper.h"
 #include "gfxPlatform.h" // For gfxPlatform::UseTiling
 #include "gfxPrefs.h"
+#include "LayersLogging.h"  // For Stringify
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/IntegerPrintfMacros.h"
@@ -15,6 +16,7 @@
 #include "mozilla/layers/ShadowLayers.h"
 #include "mozilla/TouchEvents.h"
 #include "nsContentUtils.h"
+#include "nsContainerFrame.h"
 #include "nsIScrollableFrame.h"
 #include "nsLayoutUtils.h"
 #include "nsIInterfaceRequestorUtils.h"
@@ -173,7 +175,7 @@ SetDisplayPortMargins(nsIPresShell* aPresShell,
     return;
   }
 
-  bool hadDisplayPort = nsLayoutUtils::GetDisplayPort(aContent);
+  bool hadDisplayPort = nsLayoutUtils::HasDisplayPort(aContent);
   ScreenMargin margins = aMetrics.GetDisplayPortMargins();
   nsLayoutUtils::SetDisplayPortMargins(aContent, aPresShell, margins, 0);
   if (!hadDisplayPort) {
@@ -196,6 +198,14 @@ GetPresShell(const nsIContent* aContent)
     result = doc->GetShell();
   }
   return result.forget();
+}
+
+static void
+SetPaintRequestTime(nsIContent* aContent, const TimeStamp& aPaintRequestTime)
+{
+  aContent->SetProperty(nsGkAtoms::paintRequestTime,
+                        new TimeStamp(aPaintRequestTime),
+                        nsINode::DeleteProperty<TimeStamp>);
 }
 
 void
@@ -243,8 +253,9 @@ APZCCallbackHelper::UpdateRootFrame(FrameMetrics& aMetrics)
   // adjusts the display port margins, so do it before we set those.
   ScrollFrame(content, aMetrics);
 
-  MOZ_ASSERT(nsLayoutUtils::GetDisplayPort(content));
+  MOZ_ASSERT(nsLayoutUtils::HasDisplayPort(content));
   SetDisplayPortMargins(shell, content, aMetrics);
+  SetPaintRequestTime(content, aMetrics.GetPaintRequestTime());
 }
 
 void
@@ -266,6 +277,7 @@ APZCCallbackHelper::UpdateSubFrame(FrameMetrics& aMetrics)
   if (nsCOMPtr<nsIPresShell> shell = GetPresShell(content)) {
     SetDisplayPortMargins(shell, content, aMetrics);
   }
+  SetPaintRequestTime(content, aMetrics.GetPaintRequestTime());
 }
 
 bool
@@ -426,6 +438,28 @@ APZCCallbackHelper::GetRootContentDocumentPresShellForContent(nsIContent* aConte
     return context->PresShell();
 }
 
+static nsIPresShell*
+GetRootDocumentPresShell(nsIContent* aContent)
+{
+    nsIDocument* doc = aContent->GetComposedDoc();
+    if (!doc) {
+        return nullptr;
+    }
+    nsIPresShell* shell = doc->GetShell();
+    if (!shell) {
+        return nullptr;
+    }
+    nsPresContext* context = shell->GetPresContext();
+    if (!context) {
+        return nullptr;
+    }
+    context = context->GetRootPresContext();
+    if (!context) {
+        return nullptr;
+    }
+    return context->PresShell();
+}
+
 CSSPoint
 APZCCallbackHelper::ApplyCallbackTransform(const CSSPoint& aInput,
                                            const ScrollableLayerGuid& aGuid)
@@ -434,31 +468,55 @@ APZCCallbackHelper::ApplyCallbackTransform(const CSSPoint& aInput,
     if (aGuid.mScrollId == FrameMetrics::NULL_SCROLL_ID) {
         return input;
     }
-    // Apply the callback-transform.
-    // XXX: technically we need to walk all the way up the layer tree from the layer
-    // represented by |aGuid.mScrollId| up to the root of the layer tree and apply
-    // the input transforms at each level in turn. However, it is quite difficult
-    // to do this given that the structure of the layer tree may be different from
-    // the structure of the content tree. Also it may be impossible to do correctly
-    // at this point because there are other CSS transforms and such interleaved in
-    // between so applying the inputTransforms all in a row at the end may leave
-    // some things transformed improperly. In practice we should rarely hit scenarios
-    // where any of this matters, so I'm skipping it for now and just doing the single
-    // transform for the layer that the input hit.
     nsCOMPtr<nsIContent> content = nsLayoutUtils::FindContentFor(aGuid.mScrollId);
-    if (content) {
-        void* property = content->GetProperty(nsGkAtoms::apzCallbackTransform);
-        CSSPoint delta = property ? (*static_cast<CSSPoint*>(property)) : CSSPoint(0.0f, 0.0f);
-        // The delta is in root content document coordinate space while the
-        // aInput point is in root document coordinate space so convert the
-        // delta to root document space before adding it to the aInput point.
-        float resolution = 1.0f;
-        if (nsIPresShell* shell = GetRootContentDocumentPresShellForContent(content)) {
-            resolution = shell->GetResolution();
+    if (!content) {
+        return input;
+    }
+
+    // First, scale inversely by the root content document's pres shell
+    // resolution to cancel the scale-to-resolution transform that the
+    // compositor adds to the layer with the pres shell resolution. The points
+    // sent to Gecko by APZ don't have this transform unapplied (unlike other
+    // compositor-side transforms) because APZ doesn't know about it.
+    if (nsIPresShell* shell = GetRootDocumentPresShell(content)) {
+        input = input / shell->GetResolution();
+    }
+
+    // This represents any resolution on the Root Content Document (RCD)
+    // that's not on the Root Document (RD). That is, on platforms where
+    // RCD == RD, it's 1, and on platforms where RCD != RD, it's the RCD
+    // resolution. 'input' has this resolution applied, but the scroll
+    // deltas retrieved below do not, so we need to apply them to the
+    // deltas before adding the deltas to 'input'. (Technically, deltas
+    // from scroll frames outside the RCD would already have this
+    // resolution applied, but we don't have such scroll frames in
+    // practice.)
+    float nonRootResolution = 1.0f;
+    if (nsIPresShell* shell = GetRootContentDocumentPresShellForContent(content)) {
+      nonRootResolution = shell->GetCumulativeNonRootScaleResolution();
+    }
+    // Now apply the callback-transform.
+    // XXX: Walk up the frame tree from the frame of this content element
+    // to the root of the frame tree, and apply any apzCallbackTransform
+    // found on the way. This is only approximately correct, as it does
+    // not take into account CSS transforms, nor differences in structure between
+    // the frame tree (which determines the transforms we're applying)
+    // and the layer tree (which determines the transforms we *want* to
+    // apply).
+    nsIFrame* frame = content->GetPrimaryFrame();
+    nsCOMPtr<nsIContent> lastContent;
+    while (frame) {
+        if (content && (content != lastContent)) {
+            void* property = content->GetProperty(nsGkAtoms::apzCallbackTransform);
+            if (property) {
+                CSSPoint delta = (*static_cast<CSSPoint*>(property));
+                delta = delta * nonRootResolution;
+                input += delta;
+            }
         }
-        delta.x = delta.x * resolution;
-        delta.y = delta.y * resolution;
-        input += delta;
+        frame = frame->GetParent();
+        lastContent = content;
+        content = frame ? frame->GetContent() : nullptr;
     }
     return input;
 }
@@ -600,6 +658,19 @@ PrepareForSetTargetAPZCNotification(nsIWidget* aWidget,
                                     const LayoutDeviceIntPoint& aRefPoint,
                                     nsTArray<ScrollableLayerGuid>* aTargets)
 {
+#if defined(MOZ_ANDROID_APZ)
+  // Re-target so that the hit test is performed relative to the frame for the
+  // Root Content Document instead of the Root Document which are different in
+  // Android. See bug 1229752 comment 16 for an explanation of why this is necessary.
+  if (nsIDocument* doc = aRootFrame->PresContext()->PresShell()->GetTouchEventTargetDocument()) {
+    if (nsIPresShell* shell = doc->GetShell()) {
+      if(nsIFrame* frame = shell->GetRootFrame()) {
+        aRootFrame = frame;
+      }
+    }
+  }
+#endif
+
   ScrollableLayerGuid guid(aGuid.mLayersId, 0, FrameMetrics::NULL_SCROLL_ID);
   nsPoint point =
     nsLayoutUtils::GetEventCoordinatesRelativeTo(aWidget, aRefPoint, aRootFrame);
@@ -626,7 +697,7 @@ PrepareForSetTargetAPZCNotification(nsIWidget* aWidget,
     dpElement, &(guid.mPresShellId), &(guid.mScrollId));
   aTargets->AppendElement(guid);
 
-  if (!guidIsValid || nsLayoutUtils::GetDisplayPort(dpElement, nullptr)) {
+  if (!guidIsValid || nsLayoutUtils::HasDisplayPort(dpElement)) {
     return false;
   }
 
@@ -848,7 +919,6 @@ APZCCallbackHelper::IsDisplayportSuppressed()
 {
   return sActiveSuppressDisplayport > 0;
 }
-
 
 } // namespace layers
 } // namespace mozilla

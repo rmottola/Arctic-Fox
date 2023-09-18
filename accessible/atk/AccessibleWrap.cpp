@@ -145,7 +145,7 @@ MaiAtkObject::GetAtkHyperlink()
 void
 MaiAtkObject::Shutdown()
 {
-  accWrap = 0;
+  accWrap.SetBits(0);
   MaiHyperlink* maiHyperlink =
     (MaiHyperlink*)g_object_get_qdata(G_OBJECT(this), quark_mai_hyperlink);
   if (maiHyperlink) {
@@ -559,7 +559,7 @@ initializeCB(AtkObject *aAtkObj, gpointer aData)
         ATK_OBJECT_CLASS(parent_class)->initialize(aAtkObj, aData);
 
   /* initialize object */
-  MAI_ATK_OBJECT(aAtkObj)->accWrap = reinterpret_cast<uintptr_t>(aData);
+  MAI_ATK_OBJECT(aAtkObj)->accWrap.SetBits(reinterpret_cast<uintptr_t>(aData));
 }
 
 void
@@ -567,7 +567,7 @@ finalizeCB(GObject *aObj)
 {
     if (!IS_MAI_OBJECT(aObj))
         return;
-    NS_ASSERTION(MAI_ATK_OBJECT(aObj)->accWrap == 0, "AccWrap NOT null");
+    NS_ASSERTION(MAI_ATK_OBJECT(aObj)->accWrap.IsNull(), "AccWrap NOT null");
 
     // call parent finalize function
     // finalize of GObjectClass will unref the accessible parent if has
@@ -597,7 +597,8 @@ static void
 MaybeFireNameChange(AtkObject* aAtkObj, const nsString& aNewName)
 {
   NS_ConvertUTF16toUTF8 newNameUTF8(aNewName);
-  if (aAtkObj->name && newNameUTF8.Equals(aAtkObj->name))
+  if (aAtkObj->name &&
+      !strncmp(aAtkObj->name, newNameUTF8.get(), newNameUTF8.Length()))
     return;
 
   // Below we duplicate the functionality of atk_object_set_name(),
@@ -649,22 +650,17 @@ getRoleCB(AtkObject *aAtkObj)
   if (aAtkObj->role != ATK_ROLE_INVALID)
     return aAtkObj->role;
 
-  AccessibleWrap* accWrap = GetAccessibleWrap(aAtkObj);
-  a11y::role role;
-  if (!accWrap) {
-    ProxyAccessible* proxy = GetProxy(aAtkObj);
-    if (!proxy)
-      return ATK_ROLE_INVALID;
+  AccessibleOrProxy acc = GetInternalObj(aAtkObj);
+  if (acc.IsNull()) {
+    return ATK_ROLE_INVALID;
+  }
 
-    role = proxy->Role();
-  } else {
 #ifdef DEBUG
+  if (AccessibleWrap* accWrap = GetAccessibleWrap(aAtkObj)) {
     NS_ASSERTION(nsAccUtils::IsTextInterfaceSupportCorrect(accWrap),
                  "Does not support Text interface when it should");
-#endif
-
-    role = accWrap->Role();
   }
+#endif
 
 #define ROLE(geckoRole, stringRole, atkRole, macRole, \
              msaaRole, ia2Role, nameRule) \
@@ -672,11 +668,11 @@ getRoleCB(AtkObject *aAtkObj)
     aAtkObj->role = atkRole; \
     break;
 
-  switch (role) {
+  switch (acc.Role()) {
 #include "RoleMap.h"
     default:
       MOZ_CRASH("Unknown role.");
-  };
+  }
 
 #undef ROLE
 
@@ -1064,7 +1060,7 @@ GetAccessibleWrap(AtkObject* aAtkObj)
                  nullptr);
 
   uintptr_t accWrapPtr = isMAIObject ?
-    MAI_ATK_OBJECT(aAtkObj)->accWrap :
+    MAI_ATK_OBJECT(aAtkObj)->accWrap.Bits() :
     reinterpret_cast<uintptr_t>(MAI_ATK_SOCKET(aAtkObj)->accWrap);
   if (accWrapPtr & IS_PROXY)
     return nullptr;
@@ -1087,12 +1083,16 @@ GetAccessibleWrap(AtkObject* aAtkObj)
 ProxyAccessible*
 GetProxy(AtkObject* aObj)
 {
-  if (!aObj || !IS_MAI_OBJECT(aObj) ||
-      !(MAI_ATK_OBJECT(aObj)->accWrap & IS_PROXY))
+  return GetInternalObj(aObj).AsProxy();
+}
+
+AccessibleOrProxy
+GetInternalObj(AtkObject* aObj)
+{
+  if (!aObj || !IS_MAI_OBJECT(aObj))
     return nullptr;
 
-  return reinterpret_cast<ProxyAccessible*>(MAI_ATK_OBJECT(aObj)->accWrap
-      & ~IS_PROXY);
+  return MAI_ATK_OBJECT(aObj)->accWrap;
 }
 
 AtkObject*

@@ -19,7 +19,6 @@
 #include "gfxPrefs.h"
 #include "gfxEnv.h"
 #include "gfxTextRun.h"
-#include "gfxVR.h"
 
 #ifdef XP_WIN
 #include <process.h>
@@ -126,6 +125,8 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 #include "SoftwareVsyncSource.h"
 #include "nscore.h" // for NS_FREE_PERMANENT_DATA
 #include "mozilla/dom/ContentChild.h"
+#include "gfxVR.h"
+#include "VRManagerChild.h"
 
 namespace mozilla {
 namespace layers {
@@ -445,8 +446,7 @@ gfxPlatform::gfxPlatform()
                      contentMask, BackendType::CAIRO);
     mTotalSystemMemory = mozilla::hal::GetTotalSystemMemory();
 
-    // give HMDs a chance to be initialized very early on
-    VRHMDManager::ManagerInit();
+    VRManager::ManagerInit();
 }
 
 gfxPlatform*
@@ -577,7 +577,7 @@ gfxPlatform::Init()
 
     gPlatform->mScreenReferenceSurface =
         gPlatform->CreateOffscreenSurface(IntSize(1, 1),
-                                          gfxImageFormat::ARGB32);
+                                          SurfaceFormat::A8R8G8B8_UINT32);
     if (!gPlatform->mScreenReferenceSurface) {
         NS_RUNTIMEABORT("Could not initialize mScreenReferenceSurface");
     }
@@ -739,6 +739,7 @@ gfxPlatform::InitLayersIPC()
         SharedBufferManagerChild::StartUp();
 #endif
         mozilla::layers::ImageBridgeChild::StartUp();
+        gfx::VRManagerChild::StartUpSameProcess();
     }
 }
 
@@ -754,22 +755,22 @@ gfxPlatform::ShutdownLayersIPC()
     {
         // This must happen after the shutdown of media and widgets, which
         // are triggered by the NS_XPCOM_SHUTDOWN_OBSERVER_ID notification.
+        gfx::VRManagerChild::ShutDown();
         layers::ImageBridgeChild::ShutDown();
 #ifdef MOZ_WIDGET_GONK
         layers::SharedBufferManagerChild::ShutDown();
 #endif
 
         layers::CompositorParent::ShutDown();
-    }
+	} else if (XRE_GetProcessType() == GeckoProcessType_Content) {
+		gfx::VRManagerChild::ShutDown();
+	}
 }
 
 gfxPlatform::~gfxPlatform()
 {
     mScreenReferenceSurface = nullptr;
     mScreenReferenceDrawTarget = nullptr;
-
-    // Clean up any VR stuff
-    VRHMDManager::ManagerDestroy();
 
     // The cairo folks think we should only clean up in debug builds,
     // but we're generally in the habit of trying to shut down as
@@ -897,11 +898,7 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     // readback of aSurface's surface into memory if, for example, aSurface
     // wraps an xlib cairo surface (which can be important to avoid a major
     // slowdown).
-    NativeSurface surf;
-    surf.mFormat = format;
-    surf.mType = NativeSurfaceType::CAIRO_SURFACE;
-    surf.mSurface = aSurface->CairoSurface();
-    surf.mSize = aSurface->GetSize();
+    //
     // We return here regardless of whether CreateSourceSurfaceFromNativeSurface
     // succeeds or not since we don't expect to be able to do any better below
     // if it fails.
@@ -914,7 +911,8 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     // strong reference back to srcBuffer, creating a reference loop and a
     // memory leak. Not caching is fine since wrapping is cheap enough (no
     // copying) so we can just wrap again next time we're called.
-    return aTarget->CreateSourceSurfaceFromNativeSurface(surf);
+    return Factory::CreateSourceSurfaceForCairoSurface(aSurface->CairoSurface(),
+                                                       aSurface->GetSize(), format);
   }
 
   RefPtr<SourceSurface> srcBuffer;
@@ -955,18 +953,8 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     // readback), and the OptimizeSourceSurface may well copy again and upload
     // to the GPU. So, while this code path is rarely hit, hitting it may be
     // very slow.
-    NativeSurface surf;
-    surf.mFormat = format;
-    surf.mType = NativeSurfaceType::CAIRO_SURFACE;
-    surf.mSurface = aSurface->CairoSurface();
-    surf.mSize = aSurface->GetSize();
-    RefPtr<DrawTarget> drawTarget =
-      Factory::CreateDrawTarget(BackendType::CAIRO, IntSize(1, 1), format);
-    if (!drawTarget) {
-      gfxWarning() << "gfxPlatform::GetSourceSurfaceForSurface failed in CreateDrawTarget";
-      return nullptr;
-    }
-    srcBuffer = drawTarget->CreateSourceSurfaceFromNativeSurface(surf);
+    srcBuffer = Factory::CreateSourceSurfaceForCairoSurface(aSurface->CairoSurface(),
+                                                            aSurface->GetSize(), format);
     if (srcBuffer) {
       srcBuffer = aTarget->OptimizeSourceSurface(srcBuffer);
     }
@@ -1855,11 +1843,11 @@ gfxPlatform::Optimal2DFormatForContent(gfxContentType aContent)
   switch (aContent) {
   case gfxContentType::COLOR:
     switch (GetOffscreenFormat()) {
-    case gfxImageFormat::ARGB32:
+    case SurfaceFormat::A8R8G8B8_UINT32:
       return mozilla::gfx::SurfaceFormat::B8G8R8A8;
-    case gfxImageFormat::RGB24:
+    case SurfaceFormat::X8R8G8B8_UINT32:
       return mozilla::gfx::SurfaceFormat::B8G8R8X8;
-    case gfxImageFormat::RGB16_565:
+    case SurfaceFormat::R5G6B5_UINT16:
       return mozilla::gfx::SurfaceFormat::R5G6B5_UINT16;
     default:
       NS_NOTREACHED("unknown gfxImageFormat for gfxContentType::COLOR");
@@ -1882,12 +1870,12 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
   case gfxContentType::COLOR:
     return GetOffscreenFormat();
   case gfxContentType::ALPHA:
-    return gfxImageFormat::A8;
+    return SurfaceFormat::A8;
   case gfxContentType::COLOR_ALPHA:
-    return gfxImageFormat::ARGB32;
+    return SurfaceFormat::A8R8G8B8_UINT32;
   default:
     NS_NOTREACHED("unknown gfxContentType");
-    return gfxImageFormat::ARGB32;
+    return SurfaceFormat::A8R8G8B8_UINT32;
   }
 }
 
@@ -2271,9 +2259,7 @@ gfxPlatform::GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layer
   if (useAcceleration) {
     GetAcceleratedCompositorBackends(aBackends);
   }
-  if (SupportsBasicCompositor()) {
-    aBackends.AppendElement(LayersBackend::LAYERS_BASIC);
-  }
+  aBackends.AppendElement(LayersBackend::LAYERS_BASIC);
 }
 
 void

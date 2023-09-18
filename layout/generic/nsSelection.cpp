@@ -2781,14 +2781,14 @@ nsFrameSelection::AddCellsToSelection(nsIContent *aTableContent,
         col ++;
       else
         col--;
-    };
+    }
     if (row == aEndRowIndex) break;
 
     if (aStartRowIndex < aEndRowIndex)
       row++;
     else
       row--;
-  };
+  }
   return result;
 }
 

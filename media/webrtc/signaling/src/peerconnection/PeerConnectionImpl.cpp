@@ -186,6 +186,7 @@ public:
   virtual void NotifyTracksAvailable(DOMMediaStream* aStream) override
   {
     MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(aStream);
 
     PeerConnectionWrapper wrapper(mPcHandle);
 
@@ -198,6 +199,13 @@ public:
 
     std::string streamId = PeerConnectionImpl::GetStreamId(*aStream);
     bool notifyStream = true;
+
+    Sequence<OwningNonNull<DOMMediaStream>> streams;
+    if (!streams.AppendElement(OwningNonNull<DOMMediaStream>(*aStream),
+                               fallible)) {
+      MOZ_ASSERT(false);
+      return;
+    }
 
     for (size_t i = 0; i < tracks.Length(); i++) {
       std::string trackId;
@@ -230,7 +238,7 @@ public:
 
       JSErrorResult jrv;
       CSFLogInfo(logTag, "Calling OnAddTrack(%s)", trackId.c_str());
-      mObserver->OnAddTrack(*tracks[i], jrv);
+      mObserver->OnAddTrack(*tracks[i], streams, jrv);
       if (jrv.Failed()) {
         CSFLogError(logTag, ": OnAddTrack(%u) failed! Error: %u",
                     static_cast<unsigned>(i),
@@ -366,6 +374,24 @@ bool PCUuidGenerator::Generate(std::string* idp) {
   return true;
 }
 
+bool IsPrivateBrowsing(nsPIDOMWindow* aWindow)
+{
+#if defined(MOZILLA_EXTERNAL_LINKAGE)
+  return false;
+#else
+  if (!aWindow) {
+    return false;
+  }
+
+  nsIDocument *doc = aWindow->GetExtantDoc();
+  if (!doc) {
+    return false;
+  }
+
+  nsILoadContext *loadContext = doc->GetLoadContext();
+  return loadContext && loadContext->UsePrivateBrowsing();
+#endif
+}
 
 PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
 : mTimeCard(MOZ_LOG_TEST(signalingLogInfo(),LogLevel::Error) ?
@@ -393,12 +419,18 @@ PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
   , mHaveDataStream(false)
   , mAddCandidateErrorCount(0)
   , mTrickle(true) // TODO(ekr@rtfm.com): Use pref
-  , mShouldSuppressNegotiationNeeded(false)
+  , mNegotiationNeeded(false)
+  , mPrivateWindow(false)
 {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   MOZ_ASSERT(NS_IsMainThread());
+  auto log = RLogRingBuffer::CreateInstance();
   if (aGlobal) {
     mWindow = do_QueryInterface(aGlobal->GetAsSupports());
+    if (IsPrivateBrowsing(mWindow)) {
+      mPrivateWindow = true;
+      log->EnterPrivateMode();
+    }
   }
 #endif
   CSFLogInfo(logTag, "%s: PeerConnectionImpl constructor for %s",
@@ -410,6 +442,8 @@ PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
   mAllowIceLinkLocal = Preferences::GetBool(
     "media.peerconnection.ice.link_local", false);
 #endif
+  memset(mMaxReceiving, 0, sizeof(mMaxReceiving));
+  memset(mMaxSending, 0, sizeof(mMaxSending));
 }
 
 PeerConnectionImpl::~PeerConnectionImpl()
@@ -422,6 +456,15 @@ PeerConnectionImpl::~PeerConnectionImpl()
   }
   // This aborts if not on main thread (in Debug builds)
   PC_AUTO_ENTER_API_CALL_NO_CHECK();
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  if (mPrivateWindow) {
+    auto * log = RLogRingBuffer::GetInstance();
+    if (log) {
+      log->ExitPrivateMode();
+    }
+    mPrivateWindow = false;
+  }
+#endif
   if (PeerConnectionCtx::isActive()) {
     PeerConnectionCtx::GetInstance()->mPeerConnections.erase(mHandle);
   } else {
@@ -2481,6 +2524,57 @@ PeerConnectionImpl::PluginCrash(uint32_t aPluginID,
   return true;
 }
 
+void
+PeerConnectionImpl::RecordEndOfCallTelemetry() const
+{
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  // Bitmask used for WEBRTC/LOOP_CALL_TYPE telemetry reporting
+  static const uint32_t kAudioTypeMask = 1;
+  static const uint32_t kVideoTypeMask = 2;
+  static const uint32_t kDataChannelTypeMask = 4;
+
+  // Report end-of-call Telemetry
+  if (mJsepSession->GetNegotiations() > 0) {
+    Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_RENEGOTIATIONS :
+                          Telemetry::WEBRTC_RENEGOTIATIONS,
+                          mJsepSession->GetNegotiations()-1);
+  }
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_MAX_VIDEO_SEND_TRACK :
+                        Telemetry::WEBRTC_MAX_VIDEO_SEND_TRACK,
+                        mMaxSending[SdpMediaSection::MediaType::kVideo]);
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_MAX_VIDEO_RECEIVE_TRACK :
+                        Telemetry::WEBRTC_MAX_VIDEO_RECEIVE_TRACK,
+                        mMaxReceiving[SdpMediaSection::MediaType::kVideo]);
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_MAX_AUDIO_SEND_TRACK :
+                        Telemetry::WEBRTC_MAX_AUDIO_SEND_TRACK,
+                        mMaxSending[SdpMediaSection::MediaType::kAudio]);
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_MAX_AUDIO_RECEIVE_TRACK :
+                        Telemetry::WEBRTC_MAX_AUDIO_RECEIVE_TRACK,
+                        mMaxReceiving[SdpMediaSection::MediaType::kAudio]);
+  // DataChannels appear in both Sending and Receiving
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_DATACHANNEL_NEGOTIATED :
+                        Telemetry::WEBRTC_DATACHANNEL_NEGOTIATED,
+                        mMaxSending[SdpMediaSection::MediaType::kApplication]);
+  // Enumerated/bitmask: 1 = Audio, 2 = Video, 4 = DataChannel
+  // A/V = 3, A/V/D = 7, etc
+  uint32_t type = 0;
+  if (mMaxSending[SdpMediaSection::MediaType::kAudio] ||
+      mMaxReceiving[SdpMediaSection::MediaType::kAudio]) {
+    type = kAudioTypeMask;
+  }
+  if (mMaxSending[SdpMediaSection::MediaType::kVideo] ||
+      mMaxReceiving[SdpMediaSection::MediaType::kVideo]) {
+    type |= kVideoTypeMask;
+  }
+  if (mMaxSending[SdpMediaSection::MediaType::kApplication]) {
+    type |= kDataChannelTypeMask;
+  }
+  Telemetry::Accumulate(mIsLoop ? Telemetry::LOOP_CALL_TYPE :
+                        Telemetry::WEBRTC_CALL_TYPE,
+                        type);
+#endif
+}
+
 nsresult
 PeerConnectionImpl::CloseInt()
 {
@@ -2490,7 +2584,10 @@ PeerConnectionImpl::CloseInt()
   // for all trickle ICE candidates to come in; this can happen well after we've
   // transitioned to connected. As a bonus, this allows us to detect race
   // conditions where a stats dispatch happens right as the PC closes.
-  RecordLongtermICEStatistics();
+  if (!mPrivateWindow) {
+    RecordLongtermICEStatistics();
+  }
+  RecordEndOfCallTelemetry();
   CSFLogInfo(logTag, "%s: Closing PeerConnectionImpl %s; "
              "ending call", __FUNCTION__, mHandle.c_str());
   if (mJsepSession) {
@@ -2560,8 +2657,10 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
   mSignalingState = aSignalingState;
 
   bool fireNegotiationNeeded = false;
-
   if (mSignalingState == PCImplSignalingState::SignalingStable) {
+    // Either negotiation is done, or we've rolled back. In either case, we
+    // need to re-evaluate whether further negotiation is required.
+    mNegotiationNeeded = false;
     // If we're rolling back a local offer, we might need to remove some
     // transports, but nothing further needs to be done.
     mMedia->ActivateOrRemoveTransports(*mJsepSession);
@@ -2569,19 +2668,33 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
       mMedia->UpdateMediaPipelines(*mJsepSession);
       InitializeDataChannel();
       mMedia->StartIceChecks(*mJsepSession);
-      mShouldSuppressNegotiationNeeded = false;
-      if (!mJsepSession->AllLocalTracksAreAssigned()) {
-        CSFLogInfo(logTag, "Not all local tracks were assigned to an "
-                           "m-section, either because the offerer did not offer"
-                           " to receive enough tracks, or because tracks were "
-                           "added after CreateOffer/Answer, but before "
-                           "offer/answer completed. This requires "
-                           "renegotiation.");
-        fireNegotiationNeeded = true;
+    }
+
+    if (!mJsepSession->AllLocalTracksAreAssigned()) {
+      CSFLogInfo(logTag, "Not all local tracks were assigned to an "
+                 "m-section, either because the offerer did not offer"
+                 " to receive enough tracks, or because tracks were "
+                 "added after CreateOffer/Answer, but before "
+                 "offer/answer completed. This requires "
+                 "renegotiation.");
+      fireNegotiationNeeded = true;
+    }
+
+    // Telemetry: record info on the current state of streams/renegotiations/etc
+    // Note: this code gets run on rollbacks as well!
+
+    // Update the max channels used with each direction for each type
+    uint16_t receiving[SdpMediaSection::kMediaTypes];
+    uint16_t sending[SdpMediaSection::kMediaTypes];
+    mJsepSession->CountTracks(receiving, sending);
+    for (size_t i = 0; i < SdpMediaSection::kMediaTypes; i++) {
+      if (mMaxReceiving[i] < receiving[i]) {
+        mMaxReceiving[i] = receiving[i];
+      }
+      if (mMaxSending[i] < sending[i]) {
+        mMaxSending[i] = sending[i];
       }
     }
-  } else {
-    mShouldSuppressNegotiationNeeded = true;
   }
 
   if (mSignalingState == PCImplSignalingState::SignalingClosed) {
@@ -2596,6 +2709,8 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
   pco->OnStateChange(PCObserverStateType::SignalingState, rv);
 
   if (fireNegotiationNeeded) {
+    // We don't use MaybeFireNegotiationNeeded here, since content might have
+    // already cased a transition from stable.
     OnNegotiationNeeded();
   }
 }
@@ -3398,11 +3513,41 @@ PeerConnectionImpl::RecordLongtermICEStatistics() {
 void
 PeerConnectionImpl::OnNegotiationNeeded()
 {
-  if (mShouldSuppressNegotiationNeeded) {
+  if (mSignalingState != PCImplSignalingState::SignalingStable) {
+    // We will check whether we need to renegotiate when we reach stable again
     return;
   }
 
-  mShouldSuppressNegotiationNeeded = true;
+  if (mNegotiationNeeded) {
+    return;
+  }
+
+  mNegotiationNeeded = true;
+
+  RUN_ON_THREAD(mThread,
+                WrapRunnableNM(&MaybeFireNegotiationNeeded_static, mHandle),
+                NS_DISPATCH_NORMAL);
+}
+
+/* static */
+void
+PeerConnectionImpl::MaybeFireNegotiationNeeded_static(
+    const std::string& pcHandle)
+{
+  PeerConnectionWrapper wrapper(pcHandle);
+  if (!wrapper.impl()) {
+    return;
+  }
+
+  wrapper.impl()->MaybeFireNegotiationNeeded();
+}
+
+void
+PeerConnectionImpl::MaybeFireNegotiationNeeded()
+{
+  if (!mNegotiationNeeded) {
+    return;
+  }
 
   RefPtr<PeerConnectionObserver> pco = do_QueryObjectReferent(mPCObserver);
   if (!pco) {

@@ -2121,6 +2121,11 @@ nsDocumentViewer::Hide(void)
 
   nsCOMPtr<nsIDocShell> docShell(mContainer);
   if (docShell) {
+#ifdef DEBUG
+    nsCOMPtr<nsIContentViewer> currentViewer;
+    docShell->GetContentViewer(getter_AddRefs(currentViewer));
+    MOZ_ASSERT(currentViewer == this);
+#endif
     nsCOMPtr<nsILayoutHistoryState> layoutState;
     mPresShell->CaptureHistoryState(getter_AddRefs(layoutState));
   }
@@ -3794,8 +3799,7 @@ nsDocumentViewer::PrintPreviewNavigate(int16_t aType, int32_t aPageNum)
 
   // Now, locate the current page we are on and
   // and the page of the page number
-  nsIFrame* pageFrame = seqFrame->GetFirstPrincipalChild();
-  while (pageFrame != nullptr) {
+  for (nsIFrame* pageFrame : seqFrame->PrincipalChildList()) {
     nsRect pageRect = pageFrame->GetRect();
     if (pageRect.Contains(pageRect.x, pt.y)) {
       currentPage = pageFrame;
@@ -3805,7 +3809,6 @@ nsDocumentViewer::PrintPreviewNavigate(int16_t aType, int32_t aPageNum)
       break;
     }
     pageNum++;
-    pageFrame = pageFrame->GetNextSibling();
   }
 
   if (aType == nsIWebBrowserPrint::PRINTPREVIEW_PREV_PAGE) {

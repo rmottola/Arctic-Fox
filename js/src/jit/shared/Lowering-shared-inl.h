@@ -159,6 +159,7 @@ LIRGeneratorShared::defineReturn(LInstruction* lir, MDefinition* mir)
       case MIRType_Double:
         lir->setDef(0, LDefinition(vreg, LDefinition::DOUBLE, LFloatReg(ReturnDoubleReg)));
         break;
+      case MIRType_Bool32x4:
       case MIRType_Int32x4:
         lir->setDef(0, LDefinition(vreg, LDefinition::INT32X4, LFloatReg(ReturnSimd128Reg)));
         break;
@@ -268,11 +269,10 @@ LIRGeneratorShared::redefine(MDefinition* def, MDefinition* as)
     {
         MInstruction* replacement;
         if (def->type() != as->type()) {
-            Value v = as->toConstant()->value();
             if (as->type() == MIRType_Int32)
-                replacement = MConstant::New(alloc(), BooleanValue(v.toInt32()));
+                replacement = MConstant::New(alloc(), BooleanValue(as->toConstant()->toInt32()));
             else
-                replacement = MConstant::New(alloc(), Int32Value(v.toBoolean()));
+                replacement = MConstant::New(alloc(), Int32Value(as->toConstant()->toBoolean()));
             def->block()->insertBefore(def->toInstruction(), replacement);
             emitAtUses(replacement->toInstruction());
         } else {
@@ -348,7 +348,7 @@ LAllocation
 LIRGeneratorShared::useOrConstant(MDefinition* mir)
 {
     if (mir->isConstant())
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return use(mir);
 }
 
@@ -356,7 +356,7 @@ LAllocation
 LIRGeneratorShared::useOrConstantAtStart(MDefinition* mir)
 {
     if (mir->isConstant())
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return useAtStart(mir);
 }
 
@@ -364,7 +364,7 @@ LAllocation
 LIRGeneratorShared::useRegisterOrConstant(MDefinition* mir)
 {
     if (mir->isConstant())
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return useRegister(mir);
 }
 
@@ -372,14 +372,14 @@ LAllocation
 LIRGeneratorShared::useRegisterOrConstantAtStart(MDefinition* mir)
 {
     if (mir->isConstant())
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return useRegisterAtStart(mir);
 }
 
 LAllocation
 LIRGeneratorShared::useRegisterOrZeroAtStart(MDefinition* mir)
 {
-    if (mir->isConstant() && mir->toConstant()->value().isInt32(0))
+    if (mir->isConstant() && mir->toConstant()->isInt32(0))
         return LAllocation();
     return useRegisterAtStart(mir);
 }
@@ -388,7 +388,7 @@ LAllocation
 LIRGeneratorShared::useRegisterOrNonDoubleConstant(MDefinition* mir)
 {
     if (mir->isConstant() && mir->type() != MIRType_Double && mir->type() != MIRType_Float32)
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return useRegister(mir);
 }
 
@@ -449,7 +449,7 @@ LAllocation
 LIRGeneratorShared::useKeepaliveOrConstant(MDefinition* mir)
 {
     if (mir->isConstant())
-        return LAllocation(mir->toConstant()->vp());
+        return LAllocation(mir->toConstant());
     return useKeepalive(mir);
 }
 
@@ -629,7 +629,7 @@ LIRGeneratorShared::useBoxOrTypedOrConstant(LInstruction* lir, size_t n, MDefini
     }
 
     if (useConstant && mir->isConstant())
-        lir->setOperand(n, LAllocation(mir->toConstant()->vp()));
+        lir->setOperand(n, LAllocation(mir->toConstant()));
     else
         lir->setOperand(n, useRegister(mir));
 

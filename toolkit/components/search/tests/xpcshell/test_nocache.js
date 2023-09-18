@@ -12,7 +12,7 @@
 
 function run_test()
 {
-  removeCache();
+  removeCacheFile();
   updateAppInfo();
   do_load_manifest("data/chrome.manifest");
   useHttpServer();
@@ -48,18 +48,13 @@ add_task(function* test_nocache() {
   let text = new TextDecoder().decode(data);
   let cache = JSON.parse(text);
   let found = false;
-  for (let dirName in cache.directories) {
-    for (let engine of cache.directories[dirName].engines) {
-      if (engine._id == "[app]/test-search-engine.xml") {
-        found = true;
-        break;
-      }
-    }
-    if (found) {
+  for (let engine of cache.engines) {
+    if (engine._shortName == "test-search-engine") {
+      found = true;
       break;
     }
   }
   do_check_true(found);
 
-  removeCache();
+  removeCacheFile();
 });

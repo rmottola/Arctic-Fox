@@ -27,6 +27,7 @@
 
 #include "jit/ExecutableAllocator.h"
 
+#include "jit/JitCompartment.h"
 #include "js/MemoryMetrics.h"
 
 #ifdef __APPLE__
@@ -44,6 +45,8 @@ ExecutablePool::~ExecutablePool()
     MOZ_ASSERT(m_baselineCodeBytes == 0);
     MOZ_ASSERT(m_regexpCodeBytes == 0);
     MOZ_ASSERT(m_otherCodeBytes == 0);
+
+    MOZ_ASSERT(!isMarked());
 
     m_allocator->releasePoolPages(this);
 }
@@ -91,8 +94,8 @@ ExecutablePool::addRef()
     // pools have multiple holders, and they have one holder per chunk
     // of generated code, and they only hold 16KB or so of code.
     MOZ_ASSERT(m_refCount);
-    MOZ_ASSERT(m_refCount < UINT_MAX);
     ++m_refCount;
+    MOZ_ASSERT(m_refCount, "refcount overflow");
 }
 
 void*
@@ -338,21 +341,69 @@ ExecutableAllocator::addSizeOfCode(JS::CodeSizes* sizes) const
 void
 ExecutableAllocator::reprotectAll(ProtectionSetting protection)
 {
-    if (!nonWritableJitCode)
-        return;
-
+#ifdef NON_WRITABLE_JIT_CODE
     if (!m_pools.initialized())
         return;
 
-    for (ExecPoolHashSet::Range r = m_pools.all(); !r.empty(); r.popFront()) {
-        ExecutablePool* pool = r.front();
-        char* start = pool->m_allocation.pages;
-        reprotectRegion(start, pool->m_freePtr - start, protection);
-    }
+    for (ExecPoolHashSet::Range r = m_pools.all(); !r.empty(); r.popFront())
+        reprotectPool(rt_, r.front(), protection);
+#endif
 }
 
-#if TARGET_OS_IPHONE
-bool ExecutableAllocator::nonWritableJitCode = true;
-#else
-bool ExecutableAllocator::nonWritableJitCode = false;
+/* static */ void
+ExecutableAllocator::reprotectPool(JSRuntime* rt, ExecutablePool* pool, ProtectionSetting protection)
+{
+#ifdef NON_WRITABLE_JIT_CODE
+    // Don't race with reprotectAll called from the signal handler.
+    MOZ_ASSERT(rt->jitRuntime()->preventBackedgePatching() || rt->handlingJitInterrupt());
+
+    char* start = pool->m_allocation.pages;
+    if (!reprotectRegion(start, pool->m_freePtr - start, protection))
+        MOZ_CRASH();
 #endif
+}
+
+/* static */ void
+ExecutableAllocator::poisonCode(JSRuntime* rt, JitPoisonRangeVector& ranges)
+{
+    MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
+
+    // Don't race with reprotectAll called from the signal handler.
+    JitRuntime::AutoPreventBackedgePatching apbp(rt);
+
+#ifdef DEBUG
+    // Make sure no pools have the mark bit set.
+    for (size_t i = 0; i < ranges.length(); i++)
+        MOZ_ASSERT(!ranges[i].pool->isMarked());
+#endif
+
+    for (size_t i = 0; i < ranges.length(); i++) {
+        ExecutablePool* pool = ranges[i].pool;
+        if (pool->m_refCount == 1) {
+            // This is the last reference so the release() call below will
+            // unmap the memory. Don't bother poisoning it.
+            continue;
+        }
+
+        MOZ_ASSERT(pool->m_refCount > 1);
+
+        // Use the pool's mark bit to indicate we made the pool writable.
+        // This avoids reprotecting a pool multiple times.
+        if (!pool->isMarked()) {
+            reprotectPool(rt, pool, Writable);
+            pool->mark();
+        }
+
+        memset(ranges[i].start, JS_SWEPT_CODE_PATTERN, ranges[i].size);
+    }
+
+    // Make the pools executable again and drop references.
+    for (size_t i = 0; i < ranges.length(); i++) {
+        ExecutablePool* pool = ranges[i].pool;
+        if (pool->isMarked()) {
+            reprotectPool(rt, pool, Executable);
+            pool->unmark();
+        }
+        pool->release();
+    }
+}

@@ -17,6 +17,7 @@
 #include "jshashutil.h"
 #include "jsobj.h"
 
+#include "gc/Policy.h"
 #include "js/HashTable.h"
 
 #include "jscntxtinlines.h"
@@ -60,7 +61,7 @@ ShapeTable::init(ExclusiveContext* cx, Shape* lastProp)
 
     for (Shape::Range<NoGC> r(lastProp); !r.empty(); r.popFront()) {
         Shape& shape = r.front();
-        Entry& entry = search(shape.propid(), true);
+        Entry& entry = search<MaybeAdding::Adding>(shape.propid());
 
         /*
          * Beware duplicate args and arg vs. var conflicts: the youngest shape
@@ -186,8 +187,9 @@ Hash2(HashNumber hash0, uint32_t log2, uint32_t shift)
     return ((hash0 << log2) >> shift) | 1;
 }
 
+template<MaybeAdding Adding>
 ShapeTable::Entry&
-ShapeTable::search(jsid id, bool adding)
+ShapeTable::search(jsid id)
 {
     MOZ_ASSERT(entries_);
     MOZ_ASSERT(!JSID_IS_EMPTY(id));
@@ -211,22 +213,23 @@ ShapeTable::search(jsid id, bool adding)
     HashNumber hash2 = Hash2(hash0, sizeLog2, hashShift_);
     uint32_t sizeMask = JS_BITMASK(sizeLog2);
 
-#ifdef DEBUG
-    bool collisionFlag = true;
-#endif
-
     /* Save the first removed entry pointer so we can recycle it if adding. */
     Entry* firstRemoved;
-    if (entry->isRemoved()) {
-        firstRemoved = entry;
-    } else {
-        firstRemoved = nullptr;
-        if (adding && !entry->hadCollision())
-            entry->flagCollision();
-#ifdef DEBUG
-        collisionFlag &= entry->hadCollision();
-#endif
+    if (Adding == MaybeAdding::Adding) {
+        if (entry->isRemoved()) {
+            firstRemoved = entry;
+        } else {
+            firstRemoved = nullptr;
+            if (!entry->hadCollision())
+                entry->flagCollision();
+        }
     }
+
+#ifdef DEBUG
+    bool collisionFlag = true;
+    if (!entry->isRemoved())
+        collisionFlag = entry->hadCollision();
+#endif
 
     while (true) {
         hash1 -= hash2;
@@ -234,7 +237,7 @@ ShapeTable::search(jsid id, bool adding)
         entry = &getEntry(hash1);
 
         if (entry->isFree())
-            return (adding && firstRemoved) ? *firstRemoved : *entry;
+            return (Adding == MaybeAdding::Adding && firstRemoved) ? *firstRemoved : *entry;
 
         shape = entry->shape();
         if (shape && shape->propidRaw() == id) {
@@ -242,20 +245,27 @@ ShapeTable::search(jsid id, bool adding)
             return *entry;
         }
 
-        if (entry->isRemoved()) {
-            if (!firstRemoved)
-                firstRemoved = entry;
-        } else {
-            if (adding && !entry->hadCollision())
-                entry->flagCollision();
+        if (Adding == MaybeAdding::Adding) {
+            if (entry->isRemoved()) {
+                if (!firstRemoved)
+                    firstRemoved = entry;
+            } else {
+                if (!entry->hadCollision())
+                    entry->flagCollision();
+            }
+        }
+
 #ifdef DEBUG
+        if (!entry->isRemoved())
             collisionFlag &= entry->hadCollision();
 #endif
-        }
     }
 
     MOZ_CRASH("Shape::search failed to find an expected entry.");
 }
+
+template ShapeTable::Entry& ShapeTable::search<MaybeAdding::Adding>(jsid id);
+template ShapeTable::Entry& ShapeTable::search<MaybeAdding::NotAdding>(jsid id);
 
 bool
 ShapeTable::change(int log2Delta, ExclusiveContext* cx)
@@ -284,7 +294,7 @@ ShapeTable::change(int log2Delta, ExclusiveContext* cx)
     /* Copy only live entries, leaving removed and free ones behind. */
     for (Entry* oldEntry = oldTable; oldSize != 0; oldEntry++) {
         if (Shape* shape = oldEntry->shape()) {
-            Entry& entry = search(shape->propid(), true);
+            Entry& entry = search<MaybeAdding::Adding>(shape->propid());
             MOZ_ASSERT(entry.isFree());
             entry.setShape(shape);
         }
@@ -495,7 +505,7 @@ NativeObject::addProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
 
     ShapeTable::Entry* entry = nullptr;
     if (obj->inDictionaryMode())
-        entry = &obj->lastProperty()->table().search(id, true);
+        entry = &obj->lastProperty()->table().search<MaybeAdding::Adding>(id);
 
     return addPropertyInternal(cx, obj, id, getter, setter, slot, attrs, flags, entry,
                                allowDictionary);
@@ -545,14 +555,14 @@ NativeObject::addPropertyInternal(ExclusiveContext* cx,
             if (!obj->toDictionaryMode(cx))
                 return nullptr;
             table = &obj->lastProperty()->table();
-            entry = &table->search(id, true);
+            entry = &table->search<MaybeAdding::Adding>(id);
         }
     } else {
         table = &obj->lastProperty()->table();
         if (table->needsToGrow()) {
             if (!table->grow(cx))
                 return nullptr;
-            entry = &table->search(id, true);
+            entry = &table->search<MaybeAdding::Adding>(id);
             MOZ_ASSERT(!entry->shape());
         }
     }
@@ -713,7 +723,7 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
      * shape table.
      */
     ShapeTable::Entry* entry;
-    RootedShape shape(cx, Shape::search(cx, obj->lastProperty(), id, &entry, true));
+    RootedShape shape(cx, Shape::search<MaybeAdding::Adding>(cx, obj->lastProperty(), id, &entry));
     if (!shape) {
         /*
          * You can't add properties to a non-extensible object, but you can change
@@ -777,7 +787,7 @@ NativeObject::putProperty(ExclusiveContext* cx, HandleNativeObject obj, HandleId
     if (shape != obj->lastProperty() && !obj->inDictionaryMode()) {
         if (!obj->toDictionaryMode(cx))
             return nullptr;
-        entry = &obj->lastProperty()->table().search(shape->propid(), false);
+        entry = &obj->lastProperty()->table().search<MaybeAdding::NotAdding>(shape->propid());
         shape = entry->shape();
     }
 
@@ -925,7 +935,7 @@ NativeObject::removeProperty(ExclusiveContext* cx, jsid id_)
     if (!self->inDictionaryMode() && (shape != self->lastProperty() || !self->canRemoveLastProperty())) {
         if (!self->toDictionaryMode(cx))
             return false;
-        entry = &self->lastProperty()->table().search(shape->propid(), false);
+        entry = &self->lastProperty()->table().search<MaybeAdding::NotAdding>(shape->propid());
         shape = entry->shape();
     }
 
@@ -1108,7 +1118,7 @@ NativeObject::replaceWithNewEquivalentShape(ExclusiveContext* cx, Shape* oldShap
     ShapeTable& table = self->lastProperty()->table();
     ShapeTable::Entry* entry = oldShape->isEmptyShape()
                                ? nullptr
-                               : &table.search(oldShape->propidRef(), false);
+                               : &table.search<MaybeAdding::NotAdding>(oldShape->propidRef());
 
     /*
      * Splice the new shape into the same position as the old shape, preserving
@@ -1309,18 +1319,7 @@ BaseShape::traceChildren(JSTracer* trc)
 void
 JSCompartment::sweepBaseShapeTable()
 {
-    if (!baseShapes.initialized())
-        return;
-
-    for (BaseShapeSet::Enum e(baseShapes); !e.empty(); e.popFront()) {
-        UnownedBaseShape* base = e.front().unbarrieredGet();
-        if (IsAboutToBeFinalizedUnbarriered(&base)) {
-            e.removeFront();
-        } else if (base != e.front().unbarrieredGet()) {
-            ReadBarriered<UnownedBaseShape*> b(base);
-            e.rekeyFront(base, b);
-        }
-    }
+    baseShapes.sweep();
 }
 
 #ifdef JSGC_HASH_TABLE_CHECKS
@@ -1605,24 +1604,7 @@ EmptyShape::insertInitialShape(ExclusiveContext* cx, HandleShape shape, HandleOb
 void
 JSCompartment::sweepInitialShapeTable()
 {
-    if (initialShapes.initialized()) {
-        for (InitialShapeSet::Enum e(initialShapes); !e.empty(); e.popFront()) {
-            const InitialShapeEntry& entry = e.front();
-            Shape* shape = entry.shape.unbarrieredGet();
-            JSObject* proto = entry.proto.raw();
-            if (IsAboutToBeFinalizedUnbarriered(&shape) ||
-                (entry.proto.isObject() && IsAboutToBeFinalizedUnbarriered(&proto)))
-            {
-                e.removeFront();
-            } else {
-                if (shape != entry.shape.unbarrieredGet() || proto != entry.proto.raw()) {
-                    ReadBarrieredShape readBarrieredShape(shape);
-                    InitialShapeEntry newKey(readBarrieredShape, TaggedProto(proto));
-                    e.rekeyFront(newKey.getLookup(), newKey);
-                }
-            }
-        }
-    }
+    initialShapes.sweep();
 }
 
 void

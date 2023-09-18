@@ -70,26 +70,6 @@ ShouldZoomToElement(const nsCOMPtr<dom::Element>& aElement) {
   return true;
 }
 
-// Calculate the bounding rect of |aElement|, relative to the origin
-// of the document associated with |aShell|.
-// |aRootScrollFrame| should be the root scroll frame of the document in
-// question.
-// The implementation is adapted from Element::GetBoundingClientRect().
-static CSSRect
-GetBoundingContentRect(const nsCOMPtr<nsIPresShell>& aShell,
-                       const nsCOMPtr<dom::Element>& aElement,
-                       const nsIScrollableFrame* aRootScrollFrame) {
-  if (nsIFrame* frame = aElement->GetPrimaryFrame()) {
-    return CSSRect::FromAppUnits(
-        nsLayoutUtils::GetAllInFlowRectsUnion(
-            frame,
-            aShell->GetRootFrame(),
-            nsLayoutUtils::RECTS_ACCOUNT_FOR_TRANSFORMS)
-      + aRootScrollFrame->GetScrollPosition());
-  }
-  return CSSRect();
-}
-
 static bool
 IsRectZoomedIn(const CSSRect& aRect, const CSSRect& aCompositedArea)
 {
@@ -143,7 +123,27 @@ CalculateRectToZoomTo(const nsCOMPtr<nsIDocument>& aRootContentDocument,
   FrameMetrics metrics = nsLayoutUtils::CalculateBasicFrameMetrics(rootScrollFrame);
   CSSRect compositedArea(metrics.GetScrollOffset(), metrics.CalculateCompositedSizeInCssPixels());
   const CSSCoord margin = 15;
-  CSSRect rect = GetBoundingContentRect(shell, element, rootScrollFrame);
+  CSSRect rect = nsLayoutUtils::GetBoundingContentRect(element, rootScrollFrame);
+
+  // If the element is taller than the visible area of the page scale
+  // the height of the |rect| so that it has the same aspect ratio as
+  // the root frame.  The clipped |rect| is centered on the y value of
+  // the touch point. This allows tall narrow elements to be zoomed.
+  if (!rect.IsEmpty() && compositedArea.width > 0.0f) {
+    const float widthRatio = rect.width / compositedArea.width;
+    float targetHeight = compositedArea.height * widthRatio;
+    if (widthRatio < 0.9 && targetHeight < rect.height) {
+      const CSSPoint scrollPoint = CSSPoint::FromAppUnits(rootScrollFrame->GetScrollPosition());
+      float newY = aPoint.y + scrollPoint.y - (targetHeight * 0.5f);
+      if ((newY + targetHeight) > (rect.y + rect.height)) {
+        rect.y += rect.height - targetHeight;
+      } else if (newY > rect.y) {
+        rect.y = newY;
+      }
+      rect.height = targetHeight;
+    }
+  }
+
   rect = CSSRect(std::max(metrics.GetScrollableRect().x, rect.x - margin),
                  rect.y,
                  rect.width + 2 * margin,

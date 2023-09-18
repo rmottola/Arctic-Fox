@@ -2,12 +2,12 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { gDevTools } = require("devtools/client/framework/devtools");
 var { CurlUtils } = Cu.import("resource://devtools/client/shared/Curl.jsm", {});
 var promise = require("promise");
 var NetworkHelper = require("devtools/shared/webconsole/network-helper");
@@ -107,7 +107,8 @@ function removeTab(aTab, aWindow) {
   let targetWindow = aWindow || window;
   let targetBrowser = targetWindow.gBrowser;
 
-  targetBrowser.removeTab(aTab);
+  // browser_net_pane-toggle.js relies on synchronous removeTab behavior.
+  targetBrowser.removeTab(aTab, {skipPermitUnload: true});
 }
 
 function waitForNavigation(aTarget) {

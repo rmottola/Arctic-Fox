@@ -502,6 +502,11 @@ public:
   void
   MaybeCheckNavigationUpdate(nsIDocument* aDoc);
 
+  nsresult
+  SendPushEvent(const nsACString& aOriginAttributes,
+                const nsACString& aScope,
+                Maybe<nsTArray<uint8_t>> aData);
+
 private:
   ServiceWorkerManager();
   ~ServiceWorkerManager();

@@ -31,14 +31,6 @@
 #include "mozilla/MacroForEach.h"
 #include "mozilla/TypeTraits.h"
 
-namespace mozilla {
-template <typename T>
-struct HasDangerousPublicDestructor
-{
-  static const bool value = false;
-};
-}
-
 #if defined(__clang__)
    // bug 1028428 shows that at least in FreeBSD 10.0 with Clang 3.4 and libc++ 3.4,
    // std::is_destructible is buggy in that it returns false when it should return true
@@ -50,8 +42,8 @@ struct HasDangerousPublicDestructor
 #  if MOZ_USING_LIBSTDCXX && MOZ_GCC_VERSION_AT_LEAST(4, 8, 0)
 #    define MOZ_HAVE_STD_IS_DESTRUCTIBLE
    // Some GCC versions have an ICE when using destructors in decltype().
-   // Works for me on GCC 4.8.2 on Fedora 20 x86-64.
-#  elif MOZ_GCC_VERSION_AT_LEAST(4, 8, 2)
+   // Works on GCC 4.8 at least.
+#  elif MOZ_GCC_VERSION_AT_LEAST(4, 8, 0)
 #    define MOZ_CAN_USE_IS_DESTRUCTIBLE_FALLBACK
 #  endif
 #endif
@@ -87,16 +79,9 @@ struct HasDangerousPublicDestructor
 
 #ifdef MOZ_IS_DESTRUCTIBLE
 #define MOZ_ASSERT_TYPE_OK_FOR_REFCOUNTING(X) \
-  static_assert(!MOZ_IS_DESTRUCTIBLE(X) || \
-                mozilla::HasDangerousPublicDestructor<X>::value, \
+  static_assert(!MOZ_IS_DESTRUCTIBLE(X), \
                 "Reference-counted class " #X " should not have a public destructor. " \
-                "Try to make this class's destructor non-public. If that is really " \
-                "not possible, you can whitelist this class by providing a " \
-                "HasDangerousPublicDestructor specialization for it."); \
-  static_assert(!mozilla::HasDangerousPublicDestructor<X>::value || \
-                MOZ_IS_DESTRUCTIBLE(X), \
-                "Class " #X " has no public destructor. That's good! So please " \
-                "remove the HasDangerousPublicDestructor specialization for it.");
+                "Make this class's destructor non-public");
 #else
 #define MOZ_ASSERT_TYPE_OK_FOR_REFCOUNTING(X)
 #endif
@@ -155,6 +140,14 @@ private:
 #define MOZ_ASSERT_CLASSNAME(_type)                         \
   static_assert(mozilla::IsClass<_type>::value,             \
                 "Token '" #_type "' is not a class type.")
+// Older versions of gcc can't instantiate local classes in templates.
+// GCC 4.7 doesn't have this problem.
+#if MOZ_IS_GCC
+# if !MOZ_GCC_VERSION_AT_LEAST(4, 7, 0)
+#  undef MOZ_ASSERT_CLASSNAME
+#  define MOZ_ASSERT_CLASSNAME(_type)
+# endif
+#endif
 
 // Note that the following constructor/destructor logging macros are redundant
 // for refcounted objects that log via the NS_LOG_ADDREF/NS_LOG_RELEASE macros.

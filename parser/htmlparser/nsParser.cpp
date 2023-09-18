@@ -1686,7 +1686,7 @@ ExtractCharsetFromXmlDeclaration(const unsigned char* aBytes, int32_t aLen,
   return !oCharset.IsEmpty();
 }
 
-inline const char
+inline char
 GetNextChar(nsACString::const_iterator& aStart,
             nsACString::const_iterator& aEnd)
 {

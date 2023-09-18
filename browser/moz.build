@@ -13,6 +13,7 @@ DIRS += [
     'locales',
     'modules',
     'themes',
+    'extensions',
 ]
 
 DIRS += [

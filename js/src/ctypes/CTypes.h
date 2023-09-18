@@ -6,7 +6,6 @@
 #ifndef ctypes_CTypes_h
 #define ctypes_CTypes_h
 
-#include "mozilla/UniquePtr.h"
 #include "mozilla/Vector.h"
 
 #include "ffi.h"
@@ -16,6 +15,7 @@
 
 #include "ctypes/typedefs.h"
 #include "js/GCHashTable.h"
+#include "js/UniquePtr.h"
 #include "js/Vector.h"
 #include "vm/String.h"
 
@@ -231,7 +231,7 @@ struct FieldInfo
   size_t              mOffset;  // offset of the field in the struct, in bytes
 
   void trace(JSTracer* trc) {
-    JS_CallObjectTracer(trc, &mType, "fieldType");
+    JS::TraceEdge(trc, &mType, "fieldType");
   }
 };
 
@@ -467,7 +467,7 @@ namespace PointerType {
   JSObject* GetBaseType(JSObject* obj);
 } // namespace PointerType
 
-typedef mozilla::UniquePtr<ffi_type, JS::DeletePolicy<ffi_type>> UniquePtrFFIType;
+typedef UniquePtr<ffi_type> UniquePtrFFIType;
 
 namespace ArrayType {
   JSObject* CreateInternal(JSContext* cx, HandleObject baseType, size_t length,

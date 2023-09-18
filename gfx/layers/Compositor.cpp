@@ -58,12 +58,9 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
   }
 
   if (aVisibleRegion.GetNumRects() > 1) {
-    nsIntRegionRectIterator screenIter(aVisibleRegion);
-
-    while (const gfx::IntRect* rect = screenIter.Next())
-    {
+    for (auto iter = aVisibleRegion.RectIter(); !iter.Done(); iter.Next()) {
       DrawDiagnostics(aFlags | DiagnosticFlags::REGION_RECT,
-                      IntRectToRect(*rect), aClipRect, aTransform,
+                      IntRectToRect(iter.Get()), aClipRect, aTransform,
                       aFlashCounter);
     }
   }
@@ -355,6 +352,50 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
            0.0f, 0.0f, br.x, br.y,
            flipped);
   return 4;
+}
+
+gfx::IntRect
+Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
+                                    const gfx::Rect& aClipRect,
+                                    const gfx::Matrix4x4& aTransform,
+                                    gfx::Matrix4x4* aOutTransform,
+                                    gfx::Rect* aOutLayerQuad)
+{
+  // Compute the clip.
+  gfx::IntPoint rtOffset = GetCurrentRenderTarget()->GetOrigin();
+  gfx::IntSize rtSize = GetCurrentRenderTarget()->GetSize();
+
+  gfx::Rect renderBounds(0, 0, rtSize.width, rtSize.height);
+  renderBounds.IntersectRect(renderBounds, aClipRect);
+  renderBounds.MoveBy(rtOffset);
+
+  // Apply the layer transform.
+  gfx::RectDouble dest = aTransform.TransformAndClipBounds(
+    gfx::RectDouble(aRect.x, aRect.y, aRect.width, aRect.height),
+    gfx::RectDouble(renderBounds.x, renderBounds.y, renderBounds.width, renderBounds.height));
+  dest -= rtOffset;
+
+  // Ensure we don't round out to -1, which trips up Direct3D.
+  dest.IntersectRect(dest, gfx::RectDouble(0, 0, rtSize.width, rtSize.height));
+
+  if (aOutLayerQuad) {
+    *aOutLayerQuad = gfx::Rect(dest.x, dest.y, dest.width, dest.height);
+  }
+
+  // Round out to integer.
+  gfx::IntRect result;
+  dest.RoundOut();
+  dest.ToIntRect(&result);
+
+  // Create a transform from adjusted clip space to render target space,
+  // translate it for the backdrop rect, then transform it into the backdrop's
+  // uv-space.
+  gfx::Matrix4x4 transform;
+  transform.PostScale(rtSize.width, rtSize.height, 1.0);
+  transform.PostTranslate(-result.x, -result.y, 0.0);
+  transform.PostScale(1 / float(result.width), 1 / float(result.height), 1.0);
+  *aOutTransform = transform;
+  return result;
 }
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17

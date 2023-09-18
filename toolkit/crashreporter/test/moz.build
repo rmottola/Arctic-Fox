@@ -1,0 +1,33 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+DIST_INSTALL = False
+
+XPCSHELL_TESTS_MANIFESTS += ['unit/xpcshell.ini', 'unit_ipc/xpcshell.ini']
+BROWSER_CHROME_MANIFESTS += ['browser/browser.ini']
+
+UNIFIED_SOURCES += [
+    '../google-breakpad/src/processor/basic_code_modules.cc',
+    '../google-breakpad/src/processor/dump_context.cc',
+    '../google-breakpad/src/processor/dump_object.cc',
+    '../google-breakpad/src/processor/logging.cc',
+    '../google-breakpad/src/processor/minidump.cc',
+    '../google-breakpad/src/processor/pathname_stripper.cc',
+    '../google-breakpad/src/processor/proc_maps_linux.cc',
+    'dumputils.cpp',
+    'nsTestCrasher.cpp',
+]
+
+GeckoSharedLibrary('testcrasher')
+
+DEFINES['SHARED_LIBRARY'] = '%s%s%s' % (
+    CONFIG['DLL_PREFIX'],
+    LIBRARY_NAME,
+    CONFIG['DLL_SUFFIX']
+)
+
+include('/toolkit/crashreporter/crashreporter.mozbuild')
+
+NO_PGO = True

@@ -91,10 +91,10 @@
 #ifdef MC_PRIVATE_BUILD
           This is a private build of Arctic Fox.
 #else
-          Arctic Fox is a fork of Pale Moon 27.9.4 that was released by <label class="text-link" href="http://www.moonchildproductions.info">Moonchild Productions</label>.
+          Arctic Fox is an open, portable browser based on Gecko by <label class="text-link" href="http://www.mozilla.org">Mozilla</label>.
         </description>
         <description class="text-pmcreds">
-          The intent is to add security updates and bug fixes to keep this browser as up to date as possible for older Intel OSX and PowerPC Linux machines.
+          Arctic Fox is a fork of Pale Moon 27.9.4 that was released by <label class="text-link" href="http://www.moonchildproductions.info">Moonchild Productions</label>.
         </description>
         <description class="text-blurb">
           Arctic Fox is not associated with Pale Moon.

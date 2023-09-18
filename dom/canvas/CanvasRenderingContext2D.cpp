@@ -3480,7 +3480,7 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
     }
     mTextRun = mFontgrp->MakeTextRun(text,
                                      length,
-                                     mThebes,
+                                     mThebes->GetDrawTarget(),
                                      mAppUnitsPerDevPixel,
                                      flags,
                                      mMissingFonts);
@@ -3493,7 +3493,7 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
                                                                mDoMeasureBoundingBox ?
                                                                  gfxFont::TIGHT_INK_EXTENTS :
                                                                  gfxFont::LOOSE_INK_EXTENTS,
-                                                               mThebes,
+                                                               mThebes->GetDrawTarget(),
                                                                nullptr);
 
     // this only measures the height; the total width is gotten from the
@@ -3529,7 +3529,7 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
                               mDoMeasureBoundingBox ?
                                   gfxFont::TIGHT_INK_EXTENTS :
                                   gfxFont::LOOSE_INK_EXTENTS,
-                              mThebes,
+                              mThebes->GetDrawTarget(),
                               nullptr);
       inlineCoord += textRunMetrics.mAdvanceWidth;
       // old code was:
@@ -3830,6 +3830,10 @@ CanvasRenderingContext2D::DrawOrMeasureText(const nsAString& aRawText,
     if (aWidth) {
       *aWidth = 0;
     }
+    return NS_OK;
+  }
+
+  if (!IsFinite(aX) || !IsFinite(aY)) {
     return NS_OK;
   }
 
@@ -5437,7 +5441,7 @@ CanvasRenderingContext2D::PutImageData_explicit(int32_t x, int32_t y, uint32_t w
   uint32_t copyWidth = dirtyRect.Width();
   uint32_t copyHeight = dirtyRect.Height();
   RefPtr<gfxImageSurface> imgsurf = new gfxImageSurface(gfx::IntSize(copyWidth, copyHeight),
-                                                          gfxImageFormat::ARGB32,
+                                                          SurfaceFormat::A8R8G8B8_UINT32,
                                                           false);
   if (!imgsurf || imgsurf->CairoStatus()) {
     return NS_ERROR_FAILURE;

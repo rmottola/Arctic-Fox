@@ -96,17 +96,42 @@ IsNamedAnchorTag(const nsString& s)
 nsHTMLEditor::nsHTMLEditor()
 : nsPlaintextEditor()
 , mCRInParagraphCreatesParagraph(false)
+, mCSSAware(false)
 , mSelectedCellIndex(0)
 , mIsObjectResizingEnabled(true)
 , mIsResizing(false)
+, mPreserveRatio(false)
+, mResizedObjectIsAnImage(false)
 , mIsAbsolutelyPositioningEnabled(true)
 , mResizedObjectIsAbsolutelyPositioned(false)
 , mGrabberClicked(false)
 , mIsMoving(false)
 , mSnapToGridEnabled(false)
 , mIsInlineTableEditingEnabled(true)
+, mOriginalX(0)
+, mOriginalY(0)
+, mResizedObjectX(0)
+, mResizedObjectY(0)
+, mResizedObjectWidth(0)
+, mResizedObjectHeight(0)
+, mResizedObjectMarginLeft(0)
+, mResizedObjectMarginTop(0)
+, mResizedObjectBorderLeft(0)
+, mResizedObjectBorderTop(0)
+, mXIncrementFactor(0)
+, mYIncrementFactor(0)
+, mWidthIncrementFactor(0)
+, mHeightIncrementFactor(0)
 , mInfoXIncrement(20)
 , mInfoYIncrement(20)
+, mPositionedObjectX(0)
+, mPositionedObjectY(0)
+, mPositionedObjectWidth(0)
+, mPositionedObjectHeight(0)
+, mPositionedObjectMarginLeft(0)
+, mPositionedObjectMarginTop(0)
+, mPositionedObjectBorderLeft(0)
+, mPositionedObjectBorderTop(0)
 , mGridSize(0)
 {
 }
@@ -1154,7 +1179,7 @@ nsHTMLEditor::CollapseSelectionToDeepestNonTableFirstChild(
       break;
     }
     node = child;
-  };
+  }
 
   selection->Collapse(node, 0);
 }
@@ -2680,7 +2705,7 @@ nsHTMLEditor::SetHTMLBackgroundColor(const nsAString& aColor)
           if (NS_FAILED(res)) break;
 
           GetNextSelectedCell(nullptr, getter_AddRefs(cell));
-        };
+        }
         return res;
       }
     }

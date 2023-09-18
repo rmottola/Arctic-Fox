@@ -613,6 +613,7 @@ function BuildConditionSandbox(aURL) {
       sandbox.d2d = false;
     }
     var info = gfxInfo.getInfo();
+    sandbox.azureCairo = info.AzureCanvasBackend == "cairo";
     sandbox.azureQuartz = info.AzureCanvasBackend == "quartz";
     sandbox.azureSkia = info.AzureCanvasBackend == "skia";
     sandbox.skiaContent = info.AzureContentBackend == "skia";
@@ -625,6 +626,8 @@ function BuildConditionSandbox(aURL) {
       gWindowUtils.layerManagerType != "Basic";
     sandbox.d3d11 =
       gWindowUtils.layerManagerType == "Direct3D 11";
+    sandbox.d3d9 =
+      gWindowUtils.layerManagerType == "Direct3D 9";
     sandbox.layersOpenGL =
       gWindowUtils.layerManagerType == "OpenGL";
     sandbox.layersOMTC =

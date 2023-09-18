@@ -79,7 +79,7 @@ js::SetFakeCPUCount(size_t count)
 }
 
 bool
-js::StartOffThreadWasmCompile(ExclusiveContext* cx, wasm::CompileTask* task)
+js::StartOffThreadWasmCompile(ExclusiveContext* cx, wasm::IonCompileTask* task)
 {
     AutoLockHelperThreadState lock;
 
@@ -202,7 +202,8 @@ ParseTask::ParseTask(ExclusiveContext* cx, JSObject* exclusiveContextGlobal, JSC
     alloc(JSRuntime::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
     exclusiveContextGlobal(initCx->runtime(), exclusiveContextGlobal),
     callback(callback), callbackData(callbackData),
-    script(initCx->runtime()), sourceObject(nullptr), errors(cx), overRecursed(false)
+    script(initCx->runtime()), sourceObject(initCx->runtime()),
+    errors(cx), overRecursed(false), outOfMemory(false)
 {
 }
 
@@ -349,20 +350,26 @@ js::StartOffThreadParseScript(JSContext* cx, const ReadOnlyCompileOptions& optio
     // which could require barriers on the atoms compartment.
     gc::AutoSuppressGC suppress(cx);
 
-    JS::CompartmentOptions compartmentOptions(cx->compartment()->options());
-    compartmentOptions.setZone(JS::FreshZone);
-    compartmentOptions.setInvisibleToDebugger(true);
-    compartmentOptions.setMergeable(true);
+    JSCompartment* currentCompartment = cx->compartment();
+
+    JS::CompartmentOptions compartmentOptions(currentCompartment->creationOptions(),
+                                              currentCompartment->behaviors());
+
+    auto& creationOptions = compartmentOptions.creationOptions();
+
+    creationOptions.setInvisibleToDebugger(true)
+                   .setMergeable(true)
+                   .setZone(JS::FreshZone);
 
     // Don't falsely inherit the host's global trace hook.
-    compartmentOptions.setTrace(nullptr);
+    creationOptions.setTrace(nullptr);
 
     JSObject* global = JS_NewGlobalObject(cx, &parseTaskGlobalClass, nullptr,
                                           JS::FireOnNewGlobalHook, compartmentOptions);
     if (!global)
         return false;
 
-    JS_SetCompartmentPrincipals(global->compartment(), cx->compartment()->principals());
+    JS_SetCompartmentPrincipals(global->compartment(), currentCompartment->principals());
 
     // Initialize all classes required for parsing while still on the main
     // thread, for both the target and the new global so that prototype
@@ -735,7 +742,7 @@ GlobalHelperThreadState::canStartWasmCompile()
 
     // Honor the maximum allowed threads to compile wasm jobs at once,
     // to avoid oversaturating the machine.
-    if (!checkTaskThreadLimit<wasm::CompileTask*>(maxWasmCompilationThreads()))
+    if (!checkTaskThreadLimit<wasm::IonCompileTask*>(maxWasmCompilationThreads()))
         return false;
 
     return true;
@@ -1049,6 +1056,12 @@ GlobalHelperThreadState::finishParseTask(JSContext* maybecx, JSRuntime* rt, void
     if (!parseTask->finish(cx))
         return nullptr;
 
+    // Report out of memory errors eagerly, or errors could be malformed.
+    if (parseTask->outOfMemory) {
+        ReportOutOfMemory(cx);
+        return nullptr;
+    }
+
     // Report any error or warnings generated during the parse, and inform the
     // debugger about the compiled scripts.
     for (size_t i = 0; i < parseTask->errors.length(); i++)
@@ -1199,11 +1212,11 @@ HelperThread::handleWasmWorkload()
     currentTask.emplace(HelperThreadState().wasmWorklist().popCopy());
     bool success = false;
 
-    wasm::CompileTask* task = wasmTask();
+    wasm::IonCompileTask* task = wasmTask();
     {
         AutoUnlockHelperThreadState unlock;
-        PerThreadData::AutoEnterRuntime enter(threadData.ptr(), task->args().runtime);
-        success = wasm::CompileFunction(task);
+        PerThreadData::AutoEnterRuntime enter(threadData.ptr(), task->runtime());
+        success = wasm::IonCompileFunction(task);
     }
 
     // On success, try to move work to the finished list.
@@ -1332,15 +1345,16 @@ ExclusiveContext::setHelperThread(HelperThread* thread)
     perThreadData = thread->threadData.ptr();
 }
 
-frontend::CompileError&
-ExclusiveContext::addPendingCompileError()
+bool
+ExclusiveContext::addPendingCompileError(frontend::CompileError** error)
 {
-    frontend::CompileError* error = js_new<frontend::CompileError>();
-    if (!error)
-        MOZ_CRASH();
-    if (!helperThread()->parseTask()->errors.append(error))
-        MOZ_CRASH();
-    return *error;
+    UniquePtr<frontend::CompileError> errorPtr(new_<frontend::CompileError>());
+    if (!errorPtr)
+        return false;
+    if (!helperThread()->parseTask()->errors.append(errorPtr.get()))
+        return false;
+    *error = errorPtr.release();
+    return true;
 }
 
 void
@@ -1348,6 +1362,14 @@ ExclusiveContext::addPendingOverRecursed()
 {
     if (helperThread()->parseTask())
         helperThread()->parseTask()->overRecursed = true;
+}
+
+void
+ExclusiveContext::addPendingOutOfMemory()
+{
+    // Keep in sync with recoverFromOutOfMemory.
+    if (helperThread()->parseTask())
+        helperThread()->parseTask()->outOfMemory = true;
 }
 
 void
@@ -1377,13 +1399,13 @@ HelperThread::handleParseWorkload()
         // ! WARNING WARNING WARNING !
         ExclusiveContext* parseCx = task->cx;
         Rooted<ClonedBlockObject*> globalLexical(parseCx, &parseCx->global()->lexicalScope());
-        Rooted<ScopeObject*> staticScope(parseCx, &globalLexical->staticBlock());
+        Rooted<StaticScope*> staticScope(parseCx, &globalLexical->staticBlock());
         task->script = frontend::CompileScript(parseCx, &task->alloc,
                                                globalLexical, staticScope, nullptr,
                                                task->options, srcBuf,
                                                /* source_ = */ nullptr,
                                                /* extraSct = */ nullptr,
-                                               /* sourceObjectOut = */ &(task->sourceObject));
+                                               /* sourceObjectOut = */ task->sourceObject.address());
     }
 
     // The callback is invoked while we are still off the main thread.

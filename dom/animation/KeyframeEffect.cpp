@@ -10,17 +10,17 @@
 #include "mozilla/dom/KeyframeEffectBinding.h"
 #include "mozilla/dom/PropertyIndexedKeyframesBinding.h"
 #include "mozilla/AnimationUtils.h"
+#include "mozilla/EffectCompositor.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/LookAndFeel.h" // For LookAndFeel::GetInt
 #include "mozilla/StyleAnimationValue.h"
-#include "AnimationCommon.h"
 #include "Layers.h" // For Layer
 #include "nsCSSParser.h"
 #include "nsCSSPropertySet.h"
 #include "nsCSSProps.h" // For nsCSSProps::PropHasFlags
 #include "nsCSSValue.h"
 #include "nsStyleUtil.h"
-#include <algorithm>    // std::max
+#include <algorithm> // For std::max
 
 namespace mozilla {
 
@@ -94,6 +94,7 @@ KeyframeEffectReadOnly::KeyframeEffectReadOnly(
   , mTarget(aTarget)
   , mTiming(aTiming)
   , mPseudoType(aPseudoType)
+  , mInEffectOnLastAnimationTimingUpdate(false)
 {
   MOZ_ASSERT(aTarget, "null animation target is not yet supported");
 }
@@ -130,6 +131,62 @@ KeyframeEffectReadOnly::SetTiming(const AnimationTiming& aTiming)
   // NotifyEffectTimingUpdated will eventually cause
   // NotifyAnimationTimingUpdated to be called on this object which will
   // update our registration with the target element.
+}
+
+void
+KeyframeEffectReadOnly::NotifyAnimationTimingUpdated()
+{
+  UpdateTargetRegistration();
+
+  // If the effect is not relevant it will be removed from the target
+  // element's effect set. However, effects not in the effect set
+  // will not be included in the set of candidate effects for running on
+  // the compositor and hence they won't have their compositor status
+  // updated. As a result, we need to make sure we clear their compositor
+  // status here.
+  bool isRelevant = mAnimation && mAnimation->IsRelevant();
+  if (!isRelevant) {
+    ResetIsRunningOnCompositor();
+  }
+
+  // Detect changes to "in effect" status since we need to recalculate the
+  // animation cascade for this element whenever that changes.
+  bool inEffect = IsInEffect();
+  if (inEffect != mInEffectOnLastAnimationTimingUpdate) {
+    if (mTarget) {
+      EffectSet* effectSet = EffectSet::GetEffectSet(mTarget, mPseudoType);
+      if (effectSet) {
+        effectSet->MarkCascadeNeedsUpdate();
+      }
+    }
+    mInEffectOnLastAnimationTimingUpdate = inEffect;
+  }
+
+  // Request restyle if necessary.
+  //
+  // Bug 1235002: We should skip requesting a restyle when mProperties is empty.
+  // However, currently we don't properly encapsulate mProperties so we can't
+  // detect when it changes. As a result, if we skip requesting restyles when
+  // mProperties is empty and we play an animation and *then* add properties to
+  // it (as we currently do when building CSS animations), we will fail to
+  // request a restyle at all. Since animations without properties are rare, we
+  // currently just request the restyle regardless of whether mProperties is
+  // empty or not.
+  //
+  // Bug 1216843: When we implement iteration composite modes, we need to
+  // also detect if the current iteration has changed.
+  if (mAnimation && GetComputedTiming().mProgress != mProgressOnLastCompose) {
+    EffectCompositor::RestyleType restyleType =
+      CanThrottle() ?
+      EffectCompositor::RestyleType::Throttled :
+      EffectCompositor::RestyleType::Standard;
+    nsPresContext* presContext = GetPresContext();
+    if (presContext) {
+      presContext->EffectCompositor()->
+        RequestRestyle(mTarget, mPseudoType, restyleType,
+                       mAnimation->CascadeLevel());
+    }
+  }
 }
 
 Nullable<TimeDuration>
@@ -372,10 +429,36 @@ KeyframeEffectReadOnly::HasAnimationOfProperties(
 }
 
 void
+KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
+{
+  nsCSSPropertySet winningInCascadeProperties;
+  nsCSSPropertySet runningOnCompositorProperties;
+
+  for (const AnimationProperty& property : mProperties) {
+    if (property.mWinsInCascade) {
+      winningInCascadeProperties.AddProperty(property.mProperty);
+    }
+    if (property.mIsRunningOnCompositor) {
+      runningOnCompositorProperties.AddProperty(property.mProperty);
+    }
+  }
+
+  mProperties = aOther.mProperties;
+
+  for (AnimationProperty& property : mProperties) {
+    property.mWinsInCascade =
+      winningInCascadeProperties.HasProperty(property.mProperty);
+    property.mIsRunningOnCompositor =
+      runningOnCompositorProperties.HasProperty(property.mProperty);
+  }
+}
+
+void
 KeyframeEffectReadOnly::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                                      nsCSSPropertySet& aSetProperties)
 {
   ComputedTiming computedTiming = GetComputedTiming();
+  mProgressOnLastCompose = computedTiming.mProgress;
 
   // If the progress is null, we don't have fill data for the current
   // time so we shouldn't animate.
@@ -398,7 +481,7 @@ KeyframeEffectReadOnly::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                "incorrect last to key");
 
     if (aSetProperties.HasProperty(prop.mProperty)) {
-      // Animations are composed by AnimationCollection by iterating
+      // Animations are composed by EffectCompositor by iterating
       // from the last animation to first. For animations targetting the
       // same property, the later one wins. So if this property is already set,
       // we should not override it.
@@ -533,10 +616,6 @@ KeyframeEffectReadOnly::UpdateTargetRegistration()
     if (effectSet) {
       effectSet->RemoveEffect(*this);
     }
-    // Any effects not in the effect set will not be included in the set of
-    // candidate effects for running on the compositor and hence they won't
-    // have their compositor status updated so we should do that now.
-    ResetIsRunningOnCompositor();
   }
 }
 
@@ -1327,7 +1406,6 @@ BuildSegmentsFromValueEntries(nsTArray<KeyframeValueEntry>& aEntries,
       MOZ_ASSERT(aEntries[i].mOffset == 0.0f);
       animationProperty = aResult.AppendElement();
       animationProperty->mProperty = aEntries[i].mProperty;
-      animationProperty->mWinsInCascade = true;
       lastProperty = aEntries[i].mProperty;
     }
 
@@ -1529,7 +1607,6 @@ BuildAnimationPropertyListFromPropertyIndexedKeyframes(
         animationPropertyIndexes[i] = aResult.Length();
         AnimationProperty* animationProperty = aResult.AppendElement();
         animationProperty->mProperty = p;
-        animationProperty->mWinsInCascade = true;
         properties.AddProperty(p);
       }
     }
@@ -1776,15 +1853,14 @@ KeyframeEffectReadOnly::OverflowRegionRefreshInterval()
 bool
 KeyframeEffectReadOnly::CanThrottle() const
 {
-  // Animation::CanThrottle checks for not in effect animations
-  // before calling this.
-  MOZ_ASSERT(IsInEffect(), "Effect should be in effect");
-
-  // Unthrottle if this animation is not current (i.e. it has passed the end).
-  // In future we may be able to throttle this case too, but we should only get
-  // occasional ticks while the animation is in this state so it doesn't matter
-  // too much.
-  if (!IsCurrent()) {
+  // Unthrottle if we are not in effect or current. This will be the case when
+  // our owning animation has finished, is idle, or when we are in the delay
+  // phase (but without a backwards fill). In each case the computed progress
+  // value produced on each tick will be the same so we will skip requesting
+  // unnecessary restyles in NotifyAnimationTimingUpdated. Any calls we *do* get
+  // here will be because of a change in state (e.g. we are newly finished or
+  // newly no longer in effect) in which case we shouldn't throttle the sample.
+  if (!IsInEffect() || !IsCurrent()) {
     return false;
   }
 
@@ -1812,14 +1888,15 @@ KeyframeEffectReadOnly::CanThrottle() const
       continue;
     }
 
-    AnimationCollection* collection = GetCollection();
-    MOZ_ASSERT(collection,
-      "CanThrottle should be called on an effect associated with an animation");
+    EffectSet* effectSet = EffectSet::GetEffectSet(mTarget, mPseudoType);
+    MOZ_ASSERT(effectSet, "CanThrottle should be called on an effect "
+                          "associated with a target element");
     layers::Layer* layer =
       FrameLayerBuilder::GetDedicatedLayer(frame, record.mLayerType);
-    // Unthrottle if the layer needs to be brought up to date with the animation.
+    // Unthrottle if the layer needs to be brought up to date
     if (!layer ||
-        collection->mAnimationGeneration > layer->GetAnimationGeneration()) {
+        effectSet->GetAnimationGeneration() !=
+          layer->GetAnimationGeneration()) {
       return false;
     }
 
@@ -1859,13 +1936,16 @@ KeyframeEffectReadOnly::CanThrottleTransformChanges(nsIFrame& aFrame) const
   TimeStamp now =
     presContext->RefreshDriver()->MostRecentRefresh();
 
-  AnimationCollection* collection = GetCollection();
-  MOZ_ASSERT(collection,
-    "CanThrottleTransformChanges should be involved with animation collection");
-  TimeStamp styleRuleRefreshTime = collection->mStyleRuleRefreshTime;
+  EffectSet* effectSet = EffectSet::GetEffectSet(mTarget, mPseudoType);
+  MOZ_ASSERT(effectSet, "CanThrottleTransformChanges is expected to be called"
+                        " on an effect in an effect set");
+  MOZ_ASSERT(mAnimation, "CanThrottleTransformChanges is expected to be called"
+                         " on an effect with a parent animation");
+  TimeStamp animationRuleRefreshTime =
+    effectSet->AnimationRuleRefreshTime(mAnimation->CascadeLevel());
   // If this animation can cause overflow, we can throttle some of the ticks.
-  if (!styleRuleRefreshTime.IsNull() &&
-      (now - styleRuleRefreshTime) < OverflowRegionRefreshInterval()) {
+  if (!animationRuleRefreshTime.IsNull() &&
+      (now - animationRuleRefreshTime) < OverflowRegionRefreshInterval()) {
     return true;
   }
 
@@ -1935,12 +2015,6 @@ KeyframeEffectReadOnly::GetPresContext() const
     return nullptr;
   }
   return shell->GetPresContext();
-}
-
-AnimationCollection *
-KeyframeEffectReadOnly::GetCollection() const
-{
-  return mAnimation ? mAnimation->GetCollection() : nullptr;
 }
 
 /* static */ bool

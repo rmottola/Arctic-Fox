@@ -1,7 +1,6 @@
-# -*- indent-tabs-mode: nil -*-
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const Ci = Components.interfaces;
 const Cc = Components.classes;
@@ -12,12 +11,13 @@ const XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
-                                  "resource://gre/modules/AppConstants.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
                                   "resource:///modules/AboutHome.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
+                                  "resource://gre/modules/NewTabUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
@@ -46,8 +46,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "BookmarkJSONUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
                                   "resource://gre/modules/PageThumbs.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
-                                  "resource://gre/modules/NewTabUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PdfJs",
+                                  "resource://pdf.js/PdfJs.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "webrtcUI",
                                   "resource:///modules/webrtcUI.jsm");
@@ -105,17 +105,17 @@ XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
 
-#ifdef E10S_TESTING_ONLY
-XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
-                                  "resource://gre/modules/UpdateUtils.jsm");
-#endif
+if (AppConstants.E10S_TESTING_ONLY) {
+  XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
+                                    "resource://gre/modules/UpdateUtils.jsm");
+}
 
-#ifdef MOZ_CRASHREPORTER
-XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
-                                  "resource:///modules/ContentCrashReporters.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
-                                  "resource:///modules/ContentCrashReporters.jsm");
-#endif
+XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
+                                  "resource:///modules/ContentCrashHandlers.jsm");
+if (AppConstants.MOZ_CRASHREPORTER) {
+  XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
+                                    "resource:///modules/ContentCrashHandlers.jsm");
+}
 
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
                                   "resource:///modules/ReaderParent.jsm");
@@ -205,11 +205,11 @@ function BrowserGlue() {
   this._init();
 }
 
-#ifndef XP_MACOSX
-# OS X has the concept of zero-window sessions and therefore ignores the
-# browser-lastwindow-close-* topics.
-#define OBSERVE_LASTWINDOW_CLOSE_TOPICS 1
-#endif
+/*
+ * OS X has the concept of zero-window sessions and therefore ignores the
+ * browser-lastwindow-close-* topics.
+ */
+const OBSERVE_LASTWINDOW_CLOSE_TOPICS = AppConstants.platform != "macosx";
 
 BrowserGlue.prototype = {
   _saveSession: false,
@@ -231,7 +231,6 @@ BrowserGlue.prototype = {
     Services.prefs.savePrefFile(null);
   },
 
-#ifdef MOZ_SERVICES_SYNC
   _setSyncAutoconnectDelay: function BG__setSyncAutoconnectDelay() {
     // Assume that a non-zero value for services.sync.autoconnectDelay should override
     if (Services.prefs.prefHasUserValue("services.sync.autoconnectDelay")) {
@@ -253,7 +252,6 @@ BrowserGlue.prototype = {
     Cu.import("resource://services-sync/main.js");
     Weave.Service.scheduler.delayedAutoConnect(delay);
   },
-#endif
 
   // nsIObserver implementation
   observe: function BG_observe(subject, topic, data) {
@@ -297,24 +295,24 @@ BrowserGlue.prototype = {
           Cu.reportError("Could not end startup crash tracking in quit-application-granted: " + e);
         }
         break;
-#ifdef OBSERVE_LASTWINDOW_CLOSE_TOPICS
       case "browser-lastwindow-close-requested":
-        // The application is not actually quitting, but the last full browser
-        // window is about to be closed.
-        this._onQuitRequest(subject, "lastwindow");
+        if (OBSERVE_LASTWINDOW_CLOSE_TOPICS) {
+          // The application is not actually quitting, but the last full browser
+          // window is about to be closed.
+          this._onQuitRequest(subject, "lastwindow");
+        }
         break;
       case "browser-lastwindow-close-granted":
-        this._setPrefToSaveSession();
+        if (OBSERVE_LASTWINDOW_CLOSE_TOPICS) {
+          this._setPrefToSaveSession();
+        }
         break;
-#endif
-#ifdef MOZ_SERVICES_SYNC
       case "weave:service:ready":
         this._setSyncAutoconnectDelay();
         break;
       case "weave:engine:clients:display-uri":
         this._onDisplaySyncURI(subject);
         break;
-#endif
       case "session-save":
         this._setPrefToSaveSession(true);
         subject.QueryInterface(Ci.nsISupportsPRBool);
@@ -441,6 +439,9 @@ BrowserGlue.prototype = {
       case "autocomplete-did-enter-text":
         this._handleURLBarTelemetry(subject.QueryInterface(Ci.nsIAutoCompleteInput));
         break;
+      case AddonWatcher.TOPIC_SLOW_ADDON_DETECTED:
+        this._notifySlowAddon(data);
+        break;
     }
   },
 
@@ -521,14 +522,12 @@ BrowserGlue.prototype = {
     os.addObserver(this, "browser:purge-session-history", false);
     os.addObserver(this, "quit-application-requested", false);
     os.addObserver(this, "quit-application-granted", false);
-#ifdef OBSERVE_LASTWINDOW_CLOSE_TOPICS
-    os.addObserver(this, "browser-lastwindow-close-requested", false);
-    os.addObserver(this, "browser-lastwindow-close-granted", false);
-#endif
-#ifdef MOZ_SERVICES_SYNC
+    if (OBSERVE_LASTWINDOW_CLOSE_TOPICS) {
+      os.addObserver(this, "browser-lastwindow-close-requested", false);
+      os.addObserver(this, "browser-lastwindow-close-granted", false);
+    }
     os.addObserver(this, "weave:service:ready", false);
     os.addObserver(this, "weave:engine:clients:display-uri", false);
-#endif
     os.addObserver(this, "session-save", false);
     os.addObserver(this, "places-init-complete", false);
     this._isPlacesInitObserver = true;
@@ -545,6 +544,10 @@ BrowserGlue.prototype = {
     os.addObserver(this, "flash-plugin-hang", false);
     os.addObserver(this, "xpi-signature-changed", false);
     os.addObserver(this, "autocomplete-did-enter-text", false);
+
+    if (AppConstants.NIGHTLY_BUILD) {
+      os.addObserver(this, AddonWatcher.TOPIC_SLOW_ADDON_DETECTED, false);
+    }
 
     ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-browserAction.js");
@@ -568,14 +571,12 @@ BrowserGlue.prototype = {
     os.removeObserver(this, "quit-application-requested");
     os.removeObserver(this, "quit-application-granted");
     os.removeObserver(this, "restart-in-safe-mode");
-#ifdef OBSERVE_LASTWINDOW_CLOSE_TOPICS
-    os.removeObserver(this, "browser-lastwindow-close-requested");
-    os.removeObserver(this, "browser-lastwindow-close-granted");
-#endif
-#ifdef MOZ_SERVICES_SYNC
+    if (OBSERVE_LASTWINDOW_CLOSE_TOPICS) {
+      os.removeObserver(this, "browser-lastwindow-close-requested");
+      os.removeObserver(this, "browser-lastwindow-close-granted");
+    }
     os.removeObserver(this, "weave:service:ready");
     os.removeObserver(this, "weave:engine:clients:display-uri");
-#endif
     os.removeObserver(this, "session-save");
     if (this._bookmarksBackupIdleTime) {
       this._idleService.removeIdleObserver(this, this._bookmarksBackupIdleTime);
@@ -697,9 +698,9 @@ BrowserGlue.prototype = {
     this._syncSearchEngines();
 
     PageThumbs.init();
-    NewTabUtils.init();
     webrtcUI.init();
     AboutHome.init();
+    NewTabUtils.init();
     SessionStore.init();
     BrowserUITelemetry.init();
     ContentSearch.init();
@@ -719,31 +720,26 @@ BrowserGlue.prototype = {
     LoginManagerParent.init();
     ReaderParent.init();
 
-#ifdef MOZ_CRASHREPORTER
-    TabCrashReporter.init();
-    PluginCrashReporter.init();
-#endif
+    if (!AppConstants.RELEASE_BUILD) {
+      let themeName = gBrowserBundle.GetStringFromName("deveditionTheme.name");
+      let vendorShortName = gBrandBundle.GetStringFromName("vendorShortName");
 
-#ifndef RELEASE_BUILD
-    let browserBundle = Services.strings.createBundle("chrome://browser/locale/browser.properties");
-    let brandBundle = Services.strings.createBundle("chrome://branding/locale/brand.properties");
-    let themeName = browserBundle.GetStringFromName("deveditionTheme.name");
-    let vendorShortName = brandBundle.GetStringFromName("vendorShortName");
-
-    LightweightThemeManager.addBuiltInTheme({
-      id: "firefox-devedition@mozilla.org",
-      name: themeName,
-      headerURL: "resource:///chrome/browser/content/browser/defaultthemes/devedition.header.png",
-      iconURL: "resource:///chrome/browser/content/browser/defaultthemes/devedition.icon.png",
-      author: vendorShortName,
-    });
-#endif
+      LightweightThemeManager.addBuiltInTheme({
+        id: "firefox-devedition@mozilla.org",
+        name: themeName,
+        headerURL: "resource:///chrome/browser/content/browser/defaultthemes/devedition.header.png",
+        iconURL: "resource:///chrome/browser/content/browser/defaultthemes/devedition.icon.png",
+        author: vendorShortName,
+      });
+    }
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
-#ifdef NIGHTLY_BUILD
-    AddonWatcher.init(this._notifySlowAddon);
-#endif
+    TabCrashHandler.init();
+    if (AppConstants.MOZ_CRASHREPORTER) {
+      PluginCrashReporter.init();
+    }
+
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
@@ -901,15 +897,18 @@ BrowserGlue.prototype = {
   },
 
   _firstWindowTelemetry: function(aWindow) {
-#ifdef XP_WIN
-    let SCALING_PROBE_NAME = "DISPLAY_SCALING_MSWIN";
-#elifdef XP_MACOSX
-    let SCALING_PROBE_NAME = "DISPLAY_SCALING_OSX";
-#elifdef XP_LINUX
-    let SCALING_PROBE_NAME = "DISPLAY_SCALING_LINUX";
-#else
     let SCALING_PROBE_NAME = "";
-#endif
+    switch (AppConstants.platform) {
+      case "win":
+        SCALING_PROBE_NAME = "DISPLAY_SCALING_MSWIN";
+        break;
+      case "macosx":
+        SCALING_PROBE_NAME = "DISPLAY_SCALING_OSX";
+        break;
+      case "linux":
+        SCALING_PROBE_NAME = "DISPLAY_SCALING_LINUX";
+        break;
+    }
     if (SCALING_PROBE_NAME) {
       let scaling = aWindow.devicePixelRatio * 100;
       Services.telemetry.getHistogramById(SCALING_PROBE_NAME).add(scaling);
@@ -919,23 +918,23 @@ BrowserGlue.prototype = {
   // the first browser window has finished initializing
   _onFirstWindowLoaded: function BG__onFirstWindowLoaded(aWindow) {
 
-#ifdef NIGHTLY_BUILD
-    // Registering Shumway bootstrap script the child processes.
-    aWindow.messageManager.loadFrameScript("chrome://shumway/content/bootstrap-content.js", true);
-    // Initializing Shumway (shall be run after child script registration).
-    ShumwayUtils.init();
-#endif
-
-#ifdef XP_WIN
-    // For windows seven, initialize the jump list module.
-    const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
-    if (WINTASKBAR_CONTRACTID in Cc &&
-        Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
-      let temp = {};
-      Cu.import("resource:///modules/WindowsJumpLists.jsm", temp);
-      temp.WinTaskbarJumpList.startup();
+    if (AppConstants.NIGHTLY_BUILD) {
+      // Registering Shumway bootstrap script the child processes.
+      Services.ppmm.loadProcessScript("chrome://shumway/content/bootstrap-content.js", true);
+      // Initializing Shumway (shall be run after child script registration).
+      ShumwayUtils.init();
     }
-#endif
+
+    if (AppConstants.platform == "win") {
+      // For Windows 7, initialize the jump list module.
+      const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
+      if (WINTASKBAR_CONTRACTID in Cc &&
+          Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
+        let temp = {};
+        Cu.import("resource:///modules/WindowsJumpLists.jsm", temp);
+        temp.WinTaskbarJumpList.startup();
+      }
+    }
 
     this._trackSlowStartup();
 
@@ -960,9 +959,9 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
-#ifdef NIGHTLY_BUILD
-    AddonWatcher.uninit();
-#endif
+    if (AppConstants.NIGHTLY_BUILD) {
+      AddonWatcher.uninit();
+    }
     this._dispose();
   },
 
@@ -1027,11 +1026,12 @@ BrowserGlue.prototype = {
       });
     }
 
-#ifdef MOZ_REQUIRE_SIGNING
-    let signingRequired = true;
-#else
-    let signingRequired = Services.prefs.getBoolPref("xpinstall.signatures.required");
-#endif
+    let signingRequired;
+    if (AppConstants.MOZ_REQUIRE_SIGNING) {
+      signingRequired = true;
+    } else {
+      signingRequired = Services.prefs.getBoolPref("xpinstall.signatures.required");
+    }
 
     if (signingRequired) {
       let disabledAddons = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_DISABLED);
@@ -1050,11 +1050,16 @@ BrowserGlue.prototype = {
 
     // Perform default browser checking.
     if (ShellService) {
-#ifdef DEBUG
-      let shouldCheck = false;
-#else
-      let shouldCheck = ShellService.shouldCheckDefaultBrowser;
-#endif
+      let shouldCheck = AppConstants.DEBUG ? false :
+                                             ShellService.shouldCheckDefaultBrowser;
+      let promptCount;
+      let skipDefaultBrowserCheck = false;
+      if (!AppConstants.RELEASE_BUILD) {
+        promptCount =
+          Services.prefs.getIntPref("browser.shell.defaultBrowserCheckCount");
+        skipDefaultBrowserCheck =
+          Services.prefs.getBoolPref("browser.shell.skipDefaultBrowserCheck");
+      }
       let willRecoverSession = false;
       try {
         let ss = Cc["@mozilla.org/browser/sessionstartup;1"].
@@ -1074,9 +1079,9 @@ BrowserGlue.prototype = {
       }
     }
 
-#ifdef E10S_TESTING_ONLY
-    E10SUINotification.checkStatus();
-#endif
+    if (AppConstants.E10S_TESTING_ONLY) {
+      E10SUINotification.checkStatus();
+    }
   },
 
   _onQuitRequest: function BG__onQuitRequest(aCancelQuit, aQuitType) {
@@ -1730,20 +1735,20 @@ BrowserGlue.prototype = {
       Services.prefs.clearUserPref("browser.library.useNewDownloadsView");
     }
 
-#ifdef XP_WIN
-    if (currentUIVersion < 10) {
-      // For Windows systems with display set to > 96dpi (i.e. systemDefaultScale
-      // will return a value > 1.0), we want to discard any saved full-zoom settings,
-      // as we'll now be scaling the content according to the system resolution
-      // scale factor (Windows "logical DPI" setting)
-      let sm = Cc["@mozilla.org/gfx/screenmanager;1"].getService(Ci.nsIScreenManager);
-      if (sm.systemDefaultScale > 1.0) {
-        let cps2 = Cc["@mozilla.org/content-pref/service;1"].
-                   getService(Ci.nsIContentPrefService2);
-        cps2.removeByName("browser.content.full-zoom", null);
+    if (AppConstants.platform == "win") {
+      if (currentUIVersion < 10) {
+        // For Windows systems with display set to > 96dpi (i.e. systemDefaultScale
+        // will return a value > 1.0), we want to discard any saved full-zoom settings,
+        // as we'll now be scaling the content according to the system resolution
+        // scale factor (Windows "logical DPI" setting)
+        let sm = Cc["@mozilla.org/gfx/screenmanager;1"].getService(Ci.nsIScreenManager);
+        if (sm.systemDefaultScale > 1.0) {
+          let cps2 = Cc["@mozilla.org/content-pref/service;1"].
+                     getService(Ci.nsIContentPrefService2);
+          cps2.removeByName("browser.content.full-zoom", null);
+        }
       }
     }
-#endif
 
     if (currentUIVersion < 11) {
       Services.prefs.clearUserPref("dom.disable_window_move_resize");
@@ -1815,7 +1820,7 @@ BrowserGlue.prototype = {
     }
 
     if (currentUIVersion < 19) {
-      let detector = null;    
+      let detector = null;
       try {
         detector = Services.prefs.getComplexValue("intl.charset.detector",
                                                   Ci.nsIPrefLocalizedString).data;
@@ -2164,7 +2169,6 @@ BrowserGlue.prototype = {
     chromeWindow.openPreferences(...args);
   },
 
-#ifdef MOZ_SERVICES_SYNC
   /**
    * Called as an observer when Sync's "display URI" notification is fired.
    *
@@ -2186,7 +2190,6 @@ BrowserGlue.prototype = {
       Cu.reportError("Error displaying tab received by Sync: " + ex);
     }
   },
-#endif
 
   _handleFlashHang: function() {
     ++this._flashHangCount;
@@ -2648,16 +2651,17 @@ var DefaultBrowserCheck = {
 
   setAsDefault: function() {
     let claimAllTypes = true;
-#ifdef XP_WIN
-    try {
-      // In Windows 8, the UI for selecting default protocol is much
-      // nicer than the UI for setting file type associations. So we
-      // only show the protocol association screen on Windows 8.
-      // Windows 8 is version 6.2.
-      let version = Services.sysinfo.getProperty("version");
-      claimAllTypes = (parseFloat(version) < 6.2);
-    } catch (ex) { }
-#endif
+    let setAsDefaultError = false;
+    if (AppConstants.platform == "win") {
+      try {
+        // In Windows 8+, the UI for selecting default protocol is much
+        // nicer than the UI for setting file type associations. So we
+        // only show the protocol association screen on Windows 8+.
+        // Windows 8 is version 6.2.
+        let version = Services.sysinfo.getProperty("version");
+        claimAllTypes = (parseFloat(version) < 6.2);
+      } catch (ex) { }
+    }
     try {
       ShellService.setDefaultBrowser(claimAllTypes, false);
     } catch (ex) {
@@ -2788,7 +2792,6 @@ var DefaultBrowserCheck = {
   },
 };
 
-#ifdef E10S_TESTING_ONLY
 var E10SUINotification = {
   // Increase this number each time we want to roll out an
   // e10s testing period to Nightly users.
@@ -2825,7 +2828,7 @@ var E10SUINotification = {
       // e10s doesn't work with accessibility, so we prompt to disable
       // e10s if a11y is enabled, now or in the future.
       Services.obs.addObserver(this, "a11y-init-or-shutdown", true);
-      if (Services.appinfo.accessibilityEnabled) {
+      if (Services.appinfo.accessibilityIsBlacklistedForE10S) {
         this._showE10sAccessibilityWarning();
       }
     } else {
@@ -3003,7 +3006,6 @@ var E10SUINotification = {
     win.PopupNotifications.show(browser, "a11y_enabled_with_e10s", promptMessage, null, mainAction, secondaryActions, options);
   },
 };
-#endif
 
 var components = [BrowserGlue, ContentPermissionPrompt, AboutNewTabService];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(components);

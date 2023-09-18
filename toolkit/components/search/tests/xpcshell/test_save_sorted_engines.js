@@ -18,7 +18,6 @@
  */
 
 function run_test() {
-  removeMetadata();
   updateAppInfo();
   useHttpServer();
 
@@ -30,6 +29,7 @@ add_task(function* test_save_sorted_engines() {
     { name: "Test search engine", xmlFileName: "engine.xml" },
     { name: "A second test engine", xmlFileName: "engine2.xml"},
   ]);
+  yield promiseAfterCache();
 
   let search = Services.search;
 
@@ -43,7 +43,7 @@ add_task(function* test_save_sorted_engines() {
 
   // Check that the entries are placed as specified correctly
   let json = getSearchMetadata();
-  do_check_eq(json["[app]/test-search-engine.xml"].order, 1);
+  do_check_eq(json["[profile]/test-search-engine.xml"].order, 1);
   do_check_eq(json["[profile]/a-second-test-engine.xml"].order, 2);
 
   // Test removing an engine

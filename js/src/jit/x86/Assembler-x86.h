@@ -103,6 +103,18 @@ static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD0 = edi;
 static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD1 = eax;
 static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD2 = esi;
 
+// Registerd used in RegExpMatcher instruction (do not use JSReturnOperand).
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherRegExpReg = CallTempReg0;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherStringReg = CallTempReg1;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherLastIndexReg = CallTempReg2;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherStickyReg = CallTempReg4;
+
+// Registerd used in RegExpTester instruction (do not use ReturnReg).
+static MOZ_CONSTEXPR_VAR Register RegExpTesterRegExpReg = CallTempReg0;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterStringReg = CallTempReg2;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterLastIndexReg = CallTempReg3;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterStickyReg = CallTempReg4;
+
 // GCC stack is aligned on 16 bytes. Ion does not maintain this for internal
 // calls. asm.js code does.
 #if defined(__GNUC__)
@@ -288,7 +300,7 @@ class Assembler : public AssemblerX86Shared
     }
     void mov(wasm::SymbolicAddress imm, Register dest) {
         masm.movl_i32r(-1, dest.encoding());
-        append(AsmJSAbsoluteLink(CodeOffset(masm.currentOffset()), imm));
+        append(AsmJSAbsoluteAddress(CodeOffset(masm.currentOffset()), imm));
     }
     void mov(const Operand& src, Register dest) {
         movl(src, dest);
@@ -367,11 +379,11 @@ class Assembler : public AssemblerX86Shared
     }
     void cmpl(Register rhs, wasm::SymbolicAddress lhs) {
         masm.cmpl_rm_disp32(rhs.encoding(), (void*)-1);
-        append(AsmJSAbsoluteLink(CodeOffset(masm.currentOffset()), lhs));
+        append(AsmJSAbsoluteAddress(CodeOffset(masm.currentOffset()), lhs));
     }
     void cmpl(Imm32 rhs, wasm::SymbolicAddress lhs) {
         JmpSrc src = masm.cmpl_im_disp32(rhs.value, (void*)-1);
-        append(AsmJSAbsoluteLink(CodeOffset(src.offset()), lhs));
+        append(AsmJSAbsoluteAddress(CodeOffset(src.offset()), lhs));
     }
 
     void adcl(Imm32 imm, Register dest) {
@@ -903,7 +915,7 @@ class Assembler : public AssemblerX86Shared
         return CodeOffset(masm.currentOffset());
     }
 
-    void loadAsmJSActivation(Register dest) {
+    void loadWasmActivation(Register dest) {
         CodeOffset label = movlWithPatch(PatchedAbsoluteAddress(), dest);
         append(AsmJSGlobalAccess(label, wasm::ActivationGlobalDataOffset));
     }

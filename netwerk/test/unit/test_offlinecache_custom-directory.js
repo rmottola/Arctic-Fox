@@ -10,9 +10,11 @@
  */
 
 Cu.import("resource://testing-common/httpd.js");
+Cu.import('resource://gre/modules/Services.jsm');
 
 var httpServer = null;
 var cacheUpdateObserver = null;
+var systemPrincipal = Services.scriptSecurityManager.getSystemPrincipal();
 
 function make_channel(url, callback, ctx) {
   var ios = Cc["@mozilla.org/network/io-service;1"].
@@ -124,7 +126,7 @@ function run_test()
   var update = us.scheduleAppUpdate(
       make_uri("http://localhost:4444/manifest"),
       make_uri("http://localhost:4444/masterEntry"),
-      0 /* no AppID */, false /* not in browser*/,
+      systemPrincipal,
       customDir);
 
   var expectedStates = [

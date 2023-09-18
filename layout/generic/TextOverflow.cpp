@@ -28,14 +28,19 @@
 namespace mozilla {
 namespace css {
 
-class LazyReferenceRenderingContextGetterFromFrame final :
-    public gfxFontGroup::LazyReferenceContextGetter {
+class LazyReferenceRenderingDrawTargetGetterFromFrame final :
+    public gfxFontGroup::LazyReferenceDrawTargetGetter {
 public:
-  explicit LazyReferenceRenderingContextGetterFromFrame(nsIFrame* aFrame)
+  typedef mozilla::gfx::DrawTarget DrawTarget;
+
+  explicit LazyReferenceRenderingDrawTargetGetterFromFrame(nsIFrame* aFrame)
     : mFrame(aFrame) {}
-  virtual already_AddRefed<gfxContext> GetRefContext() override
+  virtual already_AddRefed<DrawTarget> GetRefDrawTarget() override
   {
-    return mFrame->PresContext()->PresShell()->CreateReferenceRenderingContext();
+    RefPtr<gfxContext> ctx =
+      mFrame->PresContext()->PresShell()->CreateReferenceRenderingContext();
+    RefPtr<DrawTarget> dt = ctx->GetDrawTarget();
+    return dt.forget();
   }
 private:
   nsIFrame* mFrame;
@@ -47,11 +52,11 @@ GetEllipsisTextRun(nsIFrame* aFrame)
   RefPtr<nsFontMetrics> fm;
   nsLayoutUtils::GetFontMetricsForFrame(aFrame, getter_AddRefs(fm),
     nsLayoutUtils::FontSizeInflationFor(aFrame));
-  LazyReferenceRenderingContextGetterFromFrame lazyRefContextGetter(aFrame);
+  LazyReferenceRenderingDrawTargetGetterFromFrame lazyRefDrawTargetGetter(aFrame);
   return fm->GetThebesFontGroup()->GetEllipsisTextRun(
     aFrame->PresContext()->AppUnitsPerDevPixel(),
     nsLayoutUtils::GetTextRunOrientFlagsForStyle(aFrame->StyleContext()),
-    lazyRefContextGetter);
+    lazyRefDrawTargetGetter);
 }
 
 static nsIFrame*
@@ -375,13 +380,11 @@ TextOverflow::ExamineFrameSubtree(nsIFrame*       aFrame,
     return;
   }
 
-  nsIFrame* child = aFrame->GetFirstPrincipalChild();
-  while (child) {
+  for (nsIFrame* child : aFrame->PrincipalChildList()) {
     ExamineFrameSubtree(child, aContentArea, aInsideMarkersArea,
                         aFramesToHide, aAlignmentEdges,
                         aFoundVisibleTextOrAtomic,
                         aClippedMarkerEdges);
-    child = child->GetNextSibling();
   }
 }
 

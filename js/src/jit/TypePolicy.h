@@ -168,6 +168,18 @@ class ConvertToStringPolicy final : public TypePolicy
     }
 };
 
+// Expect an Boolean for operand Op. If the input is a Value, it is unboxed.
+template <unsigned Op>
+class BooleanPolicy final : private TypePolicy
+{
+  public:
+    EMPTY_DATA_;
+    static bool staticAdjustInputs(TempAllocator& alloc, MInstruction* def);
+    virtual bool adjustInputs(TempAllocator& alloc, MInstruction* def) override {
+        return staticAdjustInputs(alloc, def);
+    }
+};
+
 // Expect an Int for operand Op. If the input is a Value, it is unboxed.
 template <unsigned Op>
 class IntPolicy final : private TypePolicy
@@ -512,14 +524,6 @@ class FilterTypeSetPolicy final : public TypePolicy
     EMPTY_DATA_;
     virtual bool adjustInputs(TempAllocator& alloc, MInstruction* ins) override;
 };
-
-static inline bool
-CoercesToDouble(MIRType type)
-{
-    if (type == MIRType_Undefined || IsFloatingPointType(type))
-        return true;
-    return false;
-}
 
 #undef SPECIALIZATION_DATA_
 #undef INHERIT_DATA_

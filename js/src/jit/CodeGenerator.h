@@ -43,9 +43,10 @@ class OutOfLineStoreElementHole;
 class OutOfLineTypeOfV;
 class OutOfLineUpdateCache;
 class OutOfLineCallPostWriteBarrier;
+class OutOfLineCallPostWriteElementBarrier;
 class OutOfLineIsCallable;
-class OutOfLineRegExpExec;
-class OutOfLineRegExpTest;
+class OutOfLineRegExpMatcher;
+class OutOfLineRegExpTester;
 class OutOfLineLambdaArrow;
 
 class CodeGenerator : public CodeGeneratorSpecific
@@ -61,7 +62,7 @@ class CodeGenerator : public CodeGeneratorSpecific
 
   public:
     bool generate();
-    bool generateAsmJS(AsmJSFunctionOffsets *offsets);
+    bool generateAsmJS(wasm::FuncOffsets *offsets);
     bool link(JSContext* cx, CompilerConstraintList* constraints);
     bool linkSharedStubs(JSContext* cx);
 
@@ -106,10 +107,10 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitValueToObjectOrNull(LValueToObjectOrNull* lir);
     void visitInteger(LInteger* lir);
     void visitRegExp(LRegExp* lir);
-    void visitRegExpExec(LRegExpExec* lir);
-    void visitOutOfLineRegExpExec(OutOfLineRegExpExec* ool);
-    void visitRegExpTest(LRegExpTest* lir);
-    void visitOutOfLineRegExpTest(OutOfLineRegExpTest* ool);
+    void visitRegExpMatcher(LRegExpMatcher* lir);
+    void visitOutOfLineRegExpMatcher(OutOfLineRegExpMatcher* ool);
+    void visitRegExpTester(LRegExpTester* lir);
+    void visitOutOfLineRegExpTester(OutOfLineRegExpTester* ool);
     void visitRegExpReplace(LRegExpReplace* lir);
     void visitStringReplace(LStringReplace* lir);
     void emitSharedStub(ICStub::Kind kind, LInstruction* lir);
@@ -137,9 +138,16 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitTypeBarrierV(LTypeBarrierV* lir);
     void visitTypeBarrierO(LTypeBarrierO* lir);
     void visitMonitorTypes(LMonitorTypes* lir);
+    template <class LPostBarrierType>
+    void visitPostWriteBarrierCommonO(LPostBarrierType* lir, OutOfLineCode* ool);
+    template <class LPostBarrierType>
+    void visitPostWriteBarrierCommonV(LPostBarrierType* lir, OutOfLineCode* ool);
     void visitPostWriteBarrierO(LPostWriteBarrierO* lir);
+    void visitPostWriteElementBarrierO(LPostWriteElementBarrierO* lir);
     void visitPostWriteBarrierV(LPostWriteBarrierV* lir);
+    void visitPostWriteElementBarrierV(LPostWriteElementBarrierV* lir);
     void visitOutOfLineCallPostWriteBarrier(OutOfLineCallPostWriteBarrier* ool);
+    void visitOutOfLineCallPostWriteElementBarrier(OutOfLineCallPostWriteElementBarrier* ool);
     void visitCallNative(LCallNative* call);
     void emitCallInvokeFunction(LInstruction* call, Register callereg,
                                 bool isConstructing, uint32_t argc,
@@ -530,7 +538,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     // Barriered objects in a bit mask.
     uint32_t simdRefreshTemplatesDuringLink_;
 
-    void registerSimdTemplate(InlineTypedObject* templateObject);
+    void registerSimdTemplate(SimdType simdType);
     void captureSimdTemplate(JSContext* cx);
 };
 

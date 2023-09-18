@@ -685,7 +685,8 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(Console)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Console)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsIObserver)
-  NS_INTERFACE_MAP_ENTRY(nsISupports)
+  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIObserver)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
 NS_INTERFACE_MAP_END
 
 Console::Console(nsPIDOMWindow* aWindow)
@@ -709,7 +710,7 @@ Console::Console(nsPIDOMWindow* aWindow)
   if (NS_IsMainThread()) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
     if (obs) {
-      obs->AddObserver(this, "inner-window-destroyed", false);
+      obs->AddObserver(this, "inner-window-destroyed", true);
     }
   }
 
@@ -1594,9 +1595,14 @@ Console::ProcessArguments(JSContext* aCx,
             return false;
           }
 
-          nsCString format;
-          MakeFormatString(format, integer, mantissa, 'f');
-          output.AppendPrintf(format.get(), v);
+          // nspr returns "nan", but we want to expose it as "NaN"
+          if (std::isnan(v)) {
+            output.AppendFloat(v);
+          } else {
+            nsCString format;
+            MakeFormatString(format, integer, mantissa, 'f');
+            output.AppendPrintf(format.get(), v);
+          }
         }
         break;
 

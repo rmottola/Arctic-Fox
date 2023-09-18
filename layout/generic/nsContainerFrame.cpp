@@ -27,16 +27,11 @@
 #include "nsBoxLayoutState.h"
 #include "nsCSSFrameConstructor.h"
 #include "nsBlockFrame.h"
+#include "nsPlaceholderFrame.h"
 #include "mozilla/AutoRestore.h"
 #include "nsIFrameInlines.h"
 #include "nsPrintfCString.h"
 #include <algorithm>
-
-#ifdef DEBUG
-#undef NOISY
-#else
-#undef NOISY
-#endif
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -69,13 +64,37 @@ void
 nsContainerFrame::SetInitialChildList(ChildListID  aListID,
                                       nsFrameList& aChildList)
 {
-  MOZ_ASSERT(mFrames.IsEmpty(),
-             "unexpected second call to SetInitialChildList");
-  MOZ_ASSERT(aListID == kPrincipalList, "unexpected child list");
 #ifdef DEBUG
   nsFrame::VerifyDirtyBitSet(aChildList);
 #endif
-  mFrames.SetFrames(aChildList);
+  if (aListID == kPrincipalList) {
+    MOZ_ASSERT(mFrames.IsEmpty(),
+               "unexpected second call to SetInitialChildList");
+    mFrames.SetFrames(aChildList);
+  } else if (aListID == kBackdropList) {
+    MOZ_ASSERT(StyleDisplay()->mTopLayer != NS_STYLE_TOP_LAYER_NONE,
+               "Only top layer frames should have backdrop");
+    MOZ_ASSERT(GetStateBits() & NS_FRAME_OUT_OF_FLOW,
+               "Top layer frames should be out-of-flow");
+    MOZ_ASSERT(!Properties().Get(BackdropProperty()),
+               "We shouldn't have setup backdrop frame list before");
+#ifdef DEBUG
+    {
+      nsIFrame* placeholder = aChildList.FirstChild();
+      MOZ_ASSERT(aChildList.OnlyChild(), "Should have only one backdrop");
+      MOZ_ASSERT(placeholder->GetType() == nsGkAtoms::placeholderFrame,
+                "The frame to be stored should be a placeholder");
+      MOZ_ASSERT(static_cast<nsPlaceholderFrame*>(placeholder)->
+                GetOutOfFlowFrame()->GetType() == nsGkAtoms::backdropFrame,
+                "The placeholder should points to a backdrop frame");
+    }
+#endif
+    nsFrameList* list =
+      new (PresContext()->PresShell()) nsFrameList(aChildList);
+    Properties().Set(BackdropProperty(), list);
+  } else {
+    MOZ_ASSERT_UNREACHABLE("Unexpected child list");
+  }
 }
 
 void
@@ -210,11 +229,15 @@ nsContainerFrame::DestroyFrom(nsIFrame* aDestructRoot)
              !(props->Get(this, nsContainerFrame::OverflowContainersProperty()) ||
                props->Get(this, nsContainerFrame::ExcessOverflowContainersProperty())),
              "this type of frame should't have overflow containers");
-
   SafelyDestroyFrameListProp(aDestructRoot, shell, props,
                              OverflowContainersProperty());
   SafelyDestroyFrameListProp(aDestructRoot, shell, props,
                              ExcessOverflowContainersProperty());
+
+  MOZ_ASSERT(!props->Get(this, BackdropProperty()) ||
+             StyleDisplay()->mTopLayer != NS_STYLE_TOP_LAYER_NONE,
+             "only top layer frame may have backdrop");
+  SafelyDestroyFrameListProp(aDestructRoot, shell, props, BackdropProperty());
 
   nsSplittableFrame::DestroyFrom(aDestructRoot);
 }
@@ -225,7 +248,8 @@ nsContainerFrame::DestroyFrom(nsIFrame* aDestructRoot)
 const nsFrameList&
 nsContainerFrame::GetChildList(ChildListID aListID) const
 {
-  // We only know about the principal child list and the overflow lists.
+  // We only know about the principal child list, the overflow lists,
+  // and the backdrop list.
   switch (aListID) {
     case kPrincipalList:
       return mFrames;
@@ -240,6 +264,10 @@ nsContainerFrame::GetChildList(ChildListID aListID) const
     case kExcessOverflowContainersList: {
       nsFrameList* list =
         GetPropTableFrames(ExcessOverflowContainersProperty());
+      return list ? *list : nsFrameList::EmptyList();
+    }
+    case kBackdropList: {
+      nsFrameList* list = GetPropTableFrames(BackdropProperty());
       return list ? *list : nsFrameList::EmptyList();
     }
     default:
@@ -272,6 +300,13 @@ nsContainerFrame::GetChildLists(nsTArray<ChildList>* aLists) const
                        aLists, kOverflowContainersList);
     ::AppendIfNonempty(this, propTable, ExcessOverflowContainersProperty(),
                        aLists, kExcessOverflowContainersList);
+  }
+  // Bypass BackdropProperty hashtable lookup for any in-flow frames
+  // since frames in the top layer (only which can have backdrop) are
+  // definitely out-of-flow.
+  if (GetStateBits() & NS_FRAME_OUT_OF_FLOW) {
+    ::AppendIfNonempty(this, propTable, BackdropProperty(),
+                       aLists, kBackdropList);
   }
   nsSplittableFrame::GetChildLists(aLists);
 }
@@ -429,7 +464,7 @@ nsContainerFrame::CreateViewForFrame(nsIFrame* aFrame,
 
   NS_FRAME_LOG(NS_FRAME_TRACE_CALLS,
                ("nsContainerFrame::CreateViewForFrame: frame=%p view=%p",
-                aFrame));
+                aFrame, view));
 }
 
 /**
@@ -600,8 +635,8 @@ IsTopLevelWidget(nsIWidget* aWidget)
   nsWindowType windowType = aWidget->WindowType();
   return windowType == eWindowType_toplevel ||
          windowType == eWindowType_dialog ||
+         windowType == eWindowType_popup ||
          windowType == eWindowType_sheet;
-  // popups aren't toplevel so they're not handled here
 }
 
 void

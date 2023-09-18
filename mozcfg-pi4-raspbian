@@ -1,0 +1,41 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#crypto implies simd
+#mcpu does arch+tune
+#
+#export CC="gcc-8 -mcpu=cortex-a72+crypto -mfpu=neon"
+#export CXX="g++-8 -mcpu=cortex-a72+crypto -mfpu=neon"
+export CC="gcc-8 "
+export CXX="g++-8 "
+export LDFLAGS="-latomic"
+
+mk_add_options MOZ_MAKE_FLAGS="-s -j4"
+#mk_add_options LDFLAGS="-latomic"
+
+
+ac_add_options --disable-crashreporter
+ac_add_options --disable-tests
+ac_add_options --disable-debug
+ac_add_options --disable-updater
+ac_add_options --disable-mozril-geoloc
+ac_add_options --disable-webrtc
+ac_add_options --disable-safe-browsing
+ac_add_options --disable-parental-controls
+ac_add_options --enable-release
+ac_add_options --disable-necko-wifi
+ac_add_options --disable-eme
+ac_add_options --disable-gamepad
+ac_add_options --enable-dbus
+ac_add_options --disable-gio
+ac_add_options --disable-pulseaudio
+ac_add_options --disable-gstreamer
+ac_add_options --disable-gconf
+ac_add_options --enable-strip
+ac_add_options --enable-install-strip
+ac_add_options --enable-application=browser
+ac_add_options --with-branding=browser/branding/arcticfox
+ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
+
+

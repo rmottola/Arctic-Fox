@@ -46,6 +46,7 @@ XPIDL_SOURCES += [
     'nsIFileStreams.idl',
     'nsIFileURL.idl',
     'nsIForcePendingChannel.idl',
+    'nsIFormPOSTActionChannel.idl',
     'nsIHttpPushListener.idl',
     'nsIIncrementalDownload.idl',
     'nsIIncrementalStreamLoader.idl',
@@ -167,6 +168,7 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
+    'LoadContextInfo.h',
     'LoadInfo.h',
     'LoadTainting.h',
 ]
@@ -193,7 +195,6 @@ UNIFIED_SOURCES += [
     'CaptivePortalService.cpp',
     'ChannelDiverterChild.cpp',
     'ChannelDiverterParent.cpp',
-    'ClosingService.cpp',
     'Dashboard.cpp',
     'EventTokenBucket.cpp',
     'LoadContextInfo.cpp',

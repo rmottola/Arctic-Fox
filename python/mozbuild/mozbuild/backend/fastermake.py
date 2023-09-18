@@ -5,6 +5,10 @@
 from __future__ import absolute_import, unicode_literals, print_function
 
 from mozbuild.backend.common import CommonBackend
+from mozbuild.frontend.context import (
+    Context,
+    Path,
+)
 from mozbuild.frontend.data import (
     ChromeManifestEntry,
     ContextDerived,
@@ -30,10 +34,7 @@ class FasterMakeBackend(CommonBackend):
     def _init(self):
         super(FasterMakeBackend, self)._init()
 
-        self._seen_directories = set()
-        self._defines = dict()
-
-        self._manifest_entries = OrderedDefaultDict(list)
+        self._manifest_entries = OrderedDefaultDict(set)
 
         self._install_manifests = OrderedDefaultDict(InstallManifest)
 
@@ -47,6 +48,8 @@ class FasterMakeBackend(CommonBackend):
             # This matches what PP_TARGETS do in config/rules.
             if target.endswith('.in'):
                 target = target[:-3]
+        if target.endswith('.css'):
+            kwargs['marker'] = '%'
         depfile = mozpath.join(
             self.environment.topobjdir, 'faster', '.deps',
             mozpath.join(obj.install_target, dest, target).replace('/', '_'))
@@ -57,20 +60,12 @@ class FasterMakeBackend(CommonBackend):
             **kwargs)
 
     def consume_object(self, obj):
-        if not isinstance(obj, Defines) and isinstance(obj, ContextDerived):
-            defines = self._defines.get(obj.objdir, {})
+        if isinstance(obj, (JARManifest, FinalTargetPreprocessedFiles)):
+            defines = obj.defines or {}
             if defines:
                 defines = defines.defines
 
-        if isinstance(obj, Defines):
-            self._defines[obj.objdir] = obj
-
-            # We're assuming below that Defines come first for a given objdir,
-            # which is kind of set in stone from the order things are treated
-            # in emitter.py.
-            assert obj.objdir not in self._seen_directories
-
-        elif isinstance(obj, JARManifest) and \
+        if isinstance(obj, JARManifest) and \
                 obj.install_target.startswith('dist/bin'):
             self._consume_jar_manifest(obj, defines)
 
@@ -94,24 +89,14 @@ class FasterMakeBackend(CommonBackend):
             if obj.path != top_level:
                 entry = 'manifest %s' % mozpath.relpath(obj.path,
                                                         obj.install_target)
-                if entry not in self._manifest_entries[top_level]:
-                    self._manifest_entries[top_level].append(entry)
-            self._manifest_entries[obj.path].append(str(obj.entry))
+                self._manifest_entries[top_level].add(entry)
+            self._manifest_entries[obj.path].add(str(obj.entry))
 
         elif isinstance(obj, XPIDLFile):
             self._has_xpidl = True
-            # XPIDL are emitted before Defines, which breaks the assert in the
-            # branch for Defines. OTOH, we don't actually care about the
-            # XPIDLFile objects just yet, so we can just pretend we didn't see
-            # an object in the directory yet.
-            return True
 
-        else:
-            # We currently ignore a lot of object types, so just acknowledge
-            # everything.
-            return True
-
-        self._seen_directories.add(obj.objdir)
+        # We currently ignore a lot of object types, so just acknowledge
+        # everything.
         return True
 
     def _consume_jar_manifest(self, obj, defines):
@@ -132,8 +117,11 @@ class FasterMakeBackend(CommonBackend):
             BUILD_FASTER=1,
         )
         pp.out = JarManifestParser()
-        pp.do_include(obj.path)
+        pp.do_include(obj.path.full_path)
         self.backend_input_files |= pp.includes
+
+        jar_context = Context(config=obj._context.config)
+        jar_context.add_source(obj.path.full_path)
 
         for jarinfo in pp.out:
             install_target = obj.install_target
@@ -143,80 +131,72 @@ class FasterMakeBackend(CommonBackend):
             for e in jarinfo.entries:
                 if e.is_locale:
                     if jarinfo.relativesrcdir:
-                        path = mozpath.join(self.environment.topsrcdir,
-                                            jarinfo.relativesrcdir)
+                        src = '/%s' % jarinfo.relativesrcdir
                     else:
-                        path = mozpath.dirname(obj.path)
-                    src = mozpath.join( path, 'en-US', e.source)
-                elif e.source.startswith('/'):
-                    src = mozpath.join(self.environment.topsrcdir,
-                                       e.source[1:])
+                        src = ''
+                    src = mozpath.join(src, 'en-US', e.source)
                 else:
-                    src = mozpath.join(mozpath.dirname(obj.path), e.source)
+                    src = e.source
+
+                src = Path(jar_context, src)
 
                 if '*' in e.source:
                     if e.preprocess:
                         raise Exception('%s: Wildcards are not supported with '
                                         'preprocessing' % obj.path)
                     def _prefix(s):
-                        for p in s.split('/'):
+                        for p in mozpath.split(s):
                             if '*' not in p:
                                 yield p + '/'
-                    prefix = ''.join(_prefix(src))
+                    prefix = ''.join(_prefix(src.full_path))
 
                     self._install_manifests[install_target] \
                         .add_pattern_symlink(
                         prefix,
-                        src[len(prefix):],
+                        src.full_path[len(prefix):],
                         mozpath.join(jarinfo.name, e.output))
                     continue
 
-                if not os.path.exists(src):
+                if not os.path.exists(src.full_path):
                     if e.is_locale:
                         raise Exception(
                             '%s: Cannot find %s' % (obj.path, e.source))
                     if e.source.startswith('/'):
-                        src = mozpath.join(self.environment.topobjdir,
-                                           e.source[1:])
+                        src = Path(jar_context, '!' + e.source)
                     else:
                         # This actually gets awkward if the jar.mn is not
                         # in the same directory as the moz.build declaring
                         # it, but it's how it works in the recursive make,
                         # not that anything relies on that, but it's simpler.
-                        src = mozpath.join(obj.objdir, e.source)
+                        src = Path(obj._context, '!' + e.source)
                     self._dependencies['install-%s' % install_target] \
                         .append(mozpath.relpath(
-                        src, self.environment.topobjdir))
+                        src.full_path, self.environment.topobjdir))
 
                 if e.preprocess:
-                    kwargs = {}
-                    if src.endswith('.css'):
-                        kwargs['marker'] = '%'
                     self._add_preprocess(
                         obj,
-                        src,
+                        src.full_path,
                         mozpath.join(jarinfo.name, mozpath.dirname(e.output)),
                         mozpath.basename(e.output),
-                        defines=defines,
-                        **kwargs)
+                        defines=defines)
                 else:
                     self._install_manifests[install_target].add_symlink(
-                        src,
+                        src.full_path,
                         mozpath.join(jarinfo.name, e.output))
 
             manifest = mozpath.normpath(mozpath.join(install_target,
                                                      jarinfo.name))
             manifest += '.manifest'
             for m in jarinfo.chrome_manifests:
-                self._manifest_entries[manifest].append(
+                self._manifest_entries[manifest].add(
                     m.replace('%', mozpath.basename(jarinfo.name) + '/'))
 
             if jarinfo.name != 'chrome':
                 manifest = mozpath.normpath(mozpath.join(install_target,
                                                          'chrome.manifest'))
                 entry = 'manifest %s.manifest' % jarinfo.name
-                if entry not in self._manifest_entries[manifest]:
-                    self._manifest_entries[manifest].append(entry)
+                self._manifest_entries[manifest].add(entry)
 
     def consume_finished(self):
         mk = Makefile()
@@ -237,16 +217,17 @@ class FasterMakeBackend(CommonBackend):
         ):
             mk.add_statement('%s = %s' % (var, self.environment.substs[var]))
 
+        install_manifests_bases = self._install_manifests.keys()
+
         # Add information for chrome manifest generation
         manifest_targets = []
 
         for target, entries in self._manifest_entries.iteritems():
             manifest_targets.append(target)
-            target = '$(TOPOBJDIR)/%s' % target
-            mk.create_rule([target]).add_dependencies(
-                ['content = %s' % ' '.join('"%s"' % e for e in entries)])
-
-        mk.add_statement('MANIFEST_TARGETS = %s' % ' '.join(manifest_targets))
+            install_target = mozpath.basedir(target, install_manifests_bases)
+            self._install_manifests[install_target].add_content(
+                ''.join('%s\n' % e for e in sorted(entries)),
+                mozpath.relpath(target, install_target))
 
         # Add information for install manifests.
         mk.add_statement('INSTALL_MANIFESTS = %s'

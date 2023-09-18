@@ -8,6 +8,7 @@
 
 #include "nscore.h"
 #include "nsIWidget.h"
+#include "npapi.h"
 #include <windows.h>
 #include <inputscope.h>
 
@@ -103,6 +104,17 @@ public:
    */
   static void InitInputContext(nsWindow* aWindow, InputContext& aInputContext);
 
+  /*
+   * For windowless plugin helper.
+   */
+  static void SetCandidateWindow(nsWindow* aWindow, CANDIDATEFORM* aForm);
+
+  /*
+   * For WM_IME_*COMPOSITION messages and e10s with windowless plugin
+   */
+  static void DefaultProcOfPluginEvent(nsWindow* aWindow,
+                                       const NPEvent* aPluginEvent);
+
 #ifdef DEBUG
   /**
    * Returns true when current keyboard layout has IME.  Otherwise, false.
@@ -123,7 +135,6 @@ private:
   // If sIMMEnabled is false, any IME messages are not handled in TSF mode.
   // Additionally, IME context is always disassociated from focused window.
   static bool sIsIMMEnabled;
-  static bool sShowingOnScreenKeyboard;
 
   static bool IsTSFAvailable() { return (sIsInTSFMode && !sPluginHasFocus); }
   static bool IsIMMActive();
@@ -147,6 +158,12 @@ private:
    * Windows 8 and higher.
    */
   static void DismissOnScreenKeyboard();
+
+  /**
+   * Get the HWND for the on-screen keyboard, if it's up. Only
+   * allowed for Windows 8 and higher.
+   */
+  static HWND GetOnScreenKeyboardWindow();
 #endif // #ifdef NS_ENABLE_TSF
 };
 

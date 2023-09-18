@@ -4,6 +4,44 @@
 
 #include "TypedObjectConstants.h"
 
+function ViewedArrayBufferIfReified(tarray) {
+    assert(IsTypedArray(tarray), "non-typed array asked for its buffer");
+
+    var buf = UnsafeGetReservedSlot(tarray, JS_TYPEDARRAYLAYOUT_BUFFER_SLOT);
+    assert(buf === null || (IsObject(buf) && (IsArrayBuffer(buf) || IsSharedArrayBuffer(buf))),
+           "unexpected value in buffer slot");
+    return buf;
+}
+
+function IsDetachedBuffer(buffer) {
+    // A typed array with a null buffer has never had its buffer exposed to
+    // become detached.
+    if (buffer === null)
+        return false;
+
+    assert(IsArrayBuffer(buffer) || IsSharedArrayBuffer(buffer),
+           "non-ArrayBuffer passed to IsDetachedBuffer");
+
+    // Shared array buffers are not detachable.
+    //
+    // This check is more expensive than desirable, but IsDetachedBuffer is
+    // only hot for non-shared memory in SetFromNonTypedArray, so there is an
+    // optimization in place there to avoid incurring the cost here.  An
+    // alternative is to give SharedArrayBuffer the same layout as ArrayBuffer.
+    if (IsSharedArrayBuffer(buffer))
+	return false;
+
+    var flags = UnsafeGetInt32FromReservedSlot(buffer, JS_ARRAYBUFFER_FLAGS_SLOT);
+    return (flags & JS_ARRAYBUFFER_DETACHED_FLAG) !== 0;
+}
+
+function GetAttachedArrayBuffer(tarray) {
+    var buffer = ViewedArrayBufferIfReified(tarray);
+    if (IsDetachedBuffer(buffer))
+        ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+    return buffer;
+}
+
 // ES6 draft 20150304 %TypedArray%.prototype.copyWithin
 function TypedArrayCopyWithin(target, start, end = undefined) {
     // This function is not generic.
@@ -12,7 +50,7 @@ function TypedArrayCopyWithin(target, start, end = undefined) {
                             "TypedArrayCopyWithin");
     }
 
-    // Bug 1101256: detachment checks mandated by ValidateTypedArray
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var obj = this;
@@ -62,8 +100,9 @@ function TypedArrayCopyWithin(target, start, end = undefined) {
     // Steps 15-17.
     //
     // Note that getting or setting a typed array element must throw if the
-    // typed array is neutered, so the intrinsic below checks for neutering.
-    // This happens *only* if a get/set occurs, i.e. when |count > 0|.
+    // underlying buffer is detached, so the intrinsic below checks for
+    // detachment.  This happens *only* if a get/set occurs, i.e. when
+    // |count > 0|.
     //
     // Also note that this copies elements effectively by memmove, *not* in
     // step 17's specified order.  This is unobservable, but it would be if we
@@ -85,7 +124,8 @@ function TypedArrayEntries() {
         return callFunction(CallTypedArrayMethodIfWrapped, O, "TypedArrayEntries");
     }
 
-    // Step 4-6. Bug 1101256: detachment checks
+    // Step 4-6.
+    GetAttachedArrayBuffer(O);
 
     // Step 7.
     return CreateArrayIterator(O, ITEM_KIND_KEY_AND_VALUE);
@@ -98,6 +138,8 @@ function TypedArrayEvery(callbackfn, thisArg = undefined) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, thisArg,
                             "TypedArrayEvery");
     }
+
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var O = this;
@@ -139,6 +181,8 @@ function TypedArrayFill(value, start = 0, end = undefined) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, value, start, end,
                             "TypedArrayFill");
     }
+
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var O = this;
@@ -182,6 +226,8 @@ function TypedArrayFilter(callbackfn, thisArg = undefined) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, thisArg,
                            "TypedArrayFilter");
     }
+
+    GetAttachedArrayBuffer(O);
 
     // Step 4.
     var len = TypedArrayLength(O);
@@ -243,6 +289,8 @@ function TypedArrayFind(predicate, thisArg = undefined) {
                             "TypedArrayFind");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -280,6 +328,8 @@ function TypedArrayFindIndex(predicate, thisArg = undefined) {
                             "TypedArrayFindIndex");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -314,6 +364,8 @@ function TypedArrayForEach(callbackfn, thisArg = undefined) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, thisArg,
                             "TypedArrayForEach");
     }
+
+    GetAttachedArrayBuffer(this);
 
     // Step 1-2.
     var O = this;
@@ -350,6 +402,8 @@ function TypedArrayIndexOf(searchElement, fromIndex = 0) {
                             "TypedArrayIndexOf");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -360,8 +414,8 @@ function TypedArrayIndexOf(searchElement, fromIndex = 0) {
     if (len === 0)
         return -1;
 
-    // Steps 7-8.
-    var n = ToInteger(fromIndex);
+    // Steps 7-8.  Add zero to convert -0 to +0, per ES6 5.2.
+    var n = ToInteger(fromIndex) + 0;
 
     // Step 9.
     if (n >= len)
@@ -398,6 +452,8 @@ function TypedArrayJoin(separator) {
     if (!IsObject(this) || !IsTypedArray(this)) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, separator, "TypedArrayJoin");
     }
+
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var O = this;
@@ -439,19 +495,19 @@ function TypedArrayJoin(separator) {
     return R;
 }
 
-// ES6 draft rev30 (2014/12/24) 22.2.3.15 %TypedArray%.prototype.keys()
+// ES6 draft (2016/1/11) 22.2.3.15 %TypedArray%.prototype.keys()
 function TypedArrayKeys() {
     // Step 1.
     var O = this;
 
-    // Step 2-3.
+    // Step 2.
     if (!IsObject(O) || !IsTypedArray(O)) {
         return callFunction(CallTypedArrayMethodIfWrapped, O, "TypedArrayKeys");
     }
 
-    // Step 4-6. Bug 1101256: detachment checks
+    GetAttachedArrayBuffer(O);
 
-    // Step 7.
+    // Step 3.
     return CreateArrayIterator(O, ITEM_KIND_KEY);
 }
 
@@ -463,6 +519,8 @@ function TypedArrayLastIndexOf(searchElement, fromIndex = undefined) {
                             "TypedArrayLastIndexOf");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -473,8 +531,8 @@ function TypedArrayLastIndexOf(searchElement, fromIndex = undefined) {
     if (len === 0)
         return -1;
 
-    // Steps 7-8.
-    var n = fromIndex === undefined ? len - 1 : ToInteger(fromIndex);
+    // Steps 7-8.  Add zero to convert -0 to +0, per ES6 5.2.
+    var n = fromIndex === undefined ? len - 1 : ToInteger(fromIndex) + 0;
 
     // Steps 9-10.
     var k = n >= 0 ? std_Math_min(n, len - 1) : len + n;
@@ -501,6 +559,8 @@ function TypedArrayMap(callbackfn, thisArg = undefined) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, thisArg,
                             "TypedArrayMap");
     }
+
+    GetAttachedArrayBuffer(O);
 
     // Step 4.
     var len = TypedArrayLength(O);
@@ -541,6 +601,8 @@ function TypedArrayReduce(callbackfn/*, initialValue*/) {
     if (!IsObject(this) || !IsTypedArray(this))
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, "TypedArrayReduce");
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -579,6 +641,8 @@ function TypedArrayReduceRight(callbackfn/*, initialValue*/) {
     // This function is not generic.
     if (!IsObject(this) || !IsTypedArray(this))
         return callFunction(CallTypedArrayMethodIfWrapped, this, callbackfn, "TypedArrayReduceRight");
+
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var O = this;
@@ -620,6 +684,8 @@ function TypedArrayReverse() {
         return callFunction(CallTypedArrayMethodIfWrapped, this, "TypedArrayReverse");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -649,37 +715,6 @@ function TypedArrayReverse() {
 
     // Step 9.
     return O;
-}
-
-function ViewedArrayBufferIfReified(tarray) {
-    assert(IsTypedArray(tarray), "non-typed array asked for its buffer");
-
-    var buf = UnsafeGetReservedSlot(tarray, JS_TYPEDARRAYLAYOUT_BUFFER_SLOT);
-    assert(buf === null || (IsObject(buf) && (IsArrayBuffer(buf) || IsSharedArrayBuffer(buf))),
-           "unexpected value in buffer slot");
-    return buf;
-}
-
-function IsDetachedBuffer(buffer) {
-    // Typed arrays whose buffers are null use inline storage and can't have
-    // been neutered.
-    if (buffer === null)
-        return false;
-
-    assert(IsArrayBuffer(buffer) || IsSharedArrayBuffer(buffer),
-           "non-ArrayBuffer passed to IsDetachedBuffer");
-
-    // Typed arrays whose buffers map shared memory can't have been neutered.
-    //
-    // This check is more expensive than desirable, but IsDetachedBuffer is
-    // only hot for non-shared memory in SetFromNonTypedArray, so there is an
-    // optimization in place there to avoid incurring the cost here.  An
-    // alternative is to give SharedArrayBuffer the same layout as ArrayBuffer.
-    if (IsSharedArrayBuffer(buffer))
-	return false;
-
-    var flags = UnsafeGetInt32FromReservedSlot(buffer, JS_ARRAYBUFFER_FLAGS_SLOT);
-    return (flags & JS_ARRAYBUFFER_NEUTERED_FLAG) !== 0;
 }
 
 // ES6 draft 20150220 22.2.3.22.1 %TypedArray%.prototype.set(array [, offset])
@@ -789,9 +824,7 @@ function TypedArraySet(overloaded, offset) {
         ThrowRangeError(JSMSG_TYPED_ARRAY_NEGATIVE_ARG, "2");
 
     // Steps 9-10.
-    var targetBuffer = ViewedArrayBufferIfReified(target);
-    if (IsDetachedBuffer(targetBuffer))
-        ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+    var targetBuffer = GetAttachedArrayBuffer(target);
 
     // Step 11.
     var targetLength = TypedArrayLength(target);
@@ -813,6 +846,8 @@ function TypedArraySlice(start, end) {
     if (!IsObject(O) || !IsTypedArray(O)) {
         return callFunction(CallTypedArrayMethodIfWrapped, O, start, end, "TypedArraySlice");
     }
+
+    GetAttachedArrayBuffer(O);
 
     // Step 4.
     var len = TypedArrayLength(O);
@@ -870,6 +905,8 @@ function TypedArraySome(callbackfn, thisArg = undefined) {
                             "TypedArraySome");
     }
 
+    GetAttachedArrayBuffer(this);
+
     // Steps 1-2.
     var O = this;
 
@@ -901,6 +938,74 @@ function TypedArraySome(callbackfn, thisArg = undefined) {
 
     // Step 10.
     return false;
+}
+
+// ES6 draft 20151210 22.2.3.26
+// Cases are ordered according to likelihood of occurrence
+// as opposed to the ordering in the spec.
+function TypedArrayCompare(x, y) {
+    // Step 1.
+    assert(typeof x === "number" && typeof y === "number",
+           "x and y are not numbers.");
+
+    // Steps 6 - 7.
+    var diff = x - y;
+    if (diff)
+        return diff;
+
+    // Steps 8 - 10.
+    if (x === 0 && y === 0)
+        return (1/x > 0 ? 1 : 0) - (1/y > 0 ? 1 : 0);
+
+    // Step 2. Implemented in TypedArraySort
+
+    // Step 3.
+    if (Number_isNaN(x) && Number_isNaN(y))
+        return 0;
+
+    // Steps 4 - 5.
+    if (Number_isNaN(x) || Number_isNaN(y))
+        return Number_isNaN(x) ? 1 : -1;
+
+}
+
+// ES6 draft 20151210 22.2.3.26 %TypedArray%.prototype.sort ( comparefn ).
+function TypedArraySort(comparefn) {
+    // This function is not generic.
+    if (!IsObject(this) || !IsTypedArray(this)) {
+        return callFunction(CallTypedArrayMethodIfWrapped, this, comparefn,
+                            "TypedArraySort");
+    }
+
+    // Step 1.
+    var obj = this;
+
+    // Step 2.
+    var buffer = GetAttachedArrayBuffer(obj);
+
+    // Step 3.
+    var len = TypedArrayLength(obj);
+
+    if (comparefn === undefined) {
+        comparefn = TypedArrayCompare;
+    } else {
+        // To satisfy step 2 from TypedArray SortCompare described in 22.2.3.26
+        // the user supplied comparefn is wrapped.
+        var wrappedCompareFn = comparefn;
+        comparefn = function(x, y) {
+            // Step a.
+            var v = wrappedCompareFn(x, y);
+            // Step b.
+            if (IsDetachedBuffer(buffer))
+                ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+            // Step c. is redundant, see:
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1121937#c36
+            // Step d.
+            return v;
+        }
+    }
+
+    return QuickSort(obj, len, comparefn);
 }
 
 // ES6 draft 20150304 %TypedArray%.prototype.subarray
@@ -959,7 +1064,8 @@ function TypedArrayValues() {
         return callFunction(CallTypedArrayMethodIfWrapped, O, "TypedArrayValues");
     }
 
-    // Step 4-6. Bug 1101256: detachment checks
+    // Step 4-6.
+    GetAttachedArrayBuffer(O);
 
     // Step 7.
     return CreateArrayIterator(O, ITEM_KIND_VALUE);
@@ -974,6 +1080,8 @@ function TypedArrayIncludes(searchElement, fromIndex = 0) {
         return callFunction(CallTypedArrayMethodIfWrapped, this, searchElement,
                             fromIndex, "TypedArrayIncludes");
     }
+
+    GetAttachedArrayBuffer(this);
 
     // Steps 1-2.
     var O = this;
@@ -1166,4 +1274,80 @@ function TypedArrayStaticOf(/*...items*/) {
 
     // Step 8.
     return newObj;
+}
+
+// ES 2016 draft Dec 10, 2015 24.1.4.3.
+function ArrayBufferSlice(start, end) {
+    // Step 1.
+    var O = this;
+
+    // Steps 2-3,
+    // This function is not generic.
+    if (!IsObject(O) || !IsArrayBuffer(O)) {
+        return callFunction(CallArrayBufferMethodIfWrapped, O, start, end,
+                            "ArrayBufferSlice");
+    }
+
+    // Step 4.
+    if (IsDetachedBuffer(O))
+        ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+
+    // Step 5.
+    var len = ArrayBufferByteLength(O);
+
+    // Step 6.
+    var relativeStart = ToInteger(start);
+
+    // Step 7.
+    var first = relativeStart < 0 ? std_Math_max(len + relativeStart, 0)
+                                  : std_Math_min(relativeStart, len);
+
+    // Step 8.
+    var relativeEnd = end === undefined ? len
+                                        : ToInteger(end);
+
+    // Step 9.
+    var final = relativeEnd < 0 ? std_Math_max(len + relativeEnd, 0)
+                                : std_Math_min(relativeEnd, len);
+
+    // Step 10.
+    var newLen = std_Math_max(final - first, 0);
+
+    // Step 11
+    var ctor = SpeciesConstructor(O, GetBuiltinConstructor("ArrayBuffer"));
+
+    // Step 12.
+    var new_ = new ctor(newLen);
+
+    // Step 13.
+    if (!IsArrayBuffer(new_))
+        ThrowTypeError(JSMSG_NON_ARRAY_BUFFER_RETURNED);
+
+    // Step 14.
+    if (IsDetachedBuffer(new_))
+        ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+
+    // Step 15.
+    if (new_ == O)
+        ThrowTypeError(JSMSG_SAME_ARRAY_BUFFER_RETURNED);
+
+    // Step 16.
+    if (ArrayBufferByteLength(new_) < newLen)
+        ThrowTypeError(JSMSG_SHORT_ARRAY_BUFFER_RETURNED, newLen, ArrayBufferByteLength(new_));
+
+    // Step 18.
+    if (IsDetachedBuffer(O))
+        ThrowTypeError(JSMSG_TYPED_ARRAY_DETACHED);
+
+    // Steps 19-21.
+    ArrayBufferCopyData(new_, O, first | 0, newLen | 0);
+
+    // Step 22.
+    return new_;
+}
+
+function ArrayBufferStaticSlice(buf, start, end) {
+    if (arguments.length < 1)
+        ThrowTypeError(JSMSG_MISSING_FUN_ARG, 0, 'ArrayBuffer.slice');
+    return callFunction(ArrayBufferSlice, buf, start, end);
 }

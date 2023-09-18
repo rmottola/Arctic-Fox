@@ -8,8 +8,6 @@
 #ifndef __nsWindow_h__
 #define __nsWindow_h__
 
-#include "mozilla/ipc/SharedMemorySysV.h"
-
 #include "nsAutoPtr.h"
 
 #include "mozcontainer.h"
@@ -26,6 +24,8 @@
 #ifdef MOZ_X11
 #include <gdk/gdkx.h>
 #endif /* MOZ_X11 */
+
+#include "nsShmImage.h"
 
 #ifdef ACCESSIBILITY
 #include "mozilla/a11y/Accessible.h"
@@ -64,10 +64,6 @@ extern PRLogModuleInfo *gWidgetDrawLog;
 class gfxASurface;
 class gfxPattern;
 class nsPluginNativeWindowGtk;
-#if defined(MOZ_X11) && defined(MOZ_HAVE_SHAREDMEMORYSYSV)
-#  define MOZ_HAVE_SHMIMAGE
-class nsShmImage;
-#endif
 
 namespace mozilla {
 class TimeStamp;
@@ -95,6 +91,7 @@ public:
     bool AreBoundsSane(void);
 
     // nsIWidget
+    using nsBaseWidget::Create; // for Create signature not overridden here
     NS_IMETHOD         Create(nsIWidget* aParent,
                               nsNativeWidget aNativeParent,
                               const LayoutDeviceIntRect& aRect,
@@ -103,6 +100,11 @@ public:
     virtual nsIWidget *GetParent() override;
     virtual float      GetDPI() override;
     virtual double     GetDefaultScaleInternal() override; 
+    // Under Gtk, we manage windows using device pixels so no scaling is needed:
+    mozilla::DesktopToLayoutDeviceScale GetDesktopToDeviceScale() final
+    {
+        return mozilla::DesktopToLayoutDeviceScale(1.0);
+    }
     virtual nsresult   SetParent(nsIWidget* aNewParent) override;
     NS_IMETHOD         SetModal(bool aModal) override;
     virtual bool       IsVisible() const override;
@@ -214,9 +216,10 @@ public:
 #endif
 
     virtual already_AddRefed<mozilla::gfx::DrawTarget>
-                       StartRemoteDrawingInRegion(nsIntRegion& aInvalidRegion) override;
+                       StartRemoteDrawingInRegion(LayoutDeviceIntRegion& aInvalidRegion,
+                                                  mozilla::layers::BufferMode* aBufferMode) override;
     virtual void       EndRemoteDrawingInRegion(mozilla::gfx::DrawTarget* aDrawTarget,
-                                                nsIntRegion& aInvalidRegion) override;
+                                                LayoutDeviceIntRegion& aInvalidRegion) override;
 
 private:
     void               UpdateAlpha(mozilla::gfx::SourceSurface* aSourceSurface, nsIntRect aBoundsRect);
@@ -307,7 +310,9 @@ public:
    virtual nsresult    ConfigureChildren(const nsTArray<Configuration>& aConfigurations) override;
    nsresult            UpdateTranslucentWindowAlphaInternal(const nsIntRect& aRect,
                                                             uint8_t* aAlphas, int32_t aStride);
-    virtual already_AddRefed<mozilla::gfx::DrawTarget> GetDrawTarget(const nsIntRegion& aRegion);
+
+    already_AddRefed<mozilla::gfx::DrawTarget> GetDrawTarget(const LayoutDeviceIntRegion& aRegion,
+                                                             mozilla::layers::BufferMode* aBufferMode);
 
 #if (MOZ_WIDGET_GTK == 2)
     static already_AddRefed<gfxASurface> GetSurfaceForGdkDrawable(GdkDrawable* aDrawable,
@@ -339,14 +344,14 @@ public:
     // To GDK
     gint DevicePixelsToGdkCoordRoundUp(int pixels);
     gint DevicePixelsToGdkCoordRoundDown(int pixels);
-    GdkPoint DevicePixelsToGdkPointRoundDown(nsIntPoint point);
-    GdkRectangle DevicePixelsToGdkSizeRoundUp(nsIntSize pixelSize);
+    GdkPoint DevicePixelsToGdkPointRoundDown(LayoutDeviceIntPoint point);
+    GdkRectangle DevicePixelsToGdkSizeRoundUp(LayoutDeviceIntSize pixelSize);
 
     // From GDK
     int GdkCoordToDevicePixels(gint coord);
     LayoutDeviceIntPoint GdkPointToDevicePixels(GdkPoint point);
     LayoutDeviceIntPoint GdkEventCoordsToDevicePixels(gdouble x, gdouble y);
-    nsIntRect GdkRectToDevicePixels(GdkRectangle rect);
+    LayoutDeviceIntRect GdkRectToDevicePixels(GdkRectangle rect);
 
 protected:
     virtual ~nsWindow();

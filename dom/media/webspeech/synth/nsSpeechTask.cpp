@@ -29,8 +29,10 @@ namespace dom {
 class SynthStreamListener : public MediaStreamListener
 {
 public:
-  explicit SynthStreamListener(nsSpeechTask* aSpeechTask) :
+  explicit SynthStreamListener(nsSpeechTask* aSpeechTask,
+                               MediaStream* aStream) :
     mSpeechTask(aSpeechTask),
+    mStream(aStream),
     mStarted(false)
   {
   }
@@ -63,6 +65,8 @@ public:
         break;
       case EVENT_REMOVED:
         mSpeechTask = nullptr;
+        // Dereference MediaStream to destroy safety
+        mStream = nullptr;
         break;
       default:
         break;
@@ -83,6 +87,8 @@ private:
   // Raw pointer; if we exist, the stream exists,
   // and 'mSpeechTask' exclusively owns it and therefor exists as well.
   nsSpeechTask* mSpeechTask;
+  // This is KungFuDeathGrip for MediaStream
+  RefPtr<MediaStream> mStream;
 
   bool mStarted;
 };
@@ -94,6 +100,7 @@ NS_IMPL_CYCLE_COLLECTION(nsSpeechTask, mSpeechSynthesis, mUtterance, mCallback);
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsSpeechTask)
   NS_INTERFACE_MAP_ENTRY(nsISpeechTask)
   NS_INTERFACE_MAP_ENTRY(nsIAudioChannelAgentCallback)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsISpeechTask)
 NS_INTERFACE_MAP_END
 
@@ -132,6 +139,8 @@ nsSpeechTask::~nsSpeechTask()
       mStream->Destroy();
     }
 
+    // This will finally destroyed by SynthStreamListener becasue
+    // MediaStream::Destroy() is async.
     mStream = nullptr;
   }
 
@@ -142,15 +151,19 @@ nsSpeechTask::~nsSpeechTask()
 }
 
 void
-nsSpeechTask::Init(ProcessedMediaStream* aStream)
+nsSpeechTask::InitDirectAudio()
 {
-  if (aStream) {
-    mStream = aStream->Graph()->CreateSourceStream(nullptr);
-    mPort = aStream->AllocateInputPort(mStream, 0);
-    mIndirectAudio = false;
-  } else {
-    mIndirectAudio = true;
-  }
+  mStream = MediaStreamGraph::GetInstance(MediaStreamGraph::AUDIO_THREAD_DRIVER,
+                                          AudioChannel::Normal)->
+    CreateSourceStream(nullptr);
+  mIndirectAudio = false;
+  mInited = true;
+}
+
+void
+nsSpeechTask::InitIndirectAudio()
+{
+  mIndirectAudio = true;
   mInited = true;
 }
 
@@ -181,7 +194,7 @@ nsSpeechTask::Setup(nsISpeechTaskCallback* aCallback,
   // mStream is set up in Init() that should be called before this.
   MOZ_ASSERT(mStream);
 
-  mStream->AddListener(new SynthStreamListener(this));
+  mStream->AddListener(new SynthStreamListener(this, mStream));
 
   // XXX: Support more than one channel
   if(NS_WARN_IF(!(aChannels == 1))) {
@@ -681,6 +694,9 @@ nsSpeechTask::CreateAudioChannelAgent()
   mAudioChannelAgent->InitWithWeakCallback(mUtterance->GetOwner(),
                                            static_cast<int32_t>(AudioChannelService::GetDefaultAudioChannel()),
                                            this);
+  float volume = 0.0f;
+  bool muted = true;
+  mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
 }
 
 void
@@ -695,22 +711,25 @@ nsSpeechTask::DestroyAudioChannelAgent()
 NS_IMETHODIMP
 nsSpeechTask::WindowVolumeChanged(float aVolume, bool aMuted)
 {
-  SetAudioOutputVolume(mVolume * aVolume * aMuted);
+  SetAudioOutputVolume(aMuted ? 0.0 : mVolume * aVolume);
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsSpeechTask::WindowAudioCaptureChanged()
+nsSpeechTask::WindowAudioCaptureChanged(bool aCapture)
 {
   // This is not supported yet.
   return NS_OK;
 }
 
 void
-nsSpeechTask::SetAudioOutputVolume(uint32_t aVolume)
+nsSpeechTask::SetAudioOutputVolume(float aVolume)
 {
-  if (mStream) {
+  if (mStream && !mStream->IsDestroyed()) {
     mStream->SetAudioOutputVolume(this, aVolume);
+  }
+  if (mIndirectAudio) {
+    mCallback->OnVolumeChanged(aVolume);
   }
 }
 

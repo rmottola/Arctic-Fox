@@ -40,6 +40,7 @@ class PuppetWidget : public nsBaseWidget
   typedef mozilla::dom::TabChild TabChild;
   typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef nsBaseWidget Base;
+  typedef mozilla::CSSRect CSSRect;
 
   // The width and height of the "widget" are clamped to this.
   static const size_t kMaxDimension;
@@ -53,6 +54,7 @@ protected:
 public:
   NS_DECL_ISUPPORTS_INHERITED
 
+  using nsBaseWidget::Create; // for Create signature not overridden here
   NS_IMETHOD Create(nsIWidget* aParent,
                     nsNativeWidget aNativeParent,
                     const LayoutDeviceIntRect& aRect,
@@ -110,12 +112,6 @@ public:
   virtual nsresult ConfigureChildren(const nsTArray<Configuration>& aConfigurations) override;
 
   NS_IMETHOD Invalidate(const LayoutDeviceIntRect& aRect) override;
-
-  // This API is going away, steer clear.
-  virtual void Scroll(const nsIntPoint& aDelta,
-                      const nsTArray<nsIntRect>& aDestRects,
-                      const nsTArray<Configuration>& aReconfigureChildren)
-  { /* dead man walking */ }
 
   // PuppetWidgets don't have native data, as they're purely nonnative.
   virtual void* GetNativeData(uint32_t aDataType) override;
@@ -220,6 +216,8 @@ public:
                             nsString& aCommitted) override;
 
   NS_IMETHOD SetPluginFocused(bool& aFocused) override;
+  virtual void DefaultProcOfPluginEvent(
+                 const mozilla::WidgetPluginEvent& aEvent) override;
 
   virtual nsresult SynthesizeNativeKeyEvent(int32_t aNativeKeyboardLayout,
                                             int32_t aNativeKeyCode,
@@ -254,6 +252,14 @@ public:
   virtual uint32_t GetMaxTouchPoints() const override;
 
   virtual void StartAsyncScrollbarDrag(const AsyncDragMetrics& aDragMetrics) override;
+
+  virtual void SetCandidateWindowForPlugin(
+                 const CandidateWindowPosition& aPosition) override;
+
+  virtual void ZoomToRect(const uint32_t& aPresShellId,
+                          const FrameMetrics::ViewID& aViewId,
+                          const CSSRect& aRect,
+                          const uint32_t& aFlags) override;
 protected:
   virtual nsresult NotifyIMEInternal(
                      const IMENotification& aIMENotification) override;

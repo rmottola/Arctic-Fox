@@ -407,11 +407,14 @@ GLContext::GLContext(const SurfaceCaps& caps,
     mMaxCubeMapTextureSize(0),
     mMaxTextureImageSize(0),
     mMaxRenderbufferSize(0),
+    mMaxSamples(0),
     mNeedsTextureSizeChecks(false),
     mNeedsFlushBeforeDeleteFB(false),
     mWorkAroundDriverBugs(true),
     mHeavyGLCallsSinceLastFlush(false)
 {
+    mMaxViewportDims[0] = 0;
+    mMaxViewportDims[1] = 0;
     mOwningThreadId = PlatformThread::CurrentId();
 }
 
@@ -1721,7 +1724,6 @@ GLContext::InitWithPrefix(const char *prefix, bool trygl)
 
         mMaxTextureImageSize = mMaxTextureSize;
 
-        mMaxSamples = 0;
         if (IsSupported(GLFeature::framebuffer_multisample)) {
             fGetIntegerv(LOCAL_GL_MAX_SAMPLES, (GLint*)&mMaxSamples);
         }
@@ -2778,7 +2780,7 @@ GLContext::Readback(SharedSurface* src, gfx::DataSourceSurface* dest)
                                          LOCAL_GL_RENDERBUFFER, src->ProdRenderbuffer());
                 break;
             default:
-                MOZ_CRASH("bad `src->mAttachType`.");
+                MOZ_CRASH("GFX: bad `src->mAttachType`.");
             }
 
             DebugOnly<GLenum> status = fCheckFramebufferStatus(LOCAL_GL_FRAMEBUFFER);

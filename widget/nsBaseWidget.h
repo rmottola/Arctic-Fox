@@ -100,6 +100,7 @@ protected:
   typedef mozilla::layers::APZEventState APZEventState;
   typedef mozilla::layers::SetAllowedTouchBehaviorCallback SetAllowedTouchBehaviorCallback;
   typedef mozilla::CSSIntRect CSSIntRect;
+  typedef mozilla::CSSRect CSSRect;
   typedef mozilla::ScreenRotation ScreenRotation;
 
   virtual ~nsBaseWidget();
@@ -177,14 +178,19 @@ public:
   NS_IMETHOD              SetWindowClass(const nsAString& xulWinType) override;
   virtual nsresult        SetWindowClipRegion(const nsTArray<LayoutDeviceIntRect>& aRects, bool aIntersectWithExisting) override;
   // Return whether this widget interprets parameters to Move and Resize APIs
-  // as "global display pixels" rather than "device pixels", and therefore
+  // as "desktop pixels" rather than "device pixels", and therefore
   // applies its GetDefaultScale() value to them before using them as mBounds
   // etc (which are always stored in device pixels).
   // Note that APIs that -get- the widget's position/size/bounds, rather than
   // -setting- them (i.e. moving or resizing the widget) will always return
   // values in the widget's device pixels.
-  bool                    BoundsUseDisplayPixels() const {
+  bool                    BoundsUseDesktopPixels() const {
     return mWindowType <= eWindowType_popup;
+  }
+  // Default implementation, to be overridden by platforms where desktop coords
+  // are virtualized and may not correspond to device pixels on the screen.
+  mozilla::DesktopToLayoutDeviceScale GetDesktopToDeviceScale() override {
+    return mozilla::DesktopToLayoutDeviceScale(1.0);
   }
   NS_IMETHOD              MoveClient(double aX, double aY) override;
   NS_IMETHOD              ResizeClient(double aWidth, double aHeight, bool aRepaint) override;
@@ -217,6 +223,13 @@ public:
                           { return NS_ERROR_NOT_IMPLEMENTED; }
   NS_IMETHOD              SetPluginFocused(bool& aFocused) override
                           { return NS_ERROR_NOT_IMPLEMENTED; }
+  virtual void            SetCandidateWindowForPlugin(
+                            const mozilla::widget::CandidateWindowPosition&
+                              aPosition) override
+                          { }
+  virtual void            DefaultProcOfPluginEvent(
+                            const mozilla::WidgetPluginEvent& aEvent) override
+                          { }
   NS_IMETHOD              AttachNativeKeyEvent(mozilla::WidgetKeyboardEvent& aEvent) override { return NS_ERROR_NOT_IMPLEMENTED; }
   NS_IMETHOD_(bool)       ExecuteNativeKeyBinding(
                             NativeKeyBindingsType aType,
@@ -226,10 +239,6 @@ public:
   virtual bool            ComputeShouldAccelerate();
   virtual nsIMEUpdatePreference GetIMEUpdatePreference() override { return nsIMEUpdatePreference(); }
   NS_IMETHOD              OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect) override { return NS_ERROR_NOT_IMPLEMENTED; }
-  NS_IMETHOD              OverrideSystemMouseScrollSpeed(double aOriginalDeltaX,
-                                                         double aOriginalDeltaY,
-                                                         double& aOverriddenDeltaX,
-                                                         double& aOverriddenDeltaY) override;
   virtual already_AddRefed<nsIWidget>
   CreateChild(const LayoutDeviceIntRect& aRect,
               nsWidgetInitData* aInitData = nullptr,
@@ -240,7 +249,10 @@ public:
   virtual nsIWidgetListener* GetPreviouslyAttachedWidgetListener() override;
   virtual void               SetPreviouslyAttachedWidgetListener(nsIWidgetListener* aListener) override;
   NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() override final;
-
+  virtual void ZoomToRect(const uint32_t& aPresShellId,
+                          const FrameMetrics::ViewID& aViewId,
+                          const CSSRect& aRect,
+                          const uint32_t& aFlags) override;
   // Helper function for dispatching events which are not processed by APZ,
   // but need to be transformed by APZ.
   nsEventStatus DispatchInputEvent(mozilla::WidgetInputEvent* aEvent) override;
@@ -287,10 +299,6 @@ public:
     return aClientSize;
   }
 
-  // return the widget's outside dimensions
-  // in global coordinates in display pixel.
-  CSSIntRect GetScaledScreenBounds();
-
   // return the screen the widget is in.
   already_AddRefed<nsIScreen> GetWidgetScreen();
 
@@ -306,7 +314,7 @@ public:
 
   virtual uint32_t GetGLFrameBufferFormat() override;
 
-  virtual const SizeConstraints& GetSizeConstraints() const override;
+  virtual const SizeConstraints GetSizeConstraints() override;
   virtual void SetSizeConstraints(const SizeConstraints& aConstraints) override;
 
   virtual bool CaptureWidgetOnScreen(RefPtr<mozilla::gfx::DrawTarget> aDT) override {
@@ -350,7 +358,6 @@ protected:
                                   nsIFile **aResult);
   virtual void    OnDestroy();
   void            BaseCreate(nsIWidget *aParent,
-                             const LayoutDeviceIntRect& aRect,
                              nsWidgetInitData* aInitData);
 
   virtual void ConfigureAPZCTreeManager();
@@ -461,12 +468,13 @@ protected:
    * @param aWidth width to constrain
    * @param aHeight height to constrain
    */
-  void ConstrainSize(int32_t* aWidth, int32_t* aHeight) const
+  void ConstrainSize(int32_t* aWidth, int32_t* aHeight)
   {
-    *aWidth = std::max(mSizeConstraints.mMinSize.width,
-                     std::min(mSizeConstraints.mMaxSize.width, *aWidth));
-    *aHeight = std::max(mSizeConstraints.mMinSize.height,
-                      std::min(mSizeConstraints.mMaxSize.height, *aHeight));
+    SizeConstraints c = GetSizeConstraints();
+    *aWidth = std::max(c.mMinSize.width,
+                       std::min(c.mMaxSize.width, *aWidth));
+    *aHeight = std::max(c.mMinSize.height,
+                        std::min(c.mMaxSize.height, *aHeight));
   }
 
   virtual CompositorChild* GetRemoteRenderer() override;
@@ -508,8 +516,8 @@ protected:
   RefPtr<TextEventDispatcher> mTextEventDispatcher;
   nsCursor          mCursor;
   nsBorderStyle     mBorderStyle;
-  nsIntRect         mBounds;
-  CSSIntRect*       mOriginalBounds;
+  LayoutDeviceIntRect mBounds;
+  LayoutDeviceIntRect* mOriginalBounds;
   // When this pointer is null, the widget is not clipped
   mozilla::UniquePtr<LayoutDeviceIntRect[]> mClipRects;
   uint32_t          mClipRectCount;
@@ -521,7 +529,9 @@ protected:
   bool              mUpdateCursor;
   bool              mUseAttachedEvents;
   bool              mIMEHasFocus;
-
+#ifdef XP_WIN
+  bool              mAccessibilityInUseFlag;
+#endif
   static nsIRollupListener* gRollupListener;
 
   // the last rolled up popup. Only set this when an nsAutoRollup is in scope,

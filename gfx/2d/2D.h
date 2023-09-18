@@ -42,6 +42,9 @@ struct ID3D11Texture2D;
 struct ID3D11Device;
 struct ID2D1Device;
 struct IDWriteRenderingParams;
+struct IDWriteFont;
+struct IDWriteFontFamily;
+struct IDWriteFontFace;
 
 class GrContext;
 
@@ -667,6 +670,29 @@ protected:
   UserData mUserData;
 };
 
+/**
+ * Derived classes hold a native font resource from which to create
+ * ScaledFonts.
+ */
+class NativeFontResource : public RefCounted<NativeFontResource>
+{
+public:
+  MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(NativeFontResource)
+
+  /**
+   * Creates a ScaledFont using the font corresponding to the index and
+   * the given glyph size.
+   *
+   * @param aIndex index for the font within the resource.
+   * @param aGlyphSize the size of ScaledFont required.
+   * @return an already_addrefed ScaledFont, containing nullptr if failed.
+   */
+  virtual already_AddRefed<ScaledFont>
+    CreateScaledFont(uint32_t aIndex, uint32_t aGlyphSize) = 0;
+
+  virtual ~NativeFontResource() {};
+};
+
 /** This class is designed to allow passing additional glyph rendering
  * parameters to the glyph drawing functions. This is an empty wrapper class
  * merely used to allow holding on to and passing around platform specific
@@ -703,6 +729,9 @@ public:
   virtual DrawTargetType GetType() const = 0;
 
   virtual BackendType GetBackendType() const = 0;
+
+  virtual bool IsRecording() const { return false; }
+
   /**
    * Returns a SourceSurface which is a snapshot of the current contents of the DrawTarget.
    * Multiple calls to Snapshot() without any drawing operations in between will
@@ -717,7 +746,8 @@ public:
    * Release takes the original data pointer for safety.
    */
   virtual bool LockBits(uint8_t** aData, IntSize* aSize,
-                        int32_t* aStride, SurfaceFormat* aFormat) { return false; }
+                        int32_t* aStride, SurfaceFormat* aFormat,
+                        IntPoint* aOrigin = nullptr) { return false; }
   virtual void ReleaseBits(uint8_t* aData) {}
 
   /** Ensure that the DrawTarget backend has flushed all drawing operations to
@@ -939,6 +969,35 @@ public:
   virtual void PopClip() = 0;
 
   /**
+   * Push a 'layer' to the DrawTarget, a layer is a temporary surface that all
+   * drawing will be redirected to, this is used for example to support group
+   * opacity or the masking of groups. Clips must be balanced within a layer,
+   * i.e. between a matching PushLayer/PopLayer pair there must be as many
+   * PushClip(Rect) calls as there are PopClip calls.
+   *
+   * @param aOpaque Whether the layer will be opaque
+   * @param aOpacity Opacity of the layer
+   * @param aMask Mask applied to the layer
+   * @param aMaskTransform Transform applied to the layer mask
+   * @param aBounds Optional bounds in device space to which the layer is
+   *                limited in size.
+   * @param aCopyBackground Whether to copy the background into the layer, this
+   *                        is only supported when aOpaque is true.
+   */
+  virtual void PushLayer(bool aOpaque, Float aOpacity,
+                         SourceSurface* aMask,
+                         const Matrix& aMaskTransform,
+                         const IntRect& aBounds = IntRect(),
+                         bool aCopyBackground = false) { MOZ_CRASH(); }
+
+  /**
+   * This balances a call to PushLayer and proceeds to blend the layer back
+   * onto the background. This blend will blend the temporary surface back
+   * onto the target in device space using POINT sampling and operator over.
+   */
+  virtual void PopLayer() { MOZ_CRASH(); }
+
+  /**
    * Create a SourceSurface optimized for use with this DrawTarget from
    * existing bitmap data in memory.
    *
@@ -1084,6 +1143,10 @@ public:
     return mOpaqueRect;
   }
 
+  virtual bool IsCurrentGroupOpaque() {
+    return GetFormat() == SurfaceFormat::B8G8R8X8;
+  }
+
   virtual void SetPermitSubpixelAA(bool aPermitSubpixelAA) {
     mPermitSubpixelAA = aPermitSubpixelAA;
   }
@@ -1177,6 +1240,8 @@ public:
 
   static already_AddRefed<DrawTarget> CreateDrawTargetForCairoSurface(cairo_surface_t* aSurface, const IntSize& aSize, SurfaceFormat* aFormat = nullptr);
 
+  static already_AddRefed<SourceSurface> CreateSourceSurfaceForCairoSurface(cairo_surface_t* aSurface, const IntSize& aSize, SurfaceFormat aFormat);
+
   static already_AddRefed<DrawTarget>
     CreateDrawTarget(BackendType aBackend, const IntSize &aSize, SurfaceFormat aFormat);
 
@@ -1190,16 +1255,15 @@ public:
     CreateScaledFontForNativeFont(const NativeFont &aNativeFont, Float aSize);
 
   /**
-   * This creates a ScaledFont from TrueType data.
+   * This creates a NativeFontResource from TrueType data.
    *
    * @param aData Pointer to the data
    * @param aSize Size of the TrueType data
-   * @param aFaceIndex Index of the font face in the truetype data this ScaledFont needs to represent.
-   * @param aGlyphSize Size of the glyphs in this ScaledFont
-   * @param aType Type of ScaledFont that should be created.
+   * @param aType Type of NativeFontResource that should be created.
+   * @return a NativeFontResource of nullptr if failed.
    */
-  static already_AddRefed<ScaledFont>
-    CreateScaledFontForTrueTypeData(uint8_t *aData, uint32_t aSize, uint32_t aFaceIndex, Float aGlyphSize, FontType aType);
+  static already_AddRefed<NativeFontResource>
+    CreateNativeFontResource(uint8_t *aData, uint32_t aSize, FontType aType);
 
   /**
    * This creates a scaled font with an associated cairo_scaled_font_t, and
@@ -1313,6 +1377,12 @@ public:
   static uint64_t GetD2DVRAMUsageDrawTarget();
   static uint64_t GetD2DVRAMUsageSourceSurface();
   static void D2DCleanup();
+
+  static already_AddRefed<ScaledFont>
+    CreateScaledFontForDWriteFont(IDWriteFont* aFont,
+                                  IDWriteFontFamily* aFontFamily,
+                                  IDWriteFontFace* aFontFace,
+                                  Float aSize);
 
 private:
   static ID2D1Device *mD2D1Device;

@@ -1596,7 +1596,7 @@ function Intl_Collator_compare_get() {
         var F = collatorCompareToBind;
 
         // Step 1.b-d.
-        var bc = callFunction(std_Function_bind, F, this);
+        var bc = callFunction(FunctionBind, F, this);
         internals.boundCompare = bc;
     }
 
@@ -2037,7 +2037,7 @@ function Intl_NumberFormat_format_get() {
         var F = numberFormatFormatToBind;
 
         // Step 1.b-d.
-        var bf = callFunction(std_Function_bind, F, this);
+        var bf = callFunction(FunctionBind, F, this);
         internals.boundFormat = bf;
     }
     // Step 2.
@@ -2713,9 +2713,8 @@ function dateTimeFormatFormatToBind() {
     var x = (date === undefined) ? std_Date_now() : ToNumber(date);
 
     // Step 1.a.iii.
-    return intl_FormatDateTime(this, x);
+    return intl_FormatDateTime(this, x, false);
 }
-
 
 /**
  * Returns a function bound to this DateTimeFormat that returns a String value
@@ -2734,12 +2733,41 @@ function Intl_DateTimeFormat_format_get() {
         var F = dateTimeFormatFormatToBind;
 
         // Step 1.b-d.
-        var bf = callFunction(std_Function_bind, F, this);
+        var bf = callFunction(FunctionBind, F, this);
         internals.boundFormat = bf;
     }
 
     // Step 2.
     return internals.boundFormat;
+}
+
+
+function dateTimeFormatFormatToPartsToBind() {
+    // Steps 1.a.i-ii
+    var date = arguments.length > 0 ? arguments[0] : undefined;
+    var x = (date === undefined) ? std_Date_now() : ToNumber(date);
+
+    // Step 1.a.iii.
+    return intl_FormatDateTime(this, x, true);
+}
+
+
+function Intl_DateTimeFormat_formatToParts_get() {
+    // Check "this DateTimeFormat object" per introduction of section 12.3.
+    var internals = getDateTimeFormatInternals(this, "formatToParts");
+
+    // Step 1.
+    if (internals.boundFormatToParts === undefined) {
+        // Step 1.a.
+        var F = dateTimeFormatFormatToPartsToBind;
+
+        // Step 1.b-d.
+        var bf = callFunction(FunctionBind, F, this);
+        internals.boundFormatToParts = bf;
+    }
+
+    // Step 2.
+    return internals.boundFormatToParts;
 }
 
 

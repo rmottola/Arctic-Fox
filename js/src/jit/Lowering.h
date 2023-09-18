@@ -161,8 +161,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitToString(MToString* convert);
     void visitToObjectOrNull(MToObjectOrNull* convert);
     void visitRegExp(MRegExp* ins);
-    void visitRegExpExec(MRegExpExec* ins);
-    void visitRegExpTest(MRegExpTest* ins);
+    void visitRegExpMatcher(MRegExpMatcher* ins);
+    void visitRegExpTester(MRegExpTester* ins);
     void visitRegExpReplace(MRegExpReplace* ins);
     void visitStringReplace(MStringReplace* ins);
     void visitBinarySharedStub(MBinarySharedStub* ins);
@@ -186,6 +186,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitTypeBarrier(MTypeBarrier* ins);
     void visitMonitorTypes(MMonitorTypes* ins);
     void visitPostWriteBarrier(MPostWriteBarrier* ins);
+    void visitPostWriteElementBarrier(MPostWriteElementBarrier* ins);
     void visitArrayLength(MArrayLength* ins);
     void visitSetArrayLength(MSetArrayLength* ins);
     void visitTypedArrayLength(MTypedArrayLength* ins);
@@ -285,7 +286,6 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitSimdUnbox(MSimdUnbox* ins);
     void visitSimdExtractElement(MSimdExtractElement* ins);
     void visitSimdInsertElement(MSimdInsertElement* ins);
-    void visitSimdSignMask(MSimdSignMask* ins);
     void visitSimdSwizzle(MSimdSwizzle* ins);
     void visitSimdGeneralShuffle(MSimdGeneralShuffle* ins);
     void visitSimdShuffle(MSimdShuffle* ins);
@@ -296,6 +296,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitSimdConstant(MSimdConstant* ins);
     void visitSimdConvert(MSimdConvert* ins);
     void visitSimdReinterpretCast(MSimdReinterpretCast* ins);
+    void visitSimdAllTrue(MSimdAllTrue* ins);
+    void visitSimdAnyTrue(MSimdAnyTrue* ins);
     void visitPhi(MPhi* ins);
     void visitBeta(MBeta* ins);
     void visitObjectState(MObjectState* ins);

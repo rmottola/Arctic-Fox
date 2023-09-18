@@ -6,6 +6,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/UniquePtrExtensions.h"
+#include "mozilla/UniquePtr.h"
 
 #include "nsIIncrementalDownload.h"
 #include "nsIRequestObserver.h"
@@ -27,6 +28,7 @@
 #include <algorithm>
 #include "nsIContentPolicy.h"
 #include "nsContentUtils.h"
+#include "mozilla/UniquePtr.h"
 
 // Default values used to initialize a nsIncrementalDownload object.
 #define DEFAULT_CHUNK_SIZE (4096 * 16)  // bytes
@@ -36,6 +38,8 @@
 
 // Number of times to retry a failed byte-range request.
 #define MAX_RETRY_COUNT 20
+
+using namespace mozilla;
 
 //-----------------------------------------------------------------------------
 
@@ -147,7 +151,7 @@ private:
   nsCOMPtr<nsIFile>                        mDest;
   nsCOMPtr<nsIChannel>                     mChannel;
   nsCOMPtr<nsITimer>                       mTimer;
-  UniquePtr<char[]>                        mChunk;
+  mozilla::UniquePtr<char[]>               mChunk;
   int32_t                                  mChunkLen;
   int32_t                                  mChunkSize;
   int32_t                                  mInterval;
@@ -709,7 +713,7 @@ nsIncrementalDownload::OnStartRequest(nsIRequest *request,
   if (diff < int64_t(mChunkSize))
     mChunkSize = uint32_t(diff);
 
-  mChunk = MakeUniqueFallible<char[]>(mChunkSize);
+  mChunk = mozilla::MakeUniqueFallible<char[]>(mChunkSize);
   if (!mChunk)
     rv = NS_ERROR_OUT_OF_MEMORY;
 

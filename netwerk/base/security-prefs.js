@@ -74,6 +74,8 @@ pref("security.OCSP.enabled", 1);
 pref("security.OCSP.require", false);
 pref("security.OCSP.GET.enabled", false);
 
+pref("security.pki.cert_short_lifetime_in_days", 10);
+
 pref("security.ssl.errorReporting.enabled", false);
 pref("security.ssl.errorReporting.url", "https://data.mozilla.com/submit/sslreports");
 pref("security.ssl.errorReporting.automatic", false);

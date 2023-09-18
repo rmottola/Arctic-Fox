@@ -663,7 +663,7 @@ PendingLookup::StartLookup()
   nsresult rv = DoLookupInternal();
   if (NS_FAILED(rv)) {
     return OnComplete(false, NS_OK);
-  };
+  }
   return rv;
 }
 

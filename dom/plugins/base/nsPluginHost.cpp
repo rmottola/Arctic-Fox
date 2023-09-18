@@ -133,6 +133,7 @@ using mozilla::dom::FakePluginTagInit;
 #define kPluginTmpDirName NS_LITERAL_CSTRING("plugtmp")
 
 static const char *kPrefWhitelist = "plugin.allowed_types";
+static const char *kPrefLoadInParentPrefix = "plugin.load_in_parent_process.";
 static const char *kPrefDisableFullPage = "plugin.disable_full_page_plugin_for_types";
 static const char *kPrefJavaMIME = "plugin.java.mime";
 
@@ -182,6 +183,37 @@ LazyLogModule nsPluginLogging::gPluginLog(PLUGIN_LOG_NAME);
 
 nsIFile *nsPluginHost::sPluginTempDir;
 nsPluginHost *nsPluginHost::sInst;
+
+/* to cope with short read */
+/* we should probably put this into a global library now that this is the second
+   time we need this. */
+static
+int32_t
+busy_beaver_PR_Read(PRFileDesc *fd, void * start, int32_t len)
+{
+    int n;
+    int32_t remaining = len;
+
+    while (remaining > 0)
+    {
+        n = PR_Read(fd, start, remaining);
+        if (n < 0)
+        {
+            /* may want to repeat if errno == EINTR */
+            if( (len - remaining) == 0 ) // no octet is ever read
+                return -1;
+            break;
+        }
+        else
+        {
+            remaining -= n;
+            char *cp = (char *) start;
+            cp += n;
+            start = cp;
+        }
+    }
+    return len - remaining;
+}
 
 NS_IMPL_ISUPPORTS0(nsInvalidPluginTag)
 
@@ -1332,6 +1364,7 @@ nsresult nsPluginHost::EnsurePluginLoaded(nsPluginTag* aPluginTag)
 nsresult
 nsPluginHost::GetPluginForContentProcess(uint32_t aPluginId, nsNPAPIPlugin** aPlugin)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
   MOZ_ASSERT(XRE_IsParentProcess());
 
   // If plugins haven't been scanned yet, do so now
@@ -1854,6 +1887,10 @@ nsPluginHost::SiteHasData(nsIPluginTag* plugin, const nsACString& domain,
 nsPluginHost::SpecialType
 nsPluginHost::GetSpecialType(const nsACString & aMIMEType)
 {
+  if (aMIMEType.LowerCaseEqualsASCII("application/x-test")) {
+    return eSpecialType_Test;
+  }
+
   if (aMIMEType.LowerCaseEqualsASCII("application/x-shockwave-flash") ||
       aMIMEType.LowerCaseEqualsASCII("application/futuresplash")) {
     return eSpecialType_Flash;
@@ -2427,17 +2464,21 @@ nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged
   }
 
   if (parentEpoch != ChromeEpochForContent()) {
-    SetChromeEpochForContent(parentEpoch);
     *aPluginsChanged = true;
     if (!aCreatePluginList) {
       return NS_OK;
     }
 
+    // Don't do this if aCreatePluginList is false. Otherwise, when we actually
+    // want to create the list, we'll come back here and do nothing.
+    SetChromeEpochForContent(parentEpoch);
+
     for (size_t i = 0; i < plugins.Length(); i++) {
       PluginTag& tag = plugins[i];
 
       // Don't add the same plugin again.
-      if (PluginWithId(tag.id())) {
+      if (nsPluginTag* existing = PluginWithId(tag.id())) {
+        UpdateInMemoryPluginInfo(existing);
         continue;
       }
 
@@ -2452,8 +2493,10 @@ nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged
                                                nsTArray<nsCString>(tag.extensions()),
                                                tag.isJavaPlugin(),
                                                tag.isFlashPlugin(),
+                                               tag.supportsAsyncInit(),
                                                tag.lastModifiedTime(),
-                                               tag.isFromExtension());
+                                               tag.isFromExtension(),
+                                               tag.sandboxLevel());
       AddPluginTag(pluginTag);
     }
   }
@@ -2696,22 +2739,19 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                       tag->Extensions(),
                                       tag->mIsJavaPlugin,
                                       tag->mIsFlashPlugin,
+                                      tag->mSupportsAsyncInit,
                                       tag->FileName(),
                                       tag->Version(),
                                       tag->mLastModifiedTime,
-                                      tag->IsFromExtension()));
+                                      tag->IsFromExtension(),
+                                      tag->mSandboxLevel));
   }
   return NS_OK;
 }
 
-// This function is not relevant for fake plugins.
 void
-nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
+nsPluginHost::UpdateInMemoryPluginInfo(nsPluginTag* aPluginTag)
 {
-  MOZ_ASSERT(XRE_IsParentProcess());
-
-  ReadPluginInfo();
-  WritePluginInfo();
   NS_ITERATIVE_UNREF_LIST(RefPtr<nsPluginTag>, mCachedPlugins, mNext);
   NS_ITERATIVE_UNREF_LIST(RefPtr<nsInvalidPluginTag>, mInvalidPlugins, mNext);
 
@@ -2742,6 +2782,20 @@ nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
     obsService->NotifyObservers(nullptr, "plugin-info-updated", nullptr);
 }
 
+// This function is not relevant for fake plugins.
+void
+nsPluginHost::UpdatePluginInfo(nsPluginTag* aPluginTag)
+{
+  MOZ_ASSERT(XRE_IsParentProcess());
+
+  ReadPluginInfo();
+  WritePluginInfo();
+
+  IncrementChromeEpoch();
+
+  UpdateInMemoryPluginInfo(aPluginTag);
+}
+
 /* static */ bool
 nsPluginHost::IsTypeWhitelisted(const char *aMimeType)
 {
@@ -2751,6 +2805,14 @@ nsPluginHost::IsTypeWhitelisted(const char *aMimeType)
   }
   nsDependentCString wrap(aMimeType);
   return IsTypeInList(wrap, whitelist);
+}
+
+/* static */ bool
+nsPluginHost::ShouldLoadTypeInParent(const nsACString& aMimeType)
+{
+  nsCString prefName(kPrefLoadInParentPrefix);
+  prefName += aMimeType;
+  return Preferences::GetBool(prefName.get(), false);
 }
 
 void
@@ -3015,7 +3077,9 @@ nsPluginHost::ReadPluginInfo()
   // set rv to return an error on goto out
   rv = NS_ERROR_FAILURE;
 
-  int32_t bread = PR_Read(fd, registry, flen);
+  // We know how many octes we are supposed to read.
+  // So let use the busy_beaver_PR_Read version.
+  int32_t bread = busy_beaver_PR_Read(fd, registry, flen);
 
   PRStatus prrc;
   prrc = PR_Close(fd);
@@ -3026,6 +3090,7 @@ nsPluginHost::ReadPluginInfo()
     return rv;
   }
 
+  // short read error, so to speak.
   if (flen > bread)
     return rv;
 
@@ -3386,7 +3451,9 @@ nsresult nsPluginHost::NewPluginURLStream(const nsString& aURL,
                      nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL,
                      nsIContentPolicy::TYPE_OBJECT_SUBREQUEST,
                      nullptr,  // aLoadGroup
-                     listenerPeer);
+                     listenerPeer,
+                     nsIRequest::LOAD_NORMAL | nsIChannel::LOAD_CLASSIFY_URI |
+                     nsIChannel::LOAD_BYPASS_SERVICE_WORKER);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (doc) {
@@ -3509,6 +3576,7 @@ nsPluginHost::AddHeadersToChannel(const char *aHeadersData,
 nsresult
 nsPluginHost::StopPluginInstance(nsNPAPIPluginInstance* aInstance)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
   if (PluginDestructionGuard::DelayDestroy(aInstance)) {
     return NS_OK;
   }

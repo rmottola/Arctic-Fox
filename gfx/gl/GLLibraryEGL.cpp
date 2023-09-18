@@ -8,6 +8,7 @@
 #include "gfxUtils.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/unused.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsIGfxInfo.h"
@@ -28,7 +29,7 @@ namespace gl {
 StaticMutex GLLibraryEGL::sMutex;
 GLLibraryEGL sEGLLibrary;
 #ifdef MOZ_B2G
-ThreadLocal<EGLContext> GLLibraryEGL::sCurrentContext;
+MOZ_THREAD_LOCAL(EGLContext) GLLibraryEGL::sCurrentContext;
 #endif
 
 // should match the order of EGLExtensions, and be null-terminated.
@@ -189,7 +190,7 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
 
 #ifdef MOZ_B2G
     if (!sCurrentContext.init())
-      MOZ_CRASH("Tls init failed");
+      MOZ_CRASH("GFX: Tls init failed");
 #endif
 
 #ifdef XP_WIN
@@ -306,8 +307,8 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel)
     };
 
     // Do not warn about the failure to load this - see bug 1092191
-    GLLibraryLoader::LoadSymbols(mEGLLibrary, &optionalSymbols[0], nullptr, nullptr,
-                                 false);
+    Unused << GLLibraryLoader::LoadSymbols(mEGLLibrary, &optionalSymbols[0],
+                                           nullptr, nullptr, false);
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 18
     MOZ_RELEASE_ASSERT(mSymbols.fQueryStringImplementationANDROID,

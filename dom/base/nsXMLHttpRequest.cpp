@@ -14,6 +14,7 @@
 #include "mozilla/dom/BlobSet.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FetchUtil.h"
+#include "mozilla/dom/FormData.h"
 #include "mozilla/dom/XMLDocument.h"
 #include "mozilla/dom/XMLHttpRequestUploadBinding.h"
 #include "mozilla/EventDispatcher.h"
@@ -74,7 +75,6 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsIClassOfService.h"
 #include "nsCharSeparatedTokenizer.h"
-#include "nsFormData.h"
 #include "nsStreamListenerWrapper.h"
 #include "xpcjsid.h"
 #include "nsITimedChannel.h"
@@ -1665,7 +1665,8 @@ nsXMLHttpRequest::Open(const nsACString& inMethod, const nsACString& url,
   nsCOMPtr<nsILoadGroup> loadGroup = GetLoadGroup();
 
   nsSecurityFlags secFlags;
-  nsLoadFlags loadFlags = nsIRequest::LOAD_BACKGROUND;
+  nsLoadFlags loadFlags = nsIRequest::LOAD_BACKGROUND |
+    nsIChannel::LOAD_CLASSIFY_URI;
   if (nsContentUtils::IsSystemPrincipal(mPrincipal)) {
     // When chrome is loading we want to make sure to sandbox any potential
     // result document. We also want to allow cross-origin loads.

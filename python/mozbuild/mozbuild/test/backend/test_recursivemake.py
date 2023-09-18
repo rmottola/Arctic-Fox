@@ -401,11 +401,15 @@ class TestRecursiveMakeBackend(BackendTester):
         # EXPORTS files should appear in the dist_include install manifest.
         m = InstallManifest(path=mozpath.join(env.topobjdir,
             '_build_manifests', 'install', 'dist_include'))
-        self.assertEqual(len(m), 4)
+        self.assertEqual(len(m), 8)
         self.assertIn('foo.h', m)
         self.assertIn('mozilla/mozilla1.h', m)
         self.assertIn('mozilla/dom/dom1.h', m)
         self.assertIn('gfx/gfx.h', m)
+        self.assertIn('bar.h', m)
+        self.assertIn('mozilla/mozilla2.h', m)
+        self.assertIn('mozilla/dom/dom2.h', m)
+        self.assertIn('mozilla/dom/dom3.h', m)
         # EXPORTS files that are also GENERATED_FILES should be handled as
         # INSTALL_TARGETS.
         backend_path = mozpath.join(env.topobjdir, 'backend.mk')
@@ -601,7 +605,7 @@ class TestRecursiveMakeBackend(BackendTester):
         var = 'DEFINES'
         defines = [val for val in lines if val.startswith(var)]
 
-        expected = ['DEFINES += -DFOO -DBAZ=\'"ab\'\\\'\'cd"\' -UQUX -DBAR=7 -DVALUE=xyz']
+        expected = ['DEFINES += -DFOO \'-DBAZ="ab\'\\\'\'cd"\' -UQUX -DBAR=7 -DVALUE=xyz']
         self.assertEqual(defines, expected)
 
     def test_host_defines(self):
@@ -614,7 +618,7 @@ class TestRecursiveMakeBackend(BackendTester):
         var = 'HOST_DEFINES'
         defines = [val for val in lines if val.startswith(var)]
 
-        expected = ['HOST_DEFINES += -DFOO -DBAZ=\'"ab\'\\\'\'cd"\' -UQUX -DBAR=7 -DVALUE=xyz']
+        expected = ['HOST_DEFINES += -DFOO \'-DBAZ="ab\'\\\'\'cd"\' -UQUX -DBAR=7 -DVALUE=xyz']
         self.assertEqual(defines, expected)
 
     def test_local_includes(self):

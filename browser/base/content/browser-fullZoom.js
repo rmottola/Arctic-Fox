@@ -74,7 +74,6 @@ var FullZoom = {
     }
 
     // This should be nulled after initialization.
-    this._initialLocations.clear();
     this._initialLocations = null;
   },
 

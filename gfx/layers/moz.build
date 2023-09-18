@@ -153,6 +153,8 @@ EXPORTS.mozilla.layers += [
     'ipc/CompositorLRU.h',
     'ipc/CompositorParent.h',
     'ipc/FenceUtils.h',
+    'ipc/GonkNativeHandle.h',
+    'ipc/GonkNativeHandleUtils.h',
     'ipc/ImageBridgeChild.h',
     'ipc/ImageBridgeParent.h',
     'ipc/ImageContainerParent.h',
@@ -237,6 +239,8 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
              ]
         ]
     SOURCES += [
+        'ipc/GonkNativeHandle.cpp',
+        'ipc/GonkNativeHandleUtils.cpp',
         'ipc/ShadowLayerUtilsGralloc.cpp',
     ]
 
@@ -244,6 +248,7 @@ UNIFIED_SOURCES += [
     'apz/src/APZCTreeManager.cpp',
     'apz/src/AsyncPanZoomController.cpp',
     'apz/src/Axis.cpp',
+    'apz/src/CheckerboardEvent.cpp',
     'apz/src/GestureEventListener.cpp',
     'apz/src/HitTestingTreeNode.cpp',
     'apz/src/InputBlockState.cpp',

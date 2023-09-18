@@ -206,6 +206,7 @@ static void DestroyTextureData(TextureData* aTextureData, ISurfaceAllocator* aAl
 void
 TextureChild::ActorDestroy(ActorDestroyReason why)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
   mWaitForRecycle = nullptr;
 
   if (mTextureData) {
@@ -294,13 +295,13 @@ DeallocateTextureClient(TextureDeallocParams params)
   if (params.syncDeallocation) {
     MOZ_PERFORMANCE_WARNING("gfx",
       "TextureClient/Host pair requires synchronous deallocation");
-    actor->DestroySynchronously();
+    actor->DestroySynchronously(actor->GetForwarder());
     DestroyTextureData(params.data, params.allocator, params.clientDeallocation,
                        actor->mMainThreadOnly);
   } else {
     actor->mTextureData = params.data;
     actor->mOwnsTextureData = params.clientDeallocation;
-    actor->Destroy();
+    actor->Destroy(actor->GetForwarder());
     // DestroyTextureData will be called by TextureChild::ActorDestroy
   }
 }
@@ -337,6 +338,14 @@ void TextureClient::Destroy(bool aForceSync)
     params.syncDeallocation = !!(mFlags & TextureFlags::DEALLOCATE_CLIENT) || aForceSync;
     DeallocateTextureClient(params);
   }
+}
+
+bool
+TextureClient::DestroyFallback(PTextureChild* aActor)
+{
+  // should not end up here so crash debug builds.
+  MOZ_ASSERT(false);
+  return aActor->SendDestroySync();
 }
 
 bool
@@ -782,6 +791,13 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
     return nullptr;
+  }
+
+  if (aFormat == SurfaceFormat::B8G8R8X8 &&
+      (aAllocFlags != TextureAllocationFlags::ALLOC_CLEAR_BUFFER_BLACK) &&
+      aMoz2DBackend == gfx::BackendType::SKIA) {
+    // skia requires alpha component of RGBX textures to be 255.
+    aAllocFlags = TextureAllocationFlags::ALLOC_CLEAR_BUFFER_WHITE;
   }
 
   TextureData* texData = BufferTextureData::Create(aSize, aFormat, aMoz2DBackend,

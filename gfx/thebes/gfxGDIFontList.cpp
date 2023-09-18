@@ -24,6 +24,7 @@
 #include "nsISimpleEnumerator.h"
 #include "nsIWindowsRegKey.h"
 #include "gfxFontConstants.h"
+#include "GeckoProfiler.h"
 
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Telemetry.h"
@@ -143,6 +144,8 @@ GDIFontEntry::GDIFontEntry(const nsAString& aFaceName,
 nsresult
 GDIFontEntry::ReadCMAP(FontInfoData *aFontInfoData)
 {
+    PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
+
     // attempt this once, if errors occur leave a blank cmap
     if (mCharacterMap) {
         return NS_OK;
@@ -218,8 +221,16 @@ GDIFontEntry::IsSymbolFont()
 gfxFont *
 GDIFontEntry::CreateFontInstance(const gfxFontStyle* aFontStyle, bool aNeedsBold)
 {
-    return new gfxGDIFont(this, aFontStyle, aNeedsBold,
-                          gfxFont::kAntialiasDefault);
+    bool isXP = !IsVistaOrLater();
+
+    bool useClearType = isXP && !aFontStyle->systemFont &&
+        (gfxWindowsPlatform::GetPlatform()->UseClearTypeAlways() ||
+         (mIsDataUserFont &&
+          gfxWindowsPlatform::GetPlatform()->UseClearTypeForDownloadableFonts()));
+
+    return new gfxGDIFont(this, aFontStyle, aNeedsBold, 
+                          (useClearType ? gfxFont::kAntialiasSubpixel
+                                        : gfxFont::kAntialiasDefault));
 }
 
 nsresult
@@ -910,22 +921,22 @@ gfxGDIFontList::GetDefaultFont(const gfxFontStyle* aStyle)
     gfxFontFamily *ff = nullptr;
 
     // this really shouldn't fail to find a font....
-    HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-    LOGFONTW logFont;
-    if (hGDI && ::GetObjectW(hGDI, sizeof(logFont), &logFont)) {
-        ff = FindFamily(nsDependentString(logFont.lfFaceName));
-        if (ff) {
-            return ff;
-        }
-    }
-
-    // ...but just in case, try another approach as well
     NONCLIENTMETRICSW ncm;
     ncm.cbSize = sizeof(ncm);
     BOOL status = ::SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, 
                                           sizeof(ncm), &ncm, 0);
     if (status) {
         ff = FindFamily(nsDependentString(ncm.lfMessageFont.lfFaceName));
+        if (ff) {
+            return ff;
+        }
+    }
+
+    // ...but just in case, try another (long-deprecated) approach as well
+    HGDIOBJ hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
+    LOGFONTW logFont;
+    if (hGDI && ::GetObjectW(hGDI, sizeof(logFont), &logFont)) {
+        ff = FindFamily(nsDependentString(logFont.lfFaceName));
     }
 
     return ff;
@@ -1172,11 +1183,11 @@ gfxGDIFontList::ActivateBundledFonts()
         if (!file) {
             continue;
         }
-        nsCString path;
-        if (NS_FAILED(file->GetNativePath(path))) {
+        nsAutoString path;
+        if (NS_FAILED(file->GetPath(path))) {
             continue;
         }
-        AddFontResourceEx(path.get(), FR_PRIVATE, nullptr);
+        AddFontResourceExW(path.get(), FR_PRIVATE, nullptr);
     }
 }
 

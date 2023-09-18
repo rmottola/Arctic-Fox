@@ -96,14 +96,17 @@ const MIN_VISIBLE_HISTORY_TILES = 8;
 // The max number of visible (not blocked) history tiles to test for inadjacency
 const MAX_VISIBLE_HISTORY_TILES = 15;
 
-// Divide frecency by this amount for pings
-const PING_SCORE_DIVISOR = 10000;
-
 // Allowed ping actions remotely stored as columns: case-insensitive [a-z0-9_]
 const PING_ACTIONS = ["block", "click", "pin", "sponsored", "sponsored_link", "unpin", "view"];
 
 // Location of inadjacent sites json
 const INADJACENCY_SOURCE = "chrome://browser/content/newtab/newTab.inadjacent.json";
+
+// Fake URL to keep track of last block of a suggested tile in the frequency cap object
+const FAKE_SUGGESTED_BLOCK_URL = "ignore://suggested_block";
+
+// Time before suggested tile is allowed to play again after block - default to 1 day
+const AFTER_SUGGESTED_BLOCK_DECAY_TIME = 24*60*60*1000;
 
 /**
  * Singleton that serves as the provider of directory links.
@@ -159,12 +162,14 @@ var DirectoryLinksProvider = {
    */
   _newTabHasInadjacentSite: false,
 
-  get _observedPrefs() Object.freeze({
-    enhanced: PREF_NEWTAB_ENHANCED,
-    linksURL: PREF_DIRECTORY_SOURCE,
-    matchOSLocale: PREF_MATCH_OS_LOCALE,
-    prefSelectedLocale: PREF_SELECTED_LOCALE,
-  }),
+  get _observedPrefs() {
+    return Object.freeze({
+      enhanced: PREF_NEWTAB_ENHANCED,
+      linksURL: PREF_DIRECTORY_SOURCE,
+      matchOSLocale: PREF_MATCH_OS_LOCALE,
+      prefSelectedLocale: PREF_SELECTED_LOCALE,
+    });
+  },
 
   get _linksURL() {
     if (!this.__linksURL) {
@@ -491,6 +496,29 @@ var DirectoryLinksProvider = {
   },
 
   /**
+   * Handles block on suggested tile: updates fake block url with current timestamp
+   */
+  handleSuggestedTileBlock: function DirectoryLinksProvider_handleSuggestedTileBlock() {
+    this._updateFrequencyCapSettings({url: FAKE_SUGGESTED_BLOCK_URL});
+    this._writeFrequencyCapFile();
+    this._updateSuggestedTile();
+  },
+
+  /**
+   * Checks if suggested tile is being blocked for the rest of "decay time"
+   * @return True if blocked, false otherwise
+   */
+  _isSuggestedTileBlocked: function DirectoryLinksProvider__isSuggestedTileBlocked() {
+    let capObject = this._frequencyCaps[FAKE_SUGGESTED_BLOCK_URL];
+    if (!capObject || !capObject.lastUpdated) {
+      // user never blocked suggested tile or lastUpdated is missing
+      return false;
+    }
+    // otherwise, make sure that enough time passed after suggested tile was blocked
+    return (capObject.lastUpdated + AFTER_SUGGESTED_BLOCK_DECAY_TIME) > Date.now();
+  },
+
+  /**
    * Report some action on a newtab page (view, click)
    * @param sites Array of sites shown on newtab page
    * @param action String of the behavior to report
@@ -535,49 +563,12 @@ var DirectoryLinksProvider = {
     }
     catch (ex) {}
 
-    // Only send pings when enhancing tiles with an endpoint and valid action
+    // Bug 1240245 - We no longer send pings, but frequency capping and fetching
+    // tests depend on the following actions, so references to PING remain.
     let invalidAction = PING_ACTIONS.indexOf(action) == -1;
     if (!newtabEnhanced || pingEndPoint == "" || invalidAction) {
       return Promise.resolve();
     }
-
-    let actionIndex;
-    let data = {
-      locale: this.locale,
-      tiles: sites.reduce((tiles, site, pos) => {
-        // Only add data for non-empty tiles
-        if (site) {
-          // Remember which tiles data triggered the action
-          let {link} = site;
-          let tilesIndex = tiles.length;
-          if (triggeringSiteIndex == pos) {
-            actionIndex = tilesIndex;
-          }
-
-          // Make the payload in a way so keys can be excluded when stringified
-          let id = link.directoryId;
-          tiles.push({
-            id: id || site.enhancedId,
-            pin: site.isPinned() ? 1 : undefined,
-            pos: pos != tilesIndex ? pos : undefined,
-            past_impressions: pos == triggeringSiteIndex ? pastImpressions : undefined,
-            score: Math.round(link.frecency / PING_SCORE_DIVISOR) || undefined,
-            url: site.enhancedId && "",
-          });
-        }
-        return tiles;
-      }, []),
-    };
-
-    // Provide a direct index to the tile triggering the action
-    if (actionIndex !== undefined) {
-      data[action] = actionIndex;
-    }
-
-    // Package the data to be sent with the ping
-    let ping = this._newXHR();
-    ping.open("POST", pingEndPoint + (action == "view" ? "view" : "click"));
-    ping.send(JSON.stringify(data));
 
     return Task.spawn(function* () {
       // since we updated views/clicks we need write _frequencyCaps to disk
@@ -728,7 +719,7 @@ var DirectoryLinksProvider = {
     NewTabUtils.placesProvider.addObserver(this);
     NewTabUtils.links.addObserver(this);
 
-    return Task.spawn(function() {
+    return Task.spawn(function*() {
       // get the last modified time of the links file if it exists
       let doesFileExists = yield OS.File.exists(this._directoryFilePath);
       if (doesFileExists) {
@@ -871,7 +862,7 @@ var DirectoryLinksProvider = {
     if (!sortedLinks) {
       // If NewTabUtils.links.resetCache() is called before getting here,
       // sortedLinks may be undefined.
-      return;
+      return undefined;
     }
 
     // Delete the current suggested tile, if one exists.
@@ -888,10 +879,13 @@ var DirectoryLinksProvider = {
       }
     }
 
-    if (this._topSitesWithSuggestedLinks.size == 0 || !this._shouldUpdateSuggestedTile()) {
+    if (this._topSitesWithSuggestedLinks.size == 0 ||
+        !this._shouldUpdateSuggestedTile() ||
+        this._isSuggestedTileBlocked()) {
       // There are no potential suggested links we can show or not
-      // enough history for a suggested tile.
-      return;
+      // enough history for a suggested tile, or suggested tile was
+      // recently blocked and wait time interval has not decayed yet
+      return undefined;
     }
 
     // Create a flat list of all possible links we can show as suggested.
@@ -946,7 +940,7 @@ var DirectoryLinksProvider = {
     // We might have run out of possible links to show
     let numLinks = possibleLinks.size;
     if (numLinks == 0) {
-      return;
+      return undefined;
     }
 
     let flattenedLinks = [...possibleLinks.values()];
@@ -1111,7 +1105,8 @@ var DirectoryLinksProvider = {
   _pruneFrequencyCapUrls: function DirectoryLinksProvider_pruneFrequencyCapUrls(timeDelta = DEFAULT_PRUNE_TIME_DELTA) {
     let timeThreshold = Date.now() - timeDelta;
     Object.keys(this._frequencyCaps).forEach(url => {
-      if (this._frequencyCaps[url].lastUpdated <= timeThreshold) {
+      // remove url if it is not ignorable and wasn't updated for a while
+      if (!url.startsWith("ignore") && this._frequencyCaps[url].lastUpdated <= timeThreshold) {
         delete this._frequencyCaps[url];
       }
     });

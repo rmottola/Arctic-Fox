@@ -50,9 +50,6 @@ with Files('../public/TrackedOptimizationInfo.h'):
     BUG_COMPONENT = component_jit
 
 
-if CONFIG['DEHYDRA_PATH']:
-    DIRS += ['analysis-tests']
-
 if CONFIG['JS_BUNDLED_EDITLINE']:
     DIRS += ['editline']
 
@@ -114,6 +111,8 @@ EXPORTS.js += [
     '../public/Debug.h',
     '../public/GCAPI.h',
     '../public/GCHashTable.h',
+    '../public/GCPolicyAPI.h',
+    '../public/GCVector.h',
     '../public/HashTable.h',
     '../public/HeapAPI.h',
     '../public/Id.h',
@@ -128,7 +127,6 @@ EXPORTS.js += [
     '../public/RootingAPI.h',
     '../public/SliceBudget.h',
     '../public/StructuredClone.h',
-    '../public/TraceableVector.h',
     '../public/TraceKind.h',
     '../public/TracingAPI.h',
     '../public/TrackedOptimizationInfo.h',
@@ -138,6 +136,8 @@ EXPORTS.js += [
     '../public/UbiNodeCensus.h',
     '../public/UbiNodeDominatorTree.h',
     '../public/UbiNodePostOrder.h',
+    '../public/UbiNodeShortestPaths.h',
+    '../public/UniquePtr.h',
     '../public/Utility.h',
     '../public/Value.h',
     '../public/Vector.h',
@@ -145,14 +145,16 @@ EXPORTS.js += [
 ]
 
 UNIFIED_SOURCES += [
-    'asmjs/AsmJSFrameIterator.cpp',
-    'asmjs/AsmJSLink.cpp',
-    'asmjs/AsmJSModule.cpp',
-    'asmjs/AsmJSSignalHandlers.cpp',
-    'asmjs/AsmJSValidate.cpp',
+    'asmjs/AsmJS.cpp',
+    'asmjs/Wasm.cpp',
+    'asmjs/WasmFrameIterator.cpp',
     'asmjs/WasmGenerator.cpp',
     'asmjs/WasmIonCompile.cpp',
+    'asmjs/WasmModule.cpp',
+    'asmjs/WasmSignalHandlers.cpp',
     'asmjs/WasmStubs.cpp',
+    'asmjs/WasmText.cpp',
+    'asmjs/WasmTypes.cpp',
     'builtin/AtomicsObject.cpp',
     'builtin/Eval.cpp',
     'builtin/Intl.cpp',
@@ -264,7 +266,6 @@ UNIFIED_SOURCES += [
     'jscntxt.cpp',
     'jscompartment.cpp',
     'jsdate.cpp',
-    'jsdtoa.cpp',
     'jsexn.cpp',
     'jsfriendapi.cpp',
     'jsfun.cpp',
@@ -339,6 +340,7 @@ UNIFIED_SOURCES += [
     'vm/TypeInference.cpp',
     'vm/UbiNode.cpp',
     'vm/UbiNodeCensus.cpp',
+    'vm/UbiNodeShortestPaths.cpp',
     'vm/UnboxedObject.cpp',
     'vm/Unicode.cpp',
     'vm/Value.cpp',
@@ -352,6 +354,8 @@ UNIFIED_SOURCES += [
 # without PGO
 # frontend/Parser.cpp cannot be built in unified mode because of explicit
 # template instantiations.
+# jsdtoa.cpp cannot be built in unified mode because we want to suppress
+# compiler warnings in third-party dtoa.c.
 # jsmath.cpp cannot be built in unified mode because it needs to pull rand_s
 # from <stdlib.h> on Windows through a preprocessor define.
 # jsutil.cpp cannot be built in unified mode because it is needed for
@@ -365,6 +369,7 @@ SOURCES += [
     'gc/StoreBuffer.cpp',
     'jsarray.cpp',
     'jsatom.cpp',
+    'jsdtoa.cpp',
     'jsmath.cpp',
     'jsutil.cpp',
     'vm/Initialization.cpp',
@@ -616,7 +621,11 @@ if CONFIG['MOZ_ETW']:
 
 if CONFIG['NIGHTLY_BUILD']:
     DEFINES['ENABLE_BINARYDATA'] = True
+
+# Also in shell/moz.build
+if CONFIG['NIGHTLY_BUILD']:
     DEFINES['ENABLE_SHARED_ARRAY_BUFFER'] = True
+    DEFINES['ENABLE_SIMD'] = True
 
 DEFINES['EXPORT_JS_API'] = True
 
@@ -691,8 +700,10 @@ selfhosted.inputs = [
     'builtin/SelfHostingDefines.h',
     'builtin/Utilities.js',
     'builtin/Array.js',
+    'builtin/Classes.js',
     'builtin/Date.js',
     'builtin/Error.js',
+    'builtin/Function.js',
     'builtin/Generator.js',
     'builtin/Intl.js',
     'builtin/IntlData.js',
@@ -705,6 +716,7 @@ selfhosted.inputs = [
     'builtin/RegExp.js',
     'builtin/String.js',
     'builtin/Set.js',
+    'builtin/Sorting.js',
     'builtin/TypedArray.js',
     'builtin/TypedObject.js',
     'builtin/WeakSet.js'
@@ -716,3 +728,7 @@ if CONFIG['JS_HAS_CTYPES']:
     else:
         # Windows needs this to be linked with a static library.
         DEFINES['FFI_BUILDING'] = True
+
+# Suppress warnings in third-party code.
+if CONFIG['CLANG_CXX']:
+    SOURCES['jsdtoa.cpp'].flags += ['-Wno-implicit-fallthrough']

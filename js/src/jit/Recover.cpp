@@ -406,12 +406,15 @@ MMul::writeRecoverData(CompactBufferWriter& writer) const
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Mul));
     writer.writeByte(specialization_ == MIRType_Float32);
+    MOZ_ASSERT(Mode(uint8_t(mode_)) == mode_);
+    writer.writeByte(uint8_t(mode_));
     return true;
 }
 
 RMul::RMul(CompactBufferReader& reader)
 {
     isFloatOperation_ = reader.readByte();
+    mode_ = reader.readByte();
 }
 
 bool
@@ -421,13 +424,19 @@ RMul::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedValue rhs(cx, iter.read());
     RootedValue result(cx);
 
-    if (!js::MulValues(cx, &lhs, &rhs, &result))
-        return false;
+    if (MMul::Mode(mode_) == MMul::Normal) {
+        if (!js::MulValues(cx, &lhs, &rhs, &result))
+            return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
-    // rounded to a Float32.
-    if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
-        return false;
+        // MIRType_Float32 is a specialization embedding the fact that the
+        // result is rounded to a Float32.
+        if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
+            return false;
+    } else {
+        MOZ_ASSERT(MMul::Mode(mode_) == MMul::Integer);
+        if (!js::math_imul_handle(cx, lhs, rhs, &result))
+            return false;
+    }
 
     iter.storeInstructionResult(result);
     return true;
@@ -987,23 +996,27 @@ RStringSplit::recover(JSContext* cx, SnapshotIterator& iter) const
     return true;
 }
 
-bool MRegExpExec::writeRecoverData(CompactBufferWriter& writer) const
+bool
+MRegExpMatcher::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
-    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpExec));
+    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpMatcher));
     return true;
 }
 
-RRegExpExec::RRegExpExec(CompactBufferReader& reader)
+RRegExpMatcher::RRegExpMatcher(CompactBufferReader& reader)
 {}
 
-bool RRegExpExec::recover(JSContext* cx, SnapshotIterator& iter) const{
+bool
+RRegExpMatcher::recover(JSContext* cx, SnapshotIterator& iter) const
+{
     RootedObject regexp(cx, &iter.read().toObject());
     RootedString input(cx, iter.read().toString());
+    int32_t lastIndex = iter.read().toInt32();
+    bool sticky = iter.read().toBoolean();
 
     RootedValue result(cx);
-
-    if (!regexp_exec_raw(cx, regexp, input, nullptr, &result))
+    if (!RegExpMatcherRaw(cx, regexp, input, lastIndex, sticky, nullptr, &result))
         return false;
 
     iter.storeInstructionResult(result);
@@ -1011,28 +1024,30 @@ bool RRegExpExec::recover(JSContext* cx, SnapshotIterator& iter) const{
 }
 
 bool
-MRegExpTest::writeRecoverData(CompactBufferWriter& writer) const
+MRegExpTester::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
-    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpTest));
+    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpTester));
     return true;
 }
 
-RRegExpTest::RRegExpTest(CompactBufferReader& reader)
+RRegExpTester::RRegExpTester(CompactBufferReader& reader)
 { }
 
 bool
-RRegExpTest::recover(JSContext* cx, SnapshotIterator& iter) const
+RRegExpTester::recover(JSContext* cx, SnapshotIterator& iter) const
 {
     RootedString string(cx, iter.read().toString());
     RootedObject regexp(cx, &iter.read().toObject());
-    bool resultBool;
+    int32_t lastIndex = iter.read().toInt32();
+    bool sticky = iter.read().toBoolean();
+    int32_t endIndex;
 
-    if (!js::regexp_test_raw(cx, regexp, string, &resultBool))
+    if (!js::RegExpTesterRaw(cx, regexp, string, lastIndex, sticky, &endIndex))
         return false;
 
     RootedValue result(cx);
-    result.setBoolean(resultBool);
+    result.setInt32(endIndex);
     iter.storeInstructionResult(result);
     return true;
 }
@@ -1320,9 +1335,8 @@ MSimdBox::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_SimdBox));
-    SimdTypeDescr& simdTypeDescr = templateObject()->typeDescr().as<SimdTypeDescr>();
-    SimdTypeDescr::Type type = simdTypeDescr.type();
-    writer.writeByte(uint8_t(type));
+    static_assert(sizeof(SimdType) == sizeof(uint8_t), "assuming uint8 storage class for SimdType");
+    writer.writeByte(uint8_t(simdType()));
     return true;
 }
 
@@ -1337,27 +1351,47 @@ RSimdBox::recover(JSContext* cx, SnapshotIterator& iter) const
     JSObject* resultObject = nullptr;
     RValueAllocation a = iter.readAllocation();
     MOZ_ASSERT(iter.allocationReadable(a));
+    MOZ_ASSERT_IF(a.mode() == RValueAllocation::ANY_FLOAT_REG, a.fpuReg().isSimd128());
     const FloatRegisters::RegisterContent* raw = iter.floatAllocationPointer(a);
-    switch (SimdTypeDescr::Type(type_)) {
-      case SimdTypeDescr::Int32x4:
-        MOZ_ASSERT_IF(a.mode() == RValueAllocation::ANY_FLOAT_REG,
-                      a.fpuReg().isSimd128());
+    switch (SimdType(type_)) {
+      case SimdType::Bool32x4:
+        resultObject = js::CreateSimd<Bool32x4>(cx, (const Bool32x4::Elem*) raw);
+        break;
+      case SimdType::Int32x4:
         resultObject = js::CreateSimd<Int32x4>(cx, (const Int32x4::Elem*) raw);
         break;
-      case SimdTypeDescr::Float32x4:
-        MOZ_ASSERT_IF(a.mode() == RValueAllocation::ANY_FLOAT_REG,
-                      a.fpuReg().isSimd128());
+      case SimdType::Uint32x4:
+        resultObject = js::CreateSimd<Uint32x4>(cx, (const Uint32x4::Elem*) raw);
+        break;
+      case SimdType::Float32x4:
         resultObject = js::CreateSimd<Float32x4>(cx, (const Float32x4::Elem*) raw);
         break;
-      case SimdTypeDescr::Float64x2:
+      case SimdType::Float64x2:
         MOZ_CRASH("NYI, RSimdBox of Float64x2");
         break;
-      case SimdTypeDescr::Int8x16:
+      case SimdType::Int8x16:
         MOZ_CRASH("NYI, RSimdBox of Int8x16");
         break;
-      case SimdTypeDescr::Int16x8:
+      case SimdType::Int16x8:
         MOZ_CRASH("NYI, RSimdBox of Int16x8");
         break;
+      case SimdType::Uint8x16:
+        MOZ_CRASH("NYI, RSimdBox of UInt8x16");
+        break;
+      case SimdType::Uint16x8:
+        MOZ_CRASH("NYI, RSimdBox of UInt16x8");
+        break;
+      case SimdType::Bool8x16:
+        MOZ_CRASH("NYI, RSimdBox of Bool8x16");
+        break;
+      case SimdType::Bool16x8:
+        MOZ_CRASH("NYI, RSimdBox of Bool16x8");
+        break;
+      case SimdType::Bool64x2:
+        MOZ_CRASH("NYI, RSimdBox of Bool64x2");
+        break;
+      case SimdType::Count:
+        MOZ_CRASH("RSimdBox of Count is unreachable");
     }
 
     if (!resultObject)

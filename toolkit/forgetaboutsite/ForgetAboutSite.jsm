@@ -21,17 +21,16 @@ this.EXPORTED_SYMBOLS = ["ForgetAboutSite"];
  * "mozilla.org", this will return true.  It would return false the other way
  * around.
  */
-function hasRootDomain(str, aDomain) {
+function hasRootDomain(str, aDomain)
+{
   let index = str.indexOf(aDomain);
   // If aDomain is not found, we know we do not have it as a root domain.
-  if (index == -1) {
+  if (index == -1)
     return false;
-  }
 
   // If the strings are the same, we obviously have a match.
-  if (str == aDomain) {
+  if (str == aDomain)
     return true;
-  }
 
   // Otherwise, we have aDomain as our root domain iff the index of aDomain is
   // aDomain.length subtracted from our length and (since we do not have an

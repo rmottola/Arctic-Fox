@@ -250,6 +250,16 @@ class LSimdExtractElementBase : public LInstructionHelper<1, 1, 0>
     }
 };
 
+// Extracts an element from a given SIMD bool32x4 lane.
+class LSimdExtractElementB : public LSimdExtractElementBase
+{
+  public:
+    LIR_HEADER(SimdExtractElementB);
+    explicit LSimdExtractElementB(const LAllocation& base)
+      : LSimdExtractElementBase(base)
+    {}
+};
+
 // Extracts an element from a given SIMD int32x4 lane.
 class LSimdExtractElementI : public LSimdExtractElementBase
 {
@@ -259,6 +269,7 @@ class LSimdExtractElementI : public LSimdExtractElementBase
       : LSimdExtractElementBase(base)
     {}
 };
+
 // Extracts an element from a given SIMD float32x4 lane.
 class LSimdExtractElementF : public LSimdExtractElementBase
 {
@@ -268,6 +279,24 @@ class LSimdExtractElementF : public LSimdExtractElementBase
       : LSimdExtractElementBase(base)
     {}
 };
+
+// Extracts an element from an Uint32x4 SIMD vector, converts to double.
+class LSimdExtractElementU2D : public LInstructionHelper<1, 1, 1>
+{
+  public:
+    LIR_HEADER(SimdExtractElementU2D);
+    explicit LSimdExtractElementU2D(const LAllocation& base, const LDefinition& temp) {
+        setOperand(0, base);
+        setTemp(0, temp);
+    }
+    SimdLane lane() const {
+        return mir_->toSimdExtractElement()->lane();
+    }
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+};
+
 
 class LSimdInsertElementBase : public LInstructionHelper<1, 2, 0>
 {
@@ -293,7 +322,8 @@ class LSimdInsertElementBase : public LInstructionHelper<1, 2, 0>
     }
 };
 
-// Replace an element from a given SIMD int32x4 lane with a given value.
+// Replace an element from a given SIMD integer or boolean lane with a given value.
+// The value inserted into a boolean lane should be 0 or -1.
 class LSimdInsertElementI : public LSimdInsertElementBase
 {
   public:
@@ -311,16 +341,6 @@ class LSimdInsertElementF : public LSimdInsertElementBase
     LSimdInsertElementF(const LAllocation& vec, const LAllocation& val)
       : LSimdInsertElementBase(vec, val)
     {}
-};
-
-class LSimdSignMaskX4 : public LInstructionHelper<1, 1, 0>
-{
-  public:
-    LIR_HEADER(SimdSignMaskX4);
-
-    explicit LSimdSignMaskX4(const LAllocation& input) {
-        setOperand(0, input);
-    }
 };
 
 // Base class for both int32x4 and float32x4 shuffle instructions.
@@ -606,6 +626,37 @@ class LSimdSelect : public LInstructionHelper<1, 3, 1>
     }
 };
 
+class LSimdAnyTrue : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(SimdAnyTrue)
+    explicit LSimdAnyTrue(const LAllocation& input) {
+        setOperand(0, input);
+    }
+    const LAllocation* vector() {
+        return getOperand(0);
+    }
+    MSimdAnyTrue* mir() const {
+        return mir_->toSimdAnyTrue();
+    }
+};
+
+class LSimdAllTrue : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(SimdAllTrue)
+    explicit LSimdAllTrue(const LAllocation& input) {
+        setOperand(0, input);
+    }
+    const LAllocation* vector() {
+        return getOperand(0);
+    }
+    MSimdAllTrue* mir() const {
+        return mir_->toSimdAllTrue();
+    }
+};
+
+
 // Constant 32-bit integer.
 class LInteger : public LInstructionHelper<1, 0, 0>
 {
@@ -693,7 +744,7 @@ class LFloat32 : public LInstructionHelper<1, 0, 0>
     }
 };
 
-// Constant SIMD int32x4
+// Constant SIMD int32x4. Also used for bool32x4.
 class LInt32x4 : public LInstructionHelper<1, 0, 0>
 {
   public:
@@ -703,7 +754,7 @@ class LInt32x4 : public LInstructionHelper<1, 0, 0>
     const SimdConstant& getValue() const { return mir_->toSimdConstant()->value(); }
 };
 
-// Constant SIMD float32x4
+// Constant SIMD float32x4.
 class LFloat32x4 : public LInstructionHelper<1, 0, 0>
 {
   public:
@@ -1155,26 +1206,14 @@ class LCheckOverRecursed : public LInstructionHelper<0, 0, 0>
 
 class LAsmJSInterruptCheck : public LInstructionHelper<0, 0, 0>
 {
-    Label* interruptExit_;
-    const wasm::CallSiteDesc& funcDesc_;
-
   public:
     LIR_HEADER(AsmJSInterruptCheck);
 
-    LAsmJSInterruptCheck(Label* interruptExit, const wasm::CallSiteDesc& funcDesc)
-      : interruptExit_(interruptExit), funcDesc_(funcDesc)
-    {
-    }
+    LAsmJSInterruptCheck()
+    { }
 
     bool isCall() const {
         return true;
-    }
-
-    Label* interruptExit() const {
-        return interruptExit_;
-    }
-    const wasm::CallSiteDesc& funcDesc() const {
-        return funcDesc_;
     }
 };
 
@@ -3773,6 +3812,29 @@ class LFloat32x4ToInt32x4 : public LInstructionHelper<1, 1, 1>
     }
 };
 
+// Float32x4 to Uint32x4 needs one GPR temp and one FloatReg temp.
+class LFloat32x4ToUint32x4 : public LInstructionHelper<1, 1, 2>
+{
+  public:
+    LIR_HEADER(Float32x4ToUint32x4);
+    explicit LFloat32x4ToUint32x4(const LAllocation& input, const LDefinition& tempR,
+                                  const LDefinition& tempF)
+    {
+        setOperand(0, input);
+        setTemp(0, tempR);
+        setTemp(1, tempF);
+    }
+    const LDefinition* tempR() {
+        return getTemp(0);
+    }
+    const LDefinition* tempF() {
+        return getTemp(1);
+    }
+    const MSimdConvert* mir() const {
+        return mir_->toSimdConvert();
+    }
+};
+
 // Double raised to a half power.
 class LPowHalfD : public LInstructionHelper<1, 1, 0>
 {
@@ -3907,15 +3969,18 @@ class LRegExp : public LCallInstructionHelper<1, 0, 0>
     }
 };
 
-class LRegExpExec : public LCallInstructionHelper<BOX_PIECES, 2, 0>
+class LRegExpMatcher : public LCallInstructionHelper<BOX_PIECES, 4, 0>
 {
   public:
-    LIR_HEADER(RegExpExec)
+    LIR_HEADER(RegExpMatcher)
 
-    LRegExpExec(const LAllocation& regexp, const LAllocation& string)
+    LRegExpMatcher(const LAllocation& regexp, const LAllocation& string,
+                   const LAllocation& lastIndex, const LAllocation& sticky)
     {
         setOperand(0, regexp);
         setOperand(1, string);
+        setOperand(2, lastIndex);
+        setOperand(3, sticky);
     }
 
     const LAllocation* regexp() {
@@ -3924,21 +3989,30 @@ class LRegExpExec : public LCallInstructionHelper<BOX_PIECES, 2, 0>
     const LAllocation* string() {
         return getOperand(1);
     }
+    const LAllocation* lastIndex() {
+        return getOperand(2);
+    }
+    const LAllocation* sticky() {
+        return getOperand(3);
+    }
 
-    const MRegExpExec* mir() const {
-        return mir_->toRegExpExec();
+    const MRegExpMatcher* mir() const {
+        return mir_->toRegExpMatcher();
     }
 };
 
-class LRegExpTest : public LCallInstructionHelper<1, 2, 0>
+class LRegExpTester : public LCallInstructionHelper<1, 4, 0>
 {
   public:
-    LIR_HEADER(RegExpTest)
+    LIR_HEADER(RegExpTester)
 
-    LRegExpTest(const LAllocation& regexp, const LAllocation& string)
+    LRegExpTester(const LAllocation& regexp, const LAllocation& string,
+                  const LAllocation& lastIndex, const LAllocation& sticky)
     {
         setOperand(0, regexp);
         setOperand(1, string);
+        setOperand(2, lastIndex);
+        setOperand(3, sticky);
     }
 
     const LAllocation* regexp() {
@@ -3947,9 +4021,15 @@ class LRegExpTest : public LCallInstructionHelper<1, 2, 0>
     const LAllocation* string() {
         return getOperand(1);
     }
+    const LAllocation* lastIndex() {
+        return getOperand(2);
+    }
+    const LAllocation* sticky() {
+        return getOperand(3);
+    }
 
-    const MRegExpTest* mir() const {
-        return mir_->toRegExpTest();
+    const MRegExpTester* mir() const {
+        return mir_->toRegExpTester();
     }
 };
 
@@ -6500,6 +6580,75 @@ class LPostWriteBarrierV : public LInstructionHelper<0, 1 + BOX_PIECES, 1>
     const LAllocation* object() {
         return getOperand(0);
     }
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+};
+
+// Generational write barrier used when writing an object to another object's
+// elements.
+class LPostWriteElementBarrierO : public LInstructionHelper<0, 3, 1>
+{
+  public:
+    LIR_HEADER(PostWriteElementBarrierO)
+
+    LPostWriteElementBarrierO(const LAllocation& obj, const LAllocation& value,
+                              const LAllocation& index, const LDefinition& temp) {
+        setOperand(0, obj);
+        setOperand(1, value);
+        setOperand(2, index);
+        setTemp(0, temp);
+    }
+
+    const MPostWriteElementBarrier* mir() const {
+        return mir_->toPostWriteElementBarrier();
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+
+    const LAllocation* value() {
+        return getOperand(1);
+    }
+
+    const LAllocation* index() {
+        return getOperand(2);
+    }
+
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+};
+
+// Generational write barrier used when writing a value to another object's
+// elements.
+class LPostWriteElementBarrierV : public LInstructionHelper<0, 2 + BOX_PIECES, 1>
+{
+  public:
+    LIR_HEADER(PostWriteElementBarrierV)
+
+    LPostWriteElementBarrierV(const LAllocation& obj, const LAllocation& index,
+                              const LDefinition& temp) {
+        setOperand(0, obj);
+        setOperand(1, index);
+        setTemp(0, temp);
+    }
+
+    static const size_t Input = 2;
+
+    const MPostWriteElementBarrier* mir() const {
+        return mir_->toPostWriteElementBarrier();
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+
+    const LAllocation* index() {
+        return getOperand(1);
+    }
+
     const LDefinition* temp() {
         return getTemp(0);
     }

@@ -15,7 +15,6 @@
 #include "mozilla/Move.h"
 #include "mozilla/RangedPtr.h"
 #include "mozilla/TypeTraits.h"
-#include "mozilla/UniquePtr.h"
 #include "mozilla/Variant.h"
 
 #include "jspubtd.h"
@@ -25,6 +24,7 @@
 #include "js/RootingAPI.h"
 #include "js/TracingAPI.h"
 #include "js/TypeDecls.h"
+#include "js/UniquePtr.h"
 #include "js/Value.h"
 #include "js/Vector.h"
 
@@ -174,16 +174,6 @@ class StackFrame;
 } // namespace ubi
 } // namespace JS
 
-namespace mozilla {
-
-template<>
-class DefaultDelete<JS::ubi::EdgeRange> : public JS::DeletePolicy<JS::ubi::EdgeRange> { };
-
-template<>
-class DefaultDelete<JS::ubi::StackFrame> : public JS::DeletePolicy<JS::ubi::StackFrame> { };
-
-} // namespace mozilla
-
 namespace JS {
 namespace ubi {
 
@@ -191,7 +181,6 @@ using mozilla::Forward;
 using mozilla::Maybe;
 using mozilla::Move;
 using mozilla::RangedPtr;
-using mozilla::UniquePtr;
 using mozilla::Variant;
 
 /*** ubi::StackFrame ******************************************************************************/
@@ -319,7 +308,7 @@ template<typename T> class ConcreteStackFrame;
 // valid within the scope of an AutoCheckCannotGC; if the graph being analyzed
 // is an offline heap snapshot, the JS::ubi::StackFrame is valid as long as the
 // offline heap snapshot is alive.
-class StackFrame : public JS::Traceable {
+class StackFrame {
     // Storage in which we allocate BaseStackFrame subclasses.
     mozilla::AlignedStorage2<BaseStackFrame> storage;
 
@@ -408,12 +397,6 @@ class StackFrame : public JS::Traceable {
     // Get the size of the respective strings. 0 is returned for null strings.
     size_t sourceLength();
     size_t functionDisplayNameLength();
-
-    // JS::Traceable implementation just forwards to our virtual trace method.
-    static void trace(StackFrame* frame, JSTracer* trc) {
-        if (frame)
-            frame->trace(trc);
-    }
 
     // Methods that forward to virtual calls through BaseStackFrame.
 
@@ -597,7 +580,7 @@ class Base {
     //
     // If wantNames is true, compute names for edges. Doing so can be expensive
     // in time and memory.
-    virtual UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const = 0;
+    virtual js::UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const = 0;
 
     // Return the Zone to which this node's referent belongs, or nullptr if the
     // referent is not of a type allocated in SpiderMonkey Zones.
@@ -633,8 +616,7 @@ class Base {
     // Otherwise, place nullptr in the out parameter. Caller maintains ownership
     // of the out parameter. True is returned on success, false is returned on
     // OOM.
-    virtual bool jsObjectConstructorName(JSContext* cx,
-                                         UniquePtr<char16_t[], JS::FreePolicy>& outName) const {
+    virtual bool jsObjectConstructorName(JSContext* cx, UniqueTwoByteChars& outName) const {
         outName.reset(nullptr);
         return true;
     }
@@ -780,8 +762,7 @@ class Node {
     JS::Zone* zone()                const { return base()->zone(); }
     JSCompartment* compartment()    const { return base()->compartment(); }
     const char* jsObjectClassName() const { return base()->jsObjectClassName(); }
-    bool jsObjectConstructorName(JSContext* cx,
-                                 UniquePtr<char16_t[], JS::FreePolicy>& outName) const {
+    bool jsObjectConstructorName(JSContext* cx, UniqueTwoByteChars& outName) const {
         return base()->jsObjectConstructorName(cx, outName);
     }
 
@@ -796,7 +777,7 @@ class Node {
         return size;
     }
 
-    UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames = true) const {
+    js::UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames = true) const {
         return base()->edges(rt, wantNames);
     }
 
@@ -827,10 +808,12 @@ class Node {
     };
 };
 
+using NodeSet = js::HashSet<Node, js::DefaultHasher<Node>, js::SystemAllocPolicy>;
+using NodeSetPtr = mozilla::UniquePtr<NodeSet, JS::DeletePolicy<NodeSet>>;
 
 /*** Edge and EdgeRange ***************************************************************************/
 
-using EdgeName = UniquePtr<const char16_t[], JS::FreePolicy>;
+using EdgeName = UniqueTwoByteChars;
 
 // An outgoing edge to a referent node.
 class Edge {
@@ -863,7 +846,8 @@ class Edge {
     // false as the wantNames parameter.
     //
     // The storage is owned by this Edge, and will be freed when this Edge is
-    // destructed.
+    // destructed. You may take ownership of the name by `mozilla::Move`ing it
+    // out of the edge; it is just a UniquePtr.
     //
     // (In real life we'll want a better representation for names, to avoid
     // creating tons of strings when the names follow a pattern; and we'll need
@@ -1002,7 +986,7 @@ class MOZ_STACK_CLASS RootList {
 
 template<>
 struct Concrete<RootList> : public Base {
-    UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
+    js::UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
     const char16_t* typeName() const override { return concreteTypeName; }
 
   protected:
@@ -1019,7 +1003,7 @@ struct Concrete<RootList> : public Base {
 template<typename Referent>
 class TracerConcrete : public Base {
     const char16_t* typeName() const override { return concreteTypeName; }
-    UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
+    js::UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
     JS::Zone* zone() const override;
 
   protected:
@@ -1077,8 +1061,7 @@ template<> struct Concrete<JSScript> : TracerConcreteWithCompartment<JSScript> {
 template<>
 class Concrete<JSObject> : public TracerConcreteWithCompartment<JSObject> {
     const char* jsObjectClassName() const override;
-    bool jsObjectConstructorName(JSContext* cx,
-                                 UniquePtr<char16_t[], JS::FreePolicy>& outName) const override;
+    bool jsObjectConstructorName(JSContext* cx, UniqueTwoByteChars& outName) const override;
     Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
 
     bool hasAllocationStack() const override;
@@ -1113,7 +1096,7 @@ template<>
 class Concrete<void> : public Base {
     const char16_t* typeName() const override;
     Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
-    UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
+    js::UniquePtr<EdgeRange> edges(JSRuntime* rt, bool wantNames) const override;
     JS::Zone* zone() const override;
     JSCompartment* compartment() const override;
     CoarseType coarseType() const final;

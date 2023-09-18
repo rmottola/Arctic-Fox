@@ -9,7 +9,6 @@
 
 #include "ActiveLayerTracker.h"
 #include "gfxPlatform.h"
-#include "nsRuleData.h"
 #include "nsCSSPropertySet.h"
 #include "nsCSSValue.h"
 #include "nsCycleCollectionParticipant.h"
@@ -20,6 +19,7 @@
 #include "FrameLayerBuilder.h"
 #include "nsDisplayList.h"
 #include "mozilla/AnimationUtils.h"
+#include "mozilla/EffectCompositor.h"
 #include "mozilla/EffectSet.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/KeyframeEffect.h"
@@ -118,42 +118,20 @@ CommonAnimationManager::GetAnimationCollection(dom::Element *aElement,
 AnimationCollection*
 CommonAnimationManager::GetAnimationCollection(const nsIFrame* aFrame)
 {
-  nsIContent* content = aFrame->GetContent();
-  if (!content) {
+  Maybe<Pair<dom::Element*, nsCSSPseudoElements::Type>> pseudoElement =
+    EffectCompositor::GetAnimationElementAndPseudoForFrame(aFrame);
+  if (!pseudoElement) {
     return nullptr;
   }
 
-  nsCSSPseudoElements::Type pseudoType =
-    nsCSSPseudoElements::ePseudo_NotPseudoElement;
-
-  if (aFrame->IsGeneratedContentFrame()) {
-    nsIFrame* parent = aFrame->GetParent();
-    if (parent->IsGeneratedContentFrame()) {
-      return nullptr;
-    }
-    nsIAtom* name = content->NodeInfo()->NameAtom();
-    if (name == nsGkAtoms::mozgeneratedcontentbefore) {
-      pseudoType = nsCSSPseudoElements::ePseudo_before;
-    } else if (name == nsGkAtoms::mozgeneratedcontentafter) {
-      pseudoType = nsCSSPseudoElements::ePseudo_after;
-    } else {
-      return nullptr;
-    }
-    content = content->GetParent();
-    if (!content) {
-      return nullptr;
-    }
-  } else {
-    if (!content->MayHaveAnimations()) {
-      return nullptr;
-    }
-  }
-
-  if (!content->IsElement()) {
+  if (pseudoElement->second() ==
+        nsCSSPseudoElements::ePseudo_NotPseudoElement &&
+      !pseudoElement->first()->MayHaveAnimations()) {
     return nullptr;
   }
 
-  return GetAnimationCollection(content->AsElement(), pseudoType,
+  return GetAnimationCollection(pseudoElement->first(),
+                                pseudoElement->second(),
                                 false /* aCreateIfNeeded */);
 }
 
@@ -194,9 +172,19 @@ CommonAnimationManager::RulesMatching(ElementRuleProcessorData* aData)
 {
   MOZ_ASSERT(aData->mPresContext == mPresContext,
              "pres context mismatch");
+
+  EffectCompositor::CascadeLevel cascadeLevel =
+    IsAnimationManager() ?
+    EffectCompositor::CascadeLevel::Animations :
+    EffectCompositor::CascadeLevel::Transitions;
+  nsCSSPseudoElements::Type pseudoType =
+    nsCSSPseudoElements::ePseudo_NotPseudoElement;
+
   nsIStyleRule *rule =
-    GetAnimationRule(aData->mElement,
-                     nsCSSPseudoElements::ePseudo_NotPseudoElement);
+    mPresContext->EffectCompositor()->GetAnimationRule(aData->mElement,
+                                                       pseudoType,
+                                                       cascadeLevel);
+
   if (rule) {
     aData->mRuleWalker->Forward(rule);
     aData->mRuleWalker->CurrentNode()->SetIsAnimationRule();
@@ -216,7 +204,15 @@ CommonAnimationManager::RulesMatching(PseudoElementRuleProcessorData* aData)
   // FIXME: Do we really want to be the only thing keeping a
   // pseudo-element alive?  I *think* the non-animation restyle should
   // handle that, but should add a test.
-  nsIStyleRule *rule = GetAnimationRule(aData->mElement, aData->mPseudoType);
+
+  EffectCompositor::CascadeLevel cascadeLevel =
+    IsAnimationManager() ?
+    EffectCompositor::CascadeLevel::Animations :
+    EffectCompositor::CascadeLevel::Transitions;
+  nsIStyleRule *rule =
+    mPresContext->EffectCompositor()->GetAnimationRule(aData->mElement,
+                                                       aData->mPseudoType,
+                                                       cascadeLevel);
   if (rule) {
     aData->mRuleWalker->Forward(rule);
     aData->mRuleWalker->CurrentNode()->SetIsAnimationRule();
@@ -254,24 +250,6 @@ CommonAnimationManager::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
   return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
 }
 
-void
-CommonAnimationManager::AddStyleUpdatesTo(RestyleTracker& aTracker)
-{
-  TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
-
-  for (AnimationCollection* collection = mElementCollections.getFirst();
-       collection; collection = collection->getNext()) {
-    collection->EnsureStyleRuleFor(now);
-
-    dom::Element* elementToRestyle = collection->GetElementToRestyle();
-    if (elementToRestyle) {
-      nsRestyleHint rshint = collection->IsForTransitions()
-        ? eRestyle_CSSTransitions : eRestyle_CSSAnimations;
-      aTracker.AddPendingRestyle(elementToRestyle, rshint, nsChangeHint(0));
-    }
-  }
-}
-
 /* static */ bool
 CommonAnimationManager::ExtractComputedValueForTransition(
                           nsCSSProperty aProperty,
@@ -291,139 +269,6 @@ CommonAnimationManager::ExtractComputedValueForTransition(
   return result;
 }
 
-void
-CommonAnimationManager::FlushAnimations()
-{
-  TimeStamp now = mPresContext->RefreshDriver()->MostRecentRefresh();
-  for (AnimationCollection* collection = mElementCollections.getFirst();
-       collection; collection = collection->getNext()) {
-    if (collection->mStyleRuleRefreshTime == now) {
-      continue;
-    }
-
-    MOZ_ASSERT(collection->mElement->GetComposedDoc() ==
-                 mPresContext->Document(),
-               "Should not have a transition/animation collection for an "
-               "element that is not part of the document tree");
-
-    collection->RequestRestyle(AnimationCollection::RestyleType::Standard);
-  }
-}
-
-nsIStyleRule*
-CommonAnimationManager::GetAnimationRule(mozilla::dom::Element* aElement,
-                                         nsCSSPseudoElements::Type aPseudoType)
-{
-  MOZ_ASSERT(
-    aPseudoType == nsCSSPseudoElements::ePseudo_NotPseudoElement ||
-    aPseudoType == nsCSSPseudoElements::ePseudo_before ||
-    aPseudoType == nsCSSPseudoElements::ePseudo_after,
-    "forbidden pseudo type");
-
-  if (!mPresContext->IsDynamic()) {
-    // For print or print preview, ignore animations.
-    return nullptr;
-  }
-
-  AnimationCollection* collection =
-    GetAnimationCollection(aElement, aPseudoType, false /* aCreateIfNeeded */);
-  if (!collection) {
-    return nullptr;
-  }
-
-  RestyleManager* restyleManager = mPresContext->RestyleManager();
-  if (restyleManager->SkipAnimationRules()) {
-    return nullptr;
-  }
-
-  collection->EnsureStyleRuleFor(
-    mPresContext->RefreshDriver()->MostRecentRefresh());
-
-  return collection->mStyleRule;
-}
-
-void
-CommonAnimationManager::ClearIsRunningOnCompositor(const nsIFrame* aFrame,
-                                                   nsCSSProperty aProperty)
-{
-  EffectSet* effects = EffectSet::GetEffectSet(aFrame);
-  if (!effects) {
-    return;
-  }
-
-  for (KeyframeEffectReadOnly* effect : *effects) {
-    effect->SetIsRunningOnCompositor(aProperty, false);
-  }
-}
-
-NS_IMPL_ISUPPORTS(AnimValuesStyleRule, nsIStyleRule)
-
-/* virtual */ void
-AnimValuesStyleRule::MapRuleInfoInto(nsRuleData* aRuleData)
-{
-  nsStyleContext *contextParent = aRuleData->mStyleContext->GetParent();
-  if (contextParent && contextParent->HasPseudoElementData()) {
-    // Don't apply transitions or animations to things inside of
-    // pseudo-elements.
-    // FIXME (Bug 522599): Add tests for this.
-
-    // Prevent structs from being cached on the rule node since we're inside
-    // a pseudo-element, as we could determine cacheability differently
-    // when walking the rule tree for a style context that is not inside
-    // a pseudo-element.  Note that nsRuleNode::GetStyle##name_ and GetStyleData
-    // will never look at cached structs when we're animating things inside
-    // a pseduo-element, so that we don't incorrectly return a struct that
-    // is only appropriate for non-pseudo-elements.
-    aRuleData->mConditions.SetUncacheable();
-    return;
-  }
-
-  for (uint32_t i = 0, i_end = mPropertyValuePairs.Length(); i < i_end; ++i) {
-    PropertyValuePair &cv = mPropertyValuePairs[i];
-    if (aRuleData->mSIDs & nsCachedStyleData::GetBitForSID(
-                             nsCSSProps::kSIDTable[cv.mProperty]))
-    {
-      nsCSSValue *prop = aRuleData->ValueFor(cv.mProperty);
-      if (prop->GetUnit() == eCSSUnit_Null) {
-#ifdef DEBUG
-        bool ok =
-#endif
-          StyleAnimationValue::UncomputeValue(cv.mProperty, cv.mValue, *prop);
-        MOZ_ASSERT(ok, "could not store computed value");
-      }
-    }
-  }
-}
-
-/* virtual */ bool
-AnimValuesStyleRule::MightMapInheritedStyleData()
-{
-  return mStyleBits & NS_STYLE_INHERITED_STRUCT_MASK;
-}
-
-#ifdef DEBUG
-/* virtual */ void
-AnimValuesStyleRule::List(FILE* out, int32_t aIndent) const
-{
-  nsAutoCString str;
-  for (int32_t index = aIndent; --index >= 0; ) {
-    str.AppendLiteral("  ");
-  }
-  str.AppendLiteral("[anim values] { ");
-  for (uint32_t i = 0, i_end = mPropertyValuePairs.Length(); i < i_end; ++i) {
-    const PropertyValuePair &pair = mPropertyValuePairs[i];
-    str.Append(nsCSSProps::GetStringValue(pair.mProperty));
-    str.AppendLiteral(": ");
-    nsAutoString value;
-    StyleAnimationValue::UncomputeValue(pair.mProperty, pair.mValue, value);
-    AppendUTF16toUTF8(value, str);
-    str.AppendLiteral("; ");
-  }
-  str.AppendLiteral("}\n");
-  fprintf_stderr(out, "%s", str.get());
-}
-#endif
-
 /*static*/ nsString
 AnimationCollection::PseudoTypeAsString(nsCSSPseudoElements::Type aPseudoType)
 {
@@ -437,32 +282,6 @@ AnimationCollection::PseudoTypeAsString(nsCSSPseudoElements::Type aPseudoType)
                  "Unexpected pseudo type");
       return EmptyString();
   }
-}
-
-mozilla::dom::Element*
-AnimationCollection::GetElementToRestyle() const
-{
-  if (IsForElement()) {
-    return mElement;
-  }
-
-  nsIFrame* primaryFrame = mElement->GetPrimaryFrame();
-  if (!primaryFrame) {
-    return nullptr;
-  }
-  nsIFrame* pseudoFrame;
-  if (IsForBeforePseudo()) {
-    pseudoFrame = nsLayoutUtils::GetBeforeFrame(primaryFrame);
-  } else if (IsForAfterPseudo()) {
-    pseudoFrame = nsLayoutUtils::GetAfterFrame(primaryFrame);
-  } else {
-    MOZ_ASSERT(false, "unknown mElementProperty");
-    return nullptr;
-  }
-  if (!pseudoFrame) {
-    return nullptr;
-  }
-  return pseudoFrame->GetContent()->AsElement();
 }
 
 /*static*/ void
@@ -492,94 +311,6 @@ AnimationCollection::Tick()
        animIdx != animEnd; animIdx++) {
     mAnimations[animIdx]->Tick();
   }
-}
-
-void
-AnimationCollection::EnsureStyleRuleFor(TimeStamp aRefreshTime)
-{
-  mHasPendingAnimationRestyle = false;
-
-  if (!mStyleChanging) {
-    mStyleRuleRefreshTime = aRefreshTime;
-    return;
-  }
-
-  if (!mStyleRuleRefreshTime.IsNull() &&
-      mStyleRuleRefreshTime == aRefreshTime) {
-    // mStyleRule may be null and valid, if we have no style to apply.
-    return;
-  }
-
-  if (mManager->IsAnimationManager()) {
-    // Update cascade results before updating the style rule, since the
-    // cascade results can influence the style rule.
-    static_cast<nsAnimationManager*>(mManager)->MaybeUpdateCascadeResults(this);
-  }
-
-  mStyleRuleRefreshTime = aRefreshTime;
-  mStyleRule = nullptr;
-  // We'll set mStyleChanging to true below if necessary.
-  mStyleChanging = false;
-
-  // If multiple animations specify behavior for the same property the
-  // animation which occurs last in the value of animation-name wins.
-  // As a result, we iterate from last animation to first and, if a
-  // property has already been set, we don't leave it.
-  nsCSSPropertySet properties;
-
-  for (size_t animIdx = mAnimations.Length(); animIdx-- != 0; ) {
-    mAnimations[animIdx]->ComposeStyle(mStyleRule, properties, mStyleChanging);
-  }
-}
-
-void
-AnimationCollection::RequestRestyle(RestyleType aRestyleType)
-{
-  MOZ_ASSERT(IsForElement() || IsForBeforePseudo() || IsForAfterPseudo(),
-             "Unexpected mElementProperty; might restyle too much");
-
-  nsPresContext* presContext = mManager->PresContext();
-  if (!presContext) {
-    // Pres context will be null after the manager is disconnected.
-    return;
-  }
-
-  // Steps for Restyle::Layer:
-
-  if (aRestyleType == RestyleType::Layer) {
-    mStyleRuleRefreshTime = TimeStamp();
-    mStyleChanging = true;
-
-    // Prompt layers to re-sync their animations.
-    presContext->ClearLastStyleUpdateForAllAnimations();
-    presContext->RestyleManager()->IncrementAnimationGeneration();
-    UpdateAnimationGeneration(presContext);
-  }
-
-  // Steps for RestyleType::Standard and above:
-
-  if (mHasPendingAnimationRestyle) {
-    return;
-  }
-
-  if (aRestyleType >= RestyleType::Standard) {
-    mHasPendingAnimationRestyle = true;
-    PostRestyleForAnimation(presContext);
-    return;
-  }
-
-  // Steps for RestyleType::Throttled:
-
-  MOZ_ASSERT(aRestyleType == RestyleType::Throttled,
-             "Should have already handled all non-throttled restyles");
-  presContext->Document()->SetNeedStyleFlush();
-}
-
-void
-AnimationCollection::UpdateAnimationGeneration(nsPresContext* aPresContext)
-{
-  mAnimationGeneration =
-    aPresContext->RestyleManager()->GetAnimationGeneration();
 }
 
 void

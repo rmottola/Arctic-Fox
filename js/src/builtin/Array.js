@@ -14,8 +14,8 @@ function ArrayIndexOf(searchElement/*, fromIndex*/) {
     if (len === 0)
         return -1;
 
-    /* Step 5. */
-    var n = arguments.length > 1 ? ToInteger(arguments[1]) : 0;
+    /* Step 5.  Add zero to convert -0 to +0, per ES6 5.2. */
+    var n = arguments.length > 1 ? ToInteger(arguments[1]) + 0 : 0;
 
     /* Step 6. */
     if (n >= len)
@@ -70,8 +70,8 @@ function ArrayLastIndexOf(searchElement/*, fromIndex*/) {
     if (len === 0)
         return -1;
 
-    /* Step 5. */
-    var n = arguments.length > 1 ? ToInteger(arguments[1]) : len - 1;
+    /* Step 5.  Add zero to convert -0 to +0, per ES6 5.2. */
+    var n = arguments.length > 1 ? ToInteger(arguments[1]) + 0 : len - 1;
 
     /* Steps 6-7. */
     var k;
@@ -193,6 +193,36 @@ function ArrayStaticSome(list, callbackfn/*, thisArg*/) {
         ThrowTypeError(JSMSG_NOT_FUNCTION, DecompileArg(1, callbackfn));
     var T = arguments.length > 2 ? arguments[2] : void 0;
     return callFunction(ArraySome, list, callbackfn, T);
+}
+
+/* ES6 draft 2016-1-15 22.1.3.25 Array.prototype.sort (comparefn) */
+function ArraySort(comparefn) {
+    /* Step 1. */
+    var O = ToObject(this);
+
+    /* Step 2. */
+    var len = TO_UINT32(O.length);
+
+    /* 22.1.3.25.1 Runtime Semantics: SortCompare( x, y ) */
+    var wrappedCompareFn = comparefn;
+    comparefn = function(x, y) {
+        /* Steps 1-3. */
+        if (x === undefined) {
+            if (y === undefined)
+                return 0;
+           return 1;
+        }
+        if (y === undefined)
+            return -1;
+
+        /* Step 4.a. */
+        var v = ToNumber(wrappedCompareFn(x, y));
+
+        /* Step 4.b-c. */
+        return v !== v ? 0 : v;
+    }
+
+    return MergeSort(O, len, comparefn);
 }
 
 /* ES5 15.4.4.18. */
@@ -690,15 +720,17 @@ function ArrayIteratorNext() {
         return callFunction(CallArrayIteratorMethodIfWrapped, this,
                             "ArrayIteratorNext");
     }
-
     var a = UnsafeGetObjectFromReservedSlot(this, ITERATOR_SLOT_TARGET);
     // The index might not be an integer, so we have to do a generic get here.
     var index = UnsafeGetReservedSlot(this, ITERATOR_SLOT_NEXT_INDEX);
     var itemKind = UnsafeGetInt32FromReservedSlot(this, ITERATOR_SLOT_ITEM_KIND);
     var result = { value: undefined, done: false };
+    var len = IsPossiblyWrappedTypedArray(a)
+              ? PossiblyWrappedTypedArrayLength(a)
+              : TO_UINT32(a.length);
 
     // FIXME: This should be ToLength, which clamps at 2**53.  Bug 924058.
-    if (index >= TO_UINT32(a.length)) {
+    if (index >= len) {
         // When the above is changed to ToLength, use +1/0 here instead
         // of MAX_UINT32.
         UnsafeSetReservedSlot(this, ITERATOR_SLOT_NEXT_INDEX, 0xffffffff);

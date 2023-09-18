@@ -90,7 +90,7 @@ nsMathMLmmultiscriptsFrame::TransmitAutomaticData()
 }
 
 /* virtual */ nsresult
-nsMathMLmmultiscriptsFrame::Place(nsRenderingContext& aRenderingContext,
+nsMathMLmmultiscriptsFrame::Place(DrawTarget*          aDrawTarget,
                                   bool                 aPlaceOrigin,
                                   nsHTMLReflowMetrics& aDesiredSize)
 {
@@ -135,7 +135,7 @@ nsMathMLmmultiscriptsFrame::Place(nsRenderingContext& aRenderingContext,
                         mStyleContext, fontSizeInflation);
     }
   }
-  return PlaceMultiScript(PresContext(), aRenderingContext, aPlaceOrigin,
+  return PlaceMultiScript(PresContext(), aDrawTarget, aPlaceOrigin,
                           aDesiredSize, this, subScriptShift, supScriptShift,
                           fontSizeInflation);
 }
@@ -143,8 +143,8 @@ nsMathMLmmultiscriptsFrame::Place(nsRenderingContext& aRenderingContext,
 // exported routine that both munderover and mmultiscripts share.
 // munderover uses this when movablelimits is set.
 nsresult
-nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
-                                        nsRenderingContext& aRenderingContext,
+nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*  aPresContext,
+                                        DrawTarget*          aDrawTarget,
                                         bool                 aPlaceOrigin,
                                         nsHTMLReflowMetrics& aDesiredSize,
                                         nsMathMLContainerFrame* aFrame,
@@ -173,14 +173,14 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
   // depend only on the current font
   ////////////////////////////////////////
 
-  nsIFrame* baseFrame = aFrame->GetFirstPrincipalChild();
+  nsIFrame* baseFrame = aFrame->PrincipalChildList().FirstChild();
 
   if (!baseFrame) {
     if (tag == nsGkAtoms::mmultiscripts_)
       aFrame->ReportErrorToConsole("NoBase");
     else
       aFrame->ReportChildCountError();
-    return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+    return aFrame->ReflowError(aDrawTarget, aDesiredSize);
   }
 
   // get x-height (an ex)
@@ -322,14 +322,14 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
   // Note that only msup starts with a superscript.
   bool isSubScript = (tag != nsGkAtoms::msup_);
 
-  nsIFrame* childFrame = aFrame->GetFirstPrincipalChild();
+  nsIFrame* childFrame = aFrame->PrincipalChildList().FirstChild();
   while (childFrame) {
     if (childFrame->GetContent()->IsMathMLElement(nsGkAtoms::mprescripts_)) {
       if (tag != nsGkAtoms::mmultiscripts_) {
         if (aPlaceOrigin) {
           aFrame->ReportInvalidChildError(nsGkAtoms::mprescripts_);
         }
-        return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+        return aFrame->ReflowError(aDrawTarget, aDesiredSize);
       }
       if (prescriptsFrame) {
         // duplicate <mprescripts/> found
@@ -337,13 +337,13 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
         if (aPlaceOrigin) {
           aFrame->ReportErrorToConsole("DuplicateMprescripts");
         }
-        return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+        return aFrame->ReflowError(aDrawTarget, aDesiredSize);
       }
       if (!isSubScript) {
         if (aPlaceOrigin) {
           aFrame->ReportErrorToConsole("SubSupMismatch");
         }
-        return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+        return aFrame->ReflowError(aDrawTarget, aDesiredSize);
       }
 
       prescriptsFrame = childFrame;
@@ -356,7 +356,7 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
           if (aPlaceOrigin) {
             aFrame->ReportErrorToConsole("NoBase");
           }
-          return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+          return aFrame->ReflowError(aDrawTarget, aDesiredSize);
         } else {
           //A different error message is triggered later for the other tags
           foundNoneTag = true;
@@ -488,7 +488,7 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
                                         oneDevPixel);
           } else {
             nscoord ruleSize;
-            GetRuleThickness(aRenderingContext, fm, ruleSize);
+            GetRuleThickness(aDrawTarget, fm, ruleSize);
             subSuperscriptGapMin = 4 * ruleSize;
           }
           nscoord gap =
@@ -550,7 +550,7 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*      aPresContext,
         aFrame->ReportErrorToConsole("SubSupMismatch");
       }
     }
-    return aFrame->ReflowError(aRenderingContext, aDesiredSize);
+    return aFrame->ReflowError(aDrawTarget, aDesiredSize);
   }
 
   // we left out the width of prescripts, so ...

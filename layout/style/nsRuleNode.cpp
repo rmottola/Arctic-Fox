@@ -1652,7 +1652,7 @@ nsRuleNode::ConvertChildrenToHash(int32_t aNumKids)
   for (nsRuleNode* curr = ChildrenList(); curr; curr = curr->mNextSibling) {
     // This will never fail because of the initial size we gave the table.
     auto entry =
-      static_cast<ChildrenHashEntry*>(hash->Add(curr->mRule, fallible));
+      static_cast<ChildrenHashEntry*>(hash->Add(curr->mRule));
     NS_ASSERTION(!entry->mRuleNode, "duplicate entries in list");
     entry->mRuleNode = curr;
   }
@@ -7689,9 +7689,11 @@ SetGridTrackBreadth(const nsCSSValue& aValue,
     MOZ_ASSERT(unit != eCSSUnit_Inherit && unit != eCSSUnit_Unset,
                "Unexpected value that would use dummyParentCoord");
     const nsStyleCoord dummyParentCoord;
-    SetCoord(aValue, aResult, dummyParentCoord,
-             SETCOORD_LPE | SETCOORD_STORE_CALC,
-             aStyleContext, aPresContext, aConditions);
+    DebugOnly<bool> stored =
+      SetCoord(aValue, aResult, dummyParentCoord,
+               SETCOORD_LPE | SETCOORD_STORE_CALC,
+               aStyleContext, aPresContext, aConditions);
+    MOZ_ASSERT(stored, "invalid <track-size> value");
   }
 }
 
@@ -7759,15 +7761,14 @@ SetGridAutoColumnsRows(const nsCSSValue& aValue,
 
 static void
 AppendGridLineNames(const nsCSSValue& aValue,
-                    nsStyleGridTemplate& aResult)
+                    nsTArray<nsString>& aNameList)
 {
   // Compute a <line-names> value
-  nsTArray<nsString>* nameList = aResult.mLineNameLists.AppendElement();
   // Null unit means empty list, nothing more to do.
   if (aValue.GetUnit() != eCSSUnit_Null) {
     const nsCSSValueList* item = aValue.GetListValue();
     do {
-      nsString* name = nameList->AppendElement();
+      nsString* name = aNameList.AppendElement();
       item->mValue.GetStringValue(*name);
       item = item->mNext;
     } while (item);
@@ -7793,6 +7794,10 @@ SetGridTrackList(const nsCSSValue& aValue,
     aResult.mLineNameLists = aParentValue.mLineNameLists;
     aResult.mMinTrackSizingFunctions = aParentValue.mMinTrackSizingFunctions;
     aResult.mMaxTrackSizingFunctions = aParentValue.mMaxTrackSizingFunctions;
+    aResult.mRepeatAutoLineNameListBefore = aParentValue.mRepeatAutoLineNameListBefore;
+    aResult.mRepeatAutoLineNameListAfter = aParentValue.mRepeatAutoLineNameListAfter;
+    aResult.mRepeatAutoIndex = aParentValue.mRepeatAutoIndex;
+    aResult.mIsAutoFill = aParentValue.mIsAutoFill;
     break;
 
   case eCSSUnit_Initial:
@@ -7802,20 +7807,42 @@ SetGridTrackList(const nsCSSValue& aValue,
     aResult.mLineNameLists.Clear();
     aResult.mMinTrackSizingFunctions.Clear();
     aResult.mMaxTrackSizingFunctions.Clear();
+    aResult.mRepeatAutoLineNameListBefore.Clear();
+    aResult.mRepeatAutoLineNameListAfter.Clear();
+    aResult.mRepeatAutoIndex = -1;
+    aResult.mIsAutoFill = false;
     break;
 
   default:
     aResult.mLineNameLists.Clear();
     aResult.mMinTrackSizingFunctions.Clear();
     aResult.mMaxTrackSizingFunctions.Clear();
+    aResult.mRepeatAutoLineNameListBefore.Clear();
+    aResult.mRepeatAutoLineNameListAfter.Clear();
+    aResult.mRepeatAutoIndex = -1;
+    aResult.mIsAutoFill = false;
     const nsCSSValueList* item = aValue.GetListValue();
     if (item->mValue.GetUnit() == eCSSUnit_Enumerated &&
         item->mValue.GetIntValue() == NS_STYLE_GRID_TEMPLATE_SUBGRID) {
       // subgrid <line-name-list>?
       aResult.mIsSubgrid = true;
       item = item->mNext;
-      while (item) {
-        AppendGridLineNames(item->mValue, aResult);
+      for (int32_t i = 0; item && i < nsStyleGridLine::kMaxLine; ++i) {
+        if (item->mValue.GetUnit() == eCSSUnit_Pair) {
+          // This is a 'auto-fill' <name-repeat> expression.
+          const nsCSSValuePair& pair = item->mValue.GetPairValue();
+          MOZ_ASSERT(aResult.mRepeatAutoIndex == -1,
+                     "can only have one <name-repeat> with auto-fill");
+          aResult.mRepeatAutoIndex = i;
+          aResult.mIsAutoFill = true;
+          MOZ_ASSERT(pair.mXValue.GetIntValue() == NS_STYLE_GRID_REPEAT_AUTO_FILL,
+                     "unexpected repeat() enum value for subgrid");
+          const nsCSSValueList* list = pair.mYValue.GetListValue();
+          AppendGridLineNames(list->mValue, aResult.mRepeatAutoLineNameListBefore);
+        } else {
+          AppendGridLineNames(item->mValue,
+                              *aResult.mLineNameLists.AppendElement());
+        }
         item = item->mNext;
       }
     } else {
@@ -7825,17 +7852,45 @@ SetGridTrackList(const nsCSSValue& aValue,
       // and alternating between that and <track-size>.
       aResult.mIsSubgrid = false;
       for (int32_t line = 1;  ; ++line) {
-        AppendGridLineNames(item->mValue, aResult);
+        AppendGridLineNames(item->mValue,
+                            *aResult.mLineNameLists.AppendElement());
         item = item->mNext;
 
         if (!item || line == nsStyleGridLine::kMaxLine) {
           break;
         }
 
-        nsStyleCoord& min = *aResult.mMinTrackSizingFunctions.AppendElement();
-        nsStyleCoord& max = *aResult.mMaxTrackSizingFunctions.AppendElement();
-        SetGridTrackSize(item->mValue, min, max,
-                         aStyleContext, aPresContext, aConditions);
+        if (item->mValue.GetUnit() == eCSSUnit_Pair) {
+          // This is a 'auto-fill' / 'auto-fit' <auto-repeat> expression.
+          const nsCSSValuePair& pair = item->mValue.GetPairValue();
+          MOZ_ASSERT(aResult.mRepeatAutoIndex == -1,
+                     "can only have one <auto-repeat>");
+          aResult.mRepeatAutoIndex = line - 1;
+          switch (pair.mXValue.GetIntValue()) {
+            case NS_STYLE_GRID_REPEAT_AUTO_FILL:
+              aResult.mIsAutoFill = true;
+              break;
+            case NS_STYLE_GRID_REPEAT_AUTO_FIT:
+              aResult.mIsAutoFill = false;
+              break;
+            default:
+              MOZ_ASSERT_UNREACHABLE("unexpected repeat() enum value");
+          }
+          const nsCSSValueList* list = pair.mYValue.GetListValue();
+          AppendGridLineNames(list->mValue, aResult.mRepeatAutoLineNameListBefore);
+          list = list->mNext;
+          nsStyleCoord& min = *aResult.mMinTrackSizingFunctions.AppendElement();
+          nsStyleCoord& max = *aResult.mMaxTrackSizingFunctions.AppendElement();
+          SetGridTrackSize(list->mValue, min, max,
+                           aStyleContext, aPresContext, aConditions);
+          list = list->mNext;
+          AppendGridLineNames(list->mValue, aResult.mRepeatAutoLineNameListAfter);
+        } else {
+          nsStyleCoord& min = *aResult.mMinTrackSizingFunctions.AppendElement();
+          nsStyleCoord& max = *aResult.mMaxTrackSizingFunctions.AppendElement();
+          SetGridTrackSize(item->mValue, min, max,
+                           aStyleContext, aPresContext, aConditions);
+        }
 
         item = item->mNext;
         MOZ_ASSERT(item, "Expected a eCSSUnit_List of odd length");
@@ -8042,25 +8097,14 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
               pos->mAlignContent, conditions,
               SETDSC_ENUMERATED | SETDSC_UNSET_INITIAL,
               parentPos->mAlignContent,
-              NS_STYLE_ALIGN_AUTO, 0, 0, 0, 0);
+              NS_STYLE_ALIGN_NORMAL, 0, 0, 0, 0);
 
   // align-items: enum, inherit, initial
-  const auto& alignItemsValue = *aRuleData->ValueForAlignItems();
-  if (MOZ_UNLIKELY(alignItemsValue.GetUnit() == eCSSUnit_Inherit)) {
-    if (MOZ_LIKELY(parentContext)) {
-      pos->mAlignItems =
-        parentPos->ComputedAlignItems(parentContext->StyleDisplay());
-    } else {
-      pos->mAlignItems = NS_STYLE_ALIGN_AUTO;
-    }
-    conditions.SetUncacheable();
-  } else {
-    SetDiscrete(alignItemsValue,
-                pos->mAlignItems, conditions,
-                SETDSC_ENUMERATED | SETDSC_UNSET_INITIAL,
-                parentPos->mAlignItems, // unused, we handle 'inherit' above
-                NS_STYLE_ALIGN_AUTO, 0, 0, 0, 0);
-  }
+  SetDiscrete(*aRuleData->ValueForAlignItems(),
+              pos->mAlignItems, conditions,
+              SETDSC_ENUMERATED | SETDSC_UNSET_INITIAL,
+              parentPos->mAlignItems,
+              NS_STYLE_ALIGN_NORMAL, 0, 0, 0, 0);
 
   // align-self: enum, inherit, initial
   const auto& alignSelfValue = *aRuleData->ValueForAlignSelf();
@@ -8070,11 +8114,9 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
       if (MOZ_LIKELY(grandparentContext)) {
         parentContext->AddStyleBit(NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE);
       }
-      pos->mAlignSelf =
-        parentPos->ComputedAlignSelf(parentContext->StyleDisplay(),
-                                     grandparentContext);
+      pos->mAlignSelf = parentPos->ComputedAlignSelf(grandparentContext);
     } else {
-      pos->mAlignSelf = NS_STYLE_ALIGN_START;
+      pos->mAlignSelf = NS_STYLE_ALIGN_NORMAL;
     }
     conditions.SetUncacheable();
   } else {
@@ -8086,32 +8128,20 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
   }
 
   // justify-content: enum, inherit, initial
-  const auto& justifyContentValue = *aRuleData->ValueForJustifyContent();
-  if (MOZ_UNLIKELY(justifyContentValue.GetUnit() == eCSSUnit_Inherit)) {
-    if (MOZ_LIKELY(parentContext)) {
-      pos->mJustifyContent =
-        parentPos->ComputedJustifyContent(parentContext->StyleDisplay());
-    } else {
-      pos->mJustifyContent = NS_STYLE_JUSTIFY_AUTO;
-    }
-    conditions.SetUncacheable();
-  } else {
-    SetDiscrete(justifyContentValue,
-                pos->mJustifyContent, conditions,
-                SETDSC_ENUMERATED | SETDSC_UNSET_INITIAL,
-                parentPos->mJustifyContent, // unused, we handle 'inherit' above
-                NS_STYLE_JUSTIFY_AUTO, 0, 0, 0, 0);
-  }
+  SetDiscrete(*aRuleData->ValueForJustifyContent(),
+              pos->mJustifyContent, conditions,
+              SETDSC_ENUMERATED | SETDSC_UNSET_INITIAL,
+              parentPos->mJustifyContent,
+              NS_STYLE_JUSTIFY_NORMAL, 0, 0, 0, 0);
 
   // justify-items: enum, inherit, initial
   const auto& justifyItemsValue = *aRuleData->ValueForJustifyItems();
   if (MOZ_UNLIKELY(justifyItemsValue.GetUnit() == eCSSUnit_Inherit)) {
     if (MOZ_LIKELY(parentContext)) {
       pos->mJustifyItems =
-        parentPos->ComputedJustifyItems(parentContext->StyleDisplay(),
-                                        parentContext);
+        parentPos->ComputedJustifyItems(parentContext->GetParent());
     } else {
-      pos->mJustifyItems = NS_STYLE_JUSTIFY_AUTO;
+      pos->mJustifyItems = NS_STYLE_JUSTIFY_NORMAL;
     }
     conditions.SetUncacheable();
   } else {
@@ -8130,11 +8160,9 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
       if (MOZ_LIKELY(grandparentContext)) {
         parentContext->AddStyleBit(NS_STYLE_CHILD_USES_GRANDANCESTOR_STYLE);
       }
-      pos->mJustifySelf =
-        parentPos->ComputedJustifySelf(parentContext->StyleDisplay(),
-                                       grandparentContext);
+      pos->mJustifySelf = parentPos->ComputedJustifySelf(grandparentContext);
     } else {
-      pos->mJustifySelf = NS_STYLE_JUSTIFY_START;
+      pos->mJustifySelf = NS_STYLE_JUSTIFY_NORMAL;
     }
     conditions.SetUncacheable();
   } else {

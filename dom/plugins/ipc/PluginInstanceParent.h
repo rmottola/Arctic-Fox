@@ -60,6 +60,8 @@ public:
 #endif // defined(XP_WIN)
 
 public:
+    typedef mozilla::gfx::DrawTarget DrawTarget;
+
     PluginInstanceParent(PluginModuleParent* parent,
                          NPP npp,
                          const nsCString& mimeType,
@@ -338,9 +340,8 @@ public:
 #endif
     nsresult SetBackgroundUnknown();
     nsresult BeginUpdateBackground(const nsIntRect& aRect,
-                                   gfxContext** aCtx);
-    nsresult EndUpdateBackground(gfxContext* aCtx,
-                                 const nsIntRect& aRect);
+                                   DrawTarget** aDrawTarget);
+    nsresult EndUpdateBackground(const nsIntRect& aRect);
     void DidComposite();
 
     bool IsUsingDirectDrawing();
@@ -351,6 +352,17 @@ public:
 
     static PluginInstanceParent* Cast(NPP instance,
                                       PluginAsyncSurrogate** aSurrogate = nullptr);
+
+    // for IME hook
+    virtual bool
+    RecvGetCompositionString(const uint32_t& aIndex,
+                             nsTArray<uint8_t>* aBuffer,
+                             int32_t* aLength) override;
+    virtual bool
+    RecvSetCandidateWindow(
+        const mozilla::widget::CandidateWindowPosition& aPosition) override;
+    virtual bool
+    RecvRequestCommitOrCancel(const bool& aCommitted) override;
 
 private:
     // Create an appropriate platform surface for a background of size
@@ -376,6 +388,9 @@ private:
 
     void SetCurrentImage(layers::Image* aImage);
 
+    // Update Telemetry with the current drawing model.
+    void RecordDrawingModel();
+
 private:
     PluginModuleParent* mParent;
     RefPtr<PluginAsyncSurrogate> mSurrogate;
@@ -386,6 +401,11 @@ private:
     bool mIsWhitelistedForShumway;
     NPWindowType mWindowType;
     int16_t mDrawingModel;
+
+    // Since plugins may request different drawing models to find a compatible
+    // one, we only record the drawing model after a SetWindow call and if the
+    // drawing model has changed.
+    int mLastRecordedDrawingModel;
 
     nsDataHashtable<nsPtrHashKey<NPObject>, PluginScriptableObjectParent*> mScriptableObjects;
 

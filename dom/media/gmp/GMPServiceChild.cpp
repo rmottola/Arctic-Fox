@@ -59,7 +59,7 @@ public:
   {
   }
 
-  virtual void Done(GMPServiceChild* aGMPServiceChild)
+  void Done(GMPServiceChild* aGMPServiceChild) override
   {
     if (!aGMPServiceChild) {
       mCallback->Done(nullptr);
@@ -147,7 +147,7 @@ public:
   {
   }
 
-  virtual void Done(GMPServiceChild* aGMPServiceChild)
+  void Done(GMPServiceChild* aGMPServiceChild) override
   {
     if (!aGMPServiceChild) {
       mCallback->Done(NS_ERROR_FAILURE, EmptyCString());
@@ -182,40 +182,6 @@ GeckoMediaPluginServiceChild::GetNodeId(const nsAString& aOrigin,
 {
   UniquePtr<GetServiceChildCallback> callback(
     new GetNodeIdDone(aOrigin, aTopLevelOrigin, aGMPName, aInPrivateBrowsing, Move(aCallback)));
-  GetServiceChild(Move(callback));
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-GeckoMediaPluginServiceChild::UpdateTrialCreateState(const nsAString& aKeySystem,
-                                                     uint32_t aState)
-{
-  if (NS_GetCurrentThread() != mGMPThread) {
-    mGMPThread->Dispatch(NS_NewRunnableMethodWithArgs<nsString, uint32_t>(
-      this, &GeckoMediaPluginServiceChild::UpdateTrialCreateState,
-      aKeySystem, aState), NS_DISPATCH_NORMAL);
-    return NS_OK;
-  }
-
-  class Callback : public GetServiceChildCallback
-  {
-  public:
-    Callback(const nsAString& aKeySystem, uint32_t aState)
-      : mKeySystem(aKeySystem)
-      , mState(aState)
-    { }
-
-    virtual void Done(GMPServiceChild* aService) override
-    {
-      aService->SendUpdateGMPTrialCreateState(mKeySystem, mState);
-    }
-
-  private:
-    nsString mKeySystem;
-    uint32_t mState;
-  };
-
-  UniquePtr<GetServiceChildCallback> callback(new Callback(aKeySystem, aState));
   GetServiceChild(Move(callback));
   return NS_OK;
 }

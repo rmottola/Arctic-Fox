@@ -384,10 +384,10 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
 
   // Collect new selected filenames
   nsTArray<RefPtr<File>> newFiles;
-  if (mode == static_cast<int16_t>(nsIFilePicker::modeOpenMultiple) ||
-      mode == static_cast<int16_t>(nsIFilePicker::modeGetFolder)) {
+  if (mode == static_cast<int16_t>(nsIFilePicker::modeOpenMultiple)) {
     nsCOMPtr<nsISimpleEnumerator> iter;
-    nsresult rv = mFilePicker->GetDomfiles(getter_AddRefs(iter));
+    nsresult rv =
+      mFilePicker->GetDomFileOrDirectoryEnumerator(getter_AddRefs(iter));
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!iter) {
@@ -407,9 +407,10 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
       }
     }
   } else {
-    MOZ_ASSERT(mode == static_cast<int16_t>(nsIFilePicker::modeOpen));
+    MOZ_ASSERT(mode == static_cast<int16_t>(nsIFilePicker::modeOpen) ||
+               mode == static_cast<int16_t>(nsIFilePicker::modeGetFolder));
     nsCOMPtr<nsISupports> tmp;
-    nsresult rv = mFilePicker->GetDomfile(getter_AddRefs(tmp));
+    nsresult rv = mFilePicker->GetDomFileOrDirectory(getter_AddRefs(tmp));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIDOMBlob> blob = do_QueryInterface(tmp);
@@ -936,6 +937,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLInputElement,
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFiles)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFileList)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesAndDirectoriesPromise)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
@@ -944,6 +946,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFiles)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFileList)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesAndDirectoriesPromise)
   if (tmp->IsSingleLineTextControl(false)) {
     tmp->mInputData.mState->Unlink();
   }
@@ -2517,6 +2520,9 @@ HTMLInputElement::UpdateFileList()
     }
   }
 
+  // Make sure we (lazily) create a new Promise for GetFilesAndDirectories:
+  mFilesAndDirectoriesPromise = nullptr;
+
   return NS_OK;
 }
 
@@ -2886,9 +2892,7 @@ HTMLInputElement::Focus(ErrorResult& aError)
   // tab to the next one.
   nsIFrame* frame = GetPrimaryFrame();
   if (frame) {
-    for (nsIFrame* childFrame = frame->GetFirstPrincipalChild();
-         childFrame;
-         childFrame = childFrame->GetNextSibling()) {
+    for (nsIFrame* childFrame : frame->PrincipalChildList()) {
       // See if the child is a button control.
       nsCOMPtr<nsIFormControl> formCtrl =
         do_QueryInterface(childFrame->GetContent());
@@ -4821,6 +4825,9 @@ HTMLInputElement::ChooseDirectory(ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
+  // Script can call this method directly, so even though we don't show the
+  // "Pick Folder..." button on platforms that don't have a directory picker
+  // we have to redirect to the file picker here.
   InitFilePicker(
 #if defined(ANDROID) || defined(MOZ_B2G)
                  // No native directory picker - redirect to plain file picker
@@ -4831,30 +4838,13 @@ HTMLInputElement::ChooseDirectory(ErrorResult& aRv)
                  );
 }
 
-static already_AddRefed<OSFileSystem>
-MakeOrReuseFileSystem(const nsAString& aNewLocalRootPath,
-                      OSFileSystem* aFS,
-                      nsPIDOMWindow* aWindow)
-{
-  MOZ_ASSERT(aWindow);
-
-  RefPtr<OSFileSystem> fs;
-  if (aFS) {
-    const nsAString& prevLocalRootPath = aFS->GetLocalRootPath();
-    if (aNewLocalRootPath == prevLocalRootPath) {
-      fs = aFS;
-    }
-  }
-  if (!fs) {
-    fs = new OSFileSystem(aNewLocalRootPath);
-    fs->Init(aWindow);
-  }
-  return fs.forget();
-}
-
 already_AddRefed<Promise>
 HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
 {
+  if (mFilesAndDirectoriesPromise) {
+    return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
+  }
+
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);
   if (!global) {
@@ -4875,8 +4865,6 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
     return p.forget();
   }
 
-  nsPIDOMWindow* window = OwnerDoc()->GetInnerWindow();
-  RefPtr<OSFileSystem> fs;
   for (uint32_t i = 0; i < filesAndDirs.Length(); ++i) {
     if (filesAndDirs[i]->IsDirectory()) {
 #if defined(ANDROID) || defined(MOZ_B2G)
@@ -4892,7 +4880,10 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
       }
       int32_t leafSeparatorIndex = path.RFind(FILE_PATH_SEPARATOR);
       nsDependentSubstring dirname = Substring(path, 0, leafSeparatorIndex);
-      fs = MakeOrReuseFileSystem(dirname, fs, window);
+
+      RefPtr<OSFileSystem> fs = new OSFileSystem(dirname);
+      fs->Init(OwnerDoc()->GetInnerWindow());
+
       nsAutoString dompath(NS_LITERAL_STRING(FILESYSTEM_DOM_PATH_SEPARATOR));
       dompath.Append(Substring(path, leafSeparatorIndex + 1));
       RefPtr<Directory> directory = new Directory(fs, dompath);
@@ -4908,6 +4899,11 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
   }
 
   p->MaybeResolve(filesAndDirsSeq);
+
+  // Cache the Promise so that repeat getFilesAndDirectories() calls return
+  // the same Promise and array of File and Directory objects until the user
+  // picks different files/directories:
+  mFilesAndDirectoriesPromise = p;
 
   return p.forget();
 }
@@ -5539,10 +5535,10 @@ HTMLInputElement::SubmitNamesValues(nsFormSubmission* aFormSubmission)
     }
 
     if (files.IsEmpty()) {
-      // If no file was selected, pretend we had an empty file with an
-      // empty filename.
-      aFormSubmission->AddNameFilePair(name, nullptr);
-
+      RefPtr<BlobImpl> blobImpl =
+        new BlobImplEmptyFile(NS_LITERAL_STRING("application/octet-stream"));
+      RefPtr<File> file = File::Create(OwnerDoc()->GetInnerWindow(), blobImpl);
+      aFormSubmission->AddNameFilePair(name, file);
     }
 
     return NS_OK;

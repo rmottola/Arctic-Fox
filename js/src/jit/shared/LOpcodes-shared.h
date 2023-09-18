@@ -22,12 +22,15 @@
     _(SimdSplatX4)                  \
     _(Int32x4)                      \
     _(Float32x4)                    \
+    _(SimdAllTrue)                  \
+    _(SimdAnyTrue)                  \
     _(SimdReinterpretCast)          \
     _(SimdExtractElementI)          \
+    _(SimdExtractElementU2D)        \
+    _(SimdExtractElementB)          \
     _(SimdExtractElementF)          \
     _(SimdInsertElementI)           \
     _(SimdInsertElementF)           \
-    _(SimdSignMaskX4)               \
     _(SimdGeneralShuffleI)          \
     _(SimdGeneralShuffleF)          \
     _(SimdSwizzleI)                 \
@@ -183,6 +186,7 @@
     _(ValueToObjectOrNull)          \
     _(Int32x4ToFloat32x4)           \
     _(Float32x4ToInt32x4)           \
+    _(Float32x4ToUint32x4)          \
     _(Start)                        \
     _(OsrEntry)                     \
     _(OsrValue)                     \
@@ -190,8 +194,8 @@
     _(OsrReturnValue)               \
     _(OsrArgumentsObject)           \
     _(RegExp)                       \
-    _(RegExpExec)                   \
-    _(RegExpTest)                   \
+    _(RegExpMatcher)                \
+    _(RegExpTester)                 \
     _(RegExpReplace)                \
     _(StringReplace)                \
     _(Substr)                       \
@@ -222,6 +226,8 @@
     _(MonitorTypes)                 \
     _(PostWriteBarrierO)            \
     _(PostWriteBarrierV)            \
+    _(PostWriteElementBarrierO)     \
+    _(PostWriteElementBarrierV)     \
     _(InitializedLength)            \
     _(SetInitializedLength)         \
     _(UnboxedArrayLength)           \

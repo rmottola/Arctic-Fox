@@ -128,7 +128,8 @@ function handleGUMRequest(aSubject, aTopic, aData) {
       // and allow the user to plug in a device, instead of immediately failing.
       denyGUMRequest({callID: aSubject.callID}, error);
     },
-    aSubject.innerWindowID);
+    aSubject.innerWindowID,
+    aSubject.callID);
 }
 
 function prompt(aContentWindow, aWindowID, aCallID, aConstraints, aDevices, aSecure) {
@@ -327,8 +328,11 @@ function getMessageManagerForWindow(aContentWindow) {
   try {
     // If e10s is disabled, this throws NS_NOINTERFACE for closed tabs.
     return ir.getInterface(Ci.nsIContentFrameMessageManager);
-  } catch(e if e.result == Cr.NS_NOINTERFACE) {
-    return null;
+  } catch(e) {
+    if (e.result == Cr.NS_NOINTERFACE) {
+      return null;
+    }
+    throw e;
   }
 }
 

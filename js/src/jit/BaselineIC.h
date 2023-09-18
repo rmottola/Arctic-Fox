@@ -19,7 +19,7 @@
 #include "jit/BaselineJIT.h"
 #include "jit/SharedIC.h"
 #include "jit/SharedICRegisters.h"
-#include "js/TraceableVector.h"
+#include "js/GCVector.h"
 #include "vm/ArrayObject.h"
 #include "vm/UnboxedObject.h"
 
@@ -3466,6 +3466,8 @@ IsCacheableDOMProxy(JSObject* obj)
     const BaseProxyHandler* handler = obj->as<ProxyObject>().handler();
     return handler->family() == GetDOMProxyHandlerFamily();
 }
+
+struct IonOsrTempData;
 
 } // namespace jit
 } // namespace js

@@ -215,9 +215,6 @@ public:
 
   virtual bool IsHidden() const final override;
 
-  // In order to create overlayImageContainer to support DOMHwMediaStream.
-  VideoFrameContainer* GetOverlayImageVideoFrameContainer();
-
   // Called by the media decoder and the video frame to get the
   // ImageContainer containing the video data.
   B2G_ACL_EXPORT virtual VideoFrameContainer* GetVideoFrameContainer() final override;
@@ -1196,11 +1193,6 @@ protected:
   // Current audio volume
   double mVolume;
 
-  // Helper function to iterate over a hash table
-  // and convert it to a JSObject.
-  static PLDHashOperator BuildObjectFromTags(nsCStringHashKey::KeyType aKey,
-                                             nsCString aValue,
-                                             void* aUserArg);
   nsAutoPtr<const MetadataTags> mTags;
 
   // URI of the resource we're attempting to load. This stores the value we

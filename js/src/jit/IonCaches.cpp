@@ -24,6 +24,7 @@
 #include "jit/VMFunctions.h"
 #include "js/Proxy.h"
 #include "vm/Shape.h"
+#include "vm/Stack.h"
 
 #include "jit/JitFrames-inl.h"
 #include "jit/MacroAssembler-inl.h"
@@ -171,7 +172,7 @@ class IonCache::StubAttacher
     // value would be replaced by the attachStub function after the allocation
     // of the JitCode. The self-reference is used to keep the stub path alive
     // even if the IonScript is invalidated or if the IC is flushed.
-    static const ImmPtr STUB_ADDR;
+    static const void* const STUB_ADDR;
 
     template <class T1, class T2>
     void branchNextStub(MacroAssembler& masm, Assembler::Condition cond, T1 op1, T2 op2) {
@@ -218,7 +219,7 @@ class IonCache::StubAttacher
         // WARNING: stubs are flushed on GC.
         // WARNING:
         MOZ_ASSERT(!hasStubCodePatchOffset_);
-        stubCodePatchOffset_ = masm.PushWithPatch(STUB_ADDR);
+        stubCodePatchOffset_ = masm.PushWithPatch(ImmPtr(STUB_ADDR));
         hasStubCodePatchOffset_ = true;
     }
 
@@ -231,7 +232,7 @@ class IonCache::StubAttacher
     void patchStubCodePointer(JitCode* code) {
         if (hasStubCodePatchOffset_) {
             Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, stubCodePatchOffset_),
-                                               ImmPtr(code), STUB_ADDR);
+                                               ImmPtr(code), ImmPtr(STUB_ADDR));
         }
     }
 
@@ -251,7 +252,7 @@ class IonCache::StubAttacher
     }
 };
 
-const ImmPtr IonCache::StubAttacher::STUB_ADDR = ImmPtr((void*)0xdeadc0de);
+const void* const IonCache::StubAttacher::STUB_ADDR = (void*)0xdeadc0de;
 
 void
 IonCache::emitInitialJump(MacroAssembler& masm, RepatchLabel& entry)
@@ -740,15 +741,16 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
 
 static void
 GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
-                 IonCache::StubAttacher& attacher, JSObject* obj, JSObject* holder,
-                 Shape* shape, Register object, TypedOrValueRegister output,
-                 Label* failures = nullptr)
+                 IonCache::StubAttacher& attacher, MaybeCheckLexical checkLexical,
+                 JSObject* obj, JSObject* holder, Shape* shape, Register object,
+                 TypedOrValueRegister output, Label* failures = nullptr)
 {
     // If there's a single jump to |failures|, we can patch the shape guard
     // jump directly. Otherwise, jump to the end of the stub, so there's a
     // common point to patch.
     bool multipleFailureJumps = (obj != holder)
                              || obj->is<UnboxedPlainObject>()
+                             || (checkLexical && output.hasValue())
                              || (failures != nullptr && failures->used());
 
     // If we have multiple failure jumps but didn't get a label from the
@@ -835,10 +837,13 @@ GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     }
 
     // Slot access.
-    if (holder)
+    if (holder) {
         EmitLoadSlot(masm, &holder->as<NativeObject>(), shape, holderReg, output, scratchReg);
-    else
+        if (checkLexical && output.hasValue())
+            masm.branchTestMagic(Assembler::Equal, output.valueReg(), failures);
+    } else {
         masm.moveValue(UndefinedValue(), output.valueReg());
+    }
 
     // Restore scratch on success.
     if (restoreScratch)
@@ -852,7 +857,6 @@ GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     masm.bind(failures);
 
     attacher.jumpNextStub(masm);
-
 }
 
 static void
@@ -1019,7 +1023,8 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
         uint32_t framePushedBefore = masm.framePushed();
 
         // Construct IonAccessorICFrameLayout.
-        uint32_t descriptor = MakeFrameDescriptor(masm.framePushed(), JitFrame_IonJS);
+        uint32_t descriptor = MakeFrameDescriptor(masm.framePushed(), JitFrame_IonJS,
+                                                  IonAccessorICFrameLayout::Size());
         attacher.pushStubCodePointer(masm);
         masm.Push(Imm32(descriptor));
         masm.Push(ImmPtr(returnAddr));
@@ -1039,7 +1044,8 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
 
         masm.movePtr(ImmGCPtr(target), scratchReg);
 
-        descriptor = MakeFrameDescriptor(argSize + padding, JitFrame_IonAccessorIC);
+        descriptor = MakeFrameDescriptor(argSize + padding, JitFrame_IonAccessorIC,
+                                         JitFrameLayout::Size());
         masm.Push(Imm32(0)); // argc
         masm.Push(scratchReg);
         masm.Push(Imm32(descriptor));
@@ -1486,7 +1492,7 @@ GetPropertyIC::tryAttachNative(JSContext* cx, HandleScript outerScript, IonScrip
 
     switch (type) {
       case CanAttachReadSlot:
-        GenerateReadSlot(cx, ion, masm, attacher, obj, holder,
+        GenerateReadSlot(cx, ion, masm, attacher, DontCheckLexical, obj, holder,
                          shape, object(), output(), maybeFailures);
         attachKind = idempotent() ? "idempotent reading"
                                     : "non idempotent reading";
@@ -1569,7 +1575,7 @@ GetPropertyIC::tryAttachUnboxedExpando(JSContext* cx, HandleScript outerScript, 
     Label* maybeFailures = failures.used() ? &failures : nullptr;
 
     StubAttacher attacher(*this);
-    GenerateReadSlot(cx, ion, masm, attacher, obj, obj,
+    GenerateReadSlot(cx, ion, masm, attacher, DontCheckLexical, obj, obj,
                      shape, object(), output(), maybeFailures);
     return linkAndAttachStub(cx, masm, attacher, ion, "read unboxed expando",
                              JS::TrackedOutcome::ICGetPropStub_UnboxedReadExpando);
@@ -1616,7 +1622,7 @@ GetPropertyIC::tryAttachTypedArrayLength(JSContext* cx, HandleScript outerScript
     MOZ_ASSERT(canAttachStub());
     MOZ_ASSERT(!*emitted);
 
-    if (!IsAnyTypedArray(obj))
+    if (!obj->is<TypedArrayObject>())
         return true;
 
     if (!JSID_IS_ATOM(id, cx->names().length))
@@ -2249,10 +2255,10 @@ GetPropertyIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex
         outerScript->setInvalidatedIdempotentCache();
 
         // Do not re-invalidate if the lookup already caused invalidation.
-        if (!outerScript->hasIonScript())
-            return true;
+        if (outerScript->hasIonScript())
+            Invalidate(cx, outerScript);
 
-        return Invalidate(cx, outerScript);
+        return true;
     }
 
     jsbytecode* pc = cache.idempotent() ? nullptr : cache.pc();
@@ -2852,7 +2858,8 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
         uint32_t framePushedBefore = masm.framePushed();
 
         // Construct IonAccessorICFrameLayout.
-        uint32_t descriptor = MakeFrameDescriptor(masm.framePushed(), JitFrame_IonJS);
+        uint32_t descriptor = MakeFrameDescriptor(masm.framePushed(), JitFrame_IonJS,
+                                                  IonAccessorICFrameLayout::Size());
         attacher.pushStubCodePointer(masm);
         masm.Push(Imm32(descriptor));
         masm.Push(ImmPtr(returnAddr));
@@ -2874,7 +2881,8 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 
         masm.movePtr(ImmGCPtr(target), tempReg);
 
-        descriptor = MakeFrameDescriptor(argSize + padding, JitFrame_IonAccessorIC);
+        descriptor = MakeFrameDescriptor(argSize + padding, JitFrame_IonAccessorIC,
+                                         JitFrameLayout::Size());
         masm.Push(Imm32(1)); // argc
         masm.Push(tempReg);
         masm.Push(Imm32(descriptor));
@@ -3068,7 +3076,7 @@ GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         masm.passABIArg(object);
         masm.move32(Imm32(newNumDynamicSlots), temp2);
         masm.passABIArg(temp2);
-        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, NativeObject::growSlotsStatic));
+        masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, NativeObject::growSlotsDontReportOOM));
 
         // Branch on ReturnReg before restoring volatile registers, so
         // ReturnReg isn't clobbered.
@@ -3826,6 +3834,7 @@ GetPropertyIC::tryAttachDenseElement(JSContext* cx, HandleScript outerScript, Io
 /* static */ bool
 GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, TypedOrValueRegister output)
 {
+
     if (!idval.isInt32() || idval.toInt32() < 0)
         return false;
 
@@ -3838,7 +3847,7 @@ GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, Typed
     if (obj->as<NativeObject>().getDenseInitializedLength() == 0)
         return false;
 
-    while (obj) {
+    do {
         if (obj->isIndexed())
             return false;
 
@@ -3857,7 +3866,7 @@ GetPropertyIC::canAttachDenseElementHole(JSObject* obj, HandleValue idval, Typed
             return false;
 
         obj = proto;
-    }
+    } while (obj);
 
     return true;
 }
@@ -3889,8 +3898,11 @@ GenerateDenseElementHole(JSContext* cx, MacroAssembler& masm, IonCache::StubAtta
         MOZ_ASSERT(pobj->as<NativeObject>().lastProperty());
 
         masm.movePtr(ImmGCPtr(pobj), scratchReg);
-        if (pobj->hasUncacheableProto()) {
-            MOZ_ASSERT(!pobj->isSingleton());
+
+        // Non-singletons with uncacheable protos can change their proto
+        // without a shape change, so also guard on the group (which determines
+        // the proto) in this case.
+        if (pobj->hasUncacheableProto() && !pobj->isSingleton()) {
             Address groupAddr(scratchReg, JSObject::offsetOfGroup());
             masm.branchPtr(Assembler::NotEqual, groupAddr, ImmGCPtr(pobj->group()), &failures);
         }
@@ -3987,7 +3999,7 @@ GetPropertyIC::tryAttachDenseElementHole(JSContext* cx, HandleScript outerScript
 GetPropertyIC::canAttachTypedOrUnboxedArrayElement(JSObject* obj, const Value& idval,
                                                    TypedOrValueRegister output)
 {
-    if (!IsAnyTypedArray(obj) && !obj->is<UnboxedArrayObject>())
+    if (!obj->is<TypedArrayObject>() && !obj->is<UnboxedArrayObject>())
         return false;
 
     MOZ_ASSERT(idval.isInt32() || idval.isString());
@@ -4005,13 +4017,13 @@ GetPropertyIC::canAttachTypedOrUnboxedArrayElement(JSObject* obj, const Value& i
             return false;
     }
 
-    if (IsAnyTypedArray(obj)) {
-        if (index >= AnyTypedArrayLength(obj))
+    if (obj->is<TypedArrayObject>()) {
+        if (index >= obj->as<TypedArrayObject>().length())
             return false;
 
         // The output register is not yet specialized as a float register, the only
         // way to accept float typed arrays for now is to return a Value type.
-        uint32_t arrayType = AnyTypedArrayType(obj);
+        uint32_t arrayType = obj->as<TypedArrayObject>().type();
         if (arrayType == Scalar::Float32 || arrayType == Scalar::Float64)
             return output.hasValue();
 
@@ -4101,7 +4113,7 @@ GenerateGetTypedOrUnboxedArrayElement(JSContext* cx, MacroAssembler& masm,
 
     Label popObjectAndFail;
 
-    if (IsAnyTypedArray(array)) {
+    if (array->is<TypedArrayObject>()) {
         // Guard on the initialized length.
         Address length(object, TypedArrayObject::lengthOffset());
         masm.branch32(Assembler::BelowOrEqual, length, indexReg, &failures);
@@ -4115,7 +4127,7 @@ GenerateGetTypedOrUnboxedArrayElement(JSContext* cx, MacroAssembler& masm,
 
         // Load the value. We use an invalid register because the destination
         // register is necessary a non double register.
-        Scalar::Type arrayType = AnyTypedArrayType(array);
+        Scalar::Type arrayType = array->as<TypedArrayObject>().type();
         int width = Scalar::byteSize(arrayType);
         BaseIndex source(elementReg, indexReg, ScaleFromElemWidth(width));
         if (output.hasValue()) {
@@ -4330,7 +4342,7 @@ static bool
 IsTypedArrayElementSetInlineable(JSObject* obj, const Value& idval, const Value& value)
 {
     // Don't bother attaching stubs for assigning strings, objects or symbols.
-    return IsAnyTypedArray(obj) && idval.isInt32() &&
+    return obj->is<TypedArrayObject>() && idval.isInt32() &&
            !value.isString() && !value.isObject() && !value.isSymbol();
 }
 
@@ -4534,7 +4546,7 @@ GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
     Label failures, done, popObjectAndFail;
 
     // Guard on the shape.
-    Shape* shape = AnyTypedArrayShape(tarr);
+    Shape* shape = tarr->as<TypedArrayObject>().lastProperty();
     if (!shape)
         return false;
     masm.branchTestObjShape(Assembler::NotEqual, object, shape, &failures);
@@ -4561,7 +4573,7 @@ GenerateSetTypedArrayElement(JSContext* cx, MacroAssembler& masm, IonCache::Stub
     masm.loadPtr(Address(object, TypedArrayObject::dataOffset()), elements);
 
     // Set the value.
-    Scalar::Type arrayType = AnyTypedArrayType(tarr);
+    Scalar::Type arrayType = tarr->as<TypedArrayObject>().type();
     int width = Scalar::byteSize(arrayType);
     BaseIndex target(elements, indexReg, ScaleFromElemWidth(width));
 
@@ -4824,7 +4836,9 @@ NameIC::attachReadSlot(JSContext* cx, HandleScript outerScript, IonScript* ion,
 
     // GenerateScopeChain leaves the last scope chain in scratchReg, even though it
     // doesn't generate the extra guard.
-    GenerateReadSlot(cx, ion, masm, attacher, holderBase, holder, shape, scratchReg,
+    //
+    // NAME ops must do their own TDZ checks.
+    GenerateReadSlot(cx, ion, masm, attacher, CheckLexical, holderBase, holder, shape, scratchReg,
                      outputReg(), failures.used() ? &failures : nullptr);
 
     return linkAndAttachStub(cx, masm, attacher, ion, "generic",

@@ -891,7 +891,9 @@ nsSliderFrame::SetInitialChildList(ChildListID     aListID,
                                    nsFrameList&    aChildList)
 {
   nsBoxFrame::SetInitialChildList(aListID, aChildList);
-  AddListener();
+  if (aListID == kPrincipalList) {
+    AddListener();
+  }
 }
 
 nsresult
@@ -945,7 +947,7 @@ nsSliderFrame::StartAPZDrag()
                                IsHorizontal() ? AsyncDragMetrics::HORIZONTAL :
                                                 AsyncDragMetrics::VERTICAL);
 
-  if (!nsLayoutUtils::GetDisplayPort(scrollableContent)) {
+  if (!nsLayoutUtils::HasDisplayPort(scrollableContent)) {
     return false;
   }
 

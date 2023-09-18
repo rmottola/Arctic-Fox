@@ -65,6 +65,7 @@ class nsDeviceContext;
 class gfxMissingFontRecorder;
 
 namespace mozilla {
+class EffectCompositor;
 class EventStateManager;
 class RestyleManager;
 class CounterStyleManager;
@@ -227,6 +228,7 @@ public:
   nsCSSFrameConstructor* FrameConstructor()
     { return PresShell()->FrameConstructor(); }
 
+  mozilla::EffectCompositor* EffectCompositor() { return mEffectCompositor; }
   nsTransitionManager* TransitionManager() { return mTransitionManager; }
   nsAnimationManager* AnimationManager() { return mAnimationManager; }
 
@@ -403,18 +405,18 @@ public:
   /**
    * Get the default colors
    */
-  const nscolor DefaultColor() const { return mDefaultColor; }
-  const nscolor DefaultBackgroundColor() const { return mBackgroundColor; }
-  const nscolor DefaultLinkColor() const { return mLinkColor; }
-  const nscolor DefaultActiveLinkColor() const { return mActiveLinkColor; }
-  const nscolor DefaultVisitedLinkColor() const { return mVisitedLinkColor; }
-  const nscolor FocusBackgroundColor() const { return mFocusBackgroundColor; }
-  const nscolor FocusTextColor() const { return mFocusTextColor; }
+  nscolor DefaultColor() const { return mDefaultColor; }
+  nscolor DefaultBackgroundColor() const { return mBackgroundColor; }
+  nscolor DefaultLinkColor() const { return mLinkColor; }
+  nscolor DefaultActiveLinkColor() const { return mActiveLinkColor; }
+  nscolor DefaultVisitedLinkColor() const { return mVisitedLinkColor; }
+  nscolor FocusBackgroundColor() const { return mFocusBackgroundColor; }
+  nscolor FocusTextColor() const { return mFocusTextColor; }
 
   /**
    * Body text color, for use in quirks mode only.
    */
-  const nscolor BodyTextColor() const { return mBodyTextColor; }
+  nscolor BodyTextColor() const { return mBodyTextColor; }
   void SetBodyTextColor(nscolor aColor) { mBodyTextColor = aColor; }
 
   bool GetUseFocusColors() const { return mUseFocusColors; }
@@ -704,13 +706,6 @@ public:
   {
     mDrawColorBackground = aCanDraw;
   }
-
-  /**
-   * Getter and setters for OMTA time counters
-   */
-  bool StyleUpdateForAllAnimationsIsUpToDate() const;
-  void TickLastStyleUpdateForAllAnimations();
-  void ClearLastStyleUpdateForAllAnimations();
 
   /**
    *  Check if bidi enabled (set depending on the presence of RTL
@@ -1221,6 +1216,7 @@ protected:
                                             // from gfx back to layout.
   RefPtr<mozilla::EventStateManager> mEventManager;
   RefPtr<nsRefreshDriver> mRefreshDriver;
+  RefPtr<mozilla::EffectCompositor> mEffectCompositor;
   RefPtr<nsTransitionManager> mTransitionManager;
   RefPtr<nsAnimationManager> mAnimationManager;
   RefPtr<mozilla::RestyleManager> mRestyleManager;

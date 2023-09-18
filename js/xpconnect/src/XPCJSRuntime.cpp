@@ -45,6 +45,8 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ProcessHangMonitor.h"
+#include "mozilla/UniquePtrExtensions.h"
+#include "mozilla/unused.h"
 #include "AccessCheck.h"
 #include "nsGlobalWindow.h"
 #include "nsAboutProtocolUtils.h"
@@ -195,6 +197,7 @@ CompartmentPrivate::CompartmentPrivate(JSCompartment* c)
     , skipWriteToGlobalPrototype(false)
     , isWebExtensionContentScript(false)
     , waiveInterposition(false)
+    , allowCPOWs(false)
     , universalXPConnectEnabled(false)
     , forcePermissiveCOWs(false)
     , scriptability(c)
@@ -926,7 +929,6 @@ XPCJSRuntime::WeakPointerZoneGroupCallback(JSRuntime* rt, void* data)
     // about to be finalized and update any pointers to moved GC things.
     XPCJSRuntime* self = static_cast<XPCJSRuntime*>(data);
 
-    MOZ_ASSERT(self->WrappedJSToReleaseArray().IsEmpty());
     self->mWrappedJSMap->UpdateWeakPointersAfterGC(self);
 
     XPCWrappedNativeScope::UpdateWeakPointersAfterGC(self);
@@ -1564,6 +1566,12 @@ ReloadPrefsCallback(const char* pref, void* data)
 
     bool useAsyncStack = Preferences::GetBool(JS_OPTIONS_DOT_STR "asyncstack");
 
+    bool throwOnDebuggeeWouldRun = Preferences::GetBool(JS_OPTIONS_DOT_STR
+                                                        "throw_on_debuggee_would_run");
+
+    bool dumpStackOnDebuggeeWouldRun = Preferences::GetBool(JS_OPTIONS_DOT_STR
+                                                            "dump_stack_on_debuggee_would_run");
+
     bool werror = Preferences::GetBool(JS_OPTIONS_DOT_STR "werror");
 
     bool extraWarnings = Preferences::GetBool(JS_OPTIONS_DOT_STR "strict");
@@ -1577,6 +1585,8 @@ ReloadPrefsCallback(const char* pref, void* data)
                              .setThrowOnAsmJSValidationFailure(throwOnAsmJSValidationFailure)
                              .setNativeRegExp(useNativeRegExp)
                              .setAsyncStack(useAsyncStack)
+                             .setThrowOnDebuggeeWouldRun(throwOnDebuggeeWouldRun)
+                             .setDumpStackOnDebuggeeWouldRun(dumpStackOnDebuggeeWouldRun)
                              .setWerror(werror)
                              .setExtraWarnings(extraWarnings);
 
@@ -2460,11 +2470,6 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         KIND_HEAP, rtStats.runtime.contexts,
         "JSContext objects and structures that belong to them.");
 
-    RREPORT_BYTES(rtPath + NS_LITERAL_CSTRING("runtime/dtoa"),
-        KIND_HEAP, rtStats.runtime.dtoa,
-        "The DtoaState object, which is used for converting strings to "
-        "numbers and vice versa.");
-
     RREPORT_BYTES(rtPath + NS_LITERAL_CSTRING("runtime/temporary"),
         KIND_HEAP, rtStats.runtime.temporary,
         "Transient data (mostly parse nodes) held by the JSRuntime during "
@@ -2659,7 +2664,7 @@ class JSMainRuntimeCompartmentsReporter final : public nsIMemoryReporter
                     ? NS_LITERAL_CSTRING("js-main-runtime-compartments/system/")
                     : NS_LITERAL_CSTRING("js-main-runtime-compartments/user/"),
                     0);
-        data->paths.append(path);
+        mozilla::Unused << data->paths.append(path);
     }
 
     NS_IMETHOD CollectReports(nsIMemoryReporterCallback* cb,
@@ -3253,11 +3258,11 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
         return NS_ERROR_FILE_TOO_BIG;
 
     // Allocate an internal buf the size of the file.
-    nsAutoArrayPtr<unsigned char> buf(new unsigned char[rawLen]);
+    auto buf = MakeUniqueFallible<unsigned char>(rawLen);
     if (!buf)
         return NS_ERROR_OUT_OF_MEMORY;
 
-    unsigned char* ptr = buf;
+    unsigned char* ptr = buf.get();
     unsigned char* end = ptr + rawLen;
     while (ptr < end) {
         uint32_t bytesRead;
@@ -3268,7 +3273,7 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
         ptr += bytesRead;
     }
 
-    rv = nsScriptLoader::ConvertToUTF16(scriptChannel, buf, rawLen, EmptyString(),
+    rv = nsScriptLoader::ConvertToUTF16(scriptChannel, buf.get(), rawLen, EmptyString(),
                                         nullptr, *src, *len);
     NS_ENSURE_SUCCESS(rv, rv);
 

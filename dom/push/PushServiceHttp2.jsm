@@ -321,7 +321,7 @@ SubscriptionListener.prototype = {
       pushReceiptEndpoint: linkParserResult.pushReceiptEndpoint,
       scope: this._subInfo.record.scope,
       originAttributes: this._subInfo.record.originAttributes,
-      quota: this._subInfo.record.maxQuota,
+      systemRecord: this._subInfo.record.systemRecord,
       ctime: Date.now(),
     });
 

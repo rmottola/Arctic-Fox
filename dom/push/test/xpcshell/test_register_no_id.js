@@ -15,9 +15,6 @@ function run_test() {
     requestTimeout: 1000,
     retryBaseInterval: 150
   });
-  disableServiceWorkerEvents(
-    'https://example.com/incomplete'
-  );
   run_next_test();
 }
 
@@ -53,8 +50,11 @@ add_task(function* test_register_no_id() {
   });
 
   yield rejects(
-    PushNotificationService.register('https://example.com/incomplete',
-      ChromeUtils.originAttributesToSuffix({ appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false })),
+    PushService.register({
+      scope: 'https://example.com/incomplete',
+      originAttributes: ChromeUtils.originAttributesToSuffix(
+        { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false }),
+    }),
     'Expected error for incomplete register response'
   );
 

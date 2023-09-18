@@ -161,6 +161,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "ProcessHangMonitor",
   "resource:///modules/ProcessHangMonitor.jsm");
 
+if (AppConstants.MOZ_SAFE_BROWSING) {
+  XPCOMUtils.defineLazyModuleGetter(this, "SafeBrowsing",
+    "resource://gre/modules/SafeBrowsing.jsm");
+}
+
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
@@ -173,12 +178,13 @@ XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
 XPCOMUtils.defineLazyModuleGetter(this, "gWebRTCUI",
   "resource:///modules/webrtcUI.jsm", "webrtcUI");
 
-#ifdef MOZ_CRASHREPORTER
-XPCOMUtils.defineLazyModuleGetter(this, "TabCrashReporter",
-  "resource:///modules/ContentCrashReporters.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
-  "resource:///modules/ContentCrashReporters.jsm");
-#endif
+XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
+  "resource:///modules/ContentCrashHandlers.jsm");
+
+if (AppConstants.MOZ_CRASHREPORTER) {
+  XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
+    "resource:///modules/ContentCrashHandlers.jsm");
+}
 
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
   "resource:///modules/FormValidationHandler.jsm");
@@ -1213,6 +1219,11 @@ var gBrowserInit = {
       else {
         loadOneOrMoreURIs(uriToLoad);
       }
+    }
+
+    if (AppConstants.MOZ_SAFE_BROWSING) {
+      // Bug 778855 - Perf regression if we do this here. To be addressed in bug 779008.
+      setTimeout(function() { SafeBrowsing.init(); }, 2000);
     }
 
     Services.obs.addObserver(gSessionHistoryObserver, "browser:purge-session-history", false);
@@ -7432,11 +7443,6 @@ var gRemoteTabsUI = {
     if (window.location.href != getBrowserURL() &&
         // Also check hidden window for the Mac no-window case
         window.location.href != "chrome://browser/content/hiddenWindow.xul") {
-      return;
-    }
-
-    if (Services.appinfo.inSafeMode) {
-      // e10s isn't supported in safe mode, so don't show the menu items for it
       return;
     }
 

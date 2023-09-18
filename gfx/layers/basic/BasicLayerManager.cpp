@@ -442,9 +442,8 @@ MarkLayersHidden(Layer* aLayer, const IntRect& aClipRect,
     // content is opaque
     if ((aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) &&
         (newFlags & ALLOW_OPAQUE)) {
-      nsIntRegionRectIterator it(region);
-      while (const IntRect* sr = it.Next()) {
-        r = *sr;
+      for (auto iter = region.RectIter(); !iter.Done(); iter.Next()) {
+        r = iter.Get();
         TransformIntRect(r, transform, ToInsideIntRect);
 
         r.IntersectRect(r, newClipRect);
@@ -609,10 +608,9 @@ BasicLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback,
 
     PaintLayer(mTarget, mRoot, aCallback, aCallbackData);
     if (!mRegionToClear.IsEmpty()) {
-      nsIntRegionRectIterator iter(mRegionToClear);
-      const IntRect *r;
-      while ((r = iter.Next())) {
-        mTarget->GetDrawTarget()->ClearRect(Rect(r->x, r->y, r->width, r->height));
+      for (auto iter = mRegionToClear.RectIter(); !iter.Done(); iter.Next()) {
+        const IntRect& r = iter.Get();
+        mTarget->GetDrawTarget()->ClearRect(Rect(r.x, r.y, r.width, r.height));
       }
     }
     if (mWidget) {
@@ -775,7 +773,7 @@ Transform(const gfxImageSurface* aDest,
           gfxPoint aDestOffset)
 {
   IntSize destSize = aDest->GetSize();
-  pixman_image_t* dest = pixman_image_create_bits(aDest->Format() == gfxImageFormat::ARGB32 ? PIXMAN_a8r8g8b8 : PIXMAN_x8r8g8b8,
+  pixman_image_t* dest = pixman_image_create_bits(aDest->Format() == SurfaceFormat::A8R8G8B8_UINT32 ? PIXMAN_a8r8g8b8 : PIXMAN_x8r8g8b8,
                                                   destSize.width,
                                                   destSize.height,
                                                   (uint32_t*)aDest->Data(),
@@ -851,7 +849,7 @@ Transform3D(RefPtr<SourceSurface> aSource,
   RefPtr<gfxASurface> dest = aDest->CurrentSurface();
   RefPtr<gfxImageSurface> destImage = new gfxImageSurface(IntSize(aDestRect.width,
                                                                     aDestRect.height),
-                                                            gfxImageFormat::ARGB32);
+                                                            SurfaceFormat::A8R8G8B8_UINT32);
   gfxPoint offset = aDestRect.TopLeft();
 
   // Include a translation to the correct origin.

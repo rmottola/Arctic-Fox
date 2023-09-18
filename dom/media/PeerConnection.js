@@ -405,8 +405,9 @@ RTCPeerConnection.prototype = {
           "InvalidStateError");
     }
 
-    this.makeGetterSetterEH("onaddstream");
-    this.makeGetterSetterEH("onaddtrack");
+    this.makeGetterSetterEH("ontrack");
+    this.makeLegacyGetterSetterEH("onaddstream", "Use peerConnection.ontrack instead.");
+    this.makeLegacyGetterSetterEH("onaddtrack", "Use peerConnection.ontrack instead.");
     this.makeGetterSetterEH("onicecandidate");
     this.makeGetterSetterEH("onnegotiationneeded");
     this.makeGetterSetterEH("onsignalingstatechange");
@@ -656,6 +657,18 @@ RTCPeerConnection.prototype = {
                           {
                             get:function()  { return this.getEH(name); },
                             set:function(h) { return this.setEH(name, h); }
+                          });
+  },
+
+  makeLegacyGetterSetterEH: function(name, msg) {
+    Object.defineProperty(this, name,
+                          {
+                            get:function()  { return this.getEH(name); },
+                            set:function(h) {
+                              this.logWarning(name + " is deprecated! " + msg,
+                                              null, 0);
+                              return this.setEH(name, h);
+                            }
                           });
   },
 
@@ -1409,13 +1422,28 @@ PeerConnectionObserver.prototype = {
                                                              { stream: stream }));
   },
 
-  onAddTrack: function(track) {
-    let ev = new this._dompc._win.MediaStreamTrackEvent("addtrack",
-                                                        { track: track });
+  onAddTrack: function(track, streams) {
+    let pc = this._dompc;
+    let receiver = pc._win.RTCRtpReceiver._create(pc._win,
+                                                  new RTCRtpReceiver(this,
+                                                                     track));
+    pc._receivers.push(receiver);
+    let ev = new this._dompc._win.RTCTrackEvent("track",
+                                                { receiver: receiver,
+                                                  track: track,
+                                                  streams: streams });
+    this.dispatchEvent(ev);
+
+    // Fire legacy event as well for a little bit.
+    ev = new this._dompc._win.MediaStreamTrackEvent("addtrack", { track: track });
     this.dispatchEvent(ev);
   },
 
   onRemoveTrack: function(track, type) {
+    let i = this._dompc._receivers.findIndex(receiver => receiver.track == track);
+    if (i >= 0) {
+      this._receivers.splice(i, 1);
+    }
     this.dispatchEvent(new this._dompc._win.MediaStreamTrackEvent("removetrack",
                                                                   { track: track }));
   },
@@ -1483,7 +1511,7 @@ RTCRtpSender.prototype = {
 };
 
 function RTCRtpReceiver(pc, track) {
-  this.pc = pc;
+  this._pc = pc;
   this.track = track;
 }
 RTCRtpReceiver.prototype = {

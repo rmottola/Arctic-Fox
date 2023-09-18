@@ -1116,9 +1116,7 @@ ChoiceNode::FilterASCII(int depth, bool ignore_case, bool unicode)
             alternatives()[i].node()->FilterASCII(depth - 1, ignore_case, unicode);
         if (replacement != nullptr) {
             alternatives()[i].set_node(replacement);
-            AutoEnterOOMUnsafeRegion oomUnsafe;
-            if (!new_alternatives.append(alternatives()[i]))
-                oomUnsafe.crash("ChoiceNode::FilterASCII");
+            new_alternatives.append(alternatives()[i]);
         }
     }
 
@@ -1888,11 +1886,11 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
 template <typename CharT>
 RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const CharT* chars, size_t start,
-                      size_t length, MatchPairs* matches)
+                      size_t length, MatchPairs* matches, size_t* endIndex)
 {
     typedef void (*RegExpCodeSignature)(InputOutputData*);
 
-    InputOutputData data(chars, chars + length, start, matches);
+    InputOutputData data(chars, chars + length, start, matches, endIndex);
 
     RegExpCodeSignature function = reinterpret_cast<RegExpCodeSignature>(codeBlock->raw());
 
@@ -1906,11 +1904,11 @@ irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const CharT* chars
 
 template RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const Latin1Char* chars, size_t start,
-                      size_t length, MatchPairs* matches);
+                      size_t length, MatchPairs* matches, size_t* endIndex);
 
 template RegExpRunStatus
 irregexp::ExecuteCode(JSContext* cx, jit::JitCode* codeBlock, const char16_t* chars, size_t start,
-                      size_t length, MatchPairs* matches);
+                      size_t length, MatchPairs* matches, size_t* endIndex);
 
 // -------------------------------------------------------------------
 // Tree to graph conversion
@@ -3249,7 +3247,7 @@ EmitDoubleBoundaryTest(RegExpMacroAssembler* masm,
     }
 }
 
-typedef Vector<int, 4, LifoAllocPolicy<Infallible> > RangeBoundaryVector;
+typedef InfallibleVector<int, 4> RangeBoundaryVector;
 
 // even_label is for ranges[i] to ranges[i + 1] where i - start_index is even.
 // odd_label is for ranges[i] to ranges[i + 1] where i - start_index is odd.
@@ -3817,7 +3815,7 @@ EmitAtomLetter(RegExpCompiler* compiler,
       }
       case 4:
         macro_assembler->CheckCharacter(chars[3], &ok);
-        // Fall through!
+        MOZ_FALLTHROUGH;
       case 3:
         macro_assembler->CheckCharacter(chars[0], &ok);
         macro_assembler->CheckCharacter(chars[1], &ok);
@@ -4236,12 +4234,13 @@ class AlternativeGenerationList
     {
         alt_gens_.reserve(count);
         for (size_t i = 0; i < count && i < kAFew; i++)
-            alt_gens_.infallibleAppend(a_few_alt_gens_ + i);
+            alt_gens_.append(a_few_alt_gens_ + i);
         for (size_t i = kAFew; i < count; i++) {
+            AutoEnterOOMUnsafeRegion oomUnsafe;
             AlternativeGeneration* gen = js_new<AlternativeGeneration>();
             if (!gen)
-                MOZ_CRASH("AlternativeGenerationList js_new");
-            alt_gens_.infallibleAppend(gen);
+                oomUnsafe.crash("AlternativeGenerationList js_new");
+            alt_gens_.append(gen);
         }
     }
 
@@ -4258,7 +4257,7 @@ class AlternativeGenerationList
 
   private:
     static const size_t kAFew = 10;
-    Vector<AlternativeGeneration*, 1, LifoAllocPolicy<Infallible> > alt_gens_;
+    InfallibleVector<AlternativeGeneration*, 1> alt_gens_;
     AlternativeGeneration a_few_alt_gens_[kAFew];
 };
 

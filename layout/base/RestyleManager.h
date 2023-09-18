@@ -100,10 +100,7 @@ public:
   // track whether off-main-thread animations are up-to-date.
   uint64_t GetAnimationGeneration() const { return mAnimationGeneration; }
 
-  // A workaround until bug 847286 lands that gets the maximum of the animation
-  // generation counters stored on the set of animations and transitions
-  // respectively for |aFrame|.
-  static uint64_t GetMaxAnimationGenerationForFrame(nsIFrame* aFrame);
+  static uint64_t GetAnimationGenerationForFrame(nsIFrame* aFrame);
 
   // Update the animation generation count to mark that animation state
   // has changed.
@@ -380,11 +377,6 @@ public:
   // other than primary frames.
   void UpdateOnlyAnimationStyles();
 
-  bool ThrottledAnimationStyleIsUpToDate() const {
-    return mLastUpdateForThrottledAnimations ==
-             mPresContext->RefreshDriver()->MostRecentRefresh();
-  }
-
   // Rebuilds all style data by throwing out the old rule tree and
   // building a new one, and additionally applying aExtraHint (which
   // must not contain nsChangeHint_ReconstructFrame) to the root frame.
@@ -555,8 +547,6 @@ private:
   uint32_t mHoverGeneration;
   nsChangeHint mRebuildAllExtraHint;
   nsRestyleHint mRebuildAllRestyleHint;
-
-  mozilla::TimeStamp mLastUpdateForThrottledAnimations;
 
   OverflowChangedTracker mOverflowChangedTracker;
 

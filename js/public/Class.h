@@ -337,8 +337,8 @@ typedef JSString*
  * (e.g., the DOM attributes for a given node reflected as obj) on demand.
  *
  * JS looks for a property in an object, and if not found, tries to resolve
- * the given id. *resolvedp should be set to true iff the property was
- * was defined on |obj|.
+ * the given id. *resolvedp should be set to true iff the property was defined
+ * on |obj|.
  */
 typedef bool
 (* JSResolveOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
@@ -412,7 +412,7 @@ typedef bool
                      JS::MutableHandleObject objp, JS::MutableHandle<Shape*> propp);
 typedef bool
 (* DefinePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::Handle<JSPropertyDescriptor> desc,
+                     JS::Handle<JS::PropertyDescriptor> desc,
                      JS::ObjectOpResult& result);
 typedef bool
 (* HasPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
@@ -424,7 +424,7 @@ typedef bool
                   JS::HandleValue receiver, JS::ObjectOpResult& result);
 typedef bool
 (* GetOwnPropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
-                     JS::MutableHandle<JSPropertyDescriptor> desc);
+                     JS::MutableHandle<JS::PropertyDescriptor> desc);
 typedef bool
 (* DeletePropertyOp)(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                      JS::ObjectOpResult& result);

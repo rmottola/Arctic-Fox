@@ -11,7 +11,7 @@
 
 #include <limits.h>
 
-#include "asmjs/AsmJSFrameIterator.h"
+#include "asmjs/WasmTypes.h"
 #include "jit/JitAllocPolicy.h"
 #include "jit/Label.h"
 #include "jit/Registers.h"
@@ -139,8 +139,7 @@ static inline bool
 IsCompilingAsmJS()
 {
     // asm.js compilation pushes a JitContext with a null JSCompartment.
-    JitContext* jctx = MaybeGetJitContext();
-    return jctx && jctx->compartment == nullptr;
+    return GetJitContext()->compartment == nullptr;
 }
 #endif
 
@@ -681,10 +680,10 @@ struct AsmJSGlobalAccess
 
 // Represents an instruction to be patched and the intended pointee. These
 // links are accumulated in the MacroAssembler, but patching is done outside
-// the MacroAssembler (in AsmJSModule::staticallyLink).
-struct AsmJSAbsoluteLink
+// the MacroAssembler (in Module::staticallyLink).
+struct AsmJSAbsoluteAddress
 {
-    AsmJSAbsoluteLink(CodeOffset patchAt, wasm::SymbolicAddress target)
+    AsmJSAbsoluteAddress(CodeOffset patchAt, wasm::SymbolicAddress target)
       : patchAt(patchAt), target(target) {}
 
     CodeOffset patchAt;
@@ -709,9 +708,10 @@ struct AsmJSInternalCallee
 class AssemblerShared
 {
     wasm::CallSiteAndTargetVector callsites_;
+    wasm::JumpSiteArray jumpsites_;
     wasm::HeapAccessVector heapAccesses_;
     Vector<AsmJSGlobalAccess, 0, SystemAllocPolicy> asmJSGlobalAccesses_;
-    Vector<AsmJSAbsoluteLink, 0, SystemAllocPolicy> asmJSAbsoluteLinks_;
+    Vector<AsmJSAbsoluteAddress, 0, SystemAllocPolicy> asmJSAbsoluteAddresses_;
 
   protected:
     Vector<CodeLabel, 0, SystemAllocPolicy> codeLabels_;
@@ -741,15 +741,21 @@ class AssemblerShared
         return embedsNurseryPointers_;
     }
 
-    void append(const wasm::CallSiteDesc& desc, CodeOffset label, size_t framePushed,
+    void append(const wasm::CallSiteDesc& desc, CodeOffset retAddr, size_t framePushed,
                 uint32_t targetIndex = wasm::CallSiteAndTarget::NOT_INTERNAL)
     {
         // framePushed does not include sizeof(AsmJSFrame), so add it in here (see
         // CallSite::stackDepth).
-        wasm::CallSite callsite(desc, label.offset(), framePushed + sizeof(AsmJSFrame));
+        wasm::CallSite callsite(desc, retAddr.offset(), framePushed + sizeof(AsmJSFrame));
         enoughMemory_ &= callsites_.append(wasm::CallSiteAndTarget(callsite, targetIndex));
     }
     wasm::CallSiteAndTargetVector& callSites() { return callsites_; }
+
+    void append(wasm::JumpTarget target, uint32_t offset) {
+        enoughMemory_ &= jumpsites_[target].append(offset);
+    }
+    const wasm::JumpSiteArray& jumpSites() { return jumpsites_; }
+    void clearJumpSites() { for (auto& v : jumpsites_) v.clear(); }
 
     void append(wasm::HeapAccess access) { enoughMemory_ &= heapAccesses_.append(access); }
     wasm::HeapAccessVector&& extractHeapAccesses() { return Move(heapAccesses_); }
@@ -758,9 +764,9 @@ class AssemblerShared
     size_t numAsmJSGlobalAccesses() const { return asmJSGlobalAccesses_.length(); }
     AsmJSGlobalAccess asmJSGlobalAccess(size_t i) const { return asmJSGlobalAccesses_[i]; }
 
-    void append(AsmJSAbsoluteLink link) { enoughMemory_ &= asmJSAbsoluteLinks_.append(link); }
-    size_t numAsmJSAbsoluteLinks() const { return asmJSAbsoluteLinks_.length(); }
-    AsmJSAbsoluteLink asmJSAbsoluteLink(size_t i) const { return asmJSAbsoluteLinks_[i]; }
+    void append(AsmJSAbsoluteAddress link) { enoughMemory_ &= asmJSAbsoluteAddresses_.append(link); }
+    size_t numAsmJSAbsoluteAddresses() const { return asmJSAbsoluteAddresses_.length(); }
+    AsmJSAbsoluteAddress asmJSAbsoluteAddress(size_t i) const { return asmJSAbsoluteAddresses_[i]; }
 
     static bool canUseInSingleByteInstruction(Register reg) { return true; }
 
@@ -782,6 +788,14 @@ class AssemblerShared
         for (; i < callsites_.length(); i++)
             callsites_[i].offsetReturnAddressBy(delta);
 
+        for (wasm::JumpTarget target : mozilla::MakeEnumeratedRange(wasm::JumpTarget::Limit)) {
+            wasm::Uint32Vector& offsets = jumpsites_[target];
+            i = offsets.length();
+            enoughMemory_ &= offsets.appendAll(other.jumpsites_[target]);
+            for (; i < offsets.length(); i++)
+                offsets[i] += delta;
+        }
+
         i = heapAccesses_.length();
         enoughMemory_ &= heapAccesses_.appendAll(other.heapAccesses_);
         for (; i < heapAccesses_.length(); i++)
@@ -792,10 +806,10 @@ class AssemblerShared
         for (; i < asmJSGlobalAccesses_.length(); i++)
             asmJSGlobalAccesses_[i].patchAt.offsetBy(delta);
 
-        i = asmJSAbsoluteLinks_.length();
-        enoughMemory_ &= asmJSAbsoluteLinks_.appendAll(other.asmJSAbsoluteLinks_);
-        for (; i < asmJSAbsoluteLinks_.length(); i++)
-            asmJSAbsoluteLinks_[i].patchAt.offsetBy(delta);
+        i = asmJSAbsoluteAddresses_.length();
+        enoughMemory_ &= asmJSAbsoluteAddresses_.appendAll(other.asmJSAbsoluteAddresses_);
+        for (; i < asmJSAbsoluteAddresses_.length(); i++)
+            asmJSAbsoluteAddresses_[i].patchAt.offsetBy(delta);
 
         i = codeLabels_.length();
         enoughMemory_ &= codeLabels_.appendAll(other.codeLabels_);

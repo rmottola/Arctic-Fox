@@ -8,7 +8,7 @@
 
 #include "mozilla/MemoryReporting.h"
 
-#include "asmjs/AsmJSModule.h"
+#include "asmjs/WasmModule.h"
 #include "jit/BaselineCompiler.h"
 #include "jit/BaselineIC.h"
 #include "jit/CompileInfo.h"
@@ -51,7 +51,7 @@ BaselineScript::BaselineScript(uint32_t prologueOffset, uint32_t epilogueOffset,
   : method_(nullptr),
     templateScope_(nullptr),
     fallbackStubSpace_(),
-    dependentAsmJSModules_(nullptr),
+    dependentWasmModules_(nullptr),
     prologueOffset_(prologueOffset),
     epilogueOffset_(epilogueOffset),
     profilerEnterToggleOffset_(profilerEnterToggleOffset),
@@ -84,7 +84,7 @@ CheckFrame(InterpreterFrame* fp)
         return false;
     }
 
-    if (fp->isNonEvalFunctionFrame() && fp->numActualArgs() > BASELINE_MAX_ARGS_LENGTH) {
+    if (fp->isFunctionFrame() && fp->numActualArgs() > BASELINE_MAX_ARGS_LENGTH) {
         // Fall back to the interpreter to avoid running out of stack space.
         JitSpew(JitSpew_BaselineAbort, "Too many arguments (%u)", fp->numActualArgs());
         return false;
@@ -105,6 +105,15 @@ EnterBaseline(JSContext* cx, EnterJitData& data)
     } else {
         JS_CHECK_RECURSION(cx, return JitExec_Aborted);
     }
+
+#ifdef DEBUG
+    // Assert we don't GC before entering JIT code. A GC could discard JIT code
+    // or move the function stored in the CalleeToken (it won't be traced at
+    // this point). We use Maybe<> here so we can call reset() to call the
+    // AutoAssertOnGC destructor before we enter JIT code.
+    mozilla::Maybe<JS::AutoAssertOnGC> nogc;
+    nogc.emplace(cx->runtime());
+#endif
 
     MOZ_ASSERT(jit::IsBaselineEnabled(cx));
     MOZ_ASSERT_IF(data.osrFrame, CheckFrame(data.osrFrame));
@@ -130,6 +139,9 @@ EnterBaseline(JSContext* cx, EnterJitData& data)
         if (data.osrFrame)
             data.osrFrame->setRunningInJit();
 
+#ifdef DEBUG
+        nogc.reset();
+#endif
         // Single transition point from Interpreter to Baseline.
         CALL_GENERATED_CODE(enter, data.jitcode, data.maxArgc, data.maxArgv, data.osrFrame, data.calleeToken,
                             data.scopeChain.get(), data.osrNumStackValues, data.result.address());
@@ -201,7 +213,7 @@ jit::EnterBaselineAtBranch(JSContext* cx, InterpreterFrame* fp, jsbytecode* pc)
     AutoValueVector vals(cx);
     RootedValue thisv(cx);
 
-    if (fp->isNonEvalFunctionFrame()) {
+    if (fp->isFunctionFrame()) {
         data.constructing = fp->isConstructing();
         data.numActualArgs = fp->numActualArgs();
         data.maxArgc = Max(fp->numActualArgs(), fp->numFormalArgs()) + 1; // +1 = include |this|
@@ -216,11 +228,7 @@ jit::EnterBaselineAtBranch(JSContext* cx, InterpreterFrame* fp, jsbytecode* pc)
         data.maxArgv = thisv.address();
         data.scopeChain = fp->scopeChain();
 
-        // For eval function frames, set the callee token to the enclosing function.
-        if (fp->isFunctionFrame())
-            data.calleeToken = CalleeToToken(&fp->callee(), /* constructing = */ false);
-        else
-            data.calleeToken = CalleeToToken(fp->script());
+        data.calleeToken = CalleeToToken(fp->script());
 
         if (fp->isEvalFrame()) {
             if (!vals.reserve(2))
@@ -228,7 +236,7 @@ jit::EnterBaselineAtBranch(JSContext* cx, InterpreterFrame* fp, jsbytecode* pc)
 
             vals.infallibleAppend(thisv);
 
-            if (fp->isFunctionFrame())
+            if (fp->script()->isDirectEvalInFunction())
                 vals.infallibleAppend(fp->newTarget());
             else
                 vals.infallibleAppend(NullValue());
@@ -371,9 +379,7 @@ jit::CanEnterBaselineMethod(JSContext* cx, RunState& state)
             return Method_Error;
         }
     } else {
-        MOZ_ASSERT(state.isExecute());
-        ExecuteType type = state.asExecute()->type();
-        if (type == EXECUTE_DEBUG) {
+        if (state.asExecute()->isDebuggerEval()) {
             JitSpew(JitSpew_BaselineAbort, "debugger frame");
             return Method_CantCompile;
         }
@@ -485,60 +491,57 @@ BaselineScript::Destroy(FreeOp* fop, BaselineScript* script)
 
     MOZ_ASSERT(!script->hasPendingIonBuilder());
 
-    script->unlinkDependentAsmJSModules(fop);
+    script->unlinkDependentWasmModules(fop);
 
     fop->delete_(script);
 }
 
 void
-BaselineScript::clearDependentAsmJSModules()
+BaselineScript::clearDependentWasmModules()
 {
-    // Remove any links from AsmJSModules that contain optimized FFI calls into
+    // Remove any links from wasm::Modules that contain optimized import calls into
     // this BaselineScript.
-    if (dependentAsmJSModules_) {
-        for (size_t i = 0; i < dependentAsmJSModules_->length(); i++) {
-            DependentAsmJSModuleExit exit = (*dependentAsmJSModules_)[i];
-            exit.module->exit(exit.exitIndex).deoptimize(*exit.module);
-        }
-
-        dependentAsmJSModules_->clear();
+    if (dependentWasmModules_) {
+        for (DependentWasmModuleImport dep : *dependentWasmModules_)
+            dep.module->deoptimizeImportExit(dep.importIndex);
+        dependentWasmModules_->clear();
     }
 }
 
 void
-BaselineScript::unlinkDependentAsmJSModules(FreeOp* fop)
+BaselineScript::unlinkDependentWasmModules(FreeOp* fop)
 {
-    // Remove any links from AsmJSModules that contain optimized FFI calls into
+    // Remove any links from wasm::Modules that contain optimized FFI calls into
     // this BaselineScript.
-    clearDependentAsmJSModules();
-    if (dependentAsmJSModules_) {
-        fop->delete_(dependentAsmJSModules_);
-        dependentAsmJSModules_ = nullptr;
+    clearDependentWasmModules();
+    if (dependentWasmModules_) {
+        fop->delete_(dependentWasmModules_);
+        dependentWasmModules_ = nullptr;
     }
 }
 
 bool
-BaselineScript::addDependentAsmJSModule(JSContext* cx, DependentAsmJSModuleExit exit)
+BaselineScript::addDependentWasmModule(JSContext* cx, wasm::Module& module, uint32_t importIndex)
 {
-    if (!dependentAsmJSModules_) {
-        dependentAsmJSModules_ = cx->new_<Vector<DependentAsmJSModuleExit> >(cx);
-        if (!dependentAsmJSModules_)
+    if (!dependentWasmModules_) {
+        dependentWasmModules_ = cx->new_<Vector<DependentWasmModuleImport> >(cx);
+        if (!dependentWasmModules_)
             return false;
     }
-    return dependentAsmJSModules_->append(exit);
+    return dependentWasmModules_->emplaceBack(&module, importIndex);
 }
 
 void
-BaselineScript::removeDependentAsmJSModule(DependentAsmJSModuleExit exit)
+BaselineScript::removeDependentWasmModule(wasm::Module& module, uint32_t importIndex)
 {
-    if (!dependentAsmJSModules_)
+    if (!dependentWasmModules_)
         return;
 
-    for (size_t i = 0; i < dependentAsmJSModules_->length(); i++) {
-        if ((*dependentAsmJSModules_)[i].module == exit.module &&
-            (*dependentAsmJSModules_)[i].exitIndex == exit.exitIndex)
+    for (size_t i = 0; i < dependentWasmModules_->length(); i++) {
+        if ((*dependentWasmModules_)[i].module == &module &&
+            (*dependentWasmModules_)[i].importIndex == importIndex)
         {
-            dependentAsmJSModules_->erase(dependentAsmJSModules_->begin() + i);
+            dependentWasmModules_->erase(dependentWasmModules_->begin() + i);
             break;
         }
     }
@@ -692,6 +695,18 @@ BaselineScript::stackCheckICEntry(bool earlyCheck)
             return icEntry(i);
     }
     MOZ_CRASH("No stack check ICEntry found.");
+}
+
+ICEntry&
+BaselineScript::warmupCountICEntry()
+{
+    // The stack check will be at a very low offset, so just do a linear search
+    // from the beginning.
+    for (size_t i = 0; i < numICEntries() && icEntry(i).pcOffset() == 0; i++) {
+        if (icEntry(i).kind() == ICEntry::Kind_WarmupCounter)
+            return icEntry(i);
+    }
+    MOZ_CRASH("No warmup count ICEntry found.");
 }
 
 ICEntry&
@@ -1174,11 +1189,12 @@ MarkActiveBaselineScripts(JSRuntime* rt, const JitActivationIterator& activation
           case JitFrame_BaselineJS:
             iter.script()->baselineScript()->setActive();
             break;
-          case JitFrame_LazyLink: {
-            LazyLinkExitFrameLayout* ll = iter.exitFrame()->as<LazyLinkExitFrameLayout>();
-            ScriptFromCalleeToken(ll->jsFrame()->calleeToken())->baselineScript()->setActive();
+          case JitFrame_Exit:
+            if (iter.exitFrame()->is<LazyLinkExitFrameLayout>()) {
+                LazyLinkExitFrameLayout* ll = iter.exitFrame()->as<LazyLinkExitFrameLayout>();
+                ScriptFromCalleeToken(ll->jsFrame()->calleeToken())->baselineScript()->setActive();
+            }
             break;
-          }
           case JitFrame_Bailout:
           case JitFrame_IonJS: {
             // Keep the baseline script around, since bailouts from the ion

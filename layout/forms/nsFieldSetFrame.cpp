@@ -235,7 +235,7 @@ nsFieldSetFrame::PaintBorderBackground(
                                     aDirtyRect, rect, bgFlags);
 
   nsCSSRendering::PaintBoxShadowInner(presContext, aRenderingContext,
-                                      this, rect, aDirtyRect);
+                                      this, rect);
 
   if (nsIFrame* legend = GetLegend()) {
     css::Side legendSide = wm.PhysicalSide(eLogicalSideBStart);
@@ -663,8 +663,9 @@ void
 nsFieldSetFrame::SetInitialChildList(ChildListID    aListID,
                                      nsFrameList&   aChildList)
 {
-  nsContainerFrame::SetInitialChildList(kPrincipalList, aChildList);
-  MOZ_ASSERT(GetInner());
+  nsContainerFrame::SetInitialChildList(aListID, aChildList);
+  MOZ_ASSERT(aListID != kPrincipalList || GetInner(),
+             "Setting principal child list should populate our inner frame");
 }
 void
 nsFieldSetFrame::AppendFrames(ChildListID    aListID,

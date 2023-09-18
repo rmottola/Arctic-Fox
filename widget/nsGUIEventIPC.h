@@ -165,6 +165,7 @@ struct ParamTraits<mozilla::WidgetWheelEvent>
     WriteParam(aMsg, aParam.deltaZ);
     WriteParam(aMsg, aParam.deltaMode);
     WriteParam(aMsg, aParam.customizedByUserPrefs);
+    WriteParam(aMsg, aParam.mayHaveMomentum);
     WriteParam(aMsg, aParam.isMomentum);
     WriteParam(aMsg, aParam.mIsNoLineOrPageDelta);
     WriteParam(aMsg, aParam.lineOrPageDeltaX);
@@ -174,6 +175,7 @@ struct ParamTraits<mozilla::WidgetWheelEvent>
     WriteParam(aMsg, aParam.overflowDeltaY);
     WriteParam(aMsg, aParam.mViewPortIsOverscrolled);
     WriteParam(aMsg, aParam.mCanTriggerSwipe);
+    WriteParam(aMsg, aParam.mAllowToOverrideSystemScrollSpeed);
   }
 
   static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
@@ -187,6 +189,7 @@ struct ParamTraits<mozilla::WidgetWheelEvent>
       ReadParam(aMsg, aIter, &aResult->deltaZ) &&
       ReadParam(aMsg, aIter, &aResult->deltaMode) &&
       ReadParam(aMsg, aIter, &aResult->customizedByUserPrefs) &&
+      ReadParam(aMsg, aIter, &aResult->mayHaveMomentum) &&
       ReadParam(aMsg, aIter, &aResult->isMomentum) &&
       ReadParam(aMsg, aIter, &aResult->mIsNoLineOrPageDelta) &&
       ReadParam(aMsg, aIter, &aResult->lineOrPageDeltaX) &&
@@ -195,7 +198,8 @@ struct ParamTraits<mozilla::WidgetWheelEvent>
       ReadParam(aMsg, aIter, &aResult->overflowDeltaX) &&
       ReadParam(aMsg, aIter, &aResult->overflowDeltaY) &&
       ReadParam(aMsg, aIter, &aResult->mViewPortIsOverscrolled) &&
-      ReadParam(aMsg, aIter, &aResult->mCanTriggerSwipe);
+      ReadParam(aMsg, aIter, &aResult->mCanTriggerSwipe) &&
+      ReadParam(aMsg, aIter, &aResult->mAllowToOverrideSystemScrollSpeed);
     aResult->scrollType =
       static_cast<mozilla::WidgetWheelEvent::ScrollType>(scrollType);
     return rv;
@@ -939,6 +943,26 @@ struct ParamTraits<mozilla::ContentCache>
            ReadParam(aMsg, aIter, &aResult->mTextRectArray.mStart) &&
            ReadParam(aMsg, aIter, &aResult->mTextRectArray.mRects) &&
            ReadParam(aMsg, aIter, &aResult->mEditorRect);
+  }
+};
+
+template<>
+struct ParamTraits<mozilla::widget::CandidateWindowPosition>
+{
+  typedef mozilla::widget::CandidateWindowPosition paramType;
+
+  static void Write(Message* aMsg, const paramType& aParam)
+  {
+    WriteParam(aMsg, aParam.mPoint);
+    WriteParam(aMsg, aParam.mRect);
+    WriteParam(aMsg, aParam.mExcludeRect);
+  }
+
+  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->mPoint) &&
+           ReadParam(aMsg, aIter, &aResult->mRect) &&
+           ReadParam(aMsg, aIter, &aResult->mExcludeRect);
   }
 };
 

@@ -556,6 +556,10 @@ case "$target" in
             # -Zc:sizedDealloc- disables C++14 global sized deallocation (see bug 1160146)
             CXXFLAGS="$CXXFLAGS -Zc:sizedDealloc-"
 
+            # Disable C++11 thread-safe statics due to crashes on XP (bug 1204752)
+            # See https://connect.microsoft.com/VisualStudio/feedback/details/1789709/visual-c-2015-runtime-broken-on-windows-server-2003-c-11-magic-statics
+            CXXFLAGS="$CXXFLAGS -Zc:threadSafeInit-"
+
             # https://connect.microsoft.com/VisualStudio/feedback/details/888527/warnings-on-dbghelp-h
             # for dbghelp.h, imagehlp.h, and shobj.h
             # C4091: 'typedef ': ignored on left of '' when no variable is declared
@@ -2252,8 +2256,61 @@ ia64*-hpux*)
         CFLAGS="$CFLAGS -wd4244 -wd4267 -wd4819"
         CXXFLAGS="$CXXFLAGS -wd4251 -wd4244 -wd4267 -wd4345 -wd4351 -wd4482 -wd4800 -wd4819"
         if test -n "$CLANG_CL"; then
+            # XXX We should combine some of these with our generic GCC-style
+            # warning checks.
+            #
             # Suppress the clang-cl warning for the inline 'new' and 'delete' in mozalloc
             CXXFLAGS="$CXXFLAGS -Wno-inline-new-delete"
+            # We use offsetof on non-POD objects all the time.
+            # We also suppress this warning on other platforms.
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-offsetof"
+            # MFBT thinks clang-cl supports constexpr, which it does, but
+            # not everything in Windows C++ headers supports constexpr
+            # as we might expect until MSVC 2015, so turn off this warning
+            # for now.
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-constexpr"
+            # This warns for reasonable things like:
+            #   enum { X = 0xffffffffU };
+            # which is annoying for IDL headers.
+            CXXFLAGS="$CXXFLAGS -Wno-microsoft-enum-value"
+            # This warns for cases that would be reached by the Microsoft
+            # #include rules, but also currently warns on cases that would
+            # *also* be reached by standard C++ include rules.  That
+            # behavior doesn't seem useful, so we turn it off.
+            CXXFLAGS="$CXXFLAGS -Wno-microsoft-include"
+            # We normally error out on unknown pragmas, but since clang-cl
+            # claims to be MSVC, it would be difficult to add
+            # #if defined(_MSC_VER) && !defined(__clang__) everywhere we
+            # use such pragmas, so just ignore them.
+            CFLAGS="$CFLAGS -Wno-unknown-pragmas"
+            CXXFLAGS="$CXXFLAGS -Wno-unknown-pragmas"
+            # clang-cl's Intrin.h marks things like _ReadWriteBarrier
+            # as __attribute((__deprecated__)).  This is nice to know,
+            # but since we don't get the equivalent warning from MSVC,
+            # let's just ignore it.
+            CFLAGS="$CFLAGS -Wno-deprecated-declarations"
+            CXXFLAGS="$CXXFLAGS -Wno-deprecated-declarations"
+            # We use a function like:
+            #   __declspec(noreturn) __inline void f() {}
+            # which -Winvalid-noreturn complains about.  Again, MSVC seems
+            # OK with it, so let's silence the warning.
+            CFLAGS="$CFLAGS -Wno-invalid-noreturn"
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-noreturn"
+            # Missing |override| on virtual function declarations isn't
+            # something that MSVC currently warns about.
+            CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override"
+            # We use -DHAS_EXCEPTIONS=0, which removes the |throw()|
+            # declaration on |operator delete(void*)|.  However, clang-cl
+            # must internally declare |operator delete(void*)| differently,
+            # which causes this warning for virtually every file in the
+            # tree.  clang-cl doesn't support -fno-exceptions or equivalent,
+            # so there doesn't seem to be any way to convince clang-cl to
+            # declare |delete| differently.  Therefore, suppress this
+            # warning.
+            CXXFLAGS="$CXXFLAGS -Wno-implicit-exception-spec-mismatch"
+            # At least one MSVC header and several headers in-tree have
+            # unused typedefs, so turn this on.
+            CXXFLAGS="$CXXFLAGS -Wno-unused-local-typedef"
         fi
         # make 'foo == bar;' error out
         CFLAGS="$CFLAGS -we4553"
@@ -4725,6 +4782,21 @@ fi
 AC_SUBST(MOZ_ENABLE_DBUS)
 
 dnl ========================================================
+dnl = speech-dispatcher support
+dnl ========================================================
+
+if test "$MOZ_ENABLE_GTK" -o "$MOZ_ENABLE_QT"
+then
+    MOZ_SYNTH_SPEECHD=1
+
+    MOZ_ARG_DISABLE_BOOL(synth-speechd,
+    [  --disable-synth-speechd Disable speech-dispatcher support ],
+        MOZ_SYNTH_SPEECHD=,
+        MOZ_SYNTH_SPEECHD=1)
+fi
+AC_SUBST(MOZ_SYNTH_SPEECHD)
+
+dnl ========================================================
 dnl = Enable Android History instead of Places
 dnl ========================================================
 if test -n "$MOZ_ANDROID_HISTORY"; then
@@ -7151,7 +7223,6 @@ fi
 dnl We need to wrap dlopen and related functions on Android because we use
 dnl our own linker.
 if test "$OS_TARGET" = Android; then
-    MOZ_GLUE_WRAP_LDFLAGS="${MOZ_GLUE_WRAP_LDFLAGS} -Wl,--wrap=PR_GetEnv,--wrap=PR_SetEnv"
     if test "$MOZ_WIDGET_TOOLKIT" = gonk -a -n "$MOZ_NUWA_PROCESS"; then
         MOZ_GLUE_WRAP_LDFLAGS="${MOZ_GLUE_WRAP_LDFLAGS} -Wl,--wrap=pthread_create,--wrap=epoll_wait,--wrap=poll,--wrap=pthread_cond_timedwait,--wrap=pthread_cond_wait,--wrap=epoll_create,--wrap=epoll_ctl,--wrap=close,--wrap=pthread_key_create,--wrap=pthread_key_delete,--wrap=socketpair,--wrap=pthread_self,--wrap=pthread_mutex_lock,--wrap=pthread_mutex_trylock,--wrap=pthread_join,--wrap=pipe,--wrap=pipe2"
     fi
@@ -7882,6 +7953,15 @@ MOZ_ARG_ENABLE_BOOL(skia,
 [  --enable-skia   Enable use of Skia],
 MOZ_ENABLE_SKIA=1,
 MOZ_ENABLE_SKIA=)
+
+dnl Skia GPU support may not reliably build on certain *BSDs (see bug 1234494).
+if test "${OS_TARGET}" = "OpenBSD" -o \
+        "${OS_TARGET}" = "NetBSD" -o \
+        "${OS_ARCH}" = "SunOS"; then
+    MOZ_DISABLE_SKIA_GPU=1
+else
+    MOZ_DISABLE_SKIA_GPU=
+fi
 
 MOZ_ARG_DISABLE_BOOL(skia-gpu,
 [  --disable-skia-gpu  Disable use of Skia-GPU],
@@ -8632,22 +8712,19 @@ CXXFLAGS=`echo \
 
 COMPILE_CFLAGS=`echo \
     $_DEFINES_CFLAGS \
-    $_DEPEND_CFLAGS \
     $COMPILE_CFLAGS`
 
 COMPILE_CXXFLAGS=`echo \
     $_DEFINES_CXXFLAGS \
-    $_DEPEND_CFLAGS \
     $COMPILE_CXXFLAGS`
 
 HOST_CFLAGS=`echo \
-    $HOST_CFLAGS \
-    $_DEPEND_CFLAGS`
+    $HOST_CFLAGS`
 
 HOST_CXXFLAGS=`echo \
-    $HOST_CXXFLAGS \
-    $_DEPEND_CFLAGS`
+    $HOST_CXXFLAGS`
 
+AC_SUBST(_DEPEND_CFLAGS)
 AC_SUBST(MOZ_NATIVE_JPEG)
 AC_SUBST(MOZ_NATIVE_PNG)
 AC_SUBST(MOZ_NATIVE_BZ2)

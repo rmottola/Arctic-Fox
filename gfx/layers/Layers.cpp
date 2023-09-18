@@ -76,8 +76,7 @@ LayerManager::GetRootScrollableLayerId()
     return FrameMetrics::NULL_SCROLL_ID;
   }
 
-  nsTArray<LayerMetricsWrapper> queue;
-  queue.AppendElement(LayerMetricsWrapper(mRoot));
+  nsTArray<LayerMetricsWrapper> queue = { LayerMetricsWrapper(mRoot) };
   while (queue.Length()) {
     LayerMetricsWrapper layer = queue[0];
     queue.RemoveElementAt(0);
@@ -110,8 +109,7 @@ LayerManager::GetRootScrollableLayers(nsTArray<Layer*>& aArray)
     return;
   }
 
-  nsTArray<Layer*> queue;
-  queue.AppendElement(mRoot);
+  nsTArray<Layer*> queue = { mRoot };
   while (queue.Length()) {
     Layer* layer = queue[0];
     queue.RemoveElementAt(0);
@@ -134,8 +132,7 @@ LayerManager::GetScrollableLayers(nsTArray<Layer*>& aArray)
     return;
   }
 
-  nsTArray<Layer*> queue;
-  queue.AppendElement(mRoot);
+  nsTArray<Layer*> queue = { mRoot };
   while (!queue.IsEmpty()) {
     Layer* layer = queue.LastElement();
     queue.RemoveElementAt(queue.Length() - 1);
@@ -941,7 +938,7 @@ Layer::ApplyPendingUpdatesForThisTransaction()
   }
 }
 
-const float
+float
 Layer::GetLocalOpacity()
 {
   float opacity = mOpacity;
@@ -1117,7 +1114,9 @@ ContainerLayer::ContainerLayer(LayerManager* aManager, void* aImplData)
     mSupportsComponentAlphaChildren(false),
     mMayHaveReadbackChild(false),
     mChildrenChanged(false),
-    mEventRegionsOverride(EventRegionsOverride::NoOverride)
+    mEventRegionsOverride(EventRegionsOverride::NoOverride),
+    mVRDeviceID(0),
+    mInputFrameID(0)
 {
   MOZ_COUNT_CTOR(ContainerLayer);
   mContentFlags = 0; // Clear NO_TEXT, NO_TEXT_OVER_TRANSPARENT
@@ -1279,7 +1278,8 @@ ContainerLayer::FillSpecificAttributes(SpecificLayerAttributes& aAttrs)
                                     mInheritedXScale, mInheritedYScale,
                                     mPresShellResolution, mScaleToResolution,
                                     mEventRegionsOverride,
-                                    reinterpret_cast<uint64_t>(mHMDInfo.get()));
+                                    mVRDeviceID,
+                                    mInputFrameID);
 }
 
 bool
@@ -1987,9 +1987,8 @@ DumpRect(layerscope::LayersPacket::Layer::Rect* aLayerRect,
 static void
 DumpRegion(layerscope::LayersPacket::Layer::Region* aLayerRegion, const nsIntRegion& aRegion)
 {
-  nsIntRegionRectIterator it(aRegion);
-  while (const IntRect* sr = it.Next()) {
-    DumpRect(aLayerRegion->add_r(), *sr);
+  for (auto iter = aRegion.RectIter(); !iter.Done(); iter.Next()) {
+    DumpRect(aLayerRegion->add_r(), iter.Get());
   }
 }
 
@@ -2143,8 +2142,8 @@ ContainerLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   if (mEventRegionsOverride & EventRegionsOverride::ForceEmptyHitRegion) {
     aStream << " [force-ehr]";
   }
-  if (mHMDInfo) {
-    aStream << nsPrintfCString(" [hmd=%p]", mHMDInfo.get()).get();
+  if (mVRDeviceID) {
+    aStream << nsPrintfCString(" [hmd=%lu] [hmdframe=%l]", mVRDeviceID, mInputFrameID).get();
   }
 }
 
@@ -2430,7 +2429,7 @@ void
 SetAntialiasingFlags(Layer* aLayer, DrawTarget* aTarget)
 {
   bool permitSubpixelAA = !(aLayer->GetContentFlags() & Layer::CONTENT_DISABLE_SUBPIXEL_AA);
-  if (aTarget->GetFormat() != SurfaceFormat::B8G8R8A8) {
+  if (aTarget->IsCurrentGroupOpaque()) {
     aTarget->SetPermitSubpixelAA(permitSubpixelAA);
     return;
   }

@@ -106,7 +106,7 @@
 #include "mozilla/dom/Promise.h"
 
 #include "nsIUploadChannel2.h"
-#include "nsFormData.h"
+#include "mozilla/dom/FormData.h"
 #include "nsIDocShell.h"
 
 #include "WorkerPrivate.h"
@@ -212,6 +212,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCachedResolveResults)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeviceStorageAreaListener)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPresentation)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVRGetDevicesPromises)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -345,6 +346,8 @@ Navigator::Invalidate()
   if (mDeviceStorageAreaListener) {
     mDeviceStorageAreaListener = nullptr;
   }
+
+  mVRGetDevicesPromises.Clear();
 }
 
 //*****************************************************************************
@@ -357,11 +360,22 @@ Navigator::GetUserAgent(nsAString& aUserAgent)
   nsCOMPtr<nsIURI> codebaseURI;
   nsCOMPtr<nsPIDOMWindow> window;
 
-  if (mWindow && mWindow->GetDocShell()) {
+  if (mWindow) {
     window = mWindow;
-    nsIDocument* doc = mWindow->GetExtantDoc();
-    if (doc) {
-      doc->NodePrincipal()->GetURI(getter_AddRefs(codebaseURI));
+    nsIDocShell* docshell = window->GetDocShell();
+    nsString customUserAgent;
+    if (docshell) {
+      docshell->GetCustomUserAgent(customUserAgent);
+
+      if (!customUserAgent.IsEmpty()) {
+        aUserAgent = customUserAgent;
+        return NS_OK;
+      }
+
+      nsIDocument* doc = mWindow->GetExtantDoc();
+      if (doc) {
+        doc->NodePrincipal()->GetURI(getter_AddRefs(codebaseURI));
+      }
     }
   }
 
@@ -759,13 +773,25 @@ NS_IMPL_ISUPPORTS(VibrateWindowListener, nsIDOMEventListener)
 
 StaticRefPtr<VibrateWindowListener> gVibrateWindowListener;
 
+static bool
+MayVibrate(nsIDocument* doc) {
+#if MOZ_WIDGET_GONK
+  if (XRE_IsParentProcess()) {
+    return true; // The system app can always vibrate
+  }
+#endif // MOZ_WIDGET_GONK
+
+  // Hidden documents cannot start or stop a vibration.
+  return (doc && !doc->Hidden());
+}
+
 NS_IMETHODIMP
 VibrateWindowListener::HandleEvent(nsIDOMEvent* aEvent)
 {
   nsCOMPtr<nsIDocument> doc =
     do_QueryInterface(aEvent->InternalDOMEvent()->GetTarget());
 
-  if (!doc || doc->Hidden()) {
+  if (!MayVibrate(doc)) {
     // It's important that we call CancelVibrate(), not Vibrate() with an
     // empty list, because Vibrate() will fail if we're no longer focused, but
     // CancelVibrate() will succeed, so long as nobody else has started a new
@@ -838,12 +864,8 @@ Navigator::Vibrate(const nsTArray<uint32_t>& aPattern)
   }
 
   nsCOMPtr<nsIDocument> doc = mWindow->GetExtantDoc();
-  if (!doc) {
-    return false;
-  }
 
-  if (doc->Hidden()) {
-    // Hidden documents cannot start or stop a vibration.
+  if (!MayVibrate(doc)) {
     return false;
   }
 
@@ -1177,13 +1199,19 @@ Navigator::SendBeacon(const nsAString& aUrl,
     return false;
   }
 
+  nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL |
+    nsIChannel::LOAD_CLASSIFY_URI;
+
   nsCOMPtr<nsIChannel> channel;
   rv = NS_NewChannel(getter_AddRefs(channel),
                      uri,
                      doc,
                      nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS |
                        nsILoadInfo::SEC_COOKIES_INCLUDE,
-                     nsIContentPolicy::TYPE_BEACON);
+                     nsIContentPolicy::TYPE_BEACON,
+                     nullptr, // aLoadGroup
+                     nullptr, // aCallbacks
+                     loadFlags);
 
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
@@ -1249,7 +1277,7 @@ Navigator::SendBeacon(const nsAString& aUrl,
       mimeType = NS_ConvertUTF16toUTF8(type);
 
     } else if (aData.Value().IsFormData()) {
-      nsFormData& form = aData.Value().GetAsFormData();
+      FormData& form = aData.Value().GetAsFormData();
       uint64_t len;
       nsAutoCString charset;
       form.GetSendInfo(getter_AddRefs(in),
@@ -1351,6 +1379,7 @@ Navigator::MozGetUserMediaDevices(const MediaStreamConstraints& aConstraints,
                                   MozGetUserMediaDevicesSuccessCallback& aOnSuccess,
                                   NavigatorUserMediaErrorCallback& aOnError,
                                   uint64_t aInnerWindowID,
+                                  const nsAString& aCallID,
                                   ErrorResult& aRv)
 {
   CallbackObjectHolder<MozGetUserMediaDevicesSuccessCallback,
@@ -1370,7 +1399,7 @@ Navigator::MozGetUserMediaDevices(const MediaStreamConstraints& aConstraints,
 
   MediaManager* manager = MediaManager::Get();
   aRv = manager->GetUserMediaDevices(mWindow, aConstraints, onsuccess, onerror,
-                                     aInnerWindowID);
+                                     aInnerWindowID, aCallID);
 }
 #endif
 
@@ -1558,9 +1587,10 @@ Navigator::HasFeature(const nsAString& aName, ErrorResult& aRv)
     return nullptr;
   }
 
-  // Hardcoded web-extensions feature which is b2g specific.
+  // Hardcoded extensions features which are b2g specific.
 #ifdef MOZ_B2G
-  if (aName.EqualsLiteral("web-extensions")) {
+  if (aName.EqualsLiteral("web-extensions") ||
+      aName.EqualsLiteral("late-customization")) {
     p->MaybeResolve(true);
     return p.forget();
   }
@@ -1573,6 +1603,7 @@ Navigator::HasFeature(const nsAString& aName, ErrorResult& aRv)
 #ifdef MOZ_B2G
   , "manifest.chrome.navigation"
   , "manifest.precompile"
+  , "manifest.role.homescreen"
 #endif
   };
 
@@ -1897,16 +1928,35 @@ Navigator::GetVRDevices(ErrorResult& aRv)
     return nullptr;
   }
 
+  // We pass ourself to RefreshVRDevices, so NotifyVRDevicesUpdated will
+  // be called asynchronously, resolving the promises in mVRGetDevicesPromises.
+  if (!VRDevice::RefreshVRDevices(this)) {
+    p->MaybeReject(NS_ERROR_FAILURE);
+    return p.forget();
+  }
+
+  mVRGetDevicesPromises.AppendElement(p);
+  return p.forget();
+}
+
+void
+Navigator::NotifyVRDevicesUpdated()
+{
+  // Synchronize the VR devices and resolve the promises in
+  // mVRGetDevicesPromises
   nsGlobalWindow* win = static_cast<nsGlobalWindow*>(mWindow.get());
 
   nsTArray<RefPtr<VRDevice>> vrDevs;
-  if (!win->GetVRDevices(vrDevs)) {
-    p->MaybeReject(NS_ERROR_FAILURE);
+  if (win->UpdateVRDevices(vrDevs)) {
+    for (auto p: mVRGetDevicesPromises) {
+      p->MaybeResolve(vrDevs);
+    }
   } else {
-    p->MaybeResolve(vrDevs);
+    for (auto p: mVRGetDevicesPromises) {
+      p->MaybeReject(NS_ERROR_FAILURE);
+    }
   }
-
-  return p.forget();
+  mVRGetDevicesPromises.Clear();
 }
 
 //*****************************************************************************
@@ -2177,7 +2227,7 @@ Navigator::GetMozAudioChannelManager(ErrorResult& aRv)
 bool
 Navigator::DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObject,
                      JS::Handle<jsid> aId,
-                     JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                     JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   // Note: Keep this in sync with MayResolve.
   if (!JSID_IS_STRING(aId)) {
@@ -2541,37 +2591,6 @@ Navigator::HasMobileIdSupport(JSContext* aCx, JSObject* aGlobal)
 
 /* static */
 bool
-Navigator::HasTVSupport(JSContext* aCx, JSObject* aGlobal)
-{
-  JS::Rooted<JSObject*> global(aCx, aGlobal);
-
-  nsCOMPtr<nsPIDOMWindow> win = GetWindowFromGlobal(global);
-  if (!win) {
-    return false;
-  }
-
-  // Just for testing, we can enable TV for any kind of app.
-  if (Preferences::GetBool("dom.testing.tv_enabled_for_hosted_apps", false)) {
-    return true;
-  }
-
-  nsIDocument* doc = win->GetExtantDoc();
-  if (!doc || !doc->NodePrincipal()) {
-    return false;
-  }
-
-  nsIPrincipal* principal = doc->NodePrincipal();
-  uint16_t status;
-  if (NS_FAILED(principal->GetAppStatus(&status))) {
-    return false;
-  }
-
-  // Only support TV Manager API for certified apps for now.
-  return status == nsIPrincipal::APP_STATUS_CERTIFIED;
-}
-
-/* static */
-bool
 Navigator::HasPresentationSupport(JSContext* aCx, JSObject* aGlobal)
 {
   JS::Rooted<JSObject*> global(aCx, aGlobal);
@@ -2745,6 +2764,12 @@ Navigator::AppName(nsAString& aAppName, bool aUsePrefOverriddenValue)
   }
 
   aAppName.AssignLiteral("Netscape");
+}
+
+void
+Navigator::ClearUserAgentCache()
+{
+  NavigatorBinding::ClearCachedUserAgentValue(this);
 }
 
 nsresult

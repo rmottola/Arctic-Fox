@@ -1,4 +1,5 @@
-/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -282,7 +283,8 @@ AppendCSSShadowValue(const nsCSSShadowItem *aShadow,
 
 // Like nsStyleCoord::CalcValue, but with length in float pixels instead
 // of nscoord.
-struct PixelCalcValue {
+struct PixelCalcValue
+{
   float mLength, mPercent;
   bool mHasPercent;
 };
@@ -3622,12 +3624,14 @@ StyleAnimationValue::GetScaleValue(const nsIFrame* aForFrame) const
   MOZ_ASSERT(list->mHead);
 
   RuleNodeCacheConditions dontCare;
+  bool dontCareBool;
   nsStyleTransformMatrix::TransformReferenceBox refBox(aForFrame);
   Matrix4x4 transform = nsStyleTransformMatrix::ReadTransforms(
                           list->mHead,
                           aForFrame->StyleContext(),
                           aForFrame->PresContext(), dontCare, refBox,
-                          aForFrame->PresContext()->AppUnitsPerDevPixel());
+                          aForFrame->PresContext()->AppUnitsPerDevPixel(),
+                          &dontCareBool);
 
   Matrix transform2d;
   bool canDraw2D = transform.CanDraw2D(&transform2d);
@@ -3856,11 +3860,11 @@ void
 StyleAnimationValue::SetAndAdoptCSSValueTripletValue(
                        nsCSSValueTriplet *aValueTriplet, Unit aUnit)
 {
-    FreeValue();
-    MOZ_ASSERT(IsCSSValueTripletUnit(aUnit), "bad unit");
-    MOZ_ASSERT(aValueTriplet != nullptr, "value pairs may not be null");
-    mUnit = aUnit;
-    mValue.mCSSValueTriplet = aValueTriplet; // take ownership
+  FreeValue();
+  MOZ_ASSERT(IsCSSValueTripletUnit(aUnit), "bad unit");
+  MOZ_ASSERT(aValueTriplet != nullptr, "value pairs may not be null");
+  mUnit = aUnit;
+  mValue.mCSSValueTriplet = aValueTriplet; // take ownership
 }
 
 void

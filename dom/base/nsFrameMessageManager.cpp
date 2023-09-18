@@ -1624,15 +1624,6 @@ nsMessageManagerScriptExecutor::DidCreateGlobal()
   }
 }
 
-static PLDHashOperator
-RemoveCachedScriptEntry(const nsAString& aKey,
-                        nsMessageManagerScriptHolder*& aData,
-                        void* aUserArg)
-{
-  delete aData;
-  return PL_DHASH_REMOVE;
-}
-
 // static
 void
 nsMessageManagerScriptExecutor::Shutdown()
@@ -1640,7 +1631,10 @@ nsMessageManagerScriptExecutor::Shutdown()
   if (sCachedScripts) {
     AutoSafeJSContext cx;
     NS_ASSERTION(sCachedScripts != nullptr, "Need cached scripts");
-    sCachedScripts->Enumerate(RemoveCachedScriptEntry, nullptr);
+    for (auto iter = sCachedScripts->Iter(); !iter.Done(); iter.Next()) {
+      delete iter.Data();
+      iter.Remove();
+    }
 
     delete sCachedScripts;
     sCachedScripts = nullptr;
@@ -1813,8 +1807,8 @@ nsMessageManagerScriptExecutor::InitChildGlobalInternal(
   const uint32_t flags = nsIXPConnect::INIT_JS_STANDARD_CLASSES;
 
   JS::CompartmentOptions options;
-  options.setZone(JS::SystemZone)
-         .setVersion(JSVERSION_LATEST);
+  options.creationOptions().setZone(JS::SystemZone);
+  options.behaviors().setVersion(JSVERSION_LATEST);
 
   nsresult rv =
     xpc->InitClassesWithNewWrappedGlobal(cx, aScope, mPrincipal,

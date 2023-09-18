@@ -10,7 +10,6 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/IntegerRange.h"
 #include "mozilla/PodOperations.h"
-#include "mozilla/UniquePtr.h"
 
 #include "jsalloc.h"
 #include "jsgc.h"
@@ -162,7 +161,7 @@ struct Statistics
     /* Create a convenient type for referring to tables of phase times. */
     using PhaseTimeTable = int64_t[NumTimingArrays][PHASE_LIMIT];
 
-    static void initialize();
+    static bool initialize();
 
     explicit Statistics(JSRuntime* rt);
     ~Statistics();
@@ -192,6 +191,23 @@ struct Statistics
         counts[s]++;
     }
 
+    void beginNurseryCollection(JS::gcreason::Reason reason) {
+        count(STAT_MINOR_GC);
+        if (nurseryCollectionCallback) {
+            (*nurseryCollectionCallback)(runtime,
+                                         JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START,
+                                         reason);
+        }
+    }
+
+    void endNurseryCollection(JS::gcreason::Reason reason) {
+        if (nurseryCollectionCallback) {
+            (*nurseryCollectionCallback)(runtime,
+                                         JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END,
+                                         reason);
+        }
+    }
+
     int64_t beginSCC();
     void endSCC(unsigned scc, int64_t start);
 
@@ -201,6 +217,8 @@ struct Statistics
     UniqueChars formatDetailedMessage();
 
     JS::GCSliceCallback setSliceCallback(JS::GCSliceCallback callback);
+    JS::GCNurseryCollectionCallback setNurseryCollectionCallback(
+        JS::GCNurseryCollectionCallback callback);
 
     int64_t clearMaxGCPauseAccumulator();
     int64_t getMaxGCPauseSinceClear();
@@ -307,6 +325,7 @@ struct Statistics
     Vector<int64_t, 0, SystemAllocPolicy> sccTimes;
 
     JS::GCSliceCallback sliceCallback;
+    JS::GCNurseryCollectionCallback nurseryCollectionCallback;
 
     /*
      * True if we saw an OOM while allocating slices. The statistics for this
@@ -404,7 +423,6 @@ struct MOZ_RAII AutoSCC
 };
 
 const char* ExplainInvocationKind(JSGCInvocationKind gckind);
-const char* ExplainReason(JS::gcreason::Reason reason);
 
 } /* namespace gcstats */
 } /* namespace js */

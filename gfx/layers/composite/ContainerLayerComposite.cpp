@@ -32,6 +32,7 @@
 #include "nsTArray.h"                   // for nsAutoTArray
 #include "TextRenderer.h"               // for TextRenderer
 #include <vector>
+#include "VRManager.h"                  // for VRManager
 #include "GeckoProfiler.h"              // for GeckoProfiler
 #ifdef MOZ_ENABLE_PROFILER_SPS
 #include "ProfilerMarkers.h"            // for ProfilerMarkers
@@ -138,8 +139,11 @@ template<class ContainerT> void
 ContainerRenderVR(ContainerT* aContainer,
                   LayerManagerComposite* aManager,
                   const gfx::IntRect& aClipRect,
-                  gfx::VRHMDInfo* aHMD)
+                  RefPtr<gfx::VRHMDInfo> aHMD,
+                  int32_t aInputFrameID)
 {
+  int32_t inputFrameID = -1;
+
   RefPtr<CompositingRenderTarget> surface;
 
   Compositor* compositor = aManager->GetCompositor();
@@ -149,7 +153,7 @@ ContainerRenderVR(ContainerT* aContainer,
   float opacity = aContainer->GetEffectiveOpacity();
 
   // The size of each individual eye surface
-  gfx::IntSize eyeResolution = aHMD->SuggestedEyeResolution();
+  gfx::IntSize eyeResolution = aHMD->GetDeviceInfo().SuggestedEyeResolution();
   gfx::IntRect eyeRect[2];
   eyeRect[0] = gfx::IntRect(0, 0, eyeResolution.width, eyeResolution.height);
   eyeRect[1] = gfx::IntRect(eyeResolution.width, 0, eyeResolution.width, eyeResolution.height);
@@ -264,6 +268,14 @@ ContainerRenderVR(ContainerT* aContainer,
                                                  surfaceRect.width, surfaceRect.height));
       layerToRender->RenderLayer(surfaceRect);
 
+      CompositableHost *ch = layerToRender->GetCompositableHost();
+      if (ch) {
+        int32_t compositableInputFrameID = ch->GetLastInputFrameID();
+        if (compositableInputFrameID != -1) {
+          inputFrameID = compositableInputFrameID;
+        }
+      }
+
       if (restoreTransform) {
         layer->ReplaceEffectiveTransform(childTransform);
       }
@@ -281,7 +293,7 @@ ContainerRenderVR(ContainerT* aContainer,
   compositor->SetRenderTarget(previousTarget);
 
   if (vrRendering) {
-    vrRendering->SubmitFrame(aContainer->mVRRenderTargetSet);
+    vrRendering->SubmitFrame(aContainer->mVRRenderTargetSet, inputFrameID);
     DUMP("<<< ContainerRenderVR [used vrRendering] [%p]\n", aContainer);
     if (!gfxPrefs::VRMirrorTextures()) {
       return;
@@ -340,7 +352,7 @@ ContainerPrepare(ContainerT* aContainer,
   aContainer->mPrepared = MakeUnique<PreparedData>();
   aContainer->mPrepared->mNeedsSurfaceCopy = false;
 
-  gfx::VRHMDInfo *hmdInfo = aContainer->GetVRHMDInfo();
+  RefPtr<gfx::VRHMDInfo> hmdInfo = gfx::VRManager::Get()->GetDevice(aContainer->GetVRDeviceID());
   if (hmdInfo && hmdInfo->GetConfiguration().IsValid()) {
     // we're not going to do anything here; instead, we'll do it all in ContainerRender.
     // XXX fix this; we can win with the same optimizations.  Specifically, we
@@ -444,7 +456,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
     return;
   }
 
-  ViewTransform asyncTransformWithoutOverscroll;
+  AsyncTransform asyncTransformWithoutOverscroll;
   ParentLayerPoint scrollOffset;
   controller->SampleContentTransformForFrame(&asyncTransformWithoutOverscroll,
                                            scrollOffset);
@@ -686,9 +698,9 @@ ContainerRender(ContainerT* aContainer,
 {
   MOZ_ASSERT(aContainer->mPrepared);
 
-  gfx::VRHMDInfo *hmdInfo = aContainer->GetVRHMDInfo();
+  RefPtr<gfx::VRHMDInfo> hmdInfo = gfx::VRManager::Get()->GetDevice(aContainer->GetVRDeviceID());
   if (hmdInfo && hmdInfo->GetConfiguration().IsValid()) {
-    ContainerRenderVR(aContainer, aManager, aClipRect, hmdInfo);
+    ContainerRenderVR(aContainer, aManager, aClipRect, hmdInfo, aContainer->GetInputFrameID());
     aContainer->mPrepared = nullptr;
     return;
   }

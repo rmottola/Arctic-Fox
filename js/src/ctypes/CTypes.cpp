@@ -40,6 +40,7 @@
 
 #include "builtin/TypedObject.h"
 #include "ctypes/Library.h"
+#include "gc/Policy.h"
 #include "gc/Zone.h"
 #include "js/Vector.h"
 
@@ -4093,7 +4094,8 @@ CType::Finalize(JSFreeOp* fop, JSObject* obj)
     }
   }
 
-    // Fall through.
+    MOZ_FALLTHROUGH;
+
   case TYPE_array: {
     // Free the ffi_type info.
     slot = JS_GetReservedSlot(obj, SLOT_FFITYPE);
@@ -4140,10 +4142,10 @@ CType::Trace(JSTracer* trc, JSObject* obj)
     MOZ_ASSERT(fninfo);
 
     // Identify our objects to the tracer.
-    JS_CallObjectTracer(trc, &fninfo->mABI, "abi");
-    JS_CallObjectTracer(trc, &fninfo->mReturnType, "returnType");
+    JS::TraceEdge(trc, &fninfo->mABI, "abi");
+    JS::TraceEdge(trc, &fninfo->mReturnType, "returnType");
     for (size_t i = 0; i < fninfo->mArgTypes.length(); ++i)
-      JS_CallObjectTracer(trc, &fninfo->mArgTypes[i], "argType");
+      JS::TraceEdge(trc, &fninfo->mArgTypes[i], "argType");
 
     break;
   }
@@ -5549,7 +5551,7 @@ PostBarrierCallback(JSTracer* trc, JSString* key, void* data)
 
     UnbarrieredFieldInfoHash* table = reinterpret_cast<UnbarrieredFieldInfoHash*>(data);
     JSString* prior = key;
-    JS_CallUnbarrieredStringTracer(trc, &key, "CType fieldName");
+    js::UnsafeTraceManuallyBarrieredEdge(trc, &key, "CType fieldName");
     table->rekeyIfMoved(JS_ASSERT_STRING_IS_FLAT(prior), JS_ASSERT_STRING_IS_FLAT(key));
 }
 
@@ -6872,7 +6874,7 @@ CClosure::Create(JSContext* cx,
   // we might be unable to convert the value to the proper type. If so, we want
   // the caller to know about it _now_, rather than some uncertain time in the
   // future when the error sentinel is actually needed.
-  mozilla::UniquePtr<uint8_t[], JS::FreePolicy> errResult;
+  UniquePtr<uint8_t[], JS::FreePolicy> errResult;
   if (!errVal.isUndefined()) {
 
     // Make sure the callback returns something.
@@ -6947,10 +6949,10 @@ CClosure::Trace(JSTracer* trc, JSObject* obj)
 
   // Identify our objects to the tracer. (There's no need to identify
   // 'closureObj', since that's us.)
-  JS_CallObjectTracer(trc, &cinfo->typeObj, "typeObj");
-  JS_CallObjectTracer(trc, &cinfo->jsfnObj, "jsfnObj");
+  JS::TraceEdge(trc, &cinfo->typeObj, "typeObj");
+  JS::TraceEdge(trc, &cinfo->jsfnObj, "jsfnObj");
   if (cinfo->thisObj)
-    JS_CallObjectTracer(trc, &cinfo->thisObj, "thisObj");
+    JS::TraceEdge(trc, &cinfo->thisObj, "thisObj");
 }
 
 void
