@@ -3016,6 +3016,8 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
                                nsIAsyncOutputStream **outstream,
                                bool isBackup)
 {
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+
     nsresult rv;
     const char *socketTypes[1];
     uint32_t typeCount = 0;
@@ -3118,6 +3120,10 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
 
     rv = socketTransport->SetSecurityCallbacks(this);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    Telemetry::Accumulate(Telemetry::HTTP_CONNECTION_ENTRY_CACHE_HIT_1,
+                          mEnt->mUsedForConnection);
+    mEnt->mUsedForConnection = true;
 
     nsCOMPtr<nsIOutputStream> sout;
     rv = socketTransport->OpenOutputStream(nsITransport::OPEN_UNBUFFERED,
@@ -3577,6 +3583,7 @@ nsConnectionEntry::nsConnectionEntry(nsHttpConnectionInfo *ci)
     , mInPreferredHash(false)
     , mPreferIPv4(false)
     , mPreferIPv6(false)
+    , mUsedForConnection(false)
 {
     MOZ_COUNT_CTOR(nsConnectionEntry);
     if (gHttpHandler->GetPipelineAggressive()) {
