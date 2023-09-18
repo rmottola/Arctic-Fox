@@ -6,6 +6,7 @@
 
 DIRS += [
     'about',
+    'contextualidentity',
     'certerror',
     'dirprovider',
     'downloads',
