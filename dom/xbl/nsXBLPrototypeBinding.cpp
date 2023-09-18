@@ -1014,15 +1014,6 @@ nsXBLPrototypeBinding::ReadNewBinding(nsIObjectInputStream* aStream,
   return rv;
 }
 
-static PLDHashOperator
-WriteInterfaceID(const nsIID& aKey, nsIContent* aData, void* aClosure)
-{
-  // We can just write out the ids. The cache will be invalidated when a
-  // different build is used, so we don't need to worry about ids changing.
-  static_cast<nsIObjectOutputStream *>(aClosure)->WriteID(aKey);
-  return PL_DHASH_NEXT;
-}
-
 nsresult
 nsXBLPrototypeBinding::Write(nsIObjectOutputStream* aStream)
 {
@@ -1091,7 +1082,11 @@ nsXBLPrototypeBinding::Write(nsIObjectOutputStream* aStream)
   rv = aStream->Write32(mInterfaceTable.Count());
   NS_ENSURE_SUCCESS(rv, rv);
 
-  mInterfaceTable.EnumerateRead(WriteInterfaceID, aStream);
+  for (auto iter = mInterfaceTable.Iter(); !iter.Done(); iter.Next()) {
+    // We can just write out the ids. The cache will be invalidated when a
+    // different build is used, so we don't need to worry about ids changing.
+    aStream->WriteID(iter.Key());
+  }
 
   // Write out the implementation details.
   if (mImplementation) {
