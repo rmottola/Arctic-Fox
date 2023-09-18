@@ -263,6 +263,9 @@ nsHttpConnection::StartSpdy(uint8_t spdyVersion)
     } else {
         mTLSFilter->SetProxiedTransaction(mSpdySession);
     }
+    if (mDontReuse) {
+        mSpdySession->DontReuse();
+    }
 }
 
 bool
@@ -751,6 +754,7 @@ nsHttpConnection::InitSSLParams(bool connectingToProxy, bool proxyStartSSL)
 void
 nsHttpConnection::DontReuse()
 {
+    LOG(("nsHttpConnection::DontReuse %p spdysession=%p\n", this, mSpdySession.get()));
     mKeepAliveMask = false;
     mKeepAlive = false;
     mDontReuse = true;
