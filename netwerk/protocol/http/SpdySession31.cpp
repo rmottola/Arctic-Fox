@@ -1617,22 +1617,6 @@ SpdySession31::HandleHeaders(SpdySession31 *self)
   return rv;
 }
 
-PLDHashOperator
-SpdySession31::RestartBlockedOnRwinEnumerator(nsAHttpTransaction *key,
-                                              nsAutoPtr<SpdyStream31> &stream,
-                                              void *closure)
-{
-  SpdySession31 *self = static_cast<SpdySession31 *>(closure);
-  MOZ_ASSERT(self->mRemoteSessionWindow > 0);
-
-  if (!stream->BlockedOnRwin() || stream->RemoteWindow() <= 0)
-    return PL_DHASH_NEXT;
-
-  self->mReadyForWrite.Push(stream);
-  self->SetWriteCallbacks();
-  return PL_DHASH_NEXT;
-}
-
 nsresult
 SpdySession31::HandleWindowUpdate(SpdySession31 *self)
 {
@@ -1676,7 +1660,19 @@ SpdySession31::HandleWindowUpdate(SpdySession31 *self)
     if ((oldRemoteWindow <= 0) && (self->mRemoteSessionWindow > 0)) {
       LOG3(("SpdySession31::HandleWindowUpdate %p restart session window\n",
             self));
-      self->mStreamTransactionHash.Enumerate(RestartBlockedOnRwinEnumerator, self);
+      for (auto iter = self->mStreamTransactionHash.Iter();
+           !iter.Done();
+           iter.Next()) {
+        MOZ_ASSERT(self->mRemoteSessionWindow > 0);
+
+        nsAutoPtr<SpdyStream31>& stream = iter.Data();
+        if (!stream->BlockedOnRwin() || stream->RemoteWindow() <= 0) {
+          continue;
+        }
+
+        self->mReadyForWrite.Push(stream);
+        self->SetWriteCallbacks();
+      }
     }
   }
 
@@ -2906,22 +2902,6 @@ SpdySession31::Http1xTransactionCount()
   return 0;
 }
 
-// used as an enumerator by TakeSubTransactions()
-static PLDHashOperator
-  TakeStream(nsAHttpTransaction *key,
-             nsAutoPtr<SpdyStream31> &stream,
-             void *closure)
-{
-  nsTArray<RefPtr<nsAHttpTransaction> > *list =
-    static_cast<nsTArray<RefPtr<nsAHttpTransaction> > *>(closure);
-
-  list->AppendElement(key);
-
-  // removing the stream from the hash will delete the stream
-  // and drop the transaction reference the hash held
-  return PL_DHASH_REMOVE;
-}
-
 nsresult
 SpdySession31::TakeSubTransactions(
   nsTArray<RefPtr<nsAHttpTransaction> > &outTransactions)
@@ -2936,7 +2916,13 @@ SpdySession31::TakeSubTransactions(
 
   LOG3(("   taking %d\n", mStreamTransactionHash.Count()));
 
-  mStreamTransactionHash.Enumerate(TakeStream, &outTransactions);
+  for (auto iter = mStreamTransactionHash.Iter(); !iter.Done(); iter.Next()) {
+    outTransactions.AppendElement(iter.Key());
+
+    // Removing the stream from the hash will delete the stream and drop the
+    // transaction reference the hash held.
+    iter.Remove();
+  }
   return NS_OK;
 }
 
