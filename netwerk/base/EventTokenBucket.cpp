@@ -207,6 +207,18 @@ EventTokenBucket::UnPause()
   UpdateTimer();
 }
 
+void
+EventTokenBucket::Stop()
+{
+  MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+  SOCKET_LOG(("EventTokenBucket::Stop %p armed=%d\n", this, mTimerArmed));
+  mStopped = true;
+  if (mTimerArmed) {
+    mTimer->Cancel();
+    mTimerArmed = false;
+  }
+}
+
 nsresult
 EventTokenBucket::SubmitEvent(ATokenBucketEvent *event, nsICancelable **cancelable)
 {

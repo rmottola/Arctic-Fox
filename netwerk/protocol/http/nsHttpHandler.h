@@ -29,6 +29,8 @@ class nsISiteSecurityService;
 class nsIStreamConverterService;
 class nsITimer;
 
+extern mozilla::Atomic<PRThread*, mozilla::Relaxed> gSocketThread;
+
 namespace mozilla {
 namespace net {
 class ATokenBucketEvent;
@@ -567,6 +569,7 @@ public:
     nsresult SubmitPacedRequest(ATokenBucketEvent *event,
                                 nsICancelable **cancel)
     {
+        MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
         if (!mRequestTokenBucket)
             return NS_ERROR_UNEXPECTED;
         return mRequestTokenBucket->SubmitEvent(event, cancel);
@@ -575,7 +578,17 @@ public:
     // Socket thread only
     void SetRequestTokenBucket(EventTokenBucket *aTokenBucket)
     {
+        MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
         mRequestTokenBucket = aTokenBucket;
+    }
+
+    void StopRequestTokenBucket()
+    {
+        MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+        if (mRequestTokenBucket) {
+            mRequestTokenBucket->Stop();
+            mRequestTokenBucket = nullptr;
+        }
     }
 
 private:
