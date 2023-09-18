@@ -766,20 +766,18 @@ nsWindowMemoryReporter::CheckForGhostWindows(
   TimeStamp now = mLastCheckForGhostWindows;
   for (auto iter = mDetachedWindows.Iter(); !iter.Done(); iter.Next()) {
     nsWeakPtr weakKey = do_QueryInterface(iter.Key());
-    nsCOMPtr<mozIDOMWindow> iwindow = do_QueryReferent(weakKey);
-    if (!iwindow) {
+    nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(weakKey);
+    if (!window) {
       // The window object has been destroyed.  Stop tracking its weak ref in
       // our hashtable.
       iter.Remove();
       continue;
     }
 
-    nsPIDOMWindowInner* window = nsPIDOMWindowInner::From(iwindow);
-
     // Avoid calling GetTop() if we have no outer window.  Nothing will break if
     // we do, but it will spew debug output, which can cause our test logs to
     // overflow.
-    nsCOMPtr<nsPIDOMWindowOuter> top;
+    nsCOMPtr<nsPIDOMWindow> top;
     if (window->GetOuterWindow()) {
       top = window->GetOuterWindow()->GetTop();
     }
