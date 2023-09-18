@@ -66,6 +66,7 @@ Http2Stream::Http2Stream(nsAHttpTransaction *httpTransaction,
   , mRequestBodyLenRemaining(0)
   , mLocalUnacked(0)
   , mBlockedOnRwin(false)
+  , mSentPushWindowBump(false)
   , mTotalSent(0)
   , mTotalRead(0)
   , mPushSource(nullptr)
@@ -487,8 +488,8 @@ Http2Stream::ParseHttpRequestHeaders(const char *buf,
           mSession, hashkey.get(), schedulingContext, cache, pushedStream));
 
     if (pushedStream) {
-      LOG3(("Pushed Stream Match located id=0x%X key=%s\n",
-            pushedStream->StreamID(), hashkey.get()));
+      LOG3(("Pushed Stream Match located %p id=0x%X key=%s\n",
+            pushedStream, pushedStream->StreamID(), hashkey.get()));
       pushedStream->SetConsumerStream(this);
       mPushSource = pushedStream;
       SetSentFin(true);
@@ -1396,6 +1397,14 @@ Http2Stream::OnReadSegment(const char *buf,
 
   case SENDING_FIN_STREAM:
     MOZ_ASSERT(false, "resuming partial fin stream out of OnReadSegment");
+    break;
+
+  case UPSTREAM_COMPLETE:
+    MOZ_ASSERT(mPushSource && !mSentPushWindowBump, "unexpected upstream_complete");
+    rv = TransmitFrame(nullptr, nullptr, true);
+    if (NS_SUCCEEDED(rv)) {
+      mSentPushWindowBump = true;
+    }
     break;
 
   default:
