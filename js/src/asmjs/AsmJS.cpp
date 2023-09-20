@@ -1794,7 +1794,12 @@ class MOZ_STACK_CLASS ModuleValidator
                 return false;
         }
 
-        return mg_.init(Move(genData), Move(filename));
+        if (!mg_.init(Move(genData), Move(filename)))
+            return false;
+
+        mg_.bumpMinHeapLength(module_->minHeapLength);
+
+        return true;
     }
 
     ExclusiveContext* cx() const             { return cx_; }
@@ -2090,8 +2095,10 @@ class MOZ_STACK_CLASS ModuleValidator
         if (len > uint64_t(INT32_MAX) + 1)
             return false;
         len = RoundUpToNextValidAsmJSHeapLength(len);
-        if (len > module_->minHeapLength)
+        if (len > module_->minHeapLength) {
             module_->minHeapLength = len;
+            mg_.bumpMinHeapLength(len);
+        }
         return true;
     }
 
@@ -3505,40 +3512,12 @@ IsLiteralOrConstInt(FunctionValidator& f, ParseNode* pn, uint32_t* u32)
     return IsLiteralInt(lit, u32);
 }
 
-static bool
-FoldMaskedArrayIndex(FunctionValidator& f, ParseNode** indexExpr, int32_t* mask,
-                     NeedsBoundsCheck* needsBoundsCheck)
-{
-    MOZ_ASSERT((*indexExpr)->isKind(PNK_BITAND));
-
-    ParseNode* indexNode = BitwiseLeft(*indexExpr);
-    ParseNode* maskNode = BitwiseRight(*indexExpr);
-
-    uint32_t mask2;
-    if (IsLiteralOrConstInt(f, maskNode, &mask2)) {
-        // Flag the access to skip the bounds check if the mask ensures that an
-        // 'out of bounds' access can not occur based on the current heap length
-        // constraint. The unsigned maximum of a masked index is the mask
-        // itself, so check that the mask is not negative and compare the mask
-        // to the known minimum heap length.
-        if (int32_t(mask2) >= 0 && mask2 < f.m().minHeapLength())
-            *needsBoundsCheck = NO_BOUNDS_CHECK;
-        *mask &= mask2;
-        *indexExpr = indexNode;
-        return true;
-    }
-
-    return false;
-}
-
 static const int32_t NoMask = -1;
 
 static bool
 CheckArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr,
-                 Scalar::Type* viewType, NeedsBoundsCheck* needsBoundsCheck, int32_t* mask)
+                 Scalar::Type* viewType, int32_t* mask)
 {
-    *needsBoundsCheck = NEEDS_BOUNDS_CHECK;
-
     if (!viewName->isKind(PNK_NAME))
         return f.fail(viewName, "base of array access must be a typed array view name");
 
@@ -3555,7 +3534,6 @@ CheckArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr
             return f.fail(indexExpr, "constant index out of range");
 
         *mask = NoMask;
-        *needsBoundsCheck = NO_BOUNDS_CHECK;
         return f.writeInt32Lit(byteOffset);
     }
 
@@ -3577,9 +3555,6 @@ CheckArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr
 
         ParseNode* pointerNode = BitwiseLeft(indexExpr);
 
-        if (pointerNode->isKind(PNK_BITAND))
-            FoldMaskedArrayIndex(f, &pointerNode, mask, needsBoundsCheck);
-
         Type pointerType;
         if (!CheckExpr(f, pointerNode, &pointerType))
             return false;
@@ -3595,9 +3570,6 @@ CheckArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr
         bool folded = false;
 
         ParseNode* pointerNode = indexExpr;
-
-        if (pointerNode->isKind(PNK_BITAND))
-            folded = FoldMaskedArrayIndex(f, &pointerNode, mask, needsBoundsCheck);
 
         Type pointerType;
         if (!CheckExpr(f, pointerNode, &pointerType))
@@ -3617,13 +3589,13 @@ CheckArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr
 
 static bool
 CheckAndPrepareArrayAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr,
-                           Scalar::Type* viewType, NeedsBoundsCheck* needsBoundsCheck, int32_t* mask)
+                           Scalar::Type* viewType, int32_t* mask)
 {
     size_t prepareAt;
     if (!f.encoder().writePatchableExpr(&prepareAt))
         return false;
 
-    if (!CheckArrayAccess(f, viewName, indexExpr, viewType, needsBoundsCheck, mask))
+    if (!CheckArrayAccess(f, viewName, indexExpr, viewType, mask))
         return false;
 
     // Don't generate the mask op if there is no need for it which could happen for
@@ -3641,17 +3613,13 @@ static bool
 CheckLoadArray(FunctionValidator& f, ParseNode* elem, Type* type)
 {
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
 
     size_t opcodeAt;
-    size_t needsBoundsCheckAt;
     if (!f.encoder().writePatchableExpr(&opcodeAt))
         return false;
-    if (!f.encoder().writePatchableU8(&needsBoundsCheckAt))
-        return false;
 
-    if (!CheckAndPrepareArrayAccess(f, ElemBase(elem), ElemIndex(elem), &viewType, &needsBoundsCheck, &mask))
+    if (!CheckAndPrepareArrayAccess(f, ElemBase(elem), ElemIndex(elem), &viewType, &mask))
         return false;
 
     switch (viewType) {
@@ -3665,8 +3633,6 @@ CheckLoadArray(FunctionValidator& f, ParseNode* elem, Type* type)
       case Scalar::Float64: f.encoder().patchExpr(opcodeAt, Expr::F64LoadMem);    break;
       default: MOZ_CRASH("unexpected scalar type");
     }
-
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
 
     switch (viewType) {
       case Scalar::Int8:
@@ -3693,16 +3659,12 @@ static bool
 CheckStoreArray(FunctionValidator& f, ParseNode* lhs, ParseNode* rhs, Type* type)
 {
     size_t opcodeAt;
-    size_t needsBoundsCheckAt;
     if (!f.encoder().writePatchableExpr(&opcodeAt))
-        return false;
-    if (!f.encoder().writePatchableU8(&needsBoundsCheckAt))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckAndPrepareArrayAccess(f, ElemBase(lhs), ElemIndex(lhs), &viewType, &needsBoundsCheck, &mask))
+    if (!CheckAndPrepareArrayAccess(f, ElemBase(lhs), ElemIndex(lhs), &viewType, &mask))
         return false;
 
     Type rhsType;
@@ -3758,8 +3720,6 @@ CheckStoreArray(FunctionValidator& f, ParseNode* lhs, ParseNode* rhs, Type* type
         break;
       default: MOZ_CRASH("unexpected scalar type");
     }
-
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
 
     *type = rhsType;
     return true;
@@ -3999,10 +3959,9 @@ CheckMathMinMax(FunctionValidator& f, ParseNode* callNode, bool isMax, Type* typ
 
 static bool
 CheckSharedArrayAtomicAccess(FunctionValidator& f, ParseNode* viewName, ParseNode* indexExpr,
-                             Scalar::Type* viewType, NeedsBoundsCheck* needsBoundsCheck,
-                             int32_t* mask)
+                             Scalar::Type* viewType, int32_t* mask)
 {
-    if (!CheckAndPrepareArrayAccess(f, viewName, indexExpr, viewType, needsBoundsCheck, mask))
+    if (!CheckAndPrepareArrayAccess(f, viewName, indexExpr, viewType, mask))
         return false;
 
     // The global will be sane, CheckArrayAccess checks it.
@@ -4038,10 +3997,9 @@ CheckAtomicsFence(FunctionValidator& f, ParseNode* call, Type* type)
 }
 
 static bool
-WriteAtomicOperator(FunctionValidator& f, Expr opcode, size_t* needsBoundsCheckAt, size_t* viewTypeAt)
+WriteAtomicOperator(FunctionValidator& f, Expr opcode, size_t* viewTypeAt)
 {
     return f.encoder().writeExpr(opcode) &&
-           f.encoder().writePatchableU8(needsBoundsCheckAt) &&
            f.encoder().writePatchableU8(viewTypeAt);
 }
 
@@ -4054,18 +4012,15 @@ CheckAtomicsLoad(FunctionValidator& f, ParseNode* call, Type* type)
     ParseNode* arrayArg = CallArgList(call);
     ParseNode* indexArg = NextNode(arrayArg);
 
-    size_t needsBoundsCheckAt;
     size_t viewTypeAt;
-    if (!WriteAtomicOperator(f, Expr::I32AtomicsLoad, &needsBoundsCheckAt, &viewTypeAt))
+    if (!WriteAtomicOperator(f, Expr::I32AtomicsLoad, &viewTypeAt))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &needsBoundsCheck, &mask))
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &mask))
         return false;
 
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
     f.encoder().patchU8(viewTypeAt, uint8_t(viewType));
 
     *type = Type::Int;
@@ -4082,15 +4037,13 @@ CheckAtomicsStore(FunctionValidator& f, ParseNode* call, Type* type)
     ParseNode* indexArg = NextNode(arrayArg);
     ParseNode* valueArg = NextNode(indexArg);
 
-    size_t needsBoundsCheckAt;
     size_t viewTypeAt;
-    if (!WriteAtomicOperator(f, Expr::I32AtomicsStore, &needsBoundsCheckAt, &viewTypeAt))
+    if (!WriteAtomicOperator(f, Expr::I32AtomicsStore, &viewTypeAt))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &needsBoundsCheck, &mask))
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &mask))
         return false;
 
     Type rhsType;
@@ -4100,7 +4053,6 @@ CheckAtomicsStore(FunctionValidator& f, ParseNode* call, Type* type)
     if (!rhsType.isIntish())
         return f.failf(arrayArg, "%s is not a subtype of intish", rhsType.toChars());
 
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
     f.encoder().patchU8(viewTypeAt, uint8_t(viewType));
 
     *type = rhsType;
@@ -4117,17 +4069,15 @@ CheckAtomicsBinop(FunctionValidator& f, ParseNode* call, Type* type, AtomicOp op
     ParseNode* indexArg = NextNode(arrayArg);
     ParseNode* valueArg = NextNode(indexArg);
 
-    size_t needsBoundsCheckAt;
     size_t viewTypeAt;
-    if (!WriteAtomicOperator(f, Expr::I32AtomicsBinOp, &needsBoundsCheckAt, &viewTypeAt))
+    if (!WriteAtomicOperator(f, Expr::I32AtomicsBinOp, &viewTypeAt))
         return false;
     if (!f.encoder().writeU8(uint8_t(op)))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &needsBoundsCheck, &mask))
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &mask))
         return false;
 
     Type valueArgType;
@@ -4137,7 +4087,6 @@ CheckAtomicsBinop(FunctionValidator& f, ParseNode* call, Type* type, AtomicOp op
     if (!valueArgType.isIntish())
         return f.failf(valueArg, "%s is not a subtype of intish", valueArgType.toChars());
 
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
     f.encoder().patchU8(viewTypeAt, uint8_t(viewType));
 
     *type = Type::Int;
@@ -4171,15 +4120,13 @@ CheckAtomicsCompareExchange(FunctionValidator& f, ParseNode* call, Type* type)
     ParseNode* oldValueArg = NextNode(indexArg);
     ParseNode* newValueArg = NextNode(oldValueArg);
 
-    size_t needsBoundsCheckAt;
     size_t viewTypeAt;
-    if (!WriteAtomicOperator(f, Expr::I32AtomicsCompareExchange, &needsBoundsCheckAt, &viewTypeAt))
+    if (!WriteAtomicOperator(f, Expr::I32AtomicsCompareExchange, &viewTypeAt))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &needsBoundsCheck, &mask))
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &mask))
         return false;
 
     Type oldValueArgType;
@@ -4196,7 +4143,6 @@ CheckAtomicsCompareExchange(FunctionValidator& f, ParseNode* call, Type* type)
     if (!newValueArgType.isIntish())
         return f.failf(newValueArg, "%s is not a subtype of intish", newValueArgType.toChars());
 
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
     f.encoder().patchU8(viewTypeAt, uint8_t(viewType));
 
     *type = Type::Int;
@@ -4213,15 +4159,13 @@ CheckAtomicsExchange(FunctionValidator& f, ParseNode* call, Type* type)
     ParseNode* indexArg = NextNode(arrayArg);
     ParseNode* valueArg = NextNode(indexArg);
 
-    size_t needsBoundsCheckAt;
     size_t viewTypeAt;
-    if (!WriteAtomicOperator(f, Expr::I32AtomicsExchange, &needsBoundsCheckAt, &viewTypeAt))
+    if (!WriteAtomicOperator(f, Expr::I32AtomicsExchange, &viewTypeAt))
         return false;
 
     Scalar::Type viewType;
-    NeedsBoundsCheck needsBoundsCheck;
     int32_t mask;
-    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &needsBoundsCheck, &mask))
+    if (!CheckSharedArrayAtomicAccess(f, arrayArg, indexArg, &viewType, &mask))
         return false;
 
     Type valueArgType;
@@ -4231,7 +4175,6 @@ CheckAtomicsExchange(FunctionValidator& f, ParseNode* call, Type* type)
     if (!valueArgType.isIntish())
         return f.failf(arrayArg, "%s is not a subtype of intish", valueArgType.toChars());
 
-    f.encoder().patchU8(needsBoundsCheckAt, uint8_t(needsBoundsCheck));
     f.encoder().patchU8(viewTypeAt, uint8_t(viewType));
 
     *type = Type::Int;
@@ -5078,11 +5021,8 @@ CheckSimdLoadStoreArgs(FunctionValidator& f, ParseNode* call)
     if (IsLiteralOrConstInt(f, indexExpr, &indexLit)) {
         if (!f.m().tryConstantAccess(indexLit, Simd128DataSize))
             return f.fail(indexExpr, "constant index out of range");
-        return f.encoder().writeU8(NO_BOUNDS_CHECK) && f.writeInt32Lit(indexLit);
+        return f.writeInt32Lit(indexLit);
     }
-
-    if (!f.encoder().writeU8(NEEDS_BOUNDS_CHECK))
-        return false;
 
     Type indexType;
     if (!CheckExpr(f, indexExpr, &indexType))
