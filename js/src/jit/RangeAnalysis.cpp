@@ -124,6 +124,20 @@ SpewRange(MDefinition* def)
 #endif
 }
 
+static inline void
+SpewTruncate(MDefinition* def, MDefinition::TruncateKind kind, bool shouldClone)
+{
+#ifdef JS_JITSPEW
+    if (JitSpewEnabled(JitSpew_Range)) {
+        JitSpewHeader(JitSpew_Range);
+        Fprinter& out = JitSpewPrinter();
+        out.printf("truncating ");
+        def->printName(out);
+        out.printf(" (kind: %s, clone: %d)\n", MDefinition::TruncateKindString(kind), shouldClone);
+    }
+#endif
+}
+
 TempAllocator&
 RangeAnalysis::alloc() const
 {
@@ -3034,6 +3048,8 @@ RangeAnalysis::truncate()
             if (!iter->needTruncation(kind))
                 continue;
 
+            SpewTruncate(*iter, kind, shouldClone);
+
             // If needed, clone the current instruction for keeping it for the
             // bailout path.  This give us the ability to truncate instructions
             // even after the removal of branches.
@@ -3057,6 +3073,9 @@ RangeAnalysis::truncate()
             // Truncate this phi if possible.
             if (shouldClone || !iter->needTruncation(kind))
                 continue;
+
+            SpewTruncate(*iter, kind, shouldClone);
+
             iter->truncate();
 
             // Delay updates of inputs/outputs to avoid creating node which
