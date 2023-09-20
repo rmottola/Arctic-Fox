@@ -2383,7 +2383,7 @@ MDefinition::truncate()
 bool
 MConstant::needTruncation(TruncateKind kind)
 {
-    return value_.isDouble();
+    return IsFloatingPointType(type());
 }
 
 void
@@ -2392,8 +2392,9 @@ MConstant::truncate()
     MOZ_ASSERT(needTruncation(Truncate));
 
     // Truncate the double to int, since all uses truncates it.
-    int32_t res = ToInt32(value_.toDouble());
-    value_.setInt32(res);
+    int32_t res = ToInt32(toNumber());
+    payload_.asBits = 0;
+    payload_.i32 = res;
     setResultType(MIRType_Int32);
     if (range())
         range()->setInt32(res, res);
