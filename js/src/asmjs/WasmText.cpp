@@ -2484,17 +2484,10 @@ ParseIfElse(WasmParseContext& c, Expr expr)
 }
 
 static bool
-ParseLoadStoreAddress(WasmParseContext& c, WasmAstExpr** base,
-                      int32_t* offset, int32_t* align)
+ParseLoadStoreAddress(WasmParseContext& c, int32_t* offset, int32_t* align, WasmAstExpr** base)
 {
-    *base = ParseExpr(c);
-    if (!*base)
-        return false;
-
-    WasmToken token = c.ts.get();
-
     *offset = 0;
-    if (token.kind() == WasmToken::Offset) {
+    if (c.ts.getIf(WasmToken::Offset)) {
         if (!c.ts.match(WasmToken::Equal, c.error))
             return false;
         WasmToken val = c.ts.get();
@@ -2506,12 +2499,10 @@ ParseLoadStoreAddress(WasmParseContext& c, WasmAstExpr** base,
             c.ts.generateError(val, c.error);
             return false;
         }
-
-        token = c.ts.get();
     }
 
     *align = 0;
-    if (token.kind() == WasmToken::Align) {
+    if (c.ts.getIf(WasmToken::Align)) {
         if (!c.ts.match(WasmToken::Equal, c.error))
             return false;
         WasmToken val = c.ts.get();
@@ -2523,21 +2514,22 @@ ParseLoadStoreAddress(WasmParseContext& c, WasmAstExpr** base,
             c.ts.generateError(val, c.error);
             return false;
         }
-
-        token = c.ts.get();
     }
 
-    c.ts.unget(token);
+    *base = ParseExpr(c);
+    if (!*base)
+        return false;
+
     return true;
 }
 
 static WasmAstLoad*
 ParseLoad(WasmParseContext& c, Expr expr)
 {
-    WasmAstExpr* base;
     int32_t offset;
     int32_t align;
-    if (!ParseLoadStoreAddress(c, &base, &offset, &align))
+    WasmAstExpr* base;
+    if (!ParseLoadStoreAddress(c, &offset, &align, &base))
         return nullptr;
 
     if (align == 0) {
@@ -2575,10 +2567,10 @@ ParseLoad(WasmParseContext& c, Expr expr)
 static WasmAstStore*
 ParseStore(WasmParseContext& c, Expr expr)
 {
-    WasmAstExpr* base;
     int32_t offset;
     int32_t align;
-    if (!ParseLoadStoreAddress(c, &base, &offset, &align))
+    WasmAstExpr* base;
+    if (!ParseLoadStoreAddress(c, &offset, &align, &base))
         return nullptr;
 
     if (align == 0) {
@@ -3619,9 +3611,9 @@ EncodeIfElse(Encoder& e, WasmAstIfElse& ie)
 static bool
 EncodeLoadStoreAddress(Encoder &e, const WasmAstLoadStoreAddress &address)
 {
-    return EncodeExpr(e, address.base()) &&
-           e.writeVarU32(address.offset()) &&
-           e.writeVarU32(address.align());
+    return e.writeVarU32(address.offset()) &&
+           e.writeVarU32(address.align()) &&
+           EncodeExpr(e, address.base());
 }
 
 static bool
