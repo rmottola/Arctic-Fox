@@ -736,9 +736,6 @@ ModuleGenerator::startFuncDefs()
     if (!threadView_)
         return false;
 
-    if (!funcIndexToExport_.init())
-        return false;
-
     uint32_t numTasks;
     if (ParallelCompilationEnabled(cx_) &&
         HelperThreadState().wasmCompilationInProgress.compareExchange(false, true))
