@@ -3174,7 +3174,7 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
 
     if (MConstant* defConst = def->maybeConstantValue()) {
         *pwrapped = defConst;
-        return defConst->isInt32(0);
+        return defConst->type() == MIRType_Int32 && defConst->toInt32() >= 0;
     }
 
     return false;
