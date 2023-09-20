@@ -863,6 +863,8 @@ class WasmToken
     }
 };
 
+} // end anonymous namespace
+
 static bool
 IsWasmNewLine(char16_t c)
 {
@@ -1038,6 +1040,8 @@ ConsumeTextByte(const char16_t** curp, const char16_t* end, uint8_t *byte = null
     return true;
 }
 
+namespace {
+
 class WasmTokenStream
 {
     static const uint32_t LookaheadSize = 2;
@@ -1153,6 +1157,8 @@ class WasmTokenStream
         return match(expect, &token, error);
     }
 };
+
+} // end anonymous namespace
 
 WasmToken WasmTokenStream::next()
 {
@@ -1819,8 +1825,6 @@ WasmToken WasmTokenStream::next()
     return fail(begin);
 }
 
-} // end anonymous namespace
-
 /*****************************************************************************/
 // wasm text format parser
 
@@ -1848,6 +1852,8 @@ struct WasmParseContext
         DestroyDtoaState(dtoaState);
     }
 };
+
+} // end anonymous namespace
 
 static WasmAstExpr*
 ParseExprInsideParens(WasmParseContext& c);
@@ -2858,8 +2864,6 @@ ParseModule(const char16_t* text, LifoAlloc& lifo, UniqueChars* error)
 
     return module;
 }
-
-} // end anonymous namespace
 
 /*****************************************************************************/
 // wasm name resolution
