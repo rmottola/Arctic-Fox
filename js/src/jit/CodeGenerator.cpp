@@ -2491,6 +2491,12 @@ CodeGenerator::visitInteger(LInteger* lir)
 }
 
 void
+CodeGenerator::visitInteger64(LInteger64* lir)
+{
+    masm.move64(Imm64(lir->getValue()), ToOutRegister64(lir));
+}
+
+void
 CodeGenerator::visitPointer(LPointer* lir)
 {
     if (lir->kind() == LPointer::GC_THING)
