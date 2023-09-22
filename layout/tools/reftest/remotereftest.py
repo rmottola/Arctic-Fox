@@ -336,11 +336,7 @@ class RemoteReftest(RefTest):
             except:
                 print "Warning: cleaning up pidfile '%s' was unsuccessful from the test harness" % self.pidFile
 
-def main():
-    automation = RemoteAutomation(None)
-    parser = reftestcommandline.RemoteArgumentsParser()
-    options = parser.parse_args()
-
+def runTests(options, parser):
     if (options.dm_trans == 'sut' and options.deviceIP == None):
         print "Error: If --dm_trans = sut, you must provide a device IP to connect to via the --deviceIP option"
         return 1
@@ -359,6 +355,7 @@ def main():
         print "Automation Error: exception while initializing devicemanager.  Most likely the device is not in a testable state."
         return 1
 
+    automation = RemoteAutomation(None)
     automation.setDeviceManager(dm)
 
     if (options.remoteProductName != None):
@@ -396,7 +393,8 @@ def main():
     if (dm.processExist(procName)):
         dm.killProcess(procName)
 
-    reftest.printDeviceInfo()
+    if options.printDeviceInfo:
+        reftest.printDeviceInfo()
 
 #an example manifest name to use on the cli
 #    manifest = "http://" + options.remoteWebServer + "/reftests/layout/reftests/reftest-sanity/reftest.list"
@@ -411,8 +409,24 @@ def main():
 
     reftest.stopWebServer(options)
 
-    reftest.printDeviceInfo(printLogcat=True)
+    if options.printDeviceInfo:
+        reftest.printDeviceInfo(printLogcat=True)
 
+    return retVal
+
+def run(**kwargs):
+    # Mach gives us kwargs; this is a way to turn them back into an
+    # options object
+    parser = reftestcommandline.RemoteArgumentsParser()
+    parser.set_defaults(**kwargs)
+    options = parser.parse_args(kwargs["tests"])
+    retVal = runTests(options, parser)
+    return retVal
+
+def main():
+    parser = reftestcommandline.RemoteArgumentsParser()
+    options = parser.parse_args()
+    retVal = runTests(options, parser)
     return retVal
 
 if __name__ == "__main__":
