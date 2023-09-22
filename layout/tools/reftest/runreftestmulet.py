@@ -160,7 +160,9 @@ class MuletReftest(RefTest):
         return cmd, args
 
     def _on_output(self, line):
-        print(line)
+        sys.stdout.write("%s\n" % line)
+        sys.stdout.flush()
+
         # TODO use structured logging
         if "TEST-START" in line and "|" in line:
             self.last_test = line.split("|")[1].strip()
