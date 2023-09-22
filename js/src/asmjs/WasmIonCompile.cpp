@@ -1422,10 +1422,22 @@ static bool EmitExpr(FunctionCompiler&, ExprType, MDefinition**, LabelVector* = 
 static bool EmitExprStmt(FunctionCompiler&, MDefinition**, LabelVector* = nullptr);
 
 static bool
-EmitLoadArray(FunctionCompiler& f, Scalar::Type scalarType, MDefinition** def)
+EmitLoadStoreAddress(FunctionCompiler& f, uint32_t* offset, uint32_t* align, MDefinition** base)
 {
+    *offset = f.readVarU32();
+    MOZ_ASSERT(*offset == 0, "Non-zero offsets not supported yet");
+
+    *align = f.readVarU32();
+
+    return EmitExpr(f, ExprType::I32, base);
+}
+
+static bool
+EmitLoad(FunctionCompiler& f, Scalar::Type scalarType, MDefinition** def)
+{
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
     *def = f.loadHeap(scalarType, ptr);
     return true;
@@ -1434,8 +1446,9 @@ EmitLoadArray(FunctionCompiler& f, Scalar::Type scalarType, MDefinition** def)
 static bool
 EmitStore(FunctionCompiler& f, Scalar::Type viewType, MDefinition** def)
 {
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
 
     MDefinition* rhs = nullptr;
@@ -1466,8 +1479,9 @@ static bool
 EmitStoreWithCoercion(FunctionCompiler& f, Scalar::Type rhsType, Scalar::Type viewType,
                       MDefinition **def)
 {
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
 
     MDefinition* rhs = nullptr;
@@ -1537,9 +1551,12 @@ static bool
 EmitAtomicsLoad(FunctionCompiler& f, MDefinition** def)
 {
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     *def = f.atomicLoadHeap(viewType, index);
     return true;
 }
@@ -1548,9 +1565,12 @@ static bool
 EmitAtomicsStore(FunctionCompiler& f, MDefinition** def)
 {
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
@@ -1564,9 +1584,12 @@ EmitAtomicsBinOp(FunctionCompiler& f, MDefinition** def)
 {
     Scalar::Type viewType = Scalar::Type(f.readU8());
     js::jit::AtomicOp op = js::jit::AtomicOp(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
@@ -1578,9 +1601,12 @@ static bool
 EmitAtomicsCompareExchange(FunctionCompiler& f, MDefinition** def)
 {
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* oldValue;
     if (!EmitExpr(f, ExprType::I32, &oldValue))
         return false;
@@ -1595,9 +1621,12 @@ static bool
 EmitAtomicsExchange(FunctionCompiler& f, MDefinition** def)
 {
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
@@ -2771,15 +2800,15 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::I32BitNot:
         return EmitBitwise<MBitNot>(f, def);
       case Expr::I32LoadMem8S:
-        return EmitLoadArray(f, Scalar::Int8, def);
+        return EmitLoad(f, Scalar::Int8, def);
       case Expr::I32LoadMem8U:
-        return EmitLoadArray(f, Scalar::Uint8, def);
+        return EmitLoad(f, Scalar::Uint8, def);
       case Expr::I32LoadMem16S:
-        return EmitLoadArray(f, Scalar::Int16, def);
+        return EmitLoad(f, Scalar::Int16, def);
       case Expr::I32LoadMem16U:
-        return EmitLoadArray(f, Scalar::Uint16, def);
+        return EmitLoad(f, Scalar::Uint16, def);
       case Expr::I32LoadMem:
-        return EmitLoadArray(f, Scalar::Int32, def);
+        return EmitLoad(f, Scalar::Int32, def);
       case Expr::I32StoreMem8:
         return EmitStore(f, Scalar::Int8, def);
       case Expr::I32StoreMem16:
@@ -2853,7 +2882,7 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::F32ConvertUI32:
         return EmitUnary<MAsmJSUnsignedToFloat32>(f, ExprType::I32, def);
       case Expr::F32LoadMem:
-        return EmitLoadArray(f, Scalar::Float32, def);
+        return EmitLoad(f, Scalar::Float32, def);
       case Expr::F32StoreMem:
         return EmitStore(f, Scalar::Float32, def);
       case Expr::F32StoreMemF64:
@@ -2901,7 +2930,7 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::F64ConvertUI32:
         return EmitUnary<MAsmJSUnsignedToDouble>(f, ExprType::I32, def);
       case Expr::F64LoadMem:
-        return EmitLoadArray(f, Scalar::Float64, def);
+        return EmitLoad(f, Scalar::Float64, def);
       case Expr::F64StoreMem:
         return EmitStore(f, Scalar::Float64, def);
       case Expr::F64StoreMemF32:
