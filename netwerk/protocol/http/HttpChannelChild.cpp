@@ -1964,6 +1964,8 @@ HttpChannelChild::ContinueAsyncOpen()
   }
   openArgs.cacheKey() = cacheKey;
 
+  openArgs.blockAuthPrompt() = mBlockAuthPrompt;
+
   nsresult rv = mozilla::ipc::LoadInfoToLoadInfoArgs(mLoadInfo, &openArgs.loadInfo());
   NS_ENSURE_SUCCESS(rv, rv);
 
