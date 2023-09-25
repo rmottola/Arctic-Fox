@@ -32,9 +32,9 @@ ZIP_IN ?= $(_ABS_DIST)/$(PACKAGE)
 WIN32_INSTALLER_IN ?= $(_ABS_DIST)/$(PKG_INST_PATH)$(PKG_INST_BASENAME).exe
 RETRIEVE_WINDOWS_INSTALLER = 1
 
-MOZ_LANGPACK_EID=langpack-$(AB_CD)@palemoon.org
+MOZ_LANGPACK_EID=langpack-$(AB_CD)@firefox.mozilla.org
 
-L10N_PREF_JS_EXPORTS = $(call MERGE_FILE,palemoon-l10n.js)
+L10N_PREF_JS_EXPORTS = $(call MERGE_FILE,firefox-l10n.js)
 L10N_PREF_JS_EXPORTS_PATH = $(FINAL_TARGET)/$(PREF_DIR)
 L10N_PREF_JS_EXPORTS_FLAGS = $(PREF_PPFLAGS) --silence-missing-directive-warnings
 PP_TARGETS += L10N_PREF_JS_EXPORTS
@@ -166,7 +166,7 @@ clobber-zip:
 	  $(STAGEDIST)/chrome/$(AB_CD).manifest \
 	  $(STAGEDIST)/webapprt/chrome/$(AB_CD).jar \
 	  $(STAGEDIST)/webapprt/chrome/$(AB_CD).manifest \
-	  $(STAGEDIST)/$(PREF_DIR)/palemoon-l10n.js
+	  $(STAGEDIST)/$(PREF_DIR)/firefox-l10n.js
 	$(RM) -rf  $(STAGEDIST)/dictionaries \
 	  $(STAGEDIST)/hyphenation \
 	  $(STAGEDIST)/defaults/profile \
