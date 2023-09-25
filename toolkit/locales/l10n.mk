@@ -113,6 +113,10 @@ repackage-zip: ALREADY_SZIPPED=1
 repackage-zip:  libs-$(AB_CD)
 # call a hook for apps to put their uninstall helper.exe into the package
 	$(UNINSTALLER_PACKAGE_HOOK)
+# call a hook for apps to build the stub installer
+ifdef MOZ_STUB_INSTALLER
+	$(STUB_HOOK)
+endif
 	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/l10n-repack.py $(STAGEDIST) $(DIST)/xpi-stage/locale-$(AB_CD) \
 		$(MOZ_PKG_EXTRAL10N) \
 		$(if $(filter omni,$(MOZ_PACKAGER_FORMAT)),$(if $(NON_OMNIJAR_FILES),--non-resource $(NON_OMNIJAR_FILES)))
