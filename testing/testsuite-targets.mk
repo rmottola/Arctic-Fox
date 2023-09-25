@@ -386,7 +386,6 @@ pgo-profile-run:
 # Package up the tests and test harnesses
 include $(topsrcdir)/toolkit/mozapps/installer/package-name.mk
 
-ifndef UNIVERSAL_BINARY
 PKG_STAGE = $(DIST)/test-stage
 
 stage-all: \
@@ -413,10 +412,6 @@ stage-all: \
 ifdef MOZ_WEBRTC
 stage-all: stage-steeplechase
 endif
-else
-# This staging area has been built for us by universal/flight.mk
-PKG_STAGE = $(DIST)/universal/test-stage
-endif
 
 TEST_PKGS := \
   cppunittest \
@@ -439,9 +434,7 @@ test-packages-manifest-tc:
 
 test-packages-manifest:
 	@rm -f $(MOZ_TEST_PACKAGES_FILE)
-ifndef UNIVERSAL_BINARY
 	$(NSINSTALL) -D $(dir $(MOZ_TEST_PACKAGES_FILE))
-endif
 	$(PYTHON) $(topsrcdir)/build/gen_test_packages_manifest.py \
       --jsshell $(JSSHELL_NAME) \
       --dest-file $(MOZ_TEST_PACKAGES_FILE) \
@@ -450,9 +443,7 @@ endif
 
 package-tests-prepare-dest:
 	@rm -f '$(DIST)/$(PKG_PATH)$(TEST_PACKAGE)'
-ifndef UNIVERSAL_BINARY
 	$(NSINSTALL) -D $(DIST)/$(PKG_PATH)
-endif
 	cd $(PKG_STAGE) && \
 	  zip -rq9D $(abspath $(DIST))/$(PKG_PATH)mozharness.zip mozharness
 package-tests: package-tests-mozharness
