@@ -6,6 +6,13 @@
 include $(topsrcdir)/config/config.mk
 
 ifdef LOCALE_MERGEDIR
+vpath crashreporter%.ini $(LOCALE_MERGEDIR)/browser/crashreporter
+endif
+vpath crashreporter%.ini $(LOCALE_SRCDIR)/crashreporter
+ifdef LOCALE_MERGEDIR
+vpath crashreporter%.ini @srcdir@/en-US/crashreporter
+endif
+ifdef LOCALE_MERGEDIR
 vpath book%.inc $(LOCALE_MERGEDIR)/browser/profile
 endif
 vpath book%.inc $(LOCALE_SRCDIR)/profile
@@ -131,6 +138,9 @@ libs-%:
 	$(NSINSTALL) -D $(DIST)/install
 	@$(MAKE) -C ../../toolkit/locales libs-$* XPI_ROOT_APPID='$(XPI_ROOT_APPID)'
 	@$(MAKE) -C ../../services/sync/locales AB_CD=$* XPI_NAME=locale-$*
+ifdef MOZ_WEBAPP_RUNTIME
+	@$(MAKE) -C ../../webapprt/locales AB_CD=$* XPI_NAME=locale-$*
+endif
 	@$(MAKE) -C ../../extensions/spellcheck/locales AB_CD=$* XPI_NAME=locale-$*
 	@$(MAKE) -C ../../intl/locales AB_CD=$* XPI_NAME=locale-$*
 	@$(MAKE) -C ../../devtools/client/locales AB_CD=$* XPI_NAME=locale-$* XPI_ROOT_APPID='$(XPI_ROOT_APPID)'
@@ -198,6 +208,11 @@ else
 	  sed -e 's/%MOZ_APP_DISPLAYNAME%/$(MOZ_APP_DISPLAYNAME)/' > \
 	  $(FINAL_TARGET)/../updater.ini
 endif
+endif
+
+ifdef MOZ_CRASHREPORTER
+libs:: crashreporter-override.ini
+	$(SYSINSTALL) $(IFLAGS1) $^ $(FINAL_TARGET)
 endif
 
 ident:
