@@ -404,7 +404,6 @@ stage-all: \
   stage-marionette \
   stage-cppunittests \
   stage-jittest \
-  stage-web-platform-tests \
   stage-luciddream \
   test-packages-manifest \
   test-packages-manifest-tc \
@@ -417,11 +416,11 @@ TEST_PKGS := \
   cppunittest \
   reftest \
   talos \
-  web-platform \
   $(NULL)
 
 PYTHON_TEST_PKGS := \
   mochitest \
+  web-platform \
   xpcshell \
   $(NULL)
 
@@ -636,9 +635,6 @@ stage-marionette: make-stage-dir
 stage-mozbase: make-stage-dir
 	$(MAKE) -C $(DEPTH)/testing/mozbase stage-package
 
-stage-web-platform-tests: make-stage-dir
-	$(MAKE) -C $(DEPTH)/testing/web-platform stage-package
-
 stage-instrumentation-tests: make-stage-dir
 	$(MAKE) -C $(DEPTH)/testing/instrumentation stage-package
 
@@ -681,7 +677,6 @@ stage-extensions: make-stage-dir
   stage-modules \
   stage-marionette \
   stage-steeplechase \
-  stage-web-platform-tests \
   stage-instrumentation-tests \
   stage-luciddream \
   test-packages-manifest \
