@@ -397,7 +397,6 @@ stage-all: \
   stage-xpcshell \
   stage-jstests \
   stage-jetpack \
-  stage-mozbase \
   stage-marionette \
   stage-cppunittests \
   stage-luciddream \
@@ -478,7 +477,6 @@ make-stage-dir:
 	$(NSINSTALL) -D $(PKG_STAGE)/certs
 	$(NSINSTALL) -D $(PKG_STAGE)/config
 	$(NSINSTALL) -D $(PKG_STAGE)/jetpack
-	$(NSINSTALL) -D $(PKG_STAGE)/mozbase
 	$(NSINSTALL) -D $(PKG_STAGE)/modules
 	$(NSINSTALL) -D $(PKG_STAGE)/tools/mach
 
@@ -583,9 +581,6 @@ stage-marionette: make-stage-dir
           | (cd $(topsrcdir) && xargs tar $(TAR_CREATE_FLAGS) -) \
           | (cd $(MARIONETTE_DIR)/tests && tar -xf -)
 
-stage-mozbase: make-stage-dir
-	$(MAKE) -C $(DEPTH)/testing/mozbase stage-package
-
 stage-instrumentation-tests: make-stage-dir
 	$(MAKE) -C $(DEPTH)/testing/instrumentation stage-package
 
@@ -622,7 +617,6 @@ stage-extensions: make-stage-dir
   stage-jstests \
   stage-android \
   stage-jetpack \
-  stage-mozbase \
   stage-marionette \
   stage-steeplechase \
   stage-instrumentation-tests \
