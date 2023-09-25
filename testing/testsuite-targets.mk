@@ -444,11 +444,14 @@ test-packages-manifest:
 package-tests-prepare-dest:
 	@rm -f '$(DIST)/$(PKG_PATH)$(TEST_PACKAGE)'
 	$(NSINSTALL) -D $(DIST)/$(PKG_PATH)
-	cd $(PKG_STAGE) && \
-	  zip -rq9D $(abspath $(DIST))/$(PKG_PATH)mozharness.zip mozharness
+
+package-tests-mozharness: package-tests-prepare-dest
+	$(call py_action,test_archive,mozharness $(abspath $(DIST))/$(PKG_PATH)/mozharness.zip)
 package-tests: package-tests-mozharness
 
 package-tests-common: stage-all package-tests-prepare-dest
+	cd $(abspath $(PKG_STAGE)) && \
+	  zip -rq9D '$(abspath $(DIST))/$(PKG_PATH)$(TEST_PACKAGE)' \
 	  * -x \*/.mkdir.done \*.pyc $(foreach name,$(TEST_PKGS),$(name)\*)
 package-tests: package-tests-common
 
