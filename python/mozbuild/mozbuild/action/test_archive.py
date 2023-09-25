@@ -32,6 +32,7 @@ ARCHIVE_FILES = {
             'pattern': '**',
             'ignore': [
                 'cppunittest/**',
+                'gtest/**',
                 'mochitest/**',
                 'reftest/**',
                 'talos/**',
@@ -133,6 +134,13 @@ ARCHIVE_FILES = {
             'base': '',
             'pattern': 'mozinfo.json',
             'dest': 'cppunittest',
+        },
+    ],
+    'gtest': [
+        {
+            'source': STAGE,
+            'base': '',
+            'pattern': 'gtest/**',
         },
     ],
     'mochitest': [
