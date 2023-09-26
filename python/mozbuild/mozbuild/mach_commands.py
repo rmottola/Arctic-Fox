@@ -34,6 +34,8 @@ from mozbuild.base import (
     ObjdirMismatchException,
 )
 
+from mozbuild.backend import backends
+
 
 BUILD_WHAT_HELP = '''
 What to build. Can be a top-level make target or a relative directory. If
@@ -595,9 +597,7 @@ class Build(MachCommandBase):
         help='Show a diff of changes.')
     # It would be nice to filter the choices below based on
     # conditions, but that is for another day.
-    @CommandArgument('-b', '--backend', nargs='+',
-        choices=['RecursiveMake', 'AndroidEclipse', 'CppEclipse',
-                 'VisualStudio', 'FasterMake', 'CompileDB', 'ChromeMap'],
+    @CommandArgument('-b', '--backend', nargs='+', choices=sorted(backends),
         help='Which backend to build.')
     def build_backend(self, backend, diff=False):
         python = self.virtualenv_manager.python_path
