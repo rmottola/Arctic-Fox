@@ -999,6 +999,7 @@ def expand_variables(s, variables):
         result += value
     return result
 
+
 class DefinesAction(argparse.Action):
     '''An ArgumentParser action to handle -Dvar[=value] type of arguments.'''
     def __call__(self, parser, namespace, values, option_string):

@@ -35,11 +35,11 @@ from mozbuild.base import (
     ObjdirMismatchException,
 )
 
-from mozbuild.backend import backends
-
 from mozpack.manifests import (
     InstallManifest,
 )
+
+from mozbuild.backend import backends
 
 
 BUILD_WHAT_HELP = '''
