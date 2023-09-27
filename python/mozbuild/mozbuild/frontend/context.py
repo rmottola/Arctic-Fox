@@ -1367,7 +1367,7 @@ VARIABLES = {
         JAR manifests are files in the tree that define how to package files
         into JARs and how chrome registration is performed. For more info,
         see :ref:`jar_manifests`.
-        """, 'libs'),
+        """, None),
 
     # IDL Generation.
     'XPIDL_SOURCES': (StrictOrderingOnAppendList, list,
