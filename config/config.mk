@@ -297,9 +297,9 @@ JAVA_IFACES_PKG_NAME = org/mozilla/interfaces
 
 INCLUDES = \
   -I$(srcdir) \
-  -I. \
+  -I$(CURDIR) \
   $(LOCAL_INCLUDES) \
-  -I$(DIST)/include \
+  -I$(ABS_DIST)/include \
   $(NULL)
 
 ifndef IS_GYP_DIR
