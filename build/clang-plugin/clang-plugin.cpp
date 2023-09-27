@@ -28,6 +28,17 @@ typedef std::unique_ptr<ASTConsumer> ASTConsumerPtr;
 typedef ASTConsumer *ASTConsumerPtr;
 #endif
 
+#if CLANG_VERSION_FULL < 308
+// In clang 3.8, a number of AST matchers were renamed to better match the
+// respective AST node.  We use the new names, and #define them to the old
+// ones for compatibility with older versions.
+#define cxxConstructExpr constructExpr
+#define cxxConstructorDecl constructorDecl
+#define cxxMethodDecl methodDecl
+#define cxxNewExpr newExpr
+#define cxxRecordDecl recordDecl
+#endif
+
 namespace {
 
 using namespace clang::ast_matchers;
@@ -866,7 +877,7 @@ bool isPlacementNew(const CXXNewExpr *Expr) {
 
 DiagnosticsMatcher::DiagnosticsMatcher() {
   astMatcher.addMatcher(varDecl().bind("node"), &scopeChecker);
-  astMatcher.addMatcher(newExpr().bind("node"), &scopeChecker);
+  astMatcher.addMatcher(cxxNewExpr().bind("node"), &scopeChecker);
   astMatcher.addMatcher(materializeTemporaryExpr().bind("node"), &scopeChecker);
   astMatcher.addMatcher(
       callExpr(callee(functionDecl(heapAllocator()))).bind("node"),
@@ -892,7 +903,7 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
           .bind("call"),
       &arithmeticArgChecker);
   astMatcher.addMatcher(
-      constructExpr(
+      cxxConstructExpr(
           allOf(hasDeclaration(noArithmeticExprInArgs()),
                 anyOf(hasDescendant(
                           binaryOperator(
@@ -911,7 +922,7 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
           .bind("call"),
       &arithmeticArgChecker);
 
-  astMatcher.addMatcher(recordDecl(hasTrivialCtorDtor()).bind("node"),
+  astMatcher.addMatcher(cxxRecordDecl(hasTrivialCtorDtor()).bind("node"),
                         &trivialCtorDtorChecker);
 
   astMatcher.addMatcher(
@@ -954,12 +965,12 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
   // conversions as 'operator _Bool', but newer clang versions recognize these
   // as 'operator bool'.
   astMatcher.addMatcher(
-      methodDecl(anyOf(hasName("operator bool"), hasName("operator _Bool")))
+      cxxMethodDecl(anyOf(hasName("operator bool"), hasName("operator _Bool")))
           .bind("node"),
       &explicitOperatorBoolChecker);
 
   astMatcher.addMatcher(
-      recordDecl(allOf(decl().bind("decl"), hasRefCntMember())),
+      cxxRecordDecl(allOf(decl().bind("decl"), hasRefCntMember())),
       &noDuplicateRefCntMemberChecker);
 
   astMatcher.addMatcher(
@@ -978,20 +989,20 @@ DiagnosticsMatcher::DiagnosticsMatcher() {
       &nonMemMovableChecker);
 
   astMatcher.addMatcher(
-      constructorDecl(isInterestingImplicitCtor(),
-                      ofClass(allOf(isConcreteClass(), decl().bind("class"))),
-                      unless(isMarkedImplicit()))
+      cxxConstructorDecl(isInterestingImplicitCtor(),
+                         ofClass(allOf(isConcreteClass(), decl().bind("class"))),
+                         unless(isMarkedImplicit()))
           .bind("ctor"),
       &explicitImplicitChecker);
 
   astMatcher.addMatcher(varDecl(hasType(autoNonAutoableType())).bind("node"),
                         &noAutoTypeChecker);
 
-  astMatcher.addMatcher(constructorDecl(isExplicitMoveConstructor()).bind("node"),
+  astMatcher.addMatcher(cxxConstructorDecl(isExplicitMoveConstructor()).bind("node"),
                         &noExplicitMoveConstructorChecker);
 
-  astMatcher.addMatcher(constructExpr(hasDeclaration(
-                                          constructorDecl(
+  astMatcher.addMatcher(cxxConstructExpr(hasDeclaration(
+                                          cxxConstructorDecl(
                                               isCompilerProvidedCopyConstructor(),
                                               ofClass(hasRefCntMember())))).bind("node"),
                         &refCountedCopyConstructorChecker);
