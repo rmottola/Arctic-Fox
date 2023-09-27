@@ -10,9 +10,114 @@ import sys
 import mozinfo
 import mozrunner.utils
 
-def _raw_log():
-    import logging
-    return logging.getLogger(__name__)
+
+def _get_default_logger():
+    from mozlog import get_default_logger
+    log = get_default_logger(component='mozleak')
+
+    if not log:
+        import logging
+        log = logging.getLogger(__name__)
+    return log
+
+
+# Do not add anything to this list, unless one of the existing leaks below
+# has started to leak additional objects. This function returns a dict
+# mapping the names of objects as reported to the XPCOM leak checker to an
+# upper bound on the number of leaked objects of that kind that are allowed
+# to appear in a content process leak report.
+def expectedTabProcessLeakCounts():
+    leaks = {}
+
+    def appendExpectedLeakCounts(leaks2):
+        for obj, count in leaks2.iteritems():
+            leaks[obj] = leaks.get(obj, 0) + count
+
+    # Bug 1117203 - ImageBridgeChild is not shut down in tab processes.
+    appendExpectedLeakCounts({
+        'AsyncTransactionTrackersHolder': 1,
+        'CondVar': 2,
+        'IPC::Channel': 1,
+        'MessagePump': 1,
+        'Mutex': 2,
+        'PImageBridgeChild': 1,
+        'RefCountedMonitor': 1,
+        'RefCountedTask': 2,
+        'StoreRef': 1,
+        'WaitableEventKernel': 1,
+        'WeakReference<MessageListener>': 1,
+        'base::Thread': 1,
+        'ipc::MessageChannel': 1,
+        'nsTArray_base': 7,
+        'nsThread': 1,
+    })
+
+    # Bug 1215265 - CompositorChild is not shut down.
+    appendExpectedLeakCounts({
+        'CompositorChild': 1,
+        'CondVar': 1,
+        'IPC::Channel': 1,
+        'Mutex': 1,
+        'PCompositorChild': 1,
+        'RefCountedMonitor': 1,
+        'RefCountedTask': 2,
+        'StoreRef': 1,
+        'WeakReference<MessageListener>': 1,
+        'ipc::MessageChannel': 1,
+        'nsTArray_base': 2,
+    })
+
+    # Bug 1215265 - Windows-specific graphics leaks, maybe related to
+    # CompositorChild and/or ImageBridgeChild not being shut down.
+    if mozinfo.isWin:
+        # Windows leaks comment to all content processes.
+        # 2696 bytes leaked total on Win7.
+        appendExpectedLeakCounts({
+            'AsyncTransactionTrackersHolder': 1,
+            'CompositableChild': 1,
+            'Mutex': 1,
+            'PCompositableChild': 1,
+            'PImageContainerChild': 1,
+            'SyncObject': 1,
+            'WeakReference<MessageListener>': 2,
+        })
+
+        # Various additional graphics-related Windows leaks in Mochitests.
+        # M2 leaks in dom/media/tests/mochitest/ipc/
+        # dt1 leaks in devtools/client/animationinspector/test/browser_animation_animated_properties_displayed.js
+        # dt1 leaks in devtools/client/debugger/test/mochitest/ (additional leaks are intermittent?)
+        # dt2 leaks in devtools/client/inspector/computed/test/
+        # dt8 leaks in devtools/shared/worker/tests/browser/ (additional leaks are intermittent?)
+        # gl leaks in dom/canvas/test/webgl-mochitest/
+        appendExpectedLeakCounts({
+            'AsyncTransactionTracker': 1,
+            'AsyncTransactionTrackersHolder': 4,
+            'AsyncTransactionWaiter': 1,
+            'CompositableChild': 3,
+            'CompositableClient': 3,
+            'CondVar': 5,
+            'DXGID3D9TextureData': 1,
+            'FdObj': 2,
+            'GfxTextureWasteTracker': 1,
+            'IPC::Message': 1,
+            'ITextureClientRecycleAllocator': 1,
+            'LayerTransactionChild': 5,
+            'Mutex': 7,
+            'PCompositableChild': 3,
+            'PImageContainerChild': 3,
+            'PLayerTransactionChild': 5,
+            'PTextureChild': 5,
+            'RemoveTextureFromCompositableTracker': 1,
+            'SharedMemory': 5,
+            'SyncObject': 5,
+            'TextureChild': 5,
+            'TextureClientHolder': 1,
+            'TextureData': 5,
+            'WeakReference<MessageListener>': 10,
+            'nsTArray_base': 17,
+        })
+
+    return leaks
 
 
 def process_single_leak_file(leakLogFileName, processType, leakThreshold,
@@ -31,9 +136,10 @@ def process_single_leak_file(leakLogFileName, processType, leakThreshold,
                         r"\s*-?\d+\s+(?P<numLeaked>-?\d+)")
     # The class name can contain spaces. We remove trailing whitespace later.
 
-    log = log or _raw_log()
+    log = log or _get_default_logger()
 
     processString = "%s process:" % processType
+    expectedLeaks = expectedTabProcessLeakCounts() if processType == 'tab' else {}
     crashedOnPurpose = False
     totalBytesLeaked = None
     logAsWarning = False
@@ -85,9 +191,17 @@ def process_single_leak_file(leakLogFileName, processType, leakThreshold,
                 logAsWarning = True
                 continue
             if name != "TOTAL" and numLeaked != 0 and recordLeakedObjects:
-                leakedObjectNames.append(name)
-                leakedObjectAnalysis.append("TEST-INFO | leakcheck | %s leaked %d %s (%s bytes)"
-                                            % (processString, numLeaked, name, bytesLeaked))
+                currExpectedLeak = expectedLeaks.get(name, 0)
+                if not expectedLeaks or numLeaked <= currExpectedLeak:
+                    if not expectedLeaks:
+                        leakedObjectNames.append(name)
+                    leakedObjectAnalysis.append("TEST-INFO | leakcheck | %s leaked %d %s"
+                                                % (processString, numLeaked, name))
+                else:
+                    leakedObjectNames.append(name)
+                    leakedObjectAnalysis.append("WARNING | leakcheck | %s leaked too many %s (expected %d, got %d)"
+                                                % (processString, name, currExpectedLeak, numLeaked))
+
 
     leakAnalysis.extend(leakedObjectAnalysis)
     if logAsWarning:
@@ -117,8 +231,7 @@ def process_single_leak_file(leakLogFileName, processType, leakThreshold,
                  processString)
         return
 
-    # totalBytesLeaked was seen and is non-zero.
-    if totalBytesLeaked > leakThreshold:
+    if totalBytesLeaked > leakThreshold or (expectedLeaks and leakedObjectNames):
         logAsWarning = True
         # Fail the run if we're over the threshold (which defaults to 0)
         prefix = "TEST-UNEXPECTED-FAIL"
@@ -132,6 +245,8 @@ def process_single_leak_file(leakLogFileName, processType, leakThreshold,
     if len(leakedObjectNames) > maxSummaryObjects:
         leakedObjectSummary += ', ...'
 
+    # totalBytesLeaked will include any expected leaks, so it can be off
+    # by a few thousand bytes.
     if logAsWarning:
         log.warning("%s | leakcheck | %s %d bytes leaked (%s)"
                     % (prefix, processString, totalBytesLeaked, leakedObjectSummary))
@@ -167,7 +282,7 @@ def process_leak_log(leak_log_file, leak_thresholds=None,
     in the list ignore_missing_leaks.
     """
 
-    log = log or _raw_log()
+    log = log or _get_default_logger()
 
     leakLogFile = leak_log_file
     if not os.path.exists(leakLogFile):

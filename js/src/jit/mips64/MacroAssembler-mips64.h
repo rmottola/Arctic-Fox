@@ -319,6 +319,10 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
         branch(code);
     }
 
+    void jump(wasm::JumpTarget target) {
+        ma_b(target);
+    }
+
     void splitTag(Register src, Register dest) {
         ma_dsrl(dest, src, Imm32(JSVAL_TAG_SHIFT));
     }
@@ -458,6 +462,7 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void branchTestNumber(Condition cond, Register tag, Label* label);
 
     void branchTestMagic(Condition cond, const ValueOperand& value, Label* label);
+    void branchTestMagic(Condition cond, const ValueOperand& value, wasm::JumpTarget target);
     void branchTestMagic(Condition cond, Register tag, Label* label);
     void branchTestMagic(Condition cond, const Address& address, Label* label);
     void branchTestMagic(Condition cond, const BaseIndex& src, Label* label);
@@ -945,9 +950,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
 
     void move32(Imm32 imm, Register dest);
     void move32(Register src, Register dest);
-    void move64(Register64 src, Register64 dest) {
-        movePtr(src.reg, dest.reg);
-    }
 
     void movePtr(Register src, Register dest);
     void movePtr(ImmWord imm, Register dest);

@@ -77,6 +77,7 @@ GCONF_VERSION=1.2.1
 STARTUP_NOTIFICATION_VERSION=0.8
 DBUS_VERSION=0.60
 SQLITE_VERSION=3.21.0
+FONTCONFIG_VERSION=2.7.0
 
 MSMANIFEST_TOOL=
 
@@ -140,8 +141,6 @@ DIST="$MOZ_BUILD_ROOT/dist"
 
 MOZ_PYTHON
 
-MOZ_BUILD_BACKEND
-
 MOZ_DEFAULT_COMPILER
 
 COMPILE_ENVIRONMENT=1
@@ -150,6 +149,20 @@ MOZ_ARG_DISABLE_BOOL(compile-environment,
                           Disable compiler/library checks.],
     COMPILE_ENVIRONMENT= )
 AC_SUBST(COMPILE_ENVIRONMENT)
+
+MOZ_ARG_ENABLE_BOOL(artifact-builds,
+[  --enable-artifact-builds
+                          Download and use prebuilt binary artifacts.],
+    MOZ_ARTIFACT_BUILDS=1,
+    MOZ_ARTIFACT_BUILDS= )
+AC_SUBST(MOZ_ARTIFACT_BUILDS)
+
+if test -n "$MOZ_ARTIFACT_BUILDS"; then
+    dnl Artifact builds imply --disable-compile-environment.
+    COMPILE_ENVIRONMENT=
+fi
+
+MOZ_BUILD_BACKEND(.)
 
 MOZ_ARG_WITH_STRING(l10n-base,
 [  --with-l10n-base=DIR    path to l10n repositories],
@@ -545,8 +558,6 @@ case "$target" in
             MSVS_VERSION=2015
             MSVC_C_RUNTIME_DLL=vcruntime140.dll
             MSVC_CXX_RUNTIME_DLL=msvcp140.dll
-            MSVC_APPCRT_DLL=appcrt140.dll
-            MSVC_DESKTOPCRT_DLL=desktopcrt140.dll
 
             # -Wv:18 disables all warnings introduced after VS2013
             # See http://blogs.msdn.com/b/vcblog/archive/2014/11/12/improvements-to-warnings-in-the-c-compiler.aspx
@@ -576,8 +587,6 @@ See https://developer.mozilla.org/en/Windows_Build_Prerequisites.])
         AC_SUBST(MSVC_CXX_RUNTIME_DLL)
         AC_SUBST(MSVC_REDIST_OPENMP_DIR)
         AC_SUBST(MSVC_OPENMP_DLL)
-        AC_SUBST(MSVC_APPCRT_DLL)
-        AC_SUBST(MSVC_DESKTOPCRT_DLL)
 
         # Disable SEH on clang-cl because it doesn't implement them yet.
         if test -z "$CLANG_CL"; then
@@ -800,7 +809,7 @@ else
 fi
 
 if test -z "$COMPILE_ENVIRONMENT"; then
-    NSINSTALL_BIN='$(PYTHON) $(topsrcdir)/config/nsinstall.py'
+    NSINSTALL_BIN='$(PYTHON) $(MOZILLA_DIR)/config/nsinstall.py'
 fi
 AC_SUBST(NSINSTALL_BIN)
 
@@ -963,7 +972,6 @@ OBJ_SUFFIX=o
 LIB_SUFFIX=a
 ASM_SUFFIX=s
 IMPORT_LIB_SUFFIX=
-TARGET_MD_ARCH=unix
 DIRENT_INO=d_ino
 MOZ_USER_DIR=".mozilla"
 
@@ -1453,80 +1461,11 @@ if test "$GNU_CC"; then
         fi
     fi
 
-    # Turn on gcc/clang warnings:
-    # https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gcc/Warning-Options.html
-    #
-    # -Wall - turn on a lot of warnings
-    # -Wchar-subscripts - catches array index using signed char
-    # -Wcomment - catches nested comments
-    # -Wempty-body - catches bugs, e.g. "if (c); foo();", few false positives
-    # -Wendif-labels - catches `#else FOO` and `#endif FOO` not in comment
-    # -Wenum-compare - catches comparison of different enum types
-    # -Wignored-qualifiers - catches returns types with qualifiers like const
-    # -Wint-to-pointer-cast - catches cast to pointer from integer of different size
-    # -Wmultichar - catches multicharacter integer constants like 'THIS'
-    # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
-    # -Wnonnull - catches NULL used with functions arguments marked as non-null
-    # -Wpointer-arith - catches pointer arithmetic using NULL or sizeof(void)
-    # -Wpointer-sign - catches mixing pointers to signed and unsigned types
-    # -Wpointer-to-int-cast - catches casts from pointer to different sized int
-    # -Wreturn-type - catches missing returns, zero false positives
-    # -Wsequence-point - catches undefined order behavior like `a = a++`
-    # -Wsign-compare - catches comparison of signed and unsigned types
-    # -Wtrigraphs - catches unlikely use of trigraphs
-    # -Wtype-limits - catches overflow bugs, few false positives
-    # -Wunknown-pragmas - catches unexpected #pragma directives
-    #
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wall"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wempty-body"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wpointer-to-int-cast"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wsign-compare"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wtype-limits"
+    MOZ_SET_WARNINGS_CFLAGS
 
-    # Treat some warnings as errors if --enable-warnings-as-errors:
-    if test "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=char-subscripts"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=comment"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=endif-labels"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=enum-compare"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=ignored-qualifiers"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=int-to-pointer-cast"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=multichar"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=nonnull"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=pointer-arith"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=pointer-sign"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=return-type"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=sequence-point"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=trigraphs"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=uninitialized"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=unknown-pragmas"
-
-        MOZ_C_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_c_has_werror_non_literal_null_conversion)
-        MOZ_C_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_c_has_sometimes_uninitialized)
-    fi
-
-    # Turn off the following warnings that -Wall turns on:
-    # -Wno-unused - lots of violations in third-party code
-    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
-    #
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wno-unused"
-
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
-
-    if test -z "$INTEL_CC" -a -z "$CLANG_CC"; then
-       # Don't use -Wcast-align with ICC or clang
-       case "$CPU_ARCH" in
-           # And don't use it on hppa, ia64, sparc, arm, since it's noisy there
-           hppa | ia64 | sparc | arm)
-           ;;
-           *)
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wcast-align"
-           ;;
-       esac
-    fi
-
-    _DEFINES_CFLAGS='-include $(DEPTH)/mozilla-config.h -DMOZILLA_CLIENT'
+    _DEFINES_CFLAGS='-include $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
     _USE_CPP_INCLUDE_FLAG=1
+
     ASFLAGS="$ASFLAGS $_DEFINES_CFLAGS"
 
 elif test "$SOLARIS_SUNPRO_CC"; then
@@ -1557,91 +1496,10 @@ if test "$GNU_CXX"; then
     # FIXME: Let us build with strict aliasing. bug 414641.
     CXXFLAGS="$CXXFLAGS -fno-exceptions -fno-strict-aliasing"
 
-    # Turn on gcc/clang warnings:
-    # https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gcc/Warning-Options.html
-    #
-    # -Wall - turn on a lot of warnings
-    # -Wempty-body - catches bugs, e.g. "if (c); foo();", few false positives
-    # -Wendif-labels - catches `#else FOO` and `#endif FOO` not in comment
-    # -Wint-to-pointer-cast - catches cast to pointer from integer of different size
-    # -Wmissing-braces - catches aggregate initializers missing nested braces
-    # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
-    # -Woverloaded-virtual - function declaration hides virtual function from base class
-    # -Wparentheses - catches `if (a=b)` and operator precedence bugs
-    # -Wpointer-arith - catches pointer arithmetic using NULL or sizeof(void)
-    # -Wrange-loop-analysis - catches copies during range-based for loops.
-    # -Wreturn-type - catches missing returns, zero false positives
-    # -Wsequence-point - catches undefined order behavior like `a = a++`
-    # -Wsign-compare - catches comparison of signed and unsigned types
-    # -Wswitch - catches switches without all enum cases or default case
-    # -Wtrigraphs - catches unlikely use of trigraphs
-    # -Wtype-limits - catches overflow bugs, few false positives
-    # -Wunused-label - catches unused goto labels
-    # -Wwrite-strings - catches non-const char* pointers to string literals
-    #
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wall"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wempty-body"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Woverloaded-virtual"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wsign-compare"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wwrite-strings"
+    MOZ_SET_WARNINGS_CXXFLAGS
 
-    # Treat some warnings as errors if --enable-warnings-as-errors:
-    if test "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=endif-labels"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=int-to-pointer-cast"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=missing-braces"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=parentheses"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=pointer-arith"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=return-type"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=sequence-point"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=switch"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=trigraphs"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=type-limits"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=uninitialized"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=unused-label"
-
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_cxx_has_werror_non_literal_null_conversion)
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, range-loop-analysis, ac_cxx_has_range_loop_analysis)
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_cxx_has_sometimes_uninitialized)
-    fi
-
-    # Turn off the following warnings that -Wall turns on:
-    # -Wno-invalid-offsetof - we use offsetof on non-POD types frequently
-    # -Wno-inline-new-delete - we inline 'new' and 'delete' in mozalloc
-    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
-    #   for performance reasons, and because GCC and clang accept it (though
-    #   clang warns about it).
-    #
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-invalid-offsetof"
-
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, inline-new-delete, ac_cxx_has_wno_inline_new_delete)
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
-
-    if test -z "$INTEL_CXX" -a -z "$CLANG_CXX"; then
-       # Don't use -Wcast-align with ICC or clang
-       case "$CPU_ARCH" in
-           # And don't use it on hppa, ia64, sparc, arm, since it's noisy there
-           hppa | ia64 | sparc | arm)
-           ;;
-           *)
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wcast-align"
-           ;;
-       esac
-    fi
-
-    _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -include $(DEPTH)/mozilla-config.h'
+    _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -include $(topobjdir)/mozilla-config.h'
     _USE_CPP_INCLUDE_FLAG=1
-
-    # Recent clang and gcc support C++11 deleted functions without warnings if
-    # compiling with -std=c++0x or -std=gnu++0x (or c++11 or gnu++11 in very new
-    # versions).  We can't use -std=c++0x yet, so gcc's support must remain
-    # unused.  But clang's warning can be disabled, so when compiling with clang
-    # we use it to opt out of the warning, enabling (macro-encapsulated) use of
-    # deleted function syntax.
-    if test "$CLANG_CXX"; then
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-c++0x-extensions"
-        MOZ_CXX_SUPPORTS_WARNING(-Wno-, extended-offsetof, ac_cxx_has_wno_extended_offsetof)
-    fi
 
 else
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_MOZILLA_CONFIG_H_ $(ACDEFINES)'
@@ -1679,7 +1537,6 @@ dnl ========================================================
 if test -n "$MACOSX_DEPLOYMENT_TARGET" -a -n "$MOZ_RUST"; then
   AC_MSG_CHECKING([if we're targeting 32-bit])
   if test -z "$HAVE_64BIT_BUILD"; then
-    RUSTC="$RUSTC --target=i686-apple-darwin"
     AC_MSG_RESULT([using $RUSTC])
   else
     AC_MSG_RESULT([no])
@@ -1734,15 +1591,6 @@ MOZ_ARG_ENABLE_BOOL(systrace,
     MOZ_USE_SYSTRACE= )
 if test -n "$MOZ_USE_SYSTRACE"; then
     AC_DEFINE(MOZ_USE_SYSTRACE)
-fi
-
-# For profiling builds keep the symbol information
-if test "$MOZ_PROFILING" -a -z "$STRIP_FLAGS"; then
-    case "$OS_TARGET" in
-    Linux|DragonFly|FreeBSD|NetBSD|OpenBSD)
-        STRIP_FLAGS="--strip-debug"
-        ;;
-    esac
 fi
 
 dnl ========================================================
@@ -1808,6 +1656,38 @@ if test -n "$MOZ_VTUNE"; then
     AC_DEFINE(MOZ_VTUNE)
 fi
 
+# For profiling builds keep the symbol information
+if test "$MOZ_PROFILING" -a -z "$STRIP_FLAGS"; then
+    case "$OS_TARGET" in
+    Linux|DragonFly|FreeBSD|NetBSD|OpenBSD)
+        STRIP_FLAGS="--strip-debug"
+        ;;
+    esac
+fi
+
+dnl ========================================================
+dnl = Enable DMD
+dnl ========================================================
+
+MOZ_ARG_ENABLE_BOOL(dmd,
+[  --enable-dmd            Enable DMD; also enables jemalloc, replace-malloc and profiling],
+    MOZ_DMD=1,
+    MOZ_DMD= )
+
+if test "$MOZ_DMD"; then
+    AC_DEFINE(MOZ_DMD)
+
+    if test "${CPU_ARCH}" = "arm"; then
+        CFLAGS="$CFLAGS -funwind-tables"
+        CXXFLAGS="$CXXFLAGS -funwind-tables"
+    fi
+
+    MOZ_MEMORY=1                        # DMD enables jemalloc
+    MOZ_REPLACE_MALLOC=1                # DMD enables replace-malloc
+    MOZ_PROFILING=1                     # DMD enables profiling
+fi
+AC_SUBST(MOZ_DMD)
+
 dnl ========================================================
 dnl Profiling
 dnl ========================================================
@@ -1829,14 +1709,8 @@ case "$host" in
         HOST_CFLAGS="$HOST_CFLAGS -mwindows"
     fi
     HOST_CFLAGS="$HOST_CFLAGS -DXP_WIN32 -DXP_WIN -DWIN32 -D_WIN32 -DNO_X11 -D_CRT_SECURE_NO_WARNINGS"
-    HOST_NSPR_MDCPUCFG='"md/_winnt.cfg"'
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O2}"
     HOST_BIN_SUFFIX=.exe
-    case "$host" in
-    *mingw*)
-        PERL="/bin/sh ${_topsrcdir}/build/msys-perl-wrapper"
-        ;;
-    esac
 
     case "${host_cpu}" in
     i*86)
@@ -1855,13 +1729,11 @@ case "$host" in
 
 *-darwin*)
     HOST_CFLAGS="$HOST_CFLAGS -DXP_UNIX -DXP_MACOSX -DNO_X11"
-    HOST_NSPR_MDCPUCFG='"md/_darwin.cfg"'
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3}"
     ;;
 
 *-linux*|*-kfreebsd*-gnu|*-gnu*)
     HOST_CFLAGS="$HOST_CFLAGS -DXP_UNIX"
-    HOST_NSPR_MDCPUCFG='"md/_linux.cfg"'
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3}"
     ;;
 
@@ -2009,7 +1881,6 @@ case "$target" in
         # builds.
         MOZ_DEBUG_LDFLAGS="$MOZ_DEBUG_LDFLAGS -framework ExceptionHandling";
     fi
-    TARGET_NSPR_MDCPUCFG='\"md/_darwin.cfg\"'
 
     if test "x$lto_is_enabled" = "xyes"; then
         echo "Skipping -dead_strip because lto is enabled."
@@ -2102,7 +1973,6 @@ ia64*-hpux*)
             MOZ_LINKER=1
         fi
     fi
-    TARGET_NSPR_MDCPUCFG='\"md/_linux.cfg\"'
 
     MOZ_GFX_OPTIMIZE_MOBILE=1
     MOZ_OPTIMIZE_FLAGS="-O2 -fno-reorder-functions"
@@ -2125,8 +1995,6 @@ ia64*-hpux*)
            MOZ_OPTIMIZE_FLAGS="-freorder-blocks $MOZ_OPTIMIZE_FLAGS"
         fi
     fi
-
-    TARGET_NSPR_MDCPUCFG='\"md/_linux.cfg\"'
 
     MOZ_MEMORY=1
 
@@ -2219,8 +2087,8 @@ ia64*-hpux*)
         WIN32_GUI_EXE_LDFLAGS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
         DSO_LDOPTS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
         _USE_CPP_INCLUDE_FLAG=1
-        _DEFINES_CFLAGS='-FI $(DEPTH)/dist/include/mozilla-config.h -DMOZILLA_CLIENT'
-        _DEFINES_CXXFLAGS='-FI $(DEPTH)/dist/include/mozilla-config.h -DMOZILLA_CLIENT'
+        _DEFINES_CFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
+        _DEFINES_CXXFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
         if test "$CPU_ARCH" = "x86" -a -z "$CLANG_CL"; then
@@ -2311,6 +2179,11 @@ ia64*-hpux*)
             # At least one MSVC header and several headers in-tree have
             # unused typedefs, so turn this on.
             CXXFLAGS="$CXXFLAGS -Wno-unused-local-typedef"
+            # Several JS engine header files use __declspec(dllimport) on
+            # classes, and clang-cl helpfully warns about its non-support
+            # for such cases.  We're not particularly worried about that,
+            # so ignore that warning.
+            CXXFLAGS="$CXXFLAGS -Wno-ignored-attributes"
         fi
         # make 'foo == bar;' error out
         CFLAGS="$CFLAGS -we4553"
@@ -2321,13 +2194,9 @@ ia64*-hpux*)
         MOZ_OPTIMIZE_FLAGS='-O1 -Oi'
         MOZ_FIX_LINK_PATHS=
         MOZ_COMPONENT_NSPR_LIBS='$(NSPR_LIBS)'
-        # Don't enable these flags on clang-cl since it doesn't ignore unknown arguments by default, and
-        # autoconf insists on passing $LDFLAGS to the compiler.
-        if test -z "$CLANG_CL"; then
-            LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT -OPT:REF -OPT:ICF=15"
-            if test -z "$DEVELOPER_OPTIONS"; then
-                LDFLAGS="$LDFLAGS -RELEASE"
-            fi
+        LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
+        if test -z "$DEVELOPER_OPTIONS"; then
+            LDFLAGS="$LDFLAGS -RELEASE"
         fi
         dnl For profile-guided optimization
         PROFILE_GEN_CFLAGS="-GL"
@@ -2368,13 +2237,9 @@ ia64*-hpux*)
     AC_DEFINE(WIN32_LEAN_AND_MEAN)
     dnl See http://support.microsoft.com/kb/143208 to use STL
     AC_DEFINE(NOMINMAX)
-    TARGET_MD_ARCH=win32
     _PLATFORM_DEFAULT_TOOLKIT='cairo-windows'
     BIN_SUFFIX='.exe'
     MOZ_USER_DIR="Mozilla"
-
-    dnl Hardcode to win95 for now - cls
-    TARGET_NSPR_MDCPUCFG='\"md/_win95.cfg\"'
 
     dnl set NO_X11 defines here as the general check is skipped on win32
     no_x=yes
@@ -2406,11 +2271,7 @@ ia64*-hpux*)
             LDFLAGS="$LDFLAGS -Wl,--enable-stdcall-fixup -Wl,--large-address-aware"
         else
             DSO_LDOPTS="$DSO_LDOPTS -MACHINE:X86"
-            # Disable this flag on clang-cl since it doesn't ignore unknown arguments by default, and
-            # autoconf insists on passing $LDFLAGS to the compiler.
-            if test -z "$CLANG_CL"; then
-                LDFLAGS="$LDFLAGS -SAFESEH"
-            fi
+            LDFLAGS="$LDFLAGS -SAFESEH"
         fi
 
         AC_DEFINE(_X86_)
@@ -2472,7 +2333,6 @@ ia64*-hpux*)
 
 *-solaris*)
     AC_DEFINE(SOLARIS)
-    TARGET_NSPR_MDCPUCFG='\"md/_solaris.cfg\"'
     MOZ_FIX_LINK_PATHS=
     # $ORIGIN/.. is for shared libraries under components/ to locate shared
     # libraries one level up (e.g. libnspr4.so)
@@ -3000,7 +2860,7 @@ dnl Checks for library functions.
 dnl ========================================================
 AC_PROG_GCC_TRADITIONAL
 AC_FUNC_MEMCMP
-AC_CHECK_FUNCS(stat64 lstat64 truncate64 statvfs64 statvfs statfs64 statfs getpagesize gmtime_r localtime_r arc4random arc4random_buf mallinfo)
+AC_CHECK_FUNCS(stat64 lstat64 truncate64 statvfs64 statvfs statfs64 statfs getpagesize gmtime_r localtime_r arc4random arc4random_buf mallinfo gettid lchown setpriority strerror syscall)
 
 dnl check for clock_gettime(), the CLOCK_MONOTONIC clock
 AC_CACHE_CHECK(for clock_gettime(CLOCK_MONOTONIC),
@@ -3425,6 +3285,15 @@ MOZ_ARG_WITH_STRING(libxul-sdk,
 [  --with-libxul-sdk=PFX   Use the libXUL SDK at <PFX>],
   AC_MSG_ERROR([--with-libxul-sdk is not supported anymore.]))
 
+case "$OS_TARGET" in
+WINNT|Darwin|Android)
+  MOZ_FOLD_LIBS=1
+  ;;
+*)
+  MOZ_FOLD_LIBS=
+  ;;
+esac
+
 MOZ_CONFIG_NSPR()
 
 dnl set GRE_MILESTONE
@@ -3528,12 +3397,14 @@ AC_MSG_CHECKING([for YASM assembler])
 AC_CHECK_PROGS(YASM, yasm, "")
 
 if test -n "$YASM"; then
+  AC_MSG_CHECKING([yasm version])
   dnl Pull out yasm's version string
   YASM_VERSION=`yasm --version | $AWK '/^yasm/ { print $2 }'`
   _YASM_MAJOR_VERSION=`echo ${YASM_VERSION} | $AWK -F\. '{ print $1 }'`
   _YASM_MINOR_VERSION=`echo ${YASM_VERSION} | $AWK -F\. '{ print $2 }'`
   _YASM_RELEASE=`      echo ${YASM_VERSION} | $AWK -F\. '{ print $3 }'`
   _YASM_BUILD=`        echo ${YASM_VERSION} | $AWK -F\. '{ print $4 }'`
+  AC_MSG_RESULT([$_YASM_MAJOR_VERSION.$_YASM_MINOR_VERSION.$_YASM_RELEASE ($YASM_VERSION)])
 fi
 
 if test -z "$SKIP_LIBRARY_CHECKS"; then
@@ -4065,8 +3936,6 @@ xulrunner)
   ;;
 esac
 
-BUILD_BACKENDS="$BUILD_BACKENDS FasterMake"
-
 if test -n "$MOZ_B2G"; then
     AC_DEFINE(MOZ_B2G)
 fi
@@ -4099,16 +3968,6 @@ AC_SUBST(MOZ_MULET)
 AC_SUBST(MOZ_B2G_VERSION)
 
 AC_DEFINE_UNQUOTED(MOZ_BUILD_APP,$MOZ_BUILD_APP)
-
-case "$OS_TARGET" in
-WINNT|Darwin|Android)
-  MOZ_FOLD_LIBS=1
-  ;;
-*)
-  MOZ_FOLD_LIBS=
-  ;;
-esac
-
 
 dnl ========================================================
 dnl =
@@ -4971,7 +4830,7 @@ AC_SUBST(MOZ_WEBRTC_HAVE_ETHTOOL_SPEED_HI)
 
 # target_arch is from {ia32|x64|arm|ppc}
 case "$CPU_ARCH" in
-x86_64 | arm | x86 | ppc* | ia64)
+x86_64 | arm | aarch64 | x86 | ppc* | ia64)
     :
     ;;
 *)
@@ -5413,6 +5272,23 @@ if test -z "$MOZ_NATIVE_LIBVPX"; then
         VPX_AS_CONVERSION='$(PERL) $(topsrcdir)/media/libvpx/build/make/ads2gas.pl'
         VPX_ASM_SUFFIX="$ASM_SUFFIX"
         VPX_ARM_ASM=1
+        dnl Building with -mfpu=neon requires either the "softfp" or the
+        dnl "hardfp" ABI. Depending on the compiler's default target, and the
+        dnl CFLAGS, the default ABI might be neither, in which case it is the
+        dnl "softfloat" ABI.
+        dnl The "softfloat" ABI is binary-compatible with the "softfp" ABI, so
+        dnl we can safely mix code built with both ABIs. So, if we detect
+        dnl that compiling uses the "softfloat" ABI, force the use of the
+        dnl "softfp" ABI instead.
+        dnl Confusingly, the __SOFTFP__ preprocessor variable indicates the
+        dnl "softfloat" ABI, not the "softfp" ABI.
+        dnl Note: VPX_ASFLAGS is also used in CFLAGS.
+        AC_TRY_COMPILE([],
+          [#ifndef __SOFTFP__
+           #error "compiler target supports -mfpu=neon, so we don't have to add extra flags"
+           #endif],
+           VPX_ASFLAGS="$VPX_ASFLAGS -mfloat-abi=softfp"
+           )
       fi
     ;;
     *:x86)
@@ -5738,6 +5614,7 @@ MOZ_DIRECTX_SDK_PATH=
 MOZ_D3DCOMPILER_XP_DLL=
 MOZ_D3DCOMPILER_XP_CAB=
 
+if test "$COMPILE_ENVIRONMENT" ; then
 case "$target_os" in
 *mingw*)
     MOZ_ANGLE_RENDERER=1
@@ -5782,9 +5659,9 @@ if test -n "$MOZ_ANGLE_RENDERER"; then
   # Find a D3D compiler DLL in a Windows SDK.
   MOZ_D3DCOMPILER_VISTA_DLL=
   case "$MOZ_WINSDK_MAXVER" in
-  0x0603*)
+  0x0603*|0x0A00*)
     MOZ_D3DCOMPILER_VISTA_DLL=d3dcompiler_47.dll
-    AC_MSG_RESULT([Found D3D compiler in Windows SDK 8.1.])
+    AC_MSG_RESULT([Found D3D compiler in Windows SDK.])
   ;;
   esac
 
@@ -5803,6 +5680,8 @@ if test -n "$MOZ_ANGLE_RENDERER"; then
     else
       AC_MSG_RESULT([Windows SDK not found.])
     fi
+  else
+    AC_MSG_ERROR([Couldn't find Windows SDK 8.1 or higher needed for ANGLE.])
   fi
 
   if test -z "$MOZ_D3DCOMPILER_VISTA_DLL_PATH"; then
@@ -5898,7 +5777,9 @@ if test -n "$MOZ_ANGLE_RENDERER"; then
       AC_MSG_ERROR([  Install Windows SDK 8.0+, as well as DirectX SDK (June 2010 version or newer), or reconfigure without this flag.])
     fi
   fi
-fi
+fi # MOZ_ANGLE_RENDERER
+
+fi # COMPILE_ENVIRONMENT
 
 
 dnl ========================================================
@@ -6373,7 +6254,12 @@ MOZ_ARG_ENABLE_BOOL(signmar,
     MOZ_ENABLE_SIGNMAR= )
 
 if test -n "$MOZ_ENABLE_SIGNMAR"; then
-  AC_DEFINE(MOZ_ENABLE_SIGNMAR)
+  if test -z "$COMPILE_ENVIRONMENT" ; then
+    AC_MSG_WARN([Cannot --enable-signmar with --disable-compile-environment])
+    MOZ_ENABLE_SIGNMAR=
+  else
+    AC_DEFINE(MOZ_ENABLE_SIGNMAR)
+  fi
 fi
 
 dnl ========================================================
@@ -6908,26 +6794,6 @@ dnl = Disable treating compiler warnings as errors
 dnl ========================================================
 if test -z "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
    WARNINGS_AS_ERRORS=''
-elif test "$GNU_CC"; then
-    # Prevent the following GCC warnings from being treated as errors:
-    # -Wmaybe-uninitialized - too many false positives
-    # -Wdeprecated-declarations - we don't want our builds held hostage when a
-    #   platform-specific API becomes deprecated.
-    # -Wfree-nonheap-object - false positives during PGO
-    # -Warray-bounds - false positives depending on optimization
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_c_has_noerror_maybe_uninitialized)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_cxx_has_noerror_maybe_uninitialized)
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=deprecated-declarations, ac_c_has_noerror_deprecated_declarations)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=deprecated-declarations, ac_cxx_has_noerror_deprecated_declarations)
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=array-bounds, ac_c_has_noerror_array_bounds)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=array-bounds, ac_cxx_has_noerror_array_bounds)
-
-    if test -n "$MOZ_PGO"; then
-        MOZ_C_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_c_has_noerror_coverage_mismatch)
-        MOZ_CXX_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_cxx_has_noerror_coverage_mismatch)
-        MOZ_C_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_c_has_noerror_free_nonheap_object)
-        MOZ_CXX_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_cxx_has_noerror_free_nonheap_object)
-    fi
 fi
 
 dnl ========================================================
@@ -6989,28 +6855,6 @@ fi
 if test -n "$MOZ_DEBUG"; then
     AC_DEFINE(MOZ_DUMP_PAINTING)
 fi
-
-dnl ========================================================
-dnl = Enable DMD
-dnl ========================================================
-
-MOZ_ARG_ENABLE_BOOL(dmd,
-[  --enable-dmd            Enable DMD; also enables jemalloc and replace-malloc],
-    MOZ_DMD=1,
-    MOZ_DMD= )
-
-if test "$MOZ_DMD"; then
-    AC_DEFINE(MOZ_DMD)
-
-    if test "${CPU_ARCH}" = "arm"; then
-        CFLAGS="$CFLAGS -funwind-tables"
-        CXXFLAGS="$CXXFLAGS -funwind-tables"
-    fi
-
-    MOZ_MEMORY=1                        # DMD enables jemalloc
-    MOZ_REPLACE_MALLOC=1                # DMD enables replace-malloc
-fi
-AC_SUBST(MOZ_DMD)
 
 dnl ========================================================
 dnl = Enable jemalloc
@@ -7368,7 +7212,7 @@ MOZ_ARG_ENABLE_BOOL(tasktracer,
 [  --enable-tasktracer       Set compile flags necessary for using TaskTracer],
     MOZ_TASK_TRACER=1,
     MOZ_TASK_TRACER= )
-if test "$MOZ_WIDGET_TOOLKIT" = "gonk" -a -n "$MOZ_TASK_TRACER"; then
+if test -n "$MOZ_TASK_TRACER"; then
     AC_DEFINE(MOZ_TASK_TRACER)
     AC_SUBST(MOZ_TASK_TRACER)
 fi
@@ -8014,7 +7858,7 @@ if test "$USE_FC_FREETYPE"; then
         AC_DEFINE(HAVE_FONTCONFIG_FCFREETYPE_H)
     fi
 
-    PKG_CHECK_MODULES(_FONTCONFIG, fontconfig,
+    PKG_CHECK_MODULES(_FONTCONFIG, fontconfig >= $FONTCONFIG_VERSION,
     [
         if test "$MOZ_PANGO"; then
             MOZ_PANGO_CFLAGS="$MOZ_PANGO_CFLAGS $_FONTCONFIG_CFLAGS"
@@ -8111,11 +7955,14 @@ if test "$MOZ_TREE_CAIRO"; then
         MOZ_ENABLE_D2D_SURFACE=1
         MOZ_ENABLE_DWRITE_FONT=1
 
-        MOZ_CHECK_HEADER(d3d9.h, MOZ_ENABLE_D3D9_LAYER=1)
+        if test "$COMPILE_ENVIRONMENT"; then
 
-        dnl D3D10 Layers depend on D2D Surfaces.
-        if test -n "$WIN32_D2D_SURFACE_FEATURE"; then
-          MOZ_CHECK_HEADER(d3d10.h, MOZ_ENABLE_D3D10_LAYER=1)
+          MOZ_CHECK_HEADER(d3d9.h, MOZ_ENABLE_D3D9_LAYER=1)
+
+          dnl D3D10 Layers depend on D2D Surfaces.
+          if test -n "$WIN32_D2D_SURFACE_FEATURE"; then
+            MOZ_CHECK_HEADER(d3d10.h, MOZ_ENABLE_D3D10_LAYER=1)
+          fi
         fi
         ;;
     esac
@@ -8500,7 +8347,6 @@ AC_SUBST(USE_DEPENDENT_LIBS)
 
 AC_SUBST(MOZ_BUILD_ROOT)
 
-AC_SUBST(MOZ_POST_DSO_LIB_COMMAND)
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
 AC_SUBST(MOZ_LINKER_EXTRACT)
 
@@ -8653,6 +8499,7 @@ AC_SUBST(MOZ_UA_BUILDID)
 AC_SUBST(MOZ_APP_STATIC_INI)
 
 AC_SUBST(MOZ_PKG_SPECIAL)
+AC_SUBST(MOZ_SIMPLE_PACKAGE_NAME)
 
 AC_SUBST(MOZILLA_OFFICIAL)
 if test "$MOZILLA_OFFICIAL"; then
@@ -8697,7 +8544,6 @@ if test -n "$MOZ_TELEMETRY_REPORTING" || test -n "$MOZ_SERVICES_HEALTHREPORT"; t
 fi
 
 dnl win32 options
-AC_SUBST(MOZ_BROWSE_INFO)
 AC_SUBST(WIN32_REDIST_DIR)
 AC_SUBST(MAKENSISU)
 
@@ -8782,15 +8628,12 @@ AC_SUBST(HOST_AR)
 AC_SUBST(HOST_AR_FLAGS)
 AC_SUBST(HOST_LD)
 AC_SUBST(HOST_RANLIB)
-AC_SUBST(HOST_NSPR_MDCPUCFG)
 AC_SUBST(HOST_BIN_SUFFIX)
 AC_SUBST(HOST_OS_ARCH)
 
 AC_SUBST(TARGET_CPU)
 AC_SUBST(TARGET_VENDOR)
 AC_SUBST(TARGET_OS)
-AC_SUBST(TARGET_NSPR_MDCPUCFG)
-AC_SUBST(TARGET_MD_ARCH)
 AC_SUBST(TARGET_XPCOM_ABI)
 AC_SUBST(OS_TARGET)
 AC_SUBST(OS_ARCH)
@@ -9025,12 +8868,10 @@ dnl ========================================================
 dnl ICU Support
 dnl ========================================================
 
-# Internationalization isn't built or exposed by default in non-desktop
-# builds.  Bugs to enable:
-#
-#   Android:  bug 864843
+# Internationalization is not built or exposed on Fennec.
+# See Bug 1215256
 
-if test "$MOZ_WIDGET_TOOLKIT" = "android"; then
+if test "$MOZ_BUILD_APP" = "mobile/android"; then
     _INTL_API=no
 else
     _INTL_API=yes
@@ -9055,9 +8896,8 @@ MOZ_CREATE_CONFIG_STATUS()
 if test "$COMPILE_ENVIRONMENT"; then
   MOZ_SUBCONFIGURE_ICU()
   MOZ_SUBCONFIGURE_FFI()
+  MOZ_SUBCONFIGURE_JEMALLOC()
 fi
-
-MOZ_SUBCONFIGURE_JEMALLOC()
 
 # Run freetype configure script
 
@@ -9124,8 +8964,6 @@ fi
 if test "$COMPILE_ENVIRONMENT"; then
 
 export WRAP_LDFLAGS
-
-MOZ_SUBCONFIGURE_NSPR()
 
 dnl ========================================================
 dnl = Setup a nice relatively clean build environment for

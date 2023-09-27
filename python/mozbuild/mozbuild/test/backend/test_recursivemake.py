@@ -164,7 +164,7 @@ class TestRecursiveMakeBackend(BackendTester):
         self.assertTrue(os.path.exists(mozpath.join(env.topobjdir,
             'backend.RecursiveMakeBackend')))
         self.assertTrue(os.path.exists(mozpath.join(env.topobjdir,
-            'backend.RecursiveMakeBackend.pp')))
+            'backend.RecursiveMakeBackend.in')))
 
     def test_output_files(self):
         """Ensure proper files are generated."""
@@ -188,6 +188,7 @@ class TestRecursiveMakeBackend(BackendTester):
         lines = [l.strip() for l in open(p, 'rt').readlines()[1:] if not l.startswith('#')]
         self.assertEqual(lines, [
             'DEPTH := .',
+            'topobjdir := %s' % env.topobjdir,
             'topsrcdir := %s' % env.topsrcdir,
             'srcdir := %s' % env.topsrcdir,
             'VPATH := %s' % env.topsrcdir,
@@ -207,7 +208,7 @@ class TestRecursiveMakeBackend(BackendTester):
         self.assertTrue(os.path.exists(p))
 
         lines = [l.strip() for l in open(p, 'rt').readlines()]
-        self.assertEqual(len(lines), 9)
+        self.assertEqual(len(lines), 10)
 
         self.assertTrue(lines[0].startswith('# THIS FILE WAS AUTOMATICALLY'))
 
@@ -220,7 +221,17 @@ class TestRecursiveMakeBackend(BackendTester):
         lines = [l.strip() for l in open(p, 'rt').readlines()[2:]]
         self.assertEqual(lines, [
             'DIRS := dir1 dir2',
-            'TEST_DIRS := dir3',
+        ])
+
+        # Make env.substs writable to add ENABLE_TESTS
+        env.substs = dict(env.substs)
+        env.substs['ENABLE_TESTS'] = '1'
+        self._consume('stub0', RecursiveMakeBackend, env=env)
+        p = mozpath.join(env.topobjdir, 'backend.mk')
+
+        lines = [l.strip() for l in open(p, 'rt').readlines()[2:]]
+        self.assertEqual(lines, [
+            'DIRS := dir1 dir2 dir3',
         ])
 
     def test_mtime_no_change(self):
@@ -374,19 +385,22 @@ class TestRecursiveMakeBackend(BackendTester):
         lines = [l.strip() for l in open(backend_path, 'rt').readlines()[2:]]
 
         expected = [
-            'GENERATED_FILES += bar.c',
+            'export:: bar.c',
+            'GARBAGE += bar.c',
             'EXTRA_MDDEPEND_FILES += bar.c.pp',
             'bar.c: %s/generate-bar.py' % env.topsrcdir,
             '$(REPORT_BUILD)',
             '$(call py_action,file_generate,%s/generate-bar.py baz bar.c $(MDDEPDIR)/bar.c.pp)' % env.topsrcdir,
             '',
-            'GENERATED_FILES += foo.c',
+            'export:: foo.c',
+            'GARBAGE += foo.c',
             'EXTRA_MDDEPEND_FILES += foo.c.pp',
             'foo.c: %s/generate-foo.py %s/foo-data' % (env.topsrcdir, env.topsrcdir),
             '$(REPORT_BUILD)',
             '$(call py_action,file_generate,%s/generate-foo.py main foo.c $(MDDEPDIR)/foo.c.pp %s/foo-data)' % (env.topsrcdir, env.topsrcdir),
             '',
-            'GENERATED_FILES += quux.c',
+            'export:: quux.c',
+            'GARBAGE += quux.c',
             'EXTRA_MDDEPEND_FILES += quux.c.pp',
         ]
 
@@ -415,13 +429,17 @@ class TestRecursiveMakeBackend(BackendTester):
         backend_path = mozpath.join(env.topobjdir, 'backend.mk')
         lines = [l.strip() for l in open(backend_path, 'rt').readlines()[2:]]
         expected = [
-            'GENERATED_FILES += bar.h',
+            'export:: bar.h',
+            'GARBAGE += bar.h',
             'EXTRA_MDDEPEND_FILES += bar.h.pp',
-            'GENERATED_FILES += mozilla2.h',
+            'export:: mozilla2.h',
+            'GARBAGE += mozilla2.h',
             'EXTRA_MDDEPEND_FILES += mozilla2.h.pp',
-            'GENERATED_FILES += dom2.h',
+            'export:: dom2.h',
+            'GARBAGE += dom2.h',
             'EXTRA_MDDEPEND_FILES += dom2.h.pp',
-            'GENERATED_FILES += dom3.h',
+            'export:: dom3.h',
+            'GARBAGE += dom3.h',
             'EXTRA_MDDEPEND_FILES += dom3.h.pp',
             'dist_include_FILES += bar.h',
             'dist_include_DEST := $(DEPTH)/dist/include/',
@@ -548,6 +566,9 @@ class TestRecursiveMakeBackend(BackendTester):
         os.makedirs(purge_dir)
         m = InstallManifest()
         m.write(path=manifest_path)
+        with open(mozpath.join(
+                env.topobjdir, 'backend.RecursiveMakeBackend'), 'w') as f:
+            f.write('%s\n' % manifest_path)
 
         self.assertTrue(os.path.exists(manifest_path))
         self._consume('stub0', RecursiveMakeBackend, env)
@@ -646,8 +667,8 @@ class TestRecursiveMakeBackend(BackendTester):
         topobjdir = env.topobjdir.replace('\\', '/')
 
         expected = [
-            'LOCAL_INCLUDES += -Ibar/baz',
-            'LOCAL_INCLUDES += -Ifoo',
+            'LOCAL_INCLUDES += -I$(CURDIR)/bar/baz',
+            'LOCAL_INCLUDES += -I$(CURDIR)/foo',
         ]
 
         found = [str for str in lines if str.startswith('LOCAL_INCLUDES')]
@@ -695,6 +716,7 @@ class TestRecursiveMakeBackend(BackendTester):
             'DIST_FILES_0 += $(srcdir)/install.rdf',
             'DIST_FILES_0 += $(srcdir)/main.js',
             'DIST_FILES_0_PATH := $(DEPTH)/dist/bin/',
+            'DIST_FILES_0_TARGET := misc',
             'PP_TARGETS += DIST_FILES_0',
         ]
 

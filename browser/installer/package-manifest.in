@@ -46,7 +46,6 @@
 @RESPATH@/browser/chrome/@AB_CD@.manifest
 @RESPATH@/chrome/@AB_CD@@JAREXT@
 @RESPATH@/chrome/@AB_CD@.manifest
-@RESPATH@/browser/defaults/profile/bookmarks.html
 @RESPATH@/browser/defaults/profile/chrome/*
 @RESPATH@/browser/defaults/profile/localstore.rdf
 @RESPATH@/browser/defaults/profile/mimeTypes.rdf
@@ -55,7 +54,7 @@
 @RESPATH@/fonts/*
 #endif
 @RESPATH@/hyphenation/*
-@RESPATH@/browser/@PREF_DIR@/palemoon-l10n.js
+@RESPATH@/browser/@PREF_DIR@/firefox-l10n.js
 #ifdef HAVE_MAKENSISU
 @BINPATH@/uninstall/helper.exe
 #endif
@@ -99,12 +98,6 @@
 @BINPATH@/@MSVC_C_RUNTIME_DLL@
 @BINPATH@/@MSVC_CXX_RUNTIME_DLL@
 @BINPATH@/@MSVC_OPENMP_DLL@
-#ifdef MSVC_APPCRT_DLL
-@BINPATH@/@MSVC_APPCRT_DLL@
-#endif
-#ifdef MSVC_DESKTOPCRT_DLL
-@BINPATH@/@MSVC_DESKTOPCRT_DLL@
-#endif
 #endif
 #endif
 #ifndef MOZ_NATIVE_ICU

@@ -74,7 +74,7 @@ ToMIRType(ValType vt)
 {
     switch (vt) {
       case ValType::I32: return jit::MIRType_Int32;
-      case ValType::I64: MOZ_CRASH("NYI");
+      case ValType::I64: return jit::MIRType_Int64;
       case ValType::F32: return jit::MIRType_Float32;
       case ValType::F64: return jit::MIRType_Double;
       case ValType::I32x4: return jit::MIRType_Int32x4;
@@ -192,6 +192,29 @@ static inline jit::MIRType
 ToMIRType(ExprType et)
 {
     return IsVoid(et) ? jit::MIRType_None : ToMIRType(ValType(et));
+}
+
+static inline const char*
+ToCString(ExprType type)
+{
+    switch (type) {
+      case ExprType::Void:  return "void";
+      case ExprType::I32:   return "i32";
+      case ExprType::I64:   return "i64";
+      case ExprType::F32:   return "f32";
+      case ExprType::F64:   return "f64";
+      case ExprType::I32x4: return "i32x4";
+      case ExprType::F32x4: return "f32x4";
+      case ExprType::B32x4: return "b32x4";
+      case ExprType::Limit:;
+    }
+    MOZ_CRASH("bad expression type");
+}
+
+static inline const char*
+ToCString(ValType type)
+{
+    return ToCString(ToExprType(type));
 }
 
 // The Sig class represents a WebAssembly function signature which takes a list

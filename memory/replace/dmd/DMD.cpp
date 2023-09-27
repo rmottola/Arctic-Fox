@@ -12,10 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef XP_WIN
-#if defined(MOZ_OPTIMIZE) && !defined(MOZ_PROFILING)
-#error "Optimized, DMD-enabled builds on Windows must be built with --enable-profiling"
+#if !defined(MOZ_PROFILING)
+#error "DMD requires MOZ_PROFILING"
 #endif
+
+#ifdef XP_WIN
 #include <windows.h>
 #include <process.h>
 #else
@@ -381,7 +382,6 @@ class Options
 
   Mode mMode;
   NumOption<size_t> mSampleBelowSize;
-  NumOption<uint32_t> mMaxFrames;
   bool mShowDumpStats;
 
   void BadArg(const char* aArg);
@@ -403,7 +403,6 @@ public:
   const char* DMDEnvVar() const { return mDMDEnvVar; }
 
   size_t SampleBelowSize() const { return mSampleBelowSize.mActual; }
-  size_t MaxFrames()       const { return mMaxFrames.mActual; }
   size_t ShowDumpStats()   const { return mShowDumpStats; }
 };
 
@@ -610,7 +609,10 @@ public:
 class StringTable
 {
 public:
-  StringTable() { (void)mSet.init(64); }
+  StringTable()
+  {
+    MOZ_ALWAYS_TRUE(mSet.init(64));
+  }
 
   const char*
   Intern(const char* aString)
@@ -621,7 +623,7 @@ public:
     }
 
     const char* newString = InfallibleAllocPolicy::strdup_(aString);
-    (void)mSet.add(p, newString);
+    MOZ_ALWAYS_TRUE(mSet.add(p, newString));
     return newString;
   }
 
@@ -691,9 +693,7 @@ public:
 
 private:
   uint32_t mLength;             // The number of PCs.
-  const void* mPcs[MaxFrames];  // The PCs themselves.  If --max-frames is less
-                                // than 24, this array is bigger than
-                                // necessary, but that case is unusual.
+  const void* mPcs[MaxFrames];  // The PCs themselves.
 
 public:
   StackTrace() : mLength(0) {}
@@ -775,7 +775,7 @@ StackTrace::Get(Thread* aT)
     AutoUnlockState unlock;
     uint32_t skipFrames = 2;
     if (MozStackWalk(StackWalkCallback, skipFrames,
-                      gOptions->MaxFrames(), &tmp, 0, nullptr)) {
+                     MaxFrames, &tmp, 0, nullptr)) {
       // Handle the common case first.  All is ok.  Nothing to do.
     } else {
       tmp.mLength = 0;
@@ -785,7 +785,7 @@ StackTrace::Get(Thread* aT)
   StackTraceTable::AddPtr p = gStackTraceTable->lookupForAdd(&tmp);
   if (!p) {
     StackTrace* stnew = InfallibleAllocPolicy::new_<StackTrace>(tmp);
-    (void)gStackTraceTable->add(p, stnew);
+    MOZ_ALWAYS_TRUE(gStackTraceTable->add(p, stnew));
   }
   return *p;
 }
@@ -934,14 +934,14 @@ public:
 
   void AddStackTracesToTable(StackTraceSet& aStackTraces) const
   {
-    aStackTraces.put(AllocStackTrace());  // never null
+    MOZ_ALWAYS_TRUE(aStackTraces.put(AllocStackTrace()));  // never null
     if (gOptions->IsDarkMatterMode()) {
       const StackTrace* st;
       if ((st = ReportStackTrace1())) {     // may be null
-        aStackTraces.put(st);
+        MOZ_ALWAYS_TRUE(aStackTraces.put(st));
       }
       if ((st = ReportStackTrace2())) {     // may be null
-        aStackTraces.put(st);
+        MOZ_ALWAYS_TRUE(aStackTraces.put(st));
       }
     }
   }
@@ -1052,7 +1052,7 @@ public:
 
   void AddStackTracesToTable(StackTraceSet& aStackTraces) const
   {
-    aStackTraces.put(AllocStackTrace());  // never null
+    MOZ_ALWAYS_TRUE(aStackTraces.put(AllocStackTrace()));  // never null
   }
 
   // Hash policy.
@@ -1090,7 +1090,7 @@ void MaybeAddToDeadBlockTable(const DeadBlock& aDb)
     if (DeadBlockTable::AddPtr p = gDeadBlockTable->lookupForAdd(aDb)) {
       p->value() += 1;
     } else {
-      gDeadBlockTable->add(p, aDb, 1);
+      MOZ_ALWAYS_TRUE(gDeadBlockTable->add(p, aDb, 1));
     }
   }
 }
@@ -1104,7 +1104,7 @@ GatherUsedStackTraces(StackTraceSet& aStackTraces)
   MOZ_ASSERT(Thread::Fetch()->InterceptsAreBlocked());
 
   aStackTraces.finish();
-  aStackTraces.init(512);
+  MOZ_ALWAYS_TRUE(aStackTraces.init(512));
 
   for (auto r = gLiveBlockTable->all(); !r.empty(); r.popFront()) {
     r.front().AddStackTracesToTable(aStackTraces);
@@ -1170,12 +1170,12 @@ AllocCallback(void* aPtr, size_t aReqSize, Thread* aT)
 
       LiveBlock b(aPtr, sampleBelowSize, StackTrace::Get(aT),
                   /* isSampled */ true);
-      (void)gLiveBlockTable->putNew(aPtr, b);
+      MOZ_ALWAYS_TRUE(gLiveBlockTable->putNew(aPtr, b));
     }
   } else {
     // If this block size is larger than the sample size, record it exactly.
     LiveBlock b(aPtr, aReqSize, StackTrace::Get(aT), /* isSampled */ false);
-    (void)gLiveBlockTable->putNew(aPtr, b);
+    MOZ_ALWAYS_TRUE(gLiveBlockTable->putNew(aPtr, b));
   }
 }
 
@@ -1426,7 +1426,6 @@ Options::Options(const char* aDMDEnvVar)
                           : nullptr)
   , mMode(DarkMatter)
   , mSampleBelowSize(4093, 100 * 100 * 1000)
-  , mMaxFrames(StackTrace::MaxFrames, StackTrace::MaxFrames)
   , mShowDumpStats(false)
 {
   // It's no longer necessary to set the DMD env var to "1" if you want default
@@ -1469,9 +1468,6 @@ Options::Options(const char* aDMDEnvVar)
                  &myLong)) {
         mSampleBelowSize.mActual = myLong;
 
-      } else if (GetLong(arg, "--max-frames", 1, mMaxFrames.mMax, &myLong)) {
-        mMaxFrames.mActual = myLong;
-
       } else if (GetBool(arg, "--show-dump-stats", &myBool)) {
         mShowDumpStats = myBool;
 
@@ -1498,22 +1494,7 @@ Options::BadArg(const char* aArg)
 {
   StatusMsg("\n");
   StatusMsg("Bad entry in the $DMD environment variable: '%s'.\n", aArg);
-  StatusMsg("\n");
-  StatusMsg("$DMD must be a whitespace-separated list of |--option=val|\n");
-  StatusMsg("entries.\n");
-  StatusMsg("\n");
-  StatusMsg("The following options are allowed;  defaults are shown in [].\n");
-  StatusMsg("  --mode=<mode>                Profiling mode [dark-matter]\n");
-  StatusMsg("      where <mode> is one of: live, dark-matter, cumulative\n");
-  StatusMsg("  --sample-below=<1..%d> Sample blocks smaller than this [%d]\n",
-            int(mSampleBelowSize.mMax),
-            int(mSampleBelowSize.mDefault));
-  StatusMsg("                               (prime numbers are recommended)\n");
-  StatusMsg("  --max-frames=<1..%d>         Max. depth of stack traces [%d]\n",
-            int(mMaxFrames.mMax),
-            int(mMaxFrames.mDefault));
-  StatusMsg("  --show-dump-stats=<yes|no>   Show stats about dumps? [no]\n");
-  StatusMsg("\n");
+  StatusMsg("See the output of |mach help run| for the allowed options.\n");
   exit(1);
 }
 
@@ -1590,16 +1571,17 @@ Init(const malloc_table_t* aMallocTable)
     AutoLockState lock;
 
     gStackTraceTable = InfallibleAllocPolicy::new_<StackTraceTable>();
-    gStackTraceTable->init(8192);
+    MOZ_ALWAYS_TRUE(gStackTraceTable->init(8192));
 
     gLiveBlockTable = InfallibleAllocPolicy::new_<LiveBlockTable>();
-    gLiveBlockTable->init(8192);
+    MOZ_ALWAYS_TRUE(gLiveBlockTable->init(8192));
 
     // Create this even if the mode isn't Cumulative (albeit with a small
     // size), in case the mode is changed later on (as is done by SmokeDMD.cpp,
     // for example).
     gDeadBlockTable = InfallibleAllocPolicy::new_<DeadBlockTable>();
-    gDeadBlockTable->init(gOptions->IsCumulativeMode() ? 8192 : 4);
+    size_t tableSize = gOptions->IsCumulativeMode() ? 8192 : 4;
+    MOZ_ALWAYS_TRUE(gDeadBlockTable->init(tableSize));
   }
 
   gIsDMDInitialized = true;
@@ -1720,7 +1702,11 @@ DMDFuncs::ClearReports()
 class ToIdStringConverter final
 {
 public:
-  ToIdStringConverter() : mNextId(0) { mIdMap.init(512); }
+  ToIdStringConverter()
+    : mNextId(0)
+  {
+    MOZ_ALWAYS_TRUE(mIdMap.init(512));
+  }
 
   // Converts a pointer to a unique ID. Reuses the existing ID for the pointer
   // if it's been seen before.
@@ -1730,7 +1716,7 @@ public:
     PointerIdMap::AddPtr p = mIdMap.lookupForAdd(aPtr);
     if (!p) {
       id = mNextId++;
-      (void)mIdMap.add(p, aPtr, id);
+      MOZ_ALWAYS_TRUE(mIdMap.add(p, aPtr, id));
     } else {
       id = p->value();
     }
@@ -1828,10 +1814,10 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
   auto locService = InfallibleAllocPolicy::new_<CodeAddressService>();
 
   StackTraceSet usedStackTraces;
-  usedStackTraces.init(512);
+  MOZ_ALWAYS_TRUE(usedStackTraces.init(512));
 
   PointerSet usedPcs;
-  usedPcs.init(512);
+  MOZ_ALWAYS_TRUE(usedPcs.init(512));
 
   size_t iscSize;
 
@@ -1936,7 +1922,7 @@ AnalyzeImpl(UniquePtr<JSONWriteFunc> aWriter)
           for (uint32_t i = 0; i < st->Length(); i++) {
             const void* pc = st->Pc(i);
             writer.StringElement(isc.ToIdString(pc));
-            usedPcs.put(pc);
+            MOZ_ALWAYS_TRUE(usedPcs.put(pc));
           }
         }
         writer.EndArray();

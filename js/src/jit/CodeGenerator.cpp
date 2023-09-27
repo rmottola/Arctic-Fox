@@ -2491,6 +2491,12 @@ CodeGenerator::visitInteger(LInteger* lir)
 }
 
 void
+CodeGenerator::visitInteger64(LInteger64* lir)
+{
+    masm.move64(Imm64(lir->getValue()), ToOutRegister64(lir));
+}
+
+void
 CodeGenerator::visitPointer(LPointer* lir)
 {
     if (lir->kind() == LPointer::GC_THING)
@@ -9312,23 +9318,23 @@ CodeGenerator::visitToIdV(LToIdV* lir)
     Label notInt32;
     FloatRegister temp = ToFloatRegister(lir->tempFloat());
     const ValueOperand out = ToOutValue(lir);
-    ValueOperand index = ToValue(lir, LToIdV::Index);
+    ValueOperand input = ToValue(lir, LToIdV::Input);
 
     OutOfLineCode* ool = oolCallVM(ToIdInfo, lir,
                                    ArgList(ImmGCPtr(current->mir()->info().script()),
                                            ImmPtr(lir->mir()->resumePoint()->pc()),
-                                           ToValue(lir, LToIdV::Index)),
+                                           ToValue(lir, LToIdV::Input)),
                                    StoreValueTo(out));
 
-    Register tag = masm.splitTagForTest(index);
+    Register tag = masm.splitTagForTest(input);
 
     masm.branchTestInt32(Assembler::NotEqual, tag, &notInt32);
-    masm.moveValue(index, out);
+    masm.moveValue(input, out);
     masm.jump(ool->rejoin());
 
     masm.bind(&notInt32);
     masm.branchTestDouble(Assembler::NotEqual, tag, ool->entry());
-    masm.unboxDouble(index, temp);
+    masm.unboxDouble(input, temp);
     masm.convertDoubleToInt32(temp, out.scratchReg(), ool->entry(), true);
     masm.tagValue(JSVAL_TYPE_INT32, out.scratchReg(), out);
 

@@ -215,7 +215,6 @@ private:
 
   nsCString             mConnectString;
   uint32_t              mConnectStringOffset;
-  nsHttpRequestHead     *mRequestHead;
 
   nsAHttpConnection    *mSession;
   nsAHttpSegmentReader *mSegmentReader;

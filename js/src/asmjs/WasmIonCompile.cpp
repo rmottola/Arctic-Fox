@@ -118,7 +118,8 @@ class FunctionCompiler
                 ins = MConstant::NewAsmJS(alloc(), Int32Value(0), MIRType_Int32);
                 break;
               case ValType::I64:
-                MOZ_CRASH("int64");
+                ins = MConstant::NewInt64(alloc(), 0);
+                break;
               case ValType::F32:
                 ins = MConstant::NewAsmJS(alloc(), Float32Value(0.f), MIRType_Float32);
                 break;
@@ -194,6 +195,15 @@ class FunctionCompiler
         if (inDeadCode())
             return nullptr;
         MConstant* constant = MConstant::NewAsmJS(alloc(), v, type);
+        curBlock_->add(constant);
+        return constant;
+    }
+
+    MDefinition* constant(int64_t i)
+    {
+        if (inDeadCode())
+            return nullptr;
+        MConstant* constant = MConstant::NewInt64(alloc(), i);
         curBlock_->add(constant);
         return constant;
     }
@@ -470,53 +480,46 @@ class FunctionCompiler
         curBlock_->setSlot(info().localSlot(slot), def);
     }
 
-    MDefinition* loadHeap(Scalar::Type accessType, MDefinition* ptr, NeedsBoundsCheck chk)
+    MDefinition* loadHeap(Scalar::Type accessType, MDefinition* ptr)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MOZ_ASSERT(!Scalar::isSimdType(accessType), "SIMD loads should use loadSimdHeap");
-        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr, needsBoundsCheck);
+        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr);
         curBlock_->add(load);
         return load;
     }
 
-    MDefinition* loadSimdHeap(Scalar::Type accessType, MDefinition* ptr, NeedsBoundsCheck chk,
-                              unsigned numElems)
+    MDefinition* loadSimdHeap(Scalar::Type accessType, MDefinition* ptr, unsigned numElems)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MOZ_ASSERT(Scalar::isSimdType(accessType), "loadSimdHeap can only load from a SIMD view");
-        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr, needsBoundsCheck,
-                                                   numElems);
+        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr, numElems);
         curBlock_->add(load);
         return load;
     }
 
-    void storeHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* v, NeedsBoundsCheck chk)
+    void storeHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* v)
     {
         if (inDeadCode())
             return;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MOZ_ASSERT(!Scalar::isSimdType(accessType), "SIMD stores should use storeSimdHeap");
-        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v, needsBoundsCheck);
+        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v);
         curBlock_->add(store);
     }
 
     void storeSimdHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* v,
-                       NeedsBoundsCheck chk, unsigned numElems)
+                       unsigned numElems)
     {
         if (inDeadCode())
             return;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MOZ_ASSERT(Scalar::isSimdType(accessType), "storeSimdHeap can only load from a SIMD view");
-        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v, needsBoundsCheck,
-                                                      numElems);
+        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v, numElems);
         curBlock_->add(store);
     }
 
@@ -528,66 +531,59 @@ class FunctionCompiler
         curBlock_->add(ins);
     }
 
-    MDefinition* atomicLoadHeap(Scalar::Type accessType, MDefinition* ptr, NeedsBoundsCheck chk)
+    MDefinition* atomicLoadHeap(Scalar::Type accessType, MDefinition* ptr)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
-        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr, needsBoundsCheck,
-                                                   /* numElems */ 0,
+        MAsmJSLoadHeap* load = MAsmJSLoadHeap::New(alloc(), accessType, ptr, /* numElems */ 0,
                                                    MembarBeforeLoad, MembarAfterLoad);
         curBlock_->add(load);
         return load;
     }
 
-    void atomicStoreHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* v, NeedsBoundsCheck chk)
+    void atomicStoreHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* v)
     {
         if (inDeadCode())
             return;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
-        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v, needsBoundsCheck,
+        MAsmJSStoreHeap* store = MAsmJSStoreHeap::New(alloc(), accessType, ptr, v,
                                                       /* numElems = */ 0,
                                                       MembarBeforeStore, MembarAfterStore);
         curBlock_->add(store);
     }
 
     MDefinition* atomicCompareExchangeHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* oldv,
-                                           MDefinition* newv, NeedsBoundsCheck chk)
+                                           MDefinition* newv)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MAsmJSCompareExchangeHeap* cas =
-            MAsmJSCompareExchangeHeap::New(alloc(), accessType, ptr, oldv, newv, needsBoundsCheck);
+            MAsmJSCompareExchangeHeap::New(alloc(), accessType, ptr, oldv, newv);
         curBlock_->add(cas);
         return cas;
     }
 
-    MDefinition* atomicExchangeHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* value,
-                                    NeedsBoundsCheck chk)
+    MDefinition* atomicExchangeHeap(Scalar::Type accessType, MDefinition* ptr, MDefinition* value)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MAsmJSAtomicExchangeHeap* cas =
-            MAsmJSAtomicExchangeHeap::New(alloc(), accessType, ptr, value, needsBoundsCheck);
+            MAsmJSAtomicExchangeHeap::New(alloc(), accessType, ptr, value);
         curBlock_->add(cas);
         return cas;
     }
 
     MDefinition* atomicBinopHeap(js::jit::AtomicOp op, Scalar::Type accessType, MDefinition* ptr,
-                                 MDefinition* v, NeedsBoundsCheck chk)
+                                 MDefinition* v)
     {
         if (inDeadCode())
             return nullptr;
 
-        bool needsBoundsCheck = chk == NEEDS_BOUNDS_CHECK;
         MAsmJSAtomicBinopHeap* binop =
-            MAsmJSAtomicBinopHeap::New(alloc(), op, accessType, ptr, v, needsBoundsCheck);
+            MAsmJSAtomicBinopHeap::New(alloc(), op, accessType, ptr, v);
         curBlock_->add(binop);
         return binop;
     }
@@ -1234,6 +1230,7 @@ class FunctionCompiler
 
     uint8_t        readU8()       { return decoder_.uncheckedReadFixedU8(); }
     uint32_t       readVarU32()   { return decoder_.uncheckedReadVarU32(); }
+    uint64_t       readVarU64()   { return decoder_.uncheckedReadVarU64(); }
     float          readF32()      { return decoder_.uncheckedReadFixedF32(); }
     double         readF64()      { return decoder_.uncheckedReadFixedF64(); }
     Expr           readExpr()     { return decoder_.uncheckedReadExpr(); }
@@ -1364,7 +1361,9 @@ EmitLiteral(FunctionCompiler& f, ExprType type, MDefinition** def)
         return true;
       }
       case ExprType::I64: {
-        MOZ_CRASH("int64");
+        int64_t val = f.readVarU64();
+        *def = f.constant(val);
+        return true;
       }
       case ExprType::F32: {
         float val = f.readF32();
@@ -1423,23 +1422,33 @@ static bool EmitExpr(FunctionCompiler&, ExprType, MDefinition**, LabelVector* = 
 static bool EmitExprStmt(FunctionCompiler&, MDefinition**, LabelVector* = nullptr);
 
 static bool
-EmitLoadArray(FunctionCompiler& f, Scalar::Type scalarType, MDefinition** def)
+EmitLoadStoreAddress(FunctionCompiler& f, uint32_t* offset, uint32_t* align, MDefinition** base)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
+    *offset = f.readVarU32();
+    MOZ_ASSERT(*offset == 0, "Non-zero offsets not supported yet");
+
+    *align = f.readVarU32();
+
+    return EmitExpr(f, ExprType::I32, base);
+}
+
+static bool
+EmitLoad(FunctionCompiler& f, Scalar::Type scalarType, MDefinition** def)
+{
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
-    *def = f.loadHeap(scalarType, ptr, needsBoundsCheck);
+    *def = f.loadHeap(scalarType, ptr);
     return true;
 }
 
 static bool
 EmitStore(FunctionCompiler& f, Scalar::Type viewType, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
-
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
 
     MDefinition* rhs = nullptr;
@@ -1461,7 +1470,7 @@ EmitStore(FunctionCompiler& f, Scalar::Type viewType, MDefinition** def)
       default: MOZ_CRASH("unexpected scalar type");
     }
 
-    f.storeHeap(viewType, ptr, rhs, needsBoundsCheck);
+    f.storeHeap(viewType, ptr, rhs);
     *def = rhs;
     return true;
 }
@@ -1470,9 +1479,9 @@ static bool
 EmitStoreWithCoercion(FunctionCompiler& f, Scalar::Type rhsType, Scalar::Type viewType,
                       MDefinition **def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
+    uint32_t offset, align;
     MDefinition* ptr;
-    if (!EmitExpr(f, ExprType::I32, &ptr))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &ptr))
         return false;
 
     MDefinition* rhs = nullptr;
@@ -1489,7 +1498,7 @@ EmitStoreWithCoercion(FunctionCompiler& f, Scalar::Type rhsType, Scalar::Type vi
         MOZ_CRASH("unexpected coerced store");
     }
 
-    f.storeHeap(viewType, ptr, coerced, needsBoundsCheck);
+    f.storeHeap(viewType, ptr, coerced);
     *def = rhs;
     return true;
 }
@@ -1541,27 +1550,31 @@ EmitMathMinMax(FunctionCompiler& f, ExprType type, bool isMax, MDefinition** def
 static bool
 EmitAtomicsLoad(FunctionCompiler& f, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
-    *def = f.atomicLoadHeap(viewType, index, needsBoundsCheck);
+
+    *def = f.atomicLoadHeap(viewType, index);
     return true;
 }
 
 static bool
 EmitAtomicsStore(FunctionCompiler& f, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
-    f.atomicStoreHeap(viewType, index, value, needsBoundsCheck);
+    f.atomicStoreHeap(viewType, index, value);
     *def = value;
     return true;
 }
@@ -1569,49 +1582,55 @@ EmitAtomicsStore(FunctionCompiler& f, MDefinition** def)
 static bool
 EmitAtomicsBinOp(FunctionCompiler& f, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
     Scalar::Type viewType = Scalar::Type(f.readU8());
     js::jit::AtomicOp op = js::jit::AtomicOp(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
-    *def = f.atomicBinopHeap(op, viewType, index, value, needsBoundsCheck);
+    *def = f.atomicBinopHeap(op, viewType, index, value);
     return true;
 }
 
 static bool
 EmitAtomicsCompareExchange(FunctionCompiler& f, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* oldValue;
     if (!EmitExpr(f, ExprType::I32, &oldValue))
         return false;
     MDefinition* newValue;
     if (!EmitExpr(f, ExprType::I32, &newValue))
         return false;
-    *def = f.atomicCompareExchangeHeap(viewType, index, oldValue, newValue, needsBoundsCheck);
+    *def = f.atomicCompareExchangeHeap(viewType, index, oldValue, newValue);
     return true;
 }
 
 static bool
 EmitAtomicsExchange(FunctionCompiler& f, MDefinition** def)
 {
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
     Scalar::Type viewType = Scalar::Type(f.readU8());
+
+    uint32_t offset, align;
     MDefinition* index;
-    if (!EmitExpr(f, ExprType::I32, &index))
+    if (!EmitLoadStoreAddress(f, &offset, &align, &index))
         return false;
+
     MDefinition* value;
     if (!EmitExpr(f, ExprType::I32, &value))
         return false;
-    *def = f.atomicExchangeHeap(viewType, index, value, needsBoundsCheck);
+    *def = f.atomicExchangeHeap(viewType, index, value);
     return true;
 }
 
@@ -1980,13 +1999,11 @@ EmitSimdLoad(FunctionCompiler& f, ExprType type, unsigned numElems, MDefinition*
     if (!numElems)
         numElems = defaultNumElems;
 
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
-
     MDefinition* index;
     if (!EmitExpr(f, ExprType::I32, &index))
         return false;
 
-    *def = f.loadSimdHeap(viewType, index, needsBoundsCheck, numElems);
+    *def = f.loadSimdHeap(viewType, index, numElems);
     return true;
 }
 
@@ -1999,8 +2016,6 @@ EmitSimdStore(FunctionCompiler& f, ExprType type, unsigned numElems, MDefinition
     if (!numElems)
         numElems = defaultNumElems;
 
-    NeedsBoundsCheck needsBoundsCheck = NeedsBoundsCheck(f.readU8());
-
     MDefinition* index;
     if (!EmitExpr(f, ExprType::I32, &index))
         return false;
@@ -2009,7 +2024,7 @@ EmitSimdStore(FunctionCompiler& f, ExprType type, unsigned numElems, MDefinition
     if (!EmitExpr(f, type, &vec))
         return false;
 
-    f.storeSimdHeap(viewType, index, vec, needsBoundsCheck, numElems);
+    f.storeSimdHeap(viewType, index, vec, numElems);
     *def = vec;
     return true;
 }
@@ -2353,10 +2368,6 @@ EmitSimdOp(FunctionCompiler& f, ExprType type, SimdOperation op, SimdSign sign, 
         return EmitSimdShift(f, type, MSimdShift::lsh, def);
       case SimdOperation::Fn_shiftRightByScalar:
         return EmitSimdShift(f, type, MSimdShift::rshForSign(sign), def);
-      case SimdOperation::Fn_shiftRightArithmeticByScalar:
-        return EmitSimdShift(f, type, MSimdShift::rsh, def);
-      case SimdOperation::Fn_shiftRightLogicalByScalar:
-        return EmitSimdShift(f, type, MSimdShift::ursh, def);
 #define _CASE(OP) \
       case SimdOperation::Fn_##OP: \
         return EmitSimdBinaryComp(f, type, MSimdBinaryComp::OP, sign, def);
@@ -2789,15 +2800,15 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::I32BitNot:
         return EmitBitwise<MBitNot>(f, def);
       case Expr::I32LoadMem8S:
-        return EmitLoadArray(f, Scalar::Int8, def);
+        return EmitLoad(f, Scalar::Int8, def);
       case Expr::I32LoadMem8U:
-        return EmitLoadArray(f, Scalar::Uint8, def);
+        return EmitLoad(f, Scalar::Uint8, def);
       case Expr::I32LoadMem16S:
-        return EmitLoadArray(f, Scalar::Int16, def);
+        return EmitLoad(f, Scalar::Int16, def);
       case Expr::I32LoadMem16U:
-        return EmitLoadArray(f, Scalar::Uint16, def);
+        return EmitLoad(f, Scalar::Uint16, def);
       case Expr::I32LoadMem:
-        return EmitLoadArray(f, Scalar::Int32, def);
+        return EmitLoad(f, Scalar::Int32, def);
       case Expr::I32StoreMem8:
         return EmitStore(f, Scalar::Int8, def);
       case Expr::I32StoreMem16:
@@ -2837,6 +2848,9 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
         return EmitAtomicsStore(f, def);
       case Expr::I32AtomicsBinOp:
         return EmitAtomicsBinOp(f, def);
+      // I64
+      case Expr::I64Const:
+        return EmitLiteral(f, ExprType::I64, def);
       // F32
       case Expr::F32Const:
         return EmitLiteral(f, ExprType::F32, def);
@@ -2868,7 +2882,7 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::F32ConvertUI32:
         return EmitUnary<MAsmJSUnsignedToFloat32>(f, ExprType::I32, def);
       case Expr::F32LoadMem:
-        return EmitLoadArray(f, Scalar::Float32, def);
+        return EmitLoad(f, Scalar::Float32, def);
       case Expr::F32StoreMem:
         return EmitStore(f, Scalar::Float32, def);
       case Expr::F32StoreMemF64:
@@ -2916,7 +2930,7 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::F64ConvertUI32:
         return EmitUnary<MAsmJSUnsignedToDouble>(f, ExprType::I32, def);
       case Expr::F64LoadMem:
-        return EmitLoadArray(f, Scalar::Float64, def);
+        return EmitLoad(f, Scalar::Float64, def);
       case Expr::F64StoreMem:
         return EmitStore(f, Scalar::Float64, def);
       case Expr::F64StoreMemF32:
@@ -2978,7 +2992,6 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::F64Nearest:
       case Expr::F64Trunc:
       case Expr::I32WrapI64:
-      case Expr::I64Const:
       case Expr::I64ExtendSI32:
       case Expr::I64ExtendUI32:
       case Expr::I64TruncSF32:
@@ -3060,8 +3073,9 @@ wasm::IonCompileFunction(IonCompileTask* task)
     MIRGraph graph(&results.alloc());
     CompileInfo compileInfo(func.numLocals());
     MIRGenerator mir(nullptr, options, &results.alloc(), &graph, &compileInfo,
-                     IonOptimizations.get(OptimizationLevel::AsmJS),
-                     task->mg().args().useSignalHandlersForOOB);
+                     IonOptimizations.get(OptimizationLevel::AsmJS));
+    mir.initUsesSignalHandlersForAsmJSOOB(task->mg().args().useSignalHandlersForOOB);
+    mir.initMinAsmJSHeapLength(task->mg().minHeapLength());
 
     // Build MIR graph
     {

@@ -538,7 +538,7 @@ class TreeMetadataEmitter(LoggingMixin):
                         'action', 'generate_symbols_file.py')
                     yield GeneratedFile(context, script,
                         'generate_symbols_file', lib.symbols_file,
-                        [symbols_file.full_path])
+                        [symbols_file.full_path], lib.defines.get_defines())
             if static_lib:
                 lib = StaticLibrary(context, libname, **static_args)
                 self._libs[libname].append(lib)
@@ -571,12 +571,6 @@ class TreeMetadataEmitter(LoggingMixin):
             yield self._create_substitution(ConfigFileSubstitution, context,
                 path)
 
-        for path in context['CONFIGURE_DEFINE_FILES']:
-            script = mozpath.join(mozpath.dirname(mozpath.dirname(__file__)),
-                                  'action', 'process_define_files.py')
-            yield GeneratedFile(context, script, 'process_define_file', path,
-                                [mozpath.join(context.srcdir, path + '.in')])
-
         for obj in self._process_xpidl(context):
             yield obj
 
@@ -601,6 +595,7 @@ class TreeMetadataEmitter(LoggingMixin):
             'LD_VERSION_SCRIPT',
             'USE_EXTENSION_MANIFEST',
             'NO_JS_MANIFEST',
+            'HAS_MISC_RULE',
         ]
         for v in varlist:
             if v in context and context[v]:
@@ -711,10 +706,10 @@ class TreeMetadataEmitter(LoggingMixin):
                                 'File listed in %s does not exist: %s'
                                 % (var, path), context)
                     else:
-                        if mozpath.basename(f.full_path) not in generated_files:
+                        if f.target_basename not in generated_files:
                             raise SandboxValidationError(
                                 ('Objdir file listed in %s not in ' +
-                                 'GENERATED_FILES: %s') % (var, path), context)
+                                 'GENERATED_FILES: %s') % (var, f), context)
 
             # Addons (when XPI_NAME is defined) and Applications (when
             # DIST_SUBDIR is defined) use a different preferences directory
@@ -922,6 +917,13 @@ class TreeMetadataEmitter(LoggingMixin):
                 xpidl_module, add_to_manifest=not context['XPIDL_NO_MANIFEST'])
 
     def _process_generated_files(self, context):
+        for path in context['CONFIGURE_DEFINE_FILES']:
+            script = mozpath.join(mozpath.dirname(mozpath.dirname(__file__)),
+                                  'action', 'process_define_files.py')
+            yield GeneratedFile(context, script, 'process_define_file',
+                                unicode(path),
+                                [mozpath.join(context.srcdir, path + '.in')])
+
         generated_files = context.get('GENERATED_FILES')
         if not generated_files:
             return
@@ -1307,8 +1309,6 @@ class TreeMetadataEmitter(LoggingMixin):
     def _emit_directory_traversal_from_context(self, context):
         o = DirectoryTraversal(context)
         o.dirs = context.get('DIRS', [])
-        o.test_dirs = context.get('TEST_DIRS', [])
-        o.affected_tiers = context.get_affected_tiers()
 
         # Some paths have a subconfigure, yet also have a moz.build. Those
         # shouldn't end up in self._external_paths.

@@ -322,12 +322,6 @@ enum class Expr : uint16_t
     Limit
 };
 
-enum NeedsBoundsCheck : uint8_t
-{
-    NO_BOUNDS_CHECK,
-    NEEDS_BOUNDS_CHECK
-};
-
 typedef Vector<uint8_t, 0, SystemAllocPolicy> Bytecode;
 typedef UniquePtr<Bytecode> UniqueBytecode;
 
@@ -480,6 +474,15 @@ class Encoder
     }
     void patchVarU32(size_t offset, uint32_t patchBits) {
         return patchVarU32(offset, patchBits, UINT32_MAX);
+    }
+
+    MOZ_WARN_UNUSED_RESULT bool writePatchableVarU8(size_t* offset) {
+        *offset = bytecode_.length();
+        return writeU8(UINT8_MAX);
+    }
+    void patchVarU8(size_t offset, uint8_t patchBits) {
+        MOZ_ASSERT(patchBits < 0x80);
+        return patchU8(offset, patchBits);
     }
 
     MOZ_WARN_UNUSED_RESULT bool writePatchableExpr(size_t* offset) {
@@ -713,19 +716,29 @@ class Decoder
     double uncheckedReadFixedF64() {
         return uncheckedRead<double>();
     }
-    uint32_t uncheckedReadVarU32() {
-        uint32_t decoded = 0;
+    template <typename UInt>
+    UInt uncheckedReadVarU() {
+        static const unsigned numBits = sizeof(UInt) * CHAR_BIT;
+        static const unsigned remainderBits = numBits % 7;
+        static const unsigned numBitsInSevens = numBits - remainderBits;
+        UInt decoded = 0;
         uint32_t shift = 0;
         do {
             uint8_t byte = *cur_++;
             if (!(byte & 0x80))
-                return decoded | (uint32_t(byte) << shift);
-            decoded |= uint32_t(byte & 0x7f) << shift;
+                return decoded | (UInt(byte) << shift);
+            decoded |= UInt(byte & 0x7f) << shift;
             shift += 7;
-        } while (shift != 28);
+        } while (shift != numBitsInSevens);
         uint8_t byte = *cur_++;
         MOZ_ASSERT(!(byte & 0xf0));
-        return decoded | (uint32_t(byte) << 28);
+        return decoded | (UInt(byte) << numBitsInSevens);
+    }
+    uint32_t uncheckedReadVarU32() {
+        return uncheckedReadVarU<uint32_t>();
+    }
+    uint64_t uncheckedReadVarU64() {
+        return uncheckedReadVarU<uint64_t>();
     }
     Expr uncheckedReadExpr() {
         return uncheckedReadEnum<Expr>();

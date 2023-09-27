@@ -107,14 +107,12 @@ class DirectoryTraversal(ContextDerived):
     """
     __slots__ = (
         'dirs',
-        'test_dirs',
     )
 
     def __init__(self, context):
         ContextDerived.__init__(self, context)
 
         self.dirs = []
-        self.test_dirs = []
 
 
 class BaseConfigSubstitution(ContextDerived):
@@ -499,10 +497,12 @@ class SharedLibrary(Library):
         else:
             self.soname = self.lib_name
 
-        if symbols_file:
-            self.symbols_file = '%s.symbols' % self.lib_name
-        else:
+        if not symbols_file:
             self.symbols_file = None
+        elif context.config.substs['OS_TARGET'] == 'WINNT':
+            self.symbols_file = '%s.def' % self.lib_name
+        else:
+            self.symbols_file = '%s.symbols' % self.lib_name
 
 
 class ExternalLibrary(object):
@@ -850,14 +850,16 @@ class GeneratedFile(ContextDerived):
         'method',
         'output',
         'inputs',
+        'flags',
     )
 
-    def __init__(self, context, script, method, output, inputs):
+    def __init__(self, context, script, method, output, inputs, flags=()):
         ContextDerived.__init__(self, context)
         self.script = script
         self.method = method
         self.output = output
         self.inputs = inputs
+        self.flags = flags
 
 
 class ClassPathEntry(object):

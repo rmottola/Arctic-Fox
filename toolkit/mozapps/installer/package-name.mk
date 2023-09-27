@@ -54,8 +54,13 @@ ifndef MOZ_PKG_APPNAME
 MOZ_PKG_APPNAME = $(MOZ_APP_NAME)
 endif
 
-PKG_BASENAME = $(MOZ_PKG_APPNAME)-$(MOZ_PKG_VERSION).$(MOZ_PKG_PLATFORM)
+ifdef MOZ_SIMPLE_PACKAGE_NAME
+PKG_BASENAME := $(MOZ_SIMPLE_PACKAGE_NAME)
+else
+PKG_BASENAME = $(MOZ_PKG_APPNAME)-$(MOZ_PKG_VERSION).$(AB_CD).$(MOZ_PKG_PLATFORM)
+endif
 PKG_PATH =
+SDK_PATH =
 PKG_INST_BASENAME = $(PKG_BASENAME).installer
 PKG_STUB_BASENAME = $(PKG_BASENAME).installer-stub
 PKG_INST_PATH = $(PKG_PATH)
@@ -98,14 +103,9 @@ PKG_INST_BASENAME = $(MOZ_PKG_APPNAME_LC)-setup-$(MOZ_PKG_VERSION)
 endif
 endif
 PKG_PATH = $(MOZ_PKG_PLATFORM)/$(AB_CD)/
+SDK_PATH = $(PKG_PATH)/sdk/
 CHECKSUMS_FILE_BASENAME = $(MOZ_PKG_APPNAME_LC)-$(MOZ_PKG_VERSION)
 MOZ_INFO_BASENAME = $(MOZ_PKG_APPNAME_LC)-$(MOZ_PKG_VERSION)
-ifeq ($(MOZ_APP_NAME),xulrunner)
-PKG_PATH = runtimes/
-PKG_BASENAME = $(MOZ_APP_NAME)-$(MOZ_PKG_VERSION).$(AB_CD).$(MOZ_PKG_PLATFORM)
-CHECKSUMS_FILE_BASENAME = $(PKG_BASENAME)
-MOZ_INFO_BASENAME = $(PKG_BASENAME)
-endif
 PKG_INST_PATH = $(PKG_PATH)
 PKG_UPDATE_BASENAME = $(MOZ_PKG_APPNAME_LC)-$(MOZ_PKG_VERSION)
 PKG_UPDATE_PATH = update/$(PKG_PATH)
@@ -128,6 +128,9 @@ SYMBOL_ARCHIVE_BASENAME = $(PKG_BASENAME).crashreporter-symbols
 # Code coverage package naming
 CODE_COVERAGE_ARCHIVE_BASENAME = $(PKG_BASENAME).code-coverage-gcno
 
+# Mozharness naming
+MOZHARNESS_PACKAGE = mozharness.zip
+
 # Test package naming
 TEST_PACKAGE = $(PKG_BASENAME).common.tests.zip
 CPP_TEST_PACKAGE = $(PKG_BASENAME).cppunittest.tests.zip
@@ -136,6 +139,7 @@ MOCHITEST_PACKAGE = $(PKG_BASENAME).mochitest.tests.zip
 REFTEST_PACKAGE = $(PKG_BASENAME).reftest.tests.zip
 WP_TEST_PACKAGE = $(PKG_BASENAME).web-platform.tests.zip
 TALOS_PACKAGE = $(PKG_BASENAME).talos.tests.zip
+GTEST_PACKAGE = $(PKG_BASENAME).gtest.tests.zip
 
 ifneq (,$(wildcard $(DIST)/bin/application.ini))
 BUILDID = $(shell $(PYTHON) $(MOZILLA_DIR)/config/printconfigsetting.py $(DIST)/bin/application.ini App BuildID)
@@ -165,7 +169,11 @@ MOZ_TEST_PACKAGES_FILE = $(DIST)/$(PKG_PATH)/test_packages.json
 MOZ_TEST_PACKAGES_FILE_TC = $(DIST)/$(PKG_PATH)/test_packages_tc.json
 
 # JavaScript Shell
+ifdef MOZ_SIMPLE_PACKAGE_NAME
+JSSHELL_NAME := $(MOZ_SIMPLE_PACKAGE_NAME).jsshell.zip
+else
 JSSHELL_NAME = jsshell-$(MOZ_PKG_PLATFORM).zip
+endif
 PKG_JSSHELL = $(DIST)/$(JSSHELL_NAME)
 
 endif # PACKAGE_NAME_MK_INCLUDED

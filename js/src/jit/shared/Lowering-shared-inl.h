@@ -108,6 +108,28 @@ LIRGeneratorShared::defineBox(LInstructionHelper<BOX_PIECES, Ops, Temps>* lir, M
     add(lir);
 }
 
+template <size_t Ops, size_t Temps> void
+LIRGeneratorShared::defineInt64(LInstructionHelper<INT64_PIECES, Ops, Temps>* lir, MDefinition* mir,
+                                LDefinition::Policy policy)
+{
+    // Call instructions should use defineReturn.
+    MOZ_ASSERT(!lir->isCall());
+
+    uint32_t vreg = getVirtualRegister();
+
+#if JS_BITS_PER_WORD == 32
+    lir->setDef(0, LDefinition(vreg, LDefinition::GENERAL, policy));
+    lir->setDef(1, LDefinition(vreg + 1, LDefinition::GENERAL, policy));
+    getVirtualRegister();
+#else
+    lir->setDef(0, LDefinition(vreg, LDefinition::GENERAL, policy));
+#endif
+    lir->setMir(mir);
+
+    mir->setVirtualRegister(vreg);
+    add(lir);
+}
+
 void
 LIRGeneratorShared::defineSharedStubReturn(LInstruction* lir, MDefinition* mir)
 {
@@ -298,8 +320,7 @@ LIRGeneratorShared::redefine(MDefinition* def, MDefinition* as)
                 break;
               }
               case MIRType_Value: {
-                LAssertResultV* check = new(alloc()) LAssertResultV();
-                useBox(check, LAssertRangeV::Input, def);
+                LAssertResultV* check = new(alloc()) LAssertResultV(useBox(def));
                 add(check, def->toInstruction());
                 break;
               }
@@ -606,35 +627,40 @@ LIRGeneratorShared::useRegisterForTypedLoad(MDefinition* mir, MIRType type)
     return useRegisterAtStart(mir);
 }
 
-void
-LIRGeneratorShared::useBox(LInstruction* lir, size_t n, MDefinition* mir,
-                           LUse::Policy policy, bool useAtStart)
+LBoxAllocation
+LIRGeneratorShared::useBox(MDefinition* mir, LUse::Policy policy, bool useAtStart)
 {
     MOZ_ASSERT(mir->type() == MIRType_Value);
 
     ensureDefined(mir);
-    lir->setOperand(n, LUse(mir->virtualRegister(), policy, useAtStart));
+
 #if defined(JS_NUNBOX32)
-    lir->setOperand(n + 1, LUse(VirtualRegisterOfPayload(mir), policy, useAtStart));
+    return LBoxAllocation(LUse(mir->virtualRegister(), policy, useAtStart),
+                          LUse(VirtualRegisterOfPayload(mir), policy, useAtStart));
+#else
+    return LBoxAllocation(LUse(mir->virtualRegister(), policy, useAtStart));
 #endif
 }
 
-void
-LIRGeneratorShared::useBoxOrTypedOrConstant(LInstruction* lir, size_t n, MDefinition* mir,
-                                            bool useConstant)
+LBoxAllocation
+LIRGeneratorShared::useBoxOrTypedOrConstant(MDefinition* mir, bool useConstant)
 {
-    if (mir->type() == MIRType_Value) {
-        useBox(lir, n, mir);
-        return;
+    if (mir->type() == MIRType_Value)
+        return useBox(mir);
+
+
+    if (useConstant && mir->isConstant()) {
+#if defined(JS_NUNBOX32)
+        return LBoxAllocation(LAllocation(mir->toConstant()), LAllocation());
+#else
+        return LBoxAllocation(LAllocation(mir->toConstant()));
+#endif
     }
 
-    if (useConstant && mir->isConstant())
-        lir->setOperand(n, LAllocation(mir->toConstant()));
-    else
-        lir->setOperand(n, useRegister(mir));
-
 #if defined(JS_NUNBOX32)
-    lir->setOperand(n + 1, LAllocation());
+    return LBoxAllocation(useRegister(mir), LAllocation());
+#else
+    return LBoxAllocation(useRegister(mir));
 #endif
 }
 

@@ -189,12 +189,7 @@ OS_LDFLAGS += $(_DEBUG_LDFLAGS)
 
 # XXX: What does this? Bug 482434 filed for better explanation.
 ifeq ($(OS_ARCH)_$(GNU_CC),WINNT_)
-ifdef MOZ_DEBUG
-ifneq (,$(MOZ_BROWSE_INFO)$(MOZ_BSCFILE))
-OS_CFLAGS += -FR
-OS_CXXFLAGS += -FR
-endif
-else # ! MOZ_DEBUG
+ifndef MOZ_DEBUG
 
 # MOZ_DEBUG_SYMBOLS generates debug symbols in separate PDB files.
 # Used for generating an optimized build with debugging symbols.
@@ -297,9 +292,9 @@ JAVA_IFACES_PKG_NAME = org/mozilla/interfaces
 
 INCLUDES = \
   -I$(srcdir) \
-  -I. \
+  -I$(CURDIR) \
   $(LOCAL_INCLUDES) \
-  -I$(DIST)/include \
+  -I$(ABS_DIST)/include \
   $(NULL)
 
 ifndef IS_GYP_DIR

@@ -296,6 +296,10 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
         branch(code);
     }
 
+    void jump(wasm::JumpTarget target) {
+        ma_b(target);
+    }
+
     void negl(Register reg) {
         ma_negu(reg, reg);
     }
@@ -417,6 +421,7 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
     void branchTestNumber(Condition cond, Register tag, Label* label);
 
     void branchTestMagic(Condition cond, const ValueOperand& value, Label* label);
+    void branchTestMagic(Condition cond, const ValueOperand& value, wasm::JumpTarget target);
     void branchTestMagic(Condition cond, Register tag, Label* label);
     void branchTestMagic(Condition cond, const Address& address, Label* label);
     void branchTestMagic(Condition cond, const BaseIndex& src, Label* label);
@@ -931,10 +936,6 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
 
     void move32(Imm32 imm, Register dest);
     void move32(Register src, Register dest);
-    void move64(Register64 src, Register64 dest) {
-        move32(src.low, dest.low);
-        move32(src.high, dest.high);
-    }
 
     void movePtr(Register src, Register dest);
     void movePtr(ImmWord imm, Register dest);

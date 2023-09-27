@@ -4,18 +4,30 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import argparse
 import buildconfig
 import os
 from StringIO import StringIO
 from mozbuild.preprocessor import Preprocessor
+from mozbuild.util import DefinesAction
 
 
-def generate_symbols_file(output, input):
+def generate_symbols_file(output, *args):
     ''' '''
-    input = os.path.abspath(input)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input')
+    parser.add_argument('-D', action=DefinesAction)
+    parser.add_argument('-U', action='append', default=[])
+    args = parser.parse_args(args)
+    input = os.path.abspath(args.input)
 
     pp = Preprocessor()
     pp.context.update(buildconfig.defines)
+    if args.D:
+        pp.context.update(args.D)
+    for undefine in args.U:
+        if undefine in pp.context:
+            del pp.context[undefine]
     # Hack until MOZ_DEBUG_FLAGS are simply part of buildconfig.defines
     if buildconfig.substs['MOZ_DEBUG']:
         pp.context['DEBUG'] = '1'
@@ -30,24 +42,7 @@ def generate_symbols_file(output, input):
 
     symbols = [s.strip() for s in pp.out.getvalue().splitlines() if s.strip()]
 
-    if buildconfig.substs['GCC_USE_GNU_LD']:
-        # A linker version script is generated for GNU LD that looks like the
-        # following:
-        # {
-        # global:
-        #   symbol1;
-        #   symbol2;
-        #   ...
-        # local:
-        #   *;
-        # };
-        output.write('{\nglobal:\n  %s;\nlocal:\n  *;\n};'
-                     % ';\n  '.join(symbols))
-    elif buildconfig.substs['OS_TARGET'] == 'Darwin':
-        # A list of symbols is generated for Apple ld that simply lists all
-        # symbols, with an underscore prefix.
-        output.write(''.join('_%s\n' % s for s in symbols))
-    elif buildconfig.substs['OS_TARGET'] == 'WINNT':
+    if buildconfig.substs['OS_TARGET'] == 'WINNT':
         # A def file is generated for MSVC link.exe that looks like the
         # following:
         # LIBRARY library.dll
@@ -72,8 +67,25 @@ def generate_symbols_file(output, input):
         # is, in fact, part of the symbol name as far as the symbols variable
         # is concerned.
         libname, ext = os.path.splitext(os.path.basename(output.name))
-        assert ext == '.symbols'
+        assert ext == '.def'
         output.write('LIBRARY %s\nEXPORTS\n  %s\n'
                      % (libname, '\n  '.join(symbols)))
+    elif buildconfig.substs['GCC_USE_GNU_LD']:
+        # A linker version script is generated for GNU LD that looks like the
+        # following:
+        # {
+        # global:
+        #   symbol1;
+        #   symbol2;
+        #   ...
+        # local:
+        #   *;
+        # };
+        output.write('{\nglobal:\n  %s;\nlocal:\n  *;\n};'
+                     % ';\n  '.join(symbols))
+    elif buildconfig.substs['OS_TARGET'] == 'Darwin':
+        # A list of symbols is generated for Apple ld that simply lists all
+        # symbols, with an underscore prefix.
+        output.write(''.join('_%s\n' % s for s in symbols))
 
     return set(pp.includes)

@@ -799,6 +799,8 @@ protected:
 
   void ResetResponse();
 
+  bool ShouldBlockAuthPrompt();
+
   struct RequestHeader
   {
     nsCString header;

@@ -50,6 +50,8 @@ static const uint32_t PAYLOAD_INDEX = 1;
 # error "Unknown!"
 #endif
 
+static const uint32_t INT64_PIECES = sizeof(int64_t) / sizeof(uintptr_t);
+
 // Represents storage for an operand. For constants, the pointer is tagged
 // with a single bit, and the untagged pointer is a pointer to a Value.
 class LAllocation : public TempObject
@@ -290,6 +292,50 @@ class LUse : public LAllocation
 };
 
 static const uint32_t MAX_VIRTUAL_REGISTERS = LUse::VREG_MASK;
+
+class LBoxAllocation
+{
+#ifdef JS_NUNBOX32
+    LAllocation type_;
+    LAllocation payload_;
+#else
+    LAllocation value_;
+#endif
+
+  public:
+#ifdef JS_NUNBOX32
+    LBoxAllocation(LAllocation type, LAllocation payload) : type_(type), payload_(payload) {}
+
+    LAllocation type() const { return type_; }
+    LAllocation payload() const { return payload_; }
+#else
+    explicit LBoxAllocation(LAllocation value) : value_(value) {}
+
+    LAllocation value() const { return value_; }
+#endif
+};
+
+class LInt64Allocation
+{
+#if JS_BITS_PER_WORD == 32
+    LAllocation high_;
+    LAllocation low_;
+#else
+    LAllocation value_;
+#endif
+
+  public:
+#if JS_BITS_PER_WORD == 32
+    LInt64Allocation(LAllocation high, LAllocation low) : high_(high), low_(low) {}
+
+    LAllocation high() const { return high_; }
+    LAllocation low() const { return low_; }
+#else
+    explicit LInt64Allocation(LAllocation value) : value_(value) {}
+
+    LAllocation value() const { return value_; }
+#endif
+};
 
 class LGeneralReg : public LAllocation
 {
@@ -567,6 +613,9 @@ class LDefinition
           case MIRType_Elements:
             return LDefinition::SLOTS;
           case MIRType_Pointer:
+#if JS_BITS_PER_WORD == 64
+          case MIRType_Int64:
+#endif
             return LDefinition::GENERAL;
           case MIRType_Bool32x4:
           case MIRType_Int32x4:
@@ -1049,6 +1098,14 @@ class LInstructionHelper : public details::LInstructionFixedDefsTempsHelper<Defs
     }
     void setOperand(size_t index, const LAllocation& a) final override {
         operands_[index] = a;
+    }
+    void setBoxOperand(size_t index, const LBoxAllocation& alloc) {
+#ifdef JS_NUNBOX32
+        operands_[index] = alloc.type();
+        operands_[index + 1] = alloc.payload();
+#else
+        operands_[index] = alloc.value();
+#endif
     }
 };
 

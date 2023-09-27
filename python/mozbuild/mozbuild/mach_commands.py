@@ -5,6 +5,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import argparse
+import errno
 import itertools
 import json
 import logging
@@ -20,11 +21,13 @@ from mach.decorators import (
     CommandArgumentGroup,
     CommandProvider,
     Command,
+    SubCommand,
 )
 
 from mach.mixin.logging import LoggingMixin
 
 from mozbuild.base import (
+    BuildEnvironmentNotFoundException,
     MachCommandBase,
     MachCommandConditions as conditions,
     MozbuildObject,
@@ -32,6 +35,12 @@ from mozbuild.base import (
     MozconfigLoadException,
     ObjdirMismatchException,
 )
+
+from mozpack.manifests import (
+    InstallManifest,
+)
+
+from mozbuild.backend import backends
 
 
 BUILD_WHAT_HELP = '''
@@ -319,6 +328,8 @@ class Build(MachCommandBase):
                 if directory.startswith('/'):
                     directory = directory[1:]
 
+            status = None
+            monitor.start_resource_recording()
             if what:
                 top_make = os.path.join(self.topobjdir, 'Makefile')
                 if not os.path.exists(top_make):
@@ -376,10 +387,12 @@ class Build(MachCommandBase):
                 # backend. But that involves make reinvoking itself and there
                 # are undesired side-effects of this. See bug 877308 for a
                 # comprehensive history lesson.
-                self._run_make(directory=self.topobjdir,
-                    target='backend.RecursiveMakeBackend',
+                self._run_make(directory=self.topobjdir, target='backend',
                     line_handler=output.on_line, log=False,
                     print_directory=False)
+
+                if self.substs.get('MOZ_ARTIFACT_BUILDS', False):
+                    self._run_mach_artifact_install()
 
                 # Build target pairs.
                 for make_dir, make_target in target_pairs:
@@ -395,7 +408,19 @@ class Build(MachCommandBase):
                     if status != 0:
                         break
             else:
-                monitor.start_resource_recording()
+                try:
+                    if self.substs.get('MOZ_ARTIFACT_BUILDS', False):
+                        self._run_mach_artifact_install()
+                except BuildEnvironmentNotFoundException:
+                    # Can't read self.substs from config.status?  That means we
+                    # need to run configure.  The client.mk invocation below
+                    # will configure, which will run config.status, which will
+                    # invoke |mach artifact install| itself before continuing
+                    # the build.  Therefore, we needn't install artifacts
+                    # ourselves.
+                    self.log(logging.DEBUG, 'artifact',
+                             {}, "Not running |mach artifact install| -- it will be run by client.mk.")
+
                 status = self._run_make(srcdir=True, filename='client.mk',
                     line_handler=output.on_line, log=False, print_directory=False,
                     allow_parallel=False, ensure_exit_code=False, num_jobs=jobs,
@@ -468,6 +493,24 @@ class Build(MachCommandBase):
 
             print('To view resource usage of the build, run |mach '
                 'resource-usage|.')
+
+            telemetry_handler = getattr(self._mach_context,
+                                        'telemetry_handler', None)
+            telemetry_data = monitor.get_resource_usage()
+
+            # Record build configuration data. For now, we cherry pick
+            # items we need rather than grabbing everything, in order
+            # to avoid accidentally disclosing PII.
+            try:
+                moz_artifact_builds = self.substs.get('MOZ_ARTIFACT_BUILDS',
+                                                      False)
+                telemetry_data['substs'] = {
+                    'MOZ_ARTIFACT_BUILDS': moz_artifact_builds,
+                }
+            except BuildEnvironmentNotFoundException:
+                pass
+
+            telemetry_handler(self._mach_context, telemetry_data)
 
         # Only for full builds because incremental builders likely don't
         # need to be burdened with this.
@@ -578,11 +621,13 @@ class Build(MachCommandBase):
         help='Show a diff of changes.')
     # It would be nice to filter the choices below based on
     # conditions, but that is for another day.
-    @CommandArgument('-b', '--backend', nargs='+',
-        choices=['RecursiveMake', 'AndroidEclipse', 'CppEclipse',
-                 'VisualStudio', 'FasterMake', 'CompileDB'],
+    @CommandArgument('-b', '--backend', nargs='+', choices=sorted(backends),
         help='Which backend to build.')
-    def build_backend(self, backend, diff=False):
+    @CommandArgument('-v', '--verbose', action='store_true',
+        help='Verbose output.')
+    @CommandArgument('-n', '--dry-run', action='store_true',
+        help='Do everything except writing files out.')
+    def build_backend(self, backend, diff=False, verbose=False, dry_run=False):
         python = self.virtualenv_manager.python_path
         config_status = os.path.join(self.topobjdir, 'config.status')
 
@@ -598,9 +643,25 @@ class Build(MachCommandBase):
             args.extend(backend)
         if diff:
             args.append('--diff')
+        if verbose:
+            args.append('--verbose')
+        if dry_run:
+            args.append('--dry-run')
 
         return self._run_command_in_objdir(args=args, pass_thru=True,
             ensure_exit_code=False)
+
+    def _run_mach_artifact_install(self):
+        # We'd like to launch artifact using
+        # self._mach_context.commands.dispatch.  However, artifact activates
+        # the virtualenv, which plays badly with the rest of this code.
+        # Therefore, we run |mach artifact install| in a new process (and
+        # throw an exception if it fails).
+        self.log(logging.INFO, 'artifact',
+                 {}, "Running |mach artifact install|.")
+        args = [os.path.join(self.topsrcdir, 'mach'), 'artifact', 'install']
+        self._run_command_in_srcdir(args=args, require_unix_environment=True,
+            pass_thru=True, ensure_exit_code=True)
 
 @CommandProvider
 class Doctor(MachCommandBase):
@@ -974,8 +1035,11 @@ class Package(MachCommandBase):
 
     @Command('package', category='post-build',
         description='Package the built product for distribution as an APK, DMG, etc.')
-    def package(self):
-        ret = self._run_make(directory=".", target='package', ensure_exit_code=False)
+    @CommandArgument('-v', '--verbose', action='store_true',
+        help='Verbose output for what commands the packaging process is running.')
+    def package(self, verbose=False):
+        ret = self._run_make(directory=".", target='package',
+                             silent=not verbose, ensure_exit_code=False)
         if ret == 0:
             self.notify('Packaging complete')
         return ret
@@ -1054,43 +1118,54 @@ class RunProgram(MachCommandBase):
          help='Profiling mode. The default is \'dark-matter\'.')
     @CommandArgument('--sample-below', default=None, type=str, group='DMD',
         help='Sample blocks smaller than this. Use 1 for no sampling. The default is 4093.')
-    @CommandArgument('--max-frames', default=None, type=str, group='DMD',
-        help='The maximum depth of stack traces. The default and maximum is 24.')
     @CommandArgument('--show-dump-stats', action='store_true', group='DMD',
         help='Show stats when doing dumps.')
     def run(self, params, remote, background, noprofile, debug, debugger,
-        debugparams, slowscript, dmd, mode, sample_below, max_frames,
-        show_dump_stats):
+        debugparams, slowscript, dmd, mode, sample_below, show_dump_stats):
 
-        try:
-            binpath = self.get_binary_path('app')
-        except Exception as e:
-            print("It looks like your program isn't built.",
-                "You can run |mach build| to build it.")
-            print(e)
-            return 1
+        if conditions.is_android(self):
+            # Running Firefox for Android is completely different
+            if dmd:
+                print("DMD is not supported for Firefox for Android")
+                return 1
+            from mozrunner.devices.android_device import verify_android_device, run_firefox_for_android
+            if not (debug or debugger or debugparams):
+                verify_android_device(self, install=True)
+                return run_firefox_for_android(self, params)
+            verify_android_device(self, install=True, debugger=True)
+            args = ['']
 
-        args = [binpath]
+        else:
 
-        if params:
-            args.extend(params)
+            try:
+                binpath = self.get_binary_path('app')
+            except Exception as e:
+                print("It looks like your program isn't built.",
+                    "You can run |mach build| to build it.")
+                print(e)
+                return 1
 
-        if not remote:
-            args.append('-no-remote')
+            args = [binpath]
 
-        if not background and sys.platform == 'darwin':
-            args.append('-foreground')
+            if params:
+                args.extend(params)
 
-        no_profile_option_given = \
-            all(p not in params for p in ['-profile', '--profile', '-P'])
-        if no_profile_option_given and not noprofile:
-            path = os.path.join(self.topobjdir, 'tmp', 'scratch_user')
-            if not os.path.isdir(path):
-                os.makedirs(path)
-            args.append('-profile')
-            args.append(path)
+            if not remote:
+                args.append('-no-remote')
 
-        extra_env = {}
+            if not background and sys.platform == 'darwin':
+                args.append('-foreground')
+
+            no_profile_option_given = \
+                all(p not in params for p in ['-profile', '--profile', '-P'])
+            if no_profile_option_given and not noprofile:
+                path = os.path.join(self.topobjdir, 'tmp', 'scratch_user')
+                if not os.path.isdir(path):
+                    os.makedirs(path)
+                args.append('-profile')
+                args.append(path)
+
+        extra_env = {'MOZ_CRASHREPORTER_DISABLE': '1'}
 
         if debug or debugger or debugparams:
             import mozdebug
@@ -1119,8 +1194,6 @@ class RunProgram(MachCommandBase):
             if not slowscript:
                 extra_env['JS_DISABLE_SLOW_SCRIPT_SIGNALS'] = '1'
 
-            extra_env['MOZ_CRASHREPORTER_DISABLE'] = '1'
-
             # Prepend the debugger args.
             args = [self.debuggerInfo.path] + self.debuggerInfo.args + args
 
@@ -1131,8 +1204,6 @@ class RunProgram(MachCommandBase):
                 dmd_params.append('--mode=' + mode)
             if sample_below:
                 dmd_params.append('--sample-below=' + sample_below)
-            if max_frames:
-                dmd_params.append('--max-frames=' + max_frames)
             if show_dump_stats:
                 dmd_params.append('--show-dump-stats=yes')
 
@@ -1363,3 +1434,117 @@ class MachDebug(MachCommandBase):
                     return list(obj)
                 return json.JSONEncoder.default(self, obj)
         json.dump(self, cls=EnvironmentEncoder, sort_keys=True, fp=out)
+
+class ArtifactSubCommand(SubCommand):
+    def __call__(self, func):
+        after = SubCommand.__call__(self, func)
+        jobchoices = {
+            'android-api-15',
+            'android-x86',
+            'linux',
+            'linux64',
+            'macosx64',
+            'win32',
+            'win64'
+        }
+        args = [
+            CommandArgument('--tree', metavar='TREE', type=str,
+                help='Firefox tree.'),
+            CommandArgument('--job', metavar='JOB', choices=jobchoices,
+                help='Build job.'),
+            CommandArgument('--verbose', '-v', action='store_true',
+                help='Print verbose output.'),
+        ]
+        for arg in args:
+            after = arg(after)
+        return after
+
+
+@CommandProvider
+class PackageFrontend(MachCommandBase):
+    """Fetch and install binary artifacts from Mozilla automation."""
+
+    @Command('artifact', category='post-build',
+        description='Use pre-built artifacts to build Firefox.',
+        conditions=[
+            conditions.is_hg,  # mercurial only for now.
+        ])
+    def artifact(self):
+        '''Download, cache, and install pre-built binary artifacts to build Firefox.
+
+        Use |mach build| as normal to freshen your installed binary libraries:
+        artifact builds automatically download, cache, and install binary
+        artifacts from Mozilla automation, replacing whatever may be in your
+        object directory.  Use |mach artifact last| to see what binary artifacts
+        were last used.
+
+        Never build libxul again!
+
+        '''
+        pass
+
+    def _set_log_level(self, verbose):
+        self.log_manager.terminal_handler.setLevel(logging.INFO if not verbose else logging.DEBUG)
+
+    def _make_artifacts(self, tree=None, job=None):
+        self._activate_virtualenv()
+        self.virtualenv_manager.install_pip_package('pylru==1.0.9')
+        self.virtualenv_manager.install_pip_package('taskcluster==0.0.32')
+        self.virtualenv_manager.install_pip_package('mozregression==1.0.2')
+
+        state_dir = self._mach_context.state_dir
+        cache_dir = os.path.join(state_dir, 'package-frontend')
+
+        try:
+            os.makedirs(cache_dir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+        import which
+        if self._is_windows():
+          hg = which.which('hg.exe')
+        else:
+          hg = which.which('hg')
+
+        # Absolutely must come after the virtualenv is populated!
+        from mozbuild.artifacts import Artifacts
+        artifacts = Artifacts(tree, job, log=self.log, cache_dir=cache_dir, hg=hg)
+        return artifacts
+
+    @ArtifactSubCommand('artifact', 'install',
+        'Install a good pre-built artifact.')
+    @CommandArgument('source', metavar='SRC', nargs='?', type=str,
+        help='Where to fetch and install artifacts from.  Can be omitted, in '
+            'which case the current hg repository is inspected; an hg revision; '
+            'a remote URL; or a local file.',
+        default=None)
+    def artifact_install(self, source=None, tree=None, job=None, verbose=False):
+        self._set_log_level(verbose)
+        artifacts = self._make_artifacts(tree=tree, job=job)
+
+        return artifacts.install_from(source, self.distdir)
+
+    @ArtifactSubCommand('artifact', 'last',
+        'Print the last pre-built artifact installed.')
+    def artifact_print_last(self, tree=None, job=None, verbose=False):
+        self._set_log_level(verbose)
+        artifacts = self._make_artifacts(tree=tree, job=job)
+        artifacts.print_last()
+        return 0
+
+    @ArtifactSubCommand('artifact', 'print-cache',
+        'Print local artifact cache for debugging.')
+    def artifact_print_cache(self, tree=None, job=None, verbose=False):
+        self._set_log_level(verbose)
+        artifacts = self._make_artifacts(tree=tree, job=job)
+        artifacts.print_cache()
+        return 0
+
+    @ArtifactSubCommand('artifact', 'clear-cache',
+        'Delete local artifacts and reset local artifact cache.')
+    def artifact_clear_cache(self, tree=None, job=None, verbose=False):
+        self._set_log_level(verbose)
+        artifacts = self._make_artifacts(tree=tree, job=job)
+        artifacts.clear_cache()
+        return 0

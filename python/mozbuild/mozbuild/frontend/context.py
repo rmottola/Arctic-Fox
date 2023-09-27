@@ -235,13 +235,6 @@ class Context(KeyedDefaultDict):
                 update[key] = value
         KeyedDefaultDict.update(self, update)
 
-    def get_affected_tiers(self):
-        """Returns the list of tiers affected by the variables set in the
-        context.
-        """
-        tiers = (VARIABLES[key][3] for key in self if key in VARIABLES)
-        return set(tier for tier in tiers if tier)
-
 
 class TemplateContext(Context):
     def __init__(self, template=None, allowed_variables={}, config=None):
@@ -284,12 +277,8 @@ class SubContext(Context, ContextDerivedValue):
 class InitializedDefines(ContextDerivedValue, OrderedDict):
     def __init__(self, context, value=None):
         OrderedDict.__init__(self)
-        for define in context.config.substs.get('MOZ_DEBUG_DEFINES', '').split():
-            assert define[:2] == "-D"
-            pair = define[2:].split('=', 1)
-            if len(pair) == 1:
-                pair.append(1)
-            self[pair[0]] = pair[1]
+        for define in context.config.substs.get('MOZ_DEBUG_DEFINES', ()):
+            self[define] = 1
         if value:
             self.update(value)
 
@@ -411,6 +400,10 @@ class Path(ContextDerivedValue, unicode):
     def __hash__(self):
         return hash(self.full_path)
 
+    @memoized_property
+    def target_basename(self):
+        return mozpath.basename(self.full_path)
+
 
 class SourcePath(Path):
     """Like Path, but limited to paths in the source directory."""
@@ -444,6 +437,24 @@ class SourcePath(Path):
         objdir (aka pseudo-rework), this is needed.
         """
         return ObjDirPath(self.context, '!%s' % self).full_path
+
+
+class RenamedSourcePath(SourcePath):
+    """Like SourcePath, but with a different base name when installed.
+
+    The constructor takes a tuple of (source, target_basename).
+
+    This class is not meant to be exposed to moz.build sandboxes as of now,
+    and is not supported by the RecursiveMake backend.
+    """
+    def __init__(self, context, value):
+        assert isinstance(value, tuple)
+        source, self._target_basename = value
+        super(RenamedSourcePath, self).__init__(context, source)
+
+    @property
+    def target_basename(self):
+        return self._target_basename
 
 
 class ObjDirPath(Path):
@@ -946,7 +957,7 @@ VARIABLES = {
 
         The chosen script entry point may optionally return a set of strings,
         indicating extra files the output depends on.
-        """, 'export'),
+        """, None),
 
     'DEFINES': (InitializedDefines, dict,
         """Dictionary of compiler defines to declare.
@@ -1011,7 +1022,7 @@ VARIABLES = {
         Please note that converting ``libs`` rules to the ``misc`` tier must
         be done with care, as there are many implicit dependencies that can
         break the build in subtle ways.
-        """, 'misc'),
+        """, None),
 
     'FINAL_TARGET_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """List of files to be installed into the application directory.
@@ -1035,7 +1046,7 @@ VARIABLES = {
 
     'FINAL_TARGET_PP_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """Like ``FINAL_TARGET_FILES``, with preprocessing.
-        """, 'libs'),
+        """, None),
 
     'TESTING_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
         """List of files to be installed in the _tests directory.
@@ -1264,15 +1275,6 @@ VARIABLES = {
         ``HOST_BIN_SUFFIX``, the name will remain unchanged.
         """, None),
 
-    'TEST_DIRS': (ContextDerivedTypedList(SourcePath), list,
-        """Like DIRS but only for directories that contain test-only code.
-
-        If tests are not enabled, this variable will be ignored.
-
-        This variable may go away once the transition away from Makefiles is
-        complete.
-        """, None),
-
     'CONFIGURE_SUBST_FILES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Output files that will be generated using configure-like substitution.
 
@@ -1345,7 +1347,7 @@ VARIABLES = {
         JAR manifests are files in the tree that define how to package files
         into JARs and how chrome registration is performed. For more info,
         see :ref:`jar_manifests`.
-        """, 'libs'),
+        """, None),
 
     # IDL Generation.
     'XPIDL_SOURCES': (StrictOrderingOnAppendList, list,
@@ -1689,7 +1691,7 @@ VARIABLES = {
         Files from topsrcdir and the objdir can also be installed by prefixing
         the path(s) with a '/' character and a '!' character, respectively::
            TEST_HARNESS_FILES.path += ['/build/bar.py', '!quux.py']
-        """, 'libs'),
+        """, None),
 
     'NO_EXPAND_LIBS': (bool, bool,
         """Forces to build a real static library, and no corresponding fake
@@ -1900,6 +1902,10 @@ FUNCTIONS = {
         """),
 }
 
+
+TestDirsPlaceHolder = List()
+
+
 # Special variables. These complement VARIABLES.
 #
 # Each entry is a tuple of:
@@ -2023,6 +2029,15 @@ SPECIAL_VARIABLES = {
         ``TESTING_JS_MODULES.foo += ['module.jsm']``.
         """),
 
+    'TEST_DIRS': (lambda context: context['DIRS'] if context.config.substs.get('ENABLE_TESTS')
+                                  else TestDirsPlaceHolder, list,
+        """Like DIRS but only for directories that contain test-only code.
+
+        If tests are not enabled, this variable will be ignored.
+
+        This variable may go away once the transition away from Makefiles is
+        complete.
+        """),
 }
 
 # Deprecation hints.

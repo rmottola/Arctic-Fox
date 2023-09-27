@@ -1065,6 +1065,8 @@ NS_INTERFACE_MAP_END
 NS_IMETHODIMP
 nsStandardURL::GetSpec(nsACString &result)
 {
+    MOZ_ASSERT(mSpec.Length() <= (uint32_t) net_GetURLMaxLength(),
+               "The spec should never be this long, we missed a check.");
     result = mSpec;
     return NS_OK;
 }
@@ -1353,6 +1355,10 @@ nsStandardURL::SetScheme(const nsACString &input)
         return NS_ERROR_UNEXPECTED;
     }
 
+    if (mSpec.Length() + input.Length() - Scheme().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
 
     int32_t shift = ReplaceSegment(mScheme.mPos, mScheme.mLen, scheme);
@@ -1388,6 +1394,10 @@ nsStandardURL::SetUserPass(const nsACString &input)
     if (mAuthority.mLen < 0) {
         NS_WARNING("uninitialized");
         return NS_ERROR_NOT_INITIALIZED;
+    }
+
+    if (mSpec.Length() + input.Length() - Userpass(true).Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
     }
 
     InvalidateCache();
@@ -1490,6 +1500,10 @@ nsStandardURL::SetUsername(const nsACString &input)
     if (username.IsEmpty())
         return SetUserPass(username);
 
+    if (mSpec.Length() + input.Length() - Username().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
 
     // escape username if necessary
@@ -1534,6 +1548,10 @@ nsStandardURL::SetPassword(const nsACString &input)
     if (mUsername.mLen <= 0) {
         NS_WARNING("cannot set password without existing username");
         return NS_ERROR_FAILURE;
+    }
+
+    if (mSpec.Length() + input.Length() - Password().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
     }
 
     InvalidateCache();
@@ -1698,6 +1716,10 @@ nsStandardURL::SetHost(const nsACString &input)
     if (strchr(host, ' '))
         return NS_ERROR_MALFORMED_URI;
 
+    if (mSpec.Length() + strlen(host) - Host().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
     mHostEncoding = eEncoding_ASCII;
 
@@ -1746,7 +1768,7 @@ nsStandardURL::SetHost(const nsACString &input)
 
     return NS_OK;
 }
-             
+
 NS_IMETHODIMP
 nsStandardURL::SetPort(int32_t port)
 {
@@ -2512,6 +2534,10 @@ nsStandardURL::SetQuery(const nsACString &input)
     if (mPath.mLen < 0)
         return SetPath(flat);
 
+    if (mSpec.Length() + input.Length() - Query().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
 
     if (!query || !*query) {
@@ -2584,6 +2610,10 @@ nsStandardURL::SetRef(const nsACString &input)
     if (mPath.mLen < 0)
         return SetPath(flat);
 
+    if (mSpec.Length() + input.Length() - Ref().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
+
     InvalidateCache();
 
     if (!ref || !*ref) {
@@ -2651,6 +2681,10 @@ nsStandardURL::SetFileName(const nsACString &input)
 
     if (mPath.mLen < 0)
         return SetPath(flat);
+
+    if (mSpec.Length() + input.Length() - Filename().Length() > (uint32_t) net_GetURLMaxLength()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
 
     int32_t shift = 0;
 
@@ -3096,6 +3130,8 @@ nsStandardURL::Read(nsIObjectInputStream *stream)
 NS_IMETHODIMP
 nsStandardURL::Write(nsIObjectOutputStream *stream)
 {
+    MOZ_ASSERT(mSpec.Length() <= (uint32_t) net_GetURLMaxLength(),
+               "The spec should never be this long, we missed a check.");
     nsresult rv;
 
     rv = stream->Write32(mURLType);
@@ -3192,6 +3228,8 @@ FromIPCSegment(const mozilla::ipc::StandardURLSegment& aSegment)
 void
 nsStandardURL::Serialize(URIParams& aParams)
 {
+    MOZ_ASSERT(mSpec.Length() <= (uint32_t) net_GetURLMaxLength(),
+               "The spec should never be this long, we missed a check.");
     StandardURLParams params;
 
     params.urlType() = mURLType;

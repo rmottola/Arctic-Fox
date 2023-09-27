@@ -46,11 +46,13 @@ public:
   // override of Http2Stream
   nsresult ReadSegments(nsAHttpSegmentReader *,  uint32_t, uint32_t *) override;
   nsresult WriteSegments(nsAHttpSegmentWriter *, uint32_t, uint32_t *) override;
+  void AdjustInitialWindow() override;
 
   nsISchedulingContext *SchedulingContext() override { return mSchedulingContext; };
   void ConnectPushedStream(Http2Stream *consumer);
 
   bool TryOnPush();
+  static bool TestOnPush(Http2Stream *consumer);
 
   virtual bool DeferCleanup(nsresult status) override;
   void SetDeferCleanupOnSuccess(bool val) { mDeferCleanupOnSuccess = val; }
