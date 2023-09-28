@@ -62,9 +62,9 @@ PluginWidgetProxy::Create(nsIWidget* aParent,
     return rv;
   }
 
-  BaseCreate(aParent, aRect, aInitData);
+  BaseCreate(aParent, aInitData);
 
-  mBounds = aRect.ToUnknownRect();
+  mBounds = aRect;
   mEnabled = true;
   mVisible = true;
 

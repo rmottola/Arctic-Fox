@@ -75,7 +75,7 @@ JS_Init(void)
 #endif
 
     using js::TlsPerThreadData;
-    if (!TlsPerThreadData.initialized() && !TlsPerThreadData.init())
+    if (!TlsPerThreadData.init())
         return false;
 
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
@@ -104,7 +104,8 @@ JS_Init(void)
     if (!FutexRuntime::initialize())
         return false;
 
-    js::gcstats::Statistics::initialize();
+    if (!js::gcstats::Statistics::initialize())
+        return false;
 
     libraryInitState = InitState::Running;
     return true;

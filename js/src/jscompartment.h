@@ -108,6 +108,8 @@ struct CrossCompartmentKey
         MOZ_RELEASE_ASSERT(wrapped);
     }
 
+    bool needsSweep();
+
   private:
     CrossCompartmentKey() = delete;
 };
@@ -125,8 +127,8 @@ struct WrapperHasher : public DefaultHasher<CrossCompartmentKey>
     }
 };
 
-typedef HashMap<CrossCompartmentKey, ReadBarrieredValue,
-                WrapperHasher, SystemAllocPolicy> WrapperMap;
+using WrapperMap = GCRekeyableHashMap<CrossCompartmentKey, ReadBarrieredValue,
+                                      WrapperHasher, SystemAllocPolicy>;
 
 // We must ensure that all newly allocated JSObjects get their metadata
 // set. However, metadata callbacks may require the new object be in a sane
@@ -223,7 +225,8 @@ class WeakMapBase;
 
 struct JSCompartment
 {
-    JS::CompartmentOptions       options_;
+    const JS::CompartmentCreationOptions creationOptions_;
+    JS::CompartmentBehaviors behaviors_;
 
   private:
     JS::Zone*                    zone_;
@@ -280,10 +283,6 @@ struct JSCompartment
     bool                         warnedAboutExprClosure;
     bool                         warnedAboutRegExpMultiline;
 
-    // A null add-on ID means that the compartment is not associated with an
-    // add-on.
-    JSAddonId*                   const addonId;
-
 #ifdef DEBUG
     bool                         firedOnNewGlobalObject;
 #endif
@@ -312,10 +311,12 @@ struct JSCompartment
 
     JS::Zone* zone() { return zone_; }
     const JS::Zone* zone() const { return zone_; }
-    JS::CompartmentOptions& options() { return options_; }
-    const JS::CompartmentOptions& options() const { return options_; }
 
-    JSRuntime* runtimeFromMainThread() {
+    const JS::CompartmentCreationOptions& creationOptions() const { return creationOptions_; }
+    JS::CompartmentBehaviors& behaviors() { return behaviors_; }
+    const JS::CompartmentBehaviors& behaviors() const { return behaviors_; }
+
+    JSRuntime* runtimeFromMainThread() const {
         MOZ_ASSERT(CurrentThreadCanAccessRuntime(runtime_));
         return runtime_;
     }
@@ -369,8 +370,9 @@ struct JSCompartment
      */
     bool                         globalWriteBarriered;
 
-    // Non-zero if any typed objects in this compartment might be neutered.
-    int32_t                      neuteredTypedObjects;
+    // Non-zero if the storage underlying any typed object in this compartment
+    // might be detached.
+    int32_t                      detachedTypedObjects;
 
   private:
     friend class js::AutoSetNewObjectMetadata;
@@ -473,9 +475,6 @@ struct JSCompartment
     JSObject*                    gcIncomingGrayPointers;
 
   private:
-    /* Whether to preserve JIT code on non-shrinking GCs. */
-    bool                         gcPreserveJitCode;
-
     enum {
         IsDebuggee = 1 << 0,
         DebuggerObservesAllExecution = 1 << 1,
@@ -553,7 +552,8 @@ struct JSCompartment
     void traceOutgoingCrossCompartmentWrappers(JSTracer* trc);
     static void traceIncomingCrossCompartmentEdgesForZoneGC(JSTracer* trc);
 
-    bool preserveJitCode() { return gcPreserveJitCode; }
+    /* Whether to preserve JIT code on non-shrinking GCs. */
+    bool preserveJitCode() { return creationOptions_.preserveJitCode(); }
 
     void sweepAfterMinorGC();
 
@@ -753,6 +753,7 @@ struct JSCompartment
         DeprecatedFlagsArgument = 7,        // JS 1.3 or older
         // NO LONGER USING 8
         // NO LONGER USING 9
+        DeprecatedBlockScopeFunRedecl = 10,
         DeprecatedLanguageExtensionCount
     };
 

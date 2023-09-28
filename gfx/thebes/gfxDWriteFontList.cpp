@@ -342,6 +342,24 @@ gfxDWriteFontFamily::AddSizeOfIncludingThis(MallocSizeOf aMallocSizeOf,
     AddSizeOfExcludingThis(aMallocSizeOf, aSizes);
 }
 
+already_AddRefed<IDWriteFont>
+gfxDWriteFontFamily::GetDefaultFont()
+{
+  RefPtr<IDWriteFont> font;
+  for (UINT32 i = 0; i < mDWFamily->GetFontCount(); i++) {
+    HRESULT hr = mDWFamily->GetFont(i, getter_AddRefs(font));
+    if (FAILED(hr)) {
+      NS_WARNING("Failed to get default font from existing family");
+      continue;
+    }
+
+    return font.forget();
+  }
+
+  NS_WARNING("No available DWrite fonts. Returning null");
+  return nullptr;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // gfxDWriteFontEntry
 
@@ -506,6 +524,8 @@ gfxDWriteFontEntry::GetFontTable(uint32_t aTag)
 nsresult
 gfxDWriteFontEntry::ReadCMAP(FontInfoData *aFontInfoData)
 {
+    PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
+
     // attempt this once, if errors occur leave a blank cmap
     if (mCharacterMap) {
         return NS_OK;
@@ -792,35 +812,12 @@ gfxDWriteFontList::MakePlatformFont(const nsAString& aFontName,
         return nullptr;
     }
     
+    RefPtr<IDWriteFontFileStream> fontFileStream;
     RefPtr<IDWriteFontFile> fontFile;
-    HRESULT hr;
-
-    /**
-     * We pass in a pointer to a structure containing a pointer to the array
-     * containing the font data and a unique identifier. DWrite will
-     * internally copy what is at that pointer, and pass that to
-     * CreateStreamFromKey. The array will be empty when the function 
-     * succesfully returns since it swaps out the data.
-     */
-    ffReferenceKey key;
-    key.mArray = &newFontData;
-    nsCOMPtr<nsIUUIDGenerator> uuidgen =
-      do_GetService("@mozilla.org/uuid-generator;1");
-    if (!uuidgen) {
-        return nullptr;
-    }
-
-    rv = uuidgen->GenerateUUIDInPlace(&key.mGUID);
-
-    if (NS_FAILED(rv)) {
-        return nullptr;
-    }
-
-    hr = gfxWindowsPlatform::GetPlatform()->GetDWriteFactory()->
-        CreateCustomFontFileReference(&key,
-                                      sizeof(key),
-                                      gfxDWriteFontFileLoader::Instance(),
-                                      getter_AddRefs(fontFile));
+    HRESULT hr =
+      gfxDWriteFontFileLoader::CreateCustomFontFile(newFontData,
+                                                    getter_AddRefs(fontFile),
+                                                    getter_AddRefs(fontFileStream));
 
     if (FAILED(hr)) {
         NS_WARNING("Failed to create custom font file reference.");
@@ -834,6 +831,7 @@ gfxDWriteFontList::MakePlatformFont(const nsAString& aFontName,
     gfxDWriteFontEntry *entry = 
         new gfxDWriteFontEntry(uniqueName, 
                                fontFile,
+                               fontFileStream,
                                aWeight,
                                aStretch,
                                aStyle);
@@ -863,9 +861,9 @@ gfxDWriteFontList::InitFontList()
     char nowTime[256], nowDate[256];
 
     if (LOG_FONTINIT_ENABLED()) {
-        GetTimeFormat(LOCALE_INVARIANT, TIME_FORCE24HOURFORMAT,
+        GetTimeFormatA(LOCALE_INVARIANT, TIME_FORCE24HOURFORMAT,
                       nullptr, nullptr, nowTime, 256);
-        GetDateFormat(LOCALE_INVARIANT, 0, nullptr, nullptr, nowDate, 256);
+        GetDateFormatA(LOCALE_INVARIANT, 0, nullptr, nullptr, nowDate, 256);
         upTime = (double) GetTickCount();
     }
     QueryPerformanceFrequency(&frequency);

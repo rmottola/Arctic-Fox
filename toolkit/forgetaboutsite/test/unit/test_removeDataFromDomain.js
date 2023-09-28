@@ -288,7 +288,7 @@ function* test_history_not_cleared_with_uri_contains_domain()
 }
 
 // Cookie Service
-function* test_cookie_cleared_with_direct_match()
+function test_cookie_cleared_with_direct_match()
 {
   const TEST_DOMAIN = "mozilla.org";
   add_cookie(TEST_DOMAIN);
@@ -296,7 +296,7 @@ function* test_cookie_cleared_with_direct_match()
   check_cookie_exists(TEST_DOMAIN, false);
 }
 
-function* test_cookie_cleared_with_subdomain()
+function test_cookie_cleared_with_subdomain()
 {
   const TEST_DOMAIN = "www.mozilla.org";
   add_cookie(TEST_DOMAIN);
@@ -304,7 +304,7 @@ function* test_cookie_cleared_with_subdomain()
   check_cookie_exists(TEST_DOMAIN, false);
 }
 
-function* test_cookie_not_cleared_with_uri_contains_domain()
+function test_cookie_not_cleared_with_uri_contains_domain()
 {
   const TEST_DOMAIN = "ilovemozilla.org";
   add_cookie(TEST_DOMAIN);
@@ -313,7 +313,7 @@ function* test_cookie_not_cleared_with_uri_contains_domain()
 }
 
 // Login Manager
-function* test_login_manager_disabled_hosts_cleared_with_direct_match()
+function test_login_manager_disabled_hosts_cleared_with_direct_match()
 {
   const TEST_HOST = "http://mozilla.org";
   add_disabled_host(TEST_HOST);
@@ -321,7 +321,7 @@ function* test_login_manager_disabled_hosts_cleared_with_direct_match()
   check_disabled_host(TEST_HOST, false);
 }
 
-function* test_login_manager_disabled_hosts_cleared_with_subdomain()
+function test_login_manager_disabled_hosts_cleared_with_subdomain()
 {
   const TEST_HOST = "http://www.mozilla.org";
   add_disabled_host(TEST_HOST);
@@ -329,7 +329,7 @@ function* test_login_manager_disabled_hosts_cleared_with_subdomain()
   check_disabled_host(TEST_HOST, false);
 }
 
-function* test_login_manager_disabled_hosts_not_cleared_with_uri_contains_domain()
+function test_login_manager_disabled_hosts_not_cleared_with_uri_contains_domain()
 {
   const TEST_HOST = "http://ilovemozilla.org";
   add_disabled_host(TEST_HOST);
@@ -343,7 +343,7 @@ function* test_login_manager_disabled_hosts_not_cleared_with_uri_contains_domain
   check_disabled_host(TEST_HOST, false);
 }
 
-function* test_login_manager_logins_cleared_with_direct_match()
+function test_login_manager_logins_cleared_with_direct_match()
 {
   const TEST_HOST = "http://mozilla.org";
   add_login(TEST_HOST);
@@ -351,7 +351,7 @@ function* test_login_manager_logins_cleared_with_direct_match()
   check_login_exists(TEST_HOST, false);
 }
 
-function* test_login_manager_logins_cleared_with_subdomain()
+function test_login_manager_logins_cleared_with_subdomain()
 {
   const TEST_HOST = "http://www.mozilla.org";
   add_login(TEST_HOST);
@@ -373,7 +373,7 @@ function tets_login_manager_logins_not_cleared_with_uri_contains_domain()
 }
 
 // Permission Manager
-function* test_permission_manager_cleared_with_direct_match()
+function test_permission_manager_cleared_with_direct_match()
 {
   const TEST_URI = uri("http://mozilla.org");
   add_permission(TEST_URI);
@@ -381,7 +381,7 @@ function* test_permission_manager_cleared_with_direct_match()
   check_permission_exists(TEST_URI, false);
 }
 
-function* test_permission_manager_cleared_with_subdomain()
+function test_permission_manager_cleared_with_subdomain()
 {
   const TEST_URI = uri("http://www.mozilla.org");
   add_permission(TEST_URI);
@@ -389,7 +389,7 @@ function* test_permission_manager_cleared_with_subdomain()
   check_permission_exists(TEST_URI, false);
 }
 
-function* test_permission_manager_not_cleared_with_uri_contains_domain()
+function test_permission_manager_not_cleared_with_uri_contains_domain()
 {
   const TEST_URI = uri("http://ilovemozilla.org");
   add_permission(TEST_URI);
@@ -463,7 +463,7 @@ function* test_content_preferences_not_cleared_with_uri_contains_domain()
 }
 
 // Push
-function test_push_cleared()
+function* test_push_cleared()
 {
   let ps;
   try {
@@ -533,7 +533,7 @@ function test_push_cleared()
 }
 
 // Cache
-function* test_cache_cleared()
+function test_cache_cleared()
 {
   // Because this test is asynchronous, it should be the last test
   do_check_true(tests[tests.length - 1] == arguments.callee);
@@ -597,7 +597,7 @@ function* test_storage_cleared()
   do_check_eq(s[2].length, 1);
 }
 
-let tests = [
+var tests = [
   // History
   test_history_cleared_with_direct_match,
   test_history_cleared_with_subdomain,

@@ -38,6 +38,7 @@
 #if defined(MOZ_SANDBOX)
 #include "mozilla/Preferences.h"
 #include "mozilla/sandboxing/sandboxLogging.h"
+#include "nsDirectoryServiceUtils.h"
 #endif
 #endif
 
@@ -379,6 +380,8 @@ GeckoChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts,
 bool
 GeckoChildProcessHost::WaitUntilConnected(int32_t aTimeoutMs)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::OTHER);
+
   // NB: this uses a different mechanism than the chromium parent
   // class.
   PRIntervalTime timeoutTicks = (aTimeoutMs > 0) ?
@@ -598,6 +601,46 @@ MaybeAddNsprLogFileAccess(std::vector<std::wstring>& aAllowedFilesReadWrite)
   nsAutoCString resolvedEnvVar("NSPR_LOG_FILE=");
   AppendUTF16toUTF8(resolvedFilePath, resolvedEnvVar);
   PR_SetEnv(resolvedEnvVar.get());
+}
+
+static void
+AddContentSandboxAllowedFiles(int32_t aSandboxLevel,
+                              std::vector<std::wstring>& aAllowedFilesRead)
+{
+  if (aSandboxLevel < 1) {
+    return;
+  }
+
+  nsCOMPtr<nsIFile> binDir;
+  nsresult rv = NS_GetSpecialDirectory(NS_GRE_DIR, getter_AddRefs(binDir));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
+
+  nsAutoString binDirPath;
+  rv = binDir->GetPath(binDirPath);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
+
+  // If bin directory is on a remote drive add read access.
+  wchar_t volPath[MAX_PATH];
+  if (!::GetVolumePathNameW(binDirPath.get(), volPath, MAX_PATH)) {
+    return;
+  }
+
+  if (::GetDriveTypeW(volPath) != DRIVE_REMOTE) {
+    return;
+  }
+
+  // Convert network share path to format for sandbox policy.
+  if (Substring(binDirPath, 0, 2).Equals(L"\\\\")) {
+    binDirPath.InsertLiteral(MOZ_UTF16("??\\UNC"), 1);
+  }
+
+  binDirPath.AppendLiteral(MOZ_UTF16("\\*"));
+
+  aAllowedFilesRead.push_back(std::wstring(binDirPath.get()));
 }
 #endif
 
@@ -906,6 +949,7 @@ GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExt
         mSandboxBroker.SetSecurityLevelForContentProcess(mSandboxLevel);
         cmdLine.AppendLooseValue(UTF8ToWide("-sandbox"));
         shouldSandboxCurrentProcess = true;
+        AddContentSandboxAllowedFiles(mSandboxLevel, mAllowedFilesRead);
       }
 #endif // MOZ_CONTENT_SANDBOX
       break;

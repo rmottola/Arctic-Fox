@@ -55,6 +55,27 @@ SkiaColorTypeToGfxFormat(SkColorType type)
   }
 }
 
+static inline SkAlphaType
+GfxFormatToSkiaAlphaType(SurfaceFormat format)
+{
+  switch (format)
+  {
+    case SurfaceFormat::B8G8R8X8:
+    case SurfaceFormat::R5G6B5_UINT16:
+      return kOpaque_SkAlphaType;
+    default:
+      return kPremul_SkAlphaType;
+  }
+}
+
+static inline SkImageInfo
+MakeSkiaImageInfo(const IntSize& aSize, SurfaceFormat aFormat)
+{
+  return SkImageInfo::Make(aSize.width, aSize.height,
+                           GfxFormatToSkiaColorType(aFormat),
+                           GfxFormatToSkiaAlphaType(aFormat));
+}
+
 #ifdef USE_SKIA_GPU
 static inline GrPixelConfig
 GfxFormatToGrConfig(SurfaceFormat format)
@@ -156,9 +177,9 @@ StrokeOptionsToPaint(SkPaint& aPaint, const StrokeOptions &aOptions)
           pattern[i] = SkScalarMulDiv(SK_ScalarNearlyZero, 33, 32);
     }
 
-    SkDashPathEffect* dash = SkDashPathEffect::Create(&pattern.front(),
-                                                      dashCount,
-                                                      SkFloatToScalar(aOptions.mDashOffset));
+    SkPathEffect* dash = SkDashPathEffect::Create(&pattern.front(),
+                                                  dashCount,
+                                                  SkFloatToScalar(aOptions.mDashOffset));
     SkSafeUnref(aPaint.setPathEffect(dash));
   }
 

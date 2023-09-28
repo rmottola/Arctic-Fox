@@ -1466,7 +1466,7 @@ HyperTextAccessible::CaretLineNumber()
       break;
 
     // Add lines for the sibling frames before the caret
-    nsIFrame *sibling = parentFrame->GetFirstPrincipalChild();
+    nsIFrame *sibling = parentFrame->PrincipalChildList().FirstChild();
     while (sibling && sibling != caretFrame) {
       nsAutoLineIterator lineIterForSibling = sibling->GetLineIterator();
       if (lineIterForSibling) {
@@ -1769,7 +1769,7 @@ HyperTextAccessible::EnclosingRange(a11y::TextRange& aRange) const
 void
 HyperTextAccessible::SelectionRanges(nsTArray<a11y::TextRange>* aRanges) const
 {
-  NS_ASSERTION(aRanges->Length() != 0, "TextRange array supposed to be empty");
+  MOZ_ASSERT(aRanges->Length() == 0, "TextRange array supposed to be empty");
 
   dom::Selection* sel = DOMSelection();
   if (!sel)

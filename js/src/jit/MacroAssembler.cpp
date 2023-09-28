@@ -457,7 +457,7 @@ MacroAssembler::loadUnboxedProperty(T address, JSValueType type, TypedOrValueReg
               convertInt32ToDouble(address, output.typedReg().fpu());
               break;
           }
-          // Fallthrough.
+          MOZ_FALLTHROUGH;
       }
 
       case JSVAL_TYPE_BOOLEAN:
@@ -718,12 +718,12 @@ MacroAssembler::checkAllocatorState(Label* fail)
     if (js::gc::TraceEnabled() || MemProfiler::enabled())
         jump(fail);
 
-# ifdef JS_GC_ZEAL
+#ifdef JS_GC_ZEAL
     // Don't execute the inline path if gc zeal or tracing are active.
     branch32(Assembler::NotEqual,
-             AbsoluteAddress(GetJitContext()->runtime->addressOfGCZeal()), Imm32(0),
+             AbsoluteAddress(GetJitContext()->runtime->addressOfGCZealModeBits()), Imm32(0),
              fail);
-# endif
+#endif
 
     // Don't execute the inline path if the compartment has an object metadata callback,
     // as the metadata to use for the object may vary between executions of the op.
@@ -1242,8 +1242,7 @@ MacroAssembler::loadStringChar(Register str, Register index, Register output)
     loadStringChars(str, output);
 
     Label isLatin1, done;
-    branchTest32(Assembler::NonZero, Address(str, JSString::offsetOfFlags()),
-                 Imm32(JSString::LATIN1_CHARS_BIT), &isLatin1);
+    branchLatin1String(str, &isLatin1);
     load16ZeroExtend(BaseIndex(output, index, TimesTwo), output);
     jump(&done);
 
@@ -1319,7 +1318,7 @@ MacroAssembler::generateBailoutTail(Register scratch, Register bailoutInfo)
         // Enter exit frame for the FinishBailoutToBaseline call.
         loadPtr(Address(bailoutInfo, offsetof(BaselineBailoutInfo, resumeFramePtr)), temp);
         load32(Address(temp, BaselineFrame::reverseOffsetOfFrameSize()), temp);
-        makeFrameDescriptor(temp, JitFrame_BaselineJS);
+        makeFrameDescriptor(temp, JitFrame_BaselineJS, ExitFrameLayout::Size());
         push(temp);
         push(Address(bailoutInfo, offsetof(BaselineBailoutInfo, resumeAddr)));
         // No GC things to mark on the stack, push a bare token.
@@ -2006,21 +2005,6 @@ MacroAssembler::convertTypedOrValueToInt(TypedOrValueRegister src, FloatRegister
     }
 }
 
-bool
-MacroAssembler::asmMergeWith(const MacroAssembler& other)
-{
-    size_t sizeBeforeMerge = size();
-
-    if (!MacroAssemblerSpecific::asmMergeWith(other))
-        return false;
-
-    retargetWithOffset(sizeBeforeMerge, other.asmSyncInterruptLabel(), asmSyncInterruptLabel());
-    retargetWithOffset(sizeBeforeMerge, other.asmStackOverflowLabel(), asmStackOverflowLabel());
-    retargetWithOffset(sizeBeforeMerge, other.asmOnOutOfBoundsLabel(), asmOnOutOfBoundsLabel());
-    retargetWithOffset(sizeBeforeMerge, other.asmOnConversionErrorLabel(), asmOnConversionErrorLabel());
-    return true;
-}
-
 void
 MacroAssembler::finish()
 {
@@ -2038,57 +2022,6 @@ MacroAssembler::link(JitCode* code)
     MOZ_ASSERT(!oom());
     linkSelfReference(code);
     linkProfilerCallSites(code);
-}
-
-void
-MacroAssembler::branchIfNotInterpretedConstructor(Register fun, Register scratch, Label* label)
-{
-    // 16-bit loads are slow and unaligned 32-bit loads may be too so
-    // perform an aligned 32-bit load and adjust the bitmask accordingly.
-    MOZ_ASSERT(JSFunction::offsetOfNargs() % sizeof(uint32_t) == 0);
-    MOZ_ASSERT(JSFunction::offsetOfFlags() == JSFunction::offsetOfNargs() + 2);
-
-    // First, ensure it's a scripted function.
-    load32(Address(fun, JSFunction::offsetOfNargs()), scratch);
-    int32_t bits = IMM32_16ADJ(JSFunction::INTERPRETED);
-    branchTest32(Assembler::Zero, scratch, Imm32(bits), label);
-
-    // Check if the CONSTRUCTOR bit is set.
-    bits = IMM32_16ADJ(JSFunction::CONSTRUCTOR);
-    branchTest32(Assembler::Zero, scratch, Imm32(bits), label);
-}
-
-void
-MacroAssembler::branchEqualTypeIfNeeded(MIRType type, MDefinition* maybeDef, Register tag,
-                                        Label* label)
-{
-    if (!maybeDef || maybeDef->mightBeType(type)) {
-        switch (type) {
-          case MIRType_Null:
-            branchTestNull(Equal, tag, label);
-            break;
-          case MIRType_Boolean:
-            branchTestBoolean(Equal, tag, label);
-            break;
-          case MIRType_Int32:
-            branchTestInt32(Equal, tag, label);
-            break;
-          case MIRType_Double:
-            branchTestDouble(Equal, tag, label);
-            break;
-          case MIRType_String:
-            branchTestString(Equal, tag, label);
-            break;
-          case MIRType_Symbol:
-            branchTestSymbol(Equal, tag, label);
-            break;
-          case MIRType_Object:
-            branchTestObject(Equal, tag, label);
-            break;
-          default:
-            MOZ_CRASH("Unsupported type");
-        }
-    }
 }
 
 MacroAssembler::AutoProfilerCallInstrumentation::AutoProfilerCallInstrumentation(
@@ -2552,7 +2485,91 @@ MacroAssembler::linkSelfReference(JitCode* code)
     }
 }
 
+// ===============================================================
+// Branch functions
+
+void
+MacroAssembler::branchIfNotInterpretedConstructor(Register fun, Register scratch, Label* label)
+{
+    // 16-bit loads are slow and unaligned 32-bit loads may be too so
+    // perform an aligned 32-bit load and adjust the bitmask accordingly.
+    MOZ_ASSERT(JSFunction::offsetOfNargs() % sizeof(uint32_t) == 0);
+    MOZ_ASSERT(JSFunction::offsetOfFlags() == JSFunction::offsetOfNargs() + 2);
+
+    // First, ensure it's a scripted function.
+    load32(Address(fun, JSFunction::offsetOfNargs()), scratch);
+    int32_t bits = IMM32_16ADJ(JSFunction::INTERPRETED);
+    branchTest32(Assembler::Zero, scratch, Imm32(bits), label);
+
+    // Check if the CONSTRUCTOR bit is set.
+    bits = IMM32_16ADJ(JSFunction::CONSTRUCTOR);
+    branchTest32(Assembler::Zero, scratch, Imm32(bits), label);
+}
+
+void
+MacroAssembler::branchEqualTypeIfNeeded(MIRType type, MDefinition* maybeDef, Register tag,
+                                        Label* label)
+{
+    if (!maybeDef || maybeDef->mightBeType(type)) {
+        switch (type) {
+          case MIRType_Null:
+            branchTestNull(Equal, tag, label);
+            break;
+          case MIRType_Boolean:
+            branchTestBoolean(Equal, tag, label);
+            break;
+          case MIRType_Int32:
+            branchTestInt32(Equal, tag, label);
+            break;
+          case MIRType_Double:
+            branchTestDouble(Equal, tag, label);
+            break;
+          case MIRType_String:
+            branchTestString(Equal, tag, label);
+            break;
+          case MIRType_Symbol:
+            branchTestSymbol(Equal, tag, label);
+            break;
+          case MIRType_Object:
+            branchTestObject(Equal, tag, label);
+            break;
+          default:
+            MOZ_CRASH("Unsupported type");
+        }
+    }
+}
+
 //}}} check_macroassembler_style
+
+void
+MacroAssembler::BranchType::emit(MacroAssembler& masm)
+{
+    MOZ_ASSERT(isInitialized());
+    MIRType mirType = MIRType_None;
+
+    if (type_.isPrimitive()) {
+        if (type_.isMagicArguments())
+            mirType = MIRType_MagicOptimizedArguments;
+        else
+            mirType = MIRTypeFromValueType(type_.primitive());
+    } else if (type_.isAnyObject()) {
+        mirType = MIRType_Object;
+    } else {
+        MOZ_CRASH("Unknown conversion to mirtype");
+    }
+
+    if (mirType == MIRType_Double)
+        masm.branchTestNumber(cond(), reg(), jump());
+    else
+        masm.branchTestMIRType(cond(), reg(), mirType, jump());
+}
+
+void
+MacroAssembler::BranchGCPtr::emit(MacroAssembler& masm)
+{
+    MOZ_ASSERT(isInitialized());
+    masm.branchPtr(cond(), reg(), ptr_, jump());
+}
 
 namespace js {
 namespace jit {

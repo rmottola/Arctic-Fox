@@ -38,5 +38,5 @@ let tests = [
 ];
 function run_test()
 {
-  tests.forEach(function(test) test());
+  tests.forEach(test => test());
 }

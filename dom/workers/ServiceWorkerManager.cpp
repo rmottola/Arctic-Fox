@@ -105,6 +105,8 @@ static_assert(nsIHttpChannelInternal::CORS_MODE_NO_CORS == static_cast<uint32_t>
               "RequestMode enumeration value should match Necko CORS mode value.");
 static_assert(nsIHttpChannelInternal::CORS_MODE_CORS == static_cast<uint32_t>(RequestMode::Cors),
               "RequestMode enumeration value should match Necko CORS mode value.");
+static_assert(nsIHttpChannelInternal::CORS_MODE_NAVIGATE == static_cast<uint32_t>(RequestMode::Navigate),
+              "RequestMode enumeration value should match Necko CORS mode value.");
 
 static_assert(nsIHttpChannelInternal::REDIRECT_MODE_FOLLOW == static_cast<uint32_t>(RequestRedirect::Follow),
               "RequestRedirect enumeration value should make Necko Redirect mode value.");
@@ -490,6 +492,20 @@ ServiceWorkerRegistrationInfo::GetActiveWorker(nsIServiceWorkerInfo **aResult)
 {
   AssertIsOnMainThread();
   nsCOMPtr<nsIServiceWorkerInfo> info = do_QueryInterface(mActiveWorker);
+  info.forget(aResult);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ServiceWorkerRegistrationInfo::GetWorkerByID(uint64_t aID, nsIServiceWorkerInfo **aResult)
+{
+  AssertIsOnMainThread();
+  MOZ_ASSERT(aResult);
+
+  RefPtr<ServiceWorkerInfo> info = GetServiceWorkerInfoById(aID);
+  if (NS_WARN_IF(!info)) {
+    return NS_ERROR_FAILURE;
+  }
   info.forget(aResult);
   return NS_OK;
 }
@@ -2074,6 +2090,22 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
                                     uint8_t* aDataBytes,
                                     uint8_t optional_argc)
 {
+  if (optional_argc == 2) {
+    nsTArray<uint8_t> data;
+    if (!data.InsertElementsAt(0, aDataBytes, aDataLength, fallible)) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+    return SendPushEvent(aOriginAttributes, aScope, Some(data));
+  }
+  MOZ_ASSERT(optional_argc == 0);
+  return SendPushEvent(aOriginAttributes, aScope, Nothing());
+}
+
+nsresult
+ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
+                                    const nsACString& aScope,
+                                    Maybe<nsTArray<uint8_t>> aData)
+{
 #ifdef MOZ_SIMPLEPUSH
   return NS_ERROR_NOT_AVAILABLE;
 #else
@@ -2090,16 +2122,7 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
   RefPtr<ServiceWorkerRegistrationInfo> registration =
     GetRegistration(serviceWorker->GetPrincipal(), aScope);
 
-  if (optional_argc == 2) {
-    nsTArray<uint8_t> data;
-    if (!data.InsertElementsAt(0, aDataBytes, aDataLength, fallible)) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-    return serviceWorker->WorkerPrivate()->SendPushEvent(Some(data), registration);
-  } else {
-    MOZ_ASSERT(optional_argc == 0);
-    return serviceWorker->WorkerPrivate()->SendPushEvent(Nothing(), registration);
-  }
+  return serviceWorker->WorkerPrivate()->SendPushEvent(aData, registration);
 #endif // MOZ_SIMPLEPUSH
 }
 
@@ -3466,7 +3489,7 @@ ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOrigin
     documentId = aDocumentIdForTopLevelNavigation;
 
     nsCOMPtr<nsIURI> uri;
-    aRv = internalChannel->GetURI(getter_AddRefs(uri));
+    aRv = aChannel->GetSecureUpgradedChannelURI(getter_AddRefs(uri));
     if (NS_WARN_IF(aRv.Failed())) {
       return nullptr;
     }
@@ -4046,6 +4069,30 @@ ServiceWorkerManager::GetRegistration(nsIPrincipal* aPrincipal,
   }
 
   return GetRegistration(scopeKey, aScope);
+}
+
+NS_IMETHODIMP
+ServiceWorkerManager::GetRegistrationByPrincipal(nsIPrincipal* aPrincipal,
+                                                 const nsAString& aScope,
+                                                 nsIServiceWorkerRegistrationInfo** aInfo)
+{
+  MOZ_ASSERT(aPrincipal);
+  MOZ_ASSERT(aInfo);
+
+  nsCOMPtr<nsIURI> scopeURI;
+  nsresult rv = NS_NewURI(getter_AddRefs(scopeURI), aScope, nullptr, nullptr);
+  if (NS_FAILED(rv)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  RefPtr<ServiceWorkerRegistrationInfo> info =
+    GetServiceWorkerRegistrationInfo(aPrincipal, scopeURI);
+  if (!info) {
+    return NS_ERROR_FAILURE;
+  }
+  info.forget(aInfo);
+
+  return NS_OK;
 }
 
 already_AddRefed<ServiceWorkerRegistrationInfo>

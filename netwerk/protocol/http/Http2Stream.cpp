@@ -40,6 +40,8 @@ Http2Stream::Http2Stream(nsAHttpTransaction *httpTransaction,
                          int32_t priority)
   : mStreamID(0)
   , mSession(session)
+  , mSegmentReader(nullptr)
+  , mSegmentWriter(nullptr)
   , mUpstreamState(GENERATING_HEADERS)
   , mState(IDLE)
   , mRequestHeadersDone(0)
@@ -48,8 +50,6 @@ Http2Stream::Http2Stream(nsAHttpTransaction *httpTransaction,
   , mQueued(0)
   , mTransaction(httpTransaction)
   , mSocketTransport(session->SocketTransport())
-  , mSegmentReader(nullptr)
-  , mSegmentWriter(nullptr)
   , mChunkSize(session->SendingChunkSize())
   , mRequestBlockedOnRead(0)
   , mRecvdFin(0)
@@ -79,7 +79,7 @@ Http2Stream::Http2Stream(nsAHttpTransaction *httpTransaction,
   mServerReceiveWindow = session->GetServerInitialStreamWindow();
   mClientReceiveWindow = session->PushAllowance();
 
-  mTxInlineFrame = new uint8_t[mTxInlineFrameSize];
+  mTxInlineFrame = MakeUnique<uint8_t[]>(mTxInlineFrameSize);
 
   PR_STATIC_ASSERT(nsISupportsPriority::PRIORITY_LOWEST <= kNormalPriority);
 
@@ -243,28 +243,12 @@ Http2Stream::ReadSegments(nsAHttpSegmentReader *reader,
   return rv;
 }
 
-static bool
-IsDataAvailable(nsIInputStream *stream)
-{
-  if (!stream) {
-    return false;
-  }
-  uint64_t avail;
-  if (NS_FAILED(stream->Available(&avail))) {
-    return false;
-  }
-  return (avail > 0);
-}
-
 uint64_t
 Http2Stream::LocalUnAcked()
 {
   // reduce unacked by the amount of undelivered data
   // to help assert flow control
-  uint64_t undelivered = 0;
-  if (mInputBufferIn) {
-    mInputBufferIn->Available(&undelivered);
-  }
+  uint64_t undelivered = mSimpleBuffer.Available();
 
   if (undelivered > mLocalUnacked) {
     return 0;
@@ -275,25 +259,20 @@ Http2Stream::LocalUnAcked()
 nsresult
 Http2Stream::BufferInput(uint32_t count, uint32_t *countWritten)
 {
-  static const uint32_t segmentSize = 32768;
-  char buf[segmentSize];
-
-  count = std::min(segmentSize, count);
-  if (!mInputBufferOut) {
-    NS_NewPipe(getter_AddRefs(mInputBufferIn), getter_AddRefs(mInputBufferOut),
-               segmentSize, UINT32_MAX);
-    if (!mInputBufferOut) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
+  char buf[SimpleBufferPage::kSimpleBufferPageSize];
+  if (SimpleBufferPage::kSimpleBufferPageSize < count) {
+    count = SimpleBufferPage::kSimpleBufferPageSize;
   }
+
   mBypassInputBuffer = 1;
   nsresult rv = mSegmentWriter->OnWriteSegment(buf, count, countWritten);
   mBypassInputBuffer = 0;
+
   if (NS_SUCCEEDED(rv)) {
-    uint32_t buffered;
-    rv = mInputBufferOut->Write(buf, *countWritten, &buffered);
-    if (NS_SUCCEEDED(rv) && (buffered != *countWritten)) {
-      rv = NS_ERROR_OUT_OF_MEMORY;
+    rv = mSimpleBuffer.Write(buf, *countWritten);
+    if (NS_FAILED(rv)) {
+      MOZ_ASSERT(rv == NS_ERROR_OUT_OF_MEMORY);
+      return NS_ERROR_OUT_OF_MEMORY;
     }
   }
   return rv;
@@ -303,7 +282,7 @@ bool
 Http2Stream::DeferCleanup(nsresult status)
 {
   // do not cleanup a stream that has data buffered for the transaction
-  return (NS_SUCCEEDED(status) && IsDataAvailable(mInputBufferIn));
+  return (NS_SUCCEEDED(status) && mSimpleBuffer.Available());
 }
 
 // WriteSegments() is used to read data off the socket. Generally this is
@@ -487,8 +466,8 @@ Http2Stream::ParseHttpRequestHeaders(const char *buf,
           mSession, hashkey.get(), schedulingContext, cache, pushedStream));
 
     if (pushedStream) {
-      LOG3(("Pushed Stream Match located id=0x%X key=%s\n",
-            pushedStream->StreamID(), hashkey.get()));
+      LOG3(("Pushed Stream Match located %p id=0x%X key=%s\n",
+            pushedStream, pushedStream->StreamID(), hashkey.get()));
       pushedStream->SetConsumerStream(this);
       mPushSource = pushedStream;
       SetSentFin(true);
@@ -866,8 +845,7 @@ Http2Stream::TransmitFrame(const char *buf,
       mTxStreamFrameSize < Http2Session::kDefaultBufferSize &&
       mTxInlineFrameUsed + mTxStreamFrameSize < mTxInlineFrameSize) {
     LOG3(("Coalesce Transmit"));
-    memcpy (mTxInlineFrame + mTxInlineFrameUsed,
-            buf, mTxStreamFrameSize);
+    memcpy (&mTxInlineFrame[mTxInlineFrameUsed], buf, mTxStreamFrameSize);
     if (countUsed)
       *countUsed += mTxStreamFrameSize;
     mTxInlineFrameUsed += mTxStreamFrameSize;
@@ -1399,6 +1377,11 @@ Http2Stream::OnReadSegment(const char *buf,
     MOZ_ASSERT(false, "resuming partial fin stream out of OnReadSegment");
     break;
 
+  case UPSTREAM_COMPLETE:
+    MOZ_ASSERT(mPushSource);
+    rv = TransmitFrame(nullptr, nullptr, true);
+    break;
+
   default:
     MOZ_ASSERT(false, "Http2Stream::OnReadSegment non-write state");
     break;
@@ -1436,16 +1419,12 @@ Http2Stream::OnWriteSegment(char *buf,
   // so that other streams can proceed when the gecko caller is not processing
   // data events fast enough and flow control hasn't caught up yet. This
   // gets the stored data out of that pipe
-  if (!mBypassInputBuffer && IsDataAvailable(mInputBufferIn)) {
-    nsresult rv = mInputBufferIn->Read(buf, count, countWritten);
+  if (!mBypassInputBuffer && mSimpleBuffer.Available()) {
+    *countWritten = mSimpleBuffer.Read(buf, count);
+    MOZ_ASSERT(*countWritten);
     LOG3(("Http2Stream::OnWriteSegment read from flow control buffer %p %x %d\n",
           this, mStreamID, *countWritten));
-    if (!IsDataAvailable(mInputBufferIn)) {
-      // drop the pipe if we don't need it anymore
-      mInputBufferIn = nullptr;
-      mInputBufferOut = nullptr;
-    }
-    return rv;
+    return NS_OK;
   }
 
   // read from the network

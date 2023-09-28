@@ -13,7 +13,6 @@
 #include "Tools.h"
 
 #include <cmath>
-#include <limits>
 
 namespace mozilla {
 
@@ -157,22 +156,6 @@ struct RectTyped :
         Super(F(rect.x), F(rect.y),
               F(rect.width), F(rect.height)) {}
 
-    // Returns the largest rectangle that can be represented with 32-bit
-    // signed integers, centered around a point at 0,0.  As BaseRect's represent
-    // the dimensions as a top-left point with a width and height, the width
-    // and height will be the largest positive 32-bit value.  The top-left
-    // position coordinate is divided by two to center the rectangle around a
-    // point at 0,0.
-    static RectTyped<units, F> MaxIntRect()
-    {
-      return RectTyped<units, F>(
-        -std::numeric_limits<int32_t>::max() * 0.5,
-        -std::numeric_limits<int32_t>::max() * 0.5,
-        std::numeric_limits<int32_t>::max(),
-        std::numeric_limits<int32_t>::max()
-      );
-    };
-
     void NudgeToIntegers()
     {
       NudgeToInteger(&(this->x));
@@ -185,8 +168,8 @@ struct RectTyped :
     {
       *aOut = IntRectTyped<units>(int32_t(this->X()), int32_t(this->Y()),
                                   int32_t(this->Width()), int32_t(this->Height()));
-      return RectTyped<units>(F(aOut->x), F(aOut->y),
-                              F(aOut->width), F(aOut->height))
+      return RectTyped<units, F>(F(aOut->x), F(aOut->y),
+                                 F(aOut->width), F(aOut->height))
              .IsEqualEdges(*this);
     }
 

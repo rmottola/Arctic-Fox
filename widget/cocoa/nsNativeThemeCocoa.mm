@@ -2087,10 +2087,7 @@ nsNativeThemeCocoa::GetScrollbarPressStates(nsIFrame* aFrame,
   };
 
   // Get the state of any scrollbar buttons in our child frames
-  for (nsIFrame *childFrame = aFrame->GetFirstPrincipalChild(); 
-       childFrame;
-       childFrame = childFrame->GetNextSibling()) {
-
+  for (nsIFrame *childFrame : aFrame->PrincipalChildList()) {
     nsIContent *childContent = childFrame->GetContent();
     if (!childContent) continue;
     int32_t attrIndex = childContent->FindAttrValueIn(kNameSpaceID_None, nsGkAtoms::sbattr, 
@@ -3194,7 +3191,6 @@ nsNativeThemeCocoa::GetWidgetPadding(nsDeviceContext* aContext,
   // We don't want CSS padding being used for certain widgets.
   // See bug 381639 for an example of why.
   switch (aWidgetType) {
-    case NS_THEME_BUTTON:
     // Radios and checkboxes return a fixed size in GetMinimumWidgetSize
     // and have a meaningful baseline, so they can't have
     // author-specified padding.

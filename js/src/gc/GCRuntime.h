@@ -18,11 +18,6 @@
 #include "gc/StoreBuffer.h"
 #include "gc/Tracer.h"
 
-/* Perform validation of incremental marking in debug builds but not on B2G. */
-#if defined(DEBUG) && !defined(MOZ_B2G)
-#define JS_GC_MARKING_VALIDATION
-#endif
-
 namespace js {
 
 class AutoLockGC;
@@ -154,8 +149,8 @@ class GCSchedulingTunables
     /*
      * Controls the number of empty chunks reserved for future allocation.
      */
-    unsigned minEmptyChunkCount_;
-    unsigned maxEmptyChunkCount_;
+    uint32_t minEmptyChunkCount_;
+    uint32_t maxEmptyChunkCount_;
 
   public:
     GCSchedulingTunables()
@@ -190,7 +185,7 @@ class GCSchedulingTunables
     unsigned minEmptyChunkCount(const AutoLockGC&) const { return minEmptyChunkCount_; }
     unsigned maxEmptyChunkCount() const { return maxEmptyChunkCount_; }
 
-    void setParameter(JSGCParamKey key, uint32_t value, const AutoLockGC& lock);
+    bool setParameter(JSGCParamKey key, uint32_t value, const AutoLockGC& lock);
 };
 
 /*
@@ -585,7 +580,8 @@ class GCRuntime
     void finishRoots();
     void finish();
 
-    inline int zeal();
+    inline bool hasZealMode(ZealMode mode);
+    inline void clearZealMode(ZealMode mode);
     inline bool upcomingZealousGC();
     inline bool needZealousGC();
 
@@ -593,7 +589,7 @@ class GCRuntime
     void removeRoot(Value* vp);
     void setMarkStackLimit(size_t limit, AutoLockGC& lock);
 
-    void setParameter(JSGCParamKey key, uint32_t value, AutoLockGC& lock);
+    bool setParameter(JSGCParamKey key, uint32_t value, AutoLockGC& lock);
     uint32_t getParameter(JSGCParamKey key, const AutoLockGC& lock);
 
     bool triggerGC(JS::gcreason::Reason reason);
@@ -641,8 +637,8 @@ class GCRuntime
     void onOutOfMallocMemory(const AutoLockGC& lock);
 
 #ifdef JS_GC_ZEAL
-    const void* addressOfZealMode() { return &zealMode; }
-    void getZeal(uint8_t* zeal, uint32_t* frequency, uint32_t* nextScheduled);
+    const void* addressOfZealModeBits() { return &zealModeBits; }
+    void getZealBits(uint32_t* zealBits, uint32_t* frequency, uint32_t* nextScheduled);
     void setZeal(uint8_t zeal, uint32_t frequency);
     bool parseAndSetZeal(const char* str);
     void setNextScheduled(uint32_t count);
@@ -756,6 +752,9 @@ class GCRuntime
 
     void setGCCallback(JSGCCallback callback, void* data);
     void callGCCallback(JSGCStatus status) const;
+    void setObjectsTenuredCallback(JSObjectsTenuredCallback callback,
+                                   void* data);
+    void callObjectsTenuredCallback();
     bool addFinalizeCallback(JSFinalizeCallback callback, void* data);
     void removeFinalizeCallback(JSFinalizeCallback func);
     bool addWeakPointerZoneGroupCallback(JSWeakPointerZoneGroupCallback callback, void* data);
@@ -763,8 +762,9 @@ class GCRuntime
     bool addWeakPointerCompartmentCallback(JSWeakPointerCompartmentCallback callback, void* data);
     void removeWeakPointerCompartmentCallback(JSWeakPointerCompartmentCallback callback);
     JS::GCSliceCallback setSliceCallback(JS::GCSliceCallback callback);
+    JS::GCNurseryCollectionCallback setNurseryCollectionCallback(
+        JS::GCNurseryCollectionCallback callback);
 
-    void setValidate(bool enable);
     void setFullCompartmentChecks(bool enable);
 
     bool isManipulatingDeadZones() { return manipulatingDeadZones; }
@@ -790,6 +790,7 @@ class GCRuntime
 
     bool isIncrementalGc() const { return isIncremental; }
     bool isFullGc() const { return isFull; }
+    bool isCompactingGc() const { return isCompacting; }
 
     bool shouldCleanUpEverything() { return cleanUpEverything; }
 
@@ -1178,7 +1179,7 @@ class GCRuntime
     js::gc::ZoneList zonesToMaybeCompact;
     ArenaHeader* relocatedArenasToRelease;
 
-#ifdef JS_GC_MARKING_VALIDATION
+#ifdef JS_GC_ZEAL
     js::gc::MarkingValidator* markingValidator;
 #endif
 
@@ -1260,7 +1261,7 @@ class GCRuntime
      * zeal_ value 14 performs periodic shrinking collections.
      */
 #ifdef JS_GC_ZEAL
-    int zealMode;
+    uint32_t zealModeBits;
     int zealFrequency;
     int nextScheduled;
     bool deterministicOnly;
@@ -1269,10 +1270,10 @@ class GCRuntime
     js::Vector<JSObject*, 0, js::SystemAllocPolicy> selectedForMarking;
 #endif
 
-    bool validate;
     bool fullCompartmentChecks;
 
     Callback<JSGCCallback> gcCallback;
+    Callback<JSObjectsTenuredCallback> tenuredCallback;
     CallbackVector<JSFinalizeCallback> finalizeCallbacks;
     CallbackVector<JSWeakPointerZoneGroupCallback> updateWeakPointerZoneGroupCallbacks;
     CallbackVector<JSWeakPointerCompartmentCallback> updateWeakPointerCompartmentCallbacks;
@@ -1348,9 +1349,20 @@ class MOZ_RAII AutoEnterIteration {
 };
 
 #ifdef JS_GC_ZEAL
-inline int
-GCRuntime::zeal() {
-    return zealMode;
+
+inline bool
+GCRuntime::hasZealMode(ZealMode mode)
+{
+    static_assert(size_t(ZealMode::Limit) < sizeof(zealModeBits) * 8,
+                  "Zeal modes must fit in zealModeBits");
+    return zealModeBits & (1 << uint32_t(mode));
+}
+
+inline void
+GCRuntime::clearZealMode(ZealMode mode)
+{
+    zealModeBits &= ~(1 << uint32_t(mode));
+    MOZ_ASSERT(!hasZealMode(mode));
 }
 
 inline bool
@@ -1361,11 +1373,12 @@ GCRuntime::upcomingZealousGC() {
 inline bool
 GCRuntime::needZealousGC() {
     if (nextScheduled > 0 && --nextScheduled == 0) {
-        if (zealMode == ZealAllocValue ||
-            zealMode == ZealGenerationalGCValue ||
-            (zealMode >= ZealIncrementalRootsThenFinish &&
-             zealMode <= ZealIncrementalMultipleSlices) ||
-            zealMode == ZealCompactValue)
+        if (hasZealMode(ZealMode::Alloc) ||
+            hasZealMode(ZealMode::GenerationalGC) ||
+            hasZealMode(ZealMode::IncrementalRootsThenFinish) ||
+            hasZealMode(ZealMode::IncrementalMarkAllThenFinish) ||
+            hasZealMode(ZealMode::IncrementalMultipleSlices) ||
+            hasZealMode(ZealMode::Compact))
         {
             nextScheduled = zealFrequency;
         }
@@ -1374,7 +1387,8 @@ GCRuntime::needZealousGC() {
     return false;
 }
 #else
-inline int GCRuntime::zeal() { return 0; }
+inline bool GCRuntime::hasZealMode(ZealMode mode) { return false; }
+inline void GCRuntime::clearZealMode(ZealMode mode) { }
 inline bool GCRuntime::upcomingZealousGC() { return false; }
 inline bool GCRuntime::needZealousGC() { return false; }
 #endif

@@ -238,6 +238,7 @@ nsPluginTag::nsPluginTag(nsPluginInfo* aPluginInfo,
     mSupportsAsyncInit(false),
     mFullPath(aPluginInfo->fFullPath),
     mLastModifiedTime(aLastModifiedTime),
+    mSandboxLevel(0),
     mCachedBlocklistState(nsIBlocklistService::STATE_NOT_BLOCKED),
     mCachedBlocklistStateValid(false),
     mIsFromExtension(fromExtension)
@@ -271,12 +272,14 @@ nsPluginTag::nsPluginTag(const char* aName,
     mSupportsAsyncInit(false),
     mFullPath(aFullPath),
     mLastModifiedTime(aLastModifiedTime),
+    mSandboxLevel(0),
     mCachedBlocklistState(nsIBlocklistService::STATE_NOT_BLOCKED),
     mCachedBlocklistStateValid(false),
     mIsFromExtension(fromExtension)
 {
   InitMime(aMimeTypes, aMimeDescriptions, aExtensions,
            static_cast<uint32_t>(aVariants));
+  InitSandboxLevel();
   if (!aArgsAreUTF8)
     EnsureMembersAreUTF8();
   FixupVersion();
@@ -293,8 +296,10 @@ nsPluginTag::nsPluginTag(uint32_t aId,
                          nsTArray<nsCString> aExtensions,
                          bool aIsJavaPlugin,
                          bool aIsFlashPlugin,
+                         bool aSupportsAsyncInit,
                          int64_t aLastModifiedTime,
-                         bool aFromExtension)
+                         bool aFromExtension,
+                         int32_t aSandboxLevel)
   : nsIInternalPluginTag(aName, aDescription, aFileName, aVersion, aMimeTypes,
                          aMimeDescriptions, aExtensions),
     mId(aId),
@@ -302,8 +307,9 @@ nsPluginTag::nsPluginTag(uint32_t aId,
     mLibrary(nullptr),
     mIsJavaPlugin(aIsJavaPlugin),
     mIsFlashPlugin(aIsFlashPlugin),
-    mSupportsAsyncInit(false),
+    mSupportsAsyncInit(aSupportsAsyncInit),
     mLastModifiedTime(aLastModifiedTime),
+    mSandboxLevel(aSandboxLevel),
     mNiceFileName(),
     mCachedBlocklistState(nsIBlocklistService::STATE_NOT_BLOCKED),
     mCachedBlocklistStateValid(false),
@@ -358,6 +364,7 @@ void nsPluginTag::InitMime(const char* const* aMimeTypes,
         }
       case nsPluginHost::eSpecialType_Silverlight:
       case nsPluginHost::eSpecialType_Unity:
+      case nsPluginHost::eSpecialType_Test:
         mSupportsAsyncInit = true;
         break;
       case nsPluginHost::eSpecialType_None:
@@ -409,6 +416,29 @@ void nsPluginTag::InitMime(const char* const* aMimeTypes,
       mExtensions.AppendElement(nsCString());
     }
   }
+}
+
+void
+nsPluginTag::InitSandboxLevel()
+{
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+  nsAutoCString sandboxPref("dom.ipc.plugins.sandbox-level.");
+  sandboxPref.Append(GetNiceFileName());
+  if (NS_FAILED(Preferences::GetInt(sandboxPref.get(), &mSandboxLevel))) {
+    mSandboxLevel = Preferences::GetInt("dom.ipc.plugins.sandbox-level.default"
+);
+  }
+
+#if defined(_AMD64_)
+  // As level 2 is now the default NPAPI sandbox level for 64-bit flash, we
+  // don't want to allow a lower setting unless this environment variable is
+  // set. This should be changed if the firefox.js pref file is changed.
+  if (mIsFlashPlugin &&
+      !PR_GetEnv("MOZ_ALLOW_WEAKER_SANDBOX") && mSandboxLevel < 2) {
+    mSandboxLevel = 2;
+  }
+#endif
+#endif
 }
 
 #if !defined(XP_WIN) && !defined(XP_MACOSX)
@@ -577,7 +607,8 @@ nsPluginTag::GetClicktoplay(bool *aClicktoplay)
 }
 
 NS_IMETHODIMP
-nsPluginTag::GetEnabledState(uint32_t *aEnabledState) {
+nsPluginTag::GetEnabledState(uint32_t *aEnabledState)
+{
   int32_t enabledState;
   nsresult rv = Preferences::GetInt(GetStatePrefNameForPlugin(this).get(),
                                     &enabledState);
@@ -602,7 +633,8 @@ nsPluginTag::GetEnabledState(uint32_t *aEnabledState) {
 }
 
 NS_IMETHODIMP
-nsPluginTag::SetEnabledState(uint32_t aEnabledState) {
+nsPluginTag::SetEnabledState(uint32_t aEnabledState)
+{
   if (aEnabledState >= ePluginState_MaxValue)
     return NS_ERROR_ILLEGAL_VALUE;
   uint32_t oldState = nsIPluginTag::STATE_DISABLED;

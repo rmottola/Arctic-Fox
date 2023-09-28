@@ -11,6 +11,7 @@ from mozunit import main
 
 from mozbuild.frontend.context import (
     ObjDirPath,
+    Path,
 )
 from mozbuild.frontend.data import (
     AndroidResDirs,
@@ -65,9 +66,9 @@ class TestEmitterBasic(unittest.TestCase):
         os.environ.clear()
         os.environ.update(self._old_env)
 
-    def reader(self, name):
+    def reader(self, name, enable_tests=False):
         config = MockConfig(mozpath.join(data_path, name), extra_substs=dict(
-            ENABLE_TESTS='1',
+            ENABLE_TESTS='1' if enable_tests else '',
             BIN_SUFFIX='.prog',
             OS_TARGET='WINNT',
         ))
@@ -95,14 +96,11 @@ class TestEmitterBasic(unittest.TestCase):
 
         for o in objs:
             self.assertIsInstance(o, DirectoryTraversal)
-            self.assertEqual(o.test_dirs, [])
             self.assertTrue(os.path.isabs(o.context_main_path))
             self.assertEqual(len(o.context_all_paths), 1)
 
         reldirs = [o.relativedir for o in objs]
         self.assertEqual(reldirs, ['', 'foo', 'foo/biz', 'bar'])
-
-        self.assertEqual(objs[3].affected_tiers, {'misc'})
 
         dirs = [[d.full_path for d in o.dirs] for o in objs]
         self.assertEqual(dirs, [
@@ -115,6 +113,24 @@ class TestEmitterBasic(unittest.TestCase):
 
     def test_traversal_all_vars(self):
         reader = self.reader('traversal-all-vars')
+        objs = self.read_topsrcdir(reader, filter_common=False)
+        self.assertEqual(len(objs), 2)
+
+        for o in objs:
+            self.assertIsInstance(o, DirectoryTraversal)
+
+        reldirs = set([o.relativedir for o in objs])
+        self.assertEqual(reldirs, set(['', 'regular']))
+
+        for o in objs:
+            reldir = o.relativedir
+
+            if reldir == '':
+                self.assertEqual([d.full_path for d in o.dirs], [
+                    mozpath.join(reader.config.topsrcdir, 'regular')])
+
+    def test_traversal_all_vars_enable_tests(self):
+        reader = self.reader('traversal-all-vars', enable_tests=True)
         objs = self.read_topsrcdir(reader, filter_common=False)
         self.assertEqual(len(objs), 3)
 
@@ -129,8 +145,7 @@ class TestEmitterBasic(unittest.TestCase):
 
             if reldir == '':
                 self.assertEqual([d.full_path for d in o.dirs], [
-                    mozpath.join(reader.config.topsrcdir, 'regular')])
-                self.assertEqual([d.full_path for d in o.test_dirs], [
+                    mozpath.join(reader.config.topsrcdir, 'regular'),
                     mozpath.join(reader.config.topsrcdir, 'test')])
 
     def test_config_file_substitution(self):
@@ -683,7 +698,7 @@ class TestEmitterBasic(unittest.TestCase):
         self.assertEqual(len(objs), 1)
         for obj in objs:
             self.assertIsInstance(obj, JARManifest)
-            self.assertTrue(os.path.isabs(obj.path))
+            self.assertIsInstance(obj.path, Path)
 
     def test_jar_manifests_multiple_files(self):
         with self.assertRaisesRegexp(SandboxValidationError, 'limited to one value'):
@@ -718,7 +733,7 @@ class TestEmitterBasic(unittest.TestCase):
         }
         defines = {}
         for lib in libraries:
-            defines[lib.basename] = ' '.join(lib.defines.get_defines())
+            defines[lib.basename] = ' '.join(lib.lib_defines.get_defines())
         self.assertEqual(expected, defines)
 
     def test_sources(self):

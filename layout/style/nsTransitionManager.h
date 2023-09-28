@@ -10,6 +10,7 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/ContentEvents.h"
+#include "mozilla/EffectCompositor.h" // For EffectCompositor::CascadeLevel
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/Animation.h"
 #include "mozilla/dom/KeyframeEffect.h"
@@ -114,8 +115,6 @@ public:
 
   void CancelFromStyle() override
   {
-    mOwningElement = OwningElementRef();
-
     // The animation index to use for compositing will be established when
     // this transition next transitions out of the idle state but we still
     // update it now so that the sort order of this transition remains
@@ -126,6 +125,13 @@ public:
     mNeedsNewAnimationIndexWhenRun = true;
 
     Animation::CancelFromStyle();
+
+    // It is important we do this *after* calling CancelFromStyle().
+    // This is because CancelFromStyle() will end up posting a restyle and
+    // that restyle should target the *transitions* level of the cascade.
+    // However, once we clear the owning element, CascadeLevel() will begin
+    // returning CascadeLevel::Animations.
+    mOwningElement = OwningElementRef();
   }
 
   void Tick() override;
@@ -133,6 +139,13 @@ public:
   nsCSSProperty TransitionProperty() const;
 
   bool HasLowerCompositeOrderThan(const Animation& aOther) const override;
+  EffectCompositor::CascadeLevel CascadeLevel() const override
+  {
+    return IsTiedToMarkup() ?
+           EffectCompositor::CascadeLevel::Transitions :
+           EffectCompositor::CascadeLevel::Animations;
+  }
+
   void SetCreationSequence(uint64_t aIndex)
   {
     MOZ_ASSERT(IsTiedToMarkup());
@@ -159,7 +172,6 @@ protected:
   }
 
   // Animation overrides
-  CommonAnimationManager* GetAnimationManager() const override;
   void UpdateTiming(SeekFlag aSeekFlag,
                     SyncNotifyFlag aSyncNotifyFlag) override;
 
@@ -275,13 +287,6 @@ public:
   void PruneCompletedTransitions(mozilla::dom::Element* aElement,
                                  nsCSSPseudoElements::Type aPseudoType,
                                  nsStyleContext* aNewStyleContext);
-
-  void UpdateCascadeResultsWithTransitions(AnimationCollection* aTransitions);
-  void UpdateCascadeResultsWithAnimations(AnimationCollection* aAnimations);
-  void UpdateCascadeResultsWithAnimationsToBeDestroyed(
-         const AnimationCollection* aAnimations);
-  void UpdateCascadeResults(AnimationCollection* aTransitions,
-                            AnimationCollection* aAnimations);
 
   void SetInAnimationOnlyStyleUpdate(bool aInAnimationOnlyUpdate) {
     mInAnimationOnlyStyleUpdate = aInAnimationOnlyUpdate;

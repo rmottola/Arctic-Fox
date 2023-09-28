@@ -248,10 +248,8 @@ struct ContainerLayerAttributes {
   float presShellResolution;
   bool scaleToResolution;
   EventRegionsOverride eventRegionsOverride;
-  // This is a bare pointer; LayerTransactionParent::RecvUpdate prevents this
-  // from being used when !IsSameProcess(), but we should make this truly
-  // cross process at some point by passing the HMDConfig
-  uint64_t hmdInfo;
+  uint32_t hmdDeviceID;
+  int32_t inputFrameID;
 };
 struct ColorLayerAttributes     { LayerColor color; IntRect bounds; };
 struct CanvasLayerAttributes    { Filter filter; IntRect bounds; };
@@ -396,6 +394,7 @@ struct TimedTexture {
   IntRect picture;
   uint32_t frameID;
   uint32_t producerID;
+  int32_t inputFrameID;
 };
 
 /**
@@ -474,6 +473,12 @@ union Edit {
   CompositableOperation;
 };
 
+// Operations related to destroying resources, always handled after the other
+// operations for safety.
+union OpDestroy {
+  PTexture;
+  PCompositable;
+};
 
 // Replies to operations
 

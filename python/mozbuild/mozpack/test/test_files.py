@@ -625,6 +625,8 @@ class TestManifestFile(TestWithTmpDir):
         f = ManifestFile('chrome')
         f.add(ManifestContent('chrome', 'global', 'toolkit/content/global/'))
         f.add(ManifestResource('chrome', 'gre-resources', 'toolkit/res/'))
+        f.add(ManifestResource('chrome/pdfjs', 'pdfjs', './'))
+        f.add(ManifestContent('chrome/pdfjs', 'pdfjs', 'pdfjs'))
         f.add(ManifestLocale('chrome', 'browser', 'en-US',
                              'en-US/locale/browser/'))
 
@@ -632,6 +634,8 @@ class TestManifestFile(TestWithTmpDir):
         self.assertEqual(open(self.tmppath('chrome.manifest')).readlines(), [
             'content global toolkit/content/global/\n',
             'resource gre-resources toolkit/res/\n',
+            'resource pdfjs pdfjs/\n',
+            'content pdfjs pdfjs/pdfjs\n',
             'locale browser en-US en-US/locale/browser/\n',
         ])
 

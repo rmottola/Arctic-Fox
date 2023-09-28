@@ -190,8 +190,15 @@ public:
   // Always returns true if plugin.allowed_types is not set
   static bool IsTypeWhitelisted(const char *aType);
 
+  // Helper that checks if a plugin of a given MIME type can be loaded by the
+  // parent process. It checks the plugin.load_in_parent_process.<mime> pref.
+  // Always returns false if plugin.load_in_parent_process.<mime> is not set.
+  static bool ShouldLoadTypeInParent(const nsACString& aMimeType);
+
   // checks whether aType is a type we recognize for potential special handling
   enum SpecialType { eSpecialType_None,
+                     // Needed to whitelist for async init support
+                     eSpecialType_Test,
                      // Informs some decisions about OOP and quirks
                      eSpecialType_Flash,
                      // Binds to the <applet> tag, has various special
@@ -361,6 +368,8 @@ private:
   // from the chrome process.
   uint32_t ChromeEpochForContent();
   void SetChromeEpochForContent(uint32_t aEpoch);
+
+  void UpdateInMemoryPluginInfo(nsPluginTag* aPluginTag);
 
   // On certain platforms, we only want to load certain plugins. This function
   // centralizes loading rules.

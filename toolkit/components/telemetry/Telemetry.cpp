@@ -11,10 +11,12 @@
 #include <prio.h>
 
 #include "mozilla/dom/ToJSValue.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MathAlgorithms.h"
+#include "mozilla/unused.h"
 
 #include "base/histogram.h"
 #include "base/pickle.h"
@@ -840,6 +842,9 @@ public:
   nsresult GetJSSnapshot(JSContext* cx, JS::Handle<JSObject*> obj,
                          bool subsession, bool clearSubsession);
 
+  void SetRecordingEnabled(bool aEnabled) { mRecordingEnabled = aEnabled; };
+  bool IsRecordingEnabled() const { return mRecordingEnabled; };
+
   nsresult Add(const nsCString& key, uint32_t aSample);
   void Clear(bool subsession);
 
@@ -862,6 +867,7 @@ private:
   const uint32_t mMax;
   const uint32_t mBucketCount;
   const uint32_t mDataset;
+  mozilla::Atomic<bool, mozilla::Relaxed> mRecordingEnabled;
 };
 
 // Hardcoded probes
@@ -873,7 +879,6 @@ struct TelemetryHistogram {
   uint32_t id_offset;
   uint32_t expiration_offset;
   uint32_t dataset;
-  bool extendedStatisticsOK;
   bool keyed;
 
   const char *id() const;
@@ -893,6 +898,31 @@ const char *
 TelemetryHistogram::expiration() const
 {
   return &gHistogramStringTable[this->expiration_offset];
+}
+
+bool
+IsHistogramEnumId(Telemetry::ID aID)
+{
+  static_assert(((Telemetry::ID)-1 > 0), "ID should be unsigned.");
+  return aID < Telemetry::HistogramCount;
+}
+
+// List of histogram IDs which should have recording disabled initially.
+const Telemetry::ID kRecordingInitiallyDisabledIDs[] = {
+  Telemetry::FX_REFRESH_DRIVER_SYNC_SCROLL_FRAME_DELAY_MS,
+
+  // The array must not be empty. Leave these item here.
+  Telemetry::TELEMETRY_TEST_COUNT_INIT_NO_RECORD,
+  Telemetry::TELEMETRY_TEST_KEYED_COUNT_INIT_NO_RECORD
+};
+
+void
+InitHistogramRecordingEnabled()
+{
+  const size_t length = mozilla::ArrayLength(kRecordingInitiallyDisabledIDs);
+  for (size_t i = 0; i < length; i++) {
+    SetHistogramRecordingEnabled(kRecordingInitiallyDisabledIDs[i], false);
+  }
 }
 
 bool
@@ -1057,9 +1087,6 @@ GetHistogramByEnumId(Telemetry::ID id, Histogram **ret)
   }
 #endif
 
-  if (p.extendedStatisticsOK) {
-    h->SetFlags(Histogram::kExtendedStatisticsFlag);
-  }
   *ret = knownHistograms[id] = h;
   return NS_OK;
 }
@@ -1142,7 +1169,7 @@ nsresult
 HistogramAdd(Histogram& histogram, int32_t value, uint32_t dataset)
 {
   // Check if we are allowed to record the data.
-  if (!CanRecordDataset(dataset)) {
+  if (!CanRecordDataset(dataset) || !histogram.IsRecordingEnabled()) {
     return NS_OK;
   }
 
@@ -1195,27 +1222,28 @@ enum reflectStatus
 ReflectHistogramAndSamples(JSContext *cx, JS::Handle<JSObject*> obj, Histogram *h,
                            const Histogram::SampleSet &ss)
 {
+  mozilla::OffTheBooksMutexAutoLock locker(ss.mutex());
+
   // We don't want to reflect corrupt histograms.
-  if (h->FindCorruption(ss) != Histogram::NO_INCONSISTENCIES) {
+  if (h->FindCorruption(ss, locker) != Histogram::NO_INCONSISTENCIES) {
     return REFLECT_CORRUPT;
   }
 
-  if (!(JS_DefineProperty(cx, obj, "min", h->declared_min(), JSPROP_ENUMERATE)
-        && JS_DefineProperty(cx, obj, "max", h->declared_max(), JSPROP_ENUMERATE)
-        && JS_DefineProperty(cx, obj, "histogram_type", h->histogram_type(), JSPROP_ENUMERATE)
-        && JS_DefineProperty(cx, obj, "sum", double(ss.sum()), JSPROP_ENUMERATE))) {
+  if (!(JS_DefineProperty(cx, obj, "min",
+                          h->declared_min(), JSPROP_ENUMERATE)
+        && JS_DefineProperty(cx, obj, "max",
+                             h->declared_max(), JSPROP_ENUMERATE)
+        && JS_DefineProperty(cx, obj, "histogram_type",
+                             h->histogram_type(), JSPROP_ENUMERATE)
+        && JS_DefineProperty(cx, obj, "sum",
+                             double(ss.sum(locker)), JSPROP_ENUMERATE))) {
     return REFLECT_FAILURE;
   }
 
-  if (h->histogram_type() == Histogram::HISTOGRAM) {
-    if (!(JS_DefineProperty(cx, obj, "log_sum", ss.log_sum(), JSPROP_ENUMERATE)
-          && JS_DefineProperty(cx, obj, "log_sum_squares", ss.log_sum_squares(), JSPROP_ENUMERATE))) {
-      return REFLECT_FAILURE;
-    }
-  } else {
+  if (h->histogram_type() != Histogram::HISTOGRAM) {
     // Export |sum_squares| as two separate 32-bit properties so that we
     // can accurately reconstruct it on the analysis side.
-    uint64_t sum_squares = ss.sum_squares();
+    uint64_t sum_squares = ss.sum_squares(locker);
     // Cast to avoid implicit truncation warnings.
     uint32_t lo = static_cast<uint32_t>(sum_squares);
     uint32_t hi = static_cast<uint32_t>(sum_squares >> 32);
@@ -1243,7 +1271,8 @@ ReflectHistogramAndSamples(JSContext *cx, JS::Handle<JSObject*> obj, Histogram *
     return REFLECT_FAILURE;
   }
   for (size_t i = 0; i < count; i++) {
-    if (!JS_DefineElement(cx, counts_array, i, ss.counts(i), JSPROP_ENUMERATE)) {
+    if (!JS_DefineElement(cx, counts_array, i,
+                          ss.counts(locker, i), JSPROP_ENUMERATE)) {
       return REFLECT_FAILURE;
     }
   }
@@ -1265,7 +1294,8 @@ IsEmpty(const Histogram *h)
   Histogram::SampleSet ss;
   h->SnapshotSample(&ss);
 
-  return ss.counts(0) == 0 && ss.sum() == 0;
+  mozilla::OffTheBooksMutexAutoLock locker(ss.mutex());
+  return ss.counts(locker, 0) == 0 && ss.sum(locker) == 0;
 }
 
 bool
@@ -1925,6 +1955,11 @@ mFailedLockCount(0)
     mKeyedHistograms.Put(id, new KeyedHistogram(id, expiration, h.histogramType,
                                                 h.min, h.max, h.bucketCount, h.dataset));
   }
+
+  // Setup of the initial recording-enabled state (for not-recording-by-default
+  // histograms) using InitHistogramRecordingEnabled() will happen after instantiating
+  // sTelemetry since it depends on the static GetKeyedHistogramById(...) - which
+  // uses the singleton instance at sTelemetry.
 }
 
 TelemetryImpl::~TelemetryImpl() {
@@ -1951,7 +1986,6 @@ TelemetryImpl::NewHistogram(const nsACString &name, const nsACString &expiration
   if (NS_FAILED(rv))
     return rv;
   h->ClearFlags(Histogram::kUmaTargetedHistogramFlag);
-  h->SetFlags(Histogram::kExtendedStatisticsFlag);
   return WrapAndReturnHistogram(h, cx, ret);
 }
 
@@ -2106,7 +2140,13 @@ TelemetryImpl::IdentifyCorruptHistograms(StatisticsRecorder::Histograms &hs)
 
     Histogram::SampleSet ss;
     h->SnapshotSample(&ss);
-    Histogram::Inconsistencies check = h->FindCorruption(ss);
+
+    Histogram::Inconsistencies check;
+    {
+      mozilla::OffTheBooksMutexAutoLock locker(ss.mutex());
+      check = h->FindCorruption(ss, locker);
+    }
+
     bool corrupt = (check != Histogram::NO_INCONSISTENCIES);
 
     if (corrupt) {
@@ -2266,6 +2306,25 @@ TelemetryImpl::UnregisterAddonHistograms(const nsACString &id)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+TelemetryImpl::SetHistogramRecordingEnabled(const nsACString &id, bool aEnabled)
+{
+  Histogram *h;
+  nsresult rv = GetHistogramByName(id, &h);
+  if (NS_SUCCEEDED(rv)) {
+    h->SetRecordingEnabled(aEnabled);
+    return NS_OK;
+  }
+
+  KeyedHistogram* keyed = GetKeyedHistogramById(id);
+  if (keyed) {
+    keyed->SetRecordingEnabled(aEnabled);
+    return NS_OK;
+  }
+
+  return NS_ERROR_FAILURE;
+}
+
 nsresult
 TelemetryImpl::CreateHistogramSnapshots(JSContext *cx,
                                         JS::MutableHandle<JS::Value> ret,
@@ -2290,7 +2349,7 @@ TelemetryImpl::CreateHistogramSnapshots(JSContext *cx,
       DebugOnly<nsresult> rv = GetHistogramByEnumId(Telemetry::ID(i), &h);
       MOZ_ASSERT(NS_SUCCEEDED(rv));
     }
-  };
+  }
 
   StatisticsRecorder::Histograms hs;
   StatisticsRecorder::GetHistograms(&hs);
@@ -2873,10 +2932,8 @@ CreateJSTimeHistogram(JSContext* cx, const Telemetry::TimeHistogram& time)
                          JSPROP_ENUMERATE)) {
     return nullptr;
   }
-  // TODO: calculate "sum", "log_sum", and "log_sum_squares"
-  if (!JS_DefineProperty(cx, ret, "sum", 0, JSPROP_ENUMERATE) ||
-      !JS_DefineProperty(cx, ret, "log_sum", 0.0, JSPROP_ENUMERATE) ||
-      !JS_DefineProperty(cx, ret, "log_sum_squares", 0.0, JSPROP_ENUMERATE)) {
+  // TODO: calculate "sum"
+  if (!JS_DefineProperty(cx, ret, "sum", 0, JSPROP_ENUMERATE)) {
     return nullptr;
   }
 
@@ -3306,6 +3363,7 @@ TelemetryImpl::CreateTelemetryInstance()
   nsCOMPtr<nsITelemetry> ret = sTelemetry;
 
   sTelemetry->InitMemoryReporter();
+  InitHistogramRecordingEnabled(); // requires sTelemetry to exist
 
   return ret.forget();
 }
@@ -3627,7 +3685,8 @@ TelemetryImpl::RecordThreadHangStats(Telemetry::ThreadHangStats& aStats)
 
   MutexAutoLock autoLock(sTelemetry->mThreadHangStatsMutex);
 
-  sTelemetry->mThreadHangStats.append(Move(aStats));
+  // Ignore OOM.
+  mozilla::Unused << sTelemetry->mThreadHangStats.append(Move(aStats));
 }
 
 NS_IMPL_ISUPPORTS(TelemetryImpl, nsITelemetry, nsIMemoryReporter)
@@ -3795,6 +3854,34 @@ RecordShutdownEndTimeStamp() {
 }
 
 namespace Telemetry {
+
+// The external API for controlling recording state
+void
+SetHistogramRecordingEnabled(ID aID, bool aEnabled)
+{
+  if (!IsHistogramEnumId(aID)) {
+    MOZ_ASSERT(false, "Telemetry::SetHistogramRecordingEnabled(...) must be used with an enum id");
+    return;
+  }
+
+  if (gHistograms[aID].keyed) {
+    const nsDependentCString id(gHistograms[aID].id());
+    KeyedHistogram* keyed = TelemetryImpl::GetKeyedHistogramById(id);
+    if (keyed) {
+      keyed->SetRecordingEnabled(aEnabled);
+      return;
+    }
+  } else {
+    Histogram *h;
+    nsresult rv = GetHistogramByEnumId(aID, &h);
+    if (NS_SUCCEEDED(rv)) {
+      h->SetRecordingEnabled(aEnabled);
+      return;
+    }
+  }
+
+  MOZ_ASSERT(false, "Telemetry::SetHistogramRecordingEnabled(...) id not found");
+}
 
 void
 Accumulate(ID aHistogram, uint32_t aSample)
@@ -4282,6 +4369,7 @@ KeyedHistogram::KeyedHistogram(const nsACString &name, const nsACString &expirat
   , mMax(max)
   , mBucketCount(bucketCount)
   , mDataset(dataset)
+  , mRecordingEnabled(true)
 {
 }
 
@@ -4319,7 +4407,6 @@ KeyedHistogram::GetHistogram(const nsCString& key, Histogram** histogram,
   }
 
   h->ClearFlags(Histogram::kUmaTargetedHistogramFlag);
-  h->SetFlags(Histogram::kExtendedStatisticsFlag);
   *histogram = h;
 
   entry = map.PutEntry(key);
@@ -4368,6 +4455,10 @@ KeyedHistogram::Add(const nsCString& key, uint32_t sample)
     return NS_ERROR_FAILURE;
   }
 #endif
+
+  if (!IsRecordingEnabled()) {
+    return NS_OK;
+  }
 
   histogram->Add(sample);
 #if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)

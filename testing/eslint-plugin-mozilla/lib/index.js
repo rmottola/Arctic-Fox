@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
+
 "use strict";
 
 //------------------------------------------------------------------------------
@@ -12,14 +13,25 @@
 //------------------------------------------------------------------------------
 
 module.exports = {
+  processors: {
+    ".xml": require("../lib/processors/xbl-bindings"),
+  },
   rules: {
+    "balanced-listeners": require("../lib/rules/balanced-listeners"),
     "components-imports": require("../lib/rules/components-imports"),
     "import-headjs-globals": require("../lib/rules/import-headjs-globals"),
-    "mark-test-function-used": require("../lib/rules/mark-test-function-used")
+    "mark-test-function-used": require("../lib/rules/mark-test-function-used"),
+    "no-aArgs": require("../lib/rules/no-aArgs"),
+    "no-cpows-in-tests": require("../lib/rules/no-cpows-in-tests"),
+    "var-only-at-top-level": require("../lib/rules/var-only-at-top-level")
   },
   rulesConfig: {
+    "balanced-listeners": 0,
     "components-imports": 0,
     "import-headjs-globals": 0,
-    "mark-test-function-used": 0
+    "mark-test-function-used": 0,
+    "no-aArgs": 0,
+    "no-cpows-in-tests": 0,
+    "var-only-at-top-level": 0
   }
 };

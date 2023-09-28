@@ -37,7 +37,6 @@ LOCAL_INCLUDES += [
     'skia/include/gpu',
     'skia/include/images',
     'skia/include/pathops',
-    'skia/include/pipe',
     'skia/include/ports',
     'skia/include/private',
     'skia/include/utils',
@@ -69,6 +68,10 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] in {
   } or CONFIG['MOZ_WIDGET_GTK']:
     DEFINES['SK_FONTHOST_DOES_NOT_USE_FONTMGR'] = 1
 
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
+    DEFINES['UNICODE'] = True
+    DEFINES['_UNICODE'] = True
+
 # We should autogenerate these SSE related flags.
 
 if CONFIG['_MSC_VER']:
@@ -79,6 +82,7 @@ if CONFIG['_MSC_VER']:
     SOURCES['skia/src/opts/SkBitmapProcState_opts_SSSE3.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=31']
     SOURCES['skia/src/opts/SkBlitRow_opts_SSE2.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=20']
     SOURCES['skia/src/opts/SkBlitRow_opts_SSE4.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=41']
+    SOURCES['skia/src/opts/SkOpts_sse2.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=20']
     SOURCES['skia/src/opts/SkOpts_ssse3.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=31']
     SOURCES['skia/src/opts/SkOpts_sse41.cpp'].flags += ['/arch:SSE2 -DSK_CPU_SSE_LEVEL=41']
     SOURCES['skia/src/opts/SkOpts_avx.cpp'].flags += ['/arch:AVX -DSK_CPU_SSE_LEVEL=51']
@@ -88,6 +92,7 @@ if CONFIG['INTEL_ARCHITECTURE'] and CONFIG['GNU_CC']:
     SOURCES['skia/src/opts/SkBitmapProcState_opts_SSSE3.cpp'].flags += ['-mssse3']
     SOURCES['skia/src/opts/SkBlitRow_opts_SSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
     SOURCES['skia/src/opts/SkBlitRow_opts_SSE4.cpp'].flags += ['-msse4.1']
+    SOURCES['skia/src/opts/SkOpts_sse2.cpp'].flags += CONFIG['SSE2_FLAGS']
     SOURCES['skia/src/opts/SkOpts_ssse3.cpp'].flags += ['-mssse3']
     SOURCES['skia/src/opts/SkOpts_sse41.cpp'].flags += ['-msse4.1']
     SOURCES['skia/src/opts/SkOpts_avx.cpp'].flags += ['-mavx']
@@ -100,31 +105,34 @@ elif CONFIG['CLANG_CL']:
     SOURCES['skia/src/opts/SkOpts_sse41.cpp'].flags += ['-msse4.1']
     SOURCES['skia/src/opts/SkOpts_avx.cpp'].flags += ['-mavx']
 
+if CONFIG['GNU_CXX'] and CONFIG['CPU_ARCH'] == 'arm':
+    SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += ['-fomit-frame-pointer']
+
 DEFINES['SKIA_IMPLEMENTATION'] = 1
 
-if CONFIG['GNU_CXX']:
+if not CONFIG['MOZ_ENABLE_SKIA_GPU']:
+    DEFINES['SK_SUPPORT_GPU'] = 0
+
+# Suppress warnings in third-party code.
+if CONFIG['GNU_CXX'] or CONFIG['CLANG_CL']:
     CXXFLAGS += [
         '-Wno-deprecated-declarations',
         '-Wno-overloaded-virtual',
         '-Wno-sign-compare',
         '-Wno-unused-function',
     ]
-    if CONFIG['CLANG_CXX']:
-        CXXFLAGS += [
-            '-Wno-implicit-fallthrough',
-            '-Wno-inconsistent-missing-override',
-            '-Wno-macro-redefined',
-            '-Wno-unused-private-field',
-        ]
-        # work around inline function linking bug with template arguments
-        SOURCES['skia/src/gpu/GrResourceCache.cpp'].flags += ['-fkeep-inline-functions']
-    else:
-        CXXFLAGS += [
-            '-Wno-logical-op',
-            '-Wno-maybe-uninitialized',
-        ]
-    if CONFIG['CPU_ARCH'] == 'arm':
-        SOURCES['skia/src/opts/SkBlitRow_opts_arm.cpp'].flags += ['-fomit-frame-pointer']
+if CONFIG['GNU_CXX'] and not CONFIG['CLANG_CXX'] and not CONFIG['CLANG_CL']:
+    CXXFLAGS += [
+        '-Wno-logical-op',
+        '-Wno-maybe-uninitialized',
+    ]
+if CONFIG['CLANG_CXX'] or CONFIG['CLANG_CL']:
+    CXXFLAGS += [
+        '-Wno-implicit-fallthrough',
+        '-Wno-inconsistent-missing-override',
+        '-Wno-macro-redefined',
+        '-Wno-unused-private-field',
+    ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'android', 'gonk', 'qt'):
     CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
@@ -218,6 +226,7 @@ def generate_separated_sources(platform_sources):
     'intel': {
       # There is currently no x86-specific opt for SkTextureCompression
       'skia/src/opts/opts_check_x86.cpp',
+      'skia/src/opts/SkOpts_sse2.cpp',
       'skia/src/opts/SkOpts_ssse3.cpp',
       'skia/src/opts/SkOpts_sse41.cpp',
       'skia/src/opts/SkOpts_avx.cpp',
@@ -229,7 +238,8 @@ def generate_separated_sources(platform_sources):
       'skia/src/opts/SkOpts_neon.cpp',
       'skia/src/opts/SkBitmapProcState_arm_neon.cpp',
     },
-    'none': set()
+    'none': set(),
+    'gpu': set()
   })
 
   for plat in platform_sources.keys():
@@ -250,6 +260,8 @@ def generate_separated_sources(platform_sources):
         key = 'arm'
       elif '_none' in value:
         key = 'none'
+      elif 'gpu' in value or 'Gpu' in value:
+        key = 'gpu'
       elif all(value in platform_sources.get(p, {})
                for p in platforms if p != plat):
         key = 'common'
@@ -359,6 +371,9 @@ def write_mozbuild(sources):
   f.write(header)
 
   write_sources(f, sources['common'], 0)
+
+  f.write("if CONFIG['MOZ_ENABLE_SKIA_GPU']:\n")
+  write_sources(f, sources['gpu'], 4)
 
   f.write("if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gonk'):\n")
   write_sources(f, sources['android'], 4)

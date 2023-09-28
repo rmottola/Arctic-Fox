@@ -5,6 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "jscompartment.h"
 #include "jsfriendapi.h"
 
 #include "jsapi-tests/tests.h"
@@ -39,22 +40,36 @@ BEGIN_TEST(testTypedArrays)
         bool isShared;
         CHECK_EQUAL(JS_GetArrayBufferByteLength(buffer), nbytes);
         memset(JS_GetArrayBufferData(buffer, &isShared, nogc), 1, nbytes);
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK(!isShared);  // Because ArrayBuffer
     }
 
     ok = ok &&
-        TestArrayFromBuffer<JS_NewInt8ArrayWithBuffer, JS_NewInt8ArrayFromArray, int8_t, JS_GetInt8ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewUint8ArrayWithBuffer, JS_NewUint8ArrayFromArray, uint8_t, JS_GetUint8ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewUint8ClampedArrayWithBuffer, JS_NewUint8ClampedArrayFromArray, uint8_t, JS_GetUint8ClampedArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewInt16ArrayWithBuffer, JS_NewInt16ArrayFromArray, int16_t, JS_GetInt16ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewUint16ArrayWithBuffer, JS_NewUint16ArrayFromArray, uint16_t, JS_GetUint16ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewInt32ArrayWithBuffer, JS_NewInt32ArrayFromArray, int32_t, JS_GetInt32ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewUint32ArrayWithBuffer, JS_NewUint32ArrayFromArray, uint32_t, JS_GetUint32ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewFloat32ArrayWithBuffer, JS_NewFloat32ArrayFromArray, float, JS_GetFloat32ArrayData>(cx) &&
-        TestArrayFromBuffer<JS_NewFloat64ArrayWithBuffer, JS_NewFloat64ArrayFromArray, double, JS_GetFloat64ArrayData>(cx);
+        TestArrayFromBuffer<JS_NewInt8ArrayWithBuffer, JS_NewInt8ArrayFromArray, int8_t, false, JS_GetInt8ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint8ArrayWithBuffer, JS_NewUint8ArrayFromArray, uint8_t, false, JS_GetUint8ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint8ClampedArrayWithBuffer, JS_NewUint8ClampedArrayFromArray, uint8_t, false, JS_GetUint8ClampedArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewInt16ArrayWithBuffer, JS_NewInt16ArrayFromArray, int16_t, false, JS_GetInt16ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint16ArrayWithBuffer, JS_NewUint16ArrayFromArray, uint16_t, false, JS_GetUint16ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewInt32ArrayWithBuffer, JS_NewInt32ArrayFromArray, int32_t, false, JS_GetInt32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint32ArrayWithBuffer, JS_NewUint32ArrayFromArray, uint32_t, false, JS_GetUint32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewFloat32ArrayWithBuffer, JS_NewFloat32ArrayFromArray, float, false, JS_GetFloat32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewFloat64ArrayWithBuffer, JS_NewFloat64ArrayFromArray, double, false, JS_GetFloat64ArrayData>(cx);
+
+    ok = ok &&
+        TestArrayFromBuffer<JS_NewInt8ArrayWithBuffer, JS_NewInt8ArrayFromArray, int8_t, true, JS_GetInt8ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint8ArrayWithBuffer, JS_NewUint8ArrayFromArray, uint8_t, true, JS_GetUint8ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint8ClampedArrayWithBuffer, JS_NewUint8ClampedArrayFromArray, uint8_t, true, JS_GetUint8ClampedArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewInt16ArrayWithBuffer, JS_NewInt16ArrayFromArray, int16_t, true, JS_GetInt16ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint16ArrayWithBuffer, JS_NewUint16ArrayFromArray, uint16_t, true, JS_GetUint16ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewInt32ArrayWithBuffer, JS_NewInt32ArrayFromArray, int32_t, true, JS_GetInt32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewUint32ArrayWithBuffer, JS_NewUint32ArrayFromArray, uint32_t, true, JS_GetUint32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewFloat32ArrayWithBuffer, JS_NewFloat32ArrayFromArray, float, true, JS_GetFloat32ArrayData>(cx) &&
+        TestArrayFromBuffer<JS_NewFloat64ArrayWithBuffer, JS_NewFloat64ArrayFromArray, double, true, JS_GetFloat64ArrayData>(cx);
 
     return ok;
 }
+
+// Shared memory can only be mapped by a TypedArray by creating the
+// TypedArray with a SharedArrayBuffer explicitly, so no tests here.
 
 template<JSObject* Create(JSContext*, uint32_t),
          typename Element,
@@ -82,7 +97,7 @@ TestPlainTypedArray(JSContext* cx)
         Element* data;
         bool isShared;
         CHECK(data = GetData(array, &isShared, nogc));
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK(!isShared);  // Because ArrayBuffer
         *data = 13;
     }
     RootedValue v(cx);
@@ -95,18 +110,25 @@ TestPlainTypedArray(JSContext* cx)
 template<JSObject* CreateWithBuffer(JSContext*, JS::HandleObject, uint32_t, int32_t),
          JSObject* CreateFromArray(JSContext*, JS::HandleObject),
          typename Element,
+         bool Shared,
          Element* GetData(JSObject*, bool*, const JS::AutoCheckCannotGC&)>
 bool
 TestArrayFromBuffer(JSContext* cx)
 {
+    if (Shared && !cx->compartment()->creationOptions().getSharedMemoryAndAtomicsEnabled())
+        return true;
+
     size_t elts = 8;
     size_t nbytes = elts * sizeof(Element);
-    RootedObject buffer(cx, JS_NewArrayBuffer(cx, nbytes));
+    RootedObject buffer(cx, Shared ? JS_NewSharedArrayBuffer(cx, nbytes)
+                                   : JS_NewArrayBuffer(cx, nbytes));
     {
         JS::AutoCheckCannotGC nogc;
         bool isShared;
-        memset(JS_GetArrayBufferData(buffer, &isShared, nogc), 1, nbytes);
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        void* data = Shared ? JS_GetSharedArrayBufferData(buffer, &isShared, nogc)
+                            : JS_GetArrayBufferData(buffer, &isShared, nogc);
+        CHECK_EQUAL(Shared, isShared);
+        memset(data, 1, nbytes);
     }
 
     {
@@ -121,18 +143,22 @@ TestArrayFromBuffer(JSContext* cx)
     {
         bool isShared;
         CHECK_EQUAL(JS_GetArrayBufferViewBuffer(cx, array, &isShared), (JSObject*) buffer);
+        CHECK_EQUAL(Shared, isShared);
     }
 
     {
         JS::AutoCheckCannotGC nogc;
         Element* data;
         bool isShared;
-        CHECK(data = GetData(array, &isShared, nogc));
-        CHECK_EQUAL((void*) data, (void*) JS_GetArrayBufferData(buffer, &isShared, nogc));
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
 
-        CHECK_EQUAL(*reinterpret_cast<uint8_t*>(JS_GetArrayBufferData(buffer, &isShared, nogc)), 1u);
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK(data = GetData(array, &isShared, nogc));
+        CHECK_EQUAL(Shared, isShared);
+
+        CHECK_EQUAL((void*) data,
+                    Shared ? (void*) JS_GetSharedArrayBufferData(buffer, &isShared, nogc)
+                    : (void*) JS_GetArrayBufferData(buffer, &isShared, nogc));
+        CHECK_EQUAL(Shared, isShared);
+
         CHECK_EQUAL(*reinterpret_cast<uint8_t*>(data), 1u);
     }
 
@@ -159,7 +185,7 @@ TestArrayFromBuffer(JSContext* cx)
         Element* data;
         bool isShared;
         CHECK(data = GetData(array, &isShared, nogc));
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK_EQUAL(Shared, isShared);
         CHECK_EQUAL(long(v.toInt32()), long(reinterpret_cast<Element*>(data)[0]));
     }
 
@@ -174,7 +200,7 @@ TestArrayFromBuffer(JSContext* cx)
         Element* data;
         bool isShared;
         CHECK(data = GetData(array, &isShared, nogc));
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK_EQUAL(Shared, isShared);
         CHECK_EQUAL(long(v.toInt32()), long(reinterpret_cast<Element*>(data)[elts / 2]));
     }
 
@@ -189,7 +215,7 @@ TestArrayFromBuffer(JSContext* cx)
         Element* data;
         bool isShared;
         CHECK(data = GetData(array, &isShared, nogc));
-        MOZ_ASSERT(!isShared);  // Because ArrayBuffer
+        CHECK_EQUAL(Shared, isShared);
         CHECK_EQUAL(long(v.toInt32()), long(reinterpret_cast<Element*>(data)[elts - 1]));
     }
 

@@ -43,10 +43,10 @@
   justify-self: inherit;
   order: inherit;   /* needed for "order" to work on table flex/grid items */
   /* Bug 722777 */
-  -moz-transform: inherit;
-  -moz-transform-origin: inherit;
+  transform: inherit;
+  transform-origin: inherit;
   /* Bug 724750 */
-  -moz-backface-visibility: inherit;
+  backface-visibility: inherit;
   clip: inherit;
 }
 
@@ -282,8 +282,6 @@
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  z-index: 2147483647 !important;
-  background: black;
   width: 100% !important;
   height: 100% !important;
   margin: 0 !important;
@@ -292,12 +290,26 @@
   min-height: 0 !important;
   max-height: none !important;
   box-sizing: border-box !important;
+  object-fit: contain !important;
+  transform: none !important;
 }
 
 /* Selectors here should match the check in
  * nsViewportFrame.cpp:ShouldInTopLayerForFullscreen() */
 *|*:-moz-full-screen:not(:root):not(:-moz-browser-frame) {
   -moz-top-layer: top !important;
+}
+
+*|*::backdrop {
+  -moz-top-layer: top !important;
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  right: 0; bottom: 0;
+}
+
+*|*:-moz-full-screen:not(:root)::backdrop {
+  background: black;
 }
 
 /* XML parse error reporting */

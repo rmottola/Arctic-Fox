@@ -35,10 +35,8 @@ IdToObjectMap::init()
 void
 IdToObjectMap::trace(JSTracer* trc)
 {
-    for (Table::Range r(table_.all()); !r.empty(); r.popFront()) {
-        DebugOnly<JSObject*> prior = r.front().value().get();
-        JS_CallObjectTracer(trc, &r.front().value(), "ipc-object");
-    }
+    for (Table::Range r(table_.all()); !r.empty(); r.popFront())
+        JS::TraceEdge(trc, &r.front().value(), "ipc-object");
 }
 
 void
@@ -524,7 +522,7 @@ JavaScriptShared::findObjectById(JSContext* cx, const ObjectId& objId)
 static const uint64_t UnknownPropertyOp = 1;
 
 bool
-JavaScriptShared::fromDescriptor(JSContext* cx, Handle<JSPropertyDescriptor> desc,
+JavaScriptShared::fromDescriptor(JSContext* cx, Handle<PropertyDescriptor> desc,
                                  PPropertyDescriptor* out)
 {
     out->attrs() = desc.attributes();
@@ -580,7 +578,7 @@ UnknownStrictPropertyStub(JSContext* cx, HandleObject obj, HandleId id, MutableH
 
 bool
 JavaScriptShared::toDescriptor(JSContext* cx, const PPropertyDescriptor& in,
-                               MutableHandle<JSPropertyDescriptor> out)
+                               MutableHandle<PropertyDescriptor> out)
 {
     out.setAttributes(in.attrs());
     if (!fromVariant(cx, in.value(), out.value()))

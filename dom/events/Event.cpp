@@ -237,9 +237,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 JSObject*
 Event::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  if (mIsMainThreadEvent && !GetWrapperPreserveColor()) {
-    nsJSContext::LikelyShortLivingObjectCreated();
-  }
   return WrapObjectInternal(aCx, aGivenProto);
 }
 
@@ -936,7 +933,7 @@ Event::GetScreenCoords(nsPresContext* aPresContext,
     LayoutDevicePixel::ToAppUnits(aPoint, aPresContext->DeviceContext()->AppUnitsPerDevPixelAtUnitFullZoom());
 
   if (aPresContext->PresShell()) {
-    pt = pt.RemoveResolution(aPresContext->PresShell()->GetCumulativeScaleResolution());
+    pt = pt.RemoveResolution(aPresContext->PresShell()->GetCumulativeNonRootScaleResolution());
   }
 
   pt += LayoutDevicePixel::ToAppUnits(guiEvent->widget->WidgetToScreenOffset(),

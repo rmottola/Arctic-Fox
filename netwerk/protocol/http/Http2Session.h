@@ -11,6 +11,7 @@
 
 #include "ASpdySession.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/UniquePtr.h"
 #include "nsAHttpConnection.h"
 #include "nsClassHashtable.h"
 #include "nsDataHashtable.h"
@@ -294,21 +295,7 @@ private:
   // to track network I/O for timeout purposes
   nsresult   NetworkRead(nsAHttpSegmentWriter *, char *, uint32_t, uint32_t *);
 
-  static PLDHashOperator ShutdownEnumerator(nsAHttpTransaction *,
-                                            nsAutoPtr<Http2Stream> &,
-                                            void *);
-
-  static PLDHashOperator GoAwayEnumerator(nsAHttpTransaction *,
-                                          nsAutoPtr<Http2Stream> &,
-                                          void *);
-
-  static PLDHashOperator UpdateServerRwinEnumerator(nsAHttpTransaction *,
-                                                    nsAutoPtr<Http2Stream> &,
-                                                    void *);
-
-  static PLDHashOperator RestartBlockedOnRwinEnumerator(nsAHttpTransaction *,
-                                                        nsAutoPtr<Http2Stream> &,
-                                                        void *);
+  void Shutdown();
 
   // This is intended to be nsHttpConnectionMgr:nsConnectionHandle taken
   // from the first transaction on this session. That object contains the
@@ -361,7 +348,7 @@ private:
   // of header on data packets
   uint32_t             mInputFrameBufferSize; // buffer allocation
   uint32_t             mInputFrameBufferUsed; // amt of allocation used
-  nsAutoArrayPtr<char> mInputFrameBuffer;
+  UniquePtr<char[]>    mInputFrameBuffer;
 
   // mInputFrameDataSize/Read are used for tracking the amount of data consumed
   // in a frame after the 8 byte header. Control frames are always fully buffered
@@ -473,7 +460,7 @@ private:
   uint32_t             mOutputQueueSize;
   uint32_t             mOutputQueueUsed;
   uint32_t             mOutputQueueSent;
-  nsAutoArrayPtr<char> mOutputQueueBuffer;
+  UniquePtr<char[]>    mOutputQueueBuffer;
 
   PRIntervalTime       mPingThreshold;
   PRIntervalTime       mLastReadEpoch;     // used for ping timeouts

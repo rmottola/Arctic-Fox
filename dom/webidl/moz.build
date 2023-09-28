@@ -591,6 +591,7 @@ WEBIDL_FILES = [
     'WebComponents.webidl',
     'WebGL2RenderingContext.webidl',
     'WebGLRenderingContext.webidl',
+    'WebKitCSSMatrix.webidl',
     'WebSocket.webidl',
     'WheelEvent.webidl',
     'WifiOptions.webidl',
@@ -837,6 +838,7 @@ if CONFIG['MOZ_WEBRTC']:
         'MediaStreamTrackEvent.webidl',
         'RTCDataChannelEvent.webidl',
         'RTCPeerConnectionIceEvent.webidl',
+        'RTCTrackEvent.webidl',
     ]
 
 if CONFIG['MOZ_WEBSPEECH']:

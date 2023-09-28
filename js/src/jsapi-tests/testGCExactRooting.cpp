@@ -6,9 +6,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ds/TraceableFifo.h"
+#include "gc/Policy.h"
 #include "js/GCHashTable.h"
+#include "js/GCVector.h"
 #include "js/RootingAPI.h"
-#include "js/TraceableVector.h"
 
 #include "jsapi-tests/tests.h"
 
@@ -43,17 +44,17 @@ BEGIN_TEST(testGCSuppressions)
 }
 END_TEST(testGCSuppressions)
 
-struct MyContainer : public JS::Traceable
+struct MyContainer
 {
     RelocatablePtrObject obj;
     RelocatablePtrString str;
 
     MyContainer() : obj(nullptr), str(nullptr) {}
-    static void trace(MyContainer* self, JSTracer* trc) {
-        if (self->obj)
-            js::TraceEdge(trc, &self->obj, "test container");
-        if (self->str)
-            js::TraceEdge(trc, &self->str, "test container");
+    void trace(JSTracer* trc) {
+        if (obj)
+            js::TraceEdge(trc, &obj, "test container");
+        if (str)
+            js::TraceEdge(trc, &str, "test container");
     }
 };
 
@@ -203,7 +204,7 @@ BEGIN_TEST(testGCHandleHashMap)
 }
 END_TEST(testGCHandleHashMap)
 
-using ShapeVec = TraceableVector<Shape*>;
+using ShapeVec = GCVector<Shape*>;
 
 BEGIN_TEST(testGCRootedVector)
 {
@@ -249,7 +250,7 @@ BEGIN_TEST(testGCRootedVector)
 }
 
 bool
-receiveConstRefToShapeVector(const JS::Rooted<TraceableVector<Shape*>>& rooted)
+receiveConstRefToShapeVector(const JS::Rooted<GCVector<Shape*>>& rooted)
 {
     // Ensure range enumeration works through the reference.
     for (auto shape : rooted) {
@@ -259,7 +260,7 @@ receiveConstRefToShapeVector(const JS::Rooted<TraceableVector<Shape*>>& rooted)
 }
 
 bool
-receiveHandleToShapeVector(JS::Handle<TraceableVector<Shape*>> handle)
+receiveHandleToShapeVector(JS::Handle<GCVector<Shape*>> handle)
 {
     // Ensure range enumeration works through the handle.
     for (auto shape : handle) {
@@ -269,7 +270,7 @@ receiveHandleToShapeVector(JS::Handle<TraceableVector<Shape*>> handle)
 }
 
 bool
-receiveMutableHandleToShapeVector(JS::MutableHandle<TraceableVector<Shape*>> handle)
+receiveMutableHandleToShapeVector(JS::MutableHandle<GCVector<Shape*>> handle)
 {
     // Ensure range enumeration works through the handle.
     for (auto shape : handle) {
@@ -317,6 +318,8 @@ BEGIN_TEST(testTraceableFifo)
     return true;
 }
 END_TEST(testTraceableFifo)
+
+using ShapeVec = GCVector<Shape*>;
 
 static bool
 FillVector(JSContext* cx, MutableHandle<ShapeVec> shapes)

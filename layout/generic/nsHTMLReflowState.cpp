@@ -566,7 +566,7 @@ nsHTMLReflowState::InitResizeFlags(nsPresContext* aPresContext, nsIAtom* aFrameT
       if (frame->GetType() == nsGkAtoms::svgForeignObjectFrame) {
         // Foreign object frames use dirty bits in a special way.
         frame->AddStateBits(NS_FRAME_HAS_DIRTY_CHILDREN);
-        nsIFrame *kid = frame->GetFirstPrincipalChild();
+        nsIFrame *kid = frame->PrincipalChildList().FirstChild();
         if (kid) {
           kid->AddStateBits(NS_FRAME_IS_DIRTY);
         }
@@ -2307,11 +2307,10 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
         // Shrink-wrap grid items that will be aligned (rather than stretched)
         // in its inline axis.
         auto inlineAxisAlignment = wm.IsOrthogonalTo(cbwm) ?
-          mStylePosition->ComputedAlignSelf(mStyleDisplay,
-                                            frame->StyleContext()->GetParent()) :
-          mStylePosition->ComputedJustifySelf(mStyleDisplay,
-                                              frame->StyleContext()->GetParent());
-        if (inlineAxisAlignment != NS_STYLE_ALIGN_STRETCH ||
+          mStylePosition->ComputedAlignSelf(frame->StyleContext()->GetParent()) :
+          mStylePosition->ComputedJustifySelf(frame->StyleContext()->GetParent());
+        if ((inlineAxisAlignment != NS_STYLE_ALIGN_STRETCH &&
+             inlineAxisAlignment != NS_STYLE_ALIGN_NORMAL) ||
             mStyleMargin->mMargin.GetIStartUnit(wm) == eStyleUnit_Auto ||
             mStyleMargin->mMargin.GetIEndUnit(wm) == eStyleUnit_Auto) {
           computeSizeFlags =

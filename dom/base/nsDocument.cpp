@@ -742,8 +742,7 @@ nsDOMStyleSheetList::NodeWillBeDestroyed(const nsINode *aNode)
 }
 
 void
-nsDOMStyleSheetList::StyleSheetAdded(nsIDocument *aDocument,
-                                     CSSStyleSheet* aStyleSheet,
+nsDOMStyleSheetList::StyleSheetAdded(CSSStyleSheet* aStyleSheet,
                                      bool aDocumentSheet)
 {
   if (aDocumentSheet && -1 != mLength) {
@@ -752,8 +751,7 @@ nsDOMStyleSheetList::StyleSheetAdded(nsIDocument *aDocument,
 }
 
 void
-nsDOMStyleSheetList::StyleSheetRemoved(nsIDocument *aDocument,
-                                       CSSStyleSheet* aStyleSheet,
+nsDOMStyleSheetList::StyleSheetRemoved(CSSStyleSheet* aStyleSheet,
                                        bool aDocumentSheet)
 {
   if (aDocumentSheet && -1 != mLength) {
@@ -2543,7 +2541,10 @@ nsDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
     if (sameTypeParent) {
       mUpgradeInsecureRequests =
         sameTypeParent->GetDocument()->GetUpgradeInsecureRequests();
+      // if the parent document makes use of upgrade-insecure-requests
+      // then subdocument preloads should always be upgraded.
       mUpgradeInsecurePreloads =
+        mUpgradeInsecureRequests ||
         sameTypeParent->GetDocument()->GetUpgradeInsecurePreloads();
     }
   }
@@ -3655,14 +3656,12 @@ nsDocument::CreateShell(nsPresContext* aContext, nsViewManager* aViewManager,
   // Don't add anything here.  Add it to |doCreateShell| instead.
   // This exists so that subclasses can pass other values for the 4th
   // parameter some of the time.
-  return doCreateShell(aContext, aViewManager, aStyleSet,
-                       eCompatibility_FullStandards);
+  return doCreateShell(aContext, aViewManager, aStyleSet);
 }
 
 already_AddRefed<nsIPresShell>
 nsDocument::doCreateShell(nsPresContext* aContext,
-                          nsViewManager* aViewManager, nsStyleSet* aStyleSet,
-                          nsCompatibility aCompatMode)
+                          nsViewManager* aViewManager, nsStyleSet* aStyleSet)
 {
   NS_ASSERTION(!mPresShell, "We have a presshell already!");
 
@@ -3671,7 +3670,7 @@ nsDocument::doCreateShell(nsPresContext* aContext,
   FillStyleSet(aStyleSet);
 
   RefPtr<PresShell> shell = new PresShell;
-  shell->Init(this, aContext, aViewManager, aStyleSet, aCompatMode);
+  shell->Init(this, aContext, aViewManager, aStyleSet);
 
   // Note: we don't hold a ref to the shell (it holds a ref to us)
   mPresShell = shell;
@@ -4064,7 +4063,7 @@ nsDocument::AddStyleSheetToStyleSets(CSSStyleSheet* aSheet)
 void
 nsDocument::NotifyStyleSheetAdded(CSSStyleSheet* aSheet, bool aDocumentSheet)
 {
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetAdded, (this, aSheet, aDocumentSheet));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetAdded, (aSheet, aDocumentSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleSheetChangeEvent,
@@ -4077,7 +4076,7 @@ nsDocument::NotifyStyleSheetAdded(CSSStyleSheet* aSheet, bool aDocumentSheet)
 void
 nsDocument::NotifyStyleSheetRemoved(CSSStyleSheet* aSheet, bool aDocumentSheet)
 {
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetRemoved, (this, aSheet, aDocumentSheet));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetRemoved, (aSheet, aDocumentSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleSheetChangeEvent,
@@ -4205,8 +4204,7 @@ nsDocument::SetStyleSheetApplicableState(CSSStyleSheet* aSheet,
   // that are children of sheets in our style set, as well as some
   // sheets for nsHTMLEditor.
 
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetApplicableStateChanged,
-                               (this, aSheet, aApplicable));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetApplicableStateChanged, (aSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleSheetApplicableStateChangeEvent,
@@ -5111,9 +5109,7 @@ void
 nsDocument::StyleRuleChanged(CSSStyleSheet* aSheet,
                              css::Rule* aStyleRule)
 {
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleChanged,
-                               (this, aSheet,
-                                aStyleRule));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleChanged, (aSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleRuleChangeEvent,
@@ -5127,8 +5123,7 @@ void
 nsDocument::StyleRuleAdded(CSSStyleSheet* aSheet,
                            css::Rule* aStyleRule)
 {
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleAdded,
-                               (this, aSheet, aStyleRule));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleAdded, (aSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleRuleChangeEvent,
@@ -5143,8 +5138,7 @@ void
 nsDocument::StyleRuleRemoved(CSSStyleSheet* aSheet,
                              css::Rule* aStyleRule)
 {
-  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleRemoved,
-                               (this, aSheet, aStyleRule));
+  NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleRemoved, (aSheet));
 
   if (StyleSheetChangeEventsEnabled()) {
     DO_STYLESHEET_NOTIFICATION(StyleRuleChangeEvent,
@@ -6063,8 +6057,8 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
         return;
       }
 
-      JS::Rooted<JSPropertyDescriptor> descRoot(aCx);
-      JS::MutableHandle<JSPropertyDescriptor> desc(&descRoot);
+      JS::Rooted<JS::PropertyDescriptor> descRoot(aCx);
+      JS::MutableHandle<JS::PropertyDescriptor> desc(&descRoot);
       // This check may go through a wrapper, but as we checked above
       // it should be transparent or an xray. This should be fine for now,
       // until the spec is sorted out.
@@ -8698,6 +8692,13 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
       }
     }
   }
+
+  #ifdef MOZ_WEBSPEECH
+  nsGlobalWindow* globalWindow = static_cast<nsGlobalWindow*>(win);
+  if (globalWindow->HasActiveSpeechSynthesis()) {
+    return false;
+  }
+  #endif
 
   return true;
 }
@@ -11431,10 +11432,10 @@ nsresult nsDocument::RemoteFrameFullscreenReverted()
 }
 
 static void
-ReleaseHMDInfoRef(void *, nsIAtom*, void *aPropertyValue, void *)
+ReleaseVRDeviceProxyRef(void *, nsIAtom*, void *aPropertyValue, void *)
 {
   if (aPropertyValue) {
-    static_cast<gfx::VRHMDInfo*>(aPropertyValue)->Release();
+    static_cast<gfx::VRDeviceProxy*>(aPropertyValue)->Release();
   }
 }
 
@@ -11753,9 +11754,9 @@ nsDocument::ApplyFullscreen(const FullscreenRequest& aRequest)
 
   // Process options -- in this case, just HMD
   if (aRequest.mVRHMDDevice) {
-    RefPtr<gfx::VRHMDInfo> hmdRef = aRequest.mVRHMDDevice;
+    RefPtr<gfx::VRDeviceProxy> hmdRef = aRequest.mVRHMDDevice;
     elem->SetProperty(nsGkAtoms::vr_state, hmdRef.forget().take(),
-                      ReleaseHMDInfoRef, true);
+                      ReleaseVRDeviceProxyRef, true);
   }
 
   // Set the full-screen element. This sets the full-screen style on the
@@ -11922,18 +11923,15 @@ nsDocument::IsFullScreenEnabled(bool aCallerIsChrome, bool aLogFailure)
     return false;
   }
 
-  // Ensure that all ancestor <iframe> elements have the allowfullscreen
-  // boolean attribute set.
+  // Ensure that all containing elements are <iframe> and have
+  // allowfullscreen attribute set.
   nsCOMPtr<nsIDocShell> docShell(mDocumentContainer);
-  bool allowed = false;
-  if (docShell) {
-    docShell->GetFullscreenAllowed(&allowed);
-  }
-  if (!allowed) {
-    LogFullScreenDenied(aLogFailure, "FullScreenDeniedIframeNotAllowed", this);
+  if (!docShell || !docShell->GetFullscreenAllowed()) {
+    LogFullScreenDenied(aLogFailure, "FullScreenDeniedContainerNotAllowed", this);
+    return false;
   }
 
-  return allowed;
+  return true;
 }
 
 uint16_t

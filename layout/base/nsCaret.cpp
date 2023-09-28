@@ -62,7 +62,7 @@ CheckForTrailingTextFrameRecursive(nsIFrame* aFrame, nsIFrame* aStopAtFrame)
   if (!aFrame->IsFrameOfType(nsIFrame::eLineParticipant))
     return nullptr;
 
-  for (nsIFrame* f = aFrame->GetFirstPrincipalChild(); f; f = f->GetNextSibling())
+  for (nsIFrame* f : aFrame->PrincipalChildList())
   {
     nsIFrame* r = CheckForTrailingTextFrameRecursive(f, aStopAtFrame);
     if (r)
@@ -537,8 +537,7 @@ nsCaret::GetPaintGeometry(nsRect* aRect)
   return frame;
 }
 
-void nsCaret::PaintCaret(nsDisplayListBuilder *aBuilder,
-                         DrawTarget& aDrawTarget,
+void nsCaret::PaintCaret(DrawTarget& aDrawTarget,
                          nsIFrame* aForFrame,
                          const nsPoint &aOffset)
 {

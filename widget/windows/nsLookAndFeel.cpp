@@ -10,7 +10,7 @@
 #include "nsUXThemeData.h"
 #include "nsUXThemeConstants.h"
 #include "gfxFont.h"
-#include "gfxWindowsPlatform.h"
+#include "WinUtils.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/WindowsVersion.h"
 #include "gfxFontConstants.h"
@@ -34,8 +34,10 @@ nsLookAndFeel::GetOperatingSystemVersion()
     version = eOperatingSystemVersion_Windows8;
   } else if (IsWin7OrLater()) {
     version = eOperatingSystemVersion_Windows7;
-  } else {
+  } else if (IsVistaOrLater()) {
     version = eOperatingSystemVersion_WindowsVista;
+  } else {
+    version = eOperatingSystemVersion_WindowsXP;
   }
 
   return version;
@@ -63,7 +65,9 @@ static int32_t GetSystemParam(long flag, int32_t def)
     return ::SystemParametersInfo(flag, 0, &value, 0) ? value : def;
 }
 
-nsLookAndFeel::nsLookAndFeel() : nsXPLookAndFeel()
+nsLookAndFeel::nsLookAndFeel()
+  : nsXPLookAndFeel()
+  , mUseAccessibilityTheme(0)
 {
   mozilla::Telemetry::Accumulate(mozilla::Telemetry::TOUCH_ENABLED_DEVICE,
                                  WinUtils::IsTouchDeviceSupportPresent());
@@ -179,7 +183,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       idx = COLOR_HIGHLIGHT;
       break;
     case eColorID__moz_menubarhovertext:
-      if (!IsAppThemed())
+      if (!IsVistaOrLater() || !IsAppThemed())
       {
         idx = nsUXThemeData::sFlatMenus ?
                 COLOR_HIGHLIGHTTEXT :
@@ -188,7 +192,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       }
       // Fall through
     case eColorID__moz_menuhovertext:
-      if (IsAppThemed())
+      if (IsVistaOrLater() && IsAppThemed())
       {
         res = ::GetColorFromTheme(eUXMenu,
                                   MENU_POPUPITEM, MPI_HOT, TMT_TEXTCOLOR, aColor);
@@ -263,25 +267,8 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
     case eColorID__moz_cellhighlight:
       idx = COLOR_3DFACE;
       break;
-    case eColorID__moz_win_accentcolor:
-      res = GetAccentColor(aColor);
-      if (NS_SUCCEEDED(res)) {
-        return res;
-      }
-      NS_WARNING("Using fallback for accent color - UI code failed to use the "
-                 "-moz-windows-accent-color-applies media query properly");
-      // Seems to be the default color (hardcoded because of bug 1065998)
-      aColor = NS_RGB(158, 158, 158);
-      return NS_OK;
-    case eColorID__moz_win_accentcolortext:
-      res = GetAccentColorText(aColor);
-      if (NS_SUCCEEDED(res)) {
-        return res;
-      }
-      aColor = NS_RGB(0, 0, 0);
-      return NS_OK;
     case eColorID__moz_win_mediatext:
-      if (IsAppThemed()) {
+      if (IsVistaOrLater() && IsAppThemed()) {
         res = ::GetColorFromTheme(eUXMediaToolbar,
                                   TP_BUTTON, TS_NORMAL, TMT_TEXTCOLOR, aColor);
         if (NS_SUCCEEDED(res))
@@ -291,7 +278,7 @@ nsLookAndFeel::NativeGetColor(ColorID aID, nscolor &aColor)
       idx = COLOR_WINDOWTEXT;
       break;
     case eColorID__moz_win_communicationstext:
-      if (IsAppThemed())
+      if (IsVistaOrLater() && IsAppThemed())
       {
         res = ::GetColorFromTheme(eUXCommunicationsToolbar,
                                   TP_BUTTON, TS_NORMAL, TMT_TEXTCOLOR, aColor);
@@ -374,7 +361,16 @@ nsLookAndFeel::GetIntImpl(IntID aID, int32_t &aResult)
         // High contrast is a misnomer under Win32 -- any theme can be used with it,
         // e.g. normal contrast with large fonts, low contrast, etc.
         // The high contrast flag really means -- use this theme and don't override it.
-        aResult = nsUXThemeData::IsHighContrastOn();
+        if (XRE_IsContentProcess()) {
+          // If we're running in the content process, then the parent should
+          // have sent us the accessibility state when nsLookAndFeel
+          // initialized, and stashed it in the mUseAccessibilityTheme cache.
+          aResult = mUseAccessibilityTheme;
+        } else {
+          // Otherwise, we can ask the OS to see if we're using High Contrast
+          // mode.
+          aResult = nsUXThemeData::IsHighContrastOn();
+        }
         break;
     case eIntID_ScrollArrowStyle:
         aResult = eScrollArrowStyle_Single;
@@ -423,20 +419,6 @@ nsLookAndFeel::GetIntImpl(IntID aID, int32_t &aResult)
         break;
     case eIntID_DWMCompositor:
         aResult = nsUXThemeData::CheckForCompositor();
-        break;
-    case eIntID_WindowsAccentColorApplies:
-        {
-          nscolor unused;
-          aResult = NS_SUCCEEDED(GetAccentColor(unused)) ? 1 : 0;
-        }
-        break;
-    case eIntID_WindowsAccentColorIsDark:
-        {
-          nscolor accentColor;
-          if (NS_SUCCEEDED(GetAccentColor(accentColor))) {
-            aResult = AccentColorIsDark(accentColor) ? 1 : 0;
-          }
-        }
         break;
     case eIntID_WindowsGlass:
         // Aero Glass is only available prior to Windows 8 when DWM is used.
@@ -557,10 +539,10 @@ GetSysFontInfo(HDC aHDC, LookAndFeel::FontID anID,
   LOGFONTW* ptrLogFont = nullptr;
   LOGFONTW logFont;
   NONCLIENTMETRICSW ncm;
-  HGDIOBJ hGDI;
   char16_t name[LF_FACESIZE];
+  bool useShellDlg = false;
 
-  // Depending on which stock font we want, there are three different
+  // Depending on which stock font we want, there are a couple of
   // places we might have to look it up.
   switch (anID) {
   case LookAndFeel::eFont_Icon:
@@ -571,11 +553,7 @@ GetSysFontInfo(HDC aHDC, LookAndFeel::FontID anID,
     ptrLogFont = &logFont;
     break;
 
-  case LookAndFeel::eFont_Menu:
-  case LookAndFeel::eFont_MessageBox:
-  case LookAndFeel::eFont_SmallCaption:
-  case LookAndFeel::eFont_StatusBar:
-  case LookAndFeel::eFont_Tooltips:
+  default:
     ncm.cbSize = sizeof(NONCLIENTMETRICSW);
     if (!::SystemParametersInfoW(SPI_GETNONCLIENTMETRICS,
                                  sizeof(ncm), (PVOID)&ncm, 0))
@@ -583,10 +561,11 @@ GetSysFontInfo(HDC aHDC, LookAndFeel::FontID anID,
 
     switch (anID) {
     case LookAndFeel::eFont_Menu:
+    case LookAndFeel::eFont_PullDownMenu:
       ptrLogFont = &ncm.lfMenuFont;
       break;
-    case LookAndFeel::eFont_MessageBox:
-      ptrLogFont = &ncm.lfMessageFont;
+    case LookAndFeel::eFont_Caption:
+      ptrLogFont = &ncm.lfCaptionFont;
       break;
     case LookAndFeel::eFont_SmallCaption:
       ptrLogFont = &ncm.lfSmCaptionFont;
@@ -595,36 +574,28 @@ GetSysFontInfo(HDC aHDC, LookAndFeel::FontID anID,
     case LookAndFeel::eFont_Tooltips:
       ptrLogFont = &ncm.lfStatusFont;
       break;
+    case LookAndFeel::eFont_Widget:
+    case LookAndFeel::eFont_Dialog:
+    case LookAndFeel::eFont_Button:
+    case LookAndFeel::eFont_Field:
+    case LookAndFeel::eFont_List:
+      // XXX It's not clear to me whether this is exactly the right
+      // set of LookAndFeel values to map to the dialog font; we may
+      // want to add or remove cases here after reviewing the visual
+      // results under various Windows versions.
+      useShellDlg = true;
+      // Fall through so that we can get size from lfMessageFont;
+      // but later we'll use the (virtual) "MS Shell Dlg 2" font name
+      // instead of the LOGFONT's.
     default:
-      MOZ_CRASH();
+      ptrLogFont = &ncm.lfMessageFont;
+      break;
     }
-    break;
-
-  case LookAndFeel::eFont_Widget:
-  case LookAndFeel::eFont_Window:      // css3
-  case LookAndFeel::eFont_Document:
-  case LookAndFeel::eFont_Workspace:
-  case LookAndFeel::eFont_Desktop:
-  case LookAndFeel::eFont_Info:
-  case LookAndFeel::eFont_Dialog:
-  case LookAndFeel::eFont_Button:
-  case LookAndFeel::eFont_PullDownMenu:
-  case LookAndFeel::eFont_List:
-  case LookAndFeel::eFont_Field:
-  case LookAndFeel::eFont_Caption:
-    hGDI = ::GetStockObject(DEFAULT_GUI_FONT);
-    if (!hGDI)
-      return false;
-
-    if (::GetObjectW(hGDI, sizeof(logFont), &logFont) <= 0)
-      return false;
-
-    ptrLogFont = &logFont;
     break;
   }
 
   // Get scaling factor from physical to logical pixels
-  float pixelScale = 1.0f / gfxWindowsPlatform::GetPlatform()->GetDPIScale();
+  double pixelScale = 1.0 / WinUtils::SystemScaleFactor();
 
   // The lfHeight is in pixels, and it needs to be adjusted for the
   // device it will be displayed on.
@@ -673,9 +644,12 @@ GetSysFontInfo(HDC aHDC, LookAndFeel::FontID anID,
 
   aFontStyle.systemFont = true;
 
-  name[0] = 0;
-  memcpy(name, ptrLogFont->lfFaceName, LF_FACESIZE*sizeof(char16_t));
-  aFontName = name;
+  if (useShellDlg) {
+    aFontName = NS_LITERAL_STRING("MS Shell Dlg 2");
+  } else {
+    memcpy(name, ptrLogFont->lfFaceName, LF_FACESIZE*sizeof(char16_t));
+    aFontName = name;
+  }
 
   return true;
 }
@@ -701,73 +675,28 @@ nsLookAndFeel::GetPasswordCharacterImpl()
   return UNICODE_BLACK_CIRCLE_CHAR;
 }
 
-/* static */ nsresult
-nsLookAndFeel::GetAccentColor(nscolor& aColor)
+nsTArray<LookAndFeelInt>
+nsLookAndFeel::GetIntCacheImpl()
 {
-  nsresult rv;
+  nsTArray<LookAndFeelInt> lookAndFeelIntCache =
+    nsXPLookAndFeel::GetIntCacheImpl();
 
-  if (!mDwmKey) {
-    mDwmKey = do_CreateInstance("@mozilla.org/windows-registry-key;1", &rv);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
+  LookAndFeelInt useAccessibilityTheme;
+  useAccessibilityTheme.id = eIntID_UseAccessibilityTheme;
+  useAccessibilityTheme.value = GetInt(eIntID_UseAccessibilityTheme);
+  lookAndFeelIntCache.AppendElement(useAccessibilityTheme);
+
+  return lookAndFeelIntCache;
+}
+
+void
+nsLookAndFeel::SetIntCacheImpl(const nsTArray<LookAndFeelInt>& aLookAndFeelIntCache)
+{
+  for (auto entry : aLookAndFeelIntCache) {
+    if (entry.id == eIntID_UseAccessibilityTheme) {
+      mUseAccessibilityTheme = entry.value;
+      break;
     }
   }
-
-  rv = mDwmKey->Open(nsIWindowsRegKey::ROOT_KEY_CURRENT_USER,
-                     NS_LITERAL_STRING("SOFTWARE\\Microsoft\\Windows\\DWM"),
-                     nsIWindowsRegKey::ACCESS_QUERY_VALUE);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
-  // The ColorPrevalence value is set to 1 when the "Show color on title bar"
-  // setting in the Color section of Window's Personalization settings is
-  // turned on.
-  uint32_t accentColor, colorPrevalence;
-  if (NS_SUCCEEDED(mDwmKey->ReadIntValue(NS_LITERAL_STRING("AccentColor"), &accentColor)) &&
-      NS_SUCCEEDED(mDwmKey->ReadIntValue(NS_LITERAL_STRING("ColorPrevalence"), &colorPrevalence)) &&
-      colorPrevalence == 1) {
-    // The order of the color components in the DWORD stored in the registry
-    // happens to be the same order as we store the components in nscolor
-    // so we can just assign directly here.
-    aColor = accentColor;
-    rv = NS_OK;
-  } else {
-    rv = NS_ERROR_NOT_AVAILABLE;
-  }
-
-  mDwmKey->Close();
-
-  return rv;
 }
 
-bool
-nsLookAndFeel::AccentColorIsDark(nscolor aColor)
-{
-  float luminance = (NS_GET_R(aColor) * 2 +
-                     NS_GET_G(aColor) * 5 +
-                     NS_GET_B(aColor)) / 8;
-  
-  return (luminance <= 128);
-}
-
-/* static */ nsresult
-nsLookAndFeel::GetAccentColorText(nscolor& aColor)
-{
-  nscolor accentColor;
-  nsresult rv = GetAccentColor(accentColor);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
-  // We want the color that we return for text that will be drawn over
-  // a background that has the accent color to have good contrast with
-  // the accent color.  Windows itself uses either white or black text
-  // depending on how light or dark the accent color is.  We do the same
-  // here based on the luminance of the accent color with a threshhold
-  // value that seems consistent with what Windows does.
-
-  aColor = AccentColorIsDark(accentColor) ? NS_RGB(255, 255, 255) : NS_RGB(0, 0, 0);
-
-  return NS_OK;
-}

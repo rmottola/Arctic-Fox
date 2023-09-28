@@ -16,11 +16,11 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/dom/Exceptions.h"
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/FormData.h"
 #include "mozilla/dom/ProgressEvent.h"
 #include "mozilla/dom/StructuredCloneHolder.h"
 #include "nsComponentManagerUtils.h"
 #include "nsContentUtils.h"
-#include "nsFormData.h"
 #include "nsJSUtils.h"
 #include "nsThreadUtils.h"
 #include "nsVariant.h"
@@ -559,8 +559,8 @@ public:
   private:
     virtual void trace(JSTracer* aTrc)
     {
-      JS_CallValueTracer(aTrc, &mStateData->mResponse,
-                         "XMLHttpRequest::StateData::mResponse");
+      JS::TraceEdge(aTrc, &mStateData->mResponse,
+                    "XMLHttpRequest::StateData::mResponse");
     }
   };
 
@@ -1212,11 +1212,11 @@ EventRunnable::PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
         if (obj && JS_IsArrayBufferObject(obj)) {
           // Use cached response if the arraybuffer has been transfered.
           if (mProxy->mArrayBufferResponseWasTransferred) {
-            MOZ_ASSERT(JS_IsNeuteredArrayBufferObject(obj));
+            MOZ_ASSERT(JS_IsDetachedArrayBufferObject(obj));
             mUseCachedArrayBufferResponse = true;
             doClone = false;
           } else {
-            MOZ_ASSERT(!JS_IsNeuteredArrayBufferObject(obj));
+            MOZ_ASSERT(!JS_IsDetachedArrayBufferObject(obj));
             JS::AutoValueArray<1> argv(aCx);
             argv[0].set(response);
             obj = JS_NewArrayObject(aCx, argv);
@@ -2203,7 +2203,7 @@ XMLHttpRequest::Send(Blob& aBody, ErrorResult& aRv)
 }
 
 void
-XMLHttpRequest::Send(nsFormData& aBody, ErrorResult& aRv)
+XMLHttpRequest::Send(FormData& aBody, ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
   JSContext* cx = mWorkerPrivate->GetJSContext();

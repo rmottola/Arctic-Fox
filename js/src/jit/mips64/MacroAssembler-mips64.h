@@ -174,14 +174,12 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void convertUInt32ToDouble(Register src, FloatRegister dest);
     void convertUInt32ToFloat32(Register src, FloatRegister dest);
     void convertDoubleToFloat32(FloatRegister src, FloatRegister dest);
-    void branchTruncateDouble(FloatRegister src, Register dest, Label* fail);
     void convertDoubleToInt32(FloatRegister src, Register dest, Label* fail,
                               bool negativeZeroCheck = true);
     void convertFloat32ToInt32(FloatRegister src, Register dest, Label* fail,
                                bool negativeZeroCheck = true);
 
     void convertFloat32ToDouble(FloatRegister src, FloatRegister dest);
-    void branchTruncateFloat32(FloatRegister src, Register dest, Label* fail);
     void convertInt32ToFloat32(Register src, FloatRegister dest);
     void convertInt32ToFloat32(const Address& src, FloatRegister dest);
 
@@ -321,6 +319,10 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
         branch(code);
     }
 
+    void jump(wasm::JumpTarget target) {
+        ma_b(target);
+    }
+
     void splitTag(Register src, Register dest) {
         ma_dsrl(dest, src, Imm32(JSVAL_TAG_SHIFT));
     }
@@ -424,54 +426,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void branchTestBoolean(Condition cond, const Address& address, Label* label);
     void branchTestBoolean(Condition cond, const BaseIndex& src, Label* label);
 
-    void branch32(Condition cond, Register lhs, Register rhs, Label* label) {
-        ma_b(lhs, rhs, label, cond);
-    }
-    void branch32(Condition cond, Register lhs, Imm32 imm, Label* label) {
-        ma_b(lhs, imm, label, cond);
-    }
-    void branch32(Condition cond, const Operand& lhs, Register rhs, Label* label) {
-        if (lhs.getTag() == Operand::REG) {
-            ma_b(lhs.toReg(), rhs, label, cond);
-        } else {
-            branch32(cond, lhs.toAddress(), rhs, label);
-        }
-    }
-    void branch32(Condition cond, const Operand& lhs, Imm32 rhs, Label* label) {
-        if (lhs.getTag() == Operand::REG) {
-            ma_b(lhs.toReg(), rhs, label, cond);
-        } else {
-            branch32(cond, lhs.toAddress(), rhs, label);
-        }
-    }
-    void branch32(Condition cond, const Address& lhs, Register rhs, Label* label) {
-        load32(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-    void branch32(Condition cond, const Address& lhs, Imm32 rhs, Label* label) {
-        load32(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-    void branch32(Condition cond, const BaseIndex& lhs, Imm32 rhs, Label* label) {
-        load32(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-    void branchPtr(Condition cond, const Address& lhs, Register rhs, Label* label) {
-        loadPtr(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-
-    void branchPrivatePtr(Condition cond, const Address& lhs, ImmPtr ptr, Label* label) {
-        branchPtr(cond, lhs, ptr, label);
-    }
-
-    void branchPrivatePtr(Condition cond, const Address& lhs, Register ptr, Label* label) {
-        branchPtr(cond, lhs, ptr, label);
-    }
-
-    void branchPrivatePtr(Condition cond, Register lhs, ImmWord ptr, Label* label) {
-        branchPtr(cond, lhs, ptr, label);
-    }
 
     void branchTestDouble(Condition cond, const ValueOperand& value, Label* label);
     void branchTestDouble(Condition cond, Register tag, Label* label);
@@ -508,6 +462,7 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void branchTestNumber(Condition cond, Register tag, Label* label);
 
     void branchTestMagic(Condition cond, const ValueOperand& value, Label* label);
+    void branchTestMagic(Condition cond, const ValueOperand& value, wasm::JumpTarget target);
     void branchTestMagic(Condition cond, Register tag, Label* label);
     void branchTestMagic(Condition cond, const Address& address, Label* label);
     void branchTestMagic(Condition cond, const BaseIndex& src, Label* label);
@@ -526,67 +481,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
 
     void branchTestBooleanTruthy(bool b, const ValueOperand& operand, Label* label);
 
-    void branchTest32(Condition cond, Register lhs, Register rhs, Label* label) {
-        MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == NotSigned);
-        if (lhs == rhs) {
-            ma_b(lhs, rhs, label, cond);
-        } else {
-            as_and(ScratchRegister, lhs, rhs);
-            ma_b(ScratchRegister, ScratchRegister, label, cond);
-        }
-    }
-    void branchTest32(Condition cond, Register lhs, Imm32 imm, Label* label) {
-        ma_li(ScratchRegister, imm);
-        branchTest32(cond, lhs, ScratchRegister, label);
-    }
-    void branchTest32(Condition cond, const Address& address, Imm32 imm, Label* label) {
-        load32(address, SecondScratchReg);
-        branchTest32(cond, SecondScratchReg, imm, label);
-    }
-    void branchTest32(Condition cond, AbsoluteAddress address, Imm32 imm, Label* label) {
-        load32(address, ScratchRegister);
-        branchTest32(cond, ScratchRegister, imm, label);
-    }
-    void branchTestPtr(Condition cond, Register lhs, Register rhs, Label* label) {
-        MOZ_ASSERT(cond == Zero || cond == NonZero || cond == Signed || cond == NotSigned);
-        if (lhs == rhs) {
-            ma_b(lhs, rhs, label, cond);
-        } else {
-            as_and(ScratchRegister, lhs, rhs);
-            ma_b(ScratchRegister, ScratchRegister, label, cond);
-        }
-    }
-    void branchTestPtr(Condition cond, Register lhs, const Imm32 rhs, Label* label) {
-        ma_li(ScratchRegister, rhs);
-        branchTestPtr(cond, lhs, ScratchRegister, label);
-    }
-    void branchTestPtr(Condition cond, const Address& lhs, Imm32 imm, Label* label) {
-        loadPtr(lhs, SecondScratchReg);
-        branchTestPtr(cond, SecondScratchReg, imm, label);
-    }
-    void branchTest64(Condition cond, Register64 lhs, Register64 rhs, Register temp,
-                      Label* label) {
-        branchTestPtr(cond, lhs.reg, rhs.reg, label);
-    }
-    void branchPtr(Condition cond, Register lhs, Register rhs, Label* label) {
-        ma_b(lhs, rhs, label, cond);
-    }
-    void branchPtr(Condition cond, Register lhs, ImmGCPtr ptr, Label* label) {
-        ma_b(lhs, ptr, label, cond);
-    }
-    void branchPtr(Condition cond, Register lhs, ImmWord imm, Label* label) {
-        ma_b(lhs, imm, label, cond);
-    }
-    void branchPtr(Condition cond, Register lhs, ImmPtr imm, Label* label) {
-        ma_b(lhs, imm, label, cond);
-    }
-    void branchPtr(Condition cond, Register lhs, wasm::SymbolicAddress imm, Label* label) {
-        movePtr(imm, SecondScratchReg);
-        ma_b(lhs, SecondScratchReg, label, cond);
-    }
-    void branchPtr(Condition cond, Register lhs, Imm32 imm, Label* label) {
-        ma_b(lhs, imm, label, cond);
-    }
     inline void decBranchPtr(Condition cond, Register lhs, Imm32 imm, Label* label);
 
     // higher level tag testing code
@@ -618,43 +512,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
         CodeOffsetJump off = jumpWithPatch(label);
         bind(&skipJump);
         return off;
-    }
-    void branchPtr(Condition cond, Address addr, ImmGCPtr ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-
-    void branchPtr(Condition cond, Address addr, ImmWord ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-    void branchPtr(Condition cond, Address addr, ImmPtr ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-    void branchPtr(Condition cond, AbsoluteAddress addr, Register ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-    void branchPtr(Condition cond, AbsoluteAddress addr, ImmWord ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-    void branchPtr(Condition cond, wasm::SymbolicAddress addr, Register ptr, Label* label) {
-        loadPtr(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, ptr, label, cond);
-    }
-    void branch32(Condition cond, AbsoluteAddress lhs, Imm32 rhs, Label* label) {
-        load32(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-    void branch32(Condition cond, AbsoluteAddress lhs, Register rhs, Label* label) {
-        load32(lhs, SecondScratchReg);
-        ma_b(SecondScratchReg, rhs, label, cond);
-    }
-    void branch32(Condition cond, wasm::SymbolicAddress addr, Imm32 imm, Label* label) {
-        load32(addr, SecondScratchReg);
-        ma_b(SecondScratchReg, imm, label, cond);
     }
 
     template <typename T>
@@ -1093,9 +950,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
 
     void move32(Imm32 imm, Register dest);
     void move32(Register src, Register dest);
-    void move64(Register64 src, Register64 dest) {
-        movePtr(src.reg, dest.reg);
-    }
 
     void movePtr(Register src, Register dest);
     void movePtr(ImmWord imm, Register dest);
@@ -1231,12 +1085,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
 
     void breakpoint();
 
-    void branchDouble(DoubleCondition cond, FloatRegister lhs, FloatRegister rhs,
-                      Label* label);
-
-    void branchFloat(DoubleCondition cond, FloatRegister lhs, FloatRegister rhs,
-                     Label* label);
-
     void checkStackAlignment();
 
     static void calculateAlignedStackPointer(void** stackPointer);
@@ -1296,7 +1144,7 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void branchValueIsNurseryObject(Condition cond, ValueOperand value, Register temp,
                                     Label* label);
 
-    void loadAsmJSActivation(Register dest) {
+    void loadWasmActivation(Register dest) {
         loadPtr(Address(GlobalReg, wasm::ActivationGlobalDataOffset - AsmJSGlobalRegBias), dest);
     }
     void loadAsmJSHeapRegisterFromGlobalData() {

@@ -1409,7 +1409,7 @@ struct CollectorData
   CycleCollectedJSRuntime* mRuntime;
 };
 
-static mozilla::ThreadLocal<CollectorData*> sCollectorData;
+static MOZ_THREAD_LOCAL(CollectorData*) sCollectorData;
 
 ////////////////////////////////////////////////////////////////////////
 // Utility functions
@@ -2677,7 +2677,7 @@ public:
   }
 
   virtual void Trace(JS::Heap<JS::Value>* aValue, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
     if (aValue->isMarkable() && ValueIsGrayCCThing(*aValue)) {
       MOZ_ASSERT(!js::gc::IsInsideNursery(aValue->toGCThing()));
@@ -2686,7 +2686,7 @@ public:
   }
 
   virtual void Trace(JS::Heap<jsid>* aId, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
   }
 
@@ -2699,29 +2699,35 @@ public:
   }
 
   virtual void Trace(JS::Heap<JSObject*>* aObject, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
+  {
+    AppendJSObjectToPurpleBuffer(*aObject);
+  }
+
+  virtual void Trace(JSObject** aObject, const char* aName,
+                     void* aClosure) const override
   {
     AppendJSObjectToPurpleBuffer(*aObject);
   }
 
   virtual void Trace(JS::TenuredHeap<JSObject*>* aObject, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
     AppendJSObjectToPurpleBuffer(*aObject);
   }
 
   virtual void Trace(JS::Heap<JSString*>* aString, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
   }
 
   virtual void Trace(JS::Heap<JSScript*>* aScript, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
   }
 
   virtual void Trace(JS::Heap<JSFunction*>* aFunction, const char* aName,
-                     void* aClosure) const
+                     void* aClosure) const override
   {
   }
 
@@ -3993,8 +3999,11 @@ nsCycleCollector_suspectedCount()
 bool
 nsCycleCollector_init()
 {
+  static DebugOnly<bool> sInitialized;
+
   MOZ_ASSERT(NS_IsMainThread(), "Wrong thread!");
-  MOZ_ASSERT(!sCollectorData.initialized(), "Called twice!?");
+  MOZ_ASSERT(!sInitialized, "Called twice!?");
+  sInitialized = true;
 
   return sCollectorData.init();
 }
@@ -4002,8 +4011,6 @@ nsCycleCollector_init()
 void
 nsCycleCollector_startup()
 {
-  MOZ_ASSERT(sCollectorData.initialized(),
-             "Forgot to call nsCycleCollector_init!");
   if (sCollectorData.get()) {
     MOZ_CRASH();
   }

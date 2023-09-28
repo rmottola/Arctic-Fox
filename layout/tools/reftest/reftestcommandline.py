@@ -1,7 +1,10 @@
 import argparse
 import os
+import sys
 from collections import OrderedDict
 from urlparse import urlparse
+
+import mozlog
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -150,6 +153,20 @@ class ReftestArgumentsParser(argparse.ArgumentParser):
                           dest="shuffle",
                           help="run reftests in random order")
 
+        self.add_argument("--run-until-failure",
+                          action="store_true",
+                          default=False,
+                          dest="runUntilFailure",
+                          help="stop running on the first failure. Useful for RR recordings.")
+
+        self.add_argument("--repeat",
+                          action="store",
+                          type=int,
+                          default=0,
+                          dest="repeat",
+                          help="number of times the select test(s) will be executed. Useful for "
+                          "finding intermittent failures.")
+
         self.add_argument("--focus-filter-mode",
                           action="store",
                           type=str,
@@ -193,6 +210,8 @@ class ReftestArgumentsParser(argparse.ArgumentParser):
                           nargs="*",
                           help="Path to test file, manifest file, or directory containing tests")
 
+        mozlog.commandline.add_logging_group(self)
+
     def get_ip(self):
         import moznetwork
         if os.name != "nt":
@@ -221,8 +240,6 @@ class ReftestArgumentsParser(argparse.ArgumentParser):
         self.error("Failed to determine test suite; supply --suite to set this explicitly")
 
     def validate(self, options, reftest):
-        import sys
-
         if not options.tests:
             # Can't just set this in the argument parser because mach will set a default
             self.error("Must supply at least one path to a manifest file, test directory, or test file to run.")
@@ -469,14 +486,8 @@ class B2GArgumentParser(ReftestArgumentsParser):
                           action="store",
                           type=str,
                           dest="profile",
-                          help="for desktop testing, the path to the "
+                          help="for mulet testing, the path to the "
                           "gaia profile to use")
-
-        self.add_argument("--desktop",
-                          action="store_true",
-                          dest="desktop",
-                          default=False,
-                          help="Run the tests on a B2G desktop build")
 
         self.add_argument("--mulet",
                           action="store_true",
@@ -664,6 +675,12 @@ class RemoteArgumentsParser(ReftestArgumentsParser):
                           dest="httpdPath",
                           help="path to the httpd.js file")
 
+        self.add_argument("--no-device-info",
+                          action="store_false",
+                          dest="printDeviceInfo",
+                          default=True,
+                          help="do not display verbose diagnostics about the remote device")
+
     def validate_remote(self, options, automation):
         # Ensure our defaults are set properly for everything we can infer
         if not options.remoteTestRoot:
@@ -735,6 +752,6 @@ class RemoteArgumentsParser(ReftestArgumentsParser):
                 'screen')['screen'][0].split()
             width = int(parts[0].split(':')[1])
             height = int(parts[1].split(':')[1])
-            if (width < 1050 or height < 1050):
+            if (width < 1366 or height < 1050):
                 self.error("ERROR: Invalid screen resolution %sx%s, please adjust to 1366x1050 or higher" % (
                     width, height))

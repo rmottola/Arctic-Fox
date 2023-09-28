@@ -61,36 +61,13 @@ UnwrapArg(JS::Handle<JSObject*> src, Interface** ppArg)
                        reinterpret_cast<void**>(ppArg));
 }
 
-inline const ErrNum
-GetInvalidThisErrorForMethod(bool aSecurityError)
-{
-  return aSecurityError ? MSG_METHOD_THIS_UNWRAPPING_DENIED :
-                          MSG_METHOD_THIS_DOES_NOT_IMPLEMENT_INTERFACE;
-}
-
-inline const ErrNum
-GetInvalidThisErrorForGetter(bool aSecurityError)
-{
-  return aSecurityError ? MSG_GETTER_THIS_UNWRAPPING_DENIED :
-                          MSG_GETTER_THIS_DOES_NOT_IMPLEMENT_INTERFACE;
-}
-
-inline const ErrNum
-GetInvalidThisErrorForSetter(bool aSecurityError)
-{
-  return aSecurityError ? MSG_SETTER_THIS_UNWRAPPING_DENIED :
-                          MSG_SETTER_THIS_DOES_NOT_IMPLEMENT_INTERFACE;
-}
+bool
+ThrowInvalidThis(JSContext* aCx, const JS::CallArgs& aArgs,
+                 bool aSecurityError, const char* aInterfaceName);
 
 bool
 ThrowInvalidThis(JSContext* aCx, const JS::CallArgs& aArgs,
-                 const ErrNum aErrorNumber,
-                 const char* aInterfaceName);
-
-bool
-ThrowInvalidThis(JSContext* aCx, const JS::CallArgs& aArgs,
-                 const ErrNum aErrorNumber,
-                 prototypes::ID aProtoId);
+                 bool aSecurityError, prototypes::ID aProtoId);
 
 // Returns true if the JSClass is used for DOM objects.
 inline bool
@@ -334,9 +311,7 @@ class ProtoAndIfaceCache
 
     void Trace(JSTracer* aTracer) {
       for (size_t i = 0; i < ArrayLength(*this); ++i) {
-        if ((*this)[i]) {
-          JS_CallObjectTracer(aTracer, &(*this)[i], "protoAndIfaceCache[i]");
-        }
+        JS::TraceEdge(aTracer, &(*this)[i], "protoAndIfaceCache[i]");
       }
     }
 
@@ -395,9 +370,7 @@ class ProtoAndIfaceCache
         Page* p = mPages[i];
         if (p) {
           for (size_t j = 0; j < ArrayLength(*p); ++j) {
-            if ((*p)[j]) {
-              JS_CallObjectTracer(trc, &(*p)[j], "protoAndIfaceCache[i]");
-            }
+            JS::TraceEdge(trc, &(*p)[j], "protoAndIfaceCache[i]");
           }
         }
       }
@@ -2122,7 +2095,7 @@ class SequenceTracer<JSObject*, false, false, false>
 public:
   static void TraceSequence(JSTracer* trc, JSObject** objp, JSObject** end) {
     for (; objp != end; ++objp) {
-      JS_CallUnbarrieredObjectTracer(trc, objp, "sequence<object>");
+      JS::UnsafeTraceRoot(trc, objp, "sequence<object>");
     }
   }
 };
@@ -2136,7 +2109,7 @@ class SequenceTracer<JS::Value, false, false, false>
 public:
   static void TraceSequence(JSTracer* trc, JS::Value* valp, JS::Value* end) {
     for (; valp != end; ++valp) {
-      JS_CallUnbarrieredValueTracer(trc, valp, "sequence<any>");
+      JS::UnsafeTraceRoot(trc, valp, "sequence<any>");
     }
   }
 };
@@ -2460,7 +2433,7 @@ bool
 XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                        JS::Handle<JSObject*> obj,
                        JS::Handle<jsid> id,
-                       JS::MutableHandle<JSPropertyDescriptor> desc,
+                       JS::MutableHandle<JS::PropertyDescriptor> desc,
                        bool& cacheOnHolder);
 
 /**
@@ -2477,7 +2450,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 bool
 XrayDefineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                    JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                   JS::Handle<JSPropertyDescriptor> desc,
+                   JS::Handle<JS::PropertyDescriptor> desc,
                    JS::ObjectOpResult &result,
                    bool *defined);
 
@@ -3051,7 +3024,7 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
              JSPrincipals* aPrincipal, bool aInitStandardClasses,
              JS::MutableHandle<JSObject*> aGlobal)
 {
-  aOptions.setTrace(CreateGlobalOptions<T>::TraceGlobal);
+  aOptions.creationOptions().setTrace(CreateGlobalOptions<T>::TraceGlobal);
 
   aGlobal.set(JS_NewGlobalObject(aCx, aClass, aPrincipal,
                                  JS::DontFireOnNewGlobalHook, aOptions));

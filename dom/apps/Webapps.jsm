@@ -2048,7 +2048,7 @@ this.DOMApplicationRegistry = {
         Services.scriptSecurityManager.createCodebasePrincipal(appURI,
                                                                {appId: aApp.localId});
       let cacheUpdate = updateSvc.scheduleAppUpdate(
-        appcacheURI, docURI, principal, aApp.localId, false, aProfileDir);
+        appcacheURI, docURI, principal, aProfileDir);
 
       // We save the download details for potential further usage like
       // cancelling it.
@@ -2202,7 +2202,7 @@ this.DOMApplicationRegistry = {
           Services.scriptSecurityManager.createCodebasePrincipal(appURI,
                                                                  {appId: aApp.localId});
         updateSvc.checkForUpdate(Services.io.newURI(helper.fullAppcachePath(), null, null),
-                                 principal, app.localId, false, updateObserver);
+                                 principal, updateObserver);
       });
       return;
     }
@@ -2476,8 +2476,7 @@ this.DOMApplicationRegistry = {
                                                                {appId: aApp.localId});
 
       updateSvc.checkForUpdate(Services.io.newURI(manifest.fullAppcachePath(), null, null),
-                               principal, aApp.localId, false,
-                               (aSubject, aTopic, aData) => updateDeferred.resolve(aTopic));
+                               principal, (aSubject, aTopic, aData) => updateDeferred.resolve(aTopic));
 
       let topic = yield updateDeferred.promise;
 
@@ -3628,7 +3627,7 @@ this.DOMApplicationRegistry = {
       // We're passing false to get the binary hash and not base64.
       let data = hasher.finish(false);
       // Convert the binary hash data to a hex string.
-      let hash = [toHexString(data.charCodeAt(i)) for (i in data)].join("");
+      let hash = Array.from(data, (c, i) => toHexString(data.charCodeAt(i))).join("");
       debug("File hash computed: " + hash);
 
       deferred.resolve(hash);

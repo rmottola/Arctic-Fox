@@ -549,15 +549,17 @@ WebAudioDecodeJob::OnSuccess(ErrorCode aErrorCode)
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aErrorCode == NoError);
 
-  // Ignore errors in calling the callback, since there is not much that we can
-  // do about it here.
-  ErrorResult rv;
   if (mSuccessCallback) {
+    ErrorResult rv;
     mSuccessCallback->Call(*mOutput, rv);
+    // Ignore errors in calling the callback, since there is not much that we can
+    // do about it here.
+    rv.SuppressException();
   }
   mPromise->MaybeResolve(mOutput);
 
   mContext->RemoveFromDecodeQueue(this);
+
 }
 
 void
@@ -568,7 +570,7 @@ WebAudioDecodeJob::OnFailure(ErrorCode aErrorCode)
   const char* errorMessage;
   switch (aErrorCode) {
   case NoError:
-    MOZ_ASSERT(false, "Who passed NoError to OnFailure?");
+    MOZ_FALLTHROUGH_ASSERT("Who passed NoError to OnFailure?");
     // Fall through to get some sort of a sane error message if this actually
     // happens at runtime.
   case UnknownError:
@@ -599,8 +601,7 @@ WebAudioDecodeJob::OnFailure(ErrorCode aErrorCode)
   // Ignore errors in calling the callback, since there is not much that we can
   // do about it here.
   if (mFailureCallback) {
-    ErrorResult rv;
-    mFailureCallback->Call(rv);
+    mFailureCallback->Call();
   }
 
   mPromise->MaybeReject(NS_ERROR_DOM_ENCODING_NOT_SUPPORTED_ERR);

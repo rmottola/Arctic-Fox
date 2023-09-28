@@ -94,28 +94,22 @@ NSS_EXTRA_DLLS += freebl_64int_3
 NSS_EXTRA_DLLS += freebl_64fpu_3
 endif
 
-ABS_DIST := $(abspath $(DIST))
-ifeq ($(HOST_OS_ARCH),WINNT)
-ifdef CYGDRIVE_MOUNT
-ABS_DIST := $(shell cygpath -w $(ABS_DIST) | sed -e 's|\\|/|g')
-endif
-ifneq (,$(filter mingw%,$(host_os)))
-ABS_DIST := $(shell cd $(DIST) && pwd -W)
-endif
-endif
 # For all variables such as DLLFLAGS, that may contain $(DIST)
 DIST := $(ABS_DIST)
+# TODO: move this all to configure, but in Python
+ifndef MOZ_BUILD_NSPR
 NSPR_INCLUDE_DIR = $(firstword $(filter -I%,$(NSPR_CFLAGS)))
 ifneq (,$(strip $(NSPR_INCLUDE_DIR)))
 NSPR_INCLUDE_DIR := $(subst -I,,$(subst -I$(DIST),-I$(ABS_DIST),$(NSPR_INCLUDE_DIR)))
 else
-NSPR_INCLUDE_DIR = $(ABS_DIST)/include/nspr
+$(error Your NSPR CFLAGS are broken!)
 endif
 NSPR_LIB_DIR = $(firstword $(filter -L%,$(NSPR_LIBS)))
 ifneq (,$(strip $(NSPR_LIB_DIR)))
 NSPR_LIB_DIR := $(subst -L,,$(subst -L$(DIST),-L$(ABS_DIST),$(NSPR_LIB_DIR)))
 else
-NSPR_LIB_DIR = $(ABS_DIST)/lib
+$(error Your NSPR LDFLAGS are broken!)
+endif
 endif
 
 # To get debug symbols from NSS
@@ -231,11 +225,14 @@ ifdef WRAP_LDFLAGS
 NSS_EXTRA_LDFLAGS += $(WRAP_LDFLAGS)
 endif
 
-ifdef MOZ_GLUE_WRAP_LDFLAGS
+# The SHARED_LIBS part is needed unconditionally on Android.  It's not
+# clear why this is the case, but see bug 1133073 (starting around
+# comment #8) for context.
+ifneq (,$(or $(MOZ_GLUE_WRAP_LDFLAGS), $(filter Android, $(OS_TARGET))))
 NSS_EXTRA_LDFLAGS += $(SHARED_LIBS:$(DEPTH)%=$(MOZ_BUILD_ROOT)%) $(MOZ_GLUE_WRAP_LDFLAGS)
 endif
 
-ifneq (,$(WRAP_LDFLAGS)$(MOZ_GLUE_WRAP_LDFLAGS))
+ifneq (,$(NSS_EXTRA_LDFLAGS))
 DEFAULT_GMAKE_FLAGS += \
 	LDFLAGS='$(LDFLAGS) $(NSS_EXTRA_LDFLAGS)' \
 	DSO_LDOPTS='$(DSO_LDOPTS) $(LDFLAGS) $(NSS_EXTRA_LDFLAGS)' \
@@ -270,6 +267,10 @@ DEFAULT_GMAKE_FLAGS += MAKE_OBJDIR='$$(INSTALL) -D $$(OBJDIR)'
 # Work around NSS adding IMPORT_LIBRARY to TARGETS with no rule for
 # it, creating race conditions. See bug #836220
 DEFAULT_GMAKE_FLAGS += TARGETS='$$(LIBRARY) $$(SHARED_LIBRARY) $$(PROGRAM)'
+
+ifeq ($(MOZ_FOLD_LIBS),1)
+MOZ_FOLD_LIBS_FLAGS += -D_NSPR_BUILD_=1
+endif
 
 ifdef MOZ_FOLD_LIBS_FLAGS
 DEFAULT_GMAKE_FLAGS += XCFLAGS='$(MOZ_FOLD_LIBS_FLAGS)'

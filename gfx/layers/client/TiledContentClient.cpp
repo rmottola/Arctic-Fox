@@ -55,7 +55,8 @@ static void DrawDebugOverlay(mozilla::gfx::DrawTarget* dt, int x, int y, int wid
   ss << x << ", " << y;
 
   // Draw text using cairo toy text API
-  cairo_t* cr = c.GetCairo();
+  // XXX: this drawing will silently fail if |dt| doesn't have a Cairo backend
+  cairo_t* cr = gfxFont::RefCairo(dt);
   cairo_set_font_size(cr, 25);
   cairo_text_extents_t extents;
   cairo_text_extents(cr, ss.str().c_str(), &extents);
@@ -145,7 +146,7 @@ FuzzyEquals(float a, float b) {
   return (fabsf(a - b) < 1e-6);
 }
 
-static ViewTransform
+static AsyncTransform
 ComputeViewTransform(const FrameMetrics& aContentMetrics, const FrameMetrics& aCompositorMetrics)
 {
   // This is basically the same code as AsyncPanZoomController::GetCurrentAsyncTransform
@@ -154,7 +155,7 @@ ComputeViewTransform(const FrameMetrics& aContentMetrics, const FrameMetrics& aC
 
   ParentLayerPoint translation = (aCompositorMetrics.GetScrollOffset() - aContentMetrics.GetScrollOffset())
                                * aCompositorMetrics.GetZoom();
-  return ViewTransform(aCompositorMetrics.GetAsyncZoom(), -translation);
+  return AsyncTransform(aCompositorMetrics.GetAsyncZoom(), -translation);
 }
 
 bool
@@ -162,7 +163,7 @@ SharedFrameMetricsHelper::UpdateFromCompositorFrameMetrics(
     const LayerMetricsWrapper& aLayer,
     bool aHasPendingNewThebesContent,
     bool aLowPrecision,
-    ViewTransform& aViewTransform)
+    AsyncTransform& aViewTransform)
 {
   MOZ_ASSERT(aLayer);
 
@@ -292,6 +293,8 @@ ClientMultiTiledLayerBuffer::ClientMultiTiledLayerBuffer(ClientTiledPaintedLayer
                                                          SharedFrameMetricsHelper* aHelper)
   : ClientTiledLayerBuffer(aPaintedLayer, aCompositableClient)
   , mManager(aManager)
+  , mCallback(nullptr)
+  , mCallbackData(nullptr)
   , mSharedFrameMetricsHelper(aHelper)
 {
 }
@@ -973,9 +976,10 @@ ClientMultiTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
     printf_stderr("Time to draw %i: %i, %i, %i, %i\n", PR_IntervalNow() - start, bounds.x, bounds.y, bounds.width, bounds.height);
     if (aPaintRegion.IsComplex()) {
       printf_stderr("Complex region\n");
-      nsIntRegionRectIterator it(aPaintRegion);
-      for (const IntRect* rect = it.Next(); rect != nullptr; rect = it.Next()) {
-        printf_stderr(" rect %i, %i, %i, %i\n", rect->x, rect->y, rect->width, rect->height);
+      for (auto iter = aPaintRegion.RectIter(); !iter.Done(); iter.Next()) {
+        const IntRect& rect = iter.Get();
+        printf_stderr(" rect %i, %i, %i, %i\n",
+                      rect.x, rect.y, rect.width, rect.height);
       }
     }
   }
@@ -1288,12 +1292,12 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
     mTilingOrigin.x = std::min(mTilingOrigin.x, moz2DTile.mTileOrigin.x);
     mTilingOrigin.y = std::min(mTilingOrigin.y, moz2DTile.mTileOrigin.y);
 
-    nsIntRegionRectIterator it(aDirtyRegion);
-    for (const IntRect* dirtyRect = it.Next(); dirtyRect != nullptr; dirtyRect = it.Next()) {
-      gfx::Rect drawRect(dirtyRect->x - aTileOrigin.x,
-                         dirtyRect->y - aTileOrigin.y,
-                         dirtyRect->width,
-                         dirtyRect->height);
+    for (auto iter = aDirtyRegion.RectIter(); !iter.Done(); iter.Next()) {
+      const IntRect& dirtyRect = iter.Get();
+      gfx::Rect drawRect(dirtyRect.x - aTileOrigin.x,
+                         dirtyRect.y - aTileOrigin.y,
+                         dirtyRect.width,
+                         dirtyRect.height);
       drawRect.Scale(mResolution);
 
       // Mark the newly updated area as invalid in the front buffer
@@ -1327,24 +1331,22 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
   RefPtr<DrawTarget> drawTarget = backBuffer->BorrowDrawTarget();
   drawTarget->SetTransform(Matrix());
 
-  RefPtr<gfxContext> ctxt = new gfxContext(drawTarget);
-
   // XXX Perhaps we should just copy the bounding rectangle here?
   RefPtr<gfx::SourceSurface> source = mSinglePaintDrawTarget->Snapshot();
-  nsIntRegionRectIterator it(aDirtyRegion);
-  for (const IntRect* dirtyRect = it.Next(); dirtyRect != nullptr; dirtyRect = it.Next()) {
+  for (auto iter = aDirtyRegion.RectIter(); !iter.Done(); iter.Next()) {
+    const IntRect& dirtyRect = iter.Get();
 #ifdef GFX_TILEDLAYER_PREF_WARNINGS
     printf_stderr(" break into subdirtyRect %i, %i, %i, %i\n",
-                  dirtyRect->x, dirtyRect->y, dirtyRect->width, dirtyRect->height);
+                  dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
 #endif
-    gfx::Rect drawRect(dirtyRect->x - aTileOrigin.x,
-                       dirtyRect->y - aTileOrigin.y,
-                       dirtyRect->width,
-                       dirtyRect->height);
+    gfx::Rect drawRect(dirtyRect.x - aTileOrigin.x,
+                       dirtyRect.y - aTileOrigin.y,
+                       dirtyRect.width,
+                       dirtyRect.height);
     drawRect.Scale(mResolution);
 
-    gfx::IntRect copyRect(NS_lroundf((dirtyRect->x - mSinglePaintBufferOffset.x) * mResolution),
-                          NS_lroundf((dirtyRect->y - mSinglePaintBufferOffset.y) * mResolution),
+    gfx::IntRect copyRect(NS_lroundf((dirtyRect.x - mSinglePaintBufferOffset.x) * mResolution),
+                          NS_lroundf((dirtyRect.y - mSinglePaintBufferOffset.y) * mResolution),
                           drawRect.width,
                           drawRect.height);
     gfx::IntPoint copyTarget(NS_lroundf(drawRect.x), NS_lroundf(drawRect.y));
@@ -1362,7 +1364,6 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
                    aTileOrigin.y * GetPresShellResolution(), GetTileLength(), GetTileLength());
 #endif
 
-  ctxt = nullptr;
   drawTarget = nullptr;
 
   nsIntRegion tileRegion =
@@ -1401,7 +1402,7 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
 static Maybe<LayerRect>
 GetCompositorSideCompositionBounds(const LayerMetricsWrapper& aScrollAncestor,
                                    const LayerToParentLayerMatrix4x4& aTransformToCompBounds,
-                                   const ViewTransform& aAPZTransform,
+                                   const AsyncTransform& aAPZTransform,
                                    const LayerRect& aClip)
 {
   LayerToParentLayerMatrix4x4 transform = aTransformToCompBounds *
@@ -1445,7 +1446,7 @@ ClientMultiTiledLayerBuffer::ComputeProgressiveUpdateRegion(const nsIntRegion& a
   // Find out the current view transform to determine which tiles to draw
   // first, and see if we should just abort this paint. Aborting is usually
   // caused by there being an incoming, more relevant paint.
-  ViewTransform viewTransform;
+  AsyncTransform viewTransform;
 #if defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_ANDROID_APZ)
   FrameMetrics contentMetrics = scrollAncestor.Metrics();
   bool abortPaint = false;

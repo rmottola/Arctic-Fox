@@ -79,8 +79,7 @@ public:
   static bool BeforeAfterKeyboardEventEnabled();
 
   void Init(nsIDocument* aDocument, nsPresContext* aPresContext,
-            nsViewManager* aViewManager, nsStyleSet* aStyleSet,
-            nsCompatibility aCompatMode);
+            nsViewManager* aViewManager, nsStyleSet* aStyleSet);
   virtual void Destroy() override;
   virtual void MakeZombie() override;
 
@@ -212,7 +211,7 @@ public:
   }
   virtual bool ScaleToResolution() const override;
   virtual float GetCumulativeResolution() override;
-  virtual float GetCumulativeScaleResolution() override;
+  virtual float GetCumulativeNonRootScaleResolution() override;
 
   //nsIViewObserver interface
 
@@ -644,9 +643,6 @@ protected:
   void QueryIsActive();
   nsresult UpdateImageLockingState();
 
-#ifdef ANDROID
-  nsIDocument* GetTouchEventTargetDocument();
-#endif
   bool InZombieDocument(nsIContent *aContent);
   already_AddRefed<nsIPresShell> GetParentPresShellForEventHandling();
   nsIContent* GetCurrentEventContent();
@@ -721,7 +717,9 @@ protected:
   virtual void SysColorChanged() override { mPresContext->SysColorChanged(); }
   virtual void ThemeChanged() override { mPresContext->ThemeChanged(); }
   virtual void BackingScaleFactorChanged() override { mPresContext->UIResolutionChanged(); }
-
+#ifdef ANDROID
+  virtual nsIDocument* GetTouchEventTargetDocument();
+#endif
   void UpdateImageVisibility();
   void UpdateActivePointerState(mozilla::WidgetGUIEvent* aEvent);
 

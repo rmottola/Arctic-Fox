@@ -204,14 +204,6 @@ public:
   };
 
   /**
-   * Creates a DrawTarget which is optimized for inter-operating with this
-   * layermanager.
-   */
-  virtual already_AddRefed<mozilla::gfx::DrawTarget>
-    CreateDrawTarget(const mozilla::gfx::IntSize& aSize,
-                     mozilla::gfx::SurfaceFormat aFormat) override;
-
-  /**
    * Calculates the 'completeness' of the rendering that intersected with the
    * screen on the last render. This is only useful when progressive tile
    * drawing is enabled, otherwise this will always return 1.0.
@@ -328,7 +320,7 @@ private:
   /**
    * We need to know our invalid region before we're ready to render.
    */
-  void InvalidateDebugOverlay(const gfx::IntRect& aBounds);
+  void InvalidateDebugOverlay(nsIntRegion& aInvalidRegion, const gfx::IntRect& aBounds);
 
   /**
    * Render debug overlays such as the FPS/FrameCounter above the frame.

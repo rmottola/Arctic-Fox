@@ -244,7 +244,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         # Propagate LIBRARY_DEFINES to all child libraries recursively.
         def propagate_defines(outerlib, defines):
-            outerlib.defines.update(defines)
+            outerlib.lib_defines.update(defines)
             for lib in outerlib.linked_libraries:
                 # Propagate defines only along FINAL_LIBRARY paths, not USE_LIBS
                 # paths.
@@ -254,7 +254,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         for lib in (l for libs in self._libs.values() for l in libs):
             if isinstance(lib, Library):
-                propagate_defines(lib, lib.defines)
+                propagate_defines(lib, lib.lib_defines)
             yield lib
 
         for obj in self._binaries.values():
@@ -507,6 +507,23 @@ class TreeMetadataEmitter(LoggingMixin):
                         'STATIC_LIBRARY_NAME. Please change one of them.',
                         context)
 
+            symbols_file = context.get('SYMBOLS_FILE')
+            if symbols_file:
+                if not shared_lib:
+                    raise SandboxValidationError(
+                        'SYMBOLS_FILE can only be used with a SHARED_LIBRARY.',
+                        context)
+                if context.get('DEFFILE') or context.get('LD_VERSION_SCRIPT'):
+                    raise SandboxValidationError(
+                        'SYMBOLS_FILE cannot be used along DEFFILE or '
+                        'LD_VERSION_SCRIPT.', context)
+                if not os.path.exists(symbols_file.full_path):
+                    raise SandboxValidationError(
+                        'Path specified in SYMBOLS_FILE does not exist: %s '
+                        '(resolved to %s)' % (symbols_file,
+                        symbols_file.full_path), context)
+                shared_args['symbols_file'] = True
+
             if shared_lib:
                 lib = SharedLibrary(context, libname, **shared_args)
                 self._libs[libname].append(lib)
@@ -515,6 +532,13 @@ class TreeMetadataEmitter(LoggingMixin):
                     yield ChromeManifestEntry(context,
                         'components/components.manifest',
                         ManifestBinaryComponent('components', lib.lib_name))
+                if symbols_file:
+                    script = mozpath.join(
+                        mozpath.dirname(mozpath.dirname(__file__)),
+                        'action', 'generate_symbols_file.py')
+                    yield GeneratedFile(context, script,
+                        'generate_symbols_file', lib.symbols_file,
+                        [symbols_file.full_path], lib.defines.get_defines())
             if static_lib:
                 lib = StaticLibrary(context, libname, **static_args)
                 self._libs[libname].append(lib)
@@ -524,7 +548,7 @@ class TreeMetadataEmitter(LoggingMixin):
                 if not libname:
                     raise SandboxValidationError('LIBRARY_DEFINES needs a '
                         'LIBRARY_NAME to take effect', context)
-                lib.defines.update(lib_defines)
+                lib.lib_defines.update(lib_defines)
 
     def emit_from_context(self, context):
         """Convert a Context to tree metadata objects.
@@ -546,12 +570,6 @@ class TreeMetadataEmitter(LoggingMixin):
         for path in context['CONFIGURE_SUBST_FILES']:
             yield self._create_substitution(ConfigFileSubstitution, context,
                 path)
-
-        for path in context['CONFIGURE_DEFINE_FILES']:
-            script = mozpath.join(mozpath.dirname(mozpath.dirname(__file__)),
-                                  'action', 'process_define_files.py')
-            yield GeneratedFile(context, script, 'process_define_file', path,
-                                [mozpath.join(context.srcdir, path + '.in')])
 
         for obj in self._process_xpidl(context):
             yield obj
@@ -577,6 +595,7 @@ class TreeMetadataEmitter(LoggingMixin):
             'LD_VERSION_SCRIPT',
             'USE_EXTENSION_MANIFEST',
             'NO_JS_MANIFEST',
+            'HAS_MISC_RULE',
         ]
         for v in varlist:
             if v in context and context[v]:
@@ -651,6 +670,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         components = []
         for var, cls in (
+            ('BRANDING_FILES', BrandingFiles),
             ('EXPORTS', Exports),
             ('FINAL_TARGET_FILES', FinalTargetFiles),
             ('FINAL_TARGET_PP_FILES', FinalTargetPreprocessedFiles),
@@ -686,10 +706,10 @@ class TreeMetadataEmitter(LoggingMixin):
                                 'File listed in %s does not exist: %s'
                                 % (var, path), context)
                     else:
-                        if mozpath.basename(f.full_path) not in generated_files:
+                        if f.target_basename not in generated_files:
                             raise SandboxValidationError(
                                 ('Objdir file listed in %s not in ' +
-                                 'GENERATED_FILES: %s') % (var, path), context)
+                                 'GENERATED_FILES: %s') % (var, f), context)
 
             # Addons (when XPI_NAME is defined) and Applications (when
             # DIST_SUBDIR is defined) use a different preferences directory
@@ -724,10 +744,6 @@ class TreeMetadataEmitter(LoggingMixin):
                 yield ChromeManifestEntry(context, 'chrome.manifest',
                                           Manifest('components',
                                                    mozpath.basename(c)))
-
-        branding_files = context.get('BRANDING_FILES')
-        if branding_files:
-            yield BrandingFiles(context, branding_files)
 
         for obj in self._handle_libraries(context):
             yield obj
@@ -901,6 +917,13 @@ class TreeMetadataEmitter(LoggingMixin):
                 xpidl_module, add_to_manifest=not context['XPIDL_NO_MANIFEST'])
 
     def _process_generated_files(self, context):
+        for path in context['CONFIGURE_DEFINE_FILES']:
+            script = mozpath.join(mozpath.dirname(mozpath.dirname(__file__)),
+                                  'action', 'process_define_files.py')
+            yield GeneratedFile(context, script, 'process_define_file',
+                                unicode(path),
+                                [mozpath.join(context.srcdir, path + '.in')])
+
         generated_files = context.get('GENERATED_FILES')
         if not generated_files:
             return
@@ -1271,7 +1294,7 @@ class TreeMetadataEmitter(LoggingMixin):
                 'it is currently limited to one value.', context)
 
         for path in jar_manifests:
-            yield JARManifest(context, mozpath.join(context.srcdir, path))
+            yield JARManifest(context, path)
 
         # Temporary test to look for jar.mn files that creep in without using
         # the new declaration. Before, we didn't require jar.mn files to
@@ -1286,8 +1309,6 @@ class TreeMetadataEmitter(LoggingMixin):
     def _emit_directory_traversal_from_context(self, context):
         o = DirectoryTraversal(context)
         o.dirs = context.get('DIRS', [])
-        o.test_dirs = context.get('TEST_DIRS', [])
-        o.affected_tiers = context.get_affected_tiers()
 
         # Some paths have a subconfigure, yet also have a moz.build. Those
         # shouldn't end up in self._external_paths.

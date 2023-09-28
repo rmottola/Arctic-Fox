@@ -582,7 +582,7 @@ void
 GMPParent::GetCrashID(nsString& aResult)
 {
   CrashReporterParent* cr =
-    static_cast<CrashReporterParent*>(LoneManagedOrNull(ManagedPCrashReporterParent()));
+    static_cast<CrashReporterParent*>(LoneManagedOrNullAsserts(ManagedPCrashReporterParent()));
   if (NS_WARN_IF(!cr)) {
     return;
   }
@@ -936,7 +936,7 @@ GMPParent::GetVersion() const
   return mVersion;
 }
 
-const uint32_t
+uint32_t
 GMPParent::GetPluginId() const
 {
   return mPluginId;

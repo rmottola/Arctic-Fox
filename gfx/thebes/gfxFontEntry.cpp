@@ -333,7 +333,7 @@ gfxFontEntry::HasSVGGlyph(uint32_t aGlyphId)
 }
 
 bool
-gfxFontEntry::GetSVGGlyphExtents(gfxContext *aContext, uint32_t aGlyphId,
+gfxFontEntry::GetSVGGlyphExtents(DrawTarget* aDrawTarget, uint32_t aGlyphId,
                                  gfxRect *aResult)
 {
     MOZ_ASSERT(mSVGInitialized,
@@ -342,7 +342,7 @@ gfxFontEntry::GetSVGGlyphExtents(gfxContext *aContext, uint32_t aGlyphId,
                "font has invalid unitsPerEm");
 
     cairo_matrix_t fontMatrix;
-    cairo_get_font_matrix(aContext->GetCairo(), &fontMatrix);
+    cairo_get_font_matrix(gfxFont::RefCairo(aDrawTarget), &fontMatrix);
 
     gfxMatrix svgToAppSpace(fontMatrix.xx, fontMatrix.yx,
                             fontMatrix.xy, fontMatrix.yy,
@@ -1403,7 +1403,7 @@ gfxFontFamily::CheckForSimpleFamily()
     // already checked this family
     if (mIsSimpleFamily) {
         return;
-    };
+    }
 
     uint32_t count = mAvailableFonts.Length();
     if (count > 4 || count == 0) {

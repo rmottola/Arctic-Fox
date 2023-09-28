@@ -203,6 +203,8 @@ public:
 protected:
     friend class GLContext;
 
+    void UpdateUploadSize(size_t amount);
+
     /**
      * After the ctor, the TextureImage is invalid.  Implementations
      * must allocate resources successfully before returning the new
@@ -211,11 +213,12 @@ protected:
      */
     TextureImage(const gfx::IntSize& aSize,
                  GLenum aWrapMode, ContentType aContentType,
-                 Flags aFlags = NoFlags,
-                 ImageFormat aImageFormat = gfxImageFormat::Unknown);
+                 Flags aFlags = NoFlags);
 
     // Protected destructor, to discourage deletion outside of Release():
-    virtual ~TextureImage() {}
+    virtual ~TextureImage() {
+        UpdateUploadSize(0);
+    }
 
     virtual gfx::IntRect GetSrcTileRect();
 
@@ -225,6 +228,7 @@ protected:
     gfx::SurfaceFormat mTextureFormat;
     gfx::Filter mFilter;
     Flags mFlags;
+    size_t mUploadSize;
 };
 
 /**
@@ -247,8 +251,7 @@ public:
                       GLenum aWrapMode,
                       ContentType aContentType,
                       GLContext* aContext,
-                      TextureImage::Flags aFlags = TextureImage::NoFlags,
-                      TextureImage::ImageFormat aImageFormat = gfxImageFormat::Unknown);
+                      TextureImage::Flags aFlags = TextureImage::NoFlags);
 
     virtual void BindTexture(GLenum aTextureUnit);
 
@@ -298,7 +301,7 @@ public:
                       gfx::IntSize aSize,
                       TextureImage::ContentType,
                       TextureImage::Flags aFlags = TextureImage::NoFlags,
-                      TextureImage::ImageFormat aImageFormat = gfxImageFormat::Unknown);
+                      TextureImage::ImageFormat aImageFormat = gfx::SurfaceFormat::UNKNOWN);
     ~TiledTextureImage();
     void DumpDiv();
     virtual gfx::DrawTarget* BeginUpdate(nsIntRegion& aRegion);
@@ -347,8 +350,7 @@ CreateBasicTextureImage(GLContext* aGL,
                         const gfx::IntSize& aSize,
                         TextureImage::ContentType aContentType,
                         GLenum aWrapMode,
-                        TextureImage::Flags aFlags,
-                        TextureImage::ImageFormat aImageFormat = gfxImageFormat::Unknown);
+                        TextureImage::Flags aFlags);
 
 /**
   * Return a valid, allocated TextureImage of |aSize| with
@@ -373,7 +375,7 @@ CreateTextureImage(GLContext* gl,
                    TextureImage::ContentType aContentType,
                    GLenum aWrapMode,
                    TextureImage::Flags aFlags = TextureImage::NoFlags,
-                   TextureImage::ImageFormat aImageFormat = gfxImageFormat::Unknown);
+                   TextureImage::ImageFormat aImageFormat = gfx::SurfaceFormat::UNKNOWN);
 
 } // namespace gl
 } // namespace mozilla

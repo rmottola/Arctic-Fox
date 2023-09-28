@@ -304,7 +304,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       }
 
       // PNK_WITH is PN_BINARY_OBJ -- that is, PN_BINARY with (irrelevant for
-      // this method's purposes) the addition of the StaticWithObject as
+      // this method's purposes) the addition of the StaticWithScope as
       // pn_binary_obj.  Both left (expression) and right (statement) are
       // non-null.
       case PNK_WITH: {
@@ -775,10 +775,6 @@ Parser<FullParseHandler>::cloneParseTree(ParseNode* opn)
     return pn;
 }
 
-template <>
-ParseNode*
-Parser<FullParseHandler>::cloneLeftHandSide(ParseNode* opn);
-
 /*
  * Used by Parser::cloneLeftHandSide to clone a default expression
  * in the form of
@@ -889,6 +885,16 @@ Parser<FullParseHandler>::cloneLeftHandSide(ParseNode* opn)
         }
     }
     return pn;
+}
+
+template <>
+SyntaxParseHandler::Node
+Parser<SyntaxParseHandler>::cloneLeftHandSide(Node node)
+{
+    // See the comment in SyntaxParseHandler::singleBindingFromDeclaration for
+    // why this is okay.
+    MOZ_ASSERT(node == SyntaxParseHandler::NodeUnparenthesizedName);
+    return SyntaxParseHandler::NodeGeneric;
 }
 
 } /* namespace frontend */
@@ -1190,5 +1196,4 @@ ModuleBox::trace(JSTracer* trc)
 {
     ObjectBox::trace(trc);
     bindings.trace(trc);
-    exportNames.trace(trc);
 }

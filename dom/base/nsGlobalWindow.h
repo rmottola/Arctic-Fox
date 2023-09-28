@@ -129,7 +129,7 @@ class IDBFactory;
 } // namespace indexedDB
 } // namespace dom
 namespace gfx {
-class VRHMDInfo;
+class VRDeviceProxy;
 } // namespace gfx
 } // namespace mozilla
 
@@ -471,9 +471,9 @@ public:
   // Outer windows only.
   virtual nsresult SetFullscreenInternal(
     FullscreenReason aReason, bool aIsFullscreen,
-    mozilla::gfx::VRHMDInfo *aHMD = nullptr) override final;
+    mozilla::gfx::VRDeviceProxy *aHMD = nullptr) override final;
   virtual void FinishFullscreenChange(bool aIsFullscreen) override final;
-  void SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
+  bool SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
                            nsIWidget* aWidget, nsIScreen* aScreen);
   bool FullScreen() const;
 
@@ -496,7 +496,7 @@ public:
 
   bool DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObj,
                  JS::Handle<jsid> aId,
-                 JS::MutableHandle<JSPropertyDescriptor> aDesc);
+                 JS::MutableHandle<JS::PropertyDescriptor> aDesc);
   // The return value is whether DoResolve might end up resolving the given id.
   // If in doubt, return true.
   static bool MayResolve(jsid aId);
@@ -760,8 +760,8 @@ public:
   void EnableGamepadUpdates();
   void DisableGamepadUpdates();
 
-  // Get the VR devices for this window, initializing if necessary
-  bool GetVRDevices(nsTArray<RefPtr<mozilla::dom::VRDevice>>& aDevices);
+  // Update the VR devices for this window
+  bool UpdateVRDevices(nsTArray<RefPtr<mozilla::dom::VRDevice>>& aDevices);
 
 #define EVENT(name_, id_, type_, struct_)                                     \
   mozilla::dom::EventHandlerNonNull* GetOn##name_()                           \
@@ -1048,6 +1048,7 @@ public:
 #ifdef MOZ_WEBSPEECH
   mozilla::dom::SpeechSynthesis*
     GetSpeechSynthesis(mozilla::ErrorResult& aError);
+  bool HasActiveSpeechSynthesis();
 #endif
   already_AddRefed<nsICSSDeclaration>
     GetDefaultComputedStyle(mozilla::dom::Element& aElt,
@@ -1614,8 +1615,8 @@ protected:
   // Outer windows only.
   void PreloadLocalStorage();
 
-  // Returns device pixels.  Outer windows only.
-  nsIntPoint GetScreenXY(mozilla::ErrorResult& aError);
+  // Returns desktop pixels.  Outer windows only.
+  mozilla::DesktopIntPoint GetScreenXY(mozilla::ErrorResult& aError);
 
   nsGlobalWindow* InnerForSetTimeoutOrInterval(mozilla::ErrorResult& aError);
 
@@ -1857,12 +1858,8 @@ protected:
   // This is the CC generation the last time we called CanSkip.
   uint32_t mCanSkipCCGeneration;
 
-  // Did VR get initialized for this window?
-  bool                                       mVRDevicesInitialized;
   // The VRDevies for this window
   nsTArray<RefPtr<mozilla::dom::VRDevice>> mVRDevices;
-  // Any attached HMD when fullscreen
-  RefPtr<mozilla::gfx::VRHMDInfo>          mVRHMDInfo;
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;

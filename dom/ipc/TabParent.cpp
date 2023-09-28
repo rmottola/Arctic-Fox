@@ -38,6 +38,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
+#include "mozilla/UniquePtr.h"
 #include "mozilla/unused.h"
 #include "BlobParent.h"
 #include "nsCOMPtr.h"
@@ -438,7 +439,7 @@ TabParent::GetAppType(nsAString& aOut)
 }
 
 bool
-TabParent::IsVisible()
+TabParent::IsVisible() const
 {
   RefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
   if (!frameLoader) {
@@ -468,8 +469,31 @@ static void LogChannelRelevantInfo(nsIURI* aURI,
   LOG("Result principal origin: %s\n", resultPrincipalOrigin.get());
 }
 
+// This is similar to nsIScriptSecurityManager.getChannelResultPrincipal
+// but taking signedPkg into account. The reason we can't rely on channel
+// loadContext/loadInfo is it's dangerous to mutate them on parent process.
+static already_AddRefed<nsIPrincipal>
+GetChannelPrincipalWithSingedPkg(nsIChannel* aChannel, const nsACString& aSignedPkg)
+{
+  NeckoOriginAttributes neckoAttrs;
+  NS_GetOriginAttributes(aChannel, neckoAttrs);
+
+  PrincipalOriginAttributes attrs;
+  attrs.InheritFromNecko(neckoAttrs);
+  attrs.mSignedPkg = NS_ConvertUTF8toUTF16(aSignedPkg);
+
+  nsCOMPtr<nsIURI> uri;
+  nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  nsCOMPtr<nsIPrincipal> principal =
+    BasePrincipal::CreateCodebasePrincipal(uri, attrs);
+
+  return principal.forget();
+}
+
 bool
-TabParent::ShouldSwitchProcess(nsIChannel* aChannel)
+TabParent::ShouldSwitchProcess(nsIChannel* aChannel, const nsACString& aSignedPkg)
 {
   // If we lack of any information which is required to decide the need of
   // process switch, consider that we should switch process.
@@ -483,19 +507,18 @@ TabParent::ShouldSwitchProcess(nsIChannel* aChannel)
   NS_ENSURE_TRUE(loadingPrincipal, true);
 
   // Prepare the channel result principal.
-  nsCOMPtr<nsIPrincipal> resultPrincipal;
-  nsContentUtils::GetSecurityManager()->
-    GetChannelResultPrincipal(aChannel, getter_AddRefs(resultPrincipal));
+  nsCOMPtr<nsIPrincipal> channelPrincipal =
+    GetChannelPrincipalWithSingedPkg(aChannel, aSignedPkg);
 
   // Log the debug info which is used to decide the need of proces switch.
   nsCOMPtr<nsIURI> uri;
   aChannel->GetURI(getter_AddRefs(uri));
-  LogChannelRelevantInfo(uri, loadingPrincipal, resultPrincipal,
+  LogChannelRelevantInfo(uri, loadingPrincipal, channelPrincipal,
                          loadInfo->InternalContentPolicyType());
 
   // Check if the signed package is loaded from the same origin.
   bool sameOrigin = false;
-  loadingPrincipal->Equals(resultPrincipal, &sameOrigin);
+  loadingPrincipal->Equals(channelPrincipal, &sameOrigin);
   if (sameOrigin) {
     LOG("Loading singed package from the same origin. Don't switch process.\n");
     return false;
@@ -526,7 +549,7 @@ void
 TabParent::OnStartSignedPackageRequest(nsIChannel* aChannel,
                                        const nsACString& aPackageId)
 {
-  if (!ShouldSwitchProcess(aChannel)) {
+  if (!ShouldSwitchProcess(aChannel, aPackageId)) {
     return;
   }
 
@@ -2110,25 +2133,25 @@ TabParent::RecvEnableDisableCommands(const nsString& aAction,
 {
   nsCOMPtr<nsIRemoteBrowser> remoteBrowser = do_QueryInterface(mFrameElement);
   if (remoteBrowser) {
-    nsAutoArrayPtr<const char*> enabledCommands, disabledCommands;
+    UniquePtr<const char*[]> enabledCommands, disabledCommands;
 
     if (aEnabledCommands.Length()) {
-      enabledCommands = new const char* [aEnabledCommands.Length()];
+      enabledCommands = MakeUnique<const char*[]>(aEnabledCommands.Length());
       for (uint32_t c = 0; c < aEnabledCommands.Length(); c++) {
         enabledCommands[c] = aEnabledCommands[c].get();
       }
     }
 
     if (aDisabledCommands.Length()) {
-      disabledCommands = new const char* [aDisabledCommands.Length()];
+      disabledCommands = MakeUnique<const char*[]>(aDisabledCommands.Length());
       for (uint32_t c = 0; c < aDisabledCommands.Length(); c++) {
         disabledCommands[c] = aDisabledCommands[c].get();
       }
     }
 
     remoteBrowser->EnableDisableCommands(aAction,
-                                         aEnabledCommands.Length(), enabledCommands,
-                                         aDisabledCommands.Length(), disabledCommands);
+                                         aEnabledCommands.Length(), enabledCommands.get(),
+                                         aDisabledCommands.Length(), disabledCommands.get());
   }
 
   return true;
@@ -2327,7 +2350,7 @@ TabParent::GetTabIdFrom(nsIDocShell *docShell)
 RenderFrameParent*
 TabParent::GetRenderFrame()
 {
-  PRenderFrameParent* p = LoneManagedOrNull(ManagedPRenderFrameParent());
+  PRenderFrameParent* p = LoneManagedOrNullAsserts(ManagedPRenderFrameParent());
   return static_cast<RenderFrameParent*>(p);
 }
 
@@ -2358,7 +2381,7 @@ TabParent::RecvStartPluginIME(const WidgetKeyboardEvent& aKeyboardEvent,
     return true;
   }
   widget->StartPluginIME(aKeyboardEvent,
-                         (int32_t&)aPanelX, 
+                         (int32_t&)aPanelX,
                          (int32_t&)aPanelY,
                          *aCommitted);
   return true;
@@ -2372,6 +2395,31 @@ TabParent::RecvSetPluginFocused(const bool& aFocused)
     return true;
   }
   widget->SetPluginFocused((bool&)aFocused);
+  return true;
+}
+
+ bool
+TabParent::RecvSetCandidateWindowForPlugin(
+             const CandidateWindowPosition& aPosition)
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  widget->SetCandidateWindowForPlugin(aPosition);
+  return true;
+}
+
+bool
+TabParent::RecvDefaultProcOfPluginEvent(const WidgetPluginEvent& aEvent)
+{
+  nsCOMPtr<nsIWidget> widget = GetWidget();
+  if (!widget) {
+    return true;
+  }
+
+  widget->DefaultProcOfPluginEvent(aEvent);
   return true;
 }
 
@@ -2769,10 +2817,11 @@ TabParent::RecvBrowserFrameOpenWindow(PBrowserParent* aOpener,
 bool
 TabParent::RecvZoomToRect(const uint32_t& aPresShellId,
                           const ViewID& aViewId,
-                          const CSSRect& aRect)
+                          const CSSRect& aRect,
+                          const uint32_t& aFlags)
 {
   if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->ZoomToRect(aPresShellId, aViewId, aRect);
+    rfp->ZoomToRect(aPresShellId, aViewId, aRect, aFlags);
   }
   return true;
 }

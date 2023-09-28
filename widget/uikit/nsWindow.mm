@@ -51,7 +51,7 @@ UIKitPointsToDevPixels(CGPoint aPoint, CGFloat aBackingScale)
 }
 
 static CGRect
-DevPixelsToUIKitPoints(const nsIntRect& aRect, CGFloat aBackingScale)
+DevPixelsToUIKitPoints(const LayoutDeviceIntRect& aRect, CGFloat aBackingScale)
 {
     return CGRectMake((CGFloat)aRect.x / aBackingScale,
                       (CGFloat)aRect.y / aBackingScale,
@@ -377,13 +377,10 @@ private:
   }
 
   // Set up the clip region.
-  LayoutDeviceIntRegion::RectIterator iter(region);
   targetContext->NewPath();
-  for (;;) {
-    const LayoutDeviceIntRect* r = iter.Next();
-    if (!r)
-      break;
-    targetContext->Rectangle(gfxRect(r->x, r->y, r->width, r->height));
+  for (auto iter = region.RectIter(); !iter.Done(); iter.Next()) {
+    const LayoutDeviceIntRect& r = iter.Get();
+    targetContext->Rectangle(gfxRect(r.x, r.y, r.width, r.height));
   }
   targetContext->Clip();
 
@@ -493,7 +490,7 @@ nsWindow::Create(nsIWidget* aParent,
             mBounds.height = cgRect.size.height;
         }
     } else {
-        mBounds = aRect.ToUnknownRect();
+        mBounds = aRect;
     }
 
     ALOG("nsWindow[%p]::Create bounds: %d %d %d %d", (void*)this,
@@ -503,9 +500,7 @@ nsWindow::Create(nsIWidget* aParent,
     mWindowType = eWindowType_toplevel;
     mBorderStyle = eBorderStyle_default;
 
-    Inherited::BaseCreate(aParent,
-                          LayoutDeviceIntRect::FromUnknownRect(mBounds),
-                          aInitData);
+    Inherited::BaseCreate(aParent, aInitData);
 
     NS_ASSERTION(IsTopLevel() || parent, "non top level window doesn't have a parent!");
 

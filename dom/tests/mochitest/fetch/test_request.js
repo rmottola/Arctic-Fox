@@ -124,6 +124,19 @@ function testBug1109574() {
   var r3 = new Request(r1);
 }
 
+// Bug 1184550 - Request constructor should always throw if used flag is set,
+// even if body is null
+function testBug1184550() {
+  var req = new Request("", { method: 'post', body: "Test" });
+  fetch(req);
+  ok(req.bodyUsed, "Request body should be used immediately after fetch()");
+  return fetch(req).then(function(resp) {
+    ok(false, "Second fetch with same request should fail.");
+  }).catch(function(err) {
+    is(err.name, 'TypeError', "Second fetch with same request should fail.");
+  });
+}
+
 function testHeaderGuard() {
   var headers = {
     "Cookie": "Custom cookie",
@@ -136,6 +149,15 @@ function testHeaderGuard() {
   var r2 = new Request("", { mode: "no-cors", headers: headers });
   ok(!r2.headers.has("Cookie"), "no-cors Request header should have guard request-no-cors and prevent setting non-simple header.");
   ok(!r2.headers.has("Non-Simple-Header"), "no-cors Request header should have guard request-no-cors and prevent setting non-simple header.");
+}
+
+function testMode() {
+  try {
+    var req = new Request("http://example.com", {mode: "navigate"});
+    ok(false, "Creating a Request with navigate RequestMode should throw a TypeError");
+  } catch(e) {
+    is(e.name, "TypeError", "Creating a Request with navigate RequestMode should throw a TypeError");
+  }
 }
 
 function testMethod() {
@@ -498,8 +520,10 @@ function runTest() {
   testUrlFragment();
   testUrlCredentials();
   testUrlMalformed();
+  testMode();
   testMethod();
   testBug1109574();
+  testBug1184550();
   testHeaderGuard();
   testModeCorsPreflightEnumValue();
   testBug1154268();

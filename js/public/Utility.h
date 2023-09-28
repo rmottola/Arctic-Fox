@@ -235,6 +235,11 @@ static inline void* js_calloc(size_t nmemb, size_t size)
 
 static inline void* js_realloc(void* p, size_t bytes)
 {
+    // realloc() with zero size is not portable, as some implementations may
+    // return nullptr on success and free |p| for this.  We assume nullptr
+    // indicates failure and that |p| is still valid.
+    MOZ_ASSERT(bytes != 0);
+
     JS_OOM_POSSIBLY_FAIL();
     return realloc(p, bytes);
 }
@@ -460,6 +465,14 @@ namespace JS {
 template<typename T>
 struct DeletePolicy
 {
+    MOZ_CONSTEXPR DeletePolicy() {}
+
+    template<typename U>
+    MOZ_IMPLICIT DeletePolicy(DeletePolicy<U> other,
+                              typename mozilla::EnableIf<mozilla::IsConvertible<U*, T*>::value,
+                                                         int>::Type dummy = 0)
+    {}
+
     void operator()(const T* ptr) {
         js_delete(const_cast<T*>(ptr));
     }
@@ -472,6 +485,9 @@ struct FreePolicy
     }
 };
 
+typedef mozilla::UniquePtr<char[], JS::FreePolicy> UniqueChars;
+typedef mozilla::UniquePtr<char16_t[], JS::FreePolicy> UniqueTwoByteChars;
+
 } // namespace JS
 
 namespace js {
@@ -479,13 +495,6 @@ namespace js {
 /* Integral types for all hash functions. */
 typedef uint32_t HashNumber;
 const unsigned HashNumberSizeBits = 32;
-
-typedef mozilla::UniquePtr<char, JS::FreePolicy> UniqueChars;
-
-static inline UniqueChars make_string_copy(const char* str)
-{
-    return UniqueChars(js_strdup(str));
-}
 
 namespace detail {
 

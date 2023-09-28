@@ -2130,7 +2130,7 @@ nsContentUtils::IsCallerContentXBL()
 bool
 nsContentUtils::LookupBindingMember(JSContext* aCx, nsIContent *aContent,
                                     JS::Handle<jsid> aId,
-                                    JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                                    JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   nsXBLBinding* binding = aContent->GetXBLBinding();
   if (!binding)
@@ -6923,7 +6923,7 @@ nsContentUtils::GetAdjustedOffsetInTextControl(nsIFrame* aOffsetFrame,
   // has the text frames (containing the content) as its children. This will
   // be the case if we click to the right of any of the text frames, or at the
   // bottom of the text area.
-  nsIFrame* firstChild = aOffsetFrame->GetFirstPrincipalChild();
+  nsIFrame* firstChild = aOffsetFrame->PrincipalChildList().FirstChild();
   if (firstChild) {
     // In this case, the passed-in offset is incorrect, and we want the length
     // of the entire content in the text control frame.
@@ -6936,7 +6936,7 @@ nsContentUtils::GetAdjustedOffsetInTextControl(nsIFrame* aOffsetFrame,
     // frame. Our offset should therefore be the length of the first child of
     // our parent.
     int32_t aOutOffset =
-      aOffsetFrame->GetParent()->GetFirstPrincipalChild()->GetContent()->Length();
+      aOffsetFrame->GetParent()->PrincipalChildList().FirstChild()->GetContent()->Length();
     return aOutOffset;
   }
 
@@ -7694,7 +7694,8 @@ nsContentUtils::ToWidgetPoint(const CSSPoint& aPoint,
                               nsPresContext* aPresContext)
 {
   return LayoutDeviceIntPoint::FromAppUnitsRounded(
-    (CSSPoint::ToAppUnits(aPoint) + aOffset).ApplyResolution(aPresContext->PresShell()->GetCumulativeScaleResolution()),
+    (CSSPoint::ToAppUnits(aPoint) +
+    aOffset).ApplyResolution(aPresContext->PresShell()->GetCumulativeNonRootScaleResolution()),
     aPresContext->AppUnitsPerDevPixel());
 }
 

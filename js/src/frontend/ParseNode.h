@@ -9,6 +9,7 @@
 
 #include "mozilla/Attributes.h"
 
+#include "builtin/ModuleObject.h"
 #include "frontend/TokenStream.h"
 
 namespace js {
@@ -345,7 +346,7 @@ IsDeleteKind(ParseNodeKind kind)
  *                          pn_kid3: catch block statements
  * PNK_BREAK    name        pn_atom: label or null
  * PNK_CONTINUE name        pn_atom: label or null
- * PNK_WITH     binary-obj  pn_left: head expr; pn_right: body; pn_binary_obj: StaticWithObject
+ * PNK_WITH     binary-obj  pn_left: head expr; pn_right: body; pn_binary_obj: StaticWithScope
  * PNK_VAR,     list        pn_head: list of PNK_NAME or PNK_ASSIGN nodes
  * PNK_CONST                         each name node has either
  *                                     pn_used: false
@@ -838,7 +839,6 @@ class ParseNode
     /* Return true if this node appears in a Directive Prologue. */
     bool isDirectivePrologueMember() const { return pn_prologue; }
 
-#ifdef JS_HAS_GENERATOR_EXPRS
     ParseNode* generatorExpr() const {
         MOZ_ASSERT(isKind(PNK_GENEXP));
         ParseNode* callee = this->pn_head;
@@ -848,7 +848,6 @@ class ParseNode
                    body->last()->isKind(PNK_COMPREHENSIONFOR));
         return body->last();
     }
-#endif
 
     inline void markAsAssigned();
 
@@ -1486,7 +1485,7 @@ struct ClassNode : public TernaryNode {
         MOZ_ASSERT(list->isKind(PNK_CLASSMETHODLIST));
         return list;
     }
-    ObjectBox* scopeObject() const {
+    ObjectBox* scopeObjectBox() const {
         MOZ_ASSERT(pn_kid3->is<LexicalScopeNode>());
         return pn_kid3->pn_objbox;
     }

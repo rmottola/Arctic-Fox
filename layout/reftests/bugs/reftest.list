@@ -527,7 +527,7 @@ random-if(cocoaWidget) == 350506-1.html 350506-1-ref.html
 == 356774-1.html 356774-1-ref.html
 == 356775-1.html 356775-1-ref.html
 == 359869-1.html 359869-1-ref.html
-fails-if(OSX) != 359903-1.html 359903-1-ref.html # erosion of padding removed in bug 1010675 # failure is bug 1145589
+!= 359903-1.html 359903-1-ref.html # erosion of padding removed in bug 1010675
 != 359903-2.html 359903-2-ref.html # erosion of padding removed in bug 1010675
 == 360065-1.html 360065-1-ref.html
 == 360746-1.html 360746-1-ref.html
@@ -557,9 +557,9 @@ skip-if(B2G||Mulet) == 363858-1.html 363858-1-ref.html # Initial mulet triage: p
 skip-if(B2G||Mulet) == 363858-2.html 363858-2-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 363858-3.html 363858-3-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 363858-4.html 363858-4-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
-fuzzy-if(OSX>=1008,45,2) == 363858-5a.html 363858-5-ref.html
+fuzzy-if(OSX>=1008,45,2) fuzzy-if(winWidget,114,1) == 363858-5a.html 363858-5-ref.html
 == 363858-5b.html 363858-5-ref.html
-fuzzy-if(OSX>=1008,45,2) == 363858-6a.html 363858-6-ref.html
+fuzzy-if(OSX>=1008,45,2) fuzzy-if(winWidget,114,1) == 363858-6a.html 363858-6-ref.html
 == 363858-6b.html 363858-6-ref.html
 == 363874.html 363874-ref.html
 == 363874-max-width.html 363874-max-width-ref.html
@@ -1672,7 +1672,7 @@ skip-if(B2G||Mulet) == 641770-1.html 641770-1-ref.html # Initial mulet triage: p
 == 641856-1.html 641856-1-ref.html
 == 645491-1.html 645491-1-ref.html
 == 645768-1.html 645768-1-ref.html
-fails-if(layersGPUAccelerated&&cocoaWidget) fails-if(Android&&AndroidVersion<15&&AndroidVersion!=10) fuzzy-if(asyncPan&&!layersGPUAccelerated,41,260) == 650228-1.html 650228-1-ref.html # Quartz alpha blending doesn't match GL alpha blending
+fails-if(layersGPUAccelerated&&cocoaWidget) fails-if(Android&&AndroidVersion<15&&AndroidVersion!=10) fuzzy-if(!layersGPUAccelerated,41,260) == 650228-1.html 650228-1-ref.html # Quartz alpha blending doesn't match GL alpha blending
 needs-focus == 652301-1a.html 652301-1-ref.html
 needs-focus == 652301-1b.html 652301-1-ref.html
 == 652775-1.html 652775-1-ref.html
@@ -1684,7 +1684,7 @@ fails-if(layersGPUAccelerated&&cocoaWidget) fails-if(Android&&AndroidVersion==15
 != 656875.html about:blank
 == 658952.html 658952-ref.html
 == 660682-1.html 660682-1-ref.html
-skip-if((B2G&&browserIsRemote)||Mulet) skip-if(Android) == 664127-1.xul 664127-1-ref.xul # B2G: bug 974780. Android: Intermittent failures - bug 1019131 # Initial mulet triage: parity with B2G/B2G Desktop
+fuzzy-if(d2d,1,256) skip-if((B2G&&browserIsRemote)||Mulet) skip-if(Android) == 664127-1.xul 664127-1-ref.xul # B2G: bug 974780. Android: Intermittent failures - bug 1019131 # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 665597-1.html 665597-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 665597-2.html 665597-2-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if((B2G&&browserIsRemote)||Mulet) == 668319-1.xul about:blank # bug 974780 # Initial mulet triage: parity with B2G/B2G Desktop
@@ -1833,7 +1833,7 @@ fuzzy-if(/^Windows\x20NT\x205\.1/.test(http.oscpu),255,1) == 1013054-1.html 1013
 == 1021564-3.html 1021564-ref.html
 == 1021564-4.html 1021564-ref.html
 pref(browser.display.use_document_fonts,0) == 1022481-1.html 1022481-1-ref.html
-== 1022612-1.html 1022612-1-ref.html
+fuzzy-if(d2d,1,125200) == 1022612-1.html 1022612-1-ref.html
 == 1024473-1.html 1024473-1-ref.html
 == 1025914-1.html 1025914-1-ref.html
 == 1042104-1.html 1042104-1-ref.html
@@ -1942,3 +1942,4 @@ fuzzy(1,74) fuzzy-if(gtkWidget,6,79) == 1174332-1.html 1174332-1-ref.html
 == 1209994-3.html 1209994-3-ref.html
 == 1209994-4.html 1209994-4-ref.html
 == 1222226-1.html 1222226-1-ref.html
+pref(browser.display.focus_ring_width,2) == 1234758-1.html 1234758-1-ref.html

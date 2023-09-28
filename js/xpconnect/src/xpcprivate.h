@@ -1134,7 +1134,8 @@ public:
         JS::AssertGCThingMustBeTenured(expando);
         if (!mDOMExpandoSet) {
             mDOMExpandoSet = new DOMExpandoSet();
-            mDOMExpandoSet->init(8);
+            if (!mDOMExpandoSet->init(8))
+                return false;
         }
         return mDOMExpandoSet->put(JS::Heap<JSObject*>(expando));
     }
@@ -2202,10 +2203,7 @@ public:
         // This is the only time we should be tracing our mFlatJSObject,
         // normally somebody else is doing that. Be careful not to trace the
         // bogus INVALID_OBJECT value we can have during init, though.
-        if (mFlatJSObject) {
-            JS_CallTenuredObjectTracer(trc, &mFlatJSObject,
-                                       "XPCWrappedNative::mFlatJSObject");
-        }
+        JS::TraceEdge(trc, &mFlatJSObject, "XPCWrappedNative::mFlatJSObject");
     }
 
     static void Trace(JSTracer* trc, JSObject* obj);
@@ -3738,6 +3736,13 @@ public:
     // for every scope. If this flag is set we waive interposition for this
     // scope.
     bool waiveInterposition;
+
+    // If CPOWs are disabled for browser code via the
+    // dom.ipc.cpows.forbid-unsafe-from-browser preferences, then only
+    // add-ons can use CPOWs. This flag allows a non-addon scope
+    // to opt into CPOWs. It's necessary for the implementation of
+    // RemoteAddonsParent.jsm.
+    bool allowCPOWs;
 
     // This is only ever set during mochitest runs when enablePrivilege is called.
     // It's intended as a temporary stopgap measure until we can finish ripping out

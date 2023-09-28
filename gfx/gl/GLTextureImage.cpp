@@ -12,6 +12,7 @@
 #include "mozilla/gfx/2D.h"
 #include "ScopedGLHelpers.h"
 #include "GLUploadHelpers.h"
+#include "GfxTexturesReporter.h"
 
 #include "TextureImageEGL.h"
 #ifdef XP_MACOSX
@@ -39,7 +40,7 @@ CreateTextureImage(GLContext* gl,
         case GLContextType::EGL:
             return CreateTextureImageEGL(gl, aSize, aContentType, aWrapMode, aFlags, aImageFormat);
         default:
-            return CreateBasicTextureImage(gl, aSize, aContentType, aWrapMode, aFlags, aImageFormat);
+            return CreateBasicTextureImage(gl, aSize, aContentType, aWrapMode, aFlags);
     }
 }
 
@@ -54,7 +55,7 @@ TileGenFunc(GLContext* gl,
     switch (gl->GetContextType()) {
 #ifdef XP_MACOSX
         case GLContextType::CGL:
-            return TileGenFuncCGL(gl, aSize, aContentType, aFlags, aImageFormat);
+            return TileGenFuncCGL(gl, aSize, aContentType, aFlags);
 #endif
         case GLContextType::EGL:
             return TileGenFuncEGL(gl, aSize, aContentType, aFlags, aImageFormat);
@@ -93,6 +94,16 @@ gfx::IntRect TextureImage::GetTileRect() {
 
 gfx::IntRect TextureImage::GetSrcTileRect() {
     return GetTileRect();
+}
+
+void
+TextureImage::UpdateUploadSize(size_t amount)
+{
+    if (mUploadSize > 0) {
+        GfxTexturesReporter::UpdateAmount(GfxTexturesReporter::MemoryFreed, mUploadSize);
+    }
+    mUploadSize = amount;
+    GfxTexturesReporter::UpdateAmount(GfxTexturesReporter::MemoryAllocated, mUploadSize);
 }
 
 BasicTextureImage::~BasicTextureImage()
@@ -162,16 +173,20 @@ BasicTextureImage::EndUpdate()
     RefPtr<gfx::DataSourceSurface> updateData = updateSnapshot->GetDataSurface();
 
     bool relative = FinishedSurfaceUpdate();
-
+    size_t uploadSize;
     mTextureFormat =
         UploadSurfaceToTexture(mGLContext,
                                updateData,
                                mUpdateRegion,
                                mTexture,
+                               &uploadSize,
                                mTextureState == Created,
                                mUpdateOffset,
                                relative);
     FinishedSurfaceUpload();
+    if (uploadSize > 0) {
+        UpdateUploadSize(uploadSize);
+    }
 
     mUpdateDrawTarget = nullptr;
     mTextureState = Valid;
@@ -214,14 +229,19 @@ BasicTextureImage::DirectUpdate(gfx::DataSourceSurface* aSurf, const nsIntRegion
         region = aRegion;
     }
 
+    size_t uploadSize;
     mTextureFormat =
         UploadSurfaceToTexture(mGLContext,
                                aSurf,
                                region,
                                mTexture,
+                               &uploadSize,
                                mTextureState == Created,
                                bounds.TopLeft() + IntPoint(aFrom.x, aFrom.y),
                                false);
+    if (uploadSize > 0) {
+        UpdateUploadSize(uploadSize);
+    }
     mTextureState = Valid;
     return true;
 }
@@ -266,12 +286,14 @@ gfx::IntSize TextureImage::GetSize() const {
 
 TextureImage::TextureImage(const gfx::IntSize& aSize,
              GLenum aWrapMode, ContentType aContentType,
-             Flags aFlags, ImageFormat aImageFormat)
+             Flags aFlags)
     : mSize(aSize)
     , mWrapMode(aWrapMode)
     , mContentType(aContentType)
+    , mTextureFormat(gfx::SurfaceFormat::UNKNOWN)
     , mFilter(Filter::GOOD)
     , mFlags(aFlags)
+    , mUploadSize(0)
 {}
 
 BasicTextureImage::BasicTextureImage(GLuint aTexture,
@@ -279,9 +301,8 @@ BasicTextureImage::BasicTextureImage(GLuint aTexture,
                   GLenum aWrapMode,
                   ContentType aContentType,
                   GLContext* aContext,
-                  TextureImage::Flags aFlags,
-                  TextureImage::ImageFormat aImageFormat)
-  : TextureImage(aSize, aWrapMode, aContentType, aFlags, aImageFormat)
+                  TextureImage::Flags aFlags)
+  : TextureImage(aSize, aWrapMode, aContentType, aFlags)
   , mTexture(aTexture)
   , mTextureState(Created)
   , mGLContext(aContext)
@@ -314,6 +335,7 @@ TiledTextureImage::TiledTextureImage(GLContext* aGL,
     : TextureImage(aSize, LOCAL_GL_CLAMP_TO_EDGE, aContentType, aFlags)
     , mCurrentImage(0)
     , mIterationCallback(nullptr)
+    , mIterationCallbackData(nullptr)
     , mInUpdate(false)
     , mRows(0)
     , mColumns(0)
@@ -704,8 +726,7 @@ CreateBasicTextureImage(GLContext* aGL,
                         const gfx::IntSize& aSize,
                         TextureImage::ContentType aContentType,
                         GLenum aWrapMode,
-                        TextureImage::Flags aFlags,
-                        TextureImage::ImageFormat aImageFormat)
+                        TextureImage::Flags aFlags)
 {
     bool useNearestFilter = aFlags & TextureImage::UseNearestFilter;
     if (!aGL->MakeCurrent()) {
@@ -725,7 +746,7 @@ CreateBasicTextureImage(GLContext* aGL,
 
     RefPtr<BasicTextureImage> texImage =
         new BasicTextureImage(texture, aSize, aWrapMode, aContentType,
-                              aGL, aFlags, aImageFormat);
+                              aGL, aFlags);
     return texImage.forget();
 }
 

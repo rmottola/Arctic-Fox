@@ -51,7 +51,7 @@ function test_strict() {
   add_prevented_cert_override_test(
     "unknownissuer.include-subdomains.pinning.example.com",
     Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-    getXPCOMStatusFromNSS(SEC_ERROR_UNKNOWN_ISSUER));
+    SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.include-subdomains.pinning.example.com");
 
   // Issued by otherCA, which is not in the pinset for pinning.example.com.
@@ -75,18 +75,19 @@ function test_strict() {
 
   // This domain serves a cert that doesn't match the pinset, but subdomains
   // are excluded.
-  add_connection_test("test-mode.pinning.example.com",
+  add_connection_test("sub.exclude-subdomains.pinning.example.com",
                       PRErrorCodeSuccess);
 
   // This domain's pinset is exactly the same as
   // include-subdomains.pinning.example.com, serves the same cert as
   // bad.include-subdomains.pinning.example.com, but it should pass because
   // it's in test_mode.
-  add_connection_test("test-mode.pinning.example.com", Cr.NS_OK);
+  add_connection_test("test-mode.pinning.example.com",
+                      PRErrorCodeSuccess);
   // Similarly, this pin is in test-mode, so it should be overridable.
   add_cert_override_test("unknownissuer.test-mode.pinning.example.com",
                          Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                         getXPCOMStatusFromNSS(SEC_ERROR_UNKNOWN_ISSUER));
+                         SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.test-mode.pinning.example.com");
 }
 
@@ -110,21 +111,24 @@ function test_mitm() {
   add_prevented_cert_override_test(
     "unknownissuer.include-subdomains.pinning.example.com",
     Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                    SEC_ERROR_UNKNOWN_ISSUER);
+    SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.include-subdomains.pinning.example.com");
 
   // In this case, even though otherCA is not in the pinset, it is a
   // user-specified trust anchor and the pinning check succeeds.
-  add_connection_test("bad.include-subdomains.pinning.example.com", Cr.NS_OK);
+  add_connection_test("bad.include-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
 
-  add_connection_test("exclude-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("sub.exclude-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("test-mode.pinning.example.com", Cr.NS_OK);
+  add_connection_test("exclude-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("sub.exclude-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("test-mode.pinning.example.com", PRErrorCodeSuccess);
   add_cert_override_test("unknownissuer.test-mode.pinning.example.com",
                          Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                      MOZILLA_PKIX_ERROR_KEY_PINNING_FAILURE);
+                         SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.test-mode.pinning.example.com");
-};
+}
 
 function test_disabled() {
   // Disable pinning.
@@ -133,20 +137,25 @@ function test_disabled() {
     run_next_test();
   });
 
-  add_connection_test("include-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("good.include-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("bad.include-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("exclude-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("sub.exclude-subdomains.pinning.example.com", Cr.NS_OK);
-  add_connection_test("test-mode.pinning.example.com", Cr.NS_OK);
+  add_connection_test("include-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("good.include-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("bad.include-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("exclude-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("sub.exclude-subdomains.pinning.example.com",
+                      PRErrorCodeSuccess);
+  add_connection_test("test-mode.pinning.example.com", PRErrorCodeSuccess);
 
   add_cert_override_test("unknownissuer.include-subdomains.pinning.example.com",
                          Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                         getXPCOMStatusFromNSS(SEC_ERROR_UNKNOWN_ISSUER));
+                         SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.include-subdomains.pinning.example.com");
   add_cert_override_test("unknownissuer.test-mode.pinning.example.com",
                          Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                         getXPCOMStatusFromNSS(SEC_ERROR_UNKNOWN_ISSUER));
+                         SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.test-mode.pinning.example.com");
 }
 
@@ -162,7 +171,7 @@ function test_enforce_test_mode() {
   add_prevented_cert_override_test(
     "unknownissuer.include-subdomains.pinning.example.com",
     Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-                    MOZILLA_PKIX_ERROR_KEY_PINNING_FAILURE);
+    SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.include-subdomains.pinning.example.com");
 
   // Issued by otherCA, which is not in the pinset for pinning.example.com.
@@ -193,7 +202,7 @@ function test_enforce_test_mode() {
   add_prevented_cert_override_test(
     "unknownissuer.test-mode.pinning.example.com",
     Ci.nsICertOverrideService.ERROR_UNTRUSTED,
-    getXPCOMStatusFromNSS(SEC_ERROR_UNKNOWN_ISSUER));
+    SEC_ERROR_UNKNOWN_ISSUER);
   add_clear_override("unknownissuer.test-mode.pinning.example.com");
 }
 

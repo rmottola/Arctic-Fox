@@ -176,12 +176,10 @@ function securityOnLoad(uri, windowInfo) {
   var info = security._getSecurityInfo();
   if (!info) {
     document.getElementById("securityTab").hidden = true;
-    document.getElementById("securityBox").collapsed = true;
     return;
   }
   else {
     document.getElementById("securityTab").hidden = false;
-    document.getElementById("securityBox").collapsed = false;
   }
 
   const pageInfoBundle = document.getElementById("pageinfobundle");
@@ -189,7 +187,7 @@ function securityOnLoad(uri, windowInfo) {
   /* Set Identity section text */
   setText("security-identity-domain-value", info.hostName);
   
-  var owner, verifier, generalPageIdentityString;
+  var owner, verifier;
   if (info.cert && !info.isBroken) {
     // Try to pull out meaningful values.  Technically these fields are optional
     // so we'll employ fallbacks where appropriate.  The EV spec states that Org
@@ -197,8 +195,6 @@ function securityOnLoad(uri, windowInfo) {
     if (info.isEV) {
       owner = info.cert.organization;
       verifier = security.mapIssuerOrganization(info.cAName);
-      generalPageIdentityString = pageInfoBundle.getFormattedString("generalSiteIdentity",
-                                                                    [owner, verifier]);
     }
     else {
       // Technically, a non-EV cert might specify an owner in the O field or not,
@@ -210,19 +206,16 @@ function securityOnLoad(uri, windowInfo) {
       verifier = security.mapIssuerOrganization(info.cAName ||
                                                 info.cert.issuerCommonName ||
                                                 info.cert.issuerName);
-      generalPageIdentityString = owner;
     }
   }
   else {
     // We don't have valid identity credentials.
     owner = pageInfoBundle.getString("securityNoOwner");
     verifier = pageInfoBundle.getString("notset");
-    generalPageIdentityString = owner;
   }
 
   setText("security-identity-owner-value", owner);
   setText("security-identity-verifier-value", verifier);
-  setText("general-security-identity", generalPageIdentityString);
 
   /* Manage the View Cert button*/
   var viewCert = document.getElementById("security-view-cert");
@@ -294,7 +287,6 @@ function securityOnLoad(uri, windowInfo) {
   setText("security-technical-shortform", hdr);
   setText("security-technical-longform1", msg1);
   setText("security-technical-longform2", msg2); 
-  setText("general-security-privacy", hdr);
 }
 
 function setText(id, value)

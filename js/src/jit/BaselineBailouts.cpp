@@ -1169,7 +1169,8 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
 
     // Write out descriptor of BaselineJS frame.
     size_t baselineFrameDescr = MakeFrameDescriptor((uint32_t) builder.framePushed(),
-                                                    JitFrame_BaselineJS);
+                                                    JitFrame_BaselineJS,
+                                                    BaselineStubFrameLayout::Size());
     if (!builder.writeWord(baselineFrameDescr, "Descriptor"))
         return false;
 
@@ -1272,7 +1273,8 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
     // Calculate frame size for descriptor.
     size_t baselineStubFrameSize = builder.framePushed() - startOfBaselineStubFrame;
     size_t baselineStubFrameDescr = MakeFrameDescriptor((uint32_t) baselineStubFrameSize,
-                                                        JitFrame_BaselineStub);
+                                                        JitFrame_BaselineStub,
+                                                        JitFrameLayout::Size());
 
     // Push actual argc
     if (!builder.writeWord(actualArgc, "ActualArgc"))
@@ -1386,7 +1388,8 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
     // Calculate frame size for descriptor.
     size_t rectifierFrameSize = builder.framePushed() - startOfRectifierFrame;
     size_t rectifierFrameDescr = MakeFrameDescriptor((uint32_t) rectifierFrameSize,
-                                                     JitFrame_Rectifier);
+                                                     JitFrame_Rectifier,
+                                                     JitFrameLayout::Size());
 
     // Push actualArgc
     if (!builder.writeWord(actualArgc, "ActualArgc"))
@@ -1621,7 +1624,7 @@ jit::BailoutIonToBaseline(JSContext* cx, JitActivation* activation, JitFrameIter
     return BAILOUT_RETURN_OK;
 }
 
-static bool
+static void
 InvalidateAfterBailout(JSContext* cx, HandleScript outerScript, const char* reason)
 {
     // In some cases, the computation of recover instruction can invalidate the
@@ -1633,16 +1636,16 @@ InvalidateAfterBailout(JSContext* cx, HandleScript outerScript, const char* reas
     // objects no longer match the content of its properties (see Bug 1174547)
     if (!outerScript->hasIonScript()) {
         JitSpew(JitSpew_BaselineBailouts, "Ion script is already invalidated");
-        return true;
+        return;
     }
 
     MOZ_ASSERT(!outerScript->ionScript()->invalidated());
 
     JitSpew(JitSpew_BaselineBailouts, "Invalidating due to %s", reason);
-    return Invalidate(cx, outerScript);
+    Invalidate(cx, outerScript);
 }
 
-static bool
+static void
 HandleBoundsCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Bounds check failure %s:%d, inlined into %s:%d",
@@ -1652,16 +1655,12 @@ HandleBoundsCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript i
     if (!innerScript->failedBoundsCheck())
         innerScript->setFailedBoundsCheck();
 
-    if (!InvalidateAfterBailout(cx, outerScript, "bounds check failure"))
-        return false;
-
-    if (innerScript->hasIonScript() && !Invalidate(cx, innerScript))
-        return false;
-
-    return true;
+    InvalidateAfterBailout(cx, outerScript, "bounds check failure");
+    if (innerScript->hasIonScript())
+        Invalidate(cx, innerScript);
 }
 
-static bool
+static void
 HandleShapeGuardFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Shape guard failure %s:%d, inlined into %s:%d",
@@ -1673,20 +1672,20 @@ HandleShapeGuardFailure(JSContext* cx, HandleScript outerScript, HandleScript in
     // inner and outer scripts, instead of just the outer one.
     outerScript->setFailedShapeGuard();
 
-    return InvalidateAfterBailout(cx, outerScript, "shape guard failure");
+    InvalidateAfterBailout(cx, outerScript, "shape guard failure");
 }
 
-static bool
+static void
 HandleBaselineInfoBailout(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Baseline info failure %s:%d, inlined into %s:%d",
             innerScript->filename(), innerScript->lineno(),
             outerScript->filename(), outerScript->lineno());
 
-    return InvalidateAfterBailout(cx, outerScript, "invalid baseline info");
+    InvalidateAfterBailout(cx, outerScript, "invalid baseline info");
 }
 
-static bool
+static void
 HandleLexicalCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript innerScript)
 {
     JitSpew(JitSpew_IonBailouts, "Lexical check failure %s:%d, inlined into %s:%d",
@@ -1696,13 +1695,9 @@ HandleLexicalCheckFailure(JSContext* cx, HandleScript outerScript, HandleScript 
     if (!innerScript->failedLexicalCheck())
         innerScript->setFailedLexicalCheck();
 
-    if (!InvalidateAfterBailout(cx, outerScript, "lexical check failure"))
-        return false;
-
-    if (innerScript->hasIonScript() && !Invalidate(cx, innerScript))
-        return false;
-
-    return true;
+    InvalidateAfterBailout(cx, outerScript, "lexical check failure");
+    if (innerScript->hasIonScript())
+        Invalidate(cx, innerScript);
 }
 
 static bool
@@ -1721,7 +1716,7 @@ CopyFromRematerializedFrame(JSContext* cx, JitActivation* act, uint8_t* fp, size
 
     frame->setScopeChain(rematFrame->scopeChain());
 
-    if (frame->isNonEvalFunctionFrame())
+    if (frame->isFunctionFrame())
         frame->thisArgument() = rematFrame->thisArgument();
 
     for (unsigned i = 0; i < frame->numActualArgs(); i++)
@@ -1893,6 +1888,7 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
       case Bailout_NonObjectInput:
       case Bailout_NonStringInput:
       case Bailout_NonSymbolInput:
+      case Bailout_NonSimdBool32x4Input:
       case Bailout_NonSimdInt32x4Input:
       case Bailout_NonSimdFloat32x4Input:
       case Bailout_NonSharedTypedArrayInput:
@@ -1912,29 +1908,25 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
       // Invalid assumption based on baseline code.
       case Bailout_OverflowInvalidate:
         outerScript->setHadOverflowBailout();
-        // FALL THROUGH
+        MOZ_FALLTHROUGH;
       case Bailout_NonStringInputInvalidate:
       case Bailout_DoubleOutput:
       case Bailout_ObjectIdentityOrTypeGuard:
-        if (!HandleBaselineInfoBailout(cx, outerScript, innerScript))
-            return false;
+        HandleBaselineInfoBailout(cx, outerScript, innerScript);
         break;
 
       case Bailout_ArgumentCheck:
         // Do nothing, bailout will resume before the argument monitor ICs.
         break;
       case Bailout_BoundsCheck:
-      case Bailout_Neutered:
-        if (!HandleBoundsCheckFailure(cx, outerScript, innerScript))
-            return false;
+      case Bailout_Detached:
+        HandleBoundsCheckFailure(cx, outerScript, innerScript);
         break;
       case Bailout_ShapeGuard:
-        if (!HandleShapeGuardFailure(cx, outerScript, innerScript))
-            return false;
+        HandleShapeGuardFailure(cx, outerScript, innerScript);
         break;
       case Bailout_UninitializedLexical:
-        if (!HandleLexicalCheckFailure(cx, outerScript, innerScript))
-            return false;
+        HandleLexicalCheckFailure(cx, outerScript, innerScript);
         break;
       case Bailout_IonExceptionDebugMode:
         // Return false to resume in HandleException with reconstructed
@@ -1944,8 +1936,7 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
         MOZ_CRASH("Unknown bailout kind!");
     }
 
-    if (!CheckFrequentBailouts(cx, outerScript, bailoutKind))
-        return false;
+    CheckFrequentBailouts(cx, outerScript, bailoutKind);
 
     // We're returning to JIT code, so we should clear the override pc.
     topFrame->clearOverridePc();

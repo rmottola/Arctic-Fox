@@ -155,14 +155,14 @@ TLSFilterTransaction::OnReadSegment(const char *aData,
     }
 
     uint32_t amt;
-    rv = mSegmentReader->OnReadSegment(mEncryptedText, mEncryptedTextUsed, &amt);
+    rv = mSegmentReader->OnReadSegment(mEncryptedText.get(), mEncryptedTextUsed, &amt);
     if (NS_FAILED(rv)) {
       return rv;
     }
 
     mEncryptedTextUsed -= amt;
     if (mEncryptedTextUsed) {
-      memmove(mEncryptedText, mEncryptedText + amt, mEncryptedTextUsed);
+      memmove(mEncryptedText.get(), &mEncryptedText[amt], mEncryptedTextUsed);
       return NS_OK;
     }
   }
@@ -207,7 +207,7 @@ TLSFilterTransaction::OnReadSegment(const char *aData,
     // partial writes.
     rv = mSegmentReader->CommitToSegmentSize(mEncryptedTextUsed, mForce);
     if (rv != NS_BASE_STREAM_WOULD_BLOCK) {
-      rv = mSegmentReader->OnReadSegment(mEncryptedText, mEncryptedTextUsed, &amt);
+      rv = mSegmentReader->OnReadSegment(mEncryptedText.get(), mEncryptedTextUsed, &amt);
     }
 
     if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
@@ -224,7 +224,7 @@ TLSFilterTransaction::OnReadSegment(const char *aData,
     mEncryptedTextUsed = 0;
     mEncryptedTextSize = 0;
   } else {
-    memmove(mEncryptedText, mEncryptedText + amt, mEncryptedTextUsed - amt);
+    memmove(mEncryptedText.get(), &mEncryptedText[amt], mEncryptedTextUsed - amt);
     mEncryptedTextUsed -= amt;
   }
   return NS_OK;
@@ -235,7 +235,7 @@ TLSFilterTransaction::FilterOutput(const char *aBuf, int32_t aAmount)
 {
   EnsureBuffer(mEncryptedText, mEncryptedTextUsed + aAmount,
                mEncryptedTextUsed, mEncryptedTextSize);
-  memcpy(mEncryptedText + mEncryptedTextUsed, aBuf, aAmount);
+  memcpy(&mEncryptedText[mEncryptedTextUsed], aBuf, aAmount);
   mEncryptedTextUsed += aAmount;
   return aAmount;
 }
@@ -1023,9 +1023,6 @@ SpdyConnectTransaction::SpdyConnectTransaction(nsHttpConnectionInfo *ci,
 SpdyConnectTransaction::~SpdyConnectTransaction()
 {
   LOG(("SpdyConnectTransaction dtor %p\n", this));
-  if (mRequestHead) {
-    delete mRequestHead;
-  }
 
   if (mDrivingTransaction) {
     // requeue it I guess. This should be gone.
@@ -1107,7 +1104,7 @@ SpdyConnectTransaction::Flush(uint32_t count, uint32_t *countRead)
   count = std::min(count, (mOutputDataUsed - mOutputDataOffset));
   if (count) {
     nsresult rv;
-    rv = mSegmentReader->OnReadSegment(mOutputData + mOutputDataOffset,
+    rv = mSegmentReader->OnReadSegment(&mOutputData[mOutputDataOffset],
                                        count, countRead);
     if (NS_FAILED(rv) && (rv != NS_BASE_STREAM_WOULD_BLOCK)) {
       LOG(("SpdyConnectTransaction::Flush %p Error %x\n", this, rv));
@@ -1234,7 +1231,7 @@ SpdyConnectTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
   // first call into the tunnel stream to get the demux'd data out of the
   // spdy session.
   EnsureBuffer(mInputData, mInputDataUsed + count, mInputDataUsed, mInputDataSize);
-  nsresult rv = writer->OnWriteSegment(mInputData + mInputDataUsed,
+  nsresult rv = writer->OnWriteSegment(&mInputData[mInputDataUsed],
                                        count, countWritten);
   if (NS_FAILED(rv)) {
     if (rv != NS_BASE_STREAM_WOULD_BLOCK) {
@@ -1394,8 +1391,7 @@ OutputStreamShim::Write(const char * aBuf, uint32_t aCount, uint32_t *_retval)
 
   EnsureBuffer(trans->mOutputData, trans->mOutputDataUsed + aCount,
                trans->mOutputDataUsed, trans->mOutputDataSize);
-  memcpy(trans->mOutputData + trans->mOutputDataUsed,
-          aBuf, aCount);
+  memcpy(&trans->mOutputData[trans->mOutputDataUsed], aBuf, aCount);
   trans->mOutputDataUsed += aCount;
   *_retval = aCount;
   LOG(("OutputStreamShim::Write %p new %d total %d\n", this, aCount, trans->mOutputDataUsed));
@@ -1503,7 +1499,7 @@ InputStreamShim::Read(char *aBuf, uint32_t aCount, uint32_t *_retval)
   uint32_t avail = trans->mInputDataUsed - trans->mInputDataOffset;
   uint32_t tocopy = std::min(aCount, avail);
   *_retval = tocopy;
-  memcpy(aBuf, trans->mInputData + trans->mInputDataOffset, tocopy);
+  memcpy(aBuf, &trans->mInputData[trans->mInputDataOffset], tocopy);
   trans->mInputDataOffset += tocopy;
   if (trans->mInputDataOffset == trans->mInputDataUsed) {
     trans->mInputDataOffset = trans->mInputDataUsed = 0;

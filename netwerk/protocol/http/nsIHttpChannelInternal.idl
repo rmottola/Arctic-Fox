@@ -39,7 +39,7 @@ interface nsIHttpUpgradeListener : nsISupports
  * using any feature exposed by this interface, be aware that this interface
  * will change and you will be broken.  You have been warned.
  */
-[scriptable, uuid(332d5f9c-991c-45e3-922f-99e6fe0deb60)]
+[scriptable, uuid(01b8296a-e206-4e5f-acab-82bd8b6a900c)]
 interface nsIHttpChannelInternal : nsISupports
 {
     /**
@@ -226,6 +226,7 @@ interface nsIHttpChannelInternal : nsISupports
     const unsigned long CORS_MODE_SAME_ORIGIN = 0;
     const unsigned long CORS_MODE_NO_CORS = 1;
     const unsigned long CORS_MODE_CORS = 2;
+    const unsigned long CORS_MODE_NAVIGATE = 3;
     /**
      * Set by nsCORSListenerProxy to indicate CORS load type. Defaults to CORS_MODE_NO_CORS.
      */
@@ -263,4 +264,12 @@ interface nsIHttpChannelInternal : nsISupports
      */
     [noscript, notxpcom, nostdcall]
     void setCorsPreflightParameters(in StringArrayRef unsafeHeaders);
+
+    /**
+     * When set to true, the channel will not pop any authentication prompts up
+     * to the user.  When provided or cached credentials lead to an
+     * authentication failure, that failure will be propagated to the channel
+     * listener.  Must be called before opening the channel, otherwise throws.
+     */
+    attribute boolean blockAuthPrompt;
 };

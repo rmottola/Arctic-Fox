@@ -231,8 +231,8 @@ const Class js::ScalarTypeDescr::class_ = {
 
 const JSFunctionSpec js::ScalarTypeDescr::typeObjectMethods[] = {
     JS_SELF_HOSTED_FN("toSource", "DescrToSource", 0, 0),
-    {"array", {nullptr, nullptr}, 1, 0, "ArrayShorthand"},
-    {"equivalent", {nullptr, nullptr}, 1, 0, "TypeDescrEquivalent"},
+    JS_SELF_HOSTED_FN("array", "ArrayShorthand", 1, JSFUN_HAS_REST),
+    JS_SELF_HOSTED_FN("equivalent", "TypeDescrEquivalent", 1, 0),
     JS_FS_END
 };
 
@@ -412,25 +412,41 @@ js::ReferenceTypeDescr::call(JSContext* cx, unsigned argc, Value* vp)
  * Note: these are partially defined in SIMD.cpp
  */
 
+SimdType
+SimdTypeDescr::type() const {
+    uint32_t t = uint32_t(getReservedSlot(JS_DESCR_SLOT_TYPE).toInt32());
+    MOZ_ASSERT(t < uint32_t(SimdType::Count));
+    return SimdType(t);
+}
+
 int32_t
-SimdTypeDescr::size(Type t)
+SimdTypeDescr::size(SimdType t)
 {
-    MOZ_ASSERT(unsigned(t) <= SimdTypeDescr::Type::LAST_TYPE);
+    MOZ_ASSERT(unsigned(t) < unsigned(SimdType::Count));
     switch (t) {
-      case SimdTypeDescr::Int8x16:
-      case SimdTypeDescr::Int16x8:
-      case SimdTypeDescr::Int32x4:
-      case SimdTypeDescr::Float32x4:
-      case SimdTypeDescr::Float64x2:
+      case SimdType::Int8x16:
+      case SimdType::Int16x8:
+      case SimdType::Int32x4:
+      case SimdType::Uint8x16:
+      case SimdType::Uint16x8:
+      case SimdType::Uint32x4:
+      case SimdType::Float32x4:
+      case SimdType::Float64x2:
+      case SimdType::Bool8x16:
+      case SimdType::Bool16x8:
+      case SimdType::Bool32x4:
+      case SimdType::Bool64x2:
         return 16;
+      case SimdType::Count:
+        break;
     }
     MOZ_CRASH("unexpected SIMD type");
 }
 
 int32_t
-SimdTypeDescr::alignment(Type t)
+SimdTypeDescr::alignment(SimdType t)
 {
-    MOZ_ASSERT(unsigned(t) <= SimdTypeDescr::Type::LAST_TYPE);
+    MOZ_ASSERT(unsigned(t) < unsigned(SimdType::Count));
     return size(t);
 }
 
@@ -1370,7 +1386,7 @@ TypedObject::isAttached() const
         if (table) {
             JSObject* buffer = table->lookup(this);
             if (buffer)
-                return !buffer->as<ArrayBufferObject>().isNeutered();
+                return !buffer->as<ArrayBufferObject>().isDetached();
         }
         return true;
     }
@@ -1379,7 +1395,7 @@ TypedObject::isAttached() const
     if (!as<OutlineTypedObject>().outOfLineTypedMem())
         return false;
     JSObject& owner = as<OutlineTypedObject>().owner();
-    if (owner.is<ArrayBufferObject>() && owner.as<ArrayBufferObject>().isNeutered())
+    if (owner.is<ArrayBufferObject>() && owner.as<ArrayBufferObject>().isDetached())
         return false;
     return true;
 }
@@ -1392,7 +1408,7 @@ TypedObject::maybeForwardedIsAttached() const
     if (!as<OutlineTypedObject>().outOfLineTypedMem())
         return false;
     JSObject& owner = *MaybeForwarded(&as<OutlineTypedObject>().owner());
-    if (owner.is<ArrayBufferObject>() && owner.as<ArrayBufferObject>().isNeutered())
+    if (owner.is<ArrayBufferObject>() && owner.as<ArrayBufferObject>().isDetached())
         return false;
     return true;
 }
@@ -1727,7 +1743,7 @@ ReportPropertyError(JSContext* cx,
 
 bool
 TypedObject::obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id,
-                                Handle<JSPropertyDescriptor> desc,
+                                Handle<PropertyDescriptor> desc,
                                 ObjectOpResult& result)
 {
     Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
@@ -1947,7 +1963,7 @@ TypedObject::obj_setProperty(JSContext* cx, HandleObject obj, HandleId id, Handl
 
 bool
 TypedObject::obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                                          MutableHandle<JSPropertyDescriptor> desc)
+                                          MutableHandle<PropertyDescriptor> desc)
 {
     Rooted<TypedObject*> typedObj(cx, &obj->as<TypedObject>());
     if (!typedObj->isAttached()) {
@@ -2086,7 +2102,7 @@ TypedObject::obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& proper
 }
 
 void
-OutlineTypedObject::neuter(void* newData)
+OutlineTypedObject::notifyBufferDetached(void* newData)
 {
     setData(reinterpret_cast<uint8_t*>(newData));
 }
@@ -2340,7 +2356,7 @@ TypedObject::construct(JSContext* cx, unsigned int argc, Value* vp)
         Rooted<ArrayBufferObject*> buffer(cx);
         buffer = &args[0].toObject().as<ArrayBufferObject>();
 
-        if (callee->opaque() || buffer->isNeutered()) {
+        if (callee->opaque() || buffer->isDetached()) {
             JS_ReportErrorNumber(cx, GetErrorMessage,
                                  nullptr, JSMSG_TYPEDOBJECT_BAD_ARGS);
             return false;
@@ -2583,52 +2599,18 @@ js::GetTypedObjectModule(JSContext* cx, unsigned argc, Value* vp)
 }
 
 bool
-js::GetFloat32x4TypeDescr(JSContext* cx, unsigned argc, Value* vp)
+js::GetSimdTypeDescr(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isInt32());
+    // One of the JS_SIMDTYPEREPR_* constants / a SimdType enum value.
+    // getOrCreateSimdTypeDescr() will do the range check.
+    int32_t simdTypeRepr = args[0].toInt32();
     Rooted<GlobalObject*> global(cx, cx->global());
     MOZ_ASSERT(global);
-    args.rval().setObject(*global->getOrCreateSimdTypeDescr<Float32x4>(cx));
-    return true;
-}
-
-bool
-js::GetFloat64x2TypeDescr(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    Rooted<GlobalObject*> global(cx, cx->global());
-    MOZ_ASSERT(global);
-    args.rval().setObject(*global->getOrCreateSimdTypeDescr<Float64x2>(cx));
-    return true;
-}
-
-bool
-js::GetInt8x16TypeDescr(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    Rooted<GlobalObject*> global(cx, cx->global());
-    MOZ_ASSERT(global);
-    args.rval().setObject(*global->getOrCreateSimdTypeDescr<Int8x16>(cx));
-    return true;
-}
-
-bool
-js::GetInt16x8TypeDescr(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    Rooted<GlobalObject*> global(cx, cx->global());
-    MOZ_ASSERT(global);
-    args.rval().setObject(*global->getOrCreateSimdTypeDescr<Int16x8>(cx));
-    return true;
-}
-
-bool
-js::GetInt32x4TypeDescr(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    Rooted<GlobalObject*> global(cx, cx->global());
-    MOZ_ASSERT(global);
-    args.rval().setObject(*global->getOrCreateSimdTypeDescr<Int32x4>(cx));
+    auto* obj = GlobalObject::getOrCreateSimdTypeDescr(cx, global, SimdType(simdTypeRepr));
+    args.rval().setObject(*obj);
     return true;
 }
 

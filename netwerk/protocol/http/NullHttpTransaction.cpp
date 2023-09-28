@@ -14,6 +14,7 @@
 #include "nsIHttpActivityObserver.h"
 #include "NullHttpChannel.h"
 #include "nsQueryObject.h"
+#include "nsNetUtil.h"
 
 namespace mozilla {
 namespace net {
@@ -95,8 +96,8 @@ NullHttpTransaction::NullHttpTransaction(nsHttpConnectionInfo *ci,
                                          uint32_t caps)
   : mStatus(NS_OK)
   , mCaps(caps | NS_HTTP_ALLOW_KEEPALIVE)
-  , mCapsToClear(0)
   , mRequestHead(nullptr)
+  , mCapsToClear(0)
   , mIsDone(false)
   , mClaimed(false)
   , mCallbacks(callbacks)

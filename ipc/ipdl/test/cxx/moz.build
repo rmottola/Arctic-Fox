@@ -21,6 +21,8 @@ SOURCES += [
     'TestCrashCleanup.cpp',
     'TestDataStructures.cpp',
     'TestDesc.cpp',
+    'TestEndpointBridgeMain.cpp',
+    'TestEndpointOpens.cpp',
     'TestFailedCtor.cpp',
     'TestHangs.cpp',
     'TestHighestPrio.cpp',
@@ -51,11 +53,6 @@ SOURCES += [
     'TestUrgentHangs.cpp',
 ]
 
-if CONFIG['OS_ARCH'] == 'Linux':
-    SOURCES += [
-        'TestSysVShmem.cpp',
-    ]
-
 SOURCES += [
     '!IPDLUnitTests.cpp',
     'IPDLUnitTestProcessChild.cpp',
@@ -79,6 +76,11 @@ IPDL_SOURCES += [
     'PTestDesc.ipdl',
     'PTestDescSub.ipdl',
     'PTestDescSubsub.ipdl',
+    'PTestEndpointBridgeMain.ipdl',
+    'PTestEndpointBridgeMainSub.ipdl',
+    'PTestEndpointBridgeSub.ipdl',
+    'PTestEndpointOpens.ipdl',
+    'PTestEndpointOpensOpened.ipdl',
     'PTestFailedCtor.ipdl',
     'PTestFailedCtorSub.ipdl',
     'PTestFailedCtorSubsub.ipdl',
@@ -120,7 +122,6 @@ IPDL_SOURCES += [
     'PTestSyncError.ipdl',
     'PTestSyncHang.ipdl',
     'PTestSyncWakeup.ipdl',
-    'PTestSysVShmem.ipdl',
     'PTestUrgency.ipdl',
     'PTestUrgentHangs.ipdl',
 ]

@@ -2468,7 +2468,7 @@ js::ClassCanHaveExtraProperties(const Class* clasp)
     return clasp->resolve
         || clasp->ops.lookupProperty
         || clasp->ops.getProperty
-        || IsAnyTypedArrayClass(clasp);
+        || IsTypedArrayClass(clasp);
 }
 
 void

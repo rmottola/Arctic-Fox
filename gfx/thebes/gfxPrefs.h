@@ -176,6 +176,7 @@ private:
   DECL_GFX_PREF(Live, "apz.overscroll.stretch_factor",         APZOverscrollStretchFactor, float, 0.5f);
   DECL_GFX_PREF(Live, "apz.pan_repaint_interval",              APZPanRepaintInterval, int32_t, 250);
   DECL_GFX_PREF(Live, "apz.printtree",                         APZPrintTree, bool, false);
+  DECL_GFX_PREF(Live, "apz.record_checkerboarding",            APZRecordCheckerboarding, bool, false);
   DECL_GFX_PREF(Live, "apz.smooth_scroll_repaint_interval",    APZSmoothScrollRepaintInterval, int32_t, 75);
   DECL_GFX_PREF(Live, "apz.test.logging_enabled",              APZTestLoggingEnabled, bool, false);
   DECL_GFX_PREF(Live, "apz.touch_move_tolerance",              APZTouchMoveTolerance, float, 0.0);
@@ -201,6 +202,7 @@ private:
   DECL_GFX_PREF(Once, "dom.vr.cardboard.enabled",              VRCardboardEnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.add-test-devices",               VRAddTestDevices, int32_t, 1);
   DECL_GFX_PREF(Live, "dom.w3c_pointer_events.enabled",        PointerEventsEnabled, bool, false);
+  DECL_GFX_PREF(Live, "dom.w3c_touch_events.enabled",          TouchEventsEnabled, int32_t, 0);
 
   DECL_GFX_PREF(Live, "general.smoothScroll",                  SmoothScrollEnabled, bool, true);
   DECL_GFX_PREF(Live, "general.smoothScroll.durationToIntervalRatio",
@@ -255,11 +257,13 @@ private:
   DECL_GFX_PREF(Live, "gfx.SurfaceTexture.detach.enabled",     SurfaceTextureDetachEnabled, bool, true);
   DECL_GFX_PREF(Live, "gfx.testing.device-reset",              DeviceResetForTesting, int32_t, 0);
   DECL_GFX_PREF(Live, "gfx.testing.device-fail",               DeviceFailForTesting, bool, false);
-  DECL_GFX_PREF(Once, "gfx.touch.resample",                    TouchResampling, bool, false);
+
+  DECL_GFX_PREF(Live, "gfx.content.use-native-pushlayer",      UseNativePushLayer, bool, false);
 
   // These times should be in milliseconds
   DECL_GFX_PREF(Once, "gfx.touch.resample.delay-threshold",    TouchResampleVsyncDelayThreshold, int32_t, 20);
   DECL_GFX_PREF(Once, "gfx.touch.resample.max-predict",        TouchResampleMaxPredict, int32_t, 8);
+  DECL_GFX_PREF(Once, "gfx.touch.resample.min-delta",          TouchResampleMinDelta, int32_t, 2);
   DECL_GFX_PREF(Once, "gfx.touch.resample.old-touch-threshold",TouchResampleOldTouchThreshold, int32_t, 17);
   DECL_GFX_PREF(Once, "gfx.touch.resample.vsync-adjust",       TouchVsyncSampleAdjust, int32_t, 5);
 
@@ -395,10 +399,6 @@ private:
   // This affects whether events will be routed through APZ or not.
   DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.enabled",
                                                                MouseWheelHasRootScrollDeltaOverride, bool, false);
-  DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.horizontal.factor",
-                                                               MouseWheelRootHScrollDeltaFactor, int32_t, 100);
-  DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.vertical.factor",
-                                                               MouseWheelRootVScrollDeltaFactor, int32_t, 100);
   DECL_GFX_PREF(Live, "mousewheel.transaction.ignoremovedelay",MouseWheelIgnoreMoveDelayMs, int32_t, (int32_t)100);
   DECL_GFX_PREF(Live, "mousewheel.transaction.timeout",        MouseWheelTransactionTimeoutMs, int32_t, (int32_t)1500);
 
@@ -439,6 +439,7 @@ private:
   DECL_GFX_PREF(Live, "webgl.msaa-force",                      WebGLForceMSAA, bool, false);
   DECL_GFX_PREF(Live, "webgl.prefer-16bpp",                    WebGLPrefer16bpp, bool, false);
   DECL_GFX_PREF(Live, "webgl.restore-context-when-visible",    WebGLRestoreWhenVisible, bool, true);
+  DECL_GFX_PREF(Live, "webgl.allow-immediate-queries",         WebGLImmediateQueries, bool, false);
 
   DECL_GFX_PREF(Live, "webgl.webgl2-compat-mode",              WebGL2CompatMode, bool, false);
 

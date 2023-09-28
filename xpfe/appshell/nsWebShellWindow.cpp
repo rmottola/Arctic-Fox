@@ -145,7 +145,7 @@ nsresult nsWebShellWindow::Initialize(nsIXULWindow* aParent,
 
   // XXX: need to get the default window size from prefs...
   // Doesn't come from prefs... will come from CSS/XUL/RDF
-  LayoutDeviceIntRect r(initialX, initialY, aInitialWidth, aInitialHeight);
+  DesktopIntRect deskRect(initialX, initialY, aInitialWidth, aInitialHeight);
 
   // Create top level window
   mWindow = do_CreateInstance(kWindowCID, &rv);
@@ -173,8 +173,10 @@ nsresult nsWebShellWindow::Initialize(nsIXULWindow* aParent,
   mWindow->SetWidgetListener(this);
   mWindow->Create((nsIWidget *)parentWidget,          // Parent nsIWidget
                   nullptr,                            // Native parent widget
-                  r,                                  // Widget dimensions
+                  deskRect,                           // Widget dimensions
                   &widgetInitData);                   // Widget initialization data
+
+  LayoutDeviceIntRect r;
   mWindow->GetClientBounds(r);
   // Match the default background color of content. Important on windows
   // since we no longer use content child widgets.
@@ -347,7 +349,17 @@ nsWebShellWindow::SizeModeChanged(nsSizeMode sizeMode)
       ourWindow->SetFullScreen(true);
     }
     else if (sizeMode != nsSizeMode_Minimized) {
-      ourWindow->SetFullScreen(false);
+      if (ourWindow->GetFullScreen()) {
+        // The first SetFullscreenInternal call below ensures that we do
+        // not trigger any fullscreen transition even if the window was
+        // put in fullscreen only for the Fullscreen API. The second
+        // SetFullScreen call ensures that the window really exit from
+        // fullscreen even if it entered fullscreen for both Fullscreen
+        // Mode and Fullscreen API.
+        ourWindow->SetFullscreenInternal(
+          nsPIDOMWindow::eForForceExitFullscreen, false);
+        ourWindow->SetFullScreen(false);
+      }
     }
 
     // And always fire a user-defined sizemodechange event on the window

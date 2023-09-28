@@ -23,6 +23,7 @@
 #include "jsscript.h"
 
 #include "gc/Marking.h"
+#include "gc/Policy.h"
 #include "gc/Rooting.h"
 #include "js/Vector.h"
 #include "vm/Debugger.h"
@@ -63,13 +64,13 @@ LiveSavedFrameCache::getFramePtr(FrameIter& iter)
     return Nothing();
 }
 
-/* static */ void
-LiveSavedFrameCache::trace(LiveSavedFrameCache* cache, JSTracer* trc)
+void
+LiveSavedFrameCache::trace(JSTracer* trc)
 {
-    if (!cache->initialized())
+    if (!initialized())
         return;
 
-    for (auto* entry = cache->frames->begin(); entry < cache->frames->end(); entry++) {
+    for (auto* entry = frames->begin(); entry < frames->end(); entry++) {
         TraceEdge(trc,
                   &entry->savedFrame,
                   "LiveSavedFrameCache::frames SavedFrame");
@@ -1132,7 +1133,7 @@ SavedStacks::insertFrames(JSContext* cx, FrameIter& iter, MutableHandleSavedFram
         if (maxFrameCount == 0)
             parentIsInCache = iter.hasCachedSavedFrame();
 
-        auto displayAtom = iter.isNonEvalFunctionFrame() ? iter.functionDisplayAtom() : nullptr;
+        auto displayAtom = iter.isFunctionFrame() ? iter.functionDisplayAtom() : nullptr;
         if (!stackChain->emplaceBack(location.source(),
                                      location.line(),
                                      location.column(),
@@ -1338,10 +1339,10 @@ SavedStacks::getLocation(JSContext* cx, const FrameIter& iter,
     // that doesn't employ memoization, and update |locationp|'s slots directly.
 
     if (!iter.hasScript()) {
-        if (const char16_t* displayURL = iter.scriptDisplayURL()) {
+        if (const char16_t* displayURL = iter.displayURL()) {
             locationp.setSource(AtomizeChars(cx, displayURL, js_strlen(displayURL)));
         } else {
-            const char* filename = iter.scriptFilename() ? iter.scriptFilename() : "";
+            const char* filename = iter.filename() ? iter.filename() : "";
             locationp.setSource(Atomize(cx, filename, strlen(filename)));
         }
         if (!locationp.source())
@@ -1364,7 +1365,7 @@ SavedStacks::getLocation(JSContext* cx, const FrameIter& iter,
 
     if (!p) {
         RootedAtom source(cx);
-        if (const char16_t* displayURL = iter.scriptDisplayURL()) {
+        if (const char16_t* displayURL = iter.displayURL()) {
             source = AtomizeChars(cx, displayURL, js_strlen(displayURL));
         } else {
             const char* filename = script->filename() ? script->filename() : "";

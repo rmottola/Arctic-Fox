@@ -41,7 +41,7 @@ interface NavigatorID {
   readonly attribute DOMString appVersion;
   [Constant, Cached]
   readonly attribute DOMString platform;
-  [Constant, Cached, Throws=Workers]
+  [Pure, Cached, Throws=Workers]
   readonly attribute DOMString userAgent;
   [Constant, Cached]
   readonly attribute DOMString product; // constant "Gecko"
@@ -406,7 +406,13 @@ partial interface Navigator {
                               // The originating innerWindowID is needed to
                               // avoid calling the callbacks if the window has
                               // navigated away. It is optional only as legacy.
-                              optional unsigned long long innerWindowID = 0);
+                              optional unsigned long long innerWindowID = 0,
+                              // The callID is needed in case of multiple
+                              // concurrent requests to find the right one.
+                              // It is optional only as legacy.
+                              // TODO: Rewrite to not need this method anymore,
+                              // now that devices are enumerated earlier.
+                              optional DOMString callID = "");
 };
 #endif // MOZ_MEDIA_NAVIGATOR
 
@@ -423,7 +429,7 @@ partial interface Navigator {
 };
 
 partial interface Navigator {
-  [Pref="dom.tv.enabled", CheckAnyPermissions="tv", Func="Navigator::HasTVSupport"]
+  [Pref="dom.tv.enabled", CheckAnyPermissions="tv", AvailableIn=CertifiedApps]
   readonly attribute TVManager? tv;
 };
 

@@ -651,12 +651,12 @@ public:
   virtual bool getOwnPropertyDescriptor(JSContext* cx,
                                         JS::Handle<JSObject*> proxy,
                                         JS::Handle<jsid> id,
-                                        JS::MutableHandle<JSPropertyDescriptor> desc)
+                                        JS::MutableHandle<JS::PropertyDescriptor> desc)
                                         const override;
   virtual bool defineProperty(JSContext* cx,
                               JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
-                              JS::Handle<JSPropertyDescriptor> desc,
+                              JS::Handle<JS::PropertyDescriptor> desc,
                               JS::ObjectOpResult &result) const override;
   virtual bool ownPropertyKeys(JSContext *cx,
                                JS::Handle<JSObject*> proxy,
@@ -686,7 +686,7 @@ public:
   virtual bool getPropertyDescriptor(JSContext* cx,
                                      JS::Handle<JSObject*> proxy,
                                      JS::Handle<jsid> id,
-                                     JS::MutableHandle<JSPropertyDescriptor> desc)
+                                     JS::MutableHandle<JS::PropertyDescriptor> desc)
                                      const override;
   virtual bool hasOwn(JSContext *cx, JS::Handle<JSObject*> proxy,
                       JS::Handle<jsid> id, bool *bp) const override;
@@ -775,7 +775,7 @@ bool
 nsOuterWindowProxy::getPropertyDescriptor(JSContext* cx,
                                           JS::Handle<JSObject*> proxy,
                                           JS::Handle<jsid> id,
-                                          JS::MutableHandle<JSPropertyDescriptor> desc) const
+                                          JS::MutableHandle<JS::PropertyDescriptor> desc) const
 {
   // The only thing we can do differently from js::Wrapper is shadow stuff with
   // our indexed properties, so we can just try getOwnPropertyDescriptor and if
@@ -796,7 +796,7 @@ bool
 nsOuterWindowProxy::getOwnPropertyDescriptor(JSContext* cx,
                                              JS::Handle<JSObject*> proxy,
                                              JS::Handle<jsid> id,
-                                             JS::MutableHandle<JSPropertyDescriptor> desc)
+                                             JS::MutableHandle<JS::PropertyDescriptor> desc)
                                              const
 {
   bool found;
@@ -819,11 +819,10 @@ bool
 nsOuterWindowProxy::defineProperty(JSContext* cx,
                                    JS::Handle<JSObject*> proxy,
                                    JS::Handle<jsid> id,
-                                   JS::Handle<JSPropertyDescriptor> desc,
+                                   JS::Handle<JS::PropertyDescriptor> desc,
                                    JS::ObjectOpResult &result) const
 {
-  int32_t index = GetArrayIndexFromId(cx, id);
-  if (IsArrayIndex(index)) {
+  if (IsArrayIndex(GetArrayIndexFromId(cx, id))) {
     // Spec says to Reject whether this is a supported index or not,
     // since we have no indexed setter or indexed creator.  It is up
     // to the caller to decide whether to throw a TypeError.
@@ -882,8 +881,7 @@ nsOuterWindowProxy::delete_(JSContext *cx, JS::Handle<JSObject*> proxy,
     return result.failCantDeleteWindowElement();
   }
 
-  int32_t index = GetArrayIndexFromId(cx, id);
-  if (IsArrayIndex(index)) {
+  if (IsArrayIndex(GetArrayIndexFromId(cx, id))) {
     // Indexed, but not supported.  Spec says return true.
     return result.succeed();
   }
@@ -966,8 +964,7 @@ nsOuterWindowProxy::set(JSContext *cx, JS::Handle<JSObject*> proxy,
                         JS::Handle<JS::Value> receiver,
                         JS::ObjectOpResult &result) const
 {
-  int32_t index = GetArrayIndexFromId(cx, id);
-  if (IsArrayIndex(index)) {
+  if (IsArrayIndex(GetArrayIndexFromId(cx, id))) {
     // Reject the set.  It's up to the caller to decide whether to throw a
     // TypeError.  If the caller is strict mode JS code, it'll throw.
     return result.failReadOnly();
@@ -1028,7 +1025,7 @@ nsOuterWindowProxy::GetSubframeWindow(JSContext *cx,
                                       JS::Handle<JSObject*> proxy,
                                       JS::Handle<jsid> id) const
 {
-  int32_t index = GetArrayIndexFromId(cx, id);
+  uint32_t index = GetArrayIndexFromId(cx, id);
   if (!IsArrayIndex(index)) {
     return nullptr;
   }
@@ -1178,8 +1175,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mCleanedUp(false),
     mDialogAbuseCount(0),
     mAreDialogsEnabled(true),
-    mCanSkipCCGeneration(0),
-    mVRDevicesInitialized(false)
+    mCanSkipCCGeneration(0)
 {
   AssertIsOnMainThread();
 
@@ -1624,6 +1620,9 @@ nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
   // other members that the window destroyed observers could
   // re-create.
   NotifyDOMWindowDestroyed(this);
+  if (auto* reporter = nsWindowMemoryReporter::Get()) {
+    reporter->ObserveDOMWindowDetached(this);
+  }
 
   mInnerObjectsFreed = true;
 
@@ -1739,13 +1738,6 @@ NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTING_ADDREF(nsGlobalWindow)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(nsGlobalWindow)
 
-static PLDHashOperator
-MarkXBLHandlers(nsXBLPrototypeHandler* aKey, JS::Heap<JSObject*>& aData, void* aClosure)
-{
-  JS::ExposeObjectToActiveJS(aData);
-  return PL_DHASH_NEXT;
-}
-
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsGlobalWindow)
   if (tmp->IsBlackForCC(false)) {
     if (nsCCUncollectableMarker::InGeneration(tmp->mCanSkipCCGeneration)) {
@@ -1753,7 +1745,11 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsGlobalWindow)
     }
     tmp->mCanSkipCCGeneration = nsCCUncollectableMarker::sGeneration;
     if (tmp->mCachedXBLPrototypeHandlers) {
-      tmp->mCachedXBLPrototypeHandlers->Enumerate(MarkXBLHandlers, nullptr);
+      for (auto iter = tmp->mCachedXBLPrototypeHandlers->Iter();
+           !iter.Done();
+           iter.Next()) {
+        JS::ExposeObjectToActiveJS(iter.Data());
+      }
     }
     if (EventListenerManager* elm = tmp->GetExistingListenerManager()) {
       elm->MarkForCC();
@@ -1949,24 +1945,14 @@ nsGlobalWindow::RiskyUnlink()
 }
 #endif
 
-struct TraceData
-{
-  const TraceCallbacks& callbacks;
-  void* closure;
-};
-
-static PLDHashOperator
-TraceXBLHandlers(nsXBLPrototypeHandler* aKey, JS::Heap<JSObject*>& aData, void* aClosure)
-{
-  TraceData* data = static_cast<TraceData*>(aClosure);
-  data->callbacks.Trace(&aData, "Cached XBL prototype handler", data->closure);
-  return PL_DHASH_NEXT;
-}
-
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsGlobalWindow)
   if (tmp->mCachedXBLPrototypeHandlers) {
-    TraceData data = { aCallbacks, aClosure };
-    tmp->mCachedXBLPrototypeHandlers->Enumerate(TraceXBLHandlers, &data);
+    for (auto iter = tmp->mCachedXBLPrototypeHandlers->Iter();
+         !iter.Done();
+         iter.Next()) {
+      JS::Heap<JSObject*>& data = iter.Data();
+      aCallbacks.Trace(&data, "Cached XBL prototype handler", aClosure);
+    }
   }
   NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
@@ -2329,13 +2315,11 @@ CreateNativeGlobalForInner(JSContext* aCx,
   // windows or inside a browser element. In such cases we want to tag the
   // window's compartment with the add-on ID. See bug 1092156.
   if (nsContentUtils::IsSystemPrincipal(aPrincipal)) {
-    options.setAddonId(MapURIToAddonID(aURI));
+    options.creationOptions().setAddonId(MapURIToAddonID(aURI));
   }
 
-  if (top) {
-    if (top->GetGlobalJSObject()) {
-      options.setSameZoneAs(top->GetGlobalJSObject());
-    }
+  if (top && top->GetGlobalJSObject()) {
+    options.creationOptions().setSameZoneAs(top->GetGlobalJSObject());
   }
 
   // Determine if we need the Components object.
@@ -2952,8 +2936,9 @@ nsGlobalWindow::DetachFromDocShell()
     inner->FreeInnerObjects();
   }
 
-  // Make sure that this is called before we null out the document.
-  NotifyDOMWindowDestroyed(this);
+  if (auto* reporter = nsWindowMemoryReporter::Get()) {
+    reporter->ObserveDOMWindowDetached(this);
+  }
 
   NotifyWindowIDDestroyed("outer-window-destroyed");
 
@@ -3756,7 +3741,7 @@ nsPIDOMWindow::SetAudioCapture(bool aCapture)
 
   RefPtr<AudioChannelService> service = AudioChannelService::GetOrCreate();
   if (service) {
-    service->RefreshAgentsCapture(GetOuterWindow(), mWindowID);
+    service->SetWindowAudioCaptured(GetOuterWindow(), mWindowID, aCapture);
   }
 
   return NS_OK;
@@ -3776,6 +3761,19 @@ nsGlobalWindow::GetSpeechSynthesis(ErrorResult& aError)
 
   return mSpeechSynthesis;
 }
+
+bool
+nsGlobalWindow::HasActiveSpeechSynthesis()
+{
+  MOZ_ASSERT(IsInnerWindow());
+
+  if (mSpeechSynthesis) {
+    return !mSpeechSynthesis->HasEmptyQueue();
+  }
+
+  return false;
+}
+
 #endif
 
 already_AddRefed<nsIDOMWindow>
@@ -4195,7 +4193,7 @@ nsGlobalWindow::GetSupportedNames(nsTArray<nsString>& aNames)
 bool
 nsGlobalWindow::DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObj,
                           JS::Handle<jsid> aId,
-                          JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                          JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   MOZ_ASSERT(IsInnerWindow());
 
@@ -5032,25 +5030,30 @@ nsGlobalWindow::SetOuterHeight(JSContext* aCx, JS::Handle<JS::Value> aValue,
                             aValue, "outerHeight", aError);
 }
 
-nsIntPoint
+DesktopIntPoint
 nsGlobalWindow::GetScreenXY(ErrorResult& aError)
 {
   MOZ_ASSERT(IsOuterWindow());
 
   // When resisting fingerprinting, always return (0,0)
   if (nsContentUtils::ShouldResistFingerprinting(mDocShell)) {
-    return nsIntPoint(0, 0);
+    return DesktopIntPoint(0, 0);
   }
 
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
   if (!treeOwnerAsWin) {
     aError.Throw(NS_ERROR_FAILURE);
-    return nsIntPoint(0, 0);
+    return DesktopIntPoint(0, 0);
   }
 
   int32_t x = 0, y = 0;
   aError = treeOwnerAsWin->GetPosition(&x, &y);
-  return nsIntPoint(x, y);
+
+  nsCOMPtr<nsIWidget> widget = GetMainWidget();
+  DesktopToLayoutDeviceScale scale = widget ? widget->GetDesktopToDeviceScale()
+                                            : DesktopToLayoutDeviceScale(1.0);
+  DesktopPoint pt = LayoutDeviceIntPoint(x, y) / scale;
+  return DesktopIntPoint(NSToIntRound(pt.x), NSToIntRound(pt.y));
 }
 
 int32_t
@@ -5058,7 +5061,7 @@ nsGlobalWindow::GetScreenXOuter(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  return DevToCSSIntPixels(GetScreenXY(aError).x);
+  return GetScreenXY(aError).x;
 }
 
 int32_t
@@ -5302,7 +5305,7 @@ nsGlobalWindow::GetScreenYOuter(ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  return DevToCSSIntPixels(GetScreenXY(aError).y);
+  return GetScreenXY(aError).y;
 }
 
 int32_t
@@ -5919,8 +5922,12 @@ FullscreenTransitionTask::Run()
       mWindow->mFullScreen = mFullscreen;
     }
     // Toggle the fullscreen state on the widget
-    mWindow->SetWidgetFullscreen(nsPIDOMWindow::eForFullscreenAPI,
-                                 mFullscreen, mWidget, mScreen);
+    if (!mWindow->SetWidgetFullscreen(nsPIDOMWindow::eForFullscreenAPI,
+                                      mFullscreen, mWidget, mScreen)) {
+      // Fail to setup the widget, call FinishFullscreenChange to
+      // complete fullscreen change directly.
+      mWindow->FinishFullscreenChange(mFullscreen);
+    }
     // Set observer for the next content paint.
     nsCOMPtr<nsIObserver> observer = new Observer(this);
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
@@ -5979,7 +5986,7 @@ FullscreenTransitionTask::Observer::Observe(nsISupports* aSubject,
 }
 
 static bool
-MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRHMDInfo* aHMD,
+MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRDeviceProxy* aHMD,
                      nsPIDOMWindow::FullscreenReason aReason, bool aFullscreen)
 {
   nsCOMPtr<nsIWidget> widget = aWindow->GetMainWidget();
@@ -5999,20 +6006,20 @@ MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRHMDInfo* aHMD,
   }
   nsCOMPtr<nsIScreen> screen = aHMD ? aHMD->GetScreen() : nullptr;
   if (!performTransition) {
-    aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, screen);
+    return aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, screen);
   } else {
     nsCOMPtr<nsIRunnable> task =
       new FullscreenTransitionTask(duration, aWindow, aFullscreen,
                                    widget, screen, transitionData);
     task->Run();
+    return true;
   }
-  return true;
 }
 
 nsresult
 nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
                                       bool aFullScreen,
-                                      gfx::VRHMDInfo* aHMD)
+                                      gfx::VRDeviceProxy* aHMD)
 {
   MOZ_ASSERT(IsOuterWindow());
   MOZ_ASSERT(nsContentUtils::IsSafeToRunScript(),
@@ -6099,11 +6106,18 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
     }
   }
 
+  // If we didn't setup the widget, we may need to manually set this
+  // flag, or the assertion in FinishFullscreenChange is violated.
+  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
+    if (!presShell->IsInFullscreenChange()) {
+      presShell->SetIsInFullscreenChange(true);
+    }
+  }
   FinishFullscreenChange(aFullScreen);
   return NS_OK;
 }
 
-void
+bool
 nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen,
                                     nsIWidget* aWidget, nsIScreen* aScreen)
 {
@@ -6115,13 +6129,12 @@ nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen
   if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
     presShell->SetIsInFullscreenChange(true);
   }
-  if (aReason == nsPIDOMWindow::eForFullscreenMode) {
+  nsresult rv = aReason == nsPIDOMWindow::eForFullscreenMode ?
     // If we enter fullscreen for fullscreen mode, we want
     // the native system behavior.
-    aWidget->MakeFullScreenWithNativeTransition(aIsFullscreen, aScreen);
-  } else {
+    aWidget->MakeFullScreenWithNativeTransition(aIsFullscreen, aScreen) :
     aWidget->MakeFullScreen(aIsFullscreen, aScreen);
-  }
+  return NS_SUCCEEDED(rv);
 }
 
 /* virtual */ void
@@ -6996,13 +7009,15 @@ nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, b
     return;
   }
 
-  // Mild abuse of a "size" object so we don't need more helper functions.
-  nsIntSize cssPos(aXPos, aYPos);
-  CheckSecurityLeftAndTop(&cssPos.width, &cssPos.height, aCallerIsChrome);
+  DesktopIntPoint pt(aXPos, aYPos);
+  CheckSecurityLeftAndTop(&pt.x, &pt.y, aCallerIsChrome);
 
-  nsIntSize devPos = CSSToDevIntPixels(cssPos);
+  nsCOMPtr<nsIWidget> widget = GetMainWidget();
+  DesktopToLayoutDeviceScale scale = widget ? widget->GetDesktopToDeviceScale()
+                                            : DesktopToLayoutDeviceScale(1.0);
+  LayoutDevicePoint devPos = pt * scale;
 
-  aError = treeOwnerAsWin->SetPosition(devPos.width, devPos.height);
+  aError = treeOwnerAsWin->SetPosition(devPos.x, devPos.y);
 }
 
 void
@@ -9862,13 +9877,11 @@ static nsCanvasFrame* FindCanvasFrame(nsIFrame* aFrame)
         return canvasFrame;
     }
 
-    nsIFrame* kid = aFrame->GetFirstPrincipalChild();
-    while (kid) {
+    for (nsIFrame* kid : aFrame->PrincipalChildList()) {
         canvasFrame = FindCanvasFrame(kid);
         if (canvasFrame) {
             return canvasFrame;
         }
-        kid = kid->GetNextSibling();
     }
 
     return nullptr;
@@ -10539,7 +10552,7 @@ nsGlobalWindow::ShowSlowScriptDialog()
   }
 
   // Check if we should offer the option to debug
-  JS::AutoFilename filename;
+  JS::UniqueChars filename;
   unsigned lineno;
   bool hasFrame = JS::DescribeScriptedCaller(cx, &filename, &lineno);
 
@@ -11025,7 +11038,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
       fireMozStorageChanged = mLocalStorage == changingStorage;
       if (fireMozStorageChanged) {
         eventType.AssignLiteral("MozLocalStorageChanged");
-      };
+      }
       break;
     }
     default:
@@ -12976,19 +12989,11 @@ nsGlobalWindow::SyncGamepadState()
 #endif // MOZ_GAMEPAD
 
 bool
-nsGlobalWindow::GetVRDevices(nsTArray<RefPtr<mozilla::dom::VRDevice>>& aDevices)
+nsGlobalWindow::UpdateVRDevices(nsTArray<RefPtr<mozilla::dom::VRDevice>>& aDevices)
 {
-  FORWARD_TO_INNER(GetVRDevices, (aDevices), false);
+  FORWARD_TO_INNER(UpdateVRDevices, (aDevices), false);
 
-  if (!mVRDevicesInitialized) {
-    bool ok = mozilla::dom::VRDevice::CreateAllKnownVRDevices(ToSupports(this), mVRDevices);
-    if (!ok) {
-      mVRDevices.Clear();
-      return false;
-    }
-  }
-
-  mVRDevicesInitialized = true;
+  VRDevice::UpdateVRDevices(mVRDevices, ToSupports(this));
   aDevices = mVRDevices;
   return true;
 }

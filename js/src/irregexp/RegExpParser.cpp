@@ -616,7 +616,7 @@ class WideCharRange
     widechar to_;
 };
 
-typedef Vector<WideCharRange, 1, LifoAllocPolicy<Infallible> > WideCharRangeVector;
+typedef InfallibleVector<WideCharRange, 1> WideCharRangeVector;
 
 static inline CharacterRange
 LeadSurrogateRange()
@@ -740,10 +740,10 @@ AddUnicodeRange(LifoAlloc* alloc,
 // encompassing the full range of possible values.
 template <typename RangeType>
 static inline void
-NegateUnicodeRanges(LifoAlloc* alloc, Vector<RangeType, 1, LifoAllocPolicy<Infallible> >** ranges,
+NegateUnicodeRanges(LifoAlloc* alloc, InfallibleVector<RangeType, 1>** ranges,
                     RangeType full_range)
 {
-    typedef Vector<RangeType, 1, LifoAllocPolicy<Infallible> > RangeVector;
+    typedef InfallibleVector<RangeType, 1> RangeVector;
     RangeVector* tmp_ranges = alloc->newInfallible<RangeVector>(*alloc);
     tmp_ranges->append(full_range);
     RangeVector* result_ranges = alloc->newInfallible<RangeVector>(*alloc);
@@ -1563,7 +1563,7 @@ RegExpParser<CharT>::ParseDisjunction()
                     Advance();
                     break;
                 }
-                // Fall through
+                MOZ_FALLTHROUGH;
               case 'd': case 's': case 'w': {
                 widechar c = Next();
                 Advance(2);
@@ -1605,8 +1605,8 @@ RegExpParser<CharT>::ParseDisjunction()
                     Advance(2);
                     break;
                 }
+                MOZ_FALLTHROUGH;
               }
-                // FALLTHROUGH
               case '0': {
                 if (unicode_) {
                     Advance(2);
@@ -1735,7 +1735,7 @@ RegExpParser<CharT>::ParseDisjunction()
             int dummy;
             if (ParseIntervalQuantifier(&dummy, &dummy))
                 return ReportError(JSMSG_NOTHING_TO_REPEAT);
-            // fallthrough
+            MOZ_FALLTHROUGH;
           }
           default:
             if (unicode_) {

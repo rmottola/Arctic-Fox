@@ -60,13 +60,13 @@ function frameScript() {
     });
   } catch (ex) {
     Cu.reportError("Error in content (setup): " + ex);
-    Cu.reportError(ex.stack);    
+    Cu.reportError(ex.stack);
   }
 }
 
 // A variant of `Assert` that doesn't spam the logs
 // in case of success.
-let SilentAssert = {
+var SilentAssert = {
   equal: function(a, b, msg) {
     if (a == b) {
       return;
@@ -90,7 +90,7 @@ let SilentAssert = {
   }
 };
 
-let isShuttingDown = false;
+var isShuttingDown = false;
 function monotinicity_tester(source, testName) {
   // In the background, check invariants:
   // - numeric data can only ever increase;
@@ -177,7 +177,7 @@ function monotinicity_tester(source, testName) {
       let key = item.groupId;
       if (map.has(key)) {
         let old = map.get(key);
-        Assert.ok(false, `Component ${key} has already been seen. Latest: ${item.title||item.addonId||item.name}, previous: ${old.title||old.addonId||old.name}`);
+        Assert.ok(false, `Component ${key} has already been seen. Latest: ${item.addonId||item.name}, previous: ${old.addonId||old.name}`);
       }
       map.set(key, item);
     }
@@ -254,10 +254,33 @@ add_task(function* test() {
 
     let {snapshot: stats} = (yield promiseContentResponse(browser, "compartments-test:getStatistics", null));
 
-    let titles = [for(stat of stats.componentsData) stat.title];
-
+    // Attach titles to components.
+    let titles = [];
+    let map = new Map();
+    let windows = Services.wm.getEnumerator("navigator:browser");
+    while (windows.hasMoreElements()) {
+      let window = windows.getNext();
+      let tabbrowser = window.gBrowser;
+      for (let browser of tabbrowser.browsers) {
+        let id = browser.outerWindowID; // May be `null` if the browser isn't loaded yet
+        if (id != null) {
+          map.set(id, browser);
+        }
+      }
+    }
     for (let stat of stats.componentsData) {
-      info(`Compartment: ${stat.name} => ${stat.title} (${stat.isSystem?"system":"web"})`);
+      if (!stat.windowId) {
+        continue;
+      }
+      let browser = map.get(stat.windowId);
+      if (!browser) {
+        continue;
+      }
+      let title = browser.contentTitle;
+      if (title) {
+        stat.title = title;
+        titles.push(title);
+      }
     }
 
     // While the webpage consists in three compartments, we should see only
@@ -283,11 +306,10 @@ add_task(function* test() {
       break;
     } else {
       info(`Not enough CPU time detected: ${parent.jank.totalUserTime}`);
-      info(`Details: ${JSON.stringify(parent, null, "\t")}`);
     }
   }
   isShuttingDown = true;
 
   // Cleanup
-  gBrowser.removeTab(newTab);
+  gBrowser.removeTab(newTab, {skipPermitUnload: true});
 });

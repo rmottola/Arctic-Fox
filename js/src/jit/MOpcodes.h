@@ -21,7 +21,6 @@ namespace jit {
     _(SimdReinterpretCast)                                                  \
     _(SimdExtractElement)                                                   \
     _(SimdInsertElement)                                                    \
-    _(SimdSignMask)                                                         \
     _(SimdSwizzle)                                                          \
     _(SimdGeneralShuffle)                                                   \
     _(SimdShuffle)                                                          \
@@ -31,6 +30,8 @@ namespace jit {
     _(SimdBinaryBitwise)                                                    \
     _(SimdShift)                                                            \
     _(SimdSelect)                                                           \
+    _(SimdAllTrue)                                                          \
+    _(SimdAnyTrue)                                                          \
     _(CloneLiteral)                                                         \
     _(Parameter)                                                            \
     _(Callee)                                                               \
@@ -138,8 +139,8 @@ namespace jit {
     _(Nop)                                                                  \
     _(LimitedTruncate)                                                      \
     _(RegExp)                                                               \
-    _(RegExpExec)                                                           \
-    _(RegExpTest)                                                           \
+    _(RegExpMatcher)                                                        \
+    _(RegExpTester)                                                         \
     _(RegExpReplace)                                                        \
     _(StringReplace)                                                        \
     _(Lambda)                                                               \
@@ -158,6 +159,7 @@ namespace jit {
     _(TypeBarrier)                                                          \
     _(MonitorTypes)                                                         \
     _(PostWriteBarrier)                                                     \
+    _(PostWriteElementBarrier)                                              \
     _(GetPropertyCache)                                                     \
     _(GetPropertyPolymorphic)                                               \
     _(SetPropertyPolymorphic)                                               \

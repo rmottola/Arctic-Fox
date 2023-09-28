@@ -66,19 +66,19 @@ uint32_t
 TCPServerSocketParent::GetAppId()
 {
   const PContentParent *content = Manager()->Manager();
-  if (PBrowserParent* browser = LoneManagedOrNull(content->ManagedPBrowserParent())) {
+  if (PBrowserParent* browser = SingleManagedOrNull(content->ManagedPBrowserParent())) {
     TabParent *tab = TabParent::GetFrom(browser);
     return tab->OwnAppId();
   } else {
     return nsIScriptSecurityManager::UNKNOWN_APP_ID;
   }
-};
+}
 
 bool
 TCPServerSocketParent::GetInBrowser()
 {
   const PContentParent *content = Manager()->Manager();
-  if (PBrowserParent* browser = LoneManagedOrNull(content->ManagedPBrowserParent())) {
+  if (PBrowserParent* browser = SingleManagedOrNull(content->ManagedPBrowserParent())) {
     TabParent *tab = TabParent::GetFrom(browser);
     return tab->IsBrowserElement();
   } else {
@@ -113,7 +113,7 @@ TCPServerSocketParent::SendCallbackAccept(TCPSocketParent *socket)
     }
     else {
       NS_ERROR("Sending data from PTCPSocketParent was failed.");
-    };
+    }
   }
   else {
     NS_ERROR("The member value for NeckoParent is wrong.");

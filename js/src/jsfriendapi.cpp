@@ -36,7 +36,6 @@ using namespace js;
 
 using mozilla::Move;
 using mozilla::PodArrayZero;
-using mozilla::UniquePtr;
 
 // Required by PerThreadDataFriendFields::getMainThread()
 JS_STATIC_ASSERT(offsetof(JSRuntime, mainThread) ==
@@ -52,12 +51,12 @@ PerThreadDataFriendFields::PerThreadDataFriendFields()
 }
 
 JS_FRIEND_API(void)
-js::SetSourceHook(JSRuntime* rt, UniquePtr<SourceHook> hook)
+js::SetSourceHook(JSRuntime* rt, mozilla::UniquePtr<SourceHook> hook)
 {
     rt->sourceHook = Move(hook);
 }
 
-JS_FRIEND_API(UniquePtr<SourceHook>)
+JS_FRIEND_API(mozilla::UniquePtr<SourceHook>)
 js::ForgetSourceHook(JSRuntime* rt)
 {
     return Move(rt->sourceHook);
@@ -394,6 +393,11 @@ JS_FRIEND_API(JSFunction*)
 js::GetOutermostEnclosingFunctionOfScriptedCaller(JSContext* cx)
 {
     ScriptFrameIter iter(cx);
+
+    // Skip eval frames.
+    while (!iter.done() && iter.isEvalFrame())
+        ++iter;
+
     if (iter.done())
         return nullptr;
 
@@ -721,7 +725,7 @@ FormatFrame(JSContext* cx, const ScriptFrameIter& iter, char* buf, int num,
 
     RootedValue thisVal(cx);
     if (iter.hasUsableAbstractFramePtr() &&
-        iter.isNonEvalFunctionFrame() &&
+        iter.isFunctionFrame() &&
         fun && !fun->isArrow() && !fun->isDerivedClassConstructor())
     {
         if (!GetFunctionThis(cx, iter.abstractFramePtr(), &thisVal))
@@ -1072,7 +1076,7 @@ JS::ObjectPtr::updateWeakPointerAfterGC()
 void
 JS::ObjectPtr::trace(JSTracer* trc, const char* name)
 {
-    JS_CallObjectTracer(trc, &value, name);
+    JS::TraceEdge(trc, &value, name);
 }
 
 JS_FRIEND_API(JSObject*)

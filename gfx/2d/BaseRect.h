@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <ostream>
+#include <limits>
 
 #include "mozilla/Assertions.h"
 #include "mozilla/FloatingPoint.h"
@@ -544,6 +545,22 @@ struct BaseRect {
     rect.y = std::min(rect.YMost(), aRect.YMost()) - rect.height;
     return rect;
   }
+
+  // Returns the largest rectangle that can be represented with 32-bit
+  // signed integers, centered around a point at 0,0.  As BaseRect's represent
+  // the dimensions as a top-left point with a width and height, the width
+  // and height will be the largest positive 32-bit value.  The top-left
+  // position coordinate is divided by two to center the rectangle around a
+  // point at 0,0.
+  static Sub MaxIntRect()
+  {
+    return Sub(
+      -std::numeric_limits<int32_t>::max() * 0.5,
+      -std::numeric_limits<int32_t>::max() * 0.5,
+      std::numeric_limits<int32_t>::max(),
+      std::numeric_limits<int32_t>::max()
+    );
+  };
 
   friend std::ostream& operator<<(std::ostream& stream,
       const BaseRect<T, Sub, Point, SizeT, MarginT>& aRect) {

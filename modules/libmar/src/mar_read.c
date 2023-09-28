@@ -337,7 +337,7 @@ int get_mar_file_info_fp(FILE *fp,
     }
   }
 
-  if (ftell(fp) == offsetToContent) {
+  if ((int64_t)ftell(fp) == (int64_t)offsetToContent) {
     *hasAdditionalBlocks = 0;
   } else {
     if (numAdditionalBlocks) {
@@ -405,10 +405,12 @@ mar_read_product_info_block(MarFile *mar,
   /* The buffer size is 97 bytes because the MAR channel name < 64 bytes, and 
      product version < 32 bytes + 3 NULL terminator bytes. */
   char buf[97] = { '\0' };
-  int ret = get_mar_file_info_fp(mar->fp, NULL, NULL,
-                                 &hasAdditionalBlocks, 
-                                 &offsetAdditionalBlocks, 
-                                 &numAdditionalBlocks);
+  if (get_mar_file_info_fp(mar->fp, NULL, NULL,
+                           &hasAdditionalBlocks,
+                           &offsetAdditionalBlocks,
+                           &numAdditionalBlocks) != 0) {
+    return -1;
+  }
   for (i = 0; i < numAdditionalBlocks; ++i) {
     /* Read the additional block size */
     if (fread(&additionalBlockSize, 

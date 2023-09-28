@@ -125,6 +125,18 @@ static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD0 = a0;
 static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD1 = a1;
 static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD2 = t0;
 
+// Registerd used in RegExpMatcher instruction (do not use JSReturnOperand).
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherRegExpReg = CallTempReg0;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherStringReg = CallTempReg1;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherLastIndexReg = CallTempReg2;
+static MOZ_CONSTEXPR_VAR Register RegExpMatcherStickyReg = CallTempReg3;
+
+// Registerd used in RegExpTester instruction (do not use ReturnReg).
+static MOZ_CONSTEXPR_VAR Register RegExpTesterRegExpReg = CallTempReg0;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterStringReg = CallTempReg1;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterLastIndexReg = CallTempReg2;
+static MOZ_CONSTEXPR_VAR Register RegExpTesterStickyReg = CallTempReg3;
+
 static MOZ_CONSTEXPR_VAR uint32_t CodeAlignment = 4;
 
 // This boolean indicates whether we support SIMD instructions flavoured for
@@ -474,7 +486,7 @@ class BOffImm16
     bool isInvalid() {
         return data == INVALID;
     }
-    Instruction* getDest(Instruction* src);
+    Instruction* getDest(Instruction* src) const;
 
     BOffImm16(InstImm inst);
 };
@@ -1042,6 +1054,7 @@ class AssemblerMIPSShared : public AssemblerShared
 
     // label operations
     void bind(Label* label, BufferOffset boff = BufferOffset());
+    void bindLater(Label* label, wasm::JumpTarget target);
     virtual void bind(InstImm* inst, uintptr_t branch, uintptr_t target) = 0;
     virtual void Bind(uint8_t* rawCode, CodeOffset* label, const void* address) = 0;
     void bind(CodeOffset* label) {
@@ -1051,7 +1064,6 @@ class AssemblerMIPSShared : public AssemblerShared
         return nextOffset().getOffset();
     }
     void retarget(Label* label, Label* target);
-    void retargetWithOffset(size_t baseOffset, const LabelBase* label, Label* target);
 
     // See Bind
     size_t labelToPatchOffset(CodeOffset label) { return label.offset(); }

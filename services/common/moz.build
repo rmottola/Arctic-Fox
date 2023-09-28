@@ -24,15 +24,12 @@ EXTRA_JS_MODULES['services-common'] += [
 
 EXTRA_PP_JS_MODULES['services-common'] += [
     'async.js',
-    'bagheeraclient.js',
     'observers.js',
     'rest.js',
 ]
 
 TESTING_JS_MODULES.services.common += [
-    'modules-testing/bagheeraserver.js',
     'modules-testing/logging.js',
-    'modules-testing/storageserver.js',
     'modules-testing/utils.js',
 ]
 

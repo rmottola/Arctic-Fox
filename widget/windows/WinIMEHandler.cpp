@@ -28,7 +28,7 @@
 const char* kOskPathPrefName = "ui.osk.on_screen_keyboard_path";
 const char* kOskEnabled = "ui.osk.enabled";
 const char* kOskDetectPhysicalKeyboard = "ui.osk.detect_physical_keyboard";
-const char* kOskRequireTabletMode = "ui.osk.require_tablet_mode";
+const char* kOskRequireWin10 = "ui.osk.require_win10";
 const char* kOskDebugReason = "ui.osk.debug.keyboardDisplayReason";
 
 namespace mozilla {
@@ -45,7 +45,6 @@ InputContextAction::Cause IMEHandler::sLastContextActionCause =
 #ifdef NS_ENABLE_TSF
 bool IMEHandler::sIsInTSFMode = false;
 bool IMEHandler::sIsIMMEnabled = true;
-bool IMEHandler::sShowingOnScreenKeyboard = false;
 decltype(SetInputScopes)* IMEHandler::sSetInputScopes = nullptr;
 #endif // #ifdef NS_ENABLE_TSF
 
@@ -548,21 +547,22 @@ void
 IMEHandler::MaybeShowOnScreenKeyboard()
 {
   if (sPluginHasFocus ||
-      !IsWin10OrLater() ||
+      !IsWin8OrLater() ||
       !Preferences::GetBool(kOskEnabled, true) ||
-      sShowingOnScreenKeyboard ||
+      GetOnScreenKeyboardWindow() ||
       IMEHandler::IsKeyboardPresentOnSlate()) {
     return;
   }
 
-  // Tablet Mode is only supported on Windows 10 and higher.
-  // When touch-event detection within IME is better supported
-  // this check may be removed, and ShowOnScreenKeyboard can
-  // run on Windows 8 and higher (adjusting the IsWin10OrLater
-  // guard above and within MaybeDismissOnScreenKeyboard).
-  if (!IsInTabletMode() &&
-      Preferences::GetBool(kOskRequireTabletMode, true) &&
-      !AutoInvokeOnScreenKeyboardInDesktopMode()) {
+  // On Windows 10 we require tablet mode, unless the user has set the relevant
+  // Windows setting to enable the on-screen keyboard in desktop mode.
+  // We might be disabled specifically on Win8(.1), so we check that afterwards.
+  if (IsWin10OrLater()) {
+    if (!IsInTabletMode() && !AutoInvokeOnScreenKeyboardInDesktopMode()) {
+      return;
+    }
+  }
+  else if (Preferences::GetBool(kOskRequireWin10, true)) {
     return;
   }
 
@@ -574,8 +574,7 @@ void
 IMEHandler::MaybeDismissOnScreenKeyboard()
 {
   if (sPluginHasFocus ||
-      !IsWin10OrLater() ||
-      !sShowingOnScreenKeyboard) {
+      !IsWin8OrLater()) {
     return;
   }
 
@@ -836,7 +835,7 @@ IMEHandler::ShowOnScreenKeyboard()
       L"{054AAE20-4BEA-4347-8A35-64A533254A9D}\\LocalServer32";
     if (!WinUtils::GetRegistryKey(HKEY_LOCAL_MACHINE,
                                   kRegKeyName,
-                                  0,
+                                  nullptr,
                                   path,
                                   sizeof path)) {
       return;
@@ -876,7 +875,8 @@ IMEHandler::ShowOnScreenKeyboard()
         if (FAILED(hres) || !path) {
           return;
         }
-        commonProgramFilesPath = nsDependentString(path).get();
+        commonProgramFilesPath =
+          static_cast<const wchar_t*>(nsDependentString(path).get());
         ::CoTaskMemFree(path);
       }
       wstrpath.replace(commonProgramFilesOffset,
@@ -888,15 +888,14 @@ IMEHandler::ShowOnScreenKeyboard()
     Preferences::SetString(kOskPathPrefName, cachedPath);
   }
 
-  LPCWSTR cachedPathPtr;
+  const char16_t *cachedPathPtr;
   cachedPath.GetData(&cachedPathPtr);
-  HINSTANCE ret = ::ShellExecuteW(nullptr,
-                                  L"",
-                                  cachedPathPtr,
-                                  nullptr,
-                                  nullptr,
-                                  SW_SHOW);
-  sShowingOnScreenKeyboard = true;
+  ShellExecuteW(nullptr,
+                L"",
+                char16ptr_t(cachedPathPtr),
+                nullptr,
+                nullptr,
+                SW_SHOW);
 }
 
 // Based on DismissVirtualKeyboard() in Chromium's base/win/win_util.cc.
@@ -904,15 +903,45 @@ IMEHandler::ShowOnScreenKeyboard()
 void
 IMEHandler::DismissOnScreenKeyboard()
 {
-  sShowingOnScreenKeyboard = false;
+  // Dismiss the virtual keyboard if it's open
+  HWND osk = GetOnScreenKeyboardWindow();
+  if (osk) {
+    ::PostMessage(osk, WM_SYSCOMMAND, SC_CLOSE, 0);
+  }
+}
 
-  // Dismiss the virtual keyboard by generating the ESC keystroke
-  // programmatically.
+// static
+HWND
+IMEHandler::GetOnScreenKeyboardWindow()
+{
   const wchar_t kOSKClassName[] = L"IPTip_Main_Window";
   HWND osk = ::FindWindowW(kOSKClassName, nullptr);
   if (::IsWindow(osk) && ::IsWindowEnabled(osk)) {
-    ::PostMessage(osk, WM_SYSCOMMAND, SC_CLOSE, 0);
+    return osk;
   }
+  return nullptr;
+}
+
+// static
+void
+IMEHandler::SetCandidateWindow(nsWindow* aWindow, CANDIDATEFORM* aForm)
+{
+  if (!sPluginHasFocus) {
+    return;
+  }
+
+  IMMHandler::SetCandidateWindow(aWindow, aForm);
+}
+
+// static
+void
+IMEHandler::DefaultProcOfPluginEvent(nsWindow* aWindow,
+                                     const NPEvent* aPluginEvent)
+{
+  if (!sPluginHasFocus) {
+    return;
+  }
+  IMMHandler::DefaultProcOfPluginEvent(aWindow, aPluginEvent);
 }
 
 } // namespace widget

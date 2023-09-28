@@ -6,6 +6,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
   "resource://gre/modules/PlacesUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
+  "resource:///modules/ContentCrashHandlers.jsm");
 
 /**
  * Wait for a <notification> to be closed then call the specified callback.

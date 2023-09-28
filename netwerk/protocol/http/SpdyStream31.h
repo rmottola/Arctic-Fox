@@ -7,6 +7,7 @@
 #define mozilla_net_SpdyStream31_h
 
 #include "mozilla/Attributes.h"
+#include "mozilla/UniquePtr.h"
 #include "nsAHttpTransaction.h"
 
 namespace mozilla { namespace net {
@@ -143,10 +144,6 @@ protected:
 private:
   friend class nsAutoPtr<SpdyStream31>;
 
-  static PLDHashOperator hdrHashEnumerate(const nsACString &,
-                                          nsAutoPtr<nsCString> &,
-                                          void *);
-
   nsresult ParseHttpRequestHeaders(const char *, uint32_t, uint32_t *);
   nsresult GenerateSynFrame();
 
@@ -205,7 +202,7 @@ private:
 
   // The InlineFrame and associated data is used for composing control
   // frames and data frame headers.
-  nsAutoArrayPtr<uint8_t>      mTxInlineFrame;
+  UniquePtr<uint8_t[]>         mTxInlineFrame;
   uint32_t                     mTxInlineFrameSize;
   uint32_t                     mTxInlineFrameUsed;
 
@@ -224,7 +221,7 @@ private:
   uint32_t             mDecompressBufferSize;
   uint32_t             mDecompressBufferUsed;
   uint32_t             mDecompressedBytes;
-  nsAutoArrayPtr<char> mDecompressBuffer;
+  UniquePtr<char[]>    mDecompressBuffer;
 
   // Track the content-length of a request body so that we can
   // place the fin flag on the last data packet instead of waiting

@@ -17,6 +17,7 @@
 #include "js/TypeDecls.h"
 #include "nsRefPtrHashtable.h"
 
+// Only fired for inner windows.
 #define DOM_WINDOW_DESTROYED_TOPIC "dom-window-destroyed"
 #define DOM_WINDOW_FROZEN_TOPIC "dom-window-frozen"
 #define DOM_WINDOW_THAWED_TOPIC "dom-window-thawed"
@@ -42,7 +43,7 @@ class Element;
 class ServiceWorkerRegistrationMainThread;
 } // namespace dom
 namespace gfx {
-class VRHMDInfo;
+class VRDeviceProxy;
 } // namespace gfx
 } // namespace mozilla
 
@@ -512,7 +513,7 @@ public:
    */
   virtual nsresult SetFullscreenInternal(
     FullscreenReason aReason, bool aIsFullscreen,
-    mozilla::gfx::VRHMDInfo *aHMD = nullptr) = 0;
+    mozilla::gfx::VRDeviceProxy *aHMD = nullptr) = 0;
 
   /**
    * This function should be called when the fullscreen state is flipped.

@@ -70,7 +70,9 @@ protected:
 
   virtual bool RecvForceEnd() override;
 
-  virtual bool RecvSetAudioOutputVolume(const uint32_t& aVolume) override;
+  virtual bool RecvSetAudioOutputVolume(const float& aVolume) override;
+
+  virtual bool Recv__delete__() override;
 };
 
 class SpeechTaskParent : public nsSpeechTask

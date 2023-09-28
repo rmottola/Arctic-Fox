@@ -6,7 +6,7 @@
 
 #include "jit/MIRGraph.h"
 
-#include "asmjs/AsmJSValidate.h"
+#include "asmjs/Wasm.h"
 #include "jit/BytecodeAnalysis.h"
 #include "jit/Ion.h"
 #include "jit/JitSpewer.h"
@@ -19,8 +19,7 @@ using mozilla::Swap;
 
 MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOptions& options,
                            TempAllocator* alloc, MIRGraph* graph, const CompileInfo* info,
-                           const OptimizationInfo* optimizationInfo,
-                           bool usesSignalHandlersForAsmJSOOB)
+                           const OptimizationInfo* optimizationInfo)
   : compartment(compartment),
     info_(info),
     optimizationInfo_(optimizationInfo),
@@ -41,8 +40,9 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
     instrumentedProfilingIsCached_(false),
     safeForMinorGC_(true),
 #if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
-    usesSignalHandlersForAsmJSOOB_(usesSignalHandlersForAsmJSOOB),
+    usesSignalHandlersForAsmJSOOB_(false),
 #endif
+    minAsmJSHeapLength_(0),
     options(options),
     gs_(alloc)
 { }
@@ -126,26 +126,35 @@ MIRGenerator::needsAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access) const
 size_t
 MIRGenerator::foldableOffsetRange(const MAsmJSHeapAccess* access) const
 {
-    // This determines whether it's ok to fold up to AsmJSImmediateSize
-    // offsets, instead of just AsmJSCheckedImmediateSize.
+    // This determines whether it's ok to fold up to WasmImmediateSize
+    // offsets, instead of just WasmCheckedImmediateSize.
 
-#if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
-    // With signal-handler OOB handling, we reserve guard space for the full
-    // immediate size.
+    static_assert(WasmCheckedImmediateRange <= WasmImmediateRange,
+                  "WasmImmediateRange should be the size of an unconstrained "
+                  "address immediate");
+
+#ifdef ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB
+    static_assert(wasm::Uint32Range + WasmImmediateRange + sizeof(wasm::Val) < wasm::MappedSize,
+                  "When using signal handlers for bounds checking, a uint32 is added to the base "
+                  "address followed by an immediate in the range [0, WasmImmediateRange). An "
+                  "unaligned access (whose size is conservatively approximated by wasm::Val) may "
+                  "spill over, so ensure a space at the end.");
+
+    // Signal-handling can be dynamically disabled by OS bugs or flags.
     if (usesSignalHandlersForAsmJSOOB_)
-        return AsmJSImmediateRange;
+        return WasmImmediateRange;
 #endif
 
     // On 32-bit platforms, if we've proven the access is in bounds after
     // 32-bit wrapping, we can fold full offsets because they're added with
     // 32-bit arithmetic.
     if (sizeof(intptr_t) == sizeof(int32_t) && !access->needsBoundsCheck())
-        return AsmJSImmediateRange;
+        return WasmImmediateRange;
 
     // Otherwise, only allow the checked size. This is always less than the
     // minimum heap length, and allows explicit bounds checks to fold in the
     // offset without overflow.
-    return AsmJSCheckedImmediateRange;
+    return WasmCheckedImmediateRange;
 }
 
 void
@@ -609,7 +618,7 @@ MBasicBlock::linkOsrValues(MStart* start)
                 cloneRp = def->toOsrReturnValue();
         } else if (info().hasArguments() && i == info().argsObjSlot()) {
             MOZ_ASSERT(def->isConstant() || def->isOsrArgumentsObject());
-            MOZ_ASSERT_IF(def->isConstant(), def->toConstant()->value() == UndefinedValue());
+            MOZ_ASSERT_IF(def->isConstant(), def->toConstant()->type() == MIRType_Undefined);
             if (def->isOsrArgumentsObject())
                 cloneRp = def->toOsrArgumentsObject();
         } else {
@@ -619,7 +628,7 @@ MBasicBlock::linkOsrValues(MStart* start)
             // A constant Undefined can show up here for an argument slot when
             // the function has an arguments object, but the argument in
             // question is stored on the scope chain.
-            MOZ_ASSERT_IF(def->isConstant(), def->toConstant()->value() == UndefinedValue());
+            MOZ_ASSERT_IF(def->isConstant(), def->toConstant()->type() == MIRType_Undefined);
 
             if (def->isOsrValue())
                 cloneRp = def->toOsrValue();

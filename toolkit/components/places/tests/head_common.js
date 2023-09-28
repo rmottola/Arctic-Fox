@@ -88,7 +88,9 @@ clearDB();
  * @param aSpec
  *        URLString of the uri.
  */
-function uri(aSpec) NetUtil.newURI(aSpec);
+function uri(aSpec) {
+  return NetUtil.newURI(aSpec);
+}
 
 
 /**

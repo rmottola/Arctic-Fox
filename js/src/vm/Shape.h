@@ -110,16 +110,17 @@
 namespace js {
 
 class Bindings;
-class StaticBlockObject;
+class StaticBlockScope;
 class TenuringTracer;
 
 typedef JSGetterOp GetterOp;
 typedef JSSetterOp SetterOp;
-typedef JSPropertyDescriptor PropertyDescriptor;
 
 /* Limit on the number of slotful properties in an object. */
 static const uint32_t SHAPE_INVALID_SLOT = JS_BIT(24) - 1;
 static const uint32_t SHAPE_MAXIMUM_SLOT = JS_BIT(24) - 2;
+
+enum class MaybeAdding { Adding = true, NotAdding = false };
 
 /*
  * Shapes use multiplicative hashing, but specialized to
@@ -223,7 +224,9 @@ class ShapeTable {
      */
     bool init(ExclusiveContext* cx, Shape* lastProp);
     bool change(int log2Delta, ExclusiveContext* cx);
-    Entry& search(jsid id, bool adding);
+
+    template<MaybeAdding Adding>
+    Entry& search(jsid id);
 
   private:
     Entry& getEntry(uint32_t i) const {
@@ -345,7 +348,7 @@ class BaseShape : public gc::TenuredCell
         DELEGATE            =    0x8,
         NOT_EXTENSIBLE      =   0x10,
         INDEXED             =   0x20,
-        BOUND_FUNCTION      =   0x40,
+        /* (0x40 is unused) */
         HAD_ELEMENTS_ACCESS =   0x80,
         WATCHED             =  0x100,
         ITERATED_SINGLETON  =  0x200,
@@ -443,7 +446,7 @@ class BaseShape : public gc::TenuredCell
     /* For JIT usage */
     static inline size_t offsetOfFlags() { return offsetof(BaseShape, flags); }
 
-    static inline ThingRootKind rootKind() { return THING_ROOT_BASE_SHAPE; }
+    static const JS::TraceKind TraceKind = JS::TraceKind::BaseShape;
 
     void traceChildren(JSTracer* trc);
 
@@ -516,10 +519,9 @@ struct StackBaseShape : public DefaultHasher<ReadBarriered<UnownedBaseShape*>>
     static inline bool match(ReadBarriered<UnownedBaseShape*> key, const Lookup& lookup);
 };
 
-typedef HashSet<ReadBarriered<UnownedBaseShape*>,
-                StackBaseShape,
-                SystemAllocPolicy> BaseShapeSet;
-
+using BaseShapeSet = js::GCHashSet<ReadBarriered<UnownedBaseShape*>,
+                                   StackBaseShape,
+                                   SystemAllocPolicy>;
 
 class Shape : public gc::TenuredCell
 {
@@ -528,7 +530,7 @@ class Shape : public gc::TenuredCell
     friend class Bindings;
     friend class NativeObject;
     friend class PropertyTree;
-    friend class StaticBlockObject;
+    friend class StaticBlockScope;
     friend class TenuringTracer;
     friend struct StackBaseShape;
     friend struct StackShape;
@@ -580,8 +582,9 @@ class Shape : public gc::TenuredCell
                                    last, else to obj->shape_ */
     };
 
+    template<MaybeAdding Adding = MaybeAdding::NotAdding>
     static inline Shape* search(ExclusiveContext* cx, Shape* start, jsid id,
-                                ShapeTable::Entry** pentry, bool adding = false);
+                                ShapeTable::Entry** pentry);
     static inline Shape* searchNoHashify(Shape* start, jsid id);
 
     void removeFromDictionary(NativeObject* obj);
@@ -633,11 +636,6 @@ class Shape : public gc::TenuredCell
 
         if (!inDictionary() && kids.isHash())
             info->shapesMallocHeapTreeKids += kids.toHash()->sizeOfIncludingThis(mallocSizeOf);
-    }
-
-    bool isNative() const {
-        MOZ_ASSERT(!(flags & NON_NATIVE) == getObjectClass()->isNative());
-        return !(flags & NON_NATIVE);
     }
 
     bool isAccessorShape() const {
@@ -705,25 +703,24 @@ class Shape : public gc::TenuredCell
      * with these bits.
      */
     enum {
-        /* Property is placeholder for a non-native class. */
-        NON_NATIVE      = 0x01,
-
         /* Property stored in per-object dictionary, not shared property tree. */
-        IN_DICTIONARY   = 0x02,
+        IN_DICTIONARY   = 0x01,
 
         /*
          * Slotful property was stored to more than once. This is used as a
          * hint for type inference.
          */
-        OVERWRITTEN     = 0x04,
+        OVERWRITTEN     = 0x02,
 
         /*
          * This shape is an AccessorShape, a fat Shape that can store
          * getter/setter information.
          */
-        ACCESSOR_SHAPE  = 0x08,
+        ACCESSOR_SHAPE  = 0x04,
 
-        UNUSED_BITS     = 0x3C
+        /* Flags used to speed up isBigEnoughForAShapeTable(). */
+        HAS_CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE = 0x08,
+        CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE = 0x10,
     };
 
     /* Get a shape identical to this one, without parent/kids information. */
@@ -907,16 +904,38 @@ class Shape : public gc::TenuredCell
         return count;
     }
 
-    bool isBigEnoughForAShapeTable() {
-        MOZ_ASSERT(!hasTable());
-        Shape* shape = this;
+  private:
+    bool isBigEnoughForAShapeTableSlow() {
         uint32_t count = 0;
-        for (Shape::Range<NoGC> r(shape); !r.empty(); r.popFront()) {
+        for (Shape::Range<NoGC> r(this); !r.empty(); r.popFront()) {
             ++count;
             if (count >= ShapeTable::MIN_ENTRIES)
                 return true;
         }
         return false;
+    }
+
+  public:
+    bool isBigEnoughForAShapeTable() {
+        MOZ_ASSERT(!inDictionary());
+        MOZ_ASSERT(!hasTable());
+
+        // isBigEnoughForAShapeTableSlow is pretty inefficient so we only call
+        // it once and cache the result.
+
+        if (flags & HAS_CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE) {
+            bool res = flags & CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE;
+            MOZ_ASSERT(res == isBigEnoughForAShapeTableSlow());
+            return res;
+        }
+
+        MOZ_ASSERT(!(flags & CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE));
+
+        bool res = isBigEnoughForAShapeTableSlow();
+        if (res)
+            flags |= CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE;
+        flags |= HAS_CACHED_BIG_ENOUGH_FOR_SHAPE_TABLE;
+        return res;
     }
 
 #ifdef DEBUG
@@ -928,7 +947,7 @@ class Shape : public gc::TenuredCell
     void finalize(FreeOp* fop);
     void removeChild(Shape* child);
 
-    static inline ThingRootKind rootKind() { return THING_ROOT_SHAPE; }
+    static const JS::TraceKind TraceKind = JS::TraceKind::Shape;
 
     void traceChildren(JSTracer* trc);
 
@@ -1015,11 +1034,7 @@ struct EmptyShape : public js::Shape
 {
     EmptyShape(UnownedBaseShape* base, uint32_t nfixed)
       : js::Shape(base, nfixed)
-    {
-        // Only empty shapes can be NON_NATIVE.
-        if (!getObjectClass()->isNative())
-            flags |= NON_NATIVE;
-    }
+    { }
 
     static Shape* new_(ExclusiveContext* cx, Handle<UnownedBaseShape*> base, uint32_t nfixed);
 
@@ -1095,11 +1110,18 @@ struct InitialShapeEntry
     static inline HashNumber hash(const Lookup& lookup);
     static inline bool match(const InitialShapeEntry& key, const Lookup& lookup);
     static void rekey(InitialShapeEntry& k, const InitialShapeEntry& newKey) { k = newKey; }
+
+    bool needsSweep() {
+        Shape* ushape = shape.unbarrieredGet();
+        JSObject* protoObj = proto.raw();
+        return (gc::IsAboutToBeFinalizedUnbarriered(&ushape) ||
+                (proto.isObject() && gc::IsAboutToBeFinalizedUnbarriered(&protoObj)));
+    }
 };
 
-typedef HashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy> InitialShapeSet;
+using InitialShapeSet = js::GCHashSet<InitialShapeEntry, InitialShapeEntry, SystemAllocPolicy>;
 
-struct StackShape : public JS::Traceable
+struct StackShape
 {
     /* For performance, StackShape only roots when absolutely necessary. */
     UnownedBaseShape* base;
@@ -1369,7 +1391,7 @@ Shape::searchNoHashify(Shape* start, jsid id)
      * search. We never hashify into a table in parallel.
      */
     if (start->hasTable()) {
-        ShapeTable::Entry& entry = start->table().search(id, false);
+        ShapeTable::Entry& entry = start->table().search<MaybeAdding::NotAdding>(id);
         return entry.shape();
     }
 
@@ -1383,9 +1405,6 @@ Shape::matches(const StackShape& other) const
            matchesParamsAfterId(other.base, other.slot_, other.attrs, other.flags,
                                 other.rawGetter, other.rawSetter);
 }
-
-template<> struct RootKind<Shape*> : SpecificRootKind<Shape*, THING_ROOT_SHAPE> {};
-template<> struct RootKind<BaseShape*> : SpecificRootKind<BaseShape*, THING_ROOT_BASE_SHAPE> {};
 
 // Property lookup hooks on objects are required to return a non-nullptr shape
 // to signify that the property has been found. For cases where the property is

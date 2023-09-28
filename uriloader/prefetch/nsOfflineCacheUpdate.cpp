@@ -689,6 +689,7 @@ nsOfflineManifestItem::nsOfflineManifestItem(nsIURI *aURI,
                                nsIApplicationCache::ITEM_MANIFEST)
     , mParserState(PARSE_INIT)
     , mNeedsUpdate(true)
+    , mStrictFileOriginPolicy(false)
     , mManifestHashInitialized(false)
 {
     ReadStrictFileOriginPolicyPref();
@@ -1165,12 +1166,11 @@ nsOfflineCacheUpdate::nsOfflineCacheUpdate()
     , mOnlyCheckUpdate(false)
     , mSucceeded(true)
     , mObsolete(false)
-    , mAppID(NECKO_NO_APP_ID)
-    , mInBrowser(false)
     , mItemsInProgress(0)
     , mRescheduleCount(0)
     , mPinnedEntryRetriesCount(0)
     , mPinned(false)
+    , mByteProgress(0)
 {
 }
 
@@ -1229,9 +1229,7 @@ nsOfflineCacheUpdate::Init(nsIURI *aManifestURI,
                            nsIURI *aDocumentURI,
                            nsIPrincipal* aLoadingPrincipal,
                            nsIDOMDocument *aDocument,
-                           nsIFile *aCustomProfileDir,
-                           uint32_t aAppID,
-                           bool aInBrowser)
+                           nsIFile *aCustomProfileDir)
 {
     nsresult rv;
 
@@ -1250,12 +1248,14 @@ nsOfflineCacheUpdate::Init(nsIURI *aManifestURI,
         do_GetService(NS_APPLICATIONCACHESERVICE_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    nsAutoCString originSuffix;
+    rv = aLoadingPrincipal->GetOriginSuffix(originSuffix);
+    NS_ENSURE_SUCCESS(rv, rv);
+
     mDocumentURI = aDocumentURI;
 
     if (aCustomProfileDir) {
-        rv = cacheService->BuildGroupIDForApp(aManifestURI,
-                                              aAppID, aInBrowser,
-                                              mGroupID);
+        rv = cacheService->BuildGroupIDForSuffix(aManifestURI, originSuffix, mGroupID);
         NS_ENSURE_SUCCESS(rv, rv);
 
         // Create only a new offline application cache in the custom profile
@@ -1275,9 +1275,7 @@ nsOfflineCacheUpdate::Init(nsIURI *aManifestURI,
         mCustomProfileDir = aCustomProfileDir;
     }
     else {
-        rv = cacheService->BuildGroupIDForApp(aManifestURI,
-                                              aAppID, aInBrowser,
-                                              mGroupID);
+        rv = cacheService->BuildGroupIDForSuffix(aManifestURI, originSuffix, mGroupID);
         NS_ENSURE_SUCCESS(rv, rv);
 
         rv = cacheService->GetActiveCache(mGroupID,
@@ -1294,9 +1292,6 @@ nsOfflineCacheUpdate::Init(nsIURI *aManifestURI,
                                                              &mPinned);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    mAppID = aAppID;
-    mInBrowser = aInBrowser;
-
     mState = STATE_INITIALIZED;
     return NS_OK;
 }
@@ -1304,8 +1299,6 @@ nsOfflineCacheUpdate::Init(nsIURI *aManifestURI,
 nsresult
 nsOfflineCacheUpdate::InitForUpdateCheck(nsIURI *aManifestURI,
                                          nsIPrincipal* aLoadingPrincipal,
-                                         uint32_t aAppID,
-                                         bool aInBrowser,
                                          nsIObserver *aObserver)
 {
     nsresult rv;
@@ -1325,9 +1318,11 @@ nsOfflineCacheUpdate::InitForUpdateCheck(nsIURI *aManifestURI,
         do_GetService(NS_APPLICATIONCACHESERVICE_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = cacheService->BuildGroupIDForApp(aManifestURI,
-                                          aAppID, aInBrowser,
-                                          mGroupID);
+    nsAutoCString originSuffix;
+    rv = aLoadingPrincipal->GetOriginSuffix(originSuffix);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = cacheService->BuildGroupIDForSuffix(aManifestURI, originSuffix, mGroupID);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = cacheService->GetActiveCache(mGroupID,
@@ -1711,7 +1706,7 @@ nsOfflineCacheUpdate::ManifestCheckCompleted(nsresult aStatus,
         // Leave aDocument argument null. Only glues and children keep
         // document instances.
         newUpdate->Init(mManifestURI, mDocumentURI, mLoadingPrincipal, nullptr,
-                        mCustomProfileDir, mAppID, mInBrowser);
+                        mCustomProfileDir);
 
         // In a rare case the manifest will not be modified on the next refetch
         // transfer all master document URIs to the new update to ensure that

@@ -7,6 +7,7 @@
 #include "WindowNamedPropertiesHandler.h"
 #include "mozilla/dom/EventTargetBinding.h"
 #include "mozilla/dom/WindowBinding.h"
+#include "nsContentUtils.h"
 #include "nsDOMClassInfo.h"
 #include "nsGlobalWindow.h"
 #include "nsHTMLDocument.h"
@@ -79,7 +80,7 @@ WindowNamedPropertiesHandler::getOwnPropDescriptor(JSContext* aCx,
                                                    JS::Handle<JSObject*> aProxy,
                                                    JS::Handle<jsid> aId,
                                                    bool /* unused */,
-                                                   JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                                                   JS::MutableHandle<JS::PropertyDescriptor> aDesc)
                                                    const
 {
   if (!JSID_IS_STRING(aId)) {
@@ -157,7 +158,7 @@ bool
 WindowNamedPropertiesHandler::defineProperty(JSContext* aCx,
                                              JS::Handle<JSObject*> aProxy,
                                              JS::Handle<jsid> aId,
-                                             JS::Handle<JSPropertyDescriptor> aDesc,
+                                             JS::Handle<JS::PropertyDescriptor> aDesc,
                                              JS::ObjectOpResult &result) const
 {
   ErrorResult rv;
@@ -222,7 +223,7 @@ WindowNamedPropertiesHandler::delete_(JSContext* aCx,
 static bool
 ResolveWindowNamedProperty(JSContext* aCx, JS::Handle<JSObject*> aWrapper,
                            JS::Handle<JSObject*> aObj, JS::Handle<jsid> aId,
-                           JS::MutableHandle<JSPropertyDescriptor> aDesc)
+                           JS::MutableHandle<JS::PropertyDescriptor> aDesc)
 {
   {
     JSAutoCompartment ac(aCx, aObj);

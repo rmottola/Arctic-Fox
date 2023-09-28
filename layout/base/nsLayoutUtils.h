@@ -109,6 +109,12 @@ struct DisplayPortMarginsPropertyData {
 
 } // namespace mozilla
 
+// For GetDisplayPort
+enum class RelativeTo {
+  ScrollPort,
+  ScrollFrame
+};
+
 /**
  * nsLayoutUtils is a namespace class used for various helper
  * functions that are useful in multiple places in layout.  The goal
@@ -140,6 +146,7 @@ public:
   typedef mozilla::CSSPoint CSSPoint;
   typedef mozilla::CSSSize CSSSize;
   typedef mozilla::CSSIntSize CSSIntSize;
+  typedef mozilla::CSSRect CSSRect;
   typedef mozilla::ScreenMargin ScreenMargin;
   typedef mozilla::LayoutDeviceIntSize LayoutDeviceIntSize;
 
@@ -166,9 +173,16 @@ public:
   static nsIScrollableFrame* FindScrollableFrameFor(ViewID aId);
 
   /**
-   * Get display port for the given element.
+   * Get display port for the given element, relative to the specified entity,
+   * defaulting to the scrollport.
    */
-  static bool GetDisplayPort(nsIContent* aContent, nsRect *aResult = nullptr);
+  static bool GetDisplayPort(nsIContent* aContent, nsRect *aResult,
+    RelativeTo aRelativeTo = RelativeTo::ScrollPort);
+
+  /**
+   * Check whether the given element has a displayport.
+   */
+  static bool HasDisplayPort(nsIContent* aContent);
 
   /**
    * @return the display port for the given element which should be used for
@@ -177,8 +191,10 @@ public:
    * If low-precision buffers are enabled, this is the critical display port;
    * otherwise, it's the same display port returned by GetDisplayPort().
    */
-  static bool GetDisplayPortForVisibilityTesting(nsIContent* aContent,
-                                                 nsRect* aResult = nullptr);
+  static bool GetDisplayPortForVisibilityTesting(
+    nsIContent* aContent,
+    nsRect* aResult,
+    RelativeTo aRelativeTo = RelativeTo::ScrollPort);
 
   enum class RepaintMode : uint8_t {
     Repaint,
@@ -218,7 +234,12 @@ public:
   /**
    * Get the critical display port for the given element.
    */
-  static bool GetCriticalDisplayPort(nsIContent* aContent, nsRect* aResult = nullptr);
+  static bool GetCriticalDisplayPort(nsIContent* aContent, nsRect* aResult);
+
+  /**
+   * Check whether the given element has a critical display port.
+   */
+  static bool HasCriticalDisplayPort(nsIContent* aContent);
 
   /**
    * Use heuristics to figure out the child list that
@@ -517,10 +538,8 @@ public:
 
   /**
    * Return true if aPresContext's viewport has a displayport.
-   * Fills in aDisplayPort with the displayport rectangle if non-null.
    */
-  static bool ViewportHasDisplayPort(nsPresContext* aPresContext,
-                                     nsRect* aDisplayPort = nullptr);
+  static bool ViewportHasDisplayPort(nsPresContext* aPresContext);
 
   /**
    * Return true if aFrame is a fixed-pos frame and is a child of a viewport
@@ -528,8 +547,7 @@ public:
    * aDisplayPort, if non-null, is set to the display port rectangle (relative to
    * the viewport).
    */
-  static bool IsFixedPosFrameInDisplayPort(const nsIFrame* aFrame,
-                                           nsRect* aDisplayPort = nullptr);
+  static bool IsFixedPosFrameInDisplayPort(const nsIFrame* aFrame);
 
   /**
    * Store whether aThumbFrame wants its own layer. This sets a property on
@@ -1050,7 +1068,7 @@ public:
    * falls.
    */
   static bool
-  BinarySearchForPosition(nsRenderingContext* acx,
+  BinarySearchForPosition(DrawTarget* aDrawTarget,
                           nsFontMetrics& aFontMetrics,
                           const char16_t* aText,
                           int32_t    aBaseWidth,
@@ -1562,19 +1580,19 @@ public:
 
   static nscoord AppUnitWidthOfString(char16_t aC,
                                       nsFontMetrics& aFontMetrics,
-                                      nsRenderingContext& aContext) {
-    return AppUnitWidthOfString(&aC, 1, aFontMetrics, aContext);
+                                      DrawTarget* aDrawTarget) {
+    return AppUnitWidthOfString(&aC, 1, aFontMetrics, aDrawTarget);
   }
   static nscoord AppUnitWidthOfString(const nsString& aString,
                                       nsFontMetrics& aFontMetrics,
-                                      nsRenderingContext& aContext) {
+                                      DrawTarget* aDrawTarget) {
     return nsLayoutUtils::AppUnitWidthOfString(aString.get(), aString.Length(),
-                                               aFontMetrics, aContext);
+                                               aFontMetrics, aDrawTarget);
   }
   static nscoord AppUnitWidthOfString(const char16_t *aString,
                                       uint32_t aLength,
                                       nsFontMetrics& aFontMetrics,
-                                      nsRenderingContext& aContext);
+                                      DrawTarget* aDrawTarget);
   static nscoord AppUnitWidthOfStringBidi(const nsString& aString,
                                           const nsIFrame* aFrame,
                                           nsFontMetrics& aFontMetrics,
@@ -1591,13 +1609,13 @@ public:
 
   static bool StringWidthIsGreaterThan(const nsString& aString,
                                        nsFontMetrics& aFontMetrics,
-                                       nsRenderingContext& aContext,
+                                       DrawTarget* aDrawTarget,
                                        nscoord aWidth);
 
   static nsBoundingMetrics AppUnitBoundsOfString(const char16_t* aString,
                                                  uint32_t aLength,
                                                  nsFontMetrics& aFontMetrics,
-                                                 nsRenderingContext& aContext);
+                                                 DrawTarget* aDrawTarget);
 
   static void DrawString(const nsIFrame*       aFrame,
                          nsFontMetrics&        aFontMetrics,
@@ -2060,7 +2078,10 @@ public:
     SFE_PREFER_NO_PREMULTIPLY_ALPHA = 1 << 3,
     /* Whether we should skip getting a surface for vector images and
        return a DirectDrawInfo containing an imgIContainer instead. */
-    SFE_NO_RASTERIZING_VECTORS = 1 << 4
+    SFE_NO_RASTERIZING_VECTORS = 1 << 4,
+    /* If image type is vector, the return surface size will same as
+       element size, not image's intrinsic size. */
+    SFE_USE_ELEMENT_SIZE_IF_VECTOR = 1 << 5
   };
 
   struct DirectDrawInfo {
@@ -2702,24 +2723,18 @@ public:
                                                 RepaintMode aRepaintMode);
 
   /**
-   * Get the display port for |aScrollFrame|'s content. If |aScrollFrame|
-   * WantsAsyncScroll() and we don't have a scrollable displayport yet (as
-   * tracked by |aBuilder|), calculate and set a display port. Returns true if
-   * there is (now) a displayport, and if so the displayport is returned in
-   * |aOutDisplayport|.
+   * If |aScrollFrame| WantsAsyncScroll() and we don't have a scrollable
+   * displayport yet (as tracked by |aBuilder|), calculate and set a
+   * displayport.
    *
-   * Note that a displayport can either be stored as a rect, or as a base
-   * rect + margins. If it is stored as a base rect + margins, the base rect
-   * is updated to |aDisplayPortBase|, and the rect assembled from the
-   * base rect and margins is returned. If this function creates a displayport,
-   * it computes margins and stores |aDisplayPortBase| as the base rect.
+   * If this function creates a displayport, it computes margins and stores
+   * |aDisplayPortBase| as the base rect.
    *
    * This is intended to be called during display list building.
    */
-  static bool GetOrMaybeCreateDisplayPort(nsDisplayListBuilder& aBuilder,
-                                          nsIFrame* aScrollFrame,
-                                          nsRect aDisplayPortBase,
-                                          nsRect* aOutDisplayport);
+  static void MaybeCreateDisplayPort(nsDisplayListBuilder& aBuilder,
+                                     nsIFrame* aScrollFrame,
+                                     nsRect aDisplayPortBase);
 
   static nsIScrollableFrame* GetAsyncScrollableAncestorFrame(nsIFrame* aTarget);
 
@@ -2813,6 +2828,14 @@ public:
    * Returns true if the given frame is a scrollframe and it has snap points.
    */
   static bool IsScrollFrameWithSnapping(nsIFrame* aFrame);
+  /**
+   * Calculate the bounding rect of |aContent|, relative to the origin
+   * of the scrolled content of |aRootScrollFrame|.
+   * Where the element is contained inside a scrollable subframe, the
+   * bounding rect is clipped to the bounds of the subframe.
+   */
+  static CSSRect GetBoundingContentRect(const nsIContent* aContent,
+                                        const nsIScrollableFrame* aRootScrollFrame);
 
 private:
   static uint32_t sFontSizeInflationEmPerLine;

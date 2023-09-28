@@ -10,6 +10,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 
+#include "asmjs/WasmBinary.h"
 #include "jit/arm/Simulator-arm.h"
 #include "jit/Bailouts.h"
 #include "jit/BaselineFrame.h"
@@ -117,27 +118,6 @@ void MacroAssemblerARM::convertDoubleToFloat32(FloatRegister src, FloatRegister 
     as_vcvt(VFPRegister(dest).singleOverlay(), VFPRegister(src), false, c);
 }
 
-// There are two options for implementing emitTruncateDouble:
-//
-// 1. Convert the floating point value to an integer, if it did not fit, then it
-// was clamped to INT_MIN/INT_MAX, and we can test it. NOTE: if the value
-// really was supposed to be INT_MAX / INT_MIN then it will be wrong.
-//
-// 2. Convert the floating point value to an integer, if it did not fit, then it
-// set one or two bits in the fpcsr. Check those.
-void
-MacroAssemblerARM::branchTruncateDouble(FloatRegister src, Register dest, Label* fail)
-{
-    ScratchDoubleScope scratch(asMasm());
-    FloatRegister scratchSIntReg = scratch.sintOverlay();
-
-    ma_vcvt_F64_I32(src, scratchSIntReg);
-    ma_vxfer(scratchSIntReg, dest);
-    ma_cmp(dest, Imm32(0x7fffffff));
-    ma_cmp(dest, Imm32(0x80000000), Assembler::NotEqual);
-    ma_b(fail, Assembler::Equal);
-}
-
 // Checks whether a double is representable as a 32-bit integer. If so, the
 // integer is written to the output register. Otherwise, a bailout is taken to
 // the given snapshot. This function overwrites the scratch float register.
@@ -217,17 +197,6 @@ MacroAssemblerARM::convertFloat32ToDouble(FloatRegister src, FloatRegister dest)
     MOZ_ASSERT(dest.isDouble());
     MOZ_ASSERT(src.isSingle());
     as_vcvt(VFPRegister(dest), VFPRegister(src).singleOverlay());
-}
-
-void
-MacroAssemblerARM::branchTruncateFloat32(FloatRegister src, Register dest, Label* fail)
-{
-    ScratchFloat32Scope scratch(asMasm());
-    ma_vcvt_F32_I32(src, scratch.sintOverlay());
-    ma_vxfer(scratch, dest);
-    ma_cmp(dest, Imm32(0x7fffffff));
-    ma_cmp(dest, Imm32(0x80000000), Assembler::NotEqual);
-    ma_b(fail, Assembler::Equal);
 }
 
 void
@@ -424,26 +393,21 @@ MacroAssemblerARM::ma_nop()
 }
 
 void
-MacroAssemblerARM::ma_movPatchable(Imm32 imm_, Register dest, Assembler::Condition c,
-                                   RelocStyle rs)
+MacroAssemblerARM::ma_movPatchable(Imm32 imm_, Register dest, Assembler::Condition c)
 {
     int32_t imm = imm_.value;
-    switch(rs) {
-      case L_MOVWT:
+    if (HasMOVWT()) {
         as_movw(dest, Imm16(imm & 0xffff), c);
         as_movt(dest, Imm16(imm >> 16 & 0xffff), c);
-        break;
-      case L_LDR:
+    } else {
         as_Imm32Pool(dest, imm, c);
-        break;
     }
 }
 
 void
-MacroAssemblerARM::ma_movPatchable(ImmPtr imm, Register dest, Assembler::Condition c,
-                                   RelocStyle rs)
+MacroAssemblerARM::ma_movPatchable(ImmPtr imm, Register dest, Assembler::Condition c)
 {
-    ma_movPatchable(Imm32(int32_t(imm.value)), dest, c, rs);
+    ma_movPatchable(Imm32(int32_t(imm.value)), dest, c);
 }
 
 /* static */ void
@@ -503,13 +467,7 @@ MacroAssemblerARM::ma_mov(ImmGCPtr ptr, Register dest)
     // As opposed to x86/x64 version, the data relocation has to be executed
     // before to recover the pointer, and not after.
     writeDataRelocation(ptr);
-    RelocStyle rs;
-    if (HasMOVWT())
-        rs = L_MOVWT;
-    else
-        rs = L_LDR;
-
-    ma_movPatchable(Imm32(uintptr_t(ptr.value)), dest, Always, rs);
+    ma_movPatchable(Imm32(uintptr_t(ptr.value)), dest, Always);
 }
 
 // Shifts (just a move with a shifting op2)
@@ -1461,6 +1419,12 @@ MacroAssemblerARM::ma_b(Label* dest, Assembler::Condition c)
     return as_b(dest, c);
 }
 
+BufferOffset
+MacroAssemblerARM::ma_b(wasm::JumpTarget target, Assembler::Condition c)
+{
+    return as_b(target, c);
+}
+
 void
 MacroAssemblerARM::ma_bx(Register dest, Assembler::Condition c)
 {
@@ -1880,7 +1844,8 @@ bool
 MacroAssemblerARMCompat::buildOOLFakeExitFrame(void* fakeReturnAddr)
 {
     DebugOnly<uint32_t> initialDepth = asMasm().framePushed();
-    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS);
+    uint32_t descriptor = MakeFrameDescriptor(asMasm().framePushed(), JitFrame_IonJS,
+                                              ExitFrameLayout::Size());
 
     asMasm().Push(Imm32(descriptor)); // descriptor_
     asMasm().Push(ImmPtr(fakeReturnAddr));
@@ -1939,14 +1904,8 @@ MacroAssemblerARMCompat::movePtr(ImmPtr imm, Register dest)
 void
 MacroAssemblerARMCompat::movePtr(wasm::SymbolicAddress imm, Register dest)
 {
-    RelocStyle rs;
-    if (HasMOVWT())
-        rs = L_MOVWT;
-    else
-        rs = L_LDR;
-
-    append(AsmJSAbsoluteLink(CodeOffset(currentOffset()), imm));
-    ma_movPatchable(Imm32(-1), dest, Always, rs);
+    append(AsmJSAbsoluteAddress(CodeOffset(currentOffset()), imm));
+    ma_movPatchable(Imm32(-1), dest, Always);
 }
 
 void
@@ -2558,30 +2517,6 @@ MacroAssemblerARMCompat::compareDouble(FloatRegister lhs, FloatRegister rhs)
 }
 
 void
-MacroAssemblerARMCompat::branchDouble(DoubleCondition cond, FloatRegister lhs,
-                                      FloatRegister rhs, Label* label)
-{
-    compareDouble(lhs, rhs);
-
-    if (cond == DoubleNotEqual) {
-        // Force the unordered cases not to jump.
-        Label unordered;
-        ma_b(&unordered, VFP_Unordered);
-        ma_b(label, VFP_NotEqualOrUnordered);
-        bind(&unordered);
-        return;
-    }
-
-    if (cond == DoubleEqualOrUnordered) {
-        ma_b(label, VFP_Unordered);
-        ma_b(label, VFP_Equal);
-        return;
-    }
-
-    ma_b(label, ConditionFromDoubleCondition(cond));
-}
-
-void
 MacroAssemblerARMCompat::compareFloat(FloatRegister lhs, FloatRegister rhs)
 {
     // Compare the doubles, setting vector status flags.
@@ -2592,30 +2527,6 @@ MacroAssemblerARMCompat::compareFloat(FloatRegister lhs, FloatRegister rhs)
 
     // Move vector status bits to normal status flags.
     as_vmrs(pc);
-}
-
-void
-MacroAssemblerARMCompat::branchFloat(DoubleCondition cond, FloatRegister lhs,
-                                     FloatRegister rhs, Label* label)
-{
-    compareFloat(lhs, rhs);
-
-    if (cond == DoubleNotEqual) {
-        // Force the unordered cases not to jump.
-        Label unordered;
-        ma_b(&unordered, VFP_Unordered);
-        ma_b(label, VFP_NotEqualOrUnordered);
-        bind(&unordered);
-        return;
-    }
-
-    if (cond == DoubleEqualOrUnordered) {
-        ma_b(label, VFP_Unordered);
-        ma_b(label, VFP_Equal);
-        return;
-    }
-
-    ma_b(label, ConditionFromDoubleCondition(cond));
 }
 
 Assembler::Condition
@@ -3018,18 +2929,18 @@ MacroAssemblerARMCompat::branchTestValue(Condition cond, const Address& valaddr,
     // Check payload before tag, since payload is more likely to differ.
     if (cond == NotEqual) {
         ma_ldr(ToPayload(valaddr), scratch);
-        branchPtr(NotEqual, scratch, value.payloadReg(), label);
+        asMasm().branchPtr(NotEqual, scratch, value.payloadReg(), label);
 
         ma_ldr(ToType(valaddr), scratch);
-        branchPtr(NotEqual, scratch, value.typeReg(), label);
+        asMasm().branchPtr(NotEqual, scratch, value.typeReg(), label);
     } else {
         Label fallthrough;
 
         ma_ldr(ToPayload(valaddr), scratch);
-        branchPtr(NotEqual, scratch, value.payloadReg(), &fallthrough);
+        asMasm().branchPtr(NotEqual, scratch, value.payloadReg(), &fallthrough);
 
         ma_ldr(ToType(valaddr), scratch);
-        branchPtr(Equal, scratch, value.typeReg(), label);
+        asMasm().branchPtr(Equal, scratch, value.typeReg(), label);
 
         bind(&fallthrough);
     }
@@ -3289,22 +3200,6 @@ MacroAssemblerARMCompat::storeUnboxedValue(ConstantOrRegister value, MIRType val
 template void
 MacroAssemblerARMCompat::storeUnboxedValue(ConstantOrRegister value, MIRType valueType,
                                            const BaseIndex& dest, MIRType slotType);
-
-
-void
-MacroAssemblerARMCompat::branchTest64(Condition cond, Register64 lhs, Register64 rhs,
-                                      Register temp, Label* label)
-{
-    if (cond == Assembler::Zero) {
-        MOZ_ASSERT(lhs.low == rhs.low);
-        MOZ_ASSERT(lhs.high == rhs.high);
-        mov(lhs.low, ScratchRegister);
-        asMasm().or32(lhs.high, ScratchRegister);
-        branchTestPtr(cond, ScratchRegister, ScratchRegister, label);
-    } else {
-        MOZ_CRASH("Unsupported condition");
-    }
-}
 
 void
 MacroAssemblerARMCompat::moveValue(const Value& val, Register type, Register data)
@@ -3575,13 +3470,7 @@ MacroAssemblerARMCompat::storeTypeTag(ImmTag tag, const BaseIndex& dest)
 void
 MacroAssemblerARM::ma_call(ImmPtr dest)
 {
-    RelocStyle rs;
-    if (HasMOVWT())
-        rs = L_MOVWT;
-    else
-        rs = L_LDR;
-
-    ma_movPatchable(dest, CallReg, Always, rs);
+    ma_movPatchable(dest, CallReg, Always);
     as_blx(CallReg);
 }
 
@@ -3650,11 +3539,13 @@ MacroAssemblerARMCompat::handleFailureWithHandlerTail(void* handler)
     Label bailout;
 
     ma_ldr(Address(sp, offsetof(ResumeFromException, kind)), r0);
-    branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_ENTRY_FRAME), &entryFrame);
-    branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
-    branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
-    branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_FORCED_RETURN), &return_);
-    branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
+    asMasm().branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_ENTRY_FRAME),
+                      &entryFrame);
+    asMasm().branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_CATCH), &catch_);
+    asMasm().branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_FINALLY), &finally);
+    asMasm().branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_FORCED_RETURN),
+                      &return_);
+    asMasm().branch32(Assembler::Equal, r0, Imm32(ResumeFromException::RESUME_BAILOUT), &bailout);
 
     breakpoint(); // Invalid kind.
 
@@ -3705,7 +3596,8 @@ MacroAssemblerARMCompat::handleFailureWithHandlerTail(void* handler)
         Label skipProfilingInstrumentation;
         // Test if profiler enabled.
         AbsoluteAddress addressOfEnabled(GetJitContext()->runtime->spsProfiler().addressOfEnabled());
-        branch32(Assembler::Equal, addressOfEnabled, Imm32(0), &skipProfilingInstrumentation);
+        asMasm().branch32(Assembler::Equal, addressOfEnabled, Imm32(0),
+                          &skipProfilingInstrumentation);
         profilerExitFrame();
         bind(&skipProfilingInstrumentation);
     }
@@ -3980,7 +3872,7 @@ MacroAssemblerARMCompat::toggledCall(JitCode* target, bool enabled)
     BufferOffset bo = nextOffset();
     addPendingJump(bo, ImmPtr(target->raw()), Relocation::JITCODE);
     ScratchRegisterScope scratch(asMasm());
-    ma_movPatchable(ImmPtr(target->raw()), scratch, Always, HasMOVWT() ? L_MOVWT : L_LDR);
+    ma_movPatchable(ImmPtr(target->raw()), scratch, Always);
     if (enabled)
         ma_blx(scratch);
     else
@@ -4180,8 +4072,8 @@ MacroAssemblerARMCompat::branchPtrInNurseryRange(Condition cond, Register ptr, R
 
     ma_mov(Imm32(startChunk), scratch2);
     as_rsb(scratch2, scratch2, lsr(ptr, Nursery::ChunkShift));
-    branch32(cond == Assembler::Equal ? Assembler::Below : Assembler::AboveOrEqual,
-              scratch2, Imm32(nursery.numChunks()), label);
+    asMasm().branch32(cond == Assembler::Equal ? Assembler::Below : Assembler::AboveOrEqual,
+                      scratch2, Imm32(nursery.numChunks()), label);
 }
 
 void
@@ -4995,29 +4887,81 @@ MacroAssembler::call(JitCode* c)
 {
     BufferOffset bo = m_buffer.nextOffset();
     addPendingJump(bo, ImmPtr(c->raw()), Relocation::JITCODE);
-    RelocStyle rs;
-    if (HasMOVWT())
-        rs = L_MOVWT;
-    else
-        rs = L_LDR;
-
     ScratchRegisterScope scratch(*this);
-    ma_movPatchable(ImmPtr(c->raw()), scratch, Always, rs);
+    ma_movPatchable(ImmPtr(c->raw()), scratch, Always);
     callJitNoProfiler(scratch);
 }
 
 CodeOffset
 MacroAssembler::callWithPatch()
 {
-    // For now, assume that it'll be nearby.
+    // The caller ensures that the call is always in range using thunks (below)
+    // as necessary.
     as_bl(BOffImm(), Always, /* documentation */ nullptr);
     return CodeOffset(currentOffset());
 }
+
 void
 MacroAssembler::patchCall(uint32_t callerOffset, uint32_t calleeOffset)
 {
     BufferOffset inst(callerOffset - 4);
     as_bl(BufferOffset(calleeOffset).diffB<BOffImm>(inst), Always, inst);
+}
+
+CodeOffset
+MacroAssembler::thunkWithPatch()
+{
+    static_assert(32 * 1024 * 1024 - JumpImmediateRange > wasm::MaxFuncs * 3 * sizeof(Instruction),
+                  "always enough space for thunks");
+
+    // The goal of the thunk is to be able to jump to any address without the
+    // usual 32MiB branch range limitation. Additionally, to make the thunk
+    // simple to use, the thunk does not use the constant pool or require
+    // patching an absolute address. Instead, a relative offset is used which
+    // can be patched during compilation.
+
+    // Inhibit pools since these three words must be contiguous so that the offset
+    // calculations below are valid.
+    AutoForbidPools afp(this, 3);
+
+    // When pc is used, the read value is the address of the instruction + 8.
+    // This is exactly the address of the uint32 word we want to load.
+    ScratchRegisterScope scratch(*this);
+    ma_ldr(Address(pc, 0), scratch);
+
+    // Branch by making pc the destination register.
+    ma_add(pc, scratch, pc, LeaveCC, Always);
+
+    // Allocate space which will be patched by patchThunk().
+    CodeOffset u32Offset(currentOffset());
+    writeInst(UINT32_MAX);
+
+    return u32Offset;
+}
+
+void
+MacroAssembler::patchThunk(uint32_t u32Offset, uint32_t targetOffset)
+{
+    uint32_t* u32 = reinterpret_cast<uint32_t*>(editSrc(BufferOffset(u32Offset)));
+    MOZ_ASSERT(*u32 == UINT32_MAX);
+
+    uint32_t addOffset = u32Offset - 4;
+    MOZ_ASSERT(editSrc(BufferOffset(addOffset))->is<InstALU>());
+
+    // When pc is read as the operand of the add, its value is the address of
+    // the add instruction + 8.
+    *u32 = (targetOffset - addOffset) - 8;
+}
+
+void
+MacroAssembler::repatchThunk(uint8_t* code, uint32_t u32Offset, uint32_t targetOffset)
+{
+    uint32_t* u32 = reinterpret_cast<uint32_t*>(code + u32Offset);
+
+    uint32_t addOffset = u32Offset - 4;
+    MOZ_ASSERT(reinterpret_cast<Instruction*>(code + addOffset)->is<InstALU>());
+
+    *u32 = (targetOffset - addOffset) - 8;
 }
 
 void

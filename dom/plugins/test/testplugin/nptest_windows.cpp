@@ -654,6 +654,29 @@ pluginGetClipRegionRectEdge(InstanceData* instanceData,
   return NPTEST_INT32_ERROR;
 }
 
+static
+void
+createDummyWindowForIME(InstanceData* instanceData)
+{
+  WNDCLASSW wndClass;
+  wndClass.style = 0;
+  wndClass.lpfnWndProc = DefWindowProcW;
+  wndClass.cbClsExtra = 0;
+  wndClass.cbWndExtra = 0;
+  wndClass.hInstance = GetModuleHandleW(NULL);
+  wndClass.hIcon = nullptr;
+  wndClass.hCursor = nullptr;
+  wndClass.hbrBackground = (HBRUSH)COLOR_WINDOW;
+  wndClass.lpszMenuName = NULL;
+  wndClass.lpszClassName = L"SWFlash_PlaceholderX";
+  RegisterClassW(&wndClass);
+
+  instanceData->placeholderWnd =
+    static_cast<void*>(CreateWindowW(L"SWFlash_PlaceholderX", L"", WS_CHILD, 0,
+                                     0, 0, 0, HWND_MESSAGE, NULL,
+                                     GetModuleHandleW(NULL), NULL));
+}
+
 /* windowless plugin events */
 
 static bool
@@ -722,6 +745,35 @@ handleEventInternal(InstanceData* instanceData, NPEvent* pe, LRESULT* result)
         return true;
       }
       instanceData->lastKeyText.append(utf8Char, len);
+      return true;
+    }
+
+    case WM_IME_STARTCOMPOSITION:
+      instanceData->lastComposition.erase();
+      if (!instanceData->placeholderWnd) {
+        createDummyWindowForIME(instanceData);
+      }
+      return true;
+
+    case WM_IME_ENDCOMPOSITION:
+      instanceData->lastComposition.erase();
+      return true;
+
+    case WM_IME_COMPOSITION: {
+      if (pe->lParam & GCS_COMPSTR) {
+        HIMC hIMC = ImmGetContext((HWND)instanceData->placeholderWnd);
+        if (!hIMC) {
+          return false;
+        }
+        WCHAR compStr[256];
+        LONG len = ImmGetCompositionStringW(hIMC, GCS_COMPSTR, compStr,
+                                            256 * sizeof(WCHAR));
+        CHAR buffer[256];
+        len = ::WideCharToMultiByte(CP_UTF8, 0, compStr, len / sizeof(WCHAR),
+                                    buffer, 256, nullptr, nullptr);
+        instanceData->lastComposition.append(buffer, len);
+        ::ImmReleaseContext((HWND)instanceData->placeholderWnd, hIMC);
+      }
       return true;
     }
 
@@ -811,4 +863,16 @@ void pluginDoInternalConsistencyCheck(InstanceData* instanceData, string& error)
     checkEquals(childRect.right, childRect.left + CHILD_WIDGET_SIZE, "Child widget width", error);
     checkEquals(childRect.bottom, childRect.top + CHILD_WIDGET_SIZE, "Child widget height", error);
   }
+}
+
+bool pluginNativeWidgetIsVisible(InstanceData* instanceData)
+{
+  HWND hWnd = (HWND)instanceData->window.window;
+  wchar_t className[60];
+  if (::GetClassNameW(hWnd, className, sizeof(className) / sizeof(char16_t)) &&
+      !wcsicmp(className, L"GeckoPluginWindow")) {
+    return ::IsWindowVisible(hWnd);
+  }
+  // something isn't right, fail the check
+  return false;
 }

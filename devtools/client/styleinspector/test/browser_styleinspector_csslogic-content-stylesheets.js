@@ -10,6 +10,7 @@
 // toolkit/devtools/server/tests/mochitest/test_css-logic-...something...html test
 
 const TEST_URI_HTML = TEST_URL_ROOT + "doc_content_stylesheet.html";
+const TEST_URI_AUTHOR = TEST_URL_ROOT + "doc_author-sheet.html";
 const TEST_URI_XUL = TEST_URL_ROOT + "doc_content_stylesheet.xul";
 const XUL_URI = Cc["@mozilla.org/network/io-service;1"]
                 .getService(Ci.nsIIOService)
@@ -27,6 +28,14 @@ add_task(function*() {
   yield selectNode("#target", inspector);
 
   info("Checking stylesheets");
+  yield checkSheets(target);
+
+  info("Checking authored stylesheets");
+  yield addTab(TEST_URI_AUTHOR);
+
+  ({inspector} = yield openRuleView());
+  target = getNode("#target");
+  yield selectNode("#target", inspector);
   yield checkSheets(target);
 
   info("Checking stylesheets on XUL document");
@@ -58,8 +67,11 @@ function* checkSheets(target) {
 
   for (let sheet of sheets) {
     if (!sheet.href ||
-        /doc_content_stylesheet_/.test(sheet.href)) {
-      ok(sheet.isContentSheet, sheet.href + " identified as content stylesheet");
+        /doc_content_stylesheet_/.test(sheet.href) ||
+        // For the "authored" case.
+        /^data:.*seagreen/.test(sheet.href)) {
+      ok(sheet.isContentSheet,
+        sheet.href + " identified as content stylesheet");
     } else {
       ok(!sheet.isContentSheet, sheet.href + " identified as non-content stylesheet");
     }

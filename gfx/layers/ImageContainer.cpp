@@ -59,6 +59,10 @@ ImageFactory::CreatePlanarYCbCrImage(const gfx::IntSize& aScaleHint, BufferRecyc
 
 BufferRecycleBin::BufferRecycleBin()
   : mLock("mozilla.layers.BufferRecycleBin.mLock")
+  // This member is only valid when the bin is not empty and will be properly
+  // initialized in RecycleBuffer, but initializing it here avoids static analysis
+  // noise.
+  , mRecycledBufferSize(0)
 {
 }
 
@@ -135,11 +139,6 @@ ImageContainer::ImageContainer(Mode flag)
         mImageClient = ImageBridgeChild::GetSingleton()->CreateImageClient(CompositableType::IMAGE, this).take();
         MOZ_ASSERT(mImageClient);
         break;
-      case ASYNCHRONOUS_OVERLAY:
-        mIPDLChild = new ImageContainerChild(this);
-        mImageClient = ImageBridgeChild::GetSingleton()->CreateImageClient(CompositableType::IMAGE_OVERLAY, this).take();
-        MOZ_ASSERT(mImageClient);
-        break;
       default:
         MOZ_ASSERT(false, "This flag is invalid.");
         break;
@@ -180,13 +179,8 @@ RefPtr<OverlayImage>
 ImageContainer::CreateOverlayImage()
 {
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
-  if (mImageClient && mImageClient->GetTextureInfo().mCompositableType != CompositableType::IMAGE_OVERLAY) {
-    // If this ImageContainer is async but the image type mismatch, fix it here
-    if (ImageBridgeChild::IsCreated()) {
-      ImageBridgeChild::DispatchReleaseImageClient(mImageClient);
-      mImageClient = ImageBridgeChild::GetSingleton()->CreateImageClient(
-          CompositableType::IMAGE_OVERLAY, this).take();
-    }
+  if (!mImageClient || !mImageClient->AsImageClientSingle()) {
+    return nullptr;
   }
   return new OverlayImage();
 }
@@ -389,7 +383,7 @@ ImageContainer::NotifyCompositeInternal(const ImageCompositeNotification& aNotif
 
 PlanarYCbCrImage::PlanarYCbCrImage()
   : Image(nullptr, ImageFormat::PLANAR_YCBCR)
-  , mOffscreenFormat(gfxImageFormat::Unknown)
+  , mOffscreenFormat(SurfaceFormat::UNKNOWN)
   , mBufferSize(0)
 {
 }
@@ -501,7 +495,7 @@ RecyclingPlanarYCbCrImage::SetData(const Data &aData)
 gfxImageFormat
 PlanarYCbCrImage::GetOffscreenFormat()
 {
-  return mOffscreenFormat == gfxImageFormat::Unknown ?
+  return mOffscreenFormat == SurfaceFormat::UNKNOWN ?
     gfxPlatform::GetPlatform()->GetOffscreenFormat() :
     mOffscreenFormat;
 }

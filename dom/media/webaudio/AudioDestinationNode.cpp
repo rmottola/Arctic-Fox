@@ -45,11 +45,11 @@ public:
   {
   }
 
-  virtual void ProcessBlock(AudioNodeStream* aStream,
-                            GraphTime aFrom,
-                            const AudioBlock& aInput,
-                            AudioBlock* aOutput,
-                            bool* aFinished) override
+  void ProcessBlock(AudioNodeStream* aStream,
+                    GraphTime aFrom,
+                    const AudioBlock& aInput,
+                    AudioBlock* aOutput,
+                    bool* aFinished) override
   {
     // Do this just for the sake of political correctness; this output
     // will not go anywhere.
@@ -105,7 +105,7 @@ public:
     }
   }
 
-  virtual bool IsActive() const override
+  bool IsActive() const override
   {
     // Keep processing to track stream time, which is used for all timelines
     // associated with the same AudioContext.
@@ -167,7 +167,7 @@ public:
     context->OnStateChanged(nullptr, AudioContextState::Closed);
   }
 
-  virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override
+  size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override
   {
     size_t amount = AudioNodeEngine::SizeOfExcludingThis(aMallocSizeOf);
     if (mBuffer) {
@@ -176,7 +176,7 @@ public:
     return amount;
   }
 
-  virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
+  size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
   {
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
@@ -235,11 +235,11 @@ public:
     MOZ_ASSERT(aNode);
   }
 
-  virtual void ProcessBlock(AudioNodeStream* aStream,
-                            GraphTime aFrom,
-                            const AudioBlock& aInput,
-                            AudioBlock* aOutput,
-                            bool* aFinished) override
+  void ProcessBlock(AudioNodeStream* aStream,
+                    GraphTime aFrom,
+                    const AudioBlock& aInput,
+                    AudioBlock* aOutput,
+                    bool* aFinished) override
   {
     *aOutput = aInput;
     aOutput->mVolume *= mVolume;
@@ -259,7 +259,7 @@ public:
     }
   }
 
-  virtual bool IsActive() const override
+  bool IsActive() const override
   {
     // Keep processing to track stream time, which is used for all timelines
     // associated with the same AudioContext.  If there are no other engines
@@ -269,14 +269,14 @@ public:
     return true;
   }
 
-  virtual void SetDoubleParameter(uint32_t aIndex, double aParam) override
+  void SetDoubleParameter(uint32_t aIndex, double aParam) override
   {
     if (aIndex == VOLUME) {
       mVolume = aParam;
     }
   }
 
-  virtual void SetInt32Parameter(uint32_t aIndex, int32_t aParam) override
+  void SetInt32Parameter(uint32_t aIndex, int32_t aParam) override
   {
     if (aIndex == SUSPENDED) {
       mSuspended = !!aParam;
@@ -291,7 +291,7 @@ public:
     SUSPENDED,
   };
 
-  virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
+  size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
   {
     return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
   }
@@ -529,7 +529,7 @@ AudioDestinationNode::WindowVolumeChanged(float aVolume, bool aMuted)
 }
 
 NS_IMETHODIMP
-AudioDestinationNode::WindowAudioCaptureChanged()
+AudioDestinationNode::WindowAudioCaptureChanged(bool aCapture)
 {
   MOZ_ASSERT(mAudioChannelAgent);
 
@@ -537,10 +537,13 @@ AudioDestinationNode::WindowAudioCaptureChanged()
     return NS_OK;
   }
 
-  bool captured = GetOwner()->GetAudioCaptured();
+  nsCOMPtr<nsPIDOMWindow> ownerWindow = GetOwner();
+  if (!ownerWindow) {
+    return NS_OK;
+  }
 
-  if (captured != mCaptured) {
-    if (captured) {
+  if (aCapture != mCaptured) {
+    if (aCapture) {
       nsCOMPtr<nsPIDOMWindow> window = Context()->GetParentObject();
       uint64_t id = window->WindowID();
       mCaptureStreamPort =
@@ -548,7 +551,7 @@ AudioDestinationNode::WindowAudioCaptureChanged()
     } else {
       mCaptureStreamPort->Destroy();
     }
-    mCaptured = captured;
+    mCaptured = aCapture;
   }
 
   return NS_OK;
@@ -640,10 +643,7 @@ AudioDestinationNode::CreateAudioChannelAgent()
     return rv;
   }
 
-  rv = WindowAudioCaptureChanged();
-  NS_WARN_IF(NS_FAILED(rv));
-  return rv;
-
+  return NS_OK;
 }
 
 void
@@ -733,13 +733,11 @@ AudioDestinationNode::InputMuted(bool aMuted)
 
   float volume = 0.0;
   bool muted = true;
-  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(nsIAudioChannelAgent::AUDIO_AGENT_NOTIFY,
-                                                         &volume, &muted);
+  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
 
-  WindowAudioCaptureChanged();
   WindowVolumeChanged(volume, muted);
 }
 

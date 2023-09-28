@@ -10,6 +10,7 @@
 
 #include "ASpdySession.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/UniquePtr.h"
 #include "nsAHttpConnection.h"
 #include "nsClassHashtable.h"
 #include "nsDataHashtable.h"
@@ -242,21 +243,7 @@ private:
   // to track network I/O for timeout purposes
   nsresult   NetworkRead(nsAHttpSegmentWriter *, char *, uint32_t, uint32_t *);
 
-  static PLDHashOperator ShutdownEnumerator(nsAHttpTransaction *,
-                                            nsAutoPtr<SpdyStream31> &,
-                                            void *);
-
-  static PLDHashOperator GoAwayEnumerator(nsAHttpTransaction *,
-                                          nsAutoPtr<SpdyStream31> &,
-                                          void *);
-
-  static PLDHashOperator UpdateServerRwinEnumerator(nsAHttpTransaction *,
-                                                    nsAutoPtr<SpdyStream31> &,
-                                                    void *);
-
-  static PLDHashOperator RestartBlockedOnRwinEnumerator(nsAHttpTransaction *,
-                                                        nsAutoPtr<SpdyStream31> &,
-                                                        void *);
+  void Shutdown();
 
   // This is intended to be nsHttpConnectionMgr:nsConnectionHandle taken
   // from the first transaction on this session. That object contains the
@@ -307,7 +294,7 @@ private:
   // of header on data packets
   uint32_t             mInputFrameBufferSize;
   uint32_t             mInputFrameBufferUsed;
-  nsAutoArrayPtr<char> mInputFrameBuffer;
+  UniquePtr<char[]>    mInputFrameBuffer;
 
   // mInputFrameDataSize/Read are used for tracking the amount of data consumed
   // in a data frame. the data itself is not buffered in spdy
@@ -395,7 +382,7 @@ private:
   uint32_t             mOutputQueueSize;
   uint32_t             mOutputQueueUsed;
   uint32_t             mOutputQueueSent;
-  nsAutoArrayPtr<char> mOutputQueueBuffer;
+  UniquePtr<char[]>    mOutputQueueBuffer;
 
   PRIntervalTime       mPingThreshold;
   PRIntervalTime       mLastReadEpoch;     // used for ping timeouts

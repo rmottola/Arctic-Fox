@@ -185,19 +185,17 @@ public:
         continue;
       }
 
-      RefPtr<gfxContext> ctx =
+      RefPtr<DrawTarget> dt =
         sink->BeginUpdate(update.mUpdateRect + offset, update.mSequenceCounter);
-
-      if (!ctx) {
+      if (!dt) {
         continue;
       }
 
-      DrawTarget* dt = ctx->GetDrawTarget();
       dt->SetTransform(Matrix::Translation(offset.x, offset.y));
 
       rotBuffer.DrawBufferWithRotation(dt, RotatedBuffer::BUFFER_BLACK);
 
-      update.mLayer->GetSink()->EndUpdate(ctx, update.mUpdateRect + offset);
+      update.mLayer->GetSink()->EndUpdate(update.mUpdateRect + offset);
     }
   }
 
@@ -292,10 +290,15 @@ void
 ContentClientRemoteBuffer::CreateBackBuffer(const IntRect& aBufferRect)
 {
   // gfx::BackendType::NONE means fallback to the content backend
+  TextureAllocationFlags textureAllocFlags
+                         = (mTextureFlags & TextureFlags::COMPONENT_ALPHA) ?
+                            TextureAllocationFlags::ALLOC_CLEAR_BUFFER_BLACK :
+                            TextureAllocationFlags::ALLOC_CLEAR_BUFFER;
+
   mTextureClient = CreateTextureClientForDrawing(
     mSurfaceFormat, mSize, BackendSelector::Content,
     mTextureFlags | ExtraTextureFlags(),
-    TextureAllocationFlags::ALLOC_CLEAR_BUFFER
+    textureAllocFlags
   );
   if (!mTextureClient || !AddTextureClient(mTextureClient)) {
     AbortTextureClientCreation();

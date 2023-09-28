@@ -44,7 +44,7 @@ struct ScrollableLayerGuid;
 class CompositorParent;
 class GestureEventListener;
 class PCompositorParent;
-struct ViewTransform;
+struct AsyncTransform;
 class AsyncPanZoomAnimation;
 class FlingAnimation;
 class InputBlockState;
@@ -52,6 +52,7 @@ class TouchBlockState;
 class PanGestureBlockState;
 class OverscrollHandoffChain;
 class StateChangeNotificationBlocker;
+class CheckerboardEvent;
 
 /**
  * Controller for all panning and zooming logic. Any time a user input is
@@ -125,7 +126,7 @@ public:
    * in. The actual animation is done on the compositor thread after being set
    * up.
    */
-  void ZoomToRect(CSSRect aRect);
+  void ZoomToRect(CSSRect aRect, const uint32_t aFlags);
 
   /**
    * Updates any zoom constraints contained in the <meta name="viewport"> tag.
@@ -166,7 +167,7 @@ public:
    * This function returns the async transform via the |aOutTransform|
    * out parameter.
    */
-  void SampleContentTransformForFrame(ViewTransform* aOutTransform,
+  void SampleContentTransformForFrame(AsyncTransform* aOutTransform,
                                       ParentLayerPoint& aScrollOffset);
 
   /**
@@ -182,7 +183,8 @@ public:
    * layers code indicating that the frame metrics being sent with this call are
    * the initial metrics and the initial paint of the frame has just happened.
    */
-  void NotifyLayersUpdated(const FrameMetrics& aLayerMetrics, bool aIsFirstPaint);
+  void NotifyLayersUpdated(const FrameMetrics& aLayerMetrics, bool aIsFirstPaint,
+                           bool aThisLayerTreeUpdated);
 
   /**
    * The platform implementation must set the compositor parent so that we can
@@ -218,7 +220,7 @@ public:
    * existing transform, it will make the layer appear with the desired pan/zoom
    * amount.
    */
-  ViewTransform GetCurrentAsyncTransform() const;
+  AsyncTransform GetCurrentAsyncTransform() const;
 
   /**
    * Returns the same transform as GetCurrentAsyncTransform(), but includes
@@ -594,7 +596,8 @@ protected:
   /**
    * Actually send the next pending paint request to gecko.
    */
-  void DispatchRepaintRequest(const FrameMetrics& aFrameMetrics);
+  void DispatchRepaintRequest(const FrameMetrics& aFrameMetrics,
+                              const ParentLayerPoint& aVelocity);
 
   /**
    * Gets the current frame metrics. This is *not* the Gecko copy stored in the
@@ -1096,6 +1099,17 @@ private:
   // Flag to track whether or not the APZ transform is not used. This
   // flag is recomputed for every composition frame.
   bool mAsyncTransformAppliedToContent;
+
+
+  /* ===================================================================
+   * The functions and members in this section are used for checkerboard
+   * recording.
+   */
+private:
+  // This is created when this APZC instance is first included as part of a
+  // composite. If a checkerboard event takes place, this is destroyed at the
+  // end of the event, and a new one is created on the next composite.
+  UniquePtr<CheckerboardEvent> mCheckerboardEvent;
 };
 
 } // namespace layers

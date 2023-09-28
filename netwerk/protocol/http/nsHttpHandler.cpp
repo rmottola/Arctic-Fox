@@ -53,6 +53,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsSocketTransportService2.h"
+#include "nsIOService.h"
 
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -409,6 +410,11 @@ nsHttpHandler::MakeNewRequestTokenBucket()
 nsresult
 nsHttpHandler::InitConnectionMgr()
 {
+    // Init ConnectionManager only on parent!
+    if (IsNeckoChild()) {
+        return NS_OK;
+    }
+
     nsresult rv;
 
     if (!mConnMgr) {
@@ -2089,9 +2095,10 @@ nsHttpHandler::Observe(nsISupports *subject,
         if (mWifiTickler)
             mWifiTickler->Cancel();
 
-        // ensure connection manager is shutdown
-        if (mConnMgr)
-            mConnMgr->Shutdown();
+        // Inform nsIOService that network is tearing down.
+        gIOService->SetHttpHandlerAlreadyShutingDown();
+
+        ShutdownConnectionManager();
 
         // need to reset the session start time since cache validation may
         // depend on this value.
@@ -2374,6 +2381,15 @@ nsHttpsHandler::AllowPort(int32_t aPort, const char *aScheme, bool *_retval)
     // don't override anything.
     *_retval = false;
     return NS_OK;
+}
+
+void
+nsHttpHandler::ShutdownConnectionManager()
+{
+    // ensure connection manager is shutdown
+    if (mConnMgr) {
+        mConnMgr->Shutdown();
+    }
 }
 
 } // namespace net

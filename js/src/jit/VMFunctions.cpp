@@ -6,6 +6,8 @@
 
 #include "jit/VMFunctions.h"
 
+#include "jsgc.h"
+
 #include "builtin/TypedObject.h"
 #include "frontend/BytecodeCompiler.h"
 #include "jit/arm/Simulator-arm.h"
@@ -77,9 +79,20 @@ InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc
 
         RootedValue newTarget(cx, argvWithoutThis[argc]);
 
-        // If |this| hasn't been created, we can use normal construction code.
-        if (thisv.isMagic(JS_IS_CONSTRUCTING))
-            return Construct(cx, fval, cargs, newTarget, rval);
+        // If |this| hasn't been created, or is JS_UNINITIALIZED_LEXICAL,
+        // we can use normal construction code without creating an extraneous
+        // object.
+        if (thisv.isMagic()) {
+            MOZ_ASSERT(thisv.whyMagic() == JS_IS_CONSTRUCTING ||
+                       thisv.whyMagic() == JS_UNINITIALIZED_LEXICAL);
+
+            RootedObject obj(cx);
+            if (!Construct(cx, fval, cargs, newTarget, &obj))
+                return false;
+
+            rval.setObject(*obj);
+            return true;
+        }
 
         // Otherwise the default |this| has already been created.  We could
         // almost perform a *call* at this point, but we'd break |new.target|
@@ -380,40 +393,14 @@ ArrayConcatDense(JSContext* cx, HandleObject obj1, HandleObject obj2, HandleObje
 JSString*
 ArrayJoin(JSContext* cx, HandleObject array, HandleString sep)
 {
-    // The annotations in this function follow the first steps of join
-    // specified in ES5.
-
-    // Step 1
-    RootedObject obj(cx, array);
-    if (!obj)
+    JS::AutoValueArray<3> argv(cx);
+    argv[0].setUndefined();
+    argv[1].setObject(*array);
+    argv[2].setString(sep);
+    if (!js::array_join(cx, 1, argv.begin()))
         return nullptr;
-
-    AutoCycleDetector detector(cx, obj);
-    if (!detector.init())
-        return nullptr;
-
-    if (detector.foundCycle())
-        return nullptr;
-
-    // Steps 2 and 3
-    uint32_t length;
-    if (!GetLengthProperty(cx, obj, &length))
-        return nullptr;
-
-    // Steps 4 and 5
-    RootedLinearString sepstr(cx);
-    if (sep) {
-        sepstr = sep->ensureLinear(cx);
-        if (!sepstr)
-            return nullptr;
-    } else {
-        sepstr = cx->names().comma;
-    }
-
-    // Step 6 to 11
-    return js::ArrayJoin<false>(cx, obj, sepstr, length);
+    return argv[0].toString();
 }
-
 
 bool
 CharCodeAt(JSContext* cx, HandleString str, int32_t index, uint32_t* code)
@@ -569,12 +556,12 @@ CreateThis(JSContext* cx, HandleObject callee, HandleObject newTarget, MutableHa
     rval.set(MagicValue(JS_IS_CONSTRUCTING));
 
     if (callee->is<JSFunction>()) {
-        JSFunction* fun = &callee->as<JSFunction>();
+        RootedFunction fun(cx, &callee->as<JSFunction>());
         if (fun->isInterpreted() && fun->isConstructor()) {
             JSScript* script = fun->getOrCreateScript(cx);
             if (!script || !script->ensureHasTypes(cx))
                 return false;
-            if (script->isDerivedClassConstructor()) {
+            if (fun->isBoundFunction() || script->isDerivedClassConstructor()) {
                 rval.set(MagicValue(JS_UNINITIALIZED_LEXICAL));
             } else {
                 JSObject* thisObj = CreateThisForFunction(cx, callee, newTarget, GenericObject);
@@ -627,6 +614,25 @@ PostWriteBarrier(JSRuntime* rt, JSObject* obj)
 {
     MOZ_ASSERT(!IsInsideNursery(obj));
     rt->gc.storeBuffer.putWholeCell(obj);
+}
+
+static const size_t MAX_WHOLE_CELL_BUFFER_SIZE = 4096;
+
+void
+PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, size_t index)
+{
+    MOZ_ASSERT(!IsInsideNursery(obj));
+    if (obj->is<NativeObject>() &&
+        (obj->as<NativeObject>().getDenseInitializedLength() > MAX_WHOLE_CELL_BUFFER_SIZE
+#ifdef JS_GC_ZEAL
+         || rt->hasZealMode(gc::ZealMode::ElementsBarrier)
+#endif
+            ))
+    {
+        rt->gc.storeBuffer.putSlot(&obj->as<NativeObject>(), HeapSlot::Element, index, 1);
+    } else {
+        rt->gc.storeBuffer.putWholeCell(obj);
+    }
 }
 
 void
@@ -703,7 +709,7 @@ DebugEpilogue(JSContext* cx, BaselineFrame* frame, jsbytecode* pc, bool ok)
     // If Debugger::onLeaveFrame returns |true| we have to return the frame's
     // return value. If it returns |false|, the debugger threw an exception.
     // In both cases we have to pop debug scopes.
-    ok = Debugger::onLeaveFrame(cx, frame, ok);
+    ok = Debugger::onLeaveFrame(cx, frame, pc, ok);
 
     // Unwind to the outermost scope and set pc to the end of the script,
     // regardless of error.
@@ -712,7 +718,7 @@ DebugEpilogue(JSContext* cx, BaselineFrame* frame, jsbytecode* pc, bool ok)
     JSScript* script = frame->script();
     frame->setOverridePc(script->lastPC());
 
-    if (frame->isNonEvalFunctionFrame()) {
+    if (frame->isFunctionFrame()) {
         MOZ_ASSERT_IF(ok, frame->hasReturnValue());
         DebugScopes::onPopCall(frame, cx);
     } else if (frame->isStrictEvalFrame()) {
@@ -725,8 +731,7 @@ DebugEpilogue(JSContext* cx, BaselineFrame* frame, jsbytecode* pc, bool ok)
         // code will start at the previous frame.
 
         JitFrameLayout* prefix = frame->framePrefix();
-        EnsureExitFrame(prefix);
-        cx->runtime()->jitTop = (uint8_t*)prefix;
+        EnsureBareExitFrame(cx, prefix);
         return false;
     }
 
@@ -1005,7 +1010,7 @@ GlobalHasLiveOnDebuggerStatement(JSContext* cx)
 }
 
 bool
-PushBlockScope(JSContext* cx, BaselineFrame* frame, Handle<StaticBlockObject*> block)
+PushBlockScope(JSContext* cx, BaselineFrame* frame, Handle<StaticBlockScope*> block)
 {
     return frame->pushBlock(cx, block);
 }
@@ -1048,7 +1053,7 @@ DebugLeaveBlock(JSContext* cx, BaselineFrame* frame, jsbytecode* pc)
 }
 
 bool
-EnterWith(JSContext* cx, BaselineFrame* frame, HandleValue val, Handle<StaticWithObject*> templ)
+EnterWith(JSContext* cx, BaselineFrame* frame, HandleValue val, Handle<StaticWithScope*> templ)
 {
     return EnterWithOperation(cx, frame, val, templ);
 }

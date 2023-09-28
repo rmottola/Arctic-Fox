@@ -21,8 +21,8 @@ class nsPIDOMWindow;
 namespace mozilla {
 namespace dom {
 class File;
-}
-}
+} // namespace dom
+} // namespace mozilla
 
 /**
   This class creates a proxy file picker to be used in content processes.
@@ -51,8 +51,8 @@ public:
     NS_IMETHODIMP GetFileURL(nsIURI** aFileURL) override;
     NS_IMETHODIMP GetFiles(nsISimpleEnumerator** aFiles) override;
 
-    NS_IMETHODIMP GetDomfile(nsISupports** aFile) override;
-    NS_IMETHODIMP GetDomfiles(nsISimpleEnumerator** aFiles) override;
+    NS_IMETHODIMP GetDomFileOrDirectory(nsISupports** aValue) override;
+    NS_IMETHODIMP GetDomFileOrDirectoryEnumerator(nsISimpleEnumerator** aValue) override;
 
     NS_IMETHODIMP Show(int16_t* aReturn) override;
     NS_IMETHODIMP Open(nsIFilePickerShownCallback* aCallback) override;
@@ -65,9 +65,7 @@ private:
     ~nsFilePickerProxy();
     void InitNative(nsIWidget*, const nsAString&) override;
 
-    // This is an innerWindow.
-    nsCOMPtr<nsPIDOMWindow> mParent;
-    nsTArray<RefPtr<mozilla::dom::File>> mDomfiles;
+    nsTArray<RefPtr<mozilla::dom::File>> mFilesOrDirectories;
     nsCOMPtr<nsIFilePickerShownCallback> mCallback;
 
     int16_t   mSelectedType;

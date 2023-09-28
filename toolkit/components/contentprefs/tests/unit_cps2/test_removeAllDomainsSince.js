@@ -84,7 +84,7 @@ let tests = [
   },
 
   function erroneous() {
-    do_check_throws(function () cps.removeAllDomainsSince(null, "bogus"));
+    do_check_throws(() => cps.removeAllDomainsSince(null, "bogus"));
     yield true;
   },
 

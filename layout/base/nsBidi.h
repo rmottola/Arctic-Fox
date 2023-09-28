@@ -8,6 +8,7 @@
 #define nsBidi_h__
 
 #include "nsBidiUtils.h"
+#include "nsIFrame.h" // for frame property declaration
 
 // Bidi reordering engine from ICU
 /*
@@ -156,8 +157,11 @@ typedef uint8_t DirProp;
 #define DIRPROP_FLAG_MULTI_RUNS (1UL<<31)
 
 /* are there any characters that are LTR or RTL? */
-#define MASK_LTR (DIRPROP_FLAG(L)|DIRPROP_FLAG(EN)|DIRPROP_FLAG(AN)|DIRPROP_FLAG(LRE)|DIRPROP_FLAG(LRO)|DIRPROP_FLAG(LRI))
-#define MASK_RTL (DIRPROP_FLAG(R)|DIRPROP_FLAG(AL)|DIRPROP_FLAG(RLE)|DIRPROP_FLAG(RLO)|DIRPROP_FLAG(RLI))
+#define MASK_LTR (DIRPROP_FLAG(L)|DIRPROP_FLAG(EN)|DIRPROP_FLAG(ENL)| \
+                  DIRPROP_FLAG(ENR)|DIRPROP_FLAG(AN)|DIRPROP_FLAG(LRE)| \
+                  DIRPROP_FLAG(LRO)|DIRPROP_FLAG(LRI))
+#define MASK_RTL (DIRPROP_FLAG(R)|DIRPROP_FLAG(AL)|DIRPROP_FLAG(RLE)| \
+                  DIRPROP_FLAG(RLO)|DIRPROP_FLAG(RLI))
 #define MASK_R_AL (DIRPROP_FLAG(R)|DIRPROP_FLAG(AL))
 
 /* explicit embedding codes */
@@ -424,6 +428,8 @@ struct LevState {
 class nsBidi
 {
 public:
+  typedef mozilla::FramePropertyDescriptor FramePropertyDescriptor;
+
   /** @brief Default constructor.
    *
    * The nsBidi object is initially empty. It is assigned
@@ -653,6 +659,19 @@ public:
    * @param aDestSize will receive the number of characters that were written to <code>aDest</code>.
    */
   nsresult WriteReverse(const char16_t *aSrc, int32_t aSrcLength, char16_t *aDest, uint16_t aOptions, int32_t *aDestSize);
+
+  NS_DECLARE_FRAME_PROPERTY(BaseLevelProperty, nullptr)
+  NS_DECLARE_FRAME_PROPERTY(EmbeddingLevelProperty, nullptr)
+  NS_DECLARE_FRAME_PROPERTY(ParagraphDepthProperty, nullptr)
+
+#define NS_GET_BASE_LEVEL(frame) \
+NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::BaseLevelProperty()))
+
+#define NS_GET_EMBEDDING_LEVEL(frame) \
+NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::EmbeddingLevelProperty()))
+
+#define NS_GET_PARAGRAPH_DEPTH(frame) \
+NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::ParagraphDepthProperty()))
 
 protected:
   friend class nsBidiPresUtils;

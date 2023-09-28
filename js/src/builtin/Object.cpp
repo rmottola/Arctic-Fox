@@ -7,13 +7,13 @@
 #include "builtin/Object.h"
 
 #include "mozilla/ArrayUtils.h"
-#include "mozilla/UniquePtr.h"
 
 #include "jscntxt.h"
 
 #include "builtin/Eval.h"
 #include "frontend/BytecodeCompiler.h"
 #include "jit/InlinableNatives.h"
+#include "js/UniquePtr.h"
 #include "vm/StringBuffer.h"
 
 #include "jsobjinlines.h"
@@ -25,7 +25,6 @@ using namespace js;
 
 using js::frontend::IsIdentifier;
 using mozilla::ArrayLength;
-using mozilla::UniquePtr;
 
 bool
 js::obj_construct(JSContext* cx, unsigned argc, Value* vp)
@@ -630,8 +629,7 @@ js::obj_create(JSContext* cx, unsigned argc, Value* vp)
 
     if (!args[0].isObjectOrNull()) {
         RootedValue v(cx, args[0]);
-        UniquePtr<char[], JS::FreePolicy> bytes =
-            DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, nullptr);
+        UniqueChars bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, nullptr);
         if (!bytes)
             return false;
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
@@ -1091,13 +1089,18 @@ FinishObjectClassInit(JSContext* cx, JS::HandleObject ctor, JS::HandleObject pro
         return false;
 
     /*
-     * Define self-hosted functions after setting the intrinsics holder
-     * (which is needed to define self-hosted functions)
+     * Define self-hosted functions on Object and Function after setting the
+     * intrinsics holder (which is needed to define self-hosted functions).
      */
     if (!cx->runtime()->isSelfHostingGlobal(global)) {
         if (!JS_DefineFunctions(cx, ctor, object_static_methods, OnlyDefineLateProperties))
             return false;
         if (!JS_DefineFunctions(cx, proto, object_methods, OnlyDefineLateProperties))
+            return false;
+        RootedObject funProto(cx, global->getOrCreateFunctionPrototype(cx));
+        if (!funProto)
+            return false;
+        if (!JS_DefineFunctions(cx, funProto, function_methods, OnlyDefineLateProperties))
             return false;
     }
 

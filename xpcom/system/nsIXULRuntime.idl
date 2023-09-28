@@ -23,7 +23,7 @@ bool BrowserTabsRemoteAutostart();
  *                    stable/frozen, please contact Benjamin Smedberg.
  */
 
-[scriptable, uuid(c4cd11c4-6e8e-49da-85a8-dad3b7605bc3)]
+[scriptable, uuid(a1b2e167-b748-42bf-ba85-996ec39062b9)]
 interface nsIXULRuntime : nsISupports
 {
   /**
@@ -95,12 +95,6 @@ interface nsIXULRuntime : nsISupports
    * If true, the accessibility service is running.
    */
   readonly attribute boolean accessibilityEnabled;
-
-  /**
-   * Indicates if the active accessibility client is UIA.
-   * DO NOT USE! This is temporary and will be removed.
-   */
-  readonly attribute boolean accessibilityIsUIA;
 
   /**
    * Indicates whether the current Firefox build is 64-bit.

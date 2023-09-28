@@ -65,7 +65,7 @@ static const JSFunctionSpec exception_methods[] = {
     JS_FS_END
 };
 
-#define IMPLEMENT_ERROR_SUBCLASS(name) \
+#define IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(name, extraClassSpecFlags)  \
     { \
         js_Error_str, /* yes, really */ \
         JSCLASS_HAS_CACHED_PROTO(JSProto_##name) | \
@@ -90,9 +90,12 @@ static const JSFunctionSpec exception_methods[] = {
             exception_methods, \
             exception_properties, \
             nullptr, \
-            JSProto_Error \
+            JSProto_Error | extraClassSpecFlags \
         } \
     }
+
+#define IMPLEMENT_ERROR_SUBCLASS(name) \
+    IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(name, 0)
 
 const Class
 ErrorObject::classes[JSEXN_LIMIT] = {
@@ -128,7 +131,11 @@ ErrorObject::classes[JSEXN_LIMIT] = {
     IMPLEMENT_ERROR_SUBCLASS(ReferenceError),
     IMPLEMENT_ERROR_SUBCLASS(SyntaxError),
     IMPLEMENT_ERROR_SUBCLASS(TypeError),
-    IMPLEMENT_ERROR_SUBCLASS(URIError)
+    IMPLEMENT_ERROR_SUBCLASS(URIError),
+
+    // DebuggeeWouldRun is a subclass of Error but is accessible via the
+    // Debugger constructor, not the global.
+    IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(DebuggeeWouldRun, ClassSpec::DontDefineConstructor),
 };
 
 JSErrorReport*
@@ -361,7 +368,7 @@ Error(JSContext* cx, unsigned argc, Value* vp)
     } else {
         fileName = cx->runtime()->emptyString;
         if (!iter.done()) {
-            if (const char* cfilename = iter.scriptFilename())
+            if (const char* cfilename = iter.filename())
                 fileName = JS_NewStringCopyZ(cx, cfilename);
         }
     }
@@ -727,7 +734,7 @@ ErrorReport::ReportAddonExceptionToTelementry(JSContext* cx)
         return;
 
     JSCompartment* comp = stack->compartment();
-    JSAddonId* addonId = comp->addonId;
+    JSAddonId* addonId = comp->creationOptions().addonIdOrNull();
 
     // We only want to send the report if the scope that just have thrown belongs to an add-on.
     // Let's check the compartment of the youngest function on the stack, to determine that.
@@ -936,7 +943,7 @@ ErrorReport::populateUncaughtExceptionReportVA(JSContext* cx, va_list ap)
     // could accept a passed-in stack of some sort instead.
     NonBuiltinFrameIter iter(cx, cx->compartment()->principals());
     if (!iter.done()) {
-        ownedReport.filename = iter.scriptFilename();
+        ownedReport.filename = iter.filename();
         ownedReport.lineno = iter.computeLine(&ownedReport.column);
         // XXX: Make the column 1-based as in other browsers, instead of 0-based
         // which is how SpiderMonkey stores it internally. This will be

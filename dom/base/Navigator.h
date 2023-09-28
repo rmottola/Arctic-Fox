@@ -179,6 +179,10 @@ public:
                                bool aIsCallerChrome,
                                nsAString& aUserAgent);
 
+  // Clears the user agent cache by calling:
+  // NavigatorBinding::ClearCachedUserAgentValue(this);
+  void ClearUserAgentCache();
+
   already_AddRefed<Promise> GetDataStores(const nsAString& aName,
                                           const nsAString& aOwner,
                                           ErrorResult& aRv);
@@ -261,6 +265,7 @@ public:
   void GetGamepads(nsTArray<RefPtr<Gamepad> >& aGamepads, ErrorResult& aRv);
 #endif // MOZ_GAMEPAD
   already_AddRefed<Promise> GetVRDevices(ErrorResult& aRv);
+  void NotifyVRDevicesUpdated();
 #ifdef MOZ_B2G_FM
   FMRadio* GetMozFMRadio(ErrorResult& aRv);
 #endif
@@ -289,6 +294,7 @@ public:
                               MozGetUserMediaDevicesSuccessCallback& aOnSuccess,
                               NavigatorUserMediaErrorCallback& aOnError,
                               uint64_t aInnerWindowID,
+                              const nsAString& aCallID,
                               ErrorResult& aRv);
 #endif // MOZ_MEDIA_NAVIGATOR
 
@@ -296,7 +302,7 @@ public:
 
   bool DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObject,
                  JS::Handle<jsid> aId,
-                 JS::MutableHandle<JSPropertyDescriptor> aDesc);
+                 JS::MutableHandle<JS::PropertyDescriptor> aDesc);
   // The return value is whether DoResolve might end up resolving the given id.
   // If in doubt, return true.
   static bool MayResolve(jsid aId);
@@ -329,8 +335,6 @@ public:
 #ifdef MOZ_B2G
   static bool HasMobileIdSupport(JSContext* aCx, JSObject* aGlobal);
 #endif
-
-  static bool HasTVSupport(JSContext* aCx, JSObject* aGlobal);
 
   static bool HasPresentationSupport(JSContext* aCx, JSObject* aGlobal);
 
@@ -400,6 +404,8 @@ private:
   // we'd need to figure out exactly how to trace that, and that seems to be
   // rocket science.  :(
   nsInterfaceHashtable<nsStringHashKey, nsISupports> mCachedResolveResults;
+
+  nsTArray<RefPtr<Promise> > mVRGetDevicesPromises;
 };
 
 } // namespace dom

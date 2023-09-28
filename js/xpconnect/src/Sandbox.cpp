@@ -50,7 +50,6 @@
 
 using namespace mozilla;
 using namespace JS;
-using namespace js;
 using namespace xpc;
 
 using mozilla::dom::DestroyProtoAndIfaceCache;
@@ -512,7 +511,7 @@ sandbox_addProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v)
     // After bug 1015790 is fixed, we should be able to remove this unwrapping.
     RootedObject unwrappedProto(cx, js::UncheckedUnwrap(proto, /* stopAtWindowProxy = */ false));
 
-    Rooted<JSPropertyDescriptor> pd(cx);
+    Rooted<JS::PropertyDescriptor> pd(cx);
     if (!JS_GetPropertyDescriptorById(cx, proto, id, &pd))
         return false;
 
@@ -598,7 +597,7 @@ static const JSFunctionSpec SandboxFunctions[] = {
 bool
 xpc::IsSandbox(JSObject* obj)
 {
-    const Class* clasp = GetObjectClass(obj);
+    const js::Class* clasp = js::GetObjectClass(obj);
     return clasp == &SandboxClass || clasp == &SandboxWriteToProtoClass;
 }
 
@@ -722,7 +721,7 @@ WrapCallable(JSContext* cx, HandleObject callable, HandleObject sandboxProtoProx
 }
 
 template<typename Op>
-bool WrapAccessorFunction(JSContext* cx, Op& op, JSPropertyDescriptor* desc,
+bool WrapAccessorFunction(JSContext* cx, Op& op, PropertyDescriptor* desc,
                           unsigned attrFlag, HandleObject sandboxProtoProxy)
 {
     if (!op) {
@@ -746,7 +745,7 @@ bool
 xpc::SandboxProxyHandler::getPropertyDescriptor(JSContext* cx,
                                                 JS::Handle<JSObject*> proxy,
                                                 JS::Handle<jsid> id,
-                                                JS::MutableHandle<JSPropertyDescriptor> desc) const
+                                                JS::MutableHandle<PropertyDescriptor> desc) const
 {
     JS::RootedObject obj(cx, wrappedObject(proxy));
 
@@ -781,7 +780,7 @@ bool
 xpc::SandboxProxyHandler::getOwnPropertyDescriptor(JSContext* cx,
                                                    JS::Handle<JSObject*> proxy,
                                                    JS::Handle<jsid> id,
-                                                   JS::MutableHandle<JSPropertyDescriptor> desc)
+                                                   JS::MutableHandle<PropertyDescriptor> desc)
                                                    const
 {
     if (!getPropertyDescriptor(cx, proxy, id, desc))
@@ -817,7 +816,33 @@ xpc::SandboxProxyHandler::get(JSContext* cx, JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id,
                               JS::MutableHandle<Value> vp) const
 {
-    return BaseProxyHandler::get(cx, proxy, receiver, id, vp);
+    // This uses getPropertyDescriptor for backward compatibility with
+    // the old BaseProxyHandler::get implementation.
+    Rooted<PropertyDescriptor> desc(cx);
+    if (!getPropertyDescriptor(cx, proxy, id, &desc))
+        return false;
+    desc.assertCompleteIfFound();
+
+    if (!desc.object()) {
+        vp.setUndefined();
+        return true;
+    }
+
+    // Everything after here follows [[Get]] for ordinary objects.
+    if (desc.isDataDescriptor()) {
+        vp.set(desc.value());
+        return true;
+    }
+
+    MOZ_ASSERT(desc.isAccessorDescriptor());
+    RootedObject getter(cx, desc.getterObject());
+
+    if (!getter) {
+        vp.setUndefined();
+        return true;
+    }
+
+    return Call(cx, receiver, getter, HandleValueArray::empty(), vp);
 }
 
 bool
@@ -988,16 +1013,18 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
     MOZ_ASSERT(principal);
 
     JS::CompartmentOptions compartmentOptions;
-    if (options.sameZoneAs)
-        compartmentOptions.setSameZoneAs(js::UncheckedUnwrap(options.sameZoneAs));
-    else if (options.freshZone)
-        compartmentOptions.setZone(JS::FreshZone);
-    else
-        compartmentOptions.setZone(JS::SystemZone);
 
-    compartmentOptions.setInvisibleToDebugger(options.invisibleToDebugger)
-                      .setDiscardSource(options.discardSource)
-                      .setTrace(TraceXPCGlobal);
+    auto& creationOptions = compartmentOptions.creationOptions();
+
+    if (options.sameZoneAs)
+        creationOptions.setSameZoneAs(js::UncheckedUnwrap(options.sameZoneAs));
+    else if (options.freshZone)
+        creationOptions.setZone(JS::FreshZone);
+    else
+        creationOptions.setZone(JS::SystemZone);
+
+    creationOptions.setInvisibleToDebugger(options.invisibleToDebugger)
+                   .setTrace(TraceXPCGlobal);
 
     // Try to figure out any addon this sandbox should be associated with.
     // The addon could have been passed in directly, as part of the metadata,
@@ -1011,11 +1038,13 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
             addonId = id;
     }
 
-    compartmentOptions.setAddonId(addonId);
+    creationOptions.setAddonId(addonId);
 
-    const Class* clasp = options.writeToGlobalPrototype
-                       ? &SandboxWriteToProtoClass
-                       : &SandboxClass;
+    compartmentOptions.behaviors().setDiscardSource(options.discardSource);
+
+    const js::Class* clasp = options.writeToGlobalPrototype
+                             ? &SandboxWriteToProtoClass
+                             : &SandboxClass;
 
     RootedObject sandbox(cx, xpc::CreateGlobalObject(cx, js::Jsvalify(clasp),
                                                      principal, compartmentOptions));

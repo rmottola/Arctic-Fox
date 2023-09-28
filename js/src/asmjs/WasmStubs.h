@@ -16,23 +16,33 @@
  * limitations under the License.
  */
 
-#ifndef asmjs_wasm_stubs_h
-#define asmjs_wasm_stubs_h
+#ifndef wasm_stubs_h
+#define wasm_stubs_h
 
-#include "asmjs/Wasm.h"
+#include "asmjs/WasmGenerator.h"
 
 namespace js {
-
-class AsmJSModule;
-namespace jit { class MacroAssembler; }
-
 namespace wasm {
 
-typedef Vector<uint32_t> FuncOffsetVector;
+extern Offsets
+GenerateEntry(jit::MacroAssembler& masm, uint32_t target, const Sig& sig, bool usesHeap);
 
-bool
-GenerateStubs(jit::MacroAssembler& masm, AsmJSModule& module, const FuncOffsetVector& funcOffsets);
+extern ProfilingOffsets
+GenerateInterpExit(jit::MacroAssembler& masm, const Import& import, uint32_t importIndex);
+
+extern ProfilingOffsets
+GenerateJitExit(jit::MacroAssembler& masm, const Import& import, bool usesHeap);
+
+extern Offsets
+GenerateJumpTarget(jit::MacroAssembler& masm, JumpTarget target);
+
+extern ProfilingOffsets
+GenerateBadIndirectCallExit(jit::MacroAssembler& masm);
+
+extern Offsets
+GenerateInterruptStub(jit::MacroAssembler& masm);
 
 } // namespace wasm
 } // namespace js
-#endif // asmjs_wasm_stubs_h
+
+#endif // wasm_stubs_h

@@ -16,6 +16,7 @@
 #include "nsParentalControlsService.h"
 #endif
 
+#include "mozilla/AlertNotification.h"
 #include "nsAlertsService.h"
 
 #include "nsDownloadManager.h"
@@ -28,6 +29,7 @@
 #include "nsBrowserStatusFilter.h"
 #include "mozilla/FinalizationWitnessService.h"
 #include "mozilla/NativeOSFileInternals.h"
+#include "mozilla/AddonContentPolicy.h"
 #include "mozilla/AddonPathService.h"
 
 #if defined(XP_WIN)
@@ -73,6 +75,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsFindService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsParentalControlsService)
 #endif
 
+NS_GENERIC_FACTORY_CONSTRUCTOR(AlertNotification)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsAlertsService)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsDownloadManager,
@@ -90,6 +93,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(FinalizationWitnessService, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR(NativeOSFileInternalsService)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(NativeFileWatcherService, Init)
 
+NS_GENERIC_FACTORY_CONSTRUCTOR(AddonContentPolicy)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(AddonPathService, AddonPathService::GetInstance)
 
 NS_DEFINE_NAMED_CID(NS_TOOLKIT_APPSTARTUP_CID);
@@ -101,6 +105,7 @@ NS_DEFINE_NAMED_CID(NS_TOOLKIT_PERFORMANCESTATSSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_TOOLKIT_TERMINATOR_CID);
 #endif
 NS_DEFINE_NAMED_CID(NS_USERINFO_CID);
+NS_DEFINE_NAMED_CID(ALERT_NOTIFICATION_CID);
 NS_DEFINE_NAMED_CID(NS_ALERTSSERVICE_CID);
 #if !defined(MOZ_DISABLE_PARENTAL_CONTROLS)
 NS_DEFINE_NAMED_CID(NS_PARENTALCONTROLSSERVICE_CID);
@@ -116,6 +121,7 @@ NS_DEFINE_NAMED_CID(NS_UPDATEPROCESSOR_CID);
 #endif
 NS_DEFINE_NAMED_CID(FINALIZATIONWITNESSSERVICE_CID);
 NS_DEFINE_NAMED_CID(NATIVE_OSFILE_INTERNALS_SERVICE_CID);
+NS_DEFINE_NAMED_CID(NS_ADDONCONTENTPOLICY_CID);
 NS_DEFINE_NAMED_CID(NS_ADDON_PATH_SERVICE_CID);
 NS_DEFINE_NAMED_CID(NATIVE_FILEWATCHER_SERVICE_CID);
 
@@ -128,6 +134,7 @@ static const Module::CIDEntry kToolkitCIDs[] = {
   { &kNS_TOOLKIT_PERFORMANCESTATSSERVICE_CID, false, nullptr, nsPerformanceStatsServiceConstructor },
 #endif // defined (MOZ_HAS_PERFSTATS)
   { &kNS_USERINFO_CID, false, nullptr, nsUserInfoConstructor },
+  { &kALERT_NOTIFICATION_CID, false, nullptr, AlertNotificationConstructor },
   { &kNS_ALERTSSERVICE_CID, false, nullptr, nsAlertsServiceConstructor },
 #if !defined(MOZ_DISABLE_PARENTAL_CONTROLS)
   { &kNS_PARENTALCONTROLSSERVICE_CID, false, nullptr, nsParentalControlsServiceConstructor },
@@ -143,6 +150,7 @@ static const Module::CIDEntry kToolkitCIDs[] = {
 #endif
   { &kFINALIZATIONWITNESSSERVICE_CID, false, nullptr, FinalizationWitnessServiceConstructor },
   { &kNATIVE_OSFILE_INTERNALS_SERVICE_CID, false, nullptr, NativeOSFileInternalsServiceConstructor },
+  { &kNS_ADDONCONTENTPOLICY_CID, false, nullptr, AddonContentPolicyConstructor },
   { &kNS_ADDON_PATH_SERVICE_CID, false, nullptr, AddonPathServiceConstructor },
   { &kNATIVE_FILEWATCHER_SERVICE_CID, false, nullptr, NativeFileWatcherServiceConstructor },
   { nullptr }
@@ -157,6 +165,7 @@ static const Module::ContractIDEntry kToolkitContracts[] = {
   { NS_TOOLKIT_PERFORMANCESTATSSERVICE_CONTRACTID, &kNS_TOOLKIT_PERFORMANCESTATSSERVICE_CID },
 #endif // defined (MOZ_HAS_PERFSTATS)
   { NS_USERINFO_CONTRACTID, &kNS_USERINFO_CID },
+  { ALERT_NOTIFICATION_CONTRACTID, &kALERT_NOTIFICATION_CID },
   { NS_ALERTSERVICE_CONTRACTID, &kNS_ALERTSSERVICE_CID },
 #if !defined(MOZ_DISABLE_PARENTAL_CONTROLS)
   { NS_PARENTALCONTROLSSERVICE_CONTRACTID, &kNS_PARENTALCONTROLSSERVICE_CID },
@@ -171,15 +180,22 @@ static const Module::ContractIDEntry kToolkitContracts[] = {
 #endif
   { FINALIZATIONWITNESSSERVICE_CONTRACTID, &kFINALIZATIONWITNESSSERVICE_CID },
   { NATIVE_OSFILE_INTERNALS_SERVICE_CONTRACTID, &kNATIVE_OSFILE_INTERNALS_SERVICE_CID },
+  { NS_ADDONCONTENTPOLICY_CONTRACTID, &kNS_ADDONCONTENTPOLICY_CID },
   { NS_ADDONPATHSERVICE_CONTRACTID, &kNS_ADDON_PATH_SERVICE_CID },
   { NATIVE_FILEWATCHER_SERVICE_CONTRACTID, &kNATIVE_FILEWATCHER_SERVICE_CID },
+  { nullptr }
+};
+
+static const mozilla::Module::CategoryEntry kToolkitCategories[] = {
+  { "content-policy", NS_ADDONCONTENTPOLICY_CONTRACTID, NS_ADDONCONTENTPOLICY_CONTRACTID },
   { nullptr }
 };
 
 static const Module kToolkitModule = {
   Module::kVersion,
   kToolkitCIDs,
-  kToolkitContracts
+  kToolkitContracts,
+  kToolkitCategories
 };
 
 NSMODULE_DEFN(nsToolkitCompsModule) = &kToolkitModule;

@@ -117,7 +117,7 @@ typedef mozilla::null_t DXGISharedSurfaceHandle;
 // XXX maybe not the best place for these. better one?
 
 #define VARSTR(v_)  case v_: return #v_
-inline const char* const
+inline const char*
 NPPVariableToString(NPPVariable aVar)
 {
     switch (aVar) {

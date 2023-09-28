@@ -7,6 +7,8 @@ from __future__ import absolute_import, print_function, unicode_literals
 import argparse
 import os
 import sys
+import time
+
 from mozpack.copier import (
     FileCopier,
     FileRegistry,
@@ -19,7 +21,8 @@ from mozpack.manifests import InstallManifest
 from mozbuild.util import DefinesAction
 
 
-COMPLETE = 'From {dest}: Kept {existing} existing; Added/updated {updated}; ' \
+COMPLETE = 'Elapsed: {elapsed:.2f}s; From {dest}: Kept {existing} existing; ' \
+    'Added/updated {updated}; ' \
     'Removed {rm_files} files and {rm_dirs} directories.'
 
 
@@ -40,11 +43,9 @@ def process_manifest(destdir, paths, track=None,
             finder = FileFinder(destdir, find_executables=False,
                                 find_dotfiles=True)
             for dest in manifest._dests:
-                if '*' in dest:
-                    for p, f in finder.find(dest):
-                        remove_unaccounted.add(p, dummy_file)
-                else:
-                    remove_unaccounted.add(dest, dummy_file)
+                for p, f in finder.find(dest):
+                    remove_unaccounted.add(p, dummy_file)
+
         else:
             # If tracking is enabled and there is no file, we don't want to
             # be removing anything.
@@ -105,13 +106,19 @@ def main(argv):
 
     args = parser.parse_args(argv)
 
+    start = time.time()
+
     result = process_manifest(args.destdir, args.manifests,
         track=args.track, remove_unaccounted=not args.no_remove,
         remove_all_directory_symlinks=not args.no_remove_all_directory_symlinks,
         remove_empty_directories=not args.no_remove_empty_directories,
         defines=args.defines)
 
-    print(COMPLETE.format(dest=args.destdir,
+    elapsed = time.time() - start
+
+    print(COMPLETE.format(
+        elapsed=elapsed,
+        dest=args.destdir,
         existing=result.existing_files_count,
         updated=result.updated_files_count,
         rm_files=result.removed_files_count,

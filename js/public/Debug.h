@@ -12,7 +12,6 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/MemoryReporting.h"
-#include "mozilla/UniquePtr.h"
 
 #include "jsapi.h"
 #include "jspubtd.h"
@@ -26,9 +25,6 @@ class Debugger;
 } // namespace js
 
 namespace JS {
-
-using mozilla::UniquePtr;
-
 namespace dbg {
 
 // Helping embedding code build objects for Debugger
@@ -154,7 +150,7 @@ class Builder {
         // A rooted reference to our value.
         PersistentRooted<T> value;
 
-        BuiltThing(JSContext* cx, Builder& owner_, T value_ = js::GCMethods<T>::initial())
+        BuiltThing(JSContext* cx, Builder& owner_, T value_ = js::GCPolicy<T>::initial())
           : owner(owner_), value(cx, value_)
         {
             owner.assertBuilt(value_);

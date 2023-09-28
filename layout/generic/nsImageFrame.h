@@ -8,7 +8,7 @@
 #ifndef nsImageFrame_h___
 #define nsImageFrame_h___
 
-#include "nsSplittableFrame.h"
+#include "nsAtomicContainerFrame.h"
 #include "nsIIOService.h"
 #include "nsIObserver.h"
 
@@ -58,7 +58,7 @@ private:
   nsImageFrame *mFrame;
 };
 
-typedef nsSplittableFrame ImageFrameSuper;
+typedef nsAtomicContainerFrame ImageFrameSuper;
 
 class nsImageFrame : public ImageFrameSuper,
                      public nsIReflowCallback {
@@ -121,6 +121,11 @@ public:
   void List(FILE* out = stderr, const char* aPrefix = "", 
             uint32_t aFlags = 0) const override;
 #endif
+
+  nsSplittableType GetSplittableType() const override
+  {
+    return NS_FRAME_SPLITTABLE;
+  }
 
   virtual LogicalSides GetLogicalSkipSides(const nsHTMLReflowState* aReflowState = nullptr) const override;
 
@@ -249,6 +254,7 @@ protected:
    * Computes the predicted dest rect that we'll draw into, in app units, based
    * upon the provided frame content box. (The content box is what
    * nsDisplayImage::GetBounds() returns.)
+   * The result is not necessarily contained in the frame content box.
    */
   nsRect PredictedDestRect(const nsRect& aFrameContentBox);
 
@@ -426,7 +432,8 @@ public:
                                                         nsDisplayListBuilder* aBuilder) override;
 
   /**
-   * @return the dest rect we'll use when drawing this image, in app units.
+   * @return The dest rect we'll use when drawing this image, in app units.
+   *         Not necessarily contained in this item's bounds.
    */
   nsRect GetDestRect(bool* aSnap = nullptr);
 

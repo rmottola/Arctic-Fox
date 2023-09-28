@@ -7,9 +7,15 @@
 #ifndef mozilla_EffectSet_h
 #define mozilla_EffectSet_h
 
+#include "mozilla/AnimValuesStyleRule.h"
+#include "mozilla/EffectCompositor.h"
+#include "mozilla/EnumeratedArray.h"
+#include "mozilla/TimeStamp.h"
 #include "nsCSSPseudoElements.h" // For nsCSSPseudoElements::Type
 #include "nsHashKeys.h" // For nsPtrHashKey
 #include "nsTHashtable.h" // For nsTHashtable
+
+class nsPresContext;
 
 namespace mozilla {
 
@@ -24,8 +30,10 @@ class EffectSet
 {
 public:
   EffectSet()
+    : mCascadeNeedsUpdate(false)
+    , mAnimationGeneration(0)
 #ifdef DEBUG
-    : mCalledPropertyDtor(false)
+    , mCalledPropertyDtor(false)
 #endif
   {
     MOZ_COUNT_CTOR(EffectSet);
@@ -120,6 +128,31 @@ public:
   }
   bool IsEmpty() const { return mEffects.IsEmpty(); }
 
+  RefPtr<AnimValuesStyleRule>& AnimationRule(EffectCompositor::CascadeLevel
+                                             aCascadeLevel)
+  {
+    return mAnimationRule[aCascadeLevel];
+  }
+
+  const TimeStamp& AnimationRuleRefreshTime(EffectCompositor::CascadeLevel
+                                              aCascadeLevel) const
+  {
+    return mAnimationRuleRefreshTime[aCascadeLevel];
+  }
+  void UpdateAnimationRuleRefreshTime(EffectCompositor::CascadeLevel
+                                        aCascadeLevel,
+                                      const TimeStamp& aRefreshTime)
+  {
+    mAnimationRuleRefreshTime[aCascadeLevel] = aRefreshTime;
+  }
+
+  bool CascadeNeedsUpdate() const { return mCascadeNeedsUpdate; }
+  void MarkCascadeNeedsUpdate() { mCascadeNeedsUpdate = true; }
+  void MarkCascadeUpdated() { mCascadeNeedsUpdate = false; }
+
+  void UpdateAnimationGeneration(nsPresContext* aPresContext);
+  uint64_t GetAnimationGeneration() const { return mAnimationGeneration; }
+
   static nsIAtom** GetEffectSetPropertyAtoms();
 
 private:
@@ -127,6 +160,40 @@ private:
                                              aPseudoType);
 
   OwningEffectSet mEffects;
+
+  // These style rules contain the style data for currently animating
+  // values.  They only match when styling with animation.  When we
+  // style without animation, we need to not use them so that we can
+  // detect any new changes; if necessary we restyle immediately
+  // afterwards with animation.
+  EnumeratedArray<EffectCompositor::CascadeLevel,
+                  EffectCompositor::CascadeLevel(
+                    EffectCompositor::kCascadeLevelCount),
+                  RefPtr<AnimValuesStyleRule>> mAnimationRule;
+
+  // A parallel array to mAnimationRule that records the refresh driver
+  // timestamp when the rule was last updated. This is used for certain
+  // animations which are updated only periodically (e.g. transform animations
+  // running on the compositor that affect the scrollable overflow region).
+  EnumeratedArray<EffectCompositor::CascadeLevel,
+                  EffectCompositor::CascadeLevel(
+                    EffectCompositor::kCascadeLevelCount),
+                  TimeStamp> mAnimationRuleRefreshTime;
+
+  // Dirty flag to represent when the mWinsInCascade flag on effects in
+  // this set might need to be updated.
+  //
+  // Set to true any time the set of effects is changed or when
+  // one the effects goes in or out of the "in effect" state.
+  bool mCascadeNeedsUpdate;
+
+  // RestyleManager keeps track of the number of animation restyles.
+  // 'mini-flushes' (see nsTransitionManager::UpdateAllThrottledStyles()).
+  // mAnimationGeneration is the sequence number of the last flush where a
+  // transition/animation changed.  We keep a similar count on the
+  // corresponding layer so we can check that the layer is up to date with
+  // the animation manager.
+  uint64_t mAnimationGeneration;
 
 #ifdef DEBUG
   bool mCalledPropertyDtor;

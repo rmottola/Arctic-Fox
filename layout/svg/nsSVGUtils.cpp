@@ -432,9 +432,7 @@ nsSVGUtils::GetUserToCanvasTM(nsIFrame *aFrame)
 void 
 nsSVGUtils::NotifyChildrenOfSVGChange(nsIFrame *aFrame, uint32_t aFlags)
 {
-  nsIFrame *kid = aFrame->GetFirstPrincipalChild();
-
-  while (kid) {
+  for (nsIFrame* kid : aFrame->PrincipalChildList()) {
     nsISVGChildFrame* SVGFrame = do_QueryFrame(kid);
     if (SVGFrame) {
       SVGFrame->NotifySVGChanged(aFlags); 
@@ -447,7 +445,6 @@ nsSVGUtils::NotifyChildrenOfSVGChange(nsIFrame *aFrame, uint32_t aFlags)
         NotifyChildrenOfSVGChange(kid, aFlags);
       }
     }
-    kid = kid->GetNextSibling();
   }
 }
 
@@ -690,8 +687,9 @@ nsSVGUtils::PaintFrameWithEffects(nsIFrame *aFrame,
       dirtyRegion = &tmpDirtyRegion;
     }
     SVGPaintCallback paintCallback;
-    nsFilterInstance::PaintFilteredFrame(aFrame, *target, aTransform,
-                                         &paintCallback, dirtyRegion);
+    nsFilterInstance::PaintFilteredFrame(aFrame, target->GetDrawTarget(),
+                                         aTransform, &paintCallback,
+                                         dirtyRegion);
   } else {
     svgChildFrame->PaintSVG(*target, aTransform, aDirtyRect);
   }

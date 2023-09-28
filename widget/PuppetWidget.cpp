@@ -30,11 +30,10 @@ using namespace mozilla::layers;
 using namespace mozilla::widget;
 
 static void
-InvalidateRegion(nsIWidget* aWidget, const nsIntRegion& aRegion)
+InvalidateRegion(nsIWidget* aWidget, const LayoutDeviceIntRegion& aRegion)
 {
-  nsIntRegionRectIterator it(aRegion);
-  while(const nsIntRect* r = it.Next()) {
-    aWidget->Invalidate(LayoutDeviceIntRect::FromUnknownRect(*r));
+  for (auto iter = aRegion.RectIter(); !iter.Done(); iter.Next()) {
+    aWidget->Invalidate(iter.Get());
   }
 }
 
@@ -103,9 +102,9 @@ PuppetWidget::Create(nsIWidget* aParent,
 {
   MOZ_ASSERT(!aNativeParent, "got a non-Puppet native parent");
 
-  BaseCreate(nullptr, aRect, aInitData);
+  BaseCreate(nullptr, aInitData);
 
-  mBounds = aRect.ToUnknownRect();
+  mBounds = aRect;
   mEnabled = true;
   mVisible = true;
 
@@ -195,7 +194,7 @@ PuppetWidget::Show(bool aState)
 
   if (!wasVisible && mVisible) {
     Resize(mBounds.width, mBounds.height, false);
-    Invalidate(LayoutDeviceIntRect::FromUnknownRect(mBounds));
+    Invalidate(mBounds);
   }
 
   return NS_OK;
@@ -206,8 +205,9 @@ PuppetWidget::Resize(double aWidth,
                      double aHeight,
                      bool   aRepaint)
 {
-  nsIntRect oldBounds = mBounds;
-  mBounds.SizeTo(nsIntSize(NSToIntRound(aWidth), NSToIntRound(aHeight)));
+  LayoutDeviceIntRect oldBounds = mBounds;
+  mBounds.SizeTo(LayoutDeviceIntSize(NSToIntRound(aWidth),
+                                     NSToIntRound(aHeight)));
 
   if (mChild) {
     return mChild->Resize(aWidth, aHeight, aRepaint);
@@ -216,8 +216,8 @@ PuppetWidget::Resize(double aWidth,
   // XXX: roc says that |aRepaint| dictates whether or not to
   // invalidate the expanded area
   if (oldBounds.Size() < mBounds.Size() && aRepaint) {
-    nsIntRegion dirty(mBounds);
-    dirty.Sub(dirty,  oldBounds);
+    LayoutDeviceIntRegion dirty(mBounds);
+    dirty.Sub(dirty, oldBounds);
     InvalidateRegion(this, dirty);
   }
 
@@ -683,6 +683,15 @@ PuppetWidget::SetPluginFocused(bool& aFocused)
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
+}
+
+void
+PuppetWidget::DefaultProcOfPluginEvent(const WidgetPluginEvent& aEvent)
+{
+  if (!mTabChild) {
+    return;
+  }
+  mTabChild->SendDefaultProcOfPluginEvent(aEvent);
 }
 
 NS_IMETHODIMP_(void)
@@ -1224,7 +1233,7 @@ PuppetWidget::GetWindowPosition()
 NS_METHOD
 PuppetWidget::GetScreenBounds(LayoutDeviceIntRect& aRect) {
   aRect.MoveTo(WidgetToScreenOffset());
-  aRect.SizeTo(LayoutDeviceIntSize::FromUnknownSize(mBounds.Size()));
+  aRect.SizeTo(mBounds.Size());
   return NS_OK;
 }
 
@@ -1395,6 +1404,30 @@ PuppetWidget::GetCurrentWidgetListener()
   }
 
   return mAttachedWidgetListener;
+}
+
+void
+PuppetWidget::SetCandidateWindowForPlugin(
+                const CandidateWindowPosition& aPosition)
+{
+  if (!mTabChild) {
+    return;
+  }
+
+  mTabChild->SendSetCandidateWindowForPlugin(aPosition);
+}
+
+void
+PuppetWidget::ZoomToRect(const uint32_t& aPresShellId,
+                         const FrameMetrics::ViewID& aViewId,
+                         const CSSRect& aRect,
+                         const uint32_t& aFlags)
+{
+  if (!mTabChild) {
+    return;
+  }
+
+  mTabChild->SendZoomToRect(aPresShellId, aViewId, aRect, aFlags);
 }
 
 } // namespace widget

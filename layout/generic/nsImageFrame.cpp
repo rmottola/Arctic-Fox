@@ -219,7 +219,7 @@ nsImageFrame::DestroyFrom(nsIFrame* aDestructRoot)
   if (mDisplayingIcon)
     gIconLoad->RemoveIconObserver(this);
 
-  nsSplittableFrame::DestroyFrom(aDestructRoot);
+  ImageFrameSuper::DestroyFrom(aDestructRoot);
 }
 
 void
@@ -255,7 +255,7 @@ nsImageFrame::Init(nsIContent*       aContent,
                    nsContainerFrame* aParent,
                    nsIFrame*         aPrevInFlow)
 {
-  nsSplittableFrame::Init(aContent, aParent, aPrevInFlow);
+  ImageFrameSuper::Init(aContent, aParent, aPrevInFlow);
 
   mListener = new nsImageListener(this);
 
@@ -758,22 +758,15 @@ nsImageFrame::MaybeDecodeForPredictedSize()
 nsRect
 nsImageFrame::PredictedDestRect(const nsRect& aFrameContentBox)
 {
-  // What is the rect painted by the image?  It's the image's "dest rect" (the
-  // rect where a full copy of the image is mapped), clipped to the container's
-  // content box.  So, we intersect those rects.
-
   // Note: To get the "dest rect", we have to provide the "constraint rect"
   // (which is the content-box, with the effects of fragmentation undone).
   nsRect constraintRect(aFrameContentBox.TopLeft(), mComputedSize);
   constraintRect.y -= GetContinuationOffset();
 
-  const nsRect destRect =
-    nsLayoutUtils::ComputeObjectDestRect(constraintRect,
-                                         mIntrinsicSize,
-                                         mIntrinsicRatio,
-                                         StylePosition());
-
-  return destRect.Intersect(aFrameContentBox);
+  return nsLayoutUtils::ComputeObjectDestRect(constraintRect,
+                                              mIntrinsicSize,
+                                              mIntrinsicRatio,
+                                              StylePosition());
 }
 
 void
@@ -1212,7 +1205,8 @@ nsImageFrame::DisplayAltText(nsPresContext*      aPresContext,
 
       rv = nsBidiPresUtils::RenderText(str, maxFit, dir,
                                        aPresContext, aRenderingContext,
-                                       aRenderingContext, *fm, x, y);
+                                       aRenderingContext.GetDrawTarget(),
+                                       *fm, x, y);
     }
     if (NS_FAILED(rv)) {
       nsLayoutUtils::DrawUniDirString(str, maxFit,
@@ -1465,7 +1459,7 @@ nsImageFrame::DisplayAltFeedback(nsRenderingContext& aRenderingContext,
 }
 
 #ifdef DEBUG
-static void PaintDebugImageMap(nsIFrame* aFrame, nsRenderingContext* aCtx,
+static void PaintDebugImageMap(nsIFrame* aFrame, DrawTarget* aDrawTarget,
                                const nsRect& aDirtyRect, nsPoint aPt)
 {
   nsImageFrame* f = static_cast<nsImageFrame*>(aFrame);
@@ -1473,11 +1467,10 @@ static void PaintDebugImageMap(nsIFrame* aFrame, nsRenderingContext* aCtx,
   gfxPoint devPixelOffset =
     nsLayoutUtils::PointToGfxPoint(inner.TopLeft(),
                                    aFrame->PresContext()->AppUnitsPerDevPixel());
-  DrawTarget* drawTarget = aCtx->GetDrawTarget();
-  AutoRestoreTransform autoRestoreTransform(drawTarget);
-  drawTarget->SetTransform(
-    drawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
-  f->GetImageMap()->Draw(aFrame, *drawTarget,
+  AutoRestoreTransform autoRestoreTransform(aDrawTarget);
+  aDrawTarget->SetTransform(
+    aDrawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
+  f->GetImageMap()->Draw(aFrame, *aDrawTarget,
                          ColorPattern(ToDeviceColor(Color(0.f, 0.f, 0.f, 1.f))));
 }
 #endif
@@ -1645,8 +1638,10 @@ nsDisplayImage::GetLayerState(nsDisplayListBuilder* aBuilder,
 nsDisplayImage::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                 bool* aSnap)
 {
+  *aSnap = false;
   if (mImage && mImage->IsOpaque()) {
-    return nsRegion(GetDestRect(aSnap));
+    const nsRect frameContentBox = GetBounds(aSnap);
+    return GetDestRect().Intersect(frameContentBox);
   }
   return nsRegion();
 }
@@ -2076,7 +2071,7 @@ nsImageFrame::HandleEvent(nsPresContext* aPresContext,
     }
   }
 
-  return nsSplittableFrame::HandleEvent(aPresContext, aEvent, aEventStatus);
+  return ImageFrameSuper::HandleEvent(aPresContext, aEvent, aEventStatus);
 }
 
 nsresult
@@ -2113,8 +2108,8 @@ nsImageFrame::AttributeChanged(int32_t aNameSpaceID,
                                nsIAtom* aAttribute,
                                int32_t aModType)
 {
-  nsresult rv = nsSplittableFrame::AttributeChanged(aNameSpaceID,
-                                                    aAttribute, aModType);
+  nsresult rv = ImageFrameSuper::AttributeChanged(aNameSpaceID,
+                                                  aAttribute, aModType);
   if (NS_FAILED(rv)) {
     return rv;
   }

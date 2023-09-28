@@ -15,12 +15,19 @@ Cu.import("resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "console",
                                   "resource://gre/modules/Console.jsm");
 
+function section(number, url)
+{
+  const baseURL = "https://developer.mozilla.org/en-US/Firefox/Multiprocess_Firefox/Limitations_of_chrome_scripts";
+  return { number, url: baseURL + url };
+}
+
 var CompatWarning = {
-  warn: function CompatWarning_warn(msg, url) {
-
-    if (!Preferences.get("dom.ipc.shims.enabledWarnings", false))
-      return;
-
+  // Sometimes we want to generate a warning, but put off issuing it
+  // until later. For example, if someone registers a listener, we
+  // might only want to warn about it if the listener actually
+  // fires. However, we want the warning to show a stack for the
+  // registration site.
+  delayedWarning: function(msg, addon, warning) {
     function isShimLayer(filename) {
       return filename.indexOf("CompatWarning.jsm") != -1 ||
         filename.indexOf("RemoteAddonsParent.jsm") != -1 ||
@@ -32,51 +39,69 @@ var CompatWarning = {
     while (stack && isShimLayer(stack.filename))
       stack = stack.caller;
 
-    let error = Cc['@mozilla.org/scripterror;1'].createInstance(Ci.nsIScriptError);
-    if (!error || !Services.console) {
-      // Too late during shutdown to use the nsIConsole
-      return;
-    }
+    let alreadyWarned = false;
 
-    let message = `Warning: ${msg}`;
-    if (url)
-      message += `\nMore info at: ${url}`;
+    return function() {
+      if (alreadyWarned) {
+        return;
+      }
+      alreadyWarned = true;
 
-    error.init(
-               /*message*/ message,
-               /*sourceName*/ stack ? stack.filename : "",
-               /*sourceLine*/ stack ? stack.sourceLine : "",
-               /*lineNumber*/ stack ? stack.lineNumber : 0,
-               /*columnNumber*/ 0,
-               /*flags*/ Ci.nsIScriptError.warningFlag,
-               /*category*/ "chrome javascript");
-    Services.console.logMessage(error);
+      if (addon) {
+        let histogram = Services.telemetry.getKeyedHistogramById("ADDON_SHIM_USAGE");
+        histogram.add(addon, warning ? warning.number : 0);
+      }
+
+      if (!Preferences.get("dom.ipc.shims.enabledWarnings", false))
+        return;
+
+      let error = Cc['@mozilla.org/scripterror;1'].createInstance(Ci.nsIScriptError);
+      if (!error || !Services.console) {
+        // Too late during shutdown to use the nsIConsole
+        return;
+      }
+
+      let message = `Warning: ${msg}`;
+      if (warning)
+        message += `\nMore info at: ${warning.url}`;
+
+      error.init(
+                 /*message*/ message,
+                 /*sourceName*/ stack ? stack.filename : "",
+                 /*sourceLine*/ stack ? stack.sourceLine : "",
+                 /*lineNumber*/ stack ? stack.lineNumber : 0,
+                 /*columnNumber*/ 0,
+                 /*flags*/ Ci.nsIScriptError.warningFlag,
+                 /*category*/ "chrome javascript");
+      Services.console.logMessage(error);
+
+      if (Preferences.get("dom.ipc.shims.dumpWarnings", false)) {
+        dump(message + "\n");
+        while (stack) {
+          dump(stack + "\n");
+          stack = stack.caller;
+        }
+        dump("\n");
+      }
+    };
   },
 
-  chromeScriptSections: ((baseURL) => {
-    return {
-      content: baseURL + "#gBrowser.contentWindow.2C_window.content...",
-      limitations_of_CPOWs: baseURL + "#Limitations_of_CPOWs",
-      nsIContentPolicy : baseURL + "#nsIContentPolicy",
-      nsIWebProgressListener: baseURL + "#nsIWebProgressListener",
-      observers : baseURL + "#Observers_in_the_chrome_process",
-      DOM_events : baseURL + "#DOM_Events",
-      sandboxes : baseURL + "#Sandboxes",
-      JSMs : baseURL + "#JavaScript_code_modules_(JSMs)",
-      nsIAboutModule: baseURL + "#nsIAboutModule"
-    };
-  })("https://developer.mozilla.org/en-US/Firefox/Multiprocess_Firefox/Limitations_of_chrome_scripts"),
+  warn: function(msg, addon, warning) {
+    let delayed = this.delayedWarning(msg, addon, warning);
+    delayed();
+  },
 
-  frameScriptSections: ((baseURL) => {
-    return {
-      file_IO : baseURL + "#File_I.2FO",
-      XUL_and_browser_UI: baseURL + "#XUL_and_browser_UI",
-      chrome_windows: baseURL + "#Chrome_windows",
-      places_API: baseURL + "#Places_API",
-      observers: baseURL + "#Observers_in_the_content_process",
-      QI: baseURL + "#QI_from_content_window_to_chrome_window",
-      nsIAboutModule: baseURL + "#nsIAboutModule",
-      JSMs: baseURL + "#JavaScript_code_modules_(JSMs)"
-    };
-  })("https://developer.mozilla.org/en-US/Firefox/Multiprocess_Firefox/Limitations_of_frame_scripts")
+  warnings: {
+    content: section(1, "#gBrowser.contentWindow.2C_window.content..."),
+    limitations_of_CPOWs: section(2, "#Limitations_of_CPOWs"),
+    nsIContentPolicy: section(3, "#nsIContentPolicy"),
+    nsIWebProgressListener: section(4, "#nsIWebProgressListener"),
+    observers: section(5, "#Observers_in_the_chrome_process"),
+    DOM_events: section(6, "#DOM_Events"),
+    sandboxes: section(7, "#Sandboxes"),
+    JSMs: section(8, "#JavaScript_code_modules_(JSMs)"),
+    nsIAboutModule: section(9, "#nsIAboutModule"),
+    // If more than 14 values appear here, you need to change the
+    // ADDON_SHIM_USAGE histogram definition in Histograms.json.
+  },
 };

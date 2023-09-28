@@ -70,12 +70,6 @@
 #if MOZ_PACKAGE_MSVC_DLLS
 @BINPATH@/@MSVC_C_RUNTIME_DLL@
 @BINPATH@/@MSVC_CXX_RUNTIME_DLL@
-#ifdef MSVC_APPCRT_DLL
-@BINPATH@/@MSVC_APPCRT_DLL@
-#endif
-#ifdef MSVC_DESKTOPCRT_DLL
-@BINPATH@/@MSVC_DESKTOPCRT_DLL@
-#endif
 #endif
 #endif
 #ifndef MOZ_NATIVE_ICU
@@ -463,6 +457,8 @@
 @RESPATH@/components/DOMWifiManager.manifest
 @RESPATH@/components/DOMWifiP2pManager.js
 @RESPATH@/components/DOMWifiP2pManager.manifest
+@RESPATH@/components/EthernetManager.js
+@RESPATH@/components/EthernetManager.manifest
 @RESPATH@/components/NetworkInterfaceListService.js
 @RESPATH@/components/NetworkInterfaceListService.manifest
 @RESPATH@/components/NetworkManager.js
@@ -635,10 +631,6 @@
 #endif
 @RESPATH@/components/servicesComponents.manifest
 @RESPATH@/components/cryptoComponents.manifest
-#ifdef MOZ_SERVICES_HEALTHREPORT
-@RESPATH@/components/HealthReportComponents.manifest
-@RESPATH@/components/HealthReportService.js
-#endif
 @RESPATH@/components/CaptivePortalDetectComponents.manifest
 @RESPATH@/components/captivedetect.js
 @RESPATH@/components/TelemetryStartup.js

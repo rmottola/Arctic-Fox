@@ -24,6 +24,8 @@ CacheObserver* CacheObserver::sSelf = nullptr;
 static uint32_t const kDefaultUseNewCache = 1; // Use the new cache by default
 uint32_t CacheObserver::sUseNewCache = kDefaultUseNewCache;
 
+static bool sUseNewCacheTemp = false; // Temp trigger to not lose early adopters
+
 static int32_t const kAutoDeleteCacheVersion = -1; // Auto-delete off by default
 static int32_t sAutoDeleteCacheVersion = kAutoDeleteCacheVersion;
 
@@ -140,7 +142,9 @@ CacheObserver::AttachToPreferences()
     "browser.cache.auto_delete_cache_version", kAutoDeleteCacheVersion);
 
   mozilla::Preferences::AddUintVarCache(
-    &sUseNewCache, "browser.cache.backend", kDefaultUseNewCache);
+    &sUseNewCache, "browser.cache.use_new_backend", kDefaultUseNewCache);
+  mozilla::Preferences::AddBoolVarCache(
+    &sUseNewCacheTemp, "browser.cache.use_new_backend_temp", false);
 
   mozilla::Preferences::AddBoolVarCache(
     &sUseDiskCache, "browser.cache.disk.enable", kDefaultUseDiskCache);
@@ -236,7 +240,7 @@ CacheObserver::AttachToPreferences()
 }
 
 // static
-uint32_t const CacheObserver::MemoryCacheCapacity()
+uint32_t CacheObserver::MemoryCacheCapacity()
 {
   if (sMemoryCacheCapacity >= 0)
     return sMemoryCacheCapacity << 10;
@@ -274,9 +278,12 @@ uint32_t const CacheObserver::MemoryCacheCapacity()
 }
 
 // static
-bool const CacheObserver::UseNewCache()
+bool CacheObserver::UseNewCache()
 {
   uint32_t useNewCache = sUseNewCache;
+
+  if (sUseNewCacheTemp)
+    useNewCache = 1;
 
   switch (useNewCache) {
     case 0: // use the old cache backend
@@ -434,7 +441,7 @@ nsresult Run(NeckoOriginAttributes const &aOa)
 } // anon
 
 // static
-bool const CacheObserver::EntryIsTooBig(int64_t aSize, bool aUsingDisk)
+bool CacheObserver::EntryIsTooBig(int64_t aSize, bool aUsingDisk)
 {
   // If custom limit is set, check it.
   int64_t preferredLimit = aUsingDisk ? sMaxDiskEntrySize : sMaxMemoryEntrySize;

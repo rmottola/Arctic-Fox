@@ -221,7 +221,7 @@ function promiseNewSearchEngine(basename, numLogos) {
   // Wait for addEngine().
   let addDeferred = Promise.defer();
   let url = getRootDirectory(gTestPath) + basename;
-  Services.search.addEngine(url, Ci.nsISearchEngine.TYPE_MOZSEARCH, "", false, {
+  Services.search.addEngine(url, null, "", false, {
     onSuccess: function (engine) {
       info("Search engine added: " + basename);
       gNewEngines.push(engine);

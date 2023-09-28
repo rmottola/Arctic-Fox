@@ -50,10 +50,17 @@ stage-package: $(MOZ_PKG_MANIFEST) $(MOZ_PKG_MANIFEST_DEPS)
 		) \
 		$(if $(JARLOG_DIR),$(addprefix --jarlog ,$(wildcard $(JARLOG_FILE_AB_CD)))) \
 		$(if $(OPTIMIZEJARS),--optimizejars) \
+		$(if $(DISABLE_JAR_COMPRESSION),--disable-compression) \
 		$(addprefix --unify ,$(UNIFY_DIST)) \
 		$(MOZ_PKG_MANIFEST) $(DIST) $(DIST)/$(STAGEPATH)$(MOZ_PKG_DIR)$(if $(MOZ_PKG_MANIFEST),,$(_BINPATH)) \
 		$(if $(filter omni,$(MOZ_PACKAGER_FORMAT)),$(if $(NON_OMNIJAR_FILES),--non-resource $(NON_OMNIJAR_FILES)))
-	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/find-dupes.py $(DEFINES) $(ACDEFINES) $(MOZ_PKG_DUPEFLAGS) $(DIST)/$(MOZ_PKG_DIR)
+	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/find-dupes.py $(DEFINES) $(ACDEFINES) $(MOZ_PKG_DUPEFLAGS) $(DIST)/$(STAGEPATH)$(MOZ_PKG_DIR)
+ifndef MOZ_THUNDERBIRD
+	# Package mozharness
+	$(call py_action,test_archive, \
+		mozharness \
+		$(ABS_DIST)/$(PKG_PATH)$(MOZHARNESS_PACKAGE))
+endif # MOZ_THUNDERBIRD
 ifdef MOZ_PACKAGE_JSSHELL
 	# Package JavaScript Shell
 	@echo 'Packaging JavaScript Shell...'

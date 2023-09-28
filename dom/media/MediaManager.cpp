@@ -1005,10 +1005,14 @@ public:
                                                            msg);
 
       if (mAudioDevice) {
-        domStream->CreateOwnDOMTrack(kAudioTrack, MediaSegment::AUDIO);
+        nsString audioDeviceName;
+        mAudioDevice->GetName(audioDeviceName);
+        domStream->CreateOwnDOMTrack(kAudioTrack, MediaSegment::AUDIO, audioDeviceName);
       }
       if (mVideoDevice) {
-        domStream->CreateOwnDOMTrack(kVideoTrack, MediaSegment::VIDEO);
+        nsString videoDeviceName;
+        mVideoDevice->GetName(videoDeviceName);
+        domStream->CreateOwnDOMTrack(kVideoTrack, MediaSegment::VIDEO, videoDeviceName);
       }
 
       nsCOMPtr<nsIPrincipal> principal;
@@ -1879,8 +1883,7 @@ MediaManager::GetUserMedia(nsPIDOMWindow* aWindow,
           nsPIDOMWindow *outer = aWindow->GetOuterWindow();
           vc.mBrowserWindow.Construct(outer->WindowID());
         }
-        // | Fall through
-        // V
+        MOZ_FALLTHROUGH;
       case dom::MediaSourceEnum::Screen:
       case dom::MediaSourceEnum::Application:
       case dom::MediaSourceEnum::Window:
@@ -2369,7 +2372,8 @@ MediaManager::GetUserMediaDevices(nsPIDOMWindow* aWindow,
                                   const MediaStreamConstraints& aConstraints,
                                   nsIGetUserMediaDevicesSuccessCallback* aOnSuccess,
                                   nsIDOMGetUserMediaErrorCallback* aOnFailure,
-                                  uint64_t aWindowId)
+                                  uint64_t aWindowId,
+                                  const nsAString& aCallID)
 {
   MOZ_ASSERT(NS_IsMainThread());
   nsCOMPtr<nsIGetUserMediaDevicesSuccessCallback> onSuccess(aOnSuccess);
@@ -2387,10 +2391,12 @@ MediaManager::GetUserMediaDevices(nsPIDOMWindow* aWindow,
 
   for (auto& callID : *callIDs) {
     GetUserMediaTask* task;
-    if (mActiveCallbacks.Get(callID, &task)) {
-      nsCOMPtr<nsIWritableVariant> array = MediaManager_ToJSArray(*task->mSourceSet);
-      onSuccess->OnSuccess(array);
-      return NS_OK;
+    if (!aCallID.Length() || aCallID == callID) {
+      if (mActiveCallbacks.Get(callID, &task)) {
+        nsCOMPtr<nsIWritableVariant> array = MediaManager_ToJSArray(*task->mSourceSet);
+        onSuccess->OnSuccess(array);
+        return NS_OK;
+      }
     }
   }
   return NS_ERROR_UNEXPECTED;

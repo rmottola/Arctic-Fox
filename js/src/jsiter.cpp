@@ -196,8 +196,8 @@ EnumerateNativeProperties(JSContext* cx, HandleNativeObject pobj, unsigned flags
         }
 
         /* Collect any typed array or shared typed array elements from this object. */
-        if (IsAnyTypedArray(pobj)) {
-            size_t len = AnyTypedArrayLength(pobj);
+        if (pobj->is<TypedArrayObject>()) {
+            size_t len = pobj->as<TypedArrayObject>().length();
             for (size_t i = 0; i < len; i++) {
                 if (!Enumerate(cx, pobj, INT_TO_JSID(i), /* enumerable = */ true, flags, ht, props))
                     return false;
@@ -530,13 +530,13 @@ Compare(T* a, T* b, size_t c)
 {
     size_t n = (c + size_t(7)) / size_t(8);
     switch (c % 8) {
-      case 0: do { if (*a++ != *b++) return false;
-      case 7:      if (*a++ != *b++) return false;
-      case 6:      if (*a++ != *b++) return false;
-      case 5:      if (*a++ != *b++) return false;
-      case 4:      if (*a++ != *b++) return false;
-      case 3:      if (*a++ != *b++) return false;
-      case 2:      if (*a++ != *b++) return false;
+      case 0: do { if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 7:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 6:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 5:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 4:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 3:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
+      case 2:      if (*a++ != *b++) return false; MOZ_FALLTHROUGH;
       case 1:      if (*a++ != *b++) return false;
               } while (--n > 0);
     }
@@ -782,7 +782,7 @@ CanCacheIterableObject(JSContext* cx, JSObject* obj)
     if (!CanCompareIterableObjectToCache(obj))
         return false;
     if (obj->isNative()) {
-        if (IsAnyTypedArray(obj) ||
+        if (obj->is<TypedArrayObject>() ||
             obj->hasUncacheableProto() ||
             obj->getOps()->enumerate ||
             obj->getClass()->enumerate ||

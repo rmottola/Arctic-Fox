@@ -34,6 +34,7 @@
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
 #include "mozilla/UniquePtr.h"
+#include "mozilla/unused.h"
 #include <algorithm>
 
 #ifdef XP_WIN
@@ -347,7 +348,7 @@ public:
   void ClearGrandTotals();
   void DisplayTotals(const char * aStr);
   void DisplayHTMLTotals(const char * aStr);
-  void DisplayDiffsInTotals(const char * aStr);
+  void DisplayDiffsInTotals();
 
   void Add(const char * aName, nsIFrame * aFrame);
   ReflowCounter * LookUp(const char * aName);
@@ -818,8 +819,7 @@ void
 PresShell::Init(nsIDocument* aDocument,
                 nsPresContext* aPresContext,
                 nsViewManager* aViewManager,
-                nsStyleSet* aStyleSet,
-                nsCompatibility aCompatMode)
+                nsStyleSet* aStyleSet)
 {
   NS_PRECONDITION(aDocument, "null ptr");
   NS_PRECONDITION(aPresContext, "null ptr");
@@ -2274,7 +2274,7 @@ nsIPresShell::GetRootScrollFrame() const
   // Ensure root frame is a viewport frame
   if (!rootFrame || nsGkAtoms::viewportFrame != rootFrame->GetType())
     return nullptr;
-  nsIFrame* theFrame = rootFrame->GetFirstPrincipalChild();
+  nsIFrame* theFrame = rootFrame->PrincipalChildList().FirstChild();
   if (!theFrame || nsGkAtoms::scrollFrame != theFrame->GetType())
     return nullptr;
   return theFrame;
@@ -3210,8 +3210,7 @@ ComputeWhereToScroll(int16_t aWhereToScroll,
  *
  * This needs to work even if aRect has a width or height of zero.
  */
-static void ScrollToShowRect(nsIFrame*                aFrame,
-                             nsIScrollableFrame*      aFrameAsScrollable,
+static void ScrollToShowRect(nsIScrollableFrame*      aFrameAsScrollable,
                              const nsRect&            aRect,
                              nsIPresShell::ScrollAxis aVertical,
                              nsIPresShell::ScrollAxis aHorizontal,
@@ -3431,7 +3430,7 @@ PresShell::ScrollFrameRectIntoView(nsIFrame*                aFrame,
         nsMargin padding = container->GetUsedPadding();
         targetRect.Inflate(padding);
       }
-      ScrollToShowRect(container, sf, targetRect - sf->GetScrolledFrame()->GetPosition(),
+      ScrollToShowRect(sf, targetRect - sf->GetScrolledFrame()->GetPosition(),
                        aVertical, aHorizontal, aFlags);
       nsPoint newPosition = sf->GetScrollPosition();
       // If the scroll position increased, that means our content moved up,
@@ -3958,15 +3957,8 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
         mDocument->GetAnimationController()->FlushResampleRequests();
       }
 
-      if (aFlush.mFlushAnimations &&
-          !mPresContext->StyleUpdateForAllAnimationsIsUpToDate()) {
-        if (mPresContext->AnimationManager()) {
-          mPresContext->AnimationManager()->FlushAnimations();
-        }
-        if (mPresContext->TransitionManager()) {
-          mPresContext->TransitionManager()->FlushAnimations();
-        }
-        mPresContext->TickLastStyleUpdateForAllAnimations();
+      if (aFlush.mFlushAnimations && mPresContext->EffectCompositor()) {
+        mPresContext->EffectCompositor()->PostRestyleForThrottledAnimations();
       }
 
       // The FlushResampleRequests() above flushed style changes.
@@ -4283,8 +4275,7 @@ PresShell::ContentRemoved(nsIDocument *aDocument,
       if (data && data->mOverrideContent &&
           nsContentUtils::ContentIsDescendantOf(data->mOverrideContent,
                                                 aChild)) {
-        nsIPresShell::ReleasePointerCapturingContent(
-          iter.Key(), data->mOverrideContent);
+        nsIPresShell::ReleasePointerCapturingContent(iter.Key());
       }
     }
   }
@@ -4417,8 +4408,7 @@ PresShell::RecordStyleSheetChange(CSSStyleSheet* aStyleSheet)
 }
 
 void
-PresShell::StyleSheetAdded(nsIDocument* aDocument,
-                           CSSStyleSheet* aStyleSheet,
+PresShell::StyleSheetAdded(CSSStyleSheet* aStyleSheet,
                            bool aDocumentSheet)
 {
   // We only care when enabled sheets are added
@@ -4430,8 +4420,7 @@ PresShell::StyleSheetAdded(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleSheetRemoved(nsIDocument* aDocument,
-                             CSSStyleSheet* aStyleSheet,
+PresShell::StyleSheetRemoved(CSSStyleSheet* aStyleSheet,
                              bool aDocumentSheet)
 {
   // We only care when enabled sheets are removed
@@ -4443,9 +4432,7 @@ PresShell::StyleSheetRemoved(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleSheetApplicableStateChanged(nsIDocument* aDocument,
-                                            CSSStyleSheet* aStyleSheet,
-                                            bool aApplicable)
+PresShell::StyleSheetApplicableStateChanged(CSSStyleSheet* aStyleSheet)
 {
   if (aStyleSheet->HasRules()) {
     RecordStyleSheetChange(aStyleSheet);
@@ -4453,25 +4440,19 @@ PresShell::StyleSheetApplicableStateChanged(nsIDocument* aDocument,
 }
 
 void
-PresShell::StyleRuleChanged(nsIDocument* aDocument,
-                            CSSStyleSheet* aStyleSheet,
-                            mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleChanged(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
 
 void
-PresShell::StyleRuleAdded(nsIDocument* aDocument,
-                          CSSStyleSheet* aStyleSheet,
-                          mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleAdded(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
 
 void
-PresShell::StyleRuleRemoved(nsIDocument* aDocument,
-                            CSSStyleSheet* aStyleSheet,
-                            mozilla::css::Rule* aStyleRule)
+PresShell::StyleRuleRemoved(CSSStyleSheet* aStyleSheet)
 {
   RecordStyleSheetChange(aStyleSheet);
 }
@@ -4900,10 +4881,9 @@ PresShell::PaintRangePaintInfo(nsTArray<nsAutoPtr<RangePaintInfo> >* aItems,
     nsIntRegion region =
       aRegion->ToAppUnits(nsPresContext::AppUnitsPerCSSPixel())
         .ToOutsidePixels(pc->AppUnitsPerDevPixel());
-    nsIntRegionRectIterator iter(region);
-    const nsIntRect* rect;
-    while ((rect = iter.Next())) {
-      ctx->Clip(gfxRect(rect->x, rect->y, rect->width, rect->height));
+    for (auto iter = region.RectIter(); !iter.Done(); iter.Next()) {
+      const nsIntRect& rect = iter.Get();
+      ctx->Clip(gfxRect(rect.x, rect.y, rect.width, rect.height));
     }
   }
 
@@ -5260,13 +5240,16 @@ float PresShell::GetCumulativeResolution()
   return resolution;
 }
 
-float PresShell::GetCumulativeScaleResolution()
+float PresShell::GetCumulativeNonRootScaleResolution()
 {
   float resolution = 1.0;
   nsIPresShell* currentShell = this;
   while (currentShell) {
-    resolution *=  currentShell->ScaleToResolution() ? currentShell->GetResolution() : 1.0f;
-    nsPresContext* parentCtx = currentShell->GetPresContext()->GetParentPresContext();
+    nsPresContext* currentCtx = currentShell->GetPresContext();
+    if (currentCtx != currentCtx->GetRootPresContext()) {
+      resolution *=  currentShell->ScaleToResolution() ? currentShell->GetResolution() : 1.0f;
+    }
+    nsPresContext* parentCtx = currentCtx->GetParentPresContext();
     if (parentCtx) {
       currentShell = parentCtx->PresShell();
     } else {
@@ -5603,8 +5586,8 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect)
   if (scrollFrame) {
     nsRect displayPort;
     bool usingDisplayport =
-      nsLayoutUtils::GetDisplayPortForVisibilityTesting(aFrame->GetContent(),
-                                                        &displayPort);
+      nsLayoutUtils::GetDisplayPortForVisibilityTesting(
+        aFrame->GetContent(), &displayPort, RelativeTo::ScrollFrame);
     if (usingDisplayport) {
       rect = displayPort;
     } else {
@@ -5707,7 +5690,7 @@ PresShell::UpdateImageVisibility()
   if (rootScroll) {
     nsIContent* content = rootScroll->GetContent();
     if (content) {
-      nsLayoutUtils::GetDisplayPort(content, &updateRect);
+      Unused << nsLayoutUtils::GetDisplayPort(content, &updateRect, RelativeTo::ScrollFrame);
     }
 
     if (IgnoringViewportScrolling()) {
@@ -6121,7 +6104,7 @@ nsIPresShell::SetPointerCapturingContent(uint32_t aPointerId, nsIContent* aConte
 }
 
 /* static */ void
-nsIPresShell::ReleasePointerCapturingContent(uint32_t aPointerId, nsIContent* aContent)
+nsIPresShell::ReleasePointerCapturingContent(uint32_t aPointerId)
 {
   if (gActivePointersIds->Get(aPointerId)) {
     SetCapturingContent(nullptr, CAPTURE_PREVENTDRAG);
@@ -6615,24 +6598,24 @@ class ReleasePointerCaptureCaller
 public:
   ReleasePointerCaptureCaller() :
     mPointerId(0),
-    mContent(nullptr)
+    mIsSet(false)
   {
   }
   ~ReleasePointerCaptureCaller()
   {
-    if (mContent) {
-      nsIPresShell::ReleasePointerCapturingContent(mPointerId, mContent);
+    if (mIsSet) {
+      nsIPresShell::ReleasePointerCapturingContent(mPointerId);
     }
   }
-  void SetTarget(uint32_t aPointerId, nsIContent* aContent)
+  void SetTarget(uint32_t aPointerId)
   {
     mPointerId = aPointerId;
-    mContent = aContent;
+    mIsSet = true;
   }
 
 private:
   int32_t mPointerId;
-  nsCOMPtr<nsIContent> mContent;
+  bool mIsSet;
 };
 
 static bool
@@ -7304,7 +7287,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
             // Implicitly releasing capture for given pointer.
             // ePointerLostCapture should be send after ePointerUp or
             // ePointerCancel.
-            releasePointerCaptureCaller.SetTarget(pointerId, pointerCapturingContent);
+            releasePointerCaptureCaller.SetTarget(pointerId);
           }
         }
       }
@@ -9496,7 +9479,7 @@ CompareTrees(nsPresContext* aFirstPresContext, nsIFrame* aFirstFrame,
     const nsFrameList& kids1 = !lists1.IsDone() ? lists1.CurrentList() : nsFrameList();
     const nsFrameList& kids2 = !lists2.IsDone() ? lists2.CurrentList() : nsFrameList();
     int32_t l1 = kids1.GetLength();
-    int32_t l2 = kids2.GetLength();;
+    int32_t l2 = kids2.GetLength();
     if (l1 != l2) {
       ok = false;
       LogVerifyMessage(kids1.FirstChild(), kids2.FirstChild(),
@@ -9618,13 +9601,11 @@ FindTopFrame(nsIFrame* aRoot)
     }
 
     // Try one of the children
-    nsIFrame* kid = aRoot->GetFirstPrincipalChild();
-    while (nullptr != kid) {
+    for (nsIFrame* kid : aRoot->PrincipalChildList()) {
       nsIFrame* result = FindTopFrame(kid);
       if (nullptr != result) {
         return result;
       }
-      kid = kid->GetNextSibling();
     }
   }
   return nullptr;
@@ -9830,7 +9811,7 @@ PresShell::DumpReflows()
     }
     mReflowCountMgr->DisplayTotals(uriStr.get());
     mReflowCountMgr->DisplayHTMLTotals(uriStr.get());
-    mReflowCountMgr->DisplayDiffsInTotals("Differences");
+    mReflowCountMgr->DisplayDiffsInTotals();
   }
 }
 
@@ -10075,7 +10056,7 @@ void ReflowCountMgr::PaintCount(const char*     aName,
       nscoord x = 0, y = fm->MaxAscent();
       nscoord width, height = fm->MaxHeight();
       fm->SetTextRunRTL(false);
-      width = fm->GetWidth(buf, len, aRenderingContext);;
+      width = fm->GetWidth(buf, len, drawTarget);
 
       Color color;
       Color color2;
@@ -10204,10 +10185,8 @@ static void RecurseIndiTotals(nsPresContext* aPresContext,
     free(name);
   }
 
-  nsIFrame* child = aParentFrame->GetFirstPrincipalChild();
-  while (child) {
+  for (nsIFrame* child : aParentFrame->PrincipalChildList()) {
     RecurseIndiTotals(aPresContext, aHT, child, aLevel+1);
-    child = child->GetNextSibling();
   }
 
 }
@@ -10370,7 +10349,7 @@ int ReflowCountMgr::DoDisplayDiffTotals(PLHashEntry *he, int i, void *arg)
 }
 
 //------------------------------------------------------------------
-void ReflowCountMgr::DisplayDiffsInTotals(const char * aStr)
+void ReflowCountMgr::DisplayDiffsInTotals()
 {
   if (mCycledOnce) {
     printf("Differences\n");

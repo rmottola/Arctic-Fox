@@ -114,7 +114,7 @@ if test "$_conflict_files"; then
 fi
 MOZ_BUILD_ROOT=`pwd -W 2>/dev/null || pwd -P`
 
-MOZ_BUILD_BACKEND
+MOZ_BUILD_BACKEND(../..)
 
 MOZ_DEFAULT_COMPILER
 
@@ -383,8 +383,6 @@ case "$target" in
             _CC_SUITE=14
             MSVC_C_RUNTIME_DLL=vcruntime140.dll
             MSVC_CXX_RUNTIME_DLL=msvcp140.dll
-            MSVC_APPCRT_DLL=appcrt140.dll
-            MSVC_DESKTOPCRT_DLL=desktopcrt140.dll
 
             # -Wv:18 disables all warnings introduced after VS2013
             # See http://blogs.msdn.com/b/vcblog/archive/2014/11/12/improvements-to-warnings-in-the-c-compiler.aspx
@@ -393,13 +391,15 @@ case "$target" in
 
             # -Zc:sizedDealloc- disables C++14 global sized deallocation (see bug 1160146)
             CXXFLAGS="$CXXFLAGS -Zc:sizedDealloc-"
+
+            # Disable C++11 thread-safe statics due to crashes on XP (bug 1204752)
+            # See https://connect.microsoft.com/VisualStudio/feedback/details/1789709/visual-c-2015-runtime-broken-on-windows-server-2003-c-11-magic-statics
+            CXXFLAGS="$CXXFLAGS -Zc:threadSafeInit-"
         else
             AC_MSG_ERROR([This version ($CC_VERSION) of the MSVC compiler is unsupported. See https://developer.mozilla.org/en/Windows_Build_Prerequisites.])
         fi
         AC_SUBST(MSVC_C_RUNTIME_DLL)
         AC_SUBST(MSVC_CXX_RUNTIME_DLL)
-        AC_SUBST(MSVC_APPCRT_DLL)
-        AC_SUBST(MSVC_DESKTOPCRT_DLL)
 
         dnl Ensure that mt.exe is 'Microsoft (R) Manifest Tool',
         dnl not something else like "magnetic tape manipulation utility".
@@ -758,7 +758,6 @@ OBJ_SUFFIX=o
 LIB_SUFFIX=a
 ASM_SUFFIX=s
 IMPORT_LIB_SUFFIX=
-TARGET_MD_ARCH=unix
 DIRENT_INO=d_ino
 MOZ_USER_DIR=".mozilla"
 
@@ -1184,93 +1183,9 @@ if test "$GNU_CC"; then
                   AC_MSG_RESULT([no])
                   LDFLAGS=$_SAVE_LDFLAGS)
 
-    # Turn on gcc/clang warnings:
-    # https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gcc/Warning-Options.html
-    #
-    # -Wall - turn on a lot of warnings
-    # -Waddress - catches suspicious uses of memory addresses
-    # -Wchar-subscripts - catches array index using signed char
-    # -Wcomment - catches nested comments
-    # -Wempty-body - catches bugs, e.g. "if (c); foo();", few false positives
-    # -Wendif-labels - catches `#else FOO` and `#endif FOO` not in comment
-    # -Wenum-compare - catches comparison of different enum types
-    # -Wignored-qualifiers - catches returns types with qualifiers like const
-    # -Wimplicit-function-declaration - catches missing C function prototypes
-    # -Wint-to-pointer-cast - catches cast to pointer from integer of different size
-    # -Wmissing-braces - catches aggregate initializers missing nested braces
-    # -Wmultichar - catches multicharacter integer constants like 'THIS'
-    # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
-    # -Wnonnull - catches NULL used with functions arguments marked as non-null
-    # -Wparentheses - catches `if (a=b)` and operator precedence bugs
-    # -Wpointer-arith - catches pointer arithmetic using NULL or sizeof(void)
-    # -Wpointer-sign - catches mixing pointers to signed and unsigned types
-    # -Wpointer-to-int-cast - catches casts from pointer to different sized int
-    # -Wreturn-type - catches missing returns, zero false positives
-    # -Wsequence-point - catches undefined order behavior like `a = a++`
-    # -Wsign-compare - catches comparison of signed and unsigned types
-    # -Wswitch - catches switches without all enum cases or default case
-    # -Wtrigraphs - catches unlikely use of trigraphs
-    # -Wtype-limits - catches overflow bugs, few false positives
-    # -Wunknown-pragmas - catches unexpected #pragma directives
-    # -Wwrite-strings - catches non-const char* pointers to string literals
-    #
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wall"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wsign-compare"
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wtype-limits"
+    MOZ_SET_WARNINGS_CFLAGS
 
-    # Treat some warnings as errors if --enable-warnings-as-errors:
-    if test "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=address"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=char-subscripts"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=comment"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=empty-body"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=endif-labels"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=enum-compare"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=ignored-qualifiers"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=implicit-function-declaration"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=int-to-pointer-cast"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=missing-braces"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=multichar"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=nonnull"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=parentheses"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=pointer-arith"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=pointer-sign"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=pointer-to-int-cast"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=return-type"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=sequence-point"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=switch"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=trigraphs"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=uninitialized"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=unknown-pragmas"
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Werror=write-strings"
-
-        MOZ_C_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_c_has_werror_non_literal_null_conversion)
-        MOZ_C_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_c_has_sometimes_uninitialized)
-    fi
-
-    # Turn off the following warnings that -Wall turns on:
-    # -Wno-unused - lots of violations in third-party code
-    # -Wno-inline-new-delete - we inline 'new' and 'delete' in mozalloc
-    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
-    #
-    _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wno-unused"
-
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, inline-new-delete, ac_cxx_has_wno_inline_new_delete)
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
-
-    if test -z "$INTEL_CC" -a -z "$CLANG_CC"; then
-       # Don't use -Wcast-align with ICC or clang
-       case "$CPU_ARCH" in
-           # And don't use it on hppa, ia64, sparc, arm, since it's noisy there
-           hppa | ia64 | sparc | arm)
-           ;;
-           *)
-        _WARNINGS_CFLAGS="${_WARNINGS_CFLAGS} -Wcast-align"
-           ;;
-       esac
-    fi
-
-    _DEFINES_CFLAGS='-include $(DEPTH)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
+    _DEFINES_CFLAGS='-include $(topobjdir)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
     _USE_CPP_INCLUDE_FLAG=1
 
 elif test "$SOLARIS_SUNPRO_CC"; then
@@ -1298,101 +1213,10 @@ else
 fi
 
 if test "$GNU_CXX"; then
-    # Turn on gcc/clang warnings:
-    # https://gcc.gnu.org/onlinedocs/gcc-4.4.0/gcc/Warning-Options.html
-    #
-    # -Wall - turn on a lot of warnings
-    # -Wchar-subscripts - catches array index using signed char
-    # -Wcomment - catches nested comments
-    # -Wconversion-null - catches conversions between NULL and non-pointer types
-    # -Wempty-body - catches bugs, e.g. "if (c); foo();", few false positives
-    # -Wendif-labels - catches `#else FOO` and `#endif FOO` not in comment
-    # -Wignored-qualifiers - catches returns types with qualifiers like const
-    # -Wint-to-pointer-cast - catches cast to pointer from integer of different size
-    # -Wmissing-braces - catches aggregate initializers missing nested braces
-    # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
-    # -Woverloaded-virtual - function declaration hides virtual function from base class
-    # -Wparentheses - catches `if (a=b)` and operator precedence bugs
-    # -Wpointer-arith - catches pointer arithmetic using NULL or sizeof(void)
-    # -Wpointer-to-int-cast - catches casts from pointer to different sized int
-    # -Wrange-loop-analysis - catches copies during range-based for loops.
-    # -Wreorder - catches ctor initializer list not matching class definition order
-    # -Wreturn-type - catches missing returns, zero false positives
-    # -Wsequence-point - catches undefined order behavior like `a = a++`
-    # -Wsign-compare - catches comparison of signed and unsigned types
-    # -Wswitch - catches switches without all enum cases or default case
-    # -Wtrigraphs - catches unlikely use of trigraphs
-    # -Wtype-limits - catches overflow bugs, few false positives
-    # -Wunknown-pragmas - catches unexpected #pragma directives
-    # -Wunused-label - catches unused goto labels
-    # -Wunused-value - catches unused expression results
-    # -Wwrite-strings - catches non-const char* pointers to string literals
-    #
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wall"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wsign-compare"
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wtype-limits"
+    MOZ_SET_WARNINGS_CXXFLAGS
 
-    # Treat some warnings as errors if --enable-warnings-as-errors:
-    if test "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=char-subscripts"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=comment"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=endif-labels"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=ignored-qualifiers"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=int-to-pointer-cast"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=missing-braces"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=overloaded-virtual"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=parentheses"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=pointer-arith"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=reorder"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=return-type"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=sequence-point"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=switch"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=trigraphs"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=uninitialized"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=unknown-pragmas"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=unused-label"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=unused-value"
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Werror=write-strings"
-
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, conversion-null, ac_cxx_has_werror_conversion_null)
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_cxx_has_werror_non_literal_null_conversion)
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, range-loop-analysis, ac_cxx_has_range_loop_analysis)
-        MOZ_CXX_SUPPORTS_WARNING(-Werror=, sometimes-uninitialized, ac_cxx_has_sometimes_uninitialized)
-    fi
-
-    # Turn off the following warnings that -Wall turns on:
-    # -Wno-invalid-offsetof - we use offsetof on non-POD types frequently
-    # -Wno-unused-local-typedef - catches unused typedefs, which are commonly used in assertion macros
-    #
-    _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-invalid-offsetof"
-
-    MOZ_CXX_SUPPORTS_WARNING(-Wno-, unused-local-typedef, ac_cxx_has_wno_unused_local_typedef)
-
-    if test -z "$INTEL_CXX" -a -z "$CLANG_CXX"; then
-       # Don't use -Wcast-align with ICC or clang
-       case "$CPU_ARCH" in
-           # And don't use it on hppa, ia64, sparc, arm, since it's noisy there
-           hppa | ia64 | sparc | arm)
-           ;;
-           *)
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wcast-align"
-           ;;
-       esac
-    fi
-
-    _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -include $(DEPTH)/js/src/js-confdefs.h'
+    _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -include $(topobjdir)/js/src/js-confdefs.h'
     _USE_CPP_INCLUDE_FLAG=1
-
-    # Recent clang and gcc support C++11 deleted functions without warnings if
-    # compiling with -std=c++0x or -std=gnu++0x (or c++11 or gnu++11 in very new
-    # versions).  We can't use -std=c++0x yet, so gcc's support must remain
-    # unused.  But clang's warning can be disabled, so when compiling with clang
-    # we use it to opt out of the warning, enabling (macro-encapsulated) use of
-    # deleted function syntax.
-    if test "$CLANG_CXX"; then
-        _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-c++0x-extensions"
-        MOZ_CXX_SUPPORTS_WARNING(-Wno-, extended-offsetof, ac_cxx_has_wno_extended_offsetof)
-    fi
 
 else
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_JS_CONFDEFS_H_ $(ACDEFINES)'
@@ -1441,11 +1265,6 @@ case "$host" in
     HOST_CFLAGS="$HOST_CFLAGS -DXP_WIN32 -DXP_WIN -DWIN32 -D_WIN32 -DNO_X11 -D_CRT_SECURE_NO_WARNINGS"
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O2}"
     HOST_BIN_SUFFIX=.exe
-    case "$host" in
-    *mingw*)
-        PERL="/bin/sh ${_topsrcdir}/build/msys-perl-wrapper"
-        ;;
-    esac
 
     case "${host_cpu}" in
     i*86)
@@ -1551,7 +1370,6 @@ case "$target" in
     DSO_LDOPTS=''
     STRIP="$STRIP -x -S"
     _PLATFORM_DEFAULT_TOOLKIT='cairo-cocoa'
-    TARGET_NSPR_MDCPUCFG='\"md/_darwin.cfg\"'
     LDFLAGS="$LDFLAGS -lobjc"
     # The ExceptionHandling framework is needed for Objective-C exception
     # logging code in nsObjCExceptions.h. Currently we only use that in debug
@@ -1633,7 +1451,6 @@ ia64*-hpux*)
     AC_DEFINE(NO_PW_GECOS)
     no_x=yes
     _PLATFORM_DEFAULT_TOOLKIT=cairo-android
-    TARGET_NSPR_MDCPUCFG='\"md/_linux.cfg\"'
 
     MOZ_GFX_OPTIMIZE_MOBILE=1
     MOZ_OPTIMIZE_FLAGS="-O3 -fno-reorder-functions"
@@ -1658,8 +1475,6 @@ ia64*-hpux*)
            MOZ_OPTIMIZE_FLAGS="-freorder-blocks $MOZ_OPTIMIZE_FLAGS"
         fi
     fi
-
-    TARGET_NSPR_MDCPUCFG='\"md/_linux.cfg\"'
 
     case "${target_cpu}" in
     alpha*)
@@ -1740,8 +1555,8 @@ ia64*-hpux*)
         WIN32_GUI_EXE_LDFLAGS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
         DSO_LDOPTS=-SUBSYSTEM:WINDOWS,$WIN32_SUBSYSTEM_VERSION
         _USE_CPP_INCLUDE_FLAG=1
-        _DEFINES_CFLAGS='-FI $(DEPTH)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
-        _DEFINES_CXXFLAGS='-FI $(DEPTH)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
+        _DEFINES_CFLAGS='-FI $(topobjdir)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
+        _DEFINES_CXXFLAGS='-FI $(topobjdir)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
         if test "$CPU_ARCH" = "x86" -a -z "$CLANG_CL"; then
@@ -1766,8 +1581,66 @@ ia64*-hpux*)
         CFLAGS="$CFLAGS -wd4244 -wd4267"
         CXXFLAGS="$CXXFLAGS -wd4244 -wd4267 -wd4251"
         if test -n "$CLANG_CL"; then
+            # XXX We should combine some of these with our generic GCC-style
+            # warning checks.
+            #
             # Suppress the clang-cl warning for the inline 'new' and 'delete' in mozalloc
             CXXFLAGS="$CXXFLAGS -Wno-inline-new-delete"
+            # We use offsetof on non-POD objects all the time.
+            # We also suppress this warning on other platforms.
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-offsetof"
+            # MFBT thinks clang-cl supports constexpr, which it does, but
+            # not everything in Windows C++ headers supports constexpr
+            # as we might expect until MSVC 2015, so turn off this warning
+            # for now.
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-constexpr"
+            # This warns for reasonable things like:
+            #   enum { X = 0xffffffffU };
+            # which is annoying for IDL headers.
+            CXXFLAGS="$CXXFLAGS -Wno-microsoft-enum-value"
+            # This warns for cases that would be reached by the Microsoft
+            # #include rules, but also currently warns on cases that would
+            # *also* be reached by standard C++ include rules.  That
+            # behavior doesn't seem useful, so we turn it off.
+            CXXFLAGS="$CXXFLAGS -Wno-microsoft-include"
+            # We normally error out on unknown pragmas, but since clang-cl
+            # claims to be MSVC, it would be difficult to add
+            # #if defined(_MSC_VER) && !defined(__clang__) everywhere we
+            # use such pragmas, so just ignore them.
+            CFLAGS="$CFLAGS -Wno-unknown-pragmas"
+            CXXFLAGS="$CXXFLAGS -Wno-unknown-pragmas"
+            # clang-cl's Intrin.h marks things like _ReadWriteBarrier
+            # as __attribute((__deprecated__)).  This is nice to know,
+            # but since we don't get the equivalent warning from MSVC,
+            # let's just ignore it.
+            CFLAGS="$CFLAGS -Wno-deprecated-declarations"
+            CXXFLAGS="$CXXFLAGS -Wno-deprecated-declarations"
+            # We use a function like:
+            #   __declspec(noreturn) __inline void f() {}
+            # which -Winvalid-noreturn complains about.  Again, MSVC seems
+            # OK with it, so let's silence the warning.
+            CFLAGS="$CFLAGS -Wno-invalid-noreturn"
+            CXXFLAGS="$CXXFLAGS -Wno-invalid-noreturn"
+            # Missing |override| on virtual function declarations isn't
+            # something that MSVC currently warns about.
+            CXXFLAGS="$CXXFLAGS -Wno-inconsistent-missing-override"
+            # We use -DHAS_EXCEPTIONS=0, which removes the |throw()|
+            # declaration on |operator delete(void*)|.  However, clang-cl
+            # must internally declare |operator delete(void*)| differently,
+            # which causes this warning for virtually every file in the
+            # tree.  clang-cl doesn't support -fno-exceptions or equivalent,
+            # so there doesn't seem to be any way to convince clang-cl to
+            # declare |delete| differently.  Therefore, suppress this
+            # warning.
+            CXXFLAGS="$CXXFLAGS -Wno-implicit-exception-spec-mismatch"
+            # At least one MSVC header and several headers in-tree have
+            # unused typedefs, so turn this on.
+            CXXFLAGS="$CXXFLAGS -Wno-unused-local-typedef"
+            # Several JS engine header files use __declspec(dllimport) on
+            # classes, and clang-cl helpfully warns about its non-support
+            # for such cases.  We're not particularly worried about that,
+            # so ignore that warning.
+            CXXFLAGS="$CXXFLAGS -Wno-ignored-attributes"
         fi
         # make 'foo == bar;' error out
         CFLAGS="$CFLAGS -we4553"
@@ -1777,13 +1650,9 @@ ia64*-hpux*)
         WARNINGS_AS_ERRORS='-WX'
         MOZ_OPTIMIZE_FLAGS="-O2"
         MOZ_FIX_LINK_PATHS=
-        # Disable these flags on clang-cl since it doesn't ignore unknown arguments by default, and
-        # autoconf insists on passing $LDFLAGS to the compiler.
-        if test -z "$CLANG_CL"; then
-            LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
-            if test -z "$DEVELOPER_OPTIONS"; then
-                LDFLAGS="$LDFLAGS -RELEASE"
-            fi
+        LDFLAGS="$LDFLAGS -LARGEADDRESSAWARE -NXCOMPAT"
+        if test -z "$DEVELOPER_OPTIONS"; then
+            LDFLAGS="$LDFLAGS -RELEASE"
         fi
         dnl For profile-guided optimization
         PROFILE_GEN_CFLAGS="-GL"
@@ -1811,13 +1680,9 @@ ia64*-hpux*)
     AC_DEFINE(HW_THREADS)
     AC_DEFINE(STDC_HEADERS)
     AC_DEFINE(WIN32_LEAN_AND_MEAN)
-    TARGET_MD_ARCH=win32
     _PLATFORM_DEFAULT_TOOLKIT='cairo-windows'
     BIN_SUFFIX='.exe'
     MOZ_USER_DIR="Mozilla"
-
-    dnl Hardcode to win95 for now - cls
-    TARGET_NSPR_MDCPUCFG='\"md/_win95.cfg\"'
 
     dnl set NO_X11 defines here as the general check is skipped on win32
     no_x=yes
@@ -1841,11 +1706,7 @@ ia64*-hpux*)
             LDFLAGS="$LDFLAGS -Wl,--large-address-aware"
         else
             DSO_LDOPTS="$DSO_LDOPTS -MACHINE:X86"
-            # Disable this flag on clang-cl since it doesn't ignore unknown arguments by default, and
-            # autoconf insists on passing $LDFLAGS to the compiler.
-            if test -z "$CLANG_CL"; then
-                LDFLAGS="$LDFLAGS -SAFESEH"
-            fi
+            LDFLAGS="$LDFLAGS -SAFESEH"
         fi
 
     	AC_DEFINE(_X86_)
@@ -1896,7 +1757,6 @@ ia64*-hpux*)
 
 *-solaris*)
     AC_DEFINE(SOLARIS)
-    TARGET_NSPR_MDCPUCFG='\"md/_solaris.cfg\"'
     if test -z "$CROSS_COMPILE" && pkginfo -q SUNWpr && pkginfo -q SUNWprd; then
        NO_NSPR_CONFIG_SYSTEM_LDFLAGS="-L/usr/lib/mps -R/usr/lib/mps -lnspr4"
        NO_NSPR_CONFIG_SYSTEM_CFLAGS="-I/usr/include/mps"
@@ -2874,44 +2734,6 @@ dnl = Disable treating compiler warnings as errors
 dnl ========================================================
 if test -z "$MOZ_ENABLE_WARNINGS_AS_ERRORS"; then
    WARNINGS_AS_ERRORS=''
-elif test "$GNU_CC"; then
-    # Prevent the following GCC warnings from being treated as errors:
-    # -Wmaybe-uninitialized - too many false positives
-    # -Wdeprecated-declarations - we don't want our builds held hostage when a
-    #   platform-specific API becomes deprecated.
-    # -Wfree-nonheap-object - false positives during PGO
-    # -Warray-bounds - false positives depending on optimization
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_c_has_noerror_maybe_uninitialized)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=maybe-uninitialized, ac_cxx_has_noerror_maybe_uninitialized)
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=deprecated-declarations, ac_c_has_noerror_deprecated_declarations)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=deprecated-declarations, ac_cxx_has_noerror_deprecated_declarations)
-    MOZ_C_SUPPORTS_WARNING(-W, no-error=array-bounds, ac_c_has_noerror_array_bounds)
-    MOZ_CXX_SUPPORTS_WARNING(-W, no-error=array-bounds, ac_cxx_has_noerror_array_bounds)
-
-    if test -n "$MOZ_PGO"; then
-        MOZ_C_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_c_has_noerror_coverage_mismatch)
-        MOZ_CXX_SUPPORTS_WARNING(-W, no-error=coverage-mismatch, ac_cxx_has_noerror_coverage_mismatch)
-        MOZ_C_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_c_has_noerror_free_nonheap_object)
-        MOZ_CXX_SUPPORTS_WARNING(-W, no-error=free-nonheap-object, ac_cxx_has_noerror_free_nonheap_object)
-    fi
-fi
-
-dnl ========================================================
-dnl = Enable DMD
-dnl ========================================================
-
-MOZ_ARG_ENABLE_BOOL(dmd,
-[  --enable-dmd            Enable DMD; also enables jemalloc and replace-malloc],
-    MOZ_DMD=1,
-    MOZ_DMD= )
-
-if test "$MOZ_DMD"; then
-    AC_DEFINE(MOZ_DMD)
-
-    if test "${CPU_ARCH}" = "arm"; then
-        CFLAGS="$CFLAGS -funwind-tables"
-        CXXFLAGS="$CXXFLAGS -funwind-tables"
-    fi
 fi
 
 dnl ========================================================
@@ -3649,7 +3471,6 @@ AC_SUBST(USE_DEPENDENT_LIBS)
 
 AC_SUBST(MOZ_BUILD_ROOT)
 
-AC_SUBST(MOZ_POST_DSO_LIB_COMMAND)
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
 
 AC_SUBST(MOZ_APP_NAME)
@@ -3659,9 +3480,6 @@ AC_SUBST(MOZ_APP_VERSION)
 AC_SUBST(MOZ_PKG_SPECIAL)
 
 AC_SUBST(MOZILLA_OFFICIAL)
-
-dnl win32 options
-AC_SUBST(MOZ_BROWSE_INFO)
 
 dnl Echo the CFLAGS to remove extra whitespace.
 CFLAGS=`echo \
@@ -3674,22 +3492,19 @@ CXXFLAGS=`echo \
 
 COMPILE_CFLAGS=`echo \
     $_DEFINES_CFLAGS \
-	$_DEPEND_CFLAGS \
     $COMPILE_CFLAGS`
 
 COMPILE_CXXFLAGS=`echo \
     $_DEFINES_CXXFLAGS \
-	$_DEPEND_CFLAGS \
     $COMPILE_CXXFLAGS`
 
 HOST_CFLAGS=`echo \
-    $HOST_CFLAGS \
-    $_DEPEND_CFLAGS`
+    $HOST_CFLAGS`
 
 HOST_CXXFLAGS=`echo \
-    $HOST_CXXFLAGS \
-    $_DEPEND_CFLAGS`
+    $HOST_CXXFLAGS`
 
+AC_SUBST(_DEPEND_CFLAGS)
 AC_SUBST(MOZ_NATIVE_NSPR)
 
 if test -n "$MOZ_NUWA_PROCESS"; then
@@ -3728,8 +3543,6 @@ AC_SUBST(HOST_OS_ARCH)
 AC_SUBST(TARGET_CPU)
 AC_SUBST(TARGET_VENDOR)
 AC_SUBST(TARGET_OS)
-AC_SUBST(TARGET_NSPR_MDCPUCFG)
-AC_SUBST(TARGET_MD_ARCH)
 AC_SUBST(TARGET_XPCOM_ABI)
 AC_SUBST(OS_TARGET)
 AC_SUBST(OS_ARCH)
@@ -3848,9 +3661,6 @@ AC_SUBST(JS_LIBRARY_NAME)
 AC_SUBST(JS_CONFIG_MOZ_JS_LIBS)
 AC_SUBST(JS_CONFIG_LIBS)
 
-if test -n "$MOZ_BUILD_NSPR"; then
-    MOZ_SUBCONFIGURE_NSPR()
-fi
 MOZ_SUBCONFIGURE_FFI()
 MOZ_SUBCONFIGURE_JEMALLOC()
 

@@ -679,6 +679,7 @@ pref("layout.css.scroll-snap.enabled", true);
 pref("dom.ipc.processPriorityManager.enabled", true);
 pref("dom.ipc.processPriorityManager.backgroundGracePeriodMS", 1000);
 pref("dom.ipc.processPriorityManager.backgroundPerceivableGracePeriodMS", 5000);
+pref("dom.ipc.processPriorityManager.memoryPressureGracePeriodMS", 3000);
 pref("dom.ipc.processPriorityManager.temporaryPriorityLockMS", 5000);
 
 // Number of different background/foreground levels for background/foreground
@@ -1003,6 +1004,7 @@ pref("apz.allow_zooming", true);
 pref("apz.pan_repaint_interval", 16);
 
 // APZ physics settings, tuned by UX designers
+pref("apz.axis_lock.mode", 2); // Use "sticky" axis locking
 pref("apz.fling_curve_function_x1", "0.41");
 pref("apz.fling_curve_function_y1", "0.0");
 pref("apz.fling_curve_function_x2", "0.80");
@@ -1010,28 +1012,7 @@ pref("apz.fling_curve_function_y2", "1.0");
 pref("apz.fling_curve_threshold_inches_per_ms", "0.01");
 pref("apz.fling_friction", "0.00238");
 pref("apz.max_velocity_inches_per_ms", "0.07");
-
-#ifdef MOZ_WIDGET_GONK
-pref("apz.touch_move_tolerance", "0.03");
-#endif
-
-// Tweak default displayport values to reduce the risk of running out of
-// memory when zooming in
-pref("apz.x_skate_size_multiplier", "1.25");
-pref("apz.y_skate_size_multiplier", "1.5");
-pref("apz.x_stationary_size_multiplier", "1.5");
-pref("apz.y_stationary_size_multiplier", "1.8");
-pref("apz.enlarge_displayport_when_clipped", true);
-// Use "sticky" axis locking
-pref("apz.axis_lock.mode", 2);
-
-// Overscroll-related settings
 pref("apz.overscroll.enabled", true);
-pref("apz.overscroll.stretch_factor", "0.15");
-pref("apz.overscroll.spring_stiffness", "0.002");
-pref("apz.overscroll.spring_friction", "0.02");
-pref("apz.overscroll.stop_distance_threshold", "5.0");
-pref("apz.overscroll.stop_velocity_threshold", "0.01");
 
 // For event-regions based hit-testing
 pref("layout.event-regions.enabled", true);
@@ -1105,12 +1086,6 @@ pref("dom.mozSettings.allowForceReadOnly", false);
 
 // RequestSync API is enabled by default on B2G.
 pref("dom.requestSync.enabled", true);
-
-// Use vsync aligned rendering
-pref("gfx.vsync.hw-vsync.enabled", true);
-pref("gfx.vsync.compositor", true);
-pref("gfx.touch.resample", true);
-pref("gfx.vsync.refreshdriver", true);
 
 // Comma separated list of activity names that can only be provided by
 // the system app in dev mode.

@@ -83,10 +83,9 @@ void SetJitContext(JitContext* ctx);
 
 bool CanIonCompileScript(JSContext* cx, JSScript* script, bool osr);
 
-MethodStatus CanEnterAtBranch(JSContext* cx, HandleScript script,
-                              BaselineFrame* frame, jsbytecode* pc);
+bool IonCompileScriptForBaseline(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
+
 MethodStatus CanEnter(JSContext* cx, RunState& state);
-MethodStatus CompileFunctionForBaseline(JSContext* cx, HandleScript script, BaselineFrame* frame);
 MethodStatus CanEnterUsingFastInvoke(JSContext* cx, HandleScript script, uint32_t numActualArgs);
 
 MethodStatus
@@ -128,7 +127,7 @@ void Invalidate(TypeZone& types, FreeOp* fop,
                 bool cancelOffThread = true);
 void Invalidate(JSContext* cx, const RecompileInfoVector& invalid, bool resetUses = true,
                 bool cancelOffThread = true);
-bool Invalidate(JSContext* cx, JSScript* script, bool resetUses = true,
+void Invalidate(JSContext* cx, JSScript* script, bool resetUses = true,
                 bool cancelOffThread = true);
 
 void ToggleBarriers(JS::Zone* zone, bool needs);

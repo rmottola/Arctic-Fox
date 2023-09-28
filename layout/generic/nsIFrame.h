@@ -423,6 +423,7 @@ public:
   typedef mozilla::layout::FrameChildListIDs ChildListIDs;
   typedef mozilla::layout::FrameChildListIterator ChildListIterator;
   typedef mozilla::layout::FrameChildListArrayIterator ChildListArrayIterator;
+  typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef mozilla::gfx::Matrix Matrix;
   typedef mozilla::gfx::Matrix4x4 Matrix4x4;
   typedef mozilla::Sides Sides;
@@ -843,24 +844,16 @@ public:
 
   static void DestroyContentArray(void* aPropertyValue);
 
-#ifdef _MSC_VER
-// XXX Workaround MSVC issue by making the static FramePropertyDescriptor
-// non-const.  See bug 555727.
-#define NS_PROPERTY_DESCRIPTOR_CONST
-#else
-#define NS_PROPERTY_DESCRIPTOR_CONST const
-#endif
-
-#define NS_DECLARE_FRAME_PROPERTY(prop, dtor)                                                  \
-  static const FramePropertyDescriptor* prop() {                                               \
-    static NS_PROPERTY_DESCRIPTOR_CONST FramePropertyDescriptor descriptor = { dtor, nullptr }; \
-    return &descriptor;                                                                        \
+#define NS_DECLARE_FRAME_PROPERTY(prop, dtor)                            \
+  static const FramePropertyDescriptor* prop() {                         \
+    static const FramePropertyDescriptor descriptor = { dtor, nullptr }; \
+    return &descriptor;                                                  \
   }
 // Don't use this unless you really know what you're doing!
-#define NS_DECLARE_FRAME_PROPERTY_WITH_FRAME_IN_DTOR(prop, dtor)                               \
-  static const FramePropertyDescriptor* prop() {                                               \
-    static NS_PROPERTY_DESCRIPTOR_CONST FramePropertyDescriptor descriptor = { nullptr, dtor }; \
-    return &descriptor;                                                                        \
+#define NS_DECLARE_FRAME_PROPERTY_WITH_FRAME_IN_DTOR(prop, dtor)         \
+  static const FramePropertyDescriptor* prop() {                         \
+    static const FramePropertyDescriptor descriptor = { nullptr, dtor }; \
+    return &descriptor;                                                  \
   }
 
   NS_DECLARE_FRAME_PROPERTY(IBSplitSibling, nullptr)
@@ -894,8 +887,7 @@ public:
   NS_DECLARE_FRAME_PROPERTY(LineBaselineOffset, nullptr)
 
   NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImage, ReleaseValue<gfxASurface>)
-  NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImageDT,
-                            ReleaseValue<mozilla::gfx::DrawTarget>)
+  NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImageDT, ReleaseValue<DrawTarget>)
 
   NS_DECLARE_FRAME_PROPERTY(InvalidationRect, DeleteValue<nsRect>)
 
@@ -1058,7 +1050,7 @@ public:
    *          frame type, an empty list will be returned.
    */
   virtual const nsFrameList& GetChildList(ChildListID aListID) const = 0;
-  const nsFrameList& PrincipalChildList() { return GetChildList(kPrincipalList); }
+  const nsFrameList& PrincipalChildList() const { return GetChildList(kPrincipalList); }
   virtual void GetChildLists(nsTArray<ChildList>* aLists) const = 0;
 
   /**
@@ -1066,10 +1058,6 @@ public:
    * ones belong to a child document.
    */
   void GetCrossDocChildLists(nsTArray<ChildList>* aLists);
-
-  nsIFrame* GetFirstPrincipalChild() const {
-    return GetChildList(kPrincipalList).FirstChild();
-  }
 
   // The individual concrete child lists.
   static const ChildListID kPrincipalList = mozilla::layout::kPrincipalList;
@@ -1086,6 +1074,7 @@ public:
   static const ChildListID kPopupList = mozilla::layout::kPopupList;
   static const ChildListID kPushedFloatsList = mozilla::layout::kPushedFloatsList;
   static const ChildListID kSelectPopupList = mozilla::layout::kSelectPopupList;
+  static const ChildListID kBackdropList = mozilla::layout::kBackdropList;
   // A special alias for kPrincipalList that do not request reflow.
   static const ChildListID kNoReflowPrincipalList = mozilla::layout::kNoReflowPrincipalList;
 
@@ -1799,10 +1788,10 @@ public:
    * text decorations, but today it sometimes includes other things that
    * contribute to visual overflow.
    *
-   * @param aContext a rendering context that can be used if we need
+   * @param aDrawTarget a draw target that can be used if we need
    * to do measurement
    */
-  virtual nsRect ComputeTightBounds(gfxContext* aContext) const;
+  virtual nsRect ComputeTightBounds(DrawTarget* aDrawTarget) const;
 
   /**
    * This function is similar to GetPrefISize and ComputeTightBounds: it
@@ -2679,19 +2668,6 @@ public:
   FrameProperties Properties() const {
     return FrameProperties(PresContext()->PropertyTable(), this);
   }
-
-  NS_DECLARE_FRAME_PROPERTY(BaseLevelProperty, nullptr)
-  NS_DECLARE_FRAME_PROPERTY(EmbeddingLevelProperty, nullptr)
-  NS_DECLARE_FRAME_PROPERTY(ParagraphDepthProperty, nullptr)
-
-#define NS_GET_BASE_LEVEL(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::BaseLevelProperty()))
-
-#define NS_GET_EMBEDDING_LEVEL(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::EmbeddingLevelProperty()))
-
-#define NS_GET_PARAGRAPH_DEPTH(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsIFrame::ParagraphDepthProperty()))
 
   /**
    * Return true if and only if this frame obeys visibility:hidden.

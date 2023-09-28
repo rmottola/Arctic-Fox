@@ -3,18 +3,10 @@
 var gTimeoutSeconds = 45;
 var gConfig;
 
-if (Cc === undefined) {
-  var Cc = Components.classes;
-  var Ci = Components.interfaces;
-  var Cu = Components.utils;
-}
-
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "Services",
-  "resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "CustomizationTabPreloader",
   "resource:///modules/CustomizationTabPreloader.jsm");
@@ -236,7 +228,7 @@ Tester.prototype = {
     // Replace the last tab with a fresh one
     if (window.gBrowser) {
       gBrowser.addTab("about:blank", { skipAnimation: true });
-      gBrowser.removeCurrentTab();
+      gBrowser.removeTab(gBrowser.selectedTab, { skipPermitUnload: true });
       gBrowser.stop();
     }
 

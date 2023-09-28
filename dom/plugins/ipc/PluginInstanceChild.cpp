@@ -73,6 +73,25 @@ static WindowsDllInterceptor sUser32Intercept;
 static HWND sWinlessPopupSurrogateHWND = nullptr;
 static User32TrackPopupMenu sUser32TrackPopupMenuStub = nullptr;
 
+typedef HIMC (WINAPI *Imm32ImmGetContext)(HWND hWND);
+typedef BOOL (WINAPI *Imm32ImmReleaseContext)(HWND hWND, HIMC hIMC);
+typedef LONG (WINAPI *Imm32ImmGetCompositionString)(HIMC hIMC,
+                                                    DWORD dwIndex,
+                                                    LPVOID lpBuf,
+                                                    DWORD dwBufLen);
+typedef BOOL (WINAPI *Imm32ImmSetCandidateWindow)(HIMC hIMC,
+                                                  LPCANDIDATEFORM lpCandidate);
+typedef BOOL (WINAPI *Imm32ImmNotifyIME)(HIMC hIMC, DWORD dwAction,
+                                        DWORD dwIndex, DWORD dwValue);
+static WindowsDllInterceptor sImm32Intercept;
+static Imm32ImmGetContext sImm32ImmGetContextStub = nullptr;
+static Imm32ImmReleaseContext sImm32ImmReleaseContextStub = nullptr;
+static Imm32ImmGetCompositionString sImm32ImmGetCompositionStringStub = nullptr;
+static Imm32ImmSetCandidateWindow sImm32ImmSetCandidateWindowStub = nullptr;
+static Imm32ImmNotifyIME sImm32ImmNotifyIME = nullptr;
+static PluginInstanceChild* sCurrentPluginInstance = nullptr;
+static const HIMC sHookIMC = (const HIMC)0xefefefef;
+
 using mozilla::gfx::SharedDIB;
 
 #include <windows.h>
@@ -197,6 +216,7 @@ PluginInstanceChild::PluginInstanceChild(const NPPluginFuncs* aPluginIface,
     if (GetQuirks() & QUIRK_UNITY_FIXUP_MOUSE_CAPTURE) {
         SetUnityHooks();
     }
+    InitImm32Hook();
 #endif // OS_WIN
 }
 
@@ -1983,6 +2003,143 @@ PluginInstanceChild::CreateWinlessPopupSurrogate()
     SendSetNetscapeWindowAsParent(mWinlessPopupSurrogateHWND);
 }
 
+// static
+HIMC
+PluginInstanceChild::ImmGetContextProc(HWND aWND)
+{
+    if (!sCurrentPluginInstance) {
+        return sImm32ImmGetContextStub(aWND);
+    }
+
+    wchar_t szClass[21];
+    int haveClass = GetClassNameW(aWND, szClass, ArrayLength(szClass));
+    if (!haveClass || wcscmp(szClass, L"SWFlash_PlaceholderX")) {
+        NS_WARNING("We cannot recongnize hooked window class");
+        return sImm32ImmGetContextStub(aWND);
+    }
+
+    return sHookIMC;
+}
+
+// static
+BOOL
+PluginInstanceChild::ImmReleaseContextProc(HWND aWND, HIMC aIMC)
+{
+    if (aIMC == sHookIMC) {
+        return TRUE;
+    }
+
+    return sImm32ImmReleaseContextStub(aWND, aIMC);
+}
+
+// static
+LONG
+PluginInstanceChild::ImmGetCompositionStringProc(HIMC aIMC, DWORD aIndex,
+                                                 LPVOID aBuf, DWORD aLen)
+{
+    if (aIMC != sHookIMC) {
+        return sImm32ImmGetCompositionStringStub(aIMC, aIndex, aBuf, aLen);
+    }
+    if (!sCurrentPluginInstance) {
+        return IMM_ERROR_GENERAL;
+    }
+    nsAutoTArray<uint8_t, 16> dist;
+    int32_t length = 0; // IMM_ERROR_NODATA
+    sCurrentPluginInstance->SendGetCompositionString(aIndex, &dist, &length);
+    if (length == IMM_ERROR_NODATA || length == IMM_ERROR_GENERAL) {
+      return length;
+    }
+
+    if (aBuf && aLen >= static_cast<DWORD>(length)) {
+        memcpy(aBuf, dist.Elements(), length);
+    }
+    return length;
+}
+
+// staitc
+BOOL
+PluginInstanceChild::ImmSetCandidateWindowProc(HIMC aIMC, LPCANDIDATEFORM aForm)
+{
+    if (aIMC != sHookIMC) {
+        return sImm32ImmSetCandidateWindowStub(aIMC, aForm);
+    }
+
+    if (!sCurrentPluginInstance ||
+        aForm->dwIndex != 0) {
+        return FALSE;
+    }
+
+    CandidateWindowPosition position;
+    position.mPoint.x = aForm->ptCurrentPos.x;
+    position.mPoint.y = aForm->ptCurrentPos.y;
+    position.mExcludeRect = !!(aForm->dwStyle & CFS_EXCLUDE);
+    if (position.mExcludeRect) {
+      position.mRect.x = aForm->rcArea.left;
+      position.mRect.y = aForm->rcArea.top;
+      position.mRect.width = aForm->rcArea.right - aForm->rcArea.left;
+      position.mRect.height = aForm->rcArea.bottom - aForm->rcArea.top;
+    }
+
+    sCurrentPluginInstance->SendSetCandidateWindow(position);
+    return TRUE;
+}
+
+// static
+BOOL
+PluginInstanceChild::ImmNotifyIME(HIMC aIMC, DWORD aAction, DWORD aIndex,
+                                  DWORD aValue)
+{
+    if (aIMC != sHookIMC) {
+        return sImm32ImmNotifyIME(aIMC, aAction, aIndex, aValue);
+    }
+
+    // We only supports NI_COMPOSITIONSTR because Flash uses it only
+    if (!sCurrentPluginInstance ||
+        aAction != NI_COMPOSITIONSTR ||
+        (aIndex != CPS_COMPLETE && aIndex != CPS_CANCEL)) {
+        return FALSE;
+    }
+
+    sCurrentPluginInstance->SendRequestCommitOrCancel(aAction == CPS_COMPLETE);
+    return TRUE;
+}
+
+void
+PluginInstanceChild::InitImm32Hook()
+{
+    if (!(GetQuirks() & QUIRK_WINLESS_HOOK_IME)) {
+        return;
+    }
+
+    if (sImm32ImmGetContextStub) {
+        return;
+    }
+
+    // When using windowless plugin, IMM API won't work due ot OOP.
+
+    sImm32Intercept.Init("imm32.dll");
+    sImm32Intercept.AddHook(
+        "ImmGetContext",
+        reinterpret_cast<intptr_t>(ImmGetContextProc),
+        (void**)&sImm32ImmGetContextStub);
+    sImm32Intercept.AddHook(
+        "ImmReleaseContext",
+        reinterpret_cast<intptr_t>(ImmReleaseContextProc),
+        (void**)&sImm32ImmReleaseContextStub);
+    sImm32Intercept.AddHook(
+        "ImmGetCompositionStringW",
+        reinterpret_cast<intptr_t>(ImmGetCompositionStringProc),
+        (void**)&sImm32ImmGetCompositionStringStub);
+    sImm32Intercept.AddHook(
+        "ImmSetCandidateWindow",
+        reinterpret_cast<intptr_t>(ImmSetCandidateWindowProc),
+        (void**)&sImm32ImmSetCandidateWindowStub);
+    sImm32Intercept.AddHook(
+        "ImmNotifyIME",
+        reinterpret_cast<intptr_t>(ImmNotifyIME),
+        (void**)&sImm32ImmNotifyIME);
+}
+
 void
 PluginInstanceChild::DestroyWinlessPopupSurrogate()
 {
@@ -2014,6 +2171,13 @@ PluginInstanceChild::WinlessHandleEvent(NPEvent& event)
       // A little trick scrounged from chromium's code - set the focus
       // to our surrogate parent so keyboard nav events go to the menu. 
       focusHwnd = SetFocus(mWinlessPopupSurrogateHWND);
+    }
+
+    AutoRestore<PluginInstanceChild *> pluginInstance(sCurrentPluginInstance);
+    if (event.event == WM_IME_STARTCOMPOSITION ||
+        event.event == WM_IME_COMPOSITION ||
+        event.event == WM_KILLFOCUS) {
+      sCurrentPluginInstance = this;
     }
 
     MessageLoop* loop = MessageLoop::current();
@@ -2911,15 +3075,15 @@ PluginInstanceChild::CreateOptSurface(void)
     // Use an opaque surface unless we're transparent and *don't* have
     // a background to source from.
     gfxImageFormat format =
-        (mIsTransparent && !mBackground) ? gfxImageFormat::ARGB32 :
-                                           gfxImageFormat::RGB24;
+        (mIsTransparent && !mBackground) ? SurfaceFormat::A8R8G8B8_UINT32 :
+                                           SurfaceFormat::X8R8G8B8_UINT32;
 
 #ifdef MOZ_X11
     Display* dpy = mWsInfo.display;
     Screen* screen = DefaultScreenOfDisplay(dpy);
-    if (format == gfxImageFormat::RGB24 &&
+    if (format == SurfaceFormat::X8R8G8B8_UINT32 &&
         DefaultDepth(dpy, DefaultScreen(dpy)) == 16) {
-        format = gfxImageFormat::RGB16_565;
+        format = SurfaceFormat::R5G6B5_UINT16;
     }
 
     if (mSurfaceType == gfxSurfaceType::Xlib) {
@@ -3361,7 +3525,7 @@ PluginInstanceChild::PaintRectWithAlphaExtraction(const nsIntRect& aRect,
         gfxImageSurface* surfaceAsImage =
             static_cast<gfxImageSurface*>(aSurface);
         useSurfaceSubimageForBlack =
-            (surfaceAsImage->Format() == gfxImageFormat::ARGB32);
+            (surfaceAsImage->Format() == SurfaceFormat::A8R8G8B8_UINT32);
         // If we're going to use a subimage, nudge the rect so that we
         // can use optimal alpha recovery.  If we're not using a
         // subimage, the temporaries should automatically get
@@ -3380,7 +3544,7 @@ PluginInstanceChild::PaintRectWithAlphaExtraction(const nsIntRect& aRect,
     gfxPoint deviceOffset = -targetRect.TopLeft();
 
     // We always use a temporary "white image"
-    whiteImage = new gfxImageSurface(targetSize, gfxImageFormat::RGB24);
+    whiteImage = new gfxImageSurface(targetSize, SurfaceFormat::X8R8G8B8_UINT32);
     if (whiteImage->CairoStatus()) {
         return;
     }
@@ -3421,7 +3585,7 @@ PluginInstanceChild::PaintRectWithAlphaExtraction(const nsIntRect& aRect,
         blackImage = surface->GetSubimage(targetRect);
     } else {
         blackImage = new gfxImageSurface(targetSize,
-                                         gfxImageFormat::ARGB32);
+                                         SurfaceFormat::A8R8G8B8_UINT32);
     }
 
     // Paint onto black background
@@ -3715,10 +3879,9 @@ PluginInstanceChild::ReadbackDifferenceRect(const nsIntRect& rect)
     // Subtract from mSurfaceDifferenceRect area which is overlapping with rect
     nsIntRegion result;
     result.Sub(mSurfaceDifferenceRect, nsIntRegion(rect));
-    nsIntRegionRectIterator iter(result);
-    const nsIntRect* r;
-    while ((r = iter.Next()) != nullptr) {
-        dt->CopySurface(source, *r, r->TopLeft());
+    for (auto iter = result.RectIter(); !iter.Done(); iter.Next()) {
+        const nsIntRect& r = iter.Get();
+        dt->CopySurface(source, r, r.TopLeft());
     }
 
     return true;

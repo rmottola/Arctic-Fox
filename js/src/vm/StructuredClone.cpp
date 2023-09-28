@@ -1236,8 +1236,8 @@ JSStructuredCloneWriter::writeTransferMap()
         if (!memory.put(obj, memory.count()))
             return false;
 
-        // Emit a placeholder pointer. We will steal the data and neuter the
-        // transferable later, in the case of ArrayBufferObject.
+        // Emit a placeholder pointer.  We defer stealing the data until later
+        // (and, if necessary, detaching this object if it's an ArrayBuffer).
         if (!out.writePair(SCTAG_TRANSFER_MAP_PENDING_ENTRY, JS::SCTAG_TMO_UNFILLED))
             return false;
         if (!out.writePtr(nullptr)) // Pointer to ArrayBuffer contents or to SharedArrayRawBuffer.
@@ -1891,6 +1891,16 @@ JSStructuredCloneReader::readTransferMap()
                 obj = JS_NewMappedArrayBufferWithContents(cx, nbytes, content);
         } else if (tag == SCTAG_TRANSFER_MAP_SHARED_BUFFER) {
             MOZ_ASSERT(data == JS::SCTAG_TMO_SHARED_BUFFER);
+            // There's no guarantee that the receiving agent has enabled
+            // shared memory even if the transmitting agent has done so.
+            // Ideally we'd check at the transmission point, but that's
+            // tricky, and it will be a very rare problem in any case.
+            // Just fail at the receiving end if we can't handle it.
+            if (!context()->compartment()->creationOptions().getSharedMemoryAndAtomicsEnabled()) {
+                JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
+                                     JSMSG_SC_NOT_TRANSFERABLE);
+                return false;
+            }
             obj = SharedArrayBufferObject::New(context(), (SharedArrayRawBuffer*)content);
         } else {
             if (!callbacks || !callbacks->readTransfer) {
