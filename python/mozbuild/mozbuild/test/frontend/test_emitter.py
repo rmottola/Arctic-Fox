@@ -741,6 +741,8 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('sources')
         objs = self.read_topsrcdir(reader)
 
+        # The last object is a Linkable, ignore it
+        objs = objs[:-1]
         self.assertEqual(len(objs), 6)
         for o in objs:
             self.assertIsInstance(o, Sources)
@@ -767,6 +769,8 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('generated-sources')
         objs = self.read_topsrcdir(reader)
 
+        # The last object is a Linkable, ignore it
+        objs = objs[:-1]
         self.assertEqual(len(objs), 6)
 
         generated_sources = [o for o in objs if isinstance(o, GeneratedSources)]
@@ -794,6 +798,8 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('host-sources')
         objs = self.read_topsrcdir(reader)
 
+        # The last object is a Linkable, ignore it
+        objs = objs[:-1]
         self.assertEqual(len(objs), 3)
         for o in objs:
             self.assertIsInstance(o, HostSources)
@@ -817,6 +823,8 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('unified-sources')
         objs = self.read_topsrcdir(reader)
 
+        # The last object is a Linkable, ignore it
+        objs = objs[:-1]
         self.assertEqual(len(objs), 3)
         for o in objs:
             self.assertIsInstance(o, UnifiedSources)
@@ -841,6 +849,8 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('unified-sources-non-unified')
         objs = self.read_topsrcdir(reader)
 
+        # The last object is a Linkable, ignore it
+        objs = objs[:-1]
         self.assertEqual(len(objs), 3)
         for o in objs:
             self.assertIsInstance(o, UnifiedSources)
