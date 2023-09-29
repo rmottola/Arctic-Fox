@@ -827,9 +827,12 @@ nsresult nsGeolocationService::Init()
 #endif
 
 #ifdef MOZ_WIDGET_COCOA
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+
   if (Preferences::GetBool("geo.provider.use_corelocation", true)) {
     mProvider = new CoreLocationLocationProvider();
   }
+#endif
 #endif
 
 #ifdef XP_WIN
