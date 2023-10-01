@@ -20,3 +20,5 @@ skip-if(B2G||Mulet) HTTP(..) == bengali-3a.html bengali-3-ref.html # Initial mul
 HTTP(..) != bengali-3b.html bengali-3-ref.html
 HTTP(..) != bengali-3c.html bengali-3-ref.html
 HTTP(..) != bengali-3c.html bengali-3b.html
+
+HTTP(..) == balinese-1.html balinese-1-ref.html
