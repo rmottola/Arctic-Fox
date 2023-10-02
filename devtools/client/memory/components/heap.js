@@ -95,7 +95,16 @@ const Heap = module.exports = createClass({
         content = [dom.span({ className: "snapshot-status devtools-throbber" }, statusText)];
         break;
       case states.SAVED_CENSUS:
-        content = [
+        content = [];
+
+        if (snapshot.breakdown.by === "allocationStack"
+            && census.children.length === 1
+            && census.children[0].name === "noStack") {
+          content.push(dom.div({ className: "error no-allocation-stacks" },
+                               L10N.getStr("heapview.noAllocationStacks")));
+        }
+
+        content.push(
           dom.div({ className: "header" },
             dom.span({ className: "heap-tree-item-bytes" }, L10N.getStr("heapview.field.bytes")),
             dom.span({ className: "heap-tree-item-count" }, L10N.getStr("heapview.field.count")),
@@ -104,7 +113,7 @@ const Heap = module.exports = createClass({
             dom.span({ className: "heap-tree-item-name" }, L10N.getStr("heapview.field.name"))
           ),
           Tree(createTreeProperties(snapshot.census, toolbox))
-        ];
+        );
         break;
     }
     let pane = dom.div({ className: "heap-view-panel", "data-state": state }, ...content);
