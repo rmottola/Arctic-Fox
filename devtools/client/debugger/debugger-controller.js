@@ -116,6 +116,8 @@ const DebuggerEditor = require("devtools/client/sourceeditor/debugger");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const FastListWidget = require("devtools/client/shared/widgets/FastListWidget");
 
+XPCOMUtils.defineConstant(this, "EVENTS", EVENTS);
+
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
   "resource://gre/modules/Task.jsm");
 
