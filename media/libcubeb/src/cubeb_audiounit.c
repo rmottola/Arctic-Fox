@@ -544,7 +544,7 @@ audiounit_stream_init(cubeb * context, cubeb_stream ** stream, char const * stre
                       void * user_ptr)
 {
   AudioStreamBasicDescription ss;
-#if MACOSX_LESS_THAN_106
+#ifdef MACOSX_LESS_THAN_106
   ComponentDescription desc;
   Component comp;
 #else
@@ -614,7 +614,7 @@ audiounit_stream_init(cubeb * context, cubeb_stream ** stream, char const * stre
   desc.componentManufacturer = kAudioUnitManufacturer_Apple;
   desc.componentFlags = 0;
   desc.componentFlagsMask = 0;
-#if MACOSX_LESS_THAN_106
+#ifdef MACOSX_LESS_THAN_106
   comp = FindNextComponent(NULL, &desc);
 #else
   comp = AudioComponentFindNext(NULL, &desc);
@@ -644,7 +644,7 @@ audiounit_stream_init(cubeb * context, cubeb_stream ** stream, char const * stre
   stm->current_latency_frames = 0;
   stm->hw_latency_frames = UINT64_MAX;
 
-#if MACOSX_LESS_THAN_106
+#ifdef MACOSX_LESS_THAN_106
   r = OpenAComponent(comp, &stm->unit);
 #else
   r = AudioComponentInstanceNew(comp, &stm->unit);
@@ -745,7 +745,7 @@ audiounit_stream_destroy(cubeb_stream * stm)
   if (stm->unit) {
     AudioOutputUnitStop(stm->unit);
     AudioUnitUninitialize(stm->unit);
-#if MACOSX_LESS_THAN_106
+#ifdef MACOSX_LESS_THAN_106
     CloseComponent(stm->unit);
 #else
     AudioComponentInstanceDispose(stm->unit);
