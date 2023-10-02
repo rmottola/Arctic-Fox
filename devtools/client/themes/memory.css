@@ -328,6 +328,7 @@ html, body, #app, #memory-tool {
    */
   display: flex;
   align-items: center;
+  flex: 1;
   /**
    * Flexing to fill out remaining vertical space.
    * @see .header and .heap-tree-item */
@@ -364,6 +365,10 @@ html, body, #app, #memory-tool {
 .heap-tree-item.focused .heap-tree-number,
 .heap-tree-item.focused .heap-tree-percent {
   color: inherit;
+}
+
+.spacer {
+  flex: 1;
 }
 
 /**
