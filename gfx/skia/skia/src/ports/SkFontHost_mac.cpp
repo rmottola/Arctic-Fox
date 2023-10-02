@@ -851,6 +851,7 @@ CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& 
         fCG.reset(CGBitmapContextCreate(image, fSize.fWidth, fSize.fHeight, 8,
                                         rowBytes, fRGBSpace, bitmapInfo));
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
         // Skia handles quantization and subpixel positioning,
         // so disable quantization and enabe subpixel positioning in CG.
         CGContextSetAllowsFontSubpixelQuantization(fCG, false);
@@ -861,6 +862,7 @@ CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& 
         // then CG cannot draw the glyph in the correct location without subpixel positioning.
         CGContextSetAllowsFontSubpixelPositioning(fCG, true);
         CGContextSetShouldSubpixelPositionFonts(fCG, true);
+#endif
 
         CGContextSetTextDrawingMode(fCG, kCGTextFill);
 
@@ -1669,6 +1671,7 @@ SkAdvancedTypefaceMetrics* SkTypeface_Mac::onGetAdvancedTypefaceMetrics(
 ///////////////////////////////////////////////////////////////////////////////
 
 static SK_SFNT_ULONG get_font_type_tag(const SkTypeface_Mac* typeface) {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     CTFontRef ctFont = typeface->fFontRef.get();
     AutoCFRelease<CFNumberRef> fontFormatRef(
             static_cast<CFNumberRef>(CTFontCopyAttribute(ctFont, kCTFontFormatAttribute)));
@@ -1699,6 +1702,10 @@ static SK_SFNT_ULONG get_font_type_tag(const SkTypeface_Mac* typeface) {
             //Just the presence of the FontForge 'FFTM' table seems to throw it off.
             return SkSFNTHeader::fontType_WindowsTrueType::TAG;
     }
+#else
+   // FIXME for 10.5 perhaps some replacement
+   return 0;
+#endif
 }
 
 SkStreamAsset* SkTypeface_Mac::onOpenStream(int* ttcIndex) const {
