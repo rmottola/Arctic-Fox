@@ -4,6 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
+
 #include "nsCOMPtr.h"
 #include "nsGeoPosition.h"
 #include "nsIConsoleService.h"
@@ -277,3 +279,5 @@ CoreLocationLocationProvider::CancelMLSFallbackProvider()
   mMLSFallbackProvider->Shutdown();
   mMLSFallbackProvider = nullptr;
 }
+
+#endif // MacOS 10.6 or greater
