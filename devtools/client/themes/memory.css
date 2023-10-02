@@ -83,6 +83,7 @@ html, body, #app, #memory-tool {
 }
 
 /**
+ * TODO bug 1213100
  * Once we figure out how to store invertable buttons (pseudo element like in
  * this case?) we should add a .invertable class to handle this generally,
  * rather than the definitions in toolbars.css.
@@ -96,6 +97,21 @@ html, body, #app, #memory-tool {
 /**
  * Container (sidebar + main panel)
  */
+
+.devtools-toolbar .toolbar-group {
+  position: absolute;
+  left: var(--sidebar-width);
+  top: -2px;
+  white-space: nowrap;
+}
+
+.toolbar-group > label {
+  margin-right: 5px;
+}
+
+.toolbar-group .breakdown-by span {
+  margin-right: 5px;
+}
 
 #memory-tool-container {
   /**
