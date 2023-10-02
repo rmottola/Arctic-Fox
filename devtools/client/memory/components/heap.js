@@ -60,6 +60,9 @@ function createTreeProperties (snapshot, toolbox) {
     getRoots: () => census.children,
     getKey: node => node.id,
     itemHeight: HEAP_TREE_ROW_HEIGHT,
+    // Because we never add or remove children when viewing the same census, we
+    // can always reuse a cached traversal if one is available.
+    reuseCachedTraversal: traversal => true,
   };
 }
 
