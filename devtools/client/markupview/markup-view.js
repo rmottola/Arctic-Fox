@@ -3,13 +3,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
 
 const {Cc, Cu, Ci} = require("chrome");
 
 // Page size for pageup/pagedown
 const PAGE_SIZE = 10;
-const PREVIEW_AREA = 700;
 const DEFAULT_MAX_CHILDREN = 100;
 const COLLAPSE_ATTRIBUTE_LENGTH = 120;
 const COLLAPSE_DATA_URL_REGEX = /^data.+base64/;
@@ -39,7 +37,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 loader.lazyGetter(this, "DOMParser", function() {
-  return Cc["@mozilla.org/xmlextras/domparser;1"].createInstance(Ci.nsIDOMParser);
+ return Cc["@mozilla.org/xmlextras/domparser;1"].createInstance(Ci.nsIDOMParser);
 });
 loader.lazyGetter(this, "AutocompletePopup", () => {
   return require("devtools/client/shared/autocomplete-popup").AutocompletePopup;
@@ -122,7 +120,6 @@ function MarkupView(aInspector, aFrame, aControllerWindow) {
 
   this._makeTooltipPersistent = this._makeTooltipPersistent.bind(this);
 
-  this._initPreview();
   this._initTooltips();
   this._initHighlighter();
 
@@ -1593,92 +1590,6 @@ MarkupView.prototype = {
     this._lastDragTarget = null;
 
     return this._destroyer;
-  },
-
-  /**
-   * Initialize the preview panel.
-   */
-  _initPreview: function() {
-    this._previewEnabled = Services.prefs.getBoolPref("devtools.inspector.markupPreview");
-    if (!this._previewEnabled) {
-      return;
-    }
-
-    this._previewBar = this.doc.querySelector("#previewbar");
-    this._preview = this.doc.querySelector("#preview");
-    this._viewbox = this.doc.querySelector("#viewbox");
-
-    this._previewBar.classList.remove("disabled");
-
-    this._previewWidth = this._preview.getBoundingClientRect().width;
-
-    this._boundResizePreview = this._resizePreview.bind(this);
-    this._frame.contentWindow.addEventListener("resize",
-      this._boundResizePreview, true);
-    this._frame.contentWindow.addEventListener("overflow",
-      this._boundResizePreview, true);
-    this._frame.contentWindow.addEventListener("underflow",
-      this._boundResizePreview, true);
-
-    this._boundUpdatePreview = this._updatePreview.bind(this);
-    this._frame.contentWindow.addEventListener("scroll",
-      this._boundUpdatePreview, true);
-    this._updatePreview();
-  },
-
-  /**
-   * Move the preview viewbox.
-   */
-  _updatePreview: function() {
-    if (!this._previewEnabled) {
-      return;
-    }
-    let win = this._frame.contentWindow;
-
-    if (win.scrollMaxY == 0) {
-      this._previewBar.classList.add("disabled");
-      return;
-    }
-
-    this._previewBar.classList.remove("disabled");
-
-    let ratio = this._previewWidth / PREVIEW_AREA;
-    let width = ratio * win.innerWidth;
-
-    let height = ratio * (win.scrollMaxY + win.innerHeight);
-    let scrollTo
-    if (height >= win.innerHeight) {
-      scrollTo = -(height - win.innerHeight) * (win.scrollY / win.scrollMaxY);
-      this._previewBar.setAttribute("style", "height:" + height +
-        "px;transform:translateY(" + scrollTo + "px)");
-    } else {
-      this._previewBar.setAttribute("style", "height:100%");
-    }
-
-    let bgSize = ~~width + "px " + ~~height + "px";
-    this._preview.setAttribute("style", "background-size:" + bgSize);
-
-    height = ~~(win.innerHeight * ratio) + "px";
-    let top = ~~(win.scrollY * ratio) + "px";
-    this._viewbox.setAttribute("style", "height:" + height +
-      ";transform: translateY(" + top + ")");
-  },
-
-  /**
-   * Hide the preview while resizing, to avoid slowness.
-   */
-  _resizePreview: function() {
-    if (!this._previewEnabled) {
-      return;
-    }
-    let win = this._frame.contentWindow;
-    this._previewBar.classList.add("hide");
-    clearTimeout(this._resizePreviewTimeout);
-
-    setTimeout(() => {
-      this._updatePreview();
-      this._previewBar.classList.remove("hide");
-    }, 1000);
   },
 
   /**
