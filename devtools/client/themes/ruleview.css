@@ -275,12 +275,12 @@
 }
 
 .ruleview-selectorhighlighter:hover {
-  background-position: -32px 0;
+  filter: url(images/filters.svg#checked-icon-state);
 }
 
 .ruleview-selectorhighlighter:active,
 .ruleview-selectorhighlighter.highlighted {
-  background-position: -16px 0;
+  filter: url(images/filters.svg#checked-icon-state) brightness(0.9);
 }
 
 #ruleview-add-rule-button::before {
@@ -291,10 +291,6 @@
 #pseudo-class-panel-toggle::before {
   background-image: url("chrome://devtools/skin/images/pseudo-class.svg");
   background-size: cover;
-}
-#pseudo-class-panel-toggle[checked]::before {
-  background-image: url("chrome://devtools/skin/images/pseudo-class.svg#pseudo-class-checked");
-  filter: none !important;
 }
 
 .ruleview-overridden-rule-filter {
