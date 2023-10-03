@@ -564,7 +564,7 @@
   list-style-image: url(images/debugger-play.png);
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   #resume {
     list-style-image: url(images/debugger-pause@2x.png);
     -moz-image-region: rect(0px,32px,32px,0px);
@@ -631,7 +631,7 @@
   -moz-image-region: rect(0px,32px,16px,16px);
 }
 
-@media (min-resolution: 1.25dppx) {
+@media (min-resolution: 1.1dppx) {
   #instruments-pane-toggle {
     list-style-image: url(images/debugger-collapse@2x.png);
     -moz-image-region: rect(0px,32px,32px,0px);
