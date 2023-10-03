@@ -832,7 +832,7 @@ var DebuggerServer = {
 
       // Steps 3-5 are performed on the worker thread (see worker.js).
 
-      // Step 6: Wait for a response from the worker debugger.
+      // Step 6: Wait for a connection response from the worker debugger.
       let listener = {
         onClose: () => {
           aDbg.removeListener(listener);
@@ -842,19 +842,12 @@ var DebuggerServer = {
 
         onMessage: (message) => {
           let packet = JSON.parse(message);
-          if (packet.type !== "message" || packet.id !== aId) {
+          if (packet.type !== "connected" || packet.id !== aId) {
             return;
           }
 
-          message = packet.message;
-          if (message.error) {
-            reject(error);
-          }
-
-          if (message.type !== "paused") {
-            return;
-          }
-
+          // The initial connection packet has been received, don't
+          // need to listen any longer
           aDbg.removeListener(listener);
 
           // Step 7: Create a transport for the connection to the worker.
@@ -886,7 +879,8 @@ var DebuggerServer = {
           aConnection.setForwarding(aId, transport);
 
           resolve({
-            threadActor: message.from,
+            threadActor: packet.threadActor,
+            consoleActor: packet.consoleActor,
             transport: transport
           });
         }
