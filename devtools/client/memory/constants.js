@@ -81,7 +81,7 @@ const breakdowns = exports.breakdowns = {
     displayName: "Coarse Type",
     breakdown: {
       by: "coarseType",
-      objects: ALLOCATION_STACK,
+      objects: OBJECT_CLASS,
       strings: COUNT,
       scripts: INTERNAL_TYPE,
       other: INTERNAL_TYPE,
