@@ -1910,6 +1910,7 @@ MarkupContainer.prototype = {
 
           line.appendChild(closingTag.cloneNode(true));
 
+          flashElementOff(line);
           this.closeTagLine = line;
         }
         this.elt.appendChild(this.closeTagLine);
