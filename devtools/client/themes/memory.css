@@ -156,6 +156,7 @@ html, body, #app, #memory-tool {
  */
 
 .list {
+  min-width: var(--sidebar-width);
   width: var(--sidebar-width);
   overflow-y: auto;
   margin: 0;
@@ -228,6 +229,7 @@ html, body, #app, #memory-tool {
    */
   flex: 1;
   background-color: var(--theme-toolbar-background);
+  min-width: 400px;
 }
 
 #heap-view > .heap-view-panel {
@@ -285,7 +287,6 @@ html, body, #app, #memory-tool {
   text-overflow: ellipsis;
   line-height: var(--heap-tree-header-height);
   justify-content: center;
-  font-size: 90%;
   white-space: nowrap;
 }
 
@@ -351,12 +352,12 @@ html, body, #app, #memory-tool {
 
 .heap-tree-item-count,
 .heap-tree-item-total-count {
-  width: 8vw;
+  width: 10%;
 }
 
 .heap-tree-item-bytes,
 .heap-tree-item-total-bytes {
-  width: 8vw;
+  width: 10%;
 }
 
 .heap-tree-item-name {
@@ -366,7 +367,6 @@ html, body, #app, #memory-tool {
    */
   display: flex;
   align-items: center;
-  flex: 1;
   /**
    * Flexing to fill out remaining vertical space.
    * @see .header and .heap-tree-item */
@@ -394,6 +394,7 @@ html, body, #app, #memory-tool {
 .heap-tree-number {
   flex: 1;
   color: var(--theme-content-color3);
+  padding-right: 5px;
 }
 
 .heap-tree-percent {
