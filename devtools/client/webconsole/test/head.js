@@ -814,7 +814,7 @@ function openDebugger(options = {}) {
     if (dbgPanelAlreadyOpen) {
       deferred.resolve(resolveObject);
     } else {
-      panelWin.once(panelWin.EVENTS.SOURCES_ADDED, () => {
+      panelWin.DebuggerController.waitForSourcesLoaded().then(() => {
         deferred.resolve(resolveObject);
       });
     }
