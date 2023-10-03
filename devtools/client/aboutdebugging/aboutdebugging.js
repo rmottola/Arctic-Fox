@@ -23,7 +23,9 @@ loader.lazyRequireGetter(this, "WorkersComponent",
   "devtools/client/aboutdebugging/components/workers", true);
 loader.lazyRequireGetter(this, "Services");
 
-let AboutDebugging = {
+var AboutDebugging = {
+  _prefListeners: [],
+
   _categories: null,
   get categories() {
     // If needed, initialize the list of available categories.
@@ -72,11 +74,12 @@ let AboutDebugging = {
       let updatePref = () => {
         Services.prefs.setBoolPref(pref, element.checked);
       };
+      element.addEventListener("change", updatePref, false);
       let updateCheckbox = () => {
         element.checked = Services.prefs.getBoolPref(pref);
       };
-      element.addEventListener("change", updatePref, false);
       Services.prefs.addObserver(pref, updateCheckbox, false);
+      this._prefListeners.push([pref, updateCheckbox]);
       updateCheckbox();
     });
 
@@ -99,6 +102,11 @@ let AboutDebugging = {
     let telemetry = this._telemetry;
     telemetry.toolClosed("aboutdebugging");
     telemetry.destroy();
+
+    this._prefListeners.forEach(([pref, listener]) => {
+      Services.prefs.removeObserver(pref, listener);
+    });
+    this._prefListeners = [];
   },
 };
 
