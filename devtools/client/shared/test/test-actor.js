@@ -4,7 +4,7 @@
 
 "use strict";
 
-// A helper actor for brower/devtools/inspector tests.
+// A helper actor for inspector and markupview tests.
 
 var { Cc, Ci, Cu, Cr } = require("chrome");
 const {getRect, getElementFromPoint, getAdjustedQuads} = require("devtools/shared/layout/utils");
@@ -398,7 +398,7 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   /**
    * Set a JS property on a DOM Node.
    * @param {String} selector The node selector
-   * @param {String} attribute The attribute name
+   * @param {String} property The property name
    * @param {String} value The attribute value
    */
   setProperty: protocol.method(function (selector, property, value) {
@@ -416,7 +416,7 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   /**
    * Get a JS property on a DOM Node.
    * @param {String} selector The node selector
-   * @param {String} attribute The attribute name
+   * @param {String} property The property name
    * @return {String} value The attribute value
    */
   getProperty: protocol.method(function (selector, property) {
@@ -430,6 +430,24 @@ var TestActor = exports.TestActor = protocol.ActorClass({
     response: {
       value: RetVal("string")
     }
+  }),
+
+  /**
+   * Set an attribute on a DOM Node.
+   * @param {String} selector The node selector
+   * @param {String} attribute The attribute name
+   * @param {String} value The attribute value
+   */
+  setAttribute: protocol.method(function (selector, attribute, value) {
+    let node = this._querySelector(selector);
+    node.setAttribute(attribute, value);
+  }, {
+    request: {
+      selector: Arg(0, "string"),
+      property: Arg(1, "string"),
+      value: Arg(2, "string")
+    },
+    response: {}
   }),
 
   /**
