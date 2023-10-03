@@ -12,6 +12,7 @@ DIRS += [
 DevToolsModules(
     'app.js',
     'constants.js',
+    'dominator-tree-lazy-children.js',
     'initializer.js',
     'models.js',
     'panel.js',
@@ -22,3 +23,4 @@ DevToolsModules(
 
 BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
+MOCHITEST_CHROME_MANIFESTS += ['test/chrome/chrome.ini']

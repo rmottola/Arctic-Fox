@@ -99,6 +99,7 @@ pref("devtools.debugger.ui.variables-searchbox-visible", false);
 pref("devtools.memory.enabled", false);
 
 pref("devtools.memory.custom-breakdowns", "{}");
+pref("devtools.memory.custom-dominator-tree-breakdowns", "{}");
 
 // Enable the Performance tools
 pref("devtools.performance.enabled", true);

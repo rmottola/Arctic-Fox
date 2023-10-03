@@ -87,6 +87,14 @@ html, body, #app, #memory-tool {
   margin-inline-end: 5px;
 }
 
+.devtools-toolbar > label {
+  margin-inline-end: 5px;
+}
+
+#select-view {
+  margin-inline-start: 5px;
+}
+
 #take-snapshot::before {
   background-image: url(images/command-screenshot.png);
 }
@@ -436,6 +444,14 @@ html, body, #app, #memory-tool {
 /**
  * Frame View components
  */
+
+.separator,
+.not-available,
+.heap-tree-item-address {
+  opacity: .5;
+  margin-left: .5em;
+  margin-right: .5em;
+}
 
 .focused .frame-link-filename,
 .focused .frame-link-column,
