@@ -4,30 +4,43 @@
 
 "use strict";
 
-// Test cycling color types in the rule view.
+// Computed view color cycling test.
 
 const TEST_URI = `
   <style type="text/css">
-    body {
+    .matches {
       color: #f00;
     }
   </style>
-  Test cycling color types in the rule view!
+  <span id="matches" class="matches">Some styled text</span>
 `;
 
 add_task(function*() {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
-  let {inspector, view} = yield openRuleView();
-  let container = getRuleViewProperty(view, "body", "color").valueSpan;
+  let {inspector, view} = yield openComputedView();
+  yield selectNode("#matches", inspector);
+
+  info("Checking the property itself");
+  let container = getComputedViewPropertyView(view, "color").valueNode;
+  checkColorCycling(container, inspector);
+
+  info("Checking matched selectors");
+  container = yield getComputedViewMatchedRules(view, "color");
   checkColorCycling(container, inspector);
 });
 
 function checkColorCycling(container, inspector) {
-  let swatch = container.querySelector(".ruleview-colorswatch");
-  let valueNode = container.querySelector(".ruleview-color");
-  let win = inspector.sidebar.getWindowForTab("ruleview");
+  let swatch = container.querySelector(".computedview-colorswatch");
+  let valueNode = container.querySelector(".computedview-color");
+  let win = inspector.sidebar.getWindowForTab("computedview");
+
+  // "Authored" (default; currently the computed value)
+  is(valueNode.textContent, "rgb(255, 0, 0)",
+                            "Color displayed as an RGB value.");
 
   // Hex
+  EventUtils.synthesizeMouseAtCenter(swatch,
+                                     {type: "mousedown", shiftKey: true}, win);
   is(valueNode.textContent, "#f00", "Color displayed as a hex value.");
 
   // HSL
@@ -48,16 +61,9 @@ function checkColorCycling(container, inspector) {
   is(valueNode.textContent, "red",
                             "Color displayed as a color name.");
 
-  // "Authored"
+  // Back to "Authored"
   EventUtils.synthesizeMouseAtCenter(swatch,
                                      {type: "mousedown", shiftKey: true}, win);
-  is(valueNode.textContent, "#f00",
-                            "Color displayed as an authored value.");
-
-  // One more click skips hex, because it is the same as authored, and
-  // instead goes back to HSL.
-  EventUtils.synthesizeMouseAtCenter(swatch,
-                                     {type: "mousedown", shiftKey: true}, win);
-  is(valueNode.textContent, "hsl(0, 100%, 50%)",
-                            "Color displayed as an HSL value again.");
+  is(valueNode.textContent, "rgb(255, 0, 0)",
+                            "Color displayed as an RGB value.");
 }
