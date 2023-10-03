@@ -141,6 +141,9 @@ var AboutDebugging = {
       Services.prefs.removeObserver(pref, listener);
     });
     this._prefListeners = [];
+
+    React.unmountComponentAtNode(document.querySelector("#addons"));
+    React.unmountComponentAtNode(document.querySelector("#workers"));
   },
 };
 
