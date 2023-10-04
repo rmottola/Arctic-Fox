@@ -783,8 +783,6 @@ var DebuggerView = {
       this.editor.clearHistory();
       this._editorSource = {};
     }
-
-    this.Sources.emptyText = L10N.getStr("loadingSourcesText");
   },
 
   Toolbar: null,
