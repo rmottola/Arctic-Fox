@@ -618,6 +618,10 @@ browser/chrome/devtools/skin/images/vview-lock@2x.png
 browser/chrome/devtools/skin/themes/images/vview-lock@2x.png
 browser/chrome/devtools/skin/images/vview-edit@2x.png
 browser/chrome/devtools/skin/themes/images/vview-edit@2x.png
+
+browser/chrome/devtools/content/inspector/layout/layout.js
+browser/chrome/devtools/modules/devtools/client/inspector/layout/layout.js
+
 #Windows ArcticFox exceptions
 chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png
 chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric.png
