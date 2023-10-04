@@ -108,12 +108,13 @@ html, body, #app, #memory-tool {
  * Due to toolbar styles of `.devtools-toolbarbutton:not([label])` which overrides
  * .devtools-toolbarbutton's min-width of 78px, reset the min-width.
  */
-#import-snapshot {
-  min-width: 78px;
-}
-
-#diff-snapshots[disabled] {
-  opacity: .5;
+#import-snapshot,
+#clear-snapshots {
+  -moz-box-align: center;
+  flex-grow: 1;
+  padding: 1px;
+  margin: 2px 1px;
+  min-width: unset;
 }
 
 .spacer {
@@ -164,8 +165,8 @@ html, body, #app, #memory-tool {
  */
 
 .list {
-  min-width: var(--sidebar-width);
   width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   overflow-y: auto;
   margin: 0;
   padding: 0;
@@ -237,7 +238,13 @@ html, body, #app, #memory-tool {
    */
   flex: 1;
   background-color: var(--theme-toolbar-background);
-  min-width: 400px;
+
+  /**
+   * By default, flex items have min-width: auto;
+   * (https://drafts.csswg.org/css-flexbox/#min-size-auto)
+   */
+  min-width: 0;
+  font-size: 90%;
 }
 
 #heap-view > .heap-view-panel {
@@ -253,6 +260,12 @@ html, body, #app, #memory-tool {
    * Flexing to fill out remaining horizontal space. @see #heap-view.
    */
   flex: 1;
+
+  /**
+   * By default, flex items have min-width: auto;
+   * (https://drafts.csswg.org/css-flexbox/#min-size-auto)
+   */
+  min-width: 0;
 }
 
 #heap-view > .heap-view-panel > .snapshot-status,
@@ -268,7 +281,6 @@ html, body, #app, #memory-tool {
 
 #heap-view > .heap-view-panel[data-state="snapshot-state-error"] pre {
   background-color: var(--theme-body-background);
-  overflow-y: auto;
   margin: 20px;
   padding: 20px;
 }
@@ -284,7 +296,6 @@ html, body, #app, #memory-tool {
    * the last one needs to flex to fill out all remaining horizontal space.
    */
   display: flex;
-  align-items: center;
   color: var(--theme-body-color);
   background-color: var(--theme-tab-toolbar-background);
   border-bottom: 1px solid var(--cell-border-color);
@@ -317,6 +328,7 @@ html, body, #app, #memory-tool {
 
 .tree-node {
   height: var(--heap-tree-row-height);
+  line-height: var(--heap-tree-row-height);
 }
 
 /**
@@ -332,7 +344,7 @@ html, body, #app, #memory-tool {
   display: flex;
 }
 
-.tree-node:nth-child(2n) {
+.tree-node-odd {
   background-color: var(--row-alt-background-color);
 }
 
@@ -359,13 +371,16 @@ html, body, #app, #memory-tool {
 }
 
 .heap-tree-item-count,
-.heap-tree-item-total-count {
-  width: 10%;
-}
-
+.heap-tree-item-total-count,
 .heap-tree-item-bytes,
 .heap-tree-item-total-bytes {
   width: 10%;
+  /*
+   * Provision for up to :
+   * - 12 characters for the number part (10s of GB and spaces every 3 digits)
+   * - 4 chars for the percent part (the maximum length string is "100%")
+   */
+  min-width: 16ch;
 }
 
 .heap-tree-item-name {
@@ -391,7 +406,15 @@ html, body, #app, #memory-tool {
 .heap-tree-item-name {
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.heap-tree-number {
+  padding-inline-start: 3px;
+}
+
+.heap-tree-percent {
+  padding-inline-start: 3px;
+  padding-inline-end: 3px;
 }
 
 .heap-tree-number,
@@ -451,40 +474,6 @@ html, body, #app, #memory-tool {
   opacity: .5;
   margin-left: .5em;
   margin-right: .5em;
-}
-
-.focused .frame-link-filename,
-.focused .frame-link-column,
-.focused .frame-link-line,
-.focused .frame-link-host,
-.focused .frame-link-colon {
-  color: var(--theme-selection-color);
-}
-
-.frame-link-filename {
-  color: var(--theme-highlight-blue);
-  cursor: pointer;
-}
-
-.frame-link-filename:hover {
-  text-decoration: underline;
-}
-
-.frame-link-column,
-.frame-link-line,
-.frame-link-colon {
-  color: var(--theme-highlight-orange);
-}
-
-.frame-link-host {
-  margin-inline-start: 5px;
-  font-size: 90%;
-  margin-left: 5px;
-  color: var(--theme-content-color2);
-}
-
-.frame-link-function-display-name {
-  margin-right: 5px;
 }
 
 .no-allocation-stacks {
