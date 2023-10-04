@@ -282,7 +282,6 @@ devtools.jar:
 *   skin/inspector.css (themes/inspector.css)
     skin/timeline.css (themes/timeline.css)
     skin/images/profiler-stopwatch.svg (themes/images/profiler-stopwatch.svg)
-    skin/images/profiler-stopwatch-checked.svg (themes/images/profiler-stopwatch-checked.svg)
     skin/images/sort-arrows.svg       (themes/images/sort-arrows.svg)
     skin/images/tool-options.svg (themes/images/tool-options.svg)
     skin/images/tool-webconsole.svg (themes/images/tool-webconsole.svg)
