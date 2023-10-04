@@ -58,9 +58,10 @@ html, body, #app, #memory-tool {
    * We want this to be exactly at a `--sidebar-width` distance from the
    * toolbar's start boundary. A `.devtools-toolbar` has a 3px start padding.
    */
-  flex: 0 0 calc(var(--sidebar-width) - 3px);
+  flex: 0 0 calc(var(--sidebar-width) - 4px);
   border-inline-end: 1px solid var(--theme-splitter-color);
   margin-inline-end: 5px;
+  padding-right: 1px;
 }
 
 .devtools-toolbar > .toolbar-group {
