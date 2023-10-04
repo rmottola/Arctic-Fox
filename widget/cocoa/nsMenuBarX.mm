@@ -389,6 +389,9 @@ nsMenuX* nsMenuBarX::GetXULHelpMenu()
 // This resolves bugs 489196 and 539317.
 void nsMenuBarX::SetSystemHelpMenu()
 {
+  if (![NSApp respondsToSelector:@selector(setHelpMenu:)])
+    return;
+
   nsMenuX* xulHelpMenu = GetXULHelpMenu();
   if (xulHelpMenu) {
     NSMenu* helpMenu = (NSMenu*)xulHelpMenu->NativeData();
