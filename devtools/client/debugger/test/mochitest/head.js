@@ -536,13 +536,8 @@ function initDebugger(aTarget, aWindow) {
       let debuggerPanel = aToolbox.getCurrentPanel();
       let panelWin = debuggerPanel.panelWin;
 
-      // Wait for the initial resume...
-      panelWin.gClient.addOneTimeListener("resumed", () => {
-        info("Debugger client resumed successfully.");
-
-        prepareDebugger(debuggerPanel);
-        deferred.resolve([aTab, debuggee, debuggerPanel, aWindow]);
-      });
+      prepareDebugger(debuggerPanel);
+      deferred.resolve([aTab, debuggee, debuggerPanel, aWindow]);
     });
 
     return deferred.promise;
@@ -605,7 +600,6 @@ AddonDebugger.prototype = {
     this.debuggerPanel = toolbox.getCurrentPanel();
 
     // Wait for the initial resume...
-    yield waitForClientEvents(this.debuggerPanel, "resumed");
     yield prepareDebugger(this.debuggerPanel);
     yield this._attachConsole();
   }),
@@ -1042,7 +1036,7 @@ function connect(client) {
 }
 
 function close(client) {
-  info("Closing client.\n");
+  info("Waiting for client to close.\n");
   return new Promise(function (resolve) {
     client.close(() => {
       resolve();
