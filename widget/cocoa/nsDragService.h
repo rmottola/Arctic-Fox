@@ -41,10 +41,12 @@ private:
                               nsIntRect* aDragRect,
                               nsIScriptableRegion* aRegion);
   bool IsValidType(NSString* availableType, bool allowFileURL);
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   NSString* GetStringForType(NSPasteboardItem* item, const NSString* type,
                              bool allowFileURL = false);
   NSString* GetTitleForURL(NSPasteboardItem* item);
   NSString* GetFilePath(NSPasteboardItem* item);
+#endif
 
   nsCOMPtr<nsISupportsArray> mDataItems; // only valid for a drag started within gecko
   NSView* mNativeDragView;
