@@ -337,7 +337,8 @@
   background-image: url(images/magnifying-glass-light.png);
 }
 
-.devtools-searchinput:-moz-locale-dir(rtl) {
+.devtools-searchinput:-moz-locale-dir(rtl),
+.devtools-searchinput:-moz-dir(rtl) {
   background-position: calc(100% - 8px) center;
 }
 
@@ -362,6 +363,7 @@
 .devtools-rule-searchbox[filled] {
   background-color: var(--searchbox-background-color);
   border-color: var(--searchbox-border-color);
+  -moz-padding-end: 23px;
 }
 
 .devtools-style-searchbox-no-match {
@@ -384,6 +386,11 @@
   background-position: 0 0;
   background-repeat: no-repeat;
   background-color: transparent;
+}
+
+.devtools-searchinput-clear:-moz-dir(rtl) {
+  right: unset;
+  left: 7px;
 }
 
 .theme-dark .devtools-searchinput-clear {

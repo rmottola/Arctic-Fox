@@ -6,17 +6,8 @@
 <!DOCTYPE window [
   <!ENTITY % inspectorDTD SYSTEM "chrome://devtools/locale/styleinspector.dtd">
   %inspectorDTD;
-  <!ELEMENT loop ANY>
-  <!ATTLIST li foreach CDATA #IMPLIED>
-  <!ATTLIST div foreach CDATA #IMPLIED>
-  <!ATTLIST loop foreach CDATA #IMPLIED>
-  <!ATTLIST a target CDATA #IMPLIED>
-  <!ATTLIST a __pathElement CDATA #IMPLIED>
-  <!ATTLIST div _id CDATA #IMPLIED>
-  <!ATTLIST div save CDATA #IMPLIED>
-  <!ATTLIST table save CDATA #IMPLIED>
-  <!ATTLIST loop if CDATA #IMPLIED>
-  <!ATTLIST tr if CDATA #IMPLIED>
+  <!ENTITY % globalDTD SYSTEM "chrome://global/locale/global.dtd">
+  %globalDTD;
 ]>
 
 <html xmlns="http://www.w3.org/1999/xhtml"
@@ -47,7 +38,7 @@
     </script>
   </head>
 
-  <body>
+  <body dir="&locale.dir;">
 
     <div id="root" class="devtools-monospace">
       <div class="devtools-toolbar">
