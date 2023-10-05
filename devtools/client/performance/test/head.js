@@ -2,7 +2,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 var { Preferences } = Cu.import("resource://gre/modules/Preferences.jsm", {});
@@ -45,8 +45,11 @@ const IDLE_PREF = "devtools.performance.ui.show-idle-blocks";
 const INVERT_PREF = "devtools.performance.ui.invert-call-tree";
 const INVERT_FLAME_PREF = "devtools.performance.ui.invert-flame-graph";
 const FLATTEN_PREF = "devtools.performance.ui.flatten-tree-recursion";
-const JIT_PREF = "devtools.performance.ui.enable-jit-optimizations";
+const JIT_PREF = "devtools.performance.ui.show-jit-optimizations";
 const EXPERIMENTAL_PREF = "devtools.performance.ui.experimental";
+
+// Keep in sync with FRAMERATE_GRAPH_HIGH_RES_INTERVAL in views/overview.js
+const FRAMERATE_GRAPH_HIGH_RES_INTERVAL = 16; // ms
 
 // All tests are asynchronous.
 waitForExplicitFinish();
@@ -63,7 +66,7 @@ var DEFAULT_PREFS = [
   "devtools.performance.ui.enable-memory",
   "devtools.performance.ui.enable-allocations",
   "devtools.performance.ui.enable-framerate",
-  "devtools.performance.ui.enable-jit-optimizations",
+  "devtools.performance.ui.show-jit-optimizations",
   "devtools.performance.memory.sample-probability",
   "devtools.performance.memory.max-log-length",
   "devtools.performance.profiler.buffer-size",
