@@ -8,6 +8,17 @@
   %inspectorDTD;
   <!ENTITY % globalDTD SYSTEM "chrome://global/locale/global.dtd">
   %globalDTD;
+  <!ELEMENT loop ANY>
+  <!ATTLIST li foreach CDATA #IMPLIED>
+  <!ATTLIST div foreach CDATA #IMPLIED>
+  <!ATTLIST loop foreach CDATA #IMPLIED>
+  <!ATTLIST a target CDATA #IMPLIED>
+  <!ATTLIST a __pathElement CDATA #IMPLIED>
+  <!ATTLIST div _id CDATA #IMPLIED>
+  <!ATTLIST div save CDATA #IMPLIED>
+  <!ATTLIST table save CDATA #IMPLIED>
+  <!ATTLIST loop if CDATA #IMPLIED>
+  <!ATTLIST tr if CDATA #IMPLIED>
 ]>
 
 <html xmlns="http://www.w3.org/1999/xhtml"
