@@ -142,7 +142,7 @@ const MemoryApp = createClass({
           inverted,
           onToggleInverted: () =>
             dispatch(toggleInvertedAndRefresh(heapWorker)),
-          filter,
+          filterString: filter,
           setFilterString: filterString =>
             dispatch(setFilterStringAndRefresh(filterString, heapWorker)),
           diffing,
