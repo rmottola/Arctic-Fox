@@ -203,6 +203,7 @@ const Tree = module.exports = createClass({
 
   componentWillReceiveProps(nextProps) {
     this._autoExpand();
+    this._updateHeight();
   },
 
   _autoExpand() {
@@ -223,7 +224,7 @@ const Tree = module.exports = createClass({
       this.state.seen.add(item);
 
       for (let child of this.props.getChildren(item)) {
-        autoExpand(item, currentDepth + 1);
+        autoExpand(child, currentDepth + 1);
       }
     };
 
