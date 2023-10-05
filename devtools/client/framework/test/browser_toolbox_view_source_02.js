@@ -5,11 +5,11 @@
  * Tests that Toolbox#viewSourceInDebugger works when debugger is already loaded.
  */
 
-let URL = `${URL_ROOT}doc_viewsource.html`;
-let JS_URL = `${URL_ROOT}code_math.js`;
+var URL = `${URL_ROOT}doc_viewsource.html`;
+var JS_URL = `${URL_ROOT}code_math.js`;
 
 function *viewSource() {
-  let toolbox = yield loadToolbox(URL);
+  let toolbox = yield openNewTabAndToolbox(URL);
   let { panelWin: debuggerWin } = yield toolbox.selectTool("jsdebugger");
   let debuggerEvents = debuggerWin.EVENTS;
   let { DebuggerView } = debuggerWin;
@@ -34,7 +34,7 @@ function *viewSource() {
   is(DebuggerView.editor.getCursor().line + 1, 2,
     "The correct line is highlighted in the debugger's source editor.");
 
-  yield unloadToolbox(toolbox);
+  yield closeToolboxAndTab(toolbox);
   finish();
 }
 

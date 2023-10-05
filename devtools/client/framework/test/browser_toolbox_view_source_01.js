@@ -6,11 +6,11 @@
  * yet opened.
  */
 
-let URL = `${URL_ROOT}doc_viewsource.html`;
-let JS_URL = `${URL_ROOT}code_math.js`;
+var URL = `${URL_ROOT}doc_viewsource.html`;
+var JS_URL = `${URL_ROOT}code_math.js`;
 
 function *viewSource() {
-  let toolbox = yield loadToolbox(URL);
+  let toolbox = yield openNewTabAndToolbox(URL);
 
   yield toolbox.viewSourceInDebugger(JS_URL, 2);
 
@@ -26,7 +26,7 @@ function *viewSource() {
   is(DebuggerView.editor.getCursor().line + 1, 2,
     "The correct line is highlighted in the debugger's source editor.");
 
-  yield unloadToolbox(toolbox);
+  yield closeToolboxAndTab(toolbox);
   finish();
 }
 
