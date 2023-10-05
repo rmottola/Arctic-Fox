@@ -2,9 +2,8 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
-
-var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+// shared-head.js handles imports, constants, and utility functions
+Services.scriptloader.loadSubScript("chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js", this);
 
 // Disable logging for faster test runs. Set this pref to true if you want to
 // debug a test in your try runs. Both the debugger server and frontend will
@@ -12,30 +11,19 @@ var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
 Services.prefs.setBoolPref("devtools.debugger.log", false);
 
-var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-var { Promise: promise } = Cu.import("resource://devtools/shared/deprecated-sync-thenables.js", {});
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
-var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
-var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { BrowserToolboxProcess } = Cu.import("resource://devtools/client/framework/ToolboxProcess.jsm", {});
 var { DebuggerServer } = require("devtools/server/main");
 var { DebuggerClient, ObjectClient } = require("devtools/shared/client/main");
 var { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm", {});
 var EventEmitter = require("devtools/shared/event-emitter");
 const { promiseInvoke } = require("devtools/shared/async-utils");
-var { TargetFactory } = require("devtools/client/framework/target");
 var { Toolbox } = require("devtools/client/framework/toolbox")
+
+// Override promise with deprecated-sync-thenables
+promise = Cu.import("resource://devtools/shared/deprecated-sync-thenables.js", {}).Promise;
 
 const EXAMPLE_URL = "http://example.com/browser/devtools/client/debugger/test/mochitest/";
 const FRAME_SCRIPT_URL = getRootDirectory(gTestPath) + "code_frame-script.js";
-
-DevToolsUtils.testing = true;
-SimpleTest.registerCleanupFunction(() => {
-  DevToolsUtils.testing = false;
-});
-
-// All tests are asynchronous.
-waitForExplicitFinish();
 
 registerCleanupFunction(function* () {
   info("finish() was called, cleaning up...");
@@ -77,7 +65,9 @@ function getChromeWindow(aWindow) {
     .QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
 }
 
-function addTab(aUrl, aWindow) {
+// Override addTab/removeTab as defined by shared-head, since these have
+// an extra window parameter and add a frame script
+this.addTab = function addTab(aUrl, aWindow) {
   info("Adding tab: " + aUrl);
 
   let deferred = promise.defer();
@@ -100,7 +90,7 @@ function addTab(aUrl, aWindow) {
   return deferred.promise;
 }
 
-function removeTab(aTab, aWindow) {
+this.removeTab = function removeTab(aTab, aWindow) {
   info("Removing tab.");
 
   let deferred = promise.defer();
