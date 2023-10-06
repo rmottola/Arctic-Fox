@@ -74,6 +74,7 @@ var AnimationPlayerActor = ActorClass({
 
     this.onAnimationMutation = this.onAnimationMutation.bind(this);
 
+    this.walker = animationsActor.walker;
     this.tabActor = animationsActor.tabActor;
     this.player = player;
     this.node = player.effect.target;
@@ -94,7 +95,9 @@ var AnimationPlayerActor = ActorClass({
     if (this.observer && !Cu.isDeadWrapper(this.observer)) {
       this.observer.disconnect();
     }
-    this.tabActor = this.player = this.node = this.styles = this.observer = null;
+    this.tabActor = this.player = this.node = this.styles = null;
+    this.observer = this.walker = null;
+
     Actor.prototype.destroy.call(this);
   },
 
@@ -111,6 +114,12 @@ var AnimationPlayerActor = ActorClass({
 
     let data = this.getCurrentState();
     data.actor = this.actorID;
+
+    // If we know the WalkerActor, and if the animated node is known by it, then
+    // return its corresponding NodeActor ID too.
+    if (this.walker && this.walker.hasNode(this.node)) {
+      data.animationTargetNodeActorID = this.walker.getNode(this.node).actorID;
+    }
 
     return data;
   },
@@ -466,6 +475,18 @@ var AnimationPlayerFront = FrontClass(AnimationPlayerActor, {
   },
 
   /**
+   * If the AnimationsActor was given a reference to the WalkerActor previously
+   * then calling this getter will return the animation target NodeFront.
+   */
+  get animationTargetNodeFront() {
+    if (!this._form.animationTargetNodeActorID) {
+      return null;
+    }
+
+    return this.conn.getActor(this._form.animationTargetNodeActorID);
+  },
+
+  /**
    * Getter for the initial state of the player. Up to date states can be
    * retrieved by calling the getCurrentState method.
    */
@@ -579,7 +600,7 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
     events.off(this.tabActor, "navigate", this.onNavigate);
 
     this.stopAnimationPlayerUpdates();
-    this.tabActor = this.observer = this.actors = null;
+    this.tabActor = this.observer = this.actors = this.walker = null;
   },
 
   /**
@@ -589,6 +610,23 @@ var AnimationsActor = exports.AnimationsActor = ActorClass({
   disconnect: function() {
     this.destroy();
   },
+
+  /**
+   * Clients can optionally call this with a reference to their WalkerActor.
+   * If they do, then AnimationPlayerActor's forms are going to also include
+   * NodeActor IDs when the corresponding NodeActors do exist.
+   * This, in turns, is helpful for clients to avoid having to go back once more
+   * to the server to get a NodeActor for a particular animation.
+   * @param {WalkerActor} walker
+   */
+  setWalkerActor: method(function(walker) {
+    this.walker = walker;
+  }, {
+    request: {
+      walker: Arg(0, "domwalker")
+    },
+    response: {}
+  }),
 
   /**
    * Retrieve the list of AnimationPlayerActor actors for currently running
