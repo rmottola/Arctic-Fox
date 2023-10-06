@@ -4,15 +4,13 @@
 
 "use strict";
 
-// Test that StyleSheetActor.getText handles empty text correctly.
+// Test that StyleSheetsActor.getStyleSheets() works if an iframe does not have
+// a content document.
 
 const {StyleSheetsFront} = require("devtools/server/actors/stylesheets");
 
-const CONTENT = "<style>body { background-color: #f0c; }</style>";
-const TEST_URI = "data:text/html;charset=utf-8," + encodeURIComponent(CONTENT);
-
 add_task(function*() {
-  yield addTab(TEST_URI);
+  let doc = yield addTab(MAIN_DOMAIN + "stylesheets-nested-iframes.html");
 
   info("Initialising the debugger server and client.");
   initDebuggerServer();
@@ -26,15 +24,14 @@ add_task(function*() {
   ok(front, "The StyleSheetsFront was created.");
 
   let sheets = yield front.getStyleSheets();
-  ok(sheets, "getStyleSheets() succeeded");
-  is(sheets.length, 1,
-     "getStyleSheets() returned the correct number of sheets");
+  ok(sheets, "getStyleSheets() succeeded even with documentless iframes.");
 
-  let sheet = sheets[0];
-  yield sheet.update("", false);
-  let longStr = yield sheet.getText();
-  let source = yield longStr.string();
-  is(source, "", "text is empty");
+  // Bug 285395 limits the number of nested iframes to 10. There's one sheet per
+  // frame so we should get 10 sheets. However, the limit might change in the
+  // future so it's better not to rely on the limit. Asserting > 2 ensures that
+  // the test page is actually loading nested iframes and this test is doing
+  // something sensible (if we got this far, the test has served its purpose).
+  ok(sheets.length > 2, sheets.length + " sheets found (expected 3 or more).");
 
   yield closeDebuggerClient(client);
 });
