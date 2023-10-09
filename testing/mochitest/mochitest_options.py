@@ -178,13 +178,6 @@ class MochitestArguments(ArgumentContainer):
           "help": "Run chrome mochitests.",
           "suppress": True,
           }],
-        [["--ipcplugins"],
-         {"action": "store_true",
-          "dest": "ipcplugins",
-          "help": "Run ipcplugins mochitests.",
-          "default": False,
-          "suppress": True,
-          }],
         [["--bisect-chunk"],
          {"dest": "bisectChunk",
           "default": None,
@@ -590,9 +583,6 @@ class MochitestArguments(ArgumentContainer):
             )
             options.gmp_path = os.pathsep.join(
                 os.path.join(build_obj.bindir, *p) for p in gmp_modules)
-
-        if options.ipcplugins:
-            options.test_paths.append('dom/plugins/test/mochitest')
 
         if options.totalChunks is not None and options.thisChunk is None:
             parser.error(
