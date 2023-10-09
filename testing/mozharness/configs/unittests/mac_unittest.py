@@ -29,6 +29,7 @@ config = {
         "reftest": "runreftest.py",
         "xpcshell": "runxpcshelltests.py",
         "cppunittest": "runcppunittests.py",
+        "gtest": "rungtests.py",
         "jittest": "jit_test.py",
         "mozbase": "test.py",
         "mozmill": "runtestlist.py",
@@ -40,6 +41,7 @@ config = {
         "reftest": ["reftest/*", "jsreftest/*"],
         "xpcshell": ["xpcshell/*"],
         "cppunittest": ["cppunittest/*"],
+        "gtest": ["gtest/*"],
         "jittest": ["jit-test/*"],
         "mozbase": ["mozbase/*"],
         "mozmill": ["mozmill/*"],
@@ -182,6 +184,9 @@ config = {
     },
     "all_cppunittest_suites": {
         "cppunittest": ['tests/cppunittest']
+    },
+    "all_gtest_suites": {
+        "gtest": []
     },
     "all_jittest_suites": {
         "jittest": []
