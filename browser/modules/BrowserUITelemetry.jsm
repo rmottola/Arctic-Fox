@@ -15,8 +15,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry",
   "resource://gre/modules/UITelemetry.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RecentWindow",
   "resource:///modules/RecentWindow.jsm");
-//XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
-//  "resource:///modules/CustomizableUI.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
+  "resource:///modules/CustomizableUI.jsm");
 XPCOMUtils.defineLazyGetter(this, "Timer", function() {
   let timer = {};
   Cu.import("resource://gre/modules/Timer.jsm", timer);
@@ -295,14 +295,12 @@ this.BrowserUITelemetry = {
     aWindow.addEventListener("unload", this);
     let document = aWindow.document;
 
-/*
     for (let areaID of CustomizableUI.areas) {
       let areaNode = document.getElementById(areaID);
       if (areaNode) {
         (areaNode.customizationTarget || areaNode).addEventListener("mouseup", this);
       }
     }
-*/
 
     for (let itemID of OTHER_MOUSEUP_MONITORED_ITEMS) {
       let item = document.getElementById(itemID);
@@ -325,14 +323,12 @@ this.BrowserUITelemetry = {
     aWindow.removeEventListener("unload", this);
     let document = aWindow.document;
 
-/*
     for (let areaID of CustomizableUI.areas) {
       let areaNode = document.getElementById(areaID);
       if (areaNode) {
         (areaNode.customizationTarget || areaNode).removeEventListener("mouseup", this);
       }
     }
-*/
 
     for (let itemID of OTHER_MOUSEUP_MONITORED_ITEMS) {
       let item = document.getElementById(itemID);
