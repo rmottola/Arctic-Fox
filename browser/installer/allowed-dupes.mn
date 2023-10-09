@@ -560,8 +560,6 @@ browser/chrome/devtools/skin/images/command-responsivemode@2x.png
 browser/chrome/devtools/skin/themes/images/command-responsivemode@2x.png
 browser/chrome/devtools/skin/themes/tooltip/arrow-vertical-light@2x.png
 browser/chrome/devtools/skin/tooltip/arrow-vertical-light@2x.png
-browser/chrome/devtools/skin/themes/timeline.css
-browser/chrome/devtools/skin/timeline.css
 browser/chrome/devtools/skin/images/close.png
 browser/chrome/devtools/skin/themes/images/close.png
 browser/chrome/devtools/skin/themes/tooltip/arrow-horizontal-dark@2x.png

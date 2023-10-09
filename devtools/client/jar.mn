@@ -278,7 +278,6 @@ devtools.jar:
 *   skin/floating-scrollbars.css (themes/floating-scrollbars.css)
     skin/floating-scrollbars-light.css (themes/floating-scrollbars-light.css)
     skin/inspector.css (themes/inspector.css)
-    skin/timeline.css (themes/timeline.css)
     skin/images/profiler-stopwatch.svg (themes/images/profiler-stopwatch.svg)
     skin/images/emojis/emoji-command-pick.svg (themes/images/emojis/emoji-command-pick.svg)
     skin/images/emojis/emoji-tool-webconsole.svg (themes/images/emojis/emoji-tool-webconsole.svg)
