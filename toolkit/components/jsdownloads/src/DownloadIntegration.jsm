@@ -136,7 +136,11 @@ this.DownloadIntegration = {
   dontLoadObservers: false,
   dontCheckParentalControls: false,
   shouldBlockInTest: false,
+#ifdef MOZ_URL_CLASSIFIER
+  dontCheckApplicationReputation: false,
+#else
   dontCheckApplicationReputation: true,
+#endif
   shouldBlockInTestForApplicationReputation: false,
   shouldKeepBlockedDataInTest: false,
   dontOpenFileAndFolder: false,
