@@ -54,9 +54,6 @@ fi
 
 MOZ_BROWSER_STATUSBAR=1
 
-#Enable devtools by default. Can be disabled with --disable-devtools in mozconfig.
-MOZ_DEVTOOLS=1
-
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
 # Changing MOZ_*BRANDING_DIRECTORY requires a clobber to ensure correct results,
 # because branding dependencies are broken.
