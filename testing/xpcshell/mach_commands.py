@@ -278,7 +278,7 @@ class AndroidXPCShellRunner(MozbuildObject):
             else:
                 raise Exception("You must specify an APK")
 
-        if test_paths == ['all']:
+        if test_paths == 'all':
             testdirs = []
             options.testPath = None
             options.verbose = False
