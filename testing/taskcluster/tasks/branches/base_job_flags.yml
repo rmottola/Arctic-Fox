@@ -23,6 +23,7 @@ flags:
     - aries
     - aries-ota
     - aries-eng
+    - android-api-11
 
   post-build:
     - upload-symbols
