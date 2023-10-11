@@ -4,7 +4,7 @@
 * This library listens for touch events and generates mousedown, mousemove
 * mouseup, and click events to match them. It captures and dicards any
 * real mouse events (non-synthetic events with isTrusted true) that are
-* send by goanna so that there are not duplicates.
+* send by gecko so that there are not duplicates.
 *
 * This library does emit mouseover/mouseout and mouseenter/mouseleave
 * events. You can turn them off by setting MouseEventShim.trackMouseMoves to
@@ -38,7 +38,7 @@
   var target; // The element the touch is currently over
   var emitclick; // Will we be sending a click event after mouseup?
 
-  // Use capturing listeners to discard all mouse events from goanna
+  // Use capturing listeners to discard all mouse events from gecko
   window.addEventListener('mousedown', discardEvent, true);
   window.addEventListener('mouseup', discardEvent, true);
   window.addEventListener('mousemove', discardEvent, true);
@@ -70,7 +70,7 @@
     if (e.defaultPrevented)
       return;
 
-    // Sometimes an unknown goanna bug causes us to get a touchstart event
+    // Sometimes an unknown gecko bug causes us to get a touchstart event
     // for an iframe target that we can't use because it is cross origin.
     // Don't start handling a touch in that case
     try {
@@ -246,7 +246,7 @@
 }());
 
 var MouseEventShim = {
-  // It is a known goanna bug that synthetic events have timestamps measured
+  // It is a known gecko bug that synthetic events have timestamps measured
   // in microseconds while regular events have timestamps measured in
   // milliseconds. This utility function returns a the timestamp converted
   // to milliseconds, if necessary.

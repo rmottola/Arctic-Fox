@@ -7,7 +7,7 @@
 """initial_beagle.py
 
 Multi-repo m-c hg->git initial conversion with cvs prepending, specifically for
-goanna.git and beagle support.
+gecko.git and beagle support.
 
 Separated from hg_git.py for a) simplifying hg_git.py for its main purpose,
 and b) somewhat protecting the initial conversion steps from future edits.
@@ -43,7 +43,7 @@ class HgGitScript(VirtualenvMixin, TooltoolMixin, TransferMixin, VCSScript):
         Beagle is a git repo of mozilla-central, with full cvs history,
         and a number of developer-oriented repositories and branches added.
 
-        The partner-oriented goanna.git could also be incorporated into this
+        The partner-oriented gecko.git could also be incorporated into this
         script with some changes.
         """
 

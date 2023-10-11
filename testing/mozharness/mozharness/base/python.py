@@ -631,7 +631,7 @@ class InfluxRecordingMixin(object):
                 "platform",
                 "branch",
                 "slavename",
-                "goanna_revision",
+                "gecko_revision",
                 "gaia_revision",
                 "buildid",
             ],
@@ -691,7 +691,7 @@ class InfluxRecordingMixin(object):
                     "platform",
                     "branch",
                     "slavename",
-                    "goanna_revision",
+                    "gecko_revision",
                     "gaia_revision",
                     "buildid",
 

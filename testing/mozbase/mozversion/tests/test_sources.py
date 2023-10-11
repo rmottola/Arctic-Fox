@@ -25,7 +25,7 @@ SourceRepository = PlatformSourceRepo
     sources_xml = """<?xml version="1.0" ?><manifest>
   <project path="build" revision="build_revision" />
   <project path="gaia" revision="gaia_revision" />
-  <project path="goanna" revision="goanna_revision" />
+  <project path="gecko" revision="gecko_revision" />
 </manifest>
 """
 
@@ -77,7 +77,7 @@ SourceRepository = PlatformSourceRepo
     def _check_version(self, version):
         self.assertEqual(version.get('build_changeset'), 'build_revision')
         self.assertEqual(version.get('gaia_changeset'), 'gaia_revision')
-        self.assertEqual(version.get('goanna_changeset'), 'goanna_revision')
+        self.assertEqual(version.get('gecko_changeset'), 'gecko_revision')
         self.assertIsNone(version.get('invalid_key'))
 
 

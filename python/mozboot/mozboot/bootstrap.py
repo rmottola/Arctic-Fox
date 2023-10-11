@@ -36,7 +36,7 @@ obtain a copy of the source code by running:
 
 Or, if you prefer Git:
 
-    git clone https://git.mozilla.org/integration/goanna-dev.git
+    git clone https://git.mozilla.org/integration/gecko-dev.git
 '''
 
 

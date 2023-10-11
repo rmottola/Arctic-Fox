@@ -11,7 +11,7 @@ class TestTabModals(MarionetteTestCase):
 
     def setUp(self):
         MarionetteTestCase.setUp(self)
-        self.marionette.enforce_goanna_prefs({"prompts.tab_modal.enabled": True})
+        self.marionette.enforce_gecko_prefs({"prompts.tab_modal.enabled": True})
         self.marionette.navigate(self.marionette.absolute_url('modal_dialogs.html'))
 
     def alert_present(self):
@@ -185,7 +185,7 @@ class TestGlobalModals(TestTabModals):
 
     def setUp(self):
         MarionetteTestCase.setUp(self)
-        self.marionette.enforce_goanna_prefs({"prompts.tab_modal.enabled": False})
+        self.marionette.enforce_gecko_prefs({"prompts.tab_modal.enabled": False})
         self.marionette.navigate(self.marionette.absolute_url('modal_dialogs.html'))
 
     def test_unrelated_command_when_alert_present(self):

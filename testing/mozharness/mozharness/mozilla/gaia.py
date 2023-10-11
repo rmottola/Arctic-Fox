@@ -42,7 +42,7 @@ class GaiaMixin(object):
         repo: a dict containing 'repo_path', 'revision', and optionally
               'branch' parameters
         use_gaia_json: if True, the repo parameter is used to retrieve
-              a gaia.json file from a goanna repo, which in turn is used to
+              a gaia.json file from a gecko repo, which in turn is used to
               clone gaia; if False, repo represents a gaia repo to clone.
         """
 
@@ -288,14 +288,14 @@ class GaiaMixin(object):
         Two ways of using this function:
         - The user specifies --gaia-repo or in a config file
         - The buildbot propeties exist and we query the gaia json url
-          for the current goanna tree
+          for the current gecko tree
         '''
         dirs = self.query_abs_dirs()
         dest = dirs['abs_gaia_dir']
         repo = {}
 
         if self.buildbot_config is not None:
-            # get gaia commit via hgweb (goanna's gaia.json)
+            # get gaia commit via hgweb (gecko's gaia.json)
             repo = {
                 'revision': self.buildbot_config['properties']['revision'],
                 'repo_path': 'https://hg.mozilla.org/%s' % self.buildbot_config['properties']['repo_path'],

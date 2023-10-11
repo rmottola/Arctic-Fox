@@ -201,7 +201,7 @@ function isStartToFinishUpdate(update) {
 }
 
 function statusSettingIs(value, next) {
-  Services.settings.createLock().get("goanna.updateStatus", {
+  Services.settings.createLock().get("gecko.updateStatus", {
     handle: function(name, v) {
       is(v, value);
       next();

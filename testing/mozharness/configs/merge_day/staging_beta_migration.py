@@ -1,5 +1,5 @@
 # Use this script in conjunction with aurora_to_beta.py.
-# mozharness/scripts/merge_day/goanna_migration.py -c \
+# mozharness/scripts/merge_day/gecko_migration.py -c \
 #   mozharness/configs/merge_day/aurora_to_beta.py -c
 #   mozharness/configs/merge_day/staging_beta_migration.py ...
 

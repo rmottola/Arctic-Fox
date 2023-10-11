@@ -12,7 +12,7 @@ from .runner import BaseRunner
 
 class GeckoRuntimeRunner(BaseRunner):
     """
-    The base runner class used for local goanna runtime binaries,
+    The base runner class used for local gecko runtime binaries,
     such as Firefox and Thunderbird.
     """
 

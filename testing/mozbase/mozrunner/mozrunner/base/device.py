@@ -18,7 +18,7 @@ from ..devices import Emulator
 
 class DeviceRunner(BaseRunner):
     """
-    The base runner class used for running goanna on
+    The base runner class used for running gecko on
     remote devices (or emulators), such as B2G.
     """
     env = { 'MOZ_CRASHREPORTER': '1',

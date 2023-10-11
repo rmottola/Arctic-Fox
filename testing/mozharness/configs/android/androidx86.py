@@ -176,7 +176,7 @@ config = {
             "extra_args": ["--manifest=tests/xpcshell_android.ini"]
         },
     }, # end of "test_definitions"
-    # test harness options are located in the goanna tree
+    # test harness options are located in the gecko tree
     "in_tree_config": "config/mozharness/android_x86_config.py",
     "download_minidump_stackwalk": True,
     "default_blob_upload_servers": [

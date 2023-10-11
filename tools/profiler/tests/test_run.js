@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 function run_test() {
-  // If we can't get the profiler component then assume goanna was
+  // If we can't get the profiler component then assume gecko was
   // built without it and pass all the tests
   var profilerCc = Cc["@mozilla.org/tools/profiler;1"];
   if (!profilerCc)

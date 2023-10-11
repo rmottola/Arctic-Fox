@@ -1,4 +1,4 @@
-# This task is the base for most tests in goanna.
+# This task is the base for most tests in gecko.
 task:
   created: '{{now}}'
   deadline: '{{#from_now}}24 hours{{/from_now}}'
