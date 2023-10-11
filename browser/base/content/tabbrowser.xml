@@ -2536,6 +2536,13 @@
                 PrivateBrowsingUtils.isWindowPrivate(aOtherTab.ownerDocument.defaultView))
               return;
 
+            let ourBrowser = this.getBrowserForTab(aOurTab);
+            let otherBrowser = aOtherTab.linkedBrowser;
+
+            // Can't swap between chrome and content processes.
+            if (ourBrowser.isRemoteBrowser != otherBrowser.isRemoteBrowser)
+              return;
+
             // Keep the userContextId if set on other browser
             if (otherBrowser.hasAttribute("usercontextid")) {
               ourBrowser.setAttribute("usercontextid", otherBrowser.getAttribute("usercontextid"));
@@ -2561,9 +2568,6 @@
               aOurTab.setAttribute("soundplaying", "true");
               modifiedAttrs.push("soundplaying");
             }
-
-            let ourBrowser = this.getBrowserForTab(aOurTab);
-            let otherBrowser = aOtherTab.linkedBrowser;
 
             // If the other tab is pending (i.e. has not been restored, yet)
             // then do not switch docShells but retrieve the other tab's state
