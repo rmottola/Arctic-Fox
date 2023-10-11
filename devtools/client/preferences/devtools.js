@@ -17,6 +17,9 @@ pref("devtools.devedition.promo.url", "https://www.mozilla.org/firefox/developer
 // Enable the error console
 pref("devtools.errorconsole.enabled", true);
 
+// DevTools development workflow
+pref("devtools.loader.hotreload", false);
+
 // Developer toolbar preferences
 pref("devtools.toolbar.enabled", true);
 pref("devtools.toolbar.visible", false);
@@ -66,6 +69,10 @@ pref("devtools.inspector.showAllAnonymousContent", false);
 // Enable the MDN docs tooltip
 pref("devtools.inspector.mdnDocsTooltip.enabled", true);
 
+// Collapse attributes that are too long.
+// Use -1 to not collapse attributes at all.
+pref("devtools.markup.collapseAttributeLength", 120);
+
 // DevTools default color unit
 pref("devtools.defaultColorUnit", "authored");
 
@@ -99,6 +106,7 @@ pref("devtools.debugger.ui.variables-searchbox-visible", false);
 pref("devtools.memory.enabled", false);
 
 pref("devtools.memory.custom-breakdowns", "{}");
+pref("devtools.memory.custom-dominator-tree-breakdowns", "{}");
 
 // Enable the Performance tools
 pref("devtools.performance.enabled", true);
@@ -120,7 +128,7 @@ pref("devtools.performance.ui.show-idle-blocks", true);
 pref("devtools.performance.ui.enable-memory", false);
 pref("devtools.performance.ui.enable-allocations", false);
 pref("devtools.performance.ui.enable-framerate", true);
-pref("devtools.performance.ui.enable-jit-optimizations", false);
+pref("devtools.performance.ui.show-jit-optimizations", false);
 pref("devtools.performance.ui.show-triggers-for-gc-types",
   "TOO_MUCH_MALLOC ALLOC_TRIGGER LAST_DITCH EAGER_ALLOC_TRIGGER");
 

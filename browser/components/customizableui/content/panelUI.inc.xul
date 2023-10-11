@@ -1,0 +1,405 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<panel id="PanelUI-popup"
+       role="group"
+       type="arrow"
+       hidden="true"
+       flip="slide"
+       position="bottomcenter topright"
+       noautofocus="true">
+  <panelmultiview id="PanelUI-multiView" mainViewId="PanelUI-mainView">
+    <panelview id="PanelUI-mainView" context="customizationPanelContextMenu">
+      <vbox id="PanelUI-contents-scroller">
+        <vbox id="PanelUI-contents" class="panelUI-grid"/>
+      </vbox>
+
+      <footer id="PanelUI-footer">
+        <toolbarbutton id="PanelUI-update-status"
+                       oncommand="gMenuButtonUpdateBadge.onMenuPanelCommand(event);"
+                       wrap="true"
+                       hidden="true"/>
+        <hbox id="PanelUI-footer-fxa">
+          <hbox id="PanelUI-fxa-status"
+                defaultlabel="&fxaSignIn.label;"
+                signedinTooltiptext="&fxaSignedIn.tooltip;"
+                errorlabel="&fxaSignInError.label;"
+                unverifiedlabel="&fxaUnverified.label;"
+                onclick="if (event.which == 1) gFxAccounts.onMenuPanelCommand();">
+            <image id="PanelUI-fxa-avatar"/>
+            <toolbarbutton id="PanelUI-fxa-label"
+                           fxabrandname="&syncBrand.fxAccount.label;"/>
+          </hbox>
+          <toolbarseparator/>
+          <toolbarbutton id="PanelUI-fxa-icon"
+                         oncommand="gSyncUI.doSync();"
+                         closemenu="none">
+            <observes element="sync-status" attribute="syncstatus"/>
+            <observes element="sync-status" attribute="tooltiptext"/>
+          </toolbarbutton>
+        </hbox>
+
+        <hbox id="PanelUI-footer-inner">
+          <toolbarbutton id="PanelUI-customize" label="&appMenuCustomize.label;"
+                         exitLabel="&appMenuCustomizeExit.label;"
+                         tooltiptext="&appMenuCustomize.tooltip;"
+                         exitTooltiptext="&appMenuCustomizeExit.tooltip;"
+                         closemenu="none"
+                         oncommand="gCustomizeMode.toggle();"/>
+          <toolbarseparator/>
+          <toolbarbutton id="PanelUI-help" label="&helpMenu.label;"
+                         closemenu="none"
+                         tooltiptext="&appMenuHelp.tooltip;"
+                         oncommand="PanelUI.showHelpView(this);"/>
+          <toolbarseparator/>
+          <toolbarbutton id="PanelUI-quit"
+#ifdef XP_WIN
+                         label="&quitApplicationCmdWin2.label;"
+                         tooltiptext="&quitApplicationCmdWin2.tooltip;"
+#else
+#ifdef XP_MACOSX
+                         label="&quitApplicationCmdMac2.label;"
+#else
+                         label="&quitApplicationCmd.label;"
+#endif
+#endif
+                         command="cmd_quitApplication"/>
+        </hbox>
+      </footer>
+    </panelview>
+
+    <panelview id="PanelUI-history" flex="1">
+      <label value="&appMenuHistory.label;" class="panel-subview-header"/>
+      <vbox class="panel-subview-body">
+        <toolbarbutton id="appMenuViewHistorySidebar"
+                       label="&appMenuHistory.viewSidebar.label;"
+                       type="checkbox"
+                       class="subviewbutton"
+                       key="key_gotoHistory"
+                       oncommand="SidebarUI.toggle('viewHistorySidebar'); PanelUI.hide();">
+          <observes element="viewHistorySidebar" attribute="checked"/>
+        </toolbarbutton>
+        <toolbarbutton id="appMenuClearRecentHistory"
+                       label="&appMenuHistory.clearRecent.label;"
+                       class="subviewbutton"
+                       command="Tools:Sanitize"/>
+        <toolbarbutton id="sync-tabs-menuitem2"
+                       class="syncTabsMenuItem subviewbutton"
+                       label="&syncTabsMenu3.label;"
+                       oncommand="BrowserOpenSyncTabs();"
+                       hidden="true"/>
+        <toolbarbutton id="appMenuRestoreLastSession"
+                       label="&appMenuHistory.restoreSession.label;"
+                       class="subviewbutton"
+                       command="Browser:RestoreLastSession"/>
+        <menuseparator id="PanelUI-recentlyClosedTabs-separator"/>
+        <vbox id="PanelUI-recentlyClosedTabs" tooltip="bhTooltip"/>
+        <menuseparator id="PanelUI-recentlyClosedWindows-separator"/>
+        <vbox id="PanelUI-recentlyClosedWindows" tooltip="bhTooltip"/>
+        <menuseparator id="PanelUI-historyItems-separator"/>
+        <vbox id="PanelUI-historyItems" tooltip="bhTooltip"/>
+      </vbox>
+      <toolbarbutton id="PanelUI-historyMore"
+                     class="panel-subview-footer subviewbutton"
+                     label="&appMenuHistory.showAll.label;"
+                     oncommand="PlacesCommandHook.showPlacesOrganizer('History'); CustomizableUI.hidePanelForNode(this);"/>
+    </panelview>
+
+    <panelview id="PanelUI-remotetabs" flex="1" class="PanelUI-subView">
+      <label value="&appMenuRemoteTabs.label;" class="panel-subview-header"/>
+      <vbox class="panel-subview-body">
+        <!-- this widget has 3 boxes in the body, but only 1 is ever visible -->
+        <!-- When Sync is ready to sync -->
+        <vbox id="PanelUI-remotetabs-main" observes="sync-syncnow-state">
+          <toolbarbutton id="PanelUI-remotetabs-view-sidebar"
+                         class="subviewbutton"
+                         observes="viewTabsSidebar"
+                         label="&appMenuRemoteTabs.sidebar.label;"/>
+          <toolbarbutton id="PanelUI-remotetabs-syncnow"
+                         observes="sync-status"
+                         class="subviewbutton"
+                         oncommand="gSyncUI.doSync();"
+                         closemenu="none"/>
+          <menuseparator id="PanelUI-remotetabs-separator"/>
+          <deck id="PanelUI-remotetabs-deck">
+            <!-- Sync is ready to Sync and the "tabs" engine is enabled -->
+            <vbox id="PanelUI-remotetabs-tabspane">
+              <vbox id="PanelUI-remotetabs-tabslist"
+                    notabsforclientlabel="&appMenuRemoteTabs.notabs.label;"
+                    />
+            </vbox>
+            <!-- Sync is ready to Sync but the "tabs" engine isn't enabled-->
+            <hbox id="PanelUI-remotetabs-tabsdisabledpane" pack="center" flex="1">
+              <vbox class="PanelUI-remotetabs-instruction-box">
+                <hbox pack="center">
+                  <image class="fxaSyncIllustration" alt=""/>
+                </hbox>
+                <label class="PanelUI-remotetabs-instruction-label">&appMenuRemoteTabs.tabsnotsyncing.label;</label>
+                <hbox pack="center">
+                  <toolbarbutton class="PanelUI-remotetabs-prefs-button"
+                                 label="&appMenuRemoteTabs.openprefs.label;"
+                                 oncommand="gSyncUI.openSetup();"/>
+                </hbox>
+              </vbox>
+            </hbox>
+            <!-- Sync is ready to Sync but we are still fetching the tabs to show -->
+            <vbox id="PanelUI-remotetabs-fetching">
+              <label>&appMenuRemoteTabs.fetching.label;</label>
+            </vbox>
+            <!-- Sync has only 1 (ie, this) device connected -->
+            <hbox id="PanelUI-remotetabs-nodevicespane" pack="center" flex="1">
+              <vbox class="PanelUI-remotetabs-instruction-box">
+                <hbox pack="center">
+                  <image class="fxaSyncIllustration" alt=""/>
+                </hbox>
+                <label class="PanelUI-remotetabs-instruction-label">&appMenuRemoteTabs.noclients.label;</label>
+                <!-- The inner HTML for PanelUI-remotetabs-mobile-promo is built at runtime -->
+                <label id="PanelUI-remotetabs-mobile-promo"/>
+              </vbox>
+            </hbox>
+          </deck>
+        </vbox>
+        <!-- a box to ensure contained boxes are centered horizonally -->
+        <hbox pack="center" flex="1">
+          <!-- When Sync is not configured -->
+          <vbox id="PanelUI-remotetabs-setupsync"
+                flex="1"
+                align="center"
+                class="PanelUI-remotetabs-instruction-box"
+                observes="sync-setup-state">
+            <image class="fxaSyncIllustration" alt=""/>
+            <label class="PanelUI-remotetabs-instruction-label">&appMenuRemoteTabs.notsignedin.label;</label>
+            <toolbarbutton class="PanelUI-remotetabs-prefs-button"
+                           label="&appMenuRemoteTabs.signin.label;"
+                           oncommand="gSyncUI.openSetup();"/>
+          </vbox>
+          <!-- When Sync needs re-authentication. This uses the exact same messaging
+               as "Sync is not configured" but remains a separate box so we get
+               the goodness of observing broadcasters to manage the hidden states -->
+          <vbox id="PanelUI-remotetabs-reauthsync"
+                flex="1"
+                align="center"
+                class="PanelUI-remotetabs-instruction-box"
+                observes="sync-reauth-state">
+            <image class="fxaSyncIllustration" alt=""/>
+            <label class="PanelUI-remotetabs-instruction-label">&appMenuRemoteTabs.notsignedin.label;</label>
+            <toolbarbutton class="PanelUI-remotetabs-prefs-button"
+                           label="&appMenuRemoteTabs.signin.label;"
+                           oncommand="gSyncUI.openSetup();"/>
+          </vbox>
+        </hbox>
+      </vbox>
+    </panelview>
+
+    <panelview id="PanelUI-bookmarks" flex="1" class="PanelUI-subView">
+      <label value="&bookmarksMenu.label;" class="panel-subview-header"/>
+      <vbox class="panel-subview-body">
+        <toolbarbutton id="panelMenuBookmarkThisPage"
+                       class="subviewbutton"
+                       observes="bookmarkThisPageBroadcaster"
+                       command="Browser:AddBookmarkAs"
+                       onclick="PanelUI.hide();"/>
+        <toolbarseparator/>
+        <toolbarbutton id="panelMenu_viewBookmarksSidebar"
+                       label="&viewBookmarksSidebar2.label;"
+                       class="subviewbutton"
+                       key="viewBookmarksSidebarKb"
+                       oncommand="SidebarUI.toggle('viewBookmarksSidebar'); PanelUI.hide();">
+          <observes element="viewBookmarksSidebar" attribute="checked"/>
+        </toolbarbutton>
+        <toolbarbutton id="panelMenu_viewBookmarksToolbar"
+                       label="&viewBookmarksToolbar.label;"
+                       type="checkbox"
+                       toolbarId="PersonalToolbar"
+                       class="subviewbutton"
+                       oncommand="onViewToolbarCommand(event); PanelUI.hide();"/>
+        <toolbarseparator/>
+        <toolbarbutton id="panelMenu_bookmarksToolbar"
+                       label="&personalbarCmd.label;"
+                       class="subviewbutton cui-withicon"
+                       oncommand="PlacesCommandHook.showPlacesOrganizer('BookmarksToolbar'); PanelUI.hide();"/>
+        <toolbarbutton id="panelMenu_unsortedBookmarks"
+                       label="&unsortedBookmarksCmd.label;"
+                       class="subviewbutton cui-withicon"
+                       oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks'); PanelUI.hide();"/>
+        <toolbarseparator class="small-separator"/>
+        <toolbaritem id="panelMenu_bookmarksMenu"
+                     orient="vertical"
+                     smoothscroll="false"
+                     onclick="if (event.button == 1) BookmarkingUI.onPanelMenuViewCommand(event, this._placesView);"
+                     oncommand="BookmarkingUI.onPanelMenuViewCommand(event, this._placesView);"
+                     flatList="true"
+                     tooltip="bhTooltip">
+          <!-- bookmarks menu items will go here -->
+        </toolbaritem>
+      </vbox>
+      <toolbarbutton id="panelMenu_showAllBookmarks"
+                     label="&showAllBookmarks2.label;"
+                     class="subviewbutton panel-subview-footer"
+                     command="Browser:ShowAllBookmarks"
+                     onclick="PanelUI.hide();"/>
+    </panelview>
+
+    <panelview id="PanelUI-socialapi" flex="1"/>
+
+    <panelview id="PanelUI-loopapi" flex="1"/>
+
+    <panelview id="PanelUI-feeds" flex="1" oncommand="FeedHandler.subscribeToFeed(null, event);">
+      <label value="&feedsMenu2.label;" class="panel-subview-header"/>
+    </panelview>
+
+    <panelview id="PanelUI-helpView" flex="1" class="PanelUI-subView">
+      <label value="&helpMenu.label;" class="panel-subview-header"/>
+      <vbox id="PanelUI-helpItems" class="panel-subview-body"/>
+    </panelview>
+
+    <panelview id="PanelUI-developer" flex="1">
+      <label value="&webDeveloperMenu.label;" class="panel-subview-header"/>
+      <vbox id="PanelUI-developerItems" class="panel-subview-body"/>
+    </panelview>
+
+    <panelview id="PanelUI-sidebar" flex="1">
+      <label value="&appMenuSidebars.label;" class="panel-subview-header"/>
+      <vbox id="PanelUI-sidebarItems" class="panel-subview-body"/>
+    </panelview>
+
+    <panelview id="PanelUI-characterEncodingView" flex="1">
+      <label value="&charsetMenu2.label;" class="panel-subview-header"/>
+      <vbox class="panel-subview-body">
+        <vbox id="PanelUI-characterEncodingView-pinned"
+              class="PanelUI-characterEncodingView-list"/>
+        <toolbarseparator/>
+        <vbox id="PanelUI-characterEncodingView-charsets"
+              class="PanelUI-characterEncodingView-list"/>
+        <toolbarseparator/>
+        <vbox>
+          <label id="PanelUI-characterEncodingView-autodetect-label"/>
+          <vbox id="PanelUI-characterEncodingView-autodetect"
+                class="PanelUI-characterEncodingView-list"/>
+        </vbox>
+      </vbox>
+    </panelview>
+
+    <panelview id="PanelUI-panicView" flex="1">
+      <vbox class="panel-subview-body">
+        <hbox id="PanelUI-panic-timeframe">
+          <image id="PanelUI-panic-timeframe-icon" alt=""/>
+          <vbox flex="1">
+            <hbox id="PanelUI-panic-header">
+              <image id="PanelUI-panic-timeframe-icon-small" alt=""/>
+              <description id="PanelUI-panic-mainDesc" flex="1">&panicButton.view.mainTimeframeDesc;</description>
+            </hbox>
+            <radiogroup id="PanelUI-panic-timeSpan" aria-labelledby="PanelUI-panic-mainDesc" closemenu="none">
+              <radio id="PanelUI-panic-5min" label="&panicButton.view.5min;" selected="true"
+                     value="5" class="subviewradio"/>
+              <radio id="PanelUI-panic-2hr" label="&panicButton.view.2hr;"
+                     value="2" class="subviewradio"/>
+              <radio id="PanelUI-panic-day" label="&panicButton.view.day;"
+                     value="6" class="subviewradio"/>
+            </radiogroup>
+          </vbox>
+        </hbox>
+        <vbox id="PanelUI-panic-explanations">
+          <label id="PanelUI-panic-actionlist-main-label">&panicButton.view.mainActionDesc;</label>
+
+          <label id="PanelUI-panic-actionlist-windows" class="PanelUI-panic-actionlist">&panicButton.view.deleteTabsAndWindows;</label>
+          <label id="PanelUI-panic-actionlist-cookies" class="PanelUI-panic-actionlist">&panicButton.view.deleteCookies;</label>
+          <label id="PanelUI-panic-actionlist-history" class="PanelUI-panic-actionlist">&panicButton.view.deleteHistory;</label>
+          <label id="PanelUI-panic-actionlist-newwindow" class="PanelUI-panic-actionlist">&panicButton.view.openNewWindow;</label>
+
+          <label id="PanelUI-panic-warning">&panicButton.view.undoWarning;</label>
+        </vbox>
+        <button id="PanelUI-panic-view-button"
+                label="&panicButton.view.forgetButton;"/>
+      </vbox>
+    </panelview>
+
+  </panelmultiview>
+  <!-- These menupopups are located here to prevent flickering,
+       see bug 492960 comment 20. -->
+  <menupopup id="customizationPanelItemContextMenu">
+    <menuitem oncommand="gCustomizeMode.addToToolbar(document.popupNode)"
+              closemenu="single"
+              class="customize-context-moveToToolbar"
+              accesskey="&customizeMenu.moveToToolbar.accesskey;"
+              label="&customizeMenu.moveToToolbar.label;"/>
+    <menuitem oncommand="gCustomizeMode.removeFromArea(document.popupNode)"
+              closemenu="single"
+              class="customize-context-removeFromPanel"
+              accesskey="&customizeMenu.removeFromMenu.accesskey;"
+              label="&customizeMenu.removeFromMenu.label;"/>
+    <menuseparator/>
+    <menuitem command="cmd_CustomizeToolbars"
+              class="viewCustomizeToolbar"
+              accesskey="&viewCustomizeToolbar.accesskey;"
+              label="&viewCustomizeToolbar.label;"/>
+  </menupopup>
+
+  <menupopup id="customizationPaletteItemContextMenu">
+    <menuitem oncommand="gCustomizeMode.addToToolbar(document.popupNode)"
+              class="customize-context-addToToolbar"
+              accesskey="&customizeMenu.addToToolbar.accesskey;"
+              label="&customizeMenu.addToToolbar.label;"/>
+    <menuitem oncommand="gCustomizeMode.addToPanel(document.popupNode)"
+              class="customize-context-addToPanel"
+              accesskey="&customizeMenu.addToPanel.accesskey;"
+              label="&customizeMenu.addToPanel.label;"/>
+  </menupopup>
+
+  <menupopup id="customizationPanelContextMenu">
+    <menuitem command="cmd_CustomizeToolbars"
+              accesskey="&customizeMenu.addMoreItems.accesskey;"
+              label="&customizeMenu.addMoreItems.label;"/>
+  </menupopup>
+</panel>
+
+<panel id="widget-overflow"
+       role="group"
+       type="arrow"
+       noautofocus="true"
+       context="toolbar-context-menu"
+       position="bottomcenter topright"
+       hidden="true">
+  <vbox id="widget-overflow-scroller">
+    <vbox id="widget-overflow-list" class="widget-overflow-list"
+          overflowfortoolbar="nav-bar"/>
+  </vbox>
+</panel>
+
+<panel id="customization-tipPanel"
+       type="arrow"
+       flip="none"
+       side="left"
+       position="leftcenter topright"
+       noautohide="true"
+       hidden="true">
+  <hbox class="customization-tipPanel-wrapper">
+    <vbox class="customization-tipPanel-infoBox"/>
+    <vbox class="customization-tipPanel-content" flex="1">
+      <description class="customization-tipPanel-contentMessage"/>
+      <image class="customization-tipPanel-contentImage"/>
+    </vbox>
+    <vbox pack="start" align="end" class="customization-tipPanel-closeBox">
+      <toolbarbutton oncommand="gCustomizeMode.hideTip()" class="close-icon"/>
+    </vbox>
+  </hbox>
+</panel>
+
+<panel id="panic-button-success-notification"
+       type="arrow"
+       position="bottomcenter topright"
+       hidden="true"
+       role="alert"
+       orient="vertical">
+  <hbox id="panic-button-success-header">
+    <image id="panic-button-success-icon" alt=""/>
+    <vbox>
+      <description>&panicButton.thankyou.msg1;</description>
+      <description>&panicButton.thankyou.msg2;</description>
+    </vbox>
+  </hbox>
+  <button label="&panicButton.thankyou.buttonlabel;"
+          id="panic-button-success-closebutton"
+          oncommand="PanicButtonNotifier.close()"/>
+</panel>

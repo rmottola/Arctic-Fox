@@ -6,7 +6,7 @@ config = {
     "test_suite": "xpcshell",                               # reftest, mochitest or xpcshell
 
     "emulator_url": "http://127.0.1.1/b2g/emulator.zip",    # url to emulator zip file
-    "installer_url": "http://127.0.1.1/b2g/b2g.tar.gz",     # url to goanna build
+    "installer_url": "http://127.0.1.1/b2g/b2g.tar.gz",     # url to gecko build
     "xre_url": "http://127.0.1.1/b2g/xpcshell.zip",         # url to xpcshell zip file
     "test_url": "http://127.0.1.1/b2g/tests.zip",           # url to tests.zip
     "busybox_url": "http://127.0.1.1/b2g/busybox",          # url to busybox binary

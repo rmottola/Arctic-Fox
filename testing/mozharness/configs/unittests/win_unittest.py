@@ -38,17 +38,27 @@ config = {
         "reftest": "runreftest.py",
         "xpcshell": "runxpcshelltests.py",
         "cppunittest": "runcppunittests.py",
+        "gtest": "rungtests.py",
         "jittest": "jit_test.py",
         "mozbase": "test.py",
         "mozmill": "runtestlist.py",
     },
-    "minimum_tests_zip_dirs": ["bin/*", "certs/*", "modules/*", "mozbase/*", "config/*"],
+    "minimum_tests_zip_dirs": [
+        "bin/*",
+        "certs/*",
+        "config/*",
+        "marionette/*",
+        "modules/*",
+        "mozbase/*",
+        "tools/*",
+    ],
     "specific_tests_zip_dirs": {
         "mochitest": ["mochitest/*"],
         "webapprt": ["mochitest/*"],
         "reftest": ["reftest/*", "jsreftest/*"],
         "xpcshell": ["xpcshell/*"],
         "cppunittest": ["cppunittest/*"],
+        "gtest": ["gtest/*"],
         "jittest": ["jit-test/*"],
         "mozbase": ["mozbase/*"],
         "mozmill": ["mozmill/*"],
@@ -99,6 +109,7 @@ config = {
         "mozmill": {
             "options": [
                 "--binary=%(binary_path)s",
+                "--testing-modules-dir=test/modules",
                 "--symbols-path=%(symbols_path)s"
             ],
             "run_filename": "runtestlist.py",
@@ -138,17 +149,20 @@ config = {
             ],
             "run_filename": "runxpcshelltests.py",
             "testsdir": "xpcshell"
-        }
+        },
+        "gtest": {
+            "options": [
+                "--xre-path=%(abs_res_dir)s",
+                "--cwd=%(gtest_dir)s",
+                "--symbols-path=%(symbols_path)s",
+                "%(binary_path)s",
+            ],
+            "run_filename": "rungtests.py",
+        },
     },
-
     # local mochi suites
     "all_mochitest_suites":
     {
-        "plain1": ["--total-chunks=5", "--this-chunk=1", "--chunk-by-dir=4"],
-        "plain2": ["--total-chunks=5", "--this-chunk=2", "--chunk-by-dir=4"],
-        "plain3": ["--total-chunks=5", "--this-chunk=3", "--chunk-by-dir=4"],
-        "plain4": ["--total-chunks=5", "--this-chunk=4", "--chunk-by-dir=4"],
-        "plain5": ["--total-chunks=5", "--this-chunk=5", "--chunk-by-dir=4"],
         "plain": [],
         "plain-chunked": ["--chunk-by-dir=4"],
         "mochitest-push": ["--subsuite=push"],
@@ -162,9 +176,6 @@ config = {
         "jetpack-package": ["--jetpack-package"],
         "jetpack-addon": ["--jetpack-addon"],
         "a11y": ["--a11y"],
-        "plugins": ['--setpref=dom.ipc.plugins.enabled=false',
-                    '--setpref=dom.ipc.plugins.enabled.x86_64=false',
-                    '--ipcplugins']
     },
     # local webapprt suites
     "all_webapprt_suites": {
@@ -191,10 +202,16 @@ config = {
     },
     "all_xpcshell_suites": {
         "xpcshell": ["--manifest=tests/xpcshell/tests/all-test-dirs.list",
-                     "%(abs_app_dir)s/" + XPCSHELL_NAME]
+                     "%(abs_app_dir)s/" + XPCSHELL_NAME],
+        "xpcshell-addons": ["--manifest=tests/xpcshell/tests/all-test-dirs.list",
+                            "--tag=addons",
+                            "%(abs_app_dir)s/" + XPCSHELL_NAME]
     },
     "all_cppunittest_suites": {
         "cppunittest": ['tests/cppunittest']
+    },
+    "all_gtest_suites": {
+        "gtest": []
     },
     "all_jittest_suites": {
         "jittest": []

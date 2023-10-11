@@ -6529,6 +6529,12 @@
     "kind": "boolean",
     "description": "How many times has the devtool's Developer Toolbar been opened via the toolbox button?"
   },
+  "DEVTOOLS_ABOUTDEBUGGING_OPENED_BOOLEAN": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "jan@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "boolean",
+    "description": "How many times has about:debugging been opened? (bug 1204601)"
+  },
   "DEVTOOLS_WEBIDE_OPENED_BOOLEAN": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -6693,6 +6699,12 @@
     "expires_in_version": "never",
     "kind": "flag",
     "description": "How many users have opened the devtool's Developer Toolbar been opened via the toolbox button?"
+  },
+  "DEVTOOLS_ABOUTDEBUGGING_OPENED_PER_USER_FLAG": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "jan@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "description": "How many users have opened about:debugging? (bug 1204601)"
   },
   "DEVTOOLS_WEBIDE_OPENED_PER_USER_FLAG": {
     "expires_in_version": "never",
@@ -6891,6 +6903,14 @@
     "high": "10000000",
     "n_buckets": 100,
     "description": "How long has the developer toolbar been active (seconds)"
+  },
+  "DEVTOOLS_ABOUTDEBUGGING_TIME_ACTIVE_SECONDS": {
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org", "jan@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "10000000",
+    "n_buckets": 100,
+    "description": "How long has about:debugging been active? (seconds) (bug 1204601)"
   },
   "DEVTOOLS_WEBIDE_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
@@ -8642,6 +8662,62 @@
     "low": "2000000",
     "high": "4000000",
     "n_buckets": 20
+  },
+  "DEVTOOLS_MEMORY_TAKE_SNAPSHOT_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "description": "The number of heap snapshots taken by a user"
+  },
+  "DEVTOOLS_MEMORY_IMPORT_SNAPSHOT_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "description": "The number of heap snapshots imported by a user"
+  },
+  "DEVTOOLS_MEMORY_EXPORT_SNAPSHOT_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "description": "The number of heap snapshots exported by a user"
+  },
+  "DEVTOOLS_MEMORY_FILTER_CENSUS": {
+    "expires_in_version": "56",
+    "kind": "boolean",
+    "bug_numbers": [1221619],
+    "description": "Whether a census tree was filtered or not"
+  },
+  "DEVTOOLS_MEMORY_DIFF_CENSUS": {
+    "expires_in_version": "56",
+    "kind": "boolean",
+    "bug_numbers": [1221619],
+    "description": "Whether a census was the result of diffing or not"
+  },
+  "DEVTOOLS_MEMORY_INVERTED_CENSUS": {
+    "expires_in_version": "56",
+    "kind": "boolean",
+    "bug_numbers": [1221619],
+    "description": "Whether a census tree was inverted or not"
+  },
+  "DEVTOOLS_MEMORY_BREAKDOWN_CENSUS_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "keyed": true,
+    "description": "The number of times a given type of breakdown was used for a census"
+  },
+  "DEVTOOLS_MEMORY_DOMINATOR_TREE_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "description": "The number of times a user requested a dominator tree be computed"
+  },
+  "DEVTOOLS_MEMORY_BREAKDOWN_DOMINATOR_TREE_COUNT": {
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1221619],
+    "keyed": true,
+    "description": "The number of times a given type of breakdown was used for a dominator tree"
   },
   "GRAPHICS_SANITY_TEST_REASON": {
     "alert_emails": ["danderson@mozilla.com"],

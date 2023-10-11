@@ -9,8 +9,8 @@ task:
     description: |
       Decision task for testing purposes for alder.
 
-  workerType: goanna-decision
-  provisionerId: aws-provisioner
+  workerType: gecko-decision
+  provisionerId: aws-provisioner-v1
 
   scopes:
     - 'docker-worker:cache:tc-vcs-public-sources'

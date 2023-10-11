@@ -438,7 +438,7 @@ config = {
             "extra_args": [],
         },
     }, # end of "test_definitions"
-    # test harness options are located in the goanna tree
+    # test harness options are located in the gecko tree
     "in_tree_config": "config/mozharness/android_arm_4_3_config.py",
     "download_minidump_stackwalk": True,
     "default_blob_upload_servers": [

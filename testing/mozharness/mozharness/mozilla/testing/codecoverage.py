@@ -55,8 +55,8 @@ class CodeCoverageMixin(object):
         del os.environ['GCOV_PREFIX']
 
         # TODO This is fragile, find rel_topsrcdir properly somehow
-        # We need to find the path relative to the goanna topsrcdir. Use
-        # some known goanna directories as a test.
+        # We need to find the path relative to the gecko topsrcdir. Use
+        # some known gecko directories as a test.
         canary_dirs = ['browser', 'docshell', 'dom', 'js', 'layout', 'toolkit', 'xpcom', 'xpfe']
         rel_topsrcdir = None
         for root, dirs, files in os.walk(self.gcov_dir):

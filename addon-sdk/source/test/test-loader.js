@@ -387,6 +387,19 @@ exports["test require#resolve"] = function(assert) {
 
   assert.equal(foundRoot + "sdk/tabs.js", require.resolve("sdk/tabs"), "correct resolution of sdk module");
   assert.equal(foundRoot + "toolkit/loader.js", require.resolve("toolkit/loader"), "correct resolution of sdk module");
+
+  const localLoader = Loader({
+    paths: { "foo/bar": "bizzle",
+             "foo/bar2/": "bizzle2",
+             // Just to make sure this doesn't match the first entry,
+             // let use resolve this module
+             "foo/bar-bar": "foo/bar-bar" }
+  });
+  const localRequire = Require(localLoader, module);
+  assert.equal(localRequire.resolve("foo/bar"), "bizzle.js");
+  assert.equal(localRequire.resolve("foo/bar/baz"), "bizzle/baz.js");
+  assert.equal(localRequire.resolve("foo/bar-bar"), "foo/bar-bar.js");
+  assert.equal(localRequire.resolve("foo/bar2/"), "bizzle2.js");
 };
 
 const modulesURI = require.resolve("toolkit/loader").replace("toolkit/loader.js", "");
@@ -559,7 +572,7 @@ exports['test user global'] = function(assert) {
 exports['test custom require caching'] = function(assert) {
   const loader = Loader({
     paths: { '': root + "/" },
-    require: (id, require) => {
+    requireHook: (id, require) => {
       // Just load it normally
       return require(id);
     }
@@ -581,7 +594,7 @@ exports['test caching when proxying a loader'] = function(assert) {
   const parentRequire = require;
   const loader = Loader({
     paths: { '': root + "/" },
-    require: (id, childRequire) => {
+    requireHook: (id, childRequire) => {
       if(id === 'gimmejson') {
         return childRequire('fixtures/loader/json/mutation.json')
       }

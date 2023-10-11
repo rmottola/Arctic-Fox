@@ -517,7 +517,7 @@ BUILD_BASE_CONFIG_OPTIONS = [
     [["--disable-mock"], {
         "dest": "disable_mock",
         "action": "store_true",
-        "help": "do not run under mock despite what goanna-config says",
+        "help": "do not run under mock despite what gecko-config says",
     }],
 
 ]

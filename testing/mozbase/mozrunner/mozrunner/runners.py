@@ -19,7 +19,7 @@ def Runner(*args, **kwargs):
     :param binary: Path to binary.
     :param cmdargs: Arguments to pass into binary.
     :param profile: Profile object to use.
-    :param env: Environment variables to pass into the goanna process.
+    :param env: Environment variables to pass into the gecko process.
     :param clean_profile: If True, restores profile back to original state.
     :param process_class: Class used to launch the binary.
     :param process_args: Arguments to pass into process_class.
@@ -36,7 +36,7 @@ def FirefoxRunner(*args, **kwargs):
     :param binary: Path to Firefox binary.
     :param cmdargs: Arguments to pass into binary.
     :param profile: Profile object to use.
-    :param env: Environment variables to pass into the goanna process.
+    :param env: Environment variables to pass into the gecko process.
     :param clean_profile: If True, restores profile back to original state.
     :param process_class: Class used to launch the binary.
     :param process_args: Arguments to pass into process_class.
@@ -54,7 +54,7 @@ def ThunderbirdRunner(*args, **kwargs):
     :param binary: Path to Thunderbird binary.
     :param cmdargs: Arguments to pass into binary.
     :param profile: Profile object to use.
-    :param env: Environment variables to pass into the goanna process.
+    :param env: Environment variables to pass into the gecko process.
     :param clean_profile: If True, restores profile back to original state.
     :param process_class: Class used to launch the binary.
     :param process_args: Arguments to pass into process_class.
@@ -72,7 +72,7 @@ def B2GDesktopRunner(*args, **kwargs):
     :param binary: Path to b2g desktop binary.
     :param cmdargs: Arguments to pass into binary.
     :param profile: Profile object to use.
-    :param env: Environment variables to pass into the goanna process.
+    :param env: Environment variables to pass into the gecko process.
     :param clean_profile: If True, restores profile back to original state.
     :param process_class: Class used to launch the binary.
     :param process_args: Arguments to pass into process_class.

@@ -4,37 +4,25 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const Cu = Components.utils;
-const Ci = Components.interfaces;
-const Cc = Components.classes;
-const CC = Components.Constructor;
+// Load the shared-head file first.
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js",
+  this);
 
 // Services.prefs.setBoolPref("devtools.debugger.log", true);
 // SimpleTest.registerCleanupFunction(() => {
 //   Services.prefs.clearUserPref("devtools.debugger.log");
 // });
 
-// Uncomment this pref to dump all devtools emitted events to the console.
-// Services.prefs.setBoolPref("devtools.dump.emit", true);
-
-var TEST_URL_ROOT = "http://example.com/browser/devtools/client/inspector/test/";
-var ROOT_TEST_DIR = getRootDirectory(gTestPath);
-
-// All test are asynchronous
-waitForExplicitFinish();
-
-var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-var {TargetFactory} = require("devtools/client/framework/target");
-var {console} = Cu.import("resource://gre/modules/Console.jsm", {});
-var DevToolsUtils = require("devtools/shared/DevToolsUtils");
-var promise = require("promise");
-
 // Import the GCLI test helper
-var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
-Services.scriptloader.loadSubScript(testDir + "../../../commandline/test/helpers.js", this);
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/commandline/test/helpers.js",
+  this);
 
 // Import helpers registering the test-actor in remote targets
-Services.scriptloader.loadSubScript(testDir + "../../../shared/test/test-actor-registry.js", this);
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/shared/test/test-actor-registry.js",
+  this);
 
 DevToolsUtils.testing = true;
 registerCleanupFunction(() => {
@@ -42,7 +30,6 @@ registerCleanupFunction(() => {
 });
 
 registerCleanupFunction(() => {
-  Services.prefs.clearUserPref("devtools.dump.emit");
   Services.prefs.clearUserPref("devtools.inspector.activeSidebar");
 });
 
@@ -59,25 +46,6 @@ registerCleanupFunction(function*() {
   while (gBrowser.tabs.length > 1) {
     gBrowser.removeCurrentTab();
   }
-});
-
-/**
- * Add a new test tab in the browser and load the given url.
- * @param {String} url The url to be loaded in the new tab
- * @return a promise that resolves to the tab object when the url is loaded
- */
-var addTab = Task.async(function* (url) {
-  info("Adding a new tab with URL: '" + url + "'");
-
-  window.focus();
-
-  let tab = gBrowser.selectedTab = gBrowser.addTab(url);
-  let browser = tab.linkedBrowser;
-
-  yield once(browser, "load", true);
-  info("URL '" + url + "' loading complete");
-
-  return tab;
 });
 
 var navigateTo = function (toolbox, url) {
@@ -162,33 +130,19 @@ var selectNode = Task.async(function*(selector, inspector, reason="test") {
  */
 var openInspectorForURL = Task.async(function*(url, hostType) {
   let tab = yield addTab(url);
-  let { inspector, toolbox, testActor } = yield openInspector(null, hostType);
+  let { inspector, toolbox, testActor } = yield openInspector(hostType);
   return { tab, inspector, toolbox, testActor };
 });
 
-
 /**
  * Open the toolbox, with the inspector tool visible.
- * @param {Function} cb Optional callback, if you don't want to use the returned
- * promise
  * @param {String} hostType Optional hostType, as defined in Toolbox.HostType
  * @return a promise that resolves when the inspector is ready
  */
-var openInspector = Task.async(function*(cb, hostType) {
+var openInspector = Task.async(function*(hostType) {
   info("Opening the inspector");
-  let target = TargetFactory.forTab(gBrowser.selectedTab);
 
-  let toolbox = gDevTools.getToolbox(target);
-  if (toolbox) {
-    if (toolbox.getPanel("inspector")) {
-      info("Toolbox and inspector already open");
-      throw new Error("Inspector is already opened, please use getActiveInspector");
-    }
-  }
-
-  info("Opening the toolbox");
-  toolbox = yield gDevTools.showToolbox(target, "inspector", hostType);
-  yield waitForToolboxFrameFocus(toolbox);
+  let toolbox = yield openToolboxForTab(gBrowser.selectedTab, "inspector", hostType);
   let inspector = toolbox.getPanel("inspector");
 
   info("Waiting for the inspector to update");
@@ -197,30 +151,33 @@ var openInspector = Task.async(function*(cb, hostType) {
   yield registerTestActor(toolbox.target.client);
   let testActor = yield getTestActor(toolbox);
 
-  return {
-    toolbox: toolbox,
-    inspector: inspector,
-    testActor: testActor
-  };
+  return {toolbox, inspector, testActor};
 });
-
-/**
- * Wait for the toolbox frame to receive focus after it loads
- * @param {Toolbox} toolbox
- * @return a promise that resolves when focus has been received
- */
-function waitForToolboxFrameFocus(toolbox) {
-  info("Making sure that the toolbox's frame is focused");
-  let def = promise.defer();
-  let win = toolbox.frame.contentWindow;
-  waitForFocus(def.resolve, win);
-  return def.promise;
-}
 
 function getActiveInspector() {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
   return gDevTools.getToolbox(target).getPanel("inspector");
 }
+
+/**
+ * Open the toolbox, with the inspector tool visible, and the one of the sidebar
+ * tabs selected.
+ * @param {String} id The ID of the sidebar tab to be opened
+ * @param {String} hostType Optional hostType, as defined in Toolbox.HostType
+ * @return a promise that resolves when the inspector is ready and the tab is
+ * visible and ready
+ */
+var openInspectorSidebarTab = Task.async(function*(id, hostType) {
+  let {toolbox, inspector} = yield openInspector();
+
+  info("Selecting the " + id + " sidebar");
+  inspector.sidebar.select(id);
+
+  return {
+    toolbox,
+    inspector
+  };
+});
 
 /**
  * Get the NodeFront for a node that matches a given css selector, via the
@@ -256,40 +213,13 @@ var getNodeFrontInFrame = Task.async(function*(selector, frameSelector,
   return inspector.walker.querySelector(nodes[0], selector);
 });
 
-function synthesizeKeyFromKeyTag(aKeyId, aDocument = null) {
-  let document = aDocument || document;
-  let key = document.getElementById(aKeyId);
-  isnot(key, null, "Successfully retrieved the <key> node");
-
-  let modifiersAttr = key.getAttribute("modifiers");
-
-  let name = null;
-
-  if (key.getAttribute("keycode"))
-    name = key.getAttribute("keycode");
-  else if (key.getAttribute("key"))
-    name = key.getAttribute("key");
-
-  isnot(name, null, "Successfully retrieved keycode/key");
-
-  let modifiers = {
-    shiftKey: modifiersAttr.match("shift"),
-    ctrlKey: modifiersAttr.match("ctrl"),
-    altKey: modifiersAttr.match("alt"),
-    metaKey: modifiersAttr.match("meta"),
-    accelKey: modifiersAttr.match("accel")
-  }
-
-  EventUtils.synthesizeKey(name, modifiers);
-}
-
 var focusSearchBoxUsingShortcut = Task.async(function* (panelWin, callback) {
   info("Focusing search box");
   let searchBox = panelWin.document.getElementById("inspector-searchbox");
   let focused = once(searchBox, "focus");
 
   panelWin.focus();
-  synthesizeKeyFromKeyTag("nodeSearchKey", panelWin.document);
+  synthesizeKeyFromKeyTag(panelWin.document.getElementById("nodeSearchKey"));
 
   yield focused;
 
@@ -389,38 +319,6 @@ function mouseLeaveMarkupView(inspector) {
 }
 
 /**
- * Wait for eventName on target.
- * @param {Object} target An observable object that either supports on/off or
- * addEventListener/removeEventListener
- * @param {String} eventName
- * @param {Boolean} useCapture Optional, for addEventListener/removeEventListener
- * @return A promise that resolves when the event has been handled
- */
-function once(target, eventName, useCapture=false) {
-  info("Waiting for event: '" + eventName + "' on " + target + ".");
-
-  let deferred = promise.defer();
-
-  for (let [add, remove] of [
-    ["addEventListener", "removeEventListener"],
-    ["addListener", "removeListener"],
-    ["on", "off"]
-  ]) {
-    if ((add in target) && (remove in target)) {
-      target[add](eventName, function onEvent(...aArgs) {
-        info("Got event: '" + eventName + "' on " + target + ".");
-        target[remove](eventName, onEvent, useCapture);
-        deferred.resolve.apply(deferred, aArgs);
-      }, useCapture);
-      break;
-    }
-  }
-
-  return deferred.promise;
-}
-
-
-/**
  * Dispatch the copy event on the given element
  */
 function fireCopyEvent(element) {
@@ -482,6 +380,35 @@ function dispatchCommandEvent(node) {
 }
 
 /**
+ * A helper that simulates a contextmenu event on the given chrome DOM element.
+ */
+function contextMenuClick(element) {
+  let evt = element.ownerDocument.createEvent('MouseEvents');
+  let button = 2;  // right click
+
+  evt.initMouseEvent('contextmenu', true, true,
+       element.ownerDocument.defaultView, 1, 0, 0, 0, 0, false,
+       false, false, false, button, null);
+
+  element.dispatchEvent(evt);
+}
+
+/**
+ * A helper that fetches a front for a node that matches the given selector or
+ * doctype node if the selector is falsy.
+ */
+function* getNodeFrontForSelector(selector, inspector) {
+  if (selector) {
+    info("Retrieving front for selector " + selector);
+    return getNodeFront(selector, inspector);
+  } else {
+    info("Retrieving front for doctype node");
+    let {nodes} = yield inspector.walker.children(inspector.walker.rootNode);
+    return nodes[0];
+  }
+}
+
+/**
  * Encapsulate some common operations for highlighter's tests, to have
  * the tests cleaner, without exposing directly `inspector`, `highlighter`, and
  * `testActor` if not needed.
@@ -534,3 +461,101 @@ const getHighlighterHelperFor = (type) => Task.async(
     };
   }
 );
+
+// The expand all operation of the markup-view calls itself recursively and
+// there's not one event we can wait for to know when it's done
+// so use this helper function to wait until all recursive children updates are done.
+function* waitForMultipleChildrenUpdates(inspector) {
+// As long as child updates are queued up while we wait for an update already
+// wait again
+    if (inspector.markup._queuedChildUpdates &&
+        inspector.markup._queuedChildUpdates.size) {
+        yield waitForChildrenUpdated(inspector);
+        return yield waitForMultipleChildrenUpdates(inspector);
+    }
+}
+
+/**
+ * Using the markupview's _waitForChildren function, wait for all queued
+ * children updates to be handled.
+ * @param {InspectorPanel} inspector The instance of InspectorPanel currently
+ * loaded in the toolbox
+ * @return a promise that resolves when all queued children updates have been
+ * handled
+ */
+function waitForChildrenUpdated({markup}) {
+    info("Waiting for queued children updates to be handled");
+    let def = promise.defer();
+    markup._waitForChildren().then(() => {
+        executeSoon(def.resolve);
+    });
+    return def.promise;
+}
+
+/**
+ * Wait for the toolbox to emit the styleeditor-selected event and when done
+ * wait for the stylesheet identified by href to be loaded in the stylesheet
+ * editor
+ *
+ * @param {Toolbox} toolbox
+ * @param {String} href
+ *        Optional, if not provided, wait for the first editor to be ready
+ * @return a promise that resolves to the editor when the stylesheet editor is
+ * ready
+ */
+function waitForStyleEditor(toolbox, href) {
+  let def = promise.defer();
+
+  info("Waiting for the toolbox to switch to the styleeditor");
+  toolbox.once("styleeditor-selected").then(() => {
+    let panel = toolbox.getCurrentPanel();
+    ok(panel && panel.UI, "Styleeditor panel switched to front");
+
+    // A helper that resolves the promise once it receives an editor that
+    // matches the expected href. Returns false if the editor was not correct.
+    let gotEditor = (event, editor) => {
+      let currentHref = editor.styleSheet.href;
+      if (!href || (href && currentHref.endsWith(href))) {
+        info("Stylesheet editor selected");
+        panel.UI.off("editor-selected", gotEditor);
+
+        editor.getSourceEditor().then(sourceEditor => {
+          info("Stylesheet editor fully loaded");
+          def.resolve(sourceEditor);
+        });
+
+        return true;
+      }
+
+      info("The editor was incorrect. Waiting for editor-selected event.");
+      return false;
+    };
+
+    // The expected editor may already be selected. Check the if the currently
+    // selected editor is the expected one and if not wait for an
+    // editor-selected event.
+    if (!gotEditor("styleeditor-selected", panel.UI.selectedEditor)) {
+      // The expected editor is not selected (yet). Wait for it.
+      panel.UI.on("editor-selected", gotEditor);
+    }
+  });
+
+  return def.promise;
+}
+
+/**
+ * @see SimpleTest.waitForClipboard
+ *
+ * @param {Function} setup
+ *        Function to execute before checking for the
+ *        clipboard content
+ * @param {String|Function} expected
+ *        An expected string or validator function
+ * @return a promise that resolves when the expected string has been found or
+ * the validator function has returned true, rejects otherwise.
+ */
+function waitForClipboard(setup, expected) {
+  let def = promise.defer();
+  SimpleTest.waitForClipboard(expected, setup, def.resolve, def.reject);
+  return def.promise;
+}

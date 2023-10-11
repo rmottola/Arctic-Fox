@@ -219,26 +219,6 @@ class B2GEmulatorTest(TestingMixin, VCSMixin, BaseScript, BlobUploadMixin):
         if os.path.isfile(requirements):
             self.register_virtualenv_module(requirements=[requirements],
                                             two_pass=True)
-            return
-
-        # XXX Bug 879765: Dependent modules need to be listed before parent
-        # modules, otherwise they will get installed from the pypi server.
-        # XXX Bug 908356: This block can be removed as soon as the
-        # in-tree requirements files propagate to all active trees.
-        mozbase_dir = os.path.join('tests', 'mozbase')
-        self.register_virtualenv_module(
-            'manifestparser',
-            url=os.path.join(mozbase_dir, 'manifestdestiny')
-        )
-
-        for m in ('mozfile', 'mozlog', 'mozinfo', 'moznetwork', 'mozhttpd',
-                  'mozcrash', 'mozinstall', 'mozdevice', 'mozprofile', 'mozprocess',
-                  'mozrunner'):
-            self.register_virtualenv_module(
-                m, url=os.path.join(mozbase_dir, m))
-
-        self.register_virtualenv_module(
-            'marionette', url=os.path.join('tests', 'marionette'))
 
     def _query_abs_base_cmd(self, suite):
         dirs = self.query_abs_dirs()
@@ -247,6 +227,8 @@ class B2GEmulatorTest(TestingMixin, VCSMixin, BaseScript, BlobUploadMixin):
 
         raw_log_file = os.path.join(dirs['abs_blob_upload_dir'],
                                     '%s_raw.log' % suite)
+        error_summary_file = os.path.join(dirs['abs_blob_upload_dir'],
+                                          '%s_errorsummary.log' % suite)
         emulator_type = 'x86' if os.path.isdir(os.path.join(dirs['abs_b2g-distro_dir'],
                         'out', 'target', 'product', 'generic_x86')) else 'arm'
         self.info("The emulator type: %s" % emulator_type)
@@ -266,6 +248,7 @@ class B2GEmulatorTest(TestingMixin, VCSMixin, BaseScript, BlobUploadMixin):
             'test_path': self.config.get('test_path'),
             'certificate_path': dirs['abs_certs_dir'],
             'raw_log_file': raw_log_file,
+            'error_summary_file': error_summary_file,
         }
 
         if suite not in self.config["suite_definitions"]:

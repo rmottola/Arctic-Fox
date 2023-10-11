@@ -6,6 +6,10 @@
 @import url(variables.css);
 @import url(toolbars.css);
 
+body {
+  margin: 0;
+}
+
 .theme-body {
   background: var(--theme-body-background);
   color: var(--theme-body-color);

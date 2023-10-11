@@ -5,10 +5,10 @@
  * Tests that Toolbox#viewSourceInScratchpad works.
  */
 
-let URL = `${URL_ROOT}doc_viewsource.html`;
+var URL = `${URL_ROOT}doc_viewsource.html`;
 
 function *viewSource() {
-  let toolbox = yield loadToolbox(URL);
+  let toolbox = yield openNewTabAndToolbox(URL);
   let win = yield openScratchpadWindow();
   let { Scratchpad: scratchpad } = win;
 
@@ -25,7 +25,7 @@ function *viewSource() {
     "The correct line is highlighted in scratchpad's editor.");
 
   win.close();
-  yield unloadToolbox(toolbox);
+  yield closeToolboxAndTab(toolbox);
   finish();
 }
 

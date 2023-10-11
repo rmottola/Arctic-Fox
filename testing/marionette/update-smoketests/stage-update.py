@@ -26,10 +26,10 @@ def stage_update(device, stage_dir):
 
     b2g_config = b2g.import_update_tools().B2GConfig()
     target_out_dir = os.path.join(b2g.homedir, 'out', 'target', 'product', device)
-    app_ini = os.path.join(b2g_config.goanna_objdir, 'dist', 'bin',
+    app_ini = os.path.join(b2g_config.gecko_objdir, 'dist', 'bin',
                            'application.ini')
-    goanna_mar = os.path.join(b2g_config.goanna_objdir, 'dist', 'b2g-update',
-                             'b2g-goanna-update.mar')
+    gecko_mar = os.path.join(b2g_config.gecko_objdir, 'dist', 'b2g-update',
+                             'b2g-gecko-update.mar')
 
     build_data = ConfigParser()
     build_data.read(app_ini)
@@ -59,7 +59,7 @@ def stage_update(device, stage_dir):
         '--output', flash_zip])
 
     complete_mar = os.path.join(build_dir, 'complete.mar')
-    shutil.copy(goanna_mar, complete_mar)
+    shutil.copy(gecko_mar, complete_mar)
 
     flash_template = open(os.path.join(this_dir, 'flash-template.sh')).read()
     flash_script = os.path.join(build_dir, 'flash.sh')

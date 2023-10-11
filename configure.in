@@ -97,8 +97,7 @@ dnl ==============================================================
 _topsrcdir=`cd \`dirname $0\`; pwd -W 2>/dev/null || pwd -P`
 _objdir=`pwd -P`
 
-dnl TODO Don't exempt L10N builds once bug 842760 is resolved.
-if test "$_topsrcdir" = "$_objdir" -a "${with_l10n_base+set}" != set; then
+if test "$_topsrcdir" = "$_objdir"; then
   echo "  ***"
   echo "  * Building directly in the main source directory is not allowed."
   echo "  *"
@@ -354,7 +353,11 @@ if test -n "$gonkdir" ; then
     direct_nspr_config=1
     android_cxx_stl=mozstlport
 else
-    MOZ_ANDROID_NDK
+    if test "$COMPILE_ENVIRONMENT"; then
+        MOZ_ANDROID_NDK
+    else
+        AC_DEFINE(ANDROID)
+    fi # COMPILE_ENVIRONMENT
 
     case "$target" in
     *-android*|*-linuxandroid*)
@@ -1204,7 +1207,14 @@ esac
 
 dnl Configure platform-specific CPU architecture compiler options.
 dnl ==============================================================
-MOZ_ARCH_OPTS
+if test "$COMPILE_ENVIRONMENT"; then
+    MOZ_ARCH_OPTS
+else
+    if test "$OS_TARGET" = Android -a x"$MOZ_WIDGET_TOOLKIT" != x"gonk"; then
+        dnl Default Android builds to ARMv7.
+        MOZ_ARCH=armv7-a
+    fi
+fi # COMPILE_ENVIRONMENT
 
 dnl =================================================================
 dnl Set up and test static assertion macros used to avoid AC_TRY_RUN,
@@ -1253,7 +1263,10 @@ dnl Android libstdc++, placed here so it can use MOZ_ARCH
 dnl computed above.
 dnl ========================================================
 
-MOZ_ANDROID_STLPORT
+MOZ_ANDROID_CPU_ARCH
+if test "$COMPILE_ENVIRONMENT"; then
+    MOZ_ANDROID_STLPORT
+fi # COMPILE_ENVIRONMENT
 
 dnl ========================================================
 dnl Suppress Clang Argument Warnings
@@ -1872,6 +1885,7 @@ case "$target" in
         AC_DEFINE(XP_IOS)
         AC_DEFINE(XP_DARWIN)
         _PLATFORM_DEFAULT_TOOLKIT='cairo-uikit'
+        direct_nspr_config=1
     else
         AC_DEFINE(XP_MACOSX)
         AC_DEFINE(XP_DARWIN)
@@ -2089,12 +2103,12 @@ ia64*-hpux*)
         _USE_CPP_INCLUDE_FLAG=1
         _DEFINES_CFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
         _DEFINES_CXXFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
+        SSE_FLAGS="-arch:SSE"
+        SSE2_FLAGS="-arch:SSE2"
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
-        if test "$CPU_ARCH" = "x86" -a -z "$CLANG_CL"; then
+        if test "$CPU_ARCH" = "x86"; then
             dnl VS2012+ defaults to -arch:SSE2.
-            dnl Clang-cl gets confused by -arch:IA32, so don't add it.
-            dnl (See https://llvm.org/bugs/show_bug.cgi?id=24335)
             CFLAGS="$CFLAGS -arch:IA32"
             CXXFLAGS="$CXXFLAGS -arch:IA32"
         fi
@@ -2478,6 +2492,7 @@ esac
 if test -z "$COMPILE_ENVIRONMENT"; then
     SKIP_COMPILER_CHECKS=1
     SKIP_LIBRARY_CHECKS=1
+    PKG_SKIP_STRIP=1
 else
     MOZ_COMPILER_OPTS
 fi # COMPILE_ENVIRONMENT
@@ -7491,20 +7506,6 @@ if test "$MOZ_CHROME_FILE_FORMAT" != "jar" &&
     AC_MSG_ERROR([--enable-chrome-format must be set to either jar, flat, or omni])
 fi
 
-dnl ========================================================
-dnl = Enable Mozilla Developer Tools (frontend)
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(devtools,
-[  --enable-devtools           Enable Mozilla Developer Tools],
-    MOZ_DEVTOOLS=1,
-    MOZ_DEVTOOLS=)
-
-if test -n "$MOZ_DEVTOOLS"; then
-    AC_DEFINE(MOZ_DEVTOOLS)
-fi
-
-AC_SUBST(MOZ_DEVTOOLS)
-
 dnl =========================================================
 dnl Omnijar packaging (bug 552121)
 dnl =========================================================
@@ -8600,6 +8601,19 @@ AC_SUBST(MOZ_NATIVE_NSPR)
 
 AC_SUBST(MOZ_NATIVE_NSS)
 AC_SUBST(NSS_DISABLE_DBM)
+
+HOST_CMFLAGS=-fobjc-exceptions
+HOST_CMMFLAGS=-fobjc-exceptions
+OS_COMPILE_CMFLAGS=-fobjc-exceptions
+OS_COMPILE_CMMFLAGS=-fobjc-exceptions
+if test "$MOZ_WIDGET_TOOLKIT" = uikit; then
+  OS_COMPILE_CMFLAGS="$OS_COMPILE_CMFLAGS -fobjc-abi-version=2 -fobjc-legacy-dispatch"
+  OS_COMPILE_CMMFLAGS="$OS_COMPILE_CMMFLAGS -fobjc-abi-version=2 -fobjc-legacy-dispatch"
+fi
+AC_SUBST(HOST_CMFLAGS)
+AC_SUBST(HOST_CMMFLAGS)
+AC_SUBST(OS_COMPILE_CMFLAGS)
+AC_SUBST(OS_COMPILE_CMMFLAGS)
 
 OS_CFLAGS="$CFLAGS"
 OS_CXXFLAGS="$CXXFLAGS"

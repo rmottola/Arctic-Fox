@@ -91,9 +91,7 @@ BuiltinProvider.prototype = {
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "devtools": "resource://devtools",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "devtools/client": "resource://devtools/client",
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "gcli": "resource://devtools/gcli",
+        "gcli": "resource://devtools/shared/gcli/source/lib/gcli",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "promise": "resource://gre/modules/Promise-backend.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
@@ -101,7 +99,7 @@ BuiltinProvider.prototype = {
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "acorn/util/walk": "resource://devtools/acorn/walk.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "source-map": "resource://devtools/sourcemap/source-map.js",
+        "source-map": "resource://devtools/shared/sourcemap/source-map.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         // Allow access to xpcshell test items from the loader.
         "xpcshell-test": "resource://test"
@@ -215,8 +213,7 @@ SrcdirProvider.prototype = {
       let entries = [];
       let lines = data.split(/\n/);
       let preprocessed = /^\s*\*/;
-      let contentEntry =
-        new RegExp("^\\s+content/(\\w+)/(\\S+)\\s+\\((\\S+)\\)");
+      let contentEntry = /^\s+content\/(\S+)\s+\((\S+)\)/;
       for (let line of lines) {
         if (preprocessed.test(line)) {
           dump("Unable to override preprocessed file: " + line + "\n");
@@ -224,12 +221,12 @@ SrcdirProvider.prototype = {
         }
         let match = contentEntry.exec(line);
         if (match) {
-          let pathComponents = match[3].split("/");
+          let pathComponents = match[2].split("/");
           pathComponents.unshift(clientDir);
           let path = OS.Path.join.apply(OS.Path, pathComponents);
           let uri = this.fileURI(path);
-          let entry = "override chrome://" + match[1] +
-                      "/content/" + match[2] + "\t" + uri;
+          let chromeURI = "chrome://devtools/content/" + match[1];
+          let entry = "override " + chromeURI + "\t" + uri;
           entries.push(entry);
         }
       }

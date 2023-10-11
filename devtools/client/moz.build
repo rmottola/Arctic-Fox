@@ -7,19 +7,16 @@
 include('../templates.mozbuild')
 
 DIRS += [
-    'aboutdebugging/components',
+    'aboutdebugging',
     'animationinspector',
     'canvasdebugger',
     'commandline',
     'debugger',
     'eyedropper',
-    'fontinspector',
     'framework',
     'inspector',
     'jsonview',
-    'layoutview',
     'locales',
-    'markupview',
     'memory',
     'netmonitor',
     'performance',
@@ -34,7 +31,6 @@ DIRS += [
     'sourceeditor',
     'storage',
     'styleeditor',
-    'styleinspector',
     'themes',
     'tilt',
     'webaudioeditor',

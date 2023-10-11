@@ -81,11 +81,17 @@ function eventSource(aProto) {
    *        times, all instances will be removed.
    */
   aProto.removeListener = function (aName, aListener) {
-    if (!this._listeners || !this._listeners[aName]) {
+    if (!this._listeners || (aListener && !this._listeners[aName])) {
       return;
     }
-    this._listeners[aName] =
-      this._listeners[aName].filter(function (l) { return l != aListener });
+
+    if (!aListener) {
+      this._listeners[aName] = [];
+    }
+    else {
+      this._listeners[aName] =
+        this._listeners[aName].filter(function (l) { return l != aListener });
+    }
   };
 
   /**
@@ -289,7 +295,6 @@ DebuggerClient.requester = function (aPacketSkeleton,
         histogram.add(+new Date - startTime);
       }
     }, "DebuggerClient.requester request callback"));
-
   }, "DebuggerClient.requester");
 };
 
@@ -327,12 +332,19 @@ DebuggerClient.prototype = {
    * @param aOnConnected function
    *        If specified, will be called when the greeting packet is
    *        received from the debugging server.
+   *
+   * @return Promise
+   *         Resolves once connected with an array whose first element
+   *         is the application type, by default "browser", and the second
+   *         element is the traits object (help figure out the features
+   *         and behaviors of the server we connect to. See RootActor).
    */
   connect: function (aOnConnected) {
+    let deferred = promise.defer();
     this.emit("connect");
 
-    // Also emit the event on the |DebuggerServer| object (not on
-    // the instance), so it's possible to track all instances.
+    // Also emit the event on the |DebuggerClient| object (not on the instance),
+    // so it's possible to track all instances.
     events.emit(DebuggerClient, "connect", this);
 
     this.addOneTimeListener("connected", (aName, aApplicationType, aTraits) => {
@@ -340,9 +352,11 @@ DebuggerClient.prototype = {
       if (aOnConnected) {
         aOnConnected(aApplicationType, aTraits);
       }
+      deferred.resolve([aApplicationType, aTraits]);
     });
 
     this._transport.ready();
+    return deferred.promise;
   },
 
   /**
@@ -356,6 +370,22 @@ DebuggerClient.prototype = {
     // Disable detach event notifications, because event handlers will be in a
     // cleared scope by the time they run.
     this._eventsEnabled = false;
+
+    let cleanup = () => {
+      this._transport.close();
+      this._transport = null;
+    };
+
+    // If the connection is already closed,
+    // there is no need to detach client
+    // as we won't be able to send any message.
+    if (this._closed) {
+      cleanup();
+      if (aOnClosed) {
+        aOnClosed();
+      }
+      return;
+    }
 
     if (aOnClosed) {
       this.addOneTimeListener('closed', function (aEvent) {
@@ -372,12 +402,7 @@ DebuggerClient.prototype = {
       let client = clients.pop();
       if (!client) {
         // All clients detached.
-        this._transport.close();
-        this._transport = null;
-        this._activeRequests.clear();
-        this._activeRequests = null;
-        this._pendingRequests.clear();
-        this._pendingRequests = null;
+        cleanup();
         return;
       }
       if (client.detach) {
@@ -665,9 +690,19 @@ DebuggerClient.prototype = {
     if (!this.mainRoot) {
       throw Error("Have not yet received a hello packet from the server.");
     }
+    let type = aRequest.type || "";
     if (!aRequest.to) {
-      let type = aRequest.type || "";
       throw Error("'" + type + "' request packet has no destination.");
+    }
+    if (this._closed) {
+      let msg = "'" + type + "' request packet to " +
+                "'" + aRequest.to + "' " +
+               "can't be sent as the connection is closed.";
+      let resp = { error: "connectionClosed", message: msg };
+      if (aOnResponse) {
+        aOnResponse(resp);
+      }
+      return promise.reject(resp);
     }
 
     let request = new Request(aRequest);
@@ -1042,7 +1077,32 @@ DebuggerClient.prototype = {
    *        the stream.
    */
   onClosed: function (aStatus) {
+    this._closed = true;
     this.emit("closed");
+
+    // Reject all pending and active requests
+    let reject = function(type, request, actor) {
+      // Server can send packets on its own and client only pass a callback
+      // to expectReply, so that there is no request object.
+      let msg;
+      if (request.request) {
+        msg = "'" + request.request.type + "' " + type + " request packet" +
+              " to '" + actor + "' " +
+              "can't be sent as the connection just closed.";
+      } else {
+        msg = "server side packet from '" + actor + "' can't be received " +
+              "as the connection just closed.";
+      }
+      let packet = { error: "connectionClosed", message: msg };
+      request.emit("json-reply", packet);
+    };
+
+    this._pendingRequests.forEach((list, actor) => {
+      list.forEach(request => reject("pending", request, actor));
+    });
+    this._pendingRequests.clear();
+    this._activeRequests.forEach(reject.bind(null, "active"));
+    this._activeRequests.clear();
 
     // The |_pools| array on the client-side currently is used only by
     // protocol.js to store active fronts, mirroring the actor pools found in
@@ -1346,26 +1406,45 @@ WorkerClient.prototype = {
       DevToolsUtils.executeSoon(() => aOnResponse({
         type: "connected",
         threadActor: this.thread._actor,
+        consoleActor: this.consoleActor,
       }, this.thread));
       return;
     }
 
+    // The connect call on server doesn't attach the thread as of version 44.
     this.request({
       to: this._actor,
       type: "connect",
       options: aOptions,
-    }, (aResponse) => {
-      if (!aResponse.error) {
-        this.thread = new ThreadClient(this, aResponse.threadActor);
-        this.client.registerClient(this.thread);
+    }, (connectReponse) => {
+      if (connectReponse.error) {
+        aOnResponse(connectReponse, null);
+        return;
       }
-      aOnResponse(aResponse, this.thread);
+
+      this.request({
+        to: connectReponse.threadActor,
+        type: "attach"
+      }, (attachResponse) => {
+        if (attachResponse.error) {
+          aOnResponse(attachResponse, null);
+        }
+
+        this.thread = new ThreadClient(this, connectReponse.threadActor);
+        this.consoleActor = connectReponse.consoleActor;
+        this.client.registerClient(this.thread);
+
+        aOnResponse(connectReponse, this.thread);
+      });
     });
   },
 
   _onClose: function () {
     this.removeListener("close", this._onClose);
 
+    if (this.thread) {
+      this.client.unregisterClient(this.thread);
+    }
     this.client.unregisterClient(this);
     this._isClosed = true;
   },
@@ -2098,10 +2177,18 @@ ThreadClient.prototype = {
    */
   _onThreadState: function (aPacket) {
     this._state = ThreadStateTypes[aPacket.type];
+    // The debugger UI may not be initialized yet so we want to keep
+    // the packet around so it knows what to pause state to display
+    // when it's initialized
+    this._lastPausePacket = aPacket.type === 'resumed' ? null : aPacket;
     this._clearFrames();
     this._clearPauseGrips();
     aPacket.type === ThreadStateTypes.detached && this._clearThreadGrips();
     this.client._eventsEnabled && this.emit(aPacket.type, aPacket);
+  },
+
+  getLastPausePacket: function() {
+    return this._lastPausePacket;
   },
 
   /**

@@ -10,20 +10,34 @@ const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-const { require, loader } = Cu.import("resource://devtools/shared/Loader.jsm", {});
-const promise = require("promise");
-// Load target and toolbox lazily as they need gDevTools to be fully initialized
-loader.lazyRequireGetter(this, "TargetFactory", "devtools/client/framework/target", true);
-loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", true);
 
-XPCOMUtils.defineLazyModuleGetter(this, "console",
-                                  "resource://gre/modules/Console.jsm");
-//XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
-//                                  "resource:///modules/CustomizableUI.jsm");
-loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
-loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
+// Make most dependencies be reloadable so that the reload addon
+// can update all of them while keeping gDevTools.jsm as-is
+// Bug 1188405 is going to refactor this JSM into a commonjs module
+// so that it can be reloaded as other modules.
+let require, loader, promise, DefaultTools, DefaultThemes;
+let loadDependencies = () => {
+  let l = Cu.import("resource://devtools/shared/Loader.jsm", {});
+  require = l.require;
+  loader = l.loader;
+  promise = require("promise");
+  // Load target and toolbox lazily as they need gDevTools to be fully initialized
+  loader.lazyRequireGetter(this, "TargetFactory", "devtools/client/framework/target", true);
+  loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", true);
 
-const DefaultTools = require("devtools/client/definitions").defaultTools;
+  XPCOMUtils.defineLazyModuleGetter(this, "console",
+                                    "resource://gre/modules/Console.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
+                                    "resource:///modules/CustomizableUI.jsm");
+  loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
+  loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
+
+  let d = require("devtools/client/definitions");
+  DefaultTools = d.defaultTools;
+  DefaultThemes = d.defaultThemes;
+};
+loadDependencies();
+
 const EventEmitter = require("devtools/shared/event-emitter");
 const Telemetry = require("devtools/client/shared/telemetry");
 const {JsonView} = require("devtools/client/jsonview/main");
@@ -81,8 +95,7 @@ DevTools.prototype = {
    * - invertIconForLightTheme: The icon can automatically have an inversion
    *         filter applied (default is false).  All builtin tools are true, but
    *         addons may omit this to prevent unwanted changes to the `icon`
-   *         image. See devtools/client/themes/filters.svg#invert for
-   *         the filter being applied to the images (boolean|optional)
+   *         image. filter: invert(1) is applied to the image (boolean|optional)
    * - url: URL pointing to a XUL/XHTML document containing the user interface
    *        (string|required)
    * - label: Localized name for the tool to be displayed to the user
@@ -286,10 +299,17 @@ DevTools.prototype = {
 
     let currTheme = Services.prefs.getCharPref("devtools.theme");
 
-    // Change the current theme if it's being dynamically removed together
-    // with the owner (bootstrapped) extension.
-    // But, do not change it if the application is just shutting down.
-    if (!Services.startup.shuttingDown && theme.id == currTheme) {
+    // Note that we can't check if `theme` is an item
+    // of `DefaultThemes` as we end up reloading definitions
+    // module and end up with different theme objects
+    let isCoreTheme = DefaultThemes.some(t => t.id === themeId);
+
+    // Reset the theme if an extension theme that's currently applied
+    // is being removed.
+    // Ignore shutdown since addons get disabled during that time.
+    if (!Services.startup.shuttingDown &&
+        !isCoreTheme &&
+        theme.id == currTheme) {
       Services.prefs.setCharPref("devtools.theme", "light");
 
       let data = {
@@ -504,6 +524,11 @@ DevTools.prototype = {
     // Is taken care of by the gDevToolsBrowser.forgetBrowserWindow
   },
 
+  // Force reloading dependencies if the loader happens to have reloaded
+  reload() {
+    loadDependencies();
+  },
+
   /**
    * Iterator that yields each of the toolboxes.
    */
@@ -706,7 +731,7 @@ var gDevToolsBrowser = {
     let client = new DebuggerClient(transport);
 
     let deferred = promise.defer();
-    client.connect(() => {
+    client.connect().then(() => {
       client.mainRoot.listProcesses(response => {
         // Do nothing if there is only one process, the parent process.
         let contentProcesses = response.processes.filter(p => (!p.parent));
@@ -834,7 +859,7 @@ var gDevToolsBrowser = {
       broadcaster.removeAttribute("key");
     }
 
-    let tabContainer = win.document.getElementById("tabbrowser-tabs");
+    let tabContainer = win.gBrowser.tabContainer;
     tabContainer.addEventListener("TabSelect", this, false);
     tabContainer.addEventListener("TabOpen", this, false);
     tabContainer.addEventListener("TabClose", this, false);
@@ -1029,20 +1054,17 @@ var gDevToolsBrowser = {
         }
       }
 
-      let mp = doc.getElementById("menuWebDeveloperPopup");
-      if (mp) {
-        let ref;
+      let ref;
 
-        if (prevDef != null) {
-          let menuitem = doc.getElementById("menuitem_" + prevDef.id);
-          ref = menuitem && menuitem.nextSibling ? menuitem.nextSibling : null;
-        } else {
-          ref = doc.getElementById("menu_devtools_separator");
-        }
+      if (prevDef) {
+        let menuitem = doc.getElementById("menuitem_" + prevDef.id);
+        ref = menuitem && menuitem.nextSibling ? menuitem.nextSibling : null;
+      } else {
+        ref = doc.getElementById("menu_devtools_separator");
+      }
 
-        if (ref) {
-          mp.insertBefore(elements.menuitem, ref);
-        }
+      if (ref) {
+        ref.parentNode.insertBefore(elements.menuitem, ref);
       }
     }
 
@@ -1092,15 +1114,15 @@ var gDevToolsBrowser = {
     let mbs = doc.getElementById("mainBroadcasterSet");
     mbs.appendChild(fragBroadcasters);
 
-    let amp = doc.getElementById("appmenu_webDeveloper_popup");
-    if (amp) {
-      let amps = doc.getElementById("appmenu_devtools_separator");
-      amp.insertBefore(fragAppMenuItems, amps);
+    let amps = doc.getElementById("appmenu_devtools_separator");
+    if (amps) {
+      amps.parentNode.insertBefore(fragAppMenuItems, amps);
     }
 
-    let mp = doc.getElementById("menuWebDeveloperPopup");
     let mps = doc.getElementById("menu_devtools_separator");
-    mp.insertBefore(fragMenuItems, mps);
+    if (mps) {
+      mps.parentNode.insertBefore(fragMenuItems, mps);
+    }
   },
 
   /**
@@ -1169,6 +1191,16 @@ var gDevToolsBrowser = {
     };
   },
 
+  hasToolboxOpened: function(win) {
+    let tab = win.gBrowser.selectedTab;
+    for (let [target, toolbox] of gDevTools._toolboxes) {
+      if (target.tab == tab) {
+        return true;
+      }
+    }
+    return false;
+  },
+
   /**
    * Update the "Toggle Tools" checkbox in the developer tools menu. This is
    * called when a toolbox is created or destroyed.
@@ -1176,13 +1208,7 @@ var gDevToolsBrowser = {
   _updateMenuCheckbox: function DT_updateMenuCheckbox() {
     for (let win of gDevToolsBrowser._trackedBrowserWindows) {
 
-      let hasToolbox = false;
-      if (TargetFactory.isKnownTab(win.gBrowser.selectedTab)) {
-        let target = TargetFactory.forTab(win.gBrowser.selectedTab);
-        if (gDevTools._toolboxes.has(target)) {
-          hasToolbox = true;
-        }
-      }
+      let hasToolbox = gDevToolsBrowser.hasToolboxOpened(win);
 
       let broadcaster = win.document.getElementById("devtoolsMenuBroadcaster_DevToolbox");
       if (hasToolbox) {
@@ -1261,7 +1287,7 @@ var gDevToolsBrowser = {
       }
     }
 
-    let tabContainer = win.document.getElementById("tabbrowser-tabs");
+    let tabContainer = win.gBrowser.tabContainer;
     tabContainer.removeEventListener("TabSelect", this, false);
     tabContainer.removeEventListener("TabOpen", this, false);
     tabContainer.removeEventListener("TabClose", this, false);
@@ -1280,7 +1306,7 @@ var gDevToolsBrowser = {
 
         for (let win of this._trackedBrowserWindows) {
           let tabContainer = win.gBrowser.tabContainer;
-          let numPinnedTabs = tabContainer.tabbrowser._numPinnedTabs;
+          let numPinnedTabs = win.gBrowser._numPinnedTabs || 0;
           let numTabs = tabContainer.itemCount - numPinnedTabs;
 
           open += numTabs;

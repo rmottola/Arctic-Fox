@@ -22,7 +22,8 @@ var promise = require("promise");
 var EventEmitter = require("devtools/shared/event-emitter");
 var Telemetry = require("devtools/client/shared/telemetry");
 var HUDService = require("devtools/client/webconsole/hudservice");
-var sourceUtils = require("devtools/client/shared/source-utils");
+var viewSource = require("devtools/client/shared/view-source");
+var { attachThread, detachThread } = require("./attach-thread");
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://devtools/client/framework/gDevTools.jsm");
@@ -257,6 +258,10 @@ Toolbox.prototype = {
     return this._target;
   },
 
+  get threadClient() {
+    return this._threadClient;
+  },
+
   /**
    * Get/alter the host of a Toolbox, i.e. is it in browser or in a separate
    * tab. See HostType for more details.
@@ -334,6 +339,17 @@ Toolbox.prototype = {
   get splitConsole() {
     return this._splitConsole;
   },
+  /**
+   * Get the focused state of the split console
+   */
+  isSplitConsoleFocused: function() {
+    if (!this._splitConsole) {
+      return false;
+    }
+    let focusedWin = Services.focus.focusedWindow;
+    return focusedWin && focusedWin ===
+      this.doc.querySelector("#toolbox-panel-iframe-webconsole").contentWindow;
+  },
 
   /**
    * Open the toolbox
@@ -343,12 +359,18 @@ Toolbox.prototype = {
       let iframe = yield this._host.create();
       let domReady = promise.defer();
 
-      // Load the toolbox-level actor fronts and utilities now
-      yield this._target.makeRemote();
       iframe.setAttribute("src", this._URL);
       iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"));
       let domHelper = new DOMHelpers(iframe.contentWindow);
       domHelper.onceDOMReady(() => domReady.resolve());
+      // Optimization: fire up a few other things before waiting on
+      // the iframe being ready (makes startup faster)
+
+      // Load the toolbox-level actor fronts and utilities now
+      yield this._target.makeRemote();
+
+      // Attach the thread
+      this._threadClient = yield attachThread(this);
 
       yield domReady.promise;
 
@@ -488,6 +510,28 @@ Toolbox.prototype = {
         e.preventDefault();
       }
     }
+  },
+  /**
+   * Add a shortcut key that should work when a split console
+   * has focus to the toolbox.
+   *
+   * @param {element} keyElement
+   *        They <key> XUL element describing the shortcut key
+   * @param {string} whichTool
+   *        The tool the key belongs to. The corresponding command
+   *        will only trigger if this tool is active.
+   */
+  useKeyWithSplitConsole: function(keyElement, whichTool) {
+    let cloned = keyElement.cloneNode();
+    cloned.setAttribute("oncommand", "void(0)");
+    cloned.removeAttribute("command");
+    cloned.addEventListener("command", (e) => {
+      // Only forward the command if the tool is active
+      if (this.currentToolId === whichTool && this.isSplitConsoleFocused()) {
+        keyElement.doCommand();
+      }
+    }, true);
+    this.doc.getElementById("toolbox-keyset").appendChild(cloned);
   },
 
   _addReloadKeys: function() {
@@ -1925,6 +1969,10 @@ Toolbox.prototype = {
     // Destroy the profiler connection
     outstanding.push(this.destroyPerformance());
 
+    // Detach the thread
+    detachThread(this._threadClient);
+    this._threadClient = null;
+
     // We need to grab a reference to win before this._host is destroyed.
     let win = this.frame.ownerGlobal;
 
@@ -2109,7 +2157,7 @@ Toolbox.prototype = {
    * @see devtools/client/shared/source-utils.js
    */
   viewSourceInStyleEditor: function(sourceURL, sourceLine) {
-    return sourceUtils.viewSourceInStyleEditor(this, sourceURL, sourceLine);
+    return viewSource.viewSourceInStyleEditor(this, sourceURL, sourceLine);
   },
 
   /**
@@ -2117,7 +2165,7 @@ Toolbox.prototype = {
    * @see devtools/client/shared/source-utils.js
    */
   viewSourceInDebugger: function(sourceURL, sourceLine) {
-    return sourceUtils.viewSourceInDebugger(this, sourceURL, sourceLine);
+    return viewSource.viewSourceInDebugger(this, sourceURL, sourceLine);
   },
 
   /**
@@ -2130,7 +2178,7 @@ Toolbox.prototype = {
    * @see devtools/client/shared/source-utils.js
    */
   viewSourceInScratchpad: function(sourceURL, sourceLine) {
-    return sourceUtils.viewSourceInScratchpad(sourceURL, sourceLine);
+    return viewSource.viewSourceInScratchpad(sourceURL, sourceLine);
   },
 
   /**
@@ -2138,6 +2186,6 @@ Toolbox.prototype = {
    * @see devtools/client/shared/source-utils.js
    */
   viewSource: function(sourceURL, sourceLine) {
-    return sourceUtils.viewSource(this, sourceURL, sourceLine);
+    return viewSource.viewSource(this, sourceURL, sourceLine);
   },
 };

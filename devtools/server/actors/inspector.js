@@ -61,6 +61,7 @@ const object = require("sdk/util/object");
 const events = require("sdk/event/core");
 const {Unknown} = require("sdk/platform/xpcom");
 const {Class} = require("sdk/core/heritage");
+const {WalkerSearch} = require("devtools/server/actors/utils/walker-search");
 const {PageStyleActor, getFontPreviewData} = require("devtools/server/actors/styles");
 const {
   HighlighterActor,
@@ -137,7 +138,7 @@ loader.lazyGetter(this, "eventListenerService", function() {
            .getService(Ci.nsIEventListenerService);
 });
 
-loader.lazyGetter(this, "CssLogic", () => require("devtools/shared/styleinspector/css-logic").CssLogic);
+loader.lazyGetter(this, "CssLogic", () => require("devtools/shared/inspector/css-logic").CssLogic);
 
 // XXX: A poor man's makeInfallible until we move it out of transport.js
 // Which should be very soon.
@@ -421,7 +422,11 @@ var NodeActor = exports.NodeActor = protocol.ActorClass({
     if (!this.rawNode.attributes) {
       return undefined;
     }
-    return [...this.rawNode.attributes].map(attr => {
+
+    // The NamedNodeMap implementation in Firefox (returned by
+    // node.attributes) gives attributes in the reverse order compared
+    // to the source file when iterated. So reverse the list here.
+    return [...this.rawNode.attributes].reverse().map(attr => {
       return {namespace: attr.namespace, name: attr.name, value: attr.value };
     });
   },
@@ -858,6 +863,8 @@ var NodeFront = protocol.FrontClass(NodeActor, {
       this._form.incompleteValue = change.incompleteValue;
     } else if (change.type === "pseudoClassLock") {
       this._form.pseudoClassLocks = change.pseudoClassLocks;
+    } else if (change.type === "events") {
+      this._form.hasEventListeners = change.hasEventListeners;
     }
   },
 
@@ -1124,6 +1131,13 @@ types.addDictType("disconnectedNodeArray", {
 
 types.addDictType("dommutation", {});
 
+types.addDictType("searchresult", {
+  list: "domnodelist",
+  // Right now there is isn't anything required for metadata,
+  // but it's json so it can be extended with extra data.
+  metadata: "array:json"
+});
+
 /**
  * Server side of a node list as returned by querySelectorAll()
  */
@@ -1260,29 +1274,36 @@ var WalkerActor = protocol.ActorClass({
   typeName: "domwalker",
 
   events: {
-    "new-mutations" : {
+    "new-mutations": {
       type: "newMutations"
     },
-    "picker-node-picked" : {
+    "picker-node-picked": {
       type: "pickerNodePicked",
       node: Arg(0, "disconnectedNode")
     },
-    "picker-node-hovered" : {
+    "picker-node-hovered": {
       type: "pickerNodeHovered",
       node: Arg(0, "disconnectedNode")
     },
-    "picker-node-canceled" : {
+    "picker-node-canceled": {
       type: "pickerNodeCanceled"
     },
-    "highlighter-ready" : {
+    "highlighter-ready": {
       type: "highlighter-ready"
     },
-    "highlighter-hide" : {
+    "highlighter-hide": {
       type: "highlighter-hide"
     },
-    "display-change" : {
+    "display-change": {
       type: "display-change",
       nodes: Arg(0, "array:domnode")
+    },
+    // The walker actor emits a useful "resize" event to its front to let
+    // clients know when the browser window gets resized. This may be useful
+    // for refreshing a DOM node's styles for example, since those may depend on
+    // media-queries.
+    "resize": {
+      type: "resize"
     }
   },
 
@@ -1300,6 +1321,8 @@ var WalkerActor = protocol.ActorClass({
     this._pendingMutations = [];
     this._activePseudoClassLocks = new Set();
     this.showAllAnonymousContent = options.showAllAnonymousContent;
+
+    this.walkerSearch = new WalkerSearch(this);
 
     // Nodes which have been removed from the client's known
     // ownership tree are considered "orphaned", and stored in
@@ -1322,9 +1345,37 @@ var WalkerActor = protocol.ActorClass({
     // managed.
     this.rootNode = this.document();
 
-    this.reflowObserver = getLayoutChangesObserver(this.tabActor);
+    this.layoutChangeObserver = getLayoutChangesObserver(this.tabActor);
     this._onReflows = this._onReflows.bind(this);
-    this.reflowObserver.on("reflows", this._onReflows);
+    this.layoutChangeObserver.on("reflows", this._onReflows);
+    this._onResize = this._onResize.bind(this);
+    this.layoutChangeObserver.on("resize", this._onResize);
+
+    this._onEventListenerChange = this._onEventListenerChange.bind(this);
+    eventListenerService.addListenerChangeListener(this._onEventListenerChange);
+  },
+
+  /**
+   * Callback for eventListenerService.addListenerChangeListener
+   * @param nsISimpleEnumerator changesEnum
+   *    enumerator of nsIEventListenerChange
+   */
+  _onEventListenerChange: function(changesEnum) {
+    let changes = changesEnum.enumerate();
+    while (changes.hasMoreElements()) {
+      let current = changes.getNext().QueryInterface(Ci.nsIEventListenerChange);
+      let target = current.target;
+
+      if (this._refMap.has(target)) {
+        let actor = this.getNode(target);
+        let mutation = {
+          type: "events",
+          target: actor.actorID,
+          hasEventListeners: actor._hasEventListeners
+        };
+        this.queueMutation(mutation);
+      }
+    }
   },
 
   // Returns the JSON representation of this object over the wire.
@@ -1336,7 +1387,13 @@ var WalkerActor = protocol.ActorClass({
         // FF42+ Inspector starts managing the Walker, while the inspector also
         // starts cleaning itself up automatically on client disconnection.
         // So that there is no need to manually release the walker anymore.
-        autoReleased: true
+        autoReleased: true,
+        // XXX: It seems silly that we need to tell the front which capabilities
+        // its actor has in this way when the target can use actorHasMethod.  If
+        // this was ported to the protocol (Bug 1157048) we could call that inside
+        // of custom front methods and not need to do traits for this.
+        multiFrameQuerySelectorAll: true,
+        textSearch: true,
       }
     }
   },
@@ -1378,10 +1435,15 @@ var WalkerActor = protocol.ActorClass({
       this.onFrameLoad = null;
       this.onFrameUnload = null;
 
-      this.reflowObserver.off("reflows", this._onReflows);
-      this.reflowObserver = null;
-      this._onReflows = null;
+      this.walkerSearch.destroy();
+
+      this.layoutChangeObserver.off("reflows", this._onReflows);
+      this.layoutChangeObserver.off("resize", this._onResize);
+      this.layoutChangeObserver = null;
       releaseLayoutChangesObserver(this.tabActor);
+
+      eventListenerService.removeListenerChangeListener(
+        this._onEventListenerChange);
 
       this.onMutations = null;
 
@@ -1407,13 +1469,30 @@ var WalkerActor = protocol.ActorClass({
     protocol.Actor.prototype.unmanage.call(this, actor);
   },
 
-  hasNode: function(node) {
-    return this._refMap.has(node);
+  /**
+   * Determine if the walker has come across this DOM node before.
+   * @param {DOMNode} rawNode
+   * @return {Boolean}
+   */
+  hasNode: function(rawNode) {
+    return this._refMap.has(rawNode);
+  },
+
+  /**
+   * If the walker has come across this DOM node before, then get the
+   * corresponding node actor.
+   * @param {DOMNode} rawNode
+   * @return {NodeActor}
+   */
+  getNode: function(rawNode) {
+    return this._refMap.get(rawNode);
   },
 
   _ref: function(node) {
-    let actor = this._refMap.get(node);
-    if (actor) return actor;
+    let actor = this.getNode(node);
+    if (actor) {
+      return actor;
+    }
 
     actor = new NodeActor(this, node);
 
@@ -1448,6 +1527,13 @@ var WalkerActor = protocol.ActorClass({
     if (changes.length) {
       events.emit(this, "display-change", changes);
     }
+  },
+
+  /**
+   * When the browser window gets resized, relay the event to the front.
+   */
+  _onResize: function() {
+    events.emit(this, "resize");
   },
 
   /**
@@ -1694,7 +1780,7 @@ var WalkerActor = protocol.ActorClass({
 
     let child = walker.firstChild();
     while (child) {
-      let childActor = this._refMap.get(child);
+      let childActor = this.getNode(child);
       if (childActor) {
         this.releaseNode(childActor, options);
       }
@@ -1720,7 +1806,7 @@ var WalkerActor = protocol.ActorClass({
     let walker = this.getDocumentWalker(node.rawNode);
     let cur;
     while ((cur = walker.parentNode())) {
-      let parent = this._refMap.get(cur);
+      let parent = this.getNode(cur);
       if (!parent) {
         // This parent didn't exist, so hasn't been seen by the client yet.
         newParents.add(this._ref(cur));
@@ -2051,6 +2137,33 @@ var WalkerActor = protocol.ActorClass({
   }),
 
   /**
+   * Search the document for a given string.
+   * Results will be searched with the walker-search module (searches through
+   * tag names, attribute names and values, and text contents).
+   *
+   * @returns {searchresult}
+   *            - {NodeList} list
+   *            - {Array<Object>} metadata. Extra information with indices that
+   *                              match up with node list.
+   */
+  search: method(function(query) {
+    let results = this.walkerSearch.search(query);
+    let nodeList = new NodeListActor(this, results.map(r => r.node));
+
+    return {
+      list: nodeList,
+      metadata: []
+    }
+  }, {
+    request: {
+      query: Arg(0),
+    },
+    response: {
+      list: RetVal("searchresult"),
+    }
+  }),
+
+  /**
    * Returns a list of matching results for CSS selector autocompletion.
    *
    * @param string query
@@ -2153,7 +2266,7 @@ var WalkerActor = protocol.ActorClass({
           sugs.ids.set(node.id, (sugs.ids.get(node.id)|0) + 1);
           let tag = node.tagName.toLowerCase();
           sugs.tags.set(tag, (sugs.tags.get(tag)|0) + 1);
-          for (let className of node.className.split(" ")) {
+          for (let className of node.classList) {
             sugs.classes.set(className, (sugs.classes.get(className)|0) + 1);
           }
         }
@@ -2664,7 +2777,23 @@ var WalkerActor = protocol.ActorClass({
       return null;
     }
 
-    parent.rawNode.insertBefore(node.rawNode, sibling ? sibling.rawNode : null);
+    let rawNode = node.rawNode;
+    let rawParent = parent.rawNode;
+    let rawSibling = sibling ? sibling.rawNode : null;
+
+    // Don't bother inserting a node if the document position isn't going
+    // to change. This prevents needless iframes reloading and mutations.
+    if (rawNode.parentNode === rawParent) {
+      let currentNextSibling = this.nextSibling(node);
+      currentNextSibling = currentNextSibling ? currentNextSibling.rawNode :
+                                                null;
+
+      if (rawNode === rawSibling || currentNextSibling === rawSibling) {
+        return;
+      }
+    }
+
+    rawParent.insertBefore(rawNode, rawSibling);
   }, {
     request: {
       node: Arg(0, "domnode"),
@@ -2809,8 +2938,13 @@ var WalkerActor = protocol.ActorClass({
    *    See https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver#MutationRecord
    */
   onMutations: function(mutations) {
+    // Notify any observers that want *all* mutations (even on nodes that aren't
+    // referenced).  This is not sent over the protocol so can only be used by
+    // scripts running in the server process.
+    events.emit(this, "any-mutation");
+
     for (let change of mutations) {
-      let targetActor = this._refMap.get(change.target);
+      let targetActor = this.getNode(change.target);
       if (!targetActor) {
         continue;
       }
@@ -2840,7 +2974,7 @@ var WalkerActor = protocol.ActorClass({
         let removedActors = [];
         let addedActors = [];
         for (let removed of change.removedNodes) {
-          let removedActor = this._refMap.get(removed);
+          let removedActor = this.getNode(removed);
           if (!removedActor) {
             // If the client never encountered this actor we don't need to
             // mention that it was removed.
@@ -2851,7 +2985,7 @@ var WalkerActor = protocol.ActorClass({
           removedActors.push(removedActor.actorID);
         }
         for (let added of change.addedNodes) {
-          let addedActor = this._refMap.get(added);
+          let addedActor = this.getNode(added);
           if (!addedActor) {
             // If the client never encounted this actor we don't need to tell
             // it about its addition for ownership tree purposes - if the
@@ -2889,7 +3023,7 @@ var WalkerActor = protocol.ActorClass({
       return;
     }
     let frame = getFrameElement(window);
-    let frameActor = this._refMap.get(frame);
+    let frameActor = this.getNode(frame);
     if (!frameActor) {
       return;
     }
@@ -2944,7 +3078,7 @@ var WalkerActor = protocol.ActorClass({
     }
 
     let doc = window.document;
-    let documentActor = this._refMap.get(doc);
+    let documentActor = this.getNode(doc);
     if (!documentActor) {
       return;
     }
@@ -2966,7 +3100,7 @@ var WalkerActor = protocol.ActorClass({
       // they should reread the children list.
       this.queueMutation({
         type: "childList",
-        target: this._refMap.get(parentNode).actorID,
+        target: this.getNode(parentNode).actorID,
         added: [],
         removed: []
       });
@@ -3286,6 +3420,75 @@ var WalkerFront = exports.WalkerFront = protocol.FrontClass(WalkerActor, {
     impl: "_getNodeFromActor"
   }),
 
+  /*
+   * Incrementally search the document for a given string.
+   * For modern servers, results will be searched with using the WalkerActor
+   * `search` function (includes tag names, attributes, and text contents).
+   * Only 1 result is sent back, and calling the method again with the same
+   * query will send the next result. When there are no more results to be sent
+   * back, null is sent.
+   * @param {String} query
+   * @param {Object} options
+   *    - "reverse": search backwards
+   *    - "selectorOnly": treat input as a selector string (don't search text
+   *                      tags, attributes, etc)
+   */
+  search: protocol.custom(Task.async(function*(query, options = { }) {
+    let nodeList;
+    let searchType;
+    let searchData = this.searchData = this.searchData || { };
+    let selectorOnly = !!options.selectorOnly;
+
+    // Backwards compat.  Use selector only search if the new
+    // search functionality isn't implemented, or if the caller (tests)
+    // want it.
+    if (selectorOnly || !this.traits.textSearch) {
+      searchType = "selector";
+      if (this.traits.multiFrameQuerySelectorAll) {
+        nodeList = yield this.multiFrameQuerySelectorAll(query);
+      } else {
+        nodeList = yield this.querySelectorAll(this.rootNode, query);
+      }
+    } else {
+      searchType = "search";
+      let result = yield this._search(query, options);
+      nodeList = result.list;
+    }
+
+    // If this is a new search, start at the beginning.
+    if (searchData.query !== query ||
+        searchData.selectorOnly !== selectorOnly) {
+      searchData.selectorOnly = selectorOnly;
+      searchData.query = query;
+      searchData.index = -1;
+    }
+
+    if (!nodeList.length) {
+      return null;
+    }
+
+    // Move search result cursor and cycle if necessary.
+    searchData.index = options.reverse ? searchData.index - 1 :
+                                         searchData.index + 1;
+    if (searchData.index >= nodeList.length) {
+      searchData.index = 0;
+    }
+    if (searchData.index < 0) {
+      searchData.index = nodeList.length - 1;
+    }
+
+    // Send back the single node, along with any relevant search data
+    let node = yield nodeList.item(searchData.index);
+    return {
+      type: searchType,
+      node: node,
+      resultsLength: nodeList.length,
+      resultsIndex: searchData.index,
+    };
+  }), {
+    impl: "_search"
+  }),
+
   _releaseFront: function(node, force) {
     if (node.retained && !force) {
       node.reparent(null);
@@ -3538,6 +3741,7 @@ var AttributeModificationList = Class({
  */
 var InspectorActor = exports.InspectorActor = protocol.ActorClass({
   typeName: "inspector",
+
   initialize: function(conn, tabActor) {
     protocol.Actor.prototype.initialize.call(this, conn);
     this.tabActor = tabActor;
@@ -3545,6 +3749,7 @@ var InspectorActor = exports.InspectorActor = protocol.ActorClass({
 
   destroy: function () {
     protocol.Actor.prototype.destroy.call(this);
+
     this._highlighterPromise = null;
     this._pageStylePromise = null;
     this._walkerPromise = null;
@@ -3846,10 +4051,25 @@ DocumentWalker.prototype = {
     return this.walker.parentNode();
   },
 
+  nextNode: function() {
+    let node = this.walker.currentNode;
+    if (!node) {
+      return null;
+    }
+
+    let nextNode = this.walker.nextNode();
+    while (nextNode && this.filter(nextNode) === Ci.nsIDOMNodeFilter.FILTER_SKIP) {
+      nextNode = this.walker.nextNode();
+    }
+
+    return nextNode;
+  },
+
   firstChild: function() {
     let node = this.walker.currentNode;
-    if (!node)
+    if (!node) {
       return null;
+    }
 
     let firstChild = this.walker.firstChild();
     while (firstChild && this.filter(firstChild) === Ci.nsIDOMNodeFilter.FILTER_SKIP) {
@@ -3861,8 +4081,9 @@ DocumentWalker.prototype = {
 
   lastChild: function() {
     let node = this.walker.currentNode;
-    if (!node)
+    if (!node) {
       return null;
+    }
 
     let lastChild = this.walker.lastChild();
     while (lastChild && this.filter(lastChild) === Ci.nsIDOMNodeFilter.FILTER_SKIP) {

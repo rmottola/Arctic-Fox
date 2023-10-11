@@ -16,14 +16,19 @@
  *
  * The path mapping uses paths fallback (a feature supported by RequireJS)
  * See also: http://requirejs.org/docs/api.html#pathsfallbacks
+ *
+ * React module ID is using exactly the same (relative) path as the rest
+ * of the code base, so it's consistent and modules can be easily reused.
  */
 require.config({
   baseUrl: ".",
   paths: {
-    "react": [
-      "resource:///modules/devtools/client/shared/vendor/react-dev",
-      "resource:///modules/devtools/client/shared/vendor/react"
-    ]
+    "devtools/client/shared/vendor/react": [
+      "resource://devtools/client/shared/vendor/react-dev",
+      "resource://devtools/client/shared/vendor/react"
+    ],
+    "devtools/client/shared/vendor/react-dom":
+      "resource://devtools/client/shared/vendor/react-dom"
   }
 });
 

@@ -18,7 +18,7 @@ def check_task(task):
     payload = task['payload']
 
     if 'GECKO_HEAD_REPOSITORY' not in payload['env']:
-        print('Task has no head goanna repository', file=sys.stderr)
+        print('Task has no head gecko repository', file=sys.stderr)
         return -1
 
     repo = payload['env']['GECKO_HEAD_REPOSITORY']
@@ -28,7 +28,7 @@ def check_task(task):
         return -1
 
     if 'GECKO_BASE_REPOSITORY' not in payload['env']:
-        print('Task has no base goanna repository', file=sys.stderr)
+        print('Task has no base gecko repository', file=sys.stderr)
         return -1
 
     repo = payload['env']['GECKO_BASE_REPOSITORY']

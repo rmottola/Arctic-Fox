@@ -2,7 +2,7 @@
 ====================================================================
 
 mozinstall is a small python module with several convenience methods
-useful for installing and uninstalling a goanna-based application
+useful for installing and uninstalling a gecko-based application
 (e.g. Firefox) on the desktop.
 
 Simple example

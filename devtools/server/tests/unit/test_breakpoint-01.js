@@ -23,7 +23,7 @@ function run_test_with_server(aServer, aCallback)
   initTestDebuggerServer(aServer);
   gDebuggee = addTestGlobal("test-stack", aServer);
   gClient = new DebuggerClient(aServer.connectPipe());
-  gClient.connect(function () {
+  gClient.connect().then(function () {
     attachTestTabAndResume(gClient, "test-stack", function (aResponse, aTabClient, aThreadClient) {
       gThreadClient = aThreadClient;
       test_simple_breakpoint();
@@ -65,9 +65,11 @@ function test_simple_breakpoint()
     });
   });
 
-  Components.utils.evalInSandbox("var line0 = Error().lineNumber;\n" +
-                                 "debugger;\n" +   // line0 + 1
-                                 "var a = 1;\n" +  // line0 + 2
-                                 "var b = 2;\n",   // line0 + 3
-                                 gDebuggee);
+  Cu.evalInSandbox(
+    "var line0 = Error().lineNumber;\n" +
+    "debugger;\n" +   // line0 + 1
+    "var a = 1;\n" +  // line0 + 2
+    "var b = 2;\n",   // line0 + 3
+    gDebuggee
+  );
 }

@@ -15,8 +15,10 @@ export TOPLEVEL_BUILD := 1
 
 default::
 
+ifndef TEST_MOZBUILD
 ifdef MOZ_BUILD_APP
 include $(topsrcdir)/$(MOZ_BUILD_APP)/build.mk
+endif
 endif
 
 include $(topsrcdir)/config/config.mk
@@ -27,6 +29,10 @@ DIST_GARBAGE = config.cache config.log config.status* config-defs.h \
    mozilla-config.h \
    netwerk/necko-config.h xpcom/xpcom-config.h xpcom/xpcom-private.h \
    .mozconfig.mk
+
+ifndef MOZ_PROFILE_USE
+buildid.h: FORCE
+endif
 
 ifdef JS_STANDALONE
 configure_dir = $(topsrcdir)/js/src
@@ -154,10 +160,12 @@ install-manifests: $(addprefix install-,$(install_manifests))
 
 # If we're using the hybrid FasterMake/RecursiveMake backend, we want
 # to recurse in the faster/ directory in parallel of install manifests.
+# But dist/idl needs to happen before (cf. dependencies in
+# config/faster/rules.mk)
 ifneq (,$(filter FasterMake+RecursiveMake,$(BUILD_BACKENDS)))
 install-manifests: faster
 .PHONY: faster
-faster:
+faster: install-dist/idl
 	$(MAKE) -C faster FASTER_RECURSIVE_MAKE=1
 endif
 
@@ -203,20 +211,20 @@ endif
 ifdef MOZ_PROFILE_USE
 ifndef NO_PROFILE_GUIDED_OPTIMIZE
 ifneq ($(OS_ARCH)_$(GNU_CC), WINNT_)
-export:: install-manifests
+recurse_pre-export:: install-manifests
 binaries::
 	@$(MAKE) install-manifests NO_REMOVE=1 install_manifests=dist/include
 endif
 endif
 else # !MOZ_PROFILE_USE (normal build)
-export:: install-manifests
+recurse_pre-export:: install-manifests
 binaries::
 	@$(MAKE) install-manifests NO_REMOVE=1 install_manifests=dist/include
 endif
 
 # For historical reasons that are unknown, $(DIST)/sdk is always blown away
 # with no regard for PGO passes. This decision could probably be revisited.
-export:: install-dist/sdk
+recurse_pre-export:: install-dist/sdk
 
 ifndef JS_STANDALONE
 ifdef ENABLE_TESTS
