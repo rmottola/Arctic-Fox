@@ -50,6 +50,14 @@
         titlemodifier_normal="&mainWindow.titlemodifier;"
         titlemodifier_privatebrowsing="&mainWindow.titlemodifier; &mainWindow.titlePrivateBrowsingSuffix;"
 #endif
+#ifdef CAN_DRAW_IN_TITLEBAR
+#ifdef XP_WIN
+        chromemargin="0,2,2,2"
+#else
+        chromemargin="0,-1,-1,-1"
+#endif
+        tabsintitlebar="true"
+#endif
         titlemenuseparator="&mainWindow.titlemodifiermenuseparator;"
         lightweightthemes="true"
         lightweightthemesfooter="browser-bottombox"
