@@ -41,4 +41,6 @@ for name in common cppunittest reftest mochitest xpcshell web-platform; do
 done
 mv test_packages_tc.json        $HOME/artifacts/test_packages.json
 
+ccache -s
+
 ################################### build.sh ###################################

@@ -36,4 +36,6 @@ done
 mv test_packages_tc.json        $HOME/artifacts/test_packages.json
 mv jsshell-linux-x86_64.zip $HOME/artifacts/jsshell-linux-x86_64.zip
 
+ccache -s
+
 ################################### build.sh ###################################
