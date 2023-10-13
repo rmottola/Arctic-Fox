@@ -45,6 +45,8 @@ if [ 0$B2G_DEBUG -ne 0 ]; then
   debug_flag='--debug'
 fi
 
+rm -rf $WORKSPACE/B2G/out/target/product/generic/tests/
+
 ./mozharness/scripts/b2g_build.py \
   --config b2g/taskcluster-emulator.py \
   "$debug_flag" \
@@ -65,7 +67,7 @@ ls -lah $WORKSPACE/B2G/objdir-gecko/dist/
 
 mv $WORKSPACE/B2G/sources.xml $HOME/artifacts/sources.xml
 mv $WORKSPACE/B2G/out/target/product/generic/tests/gaia-tests.zip $HOME/artifacts/gaia-tests.zip
-mv $WORKSPACE/B2G/out/target/product/generic/tests/b2g-*.zip $HOME/artifacts
+mv $WORKSPACE/B2G/out/target/product/generic/tests/b2g-*tests.zip $HOME/artifacts/b2g-tests.zip
 mv $WORKSPACE/B2G/out/emulator.tar.gz $HOME/artifacts/emulator.tar.gz
 mv $WORKSPACE/B2G/objdir-gecko/dist/b2g-*.crashreporter-symbols.zip $HOME/artifacts/b2g-crashreporter-symbols.zip
 

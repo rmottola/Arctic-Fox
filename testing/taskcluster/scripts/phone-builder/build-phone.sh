@@ -2,6 +2,8 @@
 
 . pre-build.sh
 
+rm -rf $WORKSPACE/B2G/upload/
+
 ./mozharness/scripts/b2g_build.py \
   --config b2g/taskcluster-phone.py \
   "$debug_flag" \

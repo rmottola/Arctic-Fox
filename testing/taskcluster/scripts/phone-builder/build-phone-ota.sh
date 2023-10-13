@@ -22,6 +22,9 @@ else
   PLATFORM=$TARGET-$VARIANT
 fi
 
+rm -rf $WORKSPACE/B2G/upload-public/
+rm -rf $WORKSPACE/B2G/upload/
+
 ./mozharness/scripts/b2g_build.py \
   --config b2g/taskcluster-phone-nightly.py \
   --config balrog/docker-worker.py \
