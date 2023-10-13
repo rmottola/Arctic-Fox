@@ -166,7 +166,7 @@
     display: none;
 }
 
-/* ::::: bookmark toolbar ::::: */
+/* ----- BOOKMARK TOOLBAR ----- */
 
 #personal-bookmarks {
   min-height: 17px; /* 16px button height + 1px margin-bottom */
@@ -200,7 +200,7 @@ toolbarbutton.chevron:-moz-locale-dir(rtl) > .toolbarbutton-icon {
   }
 }
 
-/* ::::: bookmark buttons ::::: */
+/* ----- BOOKMARK BUTTONS ----- */
 
 toolbarbutton.bookmark-item {
   color: #222;
@@ -398,7 +398,74 @@ toolbarbutton.bookmark-item > menupopup {
   }
 }
 
-/* ::::: bookmark menus ::::: */
+/* ----- BOOKMARK STAR ANIMATION ----- */
+
+@keyframes animation-bookmarkAdded {
+  from { transform: rotate(0deg) translateX(-14px) rotate(0deg) scale(1); opacity: 0; }
+  60%  { transform: rotate(180deg) translateX(-14px) rotate(-180deg) scale(2.2); opacity: 1; }
+  80%  { opacity: 1; }
+  to   { transform: rotate(180deg) translateX(-14px) rotate(-180deg) scale(1); opacity: 0; }
+}
+
+@keyframes animation-bookmarkPulse {
+  from { transform: scale(1); }
+  50%  { transform: scale(1.3); }
+  to   { transform: scale(1); }
+}
+
+#bookmarked-notification-container {
+  min-height: 1px;
+  min-width: 1px;
+  height: 1px;
+  margin-bottom: -1px;
+  z-index: 5;
+  position: relative;
+}
+
+#bookmarked-notification {
+  background-size: 16px;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+}
+
+#bookmarked-notification-dropmarker-anchor {
+  z-index: -1;
+  position: relative;
+}
+
+#bookmarked-notification-dropmarker-icon {
+  width: 18px;
+  height: 18px;
+  visibility: hidden;
+}
+
+#bookmarked-notification-anchor[notification="finish"] > #bookmarked-notification {
+  background-image: url("chrome://browser/skin/places/bookmarks-notification-finish.png");
+  animation: animation-bookmarkAdded 800ms;
+  animation-timing-function: ease, ease, ease;
+}
+
+@media (min-resolution: 2dppx) {
+  #bookmarked-notification-anchor[notification="finish"] > #bookmarked-notification {
+    background-image: url("chrome://browser/skin/places/bookmarks-notification-finish@2x.png");
+  }
+}
+
+#bookmarks-menu-button[notification="finish"] > .toolbarbutton-menubutton-dropmarker > .dropmarker-icon {
+  list-style-image: none !important;
+}
+
+#bookmarked-notification-dropmarker-anchor[notification="finish"] > #bookmarked-notification-dropmarker-icon {
+  visibility: visible;
+  animation: animation-bookmarkPulse 300ms;
+  animation-delay: 600ms;
+  animation-timing-function: ease-out;
+}
+
+/* ----- BOOKMARK MENUS ----- */
 
 .bookmark-item > .menu-iconic-left > .menu-iconic-icon {
   width: 16px;
@@ -1154,7 +1221,7 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     opacity: 0.3;
 }
 
-/* autocomplete */
+/* ----- AUTOCOMPLETE ----- */
 
 #treecolAutoCompleteImage {
     max-width: 36px;
@@ -1235,7 +1302,8 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
     border-top: 1px solid GrayText;
 }
 
-/* combined go/reload/stop button in location bar */
+
+/* ----- COMBINED GO/RELOAD/STOP BUTTON IN LOCATION BAR ----- */
 
 #go-button,
 #urlbar > toolbarbutton {
@@ -1304,8 +1372,7 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
     -moz-image-region: rect(28px, 28px, 42px, 14px);
 }
 
-/* popup blocker button */
-
+/* POPUP BLOCKER BUTTON */
 #page-report-button {
   list-style-image: url("chrome://browser/skin/urlbar-popup-blocked.png");
   -moz-image-region: rect(0, 16px, 16px, 0);
@@ -1889,7 +1956,7 @@ toolbar[brighttext] .tabs-closebutton {
 
 /* Bookmarks toolbar */
 #PlacesToolbarDropIndicator {
-    list-style-image: url(chrome://browser/skin/places/toolbarDropMarker.png);
+  list-style-image: url(chrome://browser/skin/places/toolbarDropMarker.png);
 }
 
 toolbarbutton.bookmark-item[dragover="true"][open="true"] {
@@ -1919,7 +1986,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 
 /* Notification icon box */
 #notification-popup-box {
-    border-radius: 2.5px 0 0 2.5px;
+  border-radius: 2.5px 0 0 2.5px;
 }
 
 .notification-anchor-icon:-moz-focusring {
@@ -2021,51 +2088,51 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 /* Ctrl-Tab */
 
 #ctrlTab-panel {
-    padding: 20px 10px 10px;
-    font-weight: bold;
-    text-shadow: 0 0 1px rgb(27%,27%,27%), 0 0 2px rgb(27%,27%,27%);
+  padding: 20px 10px 10px;
+  font-weight: bold;
+  text-shadow: 0 0 1px rgb(27%,27%,27%), 0 0 2px rgb(27%,27%,27%);
 }
 
 .ctrlTab-favicon[src] {
-    background-color: white;
-    width: 20px;
-    height: 20px;
-    padding: 2px;
+  background-color: white;
+  width: 20px;
+  height: 20px;
+  padding: 2px;
 }
 
 .ctrlTab-preview-inner > .tabPreview-canvas {
-    box-shadow: 1px 1px 2px rgb(12%,12%,12%);
+  box-shadow: 1px 1px 2px rgb(12%,12%,12%);
 }
 
 .ctrlTab-preview:not(#ctrlTab-showAll) > * > .ctrlTab-preview-inner > .tabPreview-canvas {
-    margin-bottom: 2px;
+  margin-bottom: 2px;
 }
 
 .ctrlTab-preview-inner {
-    padding-bottom: 10px;
+  padding-bottom: 10px;
 }
 
 #ctrlTab-showAll:not(:focus) > * > .ctrlTab-preview-inner {
-    padding: 10px;
-    background-color: rgba(255,255,255,.2);
-    border-radius: .5em;
+  padding: 10px;
+  background-color: rgba(255,255,255,.2);
+  border-radius: .5em;
 }
 
 .ctrlTab-preview:focus > * > .ctrlTab-preview-inner {
-    color: white;
-    background-color: rgba(0,0,0,.6);
-    text-shadow: none;
-    padding: 8px;
-    border: 2px solid white;
-    border-radius: .5em;
+  color: white;
+  background-color: rgba(0,0,0,.6);
+  text-shadow: none;
+  padding: 8px;
+  border: 2px solid white;
+  border-radius: .5em;
 }
 
 .ctrlTab-preview:not(#ctrlTab-showAll):focus > * > .ctrlTab-preview-inner {
-    margin: -10px -10px 0;
+  margin: -10px -10px 0;
 }
 
 #ctrlTab-showAll {
-    margin-top: .5em;
+  margin-top: .5em;
 }
 
 /* All Tabs */
@@ -2130,13 +2197,13 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 /* Status panel */
 
 .statuspanel-label {
-    margin: 0;
-    padding: 2px 4px;
-    background: linear-gradient(#fff, #ddd);
-    border: 1px none #ccc;
-    border-top-style: solid;
-    color: #333;
-    text-shadow: none;
+  margin: 0;
+  padding: 2px 4px;
+  background: linear-gradient(#fff, #ddd);
+  border: 1px none #ccc;
+  border-top-style: solid;
+  color: #333;
+  text-shadow: none;
 }
 
 .statuspanel-label:-moz-locale-dir(ltr):not([mirror]),
@@ -2165,6 +2232,27 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 %include ../shared/login-doorhanger.inc.css
 
 %include downloads/indicator.css
+
+/* On mac, the popup notification contents are indented by default and so
+  the default closebutton margins from notification.css require adjustment */
+
+.click-to-play-plugins-notification-description-box > .popup-notification-closebutton {
+  -moz-margin-end: -6px;
+  margin-top: -7px;
+}
+
+
+
+.gclitoolbar-input-node > .textbox-input-box > html|*.textbox-input::-moz-selection {
+  color: hsl(210,11%,16%);
+}
+
+/* Developer Toolbar */
+
+#developer-toolbar-closebutton {
+  margin-left: 8px;
+  margin-right: 8px;
+}
 
 /* Error counter */
 
@@ -2238,3 +2326,5 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 .browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }
+
+%include ../shared/usercontext/usercontext.inc.css
