@@ -2,12 +2,10 @@
 
 . pre-build.sh
 
-if [ 0$B2G_DEBUG -ne 0 ]; then
-    DEBUG_SUFFIX=-debug
-fi
-
-if [ ! -d $HOME/.ssh ]; then
-    mkdir $HOME/.ssh
+if [ $TARGET == "aries" -o $TARGET == "shinano" ]; then
+  # caching objects might be dangerous for some devices (aka aries)
+  rm -rf $WORKSPACE/B2G/objdir*
+  rm -rf $WORKSPACE/B2G/out
 fi
 
 aws s3 cp s3://b2g-nightly-credentials/balrog_credentials .
@@ -16,18 +14,24 @@ mar_file=b2g-${TARGET%%-*}-gecko-update.mar
 # We need different platform names for each variant (user, userdebug and
 # eng). We do not append variant suffix for "user" to keep compability with
 # verions already installed in the phones.
-if [ $VARIANT == "user" ]; then
-  PLATFORM=$TARGET
-else
-  PLATFORM=$TARGET-$VARIANT
+if [ 0$DOGFOOD -ne 0 -o $VARIANT != "user" ]; then
+  PLATFORM=$PLATFORM-$VARIANT
+fi
+
+if ! test $MOZHARNESS_CONFIG; then
+  MOZHARNESS_CONFIG=b2g/taskcluster-phone-ota.py
+fi
+
+if ! test $BALROG_SERVER_CONFIG; then
+  BALROG_SERVER_CONFIG=balrog/docker-worker.py
 fi
 
 rm -rf $WORKSPACE/B2G/upload-public/
 rm -rf $WORKSPACE/B2G/upload/
 
 ./mozharness/scripts/b2g_build.py \
-  --config b2g/taskcluster-phone-nightly.py \
-  --config balrog/docker-worker.py \
+  --config $MOZHARNESS_CONFIG \
+  --config $BALROG_SERVER_CONFIG \
   "$debug_flag" \
   --disable-mock \
   --variant=$VARIANT \
