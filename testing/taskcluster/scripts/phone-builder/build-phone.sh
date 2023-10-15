@@ -10,11 +10,9 @@ if [ $TARGET == "aries" -o $TARGET == "shinano" ]; then
   rm -rf $WORKSPACE/B2G/out
 fi
 
-if ! test $MOZHARNESS_CONFIG; then
-  MOZHARNESS_CONFIG=b2g/taskcluster-phone.py
-fi
+MOZHARNESS_CONFIG=${MOZHARNESS_CONFIG:=b2g/taskcluster-phone.py}
 
-./mozharness/scripts/b2g_build.py \
+$WORKSPACE/gecko/testing/mozharness/scripts/b2g_build.py \
   --config $MOZHARNESS_CONFIG \
   "$debug_flag" \
   --disable-mock \
@@ -25,8 +23,7 @@ fi
   --target=$TARGET \
   --b2g-config-dir=$TARGET \
   --checkout-revision=$GECKO_HEAD_REV \
-  --base-repo=$GECKO_BASE_REPOSITORY \
-  --repo=$GECKO_HEAD_REPOSITORY
+  --repo=$WORKSPACE/gecko
 
 # Don't cache backups
 rm -rf $WORKSPACE/B2G/backup-*
