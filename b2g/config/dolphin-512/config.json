@@ -8,10 +8,12 @@
     ],
     "build_targets": ["kernelheader", ""],
     "upload_files": [
+        "{objdir}/dist/b2g-*.crashreporter-symbols.zip",
         "{objdir}/dist/b2g-*.tar.gz",
         "{workdir}/sources.xml"
     ],
     "public_upload_files": [
+        "{objdir}/dist/b2g-*.crashreporter-symbols.zip",
         "{objdir}/dist/b2g-*.tar.gz",
         "{workdir}/sources.xml"
     ],
