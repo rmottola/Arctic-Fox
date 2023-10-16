@@ -12,7 +12,8 @@ import re
 from mozharness.base.script import PostScriptAction
 from mozharness.base.transfer import TransferMixin
 
-class TryToolsMixin(object):
+
+class TryToolsMixin(TransferMixin):
     """Utility functions for an interface between try syntax and out test harnesses.
     Requires log and script mixins."""
 
