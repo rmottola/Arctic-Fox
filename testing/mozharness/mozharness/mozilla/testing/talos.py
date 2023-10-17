@@ -184,7 +184,7 @@ class Talos(TestingMixin, MercurialScript, BlobUploadMixin):
                   pass
         # finally, if sps_profile is set, we add that to the talos options
         if self.sps_profile:
-            sps_reself.pagesets_parent_dir_path = Noneults.append('--spsProfile')
+            sps_results.append('--spsProfile')
             if self.sps_profile_interval:
                 sps_results.extend(
                     ['--spsProfileInterval', str(self.sps_profile_interval)]
