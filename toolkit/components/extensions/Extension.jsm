@@ -314,6 +314,16 @@ GlobalManager = {
       injectAPI(api, chromeObj);
     }
 
+    // Find the add-on associated with this document via the
+    // principal's originAttributes. This value is computed by
+    // extensionURIToAddonID, which ensures that we don't inject our
+    // API into webAccessibleResources or remote web pages.
+    let principal = contentWindow.document.nodePrincipal;
+    let id = principal.originAttributes.addonId;
+    if (!this.extensionMap.has(id)) {
+      return;
+    }
+
     let docShell = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                                 .getInterface(Ci.nsIWebNavigation)
                                 .QueryInterface(Ci.nsIDocShellTreeItem)
@@ -322,7 +332,7 @@ GlobalManager = {
 
     if (this.docShells.has(docShell)) {
       let {extension, context} = this.docShells.get(docShell);
-      if (context) {
+      if (context && extension.id == id) {
         inject(extension, context);
       }
       return;
@@ -330,16 +340,6 @@ GlobalManager = {
 
     // We don't inject into sub-frames of a UI page.
     if (contentWindow != contentWindow.top) {
-      return;
-    }
-
-    // Find the add-on associated with this document via the
-    // principal's originAttributes. This value is computed by
-    // extensionURIToAddonID, which ensures that we don't inject our
-    // API into webAccessibleResources.
-    let principal = contentWindow.document.nodePrincipal;
-    let id = principal.originAttributes.addonId;
-    if (!this.extensionMap.has(id)) {
       return;
     }
     let extension = this.extensionMap.get(id);
