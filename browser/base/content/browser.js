@@ -490,8 +490,8 @@ var gPopupBlockerObserver = {
         this._reportButton.hidden = true;
 
       // Hide the notification box (if it's visible).
-      var notificationBox = gBrowser.getNotificationBox();
-      var notification = notificationBox.getNotificationWithValue("popup-blocked");
+      let notificationBox = gBrowser.getNotificationBox();
+      let notification = notificationBox.getNotificationWithValue("popup-blocked");
       if (notification) {
         notificationBox.removeNotification(notification, false);
       }
@@ -521,8 +521,8 @@ var gPopupBlockerObserver = {
                                 .replace("#1", brandShortName)
                                 .replace("#2", popupCount);
 
-        var notificationBox = gBrowser.getNotificationBox();
-        var notification = notificationBox.getNotificationWithValue("popup-blocked");
+        let notificationBox = gBrowser.getNotificationBox();
+        let notification = notificationBox.getNotificationWithValue("popup-blocked");
         if (notification) {
           notification.label = message;
         }
