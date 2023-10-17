@@ -170,7 +170,8 @@ class FirefoxUITests(TestingMixin, VCSToolsScript):
             repo=self.firefox_ui_repo,
             dest=dirs['abs_test_install_dir'],
             branch=self.firefox_ui_branch,
-            vcs='gittool'
+            vcs='gittool',
+            env=self.query_env(),
         )
 
     def clobber(self):
