@@ -13,6 +13,7 @@ Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   SingletonEventManager,
   runSafeSync,
+  ignoreEvent,
 } = ExtensionUtils;
 
 // EventManager-like class specifically for WebRequest. Inherits from
@@ -104,6 +105,10 @@ extensions.registerSchemaAPI("webRequest", "webRequest", (extension, context) =>
       handlerBehaviorChanged: function() {
         // TODO: Flush all caches.
       },
+
+      // TODO
+      onBeforeRedirect: ignoreEvent(context, "webRequest.onBeforeRedirect"),
+      onErrorOccurred: ignoreEvent(context, "webRequest.onErrorOccurred"),
     },
   };
 });
