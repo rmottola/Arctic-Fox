@@ -5466,5 +5466,7 @@ pref("dom.requestcontext.enabled", false);
 
 pref("dom.mozKillSwitch.enabled", false);
 
+pref("webextensions.tests", false);
+
 // Allow customization of the fallback directory for file uploads
 pref("dom.input.fallbackUploadDir", "");
