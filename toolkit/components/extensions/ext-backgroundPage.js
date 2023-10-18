@@ -136,8 +136,8 @@ extensions.registerSchemaAPI("extension", null, (extension, context) => {
     },
 
     runtime: {
-      getBackgroundPage: function(callback) {
-        runSafe(context, callback, backgroundPagesMap.get(extension).contentWindow);
+      getBackgroundPage() {
+        return context.cloneScope.Promise.resolve(backgroundPagesMap.get(extension).contentWindow);
       },
     },
   };
