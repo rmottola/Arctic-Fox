@@ -72,10 +72,19 @@ function checkSetCookiePermissions(extension, uri, cookie) {
     return false;
   }
 
-  // The cookie service ignores any leading '.' passed in, but adds one if the
-  // proposed domain is not the exact domain of the URL. So start by stripping
-  // it off.
-  cookie.host = cookie.host.replace(/^\./, "");
+  if (!cookie.host) {
+    // If no explicit host is specified, this becomes a host-only cookie.
+    cookie.host = uri.host;
+    return true;
+  }
+
+  // A leading "." is not expected, but is tolerated if it's not the only
+  // character in the host. If there is one, start by stripping it off. We'll
+  // add a new one on success.
+  if (cookie.host.length > 1) {
+    cookie.host = cookie.host.replace(/^\./, "");
+  }
+  cookie.host = cookie.host.toLowerCase();
 
   if (cookie.host != uri.host) {
     // Not an exact match, so check for a valid subdomain.
@@ -105,10 +114,11 @@ function checkSetCookiePermissions(extension, uri, cookie) {
 
     // RFC2109 suggests that we may only add cookies for sub-domains 1-level
     // below us, but enforcing that would break the web, so we don't.
-
-    // This is a valid sub-domain cookie, so add (or re-add) a leading dot.
-    cookie.host = "." + cookie.host;
   }
+
+  // An explicit domain was passed, so add a leading "." to make this a
+  // domain cookie.
+  cookie.host = "." + cookie.host;
 
   // We don't do any significant checking of path permissions. RFC2109
   // suggests we only allow sites to add cookies for sub-paths, similar to
@@ -253,13 +263,6 @@ extensions.registerSchemaAPI("cookies", "cookies", (extension, context) => {
       set: function(details, callback) {
         let uri = NetUtil.newURI(details.url).QueryInterface(Ci.nsIURL);
 
-        let domain;
-        if (details.domain !== null) {
-          domain = details.domain.toLowerCase();
-        } else {
-          domain = uri.host; // "If omitted, the cookie becomes a host-only cookie."
-        }
-
         let path;
         if (details.path !== null) {
           path = details.path;
@@ -279,7 +282,7 @@ extensions.registerSchemaAPI("cookies", "cookies", (extension, context) => {
         let expiry = isSession ? 0 : details.expirationDate;
         // Ignore storeID.
 
-        let cookieAttrs = { host: domain, path: path, isSecure: secure };
+        let cookieAttrs = { host: details.domain, path: path, isSecure: secure };
         if (checkSetCookiePermissions(extension, uri, cookieAttrs)) {
           // TODO: Set |lastError| when false.
           //
