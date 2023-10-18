@@ -204,3 +204,5 @@ add_task(function* testPageActionSecurity() {
   SimpleTest.endMonitorConsole();
   yield waitForConsole;
 });
+
+add_task(forceGC);

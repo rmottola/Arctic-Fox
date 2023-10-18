@@ -170,3 +170,5 @@ add_task(function* test_url() {
     });
   });
 });
+
+add_task(forceGC);

@@ -153,3 +153,5 @@ add_task(function* testGoodPermissions() {
 
   yield BrowserTestUtils.removeTab(tab);
 });
+
+add_task(forceGC);
