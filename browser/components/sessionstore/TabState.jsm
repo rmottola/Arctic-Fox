@@ -103,6 +103,7 @@ var TabStateInternal = {
 
     if (browser.audioMuted) {
       tabData.muted = true;
+      tabData.muteReason = tab.muteReason;
     }
 
     // Save tab attributes.
