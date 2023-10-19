@@ -59,17 +59,17 @@ add_task(function* testGoodPermissions() {
 
   info("Test explicit host permission");
   yield testHasPermission({
-    manifest: { "permissions": ["http://mochi.test/"] },
+    manifest: {"permissions": ["http://mochi.test/"]},
   });
 
   info("Test explicit host subdomain permission");
   yield testHasPermission({
-    manifest: { "permissions": ["http://*.mochi.test/"] },
+    manifest: {"permissions": ["http://*.mochi.test/"]},
   });
 
   info("Test explicit <all_urls> permission");
   yield testHasPermission({
-    manifest: { "permissions": ["<all_urls>"] },
+    manifest: {"permissions": ["<all_urls>"]},
   });
 
   info("Test activeTab permission with a browser action click");
@@ -96,7 +96,7 @@ add_task(function* testGoodPermissions() {
     },
     contentSetup() {
       return new Promise(resolve => {
-        browser.tabs.query({ active: true, currentWindow: true }, tabs => {
+        browser.tabs.query({active: true, currentWindow: true}, tabs => {
           browser.pageAction.show(tabs[0].id);
           resolve();
         });
@@ -110,7 +110,7 @@ add_task(function* testGoodPermissions() {
   yield testHasPermission({
     manifest: {
       "permissions": ["activeTab"],
-      "browser_action": { "default_popup": "_blank.html" },
+      "browser_action": {"default_popup": "_blank.html"},
     },
     setup: clickBrowserAction,
     tearDown: closeBrowserAction,
@@ -120,11 +120,11 @@ add_task(function* testGoodPermissions() {
   yield testHasPermission({
     manifest: {
       "permissions": ["activeTab"],
-      "page_action": { "default_popup": "_blank.html" },
+      "page_action": {"default_popup": "_blank.html"},
     },
     contentSetup() {
       return new Promise(resolve => {
-        browser.tabs.query({ active: true, currentWindow: true }, tabs => {
+        browser.tabs.query({active: true, currentWindow: true}, tabs => {
           browser.pageAction.show(tabs[0].id);
           resolve();
         });
@@ -140,7 +140,7 @@ add_task(function* testGoodPermissions() {
       "permissions": ["activeTab", "contextMenus"],
     },
     contentSetup() {
-      browser.contextMenus.create({ title: "activeTab", contexts: ["all"] });
+      browser.contextMenus.create({title: "activeTab", contexts: ["all"]});
       return Promise.resolve();
     },
     setup: function* (extension) {
@@ -148,7 +148,7 @@ add_task(function* testGoodPermissions() {
       let awaitPopupShown = BrowserTestUtils.waitForEvent(contextMenu, "popupshown");
       let awaitPopupHidden = BrowserTestUtils.waitForEvent(contextMenu, "popuphidden");
 
-      yield BrowserTestUtils.synthesizeMouseAtCenter("a[href]", { type: "contextmenu", button: 2 },
+      yield BrowserTestUtils.synthesizeMouseAtCenter("a[href]", {type: "contextmenu", button: 2},
                                                      gBrowser.selectedBrowser);
       yield awaitPopupShown;
 

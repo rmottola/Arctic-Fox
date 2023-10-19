@@ -44,34 +44,34 @@ add_task(function* testPageActionPopup() {
         let sendClick;
         let tests = [
           () => {
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
           () => {
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "popup-b.html" });
-            sendClick({ expectEvent: false, expectPopup: "b" });
+            browser.browserAction.setPopup({popup: "popup-b.html"});
+            sendClick({expectEvent: false, expectPopup: "b"});
           },
           () => {
-            sendClick({ expectEvent: false, expectPopup: "b" });
+            sendClick({expectEvent: false, expectPopup: "b"});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "" });
-            sendClick({ expectEvent: true, expectPopup: null });
+            browser.browserAction.setPopup({popup: ""});
+            sendClick({expectEvent: true, expectPopup: null});
           },
           () => {
-            sendClick({ expectEvent: true, expectPopup: null });
+            sendClick({expectEvent: true, expectPopup: null});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "/popup-a.html" });
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            browser.browserAction.setPopup({popup: "/popup-a.html"});
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
         ];
 
         let expect = {};
-        sendClick = ({ expectEvent, expectPopup }) => {
-          expect = { event: expectEvent, popup: expectPopup };
+        sendClick = ({expectEvent, expectPopup}) => {
+          expect = {event: expectEvent, popup: expectPopup};
           browser.test.sendMessage("send-click");
         };
 
