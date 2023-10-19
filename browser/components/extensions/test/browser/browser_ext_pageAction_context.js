@@ -15,8 +15,8 @@ function* runTests(options) {
       }).then(tabs => {
         let tabId = tabs[0].id;
         return Promise.all([
-          new Promise(resolve => browser.pageAction.getTitle({tabId}, resolve)),
-          new Promise(resolve => browser.pageAction.getPopup({tabId}, resolve))]);
+          browser.pageAction.getTitle({tabId}),
+          browser.pageAction.getPopup({tabId})]);
       }).then(details => {
         return Promise.resolve({ title: details[0],
                                  popup: details[1] });
