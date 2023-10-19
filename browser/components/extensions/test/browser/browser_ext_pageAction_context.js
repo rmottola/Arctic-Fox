@@ -12,8 +12,9 @@ function* runTests(options) {
     function getDetails() {
       return new Promise(resolve => {
         return browser.tabs.query({ active: true, currentWindow: true }, resolve);
-      }).then(tabs => {
-        let tabId = tabs[0].id;
+      }).then(([tab]) => {
+        let tabId = tab.id;
+        browser.test.log(`Get details: tab={id: ${tabId}, url: ${JSON.stringify(tab.url)}}`);
         return Promise.all([
           browser.pageAction.getTitle({tabId}),
           browser.pageAction.getPopup({tabId})]);
@@ -173,8 +174,20 @@ add_task(function* testTabSwitchContext() {
           "title": "Title 2" },
         { "icon": browser.runtime.getURL("2.png"),
           "popup": browser.runtime.getURL("2.html"),
-          "title": "Default Title" },
+          "title": "Default Title \u263a" },
       ];
+
+      let promiseTabLoad = details => {
+        return new Promise(resolve => {
+          browser.tabs.onUpdated.addListener(function listener(tabId, changed) {
+            if (tabId == details.id && changed.url == details.url) {
+              browser.tabs.onUpdated.removeListener(listener);
+              resolve();
+            }
+          });
+        });
+      };
+      let tabLoadPromise;
 
       return [
         expect => {
@@ -194,7 +207,14 @@ add_task(function* testTabSwitchContext() {
         expect => {
           browser.test.log("Create a new tab. No icon visible.");
           browser.tabs.create({ active: true, url: "about:blank?0" }, tab => {
+            tabLoadPromise = promiseTabLoad({ url: "about:blank?0", id: tab.id });
             tabs.push(tab.id);
+            expect(null);
+          });
+        },
+        expect => {
+          browser.test.log("Await tab load. No icon visible.");
+          tabLoadPromise.then(() => {
             expect(null);
           });
         },
@@ -219,11 +239,8 @@ add_task(function* testTabSwitchContext() {
 
           // TODO: This listener should not be necessary, but the |tabs.update|
           // callback currently fires too early in e10s windows.
-          browser.tabs.onUpdated.addListener(function listener(tabId, changed) {
-            if (tabId == tabs[1] && changed.url) {
-              browser.tabs.onUpdated.removeListener(listener);
-              expect(null);
-            }
+          promiseTabLoad({ id: tabs[1], url: "about:blank?1" }).then(() => {
+            expect(null);
           });
 
           browser.tabs.update(tabs[1], { url: "about:blank?1" });
