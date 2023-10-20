@@ -34,9 +34,9 @@ flags:
     - aries-ota
     - aries-eng
     - aries-dogfood
-    - android-api-11
+    - android-api-15
     - android-partner-sample1
-    - linux32
+    - linux
     - linux64
     - linux64-st-an
     - macosx64

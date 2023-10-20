@@ -5,15 +5,18 @@
 $inherits:
   from: tasks/branches/base_jobs.yml
 
+# Flags specific to this branch
+flags:
+  post-build:
+    - simulator
+
 builds:
-  aries-ota:
+  android-api-15:
     platforms:
-      - b2g
+      - Android
     types:
       opt:
-        task: tasks/builds/b2g_aries_spark_ota_opt.yml
-      debug:
-        task: tasks/builds/b2g_aries_spark_ota_debug.yml
+        task: tasks/builds/android_api_15.yml
   aries-dogfood:
     platforms:
       - b2g
