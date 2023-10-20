@@ -97,6 +97,12 @@ builds:
     types:
       opt:
         task: tasks/builds/android_api_11.yml
+  android-partner-sample1:
+    platforms:
+      - Android
+    types:
+      opt:
+        task: tasks/builds/android_api_11_partner_sample1.yml
   linux:
     platforms:
       - Linux
