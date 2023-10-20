@@ -97,6 +97,22 @@ builds:
     types:
       opt:
         task: tasks/builds/android_api_11.yml
+  linux:
+    platforms:
+      - Linux
+    types:
+      opt:
+        task: tasks/builds/opt_linux32_clobber.yml
+      debug:
+        task: tasks/builds/dbg_linux32_clobber.yml
+  linux64:
+    platforms:
+      - Linux64
+    types:
+      opt:
+        task: tasks/builds/opt_linux64_clobber.yml
+      debug:
+        task: tasks/builds/dbg_linux64_clobber.yml
   linux64-st-an:
     platforms:
       - Linux64 Static Analysis
