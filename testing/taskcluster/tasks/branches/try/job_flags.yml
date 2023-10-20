@@ -122,14 +122,12 @@ builds:
     types:
       opt:
         task: tasks/builds/android_api_11.yml
-  linux64:
+  macosx64:
     platforms:
-      - Linux64
+      - MacOSX64
     types:
-      opt:
-        task: tasks/builds/opt_linux64.yml
       debug:
-        task: tasks/builds/dbg_linux64.yml
+        task: tasks/builds/dbg_macosx64.yml
   sm-plain:
     platforms:
       - Linux64
