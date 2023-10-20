@@ -109,6 +109,12 @@ builds:
     types:
       debug:
         task: tasks/builds/dbg_macosx64.yml
+  macosx64-st-an:
+    platforms:
+      - MacOSX64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_macosx64_st-an_clobber.yml
   sm-plain:
     platforms:
       - Linux64
