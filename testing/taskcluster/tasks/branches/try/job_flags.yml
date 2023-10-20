@@ -5,39 +5,14 @@
 $inherits:
   from: tasks/branches/base_job_flags.yml
 
+# Flags specific to this branch
+flags:
+  post-build:
+    - upload-symbols
+
 builds:
   linux64_gecko:
     platforms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_desktop_opt.yml
-      debug:
-        task: tasks/builds/b2g_desktop_debug.yml
-  linux64-mulet:
-    platforms:
-      - Mulet Linux
-    types:
-      opt:
-        task: tasks/builds/mulet_linux.yml
-  emulator-l:
-    platfoms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_emulator_l_opt.yml
-      debug:
-        task: tasks/builds/b2g_emulator_l_debug.yml
-  emulator-kk:
-    platfoms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_emulator_kk_opt.yml
-      debug:
-        task: tasks/builds/b2g_emulator_kk_debug.yml
-  emulator-x86-l:
-    platfoms:
       - b2g
     types:
       opt:
@@ -122,6 +97,12 @@ builds:
     types:
       opt:
         task: tasks/builds/android_api_11.yml
+  linux64-st-an:
+    platforms:
+      - Linux64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_linux64_st-an.yml
   macosx64:
     platforms:
       - MacOSX64
@@ -179,6 +160,7 @@ post-build:
   upload-symbols:
     allowed_build_tasks:
       - tasks/builds/opt_linux64.yml
+      - tasks/builds/opt_linux64_st-an.yml
       - tasks/builds/dbg_linux64.yml
       - tasks/builds/android_api_11.yml
     task: tasks/post-builds/upload_symbols.yml
