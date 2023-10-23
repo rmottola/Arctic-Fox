@@ -49,6 +49,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
 XPCOMUtils.defineLazyModuleGetter(this, "PdfJs",
                                   "resource://pdf.js/PdfJs.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ProcessHangMonitor",
+                                  "resource:///modules/ProcessHangMonitor.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "webrtcUI",
                                   "resource:///modules/webrtcUI.jsm");
 
@@ -948,6 +951,8 @@ BrowserGlue.prototype = {
         temp.WinTaskbarJumpList.startup();
       }
     }
+
+    ProcessHangMonitor.init();
 
     this._trackSlowStartup();
 

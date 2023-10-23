@@ -1631,6 +1631,10 @@
               this.getFindBar(tab).browser = aBrowser;
             }
 
+            let evt = document.createEvent("Events");
+            evt.initEvent("TabRemotenessChange", true, false);
+            tab.dispatchEvent(evt);
+
             return true;
           ]]>
         </body>
@@ -3280,6 +3284,7 @@
             destroy: function() {
               clearTimeout(this.unloadTimer);
               clearTimeout(this.loadTimer);
+
               window.removeEventListener("MozAfterPaint", this);
               window.removeEventListener("MozLayerTreeReady", this);
               window.removeEventListener("MozLayerTreeCleared", this);
