@@ -68,12 +68,6 @@ XPCOMUtils.defineLazyGetter(this, "SMALLSVG_DATA_URI", function() {
          "IGhlaWdodD0iNDEuOCIvPg0KPC9zdmc%2BDQo%3D");
 });
 
-function LOG(aMsg) {
-  aMsg = ("*** PLACES TESTS: " + aMsg);
-  Services.console.logStringMessage(aMsg);
-  print(aMsg);
-}
-
 var gTestDir = do_get_cwd();
 
 // Initialize profile.
@@ -130,7 +124,7 @@ function DBConn(aForceNewConnection) {
  * Reads data from the provided inputstream.
  *
  * @return an array of bytes.
- */ 
+ */
 function readInputStreamData(aStream) {
   let bistream = Cc["@mozilla.org/binaryinputstream;1"].
                  createInstance(Ci.nsIBinaryInputStream);
