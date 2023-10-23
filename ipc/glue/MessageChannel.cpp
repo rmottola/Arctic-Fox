@@ -2124,8 +2124,10 @@ MessageChannel::CancelCurrentTransaction()
 {
     MonitorAutoLock lock(*mMonitor);
     if (mCurrentTransaction) {
+        CancelMessage *cancel = new CancelMessage();
+        cancel->set_transaction_id(mCurrentTransaction);
+        mLink->SendMessage(cancel);
         CancelCurrentTransactionInternal();
-        mLink->SendMessage(new CancelMessage());
     }
 }
 
