@@ -271,7 +271,7 @@ this.BrowserUtils = {
   },
 
   /**
-   * Return true if we can/should FAYT for this node + window (could be CPOW):
+   * Return true if we should FAYT for this node + window (could be CPOW):
    *
    * @param elt
    *        The element that is focused
@@ -294,7 +294,21 @@ this.BrowserUtils = {
         return false;
     }
 
-    if (win && !this.mimeTypeIsTextBased(win.document.contentType))
+    return true;
+  },
+
+  /**
+   * Return true if we can FAYT for this window (could be CPOW):
+   *
+   * @param win
+   *        The top level window that is focused
+   *
+   */
+  canFastFind: function(win) {
+    if (!win)
+      return false;
+
+    if (!this.mimeTypeIsTextBased(win.document.contentType))
       return false;
 
     // disable FAYT in about:blank to prevent FAYT opening unexpectedly.
@@ -304,7 +318,7 @@ this.BrowserUtils = {
 
     // disable FAYT in documents that ask for it to be disabled.
     if ((loc.protocol == "about:" || loc.protocol == "chrome:") &&
-        (win && win.document.documentElement &&
+        (win.document.documentElement &&
          win.document.documentElement.getAttribute("disablefastfind") == "true"))
       return false;
 
