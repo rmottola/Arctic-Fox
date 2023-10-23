@@ -245,7 +245,7 @@ class MessageChannel : HasResultCodes
     bool InterruptEventOccurred();
     bool HasPendingEvents();
 
-    void ProcessPendingRequests();
+    void ProcessPendingRequests(int transaction, int prio);
     bool ProcessPendingRequest(const Message &aUrgent);
 
     void MaybeUndeferIncall();
