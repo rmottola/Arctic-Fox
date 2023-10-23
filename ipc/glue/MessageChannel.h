@@ -132,6 +132,11 @@ class MessageChannel : HasResultCodes
 
     bool CanSend() const;
 
+    // Currently only for debugging purposes, doesn't aquire mMonitor.
+    ChannelState GetChannelState__TotallyRacy() const {
+        return mChannelState;
+    }
+
     void SetReplyTimeoutMs(int32_t aTimeoutMs);
 
     bool IsOnCxxStack() const {
