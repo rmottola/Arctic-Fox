@@ -1,6 +1,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+  <meta charset="utf-8">
   <title>Test for WebExtension localization APIs</title>
   <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
   <script type="text/javascript" src="/tests/SimpleTest/SpawnTask.js"></script>
@@ -10,15 +11,28 @@
 </head>
 <body>
 
-<script type="application/javascript;version=1.8">
+<script type="text/javascript">
+"use strict";
+
+SimpleTest.registerCleanupFunction(() => { SpecialPowers.clearUserPref("general.useragent.locale"); });
 
 add_task(function* test_i18n() {
   function runTests(assertEq) {
     let _ = browser.i18n.getMessage.bind(browser.i18n);
 
+    let url = browser.runtime.getURL("/");
+    assertEq(url, `moz-extension://${_("@@extension_id")}/`, "@@extension_id builtin message");
+
     assertEq("Foo.", _("Foo"), "Simple message in selected locale.");
 
     assertEq("(bar)", _("bar"), "Simple message fallback in default locale.");
+
+    assertEq("??", _("some-unknown-locale-string"), "Unknown locale string.");
+
+    assertEq("??", _("@@unknown_builtin_string"), "Unknown built-in string.");
+    assertEq("??", _("@@bidi_unknown_builtin_string"), "Unknown built-in bidi string.");
+
+    assertEq("Føo.", _("Föo"), "Multi-byte message in selected locale.");
 
     let substitutions = [];
     substitutions[4] = "5";
@@ -43,15 +57,15 @@ add_task(function* test_i18n() {
     assertEq("Accepted, but shouldn't break.", values[4], "Named placeholder with a strange content value");
 
     assertEq("$foo", values[5], "Non-placeholder token that should be ignored");
-  };
+  }
 
   let extension = ExtensionTestUtils.loadExtension({
     manifest: {
       "default_locale": "jp",
 
       content_scripts: [
-        { "matches": ["http://mochi.test/*/file_sample.html"],
-          "js": ["content.js"] },
+        {"matches": ["http://mochi.test/*/file_sample.html"],
+         "js": ["content.js"]},
       ],
     },
 
@@ -60,6 +74,11 @@ add_task(function* test_i18n() {
       "_locales/en_US/messages.json": {
         "foo": {
           "message": "Foo.",
+          "description": "foo",
+        },
+
+        "föo": {
+          "message": "Føo.",
           "description": "foo",
         },
 
@@ -141,6 +160,85 @@ add_task(function* test_i18n() {
   win.close();
 
   yield extension.awaitFinish("l10n");
+  yield extension.unload();
+});
+
+add_task(function* test_get_ui_language() {
+  function getResults() {
+    return {
+      getUILanguage: browser.i18n.getUILanguage(),
+      getMessage: browser.i18n.getMessage("@@ui_locale"),
+    };
+  }
+
+  function background(getResults) {
+    function checkResults(source, results, expected) {
+      browser.test.assertEq(
+        expected,
+        results.getUILanguage,
+        `Got expected getUILanguage result in ${source}`
+      );
+      browser.test.assertEq(
+        expected,
+        results.getMessage,
+        `Got expected getMessage result in ${source}`
+      );
+    }
+
+    let tabId;
+
+    browser.test.onMessage.addListener(([msg, expected]) => {
+      browser.tabs.sendMessage(tabId, "get-results", result => {
+        checkResults("contentScript", result, expected);
+        checkResults("background", getResults(), expected);
+
+        browser.test.sendMessage("done");
+      });
+    });
+
+    browser.tabs.query({currentWindow: true, active: true}, tabs => {
+      tabId = tabs[0].id;
+      browser.test.sendMessage("ready");
+    });
+  }
+
+  function content(getResults) {
+    browser.runtime.onMessage.addListener((msg, sender, respond) => {
+      respond(getResults());
+    });
+  }
+
+  let extension = ExtensionTestUtils.loadExtension({
+    manifest: {
+      "content_scripts": [{
+        "matches": ["http://mochi.test/*/file_sample.html"],
+        "run_at": "document_start",
+        "js": ["content_script.js"],
+      }],
+    },
+
+    background: `(${background})(${getResults})`,
+
+    files: {
+      "content_script.js": `(${content})(${getResults})`,
+    },
+  });
+
+  let win = window.open("file_sample.html");
+
+  yield extension.startup();
+  yield extension.awaitMessage("ready");
+
+  extension.sendMessage(["expect-results", "en_US"]);
+  yield extension.awaitMessage("done");
+
+  SpecialPowers.setCharPref("general.useragent.locale", "he");
+
+  extension.sendMessage(["expect-results", "he"]);
+  yield extension.awaitMessage("done");
+
+  win.close();
+
   yield extension.unload();
 });
 

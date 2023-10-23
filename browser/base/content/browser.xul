@@ -34,6 +34,7 @@
 <window id="main-window"
         xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
         xmlns:svg="http://www.w3.org/2000/svg"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
         onload="gBrowserInit.onLoad()" onunload="gBrowserInit.onUnload()" onclose="return WindowIsClosing();"
         title="&mainWindow.title;"
@@ -50,14 +51,6 @@
         titlemodifier_normal="&mainWindow.titlemodifier;"
         titlemodifier_privatebrowsing="&mainWindow.titlemodifier; &mainWindow.titlePrivateBrowsingSuffix;"
 #endif
-#ifdef CAN_DRAW_IN_TITLEBAR
-#ifdef XP_WIN
-        chromemargin="0,2,2,2"
-#else
-        chromemargin="0,-1,-1,-1"
-#endif
-        tabsintitlebar="true"
-#endif
         titlemenuseparator="&mainWindow.titlemodifiermenuseparator;"
         lightweightthemes="true"
         lightweightthemesfooter="browser-bottombox"
@@ -65,6 +58,7 @@
         macanimationtype="document"
         screenX="4" screenY="4"
         fullscreenbutton="true"
+        sizemode="normal"
         retargetdocumentfocus="urlbar"
         persist="screenX screenY width height sizemode">
 

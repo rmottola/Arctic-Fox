@@ -13,10 +13,10 @@ apt-get install -y \
     npm \
     curl \
     x11-utils \
-    python-virtualenv
-
-# see https://bugzilla.mozilla.org/show_bug.cgi?id=1161075
-apt-get install -y openjdk-7-jdk
+    python-virtualenv \
+    valgrind \
+    uuid-dev \
+    sqlite3
 
 # the Android SDK contains some 32-bit binaries (aapt among them) that require this
 apt-get install -y lib32z1

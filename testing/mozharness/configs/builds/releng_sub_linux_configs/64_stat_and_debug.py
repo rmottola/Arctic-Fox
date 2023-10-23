@@ -17,7 +17,7 @@ config = {
     ],
     'debug_build': True,
     'stage_platform': 'linux64-st-an-debug',
-    'purge_minsize': 12,
+    'build_type': 'st-an-debug',
     'tooltool_manifest_src': "browser/config/tooltool-manifests/linux64/\
 clang.manifest",
     'platform_supports_post_upload_to_latest': False,

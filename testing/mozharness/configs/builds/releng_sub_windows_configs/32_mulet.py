@@ -10,6 +10,8 @@ config = {
         'sendchange',
     ],
     'stage_platform': 'win32-mulet',
+    'publish_nightly_en_US_routes': False,
+    'build_type': 'mulet-opt',
     'stage_product': 'b2g',
     'tooltool_manifest_src': "b2g/dev/config/tooltool-manifests/win32/releng.manifest",
     'enable_signing': False,
@@ -31,6 +33,5 @@ config = {
         'XPCOM_DEBUG_BREAK': 'stack-and-abort',
     },
     'src_mozconfig': 'b2g/dev/config/mozconfigs/win32/mulet',
-    'purge_minsize': 9,
     #######################
 }

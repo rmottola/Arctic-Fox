@@ -21,9 +21,9 @@ add_task(function* () {
       let pageURL = "http://mochi.test:8888/browser/browser/components/extensions/test/browser/context_tabs_onUpdated_page.html";
 
       let expectedSequence = [
-        { status: "loading" },
-        { status: "loading", url: pageURL },
-        { status: "complete" },
+        {status: "loading"},
+        {status: "loading", url: pageURL},
+        {status: "complete"},
       ];
       let collectedSequence = [];
 
@@ -58,7 +58,7 @@ add_task(function* () {
         browser.test.notifyPass("tabs.onUpdated");
       });
 
-      browser.tabs.create({ url: pageURL });
+      browser.tabs.create({url: pageURL});
     },
     files: {
       "content-script.js": `
@@ -107,7 +107,7 @@ function* do_test_update(background) {
 add_task(function* test_pinned() {
   yield do_test_update(function background() {
     // Create a new tab for testing update.
-    browser.tabs.create(null, function(tab) {
+    browser.tabs.create({}, function(tab) {
       browser.tabs.onUpdated.addListener(function onUpdated(tabId, changeInfo) {
         // Check callback
         browser.test.assertEq(tabId, tab.id, "Check tab id");
@@ -151,7 +151,7 @@ add_task(function* test_unpinned() {
 add_task(function* test_url() {
   yield do_test_update(function background() {
     // Create a new tab for testing update.
-    browser.tabs.create(null, function(tab) {
+    browser.tabs.create({}, function(tab) {
       browser.tabs.onUpdated.addListener(function onUpdated(tabId, changeInfo) {
         // Check callback
         browser.test.assertEq(tabId, tab.id, "Check tab id");
@@ -170,3 +170,5 @@ add_task(function* test_url() {
     });
   });
 });
+
+add_task(forceGC);

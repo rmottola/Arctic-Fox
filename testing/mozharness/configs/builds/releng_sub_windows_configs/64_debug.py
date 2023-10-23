@@ -32,6 +32,5 @@ config = {
         'XPCOM_DEBUG_BREAK': 'stack-and-abort',
     },
     'src_mozconfig': 'browser/config/mozconfigs/win64/debug',
-    'purge_minsize': 9,
     #######################
 }

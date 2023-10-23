@@ -1,6 +1,6 @@
 "use strict";
 
-var { interfaces: Ci, utils: Cu } = Components;
+var {interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 
@@ -127,11 +127,17 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerAPI((extension, context) => {
+extensions.registerSchemaAPI("extension", null, (extension, context) => {
   return {
     extension: {
       getBackgroundPage: function() {
         return backgroundPagesMap.get(extension).contentWindow;
+      },
+    },
+
+    runtime: {
+      getBackgroundPage() {
+        return context.cloneScope.Promise.resolve(backgroundPagesMap.get(extension).contentWindow);
       },
     },
   };

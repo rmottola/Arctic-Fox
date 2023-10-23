@@ -2,6 +2,9 @@
 # List of all possible flags for each category of tests used in the case where
 # "all" is specified.
 flags:
+  aliases:
+    mochitests: mochitest
+
   builds:
     - emulator
     - emulator-jb
@@ -16,6 +19,13 @@ flags:
     - flame-kk-ota
     - flame-kk       # b2g flame kitkat
     - flame-kk-eng   # b2g flame eng build
+    - flame-kk-spark-eng
+    - nexus-4
+    - nexus-4-eng
+    - nexus-4-kk
+    - nexus-4-kk-eng
+    - nexus-5l
+    - nexus-5l-eng
     - dolphin
     - dolphin-eng
     - dolphin-512
@@ -23,12 +33,15 @@ flags:
     - aries
     - aries-ota
     - aries-eng
-    - android-api-11
+    - aries-dogfood
+    - android-api-15
+    - android-partner-sample1
+    - linux
     - linux64
+    - linux64-st-an
+    - macosx64
+    - macosx64-st-an
 
-  post-build:
-    - upload-symbols
-    
   tests:
     - cppunit
     - crashtest
@@ -40,8 +53,6 @@ flags:
     - gaia-unit
     - gaia-unit-oop
     - gaia-ui-test-sanity
-    - gaia-ui-test-oop
-    - gaia-ui-test-accessibility
     - gaia-ui-test-functional
     - gaia-ui-test-functional-dsds
     - gaia-ui-test-unit

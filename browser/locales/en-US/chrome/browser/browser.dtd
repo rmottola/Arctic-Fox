@@ -426,8 +426,6 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY searchSetAsDefault.label     "Set As Default Search Engine">
 <!ENTITY searchSetAsDefault.accesskey "D">
 
-<!ENTITY tabView.commandkey           "e">
-
 <!ENTITY openLinkCmdInTab.label       "Open Link in New Tab">
 <!ENTITY openLinkCmdInTab.accesskey   "T">
 <!ENTITY openLinkCmd.label            "Open Link in New Window">

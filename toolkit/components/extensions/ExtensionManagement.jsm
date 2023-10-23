@@ -13,6 +13,7 @@ const Cr = Components.results;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 /*
  * This file should be kept short and simple since it's loaded even
@@ -97,6 +98,19 @@ var Scripts = {
   },
 };
 
+// Manage the collection of schemas/*.json schemas that define the extension API.
+var Schemas = {
+  schemas: new Set(),
+
+  register(schema) {
+    this.schemas.add(schema);
+  },
+
+  getSchemas() {
+    return this.schemas;
+  },
+};
+
 // This object manages various platform-level issues related to
 // moz-extension:// URIs. It lives here so that it can be used in both
 // the parent and child processes.
@@ -129,6 +143,16 @@ var Service = {
     }
 
     // Create the moz-extension://uuid mapping.
+    // On b2g, in content processes we can't load jar:file:/// content, so we
+    // switch to jar:remoteopenfile:/// instead
+    // This is mostly exercised by generated extensions in tests. Installed
+    // extensions in b2g get an app: uri that also maps to the right jar: uri.
+    if (AppConstants.MOZ_B2G &&
+        Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT &&
+        uri.spec.startsWith("jar:file://")) {
+      uri = Services.io.newURI("jar:remoteopen" + uri.spec.substr("jar:".length), null, null);
+    }
+
     let handler = Services.io.getProtocolHandler("moz-extension");
     handler.QueryInterface(Ci.nsISubstitutingProtocolHandler);
     handler.setSubstitution(uuid, uri);
@@ -178,17 +202,57 @@ var Service = {
   // This is used to set the addonId on the originAttributes for the
   // nsIPrincipal attached to the URI.
   extensionURIToAddonID(uri) {
-    if (this.extensionURILoadableByAnyone(uri)) {
-      // We don't want webAccessibleResources to be associated with
-      // the add-on. That way they don't get any special privileges.
-      return null;
-    }
-
     let uuid = uri.host;
     let extension = this.uuidMap.get(uuid);
     return extension ? extension.id : undefined;
   },
 };
+
+// API Levels Helpers
+
+// Find the add-on associated with this document via the
+// principal's originAttributes. This value is computed by
+// extensionURIToAddonID, which ensures that we don't inject our
+// API into webAccessibleResources or remote web pages.
+function getAddonIdForWindow(window) {
+  let principal = window.document.nodePrincipal;
+  return principal.originAttributes.addonId;
+}
+
+const API_LEVELS = Object.freeze({
+  NO_PRIVILEGES: 0,
+  CONTENTSCRIPT_PRIVILEGES: 1,
+  FULL_PRIVILEGES: 2,
+});
+
+// Finds the API Level ("FULL_PRIVILEGES", "CONTENTSCRIPT_PRIVILEGES", "NO_PRIVILEGES")
+// with a given a window object.
+function getAPILevelForWindow(window, addonId) {
+  const {NO_PRIVILEGES, CONTENTSCRIPT_PRIVILEGES, FULL_PRIVILEGES} = API_LEVELS;
+
+  // Non WebExtension URLs and WebExtension URLs from a different extension
+  // has no access to APIs.
+  if (!addonId && getAddonIdForWindow(window) != addonId) {
+    return NO_PRIVILEGES;
+  }
+
+  let docShell = window.QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIDocShell);
+
+  // WebExtension URLs loaded into sub-frame UI have "content script API level privileges".
+  // (see Bug 1214658 for rationale)
+  if (docShell.sameTypeParent) {
+    return CONTENTSCRIPT_PRIVILEGES;
+  }
+
+  // Extension pages running in the content process defaults to "content script API level privileges".
+  if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+    return CONTENTSCRIPT_PRIVILEGES;
+  }
+
+  // WebExtension URLs loaded into top frames UI could have full API level privileges.
+  return FULL_PRIVILEGES;
+}
 
 this.ExtensionManagement = {
   startupExtension: Service.startupExtension.bind(Service),
@@ -197,6 +261,14 @@ this.ExtensionManagement = {
   registerScript: Scripts.register.bind(Scripts),
   getScripts: Scripts.getScripts.bind(Scripts),
 
+  registerSchema: Schemas.register.bind(Schemas),
+  getSchemas: Schemas.getSchemas.bind(Schemas),
+
   getFrameId: Frames.getId.bind(Frames),
   getParentFrameId: Frames.getParentId.bind(Frames),
+
+  // exported API Level Helpers
+  getAddonIdForWindow,
+  getAPILevelForWindow,
+  API_LEVELS,
 };

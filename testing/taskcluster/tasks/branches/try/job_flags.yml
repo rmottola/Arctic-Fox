@@ -1,43 +1,18 @@
 ---
 # For complete sample of all build and test jobs,
-# see <gecko>/testing/taskcluster/tasks/job_flags.yml
+# see <gecko>/testing/taskcluster/tasks/branches/base_job_flags.yml
 
 $inherits:
   from: tasks/branches/base_job_flags.yml
 
+# Flags specific to this branch
+flags:
+  post-build:
+    - upload-symbols
+
 builds:
   linux64_gecko:
     platforms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_desktop_opt.yml
-      debug:
-        task: tasks/builds/b2g_desktop_debug.yml
-  linux64-mulet:
-    platforms:
-      - Mulet Linux
-    types:
-      opt:
-        task: tasks/builds/mulet_linux.yml
-  emulator-l:
-    platfoms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_emulator_l_opt.yml
-      debug:
-        task: tasks/builds/b2g_emulator_l_debug.yml
-  emulator-kk:
-    platfoms:
-      - b2g
-    types:
-      opt:
-        task: tasks/builds/b2g_emulator_kk_opt.yml
-      debug:
-        task: tasks/builds/b2g_emulator_kk_debug.yml
-  emulator-x86-l:
-    platfoms:
       - b2g
     types:
       opt:
@@ -116,20 +91,52 @@ builds:
     types:
       opt:
         task: tasks/builds/b2g_dolphin_512_eng.yml
-  android-api-11:
+  android-api-15:
     platforms:
       - Android
     types:
       opt:
-        task: tasks/builds/android_api_11.yml
+        task: tasks/builds/android_api_15.yml
+  android-partner-sample1:
+    platforms:
+      - Android
+    types:
+      opt:
+        task: tasks/builds/android_api_15_partner_sample1.yml
+  linux:
+    platforms:
+      - Linux
+    types:
+      opt:
+        task: tasks/builds/opt_linux32_clobber.yml
+      debug:
+        task: tasks/builds/dbg_linux32_clobber.yml
   linux64:
     platforms:
       - Linux64
     types:
       opt:
-        task: tasks/builds/opt_linux64.yml
+        task: tasks/builds/opt_linux64_clobber.yml
       debug:
-        task: tasks/builds/dbg_linux64.yml
+        task: tasks/builds/dbg_linux64_clobber.yml
+  linux64-st-an:
+    platforms:
+      - Linux64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_linux64_st-an.yml
+  macosx64:
+    platforms:
+      - MacOSX64
+    types:
+      debug:
+        task: tasks/builds/dbg_macosx64.yml
+  macosx64-st-an:
+    platforms:
+      - MacOSX64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_macosx64_st-an_clobber.yml
   sm-plain:
     platforms:
       - Linux64
@@ -181,8 +188,9 @@ post-build:
   upload-symbols:
     allowed_build_tasks:
       - tasks/builds/opt_linux64.yml
+      - tasks/builds/opt_linux64_st-an.yml
       - tasks/builds/dbg_linux64.yml
-      - tasks/builds/android_api_11.yml
+      - tasks/builds/android_api_15.yml
     task: tasks/post-builds/upload_symbols.yml
 
 tests:

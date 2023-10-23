@@ -22,7 +22,7 @@ sys.path.insert(1, os.path.dirname(sys.path[0]))
 from mozprocess import ProcessHandler
 
 from mozharness.base.log import FATAL
-from mozharness.base.script import BaseScript, PostScriptRun
+from mozharness.base.script import BaseScript
 from mozharness.base.vcs.vcsbase import VCSMixin
 from mozharness.mozilla.blob_upload import BlobUploadMixin, blobupload_config_options
 from mozharness.mozilla.mozbase import MozbaseMixin
@@ -117,6 +117,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
         self.emulator = c.get('emulator')
         self.test_suite_definitions = c['test_suite_definitions']
         self.test_suite = c.get('test_suite')
+        self.sdk_level = None
         assert self.test_suite in self.test_suite_definitions
 
     def _query_tests_dir(self):
@@ -356,7 +357,10 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
 
     def _install_fennec_apk(self):
         install_ok = False
-        cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', self.installer_path]
+        if int(self.sdk_level) >= 23:
+            cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', '-g', self.installer_path]
+        else:
+            cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', self.installer_path]
         out = self._run_with_timeout(300, cmd)
         if 'Success' in out:
             install_ok = True
@@ -364,7 +368,10 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
 
     def _install_robocop_apk(self):
         install_ok = False
-        cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', self.robocop_path]
+        if int(self.sdk_level) >= 23:
+            cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', '-g', self.robocop_path]
+        else:
+            cmd = [self.adb_path, '-s', self.emulator['device_id'], 'install', '-r', self.robocop_path]
         out = self._run_with_timeout(300, cmd)
         if 'Success' in out:
             install_ok = True
@@ -487,6 +494,13 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
                 continue
             cmd.append(arg)
 
+        try_options, try_tests = self.try_args(suite_category)
+        cmd.extend(try_options)
+        cmd.extend(self.query_tests_args(
+            self.config["suite_definitions"][suite_category].get("tests"),
+            self.test_suite_definitions[self.test_suite].get("tests"),
+            try_tests))
+
         return cmd
 
     def _tooltool_fetch(self, url):
@@ -591,7 +605,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
 
     def verify_emulator(self):
         '''
-        Check to see if the emulator can be contacted via adb, telnet, and sut, if configured. 
+        Check to see if the emulator can be contacted via adb, telnet, and sut, if configured.
         If any communication attempt fails, kill the emulator, re-launch, and re-check.
         '''
         self.mkdir_p(self.query_abs_dirs()['abs_blob_upload_dir'])
@@ -624,8 +638,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
             robocop_url = self.installer_url[:self.installer_url.rfind('/')] + '/robocop.apk'
             self.info("Downloading robocop...")
             self.download_file(robocop_url, 'robocop.apk', dirs['abs_work_dir'], error_level=FATAL)
-        self.mkdir_p(dirs['abs_xre_dir'])
-        self._download_unzip(self.host_utils_url, dirs['abs_xre_dir'])
+        self.download_unzip(self.host_utils_url, dirs['abs_xre_dir'])
 
     def install(self):
         """
@@ -640,6 +653,9 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
             'device_package_name': self._query_package_name()
         }
         config = dict(config.items() + self.config.items())
+
+        self.sdk_level = self._run_with_timeout(30, [self.adb_path, '-s', self.emulator['device_id'],
+            'shell', 'getprop', 'ro.build.version.sdk'])
 
         # Install Fennec
         install_ok = self._retry(3, 30, self._install_fennec_apk, "Install Fennec APK")
@@ -659,7 +675,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
         Run the tests
         """
         cmd = self._build_command()
-        cmd = self.append_harness_extra_args(cmd)
+
         try:
             cwd = self._query_tests_dir()
         except:
@@ -673,15 +689,20 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
         self.info("Running on %s the command %s" % (self.emulator["name"], subprocess.list2cmdline(cmd)))
         self.info("##### %s log begins" % self.test_suite)
 
+        # TinderBoxPrintRe does not know about the '-debug' categories
+        aliases = {
+            'reftest-debug': 'reftest',
+            'jsreftest-debug': 'jsreftest',
+            'crashtest-debug': 'crashtest',
+        }
+        suite_category = self.test_suite_definitions[self.test_suite]["category"]
+        suite_category = aliases.get(suite_category, suite_category)
         parser = self.get_test_output_parser(
-            self.test_suite_definitions[self.test_suite]["category"],
+            suite_category,
             config=self.config,
             log_obj=self.log_obj,
             error_list=self.error_list)
-        return_code = self.run_command(cmd,
-                                       cwd=cwd,
-                                       env=env,
-                                       output_parser=parser)
+        self.run_command(cmd, cwd=cwd, env=env, output_parser=parser)
         tbpl_status, log_level = parser.evaluate_parser(0)
         parser.append_tinderboxprint_line(self.test_suite)
 

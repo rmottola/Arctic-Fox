@@ -13,8 +13,8 @@ import sys
 # load modules from parent dir
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 
-from mozharness.base.errors import TarErrorList, ZipErrorList
-from mozharness.base.log import INFO, ERROR, WARNING, FATAL
+from mozharness.base.errors import TarErrorList
+from mozharness.base.log import INFO, ERROR, WARNING
 from mozharness.base.script import PreScriptAction
 from mozharness.base.transfer import TransferMixin
 from mozharness.base.vcs.vcsbase import MercurialScript
@@ -439,7 +439,10 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
             self.fatal("Could not create blobber upload directory")
 
         cmd.append(manifest)
-        cmd = self.append_harness_extra_args(cmd)
+
+        try_options, try_tests = self.try_args("marionette")
+        cmd.extend(self.query_tests_args(try_tests,
+                                         str_format_values=config_fmt_args))
 
         env = {}
         if self.query_minidump_stackwalk():

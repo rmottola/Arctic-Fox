@@ -9,15 +9,11 @@ XPCOMUtils.defineLazyServiceGetter(this, "aboutNewTabService",
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
-  runSafe,
 } = ExtensionUtils;
 
-extensions.registerAPI((extension, context) => {
+extensions.registerSchemaAPI("windows", null, (extension, context) => {
   return {
     windows: {
-      WINDOW_ID_CURRENT: WindowManager.WINDOW_ID_CURRENT,
-      WINDOW_ID_NONE: WindowManager.WINDOW_ID_NONE,
-
       onCreated:
       new WindowEventManager(context, "windows.onCreated", "domwindowopened", (fire, window) => {
         fire(WindowManager.convert(extension, window));
@@ -43,44 +39,28 @@ extensions.registerAPI((extension, context) => {
         };
       }).api(),
 
-      get: function(windowId, getInfo, callback) {
+      get: function(windowId, getInfo) {
         let window = WindowManager.getWindow(windowId);
-        runSafe(context, callback, WindowManager.convert(extension, window, getInfo));
+        return Promise.resolve(WindowManager.convert(extension, window, getInfo));
       },
 
-      getCurrent: function(getInfo, callback) {
-        if (!callback) {
-          callback = getInfo;
-          getInfo = {};
-        }
+      getCurrent: function(getInfo) {
         let window = currentWindow(context);
-        runSafe(context, callback, WindowManager.convert(extension, window, getInfo));
+        return Promise.resolve(WindowManager.convert(extension, window, getInfo));
       },
 
-      getLastFocused: function(...args) {
-        let getInfo, callback;
-        if (args.length == 1) {
-          callback = args[0];
-        } else {
-          [getInfo, callback] = args;
-        }
+      getLastFocused: function(getInfo) {
         let window = WindowManager.topWindow;
-        runSafe(context, callback, WindowManager.convert(extension, window, getInfo));
+        return Promise.resolve(WindowManager.convert(extension, window, getInfo));
       },
 
-      getAll: function(getInfo, callback) {
-        let e = Services.wm.getEnumerator("navigator:browser");
-        let windows = [];
-        while (e.hasMoreElements()) {
-          let window = e.getNext();
-          if (window.document.readyState == "complete") {
-            windows.push(WindowManager.convert(extension, window, getInfo));
-          }
-        }
-        runSafe(context, callback, windows);
+      getAll: function(getInfo) {
+        let windows = Array.from(WindowListManager.browserWindows(),
+                                 window => WindowManager.convert(extension, window, getInfo));
+        return Promise.resolve(windows);
       },
 
-      create: function(createData, callback) {
+      create: function(createData) {
         function mkstr(s) {
           let result = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
           result.data = s;
@@ -88,7 +68,7 @@ extensions.registerAPI((extension, context) => {
         }
 
         let args = Cc["@mozilla.org/supports-array;1"].createInstance(Ci.nsISupportsArray);
-        if ("url" in createData) {
+        if (createData.url !== null) {
           if (Array.isArray(createData.url)) {
             let array = Cc["@mozilla.org/supports-array;1"].createInstance(Ci.nsISupportsArray);
             for (let url of createData.url) {
@@ -103,7 +83,7 @@ extensions.registerAPI((extension, context) => {
         }
 
         let extraFeatures = "";
-        if ("incognito" in createData) {
+        if (createData.incognito !== null) {
           if (createData.incognito) {
             extraFeatures += ",private";
           } else {
@@ -114,50 +94,48 @@ extensions.registerAPI((extension, context) => {
         let window = Services.ww.openWindow(null, "chrome://browser/content/browser.xul", "_blank",
                                             "chrome,dialog=no,all" + extraFeatures, args);
 
-        if ("left" in createData || "top" in createData) {
-          let left = "left" in createData ? createData.left : window.screenX;
-          let top = "top" in createData ? createData.top : window.screenY;
+        if (createData.left !== null || createData.top !== null) {
+          let left = createData.left !== null ? createData.left : window.screenX;
+          let top = createData.top !== null ? createData.top : window.screenY;
           window.moveTo(left, top);
         }
-        if ("width" in createData || "height" in createData) {
-          let width = "width" in createData ? createData.width : window.outerWidth;
-          let height = "height" in createData ? createData.height : window.outerHeight;
+        if (createData.width !== null || createData.height !== null) {
+          let width = createData.width !== null ? createData.width : window.outerWidth;
+          let height = createData.height !== null ? createData.height : window.outerHeight;
           window.resizeTo(width, height);
         }
 
         // TODO: focused, type, state
 
-        window.addEventListener("load", function listener() {
-          window.removeEventListener("load", listener);
-          if (callback) {
-            runSafe(context, callback, WindowManager.convert(extension, window));
-          }
+        return new Promise(resolve => {
+          window.addEventListener("load", function listener() {
+            window.removeEventListener("load", listener);
+            resolve(WindowManager.convert(extension, window));
+          });
         });
       },
 
-      update: function(windowId, updateInfo, callback) {
+      update: function(windowId, updateInfo) {
         let window = WindowManager.getWindow(windowId);
         if (updateInfo.focused) {
           Services.focus.activeWindow = window;
         }
         // TODO: All the other properties...
 
-        if (callback) {
-          runSafe(context, callback, WindowManager.convert(extension, window));
-        }
+        return Promise.resolve(WindowManager.convert(extension, window));
       },
 
-      remove: function(windowId, callback) {
+      remove: function(windowId) {
         let window = WindowManager.getWindow(windowId);
         window.close();
 
-        let listener = () => {
-          AllWindowEvents.removeListener("domwindowclosed", listener);
-          if (callback) {
-            runSafe(context, callback);
-          }
-        };
-        AllWindowEvents.addListener("domwindowclosed", listener);
+        return new Promise(resolve => {
+          let listener = () => {
+            AllWindowEvents.removeListener("domwindowclosed", listener);
+            resolve();
+          };
+          AllWindowEvents.addListener("domwindowclosed", listener);
+        });
       },
     },
   };

@@ -4,7 +4,7 @@
 
 function promisePopupShown(popup) {
   return new Promise(resolve => {
-    if (popup.popupOpen) {
+    if (popup.state == "open") {
       resolve();
     } else {
       let onPopupShown = event => {
@@ -44,34 +44,34 @@ add_task(function* testPageActionPopup() {
         let sendClick;
         let tests = [
           () => {
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
           () => {
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "popup-b.html" });
-            sendClick({ expectEvent: false, expectPopup: "b" });
+            browser.browserAction.setPopup({popup: "popup-b.html"});
+            sendClick({expectEvent: false, expectPopup: "b"});
           },
           () => {
-            sendClick({ expectEvent: false, expectPopup: "b" });
+            sendClick({expectEvent: false, expectPopup: "b"});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "" });
-            sendClick({ expectEvent: true, expectPopup: null });
+            browser.browserAction.setPopup({popup: ""});
+            sendClick({expectEvent: true, expectPopup: null});
           },
           () => {
-            sendClick({ expectEvent: true, expectPopup: null });
+            sendClick({expectEvent: true, expectPopup: null});
           },
           () => {
-            browser.browserAction.setPopup({ popup: "/popup-a.html" });
-            sendClick({ expectEvent: false, expectPopup: "a" });
+            browser.browserAction.setPopup({popup: "/popup-a.html"});
+            sendClick({expectEvent: false, expectPopup: "a"});
           },
         ];
 
         let expect = {};
-        sendClick = ({ expectEvent, expectPopup }) => {
-          expect = { event: expectEvent, popup: expectPopup };
+        sendClick = ({expectEvent, expectPopup}) => {
+          expect = {event: expectEvent, popup: expectPopup};
           browser.test.sendMessage("send-click");
         };
 
@@ -116,20 +116,20 @@ add_task(function* testPageActionPopup() {
     },
   });
 
-  let panelId = makeWidgetId(extension.id) + "-panel";
+  let viewId = `PanelUI-webext-${makeWidgetId(extension.id)}-browser-action-view`;
 
   extension.onMessage("send-click", () => {
     clickBrowserAction(extension);
   });
 
   extension.onMessage("next-test", Task.async(function* () {
-    let panel = document.getElementById(panelId);
+    let panel = getBrowserActionPopup(extension);
     if (panel) {
       yield promisePopupShown(panel);
       panel.hidePopup();
 
-      panel = document.getElementById(panelId);
-      is(panel, undefined, "panel successfully removed from document after hiding");
+      panel = getBrowserActionPopup(extension);
+      is(panel, null, "panel successfully removed from document after hiding");
     }
 
     extension.sendMessage("next-test");
@@ -140,6 +140,6 @@ add_task(function* testPageActionPopup() {
 
   yield extension.unload();
 
-  let panel = document.getElementById(panelId);
-  is(panel, undefined, "browserAction panel removed from document");
+  let view = document.getElementById(viewId);
+  is(view, null, "browserAction view removed from document");
 });

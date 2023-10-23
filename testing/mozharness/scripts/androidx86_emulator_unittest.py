@@ -29,8 +29,6 @@ from mozharness.mozilla.buildbot import TBPL_WORST_LEVEL_TUPLE
 from mozharness.mozilla.testing.testbase import TestingMixin, testing_config_options
 from mozharness.mozilla.testing.unittest import EmulatorMixin
 
-from mozharness.mozilla.testing.device import ADBDeviceHandler
-
 
 class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin, BaseScript, MozbaseMixin):
     config_options = [[
@@ -452,6 +450,13 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
                 continue
             cmd.append(arg)
 
+        try_options, try_tests = self.try_args(suite_category)
+        cmd.extend(try_options)
+        cmd.extend(self.query_tests_args(
+            self.config["suite_definitions"][suite_category].get("tests"),
+            self.test_suite_definitions[suite_name].get("tests"),
+            try_tests))
+
         return cmd
 
     def preflight_run_tests(self):
@@ -470,9 +475,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
          - the stdout where the output is going to
          - the suite name that is associated
         """
-        dirs = self.query_abs_dirs()
         cmd = self._build_command(self.emulators[emulator_index], suite_name)
-        cmd = self.append_harness_extra_args(cmd)
 
         try:
             cwd = self._query_tests_dir(suite_name)
@@ -675,8 +678,7 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
                 self._download_robocop_apk()
                 break
 
-        self.mkdir_p(dirs['abs_xre_dir'])
-        self._download_unzip(self.host_utils_url, dirs['abs_xre_dir'])
+        self.download_unzip(self.host_utils_url, dirs['abs_xre_dir'])
 
     def install(self):
         assert self.installer_path is not None, \
@@ -694,10 +696,6 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
             }
             config = dict(config.items() + self.config.items())
 
-            self.info("Creating ADBDevicHandler for %s with config %s" % (emulator["name"], config))
-            dh = ADBDeviceHandler(config=config, log_obj=self.log_obj, script_obj=self)
-            dh.device_id = emulator['device_id']
-
             # Wait for Android to finish booting
             completed = None
             retries = 0
@@ -712,15 +710,29 @@ class AndroidEmulatorTest(BlobUploadMixin, TestingMixin, EmulatorMixin, VCSMixin
             if completed != '1':
                 self.warning('Retries exhausted waiting for Android boot.')
 
+            cmd = [self.adb_path, '-s', emulator['device_id'], 'shell', 'getprop', 'ro.build.version.sdk']
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            out, err = p.communicate()
+            sdk_level = out
+
             # Install Fennec
             self.info("Installing Fennec for %s" % emulator["name"])
-            dh.install_app(self.installer_path)
+            if int(sdk_level) >= 23:
+                cmd = [self.adb_path, '-s', emulator['device_id'], 'install', '-r', '-g', self.installer_path]
+            else:
+                cmd = [self.adb_path, '-s', emulator['device_id'], 'install', '-r', self.installer_path]
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            out, err = p.communicate()
 
             # Install the robocop apk if required
             if suite_name.startswith('robocop'):
                 self.info("Installing Robocop for %s" % emulator["name"])
-                config['device_package_name'] = self.config["robocop_package_name"]
-                dh.install_app(self.robocop_path)
+                if int(sdk_level) >= 23:
+                    cmd = [self.adb_path, '-s', emulator['device_id'], 'install', '-r', '-g', self.robocop_path]
+                else:
+                    cmd = [self.adb_path, '-s', emulator['device_id'], 'install', '-r', self.robocop_path]
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+                out, err = p.communicate()
 
             self.info("Finished installing apps for %s" % emulator["name"])
 

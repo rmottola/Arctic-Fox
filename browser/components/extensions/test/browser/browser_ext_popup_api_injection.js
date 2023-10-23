@@ -27,33 +27,20 @@ add_task(function* testPageActionPopup() {
 
     background: function() {
       let tabId;
-      browser.tabs.query({ active: true, currentWindow: true }, tabs => {
+      browser.tabs.query({active: true, currentWindow: true}, tabs => {
         tabId = tabs[0].id;
         browser.pageAction.show(tabId);
         browser.test.sendMessage("ready");
       });
 
       browser.test.onMessage.addListener(() => {
-        browser.browserAction.setPopup({ popup: "/popup-a.html" });
-        browser.pageAction.setPopup({ tabId, popup: "popup-b.html" });
+        browser.browserAction.setPopup({popup: "/popup-a.html"});
+        browser.pageAction.setPopup({tabId, popup: "popup-b.html"});
 
         browser.test.sendMessage("ok");
       });
     },
   });
-
-  let browserActionId = makeWidgetId(extension.id) + "-browser-action";
-  let pageActionId = makeWidgetId(extension.id) + "-page-action";
-
-  function openPopup(buttonId) {
-    let button = document.getElementById(buttonId);
-    if (buttonId == pageActionId) {
-      // TODO: I don't know why a proper synthesized event doesn't work here.
-      button.dispatchEvent(new MouseEvent("click", {}));
-    } else {
-      EventUtils.synthesizeMouseAtCenter(button, {}, window);
-    }
-  }
 
   let promiseConsoleMessage = pattern => new Promise(resolve => {
     Services.console.registerListener(function listener(msg) {
@@ -72,20 +59,24 @@ add_task(function* testPageActionPopup() {
   // BrowserAction:
   let awaitMessage = promiseConsoleMessage(/WebExt Privilege Escalation: BrowserAction/);
   SimpleTest.expectUncaughtException();
-  openPopup(browserActionId);
+  yield clickBrowserAction(extension);
 
   let message = yield awaitMessage;
   ok(message.includes("WebExt Privilege Escalation: BrowserAction: typeof(browser) = undefined"),
      `No BrowserAction API injection`);
 
+  yield closeBrowserAction(extension);
+
   // PageAction
   awaitMessage = promiseConsoleMessage(/WebExt Privilege Escalation: PageAction/);
   SimpleTest.expectUncaughtException();
-  openPopup(pageActionId);
+  yield clickPageAction(extension);
 
   message = yield awaitMessage;
   ok(message.includes("WebExt Privilege Escalation: PageAction: typeof(browser) = undefined"),
      `No PageAction API injection: ${message}`);
+
+  yield closePageAction(extension);
 
   SimpleTest.expectUncaughtException(false);
 
@@ -95,12 +86,13 @@ add_task(function* testPageActionPopup() {
   yield extension.awaitMessage("ok");
 
 
-  // Check that unprivileged documents don't get the API.
-  openPopup(browserActionId);
+  yield clickBrowserAction(extension);
   yield extension.awaitMessage("from-popup-a");
+  yield closeBrowserAction(extension);
 
-  openPopup(pageActionId);
+  yield clickPageAction(extension);
   yield extension.awaitMessage("from-popup-b");
+  yield closePageAction(extension);
 
   yield extension.unload();
 });
