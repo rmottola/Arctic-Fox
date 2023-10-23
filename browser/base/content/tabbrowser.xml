@@ -1621,10 +1621,15 @@
 
               // Register the new outerWindowID.
               this._outerWindowIDBrowserMap.set(aBrowser.outerWindowID, aBrowser);
-	    }
+            }
 
             if (wasActive)
               aBrowser.focus();
+
+            // If the findbar has been initialised, reset its browser reference.
+            if (this.isFindBarInitialized(tab)) {
+              this.getFindBar(tab).browser = aBrowser;
+            }
 
             return true;
           ]]>
