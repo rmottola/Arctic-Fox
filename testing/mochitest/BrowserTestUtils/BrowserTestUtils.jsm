@@ -400,6 +400,28 @@ this.BrowserTestUtils = {
   },
 
   /**
+   * Removes the given tab from its parent tabbrowser and
+   * waits until its final message has reached the parent.
+   */
+  removeTab(tab, options = {}) {
+    let dontRemove = options && options.dontRemove;
+
+    return new Promise(resolve => {
+      let {messageManager: mm, frameLoader} = tab.linkedBrowser;
+      mm.addMessageListener("SessionStore:update", function onMessage(msg) {
+        if (msg.targetFrameLoader == frameLoader && msg.data.isFinal) {
+          mm.removeMessageListener("SessionStore:update", onMessage);
+          resolve();
+        }
+      }, true);
+
+      if (!dontRemove && !tab.closing) {
+        tab.ownerDocument.defaultView.gBrowser.removeTab(tab);
+      }
+    });
+  },
+
+  /**
    * Returns a promise that is resolved when element gains attribute (or,
    * optionally, when it is set to value).
    * @param {String} attr
@@ -426,26 +448,4 @@ this.BrowserTestUtils = {
       mut.observe(element, {attributeFilter: [attr]});
     });
   },
-
-  /**
-   * Removes the given tab from its parent tabbrowser and
-   * waits until its final message has reached the parent.
-   */
-  removeTab(tab, options = {}) {
-    let dontRemove = options && options.dontRemove;
-
-    return new Promise(resolve => {
-      let {messageManager: mm, frameLoader} = tab.linkedBrowser;
-      mm.addMessageListener("SessionStore:update", function onMessage(msg) {
-        if (msg.targetFrameLoader == frameLoader && msg.data.isFinal) {
-          mm.removeMessageListener("SessionStore:update", onMessage);
-          resolve();
-        }
-      }, true);
-
-      if (!dontRemove && !tab.closing) {
-        tab.ownerDocument.defaultView.gBrowser.removeTab(tab);
-      }
-    });
-  }
 };
