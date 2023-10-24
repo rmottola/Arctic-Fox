@@ -4222,8 +4222,9 @@ GetBSizeTakenByBoxSizing(StyleBoxSizing aBoxSizing,
 // Only call on style coords for which GetAbsoluteCoord returned false.
 static bool
 GetPercentBSize(const nsStyleCoord& aStyle,
-                 nsIFrame* aFrame,
-                 nscoord& aResult)
+                nsIFrame* aFrame,
+                bool aHorizontalAxis,
+                nscoord& aResult)
 {
   if (eStyleUnit_Percent != aStyle.GetUnit() &&
       !aStyle.IsCalcUnit())
@@ -4249,7 +4250,7 @@ GetPercentBSize(const nsStyleCoord& aStyle,
   const nsStyleCoord& bSizeCoord = pos->BSize(wm);
   nscoord h;
   if (!GetAbsoluteCoord(bSizeCoord, h) &&
-      !GetPercentBSize(bSizeCoord, f, h)) {
+      !GetPercentBSize(bSizeCoord, f, aHorizontalAxis, h)) {
     NS_ASSERTION(bSizeCoord.GetUnit() == eStyleUnit_Auto ||
                  bSizeCoord.HasPercent(),
                  "unknown block-size unit");
@@ -4279,7 +4280,7 @@ GetPercentBSize(const nsStyleCoord& aStyle,
 
   nscoord maxh;
   if (GetAbsoluteCoord(maxBSizeCoord, maxh) ||
-      GetPercentBSize(maxBSizeCoord, f, maxh)) {
+      GetPercentBSize(maxBSizeCoord, f, aHorizontalAxis, maxh)) {
     if (maxh < h)
       h = maxh;
   } else {
@@ -4292,7 +4293,7 @@ GetPercentBSize(const nsStyleCoord& aStyle,
 
   nscoord minh;
   if (GetAbsoluteCoord(minBSizeCoord, minh) ||
-      GetPercentBSize(minBSizeCoord, f, minh)) {
+      GetPercentBSize(minBSizeCoord, f, aHorizontalAxis, minh)) {
     if (minh > h)
       h = minh;
   } else {
@@ -4300,6 +4301,14 @@ GetPercentBSize(const nsStyleCoord& aStyle,
                  minBSizeCoord.GetUnit() == eStyleUnit_Auto,
                  "unknown min block-size unit");
   }
+
+  // Now adjust h for box-sizing styles on the parent.  We never ignore padding
+  // here.  That could conceivably cause some problems with fieldsets (which are
+  // the one place that wants to ignore padding), but solving that here without
+  // hardcoding a check for f being a fieldset-content frame is a bit of a pain.
+  nscoord bSizeTakenByBoxSizing =
+    GetBSizeTakenByBoxSizing(pos->mBoxSizing, f, aHorizontalAxis, false);
+  h = std::max(0, h - bSizeTakenByBoxSizing);
 
   if (aStyle.IsCalcUnit()) {
     aResult = std::max(nsRuleNode::ComputeComputedCalc(aStyle, h), 0);
@@ -4346,11 +4355,11 @@ GetBSizeTakenByBoxSizing(StyleBoxSizing aBoxSizing,
       // here as 0 instead, except that in some cases the width may in fact be
       // known.  See bug 1231059.
       if (GetAbsoluteCoord(paddingStart, pad) ||
-          GetPercentBSize(paddingStart, aFrame, pad)) {
+          GetPercentBSize(paddingStart, aFrame, aHorizontalAxis, pad)) {
         bSizeTakenByBoxSizing += pad;
       }
       if (GetAbsoluteCoord(paddingEnd, pad) ||
-          GetPercentBSize(paddingEnd, aFrame, pad)) {
+          GetPercentBSize(paddingEnd, aFrame, aHorizontalAxis, pad)) {
         bSizeTakenByBoxSizing += pad;
       }
     }
@@ -4766,13 +4775,13 @@ nsLayoutUtils::IntrinsicForAxis(PhysicalAxis        aAxis,
 
         nscoord h;
         if (GetAbsoluteCoord(styleBSize, h) ||
-            GetPercentBSize(styleBSize, aFrame, h)) {
+            GetPercentBSize(styleBSize, aFrame, horizontalAxis, h)) {
           h = std::max(0, h - bSizeTakenByBoxSizing);
           result = NSCoordMulDiv(h, ratioISize, ratioBSize);
         }
 
         if (GetAbsoluteCoord(styleMaxBSize, h) ||
-            GetPercentBSize(styleMaxBSize, aFrame, h)) {
+            GetPercentBSize(styleMaxBSize, aFrame, horizontalAxis, h)) {
           h = std::max(0, h - bSizeTakenByBoxSizing);
           nscoord maxISize = NSCoordMulDiv(h, ratioISize, ratioBSize);
           if (maxISize < result)
@@ -4780,7 +4789,7 @@ nsLayoutUtils::IntrinsicForAxis(PhysicalAxis        aAxis,
         }
 
         if (GetAbsoluteCoord(styleMinBSize, h) ||
-            GetPercentBSize(styleMinBSize, aFrame, h)) {
+            GetPercentBSize(styleMinBSize, aFrame, horizontalAxis, h)) {
           h = std::max(0, h - bSizeTakenByBoxSizing);
           nscoord minISize = NSCoordMulDiv(h, ratioISize, ratioBSize);
           if (minISize > result)
