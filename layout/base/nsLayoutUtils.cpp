@@ -4338,7 +4338,7 @@ GetBSizeTakenByBoxSizing(StyleBoxSizing aBoxSizing,
     bSizeTakenByBoxSizing +=
       aHorizontalAxis ? styleBorder->GetComputedBorder().TopBottom()
                       : styleBorder->GetComputedBorder().LeftRight();
-    // fall through
+    MOZ_FALLTHROUGH;
   }
   case StyleBoxSizing::Padding: {
     if (!aIgnorePadding) {
@@ -4363,7 +4363,7 @@ GetBSizeTakenByBoxSizing(StyleBoxSizing aBoxSizing,
         bSizeTakenByBoxSizing += pad;
       }
     }
-    // fall through
+    MOZ_FALLTHROUGH;
   }
   case StyleBoxSizing::Content:
   default:
@@ -5147,10 +5147,10 @@ nsLayoutUtils::ComputeSizeWithIntrinsicDimensions(WritingMode aWM,
   switch (stylePos->mBoxSizing) {
     case StyleBoxSizing::Border:
       boxSizingAdjust += aBorder;
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Padding:
       boxSizingAdjust += aPadding;
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Content:
       // nothing
       break;

@@ -539,10 +539,10 @@ nsComputedDOMStyle::GetAdjustedValuesForBoxSizing()
   switch(stylePos->mBoxSizing) {
     case StyleBoxSizing::Border:
       adjustment += mInnerFrame->GetUsedBorder();
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Padding:
       adjustment += mInnerFrame->GetUsedPadding();
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Content:
       // nothing
       break;
@@ -3841,7 +3841,7 @@ nsComputedDOMStyle::DoGetTextSizeAdjust()
   switch (StyleText()->mTextSizeAdjust) {
     default:
       NS_NOTREACHED("unexpected value");
-      // fall through
+      MOZ_FALLTHROUGH;
     case NS_STYLE_TEXT_SIZE_ADJUST_AUTO:
       val->SetIdent(eCSSKeyword_auto);
       break;

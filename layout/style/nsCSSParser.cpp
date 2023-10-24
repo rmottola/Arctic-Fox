@@ -2781,8 +2781,7 @@ CSSParserImpl::ResolveValueWithVariableReferencesRec(
         break;
 
       default:
-        NS_NOTREACHED("unexpected token type");
-        // fall through
+        MOZ_FALLTHROUGH_ASSERT("unexpected token type");
       case eCSSToken_ID:
       case eCSSToken_String:
       case eCSSToken_Includes:
@@ -4383,7 +4382,7 @@ CSSParserImpl::ParseKeyframeSelectorList(InfallibleTArray<float>& aSelectorList)
           value = 1.0f;
           break;
         }
-        // fall through
+        MOZ_FALLTHROUGH;
       default:
         UngetToken();
         // The first time through the loop, this means we got an empty
@@ -7483,7 +7482,7 @@ CSSParserImpl::ParseVariantWithRestrictions(nsCSSValue& aValue,
 {
   switch (aRestrictions) {
     default:
-      MOZ_ASSERT(false, "should not be reached");
+      MOZ_FALLTHROUGH_ASSERT("should not be reached");
     case 0:
       return ParseVariant(aValue, aVariantMask, aKeywordTable);
     case CSS_PROPERTY_VALUE_NONNEGATIVE:
@@ -10198,7 +10197,7 @@ CSSParserImpl::IsLegacyGradientLine(const nsCSSTokenType& aType,
       haveGradientLine = true;
       break;
     }
-    // fall through
+    MOZ_FALLTHROUGH;
   case eCSSToken_ID:
   case eCSSToken_Hash:
     // this is a color
@@ -10847,8 +10846,10 @@ CSSParserImpl::ParseBoxProperties(const nsCSSProperty aPropIDs[])
   switch (count) {
     case 1: // Make right == top
       result.mRight = result.mTop;
+      MOZ_FALLTHROUGH;
     case 2: // Make bottom == top
       result.mBottom = result.mTop;
+      MOZ_FALLTHROUGH;
     case 3: // Make left == right
       result.mLeft = result.mRight;
   }
@@ -10890,8 +10891,10 @@ CSSParserImpl::ParseGroupedBoxProperty(int32_t aVariantMask,
   switch (count) {
     case 1: // Make right == top
       result.mRight = result.mTop;
+      MOZ_FALLTHROUGH;
     case 2: // Make bottom == top
       result.mBottom = result.mTop;
+      MOZ_FALLTHROUGH;
     case 3: // Make left == right
       result.mLeft = result.mRight;
   }
@@ -10987,15 +10990,25 @@ CSSParserImpl::ParseBoxCornerRadiiInternals(nsCSSValue array[])
 
   // Provide missing values by replicating some of the values found
   switch (countX) {
-    case 1: dimenX.mRight = dimenX.mTop;  // top-right same as top-left, and
-    case 2: dimenX.mBottom = dimenX.mTop; // bottom-right same as top-left, and 
-    case 3: dimenX.mLeft = dimenX.mRight; // bottom-left same as top-right
+    case 1: // Make top-right same as top-left
+      dimenX.mRight = dimenX.mTop;
+      MOZ_FALLTHROUGH;
+    case 2: // Make bottom-right same as top-left
+      dimenX.mBottom = dimenX.mTop;
+      MOZ_FALLTHROUGH;
+    case 3: // Make bottom-left same as top-right
+      dimenX.mLeft = dimenX.mRight;
   }
 
   switch (countY) {
-    case 1: dimenY.mRight = dimenY.mTop;  // top-right same as top-left, and
-    case 2: dimenY.mBottom = dimenY.mTop; // bottom-right same as top-left, and 
-    case 3: dimenY.mLeft = dimenY.mRight; // bottom-left same as top-right
+    case 1: // Make top-right same as top-left
+      dimenY.mRight = dimenY.mTop;
+      MOZ_FALLTHROUGH;
+    case 2: // Make bottom-right same as top-left
+      dimenY.mBottom = dimenY.mTop;
+      MOZ_FALLTHROUGH;
+    case 3: // Make bottom-left same as top-right
+      dimenY.mLeft = dimenY.mRight;
   }
 
   NS_FOR_CSS_SIDES(side) {
