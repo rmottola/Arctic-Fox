@@ -17,7 +17,6 @@ ac_add_options --disable-gamepad
 ac_add_options --disable-dbus
 ac_add_options --disable-gio
 ac_add_options --disable-pulseaudio
-ac_add_options --disable-gstreamer
 ac_add_options --enable-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
