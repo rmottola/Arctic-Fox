@@ -1343,6 +1343,7 @@ MediaFormatReader::OnVideoSkipCompleted(uint32_t aSkipped)
   if (mDecoder) {
     mDecoder->NotifyDecodedFrames(aSkipped, 0, aSkipped);
   }
+  mVideo.mNumSamplesSkippedTotal += aSkipped;
   MOZ_ASSERT(!mVideo.mError); // We have flushed the decoder, no frame could
                               // have been decoded (and as such errored)
   NotifyDecodingRequested(TrackInfo::kVideoTrack);
@@ -1643,6 +1644,21 @@ MediaFormatReader::GetImageContainer()
 {
   return mVideoFrameContainer
     ? mVideoFrameContainer->GetImageContainer() : nullptr;
+}
+
+void
+MediaFormatReader::GetMozDebugReaderData(nsAString& aString)
+{
+  nsAutoCString result;
+  result += nsPrintfCString("hardware video decoding: %s\n",
+                            VideoIsHardwareAccelerated() ? "enabled" : "disabled");
+  result += nsPrintfCString("audio frames decoded: %lld (skipped:%lld)\n"
+                            "video frames decoded: %lld (skipped:%lld)\n",
+                            mAudio.mNumSamplesOutputTotal,
+                            mAudio.mNumSamplesSkippedTotal,
+                            mVideo.mNumSamplesOutputTotal,
+                            mVideo.mNumSamplesSkippedTotal);
+  aString += NS_ConvertUTF8toUTF16(result);
 }
 
 } // namespace mozilla
