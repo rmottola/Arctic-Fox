@@ -2959,7 +2959,7 @@ void MediaDecoderStateMachine::AddOutputStream(ProcessedMediaStream* aStream,
 {
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG("AddOutputStream aStream=%p!", aStream);
-  mStreamSink->AddOutput(aStream, aFinishWhenEnded);
+  mOutputStreamManager->Add(aStream, aFinishWhenEnded);
   nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethodWithArg<bool>(
     this, &MediaDecoderStateMachine::SetAudioCaptured, true);
   OwnerThread()->Dispatch(r.forget());
@@ -2969,8 +2969,8 @@ void MediaDecoderStateMachine::RemoveOutputStream(MediaStream* aStream)
 {
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG("RemoveOutputStream=%p!", aStream);
-  mStreamSink->RemoveOutput(aStream);
-  if (!mStreamSink->HasConsumers()) {
+  mOutputStreamManager->Remove(aStream);
+  if (mOutputStreamManager->IsEmpty()) {
     nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethodWithArg<bool>(
       this, &MediaDecoderStateMachine::SetAudioCaptured, false);
     OwnerThread()->Dispatch(r.forget());
