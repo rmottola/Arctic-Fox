@@ -42,9 +42,6 @@ DIRS += [
 if CONFIG['MOZ_RAW']:
     DIRS += ['raw']
 
-if CONFIG['MOZ_GSTREAMER']:
-    DIRS += ['gstreamer']
-
 if CONFIG['MOZ_DIRECTSHOW']:
     DIRS += ['directshow']
 
@@ -310,9 +307,6 @@ if CONFIG['MOZ_OMX_DECODER']:
 
 if CONFIG['ANDROID_VERSION'] > '15':
     DEFINES['MOZ_OMX_WEBM_DECODER'] = True
-
-CFLAGS += CONFIG['GSTREAMER_CFLAGS']
-CXXFLAGS += CONFIG['GSTREAMER_CFLAGS']
 
 include('/ipc/chromium/chromium-config.mozbuild')
 
