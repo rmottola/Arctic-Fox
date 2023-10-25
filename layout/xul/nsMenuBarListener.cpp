@@ -273,7 +273,7 @@ Modifiers
 nsMenuBarListener::GetModifiersForAccessKey(nsIDOMKeyEvent* aKeyEvent)
 {
   WidgetInputEvent* inputEvent =
-    aKeyEvent->GetInternalNSEvent()->AsInputEvent();
+    aKeyEvent->AsEvent()->GetInternalNSEvent()->AsInputEvent();
   MOZ_ASSERT(inputEvent);
 
   static const Modifiers kPossibleModifiersForAccessKey =
