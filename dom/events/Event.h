@@ -170,11 +170,6 @@ public:
     return mEvent->mFlags.mCancelable;
   }
 
-  bool CancelBubble() const
-  {
-    return mEvent->mFlags.mPropagationStopped;
-  }
-
   // xpidl implementation
   // void PreventDefault();
 
@@ -324,8 +319,6 @@ private:
   NS_IMETHOD_(void) SetTrusted(bool aTrusted) override { _to SetTrusted(aTrusted); } \
   NS_IMETHOD_(void) SetOwner(EventTarget* aOwner) override { _to SetOwner(aOwner); } \
   NS_IMETHOD_(Event*) InternalDOMEvent() override { return _to InternalDOMEvent(); } \
-  NS_IMETHOD GetCancelBubble(bool* aCancelBubble) override { return _to GetCancelBubble(aCancelBubble); } \
-  NS_IMETHOD SetCancelBubble(bool aCancelBubble) override { return _to SetCancelBubble(aCancelBubble); }
 
 #define NS_FORWARD_TO_EVENT_NO_SERIALIZATION_NO_DUPLICATION \
   NS_FORWARD_NSIDOMEVENT_NO_SERIALIZATION_NO_DUPLICATION(Event::) \

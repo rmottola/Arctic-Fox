@@ -203,7 +203,6 @@ interface nsIDOMEvent : nsISupports
   boolean                   getPreventDefault();
 
   readonly attribute boolean isTrusted;
-  attribute boolean cancelBubble;
 
   [noscript] void duplicatePrivateData();
   [noscript] void setTarget(in nsIDOMEventTarget aTarget);
