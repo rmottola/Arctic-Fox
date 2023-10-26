@@ -329,7 +329,7 @@ function runTest() {
       // Adding an attribute after the first one while on the first then going
       // down and push enter. Value should be the on from the new suggestion.
       doKey("down");
-      var datalist = document.getElementById('suggest');
+      datalist = document.getElementById('suggest');
       var added = new Option("Foo");
       datalist.insertBefore(added, datalist.children[1]);
 
@@ -350,7 +350,7 @@ function runTest() {
     case 202:
       // Change the first element value attribute.
       doKey("down");
-      var datalist = document.getElementById('suggest');
+      datalist = document.getElementById('suggest');
       prevValue = datalist.children[0].value;
       datalist.children[0].value = "foo";
       expectPopup();
@@ -361,7 +361,7 @@ function runTest() {
       doKey("return");
       checkForm("foo");
 
-      var datalist = document.getElementById('suggest');
+      datalist = document.getElementById('suggest');
       datalist.children[0].value = prevValue;
       expectPopup();
       restoreForm();
@@ -371,7 +371,7 @@ function runTest() {
     case 204:
       // Change the textContent to update the value attribute.
       doKey("down");
-      var datalist = document.getElementById('suggest');
+      datalist = document.getElementById('suggest');
       prevValue = datalist.children[0].getAttribute('value');
       datalist.children[0].removeAttribute('value');
       datalist.children[0].textContent = "foobar";
@@ -383,7 +383,7 @@ function runTest() {
       doKey("return");
       checkForm("foobar");
 
-      var datalist = document.getElementById('suggest');
+      datalist = document.getElementById('suggest');
       datalist.children[0].setAttribute('value', prevValue);
       testNum = 299;
       expectPopup();

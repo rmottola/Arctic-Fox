@@ -701,12 +701,12 @@
     set innerHTML(html) {
       var parser = new JSDOMParser();
       var node = parser.parse(html);
-      for (var i = this.childNodes.length; --i >= 0;) {
+      for (let i = this.childNodes.length; --i >= 0;) {
         this.childNodes[i].parentNode = null;
       }
       this.childNodes = node.childNodes;
       this.children = node.children;
-      for (var i = this.childNodes.length; --i >= 0;) {
+      for (let i = this.childNodes.length; --i >= 0;) {
         this.childNodes[i].parentNode = this;
       }
     },
@@ -1084,7 +1084,7 @@
       // Read any text as Text node
       if (c !== "<") {
         --this.currentChar;
-        var node = new Text();
+        let node = new Text();
         var n = this.html.indexOf("<", this.currentChar);
         if (n === -1) {
           node.innerHTML = this.html.substring(this.currentChar, this.html.length);

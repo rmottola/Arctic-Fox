@@ -50,7 +50,7 @@ const RSS090NS = "http://my.netscape.com/rdf/simple/0.9/";
 
 /***** Some general utils *****/
 function strToURI(link, base) {
-  var base = base || null;
+  base = base || null;
   if (!gIoService)
     gIoService = Cc[IO_CONTRACTID].getService(Ci.nsIIOService);
   try {
@@ -1669,7 +1669,7 @@ FeedProcessor.prototype = {
         else
           return; // don't know about this interface
 
-        var propName = localName;
+        let propName = localName;
         var prefix = gNamespaces[uri];
 
         // synonyms
