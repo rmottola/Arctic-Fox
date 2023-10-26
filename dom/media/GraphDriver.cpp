@@ -509,7 +509,6 @@ AudioCallbackDriver::AudioCallbackDriver(MediaStreamGraphImpl* aGraphImpl)
   , mStarted(false)
   , mAudioChannel(aGraphImpl->AudioChannel())
   , mInCallback(false)
-  , mPauseRequested(false)
   , mMicrophoneActive(false)
 #ifdef XP_MACOSX
   , mCallbackReceivedWhileSwitching(0)
@@ -760,11 +759,6 @@ long
 AudioCallbackDriver::DataCallback(AudioDataValue* aBuffer, long aFrames)
 {
   bool stillProcessing;
-
-  if (mPauseRequested) {
-    PodZero(aBuffer, aFrames * mGraphImpl->AudioChannelCount());
-    return aFrames;
-  }
 
 #ifdef XP_MACOSX
   if (OSXDeviceSwitchingWorkaround()) {
