@@ -155,7 +155,12 @@ class AudioInputCubeb final : public AudioInput
 public:
   explicit AudioInputCubeb(webrtc::VoiceEngine* aVoiceEngine, int aIndex = 0) :
     AudioInput(aVoiceEngine), mSelectedDevice(aIndex), mInUse(false)
-  {}
+  {
+    if (!mDeviceIndexes) {
+      mDeviceIndexes = new nsTArray<int>;
+      mDeviceNames = new nsTArray<nsCString>;
+    }
+  }
 
   static void CleanupGlobalData()
   {
@@ -164,14 +169,16 @@ public:
       cubeb_device_collection_destroy(mDevices);
       mDevices = nullptr;
     }
-    mDeviceIndexes.Clear();
-    mDeviceNames.Clear();
+    delete mDeviceIndexes;
+    mDeviceIndexes = nullptr;
+    delete mDeviceNames;
+    mDeviceNames = nullptr;
   }
 
   int GetNumOfRecordingDevices(int& aDevices)
   {
     UpdateDeviceList();
-    aDevices = mDeviceIndexes.Length();
+    aDevices = mDeviceIndexes->Length();
     return 0;
   }
 
@@ -180,11 +187,11 @@ public:
     if (aIndex == -1) {
       aIndex = 0; // -1 = system default
     }
-    if (aIndex >= (int) mDeviceIndexes.Length()) {
+    if (aIndex >= (int) mDeviceIndexes->Length()) {
       return -1;
     }
     // Note: if the device is gone, this will be -1
-    return mDeviceIndexes[aIndex]; // translate to mDevices index
+    return (*mDeviceIndexes)[aIndex]; // translate to mDevices index
   }
 
   int GetRecordingDeviceName(int aIndex, char aStrNameUTF8[128],
@@ -256,7 +263,7 @@ private:
       return;
     }
 
-    for (auto& device_index : mDeviceIndexes) {
+    for (auto& device_index : (*mDeviceIndexes)) {
       device_index = -1; // unmapped
     }
     // We keep all the device names, but wipe the mappings and rebuild them
@@ -269,14 +276,14 @@ private:
           (devices->device[i]->state == CUBEB_DEVICE_STATE_ENABLED ||
            devices->device[i]->state == CUBEB_DEVICE_STATE_UNPLUGGED))
       {
-        auto j = mDeviceNames.IndexOf(devices->device[i]->device_id);
+        auto j = mDeviceNames->IndexOf(devices->device[i]->device_id);
         if (j != nsTArray<nsCString>::NoIndex) {
           // match! update the mapping
-          mDeviceIndexes[j] = i;
+          (*mDeviceIndexes)[j] = i;
         } else {
           // new device, add to the array
-          mDeviceIndexes.AppendElement(i);
-          mDeviceNames.AppendElement(strdup(devices->device[i]->device_id));
+          mDeviceIndexes->AppendElement(i);
+          mDeviceNames->AppendElement(strdup(devices->device[i]->device_id));
         }
       }
     }
@@ -296,8 +303,9 @@ private:
   int mSelectedDevice;
   bool mInUse; // for assertions about listener lifetime
 
-  static nsTArray<int> mDeviceIndexes;
-  static nsTArray<nsCString> mDeviceNames;
+  // pointers to avoid static constructors
+  static nsTArray<int>* mDeviceIndexes;
+  static nsTArray<nsCString>* mDeviceNames;
   static cubeb_device_collection *mDevices;
   static bool mAnyInUse;
 };
