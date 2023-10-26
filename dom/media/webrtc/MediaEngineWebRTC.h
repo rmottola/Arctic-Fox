@@ -14,6 +14,7 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/Monitor.h"
+#include "mozilla/UniquePtr.h"
 #include "nsCOMPtr.h"
 #include "nsThreadUtils.h"
 #include "DOMMediaStream.h"
@@ -430,7 +431,8 @@ public:
     , mAGC(webrtc::kAgcDefault)
     , mNoiseSuppress(webrtc::kNsDefault)
     , mPlayoutDelay(0)
-    , mNullTransport(nullptr) {
+    , mNullTransport(nullptr)
+    , mInputBufferLen(0) {
     MOZ_ASSERT(aVoiceEnginePtr);
     MOZ_ASSERT(aAudioInput);
     mDeviceName.Assign(NS_ConvertUTF8toUTF16(name));
@@ -534,6 +536,10 @@ private:
   int32_t mPlayoutDelay;
 
   NullTransport *mNullTransport;
+
+  // For full_duplex packetizer output
+  size_t mInputBufferLen;
+  UniquePtr<int16_t[]> mInputBuffer;
 };
 
 class MediaEngineWebRTC : public MediaEngine
