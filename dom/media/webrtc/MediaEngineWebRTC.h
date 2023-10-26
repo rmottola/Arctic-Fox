@@ -518,7 +518,7 @@ private:
   webrtc::VoiceEngine* mVoiceEngine;
   RefPtr<mozilla::AudioInput> mAudioInput;
   bool mAudioEngineInit;
-
+  bool mFullDuplex;
   bool mHasTabVideoSource;
 
   // Store devices we've already seen in a hashtable for quick return.
