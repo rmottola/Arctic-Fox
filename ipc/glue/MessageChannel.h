@@ -263,7 +263,7 @@ class MessageChannel : HasResultCodes
     bool InterruptEventOccurred();
     bool HasPendingEvents();
 
-    void ProcessPendingRequests(int transaction, int prio);
+    void ProcessPendingRequests(int seqno, int transaction);
     bool ProcessPendingRequest(const Message &aUrgent);
 
     void MaybeUndeferIncall();
@@ -439,7 +439,7 @@ class MessageChannel : HasResultCodes
     // Tell the IO thread to close the channel and wait for it to ACK.
     void SynchronouslyClose();
 
-    bool WasTransactionCanceled(int transaction, int prio);
+    bool WasTransactionCanceled(int transaction);
     bool ShouldDeferMessage(const Message& aMsg);
     void OnMessageReceivedFromLink(const Message& aMsg);
     void OnChannelErrorFromLink();
