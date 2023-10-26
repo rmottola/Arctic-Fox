@@ -1,0 +1,287 @@
+diff --git a/dom/media/MediaStreamGraph.cpp b/dom/media/MediaStreamGraph.cpp
+index d6645a480f71..9e537a6d3948 100644
+--- a/dom/media/MediaStreamGraph.cpp
++++ b/dom/media/MediaStreamGraph.cpp
+@@ -938,18 +938,31 @@ void
+ MediaStreamGraphImpl::OpenAudioInputImpl(CubebUtils::AudioDeviceID aID,
+                                          AudioDataListener *aListener)
+ {
+- // Bug 1238038 Need support for multiple mics at once
+-  MOZ_ASSERT(!mInputWanted);
+-  if (mInputWanted) {
++  // Bug 1238038 Need support for multiple mics at once
++  if (mInputDeviceUsers.Count() > 0 &&
++      !mInputDeviceUsers.Get(aListener, nullptr)) {
++    NS_ASSERTION(false, "Input from multiple mics not yet supported; bug 1238038");
+     // Need to support separate input-only AudioCallback drivers; they'll
+     // call us back on "other" threads.  We will need to echo-cancel them, though.
+     return;
+   }
+   mInputWanted = true;
++
++  // Add to count of users for this ID.
++  // XXX Since we can't rely on IDs staying valid (ugh), use the listener as
++  // a stand-in for the ID.  Fix as part of support for multiple-captures
++  // (Bug 1238038)
++  uint32_t count = 0;
++  mInputDeviceUsers.Get(aListener, &count); // ok if this fails
++  count++;
++  mInputDeviceUsers.Put(aListener, count); // creates a new entry in the hash if needed
++
+   // aID is a cubeb_devid, and we assume that opaque ptr is valid until
+   // we close cubeb.
+   mInputDeviceID = aID;
+-  mAudioInputs.AppendElement(aListener); // always monitor speaker data
++  if (count == 1) { // first open for this listener
++    mAudioInputs.AppendElement(aListener); // always monitor speaker data
++  }
+ 
+   // Switch Drivers since we're adding input (to input-only or full-duplex)
+   MonitorAutoLock mon(mMonitor);
+@@ -986,6 +999,7 @@ MediaStreamGraphImpl::OpenAudioInput(CubebUtils::AudioDeviceID aID,
+     CubebUtils::AudioDeviceID mID;
+     RefPtr<AudioDataListener> mListener;
+   };
++  // XXX Check not destroyed!
+   this->AppendMessage(MakeUnique<Message>(this, aID, aListener));
+   return NS_OK;
+ }
+@@ -993,6 +1007,14 @@ MediaStreamGraphImpl::OpenAudioInput(CubebUtils::AudioDeviceID aID,
+ void
+ MediaStreamGraphImpl::CloseAudioInputImpl(AudioDataListener *aListener)
+ {
++  uint32_t count;
++  DebugOnly<bool> result = mInputDeviceUsers.Get(aListener, &count);
++  MOZ_ASSERT(result);
++  if (--count > 0) {
++    mInputDeviceUsers.Put(aListener, count);
++    return; // still in use
++  }
++  mInputDeviceUsers.Remove(aListener);
+   mInputDeviceID = nullptr;
+   mInputWanted = false;
+   AudioCallbackDriver *driver = CurrentDriver()->AsAudioCallbackDriver();
+@@ -2299,9 +2321,32 @@ MediaStream::AddMainThreadListener(MainThreadMediaStreamListener* aListener)
+   NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(runnable.forget())));
+ }
+ 
++nsresult
++SourceMediaStream::OpenAudioInput(CubebUtils::AudioDeviceID aID,
++                                  AudioDataListener *aListener)
++{
++  if (GraphImpl()) {
++    mInputListener = aListener;
++    return GraphImpl()->OpenAudioInput(aID, aListener);
++  }
++  return NS_ERROR_FAILURE;
++}
++
++void
++SourceMediaStream::CloseAudioInput()
++{
++  // Destroy() may have run already and cleared this
++  if (GraphImpl() && mInputListener) {
++    GraphImpl()->CloseAudioInput(mInputListener);
++  }
++  mInputListener = nullptr;
++}
++
+ void
+ SourceMediaStream::DestroyImpl()
+ {
++  CloseAudioInput();
++
+   // Hold mMutex while mGraph is reset so that other threads holding mMutex
+   // can null-check know that the graph will not destroyed.
+   MutexAutoLock lock(mMutex);
+diff --git a/dom/media/MediaStreamGraph.h b/dom/media/MediaStreamGraph.h
+index 77ccaf29c4bd..052fe6e58e5e 100644
+--- a/dom/media/MediaStreamGraph.h
++++ b/dom/media/MediaStreamGraph.h
+@@ -734,6 +734,16 @@ class SourceMediaStream : public MediaStream
+   SourceMediaStream* AsSourceStream() override { return this; }
+ 
+   // Media graph thread only
++
++  // Users of audio inputs go through the stream so it can track when the
++  // last stream referencing an input goes away, so it can close the cubeb
++  // input.  Also note: callable on any thread (though it bounces through
++  // MainThread to set the command if needed).
++  nsresult OpenAudioInput(CubebUtils::AudioDeviceID aID,
++                          AudioDataListener *aListener);
++  // Note: also implied when Destroy() happens
++  void CloseAudioInput();
++
+   void DestroyImpl() override;
+ 
+   // Call these on any thread.
+@@ -920,6 +930,12 @@ class SourceMediaStream : public MediaStream
+   void NotifyDirectConsumers(TrackData *aTrack,
+                              MediaSegment *aSegment);
+ 
++  // Only accessed on the MSG thread.  Used so to ask the MSGImpl to usecount
++  // users of a specific input.
++  // XXX Should really be a CubebUtils::AudioDeviceID, but they aren't
++  // copyable (opaque pointers)
++  RefPtr<AudioDataListener> mInputListener;
++
+   // This must be acquired *before* MediaStreamGraphImpl's lock, if they are
+   // held together.
+   Mutex mMutex;
+diff --git a/dom/media/MediaStreamGraphImpl.h b/dom/media/MediaStreamGraphImpl.h
+index 392dae03914e..5076daddcd6f 100644
+--- a/dom/media/MediaStreamGraphImpl.h
++++ b/dom/media/MediaStreamGraphImpl.h
+@@ -8,6 +8,8 @@
+ 
+ #include "MediaStreamGraph.h"
+ 
++#include "nsDataHashtable.h"
++
+ #include "mozilla/Monitor.h"
+ #include "mozilla/TimeStamp.h"
+ #include "nsIMemoryReporter.h"
+@@ -629,6 +631,9 @@ class MediaStreamGraphImpl : public MediaStreamGraph,
+   CubebUtils::AudioDeviceID mInputDeviceID;
+   bool mOutputWanted;
+   CubebUtils::AudioDeviceID mOutputDeviceID;
++  // Maps AudioDataListeners to a usecount of streams using the listener
++  // so we can know when it's no longer in use.
++  nsDataHashtable<nsPtrHashKey<AudioDataListener>, uint32_t> mInputDeviceUsers;
+ 
+   // True if the graph needs another iteration after the current iteration.
+   Atomic<bool> mNeedAnotherIteration;
+diff --git a/dom/media/webrtc/MediaEngineWebRTC.h b/dom/media/webrtc/MediaEngineWebRTC.h
+index 9b3d47addc03..ffc603012f9c 100644
+--- a/dom/media/webrtc/MediaEngineWebRTC.h
++++ b/dom/media/webrtc/MediaEngineWebRTC.h
+@@ -140,8 +140,8 @@ class AudioInput
+   virtual int GetRecordingDeviceName(int aIndex, char aStrNameUTF8[128],
+                                      char aStrGuidUTF8[128]) = 0;
+   virtual int GetRecordingDeviceStatus(bool& aIsAvailable) = 0;
+-  virtual void StartRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener) = 0;
+-  virtual void StopRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener) = 0;
++  virtual void StartRecording(SourceMediaStream *aStream, AudioDataListener *aListener) = 0;
++  virtual void StopRecording(SourceMediaStream *aStream) = 0;
+   virtual int SetRecordingDevice(int aIndex) = 0;
+ 
+ protected:
+@@ -155,7 +155,7 @@ class AudioInputCubeb final : public AudioInput
+ {
+ public:
+   explicit AudioInputCubeb(webrtc::VoiceEngine* aVoiceEngine, int aIndex = 0) :
+-    AudioInput(aVoiceEngine), mSelectedDevice(aIndex), mInUse(false)
++    AudioInput(aVoiceEngine), mSelectedDevice(aIndex), mInUseCount(0)
+   {
+     if (!mDeviceIndexes) {
+       mDeviceIndexes = new nsTArray<int>;
+@@ -216,25 +216,29 @@ class AudioInputCubeb final : public AudioInput
+     return 0;
+   }
+ 
+-  void StartRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener)
++  void StartRecording(SourceMediaStream *aStream, AudioDataListener *aListener)
+   {
+     MOZ_ASSERT(mDevices);
+ 
+-    ScopedCustomReleasePtr<webrtc::VoEExternalMedia> ptrVoERender;
+-    ptrVoERender = webrtc::VoEExternalMedia::GetInterface(mVoiceEngine);
+-    if (ptrVoERender) {
+-      ptrVoERender->SetExternalRecordingStatus(true);
++    if (mInUseCount == 0) {
++      ScopedCustomReleasePtr<webrtc::VoEExternalMedia> ptrVoERender;
++      ptrVoERender = webrtc::VoEExternalMedia::GetInterface(mVoiceEngine);
++      if (ptrVoERender) {
++        ptrVoERender->SetExternalRecordingStatus(true);
++      }
++      mAnyInUse = true;
+     }
+-    aGraph->OpenAudioInput(mDevices->device[mSelectedDevice]->devid, aListener);
+-    mInUse = true;
+-    mAnyInUse = true;
++    mInUseCount++;
++    // Always tell the stream we're using it for input
++    aStream->OpenAudioInput(mDevices->device[mSelectedDevice]->devid, aListener);
+   }
+ 
+-  void StopRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener)
++  void StopRecording(SourceMediaStream *aStream)
+   {
+-    aGraph->CloseAudioInput(aListener);
+-    mInUse = false;
+-    mAnyInUse = false;
++    aStream->CloseAudioInput();
++    if (--mInUseCount == 0) {
++      mAnyInUse = false;
++    }
+   }
+ 
+   int SetRecordingDevice(int aIndex)
+@@ -249,7 +253,7 @@ class AudioInputCubeb final : public AudioInput
+ 
+ protected:
+   ~AudioInputCubeb() {
+-    MOZ_RELEASE_ASSERT(!mInUse);
++    MOZ_RELEASE_ASSERT(mInUseCount == 0);
+   }
+ 
+ private:
+@@ -306,7 +310,7 @@ class AudioInputCubeb final : public AudioInput
+   // for this - and be careful of threading access.  The mappings need to
+   // updated on each re-enumeration.
+   int mSelectedDevice;
+-  bool mInUse; // for assertions about listener lifetime
++  uint32_t mInUseCount;
+ 
+   // pointers to avoid static constructors
+   static nsTArray<int>* mDeviceIndexes;
+@@ -353,8 +357,8 @@ class AudioInputWebRTC final : public AudioInput
+     return 0;
+   }
+ 
+-  void StartRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener) {}
+-  void StopRecording(MediaStreamGraph *aGraph, AudioDataListener *aListener) {}
++  void StartRecording(SourceMediaStream *aStream, AudioDataListener *aListener) {}
++  void StopRecording(SourceMediaStream *aStream) {}
+ 
+   int SetRecordingDevice(int aIndex)
+   {
+diff --git a/dom/media/webrtc/MediaEngineWebRTCAudio.cpp b/dom/media/webrtc/MediaEngineWebRTCAudio.cpp
+index 2b6eb3fd5719..742898d31da7 100644
+--- a/dom/media/webrtc/MediaEngineWebRTCAudio.cpp
++++ b/dom/media/webrtc/MediaEngineWebRTCAudio.cpp
+@@ -359,6 +359,8 @@ MediaEngineWebRTCMicrophoneSource::Start(SourceMediaStream *aStream,
+ 
+   if (mState == kStarted) {
+     MOZ_ASSERT(aID == mTrackID);
++    // Make sure we're associated with this stream
++    mAudioInput->StartRecording(aStream, mListener);
+     return NS_OK;
+   }
+   mState = kStarted;
+@@ -377,7 +379,7 @@ MediaEngineWebRTCMicrophoneSource::Start(SourceMediaStream *aStream,
+   }
+ 
+   // Must be *before* StartSend() so it will notice we selected external input (full_duplex)
+-  mAudioInput->StartRecording(aStream->Graph(), mListener);
++  mAudioInput->StartRecording(aStream, mListener);
+ 
+   if (mVoEBase->StartSend(mChannel)) {
+     return NS_ERROR_FAILURE;
+@@ -404,6 +406,7 @@ MediaEngineWebRTCMicrophoneSource::Stop(SourceMediaStream *aSource, TrackID aID)
+     aSource->EndTrack(aID);
+ 
+     if (!mSources.IsEmpty()) {
++      mAudioInput->StopRecording(aSource);
+       return NS_OK;
+     }
+     if (mState != kStarted) {
+@@ -416,7 +419,7 @@ MediaEngineWebRTCMicrophoneSource::Stop(SourceMediaStream *aSource, TrackID aID)
+     mState = kStopped;
+   }
+ 
+-  mAudioInput->StopRecording(aSource->Graph(), mListener);
++  mAudioInput->StopRecording(aSource);
+ 
+   mVoERender->DeRegisterExternalMediaProcessing(mChannel, webrtc::kRecordingPerChannel);
+ 
