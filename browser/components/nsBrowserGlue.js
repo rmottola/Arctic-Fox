@@ -70,6 +70,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
 XPCOMUtils.defineLazyModuleGetter(this, "OS",
                                   "resource://gre/modules/osfile.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "RemotePrompt",
+                                  "resource:///modules/RemotePrompt.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
                                   "resource:///modules/Feeds.jsm");
 
@@ -729,8 +732,10 @@ BrowserGlue.prototype = {
       Services.prefs.setBoolPref('media.mediasource.webm.enabled', false);
     }
 
-    if (Services.prefs.getBoolPref("browser.tabs.remote"))
+    if (Services.prefs.getBoolPref("browser.tabs.remote")) {
       ContentClick.init();
+      RemotePrompt.init();
+    }
     Feeds.init();
 
     LoginManagerParent.init();
@@ -749,13 +754,12 @@ BrowserGlue.prototype = {
       });
     }
 
-    Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
-
     TabCrashHandler.init();
     if (AppConstants.MOZ_CRASHREPORTER) {
       PluginCrashReporter.init();
     }
 
+    Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
