@@ -489,7 +489,7 @@ var PlacesOrganizer = {
       let backupFilePaths = yield PlacesBackups.getBackupFiles();
       for (let backupFilePath of backupFilePaths) {
         if (OS.Path.basename(backupFilePath) == backupName) {
-          PlacesOrganizer.restoreBookmarksFromFile(new FileUtils.File(backupFilePath));
+          PlacesOrganizer.restoreBookmarksFromFile(backupFilePath);
           break;
         }
       }
@@ -507,7 +507,7 @@ var PlacesOrganizer = {
     let fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     let fpCallback = function fpCallback_done(aResult) {
       if (aResult != Ci.nsIFilePicker.returnCancel) {
-        this.restoreBookmarksFromFile(fp.file);
+        this.restoreBookmarksFromFile(fp.file.path);
       }
     }.bind(this);
 
@@ -523,11 +523,10 @@ var PlacesOrganizer = {
   /**
    * Restores bookmarks from a JSON file.
    */
-  restoreBookmarksFromFile: function PO_restoreBookmarksFromFile(aFile) {
+  restoreBookmarksFromFile: function PO_restoreBookmarksFromFile(aFilePath) {
     // check file extension
-    let filePath = aFile.path;
-    if (!filePath.toLowerCase().endsWith("json") &&
-        !filePath.toLowerCase().endsWith("jsonlz4"))  {
+    if (!aFilePath.toLowerCase().endsWith("json") &&
+        !aFilePath.toLowerCase().endsWith("jsonlz4"))  {
       this._showErrorAlert(PlacesUIUtils.getString("bookmarksRestoreFormatError"));
       return;
     }
@@ -542,7 +541,7 @@ var PlacesOrganizer = {
 
     Task.spawn(function() {
       try {
-        yield BookmarkJSONUtils.importFromFile(aFile, true);
+        yield BookmarkJSONUtils.importFromFile(aFilePath, true);
       } catch(ex) {
         PlacesOrganizer._showErrorAlert(PlacesUIUtils.getString("bookmarksRestoreParseError"));
       }
