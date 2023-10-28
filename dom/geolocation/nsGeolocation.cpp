@@ -463,15 +463,7 @@ nsGeolocationRequest::Allow(JS::HandleValue aChoices)
     return NS_OK;
   }
 
-  // Kick off the geo device, if it isn't already running
   RefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
-  nsresult rv = gs->StartDevice(GetPrincipal());
-
-  if (NS_FAILED(rv)) {
-    // Location provider error
-    NotifyError(nsIDOMGeoPositionError::POSITION_UNAVAILABLE);
-    return NS_OK;
-  }
 
   bool canUseCache = false;
   CachedPositionAndAccuracy lastPosition = gs->GetCachedPosition();
@@ -495,6 +487,15 @@ nsGeolocationRequest::Allow(JS::HandleValue aChoices)
     // getCurrentPosition requests serviced by the cache
     // will now be owned by the RequestSendLocationEvent
     Update(lastPosition.position);
+  } else {
+    // Kick off the geo device, if it isn't already running
+    nsresult rv = gs->StartDevice(GetPrincipal());
+
+    if (NS_FAILED(rv)) {
+      // Location provider error
+      NotifyError(nsIDOMGeoPositionError::POSITION_UNAVAILABLE);
+      return NS_OK;
+    }
   }
 
   if (mIsWatchPositionRequest || !canUseCache) {
