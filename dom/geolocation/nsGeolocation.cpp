@@ -20,15 +20,20 @@
 #include "nsContentUtils.h"
 #include "nsContentPermissionHelper.h"
 #include "nsIDocument.h"
+#include "nsIDOMEvent.h"
 #include "nsIObserverService.h"
 #include "nsPIDOMWindow.h"
 #include "nsThreadUtils.h"
+#include "mozilla/HalWakeLock.h"
+#include "mozilla/Hal.h"
 #include "mozilla/Services.h"
 #include "mozilla/unused.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/dom/Event.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
 #include "mozilla/dom/SettingChangeNotificationBinding.h"
+#include "mozilla/dom/WakeLock.h"
 
 #include "nsJSUtils.h"
 #include "prdtoa.h"
@@ -65,6 +70,7 @@ class nsIPrincipal;
 using mozilla::Unused;          // <snicker>
 using namespace mozilla;
 using namespace mozilla::dom;
+using namespace mozilla::hal;
 
 class nsGeolocationRequest final
  : public nsIContentPermissionRequest
@@ -503,6 +509,10 @@ nsGeolocationRequest::Allow(JS::HandleValue aChoices)
       NotifyError(nsIDOMGeoPositionError::POSITION_UNAVAILABLE);
       return NS_OK;
     }
+  }
+
+  if (mLocator->ContainsRequest(this)) {
+    return NS_OK;
   }
 
   if (mIsWatchPositionRequest || !canUseCache) {
@@ -1048,6 +1058,16 @@ nsGeolocationService::StartDevice(nsIPrincipal *aPrincipal)
 }
 
 void
+nsGeolocationService::StopDisconnectTimer()
+{
+  if (mDisconnectTimer) {
+    mDisconnectTimer->Cancel();
+    mDisconnectTimer = nullptr;
+  }
+}
+
+
+void
 nsGeolocationService::SetDisconnectTimer()
 {
   if (!mDisconnectTimer) {
@@ -1099,10 +1119,7 @@ nsGeolocationService::UpdateAccuracy(bool aForceHigh)
 void
 nsGeolocationService::StopDevice()
 {
-  if(mDisconnectTimer) {
-    mDisconnectTimer->Cancel();
-    mDisconnectTimer = nullptr;
-  }
+  StopDisconnectTimer();
 
   if (XRE_IsContentProcess()) {
     ContentChild* cpc = ContentChild::GetSingleton();
@@ -1212,6 +1229,14 @@ Geolocation::Init(nsIDOMWindow* aContentDom)
     }
 
     mPrincipal = doc->NodePrincipal();
+
+    if (XRE_IsContentProcess()) {
+      doc->AddSystemEventListener(NS_LITERAL_STRING("visibilitychange"),
+                                  /* listener */ this,
+                                  /* use capture */ true,
+                                  /* wants untrusted */ false);
+    }
+
   }
 
   // If no aContentDom was passed into us, we are being used
@@ -1224,12 +1249,76 @@ Geolocation::Init(nsIDOMWindow* aContentDom)
   return NS_OK;
 }
 
+bool
+Geolocation::ContainsRequest(nsGeolocationRequest* aRequest)
+{
+  if (aRequest->IsWatch()) {
+    if (mWatchingCallbacks.Contains(aRequest)) {
+	return true;
+    }
+  } else {
+    if (mPendingCallbacks.Contains(aRequest)) {
+        return true;
+    }
+  }
+  return false;
+}
+
+
+NS_IMETHODIMP
+Geolocation::HandleEvent(nsIDOMEvent* aEvent)
+{
+
+  nsAutoString type;
+  aEvent->GetType(type);
+  if (!type.EqualsLiteral("visibilitychange")) {
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsIDocument> doc = do_QueryInterface(aEvent->InternalDOMEvent()->GetTarget());
+  MOZ_ASSERT(doc);
+
+  if (doc->Hidden()) {
+    WakeLockInformation info;
+    GetWakeLockInfo(NS_LITERAL_STRING("gps"), &info);
+
+    MOZ_ASSERT(XRE_IsContentProcess());
+    ContentChild* cpc = ContentChild::GetSingleton();
+    if (!info.lockingProcesses().Contains(cpc->GetID())) {
+      cpc->SendRemoveGeolocationListener();
+      mService->StopDisconnectTimer();
+    }
+  } else {
+    mService->SetDisconnectTimer();
+    for (uint32_t i = 0, length = mWatchingCallbacks.Length(); i < length; ++i) {
+      mWatchingCallbacks[i]->Allow(JS::UndefinedHandleValue);
+    }
+    for (uint32_t i = 0, length = mPendingCallbacks.Length(); i < length; ++i) {
+      mPendingCallbacks[i]->Allow(JS::UndefinedHandleValue);
+    }
+  }
+
+  return NS_OK;
+}
+
 void
 Geolocation::Shutdown()
 {
   // Release all callbacks
   mPendingCallbacks.Clear();
   mWatchingCallbacks.Clear();
+
+  if (XRE_IsContentProcess()) {
+    nsCOMPtr<nsPIDOMWindow> window = do_QueryReferent(mOwner);
+    if (window) {
+      nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
+      if (doc) {
+        doc->RemoveSystemEventListener(NS_LITERAL_STRING("visibilitychange"),
+                                       this,
+                                       /* useCapture = */ true);
+      }
+    }
+  }
 
   if (mService) {
     mService->RemoveLocator(this);
