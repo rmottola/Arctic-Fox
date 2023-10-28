@@ -396,9 +396,35 @@
     "description": "Location accuracy"
   },
   "GEOLOCATION_ERROR": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "flag",
     "description": "Has seen location error"
+  },
+  "GEOLOCATION_GETCURRENTPOSITION_SECURE_ORIGIN" : {
+    "expires_in_version" : "55",
+    "kind": "enumerated",
+    "n_values": 10,
+    "bug_numbers": [1230209],
+    "description" : "Number of navigator.geolocation.getCurrentPosition() calls (0=other, 1=http, 2=https)"
+  },
+  "GEOLOCATION_REQUEST_GRANTED": {
+    "expires_in_version": "55",
+    "kind": "enumerated",
+    "n_values": 20,
+    "bug_numbers": [1230209],
+    "description": "Geolocation requests either granted or denied (0=denied/other, 1=denied/http, 2=denied/https, ..., 10=granted/other, 11=granted/http, 12=granted/https)"
+  },
+  "GEOLOCATION_WATCHPOSITION_SECURE_ORIGIN" : {
+    "expires_in_version" : "55",
+    "kind": "enumerated",
+    "n_values": 10,
+    "bug_numbers": [1230209],
+    "description" : "Number of navigator.geolocation.watchPosition() calls (0=other, 1=http, 2=https)"
+  },
+  "GEOLOCATION_WIN8_SOURCE_IS_MLS": {
+    "expires_in_version": "default",
+    "kind": "boolean",
+    "description": "Geolocation on Win8 is either MLS or native"
   },
   "GEOLOCATION_OSX_SOURCE_IS_MLS": {
     "expires_in_version": "default",
@@ -433,6 +459,16 @@
     "n_buckets": 100,
     "bug_numbers": [1226196],
     "description": "Resident memory size (KB)"
+  },
+  "MEMORY_TOTAL": {
+    "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
+    "bug_numbers": [1198209],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": 32768,
+    "high": 16777216,
+    "n_buckets": 100,
+    "description": "Total Memory Across All Processes (KB)"
   },
   "MEMORY_UNIQUE": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
@@ -875,6 +911,20 @@
     "expires_in_version": "40",
     "kind": "boolean",
     "description": "WebGL canvas used"
+  },
+  "CANVAS_WEBGL_SUCCESS": {
+    "alert_emails": ["jmuizelaar@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "WebGL1 creation success",
+    "bug_numbers": [1247327]
+  },
+  "CANVAS_WEBGL2_SUCCESS": {
+    "alert_emails": ["jmuizelaar@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "WebGL2 creation success",
+    "bug_numbers": [1247327]
   },
   "TOTAL_CONTENT_PAGE_LOAD_TIME": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
