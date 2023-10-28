@@ -238,7 +238,7 @@ HTMLVideoElement::GetVideoPlaybackQuality()
     if (window) {
       nsPerformance* perf = window->GetPerformance();
       if (perf) {
-        creationTime = perf->GetDOMTiming()->TimeStampToDOMHighRes(TimeStamp::Now());
+        creationTime = perf->Now();
       }
     }
 
