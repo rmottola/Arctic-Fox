@@ -1306,6 +1306,37 @@ var BookmarkingUI = {
     this._updateToolbarStyle();
   },
 
+  onWidgetUndoMove: function BUI_undoWidgetUndoMove(aNode, aContainer) {
+    if (aNode == this.button) {
+      this._onWidgetWasMoved();
+    }
+  },
+
+  _onWidgetWasMoved: function BUI_widgetWasMoved() {
+    let usedToUpdateStarState = this._shouldUpdateStarState();
+    this._updateCustomizationState();
+    if (!usedToUpdateStarState && this._shouldUpdateStarState()) {
+      this.updateStarState();
+    } else if (usedToUpdateStarState && !this._shouldUpdateStarState()) {
+      this._updateStar();
+    }
+    // If we're moved outside of customize mode, we need to uninit
+    // our view so it gets reconstructed.
+    if (!this._isCustomizing) {
+      this._uninitView();
+    }
+  },
+
+  onCustomizeEnd: function BUI_customizeEnd(aWindow) {
+    if (aWindow == window) {
+      this._isCustomizing = false;
+      this.onToolbarVisibilityChange();
+    }
+  },
+
+  init: function() {
+  },
+
   _hasBookmarksObserver: false,
   _itemIds: [],
   uninit: function BUI_uninit() {

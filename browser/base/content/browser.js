@@ -1277,6 +1277,8 @@ var gBrowserInit = {
     // Enable/Disable auto-hide tabbar
     gBrowser.tabContainer.updateVisibility();
 
+    BookmarkingUI.init();
+
     gPrefService.addObserver(gHomeButton.prefDomain, gHomeButton, false);
 
     var homeButton = document.getElementById("home-button");
