@@ -4439,7 +4439,10 @@
             this._tabFilters.delete(tab);
             this._tabListeners.delete(tab);
           }
-          let els = Cc["@mozilla.org/eventlistenerservice;1"].getService(Ci.nsIEventListenerService);
+          const nsIEventListenerService =
+            Components.interfaces.nsIEventListenerService;
+          let els = Components.classes["@mozilla.org/eventlistenerservice;1"]
+                              .getService(nsIEventListenerService);
           els.removeSystemEventListener(document, "keydown", this, false);
           if (this.AppConstants.platform == "macosx") {
             els.removeSystemEventListener(document, "keypress", this, false);
