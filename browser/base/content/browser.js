@@ -70,10 +70,11 @@ var gAppInfo = Cc["@mozilla.org/xre/app-info;1"]
                   .getService(Ci.nsIXULAppInfo)
                   .QueryInterface(Ci.nsIXULRuntime);
 
-#ifndef XP_MACOSX
-var gEditUIVisible = true;
-#endif
+if (AppConstants.platform != "macosx") {
+  var gEditUIVisible = true;
+}
 
+/*globals gBrowser, gNavToolbox, gURLBar, gNavigatorBundle*/
 [
   ["gBrowser",            "content"],
   ["gNavToolbox",         "navigator-toolbox"],
@@ -125,10 +126,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch",
   "resource://gre/modules/TelemetryStopwatch.jsm");
 
-#ifdef MOZ_SERVICES_SYNC
 XPCOMUtils.defineLazyModuleGetter(this, "Weave",
   "resource://services-sync/main.js");
-#endif
 
 XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
   let tmp = {};
@@ -512,13 +511,14 @@ var gPopupBlockerObserver = {
         var brandBundle = document.getElementById("bundle_brand");
         var brandShortName = brandBundle.getString("brandShortName");
         var popupCount = gBrowser.selectedBrowser.blockedPopups.length;
-#ifdef XP_WIN
-        var popupButtonText = gNavigatorBundle.getString("popupWarningButton");
-        var popupButtonAccesskey = gNavigatorBundle.getString("popupWarningButton.accesskey");
-#else
-        var popupButtonText = gNavigatorBundle.getString("popupWarningButtonUnix");
-        var popupButtonAccesskey = gNavigatorBundle.getString("popupWarningButtonUnix.accesskey");
-#endif
+
+        var stringKey = AppConstants.platform == "win"
+                        ? "popupWarningButton"
+                        : "popupWarningButtonUnix";
+
+        var popupButtonText = gNavigatorBundle.getString(stringKey);
+        var popupButtonAccesskey = gNavigatorBundle.getString(stringKey + ".accesskey");
+
         var messageBase = gNavigatorBundle.getString("popupWarning.message");
         var message = PluralForm.get(popupCount, messageBase)
                                 .replace("#1", brandShortName)
@@ -1363,10 +1363,8 @@ var gBrowserInit = {
 
     FullScreen.init();
 
-#ifdef MOZ_SERVICES_SYNC
     // initialize the sync UI
     gSyncUI.init();
-#endif
 
     gBrowserThumbnails.init();
 
@@ -1659,14 +1657,12 @@ var gBrowserInit = {
     // initialize the private browsing UI
     gPrivateBrowsingUI.init();
 
-#ifdef MOZ_SERVICES_SYNC
     // initialize the sync UI
     gSyncUI.init();
-#endif
 
-#ifdef E10S_TESTING_ONLY
-    gRemoteTabsUI.init();
-#endif
+    if (AppConstants.E10S_TESTING_ONLY) {
+      gRemoteTabsUI.init();
+    }
   },
 
   nonBrowserWindowShutdown: function() {
@@ -1732,11 +1728,12 @@ var gBrowserInit = {
 /* Legacy global init functions */
 var BrowserStartup        = gBrowserInit.onLoad.bind(gBrowserInit);
 var BrowserShutdown       = gBrowserInit.onUnload.bind(gBrowserInit);
-#ifdef XP_MACOSX
-var nonBrowserWindowStartup        = gBrowserInit.nonBrowserWindowStartup.bind(gBrowserInit);
-var nonBrowserWindowDelayedStartup = gBrowserInit.nonBrowserWindowDelayedStartup.bind(gBrowserInit);
-var nonBrowserWindowShutdown       = gBrowserInit.nonBrowserWindowShutdown.bind(gBrowserInit);
-#endif
+
+if (AppConstants.platform == "macosx") {
+  var nonBrowserWindowStartup        = gBrowserInit.nonBrowserWindowStartup.bind(gBrowserInit);
+  var nonBrowserWindowDelayedStartup = gBrowserInit.nonBrowserWindowDelayedStartup.bind(gBrowserInit);
+  var nonBrowserWindowShutdown       = gBrowserInit.nonBrowserWindowShutdown.bind(gBrowserInit);
+}
 
 function HandleAppCommandEvent(evt) {
   switch (evt.command) {
@@ -3461,7 +3458,6 @@ const BrowserSearch = {
    * or focuses an existing window, if necessary.
    */
   webSearch: function BrowserSearch_webSearch() {
-#ifdef XP_MACOSX
     if (window.location.href != getBrowserURL()) {
       var win = getTopWin();
       if (win) {
@@ -3482,7 +3478,7 @@ const BrowserSearch = {
       }
       return;
     }
-#endif
+
     let openSearchPageIfFieldIsNotActive = function(aSearchBar) {
       let doc = gBrowser.selectedBrowser.contentDocument;
       let url = doc.documentURI.toLowerCase();
@@ -6773,11 +6769,9 @@ function isTabEmpty(aTab) {
   return true;
 }
 
-#ifdef MOZ_SERVICES_SYNC
 function BrowserOpenSyncTabs() {
   switchToTabHavingURI("about:sync-tabs", true);
 }
-#endif
 
 /**
  * Format a URL
@@ -7451,13 +7445,12 @@ var gRemoteTabsUI = {
       return;
     }
 
-#ifdef XP_MACOSX
-    if (Services.prefs.getBoolPref("layers.acceleration.disabled")) {
+    if (AppConstants.platform == "macosx" &&
+        Services.prefs.getBoolPref("layers.acceleration.disabled")) {
       // On OS X, "Disable Hardware Acceleration" also disables OMTC and forces
       // a fallback to Basic Layers. This is incompatible with e10s.
       return;
     }
-#endif
 
     let newNonRemoteWindow = document.getElementById("menu_newNonRemoteWindow");
 
@@ -7616,11 +7609,11 @@ var TabContextMenu = {
     for (let menuItem of menuItems)
       menuItem.disabled = disabled;
 
-#ifdef E10S_TESTING_ONLY
-    menuItems = aPopupMenu.getElementsByAttribute("tbattr", "tabbrowser-remote");
-    for (let menuItem of menuItems)
-      menuItem.hidden = !gMultiProcessBrowser;
-#endif
+    if (AppConstants.E10S_TESTING_ONLY) {
+      menuItems = aPopupMenu.getElementsByAttribute("tbattr", "tabbrowser-remote");
+      for (let menuItem of menuItems)
+        menuItem.hidden = !gMultiProcessBrowser;
+    }
 
     disabled = gBrowser.visibleTabs.length == 1;
     menuItems = aPopupMenu.getElementsByAttribute("tbattr", "tabbrowser-multiple-visible");
@@ -7822,12 +7815,8 @@ Object.defineProperty(this, "Eyedropper", {
 });
 
 XPCOMUtils.defineLazyGetter(window, "gShowPageResizers", function () {
-#ifdef XP_WIN
   // Only show resizers on Windows 2000 and XP
-  return parseFloat(Services.sysinfo.getProperty("version")) < 6;
-#else
-  return false;
-#endif
+  return AppConstants.isPlatformAndVersionAtMost("win", "5.9");
 });
 
 var MousePosTracker = {
@@ -7964,9 +7953,8 @@ var ToolbarIconColor = {
     }
 
     let toolbarSelector = "toolbar:not([collapsed=true])";
-#ifdef XP_MACOSX
-    toolbarSelector += ":not([type=menubar])";
-#endif
+    if (AppConstants.platform == "macosx")
+      toolbarSelector += ":not([type=menubar])";
 
     // The getComputedStyle calls and setting the brighttext are separated in
     // two loops to avoid flushing layout and making it dirty repeatedly.
@@ -8068,4 +8056,3 @@ TabModalPromptBox.prototype = {
     return browser;
   },
 };
-
