@@ -396,7 +396,6 @@
 @RESPATH@/browser/components/nsSetDefaultBrowser.js
 @RESPATH@/browser/components/BrowserDownloads.manifest
 @RESPATH@/browser/components/DownloadsStartup.js
-@RESPATH@/browser/components/DownloadsUI.js
 @RESPATH@/components/Downloads.manifest
 @RESPATH@/components/DownloadLegacy.js
 @RESPATH@/components/BrowserPageThumbs.manifest
