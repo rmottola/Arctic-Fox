@@ -188,7 +188,11 @@ this.MigratorPrototype = {
    * @see nsIBrowserProfileMigrator
    */
   getMigrateData: function MP_getMigrateData(aProfile) {
-    let types = [r.type for each (r in this._getMaybeCachedResources(aProfile))];
+    let resources = this._getMaybeCachedResources(aProfile);
+    if (!resources) {
+      return [];
+    }
+    let types = resources.map(r => r.type);
     return types.reduce((a, b) => a |= b, 0);
   },
 
@@ -204,7 +208,7 @@ this.MigratorPrototype = {
       throw new Error("migrate called for a non-existent source");
 
     if (aItems != Ci.nsIBrowserProfileMigrator.ALL)
-      resources = [r for each (r in resources) if (aItems & r.type)];
+      resources = resources.filter(r => aItems & r.type);
 
     // Called either directly or through the bookmarks import callback.
     function doMigrate() {
@@ -227,8 +231,8 @@ this.MigratorPrototype = {
 
       notify("Migration:Started");
       for (let [key, value] of resourcesGroupedByItems) {
-      	// TODO: (bug 449811).
-      	let migrationType = key, itemResources = value;
+        // TODO: (bug 449811).
+        let migrationType = key, itemResources = value;
 
         notify("Migration:ItemBeforeMigrate", migrationType);
 
