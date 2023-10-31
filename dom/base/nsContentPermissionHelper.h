@@ -109,7 +109,7 @@ public:
 private:
   virtual ~nsContentPermissionRequester();
 
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsWeakPtr mWindow;
   RefPtr<VisibilityChangeListener> mListener;
 };
 
