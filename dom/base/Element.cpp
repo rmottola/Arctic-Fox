@@ -3315,6 +3315,13 @@ Element::GetAnimations(nsTArray<RefPtr<Animation>>& aAnimations)
     doc->FlushPendingNotifications(Flush_Style);
   }
 
+  GetAnimationsUnsorted(aAnimations);
+  aAnimations.Sort(AnimationPtrComparator<RefPtr<Animation>>());
+}
+
+void
+Element::GetAnimationsUnsorted(nsTArray<RefPtr<Animation>>& aAnimations)
+{
   EffectSet* effects = EffectSet::GetEffectSet(this,
                          nsCSSPseudoElements::ePseudo_NotPseudoElement);
   if (!effects) {
@@ -3332,8 +3339,6 @@ Element::GetAnimations(nsTArray<RefPtr<Animation>>& aAnimations)
                "effect set");
     aAnimations.AppendElement(animation);
   }
-
-  aAnimations.Sort(AnimationPtrComparator<RefPtr<Animation>>());
 }
 
 NS_IMETHODIMP

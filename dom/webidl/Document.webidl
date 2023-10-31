@@ -310,6 +310,8 @@ partial interface Document {
 partial interface Document {
   [Func="nsDocument::IsWebAnimationsEnabled"]
   readonly attribute DocumentTimeline timeline;
+  [Func="nsDocument::IsWebAnimationsEnabled"]
+  sequence<Animation> getAnimations();
 };
 
 //  Mozilla extensions of various sorts
