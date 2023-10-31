@@ -2227,7 +2227,7 @@ NS_IMETHODIMP
 nsHTMLDocument::GetSelection(nsISelection** aReturn)
 {
   ErrorResult rv;
-  NS_IF_ADDREF(*aReturn = nsDocument::GetSelection(rv));
+  NS_IF_ADDREF(*aReturn = GetSelection(rv));
   return rv.StealNSResult();
 }
 
