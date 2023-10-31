@@ -5039,11 +5039,6 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
             return JSToNativeConversionInfo(template, declType=declType,
                                             dealWithOptional=isOptional)
 
-        if descriptor.interface.identifier.name == "AbortablePromise":
-            raise TypeError("Need to figure out what argument conversion "
-                            "should look like for AbortablePromise: %s" %
-                            sourceDescription)
-
         # This is an interface that we implement as a concrete class
         # or an XPCOM interface.
 
@@ -7167,8 +7162,7 @@ class CGPerSignatureCall(CGThing):
 
         # Hack for making Promise.prototype.then work well over Xrays.
         if (not static and
-            (descriptor.name == "Promise" or
-             descriptor.name == "MozAbortablePromise") and
+            descriptor.name == "Promise" and
             idlNode.isMethod() and
             idlNode.identifier.name == "then"):
             cgThings.append(CGGeneric(dedent(
@@ -7180,7 +7174,7 @@ class CGPerSignatureCall(CGThing):
         needsUnwrap = False
         argsPost = []
         if isConstructor:
-            if descriptor.name == "Promise" or descriptor.name == "MozAbortablePromise":
+            if descriptor.name == "Promise":
                 # Hack for Promise for now: pass in our desired proto so the
                 # implementation can create the reflector with the right proto.
                 argsPost.append("desiredProto")

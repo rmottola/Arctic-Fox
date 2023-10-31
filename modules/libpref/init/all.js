@@ -113,9 +113,6 @@ pref("browser.cache.compression_level", 3);
 pref("browser.download.saveZoneInformation", 2);
 #endif
 
-// Whether or not MozAbortablePromise is enabled.
-pref("dom.abortablepromise.enabled", false);
-
 // Whether or not testing features are enabled.
 pref("dom.quotaManager.testing", false);
 
