@@ -535,8 +535,8 @@ private:
   GetDocumentRegistration(nsIDocument* aDoc,
                           ServiceWorkerRegistrationInfo** aRegistrationInfo);
 
-  NS_IMETHODIMP
-  GetServiceWorkerForScope(nsIDOMWindow* aWindow,
+  nsresult
+  GetServiceWorkerForScope(nsPIDOMWindowInner* aWindow,
                            const nsAString& aScope,
                            WhichServiceWorker aWhichWorker,
                            nsISupports** aServiceWorker);
@@ -564,7 +564,7 @@ private:
   StopControllingADocument(ServiceWorkerRegistrationInfo* aRegistration);
 
   already_AddRefed<ServiceWorkerRegistrationInfo>
-  GetServiceWorkerRegistrationInfo(nsPIDOMWindow* aWindow);
+  GetServiceWorkerRegistrationInfo(nsPIDOMWindowInner* aWindow);
 
   already_AddRefed<ServiceWorkerRegistrationInfo>
   GetServiceWorkerRegistrationInfo(nsIDocument* aDoc);
@@ -612,14 +612,15 @@ private:
   FireControllerChange(ServiceWorkerRegistrationInfo* aRegistration);
 
   void
-  StorePendingReadyPromise(nsPIDOMWindow* aWindow, nsIURI* aURI,
+  StorePendingReadyPromise(nsPIDOMWindowInner* aWindow, nsIURI* aURI,
                            Promise* aPromise);
 
   void
   CheckPendingReadyPromises();
 
   bool
-  CheckReadyPromise(nsPIDOMWindow* aWindow, nsIURI* aURI, Promise* aPromise);
+  CheckReadyPromise(nsPIDOMWindowInner* aWindow, nsIURI* aURI,
+                    Promise* aPromise);
 
   struct PendingReadyPromise final
   {

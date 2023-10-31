@@ -338,7 +338,7 @@ public:
     return mSTSThread;
   }
 
-  nsPIDOMWindow* GetWindow() const {
+  nsPIDOMWindowInner* GetWindow() const {
     PC_AUTO_ENTER_API_CALL_NO_CHECK();
     return mWindow;
   }
@@ -726,7 +726,7 @@ private:
   // TODO: Remove if we ever properly wire PeerConnection for cycle-collection.
   nsWeakPtr mPCObserver;
 
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
 
   // The SDP sent in from JS - here for debugging.
   std::string mLocalRequestedSDP;

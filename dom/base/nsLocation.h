@@ -30,7 +30,7 @@ class nsLocation final : public nsIDOMLocation
   typedef mozilla::ErrorResult ErrorResult;
 
 public:
-  nsLocation(nsPIDOMWindow* aWindow, nsIDocShell *aDocShell);
+  nsLocation(nsPIDOMWindowInner* aWindow, nsIDocShell *aDocShell);
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_AMBIGUOUS(nsLocation,
@@ -159,7 +159,7 @@ public:
     // GetHref checks CallerSubsumes.
     GetHref(aRetval, aError);
   }
-  nsPIDOMWindow* GetParentObject() const
+  nsPIDOMWindowInner* GetParentObject() const
   {
     return mInnerWindow;
   }
@@ -186,7 +186,7 @@ protected:
   bool CallerSubsumes();
 
   nsString mCachedHash;
-  nsCOMPtr<nsPIDOMWindow> mInnerWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mInnerWindow;
   nsWeakPtr mDocShell;
 };
 

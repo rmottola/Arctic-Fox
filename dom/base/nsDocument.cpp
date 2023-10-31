@@ -2261,8 +2261,7 @@ nsDocument::ResetToURI(nsIURI *aURI, nsILoadGroup *aLoadGroup,
   }
 
   // Refresh the principal on the compartment.
-  nsPIDOMWindow* win = GetInnerWindow();
-  if (win) {
+  if (nsPIDOMWindowInner* win = GetInnerWindow()) {
     win->RefreshCompartmentPrincipal();
   }
 }
@@ -3146,14 +3145,13 @@ nsIDocument::HasFocus(ErrorResult& rv) const
   }
 
   // Is there a focused DOMWindow?
-  nsCOMPtr<nsIDOMWindow> focusedWindow;
+  nsCOMPtr<mozIDOMWindowProxy> focusedWindow;
   fm->GetFocusedWindow(getter_AddRefs(focusedWindow));
   if (!focusedWindow) {
     return false;
   }
 
-  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(focusedWindow);
-  MOZ_ASSERT(piWindow);
+  nsPIDOMWindowOuter* piWindow = nsPIDOMWindowOuter::From(focusedWindow);
 
   // Are we an ancestor of the focused DOMWindow?
   for (nsIDocument* currentDoc = piWindow->GetDoc(); currentDoc;
@@ -3208,9 +3206,8 @@ Element*
 nsIDocument::GetActiveElement()
 {
   // Get the focused element.
-  nsCOMPtr<nsPIDOMWindow> window = GetWindow();
-  if (window) {
-    nsCOMPtr<nsPIDOMWindow> focusedWindow;
+  if (nsCOMPtr<nsPIDOMWindowOuter> window = GetWindow()) {
+    nsCOMPtr<nsPIDOMWindowOuter> focusedWindow;
     nsIContent* focusedContent =
       nsFocusManager::GetFocusedDescendant(window, false,
                                            getter_AddRefs(focusedWindow));
@@ -4471,7 +4468,7 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
 {
 #ifdef DEBUG
   {
-    nsCOMPtr<nsPIDOMWindow> win(do_QueryInterface(aScriptGlobalObject));
+    nsCOMPtr<nsPIDOMWindowInner> win(do_QueryInterface(aScriptGlobalObject));
 
     NS_ASSERTION(!win || win->IsInnerWindow(),
                  "Script global object must be an inner window!");
@@ -4551,7 +4548,7 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
 
   // Remember the pointer to our window (or lack there of), to avoid
   // having to QI every time it's asked for.
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(mScriptGlobalObject);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mScriptGlobalObject);
   mWindow = window;
 
   // Now that we know what our window is, we can flush the CSP errors to the
@@ -4632,10 +4629,9 @@ nsDocument::GetScriptHandlingObjectInternal() const
 
   nsCOMPtr<nsIScriptGlobalObject> scriptHandlingObject =
     do_QueryReferent(mScopeObject);
-  nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(scriptHandlingObject);
+  nsCOMPtr<nsPIDOMWindowInner> win = do_QueryInterface(scriptHandlingObject);
   if (win) {
-    NS_ASSERTION(win->IsInnerWindow(), "Should have inner window here!");
-    nsPIDOMWindow* outer = win->GetOuterWindow();
+    nsPIDOMWindowOuter* outer = win->GetOuterWindow();
     if (!outer || outer->GetCurrentInnerWindow() != win) {
       NS_WARNING("Wrong inner/outer window combination!");
       return nullptr;
@@ -4649,8 +4645,8 @@ nsDocument::SetScriptHandlingObject(nsIScriptGlobalObject* aScriptObject)
   NS_ASSERTION(!mScriptGlobalObject ||
                mScriptGlobalObject == aScriptObject,
                "Wrong script object!");
-  nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(aScriptObject);
-  NS_ASSERTION(!win || win->IsInnerWindow(), "Should have inner window here!");
+  // XXXkhuey why bother?
+  nsCOMPtr<nsPIDOMWindowInner> win = do_QueryInterface(aScriptObject);
   if (aScriptObject) {
     mScopeObject = do_GetWeakReference(aScriptObject);
     mHasHadScriptHandlingObject = true;
@@ -4682,13 +4678,13 @@ nsDocument::SetIsContentDocument(bool aIsContentDocument)
   mIsContentDocument = aIsContentDocument;
 }
 
-nsPIDOMWindow *
+nsPIDOMWindowOuter*
 nsDocument::GetWindowInternal() const
 {
   MOZ_ASSERT(!mWindow, "This should not be called when mWindow is not null!");
   // Let's use mScriptGlobalObject. Even if the document is already removed from
   // the docshell, the outer window might be still obtainable from the it.
-  nsCOMPtr<nsPIDOMWindow> win;
+  nsCOMPtr<nsPIDOMWindowOuter> win;
   if (mRemovedFromDocShell) {
     // The docshell returns the outer window we are done.
     nsCOMPtr<nsIDocShell> kungfuDeathGrip(mDocumentContainer);
@@ -4696,10 +4692,9 @@ nsDocument::GetWindowInternal() const
       win = mDocumentContainer->GetWindow();
     }
   } else {
-    win = do_QueryInterface(mScriptGlobalObject);
-    if (win) {
+    if (nsCOMPtr<nsPIDOMWindowInner> inner = do_QueryInterface(mScriptGlobalObject)) {
       // mScriptGlobalObject is always the inner window, let's get the outer.
-      win = win->GetOuterWindow();
+      win = inner->GetOuterWindow();
     }
   }
 
@@ -5674,7 +5669,7 @@ nsDocument::CustomElementConstructor(JSContext* aCx, unsigned aArgc, JS::Value* 
 
   JS::Rooted<JSObject*> global(aCx,
     JS_GetGlobalForObject(aCx, &args.callee()));
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryWrapper(aCx, global);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryWrapper(aCx, global);
   MOZ_ASSERT(window, "Should have a non-null window");
 
   nsDocument* document = static_cast<nsDocument*>(window->GetDoc());
@@ -5726,7 +5721,7 @@ nsDocument::IsWebComponentsEnabled(JSContext* aCx, JSObject* aObject)
   // Check for the webcomponents permission. See Bug 1181555.
   JSAutoCompartment ac(aCx, obj);
   JS::Rooted<JSObject*> global(aCx, JS_GetGlobalForObject(aCx, obj));
-  nsCOMPtr<nsPIDOMWindow> window =
+  nsCOMPtr<nsPIDOMWindowInner> window =
     do_QueryInterface(nsJSUtils::GetStaticScriptGlobal(global));
 
   if (window) {
@@ -6839,10 +6834,10 @@ nsIDocument::CreateTreeWalker(nsINode& aRoot, uint32_t aWhatToShow,
 
 
 NS_IMETHODIMP
-nsDocument::GetDefaultView(nsIDOMWindow** aDefaultView)
+nsDocument::GetDefaultView(mozIDOMWindowProxy** aDefaultView)
 {
   *aDefaultView = nullptr;
-  nsCOMPtr<nsPIDOMWindow> win = GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> win = GetWindow();
   win.forget(aDefaultView);
   return NS_OK;
 }
@@ -6857,13 +6852,13 @@ nsDocument::GetLocation(nsIDOMLocation **_retval)
 already_AddRefed<nsLocation>
 nsIDocument::GetLocation() const
 {
-  nsCOMPtr<nsIDOMWindow> w = do_QueryInterface(mScriptGlobalObject);
+  nsCOMPtr<nsPIDOMWindowInner> w = do_QueryInterface(mScriptGlobalObject);
 
   if (!w) {
     return nullptr;
   }
 
-  nsGlobalWindow* window = static_cast<nsGlobalWindow*>(w.get());
+  nsGlobalWindow* window = nsGlobalWindow::Cast(w);
   ErrorResult dummy;
   RefPtr<nsLocation> loc = window->GetLocation(dummy);
   dummy.SuppressException();
@@ -7592,8 +7587,7 @@ nsIDocument::AdoptNode(nsINode& aAdoptedNode, ErrorResult& rv)
       // descendants.
       nsIDocument *doc = this;
       do {
-        nsPIDOMWindow *win = doc->GetWindow();
-        if (win) {
+        if (nsPIDOMWindowOuter *win = doc->GetWindow()) {
           nsCOMPtr<nsINode> node = win->GetFrameElementInternal();
           if (node &&
               nsContentUtils::ContentIsDescendantOf(node, adoptedNode)) {
@@ -7722,7 +7716,7 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
                                 * LayoutDeviceToScreenScale(1.0);
 
   // Special behaviour for desktop mode, provided we are not on an about: page
-  nsPIDOMWindow* win = GetWindow();
+  nsPIDOMWindowOuter* win = GetWindow();
   if (win && win->IsDesktopModeViewport() && !IsAboutPage())
   {
     CSSCoord viewportWidth = gfxPrefs::DesktopViewportWidth() / fullZoom;
@@ -7971,7 +7965,7 @@ nsDocument::PreHandleEvent(EventChainPreVisitor& aVisitor)
 
   // Load events must not propagate to |window| object, see bug 335251.
   if (aVisitor.mEvent->mMessage != eLoad) {
-    nsGlobalWindow* window = static_cast<nsGlobalWindow*>(GetWindow());
+    nsGlobalWindow* window = nsGlobalWindow::Cast(GetWindow());
     aVisitor.mParentTarget =
       window ? window->GetTargetForEventTargetChain() : nullptr;
   }
@@ -8601,7 +8595,7 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
     return false;
   }
 
-  nsPIDOMWindow* win = GetInnerWindow();
+  nsPIDOMWindowInner* win = GetInnerWindow();
   if (win && win->TimeoutSuspendCount()) {
     return false;
   }
@@ -8693,12 +8687,12 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
     }
   }
 
-  #ifdef MOZ_WEBSPEECH
-  nsGlobalWindow* globalWindow = static_cast<nsGlobalWindow*>(win);
+#ifdef MOZ_WEBSPEECH
+  auto* globalWindow = nsGlobalWindow::Cast(win);
   if (globalWindow->HasActiveSpeechSynthesis()) {
     return false;
   }
-  #endif
+#endif
 
   return true;
 }
@@ -9223,7 +9217,7 @@ nsDocument::MutationEventDispatched(nsINode* aTarget)
       return;
     }
 
-    nsPIDOMWindow* window = GetInnerWindow();
+    nsPIDOMWindowInner* window = GetInnerWindow();
     if (window &&
         !window->HasMutationListeners(NS_EVENT_BITS_MUTATION_SUBTREEMODIFIED)) {
       mSubtreeModifiedTargets.Clear();
@@ -10927,8 +10921,8 @@ AskWindowToExitFullscreen(nsIDocument* aDoc)
       /* Bubbles */ true, /* Cancelable */ false,
       /* DefaultAction */ nullptr);
   } else {
-    if (nsPIDOMWindow* win = aDoc->GetWindow()) {
-      win->SetFullscreenInternal(nsPIDOMWindow::eForFullscreenAPI, false);
+    if (nsPIDOMWindowOuter* win = aDoc->GetWindow()) {
+      win->SetFullscreenInternal(FullscreenReason::ForFullscreenAPI, false);
     }
   }
 }
@@ -11023,8 +11017,8 @@ public:
       NS_LITERAL_STRING("MozDOMFullscreen:Exited"),
       /* Bubbles */ true, /* Cancelable */ false, /* DefaultAction */ nullptr);
     // Ensure the window exits fullscreen.
-    if (nsPIDOMWindow* win = mDocuments[0]->GetWindow()) {
-      win->SetFullscreenInternal(nsPIDOMWindow::eForForceExitFullscreen, false);
+    if (nsPIDOMWindowOuter* win = mDocuments[0]->GetWindow()) {
+      win->SetFullscreenInternal(FullscreenReason::ForForceExitFullscreen, false);
     }
     return NS_OK;
   }
@@ -11392,7 +11386,7 @@ IsInActiveTab(nsIDocument* aDoc)
   if (!rootItem) {
     return false;
   }
-  nsCOMPtr<nsIDOMWindow> rootWin = rootItem->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> rootWin = rootItem->GetWindow();
   if (!rootWin) {
     return false;
   }
@@ -11402,7 +11396,7 @@ IsInActiveTab(nsIDocument* aDoc)
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> activeWindow;
+  nsCOMPtr<mozIDOMWindowProxy> activeWindow;
   fm->GetActiveWindow(getter_AddRefs(activeWindow));
   if (!activeWindow) {
     return false;
@@ -11618,7 +11612,7 @@ private:
 
 /* static */ LinkedList<FullscreenRequest> PendingFullscreenRequestList::sList;
 
-static nsCOMPtr<nsPIDOMWindow>
+static nsCOMPtr<nsPIDOMWindowOuter>
 GetRootWindow(nsIDocument* aDoc)
 {
   nsIDocShell* docShell = aDoc->GetDocShell();
@@ -11632,7 +11626,7 @@ GetRootWindow(nsIDocument* aDoc)
 
 static bool
 ShouldApplyFullscreenDirectly(nsIDocument* aDoc,
-                              nsPIDOMWindow* aRootWin)
+                              nsPIDOMWindowOuter* aRootWin)
 {
   if (XRE_GetProcessType() == GeckoProcessType_Content) {
     // If we are in the content process, we can apply the fullscreen
@@ -11666,7 +11660,7 @@ ShouldApplyFullscreenDirectly(nsIDocument* aDoc,
 void
 nsDocument::RequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
 {
-  nsCOMPtr<nsPIDOMWindow> rootWin = GetRootWindow(this);
+  nsCOMPtr<nsPIDOMWindowOuter> rootWin = GetRootWindow(this);
   if (!rootWin) {
     return;
   }
@@ -11694,7 +11688,7 @@ nsDocument::RequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
     // Make the window fullscreen.
     const FullscreenRequest*
       lastRequest = PendingFullscreenRequestList::GetLast();
-    rootWin->SetFullscreenInternal(nsPIDOMWindow::eForFullscreenAPI, true,
+    rootWin->SetFullscreenInternal(FullscreenReason::ForFullscreenAPI, true,
                                    lastRequest->mVRHMDDevice);
   }
 }
@@ -12052,7 +12046,7 @@ public:
 
     // Handling a request from user input in non-fullscreen mode.
     // Do a normal permission check.
-    nsCOMPtr<nsPIDOMWindow> window = doc->GetInnerWindow();
+    nsCOMPtr<nsPIDOMWindowInner> window = doc->GetInnerWindow();
     nsContentPermissionUtils::AskPermission(this, window);
     return NS_OK;
   }
@@ -12100,7 +12094,7 @@ nsPointerLockPermissionRequest::GetPrincipal(nsIPrincipal** aPrincipal)
 }
 
 NS_IMETHODIMP
-nsPointerLockPermissionRequest::GetWindow(nsIDOMWindow** aWindow)
+nsPointerLockPermissionRequest::GetWindow(mozIDOMWindow** aWindow)
 {
   nsCOMPtr<nsIDocument> d = do_QueryReferent(mDocument);
   if (d) {
@@ -12342,11 +12336,11 @@ nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
   if (!ownerDoc->GetContainer()) {
     return false;
   }
-  nsCOMPtr<nsPIDOMWindow> ownerWindow = ownerDoc->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> ownerWindow = ownerDoc->GetWindow();
   if (!ownerWindow) {
     return false;
   }
-  nsCOMPtr<nsPIDOMWindow> ownerInnerWindow = ownerDoc->GetInnerWindow();
+  nsCOMPtr<nsPIDOMWindowInner> ownerInnerWindow = ownerDoc->GetInnerWindow();
   if (!ownerInnerWindow) {
     return false;
   }
@@ -12354,7 +12348,7 @@ nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
     return false;
   }
 
-  nsCOMPtr<nsPIDOMWindow> top = ownerWindow->GetScriptableTop();
+  nsCOMPtr<nsPIDOMWindowOuter> top = ownerWindow->GetScriptableTop();
   if (!top || !top->GetExtantDoc() || top->GetExtantDoc()->Hidden()) {
     NS_WARNING("ShouldLockPointer(): Top document isn't visible.");
     return false;
@@ -12375,7 +12369,7 @@ bool
 nsDocument::SetPointerLock(Element* aElement, int aCursorStyle)
 {
   // NOTE: aElement will be nullptr when unlocking.
-  nsCOMPtr<nsPIDOMWindow> window = GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> window = GetWindow();
   if (!window) {
     NS_WARNING("SetPointerLock(): No Window");
     return false;
@@ -12829,7 +12823,7 @@ nsIDocument::GetTopLevelContentDocument()
   if (!mLoadedAsData) {
     parent = static_cast<nsDocument*>(this);
   } else {
-    nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(GetScopeObject());
+    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetScopeObject());
     if (!window) {
       return nullptr;
     }
@@ -13156,9 +13150,8 @@ nsAutoSyncOperation::nsAutoSyncOperation(nsIDocument* aDoc)
   mMicroTaskLevel = nsContentUtils::MicroTaskLevel();
   nsContentUtils::SetMicroTaskLevel(0);
   if (aDoc) {
-    nsPIDOMWindow* win = aDoc->GetWindow();
-    if (win) {
-      if (nsCOMPtr<nsPIDOMWindow> top = win->GetTop()) {
+    if (nsPIDOMWindowOuter* win = aDoc->GetWindow()) {
+      if (nsCOMPtr<nsPIDOMWindowOuter> top = win->GetTop()) {
         nsCOMPtr<nsIDocument> doc = top->GetExtantDoc();
         MarkDocumentTreeToBeInSyncOperation(doc, &mDocuments);
       }
@@ -13231,7 +13224,7 @@ nsIDocument::FlushUserFontSet()
       bool changed = false;
 
       if (!mFontFaceSet && !rules.IsEmpty()) {
-        nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(GetScopeObject());
+        nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetScopeObject());
         mFontFaceSet = new FontFaceSet(window, this);
       }
       if (mFontFaceSet) {
@@ -13287,7 +13280,7 @@ FontFaceSet*
 nsIDocument::Fonts()
 {
   if (!mFontFaceSet) {
-    nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(GetScopeObject());
+    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetScopeObject());
     mFontFaceSet = new FontFaceSet(window, this);
     GetUserFontSet();  // this will cause the user font set to be created/updated
   }

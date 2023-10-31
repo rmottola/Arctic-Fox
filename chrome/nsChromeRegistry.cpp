@@ -316,7 +316,7 @@ nsChromeRegistry::ConvertChromeURL(nsIURI* aChromeURI, nsIURI* *aResult)
 // theme stuff
 
 
-static void FlushSkinBindingsForWindow(nsPIDOMWindow* aWindow)
+static void FlushSkinBindingsForWindow(nsPIDOMWindowOuter* aWindow)
 {
   // Get the document.
   nsCOMPtr<nsIDocument> document = aWindow->GetDoc();
@@ -343,7 +343,7 @@ NS_IMETHODIMP nsChromeRegistry::RefreshSkins()
     nsCOMPtr<nsISupports> protoWindow;
     windowEnumerator->GetNext(getter_AddRefs(protoWindow));
     if (protoWindow) {
-      nsCOMPtr<nsPIDOMWindow> domWindow = do_QueryInterface(protoWindow);
+      nsCOMPtr<nsPIDOMWindowOuter> domWindow = do_QueryInterface(protoWindow);
       if (domWindow)
         FlushSkinBindingsForWindow(domWindow);
     }
@@ -358,7 +358,7 @@ NS_IMETHODIMP nsChromeRegistry::RefreshSkins()
     nsCOMPtr<nsISupports> protoWindow;
     windowEnumerator->GetNext(getter_AddRefs(protoWindow));
     if (protoWindow) {
-      nsCOMPtr<nsPIDOMWindow> domWindow = do_QueryInterface(protoWindow);
+      nsCOMPtr<nsPIDOMWindowOuter> domWindow = do_QueryInterface(protoWindow);
       if (domWindow)
         RefreshWindow(domWindow);
     }
@@ -380,7 +380,7 @@ nsChromeRegistry::FlushSkinCaches()
 }
 
 // XXXbsmedberg: move this to windowmediator
-nsresult nsChromeRegistry::RefreshWindow(nsPIDOMWindow* aWindow)
+nsresult nsChromeRegistry::RefreshWindow(nsPIDOMWindowOuter* aWindow)
 {
   // Deal with our subframes first.
   nsCOMPtr<nsIDOMWindowCollection> frames = aWindow->GetFrames();
@@ -388,9 +388,9 @@ nsresult nsChromeRegistry::RefreshWindow(nsPIDOMWindow* aWindow)
   frames->GetLength(&length);
   uint32_t j;
   for (j = 0; j < length; j++) {
-    nsCOMPtr<nsIDOMWindow> childWin;
+    nsCOMPtr<mozIDOMWindowProxy> childWin;
     frames->Item(j, getter_AddRefs(childWin));
-    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(childWin);
+    nsCOMPtr<nsPIDOMWindowOuter> piWindow = nsPIDOMWindowOuter::From(childWin);
     RefreshWindow(piWindow);
   }
 
@@ -506,7 +506,7 @@ nsChromeRegistry::ReloadChrome()
         nsCOMPtr<nsISupports> protoWindow;
         rv = windowEnumerator->GetNext(getter_AddRefs(protoWindow));
         if (NS_SUCCEEDED(rv)) {
-          nsCOMPtr<nsPIDOMWindow> domWindow = do_QueryInterface(protoWindow);
+          nsCOMPtr<nsPIDOMWindowOuter> domWindow = do_QueryInterface(protoWindow);
           if (domWindow) {
             nsIDOMLocation* location = domWindow->GetLocation();
             if (location) {

@@ -872,7 +872,7 @@ nsDocLoader::RemoveProgressListener(nsIWebProgressListener *aListener)
 }
 
 NS_IMETHODIMP
-nsDocLoader::GetDOMWindow(nsIDOMWindow **aResult)
+nsDocLoader::GetDOMWindow(mozIDOMWindowProxy **aResult)
 {
   return CallGetInterface(this, aResult);
 }
@@ -882,11 +882,11 @@ nsDocLoader::GetDOMWindowID(uint64_t *aResult)
 {
   *aResult = 0;
 
-  nsCOMPtr<nsIDOMWindow> window;
+  nsCOMPtr<mozIDOMWindowProxy> window;
   nsresult rv = GetDOMWindow(getter_AddRefs(window));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsPIDOMWindow> piwindow = do_QueryInterface(window);
+  nsCOMPtr<nsPIDOMWindowOuter> piwindow = nsPIDOMWindowOuter::From(window);
   NS_ENSURE_STATE(piwindow);
 
   MOZ_ASSERT(piwindow->IsOuterWindow());
@@ -899,13 +899,13 @@ nsDocLoader::GetIsTopLevel(bool *aResult)
 {
   *aResult = false;
 
-  nsCOMPtr<nsIDOMWindow> window;
+  nsCOMPtr<mozIDOMWindowProxy> window;
   GetDOMWindow(getter_AddRefs(window));
   if (window) {
-    nsCOMPtr<nsPIDOMWindow> piwindow = do_QueryInterface(window);
+    nsCOMPtr<nsPIDOMWindowOuter> piwindow = nsPIDOMWindowOuter::From(window);
     NS_ENSURE_STATE(piwindow);
 
-    nsCOMPtr<nsPIDOMWindow> topWindow = piwindow->GetTop();
+    nsCOMPtr<nsPIDOMWindowOuter> topWindow = piwindow->GetTop();
     *aResult = piwindow == topWindow;
   }
 

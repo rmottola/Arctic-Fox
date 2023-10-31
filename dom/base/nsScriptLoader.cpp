@@ -288,7 +288,7 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
   }
 
   nsCOMPtr<nsILoadGroup> loadGroup = mDocument->GetDocumentLoadGroup();
-  nsCOMPtr<nsPIDOMWindow> window(do_QueryInterface(mDocument->MasterDocument()->GetWindow()));
+  nsCOMPtr<nsPIDOMWindowOuter> window = mDocument->MasterDocument()->GetWindow();
   NS_ENSURE_TRUE(window, NS_ERROR_NULL_POINTER);
   nsIDocShell *docshell = window->GetDocShell();
   nsCOMPtr<nsIInterfaceRequestor> prompter(do_QueryInterface(docshell));
@@ -947,7 +947,7 @@ nsScriptLoader::ProcessRequest(nsScriptLoadRequest* aRequest)
     nsAutoMicroTask mt;
   }
 
-  nsPIDOMWindow *pwin = master->GetInnerWindow();
+  nsPIDOMWindowInner *pwin = master->GetInnerWindow();
   bool runScript = !!pwin;
   if (runScript) {
     nsContentUtils::DispatchTrustedEvent(scriptElem->OwnerDoc(),
@@ -1029,7 +1029,7 @@ already_AddRefed<nsIScriptGlobalObject>
 nsScriptLoader::GetScriptGlobalObject()
 {
   nsCOMPtr<nsIDocument> master = mDocument->MasterDocument();
-  nsPIDOMWindow *pwin = master->GetInnerWindow();
+  nsPIDOMWindowInner *pwin = master->GetInnerWindow();
   if (!pwin) {
     return nullptr;
   }

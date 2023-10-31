@@ -1232,7 +1232,7 @@ NS_IMPL_ISUPPORTS(BackgroundChildCallback, nsIIPCBackgroundChildCreateCallback)
 BEGIN_WORKERS_NAMESPACE
 
 void
-CancelWorkersForWindow(nsPIDOMWindow* aWindow)
+CancelWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   RuntimeService* runtime = RuntimeService::GetService();
@@ -1242,7 +1242,7 @@ CancelWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-FreezeWorkersForWindow(nsPIDOMWindow* aWindow)
+FreezeWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   RuntimeService* runtime = RuntimeService::GetService();
@@ -1252,7 +1252,7 @@ FreezeWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-ThawWorkersForWindow(nsPIDOMWindow* aWindow)
+ThawWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   RuntimeService* runtime = RuntimeService::GetService();
@@ -1262,7 +1262,7 @@ ThawWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-SuspendWorkersForWindow(nsPIDOMWindow* aWindow)
+SuspendWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   RuntimeService* runtime = RuntimeService::GetService();
@@ -1272,7 +1272,7 @@ SuspendWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-ResumeWorkersForWindow(nsPIDOMWindow* aWindow)
+ResumeWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   RuntimeService* runtime = RuntimeService::GetService();
@@ -1550,7 +1550,7 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
       mNavigatorPropertiesLoaded = true;
     }
 
-    nsPIDOMWindow* window = aWorkerPrivate->GetWindow();
+    nsPIDOMWindowInner* window = aWorkerPrivate->GetWindow();
 
     if (!isServiceWorker) {
       // Service workers are excluded since their lifetime is separate from
@@ -1704,7 +1704,7 @@ RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   }
   else if (aWorkerPrivate->IsDedicatedWorker()) {
     // May be null.
-    nsPIDOMWindow* window = aWorkerPrivate->GetWindow();
+    nsPIDOMWindowInner* window = aWorkerPrivate->GetWindow();
 
     nsTArray<WorkerPrivate*>* windowArray;
     MOZ_ALWAYS_TRUE(mWindowMap.Get(window, &windowArray));
@@ -2174,7 +2174,7 @@ RuntimeService::AddAllTopLevelWorkersToArray(nsTArray<WorkerPrivate*>& aWorkers)
 }
 
 void
-RuntimeService::GetWorkersForWindow(nsPIDOMWindow* aWindow,
+RuntimeService::GetWorkersForWindow(nsPIDOMWindowInner* aWindow,
                                     nsTArray<WorkerPrivate*>& aWorkers)
 {
   AssertIsOnMainThread();
@@ -2190,7 +2190,7 @@ RuntimeService::GetWorkersForWindow(nsPIDOMWindow* aWindow,
 }
 
 void
-RuntimeService::CancelWorkersForWindow(nsPIDOMWindow* aWindow)
+RuntimeService::CancelWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
 
@@ -2217,7 +2217,7 @@ RuntimeService::CancelWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-RuntimeService::FreezeWorkersForWindow(nsPIDOMWindow* aWindow)
+RuntimeService::FreezeWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aWindow);
@@ -2241,7 +2241,7 @@ RuntimeService::FreezeWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-RuntimeService::ThawWorkersForWindow(nsPIDOMWindow* aWindow)
+RuntimeService::ThawWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aWindow);
@@ -2265,7 +2265,7 @@ RuntimeService::ThawWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-RuntimeService::SuspendWorkersForWindow(nsPIDOMWindow* aWindow)
+RuntimeService::SuspendWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aWindow);
@@ -2279,7 +2279,7 @@ RuntimeService::SuspendWorkersForWindow(nsPIDOMWindow* aWindow)
 }
 
 void
-RuntimeService::ResumeWorkersForWindow(nsPIDOMWindow* aWindow)
+RuntimeService::ResumeWorkersForWindow(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aWindow);
@@ -2300,7 +2300,7 @@ RuntimeService::CreateSharedWorker(const GlobalObject& aGlobal,
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aGlobal.GetAsSupports());
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aGlobal.GetAsSupports());
   MOZ_ASSERT(window);
 
   JSContext* cx = aGlobal.Context();
@@ -2352,7 +2352,7 @@ RuntimeService::CreateSharedWorkerFromLoadInfo(JSContext* aCx,
   // a Shared/Service worker and the worker script loads and executes before
   // the SharedWorker object itself is created before then WorkerScriptLoaded()
   // will reset the loadInfo's window.
-  nsCOMPtr<nsPIDOMWindow> window = aLoadInfo->mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> window = aLoadInfo->mWindow;
 
   bool created = false;
   ErrorResult rv;

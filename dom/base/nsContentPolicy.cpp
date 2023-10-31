@@ -173,7 +173,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
 
     nsCOMPtr<nsIDOMElement> topFrameElement;
     bool isTopLevel = true;
-    nsCOMPtr<nsPIDOMWindow> window;
+    nsCOMPtr<nsPIDOMWindowOuter> window;
     if (nsCOMPtr<nsINode> node = do_QueryInterface(requestingContext)) {
         window = node->OwnerDoc()->GetWindow();
     } else {
@@ -188,7 +188,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
         MOZ_ASSERT(window->IsOuterWindow());
 
         if (topFrameElement) {
-            nsCOMPtr<nsPIDOMWindow> topWindow = window->GetScriptableTop();
+            nsCOMPtr<nsPIDOMWindowOuter> topWindow = window->GetScriptableTop();
             isTopLevel = topWindow == window;
         } else {
             // If we don't have a top frame element, then requestingContext is

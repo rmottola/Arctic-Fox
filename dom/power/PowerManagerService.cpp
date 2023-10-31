@@ -208,7 +208,7 @@ PowerManagerService::GetWakeLockState(const nsAString &aTopic, nsAString &aState
 
 already_AddRefed<WakeLock>
 PowerManagerService::NewWakeLock(const nsAString& aTopic,
-                                 nsIDOMWindow* aWindow,
+                                 nsPIDOMWindowInner* aWindow,
                                  mozilla::ErrorResult& aRv)
 {
   RefPtr<WakeLock> wakelock = new WakeLock();
@@ -222,11 +222,12 @@ PowerManagerService::NewWakeLock(const nsAString& aTopic,
 
 NS_IMETHODIMP
 PowerManagerService::NewWakeLock(const nsAString &aTopic,
-                                 nsIDOMWindow *aWindow,
+                                 mozIDOMWindow *aWindow,
                                  nsISupports **aWakeLock)
 {
   mozilla::ErrorResult rv;
-  RefPtr<WakeLock> wakelock = NewWakeLock(aTopic, aWindow, rv);
+  RefPtr<WakeLock> wakelock =
+    NewWakeLock(aTopic, nsPIDOMWindowInner::From(aWindow), rv);
   if (rv.Failed()) {
     return rv.StealNSResult();
   }

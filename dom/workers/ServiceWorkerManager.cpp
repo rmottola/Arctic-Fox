@@ -685,7 +685,7 @@ public:
 
 class ServiceWorkerResolveWindowPromiseOnUpdateCallback final : public ServiceWorkerUpdateFinishCallback
 {
-  RefPtr<nsPIDOMWindow> mWindow;
+  RefPtr<nsPIDOMWindowInner> mWindow;
   // The promise "returned" by the call to Update up to
   // navigator.serviceWorker.register().
   RefPtr<Promise> mPromise;
@@ -694,7 +694,8 @@ class ServiceWorkerResolveWindowPromiseOnUpdateCallback final : public ServiceWo
   {}
 
 public:
-  ServiceWorkerResolveWindowPromiseOnUpdateCallback(nsPIDOMWindow* aWindow, Promise* aPromise)
+  ServiceWorkerResolveWindowPromiseOnUpdateCallback(nsPIDOMWindowInner* aWindow,
+                                                    Promise* aPromise)
     : mWindow(aWindow)
     , mPromise(aPromise)
   {}
@@ -1574,18 +1575,18 @@ IsFromAuthenticatedOrigin(nsIDocument* aDoc)
 // If we return an error code here, the ServiceWorkerContainer will
 // automatically reject the Promise.
 NS_IMETHODIMP
-ServiceWorkerManager::Register(nsIDOMWindow* aWindow,
+ServiceWorkerManager::Register(mozIDOMWindow* aWindow,
                                nsIURI* aScopeURI,
                                nsIURI* aScriptURI,
                                nsISupports** aPromise)
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (NS_WARN_IF(!window)) {
+  if (NS_WARN_IF(!aWindow)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
+  auto* window = nsPIDOMWindowInner::From(aWindow);
   nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
   if (!doc) {
     return NS_ERROR_FAILURE;
@@ -1596,7 +1597,7 @@ ServiceWorkerManager::Register(nsIDOMWindow* aWindow,
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
-  nsCOMPtr<nsPIDOMWindow> outerWindow = window->GetOuterWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> outerWindow = window->GetOuterWindow();
   bool serviceWorkersTestingEnabled =
     outerWindow->GetServiceWorkersTestingEnabled();
 
@@ -1833,10 +1834,10 @@ ServiceWorkerRegistrationInfo::Activate()
  */
 class GetRegistrationsRunnable final : public nsRunnable
 {
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
 public:
-  GetRegistrationsRunnable(nsPIDOMWindow* aWindow, Promise* aPromise)
+  GetRegistrationsRunnable(nsPIDOMWindowInner* aWindow, Promise* aPromise)
     : mWindow(aWindow), mPromise(aPromise)
   {}
 
@@ -1911,16 +1912,16 @@ public:
 // If we return an error code here, the ServiceWorkerContainer will
 // automatically reject the Promise.
 NS_IMETHODIMP
-ServiceWorkerManager::GetRegistrations(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetRegistrations(mozIDOMWindow* aWindow,
                                        nsISupports** aPromise)
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (NS_WARN_IF(!window)) {
+  if (NS_WARN_IF(!aWindow)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
+  auto* window = nsPIDOMWindowInner::From(aWindow);
   nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
   if (NS_WARN_IF(!doc)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -1948,12 +1949,12 @@ ServiceWorkerManager::GetRegistrations(nsIDOMWindow* aWindow,
  */
 class GetRegistrationRunnable final : public nsRunnable
 {
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
   nsString mDocumentURL;
 
 public:
-  GetRegistrationRunnable(nsPIDOMWindow* aWindow, Promise* aPromise,
+  GetRegistrationRunnable(nsPIDOMWindowInner* aWindow, Promise* aPromise,
                           const nsAString& aDocumentURL)
     : mWindow(aWindow), mPromise(aPromise), mDocumentURL(aDocumentURL)
   {}
@@ -2015,17 +2016,17 @@ public:
 // If we return an error code here, the ServiceWorkerContainer will
 // automatically reject the Promise.
 NS_IMETHODIMP
-ServiceWorkerManager::GetRegistration(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetRegistration(mozIDOMWindow* aWindow,
                                       const nsAString& aDocumentURL,
                                       nsISupports** aPromise)
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (NS_WARN_IF(!window)) {
+  if (NS_WARN_IF(!aWindow)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
+  auto* window = nsPIDOMWindowInner::From(aWindow);
   nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
   if (NS_WARN_IF(!doc)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
@@ -2050,11 +2051,11 @@ ServiceWorkerManager::GetRegistration(nsIDOMWindow* aWindow,
 
 class GetReadyPromiseRunnable final : public nsRunnable
 {
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
 
 public:
-  GetReadyPromiseRunnable(nsPIDOMWindow* aWindow, Promise* aPromise)
+  GetReadyPromiseRunnable(nsPIDOMWindowInner* aWindow, Promise* aPromise)
     : mWindow(aWindow), mPromise(aPromise)
   {}
 
@@ -2177,15 +2178,16 @@ ServiceWorkerManager::SendNotificationClickEvent(const nsACString& aOriginSuffix
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::GetReadyPromise(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetReadyPromise(mozIDOMWindow* aWindow,
                                       nsISupports** aPromise)
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (NS_WARN_IF(!window)) {
+  if (NS_WARN_IF(!aWindow)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
+
+  auto* window = nsPIDOMWindowInner::From(aWindow);
 
   nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
   if (NS_WARN_IF(!doc)) {
@@ -2212,13 +2214,12 @@ ServiceWorkerManager::GetReadyPromise(nsIDOMWindow* aWindow,
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::RemoveReadyPromise(nsIDOMWindow* aWindow)
+ServiceWorkerManager::RemoveReadyPromise(mozIDOMWindow* aWindow)
 {
   AssertIsOnMainThread();
   MOZ_ASSERT(aWindow);
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (!window) {
+  if (!aWindow) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2227,7 +2228,7 @@ ServiceWorkerManager::RemoveReadyPromise(nsIDOMWindow* aWindow)
 }
 
 void
-ServiceWorkerManager::StorePendingReadyPromise(nsPIDOMWindow* aWindow,
+ServiceWorkerManager::StorePendingReadyPromise(nsPIDOMWindowInner* aWindow,
                                                nsIURI* aURI,
                                                Promise* aPromise)
 {
@@ -2244,7 +2245,7 @@ void
 ServiceWorkerManager::CheckPendingReadyPromises()
 {
   for (auto iter = mPendingReadyPromises.Iter(); !iter.Done(); iter.Next()) {
-    nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(iter.Key());
+    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(iter.Key());
     MOZ_ASSERT(window);
 
     nsAutoPtr<PendingReadyPromise>& pendingReadyPromise = iter.Data();
@@ -2256,7 +2257,7 @@ ServiceWorkerManager::CheckPendingReadyPromises()
 }
 
 bool
-ServiceWorkerManager::CheckReadyPromise(nsPIDOMWindow* aWindow,
+ServiceWorkerManager::CheckReadyPromise(nsPIDOMWindowInner* aWindow,
                                         nsIURI* aURI, Promise* aPromise)
 {
   MOZ_ASSERT(aWindow);
@@ -2900,7 +2901,7 @@ ServiceWorkerManager::StoreRegistration(
 }
 
 already_AddRefed<ServiceWorkerRegistrationInfo>
-ServiceWorkerManager::GetServiceWorkerRegistrationInfo(nsPIDOMWindow* aWindow)
+ServiceWorkerManager::GetServiceWorkerRegistrationInfo(nsPIDOMWindowInner* aWindow)
 {
   MOZ_ASSERT(aWindow);
   nsCOMPtr<nsIDocument> document = aWindow->GetExtantDoc();
@@ -3322,20 +3323,19 @@ ServiceWorkerManager::FireUpdateFoundOnServiceWorkerRegistrations(
 /*
  * This is used for installing, waiting and active.
  */
-NS_IMETHODIMP
-ServiceWorkerManager::GetServiceWorkerForScope(nsIDOMWindow* aWindow,
+nsresult
+ServiceWorkerManager::GetServiceWorkerForScope(nsPIDOMWindowInner* aWindow,
                                                const nsAString& aScope,
                                                WhichServiceWorker aWhichWorker,
                                                nsISupports** aServiceWorker)
 {
   AssertIsOnMainThread();
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  if (NS_WARN_IF(!window)) {
+  if (NS_WARN_IF(!aWindow)) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
 
-  nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
+  nsCOMPtr<nsIDocument> doc = aWindow->GetExtantDoc();
   MOZ_ASSERT(doc);
 
   ///////////////////////////////////////////
@@ -3378,7 +3378,7 @@ ServiceWorkerManager::GetServiceWorkerForScope(nsIDOMWindow* aWindow,
     return NS_ERROR_DOM_NOT_FOUND_ERR;
   }
 
-  RefPtr<ServiceWorker> serviceWorker = new ServiceWorker(window, info);
+  RefPtr<ServiceWorker> serviceWorker = new ServiceWorker(aWindow, info);
 
   serviceWorker->SetState(info->State());
   serviceWorker.forget(aServiceWorker);
@@ -3599,16 +3599,14 @@ ServiceWorkerManager::GetDocumentRegistration(nsIDocument* aDoc,
  * the document was loaded.
  */
 NS_IMETHODIMP
-ServiceWorkerManager::GetDocumentController(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetDocumentController(nsPIDOMWindowInner* aWindow,
                                             nsISupports** aServiceWorker)
 {
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aWindow);
-  MOZ_ASSERT(window);
-  if (!window || !window->GetExtantDoc()) {
+  MOZ_ASSERT(aWindow);
+  nsCOMPtr<nsIDocument> doc = aWindow->GetExtantDoc();
+  if (!doc) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;
   }
-
-  nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
 
   RefPtr<ServiceWorkerRegistrationInfo> registration;
   nsresult rv = GetDocumentRegistration(doc, getter_AddRefs(registration));
@@ -3618,14 +3616,14 @@ ServiceWorkerManager::GetDocumentController(nsIDOMWindow* aWindow,
 
   MOZ_ASSERT(registration->mActiveWorker);
   RefPtr<ServiceWorker> serviceWorker =
-    new ServiceWorker(window, registration->mActiveWorker);
+    new ServiceWorker(aWindow, registration->mActiveWorker);
 
   serviceWorker.forget(aServiceWorker);
   return NS_OK;
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::GetInstalling(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetInstalling(nsPIDOMWindowInner* aWindow,
                                     const nsAString& aScope,
                                     nsISupports** aServiceWorker)
 {
@@ -3635,7 +3633,7 @@ ServiceWorkerManager::GetInstalling(nsIDOMWindow* aWindow,
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::GetWaiting(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetWaiting(nsPIDOMWindowInner* aWindow,
                                  const nsAString& aScope,
                                  nsISupports** aServiceWorker)
 {
@@ -3645,7 +3643,7 @@ ServiceWorkerManager::GetWaiting(nsIDOMWindow* aWindow,
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::GetActive(nsIDOMWindow* aWindow,
+ServiceWorkerManager::GetActive(nsPIDOMWindowInner* aWindow,
                                 const nsAString& aScope,
                                 nsISupports** aServiceWorker)
 {
@@ -3803,20 +3801,13 @@ FireControllerChangeOnDocument(nsIDocument* aDocument)
   AssertIsOnMainThread();
   MOZ_ASSERT(aDocument);
 
-  nsCOMPtr<nsPIDOMWindow> w = aDocument->GetWindow();
+  nsCOMPtr<nsPIDOMWindowInner> w = aDocument->GetInnerWindow();
   if (!w) {
     NS_WARNING("Failed to dispatch controllerchange event");
     return;
   }
 
-  w = w->GetCurrentInnerWindow();
-  if (!w) {
-    NS_WARNING("Failed to dispatch controllerchange event");
-    return;
-  }
-
-  auto* window = static_cast<nsGlobalWindow*>(w.get());
-
+  auto* window = nsGlobalWindow::Cast(w.get());
   ErrorResult result;
   dom::Navigator* navigator = window->GetNavigator(result);
   if (NS_WARN_IF(result.Failed())) {
@@ -4453,7 +4444,7 @@ ServiceWorkerManager::RemoveListener(nsIServiceWorkerManagerListener* aListener)
 }
 
 NS_IMETHODIMP
-ServiceWorkerManager::ShouldReportToWindow(nsIDOMWindow* aWindow,
+ServiceWorkerManager::ShouldReportToWindow(mozIDOMWindowProxy* aWindow,
                                            const nsACString& aScope,
                                            bool* aResult)
 {
@@ -4463,7 +4454,7 @@ ServiceWorkerManager::ShouldReportToWindow(nsIDOMWindow* aWindow,
   *aResult = false;
 
   // Get the inner window ID to compare to our document windows below.
-  nsCOMPtr<nsPIDOMWindow> targetWin = do_QueryInterface(aWindow);
+  nsCOMPtr<nsPIDOMWindowOuter> targetWin = nsPIDOMWindowOuter::From(aWindow);
   if (NS_WARN_IF(!targetWin)) {
     return NS_OK;
   }
@@ -4486,7 +4477,7 @@ ServiceWorkerManager::ShouldReportToWindow(nsIDOMWindow* aWindow,
         continue;
       }
 
-      nsCOMPtr<nsPIDOMWindow> win = doc->GetWindow();
+      nsCOMPtr<nsPIDOMWindowOuter> win = doc->GetWindow();
       if (!win) {
         continue;
       }
@@ -4525,15 +4516,15 @@ ServiceWorkerManager::ShouldReportToWindow(nsIDOMWindow* aWindow,
         continue;
       }
 
-      nsCOMPtr<nsPIDOMWindow> win = nsGlobalWindow::GetInnerWindowWithId(id);
+      nsCOMPtr<nsPIDOMWindowInner> win = nsGlobalWindow::GetInnerWindowWithId(id)->AsInner();
       if (!win) {
         continue;
       }
 
-      win = win->GetScriptableTop();
+      nsCOMPtr<nsPIDOMWindowOuter> outer = win->GetScriptableTop();
 
       // Match.  We should report to this window.
-      if (win && winId == win->WindowID()) {
+      if (outer && winId == outer->WindowID()) {
         *aResult = true;
         return NS_OK;
       }
@@ -4553,7 +4544,7 @@ ServiceWorkerManager::ShouldReportToWindow(nsIDOMWindow* aWindow,
       continue;
     }
 
-    nsCOMPtr<nsPIDOMWindow> win = doc->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> win = doc->GetWindow();
     if (!win) {
       continue;
     }

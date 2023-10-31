@@ -15,6 +15,7 @@
 #include "mozilla/net/WebSocketChannel.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/MessageEvent.h"
+#include "mozilla/dom/MessageEventBinding.h"
 #include "mozilla/dom/nsCSPContext.h"
 #include "mozilla/dom/nsCSPUtils.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -924,7 +925,7 @@ WebSocketImpl::GetInterface(const nsIID& aIID, void** aResult)
       do_GetService(NS_WINDOWWATCHER_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr<nsPIDOMWindow> outerWindow = doc->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> outerWindow = doc->GetWindow();
     return wwatch->GetPrompt(outerWindow, aIID, aResult);
   }
 
@@ -935,7 +936,7 @@ WebSocketImpl::GetInterface(const nsIID& aIID, void** aResult)
 // WebSocket
 ////////////////////////////////////////////////////////////////////////////////
 
-WebSocket::WebSocket(nsPIDOMWindow* aOwnerWindow)
+WebSocket::WebSocket(nsPIDOMWindowInner* aOwnerWindow)
   : DOMEventTargetHelper(aOwnerWindow)
   , mIsMainThread(true)
   , mKeepingAlive(false)
@@ -1028,7 +1029,7 @@ public:
       wp = wp->GetParent();
     }
 
-    nsPIDOMWindow* window = wp->GetWindow();
+    nsPIDOMWindowInner* window = wp->GetWindow();
     if (window) {
       return InitWithWindow(window);
     }
@@ -1037,7 +1038,7 @@ public:
   }
 
 protected:
-  virtual bool InitWithWindow(nsPIDOMWindow* aWindow) = 0;
+  virtual bool InitWithWindow(nsPIDOMWindowInner* aWindow) = 0;
 
   virtual bool InitWindowless(WorkerPrivate* aTopLevelWorkerPrivate) = 0;
 };
@@ -1065,7 +1066,7 @@ public:
   }
 
 protected:
-  virtual bool InitWithWindow(nsPIDOMWindow* aWindow) override
+  virtual bool InitWithWindow(nsPIDOMWindowInner* aWindow) override
   {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(aWindow))) {
@@ -1128,7 +1129,7 @@ public:
   }
 
 protected:
-  virtual bool InitWithWindow(nsPIDOMWindow* aWindow) override
+  virtual bool InitWithWindow(nsPIDOMWindowInner* aWindow) override
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(aWindow);
@@ -1145,20 +1146,15 @@ protected:
       return true;
     }
 
-    if (aWindow->IsOuterWindow()) {
-      aWindow = aWindow->GetCurrentInnerWindow();
-    }
-
-    MOZ_ASSERT(aWindow);
-
     uint64_t windowID = 0;
-    nsCOMPtr<nsPIDOMWindow> topWindow = aWindow->GetScriptableTop();
+    nsCOMPtr<nsPIDOMWindowOuter> topWindow = aWindow->GetScriptableTop();
+    nsCOMPtr<nsPIDOMWindowInner> topInner;
     if (topWindow) {
-      topWindow = topWindow->GetCurrentInnerWindow();
+      topInner = topWindow->GetCurrentInnerWindow();
     }
 
-    if (topWindow) {
-      windowID = topWindow->WindowID();
+    if (topInner) {
+      windowID = topInner->WindowID();
     }
 
     mImpl->AsyncOpen(principal, windowID, mRv);
@@ -1190,7 +1186,7 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
                        ErrorResult& aRv)
 {
   nsCOMPtr<nsIPrincipal> principal;
-  nsCOMPtr<nsPIDOMWindow> ownerWindow;
+  nsCOMPtr<nsPIDOMWindowInner> ownerWindow;
 
   if (NS_IsMainThread()) {
     nsCOMPtr<nsIScriptObjectPrincipal> scriptPrincipal =
@@ -1335,16 +1331,17 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
   if (NS_IsMainThread()) {
     MOZ_ASSERT(principal);
 
-    nsPIDOMWindow* outerWindow = ownerWindow->GetOuterWindow();
+    nsPIDOMWindowOuter* outerWindow = ownerWindow->GetOuterWindow();
 
     uint64_t windowID = 0;
-    nsCOMPtr<nsPIDOMWindow> topWindow = outerWindow->GetScriptableTop();
+    nsCOMPtr<nsPIDOMWindowOuter> topWindow = outerWindow->GetScriptableTop();
+    nsCOMPtr<nsPIDOMWindowInner> topInner;
     if (topWindow) {
-      topWindow = topWindow->GetCurrentInnerWindow();
+      topInner = topWindow->GetCurrentInnerWindow();
     }
 
-    if (topWindow) {
-      windowID = topWindow->WindowID();
+    if (topInner) {
+      windowID = topInner->WindowID();
     }
 
     webSocket->mImpl->AsyncOpen(principal, windowID, aRv);
@@ -1893,11 +1890,9 @@ WebSocket::CreateAndDispatchMessageEvent(JSContext* aCx,
 
   RefPtr<MessageEvent> event = NS_NewDOMMessageEvent(this, nullptr, nullptr);
 
-  rv = event->InitMessageEvent(NS_LITERAL_STRING("message"), false, false,
-                               jsData, mImpl->mUTF16Origin, EmptyString(),
-                               nullptr);
-  NS_ENSURE_SUCCESS(rv, rv);
-
+  event->InitMessageEvent(nullptr, NS_LITERAL_STRING("message"), false, false,
+                          jsData, mImpl->mUTF16Origin, EmptyString(), nullptr,
+                          nullptr);
   event->SetTrusted(true);
 
   return DispatchDOMEvent(nullptr, static_cast<Event*>(event), nullptr,
@@ -2480,7 +2475,7 @@ WebSocketImpl::Observe(nsISupports* aSubject,
     return NS_OK;
   }
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aSubject);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aSubject);
   if (!mWebSocket->GetOwner() || window != mWebSocket->GetOwner()) {
     return NS_OK;
   }
@@ -2654,7 +2649,7 @@ WebSocketImpl::GetLoadGroup(nsILoadGroup** aLoadGroup)
     wp = wp->GetParent();
   }
 
-  nsPIDOMWindow* window = wp->GetWindow();
+  nsPIDOMWindowInner* window = wp->GetWindow();
   if (!window) {
     return NS_OK;
   }

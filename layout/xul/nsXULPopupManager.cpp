@@ -394,7 +394,7 @@ nsXULPopupManager::GetRollupWidget()
 }
 
 void
-nsXULPopupManager::AdjustPopupsOnWindowChange(nsPIDOMWindow* aWindow)
+nsXULPopupManager::AdjustPopupsOnWindowChange(nsPIDOMWindowOuter* aWindow)
 {
   // When the parent window is moved, adjust any child popups. Dismissable
   // menus and panels are expected to roll up when a window is moved, so there
@@ -413,8 +413,7 @@ nsXULPopupManager::AdjustPopupsOnWindowChange(nsPIDOMWindow* aWindow)
       if (popup) {
         nsIDocument* document = popup->GetCurrentDoc();
         if (document) {
-          nsPIDOMWindow* window = document->GetWindow();
-          if (window) {
+          if (nsPIDOMWindowOuter* window = document->GetWindow()) {
             window = window->GetPrivateRoot();
             if (window == aWindow) {
               list.AppendElement(frame);
@@ -826,12 +825,12 @@ CheckCaretDrawingState()
   // document and erase its caret.
   nsIFocusManager* fm = nsFocusManager::GetFocusManager();
   if (fm) {
-    nsCOMPtr<nsIDOMWindow> window;
+    nsCOMPtr<mozIDOMWindowProxy> window;
     fm->GetFocusedWindow(getter_AddRefs(window));
     if (!window)
       return;
 
-    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(window);
+    auto* piWindow = nsPIDOMWindowOuter::From(window);
     MOZ_ASSERT(piWindow);
 
     nsCOMPtr<nsIDocument> focusedDoc = piWindow->GetDoc();
@@ -1678,7 +1677,7 @@ nsXULPopupManager::MayShowPopup(nsMenuPopupFrame* aPopup)
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> rootWin = root->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> rootWin = root->GetWindow();
 
   // chrome shells can always open popups, but other types of shells can only
   // open popups when they are focused and visible
@@ -1688,7 +1687,7 @@ nsXULPopupManager::MayShowPopup(nsMenuPopupFrame* aPopup)
     if (!fm || !rootWin)
       return false;
 
-    nsCOMPtr<nsIDOMWindow> activeWindow;
+    nsCOMPtr<mozIDOMWindowProxy> activeWindow;
     fm->GetActiveWindow(getter_AddRefs(activeWindow));
     if (activeWindow != rootWin)
       return false;
@@ -1710,7 +1709,7 @@ nsXULPopupManager::MayShowPopup(nsMenuPopupFrame* aPopup)
 
 #ifdef XP_MACOSX
   if (rootWin) {
-    nsGlobalWindow *globalWin = static_cast<nsGlobalWindow *>(rootWin.get());
+    auto globalWin = nsGlobalWindow::Cast(rootWin.get());
     if (globalWin->IsInModalState()) {
       return false;
     }

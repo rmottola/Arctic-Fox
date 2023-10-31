@@ -659,7 +659,7 @@ HTMLFormElement::DoSubmit(WidgetEvent* aEvent)
 
   // XXXbz if the script global is that for an sXBL/XBL2 doc, it won't
   // be a window...
-  nsPIDOMWindow *window = OwnerDoc()->GetWindow();
+  nsPIDOMWindowOuter *window = OwnerDoc()->GetWindow();
 
   if (window) {
     mSubmitPopupState = window->GetPopupControlState();
@@ -905,7 +905,7 @@ HTMLFormElement::DoSecureToInsecureSubmitCheck(nsIURI* aActionURL,
     return NS_OK;
   }
 
-  nsCOMPtr<nsPIDOMWindow> window = OwnerDoc()->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> window = OwnerDoc()->GetWindow();
   if (!window) {
     return NS_ERROR_FAILURE;
   }
@@ -1009,7 +1009,7 @@ HTMLFormElement::NotifySubmitObservers(nsIURI* aActionURL,
     // XXXbz what do the submit observers actually want?  The window
     // of the document this is shown in?  Or something else?
     // sXBL/XBL2 issue
-    nsCOMPtr<nsPIDOMWindow> window = OwnerDoc()->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> window = OwnerDoc()->GetWindow();
 
     bool loop = true;
     while (NS_SUCCEEDED(theEnum->HasMoreElements(&loop)) && loop) {
@@ -1019,7 +1019,7 @@ HTMLFormElement::NotifySubmitObservers(nsIURI* aActionURL,
                       do_QueryInterface(inst));
       if (formSubmitObserver) {
         rv = formSubmitObserver->Notify(this,
-                                        window,
+                                        window->GetCurrentInnerWindow(),
                                         aActionURL,
                                         aCancelSubmit);
         NS_ENSURE_SUCCESS(rv, rv);
