@@ -25,7 +25,7 @@ function addDiv(t) {
  */
 function cancelAllAnimationsOnEnd(t) {
   t.add_cleanup(function() {
-    document.timeline.getAnimations().forEach(animation => animation.cancel());
+    document.getAnimations().forEach(animation => animation.cancel());
   });
 }
 
