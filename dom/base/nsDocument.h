@@ -123,6 +123,7 @@ public:
   // need to send some notification itself with the real origin.
   bool mShouldNotifyNewOrigin = true;
 };
+
 } // namespace dom
 } // namespace mozilla
 
