@@ -382,7 +382,7 @@ public:
                                 bool aUseCapture,
                                 const mozilla::dom::Nullable<bool>& aWantsUntrusted,
                                 mozilla::ErrorResult& aRv) override;
-  virtual nsPIDOMWindow* GetOwnerGlobalForBindings() override
+  virtual nsIDOMWindow* GetOwnerGlobalForBindings() override
   {
     if (IsOuterWindow()) {
       return this;
