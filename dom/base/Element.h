@@ -58,6 +58,7 @@ namespace mozilla {
 namespace dom {
   struct ScrollIntoViewOptions;
   struct ScrollToOptions;
+  class UnrestrictedDoubleOrKeyframeAnimationOptions;
 } // namespace dom
 } // namespace mozilla
 
@@ -839,6 +840,12 @@ public:
   virtual void SetUndoScope(bool aUndoScope, ErrorResult& aError)
   {
   }
+
+  already_AddRefed<Animation> Animate(
+    JSContext* aContext,
+    JS::Handle<JSObject*> aFrames,
+    const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
+    ErrorResult& aError);
 
   // Note: GetAnimations will flush style while GetAnimationsUnsorted won't.
   void GetAnimations(nsTArray<RefPtr<Animation>>& aAnimations);
