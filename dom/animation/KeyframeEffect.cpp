@@ -639,21 +639,6 @@ DumpAnimationProperties(nsTArray<AnimationProperty>& aAnimationProperties)
 }
 #endif
 
-/* static */ TimingParams
-KeyframeEffectReadOnly::ConvertKeyframeEffectOptions(
-    const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions)
-{
-  TimingParams timing;
-
-  if (aOptions.IsKeyframeEffectOptions()) {
-    timing = aOptions.GetAsKeyframeEffectOptions();
-  } else {
-    timing.mDuration.SetAsUnrestrictedDouble() =
-      aOptions.GetAsUnrestrictedDouble();
-  }
-  return timing;
-}
-
 /**
  * A property and StyleAnimationValue pair.
  */
@@ -1677,7 +1662,7 @@ KeyframeEffectReadOnly::Constructor(
     const GlobalObject& aGlobal,
     Element* aTarget,
     JS::Handle<JSObject*> aFrames,
-    const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
+    const TimingParams& aTiming,
     ErrorResult& aRv)
 {
   if (!aTarget) {
@@ -1685,8 +1670,6 @@ KeyframeEffectReadOnly::Constructor(
     aRv.Throw(NS_ERROR_DOM_ANIM_NO_TARGET_ERR);
     return nullptr;
   }
-
-  TimingParams timing = ConvertKeyframeEffectOptions(aOptions);
 
   InfallibleTArray<AnimationProperty> animationProperties;
   BuildAnimationPropertyList(aGlobal.Context(), aTarget, aFrames,
@@ -1699,7 +1682,7 @@ KeyframeEffectReadOnly::Constructor(
   RefPtr<KeyframeEffectReadOnly> effect =
     new KeyframeEffectReadOnly(aTarget->OwnerDoc(), aTarget,
                                nsCSSPseudoElements::ePseudo_NotPseudoElement,
-                               timing);
+                               aTiming);
   effect->mProperties = Move(animationProperties);
   return effect.forget();
 }
