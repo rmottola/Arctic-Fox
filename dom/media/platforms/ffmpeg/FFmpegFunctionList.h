@@ -2,14 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// A value of 0 indicates that the entry is located in libavcodec.dll
-// A negative value indicates that the entry is to always be loaded from
-// libavutil.dll, regardless of the version.
-// A positive value indicates that it is to be loaded from libavutil
-// and in that version only.
-#define AV_FUNC_AVCODEC_ALL 0
-#define AV_FUNC_AVUTIL_ALL  (-1)
-
 /* libavcodec */
 AV_FUNC(avcodec_alloc_context3, AV_FUNC_AVCODEC_ALL)
 AV_FUNC(avcodec_close, AV_FUNC_AVCODEC_ALL)
@@ -28,7 +20,8 @@ AV_FUNC(avcodec_get_frame_defaults, (AV_FUNC_53 | AV_FUNC_54))
 AV_FUNC(avcodec_alloc_frame, (AV_FUNC_53 | AV_FUNC_54))
 #endif
 #if LIBAVCODEC_VERSION_MAJOR == 54 || defined(LIBAVCODEC_ALLVERSION)
-AV_FUNC(avcodec_free_frame, AV_FUNC_54)
+AV_FUNC(avcodec_alloc_frame, AV_FUNC_AVUTIL_54)
+AV_FUNC(avcodec_free_frame, AV_FUNC_AVUTIL_54)
 #endif
 
 /* libavutil */

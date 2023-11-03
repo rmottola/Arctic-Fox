@@ -66,10 +66,10 @@ static unsigned (*avcodec_version)() = nullptr;
 
 #ifdef __GNUC__
 #define AV_FUNC(func, ver) void (*func)();
+#define LIBAVCODEC_ALLVERSION
 #else
 #define AV_FUNC(func, ver) decltype(func)* func;
 #endif
-#define LIBAVCODEC_ALLVERSION
 #include "FFmpegFunctionList.h"
 #undef LIBAVCODEC_ALLVERSION
 #undef AV_FUNC
@@ -179,10 +179,10 @@ FFmpegRuntimeLinker::Bind(const char* aLibName)
       return false;
   }
 
-#define LIBAVCODEC_ALLVERSION
+
 #define AV_FUNC(func, ver)                                                     \
-  if (ver <= 0 || ver == major) {                                              \
-    if (!(func = (decltype(func))PR_FindSymbol(ver != 0 ? sLinkedUtilLib : sLinkedLib, #func))) { \
+  if ((ver) & version) {                                                       \
+    if (!(func = (decltype(func))PR_FindSymbol(((ver) & AV_FUNC_AVUTIL_MASK) ? sLinkedUtilLib : sLinkedLib, #func))) { \
       FFMPEG_LOG("Couldn't load function " #func " from %s.", aLibName);       \
       return false;                                                            \
     }                                                                          \
@@ -191,7 +191,6 @@ FFmpegRuntimeLinker::Bind(const char* aLibName)
   }
 #include "FFmpegFunctionList.h"
 #undef AV_FUNC
-#undef LIBAVCODEC_ALLVERSION
   return true;
 }
 
