@@ -20,7 +20,6 @@ AV_FUNC(avcodec_get_frame_defaults, (AV_FUNC_53 | AV_FUNC_54))
 AV_FUNC(avcodec_alloc_frame, (AV_FUNC_53 | AV_FUNC_54))
 #endif
 #if LIBAVCODEC_VERSION_MAJOR == 54 || defined(LIBAVCODEC_ALLVERSION)
-AV_FUNC(avcodec_alloc_frame, AV_FUNC_AVUTIL_54)
 AV_FUNC(avcodec_free_frame, AV_FUNC_AVUTIL_54)
 #endif
 
