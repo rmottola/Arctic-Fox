@@ -540,6 +540,10 @@ pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
 
 
+pref("media.benchmark.vp9.threshold", 150);
+pref("media.benchmark.frames", 300);
+pref("media.benchmark.timeout", 1000);
+
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.recognition.enable", false);
 pref("media.webspeech.synth.enabled", false);
