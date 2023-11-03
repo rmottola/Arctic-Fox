@@ -38,6 +38,7 @@ if CONFIG['MOZ_FFVPX']:
     ]
 
 if CONFIG['MOZ_FFMPEG']:
+    LOCAL_INCLUDES += ['/xpcom/build']
     EXPORTS += [
         'ffmpeg/FFmpegRuntimeLinker.h',
     ]
