@@ -243,4 +243,5 @@ FFmpegRuntimeLinker::GetVersion(uint32_t& aMajor, uint32_t& aMinor, uint32_t& aM
   return version;
 }
 
+#undef LIBAVCODEC_ALLVERSION
 } // namespace mozilla
