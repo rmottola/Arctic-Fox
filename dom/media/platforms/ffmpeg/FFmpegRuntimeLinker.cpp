@@ -13,7 +13,6 @@
 #if defined(XP_WIN)
 #include "libavcodec/avcodec.h"
 #include "libavutil/avutil.h"
-#include "libavutil/imgutils.h"
 #endif
 
 namespace mozilla
