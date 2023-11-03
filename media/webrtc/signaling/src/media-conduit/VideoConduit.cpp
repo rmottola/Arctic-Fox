@@ -21,7 +21,6 @@
 #include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
 #include "webrtc/video_engine/include/vie_errors.h"
 #include "webrtc/video_engine/vie_defines.h"
-#include "browser_logging/WebRtcLog.h"
 
 #ifdef MOZ_WIDGET_ANDROID
 #include "AndroidJNIWrapper.h"
@@ -294,7 +293,6 @@ WebrtcVideoConduit::InitMain()
     }
   }
 
-  EnableWebRtcLog();
 #ifdef MOZ_WIDGET_ANDROID
   // get the JVM
   JavaVM *jvm = jsjni_GetVM();
