@@ -7622,6 +7622,7 @@ nsGlobalWindow::RevisePopupAbuseLevel(PopupControlState aControl)
   case openOverridden:
     if (PopupWhitelisted())
       abuse = PopupControlState(abuse - 1);
+    break;
   case openAllowed: break;
   default:
     NS_WARNING("Strange PopupControlState!");
