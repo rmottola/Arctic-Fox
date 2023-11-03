@@ -28,6 +28,7 @@ struct IsPixel : FalseType {};
 struct CSSPixel;
 struct LayoutDevicePixel;
 struct LayerPixel;
+struct CSSTransformedLayerPixel;
 struct RenderTargetPixel;
 struct ScreenPixel;
 struct ParentLayerPixel;
@@ -36,6 +37,7 @@ struct DesktopPixel;
 template<> struct IsPixel<CSSPixel>          : TrueType {};
 template<> struct IsPixel<LayoutDevicePixel> : TrueType {};
 template<> struct IsPixel<LayerPixel>        : TrueType {};
+template<> struct IsPixel<CSSTransformedLayerPixel> : TrueType {};
 template<> struct IsPixel<RenderTargetPixel> : TrueType {};
 template<> struct IsPixel<ScreenPixel>       : TrueType {};
 template<> struct IsPixel<ParentLayerPixel>  : TrueType {};
@@ -76,6 +78,18 @@ typedef gfx::IntRectTyped<LayerPixel> LayerIntRect;
 typedef gfx::MarginTyped<LayerPixel> LayerMargin;
 typedef gfx::IntMarginTyped<LayerPixel> LayerIntMargin;
 typedef gfx::IntRegionTyped<LayerPixel> LayerIntRegion;
+
+typedef gfx::CoordTyped<CSSTransformedLayerPixel> CSSTransformedLayerCoord;
+typedef gfx::IntCoordTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntCoord;
+typedef gfx::PointTyped<CSSTransformedLayerPixel> CSSTransformedLayerPoint;
+typedef gfx::IntPointTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntPoint;
+typedef gfx::SizeTyped<CSSTransformedLayerPixel> CSSTransformedLayerSize;
+typedef gfx::IntSizeTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntSize;
+typedef gfx::RectTyped<CSSTransformedLayerPixel> CSSTransformedLayerRect;
+typedef gfx::IntRectTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntRect;
+typedef gfx::MarginTyped<CSSTransformedLayerPixel> CSSTransformedLayerMargin;
+typedef gfx::IntMarginTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntMargin;
+typedef gfx::IntRegionTyped<CSSTransformedLayerPixel> CSSTransformedLayerIntRegion;
 
 typedef gfx::PointTyped<RenderTargetPixel> RenderTargetPoint;
 typedef gfx::IntPointTyped<RenderTargetPixel> RenderTargetIntPoint;
@@ -338,6 +352,16 @@ struct LayoutDevicePixel {
  * 4) rasterizing at a different scale in the presence of some CSS transforms
  */
 struct LayerPixel {
+};
+
+/*
+ * This is Layer coordinates with the Layer's CSS transform applied.
+ * It can be thought of as intermediate between LayerPixel and
+ * ParentLayerPixel, as further applying async transforms to this
+ * yields ParentLayerPixels.
+ */
+struct CSSTransformedLayerPixel {
+
 };
 
 /*
