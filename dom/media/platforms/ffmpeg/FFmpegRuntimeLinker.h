@@ -44,7 +44,6 @@ public:
 private:
   static PRLibrary* sLinkedLib;
   static PRLibrary* sLinkedUtilLib;
-  static const char* sLib;
 
   static bool Bind(const char* aLibName);
 
