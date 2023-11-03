@@ -21478,6 +21478,10 @@
         "url": "/web-animations/keyframe-effect/getComputedTiming.html"
       },
       {
+        "path": "web-animations/animation/constructor.html",
+        "url": "/web-animations/animation/constructor.html"
+      },
+      {
         "path": "webdriver/user_input/clear_test.py"
       }
     ]
