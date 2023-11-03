@@ -1363,6 +1363,8 @@ MediaManager::EnumerateRawDevices(uint64_t aWindowId,
                                   bool aFake, bool aFakeTracks)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aVideoType != MediaSourceEnum::Other ||
+             aAudioType != MediaSourceEnum::Other);
   RefPtr<PledgeSourceSet> p = new PledgeSourceSet();
   uint32_t id = mOutstandingPledges.Append(*p);
 
@@ -1388,30 +1390,39 @@ MediaManager::EnumerateRawDevices(uint64_t aWindowId,
                                                  videoLoopDev, aVideoType,
                                                  aAudioType, aFake,
                                                  aFakeTracks]() mutable {
-    RefPtr<MediaEngine> backend;
-    if (aFake) {
-      backend = new MediaEngineDefault(aFakeTracks);
-    } else {
+    // Only enumerate what's asked for, and only fake cams and mics.
+    bool hasVideo = aVideoType != MediaSourceEnum::Other;
+    bool hasAudio = aAudioType != MediaSourceEnum::Other;
+    bool fakeCams = aFake && aVideoType == MediaSourceEnum::Camera;
+    bool fakeMics = aFake && aAudioType == MediaSourceEnum::Microphone;
+
+    RefPtr<MediaEngine> fakeBackend, realBackend;
+    if (fakeCams || fakeMics) {
+      fakeBackend = new MediaEngineDefault(aFakeTracks);
+    }
+    if ((!fakeCams && hasVideo) || (!fakeMics && hasAudio)) {
       RefPtr<MediaManager> manager = MediaManager_GetInstance();
-      backend = manager->GetBackend(aWindowId);
+      realBackend = manager->GetBackend(aWindowId);
     }
 
     ScopedDeletePtr<SourceSet> result(new SourceSet);
 
-    nsTArray<RefPtr<VideoDevice>> videos;
-    GetSources(backend, aVideoType, &MediaEngine::EnumerateVideoDevices, videos,
-               videoLoopDev);
-    for (auto& source : videos) {
-      result->AppendElement(source);
+    if (hasVideo) {
+      nsTArray<RefPtr<VideoDevice>> videos;
+      GetSources(fakeCams? fakeBackend : realBackend, aVideoType,
+                 &MediaEngine::EnumerateVideoDevices, videos, videoLoopDev);
+      for (auto& source : videos) {
+        result->AppendElement(source);
+      }
     }
-
-    nsTArray<RefPtr<AudioDevice>> audios;
-    GetSources(backend, aAudioType,
-               &MediaEngine::EnumerateAudioDevices, audios, audioLoopDev);
-    for (auto& source : audios) {
-      result->AppendElement(source);
+    if (hasAudio) {
+      nsTArray<RefPtr<AudioDevice>> audios;
+      GetSources(fakeMics? fakeBackend : realBackend, aAudioType,
+                 &MediaEngine::EnumerateAudioDevices, audios, audioLoopDev);
+      for (auto& source : audios) {
+        result->AppendElement(source);
+      }
     }
-
     SourceSet* handoff = result.forget();
     NS_DispatchToMainThread(do_AddRef(NewRunnableFrom([id, handoff]() mutable {
       ScopedDeletePtr<SourceSet> result(handoff); // grab result
@@ -1424,7 +1435,7 @@ MediaManager::EnumerateRawDevices(uint64_t aWindowId,
         p->Resolve(result.forget());
       }
       return NS_OK;
-          })));
+    })));
   }));
   return p.forget();
 }
@@ -1832,8 +1843,8 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
     c.mVideo.SetAsBoolean() = false;
   }
 
-  MediaSourceEnum videoType = dom::MediaSourceEnum::Camera;
-  MediaSourceEnum audioType = dom::MediaSourceEnum::Microphone;
+  MediaSourceEnum videoType = dom::MediaSourceEnum::Other; // none
+  MediaSourceEnum audioType = dom::MediaSourceEnum::Other; // none
 
   if (c.mVideo.IsMediaTrackConstraints()) {
     auto& vc = c.mVideo.GetAsMediaTrackConstraints();
@@ -1935,6 +1946,8 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
                  videoType == dom::MediaSourceEnum::Screen)) {
        privileged = false;
     }
+  } else if (IsOn(c.mVideo)) {
+    videoType = dom::MediaSourceEnum::Camera;
   }
 
   if (c.mAudio.IsMediaTrackConstraints()) {
@@ -1989,7 +2002,10 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
         }
       }
     }
+  } else if (IsOn(c.mAudio)) {
+   audioType = dom::MediaSourceEnum::Microphone;
   }
+
   StreamListeners* listeners = AddWindowID(windowID);
 
   // Create a disabled listener to act as a placeholder
@@ -2052,8 +2068,8 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
       (!fake || Preferences::GetBool("media.navigator.permission.fake"));
 
   RefPtr<PledgeSourceSet> p = EnumerateDevicesImpl(windowID, videoType,
-                                                     audioType, fake,
-                                                     fakeTracks);
+                                                   audioType, fake,
+                                                   fakeTracks);
   p->Then([this, onSuccess, onFailure, windowID, c, listener, askPermission,
            prefs, isHTTPS, callID, origin](SourceSet*& aDevices) mutable {
 
@@ -2274,8 +2290,8 @@ MediaManager::EnumerateDevicesImpl(uint64_t aWindowId,
     RefPtr<MediaManager> mgr = MediaManager_GetInstance();
 
     RefPtr<PledgeSourceSet> p = mgr->EnumerateRawDevices(aWindowId,
-                                                           aVideoType, aAudioType,
-                                                           aFake, aFakeTracks);
+                                                         aVideoType, aAudioType,
+                                                         aFake, aFakeTracks);
     p->Then([id, aWindowId, aOriginKey](SourceSet*& aDevices) mutable {
       ScopedDeletePtr<SourceSet> devices(aDevices); // secondary result
 
