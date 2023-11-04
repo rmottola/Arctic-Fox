@@ -2664,14 +2664,13 @@ nsTableFrame::GetUsedMargin() const
   return nsMargin(0, 0, 0, 0);
 }
 
-NS_DECLARE_FRAME_PROPERTY(TableBCProperty, DeleteValue<BCPropertyData>)
+NS_DECLARE_FRAME_PROPERTY_DELETABLE(TableBCProperty, BCPropertyData)
 
 BCPropertyData*
 nsTableFrame::GetBCProperty(bool aCreateIfNecessary) const
 {
   FrameProperties props = Properties();
-  BCPropertyData* value = static_cast<BCPropertyData*>
-                          (props.Get(TableBCProperty()));
+  BCPropertyData* value = props.Get(TableBCProperty());
   if (!value && aCreateIfNecessary) {
     value = new BCPropertyData();
     props.Set(TableBCProperty(), value);
@@ -4302,8 +4301,7 @@ BCMapCellInfo::BCMapCellInfo(nsTableFrame* aTableFrame)
   : mTableFrame(aTableFrame)
   , mNumTableRows(aTableFrame->GetRowCount())
   , mNumTableCols(aTableFrame->GetColCount())
-  , mTableBCData(static_cast<BCPropertyData*>(
-      mTableFrame->Properties().Get(TableBCProperty())))
+  , mTableBCData(mTableFrame->Properties().Get(TableBCProperty()))
   , mTableWM(aTableFrame->StyleContext())
 {
   ResetCellInfo();
