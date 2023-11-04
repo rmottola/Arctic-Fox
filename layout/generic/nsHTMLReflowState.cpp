@@ -2383,7 +2383,7 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
 
 static void
 UpdateProp(FrameProperties& aProps,
-           const FramePropertyDescriptor* aProperty,
+           const FramePropertyDescriptor<>* aProperty,
            bool aNeeded,
            nsMargin& aNewValue)
 {

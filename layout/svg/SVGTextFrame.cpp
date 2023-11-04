@@ -5760,7 +5760,7 @@ SetupInheritablePaint(const DrawTarget* aDrawTarget,
                       gfxTextContextPaint* aOuterContextPaint,
                       SVGTextContextPaint::Paint& aTargetPaint,
                       nsStyleSVGPaint nsStyleSVG::*aFillOrStroke,
-                      const FramePropertyDescriptor* aProperty)
+                      const FramePropertyDescriptor<>* aProperty)
 {
   const nsStyleSVG *style = aFrame->StyleSVG();
   nsSVGPaintServerFrame *ps =
