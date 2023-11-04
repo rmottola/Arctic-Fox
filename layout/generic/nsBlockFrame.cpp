@@ -290,7 +290,7 @@ NS_DECLARE_FRAME_PROPERTY_WITH_DTOR_NEVER_CALLED(OverflowLinesProperty,
 NS_DECLARE_FRAME_PROPERTY_FRAMELIST(OverflowOutOfFlowsProperty)
 NS_DECLARE_FRAME_PROPERTY_FRAMELIST(PushedFloatProperty)
 NS_DECLARE_FRAME_PROPERTY_FRAMELIST(OutsideBulletProperty)
-NS_DECLARE_FRAME_PROPERTY(InsideBulletProperty, nullptr)
+NS_DECLARE_FRAME_PROPERTY_WITHOUT_DTOR(InsideBulletProperty, nsBulletFrame)
 NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BlockEndEdgeOfChildrenProperty, nscoord)
 
 //----------------------------------------------------------------------
@@ -5002,8 +5002,7 @@ nsBlockFrame::GetInsideBullet() const
     return nullptr;
   }
   NS_ASSERTION(!HasOutsideBullet(), "invalid bullet state");
-  nsBulletFrame* frame =
-    static_cast<nsBulletFrame*>(Properties().Get(InsideBulletProperty()));
+  nsBulletFrame* frame = Properties().Get(InsideBulletProperty());
   NS_ASSERTION(frame && frame->GetType() == nsGkAtoms::bulletFrame,
                "bogus inside bullet frame");
   return frame;
@@ -6706,8 +6705,7 @@ nsLineBox* nsBlockFrame::GetFirstLineContaining(nscoord y)
 
   FrameProperties props = Properties();
   
-  nsLineBox* property = static_cast<nsLineBox*>
-    (props.Get(LineCursorProperty()));
+  nsLineBox* property = props.Get(LineCursorProperty());
   line_iterator cursor = mLines.begin(property);
   nsRect cursorArea = cursor->GetVisualOverflowArea();
 
