@@ -464,7 +464,7 @@ nsDOMWindowUtils::SetDisplayPortBaseForElement(int32_t aX,
 NS_IMETHODIMP
 nsDOMWindowUtils::SetResolution(float aResolution)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
@@ -519,7 +519,7 @@ nsDOMWindowUtils::GetIsResolutionSet(bool* aIsResolutionSet) {
 NS_IMETHODIMP
 nsDOMWindowUtils::SetIsFirstPaint(bool aIsFirstPaint)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
@@ -534,7 +534,7 @@ nsDOMWindowUtils::SetIsFirstPaint(bool aIsFirstPaint)
 NS_IMETHODIMP
 nsDOMWindowUtils::GetIsFirstPaint(bool *aIsFirstPaint)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
