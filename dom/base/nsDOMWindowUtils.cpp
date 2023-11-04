@@ -2793,7 +2793,7 @@ nsDOMWindowUtils::EnableDialogs()
 NS_IMETHODIMP
 nsDOMWindowUtils::DisableDialogs()
 {
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
@@ -2807,7 +2807,7 @@ nsDOMWindowUtils::DisableDialogs()
 NS_IMETHODIMP
 nsDOMWindowUtils::AreDialogsEnabled(bool* aResult)
 {
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
@@ -3608,7 +3608,7 @@ NS_IMETHODIMP
 nsDOMWindowUtils::SetHandlingUserInput(bool aHandlingUserInput,
                                        nsIJSRAIIHelper** aHelper)
 {
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (!nsContentUtils::IsCallerChrome()) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
