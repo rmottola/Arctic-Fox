@@ -785,7 +785,7 @@ nsFrame::DidSetStyleContext(nsStyleContext* aOldStyleContext)
 
         imageLoader->DisassociateRequestFromFrame(oldImage.GetImageData(),
                                                   this);
-      }          
+      }
     }
   }
 
@@ -799,7 +799,7 @@ nsFrame::DidSetStyleContext(nsStyleContext* aOldStyleContext)
       }
 
       imageLoader->AssociateRequestToFrame(newImage.GetImageData(), this);
-    }          
+    }
   }
 
   if (aOldStyleContext) {
