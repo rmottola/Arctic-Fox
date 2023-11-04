@@ -175,7 +175,7 @@ public:
    *
    * Points are returned relative to aOriginBounds.
    */
-  static void ComputeObjectAnchorPoint(const nsStyleBackground::Position& aPos,
+  static void ComputeObjectAnchorPoint(const nsStyleImageLayers::Position& aPos,
                                        const nsSize& aOriginBounds,
                                        const nsSize& aImageSize,
                                        nsPoint* aTopLeft,
@@ -542,7 +542,7 @@ struct nsCSSRendering {
   ComputeBackgroundPositioningArea(nsPresContext* aPresContext,
                                    nsIFrame* aForFrame,
                                    const nsRect& aBorderArea,
-                                   const nsStyleBackground::Layer& aLayer,
+                                   const nsStyleImageLayers::Layer& aLayer,
                                    nsIFrame** aAttachedToFrame);
 
   static nsBackgroundLayerState
@@ -551,7 +551,7 @@ struct nsCSSRendering {
                          uint32_t aFlags,
                          const nsRect& aBorderArea,
                          const nsRect& aBGClipRect,
-                         const nsStyleBackground::Layer& aLayer);
+                         const nsStyleImageLayers::Layer& aLayer);
 
   struct BackgroundClipState {
     nsRect mBGClipArea;  // Affected by mClippedRadii
@@ -570,7 +570,7 @@ struct nsCSSRendering {
   };
 
   static void
-  GetBackgroundClip(const nsStyleBackground::Layer& aLayer,
+  GetBackgroundClip(const nsStyleImageLayers::Layer& aLayer,
                     nsIFrame* aForFrame, const nsStyleBorder& aBorder, const nsRect& aBorderArea,
                     const nsRect& aCallerDirtyRect, bool aWillPaintBorder,
                     nscoord aAppUnitsPerPixel,
@@ -634,7 +634,7 @@ struct nsCSSRendering {
                                        nsIFrame* aForFrame,
                                        const nsRect& aBorderArea,
                                        const nsRect& aClipRect,
-                                       const nsStyleBackground::Layer& aLayer,
+                                       const nsStyleImageLayers::Layer& aLayer,
                                        uint32_t aFlags);
 
   /**
