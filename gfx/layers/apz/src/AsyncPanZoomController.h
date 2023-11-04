@@ -174,7 +174,7 @@ public:
    * Return a visual effect that reflects this apzc's
    * overscrolled state, if any.
    */
-  Matrix4x4 GetOverscrollTransform() const;
+  AsyncTransformComponentMatrix GetOverscrollTransform() const;
 
   /**
    * A shadow layer update has arrived. |aLayerMetrics| is the new FrameMetrics
@@ -226,7 +226,7 @@ public:
    * Returns the same transform as GetCurrentAsyncTransform(), but includes
    * any transform due to axis over-scroll.
    */
-  Matrix4x4 GetCurrentAsyncTransformWithOverscroll() const;
+  AsyncTransformComponentMatrix GetCurrentAsyncTransformWithOverscroll() const;
 
   /**
    * Returns the transform to take something from the coordinate space of the
