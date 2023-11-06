@@ -399,8 +399,8 @@ function CopyPassword() {
                   getService(Components.interfaces.nsIClipboardHelper);
   var row = document.getElementById("signonsTree").currentIndex;
   var password = signonsTreeView.getCellText(row, {id : "passwordCol" });
-  clipboard.copyString(password, document);
-  Services.telemetry.getHistogramById("PWMGR_MANAGE_COPIED_USERNAME").add(1);
+  clipboard.copyString(password);
+  Services.telemetry.getHistogramById("PWMGR_MANAGE_COPIED_PASSWORD").add(1);
 }
 
 function CopyUsername() {
@@ -410,6 +410,7 @@ function CopyUsername() {
   var row = document.getElementById("signonsTree").currentIndex;
   var username = signonsTreeView.getCellText(row, {id : "userCol" });
   clipboard.copyString(username);
+  Services.telemetry.getHistogramById("PWMGR_MANAGE_COPIED_USERNAME").add(1);
 }
 
 function UpdateCopyPassword() {
