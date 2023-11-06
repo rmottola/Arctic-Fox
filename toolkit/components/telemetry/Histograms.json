@@ -8405,6 +8405,11 @@
     "kind": "count",
     "description": "Reports the column that logins are sorted by"
   },
+  "PWMGR_MANAGE_VISIBILITY_TOGGLED": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "Whether the visibility of passwords was toggled (0=Hide, 1=Show)"
+  },
   "PWMGR_NUM_PASSWORDS_PER_HOSTNAME": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -8555,6 +8560,11 @@
     "high": "60000",
     "n_buckets": 30,
     "description": "Time PR_Close of a UDP socket taken (ms)"
+  },
+  "PERMISSIONS_SQL_CORRUPTED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the permissions.sqlite init failure"
   },
   "GRAPHICS_DRIVER_STARTUP_TEST": {
     "alert_emails": ["danderson@mozilla.com"],
@@ -8795,11 +8805,6 @@
     "n_values": 20,
     "releaseChannelCollection": "opt-out",
     "description": "Reports why a graphics sanity test was run. 0=First Run, 1=App Updated, 2=Device Change, 3=Driver Change."
-  },
-  "PERMISSIONS_SQL_CORRUPTED": {
-    "expires_in_version": "never",
-    "kind": "count",
-    "description": "Record the permissions.sqlite init failure"
   },
   "DEFECTIVE_PERMISSIONS_SQL_REMOVED": {
     "expires_in_version": "never",
