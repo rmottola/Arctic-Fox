@@ -459,7 +459,7 @@ Sanitizer.prototype = {
     downloads: {
       clear: Task.async(function* (range) {
         let refObj = {};
-	TelemetryStopwatch.start("FX_SANITIZE_DOWNLOADS");
+        TelemetryStopwatch.start("FX_SANITIZE_DOWNLOADS", refObj);
         try {
           let filterByTime = null;
           if (range) {

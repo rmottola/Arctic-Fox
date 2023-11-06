@@ -4501,6 +4501,23 @@ var XULBrowserWindow = {
       setTimeout(function () { XULBrowserWindow.asyncUpdateUI(); }, 0);
     else
       this.asyncUpdateUI();
+
+    if (AppConstants.MOZ_CRASHREPORTER && aLocationURI) {
+      let uri = aLocationURI.clone();
+      try {
+        // If the current URI contains a username/password, remove it.
+        uri.userPass = "";
+      } catch (ex) { /* Ignore failures on about: URIs. */ }
+
+      try {
+        gCrashReporter.annotateCrashReport("URL", uri.spec);
+      } catch (ex) {
+        // Don't make noise when the crash reporter is built but not enabled.
+        if (ex.result != Components.results.NS_ERROR_NOT_INITIALIZED) {
+          throw ex;
+        }
+      }
+    }
   },
 
   asyncUpdateUI: function () {
