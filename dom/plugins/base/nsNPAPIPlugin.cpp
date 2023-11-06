@@ -1832,7 +1832,7 @@ _releasevariantvalue(NPVariant* variant)
         } else {
           void *p = (void *)s->UTF8Characters;
           DWORD nheaps = 0;
-          nsAutoTArray<HANDLE, 50> heaps;
+          AutoTArray<HANDLE, 50> heaps;
           nheaps = GetProcessHeaps(0, heaps.Elements());
           heaps.AppendElements(nheaps);
           GetProcessHeaps(nheaps, heaps.Elements());

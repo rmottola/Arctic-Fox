@@ -3688,7 +3688,7 @@ Selection::AddItem(nsRange* aItem, int32_t* aOutIndex, bool aNoStartSelect)
  */
 #if 0 
   if (mUserInitiated) {
-    nsAutoTArray<RefPtr<nsRange>, 4> rangesToAdd;
+    AutoTArray<RefPtr<nsRange>, 4> rangesToAdd;
     *aOutIndex = -1;
 
     nsIDocument* doc = GetParentObject();

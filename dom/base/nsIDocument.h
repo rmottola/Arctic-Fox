@@ -1846,7 +1846,7 @@ public:
       return mObservers;
     }
   protected:
-    nsAutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;
+    AutoTArray< nsCOMPtr<nsIObserver>, 8 > mObservers;
   };
 
   /**

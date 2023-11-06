@@ -1678,7 +1678,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
 
       if (mPresContext && mPresContext->GetPresShell()) {
         bool tracingStyleFlush = false;
-        nsAutoTArray<nsIPresShell*, 16> observers;
+        AutoTArray<nsIPresShell*, 16> observers;
         observers.AppendElements(mStyleFlushObservers);
         for (uint32_t j = observers.Length();
              j && mPresContext && mPresContext->GetPresShell(); --j) {
@@ -1718,7 +1718,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
     } else if  (i == 1) {
       // This is the Flush_Layout case.
       bool tracingLayoutFlush = false;
-      nsAutoTArray<nsIPresShell*, 16> observers;
+      AutoTArray<nsIPresShell*, 16> observers;
       observers.AppendElements(mLayoutFlushObservers);
       for (uint32_t j = observers.Length();
            j && mPresContext && mPresContext->GetPresShell(); --j) {

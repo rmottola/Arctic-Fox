@@ -166,7 +166,7 @@ nsMenuBarFrame::FindMenuWithShortcut(nsIDOMKeyEvent* aKeyEvent)
   uint32_t charCode;
   aKeyEvent->GetCharCode(&charCode);
 
-  nsAutoTArray<uint32_t, 10> accessKeys;
+  AutoTArray<uint32_t, 10> accessKeys;
   WidgetKeyboardEvent* nativeKeyEvent =
     aKeyEvent->AsEvent()->GetInternalNSEvent()->AsKeyboardEvent();
   if (nativeKeyEvent)

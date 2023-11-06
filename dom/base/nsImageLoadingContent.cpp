@@ -150,7 +150,7 @@ nsImageLoadingContent::Notify(imgIRequest* aRequest,
   {
     // Calling Notify on observers can modify the list of observers so make
     // a local copy.
-    nsAutoTArray<nsCOMPtr<imgINotificationObserver>, 2> observers;
+    AutoTArray<nsCOMPtr<imgINotificationObserver>, 2> observers;
     
     for (ImageObserver* observer = &mObserverList, *next; observer;
          observer = next) {
