@@ -2084,10 +2084,10 @@ void DoTraceSequence(JSTracer* trc, InfallibleTArray<T>& seq);
 namespace binding_detail {
 
 template<typename T>
-class AutoSequence : public AutoFallibleTArray<T, 16>
+class AutoSequence : public AutoTArray<T, 16>
 {
 public:
-  AutoSequence() : AutoFallibleTArray<T, 16>()
+  AutoSequence() : AutoTArray<T, 16>()
   {}
 
   // Allow converting to const sequences as needed

@@ -1037,7 +1037,7 @@ int CALLBACK GDIFontInfo::EnumerateFontsForFamily(
         uint32_t kNAME =
             NativeEndian::swapToBigEndian(TRUETYPE_TAG('n','a','m','e'));
         uint32_t nameSize;
-        AutoFallibleTArray<uint8_t, 1024> nameData;
+        AutoTArray<uint8_t, 1024> nameData;
 
         nameSize = ::GetFontData(hdc, kNAME, 0, nullptr, 0);
         if (nameSize != GDI_ERROR &&
@@ -1080,7 +1080,7 @@ int CALLBACK GDIFontInfo::EnumerateFontsForFamily(
         uint32_t kCMAP =
             NativeEndian::swapToBigEndian(TRUETYPE_TAG('c','m','a','p'));
         uint32_t cmapSize;
-        AutoFallibleTArray<uint8_t, 1024> cmapData;
+        AutoTArray<uint8_t, 1024> cmapData;
 
         cmapSize = ::GetFontData(hdc, kCMAP, 0, nullptr, 0);
         if (cmapSize != GDI_ERROR &&
