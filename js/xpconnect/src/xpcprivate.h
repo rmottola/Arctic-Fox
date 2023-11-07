@@ -2892,7 +2892,7 @@ private:
     JSContext* Pop();
     bool Push(JSContext* cx);
 
-    AutoInfallibleTArray<XPCJSContextInfo, 16> mStack;
+    AutoTArray<XPCJSContextInfo, 16> mStack;
     XPCJSRuntime* mRuntime;
     JSContext*  mSafeJSContext;
 };
