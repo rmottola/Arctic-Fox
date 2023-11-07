@@ -2512,7 +2512,7 @@ Accessible::CacheChildren()
   TreeWalker walker(this, mContent);
 
   Accessible* child = nullptr;
-  while ((child = walker.NextChild()) && AppendChild(child));
+  while ((child = walker.Next()) && AppendChild(child));
 }
 
 void
