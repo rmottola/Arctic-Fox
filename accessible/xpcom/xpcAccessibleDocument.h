@@ -51,6 +51,7 @@ public:
    * Return XPCOM wrapper for the internal accessible.
    */
   xpcAccessibleGeneric* GetAccessible(Accessible* aAccessible);
+  xpcAccessibleGeneric* GetXPCAccessible(ProxyAccessible* aProxy);
 
   virtual void Shutdown() override;
 
@@ -69,8 +70,20 @@ private:
     mCache.Remove(aAccessible);
   }
 
+  void NotifyOfShutdown(ProxyAccessible* aProxy)
+  {
+    MOZ_ASSERT(mRemote);
+    xpcAccessibleGeneric* acc = mCache.GetWeak(aProxy);
+    if (acc) {
+      acc->Shutdown();
+    }
+
+    mCache.Remove(aProxy);
+  }
+
   friend class DocManager;
   friend class DocAccessible;
+  friend class ProxyAccessible;
 
   xpcAccessibleDocument(const xpcAccessibleDocument&) = delete;
   xpcAccessibleDocument& operator =(const xpcAccessibleDocument&) = delete;
