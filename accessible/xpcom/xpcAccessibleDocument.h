@@ -62,7 +62,14 @@ protected:
   virtual ~xpcAccessibleDocument() {}
 
 private:
-  DocAccessible* Intl() { return mIntl.AsAccessible()->AsDoc(); }
+  DocAccessible* Intl()
+  {
+    if (Accessible* acc = mIntl.AsAccessible()) {
+      return acc->AsDoc();
+    }
+
+    return nullptr;
+  }
 
   void NotifyOfShutdown(Accessible* aAccessible)
   {
