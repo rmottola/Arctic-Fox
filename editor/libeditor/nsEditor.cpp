@@ -1479,7 +1479,7 @@ nsEditor::JoinNodes(nsINode& aLeftNode, nsINode& aRightNode)
                             parent->AsDOMNode());
   }
 
-  nsresult result;
+  nsresult result = NS_OK;
   RefPtr<JoinNodeTxn> txn = CreateTxnForJoinNode(aLeftNode, aRightNode);
   if (txn)  {
     result = DoTransaction(txn);
