@@ -2137,12 +2137,12 @@ js::ArrayShiftMoveElements(JSObject* obj)
 
 template <JSValueType Type>
 DenseElementResult
-ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
+ArrayShiftDenseKernel(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
     if (ObjectMayHaveExtraIndexedProperties(obj))
         return DenseElementResult::Incomplete;
 
-    ObjectGroup* group = obj->getGroup(cx);
+    RootedObjectGroup group(cx, obj->getGroup(cx));
     if (MOZ_UNLIKELY(!group))
         return DenseElementResult::Failure;
 
@@ -2153,9 +2153,9 @@ ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
     if (initlen == 0)
         return DenseElementResult::Incomplete;
 
-    *rval = GetBoxedOrUnboxedDenseElement<Type>(obj, 0);
-    if (rval->isMagic(JS_ELEMENTS_HOLE))
-        rval->setUndefined();
+    rval.set(GetBoxedOrUnboxedDenseElement<Type>(obj, 0));
+    if (rval.isMagic(JS_ELEMENTS_HOLE))
+        rval.setUndefined();
 
     DenseElementResult result = MoveBoxedOrUnboxedDenseElements<Type>(cx, obj, 0, 1, initlen - 1);
     MOZ_ASSERT(result != DenseElementResult::Incomplete);
@@ -2167,7 +2167,7 @@ ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
 }
 
 DefineBoxedOrUnboxedFunctor3(ArrayShiftDenseKernel,
-                             JSContext*, JSObject*, Value*);
+                             JSContext*, HandleObject, MutableHandleValue);
 
 /* ES5 15.4.4.9 */
 bool
@@ -2200,7 +2200,7 @@ js::array_shift(JSContext* cx, unsigned argc, Value* vp)
     uint32_t newlen = len - 1;
 
     /* Fast paths. */
-    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval().address());
+    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval());
     DenseElementResult result = CallBoxedOrUnboxedSpecialization(functor, obj);
     if (result != DenseElementResult::Incomplete) {
         if (result == DenseElementResult::Failure)
