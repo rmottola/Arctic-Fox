@@ -25,10 +25,11 @@ class xpcAccessibleDocument : public xpcAccessibleHyperText,
 {
 public:
   explicit xpcAccessibleDocument(DocAccessible* aIntl) :
-    xpcAccessibleHyperText(aIntl), mCache(kDefaultCacheLength) { }
+    xpcAccessibleHyperText(aIntl), mCache(kDefaultCacheLength), mRemote(false) { }
 
   xpcAccessibleDocument(ProxyAccessible* aProxy, uint32_t aInterfaces) :
-    xpcAccessibleHyperText(aProxy, aInterfaces), mCache(kDefaultCacheLength) {}
+    xpcAccessibleHyperText(aProxy, aInterfaces), mCache(kDefaultCacheLength),
+    mRemote(true) {}
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(xpcAccessibleDocument,
@@ -73,6 +74,7 @@ private:
 
   void NotifyOfShutdown(Accessible* aAccessible)
   {
+    MOZ_ASSERT(!mRemote);
     xpcAccessibleGeneric* xpcAcc = mCache.GetWeak(aAccessible);
     if (xpcAcc)
       xpcAcc->Shutdown();
@@ -99,6 +101,7 @@ private:
   xpcAccessibleDocument& operator =(const xpcAccessibleDocument&) = delete;
 
   nsRefPtrHashtable<nsPtrHashKey<const void>, xpcAccessibleGeneric> mCache;
+  bool mRemote;
 };
 
 inline xpcAccessibleGeneric*
