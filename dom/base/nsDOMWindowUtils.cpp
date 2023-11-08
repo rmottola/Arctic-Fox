@@ -2255,8 +2255,13 @@ ComputeAnimationValue(nsCSSProperty aProperty,
                       StyleAnimationValue& aOutput)
 {
 
-  if (!StyleAnimationValue::ComputeValue(aProperty, aElement, aInput,
-                                         false, aOutput)) {
+  if (!StyleAnimationValue::ComputeValue(
+        aProperty,
+        aElement,
+        nsCSSPseudoElements::ePseudo_NotPseudoElement,
+        aInput,
+        false,
+        aOutput)) {
     return false;
   }
 
