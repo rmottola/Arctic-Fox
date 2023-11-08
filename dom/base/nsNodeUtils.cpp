@@ -367,7 +367,8 @@ nsNodeUtils::LastRelease(nsINode* aNode)
     // attached
     if (aNode->HasFlag(NODE_FORCE_XBL_BINDINGS) &&
         ownerDoc->BindingManager()) {
-      ownerDoc->BindingManager()->RemovedFromDocument(elem, ownerDoc);
+      ownerDoc->BindingManager()->RemovedFromDocument(elem, ownerDoc,
+                                                      nsBindingManager::eRunDtor);
     }
   }
 
