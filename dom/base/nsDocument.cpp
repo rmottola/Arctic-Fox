@@ -5034,7 +5034,7 @@ nsDocument::DispatchContentLoadedEvents()
         // the ancestor document if we used the normal event
         // dispatching code.
 
-        WidgetEvent* innerEvent = event->GetInternalNSEvent();
+        WidgetEvent* innerEvent = event->WidgetEventPtr();
         if (innerEvent) {
           nsEventStatus status = nsEventStatus_eIgnore;
 
@@ -8052,7 +8052,7 @@ nsIDocument::CreateEvent(const nsAString& aEventType, ErrorResult& rv) const
     rv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return nullptr;
   }
-  WidgetEvent* e = ev->GetInternalNSEvent();
+  WidgetEvent* e = ev->WidgetEventPtr();
   e->mFlags.mBubbles = false;
   e->mFlags.mCancelable = false;
   return ev.forget();
@@ -9127,7 +9127,7 @@ DispatchCustomEventWithFlush(nsINode* aTarget, const nsAString& aEventType,
   event->InitEvent(aEventType, aBubbles, false);
   event->SetTrusted(true);
   if (aOnlyChromeDispatch) {
-    event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+    event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
   }
   if (nsIPresShell* shell = aTarget->OwnerDoc()->GetShell()) {
     shell->GetPresContext()->

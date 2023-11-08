@@ -968,7 +968,7 @@ nsSliderFrame::StartDrag(nsIDOMEvent* aEvent)
                             nsGkAtoms::_true, eCaseMatters))
     return NS_OK;
 
-  WidgetGUIEvent* event = aEvent->GetInternalNSEvent()->AsGUIEvent();
+  WidgetGUIEvent* event = aEvent->WidgetEventPtr()->AsGUIEvent();
 
   if (!ShouldScrollForEvent(event)) {
     return NS_OK;

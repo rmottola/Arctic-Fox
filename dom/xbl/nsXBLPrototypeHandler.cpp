@@ -921,7 +921,7 @@ nsXBLPrototypeHandler::ModifiersMatchMask(
                          nsIDOMUIEvent* aEvent,
                          const IgnoreModifierState& aIgnoreModifierState)
 {
-  WidgetInputEvent* inputEvent = aEvent->AsEvent()->GetInternalNSEvent()->AsInputEvent();
+  WidgetInputEvent* inputEvent = aEvent->AsEvent()->WidgetEventPtr()->AsInputEvent();
   NS_ENSURE_TRUE(inputEvent, false);
 
   if (mKeyMask & cMetaMask) {
