@@ -900,7 +900,7 @@ def getAllTypes(descriptors, dictionaries, callbacks):
 def iteratorNativeType(descriptor):
     assert descriptor.interface.isIterable()
     iterableDecl = descriptor.interface.maplikeOrSetlikeOrIterable
-    if iterableDecl.valueType is None:
+    if iterableDecl.isValueIterator():
         iterClass = "OneTypeIterableIterator"
     else:
         iterClass = "TwoTypeIterableIterator"
