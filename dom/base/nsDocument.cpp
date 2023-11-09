@@ -10953,12 +10953,12 @@ nsDocument::SetFullscreenRoot(nsIDocument* aRoot)
 NS_IMETHODIMP
 nsDocument::MozCancelFullScreen()
 {
-  nsIDocument::MozCancelFullScreen();
+  nsIDocument::ExitFullscreen();
   return NS_OK;
 }
 
 void
-nsIDocument::MozCancelFullScreen()
+nsIDocument::ExitFullscreen()
 {
   RestorePreviousFullScreenState();
 }
@@ -11248,7 +11248,7 @@ nsDocument::RestorePreviousFullScreenState()
 bool
 nsDocument::IsFullScreenDoc()
 {
-  return GetFullScreenElement() != nullptr;
+  return GetFullscreenElement() != nullptr;
 }
 
 class nsCallRequestFullScreen : public nsRunnable
@@ -11351,7 +11351,7 @@ nsDocument::FullScreenStackPush(Element* aElement)
   }
   EventStateManager::SetFullScreenState(aElement, true);
   mFullScreenStack.AppendElement(do_GetWeakReference(aElement));
-  NS_ASSERTION(GetFullScreenElement() == aElement, "Should match");
+  NS_ASSERTION(GetFullscreenElement() == aElement, "Should match");
   UpdateViewportScrollbarOverrideForFullscreen(this);
   return true;
 }
@@ -11490,7 +11490,7 @@ nsDocument::FullscreenElementReadyCheck(Element* aElement,
 {
   NS_ASSERTION(aElement,
     "Must pass non-null element to nsDocument::RequestFullScreen");
-  if (!aElement || aElement == GetFullScreenElement()) {
+  if (!aElement || aElement == GetFullscreenElement()) {
     return false;
   }
   if (!aElement->IsInDoc()) {
@@ -11509,8 +11509,8 @@ nsDocument::FullscreenElementReadyCheck(Element* aElement,
     // IsFullScreenEnabled calls LogFullScreenDenied, no need to log.
     return false;
   }
-  if (GetFullScreenElement() &&
-      !nsContentUtils::ContentIsDescendantOf(aElement, GetFullScreenElement())) {
+  if (GetFullscreenElement() &&
+      !nsContentUtils::ContentIsDescendantOf(aElement, GetFullscreenElement())) {
     // If this document is full-screen, only grant full-screen requests from
     // a descendant of the current full-screen element.
     LogFullScreenDenied(true, "FullScreenDeniedNotDescendant", this);
@@ -11881,14 +11881,14 @@ nsDocument::ApplyFullscreen(const FullscreenRequest& aRequest)
 NS_IMETHODIMP
 nsDocument::GetMozFullScreenElement(nsIDOMElement **aFullScreenElement)
 {
-  Element* el = GetMozFullScreenElement();
+  Element* el = GetFullscreenElement();
   nsCOMPtr<nsIDOMElement> retval = do_QueryInterface(el);
   retval.forget(aFullScreenElement);
   return NS_OK;
 }
 
 Element*
-nsDocument::GetFullScreenElement()
+nsDocument::GetFullscreenElement()
 {
   Element* element = FullScreenStackTop();
   NS_ASSERTION(!element ||
@@ -11908,12 +11908,12 @@ NS_IMETHODIMP
 nsDocument::GetMozFullScreenEnabled(bool *aFullScreen)
 {
   NS_ENSURE_ARG_POINTER(aFullScreen);
-  *aFullScreen = MozFullScreenEnabled();
+  *aFullScreen = FullscreenEnabled();
   return NS_OK;
 }
 
 bool
-nsDocument::MozFullScreenEnabled()
+nsDocument::FullscreenEnabled()
 {
   return IsFullScreenEnabled(nsContentUtils::IsCallerChrome(), false);
 }
