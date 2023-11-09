@@ -626,7 +626,7 @@ TextureClient::TextureClientRecycleCallback(TextureClient* aClient, void* aClosu
 }
 
 void
-TextureClient::SetRecycleAllocator(TextureClientRecycleAllocator* aAllocator)
+TextureClient::SetRecycleAllocator(ITextureClientRecycleAllocator* aAllocator)
 {
   mRecycleAllocator = aAllocator;
   if (aAllocator) {
