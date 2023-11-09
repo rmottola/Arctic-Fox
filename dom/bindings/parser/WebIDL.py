@@ -6596,7 +6596,7 @@ class Parser(Tokenizer):
                 if isinstance(m, IDLIterable):
                     iterable = m
                     break
-            if iterable:
+            if iterable and iterable.isPairIterator():
                 def simpleExtendedAttr(str):
                     return IDLExtendedAttribute(iface.location, (str, ))
                 nextMethod = IDLMethod(
