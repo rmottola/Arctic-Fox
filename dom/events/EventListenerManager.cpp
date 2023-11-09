@@ -1128,7 +1128,14 @@ EventListenerManager::GetLegacyEventMessage(EventMessage aEventMessage) const
     }
   }
 
-  return aEventMessage;
+  switch (aEventMessage) {
+    case eFullscreenChange:
+      return eMozFullscreenChange;
+    case eFullscreenError:
+      return eMozFullscreenError;
+    default:
+      return aEventMessage;
+  }
 }
 
 nsIDocShell*
