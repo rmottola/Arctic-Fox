@@ -315,6 +315,9 @@ var AboutReaderListener = {
   },
 
   get isAboutReader() {
+    if (!content) {
+      return false;
+    }
     return content.document.documentURI.startsWith("about:reader");
   },
 
