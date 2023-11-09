@@ -1229,6 +1229,12 @@ public:
    */
   static bool HandlePendingFullscreenRequests(nsIDocument* aDocument);
 
+  /**
+   * Dispatch fullscreenerror event and report the failure message to
+   * the console.
+   */
+  void DispatchFullscreenError(const char* aMessage);
+
   virtual void RequestPointerLock(Element* aElement) = 0;
 
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
