@@ -14,13 +14,21 @@ EXTRA_COMPONENTS += [
 ]
 
 EXTRA_JS_MODULES['services-common'] += [
-    'hawkclient.js',
-    'hawkrequest.js',
     'logmanager.js',
     'stringbundle.js',
-    'tokenserverclient.js',
     'utils.js',
 ]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android':
+    EXTRA_JS_MODULES['services-common'] += [
+        'hawkclient.js',
+        'hawkrequest.js',
+        'tokenserverclient.js',
+    ]
+
+    TESTING_JS_MODULES.services.common += [
+        'modules-testing/storageserver.js',
+    ]
 
 EXTRA_PP_JS_MODULES['services-common'] += [
     'async.js',
