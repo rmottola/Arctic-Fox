@@ -2747,6 +2747,7 @@ WorkerMain(void* arg)
 
     sr->isWorker = true;
     JS_SetRuntimePrivate(rt, sr.get());
+    JS_SetFutexCanWait(rt);
     JS_SetErrorReporter(rt, my_ErrorReporter);
     SetWorkerRuntimeOptions(rt);
 
@@ -6905,6 +6906,8 @@ main(int argc, char** argv, char** envp)
         return 1;
 
     JS_SetRuntimePrivate(rt, sr.get());
+    // Waiting is allowed on the shell's main thread, for now.
+    JS_SetFutexCanWait(rt);
     JS_SetErrorReporter(rt, my_ErrorReporter);
     JS::SetOutOfMemoryCallback(rt, my_OOMCallback, nullptr);
     if (!SetRuntimeOptions(rt, op))
