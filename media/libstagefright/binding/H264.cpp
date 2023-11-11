@@ -492,12 +492,16 @@ H264::DecodeSPSFromExtraData(const mozilla::MediaByteBuffer* aExtraData, SPSData
     return false;
   }
 
+  reader.DiscardRemaining();
+
   RefPtr<mozilla::MediaByteBuffer> rawNAL = new mozilla::MediaByteBuffer;
   rawNAL->AppendElements(ptr, length);
 
   RefPtr<mozilla::MediaByteBuffer> sps = DecodeNALUnit(rawNAL);
 
-  reader.DiscardRemaining();
+  if (!sps) {
+    return false;
+  }
 
   return DecodeSPS(sps, aDest);
 }
