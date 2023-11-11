@@ -332,7 +332,7 @@ avutil_license
 avutil_version
 #ifdef XP_WIN
 avpriv_emms_yasm
+#ifdef MSVC_2013_OR_LOWER
 avpriv_snprintf
 avpriv_strtod
-avpriv_vsnprintf
 #endif
