@@ -311,16 +311,16 @@ protected:
 
 public:
   virtual void Initialize(DeviceStorageRequestManager* aManager,
-                          DeviceStorageFile* aFile,
+                          already_AddRefed<DeviceStorageFile>&& aFile,
                           uint32_t aRequest);
 
   virtual void Initialize(DeviceStorageRequestManager* aManager,
-                          DeviceStorageFile* aFile,
+                          already_AddRefed<DeviceStorageFile>&& aFile,
                           uint32_t aRequest,
                           mozilla::dom::BlobImpl* aBlob);
 
   virtual void Initialize(DeviceStorageRequestManager* aManager,
-                          DeviceStorageFile* aFile,
+                          already_AddRefed<DeviceStorageFile>&& aFile,
                           uint32_t aRequest,
                           DeviceStorageFileDescriptor* aDSFileDescriptor);
 
@@ -411,7 +411,7 @@ public:
   using DeviceStorageRequest::Initialize;
 
   virtual void Initialize(DeviceStorageRequestManager* aManager,
-                          DeviceStorageFile* aFile,
+                          already_AddRefed<DeviceStorageFile>&& aFile,
                           uint32_t aRequest,
                           PRTime aSince);
 

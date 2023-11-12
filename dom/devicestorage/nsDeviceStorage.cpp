@@ -1534,7 +1534,7 @@ DeviceStorageRequest::~DeviceStorageRequest()
 
 void
 DeviceStorageRequest::Initialize(DeviceStorageRequestManager* aManager,
-                                 DeviceStorageFile* aFile,
+                                 already_AddRefed<DeviceStorageFile>&& aFile,
                                  uint32_t aId)
 {
   DS_LOG_DEBUG("%p manages %p", aManager, this);
@@ -1548,11 +1548,11 @@ DeviceStorageRequest::Initialize(DeviceStorageRequestManager* aManager,
 
 void
 DeviceStorageRequest::Initialize(DeviceStorageRequestManager* aManager,
-                                 DeviceStorageFile* aFile,
+                                 already_AddRefed<DeviceStorageFile>&& aFile,
                                  uint32_t aRequest,
                                  BlobImpl* aBlob)
 {
-  Initialize(aManager, aFile, aRequest);
+  Initialize(aManager, Move(aFile), aRequest);
   mBlob = aBlob;
   mCheckBlob = true;
   mCheckFile = true;
@@ -1561,11 +1561,11 @@ DeviceStorageRequest::Initialize(DeviceStorageRequestManager* aManager,
 
 void
 DeviceStorageRequest::Initialize(DeviceStorageRequestManager* aManager,
-                                 DeviceStorageFile* aFile,
+                                 already_AddRefed<DeviceStorageFile>&& aFile,
                                  uint32_t aRequest,
                                  DeviceStorageFileDescriptor* aDSFileDescriptor)
 {
-  Initialize(aManager, aFile, aRequest);
+  Initialize(aManager, Move(aFile), aRequest);
   mDSFileDescriptor = aDSFileDescriptor;
   MOZ_ASSERT(mDSFileDescriptor);
 }
@@ -1736,11 +1736,11 @@ DeviceStorageCursorRequest::DeviceStorageCursorRequest()
 
 void
 DeviceStorageCursorRequest::Initialize(DeviceStorageRequestManager* aManager,
-                                       DeviceStorageFile* aFile,
+                                       already_AddRefed<DeviceStorageFile>&& aFile,
                                        uint32_t aRequest,
                                        PRTime aSince)
 {
-  Initialize(aManager, aFile, aRequest);
+  Initialize(aManager, Move(aFile), aRequest);
   mStorageType = mFile->mStorageType;
   mSince = aSince;
 }
@@ -1943,11 +1943,11 @@ public:
   }
 
   void Initialize(DeviceStorageRequestManager* aManager,
-                  DeviceStorageFile* aFile,
+                  already_AddRefed<DeviceStorageFile>&& aFile,
                   uint32_t aRequest) override
   {
-    DeviceStorageRequest::Initialize(aManager, aFile, aRequest);
-    mUseMainThread = aFile->mPath.IsEmpty();
+    DeviceStorageRequest::Initialize(aManager, Move(aFile), aRequest);
+    mUseMainThread = mFile->mPath.IsEmpty();
   }
 
 protected:
@@ -2087,10 +2087,10 @@ public:
   }
 
   void Initialize(DeviceStorageRequestManager* aManager,
-                  DeviceStorageFile* aFile,
+                  already_AddRefed<DeviceStorageFile>&& aFile,
                   uint32_t aRequest) override
   {
-    DeviceStorageRequest::Initialize(aManager, aFile, aRequest);
+    DeviceStorageRequest::Initialize(aManager, Move(aFile), aRequest);
     mAccess = mFile->mEditable ? DEVICE_STORAGE_ACCESS_WRITE
                                : DEVICE_STORAGE_ACCESS_READ;
   }
@@ -3114,7 +3114,7 @@ nsDOMDeviceStorage::AddOrAppendNamed(Blob* aBlob, const nsAString& aPath,
   } else {
     request = new DeviceStorageAppendRequest();
   }
-  request->Initialize(mManager, dsf, id, aBlob->Impl());
+  request->Initialize(mManager, dsf.forget(), id, aBlob->Impl());
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
 }
@@ -3149,7 +3149,7 @@ nsDOMDeviceStorage::GetInternal(const nsAString& aPath, bool aEditable,
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageOpenRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3183,7 +3183,7 @@ nsDOMDeviceStorage::Delete(const nsAString& aPath, ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageDeleteRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3204,7 +3204,7 @@ nsDOMDeviceStorage::FreeSpace(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageFreeSpaceRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3229,7 +3229,7 @@ nsDOMDeviceStorage::UsedSpace(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageUsedSpaceRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3250,7 +3250,7 @@ nsDOMDeviceStorage::Available(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageAvailableRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3271,7 +3271,7 @@ nsDOMDeviceStorage::StorageStatus(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageStatusRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3292,7 +3292,7 @@ nsDOMDeviceStorage::Format(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageFormatRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3313,7 +3313,7 @@ nsDOMDeviceStorage::Mount(ErrorResult& aRv)
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageMountRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3335,7 +3335,7 @@ nsDOMDeviceStorage::Unmount(ErrorResult& aRv)
 
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageUnmountRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3383,7 +3383,7 @@ nsDOMDeviceStorage::CreateFileDescriptor(const nsAString& aPath,
   }
 
   RefPtr<DeviceStorageRequest> request = new DeviceStorageCreateFdRequest();
-  request->Initialize(mManager, dsf, id, aDSFileDescriptor);
+  request->Initialize(mManager, dsf.forget(), id, aDSFileDescriptor);
 
   aRv = CheckPermission(request.forget());
   return domRequest.forget();
@@ -3490,7 +3490,7 @@ nsDOMDeviceStorage::EnumerateInternal(const nsAString& aPath,
   if (!dsf->IsSafePath()) {
     aRv = mManager->Reject(id, POST_ERROR_EVENT_PERMISSION_DENIED);
   } else {
-    request->Initialize(mManager, dsf, id, since);
+    request->Initialize(mManager, dsf.forget(), id, since);
     aRv = CheckPermission(request.forget());
   }
 
@@ -3693,7 +3693,7 @@ nsDOMDeviceStorage::EventListenerWasAdded(const nsAString& aType,
   RefPtr<DeviceStorageFile> dsf = new DeviceStorageFile(mStorageType,
                                                           mStorageName);
   RefPtr<DeviceStorageRequest> request = new DeviceStorageWatchRequest();
-  request->Initialize(mManager, dsf, id);
+  request->Initialize(mManager, dsf.forget(), id);
   aRv = CheckPermission(request.forget());
 }
 
