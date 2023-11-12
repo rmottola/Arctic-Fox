@@ -244,7 +244,7 @@ public:
   DeviceStorageRequestManager();
 
   bool IsOwningThread();
-  nsresult DispatchToOwningThread(nsIRunnable* aRunnable);
+  nsresult DispatchToOwningThread(already_AddRefed<nsIRunnable>&& aRunnable);
 
   void StorePermission(size_t aAccess, bool aAllow);
   uint32_t CheckPermission(size_t aAccess);
@@ -289,7 +289,8 @@ private:
   uint32_t CreateInternal(mozilla::dom::DOMRequest* aRequest, bool aCursor);
   nsresult ResolveInternal(ListIndex aIndex, JS::HandleValue aResult);
   nsresult RejectInternal(ListIndex aIndex, const nsString& aReason);
-  nsresult DispatchOrAbandon(uint32_t aId, nsIRunnable* aRunnable);
+  nsresult DispatchOrAbandon(uint32_t aId,
+                             already_AddRefed<nsIRunnable>&& aRunnable);
   ListType::index_type Find(uint32_t aId);
 
   nsCOMPtr<nsIThread> mOwningThread;
