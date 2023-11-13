@@ -3840,7 +3840,7 @@ nsComputedDOMStyle::DoGetWindowDragging()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleUserInterface()->mWindowDragging,
+    nsCSSProps::ValueToKeywordEnum(StyleUIReset()->mWindowDragging,
                                    nsCSSProps::kWindowDraggingKTable));
   return val.forget();
 }
