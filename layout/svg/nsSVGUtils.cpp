@@ -661,7 +661,7 @@ nsSVGUtils::PaintFrameWithEffects(nsIFrame *aFrame,
    */
   if (clipPathFrame && isTrivialClip) {
     aContext.Save();
-    clipPathFrame->ApplyClipOrPaintClipMask(aContext, aFrame, aTransform);
+    clipPathFrame->ApplyClipPath(aContext, aFrame, aTransform);
   }
 
   /* Paint the child */
