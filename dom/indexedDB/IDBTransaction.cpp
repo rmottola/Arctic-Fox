@@ -859,7 +859,7 @@ IDBTransaction::GetError() const
 }
 
 already_AddRefed<DOMStringList>
-IDBTransaction::ObjectStoreNames()
+IDBTransaction::ObjectStoreNames() const
 {
   AssertIsOnOwningThread();
 
