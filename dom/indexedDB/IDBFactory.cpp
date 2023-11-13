@@ -43,7 +43,6 @@
 
 namespace mozilla {
 namespace dom {
-namespace indexedDB {
 
 using namespace mozilla::dom::quota;
 using namespace mozilla::ipc;
@@ -953,6 +952,5 @@ IDBFactory::BackgroundCreateCallback::ActorFailed()
   factory->BackgroundActorFailed();
 }
 
-} // namespace indexedDB
 } // namespace dom
 } // namespace mozilla
