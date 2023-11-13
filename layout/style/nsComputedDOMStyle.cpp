@@ -6040,10 +6040,11 @@ nsComputedDOMStyle::DoGetMask()
 
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
-  if (svg->mMask)
-    val->SetURI(svg->mMask);
-  else
+  if (firstLayer.mSourceURI) {
+    val->SetURI(firstLayer.mSourceURI);
+  } else {
     val->SetIdent(eCSSKeyword_none);
+  }
 
   return val.forget();
 }
