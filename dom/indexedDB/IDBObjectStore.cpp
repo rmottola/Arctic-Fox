@@ -1864,13 +1864,15 @@ IDBObjectStore::CreateIndexInternal(
 {
   AssertIsOnOwningThread();
 
-  IDBTransaction* transaction = IDBTransaction::GetCurrent();
-
-  if (!transaction ||
-      transaction != mTransaction ||
-      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
+  if (mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
       mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return nullptr;
+  }
+
+  IDBTransaction* transaction = IDBTransaction::GetCurrent();
+  if (!transaction || transaction != mTransaction) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
   }
 
@@ -1959,13 +1961,15 @@ IDBObjectStore::DeleteIndex(const nsAString& aName, ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
-  IDBTransaction* transaction = IDBTransaction::GetCurrent();
-
-  if (!transaction ||
-      transaction != mTransaction ||
-      mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
+  if (mTransaction->GetMode() != IDBTransaction::VERSION_CHANGE ||
       mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
+    return;
+  }
+
+  IDBTransaction* transaction = IDBTransaction::GetCurrent();
+  if (!transaction || transaction != mTransaction) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return;
   }
 

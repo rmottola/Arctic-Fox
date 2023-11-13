@@ -466,7 +466,6 @@ IDBDatabase::CreateObjectStore(
   AssertIsOnOwningThread();
 
   IDBTransaction* transaction = IDBTransaction::GetCurrent();
-
   if (!transaction ||
       transaction->Database() != this ||
       transaction->GetMode() != IDBTransaction::VERSION_CHANGE) {
@@ -474,7 +473,10 @@ IDBDatabase::CreateObjectStore(
     return nullptr;
   }
 
-  MOZ_ASSERT(transaction->IsOpen());
+  if (!transaction->IsOpen()) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
+    return nullptr;
+  }
 
   KeyPath keyPath(0);
   if (NS_FAILED(KeyPath::Parse(aOptionalParameters.mKeyPath, &keyPath))) {
@@ -542,7 +544,6 @@ IDBDatabase::DeleteObjectStore(const nsAString& aName, ErrorResult& aRv)
   AssertIsOnOwningThread();
 
   IDBTransaction* transaction = IDBTransaction::GetCurrent();
-
   if (!transaction ||
       transaction->Database() != this ||
       transaction->GetMode() != IDBTransaction::VERSION_CHANGE) {
@@ -550,7 +551,10 @@ IDBDatabase::DeleteObjectStore(const nsAString& aName, ErrorResult& aRv)
     return;
   }
 
-  MOZ_ASSERT(transaction->IsOpen());
+  if (!transaction->IsOpen()) {
+    aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
+    return;
+  }
 
   nsTArray<ObjectStoreSpec>& specArray = mSpec->objectStores();
 
