@@ -150,7 +150,6 @@ toolbar[printpreview="true"] {
   visibility: collapse;
 }
 
-#wrapper-urlbar-container #urlbar-container > #urlbar > toolbarbutton,
 #urlbar-container:not([combined]) > #urlbar > toolbarbutton,
 #urlbar-container[combined] + #reload-button + #stop-button,
 #urlbar-container[combined] + #reload-button,
