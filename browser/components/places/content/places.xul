@@ -53,6 +53,7 @@
     <stringbundle id="brandStrings" src="chrome://branding/locale/brand.properties"/>
   </stringbundleset>
 
+
 #ifdef XP_MACOSX
 #include ../../../base/content/browserMountPoints.inc
 #else
@@ -83,6 +84,7 @@
     <command id="OrganizerCommand:Forward"
              oncommand="PlacesOrganizer.forward();"/>
   </commandset>
+
 
   <keyset id="placesOrganizerKeyset">
     <!-- Instantiation Keys -->
@@ -357,38 +359,6 @@
     </tree>
     <splitter collapse="none" persist="state"></splitter>
     <vbox id="contentView" flex="4">
-      <toolbox id="searchModifiers" hidden="true">
-        <toolbar id="organizerScopeBar" class="chromeclass-toolbar" align="center">
-          <label id="scopeBarTitle" value="&search.in.label;"/>
-          <toolbarbutton id="scopeBarAll" class="small-margin"
-                         type="radio" group="scopeBar"
-                         oncommand="PlacesQueryBuilder.onScopeSelected(this);"
-                         label="&search.scopeBookmarks.label;"
-                         accesskey="&search.scopeBookmarks.accesskey;"/>
-          <toolbarbutton id="scopeBarHistory" class="small-margin"
-                         type="radio" group="scopeBar"
-                         oncommand="PlacesQueryBuilder.onScopeSelected(this);"
-                         label="&search.scopeHistory.label;"
-                         accesskey="&search.scopeHistory.accesskey;"/>
-          <toolbarbutton id="scopeBarDownloads" class="small-margin"
-                         type="radio" group="scopeBar"
-                         oncommand="PlacesQueryBuilder.onScopeSelected(this);"
-                         label="&search.scopeDownloads.label;"
-                         accesskey="&search.scopeDownloads.accesskey;"/>
-          <toolbarbutton id="scopeBarFolder" class="small-margin"
-                         type="radio" group="scopeBar"
-                         oncommand="PlacesQueryBuilder.onScopeSelected(this);"
-                         accesskey="&search.scopeFolder.accesskey;"
-                         emptytitle="&search.scopeFolder.label;" flex="1"/>
-          <!-- The folder scope button should flex but not take up more room
-                than its label needs.  The only simple way to do that is to
-                set a really big flex on the spacer, e.g., 2^31 - 1. -->
-          <spacer flex="2147483647"/>
-          <button id="saveSearch" class="small-margin"
-                  label="&saveSearch.label;" accesskey="&saveSearch.accesskey;"
-                  command="OrganizerCommand_search:save"/>
-        </toolbar>
-      </toolbox>
       <deck id="placesViewsDeck"
             selectedIndex="0"
             flex="1">
