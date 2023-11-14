@@ -1365,3 +1365,9 @@ pref("dom.ipc.reportProcessHangs", false);
 #else
 pref("dom.ipc.reportProcessHangs", true);
 #endif
+
+// These are the thumbnail width/height set in about:newtab.
+// If you change this, ENSURE IT IS THE SAME SIZE SET
+// by about:newtab. These values are in CSS pixels.
+pref("toolkit.pageThumbs.minWidth", 280);
+pref("toolkit.pageThumbs.minHeight", 190);
