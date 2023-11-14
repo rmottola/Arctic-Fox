@@ -6860,6 +6860,8 @@ var gIdentityHandler = {
   IDENTITY_MODE_MIXED_DISPLAY_LOADED                   : "unknownIdentity mixedContent mixedDisplayContent",  // SSL with unauthenticated display content
   IDENTITY_MODE_MIXED_ACTIVE_LOADED                    : "unknownIdentity mixedContent mixedActiveContent",  // SSL with unauthenticated active (and perhaps also display) content
   IDENTITY_MODE_MIXED_DISPLAY_LOADED_ACTIVE_BLOCKED    : "unknownIdentity mixedContent mixedDisplayContentLoadedActiveBlocked",  // SSL with unauthenticated display content; unauthenticated active content is blocked.
+  IDENTITY_MODE_MIXED_ACTIVE_BLOCKED                   : "verifiedDomain mixedContent mixedActiveBlocked",  // SSL with unauthenticated active content blocked; no unauthenticated display content
+  IDENTITY_MODE_MIXED_ACTIVE_BLOCKED_IDENTIFIED        : "verifiedIdentity mixedContent mixedActiveBlocked",  // SSL with unauthenticated active content blocked; no unauthenticated display content
   IDENTITY_MODE_CHROMEUI                               : "chromeUI",         // Part of the product's UI
 
   // Cache the most recent SSLStatus and Location seen in checkIdentity
@@ -7022,9 +7024,17 @@ var gIdentityHandler = {
     } else if (unknown) {
       this.setMode(this.IDENTITY_MODE_UNKNOWN);
     } else if (state & nsIWebProgressListener.STATE_IDENTITY_EV_TOPLEVEL) {
-      this.setMode(this.IDENTITY_MODE_IDENTIFIED);
+      if (state & nsIWebProgressListener.STATE_BLOCKED_MIXED_ACTIVE_CONTENT) {
+        this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED_IDENTIFIED);
+      } else {
+        this.setMode(this.IDENTITY_MODE_IDENTIFIED);
+      }
     } else if (state & nsIWebProgressListener.STATE_IS_SECURE) {
-      this.setMode(this.IDENTITY_MODE_DOMAIN_VERIFIED);
+      if (state & nsIWebProgressListener.STATE_BLOCKED_MIXED_ACTIVE_CONTENT) {
+        this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED);
+      } else {
+        this.setMode(this.IDENTITY_MODE_DOMAIN_VERIFIED);
+      }
     } else if (state & nsIWebProgressListener.STATE_IS_BROKEN) {
       if (state & nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) {
         this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_LOADED);
@@ -7125,7 +7135,8 @@ var gIdentityHandler = {
     let punyID = gPrefService.getIntPref("browser.identity.display_punycode", 1);
 
     switch (newMode) {
-    case this.IDENTITY_MODE_DOMAIN_VERIFIED: {
+    case this.IDENTITY_MODE_DOMAIN_VERIFIED:
+    case this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED: {
       let iData = this.getIdentityData();
       
       let label_display = "";
@@ -7163,7 +7174,8 @@ var gIdentityHandler = {
         tooltip = gNavigatorBundle.getString("identity.identified.verified_by_you");
 
       break; }
-    case this.IDENTITY_MODE_IDENTIFIED: {
+    case this.IDENTITY_MODE_IDENTIFIED:
+    case this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED_IDENTIFIED: {
       // If it's identified, then we can populate the dialog with credentials
       let iData = this.getIdentityData();
       tooltip = gNavigatorBundle.getFormattedString("identity.identified.verifier",
@@ -7239,10 +7251,12 @@ var gIdentityHandler = {
 
     switch (newMode) {
     case this.IDENTITY_MODE_DOMAIN_VERIFIED:
+    case this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED:
       owner = gNavigatorBundle.getString("identity.ownerUnknown2");
       verifier = this._identityBox.tooltipText;
       break;
-    case this.IDENTITY_MODE_IDENTIFIED: {
+    case this.IDENTITY_MODE_IDENTIFIED:
+    case this.IDENTITY_MODE_MIXED_ACTIVE_BLOCKED_IDENTIFIED: {
       // If it's identified, then we can populate the dialog with credentials
       let iData = this.getIdentityData();
       host = owner = iData.subjectOrg;

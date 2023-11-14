@@ -1050,7 +1050,7 @@ toolbar[iconsize="small"] #feed-button {
   color: GrayText;
 }
 
-%include ../shared/identity-block.inc.css
+%include ../shared/identity-block/identity-block.inc.css
 
 #page-proxy-favicon {
   margin-top: 2px;
