@@ -79,10 +79,6 @@
                 label="&sendLinkCmd.label;"
                 accesskey="&sendLinkCmd.accesskey;"
                 oncommand="gContextMenu.sendLink();"/>
-      <menuitem id="context-savelinktopocket"
-                label="&saveLinkToPocketCmd.label;"
-                accesskey="&saveLinkToPocketCmd.accesskey;"
-                oncommand="gContextMenu.saveLinkToPocket();"/>
       <menuitem id="context-copyemail"
                 label="&copyEmailCmd.label;"
                 accesskey="&copyEmailCmd.accesskey;"
@@ -282,10 +278,6 @@
                 label="&sendPageCmd.label;"
                 accesskey="&sendPageCmd.accesskey;"
                 oncommand="gContextMenu.sendPage();"/>
-      <menuitem id="context-pocket"
-                label="&saveToPocketCmd.label;"
-                accesskey="&saveToPocketCmd.accesskey;"
-                oncommand="gContextMenu.savePageToPocket();"/>
       <menuseparator id="context-sep-viewbgimage"/>
       <menuitem id="context-viewbgimage"
                 label="&viewBGImageCmd.label;"
