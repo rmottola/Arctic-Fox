@@ -402,12 +402,6 @@
             <splitter class="tree-splitter"/>
             <treecol label="&col.lastmodified.label;" id="placesContentLastModified" anonid="lastModified" flex="1" hidden="true"
                       persist="width hidden ordinal sortActive sortDirection"/>
-            <splitter class="tree-splitter"/>
-            <treecol label="&col.parentfolder.label;" id="placesContentParentFolder" anonid="parentFolder" flex="1" hidden="true"
-                      persist="width hidden ordinal"/>
-            <splitter class="tree-splitter"/>
-            <treecol label="&col.parentfolderpath.label;" id="placesContentParentFolderPath" anonid="parentFolderPath" flex="1" hidden="true"
-                      persist="width hidden ordinal"/>
           </treecols>
           <treechildren flex="1" onclick="ContentTree.onClick(event);"/>
         </tree>

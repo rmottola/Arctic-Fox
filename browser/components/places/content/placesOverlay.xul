@@ -77,8 +77,6 @@
              oncommand="goDoPlacesCommand('placesCmd_deleteDataHost');"/>
     <command id="placesCmd_createBookmark"
              oncommand="goDoPlacesCommand('placesCmd_createBookmark');"/>
-    <command id="placesCmd_openParentFolder"
-             oncommand="goDoPlacesCommand('placesCmd_openParentFolder');"/>
 
     <!-- Special versions of cut/copy/paste/delete which check for an open context menu. -->
     <command id="placesCmd_cut"
@@ -90,13 +88,6 @@
     <command id="placesCmd_delete"
              oncommand="goDoPlacesCommand('placesCmd_delete');"/>
   </commandset>
-
-  <keyset id="placesCommandKeys">
-    <key id="key_placesCmd_openParentFolder"
-         keycode="VK_F1"
-         command="placesCmd_openParentFolder"
-         modifiers="accel,shift"/>
-  </keyset>
 
   <menupopup id="placesContext"
              onpopupshowing="this._view = PlacesUIUtils.getViewForNode(document.popupNode);
@@ -214,28 +205,19 @@
               hideifprivatebrowsing="true"
               forcehideselection="bookmark"/>
     <menuseparator id="placesContext_deleteSeparator"/>
-    <menuitem id="placesContext_reload"
-              command="placesCmd_reload"
-              label="&cmd.reloadLivebookmark.label;"
-              accesskey="&cmd.reloadLivebookmark.accesskey;"
-              closemenu="single"
-              selection="livemark/feedURI"/>
     <menuitem id="placesContext_sortBy:name"
               command="placesCmd_sortBy:name"
               label="&cmd.sortby_name.label;"
               accesskey="&cmd.context_sortby_name.accesskey;"
               closemenu="single"
               selection="folder"/>
+    <menuitem id="placesContext_reload"
+              command="placesCmd_reload"
+              label="&cmd.reloadLivebookmark.label;"
+              accesskey="&cmd.reloadLivebookmark.accesskey;"
+              closemenu="single"
+              selection="livemark/feedURI"/>
     <menuseparator id="placesContext_sortSeparator"/>
-    <menuitem id="placesContext_openParentFolder"
-              command="placesCmd_openParentFolder"
-              label="&cmd.openParentFolder.label;"
-              key="key_placesCmd_openParentFolder"
-              accesskey="&cmd.openParentFolder.accesskey;"
-              selectiontype="single"
-              selection="bookmark"
-              forcehideselection="livemarkChild|livemark/feedURI|PlacesOrganizer/OrganizerQuery"/>
-    <menuseparator id="placesContext_parentFolderSeparator"/>
     <menuitem id="placesContext_show:info"
               command="placesCmd_show:info"
               label="&cmd.properties.label;" 

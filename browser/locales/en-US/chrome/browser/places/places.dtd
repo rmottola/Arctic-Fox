@@ -59,9 +59,6 @@
 <!ENTITY cmd.open_all_in_tabs.label        "Open All in Tabs">
 <!ENTITY cmd.open_all_in_tabs.accesskey    "O">
 
-<!ENTITY cmd.openParentFolder.label      "Open Containing Folder">
-<!ENTITY cmd.openParentFolder.accesskey  "F">
-
 <!ENTITY cmd.properties.label      "Properties">
 <!ENTITY cmd.properties.accesskey  "i">
 
@@ -92,8 +89,6 @@
 <!ENTITY col.description.label       "Description">
 <!ENTITY col.dateadded.label         "Added">
 <!ENTITY col.lastmodified.label      "Last Modified">
-<!ENTITY col.parentfolder.label      "Containing Folder">
-<!ENTITY col.parentfolderpath.label  "Containing Folder Path">
 
 <!ENTITY search.label                              "Search:">
 <!ENTITY search.accesskey                          "S">

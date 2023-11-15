@@ -1079,14 +1079,6 @@ var ViewMenu = {
     var columns = content.columns;
     for (var i = 0; i < columns.count; ++i) {
       var column = columns.getColumnAt(i).element;
-      if (popup.parentNode && (popup.parentNode.id == "viewSort")) {
-        switch (column.id) {
-          case "placesContentParentFolder":
-            continue;
-          case "placesContentParentFolderPath":
-            continue;
-        }
-      }
       var menuitem = document.createElement("menuitem");
       menuitem.id = "menucol_" + column.id;
       menuitem.column = column;
