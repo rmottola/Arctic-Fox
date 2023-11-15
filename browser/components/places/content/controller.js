@@ -180,7 +180,6 @@ PlacesController.prototype = {
       var selectedNode = this._view.selectedNode;
       return selectedNode && PlacesUtils.nodeIsURI(selectedNode);
     case "placesCmd_new:folder":
-    case "placesCmd_new:livemark":
       return this._canInsert();
     case "placesCmd_new:bookmark":
       return this._canInsert();
@@ -279,9 +278,6 @@ PlacesController.prototype = {
       break;
     case "placesCmd_new:bookmark":
       this.newItem("bookmark");
-      break;
-    case "placesCmd_new:livemark":
-      this.newItem("livemark");
       break;
     case "placesCmd_new:separator":
       this.newSeparator().catch(Components.utils.reportError);
