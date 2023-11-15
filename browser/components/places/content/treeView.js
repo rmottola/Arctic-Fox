@@ -230,7 +230,7 @@ PlacesTreeView.prototype = {
     if (aRow < 0) {
       return null;
     }
-  
+
     let node = this._rows[aRow];
     if (node !== undefined)
       return node;
@@ -1191,7 +1191,7 @@ PlacesTreeView.prototype = {
             PlacesUtils.livemarks.getLivemark({ id: node.itemId })
               .then(aLivemark => {
                 this._controller.cacheLivemarkInfo(node, aLivemark);
-                let props = this._cellProperties.get(node); 
+                let props = this._cellProperties.get(node);
                 this._cellProperties.set(node, props += " livemark");
                 // The livemark attribute is set as a cell property on the title cell.
                 this._invalidateCellValue(node, this.COLUMN_TYPE_TITLE);
