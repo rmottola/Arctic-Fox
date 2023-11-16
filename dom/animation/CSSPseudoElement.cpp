@@ -17,7 +17,7 @@ NS_IMPL_CYCLE_COLLECTION_ROOT_NATIVE(CSSPseudoElement, AddRef)
 NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(CSSPseudoElement, Release)
 
 CSSPseudoElement::CSSPseudoElement(Element* aElement,
-                                   nsCSSPseudoElements::Type aType)
+                                   CSSPseudoElementType aType)
   : mParentElement(aElement)
   , mPseudoType(aType)
 {
@@ -63,7 +63,7 @@ CSSPseudoElement::Animate(
 
 /* static */ already_AddRefed<CSSPseudoElement>
 CSSPseudoElement::GetCSSPseudoElement(Element* aElement,
-                                      nsCSSPseudoElements::Type aType)
+                                      CSSPseudoElementType aType)
 {
   if (!aElement) {
     return nullptr;
@@ -90,8 +90,7 @@ CSSPseudoElement::GetCSSPseudoElement(Element* aElement,
 }
 
 /* static */ nsIAtom*
-CSSPseudoElement::GetCSSPseudoElementPropertyAtom(
-    nsCSSPseudoElements::Type aType)
+CSSPseudoElement::GetCSSPseudoElementPropertyAtom(CSSPseudoElementType aType)
 {
   switch (aType) {
     case CSSPseudoElementType::before:

@@ -21,6 +21,7 @@
 #include "nsStyleUtil.h"
 #include "nsCSSFrameConstructor.h"
 #include "nsSVGEffects.h"
+#include "nsCSSPseudoElements.h"
 #include "nsCSSRendering.h"
 #include "nsAnimationManager.h"
 #include "nsTransitionManager.h"
@@ -1104,18 +1105,15 @@ RestyleManager::AnimationsWithDestroyedFrame::AnimationsWithDestroyedFrame(
 void
 RestyleManager::AnimationsWithDestroyedFrame::StopAnimationsForElementsWithoutFrames()
 {
-  StopAnimationsWithoutFrame(mContents,
-    CSSPseudoElementType::NotPseudo);
-  StopAnimationsWithoutFrame(mBeforeContents,
-    CSSPseudoElementType::before);
-  StopAnimationsWithoutFrame(mAfterContents,
-    CSSPseudoElementType::after);
+  StopAnimationsWithoutFrame(mContents, CSSPseudoElementType::NotPseudo);
+  StopAnimationsWithoutFrame(mBeforeContents, CSSPseudoElementType::before);
+  StopAnimationsWithoutFrame(mAfterContents, CSSPseudoElementType::after);
 }
 
 void
 RestyleManager::AnimationsWithDestroyedFrame::StopAnimationsWithoutFrame(
   nsTArray<RefPtr<nsIContent>>& aArray,
-  nsCSSPseudoElements::Type aPseudoType)
+  CSSPseudoElementType aPseudoType)
 {
   nsAnimationManager* animationManager =
     mRestyleManager->PresContext()->AnimationManager();
@@ -1132,7 +1130,7 @@ RestyleManager::AnimationsWithDestroyedFrame::StopAnimationsWithoutFrame(
 static inline dom::Element*
 ElementForStyleContext(nsIContent* aParentContent,
                        nsIFrame* aFrame,
-                       nsCSSPseudoElements::Type aPseudoType);
+                       CSSPseudoElementType aPseudoType);
 
 // Forwarded nsIDocumentObserver method, to handle restyling (and
 // passing the notification to the frame).
@@ -1159,8 +1157,7 @@ RestyleManager::ContentStateChanged(nsIContent* aContent,
   // need to force a reframe -- if it's needed, the HasStateDependentStyle
   // call will handle things.
   nsIFrame* primaryFrame = aElement->GetPrimaryFrame();
-  nsCSSPseudoElements::Type pseudoType =
-    CSSPseudoElementType::NotPseudo;
+  CSSPseudoElementType pseudoType = CSSPseudoElementType::NotPseudo;
   if (primaryFrame) {
     // If it's generated content, ignore LOADING/etc state changes on it.
     if (!primaryFrame->IsGeneratedContentFrame() &&
@@ -2127,7 +2124,7 @@ RestyleManager::TryStartingTransition(nsPresContext* aPresContext,
 static dom::Element*
 ElementForStyleContext(nsIContent* aParentContent,
                        nsIFrame* aFrame,
-                       nsCSSPseudoElements::Type aPseudoType)
+                       CSSPseudoElementType aPseudoType)
 {
   // We don't expect XUL tree stuff here.
   NS_PRECONDITION(aPseudoType == CSSPseudoElementType::NotPseudo ||
@@ -2199,7 +2196,7 @@ ElementForStyleContext(nsIContent* aParentContent,
  */
 static dom::Element*
 PseudoElementForStyleContext(nsIFrame* aFrame,
-                             nsCSSPseudoElements::Type aPseudoType)
+                             CSSPseudoElementType aPseudoType)
 {
   if (aPseudoType >= CSSPseudoElementType::Count) {
     return nullptr;
@@ -3845,7 +3842,7 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
 #endif
 
   nsIAtom* const pseudoTag = oldContext->GetPseudo();
-  const nsCSSPseudoElements::Type pseudoType = oldContext->GetPseudoType();
+  const CSSPseudoElementType pseudoType = oldContext->GetPseudoType();
 
   // Get the frame providing the parent style context.  If it is a
   // child, then resolve the provider first.
@@ -3974,8 +3971,7 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
         } else {
           // Don't expect XUL tree stuff here, since it needs a comparator and
           // all.
-          NS_ASSERTION(pseudoType <
-                         CSSPseudoElementType::Count,
+          NS_ASSERTION(pseudoType < CSSPseudoElementType::Count,
                        "Unexpected pseudo type");
           Element* pseudoElement =
             PseudoElementForStyleContext(aSelf, pseudoType);
@@ -4256,7 +4252,7 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
     LOG_RESTYLE_INDENT();
     RefPtr<nsStyleContext> newExtraContext;
     nsIAtom* const extraPseudoTag = oldExtraContext->GetPseudo();
-    const nsCSSPseudoElements::Type extraPseudoType =
+    const CSSPseudoElementType extraPseudoType =
       oldExtraContext->GetPseudoType();
     NS_ASSERTION(extraPseudoTag &&
                  extraPseudoTag != nsCSSAnonBoxes::mozNonElement,
@@ -4681,7 +4677,7 @@ ElementRestyler::MustReframeForAfterPseudo(nsIFrame* aFrame)
 #endif
 
 void
-ElementRestyler::MaybeReframeForPseudo(nsCSSPseudoElements::Type aPseudoType,
+ElementRestyler::MaybeReframeForPseudo(CSSPseudoElementType aPseudoType,
                                        nsIFrame* aGenConParentFrame,
                                        nsIFrame* aFrame,
                                        nsIContent* aContent,
@@ -4698,7 +4694,7 @@ ElementRestyler::MaybeReframeForPseudo(nsCSSPseudoElements::Type aPseudoType,
 }
 
 bool
-ElementRestyler::MustReframeForPseudo(nsCSSPseudoElements::Type aPseudoType,
+ElementRestyler::MustReframeForPseudo(CSSPseudoElementType aPseudoType,
                                       nsIFrame* aGenConParentFrame,
                                       nsIFrame* aFrame,
                                       nsIContent* aContent,
