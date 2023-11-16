@@ -282,7 +282,7 @@ EffectCompositor::GetAnimationRule(dom::Element* aElement,
 EffectCompositor::GetElementToRestyle(dom::Element* aElement,
                                       nsCSSPseudoElements::Type aPseudoType)
 {
-  if (aPseudoType == nsCSSPseudoElements::ePseudo_NotPseudoElement) {
+  if (aPseudoType == CSSPseudoElementType::NotPseudo) {
     return aElement;
   }
 
@@ -291,9 +291,9 @@ EffectCompositor::GetElementToRestyle(dom::Element* aElement,
     return nullptr;
   }
   nsIFrame* pseudoFrame;
-  if (aPseudoType == nsCSSPseudoElements::ePseudo_before) {
+  if (aPseudoType == CSSPseudoElementType::before) {
     pseudoFrame = nsLayoutUtils::GetBeforeFrame(primaryFrame);
-  } else if (aPseudoType == nsCSSPseudoElements::ePseudo_after) {
+  } else if (aPseudoType == CSSPseudoElementType::after) {
     pseudoFrame = nsLayoutUtils::GetAfterFrame(primaryFrame);
   } else {
     NS_NOTREACHED("Should not try to get the element to restyle for a pseudo "
@@ -496,7 +496,7 @@ EffectCompositor::GetAnimationElementAndPseudoForFrame(const nsIFrame* aFrame)
   }
 
   nsCSSPseudoElements::Type pseudoType =
-    nsCSSPseudoElements::ePseudo_NotPseudoElement;
+    CSSPseudoElementType::NotPseudo;
 
   if (aFrame->IsGeneratedContentFrame()) {
     nsIFrame* parent = aFrame->GetParent();
@@ -505,9 +505,9 @@ EffectCompositor::GetAnimationElementAndPseudoForFrame(const nsIFrame* aFrame)
     }
     nsIAtom* name = content->NodeInfo()->NameAtom();
     if (name == nsGkAtoms::mozgeneratedcontentbefore) {
-      pseudoType = nsCSSPseudoElements::ePseudo_before;
+      pseudoType = CSSPseudoElementType::before;
     } else if (name == nsGkAtoms::mozgeneratedcontentafter) {
-      pseudoType = nsCSSPseudoElements::ePseudo_after;
+      pseudoType = CSSPseudoElementType::after;
     } else {
       return result;
     }
@@ -759,7 +759,7 @@ EffectCompositor::AnimationStyleRuleProcessor::RulesMatching(
 {
   nsIStyleRule *rule =
     mCompositor->GetAnimationRule(aData->mElement,
-                                  nsCSSPseudoElements::ePseudo_NotPseudoElement,
+                                  CSSPseudoElementType::NotPseudo,
                                   mCascadeLevel);
   if (rule) {
     aData->mRuleWalker->Forward(rule);
@@ -771,8 +771,8 @@ void
 EffectCompositor::AnimationStyleRuleProcessor::RulesMatching(
   PseudoElementRuleProcessorData* aData)
 {
-  if (aData->mPseudoType != nsCSSPseudoElements::ePseudo_before &&
-      aData->mPseudoType != nsCSSPseudoElements::ePseudo_after) {
+  if (aData->mPseudoType != CSSPseudoElementType::before &&
+      aData->mPseudoType != CSSPseudoElementType::after) {
     return;
   }
 
