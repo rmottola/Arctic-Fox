@@ -1428,7 +1428,7 @@ nsLayoutUtils::GetStyleFrame(nsIFrame* aFrame)
 {
   if (aFrame->GetType() == nsGkAtoms::tableOuterFrame) {
     nsIFrame* inner = aFrame->PrincipalChildList().FirstChild();
-    NS_ASSERTION(inner, "Outer table must have an inner");
+    // inner may be null, if aFrame is mid-destruction
     return inner;
   }
 
