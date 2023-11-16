@@ -1848,7 +1848,8 @@ struct nsStyleText
   nsChangeHint CalcDifference(const nsStyleText& aOther) const;
   static nsChangeHint MaxDifference() {
     return NS_STYLE_HINT_FRAMECHANGE |
-           nsChangeHint_UpdateSubtreeOverflow;
+           nsChangeHint_UpdateSubtreeOverflow |
+           nsChangeHint_NeutralChange;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
