@@ -142,7 +142,7 @@ public:
 
   nsCSSProperty TransitionProperty() const;
 
-  bool HasLowerCompositeOrderThan(const Animation& aOther) const override;
+  bool HasLowerCompositeOrderThan(const CSSTransition& aOther) const;
   EffectCompositor::CascadeLevel CascadeLevel() const override
   {
     return IsTiedToMarkup() ?
