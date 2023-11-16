@@ -971,6 +971,8 @@ protected:
   // and alternating between that and <track-size>.
   bool ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
                                             const nsCSSValue& aFirstLineNames);
+
+  bool ParseGridTrackList(nsCSSProperty aPropID);
   bool ParseGridTemplateColumnsRows(nsCSSProperty aPropID);
 
   // |aAreaIndices| is a lookup table to help us parse faster,
@@ -9009,6 +9011,19 @@ CSSParserImpl::ParseGridTrackListRepeat(nsCSSValueList** aTailPtr)
 }
 
 bool
+CSSParserImpl::ParseGridTrackList(nsCSSProperty aPropID)
+{
+  nsCSSValue value;
+  nsCSSValue firstLineNames;
+  if (ParseGridLineNames(firstLineNames) == CSSParseResult::Error ||
+      !ParseGridTrackListWithFirstLineNames(value, firstLineNames)) {
+    return false;
+  }
+  AppendValue(aPropID, value);
+  return true;
+}
+
+bool
 CSSParserImpl::ParseGridTemplateColumnsRows(nsCSSProperty aPropID)
 {
   nsCSSValue value;
@@ -9033,13 +9048,7 @@ CSSParserImpl::ParseGridTemplateColumnsRows(nsCSSProperty aPropID)
     UngetToken();
   }
 
-  nsCSSValue firstLineNames;
-  if (ParseGridLineNames(firstLineNames) == CSSParseResult::Error ||
-      !ParseGridTrackListWithFirstLineNames(value, firstLineNames)) {
-    return false;
-  }
-  AppendValue(aPropID, value);
-  return true;
+  return ParseGridTrackList(aPropID);
 }
 
 bool
@@ -9233,14 +9242,9 @@ CSSParserImpl::ParseGridTemplate()
     }
     // Parse an optional [ / <track-list> ] as the columns value.
     if (ExpectSymbol('/', true)) {
-      nsCSSValue lineNames;
-      if (ParseGridLineNames(lineNames) == CSSParseResult::Error ||
-          !ParseGridTrackListWithFirstLineNames(value, lineNames)) {
-        return false;
-      }
-    } else {
-      value.SetNoneValue(); // absent means 'none'
+      return ParseGridTrackList(eCSSProperty_grid_template_columns);
     }
+    value.SetNoneValue(); // absent means 'none'
     AppendValue(eCSSProperty_grid_template_columns, value);
     return true;
   }
