@@ -2238,19 +2238,13 @@ WebConsoleFrame.prototype = {
       return null;
     }
 
-    let afterNode = node._outputAfterNode;
-    if (afterNode) {
-      delete node._outputAfterNode;
-    }
-
     let isFiltered = this.filterMessageNode(node);
 
     let isRepeated = this._filterRepeatedMessage(node);
 
     let visible = !isRepeated && !isFiltered;
     if (!isRepeated) {
-      this.outputNode.insertBefore(node,
-                                   afterNode ? afterNode.nextSibling : null);
+      this.outputNode.appendChild(node);
       this._pruneCategoriesQueue[node.category] = true;
 
       let nodeID = node.getAttribute("id");
@@ -3241,9 +3235,6 @@ JSTerm.prototype = {
    * The JavaScript evaluation response handler.
    *
    * @private
-   * @param object [afterMessage]
-   *        Optional message after which the evaluation result will be
-   *        inserted.
    * @param function [callback]
    *        Optional function to invoke when the evaluation result is added to
    *        the output.
@@ -3251,7 +3242,7 @@ JSTerm.prototype = {
    *        The message received from the server.
    */
   _executeResultCallback:
-  function JST__executeResultCallback(afterMessage, callback, response)
+  function JST__executeResultCallback(callback, response)
   {
     if (!this.hud) {
       return;
@@ -3275,12 +3266,6 @@ JSTerm.prototype = {
           this.clearHistory();
           break;
         case "inspectObject":
-          if (afterMessage) {
-            if (!afterMessage._objectActors) {
-              afterMessage._objectActors = new Set();
-            }
-            afterMessage._objectActors.add(helperResult.object.actor);
-          }
           this.openVariablesView({
             label: VariablesView.getString(helperResult.object, { concise: true }),
             objectActor: helperResult.object,
@@ -3328,7 +3313,6 @@ JSTerm.prototype = {
       };
     }
 
-    msg._afterMessage = afterMessage;
     msg._objectActors = new Set();
 
     if (WebConsoleUtils.isActorGrip(response.exception)) {
@@ -3379,7 +3363,7 @@ JSTerm.prototype = {
       severity: "log",
     });
     this.hud.output.addMessage(message);
-    let onResult = this._executeResultCallback.bind(this, message, resultCallback);
+    let onResult = this._executeResultCallback.bind(this, resultCallback);
 
     let options = {
       frame: this.SELECTED_FRAME,
