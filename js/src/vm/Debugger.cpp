@@ -249,6 +249,28 @@ class Debugger::FrameRange
     }
 };
 
+class AutoRestoreCompartmentDebugMode
+{
+    JSCompartment* comp_;
+    unsigned bits_;
+
+  public:
+    explicit AutoRestoreCompartmentDebugMode(JSCompartment* comp)
+      : comp_(comp), bits_(comp->debugModeBits)
+    {
+        MOZ_ASSERT(comp_);
+    }
+
+    ~AutoRestoreCompartmentDebugMode() {
+        if (comp_)
+            comp_->debugModeBits = bits_;
+    }
+
+    void release() {
+        comp_ = nullptr;
+    }
+};
+
 // Given a Debugger instance dbg, if it is enabled, prevents all its debuggee
 // compartments from executing scripts. Attempts to run script will throw an
 // instance of Debugger.DebuggeeWouldRun from the topmost locked Debugger's
@@ -376,28 +398,6 @@ Debugger::slowPathCheckNoExecute(JSContext* cx, HandleScript script)
     MOZ_ASSERT(cx->runtime()->noExecuteDebuggerTop);
     return EnterDebuggeeNoExecute::reportIfFoundInStack(cx, script);
 }
-
-class AutoRestoreCompartmentDebugMode
-{
-    JSCompartment* comp_;
-    unsigned bits_;
-
-  public:
-    AutoRestoreCompartmentDebugMode(JSCompartment* comp)
-      : comp_(comp), bits_(comp->debugModeBits)
-    {
-        MOZ_ASSERT(comp_);
-    }
-
-    ~AutoRestoreCompartmentDebugMode() {
-        if (comp_)
-            comp_->debugModeBits = bits_;
-    }
-
-    void release() {
-        comp_ = nullptr;
-    }
-};
 
 
 /*** Breakpoints *********************************************************************************/
