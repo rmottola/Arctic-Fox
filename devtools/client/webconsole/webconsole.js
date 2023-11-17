@@ -3250,7 +3250,7 @@ JSTerm.prototype = {
    *
    * @param string [executeString]
    *        The string you want to execute. If this is not provided, the current
-   *        user input is used - taken from |this.inputNode.value|.
+   *        user input is used - taken from |this.getInputValue()|.
    * @param function [callback]
    *        Optional function to invoke when the result is displayed.
    *        This is deprecated - please use the promise return value instead.
@@ -3268,7 +3268,7 @@ JSTerm.prototype = {
     }
 
     // attempt to execute the content of the inputNode
-    executeString = executeString || this.inputNode.value;
+    executeString = executeString || this.getInputValue();
     if (!executeString) {
       return;
     }
@@ -3862,15 +3862,24 @@ JSTerm.prototype = {
   },
 
   /**
+   * Gets the value from the input field
+   * @returns string
+   */
+  getInputValue: function()
+  {
+    return this.inputNode.value || "";
+  },
+
+  /**
    * The inputNode "input" and "keyup" event handler.
    * @private
    */
   _inputEventHandler: function JST__inputEventHandler()
   {
-    if (this.lastInputValue != this.inputNode.value) {
+    if (this.lastInputValue != this.getInputValue()) {
       this.resizeInput();
       this.complete(this.COMPLETE_HINT_ONLY);
-      this.lastInputValue = this.inputNode.value;
+      this.lastInputValue = this.getInputValue();
       this._inputChanged = true;
     }
   },
@@ -3895,6 +3904,7 @@ JSTerm.prototype = {
   _keyPress: function JST__keyPress(event)
   {
     let inputNode = this.inputNode;
+    let inputValue = this.getInputValue();
     let inputUpdated = false;
 
     if (event.ctrlKey) {
@@ -3904,12 +3914,12 @@ JSTerm.prototype = {
           if (Services.appinfo.OS == "WINNT") {
             break;
           }
-          let lineEndPos = inputNode.value.length;
+          let lineEndPos = inputValue.length;
           if (this.hasMultilineInput()) {
             // find index of closest newline >= cursor
             for (let i = inputNode.selectionEnd; i<lineEndPos; i++) {
-              if (inputNode.value.charAt(i) == "\r" ||
-                  inputNode.value.charAt(i) == "\n") {
+              if (inputValue.charAt(i) == "\r" ||
+                  inputValue.charAt(i) == "\n") {
                 lineEndPos = i;
                 break;
               }
@@ -4058,7 +4068,7 @@ JSTerm.prototype = {
         if (this.autocompletePopup.isOpen) {
           this.autocompletePopup.selectedIndex = 0;
           event.preventDefault();
-        } else if (this.inputNode.value.length <= 0) {
+        } else if (inputValue.length <= 0) {
           this.hud.outputNode.parentNode.scrollTop = 0;
           event.preventDefault();
         }
@@ -4068,7 +4078,7 @@ JSTerm.prototype = {
         if (this.autocompletePopup.isOpen) {
           this.autocompletePopup.selectedIndex = this.autocompletePopup.itemCount - 1;
           event.preventDefault();
-        } else if (this.inputNode.value.length <= 0) {
+        } else if (inputValue.length <= 0) {
           this.hud.outputNode.parentNode.scrollTop = this.hud.outputNode.parentNode.scrollHeight;
           event.preventDefault();
         }
@@ -4084,7 +4094,7 @@ JSTerm.prototype = {
         let cursorAtTheEnd = this.inputNode.selectionStart ==
                              this.inputNode.selectionEnd &&
                              this.inputNode.selectionStart ==
-                             this.inputNode.value.length;
+                             inputValue.length;
         let haveSuggestion = this.autocompletePopup.isOpen ||
                              this.lastCompletion.value;
         let useCompletion = cursorAtTheEnd || this._autocompletePopupNavigated;
@@ -4152,7 +4162,7 @@ JSTerm.prototype = {
       // Note: this code does not store changes to items that are already in
       // history.
       if (this.historyPlaceHolder+1 == this.historyIndex) {
-        this.history[this.historyIndex] = this.inputNode.value || "";
+        this.history[this.historyIndex] = this.getInputValue() || "";
       }
 
       this.setInputValue(inputVal);
@@ -4181,7 +4191,7 @@ JSTerm.prototype = {
    */
   hasMultilineInput: function JST_hasMultilineInput()
   {
-    return /[\r\n]/.test(this.inputNode.value);
+    return /[\r\n]/.test(this.getInputValue());
   },
 
   /**
@@ -4251,7 +4261,7 @@ JSTerm.prototype = {
    *          completion and the input value stayed the same compared to the
    *          last time this function was called, then the same completion is
    *          used again. If there is only one possible completion, then
-   *          the inputNode.value is set to this value and the selection is set
+   *          the this.getInputValue() is set to this value and the selection is set
    *          from the current cursor position to the end of the completed text.
    * @param function callback
    *        Optional function invoked when the autocomplete properties are
@@ -4262,7 +4272,7 @@ JSTerm.prototype = {
   complete: function JSTF_complete(type, callback)
   {
     let inputNode = this.inputNode;
-    let inputValue = inputNode.value;
+    let inputValue = this.getInputValue();
     let frameActor = this.getFrameActor(this.SELECTED_FRAME);
 
     // If the inputNode has no value, then don't try to complete on it.
@@ -4326,13 +4336,14 @@ JSTerm.prototype = {
   function JST__updateCompletionResult(type, callback)
   {
     let frameActor = this.getFrameActor(this.SELECTED_FRAME);
-    if (this.lastCompletion.value == this.inputNode.value && frameActor == this._lastFrameActorId) {
+    if (this.lastCompletion.value == this.getInputValue() &&
+        frameActor == this._lastFrameActorId) {
       return;
     }
 
     let requestId = gSequenceId();
     let cursor = this.inputNode.selectionStart;
-    let input = this.inputNode.value.substring(0, cursor);
+    let input = this.getInputValue().substring(0, cursor);
     let cache = this._autocompleteCache;
 
     // If the current input starts with the previous input, then we already
@@ -4402,7 +4413,7 @@ JSTerm.prototype = {
   function JST__receiveAutocompleteProperties(requestId, callback, message)
   {
     let inputNode = this.inputNode;
-    let inputValue = inputNode.value;
+    let inputValue = this.getInputValue();
     if (this.lastCompletion.value == inputValue ||
         requestId != this.lastCompletion.requestId) {
       return;
@@ -4439,7 +4450,7 @@ JSTerm.prototype = {
     };
 
     if (items.length > 1 && !popup.isOpen) {
-      let str = this.inputNode.value.substr(0, this.inputNode.selectionStart);
+      let str = this.getInputValue().substr(0, this.inputNode.selectionStart);
       let offset = str.length - (str.lastIndexOf("\n") + 1) - lastPart.length;
       let x = offset * this.hud._inputCharWidth;
       popup.openPopup(inputNode, x + this.hud._chevronWidth);
@@ -4473,7 +4484,7 @@ JSTerm.prototype = {
   onAutocompleteSelect: function JSTF_onAutocompleteSelect()
   {
     // Render the suggestion only if the cursor is at the end of the input.
-    if (this.inputNode.selectionStart != this.inputNode.value.length) {
+    if (this.inputNode.selectionStart != this.getInputValue().length) {
       return;
     }
 
@@ -4519,7 +4530,7 @@ JSTerm.prototype = {
       let suffix = currentItem.label.substring(this.lastCompletion.
                                                matchProp.length);
       let cursor = this.inputNode.selectionStart;
-      let value = this.inputNode.value;
+      let value = this.getInputValue();
       this.setInputValue(value.substr(0, cursor) + suffix + value.substr(cursor));
       let newCursor = cursor + suffix.length;
       this.inputNode.selectionStart = this.inputNode.selectionEnd = newCursor;
@@ -4540,7 +4551,7 @@ JSTerm.prototype = {
   updateCompleteNode: function JSTF_updateCompleteNode(suffix)
   {
     // completion prefix = input, with non-control chars replaced by spaces
-    let prefix = suffix ? this.inputNode.value.replace(/[\S]/g, " ") : "";
+    let prefix = suffix ? this.getInputValue().replace(/[\S]/g, " ") : "";
     this.completeNode.value = prefix + suffix;
   },
 
