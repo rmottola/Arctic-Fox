@@ -37,9 +37,8 @@
  */
 #define JS_OLD_GETTER_SETTER_METHODS    1
 
-/* Support for ES6 Classes. */
 #ifdef NIGHTLY_BUILD
-#define JS_HAS_CLASSES 1
-#endif
+
+#endif // NIGHTLY_BUILD
 
 #endif /* jsversion_h */
