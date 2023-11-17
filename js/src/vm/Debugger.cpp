@@ -376,6 +376,28 @@ Debugger::slowPathCheckNoExecute(JSContext* cx, HandleScript script)
     return EnterDebuggeeNoExecute::reportIfFoundInStack(cx, script);
 }
 
+class AutoRestoreCompartmentDebugMode
+{
+    JSCompartment* comp_;
+    unsigned bits_;
+
+  public:
+    AutoRestoreCompartmentDebugMode(JSCompartment* comp)
+      : comp_(comp), bits_(comp->debugModeBits)
+    {
+        MOZ_ASSERT(comp_);
+    }
+
+    ~AutoRestoreCompartmentDebugMode() {
+        if (comp_)
+            comp_->debugModeBits = bits_;
+    }
+
+    void release() {
+        comp_ = nullptr;
+    }
+};
+
 
 /*** Breakpoints *********************************************************************************/
 
@@ -3677,6 +3699,7 @@ Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global)
     });
 
     // (6)
+    AutoRestoreCompartmentDebugMode debugModeGuard(debuggeeCompartment);
     debuggeeCompartment->setIsDebuggee();
     debuggeeCompartment->updateDebuggerObservesAsmJS();
     debuggeeCompartment->updateDebuggerObservesCoverage();
@@ -3688,6 +3711,7 @@ Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global)
     zoneDebuggersGuard.release();
     debuggeeZonesGuard.release();
     allocationsTrackingGuard.release();
+    debugModeGuard.release();
     return true;
 }
 

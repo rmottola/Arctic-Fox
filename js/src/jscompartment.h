@@ -485,7 +485,8 @@ struct JSCompartment
         DebuggerNeedsDelazification = 1 << 4
     };
 
-    unsigned                     debugModeBits;
+    unsigned debugModeBits;
+    friend class AutoRestoreCompartmentDebugMode;
 
     static const unsigned DebuggerObservesMask = IsDebuggee |
                                                  DebuggerObservesAllExecution |
