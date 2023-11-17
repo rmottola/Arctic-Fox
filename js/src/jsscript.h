@@ -520,7 +520,7 @@ class ScriptCounts
 // the calls to the JSScript::finalize function which are used to aggregate code
 // coverage results on the compartment.
 typedef HashMap<JSScript*,
-                ScriptCounts,
+                ScriptCounts*,
                 DefaultHasher<JSScript*>,
                 SystemAllocPolicy> ScriptCountsMap;
 
