@@ -2142,8 +2142,8 @@ class LazyScript : public gc::TenuredCell
     // Function or block chain in which the script is nested, or nullptr.
     HeapPtrObject enclosingScope_;
 
-    // ScriptSourceObject, or nullptr if the script in which this is nested
-    // has not been compiled yet. This is never a CCW; we don't clone
+    // ScriptSourceObject. We leave this set to nullptr until we generate
+    // bytecode for our immediate parent. This is never a CCW; we don't clone
     // LazyScripts into other compartments.
     HeapPtrObject sourceObject_;
 
