@@ -4915,14 +4915,14 @@ CommandController.prototype = {
  * and the application we connect to through the remote debug protocol.
  *
  * @constructor
- * @param object webConsole
- *        The Web Console instance that owns this connection proxy.
+ * @param object webConsoleFrame
+ *        The WebConsoleFrame object that owns this connection proxy.
  * @param RemoteTarget target
  *        The target that the console will connect to.
  */
-function WebConsoleConnectionProxy(webConsole, target)
+function WebConsoleConnectionProxy(webConsoleFrame, target)
 {
-  this.owner = webConsole;
+  this.webConsoleFrame = webConsoleFrame;
   this.target = target;
 
   this._onPageError = this._onPageError.bind(this);
@@ -4942,12 +4942,12 @@ function WebConsoleConnectionProxy(webConsole, target)
 
 WebConsoleConnectionProxy.prototype = {
   /**
-   * The owning Web Console instance.
+   * The owning Web Console Frame instance.
    *
    * @see WebConsoleFrame
    * @type object
    */
-  owner: null,
+  webConsoleFrame: null,
 
   /**
    * The target that the console connects to.
@@ -5050,7 +5050,7 @@ WebConsoleConnectionProxy.prototype = {
     this._consoleActor = this.target.form.consoleActor;
     if (this.target.isTabActor) {
       let tab = this.target.form;
-      this.owner.onLocationChange(tab.url, tab.title);
+      this.webConsoleFrame.onLocationChange(tab.url, tab.title);
     }
     this._attachConsole();
 
@@ -5111,7 +5111,7 @@ WebConsoleConnectionProxy.prototype = {
     let msgs = ["PageError", "ConsoleAPI"];
     this.webConsoleClient.getCachedMessages(msgs, this._onCachedMessages);
 
-    this.owner._onUpdateListeners();
+    this.webConsoleFrame._onUpdateListeners();
   },
 
   /**
@@ -5139,10 +5139,10 @@ WebConsoleConnectionProxy.prototype = {
     let messages = response.messages.concat(...this.webConsoleClient.getNetworkEvents());
     messages.sort((a, b) => a.timeStamp - b.timeStamp);
 
-    this.owner.displayCachedMessages(messages);
+    this.webConsoleFrame.displayCachedMessages(messages);
 
     if (!this._hasNativeConsoleAPI) {
-      this.owner.logWarningAboutReplacedAPI();
+      this.webConsoleFrame.logWarningAboutReplacedAPI();
     }
 
     this.connected = true;
@@ -5161,8 +5161,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onPageError: function WCCP__onPageError(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handlePageError(packet.pageError);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handlePageError(packet.pageError);
     }
   },
 
@@ -5178,8 +5178,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onLogMessage: function WCCP__onLogMessage(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handleLogMessage(packet);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handleLogMessage(packet);
     }
   },
 
@@ -5195,8 +5195,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onConsoleAPICall: function WCCP__onConsoleAPICall(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handleConsoleAPICall(packet.message);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handleConsoleAPICall(packet.message);
     }
   },
 
@@ -5212,8 +5212,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onNetworkEvent: function(type, networkInfo)
   {
-    if (this.owner) {
-      this.owner.handleNetworkEvent(networkInfo);
+    if (this.webConsoleFrame) {
+      this.webConsoleFrame.handleNetworkEvent(networkInfo);
     }
   },
 
@@ -5231,8 +5231,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onNetworkEventUpdate: function(type, { packet, networkInfo })
   {
-    if (this.owner) {
-      this.owner.handleNetworkEventUpdate(networkInfo, packet);
+    if (this.webConsoleFrame) {
+      this.webConsoleFrame.handleNetworkEventUpdate(networkInfo, packet);
     }
   },
 
@@ -5248,15 +5248,15 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onFileActivity: function WCCP__onFileActivity(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handleFileActivity(packet.uri);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handleFileActivity(packet.uri);
     }
   },
 
   _onReflowActivity: function WCCP__onReflowActivity(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handleReflowActivity(packet);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handleReflowActivity(packet);
     }
   },
 
@@ -5272,8 +5272,8 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onServerLogCall: function WCCP__onServerLogCall(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.handleConsoleAPICall(packet.message);
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.handleConsoleAPICall(packet.message);
     }
   },
 
@@ -5290,8 +5290,8 @@ WebConsoleConnectionProxy.prototype = {
   _onLastPrivateContextExited:
   function WCCP__onLastPrivateContextExited(type, packet)
   {
-    if (this.owner && packet.from == this._consoleActor) {
-      this.owner.jsterm.clearPrivateMessages();
+    if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      this.webConsoleFrame.jsterm.clearPrivateMessages();
     }
   },
 
@@ -5307,11 +5307,11 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onTabNavigated: function WCCP__onTabNavigated(event, packet)
   {
-    if (!this.owner) {
+    if (!this.webConsoleFrame) {
       return;
     }
 
-    this.owner.handleTabNavigated(event, packet);
+    this.webConsoleFrame.handleTabNavigated(event, packet);
   },
 
   /**
@@ -5362,7 +5362,7 @@ WebConsoleConnectionProxy.prototype = {
     this.webConsoleClient = null;
     this.target = null;
     this.connected = false;
-    this.owner = null;
+    this.webConsoleFrame = null;
     this._disconnecter.resolve(null);
 
     return this._disconnecter.promise;
