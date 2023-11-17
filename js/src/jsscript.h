@@ -1052,11 +1052,10 @@ class JSScript : public js::gc::TenuredCell
     uint32_t        sourceStart_;
     uint32_t        sourceEnd_;
 
-    uint32_t        warmUpCount; /* Number of times the script has been called
-                                  * or has had backedges taken. When running in
-                                  * ion, also increased for any inlined scripts.
-                                  * Reset if the script's JIT code is forcibly
-                                  * discarded. */
+    // Number of times the script has been called or has had backedges taken.
+    // When running in ion, also increased for any inlined scripts. Reset if
+    // the script's JIT code is forcibly discarded.
+    mozilla::Atomic<uint32_t, mozilla::Relaxed> warmUpCount;
 
     // 16-bit fields.
 
@@ -1719,7 +1718,7 @@ class JSScript : public js::gc::TenuredCell
   public:
     uint32_t getWarmUpCount() const { return warmUpCount; }
     uint32_t incWarmUpCounter(uint32_t amount = 1) { return warmUpCount += amount; }
-    uint32_t* addressOfWarmUpCounter() { return &warmUpCount; }
+    uint32_t* addressOfWarmUpCounter() { return reinterpret_cast<uint32_t*>(&warmUpCount); }
     static size_t offsetOfWarmUpCounter() { return offsetof(JSScript, warmUpCount); }
     void resetWarmUpCounter() { incWarmUpResetCounter(); warmUpCount = 0; }
 
