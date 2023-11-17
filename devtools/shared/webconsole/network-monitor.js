@@ -527,11 +527,10 @@ NetworkMonitor.prototype = {
   owner: null,
 
   /**
-   * Whether to save the bodies of network requests and responses. Disabled by
-   * default to save memory.
+   * Whether to save the bodies of network requests and responses.
    * @type boolean
    */
-  saveRequestAndResponseBodies: false,
+  saveRequestAndResponseBodies: true,
 
   /**
    * Object that holds the HTTP activity objects for ongoing requests.
@@ -1261,7 +1260,7 @@ NetworkMonitorChild.prototype = {
   appId: null,
   owner: null,
   _netEvents: null,
-  _saveRequestAndResponseBodies: false,
+  _saveRequestAndResponseBodies: true,
 
   get saveRequestAndResponseBodies() {
     return this._saveRequestAndResponseBodies;
