@@ -6095,6 +6095,15 @@ nsContentTypeParser::GetParameter(const char* aParameterName, nsAString& aResult
                                     aResult);
 }
 
+nsresult
+nsContentTypeParser::GetType(nsAString& aResult)
+{
+  nsresult rv = GetParameter(nullptr, aResult);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsContentUtils::ASCIIToLower(aResult);
+  return NS_OK;
+}
+
 /* static */
 
 bool
