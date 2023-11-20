@@ -553,7 +553,7 @@ nsContentUtils::Init()
                                "dom.performance.enable_user_timing_logging", false);
 
   Preferences::AddBoolVarCache(&sIsFrameTimingPrefEnabled,
-                               "dom.enable_frame_timing", true);
+                               "dom.enable_frame_timing", false);
 
   Preferences::AddBoolVarCache(&sIsExperimentalAutocompleteEnabled,
                                "dom.forms.autocomplete.experimental", false);
