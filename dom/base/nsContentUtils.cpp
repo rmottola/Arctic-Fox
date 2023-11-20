@@ -6100,7 +6100,7 @@ nsContentTypeParser::GetParameter(const char* aParameterName, nsAString& aResult
 bool
 nsContentUtils::CanAccessNativeAnon()
 {
-  return IsCallerChrome() || IsCallerContentXBL();
+  return LegacyIsCallerChromeOrNativeCode() || IsCallerContentXBL();
 }
 
 /* static */ nsresult
