@@ -1831,7 +1831,7 @@ XULDocument::RemoveElementFromRefMap(Element* aElement)
         if (!entry)
             return;
         if (entry->RemoveElement(aElement)) {
-            mRefMap.RawRemoveEntry(entry);
+            mRefMap.RemoveEntry(entry);
         }
     }
 }

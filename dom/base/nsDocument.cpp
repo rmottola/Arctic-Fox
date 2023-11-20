@@ -3021,7 +3021,7 @@ nsDocument::RemoveFromIdTable(Element *aElement, nsIAtom* aId)
     ++mExpandoAndGeneration.generation;
   }
   if (entry->IsEmpty()) {
-    mIdentifierMap.RawRemoveEntry(entry);
+    mIdentifierMap.RemoveEntry(entry);
   }
 }
 
