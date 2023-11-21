@@ -130,7 +130,7 @@ nsDOMAttributeMap::DropAttribute(int32_t aNamespaceID, nsIAtom* aLocalName)
 }
 
 Attr*
-nsDOMAttributeMap::GetAttribute(mozilla::dom::NodeInfo* aNodeInfo, bool aNsAware)
+nsDOMAttributeMap::GetAttribute(mozilla::dom::NodeInfo* aNodeInfo)
 {
   NS_ASSERTION(aNodeInfo, "GetAttribute() called with aNodeInfo == nullptr!");
 
@@ -140,7 +140,7 @@ nsDOMAttributeMap::GetAttribute(mozilla::dom::NodeInfo* aNodeInfo, bool aNsAware
   if (!node) {
     RefPtr<mozilla::dom::NodeInfo> ni = aNodeInfo;
     RefPtr<Attr> newAttr =
-      new Attr(this, ni.forget(), EmptyString(), aNsAware);
+      new Attr(this, ni.forget(), EmptyString());
     mAttributeCache.Put(attr, newAttr);
     node = newAttr;
   }
@@ -160,7 +160,7 @@ nsDOMAttributeMap::NamedGetter(const nsAString& aAttrName, bool& aFound)
   }
 
   aFound = true;
-  return GetAttribute(ni, false);
+  return GetAttribute(ni);
 }
 
 bool
@@ -263,7 +263,7 @@ nsDOMAttributeMap::SetNamedItemNS(Attr& aAttr, ErrorResult& aError)
   RefPtr<Attr> attr;
 
   if (oldNi) {
-    RefPtr<Attr> oldAttr = GetAttribute(oldNi, true);
+    RefPtr<Attr> oldAttr = GetAttribute(oldNi);
 
     if (oldAttr == &aAttr) {
       return oldAttr.forget();
@@ -319,7 +319,7 @@ nsDOMAttributeMap::SetNamedItemNS(Attr& aAttr, ErrorResult& aError)
 already_AddRefed<Attr>
 nsDOMAttributeMap::RemoveNamedItem(NodeInfo* aNodeInfo, ErrorResult& aError)
 {
-  RefPtr<Attr> attribute = GetAttribute(aNodeInfo, true);
+  RefPtr<Attr> attribute = GetAttribute(aNodeInfo);
   // This removes the attribute node from the attribute map.
   aError = mContent->UnsetAttr(aNodeInfo->NamespaceID(), aNodeInfo->NameAtom(), true);
   return attribute.forget();
@@ -369,7 +369,7 @@ nsDOMAttributeMap::IndexedGetter(uint32_t aIndex, bool& aFound)
   RefPtr<mozilla::dom::NodeInfo> ni = mContent->NodeInfo()->NodeInfoManager()->
     GetNodeInfo(name->LocalName(), name->GetPrefix(), name->NamespaceID(),
                 nsIDOMNode::ATTRIBUTE_NODE);
-  return GetAttribute(ni, true);
+  return GetAttribute(ni);
 }
 
 Attr*
@@ -420,7 +420,7 @@ nsDOMAttributeMap::GetNamedItemNS(const nsAString& aNamespaceURI,
     return nullptr;
   }
 
-  return GetAttribute(ni, true);
+  return GetAttribute(ni);
 }
 
 already_AddRefed<mozilla::dom::NodeInfo>
