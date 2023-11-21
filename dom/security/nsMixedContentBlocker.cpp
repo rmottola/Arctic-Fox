@@ -323,7 +323,6 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   // If the channel is about to load mixed content, abort the channel
   if (!NS_CP_ACCEPTED(decision)) {
     autoCallback.DontCallback();
-    aOldChannel->Cancel(NS_ERROR_DOM_BAD_URI);
     return NS_BINDING_FAILED;
   }
 
