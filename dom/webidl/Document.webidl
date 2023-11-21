@@ -259,17 +259,12 @@ partial interface Document {
     Element createElementNS(DOMString? namespace, DOMString qualifiedName, DOMString typeExtension);
 };
 
-// https://w3c.github.io/page-visibility/#extensions-to-the-document-interface
+// http://dvcs.w3.org/hg/webperf/raw-file/tip/specs/PageVisibility/Overview.html#sec-document-interface
 partial interface Document {
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute boolean hidden;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute boolean mozHidden;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute VisibilityState visibilityState;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute VisibilityState mozVisibilityState;
-  [Pref="dom.visibilityAPI.enabled"]
            attribute EventHandler onvisibilitychange;
 };
 

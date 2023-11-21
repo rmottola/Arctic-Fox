@@ -133,9 +133,6 @@ pref("dom.select_events.enabled", true);
 // Whether or not selection events on text controls are enabled
 pref("dom.select_events.textcontrols.enabled", true);
 
-// Whether or not the document visbility API is enabled
-pref("dom.visibilityAPI.enabled", true);
-
 // Whether or not File Handle is enabled.
 pref("dom.fileHandle.enabled", true);
 
