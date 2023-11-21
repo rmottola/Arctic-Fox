@@ -2622,6 +2622,8 @@ public:
 
   void ObsoleteSheet(const nsAString& aSheetURI, mozilla::ErrorResult& rv);
 
+  already_AddRefed<nsIURI> GetMozDocumentURIIfNotForErrorPages();
+
   // ParentNode
   nsIHTMLCollection* Children();
   uint32_t ChildElementCount();
