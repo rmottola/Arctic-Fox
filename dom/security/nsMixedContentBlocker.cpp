@@ -671,7 +671,7 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   bool isHttpScheme = false;
   rv = aContentLocation->SchemeIs("http", &isHttpScheme);
   NS_ENSURE_SUCCESS(rv, rv);
-  if (isHttpScheme && docShell->GetDocument()->GetUpgradeInsecureRequests()) {
+  if (isHttpScheme && docShell->GetDocument()->GetUpgradeInsecureRequests(isPreload)) {
     *aDecision = ACCEPT;
     return NS_OK;
   }
