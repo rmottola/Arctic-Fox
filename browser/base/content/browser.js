@@ -2720,7 +2720,7 @@ var BrowserOnClick = {
         }
       break;
       case "Browser:SendSSLErrorReport":
-        this.onSSLErrorReport(msg.target, msg.data.elementId,
+        this.onSSLErrorReport(msg.target,
                               msg.data.documentURI,
                               msg.data.location,
                               msg.data.securityInfo);
@@ -2751,7 +2751,7 @@ var BrowserOnClick = {
     }
   },
 
-  onSSLErrorReport: function(browser, elementId, documentURI, location, securityInfo) {
+  onSSLErrorReport: function(browser, documentURI, location, securityInfo) {
     function showReportStatus(reportStatus) {
       gBrowser.selectedBrowser
           .messageManager

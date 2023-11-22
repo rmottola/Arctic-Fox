@@ -39,3 +39,8 @@ you know there's a good reason why this site doesn't use trusted identification.
 <!ENTITY certerror.copyToClipboard.label "Copy text to clipboard">
 
 <!ENTITY certerror.technical.heading "Technical Details">
+
+<!ENTITY errorReporting.automatic "Report errors like this to help Mozilla identify misconfigured sites">
+<!ENTITY errorReporting.sending "Sending report">
+<!ENTITY errorReporting.sent "Report sent">
+<!ENTITY errorReporting.tryAgain "Try again">
