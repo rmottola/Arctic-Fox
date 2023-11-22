@@ -129,7 +129,7 @@ var handleContentContextMenu = function (event) {
   Services.obs.notifyObservers(subject, "content-contextmenu", null);
 
   let doc = event.target.ownerDocument;
-  let docLocation = doc.location ? doc.location.href : undefined;
+  let docLocation = doc.mozDocumentURIIfNotForErrorPages;
   let charSet = doc.characterSet;
   let baseURI = doc.baseURI;
   let referrer = doc.referrer;
@@ -307,7 +307,6 @@ var AboutCertErrorListener = {
     // if we're enabling reports, send a report for this failure
     if (event.detail) {
       let doc = content.document;
-      let location = doc.location.href;
 
       let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
           .getService(Ci.nsISerializationHelper);
@@ -380,8 +379,6 @@ var AboutNetErrorListener = {
     // if we're enabling reports, send a report for this failure
     if (evt.detail) {
       let contentDoc = content.document;
-
-      let location = contentDoc.location.href;
 
       let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
                         .getService(Ci.nsISerializationHelper);
