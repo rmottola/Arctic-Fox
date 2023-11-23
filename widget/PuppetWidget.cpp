@@ -12,7 +12,7 @@
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/Hal.h"
 #include "mozilla/IMEStateManager.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/PLayerTransactionChild.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/TextComposition.h"
@@ -510,7 +510,7 @@ PuppetWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
                                      const nsTArray<ScrollableLayerGuid>& aTargets) const
 {
   if (mTabChild) {
-    mTabChild->SendSetTargetAPZC(aInputBlockId, aTargets);
+    mTabChild->SetTargetAPZC(aInputBlockId, aTargets);
   }
 }
 
@@ -1254,7 +1254,7 @@ uint32_t PuppetWidget::GetMaxTouchPoints() const
 void
 PuppetWidget::StartAsyncScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
 {
-  mTabChild->SendStartScrollbarDrag(aDragMetrics);
+  mTabChild->StartScrollbarDrag(aDragMetrics);
 }
 
 PuppetScreen::PuppetScreen(void *nativeScreen)
@@ -1427,7 +1427,7 @@ PuppetWidget::ZoomToRect(const uint32_t& aPresShellId,
     return;
   }
 
-  mTabChild->SendZoomToRect(aPresShellId, aViewId, aRect, aFlags);
+  mTabChild->ZoomToRect(aPresShellId, aViewId, aRect, aFlags);
 }
 
 } // namespace widget
