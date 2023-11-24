@@ -97,7 +97,7 @@ displayEnabledCallback(bool enabled)
     screenManager->DisplayEnabled(enabled);
 }
 
-} // anonymous namespace
+} // namespace
 
 static uint32_t
 SurfaceFormatToColorDepth(int32_t aSurfaceFormat)
@@ -258,9 +258,6 @@ nsScreenGonk::GetSurfaceFormat()
 ANativeWindow*
 nsScreenGonk::GetNativeWindow()
 {
-    if (IsPrimaryScreen()) {
-        StopBootAnimation();
-    }
     return mNativeWindow.get();
 }
 
