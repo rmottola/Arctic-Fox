@@ -469,11 +469,9 @@ LayerManagerComposite::UpdateAndRender()
     mInvalidRegion.SetEmpty();
   }
 
-  // Update cached layer tree information.
-  mClonedLayerTreeProperties = LayerProperties::CloneFrom(GetRoot());
-
   if (invalid.IsEmpty() && !mWindowOverlayChanged) {
     // Composition requested, but nothing has changed. Don't do any work.
+    mClonedLayerTreeProperties = LayerProperties::CloneFrom(GetRoot());
     return;
   }
 
@@ -497,6 +495,9 @@ LayerManagerComposite::UpdateAndRender()
 #endif
   mGeometryChanged = false;
   mWindowOverlayChanged = false;
+
+  // Update cached layer tree information.
+  mClonedLayerTreeProperties = LayerProperties::CloneFrom(GetRoot());
 }
 
 already_AddRefed<DrawTarget>
