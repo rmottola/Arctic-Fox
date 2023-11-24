@@ -3849,6 +3849,7 @@ this.XPIProvider = {
 
     let file = addon._sourceBundle;
 
+    XPIProvider._addURIMapping(addon.id, file);
     XPIProvider.callBootstrapMethod(addon, file, "install",
                                     BOOTSTRAP_REASONS.ADDON_INSTALL);
     addon.state = AddonManager.STATE_INSTALLED;
