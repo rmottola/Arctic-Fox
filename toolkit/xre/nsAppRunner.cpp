@@ -596,8 +596,7 @@ ProcessDDE(nsINativeAppSupport* aNative, bool aWait)
 /**
  * Determines if there is support for showing the profile manager
  *
- * @return currently true in all environments
- *         XXX: This was false for Metro. Possibly remove this logic.
+ * @return true in all environments
 */
 static bool
 CanShowProfileManager()
@@ -636,9 +635,9 @@ static void
 SetUpSandboxEnvironment()
 {
   // A low integrity temp only currently makes sense for Vista and later, e10s
-  // and sandbox pref level 1.
+  // and sandbox pref level >= 1.
   if (!IsVistaOrLater() || !BrowserTabsRemoteAutostart() ||
-      Preferences::GetInt("security.sandbox.content.level") != 1) {
+      Preferences::GetInt("security.sandbox.content.level") < 1) {
     return;
   }
 
