@@ -690,7 +690,7 @@ AsyncCompositionManager::RecordShadowTransforms(Layer* aLayer)
     if (!apzc) {
       continue;
     }
-    gfx::Matrix4x4 shadowTransform = aLayer->AsLayerComposite()->GetShadowTransform();
+    gfx::Matrix4x4 shadowTransform = aLayer->AsLayerComposite()->GetShadowBaseTransform();
     if (!shadowTransform.Is2D()) {
       continue;
     }
@@ -1423,7 +1423,7 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame,
 
   LayerComposite* rootComposite = root->AsLayerComposite();
 
-  gfx::Matrix4x4 trans = rootComposite->GetShadowTransform();
+  gfx::Matrix4x4 trans = rootComposite->GetShadowBaseTransform();
   trans *= gfx::Matrix4x4::From2D(mWorldTransform);
   rootComposite->SetShadowTransform(trans);
 
