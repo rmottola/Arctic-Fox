@@ -711,7 +711,7 @@ nsScreenGonk::SetMirroringScreen(nsScreenGonk* aScreen)
     if (mMirroringScreen) {
         return false;
     }
-    mMirroringScreen = mMirroringScreen;
+    mMirroringScreen = aScreen;
     return true;
 }
 
