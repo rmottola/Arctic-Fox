@@ -671,6 +671,7 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
   , mLastPluginUpdateLayerTreeId(0)
   , mPluginUpdateResponsePending(false)
   , mDeferPluginWindows(false)
+  , mPluginWindowsHidden(false)
 #endif
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -2251,6 +2252,14 @@ CompositorParent::UpdatePluginWindowState(uint64_t aId)
     return false;
   }
 
+  // If the plugin windows were hidden but now are not, we need to force
+  // update the metrics to make sure they are visible again.
+  if (mPluginWindowsHidden) {
+    PLUGINS_LOG("[%" PRIu64 "] re-showing", aId);
+    mPluginWindowsHidden = false;
+    pluginMetricsChanged = true;
+  }
+
   if (!lts.mPluginData.Length()) {
     // We will pass through here in cases where the previous shadow layer
     // tree contained visible plugins and the new tree does not. All we need
@@ -2341,6 +2350,7 @@ CompositorParent::HideAllPluginWindows()
   }
   mDeferPluginWindows = true;
   mPluginUpdateResponsePending = true;
+  mPluginWindowsHidden = true;
   Unused << SendHideAllPlugins((uintptr_t)GetWidget());
   ScheduleComposition();
 }
