@@ -7953,11 +7953,6 @@
     "releaseChannelCollection": "opt-in",
     "description": "Number of times the sharing feature has been enabled and disabled"
   },
-  "E10S_AUTOSTART": {
-    "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Whether a session is set to autostart e10s windows"
-  },
   "E10S_AUTOSTART_STATUS": {
     "expires_in_version": "40",
     "kind": "enumerated",
