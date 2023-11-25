@@ -5,7 +5,6 @@
 from __future__ import absolute_import, unicode_literals
 
 from mach.decorators import (
-    CommandArgument,
     CommandProvider,
     Command,
 )
