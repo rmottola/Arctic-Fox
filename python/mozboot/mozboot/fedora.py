@@ -33,6 +33,8 @@ class FedoraBootstrapper(BaseBootstrapper):
             'gcc-c++',
             'GConf2-devel',
             'glibc-static',
+            'gtk2-devel',  # it's optional in Fedora 20's GNOME Software
+                           # Development group.
             'libstdc++-static',
             'libXt-devel',
             'mesa-libGL-devel',
@@ -79,3 +81,4 @@ class FedoraBootstrapper(BaseBootstrapper):
 
     def upgrade_mercurial(self, current):
         self.dnf_update('mercurial')
+
