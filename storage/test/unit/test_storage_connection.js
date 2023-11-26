@@ -69,8 +69,7 @@ function executeAsync(statement, onResult) {
   return deferred.promise;
 }
 
-add_task(function test_connectionReady_open()
-{
+add_task(function* test_connectionReady_open() {
   // there doesn't seem to be a way for the connection to not be ready (unless
   // we close it with mozIStorageConnection::Close(), but we don't for this).
   // It can only fail if GetPath fails on the database file, or if we run out
@@ -80,8 +79,7 @@ add_task(function test_connectionReady_open()
   do_check_true(msc.connectionReady);
 });
 
-add_task(function test_connectionReady_closed()
-{
+add_task(function* test_connectionReady_closed() {
   // This also tests mozIStorageConnection::Close()
 
   var msc = getOpenedDatabase();
@@ -90,26 +88,22 @@ add_task(function test_connectionReady_closed()
   gDBConn = null; // this is so later tests don't start to fail.
 });
 
-add_task(function test_databaseFile()
-{
+add_task(function* test_databaseFile() {
   var msc = getOpenedDatabase();
   do_check_true(getTestDB().equals(msc.databaseFile));
 });
 
-add_task(function test_tableExists_not_created()
-{
+add_task(function* test_tableExists_not_created() {
   var msc = getOpenedDatabase();
   do_check_false(msc.tableExists("foo"));
 });
 
-add_task(function test_indexExists_not_created()
-{
+add_task(function* test_indexExists_not_created() {
   var msc = getOpenedDatabase();
   do_check_false(msc.indexExists("foo"));
 });
 
-add_task(function test_temp_tableExists_and_indexExists()
-{
+add_task(function* test_temp_tableExists_and_indexExists() {
   var msc = getOpenedDatabase();
   msc.executeSimpleSQL("CREATE TEMP TABLE test_temp(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
   do_check_true(msc.tableExists("test_temp"));
@@ -121,22 +115,19 @@ add_task(function test_temp_tableExists_and_indexExists()
   msc.executeSimpleSQL("DROP TABLE test_temp");
 });
 
-add_task(function test_createTable_not_created()
-{
+add_task(function* test_createTable_not_created() {
   var msc = getOpenedDatabase();
   msc.createTable("test", "id INTEGER PRIMARY KEY, name TEXT");
   do_check_true(msc.tableExists("test"));
 });
 
-add_task(function test_indexExists_created()
-{
+add_task(function* test_indexExists_created() {
   var msc = getOpenedDatabase();
   msc.executeSimpleSQL("CREATE INDEX name_ind ON test (name)");
   do_check_true(msc.indexExists("name_ind"));
 });
 
-add_task(function test_createTable_already_created()
-{
+add_task(function* test_createTable_already_created() {
   var msc = getOpenedDatabase();
   do_check_true(msc.tableExists("test"));
   try {
@@ -147,8 +138,7 @@ add_task(function test_createTable_already_created()
   }
 });
 
-add_task(function test_attach_createTable_tableExists_indexExists()
-{
+add_task(function* test_attach_createTable_tableExists_indexExists() {
   var msc = getOpenedDatabase();
   var file = do_get_file("storage_attach.sqlite", true);
   var msc2 = getDatabase(file);
@@ -160,7 +150,10 @@ add_task(function test_attach_createTable_tableExists_indexExists()
   try {
     msc.createTable("sample.test", "id INTEGER PRIMARY KEY, name TEXT");
     do_throw("We shouldn't get here!");
-  } catch (e if e.result == Components.results.NS_ERROR_FAILURE) {
+  } catch (e) {
+    if (e.result != Components.results.NS_ERROR_FAILURE) {
+      throw e;
+    }
     // we expect to fail because this table should exist already.
   }
 
@@ -177,21 +170,18 @@ add_task(function test_attach_createTable_tableExists_indexExists()
   }
 });
 
-add_task(function test_lastInsertRowID()
-{
+add_task(function* test_lastInsertRowID() {
   var msc = getOpenedDatabase();
   msc.executeSimpleSQL("INSERT INTO test (name) VALUES ('foo')");
   do_check_eq(1, msc.lastInsertRowID);
 });
 
-add_task(function test_transactionInProgress_no()
-{
+add_task(function* test_transactionInProgress_no() {
   var msc = getOpenedDatabase();
   do_check_false(msc.transactionInProgress);
 });
 
-add_task(function test_transactionInProgress_yes()
-{
+add_task(function* test_transactionInProgress_yes() {
   var msc = getOpenedDatabase();
   msc.beginTransaction();
   do_check_true(msc.transactionInProgress);
@@ -204,8 +194,7 @@ add_task(function test_transactionInProgress_yes()
   do_check_false(msc.transactionInProgress);
 });
 
-add_task(function test_commitTransaction_no_transaction()
-{
+add_task(function* test_commitTransaction_no_transaction() {
   var msc = getOpenedDatabase();
   do_check_false(msc.transactionInProgress);
   try {
@@ -216,8 +205,7 @@ add_task(function test_commitTransaction_no_transaction()
   }
 });
 
-add_task(function test_rollbackTransaction_no_transaction()
-{
+add_task(function* test_rollbackTransaction_no_transaction() {
   var msc = getOpenedDatabase();
   do_check_false(msc.transactionInProgress);
   try {
@@ -228,29 +216,25 @@ add_task(function test_rollbackTransaction_no_transaction()
   }
 });
 
-add_task(function test_get_schemaVersion_not_set()
-{
+add_task(function* test_get_schemaVersion_not_set() {
   do_check_eq(0, getOpenedDatabase().schemaVersion);
 });
 
-add_task(function test_set_schemaVersion()
-{
+add_task(function* test_set_schemaVersion() {
   var msc = getOpenedDatabase();
   const version = 1;
   msc.schemaVersion = version;
   do_check_eq(version, msc.schemaVersion);
 });
 
-add_task(function test_set_schemaVersion_same()
-{
+add_task(function* test_set_schemaVersion_same() {
   var msc = getOpenedDatabase();
   const version = 1;
   msc.schemaVersion = version; // should still work ok
   do_check_eq(version, msc.schemaVersion);
 });
 
-add_task(function test_set_schemaVersion_negative()
-{
+add_task(function* test_set_schemaVersion_negative() {
   var msc = getOpenedDatabase();
   const version = -1;
   msc.schemaVersion = version;
@@ -280,8 +264,7 @@ add_task(function* test_createTable() {
   }
 });
 
-add_task(function test_defaultSynchronousAtNormal()
-{
+add_task(function* test_defaultSynchronousAtNormal() {
   var msc = getOpenedDatabase();
   var stmt = createStatement("PRAGMA synchronous;");
   try {
@@ -295,8 +278,7 @@ add_task(function test_defaultSynchronousAtNormal()
 });
 
 // must be ran before executeAsync tests
-add_task(function test_close_does_not_spin_event_loop()
-{
+add_task(function* test_close_does_not_spin_event_loop() {
   // We want to make sure that the event loop on the calling thread does not
   // spin when close is called.
   let event = {
@@ -322,8 +304,7 @@ add_task(function test_close_does_not_spin_event_loop()
   gDBConn = null;
 });
 
-add_task(function test_asyncClose_succeeds_with_finalized_async_statement()
-{
+add_task(function* test_asyncClose_succeeds_with_finalized_async_statement() {
   // XXX this test isn't perfect since we can't totally control when events will
   //     run.  If this paticular function fails randomly, it means we have a
   //     real bug.
@@ -340,7 +321,7 @@ add_task(function test_asyncClose_succeeds_with_finalized_async_statement()
   gDBConn = null;
 });
 
-add_task(function test_close_then_release_statement() {
+add_task(function* test_close_then_release_statement() {
   // Testing the behavior in presence of a bad client that finalizes
   // statements after the database has been closed (typically by
   // letting the gc finalize the statement).
@@ -353,7 +334,7 @@ add_task(function test_close_then_release_statement() {
   gDBConn = null;
 });
 
-add_task(function test_asyncClose_then_release_statement() {
+add_task(function* test_asyncClose_then_release_statement() {
   // Testing the behavior in presence of a bad client that finalizes
   // statements after the database has been async closed (typically by
   // letting the gc finalize the statement).
@@ -366,8 +347,7 @@ add_task(function test_asyncClose_then_release_statement() {
   gDBConn = null;
 });
 
-add_task(function test_close_fails_with_async_statement_ran()
-{
+add_task(function* test_close_fails_with_async_statement_ran() {
   let deferred = Promise.defer();
   let stmt = createStatement("SELECT * FROM test");
   stmt.executeAsync();
@@ -392,8 +372,7 @@ add_task(function test_close_fails_with_async_statement_ran()
   yield deferred.promise;
 });
 
-add_task(function test_clone_optional_param()
-{
+add_task(function* test_clone_optional_param() {
   let db1 = getService().openUnsharedDatabase(getTestDB());
   let db2 = db1.clone();
   do_check_true(db2.connectionReady);
@@ -416,7 +395,7 @@ add_task(function test_clone_optional_param()
   db2.close();
 });
 
-function standardAsyncTest(promisedDB, name, shouldInit = false) {
+function* standardAsyncTest(promisedDB, name, shouldInit = false) {
   do_print("Performing standard async test " + name);
 
   let adb = yield promisedDB;
@@ -457,7 +436,7 @@ function standardAsyncTest(promisedDB, name, shouldInit = false) {
   do_print("Standard async test " + name + " complete");
 }
 
-add_task(function test_open_async() {
+add_task(function* test_open_async() {
   yield standardAsyncTest(openAsyncDatabase(getTestDB(), null), "default");
   yield standardAsyncTest(openAsyncDatabase(getTestDB()), "no optional arg");
   yield standardAsyncTest(openAsyncDatabase(getTestDB(),
@@ -498,7 +477,7 @@ add_task(function test_open_async() {
 });
 
 
-add_task(function test_async_open_with_shared_cache() {
+add_task(function* test_async_open_with_shared_cache() {
   do_print("Testing that opening with a shared cache doesn't break stuff");
   let adb = yield openAsyncDatabase(getTestDB(), {shared: true});
 
@@ -525,8 +504,7 @@ add_task(function test_async_open_with_shared_cache() {
   yield asyncClose(adb);
 });
 
-add_task(function test_clone_trivial_async()
-{
+add_task(function* test_clone_trivial_async() {
   let db1 = getService().openDatabase(getTestDB());
   do_print("Opened adb1");
   do_check_true(db1 instanceof Ci.mozIStorageAsyncConnection);
@@ -538,8 +516,7 @@ add_task(function test_clone_trivial_async()
   yield asyncClose(adb2);
 });
 
-add_task(function test_clone_no_optional_param_async()
-{
+add_task(function* test_clone_no_optional_param_async() {
   "use strict";
   do_print("Testing async cloning");
   let adb1 = yield openAsyncDatabase(getTestDB(), null);
@@ -584,8 +561,7 @@ add_task(function test_clone_no_optional_param_async()
   do_print("Second db closed");
 });
 
-add_task(function test_clone_readonly()
-{
+add_task(function* test_clone_readonly() {
   let db1 = getService().openUnsharedDatabase(getTestDB());
   let db2 = db1.clone(true);
   do_check_true(db2.connectionReady);
@@ -605,8 +581,7 @@ add_task(function test_clone_readonly()
   db2.close();
 });
 
-add_task(function test_clone_shared_readonly()
-{
+add_task(function* test_clone_shared_readonly() {
   let db1 = getService().openDatabase(getTestDB());
   let db2 = db1.clone(true);
   do_check_true(db2.connectionReady);
@@ -630,8 +605,7 @@ add_task(function test_clone_shared_readonly()
   db2.close();
 });
 
-add_task(function test_close_clone_fails()
-{
+add_task(function* test_close_clone_fails() {
   let calls = [
     "openDatabase",
     "openUnsharedDatabase",
@@ -643,15 +617,13 @@ add_task(function test_close_clone_fails()
   });
 });
 
-add_task(function test_memory_clone_fails()
-{
+add_task(function* test_memory_clone_fails() {
   let db = getService().openSpecialDatabase("memory");
   db.close();
   expectError(Cr.NS_ERROR_NOT_INITIALIZED, () => db.clone());
 });
 
-add_task(function test_clone_copies_functions()
-{
+add_task(function* test_clone_copies_functions() {
   const FUNC_NAME = "test_func";
   let calls = [
     "openDatabase",
@@ -684,8 +656,7 @@ add_task(function test_clone_copies_functions()
   });
 });
 
-add_task(function test_clone_copies_overridden_functions()
-{
+add_task(function* test_clone_copies_overridden_functions() {
   const FUNC_NAME = "lower";
   function test_func() {
     this.called = false;
@@ -730,8 +701,7 @@ add_task(function test_clone_copies_overridden_functions()
   });
 });
 
-add_task(function test_clone_copies_pragmas()
-{
+add_task(function* test_clone_copies_pragmas() {
   const PRAGMAS = [
     { name: "cache_size", value: 500, copied: true },
     { name: "temp_store", value: 2, copied: true },
@@ -773,8 +743,7 @@ add_task(function test_clone_copies_pragmas()
   db2.close();
 });
 
-add_task(function test_readonly_clone_copies_pragmas()
-{
+add_task(function* test_readonly_clone_copies_pragmas() {
   const PRAGMAS = [
     { name: "cache_size", value: 500, copied: true },
     { name: "temp_store", value: 2, copied: true },
@@ -816,8 +785,7 @@ add_task(function test_readonly_clone_copies_pragmas()
   db2.close();
 });
 
-add_task(function test_getInterface()
-{
+add_task(function* test_getInterface() {
   let db = getOpenedDatabase();
   let target = db.QueryInterface(Ci.nsIInterfaceRequestor)
                  .getInterface(Ci.nsIEventTarget);
@@ -830,7 +798,6 @@ add_task(function test_getInterface()
 });
 
 
-function run_test()
-{
+function run_test() {
   run_next_test();
 }
