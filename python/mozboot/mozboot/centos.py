@@ -61,4 +61,3 @@ class CentOSBootstrapper(BaseBootstrapper):
 
     def upgrade_mercurial(self, current):
         self.yum_update('mercurial')
-
