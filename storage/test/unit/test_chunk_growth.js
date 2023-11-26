@@ -5,8 +5,8 @@
 // This file tests SQLITE_FCNTL_CHUNK_SIZE behaves as expected
 
 function run_sql(d, sql) {
-  var stmt = d.createStatement(sql)
-  stmt.execute()
+  var stmt = d.createStatement(sql);
+  stmt.execute();
   stmt.finalize();
 }
 
@@ -18,7 +18,7 @@ function new_file(name)
 }
 
 function get_size(name) {
-  return new_file(name).fileSize
+  return new_file(name).fileSize;
 }
 
 function run_test()
@@ -39,17 +39,17 @@ function run_test()
    * While writing ensure that the file size growth in chunksize set above.
    */
   const str1024 = new Array(1024).join("T");
-  for(var i = 0; i < 32; i++) {
+  for (var i = 0; i < 32; i++) {
     run_sql(d, "INSERT INTO bloat VALUES('" + str1024 + "')");
-    var size = get_size(filename)
+    var size = get_size(filename);
     // Must not grow in small increments.
     do_check_true(size == orig_size || size >= CHUNK_SIZE);
   }
   /* In addition to growing in chunk-size increments, the db
    * should shrink in chunk-size increments too.
    */
-  run_sql(d, "DELETE FROM bloat")
-  run_sql(d, "VACUUM")
-  do_check_true(get_size(filename) >= CHUNK_SIZE)
+  run_sql(d, "DELETE FROM bloat");
+  run_sql(d, "VACUUM");
+  do_check_true(get_size(filename) >= CHUNK_SIZE);
 }
 
