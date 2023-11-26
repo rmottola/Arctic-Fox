@@ -37,6 +37,7 @@ class CentOSBootstrapper(BaseBootstrapper):
             'GConf2-devel',
             'glibc-static',
             'gtk2-devel',
+            'gtk3-devel',
             'libstdc++-static',
             'libXt-devel',
             'mesa-libGL-devel',

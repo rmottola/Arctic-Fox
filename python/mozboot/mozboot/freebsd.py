@@ -22,6 +22,7 @@ class FreeBSDBootstrapper(BaseBootstrapper):
         self.browser_packages = [
             'dbus-glib',
             'gtk2',
+            'gtk3',
             'libGL',
             'pulseaudio',
             'v4l_compat',
