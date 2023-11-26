@@ -41,7 +41,6 @@ class FedoraBootstrapper(BaseBootstrapper):
         ]
 
         self.mobile_android_packages = [
-            'ant',
             'ncurses-devel.i686',
             'libstdc++.i686',
             'zlib-devel.i686',

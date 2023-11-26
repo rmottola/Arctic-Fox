@@ -333,7 +333,6 @@ class OSXBootstrapper(BaseBootstrapper):
 
         # 1. System packages.
         packages = [
-            ('ant', 'ant'),
             ('brew-cask', 'caskroom/cask/brew-cask'),  # For installing Java later.
             ('wget', 'wget'),
         ]
