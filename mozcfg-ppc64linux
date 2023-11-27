@@ -31,7 +31,7 @@ ac_add_options --with-branding=browser/branding/arcticfox
 ac_add_options --enable-altivec
 
 # only for gcc >= 6 and only if binaries are unstable, should be inserted automatically by configure if gcc >= 6
-ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
+#ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
 
 # gtk3 now supported and default, but gtk2 just looks better
 ac_add_options --enable-default-toolkit=cairo-gtk2

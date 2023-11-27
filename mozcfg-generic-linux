@@ -21,6 +21,7 @@ ac_add_options --disable-eme
 ac_add_options --disable-gamepad
 ac_add_options --disable-dbus
 ac_add_options --disable-gio
+#ac_add_options --disable-gconf
 ac_add_options --disable-pulseaudio
 ac_add_options --enable-strip
 ac_add_options --enable-install-strip
@@ -30,7 +31,7 @@ ac_add_options --with-branding=browser/branding/arcticfox
 ac_add_options --enable-optimize
 
 # only for gcc >= 6 and only if binaries are unstable, should be inserted automatically by configure if gcc >= 6
-ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
+#ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
 
 # gtk3 now supported and default, but gtk2 just looks better
 ac_add_options --enable-default-toolkit=cairo-gtk2
