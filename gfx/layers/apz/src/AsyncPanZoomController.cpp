@@ -2795,6 +2795,17 @@ void AsyncPanZoomController::RequestContentRepaint() {
   RequestContentRepaint(mFrameMetrics);
 }
 
+/*static*/ CSSRect
+GetDisplayPortRect(const FrameMetrics& aFrameMetrics)
+{
+  // This computation is based on what happens in CalculatePendingDisplayPort. If that
+  // changes then this might need to change too
+  CSSRect baseRect(aFrameMetrics.GetScrollOffset(),
+                   aFrameMetrics.CalculateBoundedCompositedSizeInCssPixels());
+  baseRect.Inflate(aFrameMetrics.GetDisplayPortMargins() / aFrameMetrics.DisplayportPixelsPerCSSPixel());
+  return baseRect;
+}
+
 void AsyncPanZoomController::RequestContentRepaint(FrameMetrics& aFrameMetrics)
 {
   ParentLayerPoint velocity = GetVelocityVector();
@@ -2823,25 +2834,6 @@ void AsyncPanZoomController::RequestContentRepaint(FrameMetrics& aFrameMetrics)
   }
 
   aFrameMetrics.SetPaintRequestTime(TimeStamp::Now());
-  DispatchRepaintRequest(aFrameMetrics, velocity);
-  aFrameMetrics.SetPresShellId(mLastContentPaintMetrics.GetPresShellId());
-}
-
-/*static*/ CSSRect
-GetDisplayPortRect(const FrameMetrics& aFrameMetrics)
-{
-  // This computation is based on what happens in CalculatePendingDisplayPort. If that
-  // changes then this might need to change too
-  CSSRect baseRect(aFrameMetrics.GetScrollOffset(),
-                   aFrameMetrics.CalculateBoundedCompositedSizeInCssPixels());
-  baseRect.Inflate(aFrameMetrics.GetDisplayPortMargins() / aFrameMetrics.DisplayportPixelsPerCSSPixel());
-  return baseRect;
-}
-
-void
-AsyncPanZoomController::DispatchRepaintRequest(const FrameMetrics& aFrameMetrics,
-                                               const ParentLayerPoint& aVelocity)
-{
   RefPtr<GeckoContentController> controller = GetGeckoContentController();
   if (!controller) {
     return;
@@ -2850,7 +2842,7 @@ AsyncPanZoomController::DispatchRepaintRequest(const FrameMetrics& aFrameMetrics
   APZC_LOG_FM(aFrameMetrics, "%p requesting content repaint", this);
   if (mCheckerboardEvent) {
     std::stringstream info;
-    info << " velocity " << aVelocity;
+    info << " velocity " << velocity;
     std::string str = info.str();
     mCheckerboardEvent->UpdateRendertraceProperty(
         CheckerboardEvent::RequestedDisplayPort, GetDisplayPortRect(aFrameMetrics),
@@ -2865,6 +2857,7 @@ AsyncPanZoomController::DispatchRepaintRequest(const FrameMetrics& aFrameMetrics
   }
   mExpectedGeckoMetrics = aFrameMetrics;
   mLastPaintRequestMetrics = aFrameMetrics;
+  aFrameMetrics.SetPresShellId(mLastContentPaintMetrics.GetPresShellId());
 }
 
 bool AsyncPanZoomController::UpdateAnimation(const TimeStamp& aSampleTime,
