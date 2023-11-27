@@ -26,6 +26,25 @@ ac_add_options --enable-strip
 ac_add_options --enable-install-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
+
+ac_add_options --enable-optimize
+
+# only for gcc >= 6 and only if binaries are unstable, should be inserted automatically by configure if gcc >= 6
 ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
 
+# gtk3 now supported and default, but gtk2 just looks better
+ac_add_options --enable-default-toolkit=cairo-gtk2
 
+# Issue 162
+ac_add_options --disable-precompiled-startupcache
+
+# For convenience, if needed
+#ac_add_options --with-system-nspr
+#ac_add_options --with-system-nss
+#ac_add_options --with-system-icu
+#ac_add_options --with-system-zlib
+#ac_add_options --with-system-bz2
+#ac_add_options --enable-system-hunspell
+#ac_add_options --enable-system-sqlite
+#ac_add_options --enable-system-ffi
+#ac_add_options --enable-system-pixman
