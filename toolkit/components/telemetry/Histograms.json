@@ -9395,12 +9395,6 @@
     "kind": "boolean",
     "description": "Attempt to determine prevalence of scroll-linked effects on the web."
   },
-  "YOUTUBE_EMBED_SEEN": {
-    "alert_emails": ["cpeterson@mozilla.com"],
-    "expires_in_version": "48",
-    "kind": "flag",
-    "description": "Flag activated whenever a youtube flash embed is seen during a session."
-  },
   "SCROLL_INPUT_METHODS": {
     "alert_emails": ["botond@mozilla.com"],
     "bug_numbers": [1238137],
