@@ -648,6 +648,11 @@ public:
     return true;
   }
 
+  virtual bool WantsRepaints() override
+  {
+    return false;
+  }
+
 private:
   TimeDuration mDuration;
   const TimeDuration mTotalDuration;
@@ -699,6 +704,12 @@ public:
     }
     return true;
   }
+
+  virtual bool WantsRepaints() override
+  {
+    return false;
+  }
+
 private:
   AsyncPanZoomController& mApzc;
 };
@@ -2925,12 +2936,15 @@ bool AsyncPanZoomController::UpdateAnimation(const TimeStamp& aSampleTime,
 
   if (mAnimation) {
     bool continueAnimation = mAnimation->Sample(mFrameMetrics, sampleTimeDelta);
+    bool wantsRepaints = mAnimation->WantsRepaints();
     *aOutDeferredTasks = mAnimation->TakeDeferredTasks();
     if (!continueAnimation) {
       mAnimation = nullptr;
       SetState(NOTHING);
     }
-    RequestContentRepaint();
+    if (wantsRepaints) {
+      RequestContentRepaint();
+    }
     UpdateSharedCompositorFrameMetrics();
     return true;
   }
