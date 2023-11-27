@@ -2645,10 +2645,6 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
     needImageVisibilityUpdate = true;
   }
 
-  if (needImageVisibilityUpdate) {
-    presContext->PresShell()->ScheduleImageVisibilityUpdate();
-  }
-
   // notify the listeners.
   for (uint32_t i = 0; i < mListeners.Length(); i++) {
     mListeners[i]->ScrollPositionWillChange(pt.x, pt.y);
@@ -2679,9 +2675,17 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
 
     if (!displayPort.IsEqualEdges(oldDisplayPort)) {
       mOuter->SchedulePaint();
+
+      if (needImageVisibilityUpdate) {
+        presContext->PresShell()->ScheduleImageVisibilityUpdate();
+      }
     }
   } else {
     mOuter->SchedulePaint();
+
+    if (needImageVisibilityUpdate) {
+      presContext->PresShell()->ScheduleImageVisibilityUpdate();
+    }
   }
 
   if (mOuter->ChildrenHavePerspective()) {
