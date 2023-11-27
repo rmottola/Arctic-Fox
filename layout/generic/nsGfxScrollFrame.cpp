@@ -2482,6 +2482,12 @@ ScrollFrameHelper::ScheduleSyntheticMouseMove()
 }
 
 void
+ScrollFrameHelper::NotifyImageVisibilityUpdate()
+{
+  mLastUpdateImagesPos = GetScrollPosition();
+}
+
+void
 ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOrigin)
 {
   if (aOrigin == nullptr) {
@@ -2897,7 +2903,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                     const nsDisplayListSet& aLists)
 {
   if (aBuilder->IsForImageVisibility()) {
-    mLastUpdateImagesPos = GetScrollPosition();
+    NotifyImageVisibilityUpdate();
   }
 
   mOuter->DisplayBorderBackgroundOutline(aBuilder, aLists);
