@@ -2792,6 +2792,21 @@ int32_t AsyncPanZoomController::GetLastTouchIdentifier() const {
 }
 
 void AsyncPanZoomController::RequestContentRepaint() {
+  // Reinvoke this method on the main thread if it's not there already. It's
+  // important to do this before the call to CalculatePendingDisplayPort, so
+  // that CalculatePendingDisplayPort uses the most recent available version of
+  // mFrameMetrics, just before the paint request is dispatched to content.
+  if (!NS_IsMainThread()) {
+    // use the local variable to resolve the function overload.
+    auto func = static_cast<void (AsyncPanZoomController::*)()>
+        (&AsyncPanZoomController::RequestContentRepaint);
+    NS_DispatchToMainThread(NS_NewRunnableMethod(this, func));
+    return;
+  }
+
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ReentrantMonitorAutoEnter lock(mMonitor);
   ParentLayerPoint velocity = GetVelocityVector();
   mFrameMetrics.SetDisplayPortMargins(CalculatePendingDisplayPort(mFrameMetrics, velocity));
   mFrameMetrics.SetUseDisplayPortMargins(true);
@@ -2814,6 +2829,8 @@ void
 AsyncPanZoomController::RequestContentRepaint(const FrameMetrics& aFrameMetrics,
                                               const ParentLayerPoint& aVelocity)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   // If we're trying to paint what we already think is painted, discard this
   // request since it's a pointless paint.
   ScreenMargin marginDelta = (mLastPaintRequestMetrics.GetDisplayPortMargins()
@@ -2850,12 +2867,7 @@ AsyncPanZoomController::RequestContentRepaint(const FrameMetrics& aFrameMetrics,
         str);
   }
 
-  if (NS_IsMainThread()) {
-    controller->RequestContentRepaint(aFrameMetrics);
-  } else {
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg<FrameMetrics>(
-      controller, &GeckoContentController::RequestContentRepaint, aFrameMetrics));
-  }
+  controller->RequestContentRepaint(aFrameMetrics);
   mExpectedGeckoMetrics = aFrameMetrics;
   mLastPaintRequestMetrics = aFrameMetrics;
 }
@@ -3463,7 +3475,16 @@ void AsyncPanZoomController::ZoomToRect(CSSRect aRect, const uint32_t aFlags) {
       CalculatePendingDisplayPort(endZoomToMetrics, velocity));
     endZoomToMetrics.SetUseDisplayPortMargins(true);
     endZoomToMetrics.SetPaintRequestTime(TimeStamp::Now());
-    RequestContentRepaint(endZoomToMetrics, velocity);
+    if (NS_IsMainThread()) {
+      RequestContentRepaint(endZoomToMetrics, velocity);
+    } else {
+      // use a local var to resolve the function overload
+      auto func = static_cast<void (AsyncPanZoomController::*)(const FrameMetrics&, const ParentLayerPoint&)>
+          (&AsyncPanZoomController::RequestContentRepaint);
+      NS_DispatchToMainThread(
+          NS_NewRunnableMethodWithArgs<FrameMetrics, ParentLayerPoint>(
+              this, func, endZoomToMetrics, velocity));
+    }
   }
 }
 
