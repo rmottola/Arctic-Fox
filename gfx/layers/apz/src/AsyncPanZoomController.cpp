@@ -866,7 +866,8 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
      mInputQueue(aInputQueue),
      mAPZCId(sAsyncPanZoomControllerCount++),
      mSharedLock(nullptr),
-     mAsyncTransformAppliedToContent(false)
+     mAsyncTransformAppliedToContent(false),
+     mCheckerboardEventLock("APZCBELock")
 {
   if (aGestures == USE_GESTURE_DETECTOR) {
     mGestureEventListener = new GestureEventListener(this);
@@ -2891,13 +2892,16 @@ AsyncPanZoomController::RequestContentRepaint(const FrameMetrics& aFrameMetrics,
   }
 
   APZC_LOG_FM(aFrameMetrics, "%p requesting content repaint", this);
-  if (mCheckerboardEvent && mCheckerboardEvent->IsRecordingTrace()) {
-    std::stringstream info;
-    info << " velocity " << aVelocity;
-    std::string str = info.str();
-    mCheckerboardEvent->UpdateRendertraceProperty(
-        CheckerboardEvent::RequestedDisplayPort, GetDisplayPortRect(aFrameMetrics),
-        str);
+  { // scope lock
+    MutexAutoLock lock(mCheckerboardEventLock);
+    if (mCheckerboardEvent && mCheckerboardEvent->IsRecordingTrace()) {
+      std::stringstream info;
+      info << " velocity " << aVelocity;
+      std::string str = info.str();
+      mCheckerboardEvent->UpdateRendertraceProperty(
+          CheckerboardEvent::RequestedDisplayPort, GetDisplayPortRect(aFrameMetrics),
+          str);
+    }
   }
 
   controller->RequestContentRepaint(aFrameMetrics);
@@ -3004,11 +3008,14 @@ bool AsyncPanZoomController::AdvanceAnimations(const TimeStamp& aSampleTime)
 
     requestAnimationFrame = UpdateAnimation(aSampleTime, &deferredTasks);
 
-    if (mCheckerboardEvent) {
-      mCheckerboardEvent->UpdateRendertraceProperty(
-          CheckerboardEvent::UserVisible,
-          CSSRect(mFrameMetrics.GetScrollOffset(),
-                  mFrameMetrics.CalculateCompositedSizeInCssPixels()));
+    { // scope lock
+      MutexAutoLock lock(mCheckerboardEventLock);
+      if (mCheckerboardEvent) {
+        mCheckerboardEvent->UpdateRendertraceProperty(
+            CheckerboardEvent::UserVisible,
+            CSSRect(mFrameMetrics.GetScrollOffset(),
+                    mFrameMetrics.CalculateCompositedSizeInCssPixels()));
+      }
     }
   }
 
@@ -3129,10 +3136,12 @@ AsyncPanZoomController::ReportCheckerboard(const TimeStamp& aSampleTime)
 
   bool recordTrace = gfxPrefs::APZRecordCheckerboarding();
   bool forTelemetry = Telemetry::CanRecordExtended();
+  uint32_t magnitude = GetCheckerboardMagnitude();
+
+  MutexAutoLock lock(mCheckerboardEventLock);
   if (!mCheckerboardEvent && (recordTrace || forTelemetry)) {
     mCheckerboardEvent = MakeUnique<CheckerboardEvent>(recordTrace);
   }
-  uint32_t magnitude = GetCheckerboardMagnitude();
   if (magnitude) {
     mPotentialCheckerboardTracker.CheckerboardSeen();
   }
@@ -3196,36 +3205,39 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
   APZC_LOG_FM(aLayerMetrics, "%p got a NotifyLayersUpdated with aIsFirstPaint=%d, aThisLayerTreeUpdated=%d",
     this, aIsFirstPaint, aThisLayerTreeUpdated);
 
-  if (mCheckerboardEvent && mCheckerboardEvent->IsRecordingTrace()) {
-    std::string str;
-    if (aThisLayerTreeUpdated) {
-      if (!aLayerMetrics.GetPaintRequestTime().IsNull()) {
-        // Note that we might get the paint request time as non-null, but with
-        // aThisLayerTreeUpdated false. That can happen if we get a layer transaction
-        // from a different process right after we get the layer transaction with
-        // aThisLayerTreeUpdated == true. In this case we want to ignore the
-        // paint request time because it was already dumped in the previous layer
-        // transaction.
-        TimeDuration paintTime = TimeStamp::Now() - aLayerMetrics.GetPaintRequestTime();
-        std::stringstream info;
-        info << " painttime " << paintTime.ToMilliseconds();
-        str = info.str();
-      } else {
-        // This might be indicative of a wasted paint particularly if it happens
-        // during a checkerboard event.
-        str = " (this layertree updated)";
+  { // scope lock
+    MutexAutoLock lock(mCheckerboardEventLock);
+    if (mCheckerboardEvent && mCheckerboardEvent->IsRecordingTrace()) {
+      std::string str;
+      if (aThisLayerTreeUpdated) {
+        if (!aLayerMetrics.GetPaintRequestTime().IsNull()) {
+          // Note that we might get the paint request time as non-null, but with
+          // aThisLayerTreeUpdated false. That can happen if we get a layer transaction
+          // from a different process right after we get the layer transaction with
+          // aThisLayerTreeUpdated == true. In this case we want to ignore the
+          // paint request time because it was already dumped in the previous layer
+          // transaction.
+          TimeDuration paintTime = TimeStamp::Now() - aLayerMetrics.GetPaintRequestTime();
+          std::stringstream info;
+          info << " painttime " << paintTime.ToMilliseconds();
+          str = info.str();
+        } else {
+          // This might be indicative of a wasted paint particularly if it happens
+          // during a checkerboard event.
+          str = " (this layertree updated)";
+        }
       }
-    }
-    mCheckerboardEvent->UpdateRendertraceProperty(
-        CheckerboardEvent::Page, aLayerMetrics.GetScrollableRect());
-    mCheckerboardEvent->UpdateRendertraceProperty(
-        CheckerboardEvent::PaintedDisplayPort,
-        aLayerMetrics.GetDisplayPort() + aLayerMetrics.GetScrollOffset(),
-        str);
-    if (!aLayerMetrics.GetCriticalDisplayPort().IsEmpty()) {
       mCheckerboardEvent->UpdateRendertraceProperty(
-          CheckerboardEvent::PaintedCriticalDisplayPort,
-          aLayerMetrics.GetCriticalDisplayPort() + aLayerMetrics.GetScrollOffset());
+          CheckerboardEvent::Page, aLayerMetrics.GetScrollableRect());
+      mCheckerboardEvent->UpdateRendertraceProperty(
+          CheckerboardEvent::PaintedDisplayPort,
+          aLayerMetrics.GetDisplayPort() + aLayerMetrics.GetScrollOffset(),
+          str);
+      if (!aLayerMetrics.GetCriticalDisplayPort().IsEmpty()) {
+        mCheckerboardEvent->UpdateRendertraceProperty(
+            CheckerboardEvent::PaintedCriticalDisplayPort,
+            aLayerMetrics.GetCriticalDisplayPort() + aLayerMetrics.GetScrollOffset());
+      }
     }
   }
 
