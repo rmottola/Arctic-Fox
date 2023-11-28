@@ -2467,6 +2467,14 @@ void AsyncPanZoomController::AcceptFling(FlingHandoffState& aHandoffState) {
       aHandoffState.mChain,
       !aHandoffState.mIsHandoff,  // only apply acceleration if this is an initial fling
       aHandoffState.mScrolledApzc);
+  RequestSnapToDestination();
+  StartAnimation(fling);
+}
+
+void
+AsyncPanZoomController::RequestSnapToDestination()
+{
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   float friction = gfxPrefs::APZFlingFriction();
   ParentLayerPoint velocity(mX.GetVelocity(), mY.GetVelocity());
@@ -2500,8 +2508,6 @@ void AsyncPanZoomController::AcceptFling(FlingHandoffState& aHandoffState) {
                                    predictedDestination);
     }
   }
-
-  StartAnimation(fling);
 }
 
 bool AsyncPanZoomController::AttemptFling(FlingHandoffState& aHandoffState) {
