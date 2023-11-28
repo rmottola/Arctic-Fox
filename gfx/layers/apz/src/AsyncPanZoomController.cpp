@@ -3133,6 +3133,9 @@ AsyncPanZoomController::ReportCheckerboard(const TimeStamp& aSampleTime)
     mCheckerboardEvent = MakeUnique<CheckerboardEvent>(recordTrace);
   }
   uint32_t magnitude = GetCheckerboardMagnitude();
+  if (magnitude) {
+    mPotentialCheckerboardTracker.CheckerboardSeen();
+  }
   if (mCheckerboardEvent && mCheckerboardEvent->RecordFrameInfo(magnitude)) {
     // This checkerboard event is done. Report some metrics to telemetry.
     mozilla::Telemetry::Accumulate(mozilla::Telemetry::CHECKERBOARD_SEVERITY,
@@ -3141,6 +3144,8 @@ AsyncPanZoomController::ReportCheckerboard(const TimeStamp& aSampleTime)
       mCheckerboardEvent->GetPeak());
     mozilla::Telemetry::Accumulate(mozilla::Telemetry::CHECKERBOARD_DURATION,
       (uint32_t)mCheckerboardEvent->GetDuration().ToMilliseconds());
+
+    mPotentialCheckerboardTracker.CheckerboardDone();
 
     if (recordTrace) {
       // if the pref is enabled, also send it to the storage class. it may be
@@ -3605,6 +3610,7 @@ void AsyncPanZoomController::DispatchStateChangeNotification(PanZoomState aOldSt
 
   if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
     if (!IsTransformingState(aOldState) && IsTransformingState(aNewState)) {
+      mPotentialCheckerboardTracker.TransformStarted();
       controller->NotifyAPZStateChange(
           GetGuid(), APZStateChange::TransformBegin);
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
@@ -3615,6 +3621,7 @@ void AsyncPanZoomController::DispatchStateChangeNotification(PanZoomState aOldSt
       }
 #endif
     } else if (IsTransformingState(aOldState) && !IsTransformingState(aNewState)) {
+      mPotentialCheckerboardTracker.TransformStopped();
       controller->NotifyAPZStateChange(
           GetGuid(), APZStateChange::TransformEnd);
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
