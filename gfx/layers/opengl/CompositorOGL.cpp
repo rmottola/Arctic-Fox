@@ -420,6 +420,7 @@ CompositorOGL::Initialize()
     }
   }
 
+  reporter.SetSuccessful();
   return true;
 }
 
