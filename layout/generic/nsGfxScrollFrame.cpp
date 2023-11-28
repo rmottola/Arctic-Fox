@@ -3226,7 +3226,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       }
 
       DisplayListClipState::AutoSaveRestore clipStateForScrollClip(aBuilder);
-      if (usingDisplayPort) {
+      if (mWillBuildScrollableLayer) {
         if (mClipAllDescendants) {
           clipStateForScrollClip.TurnClipIntoScrollClipForContentDescendants(aBuilder, sf);
         } else {
@@ -3255,7 +3255,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       }
 
       DisplayListClipState::AutoSaveRestore clipStateForScrollClip(aBuilder);
-      if (usingDisplayPort) {
+      if (mWillBuildScrollableLayer) {
         if (mClipAllDescendants) {
           clipStateForScrollClip.TurnClipIntoScrollClipForContentDescendants(aBuilder, sf);
         } else {
