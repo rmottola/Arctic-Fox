@@ -1818,8 +1818,7 @@ nsEventStatus AsyncPanZoomController::OnScrollWheel(const ScrollWheelInput& aEve
 
         nsPoint initialPosition = CSSPoint::ToAppUnits(mFrameMetrics.GetScrollOffset());
         StartAnimation(new WheelScrollAnimation(
-          *this,
-          initialPosition));
+          *this, initialPosition, aEvent.mDeltaType));
       }
 
       nsPoint deltaInAppUnits =
