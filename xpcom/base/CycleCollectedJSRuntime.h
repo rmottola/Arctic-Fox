@@ -292,7 +292,7 @@ public:
 
   void NurseryWrapperAdded(nsWrapperCache* aCache);
   void NurseryWrapperPreserved(JSObject* aWrapper);
-  void JSObjectsTenured(JSRuntime* aRuntime);
+  void JSObjectsTenured();
 
   void DeferredFinalize(DeferredFinalizeAppendFunction aAppendFunc,
                         DeferredFinalizeFunction aFunc,
