@@ -121,6 +121,7 @@ UNIFIED_SOURCES += [
     'nsMemoryInfoDumper.cpp',
     'nsMemoryReporterManager.cpp',
     'nsMessageLoop.cpp',
+    'NSPRLogModulesParser.cpp',
     'nsSecurityConsoleMessage.cpp',
     'nsStatusReporterManager.cpp',
     'nsSystemInfo.cpp',
