@@ -7,9 +7,6 @@
 const START_STATE = STATE_PENDING_SVC;
 const END_STATE = STATE_PENDING;
 
-const START_STATE = STATE_PENDING_SVC;
-const END_STATE = STATE_FAILED_WRITE_ERROR;
-
 function run_test() {
   if (!shouldRunServiceTest()) {
     return;

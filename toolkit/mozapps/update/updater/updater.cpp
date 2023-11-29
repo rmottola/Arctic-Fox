@@ -353,6 +353,13 @@ mstrtok(const NS_tchar *delims, NS_tchar **str)
   return ret;
 }
 
+static bool
+EnvHasValue(const char *name)
+{
+  const char *val = getenv(name);
+  return (val && *val);
+}
+
 #ifdef XP_WIN
 /**
  * Coverts a relative update path to a full path for Windows.
@@ -2366,7 +2373,7 @@ UpdateThreadFunc(void *param)
       // The MOZ_TEST_SKIP_UPDATE_STAGE environment variable prevents copying
       // the files in dist/bin in the test updater when staging an update since
       // this can cause tests to timeout.
-      if (getenv("MOZ_TEST_SKIP_UPDATE_STAGE")) {
+      if (EnvHasValue("MOZ_TEST_SKIP_UPDATE_STAGE")) {
         rv = OK;
       } else {
         rv = CopyInstallDirToDestDir();
@@ -2386,8 +2393,7 @@ UpdateThreadFunc(void *param)
     }
   }
 
-  bool reportRealResults = true;
-  if (sReplaceRequest && rv && !getenv("MOZ_NO_REPLACE_FALLBACK")) {
+  if (sReplaceRequest && rv) {
     // When attempting to replace the application, we should fall back
     // to non-staged updates in case of a failure.  We do this by
     // setting the status to pending, exiting the updater, and
@@ -2432,7 +2438,7 @@ UpdateThreadFunc(void *param)
 int NS_main(int argc, NS_tchar **argv)
 {
 #if defined(MOZ_WIDGET_GONK)
-  if (getenv("LD_PRELOAD")) {
+  if (EnvHasValue("LD_PRELOAD")) {
     // If the updater is launched with LD_PRELOAD set, then we wind up
     // preloading libmozglue.so. Under some circumstances, this can cause
     // the remount of /system to fail when going from rw to ro, so if we
@@ -2550,7 +2556,7 @@ int NS_main(int argc, NS_tchar **argv)
     *slash = NS_T('\0');
   }
 
-  if (getenv("MOZ_OS_UPDATE")) {
+  if (EnvHasValue("MOZ_OS_UPDATE")) {
     sIsOSUpdate = true;
     putenv(const_cast<char*>("MOZ_OS_UPDATE="));
   }
@@ -2839,6 +2845,13 @@ int NS_main(int argc, NS_tchar **argv)
         // We didn't use the service and we did run the elevated updater.exe.
         // The elevated updater.exe is responsible for writing out the
         // update.status file.
+        return 0;
+      } else if(useService) {
+        // The service command was launched. The service is responsible for
+        // writing out the update.status file.
+        if (updateLockFileHandle != INVALID_HANDLE_VALUE) {
+          CloseHandle(updateLockFileHandle);
+        }
         return 0;
       } else {
         // Otherwise the service command was not launched at all.
