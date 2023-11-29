@@ -402,7 +402,8 @@ CopyUpdaterIntoUpdateDir(nsIFile *greDir, nsIFile *appDir, nsIFile *updateDir,
  *
  * @param pathToAppend A new library path to prepend to LD_LIBRARY_PATH
  */
-#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && \
+    !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
 #include "prprf.h"
 #define PATH_SEPARATOR ":"
 #define LD_LIBRARY_PATH_ENVVAR_NAME "LD_LIBRARY_PATH"
@@ -620,7 +621,8 @@ SwitchToUpdatedApp(nsIFile *greDir, nsIFile *updateDir,
   if (gSafeMode) {
     PR_SetEnv("MOZ_SAFE_MODE_RESTART=1");
   }
-#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && \
+    !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
   AppendToLibPath(installDirPath.get());
 #endif
 
@@ -889,7 +891,8 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
   if (gSafeMode) {
     PR_SetEnv("MOZ_SAFE_MODE_RESTART=1");
   }
-#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && \
+    !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
   AppendToLibPath(installDirPath.get());
 #endif
 
