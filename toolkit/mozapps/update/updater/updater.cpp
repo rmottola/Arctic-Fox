@@ -1929,7 +1929,8 @@ LaunchWinPostProcess(const WCHAR *installationDir,
 static void
 LaunchCallbackApp(const NS_tchar *workingDir,
                   int argc,
-                  NS_tchar **argv)
+                  NS_tchar **argv,
+                  bool usingService)
 {
   putenv(const_cast<char*>("NO_EM_RESTART="));
   putenv(const_cast<char*>("MOZ_LAUNCHED_CHILD=1"));
@@ -1946,7 +1947,11 @@ LaunchCallbackApp(const NS_tchar *workingDir,
 #elif defined(XP_MACOSX)
   LaunchChild(argc, argv);
 #elif defined(XP_WIN)
-  WinLaunchChild(argv[0], argc, argv, nullptr);
+  // Do not allow the callback to run when running an update through the
+  // service as session 0.  The unelevated updater.exe will do the launching.
+  if (!usingService) {
+    WinLaunchChild(argv[0], argc, argv, nullptr);
+  }
 #else
 # warning "Need implementaton of LaunchCallbackApp"
 #endif
@@ -2836,12 +2841,13 @@ int NS_main(int argc, NS_tchar **argv)
 
       if (argc > callbackIndex) {
         LaunchCallbackApp(argv[5], argc - callbackIndex,
-                          argv + callbackIndex);
+                          argv + callbackIndex, sUsingService);
       }
 
       CloseHandle(elevatedFileHandle);
 
-      if (INVALID_HANDLE_VALUE == updateLockFileHandle) {
+      if (!useService && !noServiceFallback &&
+          INVALID_HANDLE_VALUE == updateLockFileHandle) {
         // We didn't use the service and we did run the elevated updater.exe.
         // The elevated updater.exe is responsible for writing out the
         // update.status file.
@@ -2996,7 +3002,8 @@ int NS_main(int argc, NS_tchar **argv)
       if (argc > callbackIndex) {
         LaunchCallbackApp(argv[5],
                           argc - callbackIndex,
-                          argv + callbackIndex);
+                          argv + callbackIndex,
+                          sUsingService);
       }
       return 1;
     }
@@ -3076,7 +3083,8 @@ int NS_main(int argc, NS_tchar **argv)
           EXIT_WHEN_ELEVATED(elevatedLockFilePath, updateLockFileHandle, 1);
           LaunchCallbackApp(argv[5],
                             argc - callbackIndex,
-                            argv + callbackIndex);
+                            argv + callbackIndex,
+                            sUsingService);
           return 1;
         }
         LOG(("NS_main: callback app file in use, continuing without " \
@@ -3199,12 +3207,10 @@ int NS_main(int argc, NS_tchar **argv)
       LaunchMacPostProcess(gInstallDirPath);
     }
 #endif /* XP_MACOSX */
-
-    if (getenv("MOZ_PROCESS_UPDATES") == nullptr) {
-      LaunchCallbackApp(argv[5],
-                        argc - callbackIndex,
-                        argv + callbackIndex);
-    }
+    LaunchCallbackApp(argv[5],
+                      argc - callbackIndex,
+                      argv + callbackIndex,
+                      sUsingService);
   }
 
   return gSucceeded ? 0 : 1;
