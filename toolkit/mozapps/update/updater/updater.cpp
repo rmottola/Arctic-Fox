@@ -127,7 +127,9 @@ static bool sUseHardLinks = true;
 #endif
 
 #ifdef XP_WIN
+#ifdef MOZ_MAINTENANCE_SERVICE
 #include "registrycertificates.h"
+#endif
 BOOL PathAppendSafe(LPWSTR base, LPCWSTR extra);
 BOOL PathGetSiblingFilePath(LPWSTR destinationBuffer,
                             LPCWSTR siblingFilePath,
@@ -1872,6 +1874,13 @@ LaunchWinPostProcess(const WCHAR *installationDir,
     return false;
   }
 
+#if !defined(TEST_UPDATER) && defined(MOZ_MAINTENANCE_SERVICE)
+  if (sUsingService &&
+      !DoesBinaryMatchAllowedCertificates(installationDir, exefullpath)) {
+    return false;
+  }
+#endif
+
   WCHAR dlogFile[MAX_PATH + 1];
   if (!PathGetSiblingFilePath(dlogFile, exefullpath, L"uninstall.update")) {
     return false;
@@ -2020,6 +2029,40 @@ WriteStatusFile(int status)
 
   WriteStatusFile(text);
 }
+
+#ifdef MOZ_MAINTENANCE_SERVICE
+/*
+ * Read the update.status file and sets isPendingService to true if
+ * the status is set to pending-service.
+ *
+ * @param  isPendingService Out parameter for specifying if the status
+ *         is set to pending-service or not.
+ * @return true if the information was retrieved and it is pending
+ *         or pending-service.
+*/
+static bool
+IsUpdateStatusPendingService()
+{
+  NS_tchar filename[MAXPATHLEN];
+  NS_tsnprintf(filename, sizeof(filename)/sizeof(filename[0]),
+               NS_T("%s/update.status"), gPatchDirPath);
+
+  AutoFile file(NS_tfopen(filename, NS_T("rb")));
+  if (file == nullptr)
+    return false;
+
+  char buf[32] = { 0 };
+  fread(buf, sizeof(buf), 1, file);
+
+  const char kPendingService[] = "pending-service";
+  const char kAppliedService[] = "applied-service";
+
+  return (strncmp(buf, kPendingService,
+                  sizeof(kPendingService) - 1) == 0) ||
+         (strncmp(buf, kAppliedService,
+                  sizeof(kAppliedService) - 1) == 0);
+}
+#endif
 
 #ifdef XP_WIN
 /*
@@ -2510,6 +2553,21 @@ int NS_main(int argc, NS_tchar **argv)
   }
 
 #ifdef XP_WIN
+  bool useService = false;
+  bool testOnlyFallbackKeyExists = false;
+  bool noServiceFallback = EnvHasValue("MOZ_NO_SERVICE_FALLBACK");
+  putenv(const_cast<char*>("MOZ_NO_SERVICE_FALLBACK="));
+
+  // We never want the service to be used unless we build with
+  // the maintenance service.
+#ifdef MOZ_MAINTENANCE_SERVICE
+  useService = IsUpdateStatusPendingService();
+  // Our tests run with a different apply directory for each test.
+  // We use this registry key on our test slaves to store the
+  // allowed name/issuers.
+  testOnlyFallbackKeyExists = DoesFallbackKeyExist();
+#endif
+
   // Remove everything except close window from the context menu
   {
     HKEY hkApp = nullptr;
@@ -2692,6 +2750,10 @@ int NS_main(int argc, NS_tchar **argv)
   const int callbackIndex = 6;
 
 #if defined(XP_WIN)
+#ifdef MOZ_MAINTENANCE_SERVICE
+  sUsingService = EnvHasValue("MOZ_USING_SERVICE");
+  putenv(const_cast<char*>("MOZ_USING_SERVICE="));
+#endif
   // lastFallbackError keeps track of the last error for the service not being
   // used, in case of an error when fallback is not enabled we write the
   // error to the update.status file.
@@ -2703,7 +2765,8 @@ int NS_main(int argc, NS_tchar **argv)
   // when write access is denied to the installation directory.
   HANDLE updateLockFileHandle = INVALID_HANDLE_VALUE;
   NS_tchar elevatedLockFilePath[MAXPATHLEN] = {NS_T('\0')};
-  if (argc > callbackIndex || sStagedUpdate || sReplaceRequest) {
+  if (!sUsingService &&
+      (argc > callbackIndex || sStagedUpdate || sReplaceRequest)) {
     NS_tchar updateLockFilePath[MAXPATHLEN];
     if (sStagedUpdate) {
       // When staging an update, the lock file is:
