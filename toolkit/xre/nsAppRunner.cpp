@@ -4338,12 +4338,12 @@ void XRE_GlibInit()
 {
   static bool ran_once = false;
 
-  // GLib < 2.24 doesn't want g_thread_init to be invoked twice, so ensure
-  // it's only done once. No need for thread safety here, since this is invoked
+  // glib < 2.24 doesn't want g_thread_init to be invoked twice, so ensure
+  // we only do it once. No need for thread safety here, since this is invoked
   // well before any thread is spawned.
   if (!ran_once) {
-    // GLib version < 2.36 doesn't initialize g_slice in a static initializer.
-    // Ensure this happens through g_thread_init (GLib version < 2.32) or
+    // glib version < 2.36 doesn't initialize g_slice in a static initializer.
+    // Ensure this happens through g_thread_init (glib version < 2.32) or
     // g_type_init (2.32 <= gLib version < 2.36)."
     g_thread_init(nullptr);
     g_type_init();
