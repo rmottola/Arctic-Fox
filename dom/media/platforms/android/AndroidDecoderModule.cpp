@@ -301,7 +301,7 @@ bool
 AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
 {
   if (!AndroidBridge::Bridge() ||
-      (AndroidBridge::Bridge()->GetAPIVersion() < 16)) {
+      AndroidBridge::Bridge()->GetAPIVersion() < 16) {
     return false;
   }
 
@@ -310,12 +310,8 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
     return true;
   }
 
-  MediaCodec::LocalRef ref = mozilla::CreateDecoder(aMimeType);
-  if (!ref) {
-    return false;
-  }
-  ref->Release();
-  return true;
+  return widget::HardwareCodecCapabilityUtils::FindDecoderCodecInfoForMimeType(
+      nsCString(TranslateMimeType(aMimeType)));
 }
 
 already_AddRefed<MediaDataDecoder>
