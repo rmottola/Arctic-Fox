@@ -70,22 +70,6 @@ def process_manifest(destdir, paths, track=None,
     return result
 
 
-class DefinesAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string):
-        defines = getattr(namespace, self.dest)
-        if defines is None:
-            defines = {}
-        values = values.split('=', 1)
-        if len(values) == 1:
-            name, value = values[0], 1
-        else:
-            name, value = values
-            if value.isdigit():
-                value = int(value)
-        defines[name] = value
-        setattr(namespace, self.dest, defines)
-
-
 def main(argv):
     parser = argparse.ArgumentParser(
         description='Process install manifest files.')
