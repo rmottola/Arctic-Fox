@@ -43,6 +43,14 @@ public:
   nsresult Input(MediaRawData* aSample) override;
   void ProcessDrain() override;
   void InitCodecContext() override;
+  const char* GetDescriptionName() const override
+  {
+#ifdef USING_MOZFFVPX
+    return "ffvpx video decoder";
+#else
+    return "ffmpeg video decoder";
+#endif
+  }
   static AVCodecID GetCodecId(const nsACString& aMimeType);
 
 private:

@@ -85,6 +85,11 @@ public:
 
   }
 
+  const char* GetDescriptionName() const override
+  {
+    return "android video decoder";
+  }
+
   RefPtr<InitPromise> Init() override
   {
     mSurfaceTexture = AndroidSurfaceTexture::Create();
@@ -249,6 +254,11 @@ public:
       NS_ENSURE_SUCCESS_VOID(aFormat->SetByteBuffer(NS_LITERAL_STRING("csd-0"),
                                                     buffer));
     }
+  }
+
+  const char* GetDescriptionName() const override
+  {
+    return "android audio decoder";
   }
 
   nsresult Output(BufferInfo::Param aInfo, void* aBuffer,

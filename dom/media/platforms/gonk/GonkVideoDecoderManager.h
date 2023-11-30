@@ -60,6 +60,11 @@ public:
     return GonkDecoderManager::Flush();
   }
 
+  const char* GetDescriptionName() const override
+  {
+    return "gonk video decoder";
+  }
+
   static void RecycleCallback(TextureClient* aClient, void* aClosure);
 
 private:
