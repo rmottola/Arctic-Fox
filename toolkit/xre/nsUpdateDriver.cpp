@@ -598,7 +598,8 @@ SwitchToUpdatedApp(nsIFile *greDir, nsIFile *updateDir,
   // just needs to replace the update directory.
   pid.AppendLiteral("/replace");
 
-  int argc = appArgc + 6;
+  int immersiveArgc = 0;
+  int argc = appArgc + 6 + immersiveArgc;
   char **argv = new char*[argc + 1];
   if (!argv)
     return;
@@ -612,6 +613,11 @@ SwitchToUpdatedApp(nsIFile *greDir, nsIFile *updateDir,
     argv[6] = (char*) appFilePath.get();
     for (int i = 1; i < appArgc; ++i)
       argv[6 + i] = appArgv[i];
+#ifdef XP_WIN
+    if (immersiveArgc) {
+      argv[argc - 1] = "-ServerName:DefaultBrowserServer";
+    }
+#endif
     argv[argc] = nullptr;
   } else {
     argc = 5;
@@ -868,7 +874,8 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
 #endif
   }
 
-  int argc = appArgc + 6;
+  int immersiveArgc = 0;
+  int argc = appArgc + 6 + immersiveArgc;
   char **argv = new char*[argc + 1 ];
   if (!argv)
     return;
@@ -882,6 +889,11 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
     argv[6] = (char*) appFilePath.get();
     for (int i = 1; i < appArgc; ++i)
       argv[6 + i] = appArgv[i];
+#ifdef XP_WIN
+    if (immersiveArgc) {
+      argv[argc - 1] = "-ServerName:DefaultBrowserServer";
+    }
+#endif
     argv[argc] = nullptr;
   } else {
     argc = 5;
