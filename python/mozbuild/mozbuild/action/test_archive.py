@@ -201,6 +201,21 @@ ARCHIVE_FILES = {
     ],
     'web-platform': [
         {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/meta/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/mozilla/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/tests/**',
+        },
+        {
             'source': buildconfig.topobjdir,
             'base': '_tests',
             'pattern': 'web-platform/**',
