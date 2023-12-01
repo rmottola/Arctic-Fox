@@ -535,8 +535,9 @@ js::EnqueuePendingParseTasksAfterGC(JSRuntime* rt)
         for (size_t i = 0; i < waiting.length(); i++) {
             ParseTask* task = waiting[i];
             if (task->runtimeMatches(rt)) {
+                AutoEnterOOMUnsafeRegion oomUnsafe;
                 if (!newTasks.append(task))
-                    MOZ_CRASH("EnqueuePendingParseTasksAfterGC");
+                    oomUnsafe.crash("EnqueuePendingParseTasksAfterGC");
                 HelperThreadState().remove(waiting, &i);
             }
         }
@@ -554,8 +555,9 @@ js::EnqueuePendingParseTasksAfterGC(JSRuntime* rt)
     AutoLockHelperThreadState lock;
 
     {
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!HelperThreadState().parseWorklist().appendAll(newTasks))
-          MOZ_CRASH("EnqueuePendingParseTasksAfterGC");
+            oomUnsafe.crash("EnqueuePendingParseTasksAfterGC");
     }
 
     HelperThreadState().notifyAll(GlobalHelperThreadState::PRODUCER);
