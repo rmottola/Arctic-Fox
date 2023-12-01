@@ -70,10 +70,8 @@ private:
                                  AVFrame* aFrame);
 
   RefPtr<ImageContainer> mImageContainer;
-  uint32_t mPictureWidth;
-  uint32_t mPictureHeight;
-  uint32_t mDisplayWidth;
-  uint32_t mDisplayHeight;
+  nsIntSize mDisplay;
+  nsIntRect mImage;
 
   // Parser used for VP8 and VP9 decoding.
   AVCodecParserContext* mCodecParser;
