@@ -187,6 +187,7 @@ OpusTrackEncoder::Init(int aChannels, int aSamplingRate)
   mEncoder = opus_encoder_create(GetOutputSampleRate(), mChannels,
                                  OPUS_APPLICATION_AUDIO, &error);
 
+
   mInitialized = (error == OPUS_OK);
 
   if (mAudioBitrate) {
