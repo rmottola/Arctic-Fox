@@ -128,6 +128,8 @@ var gPlayTests = [
   { name:"r11025_s16_c1_trailing.wav", type:"audio/x-wav", duration:1.0 },
   // file with list chunk
   { name:"r16000_u8_c1_list.wav", type:"audio/x-wav", duration:4.2 },
+  // 24-bit samples
+  { name:"wavedata_s24.wav", type:"audio/x-wav", duration:1.0 },
   // aLaw compressed wave file
   { name:"wavedata_alaw.wav", type:"audio/x-wav", duration:1.0 },
   // uLaw compressed wave file
