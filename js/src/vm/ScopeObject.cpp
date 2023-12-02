@@ -1663,6 +1663,16 @@ LiveScopeVal::staticAsserts()
 
 namespace {
 
+static void
+ReportOptimizedOut(JSContext* cx, HandleId id)
+{
+    JSAutoByteString printable;
+    if (ValueToPrintable(cx, IdToValue(id), &printable)) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT,
+                             printable.ptr());
+    }
+}
+
 /*
  * DebugScopeProxy is the handler for DebugScopeObject proxy objects. Having a
  * custom handler (rather than trying to reuse js::Wrapper) gives us several
@@ -1802,7 +1812,15 @@ class DebugScopeProxy : public BaseProxyHandler
                     TypeScript::SetArgument(cx, script, i, vp);
             }
 
-            *accessResult = ACCESS_UNALIASED;
+            // It is possible that an optimized out value flows to this
+            // location due to Debugger.Frame.prototype.eval operating on a
+            // live bailed-out Baseline frame. In that case, treat the access
+            // as lost.
+            if (vp.isMagic() && vp.whyMagic() == JS_OPTIMIZED_OUT)
+                *accessResult = ACCESS_LOST;
+            else
+                *accessResult = ACCESS_UNALIASED;
+
             return true;
         }
 
@@ -1847,7 +1865,12 @@ class DebugScopeProxy : public BaseProxyHandler
                 }
             }
 
-            *accessResult = ACCESS_UNALIASED;
+            // See comment above in analogous CallObject case.
+            if (vp.isMagic() && vp.whyMagic() == JS_OPTIMIZED_OUT)
+                *accessResult = ACCESS_LOST;
+            else
+                *accessResult = ACCESS_UNALIASED;
+
             return true;
         }
 
@@ -2078,7 +2101,7 @@ class DebugScopeProxy : public BaseProxyHandler
           case ACCESS_GENERIC:
             return JS_GetOwnPropertyDescriptorById(cx, scope, id, desc);
           case ACCESS_LOST:
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT);
+            ReportOptimizedOut(cx, id);
             return false;
           default:
             MOZ_CRASH("bad AccessResult");
@@ -2142,7 +2165,7 @@ class DebugScopeProxy : public BaseProxyHandler
           case ACCESS_GENERIC:
             return GetProperty(cx, scope, scope, id, vp);
           case ACCESS_LOST:
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT);
+            ReportOptimizedOut(cx, id);
             return false;
           default:
             MOZ_CRASH("bad AccessResult");
