@@ -2329,8 +2329,11 @@ class DebugScopeProxy : public BaseProxyHandler
             *bp = true;
             return true;
         }
-        if (isThis(cx, id) && isFunctionScopeWithThis(scopeObj)) {
-            *bp = true;
+
+        // Be careful not to look up '.this' as a normal binding below, it will
+        // assert in with_HasProperty.
+        if (isThis(cx, id)) {
+            *bp = isFunctionScopeWithThis(scopeObj);
             return true;
         }
 
