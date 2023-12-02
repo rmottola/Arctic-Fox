@@ -1310,8 +1310,10 @@ ObjectGroup::newPlainObject(ExclusiveContext* cx, IdValuePair* properties, size_
         entry.types = types;
 
         ObjectGroupCompartment::PlainObjectTable::AddPtr np = table->lookupForAdd(lookup);
-        if (!table->add(np, key, entry))
+        if (!table->add(np, key, entry)) {
+            ReportOutOfMemory(cx);
             return nullptr;
+        }
 
         ids.forget();
         types.forget();
