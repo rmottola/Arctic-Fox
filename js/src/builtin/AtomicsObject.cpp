@@ -1037,7 +1037,8 @@ js::FutexRuntime::unlock()
 
 js::FutexRuntime::FutexRuntime()
   : cond_(nullptr),
-    state_(Idle)
+    state_(Idle),
+    canWait_(false)
 {
 }
 
