@@ -103,7 +103,7 @@ public:
 
   nsresult Init(const dom::Optional<double>& aFPS, const TrackID& aTrackId);
 
-  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   // WebIDL
   HTMLCanvasElement* Canvas() const { return mCanvas; }
@@ -114,7 +114,7 @@ public:
    * Create a CanvasCaptureMediaStream whose underlying stream is a SourceMediaStream.
    */
   static already_AddRefed<CanvasCaptureMediaStream>
-  CreateSourceStream(nsIDOMWindow* aWindow,
+  CreateSourceStream(nsPIDOMWindowInner* aWindow,
                      HTMLCanvasElement* aCanvas);
 
 protected:

@@ -11,16 +11,6 @@
 <h1>HTML IDL tests</h1>
 <div id=log></div>
 
-<!-- URLUtils* stubs -->
-<script type=text/plain class=untested>
-interface URLUtils {
-  stringifier;
-};
-interface URLUtilsReadOnly {
-  stringifier;
-};
-</script>
-<!-- DOM IDLs -->
 <script type=text/plain class=untested>
 [Constructor(DOMString type, optional EventInit eventInitDict)/*,
  Exposed=(Window,Worker)*/]
@@ -235,6 +225,7 @@ interface Document : Node {
   readonly attribute DOMString origin;
   readonly attribute DOMString compatMode;
   readonly attribute DOMString characterSet;
+  readonly attribute DOMString charset; // legacy alias of .characterSet
   readonly attribute DOMString inputEncoding; // legacy alias of .characterSet
   readonly attribute DOMString contentType;
 
@@ -294,7 +285,7 @@ interface Element : Node {
 
            attribute DOMString id;
            attribute DOMString className;
-  [SameObject] readonly attribute DOMTokenList classList;
+  [SameObject, PutForwards=value] readonly attribute DOMTokenList classList;
 
   boolean hasAttributes();
   [SameObject] readonly attribute NamedNodeMap attributes;
@@ -471,12 +462,9 @@ interface DOMTokenList {
   void add(DOMString... tokens);
   void remove(DOMString... tokens);
   boolean toggle(DOMString token, optional boolean force);
+  attribute DOMString value;
   stringifier;
 //  iterable<DOMString>;
-};
-
-interface DOMSettableTokenList : DOMTokenList {
-            attribute DOMString value;
 };
 </script>
 <!-- UI Events IDLs -->
@@ -867,6 +855,21 @@ typedef (Int8Array or Uint8Array or Uint8ClampedArray or
          Float32Array or Float64Array or
          DataView) ArrayBufferView;
 
+[NoInterfaceObject, Exposed=Window]
+interface HTMLHyperlinkElementUtils {
+  stringifier attribute USVString href;
+           attribute USVString origin;
+           attribute USVString protocol;
+           attribute USVString username;
+           attribute USVString password;
+           attribute USVString host;
+           attribute USVString hostname;
+           attribute USVString port;
+           attribute USVString pathname;
+           attribute USVString search;
+           attribute USVString hash;
+};
+
 interface HTMLAllCollection : HTMLCollection {
   // inherits length and 'getter'
   Element? item(unsigned long index);
@@ -905,7 +908,7 @@ interface PropertyNodeList : NodeList {
   PropertyValueArray getValues();
 };
 
-[OverrideBuiltins, Exposed=Window,Worker]
+[OverrideBuiltins, Exposed=(Window,Worker)]
 interface DOMStringMap {
   getter DOMString (DOMString name);
   setter creator void (DOMString name, DOMString value);
@@ -992,10 +995,10 @@ interface HTMLElement : Element {
 
   // microdata
            attribute boolean itemScope;
-  [PutForwards=value] readonly attribute DOMSettableTokenList itemType;
+  [PutForwards=value] readonly attribute DOMTokenList itemType;
            attribute DOMString itemId;
-  [PutForwards=value] readonly attribute DOMSettableTokenList itemRef;
-  [PutForwards=value] readonly attribute DOMSettableTokenList itemProp;
+  [PutForwards=value] readonly attribute DOMTokenList itemRef;
+  [PutForwards=value] readonly attribute DOMTokenList itemProp;
   readonly attribute HTMLPropertiesCollection properties;
            attribute any itemValue; // acts as DOMString on setting
 
@@ -1008,7 +1011,7 @@ interface HTMLElement : Element {
            attribute DOMString accessKey;
   readonly attribute DOMString accessKeyLabel;
            attribute boolean draggable;
-  [PutForwards=value] readonly attribute DOMSettableTokenList dropzone;
+  [PutForwards=value] readonly attribute DOMTokenList dropzone;
            attribute DOMString contentEditable;
   readonly attribute boolean isContentEditable;
            attribute HTMLMenuElement? contextMenu;
@@ -1046,11 +1049,12 @@ interface HTMLLinkElement : HTMLElement {
            attribute DOMString href;
            attribute DOMString crossOrigin;
            attribute DOMString rel;
+           [PutForwards=value]
   readonly attribute DOMTokenList relList;
            attribute DOMString media;
            attribute DOMString hreflang;
            attribute DOMString type;
-  [PutForwards=value] readonly attribute DOMSettableTokenList sizes;
+  [PutForwards=value] readonly attribute DOMTokenList sizes;
 
   // also has obsolete members
 };
@@ -1124,19 +1128,17 @@ interface HTMLDivElement : HTMLElement {
 };
 
 interface HTMLAnchorElement : HTMLElement {
-           attribute DOMString target;
-           attribute DOMString download;
-  [PutForwards=value] attribute DOMSettableTokenList ping;
-           attribute DOMString rel;
-  readonly attribute DOMTokenList relList;
-           attribute DOMString hreflang;
-           attribute DOMString type;
+  attribute DOMString target;
+  attribute DOMString download;
+  [PutForwards=value] readonly attribute DOMTokenList ping;
+  attribute DOMString rel;
+  [PutForwards=value] readonly attribute DOMTokenList relList;
+  attribute DOMString hreflang;
+  attribute DOMString type;
 
-           attribute DOMString text;
-
-  // also has obsolete members
+  attribute DOMString text;
 };
-HTMLAnchorElement implements URLUtils;
+HTMLAnchorElement implements HTMLHyperlinkElementUtils;
 
 interface HTMLDataElement : HTMLElement {
            attribute DOMString value;
@@ -1188,7 +1190,7 @@ interface HTMLIFrameElement : HTMLElement {
            attribute DOMString src;
            attribute DOMString srcdoc;
            attribute DOMString name;
-  [PutForwards=value] readonly attribute DOMSettableTokenList sandbox;
+  [PutForwards=value] readonly attribute DOMTokenList sandbox;
            attribute boolean seamless;
            attribute boolean allowFullscreen;
            attribute DOMString width;
@@ -1493,20 +1495,17 @@ interface HTMLMapElement : HTMLElement {
 };
 
 interface HTMLAreaElement : HTMLElement {
-           attribute DOMString alt;
-           attribute DOMString coords;
-           attribute DOMString shape;
-           attribute DOMString target;
-           attribute DOMString download;
-  [PutForwards=value] attribute DOMSettableTokenList ping;
-           attribute DOMString rel;
-  readonly attribute DOMTokenList relList;
-           attribute DOMString hreflang;
-           attribute DOMString type;
-
-  // also has obsolete members
+  attribute DOMString alt;
+  attribute DOMString coords;
+  attribute DOMString shape;
+  attribute DOMString target;
+  attribute DOMString download;
+  [PutForwards=value] readonly attribute DOMTokenList ping;
+  attribute DOMString rel;
+  [PutForwards=value] readonly attribute DOMTokenList relList;
+  // hreflang and type are not reflected
 };
-HTMLAreaElement implements URLUtils;
+HTMLAreaElement implements HTMLHyperlinkElementUtils;
 
 interface HTMLTableElement : HTMLElement {
            attribute HTMLTableCaptionElement? caption;
@@ -1571,7 +1570,7 @@ interface HTMLTableHeaderCellElement : HTMLTableCellElement {
 interface HTMLTableCellElement : HTMLElement {
            attribute unsigned long colSpan;
            attribute unsigned long rowSpan;
-  [PutForwards=value] readonly attribute DOMSettableTokenList headers;
+  [PutForwards=value] readonly attribute DOMTokenList headers;
   readonly attribute long cellIndex;
 
   // also has obsolete members
@@ -1590,7 +1589,7 @@ interface HTMLFormElement : HTMLElement {
            attribute DOMString target;
 
   readonly attribute HTMLFormControlsCollection elements;
-  readonly attribute long length;
+  readonly attribute unsigned long length;
   getter Element (unsigned long index);
   getter (RadioNodeList or Element) (DOMString name);
 
@@ -1815,7 +1814,7 @@ interface HTMLKeygenElement : HTMLElement {
 };
 
 interface HTMLOutputElement : HTMLElement {
-  [PutForwards=value] readonly attribute DOMSettableTokenList htmlFor;
+  [PutForwards=value] readonly attribute DOMTokenList htmlFor;
   readonly attribute HTMLFormElement? form;
            attribute DOMString name;
 
@@ -1976,7 +1975,7 @@ interface HTMLCanvasElement : HTMLElement {
   void toBlob(FileCallback? _callback, optional DOMString type, any... arguments);
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface CanvasProxy {
   void setContext(RenderingContext context);
 };
@@ -1990,7 +1989,7 @@ typedef (HTMLImageElement or
 
 enum CanvasFillRule { "nonzero", "evenodd" };
 
-[Constructor(optional unsigned long width, unsigned long height), Exposed=Window,Worker]
+[Constructor(optional unsigned long width, unsigned long height), Exposed=(Window,Worker)]
 interface CanvasRenderingContext2D {
 
   // back-reference to the canvas
@@ -2085,7 +2084,7 @@ interface CanvasRenderingContext2D {
 CanvasRenderingContext2D implements CanvasDrawingStyles;
 CanvasRenderingContext2D implements CanvasPathMethods;
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface CanvasDrawingStyles {
   // line caps/joins
            attribute unrestricted double lineWidth; // (default 1)
@@ -2105,7 +2104,7 @@ interface CanvasDrawingStyles {
            attribute DOMString direction; // "ltr", "rtl", "inherit" (default: "inherit")
 };
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface CanvasPathMethods {
   // shared path API methods
   void closePath();
@@ -2120,19 +2119,19 @@ interface CanvasPathMethods {
   void ellipse(unrestricted double x, unrestricted double y, unrestricted double radiusX, unrestricted double radiusY, unrestricted double rotation, unrestricted double startAngle, unrestricted double endAngle, optional boolean anticlockwise = false);
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface CanvasGradient {
   // opaque object
   void addColorStop(double offset, DOMString color);
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface CanvasPattern {
   // opaque object
   void setTransform(SVGMatrix transform);
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface TextMetrics {
   // x-direction
   readonly attribute double width; // advance width
@@ -2166,21 +2165,21 @@ dictionary HitRegionOptions {
 
 [Constructor(unsigned long sw, unsigned long sh),
  Constructor(Uint8ClampedArray data, unsigned long sw, optional unsigned long sh),
- Exposed=Window,Worker]
+ Exposed=(Window,Worker)]
 interface ImageData {
   readonly attribute unsigned long width;
   readonly attribute unsigned long height;
   readonly attribute Uint8ClampedArray data;
 };
 
-[Constructor(optional Element scope), Exposed=Window,Worker]
+[Constructor(optional Element scope), Exposed=(Window,Worker)]
 interface DrawingStyle { };
 DrawingStyle implements CanvasDrawingStyles;
 
 [Constructor,
  Constructor(Path2D path),
  Constructor(Path2D[] paths, optional CanvasFillRule fillRule = "nonzero"),
- Constructor(DOMString d), Exposed=Window,Worker]
+ Constructor(DOMString d), Exposed=(Window,Worker)]
 interface Path2D {
   void addPath(Path2D path, optional SVGMatrix? transformation = null);
   void addPathByStrokingPath(Path2D path, CanvasDrawingStyles styles, optional SVGMatrix? transformation = null);
@@ -2247,6 +2246,10 @@ dictionary DragEventInit : MouseEventInit {
   DataTransfer? dataTransfer;
 };
 
+// For purposes of this test, just treat WindowProxy as the same thing as
+// Window.
+typedef Window WindowProxy;
+
 [PrimaryGlobal]
 /*sealed*/ interface Window : EventTarget {
   // the current browsing context
@@ -2274,7 +2277,7 @@ dictionary DragEventInit : MouseEventInit {
   [Replaceable] readonly attribute unsigned long length;
   [Unforgeable] readonly attribute WindowProxy top;
            attribute any opener;
-  readonly attribute WindowProxy parent;
+  [Replaceable] readonly attribute WindowProxy parent;
   readonly attribute Element? frameElement;
   WindowProxy open(optional DOMString url = "about:blank", optional DOMString target = "_blank", [TreatNullAs=EmptyString] optional DOMString features = "", optional boolean replace = false);
   getter WindowProxy (unsigned long index);
@@ -2304,8 +2307,11 @@ interface BarProp {
            attribute boolean visible;
 };
 
+enum ScrollRestoration { "auto", "manual" };
 interface History {
+
   readonly attribute long length;
+  attribute ScrollRestoration scrollRestoration;
   readonly attribute any state;
   void go(optional long delta);
   void back();
@@ -2315,13 +2321,24 @@ interface History {
 };
 
 [Unforgeable] interface Location {
-  void assign(DOMString url);
-  void replace(DOMString url);
-  void reload();
-};
-Location implements URLUtils;
+  stringifier attribute USVString href;
+           attribute USVString origin;
+           attribute USVString protocol;
+           attribute USVString host;
+           attribute USVString hostname;
+           attribute USVString port;
+           attribute USVString pathname;
+           attribute USVString search;
+           attribute USVString hash;
 
-[Constructor(DOMString type, optional PopStateEventInit eventInitDict), Exposed=Window,Worker]
+  void assign(USVString url);
+  void replace(USVString url);
+  void reload();
+
+  [SameObject] readonly attribute USVString[] ancestorOrigins;
+};
+
+[Constructor(DOMString type, optional PopStateEventInit eventInitDict), Exposed=(Window,Worker)]
 interface PopStateEvent : Event {
   readonly attribute any state;
 };
@@ -2330,7 +2347,7 @@ dictionary PopStateEventInit : EventInit {
   any state;
 };
 
-[Constructor(DOMString type, optional HashChangeEventInit eventInitDict), Exposed=Window,Worker]
+[Constructor(DOMString type, optional HashChangeEventInit eventInitDict), Exposed=(Window,Worker)]
 interface HashChangeEvent : Event {
   readonly attribute DOMString oldURL;
   readonly attribute DOMString newURL;
@@ -2341,7 +2358,7 @@ dictionary HashChangeEventInit : EventInit {
   DOMString newURL;
 };
 
-[Constructor(DOMString type, optional PageTransitionEventInit eventInitDict), Exposed=Window,Worker]
+[Constructor(DOMString type, optional PageTransitionEventInit eventInitDict), Exposed=(Window,Worker)]
 interface PageTransitionEvent : Event {
   readonly attribute boolean persisted;
 };
@@ -2382,12 +2399,12 @@ interface ApplicationCache : EventTarget {
            attribute EventHandler onobsolete;
 };
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface NavigatorOnLine {
   readonly attribute boolean onLine;
 };
 
-[Constructor(DOMString type, optional ErrorEventInit eventInitDict), Exposed=Window,Worker]
+[Constructor(DOMString type, optional ErrorEventInit eventInitDict), Exposed=(Window,Worker)]
 interface ErrorEvent : Event {
   readonly attribute DOMString message;
   readonly attribute DOMString filename;
@@ -2500,14 +2517,14 @@ interface WindowEventHandlers {
            attribute EventHandler onunload;
 };
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface WindowBase64 {
   DOMString btoa(DOMString btoa);
   DOMString atob(DOMString atob);
 };
 Window implements WindowBase64;
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface WindowTimers {
   long setTimeout(Function handler, optional long timeout = 0, any... arguments);
   long setTimeout(DOMString handler, optional long timeout = 0, any... arguments);
@@ -2534,7 +2551,7 @@ Navigator implements NavigatorContentUtils;
 Navigator implements NavigatorStorageUtils;
 Navigator implements NavigatorPlugins;
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface NavigatorID {
   readonly attribute DOMString appCodeName; // constant "Mozilla"
   readonly attribute DOMString appName;
@@ -2545,7 +2562,7 @@ interface NavigatorID {
   readonly attribute DOMString userAgent;
 };
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface NavigatorLanguage {
   readonly attribute DOMString? language;
   readonly attribute DOMString[] languages;
@@ -2609,7 +2626,7 @@ interface External {
   unsigned long IsSearchProviderInstalled(DOMString engineURL);
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface ImageBitmap {
   readonly attribute unsigned long width;
   readonly attribute unsigned long height;
@@ -2623,14 +2640,14 @@ typedef (HTMLImageElement or
          CanvasRenderingContext2D or
          ImageBitmap) ImageBitmapSource;
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface ImageBitmapFactories {
   Promise createImageBitmap(ImageBitmapSource image, optional long sx, long sy, long sw, long sh);
 };
 Window implements ImageBitmapFactories;
 WorkerGlobalScope implements ImageBitmapFactories;
 
-[Constructor(DOMString type, optional MessageEventInit eventInitDict), Exposed=Window,Worker]
+[Constructor(DOMString type, optional MessageEventInit eventInitDict), Exposed=(Window,Worker)]
 interface MessageEvent : Event {
   readonly attribute any data;
   readonly attribute DOMString origin;
@@ -2649,7 +2666,7 @@ dictionary MessageEventInit : EventInit {
   sequence<MessagePort> ports;
 };
 
-[Constructor(DOMString url, optional EventSourceInit eventSourceInitDict), Exposed=Window,Worker]
+[Constructor(DOMString url, optional EventSourceInit eventSourceInitDict), Exposed=(Window,Worker)]
 interface EventSource : EventTarget {
   readonly attribute DOMString url;
   readonly attribute boolean withCredentials;
@@ -2672,7 +2689,7 @@ dictionary EventSourceInit {
 };
 
 enum BinaryType { "blob", "arraybuffer" };
-[Constructor(DOMString url, optional (DOMString or DOMString[]) protocols), Exposed=Window,Worker]
+[Constructor(DOMString url, optional (DOMString or DOMString[]) protocols), Exposed=(Window,Worker)]
 interface WebSocket : EventTarget {
   readonly attribute DOMString url;
 
@@ -2685,23 +2702,23 @@ interface WebSocket : EventTarget {
   readonly attribute unsigned long bufferedAmount;
 
   // networking
-           attribute EventHandler onopen;
-           attribute EventHandler onerror;
-           attribute EventHandler onclose;
+  attribute EventHandler onopen;
+  attribute EventHandler onerror;
+  attribute EventHandler onclose;
   readonly attribute DOMString extensions;
   readonly attribute DOMString protocol;
-  void close([Clamp] optional unsigned short code, optional DOMString reason);
+  void close([Clamp] optional unsigned short code, optional USVString reason);
 
   // messaging
-           attribute EventHandler onmessage;
-           attribute BinaryType binaryType;
-  void send(DOMString data);
+  attribute EventHandler onmessage;
+  attribute BinaryType binaryType;
+  void send(USVString data);
   void send(Blob data);
   void send(ArrayBuffer data);
   void send(ArrayBufferView data);
 };
 
-[Constructor(DOMString type, optional CloseEventInit eventInitDict), Exposed=Window,Worker]
+[Constructor(DOMString type, optional CloseEventInit eventInitDict), Exposed=(Window,Worker)]
 interface CloseEvent : Event {
   readonly attribute boolean wasClean;
   readonly attribute unsigned short code;
@@ -2714,13 +2731,13 @@ dictionary CloseEventInit : EventInit {
   DOMString reason;
 };
 
-[Constructor, Exposed=Window,Worker]
+[Constructor, Exposed=(Window,Worker)]
 interface MessageChannel {
   readonly attribute MessagePort port1;
   readonly attribute MessagePort port2;
 };
 
-[Exposed=Window,Worker]
+[Exposed=(Window,Worker)]
 interface MessagePort : EventTarget {
   void postMessage(any message, optional sequence<Transferable> transfer);
   void start();
@@ -2731,7 +2748,7 @@ interface MessagePort : EventTarget {
 };
 // MessagePort implements Transferable;
 
-[Constructor, Exposed=Window,Worker]
+[Constructor, Exposed=(Window,Worker)]
 interface PortCollection {
   void add(MessagePort port);
   void remove(MessagePort port);
@@ -2741,7 +2758,7 @@ interface PortCollection {
 
 callback PortCollectionCallback = void (MessagePort port);
 
-[Constructor(DOMString channel), Exposed=Window,Worker]
+[Constructor(DOMString channel), Exposed=(Window,Worker)]
 interface BroadcastChannel : EventTarget {
   readonly attribute DOMString name;
   void postMessage(any message);
@@ -2776,12 +2793,12 @@ interface WorkerGlobalScope : EventTarget {
            attribute EventHandler onconnect;
 };
 
-[NoInterfaceObject, Exposed=Window,Worker]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface AbstractWorker {
            attribute EventHandler onerror;
 };
 
-[Constructor(DOMString scriptURL), Exposed=Window,Worker]
+[Constructor(DOMString scriptURL), Exposed=(Window,Worker)]
 interface Worker : EventTarget {
   void terminate();
 
@@ -2790,7 +2807,7 @@ interface Worker : EventTarget {
 };
 Worker implements AbstractWorker;
 
-[Constructor(DOMString scriptURL, optional DOMString name), Exposed=Window,Worker]
+[Constructor(DOMString scriptURL, optional DOMString name), Exposed=(Window,Worker)]
 interface SharedWorker : EventTarget {
   readonly attribute MessagePort port;
 };
@@ -2811,8 +2828,17 @@ WorkerNavigator implements NavigatorLanguage;
 WorkerNavigator implements NavigatorOnLine;
 
 [Exposed=Worker]
-interface WorkerLocation { };
-WorkerLocation implements URLUtilsReadOnly;
+interface WorkerLocation {
+  stringifier readonly attribute USVString href;
+  readonly attribute USVString origin;
+  readonly attribute USVString protocol;
+  readonly attribute USVString host;
+  readonly attribute USVString hostname;
+  readonly attribute USVString port;
+  readonly attribute USVString pathname;
+  readonly attribute USVString search;
+  readonly attribute USVString hash;
+};
 
 interface Storage {
   readonly attribute unsigned long length;
@@ -3148,235 +3174,238 @@ var idlArray;
 var errorVideo; // used to get a MediaError object
 var iframe; // used to get a Document object (can't use `document` because some test clears the page)
 setup(function() {
-	idlArray = new IdlArray();
-	[].forEach.call(document.querySelectorAll("script[type=text\\/plain]"), function(node) {
-		if (node.className == "untested") {
-			idlArray.add_untested_idls(node.textContent);
-		} else {
-			idlArray.add_idls(node.textContent);
-		}
-	});
-	errorVideo = document.createElement('video');
-	errorVideo.src = 'data:,';
-	errorVideo.preload = 'auto';
-	iframe = document.createElement('iframe');
-	iframe.hidden = true;
-	document.body.appendChild(iframe);
+  idlArray = new IdlArray();
+  [].forEach.call(document.querySelectorAll("script[type=text\\/plain]"), function(node) {
+    if (node.className == "untested") {
+      idlArray.add_untested_idls(node.textContent);
+    } else {
+      idlArray.add_idls(node.textContent);
+    }
+  });
+  errorVideo = document.createElement('video');
+  errorVideo.src = 'data:,';
+  errorVideo.preload = 'auto';
+  iframe = document.createElement('iframe');
+  iframe.hidden = true;
+  document.body.appendChild(iframe);
 }, {explicit_done:true});
 window.onload = function() {
-	idlArray.add_objects({
-		NodeList: ['document.getElementsByName("name")'],
-		HTMLAllCollection: ['document.all'],
-		HTMLFormControlsCollection: ['document.createElement("form").elements'],
-		RadioNodeList: [],
-		HTMLOptionsCollection: ['document.createElement("select").options'],
-		HTMLPropertiesCollection: ['document.head.properties'],
-		PropertyNodeList: [],
-		DOMStringMap: ['document.head.dataset'],
-		DOMElementMap: ['document.cssElementMap'],
-		Transferable: [],
-		Document: ['iframe.contentDocument'],
-		XMLDocument: ['document.implementation.createDocument(null, "", null)'],
-		HTMLElement: [
-			'document.createElement("noscript")',
-			'document.createElement("section")',
-			'document.createElement("nav")',
-			'document.createElement("article")',
-			'document.createElement("aside")',
-			'document.createElement("hgroup")',
-			'document.createElement("header")',
-			'document.createElement("footer")',
-			'document.createElement("address")',
-			'document.createElement("dt")',
-			'document.createElement("dd")',
-			'document.createElement("figure")',
-			'document.createElement("figcaption")',
-			'document.createElement("em")',
-			'document.createElement("strong")',
-			'document.createElement("small")',
-			'document.createElement("s")',
-			'document.createElement("cite")',
-			'document.createElement("dfn")',
-			'document.createElement("abbr")',
-			'document.createElement("code")',
-			'document.createElement("var")',
-			'document.createElement("samp")',
-			'document.createElement("kbd")',
-			'document.createElement("sub")',
-			'document.createElement("sup")',
-			'document.createElement("i")',
-			'document.createElement("b")',
-			'document.createElement("u")',
-			'document.createElement("mark")',
-			'document.createElement("ruby")',
-			'document.createElement("rt")',
-			'document.createElement("rp")',
-			'document.createElement("bdi")',
-			'document.createElement("bdo")',
-			'document.createElement("wbr")',
-			'document.createElement("summary")',
-			'document.createElement("acronym")',
-			'document.createElement("basefont")',
-		],
-		HTMLUnknownElement: [
-			'document.createElement("quasit")',
-			'document.createElement("bgsound")',
-			'document.createElement("isindex")',
-			'document.createElement("multicol")',
-			'document.createElement("nextid")',
-			'document.createElement("rb")',
-			'document.createElement("spacer")',
-			'document.createElement("directory")',
-			'document.createElement("mod")',
-		],
-		HTMLHtmlElement: ['document.createElement("html")'],
-		HTMLHeadElement: ['document.createElement("head")'],
-		HTMLTitleElement: ['document.createElement("title")'],
-		HTMLBaseElement: ['document.createElement("base")'],
-		HTMLLinkElement: ['document.createElement("link")'],
-		HTMLMetaElement: ['document.createElement("meta")'],
-		HTMLStyleElement: ['document.createElement("style")'],
-		HTMLScriptElement: ['document.createElement("script")'],
-		HTMLBodyElement: ['document.createElement("body")'],
-		HTMLHeadingElement: [
-			'document.createElement("h1")',
-			'document.createElement("h2")',
-			'document.createElement("h3")',
-			'document.createElement("h4")',
-			'document.createElement("h5")',
-			'document.createElement("h6")',
-		],
-		HTMLParagraphElement: ['document.createElement("p")'],
-		HTMLHRElement: ['document.createElement("hr")'],
-		HTMLPreElement: [
-			'document.createElement("pre")',
-			'document.createElement("listing")',
-			'document.createElement("plaintext")',
-			'document.createElement("xmp")',
-		],
-		HTMLQuoteElement: [
-			'document.createElement("blockquote")',
-			'document.createElement("q")',
-		],
-		HTMLOlistElement: ['document.createElement("ol")'],
-		HTMLUlistElement: ['document.createElement("ul")'],
-		HTMLLIElement: ['document.createElement("li")'],
-		HTMLDlistElement: ['document.createElement("dl")'],
-		HTMLDivElement: ['document.createElement("div")'],
-		HTMLAnchorElement: ['document.createElement("a")'],
-		HTMLDataElement: ['document.createElement("data")'],
-		HTMLTimeElement: ['document.createElement("time")'],
-		HTMLSpanElement: ['document.createElement("span")'],
-		HTMLBRElement: ['document.createElement("br")'],
-		HTMLModElement: [
-			'document.createElement("ins")',
-			'document.createElement("del")',
-		],
-		HTMLPictureElement: ['document.createElement("picture")'],
-		HTMLImageElement: ['document.createElement("img")', 'new Image()'],
-		HTMLIframeElement: ['document.createElement("iframe")'],
-		HTMLEmbedElement: ['document.createElement("embed")'],
-		HTMLObjectElement: ['document.createElement("object")'],
-		HTMLParamElement: ['document.createElement("param")'],
-		HTMLVideoElement: ['document.createElement("video")'],
-		HTMLAudioElement: ['document.createElement("audio")', 'new Audio()'],
-		HTMLSourceElement: ['document.createElement("source")'],
-		HTMLTrackElement: ['document.createElement("track")'],
-		HTMLMediaElement: [],
-		MediaError: ['errorVideo.error'],
-		AudioTrackList: [],
-		AudioTrack: [],
-		VideoTrackList: [],
-		VideoTrack: [],
-		MediaController: ['new MediaController()'],
-		TextTrackList: ['document.createElement("video").textTracks'],
-		TextTrack: ['document.createElement("track").track'],
-		TextTrackCueList: ['document.createElement("video").addTextTrack("subtitles").cues'],
-		TextTrackCue: [],
-		DataCue: [],
-		TimeRanges: ['document.createElement("video").buffered'],
-		TrackEvent: ['new TrackEvent("addtrack"; {track:document.createElement("track").track})'],
-		HTMLCanvasElement: ['document.createElement("canvas")'],
-		CanvasRenderingContext2D: ['document.createElement("canvas").getContext("2d")'],
-		CanvasGradient: [],
-		CanvasPattern: [],
-		TextMetrics: [],
-		ImageData: [],
-		HTMLMapElement: ['document.createElement("map")'],
-		HTMLAreaElement: ['document.createElement("area")'],
-		HTMLTableElement: ['document.createElement("table")'],
-		HTMLTableCaptionElement: ['document.createElement("caption")'],
-		HTMLTableColElement: [
-			'document.createElement("colgroup")',
-			'document.createElement("col")',
-		],
-		HTMLTableSectionElement: [
-			'document.createElement("tbody")',
-			'document.createElement("thead")',
-			'document.createElement("tfoot")',
-		],
-		HTMLTableRowElement: ['document.createElement("tr")'],
-		HTMLTableDataCellElement: ['document.createElement("td")'],
-		HTMLTableHeaderCellElement: ['document.createElement("th")'],
-		HTMLTableCellElement: [],
-		HTMLFormElement: ['document.createElement("form")'],
-		HTMLFieldsetElement: ['document.createElement("fieldset")'],
-		HTMLLegendElement: ['document.createElement("legend")'],
-		HTMLLabelElement: ['document.createElement("label")'],
-		HTMLInputElement: ['document.createElement("input")'],
-		HTMLButtonElement: ['document.createElement("button")'],
-		HTMLSelectElement: ['document.createElement("select")'],
-		HTMLDataListElement: ['document.createElement("datalist")'],
-		HTMLOptGroupElement: ['document.createElement("optgroup")'],
-		HTMLOptionElement: ['document.createElement("option")'],
-		HTMLTextAreaElement: ['document.createElement("textarea")'],
-		HTMLKeygenElement: ['document.createElement("keygen")'],
-		HTMLOutputElement: ['document.createElement("output")'],
-		HTMLProgressElement: ['document.createElement("progress")'],
-		HTMLMeterElement: ['document.createElement("meter")'],
-		ValidityState: ['document.createElement("input").validity'],
-		HTMLDetailsElement: ['document.createElement("details")'],
-		HTMLCommandElement: ['document.createElement("command")'],
-		HTMLMenuElement: ['document.createElement("menu")'],
-		Window: ['window'],
-		BarProp: [],
-		History: ['window.history'],
-		Location: ['window.location'],
-		PopStateEvent: ['new PopStateEvent("popstate", { data: {} })'],
-		HashChangeEvent: [],
-		PageTransitionEvent: [],
-		BeforeUnloadEvent: [],
-		ApplicationCache: ['window.applicationCache'],
-		WindowModal: [],
-		Navigator: ['window.navigator'],
-		External: ['window.external'],
-		DataTransfer: [],
-		DataTransferItemList: [],
-		DataTransferItem: [],
-		DragEvent: [],
-		NavigatorUserMediaError: [],
-		MediaStream: [],
-		LocalMediaStream: [],
-		MediaStreamTrack: [],
-		MediaStreamRecorder: [],
-		PeerConnection: [],
-		MediaStreamEvent: [],
-		ErrorEvent: [],
-		AbstractWorker: [],
-		Worker: [],
-		SharedWorker: [],
-		MessageEvent: [],
-		MessageChannel: [],
-		MessagePort: [],
-		HTMLAppletElement: ['document.createElement("applet")'],
-		HTMLMarqueeElement: ['document.createElement("marquee")'],
-		HTMLFrameSetElement: ['document.createElement("frameset")'],
-		HTMLFrameElement: ['document.createElement("frame")'],
-		HTMLDirectoryElement: ['document.createElement("dir")'],
-		HTMLFontElement: ['document.createElement("font")'],
-	});
-	idlArray.prevent_multiple_testing("HTMLElement");
-	idlArray.test();
-	done();
+  idlArray.add_objects({
+    NodeList: ['document.getElementsByName("name")'],
+    HTMLAllCollection: ['document.all'],
+    HTMLFormControlsCollection: ['document.createElement("form").elements'],
+    RadioNodeList: [],
+    HTMLOptionsCollection: ['document.createElement("select").options'],
+    HTMLPropertiesCollection: ['document.head.properties'],
+    PropertyNodeList: [],
+    DOMStringMap: ['document.head.dataset'],
+    DOMElementMap: ['document.cssElementMap'],
+    Transferable: [],
+    Document: ['iframe.contentDocument'],
+    XMLDocument: ['document.implementation.createDocument(null, "", null)'],
+    HTMLElement: [
+      'document.createElement("noscript")',
+      'document.createElement("section")',
+      'document.createElement("nav")',
+      'document.createElement("article")',
+      'document.createElement("aside")',
+      'document.createElement("hgroup")',
+      'document.createElement("header")',
+      'document.createElement("footer")',
+      'document.createElement("address")',
+      'document.createElement("dt")',
+      'document.createElement("dd")',
+      'document.createElement("figure")',
+      'document.createElement("figcaption")',
+      'document.createElement("em")',
+      'document.createElement("strong")',
+      'document.createElement("small")',
+      'document.createElement("s")',
+      'document.createElement("cite")',
+      'document.createElement("dfn")',
+      'document.createElement("abbr")',
+      'document.createElement("code")',
+      'document.createElement("var")',
+      'document.createElement("samp")',
+      'document.createElement("kbd")',
+      'document.createElement("sub")',
+      'document.createElement("sup")',
+      'document.createElement("i")',
+      'document.createElement("b")',
+      'document.createElement("u")',
+      'document.createElement("mark")',
+      'document.createElement("ruby")',
+      'document.createElement("rt")',
+      'document.createElement("rp")',
+      'document.createElement("bdi")',
+      'document.createElement("bdo")',
+      'document.createElement("wbr")',
+      'document.createElement("summary")',
+      'document.createElement("acronym")',
+    ],
+    HTMLUnknownElement: [
+      'document.createElement("blink")',
+      'document.createElement("quasit")',
+      'document.createElement("bgsound")',
+      'document.createElement("isindex")',
+      'document.createElement("multicol")',
+      'document.createElement("nextid")',
+      'document.createElement("rb")',
+      'document.createElement("spacer")',
+      'document.createElement("basefont")',
+      'document.createElement("directory")',
+      'document.createElement("mod")',
+    ],
+    HTMLHtmlElement: ['document.createElement("html")'],
+    HTMLHeadElement: ['document.createElement("head")'],
+    HTMLTitleElement: ['document.createElement("title")'],
+    HTMLBaseElement: ['document.createElement("base")'],
+    HTMLLinkElement: ['document.createElement("link")'],
+    HTMLMetaElement: ['document.createElement("meta")'],
+    HTMLStyleElement: ['document.createElement("style")'],
+    HTMLScriptElement: ['document.createElement("script")'],
+    HTMLBodyElement: ['document.createElement("body")'],
+    HTMLHeadingElement: [
+      'document.createElement("h1")',
+      'document.createElement("h2")',
+      'document.createElement("h3")',
+      'document.createElement("h4")',
+      'document.createElement("h5")',
+      'document.createElement("h6")',
+    ],
+    HTMLParagraphElement: ['document.createElement("p")'],
+    HTMLHRElement: ['document.createElement("hr")'],
+    HTMLPreElement: [
+      'document.createElement("pre")',
+      'document.createElement("listing")',
+      'document.createElement("plaintext")',
+      'document.createElement("xmp")',
+    ],
+    HTMLQuoteElement: [
+      'document.createElement("blockquote")',
+      'document.createElement("q")',
+    ],
+    HTMLOlistElement: ['document.createElement("ol")'],
+    HTMLUlistElement: ['document.createElement("ul")'],
+    HTMLLIElement: ['document.createElement("li")'],
+    HTMLDlistElement: ['document.createElement("dl")'],
+    HTMLDivElement: ['document.createElement("div")'],
+    HTMLAnchorElement: ['document.createElement("a")'],
+    HTMLDataElement: ['document.createElement("data")'],
+    HTMLTimeElement: ['document.createElement("time")'],
+    HTMLSpanElement: ['document.createElement("span")'],
+    HTMLBRElement: ['document.createElement("br")'],
+    HTMLModElement: [
+      'document.createElement("ins")',
+      'document.createElement("del")',
+    ],
+    HTMLPictureElement: ['document.createElement("picture")'],
+    HTMLImageElement: ['document.createElement("img")', 'new Image()'],
+    HTMLIframeElement: ['document.createElement("iframe")'],
+    HTMLEmbedElement: ['document.createElement("embed")'],
+    HTMLObjectElement: ['document.createElement("object")'],
+    HTMLParamElement: ['document.createElement("param")'],
+    HTMLVideoElement: ['document.createElement("video")'],
+    HTMLAudioElement: ['document.createElement("audio")', 'new Audio()'],
+    HTMLSourceElement: ['document.createElement("source")'],
+    HTMLTrackElement: ['document.createElement("track")'],
+    HTMLMediaElement: [],
+    MediaError: ['errorVideo.error'],
+    AudioTrackList: [],
+    AudioTrack: [],
+    VideoTrackList: [],
+    VideoTrack: [],
+    MediaController: ['new MediaController()'],
+    TextTrackList: ['document.createElement("video").textTracks'],
+    TextTrack: ['document.createElement("track").track'],
+    TextTrackCueList: ['document.createElement("video").addTextTrack("subtitles").cues'],
+    TextTrackCue: [],
+    DataCue: [],
+    TimeRanges: ['document.createElement("video").buffered'],
+    TrackEvent: ['new TrackEvent("addtrack"; {track:document.createElement("track").track})'],
+    HTMLCanvasElement: ['document.createElement("canvas")'],
+    CanvasRenderingContext2D: ['document.createElement("canvas").getContext("2d")'],
+    CanvasGradient: [],
+    CanvasPattern: [],
+    TextMetrics: [],
+    ImageData: [],
+    HTMLMapElement: ['document.createElement("map")'],
+    HTMLAreaElement: ['document.createElement("area")'],
+    HTMLTableElement: ['document.createElement("table")'],
+    HTMLTableCaptionElement: ['document.createElement("caption")'],
+    HTMLTableColElement: [
+      'document.createElement("colgroup")',
+      'document.createElement("col")',
+    ],
+    HTMLTableSectionElement: [
+      'document.createElement("tbody")',
+      'document.createElement("thead")',
+      'document.createElement("tfoot")',
+    ],
+    HTMLTableRowElement: ['document.createElement("tr")'],
+    HTMLTableDataCellElement: ['document.createElement("td")'],
+    HTMLTableHeaderCellElement: ['document.createElement("th")'],
+    HTMLTableCellElement: [],
+    HTMLFormElement: ['document.createElement("form")'],
+    HTMLFieldsetElement: ['document.createElement("fieldset")'],
+    HTMLLegendElement: ['document.createElement("legend")'],
+    HTMLLabelElement: ['document.createElement("label")'],
+    HTMLInputElement: ['document.createElement("input")'],
+    HTMLButtonElement: ['document.createElement("button")'],
+    HTMLSelectElement: ['document.createElement("select")'],
+    HTMLDataListElement: ['document.createElement("datalist")'],
+    HTMLOptGroupElement: ['document.createElement("optgroup")'],
+    HTMLOptionElement: ['document.createElement("option")', 'new Option()'],
+    HTMLTextAreaElement: ['document.createElement("textarea")'],
+    HTMLKeygenElement: ['document.createElement("keygen")'],
+    HTMLOutputElement: ['document.createElement("output")'],
+    HTMLProgressElement: ['document.createElement("progress")'],
+    HTMLMeterElement: ['document.createElement("meter")'],
+    ValidityState: ['document.createElement("input").validity'],
+    HTMLDetailsElement: ['document.createElement("details")'],
+    HTMLCommandElement: ['document.createElement("command")'],
+    HTMLMenuElement: ['document.createElement("menu")'],
+    Window: ['window'],
+    BarProp: [],
+    History: ['window.history'],
+    Location: ['window.location'],
+    PopStateEvent: ['new PopStateEvent("popstate", { data: {} })'],
+    HashChangeEvent: [],
+    PageTransitionEvent: [],
+    BeforeUnloadEvent: [],
+    ApplicationCache: ['window.applicationCache'],
+    WindowModal: [],
+    Navigator: ['window.navigator'],
+    External: ['window.external'],
+    DataTransfer: [],
+    DataTransferItemList: [],
+    DataTransferItem: [],
+    DragEvent: [],
+    NavigatorUserMediaError: [],
+    MediaStream: [],
+    LocalMediaStream: [],
+    MediaStreamTrack: [],
+    MediaStreamRecorder: [],
+    PeerConnection: [],
+    MediaStreamEvent: [],
+    ErrorEvent: [],
+    WebSocket: ['new WebSocket("ws://foo")'],
+    CloseEvent: ['new CloseEvent("close")'],
+    AbstractWorker: [],
+    Worker: [],
+    SharedWorker: [],
+    MessageEvent: [],
+    MessageChannel: [],
+    MessagePort: [],
+    HTMLAppletElement: ['document.createElement("applet")'],
+    HTMLMarqueeElement: ['document.createElement("marquee")'],
+    HTMLFrameSetElement: ['document.createElement("frameset")'],
+    HTMLFrameElement: ['document.createElement("frame")'],
+    HTMLDirectoryElement: ['document.createElement("dir")'],
+    HTMLFontElement: ['document.createElement("font")'],
+  });
+  idlArray.prevent_multiple_testing("HTMLElement");
+  idlArray.test();
+  done();
 };
 </script>

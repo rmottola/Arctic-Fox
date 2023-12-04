@@ -26,6 +26,8 @@
 #include "nsILanguageAtomService.h"
 #include "mozilla/LookAndFeel.h"
 #include "nsIInterfaceRequestorUtils.h"
+#include "nsIDOMHTMLDocument.h"
+#include "nsIDOMHTMLElement.h"
 #include "nsIWeakReferenceUtils.h"
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
@@ -1664,7 +1666,7 @@ nsPresContext::UpdateViewportScrollbarStylesOverride()
     GetPropagatedScrollbarStylesForViewport(this, &mViewportStyleScrollbar);
 
   nsIDocument* document = Document();
-  if (Element* fullscreenElement = document->GetFullScreenElement()) {
+  if (Element* fullscreenElement = document->GetFullscreenElement()) {
     // If the document is in fullscreen, but the fullscreen element is
     // not the root element, we should explicitly suppress the scrollbar
     // here. Note that, we still need to return the original element
@@ -1808,7 +1810,7 @@ nsPresContext::IsTopLevelWindowInactive()
     return false;
   }
 
-  nsCOMPtr<nsPIDOMWindow> domWindow = rootItem->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> domWindow = rootItem->GetWindow();
 
   return domWindow && !domWindow->IsActive();
 }
@@ -1964,13 +1966,9 @@ NotifyTabUIResolutionChanged(TabParent* aTab, void *aArg)
 }
 
 static void
-NotifyChildrenUIResolutionChanged(nsIDOMWindow* aWindow)
+NotifyChildrenUIResolutionChanged(nsPIDOMWindowOuter* aWindow)
 {
-  nsCOMPtr<nsPIDOMWindow> piWin = do_QueryInterface(aWindow);
-  if (!piWin) {
-    return;
-  }
-  nsCOMPtr<nsIDocument> doc = piWin->GetExtantDoc();
+  nsCOMPtr<nsIDocument> doc = aWindow->GetExtantDoc();
   RefPtr<nsPIWindowRoot> topLevelWin = nsContentUtils::GetWindowRoot(doc);
   if (!topLevelWin) {
     return;
@@ -1989,7 +1987,9 @@ nsPresContext::UIResolutionChangedInternal()
   }
 
   // Recursively notify all remote leaf descendants of the change.
-  NotifyChildrenUIResolutionChanged(mDocument->GetWindow());
+  if (nsPIDOMWindowOuter* window = mDocument->GetWindow()) {
+    NotifyChildrenUIResolutionChanged(window);
+  }
 
   mDocument->EnumerateSubDocuments(UIResolutionChangedSubdocumentCallback,
                                    nullptr);
@@ -2329,7 +2329,7 @@ nsPresContext::EnsureSafeToHandOutCSSRules()
 void
 nsPresContext::FireDOMPaintEvent(nsInvalidateRequestList* aList)
 {
-  nsPIDOMWindow* ourWindow = mDocument->GetWindow();
+  nsPIDOMWindowInner* ourWindow = mDocument->GetInnerWindow();
   if (!ourWindow)
     return;
 
@@ -2382,7 +2382,7 @@ MayHavePaintEventListenerSubdocumentCallback(nsIDocument* aDocument, void* aData
 }
 
 static bool
-MayHavePaintEventListener(nsPIDOMWindow* aInnerWindow)
+MayHavePaintEventListener(nsPIDOMWindowInner* aInnerWindow)
 {
   if (!aInnerWindow)
     return false;
@@ -2414,7 +2414,7 @@ MayHavePaintEventListener(nsPIDOMWindow* aInnerWindow)
   if (node)
     return MayHavePaintEventListener(node->OwnerDoc()->GetInnerWindow());
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(parentTarget);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(parentTarget);
   if (window)
     return MayHavePaintEventListener(window);
 
@@ -3126,7 +3126,7 @@ SortConfigurations(nsTArray<nsIWidget::Configuration>* aConfigurations)
           continue;
         LayoutDeviceIntRect bounds;
         pluginsToMove[j].mChild->GetBounds(bounds);
-        nsAutoTArray<LayoutDeviceIntRect,1> clipRects;
+        AutoTArray<LayoutDeviceIntRect,1> clipRects;
         pluginsToMove[j].mChild->GetWindowClipRegion(&clipRects);
         if (HasOverlap(bounds.TopLeft(), clipRects,
                        config->mBounds.TopLeft(),

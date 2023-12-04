@@ -39,6 +39,13 @@ public:
     return TrackInfo::kVideoTrack;
   }
 
+  const char* GetDescriptionName() const override
+  {
+    nsCString failureReason;
+    return IsHardwareAccelerated(failureReason)
+      ? "wmf hardware video decoder" : "wmf software video decoder";
+  }
+
 private:
 
   bool InitializeDXVA(bool aForceD3D9);

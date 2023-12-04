@@ -759,7 +759,7 @@ getAttributesCB(AtkObject *aAtkObj)
   if (!proxy)
     return nullptr;
 
-  nsAutoTArray<Attribute, 10> attrs;
+  AutoTArray<Attribute, 10> attrs;
   proxy->Attributes(&attrs);
   if (attrs.IsEmpty())
     return nullptr;
@@ -1019,7 +1019,7 @@ refRelationSetCB(AtkObject *aAtkObj)
         continue;
 
       size_t targetCount = targetSets[i].Length();
-      nsAutoTArray<AtkObject*, 5> wrappers;
+      AutoTArray<AtkObject*, 5> wrappers;
       for (size_t j = 0; j < targetCount; j++)
         wrappers.AppendElement(GetWrapperFor(targetSets[i][j]));
 
@@ -1059,13 +1059,13 @@ GetAccessibleWrap(AtkObject* aAtkObj)
   NS_ENSURE_TRUE(isMAIObject || MAI_IS_ATK_SOCKET(aAtkObj),
                  nullptr);
 
-  uintptr_t accWrapPtr = isMAIObject ?
-    MAI_ATK_OBJECT(aAtkObj)->accWrap.Bits() :
-    reinterpret_cast<uintptr_t>(MAI_ATK_SOCKET(aAtkObj)->accWrap);
-  if (accWrapPtr & IS_PROXY)
-    return nullptr;
-
-  AccessibleWrap* accWrap = reinterpret_cast<AccessibleWrap*>(accWrapPtr);
+  AccessibleWrap* accWrap = nullptr;
+  if (isMAIObject) {
+    Accessible* acc = MAI_ATK_OBJECT(aAtkObj)->accWrap.AsAccessible();
+    accWrap = static_cast<AccessibleWrap*>(acc);
+  } else {
+    accWrap = MAI_ATK_SOCKET(aAtkObj)->accWrap;
+  }
 
   // Check if the accessible was deconstructed.
   if (!accWrap)
@@ -1664,7 +1664,7 @@ AccessibleWrap::GetColumnHeader(TableAccessible* aAccessible, int32_t aColIdx)
     return nullptr;
   }
 
-  nsAutoTArray<Accessible*, 10> headerCells;
+  AutoTArray<Accessible*, 10> headerCells;
   tableCell->ColHeaderCells(&headerCells);
   if (headerCells.IsEmpty()) {
     return nullptr;
@@ -1698,7 +1698,7 @@ AccessibleWrap::GetRowHeader(TableAccessible* aAccessible, int32_t aRowIdx)
     return nullptr;
   }
 
-  nsAutoTArray<Accessible*, 10> headerCells;
+  AutoTArray<Accessible*, 10> headerCells;
   tableCell->RowHeaderCells(&headerCells);
   if (headerCells.IsEmpty()) {
     return nullptr;

@@ -1719,7 +1719,7 @@ class ObjectBox
     ObjectBox(JSObject* object, ObjectBox* traceLink);
     bool isFunctionBox() { return object->is<JSFunction>(); }
     FunctionBox* asFunctionBox();
-    bool isModuleBox() { return object->is<ModuleObject>(); }
+    bool isModuleBox();
     ModuleBox* asModuleBox();
     virtual void trace(JSTracer* trc);
 

@@ -85,6 +85,11 @@ public:
 
   }
 
+  const char* GetDescriptionName() const override
+  {
+    return "android video decoder";
+  }
+
   RefPtr<InitPromise> Init() override
   {
     mSurfaceTexture = AndroidSurfaceTexture::Create();
@@ -251,6 +256,11 @@ public:
     }
   }
 
+  const char* GetDescriptionName() const override
+  {
+    return "android audio decoder";
+  }
+
   nsresult Output(BufferInfo::Param aInfo, void* aBuffer,
                   MediaFormat::Param aFormat, const TimeUnit& aDuration)
   {
@@ -301,7 +311,7 @@ bool
 AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
 {
   if (!AndroidBridge::Bridge() ||
-      (AndroidBridge::Bridge()->GetAPIVersion() < 16)) {
+      AndroidBridge::Bridge()->GetAPIVersion() < 16) {
     return false;
   }
 
@@ -310,12 +320,19 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
     return true;
   }
 
-  MediaCodec::LocalRef ref = mozilla::CreateDecoder(aMimeType);
-  if (!ref) {
+  // When checking "audio/x-wav", CreateDecoder can cause a JNI ERROR by
+  // Accessing a stale local reference leading to a SIGSEGV crash.
+  // To avoid this we check for wav types here.
+  if (aMimeType.EqualsLiteral("audio/x-wav") ||
+      aMimeType.EqualsLiteral("audio/wave; codecs=1") ||
+      aMimeType.EqualsLiteral("audio/wave; codecs=6") ||
+      aMimeType.EqualsLiteral("audio/wave; codecs=7") ||
+      aMimeType.EqualsLiteral("audio/wave; codecs=65534")) {
     return false;
-  }
-  ref->Release();
-  return true;
+  }  
+
+  return widget::HardwareCodecCapabilityUtils::FindDecoderCodecInfoForMimeType(
+      nsCString(TranslateMimeType(aMimeType)));
 }
 
 already_AddRefed<MediaDataDecoder>

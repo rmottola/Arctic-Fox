@@ -24,6 +24,7 @@ EXTRA_JS_MODULES += [
     'Feeds.jsm',
     'FormSubmitObserver.jsm',
     'FormValidationHandler.jsm',
+    'HiddenFrame.jsm',
     'NetworkPrioritizer.jsm',
     'NewTabURL.jsm',
     'offlineAppCache.jsm',
@@ -33,10 +34,13 @@ EXTRA_JS_MODULES += [
     'ProcessHangMonitor.jsm',
     'ReaderParent.jsm',
     'RecentWindow.jsm',
+    'RemotePrompt.jsm',
     'Sanitizer.jsm',
     'SharedFrame.jsm',
     'SitePermissions.jsm',
     'TabCrashReporter.jsm',
+    'TransientPrefs.jsm',
+    'WebappManager.jsm',
     'webrtcUI.jsm',
 ]
 

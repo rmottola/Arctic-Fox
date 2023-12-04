@@ -93,6 +93,7 @@ struct StepFunction {
 };
 
 union TimingFunction {
+  null_t;
   CubicBezierFunction;
   StepFunction;
 };
@@ -193,12 +194,14 @@ struct Animation {
   // Number of times to repeat the animation, including positive infinity.
   // Values <= 0 mean the animation will not play (although events are still
   // dispatched on the main thread).
-  float iterationCount;
+  float iterations;
   // This uses the NS_STYLE_ANIMATION_DIRECTION_* constants.
   int32_t direction;
   nsCSSProperty property;
   AnimationData data;
   float playbackRate;
+  // This is used in the transformed progress calculation.
+  TimingFunction easingFunction;
 };
 
 // Change a layer's attributes

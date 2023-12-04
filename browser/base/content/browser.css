@@ -150,7 +150,6 @@ toolbar[printpreview="true"] {
   visibility: collapse;
 }
 
-#wrapper-urlbar-container #urlbar-container > #urlbar > toolbarbutton,
 #urlbar-container:not([combined]) > #urlbar > toolbarbutton,
 #urlbar-container[combined] + #reload-button + #stop-button,
 #urlbar-container[combined] + #reload-button,
@@ -763,12 +762,13 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 }
 
 /* Give this menupopup an arrow panel styling */
+/* disable because Mac has transparency issues otherwise
+menuitems are really transparent against white background.
 #BMB_bookmarksPopup {
   -moz-appearance: none;
   -moz-binding: url("chrome://browser/content/places/menu.xml#places-popup-arrow");
   background: transparent;
   border: none;
-  transition: opacity 300ms;
   /* The popup inherits -moz-image-region from the button, must reset it */
   -moz-image-region: auto;
-}
+} */

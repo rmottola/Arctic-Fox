@@ -25,6 +25,7 @@
 #include "mozilla/AutoRestore.h"        // for AutoRestore
 #include "mozilla/ClearOnShutdown.h"    // for ClearOnShutdown
 #include "mozilla/DebugOnly.h"          // for DebugOnly
+#include "mozilla/dom/ContentParent.h"
 #include "mozilla/gfx/2D.h"          // for DrawTarget
 #include "mozilla/gfx/Point.h"          // for IntSize
 #include "mozilla/gfx/Rect.h"          // for IntSize
@@ -43,7 +44,9 @@
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/PLayerTransactionParent.h"
+#include "mozilla/layers/RemoteContentController.h"
 #include "mozilla/layers/ShadowLayersManager.h" // for ShadowLayersManager
+#include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/media/MediaSystemResourceService.h" // for MediaSystemResourceService
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "mozilla/Telemetry.h"
@@ -75,6 +78,11 @@
 
 #ifdef MOZ_WIDGET_GONK
 #include "GeckoTouchDispatcher.h"
+#include "nsScreenManagerGonk.h"
+#endif
+
+#ifdef MOZ_ANDROID_APZ
+#include "AndroidBridge.h"
 #endif
 
 #include "LayerScope.h"
@@ -286,13 +294,20 @@ CompositorVsyncScheduler::Observer::Destroy()
 CompositorVsyncScheduler::CompositorVsyncScheduler(CompositorParent* aCompositorParent, nsIWidget* aWidget)
   : mCompositorParent(aCompositorParent)
   , mLastCompose(TimeStamp::Now())
-  , mCurrentCompositeTask(nullptr)
   , mIsObservingVsync(false)
   , mNeedsComposite(0)
   , mVsyncNotificationsSkipped(0)
   , mCurrentCompositeTaskMonitor("CurrentCompositeTaskMonitor")
+  , mCurrentCompositeTask(nullptr)
   , mSetNeedsCompositeMonitor("SetNeedsCompositeMonitor")
   , mSetNeedsCompositeTask(nullptr)
+#ifdef MOZ_WIDGET_GONK
+#if ANDROID_VERSION >= 19
+  , mDisplayEnabled(false)
+  , mSetDisplayMonitor("SetDisplayMonitor")
+  , mSetDisplayTask(nullptr)
+#endif
+#endif
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWidget != nullptr);
@@ -300,6 +315,11 @@ CompositorVsyncScheduler::CompositorVsyncScheduler(CompositorParent* aCompositor
   mCompositorVsyncDispatcher = aWidget->GetCompositorVsyncDispatcher();
 #ifdef MOZ_WIDGET_GONK
   GeckoTouchDispatcher::GetInstance()->SetCompositorVsyncScheduler(this);
+
+#if ANDROID_VERSION >= 19
+  RefPtr<nsScreenManagerGonk> screenManager = nsScreenManagerGonk::GetInstance();
+  screenManager->SetCompositorVsyncScheduler(this);
+#endif
 #endif
 
   // mAsapScheduling is set on the main thread during init,
@@ -317,6 +337,54 @@ CompositorVsyncScheduler::~CompositorVsyncScheduler()
   mCompositorVsyncDispatcher = nullptr;
 }
 
+#ifdef MOZ_WIDGET_GONK
+#if ANDROID_VERSION >= 19
+void
+CompositorVsyncScheduler::SetDisplay(bool aDisplayEnable)
+{
+  // SetDisplay() is usually called from nsScreenManager at main thread. Post
+  // to compositor thread if needs.
+  if (!CompositorParent::IsInCompositorThread()) {
+    MOZ_ASSERT(NS_IsMainThread());
+    MonitorAutoLock lock(mSetDisplayMonitor);
+    mSetDisplayTask = NewRunnableMethod(this,
+                                        &CompositorVsyncScheduler::SetDisplay,
+                                        aDisplayEnable);
+    ScheduleTask(mSetDisplayTask, 0);
+    return;
+  } else {
+    MonitorAutoLock lock(mSetDisplayMonitor);
+    mSetDisplayTask = nullptr;
+  }
+
+  if (mDisplayEnabled == aDisplayEnable) {
+    return;
+  }
+
+  mDisplayEnabled = aDisplayEnable;
+  if (!mDisplayEnabled) {
+    CancelCurrentSetNeedsCompositeTask();
+    CancelCurrentCompositeTask();
+  }
+}
+
+void
+CompositorVsyncScheduler::CancelSetDisplayTask()
+{
+  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
+  MonitorAutoLock lock(mSetDisplayMonitor);
+  if (mSetDisplayTask) {
+    mSetDisplayTask->Cancel();
+    mSetDisplayTask = nullptr;
+  }
+
+  // CancelSetDisplayTask is only be called in clean-up process, so
+  // mDisplayEnabled could be false there.
+  mDisplayEnabled = false;
+}
+#endif //ANDROID_VERSION >= 19
+#endif //MOZ_WIDGET_GONK
+
 void
 CompositorVsyncScheduler::Destroy()
 {
@@ -324,6 +392,12 @@ CompositorVsyncScheduler::Destroy()
   UnobserveVsync();
   mVsyncObserver->Destroy();
   mVsyncObserver = nullptr;
+
+#ifdef MOZ_WIDGET_GONK
+#if ANDROID_VERSION >= 19
+  CancelSetDisplayTask();
+#endif
+#endif
   CancelCurrentSetNeedsCompositeTask();
   CancelCurrentCompositeTask();
 }
@@ -395,6 +469,15 @@ CompositorVsyncScheduler::SetNeedsComposite()
     MonitorAutoLock lock(mSetNeedsCompositeMonitor);
     mSetNeedsCompositeTask = nullptr;
   }
+
+#ifdef MOZ_WIDGET_GONK
+#if ANDROID_VERSION >= 19
+  // Skip composition when display off.
+  if (!mDisplayEnabled) {
+    return;
+  }
+#endif
+#endif
 
   mNeedsComposite++;
   if (!mIsObservingVsync && mNeedsComposite) {
@@ -588,6 +671,7 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
   , mLastPluginUpdateLayerTreeId(0)
   , mPluginUpdateResponsePending(false)
   , mDeferPluginWindows(false)
+  , mPluginWindowsHidden(false)
 #endif
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -801,7 +885,7 @@ CompositorParent::Invalidate()
 {
   if (mLayerManager && mLayerManager->GetRoot()) {
     mLayerManager->AddInvalidRegion(
-                                    mLayerManager->GetRoot()->GetVisibleRegion().ToUnknownRegion().GetBounds());
+                                    mLayerManager->GetRoot()->GetLocalVisibleRegion().ToUnknownRegion().GetBounds());
   }
 }
 
@@ -1568,23 +1652,57 @@ CompositorParent::RecvNotifyChildCreated(const uint64_t& child)
 }
 
 void
-CompositorParent::NotifyChildCreated(const uint64_t& aChild)
+CompositorParent::NotifyChildCreated(uint64_t aChild)
 {
   sIndirectLayerTreesLock->AssertCurrentThreadOwns();
   sIndirectLayerTrees[aChild].mParent = this;
   sIndirectLayerTrees[aChild].mLayerManager = mLayerManager;
 }
 
+/* static */ bool
+CompositorParent::UpdateRemoteContentController(uint64_t aLayersId,
+                                                dom::ContentParent* aContent,
+                                                const dom::TabId& aTabId,
+                                                dom::TabParent* aTopLevel)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  MonitorAutoLock lock(*sIndirectLayerTreesLock);
+  LayerTreeState& state = sIndirectLayerTrees[aLayersId];
+  // RemoteContentController needs to know the layers id and the top level
+  // TabParent, so we pass that to its constructor here and then set up the
+  // PAPZ protocol by calling SendPAPZConstructor (and pass in the tab id for
+  // the PBrowser that it corresponds to).
+  RefPtr<RemoteContentController> controller =
+    new RemoteContentController(aLayersId, aTopLevel);
+  if (!aContent->SendPAPZConstructor(controller, aTabId)) {
+    return false;
+  }
+  state.mController = controller;
+  return true;
+}
+
 bool
 CompositorParent::RecvAdoptChild(const uint64_t& child)
 {
-  MonitorAutoLock lock(*sIndirectLayerTreesLock);
-  NotifyChildCreated(child);
-  if (sIndirectLayerTrees[child].mLayerTree) {
-    sIndirectLayerTrees[child].mLayerTree->mLayerManager = mLayerManager;
+  RefPtr<GeckoContentController> controller;
+  {
+    MonitorAutoLock lock(*sIndirectLayerTreesLock);
+    NotifyChildCreated(child);
+    if (sIndirectLayerTrees[child].mLayerTree) {
+      sIndirectLayerTrees[child].mLayerTree->mLayerManager = mLayerManager;
+    }
+    if (sIndirectLayerTrees[child].mRoot) {
+      sIndirectLayerTrees[child].mRoot->AsLayerComposite()->SetLayerManager(mLayerManager);
+    }
+    controller = sIndirectLayerTrees[child].mController;
   }
-  if (sIndirectLayerTrees[child].mRoot) {
-    sIndirectLayerTrees[child].mRoot->AsLayerComposite()->SetLayerManager(mLayerManager);
+
+  // Calling ChildAdopted on controller will acquire a lock, to avoid a
+  // potential deadlock between that lock and sIndirectLayerTreesLock we
+  // release sIndirectLayerTreesLock first before calling ChildAdopted.
+  if (mApzcTreeManager && controller) {
+    controller->ChildAdopted();
   }
   return true;
 }
@@ -2134,6 +2252,14 @@ CompositorParent::UpdatePluginWindowState(uint64_t aId)
     return false;
   }
 
+  // If the plugin windows were hidden but now are not, we need to force
+  // update the metrics to make sure they are visible again.
+  if (mPluginWindowsHidden) {
+    PLUGINS_LOG("[%" PRIu64 "] re-showing", aId);
+    mPluginWindowsHidden = false;
+    pluginMetricsChanged = true;
+  }
+
   if (!lts.mPluginData.Length()) {
     // We will pass through here in cases where the previous shadow layer
     // tree contained visible plugins and the new tree does not. All we need
@@ -2224,6 +2350,7 @@ CompositorParent::HideAllPluginWindows()
   }
   mDeferPluginWindows = true;
   mPluginUpdateResponsePending = true;
+  mPluginWindowsHidden = true;
   Unused << SendHideAllPlugins((uintptr_t)GetWidget());
   ScheduleComposition();
 }

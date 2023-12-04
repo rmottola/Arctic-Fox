@@ -141,7 +141,7 @@ JSObject::getGroup(JSContext* cx)
 inline void
 JSObject::setGroup(js::ObjectGroup* group)
 {
-    MOZ_ASSERT(group);
+    MOZ_RELEASE_ASSERT(group);
     MOZ_ASSERT(!isSingleton());
     group_ = group;
 }
@@ -590,9 +590,7 @@ inline bool
 IsInternalFunctionObject(JSObject& funobj)
 {
     JSFunction& fun = funobj.as<JSFunction>();
-    MOZ_ASSERT_IF(fun.isLambda(),
-                  fun.isInterpreted() || fun.isAsmJSNative());
-    return fun.isLambda() && fun.isInterpreted() && !fun.environment();
+    return fun.isInterpreted() && !fun.environment();
 }
 
 /*

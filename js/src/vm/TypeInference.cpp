@@ -3100,7 +3100,11 @@ js::AddClearDefiniteGetterSetterForPrototypeChain(JSContext* cx, ObjectGroup* gr
     RootedObject proto(cx, group->proto().toObjectOrNull());
     while (proto) {
         ObjectGroup* protoGroup = proto->getGroup(cx);
-        if (!protoGroup || protoGroup->unknownProperties())
+        if (!protoGroup) {
+            cx->recoverFromOutOfMemory();
+            return false;
+        }
+        if (protoGroup->unknownProperties())
             return false;
         HeapTypeSet* protoTypes = protoGroup->getProperty(cx, proto, id);
         if (!protoTypes || protoTypes->nonDataProperty() || protoTypes->nonWritableProperty())
@@ -3882,8 +3886,9 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
     Vector<uint32_t, 32> pcOffsets(cx);
     for (ScriptFrameIter iter(cx); !iter.done(); ++iter) {
         {
+            AutoEnterOOMUnsafeRegion oomUnsafe;
             if (!pcOffsets.append(iter.script()->pcToOffset(iter.pc())))
-                MOZ_CRASH("rollbackPartiallyInitializedObjects");
+                oomUnsafe.crash("rollbackPartiallyInitializedObjects");
         }
 
         if (!iter.isConstructing()) {

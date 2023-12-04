@@ -44,6 +44,7 @@
 #include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/ipc/TestShellChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
+#include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/CompositorChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/PCompositorChild.h"
@@ -72,6 +73,7 @@
 #include "mozilla/unused.h"
 
 #include "mozInlineSpellChecker.h"
+#include "nsDocShell.h"
 #include "nsIConsoleListener.h"
 #include "nsICycleCollectorListener.h"
 #include "nsIDragService.h"
@@ -670,10 +672,6 @@ ContentChild::Init(MessageLoop* aIOLoop,
   }
   sSingleton = this;
 
-  // Make sure there's an nsAutoScriptBlocker on the stack when dispatching
-  // urgent messages.
-  GetIPCChannel()->BlockScripts();
-
   // If communications with the parent have broken down, take the process
   // down so it's not hanging around.
   bool abortOnError = true;
@@ -764,7 +762,7 @@ ContentChild::SetProcessName(const nsAString& aName, bool aDontOverride)
 }
 
 NS_IMETHODIMP
-ContentChild::ProvideWindow(nsIDOMWindow* aParent,
+ContentChild::ProvideWindow(mozIDOMWindowProxy* aParent,
                             uint32_t aChromeFlags,
                             bool aCalledFromJS,
                             bool aPositionSpecified,
@@ -773,7 +771,7 @@ ContentChild::ProvideWindow(nsIDOMWindow* aParent,
                             const nsAString& aName,
                             const nsACString& aFeatures,
                             bool* aWindowIsNew,
-                            nsIDOMWindow** aReturn)
+                            mozIDOMWindowProxy** aReturn)
 {
   return ProvideWindowCommon(nullptr, aParent, false, aChromeFlags,
                              aCalledFromJS, aPositionSpecified,
@@ -783,7 +781,7 @@ ContentChild::ProvideWindow(nsIDOMWindow* aParent,
 
 nsresult
 ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
-                                  nsIDOMWindow* aParent,
+                                  mozIDOMWindowProxy* aParent,
                                   bool aIframeMoz,
                                   uint32_t aChromeFlags,
                                   bool aCalledFromJS,
@@ -793,7 +791,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
                                   const nsAString& aName,
                                   const nsACString& aFeatures,
                                   bool* aWindowIsNew,
-                                  nsIDOMWindow** aReturn)
+                                  mozIDOMWindowProxy** aReturn)
 {
   *aReturn = nullptr;
 
@@ -861,7 +859,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
   } else {
     nsAutoCString baseURIString;
     if (aTabOpener) {
-      nsCOMPtr<nsPIDOMWindow> opener = do_QueryInterface(aParent);
+      auto* opener = nsPIDOMWindowOuter::From(aParent);
       nsCOMPtr<nsIDocument> doc = opener->GetDoc();
       nsCOMPtr<nsIURI> baseURI = doc->GetDocBaseURI();
       if (!baseURI) {
@@ -872,12 +870,22 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
       baseURI->GetSpec(baseURIString);
     }
 
+    auto* opener = nsPIDOMWindowOuter::From(aParent);
+    nsIDocShell* openerShell;
+    RefPtr<nsDocShell> openerDocShell;
+    if (opener && (openerShell = opener->GetDocShell())) {
+      openerDocShell = static_cast<nsDocShell*>(openerShell);
+    }
+
     nsresult rv;
     if (!SendCreateWindow(aTabOpener, newChild,
                           aChromeFlags, aCalledFromJS, aPositionSpecified,
                           aSizeSpecified, url,
                           name, features,
                           baseURIString,
+                          openerDocShell
+                            ? openerDocShell->GetOriginAttributes()
+                            : DocShellOriginAttributes(),
                           &rv,
                           aWindowIsNew,
                           &frameScripts,
@@ -906,7 +914,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
   }
 
   ShowInfo showInfo(EmptyString(), false, false, true, 0, 0);
-  nsCOMPtr<nsPIDOMWindow> opener = do_QueryInterface(aParent);
+  auto* opener = nsPIDOMWindowOuter::From(aParent);
   nsIDocShell* openerShell;
   if (opener && (openerShell = opener->GetDocShell())) {
     nsCOMPtr<nsILoadContext> context = do_QueryInterface(openerShell);
@@ -931,7 +939,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     newChild->RecvLoadURL(urlToLoad, BrowserConfiguration(), showInfo);
   }
 
-  nsCOMPtr<nsIDOMWindow> win = do_GetInterface(newChild->WebNavigation());
+  nsCOMPtr<mozIDOMWindowProxy> win = do_GetInterface(newChild->WebNavigation());
   win.forget(aReturn);
   return NS_OK;
 }
@@ -1259,6 +1267,19 @@ ContentChild::AllocPGMPServiceChild(mozilla::ipc::Transport* aTransport,
                                     base::ProcessId aOtherProcess)
 {
   return GMPServiceChild::Create(aTransport, aOtherProcess);
+}
+
+PAPZChild*
+ContentChild::AllocPAPZChild(const TabId& aTabId)
+{
+  return APZChild::Create(aTabId);
+}
+
+bool
+ContentChild::DeallocPAPZChild(PAPZChild* aActor)
+{
+  delete aActor;
+  return true;
 }
 
 PCompositorChild*

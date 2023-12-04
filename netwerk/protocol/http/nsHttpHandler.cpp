@@ -399,9 +399,11 @@ nsHttpHandler::Init()
 void
 nsHttpHandler::MakeNewRequestTokenBucket()
 {
-    if (!mConnMgr)
+    LOG(("nsHttpHandler::MakeNewRequestTokenBucket this=%p child=%d\n",
+         this, IsNeckoChild()));
+    if (!mConnMgr || IsNeckoChild()) {
         return;
-
+    }
     RefPtr<EventTokenBucket> tokenBucket =
         new EventTokenBucket(RequestTokenBucketHz(), RequestTokenBucketBurst());
     mConnMgr->UpdateRequestTokenBucket(tokenBucket);
@@ -2276,7 +2278,7 @@ nsHttpHandler::TickleWifi(nsIInterfaceRequestor *cb)
     // on B2G, contains the necessary information on wifi and gateway
 
     nsCOMPtr<nsIDOMWindow> domWindow = do_GetInterface(cb);
-    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(domWindow);
+    nsCOMPtr<nsPIDOMWindowOuter> piWindow = do_QueryInterface(domWindow);
     if (!piWindow)
         return;
 

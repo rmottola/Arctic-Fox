@@ -365,13 +365,6 @@ NS_IMETHODIMP
 txMozillaXSLTProcessor::Init(nsISupports* aOwner)
 {
     mOwner = aOwner;
-    if (nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(aOwner)) {
-        if (win->IsOuterWindow()) {
-            // Must be bound to inner window, innerize if necessary.
-            mOwner = win->GetCurrentInnerWindow();
-        }
-    }
-
     return NS_OK;
 }
 
@@ -673,7 +666,7 @@ txMozillaXSLTProcessor::TransformToDoc(nsIDOMDocument **aResult,
         sourceDOMDocument = do_QueryInterface(mSource);
     }
 
-    txExecutionState es(mStylesheet, IsLoadDisabled());
+    txExecutionState es(mStylesheet, IsLoadDisabled(), getLoaderDoc());
 
     // XXX Need to add error observers
 
@@ -741,7 +734,7 @@ txMozillaXSLTProcessor::TransformToFragment(nsIDOMNode *aSource,
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    txExecutionState es(mStylesheet, IsLoadDisabled());
+    txExecutionState es(mStylesheet, IsLoadDisabled(), getLoaderDoc());
 
     // XXX Need to add error observers
 
@@ -1211,7 +1204,7 @@ nsIDocument*
 txMozillaXSLTProcessor::getLoaderDoc()
 {
     if (mOwner) {
-        nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(mOwner);
+        nsCOMPtr<nsPIDOMWindowInner> win = do_QueryInterface(mOwner);
         if (win) {
             return win->GetExtantDoc();
         }

@@ -7,6 +7,7 @@
 #define nsCoreUtils_h_
 
 #include "mozilla/EventForwards.h"
+#include "nsIAccessibleEvent.h"
 #include "nsIContent.h"
 #include "nsIDocument.h" // for GetShell()
 #include "nsIPresShell.h"
@@ -28,6 +29,11 @@ class nsIWidget;
 class nsCoreUtils
 {
 public:
+  /**
+   * Return true if the given node is a label of a control.
+   */
+  static bool IsLabelWithControl(nsIContent *aContent);
+
   /**
    * Return true if the given node has registered click, mousedown or mouseup
    * event listeners.
@@ -314,6 +320,16 @@ public:
     return aChar == ' ' || aChar == '\n' ||
       aChar == '\r' || aChar == '\t' || aChar == 0xa0;
   }
+
+  /*
+   * Return true if there are any observers of accessible events.
+   */
+  static bool AccEventObserversExist();
+
+  /**
+   * Notify accessible event observers of an event.
+   */
+  static void DispatchAccEvent(RefPtr<nsIAccessibleEvent> aEvent);
 };
 
 #endif

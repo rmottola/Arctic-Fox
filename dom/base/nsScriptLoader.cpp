@@ -288,7 +288,7 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
   }
 
   nsCOMPtr<nsILoadGroup> loadGroup = mDocument->GetDocumentLoadGroup();
-  nsCOMPtr<nsPIDOMWindow> window(do_QueryInterface(mDocument->MasterDocument()->GetWindow()));
+  nsCOMPtr<nsPIDOMWindowOuter> window = mDocument->MasterDocument()->GetWindow();
   NS_ENSURE_TRUE(window, NS_ERROR_NULL_POINTER);
   nsIDocShell *docshell = window->GetDocShell();
   nsCOMPtr<nsIInterfaceRequestor> prompter(do_QueryInterface(docshell));
@@ -297,7 +297,9 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
     aRequest->mCORSMode == CORS_NONE
     ? nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL
     : nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS;
-  if (aRequest->mCORSMode == CORS_USE_CREDENTIALS) {
+  if (aRequest->mCORSMode == CORS_ANONYMOUS) {
+    securityFlags |= nsILoadInfo::SEC_COOKIES_SAME_ORIGIN;
+  } else if (aRequest->mCORSMode == CORS_USE_CREDENTIALS) {
     securityFlags |= nsILoadInfo::SEC_COOKIES_INCLUDE;
   }
   securityFlags |= nsILoadInfo::SEC_ALLOW_CHROME;
@@ -783,17 +785,8 @@ nsScriptLoader::ProcessOffThreadRequest(nsScriptLoadRequest* aRequest)
 NotifyOffThreadScriptLoadCompletedRunnable::~NotifyOffThreadScriptLoadCompletedRunnable()
 {
   if (MOZ_UNLIKELY(mRequest || mLoader) && !NS_IsMainThread()) {
-    nsCOMPtr<nsIThread> mainThread;
-    NS_GetMainThread(getter_AddRefs(mainThread));
-    if (mainThread) {
-      NS_ProxyRelease(mainThread, mRequest);
-      NS_ProxyRelease(mainThread, mLoader);
-    } else {
-      MOZ_ASSERT(false, "We really shouldn't leak!");
-      // Better to leak than crash.
-      Unused << mRequest.forget();
-      Unused << mLoader.forget();
-    }
+    NS_ReleaseOnMainThread(mRequest.forget());
+    NS_ReleaseOnMainThread(mLoader.forget());
   }
 }
 
@@ -942,7 +935,12 @@ nsScriptLoader::ProcessRequest(nsScriptLoadRequest* aRequest)
   // The window may have gone away by this point, in which case there's no point
   // in trying to run the script.
   nsCOMPtr<nsIDocument> master = mDocument->MasterDocument();
-  nsPIDOMWindow *pwin = master->GetInnerWindow();
+  {
+    // Try to perform a microtask checkpoint
+    nsAutoMicroTask mt;
+  }
+
+  nsPIDOMWindowInner *pwin = master->GetInnerWindow();
   bool runScript = !!pwin;
   if (runScript) {
     nsContentUtils::DispatchTrustedEvent(scriptElem->OwnerDoc(),
@@ -1024,7 +1022,7 @@ already_AddRefed<nsIScriptGlobalObject>
 nsScriptLoader::GetScriptGlobalObject()
 {
   nsCOMPtr<nsIDocument> master = mDocument->MasterDocument();
-  nsPIDOMWindow *pwin = master->GetInnerWindow();
+  nsPIDOMWindowInner *pwin = master->GetInnerWindow();
   if (!pwin) {
     return nullptr;
   }

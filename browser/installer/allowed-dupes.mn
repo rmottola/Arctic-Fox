@@ -620,6 +620,14 @@ browser/chrome/devtools/skin/themes/images/vview-edit@2x.png
 browser/chrome/devtools/content/inspector/layout/layout.js
 browser/chrome/devtools/modules/devtools/client/inspector/layout/layout.js
 
+browser/chrome/browser/skin/classic/browser/identity-mixed-active-loaded.svg
+browser/chrome/devtools/skin/images/security-state-insecure.svg
+browser/chrome/browser/skin/classic/browser/identity-mixed-passive-loaded.svg
+browser/chrome/devtools/skin/images/security-state-weak.svg
+browser/chrome/browser/skin/classic/browser/identity-secure.svg
+browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
+
+
 #Windows ArcticFox exceptions
 chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png
 chrome/toolkit/skin/classic/mozapps/plugins/pluginGeneric.png

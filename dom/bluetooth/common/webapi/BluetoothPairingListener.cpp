@@ -20,7 +20,7 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 NS_IMPL_ADDREF_INHERITED(BluetoothPairingListener, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(BluetoothPairingListener, DOMEventTargetHelper)
 
-BluetoothPairingListener::BluetoothPairingListener(nsPIDOMWindow* aWindow)
+BluetoothPairingListener::BluetoothPairingListener(nsPIDOMWindowInner* aWindow)
   : DOMEventTargetHelper(aWindow)
   , mHasListenedToSignal(false)
 {
@@ -30,7 +30,7 @@ BluetoothPairingListener::BluetoothPairingListener(nsPIDOMWindow* aWindow)
 }
 
 already_AddRefed<BluetoothPairingListener>
-BluetoothPairingListener::Create(nsPIDOMWindow* aWindow)
+BluetoothPairingListener::Create(nsPIDOMWindowInner* aWindow)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWindow);
@@ -48,21 +48,29 @@ BluetoothPairingListener::~BluetoothPairingListener()
 }
 
 void
-BluetoothPairingListener::DispatchPairingEvent(const nsAString& aName,
-                                               const nsAString& aAddress,
-                                               const nsAString& aPasskey,
-                                               const nsAString& aType)
+BluetoothPairingListener::DispatchPairingEvent(
+  const BluetoothRemoteName& aName,
+  const BluetoothAddress& aAddress,
+  const nsAString& aPasskey,
+  const nsAString& aType)
 {
-  MOZ_ASSERT(!aName.IsEmpty() && !aAddress.IsEmpty() && !aType.IsEmpty());
+  MOZ_ASSERT(!aAddress.IsCleared());
+  MOZ_ASSERT(!aName.IsCleared() && !aType.IsEmpty());
+
+  nsString nameStr;
+  RemoteNameToString(aName, nameStr);
+
+  nsString addressStr;
+  AddressToString(aAddress, addressStr);
 
   RefPtr<BluetoothPairingHandle> handle =
     BluetoothPairingHandle::Create(GetOwner(),
-                                   aAddress,
+                                   addressStr,
                                    aType,
                                    aPasskey);
 
   BluetoothPairingEventInit init;
-  init.mDeviceName = aName;
+  init.mDeviceName = nameStr;
   init.mHandle = handle;
 
   RefPtr<BluetoothPairingEvent> event =
@@ -87,13 +95,13 @@ BluetoothPairingListener::Notify(const BluetoothSignal& aData)
       value.get_ArrayOfBluetoothNamedValue();
 
     MOZ_ASSERT(arr.Length() == 4 &&
-               arr[0].value().type() == BluetoothValue::TnsString && // address
-               arr[1].value().type() == BluetoothValue::TnsString && // name
+               arr[0].value().type() == BluetoothValue::TBluetoothAddress && // address
+               arr[1].value().type() == BluetoothValue::TBluetoothRemoteName && // name
                arr[2].value().type() == BluetoothValue::TnsString && // passkey
                arr[3].value().type() == BluetoothValue::TnsString);  // type
 
-    nsString address = arr[0].value().get_nsString();
-    nsString name = arr[1].value().get_nsString();
+    BluetoothAddress address = arr[0].value().get_BluetoothAddress();
+    const BluetoothRemoteName& name = arr[1].value().get_BluetoothRemoteName();
     nsString passkey = arr[2].value().get_nsString();
     nsString type = arr[3].value().get_nsString();
 

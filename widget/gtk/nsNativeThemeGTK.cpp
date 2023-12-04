@@ -1028,6 +1028,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
         aExtra->left = left;
         break;
       }
+      return false;
     }
   case NS_THEME_FOCUS_OUTLINE:
     {
@@ -1054,6 +1055,7 @@ nsNativeThemeGTK::GetExtraSizeForWidget(nsIFrame* aFrame, uint8_t aWidgetType,
       } else {
         aExtra->bottom = extra;
       }
+      return false;
     }
   default:
     return false;
@@ -1110,7 +1112,7 @@ nsNativeThemeGTK::DrawWidgetBackground(nsRenderingContext* aContext,
   nsIntRect overflowRect(widgetRect);
   nsIntMargin extraSize;
   if (GetExtraSizeForWidget(aFrame, aWidgetType, &extraSize)) {
-    overflowRect.Inflate(gfx::ToIntMargin(extraSize));
+    overflowRect.Inflate(extraSize);
   }
 
   // This is the rectangle that will actually be drawn, in gdk pixels
@@ -1219,11 +1221,21 @@ nsNativeThemeGTK::GetWidgetBorder(nsDeviceContext* aContext, nsIFrame* aFrame,
   aResult->top = aResult->left = aResult->right = aResult->bottom = 0;
   switch (aWidgetType) {
   case NS_THEME_SCROLLBAR_VERTICAL:
-  case NS_THEME_SCROLLBAR_HORIZONTAL:
+  case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
     {
       MozGtkScrollbarMetrics metrics;
       moz_gtk_get_scrollbar_metrics(&metrics);
-      aResult->top = aResult->left = aResult->right = aResult->bottom = metrics.trough_border;
+      /* Top and bottom border for whole vertical scrollbar, top and bottom
+       * border for horizontal track - to correctly position thumb element */
+      aResult->top = aResult->bottom = metrics.trough_border;
+    }
+    break;
+  case NS_THEME_SCROLLBAR_HORIZONTAL:
+  case NS_THEME_SCROLLBAR_TRACK_VERTICAL:
+    {
+      MozGtkScrollbarMetrics metrics;
+      moz_gtk_get_scrollbar_metrics(&metrics);
+      aResult->left = aResult->right = metrics.trough_border;
     }
     break;
   case NS_THEME_TOOLBOX:
@@ -1261,6 +1273,7 @@ nsNativeThemeGTK::GetWidgetBorder(nsDeviceContext* aContext, nsIFrame* aFrame,
     // will need to fall through and use the default case as before.
     if (IsRegularMenuItem(aFrame))
       break;
+    MOZ_FALLTHROUGH;
   default:
     {
       GtkThemeWidgetType gtkWidgetType;
@@ -1272,6 +1285,12 @@ nsNativeThemeGTK::GetWidgetBorder(nsDeviceContext* aContext, nsIFrame* aFrame,
       }
     }
   }
+
+  gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+  aResult->top *= scale;
+  aResult->right *= scale;
+  aResult->bottom *= scale;
+  aResult->left *= scale;
   return NS_OK;
 }
 
@@ -1697,7 +1716,7 @@ nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
     if (aFrame && aFrame->GetWritingMode().IsVertical()) {
       return false;
     }
-    // fall through
+    MOZ_FALLTHROUGH;
 
   case NS_THEME_BUTTON:
   case NS_THEME_BUTTON_FOCUS:
@@ -1750,6 +1769,8 @@ nsNativeThemeGTK::ThemeSupportsWidget(nsPresContext* aPresContext,
   case NS_THEME_SCROLLBAR_BUTTON_RIGHT:
   case NS_THEME_SCROLLBAR_HORIZONTAL:
   case NS_THEME_SCROLLBAR_VERTICAL:
+  case NS_THEME_SCROLLBAR_TRACK_HORIZONTAL:
+  case NS_THEME_SCROLLBAR_TRACK_VERTICAL:
   case NS_THEME_SCROLLBAR_THUMB_HORIZONTAL:
   case NS_THEME_SCROLLBAR_THUMB_VERTICAL:
   case NS_THEME_NUMBER_INPUT:

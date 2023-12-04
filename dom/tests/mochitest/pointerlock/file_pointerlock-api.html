@@ -49,6 +49,7 @@
       }
 
       function mouseMoveHandler(e) {
+        info("Got mousemove");
         document.removeEventListener("mousemove", mouseMoveHandler, false);
 
         hasMovementX = "mozMovementX" in e;
@@ -62,6 +63,7 @@
         pointerLockChangeEventFired = true;
 
         if (document.mozPointerLockElement) {
+          info("Got mozpointerlockchange for entering");
           pointerLocked = true;
           pointerLockElement = document.mozPointerLockElement === div;
  
@@ -75,16 +77,19 @@
           document.addEventListener("mousemove", mouseMoveHandler, false);
           synthesizeMouseAtCenter(div, {type: "mousemove"}, window);
         } else {
+          info("Got mozpointerlockchange for exiting");
           pointerUnlocked = true;
-          document.mozCancelFullScreen();
+          document.exitFullscreen();
         }
       }, false);
 
-      document.addEventListener("mozfullscreenchange", function(e) {
-        if (document.mozFullScreenElement === div) {
+      document.addEventListener("fullscreenchange", function(e) {
+        if (document.fullscreenElement === div) {
+          info("Got fullscreenchange for entering");
           hasRequestPointerLock = "mozRequestPointerLock" in div;
           div.mozRequestPointerLock();
         } else {
+          info("Got fullscreenchange for exiting");
           runTests();
           SimpleTest.finish();
         }
@@ -92,7 +97,8 @@
 
       function start() {
         div = document.getElementById("div");
-        div.mozRequestFullScreen();
+        info("Requesting fullscreen on parent");
+        div.requestFullscreen();
       }
     </script>
   </pre>

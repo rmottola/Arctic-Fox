@@ -1492,6 +1492,26 @@ struct CCGraphDescriber : public LinkedListElement<CCGraphDescriber>
   Type mType;
 };
 
+class LogStringMessageAsync : public nsCancelableRunnable
+{
+public:
+  explicit LogStringMessageAsync(const nsAString& aMsg) : mMsg(aMsg)
+  {}
+
+  NS_IMETHOD Run() override
+  {
+    nsCOMPtr<nsIConsoleService> cs =
+      do_GetService(NS_CONSOLESERVICE_CONTRACTID);
+    if (cs) {
+       cs->LogStringMessage(mMsg.get());
+    }
+    return NS_OK;
+  }
+
+private:
+  nsString mMsg;
+};
+
 class nsCycleCollectorLogSinkToFile final : public nsICycleCollectorLogSink
 {
 public:
@@ -1690,17 +1710,16 @@ private:
     aLog->mFile = logFileFinalDestination;
 
     // Log to the error console.
-    nsCOMPtr<nsIConsoleService> cs =
-      do_GetService(NS_CONSOLESERVICE_CONTRACTID);
-    if (cs) {
-      // Copy out the path.
-      nsAutoString logPath;
-      logFileFinalDestination->GetPath(logPath);
+    nsAutoString logPath;
+    logFileFinalDestination->GetPath(logPath);
+    nsAutoString msg = aCollectorKind +
+      NS_LITERAL_STRING(" Collector log dumped to ") + logPath;
 
-      nsString msg = aCollectorKind +
-        NS_LITERAL_STRING(" Collector log dumped to ") + logPath;
-      cs->LogStringMessage(msg.get());
-    }
+    // We don't want any JS to run between ScanRoots and CollectWhite calls,
+    // and since ScanRoots calls this method, better to log the message
+    // asynchronously.
+    RefPtr<LogStringMessageAsync> log = new LogStringMessageAsync(msg);
+    NS_DispatchToCurrentThread(log);
     return NS_OK;
   }
 
@@ -2637,7 +2656,7 @@ class SnowWhiteKiller : public TraceCallbacks
     ObjectsVector;
 
 public:
-  SnowWhiteKiller(nsCycleCollector* aCollector, uint32_t aMaxCount)
+  explicit SnowWhiteKiller(nsCycleCollector* aCollector)
     : mCollector(aCollector)
     , mObjects(kSegmentSize)
   {
@@ -2740,10 +2759,10 @@ class RemoveSkippableVisitor : public SnowWhiteKiller
 {
 public:
   RemoveSkippableVisitor(nsCycleCollector* aCollector,
-                         uint32_t aMaxCount, bool aRemoveChildlessNodes,
+                         bool aRemoveChildlessNodes,
                          bool aAsyncSnowWhiteFreeing,
                          CC_ForgetSkippableCallback aCb)
-    : SnowWhiteKiller(aCollector, aAsyncSnowWhiteFreeing ? 0 : aMaxCount)
+    : SnowWhiteKiller(aCollector)
     , mRemoveChildlessNodes(aRemoveChildlessNodes)
     , mAsyncSnowWhiteFreeing(aAsyncSnowWhiteFreeing)
     , mDispatchedDeferredDeletion(false)
@@ -2800,7 +2819,7 @@ nsPurpleBuffer::RemoveSkippable(nsCycleCollector* aCollector,
                                 bool aAsyncSnowWhiteFreeing,
                                 CC_ForgetSkippableCallback aCb)
 {
-  RemoveSkippableVisitor visitor(aCollector, Count(), aRemoveChildlessNodes,
+  RemoveSkippableVisitor visitor(aCollector, aRemoveChildlessNodes,
                                  aAsyncSnowWhiteFreeing, aCb);
   VisitEntries(visitor);
 }
@@ -2819,7 +2838,7 @@ nsCycleCollector::FreeSnowWhite(bool aUntilNoSWInPurpleBuffer)
 
   bool hadSnowWhiteObjects = false;
   do {
-    SnowWhiteKiller visitor(this, mPurpleBuf.Count());
+    SnowWhiteKiller visitor(this);
     mPurpleBuf.VisitEntries(visitor);
     hadSnowWhiteObjects = hadSnowWhiteObjects ||
                           visitor.HasSnowWhiteObjects();
@@ -3265,9 +3284,15 @@ nsCycleCollector::CollectWhite()
     if (pinfo->mColor == white && pinfo->mParticipant) {
       if (pinfo->IsGrayJS()) {
         ++numWhiteGCed;
+        JS::Zone* zone;
         if (MOZ_UNLIKELY(pinfo->mParticipant == zoneParticipant)) {
           ++numWhiteJSZones;
+          zone = static_cast<JS::Zone*>(pinfo->mPointer);
+        } else {
+          JS::GCCellPtr ptr(pinfo->mPointer, js::GCThingTraceKind(pinfo->mPointer));
+          zone = JS::GetTenuredGCThingZone(ptr);
         }
+        mJSRuntime->AddZoneWaitingForGC(zone);
       } else {
         whiteNodes.InfallibleAppend(pinfo);
         pinfo->mParticipant->Root(pinfo->mPointer);
@@ -4166,6 +4191,11 @@ nsCycleCollector_shutdown()
 
     data->mCollector->Shutdown();
     data->mCollector = nullptr;
+    if (data->mRuntime) {
+      // Run any remaining tasks that may have been enqueued via
+      // RunInStableState during the final cycle collection.
+      data->mRuntime->ProcessStableStateQueue();
+    }
     if (!data->mRuntime) {
       delete data;
       sCollectorData.set(nullptr);

@@ -34,7 +34,7 @@
 class nsIContentSecurityPolicy;
 class nsIScriptContext;
 class nsIGlobalObject;
-class nsPIDOMWindow;
+class nsPIDOMWindowInner;
 class nsIPrincipal;
 class nsILoadGroup;
 class nsITabChild;
@@ -214,7 +214,7 @@ struct WorkerLoadInfo
   nsCOMPtr<nsIURI> mResolvedScriptURI;
   nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsIScriptContext> mScriptContext;
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;
   nsCOMPtr<nsIChannel> mChannel;
   nsCOMPtr<nsILoadGroup> mLoadGroup;
@@ -240,6 +240,7 @@ struct WorkerLoadInfo
     already_AddRefed<nsITabChild> GetAnyLiveTabChild();
 
     nsCOMPtr<nsILoadContext> mLoadContext;
+    nsCOMPtr<nsIInterfaceRequestor> mOuterRequestor;
 
     // Array of weak references to nsITabChild.  We do not want to keep TabChild
     // actors alive for long after their ActorDestroy() methods are called.
@@ -279,19 +280,19 @@ struct WorkerLoadInfo
 // All of these are implemented in RuntimeService.cpp
 
 void
-CancelWorkersForWindow(nsPIDOMWindow* aWindow);
+CancelWorkersForWindow(nsPIDOMWindowInner* aWindow);
 
 void
-FreezeWorkersForWindow(nsPIDOMWindow* aWindow);
+FreezeWorkersForWindow(nsPIDOMWindowInner* aWindow);
 
 void
-ThawWorkersForWindow(nsPIDOMWindow* aWindow);
+ThawWorkersForWindow(nsPIDOMWindowInner* aWindow);
 
 void
-SuspendWorkersForWindow(nsPIDOMWindow* aWindow);
+SuspendWorkersForWindow(nsPIDOMWindowInner* aWindow);
 
 void
-ResumeWorkersForWindow(nsPIDOMWindow* aWindow);
+ResumeWorkersForWindow(nsPIDOMWindowInner* aWindow);
 
 class WorkerTask
 {

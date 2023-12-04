@@ -43,7 +43,7 @@
 #include "nsPoint.h"                    // for nsIntPoint
 #include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsRegion.h"                   // for nsIntRegion, etc
-#include "nsTArray.h"                   // for nsAutoTArray
+#include "nsTArray.h"                   // for AutoTArray
 #ifdef MOZ_ENABLE_SKIA
 #include "skia/include/core/SkCanvas.h"         // for SkCanvas
 #include "skia/include/core/SkBitmapDevice.h"   // for SkBitmapDevice
@@ -123,10 +123,21 @@ BasicLayerManager::PushGroupForLayer(gfxContext* aContext, Layer* aLayer, const 
       group.mMaskSurface = GetMaskForLayer(aLayer, &group.mMaskTransform);
       return group;
     }
+    aContext->Restore();
   }
 
   Matrix maskTransform;
   RefPtr<SourceSurface> maskSurf = GetMaskForLayer(aLayer, &maskTransform);
+
+  if (maskSurf) {
+    // The returned transform will transform the mask to device space on the
+    // destination. Since the User->Device space transform will be applied
+    // to the mask by PopGroupAndBlend we need to adjust the transform to
+    // transform the mask to user space.
+    Matrix currentTransform = ToMatrix(group.mFinalTarget->CurrentMatrix());
+    currentTransform.Invert();
+    maskTransform = maskTransform * currentTransform;
+  }
 
   if (aLayer->CanUseOpaqueSurface() &&
       ((didCompleteClip && aRegion.GetNumRects() == 1) ||
@@ -172,8 +183,12 @@ BasicLayerManager::PopGroupForLayer(PushedGroup &group)
   RefPtr<SourceSurface> src = sourceDT->Snapshot();
 
   if (group.mMaskSurface) {
-    dt->SetTransform(group.mMaskTransform * Matrix::Translation(-group.mFinalTarget->GetDeviceOffset()));
-    dt->MaskSurface(SurfacePattern(src, ExtendMode::CLAMP, Matrix::Translation(group.mGroupOffset.x, group.mGroupOffset.y)),
+    Point finalOffset = group.mFinalTarget->GetDeviceOffset();
+    dt->SetTransform(group.mMaskTransform * Matrix::Translation(-finalOffset));
+    Matrix surfTransform = group.mMaskTransform;
+    surfTransform.Invert();
+    dt->MaskSurface(SurfacePattern(src, ExtendMode::CLAMP, surfTransform *
+                                                           Matrix::Translation(group.mGroupOffset.x, group.mGroupOffset.y)),
                     group.mMaskSurface, Point(0, 0), DrawOptions(group.mOpacity, group.mOperator));
   } else {
     // For now this is required since our group offset is in device space of the final target,
@@ -245,7 +260,7 @@ public:
   // Set the opaque rect to match the bounds of the visible region.
   void AnnotateOpaqueRect()
   {
-    const nsIntRegion visibleRegion = mLayer->GetEffectiveVisibleRegion().ToUnknownRegion();
+    const nsIntRegion visibleRegion = mLayer->GetLocalVisibleRegion().ToUnknownRegion();
     const IntRect& bounds = visibleRegion.GetBounds();
 
     DrawTarget *dt = mTarget->GetDrawTarget();
@@ -432,7 +447,7 @@ MarkLayersHidden(Layer* aLayer, const IntRect& aClipRect,
       return;
     }
 
-    nsIntRegion region = aLayer->GetEffectiveVisibleRegion().ToUnknownRegion();
+    nsIntRegion region = aLayer->GetLocalVisibleRegion().ToUnknownRegion();
     IntRect r = region.GetBounds();
     TransformIntRect(r, transform, ToOutsideIntRect);
     r.IntersectRect(r, aDirtyRect);
@@ -846,7 +861,6 @@ Transform3D(RefPtr<SourceSurface> aSource,
   aDestRect.RoundOut();
 
   // Create a surface the size of the transformed object.
-  RefPtr<gfxASurface> dest = aDest->CurrentSurface();
   RefPtr<gfxImageSurface> destImage = new gfxImageSurface(IntSize(aDestRect.width,
                                                                     aDestRect.height),
                                                             SurfaceFormat::A8R8G8B8_UINT32);
@@ -884,7 +898,7 @@ BasicLayerManager::PaintSelfOrChildren(PaintLayerContext& aPaintContext,
   } else {
     ContainerLayer* container =
         static_cast<ContainerLayer*>(aPaintContext.mLayer);
-    nsAutoTArray<Layer*, 12> children;
+    AutoTArray<Layer*, 12> children;
     container->SortChildrenBy3DZOrder(children);
     for (uint32_t i = 0; i < children.Length(); i++) {
       Layer* layer = children.ElementAt(i);
@@ -918,7 +932,7 @@ BasicLayerManager::FlushGroup(PaintLayerContext& aPaintContext, bool aNeedsClipT
   if (!mTransactionIncomplete) {
     if (aNeedsClipToVisibleRegion) {
       gfxUtils::ClipToRegion(aPaintContext.mTarget,
-                             aPaintContext.mLayer->GetEffectiveVisibleRegion().ToUnknownRegion());
+                             aPaintContext.mLayer->GetLocalVisibleRegion().ToUnknownRegion());
     }
 
     CompositionOp op = GetEffectiveOperator(aPaintContext.mLayer);
@@ -1029,7 +1043,7 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
 
   paintLayerContext.Apply2DTransform();
 
-  const nsIntRegion visibleRegion = aLayer->GetEffectiveVisibleRegion().ToUnknownRegion();
+  const nsIntRegion visibleRegion = aLayer->GetLocalVisibleRegion().ToUnknownRegion();
   // If needsGroup is true, we'll clip to the visible region after we've popped the group
   if (needsClipToVisibleRegion && !needsGroup) {
     gfxUtils::ClipToRegion(aTarget, visibleRegion);
@@ -1050,7 +1064,7 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
   if (is2D) {
     if (needsGroup) {
       PushedGroup pushedGroup =
-        PushGroupForLayer(aTarget, aLayer, aLayer->GetEffectiveVisibleRegion().ToUnknownRegion());
+        PushGroupForLayer(aTarget, aLayer, aLayer->GetLocalVisibleRegion().ToUnknownRegion());
       PaintSelfOrChildren(paintLayerContext, pushedGroup.mGroupTarget);
       PopGroupForLayer(pushedGroup);
     } else {

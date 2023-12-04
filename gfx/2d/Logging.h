@@ -14,6 +14,7 @@
 #ifdef MOZ_LOGGING
 #include "mozilla/Logging.h"
 #endif
+#include "mozilla/Tuple.h"
 
 #if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
 #include "nsDebug.h"
@@ -95,8 +96,7 @@ public:
 /// In the event of a crash, the crash report is annotated with first and
 /// the last few of these errors, under the key GraphicsCriticalError.
 /// The total number of errors stored in the crash report is controlled
-/// by preference gfx.logging.crash.length (default is six, so by default,
-/// the first as well as the last five would show up in the crash log.)
+/// by preference gfx.logging.crash.length.
 ///
 /// On platforms that support MOZ_LOGGING, the story is slightly more involved.
 /// In that case, unless gfx.logging.level is set to 4 or higher, the output
@@ -130,6 +130,7 @@ enum class LogReason : int {
   GlyphAllocFailedCG,
   InvalidRect,
   CannotDraw3D, // 20
+  IncompatibleBasicTexturedEffect,
   // End
   MustBeLessThanThis = 101,
 };
@@ -196,19 +197,24 @@ struct CriticalLogger {
   static void CrashAction(LogReason aReason);
 };
 
+// The int is the index of the Log call; if the number of logs exceeds some preset
+// capacity we may not get all of them, so the indices help figure out which
+// ones we did save.  The double is expected to be the "TimeDuration", 
+// time in seconds since the process creation.
+typedef mozilla::Tuple<int32_t,std::string,double> LoggingRecordEntry;
+
 // Implement this interface and init the Factory with an instance to
 // forward critical logs.
+typedef std::vector<LoggingRecordEntry> LoggingRecord;
 class LogForwarder {
 public:
   virtual ~LogForwarder() {}
   virtual void Log(const std::string &aString) = 0;
   virtual void CrashAction(LogReason aReason) = 0;
+  virtual bool UpdateStringsVector(const std::string& aString) = 0;
 
-  // Provide a copy of the logs to the caller.  The int is the index
-  // of the Log call, if the number of logs exceeds some preset capacity
-  // we may not get all of them, so the indices help figure out which
-  // ones we did save.
-  virtual std::vector<std::pair<int32_t,std::string> > StringsVectorCopy() = 0;
+  // Provide a copy of the logs to the caller.
+  virtual LoggingRecord LoggingRecordCopy() = 0;
 };
 
 class NoLog
@@ -273,7 +279,7 @@ public:
     if (!str.empty()) {
       WriteLog(str);
     }
-    mMessage.clear();
+    mMessage.str("");
   }
 
   Log &operator <<(char aChar) {
@@ -378,7 +384,9 @@ public:
   template<typename T>
   Log &operator<<(Hexa<T> aHex) {
     if (MOZ_UNLIKELY(LogIt())) {
-      mMessage << "0x" << std::hex << aHex.mVal << std::dec;
+      mMessage << std::showbase << std::hex
+               << aHex.mVal
+               << std::noshowbase << std::dec;
     }
     return *this;
   }

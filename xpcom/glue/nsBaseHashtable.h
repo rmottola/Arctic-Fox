@@ -233,6 +233,7 @@ public:
 template<class KeyClass, class DataType>
 nsBaseHashtableET<KeyClass, DataType>::nsBaseHashtableET(KeyTypePointer aKey)
   : KeyClass(aKey)
+  , mData()
 {
 }
 

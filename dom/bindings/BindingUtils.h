@@ -40,7 +40,6 @@
 #include "nsWrapperCacheInlines.h"
 
 class nsIJSID;
-class nsPIDOMWindow;
 
 namespace mozilla {
 
@@ -52,6 +51,9 @@ template<typename DataType> class MozMap;
 nsresult
 UnwrapArgImpl(JS::Handle<JSObject*> src, const nsIID& iid, void** ppArg);
 
+nsresult
+UnwrapWindowProxyImpl(JS::Handle<JSObject*> src, nsPIDOMWindowOuter** ppArg);
+
 /** Convert a jsval to an XPCOM pointer. */
 template <class Interface>
 inline nsresult
@@ -59,6 +61,13 @@ UnwrapArg(JS::Handle<JSObject*> src, Interface** ppArg)
 {
   return UnwrapArgImpl(src, NS_GET_TEMPLATE_IID(Interface),
                        reinterpret_cast<void**>(ppArg));
+}
+
+template <>
+inline nsresult
+UnwrapArg<nsPIDOMWindowOuter>(JS::Handle<JSObject*> src, nsPIDOMWindowOuter** ppArg)
+{
+  return UnwrapWindowProxyImpl(src, ppArg);
 }
 
 bool
@@ -1131,7 +1140,8 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
 
 // Helper for smart pointers (nsRefPtr/nsCOMPtr).
 template <template <typename> class SmartPtr, typename T,
-          typename U=typename EnableIf<IsRefcounted<T>::value, T>::Type>
+          typename U=typename EnableIf<IsRefcounted<T>::value, T>::Type,
+          typename V=typename EnableIf<IsSmartPtr<SmartPtr<T>>::value, T>::Type>
 inline bool
 WrapNewBindingNonWrapperCachedObject(JSContext* cx, JS::Handle<JSObject*> scope,
                                      const SmartPtr<T>& value,
@@ -1139,6 +1149,19 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx, JS::Handle<JSObject*> scope,
                                      JS::Handle<JSObject*> givenProto = nullptr)
 {
   return WrapNewBindingNonWrapperCachedObject(cx, scope, value.get(), rval,
+                                              givenProto);
+}
+
+// Helper for object references (as opposed to pointers).
+template <typename T,
+          typename U=typename EnableIf<!IsSmartPtr<T>::value, T>::Type>
+inline bool
+WrapNewBindingNonWrapperCachedObject(JSContext* cx, JS::Handle<JSObject*> scope,
+                                     T& value,
+                                     JS::MutableHandle<JS::Value> rval,
+                                     JS::Handle<JSObject*> givenProto = nullptr)
+{
+  return WrapNewBindingNonWrapperCachedObject(cx, scope, &value, rval,
                                               givenProto);
 }
 
@@ -2061,10 +2084,10 @@ void DoTraceSequence(JSTracer* trc, InfallibleTArray<T>& seq);
 namespace binding_detail {
 
 template<typename T>
-class AutoSequence : public AutoFallibleTArray<T, 16>
+class AutoSequence : public AutoTArray<T, 16>
 {
 public:
-  AutoSequence() : AutoFallibleTArray<T, 16>()
+  AutoSequence() : AutoTArray<T, 16>()
   {}
 
   // Allow converting to const sequences as needed
@@ -3025,6 +3048,9 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
              JS::MutableHandle<JSObject*> aGlobal)
 {
   aOptions.creationOptions().setTrace(CreateGlobalOptions<T>::TraceGlobal);
+  if (xpc::SharedMemoryEnabled()) {
+    aOptions.creationOptions().setSharedMemoryAndAtomicsEnabled(true);
+  }
 
   aGlobal.set(JS_NewGlobalObject(aCx, aClass, aPrincipal,
                                  JS::DontFireOnNewGlobalHook, aOptions));
@@ -3149,7 +3175,7 @@ EnforceNotInPrerendering(JSContext* aCx, JSObject* aObj);
 // aborting the scripts, and preventing timers and event handlers from running
 // in the window in the future.
 void
-HandlePrerenderingViolation(nsPIDOMWindow* aWindow);
+HandlePrerenderingViolation(nsPIDOMWindowInner* aWindow);
 
 bool
 CallerSubsumes(JSObject* aObject);
@@ -3299,6 +3325,26 @@ DeprecationWarning(JSContext* aCx, JSObject* aObject,
 JSString*
 InterfaceObjectToString(JSContext* aCx, JS::Handle<JSObject*> aObject,
                         unsigned /* indent */);
+
+namespace binding_detail {
+// Get a JS global object that can be used for some temporary allocations.  The
+// idea is that this should be used for situations when you need to operate in
+// _some_ compartment but don't care which one.  A typical example is when you
+// have non-JS input, non-JS output, but have to go through some sort of JS
+// representation in the middle, so need a compartment to allocate things in.
+//
+// It's VERY important that any consumers of this function only do things that
+// are guaranteed to be side-effect-free, even in the face of a script
+// environment controlled by a hostile adversary.  This is because in the worker
+// case the global is in fact the worker global, so it and its standard objects
+// are controlled by the worker script.  This is why this function is in the
+// binding_detail namespace.  Any use of this function MUST be very carefully
+// reviewed by someone who is sufficiently devious and has a very good
+// understanding of all the code that will run while we're using the return
+// value, including the SpiderMonkey parts.
+JSObject* UnprivilegedJunkScopeOrWorkerGlobal();
+} // namespace binding_detail
+
 } // namespace dom
 } // namespace mozilla
 

@@ -18,9 +18,10 @@ loader.lazyRequireGetter(this, "NetworkMonitorChild", "devtools/shared/webconsol
 loader.lazyRequireGetter(this, "ConsoleProgressListener", "devtools/shared/webconsole/network-monitor", true);
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "ServerLoggingListener", "devtools/shared/webconsole/server-logger", true);
+loader.lazyRequireGetter(this, "JSPropertyProvider", "devtools/shared/webconsole/js-property-provider", true);
 
 for (let name of ["WebConsoleUtils", "ConsoleServiceListener",
-    "ConsoleAPIListener", "addWebConsoleCommands", "JSPropertyProvider",
+    "ConsoleAPIListener", "addWebConsoleCommands",
     "ConsoleReflowListener", "CONSOLE_WORKER_IDS"]) {
   Object.defineProperty(this, name, {
     get: function(prop) {
@@ -888,6 +889,7 @@ WebConsoleActor.prototype =
     let frameActorId = aRequest.frameActor;
     let dbgObject = null;
     let environment = null;
+    let hadDebuggee = false;
 
     // This is the case of the paused debugger
     if (frameActorId) {
@@ -903,11 +905,17 @@ WebConsoleActor.prototype =
     }
     // This is the general case (non-paused debugger)
     else {
-      dbgObject = this.dbg.makeGlobalObjectReference(this.evalWindow);
+      hadDebuggee = this.dbg.hasDebuggee(this.evalWindow);
+      dbgObject = this.dbg.addDebuggee(this.evalWindow);
     }
 
     let result = JSPropertyProvider(dbgObject, environment, aRequest.text,
                                     aRequest.cursor, frameActorId) || {};
+
+    if (!hadDebuggee && dbgObject) {
+      this.dbg.removeDebuggee(this.evalWindow);
+    }
+
     let matches = result.matches || [];
     let reqText = aRequest.text.substr(0, aRequest.cursor);
 

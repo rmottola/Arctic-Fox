@@ -23,6 +23,17 @@ class AudioInfo;
 class VideoInfo;
 class TextInfo;
 
+class MetadataTag {
+public:
+  MetadataTag(const nsACString& aKey,
+              const nsACString& aValue)
+    : mKey(aKey)
+    , mValue(aValue)
+  {}
+  nsCString mKey;
+  nsCString mValue;
+};
+
 class TrackInfo {
 public:
   enum TrackType {
@@ -79,6 +90,8 @@ public:
   int64_t mDuration;
   int64_t mMediaTime;
   CryptoTrack mCrypto;
+
+  nsTArray<MetadataTag> mTags;
 
   // True if the track is gonna be (decrypted)/decoded and
   // rendered directly by non-gecko components.
@@ -150,6 +163,7 @@ protected:
     mCrypto = aOther.mCrypto;
     mIsRenderedExternally = aOther.mIsRenderedExternally;
     mType = aOther.mType;
+    mTags = aOther.mTags;
     MOZ_COUNT_CTOR(TrackInfo);
   }
 
@@ -194,22 +208,22 @@ public:
   {
   }
 
-  virtual bool IsValid() const override
+  bool IsValid() const override
   {
     return mDisplay.width > 0 && mDisplay.height > 0;
   }
 
-  virtual VideoInfo* GetAsVideoInfo() override
+  VideoInfo* GetAsVideoInfo() override
   {
     return this;
   }
 
-  virtual const VideoInfo* GetAsVideoInfo() const override
+  const VideoInfo* GetAsVideoInfo() const override
   {
     return this;
   }
 
-  virtual UniquePtr<TrackInfo> Clone() const override
+  UniquePtr<TrackInfo> Clone() const override
   {
     return MakeUnique<VideoInfo>(*this);
   }
@@ -273,22 +287,22 @@ public:
   {
   }
 
-  virtual bool IsValid() const override
+  bool IsValid() const override
   {
     return mChannels > 0 && mRate > 0;
   }
 
-  virtual AudioInfo* GetAsAudioInfo() override
+  AudioInfo* GetAsAudioInfo() override
   {
     return this;
   }
 
-  virtual const AudioInfo* GetAsAudioInfo() const override
+  const AudioInfo* GetAsAudioInfo() const override
   {
     return this;
   }
 
-  virtual UniquePtr<TrackInfo> Clone() const override
+  UniquePtr<TrackInfo> Clone() const override
   {
     return MakeUnique<AudioInfo>(*this);
   }

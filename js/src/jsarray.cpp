@@ -616,9 +616,9 @@ js::ArraySetLength(JSContext* cx, Handle<ArrayObject*> arr, HandleId id,
         // during the iteration must not be visited, and suppressing them here
         // would be too costly.
         ObjectGroup* arrGroup = arr->getGroup(cx);
-        if (!arr->isIndexed() &&
-            !MOZ_UNLIKELY(!arrGroup || arrGroup->hasAllFlags(OBJECT_FLAG_ITERATED)))
-        {
+        if (MOZ_UNLIKELY(!arrGroup))
+            return false;
+        if (!arr->isIndexed() && !MOZ_UNLIKELY(arrGroup->hasAllFlags(OBJECT_FLAG_ITERATED))) {
             if (!arr->maybeCopyElementsForWrite(cx))
                 return false;
 
@@ -1194,6 +1194,7 @@ js::array_join(JSContext* cx, unsigned argc, Value* vp)
 {
     JS_CHECK_RECURSION(cx, return false);
 
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.join");
     CallArgs args = CallArgsFromVp(argc, vp);
     return ArrayJoin<false>(cx, args);
 }
@@ -1310,6 +1311,7 @@ DefineBoxedOrUnboxedFunctor3(ArrayReverseDenseKernel,
 static bool
 array_reverse(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.reverse");
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject obj(cx, ToObject(cx, args.thisv()));
     if (!obj)
@@ -2012,6 +2014,7 @@ js::NewbornArrayPush(JSContext* cx, HandleObject obj, const Value& v)
 bool
 js::array_push(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.push");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Step 1. */
@@ -2063,6 +2066,7 @@ js::array_push(JSContext* cx, unsigned argc, Value* vp)
 bool
 js::array_pop(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.pop");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Step 1. */
@@ -2133,18 +2137,25 @@ js::ArrayShiftMoveElements(JSObject* obj)
 
 template <JSValueType Type>
 DenseElementResult
-ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
+ArrayShiftDenseKernel(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
     if (ObjectMayHaveExtraIndexedProperties(obj))
+        return DenseElementResult::Incomplete;
+
+    RootedObjectGroup group(cx, obj->getGroup(cx));
+    if (MOZ_UNLIKELY(!group))
+        return DenseElementResult::Failure;
+
+    if (MOZ_UNLIKELY(group->hasAllFlags(OBJECT_FLAG_ITERATED)))
         return DenseElementResult::Incomplete;
 
     size_t initlen = GetBoxedOrUnboxedInitializedLength<Type>(obj);
     if (initlen == 0)
         return DenseElementResult::Incomplete;
 
-    *rval = GetBoxedOrUnboxedDenseElement<Type>(obj, 0);
-    if (rval->isMagic(JS_ELEMENTS_HOLE))
-        rval->setUndefined();
+    rval.set(GetBoxedOrUnboxedDenseElement<Type>(obj, 0));
+    if (rval.isMagic(JS_ELEMENTS_HOLE))
+        rval.setUndefined();
 
     DenseElementResult result = MoveBoxedOrUnboxedDenseElements<Type>(cx, obj, 0, 1, initlen - 1);
     MOZ_ASSERT(result != DenseElementResult::Incomplete);
@@ -2156,12 +2167,13 @@ ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
 }
 
 DefineBoxedOrUnboxedFunctor3(ArrayShiftDenseKernel,
-                             JSContext*, JSObject*, Value*);
+                             JSContext*, HandleObject, MutableHandleValue);
 
 /* ES5 15.4.4.9 */
 bool
 js::array_shift(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.shift");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Step 1. */
@@ -2188,19 +2200,13 @@ js::array_shift(JSContext* cx, unsigned argc, Value* vp)
     uint32_t newlen = len - 1;
 
     /* Fast paths. */
-    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval().address());
+    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval());
     DenseElementResult result = CallBoxedOrUnboxedSpecialization(functor, obj);
     if (result != DenseElementResult::Incomplete) {
         if (result == DenseElementResult::Failure)
             return false;
 
-        if (!SetLengthProperty(cx, obj, newlen))
-            return false;
-
-        RootedId id(cx);
-        if (!IndexToId(cx, newlen, &id))
-            return false;
-        return SuppressDeletedProperty(cx, obj, id);
+        return SetLengthProperty(cx, obj, newlen);
     }
 
     /* Steps 5, 10. */
@@ -2235,6 +2241,7 @@ js::array_shift(JSContext* cx, unsigned argc, Value* vp)
 bool
 js::array_unshift(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.unshift");
     CallArgs args = CallArgsFromVp(argc, vp);
     RootedObject obj(cx, ToObject(cx, args.thisv()));
     if (!obj)
@@ -2336,7 +2343,11 @@ CanOptimizeForDenseStorage(HandleObject arr, uint32_t startingIndex, uint32_t co
      * visited.  See bug 690622.
      */
     ObjectGroup* arrGroup = arr->getGroup(cx);
-    if (MOZ_UNLIKELY(!arrGroup || arrGroup->hasAllFlags(OBJECT_FLAG_ITERATED)))
+    if (!arrGroup) {
+        cx->recoverFromOutOfMemory();
+        return false;
+    }
+    if (MOZ_UNLIKELY(arrGroup->hasAllFlags(OBJECT_FLAG_ITERATED)))
         return false;
 
     /*
@@ -2365,6 +2376,7 @@ array_splice(JSContext* cx, unsigned argc, Value* vp)
 bool
 js::array_splice_impl(JSContext* cx, unsigned argc, Value* vp, bool returnValueIsUsed)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.splice");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Step 1. */
@@ -2625,6 +2637,7 @@ js::array_concat_dense(JSContext* cx, HandleObject obj1, HandleObject obj2,
 bool
 js::array_concat(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.concat");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Treat our |this| object as the first argument; see ECMA 15.4.4.4. */
@@ -2918,6 +2931,7 @@ NormalizeSliceTerm(T value, uint32_t length)
 bool
 js::array_slice(JSContext* cx, unsigned argc, Value* vp)
 {
+    AutoSPSEntry pseudoFrame(cx->runtime(), "Array.prototype.slice");
     CallArgs args = CallArgsFromVp(argc, vp);
 
     RootedObject obj(cx, ToObject(cx, args.thisv()));

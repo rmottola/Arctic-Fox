@@ -680,6 +680,10 @@ struct JSWrapObjectCallbacks
 typedef void
 (* JSDestroyCompartmentCallback)(JSFreeOp* fop, JSCompartment* compartment);
 
+typedef size_t
+(* JSSizeOfIncludingThisCompartmentCallback)(mozilla::MallocSizeOf mallocSizeOf,
+                                             JSCompartment* compartment);
+
 typedef void
 (* JSZoneCallback)(JS::Zone* zone);
 
@@ -1001,6 +1005,9 @@ JS_BeginRequest(JSContext* cx);
 extern JS_PUBLIC_API(void)
 JS_EndRequest(JSContext* cx);
 
+extern JS_PUBLIC_API(void)
+JS_SetFutexCanWait(JSRuntime* rt);
+
 namespace js {
 
 void
@@ -1320,6 +1327,10 @@ JS_GetImplementationVersion(void);
 
 extern JS_PUBLIC_API(void)
 JS_SetDestroyCompartmentCallback(JSRuntime* rt, JSDestroyCompartmentCallback callback);
+
+extern JS_PUBLIC_API(void)
+JS_SetSizeOfIncludingThisCompartmentCallback(JSRuntime* rt,
+                                             JSSizeOfIncludingThisCompartmentCallback callback);
 
 extern JS_PUBLIC_API(void)
 JS_SetDestroyZoneCallback(JSRuntime* rt, JSZoneCallback callback);
@@ -2479,7 +2490,7 @@ enum OnNewGlobalHookOption {
 extern JS_PUBLIC_API(JSObject*)
 JS_NewGlobalObject(JSContext* cx, const JSClass* clasp, JSPrincipals* principals,
                    JS::OnNewGlobalHookOption hookOption,
-                   const JS::CompartmentOptions& options = JS::CompartmentOptions());
+                   const JS::CompartmentOptions& options);
 /**
  * Spidermonkey does not have a good way of keeping track of what compartments should be marked on
  * their own. We can mark the roots unconditionally, but marking GC things only relevant in live
@@ -4360,6 +4371,12 @@ extern JS_PUBLIC_API(JSString*)
 JS_AtomizeAndPinJSString(JSContext* cx, JS::HandleString str);
 
 extern JS_PUBLIC_API(JSString*)
+JS_AtomizeStringN(JSContext* cx, const char* s, size_t length);
+
+extern JS_PUBLIC_API(JSString*)
+JS_AtomizeString(JSContext* cx, const char* s);
+
+extern JS_PUBLIC_API(JSString*)
 JS_AtomizeAndPinStringN(JSContext* cx, const char* s, size_t length);
 
 extern JS_PUBLIC_API(JSString*)
@@ -4373,6 +4390,12 @@ JS_NewUCStringCopyN(JSContext* cx, const char16_t* s, size_t n);
 
 extern JS_PUBLIC_API(JSString*)
 JS_NewUCStringCopyZ(JSContext* cx, const char16_t* s);
+
+extern JS_PUBLIC_API(JSString*)
+JS_AtomizeUCStringN(JSContext* cx, const char16_t* s, size_t length);
+
+extern JS_PUBLIC_API(JSString*)
+JS_AtomizeUCString(JSContext* cx, const char16_t* s);
 
 extern JS_PUBLIC_API(JSString*)
 JS_AtomizeAndPinUCStringN(JSContext* cx, const char16_t* s, size_t length);
@@ -4583,7 +4606,7 @@ class MOZ_RAII JSAutoByteString
     }
 
     ~JSAutoByteString() {
-        js_free(mBytes);
+        JS_free(nullptr, mBytes);
     }
 
     /* Take ownership of the given byte array. */
@@ -4628,7 +4651,7 @@ class MOZ_RAII JSAutoByteString
     }
 
   private:
-    char*       mBytes;
+    char* mBytes;
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 
     /* Copy and assignment are not supported. */
@@ -4763,6 +4786,31 @@ typedef bool (* JSONWriteCallback)(const char16_t* buf, uint32_t len, void* data
 JS_PUBLIC_API(bool)
 JS_Stringify(JSContext* cx, JS::MutableHandleValue value, JS::HandleObject replacer,
              JS::HandleValue space, JSONWriteCallback callback, void* data);
+
+namespace JS {
+
+/**
+ * An API akin to JS_Stringify but with the goal of not having observable
+ * side-effects when the stringification is performed.  This means it does not
+ * allow a replacer or a custom space, and has the following constraints on its
+ * input:
+ *
+ * 1) The input must be a plain object or array, not an abitrary value.
+ * 2) Every value in the graph reached by the algorithm starting with this
+ *    object must be one of the following: null, undefined, a string (NOT a
+ *    string object!), a boolean, a finite number (i.e. no NaN or Infinity or
+ *    -Infinity), a plain object with no accessor properties, or an Array with
+ *    no holes.
+ *
+ * The actual behavior differs from JS_Stringify only in asserting the above and
+ * NOT attempting to get the "toJSON" property from things, since that could
+ * clearly have side-effects.
+ */
+JS_PUBLIC_API(bool)
+ToJSONMaybeSafely(JSContext* cx, JS::HandleObject input,
+                  JSONWriteCallback callback, void* data);
+
+} /* namespace JS */
 
 /**
  * JSON.parse as specified by ES5.

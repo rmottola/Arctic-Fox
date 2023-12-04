@@ -83,10 +83,10 @@ nsResizerFrame::HandleEvent(nsPresContext* aPresContext,
           switch (frameToResize->StylePosition()->mBoxSizing) {
             case StyleBoxSizing::Content:
               rect.Deflate(frameToResize->GetUsedPadding());
-              // fall through
+              MOZ_FALLTHROUGH;
             case StyleBoxSizing::Padding:
               rect.Deflate(frameToResize->GetUsedBorder());
-              // fall through
+              MOZ_FALLTHROUGH;
             case StyleBoxSizing::Border:
               // nothing
               break;
@@ -102,7 +102,7 @@ nsResizerFrame::HandleEvent(nsPresContext* aPresContext,
             break;
 
           doDefault = false;
-            
+
           // ask the widget implementation to begin a resize drag if it can
           Direction direction = GetDirection();
           nsresult rv = aEvent->widget->BeginResizeDrag(aEvent,
@@ -360,8 +360,7 @@ nsResizerFrame::GetContentToResize(nsIPresShell* aPresShell, nsIBaseWindow** aWi
     }
 
     // get the document and the window - should this be cached?
-    nsPIDOMWindow *domWindow = aPresShell->GetDocument()->GetWindow();
-    if (domWindow) {
+    if (nsPIDOMWindowOuter* domWindow = aPresShell->GetDocument()->GetWindow()) {
       nsCOMPtr<nsIDocShell> docShell = domWindow->GetDocShell();
       if (docShell) {
         nsCOMPtr<nsIDocShellTreeOwner> treeOwner;

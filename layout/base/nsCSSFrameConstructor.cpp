@@ -20,6 +20,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/LinkedList.h"
 #include "nsAbsoluteContainingBlock.h"
+#include "nsCSSPseudoElements.h"
 #include "nsIAtom.h"
 #include "nsIFrameInlines.h"
 #include "nsGkAtoms.h"
@@ -1313,7 +1314,7 @@ nsFrameConstructorState::ProcessFrameInsertions(nsAbsoluteItems& aFrameItems,
     nsIFrame* firstNewFrame = aFrameItems.FirstChild();
 
     // Cache the ancestor chain so that we can reuse it if needed.
-    nsAutoTArray<nsIFrame*, 20> firstNewFrameAncestors;
+    AutoTArray<nsIFrame*, 20> firstNewFrameAncestors;
     nsIFrame* notCommonAncestor = nullptr;
     if (lastChild) {
       notCommonAncestor = nsLayoutUtils::FillAncestors(firstNewFrame,
@@ -1331,7 +1332,7 @@ nsFrameConstructorState::ProcessFrameInsertions(nsAbsoluteItems& aFrameItems,
     } else {
       // Try the other children. First collect them to an array so that a
       // reasonable fast binary search can be used to find the insertion point.
-      nsAutoTArray<nsIFrame*, 128> children;
+      AutoTArray<nsIFrame*, 128> children;
       for (nsIFrame* f = childList.FirstChild(); f != lastChild;
            f = f->GetNextSibling()) {
         children.AppendElement(f);
@@ -1756,11 +1757,11 @@ nsCSSFrameConstructor::CreateGeneratedContentItem(nsFrameConstructorState& aStat
                                                   nsContainerFrame* aParentFrame,
                                                   nsIContent*      aParentContent,
                                                   nsStyleContext*  aStyleContext,
-                                                  nsCSSPseudoElements::Type aPseudoElement,
+                                                  CSSPseudoElementType aPseudoElement,
                                                   FrameConstructionItemList& aItems)
 {
-  MOZ_ASSERT(aPseudoElement == nsCSSPseudoElements::ePseudo_before ||
-             aPseudoElement == nsCSSPseudoElements::ePseudo_after,
+  MOZ_ASSERT(aPseudoElement == CSSPseudoElementType::before ||
+             aPseudoElement == CSSPseudoElementType::after,
              "unexpected aPseudoElement");
 
   // XXXbz is this ever true?
@@ -1781,7 +1782,7 @@ nsCSSFrameConstructor::CreateGeneratedContentItem(nsFrameConstructorState& aStat
   if (!pseudoStyleContext)
     return;
 
-  bool isBefore = aPseudoElement == nsCSSPseudoElements::ePseudo_before;
+  bool isBefore = aPseudoElement == CSSPseudoElementType::before;
 
   // |ProbePseudoStyleFor| checked the 'display' property and the
   // |ContentCount()| of the 'content' property for us.
@@ -2843,7 +2844,7 @@ nsCSSFrameConstructor::ConstructAnonymousContentForCanvas(nsFrameConstructorStat
 {
   NS_ASSERTION(aFrame->GetType() == nsGkAtoms::canvasFrame, "aFrame should be canvas frame!");
 
-  nsAutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> anonymousItems;
+  AutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> anonymousItems;
   GetAnonymousContent(aDocElement, aFrame, anonymousItems);
   if (anonymousItems.IsEmpty()) {
     return;
@@ -2960,7 +2961,7 @@ nsCSSFrameConstructor::CreateBackdropFrameFor(nsIPresShell* aPresShell,
 
   RefPtr<nsStyleContext> style = aPresShell->StyleSet()->
     ResolvePseudoElementStyle(aContent->AsElement(),
-                              nsCSSPseudoElements::ePseudo_backdrop,
+                              CSSPseudoElementType::backdrop,
                               /* aParentStyleContext */ nullptr,
                               /* aPseudoElement */ nullptr);
   nsBackdropFrame* backdropFrame = new (aPresShell) nsBackdropFrame(style);
@@ -4038,7 +4039,7 @@ nsCSSFrameConstructor::CreateAnonymousFrames(nsFrameConstructorState& aState,
                                              PendingBinding*          aPendingBinding,
                                              nsFrameItems&            aChildItems)
 {
-  nsAutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> newAnonymousItems;
+  AutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> newAnonymousItems;
   nsresult rv = GetAnonymousContent(aParent, aParentFrame, newAnonymousItems);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -4945,7 +4946,7 @@ nsCSSFrameConstructor::ResolveStyleContext(nsStyleContext* aParentStyleContext,
     RestyleManager()->GetReframingStyleContexts();
   if (rsc) {
     nsStyleContext* oldStyleContext =
-      rsc->Get(aContent, nsCSSPseudoElements::ePseudo_NotPseudoElement);
+      rsc->Get(aContent, CSSPseudoElementType::NotPseudo);
     nsPresContext* presContext = mPresShell->GetPresContext();
     if (oldStyleContext) {
       RestyleManager::TryStartingTransition(presContext, aContent,
@@ -4953,7 +4954,7 @@ nsCSSFrameConstructor::ResolveStyleContext(nsStyleContext* aParentStyleContext,
     } else if (aContent->IsElement()) {
       presContext->TransitionManager()->
         PruneCompletedTransitions(aContent->AsElement(),
-          nsCSSPseudoElements::ePseudo_NotPseudoElement, result);
+          CSSPseudoElementType::NotPseudo, result);
     }
   }
 
@@ -5792,7 +5793,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
       aParentFrame->AddStateBits(NS_FRAME_MAY_HAVE_GENERATED_CONTENT);
     }
     CreateGeneratedContentItem(aState, aParentFrame, aContent, styleContext,
-                               nsCSSPseudoElements::ePseudo_before, aItems);
+                               CSSPseudoElementType::before, aItems);
 
     FlattenedChildIterator iter(aContent);
     for (nsIContent* child = iter.GetNextChild(); child; child = iter.GetNextChild()) {
@@ -5825,7 +5826,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
     aItems.SetParentHasNoXBLChildren(!iter.XBLInvolved());
 
     CreateGeneratedContentItem(aState, aParentFrame, aContent, styleContext,
-                               nsCSSPseudoElements::ePseudo_after, aItems);
+                               CSSPseudoElementType::after, aItems);
     if (canHavePageBreak && display->mBreakAfter) {
       AddPageBreakItem(aContent, aStyleContext, aItems);
     }
@@ -5949,13 +5950,11 @@ AddGenConPseudoToFrame(nsIFrame* aOwnerFrame, nsIContent* aContent)
   NS_ASSERTION(nsLayoutUtils::IsFirstContinuationOrIBSplitSibling(aOwnerFrame),
                "property should only be set on first continuation/ib-sibling");
 
-  typedef nsAutoTArray<nsIContent*, 2> T;
-  const FramePropertyDescriptor* prop = nsIFrame::GenConProperty();
   FrameProperties props = aOwnerFrame->Properties();
-  T* value = static_cast<T*>(props.Get(prop));
+  nsIFrame::ContentArray* value = props.Get(nsIFrame::GenConProperty());
   if (!value) {
-    value = new T;
-    props.Set(prop, value);
+    value = new nsIFrame::ContentArray;
+    props.Set(nsIFrame::GenConProperty(), value);
   }
   value->AppendElement(aContent);
 }
@@ -6214,7 +6213,7 @@ AdjustAppendParentForAfterContent(nsFrameManager* aFrameManager,
   // document than aChild and return that in aAfterFrame.
   if (aParentFrame->GetGenConPseudos() ||
       nsLayoutUtils::HasPseudoStyle(aContainer, aParentFrame->StyleContext(),
-                                    nsCSSPseudoElements::ePseudo_after,
+                                    CSSPseudoElementType::after,
                                     aParentFrame->PresContext()) ||
       aFrameManager->GetDisplayContentsStyleFor(aContainer)) {
     nsIFrame* afterFrame = nullptr;
@@ -9614,7 +9613,7 @@ nsCSSFrameConstructor::GetFirstLetterStyle(nsIContent* aContent,
   if (aContent) {
     return mPresShell->StyleSet()->
       ResolvePseudoElementStyle(aContent->AsElement(),
-                                nsCSSPseudoElements::ePseudo_firstLetter,
+                                CSSPseudoElementType::firstLetter,
                                 aStyleContext,
                                 nullptr);
   }
@@ -9628,7 +9627,7 @@ nsCSSFrameConstructor::GetFirstLineStyle(nsIContent* aContent,
   if (aContent) {
     return mPresShell->StyleSet()->
       ResolvePseudoElementStyle(aContent->AsElement(),
-                                nsCSSPseudoElements::ePseudo_firstLine,
+                                CSSPseudoElementType::firstLine,
                                 aStyleContext,
                                 nullptr);
   }
@@ -9642,7 +9641,7 @@ nsCSSFrameConstructor::ShouldHaveFirstLetterStyle(nsIContent* aContent,
                                                   nsStyleContext* aStyleContext)
 {
   return nsLayoutUtils::HasPseudoStyle(aContent, aStyleContext,
-                                       nsCSSPseudoElements::ePseudo_firstLetter,
+                                       CSSPseudoElementType::firstLetter,
                                        mPresShell->GetPresContext());
 }
 
@@ -9662,7 +9661,7 @@ nsCSSFrameConstructor::ShouldHaveFirstLineStyle(nsIContent* aContent,
 {
   bool hasFirstLine =
     nsLayoutUtils::HasPseudoStyle(aContent, aStyleContext,
-                                  nsCSSPseudoElements::ePseudo_firstLine,
+                                  CSSPseudoElementType::firstLine,
                                   mPresShell->GetPresContext());
   if (hasFirstLine) {
     // But disable for fieldsets
@@ -10565,7 +10564,7 @@ nsCSSFrameConstructor::ProcessChildren(nsFrameConstructorState& aState,
   // Create any anonymous frames we need here.  This must happen before the
   // non-anonymous children are processed to ensure that popups are never
   // constructed before the popupset.
-  nsAutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> anonymousItems;
+  AutoTArray<nsIAnonymousContentCreator::ContentInfo, 4> anonymousItems;
   GetAnonymousContent(aContent, aPossiblyLeafFrame, anonymousItems);
 #ifdef DEBUG
   for (uint32_t i = 0; i < anonymousItems.Length(); ++i) {
@@ -10590,7 +10589,7 @@ nsCSSFrameConstructor::ProcessChildren(nsFrameConstructorState& aState,
         nsFrame::CorrectStyleParentFrame(aFrame, nullptr)->StyleContext();
       // Probe for generated content before
       CreateGeneratedContentItem(aState, aFrame, aContent, styleContext,
-                                 nsCSSPseudoElements::ePseudo_before,
+                                 CSSPseudoElementType::before,
                                  itemsToConstruct);
     }
 
@@ -10638,7 +10637,7 @@ nsCSSFrameConstructor::ProcessChildren(nsFrameConstructorState& aState,
     if (aCanHaveGeneratedContent) {
       // Probe for generated content after
       CreateGeneratedContentItem(aState, aFrame, aContent, styleContext,
-                                 nsCSSPseudoElements::ePseudo_after,
+                                 CSSPseudoElementType::after,
                                  itemsToConstruct);
     }
   } else {
@@ -11888,7 +11887,7 @@ nsCSSFrameConstructor::BuildInlineChildItems(nsFrameConstructorState& aState,
   if (!aItemIsWithinSVGText) {
     // Probe for generated content before
     CreateGeneratedContentItem(aState, nullptr, parentContent, parentStyleContext,
-                               nsCSSPseudoElements::ePseudo_before,
+                               CSSPseudoElementType::before,
                                aParentItem.mChildItems);
   }
 
@@ -11958,7 +11957,7 @@ nsCSSFrameConstructor::BuildInlineChildItems(nsFrameConstructorState& aState,
   if (!aItemIsWithinSVGText) {
     // Probe for generated content after
     CreateGeneratedContentItem(aState, nullptr, parentContent, parentStyleContext,
-                               nsCSSPseudoElements::ePseudo_after,
+                               CSSPseudoElementType::after,
                                aParentItem.mChildItems);
   }
 

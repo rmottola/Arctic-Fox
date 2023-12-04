@@ -731,13 +731,13 @@ D3D11TextureData::UpdateFromSurface(gfx::SourceSurface* aSurface)
   RefPtr<DataSourceSurface> srcSurf = aSurface->GetDataSurface();
 
   if (!srcSurf) {
-    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface.";
+    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface (D3D11).";
     return false;
   }
 
   DataSourceSurface::MappedSurface sourceMap;
   if (!srcSurf->Map(DataSourceSurface::READ, &sourceMap)) {
-    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface.";
+    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface (D3D11).";
     return false;
   }
 
@@ -764,13 +764,13 @@ D3D10TextureData::UpdateFromSurface(gfx::SourceSurface* aSurface)
   RefPtr<DataSourceSurface> srcSurf = aSurface->GetDataSurface();
 
   if (!srcSurf) {
-    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface.";
+    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface (D3D10).";
     return false;
   }
 
   DataSourceSurface::MappedSurface sourceMap;
   if (!srcSurf->Map(DataSourceSurface::READ, &sourceMap)) {
-    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface.";
+    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface (D3D10).";
     return false;
   }
 
@@ -1262,7 +1262,7 @@ SyncObjectD3D11::FinalizeFrame()
     if (FAILED(hr) || !mutex) {
       // Leave both the critical error and MOZ_CRASH for now; the critical error lets
       // us "save" the hr value.  We will probably eventuall replace this with gfxDevCrash.
-      gfxCriticalError() << "Failed to get KeyedMutex: " << hexa(hr);
+      gfxCriticalError() << "Failed to get KeyedMutex (1): " << hexa(hr);
       MOZ_CRASH("GFX: Cannot get D3D10 KeyedMutex");
     }
   }
@@ -1289,7 +1289,7 @@ SyncObjectD3D11::FinalizeFrame()
     if (FAILED(hr) || !mutex) {
       // Leave both the critical error and MOZ_CRASH for now; the critical error lets
       // us "save" the hr value.  We will probably eventuall replace this with gfxDevCrash.
-      gfxCriticalError() << "Failed to get KeyedMutex: " << hexa(hr);
+      gfxCriticalError() << "Failed to get KeyedMutex (2): " << hexa(hr);
       MOZ_CRASH("GFX: Cannot get D3D11 KeyedMutex");
     }
   }

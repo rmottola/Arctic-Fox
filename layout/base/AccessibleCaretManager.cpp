@@ -14,7 +14,9 @@
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/TreeWalker.h"
 #include "mozilla/IMEStateManager.h"
+#include "mozilla/Preferences.h"
 #include "nsCaret.h"
+#include "nsContainerFrame.h"
 #include "nsContentUtils.h"
 #include "nsFocusManager.h"
 #include "nsFrame.h"
@@ -702,7 +704,7 @@ AccessibleCaretManager::ChangeFocusToOrClearOldFocus(nsIFrame* aFrame) const
     nsCOMPtr<nsIDOMElement> focusableElement = do_QueryInterface(focusableContent);
     fm->SetFocus(focusableElement, nsIFocusManager::FLAG_BYMOUSE);
   } else {
-    nsIDOMWindow* win = mPresShell->GetDocument()->GetWindow();
+    nsPIDOMWindowOuter* win = mPresShell->GetDocument()->GetWindow();
     if (win) {
       fm->ClearFocus(win);
       fm->SetFocusedWindow(win);
@@ -1173,7 +1175,7 @@ AccessibleCaretManager::DispatchCaretStateChangedEvent(CaretChangedReason aReaso
     CaretStateChangedEvent::Constructor(doc, NS_LITERAL_STRING("mozcaretstatechanged"), init);
 
   event->SetTrusted(true);
-  event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
 
   AC_LOG("%s: reason %d, collapsed %d, caretVisible %d", __FUNCTION__,
          init.mReason, init.mCollapsed, init.mCaretVisible);

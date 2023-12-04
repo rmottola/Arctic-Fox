@@ -75,8 +75,10 @@ struct Packet {
 };
 
 void TransportLayerNSPRAdapter::PacketReceived(const void *data, int32_t len) {
-  input_.push(new Packet());
-  input_.back()->Assign(data, len);
+  if (enabled_) {
+    input_.push(new Packet());
+    input_.back()->Assign(data, len);
+  }
 }
 
 int32_t TransportLayerNSPRAdapter::Recv(void *buf, int32_t buflen) {
@@ -102,6 +104,11 @@ int32_t TransportLayerNSPRAdapter::Recv(void *buf, int32_t buflen) {
 }
 
 int32_t TransportLayerNSPRAdapter::Write(const void *buf, int32_t length) {
+  if (!enabled_) {
+    MOZ_MTLOG(ML_WARNING, "Writing to disabled transport layer");
+    return -1;
+  }
+
   TransportResult r = output_->SendPacket(
       static_cast<const unsigned char *>(buf), length);
   if (r >= 0) {
@@ -200,8 +207,12 @@ static PRStatus TransportLayerListen(PRFileDesc *f, int32_t depth) {
 }
 
 static PRStatus TransportLayerShutdown(PRFileDesc *f, int32_t how) {
-  UNIMPLEMENTED;
-  return PR_FAILURE;
+  // This is only called from NSS when we are the server and the client refuses
+  // to provide a certificate.  In this case, the handshake is destined for
+  // failure, so we will just let this pass.
+  TransportLayerNSPRAdapter *io = reinterpret_cast<TransportLayerNSPRAdapter *>(f->secret);
+  io->SetEnabled(false);
+  return PR_SUCCESS;
 }
 
 // This function does not support peek, or waiting until `to`
@@ -494,7 +505,7 @@ bool TransportLayerDtls::Setup() {
   pr_fd.forget(); // ownership transfered to ssl_fd;
 
   if (role_ == CLIENT) {
-    MOZ_MTLOG(ML_DEBUG, "Setting up DTLS as client");
+    MOZ_MTLOG(ML_INFO, "Setting up DTLS as client");
     rv = SSL_GetClientAuthDataHook(ssl_fd, GetClientAuthDataHook,
                                    this);
     if (rv != SECSuccess) {
@@ -502,7 +513,7 @@ bool TransportLayerDtls::Setup() {
       return false;
     }
   } else {
-    MOZ_MTLOG(ML_DEBUG, "Setting up DTLS as server");
+    MOZ_MTLOG(ML_INFO, "Setting up DTLS as server");
     // Server side
     rv = SSL_ConfigSecureServer(ssl_fd, identity_->cert(),
                                 identity_->privkey(),
@@ -617,6 +628,7 @@ bool TransportLayerDtls::Setup() {
   downward_->SignalPacketReceived.connect(this, &TransportLayerDtls::PacketReceived);
 
   if (downward_->state() == TS_OPEN) {
+    TL_SET_STATE(TS_CONNECTING);
     Handshake();
   }
 
@@ -736,7 +748,7 @@ bool TransportLayerDtls::SetupCipherSuites(PRFileDesc* ssl_fd) const {
   }
 
   for (size_t i = 0; i < PR_ARRAY_SIZE(EnabledCiphers); ++i) {
-    MOZ_MTLOG(ML_INFO, LAYER_INFO << "Enabling: " << EnabledCiphers[i]);
+    MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Enabling: " << EnabledCiphers[i]);
     rv = SSL_CipherPrefSet(ssl_fd, EnabledCiphers[i], PR_TRUE);
     if (rv != SECSuccess) {
       MOZ_MTLOG(ML_ERROR, LAYER_INFO <<
@@ -746,7 +758,7 @@ bool TransportLayerDtls::SetupCipherSuites(PRFileDesc* ssl_fd) const {
   }
 
   for (size_t i = 0; i < PR_ARRAY_SIZE(DisabledCiphers); ++i) {
-    MOZ_MTLOG(ML_INFO, LAYER_INFO << "Disabling: " << DisabledCiphers[i]);
+    MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Disabling: " << DisabledCiphers[i]);
 
     PRBool enabled = false;
     rv = SSL_CipherPrefGet(ssl_fd, DisabledCiphers[i], &enabled);
@@ -812,7 +824,15 @@ void TransportLayerDtls::StateChange(TransportLayer *layer, State state) {
     case TS_OPEN:
       MOZ_MTLOG(ML_ERROR,
                 LAYER_INFO << "Lower layer is now open; starting TLS");
-      Handshake();
+      // Async, since the ICE layer might need to send a STUN response, and we
+      // don't want the handshake to start until that is sent.
+      TL_SET_STATE(TS_CONNECTING);
+      timer_->Cancel();
+      timer_->SetTarget(target_);
+      timer_->InitWithFuncCallback(TimerCallback,
+                                   this,
+                                   0,
+                                   nsITimer::TYPE_ONE_SHOT);
       break;
 
     case TS_CLOSED:
@@ -828,8 +848,6 @@ void TransportLayerDtls::StateChange(TransportLayer *layer, State state) {
 }
 
 void TransportLayerDtls::Handshake() {
-  TL_SET_STATE(TS_CONNECTING);
-
   // Clear the retransmit timer
   timer_->Cancel();
 
@@ -860,6 +878,7 @@ void TransportLayerDtls::Handshake() {
         MOZ_MTLOG(ML_ERROR, LAYER_INFO << "Malformed DTLS message; ignoring");
         // If this were TLS (and not DTLS), this would be fatal, but
         // here we're required to ignore bad messages, so fall through
+        MOZ_FALLTHROUGH;
       case PR_WOULD_BLOCK_ERROR:
         MOZ_MTLOG(ML_NOTICE, LAYER_INFO << "Handshake would have blocked");
         PRIntervalTime timeout;
@@ -959,26 +978,31 @@ void TransportLayerDtls::PacketReceived(TransportLayer* layer,
 
   // Now try a recv if we're open, since there might be data left
   if (state_ == TS_OPEN) {
-    unsigned char buf[2000];
+    // nICEr uses a 9216 bytes buffer to allow support for jumbo frames
+    unsigned char buf[9216];
 
-    int32_t rv = PR_Recv(ssl_fd_, buf, sizeof(buf), 0, PR_INTERVAL_NO_WAIT);
-    if (rv > 0) {
-      // We have data
-      MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Read " << rv << " bytes from NSS");
-      SignalPacketReceived(this, buf, rv);
-    } else if (rv == 0) {
-      TL_SET_STATE(TS_CLOSED);
-    } else {
-      int32_t err = PR_GetError();
-
-      if (err == PR_WOULD_BLOCK_ERROR) {
-        // This gets ignored
-        MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Receive would have blocked");
+    int32_t rv;
+    // One packet might contain several DTLS packets
+    do {
+      rv = PR_Recv(ssl_fd_, buf, sizeof(buf), 0, PR_INTERVAL_NO_WAIT);
+      if (rv > 0) {
+        // We have data
+        MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Read " << rv << " bytes from NSS");
+        SignalPacketReceived(this, buf, rv);
+      } else if (rv == 0) {
+        TL_SET_STATE(TS_CLOSED);
       } else {
-        MOZ_MTLOG(ML_NOTICE, LAYER_INFO << "NSS Error " << err);
-        TL_SET_STATE(TS_ERROR);
+        int32_t err = PR_GetError();
+
+        if (err == PR_WOULD_BLOCK_ERROR) {
+          // This gets ignored
+          MOZ_MTLOG(ML_DEBUG, LAYER_INFO << "Receive would have blocked");
+        } else {
+          MOZ_MTLOG(ML_NOTICE, LAYER_INFO << "NSS Error " << err);
+          TL_SET_STATE(TS_ERROR);
+        }
       }
-    }
+    } while (rv > 0);
   }
 }
 
@@ -1189,15 +1213,12 @@ SECStatus TransportLayerDtls::AuthCertificateHook(PRFileDesc *fd,
           RefPtr<VerificationDigest> digest = digests_[i];
           rv = CheckDigest(digest, peer_cert);
 
-          if (rv != SECSuccess)
-            break;
-        }
-
-        if (rv == SECSuccess) {
-          // Matches all digests, we are good to go
-          cert_ok_ = true;
-          peer_cert = peer_cert.forget();
-          return SECSuccess;
+          // Matches a digest, we are good to go
+          if (rv == SECSuccess) {
+            cert_ok_ = true;
+            peer_cert = peer_cert.forget();
+            return SECSuccess;
+          }
         }
       }
       break;

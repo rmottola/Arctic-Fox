@@ -838,10 +838,9 @@ MakeCompressedIndexDataValues(
 }
 
 nsresult
-ReadCompressedIndexDataValuesFromBlob(
-                                   const uint8_t* aBlobData,
-                                   uint32_t aBlobDataLength,
-                                   FallibleTArray<IndexDataValue>& aIndexValues)
+ReadCompressedIndexDataValuesFromBlob(const uint8_t* aBlobData,
+                                      uint32_t aBlobDataLength,
+                                      nsTArray<IndexDataValue>& aIndexValues)
 {
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(!IsOnBackgroundThread());
@@ -916,10 +915,9 @@ ReadCompressedIndexDataValuesFromBlob(
 // static
 template <typename T>
 nsresult
-ReadCompressedIndexDataValuesFromSource(
-                                   T* aSource,
-                                   uint32_t aColumnIndex,
-                                   FallibleTArray<IndexDataValue>& aIndexValues)
+ReadCompressedIndexDataValuesFromSource(T* aSource,
+                                        uint32_t aColumnIndex,
+                                        nsTArray<IndexDataValue>& aIndexValues)
 {
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(!IsOnBackgroundThread());
@@ -963,7 +961,7 @@ ReadCompressedIndexDataValuesFromSource(
 nsresult
 ReadCompressedIndexDataValues(mozIStorageStatement* aStatement,
                               uint32_t aColumnIndex,
-                              FallibleTArray<IndexDataValue>& aIndexValues)
+                              nsTArray<IndexDataValue>& aIndexValues)
 {
   return ReadCompressedIndexDataValuesFromSource(aStatement,
                                                  aColumnIndex,
@@ -973,7 +971,7 @@ ReadCompressedIndexDataValues(mozIStorageStatement* aStatement,
 nsresult
 ReadCompressedIndexDataValues(mozIStorageValueArray* aValues,
                               uint32_t aColumnIndex,
-                              FallibleTArray<IndexDataValue>& aIndexValues)
+                              nsTArray<IndexDataValue>& aIndexValues)
 {
   return ReadCompressedIndexDataValuesFromSource(aValues,
                                                  aColumnIndex,
@@ -2768,7 +2766,7 @@ InsertIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
 
   // Read out the previous value. It may be NULL, in which case we'll just end
   // up with an empty array.
-  AutoFallibleTArray<IndexDataValue, 32> indexValues;
+  AutoTArray<IndexDataValue, 32> indexValues;
   nsresult rv = ReadCompressedIndexDataValues(aValues, 0, indexValues);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -3864,7 +3862,7 @@ private:
   nsresult
   ReadOldCompressedIDVFromBlob(const uint8_t* aBlobData,
                                uint32_t aBlobDataLength,
-                               FallibleTArray<IndexDataValue>& aIndexValues);
+                               nsTArray<IndexDataValue>& aIndexValues);
 
   NS_IMETHOD
   OnFunctionCall(mozIStorageValueArray* aArguments,
@@ -3877,7 +3875,7 @@ nsresult
 UpgradeIndexDataValuesFunction::ReadOldCompressedIDVFromBlob(
                                    const uint8_t* aBlobData,
                                    uint32_t aBlobDataLength,
-                                   FallibleTArray<IndexDataValue>& aIndexValues)
+                                   nsTArray<IndexDataValue>& aIndexValues)
 {
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(!IsOnBackgroundThread());
@@ -3989,7 +3987,7 @@ UpgradeIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aArguments
     return rv;
   }
 
-  AutoFallibleTArray<IndexDataValue, 32> oldIdv;
+  AutoTArray<IndexDataValue, 32> oldIdv;
   rv = ReadOldCompressedIDVFromBlob(oldBlob, oldBlobLength, oldIdv);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -5712,14 +5710,20 @@ private:
 public:
   NS_DECL_ISUPPORTS_INHERITED
 
+  bool
+  IsOnOwningThread() const
+  {
+    MOZ_ASSERT(mOwningThread);
+
+    bool current;
+    return NS_SUCCEEDED(mOwningThread->IsOnCurrentThread(&current)) && current;
+  }
+
   void
   AssertIsOnOwningThread() const
   {
-    AssertIsOnBackgroundThread();
-    MOZ_ASSERT(mOwningThread);
-    DebugOnly<bool> current;
-    MOZ_ASSERT(NS_SUCCEEDED(mOwningThread->IsOnCurrentThread(&current)));
-    MOZ_ASSERT(current);
+    MOZ_ASSERT(IsOnBackgroundThread());
+    MOZ_ASSERT(IsOnOwningThread());
   }
 
   void
@@ -5852,10 +5856,9 @@ protected:
                                Maybe<UniqueIndexTable>& aMaybeUniqueIndexTable);
 
   static nsresult
-  IndexDataValuesFromUpdateInfos(
-                              const nsTArray<IndexUpdateInfo>& aUpdateInfos,
-                              const UniqueIndexTable& aUniqueIndexTable,
-                              FallibleTArray<IndexDataValue>& aIndexValues);
+  IndexDataValuesFromUpdateInfos(const nsTArray<IndexUpdateInfo>& aUpdateInfos,
+                                 const UniqueIndexTable& aUniqueIndexTable,
+                                 nsTArray<IndexDataValue>& aIndexValues);
 
   static nsresult
   InsertIndexTableRows(DatabaseConnection* aConnection,
@@ -7902,7 +7905,7 @@ private:
   nsresult
   RemoveReferencesToIndex(DatabaseConnection* aConnection,
                           const Key& aObjectDataKey,
-                          FallibleTArray<IndexDataValue>& aIndexValues);
+                          nsTArray<IndexDataValue>& aIndexValues);
 
   virtual nsresult
   DoDatabaseWork(DatabaseConnection* aConnection) override;
@@ -8040,7 +8043,7 @@ class ObjectStoreGetRequestOp final
   const uint32_t mObjectStoreId;
   RefPtr<Database> mDatabase;
   const OptionalKeyRange mOptionalKeyRange;
-  AutoFallibleTArray<StructuredCloneReadInfo, 1> mResponse;
+  AutoTArray<StructuredCloneReadInfo, 1> mResponse;
   PBackgroundParent* mBackgroundParent;
   const uint32_t mLimit;
   const bool mGetAll;
@@ -8201,7 +8204,7 @@ class IndexGetRequestOp final
 
   RefPtr<Database> mDatabase;
   const OptionalKeyRange mOptionalKeyRange;
-  AutoFallibleTArray<StructuredCloneReadInfo, 1> mResponse;
+  AutoTArray<StructuredCloneReadInfo, 1> mResponse;
   PBackgroundParent* mBackgroundParent;
   const uint32_t mLimit;
   const bool mGetAll;
@@ -8228,7 +8231,7 @@ class IndexGetKeyRequestOp final
   friend class TransactionBase;
 
   const OptionalKeyRange mOptionalKeyRange;
-  AutoFallibleTArray<Key, 1> mResponse;
+  AutoTArray<Key, 1> mResponse;
   const uint32_t mLimit;
   const bool mGetAll;
 
@@ -10312,7 +10315,7 @@ DatabaseConnection::Close()
   AssertIsOnConnectionThread();
   MOZ_ASSERT(mStorageConnection);
   MOZ_ASSERT(!mDEBUGSavepointCount);
-  MOZ_ASSERT(!mInWriteTransaction);
+  MOZ_RELEASE_ASSERT(!mInWriteTransaction);
 
   PROFILER_LABEL("IndexedDB",
                  "DatabaseConnection::Close",
@@ -16365,10 +16368,10 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
   // are database files then we need to cleanup stored files (if it's needed)
   // and also get the usage.
 
-  nsAutoTArray<nsString, 20> subdirsToProcess;
+  AutoTArray<nsString, 20> subdirsToProcess;
   nsTArray<nsCOMPtr<nsIFile>> unknownFiles;
   nsTHashtable<nsStringHashKey> validSubdirs(20);
-  nsAutoTArray<FileManagerInitInfo, 20> initInfos;
+  AutoTArray<FileManagerInitInfo, 20> initInfos;
 
   nsCOMPtr<nsISimpleEnumerator> entries;
   rv = directory->GetDirectoryEntries(getter_AddRefs(entries));
@@ -17327,6 +17330,25 @@ QuotaClient::PerformIdleMaintenanceOnDatabaseInternal(
   MOZ_ASSERT(!aMaintenanceInfo.mGroup.IsEmpty());
   MOZ_ASSERT(!aMaintenanceInfo.mOrigin.IsEmpty());
 
+  class MOZ_STACK_CLASS AutoClose final
+  {
+    nsCOMPtr<mozIStorageConnection> mConnection;
+
+  public:
+    explicit AutoClose(mozIStorageConnection* aConnection)
+      : mConnection(aConnection)
+    {
+      MOZ_ASSERT(aConnection);
+    }
+
+    ~AutoClose()
+    {
+      MOZ_ASSERT(mConnection);
+
+      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mConnection->Close()));
+    }
+  };
+
   nsCOMPtr<nsIFile> databaseFile =
     GetFileForPath(aMaintenanceInfo.mDatabasePath);
   MOZ_ASSERT(databaseFile);
@@ -17341,6 +17363,8 @@ QuotaClient::PerformIdleMaintenanceOnDatabaseInternal(
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
+
+  AutoClose autoClose(connection);
 
   if (IdleMaintenanceMustEnd(aRunId)) {
     return;
@@ -17595,7 +17619,7 @@ QuotaClient::DetermineMaintenanceAction(mozIStorageConnection* aConnection,
     return rv;
   }
 
-  MOZ_ASSERT(lastVacuumSize > 0);
+  NS_ASSERTION(lastVacuumSize > 0, "Thy last vacuum size shall be greater than zero, less than zero shall thy last vacuum size not be. Zero is right out.");
 
   // This shouldn't really be possible...
   if (NS_WARN_IF(mMaintenanceStartTime <= lastVacuumTime)) {
@@ -18194,7 +18218,7 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
     return NS_ERROR_FILE_CORRUPTED;
   }
 
-  AutoFallibleTArray<uint8_t, 512> uncompressed;
+  AutoTArray<uint8_t, 512> uncompressed;
   if (NS_WARN_IF(!uncompressed.SetLength(uncompressedLength, fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -18209,7 +18233,7 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
   aInfo->mData.SwapElements(uncompressed);
 
   if (!aFileIds.IsVoid()) {
-    nsAutoTArray<int64_t, 10> array;
+    AutoTArray<int64_t, 10> array;
     nsresult rv = ConvertFileIdsToArray(aFileIds, array);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
@@ -18395,7 +18419,7 @@ nsresult
 DatabaseOperationBase::IndexDataValuesFromUpdateInfos(
                                   const nsTArray<IndexUpdateInfo>& aUpdateInfos,
                                   const UniqueIndexTable& aUniqueIndexTable,
-                                  FallibleTArray<IndexDataValue>& aIndexValues)
+                                  nsTArray<IndexDataValue>& aIndexValues)
 {
   MOZ_ASSERT(aIndexValues.IsEmpty());
   MOZ_ASSERT_IF(!aUpdateInfos.IsEmpty(), aUniqueIndexTable.Count());
@@ -18715,7 +18739,7 @@ DatabaseOperationBase::DeleteObjectStoreDataTableRowsWithIndexes(
   }
 
   DatabaseConnection::CachedStatement deleteStmt;
-  AutoFallibleTArray<IndexDataValue, 32> indexValues;
+  AutoTArray<IndexDataValue, 32> indexValues;
 
   DebugOnly<uint32_t> resultCountDEBUG = 0;
 
@@ -19807,10 +19831,6 @@ FactoryOp::Run()
       SendResults();
       return NS_OK;
 
-    // We raced, no need to crash.
-    case State::Completed:
-      return NS_OK;
-
     default:
       MOZ_CRASH("Bad state!");
   }
@@ -19824,8 +19844,12 @@ FactoryOp::Run()
     // thread.
     mState = State::SendingResults;
 
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
-                                                         NS_DISPATCH_NORMAL)));
+    if (IsOnOwningThread()) {
+      SendResults();
+    } else {
+      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+        mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+    }
   }
 
   return NS_OK;
@@ -19875,19 +19899,6 @@ FactoryOp::ActorDestroy(ActorDestroyReason aWhy)
   AssertIsOnBackgroundThread();
 
   NoteActorDestroyed();
-
-  // There may be an event in the event queue that would do the cleanup later,
-  // but if we are being destroyed abnormally (not by calling
-  // PBackgroundIDBFactoryRequestParent::Send__delete__) we need to do the
-  // cleanup here and just ignore the cleanup event in FactoryOp::Run.
-  // Otherwise some Database objects may be still alive and registered in
-  // gLiveDatabaseHashtable at the time the last factory is destroyed.
-  if (aWhy != Deletion) {
-    mState = State::SendingResults;
-    IDB_REPORT_INTERNAL_ERR();
-    mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    SendResults();
-  }
 }
 
 bool
@@ -20636,8 +20647,7 @@ OpenDatabaseOp::NoteDatabaseClosed(Database* aDatabase)
   MOZ_ASSERT(aDatabase);
   MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose ||
              mState == State::WaitingForTransactionsToComplete ||
-             mState == State::DatabaseWorkVersionChange ||
-             mState == State::SendingResults);
+             mState == State::DatabaseWorkVersionChange);
 
   if (mState != State::WaitingForOtherDatabasesToClose) {
     MOZ_ASSERT(mMaybeBlockedDatabases.IsEmpty());
@@ -23232,8 +23242,9 @@ NormalJSRuntime::Init()
 
   JSAutoRequest ar(mContext);
 
+  JS::CompartmentOptions options;
   mGlobal = JS_NewGlobalObject(mContext, &kGlobalClass, nullptr,
-                               JS::FireOnNewGlobalHook);
+                               JS::FireOnNewGlobalHook, options);
   if (NS_WARN_IF(!mGlobal)) {
     return false;
   }
@@ -23347,7 +23358,7 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
   const IndexMetadata& metadata = mOp->mMetadata;
   const int64_t& objectStoreId = mOp->mObjectStoreId;
 
-  nsAutoTArray<IndexUpdateInfo, 32> updateInfos;
+  AutoTArray<IndexUpdateInfo, 32> updateInfos;
   rv = IDBObjectStore::AppendIndexUpdateInfo(metadata.id(),
                                              metadata.keyPath(),
                                              metadata.unique(),
@@ -23413,7 +23424,7 @@ UpdateIndexDataValuesFunction::OnFunctionCall(mozIStorageValueArray* aValues,
     return rv;
   }
 
-  AutoFallibleTArray<IndexDataValue, 32> indexValues;
+  AutoTArray<IndexDataValue, 32> indexValues;
   rv = ReadCompressedIndexDataValues(aValues, 1, indexValues);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -23510,10 +23521,9 @@ DeleteIndexOp::DeleteIndexOp(VersionChangeTransaction* aTransaction,
 }
 
 nsresult
-DeleteIndexOp::RemoveReferencesToIndex(
-                                   DatabaseConnection* aConnection,
-                                   const Key& aObjectStoreKey,
-                                   FallibleTArray<IndexDataValue>& aIndexValues)
+DeleteIndexOp::RemoveReferencesToIndex(DatabaseConnection* aConnection,
+                                       const Key& aObjectStoreKey,
+                                       nsTArray<IndexDataValue>& aIndexValues)
 {
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(!IsOnBackgroundThread());
@@ -23768,7 +23778,7 @@ DeleteIndexOp::DoDatabaseWork(DatabaseConnection* aConnection)
   DatabaseConnection::CachedStatement nullIndexDataValuesStmt;
 
   Key lastObjectStoreKey;
-  AutoFallibleTArray<IndexDataValue, 32> lastIndexValues;
+  AutoTArray<IndexDataValue, 32> lastIndexValues;
 
   bool hasResult;
   while (NS_SUCCEEDED(rv = selectStmt->ExecuteStep(&hasResult)) && hasResult) {
@@ -24112,7 +24122,7 @@ ObjectStoreAddOrPutRequestOp::RemoveOldIndexDataValues(
   }
 
   if (hasResult) {
-    AutoFallibleTArray<IndexDataValue, 32> existingIndexValues;
+    AutoTArray<IndexDataValue, 32> existingIndexValues;
     rv = ReadCompressedIndexDataValues(indexValuesStmt,
                                         0,
                                         existingIndexValues);
@@ -24637,7 +24647,7 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
     MOZ_ASSERT(mUniqueIndexTable.isSome());
 
     // Write the index_data_values column.
-    AutoFallibleTArray<IndexDataValue, 32> indexValues;
+    AutoTArray<IndexDataValue, 32> indexValues;
     rv = IndexDataValuesFromUpdateInfos(mParams.indexUpdateInfos(),
                                         mUniqueIndexTable.ref(),
                                         indexValues);

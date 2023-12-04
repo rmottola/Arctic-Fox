@@ -1348,8 +1348,8 @@ struct TextNodeCorrespondence
   uint32_t mUndisplayedCharacters;
 };
 
-NS_DECLARE_FRAME_PROPERTY(TextNodeCorrespondenceProperty,
-                          DeleteValue<TextNodeCorrespondence>)
+NS_DECLARE_FRAME_PROPERTY_DELETABLE(TextNodeCorrespondenceProperty,
+                                    TextNodeCorrespondence)
 
 /**
  * Returns the number of undisplayed characters before the specified
@@ -1739,13 +1739,13 @@ private:
    * Stack of frames corresponding to <textPath> elements that are in scope
    * for the current frame.
    */
-  nsAutoTArray<nsIFrame*, 1> mTextPathFrames;
+  AutoTArray<nsIFrame*, 1> mTextPathFrames;
 
   /**
    * Stack of dominant-baseline values to record as we traverse through the
    * frame tree.
    */
-  nsAutoTArray<uint8_t, 8> mBaselines;
+  AutoTArray<uint8_t, 8> mBaselines;
 
   /**
    * The iterator's current position relative to mSubtree.
@@ -5760,7 +5760,7 @@ SetupInheritablePaint(const DrawTarget* aDrawTarget,
                       gfxTextContextPaint* aOuterContextPaint,
                       SVGTextContextPaint::Paint& aTargetPaint,
                       nsStyleSVGPaint nsStyleSVG::*aFillOrStroke,
-                      const FramePropertyDescriptor* aProperty)
+                      nsSVGEffects::ObserverPropertyDescriptor aProperty)
 {
   const nsStyleSVG *style = aFrame->StyleSVG();
   nsSVGPaintServerFrame *ps =

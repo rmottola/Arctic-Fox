@@ -31,9 +31,6 @@ using mozilla::MakeRange;
 using mozilla::PodArrayZero;
 using mozilla::PodZero;
 
-/* Except for the first and last, slices of less than 10ms are not reported. */
-static const int64_t SLICE_MIN_REPORT_TIME = 10 * PRMJ_USEC_PER_MSEC;
-
 /*
  * If this fails, then you can either delete this assertion and allow all
  * larger-numbered reasons to pile up in the last telemetry bucket, or switch
@@ -936,6 +933,7 @@ Statistics::endGC()
     int64_t markRootsTotal = SumPhase(PHASE_MARK_ROOTS, phaseTimes);
     runtime->addTelemetry(JS_TELEMETRY_GC_MARK_MS, t(markTotal));
     runtime->addTelemetry(JS_TELEMETRY_GC_SWEEP_MS, t(phaseTimes[PHASE_DAG_NONE][PHASE_SWEEP]));
+    runtime->addTelemetry(JS_TELEMETRY_GC_COMPACT_MS, t(phaseTimes[PHASE_DAG_NONE][PHASE_COMPACT]));
     runtime->addTelemetry(JS_TELEMETRY_GC_MARK_ROOTS_MS, t(markRootsTotal));
     runtime->addTelemetry(JS_TELEMETRY_GC_MARK_GRAY_MS, t(phaseTimes[PHASE_DAG_NONE][PHASE_SWEEP_MARK_GRAY]));
     runtime->addTelemetry(JS_TELEMETRY_GC_NON_INCREMENTAL, !!nonincrementalReason_);

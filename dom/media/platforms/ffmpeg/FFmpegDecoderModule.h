@@ -8,8 +8,9 @@
 #define __FFmpegDecoderModule_h__
 
 #include "PlatformDecoderModule.h"
+#include "FFmpegLibWrapper.h"
 #include "FFmpegAudioDecoder.h"
-#include "FFmpegH264Decoder.h"
+#include "FFmpegVideoDecoder.h"
 
 namespace mozilla
 {
@@ -19,14 +20,14 @@ class FFmpegDecoderModule : public PlatformDecoderModule
 {
 public:
   static already_AddRefed<PlatformDecoderModule>
-  Create()
+  Create(FFmpegLibWrapper* aLib)
   {
-    RefPtr<PlatformDecoderModule> pdm = new FFmpegDecoderModule();
+    RefPtr<PlatformDecoderModule> pdm = new FFmpegDecoderModule(aLib);
 
     return pdm.forget();
   }
 
-  FFmpegDecoderModule() {}
+  explicit FFmpegDecoderModule(FFmpegLibWrapper* aLib) : mLib(aLib) {}
   virtual ~FFmpegDecoderModule() {}
 
   already_AddRefed<MediaDataDecoder>
@@ -37,8 +38,8 @@ public:
                      MediaDataDecoderCallback* aCallback) override
   {
     RefPtr<MediaDataDecoder> decoder =
-      new FFmpegH264Decoder<V>(aVideoTaskQueue, aCallback, aConfig,
-                               aImageContainer);
+      new FFmpegVideoDecoder<V>(mLib, aVideoTaskQueue, aCallback, aConfig,
+                                aImageContainer);
     return decoder.forget();
   }
 
@@ -47,20 +48,28 @@ public:
                      FlushableTaskQueue* aAudioTaskQueue,
                      MediaDataDecoderCallback* aCallback) override
   {
+#ifdef USING_MOZFFVPX
+    return nullptr;
+#else
     RefPtr<MediaDataDecoder> decoder =
-      new FFmpegAudioDecoder<V>(aAudioTaskQueue, aCallback, aConfig);
+      new FFmpegAudioDecoder<V>(mLib, aAudioTaskQueue, aCallback, aConfig);
     return decoder.forget();
+#endif
   }
 
   bool SupportsMimeType(const nsACString& aMimeType) const override
   {
+#ifdef USING_MOZFFVPX
+    AVCodecID audioCodec = AV_CODEC_ID_NONE;
+#else
     AVCodecID audioCodec = FFmpegAudioDecoder<V>::GetCodecId(aMimeType);
-    AVCodecID videoCodec = FFmpegH264Decoder<V>::GetCodecId(aMimeType);
+#endif
+    AVCodecID videoCodec = FFmpegVideoDecoder<V>::GetCodecId(aMimeType);
     if (audioCodec == AV_CODEC_ID_NONE && videoCodec == AV_CODEC_ID_NONE) {
       return false;
     }
     AVCodecID codec = audioCodec != AV_CODEC_ID_NONE ? audioCodec : videoCodec;
-    return !!FFmpegDataDecoder<V>::FindAVCodec(codec);
+    return !!FFmpegDataDecoder<V>::FindAVCodec(mLib, codec);
   }
 
   ConversionRequired
@@ -75,6 +84,8 @@ public:
     }
   }
 
+private:
+  FFmpegLibWrapper* mLib;
 };
 
 } // namespace mozilla

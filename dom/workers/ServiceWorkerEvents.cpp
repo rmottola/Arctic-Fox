@@ -200,7 +200,7 @@ public:
     mChannel->SynthesizeStatus(mInternalResponse->GetUnfilteredStatus(),
                                mInternalResponse->GetUnfilteredStatusText());
 
-    nsAutoTArray<InternalHeaders::Entry, 5> entries;
+    AutoTArray<InternalHeaders::Entry, 5> entries;
     mInternalResponse->UnfilteredHeaders()->GetEntries(entries);
     for (uint32_t i = 0; i < entries.Length(); ++i) {
        mChannel->SynthesizeHeader(entries[i].mName, entries[i].mValue);
@@ -1225,7 +1225,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(ExtendableMessageEvent, Event)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(ExtendableMessageEvent, Event)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_JSVAL_MEMBER_CALLBACK(mData)
+  NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mData)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(ExtendableMessageEvent)

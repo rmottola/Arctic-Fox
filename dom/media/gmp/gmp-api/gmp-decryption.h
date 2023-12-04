@@ -94,10 +94,12 @@ enum GMPMediaKeyStatus {
   kGMPUsable = 0,
   kGMPExpired = 1,
   kGMPOutputDownscaled = 2,
-  kGMPOutputNotAllowed = 3,
+  kGMPOutputRestricted = 3,
   kGMPInternalError = 4,
-  kGMPUnknown = 5,
-  kGMPMediaKeyStatusInvalid = 6 // Must always be last.
+  kGMPUnknown = 5, // Removes key from MediaKeyStatusMap
+  kGMPReleased = 6,
+  kGMPStatusPending = 7,
+  kGMPMediaKeyStatusInvalid = 8 // Must always be last.
 };
 
 // Time in milliseconds, as offset from epoch, 1 Jan 1970.
@@ -124,6 +126,10 @@ typedef int64_t GMPTimestamp;
 // and return decompressed samples to Gecko for playback.
 #define GMP_EME_CAP_DECRYPT_AND_DECODE_AUDIO (uint64_t(1) << 2)
 #define GMP_EME_CAP_DECRYPT_AND_DECODE_VIDEO (uint64_t(1) << 3)
+
+// Capability; CDM can decrypt and then decode and render encrypted buffers
+#define GMP_EME_CAP_RENDER_AUDIO (uint64_t(1) << 4)
+#define GMP_EME_CAP_RENDER_VIDEO (uint64_t(1) << 5)
 
 // Callbacks to be called from the CDM. Threadsafe.
 class GMPDecryptorCallback {

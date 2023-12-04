@@ -22,6 +22,7 @@
 #include "nsThreadUtils.h"
 #include "FakeMediaStreams.h"
 #include "FakeMediaStreamsImpl.h"
+#include "FakeLogging.h"
 #include "PeerConnectionImpl.h"
 #include "PeerConnectionCtx.h"
 
@@ -42,6 +43,9 @@ extern "C" {
 #undef CRLF
 #endif
 #define CRLF "\r\n"
+
+#include "FakeIPC.h"
+#include "FakeIPC.cpp"
 
 using namespace mozilla;
 

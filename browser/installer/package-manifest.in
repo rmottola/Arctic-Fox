@@ -152,6 +152,10 @@
 #endif
 #endif
 @BINPATH@/@DLL_PREFIX@lgpllibs@DLL_SUFFIX@
+#ifdef MOZ_FFVPX
+@BINPATH@/@DLL_PREFIX@mozavutil@DLL_SUFFIX@
+@BINPATH@/@DLL_PREFIX@mozavcodec@DLL_SUFFIX@
+#endif
 @RESPATH@/browser/blocklist.xml
 #ifdef XP_UNIX
 #ifndef XP_MACOSX
@@ -333,6 +337,7 @@
 @RESPATH@/components/toolkit_finalizationwitness.xpt
 @RESPATH@/components/toolkit_formautofill.xpt
 @RESPATH@/components/toolkit_osfile.xpt
+@RESPATH@/components/toolkit_securityreporter.xpt
 #ifdef NIGHTLY_BUILD
 @RESPATH@/components/toolkit_perfmonitoring.xpt
 #endif
@@ -394,9 +399,6 @@
 @RESPATH@/browser/components/nsBrowserGlue.js
 @RESPATH@/browser/components/nsSetDefaultBrowser.manifest
 @RESPATH@/browser/components/nsSetDefaultBrowser.js
-@RESPATH@/browser/components/BrowserDownloads.manifest
-@RESPATH@/browser/components/DownloadsStartup.js
-@RESPATH@/browser/components/DownloadsUI.js
 @RESPATH@/components/Downloads.manifest
 @RESPATH@/components/DownloadLegacy.js
 @RESPATH@/components/BrowserPageThumbs.manifest
@@ -566,6 +568,9 @@
 @RESPATH@/components/SlowScriptDebug.manifest
 @RESPATH@/components/SlowScriptDebug.js
 
+@RESPATH@/components/TVSimulatorService.js
+@RESPATH@/components/TVSimulatorService.manifest
+
 #ifndef RELEASE_BUILD
 @RESPATH@/components/InterAppComm.manifest
 @RESPATH@/components/InterAppCommService.js
@@ -644,6 +649,10 @@
 @RESPATH@/components/privatebrowsing.xpt
 @RESPATH@/components/PrivateBrowsing.manifest
 @RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
+
+; Security Reports
+@RESPATH@/components/SecurityReporter.manifest
+@RESPATH@/components/SecurityReporter.js
 
 ; Signed Packaged Content
 @RESPATH@/components/InstallPackagedWebapp.manifest
@@ -830,6 +839,31 @@ bin/libfreebl_32int64_3.so
 #else
 @BINPATH@/updater@BIN_SUFFIX@
 #endif
+#endif
+
+#ifdef MOZ_WEBAPP_RUNTIME
+[WebappRuntime]
+#ifdef XP_WIN
+@BINPATH@/webapp-uninstaller@BIN_SUFFIX@
+#endif
+@RESPATH@/webapprt-stub@BIN_SUFFIX@
+@RESPATH@/webapprt/webapprt.ini
+@RESPATH@/webapprt/chrome.manifest
+@RESPATH@/webapprt/chrome/webapprt@JAREXT@
+@RESPATH@/webapprt/chrome/webapprt.manifest
+@RESPATH@/webapprt/chrome/@AB_CD@@JAREXT@
+@RESPATH@/webapprt/chrome/@AB_CD@.manifest
+@RESPATH@/webapprt/components/CommandLineHandler.js
+@RESPATH@/webapprt/components/ContentPermission.js
+@RESPATH@/webapprt/components/DirectoryProvider.js
+@RESPATH@/webapprt/components/PaymentUIGlue.js
+@RESPATH@/webapprt/components/components.manifest
+@RESPATH@/webapprt/defaults/preferences/prefs.js
+@RESPATH@/webapprt/modules/DownloadView.jsm
+@RESPATH@/webapprt/modules/Startup.jsm
+@RESPATH@/webapprt/modules/WebappRT.jsm
+@RESPATH@/webapprt/modules/WebappManager.jsm
+@RESPATH@/webapprt/modules/WebRTCHandler.jsm
 #endif
 
 @RESPATH@/components/DataStore.manifest

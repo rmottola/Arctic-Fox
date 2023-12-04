@@ -7,8 +7,10 @@
 #include "EffectSet.h"
 #include "mozilla/dom/Element.h" // For Element
 #include "RestyleManager.h"
+#include "nsCSSPseudoElements.h" // For CSSPseudoElementType
 #include "nsCycleCollectionNoteChild.h" // For CycleCollectionNoteChild
 #include "nsPresContext.h"
+#include "nsLayoutUtils.h"
 
 namespace mozilla {
 
@@ -37,7 +39,7 @@ EffectSet::Traverse(nsCycleCollectionTraversalCallback& aCallback)
 
 /* static */ EffectSet*
 EffectSet::GetEffectSet(dom::Element* aElement,
-                        nsCSSPseudoElements::Type aPseudoType)
+                        CSSPseudoElementType aPseudoType)
 {
   nsIAtom* propName = GetEffectSetPropertyAtom(aPseudoType);
   return static_cast<EffectSet*>(aElement->GetProperty(propName));
@@ -70,10 +72,15 @@ EffectSet::GetEffectSet(const nsIFrame* aFrame)
       return nullptr;
     }
   } else {
-    if (!content->MayHaveAnimations()) {
+    if (nsLayoutUtils::GetStyleFrame(content) != aFrame) {
+      // The effects associated with an element are for its primary frame.
       return nullptr;
     }
     propName = nsGkAtoms::animationEffectsProperty;
+  }
+
+  if (!content->MayHaveAnimations()) {
+    return nullptr;
   }
 
   return static_cast<EffectSet*>(content->GetProperty(propName));
@@ -81,7 +88,7 @@ EffectSet::GetEffectSet(const nsIFrame* aFrame)
 
 /* static */ EffectSet*
 EffectSet::GetOrCreateEffectSet(dom::Element* aElement,
-                                nsCSSPseudoElements::Type aPseudoType)
+                                CSSPseudoElementType aPseudoType)
 {
   EffectSet* effectSet = GetEffectSet(aElement, aPseudoType);
   if (effectSet) {
@@ -101,11 +108,27 @@ EffectSet::GetOrCreateEffectSet(dom::Element* aElement,
     return nullptr;
   }
 
-  if (aPseudoType == nsCSSPseudoElements::ePseudo_NotPseudoElement) {
-    aElement->SetMayHaveAnimations();
-  }
+  aElement->SetMayHaveAnimations();
 
   return effectSet;
+}
+
+/* static */ void
+EffectSet::DestroyEffectSet(dom::Element* aElement,
+                            CSSPseudoElementType aPseudoType)
+{
+  nsIAtom* propName = GetEffectSetPropertyAtom(aPseudoType);
+  EffectSet* effectSet =
+    static_cast<EffectSet*>(aElement->GetProperty(propName));
+  if (!effectSet) {
+    return;
+  }
+
+  MOZ_ASSERT(!effectSet->IsBeingEnumerated(),
+             "Should not destroy an effect set while it is being enumerated");
+  effectSet = nullptr;
+
+  aElement->DeleteProperty(propName);
 }
 
 void
@@ -130,16 +153,16 @@ EffectSet::GetEffectSetPropertyAtoms()
 }
 
 /* static */ nsIAtom*
-EffectSet::GetEffectSetPropertyAtom(nsCSSPseudoElements::Type aPseudoType)
+EffectSet::GetEffectSetPropertyAtom(CSSPseudoElementType aPseudoType)
 {
   switch (aPseudoType) {
-    case nsCSSPseudoElements::ePseudo_NotPseudoElement:
+    case CSSPseudoElementType::NotPseudo:
       return nsGkAtoms::animationEffectsProperty;
 
-    case nsCSSPseudoElements::ePseudo_before:
+    case CSSPseudoElementType::before:
       return nsGkAtoms::animationEffectsForBeforeProperty;
 
-    case nsCSSPseudoElements::ePseudo_after:
+    case CSSPseudoElementType::after:
       return nsGkAtoms::animationEffectsForAfterProperty;
 
     default:

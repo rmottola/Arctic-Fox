@@ -521,7 +521,7 @@ static nsDefaultMimeTypeEntry defaultMimeEntries [] =
   { AUDIO_OGG, "opus" },
   { VIDEO_WEBM, "webm" },
   { AUDIO_WEBM, "webm" },
-#if defined(MOZ_GSTREAMER) || defined(MOZ_WMF)
+#if defined(MOZ_WMF)
   { VIDEO_MP4, "mp4" },
   { AUDIO_MP4, "m4a" },
   { AUDIO_MP3, "mp3" },
@@ -625,6 +625,7 @@ static nsExtraMimeTypeEntry extraMimeEntries [] =
   // app on Firefox OS depends on the "3gp" extension mapping to the
   // "video/3gpp" MIME type.
   { AUDIO_3GPP, "3gpp,3gp", "3GPP Audio" },
+  { AUDIO_3GPP2, "3g2", "3GPP2 Audio" },
 #endif
   { AUDIO_MIDI, "mid", "Standard MIDI Audio" }
 };
@@ -686,7 +687,7 @@ nsExternalHelperAppService::DoContentContentProcessHelper(const nsACString& aMim
                                                           nsIInterfaceRequestor *aWindowContext,
                                                           nsIStreamListener ** aStreamListener)
 {
-  nsCOMPtr<nsIDOMWindow> window = do_GetInterface(aContentContext);
+  nsCOMPtr<nsPIDOMWindowOuter> window = do_GetInterface(aContentContext);
   NS_ENSURE_STATE(window);
 
   // We need to get a hold of a ContentChild so that we can begin forwarding
@@ -1934,7 +1935,7 @@ void nsExternalAppHandler::SendStatusChange(ErrorType type, nsresult rv, nsIRequ
                 // If we didn't have a prompter we will try and get a window
                 // instead, get it's docshell and use it to alert the user.
                 if (!prompter) {
-                  nsCOMPtr<nsPIDOMWindow> window(do_GetInterface(GetDialogParent()));
+                  nsCOMPtr<nsPIDOMWindowOuter> window(do_GetInterface(GetDialogParent()));
                   if (!window || !window->GetDocShell()) {
                     return;
                   }
@@ -2562,13 +2563,13 @@ bool nsExternalAppHandler::GetNeverAskFlagFromPref(const char * prefName, const 
 
 nsresult nsExternalAppHandler::MaybeCloseWindow()
 {
-  nsCOMPtr<nsPIDOMWindow> window = do_GetInterface(mContentContext);
+  nsCOMPtr<nsPIDOMWindowOuter> window = do_GetInterface(mContentContext);
   NS_ENSURE_STATE(window);
 
   if (mShouldCloseWindow) {
     // Reset the window context to the opener window so that the dependent
     // dialogs have a parent
-    nsCOMPtr<nsPIDOMWindow> opener = window->GetOpener();
+    nsCOMPtr<nsPIDOMWindowOuter> opener = window->GetOpener();
 
     if (opener && !opener->Closed()) {
       mContentContext = do_GetInterface(opener);
@@ -2594,8 +2595,7 @@ nsExternalAppHandler::Notify(nsITimer* timer)
 {
   NS_ASSERTION(mWindowToClose, "No window to close after timer fired");
 
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(mWindowToClose);
-  window->Close();
+  mWindowToClose->Close();
   mWindowToClose = nullptr;
   mTimer = nullptr;
 

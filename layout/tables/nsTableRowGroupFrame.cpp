@@ -1433,7 +1433,7 @@ nsTableRowGroupFrame::AppendFrames(ChildListID     aListID,
 
   // collect the new row frames in an array
   // XXXbz why are we doing the QI stuff?  There shouldn't be any non-rows here.
-  nsAutoTArray<nsTableRowFrame*, 8> rows;
+  AutoTArray<nsTableRowFrame*, 8> rows;
   for (nsFrameList::Enumerator e(aFrameList); !e.AtEnd(); e.Next()) {
     nsTableRowFrame *rowFrame = do_QueryFrame(e.get());
     NS_ASSERTION(rowFrame, "Unexpected frame; frame constructor screwed up");
@@ -1858,8 +1858,8 @@ nsTableRowGroupFrame::GetNextSiblingOnLine(nsIFrame*& aFrame,
 
 //end nsLineIterator methods
 
-NS_DECLARE_FRAME_PROPERTY(RowCursorProperty,
-                          DeleteValue<nsTableRowGroupFrame::FrameCursorData>)
+NS_DECLARE_FRAME_PROPERTY_DELETABLE(RowCursorProperty,
+                                    nsTableRowGroupFrame::FrameCursorData)
 
 void
 nsTableRowGroupFrame::ClearRowCursor()
@@ -1905,8 +1905,7 @@ nsTableRowGroupFrame::GetFirstRowContaining(nscoord aY, nscoord* aOverflowAbove)
     return nullptr;
   }
 
-  FrameCursorData* property = static_cast<FrameCursorData*>
-    (Properties().Get(RowCursorProperty()));
+  FrameCursorData* property = Properties().Get(RowCursorProperty());
   uint32_t cursorIndex = property->mCursorIndex;
   uint32_t frameCount = property->mFrames.Length();
   if (cursorIndex >= frameCount)

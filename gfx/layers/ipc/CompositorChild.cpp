@@ -92,7 +92,7 @@ CompositorChild::Destroy()
     mLayerManager = nullptr;
   }
 
-  nsAutoTArray<PLayerTransactionChild*, 16> transactions;
+  AutoTArray<PLayerTransactionChild*, 16> transactions;
   ManagedPLayerTransactionChild(transactions);
   for (int i = transactions.Length() - 1; i >= 0; --i) {
     RefPtr<LayerTransactionChild> layers =

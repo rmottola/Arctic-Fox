@@ -218,6 +218,14 @@ EVENT(ended,
       eEnded,
       EventNameType_HTML,
       eBasicEventClass)
+EVENT(fullscreenchange,
+      eFullscreenChange,
+      EventNameType_HTML,
+      eBasicEventClass)
+EVENT(fullscreenerror,
+      eFullscreenError,
+      EventNameType_HTML,
+      eBasicEventClass)
 EVENT(input,
       eEditorInput,
       EventNameType_HTMLXUL,
@@ -295,11 +303,11 @@ EVENT(mouseup,
       EventNameType_All,
       eMouseEventClass)
 EVENT(mozfullscreenchange,
-      eFullscreenChange,
+      eMozFullscreenChange,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(mozfullscreenerror,
-      eFullscreenError,
+      eMozFullscreenError,
       EventNameType_HTML,
       eBasicEventClass)
 EVENT(mozpointerlockchange,
@@ -549,6 +557,10 @@ WINDOW_ONLY_EVENT(devicemotion,
                   eBasicEventClass)
 WINDOW_ONLY_EVENT(deviceorientation,
                   eDeviceOrientation,
+                  EventNameType_None,
+                  eBasicEventClass)
+WINDOW_ONLY_EVENT(absolutedeviceorientation,
+                  eAbsoluteDeviceOrientation,
                   EventNameType_None,
                   eBasicEventClass)
 WINDOW_ONLY_EVENT(deviceproximity,
@@ -928,6 +940,7 @@ NON_IDL_EVENT(MozEdgeUICompleted,
               EventNameType_None,
               eSimpleGestureEventClass)
 
+// CSS Transition & Animation events:
 NON_IDL_EVENT(transitionend,
               eTransitionEnd,
               EventNameType_None,
@@ -942,6 +955,24 @@ NON_IDL_EVENT(animationend,
               eAnimationEventClass)
 NON_IDL_EVENT(animationiteration,
               eAnimationIteration,
+              EventNameType_None,
+              eAnimationEventClass)
+
+// Webkit-prefixed versions of Transition & Animation events, for web compat:
+NON_IDL_EVENT(webkitTransitionEnd,
+              eWebkitTransitionEnd,
+              EventNameType_None,
+              eTransitionEventClass)
+NON_IDL_EVENT(webkitAnimationEnd,
+              eWebkitAnimationEnd,
+              EventNameType_None,
+              eAnimationEventClass)
+NON_IDL_EVENT(webkitAnimationIteration,
+              eWebkitAnimationIteration,
+              EventNameType_None,
+              eAnimationEventClass)
+NON_IDL_EVENT(webkitAnimationStart,
+              eWebkitAnimationStart,
               EventNameType_None,
               eAnimationEventClass)
 

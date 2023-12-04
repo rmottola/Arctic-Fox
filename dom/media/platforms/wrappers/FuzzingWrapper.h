@@ -110,6 +110,10 @@ private:
   nsresult Shutdown() override;
   bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
   nsresult ConfigurationChanged(const TrackInfo& aConfig) override;
+  const char* GetDescriptionName() const override
+  {
+    return mDecoder->GetDescriptionName();
+  }
 
   RefPtr<MediaDataDecoder> mDecoder;
   RefPtr<DecoderCallbackFuzzingWrapper> mCallbackWrapper;

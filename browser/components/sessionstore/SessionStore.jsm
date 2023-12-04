@@ -671,7 +671,7 @@ var SessionStoreInternal = {
     // If we got here, that means we're dealing with a frame message
     // manager message, so the target will be a <xul:browser>.
     var browser = aMessage.target;
-    var win = browser.ownerDocument.defaultView;
+    let win = browser.ownerDocument.defaultView;
     let tab = win ? win.gBrowser.getTabForBrowser(browser) : null;
 
     // Ensure we receive only specific messages from <xul:browser>s that

@@ -18790,6 +18790,10 @@
         "url": "/vibration/silent-ignore.html"
       },
       {
+        "path": "web-animations/animatable/animate.html",
+        "url": "/web-animations/animatable/animate.html"
+      },
+      {
         "path": "web-animations/animation-node/animation-node-after.html",
         "url": "/web-animations/animation-node/animation-node-after.html"
       },
@@ -21468,6 +21472,18 @@
       {
         "path": "web-animations/keyframe-effect/constructor.html",
         "url": "/web-animations/keyframe-effect/constructor.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/effect-easing.html",
+        "url": "/web-animations/keyframe-effect/effect-easing.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming.html"
+      },
+      {
+        "path": "web-animations/animation/constructor.html",
+        "url": "/web-animations/animation/constructor.html"
       },
       {
         "path": "webdriver/user_input/clear_test.py"

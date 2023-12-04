@@ -28,7 +28,7 @@ class SpeechSynthesisUtterance final : public DOMEventTargetHelper
   friend class nsSynthVoiceRegistry;
 
 public:
-  SpeechSynthesisUtterance(nsPIDOMWindow* aOwnerWindow, const nsAString& aText);
+  SpeechSynthesisUtterance(nsPIDOMWindowInner* aOwnerWindow, const nsAString& aText);
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(SpeechSynthesisUtterance,
@@ -37,7 +37,7 @@ public:
 
   nsISupports* GetParentObject() const;
 
-  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   static
   already_AddRefed<SpeechSynthesisUtterance> Constructor(GlobalObject& aGlobal,

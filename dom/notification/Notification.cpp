@@ -158,7 +158,7 @@ public:
     MOZ_ASSERT(ok);
 
     ErrorResult result;
-    nsAutoTArray<RefPtr<Notification>, 5> notifications;
+    AutoTArray<RefPtr<Notification>, 5> notifications;
 
     for (uint32_t i = 0; i < mStrings.Length(); ++i) {
       RefPtr<Notification> n =
@@ -245,7 +245,7 @@ public:
                                            nsIContentPermissionRequest)
 
   NotificationPermissionRequest(nsIPrincipal* aPrincipal,
-                                nsPIDOMWindow* aWindow, Promise* aPromise,
+                                nsPIDOMWindowInner* aWindow, Promise* aPromise,
                                 NotificationPermissionCallback* aCallback)
     : mPrincipal(aPrincipal), mWindow(aWindow),
       mPermission(NotificationPermission::Default),
@@ -262,7 +262,7 @@ protected:
   nsresult ResolvePromise();
   nsresult DispatchResolvePromise();
   nsCOMPtr<nsIPrincipal> mPrincipal;
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
   NotificationPermission mPermission;
   RefPtr<Promise> mPromise;
   RefPtr<NotificationPermissionCallback> mCallback;
@@ -317,9 +317,9 @@ public:
 
 class FocusWindowRunnable final : public nsRunnable
 {
-  nsMainThreadPtrHandle<nsPIDOMWindow> mWindow;
+  nsMainThreadPtrHandle<nsPIDOMWindowInner> mWindow;
 public:
-  explicit FocusWindowRunnable(const nsMainThreadPtrHandle<nsPIDOMWindow>& aWindow)
+  explicit FocusWindowRunnable(const nsMainThreadPtrHandle<nsPIDOMWindowInner>& aWindow)
     : mWindow(aWindow)
   { }
 
@@ -605,7 +605,7 @@ NotificationPermissionRequest::GetPrincipal(nsIPrincipal** aRequestingPrincipal)
 }
 
 NS_IMETHODIMP
-NotificationPermissionRequest::GetWindow(nsIDOMWindow** aRequestingWindow)
+NotificationPermissionRequest::GetWindow(mozIDOMWindow** aRequestingWindow)
 {
   NS_ADDREF(*aRequestingWindow = mWindow);
   return NS_OK;
@@ -1226,7 +1226,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(Notification, DOMEventTargetHe
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(Notification, DOMEventTargetHelper)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_JSVAL_MEMBER_CALLBACK(mData);
+  NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mData)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_ADDREF_INHERITED(Notification, DOMEventTargetHelper)
@@ -1362,10 +1362,10 @@ class NotificationClickWorkerRunnable final : public NotificationWorkerRunnable
   Notification* mNotification;
   // Optional window that gets focused if click event is not
   // preventDefault()ed.
-  nsMainThreadPtrHandle<nsPIDOMWindow> mWindow;
+  nsMainThreadPtrHandle<nsPIDOMWindowInner> mWindow;
 public:
   NotificationClickWorkerRunnable(Notification* aNotification,
-                                  const nsMainThreadPtrHandle<nsPIDOMWindow>& aWindow)
+                                  const nsMainThreadPtrHandle<nsPIDOMWindowInner>& aWindow)
     : NotificationWorkerRunnable(aNotification->mWorkerPrivate)
     , mNotification(aNotification)
     , mWindow(aWindow)
@@ -1472,7 +1472,7 @@ MainThreadNotificationObserver::Observe(nsISupports* aSubject, const char* aTopi
   Notification* notification = mNotificationRef->GetNotification();
   MOZ_ASSERT(notification);
   if (!strcmp("alertclickcallback", aTopic)) {
-    nsCOMPtr<nsPIDOMWindow> window = notification->GetOwner();
+    nsCOMPtr<nsPIDOMWindowInner> window = notification->GetOwner();
     if (NS_WARN_IF(!window || !window->IsCurrentInnerWindow())) {
       // Window has been closed, this observer is not valid anymore
       return NS_ERROR_FAILURE;
@@ -1494,7 +1494,7 @@ MainThreadNotificationObserver::Observe(nsISupports* aSubject, const char* aTopi
     // triggers the observer which might be alive even though the owner window
     // was closed. Keeping this until we remove the close event (Bug 1139363)
     // from implementation.
-    nsCOMPtr<nsPIDOMWindow> window = notification->GetOwner();
+    nsCOMPtr<nsPIDOMWindowInner> window = notification->GetOwner();
     if (NS_WARN_IF(!window || !window->IsCurrentInnerWindow())) {
       return NS_ERROR_FAILURE;
     }
@@ -1526,7 +1526,7 @@ WorkerNotificationObserver::Observe(nsISupports* aSubject, const char* aTopic,
 
   RefPtr<WorkerRunnable> r;
   if (!strcmp("alertclickcallback", aTopic)) {
-    nsPIDOMWindow* window = nullptr;
+    nsPIDOMWindowInner* window = nullptr;
     if (!notification->mWorkerPrivate->IsServiceWorker()) {
       WorkerPrivate* top = notification->mWorkerPrivate;
       while (top->GetParent()) {
@@ -1542,8 +1542,8 @@ WorkerNotificationObserver::Observe(nsISupports* aSubject, const char* aTopic,
 
     // Instead of bothering with adding features and other worker lifecycle
     // management, we simply hold strongrefs to the window and document.
-    nsMainThreadPtrHandle<nsPIDOMWindow> windowHandle(
-      new nsMainThreadPtrHolder<nsPIDOMWindow>(window));
+    nsMainThreadPtrHandle<nsPIDOMWindowInner> windowHandle(
+      new nsMainThreadPtrHolder<nsPIDOMWindowInner>(window));
 
     r = new NotificationClickWorkerRunnable(notification, windowHandle);
   } else if (!strcmp("alertfinished", aTopic)) {
@@ -1777,7 +1777,7 @@ Notification::ShowInternal()
     if (mWorkerPrivate) {
       appId = mWorkerPrivate->GetPrincipal()->GetAppId();
     } else {
-      nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+      nsCOMPtr<nsPIDOMWindowInner> window = GetOwner();
       appId = (window.get())->GetDoc()->NodePrincipal()->GetAppId();
     }
 
@@ -1852,7 +1852,7 @@ Notification::RequestPermission(const GlobalObject& aGlobal,
                                 ErrorResult& aRv)
 {
   // Get principal from global to make permission request for notifications.
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aGlobal.GetAsSupports());
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aGlobal.GetAsSupports());
   nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(aGlobal.GetAsSupports());
   if (!sop) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
@@ -2025,7 +2025,7 @@ Notification::ResolveIconAndSoundURL(nsString& iconUrl, nsString& soundUrl)
 }
 
 already_AddRefed<Promise>
-Notification::Get(nsPIDOMWindow* aWindow,
+Notification::Get(nsPIDOMWindowInner* aWindow,
                   const GetNotificationOptions& aFilter,
                   const nsAString& aScope,
                   ErrorResult& aRv)
@@ -2073,7 +2073,7 @@ Notification::Get(const GlobalObject& aGlobal,
   nsCOMPtr<nsIGlobalObject> global =
     do_QueryInterface(aGlobal.GetAsSupports());
   MOZ_ASSERT(global);
-  nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(global);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
 
   return Get(window, aFilter, EmptyString(), aRv);
 }
@@ -2098,7 +2098,7 @@ public:
     RefPtr<Promise> workerPromise = mPromiseProxy->WorkerPromise();
 
     ErrorResult result;
-    nsAutoTArray<RefPtr<Notification>, 5> notifications;
+    AutoTArray<RefPtr<Notification>, 5> notifications;
     for (uint32_t i = 0; i < mStrings.Length(); ++i) {
       RefPtr<Notification> n =
         Notification::ConstructFromFields(aWorkerPrivate->GlobalScope(),
@@ -2765,7 +2765,7 @@ Notification::Observe(nsISupports* aSubject, const char* aTopic,
   if (!strcmp(aTopic, DOM_WINDOW_DESTROYED_TOPIC) ||
       !strcmp(aTopic, DOM_WINDOW_FROZEN_TOPIC)) {
 
-    nsCOMPtr<nsPIDOMWindow> window = GetOwner();
+    nsCOMPtr<nsPIDOMWindowInner> window = GetOwner();
     if (SameCOMIdentity(aSubject, window)) {
       nsCOMPtr<nsIObserverService> obs =
         mozilla::services::GetObserverService();

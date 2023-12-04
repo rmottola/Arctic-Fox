@@ -563,9 +563,9 @@ txXPathNodeUtils::getXSLTId(const txXPathNode& aNode,
 
 /* static */
 void
-txXPathNodeUtils::getBaseURI(const txXPathNode& aNode, nsAString& aURI)
+txXPathNodeUtils::getBaseURI(const txXPathNode& aNode, nsIURI** aUri)
 {
-    aNode.mNode->GetBaseURI(aURI);
+    *aUri = aNode.mNode->GetBaseURI().take();
 }
 
 /* static */
@@ -604,7 +604,7 @@ txXPathNodeUtils::comparePosition(const txXPathNode& aNode,
     // same tree.
 
     // Get parents up the tree.
-    nsAutoTArray<nsINode*, 8> parents, otherParents;
+    AutoTArray<nsINode*, 8> parents, otherParents;
     nsINode* node = aNode.mNode;
     nsINode* otherNode = aOtherNode.mNode;
     nsINode* parent;

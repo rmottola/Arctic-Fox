@@ -26,7 +26,7 @@ HOMEBREW_AUTOCONF213 = 'https://raw.github.com/Homebrew/homebrew-versions/master
 MACPORTS_URL = {'9': 'https://distfiles.macports.org/MacPorts/MacPorts-2.2.1-10.9-Mavericks.pkg',
                 '8': 'https://distfiles.macports.org/MacPorts/MacPorts-2.1.3-10.8-MountainLion.pkg',
                 '7': 'https://distfiles.macports.org/MacPorts/MacPorts-2.1.3-10.7-Lion.pkg',
-                '6': 'https://distfiles.macports.org/MacPorts/MacPorts-2.1.3-10.6-SnowLeopard.pkg',}
+                '6': 'https://distfiles.macports.org/MacPorts/MacPorts-2.1.3-10.6-SnowLeopard.pkg', }
 
 MACPORTS_CLANG_PACKAGE = 'clang-3.3'
 
@@ -166,9 +166,10 @@ license for you by downloading the JDK. If this is unacceptable you should
 uninstall.
 '''
 
+
 class OSXBootstrapper(BaseBootstrapper):
-    def __init__(self, version):
-        BaseBootstrapper.__init__(self)
+    def __init__(self, version, **kwargs):
+        BaseBootstrapper.__init__(self, **kwargs)
 
         self.os_version = StrictVersion(version)
 
@@ -210,38 +211,38 @@ class OSXBootstrapper(BaseBootstrapper):
             select = self.which('xcode-select')
             try:
                 output = self.check_output([select, '--print-path'],
-                    stderr=subprocess.STDOUT)
+                                           stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
                 # This seems to appear on fresh OS X machines before any Xcode
                 # has been installed. It may only occur on OS X 10.9 and later.
-                if 'unable to get active developer directory' in e.output:
+                if b'unable to get active developer directory' in e.output:
                     print(XCODE_NO_DEVELOPER_DIRECTORY)
                     self._install_xcode_app_store()
-                    assert False # Above should exit.
+                    assert False  # Above should exit.
 
                 output = e.output
 
             # This isn't the most robust check in the world. It relies on the
             # default value not being in an application bundle, which seems to
             # hold on at least Mavericks.
-            if '.app/' not in output:
+            if b'.app/' not in output:
                 print(XCODE_REQUIRED)
                 self._install_xcode_app_store()
-                assert False # Above should exit.
+                assert False  # Above should exit.
 
         # Once Xcode is installed, you need to agree to the license before you can
         # use it.
         try:
             output = self.check_output(['/usr/bin/xcrun', 'clang'],
-                stderr=subprocess.STDOUT)
+                                       stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            if 'license' in e.output:
+            if b'license' in e.output:
                 xcodebuild = self.which('xcodebuild')
                 try:
                     subprocess.check_call([xcodebuild, '-license'],
-                        stderr=subprocess.STDOUT)
+                                          stderr=subprocess.STDOUT)
                 except subprocess.CalledProcessError as e:
-                    if 'requires admin privileges' in e.output:
+                    if b'requires admin privileges' in e.output:
                         self.run_as_root([xcodebuild, '-license'])
 
         # Even then we're not done! We need to install the Xcode command line tools.
@@ -305,6 +306,7 @@ class OSXBootstrapper(BaseBootstrapper):
             ('mercurial', 'mercurial'),
             ('git', 'git'),
             ('autoconf213', HOMEBREW_AUTOCONF213),
+            ('gnu-tar', 'gnu-tar'),
         ]
         self._ensure_homebrew_packages(packages)
 
@@ -315,27 +317,24 @@ class OSXBootstrapper(BaseBootstrapper):
         self._ensure_homebrew_packages(packages)
 
         installed = self.check_output([self.brew, 'list']).split()
-        if self.os_version < StrictVersion('10.7') and 'llvm' not in installed:
+        if self.os_version < StrictVersion('10.7') and b'llvm' not in installed:
             print(PACKAGE_MANAGER_OLD_CLANG % ('Homebrew',))
 
             subprocess.check_call([self.brew, '-v', 'install', 'llvm',
-                '--with-clang', '--all-targets'])
+                                   '--with-clang', '--all-targets'])
 
     def ensure_homebrew_mobile_android_packages(self):
+        # Multi-part process:
+        # 1. System packages.
+        # 2. Android SDK and NDK.
+        # 3. Android packages.
+
         import android
 
-        # If we're run from a downloaded bootstrap.py, then android-ndk.rb is
-        # fetched into a temporary directory.  This finds that directory.
-        import inspect
-        path_to_android = os.path.abspath(os.path.dirname(inspect.getfile(android)))
-
-        # We don't need wget because we install the Android SDK and NDK from
-        # packages.  If we used the android.py module, we'd need wget.
+        # 1. System packages.
         packages = [
-            ('android-sdk', 'android-sdk'),
-            ('android-ndk', os.path.join(path_to_android, 'android-ndk.rb')), # This is a locally provided brew formula!
-            ('ant', 'ant'),
-            ('brew-cask', 'caskroom/cask/brew-cask'), # For installing Java later.
+            ('brew-cask', 'caskroom/cask/brew-cask'),  # For installing Java later.
+            ('wget', 'wget'),
         ]
         self._ensure_homebrew_packages(packages)
 
@@ -344,18 +343,34 @@ class OSXBootstrapper(BaseBootstrapper):
         ]
         installed = self._ensure_homebrew_casks(casks)
         if installed:
-            print(JAVA_LICENSE_NOTICE) # We accepted a license agreement for the user.
+            print(JAVA_LICENSE_NOTICE)  # We accepted a license agreement for the user.
 
-        # We could probably fish this path from |brew info android-sdk|.
-        android_tool = '/usr/local/opt/android-sdk/tools/android'
-        android.ensure_android_packages(android_tool)
+        # 2. The user may have an external Android SDK (in which case we save
+        # them a lengthy download), or they may have already completed the
+        # download. We unpack to ~/.mozbuild/{android-sdk-linux, android-ndk-r10e}.
+        mozbuild_path = os.environ.get('MOZBUILD_STATE_PATH', os.path.expanduser(os.path.join('~', '.mozbuild')))
+        self.sdk_path = os.environ.get('ANDROID_SDK_HOME', os.path.join(mozbuild_path, 'android-sdk-macosx'))
+        self.ndk_path = os.environ.get('ANDROID_NDK_HOME', os.path.join(mozbuild_path, 'android-ndk-r10e'))
+        self.sdk_url = 'https://dl.google.com/android/android-sdk_r24.0.1-macosx.zip'
+        is_64bits = sys.maxsize > 2**32
+        if is_64bits:
+            self.ndk_url = android.android_ndk_url('darwin')
+        else:
+            raise Exception('You need a 64-bit version of Mac OS X to build Firefox for Android.')
+
+        android.ensure_android_sdk_and_ndk(path=mozbuild_path,
+                                           sdk_path=self.sdk_path, sdk_url=self.sdk_url,
+                                           ndk_path=self.ndk_path, ndk_url=self.ndk_url)
+
+        # 3. We expect the |android| tool to at
+        # ~/.mozbuild/android-sdk-macosx/tools/android.
+        android_tool = os.path.join(self.sdk_path, 'tools', 'android')
+        android.ensure_android_packages(android_tool=android_tool)
 
     def suggest_homebrew_mobile_android_mozconfig(self):
         import android
-        # We could probably fish this path from |brew info android-sdk|.
-        sdk_path = '/usr/local/opt/android-sdk/platforms/%s' % android.ANDROID_PLATFORM
-        ndk_path = '/usr/local/opt/android-ndk'
-        android.suggest_mozconfig(sdk_path=sdk_path, ndk_path=ndk_path)
+        android.suggest_mozconfig(sdk_path=self.sdk_path,
+                                  ndk_path=self.ndk_path)
 
     def _ensure_macports_packages(self, packages):
         self.port = self.which('port')
@@ -371,7 +386,8 @@ class OSXBootstrapper(BaseBootstrapper):
     def ensure_macports_system_packages(self):
         packages = ['python27',
                     'mercurial',
-                    'autoconf213']
+                    'autoconf213',
+                    'gnutar']
 
         self._ensure_macports_packages(packages)
         self.run_as_root([self.port, 'select', '--set', 'python', 'python27'])
@@ -461,7 +477,7 @@ class OSXBootstrapper(BaseBootstrapper):
         url = MACPORTS_URL.get(self.minor_version, None)
         if not url:
             raise Exception('We do not have a MacPorts install URL for your '
-                'OS X version. You will need to install MacPorts manually.')
+                            'OS X version. You will need to install MacPorts manually.')
 
         print(PACKAGE_MANAGER_INSTALL % ('MacPorts', 'MacPorts', 'MacPorts', 'port'))
         pkg = urlopen(url=url, timeout=300).read()
@@ -484,9 +500,9 @@ class OSXBootstrapper(BaseBootstrapper):
         if self.package_manager == 'homebrew':
             try:
                 subprocess.check_output([self.brew, '-v', 'upgrade', package],
-                    stderr=subprocess.STDOUT)
+                                        stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
-                if 'already installed' not in e.output:
+                if b'already installed' not in e.output:
                     raise
         else:
             assert self.package_manager == 'macports'
@@ -501,4 +517,3 @@ class OSXBootstrapper(BaseBootstrapper):
             self._upgrade_package('python')
         else:
             self._upgrade_package('python27')
-

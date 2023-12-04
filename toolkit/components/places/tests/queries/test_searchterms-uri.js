@@ -13,16 +13,6 @@
      uri: "http://foo.com/", annoName: "moz/test", annoVal: "val",
      lastVisit: lastweek, title: "you know, moz is cool"},
 
-    // Test subdomain included with isRedirect=true, different transtype
-    {isInQuery: true, isVisit: true, isDetails: true, title: "amozzie",
-     isRedirect: true, uri: "http://foo.com/redirect", lastVisit: old,
-     referrer: "http://myreferrer.com", transType: PlacesUtils.history.TRANSITION_LINK},
-
-    // Test www. style URI is included, with a tag
-    {isInQuery: true, isVisit: true, isDetails: true, isTag: true,
-     uri: "http://foo.com/yiihah", tagArray: ["moz"], lastVisit: yesterday,
-     title: "foo"},
-
     // Test https protocol
     {isInQuery: false, isVisit: true, isDetails: true, title: "moz",
      uri: "https://foo.com/", lastVisit: today},
@@ -62,61 +52,36 @@ add_task(function* test_searchterms_uri()
    var query = PlacesUtils.history.getNewQuery();
    query.searchTerms = "moz";
    query.uri = uri("http://foo.com");
-   query.uriIsPrefix = true;
 
    // Options
    var options = PlacesUtils.history.getNewQueryOptions();
    options.sortingMode = options.SORT_BY_DATE_ASCENDING;
    options.resultType = options.RESULTS_AS_URI;
-   
+
    // Results
    var result = PlacesUtils.history.executeQuery(query, options);
    var root = result.root;
    root.containerOpen = true;
 
-   LOG("Number of items in result set: " + root.childCount);
+   do_print("Number of items in result set: " + root.childCount);
    for(var i=0; i < root.childCount; ++i) {
-     LOG("result: " + root.getChild(i).uri + " Title: " + root.getChild(i).title);
+     do_print("result: " + root.getChild(i).uri + " Title: " + root.getChild(i).title);
    }
 
    // Check our inital result set
    compareArrayToResult(testData, root);
 
-   // If that passes, check liveupdate
-   // Add to the query set
-   LOG("Adding item to query")
-   var change1 = [{isVisit: true, isDetails: true, uri: "http://foo.com/added.htm",
-                   title: "moz", transType: PlacesUtils.history.TRANSITION_LINK}];
+   // live update.
+   do_print("change title");
+   var change1 = [{isDetails: true, uri:"http://foo.com/",
+                   title: "mo"},];
    yield task_populateDB(change1);
-   do_check_true(isInResult(change1, root));
 
-   // Update an existing URI
-   LOG("Updating Item");
-   var change2 = [{isDetails: true, uri: "http://foo.com/changeme1.htm",
-                   title: "moz" }];
+   do_check_false(isInResult({uri: "http://foo.com/"}, root));
+   var change2 = [{isDetails: true, uri:"http://foo.com/",
+                   title: "moz"},];
    yield task_populateDB(change2);
-   do_check_true(isInResult(change2, root));
-
-   // Add one and take one out of query set, and simply change one so that it
-   // still applies to the query.
-   LOG("Updating More Items");
-   var change3 = [{isDetails: true, uri:"http://foo.com/changeme2.htm",
-                   title: "moz"},
-                  {isDetails: true, uri: "http://foo.com/yiihah",
-                   title: "moz now updated"},
-                  {isDetails: true, uri: "http://foo.com/redirect",
-                   title: "gone"}];
-   yield task_populateDB(change3);
-   do_check_true(isInResult({uri: "http://foo.com/changeme2.htm"}, root));
-   do_check_true(isInResult({uri: "http://foo.com/yiihah"}, root));
-   do_check_false(isInResult({uri: "http://foo.com/redirect"}, root));
-
-   // And now, delete one
-   LOG("Deleting items");
-   var change4 = [{isDetails: true, uri: "http://foo.com/",
-                   title: "mo,z"}];
-   yield task_populateDB(change4);
-   do_check_false(isInResult(change4, root));
+   do_check_true(isInResult({uri: "http://foo.com/"}, root));
 
    root.containerOpen = false;
 });

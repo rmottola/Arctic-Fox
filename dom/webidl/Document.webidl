@@ -219,19 +219,24 @@ partial interface Document {
 
 };
 
-// http://dvcs.w3.org/hg/fullscreen/raw-file/tip/Overview.html#api
+// https://fullscreen.spec.whatwg.org/#api
 partial interface Document {
   // Note: Per spec the 'S' in these two is lowercase, but the "Moz"
   // versions hve it uppercase.
+  readonly attribute boolean fullscreenEnabled;
+  [BinaryName="fullscreenEnabled", Deprecated="PrefixedFullscreenAPI"]
   readonly attribute boolean mozFullScreenEnabled;
-  [Throws]
+  readonly attribute Element? fullscreenElement;
+  [BinaryName="fullscreenElement", Deprecated="PrefixedFullscreenAPI"]
   readonly attribute Element? mozFullScreenElement;
 
-  //(Renamed?)void exitFullscreen();
+  void exitFullscreen();
+  [BinaryName="exitFullscreen", Deprecated="PrefixedFullscreenAPI"]
+  void mozCancelFullScreen();
 
   // Gecko-specific fullscreen bits
+  [Deprecated="PrefixedFullscreenAPI"]
   readonly attribute boolean mozFullScreen;
-  void mozCancelFullScreen();
 };
 
 // http://dvcs.w3.org/hg/pointerlock/raw-file/default/index.html#extensions-to-the-document-interface
@@ -254,17 +259,12 @@ partial interface Document {
     Element createElementNS(DOMString? namespace, DOMString qualifiedName, DOMString typeExtension);
 };
 
-// https://w3c.github.io/page-visibility/#extensions-to-the-document-interface
+// http://dvcs.w3.org/hg/webperf/raw-file/tip/specs/PageVisibility/Overview.html#sec-document-interface
 partial interface Document {
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute boolean hidden;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute boolean mozHidden;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute VisibilityState visibilityState;
-  [Pref="dom.visibilityAPI.enabled"]
   readonly attribute VisibilityState mozVisibilityState;
-  [Pref="dom.visibilityAPI.enabled"]
            attribute EventHandler onvisibilitychange;
 };
 
@@ -283,7 +283,7 @@ partial interface Document {
 // http://dev.w3.org/csswg/cssom-view/#extensions-to-the-document-interface
 partial interface Document {
     Element? elementFromPoint (float x, float y);
-
+    sequence<Element> elementsFromPoint (float x, float y);
     CaretPosition? caretPositionFromPoint (float x, float y);
 
     readonly attribute Element? scrollingElement;
@@ -310,6 +310,8 @@ partial interface Document {
 partial interface Document {
   [Func="nsDocument::IsWebAnimationsEnabled"]
   readonly attribute DocumentTimeline timeline;
+  [Func="nsDocument::IsWebAnimationsEnabled"]
+  sequence<Animation> getAnimations();
 };
 
 //  Mozilla extensions of various sorts
@@ -370,6 +372,10 @@ partial interface Document {
   [ChromeOnly] readonly attribute DOMString contentLanguage;
 
   [ChromeOnly] readonly attribute nsILoadGroup? documentLoadGroup;
+
+  // like documentURI, except that for error pages, it returns the URI we were
+  // trying to load when we hit an error, rather than the error page's own URI.
+  [ChromeOnly] readonly attribute URI? mozDocumentURIIfNotForErrorPages;
 };
 
 // Extension to give chrome JS the ability to determine when a document was
@@ -400,12 +406,6 @@ partial interface Document {
    */
   [ChromeOnly, Throws]
   void removeAnonymousContent(AnonymousContent aContent);
-};
-
-// http://w3c.github.io/selection-api/#extensions-to-document-interface
-partial interface Document {
-  [Throws]
-  Selection? getSelection();
 };
 
 // Extension to give chrome JS the ability to determine whether

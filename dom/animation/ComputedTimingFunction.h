@@ -41,6 +41,14 @@ public:
   int32_t Compare(const ComputedTimingFunction& aRhs) const;
   void AppendToString(nsAString& aResult) const;
 
+  static double GetPortion(const Maybe<ComputedTimingFunction>& aFunction,
+                           double aPortion)
+  {
+    return aFunction.isSome() ? aFunction->GetValue(aPortion) : aPortion;
+  }
+  static int32_t Compare(const Maybe<ComputedTimingFunction>& aLhs,
+                         const Maybe<ComputedTimingFunction>& aRhs);
+
 private:
   nsTimingFunction::Type mType;
   nsSMILKeySpline mTimingFunction;
@@ -50,4 +58,4 @@ private:
 
 } // namespace mozilla
 
-#endif // mozilla_dom_AnimationEffectReadOnly_h
+#endif // mozilla_ComputedTimingFunction_h

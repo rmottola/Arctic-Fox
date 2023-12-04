@@ -22,6 +22,7 @@
 #include "FakePCObserver.h"
 #include "FakeMediaStreams.h"
 #include "FakeMediaStreamsImpl.h"
+#include "FakeLogging.h"
 #include "PeerConnectionImpl.h"
 #include "PeerConnectionCtx.h"
 #include "PeerConnectionMedia.h"
@@ -43,6 +44,9 @@
 #ifdef SIGNALING_UNITTEST_STANDALONE
 #include "PeerConnectionImplEnumsBinding.cpp"
 #endif
+
+#include "FakeIPC.h"
+#include "FakeIPC.cpp"
 
 #include "ice_ctx.h"
 #include "ice_peer_ctx.h"

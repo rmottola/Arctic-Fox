@@ -53,6 +53,7 @@ mozTXTToHTMLConv::EscapeChar(const char16_t ch, nsString& aStringToAppendTo,
         break;
       }
       // else fall through
+      MOZ_FALLTHROUGH;
     default:
       aStringToAppendTo += ch;
     }
@@ -100,6 +101,7 @@ mozTXTToHTMLConv::EscapeStr(nsString& aInString, bool inAttribute)
         break;
       }
       // else fall through
+      MOZ_FALLTHROUGH;
     default:
       i++;
     }
@@ -511,7 +513,7 @@ mozTXTToHTMLConv::FindURL(const char16_t * aInString, int32_t aInLength, const u
   {
   case '@':
     state[RFC2396E] = unchecked;
-    // no break here
+    MOZ_FALLTHROUGH;
   case '.':
     state[abbreviated] = unchecked;
     break;

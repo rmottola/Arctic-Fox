@@ -215,7 +215,7 @@ nsXULElement::MaybeUpdatePrivateLifetime()
         return;
     }
 
-    nsPIDOMWindow* win = OwnerDoc()->GetWindow();
+    nsPIDOMWindowOuter* win = OwnerDoc()->GetWindow();
     nsCOMPtr<nsIDocShell> docShell = win ? win->GetDocShell() : nullptr;
     if (docShell) {
         docShell->SetAffectPrivateSessionLifetime(false);
@@ -500,7 +500,7 @@ nsXULElement::GetEventListenerManagerForAttr(nsIAtom* aAttrName, bool* aDefer)
     // listeners there?
     nsIDocument* doc = OwnerDoc();
 
-    nsPIDOMWindow *window;
+    nsPIDOMWindowInner *window;
     Element *root = doc->GetRootElement();
     if ((!root || root == this) && !mNodeInfo->Equals(nsGkAtoms::overlay) &&
         (window = doc->GetInnerWindow())) {
@@ -678,7 +678,7 @@ nsXULElement::PerformAccesskey(bool aKeyCausesActivation,
               fm->SetFocus(elementToFocus, nsIFocusManager::FLAG_BYKEY);
 
               // Return true if the element became focused.
-              nsPIDOMWindow* window = OwnerDoc()->GetWindow();
+              nsPIDOMWindowOuter* window = OwnerDoc()->GetWindow();
               focused = (window && window->GetFocusedNode());
             }
           }
@@ -1725,7 +1725,7 @@ nsXULElement::Blur(ErrorResult& rv)
     if (!doc)
       return;
 
-    nsIDOMWindow* win = doc->GetWindow();
+    nsPIDOMWindowOuter* win = doc->GetWindow();
     nsIFocusManager* fm = nsFocusManager::GetFocusManager();
     if (win && fm) {
       rv = fm->ClearFocus(win);

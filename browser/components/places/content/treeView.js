@@ -230,7 +230,7 @@ PlacesTreeView.prototype = {
     if (aRow < 0) {
       return null;
     }
-  
+
     let node = this._rows[aRow];
     if (node !== undefined)
       return node;
@@ -524,13 +524,10 @@ PlacesTreeView.prototype = {
   COLUMN_TYPE_URI: 2,
   COLUMN_TYPE_DATE: 3,
   COLUMN_TYPE_VISITCOUNT: 4,
-  COLUMN_TYPE_KEYWORD: 5,
-  COLUMN_TYPE_DESCRIPTION: 6,
-  COLUMN_TYPE_DATEADDED: 7,
-  COLUMN_TYPE_LASTMODIFIED: 8,
-  COLUMN_TYPE_TAGS: 9,
-  COLUMN_TYPE_PARENTFOLDER: 10,
-  COLUMN_TYPE_PARENTFOLDERPATH: 11,
+  COLUMN_TYPE_DESCRIPTION: 5,
+  COLUMN_TYPE_DATEADDED: 6,
+  COLUMN_TYPE_LASTMODIFIED: 7,
+  COLUMN_TYPE_TAGS: 8,
 
   _getColumnType: function PTV__getColumnType(aColumn) {
     let columnType = aColumn.element.getAttribute("anonid") || aColumn.id;
@@ -544,8 +541,6 @@ PlacesTreeView.prototype = {
         return this.COLUMN_TYPE_DATE;
       case "visitCount":
         return this.COLUMN_TYPE_VISITCOUNT;
-      case "keyword":
-        return this.COLUMN_TYPE_KEYWORD;
       case "description":
         return this.COLUMN_TYPE_DESCRIPTION;
       case "dateAdded":
@@ -554,10 +549,6 @@ PlacesTreeView.prototype = {
         return this.COLUMN_TYPE_LASTMODIFIED;
       case "tags":
         return this.COLUMN_TYPE_TAGS;
-      case "parentFolder":
-        return this.COLUMN_TYPE_PARENTFOLDER;
-      case "parentFolderPath":
-        return this.COLUMN_TYPE_PARENTFOLDERPATH;
     }
     return this.COLUMN_TYPE_UNKNOWN;
   },
@@ -580,10 +571,6 @@ PlacesTreeView.prototype = {
         return [this.COLUMN_TYPE_VISITCOUNT, false];
       case Ci.nsINavHistoryQueryOptions.SORT_BY_VISITCOUNT_DESCENDING:
         return [this.COLUMN_TYPE_VISITCOUNT, true];
-      case Ci.nsINavHistoryQueryOptions.SORT_BY_KEYWORD_ASCENDING:
-        return [this.COLUMN_TYPE_KEYWORD, false];
-      case Ci.nsINavHistoryQueryOptions.SORT_BY_KEYWORD_DESCENDING:
-        return [this.COLUMN_TYPE_KEYWORD, true];
       case Ci.nsINavHistoryQueryOptions.SORT_BY_ANNOTATION_ASCENDING:
         if (this._result.sortingAnnotation == PlacesUIUtils.DESCRIPTION_ANNO)
           return [this.COLUMN_TYPE_DESCRIPTION, false];
@@ -861,9 +848,7 @@ PlacesTreeView.prototype = {
     this._invalidateCellValue(aNode, this.COLUMN_TYPE_TAGS);
   },
 
-  nodeKeywordChanged: function PTV_nodeKeywordChanged(aNode, aNewKeyword) {
-    this._invalidateCellValue(aNode, this.COLUMN_TYPE_KEYWORD);
-  },
+  nodeKeywordChanged(aNode, aNewKeyword) {},
 
   nodeAnnotationChanged: function PTV_nodeAnnotationChanged(aNode, aAnno) {
     if (aAnno == PlacesUIUtils.DESCRIPTION_ANNO) {
@@ -1206,7 +1191,7 @@ PlacesTreeView.prototype = {
             PlacesUtils.livemarks.getLivemark({ id: node.itemId })
               .then(aLivemark => {
                 this._controller.cacheLivemarkInfo(node, aLivemark);
-                let props = this._cellProperties.get(node); 
+                let props = this._cellProperties.get(node);
                 this._cellProperties.set(node, props += " livemark");
                 // The livemark attribute is set as a cell property on the title cell.
                 this._invalidateCellValue(node, this.COLUMN_TYPE_TITLE);
@@ -1482,10 +1467,6 @@ PlacesTreeView.prototype = {
         return this._convertPRTimeToString(nodeTime);
       case this.COLUMN_TYPE_VISITCOUNT:
         return node.accessCount;
-      case this.COLUMN_TYPE_KEYWORD:
-        if (PlacesUtils.nodeIsBookmark(node))
-          return PlacesUtils.bookmarks.getKeywordForBookmark(node.itemId);
-        return "";
       case this.COLUMN_TYPE_DESCRIPTION:
         if (node.itemId != -1) {
           try {
@@ -1503,47 +1484,6 @@ PlacesTreeView.prototype = {
         if (node.lastModified)
           return this._convertPRTimeToString(node.lastModified);
         return "";
-      case this.COLUMN_TYPE_PARENTFOLDER:
-        if (PlacesUtils.nodeIsQuery(node.parent) &&
-            PlacesUtils.asQuery(node.parent).queryOptions.queryType ==
-              Components.interfaces.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY && node.uri)
-          return "";
-        var bmsvc = Components.classes["@mozilla.org/browser/nav-bookmarks-service;1"].
-                               getService(Components.interfaces.nsINavBookmarksService);
-        var rowId = node.itemId;
-        try {
-          var parentFolderId = bmsvc.getFolderIdForItem(rowId);
-          var folderTitle = bmsvc.getItemTitle(parentFolderId);
-        } catch(ex) {
-          var folderTitle = "";
-        }
-        return folderTitle;
-      case this.COLUMN_TYPE_PARENTFOLDERPATH:
-        if (PlacesUtils.nodeIsQuery(node.parent) &&
-            PlacesUtils.asQuery(node.parent).queryOptions.queryType ==
-              Components.interfaces.nsINavHistoryQueryOptions.QUERY_TYPE_HISTORY && node.uri)
-          return "";
-        var bmsvc = Components.classes["@mozilla.org/browser/nav-bookmarks-service;1"].
-                               getService(Components.interfaces.nsINavBookmarksService);
-        var rowId = node.itemId;
-        try {
-          var FolderId;
-          var parentFolderId = bmsvc.getFolderIdForItem(rowId);
-          var folderTitle = bmsvc.getItemTitle(parentFolderId);
-          while ((FolderId = bmsvc.getFolderIdForItem(parentFolderId))) {
-            if (FolderId == parentFolderId)
-              break;
-            parentFolderId = FolderId;
-            var text = bmsvc.getItemTitle(parentFolderId);
-            if (!text)
-              break;
-            folderTitle = text + " /"+ folderTitle;
-          }
-          folderTitle = folderTitle.replace(/^\s/,"");
-        } catch(ex) {
-          var folderTitle = "";
-        }
-        return folderTitle;
     }
     return "";
   },
@@ -1662,15 +1602,6 @@ PlacesTreeView.prototype = {
           newSort = NHQO.SORT_BY_VISITCOUNT_DESCENDING;
 
         break;
-      case this.COLUMN_TYPE_KEYWORD:
-        if (oldSort == NHQO.SORT_BY_KEYWORD_ASCENDING)
-          newSort = NHQO.SORT_BY_KEYWORD_DESCENDING;
-        else if (allowTriState && oldSort == NHQO.SORT_BY_KEYWORD_DESCENDING)
-          newSort = NHQO.SORT_BY_NONE;
-        else
-          newSort = NHQO.SORT_BY_KEYWORD_ASCENDING;
-
-        break;
       case this.COLUMN_TYPE_DESCRIPTION:
         if (oldSort == NHQO.SORT_BY_ANNOTATION_ASCENDING &&
             oldSortingAnnotation == PlacesUIUtils.DESCRIPTION_ANNO) {
@@ -1714,14 +1645,6 @@ PlacesTreeView.prototype = {
           newSort = NHQO.SORT_BY_NONE;
         else
           newSort = NHQO.SORT_BY_TAGS_ASCENDING;
-
-        break;
-      case this.COLUMN_TYPE_PARENTFOLDER:
-        return;
-
-        break;
-      case this.COLUMN_TYPE_PARENTFOLDERPATH:
-        return;
 
         break;
       default:

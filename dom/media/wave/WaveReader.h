@@ -27,7 +27,7 @@ public:
                         int64_t aTimeThreshold) override;
 
   nsresult ReadMetadata(MediaInfo* aInfo, MetadataTags** aTags) override;
-  RefPtr<SeekPromise> Seek(int64_t aTime, int64_t aEndTime) override;
+  RefPtr<SeekPromise> Seek(SeekTarget aTarget, int64_t aEndTime) override;
 
   media::TimeIntervals GetBuffered() override;
 
@@ -74,7 +74,8 @@ private:
   // support U8.
   enum {
     FORMAT_U8,
-    FORMAT_S16
+    FORMAT_S16,
+    FORMAT_S24
   } mSampleFormat;
 
   // Size of PCM data stored in the WAVE as reported by the data chunk in

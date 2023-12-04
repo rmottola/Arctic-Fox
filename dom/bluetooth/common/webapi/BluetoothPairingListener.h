@@ -22,16 +22,16 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
 
   static already_AddRefed<BluetoothPairingListener>
-    Create(nsPIDOMWindow* aWindow);
+    Create(nsPIDOMWindowInner* aWindow);
 
-  void DispatchPairingEvent(const nsAString& aName,
-                            const nsAString& aAddress,
+  void DispatchPairingEvent(const BluetoothRemoteName& aName,
+                            const BluetoothAddress& aAddress,
                             const nsAString& aPasskey,
                             const nsAString& aType);
 
   void Notify(const BluetoothSignal& aParam); // BluetoothSignalObserver
 
-  nsPIDOMWindow* GetParentObject() const
+  nsPIDOMWindowInner* GetParentObject() const
   {
     return GetOwner();
   }
@@ -47,7 +47,7 @@ public:
   IMPL_EVENT_HANDLER(pairingconsentreq);
 
 private:
-  BluetoothPairingListener(nsPIDOMWindow* aWindow);
+  BluetoothPairingListener(nsPIDOMWindowInner* aWindow);
   ~BluetoothPairingListener();
 
   /**

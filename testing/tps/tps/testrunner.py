@@ -72,6 +72,8 @@ class TPSTestRunner(object):
         'services.sync.firstSync': 'notReady',
         'services.sync.lastversion': '1.0',
         'toolkit.startup.max_resumed_crashes': -1,
+        # hrm - not sure what the release/beta channels will do?
+        'xpinstall.signatures.required': False,
     }
 
     debug_preferences = {
@@ -338,11 +340,11 @@ class TPSTestRunner(object):
         if self.mobile:
             self.preferences.update({'services.sync.client.type' : 'mobile'})
 
-        # Set a dummy username to force the correct authentication type. For the
-        # old sync, the username is not allowed to contain a '@'.
-        dummy = {'fx_account': 'dummy@somewhere', 'sync_account': 'dummy'}
-        auth_type = self.config.get('auth_type', 'fx_account')
-        self.preferences.update({'services.sync.username': dummy[auth_type]})
+        # If we are using legacy Sync, then set a dummy username to force the
+        # correct authentication type. Without this pref set to a value
+        # without an '@' character, Sync will initialize for FxA.
+        if self.config.get('auth_type', 'fx_account') != "fx_account":
+            self.preferences.update({'services.sync.username': "dummy"})
 
         if self.debug:
             self.preferences.update(self.debug_preferences)

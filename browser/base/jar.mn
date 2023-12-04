@@ -48,7 +48,7 @@ browser.jar:
         content/browser/aboutRobots-widget-left.png   (content/aboutRobots-widget-left.png)
         content/browser/autorecovery.js               (content/autorecovery.js)
         content/browser/autorecovery.xul              (content/autorecovery.xul)
-+	content/browser/aboutTabCrashed.css           (content/aboutTabCrashed.css)
+        content/browser/aboutTabCrashed.css           (content/aboutTabCrashed.css)
         content/browser/aboutTabCrashed.js            (content/aboutTabCrashed.js)
         content/browser/aboutTabCrashed.xhtml         (content/aboutTabCrashed.xhtml)
 *       content/browser/aboutTabGroupsMigration.xhtml (content/aboutTabGroupsMigration.xhtml)

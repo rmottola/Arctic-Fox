@@ -19,6 +19,7 @@
 #include "nsDataHashtable.h"
 #include "nsHashKeys.h"
 #include "nsTArray.h"
+#include "nsTHashtable.h"
 
 class nsCycleCollectionNoteRootCallback;
 class nsIException;
@@ -134,10 +135,12 @@ class CycleCollectedJSRuntime
   friend class JSZoneParticipant;
   friend class IncrementalFinalizeRunnable;
 protected:
-  CycleCollectedJSRuntime(JSRuntime* aParentRuntime,
-                          uint32_t aMaxBytes,
-                          uint32_t aMaxNurseryBytes);
+  CycleCollectedJSRuntime();
   virtual ~CycleCollectedJSRuntime();
+
+  nsresult Initialize(JSRuntime* aParentRuntime,
+                      uint32_t aMaxBytes,
+                      uint32_t aMaxNurseryBytes);
 
   size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
   void UnmarkSkippableJSHolders();
@@ -210,12 +213,17 @@ private:
   static void LargeAllocationFailureCallback(void* aData);
   static bool ContextCallback(JSContext* aCx, unsigned aOperation,
                               void* aData);
+  static bool EnqueuePromiseJobCallback(JSContext* aCx,
+                                        JS::HandleObject aJob,
+                                        void* aData);
 
   virtual void TraceNativeBlackRoots(JSTracer* aTracer) { };
   void TraceNativeGrayRoots(JSTracer* aTracer);
 
   void AfterProcessMicrotask(uint32_t aRecursionDepth);
+public:
   void ProcessStableStateQueue();
+private:
   void ProcessMetastableStateQueue(uint32_t aRecursionDepth);
 
 public:
@@ -288,7 +296,7 @@ public:
 
   void NurseryWrapperAdded(nsWrapperCache* aCache);
   void NurseryWrapperPreserved(JSObject* aWrapper);
-  void JSObjectsTenured(JSRuntime* aRuntime);
+  void JSObjectsTenured();
 
   void DeferredFinalize(DeferredFinalizeAppendFunction aAppendFunc,
                         DeferredFinalizeFunction aFunc,
@@ -326,6 +334,18 @@ public:
   // Get the current thread's CycleCollectedJSRuntime.  Returns null if there
   // isn't one.
   static CycleCollectedJSRuntime* Get();
+
+  // Add aZone to the set of zones waiting for a GC.
+  void AddZoneWaitingForGC(JS::Zone* aZone)
+  {
+    mZonesWaitingForGC.PutEntry(aZone);
+  }
+
+  // Prepare any zones for GC that have been passed to AddZoneWaitingForGC()
+  // since the last GC or since the last call to PrepareWaitingZonesForGC(),
+  // whichever was most recent. If there were no such zones, prepare for a
+  // full GC.
+  void PrepareWaitingZonesForGC();
 
   // Storage for watching rejected promises waiting for some client to
   // consume their rejection.
@@ -379,6 +399,8 @@ private:
   SegmentedVector<JS::PersistentRooted<JSObject*>, kSegmentSize,
                   InfallibleAllocPolicy>
     mPreservedNurseryObjects;
+
+  nsTHashtable<nsPtrHashKey<JS::Zone>> mZonesWaitingForGC;
 };
 
 void TraceScriptHolder(nsISupports* aHolder, JSTracer* aTracer);

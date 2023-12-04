@@ -626,7 +626,7 @@ TextureClient::TextureClientRecycleCallback(TextureClient* aClient, void* aClosu
 }
 
 void
-TextureClient::SetRecycleAllocator(TextureClientRecycleAllocator* aAllocator)
+TextureClient::SetRecycleAllocator(ITextureClientRecycleAllocator* aAllocator)
 {
   mRecycleAllocator = aAllocator;
   if (aAllocator) {
@@ -727,7 +727,6 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
   }
 
   if (!data && aFormat == SurfaceFormat::B8G8R8X8 &&
-      aAllocator->IsSameProcess() &&
       moz2DBackend == gfx::BackendType::CAIRO &&
       NS_IsMainThread()) {
     data = DIBTextureData::Create(aSize, aFormat, aAllocator);

@@ -1216,14 +1216,14 @@ WebSocketChannel::~WebSocketChannel()
   while ((mCurrentOut = (OutboundMessage *) mOutgoingMessages.PopFront()))
     delete mCurrentOut;
 
-  NS_ReleaseOnMainThread(mURI);
-  NS_ReleaseOnMainThread(mOriginalURI);
+  NS_ReleaseOnMainThread(mURI.forget());
+  NS_ReleaseOnMainThread(mOriginalURI.forget());
 
   mListenerMT = nullptr;
 
-  NS_ReleaseOnMainThread(mLoadGroup);
-  NS_ReleaseOnMainThread(mLoadInfo);
-  NS_ReleaseOnMainThread(static_cast<nsIWebSocketEventService*>(mService.forget().take()));
+  NS_ReleaseOnMainThread(mLoadGroup.forget());
+  NS_ReleaseOnMainThread(mLoadInfo.forget());
+  NS_ReleaseOnMainThread(mService.forget());
 }
 
 NS_IMETHODIMP
@@ -2110,6 +2110,7 @@ WebSocketChannel::PrimeNewOutgoingMessage()
       msgType = kMsgTypeBinaryString;
 
       // no break: fall down into binary string case
+      MOZ_FALLTHROUGH;
 
     case kMsgTypeBinaryString:
       mOutHeader[0] = kFinalFragBit | nsIWebSocketFrame::OPCODE_BINARY;

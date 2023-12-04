@@ -47,6 +47,7 @@ DIRS += [
     'protobuf',
     'reader',
     'reflect',
+    'securityreporter',
     'sqlite',
     'startup',
     'statusfilter',

@@ -90,8 +90,8 @@ nsXBLKeyEventHandler::ExecuteMatchedHandlers(
                         uint32_t aCharCode,
                         const IgnoreModifierState& aIgnoreModifierState)
 {
-  WidgetEvent* event = aKeyEvent->GetInternalNSEvent();
-  nsCOMPtr<EventTarget> target = aKeyEvent->InternalDOMEvent()->GetCurrentTarget();
+  WidgetEvent* event = aKeyEvent->AsEvent()->WidgetEventPtr();
+  nsCOMPtr<EventTarget> target = aKeyEvent->AsEvent()->InternalDOMEvent()->GetCurrentTarget();
 
   bool executed = false;
   for (uint32_t i = 0; i < mProtoHandlers.Length(); ++i) {
@@ -101,7 +101,7 @@ nsXBLKeyEventHandler::ExecuteMatchedHandlers(
         (hasAllowUntrustedAttr && handler->AllowUntrustedEvents()) ||
         (!hasAllowUntrustedAttr && !mIsBoundToChrome && !mUsingContentXBLScope)) &&
         handler->KeyEventMatched(aKeyEvent, aCharCode, aIgnoreModifierState)) {
-      handler->ExecuteHandler(target, aKeyEvent);
+      handler->ExecuteHandler(target, aKeyEvent->AsEvent());
       executed = true;
     }
   }
@@ -140,7 +140,7 @@ nsXBLKeyEventHandler::HandleEvent(nsIDOMEvent* aEvent)
   if (!key)
     return NS_OK;
 
-  nsAutoTArray<nsShortcutCandidate, 10> accessKeys;
+  AutoTArray<nsShortcutCandidate, 10> accessKeys;
   nsContentUtils::GetAccelKeyCandidates(key, accessKeys);
 
   if (accessKeys.IsEmpty()) {

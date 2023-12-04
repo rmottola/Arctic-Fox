@@ -310,7 +310,7 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   }
 
   int16_t decision = REJECT_REQUEST;
-  rv = ShouldLoad(nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(contentPolicyType),
+  rv = ShouldLoad(contentPolicyType,
                   newUri,
                   requestingLocation,
                   loadInfo->LoadingNode(),
@@ -323,7 +323,6 @@ nsMixedContentBlocker::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   // If the channel is about to load mixed content, abort the channel
   if (!NS_CP_ACCEPTED(decision)) {
     autoCallback.DontCallback();
-    aOldChannel->Cancel(NS_ERROR_DOM_BAD_URI);
     return NS_BINDING_FAILED;
   }
 
@@ -378,9 +377,6 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   // and unlock sBlockMixedScript and sBlockMixedDisplay before reading/writing
   // to them.
   MOZ_ASSERT(NS_IsMainThread());
-
-  MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(aContentType),
-             "We should only see external content policy types here.");
 
   bool isPreload = nsContentUtils::IsPreloadType(aContentType);
 
@@ -671,7 +667,7 @@ nsMixedContentBlocker::ShouldLoad(bool aHadInsecureImageRedirect,
   bool isHttpScheme = false;
   rv = aContentLocation->SchemeIs("http", &isHttpScheme);
   NS_ENSURE_SUCCESS(rv, rv);
-  if (isHttpScheme && docShell->GetDocument()->GetUpgradeInsecureRequests()) {
+  if (isHttpScheme && docShell->GetDocument()->GetUpgradeInsecureRequests(isPreload)) {
     *aDecision = ACCEPT;
     return NS_OK;
   }
@@ -898,8 +894,7 @@ nsMixedContentBlocker::ShouldProcess(uint32_t aContentType,
                                      nsIPrincipal* aRequestPrincipal,
                                      int16_t* aDecision)
 {
-  MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
-             "We should only see external content policy types here.");
+  aContentType = nsContentUtils::InternalContentPolicyTypeToExternal(aContentType);
 
   if (!aContentLocation) {
     // aContentLocation may be null when a plugin is loading without an associated URI resource

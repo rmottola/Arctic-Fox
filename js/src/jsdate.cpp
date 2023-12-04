@@ -700,6 +700,26 @@ ParseDigitsN(size_t n, size_t* result, const CharT* s, size_t* i, size_t limit)
     return false;
 }
 
+/*
+ * Read and convert n or less decimal digits from s[*i]
+ * to s[min(*i+n,limit)] into *result.
+ *
+ * Succeed only if greater than zero but less than or equal to n digits are
+ * converted. Advance *i only on success.
+ */
+template <typename CharT>
+static bool
+ParseDigitsNOrLess(size_t n, size_t* result, const CharT* s, size_t* i, size_t limit)
+{
+    size_t init = *i;
+
+    if (ParseDigits(result, s, i, Min(limit, init + n)))
+        return ((*i - init) > 0) && ((*i - init) <= n);
+
+    *i = init;
+    return false;
+}
+
 static int
 DaysInMonth(int year, int month)
 {
@@ -713,11 +733,6 @@ DaysInMonth(int year, int month)
  * "NOTE-datetime" specification. These formats make up a restricted
  * profile of the ISO 8601 format. Quoted here:
  *
- *   The formats are as follows. Exactly the components shown here
- *   must be present, with exactly this punctuation. Note that the "T"
- *   appears literally in the string, to indicate the beginning of the
- *   time element, as specified in ISO 8601.
- *
  *   Any combination of the date formats with the time formats is
  *   allowed, and also either the date or the time can be missing.
  *
@@ -729,6 +744,12 @@ DaysInMonth(int year, int month)
  *   be aded to a date later. If the time is missing then we assume
  *   00:00 UTC.  If the time is present but the time zone field is
  *   missing then we use local time.
+ *
+ * For the sake of cross compatibility with other implementations we
+ * make a few exceptions to the standard: months, days, hours, minutes
+ * and seconds may be either one or two digits long, and the 'T' from
+ * the time part may be replaced with a space. Given that, a date time
+ * like "1999-1-1 1:1:1" will parse successfully.
  *
  * Date part:
  *
@@ -755,17 +776,17 @@ DaysInMonth(int year, int month)
  * where:
  *
  *   YYYY = four-digit year or six digit year as +YYYYYY or -YYYYYY
- *   MM   = two-digit month (01=January, etc.)
- *   DD   = two-digit day of month (01 through 31)
- *   hh   = two digits of hour (00 through 23) (am/pm NOT allowed)
- *   mm   = two digits of minute (00 through 59)
- *   ss   = two digits of second (00 through 59)
+ *   MM   = one or two-digit month (01=January, etc.)
+ *   DD   = one or two-digit day of month (01 through 31)
+ *   hh   = one or two digits of hour (00 through 23) (am/pm NOT allowed)
+ *   mm   = one or two digits of minute (00 through 59)
+ *   ss   = one or two digits of second (00 through 59)
  *   s    = one or more digits representing a decimal fraction of a second
  *   TZD  = time zone designator (Z or +hh:mm or -hh:mm or missing for local)
  */
 template <typename CharT>
 static bool
-ParseISODate(const CharT* s, size_t length, ClippedTime* result)
+ParseISOStyleDate(const CharT* s, size_t length, ClippedTime* result)
 {
     size_t i = 0;
     int tzMul = 1;
@@ -795,6 +816,9 @@ ParseISODate(const CharT* s, size_t length, ClippedTime* result)
 #define NEED_NDIGITS(n, field)                                                 \
     if (!ParseDigitsN(n, &field, s, &i, length)) { return false; }
 
+#define NEED_NDIGITS_OR_LESS(n, field)                                         \
+    if (!ParseDigitsNOrLess(n, &field, s, &i, length)) { return false; }
+
     if (PEEK('+') || PEEK('-')) {
         if (PEEK('-'))
             dateMul = -1;
@@ -804,19 +828,23 @@ ParseISODate(const CharT* s, size_t length, ClippedTime* result)
         NEED_NDIGITS(4, year);
     }
     DONE_DATE_UNLESS('-');
-    NEED_NDIGITS(2, month);
+    NEED_NDIGITS_OR_LESS(2, month);
     DONE_DATE_UNLESS('-');
-    NEED_NDIGITS(2, day);
+    NEED_NDIGITS_OR_LESS(2, day);
 
  done_date:
-    DONE_UNLESS('T');
-    NEED_NDIGITS(2, hour);
+    if (PEEK('T') || PEEK(' '))
+        i++;
+    else
+        goto done;
+
+    NEED_NDIGITS_OR_LESS(2, hour);
     NEED(':');
-    NEED_NDIGITS(2, min);
+    NEED_NDIGITS_OR_LESS(2, min);
 
     if (PEEK(':')) {
         ++i;
-        NEED_NDIGITS(2, sec);
+        NEED_NDIGITS_OR_LESS(2, sec);
         if (PEEK('.')) {
             ++i;
             if (!ParseFractional(&frac, s, &i, length))
@@ -882,7 +910,7 @@ template <typename CharT>
 static bool
 ParseDate(const CharT* s, size_t length, ClippedTime* result)
 {
-    if (ParseISODate(s, length, result))
+    if (ParseISOStyleDate(s, length, result))
         return true;
 
     if (length == 0)
@@ -1338,14 +1366,7 @@ DateObject::fillLocalTimeSlots()
     int weekday = WeekDay(localTime);
     setReservedSlot(LOCAL_DAY_SLOT, Int32Value(weekday));
 
-    int seconds = yearSeconds % 60;
-    setReservedSlot(LOCAL_SECONDS_SLOT, Int32Value(seconds));
-
-    int minutes = (yearSeconds / 60) % 60;
-    setReservedSlot(LOCAL_MINUTES_SLOT, Int32Value(minutes));
-
-    int hours = (yearSeconds / (60 * 60)) % 24;
-    setReservedSlot(LOCAL_HOURS_SLOT, Int32Value(hours));
+    setReservedSlot(LOCAL_SECONDS_INTO_YEAR_SLOT, Int32Value(yearSeconds));
 }
 
 inline double
@@ -1546,7 +1567,15 @@ DateObject::getHours_impl(JSContext* cx, const CallArgs& args)
     DateObject* dateObj = &args.thisv().toObject().as<DateObject>();
     dateObj->fillLocalTimeSlots();
 
-    args.rval().set(dateObj->getReservedSlot(LOCAL_HOURS_SLOT));
+    // Note: LOCAL_SECONDS_INTO_YEAR_SLOT is guaranteed to contain an
+    // int32 or NaN after the call to fillLocalTimeSlots.
+    Value yearSeconds = dateObj->getReservedSlot(LOCAL_SECONDS_INTO_YEAR_SLOT);
+    if (yearSeconds.isDouble()) {
+        MOZ_ASSERT(IsNaN(yearSeconds.toDouble()));
+        args.rval().set(yearSeconds);
+    } else {
+        args.rval().setInt32((yearSeconds.toInt32() / int(SecondsPerHour)) % int(HoursPerDay));
+    }
     return true;
 }
 
@@ -1581,7 +1610,15 @@ DateObject::getMinutes_impl(JSContext* cx, const CallArgs& args)
     DateObject* dateObj = &args.thisv().toObject().as<DateObject>();
     dateObj->fillLocalTimeSlots();
 
-    args.rval().set(dateObj->getReservedSlot(LOCAL_MINUTES_SLOT));
+    // Note: LOCAL_SECONDS_INTO_YEAR_SLOT is guaranteed to contain an
+    // int32 or NaN after the call to fillLocalTimeSlots.
+    Value yearSeconds = dateObj->getReservedSlot(LOCAL_SECONDS_INTO_YEAR_SLOT);
+    if (yearSeconds.isDouble()) {
+        MOZ_ASSERT(IsNaN(yearSeconds.toDouble()));
+        args.rval().set(yearSeconds);
+    } else {
+        args.rval().setInt32((yearSeconds.toInt32() / int(SecondsPerMinute)) % int(MinutesPerHour));
+    }
     return true;
 }
 
@@ -1610,7 +1647,17 @@ date_getUTCMinutes(JSContext* cx, unsigned argc, Value* vp)
     return CallNonGenericMethod<IsDate, DateObject::getUTCMinutes_impl>(cx, args);
 }
 
-/* Date.getSeconds is mapped to getUTCSeconds */
+/*
+ * Date.getSeconds is mapped to getUTCSeconds. As long as no supported time
+ * zone has a fractional-minute component, the differences in their
+ * specifications aren't observable.
+ *
+ * We'll have to split the implementations if a new time zone with a
+ * fractional-minute component is introduced or once we implement ES6's
+ * 20.3.1.7 Local Time Zone Adjustment: time zones with adjustments like that
+ * did historically exist, e.g.
+ * https://en.wikipedia.org/wiki/UTC%E2%88%9200:25:21
+ */
 
 /* static */ MOZ_ALWAYS_INLINE bool
 DateObject::getUTCSeconds_impl(JSContext* cx, const CallArgs& args)
@@ -1618,7 +1665,15 @@ DateObject::getUTCSeconds_impl(JSContext* cx, const CallArgs& args)
     DateObject* dateObj = &args.thisv().toObject().as<DateObject>();
     dateObj->fillLocalTimeSlots();
 
-    args.rval().set(dateObj->getReservedSlot(LOCAL_SECONDS_SLOT));
+    // Note: LOCAL_SECONDS_INTO_YEAR_SLOT is guaranteed to contain an
+    // int32 or NaN after the call to fillLocalTimeSlots.
+    Value yearSeconds = dateObj->getReservedSlot(LOCAL_SECONDS_INTO_YEAR_SLOT);
+    if (yearSeconds.isDouble()) {
+        MOZ_ASSERT(IsNaN(yearSeconds.toDouble()));
+        args.rval().set(yearSeconds);
+    } else {
+        args.rval().setInt32(yearSeconds.toInt32() % int(SecondsPerMinute));
+    }
     return true;
 }
 
@@ -1628,8 +1683,13 @@ date_getUTCSeconds(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<IsDate, DateObject::getUTCSeconds_impl>(cx, args);
 }
-
-/* Date.getMilliseconds is mapped to getUTCMilliseconds */
+/*
+ * Date.getMilliseconds is mapped to getUTCMilliseconds for the same reasons
+ * that getSeconds is mapped to getUTCSeconds (see above).  No known LocalTZA
+ * has *ever* included a fractional-second component, however, so we can keep
+ * this simplification even if we stop implementing ES5 local-time computation
+ * semantics.
+ */
 
 /* static */ MOZ_ALWAYS_INLINE bool
 DateObject::getUTCMilliseconds_impl(JSContext* cx, const CallArgs& args)
@@ -2863,32 +2923,47 @@ date_toSource(JSContext* cx, unsigned argc, Value* vp)
 }
 #endif
 
-// ES6 final draft 20.3.4.41.
-static bool
-date_toString(JSContext* cx, unsigned argc, Value* vp)
+MOZ_ALWAYS_INLINE bool
+IsObject(HandleValue v)
 {
-    CallArgs args = CallArgsFromVp(argc, vp);
-    // Step 2.a. (reordered)
-    double tv = GenericNaN();
-    if (args.thisv().isObject()) {
-        // Step 1.
-        RootedObject obj(cx, &args.thisv().toObject());
+    return v.isObject();
+}
 
+// ES6 20.3.4.41.
+MOZ_ALWAYS_INLINE bool
+date_toString_impl(JSContext* cx, const CallArgs& args)
+{
+    // Step 1.
+    RootedObject obj(cx, &args.thisv().toObject());
+
+    // Step 2.
+    ESClassValue cls;
+    if (!GetBuiltinClass(cx, obj, &cls))
+        return false;
+
+    double tv;
+    if (cls != ESClass_Date) {
         // Step 2.
-        ESClassValue cls;
-        if (!GetBuiltinClass(cx, obj, &cls))
+        tv = GenericNaN();
+    } else {
+        // Step 3.
+        RootedValue unboxed(cx);
+        if (!Unbox(cx, obj, &unboxed))
             return false;
 
-        if (cls == ESClass_Date) {
-            // Step 3.a.
-            RootedValue unboxed(cx);
-            if (!Unbox(cx, obj, &unboxed))
-                return false;
-            tv = unboxed.toNumber();
-        }
+        tv = unboxed.toNumber();
     }
+
     // Step 4.
     return date_format(cx, tv, FORMATSPEC_FULL, args.rval());
+}
+
+bool
+date_toString(JSContext* cx, unsigned argc, Value* vp)
+{
+    // Step 1.
+    CallArgs args = CallArgsFromVp(argc, vp);
+    return CallNonGenericMethod<IsObject, date_toString_impl>(cx, args);
 }
 
 MOZ_ALWAYS_INLINE bool
@@ -3040,11 +3115,26 @@ DateOneArgument(JSContext* cx, const CallArgs& args)
     MOZ_ASSERT(args.length() == 1);
 
     if (args.isConstructing()) {
-        ClippedTime t;
+        if (args[0].isObject()) {
+            RootedObject obj(cx, &args[0].toObject());
+
+            ESClassValue cls;
+            if (!GetBuiltinClass(cx, obj, &cls))
+                return false;
+
+            if (cls == ESClass_Date) {
+                RootedValue unboxed(cx);
+                if (!Unbox(cx, obj, &unboxed))
+                    return false;
+
+                return NewDateObject(cx, args, TimeClip(unboxed.toNumber()));
+            }
+        }
 
         if (!ToPrimitive(cx, args[0]))
             return false;
 
+        ClippedTime t;
         if (args[0].isString()) {
             JSLinearString* linearStr = args[0].toString()->ensureLinear(cx);
             if (!linearStr)

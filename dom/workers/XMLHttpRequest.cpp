@@ -912,19 +912,10 @@ Proxy::Init()
     return true;
   }
 
-  nsPIDOMWindow* ownerWindow = mWorkerPrivate->GetWindow();
-  if (ownerWindow) {
-    ownerWindow = ownerWindow->GetOuterWindow();
-    if (!ownerWindow) {
-      NS_ERROR("No outer window?!");
-      return false;
-    }
-
-    nsPIDOMWindow* innerWindow = ownerWindow->GetCurrentInnerWindow();
-    if (mWorkerPrivate->GetWindow() != innerWindow) {
-      NS_WARNING("Window has navigated, cannot create XHR here.");
-      return false;
-    }
+  nsPIDOMWindowInner* ownerWindow = mWorkerPrivate->GetWindow();
+  if (ownerWindow && !ownerWindow->IsCurrentInnerWindow()) {
+    NS_WARNING("Window has navigated, cannot create XHR here.");
+    return false;
   }
 
   mXHR = new nsXMLHttpRequest();
@@ -1617,7 +1608,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(XMLHttpRequest,
                                                nsXHREventTarget)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_JSVAL_MEMBER_CALLBACK(mStateData.mResponse)
+  NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mStateData.mResponse)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 JSObject*

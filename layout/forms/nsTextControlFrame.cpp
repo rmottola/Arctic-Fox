@@ -10,6 +10,7 @@
 #include "nsTextControlFrame.h"
 #include "nsIPlaintextEditor.h"
 #include "nsCaret.h"
+#include "nsCSSPseudoElements.h"
 #include "nsGenericHTMLElement.h"
 #include "nsIEditor.h"
 #include "nsIEditorIMESupport.h"
@@ -346,8 +347,7 @@ nsTextControlFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
     NS_ENSURE_TRUE(placeholderNode, NS_ERROR_OUT_OF_MEMORY);
 
     // Associate ::-moz-placeholder pseudo-element with the placeholder node.
-    nsCSSPseudoElements::Type pseudoType =
-      nsCSSPseudoElements::ePseudo_mozPlaceholder;
+    CSSPseudoElementType pseudoType = CSSPseudoElementType::mozPlaceholder;
 
     RefPtr<nsStyleContext> placeholderStyleContext =
       PresContext()->StyleSet()->ResolvePseudoElementStyle(
@@ -1238,8 +1238,7 @@ nsTextControlFrame::SetInitialChildList(ChildListID     aListID,
     NS_ASSERTION(txtCtrl, "Content not a text control element");
     txtCtrl->InitializeKeyboardEventListeners();
 
-    nsPoint* contentScrollPos = static_cast<nsPoint*>
-      (Properties().Get(ContentScrollPos()));
+    nsPoint* contentScrollPos = Properties().Get(ContentScrollPos());
     if (contentScrollPos) {
       // If we have a scroll pos stored to be passed to our anonymous
       // div, do it here!
@@ -1445,9 +1444,9 @@ nsTextControlFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 }
 
 mozilla::dom::Element*
-nsTextControlFrame::GetPseudoElement(nsCSSPseudoElements::Type aType)
+nsTextControlFrame::GetPseudoElement(CSSPseudoElementType aType)
 {
-  if (aType == nsCSSPseudoElements::ePseudo_mozPlaceholder) {
+  if (aType == CSSPseudoElementType::mozPlaceholder) {
     nsCOMPtr<nsITextControlElement> txtCtrl = do_QueryInterface(GetContent());
     return txtCtrl->GetPlaceholderNode();
   }

@@ -19,6 +19,7 @@
 #include "mozilla/RefPtr.h"
 #include "FakeMediaStreams.h"
 #include "FakeMediaStreamsImpl.h"
+#include "FakeLogging.h"
 #include "MediaConduitErrors.h"
 #include "MediaConduitInterface.h"
 #include "MediaPipeline.h"
@@ -34,6 +35,9 @@
 #include "runnable_utils.h"
 
 #include "webrtc/modules/interface/module_common_types.h"
+
+#include "FakeIPC.h"
+#include "FakeIPC.cpp"
 
 #define GTEST_HAS_RTTI 0
 #include "gtest/gtest.h"

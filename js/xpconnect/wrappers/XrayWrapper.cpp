@@ -373,6 +373,112 @@ bool JSXrayTraits::getOwnPropertyFromTargetIfSafe(JSContext* cx,
     return true;
 }
 
+// Returns true on success (in the JSAPI sense), false on failure.  If true is
+// returned, desc.object() will indicate whether we actually resolved
+// the property.
+//
+// id is the property id we're looking for.
+// holder is the object to define the property on.
+// fs is the relevant JSFunctionSpec*.
+// ps is the relevant JSPropertySpec*.
+// desc is the descriptor we're resolving into.
+static bool
+TryResolvePropertyFromSpecs(JSContext* cx, HandleId id, HandleObject holder,
+                            const JSFunctionSpec* fs,
+                            const JSPropertySpec* ps,
+                            MutableHandle<PropertyDescriptor> desc)
+{
+    // Scan through the functions.
+    const JSFunctionSpec* fsMatch = nullptr;
+    for ( ; fs && fs->name; ++fs) {
+        if (PropertySpecNameEqualsId(fs->name, id)) {
+            fsMatch = fs;
+            break;
+        }
+    }
+    if (fsMatch) {
+        // Generate an Xrayed version of the method.
+        RootedFunction fun(cx, JS::NewFunctionFromSpec(cx, fsMatch, id));
+        if (!fun)
+            return false;
+
+        // The generic Xray machinery only defines non-own properties of the target on
+        // the holder. This is broken, and will be fixed at some point, but for now we
+        // need to cache the value explicitly. See the corresponding call to
+        // JS_GetOwnPropertyDescriptorById at the top of
+        // JSXrayTraits::resolveOwnProperty.
+        RootedObject funObj(cx, JS_GetFunctionObject(fun));
+        return JS_DefinePropertyById(cx, holder, id, funObj, 0) &&
+               JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
+    }
+
+    // Scan through the properties.
+    const JSPropertySpec* psMatch = nullptr;
+    for ( ; ps && ps->name; ++ps) {
+        if (PropertySpecNameEqualsId(ps->name, id)) {
+            psMatch = ps;
+            break;
+        }
+    }
+    if (psMatch) {
+        desc.value().setUndefined();
+        RootedFunction getterObj(cx);
+        RootedFunction setterObj(cx);
+        unsigned flags = psMatch->flags;
+        if (psMatch->isSelfHosted()) {
+            getterObj = JS::GetSelfHostedFunction(cx, psMatch->getter.selfHosted.funname, id, 0);
+            if (!getterObj)
+                return false;
+            desc.setGetterObject(JS_GetFunctionObject(getterObj));
+            if (psMatch->setter.selfHosted.funname) {
+                MOZ_ASSERT(flags & JSPROP_SETTER);
+                setterObj = JS::GetSelfHostedFunction(cx, psMatch->setter.selfHosted.funname, id, 0);
+                if (!setterObj)
+                    return false;
+                desc.setSetterObject(JS_GetFunctionObject(setterObj));
+            }
+        } else {
+            desc.setGetter(JS_CAST_NATIVE_TO(psMatch->getter.native.op,
+                                             JSGetterOp));
+            desc.setSetter(JS_CAST_NATIVE_TO(psMatch->setter.native.op,
+                                             JSSetterOp));
+        }
+        desc.setAttributes(flags);
+
+        // The generic Xray machinery only defines non-own properties on the holder.
+        // This is broken, and will be fixed at some point, but for now we need to
+        // cache the value explicitly. See the corresponding call to
+        // JS_GetPropertyById at the top of JSXrayTraits::resolveOwnProperty.
+        //
+        // Note also that the public-facing API here doesn't give us a way to
+        // pass along JITInfo. It's probably ok though, since Xrays are already
+        // pretty slow.
+        return JS_DefinePropertyById(cx, holder, id,
+                                     UndefinedHandleValue,
+                                     // This particular descriptor, unlike most,
+                                     // actually stores JSNatives directly,
+                                     // since we just set it up.  Do NOT pass
+                                     // JSPROP_PROPOP_ACCESSORS here!
+                                     desc.attributes(),
+                                     JS_PROPERTYOP_GETTER(desc.getter()),
+                                     JS_PROPERTYOP_SETTER(desc.setter())) &&
+               JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
+    }
+
+    return true;
+}
+
+static bool
+ShouldResolveStaticProperties(JSProtoKey key)
+{
+    // Don't try to resolve static properties on RegExp, because they
+    // have issues.  In particular, some of them grab state off the
+    // global of the RegExp constructor that describes the last regexp
+    // evaluation in that global, which is not a useful thing to do
+    // over Xrays.
+    return key != JSProto_RegExp;
+}
+
 bool
 JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
                                  HandleObject wrapper, HandleObject holder,
@@ -384,6 +490,18 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
                                              id, desc);
     if (!ok || desc.object())
         return ok;
+
+    // The non-HasPrototypes semantics implemented by traditional Xrays are kind
+    // of broken with respect to |own|-ness and the holder. The common code
+    // muddles through by only checking the holder for non-|own| lookups, but
+    // that doesn't work for us. So we do an explicit holder check here, and hope
+    // that this mess gets fixed up soon.
+    if (!JS_GetOwnPropertyDescriptorById(cx, holder, id, desc))
+        return false;
+    if (desc.object()) {
+        desc.object().set(wrapper);
+        return true;
+    }
 
     RootedObject target(cx, getTargetObject(wrapper));
     JSProtoKey key = getProtoKey(holder);
@@ -431,22 +549,44 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
                 RootedString fname(cx, JS_GetFunctionId(JS_GetObjectFunction(target)));
                 FillPropertyDescriptor(desc, wrapper, JSPROP_PERMANENT | JSPROP_READONLY,
                                        fname ? StringValue(fname) : JS_GetEmptyStringValue(cx));
-            } else if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_PROTOTYPE)) {
-                // Handle the 'prototype' property to make xrayedGlobal.StandardClass.prototype work.
+            } else {
+                // Look for various static properties/methods and the
+                // 'prototype' property.
                 JSProtoKey standardConstructor = constructorFor(holder);
                 if (standardConstructor != JSProto_Null) {
-                    RootedObject standardProto(cx);
-                    {
-                        JSAutoCompartment ac(cx, target);
-                        if (!JS_GetClassPrototype(cx, standardConstructor, &standardProto))
+                    // Handle the 'prototype' property to make
+                    // xrayedGlobal.StandardClass.prototype work.
+                    if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_PROTOTYPE)) {
+                        RootedObject standardProto(cx);
+                        {
+                            JSAutoCompartment ac(cx, target);
+                            if (!JS_GetClassPrototype(cx, standardConstructor, &standardProto))
+                                return false;
+                            MOZ_ASSERT(standardProto);
+                        }
+
+                        if (!JS_WrapObject(cx, &standardProto))
                             return false;
-                        MOZ_ASSERT(standardProto);
+                        FillPropertyDescriptor(desc, wrapper, JSPROP_PERMANENT | JSPROP_READONLY,
+                                               ObjectValue(*standardProto));
+                        return true;
                     }
-                    if (!JS_WrapObject(cx, &standardProto))
-                        return false;
-                    FillPropertyDescriptor(desc, wrapper, JSPROP_PERMANENT | JSPROP_READONLY,
-                                           ObjectValue(*standardProto));
-                    return true;
+
+                    if (ShouldResolveStaticProperties(standardConstructor)) {
+                        const js::Class* clasp = js::ProtoKeyToClass(standardConstructor);
+                        MOZ_ASSERT(clasp->spec.defined());
+
+                        if (!TryResolvePropertyFromSpecs(cx, id, holder,
+                               clasp->spec.constructorFunctions(),
+                               clasp->spec.constructorProperties(), desc)) {
+                            return false;
+                        }
+
+                        if (desc.object()) {
+                            desc.object().set(wrapper);
+                            return true;
+                        }
+                    }
                 }
             }
         } else if (IsErrorObjectKey(key)) {
@@ -485,18 +625,6 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
         return true;
     }
 
-    // The non-HasPrototypes semantics implemented by traditional Xrays are kind
-    // of broken with respect to |own|-ness and the holder. The common code
-    // muddles through by only checking the holder for non-|own| lookups, but
-    // that doesn't work for us. So we do an explicit holder check here, and hope
-    // that this mess gets fixed up soon.
-    if (!JS_GetPropertyDescriptorById(cx, holder, id, desc))
-        return false;
-    if (desc.object()) {
-        desc.object().set(wrapper);
-        return true;
-    }
-
     // Handle the 'constructor' property.
     if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_CONSTRUCTOR)) {
         RootedObject constructor(cx);
@@ -531,80 +659,17 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
     const js::Class* clasp = js::GetObjectClass(target);
     MOZ_ASSERT(clasp->spec.defined());
 
-    // Scan through the functions. Indexed array properties are handled above.
-    const JSFunctionSpec* fsMatch = nullptr;
-    for (const JSFunctionSpec* fs = clasp->spec.prototypeFunctions(); fs && fs->name; ++fs) {
-        if (PropertySpecNameEqualsId(fs->name, id)) {
-            fsMatch = fs;
-            break;
-        }
-    }
-    if (fsMatch) {
-        // Generate an Xrayed version of the method.
-        RootedFunction fun(cx, JS::NewFunctionFromSpec(cx, fsMatch, id));
-        if (!fun)
-            return false;
-
-        // The generic Xray machinery only defines non-own properties on the holder.
-        // This is broken, and will be fixed at some point, but for now we need to
-        // cache the value explicitly. See the corresponding call to
-        // JS_GetPropertyById at the top of this function.
-        RootedObject funObj(cx, JS_GetFunctionObject(fun));
-        return JS_DefinePropertyById(cx, holder, id, funObj, 0) &&
-               JS_GetPropertyDescriptorById(cx, holder, id, desc);
+    // Indexed array properties are handled above, so we can just work with the
+    // class spec here.
+    if (!TryResolvePropertyFromSpecs(cx, id, holder,
+                                     clasp->spec.prototypeFunctions(),
+                                     clasp->spec.prototypeProperties(),
+                                     desc)) {
+        return false;
     }
 
-    // Scan through the properties.
-    const JSPropertySpec* psMatch = nullptr;
-    for (const JSPropertySpec* ps = clasp->spec.prototypeProperties(); ps && ps->name; ++ps) {
-        if (PropertySpecNameEqualsId(ps->name, id)) {
-            psMatch = ps;
-            break;
-        }
-    }
-    if (psMatch) {
-        desc.value().setUndefined();
-        RootedFunction getterObj(cx);
-        RootedFunction setterObj(cx);
-        unsigned flags = psMatch->flags;
-        if (psMatch->isSelfHosted()) {
-            getterObj = JS::GetSelfHostedFunction(cx, psMatch->getter.selfHosted.funname, id, 0);
-            if (!getterObj)
-                return false;
-            desc.setGetterObject(JS_GetFunctionObject(getterObj));
-            if (psMatch->setter.selfHosted.funname) {
-                MOZ_ASSERT(flags & JSPROP_SETTER);
-                setterObj = JS::GetSelfHostedFunction(cx, psMatch->setter.selfHosted.funname, id, 0);
-                if (!setterObj)
-                    return false;
-                desc.setSetterObject(JS_GetFunctionObject(setterObj));
-            }
-        } else {
-            desc.setGetter(JS_CAST_NATIVE_TO(psMatch->getter.native.op,
-                                             JSGetterOp));
-            desc.setSetter(JS_CAST_NATIVE_TO(psMatch->setter.native.op,
-                                             JSSetterOp));
-        }
-        desc.setAttributes(flags);
-
-        // The generic Xray machinery only defines non-own properties on the holder.
-        // This is broken, and will be fixed at some point, but for now we need to
-        // cache the value explicitly. See the corresponding call to
-        // JS_GetPropertyById at the top of this function.
-        //
-        // Note also that the public-facing API here doesn't give us a way to
-        // pass along JITInfo. It's probably ok though, since Xrays are already
-        // pretty slow.
-        return JS_DefinePropertyById(cx, holder, id,
-                                     UndefinedHandleValue,
-                                     // This particular descriptor, unlike most,
-                                     // actually stores JSNatives directly,
-                                     // since we just set it up.  Do NOT pass
-                                     // JSPROP_PROPOP_ACCESSORS here!
-                                     desc.attributes(),
-                                     JS_PROPERTYOP_GETTER(desc.getter()),
-                                     JS_PROPERTYOP_SETTER(desc.setter())) &&
-               JS_GetPropertyDescriptorById(cx, holder, id, desc);
+    if (desc.object()) {
+        desc.object().set(wrapper);
     }
 
     return true;
@@ -717,6 +782,33 @@ MaybeAppend(jsid id, unsigned flags, AutoIdVector& props)
     return props.append(id);
 }
 
+// Append the names from the given function and property specs to props.
+static bool
+AppendNamesFromFunctionAndPropertySpecs(JSContext* cx,
+                                        const JSFunctionSpec* fs,
+                                        const JSPropertySpec* ps,
+                                        unsigned flags,
+                                        AutoIdVector& props)
+{
+    // Convert the method and property names to jsids and pass them to the caller.
+    for ( ; fs && fs->name; ++fs) {
+        jsid id;
+        if (!PropertySpecNameToPermanentId(cx, fs->name, &id))
+            return false;
+        if (!MaybeAppend(id, flags, props))
+            return false;
+    }
+    for ( ; ps && ps->name; ++ps) {
+        jsid id;
+        if (!PropertySpecNameToPermanentId(cx, ps->name, &id))
+            return false;
+        if (!MaybeAppend(id, flags, props))
+            return false;
+    }
+
+    return true;
+}
+
 bool
 JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags,
                              AutoIdVector& props)
@@ -764,10 +856,23 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
                 return false;
             if (!props.append(GetRTIdByIndex(cx, XPCJSRuntime::IDX_NAME)))
                 return false;
-            // Handle the .prototype property on standard constructors.
-            if (constructorFor(holder) != JSProto_Null) {
+            // Handle the .prototype property and static properties on standard
+            // constructors.
+            JSProtoKey standardConstructor = constructorFor(holder);
+            if (standardConstructor != JSProto_Null) {
                 if (!props.append(GetRTIdByIndex(cx, XPCJSRuntime::IDX_PROTOTYPE)))
                     return false;
+
+                if (ShouldResolveStaticProperties(standardConstructor)) {
+                    const js::Class* clasp = js::ProtoKeyToClass(standardConstructor);
+                    MOZ_ASSERT(clasp->spec.defined());
+
+                    if (!AppendNamesFromFunctionAndPropertySpecs(
+                           cx, clasp->spec.constructorFunctions(),
+                           clasp->spec.constructorProperties(), flags, props)) {
+                        return false;
+                    }
+                }
             }
         } else if (IsErrorObjectKey(key)) {
             if (!props.append(GetRTIdByIndex(cx, XPCJSRuntime::IDX_FILENAME)) ||
@@ -803,23 +908,9 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
     const js::Class* clasp = js::GetObjectClass(target);
     MOZ_ASSERT(clasp->spec.defined());
 
-    // Convert the method and property names to jsids and pass them to the caller.
-    for (const JSFunctionSpec* fs = clasp->spec.prototypeFunctions(); fs && fs->name; ++fs) {
-        jsid id;
-        if (!PropertySpecNameToPermanentId(cx, fs->name, &id))
-            return false;
-        if (!MaybeAppend(id, flags, props))
-            return false;
-    }
-    for (const JSPropertySpec* ps = clasp->spec.prototypeProperties(); ps && ps->name; ++ps) {
-        jsid id;
-        if (!PropertySpecNameToPermanentId(cx, ps->name, &id))
-            return false;
-        if (!MaybeAppend(id, flags, props))
-            return false;
-    }
-
-    return true;
+    return AppendNamesFromFunctionAndPropertySpecs(
+        cx, clasp->spec.prototypeFunctions(),
+        clasp->spec.prototypeProperties(), flags, props);
 }
 
 JSObject*
@@ -1172,9 +1263,9 @@ AsWindow(JSContext* cx, JSObject* wrapper)
   if (NS_SUCCEEDED(rv))
       return win;
 
-  nsCOMPtr<nsPIDOMWindow> piWin = do_QueryInterface(
+  nsCOMPtr<nsPIDOMWindowInner> piWin = do_QueryInterface(
       nsContentUtils::XPConnect()->GetNativeOfWrapper(cx, target));
-  return static_cast<nsGlobalWindow*>(piWin.get());
+  return nsGlobalWindow::Cast(piWin);
 }
 
 static bool
@@ -1281,7 +1372,7 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
                                ObjectValue(*JS_GetFunctionObject(toString)));
 
         return JS_DefinePropertyById(cx, holder, id, desc) &&
-               JS_GetPropertyDescriptorById(cx, holder, id, desc);
+               JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
     }
 
     desc.object().set(holder);
@@ -1374,7 +1465,7 @@ XrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
     bool found = false;
     if (expando) {
         JSAutoCompartment ac(cx, expando);
-        if (!JS_GetPropertyDescriptorById(cx, expando, id, desc))
+        if (!JS_GetOwnPropertyDescriptorById(cx, expando, id, desc))
             return false;
         found = !!desc.object();
     }
@@ -1420,7 +1511,7 @@ XrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
                                              wrappedJSObject_getter)) {
             return false;
         }
-        if (!JS_GetPropertyDescriptorById(cx, holder, id, desc))
+        if (!JS_GetOwnPropertyDescriptorById(cx, holder, id, desc))
             return false;
         desc.object().set(wrapper);
         return true;
@@ -1447,10 +1538,10 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
         if (win) {
-            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index);
+            nsCOMPtr<nsPIDOMWindowOuter> subframe = win->IndexedGetter(index);
             if (subframe) {
-                nsGlobalWindow* global = static_cast<nsGlobalWindow*>(subframe.get());
-                global->EnsureInnerWindow();
+                subframe->EnsureInnerWindow();
+                nsGlobalWindow* global = nsGlobalWindow::Cast(subframe);
                 JSObject* obj = global->FastGetGlobalJSObject();
                 if (MOZ_UNLIKELY(!obj)) {
                     // It's gone?
@@ -1467,7 +1558,7 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
     // in the wrapper's compartment here, not the wrappee.
     MOZ_ASSERT(js::IsObjectInContextCompartment(wrapper, cx));
 
-    return JS_GetPropertyDescriptorById(cx, holder, id, desc);
+    return JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
 }
 
 bool
@@ -1593,10 +1684,10 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
         if (win) {
-            nsCOMPtr<nsIDOMWindow> subframe = win->IndexedGetter(index);
+            nsCOMPtr<nsPIDOMWindowOuter> subframe = win->IndexedGetter(index);
             if (subframe) {
-                nsGlobalWindow* global = static_cast<nsGlobalWindow*>(subframe.get());
-                global->EnsureInnerWindow();
+                subframe->EnsureInnerWindow();
+                nsGlobalWindow* global = nsGlobalWindow::Cast(subframe);
                 JSObject* obj = global->FastGetGlobalJSObject();
                 if (MOZ_UNLIKELY(!obj)) {
                     // It's gone?
@@ -1609,7 +1700,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         }
     }
 
-    if (!JS_GetPropertyDescriptorById(cx, holder, id, desc))
+    if (!JS_GetOwnPropertyDescriptorById(cx, holder, id, desc))
         return false;
     if (desc.object()) {
         desc.object().set(wrapper);
@@ -1627,7 +1718,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         return true;
 
     return JS_DefinePropertyById(cx, holder, id, desc) &&
-           JS_GetPropertyDescriptorById(cx, holder, id, desc);
+           JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
 }
 
 bool
@@ -1902,7 +1993,7 @@ XrayWrapper<Base, Traits>::getPropertyDescriptor(JSContext* cx, HandleObject wra
         return false;
 
     // Check the holder.
-    if (!desc.object() && !JS_GetPropertyDescriptorById(cx, holder, id, desc))
+    if (!desc.object() && !JS_GetOwnPropertyDescriptorById(cx, holder, id, desc))
         return false;
     if (desc.object()) {
         desc.object().set(wrapper);
@@ -1927,9 +2018,8 @@ XrayWrapper<Base, Traits>::getPropertyDescriptor(JSContext* cx, HandleObject wra
         nsAutoJSString name;
         if (!name.init(cx, JSID_TO_STRING(id)))
             return false;
-        nsCOMPtr<nsIDOMWindow> childDOMWin = win->GetChildWindow(name);
-        if (childDOMWin) {
-            nsGlobalWindow* cwin = static_cast<nsGlobalWindow*>(childDOMWin.get());
+        if (nsCOMPtr<nsPIDOMWindowOuter> childDOMWin = win->GetChildWindow(name)) {
+            auto* cwin = nsGlobalWindow::Cast(childDOMWin);
             JSObject* childObj = cwin->FastGetGlobalJSObject();
             if (MOZ_UNLIKELY(!childObj))
                 return xpc::Throw(cx, NS_ERROR_FAILURE);
@@ -1944,7 +2034,7 @@ XrayWrapper<Base, Traits>::getPropertyDescriptor(JSContext* cx, HandleObject wra
         return true;
 
     if (!JS_DefinePropertyById(cx, holder, id, desc) ||
-        !JS_GetPropertyDescriptorById(cx, holder, id, desc))
+        !JS_GetOwnPropertyDescriptorById(cx, holder, id, desc))
     {
         return false;
     }

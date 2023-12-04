@@ -398,6 +398,7 @@ MSG_DEF(JSMSG_PROXY_EXTENSIBILITY,     0, JSEXN_TYPEERR, "proxy must report same
 MSG_DEF(JSMSG_PROXY_GETOWN_OBJORUNDEF, 0, JSEXN_TYPEERR, "proxy [[GetOwnProperty]] must return an object or undefined")
 MSG_DEF(JSMSG_PROXY_REVOKED,           0, JSEXN_TYPEERR, "illegal operation attempted on a revoked proxy")
 MSG_DEF(JSMSG_PROXY_ARG_REVOKED,       1, JSEXN_TYPEERR, "argument {0} cannot be a revoked proxy")
+MSG_DEF(JSMSG_DEPRECATED_PROXY_CREATE, 0, JSEXN_NONE, "Proxy.create and Proxy.createFunction are deprecated, use new Proxy instead")
 
 // Structured cloning
 MSG_DEF(JSMSG_SC_BAD_CLONE_VERSION,    0, JSEXN_ERR, "unsupported structured clone version")
@@ -424,7 +425,7 @@ MSG_DEF(JSMSG_DEBUG_NOT_LIVE,          1, JSEXN_ERR, "{0} is not live")
 MSG_DEF(JSMSG_DEBUG_NO_SCOPE_OBJECT,   0, JSEXN_TYPEERR, "declarative Environments don't have binding objects")
 MSG_DEF(JSMSG_DEBUG_OBJECT_PROTO,      0, JSEXN_TYPEERR, "Debugger.Object.prototype is not a valid Debugger.Object")
 MSG_DEF(JSMSG_DEBUG_OBJECT_WRONG_OWNER,0, JSEXN_TYPEERR, "Debugger.Object belongs to a different Debugger")
-MSG_DEF(JSMSG_DEBUG_OPTIMIZED_OUT,     0, JSEXN_ERR, "variable has been optimized out")
+MSG_DEF(JSMSG_DEBUG_OPTIMIZED_OUT,     1, JSEXN_ERR, "variable `{0}' has been optimized out")
 MSG_DEF(JSMSG_DEBUG_RESUMPTION_VALUE_DISALLOWED, 0, JSEXN_TYPEERR, "resumption values are disallowed in this hook")
 MSG_DEF(JSMSG_DEBUG_VARIABLE_NOT_FOUND,0, JSEXN_TYPEERR, "variable not found in environment")
 MSG_DEF(JSMSG_DEBUG_WRAPPER_IN_WAY,    3, JSEXN_TYPEERR, "{0} is {1}{2}a global object, but a direct reference is required")

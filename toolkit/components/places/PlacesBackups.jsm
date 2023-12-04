@@ -197,7 +197,7 @@ this.PlacesBackups = {
         // safely remove .tmp files without risking to remove ongoing backups.
         if (aEntry.name.endsWith(".tmp")) {
           OS.File.remove(aEntry.path);
-          return;
+          return undefined;
         }
 
         if (filenamesRegex.test(aEntry.name)) {
@@ -453,7 +453,10 @@ this.PlacesBackups = {
         newFilenameWithMetaData = appendMetaDataToFilename(newBackupFilename,
                                                            { count: nodeCount,
                                                              hash: hash });
-      } catch (ex if ex.becauseSameHash) {
+      } catch (ex) {
+        if (!ex.becauseSameHash) {
+          throw ex;
+        }
         // The last backup already contained up-to-date information, just
         // rename it as if it was today's backup.
         this._backupFiles.shift();
@@ -512,7 +515,7 @@ this.PlacesBackups = {
    *         * index: the position in the parent
    *         * dateAdded: microseconds from the epoch
    *         * lastModified: microseconds from the epoch
-   *         * type: type of the originating node as defined in PlacesUtils 
+   *         * type: type of the originating node as defined in PlacesUtils
    *         The following properties exist only for a subset of bookmarks:
    *         * annos: array of annotations
    *         * uri: url

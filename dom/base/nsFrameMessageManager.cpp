@@ -138,7 +138,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsFrameMessageManager)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsFrameMessageManager)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_JSVAL_MEMBER_CALLBACK(mInitialProcessData)
+  NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mInitialProcessData)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsFrameMessageManager)
@@ -886,7 +886,7 @@ nsFrameMessageManager::PrivateNoteIntentionalCrash()
 }
 
 NS_IMETHODIMP
-nsFrameMessageManager::GetContent(nsIDOMWindow** aContent)
+nsFrameMessageManager::GetContent(mozIDOMWindowProxy** aContent)
 {
   *aContent = nullptr;
   return NS_OK;
@@ -1809,6 +1809,10 @@ nsMessageManagerScriptExecutor::InitChildGlobalInternal(
   JS::CompartmentOptions options;
   options.creationOptions().setZone(JS::SystemZone);
   options.behaviors().setVersion(JSVERSION_LATEST);
+
+  if (xpc::SharedMemoryEnabled()) {
+    options.creationOptions().setSharedMemoryAndAtomicsEnabled(true);
+  }
 
   nsresult rv =
     xpc->InitClassesWithNewWrappedGlobal(cx, aScope, mPrincipal,

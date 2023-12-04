@@ -83,8 +83,9 @@ MODERN_PYTHON_VERSION = LooseVersion('2.7.3')
 class BaseBootstrapper(object):
     """Base class for system bootstrappers."""
 
-    def __init__(self):
+    def __init__(self, no_interactive=False):
         self.package_manager_updated = False
+        self.no_interactive = no_interactive
 
     def install_system_packages(self):
         '''
@@ -93,7 +94,7 @@ class BaseBootstrapper(object):
         build system (like autoconf).
         '''
         raise NotImplementedError('%s must implement install_system_packages()' %
-            __name__)
+                                  __name__)
 
     def install_browser_packages(self):
         '''
@@ -101,7 +102,8 @@ class BaseBootstrapper(object):
         'browser').
         '''
         raise NotImplementedError('Cannot bootstrap Firefox for Desktop: '
-            '%s does not yet implement install_browser_packages()' % __name__)
+                                  '%s does not yet implement install_browser_packages()' %
+                                  __name__)
 
     def suggest_browser_mozconfig(self):
         '''
@@ -119,7 +121,8 @@ class BaseBootstrapper(object):
         'mobile/android', also known as Fennec).
         '''
         raise NotImplementedError('Cannot bootstrap Firefox for Android: '
-            '%s does not yet implement install_mobile_android_packages()' % __name__)
+                                  '%s does not yet implement install_mobile_android_packages()'
+                                  % __name__)
 
     def suggest_mobile_android_mozconfig(self):
         '''
@@ -130,7 +133,7 @@ class BaseBootstrapper(object):
         paths to the Android SDK and NDK.
         '''
         raise NotImplementedError('%s does not yet implement suggest_mobile_android_mozconfig()' %
-            __name__)
+                                  __name__)
 
     def which(self, name):
         """Python implementation of which.
@@ -155,32 +158,51 @@ class BaseBootstrapper(object):
 
         subprocess.check_call(command, stdin=sys.stdin)
 
-    def yum_install(self, *packages):
-        command = ['yum', 'install']
+    def dnf_install(self, *packages):
+        if self.which('dnf'):
+            command = ['dnf', 'install']
+        else:
+            command = ['yum', 'install']
+
+        if self.no_interactive:
+            command.append('-y')
         command.extend(packages)
 
         self.run_as_root(command)
 
-    def yum_groupinstall(self, *packages):
-        command = ['yum', 'groupinstall']
+    def dnf_groupinstall(self, *packages):
+        if self.which('dnf'):
+            command = ['dnf', 'groupinstall']
+        else:
+            command = ['yum', 'groupinstall']
         command.extend(packages)
 
         self.run_as_root(command)
 
-    def yum_update(self, *packages):
-        command = ['yum', 'update']
+    def dnf_update(self, *packages):
+        if self.which('dnf'):
+            command = ['dnf', 'update']
+        else:
+            command = ['yum', 'update']
+
+        if self.no_interactive:
+            command.append('-y')
         command.extend(packages)
 
         self.run_as_root(command)
 
     def apt_install(self, *packages):
         command = ['apt-get', 'install']
+        if self.no_interactive:
+            command.append('-y')
         command.extend(packages)
 
         self.run_as_root(command)
 
     def apt_update(self):
         command = ['apt-get', 'update']
+        if self.no_interactive:
+            command.append('-y')
 
         self.run_as_root(command)
 
@@ -274,13 +296,21 @@ class BaseBootstrapper(object):
     def ensure_mercurial_modern(self):
         installed, modern, version = self.is_mercurial_modern()
 
-        if not installed or modern:
+        if modern:
             print('Your version of Mercurial (%s) is sufficiently modern.' %
-                version)
+                  version)
             return
 
         self._ensure_package_manager_updated()
-        self.upgrade_mercurial(version)
+
+        if installed:
+            print('Your version of Mercurial (%s) is not modern enough.' %
+                  version)
+        else:
+            print('You do not have Mercurial installed')
+
+        if self.upgrade_mercurial(version) is False:
+            return
 
         installed, modern, after = self.is_mercurial_modern()
 
@@ -291,6 +321,9 @@ class BaseBootstrapper(object):
         """Upgrade Mercurial.
 
         Child classes should reimplement this.
+
+        Return False to not perform a version check after the upgrade is
+        performed.
         """
         print(MERCURIAL_UNABLE_UPGRADE % (current, MODERN_MERCURIAL_VERSION))
 
@@ -305,7 +338,7 @@ class BaseBootstrapper(object):
         assert python
 
         info = self.check_output([python, '--version'],
-            stderr=subprocess.STDOUT)
+                                 stderr=subprocess.STDOUT)
         match = re.search('Python ([a-z0-9\.]+)', info)
         if not match:
             print('ERROR Unable to identify Python version.')
@@ -323,7 +356,7 @@ class BaseBootstrapper(object):
             return
 
         print('Your version of Python (%s) is too old. Will try to upgrade.' %
-            version)
+              version)
 
         self._ensure_package_manager_updated()
         self.upgrade_python(version)

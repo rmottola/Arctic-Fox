@@ -185,13 +185,6 @@ PrintDocTreeAll(nsIDocShellTreeItem* aItem)
 #define NS_MODIFIER_META     8
 #define NS_MODIFIER_OS       16
 
-static nsIDocument *
-GetDocumentFromWindow(nsIDOMWindow *aWindow)
-{
-  nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(aWindow);
-  return win ? win->GetExtantDoc() : nullptr;
-}
-
 /******************************************************************/
 /* mozilla::UITimerCallback                                       */
 /******************************************************************/
@@ -713,7 +706,7 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
       if (modifierMask &&
           (modifierMask == Prefs::ChromeAccessModifierMask() ||
            modifierMask == Prefs::ContentAccessModifierMask())) {
-        nsAutoTArray<uint32_t, 10> accessCharCodes;
+        AutoTArray<uint32_t, 10> accessCharCodes;
         nsContentUtils::GetAccessKeyCandidates(keyEvent, accessCharCodes);
 
         if (HandleAccessKey(aPresContext, accessCharCodes,
@@ -1272,7 +1265,7 @@ EventStateManager::HandleCrossProcessEvent(WidgetEvent* aEvent,
   // event to.
   //
   // NB: the elements of |targets| must be unique, for correctness.
-  nsAutoTArray<nsCOMPtr<nsIContent>, 1> targets;
+  AutoTArray<nsCOMPtr<nsIContent>, 1> targets;
   if (aEvent->mClass != eTouchEventClass || aEvent->mMessage == eTouchStart) {
     // If this event only has one target, and it's remote, add it to
     // the array.
@@ -1685,7 +1678,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
       }
 
       nsCOMPtr<nsISupports> container = aPresContext->GetContainerWeak();
-      nsCOMPtr<nsPIDOMWindow> window = do_GetInterface(container);
+      nsCOMPtr<nsPIDOMWindowOuter> window = do_GetInterface(container);
       if (!window)
         return;
 
@@ -1794,7 +1787,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
 } // GenerateDragGesture
 
 void
-EventStateManager::DetermineDragTargetAndDefaultData(nsPIDOMWindow* aWindow,
+EventStateManager::DetermineDragTargetAndDefaultData(nsPIDOMWindowOuter* aWindow,
                                                      nsIContent* aSelectionTarget,
                                                      DataTransfer* aDataTransfer,
                                                      nsISelection** aSelection,
@@ -1989,19 +1982,18 @@ EventStateManager::GetContentViewer(nsIContentViewer** aCv)
   nsIFocusManager* fm = nsFocusManager::GetFocusManager();
   if(!fm) return NS_ERROR_FAILURE;
 
-  nsCOMPtr<nsIDOMWindow> focusedWindow;
+  nsCOMPtr<mozIDOMWindowProxy> focusedWindow;
   fm->GetFocusedWindow(getter_AddRefs(focusedWindow));
 
-  nsCOMPtr<nsPIDOMWindow> ourWindow = do_QueryInterface(focusedWindow);
-  if(!ourWindow) return NS_ERROR_FAILURE;
+  auto* ourWindow = nsPIDOMWindowOuter::From(focusedWindow);
 
-  nsCOMPtr<nsPIDOMWindow> rootWindow = do_QueryInterface(ourWindow->GetPrivateRoot());
+  nsCOMPtr<nsPIDOMWindowOuter> rootWindow = ourWindow->GetPrivateRoot();
   if(!rootWindow) return NS_ERROR_FAILURE;
 
-  nsCOMPtr<nsIDOMWindow> contentWindow = nsGlobalWindow::Cast(rootWindow)->GetContent();
+  nsCOMPtr<nsPIDOMWindowOuter> contentWindow = nsGlobalWindow::Cast(rootWindow)->GetContent();
   if(!contentWindow) return NS_ERROR_FAILURE;
 
-  nsIDocument *doc = GetDocumentFromWindow(contentWindow);
+  nsIDocument *doc = contentWindow->GetDoc();
   if(!doc) return NS_ERROR_FAILURE;
 
   nsIPresShell *presShell = doc->GetShell();
@@ -3045,14 +3037,14 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         EnsureDocument(mPresContext);
         nsIFocusManager* fm = nsFocusManager::GetFocusManager();
         if (mDocument && fm) {
-          nsCOMPtr<nsIDOMWindow> window;
+          nsCOMPtr<mozIDOMWindowProxy> window;
           fm->GetFocusedWindow(getter_AddRefs(window));
-          nsCOMPtr<nsPIDOMWindow> currentWindow = do_QueryInterface(window);
+          auto* currentWindow = nsPIDOMWindowOuter::From(window);
           if (currentWindow && mDocument->GetWindow() &&
               currentWindow != mDocument->GetWindow() &&
               !nsContentUtils::IsChromeDoc(mDocument)) {
-            nsCOMPtr<nsPIDOMWindow> currentTop;
-            nsCOMPtr<nsPIDOMWindow> newTop;
+            nsCOMPtr<nsPIDOMWindowOuter> currentTop;
+            nsCOMPtr<nsPIDOMWindowOuter> newTop;
             currentTop = currentWindow->GetTop();
             newTop = mDocument->GetWindow()->GetTop();
             nsCOMPtr<nsIDocument> currentDoc = currentWindow->GetExtantDoc();
@@ -3142,10 +3134,15 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       if (pluginFrame) {
         MOZ_ASSERT(pluginFrame->WantsToHandleWheelEventAsDefaultAction());
         action = WheelPrefs::ACTION_SEND_TO_PLUGIN;
-      } else if (nsLayoutUtils::IsScrollFrameWithSnapping(frameToScroll)) {
+      } else if (!wheelEvent->mayHaveMomentum &&
+            nsLayoutUtils::IsScrollFrameWithSnapping(frameToScroll)) {
         // If the target has scroll-snapping points then we want to handle
         // the wheel event on the main thread even if we have APZ enabled. Do
-        // so and let the APZ know that it should ignore this event.
+        // so and let the APZ know that it should ignore this event. However,
+        // if the wheel event is synthesized from a Mac trackpad or other device
+        // that can generate additional momentum events, then we should allow
+        // APZ to handle it, because it will track the velocity and predicted
+        // destination from the momentum.
         if (wheelEvent->mFlags.mHandledByAPZ) {
           wheelEvent->mFlags.mDefaultPrevented = true;
         }
@@ -3944,7 +3941,7 @@ public:
     , mMouseEvent(aMouseEvent)
     , mEventMessage(aEventMessage)
   {
-    nsPIDOMWindow* win =
+    nsPIDOMWindowInner* win =
       aTarget ? aTarget->OwnerDoc()->GetInnerWindow() : nullptr;
     if (aMouseEvent->AsPointerEvent() ? win && win->HasPointerEnterLeaveEventListeners() :
                                         win && win->HasMouseEnterLeaveEventListeners()) {
@@ -4148,7 +4145,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
 // makes us throw away the fractional error that results, rather than having
 // it manifest as a potential one-device-pix discrepancy.
 static LayoutDeviceIntPoint
-GetWindowInnerRectCenter(nsPIDOMWindow* aWindow,
+GetWindowInnerRectCenter(nsPIDOMWindowOuter* aWindow,
                          nsIWidget* aWidget,
                          nsPresContext* aContext)
 {
@@ -5147,7 +5144,7 @@ EventStateManager::GetFocusedContent()
   if (!fm || !mDocument)
     return nullptr;
 
-  nsCOMPtr<nsPIDOMWindow> focusedWindow;
+  nsCOMPtr<nsPIDOMWindowOuter> focusedWindow;
   return nsFocusManager::GetFocusedDescendant(mDocument->GetWindow(), false,
                                               getter_AddRefs(focusedWindow));
 }
@@ -5178,7 +5175,7 @@ EventStateManager::DoContentCommandEvent(WidgetContentCommandEvent* aEvent)
 {
   EnsureDocument(mPresContext);
   NS_ENSURE_TRUE(mDocument, NS_ERROR_FAILURE);
-  nsCOMPtr<nsPIDOMWindow> window(mDocument->GetWindow());
+  nsCOMPtr<nsPIDOMWindowOuter> window(mDocument->GetWindow());
   NS_ENSURE_TRUE(window, NS_ERROR_FAILURE);
 
   nsCOMPtr<nsPIWindowRoot> root = window->GetTopWindowRoot();

@@ -837,8 +837,18 @@ AccessibleWrap::get_accSelection(VARIANT __RPC_FAR *pvarChildren)
     return E_NOTIMPL;
 
   if (IsSelect()) {
-    nsAutoTArray<Accessible*, 10> selectedItems;
-    SelectedItems(&selectedItems);
+    AutoTArray<Accessible*, 10> selectedItems;
+    if (IsProxy()) {
+      nsTArray<ProxyAccessible*> proxies;
+      Proxy()->SelectedItems(&proxies);
+
+      uint32_t selectedCount = proxies.Length();
+      for (uint32_t i = 0; i < selectedCount; i++) {
+        selectedItems.AppendElement(WrapperFor(proxies[i]));
+      }
+    } else {
+      SelectedItems(&selectedItems);
+    }
 
     // 1) Create and initialize the enumeration
     RefPtr<AccessibleEnumerator> pEnum = new AccessibleEnumerator(selectedItems);

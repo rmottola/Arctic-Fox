@@ -52,8 +52,8 @@ public:
     }
   }
 
-  virtual void NotifyEvent(MediaStreamGraph* aGraph,
-                           MediaStreamListener::MediaStreamGraphEvent event) override
+  void NotifyEvent(MediaStreamGraph* aGraph,
+                   MediaStreamListener::MediaStreamGraphEvent event) override
   {
     switch (event) {
       case EVENT_FINISHED:
@@ -73,7 +73,7 @@ public:
     }
   }
 
-  virtual void NotifyBlockingChanged(MediaStreamGraph* aGraph, Blocking aBlocked) override
+  void NotifyBlockingChanged(MediaStreamGraph* aGraph, Blocking aBlocked) override
   {
     if (aBlocked == MediaStreamListener::UNBLOCKED && !mStarted) {
       mStarted = true;
@@ -323,7 +323,7 @@ nsSpeechTask::SendAudioImpl(RefPtr<mozilla::SharedBuffer>& aSamples, uint32_t aD
   }
 
   AudioSegment segment;
-  nsAutoTArray<const int16_t*, 1> channelData;
+  AutoTArray<const int16_t*, 1> channelData;
   channelData.AppendElement(static_cast<int16_t*>(aSamples->Data()));
   segment.AppendFrames(aSamples.forget(), channelData, aDataLen);
   mStream->AppendToTrack(1, &segment);

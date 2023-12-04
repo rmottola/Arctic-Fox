@@ -884,8 +884,7 @@ nsMenuPopupFrame::HidePopup(bool aDeselectMenu, nsPopupState aNewState)
     if (mTriggerContent) {
       nsIDocument* doc = mContent->GetCurrentDoc();
       if (doc) {
-        nsPIDOMWindow* win = doc->GetWindow();
-        if (win) {
+        if (nsPIDOMWindowOuter* win = doc->GetWindow()) {
           nsCOMPtr<nsPIWindowRoot> root = win->GetTopWindowRoot();
           if (root) {
             root->SetPopupNode(nullptr);
@@ -1889,7 +1888,7 @@ nsMenuPopupFrame::FindMenuWithShortcut(nsIDOMKeyEvent* aKeyEvent, bool& doAction
 
   static DOMTimeStamp lastKeyTime = 0;
   DOMTimeStamp keyTime;
-  aKeyEvent->GetTimeStamp(&keyTime);
+  aKeyEvent->AsEvent()->GetTimeStamp(&keyTime);
 
   if (charCode == 0) {
     if (keyCode == nsIDOMKeyEvent::DOM_VK_BACK_SPACE) {

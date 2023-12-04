@@ -595,7 +595,8 @@ public:
     uint32_t mOffset;
     uint32_t mLength;
   } mInput;
-  struct
+
+  struct Reply
   {
     void* mContentsRoot;
     uint32_t mOffset;
@@ -611,18 +612,29 @@ public:
     mozilla::LayoutDeviceIntRect mRect;
     // The return widget has the caret. This is set at all query events.
     nsIWidget* mFocusedWidget;
+    // mozilla::WritingMode value at the end (focus) of the selection
+    mozilla::WritingMode mWritingMode;
+    // Used by eQuerySelectionAsTransferable
+    nsCOMPtr<nsITransferable> mTransferable;
+    // Used by eQueryTextContent with font ranges requested
+    AutoTArray<mozilla::FontRange, 1> mFontRanges;
     // true if selection is reversed (end < start)
     bool mReversed;
     // true if the selection exists
     bool mHasSelection;
     // true if DOM element under mouse belongs to widget
     bool mWidgetIsHit;
-    // mozilla::WritingMode value at the end (focus) of the selection
-    mozilla::WritingMode mWritingMode;
-    // Used by eQuerySelectionAsTransferable
-    nsCOMPtr<nsITransferable> mTransferable;
-    // Used by eQueryTextContent with font ranges requested
-    nsAutoTArray<mozilla::FontRange, 1> mFontRanges;
+
+    Reply()
+      : mContentsRoot(nullptr)
+      , mOffset(NOT_FOUND)
+      , mTentativeCaretOffset(NOT_FOUND)
+      , mFocusedWidget(nullptr)
+      , mReversed(false)
+      , mHasSelection(false)
+      , mWidgetIsHit(false)
+    {
+    }
   } mReply;
 
   enum

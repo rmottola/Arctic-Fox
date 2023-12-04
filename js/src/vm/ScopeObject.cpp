@@ -622,8 +622,20 @@ ModuleEnvironmentObject::setProperty(JSContext* cx, HandleObject obj, HandleId i
 ModuleEnvironmentObject::getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
                                                   MutableHandle<PropertyDescriptor> desc)
 {
-    // We never call this hook on scope objects.
-    MOZ_CRASH();
+    const IndirectBindingMap& bindings = obj->as<ModuleEnvironmentObject>().importBindings();
+    Shape* shape;
+    ModuleEnvironmentObject* env;
+    if (bindings.lookup(id, &env, &shape)) {
+        desc.setAttributes(JSPROP_ENUMERATE | JSPROP_PERMANENT);
+        desc.object().set(obj);
+        RootedValue value(cx, env->getSlot(shape->slot()));
+        desc.setValue(value);
+        desc.assertComplete();
+        return true;
+    }
+
+    RootedNativeObject self(cx, &obj->as<NativeObject>());
+    return NativeGetOwnPropertyDescriptor(cx, self, id, desc);
 }
 
 /* static */ bool
@@ -1479,6 +1491,13 @@ ScopeIter::settle()
     if (frame_ && frame_.isFunctionFrame() && frame_.callee()->needsCallObject() &&
         !frame_.hasCallObj())
     {
+        // At the very start of a script that starts with a lexical block, the
+        // static scope will be that block. Skip it if this is the case.
+        if (ssi_.type() == StaticScopeIter<CanGC>::Block)
+            incrementStaticScopeIter();
+
+        // We should now be at the function scope, so since we have no
+        // CallObject, skip that too.
         MOZ_ASSERT(ssi_.type() == StaticScopeIter<CanGC>::Function);
         incrementStaticScopeIter();
     }
@@ -1486,8 +1505,14 @@ ScopeIter::settle()
     // Check for trying to iterate a strict eval frame before the prologue has
     // created the CallObject.
     if (frame_ && frame_.isStrictEvalFrame() && !frame_.hasCallObj() && !ssi_.done()) {
+        // Eval frames always have their own lexical scope. Analogous to the
+        // function frame case above, if the script starts with a lexical
+        // block, the SSI could see 2 block scopes here. So skip between 1-2
+        // static block scopes here.
         MOZ_ASSERT(ssi_.type() == StaticScopeIter<CanGC>::Block);
         incrementStaticScopeIter();
+        if (ssi_.type() == StaticScopeIter<CanGC>::Block)
+            incrementStaticScopeIter();
         MOZ_ASSERT(ssi_.type() == StaticScopeIter<CanGC>::Eval);
         MOZ_ASSERT(maybeStaticScope() == frame_.script()->enclosingStaticScope());
         incrementStaticScopeIter();
@@ -1638,6 +1663,16 @@ LiveScopeVal::staticAsserts()
 
 namespace {
 
+static void
+ReportOptimizedOut(JSContext* cx, HandleId id)
+{
+    JSAutoByteString printable;
+    if (ValueToPrintable(cx, IdToValue(id), &printable)) {
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT,
+                             printable.ptr());
+    }
+}
+
 /*
  * DebugScopeProxy is the handler for DebugScopeObject proxy objects. Having a
  * custom handler (rather than trying to reuse js::Wrapper) gives us several
@@ -1777,7 +1812,15 @@ class DebugScopeProxy : public BaseProxyHandler
                     TypeScript::SetArgument(cx, script, i, vp);
             }
 
-            *accessResult = ACCESS_UNALIASED;
+            // It is possible that an optimized out value flows to this
+            // location due to Debugger.Frame.prototype.eval operating on a
+            // live bailed-out Baseline frame. In that case, treat the access
+            // as lost.
+            if (vp.isMagic() && vp.whyMagic() == JS_OPTIMIZED_OUT)
+                *accessResult = ACCESS_LOST;
+            else
+                *accessResult = ACCESS_UNALIASED;
+
             return true;
         }
 
@@ -1822,7 +1865,12 @@ class DebugScopeProxy : public BaseProxyHandler
                 }
             }
 
-            *accessResult = ACCESS_UNALIASED;
+            // See comment above in analogous CallObject case.
+            if (vp.isMagic() && vp.whyMagic() == JS_OPTIMIZED_OUT)
+                *accessResult = ACCESS_LOST;
+            else
+                *accessResult = ACCESS_UNALIASED;
+
             return true;
         }
 
@@ -2053,7 +2101,7 @@ class DebugScopeProxy : public BaseProxyHandler
           case ACCESS_GENERIC:
             return JS_GetOwnPropertyDescriptorById(cx, scope, id, desc);
           case ACCESS_LOST:
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT);
+            ReportOptimizedOut(cx, id);
             return false;
           default:
             MOZ_CRASH("bad AccessResult");
@@ -2117,7 +2165,7 @@ class DebugScopeProxy : public BaseProxyHandler
           case ACCESS_GENERIC:
             return GetProperty(cx, scope, scope, id, vp);
           case ACCESS_LOST:
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT);
+            ReportOptimizedOut(cx, id);
             return false;
           default:
             MOZ_CRASH("bad AccessResult");
@@ -2281,8 +2329,11 @@ class DebugScopeProxy : public BaseProxyHandler
             *bp = true;
             return true;
         }
-        if (isThis(cx, id) && isFunctionScopeWithThis(scopeObj)) {
-            *bp = true;
+
+        // Be careful not to look up '.this' as a normal binding below, it will
+        // assert in with_HasProperty.
+        if (isThis(cx, id)) {
+            *bp = isFunctionScopeWithThis(scopeObj);
             return true;
         }
 
@@ -2424,7 +2475,7 @@ DebugScopes::DebugScopes(JSContext* cx)
 
 DebugScopes::~DebugScopes()
 {
-    MOZ_ASSERT(missingScopes.empty());
+    MOZ_ASSERT_IF(missingScopes.initialized(), missingScopes.empty());
 }
 
 bool
@@ -2524,15 +2575,14 @@ DebugScopes::ensureCompartmentData(JSContext* cx)
     if (c->debugScopes)
         return c->debugScopes;
 
-    c->debugScopes = cx->runtime()->new_<DebugScopes>(cx);
-    if (c->debugScopes && c->debugScopes->init())
-        return c->debugScopes;
+    AutoInitGCManagedObject<DebugScopes> debugScopes(cx->make_unique<DebugScopes>(cx));
+    if (!debugScopes || !debugScopes->init()) {
+        ReportOutOfMemory(cx);
+        return nullptr;
+    }
 
-    if (c->debugScopes)
-        js_delete<DebugScopes>(c->debugScopes);
-    c->debugScopes = nullptr;
-    ReportOutOfMemory(cx);
-    return nullptr;
+    c->debugScopes = debugScopes.release();
+    return c->debugScopes;
 }
 
 DebugScopeObject*

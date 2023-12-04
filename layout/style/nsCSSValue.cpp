@@ -1517,12 +1517,12 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
                    gradient->mBgPos.mYValue.GetUnit() == eCSSUnit_Enumerated,
                    "unexpected unit");
         aResult.AppendLiteral("to");
-        if (!(gradient->mBgPos.mXValue.GetIntValue() & NS_STYLE_BG_POSITION_CENTER)) {
+        if (!(gradient->mBgPos.mXValue.GetIntValue() & NS_STYLE_IMAGELAYER_POSITION_CENTER)) {
           aResult.Append(' ');
           gradient->mBgPos.mXValue.AppendToString(eCSSProperty_background_position,
                                                   aResult, aSerialization);
         }
-        if (!(gradient->mBgPos.mYValue.GetIntValue() & NS_STYLE_BG_POSITION_CENTER)) {
+        if (!(gradient->mBgPos.mYValue.GetIntValue() & NS_STYLE_IMAGELAYER_POSITION_CENTER)) {
           aResult.Append(' ');
           gradient->mBgPos.mYValue.AppendToString(eCSSProperty_background_position,
                                                   aResult, aSerialization);
@@ -1641,7 +1641,7 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
 
       // functional values
       const nsCSSValueList *list = GetPairValue().mYValue.GetListValue();
-      nsAutoTArray<gfxAlternateValue,8> altValues;
+      AutoTArray<gfxAlternateValue,8> altValues;
 
       nsStyleUtil::ComputeFunctionalAlternates(list, altValues);
       nsStyleUtil::SerializeFunctionalAlternates(altValues, out);

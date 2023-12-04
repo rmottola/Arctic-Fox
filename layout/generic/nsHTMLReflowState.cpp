@@ -594,7 +594,7 @@ nsHTMLReflowState::InitResizeFlags(nsPresContext* aPresContext, nsIAtom* aFrameT
       // frame tree geometry (the width on an ancestor) rather than
       // style.
 
-      nsAutoTArray<nsIFrame*, 32> stack;
+      AutoTArray<nsIFrame*, 32> stack;
       stack.AppendElement(frame);
 
       do {
@@ -1145,10 +1145,10 @@ nsHTMLReflowState::CalculateBorderPaddingMargin(
   switch (mStylePosition->mBoxSizing) {
     case StyleBoxSizing::Border:
       inside += borderStartEnd;
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Padding:
       inside += paddingStartEnd;
-      // fall through
+      MOZ_FALLTHROUGH;
     case StyleBoxSizing::Content:
       // nothing
       break;
@@ -2383,12 +2383,12 @@ nsHTMLReflowState::InitConstraints(nsPresContext*     aPresContext,
 
 static void
 UpdateProp(FrameProperties& aProps,
-           const FramePropertyDescriptor* aProperty,
+           const FramePropertyDescriptor<nsMargin>* aProperty,
            bool aNeeded,
            nsMargin& aNewValue)
 {
   if (aNeeded) {
-    nsMargin* propValue = static_cast<nsMargin*>(aProps.Get(aProperty));
+    nsMargin* propValue = aProps.Get(aProperty);
     if (propValue) {
       *propValue = aNewValue;
     } else {

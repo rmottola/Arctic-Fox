@@ -115,6 +115,7 @@ enum {
     JS_TELEMETRY_GC_MAX_PAUSE_MS,
     JS_TELEMETRY_GC_MARK_MS,
     JS_TELEMETRY_GC_SWEEP_MS,
+    JS_TELEMETRY_GC_COMPACT_MS,
     JS_TELEMETRY_GC_MARK_ROOTS_MS,
     JS_TELEMETRY_GC_MARK_GRAY_MS,
     JS_TELEMETRY_GC_SLICE_MS,
@@ -242,6 +243,13 @@ namespace JS {
 /** Exposed for DumpJSStack */
 extern JS_FRIEND_API(char*)
 FormatStackDump(JSContext* cx, char* buf, bool showArgs, bool showLocals, bool showThisProps);
+
+/**
+ * Set all of the uninitialized lexicals on an object to undefined. Return
+ * true if any lexicals were initialized and false otherwise.
+ * */
+extern JS_FRIEND_API(bool)
+ForceLexicalInitialization(JSContext *cx, HandleObject obj);
 
 } // namespace JS
 

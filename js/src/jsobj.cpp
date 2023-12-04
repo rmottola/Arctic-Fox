@@ -2571,61 +2571,7 @@ js::GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
         return ok;
     }
 
-    RootedNativeObject nobj(cx, obj.as<NativeObject>());
-    RootedShape shape(cx);
-    if (!NativeLookupOwnProperty<CanGC>(cx, nobj, id, &shape))
-        return false;
-    if (!shape) {
-        desc.object().set(nullptr);
-        return true;
-    }
-
-    desc.setAttributes(GetShapeAttributes(obj, shape));
-    if (desc.isAccessorDescriptor()) {
-        MOZ_ASSERT(desc.isShared());
-
-        // The result of GetOwnPropertyDescriptor() must be either undefined or
-        // a complete property descriptor (per ES6 draft rev 32 (2015 Feb 2)
-        // 6.1.7.3, Invariants of the Essential Internal Methods).
-        //
-        // It is an unfortunate fact that in SM, properties can exist that have
-        // JSPROP_GETTER or JSPROP_SETTER but not both. In these cases, rather
-        // than return true with desc incomplete, we fill out the missing
-        // getter or setter with a null, following CompletePropertyDescriptor.
-        if (desc.hasGetterObject()) {
-            desc.setGetterObject(shape->getterObject());
-        } else {
-            desc.setGetterObject(nullptr);
-            desc.attributesRef() |= JSPROP_GETTER;
-        }
-        if (desc.hasSetterObject()) {
-            desc.setSetterObject(shape->setterObject());
-        } else {
-            desc.setSetterObject(nullptr);
-            desc.attributesRef() |= JSPROP_SETTER;
-        }
-
-        desc.value().setUndefined();
-    } else {
-        // This is either a straight-up data property or (rarely) a
-        // property with a JSGetterOp/JSSetterOp. The latter must be
-        // reported to the caller as a plain data property, so clear
-        // desc.getter/setter, and mask away the SHARED bit.
-        desc.setGetter(nullptr);
-        desc.setSetter(nullptr);
-        desc.attributesRef() &= ~JSPROP_SHARED;
-
-        if (IsImplicitDenseOrTypedArrayElement(shape)) {
-            desc.value().set(nobj->getDenseOrTypedArrayElement(JSID_TO_INT(id)));
-        } else {
-            if (!NativeGetExistingProperty(cx, nobj, nobj, shape, desc.value()))
-                return false;
-        }
-    }
-
-    desc.object().set(nobj);
-    desc.assertComplete();
-    return true;
+    return NativeGetOwnPropertyDescriptor(cx, obj.as<NativeObject>(), id, desc);
 }
 
 bool
@@ -3307,12 +3253,12 @@ GetObjectSlotNameFunctor::operator()(JS::CallbackTracer* trc, char* buf, size_t 
             if (slotname)
                 JS_snprintf(buf, bufsize, pattern, slotname);
             else
-                JS_snprintf(buf, bufsize, "**UNKNOWN SLOT %ld**", (long)slot);
+                JS_snprintf(buf, bufsize, "**UNKNOWN SLOT %" PRIu32 "**", slot);
         } while (false);
     } else {
         jsid propid = shape->propid();
         if (JSID_IS_INT(propid)) {
-            JS_snprintf(buf, bufsize, "%ld", (long)JSID_TO_INT(propid));
+            JS_snprintf(buf, bufsize, "%" PRId32 "", JSID_TO_INT(propid));
         } else if (JSID_IS_ATOM(propid)) {
             PutEscapedString(buf, bufsize, JSID_TO_ATOM(propid), 0);
         } else if (JSID_IS_SYMBOL(propid)) {
@@ -3647,8 +3593,11 @@ js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
 JS_FRIEND_API(void)
 js::DumpBacktrace(JSContext* cx)
 {
-    Sprinter sprinter(cx);
-    sprinter.init();
+    Sprinter sprinter(cx, false);
+    if (!sprinter.init()) {
+        fprintf(stdout, "js::DumpBacktrace: OOM\n");
+        return;
+    }
     size_t depth = 0;
     for (AllFramesIter i(cx); !i.done(); ++i, ++depth) {
         const char* filename = JS_GetScriptFilename(i.script());
@@ -3667,9 +3616,8 @@ js::DumpBacktrace(JSContext* cx)
     }
     fprintf(stdout, "%s", sprinter.string());
 #ifdef XP_WIN32
-    if (IsDebuggerPresent()) {
+    if (IsDebuggerPresent())
         OutputDebugStringA(sprinter.string());
-    }
 #endif
 }
 
@@ -3757,7 +3705,7 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
     if (is<NativeObject>() && as<NativeObject>().hasDynamicElements()) {
         js::ObjectElements* elements = as<NativeObject>().getElementsHeader();
         if (!elements->isCopyOnWrite() || elements->ownerObject() == this)
-            info->objectsMallocHeapElementsNonAsmJS += mallocSizeOf(elements);
+            info->objectsMallocHeapElementsNormal += mallocSizeOf(elements);
     }
 
     // Other things may be measured in the future if DMD indicates it is worthwhile.

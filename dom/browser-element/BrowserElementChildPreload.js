@@ -549,7 +549,7 @@ BrowserElementChild.prototype = {
 
   _recvEnteredFullscreen: function() {
     if (!this._windowUtils.handleFullscreenRequests() &&
-        !content.document.mozFullScreen) {
+        !content.document.fullscreenElement) {
       // If we don't actually have any pending fullscreen request
       // to handle, neither we have been in fullscreen, tell the
       // parent to just exit.

@@ -27,11 +27,11 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(Gamepad, mParent, mButtons)
 void
 Gamepad::UpdateTimestamp()
 {
-  nsCOMPtr<nsPIDOMWindow> newWindow(do_QueryInterface(mParent));
+  nsCOMPtr<nsPIDOMWindowInner> newWindow(do_QueryInterface(mParent));
   if(newWindow) {
     nsPerformance* perf = newWindow->GetPerformance();
     if (perf) {
-      mTimestamp =  perf->GetDOMTiming()->TimeStampToDOMHighRes(TimeStamp::Now());
+      mTimestamp =  perf->Now();
     }
   }
 }

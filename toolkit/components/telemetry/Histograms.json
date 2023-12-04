@@ -88,14 +88,41 @@
     "kind": "boolean",
     "description": "blocklist.xml has been loaded synchronously *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
-  "CHECKERBOARDED_CSSPIXELS_MS": {
+  "CHECKERBOARD_DURATION": {
     "alert_emails": ["kgupta@mozilla.com"],
-    "bug_numbers": [1221694],
+    "bug_numbers": [1238040],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "3840 * 2160 * 16",
+    "high": "100000",
     "n_buckets": 50,
-    "description": "Magnitude of checkerboarding in CSSPixel-milliseconds per scrollable frame per composite"
+    "description": "Duration of a checkerboard event in milliseconds"
+  },
+  "CHECKERBOARD_PEAK": {
+    "alert_emails": ["kgupta@mozilla.com"],
+    "bug_numbers": [1238040],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "3840 * 2160 * 8",
+    "n_buckets": 50,
+    "description": "Peak number of CSS pixels checkerboarded during a checkerboard event (the high value is the size of a 4k display with max APZ zooming)"
+  },
+  "CHECKERBOARD_POTENTIAL_DURATION": {
+    "alert_emails": ["kgupta@mozilla.com"],
+    "bug_numbers": [1238040],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "1000000",
+    "n_buckets": 50,
+    "description": "Duration of a chunk of time (in ms) that could reasonably have had checkerboarding"
+  },
+  "CHECKERBOARD_SEVERITY": {
+    "alert_emails": ["kgupta@mozilla.com"],
+    "bug_numbers": [1238040],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": "1073741824",
+    "n_buckets": 50,
+    "description": "Opaque measure of the severity of a checkerboard event"
   },
   "COMPOSITE_TIME" : {
     "expires_in_version": "never",
@@ -305,6 +332,14 @@
     "n_buckets": 50,
     "description": "Time spent running JS GC sweep phase (ms)"
   },
+  "GC_COMPACT_MS": {
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "10000",
+    "n_buckets": 50,
+    "description": "Time spent running JS GC compact phase (ms)"
+  },
   "GC_MARK_ROOTS_MS": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -396,9 +431,35 @@
     "description": "Location accuracy"
   },
   "GEOLOCATION_ERROR": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "flag",
     "description": "Has seen location error"
+  },
+  "GEOLOCATION_GETCURRENTPOSITION_SECURE_ORIGIN" : {
+    "expires_in_version" : "55",
+    "kind": "enumerated",
+    "n_values": 10,
+    "bug_numbers": [1230209],
+    "description" : "Number of navigator.geolocation.getCurrentPosition() calls (0=other, 1=http, 2=https)"
+  },
+  "GEOLOCATION_REQUEST_GRANTED": {
+    "expires_in_version": "55",
+    "kind": "enumerated",
+    "n_values": 20,
+    "bug_numbers": [1230209],
+    "description": "Geolocation requests either granted or denied (0=denied/other, 1=denied/http, 2=denied/https, ..., 10=granted/other, 11=granted/http, 12=granted/https)"
+  },
+  "GEOLOCATION_WATCHPOSITION_SECURE_ORIGIN" : {
+    "expires_in_version" : "55",
+    "kind": "enumerated",
+    "n_values": 10,
+    "bug_numbers": [1230209],
+    "description" : "Number of navigator.geolocation.watchPosition() calls (0=other, 1=http, 2=https)"
+  },
+  "GEOLOCATION_WIN8_SOURCE_IS_MLS": {
+    "expires_in_version": "default",
+    "kind": "boolean",
+    "description": "Geolocation on Win8 is either MLS or native"
   },
   "GEOLOCATION_OSX_SOURCE_IS_MLS": {
     "expires_in_version": "default",
@@ -433,6 +494,16 @@
     "n_buckets": 100,
     "bug_numbers": [1226196],
     "description": "Resident memory size (KB)"
+  },
+  "MEMORY_TOTAL": {
+    "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
+    "bug_numbers": [1198209],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": 32768,
+    "high": 16777216,
+    "n_buckets": 100,
+    "description": "Total Memory Across All Processes (KB)"
   },
   "MEMORY_UNIQUE": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
@@ -875,6 +946,20 @@
     "expires_in_version": "40",
     "kind": "boolean",
     "description": "WebGL canvas used"
+  },
+  "CANVAS_WEBGL_SUCCESS": {
+    "alert_emails": ["jmuizelaar@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "WebGL1 creation success",
+    "bug_numbers": [1247327]
+  },
+  "CANVAS_WEBGL2_SUCCESS": {
+    "alert_emails": ["jmuizelaar@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "WebGL2 creation success",
+    "bug_numbers": [1247327]
   },
   "TOTAL_CONTENT_PAGE_LOAD_TIME": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
@@ -3959,6 +4044,43 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "THUMBNAILS: Thumbnail found"
+  },
+  "FX_MIGRATION_ENTRY_POINT": {
+    "expires_in_version": "49",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Where the migration wizard was entered from. 0=Other/catch-all, 1=first-run, 2=refresh-firefox, 3=Places window, 4=Password manager"
+  },
+  "FX_MIGRATION_SOURCE_BROWSER": {
+    "expires_in_version": "49",
+    "kind": "enumerated",
+    "n_values": 15,
+    "releaseChannelCollection": "opt-out",
+    "description": "The browser that data is pulled from. The values correspond to the internal browser ID (see MigrationUtils.jsm)"
+  },
+  "FX_MIGRATION_ERRORS": {
+    "expires_in_version": "49",
+    "kind": "enumerated",
+    "keyed": "true",
+    "n_values": 12,
+    "releaseChannelCollection": "opt-out",
+    "description": "Errors encountered during migration in buckets defined by the datatype, keyed by the string description of the browser."
+  },
+  "FX_MIGRATION_USAGE": {
+    "expires_in_version": "49",
+    "kind": "enumerated",
+    "keyed": "true",
+    "n_values": 12,
+    "releaseChannelCollection": "opt-out",
+    "description": "Usage of migration for each datatype when migration is run through the post-firstrun flow which allows individual datatypes, keyed by the string description of the browser."
+  },
+  "FX_MIGRATION_HOMEPAGE_IMPORTED": {
+    "expires_in_version": "49",
+    "kind": "boolean",
+    "keyed": "true",
+    "releaseChannelCollection": "opt-out",
+    "description": "Whether the homepage was imported during browser migration. Only available on release builds during firstrun."
   },
   "EVENTLOOP_UI_LAG_EXP_MS": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
@@ -7858,16 +7980,14 @@
     "releaseChannelCollection": "opt-in",
     "description": "Number of times the sharing feature has been enabled and disabled"
   },
-  "E10S_AUTOSTART": {
+  "E10S_STATUS": {
+    "alert_emails": ["firefox-dev@mozilla.org"],
     "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "Whether a session is set to autostart e10s windows"
-  },
-  "E10S_AUTOSTART_STATUS": {
-    "expires_in_version": "40",
     "kind": "enumerated",
-    "n_values": 6,
-    "description": "Why e10s is enabled or disabled (0=ENABLED_BY_USER, 1=ENABLED_BY_DEFAULT, 2=DISABLED_BY_USER, 3=DISABLED_IN_SAFE_MODE, 4=DISABLED_FOR_ACCESSIBILITY, 5=DISABLED_FOR_MAC_GFX)"
+    "n_values": 12,
+    "releaseChannelCollection": "opt-out",
+    "bug_numbers": [1241294],
+    "description": "Why e10s is enabled or disabled (0=ENABLED_BY_USER, 1=ENABLED_BY_DEFAULT, 2=DISABLED_BY_USER, 3=DISABLED_IN_SAFE_MODE, 4=DISABLED_FOR_ACCESSIBILITY, 5=DISABLED_FOR_MAC_GFX, 6=DISABLED_FOR_BIDI, 7=DISABLED_FOR_ADDONS)"
   },
   "E10S_WINDOW": {
     "expires_in_version": "never",
@@ -8141,6 +8261,16 @@
     "n_buckets": 20,
     "description": "Sanitize: Time it takes to sanitize the open windows list (ms)"
   },
+  "VIDEO_VP9_BENCHMARK_FPS": {
+    "alert_emails": ["ajones@mozilla.com"],
+    "expires_in_version": "50",
+    "bug_numbers": [1230265],
+    "kind": "linear",
+    "high": 1000,
+    "n_buckets": 100,
+    "description": "720p VP9 decode benchmark measurement in frames per second",
+    "releaseChannelCollection": "opt-out"
+  },
   "MEDIA_CODEC_USED": {
     "alert_emails": ["cpearce@mozilla.com"],
     "expires_in_version": "never",
@@ -8308,6 +8438,11 @@
     "kind": "count",
     "description": "Reports the column that logins are sorted by"
   },
+  "PWMGR_MANAGE_VISIBILITY_TOGGLED": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "Whether the visibility of passwords was toggled (0=Hide, 1=Show)"
+  },
   "PWMGR_NUM_PASSWORDS_PER_HOSTNAME": {
     "expires_in_version": "never",
     "kind": "linear",
@@ -8458,6 +8593,11 @@
     "high": "60000",
     "n_buckets": 30,
     "description": "Time PR_Close of a UDP socket taken (ms)"
+  },
+  "PERMISSIONS_SQL_CORRUPTED": {
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Record the permissions.sqlite init failure"
   },
   "GRAPHICS_DRIVER_STARTUP_TEST": {
     "alert_emails": ["danderson@mozilla.com"],
@@ -8698,11 +8838,6 @@
     "n_values": 20,
     "releaseChannelCollection": "opt-out",
     "description": "Reports why a graphics sanity test was run. 0=First Run, 1=App Updated, 2=Device Change, 3=Driver Change."
-  },
-  "PERMISSIONS_SQL_CORRUPTED": {
-    "expires_in_version": "never",
-    "kind": "count",
-    "description": "Record the permissions.sqlite init failure"
   },
   "DEFECTIVE_PERMISSIONS_SQL_REMOVED": {
     "expires_in_version": "never",
@@ -9269,11 +9404,13 @@
     "kind": "boolean",
     "description": "Attempt to determine prevalence of scroll-linked effects on the web."
   },
-  "YOUTUBE_EMBED_SEEN": {
-    "alert_emails": ["cpeterson@mozilla.com"],
-    "expires_in_version": "48",
-    "kind": "flag",
-    "description": "Flag activated whenever a youtube flash embed is seen during a session."
+  "SCROLL_INPUT_METHODS": {
+    "alert_emails": ["botond@mozilla.com"],
+    "bug_numbers": [1238137],
+    "expires_in_version": "50",
+    "kind": "enumerated",
+    "n_values": 64,
+    "description": "Count of scroll actions triggered by different input methods. See gfx/layers/apz/util/ScrollInputMethods.h for a list of possible values and their meanings."
   },
   "WEB_NOTIFICATION_CLICKED": {
     "alert_emails": ["firefox-dev@mozilla.org"],

@@ -354,7 +354,7 @@ nsPluginCrashedEvent::Run()
     PluginCrashedEvent::Constructor(doc, NS_LITERAL_STRING("PluginCrashed"), init);
 
   event->SetTrusted(true);
-  event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
 
   EventDispatcher::DispatchDOMEvent(mContent, nullptr, event, nullptr, nullptr);
   return NS_OK;
@@ -3431,11 +3431,11 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
   MOZ_ASSERT(thisContent);
   nsIDocument* ownerDoc = thisContent->OwnerDoc();
 
-  nsCOMPtr<nsPIDOMWindow> window = ownerDoc->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> window = ownerDoc->GetWindow();
   if (!window) {
     return false;
   }
-  nsCOMPtr<nsPIDOMWindow> topWindow = window->GetTop();
+  nsCOMPtr<nsPIDOMWindowOuter> topWindow = window->GetTop();
   NS_ENSURE_TRUE(topWindow, false);
   nsCOMPtr<nsIDocument> topDoc = topWindow->GetDoc();
   NS_ENSURE_TRUE(topDoc, false);

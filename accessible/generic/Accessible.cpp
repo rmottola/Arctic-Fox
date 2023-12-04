@@ -302,12 +302,6 @@ Accessible::KeyboardShortcut() const
   return KeyBinding();
 }
 
-bool
-Accessible::CanHaveAnonChildren()
-{
-  return true;
-}
-
 void
 Accessible::TranslateString(const nsString& aKey, nsAString& aStringOut)
 {
@@ -885,20 +879,8 @@ Accessible::HandleAccEvent(AccEvent* aEvent)
     }
   }
 
-  nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
-  NS_ENSURE_TRUE(obsService, NS_ERROR_FAILURE);
-
-  nsCOMPtr<nsISimpleEnumerator> observers;
-  obsService->EnumerateObservers(NS_ACCESSIBLE_EVENT_TOPIC,
-                                 getter_AddRefs(observers));
-
-  NS_ENSURE_STATE(observers);
-
-  bool hasObservers = false;
-  observers->HasMoreElements(&hasObservers);
-  if (hasObservers) {
-    nsCOMPtr<nsIAccessibleEvent> event = MakeXPCEvent(aEvent);
-    return obsService->NotifyObservers(event, NS_ACCESSIBLE_EVENT_TOPIC, nullptr);
+  if (nsCoreUtils::AccEventObserversExist()) {
+    nsCoreUtils::DispatchAccEvent(MakeXPCEvent(aEvent));
   }
 
   return NS_OK;
@@ -2512,7 +2494,7 @@ Accessible::CacheChildren()
   TreeWalker walker(this, mContent);
 
   Accessible* child = nullptr;
-  while ((child = walker.NextChild()) && AppendChild(child));
+  while ((child = walker.Next()) && AppendChild(child));
 }
 
 void

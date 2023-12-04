@@ -92,6 +92,10 @@ EXPORTS.gfxipc += [
     'ipc/ShadowLayerUtils.h',
 ]
 
+EXPORTS.mozilla.dom += [
+    'apz/util/CheckerboardReportService.h',
+]
+
 EXPORTS.mozilla.layers += [
     'apz/public/GeckoContentController.h',
     # exporting things from apz/src is temporary until we extract a
@@ -109,6 +113,7 @@ EXPORTS.mozilla.layers += [
     'apz/util/ChromeProcessController.h',
     'apz/util/DoubleTapToZoom.h',
     'apz/util/InputAPZContext.h',
+    'apz/util/ScrollInputMethods.h',
     'apz/util/ScrollLinkedEffectDetector.h',
     'AsyncCanvasRenderer.h',
     'AtomicRefCountedWithFinalize.h',
@@ -146,6 +151,7 @@ EXPORTS.mozilla.layers += [
     'D3D9SurfaceImage.h',
     'Effects.h',
     'ImageDataSerializer.h',
+    'ipc/APZChild.h',
     'ipc/AsyncTransactionTracker.h',
     'ipc/CompositableForwarder.h',
     'ipc/CompositableTransactionParent.h',
@@ -159,8 +165,10 @@ EXPORTS.mozilla.layers += [
     'ipc/ImageBridgeParent.h',
     'ipc/ImageContainerParent.h',
     'ipc/ISurfaceAllocator.h',
+    'ipc/LayerAnimationUtils.h',
     'ipc/LayerTransactionChild.h',
     'ipc/LayerTransactionParent.h',
+    'ipc/RemoteContentController.h',
     'ipc/ShadowLayerChild.h',
     'ipc/ShadowLayers.h',
     'ipc/ShadowLayersManager.h',
@@ -206,6 +214,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
         'opengl/GLManager.h',
     ]
     EXPORTS += [
+        'MacIOSurfaceHelpers.h',
         'MacIOSurfaceImage.h',
     ]
     UNIFIED_SOURCES += [
@@ -213,6 +222,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     ]
     SOURCES += [
         'ipc/ShadowLayerUtilsMac.cpp',
+        'MacIOSurfaceHelpers.cpp',
         'MacIOSurfaceImage.cpp',
     ]
 
@@ -254,6 +264,7 @@ UNIFIED_SOURCES += [
     'apz/src/InputBlockState.cpp',
     'apz/src/InputQueue.cpp',
     'apz/src/OverscrollHandoffState.cpp',
+    'apz/src/PotentialCheckerboardDurationTracker.cpp',
     'apz/src/TouchCounter.cpp',
     'apz/src/WheelScrollAnimation.cpp',
     'apz/testutil/APZTestData.cpp',
@@ -261,6 +272,7 @@ UNIFIED_SOURCES += [
     'apz/util/APZCCallbackHelper.cpp',
     'apz/util/APZEventState.cpp',
     'apz/util/APZThreadUtils.cpp',
+    'apz/util/CheckerboardReportService.cpp',
     'apz/util/ChromeProcessController.cpp',
     'apz/util/DoubleTapToZoom.cpp',
     'apz/util/InputAPZContext.cpp',
@@ -318,6 +330,7 @@ UNIFIED_SOURCES += [
     'GLImages.cpp',
     'ImageDataSerializer.cpp',
     'ImageLayers.cpp',
+    'ipc/APZChild.cpp',
     'ipc/AsyncTransactionTracker.cpp',
     'ipc/CompositableTransactionParent.cpp',
     'ipc/CompositorBench.cpp',
@@ -329,8 +342,10 @@ UNIFIED_SOURCES += [
     'ipc/ImageBridgeParent.cpp',
     'ipc/ImageContainerParent.cpp',
     'ipc/ISurfaceAllocator.cpp',
+    'ipc/LayerAnimationUtils.cpp',
     'ipc/LayerTransactionChild.cpp',
     'ipc/LayerTransactionParent.cpp',
+    'ipc/RemoteContentController.cpp',
     'ipc/ShadowLayerChild.cpp',
     'ipc/ShadowLayerParent.cpp',
     'ipc/ShadowLayers.cpp',
@@ -386,6 +401,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
 IPDL_SOURCES = [
     'ipc/LayersMessages.ipdlh',
     'ipc/LayersSurfaces.ipdlh',
+    'ipc/PAPZ.ipdl',
     'ipc/PCompositable.ipdl',
     'ipc/PCompositor.ipdl',
     'ipc/PImageBridge.ipdl',
@@ -413,7 +429,7 @@ if CONFIG['MOZ_ENABLE_D3D10_LAYER']:
     DEFINES['MOZ_ENABLE_D3D10_LAYER'] = True
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
-    if CONFIG['ANDROID_VERSION'] > '17':
+    if CONFIG['ANDROID_VERSION'] >= '17':
         includes = [
             'frameworks/av/include/media/stagefright',
             'frameworks/native/include/media/openmax',

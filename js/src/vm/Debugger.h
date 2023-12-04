@@ -585,6 +585,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool drainTraceLoggerScriptCalls(JSContext* cx, unsigned argc, Value* vp);
     static bool startTraceLogger(JSContext* cx, unsigned argc, Value* vp);
     static bool endTraceLogger(JSContext* cx, unsigned argc, Value* vp);
+    static bool isCompilableUnit(JSContext* cx, unsigned argc, Value* vp);
 #ifdef NIGHTLY_BUILD
     static bool setupTraceLogger(JSContext* cx, unsigned argc, Value* vp);
     static bool drainTraceLogger(JSContext* cx, unsigned argc, Value* vp);
@@ -592,6 +593,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool construct(JSContext* cx, unsigned argc, Value* vp);
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
+    static const JSFunctionSpec static_methods[];
 
     static void removeFromFrameMapsAndClearBreakpointsIn(JSContext* cx, AbstractFramePtr frame);
     static bool updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObservableSet& obs,

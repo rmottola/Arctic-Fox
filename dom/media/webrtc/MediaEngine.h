@@ -121,12 +121,6 @@ public:
                            const MediaEnginePrefs &aPrefs,
                            const nsString& aDeviceId) = 0;
 
-  /* Change device configuration.  */
-  virtual nsresult Config(bool aEchoOn, uint32_t aEcho,
-                          bool aAgcOn, uint32_t aAGC,
-                          bool aNoiseOn, uint32_t aNoise,
-                          int32_t aPlayoutDelay) = 0;
-
   /* Returns true if a source represents a fake capture device and
    * false otherwise
    */
@@ -177,7 +171,8 @@ public:
   /* This call reserves but does not start the device. */
   virtual nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
                             const MediaEnginePrefs &aPrefs,
-                            const nsString& aDeviceId) = 0;
+                            const nsString& aDeviceId,
+                            const nsACString& aOrigin) = 0;
 
   virtual uint32_t GetBestFitnessDistance(
       const nsTArray<const dom::MediaTrackConstraintSet*>& aConstraintSets,
@@ -187,9 +182,21 @@ protected:
   // Only class' own members can be initialized in constructor initializer list.
   explicit MediaEngineSource(MediaEngineState aState)
     : mState(aState)
+#ifdef DEBUG
+    , mOwningThread(PR_GetCurrentThread())
+#endif
     , mHasFakeTracks(false)
   {}
+
+  void AssertIsOnOwningThread()
+  {
+    MOZ_ASSERT(PR_GetCurrentThread() == mOwningThread);
+  }
+
   MediaEngineState mState;
+#ifdef DEBUG
+  PRThread* mOwningThread;
+#endif
   bool mHasFakeTracks;
 };
 
@@ -204,6 +211,14 @@ public:
     , mFPS(0)
     , mMinFPS(0)
     , mFreq(0)
+    , mAecOn(false)
+    , mAgcOn(false)
+    , mNoiseOn(false)
+    , mAec(0)
+    , mAgc(0)
+    , mNoise(0)
+    , mPlayoutDelay(0)
+    , mFullDuplex(false)
   {}
 
   int32_t mWidth;
@@ -211,6 +226,14 @@ public:
   int32_t mFPS;
   int32_t mMinFPS;
   int32_t mFreq; // for test tones (fake:true)
+  bool mAecOn;
+  bool mAgcOn;
+  bool mNoiseOn;
+  int32_t mAec;
+  int32_t mAgc;
+  int32_t mNoise;
+  int32_t mPlayoutDelay;
+  bool mFullDuplex;
 
   // mWidth and/or mHeight may be zero (=adaptive default), so use functions.
 
@@ -262,7 +285,8 @@ protected:
 /**
  * Audio source and friends.
  */
-class MediaEngineAudioSource : public MediaEngineSource
+class MediaEngineAudioSource : public MediaEngineSource,
+                               public AudioDataListenerInterface
 {
 public:
   virtual ~MediaEngineAudioSource() {}

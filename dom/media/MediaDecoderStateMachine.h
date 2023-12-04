@@ -105,6 +105,7 @@ class MediaSink;
 
 class AudioSegment;
 class DecodedStream;
+class OutputStreamManager;
 class TaskQueue;
 
 extern LazyLogModule gMediaDecoderLog;
@@ -512,9 +513,6 @@ protected:
   // Notification method invoked when mLogicallySeeking changes.
   void LogicallySeekingChanged();
 
-  // Notification method invoked when mSameOriginMedia changes.
-  void SameOriginMediaChanged();
-
   // Sets internal state which causes playback of media to pause.
   // The decoder monitor must be held.
   void StopPlayback();
@@ -662,8 +660,6 @@ private:
   // Return true if the video decoder's decode speed can not catch up the
   // play time.
   bool NeedToSkipToNextKeyframe();
-
-  void AdjustAudioThresholds();
 
   void* const mDecoderID;
   const RefPtr<FrameStatistics> mFrameStats;
@@ -985,13 +981,7 @@ private:
   uint32_t AudioPrerollUsecs() const
   {
     MOZ_ASSERT(OnTaskQueue());
-    if (IsRealTime()) {
-      return 0;
-    }
-
-    uint32_t result = mLowAudioThresholdUsecs * 2;
-    MOZ_ASSERT(result <= mAmpleAudioThresholdUsecs, "Prerolling will never finish");
-    return result;
+    return IsRealTime() ? 0 : mAmpleAudioThresholdUsecs;
   }
 
   uint32_t VideoPrerollFrames() const
@@ -1090,7 +1080,7 @@ private:
   // True if we shouldn't play our audio (but still write it to any capturing
   // streams). When this is true, the audio thread will never start again after
   // it has stopped.
-  Watchable<bool> mAudioCaptured;
+  bool mAudioCaptured;
 
   // True if the audio playback thread has finished. It is finished
   // when either all the audio frames have completed playing, or we've moved
@@ -1100,6 +1090,9 @@ private:
   // When data is being sent to a MediaStream, this is true when all data has
   // been written to the MediaStream.
   Watchable<bool> mAudioCompleted;
+
+  // True if all video frames are already rendered.
+  Watchable<bool> mVideoCompleted;
 
   // Set if MDSM receives dormant request during reading metadata.
   Maybe<bool> mPendingDormant;
@@ -1185,9 +1178,12 @@ private:
   // SetStartTime because the mStartTime already set before. Also we don't need
   // to decode any audio/video since the MediaDecoder will trigger a seek
   // operation soon.
-  Watchable<bool> mSentFirstFrameLoadedEvent;
+  bool mSentFirstFrameLoadedEvent;
 
   bool mSentPlaybackEndedEvent;
+
+  // Data about MediaStreams that are being fed by the decoder.
+  const RefPtr<OutputStreamManager> mOutputStreamManager;
 
   // The SourceMediaStream we are using to feed the mOutputStreams. This stream
   // is never exposed outside the decoder.
