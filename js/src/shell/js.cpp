@@ -2785,6 +2785,7 @@ WorkerMain(void* arg)
     JS_SetRuntimePrivate(rt, sr.get());
     JS_SetFutexCanWait(rt);
     JS_SetErrorReporter(rt, my_ErrorReporter);
+    JS_InitDestroyPrincipalsCallback(rt, ShellPrincipals::destroy);
     SetWorkerRuntimeOptions(rt);
 
     if (!InitWatchdog(rt)) {
