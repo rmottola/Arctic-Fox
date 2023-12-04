@@ -145,6 +145,7 @@ struct ShellRuntime
     bool isWorker;
     double timeoutInterval;
     Atomic<bool> serviceInterrupt;
+    Atomic<bool> haveInterruptFunc;
     JS::PersistentRootedValue interruptFunc;
     bool lastWarningEnabled;
     JS::PersistentRootedValue lastWarning;
@@ -291,6 +292,7 @@ ShellRuntime::ShellRuntime()
   : isWorker(false),
     timeoutInterval(-1.0),
     serviceInterrupt(false),
+    haveInterruptFunc(false),
     lastWarningEnabled(false),
     watchdogLock(nullptr),
     watchdogWakeup(nullptr),
@@ -431,12 +433,11 @@ ShellInterruptCallback(JSContext* cx)
     sr->serviceInterrupt = false;
 
     bool result;
-    RootedValue interruptFunc(cx, sr->interruptFunc);
-    if (!interruptFunc.isNull()) {
+    if (sr->haveInterruptFunc) {
         JS::AutoSaveExceptionState savedExc(cx);
-        JSAutoCompartment ac(cx, &interruptFunc.toObject());
+        JSAutoCompartment ac(cx, &sr->interruptFunc.toObject());
         RootedValue rval(cx);
-        if (!JS_CallFunctionValue(cx, nullptr, interruptFunc,
+        if (!JS_CallFunctionValue(cx, nullptr, sr->interruptFunc,
                                   JS::HandleValueArray::empty(), &rval))
         {
             return false;
@@ -3075,7 +3076,7 @@ CancelExecution(JSRuntime* rt)
     sr->serviceInterrupt = true;
     JS_RequestInterruptCallback(rt);
 
-    if (!sr->interruptFunc.isNull()) {
+    if (sr->haveInterruptFunc) {
         static const char msg[] = "Script runs for too long, terminating.\n";
         fputs(msg, stderr);
     }
@@ -3124,6 +3125,7 @@ Timeout(JSContext* cx, unsigned argc, Value* vp)
             return false;
         }
         sr->interruptFunc = value;
+        sr->haveInterruptFunc = true;
     }
 
     args.rval().setUndefined();
@@ -3195,6 +3197,7 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
     GetShellRuntime(cx)->interruptFunc = value;
+    GetShellRuntime(cx)->haveInterruptFunc = true;
 
     args.rval().setUndefined();
     return true;
