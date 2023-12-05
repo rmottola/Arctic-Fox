@@ -7852,7 +7852,10 @@ class MStringReplace
     bool writeRecoverData(CompactBufferWriter& writer) const override;
     bool canRecoverOnBailout() const override {
         if (isFlatReplacement_)
-            return false;
+        {
+            MOZ_ASSERT(!pattern()->isRegExp());
+            return true;
+        }
         if (pattern()->isRegExp())
             return !pattern()->toRegExp()->source()->global();
         return false;
