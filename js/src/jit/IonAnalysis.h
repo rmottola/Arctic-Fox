@@ -136,7 +136,7 @@ class LinearSum
     {
         AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!terms_.appendAll(other.terms_))
-          MOZ_CRASH("LinearSum::LinearSum");
+            oomUnsafe.crash("LinearSum::LinearSum");
     }
 
     // These return false on an integer overflow, and afterwards the sum must
