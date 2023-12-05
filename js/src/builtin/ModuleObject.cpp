@@ -237,7 +237,12 @@ IndirectBindingMap::putNew(JSContext* cx, HandleId name,
 {
     RootedShape shape(cx, environment->lookup(cx, localName));
     MOZ_ASSERT(shape);
-    return map_.putNew(name, Binding(environment, shape));
+    if (!map_.putNew(name, Binding(environment, shape))) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
+    return true;
 }
 
 bool
@@ -814,7 +819,12 @@ bool
 ModuleObject::noteFunctionDeclaration(ExclusiveContext* cx, HandleAtom name, HandleFunction fun)
 {
     FunctionDeclarationVector* funDecls = functionDeclarations();
-    return funDecls->emplaceBack(name, fun);
+    if (!funDecls->emplaceBack(name, fun)) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
+    return true;
 }
 
 /* static */ bool
