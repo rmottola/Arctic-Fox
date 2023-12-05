@@ -2317,6 +2317,8 @@ RangeAnalysis::addRangeAssertions()
             if (ins->isRecoveredOnBailout())
                 continue;
 
+            if (!alloc().ensureBallast())
+                return false;
             MAssertRange* guard = MAssertRange::New(alloc(), ins, new(alloc()) Range(r));
 
             // Beta nodes and interrupt checks are required to be located at the
