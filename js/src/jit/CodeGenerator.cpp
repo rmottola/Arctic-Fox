@@ -2606,6 +2606,8 @@ CodeGenerator::visitMoveGroup(LMoveGroup* group)
     }
 
     masm.propagateOOM(resolver.resolve());
+    if (masm.oom())
+        return;
 
     MoveEmitter emitter(masm);
 
