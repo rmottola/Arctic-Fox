@@ -56,6 +56,8 @@ const MAX_SUGGESTIONS = 6;
  *     data: the entry, a string
  *   Search
  *     Performs a search.
+ *     Any GetSuggestions messages in the queue from the same target will be
+ *     cancelled.
  *     data: { engineName, searchString, healthReportKey, searchPurpose }
  *   SetCurrentEngine
  *     Sets the current engine.
@@ -81,6 +83,10 @@ const MAX_SUGGESTIONS = 6;
  *   Suggestions
  *     Sent in reply to GetSuggestions.
  *     data: see _onMessageGetSuggestions
+ *   SuggestionsCancelled
+ *     Sent in reply to GetSuggestions when pending GetSuggestions events are
+ *     cancelled.
+ *     data: null
  */
 
 this.ContentSearch = {
@@ -95,11 +101,19 @@ this.ContentSearch = {
   // { controller, previousFormHistoryResult }.  See _onMessageGetSuggestions.
   _suggestionMap: new WeakMap(),
 
+  // Resolved when we finish shutting down.
+  _destroyedPromise: null,
+
+  // The current controller and browser in _onMessageGetSuggestions.  Allows
+  // fetch cancellation from _cancelSuggestions.
+  _currentSuggestion: null,
+
   init: function () {
     Cc["@mozilla.org/globalmessagemanager;1"].
       getService(Ci.nsIMessageListenerManager).
       addMessageListener(INBOUND_MESSAGE, this);
     Services.obs.addObserver(this, "browser-search-engine-modified", false);
+    Services.obs.addObserver(this, "shutdown-leaks-before-check", false);
     Services.prefs.addObserver("browser.search.hiddenOneOffs", this, false);
   },
 
@@ -118,13 +132,18 @@ this.ContentSearch = {
   },
 
   destroy: function () {
+    if (this._destroyedPromise) {
+      return this._destroyedPromise;
+    }
+
     Cc["@mozilla.org/globalmessagemanager;1"].
       getService(Ci.nsIMessageListenerManager).
       removeMessageListener(INBOUND_MESSAGE, this);
     Services.obs.removeObserver(this, "browser-search-engine-modified");
+    Services.obs.removeObserver(this, "shutdown-leaks-before-check");
 
     this._eventQueue.length = 0;
-    return Promise.resolve(this._currentEventPromise);
+    return this._destroyedPromise = Promise.resolve(this._currentEventPromise);
   },
 
   /**
@@ -155,6 +174,12 @@ this.ContentSearch = {
     };
     msg.target.addEventListener("SwapDocShells", msg, true);
 
+    // Search requests cause cancellation of all Suggestion requests from the
+    // same browser.
+    if (msg.data.type == "Search") {
+      this._cancelSuggestions(msg);
+    }
+
     this._eventQueue.push({
       type: "Message",
       data: msg,
@@ -171,6 +196,10 @@ this.ContentSearch = {
         data: data,
       });
       this._processEventQueue();
+      break;
+    case "shutdown-leaks-before-check":
+      subj.wrappedJSObject.client.addBlocker(
+        "ContentSearch: Wait until the service is destroyed", () => this.destroy());
       break;
     }
   },
@@ -192,6 +221,27 @@ this.ContentSearch = {
         this._processEventQueue();
       }
     }.bind(this));
+  },
+
+  _cancelSuggestions: function (msg) {
+    let cancelled = false;
+    // cancel active suggestion request
+    if (this._currentSuggestion && this._currentSuggestion.target == msg.target) {
+      this._currentSuggestion.controller.stop();
+      cancelled = true;
+    }
+    // cancel queued suggestion requests
+    for (let i = 0; i < this._eventQueue.length; i++) {
+      let m = this._eventQueue[i].data;
+      if (msg.target == m.target && m.data.type == "GetSuggestions") {
+        this._eventQueue.splice(i, 1);
+        cancelled = true;
+        i--;
+      }
+    }
+    if (cancelled) {
+      this._reply(msg, "SuggestionsCancelled");
+    }
   },
 
   _onMessage: Task.async(function* (msg) {
@@ -288,7 +338,14 @@ this.ContentSearch = {
     let priv = PrivateBrowsingUtils.isBrowserPrivate(msg.target);
     // fetch() rejects its promise if there's a pending request, but since we
     // process our event queue serially, there's never a pending request.
+    this._currentSuggestion = { controller: controller, target: msg.target };
     let suggestions = yield controller.fetch(data.searchString, priv, engine);
+    this._currentSuggestion = null;
+
+    // suggestions will be null if the request was cancelled
+    if (!suggestions) {
+      return;
+    }
 
     // Keep the form history result so RemoveFormHistoryEntry can remove entries
     // from it.  Keeping only one result isn't foolproof because the client may

@@ -430,6 +430,12 @@ ContentSearchUIController.prototype = {
     }
   },
 
+  _onMsgSuggestionsCancelled: function () {
+    if (!this._table.hidden) {
+      this._hideSuggestions();
+    }
+  },
+
   _onMsgState: function (state) {
     this.defaultEngine = {
       name: state.currentEngine.name,
