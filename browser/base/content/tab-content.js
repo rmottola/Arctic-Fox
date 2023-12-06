@@ -115,12 +115,6 @@ var AboutHomeListener = {
       case "AboutHomeLoad":
         this.onPageLoad();
         break;
-      case "AboutHomeSearchEvent":
-        this.onSearch(aEvent);
-        break;
-      case "AboutHomeSearchPanel":
-        this.onOpenSearchPanel(aEvent);
-        break;
       case "click":
         this.onClick(aEvent);
         break;
@@ -138,9 +132,6 @@ var AboutHomeListener = {
       case "AboutHome:Update":
         this.onUpdate(aMessage.data);
         break;
-      case "AboutHome:FocusInput":
-        this.onFocusInput();
-        break;
     }
   },
 
@@ -151,13 +142,11 @@ var AboutHomeListener = {
 
     // Inject search engine and snippets URL.
     let docElt = doc.documentElement;
-    // set the following attributes BEFORE searchEngineName, which triggers to
-    // show the snippets when it's set.
+    // Set snippetsVersion last, which triggers to show the snippets when it's set.
     docElt.setAttribute("snippetsURL", aData.snippetsURL);
     if (aData.showKnowYourRights)
       docElt.setAttribute("showKnowYourRights", "true");
     docElt.setAttribute("snippetsVersion", aData.snippetsVersion);
-    docElt.setAttribute("searchEngineName", aData.defaultEngineName);
   },
 
   onPageLoad: function() {
@@ -168,7 +157,6 @@ var AboutHomeListener = {
 
     doc.documentElement.setAttribute("hasBrowserHandlers", "true");
     addMessageListener("AboutHome:Update", this);
-    addMessageListener("AboutHome:FocusInput", this);
     addEventListener("click", this, true);
     addEventListener("pagehide", this, true);
 
@@ -177,8 +165,6 @@ var AboutHomeListener = {
     }
 
     sendAsyncMessage("AboutHome:RequestUpdate");
-    doc.addEventListener("AboutHomeSearchEvent", this, true, true);
-    doc.addEventListener("AboutHomeSearchPanel", this, true, true);
   },
 
   onClick: function(aEvent) {
@@ -229,10 +215,6 @@ var AboutHomeListener = {
       case "settings":
         sendAsyncMessage("AboutHome:Settings");
         break;
-
-      case "searchIcon":
-        sendAsyncMessage("AboutHome:OpenSearchPanel", null, { anchor: originalTarget });
-        break;
     }
   },
 
@@ -245,21 +227,6 @@ var AboutHomeListener = {
     removeEventListener("pagehide", this, true);
     if (aEvent.target.documentElement) {
       aEvent.target.documentElement.removeAttribute("hasBrowserHandlers");
-    }
-  },
-
-  onSearch: function(aEvent) {
-    sendAsyncMessage("AboutHome:Search", { searchData: aEvent.detail });
-  },
-
-  onOpenSearchPanel: function(aEvent) {
-    sendAsyncMessage("AboutHome:OpenSearchPanel");
-  },
-
-  onFocusInput: function () {
-    let searchInput = content.document.getElementById("searchText");
-    if (searchInput) {
-      searchInput.focus();
     }
   },
 };
