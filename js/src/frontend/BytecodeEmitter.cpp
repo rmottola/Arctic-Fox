@@ -3768,7 +3768,6 @@ BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologueOp, ParseNode* p
                 continue;
             ParseNode* target = element;
             if (element->isKind(PNK_SPREAD)) {
-                MOZ_ASSERT(element->pn_kid->isKind(PNK_NAME));
                 target = element->pn_kid;
             }
             if (target->isKind(PNK_ASSIGN))
@@ -5384,15 +5383,17 @@ BytecodeEmitter::emitHoistedFunctionsInList(ParseNode* list)
     MOZ_ASSERT(list->pn_xflags & PNX_FUNCDEFS);
 
     for (ParseNode* pn = list->pn_head; pn; pn = pn->pn_next) {
+        ParseNode* maybeFun = pn;
+
         if (!sc->strict()) {
-            while (pn->isKind(PNK_LABEL))
-                pn = pn->as<LabeledStatement>().statement();
+            while (maybeFun->isKind(PNK_LABEL))
+                maybeFun = maybeFun->as<LabeledStatement>().statement();
         }
 
-        if (pn->isKind(PNK_ANNEXB_FUNCTION) ||
-            (pn->isKind(PNK_FUNCTION) && pn->functionIsHoisted()))
+        if (maybeFun->isKind(PNK_ANNEXB_FUNCTION) ||
+            (maybeFun->isKind(PNK_FUNCTION) && maybeFun->functionIsHoisted()))
         {
-            if (!emitTree(pn))
+            if (!emitTree(maybeFun))
                 return false;
         }
     }
