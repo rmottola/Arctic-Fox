@@ -179,6 +179,7 @@ this.ContentSearch = {
     if (methodName in this) {
       yield this._initService();
       yield this[methodName](msg, msg.data.data);
+      msg.target.removeEventListener("SwapDocShells", msg, true);
     }
   }),
 
