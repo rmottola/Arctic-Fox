@@ -399,9 +399,6 @@ BrowserGlue.prototype = {
       case "flash-plugin-hang":
         this._handleFlashHang();
         break;
-      case "test-initialize-sanitizer":
-        this._sanitizer.onStartup();
-        break;
       case "xpi-signature-changed":
         let disabledAddons = JSON.parse(data).disabled;
         AddonManager.getAddonsByIDs(disabledAddons, (addons) => {
@@ -415,6 +412,9 @@ BrowserGlue.prototype = {
         break;
       case "autocomplete-did-enter-text":
         this._handleURLBarTelemetry(subject.QueryInterface(Ci.nsIAutoCompleteInput));
+        break;
+      case "test-initialize-sanitizer":
+        this._sanitizer.onStartup();
         break;
       case AddonWatcher.TOPIC_SLOW_ADDON_DETECTED:
         this._notifySlowAddon(data);
@@ -442,8 +442,8 @@ BrowserGlue.prototype = {
         action.type;
     }
     if (!actionType) {
-      let styles = controller.getStyleAt(idx).split(/\s+/);
-      let style = ["autofill", "tag", "bookmark"].find(s => styles.includes(s));
+      let styles = new Set(controller.getStyleAt(idx).split(/\s+/));
+      let style = ["autofill", "tag", "bookmark"].find(s => styles.has(s));
       actionType = style || "history";
     }
 
