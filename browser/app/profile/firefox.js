@@ -376,6 +376,10 @@ pref("browser.search.context.loadInBackground", false);
 // if no result, add the search term so that the panel of the new UI is shown anyway
 pref("browser.search.showOneOffButtons", true);
 
+
+// comma seperated list of of engines to hide in the search panel.
+pref("browser.search.hiddenOneOffs", "");
+
 // send ping to the server to update
 pref("browser.search.update", true);
 
