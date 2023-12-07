@@ -80,7 +80,6 @@
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
 - Bug 1207146 - 2015-12-04 - Add a link to expert technical information in the cert 
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
-- Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen
