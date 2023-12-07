@@ -7840,26 +7840,26 @@
     "description": "Cache hits on the tile-info metadata database"
   },
   "DISPLAY_SCALING_OSX" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (OS X only)",
     "cpp_guard": "XP_MACOSX"
   },
   "DISPLAY_SCALING_MSWIN" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (MS Windows only)",
     "cpp_guard": "XP_WIN"
   },
   "DISPLAY_SCALING_LINUX" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (Linux only)",
     "cpp_guard": "XP_LINUX"
   },
