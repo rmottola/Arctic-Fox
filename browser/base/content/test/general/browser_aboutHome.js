@@ -492,17 +492,19 @@ function test()
       if (test.beforeRun)
         yield test.beforeRun();
 
-      let tab = yield promiseNewTabLoadEvent("about:home", "DOMContentLoaded");
+      // Create a tab to run the test.
+      let tab = gBrowser.selectedTab = gBrowser.addTab("about:blank");
 
-      // Must wait for both the snippets map and the browser attributes, since
-      // can't guess the order they will happen.
-      // So, start listening now, but verify the promise is fulfilled only
-      // after the snippets map setup.
-      let promise = promiseBrowserAttributes(tab);
-      // Prepare the snippets map with default values, then run the test setup.
-      let snippetsMap = yield promiseSetupSnippetsMap(tab, test.setup);
-      // Ensure browser has set attributes already, or wait for them.
-      yield promise;
+      // Add an event handler to modify the snippets map once it's ready.
+      let snippetsPromise = promiseSetupSnippetsMap(tab, test.setup);
+
+      // Start loading about:home and wait for it to complete.
+      yield promiseTabLoadEvent(tab, "about:home", "AboutHomeLoadSnippetsCompleted");
+
+      // This promise should already be resolved since the page is done,
+      // but we still want to get the snippets map out of it.
+      let snippetsMap = yield snippetsPromise;
+
       info("Running test");
       yield test.run(snippetsMap);
       info("Cleanup");
@@ -512,33 +514,6 @@ function test()
     ok(false, "Unexpected Exception: " + ex);
     finish();
   });
-}
-
-/**
- * Creates a new tab and waits for a load event.
- *
- * @param aUrl
- *        The url to load in a new tab.
- * @param aEvent
- *        The load event type to wait for.  Defaults to "load".
- * @return {Promise} resolved when the event is handled.  Gets the new tab.
- */
-function promiseNewTabLoadEvent(aUrl, aEventType="load")
-{
-  let deferred = Promise.defer();
-  let tab = gBrowser.selectedTab = gBrowser.addTab(aUrl);
-  info("Wait tab event: " + aEventType);
-  tab.linkedBrowser.addEventListener(aEventType, function load(event) {
-    if (event.originalTarget != tab.linkedBrowser.contentDocument ||
-        event.target.location.href == "about:blank") {
-      info("skipping spurious load event");
-      return;
-    }
-    tab.linkedBrowser.removeEventListener(aEventType, load, true);
-    info("Tab event received: " + aEventType);
-    deferred.resolve(tab);
-  }, true);
-  return deferred.promise;
 }
 
 /**
