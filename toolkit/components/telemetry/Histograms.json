@@ -5080,12 +5080,6 @@
     "keyed": true,
     "description": "Record the search counts for search engines"
   },
-  "SEARCH_DEFAULT_ENGINE": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "keyed": true,
-    "description": "Record the default search engine."
-  },
   "SEARCH_SERVICE_INIT_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
