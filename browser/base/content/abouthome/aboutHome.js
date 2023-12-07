@@ -61,14 +61,14 @@ function onSearchSubmit(aEvent)
 }
 
 
-let gContentSearchController;
+var gContentSearchController;
 
 function setupSearch()
 {
   // The "autofocus" attribute doesn't focus the form element
   // immediately when the element is first drawn, so the
   // attribute is also used for styling when the page first loads.
-  let searchText = document.getElementById("searchText");
+  searchText = document.getElementById("searchText");
   searchText.addEventListener("blur", function searchText_onBlur() {
     searchText.removeEventListener("blur", searchText_onBlur);
     searchText.removeAttribute("autofocus");
@@ -82,7 +82,7 @@ function setupSearch()
 }
 
 function fitToWidth() {
-  if (window.scrollMaxX != window.scrollMinX) {
+  if (document.documentElement.scrollWidth > window.innerWidth) {
     document.body.setAttribute("narrow", "true");
   } else if (document.body.hasAttribute("narrow")) {
     document.body.removeAttribute("narrow");

@@ -1749,15 +1749,16 @@
             let userContextId = aParams && aParams.userContextId;
 
             let b = document.createElementNS(NS_XUL, "browser");
-	    b.permanentKey = {};
+            b.permanentKey = {};
             b.setAttribute("type", "content-targetable");
             b.setAttribute("message", "true");
             b.setAttribute("messagemanagergroup", "browsers");
             b.setAttribute("contextmenu", this.getAttribute("contentcontextmenu"));
             b.setAttribute("tooltip", this.getAttribute("contenttooltip"));
 
-            if (userContextId)
+            if (userContextId) {
               b.setAttribute("usercontextid", userContextId);
+            }
 
             if (remote)
               b.setAttribute("remote", "true");
@@ -1828,6 +1829,7 @@
             var aForceNotRemote;
             var aNoReferrer;
             var aUserContextId;
+            var aEventDetail;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1845,6 +1847,7 @@
               aForceNotRemote       = params.forceNotRemote;
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
+              aEventDetail          = params.eventDetail;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -1859,7 +1862,10 @@
             t.setAttribute("validate", "never"); //PMed
             t.setAttribute("onerror", "this.removeAttribute('image');");
             t.className = "tabbrowser-tab";
-	    let remote = gMultiProcessBrowser &&
+
+            // The new browser should be remote if this is an e10s window and
+            // the uri to load can be loaded remotely.
+            let remote = gMultiProcessBrowser &&
                          !aForceNotRemote &&
                          E10SUtils.canLoadURIInProcess(aURI, Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT);
 
@@ -2740,7 +2746,7 @@
               Components.utils.reportError("gBrowser.addProgressListener was " +
                                            "called with a second argument, " +
                                            "which is not supported. See bug " +
-                                           "608628.");
+                                           "608628. Call stack: " + new Error().stack);
             }
 
             this.mProgressListeners.push(aListener);
@@ -3297,6 +3303,7 @@
             finish: function() {
               this.log("FINISH");
 
+              this.assert(this.tabbrowser._switcher);
               this.assert(this.tabbrowser._switcher === this);
               this.assert(!this.spinnerTab);
               this.assert(!this.loadTimer);
@@ -3385,7 +3392,6 @@
               }
 
               this.lastVisibleTab = this.visibleTab;
-
             },
 
             assert: function(cond) {
@@ -3411,6 +3417,9 @@
             // This function runs before every event. It fixes up the state
             // to account for closed tabs.
             preActions: function() {
+              this.assert(this.tabbrowser._switcher);
+              this.assert(this.tabbrowser._switcher === this);
+
               for (let [tab, state] of this.tabState) {
                 if (!tab.linkedBrowser) {
                   this.tabState.delete(tab);
@@ -4557,6 +4566,7 @@
             return;
 
           let targetIsWindow = event.target instanceof Window;
+
           // We're about to open a modal dialog, so figure out for which tab:
           // If this is a same-process modal dialog, then we're given its DOM
           // window as the event's target. For remote dialogs, we're given the
@@ -4565,6 +4575,7 @@
           let tabForEvent = targetIsWindow ?
                             this._getTabForContentWindow(event.target.top) :
                             this.getTabForBrowser(event.originalTarget);
+
           // Don't need to act if the tab is already selected:
           if (tabForEvent.selected)
             return;
@@ -5087,7 +5098,7 @@
             // Locking is neither in effect nor needed, so let tabs expand normally.
             if (isEndTab && !this._hasTabTempMaxWidth)
               return;
-              
+
             let numPinned = this.tabbrowser._numPinnedTabs;
             // Force tabs to stay the same width, unless we're closing the last tab,
             // which case we need to let them expand just enough so that the overall
@@ -5550,7 +5561,7 @@
             let averageInterval = 0;
             for (let i = 1; i < frameCount; i++) {
               averageInterval += intervals[i];
-            };
+            }
             averageInterval = averageInterval / (frameCount - 1);
 
             Services.telemetry.getHistogramById("FX_TAB_ANIM_ANY_FRAME_INTERVAL_MS").add(averageInterval);
@@ -5875,9 +5886,7 @@
             url = browserDragAndDrop.drop(event, { }, true);
           } catch (ex) {}
 
-//          // valid urls don't contain spaces ' '; if we have a space it isn't a valid url.
-//          if (!url || url.includes(" ")) //PMed
-          if (!url) //FF
+          if (!url)
             return;
 
           let bgLoad = Services.prefs.getBoolPref("browser.tabs.loadInBackground");
