@@ -132,10 +132,8 @@ IDBFactory::CreateForWindow(nsPIDOMWindowInner* aWindow,
 
   if (!(NS_SUCCEEDED(rv) && nsContentUtils::IsSystemPrincipal(principal)) &&
       NS_WARN_IF(!Preferences::GetBool(kPrefIndexedDBEnabled, false))) {
-    // IndexedDB is disabled and the caller is content.
-    NS_WARNING("An attempt to use IndexedDB was made, but it is not enabled.");
     *aFactory = nullptr;
-    return NS_OK;
+    return NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR;
   }
 
   if (rv == NS_ERROR_DOM_NOT_SUPPORTED_ERR) {
@@ -682,8 +680,6 @@ IDBFactory::OpenInternal(nsIPrincipal* aPrincipal,
   }
 
   if (!mBackgroundActor && mPendingRequests.IsEmpty()) {
-    // We need to start the sequence to create a background actor for this
-    // thread.
     BackgroundChildImpl::ThreadLocal* threadLocal =
       BackgroundChildImpl::GetThreadLocalForCurrentThread();
 
@@ -703,12 +699,18 @@ IDBFactory::OpenInternal(nsIPrincipal* aPrincipal,
       newIDBThreadLocal = idbThreadLocal = new ThreadLocal(id);
     }
 
-    RefPtr<BackgroundCreateCallback> cb =
-      new BackgroundCreateCallback(this, idbThreadLocal->GetLoggingInfo());
-    if (NS_WARN_IF(!BackgroundChild::GetOrCreateForCurrentThread(cb))) {
-      IDB_REPORT_INTERNAL_ERR();
-      aRv.Throw(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
-      return nullptr;
+    if (PBackgroundChild* actor = BackgroundChild::GetForCurrentThread()) {
+      BackgroundActorCreated(actor, idbThreadLocal->GetLoggingInfo());
+    } else {
+      // We need to start the sequence to create a background actor for this
+      // thread.
+      RefPtr<BackgroundCreateCallback> cb =
+        new BackgroundCreateCallback(this, idbThreadLocal->GetLoggingInfo());
+      if (NS_WARN_IF(!BackgroundChild::GetOrCreateForCurrentThread(cb))) {
+        IDB_REPORT_INTERNAL_ERR();
+        aRv.Throw(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
+        return nullptr;
+      }
     }
 
     if (newIDBThreadLocal) {
