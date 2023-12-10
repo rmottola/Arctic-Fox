@@ -109,6 +109,10 @@
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
+#if MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 #include "npapi.h"
 
 using namespace mozilla;
@@ -972,6 +976,12 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
   NS_ASSERTION(pluginTag, "Must have plugin tag here!");
 
   plugin->GetLibrary()->SetHasLocalInstance();
+
+#if defined(MOZ_WIDGET_ANDROID) && defined(MOZ_CRASHREPORTER)
+  if (pluginTag->mIsFlashPlugin) {
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("FlashVersion"), pluginTag->Version());
+  }
+#endif
 
   RefPtr<nsNPAPIPluginInstance> instance = new nsNPAPIPluginInstance();
 
@@ -2679,12 +2689,6 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
     /// FIXME-jsplugins - We need to cleanup the various plugintag classes
     /// to be more sane and avoid this dance
     nsPluginTag *tag = static_cast<nsPluginTag *>(basetag.get());
-
-    if (!nsNPAPIPlugin::RunPluginOOP(tag)) {
-      // Don't expose non-OOP plugins to content processes since we have no way
-      // to bridge them over.
-      continue;
-    }
 
     aPlugins->AppendElement(PluginTag(tag->mId,
                                       tag->Name(),
