@@ -372,7 +372,7 @@ BrowserGlue.prototype = {
       case "handle-xul-text-link":
         let linkHandled = subject.QueryInterface(Ci.nsISupportsPRBool);
         if (!linkHandled.data) {
-          let win = this.getMostRecentBrowserWindow();
+          let win = RecentWindow.getMostRecentBrowserWindow();
           if (win) {
             win.openUILinkIn(data, "tab");
             linkHandled.data = true;
@@ -784,7 +784,7 @@ BrowserGlue.prototype = {
   },
 
   _showSlowStartupNotification: function () {
-    let win = this.getMostRecentBrowserWindow();
+    let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
 
@@ -818,7 +818,7 @@ BrowserGlue.prototype = {
    * Show a notification bar offering a reset if the profile has been unused for some time.
    */
   _resetUnusedProfileNotification: function () {
-    let win = this.getMostRecentBrowserWindow();
+    let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
 
@@ -848,7 +848,7 @@ BrowserGlue.prototype = {
   },
 
   _notifyUnsignedAddonsDisabled: function () {
-    let win = this.getMostRecentBrowserWindow();
+    let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
 
@@ -1003,7 +1003,7 @@ BrowserGlue.prototype = {
     // them to the user.
     let changedIDs = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_INSTALLED);
     if (changedIDs.length > 0) {
-      let win = this.getMostRecentBrowserWindow();
+      let win = RecentWindow.getMostRecentBrowserWindow();
       AddonManager.getAddonsByIDs(changedIDs, function(aAddons) {
         aAddons.forEach(function(aAddon) {
           // If the add-on isn't user disabled or can't be enabled then skip it.
@@ -1063,7 +1063,7 @@ BrowserGlue.prototype = {
 
       if (shouldCheck && !isDefault && !willRecoverSession) {
         Services.tm.mainThread.dispatch(function() {
-          DefaultBrowserCheck.prompt(this.getMostRecentBrowserWindow());
+          DefaultBrowserCheck.prompt(RecentWindow.getMostRecentBrowserWindow());
         }.bind(this), Ci.nsIThread.DISPATCH_NORMAL);
       }
     }
@@ -1254,7 +1254,7 @@ BrowserGlue.prototype = {
       let key = getNotifyString({propName: "notificationButtonAccessKey",
                                  stringName: "pu.notifyButton.accesskey"});
 
-      let win = this.getMostRecentBrowserWindow();
+      let win = RecentWindow.getMostRecentBrowserWindow();
       let notifyBox = win.gBrowser.getNotificationBox();
 
       let buttons = [
@@ -1286,12 +1286,11 @@ BrowserGlue.prototype = {
     let url = getNotifyString({propName: "alertURL",
                                prefName: "startup.homepage_override_url"});
 
-    var self = this;
     function clickCallback(subject, topic, data) {
       // This callback will be called twice but only once with this topic
       if (topic != "alertclickcallback")
         return;
-      let win = self.getMostRecentBrowserWindow();
+      let win = RecentWindow.getMostRecentBrowserWindow();
       win.openUILinkIn(data, "tab");
     }
 
@@ -1317,7 +1316,7 @@ BrowserGlue.prototype = {
 //                    getService(Ci.nsIURLFormatter);
 //    var updateUrl = formatter.formatURLPref(PREF_PLUGINS_UPDATEURL);
 //
-//    var win = this.getMostRecentBrowserWindow();
+//    var win = RecentWindow.getMostRecentBrowserWindow();
 //    win.openUILinkIn(updateUrl, "tab");
   },
 
@@ -1582,7 +1581,7 @@ BrowserGlue.prototype = {
               formatURLPref("app.support.baseURL");
     url += helpTopic;
 
-    var win = this.getMostRecentBrowserWindow();
+    var win = RecentWindow.getMostRecentBrowserWindow();
 
     var buttons = [
                     {
@@ -2145,11 +2144,6 @@ BrowserGlue.prototype = {
     }
   }),
 
-  // this returns the most recent non-popup browser window
-  getMostRecentBrowserWindow: function BG_getMostRecentBrowserWindow() {
-    return RecentWindow.getMostRecentBrowserWindow();
-  },
-
   /**
    * Open preferences even if there are no open windows.
    */
@@ -2207,7 +2201,7 @@ BrowserGlue.prototype = {
     Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
     Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
 
-    let win = this.getMostRecentBrowserWindow();
+    let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win) {
       return;
     }
@@ -2250,7 +2244,7 @@ BrowserGlue.prototype = {
     Services.prefs.setBoolPref("dom.ipc.plugins.flash.disable-protected-mode", true);
     Services.prefs.setBoolPref("browser.flash-protected-mode-flip.done", true);
 
-    let win = this.getMostRecentBrowserWindow();
+    let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win) {
       return;
     }
