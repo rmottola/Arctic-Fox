@@ -1554,7 +1554,7 @@ BrowserGlue.prototype = {
                       .getHistogramById("PLACES_BACKUPS_DAYSFROMLAST")
                       .add(backupAge);
             } catch (ex) {
-              Components.utils.reportError("Unable to report telemetry.");
+              Cu.reportError("Unable to report telemetry.");
             }
 
             if (backupAge > BOOKMARKS_BACKUP_MAX_INTERVAL_DAYS)
@@ -1591,7 +1591,7 @@ BrowserGlue.prototype = {
    * If a backup for today doesn't exist, this creates one.
    */
   _backupBookmarks: function BG__backupBookmarks() {
-    return Task.spawn(function() {
+    return Task.spawn(function*() {
       let lastBackupFile = yield PlacesBackups.getMostRecentBackup();
       // Should backup bookmarks if there are no backups or the maximum
       // interval between backups elapsed.
