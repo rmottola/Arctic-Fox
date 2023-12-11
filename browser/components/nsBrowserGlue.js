@@ -1077,6 +1077,27 @@ BrowserGlue.prototype = {
 
       let willPrompt = shouldCheck && !isDefault && !willRecoverSession;
 
+      // Skip the "Set Default Browser" check during first-run or after the
+      // browser has been run a few times.
+      if (willPrompt) {
+        if (skipDefaultBrowserCheck) {
+          Services.prefs.setBoolPref("browser.shell.skipDefaultBrowserCheck", false);
+          willPrompt = false;
+        } else {
+          promptCount++;
+        }
+        if (promptCount > 3) {
+          willPrompt = false;
+        }
+      }
+
+      if (!AppConstants.RELEASE_BUILD) {
+        if (willPrompt) {
+          Services.prefs.setIntPref("browser.shell.defaultBrowserCheckCount",
+                                    promptCount);
+        }
+      }
+
       try {
         // Report default browser status on startup to telemetry
         // so we can track whether we are the default.
@@ -1086,15 +1107,8 @@ BrowserGlue.prototype = {
                           .add(isDefaultError);
         Services.telemetry.getHistogramById("BROWSER_SET_DEFAULT_ALWAYS_CHECK")
                           .add(shouldCheck);
-        let promptCount =
-          Services.prefs.getIntPref("browser.shell.defaultBrowserCheckCount");
-        if (willPrompt) {
-          promptCount++;
-        }
         Services.telemetry.getHistogramById("BROWSER_SET_DEFAULT_DIALOG_PROMPT_RAWCOUNT")
                           .add(promptCount);
-        Services.prefs.setIntPref("browser.shell.defaultBrowserCheckCount",
-                                  promptCount)
       }
       catch (ex) { /* Don't break the default prompt if telemetry is broken. */ }
 
