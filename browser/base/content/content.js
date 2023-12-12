@@ -614,6 +614,13 @@ addMessageListener("rtcpeer:Deny", ContentWebRTC);
 addMessageListener("webrtc:Allow", ContentWebRTC);
 addMessageListener("webrtc:Deny", ContentWebRTC);
 addMessageListener("webrtc:StopSharing", ContentWebRTC);
+addMessageListener("webrtc:StartBrowserSharing", () => {
+  let windowID = content.QueryInterface(Ci.nsIInterfaceRequestor)
+                        .getInterface(Ci.nsIDOMWindowUtils).outerWindowID;
+  sendAsyncMessage("webrtc:response:StartBrowserSharing", {
+    windowID: windowID
+  });
+});
 
 addEventListener("pageshow", function(event) {
   if (event.target == content.document) {
