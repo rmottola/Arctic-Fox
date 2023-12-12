@@ -2049,7 +2049,7 @@ BrowserGlue.prototype = {
     let imageURL = this._hasSystemAlertsService() ? "" :
                    "chrome://branding/content/about-logo.png";
     let title = gBrowserBundle.GetStringFromName("webNotifications.upgradeTitle");
-    let text = gBrowserBundle.GetStringFromName("webNotifications.upgradeInfo");
+    let text = gBrowserBundle.GetStringFromName("webNotifications.upgradeBody");
     let url = Services.urlFormatter.formatURLPref("browser.push.warning.infoURL");
 
     AlertsService.showAlertNotification(imageURL, title, text,
