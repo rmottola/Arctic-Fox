@@ -787,6 +787,31 @@ pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region
 // By default, we don't want protocol/content handlers to be registered from a different host, see bug 402287
 pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
 
+#ifdef MOZ_SAFE_BROWSING
+// Name of the about: page contributed by safebrowsing to handle display of error
+// pages on phishing/malware hits.  (bug 399233)
+pref("urlclassifier.alternate_error_page", "blocked");
+
+// The number of random entries to send with a gethash request.
+pref("urlclassifier.gethashnoise", 4);
+
+// Gethash timeout for Safebrowsing.
+pref("urlclassifier.gethash.timeout_ms", 5000);
+
+// If an urlclassifier table has not been updated in this number of seconds,
+// a gethash request will be forced to check that the result is still in
+// the database.
+pref("urlclassifier.max-complete-age", 2700);
+// Tables for application reputation.
+pref("urlclassifier.downloadBlockTable", "goog-badbinurl-shavar");
+#ifdef XP_WIN
+// Only download the whitelist on Windows, since the whitelist is
+// only useful for suppressing remote lookups for signed binaries which we can
+// only verify on Windows (Bug 974579). Other platforms always do remote lookups.
+pref("urlclassifier.downloadAllowTable", "goog-downloadwhite-digest256");
+#endif
+#endif
+
 pref("browser.geolocation.warning.infoURL", "http://www.palemoon.org/info-url/geolocation.shtml");
 
 pref("browser.EULA.version", 3);
@@ -1171,9 +1196,6 @@ pref("browser.newtabpage.rows", 4);
 // number of columns of newtab grid
 pref("browser.newtabpage.columns", 4);
 
-// activates the remote-hosted newtab page
-pref("browser.newtabpage.remote", false);
-
 // about:permissions
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
@@ -1181,6 +1203,9 @@ pref("permissions.places-sites-limit", 50);
 
 // endpoint to send newtab click and view pings
 pref("browser.newtabpage.directory.ping", "https://tiles.up.mozillalabs.com/v2/links/");
+
+// activates the remote-hosted newtab page
+pref("browser.newtabpage.remote", false);
 
 // Enable the DOM fullscreen API.
 pref("full-screen-api.enabled", true);
@@ -1271,17 +1296,6 @@ pref("toolkit.telemetry.optoutSample", true);
 //Arctic Fox standalone image background color
 pref("browser.display.standalone_images.background_color", "#2E3B41");
 
-pref("view_source.tab", true);
-
-// Enable ServiceWorkers for Push API consumers.
-// Interception is still disabled.
-pref("dom.serviceWorkers.enabled", true);
-
-// Enable Push API.
-pref("dom.push.enabled", true);
-
-pref("dom.serviceWorkers.openWindow.enabled", true);
-
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
@@ -1343,7 +1357,7 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
-#ifdef NIGHTLY_BUILD
+#ifndef RELEASE_BUILD
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow
 // us to change everybody to true in the future, when desired.
@@ -1351,15 +1365,16 @@ pref("browser.tabs.remote.autostart.1", false);
 pref("browser.tabs.remote.autostart.2", true);
 #endif
 
-#ifdef E10S_TESTING_ONLY
 // Enable e10s add-on interposition by default.
 pref("extensions.interposition.enabled", true);
 pref("extensions.interposition.prefetching", true);
-#endif
 
 // How often to check for CPOW timeouts. CPOWs are only timed out by
 // the hang monitor.
 pref("dom.ipc.cpow.timeout", 500);
+
+// Causes access on unsafe CPOWs from browser code to throw by default.
+pref("dom.ipc.cpows.forbid-unsafe-from-browser", true);
 
 // Enable e10s hang monitoring (slow script checking and plugin hang
 // detection).
@@ -1372,6 +1387,16 @@ pref("dom.ipc.reportProcessHangs", false);
 #else
 pref("dom.ipc.reportProcessHangs", true);
 #endif
+
+pref("view_source.tab", true);
+
+pref("dom.serviceWorkers.enabled", true);
+pref("dom.serviceWorkers.interception.enabled", true);
+pref("dom.serviceWorkers.openWindow.enabled", true);
+pref("dom.webnotifications.serviceworker.enabled", true);
+
+// Enable Push API.
+pref("dom.push.enabled", true);
 
 // These are the thumbnail width/height set in about:newtab.
 // If you change this, ENSURE IT IS THE SAME SIZE SET
