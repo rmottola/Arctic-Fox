@@ -4206,6 +4206,24 @@
     "n_buckets": 20,
     "description": "Session restore: Number of characters in DOM Storage for a tab. Pages without DOM Storage or with an empty DOM Storage are ignored."
   },
+  "FX_SESSION_RESTORE_AUTO_RESTORE_DURATION_UNTIL_EAGER_TABS_RESTORED_MS": {
+    "alert_emails": ["session-restore-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "low": "100",
+    "high": "100000",
+    "n_buckets": 20,
+    "description": "Session restore: If the browser is setup to auto-restore tabs, this probe measures the time elapsed between the instant we start Session Restore and the instant we have finished restoring tabs eagerly. At this stage, the tabs that are restored on demand are not restored yet."
+  },
+  "FX_SESSION_RESTORE_MANUAL_RESTORE_DURATION_UNTIL_EAGER_TABS_RESTORED_MS": {
+    "alert_emails": ["session-restore-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "low": "100",
+    "high": "100000",
+    "n_buckets": 20,
+    "description": "Session restore: If a session is restored by the user clicking on 'Restore Session', this probe measures the time elapsed between the instant the user has clicked and the instant we have finished restoring tabs eagerly. At this stage, the tabs that are restored on demand are not restored yet."
+  },
   "FX_TABLETMODE_PAGE_LOAD": {
     "expires_in_version": "47",
     "kind": "exponential",
@@ -5079,12 +5097,6 @@
     "kind": "count",
     "keyed": true,
     "description": "Record the search counts for search engines"
-  },
-  "SEARCH_DEFAULT_ENGINE": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "keyed": true,
-    "description": "Record the default search engine."
   },
   "SEARCH_SERVICE_INIT_MS": {
     "expires_in_version": "never",
@@ -7252,7 +7264,49 @@
   "BROWSER_IS_USER_DEFAULT": {
     "expires_in_version": "never",
     "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
     "description": "The result of the startup default desktop browser check."
+  },
+  "BROWSER_IS_USER_DEFAULT_ERROR": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
+    "description": "True if the browser was unable to determine if the browser was set as default."
+  },
+  "BROWSER_SET_DEFAULT_DIALOG_PROMPT_RAWCOUNT": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "250",
+    "n_buckets": "15",
+    "releaseChannelCollection": "opt-out",
+    "description": "The number of times that a profile has seen the 'Set Default Browser' dialog."
+  },
+  "BROWSER_SET_DEFAULT_ALWAYS_CHECK": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
+    "description": "True if the profile has `browser.shell.checkDefaultBrowser` set to true."
+  },
+  "BROWSER_SET_DEFAULT_RESULT": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": "4",
+    "releaseChannelCollection": "opt-out",
+    "description": "Result of the Set Default Browser dialog (0=Use Firefox + 'Always perform check' unchecked, 1=Use Firefox + 'Always perform check' checked, 2=Not Now + 'Always perform check' unchecked, 3=Not Now + 'Always perform check' checked)"
+  },
+  "BROWSER_SET_DEFAULT_ERROR": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
+    "description": "True if the browser was unable to set Firefox as the default browser"
+  },
+  "BROWSER_SET_DEFAULT_TIME_TO_COMPLETION_SECONDS": {
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": "500",
+    "n_buckets": "15",
+    "releaseChannelCollection": "opt-out",
+    "description": "Time to successfully set Firefox as the default browser after clicking 'Set Firefox as Default'. Should be near-instant in some environments, others require user interaction. Measured in seconds."
   },
   "BROWSER_IS_ASSIST_DEFAULT": {
     "expires_in_version": "never",
@@ -7846,26 +7900,26 @@
     "description": "Cache hits on the tile-info metadata database"
   },
   "DISPLAY_SCALING_OSX" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (OS X only)",
     "cpp_guard": "XP_MACOSX"
   },
   "DISPLAY_SCALING_MSWIN" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (MS Windows only)",
     "cpp_guard": "XP_WIN"
   },
   "DISPLAY_SCALING_LINUX" : {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
-    "n_buckets": "100",
+    "high": 500,
+    "n_buckets": 100,
     "description": "Scaling percentage for the display where the first window is opened (Linux only)",
     "cpp_guard": "XP_LINUX"
   },

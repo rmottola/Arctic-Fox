@@ -7,8 +7,6 @@
 <!DOCTYPE html [
   <!ENTITY % newTabDTD SYSTEM "chrome://browser/locale/newTab.dtd">
   %newTabDTD;
-  <!ENTITY % searchBarDTD SYSTEM "chrome://browser/locale/searchbar.dtd">
-  %searchBarDTD;
   <!ENTITY % browserDTD SYSTEM "chrome://browser/locale/browser.dtd">
   %browserDTD;
   <!ENTITY % globalDTD SYSTEM "chrome://global/locale/global.dtd">
@@ -20,7 +18,7 @@
   <title>&newtab.pageTitle;</title>
 
   <link rel="stylesheet" type="text/css" media="all" href="chrome://global/skin/" />
-  <link rel="stylesheet" type="text/css" media="all" href="chrome://browser/content/searchSuggestionUI.css" />
+  <link rel="stylesheet" type="text/css" media="all" href="chrome://browser/content/contentSearchUI.css" />
   <link rel="stylesheet" type="text/css" media="all" href="chrome://browser/content/newtab/newTab.css" />
   <link rel="stylesheet" type="text/css" media="all" href="chrome://browser/skin/newtab/newTab.css" />
 </head>
@@ -44,13 +42,13 @@
         </div>
 
       <div id="newtab-search-container">
-        <form id="newtab-search-form" name="searchForm">
-          <div id="newtab-search-logo"/>
+        <div id="newtab-search-form">
+          <div id="newtab-search-icon"/>
           <input type="text" name="q" value="" id="newtab-search-text"
-                 maxlength="256" dir="auto"/>
-          <input id="newtab-search-submit" type="submit"
-                 value="&searchEndCap.label;"/>
-        </form>
+                 aria-label="&contentSearchInput.label;" maxlength="256" dir="auto"/>
+          <input id="newtab-search-submit" type="button" value=""
+                 aria-label="&contentSearchSubmit.label;"/>
+        </div>
       </div>
 
       <div id="newtab-horizontal-margin">
@@ -67,6 +65,6 @@
     <input id="newtab-toggle" type="button"/>
   </div>
 </body>
-<script type="text/javascript;version=1.8" src="chrome://browser/content/searchSuggestionUI.js"/>
+<script type="text/javascript;version=1.8" src="chrome://browser/content/contentSearchUI.js"/>
 <script type="text/javascript;version=1.8" src="chrome://browser/content/newtab/newTab.js"/>
 </html>

@@ -376,6 +376,10 @@ pref("browser.search.context.loadInBackground", false);
 // if no result, add the search term so that the panel of the new UI is shown anyway
 pref("browser.search.showOneOffButtons", true);
 
+
+// comma seperated list of of engines to hide in the search panel.
+pref("browser.search.hiddenOneOffs", "");
+
 // send ping to the server to update
 pref("browser.search.update", true);
 
@@ -654,6 +658,9 @@ pref("accessibility.typeaheadfind", false);
 pref("accessibility.typeaheadfind.timeout", 5000);
 pref("accessibility.typeaheadfind.linksonly", false);
 pref("accessibility.typeaheadfind.flashBar", 1);
+
+// Tracks when accessibility is loaded into the previous session.
+pref("accessibility.loadedInLastSession", false);
 
 // by default we show an infobar message when pages require plugins that are blocked, or are outdated
 pref("plugins.hide_infobar_for_blocked_plugin", false);

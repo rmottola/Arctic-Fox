@@ -715,6 +715,7 @@ function CreateArrayIterator(obj, kind) {
     return CreateArrayIteratorAt(obj, kind, 0);
 }
 
+
 function ArrayIteratorNext() {
     if (!IsObject(this) || !IsArrayIterator(this)) {
         return callFunction(CallArrayIteratorMethodIfWrapped, this,

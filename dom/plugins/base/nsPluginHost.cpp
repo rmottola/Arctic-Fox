@@ -109,6 +109,10 @@
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoPlugins" , ## args)
 #endif
 
+#if MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 #include "npapi.h"
 
 using namespace mozilla;
@@ -244,6 +248,11 @@ IsTypeInList(const nsCString& aMimeType, nsCString aTypeList)
   commaSeparated.Assign(',');
   commaSeparated += aMimeType;
   commaSeparated.Append(',');
+
+  // Lower-case the search string and MIME type to properly handle a mixed-case
+  // type, as MIME types are case insensitive.
+  ToLowerCase(searchStr);
+  ToLowerCase(commaSeparated);
 
   return FindInReadable(commaSeparated, start, end);
 }
@@ -968,6 +977,12 @@ nsPluginHost::TrySetUpPluginInstance(const nsACString &aMimeType,
 
   plugin->GetLibrary()->SetHasLocalInstance();
 
+#if defined(MOZ_WIDGET_ANDROID) && defined(MOZ_CRASHREPORTER)
+  if (pluginTag->mIsFlashPlugin) {
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("FlashVersion"), pluginTag->Version());
+  }
+#endif
+
   RefPtr<nsNPAPIPluginInstance> instance = new nsNPAPIPluginInstance();
 
   // This will create the owning reference. The connection must be made between the
@@ -1080,18 +1095,6 @@ nsPluginHost::GetBlocklistStateForType(const nsACString &aMimeType,
                                     getter_AddRefs(tag));
   NS_ENSURE_SUCCESS(rv, rv);
   return tag->GetBlocklistState(aState);
-}
-
-NS_IMETHODIMP
-nsPluginHost::IsPluginOOP(const nsACString& aMimeType,
-                          bool* aResult)
-{
-  nsPluginTag* tag = FindNativePluginForType(aMimeType, true);
-  if (!tag) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
-  *aResult = nsNPAPIPlugin::RunPluginOOP(tag);
-  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1372,6 +1375,13 @@ nsPluginHost::GetPluginForContentProcess(uint32_t aPluginId, nsNPAPIPlugin** aPl
 
   nsPluginTag* pluginTag = PluginWithId(aPluginId);
   if (pluginTag) {
+    // When setting up a bridge, double check with chrome to see if this plugin
+    // is blocked hard. Note this does not protect against vulnerable plugins
+    // that the user has explicitly allowed. :(
+    if (pluginTag->IsBlocklisted()) {
+      return NS_ERROR_PLUGIN_BLOCKLISTED;
+    }
+
     nsresult rv = EnsurePluginLoaded(pluginTag);
     if (NS_FAILED(rv)) {
       return rv;
@@ -1610,58 +1620,6 @@ nsPluginHost::UnregisterFakePlugin(const nsACString& aHandlerURI)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsPluginHost::RegisterPlayPreviewMimeType(const nsACString& mimeType,
-                                          bool ignoreCTP,
-                                          const nsACString& redirectURL,
-                                          const nsACString& whitelist)
-{
-  nsAutoCString mt(mimeType);
-  nsAutoCString url(redirectURL);
-  if (url.Length() == 0) {
-    // using default play preview iframe URL, if redirectURL is not specified
-    url.AssignLiteral("data:application/x-moz-playpreview;,");
-    url.Append(mimeType);
-  }
-  nsAutoCString wl(whitelist);
-
-  RefPtr<nsPluginPlayPreviewInfo> playPreview =
-    new nsPluginPlayPreviewInfo(mt.get(), ignoreCTP, url.get(), wl.get());
-  mPlayPreviewMimeTypes.AppendElement(playPreview);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPluginHost::UnregisterPlayPreviewMimeType(const nsACString& mimeType)
-{
-  nsAutoCString mimeTypeToRemove(mimeType);
-  for (uint32_t i = mPlayPreviewMimeTypes.Length(); i > 0; i--) {
-    RefPtr<nsPluginPlayPreviewInfo> pp = mPlayPreviewMimeTypes[i - 1];
-    if (PL_strcasecmp(pp.get()->mMimeType.get(), mimeTypeToRemove.get()) == 0) {
-      mPlayPreviewMimeTypes.RemoveElementAt(i - 1);
-      break;
-    }
-  }
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPluginHost::GetPlayPreviewInfo(const nsACString& mimeType,
-                                 nsIPluginPlayPreviewInfo** aResult)
-{
-  nsAutoCString mimeTypeToFind(mimeType);
-  for (uint32_t i = 0; i < mPlayPreviewMimeTypes.Length(); i++) {
-    RefPtr<nsPluginPlayPreviewInfo> pp = mPlayPreviewMimeTypes[i];
-    if (PL_strcasecmp(pp.get()->mMimeType.get(), mimeTypeToFind.get()) == 0) {
-      *aResult = new nsPluginPlayPreviewInfo(pp.get());
-      NS_ADDREF(*aResult);
-      return NS_OK;
-    }
-  }
-  *aResult = nullptr;
-  return NS_ERROR_NOT_AVAILABLE;
-}
-
 // FIXME-jsplugins Is this method actually needed?
 NS_IMETHODIMP
 nsPluginHost::GetFakePlugin(const nsACString & aMimeType,
@@ -1892,7 +1850,8 @@ nsPluginHost::GetSpecialType(const nsACString & aMIMEType)
   }
 
   if (aMIMEType.LowerCaseEqualsASCII("application/x-shockwave-flash") ||
-      aMIMEType.LowerCaseEqualsASCII("application/futuresplash")) {
+      aMIMEType.LowerCaseEqualsASCII("application/futuresplash") ||
+      aMIMEType.LowerCaseEqualsASCII("application/x-shockwave-flash-test")) {
     return eSpecialType_Flash;
   }
 
@@ -2078,11 +2037,17 @@ bool
 nsPluginHost::ShouldAddPlugin(nsPluginTag* aPluginTag)
 {
 #if defined(XP_WIN) && (defined(__x86_64__) || defined(_M_X64))
-  // On 64-bit windows, the only plugin we should load is flash. Use library
-  // filename and MIME type to check.
+  // On 64-bit windows, the only plugins we should load are flash and
+  // silverlight. Use library filename and MIME type to check.
   if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("NPSWF"), nsCaseInsensitiveCStringComparator()) &&
       (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash")) ||
        aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-shockwave-flash-test")))) {
+    return true;
+  }
+  if (StringBeginsWith(aPluginTag->FileName(), NS_LITERAL_CSTRING("npctrl"), nsCaseInsensitiveCStringComparator()) &&
+      (aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight-test")) ||
+       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight-2")) ||
+       aPluginTag->HasMimeType(NS_LITERAL_CSTRING("application/x-silverlight")))) {
     return true;
   }
   // Accept the test plugin MIME types, so mochitests still work.
@@ -2724,12 +2689,6 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
     /// FIXME-jsplugins - We need to cleanup the various plugintag classes
     /// to be more sane and avoid this dance
     nsPluginTag *tag = static_cast<nsPluginTag *>(basetag.get());
-
-    if (!nsNPAPIPlugin::RunPluginOOP(tag)) {
-      // Don't expose non-OOP plugins to content processes since we have no way
-      // to bridge them over.
-      continue;
-    }
 
     aPlugins->AppendElement(PluginTag(tag->mId,
                                       tag->Name(),

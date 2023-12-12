@@ -86,9 +86,6 @@ var gPage = {
     document.addEventListener("dragover", this, false);
     document.addEventListener("drop", this, false);
 #endif
-     // content.js isn't loaded for the page while it's in the preloader,
-     // which is why this is necessary.
-     gSearch.setUpInitialState();
   },
 
   /**

@@ -1691,6 +1691,7 @@ Parser<ParseHandler>::newFunction(HandleAtom atom, FunctionSyntaxKind kind,
         allocKind = gc::AllocKind::FUNCTION_EXTENDED;
         break;
       default:
+        MOZ_ASSERT(kind == Statement);
 #ifdef DEBUG
         if (options().selfHostingMode && !pc->sc->isFunctionBox()) {
             isGlobalSelfHostedBuiltin = true;
@@ -4348,11 +4349,6 @@ Parser<FullParseHandler>::checkDestructuringArray(BindData<FullParseHandler>* da
                 return false;
             }
             target = element->pn_kid;
-
-            if (handler.isUnparenthesizedDestructuringPattern(target)) {
-                report(ParseError, false, target, JSMSG_BAD_DESTRUCT_TARGET);
-                return false;
-            }
         } else if (handler.isUnparenthesizedAssignment(element)) {
             target = element->pn_left;
         } else {

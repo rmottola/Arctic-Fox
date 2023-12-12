@@ -237,7 +237,12 @@ IndirectBindingMap::putNew(JSContext* cx, HandleId name,
 {
     RootedShape shape(cx, environment->lookup(cx, localName));
     MOZ_ASSERT(shape);
-    return map_.putNew(name, Binding(environment, shape));
+    if (!map_.putNew(name, Binding(environment, shape))) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
+    return true;
 }
 
 bool
@@ -577,6 +582,7 @@ ModuleObject::create(ExclusiveContext* cx, HandleObject enclosingStaticScope)
     IndirectBindingMap* bindings = zone->new_<IndirectBindingMap>(zone);
     if (!bindings || !bindings->init()) {
         ReportOutOfMemory(cx);
+        js_delete<IndirectBindingMap>(bindings);
         return nullptr;
     }
 
@@ -814,7 +820,12 @@ bool
 ModuleObject::noteFunctionDeclaration(ExclusiveContext* cx, HandleAtom name, HandleFunction fun)
 {
     FunctionDeclarationVector* funDecls = functionDeclarations();
-    return funDecls->emplaceBack(name, fun);
+    if (!funDecls->emplaceBack(name, fun)) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
+    return true;
 }
 
 /* static */ bool
@@ -884,6 +895,7 @@ ModuleObject::createNamespace(JSContext* cx, HandleModuleObject self, HandleObje
     IndirectBindingMap* bindings = zone->new_<IndirectBindingMap>(zone);
     if (!bindings || !bindings->init()) {
         ReportOutOfMemory(cx);
+        js_delete<IndirectBindingMap>(bindings);
         return nullptr;
     }
 

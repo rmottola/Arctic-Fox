@@ -1525,11 +1525,14 @@ MStringReplace::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_StringReplace));
+    writer.writeByte(isFlatReplacement_);
     return true;
 }
 
 RStringReplace::RStringReplace(CompactBufferReader& reader)
-{ }
+{
+    isFlatReplacement_ = reader.readByte();
+}
 
 bool RStringReplace::recover(JSContext* cx, SnapshotIterator& iter) const
 {
@@ -1537,7 +1540,9 @@ bool RStringReplace::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedString pattern(cx, iter.read().toString());
     RootedString replace(cx, iter.read().toString());
 
-    JSString* result = js::str_replace_string_raw(cx, string, pattern, replace);
+    JSString* result = isFlatReplacement_ ? js::str_flat_replace_string(cx, string, pattern, replace) :
+                                            js::str_replace_string_raw(cx, string, pattern, replace);
+
     if (!result)
         return false;
 

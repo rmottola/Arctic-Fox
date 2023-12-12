@@ -619,10 +619,11 @@ PostWriteBarrier(JSRuntime* rt, JSObject* obj)
 static const size_t MAX_WHOLE_CELL_BUFFER_SIZE = 4096;
 
 void
-PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, size_t index)
+PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index)
 {
     MOZ_ASSERT(!IsInsideNursery(obj));
     if (obj->is<NativeObject>() &&
+        uint32_t(index) < obj->as<NativeObject>().getDenseInitializedLength() &&
         (obj->as<NativeObject>().getDenseInitializedLength() > MAX_WHOLE_CELL_BUFFER_SIZE
 #ifdef JS_GC_ZEAL
          || rt->hasZealMode(gc::ZealMode::ElementsBarrier)
@@ -1315,7 +1316,7 @@ bool
 ThrowObjectCoercible(JSContext* cx, HandleValue v)
 {
     MOZ_ASSERT(v.isUndefined() || v.isNull());
-    MOZ_ALWAYS_FALSE(ToObjectSlow(cx, v, false));
+    MOZ_ALWAYS_FALSE(ToObjectSlow(cx, v, true));
     return false;
 }
 

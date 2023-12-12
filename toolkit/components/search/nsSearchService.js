@@ -29,6 +29,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "setTimeout",
   "resource://gre/modules/Timer.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "clearTimeout",
   "resource://gre/modules/Timer.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Lz4",
+  "resource://gre/modules/lz4.js");
 
 XPCOMUtils.defineLazyServiceGetter(this, "gTextToSubURI",
                                    "@mozilla.org/intl/texttosuburi;1",
@@ -95,7 +97,9 @@ const CACHE_INVALIDATION_DELAY = 1000;
 
 // Current cache version. This should be incremented if the format of the cache
 // file is modified.
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 1;
+
+const CACHE_FILENAME = "search.json.mozlz4";
 
 const ICON_DATAURL_PREFIX = "data:image/x-icon;base64,";
 
@@ -534,11 +538,10 @@ var ensureKnownCountryCode = Task.async(function* (ss) {
       // If we have a default engine or a list of visible default engines
       // saved, the hashes should be valid, verify them now so that we can
       // refetch if they have been tampered with.
-      let defaultEngine = ss.getGlobalAttr("searchDefault");
-      let visibleDefaultEngines = ss.getGlobalAttr("visibleDefaultEngines");
-      if ((!defaultEngine || ss.getGlobalAttr("searchDefaultHash") == getVerificationHash(defaultEngine)) &&
-          (!visibleDefaultEngines ||
-           ss.getGlobalAttr("visibleDefaultEnginesHash") == getVerificationHash(visibleDefaultEngines))) {
+      let defaultEngine = ss.getVerifiedGlobalAttr("searchDefault");
+      let visibleDefaultEngines = ss.getVerifiedGlobalAttr("visibleDefaultEngines");
+      if ((defaultEngine || defaultEngine === undefined) &&
+          (visibleDefaultEngines || visibleDefaultEngines === undefined)) {
         // No geo defaults, or valid hashes; nothing to do.
         return;
       }
@@ -777,21 +780,15 @@ var fetchRegionDefault = (ss) => new Promise(resolve => {
 
     if (response.settings && response.settings.searchDefault) {
       let defaultEngine = response.settings.searchDefault;
-      ss.setGlobalAttr("searchDefault", defaultEngine);
-      let hash = getVerificationHash(defaultEngine);
-      LOG("fetchRegionDefault saved searchDefault: " + defaultEngine +
-          " with verification hash: " + hash);
-      ss.setGlobalAttr("searchDefaultHash", hash);
+      ss.setVerifiedGlobalAttr("searchDefault", defaultEngine);
+      LOG("fetchRegionDefault saved searchDefault: " + defaultEngine);
     }
 
     if (response.settings && response.settings.visibleDefaultEngines) {
       let visibleDefaultEngines = response.settings.visibleDefaultEngines;
       let string = visibleDefaultEngines.join(",");
-      ss.setGlobalAttr("visibleDefaultEngines", string);
-      let hash = getVerificationHash(string);
-      LOG("fetchRegionDefault saved visibleDefaultEngines: " + string +
-          " with verification hash: " + hash);
-      ss.setGlobalAttr("visibleDefaultEnginesHash", hash);
+      ss.setVerifiedGlobalAttr("visibleDefaultEngines", string);
+      LOG("fetchRegionDefault saved visibleDefaultEngines: " + string);
     }
 
     let interval = response.interval || SEARCH_GEO_DEFAULT_UPDATE_INTERVAL;
@@ -877,7 +874,10 @@ function makeURI(aURLSpec, aCharset) {
  */
 function makeChannel(url) {
   try {
-    return NetUtil.newChannel({uri: url, loadUsingSystemPrincipal: true});
+    return NetUtil.newChannel({
+             uri: url,
+             loadUsingSystemPrincipal: true
+           });
   } catch (ex) { }
 
   return null;
@@ -922,21 +922,6 @@ function getLocalizedPref(aPrefName, aDefault) {
   } catch (ex) {}
 
   return aDefault;
-}
-
-/**
- * Wrapper for nsIPrefBranch::setComplexValue.
- * @param aPrefName
- *        The name of the pref to set.
- */
-function setLocalizedPref(aPrefName, aValue) {
-  const nsIPLS = Ci.nsIPrefLocalizedString;
-  try {
-    var pls = Components.classes["@mozilla.org/pref-localizedstring;1"]
-                        .createInstance(Ci.nsIPrefLocalizedString);
-    pls.data = aValue;
-    Services.prefs.setComplexValue(aPrefName, nsIPLS, pls);
-  } catch (ex) {}
 }
 
 /**
@@ -992,7 +977,7 @@ function getMozParamPref(prefName) {
  *
  * @see nsIBrowserSearchService.idl
  */
-let gInitialized = false;
+var gInitialized = false;
 function notifyAction(aEngine, aVerb) {
   if (gInitialized) {
     LOG("NOTIFY: Engine: \"" + aEngine.name + "\"; Verb: \"" + aVerb + "\"");
@@ -1219,12 +1204,7 @@ EngineURL.prototype = {
     for (let i = 0; i < aJson.params.length; ++i) {
       let param = aJson.params[i];
       if (param.mozparam) {
-        if (param.condition == "defaultEngine") {
-          if (aEngine._isDefaultEngine())
-            this.addParam(param.name, param.trueValue);
-          else
-            this.addParam(param.name, param.falseValue);
-        } else if (param.condition == "pref") {
+        if (param.condition == "pref") {
           let value = getMozParamPref(param.pref);
           this.addParam(param.name, value);
         }
@@ -1459,12 +1439,10 @@ Engine.prototype = {
 
     LOG("_initFromURIAndLoad: Downloading engine from: \"" + uri.spec + "\".");
 
-    var chan = NetUtil.ioService.newChannelFromURI2(uri,
-                                                    null,      // aLoadingNode
-                                                    Services.scriptSecurityManager.getSystemPrincipal(),
-                                                    null,      // aTriggeringPrincipal
-                                                    Ci.nsILoadInfo.SEC_NORMAL,
-                                                    Ci.nsIContentPolicy.TYPE_OTHER);
+    var chan = NetUtil.newChannel({
+                 uri: uri,
+                 loadUsingSystemPrincipal: true
+               });
 
     if (this._engineToUpdate && (chan instanceof Ci.nsIHttpChannel)) {
       var lastModified = this._engineToUpdate.getAttr("updatelastmodified");
@@ -1474,7 +1452,7 @@ Engine.prototype = {
     this._uri = uri;
     var listener = new loadListener(chan, this, this._onLoad);
     chan.notificationCallbacks = listener;
-    chan.asyncOpen(listener, null);
+    chan.asyncOpen2(listener);
   },
 
   /**
@@ -1529,14 +1507,12 @@ Engine.prototype = {
 
     LOG("_initFromURISync: Loading engine from: \"" + uri.spec + "\".");
 
-    var chan = NetUtil.ioService.newChannelFromURI2(uri,
-                                                    null,      // aLoadingNode
-                                                    Services.scriptSecurityManager.getSystemPrincipal(),
-                                                    null,      // aTriggeringPrincipal
-                                                    Ci.nsILoadInfo.SEC_NORMAL,
-                                                    Ci.nsIContentPolicy.TYPE_OTHER);
+    var chan = NetUtil.newChannel({
+                 uri: uri,
+                 loadUsingSystemPrincipal: true
+               });
 
-    var stream = chan.open();
+    var stream = chan.open2();
     var parser = Cc["@mozilla.org/xmlextras/domparser;1"].
                  createInstance(Ci.nsIDOMParser);
     var doc = parser.parseFromStream(stream, "UTF-8", stream.available(), "text/xml");
@@ -1707,6 +1683,7 @@ Engine.prototype = {
       aEngine._shortName = sanitizeName(aEngine.name);
 
     aEngine._loadPath = aEngine.getAnonymizedLoadPath(null, aEngine._uri);
+    aEngine.setAttr("loadPathHash", getVerificationHash(aEngine._loadPath));
 
     if (engineToUpdate) {
       // Keep track of the last modified date, so that we can make conditional
@@ -1810,12 +1787,10 @@ Engine.prototype = {
         // No use downloading the icon if the engine file is read-only
         LOG("_setIcon: Downloading icon: \"" + uri.spec +
             "\" for engine: \"" + this.name + "\"");
-        var chan = NetUtil.ioService.newChannelFromURI2(uri,
-                                                        null,      // aLoadingNode
-                                                        Services.scriptSecurityManager.getSystemPrincipal(),
-                                                        null,      // aTriggeringPrincipal
-                                                        Ci.nsILoadInfo.SEC_NORMAL,
-                                                        Ci.nsIContentPolicy.TYPE_INTERNAL_IMAGE);
+        var chan = NetUtil.newChannel({
+                     uri: uri,
+                     loadUsingSystemPrincipal: true
+                   });
 
         let iconLoadCallback = function (aByteArray, aEngine) {
           // This callback may run after we've already set a preferred icon,
@@ -1847,7 +1822,7 @@ Engine.prototype = {
 
         var listener = new loadListener(chan, engineToSet, iconLoadCallback);
         chan.notificationCallbacks = listener;
-        chan.asyncOpen(listener, null);
+        chan.asyncOpen2(listener);
         break;
     }
   },
@@ -1954,19 +1929,6 @@ Engine.prototype = {
             // _addMozParam is not needed here since it can be serialized fine without. _addMozParam
             // also requires a unique "name" which is not normally the case when @purpose is used.
             break;
-          case "defaultEngine":
-            // If this engine was the default search engine, use the true value
-            if (this._isDefaultEngine())
-              value = param.getAttribute("trueValue");
-            else
-              value = param.getAttribute("falseValue");
-            url.addParam(param.getAttribute("name"), value);
-            url._addMozParam({"name": param.getAttribute("name"),
-                              "falseValue": param.getAttribute("falseValue"),
-                              "trueValue": param.getAttribute("trueValue"),
-                              "condition": "defaultEngine"});
-            break;
-
           case "pref":
             try {
               value = getMozParamPref(param.getAttribute("pref"), value);
@@ -1986,17 +1948,6 @@ Engine.prototype = {
     }
 
     this._urls.push(url);
-  },
-
-  _isDefaultEngine: function SRCH_ENG__isDefaultEngine() {
-    let defaultPrefB = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF);
-    let nsIPLS = Ci.nsIPrefLocalizedString;
-    let defaultEngine;
-    let pref = getGeoSpecificPrefName("defaultenginename");
-    try {
-      defaultEngine = defaultPrefB.getComplexValue(pref, nsIPLS).data;
-    } catch (ex) {}
-    return this.name == defaultEngine;
   },
 
   /**
@@ -2163,7 +2114,6 @@ Engine.prototype = {
 
   setAttr(name, val) {
     this._metaData[name] = val;
-    notifyAction(this, SEARCH_ENGINE_CHANGED);
   },
 
   getAttr(name) {
@@ -2176,6 +2126,7 @@ Engine.prototype = {
   },
   set alias(val) {
     this.setAttr("alias", val);
+    notifyAction(this, SEARCH_ENGINE_CHANGED);
   },
 
   /**
@@ -2205,6 +2156,7 @@ Engine.prototype = {
     var value = !!val;
     if (value != this.hidden) {
       this.setAttr("hidden", value);
+      notifyAction(this, SEARCH_ENGINE_CHANGED);
     }
   },
 
@@ -2241,6 +2193,16 @@ Engine.prototype = {
      *   [other]/engine.xml
      */
 
+    const NS_XPCOM_CURRENT_PROCESS_DIR = "XCurProcD";
+    const NS_APP_USER_PROFILE_50_DIR = "ProfD";
+    const XRE_APP_DISTRIBUTION_DIR = "XREAppDist";
+
+    const knownDirs = {
+      app: NS_XPCOM_CURRENT_PROCESS_DIR,
+      profile: NS_APP_USER_PROFILE_50_DIR,
+      distribution: XRE_APP_DISTRIBUTION_DIR
+    };
+
     let leafName = this._shortName;
     if (!leafName)
       return "null";
@@ -2259,6 +2221,25 @@ Engine.prototype = {
         packageName = uri.hostPort;
         uri = gChromeReg.convertChromeURL(uri);
       }
+
+#ifdef ANDROID
+      // On Android the omni.ja file isn't at the same path as the binary
+      // used to start the process. We tweak the path here so that the code
+      // shared with Desktop will correctly identify files from the omni.ja
+      // file as coming from the [app] folder.
+      let appPath = Services.io.getProtocolHandler("resource")
+                            .QueryInterface(Ci.nsIResProtocolHandler)
+                            .getSubstitution("android");
+      if (appPath) {
+        appPath = appPath.spec;
+        let spec = uri.spec;
+        if (spec.includes(appPath)) {
+          let appURI = Services.io.newFileURI(getDir(knownDirs["app"]));
+          uri = NetUtil.newURI(spec.replace(appPath, appURI.spec));
+        }
+      }
+#endif
+
       if (uri instanceof Ci.nsINestedURI) {
         prefix = "jar:";
         suffix = "!" + packageName + "/" + leafName;
@@ -2277,16 +2258,6 @@ Engine.prototype = {
 
     let id;
     let enginePath = file.path;
-
-    const NS_XPCOM_CURRENT_PROCESS_DIR = "XCurProcD";
-    const NS_APP_USER_PROFILE_50_DIR = "ProfD";
-    const XRE_APP_DISTRIBUTION_DIR = "XREAppDist";
-
-    const knownDirs = {
-      app: NS_XPCOM_CURRENT_PROCESS_DIR,
-      profile: NS_APP_USER_PROFILE_50_DIR,
-      distribution: XRE_APP_DISTRIBUTION_DIR
-    };
 
     for (let key in knownDirs) {
       let path;
@@ -2693,6 +2664,13 @@ SearchService.prototype = {
   // The boolean indicates that the initialization has started or not.
   _initStarted: null,
 
+  // Reading the JSON cache file is the first thing done during initialization.
+  // During the async init, we save it in a field so that if we have to do a
+  // sync init before the async init finishes, we can avoid reading the cache
+  // with sync disk I/O and handling lz4 decompression synchronously.
+  // This is set back to null as soon as the initialization is finished.
+  _cacheFileJSON: null,
+
   // If initialization has not been completed yet, perform synchronous
   // initialization.
   // Throws in case of initialization error.
@@ -2739,6 +2717,7 @@ SearchService.prototype = {
     this._addObservers();
 
     gInitialized = true;
+    this._cacheFileJSON = null;
 
     this._initObservers.resolve(this._initRV);
 
@@ -2782,6 +2761,7 @@ SearchService.prototype = {
       }
       this._addObservers();
       gInitialized = true;
+      this._cacheFileJSON = null;
       this._initObservers.resolve(this._initRV);
       Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "init-complete");
       Services.telemetry.getHistogramById("SEARCH_SERVICE_INIT_SYNC").add(false);
@@ -2796,9 +2776,21 @@ SearchService.prototype = {
     this.batchTask.disarm();
     this.batchTask.arm();
   },
+  setVerifiedGlobalAttr(name, val) {
+    this.setGlobalAttr(name, val);
+    this.setGlobalAttr(name + "Hash", getVerificationHash(val));
+  },
 
   getGlobalAttr(name) {
     return this._metaData[name] || undefined;
+  },
+  getVerifiedGlobalAttr(name) {
+    let val = this.getGlobalAttr(name);
+    if (val && this.getGlobalAttr(name + "Hash") != getVerificationHash(val)) {
+      LOG("getVerifiedGlobalAttr, invalid hash for " + name);
+      return "";
+    }
+    return val;
   },
 
   _engines: { },
@@ -2813,13 +2805,7 @@ SearchService.prototype = {
   // Get the original Engine object that is the default for this region,
   // ignoring changes the user may have subsequently made.
   get _originalDefaultEngine() {
-    let defaultEngine = this.getGlobalAttr("searchDefault");
-    if (defaultEngine &&
-        this.getGlobalAttr("searchDefaultHash") != getVerificationHash(defaultEngine)) {
-      LOG("get _originalDefaultEngine, invalid searchDefaultHash for: " + defaultEngine);
-      defaultEngine = "";
-    }
-
+    let defaultEngine = this.getVerifiedGlobalAttr("searchDefault");
     if (!defaultEngine) {
       let defaultPrefB = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF);
       let nsIPLS = Ci.nsIPrefLocalizedString;
@@ -2866,9 +2852,10 @@ SearchService.prototype = {
 
     try {
       LOG("_buildCache: Writing to cache file.");
-      let path = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
+      let path = OS.Path.join(OS.Constants.Path.profileDir, CACHE_FILENAME);
       let data = gEncoder.encode(JSON.stringify(cache));
-      let promise = OS.File.writeAtomic(path, data, { tmpPath: path + ".tmp"});
+      let promise = OS.File.writeAtomic(path, data, {compression: "lz4",
+                                                     tmpPath: path + ".tmp"});
 
       promise.then(
         function onSuccess() {
@@ -3107,16 +3094,28 @@ SearchService.prototype = {
     // Start by clearing the initialized state, so we don't abort early.
     gInitialized = false;
 
-    // Clear the engines, too, so we don't stick with the stale ones.
-    this._engines = {};
-    this.__sortedEngines = null;
-    this._currentEngine = null;
-    this._defaultEngine = null;
-    this._visibleDefaultEngines = [];
-    this._metaData = {};
-
     Task.spawn(function* () {
       try {
+        if (this._batchTask) {
+          LOG("finalizing batch task");
+          let task = this._batchTask;
+          this._batchTask = null;
+          yield task.finalize();
+        }
+
+        // Clear the engines, too, so we don't stick with the stale ones.
+        this._engines = {};
+        this.__sortedEngines = null;
+        this._currentEngine = null;
+        this._visibleDefaultEngines = [];
+        this._metaData = {};
+        this._cacheFileJSON = null;
+
+        // Tests that want to force a synchronous re-initialization need to
+        // be notified when we are done uninitializing.
+        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC,
+                                     "uninit-complete");
+
         let cache = {};
         cache = yield this._asyncReadCacheFile();
         if (!gInitialized && cache.metaData)
@@ -3130,28 +3129,48 @@ SearchService.prototype = {
 
         // Typically we'll re-init as a result of a pref observer,
         // so signal to 'callers' that we're done.
-        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "reinit-complete");
+        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "init-complete");
         gInitialized = true;
       } catch (err) {
         LOG("Reinit failed: " + err);
         Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "reinit-failed");
+      } finally {
+        Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "reinit-complete");
       }
     }.bind(this));
   },
 
+  /**
+   * Read the cache file synchronously. This also imports data from the old
+   * search-metadata.json file if needed.
+   *
+   * @returns A JS object containing the cached data.
+   */
   _readCacheFile: function SRCH_SVC__readCacheFile() {
-    let cacheFile = getDir(NS_APP_USER_PROFILE_50_DIR);
-    cacheFile.append("search.json");
+    if (this._cacheFileJSON) {
+      return this._cacheFileJSON;
+    }
 
-    let json = Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON);
+    let cacheFile = getDir(NS_APP_USER_PROFILE_50_DIR);
+    cacheFile.append(CACHE_FILENAME);
 
     let stream;
     try {
       stream = Cc["@mozilla.org/network/file-input-stream;1"].
                  createInstance(Ci.nsIFileInputStream);
       stream.init(cacheFile, MODE_RDONLY, FileUtils.PERMS_FILE, 0);
-      return json.decodeFromStream(stream, stream.available());
-    } catch (ex) {
+
+      let bis = Cc["@mozilla.org/binaryinputstream;1"]
+                  .createInstance(Ci.nsIBinaryInputStream);
+      bis.setInputStream(stream);
+
+      let count = stream.available();
+      let array = new Uint8Array(count);
+      bis.readArrayBuffer(count, array.buffer);
+
+      let bytes = Lz4.decompressFileContent(array);
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch(ex) {
       LOG("_readCacheFile: Error reading cache file: " + ex);
     } finally {
       stream.close();
@@ -3159,8 +3178,8 @@ SearchService.prototype = {
 
     try {
       cacheFile.leafName = "search-metadata.json";
-      let stream = Cc["@mozilla.org/network/file-input-stream;1"].
-                   createInstance(Ci.nsIFileInputStream);
+      stream = Cc["@mozilla.org/network/file-input-stream;1"].
+                 createInstance(Ci.nsIFileInputStream);
       stream.init(cacheFile, MODE_RDONLY, FileUtils.PERMS_FILE, 0);
       let metadata = json.decodeFromStream(stream, stream.available());
       let json;
@@ -3190,19 +3209,20 @@ SearchService.prototype = {
   },
 
   /**
-   * Read from a given cache file asynchronously.
+   * Read the cache file asynchronously. This also imports data from the old
+   * search-metadata.json file if needed.
    *
    * @returns {Promise} A promise, resolved successfully if retrieveing data
    * succeeds.
    */
   _asyncReadCacheFile: function SRCH_SVC__asyncReadCacheFile() {
-    let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, "search.json");
-
     return Task.spawn(function() {
       let json;
       try {
-        let bytes = yield OS.File.read(cacheFilePath);
+        let cacheFilePath = OS.Path.join(OS.Constants.Path.profileDir, CACHE_FILENAME);
+        let bytes = yield OS.File.read(cacheFilePath, {compression: "lz4"});
         json = JSON.parse(new TextDecoder().decode(bytes));
+        this._cacheFileJSON = json;
       } catch (ex) {
         LOG("_asyncReadCacheFile: Error reading cache file: " + ex);
         json = {};
@@ -3230,7 +3250,7 @@ SearchService.prototype = {
         } catch (ex) {}
       }
       throw new Task.Result(json);
-    });
+    }.bind(this));
   },
 
   _batchTask: null,
@@ -3519,7 +3539,7 @@ SearchService.prototype = {
 
     let sis = Cc["@mozilla.org/scriptableinputstream;1"].
                 createInstance(Ci.nsIScriptableInputStream);
-    sis.init(chan.open());
+    sis.init(chan.open2());
     this._parseListTxt(sis.read(sis.available()), uris);
     return uris;
   },
@@ -3580,10 +3600,8 @@ SearchService.prototype = {
 
     // Check if we have a useable country specific list of visible default engines.
     let engineNames;
-    let visibleDefaultEngines =
-      this.getGlobalAttr("visibleDefaultEngines");
-    if (visibleDefaultEngines &&
-        this.getGlobalAttr("visibleDefaultEnginesHash") == getVerificationHash(visibleDefaultEngines)) {
+    let visibleDefaultEngines = this.getVerifiedGlobalAttr("visibleDefaultEngines");
+    if (visibleDefaultEngines) {
       engineNames = visibleDefaultEngines.split(",");
 
       for (let engineName of engineNames) {
@@ -3953,10 +3971,6 @@ SearchService.prototype = {
       this._currentEngine = null;
     }
 
-    if (engineToRemove == this.defaultEngine) {
-      this._defaultEngine = null;
-    }
-
     if (engineToRemove._readOnly) {
       // Just hide it (the "hidden" setter will notify) and remove its alias to
       // avoid future conflicts with other engines.
@@ -3982,11 +3996,10 @@ SearchService.prototype = {
       // Remove the engine from the internal store
       delete this._engines[engineToRemove.name];
 
-      notifyAction(engineToRemove, SEARCH_ENGINE_REMOVED);
-
       // Since we removed an engine, we need to update the preferences.
       this._saveSortedEngineList();
     }
+    notifyAction(engineToRemove, SEARCH_ENGINE_REMOVED);
   },
 
   moveEngine: function SRCH_SVC_moveEngine(aEngine, aNewIndex) {
@@ -4049,60 +4062,23 @@ SearchService.prototype = {
     }
   },
 
-  get defaultEngine() {
-    this._ensureInitialized();
-    if (!this._defaultEngine) {
-      let defPref = getGeoSpecificPrefName(BROWSER_SEARCH_PREF + "defaultenginename");
-      let defaultEngine = this.getEngineByName(getLocalizedPref(defPref, ""))
-      if (!defaultEngine)
-        defaultEngine = this._getSortedEngines(false)[0] || null;
-      this._defaultEngine = defaultEngine;
-    }
-    if (this._defaultEngine.hidden)
-      return this._getSortedEngines(false)[0];
-    return this._defaultEngine;
-  },
+  get defaultEngine() { return this.currentEngine; },
 
   set defaultEngine(val) {
-    this._ensureInitialized();
-    // Sometimes we get wrapped nsISearchEngine objects (external XPCOM callers),
-    // and sometimes we get raw Engine JS objects (callers in this file), so
-    // handle both.
-    if (!(val instanceof Ci.nsISearchEngine) && !(val instanceof Engine))
-      FAIL("Invalid argument passed to defaultEngine setter");
-
-    let newDefaultEngine = this.getEngineByName(val.name);
-    if (!newDefaultEngine)
-      FAIL("Can't find engine in store!", Cr.NS_ERROR_UNEXPECTED);
-
-    if (newDefaultEngine == this._defaultEngine)
-      return;
-
-    this._defaultEngine = newDefaultEngine;
-
-    let defPref = getGeoSpecificPrefName(BROWSER_SEARCH_PREF + "defaultenginename");
-
-    // If we change the default engine in the future, that change should impact
-    // users who have switched away from and then back to the build's "default"
-    // engine. So clear the user pref when the defaultEngine is set to the
-    // build's default engine, so that the defaultEngine getter falls back to
-    // whatever the default is.
-    if (this._defaultEngine == this._originalDefaultEngine) {
-      Services.prefs.clearUserPref(defPref);
-    }
-    else {
-      setLocalizedPref(defPref, this._defaultEngine.name);
-    }
-
-    notifyAction(this._defaultEngine, SEARCH_ENGINE_DEFAULT);
+    this.currentEngine = val;
   },
 
   get currentEngine() {
     this._ensureInitialized();
     if (!this._currentEngine) {
       let name = this.getGlobalAttr("current");
-      if (this.getGlobalAttr("hash") == getVerificationHash(name)) {
-        this._currentEngine = this.getEngineByName(name);
+      let engine = this.getEngineByName(name);
+      if (engine && (this.getGlobalAttr("hash") == getVerificationHash(name) ||
+                     engine._isDefault)) {
+        // If the current engine is a default one, we can relax the
+        // verification hash check to reduce the annoyance for users who
+        // backup/sync their profile in custom ways.
+        this._currentEngine = engine;
       }
     }
 
@@ -4151,6 +4127,7 @@ SearchService.prototype = {
     this.setGlobalAttr("current", newName);
     this.setGlobalAttr("hash", getVerificationHash(newName));
 
+    notifyAction(this._currentEngine, SEARCH_ENGINE_DEFAULT);
     notifyAction(this._currentEngine, SEARCH_ENGINE_CURRENT);
   },
 

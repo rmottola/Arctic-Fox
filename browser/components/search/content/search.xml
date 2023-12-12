@@ -69,15 +69,12 @@
         // Make sure we rebuild the popup in onpopupshowing
         this._needToBuildPopup = true;
 
-        var os =
-               Components.classes["@mozilla.org/observer-service;1"]
-                         .getService(Components.interfaces.nsIObserverService);
-        os.addObserver(this, "browser-search-engine-modified", false);
+        Services.obs.addObserver(this, "browser-search-engine-modified", false);
 
         this._initialized = true;
 
-        this.searchService.init((function search_init_cb(aStatus) {
-          // Bail out if the binding has been destroyed
+        Services.search.init((function search_init_cb(aStatus) {
+          // Bail out if the binding's been destroyed
           if (!this._initialized)
             return;
 
@@ -94,9 +91,7 @@
         if (this._initialized) {
           this._initialized = false;
 
-          var os = Components.classes["@mozilla.org/observer-service;1"]
-                             .getService(Components.interfaces.nsIObserverService);
-          os.removeObserver(this, "browser-search-engine-modified");
+          Services.obs.removeObserver(this, "browser-search-engine-modified");
         }
 
         // Make sure to break the cycle from _textbox to us. Otherwise we leak
@@ -111,7 +106,6 @@
           "anonid", "searchbar-textbox");</field>
       <field name="_popup">document.getAnonymousElementByAttribute(this,
           "anonid", "searchbar-popup");</field>
-      <field name="_ss">null</field>
       <field name="_engines">null</field>
       <field name="FormHistory" readonly="true">
         (Components.utils.import("resource://gre/modules/FormHistory.jsm", {})).FormHistory;
@@ -123,7 +117,7 @@
       <property name="engines" readonly="true">
         <getter><![CDATA[
           if (!this._engines)
-            this._engines = this.searchService.getVisibleEngines();
+            this._engines = Services.search.getVisibleEngines();
           return this._engines;
         ]]></getter>
       </property>
@@ -133,12 +127,11 @@
 
       <property name="currentEngine">
         <setter><![CDATA[
-          let ss = this.searchService;
-          ss.defaultEngine = ss.currentEngine = val;
+          Services.search.currentEngine = val;
           return val;
         ]]></setter>
         <getter><![CDATA[
-          var currentEngine = this.searchService.currentEngine;
+          var currentEngine = Services.search.currentEngine;
           // Return a dummy engine if there is no currentEngine
           return currentEngine || {name: "", uri: null};
         ]]></getter>
@@ -148,18 +141,6 @@
            clearing form information. -->
       <property name="textbox" readonly="true"
                 onget="return this._textbox;"/>
-
-      <property name="searchService" readonly="true">
-        <getter><![CDATA[
-          if (!this._ss) {
-            const nsIBSS = Components.interfaces.nsIBrowserSearchService;
-            this._ss =
-                 Components.classes["@mozilla.org/browser/search-service;1"]
-                           .getService(nsIBSS);
-          }
-          return this._ss;
-        ]]></getter>
-      </property>
 
       <property name="value" onget="return this._textbox.value;"
                              onset="return this._textbox.value = val;"/>
@@ -460,7 +441,7 @@
             where = whereToOpenLink(aEvent, false, true);
           }
           else {
-            var newTabPref = textBox._prefBranch.getBoolPref("browser.search.openintab");
+            var newTabPref = Services.prefs.getBoolPref("browser.search.openintab");
             if (((aEvent instanceof KeyboardEvent) && aEvent.altKey) ^ newTabPref)
               where = "tab";
             if ((aEvent instanceof MouseEvent) &&
@@ -480,7 +461,7 @@
         <parameter name="aWhere"/>
         <body><![CDATA[
           var textBox = this._textbox;
-        
+
           // Save the current value in the form history
           if (aData && !PrivateBrowsingUtils.isWindowPrivate(window)) {
             this.FormHistory.update(
@@ -511,16 +492,13 @@
         if (target.engine) {
           this.currentEngine = target.engine;
         } else if (target.classList.contains("addengine-item")) {
-          var searchService =
-            Components.classes["@mozilla.org/browser/search-service;1"]
-                      .getService(Components.interfaces.nsIBrowserSearchService);
           // Select the installed engine if the installation succeeds
           var installCallback = {
             onSuccess: engine => this.currentEngine = engine
           }
-          searchService.addEngine(target.getAttribute("uri"), null,
-                                  target.getAttribute("src"), false,
-                                  installCallback);
+          Services.search.addEngine(target.getAttribute("uri"), null,
+                                    target.getAttribute("src"), false,
+                                    installCallback);
         }
         else
           return;
@@ -573,15 +551,11 @@
 
         // Initialize fields
         this._stringBundle = document.getBindingParent(this)._stringBundle;
-        this._prefBranch =
-                  Components.classes["@mozilla.org/preferences-service;1"]
-                            .getService(Components.interfaces.nsIPrefBranch);
         this._suggestEnabled =
-            this._prefBranch.getBoolPref("browser.search.suggest.enabled");
-        this._clickSelectsAll =
-            this._prefBranch.getBoolPref("browser.urlbar.clickSelectsAll");
+          Services.prefs.getBoolPref("browser.search.suggest.enabled");
 
-        this.setAttribute("clickSelectsAll", this._clickSelectsAll);
+        if (Services.prefs.getBoolPref("browser.urlbar.clickSelectsAll"))
+          this.setAttribute("clickSelectsAll", true);
 
         // Add items to context menu and attach controller to handle them
         var textBox = document.getAnonymousElementByAttribute(this,
@@ -648,17 +622,11 @@
         this.controllers.appendController(this.searchbarController);
 
         // Add observer for suggest preference
-        var prefs = Components.classes["@mozilla.org/preferences-service;1"]
-                            .getService(Components.interfaces.nsIPrefBranch);
-        prefs.addObserver("browser.search.suggest.enabled", this, false);
-        prefs.addObserver("browser.urlbar.clickSelectsAll", this, false);
+        Services.prefs.addObserver("browser.search.suggest.enabled", this, false);
       ]]></constructor>
 
       <destructor><![CDATA[
-          var prefs = Components.classes["@mozilla.org/preferences-service;1"]
-                              .getService(Components.interfaces.nsIPrefBranch);
-          prefs.removeObserver("browser.search.suggest.enabled", this);
-          prefs.removeObserver("browser.urlbar.clickSelectsAll", this);
+        Services.prefs.removeObserver("browser.search.suggest.enabled", this);
 
         // Because XBL and the customize toolbar code interacts poorly,
         // there may not be anything to remove here
@@ -668,7 +636,6 @@
       ]]></destructor>
 
       <field name="_stringBundle"/>
-      <field name="_prefBranch"/>
       <field name="_suggestMenuItem"/>
       <field name="_suggestEnabled"/>
       <field name="_clickSelectsAll"/>
@@ -707,7 +674,7 @@
             popup.hidden = false;
 
             popup.mInput = this;
-            popup.view = this.controller.QueryInterface(Components.interfaces.nsITreeView);
+            popup.view = this.controller.QueryInterface(Ci.nsITreeView);
             popup.invalidate();
 
             popup.showCommentColumn = this.showCommentColumn;
@@ -736,16 +703,9 @@
         <parameter name="aData"/>
         <body><![CDATA[
           if (aTopic == "nsPref:changed") {
-            switch (aData) {
-              case "browser.search.suggest.enabled":
-                this._suggestEnabled = this._prefBranch.getBoolPref(aData);
-                this._suggestMenuItem.setAttribute("checked", this._suggestEnabled);
-                break;
-              case "browser.urlbar.clickSelectsAll":
-                this._clickSelectsAll = this._prefBranch.getBoolPref(aData);
-                this.setAttribute("clickSelectsAll", this._clickSelectsAll);
-                break;
-            }
+            this._suggestEnabled =
+              Services.prefs.getBoolPref("browser.search.suggest.enabled");
+            this._suggestMenuItem.setAttribute("checked", this._suggestEnabled);
           }
         ]]></body>
       </method>
@@ -955,8 +915,8 @@
             case "cmd_togglesuggest":
               // The pref observer will update _suggestEnabled and the menu
               // checkmark.
-              this._self._prefBranch.setBoolPref("browser.search.suggest.enabled",
-                                                 !this._self._suggestEnabled);
+              Services.prefs.setBoolPref("browser.search.suggest.enabled",
+                                         !this._self._suggestEnabled);
               break;
             default:
               // do nothing with unrecognized command

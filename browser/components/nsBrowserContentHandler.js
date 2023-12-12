@@ -4,8 +4,6 @@
 
 Components.utils.importGlobalProperties(["URLSearchParams"]);
 
-Components.utils.importGlobalProperties(["URLSearchParams"]);
-
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 Components.utils.import("resource://gre/modules/AppConstants.jsm");
@@ -40,7 +38,6 @@ const nsIWebNavigation       = Components.interfaces.nsIWebNavigation;
 const nsIWindowMediator      = Components.interfaces.nsIWindowMediator;
 const nsIWindowWatcher       = Components.interfaces.nsIWindowWatcher;
 const nsIWebNavigationInfo   = Components.interfaces.nsIWebNavigationInfo;
-const nsIBrowserSearchService = Components.interfaces.nsIBrowserSearchService;
 const nsICommandLineValidator = Components.interfaces.nsICommandLineValidator;
 
 const NS_BINDING_ABORTED = Components.results.NS_BINDING_ABORTED;
@@ -253,11 +250,17 @@ function getMostRecentWindow(aType) {
   return wm.getMostRecentWindow(aType);
 }
 
-function doSearch(searchTerm, cmdLine) {
-  var ss = Components.classes["@mozilla.org/browser/search-service;1"]
-                     .getService(nsIBrowserSearchService);
+function logSystemBasedSearch(engine) {
+  var countId = (engine.identifier || ("other-" + engine.name)) + ".system";
+  var count = Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS");
+  count.add(countId);
+}
 
-  var submission = ss.defaultEngine.getSubmission(searchTerm, null, "system");
+function doSearch(searchTerm, cmdLine) {
+  var engine = Services.search.defaultEngine;
+  logSystemBasedSearch(engine);
+
+  var submission = engine.getSubmission(searchTerm, null, "system");
 
   // fill our nsISupportsArray with uri-as-wstring, null, null, postData
   var sa = Components.classes["@mozilla.org/supports-array;1"]
@@ -698,16 +701,21 @@ nsDefaultCommandLineHandler.prototype = {
             var params = new URLSearchParams(url.query);
             // We don't want to rewrite all Bing URLs coming from external apps. Look
             // for the magic URL parm that's present in searches from the task bar.
-            // (Typed searches use "form=WNSGPH", Cortana voice searches use "FORM=WNSBOX")
+            // * Typed searches use "form=WNSGPH"
+            // * Cortana voice searches use "FORM=WNSBOX" or direct results, or "FORM=WNSFC2"
+            //   for "see more results on Bing.com")
+            // * Cortana voice searches started from "Hey, Cortana" use "form=WNSHCO"
+            //   or "form=WNSSSV"
+            var allowedParams = ["WNSGPH", "WNSBOX", "WNSFC2", "WNSHCO", "WNSSSV"];
             var formParam = params.get("form");
             if (!formParam) {
               formParam = params.get("FORM");
             }
-            if (formParam == "WNSGPH" || formParam == "WNSBOX") {
+            if (allowedParams.indexOf(formParam) != -1) {
               var term = params.get("q");
-              var ss = Components.classes["@mozilla.org/browser/search-service;1"]
-                                 .getService(nsIBrowserSearchService);
-              var submission = ss.defaultEngine.getSubmission(term, null, "system");
+              var engine = Services.search.defaultEngine;
+              logSystemBasedSearch(engine);
+              var submission = engine.getSubmission(term, null, "system");
               uri = submission.uri;
             }
           } catch (e) {

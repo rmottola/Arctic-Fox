@@ -355,38 +355,22 @@ BytecodeEmitter::emitDupAt(unsigned slotFromTop)
     return true;
 }
 
-/* XXX too many "... statement" L10N gaffes below -- fix via js.msg! */
-const char js_with_statement_str[] = "with statement";
-const char js_finally_block_str[]  = "finally block";
-
-static const char * const statementName[] = {
-    "label statement",       /* LABEL */
-    "if statement",          /* IF */
-    "else statement",        /* ELSE */
-    "destructuring body",    /* BODY */
-    "switch statement",      /* SWITCH */
-    "block",                 /* BLOCK */
-    js_with_statement_str,   /* WITH */
-    "catch block",           /* CATCH */
-    "try block",             /* TRY */
-    js_finally_block_str,    /* FINALLY */
-    js_finally_block_str,    /* SUBROUTINE */
-    "do loop",               /* DO_LOOP */
-    "for loop",              /* FOR_LOOP */
-    "for/in loop",           /* FOR_IN_LOOP */
-    "for/of loop",           /* FOR_OF_LOOP */
-    "while loop",            /* WHILE_LOOP */
-    "spread",                /* SPREAD */
-};
-
-static_assert(MOZ_ARRAY_LENGTH(statementName) == uint16_t(StmtType::LIMIT),
-              "statementName array and StmtType enum must be consistent");
-
 static const char*
 StatementName(StmtInfoBCE* stmt)
 {
     if (!stmt)
         return js_script_str;
+
+    /* XXX too many "... statement" L10N gaffes -- fix via js.msg! */
+    static const char* const statementName[] = {
+    #define STATEMENT_TYPE_NAME(name, desc) desc,
+        FOR_EACH_STATEMENT_TYPE(STATEMENT_TYPE_NAME)
+    #undef STATEMENT_TYPE_NAME
+    };
+
+    static_assert(MOZ_ARRAY_LENGTH(statementName) == uint16_t(StmtType::LIMIT),
+                  "statementName array and StmtType enum must be consistent");
+
     return statementName[uint16_t(stmt->type)];
 }
 
@@ -3784,7 +3768,6 @@ BytecodeEmitter::emitDestructuringDeclsWithEmitter(JSOp prologueOp, ParseNode* p
                 continue;
             ParseNode* target = element;
             if (element->isKind(PNK_SPREAD)) {
-                MOZ_ASSERT(element->pn_kid->isKind(PNK_NAME));
                 target = element->pn_kid;
             }
             if (target->isKind(PNK_ASSIGN))
@@ -5400,15 +5383,17 @@ BytecodeEmitter::emitHoistedFunctionsInList(ParseNode* list)
     MOZ_ASSERT(list->pn_xflags & PNX_FUNCDEFS);
 
     for (ParseNode* pn = list->pn_head; pn; pn = pn->pn_next) {
+        ParseNode* maybeFun = pn;
+
         if (!sc->strict()) {
-            while (pn->isKind(PNK_LABEL))
-                pn = pn->as<LabeledStatement>().statement();
+            while (maybeFun->isKind(PNK_LABEL))
+                maybeFun = maybeFun->as<LabeledStatement>().statement();
         }
 
-        if (pn->isKind(PNK_ANNEXB_FUNCTION) ||
-            (pn->isKind(PNK_FUNCTION) && pn->functionIsHoisted()))
+        if (maybeFun->isKind(PNK_ANNEXB_FUNCTION) ||
+            (maybeFun->isKind(PNK_FUNCTION) && maybeFun->functionIsHoisted()))
         {
-            if (!emitTree(pn))
+            if (!emitTree(maybeFun))
                 return false;
         }
     }

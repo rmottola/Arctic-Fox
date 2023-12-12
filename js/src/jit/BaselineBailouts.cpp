@@ -645,12 +645,6 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
         return false;
     BufferPointer<BaselineFrame> blFrame = builder.pointerAtStackOffset<BaselineFrame>(0);
 
-    // Initialize BaselineFrame::frameSize
-    uint32_t frameSize = BaselineFrame::Size() + BaselineFrame::FramePointerOffset +
-                         (sizeof(Value) * (script->nfixed() + exprStackSlots));
-    JitSpew(JitSpew_BaselineBailouts, "      FrameSize=%d", (int) frameSize);
-    blFrame->setFrameSize(frameSize);
-
     uint32_t flags = 0;
 
     // If we are bailing to a script whose execution is observed, mark the
@@ -930,7 +924,15 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
             return false;
     }
 
-    size_t endOfBaselineJSFrameStack = builder.framePushed();
+    // BaselineFrame::frameSize is the size of everything pushed since
+    // the builder.resetFramePushed() call.
+    uint32_t frameSize = builder.framePushed();
+    blFrame->setFrameSize(frameSize);
+    JitSpew(JitSpew_BaselineBailouts, "      FrameSize=%u", frameSize);
+
+    // numValueSlots() is based on the frame size, do some sanity checks.
+    MOZ_ASSERT(blFrame->numValueSlots() >= script->nfixed());
+    MOZ_ASSERT(blFrame->numValueSlots() <= script->nslots());
 
     // If we are resuming at a LOOPENTRY op, resume at the next op to avoid
     // a bailout -> enter Ion -> bailout loop with --ion-eager. See also
@@ -1149,8 +1151,10 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
                 filename = "<unknown>";
             unsigned len = strlen(filename) + 200;
             char* buf = js_pod_malloc<char>(len);
-            if (buf == nullptr)
+            if (buf == nullptr) {
+                ReportOutOfMemory(cx);
                 return false;
+            }
             JS_snprintf(buf, len, "%s %s %s on line %u of %s:%" PRIuSIZE,
                                   BailoutKindString(bailoutKind),
                                   resumeAfter ? "after" : "at",
@@ -1224,6 +1228,7 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
     // Arguments are reversed on the BaselineJS frame's stack values.
     MOZ_ASSERT(IsIonInlinablePC(pc));
     unsigned actualArgc;
+    Value callee;
     if (needToSaveArgs) {
         // For FUNAPPLY or an accessor, the arguments are not on the stack anymore,
         // but they are copied in a vector and are written here.
@@ -1231,6 +1236,7 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
             actualArgc = blFrame->numActualArgs();
         else
             actualArgc = IsSetPropPC(pc);
+        callee = savedCallerArgs[0];
 
         // Align the stack based on the number of arguments.
         size_t afterFrameSize = (actualArgc + 1) * sizeof(Value) + JitFrameLayout::Size();
@@ -1258,12 +1264,16 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
         if (!builder.maybeWritePadding(JitStackAlignment, afterFrameSize, "Padding"))
             return false;
 
-        MOZ_ASSERT(actualArgc + 2 + pushedNewTarget <= exprStackSlots);
-        for (unsigned i = 0; i < actualArgc + 1 + pushedNewTarget; i++) {
-            size_t argSlot = (script->nfixed() + exprStackSlots) - (i + 1);
-            if (!builder.writeValue(*blFrame->valueSlot(argSlot), "ArgVal"))
+        // Copy the arguments and |this| from the BaselineFrame, in reverse order.
+        size_t valueSlot = blFrame->numValueSlots() - 1;
+        size_t calleeSlot = valueSlot - actualArgc - 1 - pushedNewTarget;
+
+        for (size_t i = valueSlot; i > calleeSlot; i--) {
+            if (!builder.writeValue(*blFrame->valueSlot(i), "ArgVal"))
                 return false;
         }
+
+        callee = *blFrame->valueSlot(calleeSlot);
     }
 
     // In case these arguments need to be copied on the stack again for a rectifier frame,
@@ -1281,20 +1291,8 @@ InitFromBailout(JSContext* cx, HandleScript caller, jsbytecode* callerPC,
         return false;
 
     // Push callee token (must be a JS Function)
-    Value callee;
-    if (needToSaveArgs) {
-        // The arguments of FUNAPPLY or inlined accessors are not writen to the stack.
-        // So get the callee from the specially saved vector.
-        callee = savedCallerArgs[0];
-    } else {
-        uint32_t calleeStackSlot = exprStackSlots - uint32_t(actualArgc + 2 + pushedNewTarget);
-        size_t calleeOffset = (builder.framePushed() - endOfBaselineJSFrameStack)
-            + ((exprStackSlots - (calleeStackSlot + 1)) * sizeof(Value));
-        callee = *builder.valuePointerAtStackOffset(calleeOffset);
-        JitSpew(JitSpew_BaselineBailouts, "      CalleeStackSlot=%d", (int) calleeStackSlot);
-    }
-    JitSpew(JitSpew_BaselineBailouts, "      Callee = %016llx", *((uint64_t*) &callee));
-    MOZ_ASSERT(callee.isObject() && callee.toObject().is<JSFunction>());
+    JitSpew(JitSpew_BaselineBailouts, "      Callee = %016llx", callee.asRawBits());
+
     JSFunction* calleeFun = &callee.toObject().as<JSFunction>();
     if (!builder.writePtr(CalleeToToken(calleeFun, JSOp(*pc) == JSOP_NEW), "CalleeToken"))
         return false;
@@ -1845,12 +1843,14 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
     if (act->hasRematerializedFrame(outerFp)) {
         JitFrameIterator iter(cx);
         size_t inlineDepth = numFrames;
+        bool ok = true;
         while (inlineDepth > 0) {
-            if (iter.isBaselineJS() &&
-                !CopyFromRematerializedFrame(cx, act, outerFp, --inlineDepth,
-                                             iter.baselineFrame()))
-            {
-                return false;
+            if (iter.isBaselineJS()) {
+                // We must attempt to copy all rematerialized frames over,
+                // even if earlier ones failed, to invoke the proper frame
+                // cleanup in the Debugger.
+                ok = CopyFromRematerializedFrame(cx, act, outerFp, --inlineDepth,
+                                                 iter.baselineFrame());
             }
             ++iter;
         }
@@ -1858,6 +1858,9 @@ jit::FinishBailoutToBaseline(BaselineBailoutInfo* bailoutInfo)
         // After copying from all the rematerialized frames, remove them from
         // the table to keep the table up to date.
         act->removeRematerializedFrame(outerFp);
+
+        if (!ok)
+            return false;
     }
 
     JitSpew(JitSpew_BaselineBailouts,

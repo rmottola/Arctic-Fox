@@ -192,9 +192,6 @@ CSS_STATE_PSEUDO_CLASS(mozTypeUnsupportedPlatform, ":-moz-type-unsupported-platf
 CSS_STATE_PSEUDO_CLASS(mozHandlerClickToPlay, ":-moz-handler-clicktoplay",
                        CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
                        NS_EVENT_STATE_TYPE_CLICK_TO_PLAY)
-CSS_STATE_PSEUDO_CLASS(mozHandlerPlayPreview, ":-moz-handler-playpreview",
-                       CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
-                       NS_EVENT_STATE_TYPE_PLAY_PREVIEW)
 CSS_STATE_PSEUDO_CLASS(mozHandlerVulnerableUpdatable, ":-moz-handler-vulnerable-updatable",
                        CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
                        NS_EVENT_STATE_VULNERABLE_UPDATABLE)

@@ -11,7 +11,7 @@
 
 <!ENTITY abouthome.pageTitle "&brandFullName; Start Page">
 
-<!ENTITY abouthome.searchEngineButton.label "Search">
+<!ENTITY abouthome.search.placeholder    "Search">
 
 <!ENTITY abouthome.bookmarksButton.label "Bookmarks">
 <!ENTITY abouthome.historyButton.label   "History">
