@@ -20,6 +20,7 @@ function genericChecker() {
         "tab": 0,
         "popup": 0,
       };
+      let background;
       for (let i = 0; i < views.length; i++) {
         let view = views[i];
         browser.test.assertTrue(view.kind in counts, "view type is valid");
@@ -27,9 +28,17 @@ function genericChecker() {
         if (view.kind == "background") {
           browser.test.assertTrue(view === browser.extension.getBackgroundPage(),
                                   "background page is correct");
+          background = view;
         }
       }
-      browser.test.sendMessage("counts", counts);
+      if (background) {
+        browser.runtime.getBackgroundPage().then(view => {
+          browser.test.assertEq(background, view, "runtime.getBackgroundPage() is correct");
+          browser.test.sendMessage("counts", counts);
+        });
+      } else {
+        browser.test.sendMessage("counts", counts);
+      }
     } else if (msg == kind + "-open-tab") {
       browser.tabs.create({windowId: args[0], url: browser.runtime.getURL("tab.html")});
     } else if (msg == kind + "-close-tab") {
@@ -116,24 +125,20 @@ add_task(function* () {
   yield checkViews("background", 2, 0);
 
   function* triggerPopup(win, callback) {
-    let widgetId = makeWidgetId(extension.id) + "-browser-action";
-    let node = CustomizableUI.getWidget(widgetId).forWindow(win).node;
-
-    let evt = new CustomEvent("command", {
-      bubbles: true,
-      cancelable: true,
-    });
-    node.dispatchEvent(evt);
+    yield clickBrowserAction(extension, win);
 
     yield extension.awaitMessage("popup-ready");
 
     yield callback();
 
-    let panel = node.querySelector("panel");
-    if (panel) {
-      panel.hidePopup();
-    }
+    closeBrowserAction(extension, win);
   }
+
+  // The popup occasionally closes prematurely if we open it immediately here.
+  // I'm not sure what causes it to close (it's something internal, and seems to
+  // be focus-related, but it's not caused by JS calling hidePopup), but even a
+  // short timeout seems to consistently fix it.
+  yield new Promise(resolve => win1.setTimeout(resolve, 10));
 
   yield triggerPopup(win1, function*() {
     yield checkViews("background", 2, 1);

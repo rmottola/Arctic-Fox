@@ -24,27 +24,29 @@
 
 #include "SelfHostingDefines.h"
 
-// Assertions, defined here instead of in the header above to make `assert`
-// invisible to C++.
+// Assertions and debug printing, defined here instead of in the header above
+// to make `assert` invisible to C++.
 #ifdef DEBUG
 #define assert(b, info) if (!(b)) AssertionFailed(__FILE__ + ":" + __LINE__ + ": " + info)
+#define dbg(msg) DumpMessage(callFunction(std_Array_pop, \
+                                          callFunction(std_String_split, __FILE__, '/')) \
+                             + '#' + __LINE__ + ': ' + msg)
 #else
 #define assert(b, info) // Elided assertion.
+#define dbg(msg) // Elided debugging output.
 #endif
 
 // All C++-implemented standard builtins library functions used in self-hosted
 // code are installed via the std_functions JSFunctionSpec[] in
 // SelfHosting.cpp.
 //
-// The few items below here are either self-hosted or installing them under a
-// std_Foo name would require ugly contortions, so they just get aliased here.
-var std_Array_indexOf = ArrayIndexOf;
-var std_String_substring = String_substring;
+// Do not create an alias to a self-hosted builtin, otherwise it will be cloned
+// twice.
+//
 // WeakMap is a bare constructor without properties or methods.
 var std_WeakMap = WeakMap;
 // StopIteration is a bare constructor without properties or methods.
 var std_StopIteration = StopIteration;
-var std_Map_iterator_next = MapIteratorNext;
 
 
 /********** List specification type **********/
@@ -153,12 +155,14 @@ function GetIterator(obj, method) {
 }
 
 var _builtinCtorsCache = {__proto__: null};
+
 function GetBuiltinConstructor(builtinName) {
     var ctor = _builtinCtorsCache[builtinName] ||
                (_builtinCtorsCache[builtinName] = GetBuiltinConstructorImpl(builtinName));
     assert(ctor, `No builtin with name "${builtinName}" found`);
     return ctor;
 }
+
 function GetBuiltinPrototype(builtinName) {
     return (_builtinCtorsCache[builtinName] || GetBuiltinConstructor(builtinName)).prototype;
 }

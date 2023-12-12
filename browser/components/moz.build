@@ -8,6 +8,7 @@ DIRS += [
     'about',
     'contextualidentity',
     'certerror',
+    'customizableui',
     'dirprovider',
     'downloads',
     'extensions',

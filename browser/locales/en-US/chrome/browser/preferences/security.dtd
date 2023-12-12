@@ -16,10 +16,10 @@
 <!ENTITY  addonSecurityLevel_High       "Medium: Block all harmful add-ons (default, recommended)">
 <!ENTITY  addonSecurityLevel_Extreme    "High: Block all add-ons with known issues">
 
-<!ENTITY  passwords.label               "Passwords">
+<!ENTITY  logins.label                  "Logins">
 
-<!ENTITY  rememberPasswords.label       "Remember passwords for sites">
-<!ENTITY  rememberPasswords.accesskey   "R">
+<!ENTITY  rememberLogins.label          "Remember logins for sites">
+<!ENTITY  rememberLogins.accesskey      "R">
 <!ENTITY  passwordExceptions.label      "Exceptions…">
 <!ENTITY  passwordExceptions.accesskey  "x">
 
@@ -31,8 +31,8 @@
 <!ENTITY  changeMasterPassword.label     "Change Master Password…">
 <!ENTITY  changeMasterPassword.accesskey "M">
 
-<!ENTITY  savedPasswords.label            "Saved Passwords…">
-<!ENTITY  savedPasswords.accesskey        "P">
+<!ENTITY  savedLogins.label              "Saved Logins…">
+<!ENTITY  savedLogins.accesskey          "L">
 
 <!ENTITY  SecProto.label             "Security Protocols">
 <!ENTITY  enableHSTS.label           "Enable Strict Transport Security (HSTS)">

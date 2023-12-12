@@ -361,10 +361,14 @@ function makeSearchMatch(input, extra = {}) {
     searchQuery: "searchQuery" in extra ? extra.searchQuery : input,
     alias: extra.alias, // may be undefined which is expected.
   }
+  let style = [ "action", "searchengine" ];
+  if (extra.heuristic) {
+    style.push("heuristic");
+  }
   return {
     uri: makeActionURI("searchengine", params),
     title: params.engineName,
-    style: [ "action", "searchengine" ],
+    style,
   }
 }
 
@@ -378,10 +382,14 @@ function makeVisitMatch(input, url, extra = {}) {
     url,
     input,
   }
+  let style = [ "action", "visiturl" ];
+  if (extra.heuristic) {
+    style.push("heuristic");
+  }
   return {
     uri: makeActionURI("visiturl", params),
     title: extra.title || url,
-    style: [ "action", "visiturl" ],
+    style,
   }
 }
 
@@ -440,7 +448,7 @@ function* addTestEngine(basename, httpServer=undefined) {
 
 // Ensure we have a default search engine and the keyword.enabled preference
 // set.
-add_task(function ensure_search_engine() {
+add_task(function* ensure_search_engine() {
   // keyword.enabled is necessary for the tests to see keyword searches.
   Services.prefs.setBoolPref("keyword.enabled", true);
 

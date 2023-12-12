@@ -120,13 +120,16 @@ static bool sUseHardLinks = true;
 # define MAYBE_USE_HARD_LINKS 0
 #endif
 
-#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && \
+    !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
 #include "nss.h"
 #include "prerror.h"
 #endif
 
 #ifdef XP_WIN
+#ifdef MOZ_MAINTENANCE_SERVICE
 #include "registrycertificates.h"
+#endif
 BOOL PathAppendSafe(LPWSTR base, LPCWSTR extra);
 BOOL PathGetSiblingFilePath(LPWSTR destinationBuffer,
                             LPCWSTR siblingFilePath,
@@ -154,7 +157,7 @@ BOOL PathGetSiblingFilePath(LPWSTR destinationBuffer,
 // declare it here to avoid including that entire header file.
 #define BZ2_CRC32TABLE_UNDECLARED
 
-#if MOZ_IS_GCC
+#if MOZ_IS_GCC || defined(__clang__)
 extern "C"  __attribute__((visibility("default"))) unsigned int BZ2_crc32Table[256];
 #undef BZ2_CRC32TABLE_UNDECLARED
 #elif defined(__SUNPRO_C) || defined(__SUNPRO_CC)
@@ -295,6 +298,7 @@ static ArchiveReader gArchiveReader;
 static bool gSucceeded = false;
 static bool sStagedUpdate = false;
 static bool sReplaceRequest = false;
+static bool sUsingService = false;
 static bool sIsOSUpdate = false;
 
 #ifdef XP_WIN
@@ -317,8 +321,10 @@ mmin(size_t a, size_t b)
 static NS_tchar*
 mstrtok(const NS_tchar *delims, NS_tchar **str)
 {
-  if (!*str || !**str)
+  if (!*str || !**str) {
+    *str = nullptr;
     return nullptr;
+  }
 
   // skip leading "whitespace"
   NS_tchar *ret = *str;
@@ -351,6 +357,13 @@ mstrtok(const NS_tchar *delims, NS_tchar **str)
 
   *str = nullptr;
   return ret;
+}
+
+static bool
+EnvHasValue(const char *name)
+{
+  const char *val = getenv(name);
+  return (val && *val);
 }
 
 #ifdef XP_WIN
@@ -1811,7 +1824,8 @@ PatchIfFile::Finish(int status)
 
 /**
  * Launch the post update application (helper.exe). It takes in the path of the
- * callback application to calculate the path of helper.exe.
+ * callback application to calculate the path of helper.exe. For service updates
+ * this is called from both the system account and the current user account.
  *
  * @param  installationDir The path to the callback application binary.
  * @param  updateInfoDir   The directory where update info is stored.
@@ -1864,6 +1878,13 @@ LaunchWinPostProcess(const WCHAR *installationDir,
     return false;
   }
 
+#if !defined(TEST_UPDATER) && defined(MOZ_MAINTENANCE_SERVICE)
+  if (sUsingService &&
+      !DoesBinaryMatchAllowedCertificates(installationDir, exefullpath)) {
+    return false;
+  }
+#endif
+
   WCHAR dlogFile[MAX_PATH + 1];
   if (!PathGetSiblingFilePath(dlogFile, exefullpath, L"uninstall.update")) {
     return false;
@@ -1886,6 +1907,12 @@ LaunchWinPostProcess(const WCHAR *installationDir,
 
   wcsncpy(cmdline, dummyArg, len);
   wcscat(cmdline, exearg);
+
+  if (sUsingService ||
+      !_wcsnicmp(exeasync, L"false", 6) ||
+      !_wcsnicmp(exeasync, L"0", 2)) {
+    async = false;
+  }
 
   // We want to launch the post update helper app to update the Windows
   // registry even if there is a failure with removing the uninstall.update
@@ -1922,7 +1949,8 @@ LaunchWinPostProcess(const WCHAR *installationDir,
 static void
 LaunchCallbackApp(const NS_tchar *workingDir,
                   int argc,
-                  NS_tchar **argv)
+                  NS_tchar **argv,
+                  bool usingService)
 {
   putenv(const_cast<char*>("NO_EM_RESTART="));
   putenv(const_cast<char*>("MOZ_LAUNCHED_CHILD=1"));
@@ -1939,7 +1967,11 @@ LaunchCallbackApp(const NS_tchar *workingDir,
 #elif defined(XP_MACOSX)
   LaunchChild(argc, argv);
 #elif defined(XP_WIN)
-  WinLaunchChild(argv[0], argc, argv, nullptr);
+  // Do not allow the callback to run when running an update through the
+  // service as session 0.  The unelevated updater.exe will do the launching.
+  if (!usingService) {
+    WinLaunchChild(argv[0], argc, argv, nullptr);
+  }
 #else
 # warning "Need implementaton of LaunchCallbackApp"
 #endif
@@ -2007,6 +2039,40 @@ WriteStatusFile(int status)
 
   WriteStatusFile(text);
 }
+
+#ifdef MOZ_MAINTENANCE_SERVICE
+/*
+ * Read the update.status file and sets isPendingService to true if
+ * the status is set to pending-service.
+ *
+ * @param  isPendingService Out parameter for specifying if the status
+ *         is set to pending-service or not.
+ * @return true if the information was retrieved and it is pending
+ *         or pending-service.
+*/
+static bool
+IsUpdateStatusPendingService()
+{
+  NS_tchar filename[MAXPATHLEN];
+  NS_tsnprintf(filename, sizeof(filename)/sizeof(filename[0]),
+               NS_T("%s/update.status"), gPatchDirPath);
+
+  AutoFile file(NS_tfopen(filename, NS_T("rb")));
+  if (file == nullptr)
+    return false;
+
+  char buf[32] = { 0 };
+  fread(buf, sizeof(buf), 1, file);
+
+  const char kPendingService[] = "pending-service";
+  const char kAppliedService[] = "applied-service";
+
+  return (strncmp(buf, kPendingService,
+                  sizeof(kPendingService) - 1) == 0) ||
+         (strncmp(buf, kAppliedService,
+                  sizeof(kAppliedService) - 1) == 0);
+}
+#endif
 
 #ifdef XP_WIN
 /*
@@ -2366,7 +2432,7 @@ UpdateThreadFunc(void *param)
       // The MOZ_TEST_SKIP_UPDATE_STAGE environment variable prevents copying
       // the files in dist/bin in the test updater when staging an update since
       // this can cause tests to timeout.
-      if (getenv("MOZ_TEST_SKIP_UPDATE_STAGE")) {
+      if (EnvHasValue("MOZ_TEST_SKIP_UPDATE_STAGE")) {
         rv = OK;
       } else {
         rv = CopyInstallDirToDestDir();
@@ -2386,8 +2452,7 @@ UpdateThreadFunc(void *param)
     }
   }
 
-  bool reportRealResults = true;
-  if (sReplaceRequest && rv && !getenv("MOZ_NO_REPLACE_FALLBACK")) {
+  if (sReplaceRequest && rv) {
     // When attempting to replace the application, we should fall back
     // to non-staged updates in case of a failure.  We do this by
     // setting the status to pending, exiting the updater, and
@@ -2395,22 +2460,16 @@ UpdateThreadFunc(void *param)
     // startup path will see the pending status, and will start the
     // updater application again in order to apply the update without
     // staging.
-    // The MOZ_NO_REPLACE_FALLBACK environment variable is used to
-    // bypass this fallback, and is used in the updater tests.
-    // The only special thing which we should do here is to remove the
-    // staged directory as it won't be useful any more.
     ensure_remove_recursive(gWorkingDirPath);
-    WriteStatusFile("pending");
-    // We need to use --process-updates again in the tests
-    putenv(const_cast<char*>("MOZ_PROCESS_UPDATES="));
-    reportRealResults = false; // pretend success
-  }
-
-  if (reportRealResults) {
+    WriteStatusFile(sUsingService ? "pending-service" : "pending");
+#ifdef TEST_UPDATER
+    // Some tests need to use --test-process-updates again.
+    putenv(const_cast<char*>("MOZ_TEST_PROCESS_UPDATES="));
+#endif
+  } else {
     if (rv) {
       LOG(("failed: %d", rv));
-    }
-    else {
+    } else {
 #ifdef XP_MACOSX
       // If the update was successful we need to update the timestamp on the
       // top-level Mac OS X bundle directory so that Mac OS X's Launch Services
@@ -2432,7 +2491,7 @@ UpdateThreadFunc(void *param)
 int NS_main(int argc, NS_tchar **argv)
 {
 #if defined(MOZ_WIDGET_GONK)
-  if (getenv("LD_PRELOAD")) {
+  if (EnvHasValue("LD_PRELOAD")) {
     // If the updater is launched with LD_PRELOAD set, then we wind up
     // preloading libmozglue.so. Under some circumstances, this can cause
     // the remount of /system to fail when going from rw to ro, so if we
@@ -2449,7 +2508,8 @@ int NS_main(int argc, NS_tchar **argv)
   }
 #endif
 
-#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && !defined(XP_MACOSX)
+#if defined(MOZ_VERIFY_MAR_SIGNATURE) && !defined(XP_WIN) && \
+    !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
   // On Windows and Mac we rely on native APIs to do verifications so we don't
   // need to initialize NSS at all there.
   // Otherwise, minimize the amount of NSS we depend on by avoiding all the NSS
@@ -2497,6 +2557,21 @@ int NS_main(int argc, NS_tchar **argv)
   }
 
 #ifdef XP_WIN
+  bool useService = false;
+  bool testOnlyFallbackKeyExists = false;
+  bool noServiceFallback = EnvHasValue("MOZ_NO_SERVICE_FALLBACK");
+  putenv(const_cast<char*>("MOZ_NO_SERVICE_FALLBACK="));
+
+  // We never want the service to be used unless we build with
+  // the maintenance service.
+#ifdef MOZ_MAINTENANCE_SERVICE
+  useService = IsUpdateStatusPendingService();
+  // Our tests run with a different apply directory for each test.
+  // We use this registry key on our test slaves to store the
+  // allowed name/issuers.
+  testOnlyFallbackKeyExists = DoesFallbackKeyExist();
+#endif
+
   // Remove everything except close window from the context menu
   {
     HKEY hkApp = nullptr;
@@ -2550,7 +2625,7 @@ int NS_main(int argc, NS_tchar **argv)
     *slash = NS_T('\0');
   }
 
-  if (getenv("MOZ_OS_UPDATE")) {
+  if (EnvHasValue("MOZ_OS_UPDATE")) {
     sIsOSUpdate = true;
     putenv(const_cast<char*>("MOZ_OS_UPDATE="));
   }
@@ -2679,6 +2754,10 @@ int NS_main(int argc, NS_tchar **argv)
   const int callbackIndex = 6;
 
 #if defined(XP_WIN)
+#ifdef MOZ_MAINTENANCE_SERVICE
+  sUsingService = EnvHasValue("MOZ_USING_SERVICE");
+  putenv(const_cast<char*>("MOZ_USING_SERVICE="));
+#endif
   // lastFallbackError keeps track of the last error for the service not being
   // used, in case of an error when fallback is not enabled we write the
   // error to the update.status file.
@@ -2690,7 +2769,8 @@ int NS_main(int argc, NS_tchar **argv)
   // when write access is denied to the installation directory.
   HANDLE updateLockFileHandle = INVALID_HANDLE_VALUE;
   NS_tchar elevatedLockFilePath[MAXPATHLEN] = {NS_T('\0')};
-  if (argc > callbackIndex || sStagedUpdate || sReplaceRequest) {
+  if (!sUsingService &&
+      (argc > callbackIndex || sStagedUpdate || sReplaceRequest)) {
     NS_tchar updateLockFilePath[MAXPATHLEN];
     if (sStagedUpdate) {
       // When staging an update, the lock file is:
@@ -2760,7 +2840,8 @@ int NS_main(int argc, NS_tchar **argv)
       UACHelper::DisablePrivileges(nullptr);
     }
 
-    if (updateLockFileHandle == INVALID_HANDLE_VALUE) {
+    if (updateLockFileHandle == INVALID_HANDLE_VALUE ||
+        (useService && testOnlyFallbackKeyExists && noServiceFallback)) {
       if (!_waccess(elevatedLockFilePath, F_OK) &&
           NS_tremove(elevatedLockFilePath) != 0) {
         fprintf(stderr, "Unable to create elevated lock file! Exiting\n");
@@ -2787,15 +2868,126 @@ int NS_main(int argc, NS_tchar **argv)
         return 1;
       }
 
+      // Make sure the path to the updater to use for the update is on local.
+      // We do this check to make sure that file locking is available for
+      // race condition security checks.
+      if (useService) {
+        BOOL isLocal = FALSE;
+        useService = IsLocalFile(argv[0], isLocal) && isLocal;
+      }
+
+      // If we have unprompted elevation we should NOT use the service
+      // for the update. Service updates happen with the SYSTEM account
+      // which has more privs than we need to update with.
+      // Windows 8 provides a user interface so users can configure this
+      // behavior and it can be configured in the registry in all Windows
+      // versions that support UAC.
+      if (useService) {
+        BOOL unpromptedElevation;
+        if (IsUnpromptedElevation(unpromptedElevation)) {
+          useService = !unpromptedElevation;
+        }
+      }
+
+      // Make sure the service registry entries for the instsallation path
+      // are available.  If not don't use the service.
+      if (useService) {
+        WCHAR maintenanceServiceKey[MAX_PATH + 1];
+        if (CalculateRegistryPathFromFilePath(gInstallDirPath,
+                                              maintenanceServiceKey)) {
+          HKEY baseKey = nullptr;
+          if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+                            maintenanceServiceKey, 0,
+                            KEY_READ | KEY_WOW64_64KEY,
+                            &baseKey) == ERROR_SUCCESS) {
+            RegCloseKey(baseKey);
+          } else {
+            useService = testOnlyFallbackKeyExists;
+            if (!useService) {
+              lastFallbackError = FALLBACKKEY_NOKEY_ERROR;
+            }
+          }
+        } else {
+          useService = false;
+          lastFallbackError = FALLBACKKEY_REGPATH_ERROR;
+        }
+      }
+
+      // Originally we used to write "pending" to update.status before
+      // launching the service command.  This is no longer needed now
+      // since the service command is launched from updater.exe.  If anything
+      // fails in between, we can fall back to using the normal update process
+      // on our own.
+
+      // If we still want to use the service try to launch the service
+      // comamnd for the update.
+      if (useService) {
+        // If the update couldn't be started, then set useService to false so
+        // we do the update the old way.
+        DWORD ret = LaunchServiceSoftwareUpdateCommand(argc, (LPCWSTR *)argv);
+        useService = (ret == ERROR_SUCCESS);
+        // If the command was launched then wait for the service to be done.
+        if (useService) {
+          bool showProgressUI = false;
+          // Never show the progress UI when staging updates.
+          if (!sStagedUpdate) {
+            // We need to call this separately instead of allowing ShowProgressUI
+            // to initialize the strings because the service will move the
+            // ini file out of the way when running updater.
+            showProgressUI = !InitProgressUIStrings();
+          }
+
+          // Wait for the service to stop for 5 seconds.  If the service
+          // has still not stopped then show an indeterminate progress bar.
+          DWORD lastState = WaitForServiceStop(SVC_NAME, 5);
+          if (lastState != SERVICE_STOPPED) {
+            Thread t1;
+            if (t1.Run(WaitForServiceFinishThread, nullptr) == 0 &&
+                showProgressUI) {
+              ShowProgressUI(true, false);
+            }
+            t1.Join();
+          }
+
+          lastState = WaitForServiceStop(SVC_NAME, 1);
+          if (lastState != SERVICE_STOPPED) {
+            // If the service doesn't stop after 10 minutes there is
+            // something seriously wrong.
+            lastFallbackError = FALLBACKKEY_SERVICE_NO_STOP_ERROR;
+            useService = false;
+          }
+        } else {
+          lastFallbackError = FALLBACKKEY_LAUNCH_ERROR;
+        }
+      }
+
       // If the service can't be used when staging an update, make sure that
       // the UAC prompt is not shown! In this case, just set the status to
       // pending and the update will be applied during the next startup.
-      if (sStagedUpdate) {
+      if (!useService && sStagedUpdate) {
         if (updateLockFileHandle != INVALID_HANDLE_VALUE) {
           CloseHandle(updateLockFileHandle);
         }
         WriteStatusFile("pending");
         return 0;
+      }
+
+      // If we started the service command, and it finished, check the
+      // update.status file to make sure it succeeded, and if it did
+      // we need to manually start the PostUpdate process from the
+      // current user's session of this unelevated updater.exe the
+      // current process is running as.
+      // Note that we don't need to do this if we're just staging the update,
+      // as the PostUpdate step runs when performing the replacing in that case.
+      if (useService && !sStagedUpdate) {
+        bool updateStatusSucceeded = false;
+        if (IsUpdateStatusSucceeded(updateStatusSucceeded) &&
+            updateStatusSucceeded) {
+          if (!LaunchWinPostProcess(gInstallDirPath, gPatchDirPath)) {
+            fprintf(stderr, "The post update process which runs as the user"
+                    " for service update could not be launched.");
+          }
+        }
       }
 
       // If we didn't want to use the service at all, or if an update was
@@ -2804,7 +2996,8 @@ int NS_main(int argc, NS_tchar **argv)
       // We don't launch the elevated updater in the case that we did have
       // write access all along because in that case the only reason we're
       // using the service is because we are testing.
-      if (updateLockFileHandle == INVALID_HANDLE_VALUE) {
+      if (!useService && !noServiceFallback &&
+          updateLockFileHandle == INVALID_HANDLE_VALUE) {
         SHELLEXECUTEINFO sinfo;
         memset(&sinfo, 0, sizeof(SHELLEXECUTEINFO));
         sinfo.cbSize       = sizeof(SHELLEXECUTEINFO);
@@ -2830,15 +3023,23 @@ int NS_main(int argc, NS_tchar **argv)
 
       if (argc > callbackIndex) {
         LaunchCallbackApp(argv[5], argc - callbackIndex,
-                          argv + callbackIndex);
+                          argv + callbackIndex, sUsingService);
       }
 
       CloseHandle(elevatedFileHandle);
 
-      if (INVALID_HANDLE_VALUE == updateLockFileHandle) {
+      if (!useService && !noServiceFallback &&
+          INVALID_HANDLE_VALUE == updateLockFileHandle) {
         // We didn't use the service and we did run the elevated updater.exe.
         // The elevated updater.exe is responsible for writing out the
         // update.status file.
+        return 0;
+      } else if (useService) {
+        // The service command was launched. The service is responsible for
+        // writing out the update.status file.
+        if (updateLockFileHandle != INVALID_HANDLE_VALUE) {
+          CloseHandle(updateLockFileHandle);
+        }
         return 0;
       } else {
         // Otherwise the service command was not launched at all.
@@ -2929,7 +3130,7 @@ int NS_main(int argc, NS_tchar **argv)
     EXIT_WHEN_ELEVATED(elevatedLockFilePath, updateLockFileHandle, 1);
     if (argc > callbackIndex) {
       LaunchCallbackApp(argv[5], argc - callbackIndex,
-                        argv + callbackIndex);
+                        argv + callbackIndex, sUsingService);
     }
     return 1;
   }
@@ -2983,7 +3184,8 @@ int NS_main(int argc, NS_tchar **argv)
       if (argc > callbackIndex) {
         LaunchCallbackApp(argv[5],
                           argc - callbackIndex,
-                          argv + callbackIndex);
+                          argv + callbackIndex,
+                          sUsingService);
       }
       return 1;
     }
@@ -3063,7 +3265,8 @@ int NS_main(int argc, NS_tchar **argv)
           EXIT_WHEN_ELEVATED(elevatedLockFilePath, updateLockFileHandle, 1);
           LaunchCallbackApp(argv[5],
                             argc - callbackIndex,
-                            argv + callbackIndex);
+                            argv + callbackIndex,
+                            sUsingService);
           return 1;
         }
         LOG(("NS_main: callback app file in use, continuing without " \
@@ -3178,6 +3381,17 @@ int NS_main(int argc, NS_tchar **argv)
       if (!LaunchWinPostProcess(gInstallDirPath, gPatchDirPath)) {
         fprintf(stderr, "The post update process was not launched");
       }
+
+      // The service update will only be executed if it is already installed.
+      // For first time installs of the service, the install will happen from
+      // the PostUpdate process. We do the service update process here
+      // because it's possible we are updating with updater.exe without the
+      // service if the service failed to apply the update. We want to update
+      // the service to a newer version in that case. If we are not running
+      // through the service, then MOZ_USING_SERVICE will not exist.
+      if (!sUsingService) {
+        StartServiceUpdate(gInstallDirPath);
+      }
     }
     EXIT_WHEN_ELEVATED(elevatedLockFilePath, updateLockFileHandle, 0);
 #endif /* XP_WIN */
@@ -3187,11 +3401,10 @@ int NS_main(int argc, NS_tchar **argv)
     }
 #endif /* XP_MACOSX */
 
-    if (getenv("MOZ_PROCESS_UPDATES") == nullptr) {
-      LaunchCallbackApp(argv[5],
-                        argc - callbackIndex,
-                        argv + callbackIndex);
-    }
+    LaunchCallbackApp(argv[5],
+                      argc - callbackIndex,
+                      argv + callbackIndex,
+                      sUsingService);
   }
 
   return gSucceeded ? 0 : 1;
@@ -3508,6 +3721,7 @@ int add_dir_entries(const NS_tchar *dirpath, ActionList *list)
         LOG(("add_dir_entries: found a non-standard file: " LOG_S,
              ftsdirEntry->fts_path));
         // Fall through and try to remove as a file
+        MOZ_FALLTHROUGH;
 
       // Files
       case FTS_F:
@@ -3554,7 +3768,7 @@ int add_dir_entries(const NS_tchar *dirpath, ActionList *list)
           rv = OK;
           break;
         }
-        // Fall through
+        MOZ_FALLTHROUGH;
 
       case FTS_ERR:
         rv = UNEXPECTED_FILE_OPERATION_ERROR;

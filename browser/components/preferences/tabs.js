@@ -41,6 +41,19 @@ var gTabsPane = {
       showTabsInTaskbar.hidden = ver < 6.1;
     } catch (ex) {}
 #endif
+
+    // The "closing multiple tabs" and "opening multiple tabs might slow down
+    // &brandShortName;" warnings provide options for not showing these
+    // warnings again. When the user disabled them, we provide checkboxes to
+    // re-enable the warnings.
+    let TransientPrefs =
+      Components.utils.import("resource:///modules/TransientPrefs.jsm", {})
+                .TransientPrefs;
+    if (!TransientPrefs.prefShouldBeVisible("browser.tabs.warnOnClose"))
+      document.getElementById("warnCloseMultiple").hidden = true;
+    if (!TransientPrefs.prefShouldBeVisible("browser.tabs.warnOnOpen"))
+      document.getElementById("warnOpenMany").hidden = true;
+
     // Set the proper value in the newtab drop-down.
     gTabsPane.readNewtabUrl();
   },

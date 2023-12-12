@@ -49,8 +49,6 @@ config = {
         ],
     },
     'app_ini_path': '%(obj_dir)s/dist/bin/application.ini',
-    'purge_skip': ['info', 'rel-*:45d', 'tb-rel-*:45d'],
-    'purge_basedirs':  [],
     'enable_ccache': False,
     'vcs_share_base': 'C:\\builds\\hg-shared',
     'objdir': 'obj-firefox',
@@ -64,9 +62,9 @@ config = {
 
      #########################################################################
      ###### 32 bit specific ######
-    'base_name': 'B2G_%(branch)s_win32_goanna',
-    'platform': 'win32_goanna',
-    'stage_platform': 'win32_goanna',
+    'base_name': 'B2G_%(branch)s_win32_gecko',
+    'platform': 'win32_gecko',
+    'stage_platform': 'win32_gecko',
     'stage_product': 'b2g',
     'env': {
         'MOZBUILD_STATE_PATH': os.path.join(os.getcwd(), '.mozbuild'),
@@ -94,8 +92,7 @@ config = {
         'MINIDUMP_SAVE_PATH': '%(base_work_dir)s/minidumps',
     },
     'enable_pymake': True,
-    'purge_minsize': 12,
-    'src_mozconfig': 'b2g/config/mozconfigs/win32_goanna/nightly',
+    'src_mozconfig': 'b2g/config/mozconfigs/win32_gecko/nightly',
     'tooltool_manifest_src': "b2g/config/tooltool-manifests/win32/releng.manifest",
     #########################################################################
 }

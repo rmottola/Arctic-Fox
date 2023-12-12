@@ -85,6 +85,13 @@ ReportOutOfRange(JSContext* cx)
 }
 
 static bool
+ReportCannotWait(JSContext* cx)
+{
+    JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_ATOMICS_WAIT_NOT_ALLOWED);
+    return false;
+}
+
+static bool
 GetSharedTypedArray(JSContext* cx, HandleValue v,
                     MutableHandle<TypedArrayObject*> viewp)
 {
@@ -501,11 +508,19 @@ js::atomics_isLockFree(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     HandleValue v = args.get(0);
-    if (!v.isInt32()) {
-        args.rval().setBoolean(false);
-        return true;
+    int32_t size;
+    if (v.isInt32()) {
+        size = v.toInt32();
+    } else {
+        double dsize;
+        if (!ToInteger(cx, v, &dsize))
+            return false;
+        if (!mozilla::NumberIsInt32(dsize, &size)) {
+            args.rval().setBoolean(false);
+            return true;
+        }
     }
-    args.rval().setBoolean(jit::AtomicOperations::isLockfree(v.toInt32()));
+    args.rval().setBoolean(jit::AtomicOperations::isLockfree(size));
     return true;
 }
 
@@ -773,6 +788,9 @@ js::atomics_futexWait(JSContext* cx, unsigned argc, Value* vp)
             timeout_ms = 0;
     }
 
+    if (!rt->fx.canWait())
+        return ReportCannotWait(cx);
+
     // This lock also protects the "waiters" field on SharedArrayRawBuffer,
     // and it provides the necessary memory fence.
     AutoLockFutexAPI lock;
@@ -867,8 +885,8 @@ js::atomics_futexWakeOrRequeue(JSContext* cx, unsigned argc, Value* vp)
     HandleValue objv = args.get(0);
     HandleValue idx1v = args.get(1);
     HandleValue countv = args.get(2);
-    HandleValue valv = args.get(3);
-    HandleValue idx2v = args.get(4);
+    HandleValue idx2v = args.get(3);
+    HandleValue valv = args.get(4);
     MutableHandleValue r = args.rval();
 
     Rooted<TypedArrayObject*> view(cx, nullptr);
@@ -1019,7 +1037,8 @@ js::FutexRuntime::unlock()
 
 js::FutexRuntime::FutexRuntime()
   : cond_(nullptr),
-    state_(Idle)
+    state_(Idle),
+    canWait_(false)
 {
 }
 
@@ -1054,6 +1073,7 @@ bool
 js::FutexRuntime::wait(JSContext* cx, double timeout_ms, AtomicsObject::FutexWaitResult* result)
 {
     MOZ_ASSERT(&cx->runtime()->fx == this);
+    MOZ_ASSERT(cx->runtime()->fx.canWait());
     MOZ_ASSERT(lockHolder_ == PR_GetCurrentThread());
     MOZ_ASSERT(state_ == Idle || state_ == WaitingInterrupted);
 

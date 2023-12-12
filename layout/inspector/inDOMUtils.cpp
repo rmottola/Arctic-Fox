@@ -91,7 +91,7 @@ inDOMUtils::GetAllStyleSheets(nsIDOMDocument *aDocument, uint32_t *aLength,
     for (int32_t i = 0; i < styleSet->SheetCount(sheetType); i++) {
       sheets.AppendElement(styleSet->StyleSheetAt(sheetType, i));
     }
-    nsAutoTArray<CSSStyleSheet*, 32> xblSheetArray;
+    AutoTArray<CSSStyleSheet*, 32> xblSheetArray;
     styleSet->AppendAllXBLStyleSheets(xblSheetArray);
 
     // The XBL stylesheet array will quite often be full of duplicates. Cope:
@@ -765,6 +765,8 @@ PropertySupportsVariant(nsCSSProperty aPropertyID, uint32_t aVariant)
       case eCSSProperty_border_bottom_right_radius:
       case eCSSProperty_background_position:
       case eCSSProperty_background_size:
+      case eCSSProperty_mask_position:
+      case eCSSProperty_mask_size:
       case eCSSProperty_grid_auto_columns:
       case eCSSProperty_grid_auto_rows:
       case eCSSProperty_grid_template_columns:
@@ -1192,8 +1194,10 @@ inDOMUtils::GetCSSPseudoElementNames(uint32_t* aLength, char16_t*** aNames)
 {
   nsTArray<nsIAtom*> array;
 
-  for (int i = 0; i < nsCSSPseudoElements::ePseudo_PseudoElementCount; ++i) {
-    nsCSSPseudoElements::Type type = static_cast<nsCSSPseudoElements::Type>(i);
+  const CSSPseudoElementTypeBase pseudoCount =
+    static_cast<CSSPseudoElementTypeBase>(CSSPseudoElementType::Count);
+  for (CSSPseudoElementTypeBase i = 0; i < pseudoCount; ++i) {
+    CSSPseudoElementType type = static_cast<CSSPseudoElementType>(i);
     if (!nsCSSPseudoElements::PseudoElementIsUASheetOnly(type)) {
       nsIAtom* atom = nsCSSPseudoElements::GetPseudoAtom(type);
       array.AppendElement(atom);

@@ -13,8 +13,8 @@ import sys
 # load modules from parent dir
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 
-from mozharness.base.errors import TarErrorList, ZipErrorList
-from mozharness.base.log import INFO, ERROR, WARNING, FATAL
+from mozharness.base.errors import TarErrorList
+from mozharness.base.log import INFO, ERROR, WARNING
 from mozharness.base.script import PreScriptAction
 from mozharness.base.transfer import TransferMixin
 from mozharness.base.vcs.vcsbase import MercurialScript
@@ -324,6 +324,8 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
 
         raw_log_file = os.path.join(dirs['abs_blob_upload_dir'],
                                     'marionette_raw.log')
+        error_summary_file = os.path.join(dirs['abs_blob_upload_dir'],
+                                          'marionette_errorsummary.log')
         config_fmt_args = {
             'type': self.config.get('test_type'),
             # emulator builds require a longer timeout
@@ -339,6 +341,7 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
             'binary': self.binary_path,
             'address': self.config.get('marionette_address'),
             'raw_log_file': raw_log_file,
+            'error_summary_file': error_summary_file,
             'gecko_log': dirs["abs_blob_upload_dir"],
             'this_chunk': self.config.get('this_chunk', 1),
             'total_chunks': self.config.get('total_chunks', 1)
@@ -436,7 +439,10 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
             self.fatal("Could not create blobber upload directory")
 
         cmd.append(manifest)
-        cmd = self.append_harness_extra_args(cmd)
+
+        try_options, try_tests = self.try_args("marionette")
+        cmd.extend(self.query_tests_args(try_tests,
+                                         str_format_values=config_fmt_args))
 
         env = {}
         if self.query_minidump_stackwalk():

@@ -44,7 +44,7 @@ public:
     mImage = aImage;
   }
 
-  virtual void NotifyPull(MediaStreamGraph* aGraph, StreamTime aDesiredTime) override
+  void NotifyPull(MediaStreamGraph* aGraph, StreamTime aDesiredTime) override
   {
     // Called on the MediaStreamGraph thread.
     StreamTime delta = aDesiredTime - mSourceStream->GetEndOfAppendedData(mTrackId);
@@ -254,7 +254,7 @@ CanvasCaptureMediaStream::Init(const dom::Optional<double>& aFPS,
 }
 
 already_AddRefed<CanvasCaptureMediaStream>
-CanvasCaptureMediaStream::CreateSourceStream(nsIDOMWindow* aWindow,
+CanvasCaptureMediaStream::CreateSourceStream(nsPIDOMWindowInner* aWindow,
                                              HTMLCanvasElement* aCanvas)
 {
   RefPtr<CanvasCaptureMediaStream> stream = new CanvasCaptureMediaStream(aCanvas);

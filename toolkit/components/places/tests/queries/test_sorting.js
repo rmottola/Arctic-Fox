@@ -11,8 +11,8 @@ var tests = [];
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_NONE,
 
-  setup: function() {
-    LOG("Sorting test 1: SORT BY NONE");
+  *setup() {
+    do_print("Sorting test 1: SORT BY NONE");
 
     this._unsortedData = [
       { isBookmark: true,
@@ -74,8 +74,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_TITLE_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 2: SORT BY TITLE");
+  *setup() {
+    do_print("Sorting test 2: SORT BY TITLE");
 
     this._unsortedData = [
       { isBookmark: true,
@@ -149,8 +149,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_DATE_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 3: SORT BY DATE");
+  *setup() {
+    do_print("Sorting test 3: SORT BY DATE");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -249,8 +249,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_URI_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 4: SORT BY URI");
+  *setup() {
+    do_print("Sorting test 4: SORT BY URI");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -355,8 +355,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_VISITCOUNT_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 5: SORT BY VISITCOUNT");
+  *setup() {
+    do_print("Sorting test 5: SORT BY VISITCOUNT");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -456,8 +456,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_KEYWORD_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 6: SORT BY KEYWORD");
+  *setup() {
+    do_print("Sorting test 6: SORT BY KEYWORD");
 
     this._unsortedData = [
       { isBookmark: true,
@@ -555,8 +555,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_DATEADDED_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 7: SORT BY DATEADDED");
+  *setup() {
+    do_print("Sorting test 7: SORT BY DATEADDED");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -645,8 +645,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_LASTMODIFIED_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 8: SORT BY LASTMODIFIED");
+  *setup() {
+    do_print("Sorting test 8: SORT BY LASTMODIFIED");
 
     var timeInMicroseconds = Date.now() * 1000;
     var timeAddedInMicroseconds = timeInMicroseconds - 10000;
@@ -743,8 +743,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_TAGS_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 9: SORT BY TAGS");
+  *setup() {
+    do_print("Sorting test 9: SORT BY TAGS");
 
     this._unsortedData = [
       { isBookmark: true,
@@ -844,8 +844,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_ANNOTATION_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 10: SORT BY ANNOTATION (int32)");
+  *setup() {
+    do_print("Sorting test 10: SORT BY ANNOTATION (int32)");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -940,8 +940,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_ANNOTATION_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 11: SORT BY ANNOTATION (int64)");
+  *setup() {
+    do_print("Sorting test 11: SORT BY ANNOTATION (int64)");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -1022,8 +1022,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_ANNOTATION_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 12: SORT BY ANNOTATION (string)");
+  *setup() {
+    do_print("Sorting test 12: SORT BY ANNOTATION (string)");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -1104,8 +1104,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_ANNOTATION_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 13: SORT BY ANNOTATION (double)");
+  *setup() {
+    do_print("Sorting test 13: SORT BY ANNOTATION (double)");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [
@@ -1186,8 +1186,8 @@ tests.push({
 tests.push({
   _sortingMode: Ci.nsINavHistoryQueryOptions.SORT_BY_FRECENCY_ASCENDING,
 
-  setup: function() {
-    LOG("Sorting test 13: SORT BY FRECENCY ");
+  *setup() {
+    do_print("Sorting test 13: SORT BY FRECENCY ");
 
     var timeInMicroseconds = Date.now() * 1000;
     this._unsortedData = [

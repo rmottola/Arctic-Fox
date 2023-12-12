@@ -501,10 +501,13 @@ public:
                                 const nsString& aName,
                                 const nsCString& aFeatures,
                                 const nsCString& aBaseURI,
+                                const DocShellOriginAttributes& aOpenerOriginAttributes,
                                 nsresult* aResult,
                                 bool* aWindowIsNew,
                                 InfallibleTArray<FrameScriptInfo>* aFrameScripts,
                                 nsCString* aURLToLoad) override;
+
+  static bool AllocateLayerTreeId(TabParent* aTabParent, uint64_t* aId);
 
 protected:
   void OnChannelConnected(int32_t pid) override;
@@ -650,9 +653,19 @@ private:
 
   static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
 
+  static bool AllocateLayerTreeId(ContentParent* aContent,
+                                  TabParent* aTopLevel, const TabId& aTabId,
+                                  uint64_t* aId);
+
   PGMPServiceParent*
   AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
                          base::ProcessId aOtherProcess) override;
+
+  PAPZParent*
+  AllocPAPZParent(const TabId& aTabId) override;
+  bool
+  DeallocPAPZParent(PAPZParent* aActor) override;
+
   PCompositorParent*
   AllocPCompositorParent(mozilla::ipc::Transport* aTransport,
                          base::ProcessId aOtherProcess) override;
@@ -1003,13 +1016,17 @@ private:
 
   virtual void ProcessingError(Result aCode, const char* aMsgName) override;
 
-  virtual bool RecvAllocateLayerTreeId(uint64_t* aId) override;
+  virtual bool RecvAllocateLayerTreeId(const ContentParentId& aCpId,
+                                       const TabId& aTabId,
+                                       uint64_t* aId) override;
 
   virtual bool RecvDeallocateLayerTreeId(const uint64_t& aId) override;
 
   virtual bool RecvGetGraphicsFeatureStatus(const int32_t& aFeature,
                                             int32_t* aStatus,
                                             bool* aSuccess) override;
+
+  virtual bool RecvGraphicsError(const nsCString& aError) override;
 
   virtual bool
   RecvBeginDriverCrashGuard(const uint32_t& aGuardType,

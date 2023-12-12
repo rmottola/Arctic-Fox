@@ -38,7 +38,6 @@ const nsIWebNavigation       = Components.interfaces.nsIWebNavigation;
 const nsIWindowMediator      = Components.interfaces.nsIWindowMediator;
 const nsIWindowWatcher       = Components.interfaces.nsIWindowWatcher;
 const nsIWebNavigationInfo   = Components.interfaces.nsIWebNavigationInfo;
-const nsIBrowserSearchService = Components.interfaces.nsIBrowserSearchService;
 const nsICommandLineValidator = Components.interfaces.nsICommandLineValidator;
 
 const NS_BINDING_ABORTED = Components.results.NS_BINDING_ABORTED;
@@ -77,7 +76,7 @@ function resolveURIInternal(aCmdLine, aArgument) {
 
   // We have interpreted the argument as a relative file URI, but the file
   // doesn't exist. Try URI fixup heuristics: see bug 290782.
- 
+
   try {
     uri = urifixup.createFixupURI(aArgument, 0);
   }
@@ -129,7 +128,7 @@ function needHomepageOverride(prefb) {
     // a way to make existing profiles retain the default that we removed.
     if (savedmstone)
       prefb.setBoolPref("browser.rights.3.shown", true);
-    
+
     prefb.setCharPref("browser.startup.homepage_override.mstone", mstone);
     prefb.setCharPref("browser.startup.homepage_override.buildID", buildID);
     return (savedmstone ? OVERRIDE_NEW_MSTONE : OVERRIDE_NEW_PROFILE);
@@ -195,7 +194,7 @@ function openWindow(parent, url, target, features, args, noExternalArgs) {
 
     return wwatch.openWindow(parent, url, target, features, argstring);
   }
-  
+
   // Pass an array to avoid the browser "|"-splitting behavior.
   var argArray = Components.classes["@mozilla.org/supports-array;1"]
                     .createInstance(Components.interfaces.nsISupportsArray);
@@ -251,11 +250,17 @@ function getMostRecentWindow(aType) {
   return wm.getMostRecentWindow(aType);
 }
 
-function doSearch(searchTerm, cmdLine) {
-  var ss = Components.classes["@mozilla.org/browser/search-service;1"]
-                     .getService(nsIBrowserSearchService);
+function logSystemBasedSearch(engine) {
+  var countId = (engine.identifier || ("other-" + engine.name)) + ".system";
+  var count = Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS");
+  count.add(countId);
+}
 
-  var submission = ss.defaultEngine.getSubmission(searchTerm);
+function doSearch(searchTerm, cmdLine) {
+  var engine = Services.search.defaultEngine;
+  logSystemBasedSearch(engine);
+
+  var submission = engine.getSubmission(searchTerm, null, "system");
 
   // fill our nsISupportsArray with uri-as-wstring, null, null, postData
   var sa = Components.classes["@mozilla.org/supports-array;1"]
@@ -677,10 +682,47 @@ nsDefaultCommandLineHandler.prototype = {
       }
     }
 
+    let redirectWinSearch = false;
+    if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+      redirectWinSearch = Services.prefs.getBoolPref("browser.search.redirectWindowsSearch");
+    }
+
     try {
       var ar;
       while ((ar = cmdLine.handleFlagWithParam("url", false))) {
         var uri = resolveURIInternal(cmdLine, ar);
+
+        // Searches in the Windows 10 task bar searchbox simply open the default browser
+        // with a URL for a search on Bing. Here we extract the search term and use the
+        // user's default search engine instead.
+        if (redirectWinSearch && uri.spec.startsWith("https://www.bing.com/search")) {
+          try {
+            var url = uri.QueryInterface(Components.interfaces.nsIURL);
+            var params = new URLSearchParams(url.query);
+            // We don't want to rewrite all Bing URLs coming from external apps. Look
+            // for the magic URL parm that's present in searches from the task bar.
+            // * Typed searches use "form=WNSGPH"
+            // * Cortana voice searches use "FORM=WNSBOX" or direct results, or "FORM=WNSFC2"
+            //   for "see more results on Bing.com")
+            // * Cortana voice searches started from "Hey, Cortana" use "form=WNSHCO"
+            //   or "form=WNSSSV"
+            var allowedParams = ["WNSGPH", "WNSBOX", "WNSFC2", "WNSHCO", "WNSSSV"];
+            var formParam = params.get("form");
+            if (!formParam) {
+              formParam = params.get("FORM");
+            }
+            if (allowedParams.indexOf(formParam) != -1) {
+              var term = params.get("q");
+              var engine = Services.search.defaultEngine;
+              logSystemBasedSearch(engine);
+              var submission = engine.getSubmission(term, null, "system");
+              uri = submission.uri;
+            }
+          } catch (e) {
+            Components.utils.reportError("Couldn't redirect Windows search: " + e);
+          }
+        }
+
         urilist.push(uri);
       }
     }

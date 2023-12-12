@@ -129,7 +129,8 @@ var handleContentContextMenu = function (event) {
   Services.obs.notifyObservers(subject, "content-contextmenu", null);
 
   let doc = event.target.ownerDocument;
-  let docLocation = doc.location ? doc.location.href : undefined;
+  let docLocation = doc.mozDocumentURIIfNotForErrorPages;
+  docLocation = docLocation && docLocation.spec;
   let charSet = doc.characterSet;
   let baseURI = doc.baseURI;
   let referrer = doc.referrer;
@@ -160,7 +161,7 @@ var handleContentContextMenu = function (event) {
     disableSetDesktopBg = disableSetDesktopBackground(event.target);
 
     try {
-      let imageCache = 
+      let imageCache =
         Cc["@mozilla.org/image/tools;1"].getService(Ci.imgITools)
                                         .getImgCacheForDocument(doc);
       let props =
@@ -237,12 +238,100 @@ const TLS_ERROR_REPORT_TELEMETRY_EXPANDED = 1;
 const TLS_ERROR_REPORT_TELEMETRY_SUCCESS  = 6;
 const TLS_ERROR_REPORT_TELEMETRY_FAILURE  = 7;
 
+var AboutCertErrorListener = {
+  init(chromeGlobal) {
+    addMessageListener("AboutCertErrorDetails", this);
+    chromeGlobal.addEventListener("AboutCertErrorLoad", this, false, true);
+    chromeGlobal.addEventListener("AboutCertErrorSetAutomatic", this, false, true);
+  },
+
+  get isAboutCertError() {
+    return content.document.documentURI.startsWith("about:certerror");
+  },
+
+  handleEvent(event) {
+    if (!this.isAboutCertError) {
+      return;
+    }
+
+    switch (event.type) {
+      case "AboutCertErrorLoad":
+        this.onLoad(event);
+        break;
+      case "AboutCertErrorSetAutomatic":
+        this.onSetAutomatic(event);
+        break;
+    }
+  },
+
+  receiveMessage(msg) {
+    if (!this.isAboutCertError) {
+      return;
+    }
+
+    switch (msg.name) {
+      case "AboutCertErrorDetails":
+        this.onDetails(msg);
+        break;
+    }
+  },
+
+  onLoad(event) {
+    let originalTarget = event.originalTarget;
+    let ownerDoc = originalTarget.ownerDocument;
+    ClickEventHandler.onAboutCertError(originalTarget, ownerDoc);
+
+    // Set up the TLS Error Reporting UI - reports are sent automatically
+    // (from nsHttpChannel::OnStopRequest) if the user has previously enabled
+    // automatic sending of reports. The UI ensures that a report is sent
+    // for the certificate error currently displayed if the user enables it
+    // here.
+    let automatic = Services.prefs.getBoolPref("security.ssl.errorReporting.automatic");
+    content.dispatchEvent(new content.CustomEvent("AboutCertErrorOptions", {
+      detail: JSON.stringify({
+        enabled: Services.prefs.getBoolPref("security.ssl.errorReporting.enabled"),
+        automatic,
+      })
+    }));
+  },
+
+  onDetails(msg) {
+    let div = content.document.getElementById("certificateErrorText");
+    div.textContent = msg.data.info;
+  },
+
+  onSetAutomatic(event) {
+    sendAsyncMessage("Browser:SetSSLErrorReportAuto", {
+      automatic: event.detail
+    });
+
+    // if we're enabling reports, send a report for this failure
+    if (event.detail) {
+      let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
+          .getService(Ci.nsISerializationHelper);
+
+      let serializable =  docShell.failedChannel.securityInfo
+          .QueryInterface(Ci.nsITransportSecurityInfo)
+          .QueryInterface(Ci.nsISerializable);
+
+      let serializedSecurityInfo = serhelper.serializeToString(serializable);
+
+      let {host, port} = content.document.mozDocumentURIIfNotForErrorPages;
+      sendAsyncMessage("Browser:SendSSLErrorReport", {
+        uri: { host, port },
+        securityInfo: serializedSecurityInfo
+      });
+    }
+  },
+};
+
+AboutCertErrorListener.init(this);
+
+
 var AboutNetErrorListener = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener('AboutNetErrorLoad', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorSetAutomatic', this, false, true);
-    chromeGlobal.addEventListener('AboutNetErrorSendReport', this, false, true);
-    chromeGlobal.addEventListener('AboutNetErrorUIExpanded', this, false, true);
     chromeGlobal.addEventListener('AboutNetErrorOverride', this, false, true);
   },
 
@@ -262,13 +351,6 @@ var AboutNetErrorListener = {
     case "AboutNetErrorSetAutomatic":
       this.onSetAutomatic(aEvent);
       break;
-    case "AboutNetErrorSendReport":
-      this.onSendReport(aEvent);
-      break;
-    case "AboutNetErrorUIExpanded":
-      sendAsyncMessage("Browser:SSLErrorReportTelemetry",
-                       {reportStatus: TLS_ERROR_REPORT_TELEMETRY_EXPANDED});
-      break;
     case "AboutNetErrorOverride":
       this.onOverride(aEvent);
       break;
@@ -278,97 +360,44 @@ var AboutNetErrorListener = {
   onPageLoad: function(evt) {
     let automatic = Services.prefs.getBoolPref("security.ssl.errorReporting.automatic");
     content.dispatchEvent(new content.CustomEvent("AboutNetErrorOptions", {
-            detail: JSON.stringify({
-              enabled: Services.prefs.getBoolPref("security.ssl.errorReporting.enabled"),
-            automatic: automatic
-            })
-          }
-    ));
-    if (automatic) {
-      this.onSendReport(evt);
-    }
-    // hide parts of the UI we don't need yet
-    let contentDoc = content.document;
+      detail: JSON.stringify({
+        enabled: Services.prefs.getBoolPref("security.ssl.errorReporting.enabled"),
+        automatic: automatic
+      })
+    }));
 
-    let reportSendingMsg = contentDoc.getElementById("reportSendingMessage");
-    let reportSentMsg = contentDoc.getElementById("reportSentMessage");
-    let retryBtn = contentDoc.getElementById("reportCertificateErrorRetry");
-    reportSendingMsg.style.display = "none";
-    reportSentMsg.style.display = "none";
-    retryBtn.style.display = "none";
+    sendAsyncMessage("Browser:SSLErrorReportTelemetry",
+                     {reportStatus: TLS_ERROR_REPORT_TELEMETRY_UI_SHOWN});
   },
 
   onSetAutomatic: function(evt) {
     sendAsyncMessage("Browser:SetSSLErrorReportAuto", {
-        automatic: evt.detail
-      });
-  },
-
-  onSendReport: function(evt) {
-    let contentDoc = content.document;
-
-    let reportSendingMsg = contentDoc.getElementById("reportSendingMessage");
-    let reportSentMsg = contentDoc.getElementById("reportSentMessage");
-    let reportBtn = contentDoc.getElementById("reportCertificateError");
-    let retryBtn = contentDoc.getElementById("reportCertificateErrorRetry");
-
-    addMessageListener("Browser:SSLErrorReportStatus", function(message) {
-      // show and hide bits - but only if this is a message for the right
-      // document - we'll compare on document URI
-      if (contentDoc.documentURI === message.data.documentURI) {
-        switch(message.data.reportStatus) {
-        case "activity":
-          // Hide the button that was just clicked
-          reportBtn.style.display = "none";
-          retryBtn.style.display = "none";
-          reportSentMsg.style.display = "none";
-          reportSendingMsg.style.removeProperty("display");
-          break;
-        case "error":
-          // show the retry button
-          retryBtn.style.removeProperty("display");
-          reportSendingMsg.style.display = "none";
-          sendAsyncMessage("Browser:SSLErrorReportTelemetry",
-                           {reportStatus: TLS_ERROR_REPORT_TELEMETRY_FAILURE});
-          break;
-        case "complete":
-          // Show a success indicator
-          reportSentMsg.style.removeProperty("display");
-          reportSendingMsg.style.display = "none";
-          sendAsyncMessage("Browser:SSLErrorReportTelemetry",
-                           {reportStatus: TLS_ERROR_REPORT_TELEMETRY_SUCCESS});
-          break;
-        }
-      }
+      automatic: evt.detail
     });
 
-    let location = contentDoc.location.href;
+    // if we're enabling reports, send a report for this failure
+    if (evt.detail) {
+      let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
+                        .getService(Ci.nsISerializationHelper);
 
-    let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
-                     .getService(Ci.nsISerializationHelper);
+      let serializable = docShell.failedChannel.securityInfo
+          .QueryInterface(Ci.nsITransportSecurityInfo)
+          .QueryInterface(Ci.nsISerializable);
 
-    let serializable =  docShell.failedChannel.securityInfo
-                                .QueryInterface(Ci.nsITransportSecurityInfo)
-                                .QueryInterface(Ci.nsISerializable);
+      let serializedSecurityInfo = serhelper.serializeToString(serializable);
 
-    let serializedSecurityInfo = serhelper.serializeToString(serializable);
-
-    sendAsyncMessage("Browser:SendSSLErrorReport", {
-        elementId: evt.target.id,
-        documentURI: contentDoc.documentURI,
-        location: {hostname: contentDoc.location.hostname, port: contentDoc.location.port},
+      let {host, port} = content.document.mozDocumentURIIfNotForErrorPages;
+      sendAsyncMessage("Browser:SendSSLErrorReport", {
+        uri: { host, port },
         securityInfo: serializedSecurityInfo
       });
+
+    }
   },
 
   onOverride: function(evt) {
-    let contentDoc = content.document;
-    let location = contentDoc.location;
-
-    sendAsyncMessage("Browser:OverrideWeakCrypto", {
-      documentURI: contentDoc.documentURI,
-      location: {hostname: location.hostname, port: location.port}
-    });
+    let {host, port} = content.document.mozDocumentURIIfNotForErrorPages;
+    sendAsyncMessage("Browser:OverrideWeakCrypto", { uri: {host, port} });
   }
 }
 
@@ -461,21 +490,21 @@ var ClickEventHandler = {
                                        .QueryInterface(Ci.nsIDocShell);
     let serhelper = Cc["@mozilla.org/network/serialization-helper;1"]
                      .getService(Ci.nsISerializationHelper);
-    let serializedSSLStatus = "";
+    let serializedSecurityInfo = "";
 
     try {
       let serializable =  docShell.failedChannel.securityInfo
-                                  .QueryInterface(Ci.nsISSLStatusProvider)
-                                  .SSLStatus
+                                  .QueryInterface(Ci.nsITransportSecurityInfo)
                                   .QueryInterface(Ci.nsISerializable);
-      serializedSSLStatus = serhelper.serializeToString(serializable);
+
+      serializedSecurityInfo = serhelper.serializeToString(serializable);
     } catch (e) { }
 
     sendAsyncMessage("Browser:CertExceptionError", {
       location: ownerDoc.location.href,
       elementId: targetElement.getAttribute("id"),
       isTopFrame: (ownerDoc.defaultView.parent === ownerDoc.defaultView),
-      sslStatusAsString: serializedSSLStatus
+      securityInfoAsString: serializedSecurityInfo
     });
   },
 
@@ -662,8 +691,8 @@ addMessageListener("ContextMenu:MediaCommand", (message) => {
       media.dispatchEvent(event);
       break;
     case "fullscreen":
-      if (content.document.mozFullScreenEnabled)
-        media.mozRequestFullScreen();
+      if (content.document.fullscreenEnabled)
+        media.requestFullscreen();
       break;
   }
 });
@@ -971,7 +1000,7 @@ var PageInfoListener = {
       let rels = {};
 
       if (rel) {
-        for each (let relVal in rel.split(/\s+/)) {
+        for (let relVal of rel.split(/\s+/)) {
           rels[relVal] = true;
         }
       }

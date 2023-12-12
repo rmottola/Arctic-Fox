@@ -26,6 +26,7 @@
 #include "LayersTypes.h"
 #include "mozilla/gfx/Matrix.h"
 #include "nsRegion.h"
+#include "PotentialCheckerboardDurationTracker.h"
 
 #include "base/message_loop.h"
 
@@ -174,7 +175,7 @@ public:
    * Return a visual effect that reflects this apzc's
    * overscrolled state, if any.
    */
-  Matrix4x4 GetOverscrollTransform() const;
+  AsyncTransformComponentMatrix GetOverscrollTransform() const;
 
   /**
    * A shadow layer update has arrived. |aLayerMetrics| is the new FrameMetrics
@@ -226,7 +227,7 @@ public:
    * Returns the same transform as GetCurrentAsyncTransform(), but includes
    * any transform due to axis over-scroll.
    */
-  Matrix4x4 GetCurrentAsyncTransformWithOverscroll() const;
+  AsyncTransformComponentMatrix GetCurrentAsyncTransformWithOverscroll() const;
 
   /**
    * Returns the transform to take something from the coordinate space of the
@@ -313,6 +314,15 @@ public:
    * See CancelAnimationFlags.
    */
   void CancelAnimation(CancelAnimationFlags aFlags = Default);
+
+  /**
+   * Adjusts the scroll position to compensate for a shift in the surface, such
+   * that the content appears to remain visually in the same position. i.e. if
+   * the surface moves up by 10 screenpixels, the scroll position should also
+   * move up by 10 pixels so that what used to be at the top of the surface is
+   * now 10 pixels down the surface.
+   */
+  void AdjustScrollForSurfaceShift(const ScreenPoint& aShift);
 
   /**
    * Clear any overscroll on this APZC.
@@ -577,27 +587,19 @@ protected:
   /**
    * Utility function to send updated FrameMetrics to Gecko so that it can paint
    * the displayport area. Calls into GeckoContentController to do the actual
-   * work. Note that only one paint request can be active at a time. If a paint
-   * request is made while a paint is currently happening, it gets queued up. If
-   * a new paint request arrives before a paint is completed, the old request
-   * gets discarded.
+   * work. This call will use the current metrics. If this function is called
+   * from a non-main thread, it will redispatch itself to the main thread, and
+   * use the latest metrics during the redispatch.
    */
   void RequestContentRepaint();
 
   /**
-   * Tell the paint throttler to request a content repaint with the given
-   * metrics.  (Helper function used by RequestContentRepaint.) If aThrottled
-   * is set to false, the repaint request is sent directly without going through
-   * the paint throttler. In particular, the GeckoContentController::RequestContentRepaint
-   * function will be invoked before this function returns.
+   * Send the provided metrics to Gecko to trigger a repaint. This function
+   * may filter duplicate calls with the same metrics. This function must be
+   * called on the main thread.
    */
-  void RequestContentRepaint(FrameMetrics& aFrameMetrics);
-
-  /**
-   * Actually send the next pending paint request to gecko.
-   */
-  void DispatchRepaintRequest(const FrameMetrics& aFrameMetrics,
-                              const ParentLayerPoint& aVelocity);
+  void RequestContentRepaint(const FrameMetrics& aFrameMetrics,
+                             const ParentLayerPoint& aVelocity);
 
   /**
    * Gets the current frame metrics. This is *not* the Gecko copy stored in the
@@ -643,6 +645,9 @@ protected:
   // to a nearby snap position if appropriate. The current scroll position is
   // used as the final destination.
   void RequestSnap();
+  // Same as above, but takes into account the current velocity to find a
+  // predicted destination.
+  void RequestSnapToDestination();
 
   uint64_t mLayersId;
   RefPtr<CompositorParent> mCompositorParent;
@@ -1106,10 +1111,16 @@ private:
    * recording.
    */
 private:
+  // Mutex protecting mCheckerboardEvent
+  Mutex mCheckerboardEventLock;
   // This is created when this APZC instance is first included as part of a
   // composite. If a checkerboard event takes place, this is destroyed at the
   // end of the event, and a new one is created on the next composite.
   UniquePtr<CheckerboardEvent> mCheckerboardEvent;
+  // This is used to track the total amount of time that we could reasonably
+  // be checkerboarding. Combined with other info, this allows us to meaningfully
+  // say how frequently users actually encounter checkerboarding.
+  PotentialCheckerboardDurationTracker mPotentialCheckerboardTracker;
 };
 
 } // namespace layers

@@ -97,8 +97,7 @@ dnl ==============================================================
 _topsrcdir=`cd \`dirname $0\`; pwd -W 2>/dev/null || pwd -P`
 _objdir=`pwd -P`
 
-dnl TODO Don't exempt L10N builds once bug 842760 is resolved.
-if test "$_topsrcdir" = "$_objdir" -a "${with_l10n_base+set}" != set; then
+if test "$_topsrcdir" = "$_objdir"; then
   echo "  ***"
   echo "  * Building directly in the main source directory is not allowed."
   echo "  *"
@@ -354,7 +353,11 @@ if test -n "$gonkdir" ; then
     direct_nspr_config=1
     android_cxx_stl=mozstlport
 else
-    MOZ_ANDROID_NDK
+    if test "$COMPILE_ENVIRONMENT"; then
+        MOZ_ANDROID_NDK
+    else
+        AC_DEFINE(ANDROID)
+    fi # COMPILE_ENVIRONMENT
 
     case "$target" in
     *-android*|*-linuxandroid*)
@@ -981,7 +984,7 @@ MOZ_FS_LAYOUT=unix
 
 USE_DEPENDENT_LIBS=1
 
-_PLATFORM_DEFAULT_TOOLKIT=cairo-gtk2
+_PLATFORM_DEFAULT_TOOLKIT=cairo-gtk3
 
 if test -n "$CROSS_COMPILE"; then
     OS_TARGET="${target_os}"
@@ -1204,7 +1207,14 @@ esac
 
 dnl Configure platform-specific CPU architecture compiler options.
 dnl ==============================================================
-MOZ_ARCH_OPTS
+if test "$COMPILE_ENVIRONMENT"; then
+    MOZ_ARCH_OPTS
+else
+    if test "$OS_TARGET" = Android -a x"$MOZ_WIDGET_TOOLKIT" != x"gonk"; then
+        dnl Default Android builds to ARMv7.
+        MOZ_ARCH=armv7-a
+    fi
+fi # COMPILE_ENVIRONMENT
 
 dnl =================================================================
 dnl Set up and test static assertion macros used to avoid AC_TRY_RUN,
@@ -1253,7 +1263,10 @@ dnl Android libstdc++, placed here so it can use MOZ_ARCH
 dnl computed above.
 dnl ========================================================
 
-MOZ_ANDROID_STLPORT
+MOZ_ANDROID_CPU_ARCH
+if test "$COMPILE_ENVIRONMENT"; then
+    MOZ_ANDROID_STLPORT
+fi # COMPILE_ENVIRONMENT
 
 dnl ========================================================
 dnl Suppress Clang Argument Warnings
@@ -1872,6 +1885,7 @@ case "$target" in
         AC_DEFINE(XP_IOS)
         AC_DEFINE(XP_DARWIN)
         _PLATFORM_DEFAULT_TOOLKIT='cairo-uikit'
+        direct_nspr_config=1
     else
         AC_DEFINE(XP_MACOSX)
         AC_DEFINE(XP_DARWIN)
@@ -2089,12 +2103,12 @@ ia64*-hpux*)
         _USE_CPP_INCLUDE_FLAG=1
         _DEFINES_CFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
         _DEFINES_CXXFLAGS='-FI $(topobjdir)/mozilla-config.h -DMOZILLA_CLIENT'
+        SSE_FLAGS="-arch:SSE"
+        SSE2_FLAGS="-arch:SSE2"
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
-        if test "$CPU_ARCH" = "x86" -a -z "$CLANG_CL"; then
+        if test "$CPU_ARCH" = "x86"; then
             dnl VS2012+ defaults to -arch:SSE2.
-            dnl Clang-cl gets confused by -arch:IA32, so don't add it.
-            dnl (See https://llvm.org/bugs/show_bug.cgi?id=24335)
             CFLAGS="$CFLAGS -arch:IA32"
             CXXFLAGS="$CXXFLAGS -arch:IA32"
         fi
@@ -2478,6 +2492,7 @@ esac
 if test -z "$COMPILE_ENVIRONMENT"; then
     SKIP_COMPILER_CHECKS=1
     SKIP_LIBRARY_CHECKS=1
+    PKG_SKIP_STRIP=1
 else
     MOZ_COMPILER_OPTS
 fi # COMPILE_ENVIRONMENT
@@ -3654,7 +3669,6 @@ MOZ_VORBIS=
 MOZ_TREMOR=
 MOZ_SAMPLE_TYPE_FLOAT32=
 MOZ_SAMPLE_TYPE_S16=
-MOZ_GSTREAMER=
 MOZ_DIRECTSHOW=
 MOZ_WMF=
 if test -n "$MOZ_FMP4"; then
@@ -3662,7 +3676,7 @@ if test -n "$MOZ_FMP4"; then
 else
   MOZ_FMP4=
 fi
-MOZ_FFMPEG=
+MOZ_FFMPEG=1
 MOZ_WEBRTC=1
 MOZ_WEBRTC_SIGNALING=
 MOZ_WEBRTC_ASSERT_ALWAYS=1
@@ -3725,6 +3739,7 @@ MOZ_ANDROID_DOWNLOADS_INTEGRATION=
 MOZ_ANDROID_MLS_STUMBLER=
 MOZ_ANDROID_SHARE_OVERLAY=
 MOZ_EXCLUDE_HYPHENATION_DICTIONARIES=
+MOZ_SWITCHBOARD=
 ACCESSIBILITY=
 MOZ_TIME_MANAGER=
 MOZ_SIMPLEPUSH=
@@ -4733,6 +4748,13 @@ if test -n "$MOZ_ANDROID_MLS_STUMBLER"; then
     AC_DEFINE(MOZ_ANDROID_MLS_STUMBLER)
 fi
 
+dnl =========================================================
+dnl = Whether to exclude hyphenations files in the build
+dnl =========================================================
+if test -n "$MOZ_EXCLUDE_HYPHENATION_DICTIONARIES"; then
+    AC_DEFINE(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
+fi
+
 dnl ========================================================
 dnl = Include share overlay on Android
 dnl ========================================================
@@ -4747,11 +4769,11 @@ if test -n "$MOZ_ANDROID_TAB_QUEUE"; then
     AC_DEFINE(MOZ_ANDROID_TAB_QUEUE)
 fi
 
-dnl =========================================================
-dnl = Whether to exclude hyphenations files in the build
-dnl =========================================================
-if test -n "$MOZ_EXCLUDE_HYPHENATION_DICTIONARIES"; then
-    AC_DEFINE(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
+dnl ========================================================
+dnl = Include Switchboard A/B framework on Android
+dnl ========================================================
+if test -n "$MOZ_SWITCHBOARD"; then
+    AC_DEFINE(MOZ_SWITCHBOARD)
 fi
 
 dnl ========================================================
@@ -5070,14 +5092,6 @@ fi;
 dnl ========================================================
 dnl FFmpeg H264/AAC Decoding Support
 dnl ========================================================
-case "$OS_TARGET" in
-WINNT|Darwin|Android)
-    ;;
-*)
-    MOZ_FFMPEG=1
-    ;;
-esac
-
 MOZ_ARG_DISABLE_BOOL(ffmpeg,
 [  --disable-ffmpeg         Disable FFmpeg for fragmented H264/AAC decoding],
     MOZ_FFMPEG=,
@@ -5406,69 +5420,6 @@ if test -n "$MOZ_PULSEAUDIO"; then
 fi
 
 AC_SUBST(MOZ_PULSEAUDIO)
-
-dnl ========================================================
-dnl = Enable GStreamer
-dnl ========================================================
-case "$OS_TARGET" in
-WINNT|Darwin|Android)
-    ;;
-*)
-    MOZ_GSTREAMER=1
-    GST_API_VERSION=0.10
-    ;;
-esac
-
-MOZ_ARG_ENABLE_STRING(gstreamer,
-[  --enable-gstreamer[=0.10]           Enable GStreamer support],
-[ MOZ_GSTREAMER=1
-  # API version, eg 0.10, 1.0 etc
-  if test -z "$enableval" -o "$enableval" = "yes"; then
-    GST_API_VERSION=0.10
-  elif test "$enableval" = "no"; then
-    MOZ_GSTREAMER=
-  else
-    GST_API_VERSION=$enableval
-  fi],
-)
-
-if test -n "$MOZ_GSTREAMER"; then
-    # core/base release number
-    if test "$GST_API_VERSION" = "1.0"; then
-      GST_VERSION=1.0
-    else
-      GST_VERSION=0.10.25
-    fi
-
-    PKG_CHECK_MODULES(GSTREAMER,
-                      gstreamer-$GST_API_VERSION >= $GST_VERSION
-                      gstreamer-app-$GST_API_VERSION
-                      gstreamer-plugins-base-$GST_API_VERSION,
-                      [_HAVE_GSTREAMER=1],
-                      [_HAVE_GSTREAMER=])
-    if test -z "$_HAVE_GSTREAMER"; then
-        AC_MSG_ERROR([gstreamer and gstreamer-plugins-base development packages are needed to build gstreamer backend. Install them or disable gstreamer support with --disable-gstreamer])
-    fi
-
-    _SAVE_LDFLAGS=$LDFLAGS
-    LDFLAGS="$LDFLAGS $GSTREAMER_LIBS -lgstvideo-$GST_API_VERSION"
-    AC_TRY_LINK(,[return 0;],_HAVE_LIBGSTVIDEO=1,_HAVE_LIBGSTVIDEO=)
-    if test -n "$_HAVE_LIBGSTVIDEO" ; then
-        GSTREAMER_LIBS="$GSTREAMER_LIBS -lgstvideo-$GST_API_VERSION"
-    else
-        AC_MSG_ERROR([gstreamer-plugins-base found, but no libgstvideo. Something has gone terribly wrong. Try reinstalling gstreamer-plugins-base; failing that, disable the gstreamer backend with --disable-gstreamer.])
-    fi
-    LDFLAGS=$_SAVE_LDFLAGS
-fi
-
-AC_SUBST(MOZ_GSTREAMER)
-AC_SUBST(GST_API_VERSION)
-
-if test -n "$MOZ_GSTREAMER"; then
-     AC_DEFINE(MOZ_GSTREAMER)
-     AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION")
-fi
-
 
 dnl ========================================================
 dnl Permissions System
@@ -6071,6 +6022,29 @@ if test -n "$LIBAV_FFT_ASFLAGS"; then
 elif test -n "$MOZ_LIBAV_FFT" -a "${CPU_ARCH}" != "arm"; then
   dnl Warn if we're not building either libav or opendl-max optimized routines.
   AC_MSG_WARN([No assembler or assembly support for libav-fft.  Using unoptimized C routines.])
+fi
+
+dnl ========================================================
+dnl = FFmpeg's ffvpx configuration
+dnl ========================================================
+
+MOZ_FFVPX=
+case "$CPU_ARCH" in
+  x86)
+      MOZ_FFVPX=1
+  ;;
+  x86_64)
+      MOZ_FFVPX=1
+  ;;
+esac
+
+dnl Use same conditional as MOZ_LIBAV_FFT to enable FFmpeg's ffvpx assembly decoder.
+if test -n "$MOZ_LIBAV_FFT"; then
+  FFVPX_ASFLAGS=$LIBAV_FFT_ASFLAGS
+  FFVPX_AS=$LIBAV_FFT_AS
+fi
+if test -n "$MOZ_FFVPX"; then
+  AC_DEFINE(MOZ_FFVPX)
 fi
 
 dnl ========================================================
@@ -7491,20 +7465,6 @@ if test "$MOZ_CHROME_FILE_FORMAT" != "jar" &&
     AC_MSG_ERROR([--enable-chrome-format must be set to either jar, flat, or omni])
 fi
 
-dnl ========================================================
-dnl = Enable Mozilla Developer Tools (frontend)
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(devtools,
-[  --enable-devtools           Enable Mozilla Developer Tools],
-    MOZ_DEVTOOLS=1,
-    MOZ_DEVTOOLS=)
-
-if test -n "$MOZ_DEVTOOLS"; then
-    AC_DEFINE(MOZ_DEVTOOLS)
-fi
-
-AC_SUBST(MOZ_DEVTOOLS)
-
 dnl =========================================================
 dnl Omnijar packaging (bug 552121)
 dnl =========================================================
@@ -8508,18 +8468,10 @@ if test "$MOZILLA_OFFICIAL"; then
     MOZ_INCLUDE_SOURCE_INFO=1
 fi
 
-# On official builds, we need to know in Telemetry what revision this is built from.
-# This is e.g. needed to match incoming data to a specific revision of the Histograms.json
-# file.
-if test "$MOZILLA_OFFICIAL" && test -d ${_topsrcdir}/.hg; then
-  SOURCE_REV=`cd $_topsrcdir && hg parent --template='{node|short}'`
-  SOURCE_REPO=`cd $_topsrcdir && hg showconfig paths.default | sed -e 's|^ssh://|http://|' -e 's|/$||'`
-  SOURCE_REV_URL=$SOURCE_REPO/rev/$SOURCE_REV
-else
-  SOURCE_REV_URL=
-fi
-AC_SUBST(SOURCE_REV_URL)
-
+# External builds (specifically Ubuntu) may drop the hg repo information, so we allow to
+# explicitly set the repository and changeset information in.
+AC_SUBST(MOZ_SOURCE_REPO)
+AC_SUBST(MOZ_SOURCE_CHANGESET)
 AC_SUBST(MOZ_INCLUDE_SOURCE_INFO)
 
 AC_DEFINE_UNQUOTED(MOZ_TELEMETRY_DISPLAY_REV, 2)
@@ -8601,6 +8553,19 @@ AC_SUBST(MOZ_NATIVE_NSPR)
 AC_SUBST(MOZ_NATIVE_NSS)
 AC_SUBST(NSS_DISABLE_DBM)
 
+HOST_CMFLAGS=-fobjc-exceptions
+HOST_CMMFLAGS=-fobjc-exceptions
+OS_COMPILE_CMFLAGS=-fobjc-exceptions
+OS_COMPILE_CMMFLAGS=-fobjc-exceptions
+if test "$MOZ_WIDGET_TOOLKIT" = uikit; then
+  OS_COMPILE_CMFLAGS="$OS_COMPILE_CMFLAGS -fobjc-abi-version=2 -fobjc-legacy-dispatch"
+  OS_COMPILE_CMMFLAGS="$OS_COMPILE_CMMFLAGS -fobjc-abi-version=2 -fobjc-legacy-dispatch"
+fi
+AC_SUBST(HOST_CMFLAGS)
+AC_SUBST(HOST_CMMFLAGS)
+AC_SUBST(OS_COMPILE_CMFLAGS)
+AC_SUBST(OS_COMPILE_CMMFLAGS)
+
 OS_CFLAGS="$CFLAGS"
 OS_CXXFLAGS="$CXXFLAGS"
 OS_CPPFLAGS="$CPPFLAGS"
@@ -8676,6 +8641,9 @@ AC_SUBST(MOZ_VORBIS)
 AC_SUBST(MOZ_TREMOR)
 AC_SUBST(MOZ_WMF)
 AC_SUBST(MOZ_FFMPEG)
+AC_SUBST(MOZ_FFVPX)
+AC_SUBST(FFVPX_AS)
+AC_SUBST_LIST(FFVPX_ASFLAGS)
 AC_SUBST(MOZ_FMP4)
 AC_SUBST(MOZ_DIRECTSHOW)
 AC_SUBST(MOZ_ANDROID_OMX)

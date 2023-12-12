@@ -78,7 +78,6 @@ public:
   void AppendScrollPartsTo(nsDisplayListBuilder*   aBuilder,
                            const nsRect&           aDirtyRect,
                            const nsDisplayListSet& aLists,
-                           bool                    aUsingDisplayPort,
                            bool                    aCreateLayer,
                            bool                    aPositioned);
 
@@ -368,6 +367,12 @@ public:
   bool DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
                              nsRect* aDirtyRect,
                              bool aAllowCreateDisplayPort);
+  void NotifyImageVisibilityUpdate();
+  bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort);
+
+  bool AllowDisplayPortExpiration();
+  void TriggerDisplayPortExpiration();
+  void ResetDisplayPortExpiryTimer();
 
   void ScheduleSyntheticMouseMove();
   static void ScrollActivityCallback(nsITimer *aTimer, void* anInstance);
@@ -460,10 +465,15 @@ public:
 
   // The scroll position where we last updated image visibility.
   nsPoint mLastUpdateImagesPos;
+  bool mHadDisplayPortAtLastImageUpdate;
+  nsRect mDisplayPortAtLastImageUpdate;
 
   nsRect mPrevScrolledRect;
 
   FrameMetrics::ViewID mScrollParentID;
+
+  // Timer to remove the displayport some time after scrolling has stopped
+  nsCOMPtr<nsITimer> mDisplayPortExpiryTimer;
 
   bool mNeverHasVerticalScrollbar:1;
   bool mNeverHasHorizontalScrollbar:1;
@@ -505,6 +515,11 @@ public:
   // If true, the scroll frame should always be active because we always build
   // a scrollable layer. Used for asynchronous scrolling.
   bool mWillBuildScrollableLayer:1;
+
+  // If true, the scroll frame is an ancestor of other scrolling frames, so
+  // we shouldn't expire the displayport on this scrollframe unless those
+  // descendant scrollframes also have their displayports removed.
+  bool mIsScrollParent:1;
 
   // Whether we are the root scroll frame that is used for containerful
   // scrolling with a display port. If true, the scrollable frame
@@ -849,6 +864,15 @@ public:
                                      nsRect* aDirtyRect,
                                      bool aAllowCreateDisplayPort) override {
     return mHelper.DecideScrollableLayer(aBuilder, aDirtyRect, aAllowCreateDisplayPort);
+  }
+  virtual void NotifyImageVisibilityUpdate() override {
+    mHelper.NotifyImageVisibilityUpdate();
+  }
+  virtual bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort) override {
+    return mHelper.GetDisplayPortAtLastImageVisibilityUpdate(aDisplayPort);
+  }
+  void TriggerDisplayPortExpiration() override {
+    mHelper.TriggerDisplayPortExpiration();
   }
 
   // nsIStatefulFrame
@@ -1317,7 +1341,15 @@ public:
                                      bool aAllowCreateDisplayPort) override {
     return mHelper.DecideScrollableLayer(aBuilder, aDirtyRect, aAllowCreateDisplayPort);
   }
-
+  virtual void NotifyImageVisibilityUpdate() override {
+    mHelper.NotifyImageVisibilityUpdate();
+  }
+  virtual bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort) override {
+    return mHelper.GetDisplayPortAtLastImageVisibilityUpdate(aDisplayPort);
+  }
+  void TriggerDisplayPortExpiration() override {
+    mHelper.TriggerDisplayPortExpiration();
+  }
 
 #ifdef DEBUG_FRAME_DUMP
   virtual nsresult GetFrameName(nsAString& aResult) const override;

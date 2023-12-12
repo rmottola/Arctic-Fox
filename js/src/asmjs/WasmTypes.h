@@ -48,7 +48,9 @@ typedef Vector<uint32_t, 0, SystemAllocPolicy> Uint32Vector;
 // The ValType enum represents the WebAssembly "value type", which are used to
 // specify the type of locals and parameters.
 
-enum class ValType : uint8_t
+// FIXME: uint16_t would make more sense for the underlying storage class, but
+// causes miscompilations in GCC (fixed in 4.8.5 and 4.9.3).
+enum class ValType
 {
     I32,
     I64,
@@ -143,7 +145,7 @@ class Val
 // void represented by the empty list). For now it's easier to have a flat enum
 // and be explicit about conversions to/from value types.
 
-enum class ExprType : uint8_t
+enum class ExprType : uint16_t
 {
     I32 = uint8_t(ValType::I32),
     I64 = uint8_t(ValType::I64),

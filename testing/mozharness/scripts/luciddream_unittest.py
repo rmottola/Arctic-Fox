@@ -12,8 +12,8 @@ import sys
 # load modules from parent dir
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 
-from mozharness.base.errors import BaseErrorList, TarErrorList, ZipErrorList
-from mozharness.base.log import ERROR, WARNING, FATAL, INFO
+from mozharness.base.errors import BaseErrorList, TarErrorList
+from mozharness.base.log import ERROR, FATAL, INFO
 from mozharness.base.script import (
     BaseScript,
     PreScriptAction,
@@ -236,6 +236,7 @@ class LuciddreamTest(TestingMixin, MercurialScript, MozbaseMixin, BaseScript,
         str_format_values = {
             'browser_path': self.binary_path,
             'raw_log_file': os.path.join(dirs['abs_work_dir'], 'luciddream_raw.log'),
+            'error_summary_file': os.path.join(dirs['abs_work_dir'], 'luciddream_errorsummary.log'),
             'test_manifest': os.path.join(ld_dir, 'example-tests', 'luciddream.ini')
         }
 

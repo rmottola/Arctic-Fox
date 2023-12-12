@@ -105,7 +105,7 @@ static char16_t GetBidiControl(nsStyleContext* aStyleContext,
 
 struct BidiParagraphData {
   nsString            mBuffer;
-  nsAutoTArray<char16_t, 16> mEmbeddingStack;
+  AutoTArray<char16_t, 16> mEmbeddingStack;
   nsTArray<nsIFrame*> mLogicalFrames;
   nsTArray<nsLineBox*> mLinePerFrame;
   nsDataHashtable<nsISupportsHashKey, int32_t> mContentToFrameIndex;
@@ -394,7 +394,7 @@ struct BidiLineData {
   nsTArray<nsIFrame*> mLogicalFrames;
   nsTArray<nsIFrame*> mVisualFrames;
   nsTArray<int32_t> mIndexMap;
-  nsAutoTArray<uint8_t, 18> mLevels;
+  AutoTArray<uint8_t, 18> mLevels;
   bool mIsReordered;
 
   BidiLineData(nsIFrame* aFirstFrameOnLine, int32_t   aNumFramesOnLine)
@@ -796,11 +796,11 @@ nsBidiPresUtils::ResolveParagraph(nsBlockFrame* aBlockFrame,
           // Set the base level and embedding level of the current run even
           // on an empty frame. Otherwise frame reordering will not be correct.
           propTable->Set(frame, nsBidi::EmbeddingLevelProperty(),
-                         NS_INT32_TO_PTR(embeddingLevel));
+                         embeddingLevel);
           propTable->Set(frame, nsBidi::BaseLevelProperty(),
-                         NS_INT32_TO_PTR(aBpd->GetParaLevel()));
+                         aBpd->GetParaLevel());
           propTable->Set(frame, nsBidi::ParagraphDepthProperty(),
-                         NS_INT32_TO_PTR(aBpd->mParagraphDepth));
+                         aBpd->mParagraphDepth);
           continue;
         }
         int32_t start, end;
@@ -832,11 +832,11 @@ nsBidiPresUtils::ResolveParagraph(nsBlockFrame* aBlockFrame,
     }
     else {
       propTable->Set(frame, nsBidi::EmbeddingLevelProperty(),
-                     NS_INT32_TO_PTR(embeddingLevel));
+                     embeddingLevel);
       propTable->Set(frame, nsBidi::BaseLevelProperty(),
-                     NS_INT32_TO_PTR(aBpd->GetParaLevel()));
+                     aBpd->GetParaLevel());
       propTable->Set(frame, nsBidi::ParagraphDepthProperty(),
-                     NS_INT32_TO_PTR(aBpd->mParagraphDepth));
+                     aBpd->mParagraphDepth);
       if (isTextFrame) {
         if ( (runLength > 0) && (runLength < fragmentLength) ) {
           /*
@@ -1782,12 +1782,9 @@ nsBidiPresUtils::RemoveBidiContinuation(BidiParagraphData *aBpd,
                                         int32_t&        aOffset)
 {
   FrameProperties props = aFrame->Properties();
-  nsBidiLevel embeddingLevel =
-    (nsBidiLevel)NS_PTR_TO_INT32(props.Get(nsBidi::EmbeddingLevelProperty()));
-  nsBidiLevel baseLevel =
-    (nsBidiLevel)NS_PTR_TO_INT32(props.Get(nsBidi::BaseLevelProperty()));
-  uint8_t paragraphDepth = 
-    NS_PTR_TO_INT32(props.Get(nsBidi::ParagraphDepthProperty()));
+  nsBidiLevel embeddingLevel = props.Get(nsBidi::EmbeddingLevelProperty());
+  nsBidiLevel baseLevel = props.Get(nsBidi::BaseLevelProperty());
+  uint8_t paragraphDepth = props.Get(nsBidi::ParagraphDepthProperty());
 
   for (int32_t index = aFirstIndex + 1; index <= aLastIndex; index++) {
     nsIFrame* frame = aBpd->FrameAt(index);
@@ -1798,12 +1795,9 @@ nsBidiPresUtils::RemoveBidiContinuation(BidiParagraphData *aBpd,
       // Make the frame and its continuation ancestors fluid,
       // so they can be reused or deleted by normal reflow code
       FrameProperties frameProps = frame->Properties();
-      frameProps.Set(nsBidi::EmbeddingLevelProperty(),
-                     NS_INT32_TO_PTR(embeddingLevel));
-      frameProps.Set(nsBidi::BaseLevelProperty(),
-                     NS_INT32_TO_PTR(baseLevel));
-      frameProps.Set(nsBidi::ParagraphDepthProperty(),
-                     NS_INT32_TO_PTR(paragraphDepth));
+      frameProps.Set(nsBidi::EmbeddingLevelProperty(), embeddingLevel);
+      frameProps.Set(nsBidi::BaseLevelProperty(), baseLevel);
+      frameProps.Set(nsBidi::ParagraphDepthProperty(), paragraphDepth);
       frame->AddStateBits(NS_FRAME_IS_BIDI);
       while (frame) {
         nsIFrame* prev = frame->GetPrevContinuation();

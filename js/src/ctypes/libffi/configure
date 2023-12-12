@@ -16690,10 +16690,10 @@ fi
 	echo "********************************************************"
         echo "* WARNING: Don't know the best CFLAGS for this system  *"
         echo "* Use ./configure CFLAGS=... to specify your own flags *"
-	echo "* (otherwise, a default of CFLAGS=-O2 will be used)    *"
+	echo "* (otherwise, a default of CFLAGS=-O3 will be used)    *"
 	echo "********************************************************"
 	echo ""
-        CFLAGS="-O2"
+        CFLAGS="-O3"
   fi
 
   as_CACHEVAR=`$as_echo "ax_cv_check_cflags__$CFLAGS" | $as_tr_sh`

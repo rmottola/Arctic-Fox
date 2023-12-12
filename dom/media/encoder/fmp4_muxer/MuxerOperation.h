@@ -49,6 +49,7 @@ public:
   virtual nsresult Find(const nsACString& aType,
                         nsTArray<RefPtr<MuxerOperation>>& aOperations) = 0;
 
+protected:
   virtual ~MuxerOperation() {}
 };
 

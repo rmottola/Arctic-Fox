@@ -10,8 +10,9 @@ Cu.import("resource://devtools/shared/event-emitter.js");
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
-  runSafe,
 } = ExtensionUtils;
+
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 // WeakMap[Extension -> BrowserAction]
 var browserActionMap = new WeakMap();
@@ -24,7 +25,10 @@ function browserActionOf(extension) {
 // as the associated popup.
 function BrowserAction(options, extension) {
   this.extension = extension;
-  this.id = makeWidgetId(extension.id) + "-browser-action";
+
+  let widgetId = makeWidgetId(extension.id);
+  this.id = `${widgetId}-browser-action`;
+  this.viewId = `PanelUI-webext-${widgetId}-browser-action-view`;
   this.widget = null;
 
   this.tabManager = TabManager.for(extension);
@@ -37,10 +41,10 @@ function BrowserAction(options, extension) {
 
   this.defaults = {
     enabled: true,
-    title: title,
+    title: title || extension.name,
     badgeText: "",
     badgeBackgroundColor: null,
-    icon: IconDetails.normalize({ path: options.default_icon }, extension,
+    icon: IconDetails.normalize({path: options.default_icon}, extension,
                                 null, true),
     popup: popup,
   };
@@ -55,31 +59,60 @@ BrowserAction.prototype = {
   build() {
     let widget = CustomizableUI.createWidget({
       id: this.id,
-      type: "custom",
+      viewId: this.viewId,
+      type: "view",
       removable: true,
+      label: this.defaults.title || this.extension.name,
+      tooltiptext: this.defaults.title || "",
       defaultArea: CustomizableUI.AREA_NAVBAR,
-      onBuild: document => {
-        let node = document.createElement("toolbarbutton");
-        node.id = this.id;
-        node.setAttribute("class", "toolbarbutton-1 chromeclass-toolbar-additional badged-button");
+
+      onBeforeCreated: document => {
+        let view = document.createElementNS(XUL_NS, "panelview");
+        view.id = this.viewId;
+        view.setAttribute("flex", "1");
+
+        document.getElementById("PanelUI-multiView").appendChild(view);
+      },
+
+      onDestroyed: document => {
+        let view = document.getElementById(this.viewId);
+        if (view) {
+          view.remove();
+        }
+      },
+
+      onCreated: node => {
+        node.classList.add("badged-button");
         node.setAttribute("constrain-size", "true");
 
         this.updateButton(node, this.defaults);
+      },
 
+      onViewShowing: event => {
+        let document = event.target.ownerDocument;
         let tabbrowser = document.defaultView.gBrowser;
 
-        node.addEventListener("command", event => { // eslint-disable-line mozilla/balanced-listeners
-          let tab = tabbrowser.selectedTab;
-          let popup = this.getProperty(tab, "popup");
-          this.tabManager.addActiveTabPermission(tab);
-          if (popup) {
-            this.togglePopup(node, popup);
-          } else {
-            this.emit("click");
-          }
-        });
+        let tab = tabbrowser.selectedTab;
+        let popupURL = this.getProperty(tab, "popup");
+        this.tabManager.addActiveTabPermission(tab);
 
-        return node;
+        // If the widget has a popup URL defined, we open a popup, but do not
+        // dispatch a click event to the extension.
+        // If it has no popup URL defined, we dispatch a click event, but do not
+        // open a popup.
+        if (popupURL) {
+          try {
+            new ViewPopup(this.extension, event.target, popupURL);
+          } catch (e) {
+            Cu.reportError(e);
+            event.preventDefault();
+          }
+        } else {
+          // This isn't not a hack, but it seems to provide the correct behavior
+          // with the fewest complications.
+          event.preventDefault();
+          this.emit("click");
+        }
       },
     });
 
@@ -89,22 +122,12 @@ BrowserAction.prototype = {
     this.widget = widget;
   },
 
-  togglePopup(node, popupResource) {
-    openPanel(node, popupResource, this.extension);
-  },
-
   // Update the toolbar button |node| with the tab context data
   // in |tabData|.
   updateButton(node, tabData) {
-    if (tabData.title) {
-      node.setAttribute("tooltiptext", tabData.title);
-      node.setAttribute("label", tabData.title);
-      node.setAttribute("aria-label", tabData.title);
-    } else {
-      node.removeAttribute("tooltiptext");
-      node.removeAttribute("label");
-      node.removeAttribute("aria-label");
-    }
+    let title = tabData.title || this.extension.name;
+    node.setAttribute("tooltiptext", title);
+    node.setAttribute("label", title);
 
     if (tabData.badgeText) {
       node.setAttribute("badge", tabData.badgeText);
@@ -162,8 +185,10 @@ BrowserAction.prototype = {
   setProperty(tab, prop, value) {
     if (tab == null) {
       this.defaults[prop] = value;
-    } else {
+    } else if (value != null) {
       this.tabContext.get(tab)[prop] = value;
+    } else {
+      delete this.tabContext.get(tab)[prop];
     }
 
     this.updateOnChange(tab);
@@ -200,7 +225,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerAPI((extension, context) => {
+extensions.registerSchemaAPI("browserAction", null, (extension, context) => {
   return {
     browserAction: {
       onClicked: new EventManager(context, "browserAction.onClicked", fire => {
@@ -215,45 +240,52 @@ extensions.registerAPI((extension, context) => {
       }).api(),
 
       enable: function(tabId) {
-        let tab = tabId ? TabManager.getTab(tabId) : null;
+        let tab = tabId !== null ? TabManager.getTab(tabId) : null;
         browserActionOf(extension).setProperty(tab, "enabled", true);
       },
 
       disable: function(tabId) {
-        let tab = tabId ? TabManager.getTab(tabId) : null;
+        let tab = tabId !== null ? TabManager.getTab(tabId) : null;
         browserActionOf(extension).setProperty(tab, "enabled", false);
       },
 
       setTitle: function(details) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
-        browserActionOf(extension).setProperty(tab, "title", details.title);
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
+
+        let title = details.title;
+        // Clear the tab-specific title when given a null string.
+        if (tab && title == "") {
+          title = null;
+        }
+        browserActionOf(extension).setProperty(tab, "title", title);
       },
 
-      getTitle: function(details, callback) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+      getTitle: function(details) {
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         let title = browserActionOf(extension).getProperty(tab, "title");
-        runSafe(context, callback, title);
+        return Promise.resolve(title);
       },
 
-      setIcon: function(details, callback) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+      setIcon: function(details) {
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         let icon = IconDetails.normalize(details, extension, context);
         browserActionOf(extension).setProperty(tab, "icon", icon);
+        return Promise.resolve();
       },
 
       setBadgeText: function(details) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         browserActionOf(extension).setProperty(tab, "badgeText", details.text);
       },
 
-      getBadgeText: function(details, callback) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+      getBadgeText: function(details) {
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         let text = browserActionOf(extension).getProperty(tab, "badgeText");
-        runSafe(context, callback, text);
+        return Promise.resolve(text);
       },
 
       setPopup: function(details) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         // Note: Chrome resolves arguments to setIcon relative to the calling
         // context, but resolves arguments to setPopup relative to the extension
         // root.
@@ -263,21 +295,21 @@ extensions.registerAPI((extension, context) => {
         browserActionOf(extension).setProperty(tab, "popup", url);
       },
 
-      getPopup: function(details, callback) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+      getPopup: function(details) {
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         let popup = browserActionOf(extension).getProperty(tab, "popup");
-        runSafe(context, callback, popup);
+        return Promise.resolve(popup);
       },
 
       setBadgeBackgroundColor: function(details) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         browserActionOf(extension).setProperty(tab, "badgeBackgroundColor", details.color);
       },
 
       getBadgeBackgroundColor: function(details, callback) {
-        let tab = details.tabId ? TabManager.getTab(details.tabId) : null;
+        let tab = details.tabId !== null ? TabManager.getTab(details.tabId) : null;
         let color = browserActionOf(extension).getProperty(tab, "badgeBackgroundColor");
-        runSafe(context, callback, color);
+        return Promise.resolve(color);
       },
     },
   };

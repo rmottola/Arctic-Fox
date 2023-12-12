@@ -92,26 +92,26 @@ var TabStateInternal = {
    * @returns {object} An object with the basic data for this tab.
    */
   _collectBaseTabData: function (tab, options) {
-    let tabData = {entries: [], lastAccessed: tab.lastAccessed };
+    let tabData = { entries: [], lastAccessed: tab.lastAccessed };
     let browser = tab.linkedBrowser;
 
-    if (tab.pinned)
+    if (tab.pinned) {
       tabData.pinned = true;
-    else
-      delete tabData.pinned;
+    }
+
     tabData.hidden = tab.hidden;
-    if (browser.audioMuted)
+
+    if (browser.audioMuted) {
       tabData.muted = true;
-    else
-      delete tabData.muted;
+      tabData.muteReason = tab.muteReason;
+    }
 
     // Save tab attributes.
     tabData.attributes = TabAttributes.get(tab);
 
-    if (tab.__SS_extdata)
+    if (tab.__SS_extdata) {
       tabData.extData = tab.__SS_extdata;
-    else if (tabData.extData)
-      delete tabData.extData;
+    }
 
     // Copy data from the tab state cache only if the tab has fully finished
     // restoring. We don't want to overwrite data contained in __SS_data.
@@ -166,9 +166,9 @@ var TabStateInternal = {
       // Filter sensitive data according to the current privacy level.
       if (!includePrivateData) {
         if (key === "storage") {
-          value = PrivacyFilter.filterSessionStorageData(value, isPinned);
+          value = PrivacyFilter.filterSessionStorageData(value);
         } else if (key === "formdata") {
-          value = PrivacyFilter.filterFormData(value, isPinned);
+          value = PrivacyFilter.filterFormData(value);
         }
       }
 

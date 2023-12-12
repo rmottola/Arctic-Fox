@@ -160,6 +160,7 @@ function frameScript() {
         let eltWeb = content.document.getElementById("webpages");
         let eltAddons = content.document.getElementById("addons");
         if (!eltWeb || !eltAddons) {
+          dump(`aboutperformance-test:hasItems: the page is not ready yet webpages:${eltWeb}, addons:${eltAddons}\n`);
           return;
         }
 
@@ -168,7 +169,6 @@ function frameScript() {
 
         hasTitleInAddons = addonTitles.includes(title);
         hasTitleInWebpages = webTitles.includes(title);
-
       } catch (ex) {
         Cu.reportError("Error in content: " + ex);
         Cu.reportError(ex.stack);
@@ -197,11 +197,14 @@ add_task(function* init() {
 var promiseExpectContent = Task.async(function*(options) {
   let title = "Testing about:performance " + Math.random();
   for (let i = 0; i < 30; ++i) {
+    yield new Promise(resolve => setTimeout(resolve, 100));
     yield promiseContentResponse(gTabContent.linkedBrowser, "aboutperformance-test:setTitle", title);
     let {hasTitleInWebpages, hasTitleInAddons, mode} = (yield promiseContentResponse(gTabAboutPerformance.linkedBrowser, "aboutperformance-test:hasItems", {title, options}));
-    if (hasTitleInWebpages && ((mode == "recent") == options.displayRecent)) {
-      Assert.ok(!hasTitleInAddons, "The title appears in webpages, but not in addons");
-      return true;
+
+    info(`aboutperformance-test:hasItems ${hasTitleInAddons}, ${hasTitleInWebpages}, ${mode}, ${options.displayRecent}`);
+    if (!hasTitleInWebpages) {
+      info(`Title not found in webpages`);
+      continue;
     }
     if ((mode == "recent") != options.displayRecent) {
       info(`Wrong mode`);
@@ -280,6 +283,7 @@ add_task(function* test_close_tab() {
         yield BrowserTestUtils.removeTab(tab);
       }
     }
+  }
 });
 
 add_task(function* cleanup() {

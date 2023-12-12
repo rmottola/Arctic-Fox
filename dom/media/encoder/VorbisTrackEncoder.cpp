@@ -142,6 +142,8 @@ VorbisTrackEncoder::GetEncodedFrames(EncodedFrameContainer& aData)
       VORBISLOG("vorbis_analysis_blockout block size %d", oggPacket.bytes);
       EncodedFrame* audiodata = new EncodedFrame();
       audiodata->SetFrameType(EncodedFrame::VORBIS_AUDIO_FRAME);
+      audiodata->SetTimeStamp(oggPacket.granulepos * PR_USEC_PER_SEC
+                              / mSamplingRate);
       nsTArray<uint8_t> frameData;
       frameData.AppendElements(oggPacket.packet, oggPacket.bytes);
       audiodata->SwapInFrameData(frameData);
@@ -200,8 +202,8 @@ VorbisTrackEncoder::GetEncodedTrack(EncodedFrameContainer& aData)
     vorbis_analysis_buffer(&mVorbisDsp, (int)sourceSegment->GetDuration());
 
   int framesCopied = 0;
-  nsAutoTArray<AudioDataValue, 9600> interleavedPcm;
-  nsAutoTArray<AudioDataValue, 9600> nonInterleavedPcm;
+  AutoTArray<AudioDataValue, 9600> interleavedPcm;
+  AutoTArray<AudioDataValue, 9600> nonInterleavedPcm;
   interleavedPcm.SetLength(sourceSegment->GetDuration() * mChannels);
   nonInterleavedPcm.SetLength(sourceSegment->GetDuration() * mChannels);
   while (!iter.IsEnded()) {

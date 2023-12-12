@@ -958,7 +958,7 @@ public:
 
   virtual bool HasApzAwareListeners() const override;
 
-  virtual nsIDOMWindow* GetOwnerGlobalForBindings() override;
+  virtual nsPIDOMWindowOuter* GetOwnerGlobalForBindings() override;
   virtual nsIGlobalObject* GetOwnerGlobal() const override;
 
   /**

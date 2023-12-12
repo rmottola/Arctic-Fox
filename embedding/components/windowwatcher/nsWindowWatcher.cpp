@@ -80,7 +80,7 @@ class nsWindowWatcher;
 struct nsWatcherWindowEntry
 {
 
-  nsWatcherWindowEntry(nsIDOMWindow* aWindow, nsIWebBrowserChrome* aChrome)
+  nsWatcherWindowEntry(mozIDOMWindowProxy* aWindow, nsIWebBrowserChrome* aChrome)
   {
 #ifdef USEWEAKREFS
     mWindow = do_GetWeakReference(aWindow);
@@ -105,7 +105,7 @@ struct nsWatcherWindowEntry
 #ifdef USEWEAKREFS
   nsCOMPtr<nsIWeakReference> mWindow;
 #else // still not an owning ref
-  nsIDOMWindow* mWindow;
+  mozIDOMWindowProxy* mWindow;
 #endif
   nsIWebBrowserChrome* mChrome;
   nsWeakPtr mChromeWeak;
@@ -349,12 +349,12 @@ ConvertArgsToArray(nsISupports* aArguments)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::OpenWindow(nsIDOMWindow* aParent,
+nsWindowWatcher::OpenWindow(mozIDOMWindowProxy* aParent,
                             const char* aUrl,
                             const char* aName,
                             const char* aFeatures,
                             nsISupports* aArguments,
-                            nsIDOMWindow** aResult)
+                            mozIDOMWindowProxy** aResult)
 {
   nsCOMPtr<nsIArray> argv = ConvertArgsToArray(aArguments);
 
@@ -416,7 +416,7 @@ struct SizeSpec
 };
 
 NS_IMETHODIMP
-nsWindowWatcher::OpenWindow2(nsIDOMWindow* aParent,
+nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
                              const char* aUrl,
                              const char* aName,
                              const char* aFeatures,
@@ -426,8 +426,7 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow* aParent,
                              nsITabParent* aOpeningTab,
                              nsISupports* aArguments,
                              nsIDocShellLoadInfo* aLoadInfo,
-                             nsIDOMWindow** aResult)
-			       
+                             mozIDOMWindowProxy** aResult)
 {
   nsCOMPtr<nsIArray> argv = ConvertArgsToArray(aArguments);
 
@@ -452,7 +451,7 @@ nsWindowWatcher::OpenWindow2(nsIDOMWindow* aParent,
 }
 
 nsresult
-nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
+nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
                                     const char* aUrl,
                                     const char* aName,
                                     const char* aFeatures,
@@ -462,7 +461,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
                                     nsITabParent* aOpeningTab,
                                     nsIArray* aArgv,
                                     nsIDocShellLoadInfo* aLoadInfo,
-                                    nsIDOMWindow** aResult)
+                                    mozIDOMWindowProxy** aResult)
 {
   nsresult rv = NS_OK;
   bool isNewToplevelWindow = false;
@@ -483,11 +482,8 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
   nsCOMPtr<nsIDocShellTreeOwner> parentTreeOwner; // from the parent window, if any
   nsCOMPtr<nsIDocShellTreeItem> newDocShellItem; // from the new window
 
-  nsCOMPtr<nsPIDOMWindow> parent = do_QueryInterface(aParent);
-  if (parent && parent->IsInnerWindow()) {
-    NS_ENSURE_STATE(parent->IsCurrentInnerWindow());
-    aParent = parent->GetOuterWindow();
-  }
+  nsCOMPtr<nsPIDOMWindowOuter> parent =
+    aParent ? nsPIDOMWindowOuter::From(aParent) : nullptr;
 
   MOZ_ASSERT_IF(openedFromRemoteTab,
                 XRE_IsParentProcess());
@@ -499,7 +495,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
     return NS_ERROR_FAILURE;
   }
 
-  GetWindowTreeOwner(aParent, getter_AddRefs(parentTreeOwner));
+  GetWindowTreeOwner(parent, getter_AddRefs(parentTreeOwner));
 
   // We expect TabParent to have provided us the absolute URI of the window
   // we're to open, so there's no need to call URIfromURL (or more importantly,
@@ -537,14 +533,15 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
   // know or care about names - unless we're opening named windows from chrome.
   if (!aOpeningTab) {
     // try to find an extant window with the given name
-    nsCOMPtr<nsIDOMWindow> foundWindow = SafeGetWindowByName(name, aParent);
+    nsCOMPtr<nsPIDOMWindowOuter> foundWindow = SafeGetWindowByName(name, aParent);
     GetWindowTreeItem(foundWindow, getter_AddRefs(newDocShellItem));
   }
 
   // Do sandbox checks here, instead of waiting until nsIDocShell::LoadURI.
   // The state of the window can change before this call and if we are blocked
   // because of sandboxing, we wouldn't want that to happen.
-  nsCOMPtr<nsPIDOMWindow> parentWindow = do_QueryInterface(aParent);
+  nsCOMPtr<nsPIDOMWindowOuter> parentWindow =
+    aParent ? nsPIDOMWindowOuter::From(aParent) : nullptr;
   nsCOMPtr<nsIDocShell> parentDocShell;
   if (parentWindow) {
     parentDocShell = parentWindow->GetDocShell();
@@ -670,7 +667,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
       }
 
       if (provider) {
-        nsCOMPtr<nsIDOMWindow> newWindow;
+        nsCOMPtr<mozIDOMWindowProxy> newWindow;
         rv = provider->ProvideWindow(aParent, chromeFlags, aCalledFromJS,
                                      sizeSpec.PositionSpecified(),
                                      sizeSpec.SizeSpecified(),
@@ -802,7 +799,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
         /* It might be a chrome nsXULWindow, in which case it won't have
             an nsIDOMWindow (primary content shell). But in that case, it'll
             be able to hand over an nsIDocShellTreeItem directly. */
-        nsCOMPtr<nsIDOMWindow> newWindow(do_GetInterface(newChrome));
+        nsCOMPtr<nsPIDOMWindowOuter> newWindow(do_GetInterface(newChrome));
         if (newWindow) {
           GetWindowTreeItem(newWindow, getter_AddRefs(newDocShellItem));
         }
@@ -829,14 +826,15 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
   if (activeDocsSandboxFlags != 0) {
     newDocShell->SetSandboxFlags(activeDocsSandboxFlags);
     if (parentWindow) {
-      newDocShell->
-        SetOnePermittedSandboxedNavigator(parentWindow->GetDocShell());
+      newDocShell->SetOnePermittedSandboxedNavigator(
+        parentWindow->GetDocShell());
     }
   }
-  
+
   rv = ReadyOpenedDocShellItem(newDocShellItem, parentWindow, windowIsNew, aResult);
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   /* disable persistence of size/position in popups (determined by
      determining whether the features parameter specifies width or height
@@ -861,7 +859,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
 
   if ((aDialog || windowIsModalContentDialog) && aArgv) {
     // Set the args on the new window.
-    nsCOMPtr<nsPIDOMWindow> piwin(do_QueryInterface(*aResult));
+    nsCOMPtr<nsPIDOMWindowOuter> piwin(do_QueryInterface(*aResult));
     NS_ENSURE_TRUE(piwin, NS_ERROR_UNEXPECTED);
 
     rv = piwin->SetArguments(aArgv);
@@ -896,7 +894,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
     // the JS stack, just use the principal of our parent window.  In those
     // cases we do _not_ set the parent window principal as the owner of the
     // load--since we really don't know who the owner is, just leave it null.
-    nsCOMPtr<nsPIDOMWindow> newWindow = do_QueryInterface(*aResult);
+    nsCOMPtr<nsPIDOMWindowOuter> newWindow = do_QueryInterface(*aResult);
     NS_ASSERTION(newWindow == newDocShell->GetWindow(), "Different windows??");
 
     // The principal of the initial about:blank document gets set up in
@@ -958,24 +956,20 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
       loadInfo->SetOwner(subjectPrincipal);
     }
 
-    nsCOMPtr<nsPIDOMWindow> referrerWindow =
-      do_QueryInterface(GetEntryGlobal());
-    if (!referrerWindow) {
-      referrerWindow = do_QueryInterface(aParent);
+    /* use the URL from the *extant* document, if any. The usual accessor
+       GetDocument will synchronously create an about:blank document if
+       it has no better answer, and we only care about a real document.
+       Also using GetDocument to force document creation seems to
+       screw up focus in the hidden window; see bug 36016.
+    */
+    nsCOMPtr<nsIDocument> doc = GetEntryDocument();
+    if (!doc && parentWindow) {
+      doc = parentWindow->GetExtantDoc();
     }
-    if (referrerWindow) {
-      /* use the URL from the *extant* document, if any. The usual accessor
-         GetDocument will synchronously create an about:blank document if
-         it has no better answer, and we only care about a real document.
-         Also using GetDocument to force document creation seems to
-         screw up focus in the hidden window; see bug 36016.
-      */
-      nsCOMPtr<nsIDocument> doc = referrerWindow->GetExtantDoc();
-      if (doc) {
-        // Set the referrer
-        loadInfo->SetReferrer(doc->GetDocumentURI());
-        loadInfo->SetReferrerPolicy(doc->GetReferrerPolicy());
-      }
+    if (doc) {
+      // Set the referrer
+      loadInfo->SetReferrer(doc->GetDocumentURI());
+      loadInfo->SetReferrerPolicy(doc->GetReferrerPolicy());
     }
   }
 
@@ -1008,9 +1002,7 @@ nsWindowWatcher::OpenWindowInternal(nsIDOMWindow* aParent,
 
     if (parentStorageManager && newStorageManager) {
       nsCOMPtr<nsIDOMStorage> storage;
-      nsCOMPtr<nsPIDOMWindow> pWin = do_QueryInterface(aParent);
-      nsCOMPtr<nsPIDOMWindow> pInnerWin =
-        pWin->IsInnerWindow() ? pWin.get() : pWin->GetCurrentInnerWindow();
+      nsCOMPtr<nsPIDOMWindowInner> pInnerWin = parentWindow->GetCurrentInnerWindow();
 
       parentStorageManager->GetStorage(pInnerWin, subjectPrincipal,
                                        isPrivateBrowsingWindow,
@@ -1133,7 +1125,7 @@ nsWindowWatcher::GetWindowEnumerator(nsISimpleEnumerator** aResult)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::GetNewPrompter(nsIDOMWindow* aParent, nsIPrompt** aResult)
+nsWindowWatcher::GetNewPrompter(mozIDOMWindowProxy* aParent, nsIPrompt** aResult)
 {
   // This is for backwards compat only. Callers should just use the prompt
   // service directly.
@@ -1146,7 +1138,7 @@ nsWindowWatcher::GetNewPrompter(nsIDOMWindow* aParent, nsIPrompt** aResult)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::GetNewAuthPrompter(nsIDOMWindow* aParent,
+nsWindowWatcher::GetNewAuthPrompter(mozIDOMWindowProxy* aParent,
                                     nsIAuthPrompt** aResult)
 {
   // This is for backwards compat only. Callers should just use the prompt
@@ -1160,7 +1152,7 @@ nsWindowWatcher::GetNewAuthPrompter(nsIDOMWindow* aParent,
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::GetPrompt(nsIDOMWindow* aParent, const nsIID& aIID,
+nsWindowWatcher::GetPrompt(mozIDOMWindowProxy* aParent, const nsIID& aIID,
                            void** aResult)
 {
   // This is for backwards compat only. Callers should just use the prompt
@@ -1201,7 +1193,7 @@ nsWindowWatcher::HasWindowCreator(bool* aResult)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::GetActiveWindow(nsIDOMWindow** aActiveWindow)
+nsWindowWatcher::GetActiveWindow(mozIDOMWindowProxy** aActiveWindow)
 {
   *aActiveWindow = nullptr;
   nsCOMPtr<nsIFocusManager> fm = do_GetService(FOCUSMANAGER_CONTRACTID);
@@ -1212,7 +1204,7 @@ nsWindowWatcher::GetActiveWindow(nsIDOMWindow** aActiveWindow)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::SetActiveWindow(nsIDOMWindow* aActiveWindow)
+nsWindowWatcher::SetActiveWindow(mozIDOMWindowProxy* aActiveWindow)
 {
   nsCOMPtr<nsIFocusManager> fm = do_GetService(FOCUSMANAGER_CONTRACTID);
   if (fm) {
@@ -1222,7 +1214,7 @@ nsWindowWatcher::SetActiveWindow(nsIDOMWindow* aActiveWindow)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::AddWindow(nsIDOMWindow* aWindow, nsIWebBrowserChrome* aChrome)
+nsWindowWatcher::AddWindow(mozIDOMWindowProxy* aWindow, nsIWebBrowserChrome* aChrome)
 {
   if (!aWindow) {
     return NS_ERROR_INVALID_ARG;
@@ -1230,7 +1222,7 @@ nsWindowWatcher::AddWindow(nsIDOMWindow* aWindow, nsIWebBrowserChrome* aChrome)
 
 #ifdef DEBUG
   {
-    nsCOMPtr<nsPIDOMWindow> win(do_QueryInterface(aWindow));
+    nsCOMPtr<nsPIDOMWindowOuter> win(do_QueryInterface(aWindow));
 
     NS_ASSERTION(win->IsOuterWindow(),
                  "Uh, the active window must be an outer window!");
@@ -1281,7 +1273,7 @@ nsWindowWatcher::AddWindow(nsIDOMWindow* aWindow, nsIWebBrowserChrome* aChrome)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::RemoveWindow(nsIDOMWindow* aWindow)
+nsWindowWatcher::RemoveWindow(mozIDOMWindowProxy* aWindow)
 {
   // find the corresponding nsWatcherWindowEntry, remove it
 
@@ -1299,7 +1291,7 @@ nsWindowWatcher::RemoveWindow(nsIDOMWindow* aWindow)
 }
 
 nsWatcherWindowEntry*
-nsWindowWatcher::FindWindowEntry(nsIDOMWindow* aWindow)
+nsWindowWatcher::FindWindowEntry(mozIDOMWindowProxy* aWindow)
 {
   // find the corresponding nsWatcherWindowEntry
   nsWatcherWindowEntry* info;
@@ -1315,7 +1307,7 @@ nsWindowWatcher::FindWindowEntry(nsIDOMWindow* aWindow)
   rv = NS_OK;
   found = false;
   while (info != listEnd && NS_SUCCEEDED(rv)) {
-    nsCOMPtr<nsIDOMWindow> infoWindow(do_QueryReferent(info->mWindow));
+    nsCOMPtr<mozIDOMWindowProxy> infoWindow(do_QueryReferent(info->mWindow));
     if (!infoWindow) { // clean up dangling reference, while we're here
       rv = RemoveWindow(info);
     } else if (infoWindow.get() == aWindow) {
@@ -1378,7 +1370,7 @@ nsWindowWatcher::RemoveWindow(nsWatcherWindowEntry* aInfo)
 }
 
 NS_IMETHODIMP
-nsWindowWatcher::GetChromeForWindow(nsIDOMWindow* aWindow,
+nsWindowWatcher::GetChromeForWindow(mozIDOMWindowProxy* aWindow,
                                     nsIWebBrowserChrome** aResult)
 {
   if (!aWindow || !aResult) {
@@ -1401,8 +1393,8 @@ nsWindowWatcher::GetChromeForWindow(nsIDOMWindow* aWindow,
 
 NS_IMETHODIMP
 nsWindowWatcher::GetWindowByName(const char16_t* aTargetName,
-                                 nsIDOMWindow* aCurrentWindow,
-                                 nsIDOMWindow** aResult)
+                                 mozIDOMWindowProxy* aCurrentWindow,
+                                 mozIDOMWindowProxy** aResult)
 {
   if (!aResult) {
     return NS_ERROR_INVALID_ARG;
@@ -1410,10 +1402,13 @@ nsWindowWatcher::GetWindowByName(const char16_t* aTargetName,
 
   *aResult = nullptr;
 
+  nsPIDOMWindowOuter* currentWindow =
+    aCurrentWindow ? nsPIDOMWindowOuter::From(aCurrentWindow) : nullptr;
+
   nsCOMPtr<nsIDocShellTreeItem> treeItem;
 
   nsCOMPtr<nsIDocShellTreeItem> startItem;
-  GetWindowTreeItem(aCurrentWindow, getter_AddRefs(startItem));
+  GetWindowTreeItem(currentWindow, getter_AddRefs(startItem));
   if (startItem) {
     // Note: original requestor is null here, per idl comments
     startItem->FindItemWithName(aTargetName, nullptr, nullptr,
@@ -1424,7 +1419,7 @@ nsWindowWatcher::GetWindowByName(const char16_t* aTargetName,
   }
 
   if (treeItem) {
-    nsCOMPtr<nsIDOMWindow> domWindow = treeItem->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> domWindow = treeItem->GetWindow();
     domWindow.forget(aResult);
   }
 
@@ -1447,15 +1442,15 @@ nsWindowWatcher::RemoveEnumerator(nsWatcherWindowEnumerator* aEnumerator)
 
 nsresult
 nsWindowWatcher::URIfromURL(const char* aURL,
-                            nsIDOMWindow* aParent,
+                            mozIDOMWindowProxy* aParent,
                             nsIURI** aURI)
 {
   // Build the URI relative to the entry global.
-  nsCOMPtr<nsPIDOMWindow> baseWindow = do_QueryInterface(GetEntryGlobal());
+  nsCOMPtr<nsPIDOMWindowInner> baseWindow = do_QueryInterface(GetEntryGlobal());
 
   // failing that, build it relative to the parent window, if possible
-  if (!baseWindow) {
-    baseWindow = do_QueryInterface(aParent);
+  if (!baseWindow && aParent) {
+    baseWindow = nsPIDOMWindowOuter::From(aParent)->GetCurrentInnerWindow();
   }
 
   // failing that, use the given URL unmodified. It had better not be relative.
@@ -1494,7 +1489,7 @@ nsWindowWatcher::URIfromURL(const char* aURL,
  */
 // static
 uint32_t
-nsWindowWatcher::CalculateChromeFlags(nsIDOMWindow* aParent,
+nsWindowWatcher::CalculateChromeFlags(mozIDOMWindowProxy* aParent,
                                       const char* aFeatures,
                                       bool aFeaturesSpecified,
                                       bool aDialog,
@@ -1808,7 +1803,7 @@ nsWindowWatcher::FindItemWithName(const char16_t* aName,
     }
     nsCOMPtr<nsISupports> nextSupWindow;
     windows->GetNext(getter_AddRefs(nextSupWindow));
-    nsCOMPtr<nsIDOMWindow> nextWindow(do_QueryInterface(nextSupWindow));
+    nsCOMPtr<mozIDOMWindowProxy> nextWindow(do_QueryInterface(nextSupWindow));
     if (nextWindow) {
       nsCOMPtr<nsIDocShellTreeItem> treeItem;
       GetWindowTreeItem(nextWindow, getter_AddRefs(treeItem));
@@ -1857,9 +1852,9 @@ nsWindowWatcher::GetCallerTreeItem(nsIDocShellTreeItem* aParentItem)
   return callerItem.forget();
 }
 
-nsPIDOMWindow*
+nsPIDOMWindowOuter*
 nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
-                                     nsIDOMWindow* aCurrentWindow)
+                                     mozIDOMWindowProxy* aCurrentWindow)
 {
   nsCOMPtr<nsIDocShellTreeItem> startItem;
   GetWindowTreeItem(aCurrentWindow, getter_AddRefs(startItem));
@@ -1887,16 +1882,16 @@ nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
    is acceptable. */
 nsresult
 nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
-                                         nsIDOMWindow* aParent,
+                                         nsPIDOMWindowOuter* aParent,
                                          bool aWindowIsNew,
-                                         nsIDOMWindow** aOpenedWindow)
+                                         mozIDOMWindowProxy** aOpenedWindow)
 {
   nsresult rv = NS_ERROR_FAILURE;
 
   NS_ENSURE_ARG(aOpenedWindow);
 
   *aOpenedWindow = 0;
-  nsCOMPtr<nsPIDOMWindow> piOpenedWindow = aOpenedItem->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> piOpenedWindow = aOpenedItem->GetWindow();
   if (piOpenedWindow) {
     if (aParent) {
       piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
@@ -1997,7 +1992,7 @@ nsWindowWatcher::CalcSizeSpec(const char* aFeatures, SizeSpec& aResult)
 */
 void
 nsWindowWatcher::SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
-                                        nsIDOMWindow* aParent,
+                                        mozIDOMWindowProxy* aParent,
                                         bool aIsCallerChrome,
                                         const SizeSpec& aSizeSpec)
 {
@@ -2018,8 +2013,7 @@ nsWindowWatcher::SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
 
   double openerZoom = 1.0;
   if (aParent) {
-    nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(aParent);
-    MOZ_ASSERT(piWindow);
+    nsCOMPtr<nsPIDOMWindowOuter> piWindow = nsPIDOMWindowOuter::From(aParent);
     if (nsIDocument* doc = piWindow->GetDoc()) {
       if (nsIPresShell* shell = doc->GetShell()) {
         if (nsPresContext* presContext = shell->GetPresContext()) {
@@ -2192,14 +2186,13 @@ nsWindowWatcher::SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
 }
 
 void
-nsWindowWatcher::GetWindowTreeItem(nsIDOMWindow* aWindow,
+nsWindowWatcher::GetWindowTreeItem(mozIDOMWindowProxy* aWindow,
                                    nsIDocShellTreeItem** aResult)
 {
   *aResult = 0;
 
-  nsCOMPtr<nsPIDOMWindow> window(do_QueryInterface(aWindow));
-  if (window) {
-    nsIDocShell* docshell = window->GetDocShell();
+  if (aWindow) {
+    nsIDocShell* docshell = nsPIDOMWindowOuter::From(aWindow)->GetDocShell();
     if (docshell) {
       CallQueryInterface(docshell, aResult);
     }
@@ -2207,7 +2200,7 @@ nsWindowWatcher::GetWindowTreeItem(nsIDOMWindow* aWindow,
 }
 
 void
-nsWindowWatcher::GetWindowTreeOwner(nsIDOMWindow* aWindow,
+nsWindowWatcher::GetWindowTreeOwner(nsPIDOMWindowOuter* aWindow,
                                     nsIDocShellTreeOwner** aResult)
 {
   *aResult = 0;
@@ -2221,16 +2214,13 @@ nsWindowWatcher::GetWindowTreeOwner(nsIDOMWindow* aWindow,
 
 /* static */
 int32_t
-nsWindowWatcher::GetWindowOpenLocation(nsIDOMWindow* aParent,
+nsWindowWatcher::GetWindowOpenLocation(nsPIDOMWindowOuter* aParent,
                                        uint32_t aChromeFlags,
                                        bool aCalledFromJS,
                                        bool aPositionSpecified,
                                        bool aSizeSpecified)
 {
-  bool isFullScreen = false;
-  if (nsCOMPtr<nsPIDOMWindow> piParent = do_QueryInterface(aParent)) {
-    isFullScreen = piParent->GetFullScreen();
-  }
+  bool isFullScreen = aParent->GetFullScreen();
 
   // Where should we open this?
   int32_t containerPref;

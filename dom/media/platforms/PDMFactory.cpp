@@ -9,6 +9,9 @@
 #ifdef XP_WIN
 #include "WMFDecoderModule.h"
 #endif
+#ifdef MOZ_FFVPX
+#include "FFVPXRuntimeLinker.h"
+#endif
 #ifdef MOZ_FFMPEG
 #include "FFmpegRuntimeLinker.h"
 #endif
@@ -53,6 +56,9 @@ bool PDMFactory::sAndroidMCDecoderEnabled = false;
 bool PDMFactory::sAndroidMCDecoderPreferred = false;
 #endif
 bool PDMFactory::sGMPDecoderEnabled = false;
+#ifdef MOZ_FFVPX
+bool PDMFactory::sFFVPXDecoderEnabled = false;
+#endif
 #ifdef MOZ_FFMPEG
 bool PDMFactory::sFFmpegDecoderEnabled = false;
 #endif
@@ -94,6 +100,10 @@ PDMFactory::Init()
   Preferences::AddBoolVarCache(&sFFmpegDecoderEnabled,
                                "media.ffmpeg.enabled", false);
 #endif
+#ifdef MOZ_FFVPX
+  Preferences::AddBoolVarCache(&sFFVPXDecoderEnabled,
+                               "media.ffvpx.enabled", false);
+#endif
 #ifdef XP_WIN
   Preferences::AddBoolVarCache(&sWMFDecoderEnabled,
                                "media.wmf.enabled", false);
@@ -112,8 +122,11 @@ PDMFactory::Init()
 #ifdef MOZ_APPLEMEDIA
   AppleDecoderModule::Init();
 #endif
+#ifdef MOZ_FFVPX
+  FFVPXRuntimeLinker::Init();
+#endif
 #ifdef MOZ_FFMPEG
-  FFmpegRuntimeLinker::Link();
+  FFmpegRuntimeLinker::Init();
 #endif
   GMPDecoderModule::Init();
 }
@@ -259,6 +272,12 @@ PDMFactory::CreatePDMs()
 #ifdef XP_WIN
   if (sWMFDecoderEnabled) {
     m = new WMFDecoderModule();
+    StartupPDM(m);
+  }
+#endif
+#ifdef MOZ_FFVPX
+  if (sFFVPXDecoderEnabled) {
+    m = FFVPXRuntimeLinker::CreateDecoderModule();
     StartupPDM(m);
   }
 #endif

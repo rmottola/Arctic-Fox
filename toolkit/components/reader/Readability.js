@@ -329,7 +329,7 @@ Readability.prototype = {
       // (which will be replaced with a <p> later).
       while ((next = this._nextElement(next)) && (next.tagName == "BR")) {
         replaced = true;
-        var sibling = next.nextSibling;
+        let sibling = next.nextSibling;
         next.parentNode.removeChild(next);
         next = sibling;
       }
@@ -351,7 +351,7 @@ Readability.prototype = {
           }
 
           // Otherwise, make this node a child of the new <p>.
-          var sibling = next.nextSibling;
+          let sibling = next.nextSibling;
           p.appendChild(next);
           next = sibling;
         }
@@ -1082,7 +1082,7 @@ Readability.prototype = {
   _getLinkDensity: function(element) {
     var textLength = this._getInnerText(element).length;
     if (textLength === 0)
-      return;
+      return undefined;
 
     var linkLength = 0;
 

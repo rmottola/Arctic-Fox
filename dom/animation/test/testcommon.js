@@ -18,23 +18,34 @@ function addDiv(t) {
 }
 
 /**
- * Some tests cause animations to continue to exist even after their target
- * element has been removed from the document tree. To ensure that these
- * animations do not impact other tests we should cancel them when the test
- * is complete.
- */
-function cancelAllAnimationsOnEnd(t) {
-  t.add_cleanup(function() {
-    document.timeline.getAnimations().forEach(animation => animation.cancel());
-  });
-}
-
-/**
  * Promise wrapper for requestAnimationFrame.
  */
 function waitForFrame() {
   return new Promise(function(resolve, reject) {
     window.requestAnimationFrame(resolve);
+  });
+}
+
+/**
+ * Returns a Promise that is resolved after the given number of consecutive
+ * animation frames have occured (using requestAnimationFrame callbacks).
+ *
+ * @param frameCount  The number of animation frames.
+ * @param onFrame  An optional function to be processed in each animation frame.
+ */
+function waitForAnimationFrames(frameCount, onFrame) {
+  return new Promise(function(resolve, reject) {
+    function handleFrame() {
+      if (--frameCount <= 0) {
+        resolve();
+      } else {
+        if (onFrame && typeof onFrame === 'function') {
+          onFrame();
+        }
+        window.requestAnimationFrame(handleFrame); // wait another frame
+      }
+    }
+    window.requestAnimationFrame(handleFrame);
   });
 }
 

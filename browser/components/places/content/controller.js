@@ -155,7 +155,7 @@ PlacesController.prototype = {
           return false;
         }
       }
-      // Otherwise fall through to the cmd_delete check.
+      // Otherwise fall through the cmd_delete check.
     case "cmd_delete":
     case "placesCmd_delete":
     case "placesCmd_deleteDataHost":
@@ -180,7 +180,6 @@ PlacesController.prototype = {
       var selectedNode = this._view.selectedNode;
       return selectedNode && PlacesUtils.nodeIsURI(selectedNode);
     case "placesCmd_new:folder":
-    case "placesCmd_new:livemark":
       return this._canInsert();
     case "placesCmd_new:bookmark":
       return this._canInsert();
@@ -189,25 +188,26 @@ PlacesController.prototype = {
              !PlacesUtils.asQuery(this._view.result.root).queryOptions.excludeItems &&
              this._view.result.sortingMode ==
                  Ci.nsINavHistoryQueryOptions.SORT_BY_NONE;
-    case "placesCmd_show:info":
-      var selectedNode = this._view.selectedNode;
+    case "placesCmd_show:info": {
+      let selectedNode = this._view.selectedNode;
       return selectedNode && PlacesUtils.getConcreteItemId(selectedNode) != -1
-    case "placesCmd_reload":
+    }
+    case "placesCmd_reload": {
       // Livemark containers
-      var selectedNode = this._view.selectedNode;
+      let selectedNode = this._view.selectedNode;
       return selectedNode && this.hasCachedLivemarkInfo(selectedNode);
-    case "placesCmd_sortBy:name":
-      var selectedNode = this._view.selectedNode;
+    }
+    case "placesCmd_sortBy:name": {
+      let selectedNode = this._view.selectedNode;
       return selectedNode &&
              PlacesUtils.nodeIsFolder(selectedNode) &&
              !PlacesUIUtils.isContentsReadOnly(selectedNode) &&
              this._view.result.sortingMode ==
                  Ci.nsINavHistoryQueryOptions.SORT_BY_NONE;
+    }
     case "placesCmd_createBookmark":
       var node = this._view.selectedNode;
       return node && PlacesUtils.nodeIsURI(node) && node.itemId == -1;
-    case "placesCmd_openParentFolder":
-      return true;
     default:
       return false;
     }
@@ -277,9 +277,6 @@ PlacesController.prototype = {
     case "placesCmd_new:bookmark":
       this.newItem("bookmark");
       break;
-    case "placesCmd_new:livemark":
-      this.newItem("livemark");
-      break;
     case "placesCmd_new:separator":
       this.newSeparator().catch(Components.utils.reportError);
       break;
@@ -307,9 +304,6 @@ PlacesController.prototype = {
                                        , title: node.title
                                        }, window.top);
       break;
-    case "placesCmd_openParentFolder":
-      this.openParentFolder();
-      break;
     }
   },
 
@@ -322,9 +316,7 @@ PlacesController.prototype = {
    * are non-removable. We don't need to worry about recursion here since it
    * is a policy decision that a removable item not be placed inside a non-
    * removable item.
-   * @param aIsMoveCommand
-   *        True if the command for which this method is called only moves the
-   *        selected items to another container, false otherwise.
+   *
    * @return true if all nodes in the selection can be removed,
    *         false otherwise.
    */
@@ -784,7 +776,7 @@ PlacesController.prototype = {
   },
 
   /**
-   * Sort the selected folder by name.
+   * Sort the selected folder by name
    */
   sortFolderByName: Task.async(function* () {
     let itemId = PlacesUtils.getConcreteItemId(this._view.selectedNode);
@@ -796,281 +788,6 @@ PlacesController.prototype = {
     let guid = yield PlacesUtils.promiseItemGuid(itemId);
     yield PlacesTransactions.SortByName(guid).transact();
   }),
-
-  /**
-   * Open the parent folder for the selected bookmarks search result.
-   */
-  openParentFolder: function PC_openParentFolder() {
-    var view;
-    if (!document.popupNode) {
-      view = document.commandDispatcher.focusedElement;
-    } else {
-      view = PlacesUIUtils.getViewForNode(document.popupNode); // XULElement
-    }
-    if (!view || view.getAttribute("type") != "places")
-      return;
-    var node = view.selectedNode; // nsINavHistoryResultNode
-    var aItemId = node.itemId;
-    var aFolderItemId = this.getParentFolderByItemId(aItemId);
-    if (aFolderItemId)
-      this.selectFolderByItemId(view, aFolderItemId, aItemId);
-  },
-
-  getParentFolderByItemId: function PC_getParentFolderByItemId(aItemId) {
-    var bmsvc = Components.classes["@mozilla.org/browser/nav-bookmarks-service;1"].
-                           getService(Components.interfaces.nsINavBookmarksService);
-    var parentFolderId = bmsvc.getFolderIdForItem(aItemId);
-
-    return parentFolderId;
-  },
-
-  selectItems2: function PC_selectItems2(view, aIDs) {
-    var ids = aIDs; // Don't manipulate the caller's array.
-
-    // Array of nodes found by findNodes which are to be selected
-    var nodes = [];
-
-    // Array of nodes found by findNodes which should be opened
-    var nodesToOpen = [];
-
-    // A set of URIs of container-nodes that were previously searched,
-    // and thus shouldn't be searched again. This is empty at the initial
-    // start of the recursion and gets filled in as the recursion
-    // progresses.
-    var nodesURIChecked = [];
-
-    /**
-     * Recursively search through a node's children for items
-     * with the given IDs. When a matching item is found, remove its ID
-     * from the IDs array, and add the found node to the nodes dictionary.
-     *
-     * NOTE: This method will leave open any node that had matching items
-     * in its subtree.
-     */
-    function findNodes(node) {
-      var foundOne = false;
-      // See if node matches an ID we wanted; add to results.
-      // For simple folder queries, check both itemId and the concrete
-      // item id.
-      var index = ids.indexOf(node.itemId);
-      if (index == -1 &&
-          node.type == Components.interfaces.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT) {
-        index = ids.indexOf(PlacesUtils.asQuery(node).folderItemId); //xxx Bug 556739 3.7a5pre
-      }
-
-      if (index != -1) {
-        nodes.push(node);
-        foundOne = true;
-        ids.splice(index, 1);
-      }
-
-      if (ids.length == 0 || !PlacesUtils.nodeIsContainer(node) ||
-          nodesURIChecked.indexOf(node.uri) != -1)
-        return foundOne;
-
-      nodesURIChecked.push(node.uri);
-      PlacesUtils.asContainer(node); // xxx Bug 556739 3.7a6pre
-
-      // Remember the beginning state so that we can re-close
-      // this node if we don't find any additional results here.
-      var previousOpenness = node.containerOpen;
-      node.containerOpen = true;
-      for (var child = 0;  child < node.childCount && ids.length > 0;
-           child++) {
-        var childNode = node.getChild(child);
-        var found = findNodes(childNode);
-        if (!foundOne)
-          foundOne = found;
-      }
-
-      // If we didn't find any additional matches in this node's
-      // subtree, revert the node to its previous openness.
-      if (foundOne)
-        nodesToOpen.unshift(node);
-      node.containerOpen = previousOpenness;
-      return foundOne;
-    } // findNodes
-
-    // Disable notifications while looking for nodes.
-    let result = view.result;
-    let didSuppressNotifications = result.suppressNotifications;
-    if (!didSuppressNotifications)
-      result.suppressNotifications = true
-    try {
-      findNodes(view.result.root);
-    }
-    finally {
-      if (!didSuppressNotifications)
-        result.suppressNotifications = false;
-    }
-
-    // For all the nodes we've found, highlight the corresponding
-    // index in the tree.
-    var resultview = view.view;
-    var selection = resultview.selection;
-    selection.selectEventsSuppressed = true;
-    selection.clearSelection();
-    // Open nodes containing found items.
-    for (var i = 0; i < nodesToOpen.length; i++) {
-      nodesToOpen[i].containerOpen = true;
-    }
-    for (var i = 0; i < nodes.length; i++) {
-      if (PlacesUtils.nodeIsContainer(nodes[i]))
-        continue;
-
-      var index = resultview.treeIndexForNode(nodes[i]);
-      selection.rangedSelect(index, index, true);
-    }
-    selection.selectEventsSuppressed = false;
-  },
-
-  selectFolderByItemId: function PC_selectFolderByItemId(view, aFolderItemId, aItemId) {
-    // Library
-    if (view.getAttribute("id") == "placeContent") {
-      view = document.getElementById("placesList");
-      // Select a folder node in folder pane.
-      this.selectItems2(view, [aFolderItemId]);
-      view.selectItems([aFolderItemId]);
-      if (view.currentIndex)
-        view.treeBoxObject.ensureRowIsVisible(view.currentIndex);
-      // Reselect child node.
-      setTimeout(function(aItemId, view) {
-        var aView = view.ownerDocument.getElementById("placeContent");
-        aView.selectItems([aItemId]);
-        if (aView.currentIndex)
-          aView.treeBoxObject.ensureRowIsVisible(aView.currentIndex);
-      }, 0, aItemId, view);
-      return;
-    }
-
-    // Bookmarks Sidebar
-    if (!view)
-      return;
-    view.place = view.place;
-
-    if ('FlatBookmarksOverlay' in window) {
-      var sidebarwin = view.ownerDocument.defaultView;
-      var searchBox = sidebarwin.document.getElementById("search-box");
-      searchBox.value = "";
-      searchBox.doCommand();
-      sidebarwin.FlatBookmarks._setTreePlace(sidebarwin.FlatBookmarks._makePlaceForFolder(aFolderItemId));
-      view.selectItems([aItemId]);
-      var tbo = view.treeBoxObject;
-      tbo.ensureRowIsVisible(view.currentIndex);
-      view.focus();
-      return;
-    }
-
-    view.findNode = function flatChildNodes(node, aIDs) {
-      var ids = aIDs; // Don't manipulate the caller's array.
-
-      // Array of nodes found by findNodes which are to be selected
-      var nodes = [];
-
-      // Array of nodes found by findNodes which should be opened
-      var nodesToOpen = [];
-
-      // A set of URIs of container-nodes that were previously searched,
-      // and thus shouldn't be searched again. This is empty at the initial
-      // start of the recursion and gets filled in as the recursion
-      // progresses.
-      var nodesURIChecked = [];
-
-      /**
-       * Recursively search through a node's children for items
-       * with the given IDs. When a matching item is found, remove its ID
-       * from the IDs array, and add the found node to the nodes dictionary.
-       *
-       * NOTE: This method will leave open any node that had matching items
-       * in its subtree.
-       */
-      function findNodes(node) {
-        var foundOne = false;
-        // See if node matches an ID we wanted; add to results.
-        // For simple folder queries, check both itemId and the concrete
-        // item id.
-        var index = ids.indexOf(node.itemId);
-        if (index == -1 &&
-            node.type == Components.interfaces.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT) {
-          index = ids.indexOf(PlacesUtils.asQuery(node).folderItemId); // xxx Bug 556739 3.7a5pre
-        }
-
-        if (index != -1) {
-          nodes.push(node);
-          foundOne = true;
-          ids.splice(index, 1);
-        }
-
-        if (ids.length == 0 || !PlacesUtils.nodeIsContainer(node) ||
-            nodesURIChecked.indexOf(node.uri) != -1)
-          return foundOne;
-
-        nodesURIChecked.push(node.uri);
-        PlacesUtils.asContainer(node); // xxx Bug 556739 3.7a6pre
-        // Remember the beginning state so that we can re-close
-        // this node if we don't find any additional results here.
-        var previousOpenness = node.containerOpen;
-        node.containerOpen = true;
-        for (var child = 0;  child < node.childCount && ids.length > 0;
-             child++) {
-          var childNode = node.getChild(child);
-          if (PlacesUtils.nodeIsQuery(childNode))
-            continue;
-          var found = findNodes(childNode);
-          if (!foundOne)
-            foundOne = found;
-        }
-
-        // If we didn't find any additional matches in this node's
-        // subtree, revert the node to its previous openness.
-        if (foundOne)
-          nodesToOpen.unshift(node);
-        node.containerOpen = previousOpenness;
-        return foundOne;
-      } // findNodes
-
-      // Disable notifications while looking for nodes.
-      let result = this.result;
-      let didSuppressNotifications = result.suppressNotifications;
-      if (!didSuppressNotifications)
-        result.suppressNotifications = true
-      try {
-        findNodes(this.result.root);
-      }
-      finally {
-        if (!didSuppressNotifications)
-          result.suppressNotifications = false;
-      }
-
-      // Open nodes containing found items.
-      for (var i = 0; i < nodesToOpen.length; i++) {
-        nodesToOpen[i].containerOpen = true;
-      }
-      return nodes;
-    }; // findNode
-
-    // For all the nodes we've found, highlight the corresponding
-    // index in the tree.
-    var resultview = view.view;
-    var selection = view.view.selection;
-    selection.selectEventsSuppressed = true;
-    selection.clearSelection();
-    var nodes = view.findNode(view.result.root, [aFolderItemId]);
-    if (nodes.length > 0) {
-      var index = resultview.treeIndexForNode(nodes[0]);
-      nodes = view.findNode(nodes[0], [aItemId]);
-      if (nodes.length > 0) {
-        index = resultview.treeIndexForNode(nodes[0]);
-        selection.rangedSelect(index, index, true);
-      }
-    }
-    selection.selectEventsSuppressed = false;
-
-    var tbo = view.treeBoxObject;
-    tbo.ensureRowIsVisible(view.currentIndex);
-    view.focus();
-    return;
-  },
 
   /**
    * Walk the list of folders we're removing in this delete operation, and
@@ -1250,16 +967,13 @@ PlacesController.prototype = {
     }
 
     // Do removal in chunks to give some breath to main-thread.
-    function pagesChunkGenerator(aURIs) {
+    function* pagesChunkGenerator(aURIs) {
       while (aURIs.length) {
         let URIslice = aURIs.splice(0, REMOVE_PAGES_CHUNKLEN);
         PlacesUtils.bhistory.removePages(URIslice, URIslice.length);
-        Services.tm.mainThread.dispatch(function() {
-          try {
-            gen.next();
-          } catch (ex if ex instanceof StopIteration) {}
-        }, Ci.nsIThread.DISPATCH_NORMAL);
-        yield undefined;
+        Services.tm.mainThread.dispatch(() => gen.next(),
+                                        Ci.nsIThread.DISPATCH_NORMAL);
+        yield unefined;
       }
     }
     let gen = pagesChunkGenerator(URIs);
@@ -1737,7 +1451,7 @@ var PlacesControllerDragHelper = {
   /**
    * Extract the first accepted flavor from a list of flavors.
    * @param aFlavors
-   *        The flavors list of type nsIDOMDOMStringList.
+   *        The flavors list of type DOMStringList.
    */
   getFirstValidFlavor: function PCDH_getFirstValidFlavor(aFlavors) {
     for (let i = 0; i < aFlavors.length; i++) {
@@ -1886,7 +1600,7 @@ var PlacesControllerDragHelper = {
                       type: PlacesUtils.TYPE_X_MOZ_URL};
       }
       else
-        throw("bogus data was passed as a tab");
+        throw("bogus data was passed as a tab")
 
       let index = insertionPoint.index;
 
@@ -1896,7 +1610,7 @@ var PlacesControllerDragHelper = {
       let dragginUp = insertionPoint.itemId == unwrapped.parent &&
                       index < PlacesUtils.bookmarks.getItemIndex(unwrapped.id);
       if (index != -1 && dragginUp)
-        index += movedCount++;
+        index+= movedCount++;
 
       // If dragging over a tag container we should tag the item.
       if (insertionPoint.isTag) {
@@ -1973,13 +1687,11 @@ function goUpdatePlacesCommands() {
   updatePlacesCommand("placesCmd_open:tab");
   updatePlacesCommand("placesCmd_new:folder");
   updatePlacesCommand("placesCmd_new:bookmark");
-  updatePlacesCommand("placesCmd_new:livemark");
   updatePlacesCommand("placesCmd_new:separator");
   updatePlacesCommand("placesCmd_show:info");
   updatePlacesCommand("placesCmd_moveBookmarks");
   updatePlacesCommand("placesCmd_reload");
   updatePlacesCommand("placesCmd_sortBy:name");
-  updatePlacesCommand("placesCmd_openParentFolder");
   updatePlacesCommand("placesCmd_cut");
   updatePlacesCommand("placesCmd_copy");
   updatePlacesCommand("placesCmd_paste");

@@ -843,7 +843,7 @@ function makePreview(row)
     // find out the file size
     var sizeText;
     if (cacheEntry) {
-      var imageSize = cacheEntry.dataSize;
+      let imageSize = cacheEntry.dataSize;
       var kbSize = Math.round(imageSize / 1024 * 100) / 100;
       sizeText = gBundle.getFormattedString("generalSize",
                                             [formatNumber(kbSize), formatNumber(imageSize)]);
@@ -957,7 +957,7 @@ function makePreview(row)
       document.getElementById("theimagecontainer").collapsed = true;
     }
 
-    var imageSize = "";
+    let imageSize = "";
     if (url && !isAudio) {
       if (width != physWidth || height != physHeight) {
         imageSize = gBundle.getFormattedString("mediaDimensionsScaled",

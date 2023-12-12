@@ -69,7 +69,6 @@
 - Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
 - Bug 1219339 - 2016-01-14 : switch GetStaticInstance to use IPC's Singleton<T>
-- 1219392 - Capitalize mozilla::unused to avoid conflicts
 - Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
@@ -79,11 +78,8 @@
 - Bug 1245241 - 2016-02-18 - part 1 - Close Shmem file handles after mapping them wh
 - 1164427 - Implement elementsFromPoint (= Tests)
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
-- remaining 1151214
 - Bug 1207146 - 2015-12-04 - Add a link to expert technical information in the cert 
-- Bug 1175609 - 2015-11-17 - Bring onnegotiationneeded in line with spec. r=mt
 - Bug 1235656 - Followup: Allow extended functions with guessed atoms i
-- Bug 1235656 - Part 2: Remove alias to selfhosted builtin from Utiliti
 - Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
 - Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - Bug 1212129 - (2015-10-22 partialy applied) e10s support for disabling site notifications. r=wchen

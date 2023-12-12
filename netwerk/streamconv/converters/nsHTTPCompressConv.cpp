@@ -136,7 +136,6 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
     LOG(("nsHttpCompresssConv %p onstop partial gzip\n", this));
   }
   if (NS_SUCCEEDED(status) && mMode == HTTP_COMPRESS_BROTLI) {
-    uint32_t waste;
     nsCOMPtr<nsIForcePendingChannel> fpChannel = do_QueryInterface(request);
     bool isPending = false;
     if (request) {
@@ -145,7 +144,9 @@ nsHTTPCompressConv::OnStopRequest(nsIRequest* request, nsISupports *aContext,
     if (fpChannel && !isPending) {
       fpChannel->ForcePending(true);
     }
-    status = BrotliHandler(nullptr, this, nullptr, 0, 0, &waste);
+    if (mBrotli->mTotalOut == 0 && !BrotliStateIsStreamEnd(&mBrotli->mState)) {
+      status = NS_ERROR_INVALID_CONTENT_ENCODING;
+    }
     LOG(("nsHttpCompresssConv %p onstop brotlihandler rv %x\n", this, status));
     if (fpChannel && !isPending) {
       fpChannel->ForcePending(false);
@@ -160,6 +161,7 @@ NS_METHOD
 nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const char *dataIn,
                                   uint32_t, uint32_t aAvail, uint32_t *countRead)
 {
+  MOZ_ASSERT(stream);
   nsHTTPCompressConv *self = static_cast<nsHTTPCompressConv *>(closure);
   *countRead = 0;
 
@@ -185,7 +187,7 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
     outPtr = outBuffer;
 
     // brotli api is documented in brotli/dec/decode.h and brotli/dec/decode.c
-
+    LOG(("nsHttpCompresssConv %p brotlihandler decompress %d\n", self, avail));
     res = ::BrotliDecompressStream(
       &avail, reinterpret_cast<const unsigned char **>(&dataIn),
       &outSize, &outPtr, &self->mBrotli->mTotalOut, &self->mBrotli->mState);
@@ -204,6 +206,7 @@ nsHTTPCompressConv::BrotliHandler(nsIInputStream *stream, void *closure, const c
     if (res == BROTLI_RESULT_NEEDS_MORE_INPUT) {
       MOZ_ASSERT(!avail);
       if (avail) {
+        LOG(("nsHttpCompressConv %p did not consume all input", self));
         self->mBrotli->mStatus = NS_ERROR_UNEXPECTED;
         return self->mBrotli->mStatus;
       }
@@ -269,7 +272,7 @@ nsHTTPCompressConv::OnDataAvailable(nsIRequest* request,
       return NS_OK;
     }
 
-    // FALLTHROUGH
+    MOZ_FALLTHROUGH;
 
   case HTTP_COMPRESS_DEFLATE:
 
@@ -577,7 +580,7 @@ nsHTTPCompressConv::check_header(nsIInputStream *iStr, uint32_t streamLen, nsres
     case GZIP_EXTRA1:
       iStr->Read(&c, 1, &unused);
       streamLen--;
-      mLen = ((uInt) c & 0377) << 8;
+      mLen |= ((uInt) c & 0377) << 8;
       mSkipCount = 0;
       hMode = GZIP_EXTRA2;
       break;

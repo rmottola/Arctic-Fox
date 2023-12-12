@@ -47,7 +47,7 @@ function connectToDebugger(aCallback)
   let client = new DebuggerClient(transport);
 
   let dbgState = { dbgClient: client };
-  client.connect(aCallback.bind(null, dbgState));
+  client.connect().then(response => aCallback(dbgState, response));
 }
 
 function attachConsole(aListeners, aCallback) {

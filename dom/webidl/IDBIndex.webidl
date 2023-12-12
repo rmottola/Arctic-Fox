@@ -32,10 +32,10 @@ interface IDBIndex {
     // <null>:   Not locale-aware, uses normal JS sorting.
     // <string>: Sorted based on the rules of the specified locale.
     //           Note: never returns "auto", only the current locale.
-    [Func="mozilla::dom::indexedDB::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
+    [Func="mozilla::dom::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
     readonly attribute DOMString? locale;
 
-    [Func="mozilla::dom::indexedDB::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
+    [Func="mozilla::dom::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
     readonly attribute boolean isAutoLocale;
 
     [Throws]
@@ -56,16 +56,14 @@ interface IDBIndex {
 
 partial interface IDBIndex {
     [Throws]
-    IDBRequest mozGetAll (optional any key, optional unsigned long limit);
+    IDBRequest mozGetAll (optional any key, [EnforceRange] optional unsigned long limit);
 
     [Throws]
-    IDBRequest mozGetAllKeys (optional any key, optional unsigned long limit);
+    IDBRequest mozGetAllKeys (optional any key, [EnforceRange] optional unsigned long limit);
 
-    [Throws,
-     Func="mozilla::dom::indexedDB::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
-    IDBRequest getAll (optional any key, optional unsigned long limit);
+    [Throws]
+    IDBRequest getAll (optional any key, [EnforceRange] optional unsigned long limit);
 
-    [Throws,
-     Func="mozilla::dom::indexedDB::IndexedDatabaseManager::ExperimentalFeaturesEnabled"]
-    IDBRequest getAllKeys (optional any key, optional unsigned long limit);
+    [Throws]
+    IDBRequest getAllKeys (optional any key, [EnforceRange] optional unsigned long limit);
 };

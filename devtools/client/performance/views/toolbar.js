@@ -1,6 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* import-globals-from ../performance-controller.js */
+/* import-globals-from ../performance-view.js */
+/* globals document */
 "use strict";
 
 /**
@@ -93,7 +96,7 @@ var ToolbarView = {
    * hiding or showing all elements with class "experimental-option".
    *
    * TODO re-enable "#option-enable-memory" permanently once stable in bug 1163350
-   * TODO re-enable "#option-enable-jit-optimizations" permanently once stable in bug 1163351
+   * TODO re-enable "#option-show-jit-optimizations" permanently once stable in bug 1163351
    *
    * @param {boolean} isEnabled
    */

@@ -14,12 +14,12 @@ task:
     createdForUser: {{owner}}
 
   workerType: b2gbuild
-  provisionerId: aws-provisioner
+  provisionerId: aws-provisioner-v1
   schedulerId: task-graph-scheduler
 
   routes:
-    - 'index.gecko.v1.{{project}}.revision.{{head_rev}}.{{build_name}}.{{build_type}}'
-    - 'index.gecko.v1.{{project}}.latest.{{build_name}}.{{build_type}}'
+    - 'index.gecko.v1.{{project}}.revision.linux.{{head_rev}}.{{build_name}}.{{build_type}}'
+    - 'index.gecko.v1.{{project}}.latest.linux.{{build_name}}.{{build_type}}'
   scopes:
     # Nearly all of our build tasks use tc-vcs so just include the scope across
     # the board.
@@ -32,8 +32,8 @@ task:
   payload:
     image: '{{#docker_image}}builder{{/docker_image}}'
 
-    # One hour is a good value for most builds
-    maxRunTime: 3600
+    # Two hours is long but covers edge cases (and matches bb based infra)
+    maxRunTime: 7200
 
     cache:
       tc-vcs: '/home/worker/.tc-vcs'
@@ -47,14 +47,13 @@ task:
 
 
     env:
-      # Common environment variables for checking out goanna
+      # Common environment variables for checking out gecko
       GECKO_BASE_REPOSITORY: '{{base_repository}}'
       GECKO_HEAD_REPOSITORY: '{{head_repository}}'
       GECKO_HEAD_REV: '{{head_rev}}'
       GECKO_HEAD_REF: '{{head_ref}}'
-      MOZHARNESS_REPOSITORY: '{{mozharness_repository}}'
-      MOZHARNESS_REV: '{{mozharness_rev}}'
-      MOZHARNESS_REF: '{{mozharness_ref}}'
+      TOOLTOOL_REPO: 'https://github.com/mozilla/build-tooltool'
+      TOOLTOOL_REV: 'master'
 
   extra:
     build_product: '{{build_product}}'

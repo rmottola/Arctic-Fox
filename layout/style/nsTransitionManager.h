@@ -16,7 +16,6 @@
 #include "mozilla/dom/KeyframeEffect.h"
 #include "AnimationCommon.h"
 #include "nsCSSProps.h"
-#include "nsCSSPseudoElements.h"
 
 class nsIGlobalObject;
 class nsStyleContext;
@@ -24,6 +23,7 @@ class nsPresContext;
 class nsCSSPropertySet;
 
 namespace mozilla {
+enum class CSSPseudoElementType : uint8_t;
 struct StyleTransition;
 } // namespace mozilla
 
@@ -37,9 +37,13 @@ struct ElementPropertyTransition : public dom::KeyframeEffectReadOnly
 {
   ElementPropertyTransition(nsIDocument* aDocument,
                             dom::Element* aTarget,
-                            nsCSSPseudoElements::Type aPseudoType,
-                            const AnimationTiming &aTiming)
+                            CSSPseudoElementType aPseudoType,
+                            const TimingParams &aTiming,
+                            StyleAnimationValue aStartForReversingTest,
+                            double aReversePortion)
     : dom::KeyframeEffectReadOnly(aDocument, aTarget, aPseudoType, aTiming)
+    , mStartForReversingTest(aStartForReversingTest)
+    , mReversePortion(aReversePortion)
   { }
 
   ElementPropertyTransition* AsTransition() override { return this; }
@@ -138,7 +142,7 @@ public:
 
   nsCSSProperty TransitionProperty() const;
 
-  bool HasLowerCompositeOrderThan(const Animation& aOther) const override;
+  bool HasLowerCompositeOrderThan(const CSSTransition& aOther) const;
   EffectCompositor::CascadeLevel CascadeLevel() const override
   {
     return IsTiedToMarkup() ?
@@ -212,9 +216,9 @@ struct TransitionEventInfo {
   TimeStamp mTimeStamp;
 
   TransitionEventInfo(dom::Element* aElement,
-                      nsCSSPseudoElements::Type aPseudoType,
+                      CSSPseudoElementType aPseudoType,
                       nsCSSProperty aProperty,
-                      TimeDuration aDuration,
+                      StickyTimeDuration aDuration,
                       const TimeStamp& aTimeStamp,
                       dom::Animation* aAnimation)
     : mElement(aElement)
@@ -253,8 +257,8 @@ public:
   {
   }
 
-  NS_DECL_CYCLE_COLLECTION_CLASS(nsTransitionManager)
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_INLINE_DECL_CYCLE_COLLECTING_NATIVE_REFCOUNTING(nsTransitionManager)
+  NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS(nsTransitionManager)
 
   typedef mozilla::AnimationCollection AnimationCollection;
 
@@ -285,7 +289,7 @@ public:
    * new style.
    */
   void PruneCompletedTransitions(mozilla::dom::Element* aElement,
-                                 nsCSSPseudoElements::Type aPseudoType,
+                                 mozilla::CSSPseudoElementType aPseudoType,
                                  nsStyleContext* aNewStyleContext);
 
   void SetInAnimationOnlyStyleUpdate(bool aInAnimationOnlyUpdate) {
@@ -296,18 +300,17 @@ public:
     return mInAnimationOnlyStyleUpdate;
   }
 
-  virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
-    MOZ_MUST_OVERRIDE override;
-  virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
-    MOZ_MUST_OVERRIDE override;
-
   void QueueEvent(mozilla::TransitionEventInfo&& aEventInfo)
   {
     mEventDispatcher.QueueEvent(
       mozilla::Forward<mozilla::TransitionEventInfo>(aEventInfo));
   }
 
-  void DispatchEvents()  { mEventDispatcher.DispatchEvents(mPresContext); }
+  void DispatchEvents()
+  {
+    RefPtr<nsTransitionManager> kungFuDeathGrip(this);
+    mEventDispatcher.DispatchEvents(mPresContext);
+  }
   void SortEvents()      { mEventDispatcher.SortEvents(); }
   void ClearEventQueue() { mEventDispatcher.ClearEventQueue(); }
 

@@ -18,18 +18,6 @@ using namespace js;
 using JS::IsArrayAnswer;
 using mozilla::ArrayLength;
 
-static inline bool
-IsDataDescriptor(const PropertyDescriptor& desc)
-{
-    return desc.obj && !(desc.attrs & (JSPROP_GETTER | JSPROP_SETTER));
-}
-
-static inline bool
-IsAccessorDescriptor(const PropertyDescriptor& desc)
-{
-    return desc.obj && desc.attrs & (JSPROP_GETTER | JSPROP_SETTER);
-}
-
 // ES6 (5 April 2014) ValidateAndApplyPropertyDescriptor(O, P, Extensible, Desc, Current)
 // Since we are actually performing 9.1.6.2 IsCompatiblePropertyDescriptor(Extensible, Desc,
 // Current), some parameters are omitted.
@@ -734,52 +722,6 @@ ScriptedDirectProxyHandler::delete_(JSContext* cx, HandleObject proxy, HandleId 
 
     // step 16
     return result.succeed();
-}
-
-// ES6 (14 October, 2014) 9.5.11 Proxy.[[Enumerate]]
-bool
-ScriptedDirectProxyHandler::enumerate(JSContext* cx, HandleObject proxy,
-                                      MutableHandleObject objp) const
-{
-    // step 1
-    RootedObject handler(cx, GetDirectProxyHandlerObject(proxy));
-
-    // step 2
-    if (!handler) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_PROXY_REVOKED);
-        return false;
-    }
-
-    // step 3: unnecessary assert
-    // step 4
-    RootedObject target(cx, proxy->as<ProxyObject>().target());
-
-    // step 5-6
-    RootedValue trap(cx);
-    if (!GetProperty(cx, handler, handler, cx->names().enumerate, &trap))
-        return false;
-
-    // step 7
-    if (trap.isUndefined())
-        return GetIterator(cx, target, 0, objp);
-
-    // step 8-9
-    Value argv[] = {
-        ObjectOrNullValue(target)
-    };
-    RootedValue trapResult(cx);
-    if (!Invoke(cx, ObjectValue(*handler), trap, ArrayLength(argv), argv, &trapResult))
-        return false;
-
-    // step 10
-    if (trapResult.isPrimitive()) {
-        ReportInvalidTrapResult(cx, proxy, cx->names().enumerate);
-        return false;
-    }
-
-    // step 11
-    objp.set(&trapResult.toObject());
-    return true;
 }
 
 // ES6 (22 May, 2014) 9.5.7 Proxy.[[HasProperty]](P)

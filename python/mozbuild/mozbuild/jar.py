@@ -64,13 +64,11 @@ def getModTime(aPath):
 
 
 class JarManifestEntry(object):
-    def __init__(self, output, source, is_locale=False, preprocess=False,
-                 overwrite=False):
+    def __init__(self, output, source, is_locale=False, preprocess=False):
         self.output = output
         self.source = source
         self.is_locale = is_locale
         self.preprocess = preprocess
-        self.overwrite = overwrite
 
 
 class JarInfo(object):
@@ -90,6 +88,9 @@ class JarInfo(object):
         self.relativesrcdir = None
         self.chrome_manifests = []
         self.entries = []
+
+
+class DeprecatedJarManifest(Exception): pass
 
 
 class JarManifestParser(object):
@@ -169,17 +170,17 @@ class JarManifestParser(object):
         # directory. The <source_path> may start with a "%" for files part
         # of a localization directory, in which case the "%" counts as the
         # locale.
-        # Each entry can be prefixed with "*" for preprocessing and "+" to
-        # always overwrite the destination independently of file timestamps
-        # (the usefulness of the latter is dubious in the modern days).
+        # Each entry can be prefixed with "*" for preprocessing.
         m = self.entryline.match(line)
         if m:
+            if m.group('optOverwrite'):
+                raise DeprecatedJarManifest(
+                    'The "+" prefix is not supported anymore')
             self._current_jar.entries.append(JarManifestEntry(
                 m.group('output'),
                 m.group('source') or mozpath.basename(m.group('output')),
                 is_locale=bool(m.group('locale')),
                 preprocess=bool(m.group('optPreprocess')),
-                overwrite=bool(m.group('optOverwrite')),
             ))
             return
 
@@ -209,6 +210,7 @@ class JarMaker(object):
         self.l10nmerge = None
         self.relativesrcdir = None
         self.rootManifestAppId = None
+        self._seen_output = set()
 
     def getCommandLineParser(self):
         '''Get a optparse.OptionParser for jarmaker.
@@ -252,21 +254,6 @@ class JarMaker(object):
                      help='add an app id specific root chrome manifest entry.'
                      )
         return p
-
-    def processIncludes(self, includes):
-        '''Process given includes with the inner PreProcessor.
-
-        Only use this for #defines, the includes shouldn't generate
-        content.
-        '''
-
-        self.pp.out = StringIO()
-        for inc in includes:
-            self.pp.do_include(inc)
-        includesvalue = self.pp.out.getvalue()
-        if includesvalue:
-            logging.info('WARNING: Includes produce non-empty output')
-        self.pp.out = None
 
     def finalizeJar(self, jardir, jarbase, jarname, chromebasepath, register, doZip=True):
         '''Helper method to write out the chrome registration entries to
@@ -429,15 +416,22 @@ class JarMaker(object):
                     if '*' not in p:
                         yield p + '/'
             prefix = ''.join(_prefix(src))
+            emitted = set()
             for _srcdir in src_base:
                 finder = FileFinder(_srcdir, find_executables=False)
                 for path, _ in finder.find(src):
+                    # If the path was already seen in one of the other source
+                    # directories, skip it. That matches the non-wildcard case
+                    # below, where we pick the first existing file.
+                    reduced_path = path[len(prefix):]
+                    if reduced_path in emitted:
+                        continue
+                    emitted.add(reduced_path)
                     e = JarManifestEntry(
-                        mozpath.join(out, path[len(prefix):]),
+                        mozpath.join(out, reduced_path),
                         path,
                         is_locale=e.is_locale,
                         preprocess=e.preprocess,
-                        overwrite=e.overwrite
                     )
                     self._processEntryLine(e, outHelper, jf)
             return
@@ -453,6 +447,11 @@ class JarMaker(object):
                 jf.close()
             raise RuntimeError('File "{0}" not found in {1}'.format(src,
                                ', '.join(src_base)))
+
+        if out in self._seen_output:
+            raise RuntimeError('%s already added' % out)
+        self._seen_output.add(out)
+
         if e.preprocess:
             outf = outHelper.getOutput(out)
             inf = open(realsrc)
@@ -466,10 +465,9 @@ class JarMaker(object):
             inf.close()
             return
 
-        # copy or symlink if newer or overwrite
+        # copy or symlink if newer
 
-        if e.overwrite or getModTime(realsrc) \
-            > outHelper.getDestModTime(e.output):
+        if getModTime(realsrc) > outHelper.getDestModTime(e.output):
             if self.outputFormat == 'symlink':
                 outHelper.symlink(realsrc, out)
                 return
@@ -560,7 +558,6 @@ def main(args=None):
     jm = JarMaker()
     p = jm.getCommandLineParser()
     (options, args) = p.parse_args(args)
-    jm.processIncludes(options.I)
     jm.outputFormat = options.f
     jm.sourcedirs = options.s
     jm.topsourcedir = options.t

@@ -378,6 +378,11 @@ private:
   void AppendVariableAndValueToString(const nsAString& aName,
                                       nsAString& aResult) const;
 
+  void GetImageLayerValue(nsCSSCompressedDataBlock *data,
+                          nsAString& aValue,
+                          nsCSSValue::Serialization aSerialization,
+                          const nsCSSProperty aTable[]) const;
+
 public:
   /**
    * Returns the property at the given index in the ordered list of
@@ -414,7 +419,7 @@ private:
   // Subtracting eCSSProperty_COUNT from those values that represent custom
   // properties results in an index into mVariableOrder, which identifies the
   // specific variable the custom property declaration is for.
-  nsAutoTArray<uint32_t, 8> mOrder;
+  AutoTArray<uint32_t, 8> mOrder;
 
   // variable names of custom properties found in mOrder
   nsTArray<nsString> mVariableOrder;

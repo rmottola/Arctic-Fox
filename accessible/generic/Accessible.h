@@ -490,11 +490,6 @@ public:
   virtual nsresult HandleAccEvent(AccEvent* aAccEvent);
 
   /**
-   * Return true if this accessible allows accessible children from anonymous subtree.
-   */
-  virtual bool CanHaveAnonChildren();
-
-  /**
    * Return true if the accessible is an acceptable child.
    */
   virtual bool IsAcceptableChild(Accessible* aPossibleChild) const { return true; }
@@ -926,6 +921,12 @@ public:
   }
 
   /**
+   * Return true if the accessible doesn't allow accessible children from XBL
+   * anonymous subtree.
+   */
+  bool NoXBLKids() { return mStateFlags & eNoXBLKids; }
+
+  /**
    * Return true if this accessible has a parent whose name depends on this
    * accessible.
    */
@@ -1016,8 +1017,9 @@ protected:
     eIgnoreDOMUIEvent = 1 << 7, // don't process DOM UI events for a11y events
     eSurvivingInUpdate = 1 << 8, // parent drops children to recollect them
     eRelocated = 1 << 9, // accessible was moved in tree
+    eNoXBLKids = 1 << 10, // accessible don't allows XBL children
 
-    eLastStateFlag = eRelocated
+    eLastStateFlag = eNoXBLKids
   };
 
   /**
@@ -1132,7 +1134,7 @@ protected:
   int32_t mIndexInParent;
 
   static const uint8_t kChildrenFlagsBits = 2;
-  static const uint8_t kStateFlagsBits = 10;
+  static const uint8_t kStateFlagsBits = 11;
   static const uint8_t kContextFlagsBits = 2;
   static const uint8_t kTypeBits = 6;
   static const uint8_t kGenericTypesBits = 14;

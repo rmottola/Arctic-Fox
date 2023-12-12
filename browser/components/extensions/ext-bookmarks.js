@@ -2,15 +2,12 @@
 /* vim: set sts=2 sw=2 et tw=80: */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/PlacesUtils.jsm");
 var Bookmarks = PlacesUtils.bookmarks;
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-var {
-  runSafe,
-} = ExtensionUtils;
 
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
@@ -82,183 +79,123 @@ function convert(result) {
   return node;
 }
 
-extensions.registerPrivilegedAPI("bookmarks", (extension, context) => {
+extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
   return {
     bookmarks: {
-      get: function(idOrIdList, callback) {
+      get: function(idOrIdList) {
         let list = Array.isArray(idOrIdList) ? idOrIdList : [idOrIdList];
 
-        Task.spawn(function* () {
+        return Task.spawn(function* () {
           let bookmarks = [];
           for (let id of list) {
-            let bookmark;
-            try {
-              bookmark = yield Bookmarks.fetch({guid: id});
-              if (!bookmark) {
-                // TODO: set lastError, not found
-                return [];
-              }
-            } catch (e) {
-              // TODO: set lastError, probably an invalid guid
-              return [];
+            let bookmark = yield Bookmarks.fetch({guid: id});
+            if (!bookmark) {
+              throw new Error("Bookmark not found");
             }
             bookmarks.push(convert(bookmark));
           }
           return bookmarks;
-        }).then(results => runSafe(context, callback, results));
+        });
       },
 
-      getChildren: function(id, callback) {
+      getChildren: function(id) {
         // TODO: We should optimize this.
-        getTree(id, true).then(result => {
-          runSafe(context, callback, result);
-        }, reason => {
-          // TODO: Set lastError
-          runSafe(context, callback, []);
-        });
+        return getTree(id, true);
       },
 
-      getTree: function(callback) {
-        getTree(Bookmarks.rootGuid, false).then(result => {
-          runSafe(context, callback, result);
-        }, reason => {
-          runSafe(context, callback, []);
-        });
+      getTree: function() {
+        return getTree(Bookmarks.rootGuid, false);
       },
 
-      getSubTree: function(id, callback) {
-        getTree(id, false).then(result => {
-          runSafe(context, callback, result);
-        }, reason => {
-          runSafe(context, callback, []);
-        });
+      getSubTree: function(id) {
+        return getTree(id, false);
       },
 
-      // search
+      search: function(query) {
+        return Bookmarks.search(query).then(result => result.map(convert));
+      },
 
-      create: function(bookmark, callback) {
+      create: function(bookmark) {
         let info = {
           title: bookmark.title || "",
         };
 
         // If url is NULL or missing, it will be a folder.
-        if ("url" in bookmark && bookmark.url !== null) {
+        if (bookmark.url !== null) {
           info.type = Bookmarks.TYPE_BOOKMARK;
           info.url = bookmark.url || "";
         } else {
           info.type = Bookmarks.TYPE_FOLDER;
         }
 
-        if ("index" in bookmark) {
+        if (bookmark.index !== null) {
           info.index = bookmark.index;
         }
 
-        if ("parentId" in bookmark) {
+        if (bookmark.parentId !== null) {
           info.parentGuid = bookmark.parentId;
         } else {
           info.parentGuid = Bookmarks.unfiledGuid;
         }
 
-        let failure = reason => {
-          // TODO: set lastError.
-          if (callback) {
-            runSafe(context, callback, null);
-          }
-        };
-
         try {
-          Bookmarks.insert(info).then(result => {
-            if (callback) {
-              runSafe(context, callback, convert(result));
-            }
-          }, failure);
+          return Bookmarks.insert(info).then(convert);
         } catch (e) {
-          failure(e);
+          return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
       },
 
-      move: function(id, destination, callback) {
+      move: function(id, destination) {
         let info = {
           guid: id,
         };
 
-        if ("parentId" in destination) {
+        if (destination.parentId !== null) {
           info.parentGuid = destination.parentId;
         }
-        if ("index" in destination) {
+        if (destination.index !== null) {
           info.index = destination.index;
         }
 
-        let failure = reason => {
-          if (callback) {
-            runSafe(context, callback, null);
-          }
-        };
-
         try {
-          Bookmarks.update(info).then(result => {
-            if (callback) {
-              runSafe(context, callback, convert(result));
-            }
-          }, failure);
+          return Bookmarks.update(info).then(convert);
         } catch (e) {
-          failure(e);
+          return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
       },
 
-      update: function(id, changes, callback) {
+      update: function(id, changes) {
         let info = {
           guid: id,
         };
 
-        if ("title" in changes) {
+        if (changes.title !== null) {
           info.title = changes.title;
         }
-        if ("url" in changes) {
+        if (changes.url !== null) {
           info.url = changes.url;
         }
 
-        let failure = reason => {
-          if (callback) {
-            runSafe(context, callback, null);
-          }
-        };
-
         try {
-          Bookmarks.update(info).then(result => {
-            if (callback) {
-              runSafe(context, callback, convert(result));
-            }
-          }, failure);
+          return Bookmarks.update(info).then(convert);
         } catch (e) {
-          failure(e);
+          return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
       },
 
-      remove: function(id, callback) {
+      remove: function(id) {
         let info = {
           guid: id,
         };
 
-        let failure = reason => {
-          if (callback) {
-            runSafe(context, callback, null);
-          }
-        };
-
+        // The API doesn't give you the old bookmark at the moment
         try {
-          Bookmarks.remove(info).then(result => {
-            if (callback) {
-              // The API doesn't give you the old bookmark at the moment
-              runSafe(context, callback);
-            }
-          }, failure);
+          return Bookmarks.remove(info).then(result => {});
         } catch (e) {
-          failure(e);
+          return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
       },
     },
   };
 });
-
 

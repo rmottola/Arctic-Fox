@@ -18,6 +18,7 @@
 #include "nsAutoRef.h"
 #include "NesteggPacketHolder.h"
 #include "XiphExtradata.h"
+#include "prprf.h"
 
 #include <algorithm>
 #include <stdint.h>
@@ -33,7 +34,7 @@ namespace mozilla {
 using namespace gfx;
 
 LazyLogModule gWebMDemuxerLog("WebMDemuxer");
-extern LazyLogModule gNesteggLog;
+LazyLogModule gNesteggLog("Nestegg");
 
 // How far ahead will we look when searching future keyframe. In microseconds.
 // This value is based on what appears to be a reasonable value as most webm
@@ -388,8 +389,8 @@ WebMDemuxer::ReadMetadata()
         return NS_ERROR_FAILURE;
       }
 
-      nsAutoTArray<const unsigned char*,4> headers;
-      nsAutoTArray<size_t,4> headerLens;
+      AutoTArray<const unsigned char*,4> headers;
+      AutoTArray<size_t,4> headerLens;
       for (uint32_t header = 0; header < nheaders; ++header) {
         unsigned char* data = 0;
         size_t length = 0;

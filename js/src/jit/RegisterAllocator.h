@@ -70,7 +70,7 @@ struct AllocationIntegrityState
                 !temps.appendAll(o.temps) ||
                 !outputs.appendAll(o.outputs))
             {
-                MOZ_CRASH("InstructionInfo::InstructionInfo");
+                oomUnsafe.crash("InstructionInfo::InstructionInfo");
             }
         }
     };
@@ -82,7 +82,7 @@ struct AllocationIntegrityState
         BlockInfo(const BlockInfo& o) {
             AutoEnterOOMUnsafeRegion oomUnsafe;
             if (!phis.appendAll(o.phis))
-                MOZ_CRASH("BlockInfo::BlockInfo");
+                oomUnsafe.crash("BlockInfo::BlockInfo");
         }
     };
     Vector<BlockInfo, 0, SystemAllocPolicy> blocks;

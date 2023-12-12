@@ -321,7 +321,7 @@ WorkerRunnable::Run()
   } else {
     kungFuDeathGrip = mWorkerPrivate;
     if (isMainThread) {
-      globalObject = static_cast<nsGlobalWindow*>(mWorkerPrivate->GetWindow());
+      globalObject = nsGlobalWindow::Cast(mWorkerPrivate->GetWindow());
     } else {
       globalObject = mWorkerPrivate->GetParent()->GlobalScope();
     }

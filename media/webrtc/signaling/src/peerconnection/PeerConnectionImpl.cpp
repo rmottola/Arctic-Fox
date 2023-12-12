@@ -374,7 +374,7 @@ bool PCUuidGenerator::Generate(std::string* idp) {
   return true;
 }
 
-bool IsPrivateBrowsing(nsPIDOMWindow* aWindow)
+bool IsPrivateBrowsing(nsPIDOMWindowInner* aWindow)
 {
 #if defined(MOZILLA_EXTERNAL_LINKAGE)
   return false;
@@ -717,7 +717,7 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   // Currently no standalone unit tests for DataChannel,
   // which is the user of mWindow
   MOZ_ASSERT(aWindow);
-  mWindow = aWindow;
+  mWindow = aWindow->AsInner();
   NS_ENSURE_STATE(mWindow);
 #endif // MOZILLA_INTERNAL_API
 
@@ -787,6 +787,9 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
   mMedia->SignalIceGatheringStateChange.connect(
       this,
       &PeerConnectionImpl::IceGatheringStateChange);
+  mMedia->SignalUpdateDefaultCandidate.connect(
+      this,
+      &PeerConnectionImpl::UpdateDefaultCandidate);
   mMedia->SignalEndOfLocalCandidates.connect(
       this,
       &PeerConnectionImpl::EndOfLocalCandidates);
@@ -2516,7 +2519,7 @@ PeerConnectionImpl::PluginCrash(uint32_t aPluginID,
     PluginCrashedEvent::Constructor(doc, NS_LITERAL_STRING("PluginCrashed"), init);
 
   event->SetTrusted(true);
-  event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
 
   EventDispatcher::DispatchDOMEvent(mWindow, nullptr, event, nullptr, nullptr);
 #endif
@@ -3039,17 +3042,23 @@ PeerConnectionImpl::IceGatheringStateChange(
 }
 
 void
-PeerConnectionImpl::EndOfLocalCandidates(const std::string& defaultAddr,
-                                         uint16_t defaultPort,
-                                         const std::string& defaultRtcpAddr,
-                                         uint16_t defaultRtcpPort,
-                                         uint16_t level) {
+PeerConnectionImpl::UpdateDefaultCandidate(const std::string& defaultAddr,
+                                           uint16_t defaultPort,
+                                           const std::string& defaultRtcpAddr,
+                                           uint16_t defaultRtcpPort,
+                                           uint16_t level) {
   CSFLogDebug(logTag, "%s", __FUNCTION__);
-  mJsepSession->EndOfLocalCandidates(defaultAddr,
-                                     defaultPort,
-                                     defaultRtcpAddr,
-                                     defaultRtcpPort,
-                                     level);
+  mJsepSession->UpdateDefaultCandidate(defaultAddr,
+                                       defaultPort,
+                                       defaultRtcpAddr,
+                                       defaultRtcpPort,
+                                       level);
+}
+
+void
+PeerConnectionImpl::EndOfLocalCandidates(uint16_t level) {
+  CSFLogDebug(logTag, "%s", __FUNCTION__);
+  mJsepSession->EndOfLocalCandidates(level);
 }
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)

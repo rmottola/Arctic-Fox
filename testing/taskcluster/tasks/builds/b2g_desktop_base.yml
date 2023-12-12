@@ -1,18 +1,15 @@
 $inherits:
-  from: 'tasks/build.yml'
+  from: 'tasks/builds/b2g_base.yml'
 task:
   metadata:
-    name: "[TC] B2G Desktop {{build_type}}"
+    name: "[TC] B2G Desktop ( {{build_type}} )"
     description: B2G Desktop {{build_type}}
 
   workerType: b2gbuild-desktop
-
   payload:
-
     env:
       MOZCONFIG: 'b2g/config/mozconfigs/linux64_gecko/nightly'
-      MOZTT_GIT_URL: '{{moztt_git_url}}'
-      MOZTT_REVISION: '{{moztt_revision}}'
+      TOOLTOOL_MANIFEST: 'b2g/config/tooltool-manifests/linux64/releng.manifest'
 
     command:
       - /bin/bash
@@ -23,8 +20,11 @@ task:
         buildbot_step 'Build' ./build-b2g-desktop.sh $HOME/workspace
 
   extra:
+    treeherderEnv:
+      - production
+      - staging
     treeherder:
-      groupSymbol: tc
+      groupSymbol: "?"
       groupName: Submitted by taskcluster
       machine:
         platform: b2g-linux64
@@ -34,4 +34,3 @@ task:
     # files are located.
     locations:
       build: 'public/build/target.linux-x86_64.tar.bz2'
-      test_packages: 'public/build/test_packages.json'

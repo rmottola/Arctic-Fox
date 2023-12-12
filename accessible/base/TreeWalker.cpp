@@ -27,8 +27,8 @@ TreeWalker::
 {
   NS_ASSERTION(aContent, "No node for the accessible tree walker!");
 
-  mChildFilter = mContext->CanHaveAnonChildren() ?
-    nsIContent::eAllChildren : nsIContent::eAllButXBL;
+  mChildFilter = mContext->NoXBLKids() ?
+    nsIContent::eAllButXBL : nsIContent::eAllChildren;
   mChildFilter |= nsIContent::eSkipPlaceholderContent;
 
   if (aContent)
@@ -46,7 +46,7 @@ TreeWalker::~TreeWalker()
 // TreeWalker: private
 
 Accessible*
-TreeWalker::NextChild()
+TreeWalker::Next()
 {
   if (mStateStack.IsEmpty())
     return nullptr;
@@ -80,11 +80,9 @@ TreeWalker::NextChild()
 
     nsIContent* parent = parentNode->AsElement();
     top = PushState(parent);
-    while (nsIContent* childNode = Next(top)) {
-      if (childNode == mAnchorNode) {
-        mAnchorNode = parent;
-        return NextChild();
-      }
+    if (top->mDOMIter.Seek(mAnchorNode)) {
+      mAnchorNode = parent;
+      return Next();
     }
 
     // XXX We really should never get here, it means we're trying to find an

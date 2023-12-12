@@ -70,6 +70,7 @@
 #include "nsContentUtils.h"
 #include "ChildIterator.h"
 #include "mozilla/dom/ScriptSettings.h"
+#include "nsGlobalWindow.h"
 
 using namespace mozilla::dom;
 using namespace mozilla;
@@ -1067,9 +1068,9 @@ nsXULTemplateBuilder::Observe(nsISupports* aSubject,
     // Uuuuber hack to clean up circular references that the cycle collector
     // doesn't know about. See bug 394514.
     if (!strcmp(aTopic, DOM_WINDOW_DESTROYED_TOPIC)) {
-        nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(aSubject);
-        if (window) {
-            nsCOMPtr<nsIDocument> doc = window->GetExtantDoc();
+        if (nsCOMPtr<mozIDOMWindow> window = do_QueryInterface(aSubject)) {
+            nsCOMPtr<nsIDocument> doc =
+                nsPIDOMWindowInner::From(window)->GetExtantDoc();
             if (doc && doc == mObservedDocument)
                 NodeWillBeDestroyed(doc);
         }
@@ -2357,7 +2358,7 @@ nsXULTemplateBuilder::AddSimpleRuleBindings(nsTemplateRule* aRule,
     // Crawl the content tree of a "simple" rule, adding a variable
     // assignment for any attribute whose value is "rdf:".
 
-    nsAutoTArray<nsIContent*, 8> elements;
+    AutoTArray<nsIContent*, 8> elements;
 
     if (elements.AppendElement(aElement) == nullptr)
         return NS_ERROR_OUT_OF_MEMORY;

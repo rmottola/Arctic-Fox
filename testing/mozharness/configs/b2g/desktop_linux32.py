@@ -26,8 +26,6 @@ config = {
         "buildbot": "/tools/buildbot/bin/buildbot",
     },
     'app_ini_path': '%(obj_dir)s/dist/bin/application.ini',
-    'purge_skip': ['info', 'rel-*:45d', 'tb-rel-*:45d'],
-    'purge_basedirs':  ["/mock/users/cltbld/home/cltbld/build"],
     # mock shtuff
     'mock_mozilla_dir':  '/builds/mock_mozilla',
     'mock_target': 'mozilla-centos6-x86_64',
@@ -40,6 +38,7 @@ config = {
         ('/tools/tooltool.py', '/builds/tooltool.py'),
         ('/builds/mozilla-desktop-geoloc-api.key', '/builds/mozilla-desktop-geoloc-api.key'),
         ('/builds/crash-stats-api.token', '/builds/crash-stats-api.token'),
+        ('/usr/local/lib/hgext', '/usr/local/lib/hgext'),
     ],
     'enable_ccache': True,
     'vcs_share_base': '/builds/hg-shared',
@@ -53,9 +52,9 @@ config = {
 
     #########################################################################
     ###### 32 bit specific ######
-    'base_name': 'B2G_%(branch)s_linux32_goanna',
-    'platform': 'linux32_goanna',
-    'stage_platform': 'linux32_goanna',
+    'base_name': 'B2G_%(branch)s_linux32_gecko',
+    'platform': 'linux32_gecko',
+    'stage_platform': 'linux32_gecko',
     'stage_product': 'b2g',
     'env': {
         'MOZBUILD_STATE_PATH': os.path.join(os.getcwd(), '.mozbuild'),
@@ -84,7 +83,6 @@ config = {
         'UPLOAD_SSH_KEY': '/home/mock_mozilla/.ssh/%(stage_ssh_key)s',
         'UPLOAD_TO_TEMP': '1',
     },
-    'purge_minsize': 14,
     'mock_packages': [
         'autoconf213', 'python', 'mozilla-python27', 'zip', 'mozilla-python27-mercurial',
         'git', 'ccache', 'perl-Test-Simple', 'perl-Config-General',
@@ -133,7 +131,7 @@ config = {
         # The B2G SDK is still 64-bit, and we need libXt for that
         'libXt.x86_64',
     ],
-    'src_mozconfig': 'b2g/config/mozconfigs/linux32_goanna/nightly',
+    'src_mozconfig': 'b2g/config/mozconfigs/linux32_gecko/nightly',
     'tooltool_manifest_src': "b2g/config/tooltool-manifests/linux32/releng.manifest",
     #########################################################################
 }

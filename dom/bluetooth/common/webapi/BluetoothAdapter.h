@@ -181,10 +181,10 @@ public:
    * Others
    ***************************************************************************/
   static already_AddRefed<BluetoothAdapter>
-    Create(nsPIDOMWindow* aOwner, const BluetoothValue& aValue);
+    Create(nsPIDOMWindowInner* aOwner, const BluetoothValue& aValue);
 
   void Notify(const BluetoothSignal& aParam); // BluetoothSignalObserver
-  nsPIDOMWindow* GetParentObject() const
+  nsPIDOMWindowInner* GetParentObject() const
   {
      return GetOwner();
   }
@@ -192,6 +192,9 @@ public:
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
   virtual void DisconnectFromOwner() override;
+
+  void GetPairedDeviceProperties(
+    const nsTArray<BluetoothAddress>& aDeviceAddresses);
 
   /**
    * Set this adapter's discovery handle in use (mDiscoveryHandleInUse).
@@ -220,7 +223,7 @@ public:
   void RemoveLeScanHandle(const nsAString& aScanUuid);
 
 private:
-  BluetoothAdapter(nsPIDOMWindow* aOwner, const BluetoothValue& aValue);
+  BluetoothAdapter(nsPIDOMWindowInner* aOwner, const BluetoothValue& aValue);
   ~BluetoothAdapter();
 
   /**

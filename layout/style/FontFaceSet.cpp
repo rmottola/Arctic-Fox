@@ -93,7 +93,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(FontFaceSet)
   NS_INTERFACE_MAP_ENTRY(nsICSSLoaderObserver)
 NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
-FontFaceSet::FontFaceSet(nsPIDOMWindow* aWindow, nsIDocument* aDocument)
+FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, nsIDocument* aDocument)
   : DOMEventTargetHelper(aWindow)
   , mDocument(aDocument)
   , mStatus(FontFaceSetLoadStatus::Loaded)
@@ -282,7 +282,7 @@ FontFaceSet::FindMatchingFontFaces(const nsAString& aFont,
       continue;
     }
 
-    nsAutoTArray<gfxFontEntry*,4> entries;
+    AutoTArray<gfxFontEntry*,4> entries;
     bool needsBold;
     family->FindAllFontsForStyle(style, entries, needsBold);
 

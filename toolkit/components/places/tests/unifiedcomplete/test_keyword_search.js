@@ -12,62 +12,56 @@
  * same keyword appear in the list.
  */
 
-// Details for the keyword bookmark
-let keyBase = "http://abc/?search=";
-let keyKey = "key";
+add_task(function* test_keyword_searc() {
+  let uri1 = NetUtil.newURI("http://abc/?search=%s");
+  let uri2 = NetUtil.newURI("http://abc/?search=ThisPageIsInHistory");
+  yield PlacesTestUtils.addVisits([
+    { uri: uri1, title: "Generic page title" },
+    { uri: uri2, title: "Generic page title" }
+  ]);
+  yield addBookmark({ uri: uri1, title: "Bookmark title", keyword: "key"});
 
-// A second keyword bookmark with the same keyword
-let otherBase = "http://xyz/?foo=";
+  do_print("Plain keyword query");
+  yield check_autocomplete({
+    search: "key term",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search=term"), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
 
-let unescaped = "ユニコード";
-let pageInHistory = "ThisPageIsInHistory";
+  do_print("Multi-word keyword query");
+  yield check_autocomplete({
+    search: "key multi word",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search=multi+word"), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
 
-// Define some shared uris and titles (each page needs its own uri)
-let kURIs = [
-  keyBase + "%s",
-  keyBase + "term",
-  keyBase + "multi+word",
-  keyBase + "blocking%2B",
-  keyBase + unescaped,
-  keyBase + pageInHistory,
-  keyBase,
-  otherBase + "%s",
-  keyBase + "twoKey",
-  otherBase + "twoKey"
-];
-let kTitles = [
-  "Generic page title",
-  "Keyword title",
-  "abc",
-  "xyz"
-];
+  do_print("Keyword query with +");
+  yield check_autocomplete({
+    search: "key blocking+",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search=blocking%2B"), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
 
-// Add the keyword bookmark
-addPageBook(0, 0, 1, [], keyKey);
-// Add in the "fake pages" for keyword searches
-gPages[1] = [1,2];
-gPages[2] = [2,2];
-gPages[3] = [3,2];
-gPages[4] = [4,2];
-// Add a page into history
-addPageBook(5, 2);
-gPages[6] = [6,2];
+  do_print("Unescaped term in query");
+  yield check_autocomplete({
+    search: "key ユニコード",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search=ユニコード"), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
 
-// Provide for each test: description; search terms; array of gPages indices of
-// pages that should match; optional function to be run before the test
-let gTests = [
-  ["0: Plain keyword query",
-   keyKey + " term", [1]],
-  ["1: Multi-word keyword query",
-   keyKey + " multi word", [2]],
-  ["2: Keyword query with +",
-   keyKey + " blocking+", [3]],
-  ["3: Unescaped term in query",
-   keyKey + " " + unescaped, [4]],
-  ["4: Keyword that happens to match a page",
-   keyKey + " " + pageInHistory, [5]],
-  ["5: Keyword without query (without space)",
-   keyKey, [6]],
-  ["6: Keyword without query (with space)",
-   keyKey + " ", [6]],
-];
+  do_print("Keyword that happens to match a page");
+  yield check_autocomplete({
+    search: "key ThisPageIsInHistory",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search=ThisPageIsInHistory"), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
+
+  do_print("Keyword without query (without space)");
+  yield check_autocomplete({
+    search: "key",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search="), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
+
+  do_print("Keyword without query (with space)");
+  yield check_autocomplete({
+    search: "key ",
+    matches: [ { uri: NetUtil.newURI("http://abc/?search="), title: "abc", style: ["keyword", "heuristic"] } ]
+  });
+
+  yield cleanup();
+});

@@ -29,7 +29,7 @@ function run_test_with_server(aServer, aCallback)
   initTestDebuggerServer(aServer);
   gDebuggee = addTestGlobal("test-stack", aServer);
   gClient = new DebuggerClient(aServer.connectPipe());
-  gClient.connect(function () {
+  gClient.connect().then(function () {
     attachTestTabAndResume(gClient, "test-stack", function (aResponse, aTabClient, aThreadClient) {
       gThreadClient = aThreadClient;
       test_child_skip_breakpoint();
@@ -55,14 +55,15 @@ function test_child_skip_breakpoint()
 
   });
 
-  gDebuggee.eval("var line0 = Error().lineNumber;\n" +
-                 "function foo() {\n" + // line0 + 1
-                 "  this.a = 1;\n" +    // line0 + 2
-                 "  // A comment.\n" +  // line0 + 3
-                 "  this.b = 2;\n" +    // line0 + 4
-                 "}\n" +                // line0 + 5
-                 "debugger;\n" +        // line0 + 6
-                 "foo();\n");           // line0 + 7
+  Cu.evalInSandbox("var line0 = Error().lineNumber;\n" +
+                   "function foo() {\n" + // line0 + 1
+                   "  this.a = 1;\n" +    // line0 + 2
+                   "  // A comment.\n" +  // line0 + 3
+                   "  this.b = 2;\n" +    // line0 + 4
+                   "}\n" +                // line0 + 5
+                   "debugger;\n" +        // line0 + 6
+                   "foo();\n",            // line0 + 7
+                   gDebuggee);
 }
 
 // Set many breakpoints at the same location.

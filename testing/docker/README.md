@@ -1,7 +1,7 @@
 # Docker Images for use in TaskCluster
 
 This folder contains various docker images used in [taskcluster](http://docs.taskcluster.net/) as well as other misc docker images which may be useful for
-hacking on goanna.
+hacking on gecko.
 
 ## Organization
 

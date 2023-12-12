@@ -12,7 +12,7 @@ import sys
 sys.path.insert(1, os.path.dirname(sys.path[0]))
 
 from mozharness.base.errors import BaseErrorList
-from mozharness.base.log import ERROR, WARNING
+from mozharness.base.log import ERROR
 from mozharness.base.script import PreScriptAction
 from mozharness.base.vcs.vcsbase import MercurialScript
 from mozharness.mozilla.blob_upload import BlobUploadMixin, blobupload_config_options
@@ -137,6 +137,9 @@ class B2GDesktopTest(BlobUploadMixin, TestingMixin, MercurialScript):
 
         raw_log_file = os.path.join(dirs['abs_blob_upload_dir'],
                                     '%s_raw.log' % suite)
+        error_summary_file = os.path.join(dirs['abs_blob_upload_dir'],
+                                          '%s_errorsummary.log' % suite)
+
         str_format_values = {
             'application': self.binary_path,
             'test_manifest': self.test_manifest,
@@ -148,17 +151,22 @@ class B2GDesktopTest(BlobUploadMixin, TestingMixin, MercurialScript):
             'cert_path': dirs['abs_certs_dir'],
             'browser_arg': self.config.get('browser_arg'),
             'raw_log_file': raw_log_file,
+            'error_summary_file': error_summary_file,
         }
 
         if suite not in self.config["suite_definitions"]:
-            self.fatal("'%s' not defined in the config!" % suite),
+            self.fatal("'%s' not defined in the config!" % suite)
 
-        options = self.config["suite_definitions"][suite]["options"]
-        if options:
-            for option in options:
-                option = option % str_format_values
-                if not option.endswith('None'):
-                    cmd.append(option)
+        try_options, try_tests = self.try_args(suite)
+
+        cmd.extend(self.query_options(self.config["suite_definitions"][suite]["options"],
+                                      try_options,
+                                      str_format_values=str_format_values))
+
+        cmd.extend(self.query_tests_args(self.config["suite_definitions"][suite].get("tests"),
+                                         try_tests,
+                                         str_format_values=str_format_values))
+
         return cmd
 
     def download_and_extract(self):
@@ -192,7 +200,6 @@ class B2GDesktopTest(BlobUploadMixin, TestingMixin, MercurialScript):
             self.fatal("Don't know how to run --test-suite '%s'!" % suite)
 
         cmd = self._query_abs_base_cmd(suite)
-        cmd = self.append_harness_extra_args(cmd)
 
         cwd = dirs['abs_%s_dir' % suite]
 

@@ -377,7 +377,7 @@ void
 TabParent::AddWindowListeners()
 {
   if (mFrameElement && mFrameElement->OwnerDoc()) {
-    if (nsCOMPtr<nsPIDOMWindow> window = mFrameElement->OwnerDoc()->GetWindow()) {
+    if (nsCOMPtr<nsPIDOMWindowOuter> window = mFrameElement->OwnerDoc()->GetWindow()) {
       nsCOMPtr<EventTarget> eventTarget = window->GetTopWindowRoot();
       if (eventTarget) {
         eventTarget->AddEventListener(NS_LITERAL_STRING("MozUpdateWindowPos"),
@@ -400,7 +400,7 @@ void
 TabParent::RemoveWindowListeners()
 {
   if (mFrameElement && mFrameElement->OwnerDoc()->GetWindow()) {
-    nsCOMPtr<nsPIDOMWindow> window = mFrameElement->OwnerDoc()->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> window = mFrameElement->OwnerDoc()->GetWindow();
     nsCOMPtr<EventTarget> eventTarget = window->GetTopWindowRoot();
     if (eventTarget) {
       eventTarget->RemoveEventListener(NS_LITERAL_STRING("MozUpdateWindowPos"),
@@ -1003,14 +1003,6 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
 }
 
 void
-TabParent::UpdateFrame(const FrameMetrics& aFrameMetrics)
-{
-  if (!mIsDestroyed) {
-    Unused << SendUpdateFrame(aFrameMetrics);
-  }
-}
-
-void
 TabParent::UIResolutionChanged()
 {
   if (!mIsDestroyed) {
@@ -1050,76 +1042,6 @@ TabParent::HandleAccessKey(nsTArray<uint32_t>& aCharCodes,
 }
 
 void
-TabParent::RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                            const mozilla::CSSPoint& aDestination)
-{
-  if (!mIsDestroyed) {
-    Unused << SendRequestFlingSnap(aScrollId, aDestination);
-  }
-}
-
-void
-TabParent::AcknowledgeScrollUpdate(const ViewID& aScrollId, const uint32_t& aScrollGeneration)
-{
-  if (!mIsDestroyed) {
-    Unused << SendAcknowledgeScrollUpdate(aScrollId, aScrollGeneration);
-  }
-}
-
-void TabParent::HandleDoubleTap(const CSSPoint& aPoint,
-                                Modifiers aModifiers,
-                                const ScrollableLayerGuid &aGuid)
-{
-  if (!mIsDestroyed) {
-    Unused << SendHandleDoubleTap(aPoint, aModifiers, aGuid);
-  }
-}
-
-void TabParent::HandleSingleTap(const CSSPoint& aPoint,
-                                Modifiers aModifiers,
-                                const ScrollableLayerGuid &aGuid)
-{
-  if (!mIsDestroyed) {
-    Unused << SendHandleSingleTap(aPoint, aModifiers, aGuid);
-  }
-}
-
-void TabParent::HandleLongTap(const CSSPoint& aPoint,
-                              Modifiers aModifiers,
-                              const ScrollableLayerGuid &aGuid,
-                              uint64_t aInputBlockId)
-{
-  if (!mIsDestroyed) {
-    Unused << SendHandleLongTap(aPoint, aModifiers, aGuid, aInputBlockId);
-  }
-}
-
-void TabParent::NotifyAPZStateChange(ViewID aViewId,
-                                     APZStateChange aChange,
-                                     int aArg)
-{
-  if (!mIsDestroyed) {
-    Unused << SendNotifyAPZStateChange(aViewId, aChange, aArg);
-  }
-}
-
-void
-TabParent::NotifyMouseScrollTestEvent(const ViewID& aScrollId, const nsString& aEvent)
-{
-  if (!mIsDestroyed) {
-    Unused << SendMouseScrollTestEvent(aScrollId, aEvent);
-  }
-}
-
-void
-TabParent::NotifyFlushComplete()
-{
-  if (!mIsDestroyed) {
-    Unused << SendNotifyFlushComplete();
-  }
-}
-
-void
 TabParent::Activate()
 {
   if (!mIsDestroyed) {
@@ -1136,7 +1058,7 @@ TabParent::Deactivate()
 }
 
 NS_IMETHODIMP
-TabParent::Init(nsIDOMWindow *window)
+TabParent::Init(mozIDOMWindowProxy *window)
 {
   return NS_OK;
 }
@@ -1407,33 +1329,6 @@ CSSPoint TabParent::AdjustTapToChildWidget(const CSSPoint& aPoint)
   return aPoint + (LayoutDevicePoint(GetChildProcessOffset()) * GetLayoutDeviceToCSSScale());
 }
 
-bool TabParent::SendHandleSingleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid)
-{
-  if (mIsDestroyed) {
-    return false;
-  }
-
-  return PBrowserParent::SendHandleSingleTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid);
-}
-
-bool TabParent::SendHandleLongTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId)
-{
-  if (mIsDestroyed) {
-    return false;
-  }
-
-  return PBrowserParent::SendHandleLongTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid, aInputBlockId);
-}
-
-bool TabParent::SendHandleDoubleTap(const CSSPoint& aPoint, const Modifiers& aModifiers, const ScrollableLayerGuid& aGuid)
-{
-  if (mIsDestroyed) {
-    return false;
-  }
-
-  return PBrowserParent::SendHandleDoubleTap(AdjustTapToChildWidget(aPoint), aModifiers, aGuid);
-}
-
 bool TabParent::SendMouseWheelEvent(WidgetWheelEvent& event)
 {
   if (mIsDestroyed) {
@@ -1504,9 +1399,9 @@ bool
 TabParent::RecvRequestNativeKeyBindings(const WidgetKeyboardEvent& aEvent,
                                         MaybeNativeKeyBinding* aBindings)
 {
-  AutoInfallibleTArray<mozilla::CommandInt, 4> singleLine;
-  AutoInfallibleTArray<mozilla::CommandInt, 4> multiLine;
-  AutoInfallibleTArray<mozilla::CommandInt, 4> richText;
+  AutoTArray<mozilla::CommandInt, 4> singleLine;
+  AutoTArray<mozilla::CommandInt, 4> multiLine;
+  AutoTArray<mozilla::CommandInt, 4> richText;
 
   *aBindings = mozilla::void_t();
 
@@ -1718,9 +1613,9 @@ bool TabParent::SendRealKeyEvent(WidgetKeyboardEvent& event)
   if (event.mMessage == eKeyPress) {
     nsCOMPtr<nsIWidget> widget = GetWidget();
 
-    AutoInfallibleTArray<mozilla::CommandInt, 4> singleLine;
-    AutoInfallibleTArray<mozilla::CommandInt, 4> multiLine;
-    AutoInfallibleTArray<mozilla::CommandInt, 4> richText;
+    AutoTArray<mozilla::CommandInt, 4> singleLine;
+    AutoTArray<mozilla::CommandInt, 4> multiLine;
+    AutoTArray<mozilla::CommandInt, 4> richText;
 
     widget->ExecuteNativeKeyBinding(nsIWidget::NativeKeyBindingsForSingleLineEditor,
                                     event, DoCommandCallback, &singleLine);
@@ -2606,10 +2501,10 @@ TabParent::GetAuthPrompt(uint32_t aPromptReason, const nsIID& iid,
     do_GetService(NS_WINDOWWATCHER_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIDOMWindow> window;
+  nsCOMPtr<nsPIDOMWindowOuter> window;
   nsCOMPtr<nsIContent> frame = do_QueryInterface(mFrameElement);
   if (frame)
-    window = do_QueryInterface(frame->OwnerDoc()->GetWindow());
+    window = frame->OwnerDoc()->GetWindow();
 
   // Get an auth prompter for our window so that the parenting
   // of the dialogs works as it should when using tabs.
@@ -2815,74 +2710,11 @@ TabParent::RecvBrowserFrameOpenWindow(PBrowserParent* aOpener,
 }
 
 bool
-TabParent::RecvZoomToRect(const uint32_t& aPresShellId,
-                          const ViewID& aViewId,
-                          const CSSRect& aRect,
-                          const uint32_t& aFlags)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->ZoomToRect(aPresShellId, aViewId, aRect, aFlags);
-  }
-  return true;
-}
-
-bool
-TabParent::RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
-                                     const ViewID& aViewId,
-                                     const MaybeZoomConstraints& aConstraints)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->UpdateZoomConstraints(aPresShellId, aViewId, aConstraints);
-  }
-  return true;
-}
-
-bool
 TabParent::RecvRespondStartSwipeEvent(const uint64_t& aInputBlockId,
                                       const bool& aStartSwipe)
 {
   if (nsCOMPtr<nsIWidget> widget = GetWidget()) {
     widget->ReportSwipeStarted(aInputBlockId, aStartSwipe);
-  }
-  return true;
-}
-
-bool
-TabParent::RecvContentReceivedInputBlock(const ScrollableLayerGuid& aGuid,
-                                         const uint64_t& aInputBlockId,
-                                         const bool& aPreventDefault)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->ContentReceivedInputBlock(aGuid, aInputBlockId, aPreventDefault);
-  }
-  return true;
-}
-
-bool
-TabParent::RecvSetTargetAPZC(const uint64_t& aInputBlockId,
-                             nsTArray<ScrollableLayerGuid>&& aTargets)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->SetTargetAPZC(aInputBlockId, aTargets);
-  }
-  return true;
-}
-
-bool
-TabParent::RecvStartScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->StartScrollbarDrag(aDragMetrics);
-  }
-  return true;
-}
-
-bool
-TabParent::RecvSetAllowedTouchBehavior(const uint64_t& aInputBlockId,
-                                       nsTArray<TouchBehaviorFlags>&& aFlags)
-{
-  if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->SetAllowedTouchBehavior(aInputBlockId, aFlags);
   }
   return true;
 }
@@ -3119,7 +2951,7 @@ TabParent::LayerTreeUpdate(bool aActive)
     event->InitEvent(NS_LITERAL_STRING("MozLayerTreeCleared"), true, false);
   }
   event->SetTrusted(true);
-  event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
   bool dummy;
   mFrameElement->DispatchEvent(event, &dummy);
   return true;
@@ -3154,7 +2986,7 @@ TabParent::RecvRemotePaintIsReady()
   RefPtr<Event> event = NS_NewDOMEvent(mFrameElement, nullptr, nullptr);
   event->InitEvent(NS_LITERAL_STRING("MozAfterRemotePaint"), false, false);
   event->SetTrusted(true);
-  event->GetInternalNSEvent()->mFlags.mOnlyChromeDispatch = true;
+  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
   bool dummy;
   mFrameElement->DispatchEvent(event, &dummy);
   return true;
@@ -3261,8 +3093,8 @@ public:
   {
     return QueryInterface(uuid, result);
   }
-  NS_IMETHOD GetAssociatedWindow(nsIDOMWindow**) NO_IMPL
-  NS_IMETHOD GetTopWindow(nsIDOMWindow**) NO_IMPL
+  NS_IMETHOD GetAssociatedWindow(mozIDOMWindowProxy**) NO_IMPL
+  NS_IMETHOD GetTopWindow(mozIDOMWindowProxy**) NO_IMPL
   NS_IMETHOD GetTopFrameElement(nsIDOMElement** aElement) override
   {
     nsCOMPtr<nsIDOMElement> elem = do_QueryInterface(mElement);
@@ -3468,7 +3300,7 @@ TabParent::GetShowInfo()
 }
 
 void
-TabParent::AudioChannelChangeNotification(nsPIDOMWindow* aWindow,
+TabParent::AudioChannelChangeNotification(nsPIDOMWindowOuter* aWindow,
                                           AudioChannel aAudioChannel,
                                           float aVolume,
                                           bool aMuted)
@@ -3477,7 +3309,7 @@ TabParent::AudioChannelChangeNotification(nsPIDOMWindow* aWindow,
     return;
   }
 
-  nsCOMPtr<nsPIDOMWindow> window = mFrameElement->OwnerDoc()->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> window = mFrameElement->OwnerDoc()->GetWindow();
   while (window) {
     if (window == aWindow) {
       Unused << SendAudioChannelChangeNotification(static_cast<uint32_t>(aAudioChannel),
@@ -3485,7 +3317,7 @@ TabParent::AudioChannelChangeNotification(nsPIDOMWindow* aWindow,
       break;
     }
 
-    nsCOMPtr<nsPIDOMWindow> win = window->GetScriptableParent();
+    nsCOMPtr<nsPIDOMWindowOuter> win = window->GetScriptableParent();
     if (window == win) {
       break;
     }

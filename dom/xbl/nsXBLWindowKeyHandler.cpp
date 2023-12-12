@@ -262,13 +262,13 @@ nsresult
 nsXBLWindowKeyHandler::WalkHandlers(nsIDOMKeyEvent* aKeyEvent, nsIAtom* aEventType)
 {
   bool prevent;
-  aKeyEvent->GetDefaultPrevented(&prevent);
+  aKeyEvent->AsEvent()->GetDefaultPrevented(&prevent);
   if (prevent)
     return NS_OK;
 
   bool trustedEvent = false;
   // Don't process the event if it was not dispatched from a trusted source
-  aKeyEvent->GetIsTrusted(&trustedEvent);
+  aKeyEvent->AsEvent()->GetIsTrusted(&trustedEvent);
 
   if (!trustedEvent)
     return NS_OK;
@@ -281,7 +281,7 @@ nsXBLWindowKeyHandler::WalkHandlers(nsIDOMKeyEvent* aKeyEvent, nsIAtom* aEventTy
   if (!el) {
     if (mUserHandler) {
       WalkHandlersInternal(aKeyEvent, aEventType, mUserHandler, true);
-      aKeyEvent->GetDefaultPrevented(&prevent);
+      aKeyEvent->AsEvent()->GetDefaultPrevented(&prevent);
       if (prevent)
         return NS_OK; // Handled by the user bindings. Our work here is done.
     }
@@ -322,31 +322,39 @@ void
 nsXBLWindowKeyHandler::HandleEventOnCapture(nsIDOMKeyEvent* aEvent)
 {
   WidgetKeyboardEvent* widgetEvent =
-    aEvent->GetInternalNSEvent()->AsKeyboardEvent();
+    aEvent->AsEvent()->WidgetEventPtr()->AsKeyboardEvent();
 
   if (widgetEvent->mFlags.mNoCrossProcessBoundaryForwarding) {
     return;
   }
 
   nsCOMPtr<mozilla::dom::Element> originalTarget =
-    do_QueryInterface(aEvent->GetInternalNSEvent()->originalTarget);
+    do_QueryInterface(aEvent->AsEvent()->WidgetEventPtr()->originalTarget);
   if (!EventStateManager::IsRemoteTarget(originalTarget)) {
     return;
   }
 
-  if (!HasHandlerForEvent(aEvent)) {
+  bool aReservedForChrome = false;
+  if (!HasHandlerForEvent(aEvent, &aReservedForChrome)) {
     return;
   }
 
-  // If this event hasn't been marked as mNoCrossProcessBoundaryForwarding
-  // yet, it means it wasn't processed by content. We'll not call any
-  // of the handlers at this moment, and will wait for the event to be
-  // redispatched with mNoCrossProcessBoundaryForwarding = 1 to process it.
+  if (aReservedForChrome) {
+    // For reserved commands (such as Open New Tab), we don't to wait for
+    // the content to answer (so mWantReplyFromContentProcess remains false),
+    // neither to give a chance for content to override its behavior.
+    widgetEvent->mFlags.mNoCrossProcessBoundaryForwarding = true;
+  } else {
+    // Inform the child process that this is a event that we want a reply
+    // from.
+    widgetEvent->mFlags.mWantReplyFromContentProcess = true;
 
-  // Inform the child process that this is a event that we want a reply
-  // from.
-  widgetEvent->mFlags.mWantReplyFromContentProcess = 1;
-  aEvent->StopPropagation();
+    // If this event hadn't been marked as mNoCrossProcessBoundaryForwarding
+    // yet, it means it wasn't processed by content. We'll not call any
+    // of the handlers at this moment, and will wait for the event to be
+    // redispatched with mNoCrossProcessBoundaryForwarding = 1 to process it.
+    aEvent->AsEvent()->StopPropagation();
+  }
 }
 
 //
@@ -373,12 +381,12 @@ nsXBLWindowKeyHandler::IsHTMLEditableFieldFocused()
   if (!fm)
     return false;
 
-  nsCOMPtr<nsIDOMWindow> focusedWindow;
+  nsCOMPtr<mozIDOMWindowProxy> focusedWindow;
   fm->GetFocusedWindow(getter_AddRefs(focusedWindow));
   if (!focusedWindow)
     return false;
 
-  nsCOMPtr<nsPIDOMWindow> piwin(do_QueryInterface(focusedWindow));
+  auto* piwin = nsPIDOMWindowOuter::From(focusedWindow);
   nsIDocShell *docShell = piwin->GetDocShell();
   if (!docShell) {
     return false;
@@ -430,14 +438,16 @@ bool
 nsXBLWindowKeyHandler::WalkHandlersInternal(nsIDOMKeyEvent* aKeyEvent,
                                             nsIAtom* aEventType, 
                                             nsXBLPrototypeHandler* aHandler,
-                                            bool aExecute)
+                                            bool aExecute,
+                                            bool* aOutReservedForChrome)
 {
-  nsAutoTArray<nsShortcutCandidate, 10> accessKeys;
+  AutoTArray<nsShortcutCandidate, 10> accessKeys;
   nsContentUtils::GetAccelKeyCandidates(aKeyEvent, accessKeys);
 
   if (accessKeys.IsEmpty()) {
     return WalkHandlersAndExecute(aKeyEvent, aEventType, aHandler,
-                                  0, IgnoreModifierState(), aExecute);
+                                  0, IgnoreModifierState(),
+                                  aExecute, aOutReservedForChrome);
   }
 
   for (uint32_t i = 0; i < accessKeys.Length(); ++i) {
@@ -445,7 +455,8 @@ nsXBLWindowKeyHandler::WalkHandlersInternal(nsIDOMKeyEvent* aKeyEvent,
     IgnoreModifierState ignoreModifierState;
     ignoreModifierState.mShift = key.mIgnoreShift;
     if (WalkHandlersAndExecute(aKeyEvent, aEventType, aHandler,
-                               key.mCharCode, ignoreModifierState, aExecute)) {
+                               key.mCharCode, ignoreModifierState,
+                               aExecute, aOutReservedForChrome)) {
       return true;
     }
   }
@@ -459,14 +470,15 @@ nsXBLWindowKeyHandler::WalkHandlersAndExecute(
                          nsXBLPrototypeHandler* aHandler,
                          uint32_t aCharCode,
                          const IgnoreModifierState& aIgnoreModifierState,
-                         bool aExecute)
+                         bool aExecute,
+                         bool* aOutReservedForChrome)
 {
   nsresult rv;
 
   // Try all of the handlers until we find one that matches the event.
   for (nsXBLPrototypeHandler *currHandler = aHandler; currHandler;
        currHandler = currHandler->GetNextHandler()) {
-    bool stopped = aKeyEvent->IsDispatchStopped();
+    bool stopped = aKeyEvent->AsEvent()->IsDispatchStopped();
     if (stopped) {
       // The event is finished, don't execute any more handlers
       return false;
@@ -520,6 +532,12 @@ nsXBLWindowKeyHandler::WalkHandlersAndExecute(
       if (value.IsEmpty()) {
         continue;  // nothing to do
       }
+
+      if (aOutReservedForChrome) {
+        // The caller wants to know if this is a reserved command
+        commandElt->GetAttribute(NS_LITERAL_STRING("reserved"), value);
+        *aOutReservedForChrome = value.EqualsLiteral("true");
+      }
     }
 
     nsCOMPtr<EventTarget> piTarget;
@@ -534,7 +552,7 @@ nsXBLWindowKeyHandler::WalkHandlersAndExecute(
       return true;
     }
 
-    rv = currHandler->ExecuteHandler(piTarget, aKeyEvent);
+    rv = currHandler->ExecuteHandler(piTarget, aKeyEvent->AsEvent());
     if (NS_SUCCEEDED(rv)) {
       return true;
     }
@@ -547,7 +565,7 @@ nsXBLWindowKeyHandler::WalkHandlersAndExecute(
   // retry to look for a shortcut key without the Windows-Logo key press.
   if (!aIgnoreModifierState.mOS) {
     WidgetKeyboardEvent* keyEvent =
-      aKeyEvent->GetInternalNSEvent()->AsKeyboardEvent();
+      aKeyEvent->AsEvent()->WidgetEventPtr()->AsKeyboardEvent();
     if (keyEvent && keyEvent->IsOS()) {
       IgnoreModifierState ignoreModifierState(aIgnoreModifierState);
       ignoreModifierState.mOS = true;
@@ -561,9 +579,10 @@ nsXBLWindowKeyHandler::WalkHandlersAndExecute(
 }
 
 bool
-nsXBLWindowKeyHandler::HasHandlerForEvent(nsIDOMKeyEvent* aEvent)
+nsXBLWindowKeyHandler::HasHandlerForEvent(nsIDOMKeyEvent* aEvent,
+                                          bool* aOutReservedForChrome)
 {
-  if (!aEvent->InternalDOMEvent()->IsTrusted()) {
+  if (!aEvent->AsEvent()->InternalDOMEvent()->IsTrusted()) {
     return false;
   }
 
@@ -577,11 +596,12 @@ nsXBLWindowKeyHandler::HasHandlerForEvent(nsIDOMKeyEvent* aEvent)
   }
 
   nsAutoString eventType;
-  aEvent->GetType(eventType);
+  aEvent->AsEvent()->GetType(eventType);
   nsCOMPtr<nsIAtom> eventTypeAtom = do_GetAtom(eventType);
   NS_ENSURE_TRUE(eventTypeAtom, false);
 
-  return WalkHandlersInternal(aEvent, eventTypeAtom, mHandler, false);
+  return WalkHandlersInternal(aEvent, eventTypeAtom, mHandler, false,
+                              aOutReservedForChrome);
 }
 
 already_AddRefed<Element>

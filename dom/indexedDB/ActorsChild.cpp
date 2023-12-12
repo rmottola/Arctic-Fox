@@ -743,7 +743,7 @@ DispatchErrorEvent(IDBRequest* aRequest,
   MOZ_ASSERT(!transaction || transaction->IsOpen() || transaction->IsAborted());
 
   if (transaction && transaction->IsOpen()) {
-    WidgetEvent* internalEvent = aEvent->GetInternalNSEvent();
+    WidgetEvent* internalEvent = aEvent->WidgetEventPtr();
     MOZ_ASSERT(internalEvent);
 
     if (internalEvent->mFlags.mExceptionHasBeenRisen) {
@@ -816,7 +816,7 @@ DispatchSuccessEvent(ResultHelper* aResultHelper,
   MOZ_ASSERT_IF(transaction,
                 transaction->IsOpen() || transaction->IsAborted());
 
-  WidgetEvent* internalEvent = aEvent->GetInternalNSEvent();
+  WidgetEvent* internalEvent = aEvent->WidgetEventPtr();
   MOZ_ASSERT(internalEvent);
 
   if (transaction &&
@@ -830,14 +830,14 @@ class WorkerPermissionChallenge;
 
 // This class calles WorkerPermissionChallenge::OperationCompleted() in the
 // worker thread.
-class WorkerPermissionOperationCompleted final : public WorkerRunnable
+class WorkerPermissionOperationCompleted final : public WorkerControlRunnable
 {
   RefPtr<WorkerPermissionChallenge> mChallenge;
 
 public:
   WorkerPermissionOperationCompleted(WorkerPrivate* aWorkerPrivate,
                                      WorkerPermissionChallenge* aChallenge)
-    : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+    : WorkerControlRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
     , mChallenge(aChallenge)
   {
     MOZ_ASSERT(NS_IsMainThread());
@@ -943,11 +943,7 @@ public:
       RefPtr<WorkerPermissionOperationCompleted> runnable =
         new WorkerPermissionOperationCompleted(mWorkerPrivate, this);
 
-      if (!runnable->Dispatch(nullptr)) {
-        NS_WARNING("Failed to dispatch a runnable to the worker thread.");
-        return;
-      }
-
+      MOZ_ALWAYS_TRUE(runnable->Dispatch(nullptr));
       return;
     }
 
@@ -979,7 +975,7 @@ private:
       wp = wp->GetParent();
     }
 
-    nsPIDOMWindow* window = wp->GetWindow();
+    nsPIDOMWindowInner* window = wp->GetWindow();
     if (!window) {
       return true;
     }
@@ -1419,7 +1415,7 @@ BackgroundFactoryRequestChild::RecvPermissionChallenge(
     JSContext* cx = workerPrivate->GetJSContext();
     MOZ_ASSERT(cx);
 
-    if (!workerPrivate->AddFeature(cx, challenge)) {
+    if (NS_WARN_IF(!workerPrivate->AddFeature(cx, challenge))) {
       return false;
     }
 
@@ -1435,13 +1431,15 @@ BackgroundFactoryRequestChild::RecvPermissionChallenge(
   }
 
   if (XRE_IsParentProcess()) {
-    nsCOMPtr<nsPIDOMWindow> window = mFactory->GetParentObject();
+    nsCOMPtr<nsPIDOMWindowInner> window = mFactory->GetParentObject();
     MOZ_ASSERT(window);
 
     nsCOMPtr<Element> ownerElement =
       do_QueryInterface(window->GetChromeEventHandler());
     if (NS_WARN_IF(!ownerElement)) {
-      return false;
+      // If this fails, the page was navigated. Fail the permission check by
+      // forcing an immediate retry.
+      return SendPermissionRetry();
     }
 
     RefPtr<PermissionRequestMainProcessHelper> helper =
@@ -1796,7 +1794,7 @@ BackgroundDatabaseChild::RecvVersionChange(const uint64_t& aOldVersion,
   RefPtr<IDBDatabase> kungFuDeathGrip = mDatabase;
 
   // Handle bfcache'd windows.
-  if (nsPIDOMWindow* owner = mDatabase->GetOwner()) {
+  if (nsPIDOMWindowInner* owner = mDatabase->GetOwner()) {
     // The database must be closed if the window is already frozen.
     bool shouldAbortAndClose = owner->IsFrozen();
 

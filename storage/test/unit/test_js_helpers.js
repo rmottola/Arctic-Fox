@@ -23,7 +23,7 @@ function test_params_enumerate()
   let index = 0;
   for (let name in stmt.params) {
     if (name == "QueryInterface")
-        continue;
+      continue;
     do_check_eq(name, expected[index++]);
   }
 }
@@ -123,5 +123,5 @@ function run_test()
   );
 
   // Run the tests.
-  tests.forEach(function(test) test());
+  tests.forEach(test => test());
 }

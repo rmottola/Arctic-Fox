@@ -142,7 +142,7 @@ GrallocTextureData::Forget(ISurfaceAllocator* aAllocator)
 bool
 GrallocTextureData::Serialize(SurfaceDescriptor& aOutDescriptor)
 {
-  aOutDescriptor = NewSurfaceDescriptorGralloc(mGrallocHandle, gfx::IsOpaque(mFormat));
+  aOutDescriptor = SurfaceDescriptorGralloc(mGrallocHandle, gfx::IsOpaque(mFormat));
   return true;
 }
 
@@ -250,7 +250,7 @@ GrallocTextureData::UpdateFromSurface(gfx::SourceSurface* aSurface)
   RefPtr<DataSourceSurface> srcSurf = aSurface->GetDataSurface();
 
   if (!srcSurf) {
-    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface.";
+    gfxCriticalError() << "Failed to GetDataSurface in UpdateFromSurface (GTC).";
     return false;
   }
 
@@ -266,7 +266,7 @@ GrallocTextureData::UpdateFromSurface(gfx::SourceSurface* aSurface)
   DataSourceSurface::MappedSurface sourceMap;
 
   if (!srcSurf->Map(DataSourceSurface::READ, &sourceMap)) {
-    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface.";
+    gfxCriticalError() << "Failed to map source surface for UpdateFromSurface (GTC).";
     return false;
   }
 

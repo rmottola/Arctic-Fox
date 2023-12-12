@@ -5,15 +5,12 @@
 
 "use strict";
 
-var {gDevTools} = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
-var {console} = Cu.import("resource://gre/modules/Console.jsm", {});
+// shared-head.js handles imports, constants, and utility functions
+Services.scriptloader.loadSubScript("chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js", this);
+
 var {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
-var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-var promise = require("promise");
-var {TargetFactory} = require("devtools/client/framework/target");
 var {Utils: WebConsoleUtils} = require("devtools/shared/webconsole/utils");
 var {Messages} = require("devtools/client/webconsole/console-output");
-var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const asyncStorage = require("devtools/shared/async-storage");
 
 // Services.prefs.setBoolPref("devtools.debugger.log", true);
@@ -89,6 +86,45 @@ function closeTab(tab) {
   gBrowser.removeTab(tab);
 
   return deferred.promise;
+}
+
+/**
+ * Load the page and return the associated HUD.
+ *
+ * @param string uri
+ *   The URI of the page to load.
+ * @param string consoleType [optional]
+ *   The console type, either "browserConsole" or "webConsole". Defaults to
+ *   "webConsole".
+ * @return object
+ *   The HUD associated with the console
+ */
+function* loadPageAndGetHud(uri, consoleType) {
+  let { browser } = yield loadTab("data:text/html;charset=utf-8,Loading tab for tests");
+
+  let hud;
+  if (consoleType === "browserConsole") {
+    hud = yield HUDService.openBrowserConsoleOrFocus();
+  } else {
+    hud = yield openConsole();
+  }
+
+  ok(hud, "Console was opened");
+
+  let loaded = loadBrowser(browser);
+  yield BrowserTestUtils.loadURI(gBrowser.selectedBrowser, uri);
+  yield loaded;
+
+  yield waitForMessages({
+    webconsole: hud,
+    messages: [{
+      text: uri,
+      category: CATEGORY_NETWORK,
+      severity: SEVERITY_LOG,
+    }],
+  });
+
+  return hud;
 }
 
 function afterAllTabsLoaded(callback, win) {
@@ -814,7 +850,7 @@ function openDebugger(options = {}) {
     if (dbgPanelAlreadyOpen) {
       deferred.resolve(resolveObject);
     } else {
-      panelWin.once(panelWin.EVENTS.SOURCES_ADDED, () => {
+      panelWin.DebuggerController.waitForSourcesLoaded().then(() => {
         deferred.resolve(resolveObject);
       });
     }
@@ -1523,7 +1559,10 @@ function checkOutputForInputs(hud, inputTests) {
     container.addEventListener("TabOpen", entry._onTabOpen, true);
 
     body.scrollIntoView();
-    EventUtils.synthesizeMouse(body, 2, 2, {}, hud.iframeWindow);
+
+    if (!entry.suppressClick) {
+      EventUtils.synthesizeMouse(body, 2, 2, {}, hud.iframeWindow);
+    }
 
     if (entry.inspectable) {
       info("message body tagName '" + body.tagName + "' className '" +
@@ -1576,6 +1615,23 @@ function checkOutputForInputs(hud, inputTests) {
   }
 
   return Task.spawn(runner);
+}
+
+
+/**
+ * Finish the request and resolve with the request object.
+ *
+ * @return promise
+ * @resolves The request object.
+ */
+function waitForFinishedRequest() {
+  registerCleanupFunction(function() {
+    HUDService.lastFinishedRequest.callback = null;
+  });
+
+  return new Promise(resolve => {
+    HUDService.lastFinishedRequest.callback = request => { resolve(request) };
+  });
 }
 
 /**
@@ -1641,6 +1697,21 @@ function checkLinkToInspector(hasLinkToInspector, msg) {
 function getSourceActor(sources, URL) {
   let item = sources.getItemForAttachment(a => a.source.url === URL);
   return item && item.value;
+}
+
+/**
+ * Make a request against an actor and resolve with the packet.
+ * @param object client
+ *   The client to use when making the request.
+ * @param function requestType
+ *   The client request function to run.
+ * @param array args
+ *   The arguments to pass into the function.
+ */
+function getPacket(client, requestType, args) {
+  return new Promise(resolve => {
+    client[requestType](...args, packet => resolve(packet));
+  });
 }
 
 /**

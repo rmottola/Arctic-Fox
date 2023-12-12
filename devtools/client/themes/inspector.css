@@ -3,19 +3,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-%ifdef XP_MACOSX
 
-#inspector-toolbar:-moz-locale-dir(ltr) {
+:root[platform="mac"] #inspector-toolbar:-moz-locale-dir(ltr) {
   padding-left: 2px;
-  padding-right: 16px; /* use -moz-padding-end when/if bug 631729 gets fixed */
 }
 
-#inspector-toolbar:-moz-locale-dir(rtl) {
+:root[platform="mac"] #inspector-toolbar:-moz-locale-dir(rtl) {
   padding-left: 4px;
-  padding-right: 18px; /* use -moz-padding-end when/if bug 631729 gets fixed */
 }
 
-%endif
+#inspector-searchlabel {
+  overflow: hidden;
+}
 
 #inspector-searchbox {
   transition-property: max-width, -moz-padding-end, -moz-padding-start;
@@ -42,38 +41,20 @@
 /* Expand/collapse panel toolbar button */
 
 #inspector-pane-toggle {
-  background: none;
-  box-shadow: none;
-  border: none;
-  list-style-image: url(debugger-collapse.png);
-  -moz-image-region: rect(0px,16px,16px,0px);
-}
-
-#inspector-pane-toggle > .toolbarbutton-icon {
-  width: 16px;
-  height: 16px;
+  list-style-image: url(images/debugger-collapse.png);
 }
 
 #inspector-pane-toggle[pane-collapsed] {
   list-style-image: url(images/debugger-expand.png);
 }
 
-#inspector-pane-toggle:active {
-  -moz-image-region: rect(0px,32px,16px,16px);
-}
-
 @media (min-resolution: 1.1dppx) {
   #inspector-pane-toggle {
     list-style-image: url(images/debugger-collapse@2x.png);
-    -moz-image-region: rect(0px,32px,32px,0px);
   }
 
   #inspector-pane-toggle[pane-collapsed] {
     list-style-image: url(images/debugger-expand@2x.png);
-  }
-
-  #inspector-pane-toggle:active {
-    -moz-image-region: rect(0px,64px,32px,32px);
   }
 }
 

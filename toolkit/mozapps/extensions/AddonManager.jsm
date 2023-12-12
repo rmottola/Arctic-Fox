@@ -248,7 +248,7 @@ function callProviderAsync(aProvider, aMethod, ...aArgs) {
   let callback = aArgs[aArgs.length - 1];
   if (!(aMethod in aProvider)) {
     callback(undefined);
-    return;
+    return undefined;
   }
   try {
     return aProvider[aMethod].apply(aProvider, aArgs);
@@ -256,7 +256,7 @@ function callProviderAsync(aProvider, aMethod, ...aArgs) {
   catch (e) {
     reportProviderError(aProvider, aMethod, e);
     callback(undefined);
-    return;
+    return undefined;
   }
 }
 
@@ -2304,11 +2304,12 @@ var AddonManagerInternal = {
   },
 
   /**
-   * Starts installation of a temporary add-on from a local directory.
-   * @param  aDirectory
-   *         The directory of the add-on to be temporarily installed
-   * @return a Promise that rejects if the add-on is not restartless
-   *         or an add-on with the same ID is already temporarily installed
+   * Installs a temporary add-on from a local file or directory.
+   * @param  aFile
+   *         An nsIFile for the file or directory of the add-on to be
+   *         temporarily installed.
+   * @return a Promise that rejects if the add-on is not a valid restartless
+   *         add-on or if the same ID is already temporarily installed.
    */
   installTemporaryAddon: function(aFile) {
     if (!gStarted)

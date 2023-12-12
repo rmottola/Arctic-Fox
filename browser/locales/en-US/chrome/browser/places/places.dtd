@@ -59,9 +59,6 @@
 <!ENTITY cmd.open_all_in_tabs.label        "Open All in Tabs">
 <!ENTITY cmd.open_all_in_tabs.accesskey    "O">
 
-<!ENTITY cmd.openParentFolder.label      "Open Containing Folder">
-<!ENTITY cmd.openParentFolder.accesskey  "F">
-
 <!ENTITY cmd.properties.label      "Properties">
 <!ENTITY cmd.properties.accesskey  "i">
 
@@ -88,27 +85,12 @@
 <!ENTITY col.url.label               "Location">
 <!ENTITY col.lastvisit.label         "Visit Date">
 <!ENTITY col.visitcount.label        "Visit Count">
-<!ENTITY col.keyword.label           "Keyword">
 <!ENTITY col.description.label       "Description">
 <!ENTITY col.dateadded.label         "Added">
 <!ENTITY col.lastmodified.label      "Last Modified">
-<!ENTITY col.parentfolder.label      "Containing Folder">
-<!ENTITY col.parentfolderpath.label  "Containing Folder Path">
 
 <!ENTITY search.label                              "Search:">
 <!ENTITY search.accesskey                          "S">
-
-<!ENTITY search.in.label                           "Search in:">
-<!ENTITY search.scopeFolder.label                  "Selected Folder">
-<!ENTITY search.scopeFolder.accesskey              "r">
-<!ENTITY search.scopeBookmarks.label               "Bookmarks">
-<!ENTITY search.scopeBookmarks.accesskey           "k">
-<!ENTITY search.scopeDownloads.label               "Downloads">
-<!ENTITY search.scopeDownloads.accesskey           "D">
-<!ENTITY search.scopeHistory.label                 "History">
-<!ENTITY search.scopeHistory.accesskey             "H">
-<!ENTITY saveSearch.label                          "Save">
-<!ENTITY saveSearch.accesskey                      "S">
 
 <!ENTITY cmd.find.key  "f">
 

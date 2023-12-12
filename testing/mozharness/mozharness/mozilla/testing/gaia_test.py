@@ -6,14 +6,12 @@
 
 import copy
 import os
-import re
 import sys
 import time
 
 # load modules from parent dir
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 
-from mozharness.base.errors import TarErrorList, ZipErrorList
 from mozharness.base.log import INFO, ERROR, WARNING, FATAL
 from mozharness.base.script import PreScriptAction
 from mozharness.base.transfer import TransferMixin
@@ -25,7 +23,7 @@ from mozharness.mozilla.testing.testbase import TestingMixin, testing_config_opt
 from mozharness.mozilla.proxxy import Proxxy
 
 
-class GaiaTest(TestingMixin, MercurialScript, TransferMixin, GaiaMixin, BlobUploadMixin):
+class GaiaTest(MercurialScript, TestingMixin, BlobUploadMixin, GaiaMixin, TransferMixin):
     config_options = [[
         ["--application"],
         {"action": "store",
@@ -174,7 +172,7 @@ class GaiaTest(TestingMixin, MercurialScript, TransferMixin, GaiaMixin, BlobUplo
             self.proxxy = proxxy
         return self.proxxy
 
-    def _retry_download_file(self, url, file_name, error_level=FATAL, retry_config=None):
+    def _retry_download(self, url, file_name, error_level=FATAL, retry_config=None):
         if self.config.get("bypass_download_cache"):
             n = 0
             # ignore retry_config in this case
@@ -196,8 +194,9 @@ class GaiaTest(TestingMixin, MercurialScript, TransferMixin, GaiaMixin, BlobUplo
                     self.info("Sleeping %s before retrying..." % sleeptime)
                     time.sleep(sleeptime)
         else:
-            return super(GaiaTest, self)._retry_download_file(
-                url, file_name, error_level, retry_config=retry_config,
+            # Since we're overwritting _retry_download() we can't call download_file() directly
+            return super(GaiaTest, self)._retry_download(
+                url=url, file_name=file_name, error_level=error_level, retry_config=retry_config,
             )
 
     def run_tests(self):

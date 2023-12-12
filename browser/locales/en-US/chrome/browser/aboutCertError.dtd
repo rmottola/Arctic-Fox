@@ -36,5 +36,8 @@ tampering with your connection.</b>">
 <!ENTITY certerror.expert.contentPara2 "Don't add an exception unless
 you know there's a good reason why this site doesn't use trusted identification.">
 <!ENTITY certerror.addException.label "Add Exception…">
+<!ENTITY certerror.copyToClipboard.label "Copy text to clipboard">
 
 <!ENTITY certerror.technical.heading "Technical Details">
+
+<!ENTITY errorReporting.automatic "Report errors like this to help Mozilla identify misconfigured sites">

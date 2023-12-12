@@ -71,7 +71,7 @@ XPCOMUtils.defineLazyGetter(loaderModules, "CSS", () => {
   return Cu.Sandbox(this, {wantGlobalProperties: ["CSS"]}).CSS;
 });
 
-var sharedGlobalBlacklist = ["sdk/indexed-db"];
+var sharedGlobalBlocklist = ["sdk/indexed-db"];
 
 /**
  * Used when the tools should be loaded from the Firefox package itself.
@@ -91,9 +91,7 @@ BuiltinProvider.prototype = {
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "devtools": "resource://devtools",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "devtools/client": "resource://devtools/client",
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "gcli": "resource://devtools/gcli",
+        "gcli": "resource://devtools/shared/gcli/source/lib/gcli",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "promise": "resource://gre/modules/Promise-backend.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
@@ -101,7 +99,7 @@ BuiltinProvider.prototype = {
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "acorn/util/walk": "resource://devtools/acorn/walk.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "source-map": "resource://devtools/sourcemap/source-map.js",
+        "source-map": "resource://devtools/shared/sourcemap/source-map.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         // Allow access to xpcshell test items from the loader.
         "xpcshell-test": "resource://test"
@@ -110,7 +108,7 @@ BuiltinProvider.prototype = {
       globals: this.globals,
       invisibleToDebugger: this.invisibleToDebugger,
       sharedGlobal: true,
-      sharedGlobalBlacklist: sharedGlobalBlacklist
+      sharedGlobalBlocklist,
     });
 
     return promise.resolve(undefined);
@@ -173,7 +171,7 @@ SrcdirProvider.prototype = {
       globals: this.globals,
       invisibleToDebugger: this.invisibleToDebugger,
       sharedGlobal: true,
-      sharedGlobalBlacklist: sharedGlobalBlacklist
+      sharedGlobalBlocklist,
     });
 
     return this._writeManifest(srcDir).then(null, Cu.reportError);
@@ -215,8 +213,7 @@ SrcdirProvider.prototype = {
       let entries = [];
       let lines = data.split(/\n/);
       let preprocessed = /^\s*\*/;
-      let contentEntry =
-        new RegExp("^\\s+content/(\\w+)/(\\S+)\\s+\\((\\S+)\\)");
+      let contentEntry = /^\s+content\/(\S+)\s+\((\S+)\)/;
       for (let line of lines) {
         if (preprocessed.test(line)) {
           dump("Unable to override preprocessed file: " + line + "\n");
@@ -224,12 +221,12 @@ SrcdirProvider.prototype = {
         }
         let match = contentEntry.exec(line);
         if (match) {
-          let pathComponents = match[3].split("/");
+          let pathComponents = match[2].split("/");
           pathComponents.unshift(clientDir);
           let path = OS.Path.join.apply(OS.Path, pathComponents);
           let uri = this.fileURI(path);
-          let entry = "override chrome://" + match[1] +
-                      "/content/" + match[2] + "\t" + uri;
+          let chromeURI = "chrome://devtools/content/" + match[1];
+          let entry = "override " + chromeURI + "\t" + uri;
           entries.push(entry);
         }
       }
@@ -257,6 +254,7 @@ this.DevToolsLoader = function DevToolsLoader() {
   this.lazyImporter = XPCOMUtils.defineLazyModuleGetter.bind(XPCOMUtils);
   this.lazyServiceGetter = XPCOMUtils.defineLazyServiceGetter.bind(XPCOMUtils);
   this.lazyRequireGetter = this.lazyRequireGetter.bind(this);
+  this.main = this.main.bind(this);
 };
 
 DevToolsLoader.prototype = {
@@ -393,7 +391,24 @@ DevToolsLoader.prototype = {
         lazyImporter: this.lazyImporter,
         lazyServiceGetter: this.lazyServiceGetter,
         lazyRequireGetter: this.lazyRequireGetter,
-        id: this.id
+        id: this.id,
+        main: this.main
+      },
+      // Make sure `define` function exists.  This allows defining some modules
+      // in AMD format while retaining CommonJS compatibility through this hook.
+      // JSON Viewer needs modules in AMD format, as it currently uses RequireJS
+      // from a content document and can't access our usual loaders.  So, any
+      // modules shared with the JSON Viewer should include a define wrapper:
+      //
+      //   // Make this available to both AMD and CJS environments
+      //   define(function(require, exports, module) {
+      //     ... code ...
+      //   });
+      //
+      // Bug 1248830 will work out a better plan here for our content module
+      // loading needs, especially as we head towards devtools.html.
+      define(factory) {
+        factory(this.require, this.exports, this.module);
       },
     };
     // Lazy define console in order to load Console.jsm only when it is used

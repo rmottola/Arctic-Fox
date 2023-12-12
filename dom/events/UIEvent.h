@@ -51,7 +51,13 @@ public:
     return UIEventBinding::Wrap(aCx, this, aGivenProto);
   }
 
-  nsIDOMWindow* GetView() const
+  void InitUIEvent(const nsAString& typeArg,
+                   bool canBubbleArg,
+                   bool cancelableArg,
+                   nsGlobalWindow* viewArg,
+                   int32_t detailArg);
+
+  nsPIDOMWindowOuter* GetView() const
   {
     return mView;
   }
@@ -87,6 +93,11 @@ public:
 
   int32_t RangeOffset() const;
 
+  bool CancelBubble() const
+  {
+    return mEvent->mFlags.mPropagationStopped;
+  }
+
   bool IsChar() const;
 
 protected:
@@ -96,7 +107,7 @@ protected:
   nsIntPoint GetMovementPoint();
   nsIntPoint GetLayerPoint() const;
 
-  nsCOMPtr<nsIDOMWindow> mView;
+  nsCOMPtr<nsPIDOMWindowOuter> mView;
   int32_t mDetail;
   CSSIntPoint mClientPoint;
   // Screenpoint is mEvent->refPoint.

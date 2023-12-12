@@ -9,7 +9,6 @@
 #include "mozilla/ContentEvents.h"
 #include "mozilla/EventForwards.h"
 #include "AnimationCommon.h"
-#include "nsCSSPseudoElements.h"
 #include "mozilla/dom/Animation.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/TimeStamp.h"
@@ -26,6 +25,8 @@ class KeyframeEffectReadOnly;
 class Promise;
 } /* namespace dom */
 
+enum class CSSPseudoElementType : uint8_t;
+
 struct AnimationEventInfo {
   RefPtr<dom::Element> mElement;
   RefPtr<dom::Animation> mAnimation;
@@ -33,7 +34,7 @@ struct AnimationEventInfo {
   TimeStamp mTimeStamp;
 
   AnimationEventInfo(dom::Element* aElement,
-                     nsCSSPseudoElements::Type aPseudoType,
+                     CSSPseudoElementType aPseudoType,
                      EventMessage aMessage,
                      const nsSubstring& aAnimationName,
                      const StickyTimeDuration& aElapsedTime,
@@ -130,7 +131,7 @@ public:
 
   bool IsStylePaused() const { return mIsStylePaused; }
 
-  bool HasLowerCompositeOrderThan(const Animation& aOther) const override;
+  bool HasLowerCompositeOrderThan(const CSSAnimation& aOther) const;
 
   void SetAnimationIndex(uint64_t aIndex)
   {
@@ -169,11 +170,11 @@ protected:
   // Returns the duration from the start of the animation's source effect's
   // active interval to the point where the animation actually begins playback.
   // This is zero unless the animation's source effect has a negative delay in
-  // which // case it is the absolute value of that delay.
+  // which case it is the absolute value of that delay.
   // This is used for setting the elapsedTime member of CSS AnimationEvents.
   TimeDuration InitialAdvance() const {
     return mEffect ?
-           std::max(TimeDuration(), mEffect->Timing().mDelay * -1) :
+           std::max(TimeDuration(), mEffect->SpecifiedTiming().mDelay * -1) :
            TimeDuration();
   }
   // Converts an AnimationEvent's elapsedTime value to an equivalent TimeStamp
@@ -280,28 +281,19 @@ public:
   {
   }
 
-  NS_DECL_CYCLE_COLLECTION_CLASS(nsAnimationManager)
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-
-  // nsIStyleRuleProcessor (parts)
-  virtual size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf)
-    const MOZ_MUST_OVERRIDE override;
-  virtual size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
-    const MOZ_MUST_OVERRIDE override;
+  NS_INLINE_DECL_CYCLE_COLLECTING_NATIVE_REFCOUNTING(nsAnimationManager)
+  NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS(nsAnimationManager)
 
   /**
-   * Return the style rule that RulesMatching should add for
-   * aStyleContext.  This might be different from what RulesMatching
-   * actually added during aStyleContext's construction because the
-   * element's animation-name may have changed.  (However, this does
-   * return null during the non-animation restyling phase, as
-   * RulesMatching does.)
+   * Update the set of animations on |aElement| based on |aStyleContext|.
+   * If necessary, this will notify the corresponding EffectCompositor so
+   * that it can update its animation rule.
    *
    * aStyleContext may be a style context for aElement or for its
    * :before or :after pseudo-element.
    */
-  nsIStyleRule* CheckAnimationRule(nsStyleContext* aStyleContext,
-                                   mozilla::dom::Element* aElement);
+  void UpdateAnimations(nsStyleContext* aStyleContext,
+                        mozilla::dom::Element* aElement);
 
   /**
    * Add a pending event.
@@ -319,7 +311,11 @@ public:
    * accumulate animationstart events at other points when style
    * contexts are created.
    */
-  void DispatchEvents()  { mEventDispatcher.DispatchEvents(mPresContext); }
+  void DispatchEvents()
+  {
+    RefPtr<nsAnimationManager> kungFuDeathGrip(this);
+    mEventDispatcher.DispatchEvents(mPresContext);
+  }
   void SortEvents()      { mEventDispatcher.SortEvents(); }
   void ClearEventQueue() { mEventDispatcher.ClearEventQueue(); }
 
@@ -327,7 +323,7 @@ public:
   // rather than the element for the generated content for animations on
   // ::before and ::after.
   void StopAnimationsForElement(mozilla::dom::Element* aElement,
-                                nsCSSPseudoElements::Type aPseudoType);
+                                mozilla::CSSPseudoElementType aPseudoType);
 
   bool IsAnimationManager() override {
     return true;

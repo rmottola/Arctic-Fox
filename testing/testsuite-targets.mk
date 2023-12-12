@@ -6,10 +6,8 @@
 # Shortcut for mochitest* and xpcshell-tests targets
 ifdef TEST_PATH
 TEST_PATH_ARG := '$(TEST_PATH)'
-IPCPLUGINS_PATH_ARG := '$(TEST_PATH)'
 else
 TEST_PATH_ARG :=
-IPCPLUGINS_PATH_ARG := dom/plugins/test
 endif
 
 # include automation-build.mk to get the path to the binary
@@ -19,7 +17,7 @@ include $(topsrcdir)/build/binary-location.mk
 SYMBOLS_PATH := --symbols-path=$(DIST)/crashreporter-symbols
 
 # Usage: |make [TEST_PATH=...] [EXTRA_TEST_ARGS=...] mochitest*|.
-MOCHITESTS := mochitest-plain mochitest-chrome mochitest-devtools mochitest-a11y mochitest-ipcplugins
+MOCHITESTS := mochitest-plain mochitest-chrome mochitest-devtools mochitest-a11y
 mochitest:: $(MOCHITESTS)
 
 ifndef TEST_PACKAGE_NAME
@@ -160,22 +158,6 @@ mochitest-devtools:
 
 mochitest-a11y:
 	$(RUN_MOCHITEST) --a11y
-	$(CHECK_TEST_ERROR)
-
-mochitest-ipcplugins:
-ifeq (Darwin,$(OS_ARCH))
-ifeq (i386,$(TARGET_CPU))
-	$(RUN_MOCHITEST) --setpref=dom.ipc.plugins.enabled.i386.test.plugin=false $(IPCPLUGINS_PATH_ARG)
-endif
-ifeq (x86_64,$(TARGET_CPU))
-	$(RUN_MOCHITEST) --setpref=dom.ipc.plugins.enabled.x86_64.test.plugin=false $(IPCPLUGINS_PATH_ARG)
-endif
-ifeq (powerpc,$(TARGET_CPU))
-	$(RUN_MOCHITEST) --setpref=dom.ipc.plugins.enabled.ppc.test.plugin=false $(IPCPLUGINS_PATH_ARG)
-endif
-else
-	$(RUN_MOCHITEST) --setpref=dom.ipc.plugins.enabled=false dom/plugins/test
-endif
 	$(CHECK_TEST_ERROR)
 
 ifeq ($(OS_ARCH),Darwin)
@@ -407,7 +389,6 @@ stage-all: \
   stage-mach \
   stage-extensions \
   stage-mochitest \
-  stage-reftest \
   stage-xpcshell \
   stage-jstests \
   stage-jetpack \
@@ -511,9 +492,6 @@ ifeq ($(MOZ_BUILD_APP),mobile/android)
 	$(NSINSTALL) $(DEPTH)/mobile/android/base/fennec_ids.txt $(PKG_STAGE)/mochitest
 endif
 
-stage-reftest: make-stage-dir
-	$(MAKE) -C $(DEPTH)/layout/tools/reftest stage-package
-
 stage-xpcshell: make-stage-dir
 	$(MAKE) -C $(DEPTH)/testing/xpcshell stage-package
 
@@ -612,7 +590,6 @@ stage-extensions: make-stage-dir
   mochitest-chrome \
   mochitest-devtools \
   mochitest-a11y \
-  mochitest-ipcplugins \
   reftest \
   crashtest \
   xpcshell-tests \
@@ -625,7 +602,6 @@ stage-extensions: make-stage-dir
   stage-b2g \
   stage-config \
   stage-mochitest \
-  stage-reftest \
   stage-xpcshell \
   stage-jstests \
   stage-android \

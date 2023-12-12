@@ -1,5 +1,5 @@
-/* -*- js-indent-level: 2; indent-tabs-mode: nil -*- */
-/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft= javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -21,7 +21,7 @@ loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
 loader.lazyGetter(this, "showDoorhanger", () => require("devtools/client/shared/doorhanger").showDoorhanger);
-loader.lazyRequireGetter(this, "sourceUtils", "devtools/client/shared/source-utils");
+loader.lazyRequireGetter(this, "viewSource", "devtools/client/shared/view-source");
 
 const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
 var l10n = new WebConsoleUtils.l10n(STRINGS_URI);
@@ -209,15 +209,13 @@ HUD_SERVICE.prototype =
       DebuggerServer.allowChromeProcess = true;
 
       let client = new DebuggerClient(DebuggerServer.connectPipe());
-      client.connect(() => {
-        client.getProcess().then(aResponse => {
+      return client.connect()
+        .then(() => client.getProcess())
+        .then(aResponse => {
           // Set chrome:false in order to attach to the target
           // (i.e. send an `attach` request to the chrome actor)
-          deferred.resolve({ form: aResponse.form, client: client, chrome: false });
-        }, deferred.reject);
-      });
-
-      return deferred.promise;
+          return { form: aResponse.form, client: client, chrome: false };
+        });
     }
 
     let target;
@@ -519,7 +517,7 @@ WebConsole.prototype = {
    *        The URL of the file which corresponds to a Scratchpad id.
    */
   viewSourceInScratchpad: function WC_viewSourceInScratchpad(aSourceURL, aSourceLine) {
-    sourceUtils.viewSourceInScratchpad(aSourceURL, aSourceLine);
+    viewSource.viewSourceInScratchpad(aSourceURL, aSourceLine);
   },
 
   /**

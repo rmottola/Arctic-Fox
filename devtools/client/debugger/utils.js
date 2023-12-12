@@ -1,9 +1,18 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* globals document, window */
 "use strict";
 
-const XULUtils = {
+// Maps known URLs to friendly source group names and put them at the
+// bottom of source list.
+var KNOWN_SOURCE_GROUPS = {
+  "Add-on SDK": "resource://gre/modules/commonjs/",
+};
+
+KNOWN_SOURCE_GROUPS[L10N.getStr("anonymousSourcesLabel")] = "anonymous";
+
+var XULUtils = {
   /**
    * Create <command> elements within `commandset` with event handlers
    * bound to the `command` event
@@ -35,10 +44,10 @@ const CHARACTER_LIMIT = 250; // line character limit
 /**
  * Utility functions for handling sources.
  */
-const SourceUtils = {
+var SourceUtils = {
   _labelsCache: new Map(), // Can't use WeakMaps because keys are strings.
   _groupsCache: new Map(),
-  _minifiedCache: new WeakMap(),
+  _minifiedCache: new Map(),
 
   /**
    * Returns true if the specified url and/or content type are specific to
@@ -59,12 +68,11 @@ const SourceUtils = {
    * @return object
    *         A promise that resolves to true if source text is minified.
    */
-  isMinified: Task.async(function*(sourceClient) {
-    if (this._minifiedCache.has(sourceClient)) {
-      return this._minifiedCache.get(sourceClient);
+  isMinified: function(key, text) {
+    if (this._minifiedCache.has(key)) {
+      return this._minifiedCache.get(key);
     }
 
-    let [, text] = yield DebuggerController.SourceScripts.getText(sourceClient);
     let isMinified;
     let lineEndIndex = 0;
     let lineStartIndex = 0;
@@ -94,9 +102,9 @@ const SourceUtils = {
     isMinified =
       ((indentCount / lines) * 100) < INDENT_COUNT_THRESHOLD || overCharLimit;
 
-    this._minifiedCache.set(sourceClient, isMinified);
+    this._minifiedCache.set(key, isMinified);
     return isMinified;
-  }),
+  },
 
   /**
    * Clears the labels, groups and minify cache, populated by methods like
@@ -316,6 +324,48 @@ const SourceUtils = {
     }
     // Give up.
     return aUrl.spec;
+  },
+
+  parseSource: function(aDebuggerView, aParser) {
+    let editor = aDebuggerView.editor;
+
+    let contents = editor.getText();
+    let location = aDebuggerView.Sources.selectedValue;
+    let parsedSource = aParser.get(contents, location);
+
+    return parsedSource;
+  },
+
+  findIdentifier: function(aEditor, parsedSource, x, y) {
+    let editor = aEditor;
+
+    // Calculate the editor's line and column at the current x and y coords.
+    let hoveredPos = editor.getPositionFromCoords({ left: x, top: y });
+    let hoveredOffset = editor.getOffset(hoveredPos);
+    let hoveredLine = hoveredPos.line;
+    let hoveredColumn = hoveredPos.ch;
+
+    let scriptInfo = parsedSource.getScriptInfo(hoveredOffset);
+
+    // If the script length is negative, we're not hovering JS source code.
+    if (scriptInfo.length == -1) {
+      return;
+    }
+
+    // Using the script offset, determine the actual line and column inside the
+    // script, to use when finding identifiers.
+    let scriptStart = editor.getPosition(scriptInfo.start);
+    let scriptLineOffset = scriptStart.line;
+    let scriptColumnOffset = (hoveredLine == scriptStart.line ? scriptStart.ch : 0);
+
+    let scriptLine = hoveredLine - scriptLineOffset;
+    let scriptColumn = hoveredColumn - scriptColumnOffset;
+    let identifierInfo = parsedSource.getIdentifierAt({
+      line: scriptLine + 1,
+      column: scriptColumn,
+      scriptIndex: scriptInfo.index
+    });
+
+    return identifierInfo;
   }
 };
-

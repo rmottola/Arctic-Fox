@@ -4,11 +4,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/**
- * Loads _HTTPD_JS_PATH file, which is dynamically defined by
- * <runxpcshelltests.py>.
- */
-load(_HTTPD_JS_PATH);
+var _HTTPD_JS_PATH = __LOCATION__.parent;
+_HTTPD_JS_PATH.append("httpd.js");
+load(_HTTPD_JS_PATH.path);
 
 // if these tests fail, we'll want the debug output
 DEBUG = true;
@@ -72,7 +70,7 @@ function makeBIS(stream)
 function fileContents(file)
 {
   const PR_RDONLY = 0x01;
-  var fis = new FileInputStream(file, PR_RDONLY, 0444,
+  var fis = new FileInputStream(file, PR_RDONLY, 0o444,
                                 Ci.nsIFileInputStream.CLOSE_ON_EOF);
   var sis = new ScriptableInputStream(fis);
   var contents = sis.read(file.fileSize);

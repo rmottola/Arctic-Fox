@@ -31,7 +31,7 @@ add_task(function* test_purpose() {
                 base + aExpected);
   }
 
-  let base = "http://www.google.com/search?q=foo&ie=utf-8&oe=utf-8&aq=t&client=firefox";
+  let base = "http://www.google.com/search?q=foo&ie=utf-8&oe=utf-8&aq=t";
   check_submission("",              "foo");
   check_submission("",              "foo", null);
   check_submission("",              "foo", "text/html");
@@ -42,7 +42,7 @@ add_task(function* test_purpose() {
   check_submission("",              "foo", "text/html", "invalid");
 
   // Tests for a param that varies with a purpose but has a default value.
-  base = "http://www.google.com/search?q=foo&client=firefox";
+  base = "http://www.google.com/search?q=foo";
   check_submission("&channel=none", "foo", "application/x-moz-default-purpose");
   check_submission("&channel=none", "foo", "application/x-moz-default-purpose", null);
   check_submission("&channel=none", "foo", "application/x-moz-default-purpose", "");
@@ -55,6 +55,17 @@ add_task(function* test_purpose() {
   base = "http://www.google.com/search?q=";
   check_submission("&channel=sb", "", null,        "searchbar");
   check_submission("&channel=sb", "", "text/html", "searchbar");
+
+  // verify that the 'system' purpose falls back to the 'searchbar' purpose.
+  base = "http://www.google.com/search?q=foo";
+  check_submission("&channel=sb", "foo", "text/html", "system");
+  check_submission("&channel=sb", "foo", "text/html", "searchbar");
+  // Add an engine that actually defines the 'system' purpose...
+  [engine] = yield addTestEngines([
+    { name: "engine-system-purpose", xmlFileName: "engine-system-purpose.xml" }
+  ]);
+  // ... and check that the system purpose is used correctly.
+  check_submission("&channel=sys", "foo", "text/html", "system");
 
   do_test_finished();
 });

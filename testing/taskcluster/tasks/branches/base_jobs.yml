@@ -1,6 +1,6 @@
 ---
 # For complete sample of all build and test jobs,
-# see <gecko>/testing/taskcluster/tasks/job_flags.yml
+# see <gecko>/testing/taskcluster/tasks/branches/base_job_flags.yml
 
 $inherits:
   from: tasks/branches/base_job_flags.yml
@@ -21,7 +21,7 @@ builds:
       opt:
         task: tasks/builds/mulet_linux.yml
   emulator-kk:
-    platfoms:
+    platforms:
       - b2g
     types:
       opt:
@@ -29,7 +29,7 @@ builds:
       debug:
         task: tasks/builds/b2g_emulator_kk_debug.yml
   emulator-l:
-    platfoms:
+    platforms:
       - b2g
     types:
       opt:
@@ -37,7 +37,7 @@ builds:
       debug:
         task: tasks/builds/b2g_emulator_l_debug.yml
   emulator-jb:
-    platfoms:
+    platforms:
       - b2g
     types:
       opt:
@@ -45,7 +45,7 @@ builds:
       debug:
         task: tasks/builds/b2g_emulator_jb_debug.yml
   emulator:
-    platfoms:
+    platforms:
       - b2g
     types:
       opt:
@@ -80,6 +80,74 @@ builds:
     types:
       opt:
         task: tasks/builds/b2g_flame_kk_eng.yml
+  flame-kk-spark-eng:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_flame_kk_spark_eng.yml
+  nexus-4:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_4_user.yml
+  nexus-4-eng:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_4_eng.yml
+  nexus-4-kk:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_4_kk_user.yml
+  nexus-4-kk-eng:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_4_kk_eng.yml
+  nexus-5l:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_5l_user.yml
+  nexus-5l-eng:
+    platforms:
+      - b2g
+    types:
+      opt:
+        task: tasks/builds/b2g_nexus_5l_eng.yml
+  linux64:
+    platforms:
+      - Linux64
+    types:
+      opt:
+        task: tasks/builds/opt_linux64.yml
+      debug:
+        task: tasks/builds/dbg_linux64.yml
+  linux64-st-an:
+    platforms:
+      - Linux64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_linux64_st-an.yml
+  macosx64:
+    platforms:
+      - MacOSX64
+    types:
+      debug:
+        task: tasks/builds/dbg_macosx64.yml
+  macosx64-st-an:
+    platforms:
+      - MacOSX64 Static Analysis
+    types:
+      opt:
+        task: tasks/builds/opt_macosx64_st-an.yml
 
 tests:
   cppunit:
@@ -96,30 +164,28 @@ tests:
     allowed_build_tasks:
       tasks/builds/b2g_desktop_opt.yml:
         task: tasks/tests/b2g_build_test.yml
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_build_test.yml
   gaia-build-unit:
     allowed_build_tasks:
       tasks/builds/b2g_desktop_opt.yml:
         task: tasks/tests/b2g_build_unit.yml
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_build_unit.yml
   gaia-js-integration:
     allowed_build_tasks:
       tasks/builds/b2g_desktop_opt.yml:
         task: tasks/tests/b2g_gaia_js_integration_tests.yml
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_gaia_js_integration_tests.yml
   gaia-linter:
     allowed_build_tasks:
       tasks/builds/b2g_desktop_opt.yml:
         task: tasks/tests/b2g_linter.yml
-  gaia-ui-test-accessibility:
-    allowed_build_tasks:
-      tasks/builds/b2g_desktop_opt.yml:
-        task: tasks/tests/b2g_gaia_ui_test_accessibility.yml
-      tasks/builds/b2g_desktop_debug.yml:
-        task: tasks/tests/b2g_gaia_ui_test_accessibility.yml
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_linter.yml
   gaia-ui-test-functional:
     allowed_build_tasks:
-      tasks/builds/b2g_desktop_opt.yml:
-        task: tasks/tests/b2g_gaia_ui_test_functional.yml
-      tasks/builds/b2g_desktop_debug.yml:
-        task: tasks/tests/b2g_gaia_ui_test_functional.yml
       tasks/builds/b2g_flame_kk_eng.yml:
         task: tasks/tests/flame_kk_gaia_ui_test_functional.yml
   gaia-ui-test-functional-dsds:
@@ -132,16 +198,18 @@ tests:
         task: tasks/tests/flame_kk_gaia_ui_test_sanity.yml
   gaia-ui-test-unit:
     allowed_build_tasks:
-      tasks/builds/b2g_desktop_opt.yml:
-        task: tasks/tests/b2g_gaia_ui_test_unit.yml
-      tasks/builds/b2g_desktop_debug.yml:
-        task: tasks/tests/b2g_gaia_ui_test_unit.yml
       tasks/builds/b2g_flame_kk_eng.yml:
         task: tasks/tests/flame_kk_gaia_ui_test_unit.yml
   gaia-unit:
     allowed_build_tasks:
       tasks/builds/b2g_desktop_opt.yml:
         task: tasks/tests/b2g_gaia_unit.yml
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_gaia_unit.yml
+  gaia-unit-oop:
+    allowed_build_tasks:
+      tasks/builds/mulet_linux.yml:
+        task: tasks/tests/mulet_gaia_unit_oop.yml
   marionette:
     allowed_build_tasks:
       tasks/builds/b2g_emulator_ics_opt.yml:

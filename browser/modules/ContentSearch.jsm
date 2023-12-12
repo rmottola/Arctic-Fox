@@ -45,6 +45,9 @@ const MAX_SUGGESTIONS = 6;
  *   GetState
  *     Retrieves the current search engine state.
  *     data: null
+ *   GetStrings
+ *     Retrieves localized search UI strings.
+ *     data: null
  *   ManageEngines
  *     Opens the search engine management window.
  *     data: null
@@ -53,7 +56,9 @@ const MAX_SUGGESTIONS = 6;
  *     data: the entry, a string
  *   Search
  *     Performs a search.
- *     data: { engineName, searchString, whence }
+ *     Any GetSuggestions messages in the queue from the same target will be
+ *     cancelled.
+ *     data: { engineName, searchString, healthReportKey, searchPurpose }
  *   SetCurrentEngine
  *     Sets the current engine.
  *     data: the name of the engine
@@ -72,9 +77,16 @@ const MAX_SUGGESTIONS = 6;
  *   State
  *     Sent in reply to GetState.
  *     data: see _currentStateObj
+ *   Strings
+ *     Sent in reply to GetStrings
+ *     data: Object containing string names and values for the current locale.
  *   Suggestions
  *     Sent in reply to GetSuggestions.
  *     data: see _onMessageGetSuggestions
+ *   SuggestionsCancelled
+ *     Sent in reply to GetSuggestions when pending GetSuggestions events are
+ *     cancelled.
+ *     data: null
  */
 
 this.ContentSearch = {
@@ -89,23 +101,50 @@ this.ContentSearch = {
   // { controller, previousFormHistoryResult }.  See _onMessageGetSuggestions.
   _suggestionMap: new WeakMap(),
 
+  // Resolved when we finish shutting down.
+  _destroyedPromise: null,
+
+  // The current controller and browser in _onMessageGetSuggestions.  Allows
+  // fetch cancellation from _cancelSuggestions.
+  _currentSuggestion: null,
+
   init: function () {
     Cc["@mozilla.org/globalmessagemanager;1"].
       getService(Ci.nsIMessageListenerManager).
       addMessageListener(INBOUND_MESSAGE, this);
     Services.obs.addObserver(this, "browser-search-engine-modified", false);
+    Services.obs.addObserver(this, "shutdown-leaks-before-check", false);
+    Services.prefs.addObserver("browser.search.hiddenOneOffs", this, false);
+    this._stringBundle = Services.strings.createBundle("chrome://global/locale/autocomplete.properties");
   },
 
-
+  get searchSuggestionUIStrings() {
+    if (this._searchSuggestionUIStrings) {
+      return this._searchSuggestionUIStrings;
+    }
+    this._searchSuggestionUIStrings = {};
+    let searchBundle = Services.strings.createBundle("chrome://browser/locale/search.properties");
+    let stringNames = ["searchHeader", "searchPlaceholder", "searchForSomethingWith",
+                       "searchWithHeader", "searchSettings"];
+    for (let name of stringNames) {
+      this._searchSuggestionUIStrings[name] = searchBundle.GetStringFromName(name);
+    }
+    return this._searchSuggestionUIStrings;
+  },
 
   destroy: function () {
+    if (this._destroyedPromise) {
+      return this._destroyedPromise;
+    }
+
     Cc["@mozilla.org/globalmessagemanager;1"].
       getService(Ci.nsIMessageListenerManager).
       removeMessageListener(INBOUND_MESSAGE, this);
     Services.obs.removeObserver(this, "browser-search-engine-modified");
+    Services.obs.removeObserver(this, "shutdown-leaks-before-check");
 
     this._eventQueue.length = 0;
-    return Promise.resolve(this._currentEventPromise);
+    return this._destroyedPromise = Promise.resolve(this._currentEventPromise);
   },
 
   /**
@@ -136,6 +175,12 @@ this.ContentSearch = {
     };
     msg.target.addEventListener("SwapDocShells", msg, true);
 
+    // Search requests cause cancellation of all Suggestion requests from the
+    // same browser.
+    if (msg.data.type == "Search") {
+      this._cancelSuggestions(msg);
+    }
+
     this._eventQueue.push({
       type: "Message",
       data: msg,
@@ -145,12 +190,17 @@ this.ContentSearch = {
 
   observe: function (subj, topic, data) {
     switch (topic) {
+    case "nsPref:changed":
     case "browser-search-engine-modified":
       this._eventQueue.push({
         type: "Observe",
         data: data,
       });
       this._processEventQueue();
+      break;
+    case "shutdown-leaks-before-check":
+      subj.wrappedJSObject.client.addBlocker(
+        "ContentSearch: Wait until the service is destroyed", () => this.destroy());
       break;
     }
   },
@@ -174,11 +224,33 @@ this.ContentSearch = {
     }.bind(this));
   },
 
+  _cancelSuggestions: function (msg) {
+    let cancelled = false;
+    // cancel active suggestion request
+    if (this._currentSuggestion && this._currentSuggestion.target == msg.target) {
+      this._currentSuggestion.controller.stop();
+      cancelled = true;
+    }
+    // cancel queued suggestion requests
+    for (let i = 0; i < this._eventQueue.length; i++) {
+      let m = this._eventQueue[i].data;
+      if (msg.target == m.target && m.data.type == "GetSuggestions") {
+        this._eventQueue.splice(i, 1);
+        cancelled = true;
+        i--;
+      }
+    }
+    if (cancelled) {
+      this._reply(msg, "SuggestionsCancelled");
+    }
+  },
+
   _onMessage: Task.async(function* (msg) {
     let methodName = "_onMessage" + msg.data.type;
     if (methodName in this) {
       yield this._initService();
       yield this[methodName](msg, msg.data.data);
+      msg.target.removeEventListener("SwapDocShells", msg, true);
     }
   }),
 
@@ -188,14 +260,19 @@ this.ContentSearch = {
     });
   },
 
+  _onMessageGetStrings: function (msg, data) {
+    this._reply(msg, "Strings", this.searchSuggestionUIStrings);
+  },
+
   _onMessageSearch: function (msg, data) {
     this._ensureDataHasProperties(data, [
       "engineName",
       "searchString",
-      "whence",
+      "healthReportKey",
+      "searchPurpose",
     ]);
     let engine = Services.search.getEngineByName(data.engineName);
-    let submission = engine.getSubmission(data.searchString, "", data.whence);
+    let submission = engine.getSubmission(data.searchString, "", data.searchPurpose);
     let browser = msg.target;
     let win;
     try {
@@ -226,8 +303,8 @@ this.ContentSearch = {
       };
       win.openUILinkIn(submission.uri.spec, where, params);
     }
-    win.BrowserSearch.recordSearchInHealthReport(engine, data.whence,
-                                                 data.selection || null);
+    win.BrowserSearch.recordSearchInTelemetry(engine, data.healthReportKey,
+                                              data.selection || null);
     return Promise.resolve();
   },
 
@@ -262,7 +339,14 @@ this.ContentSearch = {
     let priv = PrivateBrowsingUtils.isBrowserPrivate(msg.target);
     // fetch() rejects its promise if there's a pending request, but since we
     // process our event queue serially, there's never a pending request.
+    this._currentSuggestion = { controller: controller, target: msg.target };
     let suggestions = yield controller.fetch(data.searchString, priv, engine);
+    this._currentSuggestion = null;
+
+    // suggestions will be null if the request was cancelled
+    if (!suggestions) {
+      return;
+    }
 
     // Keep the form history result so RemoveFormHistoryEntry can remove entries
     // from it.  Keeping only one result isn't foolproof because the client may
@@ -383,7 +467,12 @@ this.ContentSearch = {
       engines: [],
       currentEngine: yield this._currentEngineObj(),
     };
+    let pref = Services.prefs.getCharPref("browser.search.hiddenOneOffs");
+    let hiddenList = pref ? pref.split(",") : [];
     for (let engine of Services.search.getVisibleEngines()) {
+      if (hiddenList.indexOf(engine.name) != -1) {
+        continue;
+      }
       let uri = engine.getIconURLBySize(16, 16);
       state.engines.push({
         name: engine.name,
@@ -396,13 +485,12 @@ this.ContentSearch = {
   _currentEngineObj: Task.async(function* () {
     let engine = Services.search.currentEngine;
     let favicon = engine.getIconURLBySize(16, 16);
-    let uri1x = engine.getIconURLBySize(65, 26);
-    let uri2x = engine.getIconURLBySize(130, 52);
+    let placeholder = this._stringBundle.formatStringFromName(
+      "searchWithEngine", [engine.name], 1);
     let obj = {
       name: engine.name,
+      placeholder: placeholder,
       iconBuffer: yield this._arrayBufferFromDataURI(favicon),
-      logoBuffer: yield this._arrayBufferFromDataURI(uri1x),
-      logo2xBuffer: yield this._arrayBufferFromDataURI(uri2x),
     };
     return obj;
   }),
@@ -419,7 +507,13 @@ this.ContentSearch = {
     xhr.onloadend = () => {
       deferred.resolve(xhr.response);
     };
-    xhr.send();
+    try {
+      // This throws if the URI is erroneously encoded.
+      xhr.send();
+    }
+    catch (err) {
+      return Promise.resolve(null);
+    }
     return deferred.promise;
   },
 

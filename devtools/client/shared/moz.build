@@ -8,6 +8,7 @@ BROWSER_CHROME_MANIFESTS += ['test/browser.ini']
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
 DIRS += [
+    'components',
     'redux',
     'vendor',
     'widgets',
@@ -19,10 +20,13 @@ DevToolsModules(
     'browser-loader.js',
     'css-parsing-utils.js',
     'Curl.jsm',
+    'demangle.js',
     'DeveloperToolbar.jsm',
     'devices.js',
     'DOMHelpers.jsm',
     'doorhanger.js',
+    'file-watcher-worker.js',
+    'file-watcher.js',
     'frame-script-utils.js',
     'getjson.js',
     'inplace-editor.js',
@@ -37,5 +41,6 @@ DevToolsModules(
     'telemetry.js',
     'theme-switching.js',
     'theme.js',
-    'undo.js'
+    'undo.js',
+    'view-source.js',
 )

@@ -159,7 +159,7 @@ def is_installer(src):
 
         if os.access(src, os.X_OK) and src.lower().endswith('.exe'):
             if has_pefile:
-                # try to determine if binary is actually a goanna installer
+                # try to determine if binary is actually a gecko installer
                 pe_data = pefile.PE(src)
                 data = {}
                 for info in getattr(pe_data, 'FileInfo', []):

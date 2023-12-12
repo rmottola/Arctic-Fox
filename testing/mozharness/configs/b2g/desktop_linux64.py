@@ -26,7 +26,7 @@ config = {
         "buildbot": "/tools/buildbot/bin/buildbot",
     },
     'app_ini_path': '%(obj_dir)s/dist/bin/application.ini',
-    'purge_skip': ['info', 'rel-*:45d', 'tb-rel-*:45d'],
+    'purge_skip': ['info', 'rel-*:10d', 'tb-rel-*:10d'],
     'purge_basedirs':  ["/mock/users/cltbld/home/cltbld/build"],
     # mock shtuff
     'mock_mozilla_dir':  '/builds/mock_mozilla',
@@ -40,6 +40,7 @@ config = {
         ('/tools/tooltool.py', '/builds/tooltool.py'),
         ('/builds/mozilla-desktop-geoloc-api.key', '/builds/mozilla-desktop-geoloc-api.key'),
         ('/builds/crash-stats-api.token', '/builds/crash-stats-api.token'),
+        ('/usr/local/lib/hgext', '/usr/local/lib/hgext'),
     ],
     'enable_ccache': True,
     'vcs_share_base': '/builds/hg-shared',
@@ -53,9 +54,9 @@ config = {
 
     #########################################################################
     ###### 64 bit specific ######
-    'base_name': 'B2G_%(branch)s_linux64_goanna',
-    'platform': 'linux64_goanna',
-    'stage_platform': 'linux64_goanna',
+    'base_name': 'B2G_%(branch)s_linux64_gecko',
+    'platform': 'linux64_gecko',
+    'stage_platform': 'linux64_gecko',
     'stage_product': 'b2g',
     'env': {
         'MOZBUILD_STATE_PATH': os.path.join(os.getcwd(), '.mozbuild'),
@@ -96,7 +97,7 @@ config = {
                       'xorg-x11-font', 'imake', 'ccache', 'wget',
                       'freetype-2.3.11-6.el6_2.9',
                       'freetype-devel-2.3.11-6.el6_2.9'],
-    'src_mozconfig': 'b2g/config/mozconfigs/linux64_goanna/nightly',
+    'src_mozconfig': 'b2g/config/mozconfigs/linux64_gecko/nightly',
     'tooltool_manifest_src': "b2g/config/tooltool-manifests/linux64/releng.manifest",
     #########################################################################
 }

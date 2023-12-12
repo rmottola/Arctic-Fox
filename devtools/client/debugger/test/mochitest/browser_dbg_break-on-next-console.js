@@ -17,7 +17,6 @@ function test() {
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
     gSources = gDebugger.DebuggerView.Sources;
-    gBreakpoints = gDebugger.DebuggerController.Breakpoints;
     gTarget = gDebugger.gTarget;
     gThreadClient = gDebugger.gThreadClient;
     gResumeButton = gDebugger.document.getElementById("resume");
@@ -33,7 +32,7 @@ function test() {
 
     let oncePaused = gTarget.once("thread-paused");
     EventUtils.sendMouseEvent({ type: "mousedown" }, gResumeButton, gDebugger);
-    let jsterm = yield getSplitConsole();
+    let jsterm = yield getSplitConsole(gDevTools.getToolbox(gPanel.target));
     let executed = jsterm.execute("1+1");
     yield oncePaused;
 
@@ -52,20 +51,4 @@ function test() {
 
     yield executed;
   });
-
-  function getSplitConsole() {
-    return new Promise(resolve => {
-      let toolbox = gDevTools.getToolbox(gPanel.target);
-      toolbox.once("webconsole-ready", () => {
-        ok(toolbox.splitConsole, "Split console is shown.");
-        let jsterm = toolbox.getPanel("webconsole").hud.jsterm;
-        resolve(jsterm);
-      });
-      EventUtils.synthesizeKey("VK_ESCAPE", {}, gDebugger);
-    });
-  }
 }
-
-registerCleanupFunction(() => {
-  Services.prefs.clearUserPref("devtools.toolbox.splitconsoleEnabled");
-});

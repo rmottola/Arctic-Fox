@@ -56,7 +56,7 @@ private:
   RefPtr<mozilla::dom::FontFaceSet> mFontFaceSet;
   nsCOMPtr<nsIChannel>    mChannel;
   nsCOMPtr<nsITimer>      mLoadTimer;
-  TimeStamp               mStartTime;
+  mozilla::TimeStamp      mStartTime;
   nsIStreamLoader*        mStreamLoader;
 };
 

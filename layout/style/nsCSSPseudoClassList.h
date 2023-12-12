@@ -163,6 +163,7 @@ CSS_STATE_PSEUDO_CLASS(mozDevtoolsHighlighted, ":-moz-devtools-highlighted", 0, 
 
 // Matches the element which is being displayed full-screen, and
 // any containing frames.
+CSS_STATE_PSEUDO_CLASS(fullscreen, ":fullscreen", 0, "", NS_EVENT_STATE_FULL_SCREEN)
 CSS_STATE_PSEUDO_CLASS(mozFullScreen, ":-moz-full-screen", 0, "", NS_EVENT_STATE_FULL_SCREEN)
 
 // Matches any element which is an ancestor of the DOM full-screen element,
@@ -191,9 +192,6 @@ CSS_STATE_PSEUDO_CLASS(mozTypeUnsupportedPlatform, ":-moz-type-unsupported-platf
 CSS_STATE_PSEUDO_CLASS(mozHandlerClickToPlay, ":-moz-handler-clicktoplay",
                        CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
                        NS_EVENT_STATE_TYPE_CLICK_TO_PLAY)
-CSS_STATE_PSEUDO_CLASS(mozHandlerPlayPreview, ":-moz-handler-playpreview",
-                       CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
-                       NS_EVENT_STATE_TYPE_PLAY_PREVIEW)
 CSS_STATE_PSEUDO_CLASS(mozHandlerVulnerableUpdatable, ":-moz-handler-vulnerable-updatable",
                        CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "",
                        NS_EVENT_STATE_VULNERABLE_UPDATABLE)

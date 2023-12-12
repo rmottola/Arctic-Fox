@@ -22,10 +22,8 @@ if CONFIG['VPX_X86_ASM']:
     if '64' in CONFIG['OS_TEST']:
         SOURCES += files['X86-64_ASM']
 
-    # AVX2 only supported on
-    # Darwin and Windows toolchains right now
-    if CONFIG['OS_TARGET'] in ('Darwin', 'WINNT'):
-        SOURCES += files['AVX2']
+    #avx2 can be enabled on all supported compilters
+    SOURCES += files['AVX2']
 
     #postproc is only enabled on x86 with asm
     SOURCES += files['VP8_POSTPROC']
@@ -46,6 +44,12 @@ if CONFIG['VPX_ARM_ASM']:
     for f in SOURCES:
         if f.endswith('.c') and 'neon' in f:
             SOURCES[f].flags += CONFIG['VPX_ASFLAGS']
+
+    if CONFIG['OS_TARGET'] == 'Android':
+        # For cpu-features.h
+        LOCAL_INCLUDES += [
+            '%%%s/sources/android/cpufeatures' % CONFIG['ANDROID_NDK'],
+        ]
 
 # boolhuff_armv5te.asm defines the same functions as boolhuff.c instead of
 # using RTCD, so we have to make sure we only add one of the two.
@@ -84,7 +88,7 @@ if CONFIG['CLANG_CL'] or not CONFIG['_MSC_VER']:
                 SOURCES[f].flags += ['-mavx2']
 
 # Suppress warnings in third-party code.
-if CONFIG['GNU_CC']:
+if CONFIG['GNU_CC'] or CONFIG['CLANG_CL']:
     CFLAGS += [
         '-Wno-sign-compare',
         '-Wno-unused-function', # so many of these warnings; just ignore them

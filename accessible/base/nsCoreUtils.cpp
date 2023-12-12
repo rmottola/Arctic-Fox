@@ -16,11 +16,13 @@
 #include "nsIBoxObject.h"
 #include "nsIDOMXULElement.h"
 #include "nsIDocShell.h"
+#include "nsIObserverService.h"
 #include "nsIPresShell.h"
 #include "nsPresContext.h"
 #include "nsIScrollableFrame.h"
 #include "nsISelectionPrivate.h"
 #include "nsISelectionController.h"
+#include "nsISimpleEnumerator.h"
 #include "mozilla/dom/TouchEvent.h"
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/EventStateManager.h"
@@ -34,12 +36,23 @@
 #include "nsITreeBoxObject.h"
 #include "nsITreeColumns.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/HTMLLabelElement.h"
 
 using namespace mozilla;
 
 ////////////////////////////////////////////////////////////////////////////////
 // nsCoreUtils
 ////////////////////////////////////////////////////////////////////////////////
+
+bool
+nsCoreUtils::IsLabelWithControl(nsIContent* aContent)
+{
+  dom::HTMLLabelElement* label = dom::HTMLLabelElement::FromContent(aContent);
+  if (label && label->GetControl())
+    return true;
+
+  return false;
+}
 
 bool
 nsCoreUtils::HasClickListener(nsIContent *aContent)
@@ -646,4 +659,30 @@ nsCoreUtils::IsWhitespaceString(const nsSubstring& aString)
     ++iterBegin;
 
   return iterBegin == iterEnd;
+}
+
+bool
+nsCoreUtils::AccEventObserversExist()
+{
+  nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
+  NS_ENSURE_TRUE(obsService, false);
+
+  nsCOMPtr<nsISimpleEnumerator> observers;
+  obsService->EnumerateObservers(NS_ACCESSIBLE_EVENT_TOPIC,
+                                 getter_AddRefs(observers));
+  NS_ENSURE_TRUE(observers, false);
+
+  bool hasObservers = false;
+  observers->HasMoreElements(&hasObservers);
+
+  return hasObservers;
+}
+
+void
+nsCoreUtils::DispatchAccEvent(RefPtr<nsIAccessibleEvent> event)
+{
+  nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
+  NS_ENSURE_TRUE_VOID(obsService);
+
+  obsService->NotifyObservers(event, NS_ACCESSIBLE_EVENT_TOPIC, nullptr);
 }

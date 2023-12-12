@@ -34,6 +34,7 @@
 #include "mozilla/TextEvents.h"
 #include "mozilla/dom/Element.h"        // for Element, nsINode::AsElement
 #include "mozilla/dom/Text.h"
+#include "mozilla/dom/Event.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "nsAString.h"                  // for nsAString_internal::Length, etc
 #include "nsCCUncollectableMarker.h"    // for nsCCUncollectableMarker
@@ -616,7 +617,9 @@ nsEditor::GetSelectionController(nsISelectionController **aSel)
     nsCOMPtr<nsIPresShell> presShell = GetPresShell();
     selCon = do_QueryInterface(presShell);
   }
-  NS_ENSURE_TRUE(selCon, NS_ERROR_NOT_INITIALIZED);
+  if (!selCon) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
   NS_ADDREF(*aSel = selCon);
   return NS_OK;
 }
@@ -643,7 +646,9 @@ nsEditor::GetSelection(int16_t aSelectionType, nsISelection** aSelection)
   *aSelection = nullptr;
   nsCOMPtr<nsISelectionController> selcon;
   GetSelectionController(getter_AddRefs(selcon));
-  NS_ENSURE_TRUE(selcon, NS_ERROR_NOT_INITIALIZED);
+  if (!selcon) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
   return selcon->GetSelection(aSelectionType, aSelection);  // does an addref
 }
 
@@ -652,7 +657,9 @@ nsEditor::GetSelection(int16_t aSelectionType)
 {
   nsCOMPtr<nsISelection> sel;
   nsresult res = GetSelection(aSelectionType, getter_AddRefs(sel));
-  NS_ENSURE_SUCCESS(res, nullptr);
+  if (NS_FAILED(res)) {
+    return nullptr;
+  }
 
   return static_cast<Selection*>(sel.get());
 }
@@ -1478,7 +1485,7 @@ nsEditor::JoinNodes(nsINode& aLeftNode, nsINode& aRightNode)
                             parent->AsDOMNode());
   }
 
-  nsresult result;
+  nsresult result = NS_OK;
   RefPtr<JoinNodeTxn> txn = CreateTxnForJoinNode(aLeftNode, aRightNode);
   if (txn)  {
     result = DoTransaction(txn);
@@ -2648,23 +2655,42 @@ nsEditor::CreateTxnForJoinNode(nsINode& aLeftNode, nsINode& aRightNode)
 
 // BEGIN nsEditor public helper methods
 
+struct SavedRange {
+  RefPtr<Selection> mSelection;
+  nsCOMPtr<nsINode> mStartNode;
+  nsCOMPtr<nsINode> mEndNode;
+  int32_t mStartOffset;
+  int32_t mEndOffset;
+};
+
 nsresult
 nsEditor::SplitNodeImpl(nsIContent& aExistingRightNode,
                         int32_t aOffset,
                         nsIContent& aNewLeftNode)
 {
-  // Get selection
-  RefPtr<Selection> selection = GetSelection();
-  NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
+  // Remember all selection points.
+  AutoTArray<SavedRange, 10> savedRanges;
+  for (size_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES - 1; ++i) {
+    SelectionType type(1 << i);
+    SavedRange range;
+    range.mSelection = GetSelection(type);
+    if (type == nsISelectionController::SELECTION_NORMAL) {
+      NS_ENSURE_TRUE(range.mSelection, NS_ERROR_NULL_POINTER);
+    } else if (!range.mSelection) {
+      // For non-normal selections, skip over the non-existing ones.
+      continue;
+    }
 
-  // Remember some selection points, if selection is set
-  nsCOMPtr<nsINode> selStartNode, selEndNode;
-  int32_t selStartOffset = 0, selEndOffset = 0;
-  if (selection->GetRangeAt(0)) {
-    selStartNode = selection->GetRangeAt(0)->GetStartParent();
-    selStartOffset = selection->GetRangeAt(0)->StartOffset();
-    selEndNode = selection->GetRangeAt(0)->GetEndParent();
-    selEndOffset = selection->GetRangeAt(0)->EndOffset();
+    for (uint32_t j = 0; j < range.mSelection->RangeCount(); ++j) {
+      RefPtr<nsRange> r = range.mSelection->GetRangeAt(j);
+      MOZ_ASSERT(r->IsPositioned());
+      range.mStartNode = r->GetStartParent();
+      range.mStartOffset = r->StartOffset();
+      range.mEndNode = r->GetEndParent();
+      range.mEndOffset = r->EndOffset();
+
+      savedRanges.AppendElement(range);
+    }
   }
 
   nsCOMPtr<nsINode> parent = aExistingRightNode.GetParentNode();
@@ -2716,40 +2742,63 @@ nsEditor::SplitNodeImpl(nsIContent& aExistingRightNode,
     ps->FlushPendingNotifications(Flush_Frames);
   }
 
-  if (GetShouldTxnSetSelection()) {
-    // Editor wants us to set selection at split point
+  bool shouldSetSelection = GetShouldTxnSetSelection();
+
+  RefPtr<Selection> previousSelection;
+  for (size_t i = 0; i < savedRanges.Length(); ++i) {
+    // Adjust the selection if needed.
+    SavedRange& range = savedRanges[i];
+
+    // If we have not seen the selection yet, clear all of its ranges.
+    if (range.mSelection != previousSelection) {
+      nsresult rv = range.mSelection->RemoveAllRanges();
+      NS_ENSURE_SUCCESS(rv, rv);
+      previousSelection = range.mSelection;
+    }
+
+    if (shouldSetSelection &&
+        range.mSelection->Type() ==
+          nsISelectionController::SELECTION_NORMAL) {
+      // If the editor should adjust the selection, don't bother restoring
+      // the ranges for the normal selection here.
+      continue;
+    }
+
+    // Split the selection into existing node and new node.
+    if (range.mStartNode == &aExistingRightNode) {
+      if (range.mStartOffset < aOffset) {
+        range.mStartNode = &aNewLeftNode;
+      } else {
+        range.mStartOffset -= aOffset;
+      }
+    }
+
+    if (range.mEndNode == &aExistingRightNode) {
+      if (range.mEndOffset < aOffset) {
+        range.mEndNode = &aNewLeftNode;
+      } else {
+        range.mEndOffset -= aOffset;
+      }
+    }
+
+    RefPtr<nsRange> newRange;
+    nsresult rv = nsRange::CreateRange(range.mStartNode, range.mStartOffset,
+                                       range.mEndNode, range.mEndOffset,
+                                       getter_AddRefs(newRange));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = range.mSelection->AddRange(newRange);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  if (shouldSetSelection) {
+    // Editor wants us to set selection at split point.
+    RefPtr<Selection> selection = GetSelection();
+    NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
     selection->Collapse(&aNewLeftNode, aOffset);
-  } else if (selStartNode) {
-    // Else adjust the selection if needed.  If selStartNode is null, then
-    // there was no selection.
-    if (selStartNode == &aExistingRightNode) {
-      if (selStartOffset < aOffset) {
-        selStartNode = &aNewLeftNode;
-      } else {
-        selStartOffset -= aOffset;
-      }
-    }
-    if (selEndNode == &aExistingRightNode) {
-      if (selEndOffset < aOffset) {
-        selEndNode = &aNewLeftNode;
-      } else {
-        selEndOffset -= aOffset;
-      }
-    }
-    selection->Collapse(selStartNode, selStartOffset);
-    selection->Extend(selEndNode, selEndOffset);
   }
 
   return NS_OK;
 }
-
-struct SavedRange {
-  RefPtr<Selection> mSelection;
-  nsCOMPtr<nsINode> mStartNode;
-  nsCOMPtr<nsINode> mEndNode;
-  int32_t mStartOffset;
-  int32_t mEndOffset;
-};
 
 nsresult
 nsEditor::JoinNodesImpl(nsINode* aNodeToKeep,
@@ -2768,7 +2817,7 @@ nsEditor::JoinNodesImpl(nsINode* aNodeToKeep,
   nsINode* parent = GetNodeLocation(aNodeToKeep, &keepOffset);
 
   // Remember all selection points.
-  nsAutoTArray<SavedRange, 10> savedRanges;
+  AutoTArray<SavedRange, 10> savedRanges;
   for (size_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES - 1; ++i) {
     SelectionType type(1 << i);
     SavedRange range;
@@ -2782,9 +2831,7 @@ nsEditor::JoinNodesImpl(nsINode* aNodeToKeep,
 
     for (uint32_t j = 0; j < range.mSelection->RangeCount(); ++j) {
       RefPtr<nsRange> r = range.mSelection->GetRangeAt(j);
-      if (!r->IsPositioned()) {
-        continue;
-      }
+      MOZ_ASSERT(r->IsPositioned());
       range.mStartNode = r->GetStartParent();
       range.mStartOffset = r->StartOffset();
       range.mEndNode = r->GetEndParent();
@@ -3796,7 +3843,7 @@ nsEditor::SplitNodeDeep(nsIContent& aNode,
       didSplit = true;
       ErrorResult rv;
       nsCOMPtr<nsIContent> newLeftNode = SplitNode(nodeToSplit, offset, rv);
-      NS_ENSURE_TRUE(!rv.Failed(), -1);
+      NS_ENSURE_TRUE(!NS_FAILED(rv.StealNSResult()), -1);
 
       rightNode = nodeToSplit;
       leftNode = newLeftNode;
@@ -4575,7 +4622,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
   // HandleKeyPressEvent()'s switch statement.
 
   WidgetKeyboardEvent* nativeKeyEvent =
-    aKeyEvent->GetInternalNSEvent()->AsKeyboardEvent();
+    aKeyEvent->AsEvent()->WidgetEventPtr()->AsKeyboardEvent();
   NS_ENSURE_TRUE(nativeKeyEvent, NS_ERROR_UNEXPECTED);
   NS_ASSERTION(nativeKeyEvent->mMessage == eKeyPress,
                "HandleKeyPressEvent gets non-keypress event");
@@ -4585,7 +4632,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
     // consume backspace for disabled and readonly textfields, to prevent
     // back in history, which could be confusing to users
     if (nativeKeyEvent->keyCode == nsIDOMKeyEvent::DOM_VK_BACK_SPACE) {
-      aKeyEvent->PreventDefault();
+      aKeyEvent->AsEvent()->PreventDefault();
     }
     return NS_OK;
   }
@@ -4596,7 +4643,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
     case nsIDOMKeyEvent::DOM_VK_SHIFT:
     case nsIDOMKeyEvent::DOM_VK_CONTROL:
     case nsIDOMKeyEvent::DOM_VK_ALT:
-      aKeyEvent->PreventDefault(); // consumed
+      aKeyEvent->AsEvent()->PreventDefault(); // consumed
       return NS_OK;
     case nsIDOMKeyEvent::DOM_VK_BACK_SPACE:
       if (nativeKeyEvent->IsControl() || nativeKeyEvent->IsAlt() ||
@@ -4604,7 +4651,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
         return NS_OK;
       }
       DeleteSelection(nsIEditor::ePrevious, nsIEditor::eStrip);
-      aKeyEvent->PreventDefault(); // consumed
+      aKeyEvent->AsEvent()->PreventDefault(); // consumed
       return NS_OK;
     case nsIDOMKeyEvent::DOM_VK_DELETE:
       // on certain platforms (such as windows) the shift key
@@ -4616,7 +4663,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
         return NS_OK;
       }
       DeleteSelection(nsIEditor::eNext, nsIEditor::eStrip);
-      aKeyEvent->PreventDefault(); // consumed
+      aKeyEvent->AsEvent()->PreventDefault(); // consumed
       return NS_OK;
   }
   return NS_OK;
@@ -4998,8 +5045,8 @@ nsEditor::IsActiveInDOMWindow()
   NS_ENSURE_TRUE(fm, false);
 
   nsCOMPtr<nsIDocument> doc = do_QueryReferent(mDocWeak);
-  nsPIDOMWindow* ourWindow = doc->GetWindow();
-  nsCOMPtr<nsPIDOMWindow> win;
+  nsPIDOMWindowOuter* ourWindow = doc->GetWindow();
+  nsCOMPtr<nsPIDOMWindowOuter> win;
   nsIContent* content =
     nsFocusManager::GetFocusedDescendant(ourWindow, false,
                                          getter_AddRefs(win));
@@ -5012,7 +5059,7 @@ nsEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
   // If the event is trusted, the event should always cause input.
   NS_ENSURE_TRUE(aEvent, false);
 
-  WidgetEvent* widgetEvent = aEvent->GetInternalNSEvent();
+  WidgetEvent* widgetEvent = aEvent->WidgetEventPtr();
   if (NS_WARN_IF(!widgetEvent)) {
     return false;
   }
@@ -5045,7 +5092,7 @@ nsEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
     case eCompositionCommitAsIs:
       // Don't allow composition events whose internal event are not
       // WidgetCompositionEvent.
-      widgetGUIEvent = aEvent->GetInternalNSEvent()->AsCompositionEvent();
+      widgetGUIEvent = aEvent->WidgetEventPtr()->AsCompositionEvent();
       needsWidget = true;
       break;
     default:

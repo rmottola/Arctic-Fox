@@ -8,6 +8,7 @@ const {Cu, Cc, Ci} = require("chrome");
 const Services = require("Services");
 const promise = require("promise");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "gDevTools", "resource://devtools/client/framework/gDevTools.jsm");
 
 exports.OptionsPanel = OptionsPanel;
@@ -94,31 +95,21 @@ OptionsPanel.prototype = {
     return this.toolbox.target;
   },
 
-  open: function() {
-    let targetPromise;
-
+  open: Task.async(function*() {
     // For local debugging we need to make the target remote.
     if (!this.target.isRemote) {
-      targetPromise = this.target.makeRemote();
-    } else {
-      targetPromise = promise.resolve(this.target);
+      yield this.target.makeRemote();
     }
 
-    return targetPromise.then(() => {
-      this.setupToolsList();
-      this.setupToolbarButtonsList();
-      this.setupThemeList();
-      this.populatePreferences();
-      this.updateDefaultTheme();
-    }).then(() => {
-      this.isReady = true;
-      this.emit("ready");
-      return this;
-    }).then(null, function onError(aReason) {
-      Cu.reportError("OptionsPanel open failed. " +
-                     aReason.error + ": " + aReason.message);
-    });
-  },
+    this.setupToolsList();
+    this.setupToolbarButtonsList();
+    this.setupThemeList();
+    this.updateDefaultTheme();
+    yield this.populatePreferences();
+    this.isReady = true;
+    this.emit("ready");
+    return this;
+  }),
 
   _addListeners: function() {
     gDevTools.on("pref-changed", this._prefChanged);
@@ -315,7 +306,7 @@ OptionsPanel.prototype = {
     }
 
     if (this.target.activeTab) {
-      this.target.client.attachTab(this.target.activeTab._actor, (response) => {
+      return this.target.client.attachTab(this.target.activeTab._actor).then(([response,client]) => {
         this._origJavascriptEnabled = !response.javascriptEnabled;
         this.disableJSNode.checked = this._origJavascriptEnabled;
         this.disableJSNode.addEventListener("click", this._disableJSClicked, false);

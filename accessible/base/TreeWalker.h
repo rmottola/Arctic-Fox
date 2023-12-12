@@ -44,13 +44,13 @@ public:
   ~TreeWalker();
 
   /**
-   * Return the next child accessible.
+   * Return the next accessible.
    *
    * @note Returned accessible is bound to the document, if the accessible is
    *       rejected during tree creation then the caller should be unbind it
    *       from the document.
    */
-  Accessible* NextChild();
+  Accessible* Next();
 
 private:
   TreeWalker();
@@ -87,7 +87,7 @@ private:
   DocAccessible* mDoc;
   Accessible* mContext;
   nsIContent* mAnchorNode;
-  nsAutoTArray<ChildrenIterator, 20> mStateStack;
+  AutoTArray<ChildrenIterator, 20> mStateStack;
   int32_t mChildFilter;
   uint32_t mFlags;
 };

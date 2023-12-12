@@ -10,6 +10,7 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TaskQueue.h"
+#include "mozilla/Monitor.h"
 
 #include "MediaDataDemuxer.h"
 #include "MediaDecoderReader.h"
@@ -47,7 +48,7 @@ public:
   void ReadUpdatedMetadata(MediaInfo* aInfo) override;
 
   RefPtr<SeekPromise>
-  Seek(int64_t aTime, int64_t aUnused) override;
+  Seek(SeekTarget aTarget, int64_t aUnused) override;
 
 protected:
   void NotifyDataArrivedInternal() override;
@@ -96,6 +97,10 @@ public:
   void SetCDMProxy(CDMProxy* aProxy) override;
 #endif
 
+  // Returns a string describing the state of the decoder data.
+  // Used for debugging purposes.
+  void GetMozDebugReaderData(nsAString& aString);
+
 private:
   bool HasVideo() { return mVideo.mTrackDemuxer; }
   bool HasAudio() { return mAudio.mTrackDemuxer; }
@@ -128,8 +133,8 @@ private:
   bool DecodeDemuxedSamples(TrackType aTrack,
                             MediaRawData* aSample);
 
-  struct SeekTarget {
-    SeekTarget(const media::TimeUnit& aTime, bool aDropTarget)
+  struct InternalSeekTarget {
+    InternalSeekTarget(const media::TimeUnit& aTime, bool aDropTarget)
       : mTime(aTime)
       , mDropTarget(aDropTarget)
       , mWaiting(false)
@@ -141,7 +146,7 @@ private:
   };
   // Perform an internal seek to aTime. If aDropTarget is true then
   // the first sample past the target will be dropped.
-  void InternalSeek(TrackType aTrack, const SeekTarget& aTarget);
+  void InternalSeek(TrackType aTrack, const InternalSeekTarget& aTarget);
 
   // Drain the current decoder.
   void DrainDecoder(TrackType aTrack);
@@ -209,6 +214,8 @@ private:
                 uint32_t aDecodeAhead)
       : mOwner(aOwner)
       , mType(aType)
+      , mMonitor("DecoderData")
+      , mDescription("shutdown")
       , mDecodeAhead(aDecodeAhead)
       , mUpdateScheduled(false)
       , mDemuxEOS(false)
@@ -226,6 +233,7 @@ private:
       , mNumSamplesInput(0)
       , mNumSamplesOutput(0)
       , mNumSamplesOutputTotal(0)
+      , mNumSamplesSkippedTotal(0)
       , mSizeOfQueue(0)
       , mIsHardwareAccelerated(false)
       , mLastStreamSourceID(UINT32_MAX)
@@ -235,13 +243,26 @@ private:
     // Disambiguate Audio vs Video.
     MediaData::Type mType;
     RefPtr<MediaTrackDemuxer> mTrackDemuxer;
-    // The platform decoder.
-    RefPtr<MediaDataDecoder> mDecoder;
     // TaskQueue on which decoder can choose to decode.
     // Only non-null up until the decoder is created.
     RefPtr<FlushableTaskQueue> mTaskQueue;
     // Callback that receives output and error notifications from the decoder.
     nsAutoPtr<DecoderCallback> mCallback;
+
+    // Monitor protecting mDescription and mDecoder.
+    Monitor mMonitor;
+    // The platform decoder.
+    RefPtr<MediaDataDecoder> mDecoder;
+    const char* mDescription;
+    void ShutdownDecoder()
+    {
+      MonitorAutoLock mon(mMonitor);
+      if (mDecoder) {
+        mDecoder->Shutdown();
+      }
+      mDescription = "shutdown";
+      mDecoder = nullptr;
+    }
 
     // Only accessed from reader's task queue.
     uint32_t mDecodeAhead;
@@ -279,7 +300,7 @@ private:
     // If set, all decoded samples prior mTimeThreshold will be dropped.
     // Used for internal seeking when a change of stream is detected or when
     // encountering data discontinuity.
-    Maybe<SeekTarget> mTimeThreshold;
+    Maybe<InternalSeekTarget> mTimeThreshold;
     // Time of last sample returned.
     Maybe<media::TimeUnit> mLastSampleTime;
 
@@ -289,6 +310,7 @@ private:
     uint64_t mNumSamplesInput;
     uint64_t mNumSamplesOutput;
     uint64_t mNumSamplesOutputTotal;
+    uint64_t mNumSamplesSkippedTotal;
 
     // These get overriden in the templated concrete class.
     // Indicate if we have a pending promise for decoded frame.
@@ -444,7 +466,7 @@ private:
     OnSeekFailed(TrackType::kAudioTrack, aFailure);
   }
   // Temporary seek information while we wait for the data
-  Maybe<media::TimeUnit> mOriginalSeekTime;
+  Maybe<SeekTarget> mOriginalSeekTarget;
   Maybe<media::TimeUnit> mPendingSeekTime;
   MozPromiseHolder<SeekPromise> mSeekPromise;
 

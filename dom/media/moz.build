@@ -42,9 +42,6 @@ DIRS += [
 if CONFIG['MOZ_RAW']:
     DIRS += ['raw']
 
-if CONFIG['MOZ_GSTREAMER']:
-    DIRS += ['gstreamer']
-
 if CONFIG['MOZ_DIRECTSHOW']:
     DIRS += ['directshow']
 
@@ -96,6 +93,7 @@ EXPORTS += [
     'AudioSampleFormat.h',
     'AudioSegment.h',
     'AudioStream.h',
+    'Benchmark.h',
     'BufferMediaResource.h',
     'CubebUtils.h',
     'DecoderTraits.h',
@@ -131,7 +129,9 @@ EXPORTS += [
     'MP3Demuxer.h',
     'MP3FrameParser.h',
     'nsIDocumentActivity.h',
+    'QueueObject.h',
     'RtspMediaResource.h',
+    'SeekTarget.h',
     'SelfRef.h',
     'SharedBuffer.h',
     'StreamBuffer.h',
@@ -199,6 +199,7 @@ UNIFIED_SOURCES += [
     'AudioStreamTrack.cpp',
     'AudioTrack.cpp',
     'AudioTrackList.cpp',
+    'Benchmark.cpp',
     'CanvasCaptureMediaStream.cpp',
     'CubebUtils.cpp',
     'DOMMediaStream.cpp',
@@ -229,6 +230,7 @@ UNIFIED_SOURCES += [
     'MP3Decoder.cpp',
     'MP3Demuxer.cpp',
     'MP3FrameParser.cpp',
+    'QueueObject.cpp',
     'RtspMediaResource.cpp',
     'StreamBuffer.cpp',
     'TextTrack.cpp',
@@ -310,8 +312,8 @@ if CONFIG['MOZ_OMX_DECODER']:
 if CONFIG['ANDROID_VERSION'] > '15':
     DEFINES['MOZ_OMX_WEBM_DECODER'] = True
 
-CFLAGS += CONFIG['GSTREAMER_CFLAGS']
-CXXFLAGS += CONFIG['GSTREAMER_CFLAGS']
+if CONFIG['MOZ_GONK_MEDIACODEC']:
+    DEFINES['MOZ_GONK_MEDIACODEC'] = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

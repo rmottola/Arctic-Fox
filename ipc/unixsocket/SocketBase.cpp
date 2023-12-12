@@ -145,7 +145,7 @@ UnixSocketRawData::~UnixSocketRawData()
 {
   MOZ_COUNT_DTOR_INHERITED(UnixSocketRawData, UnixSocketIOBuffer);
 
-  nsAutoArrayPtr<uint8_t> data(GetBuffer());
+  UniquePtr<uint8_t[]> data(GetBuffer());
   ResetBuffer(nullptr, 0, 0, 0);
 }
 
@@ -403,7 +403,7 @@ SocketDeleteInstanceTask::~SocketDeleteInstanceTask()
 void
 SocketDeleteInstanceTask::Run()
 {
-  mIO = nullptr; // delete instance
+  mIO.reset(); // delete instance
 }
 
 //

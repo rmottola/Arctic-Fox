@@ -34,6 +34,7 @@ partial interface UIEvent {
   readonly attribute unsigned long which;
   readonly attribute Node?         rangeParent;
   readonly attribute long          rangeOffset;
+           attribute boolean       cancelBubble;
   readonly attribute boolean       isChar;
 };
 

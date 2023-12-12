@@ -8,10 +8,10 @@
 #define mozilla_EffectSet_h
 
 #include "mozilla/AnimValuesStyleRule.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/EffectCompositor.h"
 #include "mozilla/EnumeratedArray.h"
 #include "mozilla/TimeStamp.h"
-#include "nsCSSPseudoElements.h" // For nsCSSPseudoElements::Type
 #include "nsHashKeys.h" // For nsPtrHashKey
 #include "nsTHashtable.h" // For nsTHashtable
 
@@ -24,6 +24,8 @@ class Element;
 class KeyframeEffectReadOnly;
 } // namespace dom
 
+enum class CSSPseudoElementType : uint8_t;
+
 // A wrapper around a hashset of AnimationEffect objects to handle
 // storing the set as a property of an element.
 class EffectSet
@@ -32,6 +34,7 @@ public:
   EffectSet()
     : mCascadeNeedsUpdate(false)
     , mAnimationGeneration(0)
+    , mActiveIterators(0)
 #ifdef DEBUG
     , mCalledPropertyDtor(false)
 #endif
@@ -43,6 +46,9 @@ public:
   {
     MOZ_ASSERT(mCalledPropertyDtor,
                "must call destructor through element property dtor");
+    MOZ_ASSERT(mActiveIterators == 0,
+               "Effect set should not be destroyed while it is being "
+               "enumerated");
     MOZ_COUNT_DTOR(EffectSet);
   }
   static void PropertyDtor(void* aObject, nsIAtom* aPropertyName,
@@ -52,10 +58,12 @@ public:
   void Traverse(nsCycleCollectionTraversalCallback& aCallback);
 
   static EffectSet* GetEffectSet(dom::Element* aElement,
-                                 nsCSSPseudoElements::Type aPseudoType);
+                                 CSSPseudoElementType aPseudoType);
   static EffectSet* GetEffectSet(const nsIFrame* aFrame);
   static EffectSet* GetOrCreateEffectSet(dom::Element* aElement,
-                                         nsCSSPseudoElements::Type aPseudoType);
+                                         CSSPseudoElementType aPseudoType);
+  static void DestroyEffectSet(dom::Element* aElement,
+                               CSSPseudoElementType aPseudoType);
 
   void AddEffect(dom::KeyframeEffectReadOnly& aEffect);
   void RemoveEffect(dom::KeyframeEffectReadOnly& aEffect);
@@ -74,18 +82,33 @@ public:
   class Iterator
   {
   public:
-    explicit Iterator(OwningEffectSet::Iterator&& aHashIterator)
-      : mHashIterator(mozilla::Move(aHashIterator))
-      , mIsEndIterator(false) { }
-    Iterator(Iterator&& aOther)
-      : mHashIterator(mozilla::Move(aOther.mHashIterator))
-      , mIsEndIterator(aOther.mIsEndIterator) { }
-
-    static Iterator EndIterator(OwningEffectSet::Iterator&& aHashIterator)
+    explicit Iterator(EffectSet& aEffectSet)
+      : mEffectSet(aEffectSet)
+      , mHashIterator(mozilla::Move(aEffectSet.mEffects.Iter()))
+      , mIsEndIterator(false)
     {
-      Iterator result(mozilla::Move(aHashIterator));
+      mEffectSet.mActiveIterators++;
+    }
+
+    Iterator(Iterator&& aOther)
+      : mEffectSet(aOther.mEffectSet)
+      , mHashIterator(mozilla::Move(aOther.mHashIterator))
+      , mIsEndIterator(aOther.mIsEndIterator)
+    {
+      mEffectSet.mActiveIterators++;
+    }
+
+    static Iterator EndIterator(EffectSet& aEffectSet)
+    {
+      Iterator result(aEffectSet);
       result.mIsEndIterator = true;
       return result;
+    }
+
+    ~Iterator()
+    {
+      MOZ_ASSERT(mEffectSet.mActiveIterators > 0);
+      mEffectSet.mActiveIterators--;
     }
 
     bool operator!=(const Iterator& aOther) const {
@@ -117,15 +140,19 @@ public:
       return mIsEndIterator || mHashIterator.Done();
     }
 
+    EffectSet& mEffectSet;
     OwningEffectSet::Iterator mHashIterator;
     bool mIsEndIterator;
   };
 
-  Iterator begin() { return Iterator(mEffects.Iter()); }
-  Iterator end()
-  {
-    return Iterator::EndIterator(mEffects.Iter());
-  }
+  friend class Iterator;
+
+  Iterator begin() { return Iterator(*this); }
+  Iterator end() { return Iterator::EndIterator(*this); }
+#ifdef DEBUG
+  bool IsBeingEnumerated() const { return mActiveIterators != 0; }
+#endif
+
   bool IsEmpty() const { return mEffects.IsEmpty(); }
 
   RefPtr<AnimValuesStyleRule>& AnimationRule(EffectCompositor::CascadeLevel
@@ -156,8 +183,7 @@ public:
   static nsIAtom** GetEffectSetPropertyAtoms();
 
 private:
-  static nsIAtom* GetEffectSetPropertyAtom(nsCSSPseudoElements::Type
-                                             aPseudoType);
+  static nsIAtom* GetEffectSetPropertyAtom(CSSPseudoElementType aPseudoType);
 
   OwningEffectSet mEffects;
 
@@ -194,6 +220,10 @@ private:
   // corresponding layer so we can check that the layer is up to date with
   // the animation manager.
   uint64_t mAnimationGeneration;
+
+  // Track how many iterators are referencing this effect set when we are
+  // destroyed, we can assert that nothing is still pointing to us.
+  DebugOnly<uint64_t> mActiveIterators;
 
 #ifdef DEBUG
   bool mCalledPropertyDtor;

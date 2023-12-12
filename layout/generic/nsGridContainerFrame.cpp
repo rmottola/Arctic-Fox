@@ -35,6 +35,12 @@ const uint32_t nsGridContainerFrame::kAutoLine = kTranslatedMaxLine + 3457U;
 
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(TrackSize::StateBits)
 
+enum class GridLineSide
+{
+  eBeforeGridGap,
+  eAfterGridGap,
+};
+
 class nsGridContainerFrame::GridItemCSSOrderIterator
 {
 public:
@@ -914,6 +920,27 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::Tracks
   void AlignJustifyContent(const nsHTMLReflowState& aReflowState,
                            const LogicalSize& aContainerSize);
 
+  nscoord GridLineEdge(uint32_t aLine, GridLineSide aSide) const
+  {
+    if (MOZ_UNLIKELY(mSizes.IsEmpty())) {
+      // https://drafts.csswg.org/css-grid/#grid-definition
+      // "... the explicit grid still contains one grid line in each axis."
+      MOZ_ASSERT(aLine == 0, "We should only resolve line 1 in an empty grid");
+      return nscoord(0);
+    }
+    MOZ_ASSERT(aLine <= mSizes.Length(), "mSizes is too small");
+    if (aSide == GridLineSide::eBeforeGridGap) {
+      if (aLine == 0) {
+        return nscoord(0);
+      }
+      const TrackSize& sz = mSizes[aLine - 1];
+      return sz.mPosition + sz.mBase;
+    }
+    if (aLine == mSizes.Length()) {
+      return mContentBoxSize;
+    }
+    return mSizes[aLine].mPosition;
+  }
 
   nscoord SumOfGridGaps() const {
     auto len = mSizes.Length();
@@ -931,7 +958,8 @@ struct MOZ_STACK_CLASS nsGridContainerFrame::Tracks
   }
 #endif
 
-  nsAutoTArray<TrackSize, 32> mSizes;
+  AutoTArray<TrackSize, 32> mSizes;
+  nscoord mContentBoxSize;
   nscoord mGridGap;
   LogicalAxis mAxis;
 };
@@ -1039,36 +1067,6 @@ static bool
 IsNameWithStartSuffix(const nsString& aString, uint32_t* aIndex)
 {
   return IsNameWithSuffix(aString, NS_LITERAL_STRING("-start"), aIndex);
-}
-
-enum class GridLineSide {
-  eBeforeGridGap,
-  eAfterGridGap,
-};
-
-static nscoord
-GridLineEdge(uint32_t aLine, const nsTArray<TrackSize>& aTrackSizes,
-             GridLineSide aSide)
-{
-  if (MOZ_UNLIKELY(aTrackSizes.IsEmpty())) {
-    // https://drafts.csswg.org/css-grid/#grid-definition
-    // "... the explicit grid still contains one grid line in each axis."
-    MOZ_ASSERT(aLine == 0, "We should only resolve line 1 in an empty grid");
-    return nscoord(0);
-  }
-  MOZ_ASSERT(aLine <= aTrackSizes.Length(), "aTrackSizes is too small");
-  if (aSide == GridLineSide::eBeforeGridGap) {
-    if (aLine == 0) {
-      return aTrackSizes[0].mPosition;
-    }
-    const TrackSize& sz = aTrackSizes[aLine - 1];
-    return sz.mPosition + sz.mBase;
-  }
-  if (aLine == aTrackSizes.Length()) {
-    const TrackSize& sz = aTrackSizes[aLine - 1];
-    return sz.mPosition + sz.mBase;
-  }
-  return aTrackSizes[aLine].mPosition;
 }
 
 /**
@@ -1196,6 +1194,7 @@ AlignJustifySelf(uint8_t aAlignment, bool aOverflowSafe, LogicalAxis aAxis,
     case NS_STYLE_ALIGN_BASELINE:
     case NS_STYLE_ALIGN_LAST_BASELINE:
       NS_WARNING("NYI: baseline/last-baseline for grid (bug 1151204)"); // XXX
+      MOZ_FALLTHROUGH;
     case NS_STYLE_ALIGN_START:
       offset = marginStart;
       break;
@@ -2138,45 +2137,73 @@ nsGridContainerFrame::PlaceGridItems(GridReflowState& aState,
     }
   }
 
-  // Count empty 'auto-fit' tracks at the end of the repeat() range.
+  // Count empty 'auto-fit' tracks in the repeat() range.
+  // |colAdjust| will have a count for each line in the grid of how many
+  // tracks were empty between the start of the grid and that line.
+  Maybe<nsTArray<uint32_t>> colAdjust;
   uint32_t numEmptyCols = 0;
   if (aState.mColFunctions.mHasRepeatAuto &&
       !gridStyle->mGridTemplateColumns.mIsAutoFill &&
       aState.mColFunctions.NumRepeatTracks() > 0) {
-    for (int32_t start = aState.mColFunctions.mRepeatAutoStart,
-                   col = aState.mColFunctions.mRepeatAutoEnd - 1;
-         col >= start && mCellMap.IsEmptyCol(col);
-         --col) {
-      ++numEmptyCols;
+    for (uint32_t col = aState.mColFunctions.mRepeatAutoStart,
+                  endRepeat = aState.mColFunctions.mRepeatAutoEnd,
+                  numColLines = mGridColEnd + 1;
+         col < numColLines; ++col) {
+      if (numEmptyCols) {
+        (*colAdjust)[col] = numEmptyCols;
+      }
+      if (col < endRepeat && mCellMap.IsEmptyCol(col)) {
+        ++numEmptyCols;
+        if (colAdjust.isNothing()) {
+          colAdjust.emplace(numColLines);
+          colAdjust->SetLength(numColLines);
+          PodZero(colAdjust->Elements(), colAdjust->Length());
+        }
+      }
     }
   }
+  Maybe<nsTArray<uint32_t>> rowAdjust;
   uint32_t numEmptyRows = 0;
   if (aState.mRowFunctions.mHasRepeatAuto &&
       !gridStyle->mGridTemplateRows.mIsAutoFill &&
       aState.mRowFunctions.NumRepeatTracks() > 0) {
-    for (int32_t start = aState.mRowFunctions.mRepeatAutoStart,
-                   row = aState.mRowFunctions.mRepeatAutoEnd - 1;
-         row >= start && mCellMap.IsEmptyRow(row);
-         --row) {
-      ++numEmptyRows;
+    for (uint32_t row = aState.mRowFunctions.mRepeatAutoStart,
+                  endRepeat = aState.mRowFunctions.mRepeatAutoEnd,
+                  numRowLines = mGridRowEnd + 1;
+         row < numRowLines; ++row) {
+      if (numEmptyRows) {
+        (*rowAdjust)[row] = numEmptyRows;
+      }
+      if (row < endRepeat && mCellMap.IsEmptyRow(row)) {
+        ++numEmptyRows;
+        if (rowAdjust.isNothing()) {
+          rowAdjust.emplace(numRowLines);
+          rowAdjust->SetLength(numRowLines);
+          PodZero(rowAdjust->Elements(), rowAdjust->Length());
+        }
+      }
     }
   }
   // Remove the empty 'auto-fit' tracks we found above, if any.
   if (numEmptyCols || numEmptyRows) {
     // Adjust the line numbers in the grid areas.
-    const uint32_t firstRemovedCol =
-      aState.mColFunctions.mRepeatAutoEnd - numEmptyCols;
-    const uint32_t firstRemovedRow =
-      aState.mRowFunctions.mRepeatAutoEnd - numEmptyRows;
     for (auto& item : mGridItems) {
       GridArea& area = item.mArea;
-      area.mCols.AdjustForRemovedTracks(firstRemovedCol, numEmptyCols);
-      area.mRows.AdjustForRemovedTracks(firstRemovedRow, numEmptyRows);
+      if (numEmptyCols) {
+        area.mCols.AdjustForRemovedTracks(*colAdjust);
+      }
+      if (numEmptyRows) {
+        area.mRows.AdjustForRemovedTracks(*rowAdjust);
+      }
     }
     for (auto& item : mAbsPosItems) {
       GridArea& area = item.mArea;
-      area.mCols.AdjustAbsPosForRemovedTracks(firstRemovedCol, numEmptyCols);
-      area.mRows.AdjustAbsPosForRemovedTracks(firstRemovedRow, numEmptyRows);
+      if (numEmptyCols) {
+        area.mCols.AdjustAbsPosForRemovedTracks(*colAdjust);
+      }
+      if (numEmptyRows) {
+        area.mRows.AdjustAbsPosForRemovedTracks(*rowAdjust);
+      }
     }
     // Adjust the grid size.
     mGridColEnd -= numEmptyCols;
@@ -2256,6 +2283,7 @@ nsGridContainerFrame::Tracks::Initialize(
                          aFunctions.MaxSizingFor(i));
   }
   mGridGap = aGridGap;
+  mContentBoxSize = aContentBoxSize;
   MOZ_ASSERT(mGridGap >= nscoord(0), "negative grid gap");
 }
 
@@ -2292,8 +2320,8 @@ ContentContribution(nsIFrame*                         aChild,
     }
 #ifdef DEBUG
     // This will suppress various CRAZY_SIZE warnings for this reflow.
-    parent->Properties().Set(nsContainerFrame::DebugReflowingWithInfiniteISize(),
-                             parent /* anything non-null will do */);
+    parent->Properties().Set(
+      nsContainerFrame::DebugReflowingWithInfiniteISize(), true);
 #endif
     // XXX this will give mostly correct results for now (until bug 1174569).
     LogicalSize availableSize(wm, INFINITE_ISIZE_COORD, NS_UNCONSTRAINEDSIZE);
@@ -2535,7 +2563,7 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
   // http://dev.w3.org/csswg/css-grid/#algo-content
   // We're also setting mIsFlexing on the item here to speed up
   // FindUsedFlexFraction later.
-  nsAutoTArray<TrackSize::StateBits, 16> stateBitsPerSpan;
+  AutoTArray<TrackSize::StateBits, 16> stateBitsPerSpan;
   nsTArray<Step2ItemData> step2Items;
   GridItemCSSOrderIterator& iter = aState.mIter;
   nsRenderingContext* rc = &aState.mRenderingContext;
@@ -2955,6 +2983,7 @@ nsGridContainerFrame::Tracks::AlignJustifyContent(
     case NS_STYLE_ALIGN_BASELINE:
     case NS_STYLE_ALIGN_LAST_BASELINE:
       NS_WARNING("'NYI: baseline/last-baseline' (bug 1151204)"); // XXX
+      MOZ_FALLTHROUGH;
     case NS_STYLE_ALIGN_START:
       distribute = false;
       break;
@@ -3060,7 +3089,7 @@ nsGridContainerFrame::LineRange::ToLength(
 
 void
 nsGridContainerFrame::LineRange::ToPositionAndLengthForAbsPos(
-  const nsTArray<TrackSize>& aTrackSizes, nscoord aGridOrigin,
+  const Tracks& aTracks, nscoord aGridOrigin,
   nscoord* aPos, nscoord* aLength) const
 {
   // kAutoLine for abspos children contributes the corresponding edge
@@ -3071,18 +3100,17 @@ nsGridContainerFrame::LineRange::ToPositionAndLengthForAbsPos(
     } else {
       const nscoord endPos = *aPos + *aLength;
       nscoord startPos =
-        ::GridLineEdge(mStart, aTrackSizes, GridLineSide::eAfterGridGap);
+        aTracks.GridLineEdge(mStart, GridLineSide::eAfterGridGap);
       *aPos = aGridOrigin + startPos;
       *aLength = std::max(endPos - *aPos, 0);
     }
   } else {
     if (mStart == kAutoLine) {
-      nscoord endPos =
-        ::GridLineEdge(mEnd, aTrackSizes, GridLineSide::eBeforeGridGap);
+      nscoord endPos = aTracks.GridLineEdge(mEnd, GridLineSide::eBeforeGridGap);
       *aLength = std::max(aGridOrigin + endPos, 0);
     } else {
       nscoord pos;
-      ToPositionAndLength(aTrackSizes, &pos, aLength);
+      ToPositionAndLength(aTracks.mSizes, &pos, aLength);
       *aPos = aGridOrigin + pos;
     }
   }
@@ -3111,11 +3139,9 @@ nsGridContainerFrame::ContainingBlockForAbsPos(const GridReflowState& aState,
   nscoord b = aGridCB.BStart(wm);
   nscoord iSize = aGridCB.ISize(wm);
   nscoord bSize = aGridCB.BSize(wm);
-  aArea.mCols.ToPositionAndLengthForAbsPos(aState.mCols.mSizes,
-                                           aGridOrigin.I(wm),
+  aArea.mCols.ToPositionAndLengthForAbsPos(aState.mCols, aGridOrigin.I(wm),
                                            &i, &iSize);
-  aArea.mRows.ToPositionAndLengthForAbsPos(aState.mRows.mSizes,
-                                           aGridOrigin.B(wm),
+  aArea.mRows.ToPositionAndLengthForAbsPos(aState.mRows, aGridOrigin.B(wm),
                                            &b, &bSize);
   return LogicalRect(wm, i, b, iSize, bSize);
 }
@@ -3311,14 +3337,21 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
   for (const TrackSize& sz : gridReflowState.mCols.mSizes) {
     colTrackSizes.AppendElement(sz.mBase);
   }
-  Properties().Set(GridColTrackSizes(),
-                   new nsTArray<nscoord>(mozilla::Move(colTrackSizes)));
+  ComputedGridTrackInfo* colInfo = new ComputedGridTrackInfo(
+    gridReflowState.mColFunctions.mExplicitGridOffset,
+    gridReflowState.mColFunctions.NumExplicitTracks(),
+    Move(colTrackSizes));
+  Properties().Set(GridColTrackInfo(), colInfo);
+
   nsTArray<nscoord> rowTrackSizes(gridReflowState.mRows.mSizes.Length());
   for (const TrackSize& sz : gridReflowState.mRows.mSizes) {
     rowTrackSizes.AppendElement(sz.mBase);
   }
-  Properties().Set(GridRowTrackSizes(),
-                   new nsTArray<nscoord>(mozilla::Move(rowTrackSizes)));
+  ComputedGridTrackInfo* rowInfo = new ComputedGridTrackInfo(
+    gridReflowState.mRowFunctions.mExplicitGridOffset,
+    gridReflowState.mRowFunctions.NumExplicitTracks(),
+    Move(rowTrackSizes));
+  Properties().Set(GridRowTrackInfo(), rowInfo);
   
   nscoord bSize = 0;
   if (computedBSize == NS_AUTOHEIGHT) {

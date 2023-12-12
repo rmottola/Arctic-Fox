@@ -17,7 +17,6 @@ function test() {
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
     gSources = gDebugger.DebuggerView.Sources;
-    gBreakpoints = gDebugger.DebuggerController.Breakpoints;
     gTarget = gDebugger.gTarget;
     gThreadClient = gDebugger.gThreadClient;
     gResumeButton = gDebugger.document.getElementById("resume");
@@ -46,16 +45,18 @@ function test() {
     EventUtils.sendMouseEvent({ type: "mousedown" }, gResumeButton, gDebugger);
     yield oncePaused;
 
-    let updatedFrame = yield waitForDebuggerEvents(gPanel, gDebugger.EVENTS.FETCHED_SCOPES);
+    yield waitForDebuggerEvents(gPanel, gDebugger.EVENTS.SOURCE_SHOWN);
     let variables = gDebugger.DebuggerView.Variables;
 
-    is(variables._store.length, 3, "Correct number of scopes available");
+    is(variables._store.length, 4, "Correct number of scopes available");
     is(variables.getScopeAtIndex(0).name, "Function scope [interval<]",
         "Paused with correct scope (0)");
     is(variables.getScopeAtIndex(1).name, "Block scope",
         "Paused with correct scope (1)");
-    is(variables.getScopeAtIndex(2).name, "Global scope [Window]",
+    is(variables.getScopeAtIndex(2).name, "Block scope",
         "Paused with correct scope (2)");
+    is(variables.getScopeAtIndex(3).name, "Global scope [Window]",
+        "Paused with correct scope (3)");
 
     yield evalInTab(gTab, "clearInterval(interval)");
     let onceResumed = gTarget.once("thread-resumed");
@@ -73,18 +74,24 @@ function test() {
     });
     yield oncePaused;
 
-    let updatedFrame = yield waitForDebuggerEvents(gPanel, gDebugger.EVENTS.FETCHED_SCOPES);
+    yield waitForDebuggerEvents(gPanel, gDebugger.EVENTS.SOURCE_SHOWN);
     let variables = gDebugger.DebuggerView.Variables;
 
-    is(variables._store.length, 4, "Correct number of scopes available");
+    is(variables._store.length, 6, "Correct number of scopes available");
     is(variables.getScopeAtIndex(0).name, "Function scope [onclick]",
         "Paused with correct scope (0)");
-    is(variables.getScopeAtIndex(1).name, "With scope [HTMLButtonElement]",
+    // Non-syntactic lexical scope introduced by non-syntactic scope chain.
+    is(variables.getScopeAtIndex(1).name, "Block scope",
         "Paused with correct scope (1)");
-    is(variables.getScopeAtIndex(2).name, "With scope [HTMLDocument]",
+    is(variables.getScopeAtIndex(2).name, "With scope [HTMLButtonElement]",
         "Paused with correct scope (2)");
-    is(variables.getScopeAtIndex(3).name, "Global scope [Window]",
+    is(variables.getScopeAtIndex(3).name, "With scope [HTMLDocument]",
         "Paused with correct scope (3)");
+    // Global lexical scope.
+    is(variables.getScopeAtIndex(4).name, "Block scope",
+        "Paused with correct scope (4)");
+    is(variables.getScopeAtIndex(5).name, "Global scope [Window]",
+        "Paused with correct scope (5)");
 
     let onceResumed = gTarget.once("thread-resumed");
     EventUtils.sendMouseEvent({ type: "mousedown" }, gResumeButton, gDebugger);

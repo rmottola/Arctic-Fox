@@ -13,8 +13,6 @@ SimpleTest.registerCleanupFunction(function() {
   Services.prefs.clearUserPref("dom.mozBrowserFramesEnabled");
 });
 
-const {promiseInvoke} = require("devtools/shared/async-utils");
-
 const { DirectorRegistry,
         DirectorRegistryFront } = require("devtools/server/actors/director-registry");
 
@@ -30,9 +28,9 @@ function* newConnectedDebuggerClient(opts) {
   var transport = DebuggerServer.connectPipe();
   var client = new DebuggerClient(transport);
 
-  yield promiseInvoke(client, client.connect);
+  yield client.connect();
 
-  var root = yield promiseInvoke(client, client.listTabs);
+  var root = yield client.listTabs();
 
   return {
     client: client,

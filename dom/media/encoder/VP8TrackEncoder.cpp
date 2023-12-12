@@ -269,7 +269,7 @@ nsresult VP8TrackEncoder::PrepareRawFrame(VideoChunk &aChunk)
   if (format == ImageFormat::PLANAR_YCBCR) {
     PlanarYCbCrImage* yuv = static_cast<PlanarYCbCrImage *>(img.get());
 
-    MOZ_ASSERT(yuv);
+    MOZ_RELEASE_ASSERT(yuv);
     if (!yuv->IsValid()) {
       NS_WARNING("PlanarYCbCrImage is not valid");
       return NS_ERROR_FAILURE;
@@ -306,7 +306,7 @@ nsresult VP8TrackEncoder::PrepareRawFrame(VideoChunk &aChunk)
   if (format == ImageFormat::PLANAR_YCBCR) {
     PlanarYCbCrImage* yuv = static_cast<PlanarYCbCrImage *>(img.get());
 
-    MOZ_ASSERT(yuv);
+    MOZ_RELEASE_ASSERT(yuv);
     if (!yuv->IsValid()) {
       NS_WARNING("PlanarYCbCrImage is not valid");
       return NS_ERROR_FAILURE;
@@ -354,6 +354,7 @@ nsresult VP8TrackEncoder::PrepareRawFrame(VideoChunk &aChunk)
       yuvFormat = "I422";
     } else {
       VP8LOG("Unsupported planar format\n");
+      NS_ASSERTION(false, "Unsupported planar format");
       return NS_ERROR_NOT_IMPLEMENTED;
     }
 
@@ -410,6 +411,7 @@ nsresult VP8TrackEncoder::PrepareRawFrame(VideoChunk &aChunk)
       default:
         VP8LOG("Unsupported SourceSurface format %s\n",
                Stringify(surf->GetFormat()).c_str());
+        NS_ASSERTION(false, "Unsupported SourceSurface format");
         return NS_ERROR_NOT_IMPLEMENTED;
     }
 

@@ -1026,7 +1026,7 @@ LoginManagerPrompter.prototype = {
   _removeLoginNotifications : function () {
     var popupNote = this._getPopupNote();
     if (popupNote)
-      popupNote = popupNote.getNotification("password-save");
+      popupNote = popupNote.getNotification("password");
     if (popupNote)
       popupNote.remove();
 

@@ -74,40 +74,52 @@ __throw_bad_typeid(void)
 }
 
 // used by <functional>
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_THROW_INLINE void
 __throw_bad_function_call(void) {
   mozalloc_abort("fatal: STL threw bad_function_call");
 }
+#endif
 
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_logic_error(const char* msg)
 {
     mozalloc_abort(msg);
 }
+#endif
 
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_domain_error(const char* msg)
 {
     mozalloc_abort(msg);
 }
+#endif
 
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_invalid_argument(const char* msg)
 {
     mozalloc_abort(msg);
 }
+#endif
 
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_length_error(const char* msg)
 {
     mozalloc_abort(msg);
 }
+#endif
 
+#if !defined(_LIBCPP_VERSION)
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_out_of_range(const char* msg)
 {
     mozalloc_abort(msg);
 }
+#endif
 
 MOZ_THROW_NORETURN MOZ_THROW_EXPORT MOZ_ALWAYS_INLINE void
 __throw_runtime_error(const char* msg)

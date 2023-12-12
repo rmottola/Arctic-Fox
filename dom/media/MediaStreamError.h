@@ -61,12 +61,12 @@ class MediaStreamError final : public nsISupports,
                                public nsWrapperCache
 {
 public:
-  MediaStreamError(nsPIDOMWindow* aParent,
+  MediaStreamError(nsPIDOMWindowInner* aParent,
                    const nsAString& aName,
                    const nsAString& aMessage = EmptyString(),
                    const nsAString& aConstraint =  EmptyString());
 
-  MediaStreamError(nsPIDOMWindow* aParent,
+  MediaStreamError(nsPIDOMWindowInner* aParent,
                    const BaseMediaMgrError& aOther)
   : BaseMediaMgrError(aOther.mName, aOther.mMessage, aOther.mConstraint)
   , mParent(aParent) {}
@@ -75,9 +75,9 @@ public:
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(MediaStreamError)
   NS_DECLARE_STATIC_IID_ACCESSOR(MOZILLA_DOM_MEDIASTREAMERROR_IMPLEMENTATION_IID)
 
-  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
-  nsPIDOMWindow* GetParentObject() const
+  nsPIDOMWindowInner* GetParentObject() const
   {
     return mParent;
   }
@@ -88,7 +88,7 @@ public:
 private:
   virtual ~MediaStreamError() {}
 
-  RefPtr<nsPIDOMWindow> mParent;
+  RefPtr<nsPIDOMWindowInner> mParent;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(MediaStreamError,

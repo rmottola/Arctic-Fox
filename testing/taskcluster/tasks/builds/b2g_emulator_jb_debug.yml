@@ -1,12 +1,13 @@
 $inherits:
   from: 'tasks/builds/b2g_emulator_base.yml'
   variables:
-    build_name: 'emualtor-jb'
+    build_name: 'emulator-jb'
     build_type: 'debug'
 task:
   workerType: emulator-jb-debug
   scopes:
     - 'docker-worker:cache:workspace-emulator-jb-debug'
+    - 'docker-worker:cache:workspace-emulator-jb-debug-objdir-gecko-{{project}}'
   metadata:
     name: '[TC] B2G Emulator JB Debug'
 
@@ -20,6 +21,8 @@ task:
   payload:
     cache:
       workspace-emulator-jb-debug: /home/worker/workspace
+      workspace-emulator-jb-debug-objdir-gecko-{{project}}: /home/worker/objdir-gecko
     env:
       TARGET: 'emulator-jb'
       B2G_DEBUG: 1
+      TOOLTOOL_MANIFEST: 'b2g/config/emulator-jb/releng-emulator-jb.tt'

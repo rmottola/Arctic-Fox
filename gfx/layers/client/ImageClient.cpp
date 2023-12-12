@@ -119,7 +119,7 @@ ImageClientSingle::FlushAllImages(AsyncTransactionWaiter* aAsyncTransactionWaite
 bool
 ImageClientSingle::UpdateImage(ImageContainer* aContainer, uint32_t aContentFlags)
 {
-  nsAutoTArray<ImageContainer::OwningImage,4> images;
+  AutoTArray<ImageContainer::OwningImage,4> images;
   uint32_t generationCounter;
   aContainer->GetCurrentImages(&images, &generationCounter);
 
@@ -145,7 +145,7 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer, uint32_t aContentFlag
   }
 
   nsTArray<Buffer> newBuffers;
-  nsAutoTArray<CompositableForwarder::TimedTextureClient,4> textures;
+  AutoTArray<CompositableForwarder::TimedTextureClient,4> textures;
 
   for (auto& img : images) {
     Image* image = img.mImage;
@@ -155,7 +155,15 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer, uint32_t aContentFlag
       OverlayImage* overlayImage = static_cast<OverlayImage*>(image);
       OverlaySource source;
       if (overlayImage->GetSidebandStream().IsValid()) {
-        source.handle() = OverlayHandle(overlayImage->GetSidebandStream());
+        // Duplicate GonkNativeHandle::NhObj for ipc,
+        // since ParamTraits<GonkNativeHandle>::Write() absorbs native_handle_t.
+        RefPtr<GonkNativeHandle::NhObj> nhObj = overlayImage->GetSidebandStream().GetDupNhObj();
+        GonkNativeHandle handle(nhObj);
+        if (!handle.IsValid()) {
+          gfxWarning() << "ImageClientSingle::UpdateImage failed in GetDupNhObj";
+          return false;
+        }
+        source.handle() = OverlayHandle(handle);
       } else {
         source.handle() = OverlayHandle(overlayImage->GetOverlayId());
       }

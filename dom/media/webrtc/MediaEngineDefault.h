@@ -45,7 +45,8 @@ public:
 
   nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
                     const MediaEnginePrefs &aPrefs,
-                    const nsString& aDeviceId) override;
+                    const nsString& aDeviceId,
+                    const nsACString& aOrigin) override;
   nsresult Deallocate() override;
   nsresult Start(SourceMediaStream*, TrackID) override;
   nsresult Stop(SourceMediaStream*, TrackID) override;
@@ -53,10 +54,6 @@ public:
                    const MediaEnginePrefs &aPrefs,
                    const nsString& aDeviceId) override;
   void SetDirectListeners(bool aHasDirectListeners) override {};
-  nsresult Config(bool aEchoOn, uint32_t aEcho,
-                  bool aAgcOn, uint32_t aAGC,
-                  bool aNoiseOn, uint32_t aNoise,
-                  int32_t aPlayoutDelay) override { return NS_OK; };
   void NotifyPull(MediaStreamGraph* aGraph,
                   SourceMediaStream *aSource,
                   TrackID aId,
@@ -118,7 +115,8 @@ public:
 
   nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
                     const MediaEnginePrefs &aPrefs,
-                    const nsString& aDeviceId) override;
+                    const nsString& aDeviceId,
+                    const nsACString& aOrigin) override;
   nsresult Deallocate() override;
   nsresult Start(SourceMediaStream*, TrackID) override;
   nsresult Stop(SourceMediaStream*, TrackID) override;
@@ -126,10 +124,6 @@ public:
                    const MediaEnginePrefs &aPrefs,
                    const nsString& aDeviceId) override;
   void SetDirectListeners(bool aHasDirectListeners) override {};
-  nsresult Config(bool aEchoOn, uint32_t aEcho,
-                  bool aAgcOn, uint32_t aAGC,
-                  bool aNoiseOn, uint32_t aNoise,
-                  int32_t aPlayoutDelay) override { return NS_OK; };
   void AppendToSegment(AudioSegment& aSegment, TrackTicks aSamples);
   void NotifyPull(MediaStreamGraph* aGraph,
                   SourceMediaStream *aSource,
@@ -144,6 +138,14 @@ public:
 #endif
   }
 
+  void NotifyOutputData(MediaStreamGraph* aGraph,
+                        AudioDataValue* aBuffer, size_t aFrames,
+                        TrackRate aRate, uint32_t aChannels) override
+  {}
+  void NotifyInputData(MediaStreamGraph* aGraph,
+                       const AudioDataValue* aBuffer, size_t aFrames,
+                       TrackRate aRate, uint32_t aChannels) override
+  {}
   bool IsFake() override {
     return true;
   }

@@ -166,10 +166,11 @@ struct ClassInfo
 #define FOR_EACH_SIZE(macro) \
     macro(Objects, GCHeapUsed, objectsGCHeap) \
     macro(Objects, MallocHeap, objectsMallocHeapSlots) \
-    macro(Objects, MallocHeap, objectsMallocHeapElementsNonAsmJS) \
+    macro(Objects, MallocHeap, objectsMallocHeapElementsNormal) \
     macro(Objects, MallocHeap, objectsMallocHeapElementsAsmJS) \
+    macro(Objects, NonHeap,    objectsNonHeapElementsNormal) \
     macro(Objects, NonHeap,    objectsNonHeapElementsAsmJS) \
-    macro(Objects, NonHeap,    objectsNonHeapElementsMapped) \
+    macro(Objects, NonHeap,    objectsNonHeapElementsShared) \
     macro(Objects, NonHeap,    objectsNonHeapCodeAsmJS) \
     macro(Objects, MallocHeap, objectsMallocHeapMisc) \
     \
@@ -711,7 +712,9 @@ struct CompartmentStats
     macro(Other,   MallocHeap, crossCompartmentWrappersTable) \
     macro(Other,   MallocHeap, regexpCompartment) \
     macro(Other,   MallocHeap, savedStacksSet) \
-    macro(Other,   MallocHeap, nonSyntacticLexicalScopesTable)
+    macro(Other,   MallocHeap, nonSyntacticLexicalScopesTable) \
+    macro(Other,   MallocHeap, jitCompartment) \
+    macro(Other,   MallocHeap, privateData)
 
     CompartmentStats()
       : FOR_EACH_SIZE(ZERO_SIZE)

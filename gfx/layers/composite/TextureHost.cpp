@@ -212,7 +212,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
     case SurfaceDescriptor::TSurfaceDescriptorSharedGLTexture:
       return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
 
-    case SurfaceDescriptor::TNewSurfaceDescriptorGralloc:
+    case SurfaceDescriptor::TSurfaceDescriptorGralloc:
     case SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
       if (aBackend == LayersBackend::LAYERS_OPENGL) {
         return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
@@ -374,6 +374,13 @@ TextureSource::~TextureSource()
     MOZ_COUNT_DTOR(TextureSource);
 }
 
+const char*
+TextureSource::Name() const
+{
+  MOZ_CRASH("TextureSource without class name");
+  return "TextureSource";
+}
+  
 BufferTextureHost::BufferTextureHost(const BufferDescriptor& aDesc,
                                      TextureFlags aFlags)
 : TextureHost(aFlags)
@@ -522,6 +529,8 @@ BufferTextureHost::Upload(nsIntRegion *aRegion)
     // We don't have a buffer; a possible cause is that the IPDL actor
     // is already dead. This inevitably happens as IPDL actors can die
     // at any time, so we want to silently return in this case.
+    // another possible cause is that IPDL failed to map the shmem when
+    // deserializing it.
     return false;
   }
   if (!mCompositor) {
@@ -651,9 +660,19 @@ ShmemTextureHost::ShmemTextureHost(const ipc::Shmem& aShmem,
                                    ISurfaceAllocator* aDeallocator,
                                    TextureFlags aFlags)
 : BufferTextureHost(aDesc, aFlags)
-, mShmem(MakeUnique<ipc::Shmem>(aShmem))
 , mDeallocator(aDeallocator)
 {
+  if (aShmem.IsReadable()) {
+    mShmem = MakeUnique<ipc::Shmem>(aShmem);
+  } else {
+    // This can happen if we failed to map the shmem on this process, perhaps
+    // because it was big and we didn't have enough contiguous address space
+    // available, even though we did on the child process.
+    // As a result this texture will be in an invalid state and Lock will
+    // always fail.
+    gfxCriticalError() << "Failed to create a valid ShmemTextureHost";
+  }
+
   MOZ_COUNT_CTOR(ShmemTextureHost);
 }
 

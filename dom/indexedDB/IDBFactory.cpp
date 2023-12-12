@@ -43,7 +43,6 @@
 
 namespace mozilla {
 namespace dom {
-namespace indexedDB {
 
 using namespace mozilla::dom::quota;
 using namespace mozilla::ipc;
@@ -121,12 +120,11 @@ IDBFactory::~IDBFactory()
 
 // static
 nsresult
-IDBFactory::CreateForWindow(nsPIDOMWindow* aWindow,
+IDBFactory::CreateForWindow(nsPIDOMWindowInner* aWindow,
                             IDBFactory** aFactory)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWindow);
-  MOZ_ASSERT(aWindow->IsInnerWindow());
   MOZ_ASSERT(aFactory);
 
   nsCOMPtr<nsIPrincipal> principal;
@@ -134,10 +132,8 @@ IDBFactory::CreateForWindow(nsPIDOMWindow* aWindow,
 
   if (!(NS_SUCCEEDED(rv) && nsContentUtils::IsSystemPrincipal(principal)) &&
       NS_WARN_IF(!Preferences::GetBool(kPrefIndexedDBEnabled, false))) {
-    // IndexedDB is disabled and the caller is content.
-    NS_WARNING("An attempt to use IndexedDB was made, but it is not enabled.");
     *aFactory = nullptr;
-    return NS_OK;
+    return NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR;
   }
 
   if (rv == NS_ERROR_DOM_NOT_SUPPORTED_ERR) {
@@ -336,11 +332,10 @@ IDBFactory::CreateForJSInternal(JSContext* aCx,
 
 // static
 bool
-IDBFactory::AllowedForWindow(nsPIDOMWindow* aWindow)
+IDBFactory::AllowedForWindow(nsPIDOMWindowInner* aWindow)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWindow);
-  MOZ_ASSERT(aWindow->IsInnerWindow());
 
   nsCOMPtr<nsIPrincipal> principal;
   nsresult rv = AllowedForWindowInternal(aWindow, getter_AddRefs(principal));
@@ -353,12 +348,11 @@ IDBFactory::AllowedForWindow(nsPIDOMWindow* aWindow)
 
 // static
 nsresult
-IDBFactory::AllowedForWindowInternal(nsPIDOMWindow* aWindow,
+IDBFactory::AllowedForWindowInternal(nsPIDOMWindowInner* aWindow,
                                      nsIPrincipal** aPrincipal)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWindow);
-  MOZ_ASSERT(aWindow->IsInnerWindow());
 
   if (NS_WARN_IF(!IndexedDatabaseManager::GetOrCreate())) {
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -686,8 +680,6 @@ IDBFactory::OpenInternal(nsIPrincipal* aPrincipal,
   }
 
   if (!mBackgroundActor && mPendingRequests.IsEmpty()) {
-    // We need to start the sequence to create a background actor for this
-    // thread.
     BackgroundChildImpl::ThreadLocal* threadLocal =
       BackgroundChildImpl::GetThreadLocalForCurrentThread();
 
@@ -707,12 +699,18 @@ IDBFactory::OpenInternal(nsIPrincipal* aPrincipal,
       newIDBThreadLocal = idbThreadLocal = new ThreadLocal(id);
     }
 
-    RefPtr<BackgroundCreateCallback> cb =
-      new BackgroundCreateCallback(this, idbThreadLocal->GetLoggingInfo());
-    if (NS_WARN_IF(!BackgroundChild::GetOrCreateForCurrentThread(cb))) {
-      IDB_REPORT_INTERNAL_ERR();
-      aRv.Throw(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
-      return nullptr;
+    if (PBackgroundChild* actor = BackgroundChild::GetForCurrentThread()) {
+      BackgroundActorCreated(actor, idbThreadLocal->GetLoggingInfo());
+    } else {
+      // We need to start the sequence to create a background actor for this
+      // thread.
+      RefPtr<BackgroundCreateCallback> cb =
+        new BackgroundCreateCallback(this, idbThreadLocal->GetLoggingInfo());
+      if (NS_WARN_IF(!BackgroundChild::GetOrCreateForCurrentThread(cb))) {
+        IDB_REPORT_INTERNAL_ERR();
+        aRv.Throw(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
+        return nullptr;
+      }
     }
 
     if (newIDBThreadLocal) {
@@ -738,7 +736,7 @@ IDBFactory::OpenInternal(nsIPrincipal* aPrincipal,
     }
 
     JS::Rooted<JSObject*> scriptOwner(cx,
-      static_cast<nsGlobalWindow*>(mWindow.get())->FastGetGlobalJSObject());
+                                      static_cast<nsGlobalWindow*>(reinterpret_cast<nsPIDOMWindow<nsISupports>*>(mWindow.get()))->FastGetGlobalJSObject());
     MOZ_ASSERT(scriptOwner);
 
     request = IDBOpenDBRequest::CreateForWindow(this, mWindow, scriptOwner);
@@ -956,6 +954,5 @@ IDBFactory::BackgroundCreateCallback::ActorFailed()
   factory->BackgroundActorFailed();
 }
 
-} // namespace indexedDB
 } // namespace dom
 } // namespace mozilla

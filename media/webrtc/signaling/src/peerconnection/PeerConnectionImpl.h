@@ -316,11 +316,12 @@ public:
                                 NrIceCtx::ConnectionState state);
   void IceGatheringStateChange(NrIceCtx* ctx,
                                NrIceCtx::GatheringState state);
-  void EndOfLocalCandidates(const std::string& defaultAddr,
-                            uint16_t defaultPort,
-                            const std::string& defaultRtcpAddr,
-                            uint16_t defaultRtcpPort,
-                            uint16_t level);
+  void UpdateDefaultCandidate(const std::string& defaultAddr,
+                              uint16_t defaultPort,
+                              const std::string& defaultRtcpAddr,
+                              uint16_t defaultRtcpPort,
+                              uint16_t level);
+  void EndOfLocalCandidates(uint16_t level);
   void IceStreamReady(NrIceMediaStream *aStream);
 
   static void ListenThread(void *aData);
@@ -338,7 +339,7 @@ public:
     return mSTSThread;
   }
 
-  nsPIDOMWindow* GetWindow() const {
+  nsPIDOMWindowInner* GetWindow() const {
     PC_AUTO_ENTER_API_CALL_NO_CHECK();
     return mWindow;
   }
@@ -726,7 +727,7 @@ private:
   // TODO: Remove if we ever properly wire PeerConnection for cycle-collection.
   nsWeakPtr mPCObserver;
 
-  nsCOMPtr<nsPIDOMWindow> mWindow;
+  nsCOMPtr<nsPIDOMWindowInner> mWindow;
 
   // The SDP sent in from JS - here for debugging.
   std::string mLocalRequestedSDP;

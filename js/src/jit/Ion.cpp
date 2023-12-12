@@ -749,6 +749,15 @@ JitCompartment::toggleBarriers(bool enabled)
     }
 }
 
+size_t
+JitCompartment::sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const
+{
+    size_t n = mallocSizeOf(this);
+    if (stubCodes_)
+        n += stubCodes_->sizeOfIncludingThis(mallocSizeOf);
+    return n;
+}
+
 JitCode*
 JitRuntime::getBailoutTable(const FrameSizeClass& frameClass) const
 {
@@ -2102,8 +2111,6 @@ IonCompile(JSContext* cx, JSScript* script,
     AutoTraceLog logScript(logger, event);
     AutoTraceLog logCompile(logger, TraceLogger_IonCompilation);
 
-    MOZ_ASSERT(optimizationLevel != OptimizationLevel::DontCompile);
-
     // Make sure the script's canonical function isn't lazy. We can't de-lazify
     // it in a helper thread.
     script->ensureNonLazyCanonicalFunction(cx);
@@ -3347,7 +3354,6 @@ AutoFlushICache::flush(uintptr_t start, size_t len)
     PerThreadData* pt = TlsPerThreadData.get();
     AutoFlushICache* afc = pt ? pt->PerThreadData::autoFlushICache() : nullptr;
     if (!afc) {
-        MOZ_ASSERT(!IsCompilingAsmJS(), "asm.js should always create an AutoFlushICache");
         JitSpewCont(JitSpew_CacheFlush, "#");
         ExecutableAllocator::cacheFlush((void*)start, len);
         MOZ_ASSERT(len <= 32);
@@ -3361,7 +3367,6 @@ AutoFlushICache::flush(uintptr_t start, size_t len)
         return;
     }
 
-    MOZ_ASSERT(!IsCompilingAsmJS(), "asm.js should always flush within the range");
     JitSpewCont(JitSpew_CacheFlush, afc->inhibit_ ? "x" : "*");
     ExecutableAllocator::cacheFlush((void*)start, len);
 #endif

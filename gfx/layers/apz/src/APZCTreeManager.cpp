@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <stack>
 #include "APZCTreeManager.h"
 #include "AsyncPanZoomController.h"
 #include "Compositor.h"                 // for Compositor
@@ -358,7 +359,9 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
   if (!needsApzc) {
     node = RecycleOrCreateNode(aState, nullptr, aLayersId);
     AttachNodeToTree(node, aParent, aNextSibling);
-    node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(),
+    node->SetHitTestData(
+        GetEventRegions(aLayer),
+        aLayer.GetTransformTyped(),
         aLayer.GetClipRect() ? Some(ParentLayerIntRegion(*aLayer.GetClipRect())) : Nothing(),
         GetEventRegionsOverride(aParent, aLayer));
     node->SetScrollbarData(aLayer.GetScrollbarTargetContainerId(),
@@ -462,7 +465,10 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     MOZ_ASSERT(node->IsPrimaryHolder() && node->GetApzc() && node->GetApzc()->Matches(guid));
 
     ParentLayerIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
-    node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(), Some(clipRegion),
+    node->SetHitTestData(
+        GetEventRegions(aLayer),
+        aLayer.GetTransformTyped(),
+        Some(clipRegion),
         GetEventRegionsOverride(aParent, aLayer));
     apzc->SetAncestorTransform(aAncestorTransform);
 
@@ -516,11 +522,20 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     // Even though different layers associated with a given APZC may be at
     // different levels in the layer tree (e.g. one being an uncle of another),
     // we require from Layout that the CSS transforms up to their common
-    // ancestor be the same.
-    MOZ_ASSERT(aAncestorTransform == apzc->GetAncestorTransform());
+    // ancestor be roughly the same. There are cases in which the transforms
+    // are not exactly the same, for example if the parent is container layer
+    // for an opacity, and this container layer has a resolution-induced scale
+    // as its base transform and a prescale that is supposed to undo that scale.
+    // Due to floating point inaccuracies those transforms can end up not quite
+    // canceling each other. That's why we're using a fuzzy comparison here
+    // instead of an exact one.
+    MOZ_ASSERT(aAncestorTransform.FuzzyEqualsMultiplicative(apzc->GetAncestorTransform()));
 
     ParentLayerIntRegion clipRegion = ComputeClipRegion(state->mController, aLayer);
-    node->SetHitTestData(GetEventRegions(aLayer), aLayer.GetTransform(), Some(clipRegion),
+    node->SetHitTestData(
+        GetEventRegions(aLayer),
+        aLayer.GetTransformTyped(),
+        Some(clipRegion),
         GetEventRegionsOverride(aParent, aLayer));
   }
 
@@ -1036,9 +1051,11 @@ APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
                                    uint64_t* aOutInputBlockId)
 {
   ScrollWheelInput::ScrollMode scrollMode = ScrollWheelInput::SCROLLMODE_INSTANT;
-  if ((aEvent.deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE ||
-       aEvent.deltaMode == nsIDOMWheelEvent::DOM_DELTA_PAGE) &&
-      gfxPrefs::SmoothScrollEnabled() && gfxPrefs::WheelSmoothScrollEnabled())
+  if (gfxPrefs::SmoothScrollEnabled() &&
+      ((aEvent.deltaMode == nsIDOMWheelEvent::DOM_DELTA_LINE &&
+        gfxPrefs::WheelSmoothScrollEnabled()) ||
+       (aEvent.deltaMode == nsIDOMWheelEvent::DOM_DELTA_PAGE &&
+        gfxPrefs::PageSmoothScrollEnabled())))
   {
     scrollMode = ScrollWheelInput::SCROLLMODE_SMOOTH;
   }
@@ -1250,6 +1267,16 @@ APZCTreeManager::CancelAnimation(const ScrollableLayerGuid &aGuid)
   RefPtr<AsyncPanZoomController> apzc = GetTargetAPZC(aGuid);
   if (apzc) {
     apzc->CancelAnimation();
+  }
+}
+
+void
+APZCTreeManager::AdjustScrollForSurfaceShift(const ScreenPoint& aShift)
+{
+  MonitorAutoLock lock(mTreeLock);
+  RefPtr<AsyncPanZoomController> apzc = FindRootContentOrRootApzc();
+  if (apzc) {
+    apzc->AdjustScrollForSurfaceShift(aShift);
   }
 }
 
@@ -1488,7 +1515,20 @@ APZCTreeManager::GetTargetNode(const ScrollableLayerGuid& aGuid,
                                GuidComparator aComparator)
 {
   mTreeLock.AssertCurrentThreadOwns();
-  RefPtr<HitTestingTreeNode> target = FindTargetNode(mRootNode, aGuid, aComparator);
+  RefPtr<HitTestingTreeNode> target = DepthFirstSearchPostOrder(mRootNode.get(),
+      [&aGuid, &aComparator](HitTestingTreeNode* node)
+      {
+        bool matches = false;
+        if (node->GetApzc()) {
+          if (aComparator) {
+            matches = aComparator(aGuid, node->GetApzc()->GetGuid());
+          } else {
+            matches = node->GetApzc()->Matches(aGuid);
+          }
+        }
+        return matches;
+      }
+  );
   return target.forget();
 }
 
@@ -1598,36 +1638,6 @@ APZCTreeManager::SetLongTapEnabled(bool aLongTapEnabled)
     NewRunnableFunction(GestureEventListener::SetLongTapEnabled, aLongTapEnabled));
 }
 
-HitTestingTreeNode*
-APZCTreeManager::FindTargetNode(HitTestingTreeNode* aNode,
-                                const ScrollableLayerGuid& aGuid,
-                                GuidComparator aComparator)
-{
-  mTreeLock.AssertCurrentThreadOwns();
-
-  // This walks the tree in depth-first, reverse order, so that it encounters
-  // APZCs front-to-back on the screen.
-  for (HitTestingTreeNode* node = aNode; node; node = node->GetPrevSibling()) {
-    HitTestingTreeNode* match = FindTargetNode(node->GetLastChild(), aGuid, aComparator);
-    if (match) {
-      return match;
-    }
-
-    bool matches = false;
-    if (node->GetApzc()) {
-      if (aComparator) {
-        matches = aComparator(aGuid, node->GetApzc()->GetGuid());
-      } else {
-        matches = node->GetApzc()->Matches(aGuid);
-      }
-    }
-    if (matches) {
-      return node;
-    }
-  }
-  return nullptr;
-}
-
 RefPtr<HitTestingTreeNode>
 APZCTreeManager::FindScrollNode(const AsyncDragMetrics& aDragMetrics)
 {
@@ -1648,51 +1658,60 @@ APZCTreeManager::GetAPZCAtPoint(HitTestingTreeNode* aNode,
 
   // This walks the tree in depth-first, reverse order, so that it encounters
   // APZCs front-to-back on the screen.
-  for (HitTestingTreeNode* node = aNode; node; node = node->GetPrevSibling()) {
-    if (node->IsOutsideClip(aHitTestPoint)) {
-      // If the point being tested is outside the clip region for this node
-      // then we don't need to test against this node or any of its children.
-      // Just skip it and move on.
-      APZCTM_LOG("Point %f %f outside clip for node %p\n",
-        aHitTestPoint.x, aHitTestPoint.y, node);
-      continue;
-    }
+  HitTestingTreeNode* resultNode;
+  HitTestingTreeNode* root = aNode;
+  std::stack<ParentLayerPoint> hitTestPoints;
+  hitTestPoints.push(aHitTestPoint);
 
-    AsyncPanZoomController* result = nullptr;
-
-    // First check the subtree rooted at this node, because deeper nodes
-    // are more "in front".
-    Maybe<LayerPoint> hitTestPointForChildLayers = node->Untransform(aHitTestPoint);
-    if (hitTestPointForChildLayers) {
-      ParentLayerPoint childPoint = ViewAs<ParentLayerPixel>(hitTestPointForChildLayers.ref(),
-        PixelCastJustification::MovingDownToChildren);
-      result = GetAPZCAtPoint(node->GetLastChild(), childPoint, aOutHitResult);
-    }
-
-    // If we didn't match anything in the subtree, check |node|.
-    if (*aOutHitResult == HitNothing) {
-      APZCTM_LOG("Testing ParentLayer point %s (Layer %s) against node %p\n",
-          Stringify(aHitTestPoint).c_str(),
-          hitTestPointForChildLayers ? Stringify(hitTestPointForChildLayers.ref()).c_str() : "nil",
-          node);
-      HitTestResult hitResult = node->HitTest(aHitTestPoint);
-      if (hitResult != HitTestResult::HitNothing) {
-        result = node->GetNearestContainingApzcWithSameLayersId();
-        if (!result) {
-          result = FindRootApzcForLayersId(node->GetLayersId());
-          MOZ_ASSERT(result);
+  ForEachNode(root,
+      [&hitTestPoints](HitTestingTreeNode* aNode) {
+        if (aNode->IsOutsideClip(hitTestPoints.top())) {
+          // If the point being tested is outside the clip region for this node
+          // then we don't need to test against this node or any of its children.
+          // Just skip it and move on.
+          APZCTM_LOG("Point %f %f outside clip for node %p\n",
+            hitTestPoints.top().x, hitTestPoints.top().y, aNode);
+          return TraversalFlag::Skip;
         }
-        APZCTM_LOG("Successfully matched APZC %p via node %p (hit result %d)\n",
-             result, node, hitResult);
-        MOZ_ASSERT(hitResult == HitLayer || hitResult == HitDispatchToContentRegion);
-        // If event regions are disabled, *aOutHitResult will be HitLayer
-        *aOutHitResult = hitResult;
+        // First check the subtree rooted at this node, because deeper nodes
+        // are more "in front".
+        Maybe<LayerPoint> hitTestPointForChildLayers = aNode->Untransform(hitTestPoints.top());
+        APZCTM_LOG("Transformed ParentLayer point %s to layer %s\n",
+                Stringify(hitTestPoints.top()).c_str(),
+                hitTestPointForChildLayers ? Stringify(hitTestPointForChildLayers.ref()).c_str() : "nil");
+        if (!hitTestPointForChildLayers) {
+          return TraversalFlag::Skip;
+        }
+        hitTestPoints.push(ViewAs<ParentLayerPixel>(hitTestPointForChildLayers.ref(),
+            PixelCastJustification::MovingDownToChildren));
+        return TraversalFlag::Continue;
+      },
+      [&resultNode, &hitTestPoints, &aOutHitResult](HitTestingTreeNode* aNode) {
+        hitTestPoints.pop();
+        HitTestResult hitResult = aNode->HitTest(hitTestPoints.top());
+        APZCTM_LOG("Testing ParentLayer point %s against node %p\n",
+                Stringify(hitTestPoints.top()).c_str(), aNode);
+        if (hitResult != HitTestResult::HitNothing) {
+          resultNode = aNode;
+          MOZ_ASSERT(hitResult == HitLayer || hitResult == HitDispatchToContentRegion);
+          // If event regions are disabled, *aOutHitResult will be HitLayer
+          *aOutHitResult = hitResult;
+          return TraversalFlag::Abort;
+        }
+        return TraversalFlag::Continue;
       }
-    }
+  );
 
-    if (*aOutHitResult != HitNothing) {
+  if (*aOutHitResult != HitNothing) {
+      MOZ_ASSERT(resultNode);
+      AsyncPanZoomController* result = resultNode->GetNearestContainingApzcWithSameLayersId();
+      if (!result) {
+        result = FindRootApzcForLayersId(resultNode->GetLayersId());
+        MOZ_ASSERT(result);
+      }
+      APZCTM_LOG("Successfully matched APZC %p via node %p (hit result %d)\n",
+          result, aNode, *aOutHitResult);
       return result;
-    }
   }
 
   return nullptr;
@@ -1724,6 +1743,33 @@ APZCTreeManager::FindRootContentApzcForLayersId(uint64_t aLayersId) const
         return apzc
             && apzc->GetLayersId() == aLayersId
             && apzc->IsRootContent();
+      });
+  return resultNode ? resultNode->GetApzc() : nullptr;
+}
+
+AsyncPanZoomController*
+APZCTreeManager::FindRootContentOrRootApzc() const
+{
+  mTreeLock.AssertCurrentThreadOwns();
+
+  // Note: this is intended to find the same "root" that would be found
+  // by AsyncCompositionManager::ApplyAsyncContentTransformToTree inside
+  // the MOZ_ANDROID_APZ block. That is, it should find the RCD node if there
+  // is one, or the root APZC if there is not.
+  // Since BreadthFirstSearch is a pre-order search, we first do a search for
+  // the RCD, and then if we don't find one, we do a search for the root APZC.
+  HitTestingTreeNode* resultNode = BreadthFirstSearch(mRootNode.get(),
+      [](HitTestingTreeNode* aNode) {
+        AsyncPanZoomController* apzc = aNode->GetApzc();
+        return apzc && apzc->IsRootContent();
+      });
+  if (resultNode) {
+    return resultNode->GetApzc();
+  }
+  resultNode = BreadthFirstSearch(mRootNode.get(),
+      [](HitTestingTreeNode* aNode) {
+        AsyncPanZoomController* apzc = aNode->GetApzc();
+        return (apzc != nullptr);
       });
   return resultNode ? resultNode->GetApzc() : nullptr;
 }
@@ -1844,7 +1890,7 @@ APZCTreeManager::GetScreenToApzcTransform(const AsyncPanZoomController *aApzc) c
     // ancestorUntransform is updated to RC.Inverse() * QC.Inverse() when parent == P
     ancestorUntransform = parent->GetAncestorTransform().Inverse();
     // asyncUntransform is updated to PA.Inverse() when parent == P
-    Matrix4x4 asyncUntransform = parent->GetCurrentAsyncTransformWithOverscroll().Inverse();
+    Matrix4x4 asyncUntransform = parent->GetCurrentAsyncTransformWithOverscroll().Inverse().ToUnknownMatrix();
     // untransformSinceLastApzc is RC.Inverse() * QC.Inverse() * PA.Inverse()
     Matrix4x4 untransformSinceLastApzc = ancestorUntransform * asyncUntransform;
 
@@ -1876,7 +1922,7 @@ APZCTreeManager::GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) co
   // leftmost matrix in a multiplication is applied first.
 
   // asyncUntransform is LA.Inverse()
-  Matrix4x4 asyncUntransform = aApzc->GetCurrentAsyncTransformWithOverscroll().Inverse();
+  Matrix4x4 asyncUntransform = aApzc->GetCurrentAsyncTransformWithOverscroll().Inverse().ToUnknownMatrix();
 
   // aTransformToGeckoOut is initialized to LA.Inverse() * LD * MC * NC * OC * PC
   result = asyncUntransform * aApzc->GetTransformToLastDispatchedPaint() * aApzc->GetAncestorTransform();

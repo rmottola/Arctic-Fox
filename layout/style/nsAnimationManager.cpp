@@ -124,43 +124,24 @@ CSSAnimation::Tick()
 }
 
 bool
-CSSAnimation::HasLowerCompositeOrderThan(const Animation& aOther) const
+CSSAnimation::HasLowerCompositeOrderThan(const CSSAnimation& aOther) const
 {
+  MOZ_ASSERT(IsTiedToMarkup() && aOther.IsTiedToMarkup(),
+             "Should only be called for CSS animations that are sorted "
+             "as CSS animations (i.e. tied to CSS markup)");
+
   // 0. Object-equality case
   if (&aOther == this) {
     return false;
   }
 
-  // 1. Transitions sort lower
-  //
-  // FIXME: We need to differentiate between transitions and generic Animations.
-  // Generic animations don't exist yet (that's bug 1096773) so for now we're
-  // ok.
-  const CSSAnimation* otherAnimation = aOther.AsCSSAnimation();
-  if (!otherAnimation) {
-    MOZ_ASSERT(aOther.AsCSSTransition(),
-               "Animation being compared is a CSS transition");
-    return false;
+  // 1. Sort by document order
+  if (!mOwningElement.Equals(aOther.mOwningElement)) {
+    return mOwningElement.LessThan(aOther.mOwningElement);
   }
 
-  // 2. CSS animations that correspond to an animation-name property sort lower
-  //    than other CSS animations (e.g. those created or kept-alive by script).
-  if (!IsTiedToMarkup()) {
-    return !otherAnimation->IsTiedToMarkup() ?
-           Animation::HasLowerCompositeOrderThan(aOther) :
-           false;
-  }
-  if (!otherAnimation->IsTiedToMarkup()) {
-    return true;
-  }
-
-  // 3. Sort by document order
-  if (!mOwningElement.Equals(otherAnimation->mOwningElement)) {
-    return mOwningElement.LessThan(otherAnimation->mOwningElement);
-  }
-
-  // 4. (Same element and pseudo): Sort by position in animation-name
-  return mAnimationIndex < otherAnimation->mAnimationIndex;
+  // 2. (Same element and pseudo): Sort by position in animation-name
+  return mAnimationIndex < aOther.mAnimationIndex;
 }
 
 void
@@ -187,7 +168,7 @@ CSSAnimation::QueueEvents()
   }
 
   dom::Element* owningElement;
-  nsCSSPseudoElements::Type owningPseudoType;
+  CSSPseudoElementType owningPseudoType;
   mOwningElement.GetElement(owningElement, owningPseudoType);
   MOZ_ASSERT(owningElement, "Owning element should be set");
 
@@ -262,10 +243,9 @@ CSSAnimation::QueueEvents()
   StickyTimeDuration elapsedTime;
 
   if (message == eAnimationStart || message == eAnimationIteration) {
-    TimeDuration iterationStart = mEffect->Timing().mIterationDuration *
-                                    computedTiming.mCurrentIteration;
-    elapsedTime = StickyTimeDuration(std::max(iterationStart,
-                                              InitialAdvance()));
+    StickyTimeDuration iterationStart = computedTiming.mDuration *
+                                          computedTiming.mCurrentIteration;
+    elapsedTime = std::max(iterationStart, StickyTimeDuration(InitialAdvance()));
   } else {
     MOZ_ASSERT(message == eAnimationEnd);
     elapsedTime = computedTiming.mActiveDuration;
@@ -309,7 +289,8 @@ CSSAnimation::ElapsedTimeToTimeStamp(const StickyTimeDuration&
     return result;
   }
 
-  result = AnimationTimeToTimeStamp(aElapsedTime + mEffect->Timing().mDelay);
+  result = AnimationTimeToTimeStamp(aElapsedTime +
+                                    mEffect->SpecifiedTiming().mDelay);
   return result;
 }
 
@@ -317,39 +298,18 @@ CSSAnimation::ElapsedTimeToTimeStamp(const StickyTimeDuration&
 
 NS_IMPL_CYCLE_COLLECTION(nsAnimationManager, mEventDispatcher)
 
-NS_IMPL_CYCLE_COLLECTING_ADDREF(nsAnimationManager)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(nsAnimationManager)
+NS_IMPL_CYCLE_COLLECTION_ROOT_NATIVE(nsAnimationManager, AddRef)
+NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(nsAnimationManager, Release)
 
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsAnimationManager)
-  NS_INTERFACE_MAP_ENTRY(nsIStyleRuleProcessor)
-  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStyleRuleProcessor)
-NS_INTERFACE_MAP_END
-
-/* virtual */ size_t
-nsAnimationManager::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
+void
+nsAnimationManager::UpdateAnimations(nsStyleContext* aStyleContext,
+                                     mozilla::dom::Element* aElement)
 {
-  return CommonAnimationManager::SizeOfExcludingThis(aMallocSizeOf);
-
-  // Measurement of the following members may be added later if DMD finds it is
-  // worthwhile:
-  // - mEventDispatcher
-}
-
-/* virtual */ size_t
-nsAnimationManager::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
-{
-  return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
-}
-
-nsIStyleRule*
-nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
-                                       mozilla::dom::Element* aElement)
-{
-  // Ignore animations for print or print preview, and for elements
-  // that are not attached to the document tree.
-  if (!mPresContext->IsDynamic() || !aElement->IsInComposedDoc()) {
-    return nullptr;
-  }
+  MOZ_ASSERT(mPresContext->IsDynamic(),
+             "Should not update animations for print or print preview");
+  MOZ_ASSERT(aElement->IsInComposedDoc(),
+             "Should not update animations that are not attached to the "
+             "document tree");
 
   // Everything that causes our animation data to change triggers a
   // style change, which in turn triggers a non-animation restyle.
@@ -364,7 +324,7 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   if (!collection &&
       disp->mAnimationNameCount == 1 &&
       disp->mAnimations[0].GetName().IsEmpty()) {
-    return nullptr;
+    return;
   }
 
   nsAutoAnimationMutationBatch mb(aElement->OwnerDoc());
@@ -380,7 +340,7 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
     if (collection) {
       collection->Destroy();
     }
-    return nullptr;
+    return;
   }
 
   if (collection) {
@@ -442,9 +402,9 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
           KeyframeEffectReadOnly* oldEffect = oldAnim->GetEffect();
           KeyframeEffectReadOnly* newEffect = newAnim->GetEffect();
           animationChanged =
-            oldEffect->Timing() != newEffect->Timing() ||
+            oldEffect->SpecifiedTiming() != newEffect->SpecifiedTiming() ||
             oldEffect->Properties() != newEffect->Properties();
-          oldEffect->SetTiming(newEffect->Timing());
+          oldEffect->SetSpecifiedTiming(newEffect->SpecifiedTiming());
           oldEffect->CopyPropertiesFrom(*newEffect);
         }
 
@@ -511,12 +471,10 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
                                          aStyleContext->GetPseudoType(),
                                          aStyleContext);
 
-  EffectCompositor::CascadeLevel cascadeLevel =
-    EffectCompositor::CascadeLevel::Animations;
-  mPresContext->EffectCompositor()
-              ->MaybeUpdateAnimationRule(aElement,
-                                         aStyleContext->GetPseudoType(),
-                                         cascadeLevel);
+  mPresContext->EffectCompositor()->
+    MaybeUpdateAnimationRule(aElement,
+                             aStyleContext->GetPseudoType(),
+                             EffectCompositor::CascadeLevel::Animations);
 
   // We don't actually dispatch the pending events now.  We'll either
   // dispatch them the next time we get a refresh driver notification
@@ -525,17 +483,12 @@ nsAnimationManager::CheckAnimationRule(nsStyleContext* aStyleContext,
   if (mEventDispatcher.HasQueuedEvents()) {
     mPresContext->Document()->SetNeedStyleFlush();
   }
-
-  return mPresContext->EffectCompositor()
-                     ->GetAnimationRule(aElement,
-                                        aStyleContext->GetPseudoType(),
-                                        cascadeLevel);
 }
 
 void
 nsAnimationManager::StopAnimationsForElement(
   mozilla::dom::Element* aElement,
-  nsCSSPseudoElements::Type aPseudoType)
+  mozilla::CSSPseudoElementType aPseudoType)
 {
   MOZ_ASSERT(aElement);
   AnimationCollection* collection =
@@ -644,13 +597,12 @@ nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
     dest->SetAnimationIndex(static_cast<uint64_t>(animIdx));
     aAnimations.AppendElement(dest);
 
-    AnimationTiming timing;
-    timing.mIterationDuration =
-      TimeDuration::FromMilliseconds(src.GetDuration());
+    TimingParams timing;
+    timing.mDuration.SetAsUnrestrictedDouble() = src.GetDuration();
     timing.mDelay = TimeDuration::FromMilliseconds(src.GetDelay());
-    timing.mIterationCount = src.GetIterationCount();
+    timing.mIterations = src.GetIterationCount();
     timing.mDirection = src.GetDirection();
-    timing.mFillMode = src.GetFillMode();
+    timing.mFill = src.GetFillMode();
 
     RefPtr<KeyframeEffectReadOnly> destEffect =
       new KeyframeEffectReadOnly(mPresContext->Document(), aTarget,
@@ -670,7 +622,7 @@ nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
     // the replacement on a per-property basis rather than a per-rule
     // basis, just like everything else in CSS.
 
-    AutoInfallibleTArray<KeyframeData, 16> sortedKeyframes;
+    AutoTArray<KeyframeData, 16> sortedKeyframes;
 
     for (uint32_t ruleIdx = 0, ruleEnd = rule->StyleRuleCount();
          ruleIdx != ruleEnd; ++ruleIdx) {
@@ -731,7 +683,7 @@ nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
       // means we need every keyframe with the property in it, except
       // for those keyframes where a later keyframe with the *same key*
       // also has the property.
-      AutoInfallibleTArray<uint32_t, 16> keyframesWithProperty;
+      AutoTArray<uint32_t, 16> keyframesWithProperty;
       float lastKey = 100.0f; // an invalid key
       for (uint32_t kfIdx = 0, kfEnd = sortedKeyframes.Length();
            kfIdx != kfEnd; ++kfIdx) {
@@ -851,7 +803,11 @@ nsAnimationManager::BuildSegment(InfallibleTArray<AnimationPropertySegment>&
   } else {
     tf = &aAnimation.GetTimingFunction();
   }
-  segment.mTimingFunction.Init(*tf);
+  if (tf->mType != nsTimingFunction::Type::Linear) {
+    ComputedTimingFunction computedTimingFunction;
+    computedTimingFunction.Init(*tf);
+    segment.mTimingFunction = Some(computedTimingFunction);
+  }
 
   return true;
 }

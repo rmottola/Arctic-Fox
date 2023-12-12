@@ -197,7 +197,6 @@ class PandaTalosTest(TestingMixin, MercurialScript, BlobUploadMixin, MozpoolMixi
                 dirs = self.query_abs_dirs()
                 abs_base_cmd = self._query_abs_base_cmd(suite_category)
                 cmd = abs_base_cmd[:]
-                tbpl_status, log_level = None, None
                 c = self.config
                 if c.get('minidump_stackwalk_path'):
                     env['MINIDUMP_STACKWALK'] = c['minidump_stackwalk_path']
@@ -299,8 +298,7 @@ class PandaTalosTest(TestingMixin, MercurialScript, BlobUploadMixin, MozpoolMixi
         self.rmtree(dirs['abs_talosdata_dir'])
         self.mkdir_p(dirs['abs_talosdata_dir'])
         self.mkdir_p(dirs['abs_symbols_dir'])
-        self.mkdir_p(dirs['abs_fennec_dir'])
-        self._download_unzip(self.installer_url,
+        self.download_unzip(self.installer_url,
                              dirs['abs_fennec_dir'])
         #this is ugly but you can't specify a file in download_unzip to extract the file to, by default it's the abs_work_dir
         #should think of a better way
@@ -318,10 +316,10 @@ class PandaTalosTest(TestingMixin, MercurialScript, BlobUploadMixin, MozpoolMixi
                            error_level=FATAL)
         self.symbols_url = self.query_symbols_url()
 
-        self._download_unzip(self.symbols_url,
+        self.download_unzip(self.symbols_url,
                              dirs['abs_symbols_dir'])
 
-        self._download_unzip(self.config['retry_url'],
+        self.download_unzip(self.config['retry_url'],
                              dirs['abs_talosdata_dir'])
 
         taloscode = self.config.get("talos_from_code_url")
@@ -383,12 +381,6 @@ class PandaTalosTest(TestingMixin, MercurialScript, BlobUploadMixin, MozpoolMixi
         if self.config['%s_options' % suite_category]:
             for option in self.config['%s_options' % suite_category]:
                 options.append(option % str_format_values)
-            for url in self.config.get('datazilla_urls', []):
-                options.extend(['--datazilla-url', url])
-            # add datazilla authfile
-            authfile = self.config.get('datazilla_authfile')
-            if authfile:
-                options.extend(['--authfile', authfile])
             abs_base_cmd = base_cmd + options
             return abs_base_cmd
         else:

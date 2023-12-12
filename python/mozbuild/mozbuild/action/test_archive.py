@@ -14,7 +14,9 @@ import argparse
 import itertools
 import os
 import sys
+import time
 
+from mozbuild.util import ensureParentDir
 from mozpack.files import FileFinder
 from mozpack.mozjar import JarWriter
 import mozpack.path as mozpath
@@ -52,6 +54,17 @@ ARCHIVE_FILES = {
         },
         {
             'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'firefox-ui/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'dom/media/test/external',
+            'pattern': '**',
+            'dest': 'external-media-tests',
+        },
+        {
+            'source': buildconfig.topsrcdir,
             'base': 'js/src',
             'pattern': 'jit-test/**',
             'dest': 'jit-test',
@@ -83,6 +96,11 @@ ARCHIVE_FILES = {
         {
             'source': buildconfig.topsrcdir,
             'base': 'testing',
+            'pattern': 'puppeteer/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
             'pattern': 'tps/**',
         },
         {
@@ -95,6 +113,12 @@ ARCHIVE_FILES = {
             'base': 'services/sync/tests/tps',
             'pattern': '**',
             'dest': 'tps/tests',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing/web-platform/tests/tools/wptserve',
+            'pattern': '**',
+            'dest': 'tools/wptserve',
         },
     ],
     'cppunittest': [
@@ -164,9 +188,15 @@ ARCHIVE_FILES = {
     ],
     'reftest': [
         {
-            'source': STAGE,
-            'base': '',
+            'source': buildconfig.topobjdir,
+            'base': '_tests',
             'pattern': 'reftest/**',
+        },
+        {
+            'source': buildconfig.topobjdir,
+            'base': '',
+            'pattern': 'mozinfo.json',
+            'dest': 'reftest',
         },
     ],
     'talos': [
@@ -177,6 +207,21 @@ ARCHIVE_FILES = {
         },
     ],
     'web-platform': [
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/meta/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/mozilla/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing',
+            'pattern': 'web-platform/tests/**',
+        },
         {
             'source': buildconfig.topobjdir,
             'base': '_tests',
@@ -223,8 +268,8 @@ for k, v in ARCHIVE_FILES.items():
 def find_files(archive):
     for entry in ARCHIVE_FILES[archive]:
         source = entry['source']
-        base = entry['base']
-        pattern = entry['pattern']
+        base = entry.get('base', '')
+        pattern = entry.get('pattern')
         dest = entry.get('dest')
         ignore = list(entry.get('ignore', []))
         ignore.append('**/.mkdir.done')
@@ -244,6 +289,55 @@ def find_files(archive):
             yield p, f
 
 
+def find_reftest_dirs(topsrcdir, manifests):
+    from reftest import ReftestManifest
+
+    dirs = set()
+    for p in manifests:
+        m = ReftestManifest()
+        m.load(os.path.join(topsrcdir, p))
+        dirs |= m.dirs
+
+    dirs = {mozpath.normpath(d[len(topsrcdir):]).lstrip('/') for d in dirs}
+
+    # Filter out children captured by parent directories because duplicates
+    # will confuse things later on.
+    def parents(p):
+        while True:
+            p = mozpath.dirname(p)
+            if not p:
+                break
+            yield p
+
+    seen = set()
+    for d in sorted(dirs, key=len):
+        if not any(p in seen for p in parents(d)):
+            seen.add(d)
+
+    return sorted(seen)
+
+
+def insert_reftest_entries(entries):
+    """Reftests have their own mechanism for defining tests and locations.
+
+    This function is called when processing the reftest archive to process
+    reftest test manifests and insert the results into the existing list of
+    archive entries.
+    """
+    manifests = (
+        'layout/reftests/reftest.list',
+        'testing/crashtest/crashtests.list',
+    )
+
+    for base in find_reftest_dirs(buildconfig.topsrcdir, manifests):
+        entries.append({
+            'source': buildconfig.topsrcdir,
+            'base': '',
+            'pattern': '%s/**' % base,
+            'dest': 'reftest/tests',
+        })
+
+
 def main(argv):
     parser = argparse.ArgumentParser(
         description='Produce test archives')
@@ -255,11 +349,30 @@ def main(argv):
     if not args.outputfile.endswith('.zip'):
         raise Exception('expected zip output file')
 
+    # Adjust reftest entries only if processing reftests (because it is
+    # unnecessary overhead otherwise).
+    if args.archive == 'reftest':
+        insert_reftest_entries(ARCHIVE_FILES['reftest'])
+
+    file_count = 0
+    t_start = time.time()
+    ensureParentDir(args.outputfile)
     with open(args.outputfile, 'wb') as fh:
-        with JarWriter(fileobj=fh, optimize=False) as writer:
+        # Experimentation revealed that level 5 is significantly faster and has
+        # marginally larger sizes than higher values and is the sweet spot
+        # for optimal compression. Read the detailed commit message that
+        # introduced this for raw numbers.
+        with JarWriter(fileobj=fh, optimize=False, compress_level=5) as writer:
             res = find_files(args.archive)
             for p, f in res:
+                file_count += 1
                 writer.add(p.encode('utf-8'), f.read(), mode=f.mode)
+
+    duration = time.time() - t_start
+    zip_size = os.path.getsize(args.outputfile)
+    basename = os.path.basename(args.outputfile)
+    print('Wrote %d files in %d bytes to %s in %.2fs' % (
+          file_count, zip_size, basename, duration))
 
 
 if __name__ == '__main__':

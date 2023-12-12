@@ -43,10 +43,13 @@ add_task(function* test_keyword_search() {
   });
 
   do_print("Unescaped term in query");
+  // ... but note that UnifiedComplete calls encodeURIComponent() on the query
+  // string when it builds the URL, so the expected result will have the
+  // ãƒ¦ãƒ‹ã‚³ãƒ¼ãƒ‰ substring encoded in the URL.
   yield check_autocomplete({
-    search: "key ¿?¿?¿?¿?¿?",
+    search: "key ãƒ¦ãƒ‹ã‚³ãƒ¼ãƒ‰",
     searchParam: "enable-actions",
-    matches: [ { uri: makeActionURI("keyword", {url: "http://abc/?search=¿?¿?¿?¿?¿?", input: "key ¿?¿?¿?¿?¿?"}), title: "Generic page title", style: [ "action", "keyword" ] } ]
+    matches: [ { uri: makeActionURI("keyword", {url: "http://abc/?search=" + encodeURIComponent("ãƒ¦ãƒ‹ã‚³ãƒ¼ãƒ‰"), input: "key ãƒ¦ãƒ‹ã‚³ãƒ¼ãƒ‰"}), title: "Generic page title", style: [ "action", "keyword" ] } ]
   });
 
   do_print("Keyword that happens to match a page");

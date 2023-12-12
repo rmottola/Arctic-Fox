@@ -405,10 +405,12 @@ public:
     }
   }
 
-  void DrawWindow(nsGlobalWindow& window, double x, double y, double w, double h,
+  void DrawWindow(nsGlobalWindow& window, double x, double y,
+		  double w, double h,
                   const nsAString& bgColor, uint32_t flags,
                   mozilla::ErrorResult& error);
-  void DrawWidgetAsOnScreen(nsGlobalWindow& aWindow, mozilla::ErrorResult& error);
+  void DrawWidgetAsOnScreen(nsGlobalWindow& aWindow,
+			    mozilla::ErrorResult& error);
   void AsyncDrawXULElement(nsXULElement& elem, double x, double y, double w,
                            double h, const nsAString& bgColor, uint32_t flags,
                            mozilla::ErrorResult& error);
@@ -1038,7 +1040,7 @@ protected:
     bool fontExplicitLanguage;
   };
 
-  nsAutoTArray<ContextState, 3> mStyleStack;
+  AutoTArray<ContextState, 3> mStyleStack;
 
   inline ContextState& CurrentState() {
     return mStyleStack[mStyleStack.Length() - 1];

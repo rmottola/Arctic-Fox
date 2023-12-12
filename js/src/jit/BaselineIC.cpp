@@ -142,7 +142,8 @@ DoWarmUpCounterFallbackOSR(JSContext* cx, BaselineFrame* frame, ICWarmUpCounter_
         return false;
 
     if (!script->hasIonScript() || script->ionScript()->osrPc() != pc ||
-        script->ionScript()->bailoutExpected())
+        script->ionScript()->bailoutExpected() ||
+        frame->isDebuggee())
     {
         return true;
     }
@@ -1403,7 +1404,7 @@ TryAttachNativeGetAccessorElemStub(JSContext* cx, HandleScript script, jsbytecod
     RootedObject baseHolder(cx);
     if (!EffectlesslyLookupProperty(cx, obj, id, &baseHolder, &shape))
         return false;
-    if (!baseHolder || baseHolder->isNative())
+    if (!baseHolder || !baseHolder->isNative())
         return true;
 
     HandleNativeObject holder = baseHolder.as<NativeObject>();
@@ -2699,6 +2700,11 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
         if (!SetObjectElement(cx, obj, index, rhs, objv, JSOp(*pc) == JSOP_STRICTSETELEM, script, pc))
             return false;
     }
+
+    // Don't try to attach stubs that wish to be hidden. We don't know how to
+    // have different enumerability in the stubs for the moment.
+    if (op == JSOP_INITHIDDENELEM)
+        return true;
 
     // Overwrite the object on the stack (pushed for the decompiler) with the rhs.
     MOZ_ASSERT(stack[2] == objv);
@@ -4228,7 +4234,11 @@ ICGetName_Scope<NumHops>::Compiler::generateStubCode(MacroAssembler& masm)
     }
 
     masm.load32(Address(ICStubReg, ICGetName_Scope::offsetOfOffset()), scratch);
-    masm.loadValue(BaseIndex(scope, scratch, TimesOne), R0);
+
+    // GETNAME needs to check for uninitialized lexicals.
+    BaseIndex slot(scope, scratch, TimesOne);
+    masm.branchTestMagic(Assembler::Equal, slot, &failure);
+    masm.loadValue(slot, R0);
 
     // Enter type monitor IC to type-check result.
     EmitEnterTypeMonitorIC(masm);

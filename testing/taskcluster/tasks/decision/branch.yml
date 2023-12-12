@@ -28,8 +28,8 @@ tasks:
       tags:
         createdForUser: {{owner}}
 
-      workerType: "goanna-decision"
-      provisionerId: "aws-provisioner"
+      workerType: "gecko-decision"
+      provisionerId: "aws-provisioner-v1"
 
       scopes:
         - "docker-worker:cache:tc-vcs-public-sources"

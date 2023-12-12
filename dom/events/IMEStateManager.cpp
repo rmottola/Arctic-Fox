@@ -582,7 +582,7 @@ IMEStateManager::OnMouseButtonEventInEditor(nsPresContext* aPresContext,
   }
 
   WidgetMouseEvent* internalEvent =
-    aMouseEvent->GetInternalNSEvent()->AsMouseEvent();
+    aMouseEvent->AsEvent()->WidgetEventPtr()->AsMouseEvent();
   if (NS_WARN_IF(!internalEvent)) {
     MOZ_LOG(sISMLog, LogLevel::Debug,
       ("ISM:   IMEStateManager::OnMouseButtonEventInEditor(), "
@@ -595,7 +595,7 @@ IMEStateManager::OnMouseButtonEventInEditor(nsPresContext* aPresContext,
 
   if (MOZ_LOG_TEST(sISMLog, LogLevel::Info)) {
     nsAutoString eventType;
-    aMouseEvent->GetType(eventType);
+    aMouseEvent->AsEvent()->GetType(eventType);
     MOZ_LOG(sISMLog, LogLevel::Info,
       ("ISM:   IMEStateManager::OnMouseButtonEventInEditor(), "
        "mouse event (type=%s, button=%d) is %s",
@@ -628,7 +628,7 @@ IMEStateManager::OnClickInEditor(nsPresContext* aPresContext,
   NS_ENSURE_TRUE_VOID(widget);
 
   bool isTrusted;
-  nsresult rv = aMouseEvent->GetIsTrusted(&isTrusted);
+  nsresult rv = aMouseEvent->AsEvent()->GetIsTrusted(&isTrusted);
   NS_ENSURE_SUCCESS_VOID(rv);
   if (!isTrusted) {
     MOZ_LOG(sISMLog, LogLevel::Debug,

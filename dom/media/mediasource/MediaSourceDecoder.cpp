@@ -13,7 +13,6 @@
 #include "MediaSourceResource.h"
 #include "MediaSourceUtils.h"
 #include "VideoUtils.h"
-#include "MediaFormatReader.h"
 #include "MediaSourceDemuxer.h"
 #include "SourceBufferList.h"
 #include <algorithm>
@@ -47,9 +46,8 @@ MediaSourceDecoder::CreateStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
   mDemuxer = new MediaSourceDemuxer();
-  RefPtr<MediaFormatReader> reader =
-    new MediaFormatReader(this, mDemuxer, GetVideoFrameContainer());
-  return new MediaDecoderStateMachine(this, reader);
+  mReader = new MediaFormatReader(this, mDemuxer, GetVideoFrameContainer());
+  return new MediaDecoderStateMachine(this, mReader);
 }
 
 nsresult
@@ -150,7 +148,7 @@ MediaSourceDecoder::GetBuffered()
   return buffered;
 }
 
-void
+RefPtr<ShutdownPromise>
 MediaSourceDecoder::Shutdown()
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -162,7 +160,7 @@ MediaSourceDecoder::Shutdown()
   }
   mDemuxer = nullptr;
 
-  MediaDecoder::Shutdown();
+  return MediaDecoder::Shutdown();
 }
 
 /*static*/
@@ -252,7 +250,10 @@ MediaSourceDecoder::GetMediaSourceDuration()
 void
 MediaSourceDecoder::GetMozDebugReaderData(nsAString& aString)
 {
-  mDemuxer->GetMozDebugReaderData(aString);
+  if (mReader && mDemuxer) {
+    mReader->GetMozDebugReaderData(aString);
+    mDemuxer->GetMozDebugReaderData(aString);
+  }
 }
 
 double

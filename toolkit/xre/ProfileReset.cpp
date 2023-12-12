@@ -140,7 +140,7 @@ ProfileResetCleanup(nsIToolkitProfile* aOldProfile)
   nsCOMPtr<nsIAppStartup> appStartup(do_GetService(NS_APPSTARTUP_CONTRACTID));
   if (!appStartup) return NS_ERROR_FAILURE;
 
-  nsCOMPtr<nsIDOMWindow> progressWindow;
+  nsCOMPtr<mozIDOMWindowProxy> progressWindow;
   rv = windowWatcher->OpenWindow(nullptr,
                                  kResetProgressURL,
                                  "_blank",
@@ -170,7 +170,7 @@ ProfileResetCleanup(nsIToolkitProfile* aOldProfile)
     return rv;
   }
   // Close the progress window now that the cleanup thread is done.
-  nsCOMPtr<nsPIDOMWindow> piWindow = do_QueryInterface(progressWindow);
+  auto* piWindow = nsPIDOMWindowOuter::From(progressWindow);
   piWindow->Close();
 
   // Delete the old profile from profiles.ini. The folder was already deleted by the thread above.

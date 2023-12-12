@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this,
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-from __future__ import print_function, unicode_literals
+from __future__ import absolute_import, print_function, unicode_literals
 
 from mach.decorators import (
     CommandArgument,
@@ -14,7 +14,7 @@ from mozbuild.base import (
     MachCommandBase,
 )
 
-import mozpack
+import mozpack.path as mozpath
 
 
 MERGE_HELP = '''Directory to merge to. Will be removed to before running
@@ -48,13 +48,13 @@ class CompareLocales(MachCommandBase):
         try:
             self.substs  # explicitly check
             if not l10n_ini:
-                l10n_ini = mozpack.path.join(
+                l10n_ini = mozpath.join(
                     self.topsrcdir,
                     self.substs['MOZ_BUILD_APP'],
                     'locales', 'l10n.ini'
                 )
             if not l10n_base:
-                l10n_base = mozpack.path.join(
+                l10n_base = mozpath.join(
                     self.topsrcdir,
                     self.substs['L10NBASEDIR']
                 )
@@ -67,7 +67,7 @@ class CompareLocales(MachCommandBase):
             try:
                 # self.substs is raising an Exception if we're not configured
                 # don't merge if we're not
-                merge_dir = mozpack.path.join(
+                merge_dir = mozpath.join(
                     self.topobjdir,
                     self.substs['MOZ_BUILD_APP'],
                     'locales', 'merge-{ab_CD}'

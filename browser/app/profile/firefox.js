@@ -376,6 +376,10 @@ pref("browser.search.context.loadInBackground", false);
 // if no result, add the search term so that the panel of the new UI is shown anyway
 pref("browser.search.showOneOffButtons", true);
 
+
+// comma seperated list of of engines to hide in the search panel.
+pref("browser.search.hiddenOneOffs", "");
+
 // send ping to the server to update
 pref("browser.search.update", true);
 
@@ -391,6 +395,12 @@ pref("browser.search.suggest.enabled", true);
 #ifdef MOZ_OFFICIAL_BRANDING
 // {moz:official} expands to "official"
 pref("browser.search.official", true);
+#endif
+
+#ifdef XP_WIN
+pref("browser.search.redirectWindowsSearch", true);
+#else
+pref("browser.search.redirectWindowsSearch", false);
 #endif
 
 pref("browser.sessionhistory.max_entries", 50);
@@ -649,6 +659,9 @@ pref("accessibility.typeaheadfind.timeout", 5000);
 pref("accessibility.typeaheadfind.linksonly", false);
 pref("accessibility.typeaheadfind.flashBar", 1);
 
+// Tracks when accessibility is loaded into the previous session.
+pref("accessibility.loadedInLastSession", false);
+
 // by default we show an infobar message when pages require plugins that are blocked, or are outdated
 pref("plugins.hide_infobar_for_blocked_plugin", false);
 pref("plugins.hide_infobar_for_outdated_plugin", false);
@@ -661,15 +674,17 @@ pref("plugins.click_to_play", true);
 
 pref("plugins.hideMissingPluginsNotification", false);
 
-#ifdef XP_WIN
-pref("browser.preferences.instantApply", false);
-#else
-pref("browser.preferences.instantApply", true);
-#endif
+
 #ifdef XP_MACOSX
 pref("browser.preferences.animateFadeIn", true);
 #else
 pref("browser.preferences.animateFadeIn", false);
+#endif
+
+#ifdef XP_WIN
+pref("browser.preferences.instantApply", false);
+#else
+pref("browser.preferences.instantApply", true);
 #endif
 
 pref("browser.download.show_plugins_in_list", true);
@@ -793,8 +808,6 @@ pref("browser.sessionstore.interval", 15000);
 // on which sites to save text data, POSTDATA and cookies
 // 0 = everywhere, 1 = unencrypted sites, 2 = nowhere
 pref("browser.sessionstore.privacy_level", 0);
-// the same as browser.sessionstore.privacy_level, but for saving deferred session data
-pref("browser.sessionstore.privacy_level_deferred", 1);
 // how many tabs can be reopened (per window)
 pref("browser.sessionstore.max_tabs_undo", 10);
 // how many windows can be reopened (per session) - on non-OS X platforms this
@@ -973,13 +986,13 @@ pref("dom.ipc.plugins.sandbox-level.flash", 0);
 // This controls the strength of the Windows content process sandbox for testing
 // purposes. This will require a restart.
 // On windows these levels are:
-// 0 - sandbox with USER_NON_ADMIN access token level
-// 1 - a more strict sandbox, which causes problems in specific areas
-// 2 - a more strict sandbox, which might cause functionality issues. This now
-//     includes running at low integrity.
-// 3 - the strongest settings we seem to be able to use without breaking
-//     everything, but will probably cause some functionality restrictions
+// See - security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp
+// SetSecurityLevelForContentProcess() for what the different settings mean.
+#if defined(NIGHTLY_BUILD)
+pref("security.sandbox.content.level", 2);
+#else
 pref("security.sandbox.content.level", 0);
+#endif
 
 // ID (a UUID when set by gecko) that is used as a per profile suffix to a low
 // integrity temp directory.
@@ -1345,3 +1358,25 @@ pref("browser.tabs.remote.autostart.2", true);
 pref("extensions.interposition.enabled", true);
 pref("extensions.interposition.prefetching", true);
 #endif
+
+// How often to check for CPOW timeouts. CPOWs are only timed out by
+// the hang monitor.
+pref("dom.ipc.cpow.timeout", 500);
+
+// Enable e10s hang monitoring (slow script checking and plugin hang
+// detection).
+pref("dom.ipc.processHangMonitor", true);
+
+#ifdef DEBUG
+// Don't report hangs in DEBUG builds. They're too slow and often a
+// debugger is attached.
+pref("dom.ipc.reportProcessHangs", false);
+#else
+pref("dom.ipc.reportProcessHangs", true);
+#endif
+
+// These are the thumbnail width/height set in about:newtab.
+// If you change this, ENSURE IT IS THE SAME SIZE SET
+// by about:newtab. These values are in CSS pixels.
+pref("toolkit.pageThumbs.minWidth", 280);
+pref("toolkit.pageThumbs.minHeight", 190);

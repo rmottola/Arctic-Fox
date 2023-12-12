@@ -91,7 +91,7 @@ class ReleasePusher(BaseScript, VirtualenvMixin):
                 r"^.*json$",
                 r"^.*/host.*$",
                 r"^.*/mar-tools/.*$",
-                r"^.*goanna-unsigned-unaligned.apk$",
+                r"^.*gecko-unsigned-unaligned.apk$",
                 r"^.*robocop.apk$",
                 r"^.*contrib.*"
             ]

@@ -577,8 +577,8 @@ struct ParamTraits<mozilla::ipc::Endpoint<PFooSide>>
             !IPC::ReadParam(aMsg, aIter, &protocolId)) {
             return false;
         }
-        aResult->mMode = mode;
-        aResult->mProtocolId = protocolId;
+        aResult->mMode = Channel::Mode(mode);
+        aResult->mProtocolId = mozilla::ipc::ProtocolId(protocolId);
         return true;
     }
 

@@ -428,8 +428,6 @@ struct LevState {
 class nsBidi
 {
 public:
-  typedef mozilla::FramePropertyDescriptor FramePropertyDescriptor;
-
   /** @brief Default constructor.
    *
    * The nsBidi object is initially empty. It is assigned
@@ -660,18 +658,18 @@ public:
    */
   nsresult WriteReverse(const char16_t *aSrc, int32_t aSrcLength, char16_t *aDest, uint16_t aOptions, int32_t *aDestSize);
 
-  NS_DECLARE_FRAME_PROPERTY(BaseLevelProperty, nullptr)
-  NS_DECLARE_FRAME_PROPERTY(EmbeddingLevelProperty, nullptr)
-  NS_DECLARE_FRAME_PROPERTY(ParagraphDepthProperty, nullptr)
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BaseLevelProperty, nsBidiLevel)
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(EmbeddingLevelProperty, nsBidiLevel)
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(ParagraphDepthProperty, uint8_t)
 
 #define NS_GET_BASE_LEVEL(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::BaseLevelProperty()))
+  frame->Properties().Get(nsBidi::BaseLevelProperty())
 
 #define NS_GET_EMBEDDING_LEVEL(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::EmbeddingLevelProperty()))
+  frame->Properties().Get(nsBidi::EmbeddingLevelProperty())
 
 #define NS_GET_PARAGRAPH_DEPTH(frame) \
-NS_PTR_TO_INT32(frame->Properties().Get(nsBidi::ParagraphDepthProperty()))
+  frame->Properties().Get(nsBidi::ParagraphDepthProperty())
 
 protected:
   friend class nsBidiPresUtils;

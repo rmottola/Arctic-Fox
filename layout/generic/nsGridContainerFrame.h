@@ -21,6 +21,25 @@
 nsContainerFrame* NS_NewGridContainerFrame(nsIPresShell* aPresShell,
                                            nsStyleContext* aContext);
 
+namespace mozilla {
+/**
+ * The number of implicit / explicit tracks and their sizes.
+ */
+struct ComputedGridTrackInfo
+{
+  ComputedGridTrackInfo(uint32_t aNumLeadingImplicitTracks,
+                        uint32_t aNumExplicitTracks,
+                        nsTArray<nscoord>&& aSizes)
+    : mNumLeadingImplicitTracks(aNumLeadingImplicitTracks)
+    , mNumExplicitTracks(aNumExplicitTracks)
+    , mSizes(aSizes)
+  {}
+  uint32_t mNumLeadingImplicitTracks;
+  uint32_t mNumExplicitTracks;
+  nsTArray<nscoord> mSizes;
+};
+} // namespace mozilla
+
 class nsGridContainerFrame final : public nsContainerFrame
 {
 public:
@@ -86,20 +105,18 @@ public:
     StateBits mState;
   };
 
-  NS_DECLARE_FRAME_PROPERTY(GridItemContainingBlockRect, DeleteValue<nsRect>)
+  NS_DECLARE_FRAME_PROPERTY_DELETABLE(GridItemContainingBlockRect, nsRect)
 
-  NS_DECLARE_FRAME_PROPERTY(GridColTrackSizes, DeleteValue<nsTArray<nscoord>>)
-
-  const nsTArray<nscoord>* GetComputedTemplateColumns()
+  NS_DECLARE_FRAME_PROPERTY_DELETABLE(GridColTrackInfo, ComputedGridTrackInfo)
+  const ComputedGridTrackInfo* GetComputedTemplateColumns()
   {
-    return static_cast<nsTArray<nscoord>*>(Properties().Get(GridColTrackSizes()));
+    return Properties().Get(GridColTrackInfo());
   }
 
-  NS_DECLARE_FRAME_PROPERTY(GridRowTrackSizes, DeleteValue<nsTArray<nscoord>>)
-
-  const nsTArray<nscoord>* GetComputedTemplateRows()
+  NS_DECLARE_FRAME_PROPERTY_DELETABLE(GridRowTrackInfo, ComputedGridTrackInfo)
+  const ComputedGridTrackInfo* GetComputedTemplateRows()
   {
-    return static_cast<nsTArray<nscoord>*>(Properties().Get(GridRowTrackSizes()));
+    return Properties().Get(GridRowTrackInfo());
   }
 
 protected:
@@ -108,6 +125,7 @@ protected:
   static const uint32_t kTranslatedMaxLine;
   typedef mozilla::LogicalPoint LogicalPoint;
   typedef mozilla::LogicalRect LogicalRect;
+  typedef mozilla::LogicalSize LogicalSize;
   typedef mozilla::WritingMode WritingMode;
   typedef mozilla::css::GridNamedArea GridNamedArea;
   typedef nsLayoutUtils::IntrinsicISizeType IntrinsicISizeType;
@@ -191,47 +209,34 @@ protected:
     /**
      * Translate the lines to account for (empty) removed tracks.  This method
      * is only for grid items and should only be called after placement.
+     * aNumRemovedTracks contains a count for each line in the grid how many
+     * tracks were removed between the start of the grid and that line.
      */
-    void AdjustForRemovedTracks(uint32_t aFirstRemovedTrack,
-                                uint32_t aNumRemovedTracks)
+    void AdjustForRemovedTracks(const nsTArray<uint32_t>& aNumRemovedTracks)
     {
       MOZ_ASSERT(mStart != kAutoLine, "invalid resolved line for a grid item");
       MOZ_ASSERT(mEnd != kAutoLine, "invalid resolved line for a grid item");
-      if (mStart >= aFirstRemovedTrack) {
-        MOZ_ASSERT(mStart >= aFirstRemovedTrack + aNumRemovedTracks,
-                   "can't start in a removed range of tracks - those tracks "
-                   "are supposed to be empty");
-        mStart -= aNumRemovedTracks;
-        mEnd -= aNumRemovedTracks;
-      } else {
-        MOZ_ASSERT(mEnd <= aFirstRemovedTrack, "can't span into a removed "
-                   "range of tracks - those tracks are supposed to be empty");
-      }
+      uint32_t numRemovedTracks = aNumRemovedTracks[mStart];
+      MOZ_ASSERT(numRemovedTracks == aNumRemovedTracks[mEnd],
+                 "tracks that a grid item spans can't be removed");
+      mStart -= numRemovedTracks;
+      mEnd -= numRemovedTracks;
     }
     /**
      * Translate the lines to account for (empty) removed tracks.  This method
      * is only for abs.pos. children and should only be called after placement.
      * Same as for in-flow items, but we don't touch 'auto' lines here and we
-     * also need to adjust areas that span into the removed range.
+     * also need to adjust areas that span into the removed tracks.
      */
-    void AdjustAbsPosForRemovedTracks(uint32_t aFirstRemovedTrack,
-                                      uint32_t aNumRemovedTracks)
+    void AdjustAbsPosForRemovedTracks(const nsTArray<uint32_t>& aNumRemovedTracks)
     {
-      if (mStart != nsGridContainerFrame::kAutoLine &&
-          mStart > aFirstRemovedTrack) {
-        if (mStart < aFirstRemovedTrack + aNumRemovedTracks) {
-          mStart = aFirstRemovedTrack;
-        } else {
-          mStart -= aNumRemovedTracks;
-        }
+      if (mStart != nsGridContainerFrame::kAutoLine) {
+        mStart -= aNumRemovedTracks[mStart];
       }
-      if (mEnd != nsGridContainerFrame::kAutoLine &&
-          mEnd > aFirstRemovedTrack) {
-        if (mEnd < aFirstRemovedTrack + aNumRemovedTracks) {
-          mEnd = aFirstRemovedTrack;
-        } else {
-          mEnd -= aNumRemovedTracks;
-        }
+      if (mEnd != nsGridContainerFrame::kAutoLine) {
+        MOZ_ASSERT(mStart == nsGridContainerFrame::kAutoLine ||
+                   mEnd > mStart, "invalid line range");
+        mEnd -= aNumRemovedTracks[mEnd];
       }
       if (mStart == mEnd) {
         mEnd = nsGridContainerFrame::kAutoLine;
@@ -254,12 +259,12 @@ protected:
      */
     nscoord ToLength(const nsTArray<TrackSize>& aTrackSizes) const;
     /**
-     * Given an array of track sizes and a grid origin coordinate, adjust the
+     * Given a set of tracks and a grid origin coordinate, adjust the
      * abs.pos. containing block along an axis given by aPos and aLength.
      * aPos and aLength should already be initialized to the grid container
      * containing block for this axis before calling this method.
      */
-    void ToPositionAndLengthForAbsPos(const nsTArray<TrackSize>& aTrackSizes,
+    void ToPositionAndLengthForAbsPos(const Tracks& aTracks,
                                       nscoord aGridOrigin,
                                       nscoord* aPos, nscoord* aLength) const;
 
@@ -592,13 +597,13 @@ protected:
    * grid-template-columns / grid-template-rows are stored in this frame
    * property when needed, as a ImplicitNamedAreas* value.
    */
-  NS_DECLARE_FRAME_PROPERTY(ImplicitNamedAreasProperty,
-                            DeleteValue<ImplicitNamedAreas>)
+  typedef nsTHashtable<nsStringHashKey> ImplicitNamedAreas;
+  NS_DECLARE_FRAME_PROPERTY_DELETABLE(ImplicitNamedAreasProperty,
+                                      ImplicitNamedAreas)
   void InitImplicitNamedAreas(const nsStylePosition* aStyle);
   void AddImplicitNamedAreas(const nsTArray<nsTArray<nsString>>& aLineNameLists);
-  typedef nsTHashtable<nsStringHashKey> ImplicitNamedAreas;
   ImplicitNamedAreas* GetImplicitNamedAreas() const {
-    return static_cast<ImplicitNamedAreas*>(Properties().Get(ImplicitNamedAreasProperty()));
+    return Properties().Get(ImplicitNamedAreasProperty());
   }
   bool HasImplicitNamedArea(const nsString& aName) const {
     ImplicitNamedAreas* areas = GetImplicitNamedAreas();

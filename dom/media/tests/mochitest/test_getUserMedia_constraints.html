@@ -70,7 +70,7 @@ var mustSupport = [
   'width', 'height', 'frameRate', 'facingMode', 'deviceId',
   // Yet to add:
   //  'aspectRatio', 'frameRate', 'volume', 'sampleRate', 'sampleSize',
-  //  'echoCancellation', 'latency', 'groupId'
+  //  'latency', 'groupId'
 
   // http://fluffy.github.io/w3c-screen-share/#screen-based-video-constraints
   // OBE by http://w3c.github.io/mediacapture-screen-share
@@ -78,8 +78,18 @@ var mustSupport = [
 
   // Experimental https://bugzilla.mozilla.org/show_bug.cgi?id=1131568#c3
   'browserWindow', 'scrollWithPage',
-  'viewportOffsetX', 'viewportOffsetY', 'viewportWidth', 'viewportHeight'
+  'viewportOffsetX', 'viewportOffsetY', 'viewportWidth', 'viewportHeight',
+
+  'echoCancellation', 'mozNoiseSuppression', 'mozAutoGainControl'
 ];
+
+var mustFailWith = (msg, reason, constraint, f) =>
+  f().then(() => ok(false, msg + " must fail"), e => {
+    is(e.name, reason, msg + " must fail: " + e.message);
+    if (constraint !== undefined) {
+      is(e.constraint, constraint, msg + " must fail w/correct constraint.");
+    }
+  });
 
 /**
  * Starts the test run by running through each constraint
@@ -120,6 +130,11 @@ runTest(function() {
       .then(() => stream.getAudioTracks()[0].applyConstraints({ })))
     .then(() => ok(true, "applyConstraints code exercised"))
     // TODO: Test outcome once fake devices support constraints (Bug 1088621)
+    .then(() => mustFailWith("applyConstraints fails on non-Gum tracks",
+                             "OverconstrainedError", "",
+                             () => (new AudioContext())
+                                 .createMediaStreamDestination().stream
+                                 .getAudioTracks()[0].applyConstraints()))
 });
 
 </script>

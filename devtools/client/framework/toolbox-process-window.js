@@ -5,8 +5,12 @@
 
 var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
-var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { loader, require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+// Require this module just to setup things like themes and tools
+// devtools-browser is special as it loads main module
+// To be cleaned up in bug 1247203.
+require("devtools/client/framework/devtools-browser");
+var { gDevTools } = require("devtools/client/framework/devtools");
 var { TargetFactory } = require("devtools/client/framework/target");
 var { Toolbox } = require("devtools/client/framework/toolbox");
 var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
@@ -33,7 +37,7 @@ var connect = Task.async(function*() {
     port: Prefs.chromeDebuggingPort
   });
   gClient = new DebuggerClient(transport);
-  gClient.connect(() => {
+  gClient.connect().then(() => {
     let addonID = getParameterByName("addonID");
 
     if (addonID) {
@@ -105,9 +109,26 @@ function openToolbox({ form, chrome, isTabActor }) {
 }
 
 function onNewToolbox(toolbox) {
-   gToolbox = toolbox;
-   bindToolboxHandlers();
-   raise();
+  gToolbox = toolbox;
+  bindToolboxHandlers();
+  raise();
+  let testScript = getParameterByName("testScript");
+  if (testScript) {
+    // Only allow executing random chrome scripts when a special
+    // test-only pref is set
+    let prefName = "devtools.browser-toolbox.allow-unsafe-script";
+    if (Services.prefs.getPrefType(prefName) == Services.prefs.PREF_BOOL &&
+        Services.prefs.getBoolPref(prefName) === true) {
+      evaluateTestScript(testScript, toolbox);
+    }
+  }
+}
+
+function evaluateTestScript(script, toolbox) {
+  let sandbox = Cu.Sandbox(window);
+  sandbox.window = window;
+  sandbox.toolbox = toolbox;
+  Cu.evalInSandbox(script, sandbox);
 }
 
 function bindToolboxHandlers() {

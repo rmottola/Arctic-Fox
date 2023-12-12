@@ -790,6 +790,8 @@ add_task(function test_common_initialize()
   DownloadIntegration.dontOpenFileAndFolder = true;
   DownloadIntegration._deferTestOpenFile = Promise.defer();
   DownloadIntegration._deferTestShowDir = Promise.defer();
+  // Disable checking runtime permissions.
+  DownloadIntegration.dontCheckRuntimePermissions = true;
 
   // Avoid leaking uncaught promise errors
   DownloadIntegration._deferTestOpenFile.promise.then(null, () => undefined);

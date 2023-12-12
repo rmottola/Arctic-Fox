@@ -22,6 +22,7 @@ var _profileInitialized = false;
 _register_modules_protocol_handler();
 
 var _Promise = Components.utils.import("resource://gre/modules/Promise.jsm", {}).Promise;
+var _PromiseTestUtils = Components.utils.import("resource://testing-common/PromiseTestUtils.jsm", {}).PromiseTestUtils;
 
 // Support a common assertion library, Assert.jsm.
 var AssertCls = Components.utils.import("resource://testing-common/Assert.jsm", null).Assert;
@@ -196,7 +197,6 @@ function _do_main() {
 
 function _do_quit() {
   _testLogger.info("exiting test");
-  _Promise.Debugging.flushUncaughtErrors();
   _quit = true;
 }
 
@@ -467,16 +467,8 @@ function _execute_test() {
   // Call do_get_idle() to restore the factory and get the service.
   _fakeIdleService.activate();
 
-  _Promise.Debugging.clearUncaughtErrorObservers();
-  _Promise.Debugging.addUncaughtErrorObserver(function observer({message, date, fileName, stack, lineNumber}) {
-    let text = " A promise chain failed to handle a rejection: " +
-        message + " - rejection date: " + date;
-    _testLogger.error(text,
-                      {
-                        stack: _format_stack(stack),
-                        source_file: fileName
-                      });
-  });
+  _PromiseTestUtils.init();
+  _PromiseTestUtils.Assert = Assert;
 
   // _HEAD_FILES is dynamically defined by <runxpcshelltests.py>.
   _load_files(_HEAD_FILES);
@@ -501,6 +493,7 @@ function _execute_test() {
     }
     do_test_finished("MAIN run_test");
     _do_main();
+    _PromiseTestUtils.assertNoUncaughtRejections();
   } catch (e) {
     _passed = false;
     // do_check failures are already logged and set _quit to true and throw
@@ -575,8 +568,26 @@ function _execute_test() {
   // Restore idle service to avoid leaks.
   _fakeIdleService.deactivate();
 
-  if (!_passed)
-    return;
+  if (_profileInitialized) {
+    // Since we have a profile, we will notify profile shutdown topics at
+    // the end of the current test, to ensure correct cleanup on shutdown.
+    let obs = Components.classes["@mozilla.org/observer-service;1"]
+                        .getService(Components.interfaces.nsIObserverService);
+    obs.notifyObservers(null, "profile-change-net-teardown", null);
+    obs.notifyObservers(null, "profile-change-teardown", null);
+    obs.notifyObservers(null, "profile-before-change", null);
+
+    _profileInitialized = false;
+  }
+
+  try {
+    _PromiseTestUtils.ensureDOMPromiseRejectionsProcessed();
+    _PromiseTestUtils.assertNoUncaughtRejections();
+    _PromiseTestUtils.assertNoMoreExpectedRejections();
+  } finally {
+    // It's important to terminate the module to avoid crashes on shutdown.
+    _PromiseTestUtils.uninit();
+  }
 }
 
 /**
@@ -1106,18 +1117,6 @@ function do_get_profile() {
     return null;
   }
 
-  if (!_profileInitialized) {
-    // Since we have a profile, we will notify profile shutdown topics at
-    // the end of the current test, to ensure correct cleanup on shutdown.
-    do_register_cleanup(function() {
-      let obsSvc = Components.classes["@mozilla.org/observer-service;1"].
-                   getService(Components.interfaces.nsIObserverService);
-      obsSvc.notifyObservers(null, "profile-change-net-teardown", null);
-      obsSvc.notifyObservers(null, "profile-change-teardown", null);
-      obsSvc.notifyObservers(null, "profile-before-change", null);
-    });
-  }
-
   let env = Components.classes["@mozilla.org/process/environment;1"]
                       .getService(Components.interfaces.nsIEnvironment);
   // the python harness sets this in the environment for us
@@ -1199,8 +1198,8 @@ function do_load_child_test_harness()
 
   let command =
         "const _HEAD_JS_PATH=" + uneval(_HEAD_JS_PATH) + "; "
-      + "const _HTTPD_JS_PATH=" + uneval(_HTTPD_JS_PATH) + "; "
       + "const _HEAD_FILES=" + uneval(_HEAD_FILES) + "; "
+      + "const _MOZINFO_JS_PATH=" + uneval(_MOZINFO_JS_PATH) + "; "
       + "const _TAIL_FILES=" + uneval(_TAIL_FILES) + "; "
       + "const _TEST_NAME=" + uneval(_TEST_NAME) + "; "
       // We'll need more magic to get the debugger working in the child
@@ -1289,6 +1288,14 @@ function do_send_remote_message(name) {
 /**
  * Add a test function to the list of tests that are to be run asynchronously.
  *
+ * @param funcOrProperties
+ *        A function to be run or an object represents test properties.
+ *        Supported properties:
+ *          skip_if : An arrow function which has an expression to be
+ *                    evaluated whether the test is skipped or not.
+ * @param func
+ *        A function to be run only if the funcOrProperies is not a function.
+ *
  * Each test function must call run_next_test() when it's done. Test files
  * should call run_next_test() in their run_test function to execute all
  * async tests.
@@ -1296,13 +1303,30 @@ function do_send_remote_message(name) {
  * @return the test function that was passed in.
  */
 var _gTests = [];
-function add_test(func) {
-  _gTests.push([false, func]);
+function add_test(funcOrProperties, func) {
+  if (typeof funcOrProperties == "function") {
+    _gTests.push([{ _isTask: false }, funcOrProperties]);
+  } else if (typeof funcOrProperties == "object") {
+    funcOrProperties._isTask = false;
+    _gTests.push([funcOrProperties, func]);
+  } else {
+    do_throw("add_test() should take a function or an object and a function");
+  }
   return func;
 }
 
 /**
  * Add a test function which is a Task function.
+ *
+ * @param funcOrProperties
+ *        A generator function to be run or an object represents test
+ *        properties.
+ *        Supported properties:
+ *          skip_if : An arrow function which has an expression to be
+ *                    evaluated whether the test is skipped or not.
+ * @param func
+ *        A generator function to be run only if the funcOrProperies is not a
+ *        function.
  *
  * Task functions are functions fed into Task.jsm's Task.spawn(). They are
  * generators that emit promises.
@@ -1318,7 +1342,7 @@ function add_test(func) {
  *
  * Example usage:
  *
- * add_task(function test() {
+ * add_task(function* test() {
  *   let result = yield Promise.resolve(true);
  *
  *   do_check_true(result);
@@ -1327,7 +1351,7 @@ function add_test(func) {
  *   do_check_eq(secondary, "expected value");
  * });
  *
- * add_task(function test_early_return() {
+ * add_task(function* test_early_return() {
  *   let result = yield somethingThatReturnsAPromise();
  *
  *   if (!result) {
@@ -1337,9 +1361,24 @@ function add_test(func) {
  *
  *   do_check_eq(result, "foo");
  * });
+ *
+ * add_task({
+ *   skip_if: () => !("@mozilla.org/telephony/volume-service;1" in Components.classes),
+ * }, function* test_volume_service() {
+ *   let volumeService = Cc["@mozilla.org/telephony/volume-service;1"]
+ *     .getService(Ci.nsIVolumeService);
+ *   ...
+ * });
  */
-function add_task(func) {
-  _gTests.push([true, func]);
+function add_task(funcOrProperties, func) {
+  if (typeof funcOrProperties == "function") {
+    _gTests.push([{ _isTask: true }, funcOrProperties]);
+  } else if (typeof funcOrProperties == "object") {
+    funcOrProperties._isTask = true;
+    _gTests.push([funcOrProperties, func]);
+  } else {
+    do_throw("add_task() should take a function or an object and a function");
+  }
 }
 var _Task = Components.utils.import("resource://gre/modules/Task.jsm", {}).Task;
 _Task.Debugging.maintainStack = true;
@@ -1362,19 +1401,40 @@ function run_next_test()
   function _run_next_test()
   {
     if (_gTestIndex < _gTests.length) {
-      // Flush uncaught errors as early and often as possible.
-      _Promise.Debugging.flushUncaughtErrors();
-      let _isTask;
-      [_isTask, _gRunningTest] = _gTests[_gTestIndex++];
+      // Check for uncaught rejections as early and often as possible.
+      _PromiseTestUtils.assertNoUncaughtRejections();
+      let _properties;
+      [_properties, _gRunningTest,] = _gTests[_gTestIndex++];
+      if (typeof(_properties.skip_if) == "function" && _properties.skip_if()) {
+        let _condition = _properties.skip_if.toSource().replace(/\(\)\s*=>\s*/, "");
+        let _message = _gRunningTest.name
+          + " skipped because the following conditions were"
+          + " met: (" + _condition + ")";
+        _testLogger.testStatus(_TEST_NAME,
+                               _gRunningTest.name,
+                               "SKIP",
+                               "SKIP",
+                               _message);
+        do_execute_soon(run_next_test);
+        return;
+      }
       _testLogger.info(_TEST_NAME + " | Starting " + _gRunningTest.name);
       do_test_pending(_gRunningTest.name);
 
-      if (_isTask) {
+      if (_properties._isTask) {
         _gTaskRunning = true;
-        _Task.spawn(_gRunningTest).then(
-          () => { _gTaskRunning = false; run_next_test(); },
-          (ex) => { _gTaskRunning = false; do_report_unexpected_exception(ex); }
-        );
+        _Task.spawn(_gRunningTest).then(() => {
+          _gTaskRunning = false;
+          run_next_test();
+        }, ex => {
+          _gTaskRunning = false;
+          try {
+            do_report_unexpected_exception(ex);
+          } catch (ex) {
+            // The above throws NS_ERROR_ABORT and we don't want this to show up
+            // as an unhandled rejection later.
+          }
+        });
       } else {
         // Exceptions do not kill asynchronous tests, so they'll time out.
         try {
@@ -1434,3 +1494,29 @@ try {
     prefs.deleteBranch("browser.devedition.theme.enabled");
   }
 } catch (e) { }
+
+function _load_mozinfo() {
+  let mozinfoFile = Components.classes["@mozilla.org/file/local;1"]
+    .createInstance(Components.interfaces.nsIFile);
+  mozinfoFile.initWithPath(_MOZINFO_JS_PATH);
+  let stream = Components.classes["@mozilla.org/network/file-input-stream;1"]
+    .createInstance(Components.interfaces.nsIFileInputStream);
+  stream.init(mozinfoFile, -1, 0, 0);
+  let json = Components.classes["@mozilla.org/dom/json;1"]
+    .createInstance(Components.interfaces.nsIJSON);
+  let mozinfo = json.decodeFromStream(stream, stream.available());
+  stream.close();
+  return mozinfo;
+}
+
+Object.defineProperty(this, "mozinfo", {
+  configurable: true,
+  get() {
+    let _mozinfo = _load_mozinfo();
+    Object.defineProperty(this, "mozinfo", {
+      configurable: false,
+      value: _mozinfo
+    });
+    return _mozinfo;
+  }
+});

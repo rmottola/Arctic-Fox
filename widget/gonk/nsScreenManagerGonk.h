@@ -21,6 +21,7 @@
 #include "hardware/hwcomposer.h"
 
 #include "libdisplay/GonkDisplay.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Hal.h"
 #include "mozilla/Mutex.h"
 #include "nsBaseScreen.h"
@@ -42,6 +43,10 @@ namespace mozilla {
 namespace gl {
     class GLContext;
 }
+namespace layers {
+class CompositorVsyncScheduler;
+class CompositorParent;
+}
 }
 
 enum class NotifyDisplayChangedEvent : int8_t {
@@ -54,6 +59,8 @@ class nsScreenGonk : public nsBaseScreen
     typedef mozilla::hal::ScreenConfiguration ScreenConfiguration;
     typedef mozilla::GonkDisplay GonkDisplay;
     typedef mozilla::LayoutDeviceIntRect LayoutDeviceIntRect;
+    typedef mozilla::layers::CompositorParent CompositorParent;
+    typedef mozilla::gfx::DrawTarget DrawTarget;
 
 public:
     nsScreenGonk(uint32_t aId,
@@ -82,8 +89,11 @@ public:
     ScreenConfiguration GetConfiguration();
     bool IsPrimaryScreen();
 
-    ANativeWindowBuffer* DequeueBuffer();
-    bool QueueBuffer(ANativeWindowBuffer* buf);
+    already_AddRefed<DrawTarget> StartRemoteDrawing();
+    void EndRemoteDrawing();
+
+    nsresult MakeSnapshot(ANativeWindowBuffer* aBuffer);
+    void SetCompositorParent(CompositorParent* aCompositorParent);
 
 #if ANDROID_VERSION >= 17
     android::DisplaySurface* GetDisplaySurface();
@@ -122,6 +132,9 @@ public:
     nsWindow* GetMirroringWidget(); // Primary screen only
 
 protected:
+    ANativeWindowBuffer* DequeueBuffer();
+    bool QueueBuffer(ANativeWindowBuffer* buf);
+
     uint32_t mId;
     NotifyDisplayChangedEvent mEventVisibility;
     int32_t mColorDepth;
@@ -138,6 +151,7 @@ protected:
 #endif
     bool mIsMirroring; // Non-primary screen only
     RefPtr<nsScreenGonk> mMirroringScreen; // Primary screen only
+    mozilla::Atomic<CompositorParent*> mCompositorParent;
 
     // Accessed and updated only on compositor thread
     GonkDisplay::DisplayType mDisplayType;
@@ -145,6 +159,26 @@ protected:
     hwc_surface_t mEGLSurface;
     RefPtr<mozilla::gl::GLContext> mGLContext;
     RefPtr<nsWindow> mMirroringWidget; // Primary screen only
+
+    // If we're using a BasicCompositor, these fields are temporarily
+    // set during frame composition.  They wrap the hardware
+    // framebuffer.
+    RefPtr<DrawTarget> mFramebufferTarget;
+    ANativeWindowBuffer* mFramebuffer;
+    /**
+     * Points to a mapped gralloc buffer between calls to lock and unlock.
+     * Should be null outside of the lock-unlock pair.
+     */
+    uint8_t* mMappedBuffer;
+    // If we're using a BasicCompositor, this is our window back
+    // buffer.  The gralloc framebuffer driver expects us to draw the
+    // entire framebuffer on every frame, but gecko expects the
+    // windowing system to be tracking buffer updates for invalidated
+    // regions.  We get stuck holding that bag.
+    //
+    // Only accessed on the compositor thread, except during
+    // destruction.
+    RefPtr<DrawTarget> mBackBuffer;
 };
 
 class nsScreenManagerGonk final : public nsIScreenManager
@@ -170,6 +204,10 @@ public:
 
     nsresult RemoveScreen(GonkDisplay::DisplayType aDisplayType);
 
+#if ANDROID_VERSION >= 19
+    void SetCompositorVsyncScheduler(mozilla::layers::CompositorVsyncScheduler* aObserver);
+#endif
+
 protected:
     ~nsScreenManagerGonk();
     void VsyncControl(bool aEnabled);
@@ -180,6 +218,11 @@ protected:
     nsTArray<RefPtr<nsScreenGonk>> mScreens;
     RefPtr<nsRunnable> mScreenOnEvent;
     RefPtr<nsRunnable> mScreenOffEvent;
+
+#if ANDROID_VERSION >= 19
+    bool mDisplayEnabled;
+    RefPtr<mozilla::layers::CompositorVsyncScheduler> mCompositorVsyncScheduler;
+#endif
 };
 
 #endif /* nsScreenManagerGonk_h___ */

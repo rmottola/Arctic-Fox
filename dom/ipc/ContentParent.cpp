@@ -80,6 +80,7 @@
 #include "mozilla/ipc/TestShellParent.h"
 #include "mozilla/ipc/InputStreamUtils.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
+#include "mozilla/layers/PAPZParent.h"
 #include "mozilla/layers/CompositorParent.h"
 #include "mozilla/layers/ImageBridgeParent.h"
 #include "mozilla/layers/SharedBufferManagerParent.h"
@@ -602,7 +603,7 @@ ContentParentsMemoryReporter::CollectReports(nsIMemoryReporterCallback* cb,
                                              nsISupports* aClosure,
                                              bool aAnonymize)
 {
-  nsAutoTArray<ContentParent*, 16> cps;
+  AutoTArray<ContentParent*, 16> cps;
   ContentParent::GetAllEvenIfDead(cps);
 
   for (uint32_t i = 0; i < cps.Length(); i++) {
@@ -906,7 +907,7 @@ ContentParent::JoinAllSubprocesses()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsAutoTArray<ContentParent*, 8> processes;
+  AutoTArray<ContentParent*, 8> processes;
   GetAll(processes);
   if (processes.IsEmpty()) {
     printf_stderr("There are no live subprocesses.");
@@ -1117,7 +1118,7 @@ static nsIDocShell* GetOpenerDocShellHelper(Element* aFrameElement)
   // docshell to the remote docshell, via the chrome flags.
   nsCOMPtr<Element> frameElement = do_QueryInterface(aFrameElement);
   MOZ_ASSERT(frameElement);
-  nsPIDOMWindow* win = frameElement->OwnerDoc()->GetWindow();
+  nsPIDOMWindowOuter* win = frameElement->OwnerDoc()->GetWindow();
   if (!win) {
     NS_WARNING("Remote frame has no window");
     return nullptr;
@@ -2025,10 +2026,60 @@ NestedBrowserLayerIds()
 }
 } // namespace
 
+/* static */
 bool
-ContentParent::RecvAllocateLayerTreeId(uint64_t* aId)
+ContentParent::AllocateLayerTreeId(TabParent* aTabParent, uint64_t* aId)
+{
+  return AllocateLayerTreeId(aTabParent->Manager()->AsContentParent(),
+                             aTabParent, aTabParent->GetTabId(), aId);
+}
+
+/* static */
+bool
+ContentParent::AllocateLayerTreeId(ContentParent* aContent,
+                                   TabParent* aTopLevel, const TabId& aTabId,
+                                   uint64_t* aId)
 {
   *aId = CompositorParent::AllocateLayerTreeId();
+
+  if (!gfxPlatform::AsyncPanZoomEnabled()) {
+    return true;
+  }
+
+  if (!aContent || !aTopLevel) {
+    return false;
+  }
+
+  return CompositorParent::UpdateRemoteContentController(*aId, aContent,
+                                                         aTabId, aTopLevel);
+}
+
+bool
+ContentParent::RecvAllocateLayerTreeId(const ContentParentId& aCpId,
+                                       const TabId& aTabId, uint64_t* aId)
+{
+  // Protect against spoofing by a compromised child. aCpId must either
+  // correspond to the process that this ContentParent represents or be a
+  // child of it.
+  ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
+  if (ChildID() != aCpId) {
+    ContentParentId parent;
+    if (!cpm->GetParentProcessId(aCpId, &parent) ||
+        ChildID() != parent) {
+      return false;
+    }
+  }
+
+  // GetTopLevelTabParentByProcessAndTabId will make sure that aTabId
+  // lives in the process for aCpId.
+  RefPtr<ContentParent> contentParent = cpm->GetContentProcessById(aCpId);
+  RefPtr<TabParent> browserParent =
+    cpm->GetTopLevelTabParentByProcessAndTabId(aCpId, aTabId);
+  MOZ_ASSERT(contentParent && browserParent);
+
+  if (!AllocateLayerTreeId(contentParent, browserParent, aTabId, aId)) {
+    return false;
+  }
 
   auto iter = NestedBrowserLayerIds().find(this);
   if (iter == NestedBrowserLayerIds().end()) {
@@ -3393,6 +3444,21 @@ ContentParent::AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
                                       base::ProcessId aOtherProcess)
 {
   return GMPServiceParent::Create(aTransport, aOtherProcess);
+}
+
+PAPZParent*
+ContentParent::AllocPAPZParent(const TabId& aTabId)
+{
+  // The PAPZParent should just be created in the main process and then an IPDL
+  // constructor message sent to hook it up.
+  MOZ_CRASH("This shouldn't be called");
+  return nullptr;
+}
+
+bool
+ContentParent::DeallocPAPZParent(PAPZParent* aActor)
+{
+  return true;
 }
 
 PCompositorParent*
@@ -5120,7 +5186,7 @@ ContentParent::IgnoreIPCPrincipal()
 void
 ContentParent::NotifyUpdatedDictionaries()
 {
-  nsAutoTArray<ContentParent*, 8> processes;
+  AutoTArray<ContentParent*, 8> processes;
   GetAll(processes);
 
   nsCOMPtr<nsISpellChecker> spellChecker(do_GetService(NS_SPELLCHECKER_CONTRACTID));
@@ -5284,7 +5350,7 @@ bool
 ContentParent::RecvSetOfflinePermission(const Principal& aPrincipal)
 {
   nsIPrincipal* principal = aPrincipal;
-  nsContentUtils::MaybeAllowOfflineAppByDefault(principal, nullptr);
+  nsContentUtils::MaybeAllowOfflineAppByDefault(principal);
   return true;
 }
 
@@ -5396,6 +5462,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
                                 const nsString& aName,
                                 const nsCString& aFeatures,
                                 const nsCString& aBaseURI,
+                                const DocShellOriginAttributes& aOpenerOriginAttributes,
                                 nsresult* aResult,
                                 bool* aWindowIsNew,
                                 InfallibleTArray<FrameScriptInfo>* aFrameScripts,
@@ -5439,7 +5506,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     frame = do_QueryInterface(thisTabParent->GetOwnerElement());
   }
 
-  nsCOMPtr<nsPIDOMWindow> parent;
+  nsCOMPtr<nsPIDOMWindowOuter> parent;
   if (frame) {
     parent = frame->OwnerDoc()->GetWindow();
 
@@ -5490,7 +5557,8 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
       loadContext->GetUsePrivateBrowsing(&isPrivate);
     }
 
-    nsCOMPtr<nsIOpenURIInFrameParams> params = new nsOpenURIInFrameParams();
+    nsCOMPtr<nsIOpenURIInFrameParams> params =
+      new nsOpenURIInFrameParams(aOpenerOriginAttributes);
     params->SetReferrer(NS_ConvertUTF8toUTF16(aBaseURI));
     params->SetIsPrivate(isPrivate);
 
@@ -5534,7 +5602,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     finalURI->GetSpec(finalURIString);
   }
 
-  nsCOMPtr<nsIDOMWindow> window;
+  nsCOMPtr<mozIDOMWindowProxy> window;
 
   TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
@@ -5549,17 +5617,12 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
   *aResult = pwwatch->OpenWindow2(parent, uri, name, features, aCalledFromJS,
       false, false, thisTabParent, nullptr, nullptr, getter_AddRefs(window));
 
-  if (NS_WARN_IF(NS_FAILED(*aResult))) {
+  if (NS_WARN_IF(!window)) {
     return true;
   }
 
   *aResult = NS_ERROR_FAILURE;
-
-  nsCOMPtr<nsPIDOMWindow> pwindow = do_QueryInterface(window);
-  if (NS_WARN_IF(!pwindow)) {
-    return true;
-  }
-
+  auto* pwindow = nsPIDOMWindowOuter::From(window);
   nsCOMPtr<nsIDocShell> windowDocShell = pwindow->GetDocShell();
   if (NS_WARN_IF(!windowDocShell)) {
     return true;
@@ -5691,6 +5754,18 @@ bool
 ContentParent::RecvGetGraphicsDeviceInitData(DeviceInitData* aOut)
 {
   gfxPlatform::GetPlatform()->GetDeviceInitData(aOut);
+  return true;
+}
+
+bool
+ContentParent::RecvGraphicsError(const nsCString& aError)
+{
+  gfx::LogForwarder* lf = gfx::Factory::GetLogForwarder();
+  if (lf) {
+    std::stringstream message;
+    message << "CP+" << aError.get();
+    lf->UpdateStringsVector(message.str());
+  }
   return true;
 }
 

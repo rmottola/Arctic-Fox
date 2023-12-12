@@ -38,7 +38,9 @@
 #include "nsPrintfCString.h"
 
 #if defined(XP_WIN)
+#include "mozilla/WindowsVersion.h"
 #include "nsNativeConnectionHelper.h"
+#include "ShutdownLayer.h"
 #endif
 
 /* Following inclusions required for keepalive config not supported by NSPR. */
@@ -743,6 +745,7 @@ nsSocketTransport::nsSocketTransport()
     , mOutputClosed(true)
     , mResolving(false)
     , mNetAddrIsSet(false)
+    , mSelfAddrIsSet(false)
     , mLock("nsSocketTransport.mLock")
     , mFD(this)
     , mFDref(0)
@@ -909,6 +912,7 @@ nsSocketTransport::InitWithFilename(const char *filename)
 nsresult
 nsSocketTransport::InitWithConnectedSocket(PRFileDesc *fd, const NetAddr *addr)
 {
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread, "wrong thread");
     NS_ASSERTION(!mFD.IsInitialized(), "already initialized");
 
     char buf[kNetAddrMaxCStrBufSize];
@@ -929,6 +933,7 @@ nsSocketTransport::InitWithConnectedSocket(PRFileDesc *fd, const NetAddr *addr)
     mPollFlags = (PR_POLL_READ | PR_POLL_WRITE | PR_POLL_EXCEPT);
     mPollTimeout = mTimeouts[TIMEOUT_READ_WRITE];
     mState = STATE_TRANSFERRING;
+    SetSocketName(fd);
     mNetAddrIsSet = true;
 
     {
@@ -1193,7 +1198,7 @@ nsSocketTransport::BuildSocket(PRFileDesc *&fd, bool &proxyTransparent, bool &us
         if (NS_FAILED(rv)) {
             SOCKET_LOG(("  error pushing io layer [%u:%s rv=%x]\n", i, mTypes[i], rv));
             if (fd) {
-                PR_Close(fd);
+                CloseSocket(fd, mSocketTransportService->IsTelemetryEnabled());
             }
         }
     }
@@ -1354,10 +1359,24 @@ nsSocketTransport::InitiateSocket()
         PR_SetSocketOption(fd, &opt);
     }
 
+#if defined(XP_WIN)
+    // The linger is turned off by default. This is not a hard close, but
+    // closesocket should return immediately and operating system tries to send
+    // remaining data for certain, implementation specific, amount of time.
+    // https://msdn.microsoft.com/en-us/library/ms739165.aspx
+    //
+    // Turn the linger option on an set the interval to 0. This will cause hard
+    // close of the socket.
+    opt.option =  PR_SockOpt_Linger;
+    opt.value.linger.polarity = 1;
+    opt.value.linger.linger = 0;
+    PR_SetSocketOption(fd, &opt);
+#endif
+
     // inform socket transport about this newly created socket...
     rv = mSocketTransportService->AttachSocket(fd, this);
     if (NS_FAILED(rv)) {
-        PR_Close(fd);
+        CloseSocket(fd, mSocketTransportService->IsTelemetryEnabled());
         return rv;
     }
     mAttached = true;
@@ -1645,13 +1664,14 @@ nsSocketTransport::OnMsgOutputClosed(nsresult reason)
 void
 nsSocketTransport::OnSocketConnected()
 {
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread, "wrong thread");
     SOCKET_LOG(("  advancing to STATE_TRANSFERRING\n"));
 
     mPollFlags = (PR_POLL_READ | PR_POLL_WRITE | PR_POLL_EXCEPT);
     mPollTimeout = mTimeouts[TIMEOUT_READ_WRITE];
     mState = STATE_TRANSFERRING;
 
-    // Set the mNetAddrIsSet flag only when state has reached TRANSFERRING
+    // Set the m*AddrIsSet flags only when state has reached TRANSFERRING
     // because we need to make sure its value does not change due to failover
     mNetAddrIsSet = true;
 
@@ -1661,7 +1681,23 @@ nsSocketTransport::OnSocketConnected()
         MutexAutoLock lock(mLock);
         NS_ASSERTION(mFD.IsInitialized(), "no socket");
         NS_ASSERTION(mFDref == 1, "wrong socket ref count");
+        SetSocketName(mFD);
         mFDconnected = true;
+
+#ifdef XP_WIN
+        if (!mozilla::IsWin2003OrLater()) { // windows xp
+            PRSocketOptionData opt;
+            opt.option = PR_SockOpt_RecvBufferSize;
+            if (PR_GetSocketOption(mFD, &opt) == PR_SUCCESS) {
+                SOCKET_LOG(("%p checking rwin on xp originally=%u\n",
+                            this, opt.value.recv_buffer_size));
+                if (opt.value.recv_buffer_size < 65535) {
+                    opt.value.recv_buffer_size = 65535;
+                    PR_SetSocketOption(mFD, &opt);
+                }
+            }
+        }
+#endif
     }
 
     // Ensure keepalive is configured correctly if previously enabled.
@@ -1673,6 +1709,22 @@ nsSocketTransport::OnSocketConnected()
     }
 
     SendStatus(NS_NET_STATUS_CONNECTED_TO);
+}
+
+void
+nsSocketTransport::SetSocketName(PRFileDesc *fd)
+{
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread, "wrong thread");
+    if (mSelfAddrIsSet) {
+        return;
+    }
+
+    PRNetAddr prAddr;
+    memset(&prAddr, 0, sizeof(prAddr));
+    if (PR_GetSockName(fd, &prAddr) == PR_SUCCESS) {
+        PRNetAddrToNetAddr(&prAddr, &mSelfAddr);
+        mSelfAddrIsSet = true;
+    }
 }
 
 PRFileDesc *
@@ -1697,7 +1749,8 @@ public:
 
   NS_IMETHOD Run()
   {
-    PR_Close(mFD);
+    nsSocketTransport::CloseSocket(mFD,
+      gSocketTransportService->IsTelemetryEnabled());
     return NS_OK;
   }
 private:
@@ -1734,7 +1787,7 @@ nsSocketTransport::ReleaseFD_Locked(PRFileDesc *fd)
           SOCKET_LOG(("Intentional leak"));
         } else if (PR_GetCurrentThread() == gSocketThread) {
             SOCKET_LOG(("nsSocketTransport: calling PR_Close [this=%p]\n", this));
-            PR_Close(mFD);
+            CloseSocket(mFD, mSocketTransportService->IsTelemetryEnabled());
         } else {
             // Can't PR_Close() a socket off STS thread. Thunk it to STS to die
             STS_PRCloseOnSocketTransport(mFD);
@@ -1887,7 +1940,9 @@ nsSocketTransport::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
         // Update poll timeout in case it was changed
         mPollTimeout = mTimeouts[TIMEOUT_READ_WRITE];
     }
-    else if (mState == STATE_CONNECTING) {
+    else if ((mState == STATE_CONNECTING) && !gIOService->IsNetTearingDown()) {
+        // We do not need to do PR_ConnectContinue when we are already
+        // shutting down.
 
         // We use PRIntervalTime here because we need
         // nsIOService::LastOfflineStateChange time and
@@ -1959,6 +2014,13 @@ nsSocketTransport::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
                 SOCKET_LOG(("  connection failed! [reason=%x]\n", mCondition));
             }
         }
+    }
+    else if ((mState == STATE_CONNECTING) && gIOService->IsNetTearingDown()) {
+        // We do not need to do PR_ConnectContinue when we are already
+        // shutting down.
+        SOCKET_LOG(("We are in shutdown so skip PR_ConnectContinue and set "
+                    "and error.\n"));
+        mCondition = NS_ERROR_ABORT;
     }
     else {
         NS_ERROR("unexpected socket state");
@@ -2317,31 +2379,19 @@ nsSocketTransport::GetPeerAddr(NetAddr *addr)
 NS_IMETHODIMP
 nsSocketTransport::GetSelfAddr(NetAddr *addr)
 {
-    // we must not call any PR methods on our file descriptor
-    // while holding mLock since those methods might re-enter
-    // socket transport code.
+    // once we are in the connected state, mSelfAddr will not change.
+    // so if we can verify that we are in the connected state, then
+    // we can freely access mSelfAddr from any thread without being
+    // inside a critical section.
 
-    PRFileDescAutoLock fd(this);
-    if (!fd.IsInitialized()) {
-        return NS_ERROR_NOT_CONNECTED;
+    if (!mSelfAddrIsSet) {
+        SOCKET_LOG(("nsSocketTransport::GetSelfAddr [this=%p state=%d] "
+                    "NOT_AVAILABLE because not yet connected.", this, mState));
+        return NS_ERROR_NOT_AVAILABLE;
     }
 
-    PRNetAddr prAddr;
-
-    // NSPR doesn't tell us the socket address's length (as provided by
-    // the 'getsockname' system call), so we can't distinguish between
-    // named, unnamed, and abstract Unix domain socket names. (Server
-    // sockets are never unnamed, obviously, but client sockets can use
-    // any kind of address.) Clear prAddr first, so that the path for
-    // unnamed and abstract addresses will at least be reliably empty,
-    // and not garbage for unnamed sockets.
-    memset(&prAddr, 0, sizeof(prAddr));
-
-    nsresult rv =
-        (PR_GetSockName(fd, &prAddr) == PR_SUCCESS) ? NS_OK : NS_ERROR_FAILURE;
-    PRNetAddrToNetAddr(&prAddr, addr);
-
-    return rv;
+    memcpy(addr, &mSelfAddr, sizeof(NetAddr));
+    return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -3040,6 +3090,33 @@ nsSocketTransport::PRFileDescAutoLock::SetKeepaliveVals(bool aEnabled,
                "called on unsupported platform!");
     return NS_ERROR_UNEXPECTED;
 #endif
+}
+
+void
+nsSocketTransport::CloseSocket(PRFileDesc *aFd, bool aTelemetryEnabled)
+{
+#if defined(XP_WIN)
+    mozilla::net::AttachShutdownLayer(aFd);
+#endif
+
+    // We use PRIntervalTime here because we need
+    // nsIOService::LastOfflineStateChange time and
+    // nsIOService::LastConectivityChange time to be atomic.
+    PRIntervalTime closeStarted;
+    if (aTelemetryEnabled) {
+        closeStarted = PR_IntervalNow();
+    }
+
+    PR_Close(aFd);
+
+    if (aTelemetryEnabled) {
+        SendPRBlockingTelemetry(closeStarted,
+            Telemetry::PRCLOSE_TCP_BLOCKING_TIME_NORMAL,
+            Telemetry::PRCLOSE_TCP_BLOCKING_TIME_SHUTDOWN,
+            Telemetry::PRCLOSE_TCP_BLOCKING_TIME_CONNECTIVITY_CHANGE,
+            Telemetry::PRCLOSE_TCP_BLOCKING_TIME_LINK_CHANGE,
+            Telemetry::PRCLOSE_TCP_BLOCKING_TIME_OFFLINE);
+    }
 }
 
 void

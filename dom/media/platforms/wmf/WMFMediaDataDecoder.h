@@ -52,6 +52,8 @@ public:
 
   virtual TrackInfo::TrackType GetType() = 0;
 
+  virtual const char* GetDescriptionName() const = 0;
+
 protected:
   // IMFTransform wrapper that performs the decoding.
   RefPtr<MFTDecoder> mDecoder;
@@ -80,6 +82,11 @@ public:
   nsresult Shutdown() override;
 
   bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
+
+  const char* GetDescriptionName() const override
+  {
+    return mMFTManager ? mMFTManager->GetDescriptionName() : "";
+  }
 
 private:
 

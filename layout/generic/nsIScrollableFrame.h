@@ -441,6 +441,25 @@ public:
   virtual bool DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
                                      nsRect* aDirtyRect,
                                      bool aAllowCreateDisplayPort) = 0;
+
+  /**
+   * Notification that this scroll frame is getting its image visibility updated.
+   */
+  virtual void NotifyImageVisibilityUpdate() = 0;
+
+  /**
+   * Returns true if this scroll frame had a display port at the last image
+   * visibility update and fills in aDisplayPort with that displayport. Returns
+   * false otherwise, and doesn't touch aDisplayPort.
+   */
+  virtual bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort) = 0;
+
+  /**
+   * This is called when a descendant scrollframe's has its displayport expired.
+   * This function will check to see if this scrollframe may safely expire its
+   * own displayport and schedule a timer to do that if it is safe.
+   */
+  virtual void TriggerDisplayPortExpiration() = 0;
 };
 
 #endif

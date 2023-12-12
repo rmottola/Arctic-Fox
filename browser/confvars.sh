@@ -28,7 +28,6 @@ MOZ_ENABLE_SIGNMAR=1
 
 MOZ_CHROME_FILE_FORMAT=omni
 MOZ_SERVICES_COMMON=1
-MOZ_MEDIA_NAVIGATOR=1
 MOZ_SERVICES_CRYPTO=1
 MOZ_SERVICES_SYNC=1
 MOZ_APP_VERSION=$FIREFOX_VERSION
@@ -55,9 +54,6 @@ fi
 
 MOZ_BROWSER_STATUSBAR=1
 
-#Enable devtools by default. Can be disabled with --disable-devtools in mozconfig.
-MOZ_DEVTOOLS=1
-
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
 # Changing MOZ_*BRANDING_DIRECTORY requires a clobber to ensure correct results,
 # because branding dependencies are broken.
@@ -80,6 +76,7 @@ MAR_CHANNEL_ID=palemoon-release
 MOZ_PROFILE_MIGRATOR=1
 MOZ_EXTENSION_MANAGER=1
 MOZ_APP_STATIC_INI=1
+MOZ_MEDIA_NAVIGATOR=1
 if test "$OS_TARGET" = "WINNT" -o "$OS_TARGET" = "Darwin"; then
   MOZ_FOLD_LIBS=1
 fi

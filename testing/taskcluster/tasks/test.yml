@@ -1,4 +1,4 @@
-# This task is the base for most tests in goanna.
+# This task is the base for most tests in gecko.
 task:
   created: '{{now}}'
   deadline: '{{#from_now}}24 hours{{/from_now}}'
@@ -15,13 +15,27 @@ task:
     - 'docker-worker:image:{{#docker_image}}tester{{/docker_image}}'
     - 'queue:define-task:aws-provisioner-v1/test-c4-2xlarge'
     - 'queue:create-task:aws-provisioner-v1/test-c4-2xlarge'
+    - 'docker-worker:cache:tc-vcs'
+    - 'docker-worker:cache:linux-cache'
+    - 'docker-worker:capability:device:loopbackVideo'
+    - 'docker-worker:capability:device:loopbackAudio'
 
   payload:
+    capabilities:
+      devices:
+        loopbackVideo: true
+        loopbackAudio: true
     image: '{{#docker_image}}tester{{/docker_image}}'
     maxRunTime: 3600
+    cache:
+      # So pip installs are cached...
+      linux-cache: /home/worker/.cache
+      tc-vcs: '/home/worker/.tc-vcs'
     env:
-      MOZHARNESS_REPOSITORY: '{{mozharness_repository}}'
-      MOZHARNESS_REV: '{{mozharness_rev}}'
+      GAIA_HEAD_REPOSITORY: '{{{gaia_head_repository}}}'
+      GAIA_BASE_REPOSITORY: '{{{gaia_base_repository}}}'
+      GAIA_REF: '{{{gaia_ref}}}'
+      GAIA_REV: '{{{gaia_rev}}}'
 
     # All builds share a common artifact directory for ease of uploading.
     artifacts:

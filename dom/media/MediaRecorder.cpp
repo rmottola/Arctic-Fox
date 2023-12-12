@@ -18,6 +18,7 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/RecordErrorEvent.h"
 #include "mozilla/dom/VideoStreamTrack.h"
+#include "nsContentUtils.h"
 #include "nsError.h"
 #include "nsIDocument.h"
 #include "nsIPermissionManager.h"
@@ -553,7 +554,7 @@ private:
     }
   }
 
-  bool Check3gppPermission()
+  bool CheckPermission(const char* aType)
   {
     nsCOMPtr<nsIDocument> doc = mRecorder->GetOwner()->GetExtantDoc();
     if (!doc) {
@@ -576,7 +577,7 @@ private:
     }
 
     uint32_t perm = nsIPermissionManager::DENY_ACTION;
-    pm->TestExactPermissionFromPrincipal(doc->NodePrincipal(), "audio-capture:3gpp", &perm);
+    pm->TestExactPermissionFromPrincipal(doc->NodePrincipal(), aType, &perm);
     return perm == nsIPermissionManager::ALLOW_ACTION;
   }
 
@@ -589,8 +590,14 @@ private:
     // At this stage, the API doesn't allow UA to choose the output mimeType format.
 
     // Make sure the application has permission to assign AUDIO_3GPP
-    if (mRecorder->mMimeType.EqualsLiteral(AUDIO_3GPP) && Check3gppPermission()) {
+    if (mRecorder->mMimeType.EqualsLiteral(AUDIO_3GPP) && CheckPermission("audio-capture:3gpp")) {
       mEncoder = MediaEncoder::CreateEncoder(NS_LITERAL_STRING(AUDIO_3GPP),
+                                             mRecorder->GetAudioBitrate(),
+                                             mRecorder->GetVideoBitrate(),
+                                             mRecorder->GetBitrate(),
+                                             aTrackTypes);
+    } else if (mRecorder->mMimeType.EqualsLiteral(AUDIO_3GPP2) && CheckPermission("audio-capture:3gpp2")) {
+      mEncoder = MediaEncoder::CreateEncoder(NS_LITERAL_STRING(AUDIO_3GPP2),
                                              mRecorder->GetAudioBitrate(),
                                              mRecorder->GetVideoBitrate(),
                                              mRecorder->GetBitrate(),
@@ -740,7 +747,7 @@ MediaRecorder::~MediaRecorder()
 }
 
 MediaRecorder::MediaRecorder(DOMMediaStream& aSourceMediaStream,
-                             nsPIDOMWindow* aOwnerWindow)
+                             nsPIDOMWindowInner* aOwnerWindow)
   : DOMEventTargetHelper(aOwnerWindow)
   , mState(RecordingState::Inactive)
 {
@@ -753,7 +760,7 @@ MediaRecorder::MediaRecorder(DOMMediaStream& aSourceMediaStream,
 
 MediaRecorder::MediaRecorder(AudioNode& aSrcAudioNode,
                              uint32_t aSrcOutput,
-                             nsPIDOMWindow* aOwnerWindow)
+                             nsPIDOMWindowInner* aOwnerWindow)
   : DOMEventTargetHelper(aOwnerWindow)
   , mState(RecordingState::Inactive)
 {
@@ -785,11 +792,10 @@ MediaRecorder::MediaRecorder(AudioNode& aSrcAudioNode,
 void
 MediaRecorder::RegisterActivityObserver()
 {
-  nsPIDOMWindow* window = GetOwner();
-  if (window) {
-    mDocument = window->GetExtantDoc();
-    if (mDocument) {
-      mDocument->RegisterActivityObserver(
+  if (nsPIDOMWindowInner* window = GetOwner()) {
+    nsIDocument* doc = window->GetExtantDoc();
+    if (doc) {
+      doc->RegisterActivityObserver(
         NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
     }
   }
@@ -798,9 +804,12 @@ MediaRecorder::RegisterActivityObserver()
 void
 MediaRecorder::UnRegisterActivityObserver()
 {
-  if (mDocument) {
-    mDocument->UnregisterActivityObserver(
-      NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
+  if (nsPIDOMWindowInner* window = GetOwner()) {
+    nsIDocument* doc = window->GetExtantDoc();
+    if (doc) {
+      doc->UnregisterActivityObserver(
+        NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
+    }
   }
 }
 
@@ -934,7 +943,7 @@ MediaRecorder::Constructor(const GlobalObject& aGlobal,
                            const MediaRecorderOptions& aInitDict,
                            ErrorResult& aRv)
 {
-  nsCOMPtr<nsPIDOMWindow> ownerWindow = do_QueryInterface(aGlobal.GetAsSupports());
+  nsCOMPtr<nsPIDOMWindowInner> ownerWindow = do_QueryInterface(aGlobal.GetAsSupports());
   if (!ownerWindow) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
@@ -961,7 +970,7 @@ MediaRecorder::Constructor(const GlobalObject& aGlobal,
     return nullptr;
   }
 
-  nsCOMPtr<nsPIDOMWindow> ownerWindow = do_QueryInterface(aGlobal.GetAsSupports());
+  nsCOMPtr<nsPIDOMWindowInner> ownerWindow = do_QueryInterface(aGlobal.GetAsSupports());
   if (!ownerWindow) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
@@ -1118,7 +1127,7 @@ MediaRecorder::RemoveSession(Session* aSession)
 void
 MediaRecorder::NotifyOwnerDocumentActivityChanged()
 {
-  nsPIDOMWindow* window = GetOwner();
+  nsPIDOMWindowInner* window = GetOwner();
   NS_ENSURE_TRUE_VOID(window);
   nsIDocument* doc = window->GetExtantDoc();
   NS_ENSURE_TRUE_VOID(doc);

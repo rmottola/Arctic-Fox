@@ -597,6 +597,9 @@ class RRegExpReplace final : public RInstruction
 
 class RStringReplace final : public RInstruction
 {
+  private:
+    bool isFlatReplacement_;
+
   public:
     RINSTRUCTION_HEADER_(StringReplace)
 

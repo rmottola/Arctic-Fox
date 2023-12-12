@@ -1831,7 +1831,7 @@ XULDocument::RemoveElementFromRefMap(Element* aElement)
         if (!entry)
             return;
         if (entry->RemoveElement(aElement)) {
-            mRefMap.RawRemoveEntry(entry);
+            mRefMap.RemoveEntry(entry);
         }
     }
 }
@@ -4469,7 +4469,7 @@ XULDocument::GetWindowRoot()
     return nullptr;
   }
 
-    nsCOMPtr<nsPIDOMWindow> piWin = mDocumentContainer->GetWindow();
+    nsCOMPtr<nsPIDOMWindowOuter> piWin = mDocumentContainer->GetWindow();
     return piWin ? piWin->GetTopWindowRoot() : nullptr;
 }
 

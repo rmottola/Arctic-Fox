@@ -68,6 +68,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "gMIMEService",
 XPCOMUtils.defineLazyServiceGetter(this, "gExternalProtocolService",
                                    "@mozilla.org/uriloader/external-protocol-service;1",
                                    "nsIExternalProtocolService");
+#ifdef MOZ_WIDGET_ANDROID
+XPCOMUtils.defineLazyModuleGetter(this, "RuntimePermissions",
+                                  "resource://gre/modules/RuntimePermissions.jsm");
+#endif
 
 XPCOMUtils.defineLazyGetter(this, "gParentalControlsService", function() {
   if ("@mozilla.org/parental-controls-service;1" in Cc) {
@@ -136,7 +140,13 @@ this.DownloadIntegration = {
   dontLoadObservers: false,
   dontCheckParentalControls: false,
   shouldBlockInTest: false,
+  dontCheckRuntimePermissions: false,
+  shouldBlockInTestForRuntimePermissions: false,
+#ifdef MOZ_URL_CLASSIFIER
+  dontCheckApplicationReputation: false,
+#else
   dontCheckApplicationReputation: true,
+#endif
   shouldBlockInTestForApplicationReputation: false,
   shouldKeepBlockedDataInTest: false,
   dontOpenFileAndFolder: false,
@@ -492,6 +502,25 @@ this.DownloadIntegration = {
     }
 
     return Promise.resolve(shouldBlock);
+  },
+
+  /**
+   * Checks to determine whether to block downloads for not granted runtime permissions.
+   *
+   * @return {Promise}
+   * @resolves The boolean indicates to block downloads or not.
+   */
+  shouldBlockForRuntimePermissions: function DI_shouldBlockForRuntimePermissions() {
+    if (this.dontCheckRuntimePermissions) {
+      return Promise.resolve(this.shouldBlockInTestForRuntimePermissions);
+    }
+
+#ifdef MOZ_WIDGET_ANDROID
+    return RuntimePermissions.waitForPermissions(RuntimePermissions.WRITE_EXTERNAL_STORAGE)
+                             .then(permissionGranted => !permissionGranted);
+#else
+    return Promise.resolve(false);
+#endif
   },
 
   /**
@@ -927,6 +956,20 @@ this.DownloadIntegration = {
   },
 
   /**
+   * Force a save on _store if it exists. Used to ensure downloads do not
+   * persist after being sanitized on Android.
+   *
+   * @return {Promise}
+   * @resolves When _store.save() completes.
+   */
+  forceSave: function DI_forceSave() {
+    if (this._store) {
+      return this._store.save();
+    }
+    return Promise.resolve();
+  },
+
+  /**
    * Checks if we have already imported (or attempted to import)
    * the downloads database from the previous SQLite storage.
    *
@@ -1052,7 +1095,7 @@ this.DownloadObserver = {
     this._wakeTimer = null;
 
     for (let download of this._canceledOfflineDownloads) {
-      download.start();
+      download.start().catch(() => {});
     }
   },
 

@@ -351,9 +351,38 @@ exports['test console global by default'] = function (assert) {
 exports['test shared globals'] = function(assert) {
   let uri = root + '/fixtures/loader/cycles/';
   let loader = Loader({ paths: { '': uri }, sharedGlobal: true,
+                        sharedGlobalBlocklist: ['b'] });
+
+  let program = main(loader, 'main');
+
+  // As it is hard to verify what is the global of an object
+  // (due to wrappers) we check that we see the `foo` symbol
+  // being manually injected into the shared global object
+  loader.sharedGlobalSandbox.foo = true;
+
+  let m = loader.sandboxes[uri + 'main.js'];
+  let a = loader.sandboxes[uri + 'a.js'];
+  let b = loader.sandboxes[uri + 'b.js'];
+
+  assert.ok(Cu.getGlobalForObject(m).foo, "main is shared");
+  assert.ok(Cu.getGlobalForObject(a).foo, "a is shared");
+  assert.ok(!Cu.getGlobalForObject(b).foo, "b isn't shared");
+
+  unload(loader);
+}
+
+exports['test deprecated shared globals exception name'] = function(assert) {
+  let uri = root + '/fixtures/loader/cycles/';
+  let loader = Loader({ paths: { '': uri }, sharedGlobal: true,
                         sharedGlobalBlacklist: ['b'] });
 
   let program = main(loader, 'main');
+
+  assert.ok(loader.sharedGlobalBlocklist.includes("b"), "b should be in the blocklist");
+  assert.equal(loader.sharedGlobalBlocklist.length, loader.sharedGlobalBlacklist.length,
+               "both blocklists should have the same number of items.");
+  assert.equal(loader.sharedGlobalBlocklist.join(","), loader.sharedGlobalBlacklist.join(","),
+               "both blocklists should have the same items.");
 
   // As it is hard to verify what is the global of an object
   // (due to wrappers) we check that we see the `foo` symbol
@@ -387,6 +416,19 @@ exports["test require#resolve"] = function(assert) {
 
   assert.equal(foundRoot + "sdk/tabs.js", require.resolve("sdk/tabs"), "correct resolution of sdk module");
   assert.equal(foundRoot + "toolkit/loader.js", require.resolve("toolkit/loader"), "correct resolution of sdk module");
+
+  const localLoader = Loader({
+    paths: { "foo/bar": "bizzle",
+             "foo/bar2/": "bizzle2",
+             // Just to make sure this doesn't match the first entry,
+             // let use resolve this module
+             "foo/bar-bar": "foo/bar-bar" }
+  });
+  const localRequire = Require(localLoader, module);
+  assert.equal(localRequire.resolve("foo/bar"), "bizzle.js");
+  assert.equal(localRequire.resolve("foo/bar/baz"), "bizzle/baz.js");
+  assert.equal(localRequire.resolve("foo/bar-bar"), "foo/bar-bar.js");
+  assert.equal(localRequire.resolve("foo/bar2/"), "bizzle2.js");
 };
 
 const modulesURI = require.resolve("toolkit/loader").replace("toolkit/loader.js", "");
@@ -559,7 +601,7 @@ exports['test user global'] = function(assert) {
 exports['test custom require caching'] = function(assert) {
   const loader = Loader({
     paths: { '': root + "/" },
-    require: (id, require) => {
+    requireHook: (id, require) => {
       // Just load it normally
       return require(id);
     }
@@ -581,7 +623,7 @@ exports['test caching when proxying a loader'] = function(assert) {
   const parentRequire = require;
   const loader = Loader({
     paths: { '': root + "/" },
-    require: (id, childRequire) => {
+    requireHook: (id, childRequire) => {
       if(id === 'gimmejson') {
         return childRequire('fixtures/loader/json/mutation.json')
       }

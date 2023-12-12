@@ -18,16 +18,17 @@ class VideoTrack;
 class VideoTrackList : public MediaTrackList
 {
 public:
-  VideoTrackList(nsPIDOMWindow* aOwnerWindow, HTMLMediaElement* aMediaElement)
+  VideoTrackList(nsPIDOMWindowInner* aOwnerWindow,
+                 HTMLMediaElement* aMediaElement)
     : MediaTrackList(aOwnerWindow, aMediaElement)
     , mSelectedIndex(-1)
   {}
 
-  virtual JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   VideoTrack* operator[](uint32_t aIndex);
 
-  virtual void EmptyTracks() override;
+  void EmptyTracks() override;
 
   // WebIDL
   int32_t SelectedIndex() const
@@ -42,7 +43,7 @@ public:
   friend class VideoTrack;
 
 protected:
-  virtual VideoTrackList* AsVideoTrackList() override { return this; }
+  VideoTrackList* AsVideoTrackList() override { return this; }
 
 private:
   int32_t mSelectedIndex;

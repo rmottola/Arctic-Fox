@@ -59,7 +59,7 @@ nsMathMLmmultiscriptsFrame::TransmitAutomaticData()
   int32_t count = 0;
   bool isSubScript = !mContent->IsMathMLElement(nsGkAtoms::msup_);
 
-  nsAutoTArray<nsIFrame*, 8> subScriptFrames;
+  AutoTArray<nsIFrame*, 8> subScriptFrames;
   nsIFrame* childFrame = mFrames.FirstChild();
   while (childFrame) {
     if (childFrame->GetContent()->IsMathMLElement(nsGkAtoms::mprescripts_)) {
@@ -201,6 +201,14 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*  aPresContext,
   } else {
     // (0.5pt in plain TeX)
     scriptSpace = nsPresContext::CSSPointsToAppUnits(0.5f);
+  }
+
+  // Try and read sub and sup drops from the MATH table.
+  if (mathFont) {
+    subDrop = mathFont->
+      GetMathConstant(gfxFontEntry::SubscriptBaselineDropMin, oneDevPixel);
+    supDrop = mathFont->
+      GetMathConstant(gfxFontEntry::SuperscriptBaselineDropMax, oneDevPixel);
   }
 
   // force the scriptSpace to be at least 1 pixel
@@ -390,8 +398,11 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*  aPresContext,
         // subscript
         subScriptFrame = childFrame;
         GetReflowAndBoundingMetricsFor(subScriptFrame, subScriptSize, bmSubScript);
-        // get the subdrop from the subscript font
-        GetSubDropFromChild (subScriptFrame, subDrop, aFontSizeInflation);
+        if (!mathFont) {
+          // get the subdrop from the subscript font
+          GetSubDropFromChild (subScriptFrame, subDrop, aFontSizeInflation);
+        }
+
         // parameter v, Rule 18a, App. G, TeXbook
         minSubScriptShift = bmBase.descent + subDrop;
         trySubScriptShift = std::max(minSubScriptShift,subScriptShift);
@@ -431,8 +442,10 @@ nsMathMLmmultiscriptsFrame::PlaceMultiScript(nsPresContext*  aPresContext,
         // supscript
         supScriptFrame = childFrame;
         GetReflowAndBoundingMetricsFor(supScriptFrame, supScriptSize, bmSupScript);
-        // get the supdrop from the supscript font
-        GetSupDropFromChild (supScriptFrame, supDrop, aFontSizeInflation);
+        if (!mathFont) {
+          // get the supdrop from the supscript font
+          GetSupDropFromChild (supScriptFrame, supDrop, aFontSizeInflation);
+        }
         // parameter u, Rule 18a, App. G, TeXbook
         minSupScriptShift = bmBase.ascent - supDrop;
         nscoord superscriptBottomMin;

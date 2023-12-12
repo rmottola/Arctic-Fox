@@ -185,23 +185,25 @@ function removeBreakpoint(ctx, line) {
 
 function moveBreakpoint(ctx, fromLine, toLine) {
   let { ed, cm } = ctx;
-  let info = cm.lineInfo(fromLine);
 
   var fromTop = cm.cursorCoords({ line: fromLine }).top;
   var toTop = cm.cursorCoords({ line: toLine }).top;
 
+  ed.removeBreakpoint(fromLine);
+  ed.addBreakpoint(toLine);
+  let info = cm.lineInfo(toLine);
   var marker = ed.getMarker(info.line, "breakpoints", "breakpoint");
   if (marker) {
     marker.setAttribute("adding", "");
+    marker.style.position = 'relative';
+    marker.style.top = -(toTop - fromTop) + 'px';
     marker.style.transform = "translateY(" + (toTop - fromTop) + "px)";
     marker.addEventListener('transitionend', function(e) {
-      ed.removeBreakpoint(info.line);
-      ed.addBreakpoint(toLine);
-
       // For some reason, we have to reset the styles after the marker
       // is already removed, not before.
       e.target.removeAttribute("adding");
       e.target.style.transform = "none";
+      e.target.style.top = '0px';
     });
   }
 }

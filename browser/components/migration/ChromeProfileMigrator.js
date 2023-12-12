@@ -96,14 +96,15 @@ ChromeProfileMigrator.prototype.getResources =
       let profileFolder = this._chromeUserDataFolder.clone();
       profileFolder.append(aProfile.id);
       if (profileFolder.exists()) {
-        let possibleResources = [GetBookmarksResource(profileFolder),
-                                 GetHistoryResource(profileFolder),
-                                 GetCookiesResource(profileFolder),
-#ifdef XP_WIN
-                                 GetWindowsPasswordsResource(profileFolder)
-#endif
-                                 ];
-        return [r for each (r in possibleResources) if (r != null)];
+        let possibleResources = [
+          GetBookmarksResource(profileFolder),
+          GetHistoryResource(profileFolder),
+          GetCookiesResource(profileFolder),
+        ];
+        if (AppConstants.platform == "win") {
+          possibleResources.push(GetWindowsPasswordsResource(profileFolder));
+        }
+        return possibleResources.filter(r => r != null);
       }
     }
     return [];
