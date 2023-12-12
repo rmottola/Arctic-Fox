@@ -50,6 +50,7 @@
 
 #include "nsXPCOMPrivate.h" // for MAXPATHLEN and XPCOM_DLL
 #include "mozilla/StartupTimeline.h"
+#include "mozilla/Telemetry.h"
 #include "mozilla/WindowsDllBlocklist.h"
 
 using namespace mozilla;
@@ -122,6 +123,7 @@ static bool IsArg(const char* arg, const char* s)
 XRE_GetFileFromPathType XRE_GetFileFromPath;
 XRE_CreateAppDataType XRE_CreateAppData;
 XRE_FreeAppDataType XRE_FreeAppData;
+XRE_TelemetryAccumulateType XRE_TelemetryAccumulate;
 XRE_StartupTimelineRecordType XRE_StartupTimelineRecord;
 XRE_mainType XRE_main;
 XRE_StopLateWriteChecksType XRE_StopLateWriteChecks;
@@ -292,6 +294,17 @@ int main(int argc, char* argv[])
   TriggerQuirks();
 #endif
 
+  int gotCounters;
+#if defined(XP_UNIX)
+  struct rusage initialRUsage;
+  gotCounters = !getrusage(RUSAGE_SELF, &initialRUsage);
+#elif defined(XP_WIN)
+  IO_COUNTERS ioCounters;
+  gotCounters = GetProcessIoCounters(GetCurrentProcess(), &ioCounters);
+#else
+  #error "Unknown platform"  // having this here keeps cppcheck happy
+#endif
+
   nsIFile *xreDirectory;
 
 #ifdef HAS_DLL_BLOCKLIST
@@ -313,6 +326,31 @@ int main(int argc, char* argv[])
 
   XRE_StartupTimelineRecord(mozilla::StartupTimeline::START, start);
 
+  if (gotCounters) {
+#if defined(XP_WIN)
+    XRE_TelemetryAccumulate(mozilla::Telemetry::EARLY_GLUESTARTUP_READ_OPS,
+                            int(ioCounters.ReadOperationCount));
+    XRE_TelemetryAccumulate(mozilla::Telemetry::EARLY_GLUESTARTUP_READ_TRANSFER,
+                            int(ioCounters.ReadTransferCount / 1024));
+    IO_COUNTERS newIoCounters;
+    if (GetProcessIoCounters(GetCurrentProcess(), &newIoCounters)) {
+      XRE_TelemetryAccumulate(mozilla::Telemetry::GLUESTARTUP_READ_OPS,
+                              int(newIoCounters.ReadOperationCount - ioCounters.ReadOperationCount));
+      XRE_TelemetryAccumulate(mozilla::Telemetry::GLUESTARTUP_READ_TRANSFER,
+                              int((newIoCounters.ReadTransferCount - ioCounters.ReadTransferCount) / 1024));
+    }
+#elif defined(XP_UNIX)
+    XRE_TelemetryAccumulate(mozilla::Telemetry::EARLY_GLUESTARTUP_HARD_FAULTS,
+                            int(initialRUsage.ru_majflt));
+    struct rusage newRUsage;
+    if (!getrusage(RUSAGE_SELF, &newRUsage)) {
+      XRE_TelemetryAccumulate(mozilla::Telemetry::GLUESTARTUP_HARD_FAULTS,
+                              int(newRUsage.ru_majflt - initialRUsage.ru_majflt));
+    }
+#else
+  #error "Unknown platform"  // having this here keeps cppcheck happy
+#endif
+  }
 
   int result = do_main(argc, argv, xreDirectory);
 
