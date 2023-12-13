@@ -806,6 +806,7 @@ var Impl = {
     try {
       // Stop the datachoices infobar display.
       TelemetryReportingPolicy.shutdown();
+      TelemetryEnvironment.shutdown();
 
       // Stop any ping sending.
       yield TelemetrySend.shutdown();
