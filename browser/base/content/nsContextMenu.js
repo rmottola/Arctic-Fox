@@ -148,9 +148,11 @@ nsContextMenu.prototype = {
 
     var shouldShow = this.onSaveableLink || isMailtoInternal || this.onPlainTextLink;
     var isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
+    var showContainers = Services.prefs.getBoolPref("privacy.userContext.enabled");
     this.showItem("context-openlink", shouldShow && !isWindowPrivate);
     this.showItem("context-openlinkprivate", shouldShow);
     this.showItem("context-openlinkintab", shouldShow);
+    this.showItem("context-openlinkinusercontext-menu", shouldShow && showContainers);
     this.showItem("context-openlinkincurrent", shouldShow);
     this.showItem("context-sep-open", shouldShow);
   },
@@ -948,7 +950,7 @@ nsContextMenu.prototype = {
   },
 
   // Open linked-to URL in a new tab.
-  openLinkInTab: function() {
+  openLinkInTab: function(event) {
     urlSecurityCheck(this.linkURL, this.principal);
     let referrerURI = gContextMenuContentData.documentURIObject;
 
@@ -969,6 +971,7 @@ nsContextMenu.prototype = {
 
     let params = this._openLinkInParameters({
       allowMixedContent: persistAllowMixedContentInChildTab,
+      userContextId: event.target.getAttribute('usercontextid'),
     });
     openLinkIn(this.linkURL, "tab", params);
   },
