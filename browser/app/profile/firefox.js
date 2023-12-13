@@ -1357,6 +1357,9 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
+// Enable Contextual Identity Containers
+pref("privacy.userContext.enabled", false);
+
 #ifndef RELEASE_BUILD
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow

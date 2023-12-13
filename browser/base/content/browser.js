@@ -4065,6 +4065,49 @@ function updateEditUIVisibility()
 }
 
 /**
+ * Opens a new tab with the userContextId specified as an attribute of
+ * sourceEvent. This attribute is propagated to the top level originAttributes
+ * living on the tab's docShell.
+ *
+ * @param event
+ *        A click event on a userContext File Menu option
+ */
+function openNewUserContextTab(event)
+{
+  openUILinkIn(BROWSER_NEW_TAB_URL, "tab", {
+    userContextId: parseInt(event.target.getAttribute('usercontextid')),
+  });
+}
+
+/**
+ * Updates File Menu User Context UI visibility depending on
+ * privacy.userContext.enabled pref state.
+ */
+function updateUserContextUIVisibility()
+{
+  let userContextEnabled = Services.prefs.getBoolPref("privacy.userContext.enabled");
+  document.getElementById("menu_newUserContext").hidden = !userContextEnabled;
+}
+
+/**
+ * Updates the User Context UI indicators if the browser is in a non-default context
+ */
+function updateUserContextUIIndicator(browser)
+{
+  let hbox = document.getElementById("userContext-icons");
+
+  if (!browser.hasAttribute("usercontextid")) {
+    hbox.removeAttribute("usercontextid");
+    return;
+  }
+
+  let label = document.getElementById("userContext-label");
+  let userContextId = browser.getAttribute("usercontextid");
+  hbox.setAttribute("usercontextid", userContextId);
+  label.value = UserContextUI.getUserContextLabel(userContextId);
+}
+
+/**
  * Makes the Character Encoding menu enabled or disabled as appropriate.
  * To be called when the View menu or the app menu is opened.
  */
