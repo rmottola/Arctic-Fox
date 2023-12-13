@@ -1357,6 +1357,12 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
+#ifdef NIGHTLY_BUILD
+pref("privacy.trackingprotection.ui.enabled", false);
+#else
+pref("privacy.trackingprotection.ui.enabled", false);
+#endif
+
 // Enable Contextual Identity Containers
 pref("privacy.userContext.enabled", false);
 
