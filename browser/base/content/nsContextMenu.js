@@ -1048,12 +1048,11 @@ nsContextMenu.prototype = {
   },
 
   viewInfo: function() {
-    BrowserPageInfo(this.target.ownerDocument.defaultView.top.document);
+    BrowserPageInfo();
   },
 
   viewImageInfo: function() {
-    BrowserPageInfo(this.target.ownerDocument.defaultView.top.document,
-                    "mediaTab", this.target);
+    BrowserPageInfo(null, "mediaTab", this.target);
   },
 
   viewImageDesc: function(e) {
@@ -1065,7 +1064,7 @@ nsContextMenu.prototype = {
   },
 
   viewFrameInfo: function() {
-    BrowserPageInfo(this.target.ownerDocument, null, null,
+    BrowserPageInfo(gContextMenuContentData.docLocation, null, null,
                     this.frameOuterWindowID);
   },
 
