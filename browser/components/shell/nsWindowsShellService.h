@@ -30,9 +30,6 @@ protected:
   nsresult LaunchModernSettingsDialogDefaultApps();
   nsresult InvokeHTTPOpenAsVerb();
   nsresult LaunchHTTPHandlerPane();
-
-private:
-  bool      mCheckedThisSession;
 };
 
 #endif // nswindowsshellservice_h____
