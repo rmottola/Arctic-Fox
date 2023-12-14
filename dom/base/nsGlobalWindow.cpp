@@ -2343,6 +2343,7 @@ CreateNativeGlobalForInner(JSContext* aCx,
   if (aNewInner->GetOuterWindow()) {
     top = aNewInner->GetTopInternal();
   }
+
   JS::CompartmentOptions options;
 
   // Sometimes add-ons load their own XUL windows, either as separate top-level
@@ -2355,6 +2356,8 @@ CreateNativeGlobalForInner(JSContext* aCx,
   if (top && top->GetGlobalJSObject()) {
     options.creationOptions().setSameZoneAs(top->GetGlobalJSObject());
   }
+
+  xpc::InitGlobalObjectOptions(options, aPrincipal);
 
   // Determine if we need the Components object.
   bool needComponents = nsContentUtils::IsSystemPrincipal(aPrincipal) ||
