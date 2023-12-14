@@ -8074,6 +8074,9 @@ nsGlobalWindow::PostMessageMozOuter(JSContext* aCx, JS::Handle<JS::Value> aMessa
                          origin,
                          this,
                          providedPrincipal,
+                         callerInnerWin
+                         ? callerInnerWin->GetDoc()
+                         : nullptr,
                          nsContentUtils::IsCallerChrome());
 
   JS::Rooted<JS::Value> message(aCx, aMessage);
