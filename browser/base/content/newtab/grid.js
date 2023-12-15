@@ -9,7 +9,6 @@
  */
 const GRID_BOTTOM_EXTRA = 7; // title's line-height extends 7px past the margin
 const GRID_WIDTH_EXTRA = 1; // provide 1px buffer to allow for rounding error
-const SPONSORED_TAG_BUFFER = 2; // 2px buffer to clip off top of sponsored tag
 
 /**
  * This singleton represents the grid that contains all sites.
@@ -52,7 +51,7 @@ var gGrid = {
     this._createSiteFragment();
 
     gLinks.populateCache(() => {
-      this._refreshGrid();
+      this.refresh();
       this._ready = true;
 
       // If fetching links took longer than loading the page itself then
@@ -109,20 +108,9 @@ var gGrid = {
   },
 
   /**
-   * Renders and resizes the gird. _resizeGrid() call is needed to ensure
-   * that scrollbar disappears when the bottom row becomes empty following
-   * the block action, or tile display is turmed off via cog menu
-   */
-
-  refresh() {
-    this._refreshGrid();
-    this._resizeGrid();
-  },
-
-  /**
    * Renders the grid, including cells and sites.
    */
-  _refreshGrid() {
+  refresh() {
     let cell = document.createElementNS(HTML_NAMESPACE, "div");
     cell.classList.add("newtab-cell");
 
@@ -171,14 +159,17 @@ var gGrid = {
 
     // Create the site's inner HTML code.
     site.innerHTML =
+      '<span class="newtab-sponsored">' + newTabString("sponsored.button") + '</span>' +
       '<a class="newtab-link">' +
       '  <span class="newtab-thumbnail"/>' +
+      '  <span class="newtab-thumbnail enhanced-content"/>' +
       '  <span class="newtab-title"/>' +
       '</a>' +
       '<input type="button" title="' + newTabString("pin") + '"' +
       '       class="newtab-control newtab-control-pin"/>' +
       '<input type="button" title="' + newTabString("block") + '"' +
-      '       class="newtab-control newtab-control-block"/>';
+      '       class="newtab-control newtab-control-block"/>' +
+      '<span class="newtab-suggested"/>';
 
     this._siteFragment = document.createDocumentFragment();
     this._siteFragment.appendChild(site);
@@ -199,13 +190,14 @@ var gGrid = {
     // Save the cell's computed height/width including margin and border
     if (this._cellMargin === undefined) {
       let refCell = document.querySelector(".newtab-cell");
-      this._cellMargin = parseFloat(getComputedStyle(refCell).marginTop) * 2;
-      this._cellHeight = refCell.offsetHeight + this._cellMargin;
+      this._cellMargin = parseFloat(getComputedStyle(refCell).marginTop);
+      this._cellHeight = refCell.offsetHeight + this._cellMargin +
+        parseFloat(getComputedStyle(refCell).marginBottom);
       this._cellWidth = refCell.offsetWidth + this._cellMargin;
     }
 
     let availSpace = document.documentElement.clientHeight - this._cellMargin -
-                     document.querySelector("#newtab-margin-top").offsetHeight;
+                     document.querySelector("#newtab-search-container").offsetHeight;
     let visibleRows = Math.floor(availSpace / this._cellHeight);
     this._node.style.height = this._computeHeight() + "px";
     this._node.style.maxHeight = this._computeHeight(visibleRows) + "px";
