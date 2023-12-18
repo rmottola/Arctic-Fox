@@ -2990,8 +2990,6 @@ TabParent::DeallocPPluginWidgetParent(mozilla::plugins::PPluginWidgetParent* aAc
 nsresult
 TabParent::HandleEvent(nsIDOMEvent* aEvent)
 {
-  MOZ_ASSERT(mFrameElement);
-
   nsAutoString eventType;
   aEvent->GetType(eventType);
 
