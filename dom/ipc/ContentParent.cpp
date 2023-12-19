@@ -2429,6 +2429,7 @@ ContentParent::InitializeMembers()
   mShutdownPending = false;
   mIPCOpen = true;
   mHangMonitorActor = nullptr;
+  mHasGamepadListener = false;
 }
 
 bool
@@ -2472,7 +2473,6 @@ ContentParent::ContentParent(mozIApplication* aApp,
   , mOpener(aOpener)
   , mIsForBrowser(aIsForBrowser)
   , mIsNuwaProcess(aIsNuwaProcess)
-  , mHasGamepadListener(false)
 {
   InitializeMembers();  // Perform common initialization.
 
