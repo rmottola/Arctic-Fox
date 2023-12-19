@@ -6,23 +6,37 @@ function run_test() {
   runAsyncTests(tests);
 }
 
-let tests = [
+var tests = [
 
-  function observerForName_set() {
+  function* observerForName_set() {
     yield set("a.com", "foo", 1);
     let args = yield on("Set", ["foo", null, "bar"]);
-    observerArgsOK(args.foo, [["a.com", "foo", 1]]);
-    observerArgsOK(args.null, [["a.com", "foo", 1]]);
+    observerArgsOK(args.foo, [["a.com", "foo", 1, false]]);
+    observerArgsOK(args.null, [["a.com", "foo", 1, false]]);
     observerArgsOK(args.bar, []);
 
     yield setGlobal("foo", 2);
     args = yield on("Set", ["foo", null, "bar"]);
-    observerArgsOK(args.foo, [[null, "foo", 2]]);
-    observerArgsOK(args.null, [[null, "foo", 2]]);
+    observerArgsOK(args.foo, [[null, "foo", 2, false]]);
+    observerArgsOK(args.null, [[null, "foo", 2, false]]);
     observerArgsOK(args.bar, []);
   },
 
-  function observerForName_remove() {
+  function* observerForName_set_private() {
+    yield set("a.com", "foo", 1, { usePrivateBrowsing: true });
+    let args = yield on("Set", ["foo", null, "bar"]);
+    observerArgsOK(args.foo, [["a.com", "foo", 1, true]]);
+    observerArgsOK(args.null, [["a.com", "foo", 1, true]]);
+    observerArgsOK(args.bar, []);
+
+    yield setGlobal("foo", 2, { usePrivateBrowsing: true });
+    args = yield on("Set", ["foo", null, "bar"]);
+    observerArgsOK(args.foo, [[null, "foo", 2, true]]);
+    observerArgsOK(args.null, [[null, "foo", 2, true]]);
+    observerArgsOK(args.bar, []);
+  },
+
+  function* observerForName_remove() {
     yield set("a.com", "foo", 1);
     yield setGlobal("foo", 2);
 
@@ -45,7 +59,7 @@ let tests = [
     observerArgsOK(args.bar, []);
   },
 
-  function observerForName_removeByDomain() {
+  function* observerForName_removeByDomain() {
     yield set("a.com", "foo", 1);
     yield set("b.a.com", "bar", 2);
     yield setGlobal("foo", 3);
@@ -69,7 +83,7 @@ let tests = [
     observerArgsOK(args.bar, []);
   },
 
-  function observerForName_removeAllDomainsSince() {
+  function* observerForName_removeAllDomainsSince() {
     yield setWithDate("a.com", "foo", 1, 100);
     yield setWithDate("b.com", "foo", 2, 200);
     yield setWithDate("c.com", "foo", 3, 300);
@@ -88,7 +102,7 @@ let tests = [
     observerArgsOK(args.null, [["b.com", "foo"], ["c.com", "bar"], ["c.com", "foo"]]);
   },
 
-  function observerForName_removeAllDomains() {
+  function* observerForName_removeAllDomains() {
     yield set("a.com", "foo", 1);
     yield setGlobal("foo", 2);
     yield set("b.com", "bar", 3);
@@ -100,7 +114,7 @@ let tests = [
     observerArgsOK(args.bar, [["b.com", "bar"]]);
   },
 
-  function observerForName_removeByName() {
+  function* observerForName_removeByName() {
     yield set("a.com", "foo", 1);
     yield set("a.com", "bar", 2);
     yield setGlobal("foo", 3);
@@ -118,14 +132,14 @@ let tests = [
     observerArgsOK(args.bar, []);
   },
 
-  function removeObserverForName() {
+  function* removeObserverForName() {
     let args = yield on("Set", ["foo", null, "bar"], true);
 
     cps.removeObserverForName("foo", args.foo.observer);
     yield set("a.com", "foo", 1);
     yield wait();
     observerArgsOK(args.foo, []);
-    observerArgsOK(args.null, [["a.com", "foo", 1]]);
+    observerArgsOK(args.null, [["a.com", "foo", 1, false]]);
     observerArgsOK(args.bar, []);
     args.reset();
 
@@ -138,3 +152,4 @@ let tests = [
     args.reset();
   },
 ];
+
