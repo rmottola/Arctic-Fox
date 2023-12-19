@@ -5619,7 +5619,8 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
   const char* features = aFeatures.IsVoid() ? nullptr : aFeatures.get();
 
   *aResult = pwwatch->OpenWindow2(parent, uri, name, features, aCalledFromJS,
-      false, false, thisTabParent, nullptr, nullptr, getter_AddRefs(window));
+                                  false, false, thisTabParent, nullptr, nullptr,
+                                  getter_AddRefs(window));
 
   if (NS_WARN_IF(!window)) {
     return true;
