@@ -47,11 +47,11 @@ public:
                                            DOMEventTargetHelper)
 
   static already_AddRefed<MessagePort>
-  Create(nsPIDOMWindowInner* aWindow, const nsID& aUUID,
+  Create(nsISupports* aSupport, const nsID& aUUID,
          const nsID& aDestinationUUID, ErrorResult& aRv);
 
   static already_AddRefed<MessagePort>
-  Create(nsPIDOMWindowInner* aWindow, const MessagePortIdentifier& aIdentifier,
+  Create(nsISupports* aSupport, const MessagePortIdentifier& aIdentifier,
          ErrorResult& aRv);
 
   // For IPC.
@@ -90,7 +90,7 @@ public:
   void Closed();
 
 private:
-  explicit MessagePort(nsPIDOMWindowInner* aWindow);
+  explicit MessagePort(nsISupports* nsISupports);
   ~MessagePort();
 
   enum State {
