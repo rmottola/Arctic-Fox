@@ -345,7 +345,6 @@ public:
 private:
   static uint32_t sBackgroundPerceivableGracePeriodMS;
   static uint32_t sBackgroundGracePeriodMS;
-  static uint32_t sMemoryPressureGracePeriodMS;
 
   void FireTestOnlyObserverNotification(
     const char* aTopic,
@@ -370,7 +369,6 @@ private:
   nsAutoCString mNameWithComma;
 
   nsCOMPtr<nsITimer> mResetPriorityTimer;
-  nsCOMPtr<nsITimer> mMemoryPressureTimer;
 };
 
 /* static */ bool ProcessPriorityManagerImpl::sInitialized = false;
@@ -383,7 +381,6 @@ private:
   ProcessPriorityManagerImpl::sSingleton;
 /* static */ uint32_t ParticularProcessPriorityManager::sBackgroundPerceivableGracePeriodMS = 0;
 /* static */ uint32_t ParticularProcessPriorityManager::sBackgroundGracePeriodMS = 0;
-/* static */ uint32_t ParticularProcessPriorityManager::sMemoryPressureGracePeriodMS = 0;
 
 NS_IMPL_ISUPPORTS(ProcessPriorityManagerImpl,
                   nsIObserver,
@@ -703,8 +700,6 @@ ParticularProcessPriorityManager::StaticInit()
                                "dom.ipc.processPriorityManager.backgroundPerceivableGracePeriodMS");
   Preferences::AddUintVarCache(&sBackgroundGracePeriodMS,
                                "dom.ipc.processPriorityManager.backgroundGracePeriodMS");
-  Preferences::AddUintVarCache(&sMemoryPressureGracePeriodMS,
-                               "dom.ipc.processPriorityManager.memoryPressureGracePeriodMS");
 }
 
 void
@@ -1011,28 +1006,17 @@ ParticularProcessPriorityManager::ScheduleResetPriority(TimeoutPref aTimeoutPref
   }
 
   LOGP("Scheduling reset timer to fire in %dms.", timeout);
-  mResetPriorityTimer = do_CreateInstance("@mozilla.org/timer;1");
+  mResetPriorityTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
   mResetPriorityTimer->InitWithCallback(this, timeout, nsITimer::TYPE_ONE_SHOT);
 }
 
 NS_IMETHODIMP
 ParticularProcessPriorityManager::Notify(nsITimer* aTimer)
 {
-  if (mResetPriorityTimer == aTimer) {
-    LOGP("Reset priority timer callback; about to ResetPriorityNow.");
-    ResetPriorityNow();
-    mResetPriorityTimer = nullptr;
-    return NS_OK;
-  }
-
-  if (mContentParent && mMemoryPressureTimer == aTimer) {
-    Unused << mContentParent->SendFlushMemory(NS_LITERAL_STRING("lowering-priority"));
-    mMemoryPressureTimer = nullptr;
-    return NS_OK;
-  }
-
-  NS_WARNING("Unexpected timer!");
-  return NS_ERROR_INVALID_POINTER;
+  LOGP("Reset priority timer callback; about to ResetPriorityNow.");
+  ResetPriorityNow();
+  mResetPriorityTimer = nullptr;
+  return NS_OK;
 }
 
 bool
@@ -1157,18 +1141,6 @@ ParticularProcessPriorityManager::SetPriorityNow(ProcessPriority aPriority,
       NotifyProcessPriorityChanged(this, oldPriority);
 
     Unused << mContentParent->SendNotifyProcessPriorityChanged(mPriority);
-
-    if (mMemoryPressureTimer) {
-      mMemoryPressureTimer->Cancel();
-      mMemoryPressureTimer = nullptr;
-    }
-
-    if (aPriority < PROCESS_PRIORITY_FOREGROUND) {
-      mMemoryPressureTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
-      mMemoryPressureTimer->InitWithCallback(this,
-                                             sMemoryPressureGracePeriodMS,
-                                             nsITimer::TYPE_ONE_SHOT);
-    }
   }
 
   FireTestOnlyObserverNotification("process-priority-set",
