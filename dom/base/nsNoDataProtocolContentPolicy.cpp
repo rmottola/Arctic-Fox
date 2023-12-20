@@ -34,6 +34,7 @@ nsNoDataProtocolContentPolicy::ShouldLoad(uint32_t aContentType,
 {
   MOZ_ASSERT(aContentType == nsContentUtils::InternalContentPolicyTypeToExternal(aContentType),
              "We should only see external content policy types here.");
+
   *aDecision = nsIContentPolicy::ACCEPT;
 
   // Don't block for TYPE_OBJECT since such URIs are sometimes loaded by the
