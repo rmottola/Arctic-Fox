@@ -168,8 +168,8 @@ namespace mozilla {
 namespace dom {
 class Selection;
 class SelectionChangeListener;
-}
-}
+} // namespace dom
+} // namespace mozilla
 class nsIScrollableFrame;
 
 /**
