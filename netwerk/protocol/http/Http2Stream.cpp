@@ -565,7 +565,8 @@ Http2Stream::GenerateOpen()
     firstFrameFlags |= Http2Session::kFlag_END_STREAM;
   } else if (head->IsPost() ||
              head->IsPut() ||
-             head->IsConnect()) {
+             head->IsConnect() ||
+             head->IsOptions()) {
     // place fin in a data frame even for 0 length messages for iterop
   } else if (!mRequestBodyLenRemaining) {
     // for other HTTP extension methods, rely on the content-length
