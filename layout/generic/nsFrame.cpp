@@ -9739,6 +9739,8 @@ void DR_State::ParseRulesFile()
           mActive = true;
         }
       }
+
+      fclose(inFile);
     }
   }
 }
