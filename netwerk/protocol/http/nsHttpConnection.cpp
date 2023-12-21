@@ -1759,7 +1759,7 @@ nsHttpConnection::OnSocketWritable()
             again = false;
         }
         // write more to the socket until error or end-of-request...
-    } while (again);
+    } while (again && gHttpHandler->Active());
 
     return rv;
 }
@@ -1903,7 +1903,7 @@ nsHttpConnection::OnSocketReadable()
             }
         }
         // read more from the socket until error...
-    } while (again);
+    } while (again && gHttpHandler->Active());
 
     return rv;
 }
