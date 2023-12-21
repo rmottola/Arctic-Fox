@@ -1755,9 +1755,10 @@ SpdySession31::OnTransportStatus(nsITransport* aTransport,
 // generated instead.
 
 nsresult
-SpdySession31::ReadSegments(nsAHttpSegmentReader *reader,
-                            uint32_t count,
-                            uint32_t *countRead)
+SpdySession31::ReadSegmentsAgain(nsAHttpSegmentReader *reader,
+                                 uint32_t count,
+                                 uint32_t *countRead,
+                                 bool *again)
 {
   MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
@@ -1825,6 +1826,8 @@ SpdySession31::ReadSegments(nsAHttpSegmentReader *reader,
     CleanupStream(stream, rv, RST_CANCEL);
     if (SoftStreamError(rv)) {
       LOG3(("SpdySession31::ReadSegments %p soft error override\n", this));
+      *again = false;
+      SetWriteCallbacks();
       rv = NS_OK;
     }
     return rv;
@@ -1854,6 +1857,14 @@ SpdySession31::ReadSegments(nsAHttpSegmentReader *reader,
   return rv;
 }
 
+nsresult
+SpdySession31::ReadSegments(nsAHttpSegmentReader *reader,
+                            uint32_t count, uint32_t *countRead)
+{
+  bool again = false;
+  return ReadSegmentsAgain(reader, count, countRead, &again);
+}
+
 // WriteSegments() is used to read data off the socket. Generally this is
 // just the SPDY frame header and from there the appropriate SPDYStream
 // is identified from the Stream-ID. The http transaction associated with
@@ -1868,9 +1879,10 @@ SpdySession31::ReadSegments(nsAHttpSegmentReader *reader,
 // data. It always gets full frames if they are part of the stream
 
 nsresult
-SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
-                             uint32_t count,
-                             uint32_t *countWritten)
+SpdySession31::WriteSegmentsAgain(nsAHttpSegmentWriter *writer,
+                                  uint32_t count,
+                                  uint32_t *countWritten,
+                                  bool *again)
 {
   typedef nsresult  (*Control_FX) (SpdySession31 *self);
   static const Control_FX sControlFunctions[] =
@@ -2131,6 +2143,8 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
       CleanupStream(stream, NS_OK, RST_CANCEL);
       MOZ_ASSERT(!mNeedsCleanup || mNeedsCleanup == stream);
       mNeedsCleanup = nullptr;
+      *again = false;
+      ResumeRecv();
       return NS_OK;
     }
 
@@ -2231,6 +2245,14 @@ SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
   if (mShouldGoAway && !mStreamTransactionHash.Count())
     Close(NS_OK);
   return rv;
+}
+
+nsresult
+SpdySession31::WriteSegments(nsAHttpSegmentWriter *writer,
+                             uint32_t count, uint32_t *countWritten)
+{
+  bool again = false;
+  return WriteSegmentsAgain(writer, count, countWritten, &again);
 }
 
 void

@@ -1707,8 +1707,8 @@ nsHttpConnection::OnSocketWritable()
 
             LOG(("  writing transaction request stream\n"));
             mProxyConnectInProgress = false;
-            rv = mTransaction->ReadSegments(this, nsIOService::gDefaultSegmentSize,
-                                            &transactionBytes);
+            rv = mTransaction->ReadSegmentsAgain(this, nsIOService::gDefaultSegmentSize,
+                                                 &transactionBytes, &again);
             mContentBytesWritten += transactionBytes;
         }
 
@@ -1878,7 +1878,8 @@ nsHttpConnection::OnSocketReadable()
         }
 
         mSocketInCondition = NS_OK;
-        rv = mTransaction->WriteSegments(this, nsIOService::gDefaultSegmentSize, &n);
+        rv = mTransaction->
+            WriteSegmentsAgain(this, nsIOService::gDefaultSegmentSize, &n, &again);
         LOG(("nsHttpConnection::OnSocketReadable %p trans->ws rv=%x n=%d socketin=%x\n",
              this, rv, n, mSocketInCondition));
         if (NS_FAILED(rv)) {
