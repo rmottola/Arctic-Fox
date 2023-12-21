@@ -5074,6 +5074,12 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
     nsresult rv;
 
     MOZ_ASSERT(NS_IsMainThread());
+
+    if (!gHttpHandler->Active()) {
+        LOG(("  after HTTP shutdown..."));
+        return NS_ERROR_NOT_AVAILABLE;
+    }
+
     if (gHttpHandler->PackagedAppsEnabled()) {
         nsAutoCString path;
         nsCOMPtr<nsIURL> url(do_QueryInterface(mURI));
