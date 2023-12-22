@@ -221,6 +221,14 @@ nsBMPDecoder::GetCompressedImageSize() const
 }
 
 void
+nsBMPDecoder::BeforeFinishInternal()
+{
+  if (!IsMetadataDecode() && !mImageData) {
+    PostDataError();
+  }
+}
+
+void
 nsBMPDecoder::FinishInternal()
 {
   // We shouldn't be called in error cases.
@@ -490,7 +498,7 @@ nsBMPDecoder::ReadInfoHeaderSize(const char* aData, size_t aLength)
     PostDataError();
     return Transition::TerminateFailure();
   }
-  // ICO BMPs must have a WinVMPv3 header. nsICODecoder should have already
+  // ICO BMPs must have a WinBMPv3 header. nsICODecoder should have already
   // terminated decoding if this isn't the case.
   MOZ_ASSERT_IF(mIsWithinICO, mH.mBIHSize == InfoHeaderLength::WIN_V3);
 
