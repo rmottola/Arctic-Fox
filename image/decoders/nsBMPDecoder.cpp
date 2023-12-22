@@ -240,17 +240,18 @@ nsBMPDecoder::FinishInternal()
   // Send notifications if appropriate.
   if (!IsMetadataDecode() && HasSize()) {
 
+    // We should have image data.
+    MOZ_ASSERT(mImageData);
+
     // If it was truncated, fill in the missing pixels as black.
-    if (mImageData) {
-      while (mCurrentRow > 0) {
-        uint32_t* dst = RowBuffer();
-        while (mCurrentPos < mH.mWidth) {
-          SetPixel(dst, 0, 0, 0);
-          mCurrentPos++;
-        }
-        mCurrentPos = 0;
-        FinishRow();
+    while (mCurrentRow > 0) {
+      uint32_t* dst = RowBuffer();
+      while (mCurrentPos < mH.mWidth) {
+        SetPixel(dst, 0, 0, 0);
+        mCurrentPos++;
       }
+      mCurrentPos = 0;
+      FinishRow();
     }
 
     // Invalidate.
@@ -449,6 +450,7 @@ nsBMPDecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
         case State::BITFIELDS:        return ReadBitfields(aData, aLength);
         case State::COLOR_TABLE:      return ReadColorTable(aData, aLength);
         case State::GAP:              return SkipGap();
+        case State::AFTER_GAP:        return AfterGap();
         case State::PIXEL_ROW:        return ReadPixelRow(aData);
         case State::RLE_SEGMENT:      return ReadRLESegment(aData);
         case State::RLE_DELTA:        return ReadRLEDelta(aData);
@@ -718,12 +720,19 @@ nsBMPDecoder::ReadColorTable(const char* aData, size_t aLength)
     PostDataError();
     return Transition::TerminateFailure();
   }
+
   uint32_t gapLength = mH.mDataOffset - mPreGapLength;
-  return Transition::To(State::GAP, gapLength);
+  return Transition::ToUnbuffered(State::AFTER_GAP, State::GAP, gapLength);
 }
 
 LexerTransition<nsBMPDecoder::State>
 nsBMPDecoder::SkipGap()
+{
+  return Transition::ContinueUnbuffered(State::GAP);
+}
+
+LexerTransition<nsBMPDecoder::State>
+nsBMPDecoder::AfterGap()
 {
   bool hasRLE = mH.mCompression == Compression::RLE8 ||
                 mH.mCompression == Compression::RLE4;
