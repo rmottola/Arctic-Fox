@@ -959,11 +959,11 @@ nsPNGDecoder::frame_info_callback(png_structp png_ptr, png_uint_32 frame_num)
   height = png_get_next_frame_height(png_ptr, decoder->mInfo);
 
   if (width == 0) {
-    MOZ_LOG(GetPNGLog(), LogLevel::Error, ("libpng error: Frame width must not be 0\n"));
+    MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: Frame width must not be 0\n"));
     png_longjmp(png_ptr, 1);
   }
   if (height == 0) {
-    MOZ_LOG(GetPNGLog(), LogLevel::Error, ("libpng error: Frame height must not be 0\n"));
+    MOZ_LOG(sPNGLog, LogLevel::Error, ("libpng error: Frame height must not be 0\n"));
     png_longjmp(png_ptr, 1);
   }
 
