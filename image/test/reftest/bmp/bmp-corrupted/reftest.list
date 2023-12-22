@@ -10,3 +10,4 @@
 # Tests for RLE8 with an invalid BPP
 == wrapper.html?invalid-compression-RLE8.bmp about:blank
 
+== wrapper.html?invalid-truncated-metadata.bmp about:blank
