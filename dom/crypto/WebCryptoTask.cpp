@@ -2294,7 +2294,8 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
   // Construct an appropriate KeyAlorithm
   uint32_t privateAllowedUsages = 0, publicAllowedUsages = 0;
   if (mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSASSA_PKCS1) ||
-      mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSA_OAEP)) {
+      mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSA_OAEP) ||
+      mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSA_PSS)) {
     RootedDictionary<RsaHashedKeyGenParams> params(aCx);
     mEarlyRv = Coerce(aCx, params, aAlgorithm);
     if (NS_FAILED(mEarlyRv)) {
@@ -2397,6 +2398,7 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
 
   // Set key usages.
   if (mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSASSA_PKCS1) ||
+      mAlgName.EqualsLiteral(WEBCRYPTO_ALG_RSA_PSS) ||
       mAlgName.EqualsLiteral(WEBCRYPTO_ALG_ECDSA)) {
     privateAllowedUsages = CryptoKey::SIGN;
     publicAllowedUsages = CryptoKey::VERIFY;
@@ -2407,6 +2409,8 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
              mAlgName.EqualsLiteral(WEBCRYPTO_ALG_DH)) {
     privateAllowedUsages = CryptoKey::DERIVEKEY | CryptoKey::DERIVEBITS;
     publicAllowedUsages = 0;
+  } else {
+    MOZ_ASSERT(false); // This shouldn't happen.
   }
 
   mKeyPair->mPrivateKey.get()->SetExtractable(aExtractable);
@@ -3354,6 +3358,7 @@ WebCryptoTask::CreateGenerateKeyTask(JSContext* aCx,
     return new GenerateSymmetricKeyTask(aCx, aAlgorithm, aExtractable, aKeyUsages);
   } else if (algName.EqualsASCII(WEBCRYPTO_ALG_RSASSA_PKCS1) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_RSA_OAEP) ||
+             algName.EqualsASCII(WEBCRYPTO_ALG_RSA_PSS) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_ECDH) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_ECDSA) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_DH)) {
