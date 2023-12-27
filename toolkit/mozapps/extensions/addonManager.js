@@ -38,6 +38,7 @@ var gParentMM = null;
 
 function amManager() {
   Cu.import("resource://gre/modules/AddonManager.jsm");
+  /*globals AddonManagerPrivate*/
 
   let globalMM = Cc["@mozilla.org/globalmessagemanager;1"]
                  .getService(Ci.nsIMessageListenerManager);

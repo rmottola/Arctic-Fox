@@ -1024,7 +1024,7 @@ var AddonManagerInternal = {
 
       // Support for remote about:plugins. Note that this module isn't loaded
       // at the top because Services.appinfo is defined late in tests.
-      Cu.import("resource://gre/modules/RemotePageManager.jsm");
+      let { RemotePages } = Cu.import("resource://gre/modules/RemotePageManager.jsm", {});
 
       gPluginPageListener = new RemotePages("about:plugins");
       gPluginPageListener.addMessageListener("RequestPlugins", this.requestPlugins);
@@ -1192,7 +1192,7 @@ var AddonManagerInternal = {
           provider[aMethod].apply(provider, aArgs);
       }
       catch (e) {
-        reportProviderError(aProvider, aMethod, e);
+        reportProviderError(provider, aMethod, e);
       }
     }
   },
