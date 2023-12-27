@@ -1235,6 +1235,10 @@ MockAddon.prototype = {
     AddonManagerPrivate.callAddonListeners("onOperationCancelled", this);
   },
 
+  markAsSeen: function() {
+    this.seen = true;
+  },
+
   _updateActiveState: function(currentActive, newActive) {
     if (currentActive == newActive)
       return;
