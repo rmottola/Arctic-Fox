@@ -1288,7 +1288,7 @@ void DiagnosticsMatcher::RefCountedInsideLambdaChecker::run(
   const LambdaExpr *Lambda = Result.Nodes.getNodeAs<LambdaExpr>("lambda");
 
   for (const LambdaCapture Capture : Lambda->captures()) {
-    if (Capture.capturesVariable()) {
+    if (Capture.capturesVariable() && Capture.getCaptureKind() != LCK_ByRef) {
       QualType Pointee = Capture.getCapturedVar()->getType()->getPointeeType();
 
       if (!Pointee.isNull() && isClassRefCounted(Pointee)) {
