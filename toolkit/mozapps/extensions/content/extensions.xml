@@ -787,6 +787,14 @@
         ]]></body>
       </method>
 
+      <method name="isPending">
+        <parameter name="aAction"/>
+        <body><![CDATA[
+          var action = AddonManager["PENDING_" + aAction.toUpperCase()];
+          return !!(this.mAddon.pendingOperations & action);
+        ]]></body>
+      </method>
+
       <method name="typeHasFlag">
         <parameter name="aFlag"/>
         <body><![CDATA[
@@ -794,14 +802,6 @@
           let type = AddonManager.addonTypes[this.mAddon.type];
 
           return !!(type.flags & flag);
-        ]]></body>
-      </method>
-
-      <method name="isPending">
-        <parameter name="aAction"/>
-        <body><![CDATA[
-          var action = AddonManager["PENDING_" + aAction.toUpperCase()];
-          return !!(this.mAddon.pendingOperations & action);
         ]]></body>
       </method>
 
