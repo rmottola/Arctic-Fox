@@ -4905,7 +4905,7 @@ this.DOMApplicationRegistry = {
 /**
  * Appcache download observer
  */
-let AppcacheObserver = function(aApp) {
+var AppcacheObserver = function(aApp) {
   debug("Creating AppcacheObserver for " + aApp.origin +
         " - " + aApp.installState);
   this.app = aApp;
