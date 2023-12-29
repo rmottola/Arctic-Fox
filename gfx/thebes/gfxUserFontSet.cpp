@@ -782,6 +782,7 @@ gfxUserFontEntry::GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult)
 gfxUserFontSet::gfxUserFontSet()
     : mFontFamilies(4),
       mLocalRulesUsed(false),
+      mRebuildLocalRules(false),
       mDownloadCount(0),
       mDownloadSize(0)
 {
@@ -956,6 +957,7 @@ void
 gfxUserFontSet::RebuildLocalRules()
 {
     if (mLocalRulesUsed) {
+        mRebuildLocalRules = true;
         DoRebuildUserFontSet();
     }
 }
