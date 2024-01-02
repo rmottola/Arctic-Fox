@@ -27,6 +27,9 @@ namespace dom {
 class HTMLDetailsElement final : public nsGenericHTMLElement
 {
 public:
+
+  static bool IsDetailsEnabled();
+
   explicit HTMLDetailsElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
 
   NS_IMPL_FROMCONTENT_HTML_WITH_TAG(HTMLDetailsElement, details)
