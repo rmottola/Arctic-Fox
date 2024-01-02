@@ -573,6 +573,7 @@ Http2Session::ResetDownstreamState()
     mInputFrameDataStream->SetRecvdFin(true);
     MaybeDecrementConcurrent(mInputFrameDataStream);
   }
+  mInputFrameFinal = false;
   mInputFrameBufferUsed = 0;
   mInputFrameDataStream = nullptr;
 }
@@ -678,13 +679,13 @@ Http2Session::MaybeDecrementConcurrent(Http2Stream *aStream)
 // Need to decompress some data in order to keep the compression
 // context correct, but we really don't care what the result is
 nsresult
-Http2Session::UncompressAndDiscard()
+Http2Session::UncompressAndDiscard(bool isPush)
 {
   nsresult rv;
   nsAutoCString trash;
 
   rv = mDecompressor.DecodeHeaderBlock(reinterpret_cast<const uint8_t *>(mDecompressBuffer.BeginReading()),
-                                       mDecompressBuffer.Length(), trash, false);
+                                       mDecompressBuffer.Length(), trash, isPush);
   mDecompressBuffer.Truncate();
   if (NS_FAILED(rv)) {
     LOG3(("Http2Session::UncompressAndDiscard %p Compression Error\n",
@@ -1011,8 +1012,10 @@ Http2Session::CleanupStream(Http2Stream *aStream, nsresult aResult,
     return;
   }
 
-  if (!aStream->RecvdFin() && !aStream->RecvdReset() && aStream->StreamID()) {
-    LOG3(("Stream had not processed recv FIN, sending RST code %X\n", aResetCode));
+  // don't reset a stream that has recevied a fin or rst
+  if (!aStream->RecvdFin() && !aStream->RecvdReset() && aStream->StreamID() &&
+      !(mInputFrameFinal && (aStream == mInputFrameDataStream))) { // !(recvdfin with mark pending)
+    LOG3(("Stream 0x%X had not processed recv FIN, sending RST code %X\n", aStream->StreamID(), aResetCode));
     GenerateRstStream(aResetCode, aStream->StreamID());
   }
 
@@ -1217,7 +1220,7 @@ Http2Session::RecvHeaders(Http2Session *self)
                                    self->mInputFrameDataSize - paddingControlBytes - priorityLen - paddingLength);
 
     if (self->mInputFrameFlags & kFlag_END_HEADERS) {
-      rv = self->UncompressAndDiscard();
+      rv = self->UncompressAndDiscard(false);
       if (NS_FAILED(rv)) {
         LOG3(("Http2Session::RecvHeaders uncompress failed\n"));
         // this is fatal to the session
@@ -1278,7 +1281,7 @@ Http2Session::ResponseHeadersComplete()
   if (mInputFrameDataStream->AllHeadersReceived()) {
     LOG3(("Http2Session::ResponseHeadersComplete extra headers"));
     MOZ_ASSERT(mInputFrameFlags & kFlag_END_STREAM);
-    nsresult rv = UncompressAndDiscard();
+    nsresult rv = UncompressAndDiscard(false);
     if (NS_FAILED(rv)) {
       LOG3(("Http2Session::ResponseHeadersComplete extra uncompress failed\n"));
       return rv;
@@ -1620,7 +1623,7 @@ Http2Session::RecvPushPromise(Http2Session *self)
     self->mDecompressBuffer.Append(&self->mInputFrameBuffer[kFrameHeaderBytes + paddingControlBytes + promiseLen],
                                    self->mInputFrameDataSize - paddingControlBytes - promiseLen - paddingLength);
     if (self->mInputFrameFlags & kFlag_END_PUSH_PROMISE) {
-      rv = self->UncompressAndDiscard();
+      rv = self->UncompressAndDiscard(true);
       if (NS_FAILED(rv)) {
         LOG3(("Http2Session::RecvPushPromise uncompress failed\n"));
         self->mGoAwayReason = COMPRESSION_ERROR;
@@ -2259,8 +2262,8 @@ Http2Session::OnTransportStatus(nsITransport* aTransport,
 // generated instead.
 
 nsresult
-Http2Session::ReadSegments(nsAHttpSegmentReader *reader,
-                           uint32_t count, uint32_t *countRead)
+Http2Session::ReadSegmentsAgain(nsAHttpSegmentReader *reader,
+                                uint32_t count, uint32_t *countRead, bool *again)
 {
   MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
@@ -2338,6 +2341,8 @@ Http2Session::ReadSegments(nsAHttpSegmentReader *reader,
     CleanupStream(stream, rv, CANCEL_ERROR);
     if (SoftStreamError(rv)) {
       LOG3(("Http2Session::ReadSegments %p soft error override\n", this));
+      *again = false;
+      SetWriteCallbacks();
       rv = NS_OK;
     }
     return rv;
@@ -2365,6 +2370,14 @@ Http2Session::ReadSegments(nsAHttpSegmentReader *reader,
   SetWriteCallbacks();
 
   return rv;
+}
+
+nsresult
+Http2Session::ReadSegments(nsAHttpSegmentReader *reader,
+                           uint32_t count, uint32_t *countRead)
+{
+  bool again = false;
+  return ReadSegmentsAgain(reader, count, countRead, &again);
 }
 
 nsresult
@@ -2434,8 +2447,9 @@ Http2Session::ReadyToProcessDataFrame(enum internalStateType newState)
 // data. It always gets full frames if they are part of the stream
 
 nsresult
-Http2Session::WriteSegments(nsAHttpSegmentWriter *writer,
-                            uint32_t count, uint32_t *countWritten)
+Http2Session::WriteSegmentsAgain(nsAHttpSegmentWriter *writer,
+                                 uint32_t count, uint32_t *countWritten,
+                                 bool *again)
 {
   MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
@@ -2710,6 +2724,8 @@ Http2Session::WriteSegments(nsAHttpSegmentWriter *writer,
       MOZ_ASSERT(!mNeedsCleanup || mNeedsCleanup->StreamID() == streamID);
       CleanupStream(streamID, NS_OK, CANCEL_ERROR);
       mNeedsCleanup = nullptr;
+      *again = false;
+      ResumeRecv();
       return NS_OK;
     }
 
@@ -2824,6 +2840,14 @@ Http2Session::WriteSegments(nsAHttpSegmentWriter *writer,
   if (mShouldGoAway && !mStreamTransactionHash.Count())
     Close(NS_OK);
   return rv;
+}
+
+nsresult
+Http2Session::WriteSegments(nsAHttpSegmentWriter *writer,
+                            uint32_t count, uint32_t *countWritten)
+{
+  bool again = false;
+  return WriteSegmentsAgain(writer, count, countWritten, &again);
 }
 
 nsresult

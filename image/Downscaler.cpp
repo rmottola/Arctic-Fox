@@ -72,6 +72,13 @@ Downscaler::BeginFrame(const nsIntSize& aOriginalSize,
   MOZ_ASSERT(aOriginalSize.width > 0 && aOriginalSize.height > 0,
              "Invalid original size");
 
+  // Only downscale from reasonable sizes to avoid using too much memory/cpu
+  // downscaling and decoding. 1 << 20 == 1,048,576 seems a reasonable limit.
+  if (aOriginalSize.width > (1 << 20) || aOriginalSize.height > (1 << 20)) {
+    NS_WARNING("Trying to downscale image frame that is too large");
+    return NS_ERROR_INVALID_ARG;
+  }
+
   mFrameRect = aFrameRect.valueOr(nsIntRect(nsIntPoint(), aOriginalSize));
   MOZ_ASSERT(mFrameRect.x >= 0 && mFrameRect.y >= 0 &&
              mFrameRect.width >= 0 && mFrameRect.height >= 0,
@@ -99,15 +106,25 @@ Downscaler::BeginFrame(const nsIntSize& aOriginalSize,
                                0, mTargetSize.width,
                                mXFilter.get());
 
+  if (mXFilter->max_filter() <= 0 || mXFilter->num_values() != mTargetSize.width) {
+    NS_WARNING("Failed to compute filters for image downscaling");
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
   skia::resize::ComputeFilters(resizeMethod,
                                mOriginalSize.height, mTargetSize.height,
                                0, mTargetSize.height,
                                mYFilter.get());
 
+  if (mYFilter->max_filter() <= 0 || mYFilter->num_values() != mTargetSize.height) {
+    NS_WARNING("Failed to compute filters for image downscaling");
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
   // Allocate the buffer, which contains scanlines of the original image.
   // pad by 15 to handle overreads by the simd code
-  size_t bufferLen = mOriginalSize.width * sizeof(uint32_t);
-  mRowBuffer = MakeUnique<uint8_t[]>(mOriginalSize.width * sizeof(uint32_t) + 15);
+  size_t bufferLen = mOriginalSize.width * sizeof(uint32_t) + 15;
+  mRowBuffer.reset(new (fallible) uint8_t[bufferLen]);
   if (MOZ_UNLIKELY(!mRowBuffer)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -115,12 +132,11 @@ Downscaler::BeginFrame(const nsIntSize& aOriginalSize,
   // Zero buffer to keep valgrind happy.
   memset(mRowBuffer.get(), 0, bufferLen);
 
-
   // Allocate the window, which contains horizontally downscaled scanlines. (We
   // can store scanlines which are already downscale because our downscaling
   // filter is separable.)
   mWindowCapacity = mYFilter->max_filter();
-  mWindow = MakeUnique<uint8_t*[]>(mWindowCapacity);
+  mWindow.reset(new (fallible) uint8_t*[mWindowCapacity]);
   if (MOZ_UNLIKELY(!mWindow)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -129,7 +145,7 @@ Downscaler::BeginFrame(const nsIntSize& aOriginalSize,
   // pad by 15 to handle overreads by the simd code
   const int rowSize = mTargetSize.width * sizeof(uint32_t) + 15;
   for (int32_t i = 0; i < mWindowCapacity; ++i) {
-    mWindow[i] = new uint8_t[rowSize];
+    mWindow[i] = new (fallible) uint8_t[rowSize];
     anyAllocationFailed = anyAllocationFailed || mWindow[i] == nullptr;
   }
 
@@ -186,9 +202,9 @@ GetFilterOffsetAndLength(UniquePtr<skia::ConvolutionFilter1D>& aFilter,
 }
 
 void
-Downscaler::ClearRow(uint32_t aStartingAtCol)
+Downscaler::ClearRestOfRow(uint32_t aStartingAtCol)
 {
-  MOZ_ASSERT(int64_t(mOriginalSize.width) > int64_t(aStartingAtCol));
+  MOZ_ASSERT(int64_t(aStartingAtCol) <= int64_t(mOriginalSize.width));
   uint32_t bytesToClear = (mOriginalSize.width - aStartingAtCol)
                         * sizeof(uint32_t);
   memset(mRowBuffer.get() + (aStartingAtCol * sizeof(uint32_t)),

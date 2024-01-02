@@ -2907,10 +2907,21 @@ TSFTextStore::InsertEmbedded(DWORD dwFlags,
 }
 
 void
-TSFTextStore::SetInputScope(const nsString& aHTMLInputType)
+TSFTextStore::SetInputScope(const nsString& aHTMLInputType,
+                            const nsString& aHTMLInputInputMode)
 {
   mInputScopes.Clear();
   if (aHTMLInputType.IsEmpty() || aHTMLInputType.EqualsLiteral("text")) {
+    if (aHTMLInputInputMode.EqualsLiteral("url")) {
+      mInputScopes.AppendElement(IS_URL);
+    } else if (aHTMLInputInputMode.EqualsLiteral("email")) {
+      mInputScopes.AppendElement(IS_EMAIL_SMTPEMAILADDRESS);
+    } else if (aHTMLInputType.EqualsLiteral("tel")) {
+      mInputScopes.AppendElement(IS_TELEPHONE_FULLTELEPHONENUMBER);
+      mInputScopes.AppendElement(IS_TELEPHONE_LOCALNUMBER);
+    } else if (aHTMLInputType.EqualsLiteral("numeric")) {
+      mInputScopes.AppendElement(IS_NUMBER);
+    }
     return;
   }
   
@@ -4359,7 +4370,8 @@ TSFTextStore::CreateAndSetFocus(nsWindowBase* aFocusedWidget,
             "ITfTheadMgr::AssociateFocus() failure"));
     return false;
   }
-  sEnabledTextStore->SetInputScope(aContext.mHTMLInputType);
+  sEnabledTextStore->SetInputScope(aContext.mHTMLInputType,
+                                   aContext.mHTMLInputInputmode);
 
   if (sEnabledTextStore->mSink) {
     MOZ_LOG(sTextStoreLog, LogLevel::Info,
@@ -4405,17 +4417,37 @@ TSFTextStore::OnTextChangeInternal(const IMENotification& aIMENotification)
          ("TSF: 0x%p   TSFTextStore::OnTextChangeInternal(aIMENotification={ "
           "mMessage=0x%08X, mTextChangeData={ mStartOffset=%lu, "
           "mRemovedEndOffset=%lu, mAddedEndOffset=%lu, "
-          "mCausedByComposition=%s, mOccurredDuringComposition=%s }), "
+          "mCausedOnlyByComposition=%s, "
+          "mIncludingChangesDuringComposition=%s, "
+          "mIncludingChangesWithoutComposition=%s }), "
           "mSink=0x%p, mSinkMask=%s, mComposition.IsComposing()=%s",
           this, aIMENotification.mMessage,
           textChangeData.mStartOffset,
           textChangeData.mRemovedEndOffset,
           textChangeData.mAddedEndOffset,
-          GetBoolName(textChangeData.mCausedByComposition),
-          GetBoolName(textChangeData.mOccurredDuringComposition),
+          GetBoolName(textChangeData.mCausedOnlyByComposition),
+          GetBoolName(textChangeData.mIncludingChangesDuringComposition),
+          GetBoolName(textChangeData.mIncludingChangesWithoutComposition),
           mSink.get(),
           GetSinkMaskNameStr(mSinkMask).get(),
           GetBoolName(mComposition.IsComposing())));
+
+  if (textChangeData.mCausedOnlyByComposition) {
+    // Ignore text change notifications caused only by composition since it's
+    // already been handled internally.
+    return NS_OK;
+  }
+
+  if (mComposition.IsComposing() &&
+      !textChangeData.mIncludingChangesDuringComposition) {
+    // Ignore text changes when they don't include changes caused not by
+    // composition at the latest composition because changes before current
+    // composition start shouldn't cause forcibly committing composition.
+    // In the future, we should notify TSF of such delayed text changes
+    // after current composition is active (In such case,
+    // mIncludingChangesWithoutComposition is true).
+    return NS_OK;
+  }
 
   mDeferNotifyingTSF = false;
 
@@ -4502,6 +4534,12 @@ TSFTextStore::OnSelectionChangeInternal(const IMENotification& aIMENotification)
           mSink.get(), GetSinkMaskNameStr(mSinkMask).get(),
           GetBoolName(mIsRecordingActionsWithoutLock),
           GetBoolName(mComposition.IsComposing())));
+
+  if (selectionChangeData.mCausedByComposition) {
+    // Ignore selection change notifications caused by composition since it's
+    // already been handled internally.
+    return NS_OK;
+  }
 
   mDeferNotifyingTSF = false;
 
@@ -5026,7 +5064,8 @@ TSFTextStore::SetInputContext(nsWindowBase* aWidget,
 
   if (aAction.mFocusChange != InputContextAction::FOCUS_NOT_CHANGED) {
     if (sEnabledTextStore) {
-      sEnabledTextStore->SetInputScope(aContext.mHTMLInputType);
+      sEnabledTextStore->SetInputScope(aContext.mHTMLInputType,
+                                       aContext.mHTMLInputInputmode);
     }
     return;
   }

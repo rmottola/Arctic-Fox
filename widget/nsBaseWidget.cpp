@@ -2165,14 +2165,35 @@ IMENotification::TextChangeDataBase::MergeWith(
   const TextChangeDataBase& newData = aOther;
   const TextChangeDataBase oldData = *this;
 
-  // mCausedByComposition should be true only when all changes are caused by
-  // composition.
-  mCausedByComposition =
-    newData.mCausedByComposition && oldData.mCausedByComposition;
-  // mOccurredDuringComposition should be true only when all changes occurred
-  // during composition.
-  mOccurredDuringComposition =
-    newData.mOccurredDuringComposition && oldData.mOccurredDuringComposition;
+  // mCausedOnlyByComposition should be true only when all changes are caused
+  // by composition.
+  mCausedOnlyByComposition =
+    newData.mCausedOnlyByComposition && oldData.mCausedOnlyByComposition;
+
+  // mIncludingChangesWithoutComposition should be true if at least one of
+  // merged changes occurred without composition.
+  mIncludingChangesWithoutComposition =
+    newData.mIncludingChangesWithoutComposition ||
+      oldData.mIncludingChangesWithoutComposition;
+
+  // mIncludingChangesDuringComposition should be true when at least one of
+  // the merged non-composition changes occurred during the latest composition.
+  if (!newData.mCausedOnlyByComposition &&
+      !newData.mIncludingChangesDuringComposition) {
+    MOZ_ASSERT(newData.mIncludingChangesWithoutComposition);
+    MOZ_ASSERT(mIncludingChangesWithoutComposition);
+    // If new change is neither caused by composition nor occurred during
+    // composition, set mIncludingChangesDuringComposition to false because
+    // IME doesn't want outdated text changes as text change during current
+    // composition.
+    mIncludingChangesDuringComposition = false;
+  } else {
+    // Otherwise, set mIncludingChangesDuringComposition to true if either
+    // oldData or newData includes changes during composition.
+    mIncludingChangesDuringComposition =
+      newData.mIncludingChangesDuringComposition ||
+        oldData.mIncludingChangesDuringComposition;
+  }
 
   if (newData.mStartOffset >= oldData.mAddedEndOffset) {
     // Case 1:

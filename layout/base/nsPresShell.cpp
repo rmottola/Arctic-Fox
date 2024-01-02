@@ -184,6 +184,7 @@
 #include "nsSubDocumentFrame.h"
 #include "nsQueryObject.h"
 #include "nsLayoutStylesheetCache.h"
+#include "mozilla/layers/ScrollInputMethods.h"
 
 #ifdef ANDROID
 #include "nsIDocShellTreeOwner.h"
@@ -1647,11 +1648,6 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
       mFrameConstructor->EndUpdate();
     }
 
-    // Initialize after nsCanvasFrame is created.
-    if (mAccessibleCaretEventHub) {
-      mAccessibleCaretEventHub->Init();
-    }
-
     // nsAutoScriptBlocker going out of scope may have killed us too
     NS_ENSURE_STATE(!mHaveShutDown);
 
@@ -2105,7 +2101,8 @@ PresShell::PageMove(bool aForward, bool aExtend)
   // flushed and PresShell/PresContext/Frames may be dead. See bug 418470.
   return ScrollSelectionIntoView(nsISelectionController::SELECTION_NORMAL,
                                  nsISelectionController::SELECTION_FOCUS_REGION,
-                                 nsISelectionController::SCROLL_SYNCHRONOUS);
+                                 nsISelectionController::SCROLL_SYNCHRONOUS |
+                                 nsISelectionController::SCROLL_FOR_CARET_MOVE);
 }
 
 
@@ -2116,6 +2113,8 @@ PresShell::ScrollPage(bool aForward)
   nsIScrollableFrame* scrollFrame =
     GetFrameToScrollAsScrollable(nsIPresShell::eVertical);
   if (scrollFrame) {
+    mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+        (uint32_t) ScrollInputMethod::MainThreadScrollPage);
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                           nsIScrollableFrame::PAGES,
                           nsIScrollableFrame::SMOOTH,
@@ -2132,6 +2131,9 @@ PresShell::ScrollLine(bool aForward)
   nsIScrollableFrame* scrollFrame =
     GetFrameToScrollAsScrollable(nsIPresShell::eVertical);
   if (scrollFrame) {
+    mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+        (uint32_t) ScrollInputMethod::MainThreadScrollLine);
+
     int32_t lineCount = Preferences::GetInt("toolkit.scrollbox.verticalScrollDistance",
                                             NS_DEFAULT_VERTICAL_SCROLL_DISTANCE);
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? lineCount : -lineCount),
@@ -2150,6 +2152,8 @@ PresShell::ScrollCharacter(bool aRight)
   nsIScrollableFrame* scrollFrame =
     GetFrameToScrollAsScrollable(nsIPresShell::eHorizontal);
   if (scrollFrame) {
+    mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+        (uint32_t) ScrollInputMethod::MainThreadScrollCharacter);
     int32_t h = Preferences::GetInt("toolkit.scrollbox.horizontalScrollDistance",
                                     NS_DEFAULT_HORIZONTAL_SCROLL_DISTANCE);
     scrollFrame->ScrollBy(nsIntPoint(aRight ? h : -h, 0),
@@ -2168,6 +2172,8 @@ PresShell::CompleteScroll(bool aForward)
   nsIScrollableFrame* scrollFrame =
     GetFrameToScrollAsScrollable(nsIPresShell::eVertical);
   if (scrollFrame) {
+    mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+        (uint32_t) ScrollInputMethod::MainThreadCompleteScroll);
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                           nsIScrollableFrame::WHOLE,
                           nsIScrollableFrame::SMOOTH,
@@ -2202,7 +2208,8 @@ PresShell::CompleteMove(bool aForward, bool aExtend)
   // flushed and PresShell/PresContext/Frames may be dead. See bug 418470.
   return ScrollSelectionIntoView(nsISelectionController::SELECTION_NORMAL,
                                  nsISelectionController::SELECTION_FOCUS_REGION,
-                                 nsISelectionController::SCROLL_SYNCHRONOUS);
+                                 nsISelectionController::SCROLL_SYNCHRONOUS |
+                                 nsISelectionController::SCROLL_FOR_CARET_MOVE);
 }
 
 NS_IMETHODIMP

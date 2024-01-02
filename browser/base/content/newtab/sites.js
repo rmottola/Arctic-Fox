@@ -405,24 +405,12 @@ Site.prototype = {
    */
   handleEvent: function Site_handleEvent(aEvent) {
     switch (aEvent.type) {
-      case "click":
-        aEvent.preventDefault();
-        if (aEvent.target.classList.contains("newtab-control-block"))
-          this.block();
-        else if (this.isPinned())
-          this.unpin();
-        else
-          this.pin();
-        break;
       case "mouseover":
         this._node.removeEventListener("mouseover", this, false);
         this._speculativeConnect();
         break;
       case "dragstart":
         gDrag.start(this, aEvent);
-        break;
-      case "drag":
-        gDrag.drag(this, aEvent);
         break;
       case "dragend":
         gDrag.end(this, aEvent);

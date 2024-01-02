@@ -123,14 +123,16 @@ public:
 #endif // #ifdef DEBUG
 
 private:
-  static bool sPluginHasFocus;
-
+  static nsWindow* sFocusedWindow;
   static InputContextAction::Cause sLastContextActionCause;
+
+  static bool sPluginHasFocus;
 
 #ifdef NS_ENABLE_TSF
   static decltype(SetInputScopes)* sSetInputScopes;
   static void SetInputScopeForIMM32(nsWindow* aWindow,
-                                    const nsAString& aHTMLInputType);
+                                    const nsAString& aHTMLInputType,
+                                    const nsAString& aHTMLInputInputmode);
   static bool sIsInTSFMode;
   // If sIMMEnabled is false, any IME messages are not handled in TSF mode.
   // Additionally, IME context is always disassociated from focused window.
@@ -140,9 +142,10 @@ private:
   static bool IsIMMActive();
 
   static void MaybeShowOnScreenKeyboard();
-  static void MaybeDismissOnScreenKeyboard();
+  static void MaybeDismissOnScreenKeyboard(nsWindow* aWindow);
   static bool WStringStartsWithCaseInsensitive(const std::wstring& aHaystack,
                                                const std::wstring& aNeedle);
+  static bool NeedOnScreenKeyboard();
   static bool IsKeyboardPresentOnSlate();
   static bool IsInTabletMode();
   static bool AutoInvokeOnScreenKeyboardInDesktopMode();

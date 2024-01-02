@@ -574,7 +574,9 @@ var ClickEventHandler = {
     let href, baseURI;
     node = event.target;
     while (node && !href) {
-      if (node.nodeType == content.Node.ELEMENT_NODE) {
+      if (node.nodeType == content.Node.ELEMENT_NODE &&
+          (node.localName == "a" ||
+           node.namespaceURI == "http://www.w3.org/1998/Math/MathML")) {
         href = node.getAttributeNS("http://www.w3.org/1999/xlink", "href");
         if (href) {
           baseURI = node.ownerDocument.baseURIObject;
@@ -612,6 +614,13 @@ addMessageListener("rtcpeer:Deny", ContentWebRTC);
 addMessageListener("webrtc:Allow", ContentWebRTC);
 addMessageListener("webrtc:Deny", ContentWebRTC);
 addMessageListener("webrtc:StopSharing", ContentWebRTC);
+addMessageListener("webrtc:StartBrowserSharing", () => {
+  let windowID = content.QueryInterface(Ci.nsIInterfaceRequestor)
+                        .getInterface(Ci.nsIDOMWindowUtils).outerWindowID;
+  sendAsyncMessage("webrtc:response:StartBrowserSharing", {
+    windowID: windowID
+  });
+});
 
 addEventListener("pageshow", function(event) {
   if (event.target == content.document) {
@@ -928,14 +937,31 @@ var PageInfoListener = {
       document = content.document;
     }
 
+    let imageElement = message.objects.imageElement;
+
     let pageInfoData = {metaViewRows: this.getMetaInfo(document),
                         docInfo: this.getDocumentInfo(document),
                         feeds: this.getFeedsInfo(document, strings),
-                        windowInfo: this.getWindowInfo(window)};
+                        windowInfo: this.getWindowInfo(window),
+                        imageInfo: this.getImageInfo(imageElement)};
+
     sendAsyncMessage("PageInfo:data", pageInfoData);
 
     // Separate step so page info dialog isn't blank while waiting for this to finish.
     this.getMediaInfo(document, window, strings);
+  },
+
+  getImageInfo: function(imageElement) {
+    let imageInfo = null;
+    if (imageElement) {
+      imageInfo = {
+        currentSrc: imageElement.currentSrc,
+        width: imageElement.width,
+        height: imageElement.height,
+        imageText: imageElement.title || imageElement.alt
+      };
+    }
+    return imageInfo;
   },
 
   getMetaInfo: function(document) {

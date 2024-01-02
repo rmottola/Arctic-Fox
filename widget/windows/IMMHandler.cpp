@@ -513,9 +513,15 @@ void
 IMMHandler::OnFocusChange(bool aFocus, nsWindow* aWindow)
 {
   MOZ_LOG(gIMMLog, LogLevel::Info,
-    ("IMM: OnFocusChange(aFocus=%s, aWindow=%p), sHasFocus=%s",
-     GetBoolName(aFocus), aWindow, GetBoolName(sHasFocus)));
+    ("IMM: OnFocusChange(aFocus=%s, aWindow=%p), sHasFocus=%s, "
+     "IsComposingWindow(aWindow)=%s, aWindow->Destroyed()=%s",
+     GetBoolName(aFocus), aWindow, GetBoolName(sHasFocus),
+     GetBoolName(IsComposingWindow(aWindow)),
+     GetBoolName(aWindow->Destroyed())));
 
+  if (!aFocus && IsComposingWindow(aWindow) && aWindow->Destroyed()) {
+    CancelComposition(aWindow);
+  }
   if (gIMMHandler) {
     gIMMHandler->mSelection.Clear();
   }
@@ -1266,7 +1272,7 @@ IMMHandler::HandleStartComposition(nsWindow* aWindow,
   WidgetCompositionEvent event(true, eCompositionStart, aWindow);
   LayoutDeviceIntPoint point(0, 0);
   aWindow->InitEvent(event, &point);
-  aWindow->DispatchWindowEvent(&event);
+  DispatchEvent(aWindow, event);
 
   mIsComposing = true;
   mComposingWindow = aWindow;
@@ -1540,7 +1546,7 @@ IMMHandler::HandleEndComposition(nsWindow* aWindow,
   if (aCommitString) {
     compositionCommitEvent.mData = *aCommitString;
   }
-  aWindow->DispatchWindowEvent(&compositionCommitEvent);
+  DispatchEvent(aWindow, compositionCommitEvent);
   mIsComposing = false;
   mComposingWindow = nullptr;
 }
@@ -1664,7 +1670,7 @@ IMMHandler::HandleQueryCharPosition(nsWindow* aWindow,
 
   WidgetQueryContentEvent editorRect(true, eQueryEditorRect, aWindow);
   aWindow->InitEvent(editorRect);
-  aWindow->DispatchWindowEvent(&editorRect);
+  DispatchEvent(aWindow, editorRect);
   if (NS_WARN_IF(!editorRect.mSucceeded)) {
     MOZ_LOG(gIMMLog, LogLevel::Error,
       ("IMM: HandleQueryCharPosition, eQueryEditorRect failed"));
@@ -1736,7 +1742,7 @@ IMMHandler::HandleDocumentFeed(nsWindow* aWindow,
   WidgetQueryContentEvent textContent(true, eQueryTextContent, aWindow);
   textContent.InitForQueryTextContent(0, UINT32_MAX);
   aWindow->InitEvent(textContent, &point);
-  aWindow->DispatchWindowEvent(&textContent);
+  DispatchEvent(aWindow, textContent);
   if (!textContent.mSucceeded) {
     MOZ_LOG(gIMMLog, LogLevel::Error,
       ("IMM: HandleDocumentFeed, FAILED, due to eQueryTextContent failure"));
@@ -1881,6 +1887,22 @@ GetRangeTypeName(uint32_t aRangeType)
   }
 }
 
+// static
+void
+IMMHandler::DispatchEvent(nsWindow* aWindow, WidgetGUIEvent& aEvent)
+{
+  MOZ_LOG(gIMMLog, LogLevel::Info,
+    ("IMM: DispatchEvent(aWindow=0x%p, aEvent={ mMessage=%s }, "
+     "aWindow->Destroyed()=%s",
+     aWindow, ToChar(aEvent.mMessage), GetBoolName(aWindow->Destroyed())));
+
+  if (aWindow->Destroyed()) {
+    return;
+  }
+
+  aWindow->DispatchWindowEvent(&aEvent);
+}
+
 void
 IMMHandler::DispatchCompositionChangeEvent(nsWindow* aWindow,
                                            const IMEContext& aContext)
@@ -1908,7 +1930,7 @@ IMMHandler::DispatchCompositionChangeEvent(nsWindow* aWindow,
   event.mRanges = CreateTextRangeArray();
   event.mData = mCompositionString;
 
-  aWindow->DispatchWindowEvent(&event);
+  DispatchEvent(aWindow, event);
 
   // Calling SetIMERelatedWindowsPos will be failure on e10s at this point.
   // compositionchange event will notify NOTIFY_IME_OF_COMPOSITION_UPDATE, then
@@ -1990,8 +2012,12 @@ IMMHandler::CreateTextRangeArray()
   if (targetClause &&
       cursor >= targetClause->mStartOffset &&
       cursor <= targetClause->mEndOffset) {
+    // Forget the caret position specified by IME since Gecko's caret position
+    // will be at the end of composition string.
+    mCursorPosition = NO_IME_CARET;
     MOZ_LOG(gIMMLog, LogLevel::Info,
-      ("IMM: CreateTextRangeArray, no caret due to it's in the target clause"));
+      ("IMM: CreateTextRangeArray, no caret due to it's in the target clause, "
+       "now, mCursorPosition is NO_IME_CARET"));
     return textRangeArray.forget();
   }
 
@@ -2172,7 +2198,7 @@ IMMHandler::GetCharacterRectOfSelectedTextAt(nsWindow* aWindow,
     WidgetQueryContentEvent charRect(true, eQueryTextRect, aWindow);
     charRect.InitForQueryTextRect(offset, 1);
     aWindow->InitEvent(charRect, &point);
-    aWindow->DispatchWindowEvent(&charRect);
+    DispatchEvent(aWindow, charRect);
     if (charRect.mSucceeded) {
       aCharRect = charRect.mReply.mRect;
       if (aWritingMode) {
@@ -2209,7 +2235,7 @@ IMMHandler::GetCaretRect(nsWindow* aWindow,
   WidgetQueryContentEvent caretRect(true, eQueryCaretRect, aWindow);
   caretRect.InitForQueryCaretRect(selection.mOffset);
   aWindow->InitEvent(caretRect, &point);
-  aWindow->DispatchWindowEvent(&caretRect);
+  DispatchEvent(aWindow, caretRect);
   if (!caretRect.mSucceeded) {
     MOZ_LOG(gIMMLog, LogLevel::Info,
       ("IMM: GetCaretRect, FAILED, due to eQueryCaretRect failure"));
@@ -2382,7 +2408,7 @@ IMMHandler::SetIMERelatedWindowsPosOnPlugin(nsWindow* aWindow,
 {
   WidgetQueryContentEvent editorRectEvent(true, eQueryEditorRect, aWindow);
   aWindow->InitEvent(editorRectEvent);
-  aWindow->DispatchWindowEvent(&editorRectEvent);
+  DispatchEvent(aWindow, editorRectEvent);
   if (!editorRectEvent.mSucceeded) {
     MOZ_LOG(gIMMLog, LogLevel::Info,
       ("IMM: SetIMERelatedWindowsPosOnPlugin, "
@@ -2795,7 +2821,7 @@ IMMHandler::Selection::Init(nsWindow* aWindow)
   WidgetQueryContentEvent selection(true, eQuerySelectedText, aWindow);
   LayoutDeviceIntPoint point(0, 0);
   aWindow->InitEvent(selection, &point);
-  aWindow->DispatchWindowEvent(&selection);
+  DispatchEvent(aWindow, selection);
   if (NS_WARN_IF(!selection.mSucceeded)) {
     MOZ_LOG(gIMMLog, LogLevel::Error,
       ("IMM: Selection::Init, FAILED, due to eQuerySelectedText failure"));

@@ -65,12 +65,20 @@ this.TelemetryEnvironment = {
     return getGlobal().onInitialized();
   },
 
+  delayedInit: function() {
+    return getGlobal().delayedInit();
+  },
+
   registerChangeListener: function(name, listener) {
     return getGlobal().registerChangeListener(name, listener);
   },
 
   unregisterChangeListener: function(name) {
     return getGlobal().unregisterChangeListener(name);
+  },
+
+  shutdown: function() {
+    return getGlobal().shutdown();
   },
 
   // Policy to use when saving preferences. Exported for using them in tests.
@@ -104,7 +112,6 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
   ["browser.newtab.url", {what: RECORD_PREF_STATE}],
   ["browser.newtabpage.enabled", {what: RECORD_PREF_VALUE}],
   ["browser.newtabpage.enhanced", {what: RECORD_PREF_VALUE}],
-  ["browser.polaris.enabled", {what: RECORD_PREF_VALUE}],
   ["browser.shell.checkDefaultBrowser", {what: RECORD_PREF_VALUE}],
   ["browser.search.suggest.enabled", {what: RECORD_PREF_VALUE}],
   ["browser.startup.homepage", {what: RECORD_PREF_STATE}],
@@ -175,6 +182,19 @@ const SEARCH_ENGINE_MODIFIED_TOPIC = "browser-search-engine-modified";
 const SEARCH_SERVICE_TOPIC = "browser-search-service";
 const COMPOSITOR_CREATED_TOPIC = "compositor:created";
 const DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC = "distribution-customization-complete";
+
+/**
+ * Enforces the parameter to a boolean value.
+ * @param aValue The input value.
+ * @return {Boolean|Object} If aValue is a boolean or a number, returns its truthfulness
+ *         value. Otherwise, return null.
+ */
+function enforceBoolean(aValue) {
+  if (typeof(aValue) !== "number" && typeof(aValue) !== "boolean") {
+    return null;
+  }
+  return (new Boolean(aValue)).valueOf();
+}
 
 /**
  * Get the current browser.
@@ -261,7 +281,7 @@ function getGfxField(aPropertyName, aDefault) {
  * @return {String} The substring or null if the input string is null.
  */
 function limitStringToLength(aString, aMaxLength) {
-  if (aString === null) {
+  if (typeof(aString) !== "string") {
     return null;
   }
   return aString.substring(0, aMaxLength);
@@ -512,28 +532,37 @@ EnvironmentAddonBuilder.prototype = {
         continue;
       }
 
-      // Make sure to have valid dates.
-      let installDate = new Date(Math.max(0, addon.installDate));
-      let updateDate = new Date(Math.max(0, addon.updateDate));
+      // Weird addon data in the wild can lead to exceptions while collecting
+      // the data.
+      try {
+        // Make sure to have valid dates.
+        let installDate = new Date(Math.max(0, addon.installDate));
+        let updateDate = new Date(Math.max(0, addon.updateDate));
 
-      activeAddons[addon.id] = {
-        blocklisted: (addon.blocklistState !== Ci.nsIBlocklistService.STATE_NOT_BLOCKED),
-        description: limitStringToLength(addon.description, MAX_ADDON_STRING_LENGTH),
-        name: limitStringToLength(addon.name, MAX_ADDON_STRING_LENGTH),
-        userDisabled: addon.userDisabled,
-        appDisabled: addon.appDisabled,
-        version: limitStringToLength(addon.version, MAX_ADDON_STRING_LENGTH),
-        scope: addon.scope,
-        type: addon.type,
-        foreignInstall: addon.foreignInstall,
-        hasBinaryComponents: addon.hasBinaryComponents,
-        installDay: Utils.millisecondsToDays(installDate.getTime()),
-        updateDay: Utils.millisecondsToDays(updateDate.getTime()),
-        signedState: addon.signedState,
-      };
+        activeAddons[addon.id] = {
+          blocklisted: (addon.blocklistState !== Ci.nsIBlocklistService.STATE_NOT_BLOCKED),
+          description: limitStringToLength(addon.description, MAX_ADDON_STRING_LENGTH),
+          name: limitStringToLength(addon.name, MAX_ADDON_STRING_LENGTH),
+          userDisabled: enforceBoolean(addon.userDisabled),
+          appDisabled: addon.appDisabled,
+          version: limitStringToLength(addon.version, MAX_ADDON_STRING_LENGTH),
+          scope: addon.scope,
+          type: addon.type,
+          foreignInstall: enforceBoolean(addon.foreignInstall),
+          hasBinaryComponents: addon.hasBinaryComponents,
+          installDay: Utils.millisecondsToDays(installDate.getTime()),
+          updateDay: Utils.millisecondsToDays(updateDate.getTime()),
+          signedState: addon.signedState,
+          isSystem: addon.isSystem,
+        };
 
-      if (addon.signedState !== undefined)
-        activeAddons[addon.id].signedState = addon.signedState;
+        if (addon.signedState !== undefined)
+          activeAddons[addon.id].signedState = addon.signedState;
+
+      } catch (ex) {
+        this._environment._log.error("_getActiveAddons - An addon was discarded due to an error", ex);
+        continue;
+      }
     }
 
     return activeAddons;
@@ -560,11 +589,11 @@ EnvironmentAddonBuilder.prototype = {
         blocklisted: (theme.blocklistState !== Ci.nsIBlocklistService.STATE_NOT_BLOCKED),
         description: limitStringToLength(theme.description, MAX_ADDON_STRING_LENGTH),
         name: limitStringToLength(theme.name, MAX_ADDON_STRING_LENGTH),
-        userDisabled: theme.userDisabled,
+        userDisabled: enforceBoolean(theme.userDisabled),
         appDisabled: theme.appDisabled,
         version: limitStringToLength(theme.version, MAX_ADDON_STRING_LENGTH),
         scope: theme.scope,
-        foreignInstall: theme.foreignInstall,
+        foreignInstall: enforceBoolean(theme.foreignInstall),
         hasBinaryComponents: theme.hasBinaryComponents,
         installDay: Utils.millisecondsToDays(installDate.getTime()),
         updateDay: Utils.millisecondsToDays(updateDate.getTime()),
@@ -589,19 +618,24 @@ EnvironmentAddonBuilder.prototype = {
         continue;
       }
 
-      // Make sure to have a valid date.
-      let updateDate = new Date(Math.max(0, tag.lastModifiedTime));
+      try {
+        // Make sure to have a valid date.
+        let updateDate = new Date(Math.max(0, tag.lastModifiedTime));
 
-      activePlugins.push({
-        name: limitStringToLength(tag.name, MAX_ADDON_STRING_LENGTH),
-        version: limitStringToLength(tag.version, MAX_ADDON_STRING_LENGTH),
-        description: limitStringToLength(tag.description, MAX_ADDON_STRING_LENGTH),
-        blocklisted: tag.blocklisted,
-        disabled: tag.disabled,
-        clicktoplay: tag.clicktoplay,
-        mimeTypes: tag.getMimeTypes({}),
-        updateDay: Utils.millisecondsToDays(updateDate.getTime()),
-      });
+        activePlugins.push({
+          name: limitStringToLength(tag.name, MAX_ADDON_STRING_LENGTH),
+          version: limitStringToLength(tag.version, MAX_ADDON_STRING_LENGTH),
+          description: limitStringToLength(tag.description, MAX_ADDON_STRING_LENGTH),
+          blocklisted: tag.blocklisted,
+          disabled: tag.disabled,
+          clicktoplay: tag.clicktoplay,
+          mimeTypes: tag.getMimeTypes({}),
+          updateDay: Utils.millisecondsToDays(updateDate.getTime()),
+        });
+      } catch (ex) {
+        this._environment._log.error("_getActivePlugins - A plugin was discarded due to an error", ex);
+        continue;
+      }
     }
 
     return activePlugins;
@@ -625,11 +659,16 @@ EnvironmentAddonBuilder.prototype = {
         continue;
       }
 
-      activeGMPlugins[plugin.id] = {
-        version: plugin.version,
-        userDisabled: plugin.userDisabled,
-        applyBackgroundUpdates: plugin.applyBackgroundUpdates,
-      };
+      try {
+        activeGMPlugins[plugin.id] = {
+          version: plugin.version,
+          userDisabled: enforceBoolean(plugin.userDisabled),
+          applyBackgroundUpdates: plugin.applyBackgroundUpdates,
+        };
+      } catch (ex) {
+        this._environment._log.error("_getActiveGMPlugins - A GMPlugin was discarded due to an error", ex);
+        continue;
+      }
     }
 
     return activeGMPlugins;
@@ -664,6 +703,7 @@ function EnvironmentCache() {
   this._log.trace("constructor");
 
   this._shutdown = false;
+  this._delayedInitFinished = false;
 
   // A map of listeners that will be called on environment changes.
   this._changeListeners = new Map();
@@ -699,10 +739,8 @@ function EnvironmentCache() {
     p = [ this._addonBuilder.init() ];
   }
 
-  if (AppConstants.platform !== "android") {
-    this._currentEnvironment.profile = {};
-    p.push(this._updateProfile());
-  }
+  this._currentEnvironment.profile = {};
+  p.push(this._updateProfile());
 
   let setup = () => {
     this._initTask = null;
@@ -743,6 +781,13 @@ EnvironmentCache.prototype = {
   },
 
   /**
+   * This gets called when the delayed init completes.
+   */
+  delayedInit: function() {
+    this._delayedInitFinished = true;
+  },
+
+  /**
    * Register a listener for environment changes.
    * @param name The name of the listener. If a new listener is registered
    *             with the same name, the old listener will be replaced.
@@ -770,6 +815,11 @@ EnvironmentCache.prototype = {
       return;
     }
     this._changeListeners.delete(name);
+  },
+
+  shutdown: function() {
+    this._log.trace("shutdown");
+    this._shutdown = true;
   },
 
   /**
@@ -846,7 +896,7 @@ EnvironmentCache.prototype = {
   _addObservers: function () {
     // Watch the search engine change and service topics.
     Services.obs.addObserver(this, SEARCH_ENGINE_MODIFIED_TOPIC, false);
-//    Services.obs.addObserver(this, SEARCH_SERVICE_TOPIC, false);
+    Services.obs.addObserver(this, SEARCH_SERVICE_TOPIC, false);
     Services.obs.addObserver(this, COMPOSITOR_CREATED_TOPIC, false);
     Services.obs.addObserver(this, DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC, false);
   },
@@ -854,11 +904,11 @@ EnvironmentCache.prototype = {
   _removeObservers: function () {
     // Remove the search engine change and service observers.
     Services.obs.removeObserver(this, SEARCH_ENGINE_MODIFIED_TOPIC);
-//    Services.obs.removeObserver(this, SEARCH_SERVICE_TOPIC);
+    Services.obs.removeObserver(this, SEARCH_SERVICE_TOPIC);
     Services.obs.removeObserver(this, COMPOSITOR_CREATED_TOPIC);
     try {
       Services.obs.removeObserver(this, DISTRIBUTION_CUSTOMIZATION_COMPLETE_TOPIC);
-    } catch(ex) {};
+    } catch(ex) {}
   },
 
   observe: function (aSubject, aTopic, aData) {
@@ -1012,6 +1062,7 @@ EnvironmentCache.prototype = {
     if (AppConstants.platform === "gonk") {
       return true;
     }
+
     if (!("@mozilla.org/browser/shell-service;1" in Cc)) {
       this._log.info("_isDefaultBrowser - Could not obtain browser shell service");
       return null;
@@ -1019,11 +1070,21 @@ EnvironmentCache.prototype = {
 
     let shellService;
     try {
-      shellService = Cc["@mozilla.org/browser/shell-service;1"]
-                       .getService(Ci.nsIShellService);
+      let scope = {};
+      Cu.import("resource:///modules/ShellService.jsm", scope);
+      shellService = scope.ShellService;
     } catch (ex) {
-      this._log.error("_isDefaultBrowser - Could not obtain shell service", ex);
-      return null;
+      this._log.error("_isDefaultBrowser - Could not obtain shell service JSM");
+    }
+
+    if (!shellService) {
+      try {
+        shellService = Cc["@mozilla.org/browser/shell-service;1"]
+                         .getService(Ci.nsIShellService);
+      } catch (ex) {
+        this._log.error("_isDefaultBrowser - Could not obtain shell service", ex);
+        return null;
+      }
     }
 
     try {
@@ -1050,7 +1111,6 @@ EnvironmentCache.prototype = {
       blocklistEnabled: Preferences.get(PREF_BLOCKLIST_ENABLED, true),
       e10sEnabled: Services.appinfo.browserTabsRemoteAutostart,
       telemetryEnabled: Utils.isTelemetryEnabled,
-      isInOptoutSample: TelemetryController.isInOptoutSample,
       locale: getBrowserLocale(),
       update: {
         channel: updateChannel,
@@ -1152,7 +1212,7 @@ EnvironmentCache.prototype = {
    * not a portable device.
    */
   _getDeviceData: function () {
-    if (["gonk", "android"].indexOf(AppConstants.platform) === -1) {
+    if (!["gonk", "android"].includes(AppConstants.platform)) {
       return null;
     }
 
@@ -1175,7 +1235,7 @@ EnvironmentCache.prototype = {
       locale: getSystemLocale(),
     };
 
-    if (["gonk", "android"].indexOf(AppConstants.platform) !== -1) {
+    if (["gonk", "android"].includes(AppConstants.platform)) {
       data.kernelVersion = getSysinfoProperty("kernel_version", null);
     } else if (AppConstants.platform === "win") {
       let servicePack = getServicePack();
@@ -1224,7 +1284,7 @@ EnvironmentCache.prototype = {
       features: {},
     };
 
-    if (["gonk", "android", "linux"].indexOf(AppConstants.platform) === -1) {
+    if (!["gonk", "android", "linux"].includes(AppConstants.platform)) {
       let gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo);
       try {
         gfxData.monitors = gfxInfo.getMonitors();
@@ -1289,7 +1349,7 @@ EnvironmentCache.prototype = {
 
     if (AppConstants.platform === "win") {
       data.isWow64 = getSysinfoProperty("isWow64", null);
-    } else if (["gonk", "android"].indexOf(AppConstants.platform) !== -1) {
+    } else if (["gonk", "android"].includes(AppConstants.platform)) {
       data.device = this._getDeviceData();
     }
 
@@ -1306,6 +1366,7 @@ EnvironmentCache.prototype = {
     // We are already skipping change events in _checkChanges if there is a pending change task running.
     let now = Policy.now();
     if (this._lastEnvironmentChangeDate &&
+        this._delayedInitFinished &&
         (CHANGE_THROTTLE_INTERVAL_MS >=
          (now.getTime() - this._lastEnvironmentChangeDate.getTime()))) {
       this._log.trace("_onEnvironmentChange - throttling changes, now: " + now +
@@ -1313,7 +1374,9 @@ EnvironmentCache.prototype = {
       return;
     }
 
-    this._lastEnvironmentChangeDate = now;
+    if(this._delayedInitFinished) {
+      this._lastEnvironmentChangeDate = now;
+    }
 
     for (let [name, listener] of this._changeListeners) {
       try {

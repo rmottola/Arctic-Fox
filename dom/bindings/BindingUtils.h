@@ -1617,7 +1617,7 @@ WrapNativeParent(JSContext* cx, T* p, nsWrapperCache* cache,
   }
 
   JSObject* parent = WrapNativeParentHelper<T>::Wrap(cx, p, cache);
-  if (!useXBLScope) {
+  if (!parent || !useXBLScope) {
     return parent;
   }
 
@@ -2332,7 +2332,7 @@ public:
 
 // Rooter class for MozMap; this is what we mostly use in the codegen.
 template<typename T>
-class MOZ_RAII MozMapRooter : private JS::CustomAutoRooter
+class MOZ_RAII MozMapRooter final : private JS::CustomAutoRooter
 {
 public:
   MozMapRooter(JSContext *aCx, MozMap<T>* aMozMap
@@ -3040,6 +3040,11 @@ RegisterDOMNames();
 
 // The return value is whatever the ProtoHandleGetter we used
 // returned.  This should be the DOM prototype for the global.
+//
+// Typically this method's caller will want to ensure that
+// xpc::InitGlobalObjectOptions is called before, and xpc::InitGlobalObject is
+// called after, this method, to ensure that this global object and its
+// compartment are consistent with other global objects.
 template <class T, ProtoHandleGetter GetProto>
 JS::Handle<JSObject*>
 CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,

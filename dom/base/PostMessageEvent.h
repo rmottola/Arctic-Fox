@@ -33,6 +33,7 @@ public:
                    const nsAString& aCallerOrigin,
                    nsGlobalWindow* aTargetWindow,
                    nsIPrincipal* aProvidedPrincipal,
+                   nsIDocument* aSourceDocument,
                    bool aTrustedCaller);
 
 private:
@@ -42,6 +43,7 @@ private:
   nsString mCallerOrigin;
   RefPtr<nsGlobalWindow> mTargetWindow;
   nsCOMPtr<nsIPrincipal> mProvidedPrincipal;
+  nsCOMPtr<nsIDocument> mSourceDocument;
   bool mTrustedCaller;
 };
 

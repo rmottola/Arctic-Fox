@@ -585,12 +585,23 @@ NS_IMETHODIMP
 HttpBaseChannel::Open(nsIInputStream **aResult)
 {
   NS_ENSURE_TRUE(!mWasOpened, NS_ERROR_IN_PROGRESS);
+
+  if (!gHttpHandler->Active()) {
+    LOG(("HttpBaseChannel::Open after HTTP shutdown..."));
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   return NS_ImplementChannelOpen(this, aResult);
 }
 
 NS_IMETHODIMP
 HttpBaseChannel::Open2(nsIInputStream** aStream)
 {
+  if (!gHttpHandler->Active()) {
+    LOG(("HttpBaseChannel::Open after HTTP shutdown..."));
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   nsCOMPtr<nsIStreamListener> listener;
   nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1771,14 +1782,15 @@ HttpBaseChannel::GetRequestSucceeded(bool *aValue)
 }
 
 NS_IMETHODIMP
-HttpBaseChannel::RedirectTo(nsIURI *newURI)
+HttpBaseChannel::RedirectTo(nsIURI *targetURI)
 {
-  // We can only redirect unopened channels
-  ENSURE_CALLED_BEFORE_CONNECT();
+  // We cannot redirect after OnStartRequest of the listener
+  // has been called, since to redirect we have to switch channels
+  // and the dance with OnStartRequest et al has to start over.
+  // This would break the nsIStreamListener contract.
+  NS_ENSURE_FALSE(mOnStartRequestCalled, NS_ERROR_NOT_AVAILABLE);
 
-  // The redirect is stored internally for use in AsyncOpen
-  mAPIRedirectToURI = newURI;
-
+  mAPIRedirectToURI = targetURI;
   return NS_OK;
 }
 
@@ -2724,6 +2736,12 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
     httpInternal->SetThirdPartyFlags(mThirdPartyFlags);
     httpInternal->SetAllowSpdy(mAllowSpdy);
     httpInternal->SetAllowAltSvc(mAllowAltSvc);
+
+    RefPtr<nsHttpChannel> realChannel;
+    CallQueryInterface(newChannel, realChannel.StartAssignment());
+    if (realChannel) {
+      realChannel->SetTopWindowURI(mTopWindowURI);
+    }
 
     // update the DocumentURI indicator since we are being redirected.
     // if this was a top-level document channel, then the new channel

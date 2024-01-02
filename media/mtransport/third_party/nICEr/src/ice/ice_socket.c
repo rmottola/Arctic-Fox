@@ -61,14 +61,15 @@ static void nr_ice_socket_readable_cb(NR_SOCKET s, int how, void *cb_arg)
     r_log(LOG_ICE,LOG_DEBUG,"ICE(%s): Socket ready to read",sock->ctx->label);
 
     /* Re-arm first! */
-    if (sock->type != NR_ICE_SOCKET_TYPE_STREAM_TCP)
+    if (sock->type != NR_ICE_SOCKET_TYPE_STREAM_TCP) {
+      r_log(LOG_ICE,LOG_DEBUG,"ICE(%s): rearming",sock->ctx->label);
       NR_ASYNC_WAIT(s,how,nr_ice_socket_readable_cb,cb_arg);
+    }
 
     if(r=nr_socket_recvfrom(sock->sock,buf,sizeof(buf),&len_s,0,&addr)){
-      if (r != R_WOULDBLOCK && (sock->type == NR_ICE_SOCKET_TYPE_STREAM_TURN)) {
+      if (r != R_WOULDBLOCK && (sock->type != NR_ICE_SOCKET_TYPE_DGRAM)) {
         /* Report this error upward. Bug 946423 */
-        r_log(LOG_ICE,LOG_ERR,"ICE(%s): Error %d on reliable socket. Abandoning.",sock->ctx->label, r);
-        NR_ASYNC_CANCEL(s, NR_ASYNC_WAIT_READ);
+        r_log(LOG_ICE,LOG_ERR,"ICE(%s): Error %d on reliable socket(%p). Abandoning.",sock->ctx->label, r, s);
       }
       return;
     }

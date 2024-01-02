@@ -25,6 +25,9 @@
 #include "nsISocketTransportService.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsDirectoryServiceDefs.h"
+#ifdef MOZ_CRASHREPORTER
+#include "nsICrashReporter.h"
+#endif
 #include "nsPISocketTransportService.h"
 #include "nsServiceManagerUtils.h"
 #if !defined(MOZILLA_XPCOMRT_API)
@@ -63,6 +66,27 @@ class MtransportTestUtils {
     sts_ = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
 
+#ifdef MOZ_CRASHREPORTER
+    char *crashreporter = PR_GetEnv("MOZ_CRASHREPORTER");
+    if (crashreporter && !strcmp(crashreporter, "1")) {
+      //TODO: move this to an even-more-common location to use in all
+      // C++ unittests
+      crashreporter_ = do_GetService("@mozilla.org/toolkit/crash-reporter;1");
+      if (crashreporter_) {
+        std::cerr << "Setting up crash reporting" << std::endl;
+
+        nsCOMPtr<nsIProperties> dirsvc =
+            do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID);
+        nsCOMPtr<nsIFile> cwd;
+        rv = dirsvc->Get(NS_OS_CURRENT_WORKING_DIR,
+                         NS_GET_IID(nsIFile),
+                         getter_AddRefs(cwd));
+        MOZ_ASSERT(NS_SUCCEEDED(rv));
+        crashreporter_->SetEnabled(true);
+        crashreporter_->SetMinidumpPath(cwd);
+      }
+    }
+#endif
   }
 
   nsCOMPtr<nsIEventTarget> sts_target() { return sts_target_; }
@@ -71,6 +95,9 @@ class MtransportTestUtils {
   ScopedXPCOM xpcom_;
   nsCOMPtr<nsIEventTarget> sts_target_;
   nsCOMPtr<nsPISocketTransportService> sts_;
+#ifdef MOZ_CRASHREPORTER
+  nsCOMPtr<nsICrashReporter> crashreporter_;
+#endif
 };
 
 

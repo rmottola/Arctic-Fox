@@ -481,6 +481,9 @@ private:
     bool           mSafeHintEnabled;
     bool           mParentalControlEnabled;
 
+    // true in between init and shutdown states
+    Atomic<bool, Relaxed> mHandlerActive;
+
     // Whether telemetry is reported or not
     uint32_t           mTelemetryEnabled : 1;
 
@@ -489,9 +492,6 @@ private:
 
     // The value of 'hidden' network.http.debug-observations : 1;
     uint32_t           mDebugObservations : 1;
-
-    // true in between init and shutdown states
-    uint32_t           mHandlerActive : 1;
 
     uint32_t           mEnableSpdy : 1;
     uint32_t           mSpdyV31 : 1;

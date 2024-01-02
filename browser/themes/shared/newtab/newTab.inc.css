@@ -8,18 +8,6 @@
   background-color: transparent;
 }
 
-body {
-  background: linear-gradient(to top,#DFF3FF,#F9F9F9) fixed;
-}
-
-/* SCROLLBOX */
-#newtab-scrollbox:not([page-disabled]) {
-  background-color: rgb(229,229,229);
-  background-image: url(chrome://browser/skin/newtab/noise.png),
-                    linear-gradient(rgba(255,255,255,.5), rgba(255,255,255,.2));
-  background-attachment: fixed;
-}
-
 /* UNDO */
 #newtab-undo-container {
   padding: 4px 3px;
@@ -34,6 +22,16 @@ body {
   margin-bottom: 0;
 }
 
+.newtab-undo-button {
+  -moz-appearance: none;
+  cursor: pointer;
+  padding: 0;
+  margin: 0 4px;
+  border: 0;
+  background: transparent;
+  text-decoration: none;
+  min-width: 0;
+}
 
 .newtab-undo-button:hover {
   text-decoration: underline;
@@ -43,69 +41,82 @@ body {
   outline: 1px dotted;
 }
 
-
-#newtab-undo-close-button > .toolbarbutton-text {
-  display: none;
-}
-
-#newtab-undo-close-button:-moz-focusring {
-  outline: 1px dotted;
-}
-
-/* TOGGLE */
-#newtab-toggle {
-  width: 16px;
-  height: 16px;
+#newtab-undo-close-button {
+  -moz-appearance: none;
   padding: 0;
   border: none;
-  background: -216px 0 transparent url(chrome://browser/skin/newtab/controls.png);
 }
 
-#newtab-toggle[page-disabled] {
-  background-position: -232px 0;
+#newtab-undo-close-button {
+  -moz-appearance: none;
+  padding: 0;
+  border: none;
+  height: 16px;
+  width: 16px;
+  float: right;
+  right: 0;
+  background-image: -moz-image-rect(url(chrome://global/skin/icons/close.png), 0, 16, 16, 0);
+  background-color: transparent;
 }
 
-/* ROWS */
-.newtab-row {
-  margin-bottom: 20px;
+#newtab-undo-close-button:hover {
+  background-image: -moz-image-rect(url(chrome://global/skin/icons/close.png), 0, 32, 16, 16);
 }
 
-.newtab-row:last-child {
-  margin-bottom: 0;
+#newtab-undo-close-button:active {
+  background-image: -moz-image-rect(url(chrome://global/skin/icons/close.png), 0, 48, 16, 32);
+}
+
+/* CUSTOMIZE */
+#newtab-customize-button,
+.newtab-customize {
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 32, 32, 0);
+  background-size: 28px;
+  height: 38px;
+  width: 38px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: transparent;
+  border: none;
+}
+
+.newtab-customize {
+  height: 28px;
+  width: 28px;
+}
+
+#newtab-customize-button:-moz-any(:hover, :active, [active]) {
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 64, 32, 32);
+  background-color: #FFFFFF;
+  border: solid 1px #CCCCCC;
+  border-radius: 2px;
 }
 
 /* CELLS */
 .newtab-cell {
-  -moz-margin-end: 20px;
   background-color: rgba(255,255,255,.2);
-  border: 1px solid;
-  border-color: rgba(8,22,37,.12) rgba(8,22,37,.14) rgba(8,22,37,.16);
-  border-radius: 1px;
-  transition: border-color 100ms ease-out;
+  border-radius: 8px;
 }
 
 .newtab-cell:empty {
-  border: 1px dashed;
-  border-color: rgba(8,22,37,.15) rgba(8,22,37,.17) rgba(8,22,37,.19);
-}
-
-.newtab-cell:last-child {
-  -moz-margin-end: 0;
-}
-
-.newtab-cell:hover:not(:empty):not([dragged]) {
-  border-color: rgba(8,22,37,.25) rgba(8,22,37,.27) rgba(8,22,37,.3);
+  outline: 2px dashed #c1c1c1;
+  -moz-outline-radius: 8px;
 }
 
 /* SITES */
 .newtab-site {
+  border-radius: inherit;
+  box-shadow: 0 1px 3px #c1c1c1;
   text-decoration: none;
   transition-property: top, left, opacity, box-shadow, background-color;
 }
 
-.newtab-site:hover,
+.newtab-cell:not([ignorehover]) .newtab-control:hover ~ .newtab-link,
+.newtab-cell:not([ignorehover]) .newtab-link:hover,
 .newtab-site[dragged] {
-  box-shadow: 0 3px 6px 1px rgba(8,20,37,.6);
+  border: 2px solid white;
+  box-shadow: 0 0 6px 2px #4cb1ff;
+  margin: -2px;
 }
 
 .newtab-site[dragged] {
@@ -113,45 +124,71 @@ body {
   background-color: rgb(242,242,242);
 }
 
-/***
- * If you change the sizes here, change them in newTab.css
- * and the preference values:
- * toolkit.pageThumbs.minWidth
- * toolkit.pageThumbs.minHeight
- */
+/* LINKS */
+.newtab-link {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
 /* THUMBNAILS */
 .newtab-thumbnail {
   background-origin: padding-box;
   background-clip: padding-box;
   background-repeat: no-repeat;
   background-size: cover;
+  border-radius: 8px 8px 0px 0px;
+  height: 180px;
+  transition: opacity 100ms ease-out;
+}
+
+.newtab-cell:not([ignorehover]) .newtab-site:hover .newtab-thumbnail.enhanced-content {
+  opacity: 0;
+}
+
+.newtab-site[type=affiliate] .newtab-thumbnail,
+.newtab-site[type=enhanced] .newtab-thumbnail,
+.newtab-site[type=organic] .newtab-thumbnail,
+.newtab-site[type=sponsored] .newtab-thumbnail {
+  background-position: center center;
+  background-size: auto;
 }
 
 /* TITLES */
-.newtab-title {
-  padding: 0 8px 1px;
-  background-color: rgba(248,249,251,.95);
-  color: #1f364c;
-  line-height: 24px;
+.newtab-sponsored,
+.newtab-title,
+.newtab-suggested  {
+  color: #5c5c5c;
+}
+
+.newtab-suggested[active] {
+  background-color: rgba(51, 51, 51, 0.95);
+  border: 0;
+  color: white;
+}
+
+.newtab-site:hover .newtab-title {
+  color: #222;
 }
 
 .newtab-site[pinned] .newtab-title {
-  padding-inline-start: 16px;
+  -moz-padding-start: 24px;
 }
 
 .newtab-site[pinned] .newtab-title::before {
-  background-image: url(chrome://browser/skin/newtab/pinned.png);
+  background-image: -moz-image-rect(url("chrome://browser/skin/newtab/controls.svg"), 7, 278, 28, 266);
+  background-size: 10px;
   content: "";
-  left: 2px;
-  top: 2px;
+  height: 17px;
+  left: 0;
   position: absolute;
-  width: 12px;
-  height: 20px;
+  width: 10px;
+  margin-left: 8px;
+  margin-top: 6px;
 }
 
-.newtab-site[pinned] .newtab-title:dir(rtl)::before {
+.newtab-site[pinned] .newtab-title:-moz-dir(rtl)::before {
   left: auto;
-  right: 2px;
+  right: 0;
 }
 
 /* CONTROLS */
@@ -161,49 +198,31 @@ body {
   border: none;
   height: 24px;
   width: 24px;
-  top: 4px;
-  background: transparent url(chrome://browser/skin/newtab/controls.png);
 }
 
-.newtab-control-pin:dir(ltr),
-.newtab-control-block:dir(rtl) {
-  left: 4px;
+.newtab-control-pin,
+.newtab-site[pinned] .newtab-control-pin:hover:active {
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 96, 32, 64);
 }
 
-.newtab-control-block:dir(ltr),
-.newtab-control-pin:dir(rtl) {
-  right: 4px;
-}
-
-.newtab-control-pin:hover {
-  background-position: -24px 0;
-}
-
-.newtab-control-pin:active {
-  background-position: -48px 0;
-}
-
-.newtab-site[pinned] .newtab-control-pin {
-  background-position: -72px 0;
-}
-
+.newtab-control-pin:hover,
 .newtab-site[pinned] .newtab-control-pin:hover {
-  background-position: -96px 0;
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 160, 32, 128);
 }
 
-.newtab-site[pinned] .newtab-control-pin:active {
-  background-position: -120px 0;
+.newtab-control-pin:hover:active,
+.newtab-site[pinned] .newtab-control-pin {
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 128, 32, 96);
 }
 
 .newtab-control-block {
-  background-position: -144px 0;
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 192, 32, 160);
 }
 
 .newtab-control-block:hover {
-  background-position: -168px 0;
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 224, 32, 192);
 }
 
-.newtab-control-block:active {
-  background-position: -192px 0;
+.newtab-control-block:hover:active {
+  background-image: -moz-image-rect(url(chrome://browser/skin/newtab/controls.svg), 0, 256, 32, 224);
 }
-

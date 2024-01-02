@@ -1513,7 +1513,7 @@ void nsDisplaySelectionOverlay::Paint(nsDisplayListBuilder* aBuilder,
   nsIntRect pxRect =
     mVisibleRect.ToOutsidePixels(mFrame->PresContext()->AppUnitsPerDevPixel());
   Rect rect(pxRect.x, pxRect.y, pxRect.width, pxRect.height);
-  MaybeSnapToDevicePixels(rect, aDrawTarget);
+  MaybeSnapToDevicePixels(rect, aDrawTarget, true);
 
   aDrawTarget.FillRect(rect, color);
 }
@@ -2114,8 +2114,6 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
 
   DisplayListClipState::AutoSaveRestore clipState(aBuilder);
 
-  nsDisplayListBuilder::AutoSaveRestorePerspectiveIndex perspectiveIndex(aBuilder, this);
-
   if (isTransformed || useBlendMode || usingSVGEffects || useFixedPosition || useStickyPosition) {
     // We don't need to pass ancestor clipping down to our children;
     // everything goes inside a display item's child list, and the display
@@ -2134,6 +2132,9 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     DisplayListClipState::AutoSaveRestore nestedClipState(aBuilder);
     nsDisplayListBuilder::AutoInTransformSetter
       inTransformSetter(aBuilder, inTransform);
+    nsDisplayListBuilder::AutoSaveRestorePerspectiveIndex
+      perspectiveIndex(aBuilder, this);
+
     CheckForApzAwareEventHandlers(aBuilder, this);
 
     nsRect clipPropClip;
@@ -2269,7 +2270,7 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
       int index = 1;
 
       while (nsDisplayItem* item = resultList.RemoveBottom()) {
-        if (ItemParticipatesIn3DContext(this, item)) {
+        if (ItemParticipatesIn3DContext(this, item) && !item->GetClip().HasClip()) {
           // The frame of this item participates the same 3D context.
           WrapSeparatorTransform(aBuilder, this, dirtyRect,
                                  &nonparticipants, &participants, index++);
@@ -4709,12 +4710,13 @@ nsFrame::ReflowAbsoluteFrames(nsPresContext*           aPresContext,
     // child frames that need to be reflowed
 
     // The containing block for the abs pos kids is formed by our padding edge.
-    nsMargin computedBorder =
-      aReflowState.ComputedPhysicalBorderPadding() - aReflowState.ComputedPhysicalPadding();
+    nsMargin usedBorder = GetUsedBorder();
     nscoord containingBlockWidth =
-      aDesiredSize.Width() - computedBorder.LeftRight();
+      aDesiredSize.Width() - usedBorder.LeftRight();
+    MOZ_ASSERT(containingBlockWidth >= 0);
     nscoord containingBlockHeight =
-      aDesiredSize.Height() - computedBorder.TopBottom();
+      aDesiredSize.Height() - usedBorder.TopBottom();
+    MOZ_ASSERT(containingBlockHeight >= 0);
 
     nsContainerFrame* container = do_QueryFrame(this);
     NS_ASSERTION(container, "Abs-pos children only supported on container frames for now");
@@ -8280,7 +8282,9 @@ nsIFrame::IsFocusable(int32_t *aTabIndex, bool aWithMouse)
   }
   bool isFocusable = false;
 
-  if (mContent && mContent->IsElement() && IsVisibleConsideringAncestors()) {
+  if (mContent && mContent->IsElement() && IsVisibleConsideringAncestors() &&
+      StyleContext()->GetPseudo() != nsCSSAnonBoxes::anonymousFlexItem &&
+      StyleContext()->GetPseudo() != nsCSSAnonBoxes::anonymousGridItem) {
     const nsStyleUserInterface* ui = StyleUserInterface();
     if (ui->mUserFocus != NS_STYLE_USER_FOCUS_IGNORE &&
         ui->mUserFocus != NS_STYLE_USER_FOCUS_NONE) {
@@ -9735,6 +9739,8 @@ void DR_State::ParseRulesFile()
           mActive = true;
         }
       }
+
+      fclose(inFile);
     }
   }
 }

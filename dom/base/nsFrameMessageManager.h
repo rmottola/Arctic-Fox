@@ -215,8 +215,10 @@ public:
                                 const JS::Value& aJSON,
                                 const JS::Value& aObjects,
                                 nsIPrincipal* aPrincipal,
+                                const JS::Value& aTransfers,
                                 JSContext* aCx,
                                 uint8_t aArgc);
+
   nsresult DispatchAsyncMessageInternal(JSContext* aCx,
                                         const nsAString& aMessage,
                                         StructuredCloneData& aData,
@@ -397,6 +399,7 @@ protected:
   void TryCacheLoadAndCompileScript(const nsAString& aURL,
                                     bool aRunInGlobalScope);
   bool InitChildGlobalInternal(nsISupports* aScope, const nsACString& aID);
+  void Trace(const TraceCallbacks& aCallbacks, void* aClosure);
   nsCOMPtr<nsIXPConnectJSObjectHolder> mGlobal;
   nsCOMPtr<nsIPrincipal> mPrincipal;
   AutoTArray<JS::Heap<JSObject*>, 2> mAnonymousGlobalScopes;

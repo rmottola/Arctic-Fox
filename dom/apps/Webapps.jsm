@@ -3487,21 +3487,15 @@ this.DOMApplicationRegistry = {
     let requestChannel;
 
     let appURI = NetUtil.newURI(aNewApp.origin, null, null);
-    let principal =
-      Services.scriptSecurityManager.createCodebasePrincipal(appURI,
-                                                             {appId: aNewApp.localId});
-
     if (aIsLocalFileInstall) {
       requestChannel = NetUtil.newChannel({
         uri: aFullPackagePath,
-        loadingPrincipal: principal,
-        contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER}
+        loadUsingSystemPrincipal: true}
       ).QueryInterface(Ci.nsIFileChannel);
     } else {
       requestChannel = NetUtil.newChannel({
         uri: aFullPackagePath,
-        loadingPrincipal: principal,
-        contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER}
+        loadUsingSystemPrincipal: true}
       ).QueryInterface(Ci.nsIHttpChannel);
       requestChannel.loadFlags |= Ci.nsIRequest.INHIBIT_CACHING;
     }
@@ -4735,6 +4729,10 @@ this.DOMApplicationRegistry = {
     }
 
     return this.getManifestFor(aManifestURL).then((aManifest) => {
+      if (!aManifest) {
+        return Promise.reject("NoManifest");
+      }
+
       let manifest = aEntryPoint && aManifest.entry_points &&
                      aManifest.entry_points[aEntryPoint]
         ? aManifest.entry_points[aEntryPoint]
@@ -4907,7 +4905,7 @@ this.DOMApplicationRegistry = {
 /**
  * Appcache download observer
  */
-let AppcacheObserver = function(aApp) {
+var AppcacheObserver = function(aApp) {
   debug("Creating AppcacheObserver for " + aApp.origin +
         " - " + aApp.installState);
   this.app = aApp;

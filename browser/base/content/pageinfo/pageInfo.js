@@ -353,7 +353,7 @@ function onLoadPageInfo()
   window.focus();
 }
 
-function loadPageInfo(frameOuterWindowID)
+function loadPageInfo(frameOuterWindowID, imageElement)
 {
   let mm = window.opener.gBrowser.selectedBrowser.messageManager;
 
@@ -365,7 +365,8 @@ function loadPageInfo(frameOuterWindowID)
 
   // Look for pageInfoListener in content.js. Sends message to listener with arguments.
   mm.sendAsyncMessage("PageInfo:getData", {strings: gStrings,
-                      frameOuterWindowID: frameOuterWindowID});
+                      frameOuterWindowID: frameOuterWindowID},
+                      { imageElement });
 
   let pageInfoData;
 
@@ -378,6 +379,8 @@ function loadPageInfo(frameOuterWindowID)
     let uri = makeURI(docInfo.documentURIObject.spec,
                       docInfo.documentURIObject.originCharset);
     gDocInfo = docInfo;
+
+    gImageElement = pageInfoData.imageInfo;
 
     var titleFormat = windowInfo.isTopWindow ? "pageInfo.page.title"
                                              : "pageInfo.frame.title";
@@ -482,19 +485,11 @@ function loadTab(args)
   // If the "View Image Info" context menu item was used, the related image
   // element is provided as an argument. This can't be a background image.
   let imageElement = args && args.imageElement;
-  if (imageElement) {
-    gImageElement = {currentSrc: imageElement.currentSrc,
-                     width: imageElement.width, height: imageElement.height,
-                     imageText: imageElement.title || imageElement.alt};
-  }
-  else {
-    gImageElement = null;
-  }
 
   let frameOuterWindowID = args && args.frameOuterWindowID;
 
   /* Load the page info */
-  loadPageInfo(frameOuterWindowID);
+  loadPageInfo(frameOuterWindowID, imageElement);
 
   var initialTab = (args && args.initialTab) || "generalTab";
   var radioGroup = document.getElementById("viewGroup");

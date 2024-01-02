@@ -2515,6 +2515,11 @@ public:
 
   static bool IsNonSubresourceRequest(nsIChannel* aChannel);
 
+  static uint32_t CookiesBehavior()
+  {
+    return sCookiesBehavior;
+  }
+
   // The order of these entries matters, as we use std::min for total ordering
   // of permissions. Private Browsing is considered to be more limiting
   // then session scoping

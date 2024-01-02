@@ -3,8 +3,14 @@ Preferences
 
 Telemetry behaviour is controlled through the preferences listed here.
 
-*Note:* On official builds (which define ``MOZILLA_OFFICIAL``), Telemetry is only initialized when ``MOZ_TELEMETRY_REPORTING`` is defined.
-Sending only happens on official builds with ``MOZ_TELEMETRY_REPORTING`` defined.
+Default behaviors
+-----------------
+
+Sending only happens on official builds (i.e. with ``MOZILLA_OFFICIAL``set) with ``MOZ_TELEMETRY_REPORTING`` defined.
+All other builds drop all outgoing pings, so they will also not retry sending them later.
+
+Preferences
+-----------
 
 ``toolkit.telemetry.unified``
 
@@ -23,6 +29,10 @@ Sending only happens on official builds with ``MOZ_TELEMETRY_REPORTING`` defined
   If ``unified`` is off, this controls whether the Telemetry module is enabled.
   If ``unified`` is on, this controls whether to record *extended* data.
   This preference is controlled through the `Preferences` dialog.
+
+  Note that the default value here of this pref depends on the define ``RELEASE_BUILD`` and the channel.
+  If ``RELEASE_BUILD`` is set, ``MOZ_TELEMETRY_ON_BY_DEFAULT`` gets set, which means this pref will default to ``true``.
+  This is overridden by the preferences code on the "beta" channel, the pref also defaults to ``true`` there.
 
 ``datareporting.healthreport.uploadEnabled``
 
@@ -55,6 +65,10 @@ Data-choices notification
 ``datareporting.policy.dataSubmissionEnabled``
 
   This is the data submission master kill switch. If disabled, no policy is shown or upload takes place, ever.
+
+``datareporting.policy.dataSubmissionEnabled.v2``
+
+  If disabled, FHR v2 data will not be sent to Mozilla servers. Telemetry v4 data submission will not be affected. This is like ``datareporting.policy.dataSubmissionEnabled``, but only affects FHR - Telemetry upload will not be disabled.
 
 ``datareporting.policy.dataSubmissionPolicyNotifiedTime``
 

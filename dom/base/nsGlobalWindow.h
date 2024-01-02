@@ -106,7 +106,6 @@ class Crypto;
 class External;
 class Function;
 class Gamepad;
-class VRDevice;
 class MediaQueryList;
 class MozSelfSupport;
 class Navigator;
@@ -117,6 +116,8 @@ struct RequestInit;
 class RequestOrUSVString;
 class Selection;
 class SpeechSynthesis;
+class U2F;
+class VRDevice;
 class WakeLock;
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
 class WindowOrientationObserver;
@@ -1075,6 +1076,7 @@ public:
   void SizeToContentOuter(mozilla::ErrorResult& aError, bool aCallerIsChrome);
   void SizeToContent(mozilla::ErrorResult& aError);
   mozilla::dom::Crypto* GetCrypto(mozilla::ErrorResult& aError);
+  mozilla::dom::U2F* GetU2f(mozilla::ErrorResult& aError);
   nsIControllers* GetControllersOuter(mozilla::ErrorResult& aError);
   nsIControllers* GetControllers(mozilla::ErrorResult& aError);
   nsresult GetControllers(nsIControllers** aControllers) override;
@@ -1636,8 +1638,8 @@ protected:
   // Outer windows only.
   void PreloadLocalStorage();
 
-  // Returns desktop pixels.  Outer windows only.
-  mozilla::DesktopIntPoint GetScreenXY(mozilla::ErrorResult& aError);
+  // Returns CSS pixels based on primary screen.  Outer windows only.
+  mozilla::CSSIntPoint GetScreenXY(mozilla::ErrorResult& aError);
 
   nsGlobalWindow* InnerForSetTimeoutOrInterval(mozilla::ErrorResult& aError);
 
@@ -1662,6 +1664,10 @@ protected:
   // being abused. This is used in the cases where we have no modifiable UI to
   // show, in that case we show a separate dialog to ask this question.
   bool ConfirmDialogIfNeeded();
+
+  // Helper called after moving/resizing, to update docShell's presContext
+  // if we have caused a resolution change by moving across monitors.
+  void CheckForDPIChange();
 
 private:
   // Fire the JS engine's onNewGlobalObject hook.  Only used on inner windows.
@@ -1779,6 +1785,7 @@ protected:
   nsString                      mDefaultStatus;
   RefPtr<nsGlobalWindowObserver> mObserver; // Inner windows only.
   RefPtr<mozilla::dom::Crypto>  mCrypto;
+  RefPtr<mozilla::dom::U2F> mU2F;
   RefPtr<mozilla::dom::cache::CacheStorage> mCacheStorage;
   RefPtr<mozilla::dom::Console> mConsole;
   // We need to store an nsISupports pointer to this object because the

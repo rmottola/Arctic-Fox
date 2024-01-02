@@ -709,8 +709,12 @@ WrapCallable(JSContext* cx, HandleObject callable, HandleObject sandboxProtoProx
                  &xpc::sandboxProxyHandler);
 
     RootedValue priv(cx, ObjectValue(*callable));
+    // We want to claim to have the same proto as our wrapped callable, so set
+    // ourselves up with a lazy proto.
+    js::ProxyOptions options;
+    options.setLazyProto(true);
     JSObject* obj = js::NewProxyObject(cx, &xpc::sandboxCallableProxyHandler,
-                                       priv, nullptr);
+                                       priv, nullptr, options);
     if (obj) {
         js::SetProxyExtra(obj, SandboxCallableProxyHandler::SandboxProxySlot,
                           ObjectValue(*sandboxProtoProxy));
@@ -1014,6 +1018,9 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
     JS::CompartmentOptions compartmentOptions;
 
     auto& creationOptions = compartmentOptions.creationOptions();
+
+    if (xpc::SharedMemoryEnabled())
+        creationOptions.setSharedMemoryAndAtomicsEnabled(true);
 
     if (options.sameZoneAs)
         creationOptions.setSameZoneAs(js::UncheckedUnwrap(options.sameZoneAs));

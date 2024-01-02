@@ -26,7 +26,53 @@
 <body dir="&locale.dir;">
   <div id="newtab-customize-overlay"></div>
 
-  <div id="newtab-scrollbox">
+  <div class="newtab-customize-panel-container">
+    <div id="newtab-customize-panel" orient="vertical">
+        <div id="newtab-customize-panel-anchor"></div>
+        <div id="newtab-customize-panel-inner-wrapper">
+          <div id="newtab-customize-title" class="newtab-customize-panel-item">
+            <label>&newtab.customize.cog.title2;</label>
+          </div>
+
+          <div class="newtab-customize-complex-option">
+            <div id="newtab-customize-classic" class="newtab-customize-panel-superitem newtab-customize-panel-item selectable">
+                <label>&newtab.customize.classic;</label>
+            </div>
+            <div id="newtab-customize-enhanced" class="newtab-customize-panel-subitem">
+                <label class="checkbox"></label>
+                <label>&newtab.customize.cog.enhanced;</label>
+            </div>
+          </div>
+          <div id="newtab-customize-blank" class="newtab-customize-panel-item selectable">
+            <label>&newtab.customize.blank2;</label>
+          </div>
+          <div id="newtab-customize-learn" class="newtab-customize-panel-item">
+            <label>&newtab.customize.cog.learn;</label>
+          </div>
+        </div>
+    </div>
+  </div>
+
+  <div id="newtab-intro-mask">
+    <div id="newtab-intro-modal">
+      <div id="newtab-intro-header"/>
+      <div id="newtab-intro-body">
+        <div id="newtab-intro-content">
+          <div id="newtab-intro-text">
+            <p/><p/>
+          </div>
+        </div>
+        <div id="newtab-intro-buttons">
+          <input id="newtab-intro-button" type="button" default="true" onclick="gIntro._exitIntro()"/>
+        </div>
+      </div>
+      <div id="newtab-intro-footer">
+        <ul>
+          <li id="newtab-intro-link"/>
+        </ul>
+      </div>
+    </div>
+  </div>
 
     <div id="newtab-vertical-margin">
       <div id="newtab-margin-top"/>
@@ -61,9 +107,8 @@
       </div>
 
       <div id="newtab-margin-bottom"/>
-    </div>
-    <input id="newtab-toggle" type="button"/>
   </div>
+      <input id="newtab-customize-button" type="button" dir="&locale.dir;" title="&newtab.customize.title;"/>
 </body>
 <script type="text/javascript;version=1.8" src="chrome://browser/content/contentSearchUI.js"/>
 <script type="text/javascript;version=1.8" src="chrome://browser/content/newtab/newTab.js"/>

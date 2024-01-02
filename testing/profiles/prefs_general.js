@@ -113,7 +113,7 @@ user_pref("network.sntp.pools", "%(server)s");
 user_pref("network.sntp.maxRetryCount", 1);
 
 // Make sure the notification permission migration test doesn't hit the network.
-user_pref("browser.push.warning.infoURL", "http://%(server)s/alerts-dummy/infoURL");
+user_pref("app.support.baseURL", "http://%(server)s/support-dummy/");
 
 // Existing tests don't wait for the notification button security delay
 user_pref("security.notification_enable_delay", 0);
@@ -231,9 +231,6 @@ user_pref('browser.tiles.reportURL', 'http://%(server)s/tests/robocop/robocop_ti
 
 // We want to collect telemetry, but we don't want to send in the results.
 user_pref('toolkit.telemetry.server', 'https://%(server)s/telemetry-dummy/');
-// Our current tests expect the unified Telemetry feature to be opt-out,
-// which is not true while we hold back shipping it.
-user_pref('toolkit.telemetry.unifiedIsOptIn', false);
 
 // A couple of preferences with default values to test that telemetry preference
 // watching is working.

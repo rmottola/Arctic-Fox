@@ -78,6 +78,7 @@ nsHttpConnection::nsHttpConnection()
     , mTransactionCaps(0)
     , mResponseTimeoutEnabled(false)
     , mTCPKeepaliveConfig(kTCPKeepaliveDisabled)
+    , mForceSendPending(false)
     , m0RTTChecked(false)
     , mWaitingFor0RTTResponse(false)
     , mContentBytesWritten0RTT(0)
@@ -110,6 +111,10 @@ nsHttpConnection::~nsHttpConnection()
                               Telemetry::SPDY_KBREAD_PER_CONN :
                               Telemetry::HTTP_KBREAD_PER_CONN,
                               totalKBRead);
+    }
+    if (mForceSendTimer) {
+        mForceSendTimer->Cancel();
+        mForceSendTimer = nullptr;
     }
 }
 
@@ -669,6 +674,10 @@ nsHttpConnection::Close(nsresult reason, bool aIsShutdown)
     if (mTCPKeepaliveTransitionTimer) {
         mTCPKeepaliveTransitionTimer->Cancel();
         mTCPKeepaliveTransitionTimer = nullptr;
+    }
+    if (mForceSendTimer) {
+        mForceSendTimer->Cancel();
+        mForceSendTimer = nullptr;
     }
 
     if (NS_FAILED(reason)) {
@@ -1443,10 +1452,10 @@ nsHttpConnection::ResumeRecv()
 }
 
 
-class nsHttpConnectionForceIO : public nsRunnable
+class HttpConnectionForceIO : public nsRunnable
 {
 public:
-  nsHttpConnectionForceIO(nsHttpConnection *aConn, bool doRecv)
+  HttpConnectionForceIO(nsHttpConnection *aConn, bool doRecv)
      : mConn(aConn)
      , mDoRecv(doRecv)
     {}
@@ -1460,14 +1469,49 @@ public:
                 return NS_OK;
             return mConn->OnInputStreamReady(mConn->mSocketIn);
         }
-        if (!mConn->mSocketOut)
+
+        MOZ_ASSERT(mConn->mForceSendPending);
+        mConn->mForceSendPending = false;
+        if (!mConn->mSocketOut) {
             return NS_OK;
+        }
         return mConn->OnOutputStreamReady(mConn->mSocketOut);
     }
 private:
     RefPtr<nsHttpConnection> mConn;
     bool mDoRecv;
 };
+
+void
+nsHttpConnection::ForceSendIO(nsITimer *aTimer, void *aClosure)
+{
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+    nsHttpConnection *self = static_cast<nsHttpConnection *>(aClosure);
+    MOZ_ASSERT(aTimer == self->mForceSendTimer);
+    self->mForceSendTimer = nullptr;
+    NS_DispatchToCurrentThread(new HttpConnectionForceIO(self, false));
+}
+
+nsresult
+nsHttpConnection::MaybeForceSendIO()
+{
+    MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
+    // due to bug 1213084 sometimes real I/O events do not get serviced when
+    // NSPR derived I/O events are ready and this can cause a deadlock with
+    // https over https proxying. Normally we would expect the write callback to
+    // be invoked before this timer goes off, but set it at the old windows
+    // tick interval (kForceDelay) as a backup for those circumstances.
+    static const uint32_t kForceDelay = 17; //ms
+
+    if (mForceSendPending) {
+        return NS_OK;
+    }
+    MOZ_ASSERT(!mForceSendTimer);
+    mForceSendPending = true;
+    mForceSendTimer = do_CreateInstance("@mozilla.org/timer;1");
+    return mForceSendTimer->InitWithFuncCallback(
+        nsHttpConnection::ForceSendIO, this, kForceDelay, nsITimer::TYPE_ONE_SHOT);
+}
 
 // trigger an asynchronous read
 nsresult
@@ -1476,7 +1520,7 @@ nsHttpConnection::ForceRecv()
     LOG(("nsHttpConnection::ForceRecv [this=%p]\n", this));
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
 
-    return NS_DispatchToCurrentThread(new nsHttpConnectionForceIO(this, true));
+    return NS_DispatchToCurrentThread(new HttpConnectionForceIO(this, true));
 }
 
 // trigger an asynchronous write
@@ -1489,8 +1533,7 @@ nsHttpConnection::ForceSend()
     if (mTLSFilter) {
         return mTLSFilter->NudgeTunnel(this);
     }
-
-    return NS_DispatchToCurrentThread(new nsHttpConnectionForceIO(this, false));
+    return MaybeForceSendIO();
 }
 
 void
@@ -1664,8 +1707,8 @@ nsHttpConnection::OnSocketWritable()
 
             LOG(("  writing transaction request stream\n"));
             mProxyConnectInProgress = false;
-            rv = mTransaction->ReadSegments(this, nsIOService::gDefaultSegmentSize,
-                                            &transactionBytes);
+            rv = mTransaction->ReadSegmentsAgain(this, nsIOService::gDefaultSegmentSize,
+                                                 &transactionBytes, &again);
             mContentBytesWritten += transactionBytes;
         }
 
@@ -1716,7 +1759,7 @@ nsHttpConnection::OnSocketWritable()
             again = false;
         }
         // write more to the socket until error or end-of-request...
-    } while (again);
+    } while (again && gHttpHandler->Active());
 
     return rv;
 }
@@ -1834,28 +1877,33 @@ nsHttpConnection::OnSocketReadable()
             break;
         }
 
-        rv = mTransaction->WriteSegments(this, nsIOService::gDefaultSegmentSize, &n);
+        mSocketInCondition = NS_OK;
+        rv = mTransaction->
+            WriteSegmentsAgain(this, nsIOService::gDefaultSegmentSize, &n, &again);
+        LOG(("nsHttpConnection::OnSocketReadable %p trans->ws rv=%x n=%d socketin=%x\n",
+             this, rv, n, mSocketInCondition));
         if (NS_FAILED(rv)) {
             // if the transaction didn't want to take any more data, then
             // wait for the transaction to call ResumeRecv.
-            if (rv == NS_BASE_STREAM_WOULD_BLOCK)
+            if (rv == NS_BASE_STREAM_WOULD_BLOCK) {
                 rv = NS_OK;
+            }
             again = false;
-        }
-        else {
+        } else {
             mCurrentBytesRead += n;
             mTotalBytesRead += n;
             if (NS_FAILED(mSocketInCondition)) {
                 // continue waiting for the socket if necessary...
-                if (mSocketInCondition == NS_BASE_STREAM_WOULD_BLOCK)
+                if (mSocketInCondition == NS_BASE_STREAM_WOULD_BLOCK) {
                     rv = ResumeRecv();
-                else
+                } else {
                     rv = mSocketInCondition;
+                }
                 again = false;
             }
         }
         // read more from the socket until error...
-    } while (again);
+    } while (again && gHttpHandler->Active());
 
     return rv;
 }
@@ -2160,7 +2208,6 @@ nsHttpConnection::OnOutputStreamReady(nsIAsyncOutputStream *out)
 {
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
     MOZ_ASSERT(out == mSocketOut, "unexpected socket");
-
     // if the transaction was dropped...
     if (!mTransaction) {
         LOG(("  no transaction; ignoring event\n"));
@@ -2222,9 +2269,17 @@ void
 nsHttpConnection::CheckForTraffic(bool check)
 {
     if (check) {
+        LOG((" CheckForTraffic conn %p\n", this));
         if (mSpdySession) {
-            // Send a ping to verify it is still alive
-            mSpdySession->SendPing();
+            if (PR_IntervalToMilliseconds(IdleTime()) >= 500) {
+                // Send a ping to verify it is still alive if it has been idle
+                // more than half a second, the network changed events are
+                // rate-limited to one per 1000 ms.
+                LOG((" SendPing\n"));
+                mSpdySession->SendPing();
+            } else {
+                LOG((" SendPing skipped due to network activity\n"));
+            }
         } else {
             // If not SPDY, Store snapshot amount of data right now
             mTrafficCount = mTotalBytesWritten + mTotalBytesRead;

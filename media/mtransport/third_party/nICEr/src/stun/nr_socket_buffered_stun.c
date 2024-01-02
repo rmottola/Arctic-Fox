@@ -250,7 +250,15 @@ abort:
 
 static void nr_socket_buffered_stun_failed(nr_socket_buffered_stun *sock)
   {
+    NR_SOCKET fd;
+
     sock->read_state = NR_ICE_SOCKET_READ_FAILED;
+
+    /* Cancel waiting on the socket */
+    if (sock->inner && !nr_socket_getfd(sock->inner, &fd)) {
+      NR_ASYNC_CANCEL(fd, NR_ASYNC_WAIT_WRITE);
+      NR_ASYNC_CANCEL(fd, NR_ASYNC_WAIT_READ);
+    }
   }
 
 static int nr_socket_buffered_stun_recvfrom(void *obj,void * restrict buf,
@@ -523,6 +531,10 @@ static void nr_socket_buffered_stun_writable_cb(NR_SOCKET s, int how, void *arg)
   nr_socket_buffered_stun *sock = (nr_socket_buffered_stun *)arg;
   int r,_status;
   nr_p_buf *n1, *n2;
+
+  if (sock->read_state == NR_ICE_SOCKET_READ_FAILED) {
+    ABORT(R_FAILED);
+  }
 
   /* Try to flush */
   STAILQ_FOREACH_SAFE(n1, &sock->pending_writes, entry, n2) {

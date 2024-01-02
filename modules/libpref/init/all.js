@@ -697,6 +697,7 @@ pref("gfx.color_management.enablev4", false);
 
 pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
+pref("gfx.downloadable_fonts.fallback_delay_short", 100);
 
 // disable downloadable font cache so that behavior is consistently
 // the uncached load behavior across pages (useful for testing reflow problems)
@@ -4915,8 +4916,10 @@ pref("dom.mozPermissionSettings.enabled", false);
 
 // W3C touch events
 // 0 - disabled, 1 - enabled, 2 - autodetect
-// Enabling it for Windows is tracked by bug 736048.
-#if defined(XP_WIN) || defined(XP_MACOSX)
+// Autodetection is currently only supported on Windows and GTK3
+#if defined(XP_MACOSX)
+pref("dom.w3c_touch_events.enabled", 0);
+#elif defined(XP_WIN) && !defined(NIGHTLY_BUILD)
 pref("dom.w3c_touch_events.enabled", 0);
 #else
 pref("dom.w3c_touch_events.enabled", 2);
@@ -5053,6 +5056,11 @@ pref("dom.vr.oculus050.enabled", true);
 pref("dom.vr.cardboard.enabled", false);
 // 0 = never; 1 = only if real devices aren't there; 2 = always
 pref("dom.vr.add-test-devices", 1);
+// Pose prediction reduces latency effects by returning future predicted HMD
+// poses to callers of the WebVR API.  This currently only has an effect for
+// Oculus Rift on SDK 0.8 or greater.  It is disabled by default for now due to
+// frame uniformity issues with e10s.
+pref("dom.vr.poseprediction.enabled", false);
 // true = show the VR textures in our compositing output; false = don't.
 // true might have performance impact
 pref("gfx.vr.mirror-textures", false);

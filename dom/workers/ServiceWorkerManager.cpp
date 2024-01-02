@@ -501,9 +501,7 @@ ServiceWorkerRegistrationInfo::GetWorkerByID(uint64_t aID, nsIServiceWorkerInfo 
   MOZ_ASSERT(aResult);
 
   RefPtr<ServiceWorkerInfo> info = GetServiceWorkerInfoById(aID);
-  if (NS_WARN_IF(!info)) {
-    return NS_ERROR_FAILURE;
-  }
+  // It is ok to return null for a missing service worker info.
   info.forget(aResult);
   return NS_OK;
 }
@@ -3451,14 +3449,14 @@ public:
 
 } // anonymous namespace
 
-already_AddRefed<nsIRunnable>
-ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOriginAttributes,
-                                        nsIDocument* aDoc,
-                                        const nsAString& aDocumentIdForTopLevelNavigation,
-                                        nsIInterceptedChannel* aChannel,
-                                        bool aIsReload,
-                                        bool aIsSubresourceLoad,
-                                        ErrorResult& aRv)
+void
+ServiceWorkerManager::DispatchFetchEvent(const PrincipalOriginAttributes& aOriginAttributes,
+                                         nsIDocument* aDoc,
+                                         const nsAString& aDocumentIdForTopLevelNavigation,
+                                         nsIInterceptedChannel* aChannel,
+                                         bool aIsReload,
+                                         bool aIsSubresourceLoad,
+                                         ErrorResult& aRv)
 {
   MOZ_ASSERT(aChannel);
   AssertIsOnMainThread();
@@ -3473,13 +3471,13 @@ ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOrigin
     loadGroup = aDoc->GetDocumentLoadGroup();
     nsresult rv = aDoc->GetOrCreateId(documentId);
     if (NS_WARN_IF(NS_FAILED(rv))) {
-      return nullptr;
+      return;
     }
   } else {
     nsCOMPtr<nsIChannel> internalChannel;
     aRv = aChannel->GetChannel(getter_AddRefs(internalChannel));
     if (NS_WARN_IF(aRv.Failed())) {
-      return nullptr;
+      return;
     }
 
     internalChannel->GetLoadGroup(getter_AddRefs(loadGroup));
@@ -3489,7 +3487,7 @@ ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOrigin
     nsCOMPtr<nsIURI> uri;
     aRv = aChannel->GetSecureUpgradedChannelURI(getter_AddRefs(uri));
     if (NS_WARN_IF(aRv.Failed())) {
-      return nullptr;
+      return;
     }
 
     RefPtr<ServiceWorkerRegistrationInfo> registration =
@@ -3497,7 +3495,7 @@ ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOrigin
     if (!registration) {
       NS_WARNING("No registration found when dispatching the fetch event");
       aRv.Throw(NS_ERROR_FAILURE);
-      return nullptr;
+      return;
     }
 
     // This should only happen if IsAvailable() returned true.
@@ -3508,25 +3506,13 @@ ServiceWorkerManager::PrepareFetchEvent(const PrincipalOriginAttributes& aOrigin
   }
 
   if (NS_WARN_IF(aRv.Failed()) || !serviceWorker) {
-    return nullptr;
+    return;
   }
 
   nsCOMPtr<nsIRunnable> continueRunnable =
     new ContinueDispatchFetchEventRunnable(serviceWorker->WorkerPrivate(),
                                            aChannel, loadGroup,
                                            documentId, aIsReload);
-
-  return continueRunnable.forget();
-}
-
-void
-ServiceWorkerManager::DispatchPreparedFetchEvent(nsIInterceptedChannel* aChannel,
-                                                 nsIRunnable* aPreparedRunnable,
-                                                 ErrorResult& aRv)
-{
-  MOZ_ASSERT(aChannel);
-  MOZ_ASSERT(aPreparedRunnable);
-  AssertIsOnMainThread();
 
   nsCOMPtr<nsIChannel> innerChannel;
   aRv = aChannel->GetChannel(getter_AddRefs(innerChannel));
@@ -3538,12 +3524,12 @@ ServiceWorkerManager::DispatchPreparedFetchEvent(nsIInterceptedChannel* aChannel
 
   // If there is no upload stream, then continue immediately
   if (!uploadChannel) {
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(aPreparedRunnable->Run()));
+    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(continueRunnable->Run()));
     return;
   }
   // Otherwise, ensure the upload stream can be cloned directly.  This may
   // require some async copying, so provide a callback.
-  aRv = uploadChannel->EnsureUploadStreamIsCloneable(aPreparedRunnable);
+  aRv = uploadChannel->EnsureUploadStreamIsCloneable(continueRunnable);
 }
 
 bool

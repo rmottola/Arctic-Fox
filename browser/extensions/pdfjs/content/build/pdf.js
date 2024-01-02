@@ -28,8 +28,8 @@ factory((root.pdfjsDistBuildPdf = {}));
   // Use strict in our context only - users might not want it
   'use strict';
 
-var pdfjsVersion = '1.3.161';
-var pdfjsBuild = '4a215f0';
+var pdfjsVersion = '1.4.83';
+var pdfjsBuild = '0629fd0';
 
   var pdfjsFilePath =
     typeof document !== 'undefined' && document.currentScript ?
@@ -94,7 +94,7 @@ var CustomStyle = (function CustomStyleClosure() {
   // in some versions of IE9 it is critical that ms appear in this list
   // before Moz
   var prefixes = ['ms', 'Moz', 'Webkit', 'O'];
-  var _cache = {};
+  var _cache = Object.create(null);
 
   function CustomStyle() {}
 
@@ -369,9 +369,9 @@ function warn(msg) {
   }
 }
 
-// Deprecated API function -- treated as warnings.
+// Deprecated API function -- display regardless of the PDFJS.verbosity setting.
 function deprecated(details) {
-  warn('Deprecated API usage: ' + details);
+  console.log('Deprecated API usage: ' + details);
 }
 
 // Fatal errors that should trigger the fallback UI and halt execution by
@@ -413,29 +413,22 @@ function combineUrl(baseUrl, url) {
   if (!url) {
     return baseUrl;
   }
-  if (/^[a-z][a-z0-9+\-.]*:/i.test(url)) {
-    return url;
-  }
-  var i;
-  if (url.charAt(0) === '/') {
-    // absolute path
-    i = baseUrl.indexOf('://');
-    if (url.charAt(1) === '/') {
-      ++i;
-    } else {
-      i = baseUrl.indexOf('/', i + 3);
+  return new URL(url, baseUrl).href;
+}
+
+// Checks if URLs have the same origin. For non-HTTP based URLs, returns false.
+function isSameOrigin(baseUrl, otherUrl) {
+  try {
+    var base = new URL(baseUrl);
+    if (!base.origin || base.origin === 'null') {
+      return false; // non-HTTP url
     }
-    return baseUrl.substring(0, i) + url;
-  } else {
-    // relative path
-    var pathLength = baseUrl.length;
-    i = baseUrl.lastIndexOf('#');
-    pathLength = i >= 0 ? i : pathLength;
-    i = baseUrl.lastIndexOf('?', pathLength);
-    pathLength = i >= 0 ? i : pathLength;
-    var prefixLength = baseUrl.lastIndexOf('/', pathLength);
-    return baseUrl.substring(0, prefixLength + 1) + url;
+  } catch (e) {
+    return false;
   }
+
+  var other = new URL(otherUrl, base);
+  return base.origin === other.origin;
 }
 
 // Validates if URL is safe and allowed, e.g. to avoid XSS.
@@ -463,6 +456,26 @@ function isValidUrl(url, allowRelative) {
 }
 PDFJS.isValidUrl = isValidUrl;
 
+/**
+ * Adds various attributes (href, title, target, rel) to hyperlinks.
+ * @param {HTMLLinkElement} link - The link element.
+ * @param {Object} params - An object with the properties:
+ * @param {string} params.url - An absolute URL.
+ */
+function addLinkAttributes(link, params) {
+  var url = params && params.url;
+  link.href = link.title = (url ? removeNullCharacters(url) : '');
+
+  if (url) {
+    if (isExternalLinkTargetSet()) {
+      link.target = LinkTargetStringMap[PDFJS.externalLinkTarget];
+    }
+    // Strip referrer from the URL.
+    link.rel = PDFJS.externalLinkRel;
+  }
+}
+PDFJS.addLinkAttributes = addLinkAttributes;
+
 function shadow(obj, prop, value) {
   Object.defineProperty(obj, prop, { value: value,
                                      enumerable: true,
@@ -471,6 +484,18 @@ function shadow(obj, prop, value) {
   return value;
 }
 PDFJS.shadow = shadow;
+
+function getLookupTableFactory(initializer) {
+  var lookup;
+  return function () {
+    if (initializer) {
+      lookup = Object.create(null);
+      initializer(lookup);
+      initializer = null;
+    }
+    return lookup;
+  };
+}
 
 var LinkTarget = PDFJS.LinkTarget = {
   NONE: 0, // Default value.
@@ -862,6 +887,42 @@ var Util = PDFJS.Util = (function UtilClosure() {
     return num < 0 ? -1 : 1;
   };
 
+  var ROMAN_NUMBER_MAP = [
+    '', 'C', 'CC', 'CCC', 'CD', 'D', 'DC', 'DCC', 'DCCC', 'CM',
+    '', 'X', 'XX', 'XXX', 'XL', 'L', 'LX', 'LXX', 'LXXX', 'XC',
+    '', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'
+  ];
+  /**
+   * Converts positive integers to (upper case) Roman numerals.
+   * @param {integer} number - The number that should be converted.
+   * @param {boolean} lowerCase - Indicates if the result should be converted
+   *   to lower case letters. The default is false.
+   * @return {string} The resulting Roman number.
+   */
+  Util.toRoman = function Util_toRoman(number, lowerCase) {
+    assert(isInt(number) && number > 0,
+           'The number should be a positive integer.');
+    var pos, romanBuf = [];
+    // Thousands
+    while (number >= 1000) {
+      number -= 1000;
+      romanBuf.push('M');
+    }
+    // Hundreds
+    pos = (number / 100) | 0;
+    number %= 100;
+    romanBuf.push(ROMAN_NUMBER_MAP[pos]);
+    // Tens
+    pos = (number / 10) | 0;
+    number %= 10;
+    romanBuf.push(ROMAN_NUMBER_MAP[10 + pos]);
+    // Ones
+    romanBuf.push(ROMAN_NUMBER_MAP[20 + number]);
+
+    var romanStr = romanBuf.join('');
+    return (lowerCase ? romanStr.toLowerCase() : romanStr);
+  };
+
   Util.appendToArray = function Util_appendToArray(arr1, arr2) {
     Array.prototype.push.apply(arr1, arr2);
   };
@@ -1210,7 +1271,7 @@ var StatTimer = (function StatTimerClosure() {
     return str;
   }
   function StatTimer() {
-    this.started = {};
+    this.started = Object.create(null);
     this.times = [];
     this.enabled = true;
   }
@@ -1304,8 +1365,8 @@ function MessageHandler(sourceName, targetName, comObj) {
   this.comObj = comObj;
   this.callbackIndex = 1;
   this.postMessageTransfers = true;
-  var callbacksCapabilities = this.callbacksCapabilities = {};
-  var ah = this.actionHandler = {};
+  var callbacksCapabilities = this.callbacksCapabilities = Object.create(null);
+  var ah = this.actionHandler = Object.create(null);
 
   this._onComObjOnMessage = function messageHandlerComObjOnMessage(event) {
     var data = event.data;
@@ -1444,6 +1505,7 @@ function loadJpegStream(id, imageUrl, objs) {
   img.src = imageUrl;
 }
 
+
 exports.FONT_IDENTITY_MATRIX = FONT_IDENTITY_MATRIX;
 exports.IDENTITY_MATRIX = IDENTITY_MATRIX;
 exports.OPS = OPS;
@@ -1475,6 +1537,7 @@ exports.combineUrl = combineUrl;
 exports.createPromiseCapability = createPromiseCapability;
 exports.deprecated = deprecated;
 exports.error = error;
+exports.getLookupTableFactory = getLookupTableFactory;
 exports.info = info;
 exports.isArray = isArray;
 exports.isArrayBuffer = isArrayBuffer;
@@ -1484,7 +1547,9 @@ exports.isExternalLinkTargetSet = isExternalLinkTargetSet;
 exports.isInt = isInt;
 exports.isNum = isNum;
 exports.isString = isString;
+exports.isSameOrigin = isSameOrigin;
 exports.isValidUrl = isValidUrl;
+exports.addLinkAttributes = addLinkAttributes;
 exports.loadJpegStream = loadJpegStream;
 exports.log2 = log2;
 exports.readInt8 = readInt8;
@@ -1511,9 +1576,7 @@ exports.warn = warn;
 var AnnotationBorderStyleType = sharedUtil.AnnotationBorderStyleType;
 var AnnotationType = sharedUtil.AnnotationType;
 var Util = sharedUtil.Util;
-var isExternalLinkTargetSet = sharedUtil.isExternalLinkTargetSet;
-var LinkTargetStringMap = sharedUtil.LinkTargetStringMap;
-var removeNullCharacters = sharedUtil.removeNullCharacters;
+var addLinkAttributes = sharedUtil.addLinkAttributes;
 var warn = sharedUtil.warn;
 var CustomStyle = displayDOMUtils.CustomStyle;
 
@@ -1566,7 +1629,7 @@ AnnotationElementFactory.prototype =
         return new StrikeOutAnnotationElement(parameters);
 
       default:
-        throw new Error('Unimplemented annotation type "' + subtype + '"');
+        return new AnnotationElement(parameters);
     }
   }
 };
@@ -1576,14 +1639,17 @@ AnnotationElementFactory.prototype =
  * @alias AnnotationElement
  */
 var AnnotationElement = (function AnnotationElementClosure() {
-  function AnnotationElement(parameters) {
+  function AnnotationElement(parameters, isRenderable) {
+    this.isRenderable = isRenderable || false;
     this.data = parameters.data;
     this.layer = parameters.layer;
     this.page = parameters.page;
     this.viewport = parameters.viewport;
     this.linkService = parameters.linkService;
 
-    this.container = this._createContainer();
+    if (isRenderable) {
+      this.container = this._createContainer();
+    }
   }
 
   AnnotationElement.prototype = /** @lends AnnotationElement.prototype */ {
@@ -1698,7 +1764,7 @@ var AnnotationElement = (function AnnotationElementClosure() {
  */
 var LinkAnnotationElement = (function LinkAnnotationElementClosure() {
   function LinkAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    AnnotationElement.call(this, parameters, true);
   }
 
   Util.inherit(LinkAnnotationElement, AnnotationElement, {
@@ -1713,17 +1779,7 @@ var LinkAnnotationElement = (function LinkAnnotationElementClosure() {
       this.container.className = 'linkAnnotation';
 
       var link = document.createElement('a');
-      link.href = link.title = (this.data.url ?
-                                removeNullCharacters(this.data.url) : '');
-
-      if (this.data.url && isExternalLinkTargetSet()) {
-        link.target = LinkTargetStringMap[PDFJS.externalLinkTarget];
-      }
-
-      // Strip referrer from the URL.
-      if (this.data.url) {
-        link.rel = PDFJS.externalLinkRel;
-      }
+      addLinkAttributes(link, { url: this.data.url });
 
       if (!this.data.url) {
         if (this.data.action) {
@@ -1790,7 +1846,9 @@ var LinkAnnotationElement = (function LinkAnnotationElementClosure() {
  */
 var TextAnnotationElement = (function TextAnnotationElementClosure() {
   function TextAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    var isRenderable = !!(parameters.data.hasPopup ||
+                          parameters.data.title || parameters.data.contents);
+    AnnotationElement.call(this, parameters, isRenderable);
   }
 
   Util.inherit(TextAnnotationElement, AnnotationElement, {
@@ -1844,7 +1902,9 @@ var TextAnnotationElement = (function TextAnnotationElementClosure() {
  */
 var WidgetAnnotationElement = (function WidgetAnnotationElementClosure() {
   function WidgetAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    var isRenderable = !parameters.data.hasAppearance &&
+                       !!parameters.data.fieldValue;
+    AnnotationElement.call(this, parameters, isRenderable);
   }
 
   Util.inherit(WidgetAnnotationElement, AnnotationElement, {
@@ -1911,7 +1971,8 @@ var WidgetAnnotationElement = (function WidgetAnnotationElementClosure() {
  */
 var PopupAnnotationElement = (function PopupAnnotationElementClosure() {
   function PopupAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    var isRenderable = !!(parameters.data.title || parameters.data.contents);
+    AnnotationElement.call(this, parameters, isRenderable);
   }
 
   Util.inherit(PopupAnnotationElement, AnnotationElement, {
@@ -2101,7 +2162,7 @@ var PopupElement = (function PopupElementClosure() {
 var HighlightAnnotationElement = (
     function HighlightAnnotationElementClosure() {
   function HighlightAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    AnnotationElement.call(this, parameters, true);
   }
 
   Util.inherit(HighlightAnnotationElement, AnnotationElement, {
@@ -2128,7 +2189,7 @@ var HighlightAnnotationElement = (
 var UnderlineAnnotationElement = (
     function UnderlineAnnotationElementClosure() {
   function UnderlineAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    AnnotationElement.call(this, parameters, true);
   }
 
   Util.inherit(UnderlineAnnotationElement, AnnotationElement, {
@@ -2154,7 +2215,7 @@ var UnderlineAnnotationElement = (
  */
 var SquigglyAnnotationElement = (function SquigglyAnnotationElementClosure() {
   function SquigglyAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    AnnotationElement.call(this, parameters, true);
   }
 
   Util.inherit(SquigglyAnnotationElement, AnnotationElement, {
@@ -2181,7 +2242,7 @@ var SquigglyAnnotationElement = (function SquigglyAnnotationElementClosure() {
 var StrikeOutAnnotationElement = (
     function StrikeOutAnnotationElementClosure() {
   function StrikeOutAnnotationElement(parameters) {
-    AnnotationElement.call(this, parameters);
+    AnnotationElement.call(this, parameters, true);
   }
 
   Util.inherit(StrikeOutAnnotationElement, AnnotationElement, {
@@ -2228,7 +2289,7 @@ var AnnotationLayer = (function AnnotationLayerClosure() {
 
       for (var i = 0, ii = parameters.annotations.length; i < ii; i++) {
         var data = parameters.annotations[i];
-        if (!data || !data.hasHtml) {
+        if (!data) {
           continue;
         }
 
@@ -2240,7 +2301,9 @@ var AnnotationLayer = (function AnnotationLayerClosure() {
           linkService: parameters.linkService
         };
         var element = annotationElementFactory.create(properties);
-        parameters.div.appendChild(element.render());
+        if (element.isRenderable) {
+          parameters.div.appendChild(element.render());
+        }
       }
     },
 
@@ -2336,7 +2399,7 @@ FontLoader.prototype = {
 
 var FontFaceObject = (function FontFaceObjectClosure() {
   function FontFaceObject(translatedData) {
-    this.compiledGlyphs = {};
+    this.compiledGlyphs = Object.create(null);
     // importing translated data
     for (var i in translatedData) {
       this[i] = translatedData[i];
@@ -2472,7 +2535,7 @@ var Metadata = PDFJS.Metadata = (function MetadataClosure() {
     }
 
     this.metaDocument = meta;
-    this.metadata = {};
+    this.metadata = Object.create(null);
     this.parse();
   }
 
@@ -5011,6 +5074,12 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       ctx.transform.apply(ctx, current.textMatrix);
       ctx.translate(current.x, current.y + current.textRise);
 
+      if (current.patternFill) {
+        // TODO: Some shading patterns are not applied correctly to text,
+        //       e.g. issues 3988 and 5432, and ShowText-ShadingPattern.pdf.
+        ctx.fillStyle = current.fillColor.getPattern(ctx, this);
+      }
+
       if (fontDirection > 0) {
         ctx.scale(textHScale, -1);
       } else {
@@ -5839,6 +5908,7 @@ var error = sharedUtil.error;
 var deprecated = sharedUtil.deprecated;
 var info = sharedUtil.info;
 var isArrayBuffer = sharedUtil.isArrayBuffer;
+var isSameOrigin = sharedUtil.isSameOrigin;
 var loadJpegStream = sharedUtil.loadJpegStream;
 var stringToBytes = sharedUtil.stringToBytes;
 var warn = sharedUtil.warn;
@@ -6198,9 +6268,9 @@ PDFJS.getDocument = function getDocument(src,
         throw new Error('Loading aborted');
       }
       var messageHandler = new MessageHandler(docId, workerId, worker.port);
-      messageHandler.send('Ready', null);
       var transport = new WorkerTransport(messageHandler, task, rangeTransport);
       task._transport = transport;
+      messageHandler.send('Ready', null);
     });
   }).catch(task._capability.reject);
 
@@ -6476,6 +6546,14 @@ var PDFDocumentProxy = (function PDFDocumentProxyClosure() {
       return this.transport.getDestination(id);
     },
     /**
+     * @return {Promise} A promise that is resolved with:
+     *   an Array containing the pageLabels that correspond to the pageIndexes,
+     *   or `null` when no pageLabels are present in the PDF file.
+     */
+    getPageLabels: function PDFDocumentProxy_getPageLabels() {
+      return this.transport.getPageLabels();
+    },
+    /**
      * @return {Promise} A promise that is resolved with a lookup table for
      * mapping named attachments to their content.
      */
@@ -6497,8 +6575,9 @@ var PDFDocumentProxy = (function PDFDocumentProxyClosure() {
      *   title: string,
      *   bold: boolean,
      *   italic: boolean,
-     *   color: rgb array,
+     *   color: rgb Uint8Array,
      *   dest: dest obj,
+     *   url: string,
      *   items: array of more items like this
      *  },
      *  ...
@@ -6647,7 +6726,7 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
     this.objs = new PDFObjects();
     this.cleanupAfterRender = false;
     this.pendingCleanup = false;
-    this.intentStates = {};
+    this.intentStates = Object.create(null);
     this.destroyed = false;
   }
   PDFPageProxy.prototype = /** @lends PDFPageProxy.prototype */ {
@@ -6722,7 +6801,7 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
       var renderingIntent = (params.intent === 'print' ? 'print' : 'display');
 
       if (!this.intentStates[renderingIntent]) {
-        this.intentStates[renderingIntent] = {};
+        this.intentStates[renderingIntent] = Object.create(null);
       }
       var intentState = this.intentStates[renderingIntent];
 
@@ -6809,17 +6888,23 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
       function operatorListChanged() {
         if (intentState.operatorList.lastChunk) {
           intentState.opListReadCapability.resolve(intentState.operatorList);
+
+          var i = intentState.renderTasks.indexOf(opListTask);
+          if (i >= 0) {
+            intentState.renderTasks.splice(i, 1);
+          }
         }
       }
 
       var renderingIntent = 'oplist';
       if (!this.intentStates[renderingIntent]) {
-        this.intentStates[renderingIntent] = {};
+        this.intentStates[renderingIntent] = Object.create(null);
       }
       var intentState = this.intentStates[renderingIntent];
+      var opListTask;
 
       if (!intentState.opListReadCapability) {
-        var opListTask = {};
+        opListTask = {};
         opListTask.operatorListChanged = operatorListChanged;
         intentState.receivingOperatorList = true;
         intentState.opListReadCapability = createPromiseCapability();
@@ -6862,6 +6947,10 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
 
       var waitOn = [];
       Object.keys(this.intentStates).forEach(function(intent) {
+        if (intent === 'oplist') {
+          // Avoid errors below, since the renderTasks are just stubs.
+          return;
+        }
         var intentState = this.intentStates[intent];
         intentState.renderTasks.forEach(function(renderTask) {
           var renderCompleted = renderTask.capability.promise.
@@ -6989,6 +7078,14 @@ var PDFWorker = (function PDFWorkerClosure() {
     return PDFJS.fakeWorkerFilesLoadedCapability.promise;
   }
 
+  function createCDNWrapper(url) {
+    // We will rely on blob URL's property to specify origin.
+    // We want this function to fail in case if createObjectURL or Blob do not
+    // exist or fail for some reason -- our Worker creation will fail anyway.
+    var wrapper = 'importScripts(\'' + url + '\');';
+    return URL.createObjectURL(new Blob([wrapper]));
+  }
+
   function PDFWorker(name) {
     this.name = name;
     this.destroyed = false;
@@ -7015,7 +7112,7 @@ var PDFWorker = (function PDFWorkerClosure() {
 
     _initialize: function PDFWorker_initialize() {
       // If worker support isn't disabled explicit and the browser has worker
-      // support, create a new web worker and test if it/the browser fullfills
+      // support, create a new web worker and test if it/the browser fulfills
       // all requirements to run parts of pdf.js in a web worker.
       // Right now, the requirement is, that an Uint8Array is still an
       // Uint8Array as it arrives on the worker. (Chrome added this with v.15.)
@@ -7555,6 +7652,10 @@ var WorkerTransport = (function WorkerTransportClosure() {
       return this.messageHandler.sendWithPromise('GetDestination', { id: id });
     },
 
+    getPageLabels: function WorkerTransport_getPageLabels() {
+      return this.messageHandler.sendWithPromise('GetPageLabels', null);
+    },
+
     getAttachments: function WorkerTransport_getAttachments() {
       return this.messageHandler.sendWithPromise('GetAttachments', null);
     },
@@ -7608,7 +7709,7 @@ var WorkerTransport = (function WorkerTransportClosure() {
  */
 var PDFObjects = (function PDFObjectsClosure() {
   function PDFObjects() {
-    this.objs = {};
+    this.objs = Object.create(null);
   }
 
   PDFObjects.prototype = {
@@ -7699,7 +7800,7 @@ var PDFObjects = (function PDFObjectsClosure() {
     },
 
     clear: function PDFObjects_clear() {
-      this.objs = {};
+      this.objs = Object.create(null);
     }
   };
   return PDFObjects;

@@ -662,6 +662,8 @@ NotificationPermissionRequest::ResolvePromise()
     mCallback->Call(mPermission, error);
     rv = error.StealNSResult();
   }
+  Telemetry::Accumulate(
+    Telemetry::WEB_NOTIFICATION_REQUEST_PERMISSION_CALLBACK, !!mCallback);
   mPromise->MaybeResolve(mPermission);
   return rv;
 }
@@ -2698,7 +2700,12 @@ Notification::CreateAndShow(nsIGlobalObject* aGlobal,
   MOZ_ASSERT(aGlobal);
 
   AutoJSAPI jsapi;
-  jsapi.Init(aGlobal);
+  if (NS_WARN_IF(!jsapi.Init(aGlobal)))
+  {
+    aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
+    return nullptr;
+  }
+
   JSContext* cx = jsapi.cx();
 
   RefPtr<Notification> notification = CreateInternal(aGlobal, EmptyString(),

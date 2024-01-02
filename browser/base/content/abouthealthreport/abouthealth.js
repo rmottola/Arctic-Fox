@@ -11,6 +11,9 @@ Cu.import("resource://gre/modules/Services.jsm");
 
 const prefs = new Preferences("datareporting.healthreport.");
 
+const PREF_UNIFIED = "toolkit.telemetry.unified";
+const PREF_REPORTING_URL = "datareporting.healthreport.about.reportUrl";
+
 var healthReportWrapper = {
   init: function () {
     let iframe = document.getElementById("remote-report");
@@ -28,7 +31,7 @@ var healthReportWrapper = {
   },
 
   _getReportURI: function () {
-    let url = Services.urlFormatter.formatURLPref("datareporting.healthreport.about.reportUrl");
+    let url = Services.urlFormatter.formatURLPref(PREF_REPORTING_URL);
     return Services.io.newURI(url, null, null);
   },
 

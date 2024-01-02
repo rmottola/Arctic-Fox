@@ -11,6 +11,8 @@
 %aboutDTD;
 ]>
 
+<!-- import-globals-from extensions.js -->
+
 <bindings id="addonBindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
@@ -785,6 +787,14 @@
         ]]></body>
       </method>
 
+      <method name="isPending">
+        <parameter name="aAction"/>
+        <body><![CDATA[
+          var action = AddonManager["PENDING_" + aAction.toUpperCase()];
+          return !!(this.mAddon.pendingOperations & action);
+        ]]></body>
+      </method>
+
       <method name="typeHasFlag">
         <parameter name="aFlag"/>
         <body><![CDATA[
@@ -792,14 +802,6 @@
           let type = AddonManager.addonTypes[this.mAddon.type];
 
           return !!(type.flags & flag);
-        ]]></body>
-      </method>
-
-      <method name="isPending">
-        <parameter name="aAction"/>
-        <body><![CDATA[
-          var action = AddonManager["PENDING_" + aAction.toUpperCase()];
-          return !!(this.mAddon.pendingOperations & action);
         ]]></body>
       </method>
 
@@ -821,14 +823,14 @@
         <xul:image class="warning-icon"/>
         <xul:label anonid="warning" flex="1"/>
         <xul:label anonid="warning-link" class="text-link"/>
-        <xul:button anonid="warning-btn" class="button-link"/>
+        <xul:button anonid="warning-btn" class="button-link" hidden="true"/>
         <xul:spacer flex="5000"/> <!-- Necessary to allow the message to wrap -->
       </xul:hbox>
       <xul:hbox anonid="error-container"
                 class="error">
         <xul:image class="error-icon"/>
         <xul:label anonid="error" flex="1"/>
-        <xul:label anonid="error-link" class="text-link"/>
+        <xul:label anonid="error-link" class="text-link" hidden="true"/>
         <xul:spacer flex="5000"/> <!-- Necessary to allow the message to wrap -->
       </xul:hbox>
       <xul:hbox anonid="pending-container"

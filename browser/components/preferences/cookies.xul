@@ -85,22 +85,21 @@
             <hbox pack="end"><label id="expiresLabel" control="expires" value="&props.expires.label;"/></hbox>
             <textbox id="expires" readonly="true" class="plain"/>
           </row>
+          <row align="center" id="userContextRow">
+            <hbox pack="end"><label id="userContextLabel" control="userContext" value="&props.container.label;"/></hbox>
+            <textbox id="userContext" readonly="true" class="plain"/>
+          </row>
         </rows>
       </grid>
     </hbox>
   </vbox>
   <hbox align="end">
     <hbox class="actionButtons" flex="1">
-      <deck oncommand="gCookiesWindow.deleteCookie();">
-        <button id="removeCookie" disabled="true" icon="remove"
-                label="&button.removecookie.label;"
-                accesskey="&button.removecookie.accesskey;"/>
-        <button id="removeCookies" disabled="true" icon="remove"
-                label="&button.removecookies.label;"
-                accesskey="&button.removecookie.accesskey;"/>
-      </deck>
+      <button id="removeSelectedCookies" disabled="true" icon="clear"
+              accesskey="&button.removeSelectedCookies.accesskey;"
+              oncommand="gCookiesWindow.deleteCookie();"/>
       <button id="removeAllCookies" disabled="true" icon="clear"
-              label="&button.removeallcookies.label;" accesskey="&button.removeallcookies.accesskey;"
+              label="&button.removeAllCookies.label;" accesskey="&button.removeAllCookies.accesskey;"
               oncommand="gCookiesWindow.deleteAllCookies();"/>
       <spacer flex="1"/>
 #ifndef XP_MACOSX

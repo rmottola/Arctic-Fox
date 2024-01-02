@@ -4301,6 +4301,21 @@ BluetoothDBusService::StopLeScanInternal(
 }
 
 void
+BluetoothDBusService::StartAdvertisingInternal(
+  const BluetoothUuid& aAppUuid,
+  const BluetoothGattAdvertisingData& aAdvData,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::StopAdvertisingInternal(
+  const BluetoothUuid& aAppUuid,
+  BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
 BluetoothDBusService::ConnectGattClientInternal(
   const BluetoothUuid& aAppUuid, const BluetoothAddress& aDeviceAddress,
   BluetoothReplyRunnable* aRunnable)
@@ -4509,6 +4524,12 @@ BluetoothDBusService::ReplyToMapSendMessage(long aMasId,
 void
 BluetoothDBusService::ReplyToMapMessageUpdate(long aMasId, bool aStatus,
   BluetoothReplyRunnable* aRunnable)
+{
+}
+
+void
+BluetoothDBusService::GattServerRegisterInternal(
+  const BluetoothUuid& aAppUuid, BluetoothReplyRunnable* aRunnable)
 {
 }
 

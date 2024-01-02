@@ -280,7 +280,7 @@
   "GC_REASON_2": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "JS::gcreason::NUM_TELEMETRY_REASONS",
+    "n_values": 100,
     "description": "Reason (enum value) for initiating a GC"
   },
   "GC_IS_COMPARTMENTAL": {
@@ -407,13 +407,13 @@
   "GC_MINOR_REASON": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "JS::gcreason::NUM_TELEMETRY_REASONS",
+    "n_values": 100,
     "description": "Reason (enum value) for initiating a minor GC"
   },
   "GC_MINOR_REASON_LONG": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "JS::gcreason::NUM_TELEMETRY_REASONS",
+    "n_values": 100,
     "description": "Reason (enum value) that caused a long (>1ms) minor GC"
   },
   "GC_MINOR_US": {
@@ -502,6 +502,16 @@
     "kind": "exponential",
     "low": 32768,
     "high": 16777216,
+    "n_buckets": 100,
+    "description": "Total Memory Across All Processes (KB)"
+  },
+  "MEMORY_TOTAL": {
+    "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
+    "bug_numbers": [1198209],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": "32 * 1024",
+    "high": "16 * 1024 * 1024",
     "n_buckets": 100,
     "description": "Total Memory Across All Processes (KB)"
   },
@@ -3077,7 +3087,7 @@
   "STARTUP_MEASUREMENT_ERRORS": {
     "expires_in_version": "default",
     "kind": "enumerated",
-    "n_values": "mozilla::StartupTimeline::MAX_EVENT_ID",
+    "n_values": 16,
     "description": "Flags errors in startup calculation()"
   },
   "NETWORK_DISK_CACHE_OPEN": {
@@ -5898,9 +5908,36 @@
     "description": "The time (in milliseconds) that it took a 'reconfigure thread' request to go round trip."
   },
   "MEDIA_RUST_MP4PARSE_SUCCESS": {
+    "alert_emails": ["giles@mozilla.com", "kinetik@flim.org"],
     "expires_in_version": "50",
     "kind": "boolean",
+    "bug_numbers": [1220885],
     "description": "(Bug 1220885) Whether the rust mp4 demuxer successfully parsed a stream segment.",
+    "cpp_guard": "MOZ_RUST_MP4PARSE"
+  },
+  "MEDIA_RUST_MP4PARSE_ERROR_CODE": {
+    "alert_emails": ["giles@mozilla.com", "kinetik@flim.org"],
+    "expires_in_version": "50",
+    "kind": "enumerated",
+    "n_values": 32,
+    "bug_numbers": [1238420],
+    "description": "The error code reported when an MP4 parse attempt has failed.",
+    "cpp_guard": "MOZ_RUST_MP4PARSE"
+  },
+  "MEDIA_RUST_MP4PARSE_TRACK_MATCH_AUDIO": {
+    "alert_emails": ["giles@mozilla.com", "kinetik@flim.org"],
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "bug_numbers": [1231169],
+    "description": "Whether rust and stagefight mp4 parser audio track results match.",
+    "cpp_guard": "MOZ_RUST_MP4PARSE"
+  },
+  "MEDIA_RUST_MP4PARSE_TRACK_MATCH_VIDEO": {
+    "alert_emails": ["giles@mozilla.com", "kinetik@flim.org"],
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "bug_numbers": [1231169],
+    "description": "Whether rust and stagefight mp4 parser video track results match.",
     "cpp_guard": "MOZ_RUST_MP4PARSE"
   },
   "MEDIA_WMF_DECODE_ERROR": {
@@ -5908,6 +5945,13 @@
     "kind": "enumerated",
     "n_values": 256,
     "description": "WMF media decoder error or success (0) codes."
+  },
+  "MEDIA_OGG_LOADED_IS_CHAINED": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "53",
+    "kind": "boolean",
+    "description": "Whether Ogg audio/video encountered are chained or not.",
+    "bug_numbers": [1230295]
   },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
     "expires_in_version": "40",
@@ -9612,5 +9656,12 @@
     "bug_numbers": [1229961],
     "n_values": 12,
     "description": "Plugin drawing model. 0 when windowed, otherwise NPDrawingModel + 1."
+  },
+  "WEB_NOTIFICATION_REQUEST_PERMISSION_CALLBACK": {
+    "alert_emails": ["push@mozilla.com"],
+    "expires_in_version": "55",
+    "bug_numbers": [1241278],
+    "kind": "boolean",
+    "description": "Usage of the deprecated Notification.requestPermission() callback argument"
   }
 }
