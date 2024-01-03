@@ -107,6 +107,9 @@ static mozilla::LazyLogModule gMediaElementEventsLog("nsMediaElementEvents");
 
 #include "mozilla/EventStateManager.h"
 
+#include "mozilla/dom/HTMLVideoElement.h"
+#include "mozilla/dom/VideoPlaybackQuality.h"
+
 using namespace mozilla::layers;
 using mozilla::net::nsMediaFragmentURIParser;
 
