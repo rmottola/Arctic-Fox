@@ -412,6 +412,7 @@ protected:
   void OnAudioPopped(const RefPtr<MediaData>& aSample);
   void OnVideoPopped(const RefPtr<MediaData>& aSample);
 
+  void CheckIsAudible(const MediaData* aSample);
   void VolumeChanged();
   void LogicalPlaybackRateChanged();
   void PreservesPitchChanged();
@@ -1214,6 +1215,10 @@ private:
   // True if audio is offloading.
   // Playback will not start when audio is offloading.
   bool mAudioOffloading;
+
+  // Used to distiguish continuous silent audio data.
+  bool mIsAudioDataAudible;
+  uint32_t mSilentDataDuration;
 
 #ifdef MOZ_EME
   void OnCDMProxyReady(RefPtr<CDMProxy> aProxy);
