@@ -5674,7 +5674,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
   // ::before and ::after); we always want to create "internal" anonymous
   // content.
   auto* details = HTMLDetailsElement::FromContentOrNull(parent);
-  if (details && !details->Open() &&
+  if (details && details->IsDetailsEnabled() && !details->Open() &&
       (!aContent->IsRootOfNativeAnonymousSubtree() ||
        aContent->IsGeneratedContentContainerForBefore() ||
        aContent->IsGeneratedContentContainerForAfter())) {

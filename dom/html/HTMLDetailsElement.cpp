@@ -25,7 +25,7 @@ namespace mozilla {
 namespace dom {
 
 
-bool
+/* static */ bool
 HTMLDetailsElement::IsDetailsEnabled()
 {
   static bool isDetailsEnabled = false;
