@@ -8,19 +8,10 @@
 #include "mozilla/dom/HTMLDetailsElement.h"
 #include "mozilla/dom/HTMLElementBinding.h"
 #include "mozilla/dom/HTMLUnknownElement.h"
-#include "mozilla/dom/HTMLDetailsElementBinding.h"
-
-#include "nsIPresShell.h"
-#include "nsPresContext.h"
-#include "nsIDOMEvent.h"
-#include "mozilla/ContentEvents.h"
 #include "mozilla/EventDispatcher.h"
-#include "mozilla/EventStateManager.h"
-#include "mozilla/EventStates.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/TextEvents.h"
-#include "nsPresState.h"
 #include "nsFocusManager.h"
 
 // Expand NS_IMPL_NS_NEW_HTML_ELEMENT(Summary) to add pref check.
@@ -37,11 +28,6 @@ NS_NewHTMLSummaryElement(already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo,
 
 namespace mozilla {
 namespace dom {
-
-HTMLSummaryElement::HTMLSummaryElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo)
-  : nsGenericHTMLElement(aNodeInfo)
-{
-}
 
 HTMLSummaryElement::~HTMLSummaryElement()
 {

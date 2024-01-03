@@ -8,9 +8,8 @@
 
 #include "mozilla/Attributes.h"
 #include "nsGenericHTMLElement.h"
-  
+
 namespace mozilla {
-class EventChainPostVisitor;
 namespace dom {
 class HTMLDetailsElement;
 
@@ -21,11 +20,16 @@ class HTMLDetailsElement;
 class HTMLSummaryElement final : public nsGenericHTMLElement
 {
 public:
-  explicit HTMLSummaryElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
+  using NodeInfo = mozilla::dom::NodeInfo;
+
+  explicit HTMLSummaryElement(already_AddRefed<NodeInfo>& aNodeInfo)
+    : nsGenericHTMLElement(aNodeInfo)
+  {
+  }
 
   NS_IMPL_FROMCONTENT_HTML_WITH_TAG(HTMLSummaryElement, summary)
 
-  nsresult Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode** aResult) const override;
+  nsresult Clone(NodeInfo* aNodeInfo, nsINode** aResult) const override;
 
   nsresult PostHandleEvent(EventChainPostVisitor& aVisitor) override;
 
@@ -45,7 +49,8 @@ public:
 protected:
   virtual ~HTMLSummaryElement();
 
-  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapNode(JSContext* aCx,
+                     JS::Handle<JSObject*> aGivenProto) override;
 };
 
 } // namespace dom
