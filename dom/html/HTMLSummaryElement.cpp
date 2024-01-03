@@ -4,9 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/HTMLSummaryElement.h"
-#include "mozilla/dom/HTMLSummaryElementBinding.h"
 
 #include "mozilla/dom/HTMLDetailsElement.h"
+#include "mozilla/dom/HTMLElementBinding.h"
 #include "mozilla/dom/HTMLUnknownElement.h"
 #include "mozilla/dom/HTMLDetailsElementBinding.h"
 
@@ -172,7 +172,7 @@ HTMLSummaryElement::GetDetails() const
 JSObject*
 HTMLSummaryElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
-  return HTMLSummaryElementBinding::Wrap(aCx, this, aGivenProto);
+  return HTMLElementBinding::Wrap(aCx, this, aGivenProto);
 }
 
 } // namespace dom

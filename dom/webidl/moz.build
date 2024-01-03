@@ -241,7 +241,6 @@ WEBIDL_FILES = [
     'HTMLSourceElement.webidl',
     'HTMLSpanElement.webidl',
     'HTMLStyleElement.webidl',
-    'HTMLSummaryElement.webidl',
     'HTMLTableCaptionElement.webidl',
     'HTMLTableCellElement.webidl',
     'HTMLTableColElement.webidl',

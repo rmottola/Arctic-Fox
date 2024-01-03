@@ -24,11 +24,6 @@ NS_NewHTMLDetailsElement(already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo,
 namespace mozilla {
 namespace dom {
 
-HTMLDetailsElement::HTMLDetailsElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo)
-  : nsGenericHTMLElement(aNodeInfo)
-{
-}
-
 
 bool
 HTMLDetailsElement::IsDetailsEnabled()
