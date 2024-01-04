@@ -1289,19 +1289,21 @@ Geolocation::Init(nsPIDOMWindowInner* aContentDom)
     nsresult rv = mPrincipal->GetURI(getter_AddRefs(uri));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    bool isHttp;
-    rv = uri->SchemeIs("http", &isHttp);
-    NS_ENSURE_SUCCESS(rv, rv);
+    if (uri) {
+      bool isHttp;
+      rv = uri->SchemeIs("http", &isHttp);
+      NS_ENSURE_SUCCESS(rv, rv);
 
-    bool isHttps;
-    rv = uri->SchemeIs("https", &isHttps);
-    NS_ENSURE_SUCCESS(rv, rv);
+      bool isHttps;
+      rv = uri->SchemeIs("https", &isHttps);
+      NS_ENSURE_SUCCESS(rv, rv);
 
-    // Store the protocol to send via telemetry later.
-    if (isHttp) {
-      mProtocolType = ProtocolType::HTTP;
-    } else if (isHttps) {
-      mProtocolType = ProtocolType::HTTPS;
+      // Store the protocol to send via telemetry later.
+      if (isHttp) {
+        mProtocolType = ProtocolType::HTTP;
+      } else if (isHttps) {
+        mProtocolType = ProtocolType::HTTPS;
+      }
     }
   }
 
