@@ -172,7 +172,7 @@ HTMLMetaElement::CreateAndDispatchEvent(nsIDocument* aDoc,
 
   RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(this, aEventName, true, true);
-  asyncDispatcher->PostDOMEvent();
+  asyncDispatcher->RunDOMEventWhenSafe();
 }
 
 JSObject*
