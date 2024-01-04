@@ -416,7 +416,7 @@ ImageDocument::RestoreImage()
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::width, true);
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::height, true);
   
-  if (mImageIsOverflowing) {
+  if (ImageIsOverflowing()) {
     SetModeClass(eOverflowing);
   }
   else {
@@ -444,7 +444,7 @@ ImageDocument::ToggleImageSize()
     ResetZoomLevel();
     RestoreImage();
   }
-  else if (mImageIsOverflowing) {
+  else if (ImageIsOverflowing()) {
     ResetZoomLevel();
     ShrinkToFit();
   }
@@ -582,7 +582,7 @@ ImageDocument::HandleEvent(nsIDOMEvent* aEvent)
       mShouldResize = false;
       RestoreImageTo(x, y);
     }
-    else if (mImageIsOverflowing) {
+    else if (ImageIsOverflowing()) {
       ShrinkToFit();
     }
   } else if (eventType.EqualsLiteral("load")) {
@@ -698,14 +698,14 @@ ImageDocument::CheckOverflowing(bool changeState)
     mVisibleHeight = nsPresContext::AppUnitsToFloatCSSPixels(visibleArea.height);
   }
 
-  bool imageWasOverflowing = mImageIsOverflowing;
-  mImageIsOverflowing =
-    mImageWidth > mVisibleWidth || mImageHeight > mVisibleHeight;
-  bool windowBecameBigEnough = imageWasOverflowing && !mImageIsOverflowing;
+  bool imageWasOverflowing = ImageIsOverflowing();
+  mImageIsOverflowingHorizontally = mImageWidth > mVisibleWidth;
+  mImageIsOverflowingVertically = mImageHeight > mVisibleHeight;
+  bool windowBecameBigEnough = imageWasOverflowing && !ImageIsOverflowing();
 
   if (changeState || mShouldResize || mFirstResize ||
       windowBecameBigEnough) {
-    if (mImageIsOverflowing && (changeState || mShouldResize)) {
+    if (ImageIsOverflowing() && (changeState || mShouldResize)) {
       ShrinkToFit();
     }
     else if (mImageIsResized || mFirstResize || windowBecameBigEnough) {
