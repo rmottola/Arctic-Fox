@@ -9,6 +9,10 @@ SOURCES += [
     'WindowsLocationProvider.cpp'
 ]
 
+LOCAL_INCLUDES += [
+    '/dom/geolocation'
+]
+
 FINAL_LIBRARY = 'xul'
 
 if CONFIG['GNU_CXX']:
