@@ -5592,9 +5592,7 @@ int32_t
 nsGlobalWindow::GetScrollMinX(ErrorResult& aError)
 {
   MOZ_ASSERT(IsInnerWindow());
-  int32_t scrollMinX = 0;
-  FORWARD_TO_OUTER_OR_THROW(GetScrollBoundaryOuter, (eSideLeft), aError, scrollMinX);
-  return scrollMinX;
+  FORWARD_TO_OUTER_OR_THROW(GetScrollBoundaryOuter, (eSideLeft), aError, 0);
 }
 
 int32_t
