@@ -10622,7 +10622,7 @@ nsDocument::SetImagesNeedAnimating(bool aAnimating)
 }
 
 already_AddRefed<Touch>
-nsIDocument::CreateTouch(nsIDOMWindow* aView,
+nsIDocument::CreateTouch(nsGlobalWindow* aView,
                          EventTarget* aTarget,
                          int32_t aIdentifier,
                          int32_t aPageX, int32_t aPageY,
@@ -10632,6 +10632,7 @@ nsIDocument::CreateTouch(nsIDOMWindow* aView,
                          float aRotationAngle,
                          float aForce)
 {
+  MOZ_ASSERT(aView->IsInnerWindow());
   RefPtr<Touch> touch = new Touch(aTarget,
                                   aIdentifier,
                                   aPageX, aPageY,
