@@ -544,7 +544,7 @@ FT2FontEntry::GetFontTable(uint32_t aTableTag)
         FTUserFontData *userFontData = static_cast<FTUserFontData*>(
             cairo_font_face_get_user_data(mFontFace, &sFTUserFontDataKey));
         if (userFontData && userFontData->FontData()) {
-			return gfxFontUtils::GetTableFromFontData(userFontData->FontData(), aTableTag);
+            return GetTableFromFontData(userFontData->FontData(), aTableTag);
         }
     }
 
@@ -1203,6 +1203,22 @@ gfxFT2FontList::FindFonts()
          Preferences::GetBool("gfx.bundled_fonts.enabled")) ||
         Preferences::GetBool("gfx.bundled_fonts.force-enabled")) {
         FindFontsInOmnijar(&fnc);
+    }
+
+    // Look for downloaded fonts in a profile-agnostic "fonts" directory.
+    nsCOMPtr<nsIProperties> dirSvc =
+      do_GetService(NS_DIRECTORY_SERVICE_CONTRACTID);
+    if (dirSvc) {
+        nsCOMPtr<nsIFile> appDir;
+        nsresult rv = dirSvc->Get(NS_XPCOM_CURRENT_PROCESS_DIR,
+                         NS_GET_IID(nsIFile), getter_AddRefs(appDir));
+        if (NS_SUCCEEDED(rv)) {
+            appDir->AppendNative(NS_LITERAL_CSTRING("fonts"));
+            nsCString localPath;
+            if (NS_SUCCEEDED(appDir->GetNativePath(localPath))) {
+                FindFontsInDir(localPath, &fnc, FT2FontFamily::kVisible);
+            }
+        }
     }
 
     // look for locally-added fonts in a "fonts" subdir of the profile
