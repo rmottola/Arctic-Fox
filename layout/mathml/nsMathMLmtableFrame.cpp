@@ -1191,7 +1191,7 @@ nsMathMLmtdFrame::GetColSpan()
     if (!value.IsEmpty()) {
       nsresult error;
       colspan = value.ToInteger(&error);
-      if (NS_FAILED(error) || colspan < 0 || colspan > MAX_COLSPAN)
+      if (NS_FAILED(error) || colspan <= 0 || colspan > MAX_COLSPAN)
         colspan = 1;
     }
   }

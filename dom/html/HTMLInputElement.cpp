@@ -400,8 +400,8 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
     while (NS_SUCCEEDED(iter->HasMoreElements(&hasMore)) && hasMore) {
       iter->GetNext(getter_AddRefs(tmp));
       nsCOMPtr<nsIDOMBlob> domBlob = do_QueryInterface(tmp);
-      NS_WARN_IF_FALSE(domBlob,
-                       "Null file object from FilePicker's file enumerator?");
+      MOZ_ASSERT(domBlob,
+                 "Null file object from FilePicker's file enumerator?");
       if (domBlob) {
         newFiles.AppendElement(static_cast<File*>(domBlob.get()));
       }
@@ -2496,6 +2496,11 @@ FileList*
 HTMLInputElement::GetFiles()
 {
   if (mType != NS_FORM_INPUT_FILE) {
+    return nullptr;
+  }
+
+  if (Preferences::GetBool("dom.input.dirpicker", false) &&
+      HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
     return nullptr;
   }
 
@@ -4872,6 +4877,11 @@ HTMLInputElement::ChooseDirectory(ErrorResult& aRv)
 already_AddRefed<Promise>
 HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
 {
+  if (mType != NS_FORM_INPUT_FILE) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
+
   if (mFilesAndDirectoriesPromise) {
     return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
   }

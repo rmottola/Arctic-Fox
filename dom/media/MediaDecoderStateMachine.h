@@ -170,13 +170,6 @@ public:
 
   RefPtr<ShutdownPromise> BeginShutdown();
 
-  void DispatchStartBuffering()
-  {
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(this, &MediaDecoderStateMachine::StartBuffering);
-    OwnerThread()->Dispatch(runnable.forget());
-  }
-
   // Notifies the state machine that should minimize the number of samples
   // decoded we preroll, until playback starts. The first time playback starts
   // the state machine is free to return to prerolling normally. Note
@@ -412,6 +405,7 @@ protected:
   void OnAudioPopped(const RefPtr<MediaData>& aSample);
   void OnVideoPopped(const RefPtr<MediaData>& aSample);
 
+  void CheckIsAudible(const MediaData* aSample);
   void VolumeChanged();
   void LogicalPlaybackRateChanged();
   void PreservesPitchChanged();
@@ -1215,6 +1209,9 @@ private:
   // Playback will not start when audio is offloading.
   bool mAudioOffloading;
 
+  // Duration of the continuous silent data.
+  uint32_t mSilentDataDuration;
+
 #ifdef MOZ_EME
   void OnCDMProxyReady(RefPtr<CDMProxy> aProxy);
   void OnCDMProxyNotReady();
@@ -1283,6 +1280,9 @@ private:
   // Current playback position in the stream in bytes.
   Canonical<int64_t> mPlaybackOffset;
 
+  // Used to distiguish whether the audio is producing sound.
+  Canonical<bool> mIsAudioDataAudible;
+
 public:
   AbstractCanonical<media::TimeIntervals>* CanonicalBuffered() {
     return mReader->CanonicalBuffered();
@@ -1301,6 +1301,9 @@ public:
   }
   AbstractCanonical<int64_t>* CanonicalPlaybackOffset() {
     return &mPlaybackOffset;
+  }
+  AbstractCanonical<bool>* CanonicalIsAudioDataAudible() {
+    return &mIsAudioDataAudible;
   }
 };
 

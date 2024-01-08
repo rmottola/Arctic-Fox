@@ -6,17 +6,11 @@
 #ifndef mozilla_dom_HTMLDetailsElement_h
 #define mozilla_dom_HTMLDetailsElement_h
 
-#include "nsIAtom.h"
-#include "nsGkAtoms.h"
-#include "nsIContent.h"
-
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/Attributes.h"
 #include "nsGenericHTMLElement.h"
 
 namespace mozilla {
-class EventChainPostVisitor;
-class ErrorResult;
 namespace dom {
 
 // HTMLDetailsElement implements the <details> tag, which is used as a
@@ -27,25 +21,29 @@ namespace dom {
 class HTMLDetailsElement final : public nsGenericHTMLElement
 {
 public:
-  explicit HTMLDetailsElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
+  using NodeInfo = mozilla::dom::NodeInfo;
+
+  static bool IsDetailsEnabled();
+
+  explicit HTMLDetailsElement(already_AddRefed<NodeInfo>& aNodeInfo)
+    : nsGenericHTMLElement(aNodeInfo)
+  {
+  }
 
   NS_IMPL_FROMCONTENT_HTML_WITH_TAG(HTMLDetailsElement, details)
 
   nsIContent* GetFirstSummary() const;
 
-  nsresult Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode** aResult) const override;
+  nsresult Clone(NodeInfo* aNodeInfo, nsINode** aResult) const override;
 
   nsChangeHint GetAttributeChangeHint(const nsIAtom* aAttribute,
                                       int32_t aModType) const override;
 
   nsresult BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                         nsAttrValueOrString* aValue,
-                         bool aNotify) override;
+                         nsAttrValueOrString* aValue, bool aNotify) override;
 
-  // WebIDL methods.
-  bool Open() const {
-    return GetBoolAttr(nsGkAtoms::open);
-  }
+  // HTMLDetailsElement WebIDL
+  bool Open() const { return GetBoolAttr(nsGkAtoms::open); }
 
   void SetOpen(bool aOpen, ErrorResult& aError)
   {
@@ -62,7 +60,8 @@ public:
 protected:
   virtual ~HTMLDetailsElement();
 
-  virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
+  JSObject* WrapNode(JSContext* aCx,
+                     JS::Handle<JSObject*> aGivenProto) override;
 
   class ToggleEventDispatcher final : public AsyncEventDispatcher
   {
