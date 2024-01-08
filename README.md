@@ -2,9 +2,9 @@
 
 Arctic Fox started as a forked and rebranded Pale Moon 27.9.4 and retains its _classic_ interface. Many fixes and enhancements have been imported from Firefox and TenFourFox.
 
-Arctic Fox aims to be a desktop oriented browser with phone support removed, or no longer updated in the tree. Android has been aaxed, iOS is lingering.
+Arctic Fox aims to be a desktop oriented browser with phone support removed, or no longer updated in the tree. Android has been axed, iOS is lingering.
 
-The goal is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.8, PowerPC's running Linux, Windows XP, etc.
+The goal is to implement specific security updates and bug fixes to keep this browser as up to date as possible for aging systems. Examples would be Mac OSX 10.6-10.11, PowerPC's running Linux, Windows XP, etc.
 
 Arctic Fox will build for Mac OS X 10.6 and up, Windows XP, i386/x86_64/PowerPC-BE, MIPS-el, ARM  on Linux, and more than likely any other Unix/BSD varient.
 Ideally, we'd like to get it working on PowerPC 10.5 as well.
@@ -14,6 +14,7 @@ Compared to PaleMoon 27 some major changes:
 * ARM support has been reinstantiated, including JIT!
 * MIPS support reinstantiated, too (less tested and only on Little Endian)
 * WebRTC has been reinstantiated
+* vast improvement in compiler support, up to gcc 13
 
 ## Build tips
 
@@ -31,19 +32,6 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
   * Now package it: ./mach package 
   * The built package will be in /obj_blah_blah/dist 
 
-
-* To Build On FreeBSD
-    * Up to 12.1 compilation fine with Clang and GCC.
-    * On 12.2 clang fails to build, GCC completes, but binary unstable and fails to package
-
-* To Build on OpenBSD
-    * latest clang tried (8.0) needs -O0 or it will generate a crashing binary (x86-64 only)
-    * x86 does not hang on sputnik javascript tests while on all other systems it does!
-    * add LDFLAGS="-Wl,-z,wxneeded" to relax memory checks
-    * add TAR=gtar
-
-* To Build on NetBSD
-    * every gcc version tested worked, system one being OK up to gcc8
 
 If you are under memory pressure, try:
 * use -g0 in your optimization flags (removes debug information, greatly reducing file sizes)
