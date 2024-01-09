@@ -19,12 +19,20 @@
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
+
 #ifdef MOZ_NUWA_PROCESS
 #include "ipc/Nuwa.h"
 #endif
 
 #ifdef XP_WIN
 #include <windows.h>
+#endif
+
+#if defined(MOZ_ENABLE_PROFILER_SPS) && defined(MOZ_PROFILING) && defined(XP_WIN)
+  #define REPORT_CHROME_HANGS
 #endif
 
 namespace mozilla {
