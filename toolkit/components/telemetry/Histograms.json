@@ -4101,6 +4101,15 @@
     "n_buckets": 20,
     "description": "Widget: Time it takes for the message before a UI message (ms)"
   },
+  "EVENTLOOP_UI_ACTIVITY_EXP_MS": {
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "bug_numbers": [1198196],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 50,
+    "description": "Widget: Time it takes for the message before a UI message (ms)"
+  },
   "FX_SESSION_RESTORE_STARTUP_INIT_SESSION_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
