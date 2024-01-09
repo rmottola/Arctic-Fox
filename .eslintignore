@@ -66,7 +66,6 @@ browser/base/content/newtab/**
 browser/components/customizableui/**
 browser/components/downloads/**
 browser/components/feeds/**
-browser/components/migration/**
 browser/components/*.js
 browser/components/pocket/**
 browser/components/preferences/**
