@@ -12,6 +12,7 @@
 #include "gfx2DGlue.h"
 #include "gfxUtils.h"
 #include "mozilla/gfx/2D.h"
+#include "GeckoProfiler.h"
 
 using namespace mozilla::gfx;
 
@@ -232,6 +233,7 @@ TextureSourceD3D9::DataToTexture(DeviceManagerD3D9* aDeviceManager,
                                  _D3DFORMAT aFormat,
                                  uint32_t aBPP)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
   RefPtr<IDirect3DSurface9> surface;
   D3DLOCKED_RECT lockedRect;
   RefPtr<IDirect3DTexture9> texture = InitTextures(aDeviceManager, aSize, aFormat,
@@ -327,6 +329,7 @@ DataTextureSourceD3D9::Update(gfx::DataSourceSurface* aSurface,
                               nsIntRegion* aDestRegion,
                               gfx::IntPoint* aSrcOffset)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
   // Right now we only support full surface update. If aDestRegion is provided,
   // It will be ignored. Incremental update with a source offset is only used
   // on Mac so it is not clear that we ever will need to support it for D3D.
@@ -641,6 +644,7 @@ DXGID3D9TextureData::Create(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
                             TextureFlags aFlags,
                             IDirect3DDevice9* aDevice)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
   MOZ_ASSERT(aFormat == gfx::SurfaceFormat::B8G8R8X8);
   if (aFormat != gfx::SurfaceFormat::B8G8R8X8) {
     return nullptr;
@@ -712,6 +716,7 @@ bool
 DataTextureSourceD3D9::UpdateFromTexture(IDirect3DTexture9* aTexture,
                                          const nsIntRegion* aRegion)
 {
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
   MOZ_ASSERT(aTexture);
 
   D3DSURFACE_DESC desc;
