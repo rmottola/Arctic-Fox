@@ -2175,11 +2175,9 @@ private:
 
       mJwk.mExt.Construct(mExtractable);
 
-      if (!mKeyUsages.IsEmpty()) {
-        mJwk.mKey_ops.Construct();
-        if (!mJwk.mKey_ops.Value().AppendElements(mKeyUsages, fallible)) {
-          return NS_ERROR_OUT_OF_MEMORY;
-        }
+      mJwk.mKey_ops.Construct();
+      if (!mJwk.mKey_ops.Value().AppendElements(mKeyUsages, fallible)) {
+        return NS_ERROR_OUT_OF_MEMORY;
       }
 
       return NS_OK;
