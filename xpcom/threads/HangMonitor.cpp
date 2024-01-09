@@ -19,6 +19,10 @@
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 
+#ifdef MOZ_NUWA_PROCESS
+#include "ipc/Nuwa.h"
+#endif
+
 #ifdef XP_WIN
 #include <windows.h>
 #endif
@@ -97,6 +101,15 @@ Crash()
 #ifdef XP_WIN
   if (::IsDebuggerPresent()) {
     return;
+  }
+#endif
+
+#ifdef MOZ_CRASHREPORTER
+  // If you change this, you must also deal with the threadsafety of AnnotateCrashReport in
+  // non-chrome processes!
+  if (GeckoProcessType_Default == XRE_GetProcessType()) {
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Hang"),
+                                       NS_LITERAL_CSTRING("1"));
   }
 #endif
 
@@ -318,6 +331,12 @@ ThreadMain(void*)
 {
   PR_SetCurrentThreadName("Hang Monitor");
 
+#ifdef MOZ_NUWA_PROCESS
+  if (IsNuwaProcess()) {
+    NuwaMarkCurrentThread(nullptr, nullptr);
+  }
+#endif
+
   MonitorAutoLock lock(*gMonitor);
 
   // In order to avoid issues with the hang monitor incorrectly triggering
@@ -398,10 +417,8 @@ ThreadMain(void*)
 void
 Startup()
 {
-  // The hang detector only runs in chrome processes. If you change this,
-  // you must also deal with the threadsafety of AnnotateCrashReport in
-  // non-chrome processes!
-  if (GeckoProcessType_Default != XRE_GetProcessType()) {
+  if (GeckoProcessType_Default != XRE_GetProcessType() &&
+      GeckoProcessType_Content != XRE_GetProcessType()) {
     return;
   }
 
@@ -435,7 +452,8 @@ Startup()
 void
 Shutdown()
 {
-  if (GeckoProcessType_Default != XRE_GetProcessType()) {
+  if (GeckoProcessType_Default != XRE_GetProcessType() &&
+      GeckoProcessType_Content != XRE_GetProcessType()) {
     return;
   }
 
