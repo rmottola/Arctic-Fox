@@ -123,18 +123,15 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
         return;
     }
 
-    if (!mBoundReadFramebuffer->ValidateAndInitAttachments("blitFramebuffer's READ_FRAMEBUFFER") ||
-        !mBoundDrawFramebuffer->ValidateAndInitAttachments("blitFramebuffer's DRAW_FRAMEBUFFER"))
-    {
-        return;
-    }
-
     GLsizei srcSamples;
     const webgl::FormatInfo* srcColorFormat = nullptr;
     const webgl::FormatInfo* srcDepthFormat = nullptr;
     const webgl::FormatInfo* srcStencilFormat = nullptr;
 
     if (mBoundReadFramebuffer) {
+        if (!mBoundReadFramebuffer->ValidateAndInitAttachments("blitFramebuffer's READ_FRAMEBUFFER"))
+            return;
+
         if (!GetFBInfoForBlit(mBoundReadFramebuffer, "READ_FRAMEBUFFER", &srcSamples,
                               &srcColorFormat, &srcDepthFormat, &srcStencilFormat))
         {
@@ -153,6 +150,9 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
     const webgl::FormatInfo* dstStencilFormat = nullptr;
 
     if (mBoundDrawFramebuffer) {
+        if (!mBoundDrawFramebuffer->ValidateAndInitAttachments("blitFramebuffer's DRAW_FRAMEBUFFER"))
+            return;
+
         if (!GetFBInfoForBlit(mBoundDrawFramebuffer, "DRAW_FRAMEBUFFER", &dstSamples,
                               &dstColorFormat, &dstDepthFormat, &dstStencilFormat))
         {
