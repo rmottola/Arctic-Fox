@@ -1155,6 +1155,8 @@ WebGLFramebuffer::GetAttachmentParameter(const char* funcName, JSContext* cx,
         attachPoint = GetAttachPoint(LOCAL_GL_DEPTH_ATTACHMENT);
     }
 
+    FinalizeAttachments();
+
     return attachPoint->GetParameter(funcName, mContext, cx, target, attachment, pname,
                                      out_error);
 }
