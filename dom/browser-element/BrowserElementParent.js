@@ -464,6 +464,7 @@ BrowserElementParent.prototype = {
     /* username and password */
     let detail = {
       host:     authDetail.host,
+      path:     authDetail.path,
       realm:    authDetail.realm,
       isProxy:  authDetail.isProxy
     };
