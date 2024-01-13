@@ -4,12 +4,26 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('*'):
+    BUG_COMPONENT = ('Toolkit', 'Download Manager')
+
+with Files('ApplicationReputation.*'):
+    BUG_COMPONENT = ('Core', 'DOM: Security')
+
+with Files('csd.pb.*'):
+    BUG_COMPONENT = ('Core', 'DOM: Security')
+
+with Files('generate_csd.sh'):
+    BUG_COMPONENT = ('Core', 'DOM: Security')
+
+with Files('nsIApplicationReputation.idl'):
+    BUG_COMPONENT = ('Core', 'DOM: Security')
+
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 
 if not CONFIG['MOZ_JSDOWNLOADS']:
     XPCSHELL_TESTS_MANIFESTS += ['test/schema_migration/xpcshell.ini']
     BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']
-    MOCHITEST_MANIFESTS += ['test/browser/mochitest.ini']
 
 XPIDL_SOURCES += [
     'nsIApplicationReputation.idl',
@@ -29,6 +43,12 @@ UNIFIED_SOURCES += [
 SOURCES += [
     'SQLFunctions.cpp',
 ]
+
+if CONFIG['MOZ_URL_CLASSIFIER']:
+    UNIFIED_SOURCES += [
+        'ApplicationReputation.cpp',
+        'csd.pb.cc'
+    ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     # Can't build unified because we need CreateEvent which some IPC code
