@@ -794,6 +794,10 @@ pref("gecko.handlerService.schemes.ircs.3.uriTemplate", "chrome://browser-region
 pref("gecko.handlerService.allowRegisterFromDifferentHost", false);
 
 #ifdef MOZ_SAFE_BROWSING
+pref("browser.safebrowsing.downloads.remote.block_dangerous",            true);
+pref("browser.safebrowsing.downloads.remote.block_dangerous_host",       true);
+pref("browser.safebrowsing.downloads.remote.block_potentially_unwanted", false);
+pref("browser.safebrowsing.downloads.remote.block_uncommon",             false);
 // Name of the about: page contributed by safebrowsing to handle display of error
 // pages on phishing/malware hits.  (bug 399233)
 pref("urlclassifier.alternate_error_page", "blocked");
