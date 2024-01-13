@@ -17,6 +17,9 @@ var path = require("path");
 var helpers = require("../helpers");
 
 const SCRIPTS = [
+  //"browser/base/content/nsContextMenu.js",
+  "toolkit/content/contentAreaUtils.js",
+  "browser/components/places/content/editBookmarkOverlay.js",
   "toolkit/components/printing/content/printUtils.js",
   "toolkit/content/viewZoomOverlay.js",
   "browser/components/places/content/browserPlacesViews.js",
@@ -46,13 +49,14 @@ const SCRIPTS = [
   "browser/base/content/browser-thumbnails.js",
   "browser/base/content/browser-trackingprotection.js",
   "browser/base/content/browser-data-submission-info-bar.js",
-  "browser/base/content/browser-fxaccounts.js",
+  "browser/base/content/browser-fxaccounts.js"
 ];
 
 module.exports = function(context) {
   return {
     Program: function(node) {
-      if (!helpers.getIsBrowserMochitest(this)) {
+      if (!helpers.getIsBrowserMochitest(this) &&
+          !helpers.getIsHeadFile(this)) {
         return;
       }
 
