@@ -3482,7 +3482,8 @@ ServiceWorkerManager::DispatchFetchEvent(const PrincipalOriginAttributes& aOrigi
 
     internalChannel->GetLoadGroup(getter_AddRefs(loadGroup));
 
-    documentId = aDocumentIdForTopLevelNavigation;
+    // TODO: Use aDocumentIdForTopLevelNavigation for potentialClientId, pending
+    // the spec change.
 
     nsCOMPtr<nsIURI> uri;
     aRv = aChannel->GetSecureUpgradedChannelURI(getter_AddRefs(uri));
