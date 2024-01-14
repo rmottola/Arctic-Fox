@@ -1234,8 +1234,7 @@ private:
                   request->Redirect() == RequestRedirect::Manual);
 
     RootedDictionary<FetchEventInit> init(aCx);
-    init.mRequest.Construct();
-    init.mRequest.Value() = request;
+    init.mRequest = request;
     init.mBubbles = false;
     init.mCancelable = true;
     if (!mClientId.IsEmpty()) {
