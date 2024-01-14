@@ -338,6 +338,9 @@ int
 GonkCameraHardware::AutoFocus()
 {
   DOM_CAMERA_LOGI("%s\n", __func__);
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   return mCamera->autoFocus();
 }
 
@@ -345,6 +348,9 @@ int
 GonkCameraHardware::CancelAutoFocus()
 {
   DOM_CAMERA_LOGI("%s\n", __func__);
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   return mCamera->cancelAutoFocus();
 }
 
@@ -352,8 +358,11 @@ int
 GonkCameraHardware::StartFaceDetection()
 {
   DOM_CAMERA_LOGI("%s\n", __func__);
-  int rv = INVALID_OPERATION;
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
 
+  int rv = INVALID_OPERATION;
 #if ANDROID_VERSION >= 15
   rv = mCamera->sendCommand(CAMERA_CMD_START_FACE_DETECTION, CAMERA_FACE_DETECTION_HW, 0);
 #endif
@@ -368,8 +377,11 @@ int
 GonkCameraHardware::StopFaceDetection()
 {
   DOM_CAMERA_LOGI("%s\n", __func__);
-  int rv = INVALID_OPERATION;
+  if (mClosing) {
+    return DEAD_OBJECT;
+  }
 
+  int rv = INVALID_OPERATION;
 #if ANDROID_VERSION >= 15
   rv = mCamera->sendCommand(CAMERA_CMD_STOP_FACE_DETECTION, 0, 0);
 #endif
@@ -383,6 +395,9 @@ GonkCameraHardware::StopFaceDetection()
 int
 GonkCameraHardware::TakePicture()
 {
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   return mCamera->takePicture(CAMERA_MSG_SHUTTER | CAMERA_MSG_COMPRESSED_IMAGE);
 }
 
@@ -395,6 +410,9 @@ GonkCameraHardware::CancelTakePicture()
 int
 GonkCameraHardware::PushParameters(const GonkCameraParameters& aParams)
 {
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   const String8 s = aParams.Flatten();
   return mCamera->setParameters(s);
 }
@@ -402,6 +420,9 @@ GonkCameraHardware::PushParameters(const GonkCameraParameters& aParams)
 nsresult
 GonkCameraHardware::PullParameters(GonkCameraParameters& aParams)
 {
+  if (NS_WARN_IF(mClosing)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
   const String8 s = mCamera->getParameters();
   return aParams.Unflatten(s);
 }
@@ -410,6 +431,9 @@ GonkCameraHardware::PullParameters(GonkCameraParameters& aParams)
 int
 GonkCameraHardware::PushParameters(const CameraParameters& aParams)
 {
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   String8 s = aParams.flatten();
   return mCamera->setParameters(s);
 }
@@ -417,8 +441,10 @@ GonkCameraHardware::PushParameters(const CameraParameters& aParams)
 void
 GonkCameraHardware::PullParameters(CameraParameters& aParams)
 {
-  const String8 s = mCamera->getParameters();
-  aParams.unflatten(s);
+  if (!NS_WARN_IF(mClosing)) {
+    const String8 s = mCamera->getParameters();
+    aParams.unflatten(s);
+  }
 }
 #endif
 
@@ -426,6 +452,9 @@ int
 GonkCameraHardware::StartPreview()
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   return mCamera->startPreview();
 }
 
@@ -433,16 +462,20 @@ void
 GonkCameraHardware::StopPreview()
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
-  mCamera->stopPreview();
+  if (!mClosing) {
+    mCamera->stopPreview();
+  }
 }
 
 int
 GonkCameraHardware::StartRecording()
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
-  int rv = OK;
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
 
-  rv = mCamera->startRecording();
+  int rv = mCamera->startRecording();
   if (rv != OK) {
     DOM_CAMERA_LOGE("mHardware->startRecording() failed with status %d", rv);
   }
@@ -453,6 +486,9 @@ int
 GonkCameraHardware::StopRecording()
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
+  if (mClosing) {
+    return DEAD_OBJECT;
+  }
   mCamera->stopRecording();
   return OK;
 }
@@ -468,12 +504,17 @@ GonkCameraHardware::SetListener(const sp<GonkCameraListener>& aListener)
 void
 GonkCameraHardware::ReleaseRecordingFrame(const sp<IMemory>& aFrame)
 {
-  mCamera->releaseRecordingFrame(aFrame);
+  if (!NS_WARN_IF(mClosing)) {
+    mCamera->releaseRecordingFrame(aFrame);
+  }
 }
 #endif
 
 int
 GonkCameraHardware::StoreMetaDataInBuffers(bool aEnabled)
 {
+  if (NS_WARN_IF(mClosing)) {
+    return DEAD_OBJECT;
+  }
   return mCamera->storeMetaDataInBuffers(aEnabled);
 }
