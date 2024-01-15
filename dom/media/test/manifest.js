@@ -742,6 +742,19 @@ function removeNodeAndSource(n) {
   }
 }
 
+function once(target, name, cb) {
+  var p = new Promise(function(resolve, reject) {
+    target.addEventListener(name, function onceEvent() {
+      target.removeEventListener(name, onceEvent);
+      resolve();
+    });
+  });
+  if (cb) {
+    p.then(cb);
+  }
+  return p;
+}
+
 function TimeStamp(token) {
   function pad(x) {
     return (x < 10) ? "0" + x : x;
@@ -760,19 +773,6 @@ function TimeStamp(token) {
 
 function Log(token, msg) {
   info(TimeStamp(token) + " " + msg);
-}
-
-function once(target, name, cb) {
-  var p = new Promise(function(resolve, reject) {
-    target.addEventListener(name, function() {
-      target.removeEventListener(name, cb);
-      resolve();
-    });
-  });
-  if (cb) {
-    p.then(cb);
-  }
-  return p;
 }
 
 // Number of tests to run in parallel.
