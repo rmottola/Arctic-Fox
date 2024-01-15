@@ -950,17 +950,17 @@ function mediaTestCleanup(callback) {
     SpecialPowers.exactGC(window, cb);
 }
 
-// B2G emulator and Android 2.3 are condidered slow platforms
-function isSlowPlatform() {
-  return SpecialPowers.Services.appinfo.name == "B2G" || getAndroidVersion() == 10;
-}
-
 function setMediaTestsPrefs(callback, extraPrefs) {
   var prefs = gTestPrefs;
   if (extraPrefs) {
     prefs = prefs.concat(extraPrefs);
   }
   SpecialPowers.pushPrefEnv({"set": prefs}, callback);
+}
+
+// B2G emulator and Android 2.3 are condidered slow platforms
+function isSlowPlatform() {
+  return SpecialPowers.Services.appinfo.name == "B2G" || getAndroidVersion() == 10;
 }
 
 // Could be undefined in a page opened by the parent test page
