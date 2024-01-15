@@ -504,12 +504,26 @@ var gUnseekableTests = [
   { name:"no-cues.webm", type:"video/webm" },
   { name:"bogus.duh", type:"bogus/duh"}
 ];
-// Android supports fragmented MP4 playback from 4.3.
-var androidVersion = SpecialPowers.Cc['@mozilla.org/system-info;1']
-                                  .getService(SpecialPowers.Ci.nsIPropertyBag2)
-                                  .getProperty('version');
-// Fragmented MP4.
-if (manifestNavigator().userAgent.indexOf("Mobile") != -1 && androidVersion >= 18) {
+
+var androidVersion = -1; // non-Android platforms
+if (manifestNavigator().userAgent.indexOf("Mobile") != -1 ||
+    manifestNavigator().userAgent.indexOf("Tablet") != -1) {
+  // See nsSystemInfo.cpp, the getProperty('version') returns different value
+  // on each platforms, so we need to distinguish the android and B2G platform.
+  var versionString = manifestNavigator().userAgent.indexOf("Android") != -1 ?
+                      'version' : 'sdk_version';
+  androidVersion = SpecialPowers.Cc['@mozilla.org/system-info;1']
+                                .getService(SpecialPowers.Ci.nsIPropertyBag2)
+                                .getProperty(versionString);
+}
+
+function getAndroidVersion() {
+  return androidVersion;
+}
+
+//Android supports fragmented MP4 playback from 4.3.
+//Fragmented MP4.
+if (getAndroidVersion() >= 18) {
   gUnseekableTests = gUnseekableTests.concat([
     { name:"street.mp4", type:"video/mp4" }
   ]);
@@ -949,4 +963,8 @@ function setMediaTestsPrefs(callback, extraPrefs) {
   SpecialPowers.pushPrefEnv({"set": prefs}, callback);
 }
 
-SimpleTest.requestFlakyTimeout("untriaged");
+// Could be undefined in a page opened by the parent test page
+// like file_access_controls.html.
+if ("SimpleTest" in window) {
+  SimpleTest.requestFlakyTimeout("untriaged");
+}
