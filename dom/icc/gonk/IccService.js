@@ -37,7 +37,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gStkCmdFactory",
                                    "@mozilla.org/icc/stkcmdfactory;1",
                                    "nsIStkCmdFactory");
 
-let DEBUG = RIL.DEBUG_RIL;
+var DEBUG = RIL.DEBUG_RIL;
 function debug(s) {
   dump("IccService: " + s);
 }
@@ -86,17 +86,12 @@ function IccContact(aContact) {
   this._numbers = [];
   this._emails = [];
 
-  if (aContact.alphaId) {
-    this._names.push(aContact.alphaId);
-  }
-
-  if (aContact.number) {
-    this._numbers.push(aContact.number);
-  }
+  this._names.push(aContact.alphaId);
+  this._numbers.push(aContact.number);
 
   let anrLen = aContact.anr ? aContact.anr.length : 0;
   for (let i = 0; i < anrLen; i++) {
-    this._numbers.push(anr[i]);
+    this._numbers.push(aContact.anr[i]);
   }
 
   if (aContact.email) {
@@ -218,6 +213,11 @@ IccService.prototype = {
     }
 
     let icc = this.getIccByServiceId(aServiceId);
+
+    if (!icc.iccInfo || !icc.iccInfo.iccid) {
+      debug("Warning: got STK command when iccid is invalid.");
+      return;
+    }
 
     gIccMessenger.notifyStkProactiveCommand(icc.iccInfo.iccid, aStkcommand);
 
@@ -712,7 +712,7 @@ Icc.prototype = {
       if (length > 0) {
         iccContact.anr = [];
         for (let i = 0; i < length; i++) {
-          iccContact.anr.push(anrArray[i].value);
+          iccContact.anr.push(anrArray[i]);
         }
       }
     }

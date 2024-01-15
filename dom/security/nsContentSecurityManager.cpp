@@ -42,6 +42,11 @@ static bool SchemeIs(nsIURI* aURI, const char* aScheme)
 static nsresult
 DoCheckLoadURIChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
 {
+  // Bug 1228117: determine the correct security policy for DTD loads
+  if (aLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_DTD) {
+    return NS_OK;
+  }
+
   nsresult rv = NS_OK;
 
   nsCOMPtr<nsIPrincipal> loadingPrincipal = aLoadInfo->LoadingPrincipal();
@@ -138,8 +143,17 @@ DoContentSecurityChecks(nsIURI* aURI, nsILoadInfo* aLoadInfo)
       break;
     }
 
-    case nsIContentPolicy::TYPE_IMAGE:
-    case nsIContentPolicy::TYPE_STYLESHEET:
+    case nsIContentPolicy::TYPE_IMAGE: {
+      MOZ_ASSERT(false, "contentPolicyType not supported yet");
+      break;
+    }
+
+    case nsIContentPolicy::TYPE_STYLESHEET: {
+      mimeTypeGuess = NS_LITERAL_CSTRING("text/css");
+      requestingContext = aLoadInfo->LoadingNode();
+      break;
+    }
+
     case nsIContentPolicy::TYPE_OBJECT:
     case nsIContentPolicy::TYPE_DOCUMENT: {
       MOZ_ASSERT(false, "contentPolicyType not supported yet");
@@ -509,10 +523,18 @@ nsContentSecurityManager::IsURIPotentiallyTrustworthy(nsIURI* aURI, bool* aIsTru
   *aIsTrustWorthy = false;
   nsAutoCString scheme;
   nsresult rv = aURI->GetScheme(scheme);
-  NS_ENSURE_SUCCESS(rv, NS_OK);
+  if (NS_FAILED(rv)) {
+    return NS_OK;
+  }
 
+  // According to the specification, the user agent may choose to extend the
+  // trust to other, vendor-specific URL schemes. We use this for "resource:",
+  // which is technically a substituting protocol handler that is not limited to
+  // local resource mapping, but in practice is never mapped remotely as this
+  // would violate assumptions a lot of code makes.
   if (scheme.EqualsLiteral("https") ||
       scheme.EqualsLiteral("file") ||
+      scheme.EqualsLiteral("resource") ||
       scheme.EqualsLiteral("app") ||
       scheme.EqualsLiteral("wss")) {
     *aIsTrustWorthy = true;
@@ -521,7 +543,9 @@ nsContentSecurityManager::IsURIPotentiallyTrustworthy(nsIURI* aURI, bool* aIsTru
 
   nsAutoCString host;
   rv = aURI->GetHost(host);
-  NS_ENSURE_SUCCESS(rv, NS_OK);
+  if (NS_FAILED(rv)) {
+    return NS_OK;
+  }
 
   if (host.Equals("127.0.0.1") ||
       host.Equals("localhost") ||
@@ -529,6 +553,5 @@ nsContentSecurityManager::IsURIPotentiallyTrustworthy(nsIURI* aURI, bool* aIsTru
     *aIsTrustWorthy = true;
     return NS_OK;
   }
-
   return NS_OK;
 }

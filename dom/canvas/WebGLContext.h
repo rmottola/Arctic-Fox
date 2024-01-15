@@ -332,6 +332,8 @@ public:
         return ActiveBoundTextureForTarget(texTarget);
     }
 
+    void InvalidateResolveCacheForTextureWithTexUnit(const GLuint);
+
     already_AddRefed<Layer>
     GetCanvasLayer(nsDisplayListBuilder* builder, Layer* oldLayer,
                    LayerManager* manager) override;
@@ -825,7 +827,8 @@ protected:
 public:
     void Disable(GLenum cap);
     void Enable(GLenum cap);
-    bool GetStencilBits(GLint* out_stencilBits);
+    bool GetStencilBits(GLint* const out_stencilBits);
+    bool GetChannelBits(const char* funcName, GLenum pname, GLint* const out_val);
     virtual JS::Value GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv);
 
     void GetParameter(JSContext* cx, GLenum pname,
@@ -1111,7 +1114,6 @@ protected:
     int32_t mGLMaxVertexUniformVectors;
     uint32_t  mGLMaxTransformFeedbackSeparateAttribs;
     GLuint  mGLMaxUniformBufferBindings;
-    GLsizei mGLMaxSamples;
 
     // What is supported:
     uint32_t mGLMaxColorAttachments;
@@ -1503,6 +1505,7 @@ protected:
     bool mNeedsFakeNoAlpha;
     bool mNeedsFakeNoDepth;
     bool mNeedsFakeNoStencil;
+    bool mNeedsEmulatedLoneDepthStencil;
 
     struct ScopedMaskWorkaround {
         WebGLContext& mWebGL;
@@ -1525,11 +1528,32 @@ protected:
                    webgl.mDepthTestEnabled;
         }
 
+        static bool HasDepthButNoStencil(const WebGLFramebuffer* fb);
+
         static bool ShouldFakeNoStencil(WebGLContext& webgl) {
-            // We should only be doing this if we're about to draw to the backbuffer.
-            return !webgl.mBoundDrawFramebuffer &&
-                   webgl.mNeedsFakeNoStencil &&
-                   webgl.mStencilTestEnabled;
+            if (!webgl.mStencilTestEnabled)
+                return false;
+
+            if (!webgl.mBoundDrawFramebuffer) {
+                if (webgl.mNeedsFakeNoStencil)
+                    return true;
+
+                if (webgl.mNeedsEmulatedLoneDepthStencil &&
+                    webgl.mOptions.depth && !webgl.mOptions.stencil)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (webgl.mNeedsEmulatedLoneDepthStencil &&
+                HasDepthButNoStencil(webgl.mBoundDrawFramebuffer))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         explicit ScopedMaskWorkaround(WebGLContext& webgl);
@@ -1758,7 +1782,7 @@ Intersect(uint32_t srcSize, int32_t dstStartInSrc, uint32_t dstSize,
 
 bool
 ZeroTextureData(WebGLContext* webgl, const char* funcName, bool respecifyTexture,
-                TexImageTarget target, uint32_t level,
+                GLuint tex, TexImageTarget target, uint32_t level,
                 const webgl::FormatUsageInfo* usage, uint32_t xOffset, uint32_t yOffset,
                 uint32_t zOffset, uint32_t width, uint32_t height, uint32_t depth);
 

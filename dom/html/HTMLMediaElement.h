@@ -174,6 +174,9 @@ public:
   // resource has a decode error during metadata loading or decoding.
   virtual void DecodeError() final override;
 
+  // Return true if error attribute is not null.
+  virtual bool HasError() const final override;
+
   // Called by the video decoder object, on the main thread, when the
   // resource load has been cancelled.
   virtual void LoadAborted() final override;
@@ -393,6 +396,9 @@ public:
   // Called by the media decoder object, on the main thread,
   // when the connection between Rtsp server and client gets lost.
   virtual void ResetConnectionState() final override;
+
+  // Called by media decoder when the audible state changed.
+  virtual void NotifyAudibleStateChanged(bool aAudible) final override;
 
   // XPCOM GetPreload() is OK
   void SetPreload(const nsAString& aValue, ErrorResult& aRv)
@@ -1509,6 +1515,9 @@ private:
   // initially be set to zero seconds. This time is used to allow the element to
   // be seeked even before the media is loaded.
   double mDefaultPlaybackStartPosition;
+
+  // True if the audio track is producing audible sound.
+  bool mIsAudioTrackAudible;
 };
 
 } // namespace dom

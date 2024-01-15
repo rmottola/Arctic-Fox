@@ -77,6 +77,8 @@ GetActionCauseName(InputContextAction::Cause aCause)
       return "CAUSE_KEY";
     case InputContextAction::CAUSE_MOUSE:
       return "CAUSE_MOUSE";
+    case InputContextAction::CAUSE_TOUCH:
+      return "CAUSE_TOUCH";
     default:
       return "illegal value";
   }
@@ -657,8 +659,13 @@ IMEStateManager::OnClickInEditor(nsPresContext* aPresContext,
     return; // should notify only first click event.
   }
 
-  InputContextAction action(InputContextAction::CAUSE_MOUSE,
-                            InputContextAction::FOCUS_NOT_CHANGED);
+  uint16_t inputSource = nsIDOMMouseEvent::MOZ_SOURCE_UNKNOWN;
+  aMouseEvent->GetMozInputSource(&inputSource);
+  InputContextAction::Cause cause =
+    inputSource == nsIDOMMouseEvent::MOZ_SOURCE_TOUCH ?
+      InputContextAction::CAUSE_TOUCH : InputContextAction::CAUSE_MOUSE;
+
+  InputContextAction action(cause, InputContextAction::FOCUS_NOT_CHANGED);
   IMEState newState = GetNewIMEState(aPresContext, aContent);
   SetIMEState(newState, aContent, widget, action);
 }
@@ -951,7 +958,7 @@ IMEStateManager::SetInputContextForChildProcess(
      GetActionFocusChangeName(aAction.mFocusChange),
      sPresContext, sActiveTabParent.get()));
 
-  if (NS_WARN_IF(aTabParent != sActiveTabParent)) {
+  if (aTabParent != sActiveTabParent) {
     MOZ_LOG(sISMLog, LogLevel::Error,
       ("ISM:    IMEStateManager::SetInputContextForChildProcess(), FAILED, "
        "because non-focused tab parent tries to set input context"));
@@ -1027,7 +1034,8 @@ IMEStateManager::SetIMEState(const IMEState& aState,
       context.mHTMLInputType.Assign(nsGkAtoms::textarea->GetUTF16String());
     }
 
-    if (Preferences::GetBool("dom.forms.inputmode", false)) {
+    if (Preferences::GetBool("dom.forms.inputmode", false) ||
+        nsContentUtils::IsChromeDoc(aContent->OwnerDoc())) {
       aContent->GetAttr(kNameSpaceID_None, nsGkAtoms::inputmode,
                         context.mHTMLInputInputmode);
     }
@@ -1465,8 +1473,19 @@ IMEStateManager::NotifyIME(const IMENotification& aNotification,
       return composition ?
         composition->RequestToCommit(aWidget, true) : NS_OK;
     case NOTIFY_IME_OF_COMPOSITION_UPDATE:
-      return composition && !isSynthesizedForTests ?
-        aWidget->NotifyIME(aNotification) : NS_OK;
+      if (!aOriginIsRemote && (!composition || isSynthesizedForTests)) {
+        MOZ_LOG(sISMLog, LogLevel::Info,
+          ("ISM:   IMEStateManager::NotifyIME(), FAILED, received content "
+           "change notification from this process but there is no compostion"));
+        return NS_OK;
+      }
+      if (!sRemoteHasFocus && aOriginIsRemote) {
+        MOZ_LOG(sISMLog, LogLevel::Info,
+          ("ISM:   IMEStateManager::NotifyIME(), received content change "
+           "notification from the remote but it's already lost focus"));
+        return NS_OK;
+      }
+      return aWidget->NotifyIME(aNotification);
     default:
       MOZ_CRASH("Unsupported notification");
   }

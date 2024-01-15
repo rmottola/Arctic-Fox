@@ -1960,6 +1960,23 @@ mFailedLockCount(0)
   // histograms) using InitHistogramRecordingEnabled() will happen after instantiating
   // sTelemetry since it depends on the static GetKeyedHistogramById(...) - which
   // uses the singleton instance at sTelemetry.
+
+  // Some Telemetry histograms depend on the value of C++ constants and hardcode
+  // their values in Histograms.json.
+  // We add static asserts here for those values to match so that future changes
+  // don't go unnoticed.
+  // TODO: Compare explicitly with gHistograms[<histogram id>].bucketCount here
+  // once we can make gHistograms constexpr (requires VS2015).
+  static_assert((JS::gcreason::NUM_TELEMETRY_REASONS == 100),
+      "NUM_TELEMETRY_REASONS is assumed to be a fixed value in Histograms.json."
+      " If this was an intentional change, update this assert with its value "
+      "and update the n_values for the following in Histograms.json: "
+      "GC_MINOR_REASON, GC_MINOR_REASON_LONG, GC_REASON_2");
+  static_assert((mozilla::StartupTimeline::MAX_EVENT_ID == 16),
+      "MAX_EVENT_ID is assumed to be a fixed value in Histograms.json.  If this"
+      " was an intentional change, update this assert with its value and update"
+      " the n_values for the following in Histograms.json:"
+      " STARTUP_MEASUREMENT_ERRORS");
 }
 
 TelemetryImpl::~TelemetryImpl() {
@@ -3559,7 +3576,6 @@ static MOZ_CONSTEXPR_VAR TrackedDBEntry kTrackedDBs[] = {
   TRACKEDDB_ENTRY("downloads.sqlite"),
   TRACKEDDB_ENTRY("extensions.sqlite"),
   TRACKEDDB_ENTRY("formhistory.sqlite"),
-  TRACKEDDB_ENTRY("healthreport.sqlite"),
   TRACKEDDB_ENTRY("index.sqlite"),
   TRACKEDDB_ENTRY("netpredictions.sqlite"),
   TRACKEDDB_ENTRY("permissions.sqlite"),
@@ -3646,7 +3662,7 @@ void
 TelemetryImpl::RecordIceCandidates(const uint32_t iceCandidateBitmask,
                                    const bool success, const bool loop)
 {
-  if (!sTelemetry)
+  if (!sTelemetry || !sTelemetry->mCanRecordExtended)
     return;
 
   sTelemetry->mWebrtcTelemetry.RecordIceCandidateMask(iceCandidateBitmask, success, loop);

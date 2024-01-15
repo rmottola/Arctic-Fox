@@ -20,28 +20,33 @@ GetFBInfoForBlit(const WebGLFramebuffer* fb, const char* const fbInfo,
                  const webgl::FormatInfo** const out_depthFormat,
                  const webgl::FormatInfo** const out_stencilFormat)
 {
-    *out_samples = 1; // TODO
+    *out_samples = 0;
     *out_colorFormat = nullptr;
     *out_depthFormat = nullptr;
     *out_stencilFormat = nullptr;
 
     if (fb->ColorAttachment(0).IsDefined()) {
         const auto& attachment = fb->ColorAttachment(0);
+        *out_samples = attachment.Samples();
         *out_colorFormat = attachment.Format()->format;
     }
 
     if (fb->DepthStencilAttachment().IsDefined()) {
         const auto& attachment = fb->DepthStencilAttachment();
+        *out_samples = attachment.Samples();
+
         *out_depthFormat = attachment.Format()->format;
         *out_stencilFormat = *out_depthFormat;
     } else {
         if (fb->DepthAttachment().IsDefined()) {
             const auto& attachment = fb->DepthAttachment();
+            *out_samples = attachment.Samples();
             *out_depthFormat = attachment.Format()->format;
         }
 
         if (fb->StencilAttachment().IsDefined()) {
             const auto& attachment = fb->StencilAttachment();
+            *out_samples = attachment.Samples();
             *out_stencilFormat = attachment.Format()->format;
         }
     }
@@ -118,25 +123,22 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
         return;
     }
 
-    if (!mBoundReadFramebuffer->ValidateAndInitAttachments("blitFramebuffer's READ_FRAMEBUFFER") ||
-        !mBoundDrawFramebuffer->ValidateAndInitAttachments("blitFramebuffer's DRAW_FRAMEBUFFER"))
-    {
-        return;
-    }
-
     GLsizei srcSamples;
     const webgl::FormatInfo* srcColorFormat = nullptr;
     const webgl::FormatInfo* srcDepthFormat = nullptr;
     const webgl::FormatInfo* srcStencilFormat = nullptr;
 
     if (mBoundReadFramebuffer) {
+        if (!mBoundReadFramebuffer->ValidateAndInitAttachments("blitFramebuffer's READ_FRAMEBUFFER"))
+            return;
+
         if (!GetFBInfoForBlit(mBoundReadFramebuffer, "READ_FRAMEBUFFER", &srcSamples,
                               &srcColorFormat, &srcDepthFormat, &srcStencilFormat))
         {
             return;
         }
     } else {
-        srcSamples = 1; // Always 1.
+        srcSamples = 0; // Always 0.
 
         GetBackbufferFormats(mOptions, &srcColorFormat, &srcDepthFormat,
                              &srcStencilFormat);
@@ -148,6 +150,9 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
     const webgl::FormatInfo* dstStencilFormat = nullptr;
 
     if (mBoundDrawFramebuffer) {
+        if (!mBoundDrawFramebuffer->ValidateAndInitAttachments("blitFramebuffer's DRAW_FRAMEBUFFER"))
+            return;
+
         if (!GetFBInfoForBlit(mBoundDrawFramebuffer, "DRAW_FRAMEBUFFER", &dstSamples,
                               &dstColorFormat, &dstDepthFormat, &dstStencilFormat))
         {
@@ -221,13 +226,13 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
         return;
     }
 
-    if (dstSamples != 1) {
+    if (dstSamples != 0) {
         ErrorInvalidOperation("blitFramebuffer: DRAW_FRAMEBUFFER may not have"
                               " multiple samples.");
         return;
     }
 
-    if (srcSamples != 1) {
+    if (srcSamples != 0) {
         if (mask & LOCAL_GL_COLOR_BUFFER_BIT &&
             dstColorFormat != srcColorFormat)
         {
@@ -258,7 +263,7 @@ WebGL2Context::BlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY
 static bool
 ValidateTextureLayerAttachment(GLenum attachment)
 {
-    if (LOCAL_GL_COLOR_ATTACHMENT0 < attachment &&
+    if (LOCAL_GL_COLOR_ATTACHMENT0 <= attachment &&
         attachment <= LOCAL_GL_COLOR_ATTACHMENT15)
     {
         return true;
@@ -293,8 +298,11 @@ WebGL2Context::FramebufferTextureLayer(GLenum target, GLenum attachment,
                                      "texture object.");
         }
 
-        if (level < 0)
+        if (layer < 0)
             return ErrorInvalidValue("framebufferTextureLayer: layer must be >= 0.");
+
+        if (level < 0)
+            return ErrorInvalidValue("framebufferTextureLayer: level must be >= 0.");
 
         switch (texture->Target().get()) {
         case LOCAL_GL_TEXTURE_3D:
@@ -302,12 +310,22 @@ WebGL2Context::FramebufferTextureLayer(GLenum target, GLenum attachment,
                 return ErrorInvalidValue("framebufferTextureLayer: layer must be < "
                                          "MAX_3D_TEXTURE_SIZE");
             }
+
+            if (uint32_t(level) > FloorLog2(mImplMax3DTextureSize)) {
+                return ErrorInvalidValue("framebufferTextureLayer: layer mube be <= "
+                                         "log2(MAX_3D_TEXTURE_SIZE");
+            }
             break;
 
         case LOCAL_GL_TEXTURE_2D_ARRAY:
             if (uint32_t(layer) >= mImplMaxArrayTextureLayers) {
                 return ErrorInvalidValue("framebufferTextureLayer: layer must be < "
                                          "MAX_ARRAY_TEXTURE_LAYERS");
+            }
+
+            if (uint32_t(level) > FloorLog2(mImplMaxTextureSize)) {
+                return ErrorInvalidValue("framebufferTextureLayer: layer mube be <= "
+                                         "log2(MAX_TEXTURE_SIZE");
             }
             break;
 

@@ -15,6 +15,7 @@ var Cr = Components.results;
  */
 
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/BrowserElementPromptService.jsm");
 
@@ -250,7 +251,6 @@ function BrowserElementParent() {
   this._pendingDOMFullscreen = false;
 
   Services.obs.addObserver(this, 'oop-frameloader-crashed', /* ownsWeak = */ true);
-  Services.obs.addObserver(this, 'copypaste-docommand', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'ask-children-to-execute-copypaste-command', /* ownsWeak = */ true);
   Services.obs.addObserver(this, 'back-docommand', /* ownsWeak = */ true);
 
@@ -463,6 +463,7 @@ BrowserElementParent.prototype = {
     /* username and password */
     let detail = {
       host:     authDetail.host,
+      path:     authDetail.path,
       realm:    authDetail.realm,
       isProxy:  authDetail.isProxy
     };
@@ -1001,36 +1002,17 @@ BrowserElementParent.prototype = {
                                              Ci.nsIRequestObserver])
     };
 
-    // If we have a URI we'll use it to get the triggering principal to use,
-    // if not available a null principal is acceptable.
-    let referrer = null;
-    let principal = null;
-    if (_options.referrer) {
-      // newURI can throw on malformed URIs.
-      try {
-        referrer = Services.io.newURI(_options.referrer, null, null);
-      }
-      catch(e) {
-        debug('Malformed referrer -- ' + e);
-      }
+    let referrer = Services.io.newURI(_options.referrer, null, null);
+    let principal =
+      Services.scriptSecurityManager.createCodebasePrincipal(
+        referrer, this._frameLoader.loadContext.originAttributes);
 
-      // This simply returns null if there is no principal available
-      // for the requested uri. This is an acceptable fallback when
-      // calling newChannelFromURI2.
-      principal =
-        Services.scriptSecurityManager.createCodebasePrincipal(
-          referrer, this._frameLoader.loadContext.originAttributes);
-    }
-
-    debug('Using principal? ' + !!principal);
-
-    let channel =
-      Services.io.newChannelFromURI2(url,
-                                     null,       // No document.
-                                     principal,  // Loading principal
-                                     principal,  // Triggering principal
-                                     Ci.nsILoadInfo.SEC_NORMAL,
-                                     Ci.nsIContentPolicy.TYPE_OTHER);
+    let channel = NetUtil.newChannel({
+      uri: url,
+      loadingPrincipal: principal,
+      securityFlags: SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS,
+      contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER
+    });
 
     // XXX We would set private browsing information prior to calling this.
     channel.notificationCallbacks = interfaceRequestor;
@@ -1055,7 +1037,7 @@ BrowserElementParent.prototype = {
     }
 
     // Set-up complete, let's get things started.
-    channel.asyncOpen(new DownloadListener(), null);
+    channel.asyncOpen2(new DownloadListener());
 
     return req;
   },
@@ -1293,11 +1275,6 @@ BrowserElementParent.prototype = {
     case 'oop-frameloader-crashed':
       if (this._isAlive() && subject == this._frameLoader) {
         this._fireFatalError();
-      }
-      break;
-    case 'copypaste-docommand':
-      if (this._isAlive() && this._frameElement.isEqualNode(subject.wrappedJSObject)) {
-        this._sendAsyncMsg('do-command', { command: data });
       }
       break;
     case 'ask-children-to-execute-copypaste-command':

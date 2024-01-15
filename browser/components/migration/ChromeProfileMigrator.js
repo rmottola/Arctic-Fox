@@ -19,6 +19,7 @@ const AUTH_TYPE = {
   SCHEME_DIGEST: 2
 };
 
+Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
@@ -32,10 +33,33 @@ XPCOMUtils.defineLazyModuleGetter(this, "OSCrypto",
                                   "resource://gre/modules/OSCrypto.jsm");
 
 /**
+ * Get an nsIFile instance representing the expected location of user data
+ * for this copy of Chrome/Chromium/Canary on different OSes.
+ * @param subfoldersWin {Array} an array of subfolders to use for Windows
+ * @param subfoldersOSX {Array} an array of subfolders to use for OS X
+ * @param subfoldersUnix {Array} an array of subfolders to use for *nix systems
+ * @returns {nsIFile} the place we expect data to live. Might not actually exist!
+ */
+function getDataFolder(subfoldersWin, subfoldersOSX, subfoldersUnix) {
+  let dirServiceID, subfolders;
+  if (AppConstants.platform == "win") {
+    dirServiceID = "LocalAppData";
+    subfolders = subfoldersWin.concat(["User Data"]);
+  } else if (AppConstants.platform == "macosx") {
+    dirServiceID = "ULibDir";
+    subfolders = ["Application Support"].concat(subfoldersOSX);
+  } else {
+    dirServiceID = "Home";
+    subfolders = [".config"].concat(subfoldersUnix);
+  }
+  return FileUtils.getDir(dirServiceID, subfolders, false);
+}
+
+/**
  * Convert Chrome time format to Date object
  *
  * @param   aTime
- *          Chrome time 
+ *          Chrome time
  * @return  converted Date object
  * @note    Google Chrome uses FILETIME / 10 as time.
  *          FILETIME is based on same structure of Windows.
@@ -52,11 +76,18 @@ function chromeTimeToDate(aTime)
  *          GUID of the folder where items will be inserted
  * @param   items
  *          bookmark items to be inserted
+ * @param   errorAccumulator
+ *          function that gets called with any errors thrown so we don't drop them on the floor.
  */
-function* insertBookmarkItems(parentGuid, items) {
+function* insertBookmarkItems(parentGuid, items, errorAccumulator) {
   for (let item of items) {
     try {
       if (item.type == "url") {
+        if (item.url.trim().startsWith("chrome:")) {
+          // Skip invalid chrome URIs. Creating an actual URI always reports
+          // messages to the console, so we avoid doing that.
+          continue;
+        }
         yield PlacesUtils.bookmarks.insert({
           parentGuid, url: item.url, title: item.name
         });
@@ -65,25 +96,19 @@ function* insertBookmarkItems(parentGuid, items) {
           parentGuid, type: PlacesUtils.bookmarks.TYPE_FOLDER, title: item.name
         })).guid;
 
-        yield insertBookmarkItems(newFolderGuid, item.children);
+        yield insertBookmarkItems(newFolderGuid, item.children, errorAccumulator);
       }
     } catch (e) {
       Cu.reportError(e);
+      errorAccumulator(e);
     }
   }
 }
 
 
 function ChromeProfileMigrator() {
-  let chromeUserDataFolder = FileUtils.getDir(
-#ifdef XP_WIN
-    "LocalAppData", ["Google", "Chrome", "User Data"]
-#elifdef XP_MACOSX
-    "ULibDir", ["Application Support", "Google", "Chrome"]
-#else
-    "Home", [".config", "google-chrome"]
-#endif
-    , false);
+  let chromeUserDataFolder =
+    getDataFolder(["Google", "Chrome"], ["Google", "Chrome"], ["google-chrome"]);
   this._chromeUserDataFolder = chromeUserDataFolder.exists() ?
     chromeUserDataFolder : null;
 }
@@ -203,6 +228,8 @@ function GetBookmarksResource(aProfileFolder) {
 
     migrate: function(aCallback) {
       return Task.spawn(function* () {
+        let gotErrors = false;
+        let errorGatherer = () => gotErrors = true;
         let jsonStream = yield new Promise(resolve =>
           NetUtil.asyncFetch({ uri: NetUtil.newURI(bookmarksFile),
                                loadUsingSystemPrincipal: true
@@ -231,7 +258,7 @@ function GetBookmarksResource(aProfileFolder) {
             parentGuid =
               yield MigrationUtils.createImportedBookmarksFolder("Chrome", parentGuid);
           }
-          yield insertBookmarkItems(parentGuid, roots.bookmark_bar.children);
+          yield insertBookmarkItems(parentGuid, roots.bookmark_bar.children, errorGatherer);
         }
 
         // Importing bookmark menu items
@@ -243,10 +270,13 @@ function GetBookmarksResource(aProfileFolder) {
             parentGuid =
               yield MigrationUtils.createImportedBookmarksFolder("Chrome", parentGuid);
           }
-          yield insertBookmarkItems(parentGuid, roots.other.children);
+          yield insertBookmarkItems(parentGuid, roots.other.children, errorGatherer);
+        }
+        if (gotErrors) {
+          throw "The migration included errors.";
         }
       }.bind(this)).then(() => aCallback(true),
-                          e => { Cu.reportError(e); aCallback(false) });
+                          e => aCallback(false));
     }
   };
 }
@@ -476,15 +506,7 @@ ChromeProfileMigrator.prototype.classID = Components.ID("{4cec1de4-1671-4fc3-a53
  *  Chromium migration
  **/
 function ChromiumProfileMigrator() {
-  let chromiumUserDataFolder = FileUtils.getDir(
-#ifdef XP_WIN
-    "LocalAppData", ["Chromium", "User Data"]
-#elifdef XP_MACOSX
-    "ULibDir", ["Application Support", "Chromium"]
-#else
-    "Home", [".config", "chromium"]
-#endif
-    , false);
+  let chromiumUserDataFolder = getDataFolder(["Chromium"], ["Chromium"], ["chromium"]);
   this._chromeUserDataFolder = chromiumUserDataFolder.exists() ? chromiumUserDataFolder : null;
 }
 
@@ -495,19 +517,12 @@ ChromiumProfileMigrator.prototype.classID = Components.ID("{8cece922-9720-42de-b
 
 var componentsArray = [ChromeProfileMigrator, ChromiumProfileMigrator];
 
-#if defined(XP_WIN) || defined(XP_MACOSX)
 /**
  * Chrome Canary
  * Not available on Linux
  **/
 function CanaryProfileMigrator() {
-  let chromeUserDataFolder = FileUtils.getDir(
-#ifdef XP_WIN
-    "LocalAppData", ["Google", "Chrome SxS", "User Data"]
-#elifdef XP_MACOSX
-    "ULibDir", ["Application Support", "Google", "Chrome Canary"]
-#endif
-    , false);
+  let chromeUserDataFolder = getDataFolder(["Google", "Chrome SxS"], ["Google", "Chrome Canary"]);
   this._chromeUserDataFolder = chromeUserDataFolder.exists() ? chromeUserDataFolder : null;
 }
 CanaryProfileMigrator.prototype = Object.create(ChromeProfileMigrator.prototype);
@@ -515,7 +530,8 @@ CanaryProfileMigrator.prototype.classDescription = "Chrome Canary Profile Migrat
 CanaryProfileMigrator.prototype.contractID = "@mozilla.org/profile/migrator;1?app=browser&type=canary";
 CanaryProfileMigrator.prototype.classID = Components.ID("{4bf85aa5-4e21-46ca-825f-f9c51a5e8c76}");
 
-componentsArray.push(CanaryProfileMigrator);
-#endif
+if (AppConstants.platform == "win" || AppConstants.platform == "macosx") {
+  componentsArray.push(CanaryProfileMigrator);
+}
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(componentsArray);

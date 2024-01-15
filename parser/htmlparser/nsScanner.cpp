@@ -6,6 +6,7 @@
 
 //#define __INCREMENTAL 1
 
+#include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
 
 #include "nsScanner.h"
@@ -424,6 +425,7 @@ nsresult nsScanner::SkipWhitespace(int32_t& aNewlinesSkipped) {
     switch(theChar) {
       case '\n':
       case '\r': ++aNewlinesSkipped;
+                 MOZ_FALLTHROUGH;
       case ' ' :
       case '\t':
         {
@@ -795,6 +797,7 @@ nsresult nsScanner::ReadWhitespace(nsScannerIterator& aStart,
     switch(theChar) {
       case '\n':
       case '\r': ++aNewlinesSkipped;
+                 MOZ_FALLTHROUGH;
       case ' ' :
       case '\t':
         {

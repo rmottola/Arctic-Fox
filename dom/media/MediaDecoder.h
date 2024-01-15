@@ -411,6 +411,10 @@ public:
   // Call on the main thread only.
   virtual bool IsEndedOrShutdown() const;
 
+  // Return true if the MediaDecoderOwner's error attribute is not null.
+  // If the MediaDecoder is shutting down, OwnerHasError will return true.
+  bool OwnerHasError() const;
+
 protected:
   // Updates the media duration. This is called while the media is being
   // played, calls before the media has reached loaded metadata are ignored.
@@ -457,10 +461,8 @@ public:
   // media element when it is restored from the bfcache, or when we need
   // to stop throttling the download. Call on the main thread only.
   // The download will only actually resume once as many Resume calls
-  // have been made as Suspend calls. When aForceBuffering is true,
-  // we force the decoder to go into buffering state before resuming
-  // playback.
-  virtual void Resume(bool aForceBuffering);
+  // have been made as Suspend calls.
+  virtual void Resume();
 
   // Moves any existing channel loads into or out of background. Background
   // loads don't block the load event. This is called when we stop or restart
@@ -912,6 +914,9 @@ protected:
   // start playing back again.
   Mirror<int64_t> mPlaybackPosition;
 
+  // Used to distiguish whether the audio is producing sound.
+  Mirror<bool> mIsAudioDataAudible;
+
   // Volume of playback.  0.0 = muted. 1.0 = full volume.
   Canonical<double> mVolume;
 
@@ -1007,6 +1012,9 @@ public:
   }
 
 private:
+  // Notify owner when the audible state changed
+  void NotifyAudibleStateChanged();
+
   /* Functions called by ResourceCallback */
 
   // A media stream is assumed to be infinite if the metadata doesn't

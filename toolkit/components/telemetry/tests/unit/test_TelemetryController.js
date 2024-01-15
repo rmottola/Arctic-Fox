@@ -30,7 +30,6 @@ const PREF_BRANCH = "toolkit.telemetry.";
 const PREF_ENABLED = PREF_BRANCH + "enabled";
 const PREF_ARCHIVE_ENABLED = PREF_BRANCH + "archive.enabled";
 const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
-const PREF_FHR_SERVICE_ENABLED = "datareporting.healthreport.service.enabled";
 const PREF_UNIFIED = PREF_BRANCH + "unified";
 const PREF_OPTOUT_SAMPLE = PREF_BRANCH + "optoutSample";
 
@@ -356,6 +355,54 @@ add_task(function* test_optoutSampling() {
     yield TelemetryController.reset();
     Assert.equal(Telemetry.canRecordBase, true,
                  "Sampling should not override the default opt-out behavior");
+  }
+});
+
+add_task(function* test_telemetryCleanFHRDatabase(){
+  const FHR_DBNAME_PREF = "datareporting.healthreport.dbName";
+  const CUSTOM_DB_NAME = "unlikely.to.be.used.sqlite";
+  const DEFAULT_DB_NAME = "healthreport.sqlite";
+
+  // Check that we're able to remove a FHR DB with a custom name.
+  const CUSTOM_DB_PATHS = [
+    OS.Path.join(OS.Constants.Path.profileDir, CUSTOM_DB_NAME),
+    OS.Path.join(OS.Constants.Path.profileDir, CUSTOM_DB_NAME + "-wal"),
+    OS.Path.join(OS.Constants.Path.profileDir, CUSTOM_DB_NAME + "-shm"),
+  ];
+  Preferences.set(FHR_DBNAME_PREF, CUSTOM_DB_NAME);
+
+  // Write fake DB files to the profile directory.
+  for (let dbFilePath of CUSTOM_DB_PATHS) {
+    yield OS.File.writeAtomic(dbFilePath, "some data");
+  }
+
+  // Trigger the cleanup and check that the files were removed.
+  yield TelemetryStorage.removeFHRDatabase();
+  for (let dbFilePath of CUSTOM_DB_PATHS) {
+    Assert.ok(!(yield OS.File.exists(dbFilePath)), "The DB must not be on the disk anymore: " + dbFilePath);
+  }
+
+  // We should not break anything if there's no DB file.
+  yield TelemetryStorage.removeFHRDatabase();
+
+  // Check that we're able to remove a FHR DB with the default name.
+  Preferences.reset(FHR_DBNAME_PREF);
+
+  const DEFAULT_DB_PATHS = [
+    OS.Path.join(OS.Constants.Path.profileDir, DEFAULT_DB_NAME),
+    OS.Path.join(OS.Constants.Path.profileDir, DEFAULT_DB_NAME + "-wal"),
+    OS.Path.join(OS.Constants.Path.profileDir, DEFAULT_DB_NAME + "-shm"),
+  ];
+
+  // Write fake DB files to the profile directory.
+  for (let dbFilePath of DEFAULT_DB_PATHS) {
+    yield OS.File.writeAtomic(dbFilePath, "some data");
+  }
+
+  // Trigger the cleanup and check that the files were removed.
+  yield TelemetryStorage.removeFHRDatabase();
+  for (let dbFilePath of DEFAULT_DB_PATHS) {
+    Assert.ok(!(yield OS.File.exists(dbFilePath)), "The DB must not be on the disk anymore: " + dbFilePath);
   }
 });
 

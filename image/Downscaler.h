@@ -58,6 +58,7 @@ public:
 
   const nsIntSize& OriginalSize() const { return mOriginalSize; }
   const nsIntSize& TargetSize() const { return mTargetSize; }
+  const nsIntSize FrameSize() const { return nsIntSize(mFrameRect.width, mFrameRect.height); }
   const gfxSize& Scale() const { return mScale; }
 
   /**
@@ -91,8 +92,11 @@ public:
     return mRowBuffer.get() + mFrameRect.x * sizeof(uint32_t);
   }
 
-  /// Clears the current row buffer (optionally starting at @aStartingAtCol).
-  void ClearRow(uint32_t aStartingAtCol = 0);
+  /// Clears the current row buffer.
+  void ClearRow() { ClearRestOfRow(0); }
+
+  /// Clears the current row buffer starting at @aStartingAtCol.
+  void ClearRestOfRow(uint32_t aStartingAtCol);
 
   /// Signals that the decoder has finished writing a row into the row buffer.
   void CommitRow();
@@ -165,11 +169,13 @@ public:
 
   bool IsFrameComplete() const { return false; }
   uint8_t* RowBuffer() { return nullptr; }
-  void ClearRow(uint32_t = 0) { }
+  void ClearRow() { }
+  void ClearRestOfRow(uint32_t) { }
   void CommitRow() { }
   bool HasInvalidation() const { return false; }
   DownscalerInvalidRect TakeInvalidRect() { return DownscalerInvalidRect(); }
   void ResetForNextProgressivePass() { }
+  const nsIntSize FrameSize() const { return nsIntSize(0, 0); }
 };
 
 #endif // MOZ_ENABLE_SKIA

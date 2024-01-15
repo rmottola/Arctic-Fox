@@ -416,8 +416,12 @@ ImageDocument::RestoreImage()
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::width, true);
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::height, true);
   
-  if (mImageIsOverflowing) {
-    SetModeClass(eOverflowing);
+  if (ImageIsOverflowing()) {
+    if (!mImageIsOverflowingVertically) {
+      SetModeClass(eOverflowingHorizontalOnly);
+    } else {
+      SetModeClass(eOverflowingVertical);
+    }
   }
   else {
     SetModeClass(eNone);
@@ -444,7 +448,7 @@ ImageDocument::ToggleImageSize()
     ResetZoomLevel();
     RestoreImage();
   }
-  else if (mImageIsOverflowing) {
+  else if (ImageIsOverflowing()) {
     ResetZoomLevel();
     ShrinkToFit();
   }
@@ -509,10 +513,16 @@ ImageDocument::SetModeClass(eModeClasses mode)
     classList->Remove(NS_LITERAL_STRING("shrinkToFit"), rv);
   }
 
-  if (mode == eOverflowing) {
-    classList->Add(NS_LITERAL_STRING("overflowing"), rv);
+  if (mode == eOverflowingVertical) {
+    classList->Add(NS_LITERAL_STRING("overflowingVertical"), rv);
   } else {
-    classList->Remove(NS_LITERAL_STRING("overflowing"), rv);
+    classList->Remove(NS_LITERAL_STRING("overflowingVertical"), rv);
+  }
+
+  if (mode == eOverflowingHorizontalOnly) {
+    classList->Add(NS_LITERAL_STRING("overflowingHorizontalOnly"), rv);
+  } else {
+    classList->Remove(NS_LITERAL_STRING("overflowingHorizontalOnly"), rv);
   }
 }
 
@@ -582,7 +592,7 @@ ImageDocument::HandleEvent(nsIDOMEvent* aEvent)
       mShouldResize = false;
       RestoreImageTo(x, y);
     }
-    else if (mImageIsOverflowing) {
+    else if (ImageIsOverflowing()) {
       ShrinkToFit();
     }
   } else if (eventType.EqualsLiteral("load")) {
@@ -698,18 +708,27 @@ ImageDocument::CheckOverflowing(bool changeState)
     mVisibleHeight = nsPresContext::AppUnitsToFloatCSSPixels(visibleArea.height);
   }
 
-  bool imageWasOverflowing = mImageIsOverflowing;
-  mImageIsOverflowing =
-    mImageWidth > mVisibleWidth || mImageHeight > mVisibleHeight;
-  bool windowBecameBigEnough = imageWasOverflowing && !mImageIsOverflowing;
+  bool imageWasOverflowing = ImageIsOverflowing();
+  bool imageWasOverflowingVertically = mImageIsOverflowingVertically;
+  mImageIsOverflowingHorizontally = mImageWidth > mVisibleWidth;
+  mImageIsOverflowingVertically = mImageHeight > mVisibleHeight;
+  bool windowBecameBigEnough = imageWasOverflowing && !ImageIsOverflowing();
+  bool verticalOverflowChanged =
+    mImageIsOverflowingVertically != imageWasOverflowingVertically;
 
   if (changeState || mShouldResize || mFirstResize ||
-      windowBecameBigEnough) {
-    if (mImageIsOverflowing && (changeState || mShouldResize)) {
+      windowBecameBigEnough || verticalOverflowChanged) {
+    if (ImageIsOverflowing() && (changeState || mShouldResize)) {
       ShrinkToFit();
     }
     else if (mImageIsResized || mFirstResize || windowBecameBigEnough) {
       RestoreImage();
+    } else if (!mImageIsResized && verticalOverflowChanged) {
+      if (mImageIsOverflowingVertically) {
+        SetModeClass(eOverflowingVertical);
+      } else {
+        SetModeClass(eOverflowingHorizontalOnly);
+      }
     }
   }
   mFirstResize = false;

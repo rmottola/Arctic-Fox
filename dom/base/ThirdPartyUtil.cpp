@@ -46,7 +46,9 @@ ThirdPartyUtil::IsThirdPartyInternal(const nsCString& aFirstDomain,
                                      nsIURI* aSecondURI,
                                      bool* aResult)
 {
-  NS_ENSURE_ARG(aSecondURI);
+  if (!aSecondURI) {
+    return NS_ERROR_INVALID_ARG;
+  }
 
   // Get the base domain for aSecondURI.
   nsCString secondDomain;
@@ -281,6 +283,10 @@ NS_IMETHODIMP
 ThirdPartyUtil::GetBaseDomain(nsIURI* aHostURI,
                               nsACString& aBaseDomain)
 {
+  if (!aHostURI) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
   // Get the base domain. this will fail if the host contains a leading dot,
   // more than one trailing dot, or is otherwise malformed.
   nsresult rv = mTLDService->GetBaseDomain(aHostURI, 0, aBaseDomain);

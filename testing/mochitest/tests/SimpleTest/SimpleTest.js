@@ -1021,6 +1021,15 @@ SimpleTest.finish = function() {
                                + "SimpleTest.waitForExplicitFinish() if you need "
                                + "it.)");
         }
+        if (SimpleTest._expectingRegisteredServiceWorker) {
+            if (!SpecialPowers.isServiceWorkerRegistered()) {
+                SimpleTest.ok(false, "This test is expected to leave a service worker registered");
+            }
+        } else {
+            if (SpecialPowers.isServiceWorkerRegistered()) {
+                SimpleTest.ok(false, "This test left a service worker registered without cleaning it up");
+            }
+        }
 
         if (parentRunner) {
             /* We're running in an iframe, and the parent has a TestRunner */
@@ -1242,6 +1251,14 @@ SimpleTest.isIgnoringAllUncaughtExceptions = function () {
 };
 
 /**
+ * Indicates to the test framework that this test is expected to leave a
+ * service worker registered when it finishes.
+ */
+SimpleTest.expectRegisteredServiceWorker = function () {
+    SimpleTest._expectingRegisteredServiceWorker = true;
+};
+
+/**
  * Resets any state this SimpleTest object has.  This is important for
  * browser chrome mochitests, which reuse the same SimpleTest object
  * across a run.
@@ -1249,6 +1266,7 @@ SimpleTest.isIgnoringAllUncaughtExceptions = function () {
 SimpleTest.reset = function () {
     SimpleTest._ignoringAllUncaughtExceptions = false;
     SimpleTest._expectingUncaughtException = false;
+    SimpleTest._expectingRegisteredServiceWorker = false;
     SimpleTest._bufferedMessages = [];
 };
 

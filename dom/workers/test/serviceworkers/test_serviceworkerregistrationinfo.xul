@@ -99,6 +99,9 @@
           iframe.contentWindow.postMessage("register", "*");
           yield promise;
 
+          iframe.contentWindow.postMessage("unregister", "*");
+          yield waitForUnregister(EXAMPLE_URL);
+
           SimpleTest.finish();
         });
       });

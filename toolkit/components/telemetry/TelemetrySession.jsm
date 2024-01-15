@@ -58,6 +58,10 @@ const PREF_UNIFIED = PREF_BRANCH + "unified";
 
 const MESSAGE_TELEMETRY_PAYLOAD = "Telemetry:Payload";
 const MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD = "Telemetry:GetChildPayload";
+const MESSAGE_TELEMETRY_THREAD_HANGS = "Telemetry:ChildThreadHangs";
+const MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS = "Telemetry:GetChildThreadHangs";
+const MESSAGE_TELEMETRY_USS = "Telemetry:USS";
+const MESSAGE_TELEMETRY_GET_CHILD_USS = "Telemetry:GetChildUSS";
 
 const DATAREPORTING_DIRECTORY = "datareporting";
 const ABORTED_SESSION_FILE_NAME = "aborted-session-ping";
@@ -93,6 +97,9 @@ const IDLE_TIMEOUT_SECONDS = Preferences.get("toolkit.telemetry.idleTimeout", 5 
 const ABORTED_SESSION_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 const TOPIC_CYCLE_COLLECTOR_BEGIN = "cycle-collector-begin";
+
+// How long to wait in millis for all the child memory reports to come in
+const TOTAL_MEMORY_COLLECTOR_TIMEOUT = 200;
 
 var gLastMemoryPoll = null;
 
@@ -537,6 +544,17 @@ this.TelemetrySession = Object.freeze({
     return Impl.requestChildPayloads();
   },
   /**
+   * Returns a promise that resolves to an array of thread hang stats from content processes, one entry per process.
+   * The structure of each entry is identical to that of "threadHangStats" in nsITelemetry.
+   * While thread hang stats are also part of the child payloads, this function is useful for cheaply getting this information,
+   * which is useful for realtime hang monitoring.
+   * Child processes that do not respond, or spawn/die during execution of this function are excluded from the result.
+   * @returns Promise
+   */
+  getChildThreadHangs: function() {
+    return Impl.getChildThreadHangs();
+  },
+  /**
    * Save the session state to a pending file.
    * Used only for testing purposes.
    */
@@ -641,6 +659,15 @@ var Impl = {
   // where source is a weak reference to the child process,
   // and payload is the telemetry payload from that child process.
   _childTelemetry: [],
+  // Thread hangs from child processes.
+  // Each element is in the format {source: <weak-ref>, payload: <object>},
+  // where source is a weak reference to the child process,
+  // and payload contains the thread hang stats from that child process.
+  _childThreadHangs: [],
+  // Array of the resolve functions of all the promises that are waiting for the child thread hang stats to arrive, used to resolve all those promises at once
+  _childThreadHangsResolveFunctions: [],
+  // Timeout function for child thread hang stats retrieval
+  _childThreadHangsTimeout: null,
   // Unique id that identifies this session so the server can cope with duplicate
   // submissions, orphaning and other oddities. The id is shared across subsessions.
   _sessionId: null,
@@ -666,6 +693,15 @@ var Impl = {
   _delayedInitTask: null,
   // The deferred promise resolved when the initialization task completes.
   _delayedInitTaskDeferred: null,
+  // Need a timeout in case children are tardy in giving back their memory reports.
+  _totalMemoryTimeout: undefined,
+  // An accumulator of total memory across all processes. Only valid once the final child reports.
+  _totalMemory: null,
+  // A Set of outstanding USS report ids
+  _childrenToHearFrom: null,
+  // monotonically-increasing id for USS reports
+  _nextTotalMemoryId: 1,
+
 
   get _log() {
     if (!this._logger) {
@@ -797,7 +833,7 @@ var Impl = {
    *   values: { bucket1: count1, bucket2: count2, ... } }
    */
   packHistogram: function packHistogram(hgram) {
-    let r = hgram.ranges;;
+    let r = hgram.ranges;
     let c = hgram.counts;
     let retgram = {
       range: [r[1], r[r.length - 1]],
@@ -964,11 +1000,11 @@ var Impl = {
         Math.floor((monotonicNow - this._subsessionStartTimeMonotonic) / 1000),
     };
 
-    // TODO: Remove this when bug 1124128 lands.
+    // TODO: Remove this when bug 1201837 lands.
     if (this._addons)
       ret.addons = this._addons;
 
-    // TODO: Remove this when bug 1124128 lands.
+    // TODO: Remove this when bug 1201837 lands.
     let flashVersion = this.getFlashVersion();
     if (flashVersion)
       ret.flashVersion = flashVersion;
@@ -1027,7 +1063,7 @@ var Impl = {
                   "telemetry accessed an unknown distinguished amount");
         boundHandleMemoryReport(id, units, amount);
       } catch (e) {
-      };
+      }
     }
     let b = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_BYTES, n);
     let c = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_COUNT, n);
@@ -1050,6 +1086,32 @@ var Impl = {
     cc("LOW_MEMORY_EVENTS_PHYSICAL", "lowMemoryEventsPhysical");
     c("GHOST_WINDOWS", "ghostWindows");
     cc("PAGE_FAULTS_HARD", "pageFaultsHard");
+
+    if (!Utils.isContentProcess && !this._totalMemoryTimeout) {
+      // Only the chrome process should gather total memory
+      // total = parent RSS + sum(child USS)
+      this._totalMemory = mgr.residentFast;
+      if (ppmm.childCount > 1) {
+        // Do not report If we time out waiting for the children to call
+        this._totalMemoryTimeout = setTimeout(
+          () => {
+            this._totalMemoryTimeout = undefined;
+            this._childrenToHearFrom.clear();
+          },
+          TOTAL_MEMORY_COLLECTOR_TIMEOUT);
+        this._childrenToHearFrom = new Set();
+        for (let i = 1; i < ppmm.childCount; i++) {
+          ppmm.getChildAt(i).sendAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_USS, {id: this._nextTotalMemoryId});
+          this._childrenToHearFrom.add(this._nextTotalMemoryId);
+          this._nextTotalMemoryId++;
+        }
+      } else {
+        boundHandleMemoryReport(
+          "MEMORY_TOTAL",
+          Ci.nsIMemoryReporter.UNITS_BYTES,
+          this._totalMemory);
+      }
+    }
 
     histogram.add(new Date() - startTime);
   },
@@ -1182,7 +1244,9 @@ var Impl = {
       }
 
       payloadObj.addonDetails = protect(() => AddonManagerPrivate.getTelemetryDetails());
-      payloadObj.UIMeasurements = protect(() => UITelemetry.getUIMeasurements());
+
+      let clearUIsession = !(reason == REASON_GATHER_PAYLOAD || reason == REASON_GATHER_SUBSESSION_PAYLOAD);
+      payloadObj.UIMeasurements = protect(() => UITelemetry.getUIMeasurements(clearUIsession));
 
       if (this._slowSQLStartup &&
           Object.keys(this._slowSQLStartup).length != 0 &&
@@ -1214,7 +1278,7 @@ var Impl = {
   getSessionPayload: function getSessionPayload(reason, clearSubsession) {
     this._log.trace("getSessionPayload - reason: " + reason + ", clearSubsession: " + clearSubsession);
 
-    const isMobile = ["gonk", "android"].indexOf(AppConstants.platform) !== -1;
+    const isMobile = ["gonk", "android"].includes(AppConstants.platform);
     const isSubsession = isMobile ? false : !this._isClassicReason(reason);
 
     if (isMobile) {
@@ -1332,6 +1396,8 @@ var Impl = {
     this._hasXulWindowVisibleObserver = true;
 
     ppml.addMessageListener(MESSAGE_TELEMETRY_PAYLOAD, this);
+    ppml.addMessageListener(MESSAGE_TELEMETRY_THREAD_HANGS, this);
+    ppml.addMessageListener(MESSAGE_TELEMETRY_USS, this);
 
     // Delay full telemetry initialization to give the browser time to
     // run various late initializers. Otherwise our gathered memory
@@ -1397,6 +1463,8 @@ var Impl = {
 
     Services.obs.addObserver(this, "content-child-shutdown", false);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD, this);
+    cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS, this);
+    cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_USS, this);
 
     this.gatherStartupHistograms();
 
@@ -1428,6 +1496,7 @@ var Impl = {
     switch (message.name) {
     case MESSAGE_TELEMETRY_PAYLOAD:
     {
+      // In parent process, receive Telemetry payload from child
       let source = message.data.childUUID;
       delete message.data.childUUID;
 
@@ -1453,8 +1522,62 @@ var Impl = {
     }
     case MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD:
     {
+      // In child process, send the requested Telemetry payload
       this.sendContentProcessPing("saved-session");
       break;
+    }
+    case MESSAGE_TELEMETRY_THREAD_HANGS:
+    {
+      // Accumulate child thread hang stats from this child
+      this._childThreadHangs.push(message.data);
+
+      // Check if we've got data from all the children, accounting for child processes dying
+      // if it happens before the last response is received and no new child processes are spawned at the exact same time
+      // If that happens, we can resolve the promise earlier rather than having to wait for the timeout to expire
+      // Basically, the number of replies is at most the number of messages sent out, this._childCount,
+      // and also at most the number of child processes that currently exist
+      if (this._childThreadHangs.length === Math.min(this._childCount, ppmm.childCount)) {
+        clearTimeout(this._childThreadHangsTimeout);
+
+        // Resolve all the promises that are waiting on these thread hang stats
+        // We resolve here instead of rejecting because
+        for (let resolve of this._childThreadHangsResolveFunctions) {
+          resolve(this._childThreadHangs);
+        }
+        this._childThreadHangsResolveFunctions = [];
+      }
+
+      break;
+    }
+    case MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS:
+    {
+      // In child process, send the requested child thread hangs
+      this.sendContentProcessThreadHangs();
+      break;
+    }
+    case MESSAGE_TELEMETRY_USS:
+    {
+      // In parent process, receive the USS report from the child
+      if (this._totalMemoryTimeout && this._childrenToHearFrom.delete(message.data.id)) {
+        this._totalMemory += message.data.bytes;
+        if (this._childrenToHearFrom.size == 0) {
+          clearTimeout(this._totalMemoryTimeout);
+          this._totalMemoryTimeout = undefined;
+          this.handleMemoryReport(
+            "MEMORY_TOTAL",
+            Ci.nsIMemoryReporter.UNITS_BYTES,
+            this._totalMemory);
+        }
+      } else {
+        this._log.trace("Child USS report was missed");
+      }
+      break;
+    }
+    case MESSAGE_TELEMETRY_GET_CHILD_USS:
+    {
+      // In child process, send the requested USS report
+      this.sendContentProcessUSS(message.data.id);
+      break
     }
     default:
       throw new Error("Telemetry.receiveMessage: bad message name");
@@ -1463,12 +1586,39 @@ var Impl = {
 
   _processUUID: generateUUID(),
 
+  sendContentProcessUSS: function sendContentProcessUSS(aMessageId) {
+    this._log.trace("sendContentProcessUSS");
+
+    let mgr;
+    try {
+      mgr = Cc["@mozilla.org/memory-reporter-manager;1"].
+            getService(Ci.nsIMemoryReporterManager);
+    } catch (e) {
+      // OK to skip memory reporters in xpcshell
+      return;
+    }
+
+    cpmm.sendAsyncMessage(
+      MESSAGE_TELEMETRY_USS,
+      {bytes: mgr.residentUnique, id: aMessageId}
+    );
+  },
+
   sendContentProcessPing: function sendContentProcessPing(reason) {
     this._log.trace("sendContentProcessPing - Reason " + reason);
     const isSubsession = !this._isClassicReason(reason);
     let payload = this.getSessionPayload(reason, isSubsession);
     payload.childUUID = this._processUUID;
     cpmm.sendAsyncMessage(MESSAGE_TELEMETRY_PAYLOAD, payload);
+  },
+
+  sendContentProcessThreadHangs: function sendContentProcessThreadHangs() {
+    this._log.trace("sendContentProcessThreadHangs");
+    let payload = {
+      childUUID: this._processUUID,
+      hangs: Telemetry.threadHangStats,
+    };
+    cpmm.sendAsyncMessage(MESSAGE_TELEMETRY_THREAD_HANGS, payload);
   },
 
    /**
@@ -1560,6 +1710,50 @@ var Impl = {
     ppmm.broadcastAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD, {});
   },
 
+  getChildThreadHangs: function getChildThreadHangs() {
+    return new Promise((resolve) => {
+      // Return immediately if there are no child processes to get stats from
+      if (ppmm.childCount === 0) {
+        resolve([]);
+        return;
+      }
+
+      // Register our promise so it will be resolved when we receive the child thread hang stats on the parent process
+      // The resolve functions will all be called from "receiveMessage" when a MESSAGE_TELEMETRY_THREAD_HANGS message comes in
+      this._childThreadHangsResolveFunctions.push((threadHangStats) => {
+        let hangs = threadHangStats.map(child => child.hangs);
+        return resolve(hangs);
+      });
+
+      // If we (the parent) are not currently in the process of requesting child thread hangs, request them
+      // If we are, then the resolve function we registered above will receive the results without needing to request them again
+      if (this._childThreadHangsResolveFunctions.length === 1) {
+        // We have to cache the number of children we send messages to, in case the child count changes while waiting for messages to arrive
+        // This handles the case where the child count increases later on, in which case the new processes won't respond since we never sent messages to them
+        this._childCount = ppmm.childCount;
+
+        this._childThreadHangs = []; // Clear the child hangs
+        for (let i = 0; i < this._childCount; i++) {
+          // If a child dies at exactly while we're running this loop, the message sending will fail but we won't get an exception
+          // In this case, since we won't know this has happened, we will simply rely on the timeout to handle it
+          ppmm.getChildAt(i).sendAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS);
+        }
+
+        // Set up a timeout in case one or more of the content processes never responds
+        this._childThreadHangsTimeout = setTimeout(() => {
+          // Resolve all the promises that are waiting on these thread hang stats
+          // We resolve here instead of rejecting because the purpose of this function is
+          // to retrieve the BHR stats from all processes that will give us stats
+          // As a result, one process failing simply means it doesn't get included in the result.
+          for (let resolve of this._childThreadHangsResolveFunctions) {
+            resolve(this._childThreadHangs);
+          }
+          this._childThreadHangsResolveFunctions = [];
+        }, 200);
+      }
+    });
+  },
+
   gatherStartup: function gatherStartup() {
     this._log.trace("gatherStartup");
     let counters = processInfo.getCounters();
@@ -1600,9 +1794,7 @@ var Impl = {
       Services.obs.removeObserver(this, "content-child-shutdown");
       this.uninstall();
 
-      if (Telemetry.isOfficialTelemetry) {
-        this.sendContentProcessPing(REASON_SAVED_SESSION);
-      }
+      this.sendContentProcessPing(REASON_SAVED_SESSION);
       break;
     case TOPIC_CYCLE_COLLECTOR_BEGIN:
       let now = new Date();
@@ -1659,15 +1851,13 @@ var Impl = {
       //    send the live data while in the foreground, or create the file again on the next
       //    backgrounding), or not (in which case we will delete it on submit, or overwrite
       //    it on the next backgrounding). Not deleting it is faster, so that's what we do.
-      if (Telemetry.isOfficialTelemetry) {
-        let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
-        let options = {
-          addClientId: true,
-          addEnvironment: true,
-          overwrite: true,
-        };
-        TelemetryController.addPendingPing(getPingType(payload), payload, options);
-      }
+      let payload = this.getSessionPayload(REASON_SAVED_SESSION, false);
+      let options = {
+        addClientId: true,
+        addEnvironment: true,
+        overwrite: true,
+      };
+      TelemetryController.addPendingPing(getPingType(payload), payload, options);
       break;
     }
   },
@@ -1692,20 +1882,15 @@ var Impl = {
         this._initialized = false;
       };
 
-      if (Telemetry.isOfficialTelemetry || testing) {
-        return Task.spawn(function*() {
-          yield this.saveShutdownPings();
+      return Task.spawn(function*() {
+        yield this.saveShutdownPings();
 
-          if (IS_UNIFIED_TELEMETRY) {
-            yield TelemetryController.removeAbortedSessionPing();
-          }
+        if (IS_UNIFIED_TELEMETRY) {
+          yield TelemetryController.removeAbortedSessionPing();
+        }
 
-          reset();
-        }.bind(this));
-      }
-
-      reset();
-      return Promise.resolve();
+        reset();
+      }.bind(this));
     };
 
     // We can be in one the following states here:
@@ -1815,7 +2000,7 @@ var Impl = {
       REASON_GATHER_PAYLOAD,
       REASON_TEST_PING,
     ];
-    return classicReasons.indexOf(reason) != -1;
+    return classicReasons.includes(reason);
   },
 
   /**

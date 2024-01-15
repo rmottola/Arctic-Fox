@@ -181,6 +181,7 @@ void
 Decoder::CompleteDecode()
 {
   // Implementation-specific finalization
+  BeforeFinishInternal();
   if (!HasError()) {
     FinishInternal();
   } else {
@@ -384,6 +385,7 @@ Decoder::AllocateFrameInternal(uint32_t aFrameNum,
  */
 
 void Decoder::InitInternal() { }
+void Decoder::BeforeFinishInternal() { }
 void Decoder::FinishInternal() { }
 void Decoder::FinishWithErrorInternal() { }
 

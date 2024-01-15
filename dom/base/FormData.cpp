@@ -23,37 +23,39 @@ FormData::FormData(nsISupports* aOwner)
 
 namespace {
 
-// Implements steps 3 and 4 of the "create an entry" algorithm of FormData.
 already_AddRefed<File>
-CreateNewFileInstance(Blob& aBlob, const Optional<nsAString>& aFilename,
-                      ErrorResult& aRv)
+GetOrCreateFileCalledBlob(Blob& aBlob, ErrorResult& aRv)
 {
-  // Step 3 "If value is a Blob object and not a File object, set value to
-  // a new File object, representing the same bytes, whose name attribute value
-  // is "blob"."
-  // Step 4 "If value is a File object and filename is given, set value to
-  // a new File object, representing the same bytes, whose name attribute
-  // value is filename."
-  nsAutoString filename;
-  if (aFilename.WasPassed()) {
-    filename = aFilename.Value();
-  } else {
-    // If value is already a File and filename is not passed, the spec says not
-    // to create a new instance.
-    RefPtr<File> file = aBlob.ToFile();
-    if (file) {
-      return file.forget();
-    }
-
-    filename = NS_LITERAL_STRING("blob");
+  // If this is file, we can just use it
+  RefPtr<File> file = aBlob.ToFile();
+  if (file) {
+    return file.forget();
   }
 
-  RefPtr<File> file = aBlob.ToFile(filename, aRv);
+  // Forcing 'blob' as filename
+  file = aBlob.ToFile(NS_LITERAL_STRING("blob"), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
   return file.forget();
+}
+
+already_AddRefed<File>
+GetBlobForFormDataStorage(Blob& aBlob, const Optional<nsAString>& aFilename,
+                          ErrorResult& aRv)
+{
+  // Forcing a filename
+  if (aFilename.WasPassed()) {
+    RefPtr<File> file = aBlob.ToFile(aFilename.Value(), aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+
+    return file.forget();
+  }
+
+  return GetOrCreateFileCalledBlob(aBlob, aRv);
 }
 
 } // namespace
@@ -78,7 +80,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(FormData)
 
   for (uint32_t i = 0, len = tmp->mFormData.Length(); i < len; ++i) {
     ImplCycleCollectionTraverse(cb, tmp->mFormData[i].value,
-                                "mFormData[i].GetAsFile()", 0);
+                                "mFormData[i].GetAsBlob()", 0);
   }
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
@@ -116,14 +118,14 @@ FormData::Append(const nsAString& aName, const nsAString& aValue,
 void
 FormData::Append(const nsAString& aName, Blob& aBlob,
                  const Optional<nsAString>& aFilename,
-                   ErrorResult& aRv)
+                 ErrorResult& aRv)
 {
-  RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename, aRv);
+  RefPtr<File> file = GetBlobForFormDataStorage(aBlob, aFilename, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;
   }
 
-  AddNameFilePair(aName, file);
+  AddNameBlobPair(aName, file);
 }
 
 void
@@ -140,7 +142,7 @@ FormData::Delete(const nsAString& aName)
 
 void
 FormData::Get(const nsAString& aName,
-              Nullable<OwningFileOrUSVString>& aOutValue)
+              Nullable<OwningBlobOrUSVString>& aOutValue)
 {
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
     if (aName.Equals(mFormData[i].name)) {
@@ -154,11 +156,11 @@ FormData::Get(const nsAString& aName,
 
 void
 FormData::GetAll(const nsAString& aName,
-                 nsTArray<OwningFileOrUSVString>& aValues)
+                 nsTArray<OwningBlobOrUSVString>& aValues)
 {
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
     if (aName.Equals(mFormData[i].name)) {
-      OwningFileOrUSVString* element = aValues.AppendElement();
+      OwningBlobOrUSVString* element = aValues.AppendElement();
       *element = mFormData[i].value;
     }
   }
@@ -177,12 +179,18 @@ FormData::Has(const nsAString& aName)
 }
 
 nsresult
-FormData::AddNameFilePair(const nsAString& aName, File* aFile)
+FormData::AddNameBlobPair(const nsAString& aName, Blob* aBlob)
 {
-  MOZ_ASSERT(aFile);
+  MOZ_ASSERT(aBlob);
+
+  ErrorResult rv;
+  RefPtr<File> file = GetOrCreateFileCalledBlob(*aBlob, rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
+  }
 
   FormDataTuple* data = mFormData.AppendElement();
-  SetNameFilePair(data, aName, aFile);
+  SetNameFilePair(data, aName, file);
   return NS_OK;
 }
 
@@ -215,7 +223,7 @@ FormData::Set(const nsAString& aName, Blob& aBlob,
 {
   FormDataTuple* tuple = RemoveAllOthersAndGetFirstFormDataTuple(aName);
   if (tuple) {
-    RefPtr<File> file = CreateNewFileInstance(aBlob, aFilename, aRv);
+    RefPtr<File> file = GetBlobForFormDataStorage(aBlob, aFilename, aRv);
     if (NS_WARN_IF(aRv.Failed())) {
       return;
     }
@@ -251,7 +259,7 @@ FormData::GetKeyAtIndex(uint32_t aIndex) const
   return mFormData[aIndex].name;
 }
 
-const OwningFileOrUSVString&
+const OwningBlobOrUSVString&
 FormData::GetValueAtIndex(uint32_t aIndex) const
 {
   MOZ_ASSERT(aIndex < mFormData.Length());
@@ -277,7 +285,7 @@ FormData::SetNameFilePair(FormDataTuple* aData,
   MOZ_ASSERT(aFile);
 
   aData->name = aName;
-  aData->value.SetAsFile() = aFile;
+  aData->value.SetAsBlob() = aFile;
 }
 
 // -------------------------------------------------------------------------
@@ -358,8 +366,8 @@ FormData::GetSendInfo(nsIInputStream** aBody, uint64_t* aContentLength,
   nsFSMultipartFormData fs(NS_LITERAL_CSTRING("UTF-8"), nullptr);
 
   for (uint32_t i = 0; i < mFormData.Length(); ++i) {
-    if (mFormData[i].value.IsFile()) {
-      fs.AddNameFilePair(mFormData[i].name, mFormData[i].value.GetAsFile());
+    if (mFormData[i].value.IsBlob()) {
+      fs.AddNameBlobPair(mFormData[i].name, mFormData[i].value.GetAsBlob());
     } else if (mFormData[i].value.IsUSVString()) {
       fs.AddNameValuePair(mFormData[i].name,
                           mFormData[i].value.GetAsUSVString());

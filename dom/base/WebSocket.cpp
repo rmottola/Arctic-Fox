@@ -2116,17 +2116,6 @@ public:
     return true;
   }
 
-  bool Suspend(JSContext* aCx) override
-  {
-    {
-      MutexAutoLock lock(mWebSocketImpl->mMutex);
-      mWebSocketImpl->mWorkerShuttingDown = true;
-    }
-
-    mWebSocketImpl->CloseConnection(nsIWebSocketChannel::CLOSE_GOING_AWAY);
-    return true;
-  }
-
 private:
   WebSocketImpl* mWebSocketImpl;
 };

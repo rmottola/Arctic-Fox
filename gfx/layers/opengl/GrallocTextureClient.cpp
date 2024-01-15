@@ -12,6 +12,7 @@
 #include "mozilla/layers/ISurfaceAllocator.h"
 #include "mozilla/layers/ShadowLayerUtilsGralloc.h"
 #include "gfx2DGlue.h"
+#include "gfxPrefs.h" // for gfxPrefs
 #include "SharedSurfaceGralloc.h"
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
@@ -33,14 +34,6 @@ DisableGralloc(SurfaceFormat aFormat, const gfx::IntSize& aSizeHint)
   if (aFormat == gfx::SurfaceFormat::A8) {
     return true;
   }
-#if ANDROID_VERSION <= 15
-  // Adreno 200 has a problem of drawing gralloc buffer width less than 64 and
-  // drawing gralloc buffer with a height 9px-16px.
-  // See Bug 983971.
-  if (aSizeHint.width < 64 || aSizeHint.height < 32) {
-    return true;
-  }
-#endif
 
   return false;
 }
@@ -345,6 +338,20 @@ GrallocTextureData::CreateForDrawing(gfx::IntSize aSize, gfx::SurfaceFormat aFor
   if (DisableGralloc(aFormat, aSize)) {
     return nullptr;
   }
+
+#if ANDROID_VERSION <= 15
+  // Adreno 200 has a problem of drawing gralloc buffer width less than 64 and
+  // drawing gralloc buffer with a height 9px-16px.
+  // See Bug 983971.
+  // We only have this restriction in TextureClients that we'll use for drawing
+  // (not with WebGL for instance). Not sure why that's OK, but we have tests that
+  // rely on being able to create 32x32 webgl canvases with gralloc, so moving
+  // this check in DisableGralloc will break them.
+  if (aSize.width < 64 || aSize.height < 32) {
+    return nullptr;
+  }
+#endif
+
   uint32_t usage = android::GraphicBuffer::USAGE_SW_READ_OFTEN |
                    android::GraphicBuffer::USAGE_SW_WRITE_OFTEN |
                    android::GraphicBuffer::USAGE_HW_TEXTURE;

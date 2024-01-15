@@ -219,7 +219,6 @@ class CodeGeneratorShared : public LElementVisitor
     inline Operand ToOperand(const LDefinition* def);
 
   protected:
-
 #ifdef CHECK_OSIPOINT_REGISTERS
     void resetOsiPointRegs(LSafepoint* safepoint);
     bool shouldVerifyOsiPointRegs(LSafepoint* safepoint);
