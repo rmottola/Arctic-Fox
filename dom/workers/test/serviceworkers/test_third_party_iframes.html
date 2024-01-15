@@ -94,7 +94,7 @@ function testShouldIntercept(done) {
   }, {
     status: "swresponse",
     next: function() {
-      iframe.src = origin + basePath + "unregister.html";
+      iframe.src = thirdPartyOrigin + basePath + "unregister.html";
     }
   }, {
     status: "unregistrationdone",
@@ -121,7 +121,7 @@ function testShouldNotIntercept(done) {
   }, {
     status: "networkresponse",
     next: function() {
-      iframe.src = origin + basePath + "unregister.html";
+      iframe.src = thirdPartyOrigin + basePath + "unregister.html";
     }
   }, {
     status: "unregistrationdone",
