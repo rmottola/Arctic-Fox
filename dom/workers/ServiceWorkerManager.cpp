@@ -14,7 +14,6 @@
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
-#include "nsIJARChannel.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIMutableArray.h"
 #include "nsIScriptError.h"
@@ -1649,15 +1648,7 @@ ServiceWorkerManager::Register(mozIDOMWindow* aWindow,
   aScriptURI->SchemeIs("http", &isHttp);
   aScriptURI->SchemeIs("https", &isHttps);
   if (NS_WARN_IF(!isHttp && !isHttps)) {
-#ifdef RELEASE_BUILD
     return NS_ERROR_DOM_SECURITY_ERR;
-#else
-    bool isApp = false;
-    aScriptURI->SchemeIs("app", &isApp);
-    if (NS_WARN_IF(!isApp)) {
-    return NS_ERROR_DOM_SECURITY_ERR;
-    }
-#endif
   }
 
   nsCString cleanedScope;
