@@ -378,6 +378,18 @@ BrowserGlue.prototype = {
       case "profile-before-change":
         this._onProfileShutdown();
         break;
+      case "keyword-search":
+        // This notification is broadcast by the docshell when it "fixes up" a
+        // URI that it's been asked to load into a keyword search.
+        let engine = null;
+        try {
+          engine = subject.QueryInterface(Ci.nsISearchEngine);
+        } catch (ex) {
+          Cu.reportError(ex);
+        }
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        win.BrowserSearch.recordSearchInTelemetry(engine, "urlbar");
+        break;
       case "browser-search-engine-modified":
         // Ensure we cleanup the hiddenOneOffs pref when removing
         // an engine, and that newly added engines are visible.

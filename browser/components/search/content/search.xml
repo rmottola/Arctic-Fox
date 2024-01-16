@@ -472,9 +472,16 @@
                   Components.utils.reportError("Saving search to form history failed: " + aError.message);
               }});
           }
-          
+
+          let engine = aEngine || this.currentEngine;
+          var submission = engine.getSubmission(aData, null, "searchbar");
+          let telemetrySearchDetails = this.telemetrySearchDetails;
+          this.telemetrySearchDetails = null;
+          if (telemetrySearchDetails && telemetrySearchDetails.index == -1) {
+            telemetrySearchDetails = null;
+          }
+          BrowserSearch.recordSearchInTelemetry(engine, "searchbar", telemetrySearchDetails);
           // null parameter below specifies HTML response for search
-          var submission = this.currentEngine.getSubmission(aData);
           let params = {
             postData: submission.postData,
             inBackground: aWhere == "tab-background"

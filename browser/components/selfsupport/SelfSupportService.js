@@ -8,18 +8,9 @@ const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm");
 
-const policy = Cc["@mozilla.org/datareporting/service;1"]
-                 .getService(Ci.nsISupports)
-                 .wrappedJSObject
-                 .policy;
-
-XPCOMUtils.defineLazyGetter(this, "reporter", () => {
-  return Cc["@mozilla.org/datareporting/service;1"]
-           .getService(Ci.nsISupports)
-           .wrappedJSObject
-           .healthReporter;
-});
+const PREF_FHR_UPLOAD_ENABLED = "datareporting.healthreport.uploadEnabled";
 
 XPCOMUtils.defineLazyModuleGetter(this, "TelemetryArchive",
                                   "resource://gre/modules/TelemetryArchive.jsm");
@@ -44,32 +35,11 @@ MozSelfSupportInterface.prototype = {
   },
 
   get healthReportDataSubmissionEnabled() {
-    return policy.healthReportUploadEnabled;
+    return Preferences.get(PREF_FHR_UPLOAD_ENABLED, false);
   },
 
   set healthReportDataSubmissionEnabled(enabled) {
-    let reason = "Self-support interface sent " +
-                 (enabled ? "opt-in" : "opt-out") +
-                 " command.";
-    policy.recordHealthReportUploadEnabled(enabled, reason);
-  },
-
-  getHealthReportPayload: function () {
-    return new this._window.Promise(function (aResolve, aReject) {
-      if (reporter) {
-        let resolvePayload = function () {
-          reporter.collectAndObtainJSONPayload(true).then(aResolve, aReject);
-        };
-
-        if (reporter.initialized) {
-          resolvePayload();
-        } else {
-          reporter.onInit().then(resolvePayload, aReject);
-        }
-      } else {
-        aReject(new Error("No reporter"));
-      }
-    }.bind(this));
+    Preferences.set(PREF_FHR_UPLOAD_ENABLED, enabled);
   },
 
   resetPref: function(name) {
