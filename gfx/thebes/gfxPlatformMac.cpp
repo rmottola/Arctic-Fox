@@ -99,10 +99,37 @@ gfxPlatformMac::gfxPlatformMac()
     MacIOSurfaceLib::LoadLibrary();
 }
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
 gfxPlatformMac::~gfxPlatformMac()
 {
     gfxCoreTextShaper::Shutdown();
 }
+
+ByteCount
+gfxPlatformMac::GetCachedDirSizeForFont(nsString name)
+{
+	FontDirWrapper *x = PlatformFontDirCache.Get(name);
+	if (x) return x->sizer;
+	return 0;
+}
+uint8_t*
+gfxPlatformMac::GetCachedDirForFont(nsString name)
+{
+	FontDirWrapper *x = PlatformFontDirCache.Get(name);
+	if (x)
+		return x->fontDir;
+	else
+		return nullptr;
+}
+void
+gfxPlatformMac::SetCachedDirForFont(nsString name, uint8_t* table, ByteCount sizer)
+{
+	if (MOZ_UNLIKELY(sizer < 1 || sizer > 1023)) return;
+
+	FontDirWrapper *k = new FontDirWrapper(sizer, table);
+	PlatformFontDirCache.Put(name, k);
+}
+#endif
 
 gfxPlatformFontList*
 gfxPlatformMac::CreatePlatformFontList()
