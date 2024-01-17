@@ -45,6 +45,7 @@ class nsTextFrame : public nsTextFrameBase {
   typedef mozilla::gfx::Point Point;
   typedef mozilla::gfx::Rect Rect;
   typedef mozilla::gfx::Size Size;
+  typedef gfxTextRun::Range Range;
 
 public:
   NS_DECL_QUERYFRAME_TARGET(nsTextFrame)
@@ -416,8 +417,7 @@ public:
                               const gfxPoint& aTextBaselinePt,
                               const gfxRect& aDirtyRect,
                               PropertyProvider& aProvider,
-                              uint32_t aContentOffset,
-                              uint32_t aContentLength,
+                              Range aRange,
                               nsTextPaintStyle& aTextPaintStyle,
                               const nsCharClipDisplayItem::ClipEdges& aClipEdges,
                               gfxTextContextPaint* aContextPaint,
@@ -432,8 +432,7 @@ public:
                                     const gfxPoint& aTextBaselinePt,
                                     const gfxRect& aDirtyRect,
                                     PropertyProvider& aProvider,
-                                    uint32_t aContentOffset,
-                                    uint32_t aContentLength,
+                                    Range aContentRange,
                                     nsTextPaintStyle& aTextPaintStyle,
                                     SelectionDetails* aDetails,
                                     SelectionType* aAllTypes,
@@ -445,8 +444,7 @@ public:
                                      const gfxPoint& aTextBaselinePt,
                                      const gfxRect& aDirtyRect,
                                      PropertyProvider& aProvider,
-                                     uint32_t aContentOffset,
-                                     uint32_t aContentLength,
+                                     Range aContentRange,
                                      nsTextPaintStyle& aTextPaintStyle,
                                      SelectionDetails* aDetails,
                                      SelectionType aSelectionType,
@@ -455,7 +453,7 @@ public:
   void DrawEmphasisMarks(gfxContext* aContext,
                          mozilla::WritingMode aWM,
                          const gfxPoint& aTextBaselinePt,
-                         uint32_t aOffset, uint32_t aLength,
+                         Range aRange,
                          const nscolor* aDecorationOverrideColor,
                          PropertyProvider& aProvider);
 
@@ -608,8 +606,7 @@ protected:
   nsRect UpdateTextEmphasis(mozilla::WritingMode aWM,
                             PropertyProvider& aProvider);
 
-  void PaintOneShadow(uint32_t aOffset,
-                      uint32_t aLength,
+  void PaintOneShadow(Range aRange,
                       nsCSSShadowItem* aShadowDetails,
                       PropertyProvider* aProvider,
                       const nsRect& aDirtyRect,
@@ -623,7 +620,7 @@ protected:
                       uint32_t aBlurFlags);
 
   void PaintShadows(nsCSSShadowArray* aShadow,
-                    uint32_t aOffset, uint32_t aLength,
+                    Range aRange,
                     const nsRect& aDirtyRect,
                     const gfxPoint& aFramePt,
                     const gfxPoint& aTextBaselinePt,
@@ -709,8 +706,7 @@ protected:
 
   void DrawTextRun(gfxContext* const aCtx,
                    const gfxPoint& aTextBaselinePt,
-                   uint32_t aOffset,
-                   uint32_t aLength,
+                   Range aRange,
                    PropertyProvider& aProvider,
                    nscolor aTextColor,
                    gfxFloat& aAdvanceWidth,
@@ -722,8 +718,7 @@ protected:
                                  const gfxRect& aDirtyRect,
                                  const gfxPoint& aFramePt,
                                  const gfxPoint& aTextBaselinePt,
-                                 uint32_t aOffset,
-                                 uint32_t aLength,
+                                 Range aRange,
                                  PropertyProvider& aProvider,
                                  const nsTextPaintStyle& aTextStyle,
                                  nscolor aTextColor,
@@ -739,8 +734,7 @@ protected:
                 const gfxRect& aDirtyRect,
                 const gfxPoint& aFramePt,
                 const gfxPoint& aTextBaselinePt,
-                uint32_t aOffset,
-                uint32_t aLength,
+                Range aRange,
                 PropertyProvider& aProvider,
                 const nsTextPaintStyle& aTextStyle,
                 nscolor aTextColor,
