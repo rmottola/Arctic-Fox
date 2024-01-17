@@ -940,6 +940,11 @@ gfxMacPlatformFontList::InitSystemFonts()
 #endif
     }
 
+    nsAutoCString en("en");
+    nsAutoTArray<gfxFontFamily*,10> list;
+    LookupFontCascadeForLang(en, list);
+    mDefaultCascadeLangs.PutEntry(en);
+    mDefaultCascadeFamilies.AppendElements(list);
 }
 
 gfxFontFamily*
