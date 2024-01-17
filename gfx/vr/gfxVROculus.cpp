@@ -148,7 +148,6 @@ InitializeOculusCAPI()
     }
 
     if (!ovrlib) {
-      printf_stderr("Failed to load Oculus VR library!\n");
       return false;
     }
   }
