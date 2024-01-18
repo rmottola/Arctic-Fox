@@ -7,7 +7,7 @@
   background-repeat: no-repeat;
   background-color: #100000;
   background-size: cover;
-  color: #E0E0FF; 
+  color: #000000;
 }
 
 #PMleftBox {
@@ -25,8 +25,12 @@
   margin-right: 30px;
 }
 
+#detailsBox > description {
+  color: #000066;
+}
+
 #detailsBox > description > .text-link {
-  color: #CDC36F;
+  color: #1111CC;
 }
 
 #PMbottomBox {
