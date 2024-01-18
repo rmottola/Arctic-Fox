@@ -99,12 +99,14 @@ gfxPlatformMac::gfxPlatformMac()
     MacIOSurfaceLib::LoadLibrary();
 }
 
-#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
 gfxPlatformMac::~gfxPlatformMac()
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     gfxCoreTextShaper::Shutdown();
+#endif
 }
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
 ByteCount
 gfxPlatformMac::GetCachedDirSizeForFont(nsString name)
 {
