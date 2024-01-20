@@ -4021,12 +4021,6 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
     aEndBevelOffset = 0;
   }
 
-  gfxContext *ctx = aContext.ThebesContext();
-  AntialiasMode oldMode = ctx->CurrentAntialiasMode();
-  ctx->SetAntialiasMode(AntialiasMode::NONE);
-
-  ctx->SetColor(Color::FromABGR(aBorderColor));
-
   DrawTarget& drawTarget = *aContext.GetDrawTarget();
 
   switch (aBorderStyle) {
@@ -4108,8 +4102,6 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
       nscolor bevelColor = MakeBevelColor(ridgeGrooveSide, ridgeGroove,
                                           aBGColor->mBackgroundColor,
                                           aBorderColor);
-      // XXXbz is this SetColor call still needed?
-      ctx->SetColor(Color::FromABGR(bevelColor));
       nsRect rect(aBorder);
       nscoord half;
       if (horizontal) { // top, bottom
@@ -4149,8 +4141,6 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
       // background color, but I don't care.
       bevelColor = MakeBevelColor(ridgeGrooveSide, ridgeGroove,
                                   aBGColor->mBackgroundColor, aBorderColor);
-      // XXXbz is this SetColor call still needed?
-      ctx->SetColor(Color::FromABGR(bevelColor));
       if (horizontal) {
         rect.y = rect.y + half;
         rect.height = aBorder.height - half;
@@ -4272,8 +4262,6 @@ nsCSSRendering::DrawTableBorderSegment(nsRenderingContext&     aContext,
     NS_ASSERTION(false, "Unexpected 'auto' table border");
     break;
   }
-
-  ctx->SetAntialiasMode(oldMode);
 }
 
 // End table border-collapsing section
