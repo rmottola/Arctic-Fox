@@ -880,7 +880,15 @@
                      label="&listAllTabs.label;"
                      tooltiptext="&listAllTabs.label;"
                      removable="true">
-        <menupopup id="alltabs-popup" position="after_end"/>
+        <menupopup id="alltabs-popup"
+                   position="after_end">
+          <menuitem id="alltabs_undoCloseTab"
+                    class="menuitem-iconic"
+                    key="key_undoCloseTab"
+                    label="&undoCloseTab.label;"
+                    observes="History:UndoCloseTab"/>
+          <menuseparator id="alltabs-popup-separator"/>
+        </menupopup>
       </toolbarbutton>
 
       <toolbarbutton id="tabs-closebutton"
