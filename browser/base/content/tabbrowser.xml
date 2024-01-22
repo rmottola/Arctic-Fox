@@ -938,51 +938,24 @@
         <parameter name="aTab"/>
         <body>
           <![CDATA[
-            // Bug 691610 - e10s support for useDefaultIcon
-            if (gMultiProcessBrowser)
-              return;
-
             var browser = this.getBrowserForTab(aTab);
-            var docURIObject = browser.contentDocument.documentURIObject;
+            var documentURI = browser.documentURI;
             var icon = null;
-            <!-- Pale Moon: new image icon method, see bug #305986 -->
-            let req = browser.contentDocument.imageRequest;
-            let sz = Services.prefs.getIntPref("browser.chrome.image_icons.max_size");
-            if (browser.contentDocument instanceof ImageDocument && 
-                req && req.image) {
-              if (Services.prefs.getBoolPref("browser.chrome.site_icons") && sz) {
-                try {
-                  <!-- Main method: draw on a hidden canvas -->
-                  var canvas = document.createElementNS("http://www.w3.org/1999/xhtml", "canvas");
-                  var tabImg = document.getAnonymousElementByAttribute(aTab, "anonid", "tab-icon");
-                  var w = tabImg.boxObject.width;
-                  var h = tabImg.boxObject.height;
-                  canvas.width = w;
-                  canvas.height = h;
-                  var ctx = canvas.getContext('2d');
-                  ctx.drawImage(browser.contentDocument.body.firstChild, 0, 0, w, h);
-                  icon = canvas.toDataURL();
-                }
-                catch (e) { 
-                  <!-- Fallback method in case canvas method fails, restricted by sz -->
-                  try {
-                  
-                    if (req &&
-                        req.image &&
-                        req.image.width <= sz &&
-                        req.image.height <= sz)
-                      icon = browser.currentURI;
-                  } 
-                  catch (e) { 
-                    <!-- Both methods fail (very large or corrupt image): icon remains null -->
-                  }
+
+            if (browser.imageDocument) {
+              if (Services.prefs.getBoolPref("browser.chrome.site_icons")) {
+                let sz = Services.prefs.getIntPref("browser.chrome.image_icons.max_size");
+                if (browser.imageDocument.width <= sz &&
+                    browser.imageDocument.height <= sz) {
+                  icon = browser.currentURI;
                 }
               }
             }
+
             // Use documentURIObject in the check for shouldLoadFavIcon so that we
             // do the right thing with about:-style error pages.  Bug 453442
-            else if (this.shouldLoadFavIcon(docURIObject)) {
-              let url = docURIObject.prePath + "/favicon.ico";
+            if (!icon && this.shouldLoadFavIcon(documentURI)) {
+              let url = documentURI.prePath + "/favicon.ico";
               if (!this.isFailedIcon(url))
                 icon = url;
             }
