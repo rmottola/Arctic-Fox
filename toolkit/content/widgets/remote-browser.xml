@@ -219,18 +219,6 @@
         ]]></getter>
       </property>
 
-      <field name="_outerWindowID">null</field>
-      <property name="outerWindowID"
-                onget="return this._outerWindowID"
-                readonly="true"/>
-
-      <field name="_innerWindowID">null</field>
-      <property name="innerWindowID">
-        <getter><![CDATA[
-          return this._innerWindowID;
-        ]]></getter>
-      </property>
-
       <property name="autoCompletePopup"
                 onget="return document.getElementById(this.getAttribute('autocompletepopup'))"
                 readonly="true"/>
@@ -477,20 +465,6 @@
                 let menulist = document.getElementById(this.getAttribute("selectmenulist"));
                 this._selectParentHelper.hide(menulist);
               }
-              break;
-            }
-
-            case "DOMFullscreen:RequestExit": {
-              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                                      .getInterface(Ci.nsIDOMWindowUtils);
-              windowUtils.exitFullscreen();
-              break;
-            }
-
-            case "DOMFullscreen:RequestRollback": {
-              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                                      .getInterface(Ci.nsIDOMWindowUtils);
-              windowUtils.remoteFrameFullscreenReverted();
               break;
             }
 
