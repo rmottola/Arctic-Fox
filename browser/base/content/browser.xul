@@ -206,6 +206,24 @@
 
     <menupopup id="toolbar-context-menu"
                onpopupshowing="onViewToolbarsPopupShowing(event);">
+      <menuitem id="toolbar-context-reloadAllTabs"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                oncommand="gBrowser.reloadAllTabs();"
+                label="&reloadAllTabs.label;"
+                accesskey="&toolbarContextMenu.reloadAllTabs.accesskey;"/>
+      <menuitem id="toolbar-context-bookmarkAllTabs"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                command="Browser:BookmarkAllTabs"
+                label="&bookmarkAllTabs.label;"
+                accesskey="&toolbarContextMenu.bookmarkAllTabs.accesskey;"/>
+      <menuitem id="toolbar-context-undoCloseTab"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                label="&undoCloseTab.label;"
+                accesskey="&toolbarContextMenu.undoCloseTab.accesskey;"
+                observes="History:UndoCloseTab"/>
       <menuseparator/>
       <menuitem command="cmd_ToggleTabsOnTop"
                 type="checkbox"
