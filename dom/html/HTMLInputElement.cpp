@@ -400,8 +400,8 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
     while (NS_SUCCEEDED(iter->HasMoreElements(&hasMore)) && hasMore) {
       iter->GetNext(getter_AddRefs(tmp));
       nsCOMPtr<nsIDOMBlob> domBlob = do_QueryInterface(tmp);
-      NS_WARN_IF_FALSE(domBlob,
-                       "Null file object from FilePicker's file enumerator?");
+      MOZ_ASSERT(domBlob,
+                 "Null file object from FilePicker's file enumerator?");
       if (domBlob) {
         newFiles.AppendElement(static_cast<File*>(domBlob.get()));
       }
@@ -1136,6 +1136,15 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
           LoadImage(src, false, aNotify, eImageLoadType_Normal);
         }
       }
+
+      if (mType == NS_FORM_INPUT_PASSWORD && IsInComposedDoc()) {
+        AsyncEventDispatcher* dispatcher =
+          new AsyncEventDispatcher(this,
+                                   NS_LITERAL_STRING("DOMInputPasswordAdded"),
+                                   true,
+                                   true);
+        dispatcher->PostDOMEvent();
+      }
     }
 
     if (aName == nsGkAtoms::required || aName == nsGkAtoms::disabled ||
@@ -1154,7 +1163,6 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       UpdateTypeMismatchValidityState();
     } else if (aName == nsGkAtoms::max) {
       UpdateHasRange();
-      UpdateRangeOverflowValidityState();
       if (mType == NS_FORM_INPUT_RANGE) {
         // The value may need to change when @max changes since the value may
         // have been invalid and can now change to a valid value, or vice
@@ -1172,25 +1180,34 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
         nsresult rv =
           SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
         NS_ENSURE_SUCCESS(rv, rv);
-        MOZ_ASSERT(!GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
-                   "HTML5 spec does not allow this");
       }
+      // Validity state must be updated *after* the SetValueInternal call above
+      // or else the following assert will not be valid.
+      // We don't assert the state of underflow during parsing since
+      // DoneCreatingElement sanitizes.
+      UpdateRangeOverflowValidityState();
+      MOZ_ASSERT(mParserCreating ||
+                 mType != NS_FORM_INPUT_RANGE ||
+                 !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
+                 "HTML5 spec does not allow underflow for type=range");
     } else if (aName == nsGkAtoms::min) {
       UpdateHasRange();
+      if (mType == NS_FORM_INPUT_RANGE) {
+        // See @max comment
+        nsAutoString value;
+        GetValue(value);
+        nsresult rv =
+          SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
+      // See corresponding @max comment
       UpdateRangeUnderflowValidityState();
       UpdateStepMismatchValidityState();
-      if (mType == NS_FORM_INPUT_RANGE) {
-        // See @max comment
-        nsAutoString value;
-        GetValue(value);
-        nsresult rv =
-          SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
-        NS_ENSURE_SUCCESS(rv, rv);
-        MOZ_ASSERT(!GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
-                   "HTML5 spec does not allow this");
-      }
+      MOZ_ASSERT(mParserCreating ||
+                 mType != NS_FORM_INPUT_RANGE ||
+                 !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
+                 "HTML5 spec does not allow underflow for type=range");
     } else if (aName == nsGkAtoms::step) {
-      UpdateStepMismatchValidityState();
       if (mType == NS_FORM_INPUT_RANGE) {
         // See @max comment
         nsAutoString value;
@@ -1198,9 +1215,13 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
         nsresult rv =
           SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
         NS_ENSURE_SUCCESS(rv, rv);
-        MOZ_ASSERT(!GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
-                   "HTML5 spec does not allow this");
       }
+      // See corresponding @max comment
+      UpdateStepMismatchValidityState();
+      MOZ_ASSERT(mParserCreating ||
+                 mType != NS_FORM_INPUT_RANGE ||
+                 !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
+                 "HTML5 spec does not allow underflow for type=range");
     } else if (aName == nsGkAtoms::dir &&
                aValue && aValue->Equals(nsGkAtoms::_auto, eIgnoreCase)) {
       SetDirectionIfAuto(true, aNotify);
@@ -2475,6 +2496,11 @@ FileList*
 HTMLInputElement::GetFiles()
 {
   if (mType != NS_FORM_INPUT_FILE) {
+    return nullptr;
+  }
+
+  if (Preferences::GetBool("dom.input.dirpicker", false) &&
+      HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
     return nullptr;
   }
 
@@ -4210,11 +4236,20 @@ HTMLInputElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   // And now make sure our state is up to date
   UpdateState(false);
 
-#ifdef EARLY_BETA_OR_EARLIER
   if (mType == NS_FORM_INPUT_PASSWORD) {
+    if (IsInComposedDoc()) {
+      AsyncEventDispatcher* dispatcher =
+        new AsyncEventDispatcher(this,
+                                 NS_LITERAL_STRING("DOMInputPasswordAdded"),
+                                 true,
+                                 true);
+      dispatcher->PostDOMEvent();
+    }
+
+#ifdef EARLY_BETA_OR_EARLIER
     Telemetry::Accumulate(Telemetry::PWMGR_PASSWORD_INPUT_IN_FORM, !!mForm);
-  }
 #endif
+  }
 
   return rv;
 }
@@ -4842,6 +4877,11 @@ HTMLInputElement::ChooseDirectory(ErrorResult& aRv)
 already_AddRefed<Promise>
 HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
 {
+  if (mType != NS_FORM_INPUT_FILE) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
+
   if (mFilesAndDirectoriesPromise) {
     return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
   }
@@ -5532,14 +5572,14 @@ HTMLInputElement::SubmitNamesValues(nsFormSubmission* aFormSubmission)
     const nsTArray<RefPtr<File>>& files = GetFilesInternal();
 
     for (uint32_t i = 0; i < files.Length(); ++i) {
-      aFormSubmission->AddNameFilePair(name, files[i]);
+      aFormSubmission->AddNameBlobPair(name, files[i]);
     }
 
     if (files.IsEmpty()) {
       RefPtr<BlobImpl> blobImpl =
-        new BlobImplEmptyFile(NS_LITERAL_STRING("application/octet-stream"));
-      RefPtr<File> file = File::Create(OwnerDoc()->GetInnerWindow(), blobImpl);
-      aFormSubmission->AddNameFilePair(name, file);
+        new EmptyBlobImpl(NS_LITERAL_STRING("application/octet-stream"));
+      RefPtr<Blob> blob = Blob::Create(OwnerDoc()->GetInnerWindow(), blobImpl);
+      aFormSubmission->AddNameBlobPair(name, blob);
     }
 
     return NS_OK;

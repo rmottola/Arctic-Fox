@@ -128,7 +128,7 @@ ContactDB.prototype = {
         uri: NetUtil.newURI(contactsFile),
         loadUsingSystemPrincipal: true});
 
-      let stream = chan.open();
+      let stream = chan.open2();
       // Obtain a converter to read from a UTF-8 encoded input stream.
       let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
                       .createInstance(Ci.nsIScriptableUnicodeConverter);
@@ -236,7 +236,7 @@ ContactDB.prototype = {
           objectStore = aTransaction.objectStore(STORE_NAME);
         }
         // Delete old tel index.
-        if (objectStore.indexNames.includes("tel")) {
+        if (objectStore.indexNames.contains("tel")) {
           objectStore.deleteIndex("tel");
         }
 
@@ -269,7 +269,7 @@ ContactDB.prototype = {
         }
 
         // Delete old email index.
-        if (objectStore.indexNames.includes("email")) {
+        if (objectStore.indexNames.contains("email")) {
           objectStore.deleteIndex("email");
         }
 
@@ -376,7 +376,7 @@ ContactDB.prototype = {
         }
 
         // Delete old tel index (not on the right field).
-        if (objectStore.indexNames.includes("tel")) {
+        if (objectStore.indexNames.contains("tel")) {
           objectStore.deleteIndex("tel");
         }
 
@@ -469,7 +469,7 @@ ContactDB.prototype = {
         if (!objectStore) {
           objectStore = aTransaction.objectStore(STORE_NAME);
         }
-        if (!objectStore.indexNames.includes("telMatch")) {
+        if (!objectStore.indexNames.contains("telMatch")) {
           objectStore.createIndex("telMatch", "search.parsedTel", {multiEntry: true});
         }
         objectStore.openCursor().onsuccess = function(event) {
@@ -693,7 +693,7 @@ ContactDB.prototype = {
 
         // an earlier version of this code could have run, so checking whether
         // the index exists
-        if (!objectStore.indexNames.includes("name")) {
+        if (!objectStore.indexNames.contains("name")) {
           objectStore.createIndex("name", "properties.name", { multiEntry: true });
           objectStore.createIndex("nameLowerCase", "search.name", { multiEntry: true });
         }
@@ -1039,7 +1039,7 @@ ContactDB.prototype = {
           contactsArray.push(aContacts[i]);
         }
 
-        let contactIdsArray = contactsArray.map(function(el) el.id);
+        let contactIdsArray = contactsArray.map(el => el.id);
 
         // save contact ids in cache
         this.newTxn("readwrite", SAVED_GETALL_STORE_NAME, function(txn, store) {
@@ -1225,7 +1225,7 @@ ContactDB.prototype = {
     if (DEBUG) debug("ContactDB:find val:" + aOptions.filterValue + " by: " + aOptions.filterBy + " op: " + aOptions.filterOp);
     let self = this;
     this.newTxn("readonly", STORE_NAME, function (txn, store) {
-      let filterOps = ["equals", "includes", "match", "startsWith"];
+      let filterOps = ["equals", "contains", "match", "startsWith"];
       if (aOptions && (filterOps.indexOf(aOptions.filterOp) >= 0)) {
         self._findWithIndex(txn, store, aOptions);
       } else {
@@ -1327,9 +1327,9 @@ ContactDB.prototype = {
 
         request = index.mozGetAll(normalized, limit);
       } else {
-        // XXX: "includes" should be handled separately, this is "startsWith"
-        if (options.filterOp === 'includes' && key !== 'tel') {
-          dump("ContactDB: 'includes' only works for 'tel'. Falling back " +
+        // XXX: "contains" should be handled separately, this is "startsWith"
+        if (options.filterOp === 'contains' && key !== 'tel') {
+          dump("ContactDB: 'contains' only works for 'tel'. Falling back " +
                "to 'startsWith'.\n");
         }
         // not case sensitive

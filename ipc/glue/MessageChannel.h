@@ -301,6 +301,7 @@ class MessageChannel : HasResultCodes
 
     bool ShouldContinueFromTimeout();
 
+    void EndTimeout();
     void CancelTransaction(int transaction);
 
     // The "remote view of stack depth" can be different than the
@@ -453,8 +454,8 @@ class MessageChannel : HasResultCodes
     // Can be run on either thread
     void AssertWorkerThread() const
     {
-        MOZ_ASSERT(mWorkerLoopID == MessageLoop::current()->id(),
-                   "not on worker thread!");
+        MOZ_RELEASE_ASSERT(mWorkerLoopID == MessageLoop::current()->id(),
+                           "not on worker thread!");
     }
 
     // The "link" thread is either the I/O thread (ProcessLink) or the
@@ -462,8 +463,8 @@ class MessageChannel : HasResultCodes
     // NOT our worker thread.
     void AssertLinkThread() const
     {
-        MOZ_ASSERT(mWorkerLoopID != MessageLoop::current()->id(),
-                   "on worker thread but should not be!");
+        MOZ_RELEASE_ASSERT(mWorkerLoopID != MessageLoop::current()->id(),
+                           "on worker thread but should not be!");
     }
 
   private:
@@ -541,16 +542,22 @@ class MessageChannel : HasResultCodes
     class AutoSetValue {
       public:
         explicit AutoSetValue(T &var, const T &newValue)
-          : mVar(var), mPrev(var)
+          : mVar(var), mPrev(var), mNew(newValue)
         {
             mVar = newValue;
         }
         ~AutoSetValue() {
-            mVar = mPrev;
+            // The value may have been zeroed if the transaction was
+            // canceled. In that case we shouldn't return it to its previous
+            // value.
+            if (mVar == mNew) {
+                mVar = mPrev;
+            }
         }
       private:
         T& mVar;
         T mPrev;
+        T mNew;
     };
 
     // Worker thread only.
@@ -617,8 +624,9 @@ class MessageChannel : HasResultCodes
            if (!aMessage.is_sync())
                return;
 
-           MOZ_ASSERT_IF(mChan->mSide == ParentSide && mOldTransaction != aMessage.transaction_id(),
-                         !mOldTransaction || aMessage.priority() > mChan->AwaitingSyncReplyPriority());
+           MOZ_DIAGNOSTIC_ASSERT(
+               !(mChan->mSide == ParentSide && mOldTransaction != aMessage.transaction_id()) ||
+               !mOldTransaction || aMessage.priority() > mChan->AwaitingSyncReplyPriority());
            mChan->mCurrentTransaction = aMessage.transaction_id();
        }
        ~AutoEnterTransaction() {
@@ -769,7 +777,7 @@ class MessageChannel : HasResultCodes
     // safely.  This is necessary to be able to cancel notification if we are
     // closed at the same time.
     RefPtr<RefCountedTask> mOnChannelConnectedTask;
-    DebugOnly<bool> mPeerPidSet;
+    bool mPeerPidSet;
     int32_t mPeerPid;
 };
 

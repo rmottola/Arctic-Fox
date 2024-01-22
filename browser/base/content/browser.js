@@ -10,6 +10,8 @@ var Cc = Components.classes;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/NotificationDB.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
+Cu.import("resource:///modules/UserContextUI.jsm");
+
 
 XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
@@ -945,7 +947,8 @@ var gBrowserInit = {
     FeedHandler.init();
     DevEdition.init();
     AboutPrivateBrowsingListener.init();
-    
+    RefreshBlocker.init();
+
     let mm = window.getGroupMessageManager("browsers");
     mm.loadFrameScript("chrome://browser/content/tab-content.js", true);
     mm.loadFrameScript("chrome://browser/content/content.js", true);
@@ -1180,6 +1183,12 @@ var gBrowserInit = {
         // swap the given tab with the default about:blank tab and then close
         // the original tab in the other window.
         let tabToOpen = uriToLoad;
+
+        // If this tab was passed as a window argument, clear the
+        // reference to it from the arguments array.
+        if (window.arguments[0] == tabToOpen) {
+          window.arguments[0] = null;
+        }
 
         // Stop the about:blank load
         gBrowser.stop();
@@ -1537,6 +1546,8 @@ var gBrowserInit = {
     BrowserOnClick.uninit();
 
     DevEdition.uninit();
+
+    RefreshBlocker.uninit();
 
     SidebarUI.uninit();
 
@@ -2430,16 +2441,22 @@ function BrowserViewSource(browser) {
   });
 }
 
-// doc - document to use for source, or null for this window's document
+// documentURL - URL of the document to view, or null for this window's document
 // initialTab - name of the initial tab to display, or null for the first tab
 // imageElement - image to load in the Media Tab of the Page Info window; can be null/omitted
 // frameOuterWindowID - the id of the frame that the context menu opened in; can be null/omitted
-function BrowserPageInfo(doc, initialTab, imageElement, frameOuterWindowID) {
-  var args = {doc: doc, initialTab: initialTab, imageElement: imageElement,
-              frameOuterWindowID: frameOuterWindowID};
+function BrowserPageInfo(documentURL, initialTab, imageElement, frameOuterWindowID) {
+  if (documentURL instanceof HTMLDocument) {
+    Deprecated.warning("Please pass the location URL instead of the document " +
+                       "to BrowserPageInfo() as the first argument.",
+                       "https://bugzilla.mozilla.org/show_bug.cgi?id=1238180");
+    documentURL = documentURL.location;
+  }
+
+  let args = { initialTab, imageElement, frameOuterWindowID };
   var windows = Services.wm.getEnumerator("Browser:page-info");
 
-  var documentURL = doc ? doc.location : window.gBrowser.selectedBrowser.currentURI.spec;
+  documentURL = documentURL || window.gBrowser.selectedBrowser.currentURI.spec;
 
   // Check for windows matching the url
   while (windows.hasMoreElements()) {
@@ -3032,7 +3049,7 @@ function populateMirrorTabMenu(popup) {
     item.addEventListener("command", mirrorMenuItemClicked);
     popup.appendChild(item);
   });
-};
+}
 
 function getWebNavigation()
 {
@@ -3568,7 +3585,7 @@ const BrowserSearch = {
   loadSearchFromContext: function (terms) {
     let engine = BrowserSearch._loadSearch(terms, true, "contextmenu");
     if (engine) {
-      BrowserSearch.recordSearchInHealthReport(engine, "contextmenu");
+      BrowserSearch.recordSearchInTelemetry(engine, "contextmenu");
     }
   },
 
@@ -3592,10 +3609,26 @@ const BrowserSearch = {
     openUILinkIn(searchEnginesURL, where);
   },
 
+  _getSearchEngineId: function (engine) {
+    if (!engine) {
+      return "other";
+    }
+
+    if (engine.identifier) {
+      return engine.identifier;
+    }
+
+    if (!("name" in engine) || engine.name === undefined) {
+      return "other";
+    }
+
+    return "other-" + engine.name;
+  },
+
   /**
-   * Helper to record a search with Firefox Health Report.
+   * Helper to record a search with Telemetry.
    *
-   * FHR records only search counts and nothing pertaining to the search itself.
+   * Telemetry records only search counts and nothing pertaining to the search itself.
    *
    * @param engine
    *        (nsISearchEngine) The engine handling the search.
@@ -3607,30 +3640,35 @@ const BrowserSearch = {
    *        the search was a suggested search, this indicates where the
    *        item was in the suggestion list and how the user selected it.
    */
-  recordSearchInHealthReport: function (engine, source, selection) {
-//    BrowserUITelemetry.countSearchEvent(source, null, selection);
-#ifdef MOZ_SERVICES_HEALTHREPORT
-    let reporter = Cc["@mozilla.org/datareporting/service;1"]
-                     .getService()
-                     .wrappedJSObject
-                     .healthReporter;
+  recordSearchInTelemetry: function (engine, source, selection) {
+    const SOURCES = [
+      "abouthome",
+      "contextmenu",
+      "newtab",
+      "searchbar",
+      "urlbar",
+    ];
 
-    // This can happen if the FHR component of the data reporting service is
-    // disabled. This is controlled by a pref that most will never use.
-    if (!reporter) {
+    BrowserUITelemetry.countSearchEvent(source, null, selection);
+
+    if (SOURCES.indexOf(source) == -1) {
+      Cu.reportError("Unknown source for search: " + source);
       return;
     }
 
-    reporter.onInit().then(function record() {
-      try {
-        reporter.getProvider("org.mozilla.searches").recordSearch(engine, source);
-      } catch (ex) {
-        Cu.reportError(ex);
-      }
-    });
-#endif
+    let countId = this._getSearchEngineId(engine) + "." + source;
+
+    let count = Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS");
+    count.add(countId);
   },
+
+  recordOneoffSearchInTelemetry: function (engine, source, type, where) {
+    let id = this._getSearchEngineId(engine) + "." + source;
+    BrowserUITelemetry.countOneoffSearchEvent(id, type, where);
+  }
 };
+
+XPCOMUtils.defineConstant(this, "BrowserSearch", BrowserSearch);
 
 function FillHistoryMenu(aParent) {
   // Lazily add the hover listeners on first showing and never remove them
@@ -4056,6 +4094,49 @@ function updateEditUIVisibility()
     goSetCommandEnabled("cmd_switchTextDirection", true);
   }
 #endif
+}
+
+/**
+ * Opens a new tab with the userContextId specified as an attribute of
+ * sourceEvent. This attribute is propagated to the top level originAttributes
+ * living on the tab's docShell.
+ *
+ * @param event
+ *        A click event on a userContext File Menu option
+ */
+function openNewUserContextTab(event)
+{
+  openUILinkIn(BROWSER_NEW_TAB_URL, "tab", {
+    userContextId: parseInt(event.target.getAttribute('usercontextid')),
+  });
+}
+
+/**
+ * Updates File Menu User Context UI visibility depending on
+ * privacy.userContext.enabled pref state.
+ */
+function updateUserContextUIVisibility()
+{
+  let userContextEnabled = Services.prefs.getBoolPref("privacy.userContext.enabled");
+  document.getElementById("menu_newUserContext").hidden = !userContextEnabled;
+}
+
+/**
+ * Updates the User Context UI indicators if the browser is in a non-default context
+ */
+function updateUserContextUIIndicator(browser)
+{
+  let hbox = document.getElementById("userContext-icons");
+
+  if (!browser.hasAttribute("usercontextid")) {
+    hbox.removeAttribute("usercontextid");
+    return;
+  }
+
+  let label = document.getElementById("userContext-label");
+  let userContextId = browser.getAttribute("usercontextid");
+  hbox.setAttribute("usercontextid", userContextId);
+  label.value = UserContextUI.getUserContextLabel(userContextId);
 }
 
 /**
@@ -4820,54 +4901,6 @@ var TabsProgressListener = {
 
     FullZoom.onLocationChange(aLocationURI, false, aBrowser);
   },
-
-  onRefreshAttempted: function (aBrowser, aWebProgress, aURI, aDelay, aSameURI) {
-    if (gPrefService.getBoolPref("accessibility.blockautorefresh")) {
-      let brandBundle = document.getElementById("bundle_brand");
-      let brandShortName = brandBundle.getString("brandShortName");
-      let refreshButtonText =
-        gNavigatorBundle.getString("refreshBlocked.goButton");
-      let refreshButtonAccesskey =
-        gNavigatorBundle.getString("refreshBlocked.goButton.accesskey");
-      let message =
-        gNavigatorBundle.getFormattedString(aSameURI ? "refreshBlocked.refreshLabel"
-                                                     : "refreshBlocked.redirectLabel",
-                                            [brandShortName]);
-      let docShell = aWebProgress.DOMWindow
-                                 .QueryInterface(Ci.nsIInterfaceRequestor)
-                                 .getInterface(Ci.nsIWebNavigation)
-                                 .QueryInterface(Ci.nsIDocShell);
-      let notificationBox = gBrowser.getNotificationBox(aBrowser);
-      let notification = notificationBox.getNotificationWithValue("refresh-blocked");
-      if (notification) {
-        notification.label = message;
-        notification.refreshURI = aURI;
-        notification.delay = aDelay;
-        notification.docShell = docShell;
-      } else {
-        let buttons = [{
-          label: refreshButtonText,
-          accessKey: refreshButtonAccesskey,
-          callback: function (aNotification, aButton) {
-            var refreshURI = aNotification.docShell
-                                          .QueryInterface(Ci.nsIRefreshURI);
-            refreshURI.forceRefreshURI(aNotification.refreshURI,
-                                       aNotification.delay, true);
-          }
-        }];
-        notification =
-          notificationBox.appendNotification(message, "refresh-blocked",
-                                             "chrome://browser/skin/Info.png",
-                                             notificationBox.PRIORITY_INFO_MEDIUM,
-                                             buttons);
-        notification.refreshURI = aURI;
-        notification.delay = aDelay;
-        notification.docShell = docShell;
-      }
-      return false;
-    }
-    return true;
-  }
 }
 
 function nsBrowserAccess() { }
@@ -5076,6 +5109,39 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
     popup.insertBefore(menuItem, firstMenuItem);
 
     menuItem.addEventListener("command", onViewToolbarCommand, false);
+  }
+
+  let showTabStripItems = toolbarItem && toolbarItem.id == "tabbrowser-tabs";
+  for (let node of popup.querySelectorAll('menuitem[contexttype="toolbaritem"]')) {
+    node.hidden = showTabStripItems;
+  }
+
+  for (let node of popup.querySelectorAll('menuitem[contexttype="tabbar"]')) {
+    node.hidden = !showTabStripItems;
+  }
+
+  if (showTabStripItems) {
+    PlacesCommandHook.updateBookmarkAllTabsCommand();
+
+    let haveMultipleTabs = gBrowser.visibleTabs.length > 1;
+    document.getElementById("toolbar-context-reloadAllTabs").disabled = !haveMultipleTabs;
+
+    document.getElementById("toolbar-context-undoCloseTab").disabled =
+      SessionStore.getClosedTabCount(window) == 0;
+    return;
+  }
+
+  // In some cases, we will exit the above loop with toolbarItem being the
+  // xul:document. That has no parentNode, and we should disable the items in
+  // this case.
+  let movable = toolbarItem && toolbarItem.parentNode &&
+                CustomizableUI.isWidgetRemovable(toolbarItem);
+  if (movable) {
+    moveToPanel.removeAttribute("disabled");
+    removeFromToolbar.removeAttribute("disabled");
+  } else {
+    moveToPanel.setAttribute("disabled", true);
+    removeFromToolbar.setAttribute("disabled", true);
   }
 }
 
@@ -5871,7 +5937,7 @@ function handleDroppedLink(event, url, name)
   // Keep the event from being handled by the dragDrop listeners
   // built-in to gecko if they happen to be above us.
   event.preventDefault();
-};
+}
 
 function BrowserSetForcedCharacterSet(aCharset)
 {
@@ -7430,14 +7496,14 @@ function getNotificationBox(aWindow) {
   if (foundBrowser)
     return gBrowser.getNotificationBox(foundBrowser)
   return null;
-};
+}
 
 function getTabModalPromptBox(aWindow) {
   var foundBrowser = gBrowser.getBrowserForDocument(aWindow.document);
   if (foundBrowser)
     return gBrowser.getTabModalPromptBox(foundBrowser);
   return null;
-};
+}
 
 /* DEPRECATED */
 function getBrowser() {

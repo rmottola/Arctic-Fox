@@ -352,17 +352,32 @@ public:
   }
 
   /**
-   * Return the base URI for relative URIs in the document (the document uri
-   * unless it's overridden by SetBaseURI, HTML <base> tags, etc.).  The
-   * returned URI could be null if there is no document URI.  If the document
-   * is a srcdoc document, return the parent document's base URL.
+   * Return the fallback base URL for this document, as defined in the HTML
+   * specification.  Note that this can return null if there is no document URI.
+   *
+   * XXXbz: This doesn't implement the bits for about:blank yet.
    */
-  nsIURI* GetDocBaseURI() const
+  nsIURI* GetFallbackBaseURI() const
   {
     if (mIsSrcdocDocument && mParentDocument) {
       return mParentDocument->GetDocBaseURI();
     }
-    return mDocumentBaseURI ? mDocumentBaseURI : mDocumentURI;
+    return mDocumentURI;
+  }
+
+  /**
+   * Return the base URI for relative URIs in the document (the document uri
+   * unless it's overridden by SetBaseURI, HTML <base> tags, etc.).  The
+   * returned URI could be null if there is no document URI.  If the document is
+   * a srcdoc document and has no explicit base URL, return the parent
+   * document's base URL.
+   */
+  nsIURI* GetDocBaseURI() const
+  {
+    if (mDocumentBaseURI) {
+      return mDocumentBaseURI;
+    }
+    return GetFallbackBaseURI();
   }
   virtual already_AddRefed<nsIURI> GetBaseURI(bool aTryUseXHRDocBaseURI = false) const override;
 
@@ -2596,7 +2611,7 @@ public:
              JS::Handle<JSObject*> aResult, mozilla::ErrorResult& rv);
   // Touch event handlers already on nsINode
   already_AddRefed<mozilla::dom::Touch>
-    CreateTouch(nsIDOMWindow* aView, mozilla::dom::EventTarget* aTarget,
+    CreateTouch(nsGlobalWindow* aView, mozilla::dom::EventTarget* aTarget,
                 int32_t aIdentifier, int32_t aPageX, int32_t aPageY,
                 int32_t aScreenX, int32_t aScreenY, int32_t aClientX,
                 int32_t aClientY, int32_t aRadiusX, int32_t aRadiusY,

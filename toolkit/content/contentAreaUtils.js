@@ -1,7 +1,6 @@
-# -*- indent-tabs-mode: nil; js-indent-level: 2 -*- 
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -23,6 +22,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "Services",
                                   "resource://gre/modules/Services.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Deprecated",
+                                  "resource://gre/modules/Deprecated.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
+
 var ContentAreaUtils = {
 
   // this is for backwards compatibility.
@@ -98,14 +102,66 @@ function saveURL(aURL, aFileName, aFilePickerTitleKey, aShouldBypassCache,
 const imgICache = Components.interfaces.imgICache;
 const nsISupportsCString = Components.interfaces.nsISupportsCString;
 
+/**
+ * Offers to save an image URL to the file system.
+ *
+ * @param aURL (string)
+ *        The URL of the image to be saved.
+ * @param aFileName (string)
+ *        The suggested filename for the saved file.
+ * @param aFilePickerTitleKey (string, optional)
+ *        Localized string key for an alternate title for the file
+ *        picker. If set to null, this will default to something sensible.
+ * @param aShouldBypassCache (bool)
+ *        If true, the image will always be retrieved from the server instead
+ *        of the network or image caches.
+ * @param aSkipPrompt (bool)
+ *        If true, we will attempt to save the file with the suggested
+ *        filename to the default downloads folder without showing the
+ *        file picker.
+ * @param aReferrer (nsIURI, optional)
+ *        The referrer URI object (not a URL string) to use, or null
+ *        if no referrer should be sent.
+ * @param aDoc (nsIDocument, deprecated, optional)
+ *        The content document that the save is being initiated from. If this
+ *        is omitted, then aIsContentWindowPrivate must be provided.
+ * @param aContentType (string, optional)
+ *        The content type of the image.
+ * @param aContentDisp (string, optional)
+ *        The content disposition of the image.
+ * @param aIsContentWindowPrivate (bool)
+ *        Whether or not the containing window is in private browsing mode.
+ *        Does not need to be provided is aDoc is passed.
+ */
 function saveImageURL(aURL, aFileName, aFilePickerTitleKey, aShouldBypassCache,
-                      aSkipPrompt, aReferrer, aDoc, aContentType, aContentDisp)
+                      aSkipPrompt, aReferrer, aDoc, aContentType, aContentDisp,
+                      aIsContentWindowPrivate)
 {
   forbidCPOW(aURL, "saveImageURL", "aURL");
   forbidCPOW(aReferrer, "saveImageURL", "aReferrer");
-  // Allow aSourceDocument to be a CPOW.
 
-  if (!aShouldBypassCache &&
+  if (aDoc && aIsContentWindowPrivate == undefined) {
+    if (Components.utils.isCrossProcessWrapper(aDoc)) {
+      Deprecated.warning("saveImageURL should not be passed document CPOWs. " +
+                         "The caller should pass in the content type and " +
+                         "disposition themselves",
+                         "https://bugzilla.mozilla.org/show_bug.cgi?id=1243643");
+    }
+    // This will definitely not work for in-browser code or multi-process compatible
+    // add-ons due to bug 1233497, which makes unsafe CPOW usage throw by default.
+    Deprecated.warning("saveImageURL should be passed the private state of " +
+                       "the containing window.",
+                       "https://bugzilla.mozilla.org/show_bug.cgi?id=1243643");
+    aIsContentWindowPrivate =
+      PrivateBrowsingUtils.isContentWindowPrivate(aDoc.defaultView);
+  }
+
+  // We'd better have the private state by now.
+  if (aIsContentWindowPrivate == undefined) {
+    throw new Error("saveImageURL couldn't compute private state of content window");
+  }
+
+  if (!aShouldBypassCache && (aDoc && !Components.utils.isCrossProcessWrapper(aDoc)) &&
       (!aContentType && !aContentDisp)) {
     try {
       var imageCache = Components.classes["@mozilla.org/image/tools;1"]
@@ -121,9 +177,10 @@ function saveImageURL(aURL, aFileName, aFilePickerTitleKey, aShouldBypassCache,
       // Failure to get type and content-disposition off the image is non-fatal
     }
   }
+
   internalSave(aURL, null, aFileName, aContentDisp, aContentType,
                aShouldBypassCache, aFilePickerTitleKey, null, aReferrer,
-               aDoc, aSkipPrompt, null);
+               null, aSkipPrompt, null, aIsContentWindowPrivate);
 }
 
 // This is like saveDocument, but takes any browser/frame-like element
@@ -260,8 +317,10 @@ DownloadListener.prototype = {
 }
 
 const kSaveAsType_Complete = 0; // Save document with attached objects.
+XPCOMUtils.defineConstant(this, "kSaveAsType_Complete", 0);
 // const kSaveAsType_URL      = 1; // Save document or URL by itself.
 const kSaveAsType_Text     = 2; // Save document, converting to plain text.
+XPCOMUtils.defineConstant(this, "kSaveAsType_Text", kSaveAsType_Text);
 
 /**
  * internalSave: Used when saving a document or URL.
@@ -293,7 +352,7 @@ const kSaveAsType_Text     = 2; // Save document, converting to plain text.
  * @param aDocument
  *        The document to be saved
  * @param aDefaultFileName
- *        The caller-provided suggested filename if we don't 
+ *        The caller-provided suggested filename if we don't
  *        find a better one
  * @param aContentDisposition
  *        The caller-provided content-disposition header to use.
@@ -535,7 +594,7 @@ function AutoChosen(aFileAutoChosen, aUriAutoChosen) {
  * Structure for holding info about a URL and the target filename it should be
  * saved to. This structure is populated by initFileInfo(...).
  * @param aSuggestedFileName This is used by initFileInfo(...) when it
- *        cannot 'discover' the filename from the url 
+ *        cannot 'discover' the filename from the url
  * @param aFileName The target filename
  * @param aFileBaseName The filename without the file extension
  * @param aFileExt The extension of the filename
@@ -594,7 +653,7 @@ function initFileInfo(aFI, aURL, aURLCharset, aDocument,
   }
 }
 
-/** 
+/**
  * Given the Filepicker Parameters (aFpP), show the file picker dialog,
  * prompting the user to confirm (or change) the fileName.
  * @param aFpP
@@ -609,7 +668,7 @@ function initFileInfo(aFI, aURL, aURLCharset, aDocument,
  *        is set, but ask for the target explicitly.
  * @param aRelatedURI
  *        An nsIURI associated with the download. The last used
- *        directory of the picker is retrieved from/stored in the 
+ *        directory of the picker is retrieved from/stored in the
  *        Content Pref Service using this URI.
  * @return Promise
  * @resolve a boolean. When true, it indicates that the file picker dialog
@@ -617,7 +676,7 @@ function initFileInfo(aFI, aURL, aURLCharset, aDocument,
  */
 function promiseTargetFile(aFpP, /* optional */ aSkipPrompt, /* optional */ aRelatedURI)
 {
-  return Task.spawn(function() {
+  return Task.spawn(function*() {
     let downloadLastDir = new DownloadLastDir(window);
     let prefBranch = Services.prefs.getBranch("browser.download.");
     let useDownloadDir = prefBranch.getBoolPref("useDownloadDir");
@@ -635,7 +694,7 @@ function promiseTargetFile(aFpP, /* optional */ aSkipPrompt, /* optional */ aRel
       dir.append(getNormalizedLeafName(aFpP.fileInfo.fileName,
                                        aFpP.fileInfo.fileExt));
       aFpP.file = uniqueFile(dir);
-      throw new Task.Result(true);
+      return true;
     }
 
     // We must prompt for the file name explicitly.
@@ -690,7 +749,7 @@ function promiseTargetFile(aFpP, /* optional */ aSkipPrompt, /* optional */ aRel
     });
     let result = yield deferComplete.promise;
     if (result == Components.interfaces.nsIFilePicker.returnCancel || !fp.file) {
-      throw new Task.Result(false);
+      return false;
     }
 
     if (aFpP.saveMode != SAVEMODE_FILEONLY)
@@ -705,7 +764,7 @@ function promiseTargetFile(aFpP, /* optional */ aSkipPrompt, /* optional */ aRel
     aFpP.file = fp.file;
     aFpP.fileURL = fp.fileURL;
 
-    throw new Task.Result(true);
+    return true;
   });
 }
 
@@ -737,7 +796,6 @@ function uniqueFile(aLocalFile)
   return aLocalFile;
 }
 
-#ifdef MOZ_JSDOWNLOADS
 /**
  * Download a URL using the new jsdownloads API.
  *
@@ -783,62 +841,16 @@ function DownloadURL(aURL, aFileName, aInitiatingDocument) {
     list.add(download);
   }).then(null, Components.utils.reportError);
 }
-#endif
-
-#ifdef MOZ_JSDOWNLOADS
-/**
- * Download a URL using the new jsdownloads API.
- *
- * @param aURL
- *        the url to download
- * @param [optional] aFileName
- *        the destination file name, if omitted will be obtained from the url.
- * @param aInitiatingDocument
- *        The document from which the download was initiated.
- */
-function DownloadURL(aURL, aFileName, aInitiatingDocument) {
-  // For private browsing, try to get document out of the most recent browser
-  // window, or provide our own if there's no browser window.
-  let isPrivate = aInitiatingDocument.defaultView
-                                     .QueryInterface(Ci.nsIInterfaceRequestor)
-                                     .getInterface(Ci.nsIWebNavigation)
-                                     .QueryInterface(Ci.nsILoadContext)
-                                     .usePrivateBrowsing;
-
-  let fileInfo = new FileInfo(aFileName);
-  initFileInfo(fileInfo, aURL, null, null, null, null);
-
-  let filepickerParams = {
-    fileInfo: fileInfo,
-    saveMode: SAVEMODE_FILEONLY
-  };
-
-  Task.spawn(function* () {
-    let accepted = yield promiseTargetFile(filepickerParams, true, fileInfo.uri);
-    if (!accepted)
-      return;
-
-    let file = filepickerParams.file;
-    let download = yield Downloads.createDownload({
-      source: { url: aURL, isPrivate: isPrivate },
-      target: { path: file.path, partFilePath: file.path + ".part" }
-    });
-    download.tryToKeepPartialData = true;
-    download.start();
-
-    // Add the download to the list, allowing it to be managed.
-    let list = yield Downloads.getList(Downloads.ALL);
-    list.add(download);
-  }).then(null, Components.utils.reportError);
-}
-#endif
 
 // We have no DOM, and can only save the URL as is.
 const SAVEMODE_FILEONLY      = 0x00;
+XPCOMUtils.defineConstant(this, "SAVEMODE_FILEONLY", SAVEMODE_FILEONLY);
 // We have a DOM and can save as complete.
 const SAVEMODE_COMPLETE_DOM  = 0x01;
+XPCOMUtils.defineConstant(this, "SAVEMODE_COMPLETE_DOM", SAVEMODE_COMPLETE_DOM);
 // We have a DOM which we can serialize as text.
 const SAVEMODE_COMPLETE_TEXT = 0x02;
+XPCOMUtils.defineConstant(this, "SAVEMODE_COMPLETE_TEXT", SAVEMODE_COMPLETE_TEXT);
 
 // If we are able to save a complete DOM, the 'save as complete' filter
 // must be the first filter appended.  The 'save page only' counterpart
@@ -1145,10 +1157,10 @@ function getNormalizedLeafName(aFile, aDefaultExtension)
   if (!aDefaultExtension)
     return aFile;
 
-#ifdef XP_WIN
-  // Remove trailing dots and spaces on windows
-  aFile = aFile.replace(/[\s.]+$/, "");
-#endif
+  if (AppConstants.platform == "win") {
+    // Remove trailing dots and spaces on windows
+    aFile = aFile.replace(/[\s.]+$/, "");
+  }
 
   // Remove leading dots
   aFile = aFile.replace(/^\.+/, "");

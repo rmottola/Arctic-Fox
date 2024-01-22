@@ -208,10 +208,10 @@ protected:
 };
 
 // custom text renderer used to determine the fallback font for a given char
-class FontFallbackRenderer final : public IDWriteTextRenderer
+class DWriteFontFallbackRenderer final : public IDWriteTextRenderer
 {
 public:
-    FontFallbackRenderer(IDWriteFactory *aFactory)
+    DWriteFontFallbackRenderer(IDWriteFactory *aFactory)
         : mRefCount(0)
     {
         HRESULT hr = S_OK;
@@ -220,7 +220,7 @@ public:
         NS_ASSERTION(SUCCEEDED(hr), "GetSystemFontCollection failed!");
     }
 
-    ~FontFallbackRenderer()
+    ~DWriteFontFallbackRenderer()
     {}
 
     // IDWriteTextRenderer methods
@@ -432,7 +432,7 @@ private:
     bool mGDIFontTableAccess;
     RefPtr<IDWriteGdiInterop> mGDIInterop;
 
-    RefPtr<FontFallbackRenderer> mFallbackRenderer;
+    RefPtr<DWriteFontFallbackRenderer> mFallbackRenderer;
     RefPtr<IDWriteTextFormat>    mFallbackFormat;
 
     RefPtr<IDWriteFontCollection> mSystemFonts;

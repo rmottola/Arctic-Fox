@@ -47,9 +47,12 @@
 #include "mozilla/dom/HTMLInputElement.h"
 #include "nsNumberControlFrame.h"
 #include "nsFrameSelection.h"
+#include "mozilla/Telemetry.h"
+#include "mozilla/layers/ScrollInputMethods.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
+using mozilla::layers::ScrollInputMethod;
 
 static NS_DEFINE_CID(kTextEditorCID, NS_TEXTEDITOR_CID);
 
@@ -536,8 +539,10 @@ nsTextInputSelectionImpl::PageMove(bool aForward, bool aExtend)
   }
   // After ScrollSelectionIntoView(), the pending notifications might be
   // flushed and PresShell/PresContext/Frames may be dead. See bug 418470.
-  return ScrollSelectionIntoView(nsISelectionController::SELECTION_NORMAL, nsISelectionController::SELECTION_FOCUS_REGION,
-                                 nsISelectionController::SCROLL_SYNCHRONOUS);
+  return ScrollSelectionIntoView(nsISelectionController::SELECTION_NORMAL,
+                                 nsISelectionController::SELECTION_FOCUS_REGION,
+                                 nsISelectionController::SCROLL_SYNCHRONOUS |
+                                 nsISelectionController::SCROLL_FOR_CARET_MOVE);
 }
 
 NS_IMETHODIMP
@@ -545,6 +550,9 @@ nsTextInputSelectionImpl::CompleteScroll(bool aForward)
 {
   if (!mScrollFrame)
     return NS_ERROR_NOT_INITIALIZED;
+
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+      (uint32_t) ScrollInputMethod::MainThreadCompleteScroll);
 
   mScrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                          nsIScrollableFrame::WHOLE,
@@ -595,6 +603,9 @@ nsTextInputSelectionImpl::ScrollPage(bool aForward)
   if (!mScrollFrame)
     return NS_ERROR_NOT_INITIALIZED;
 
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+      (uint32_t) ScrollInputMethod::MainThreadScrollPage);
+
   mScrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                          nsIScrollableFrame::PAGES,
                          nsIScrollableFrame::SMOOTH);
@@ -607,6 +618,9 @@ nsTextInputSelectionImpl::ScrollLine(bool aForward)
   if (!mScrollFrame)
     return NS_ERROR_NOT_INITIALIZED;
 
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+      (uint32_t) ScrollInputMethod::MainThreadScrollLine);
+
   mScrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                          nsIScrollableFrame::LINES,
                          nsIScrollableFrame::SMOOTH);
@@ -618,6 +632,9 @@ nsTextInputSelectionImpl::ScrollCharacter(bool aRight)
 {
   if (!mScrollFrame)
     return NS_ERROR_NOT_INITIALIZED;
+
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+      (uint32_t) ScrollInputMethod::MainThreadScrollCharacter);
 
   mScrollFrame->ScrollBy(nsIntPoint(aRight ? 1 : -1, 0),
                          nsIScrollableFrame::LINES,
@@ -1930,6 +1947,21 @@ nsTextEditorState::SetValue(const nsAString& aValue, uint32_t aFlags)
         // we should skip to set the new value to the editor here.  It should
         // be set later with the updated mValueBeingSet.
         return true;
+      }
+      if (NS_WARN_IF(!mBoundFrame)) {
+        // We're not sure if this case is possible.
+      } else {
+        // If setting value won't change current value, we shouldn't commit
+        // composition for compatibility with the other browsers.
+        nsAutoString currentValue;
+        mBoundFrame->GetText(currentValue);
+        if (newValue == currentValue) {
+          // Note that in this case, we shouldn't fire any events with setting
+          // value because event handlers may try to set value recursively but
+          // we cannot commit composition at that time due to unsafe to run
+          // script (see below).
+          return true;
+        }
       }
       // If there is composition, need to commit composition first because
       // other browsers do that.

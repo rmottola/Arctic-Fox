@@ -47,10 +47,9 @@ ScopedResolveTexturesForDraw::ScopedResolveTexturesForDraw(WebGLContext* webgl,
                                                            bool* const out_error)
     : mWebGL(webgl)
 {
-    //typedef nsTArray<WebGLRefPtr<WebGLTexture>> TexturesT;
     typedef decltype(WebGLContext::mBound2DTextures) TexturesT;
 
-    const auto fnResolveAll = [this, funcName, out_error](const TexturesT& textures)
+    const auto fnResolveAll = [this, funcName](const TexturesT& textures)
     {
         const auto len = textures.Length();
         for (uint32_t texUnit = 0; texUnit < len; ++texUnit) {
@@ -59,7 +58,8 @@ ScopedResolveTexturesForDraw::ScopedResolveTexturesForDraw(WebGLContext* webgl,
                 continue;
 
             FakeBlackType fakeBlack;
-            *out_error |= !tex->ResolveForDraw(funcName, texUnit, &fakeBlack);
+            if (!tex->ResolveForDraw(funcName, texUnit, &fakeBlack))
+                return false;
 
             if (fakeBlack == FakeBlackType::None)
                 continue;
@@ -67,18 +67,21 @@ ScopedResolveTexturesForDraw::ScopedResolveTexturesForDraw(WebGLContext* webgl,
             mWebGL->BindFakeBlack(texUnit, tex->Target(), fakeBlack);
             mRebindRequests.push_back({texUnit, tex});
         }
+
+        return true;
     };
 
-    *out_error = false;
+    bool ok = true;
+    ok &= fnResolveAll(mWebGL->mBound2DTextures);
+    ok &= fnResolveAll(mWebGL->mBoundCubeMapTextures);
+    ok &= fnResolveAll(mWebGL->mBound3DTextures);
+    ok &= fnResolveAll(mWebGL->mBound2DArrayTextures);
 
-    fnResolveAll(mWebGL->mBound2DTextures);
-    fnResolveAll(mWebGL->mBoundCubeMapTextures);
-    fnResolveAll(mWebGL->mBound3DTextures);
-    fnResolveAll(mWebGL->mBound2DArrayTextures);
-
-    if (*out_error) {
+    if (!ok) {
         mWebGL->ErrorOutOfMemory("%s: Failed to resolve textures for draw.", funcName);
     }
+
+    *out_error = !ok;
 }
 
 ScopedResolveTexturesForDraw::~ScopedResolveTexturesForDraw()

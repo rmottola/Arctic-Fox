@@ -330,5 +330,5 @@ function waitForCondition(condition, nextTest, errorMsg) {
   function moveOn() {
     clearInterval(interval);
     nextTest();
-  };
+  }
 }

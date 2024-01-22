@@ -5,27 +5,28 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Hal.h"
+
 #include "HalImpl.h"
 #include "HalLog.h"
 #include "HalSandbox.h"
+#include "nsIDOMDocument.h"
+#include "nsIDOMWindow.h"
+#include "nsIDocument.h"
+#include "nsIDocShell.h"
+#include "nsITabChild.h"
+#include "nsIWebNavigation.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
-#include "mozilla/Observer.h"
-#include "nsIDocument.h"
-#include "nsIDOMDocument.h"
 #include "nsPIDOMWindow.h"
-#include "nsIDOMWindow.h"
-#include "mozilla/Services.h"
-#include "nsIWebNavigation.h"
-#include "nsITabChild.h"
-#include "nsIDocShell.h"
-#include "mozilla/StaticPtr.h"
-#include "mozilla/ClearOnShutdown.h"
-#include "WindowIdentifier.h"
 #include "nsJSUtils.h"
-#include "mozilla/dom/ScreenOrientation.h"
+#include "mozilla/ClearOnShutdown.h"
+#include "mozilla/Observer.h"
+#include "mozilla/Services.h"
+#include "mozilla/StaticPtr.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/ContentParent.h"
+#include "mozilla/dom/ScreenOrientation.h"
+#include "WindowIdentifier.h"
 
 #ifdef XP_WIN
 #include <process.h>
@@ -145,7 +146,7 @@ Vibrate(const nsTArray<uint32_t>& pattern, const WindowIdentifier &id)
     *gLastIDToVibrate = id.AsArray();
   }
 
-  // Don't forward our ID if we are not in the sandbox, because hal_impl 
+  // Don't forward our ID if we are not in the sandbox, because hal_impl
   // doesn't need it, and we don't want it to be tempted to read it.  The
   // empty identifier will assert if it's used.
   PROXY_IF_SANDBOXED(Vibrate(pattern, InSandbox() ? id : WindowIdentifier()));
@@ -180,7 +181,7 @@ CancelVibrate(const WindowIdentifier &id)
   // the same window.  All other cancellation requests are ignored.
 
   if (InSandbox() || (gLastIDToVibrate && *gLastIDToVibrate == id.AsArray())) {
-    // Don't forward our ID if we are not in the sandbox, because hal_impl 
+    // Don't forward our ID if we are not in the sandbox, because hal_impl
     // doesn't need it, and we don't want it to be tempted to read it.  The
     // empty identifier will assert if it's used.
     PROXY_IF_SANDBOXED(CancelVibrate(InSandbox() ? id : WindowIdentifier()));
@@ -494,14 +495,14 @@ NotifySystemTimezoneChange(const SystemTimezoneChangeInformation& aSystemTimezon
   sSystemTimezoneChangeObservers.BroadcastInformation(aSystemTimezoneChangeInfo);
 }
 
-void 
+void
 AdjustSystemClock(int64_t aDeltaMilliseconds)
 {
   AssertMainThread();
   PROXY_IF_SANDBOXED(AdjustSystemClock(aDeltaMilliseconds));
 }
 
-void 
+void
 SetTimezone(const nsCString& aTimezoneSpec)
 {
   AssertMainThread();
@@ -540,7 +541,7 @@ static SensorObserverList* gSensorObservers = nullptr;
 static SensorObserverList &
 GetSensorObservers(SensorType sensor_type) {
   MOZ_ASSERT(sensor_type < NUM_SENSOR_TYPE);
-  
+
   if(!gSensorObservers) {
     gSensorObservers = new SensorObserverList[NUM_SENSOR_TYPE];
   }
@@ -552,7 +553,7 @@ RegisterSensorObserver(SensorType aSensor, ISensorObserver *aObserver) {
   SensorObserverList &observers = GetSensorObservers(aSensor);
 
   AssertMainThread();
-  
+
   observers.AddObserver(aObserver);
   if(observers.Length() == 1) {
     EnableSensorNotifications(aSensor);
@@ -588,7 +589,7 @@ NotifySensorChange(const SensorData &aSensorData) {
   SensorObserverList &observers = GetSensorObservers(aSensorData.sensor());
 
   AssertMainThread();
-  
+
   observers.Broadcast(aSensorData);
 }
 
@@ -758,7 +759,7 @@ static SwitchObserverList *sSwitchObserverLists = nullptr;
 
 static SwitchObserverList&
 GetSwitchObserverList(SwitchDevice aDevice) {
-  MOZ_ASSERT(0 <= aDevice && aDevice < NUM_SWITCH_DEVICE); 
+  MOZ_ASSERT(0 <= aDevice && aDevice < NUM_SWITCH_DEVICE);
   if (sSwitchObserverLists == nullptr) {
     sSwitchObserverLists = new SwitchObserverList[NUM_SWITCH_DEVICE];
   }
@@ -1190,6 +1191,24 @@ bool IsHeadphoneEventFromInputDev()
 {
   AssertMainThread();
   RETURN_PROXY_IF_SANDBOXED(IsHeadphoneEventFromInputDev(), false);
+}
+
+nsresult StartSystemService(const char* aSvcName, const char* aArgs)
+{
+  AssertMainThread();
+  RETURN_PROXY_IF_SANDBOXED(StartSystemService(aSvcName, aArgs), NS_ERROR_FAILURE);
+}
+
+void StopSystemService(const char* aSvcName)
+{
+  AssertMainThread();
+  PROXY_IF_SANDBOXED(StopSystemService(aSvcName));
+}
+
+bool SystemServiceIsRunning(const char* aSvcName)
+{
+  AssertMainThread();
+  RETURN_PROXY_IF_SANDBOXED(SystemServiceIsRunning(aSvcName), false);
 }
 
 } // namespace hal

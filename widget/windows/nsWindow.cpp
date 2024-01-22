@@ -189,6 +189,7 @@
 
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/InputAPZContext.h"
+#include "ClientLayerManager.h"
 #include "InputData.h"
 
 #include "mozilla/Telemetry.h"
@@ -1402,6 +1403,17 @@ nsWindow::SetSizeConstraints(const SizeConstraints& aConstraints)
     c.mMinSize.width = std::max(int32_t(::GetSystemMetrics(SM_CXMINTRACK)), c.mMinSize.width);
     c.mMinSize.height = std::max(int32_t(::GetSystemMetrics(SM_CYMINTRACK)), c.mMinSize.height);
   }
+  ClientLayerManager *clientLayerManager = GetLayerManager()->AsClientLayerManager();
+
+  if (clientLayerManager) {
+    int32_t maxSize = clientLayerManager->GetMaxTextureSize();
+    // We can't make ThebesLayers bigger than this anyway.. no point it letting
+    // a window grow bigger as we won't be able to draw content there in
+    // general.
+    c.mMaxSize.width = std::min(c.mMaxSize.width, maxSize);
+    c.mMaxSize.height = std::min(c.mMaxSize.height, maxSize);
+  }
+
   mSizeConstraintsScale = GetDefaultScale().scale;
 
   nsBaseWidget::SetSizeConstraints(c);

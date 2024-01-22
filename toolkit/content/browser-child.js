@@ -122,6 +122,14 @@ var WebProgressListener = {
     json.stateFlags = aStateFlags;
     json.status = aStatus;
 
+    // It's possible that this state change was triggered by
+    // loading an internal error page, for which the parent
+    // will want to know some details, so we'll update it with
+    // the documentURI.
+    if (aWebProgress && aWebProgress.isTopLevel) {
+      json.documentURI = content.document.documentURIObject.spec;
+    }
+
     this._send("Content:StateChange", json, objects);
   },
 
@@ -367,7 +375,6 @@ addEventListener("DOMWindowClose", function (aEvent) {
   if (!aEvent.isTrusted)
     return;
   sendAsyncMessage("DOMWindowClose");
-  aEvent.preventDefault();
 }, false);
 
 addEventListener("ImageContentLoaded", function (aEvent) {
@@ -468,10 +475,18 @@ addMessageListener("UpdateCharacterSet", function (aMessage) {
  * Remote thumbnail request handler for PageThumbs thumbnails.
  */
 addMessageListener("Browser:Thumbnail:Request", function (aMessage) {
-  let snapshotWidth = aMessage.data.canvasWidth;
-  let snapshotHeight = aMessage.data.canvasHeight;
-  let canvas = PageThumbUtils.createCanvas(content, snapshotWidth, snapshotHeight);
-  let snapshot = PageThumbUtils.createSnapshotThumbnail(content, canvas);
+  let snapshot;
+  let args = aMessage.data.additionalArgs;
+  let fullScale = args ? args.fullScale : false;
+  if (fullScale) {
+    snapshot = PageThumbUtils.createSnapshotThumbnail(content, null, args);
+  } else {
+    let snapshotWidth = aMessage.data.canvasWidth;
+    let snapshotHeight = aMessage.data.canvasHeight;
+    snapshot =
+      PageThumbUtils.createCanvas(content, snapshotWidth, snapshotHeight);
+    PageThumbUtils.createSnapshotThumbnail(content, snapshot, args);
+  }
 
   snapshot.toBlob(function (aBlob) {
     sendAsyncMessage("Browser:Thumbnail:Response", {

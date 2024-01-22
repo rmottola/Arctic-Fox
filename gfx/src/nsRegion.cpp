@@ -738,13 +738,24 @@ nsIntRegion nsRegion::ScaleToNearestPixels (float aScaleX, float aScaleY,
 nsIntRegion nsRegion::ScaleToOutsidePixels (float aScaleX, float aScaleY,
                                             nscoord aAppUnitsPerPixel) const
 {
-  nsIntRegion result;
-  for (auto iter = RectIter(); !iter.Done(); iter.Next()) {
-    mozilla::gfx::IntRect deviceRect =
-      iter.Get().ScaleToOutsidePixels(aScaleX, aScaleY, aAppUnitsPerPixel);
-    result.Or(result, deviceRect);
+  // make a copy of the region so that we can mutate it inplace
+  nsRegion region = *this;
+  int n;
+  pixman_box32_t *boxes = pixman_region32_rectangles(&region.mImpl, &n);
+  boxes = pixman_region32_rectangles(&region.mImpl, &n);
+  for (int i=0; i<n; i++) {
+    nsRect rect = BoxToRect(boxes[i]);
+    mozilla::gfx::IntRect irect = rect.ScaleToOutsidePixels(aScaleX, aScaleY, aAppUnitsPerPixel);
+    boxes[i] = RectToBox(irect);
   }
-  return result;
+
+  nsIntRegion iRegion;
+  // clear out the initial pixman_region so that we can replace it below
+  pixman_region32_fini(&iRegion.mImpl.mImpl);
+  // This will union all of the rectangles and runs in about O(n lg(n))
+  pixman_region32_init_rects(&iRegion.mImpl.mImpl, boxes, n);
+
+  return iRegion;
 }
 
 nsIntRegion nsRegion::ScaleToInsidePixels (float aScaleX, float aScaleY,
@@ -949,11 +960,6 @@ namespace {
       SizePair result;
       result.mSize = result.mSizeContainingRect = kVeryLargeNegativeNumber;
       return result;
-    }
-    SizePair& operator=(const SizePair& aOther) {
-      mSizeContainingRect = aOther.mSizeContainingRect;
-      mSize = aOther.mSize;
-      return *this;
     }
     bool operator<(const SizePair& aOther) const {
       if (mSizeContainingRect < aOther.mSizeContainingRect)

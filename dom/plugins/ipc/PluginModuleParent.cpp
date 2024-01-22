@@ -33,6 +33,7 @@
 #include "nsCRT.h"
 #include "nsIFile.h"
 #include "nsIObserverService.h"
+#include "nsIXULRuntime.h"
 #include "nsNPAPIPlugin.h"
 #include "nsPrintfCString.h"
 #include "prsystem.h"
@@ -133,16 +134,6 @@ mozilla::plugins::SetupBridge(uint32_t aPluginId,
         return true;
     }
     *rv = PPluginModule::Bridge(aContentParent, chromeParent);
-    if (NS_FAILED(*rv)) {
-#if defined(MOZ_CRASHREPORTER)
-        // We are going to abort due to the failure, lets note the cause
-        // in the report for diagnosing.
-        nsAutoCString error;
-        error.AppendPrintf("%X %d", *rv, chromeParent->GetIPCChannel()->GetChannelState__TotallyRacy());
-        CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("BridgePluginError"), error);
-#endif
-      return false;
-    }
     return true;
 }
 
@@ -673,7 +664,8 @@ PluginModuleParent::PluginModuleParent(bool aIsChrome, bool aAllowAsyncInit)
 {
 #if defined(XP_WIN) || defined(XP_MACOSX) || defined(MOZ_WIDGET_GTK)
     mIsStartingAsync = aAllowAsyncInit &&
-                       Preferences::GetBool(kAsyncInitPref, false);
+                       Preferences::GetBool(kAsyncInitPref, false) &&
+                       !BrowserTabsRemoteAutostart();
 #if defined(MOZ_CRASHREPORTER)
     CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AsyncPluginInit"),
                                        mIsStartingAsync ?
@@ -1285,6 +1277,8 @@ PluginModuleChromeParent::TerminateChildProcess(MessageLoop* aMsgLoop,
     }
 
     if (reportsReady) {
+        // Important to set this here, it tells the ActorDestroy handler
+        // that we have an existing crash report that needs to be finalized.
         mPluginDumpID = crashReporter->ChildDumpID();
         PLUGIN_LOG_DEBUG(
                 ("generated paired browser/plugin minidumps: %s)",
@@ -1532,7 +1526,13 @@ PluginModuleChromeParent::ProcessFirstMinidump()
     WriteExtraDataForMinidump(notes);
 
     if (!mPluginDumpID.IsEmpty()) {
+        // mPluginDumpID may be set in TerminateChildProcess, which means the
+        // process hang monitor has already collected a 3-way browser, plugin,
+        // content crash report. If so, update the existing report with our
+        // annotations and finalize it. If not, fall through for standard
+        // plugin crash report handling.
         crashReporter->GenerateChildData(&notes);
+        crashReporter->FinalizeChildData();
         return;
     }
 

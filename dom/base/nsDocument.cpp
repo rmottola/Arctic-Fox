@@ -8276,7 +8276,9 @@ nsDocument::IsScriptEnabled()
   if (!globalObject && mMasterDocument) {
     globalObject = do_QueryInterface(mMasterDocument->GetInnerWindow());
   }
-  NS_ENSURE_TRUE(globalObject && globalObject->GetGlobalJSObject(), false);
+  if (!globalObject || !globalObject->GetGlobalJSObject()) {
+    return false;
+  }
 
   return sm->ScriptAllowed(globalObject->GetGlobalJSObject());
 }
@@ -8782,9 +8784,11 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
   }
 
 #ifdef MOZ_WEBSPEECH
-  auto* globalWindow = nsGlobalWindow::Cast(win);
-  if (globalWindow->HasActiveSpeechSynthesis()) {
-    return false;
+  if (win) {
+    auto* globalWindow = nsGlobalWindow::Cast(win);
+    if (globalWindow->HasActiveSpeechSynthesis()) {
+      return false;
+    }
   }
 #endif
 
@@ -10618,7 +10622,7 @@ nsDocument::SetImagesNeedAnimating(bool aAnimating)
 }
 
 already_AddRefed<Touch>
-nsIDocument::CreateTouch(nsIDOMWindow* aView,
+nsIDocument::CreateTouch(nsGlobalWindow* aView,
                          EventTarget* aTarget,
                          int32_t aIdentifier,
                          int32_t aPageX, int32_t aPageY,
@@ -10628,6 +10632,7 @@ nsIDocument::CreateTouch(nsIDOMWindow* aView,
                          float aRotationAngle,
                          float aForce)
 {
+  MOZ_ASSERT_IF(aView, aView->IsInnerWindow());
   RefPtr<Touch> touch = new Touch(aTarget,
                                   aIdentifier,
                                   aPageX, aPageY,
@@ -12095,7 +12100,7 @@ public:
     mUserInputOrChromeCaller(aUserInputOrChromeCaller)
   {
     nsCOMPtr<nsIDocument> doc = do_QueryReferent(mDocument);
-    if (doc) {
+    if (doc && doc->GetInnerWindow()) {
       mRequester = new nsContentPermissionRequester(doc->GetInnerWindow());
     }
   }
@@ -13388,5 +13393,5 @@ nsIDocument::ReportHasScrollLinkedEffect()
   nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
                                   NS_LITERAL_CSTRING("Async Pan/Zoom"),
                                   this, nsContentUtils::eLAYOUT_PROPERTIES,
-                                  "ScrollLinkedEffectFound");
+                                  "ScrollLinkedEffectFound2");
 }

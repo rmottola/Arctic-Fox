@@ -132,21 +132,14 @@ if (AppConstants.MOZ_CRASHREPORTER) {
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
                                   "resource:///modules/ReaderParent.jsm");
 
-XPCOMUtils.defineLazyGetter(this, "ShellService", function() {
-  try {
-    return Cc["@mozilla.org/browser/shell-service;1"].
-           getService(Ci.nsIShellService);
-  }
-  catch(ex) {
-    return null;
-  }
-});
-
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionManagement",
                                   "resource://gre/modules/ExtensionManagement.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ShellService",
+                                  "resource:///modules/ShellService.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "AlertsService",
                                    "@mozilla.org/alerts-service;1", "nsIAlertsService");
@@ -384,6 +377,18 @@ BrowserGlue.prototype = {
         break;
       case "profile-before-change":
         this._onProfileShutdown();
+        break;
+      case "keyword-search":
+        // This notification is broadcast by the docshell when it "fixes up" a
+        // URI that it's been asked to load into a keyword search.
+        let engine = null;
+        try {
+          engine = subject.QueryInterface(Ci.nsISearchEngine);
+        } catch (ex) {
+          Cu.reportError(ex);
+        }
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        win.BrowserSearch.recordSearchInTelemetry(engine, "urlbar");
         break;
       case "browser-search-engine-modified":
         // Ensure we cleanup the hiddenOneOffs pref when removing
@@ -1004,19 +1009,24 @@ BrowserGlue.prototype = {
 
     // For any add-ons that were installed disabled and can be enabled offer
     // them to the user.
-    let changedIDs = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_INSTALLED);
-    if (changedIDs.length > 0) {
-      let win = RecentWindow.getMostRecentBrowserWindow();
-      AddonManager.getAddonsByIDs(changedIDs, function(aAddons) {
-        aAddons.forEach(function(aAddon) {
-          // If the add-on isn't user disabled or can't be enabled then skip it.
-          if (!aAddon.userDisabled || !(aAddon.permissions & AddonManager.PERM_CAN_ENABLE))
-            return;
+    let win = RecentWindow.getMostRecentBrowserWindow();
+    AddonManager.getAllAddons(addons => {
+      for (let addon of addons) {
+        // If this add-on has already seen (or seen is undefined for non-XPI
+        // add-ons) then skip it.
+        if (addon.seen !== false) {
+          continue;
+        }
 
-          win.openUILinkIn("about:newaddon?id=" + aAddon.id, "tab");
-        })
-      });
-    }
+        // If this add-on cannot be enabled (either already enabled or
+        // appDisabled) then skip it.
+        if (!(addon.permissions & AddonManager.PERM_CAN_ENABLE)) {
+          continue;
+        }
+
+        win.openUILinkIn("about:newaddon?id=" + addon.id, "tab");
+      }
+    });
 
     let signingRequired;
     if (AppConstants.MOZ_REQUIRE_SIGNING) {
@@ -2044,14 +2054,26 @@ BrowserGlue.prototype = {
       let win = RecentWindow.getMostRecentBrowserWindow();
       win.openUILinkIn(data, "tab");
     }
-    let imageURL = "chrome://browser/skin/web-notifications-icon.svg";
+    // Show the application icon for XUL notifications. We assume system-level
+    // notifications will include their own icon.
+    let imageURL = this._hasSystemAlertsService() ? "" :
+                   "chrome://branding/content/about-logo.png";
     let title = gBrowserBundle.GetStringFromName("webNotifications.upgradeTitle");
-    let text = gBrowserBundle.GetStringFromName("webNotifications.upgradeInfo");
-    let url = Services.urlFormatter.formatURLPref("browser.push.warning.infoURL");
+    let text = gBrowserBundle.GetStringFromName("webNotifications.upgradeBody");
+    let url = Services.urlFormatter.formatURLPref("app.support.baseURL") +
+      "push#w_upgraded-notifications";
 
     AlertsService.showAlertNotification(imageURL, title, text,
                                         true, url, clickCallback);
   }),
+
+  _hasSystemAlertsService: function() {
+    try {
+      return !!Cc["@mozilla.org/system-alerts-service;1"].getService(
+        Ci.nsIAlertsService);
+    } catch (e) {}
+    return false;
+  },
 
   // ------------------------------
   // public nsIBrowserGlue members
@@ -2521,7 +2543,8 @@ ContentPermissionPrompt.prototype = {
     }
 
     var options = {
-      learnMoreURL: Services.urlFormatter.formatURLPref("browser.push.warning.infoURL"),
+      learnMoreURL:
+        Services.urlFormatter.formatURLPref("app.support.baseURL") + "push",
     };
 
     this._showPrompt(aRequest, message, "desktop-notification", actions,

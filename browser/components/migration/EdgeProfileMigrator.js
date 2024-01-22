@@ -7,14 +7,18 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
+Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource:///modules/MigrationUtils.jsm");
 Cu.import("resource:///modules/MSMigrationUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ESEDBReader",
+                                  "resource:///modules/ESEDBReader.jsm");
 
 const kEdgeRegistryRoot = "SOFTWARE\\Classes\\Local Settings\\Software\\" +
   "Microsoft\\Windows\\CurrentVersion\\AppContainer\\Storage\\" +
   "microsoft.microsoftedge_8wekyb3d8bbwe\\MicrosoftEdge";
+const kEdgeReadingListPath = "AC\\MicrosoftEdge\\User\\Default\\DataStore\\Data\\";
 
 function EdgeTypedURLMigrator() {
 }
@@ -79,6 +83,115 @@ EdgeTypedURLMigrator.prototype = {
   },
 }
 
+function EdgeReadingListMigrator() {
+}
+
+EdgeReadingListMigrator.prototype = {
+  type: MigrationUtils.resourceTypes.BOOKMARKS,
+  _dbFile: null,
+
+  get exists() {
+    this._dbFile = this._getDBFile();
+    return !!this._dbFile;
+  },
+
+  _getDBFile() {
+    let edgeDir = MSMigrationUtils.getEdgeLocalDataFolder();
+    if (!edgeDir) {
+      return null;
+    }
+    edgeDir.appendRelativePath(kEdgeReadingListPath);
+    if (!edgeDir.exists() || !edgeDir.isReadable() || !edgeDir.isDirectory()) {
+      return null;
+    }
+    let expectedLocation = edgeDir.clone();
+    expectedLocation.appendRelativePath("nouser1\\120712-0049\\DBStore\\spartan.edb");
+    if (expectedLocation.exists() && expectedLocation.isReadable() && expectedLocation.isFile()) {
+      return expectedLocation;
+    }
+    // We used to recurse into arbitrary subdirectories here, but that code
+    // went unused, so it likely isn't necessary, even if we don't understand
+    // where the magic folders above come from, they seem to be the same for
+    // everyone. Just return null if they're not there:
+    return null;
+  },
+
+  migrate(callback) {
+    this._migrateReadingList(PlacesUtils.bookmarks.menuGuid).then(
+      () => callback(true),
+      ex => {
+        Cu.reportError(ex);
+        callback(false);
+      }
+    );
+  },
+
+  _migrateReadingList: Task.async(function*(parentGuid) {
+    let readingListItems = [];
+    let database;
+    try {
+      let logFile = this._dbFile.parent;
+      logFile.append("LogFiles");
+      database = ESEDBReader.openDB(this._dbFile.parent, this._dbFile, logFile);
+      let columns = [
+        {name: "URL", type: "string"},
+        {name: "Title", type: "string"},
+        {name: "AddedDate", type: "date"}
+      ];
+
+      // Later versions have an isDeleted column:
+      let isDeletedColumn = database.checkForColumn("ReadingList", "isDeleted");
+      if (isDeletedColumn && isDeletedColumn.dbType == ESEDBReader.COLUMN_TYPES.JET_coltypBit) {
+        columns.push({name: "isDeleted", type: "boolean"});
+      }
+
+      let tableReader = database.tableItems("ReadingList", columns);
+      for (let row of tableReader) {
+        if (!row.isDeleted) {
+          readingListItems.push(row);
+        }
+      }
+    } catch (ex) {
+      Cu.reportError("Failed to extract Edge reading list information from " +
+                     "the database at " + this._dbFile.path + " due to the following error: " + ex);
+      // Deliberately make this fail so we expose failure in the UI:
+      throw ex;
+    } finally {
+      if (database) {
+        ESEDBReader.closeDB(database);
+      }
+    }
+    if (!readingListItems.length) {
+      return;
+    }
+    let destFolderGuid = yield this._ensureReadingListFolder(parentGuid);
+    let exceptionThrown;
+    for (let item of readingListItems) {
+      let dateAdded = item.AddedDate || new Date();
+      yield PlacesUtils.bookmarks.insert({
+        parentGuid: destFolderGuid, url: item.URL, title: item.Title, dateAdded
+      }).catch(ex => {
+        if (!exceptionThrown) {
+          exceptionThrown = ex;
+        }
+        Cu.reportError(ex);
+      });
+    }
+    if (exceptionThrown) {
+      throw exceptionThrown;
+    }
+  }),
+
+  _ensureReadingListFolder: Task.async(function*(parentGuid) {
+    if (!this.__readingListFolderGuid) {
+      let folderTitle = MigrationUtils.getLocalizedString("importedEdgeReadingList");
+      let folderSpec = {type: PlacesUtils.bookmarks.TYPE_FOLDER, parentGuid, title: folderTitle};
+      this.__readingListFolderGuid = (yield PlacesUtils.bookmarks.insert(folderSpec)).guid;
+    }
+    return this.__readingListFolderGuid;
+  }),
+};
+
 function EdgeProfileMigrator() {
 }
 
@@ -89,6 +202,7 @@ EdgeProfileMigrator.prototype.getResources = function() {
     MSMigrationUtils.getBookmarksMigrator(MSMigrationUtils.MIGRATION_TYPE_EDGE),
     MSMigrationUtils.getCookiesMigrator(MSMigrationUtils.MIGRATION_TYPE_EDGE),
     new EdgeTypedURLMigrator(),
+    new EdgeReadingListMigrator(),
   ];
   let windowsVaultFormPasswordsMigrator =
     MSMigrationUtils.getWindowsVaultFormPasswordsMigrator();

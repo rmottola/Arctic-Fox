@@ -21,12 +21,14 @@ IccContact::Create(mozContact& aMozContact, nsIIccContact** aIccContact)
   // Id
   nsAutoString id;
   aMozContact.GetId(id, er);
-  NS_ENSURE_SUCCESS(er.StealNSResult(), NS_ERROR_FAILURE);
+  nsresult rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // Names
   Nullable<nsTArray<nsString>> names;
   aMozContact.GetName(names, er);
-  NS_ENSURE_SUCCESS(er.StealNSResult(), NS_ERROR_FAILURE);
+  rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
   if (names.IsNull()) {
     // Set as Empty nsTarray<nsString> for IccContact constructor.
     names.SetValue();
@@ -35,7 +37,8 @@ IccContact::Create(mozContact& aMozContact, nsIIccContact** aIccContact)
   // Numbers
   Nullable<nsTArray<ContactTelField>> nullableNumberList;
   aMozContact.GetTel(nullableNumberList, er);
-  NS_ENSURE_SUCCESS(er.StealNSResult(), NS_ERROR_FAILURE);
+  rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
   nsTArray<nsString> numbers;
   if (!nullableNumberList.IsNull()) {
     const nsTArray<ContactTelField>& numberList = nullableNumberList.Value();
@@ -49,7 +52,8 @@ IccContact::Create(mozContact& aMozContact, nsIIccContact** aIccContact)
   // Emails
   Nullable<nsTArray<ContactField>> nullableEmailList;
   aMozContact.GetEmail(nullableEmailList, er);
-  NS_ENSURE_SUCCESS(er.StealNSResult(), NS_ERROR_FAILURE);
+  rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
   nsTArray<nsString> emails;
   if (!nullableEmailList.IsNull()) {
     const nsTArray<ContactField>& emailList = nullableEmailList.Value();
@@ -125,6 +129,11 @@ NS_IMETHODIMP IccContact::Get##_field(uint32_t* aCount, char16_t*** a##_field)  
     return NS_ERROR_OUT_OF_MEMORY;                                              \
   }                                                                             \
   for (uint32_t i = 0; i < count; i++) {                                        \
+    if(m##_field[i].IsVoid()) {                                                 \
+      (temp)[i] = nullptr;                                                      \
+      continue;                                                                 \
+    }                                                                           \
+                                                                                \
     (temp)[i] = ToNewUnicode(m##_field[i]);                                     \
     if (!(temp)[i]) {                                                           \
       NS_FREE_XPCOM_ALLOCATED_POINTER_ARRAY(i, temp);                           \

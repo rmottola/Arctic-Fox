@@ -79,6 +79,10 @@ const MOUSE_ID = 'mouse';
 const EDGE = 0.1;
 // Multiply timeouts by this constant, x2 works great too for slower users.
 const TIMEOUT_MULTIPLIER = 1;
+// A single pointer down/up sequence periodically precedes the tripple swipe
+// gesture on Android. This delay acounts for that.
+const IS_ANDROID = Utils.MozBuildApp === 'mobile/android' &&
+  Utils.AndroidSdkVersion >= 14;
 
 /**
  * A point object containing distance travelled data.
@@ -157,6 +161,14 @@ this.GestureSettings = { // jshint ignore:line
     MAX_CONSECUTIVE_GESTURE_DELAY * TIMEOUT_MULTIPLIER,
 
   /**
+   * A maximum time we wait for a next pointer down event to consider a sequence
+   * a multi-action gesture.
+   * @type {Number}
+   */
+  maxGestureResolveTimeout:
+    MAX_CONSECUTIVE_GESTURE_DELAY * TIMEOUT_MULTIPLIER,
+
+  /**
    * Delay before tap turns into dwell
    * @type {Number}
    */
@@ -194,13 +206,13 @@ this.GestureTracker = { // jshint ignore:line
    * @param  {Number} aTimeStamp A new pointer event timeStamp.
    * @param  {Function} aGesture A gesture constructor (default: Tap).
    */
-  _init: function GestureTracker__init(aDetail, aTimeStamp, aGesture = Tap) {
+  _init: function GestureTracker__init(aDetail, aTimeStamp, aGesture) {
     // Only create a new gesture on |pointerdown| event.
     if (aDetail.type !== 'pointerdown') {
       return;
     }
     let points = aDetail.points;
-    let GestureConstructor = aGesture;
+    let GestureConstructor = aGesture || (IS_ANDROID ? DoubleTap : Tap);
     this._create(GestureConstructor);
     this._update(aDetail, aTimeStamp);
   },
@@ -359,7 +371,7 @@ Gesture.prototype = {
     let delay = this._getDelay(aTimeStamp);
     let handler = () => {
       Logger.gesture('timer handler');
-      delete this._timer;
+      this.clearTimer();
       if (!this._inProgress) {
         this._deferred.reject();
       } else if (this._rejectToOnWait) {
@@ -502,6 +514,7 @@ Gesture.prototype = {
     }
     Logger.gesture('Resolving', this.id, 'gesture.');
     this.isComplete = true;
+    this.clearTimer();
     let detail = this.compile();
     if (detail) {
       this._emit(detail);
@@ -526,6 +539,7 @@ Gesture.prototype = {
     }
     Logger.gesture('Rejecting', this.id, 'gesture.');
     this.isComplete = true;
+    this.clearTimer();
     return {
       id: this.id,
       gestureType: aRejectTo
@@ -692,11 +706,12 @@ TapGesture.prototype.pointerup = function TapGesture_pointerup(aPoints) {
       let complete = this._update(aPoints, 'pointerup', false, true);
       if (complete) {
         this.clearTimer();
-        if (GestureSettings.maxConsecutiveGestureDelay) {
+        if (GestureSettings.maxGestureResolveTimeout) {
           this._pointerUpTimer = setTimeout(() => {
+            clearTimeout(this._pointerUpTimer);
             delete this._pointerUpTimer;
             this._deferred.resolve();
-          }, GestureSettings.maxConsecutiveGestureDelay);
+          }, GestureSettings.maxGestureResolveTimeout);
         } else {
           this._deferred.resolve();
         }

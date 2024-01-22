@@ -71,6 +71,11 @@ struct nsIMEUpdatePreference final
   {
   }
 
+  nsIMEUpdatePreference operator|(const nsIMEUpdatePreference& aOther) const
+  {
+    return nsIMEUpdatePreference(aOther.mWantUpdates | mWantUpdates);
+  }
+
   void DontNotifyChangesCausedByComposition()
   {
     mWantUpdates &= ~DEFAULT_CONDITIONS_OF_NOTIFYING_CHANGES;
@@ -114,7 +119,6 @@ struct nsIMEUpdatePreference final
 
   Notifications mWantUpdates;
 };
-
 
 /**
  * Contains IMEStatus plus information about the current 
@@ -386,7 +390,19 @@ struct InputContextAction final
   bool UserMightRequestOpenVKB() const
   {
     return (mFocusChange == FOCUS_NOT_CHANGED &&
-            mCause == CAUSE_MOUSE);
+            (mCause == CAUSE_MOUSE || mCause == CAUSE_TOUCH));
+  }
+
+  static bool IsUserAction(Cause aCause)
+  {
+    switch (aCause) {
+      case CAUSE_KEY:
+      case CAUSE_MOUSE:
+      case CAUSE_TOUCH:
+        return true;
+      default:
+        return false;
+    }
   }
 
   InputContextAction()
@@ -442,6 +458,7 @@ struct IMENotification final
   }
 
   IMENotification(const IMENotification& aOther)
+    : mMessage(NOTIFY_IME_OF_NOTHING)
   {
     Assign(aOther);
   }
@@ -470,6 +487,7 @@ struct IMENotification final
         mMouseButtonEventData.mButton = -1;
         mMouseButtonEventData.mButtons = 0;
         mMouseButtonEventData.mModifiers = 0;
+        break;
       default:
         break;
     }
@@ -719,8 +737,20 @@ struct IMENotification final
     // mStartOffset if just removed.  The vlaue is offset in the new content.
     uint32_t mAddedEndOffset;
 
-    bool mCausedByComposition;
-    bool mOccurredDuringComposition;
+    // Note that TextChangeDataBase may be the result of merging two or more
+    // changes especially in e10s mode.
+
+    // mCausedOnlyByComposition is true only when *all* merged changes are
+    // caused by composition.
+    bool mCausedOnlyByComposition;
+    // mIncludingChangesDuringComposition is true if at least one change which
+    // is not caused by composition occurred during the last composition.
+    // Note that if after the last composition is finished and there are some
+    // changes not caused by composition, this is set to false.
+    bool mIncludingChangesDuringComposition;
+    // mIncludingChangesWithoutComposition is true if there is at least one
+    // change which did occur when there wasn't a composition ongoing.
+    bool mIncludingChangesWithoutComposition;
 
     uint32_t OldLength() const
     {
@@ -791,8 +821,11 @@ struct IMENotification final
       mStartOffset = aStartOffset;
       mRemovedEndOffset = aRemovedEndOffset;
       mAddedEndOffset = aAddedEndOffset;
-      mCausedByComposition = aCausedByComposition;
-      mOccurredDuringComposition = aOccurredDuringComposition;
+      mCausedOnlyByComposition = aCausedByComposition;
+      mIncludingChangesDuringComposition =
+        !aCausedByComposition && aOccurredDuringComposition;
+      mIncludingChangesWithoutComposition =
+        !aCausedByComposition && !aOccurredDuringComposition;
     }
   };
 
@@ -835,30 +868,6 @@ struct IMENotification final
   {
     MOZ_RELEASE_ASSERT(mMessage == NOTIFY_IME_OF_TEXT_CHANGE);
     mTextChangeData = aTextChangeData;
-  }
-
-  bool IsCausedByComposition() const
-  {
-    switch (mMessage) {
-      case NOTIFY_IME_OF_SELECTION_CHANGE:
-        return mSelectionChangeData.mCausedByComposition;
-      case NOTIFY_IME_OF_TEXT_CHANGE:
-        return mTextChangeData.mCausedByComposition;
-      default:
-        return false;
-    }
-  }
-
-  bool OccurredDuringComposition() const
-  {
-    switch (mMessage) {
-      case NOTIFY_IME_OF_SELECTION_CHANGE:
-        return mSelectionChangeData.mOccurredDuringComposition;
-      case NOTIFY_IME_OF_TEXT_CHANGE:
-        return mTextChangeData.mOccurredDuringComposition;
-      default:
-        return false;
-    }
   }
 };
 

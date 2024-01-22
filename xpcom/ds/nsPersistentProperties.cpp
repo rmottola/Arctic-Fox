@@ -486,8 +486,7 @@ NS_IMPL_ISUPPORTS(nsPersistentProperties, nsIPersistentProperties, nsIProperties
 NS_IMETHODIMP
 nsPersistentProperties::Load(nsIInputStream* aIn)
 {
-  nsresult rv = nsSimpleUnicharStreamFactory::GetInstance()->
-    CreateInstanceFromUTF8Stream(aIn, getter_AddRefs(mIn));
+  nsresult rv = NS_NewUnicharInputStream(aIn, getter_AddRefs(mIn));
 
   if (rv != NS_OK) {
     NS_WARNING("Error creating UnicharInputStream");
@@ -524,11 +523,11 @@ nsPersistentProperties::SetStringProperty(const nsACString& aKey,
 {
   const nsAFlatCString&  flatKey = PromiseFlatCString(aKey);
   auto entry = static_cast<PropertyTableEntry*>
-                          (mTable.Add(flatKey.get(), mozilla::fallible));
+                          (mTable.Add(flatKey.get()));
 
   if (entry->mKey) {
     aOldValue = entry->mValue;
-    NS_WARNING(nsPrintfCString("the property %s already exists\n",
+    NS_WARNING(nsPrintfCString("the property %s already exists",
                                flatKey.get()).get());
   } else {
     aOldValue.Truncate();

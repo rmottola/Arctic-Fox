@@ -16,7 +16,6 @@
 #include "nsDOMString.h"
 #include "nsServiceManagerUtils.h"
 
-
 namespace mozilla {
 namespace browser {
 
@@ -222,7 +221,6 @@ AboutRedirector::GetIndexedDBOriginPostfix(nsIURI *aURI, nsAString &result)
   SetDOMStringToNull(result);
   return NS_ERROR_ILLEGAL_VALUE;
 }
-
 
 nsresult
 AboutRedirector::Create(nsISupports *aOuter, REFNSIID aIID, void **result)

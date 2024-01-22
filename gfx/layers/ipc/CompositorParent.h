@@ -56,6 +56,7 @@ class CompositorParent;
 class LayerManagerComposite;
 class LayerTransactionParent;
 class PAPZParent;
+class CrossProcessCompositorParent;
 
 struct ScopedLayerTreeRegistration
 {
@@ -389,7 +390,7 @@ public:
     // Pointer to the CrossProcessCompositorParent. Used by APZCs to share
     // their FrameMetrics with the corresponding child process that holds
     // the PCompositorChild
-    PCompositorParent* mCrossProcessParent;
+    CrossProcessCompositorParent* mCrossProcessParent;
     TargetConfig mTargetConfig;
     APZTestData mApzTestData;
     LayerTransactionParent* mLayerTree;
@@ -397,6 +398,8 @@ public:
     bool mUpdatedPluginDataAvailable;
     RefPtr<CompositorUpdateObserver> mLayerTreeReadyObserver;
     RefPtr<CompositorUpdateObserver> mLayerTreeClearedObserver;
+
+    PCompositorParent* CrossProcessPCompositor() const;
   };
 
   /**

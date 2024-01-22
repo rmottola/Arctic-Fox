@@ -44,6 +44,7 @@
 #include "GeckoProfiler.h"
 #include "FrameUniformityData.h"
 #include "TreeTraversal.h"
+#include "VsyncSource.h"
 
 struct nsCSSValueSharedList;
 
@@ -1395,7 +1396,6 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame,
     // code also includes Fennec which is rendered async.  Fennec uses
     // its own platform-specific async rendering that is done partially
     // in Gecko and partially in Java.
-    wantNextFrame |= SampleAPZAnimations(LayerMetricsWrapper(root), aCurrentFrame);
     bool foundRoot = false;
     Maybe<ParentLayerIntRect> clipDeferredFromChildren;
     if (ApplyAsyncContentTransformToTree(root, &foundRoot, clipDeferredFromChildren)) {
@@ -1419,6 +1419,15 @@ AsyncCompositionManager::TransformShadowTree(TimeStamp aCurrentFrame,
         }
       }
     }
+
+    // Advance APZ animations to the next expected vsync timestamp, if we can
+    // get it.
+    TimeStamp nextFrame = aCurrentFrame;
+    TimeDuration vsyncrate = gfxPlatform::GetPlatform()->GetHardwareVsync()->GetGlobalDisplay().GetVsyncRate();
+    if (vsyncrate != TimeDuration::Forever()) {
+      nextFrame += vsyncrate;
+    }
+    wantNextFrame |= SampleAPZAnimations(LayerMetricsWrapper(root), nextFrame);
   }
 
   LayerComposite* rootComposite = root->AsLayerComposite();

@@ -1977,6 +1977,12 @@ private:
   bool mNotifyAfterRemotePaint;
 };
 
+PCompositorParent*
+CompositorParent::LayerTreeState::CrossProcessPCompositor() const
+{
+  return mCrossProcessParent;
+}
+
 void
 CompositorParent::DidComposite(TimeStamp& aCompositeStart,
                                TimeStamp& aCompositeEnd)

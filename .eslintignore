@@ -66,7 +66,6 @@ browser/base/content/newtab/**
 browser/components/customizableui/**
 browser/components/downloads/**
 browser/components/feeds/**
-browser/components/migration/**
 browser/components/*.js
 browser/components/pocket/**
 browser/components/preferences/**
@@ -192,7 +191,6 @@ toolkit/components/passwordmgr/**
 toolkit/mozapps/extensions/**
 
 # Uses preprocessing
-toolkit/content/contentAreaUtils.js
 toolkit/content/widgets/videocontrols.xml
 toolkit/components/jsdownloads/src/DownloadIntegration.jsm
 toolkit/components/search/nsSearchService.js

@@ -1132,6 +1132,20 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
   list-style-image: url("chrome://browser/skin/menu-forward.png") !important;
 }
 
+/* undo close tab menu item */
+#alltabs_undoCloseTab {
+  list-style-image: url(chrome://browser/skin/undoCloseTab.png);
+}
+
+@media (min-resolution: 1.25dppx) {
+  #alltabs_undoCloseTab {
+    list-style-image: url(chrome://browser/skin/undoCloseTab@2x.png);
+  }
+  #alltabs_undoCloseTab > .toolbarbutton-icon {
+    width: 16px;
+  }
+}
+
 #stop-button {
   -moz-image-region: rect(0, 54px, 18px, 36px);
 }

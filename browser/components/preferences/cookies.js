@@ -5,6 +5,10 @@
 
 const nsICookie = Components.interfaces.nsICookie;
 
+Components.utils.import("resource://gre/modules/PluralForm.jsm");
+Components.utils.import("resource://gre/modules/Services.jsm")
+Components.utils.import("resource:///modules/UserContextUI.jsm");
+
 var gCookiesWindow = {
   _cm               : Components.classes["@mozilla.org/cookiemanager;1"]
                                 .getService(Components.interfaces.nsICookieManager),
@@ -27,6 +31,10 @@ var gCookiesWindow = {
     this._populateList(true);
 
     document.getElementById("filter").focus();
+
+    if (!Services.prefs.getBoolPref("privacy.userContext.enabled")) {
+      document.getElementById("userContextRow").hidden = true;
+    }
   },
 
   uninit: function () {
@@ -451,16 +459,17 @@ var gCookiesWindow = {
   _makeCookieObject: function (aStrippedHost, aCookie) {
     var host = aCookie.host;
     var formattedHost = host.charAt(0) == "." ? host.substring(1, host.length) : host;
-    var c = { name        : aCookie.name,
-              value       : aCookie.value,
-              isDomain    : aCookie.isDomain,
-              host        : aCookie.host,
-              rawHost     : aStrippedHost,
-              path        : aCookie.path,
-              isSecure    : aCookie.isSecure,
-              expires     : aCookie.expires,
-              level       : 1,
-              container   : false };
+    var c = { name            : aCookie.name,
+              value           : aCookie.value,
+              isDomain        : aCookie.isDomain,
+              host            : aCookie.host,
+              rawHost         : aStrippedHost,
+              path            : aCookie.path,
+              isSecure        : aCookie.isSecure,
+              expires         : aCookie.expires,
+              level           : 1,
+              container       : false,
+              originAttributes: aCookie.originAttributes };
     return c;
   },
 
@@ -496,9 +505,17 @@ var gCookiesWindow = {
     return this._bundle.getString("expireAtEndOfSession");
   },
 
+  _getUserContextString: function(aUserContextId) {
+    if (parseInt(aUserContextId) == 0) {
+      return this._bundle.getString("defaultUserContextLabel");
+    }
+
+    return UserContextUI.getUserContextLabel(aUserContextId);
+  },
+
   _updateCookieData: function (aItem) {
     var seln = this._view.selection;
-    var ids = ["name", "value", "host", "path", "isSecure", "expires"];
+    var ids = ["name", "value", "host", "path", "isSecure", "expires", "userContext"];
     var properties;
 
     if (aItem && !aItem.container && seln.count > 0) {
@@ -507,24 +524,27 @@ var gCookiesWindow = {
                      isDomain: aItem.isDomain ? this._bundle.getString("domainColon")
                                               : this._bundle.getString("hostColon"),
                      isSecure: aItem.isSecure ? this._bundle.getString("forSecureOnly")
-                                              : this._bundle.getString("forAnyConnection") };
-      for (var i = 0; i < ids.length; ++i)
+                                              : this._bundle.getString("forAnyConnection"),
+                     userContext: this._getUserContextString(aItem.originAttributes.userContextId) };
+      for (var i = 0; i < ids.length; ++i) {
         document.getElementById(ids[i]).disabled = false;
+      }
     }
     else {
       var noneSelected = this._bundle.getString("noCookieSelected");
       properties = { name: noneSelected, value: noneSelected, host: noneSelected,
                      path: noneSelected, expires: noneSelected,
-                     isSecure: noneSelected };
-      for (i = 0; i < ids.length; ++i)
+                     isSecure: noneSelected, userContext: noneSelected };
+      for (i = 0; i < ids.length; ++i) {
         document.getElementById(ids[i]).disabled = true;
+      }
     }
     for (var property in properties)
       document.getElementById(property).value = properties[property];
   },
 
   onCookieSelected: function () {
-    var properties, item;
+    var item;
     var seln = this._tree.view.selection;
     if (!this._view._filtered)
       item = this._view._getItemAtIndex(seln.currentIndex);
@@ -541,22 +561,19 @@ var gCookiesWindow = {
       for (var j = min.value; j <= max.value; ++j) {
         item = this._view._getItemAtIndex(j);
         if (!item) continue;
-        if (item.container && !item.open)
+        if (item.container)
           selectedCookieCount += item.cookies.length;
         else if (!item.container)
           ++selectedCookieCount;
       }
     }
-    var item = this._view._getItemAtIndex(seln.currentIndex);
-    if (item && seln.count == 1 && item.container && item.open)
-      selectedCookieCount += 2;
 
-    var removeCookie = document.getElementById("removeCookie");
-    var removeCookies = document.getElementById("removeCookies");
-    removeCookie.parentNode.selectedPanel =
-      selectedCookieCount == 1 ? removeCookie : removeCookies;
+    let buttonLabel = this._bundle.getString("removeSelectedCookies");
+    let removeSelectedCookies = document.getElementById("removeSelectedCookies");
+    removeSelectedCookies.label = PluralForm.get(selectedCookieCount, buttonLabel)
+                                            .replace("#1", selectedCookieCount);
 
-    removeCookie.disabled = removeCookies.disabled = !(seln.count > 0);
+    removeSelectedCookies.disabled = !(seln.count > 0);
   },
 
   performDeletion: function gCookiesWindow_performDeletion(deleteItems) {

@@ -4,6 +4,9 @@
 
 "use strict";
 
+/* import-globals-from ../../../content/contentAreaUtils.js */
+/*globals XMLStylesheetProcessingInstruction*/
+
 var Cc = Components.classes;
 var Ci = Components.interfaces;
 var Cu = Components.utils;
@@ -1731,7 +1734,7 @@ function doPendingUninstalls(aListBox) {
   var listitem = aListBox.firstChild;
   while (listitem) {
     if (listitem.getAttribute("pending") == "uninstall" &&
-        !(listitem.opRequiresRestart("uninstall")))
+        !(listitem.opRequiresRestart("UNINSTALL")))
       items.push(listitem.mAddon);
     listitem = listitem.nextSibling;
   }

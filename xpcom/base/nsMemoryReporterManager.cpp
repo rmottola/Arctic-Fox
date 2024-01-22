@@ -46,6 +46,10 @@ using namespace mozilla;
 #  include "mozmemory.h"
 #endif  // MOZ_MEMORY
 
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) && !defined(SM_LARGE_PAGE)
+#define SM_LARGE_PAGE 8
+#endif
+
 #if defined(XP_LINUX)
 
 #include <malloc.h>

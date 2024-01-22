@@ -107,6 +107,9 @@ static mozilla::LazyLogModule gMediaElementEventsLog("nsMediaElementEvents");
 
 #include "mozilla/EventStateManager.h"
 
+#include "mozilla/dom/HTMLVideoElement.h"
+#include "mozilla/dom/VideoPlaybackQuality.h"
+
 using namespace mozilla::layers;
 using mozilla::net::nsMediaFragmentURIParser;
 
@@ -722,6 +725,7 @@ void HTMLMediaElement::AbortExistingLoads()
   }
 
   mError = nullptr;
+  mCurrentPlayRangeStart = -1.0;
   mLoadedDataFired = false;
   mAutoplaying = true;
   mIsLoadingFromSourceChildren = false;
@@ -774,6 +778,7 @@ void HTMLMediaElement::NoSupportedMediaSourceError()
   ChangeNetworkState(nsIDOMHTMLMediaElement::NETWORK_NO_SOURCE);
   DispatchAsyncEvent(NS_LITERAL_STRING("error"));
   ChangeDelayLoadStatus(false);
+  UpdateAudioChannelPlayingState();
 }
 
 typedef void (HTMLMediaElement::*SyncSectionFn)();
@@ -1415,6 +1420,8 @@ NS_IMETHODIMP HTMLMediaElement::GetCurrentTime(double* aCurrentTime)
 void
 HTMLMediaElement::FastSeek(double aTime, ErrorResult& aRv)
 {
+  LOG(LogLevel::Debug, ("Reporting telemetry VIDEO_FASTSEEK_USED"));
+  Telemetry::Accumulate(Telemetry::VIDEO_FASTSEEK_USED, 1);
   Seek(aTime, SeekTarget::PrevSyncPoint, aRv);
 }
 
@@ -2108,7 +2115,8 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
     mElementInTreeState(ELEMENT_NOT_INTREE),
     mHasUserInteraction(false),
     mFirstFrameLoaded(false),
-    mDefaultPlaybackStartPosition(0.0)
+    mDefaultPlaybackStartPosition(0.0),
+    mIsAudioTrackAudible(false)
 {
   ErrorResult rv;
 
@@ -2188,7 +2196,7 @@ void HTMLMediaElement::StopSuspendingAfterFirstFrame()
     return;
   mSuspendedAfterFirstFrame = false;
   if (mDecoder) {
-    mDecoder->Resume(true);
+    mDecoder->Resume();
   }
 }
 
@@ -2679,6 +2687,19 @@ HTMLMediaElement::ReportMSETelemetry()
     }
   }
 
+  if (HTMLVideoElement* vid = HTMLVideoElement::FromContentOrNull(this)) {
+    RefPtr<VideoPlaybackQuality> quality = vid->GetVideoPlaybackQuality();
+    uint64_t totalFrames = quality->TotalVideoFrames();
+    uint64_t droppedFrames = quality->DroppedVideoFrames();
+    if (totalFrames) {
+      uint32_t percentage = 100 * droppedFrames / totalFrames;
+      LOG(LogLevel::Debug,
+          ("Reporting telemetry DROPPED_FRAMES_IN_VIDEO_PLAYBACK"));
+      Telemetry::Accumulate(Telemetry::VIDEO_DROPPED_FRAMES_PROPORTION,
+                            percentage);
+    }
+  }
+
   Telemetry::Accumulate(Telemetry::VIDEO_MSE_UNLOAD_STATE, state);
   LOG(LogLevel::Debug, ("%p VIDEO_MSE_UNLOAD_STATE = %d", this, state));
 
@@ -3032,41 +3053,36 @@ class HTMLMediaElement::StreamSizeListener : public MediaStreamListener {
 public:
   explicit StreamSizeListener(HTMLMediaElement* aElement) :
     mElement(aElement),
-    mMutex("HTMLMediaElement::StreamSizeListener")
+    mInitialSizeFound(false)
   {}
   void Forget() { mElement = nullptr; }
 
-  void ReceivedSize()
+  void ReceivedSize(gfx::IntSize aSize)
   {
     if (!mElement) {
       return;
     }
-    gfx::IntSize size;
-    {
-      MutexAutoLock lock(mMutex);
-      size = mInitialSize;
-    }
     RefPtr<HTMLMediaElement> deathGrip = mElement;
-    mElement->UpdateInitialMediaSize(size);
+    mElement->UpdateInitialMediaSize(aSize);
   }
-  virtual void NotifyQueuedTrackChanges(MediaStreamGraph* aGraph, TrackID aID,
-                                        StreamTime aTrackOffset,
-                                        uint32_t aTrackEvents,
-                                        const MediaSegment& aQueuedMedia,
-                                        MediaStream* aInputStream,
-                                        TrackID aInputTrackID) override
+
+  void NotifyQueuedTrackChanges(MediaStreamGraph* aGraph, TrackID aID,
+                                StreamTime aTrackOffset,
+                                uint32_t aTrackEvents,
+                                const MediaSegment& aQueuedMedia,
+                                MediaStream* aInputStream,
+                                TrackID aInputTrackID) override
   {
-    MutexAutoLock lock(mMutex);
-    if (mInitialSize != gfx::IntSize(0,0) ||
-        aQueuedMedia.GetType() != MediaSegment::VIDEO) {
+    if (mInitialSizeFound || aQueuedMedia.GetType() != MediaSegment::VIDEO) {
       return;
     }
     const VideoSegment& video = static_cast<const VideoSegment&>(aQueuedMedia);
     for (VideoSegment::ConstChunkIterator c(video); !c.IsEnded(); c.Next()) {
       if (c->mFrame.GetIntrinsicSize() != gfx::IntSize(0,0)) {
-        mInitialSize = c->mFrame.GetIntrinsicSize();
         nsCOMPtr<nsIRunnable> event =
-          NS_NewRunnableMethod(this, &StreamSizeListener::ReceivedSize);
+          NS_NewRunnableMethodWithArgs<gfx::IntSize>(
+              this, &StreamSizeListener::ReceivedSize,
+              c->mFrame.GetIntrinsicSize());
         aGraph->DispatchToMainThreadAfterStreamStateUpdate(event.forget());
       }
     }
@@ -3076,9 +3092,8 @@ private:
   // These fields may only be accessed on the main thread
   HTMLMediaElement* mElement;
 
-  // mMutex protects the fields below; they can be accessed on any thread
-  Mutex mMutex;
-  gfx::IntSize mInitialSize;
+  // These fields may only be accessed on the MSG thread
+  bool mInitialSizeFound;
 };
 
 class HTMLMediaElement::MediaStreamTracksAvailableCallback:
@@ -3151,9 +3166,7 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
 
     mMediaStreamListener = new StreamListener(this,
         "HTMLMediaElement::mMediaStreamListener");
-    mMediaStreamSizeListener = new StreamSizeListener(this);
     stream->AddListener(mMediaStreamListener);
-    stream->AddListener(mMediaStreamSizeListener);
 
     mWatchManager.Watch(*mMediaStreamListener,
         &HTMLMediaElement::UpdateReadyStateInternal);
@@ -3170,7 +3183,6 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
       mSrcStreamPausedCurrentTime = CurrentTime();
 
       stream->RemoveListener(mMediaStreamListener);
-      stream->RemoveListener(mMediaStreamSizeListener);
 
       stream->RemoveAudioOutput(this);
       VideoFrameContainer* container = GetVideoFrameContainer();
@@ -3186,8 +3198,6 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
 
     mMediaStreamListener->Forget();
     mMediaStreamListener = nullptr;
-    mMediaStreamSizeListener->Forget();
-    mMediaStreamSizeListener = nullptr;
   }
 }
 
@@ -3206,6 +3216,9 @@ void HTMLMediaElement::SetupSrcMediaStreamPlayback(DOMMediaStream* aStream)
   RefPtr<MediaStream> stream = GetSrcMediaStream();
   if (stream) {
     stream->SetAudioChannelType(mAudioChannel);
+
+    mMediaStreamSizeListener = new StreamSizeListener(this);
+    stream->AddListener(mMediaStreamSizeListener);
   }
 
   UpdateSrcMediaStreamPlaying();
@@ -3231,6 +3244,15 @@ void HTMLMediaElement::EndSrcMediaStreamPlayback()
   MOZ_ASSERT(mSrcStream);
 
   UpdateSrcMediaStreamPlaying(REMOVING_SRC_STREAM);
+
+  if (mMediaStreamSizeListener) {
+    RefPtr<MediaStream> stream = GetSrcMediaStream();
+    if (stream) {
+      stream->RemoveListener(mMediaStreamSizeListener);
+    }
+    mMediaStreamSizeListener->Forget();
+    mMediaStreamSizeListener = nullptr;
+  }
 
   mSrcStream->UnregisterTrackListener(mMediaStreamTrackListener);
   mMediaStreamTrackListener = nullptr;
@@ -3471,6 +3493,11 @@ void HTMLMediaElement::DecodeError()
   }
 }
 
+bool HTMLMediaElement::HasError() const
+{
+  return GetError();
+}
+
 void HTMLMediaElement::LoadAborted()
 {
   Error(nsIDOMMediaError::MEDIA_ERR_ABORTED);
@@ -3499,6 +3526,7 @@ void HTMLMediaElement::Error(uint16_t aStealNSResult)
     ChangeNetworkState(nsIDOMHTMLMediaElement::NETWORK_IDLE);
   }
   ChangeDelayLoadStatus(false);
+  UpdateAudioChannelPlayingState();
 }
 
 void HTMLMediaElement::PlaybackEnded()
@@ -4139,6 +4167,16 @@ void HTMLMediaElement::UpdateInitialMediaSize(const nsIntSize& aSize)
   if (!mMediaInfo.HasVideo()) {
     UpdateMediaSize(aSize);
   }
+
+  if (!mMediaStreamSizeListener) {
+    return;
+  }
+  RefPtr<MediaStream> stream = GetSrcMediaStream();
+  if (stream) {
+    stream->RemoveListener(mMediaStreamSizeListener);
+  }
+  mMediaStreamSizeListener->Forget();
+  mMediaStreamSizeListener = nullptr;
 }
 
 void HTMLMediaElement::SuspendOrResumeElement(bool aPauseElement, bool aSuspendEvents)
@@ -4162,7 +4200,7 @@ void HTMLMediaElement::SuspendOrResumeElement(bool aPauseElement, bool aSuspendE
       mEventDeliveryPaused = aSuspendEvents;
     } else {
       if (mDecoder) {
-        mDecoder->Resume(false);
+        mDecoder->Resume();
         if (!mPaused && !mDecoder->IsEndedOrShutdown()) {
           mDecoder->Play();
         }
@@ -4291,8 +4329,6 @@ void HTMLMediaElement::DoRemoveSelfReference()
 nsresult HTMLMediaElement::Observe(nsISupports* aSubject,
                                    const char* aTopic, const char16_t* aData)
 {
-  NS_ENSURE_TRUE(nsContentUtils::IsCallerChrome(), NS_ERROR_NOT_AVAILABLE);
-
   if (strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID) == 0) {
     mShuttingDown = true;
     AddRemoveSelfReference();
@@ -4693,6 +4729,11 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
     return false;
   }
 
+  // If we have an error, we are not playing.
+  if (mError) {
+    return false;
+  }
+
   // If this element doesn't have any audio tracks.
   if (!HasAudio()) {
     return false;
@@ -4815,20 +4856,8 @@ HTMLMediaElement::SetMediaKeys(mozilla::dom::MediaKeys* aMediaKeys,
   if (aRv.Failed()) {
     return nullptr;
   }
-  if (mMediaKeys == aMediaKeys) {
-    promise->MaybeResolve(JS::UndefinedHandleValue);
-    return promise.forget();
-  }
-  if (aMediaKeys && aMediaKeys->IsBoundToMediaElement()) {
-    promise->MaybeReject(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR,
-                         NS_LITERAL_CSTRING("MediaKeys object is already bound to another HTMLMediaElement"));
-    return promise.forget();
-  }
-  if (mMediaKeys) {
-    // Existing MediaKeys object. Shut it down.
-    mMediaKeys->Shutdown();
-    mMediaKeys = nullptr;
-  }
+
+  // We only support EME for MSE content by default.
   if (mDecoder &&
       !mMediaSource &&
       Preferences::GetBool("media.eme.mse-only", true)) {
@@ -4838,19 +4867,92 @@ HTMLMediaElement::SetMediaKeys(mozilla::dom::MediaKeys* aMediaKeys,
     return promise.forget();
   }
 
-  mMediaKeys = aMediaKeys;
+  // 1. If mediaKeys and the mediaKeys attribute are the same object,
+  // return a resolved promise.
+  if (mMediaKeys == aMediaKeys) {
+    promise->MaybeResolve(JS::UndefinedHandleValue);
+    return promise.forget();
+  }
+
+  // Note: Our attaching code is synchronous, so we can skip the following steps.
+
+  // 2. If this object's attaching media keys value is true, return a
+  // promise rejected with a new DOMException whose name is InvalidStateError.
+  // 3. Let this object's attaching media keys value be true.
+  // 4. Let promise be a new promise.
+  // 5. Run the following steps in parallel:
+
+  // 5.1 If mediaKeys is not null, CDM instance represented by mediaKeys is
+  // already in use by another media element, and the user agent is unable
+  // to use it with this element, let this object's attaching media keys
+  // value be false and reject promise with a new DOMException whose name
+  // is QuotaExceededError.
+  if (aMediaKeys && aMediaKeys->IsBoundToMediaElement()) {
+    promise->MaybeReject(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR,
+      NS_LITERAL_CSTRING("MediaKeys object is already bound to another HTMLMediaElement"));
+    return promise.forget();
+  }
+
+  // 5.2 If the mediaKeys attribute is not null, run the following steps:
   if (mMediaKeys) {
-    if (NS_FAILED(mMediaKeys->Bind(this))) {
+    // 5.2.1 If the user agent or CDM do not support removing the association,
+    // let this object's attaching media keys value be false and reject promise
+    // with a new DOMException whose name is NotSupportedError.
+
+    // 5.2.2 If the association cannot currently be removed, let this object's
+    // attaching media keys value be false and reject promise with a new
+    // DOMException whose name is InvalidStateError.
+    if (mDecoder) {
+      // We don't support swapping out the MediaKeys once we've started to
+      // setup the playback pipeline. Note this also means we don't need to worry
+      // about handling disassociating the MediaKeys from the MediaDecoder.
       promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR,
-                           NS_LITERAL_CSTRING("Failed to bind MediaKeys object to HTMLMediaElement"));
-      mMediaKeys = nullptr;
+        NS_LITERAL_CSTRING("Can't change MediaKeys on HTMLMediaElement after load has started"));
       return promise.forget();
     }
+
+    // 5.2.3 Stop using the CDM instance represented by the mediaKeys attribute
+    // to decrypt media data and remove the association with the media element.
+    mMediaKeys->Unbind();
+    mMediaKeys = nullptr;
+
+    // 5.2.4 If the preceding step failed, let this object's attaching media
+    // keys value be false and reject promise with a new DOMException whose
+    // name is the appropriate error name.
+  }
+
+  // 5.3. If mediaKeys is not null, run the following steps:
+  if (aMediaKeys) {
+    // 5.3.1 Associate the CDM instance represented by mediaKeys with the
+    // media element for decrypting media data.
+    if (NS_FAILED(aMediaKeys->Bind(this))) {
+      // 5.3.2 If the preceding step failed, run the following steps:
+      // 5.3.2.1 Set the mediaKeys attribute to null.
+      mMediaKeys = nullptr;
+      // 5.3.2.2 Let this object's attaching media keys value be false.
+      // 5.3.2.3 Reject promise with a new DOMException whose name is
+      // the appropriate error name.
+      promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR,
+                           NS_LITERAL_CSTRING("Failed to bind MediaKeys object to HTMLMediaElement"));
+      return promise.forget();
+    }
+    // 5.3.3 Queue a task to run the "Attempt to Resume Playback If Necessary"
+    // algorithm on the media element.
+    // Note: Setting the CDMProxy on the MediaDecoder will unblock playback.
     if (mDecoder) {
-      mDecoder->SetCDMProxy(mMediaKeys->GetCDMProxy());
+      mDecoder->SetCDMProxy(aMediaKeys->GetCDMProxy());
     }
   }
+
+  // 5.4 Set the mediaKeys attribute to mediaKeys.
+  mMediaKeys = aMediaKeys;
+
+  // 5.5 Let this object's attaching media keys value be false.
+
+  // 5.6 Resolve promise.
   promise->MaybeResolve(JS::UndefinedHandleValue);
+
+  // 6. Return promise.
   return promise.forget();
 }
 
@@ -5078,6 +5180,15 @@ HTMLMediaElement::IsCurrentlyPlaying() const
     return true;
   }
   return false;
+}
+
+void
+HTMLMediaElement::NotifyAudibleStateChanged(bool aAudible)
+{
+  if (mIsAudioTrackAudible != aAudible) {
+    mIsAudioTrackAudible = aAudible;
+    // To do ...
+  }
 }
 
 } // namespace dom

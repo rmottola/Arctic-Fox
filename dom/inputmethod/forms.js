@@ -421,7 +421,6 @@ var FormAssistant = {
     addMessageListener("Forms:Select:Blur", this);
     addMessageListener("Forms:SetSelectionRange", this);
     addMessageListener("Forms:ReplaceSurroundingText", this);
-    addMessageListener("Forms:GetText", this);
     addMessageListener("Forms:Input:SendKey", this);
     addMessageListener("Forms:GetContext", this);
     addMessageListener("Forms:SetComposition", this);
@@ -436,8 +435,8 @@ var FormAssistant = {
   isHandlingFocus: false,
   selectionStart: -1,
   selectionEnd: -1,
-  textBeforeCursor: "",
-  textAfterCursor: "",
+  text: "",
+
   scrollIntoViewTimeout: null,
   _focusedElement: null,
   _focusCounter: 0, // up one for every time we focus a new element
@@ -522,8 +521,6 @@ var FormAssistant = {
         });
         if (del && element === self.focusedElement) {
           self.unhandleFocus();
-          self.selectionStart = -1;
-          self.selectionEnd = -1;
         }
       });
 
@@ -624,8 +621,6 @@ var FormAssistant = {
       case "blur":
         if (this.focusedElement) {
           this.unhandleFocus();
-          this.selectionStart = -1;
-          this.selectionEnd = -1;
         }
         break;
 
@@ -694,14 +689,6 @@ var FormAssistant = {
     }
 
     if (!target) {
-      switch (msg.name) {
-      case "Forms:GetText":
-        sendAsyncMessage("Forms:GetText:Result:Error", {
-          requestId: json.requestId,
-          error: "No focused element"
-        });
-        break;
-      }
       return;
     }
 
@@ -933,24 +920,6 @@ var FormAssistant = {
         break;
       }
 
-      case "Forms:GetText": {
-        let value = isContentEditable(target) ? getContentEditableText(target)
-                                              : target.value;
-
-        if (json.offset && json.length) {
-          value = value.substr(json.offset, json.length);
-        }
-        else if (json.offset) {
-          value = value.substr(json.offset);
-        }
-
-        sendAsyncMessage("Forms:GetText:Result:OK", {
-          requestId: json.requestId,
-          text: value
-        });
-        break;
-      }
-
       case "Forms:GetContext": {
         let obj = getJSON(target, this._focusCounter);
         sendAsyncMessage("Forms:GetContext:Result:OK", obj);
@@ -995,7 +964,10 @@ var FormAssistant = {
   unhandleFocus: function fa_unhandleFocus() {
     this.setFocusedElement(null);
     this.isHandlingFocus = false;
-    sendAsyncMessage("Forms:Input", { "type": "blur" });
+    this.selectionStart = -1;
+    this.selectionEnd = -1;
+    this.text = "";
+    sendAsyncMessage("Forms:Blur", {});
   },
 
   isFocusableElement: function fa_isFocusableElement(element) {
@@ -1024,7 +996,7 @@ var FormAssistant = {
   },
 
   sendInputState: function(element) {
-    sendAsyncMessage("Forms:Input", getJSON(element, this._focusCounter));
+    sendAsyncMessage("Forms:Focus", getJSON(element, this._focusCounter));
   },
 
   getSelectionInfo: function fa_getSelectionInfo() {
@@ -1034,23 +1006,18 @@ var FormAssistant = {
     let text = isContentEditable(element) ? getContentEditableText(element)
                                           : element.value;
 
-    let textAround = getTextAroundCursor(text, range);
-
     let changed = this.selectionStart !== range[0] ||
       this.selectionEnd !== range[1] ||
-      this.textBeforeCursor !== textAround.before ||
-      this.textAfterCursor !== textAround.after;
+      this.text !== text;
 
     this.selectionStart = range[0];
     this.selectionEnd = range[1];
-    this.textBeforeCursor = textAround.before;
-    this.textAfterCursor = textAround.after;
+    this.text = text;
 
     return {
       selectionStart: range[0],
       selectionEnd: range[1],
-      textBeforeCursor: textAround.before,
-      textAfterCursor: textAround.after,
+      text: text,
       changed: changed
     };
   },
@@ -1111,28 +1078,32 @@ function getJSON(element, focusCounter) {
   // need it's number control here in order to get the correct 'type' etc.:
   element = element.ownerNumberControl || element;
 
-  let type = element.type || "";
+  let type = element.tagName.toLowerCase();
+  let inputType = (element.type || "").toLowerCase();
   let value = element.value || "";
   let max = element.max || "";
   let min = element.min || "";
 
-  // Treat contenteditble element as a special text area field
+  // Treat contenteditable element as a special text area field
   if (isContentEditable(element)) {
-    type = "textarea";
+    type = "contenteditable";
+    inputType = "textarea";
     value = getContentEditableText(element);
   }
 
   // Until the input type=date/datetime/range have been implemented
   // let's return their real type even if the platform returns 'text'
-  let attributeType = element.getAttribute("type") || "";
+  let attributeInputType = element.getAttribute("type") || "";
 
-  if (attributeType) {
-    var typeLowerCase = attributeType.toLowerCase();
-    switch (typeLowerCase) {
+  if (attributeInputType) {
+    let inputTypeLowerCase = attributeInputType.toLowerCase();
+    switch (inputTypeLowerCase) {
       case "datetime":
       case "datetime-local":
+      case "month":
+      case "week":
       case "range":
-        type = typeLowerCase;
+        inputType = inputTypeLowerCase;
         break;
     }
   }
@@ -1143,45 +1114,29 @@ function getJSON(element, focusCounter) {
   // inputmode for fields. This shouldn't be used outside of pre-installed
   // apps because the attribute is going to disappear as soon as a definitive
   // solution will be find.
-  let inputmode = element.getAttribute('x-inputmode');
-  if (inputmode) {
-    inputmode = inputmode.toLowerCase();
+  let inputMode = element.getAttribute('x-inputmode');
+  if (inputMode) {
+    inputMode = inputMode.toLowerCase();
   } else {
-    inputmode = '';
+    inputMode = '';
   }
 
   let range = getSelectionRange(element);
-  let textAround = getTextAroundCursor(value, range);
 
   return {
     "contextId": focusCounter,
 
-    "type": type.toLowerCase(),
+    "type": type,
+    "inputType": inputType,
+    "inputMode": inputMode,
+
     "choices": getListForElement(element),
     "value": value,
-    "inputmode": inputmode,
     "selectionStart": range[0],
     "selectionEnd": range[1],
     "max": max,
     "min": min,
-    "lang": element.lang || "",
-    "textBeforeCursor": textAround.before,
-    "textAfterCursor": textAround.after
-  };
-}
-
-function getTextAroundCursor(value, range) {
-  let textBeforeCursor = range[0] < 100 ?
-    value.substr(0, range[0]) :
-    value.substr(range[0] - 100, 100);
-
-  let textAfterCursor = range[1] + 100 > value.length ?
-    value.substr(range[0], value.length) :
-    value.substr(range[0], range[1] - range[0] + 100);
-
-  return {
-    before: textBeforeCursor,
-    after: textAfterCursor
+    "lang": element.lang || ""
   };
 }
 

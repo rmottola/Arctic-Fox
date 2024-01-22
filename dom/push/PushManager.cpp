@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/PushManager.h"
 
+#include "mozilla/Base64.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 #include "mozilla/unused.h"
@@ -65,6 +66,26 @@ GetPermissionState(nsIPrincipal* aPrincipal,
   return NS_OK;
 }
 
+void
+SubscriptionToJSON(PushSubscriptionJSON& aJSON, const nsString& aEndpoint,
+                   const nsTArray<uint8_t>& aRawP256dhKey,
+                   const nsTArray<uint8_t>& aAuthSecret)
+{
+  aJSON.mEndpoint.Construct();
+  aJSON.mEndpoint.Value() = aEndpoint;
+
+  aJSON.mKeys.mP256dh.Construct();
+  nsresult rv = Base64URLEncode(aRawP256dhKey.Length(),
+                                aRawP256dhKey.Elements(),
+                                aJSON.mKeys.mP256dh.Value());
+  Unused << NS_WARN_IF(NS_FAILED(rv));
+
+  aJSON.mKeys.mAuth.Construct();
+  rv = Base64URLEncode(aAuthSecret.Length(), aAuthSecret.Elements(),
+                       aJSON.mKeys.mAuth.Value());
+  Unused << NS_WARN_IF(NS_FAILED(rv));
+}
+
 } // anonymous namespace
 
 class UnsubscribeResultCallback final : public nsIUnsubscribeResultCallback
@@ -84,7 +105,7 @@ public:
     if (NS_SUCCEEDED(aStatus)) {
       mPromise->MaybeResolve(aSuccess);
     } else {
-      mPromise->MaybeReject(NS_ERROR_DOM_NETWORK_ERR);
+      mPromise->MaybeReject(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE);
     }
 
     return NS_OK;
@@ -121,6 +142,12 @@ PushSubscription::Unsubscribe(ErrorResult& aRv)
   Unused << NS_WARN_IF(NS_FAILED(
     service->Unsubscribe(mScope, mPrincipal, callback)));
   return p.forget();
+}
+
+void
+PushSubscription::ToJSON(PushSubscriptionJSON& aJSON)
+{
+  SubscriptionToJSON(aJSON, mEndpoint, mRawP256dhKey, mAuthSecret);
 }
 
 PushSubscription::PushSubscription(nsIGlobalObject* aGlobal,
@@ -376,7 +403,7 @@ public:
     if (NS_SUCCEEDED(mStatus)) {
       promise->MaybeResolve(mSuccess);
     } else {
-      promise->MaybeReject(NS_ERROR_DOM_NETWORK_ERR);
+      promise->MaybeReject(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE);
     }
 
     mProxy->CleanUp(aCx);
@@ -450,10 +477,16 @@ public:
   Run() override
   {
     AssertIsOnMainThread();
-    MutexAutoLock lock(mProxy->Lock());
-    if (mProxy->CleanedUp()) {
-      return NS_OK;
+
+    nsCOMPtr<nsIPrincipal> principal;
+    {
+      MutexAutoLock lock(mProxy->Lock());
+      if (mProxy->CleanedUp()) {
+        return NS_OK;
+      }
+      principal = mProxy->GetWorkerPrivate()->GetPrincipal();
     }
+    MOZ_ASSERT(principal);
 
     RefPtr<WorkerUnsubscribeResultCallback> callback =
       new WorkerUnsubscribeResultCallback(mProxy);
@@ -465,7 +498,6 @@ public:
       return NS_OK;
     }
 
-    nsCOMPtr<nsIPrincipal> principal = mProxy->GetWorkerPrivate()->GetPrincipal();
     if (NS_WARN_IF(NS_FAILED(service->Unsubscribe(mScope, principal, callback)))) {
       callback->OnUnsubscribe(NS_ERROR_FAILURE, false);
       return NS_OK;
@@ -496,7 +528,7 @@ WorkerPushSubscription::Unsubscribe(ErrorResult &aRv)
 
   RefPtr<PromiseWorkerProxy> proxy = PromiseWorkerProxy::Create(worker, p);
   if (!proxy) {
-    p->MaybeReject(NS_ERROR_DOM_NETWORK_ERR);
+    p->MaybeReject(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE);
     return p.forget();
   }
 
@@ -505,6 +537,12 @@ WorkerPushSubscription::Unsubscribe(ErrorResult &aRv)
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
 
   return p.forget();
+}
+
+void
+WorkerPushSubscription::ToJSON(PushSubscriptionJSON& aJSON)
+{
+  SubscriptionToJSON(aJSON, mEndpoint, mRawP256dhKey, mAuthSecret);
 }
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_0(WorkerPushSubscription)
@@ -560,6 +598,8 @@ public:
                                        mRawP256dhKey, mAuthSecret);
         promise->MaybeResolve(sub);
       }
+    } else if (NS_ERROR_GET_MODULE(mStatus) == NS_ERROR_MODULE_DOM_PUSH ) {
+      promise->MaybeReject(mStatus);
     } else {
       promise->MaybeReject(NS_ERROR_DOM_PUSH_ABORT_ERR);
     }
@@ -709,14 +749,22 @@ public:
   Run() override
   {
     AssertIsOnMainThread();
-    MutexAutoLock lock(mProxy->Lock());
-    if (mProxy->CleanedUp()) {
-      return NS_OK;
+
+    nsCOMPtr<nsIPrincipal> principal;
+    {
+      // Bug 1228723: If permission is revoked or an error occurs, the
+      // subscription callback will be called synchronously. This causes
+      // `GetSubscriptionCallback::OnPushSubscription` to deadlock when
+      // it tries to acquire the lock.
+      MutexAutoLock lock(mProxy->Lock());
+      if (mProxy->CleanedUp()) {
+        return NS_OK;
+      }
+      principal = mProxy->GetWorkerPrivate()->GetPrincipal();
     }
+    MOZ_ASSERT(principal);
 
     RefPtr<GetSubscriptionCallback> callback = new GetSubscriptionCallback(mProxy, mScope);
-
-    nsCOMPtr<nsIPrincipal> principal = mProxy->GetWorkerPrivate()->GetPrincipal();
 
     PushPermissionState state;
     nsresult rv = GetPermissionState(principal, state);
@@ -730,7 +778,7 @@ public:
         callback->OnPushSubscriptionError(NS_OK);
         return NS_OK;
       }
-      callback->OnPushSubscriptionError(NS_ERROR_FAILURE);
+      callback->OnPushSubscriptionError(NS_ERROR_DOM_PUSH_DENIED_ERR);
       return NS_OK;
     }
 

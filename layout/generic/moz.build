@@ -168,6 +168,7 @@ UNIFIED_SOURCES += [
     'ScrollbarActivity.cpp',
     'ScrollVelocityQueue.cpp',
     'StickyScrollContainer.cpp',
+    'SummaryFrame.cpp',
     'TextOverflow.cpp',
 ]
 
@@ -193,6 +194,7 @@ LOCAL_INCLUDES += [
     '/dom/base',
     '/dom/html',
     '/dom/xul',
+    '/editor/libeditor'
 ]
 
 JAR_MANIFESTS += ['jar.mn']

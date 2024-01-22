@@ -29,6 +29,7 @@
 #include "mozilla/ToString.h"
 #include "nsHTMLReflowMetrics.h"
 #include "ImageContainer.h"
+#include "gfx2DGlue.h"
 
 #include <limits>
 #include <algorithm>

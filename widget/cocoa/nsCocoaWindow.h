@@ -52,10 +52,9 @@ typedef struct NSEdgeInsets {
 // Not in 10.4 or 10.5.
 @protocol NSAnimationDelegate
 @end
+#endif // 10.5 or earlier
+
 #endif
-
-
-#endif // 10.7
 
 typedef struct _nsCocoaWindowList {
   _nsCocoaWindowList() : prev(nullptr), window(nullptr) {}

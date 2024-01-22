@@ -273,8 +273,10 @@ WebGL2Context::GetIndexedParameter(GLenum target, GLuint index,
             return ErrorInvalidValue("getIndexedParameter: index should be less than "
                                      "MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS");
 
-        retval.SetValue().SetAsWebGLBuffer() =
-            mBoundTransformFeedbackBuffers[index].get();
+        if (mBoundTransformFeedbackBuffers[index].get()) {
+            retval.SetValue().SetAsWebGLBuffer() =
+                mBoundTransformFeedbackBuffers[index].get();
+        }
         return;
 
     case LOCAL_GL_UNIFORM_BUFFER_BINDING:
@@ -282,7 +284,8 @@ WebGL2Context::GetIndexedParameter(GLenum target, GLuint index,
             return ErrorInvalidValue("getIndexedParameter: index should be than "
                                      "MAX_UNIFORM_BUFFER_BINDINGS");
 
-        retval.SetValue().SetAsWebGLBuffer() = mBoundUniformBuffers[index].get();
+        if (mBoundUniformBuffers[index].get())
+            retval.SetValue().SetAsWebGLBuffer() = mBoundUniformBuffers[index].get();
         return;
 
     case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_START:
@@ -315,20 +318,38 @@ WebGL2Context::GetUniformIndices(WebGLProgram* program,
     program->GetUniformIndices(uniformNames, retval);
 }
 
+static bool
+ValidateUniformEnum(WebGLContext* webgl, GLenum pname, const char* info)
+{
+    switch (pname) {
+    case LOCAL_GL_UNIFORM_TYPE:
+    case LOCAL_GL_UNIFORM_SIZE:
+    case LOCAL_GL_UNIFORM_BLOCK_INDEX:
+    case LOCAL_GL_UNIFORM_OFFSET:
+    case LOCAL_GL_UNIFORM_ARRAY_STRIDE:
+    case LOCAL_GL_UNIFORM_MATRIX_STRIDE:
+    case LOCAL_GL_UNIFORM_IS_ROW_MAJOR:
+        return true;
+
+    default:
+        webgl->ErrorInvalidEnum("%s: invalid pname: %s", info, webgl->EnumName(pname));
+        return false;
+    }
+}
+
 void
-WebGL2Context::GetActiveUniforms(WebGLProgram* program,
+WebGL2Context::GetActiveUniforms(JSContext* cx,
+                                 WebGLProgram* program,
                                  const dom::Sequence<GLuint>& uniformIndices,
                                  GLenum pname,
-                                 dom::Nullable< nsTArray<GLint> >& retval)
+                                 JS::MutableHandleValue retval)
 {
-    retval.SetNull();
+    retval.set(JS::NullValue());
     if (IsContextLost())
         return;
 
-    if (pname == LOCAL_GL_UNIFORM_NAME_LENGTH) {
-        ErrorInvalidEnumInfo("getActiveUniforms: pname", pname);
+    if (!ValidateUniformEnum(this, pname, "getActiveUniforms"))
         return;
-    }
 
     if (!ValidateObject("getActiveUniforms: program", program))
         return;
@@ -338,12 +359,50 @@ WebGL2Context::GetActiveUniforms(WebGLProgram* program,
         return;
 
     GLuint progname = program->mGLName;
-    nsTArray<GLint>& arr = retval.SetValue();
-    arr.SetLength(count);
+    Vector<GLint> samples;
+    if (!samples.resize(count)) {
+        return;
+    }
 
     MakeContextCurrent();
     gl->fGetActiveUniformsiv(progname, count, uniformIndices.Elements(), pname,
-                             arr.Elements());
+                             samples.begin());
+
+    JS::Rooted<JSObject*> array(cx, JS_NewArrayObject(cx, count));
+    if (!array) {
+        return;
+    }
+
+    switch (pname) {
+    case LOCAL_GL_UNIFORM_TYPE:
+    case LOCAL_GL_UNIFORM_SIZE:
+    case LOCAL_GL_UNIFORM_BLOCK_INDEX:
+    case LOCAL_GL_UNIFORM_OFFSET:
+    case LOCAL_GL_UNIFORM_ARRAY_STRIDE:
+    case LOCAL_GL_UNIFORM_MATRIX_STRIDE:
+        for (uint32_t i = 0; i < count; ++i) {
+            JS::RootedValue value(cx);
+            value = JS::Int32Value(samples[i]);
+            if (!JS_DefineElement(cx, array, i, value, JSPROP_ENUMERATE)) {
+                return;
+            }
+        }
+        break;
+    case LOCAL_GL_UNIFORM_IS_ROW_MAJOR:
+        for (uint32_t i = 0; i < count; ++i) {
+            JS::RootedValue value(cx);
+            value = JS::BooleanValue(samples[i]);
+            if (!JS_DefineElement(cx, array, i, value, JSPROP_ENUMERATE)) {
+                return;
+            }
+        }
+        break;
+
+    default:
+        return;
+    }
+
+    retval.setObjectOrNull(array);
 }
 
 GLuint

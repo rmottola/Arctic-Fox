@@ -31,8 +31,9 @@ ENUM_ENTRY_VARIABLE_NAME = 'strings'
 INSTANCE_RESERVED_SLOTS = 1
 
 
-def memberReservedSlot(member):
-    return "(DOM_INSTANCE_RESERVED_SLOTS + %d)" % member.slotIndex
+def memberReservedSlot(member, descriptor):
+    return ("(DOM_INSTANCE_RESERVED_SLOTS + %d)" %
+            member.slotIndices[descriptor.interface.identifier.name])
 
 
 def toStringBool(arg):
@@ -1036,10 +1037,7 @@ class CGHeaders(CGWrapper):
                 headerSet.add("mozilla/dom/Nullable.h")
             unrolled = t.unroll()
             if unrolled.isUnion():
-                if len(config.filenamesPerUnion[unrolled.name]) > 1:
-                    headerSet.add("mozilla/dom/UnionTypes.h")
-                else:
-                    headerSet.add(self.getDeclarationFilename(unrolled))
+                headerSet.add(self.getUnionDeclarationFilename(config, unrolled))
                 bindingHeaders.add("mozilla/dom/UnionConversions.h")
             elif unrolled.isDate():
                 if dictionary or jsImplementedDescriptors:
@@ -1197,6 +1195,20 @@ class CGHeaders(CGWrapper):
         basename = os.path.basename(decl.filename())
         return basename.replace('.webidl', 'Binding.h')
 
+    @staticmethod
+    def getUnionDeclarationFilename(config, unionType):
+        assert unionType.isUnion()
+        assert unionType.unroll() == unionType
+        # If a union is "defined" in multiple files, it goes in UnionTypes.h.
+        if len(config.filenamesPerUnion[unionType.name]) > 1:
+            return "mozilla/dom/UnionTypes.h"
+        # If a union is defined by a built-in typedef, it also goes in
+        # UnionTypes.h.
+        assert len(config.filenamesPerUnion[unionType.name]) == 1
+        if "<unknown>" in config.filenamesPerUnion[unionType.name]:
+            return "mozilla/dom/UnionTypes.h"
+        return CGHeaders.getDeclarationFilename(unionType)
+
 
 def SortedDictValues(d):
     """
@@ -1292,10 +1304,7 @@ def UnionTypes(unionTypes, config):
                     # And add headers for the type we're parametrized over
                     addHeadersForType(f.inner)
 
-            if len(config.filenamesPerUnion[t.name]) > 1:
-                implheaders.add("mozilla/dom/UnionTypes.h")
-            else:
-                implheaders.add(CGHeaders.getDeclarationFilename(t))
+            implheaders.add(CGHeaders.getUnionDeclarationFilename(config, t))
             for f in t.flatMemberTypes:
                 assert not f.nullable()
                 addHeadersForType(f)
@@ -1358,8 +1367,9 @@ def UnionConversions(unionTypes, config):
                     # And the internal type of the MozMap
                     addHeadersForType(f.inner, providers)
 
-            if len(config.filenamesPerUnion[t.name]) == 1:
-                headers.add(CGHeaders.getDeclarationFilename(t))
+            # We plan to include UnionTypes.h no matter what, so it's
+            # OK if we throw it into the set here.
+            headers.add(CGHeaders.getUnionDeclarationFilename(config, t))
 
             for f in t.flatMemberTypes:
                 addHeadersForType(f, providers)
@@ -2142,7 +2152,7 @@ def clearableCachedAttrs(descriptor):
             m.isAttr() and
             # Constants should never need clearing!
             m.dependsOn != "Nothing" and
-            m.slotIndex is not None)
+            m.slotIndices is not None)
 
 
 def MakeClearCachedValueNativeName(member):
@@ -3259,7 +3269,7 @@ class CGConstructorEnabled(CGAbstractMethod):
         conditions = []
         iface = self.descriptor.interface
 
-        if not iface.isExposedInWindow():
+        if not iface.isExposedOnMainThread():
             exposedInWindowCheck = dedent(
                 """
                 MOZ_ASSERT(!NS_IsMainThread(), "Why did we even get called?");
@@ -3278,7 +3288,7 @@ class CGConstructorEnabled(CGAbstractMethod):
                 }
                 """, workerCondition=workerCondition.define())
             exposedInWorkerCheck = CGGeneric(exposedInWorkerCheck)
-            if iface.isExposedInWindow():
+            if iface.isExposedOnMainThread():
                 exposedInWorkerCheck = CGIfWrapper(exposedInWorkerCheck,
                                                    "!NS_IsMainThread()")
             body.append(exposedInWorkerCheck)
@@ -3813,8 +3823,6 @@ class CGUpdateMemberSlotsMethod(CGAbstractStaticMethod):
                     }
                     // Getter handled setting our reserved slots
                     """,
-                    slot=memberReservedSlot(m),
-                    interface=self.descriptor.interface.identifier.name,
                     member=m.identifier.name)
 
         body += "\nreturn true;\n"
@@ -3836,7 +3844,7 @@ class CGClearCachedValueMethod(CGAbstractMethod):
         CGAbstractMethod.__init__(self, descriptor, name, returnType, args)
 
     def definition_body(self):
-        slotIndex = memberReservedSlot(self.member)
+        slotIndex = memberReservedSlot(self.member, self.descriptor)
         if self.member.getExtendedAttribute("StoreInSlot"):
             # We have to root things and save the old value in case
             # regetting fails, so we can restore it.
@@ -7379,7 +7387,7 @@ class CGPerSignatureCall(CGThing):
                               "NewObject implies that we need to keep the object alive with a strong reference.");
                 """)
 
-        setSlot = self.idlNode.isAttr() and self.idlNode.slotIndex is not None
+        setSlot = self.idlNode.isAttr() and self.idlNode.slotIndices is not None
         if setSlot:
             # For attributes in slots, we want to do some
             # post-processing once we've wrapped them.
@@ -7426,7 +7434,7 @@ class CGPerSignatureCall(CGThing):
                                               "args.rval().isObject()")
                 postSteps += freezeValue.define()
             postSteps += ("js::SetReservedSlot(reflector, %s, args.rval());\n" %
-                          memberReservedSlot(self.idlNode))
+                          memberReservedSlot(self.idlNode, self.descriptor))
             # For the case of Cached attributes, go ahead and preserve our
             # wrapper if needed.  We need to do this because otherwise the
             # wrapper could get garbage-collected and the cached value would
@@ -8011,7 +8019,7 @@ class CGSetterCall(CGPerSignatureCall):
 
     def wrap_return_value(self):
         attr = self.idlNode
-        if self.descriptor.wrapperCache and attr.slotIndex is not None:
+        if self.descriptor.wrapperCache and attr.slotIndices is not None:
             if attr.getExtendedAttribute("StoreInSlot"):
                 args = "cx, self"
             else:
@@ -8558,7 +8566,7 @@ class CGSpecializedGetter(CGAbstractStaticMethod):
             return getMaplikeOrSetlikeSizeGetterBody(self.descriptor, self.attr)
         nativeName = CGSpecializedGetter.makeNativeName(self.descriptor,
                                                         self.attr)
-        if self.attr.slotIndex is not None:
+        if self.attr.slotIndices is not None:
             if self.descriptor.hasXPConnectImpls:
                 raise TypeError("Interface '%s' has XPConnect impls, so we "
                                 "can't use our slot for property '%s'!" %
@@ -8584,7 +8592,7 @@ class CGSpecializedGetter(CGAbstractStaticMethod):
                 }
 
                 """,
-                slot=memberReservedSlot(self.attr),
+                slot=memberReservedSlot(self.attr, self.descriptor),
                 maybeWrap=getMaybeWrapValueFuncForType(self.attr.type))
         else:
             prefix = ""
@@ -8835,10 +8843,13 @@ class CGMemberJITInfo(CGThing):
                 slotIndex=slotIndex)
             return initializer.rstrip()
 
-        slotAssert = dedent(
+        slotAssert = fill(
             """
-            static_assert(%s <= JSJitInfo::maxSlotIndex, "We won't fit");
-            """ % slotIndex)
+            static_assert(${slotIndex} <= JSJitInfo::maxSlotIndex, "We won't fit");
+            static_assert(${slotIndex} < ${classReservedSlots}, "There is no slot for us");
+            """,
+            slotIndex=slotIndex,
+            classReservedSlots=INSTANCE_RESERVED_SLOTS + self.descriptor.interface.totalMembersInSlots)
         if args is not None:
             argTypes = "%s_argTypes" % infoName
             args = [CGMemberJITInfo.getJSArgType(arg.type) for arg in args]
@@ -8886,10 +8897,10 @@ class CGMemberJITInfo(CGThing):
 
             getterinfal = getterinfal and infallibleForMember(self.member, self.member.type, self.descriptor)
             isAlwaysInSlot = self.member.getExtendedAttribute("StoreInSlot")
-            if self.member.slotIndex is not None:
+            if self.member.slotIndices is not None:
                 assert isAlwaysInSlot or self.member.getExtendedAttribute("Cached")
                 isLazilyCachedInSlot = not isAlwaysInSlot
-                slotIndex = memberReservedSlot(self.member)
+                slotIndex = memberReservedSlot(self.member, self.descriptor)
                 # We'll statically assert that this is not too big in
                 # CGUpdateMemberSlotsMethod, in the case when
                 # isAlwaysInSlot is true.
@@ -15354,7 +15365,7 @@ def getMaplikeOrSetlikeBackingObject(descriptor, maplikeOrSetlike, helperImpl=No
           PreserveWrapper<${selfType}>(self);
         }
         """,
-        slot=memberReservedSlot(maplikeOrSetlike),
+        slot=memberReservedSlot(maplikeOrSetlike, descriptor),
         func_prefix=func_prefix,
         errorReturn=getMaplikeOrSetlikeErrorReturn(helperImpl),
         selfType=descriptor.nativeType)

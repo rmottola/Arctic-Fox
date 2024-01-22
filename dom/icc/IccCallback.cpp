@@ -38,7 +38,10 @@ IccContactToMozContact(JSContext* aCx, GlobalObject& aGlobal,
   if (count > 0) {
     Sequence<nsString>& nameSeq = properties.mName.Construct().SetValue();
     for (uint32_t i = 0; i < count; i++) {
-      nameSeq.AppendElement(nsDependentString(rawStringArray[i]), fallible);
+      nameSeq.AppendElement(
+        rawStringArray[i] ? nsDependentString(rawStringArray[i])
+                          : EmptyString(),
+        fallible);
     }
     NS_FREE_XPCOM_ALLOCATED_POINTER_ARRAY(count, rawStringArray);
   }
@@ -52,7 +55,9 @@ IccContactToMozContact(JSContext* aCx, GlobalObject& aGlobal,
     Sequence<ContactTelField>& numberSeq = properties.mTel.Construct().SetValue();
     for (uint32_t i = 0; i < count; i++) {
       ContactTelField number;
-      number.mValue.Construct() = nsDependentString(rawStringArray[i]);
+      number.mValue.Construct() =
+        rawStringArray[i] ? nsDependentString(rawStringArray[i])
+                          : EmptyString();
       numberSeq.AppendElement(number, fallible);
     }
     NS_FREE_XPCOM_ALLOCATED_POINTER_ARRAY(count, rawStringArray);
@@ -67,7 +72,9 @@ IccContactToMozContact(JSContext* aCx, GlobalObject& aGlobal,
     Sequence<ContactField>& emailSeq = properties.mEmail.Construct().SetValue();
     for (uint32_t i = 0; i < count; i++) {
       ContactField email;
-      email.mValue.Construct() = nsDependentString(rawStringArray[i]);
+      email.mValue.Construct() =
+        rawStringArray[i] ? nsDependentString(rawStringArray[i])
+                          : EmptyString();
       emailSeq.AppendElement(email, fallible);
     }
     NS_FREE_XPCOM_ALLOCATED_POINTER_ARRAY(count, rawStringArray);
@@ -76,14 +83,16 @@ IccContactToMozContact(JSContext* aCx, GlobalObject& aGlobal,
   ErrorResult er;
   RefPtr<mozContact> contact
     = mozContact::Constructor(aGlobal, aCx, properties, er);
-  NS_ENSURE_FALSE(er.Failed(), er.StealNSResult());
+  rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoString contactId;
   rv = aIccContact->GetId(contactId);
   NS_ENSURE_SUCCESS(rv, rv);
 
   contact->SetId(contactId, er);
-  NS_ENSURE_FALSE(er.Failed(), er.StealNSResult());
+  rv = er.StealNSResult();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   contact.forget(aMozContact);
 

@@ -494,6 +494,8 @@ protected:
   friend class nsPresShellEventCB;
 
   bool mCaretEnabled;
+
+  bool mIsHidden;
 #ifdef DEBUG
   nsStyleSet* CloneStyleSet(nsStyleSet* aSet);
   bool VerifyIncrementalReflow();
@@ -720,6 +722,10 @@ protected:
 #ifdef ANDROID
   virtual nsIDocument* GetTouchEventTargetDocument();
 #endif
+
+  virtual void PausePainting() override;
+  virtual void ResumePainting() override;
+
   void UpdateImageVisibility();
   void UpdateActivePointerState(mozilla::WidgetGUIEvent* aEvent);
 

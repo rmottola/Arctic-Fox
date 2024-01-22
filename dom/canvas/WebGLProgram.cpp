@@ -172,10 +172,12 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
 
         // Collect active locations:
         GLint loc = gl->fGetAttribLocation(prog->mGLName, mappedName.BeginReading());
-        if (loc == -1)
-            MOZ_CRASH("Active attrib has no location.");
-
-        info->activeAttribLocs.insert(loc);
+        if (loc == -1) {
+            if (mappedName != "gl_InstanceID")
+                MOZ_CRASH("Active attrib has no location.");
+        } else {
+            info->activeAttribLocs.insert(loc);
+        }
     }
 
     // Uniforms
@@ -599,6 +601,7 @@ WebGLProgram::GetProgramParameter(GLenum pname) const
     if (mContext->IsWebGL2()) {
         switch (pname) {
         case LOCAL_GL_ACTIVE_UNIFORM_BLOCKS:
+        case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_MODE:
             return JS::Int32Value(GetProgramiv(gl, mGLName, pname));
 
         case LOCAL_GL_TRANSFORM_FEEDBACK_VARYINGS:

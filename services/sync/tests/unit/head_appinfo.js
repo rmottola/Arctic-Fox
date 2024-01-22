@@ -1,7 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const {classes: Cc, interfaces: Ci, results: Cr, utils: Cu} = Components;
+var {classes: Cc, interfaces: Ci, results: Cr, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -18,13 +18,16 @@ fhs.observe(null, "profile-after-change", null);
 Services.prefs.setCharPref("identity.sync.tokenserver.uri", "http://token-server");
 
 // Make sure to provide the right OS so crypto loads the right binaries
-var OS = "XPCShell";
-if ("@mozilla.org/windows-registry-key;1" in Cc)
-  OS = "WINNT";
-else if ("nsILocalFileMac" in Ci)
-  OS = "Darwin";
-else
-  OS = "Linux";
+function getOS() {
+  switch (mozinfo.os) {
+    case "win":
+      return "WINNT";
+    case "mac":
+      return "Darwin";
+    default:
+      return "Linux";
+  }
+}
 
 var XULAppInfo = {
   vendor: "Mozilla",
@@ -36,7 +39,7 @@ var XULAppInfo = {
   platformBuildID: "20100621",
   inSafeMode: false,
   logConsoleErrors: true,
-  OS: OS,
+  OS: getOS(),
   XPCOMABI: "noarch-spidermonkey",
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIXULAppInfo, Ci.nsIXULRuntime]),
   invalidateCachesOnRestart: function invalidateCachesOnRestart() { }

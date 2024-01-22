@@ -168,8 +168,8 @@ namespace mozilla {
 namespace dom {
 class Selection;
 class SelectionChangeListener;
-}
-}
+} // namespace dom
+} // namespace mozilla
 class nsIScrollableFrame;
 
 /**
@@ -362,6 +362,7 @@ public:
    * at some point after the method returns.
    * SCROLL_FIRST_ANCESTOR_ONLY: if set, only the first ancestor will be scrolled
    * into view.
+   *
    */
   /*unsafe*/
   nsresult ScrollSelectionIntoView(SelectionType aType,

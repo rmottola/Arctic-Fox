@@ -1109,7 +1109,7 @@ int CALLBACK GDIFontInfo::EnumerateFontsForFamily(
         famData->mFontInfo.mFontFaceData.Put(fontName, fontData);
     }
 
-    return 1;
+    return famData->mFontInfo.mCanceled ? 0 : 1;
 }
 
 void

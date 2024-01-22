@@ -12,6 +12,8 @@
 
 #include <locationapi.h>
 
+class MLSFallback;
+
 namespace mozilla {
 namespace dom {
 
@@ -23,10 +25,25 @@ public:
 
   WindowsLocationProvider();
 
+  nsresult CreateAndWatchMLSProvider(nsIGeolocationUpdate* aCallback);
+  void CancelMLSProvider();
+
+  class MLSUpdate : public nsIGeolocationUpdate
+  {
+  public:
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIGEOLOCATIONUPDATE
+    explicit MLSUpdate(nsIGeolocationUpdate* aCallback);
+
+  private:
+    nsCOMPtr<nsIGeolocationUpdate> mCallback;
+    virtual ~MLSUpdate() {}
+  };
 private:
-  ~WindowsLocationProvider() {}
+  ~WindowsLocationProvider();
 
   RefPtr<ILocation> mLocation;
+  RefPtr<MLSFallback> mMLSProvider;
 };
 
 } // namespace dom

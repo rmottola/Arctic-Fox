@@ -206,6 +206,24 @@
 
     <menupopup id="toolbar-context-menu"
                onpopupshowing="onViewToolbarsPopupShowing(event);">
+      <menuitem id="toolbar-context-reloadAllTabs"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                oncommand="gBrowser.reloadAllTabs();"
+                label="&toolbarContextMenu.reloadAllTabs.label;"
+                accesskey="&toolbarContextMenu.reloadAllTabs.accesskey;"/>
+      <menuitem id="toolbar-context-bookmarkAllTabs"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                command="Browser:BookmarkAllTabs"
+                label="&toolbarContextMenu.bookmarkAllTabs.label;"
+                accesskey="&toolbarContextMenu.bookmarkAllTabs.accesskey;"/>
+      <menuitem id="toolbar-context-undoCloseTab"
+                class="toolbaritem-tabsmenu"
+                contexttype="tabbar"
+                label="&toolbarContextMenu.undoCloseTab.label;"
+                accesskey="&toolbarContextMenu.undoCloseTab.accesskey;"
+                observes="History:UndoCloseTab"/>
       <menuseparator/>
       <menuitem command="cmd_ToggleTabsOnTop"
                 type="checkbox"
@@ -862,7 +880,15 @@
                      label="&listAllTabs.label;"
                      tooltiptext="&listAllTabs.label;"
                      removable="true">
-        <menupopup id="alltabs-popup" position="after_end"/>
+        <menupopup id="alltabs-popup"
+                   position="after_end">
+          <menuitem id="alltabs_undoCloseTab"
+                    class="menuitem-iconic"
+                    key="key_undoCloseTab"
+                    label="&undoCloseTab.label;"
+                    observes="History:UndoCloseTab"/>
+          <menuseparator id="alltabs-popup-separator"/>
+        </menupopup>
       </toolbarbutton>
 
       <toolbarbutton id="tabs-closebutton"

@@ -178,9 +178,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(TabChildBase)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(TabChildBase)
-  for (uint32_t i = 0; i < tmp->mAnonymousGlobalScopes.Length(); ++i) {
-    NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mAnonymousGlobalScopes[i])
-  }
+  tmp->nsMessageManagerScriptExecutor::Trace(aCallbacks, aClosure);
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(TabChildBase)
@@ -871,7 +869,10 @@ TabChild::NotifyTabContextUpdated()
         } else {
           docShell->SetIsApp(OwnAppId());
         }
-        docShell->SetIsSignedPackage(OriginAttributesRef().mSignedPkg);
+
+        OriginAttributes attrs = OriginAttributesRef();
+        docShell->SetIsSignedPackage(attrs.mSignedPkg);
+        docShell->SetUserContextId(attrs.mUserContextId);
     }
 }
 
@@ -2814,7 +2815,7 @@ TabChild::DidComposite(uint64_t aTransactionId,
   MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
                LayersBackend::LAYERS_CLIENT);
 
-  RefPtr<ClientLayerManager> manager =
+  ClientLayerManager *manager =
     static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
 
   manager->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
@@ -2848,8 +2849,7 @@ TabChild::ClearCachedResources()
   MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
                LayersBackend::LAYERS_CLIENT);
 
-  ClientLayerManager *manager =
-    static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
+  ClientLayerManager *manager = mPuppetWidget->GetLayerManager()->AsClientLayerManager();
   manager->ClearCachedResources();
 }
 

@@ -5823,6 +5823,15 @@ nsDocShell::SetPosition(int32_t aX, int32_t aY)
 }
 
 NS_IMETHODIMP
+nsDocShell::SetPositionDesktopPix(int32_t aX, int32_t aY)
+{
+  // Added to nsIBaseWindow in bug 1247335;
+  // implement if a use-case is found.
+  NS_ASSERTION(false, "implement me!");
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
 nsDocShell::GetPosition(int32_t* aX, int32_t* aY)
 {
   return GetPositionAndSize(aX, aY, nullptr, nullptr);
@@ -14227,7 +14236,8 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNonSubresourceReques
     do_GetService(THIRDPARTYUTIL_CONTRACTID, &result);
   NS_ENSURE_SUCCESS(result, result);
 
-  if (mCurrentURI) {
+  if (mCurrentURI &&
+      nsContentUtils::CookiesBehavior() == nsICookieService::BEHAVIOR_REJECT_FOREIGN) {
     nsAutoCString uriSpec;
     mCurrentURI->GetSpec(uriSpec);
     if (!(uriSpec.EqualsLiteral("about:blank"))) {
@@ -14242,10 +14252,7 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNonSubresourceReques
           return result;
       }
 
-      if (isThirdPartyURI &&
-          (Preferences::GetInt("network.cookie.cookieBehavior",
-                               nsICookieService::BEHAVIOR_ACCEPT) ==
-                               nsICookieService::BEHAVIOR_REJECT_FOREIGN)) {
+      if (isThirdPartyURI) {
         return NS_OK;
       }
     }
@@ -14272,55 +14279,8 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNonSubresourceReques
   return NS_OK;
 }
 
-namespace {
-
-class FetchEventDispatcher final : public nsIFetchEventDispatcher
-{
-public:
-  FetchEventDispatcher(nsIInterceptedChannel* aChannel,
-                       nsIRunnable* aContinueRunnable)
-    : mChannel(aChannel)
-    , mContinueRunnable(aContinueRunnable)
-  {
-  }
-
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIFETCHEVENTDISPATCHER
-
-private:
-  ~FetchEventDispatcher()
-  {
-  }
-
-  nsCOMPtr<nsIInterceptedChannel> mChannel;
-  nsCOMPtr<nsIRunnable> mContinueRunnable;
-};
-
-NS_IMPL_ISUPPORTS(FetchEventDispatcher, nsIFetchEventDispatcher)
-
 NS_IMETHODIMP
-FetchEventDispatcher::Dispatch()
-{
-  RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-  if (!swm) {
-    mChannel->Cancel(NS_ERROR_INTERCEPTION_FAILED);
-    return NS_OK;
-  }
-
-  ErrorResult error;
-  swm->DispatchPreparedFetchEvent(mChannel, mContinueRunnable, error);
-  if (NS_WARN_IF(error.Failed())) {
-    return error.StealNSResult();
-  }
-
-  return NS_OK;
-}
-
-}
-
-NS_IMETHODIMP
-nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel,
-                               nsIFetchEventDispatcher** aFetchDispatcher)
+nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel)
 {
   RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
   if (!swm) {
@@ -14357,17 +14317,11 @@ nsDocShell::ChannelIntercepted(nsIInterceptedChannel* aChannel,
   attrs.InheritFromDocShellToDoc(GetOriginAttributes(), uri);
 
   ErrorResult error;
-  nsCOMPtr<nsIRunnable> runnable =
-    swm->PrepareFetchEvent(attrs, doc, mInterceptedDocumentId, aChannel,
-                           isReload, isSubresourceLoad, error);
+  swm->DispatchFetchEvent(attrs, doc, mInterceptedDocumentId, aChannel,
+                          isReload, isSubresourceLoad, error);
   if (NS_WARN_IF(error.Failed())) {
     return error.StealNSResult();
   }
-
-  MOZ_ASSERT(runnable);
-  RefPtr<FetchEventDispatcher> dispatcher =
-    new FetchEventDispatcher(aChannel, runnable);
-  dispatcher.forget(aFetchDispatcher);
 
   return NS_OK;
 }
