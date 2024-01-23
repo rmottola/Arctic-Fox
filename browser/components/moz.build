@@ -15,6 +15,7 @@ DIRS += [
     'feeds',
     'fuel',
     'migration',
+    'newtab',
     'places',
     'preferences',
     'privatebrowsing',
