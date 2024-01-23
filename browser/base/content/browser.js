@@ -5111,6 +5111,22 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
     menuItem.addEventListener("command", onViewToolbarCommand, false);
   }
 
+  // The explicitOriginalTarget can be a nested child element of a toolbaritem.
+  let toolbarItem = aEvent.explicitOriginalTarget;
+
+  if (toolbarItem && toolbarItem.localName == "toolbarpaletteitem") {
+    toolbarItem = toolbarItem.firstChild;
+  } else {
+    while (toolbarItem && toolbarItem.parentNode) {
+      let parent = toolbarItem.parentNode;
+      if ((parent.classList && parent.classList.contains("customization-target")) ||
+          parent.localName == "toolbarpaletteitem" ||
+          parent.localName == "toolbar")
+        break;
+      toolbarItem = parent;
+    }
+  }
+
   let showTabStripItems = toolbarItem && toolbarItem.id == "tabbrowser-tabs";
   for (let node of popup.querySelectorAll('menuitem[contexttype="toolbaritem"]')) {
     node.hidden = showTabStripItems;

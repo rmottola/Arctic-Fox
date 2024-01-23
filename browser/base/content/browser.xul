@@ -205,7 +205,15 @@
     </panel>
 
     <menupopup id="toolbar-context-menu"
-               onpopupshowing="onViewToolbarsPopupShowing(event);">
+               onpopupshowing="onViewToolbarsPopupShowing(event, document.getElementById('viewToolbarsMenuSeparator'));">
+      <menuitem oncommand="gCustomizeMode.addToPanel(document.popupNode)"
+                accesskey="&customizeMenu.addToPanel.accesskey;"
+                label="&customizeMenu.addToPanel.label;"
+                class="customize-context-addToPanel"/>
+      <menuitem oncommand="gCustomizeMode.removeFromArea(document.popupNode)"
+                accesskey="&customizeMenu.removeFromToolbar.accesskey;"
+                label="&customizeMenu.removeFromToolbar.label;"
+                class="customize-context-removeFromToolbar"/>
       <menuitem id="toolbar-context-reloadAllTabs"
                 class="toolbaritem-tabsmenu"
                 contexttype="tabbar"
@@ -229,7 +237,9 @@
                 type="checkbox"
                 label="&viewTabsOnTop.label;"
                 accesskey="&viewTabsOnTop.accesskey;"/>
+      <menuseparator id="viewToolbarsMenuSeparator"/>
       <menuitem command="cmd_CustomizeToolbars"
+                class="viewCustomizeToolbar"
                 label="&viewCustomizeToolbar.label;"
                 accesskey="&viewCustomizeToolbar.accesskey;"/>
     </menupopup>
