@@ -1,60 +1,76 @@
-/* globals ok, equal, RemoteNewTabLocation, NewTabPrefsProvider, Services, Preferences */
-/* jscs:disable requireCamelCaseOrUpperCaseIdentifiers */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/
+ */
+
+/* globals Services, XPCOMUtils, NewTabPrefsProvider, Preferences, aboutNewTabService */
+
 "use strict";
 
-Components.utils.import("resource:///modules/RemoteNewTabLocation.jsm");
-Components.utils.import("resource:///modules/NewTabPrefsProvider.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.importGlobalProperties(["URL"]);
+const {utils: Cu} = Components;
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm");
 
-RemoteNewTabLocation.init();
-const DEFAULT_HREF = RemoteNewTabLocation.href;
-RemoteNewTabLocation.uninit();
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
+                                  "resource:///modules/NewTabPrefsProvider.jsm");
 
-add_task(function* test_defaults() {
-  RemoteNewTabLocation.init();
-  ok(RemoteNewTabLocation.href, "Default location has an href");
-  ok(RemoteNewTabLocation.origin, "Default location has an origin");
-  ok(!RemoteNewTabLocation.overridden, "Default location is not overridden");
-  RemoteNewTabLocation.uninit();
-});
+XPCOMUtils.defineLazyServiceGetter(this, "aboutNewTabService",
+                                   "@mozilla.org/browser/aboutnewtab-service;1",
+                                   "nsIAboutNewTabService");
+
+const DEFAULT_HREF = aboutNewTabService.generateRemoteURL();
 
 /**
- * Tests the overriding of the default URL
+ * Test the overriding of the default URL
  */
-add_task(function* test_overrides() {
-  RemoteNewTabLocation.init();
-  let testURL = new URL("https://example.com/");
+add_task(function* () {
+  NewTabPrefsProvider.prefs.init();
   let notificationPromise;
+  Services.prefs.setBoolPref("browser.newtabpage.remote", false);
+  let localChromeURL = "chrome://browser/content/newtab/newTab.xhtml";
 
-  notificationPromise = nextChangeNotificationPromise(
-    testURL.href, "Remote Location should change");
-  RemoteNewTabLocation.override(testURL.href);
-  yield notificationPromise;
-  ok(RemoteNewTabLocation.overridden, "Remote location should be overridden");
-  equal(RemoteNewTabLocation.href, testURL.href,
-        "Remote href should be the custom URL");
-  equal(RemoteNewTabLocation.origin, testURL.origin,
-        "Remote origin should be the custom URL");
+  // tests default is the local newtab resource
+  Assert.equal(aboutNewTabService.newTabURL, localChromeURL,
+               `Default newtab URL should be ${localChromeURL}`);
 
-  notificationPromise = nextChangeNotificationPromise(
-    DEFAULT_HREF, "Remote href should be reset");
-  RemoteNewTabLocation.reset();
+  // test the newtab service does not go in a circular redirect
+  aboutNewTabService.newTabURL = "about:newtab";
+  Assert.equal(aboutNewTabService.newTabURL, localChromeURL,
+               "Newtab URL avoids a circular redirect by setting to the default URL");
+
+  let url = "http://example.com/";
+  notificationPromise = nextChangeNotificationPromise(url);
+  aboutNewTabService.newTabURL = url;
   yield notificationPromise;
-  ok(!RemoteNewTabLocation.overridden, "Newtab URL should not be overridden");
-  RemoteNewTabLocation.uninit();
+  Assert.ok(aboutNewTabService.overridden, "Newtab URL should be overridden");
+  Assert.ok(!aboutNewTabService.remoteEnabled, "Newtab remote should not be enabled");
+  Assert.equal(aboutNewTabService.newTabURL, url, "Newtab URL should be the custom URL");
+
+  notificationPromise = nextChangeNotificationPromise("chrome://browser/content/newtab/newTab.xhtml");
+  aboutNewTabService.resetNewTabURL();
+  yield notificationPromise;
+  Assert.ok(!aboutNewTabService.overridden, "Newtab URL should not be overridden");
+  Assert.equal(aboutNewTabService.newTabURL, "chrome://browser/content/newtab/newTab.xhtml",
+               "Newtab URL should be the default");
+
+  // change newtab page to remote
+  Services.prefs.setBoolPref("browser.newtabpage.remote", true);
+  let remoteHref = aboutNewTabService.generateRemoteURL();
+  Assert.equal(aboutNewTabService.newTabURL, remoteHref, "Newtab URL should be the default remote URL");
+  Assert.ok(!aboutNewTabService.overridden, "Newtab URL should not be overridden");
+  Assert.ok(aboutNewTabService.remoteEnabled, "Newtab remote should be enabled");
+  NewTabPrefsProvider.prefs.uninit();
 });
 
 /**
- * Tests how RemoteNewTabLocation responds to updates to prefs
+ * Tests reponse to updates to prefs
  */
 add_task(function* test_updates() {
-  RemoteNewTabLocation.init();
+  Preferences.set("browser.newtabpage.remote", true);
   let notificationPromise;
   let expectedHref = "https://newtab.cdn.mozilla.net" +
-                     `/v${RemoteNewTabLocation.version}` +
-                     "/nightly" +
+                     `/v${aboutNewTabService.remoteVersion}` +
+                     `/${aboutNewTabService.remoteReleaseName}` +
                      "/en-GB" +
                      "/index.html";
   Preferences.set("intl.locale.matchOS", true);
@@ -74,68 +90,62 @@ add_task(function* test_updates() {
   yield notificationPromise;
 
   // test update fires on override and reset
-  let testURL = new URL("https://example.com/");
+  let testURL = "https://example.com/";
   notificationPromise = nextChangeNotificationPromise(
-    testURL.href, "a notification occurs on override");
-  RemoteNewTabLocation.override(testURL.href);
+    testURL, "a notification occurs on override");
+  aboutNewTabService.newTabURL = testURL;
   yield notificationPromise;
 
   // from overridden to default
   notificationPromise = nextChangeNotificationPromise(
     DEFAULT_HREF, "a notification occurs on reset");
-  RemoteNewTabLocation.reset();
+  aboutNewTabService.resetNewTabURL();
+  Assert.ok(aboutNewTabService.remoteEnabled, "Newtab remote should be enabled");
   yield notificationPromise;
 
   // override to default URL from default URL
   notificationPromise = nextChangeNotificationPromise(
-    testURL.href, "a notification only occurs for a change in overridden urls");
-  RemoteNewTabLocation.override(DEFAULT_HREF);
-  RemoteNewTabLocation.override(testURL.href);
+    testURL, "a notification only occurs for a change in overridden urls");
+  aboutNewTabService.newTabURL = aboutNewTabService.generateRemoteURL();
+  Assert.ok(aboutNewTabService.remoteEnabled, "Newtab remote should be enabled");
+  aboutNewTabService.newTabURL = testURL;
+  Assert.ok(!aboutNewTabService.remoteEnabled, "Newtab remote should not be enabled");
   yield notificationPromise;
 
   // reset twice, only one notification for default URL
   notificationPromise = nextChangeNotificationPromise(
     DEFAULT_HREF, "reset occurs");
-  RemoteNewTabLocation.reset();
-  yield notificationPromise;
-
-  notificationPromise = nextChangeNotificationPromise(
-    testURL.href, "a notification only occurs for a change in reset urls");
-  RemoteNewTabLocation.reset();
-  RemoteNewTabLocation.override(testURL.href);
+  aboutNewTabService.resetNewTabURL();
   yield notificationPromise;
 
   NewTabPrefsProvider.prefs.uninit();
-  RemoteNewTabLocation.uninit();
 });
 
 /**
- * Verifies that RemoteNewTabLocation's _releaseFromUpdateChannel
+ * Verifies that releaseFromUpdateChannel
  * Returns the correct release names
  */
 add_task(function* test_release_names() {
-  RemoteNewTabLocation.init();
-  let valid_channels = RemoteNewTabLocation.channels;
+  let valid_channels = ["esr", "release", "beta", "aurora", "nightly"];
   let invalid_channels = new Set(["default", "invalid"]);
 
   for (let channel of valid_channels) {
-    equal(channel, RemoteNewTabLocation._releaseFromUpdateChannel(channel),
+    Assert.equal(channel, aboutNewTabService.releaseFromUpdateChannel(channel),
           "release == channel name when valid");
   }
 
   for (let channel of invalid_channels) {
-    equal("nightly", RemoteNewTabLocation._releaseFromUpdateChannel(channel),
+    Assert.equal("nightly", aboutNewTabService.releaseFromUpdateChannel(channel),
           "release == nightly when invalid");
   }
-  RemoteNewTabLocation.uninit();
 });
 
 function nextChangeNotificationPromise(aNewURL, testMessage) {
   return new Promise(resolve => {
-    Services.obs.addObserver(function observer(aSubject, aTopic, aData) { // jshint ignore:line
+    Services.obs.addObserver(function observer(aSubject, aTopic, aData) {  // jshint unused:false
       Services.obs.removeObserver(observer, aTopic);
-      equal(aData, aNewURL, testMessage);
+      Assert.equal(aData, aNewURL, testMessage);
       resolve();
-    }, "remote-new-tab-location-changed", false);
+    }, "newtab-url-changed", false);
   });
 }

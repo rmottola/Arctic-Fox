@@ -54,6 +54,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
                                   "resource:///modules/NewTabURL.jsm");
 
+XPCOMUtils.defineLazyServiceGetter(this, "gAboutNewTabService",
+                                   "@mozilla.org/browser/aboutnewtab-service;1",
+                                   "nsIAboutNewTabService");
+
 const nsIWebNavigation = Ci.nsIWebNavigation;
 const gToolbarInfoSeparators = ["|", "-"];
 
@@ -2488,8 +2492,11 @@ function URLBarSetURI(aURI) {
     } catch (e) {}
 
     // Replace initial page URIs with an empty string
-    // only if there's no opener (bug 370555).
-    if (gInitialPages.indexOf(uri.spec) != -1)
+    // 1. only if there's no opener (bug 370555).
+    // 2. if remote newtab is enabled and it's the default remote newtab page
+    let defaultRemoteURL = gAboutNewTabService.remoteEnabled &&
+                           uri.spec === gAboutNewTabService.newTabURL;
+    if (gInitialPages.includes(uri.spec) || defaultRemoteURL)
       value = gBrowser.selectedBrowser.hasContentOpener ? uri.spec : "";
     else
       value = losslessDecodeURI(uri);

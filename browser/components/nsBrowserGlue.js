@@ -147,8 +147,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ShellService",
 XPCOMUtils.defineLazyServiceGetter(this, "AlertsService",
                                    "@mozilla.org/alerts-service;1", "nsIAlertsService");
 
-const ABOUT_NEWTAB = "about:newtab";
-
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
 
@@ -2320,50 +2318,6 @@ BrowserGlue.prototype = {
   _xpcom_factory: BrowserGlueServiceFactory,
 }
 
-// ------------------------------------
-// nsIAboutNewTabService implementation
-//-------------------------------------
-
-function AboutNewTabService()
-{
-  this._newTabURL = ABOUT_NEWTAB;
-  this._overridden = false;
-}
-
-AboutNewTabService.prototype = {
-  classID: Components.ID("{97eea4bb-db50-4ae0-9147-1e5ed55b4ed5}"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIAboutNewTabService]),
-
-  get newTabURL() {
-
-    if (!AppConstants.RELEASE_BUILD && Services.prefs.getBoolPref("browser.newtabpage.remote")) {
-      return "about:remote-newtab";
-    }
-
-    return this._newTabURL;
-  },
-
-  set newTabURL(aNewTabURL) {
-    if (aNewTabURL === ABOUT_NEWTAB) {
-      this.resetNewTabURL();
-      return;
-    }
-    this._newTabURL = aNewTabURL;
-    this._overridden = true;
-    Services.obs.notifyObservers(null, "newtab-url-changed", this._newTabURL);
-  },
-
-  get overridden() {
-    return this._overridden;
-  },
-
-  resetNewTabURL: function() {
-    this._newTabURL = ABOUT_NEWTAB;
-    this._overridden = false;
-    Services.obs.notifyObservers(null, "newtab-url-changed", this._newTabURL);
-   }
-};
-
 function ContentPermissionPrompt() {}
 
 ContentPermissionPrompt.prototype = {
@@ -3078,5 +3032,5 @@ var E10SUINotification = {
   },
 };
 
-var components = [BrowserGlue, ContentPermissionPrompt, AboutNewTabService];
+var components = [BrowserGlue, ContentPermissionPrompt];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(components);

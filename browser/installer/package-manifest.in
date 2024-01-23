@@ -399,6 +399,9 @@
 @RESPATH@/browser/components/nsBrowserGlue.js
 @RESPATH@/browser/components/nsSetDefaultBrowser.manifest
 @RESPATH@/browser/components/nsSetDefaultBrowser.js
+@RESPATH@/browser/components/browser-newtab.xpt
+@RESPATH@/browser/components/aboutNewTabService.js
+@RESPATH@/browser/components/NewTabComponents.manifest
 @RESPATH@/components/Downloads.manifest
 @RESPATH@/components/DownloadLegacy.js
 @RESPATH@/components/BrowserPageThumbs.manifest

@@ -30,7 +30,6 @@ if CONFIG['MOZ_BROWSER_STATUSBAR']:
 DIRS += ['build']
 
 XPIDL_SOURCES += [
-    'nsIAboutNewTabService.idl',
     'nsIBrowserGlue.idl',
     'nsIBrowserHandler.idl',
 ]
