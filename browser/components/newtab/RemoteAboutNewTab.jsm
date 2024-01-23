@@ -31,6 +31,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "RemoteDirectoryLinksProvider",
   "resource:///modules/RemoteDirectoryLinksProvider.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "RemoteNewTabLocation",
   "resource:///modules/RemoteNewTabLocation.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesProvider",
+  "resource:///modules/PlacesProvider.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
+  "resource:///modules/NewTabPrefsProvider.jsm");
 
 let RemoteAboutNewTab = {
 
@@ -43,12 +47,50 @@ let RemoteAboutNewTab = {
     this.pageListener = new RemotePages("about:remote-newtab");
     this.pageListener.addMessageListener("NewTab:InitializeGrid", this.initializeGrid.bind(this));
     this.pageListener.addMessageListener("NewTab:UpdateGrid", this.updateGrid.bind(this));
+    this.pageListener.addMessageListener("NewTab:Customize", this.customize.bind(this));
     this.pageListener.addMessageListener("NewTab:CaptureBackgroundPageThumbs",
         this.captureBackgroundPageThumb.bind(this));
     this.pageListener.addMessageListener("NewTab:PageThumbs", this.createPageThumb.bind(this));
     this.pageListener.addMessageListener("NewTabFrame:GetInit", this.initContentFrame.bind(this));
 
     this._addObservers();
+  },
+
+  customize: function(message) {
+    if (message.data.enabled !== undefined) {
+      Services.prefs.setBoolPref("browser.newtabpage.enabled", message.data.enabled);
+    }
+    if (message.data.enhanced !== undefined) {
+      Services.prefs.setBoolPref("browser.newtabpage.enhanced", message.data.enhanced);
+    }
+  },
+
+  /**
+   * Notifies when history is cleared
+   */
+  placesClearHistory: function() {
+    this.pageListener.sendAsyncMessage("NewTab:PlacesClearHistory");
+  },
+
+  /**
+   * Notifies when a link has changed
+   */
+  placesLinkChanged: function(name, data) { // jshint ignore:line
+    this.pageListener.sendAsyncMessage("NewTab:PlacesLinkChanged", data);
+  },
+
+  /**
+   * Notifies when many links have changed
+   */
+  placesManyLinksChanged: function() {
+    this.pageListener.sendAsyncMessage("NewTab:PlacesManyLinksChanged");
+  },
+
+  /**
+   * Notifies when one URL has been deleted
+   */
+  placesDeleteURI: function(name, data) { // jshint ignore:line
+    this.pageListener.sendAsyncMessage("NewTab:PlacesDeleteURI", data.url);
   },
 
   /**
@@ -186,7 +228,6 @@ let RemoteAboutNewTab = {
    */
   observe: function(aSubject, aTopic, aData) { // jshint ignore:line
     let extraData;
-    let refreshPage = false;
     if (aTopic === "browser:purge-session-history") {
       RemoteNewTabUtils.links.resetCache();
       RemoteNewTabUtils.links.populateCache(() => {
@@ -206,12 +247,31 @@ let RemoteAboutNewTab = {
     }
   },
 
+  setEnabled: function(name, data) { // jshint ignore:line
+    this.pageListener.sendAsyncMessage("NewTab:setEnabled", data);
+  },
+
+  setEnhanced: function(name, data) { // jshint ignore:line
+    this.pageListener.sendAsyncMessage("NewTab:setEnhanced", data);
+  },
+
+  setPinned: function(name, data) { // jshint ignore:line
+    this.pageListener.sendAsyncMessage("NewTab:setPinnedLinks", data);
+  },
+
   /**
    * Add all observers that about:newtab page must listen for.
    */
   _addObservers: function() {
     Services.obs.addObserver(this, "page-thumbnail:create", true);
     Services.obs.addObserver(this, "browser:purge-session-history", true);
+    PlacesProvider.links.on("deleteURI", this.placesDeleteURI.bind(this));
+    PlacesProvider.links.on("clearHistory", this.placesClearHistory.bind(this));
+    PlacesProvider.links.on("linkChanged", this.placesLinkChanged.bind(this));
+    PlacesProvider.links.on("manyLinksChanged", this.placesManyLinksChanged.bind(this));
+    NewTabPrefsProvider.prefs.on("browser.newtabpage.enabled", this.setEnabled.bind(this));
+    NewTabPrefsProvider.prefs.on("browser.newtabpage.enhanced", this.setEnhanced.bind(this));
+    NewTabPrefsProvider.prefs.on("browser.newtabpage.pinned", this.setPinned.bind(this));
   },
 
   /**
@@ -220,6 +280,13 @@ let RemoteAboutNewTab = {
   _removeObservers: function() {
     Services.obs.removeObserver(this, "page-thumbnail:create");
     Services.obs.removeObserver(this, "browser:purge-session-history");
+    PlacesProvider.links.off("deleteURI", this.placesDeleteURI);
+    PlacesProvider.links.off("clearHistory", this.placesClearHistory);
+    PlacesProvider.links.off("linkChanged", this.placesLinkChanged);
+    PlacesProvider.links.off("manyLinksChanged", this.placesManyLinksChanged);
+    NewTabPrefsProvider.prefs.off("browser.newtabpage.enabled", this.setEnabled.bind(this));
+    NewTabPrefsProvider.prefs.off("browser.newtabpage.enhanced", this.setEnhanced.bind(this));
+    NewTabPrefsProvider.prefs.off("browser.newtabpage.pinned", this.setPinned.bind(this));
   },
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
