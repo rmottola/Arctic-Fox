@@ -4001,7 +4001,6 @@ function BrowserToolboxCustomizeChange(aType) {
     default:
       gHomeButton.updatePersonalToolbarStyle();
       BookmarkingUI.customizeChange();
-      allTabs.readPref();
   }
 }
 
