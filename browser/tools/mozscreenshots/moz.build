@@ -4,28 +4,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-CONFIGURE_SUBST_FILES += ['installer/Makefile']
-
-DIRS += [
-    'base',
-    'components',
-    'fonts',
-    'locales',
-    'modules',
-    'themes',
-    'extensions',
-]
-
-DIRS += [
-    'app',
-]
-
-if CONFIG['MAKENSISU']:
-    DIRS += ['installer/windows']
+BROWSER_CHROME_MANIFESTS += ['browser.ini']
 
 TEST_DIRS += [
-    'tools/mozscreenshots',
+    'mozscreenshots/extension',
 ]
-
-DIST_SUBDIR = 'browser'
-export('DIST_SUBDIR')
