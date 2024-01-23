@@ -9,7 +9,7 @@ var Ci = Components.interfaces;
 Cu.import("resource://devtools/client/framework/gDevTools.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
-const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const {require} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
 const {Toolbox} = require("devtools/client/framework/toolbox");
 const Services = require("Services");
 const {AppProjects} = require("devtools/client/webide/modules/app-projects");
@@ -1135,4 +1135,11 @@ var Cmds = {
     UI.contentViewer.fullZoom = 1;
     Services.prefs.setCharPref("devtools.webide.zoom", 1);
   },
+
+  reloadDevtools: function(event) {
+    if (Services.prefs.prefHasUserValue("devtools.loader.srcdir")) {
+      let {devtools} = Cu.import("resource://gre/modules/devtools/Loader.jsm", {});
+      devtools.reload();
+    }
+  }
 };
