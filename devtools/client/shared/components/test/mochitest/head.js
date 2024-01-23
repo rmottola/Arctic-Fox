@@ -9,12 +9,12 @@ Cu.import("resource://gre/modules/Task.jsm");
 var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 
 var { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
-var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
-var { gDevTools } = Cu.import("resource:///modules/devtools/gDevTools.jsm", {});
-var { DebuggerServer } = Cu.import("resource://gre/modules/devtools/dbg-server.jsm", {});
-var { DebuggerClient } = Cu.import("resource://gre/modules/devtools/dbg-client.jsm", {});
+var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
+var { DebuggerServer } = require("devtools/server/main");
+var { DebuggerClient } = require("devtools/shared/client/main");
 var { TargetFactory } = require("devtools/client/framework/target");
 var { Toolbox } = require("devtools/client/framework/toolbox");
 
