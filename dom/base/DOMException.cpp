@@ -398,7 +398,7 @@ Exception::GetData(nsISupports** aData)
 }
 
 NS_IMETHODIMP
-Exception::ToString(nsACString& _retval)
+Exception::ToString(JSContext* aCx, nsACString& _retval)
 {
   NS_ENSURE_TRUE(mInitialized, NS_ERROR_NOT_INITIALIZED);
 
@@ -411,7 +411,7 @@ Exception::ToString(nsACString& _retval)
 
   if (mLocation) {
     // we need to free this if it does not fail
-    nsresult rv = mLocation->ToString(location);
+    nsresult rv = mLocation->ToString(aCx, location);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
@@ -545,13 +545,13 @@ Exception::GetStack(nsAString& aStack, ErrorResult& aRv) const
 }
 
 void
-Exception::Stringify(nsString& retval)
+Exception::Stringify(JSContext* aCx, nsString& retval)
 {
   nsCString str;
 #ifdef DEBUG
   DebugOnly<nsresult> rv =
 #endif
-  ToString(str);
+  ToString(aCx, str);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
   CopyUTF8toUTF16(str, retval);
 }
@@ -590,7 +590,7 @@ DOMException::GetCode(uint16_t* aCode)
 }
 
 NS_IMETHODIMP
-DOMException::ToString(nsACString& aReturn)
+DOMException::ToString(JSContext* aCx, nsACString& aReturn)
 {
   aReturn.Truncate();
 
