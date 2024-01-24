@@ -369,7 +369,7 @@ public:
 
 private:
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     // Silence bad assertions.
     return true;
@@ -563,7 +563,7 @@ public:
 
 private:
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     MOZ_CRASH("Don't call Dispatch() on CloseEventRunnable!");
   }
@@ -826,7 +826,7 @@ public:
 
 private:
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     aWorkerPrivate->AssertIsOnParentThread();
     // Modify here, but not in PostRun! This busy count addition will be matched
@@ -1145,7 +1145,7 @@ private:
   ~TimerRunnable() {}
 
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     // Silence bad assertions.
     return true;
@@ -1192,7 +1192,7 @@ private:
   }
 
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     // Silence bad assertions.
     return true;
@@ -1240,7 +1240,7 @@ class KillCloseEventRunnable final : public WorkerRunnable
 
   private:
     virtual bool
-    PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+    PreDispatch(WorkerPrivate* aWorkerPrivate) override
     {
       // Silence bad assertions, this is dispatched from the timer thread.
       return true;
@@ -1306,7 +1306,7 @@ private:
   }
 
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     MOZ_CRASH("Don't call Dispatch() on KillCloseEventRunnable!");
   }
@@ -1460,7 +1460,7 @@ public:
 
 private:
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     // Silence bad assertions, this can be dispatched from either the main
     // thread or the timer thread..
@@ -1651,7 +1651,7 @@ private:
   }
 
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
   {
     MOZ_ASSERT_UNREACHABLE("Should never call Dispatch on this!");
     return true;
