@@ -2115,7 +2115,7 @@ public:
     }
 
     workerPromise->MaybeResolve(notifications);
-    mPromiseProxy->CleanUp(aCx);
+    mPromiseProxy->CleanUp();
   }
 };
 

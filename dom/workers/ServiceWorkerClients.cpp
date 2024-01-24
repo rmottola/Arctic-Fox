@@ -94,7 +94,7 @@ class GetRunnable final : public nsRunnable
       } else {
         promise->MaybeResolve(JS::UndefinedHandleValue);
       }
-      mPromiseProxy->CleanUp(aCx);
+      mPromiseProxy->CleanUp();
       return true;
     }
   };
@@ -174,7 +174,7 @@ class MatchAllRunnable final : public nsRunnable
       }
 
       promise->MaybeResolve(ret);
-      mPromiseProxy->CleanUp(aCx);
+      mPromiseProxy->CleanUp();
       return true;
     }
   };
@@ -250,7 +250,7 @@ public:
       promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR);
     }
 
-    mPromiseProxy->CleanUp(aCx);
+    mPromiseProxy->CleanUp();
     return true;
   }
 };
@@ -332,7 +332,7 @@ public:
       promise->MaybeResolve(JS::NullHandleValue);
     }
 
-    mPromiseProxy->CleanUp(aCx);
+    mPromiseProxy->CleanUp();
     return true;
   }
 
