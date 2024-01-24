@@ -567,7 +567,7 @@ WebConsoleFrame.prototype = {
     this._addFocusCallback(this.outputNode, (evt) => {
       if ((evt.target.nodeName.toLowerCase() != "a") &&
           (evt.target.parentNode.nodeName.toLowerCase() != "a")) {
-        this.jsterm.inputNode.focus();
+        this.jsterm.focus();
       }
     });
 
@@ -579,7 +579,7 @@ WebConsoleFrame.prototype = {
     });
 
     // focus input node
-    this.jsterm.inputNode.focus();
+    this.jsterm.focus();
   },
 
   /**
@@ -597,7 +597,7 @@ WebConsoleFrame.prototype = {
    * @private
    */
   _onPanelSelected: function() {
-    this.jsterm.inputNode.focus();
+    this.jsterm.focus();
   },
 
   /**
