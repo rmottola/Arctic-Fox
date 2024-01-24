@@ -16,6 +16,9 @@ Cu.import("resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
                                   "resource:///modules/AboutHome.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AboutNewTab",
+                                  "resource:///modules/AboutNewTab.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
 
@@ -681,6 +684,7 @@ BrowserGlue.prototype = {
     webrtcUI.init();
     AboutHome.init();
     NewTabUtils.init();
+    AboutNewTab.init();
     NewTabPrefsProvider.prefs.init();
 
     SessionStore.init();
@@ -958,7 +962,9 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
 
     WebappManager.uninit();
+
     NewTabPrefsProvider.prefs.uninit();
+    AboutNewTab.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
     if (AppConstants.NIGHTLY_BUILD) {
