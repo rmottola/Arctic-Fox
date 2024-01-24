@@ -10,11 +10,11 @@ var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 
 var { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
-var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var { gDevTools } = require("devtools/client/framework/devtools");
 var { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
 var { DebuggerServer } = require("devtools/server/main");
 var { DebuggerClient } = require("devtools/shared/client/main");
+var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { TargetFactory } = require("devtools/client/framework/target");
 var { Toolbox } = require("devtools/client/framework/toolbox");
 
