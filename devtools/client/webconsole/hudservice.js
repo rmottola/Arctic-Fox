@@ -24,7 +24,7 @@ loader.lazyGetter(this, "showDoorhanger", () => require("devtools/client/shared/
 loader.lazyRequireGetter(this, "viewSource", "devtools/client/shared/view-source");
 
 const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
-var l10n = new WebConsoleUtils.l10n(STRINGS_URI);
+var l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const BROWSER_CONSOLE_WINDOW_FEATURES = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
 
