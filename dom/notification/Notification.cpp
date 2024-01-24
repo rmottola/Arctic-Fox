@@ -1057,7 +1057,8 @@ Notification::Constructor(const GlobalObject& aGlobal,
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
   RefPtr<Notification> notification =
-    CreateAndShow(global, aTitle, aOptions, EmptyString(), aRv);
+    CreateAndShow(aGlobal.Context(), global, aTitle, aOptions,
+                  EmptyString(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -2601,7 +2602,8 @@ public:
 
 /* static */
 already_AddRefed<Promise>
-Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
+Notification::ShowPersistentNotification(JSContext* aCx,
+                                         nsIGlobalObject *aGlobal,
                                          const nsAString& aScope,
                                          const nsAString& aTitle,
                                          const NotificationOptions& aOptions,
@@ -2678,7 +2680,7 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
   p->MaybeResolve(JS::UndefinedHandleValue);
 
   RefPtr<Notification> notification =
-    CreateAndShow(aGlobal, aTitle, aOptions, aScope, aRv);
+    CreateAndShow(aCx, aGlobal, aTitle, aOptions, aScope, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -2687,7 +2689,8 @@ Notification::ShowPersistentNotification(nsIGlobalObject *aGlobal,
 }
 
 /* static */ already_AddRefed<Notification>
-Notification::CreateAndShow(nsIGlobalObject* aGlobal,
+Notification::CreateAndShow(JSContext* aCx,
+                            nsIGlobalObject* aGlobal,
                             const nsAString& aTitle,
                             const NotificationOptions& aOptions,
                             const nsAString& aScope,
@@ -2695,21 +2698,12 @@ Notification::CreateAndShow(nsIGlobalObject* aGlobal,
 {
   MOZ_ASSERT(aGlobal);
 
-  AutoJSAPI jsapi;
-  if (NS_WARN_IF(!jsapi.Init(aGlobal)))
-  {
-    aRv.Throw(NS_ERROR_DOM_ABORT_ERR);
-    return nullptr;
-  }
-
-  JSContext* cx = jsapi.cx();
-
   RefPtr<Notification> notification = CreateInternal(aGlobal, EmptyString(),
-                                                       aTitle, aOptions);
+                                                     aTitle, aOptions);
 
   // Make a structured clone of the aOptions.mData object
-  JS::Rooted<JS::Value> data(cx, aOptions.mData);
-  notification->InitFromJSVal(cx, data, aRv);
+  JS::Rooted<JS::Value> data(aCx, aOptions.mData);
+  notification->InitFromJSVal(aCx, data, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
