@@ -19,7 +19,7 @@ onmessage = function(e) {
     }
 
     try {
-      importScript(['importscript.sjs']);
+      importScripts(['importscript.sjs']);
       res[0].postMessage("KO");
       return;
     } catch(e) {}
