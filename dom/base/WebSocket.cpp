@@ -2143,8 +2143,7 @@ WebSocketImpl::RegisterFeature()
   MOZ_ASSERT(!mWorkerFeature);
   mWorkerFeature = new WebSocketWorkerFeature(this);
 
-  JSContext* cx = GetCurrentThreadJSContext();
-  if (!mWorkerPrivate->AddFeature(cx, mWorkerFeature)) {
+  if (!mWorkerPrivate->AddFeature(mWorkerFeature)) {
     NS_WARNING("Failed to register a feature.");
     mWorkerFeature = nullptr;
     return false;
@@ -2165,8 +2164,7 @@ WebSocketImpl::UnregisterFeature()
   mWorkerPrivate->AssertIsOnWorkerThread();
   MOZ_ASSERT(mWorkerFeature);
 
-  JSContext* cx = GetCurrentThreadJSContext();
-  mWorkerPrivate->RemoveFeature(cx, mWorkerFeature);
+  mWorkerPrivate->RemoveFeature(mWorkerFeature);
   mWorkerFeature = nullptr;
   mWorkerPrivate = nullptr;
 

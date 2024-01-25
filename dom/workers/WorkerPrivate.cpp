@@ -5103,7 +5103,7 @@ WorkerPrivate::RemoveChildWorker(JSContext* aCx, ParentType* aChildWorker)
 }
 
 bool
-WorkerPrivate::AddFeature(JSContext* aCx, WorkerFeature* aFeature)
+WorkerPrivate::AddFeature(WorkerFeature* aFeature)
 {
   AssertIsOnWorkerThread();
 
@@ -5126,7 +5126,7 @@ WorkerPrivate::AddFeature(JSContext* aCx, WorkerFeature* aFeature)
 }
 
 void
-WorkerPrivate::RemoveFeature(JSContext* aCx, WorkerFeature* aFeature)
+WorkerPrivate::RemoveFeature(WorkerFeature* aFeature)
 {
   AssertIsOnWorkerThread();
 

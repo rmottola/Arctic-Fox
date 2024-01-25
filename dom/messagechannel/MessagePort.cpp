@@ -368,8 +368,7 @@ MessagePort::Initialize(const nsID& aUUID,
     MOZ_ASSERT(!mWorkerFeature);
 
     nsAutoPtr<WorkerFeature> feature(new MessagePortFeature(this));
-    JSContext* cx = workerPrivate->GetJSContext();
-    if (NS_WARN_IF(!workerPrivate->AddFeature(cx, feature))) {
+    if (NS_WARN_IF(!workerPrivate->AddFeature(feature))) {
       aRv.Throw(NS_ERROR_FAILURE);
       return;
     }
@@ -909,8 +908,7 @@ MessagePort::UpdateMustKeepAlive()
       WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
       MOZ_ASSERT(workerPrivate);
 
-      workerPrivate->RemoveFeature(workerPrivate->GetJSContext(),
-                                   mWorkerFeature);
+      workerPrivate->RemoveFeature(mWorkerFeature);
       mWorkerFeature = nullptr;
     }
 

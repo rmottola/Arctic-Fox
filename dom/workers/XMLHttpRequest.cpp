@@ -1703,9 +1703,7 @@ XMLHttpRequest::MaybePin(ErrorResult& aRv)
     return;
   }
 
-  JSContext* cx = GetCurrentThreadJSContext();
-
-  if (!mWorkerPrivate->AddFeature(cx, this)) {
+  if (!mWorkerPrivate->AddFeature(this)) {
     aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
@@ -1823,9 +1821,7 @@ XMLHttpRequest::Unpin()
 
   MOZ_ASSERT(mRooted, "Mismatched calls to Unpin!");
 
-  JSContext* cx = GetCurrentThreadJSContext();
-
-  mWorkerPrivate->RemoveFeature(cx, this);
+  mWorkerPrivate->RemoveFeature(this);
 
   mRooted = false;
 
