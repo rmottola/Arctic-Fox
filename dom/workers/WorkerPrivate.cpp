@@ -466,6 +466,14 @@ public:
     mIncrease(aIncrease)
   { }
 
+  // We don't need a JSContext to dispatch, since we know our PreDispatch and
+  // DispatchInternal don't throw any exceptions.
+  bool
+  Dispatch()
+  {
+    return WorkerControlRunnable::Dispatch(nullptr);
+  }
+
 private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
@@ -5049,7 +5057,7 @@ WorkerPrivate::ModifyBusyCountFromWorker(bool aIncrease)
 
   RefPtr<ModifyBusyCountRunnable> runnable =
     new ModifyBusyCountRunnable(this, aIncrease);
-  return runnable->Dispatch(aCx);
+  return runnable->Dispatch();
 }
 
 bool
