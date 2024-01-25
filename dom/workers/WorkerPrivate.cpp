@@ -2536,11 +2536,9 @@ WorkerPrivateParent<Derived>::NotifyPrivate(Status aStatus)
 
 template <class Derived>
 bool
-WorkerPrivateParent<Derived>::Freeze(JSContext* aCx,
-                                     nsPIDOMWindowInner* aWindow)
+WorkerPrivateParent<Derived>::Freeze(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnParentThread();
-  MOZ_ASSERT(aCx);
 
   // Shared workers are only frozen if all of their owning documents are
   // frozen. It can happen that mSharedWorkers is empty but this thread has
@@ -2595,10 +2593,9 @@ WorkerPrivateParent<Derived>::Freeze(JSContext* aCx,
 
 template <class Derived>
 bool
-WorkerPrivateParent<Derived>::Thaw(JSContext* aCx, nsPIDOMWindowInner* aWindow)
+WorkerPrivateParent<Derived>::Thaw(nsPIDOMWindowInner* aWindow)
 {
   AssertIsOnParentThread();
-  MOZ_ASSERT(aCx);
 
   if (IsDedicatedWorker() && !mParentFrozen) {
     // If we are in here, it means that this worker has been created when the
@@ -3102,7 +3099,7 @@ WorkerPrivateParent<Derived>::RegisterSharedWorker(JSContext* aCx,
 
   // If there were other SharedWorker objects attached to this worker then they
   // may all have been frozen and this worker would need to be thawed.
-  if (mSharedWorkers.Length() > 1 && !Thaw(aCx, nullptr)) {
+  if (mSharedWorkers.Length() > 1 && !Thaw(nullptr)) {
     return false;
   }
 
@@ -3278,12 +3275,8 @@ WorkerPrivateParent<Derived>::CloseSharedWorkersForWindow(
   // may all be frozen and this worker would need to be frozen. Otherwise,
   // if that was the last SharedWorker then it's time to cancel this worker.
 
-  AutoSafeJSContext cx;
-
   if (!mSharedWorkers.IsEmpty()) {
-    if (!Freeze(cx, nullptr)) {
-      JS_ReportPendingException(cx);
-    }
+    Freeze(nullptr);
   } else {
     Cancel();
   }
