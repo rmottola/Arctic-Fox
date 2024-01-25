@@ -5151,7 +5151,7 @@ WorkerPrivate::NotifyFeatures(JSContext* aCx, Status aStatus)
   NS_ASSERTION(aStatus > Running, "Bad status!");
 
   if (aStatus >= Closing) {
-    CancelAllTimeouts(aCx);
+    CancelAllTimeouts();
   }
 
   nsTObserverArray<WorkerFeature*>::ForwardIterator iter(mFeatures);
@@ -5173,7 +5173,7 @@ WorkerPrivate::NotifyFeatures(JSContext* aCx, Status aStatus)
 }
 
 void
-WorkerPrivate::CancelAllTimeouts(JSContext* aCx)
+WorkerPrivate::CancelAllTimeouts()
 {
   AssertIsOnWorkerThread();
 
