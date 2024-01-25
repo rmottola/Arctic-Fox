@@ -1022,8 +1022,8 @@ nsJSObjWrapper::NP_RemoveProperty(NPObject *npobj, NPIdentifier npid)
 
 //static
 bool
-nsJSObjWrapper::NP_Enumerate(NPObject* npobj, NPIdentifier** idarray,
-                             uint32_t* count)
+nsJSObjWrapper::NP_Enumerate(NPObject *npobj, NPIdentifier **idarray,
+                             uint32_t *count)
 {
   NPP npp = NPPStack::Peek();
   nsIGlobalObject* globalObject = GetGlobalObject(npp);
@@ -1662,15 +1662,15 @@ NPObjWrapper_Enumerate(JSContext *cx, JS::Handle<JSObject*> obj,
 }
 
 static bool
-NPObjWrapper_Resolve(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                     bool* resolvedp)
+NPObjWrapper_Resolve(JSContext *cx, JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
+                     bool *resolvedp)
 {
   if (JSID_IS_SYMBOL(id))
     return true;
 
   PROFILER_LABEL_FUNC(js::ProfileEntry::Category::JS);
 
-  NPObject* npobj = GetNPObject(cx, obj);
+  NPObject *npobj = GetNPObject(cx, obj);
 
   if (!npobj || !npobj->_class || !npobj->_class->hasProperty ||
       !npobj->_class->hasMethod) {
