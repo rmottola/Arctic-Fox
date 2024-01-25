@@ -239,7 +239,7 @@ FindExceptionStack(JSContext* cx, JS::HandleValue exceptionValue)
 
   JS::RootedObject exceptionObject(cx, &exceptionValue.toObject());
   JSAutoCompartment ac(cx, exceptionObject);
-  JS::RootedObject stackObject(cx, ExceptionStackOrNull(cx, exceptionObject));
+  JS::RootedObject stackObject(cx, ExceptionStackOrNull(exceptionObject));
   if (stackObject) {
     return stackObject;
   }
