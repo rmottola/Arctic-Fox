@@ -1934,7 +1934,7 @@ XMLHttpRequest::Open(const nsACString& aMethod, const nsAString& aUrl,
                      mTimeout);
 
   ++mProxy->mOpenCount;
-  if (!runnable->Dispatch(())) {
+  if (!runnable->Dispatch()) {
     if (mProxy && !--mProxy->mOpenCount) {
       ReleaseProxy();
     }
