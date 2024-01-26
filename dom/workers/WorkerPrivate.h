@@ -1051,10 +1051,10 @@ public:
   }
 
   bool
-  FreezeInternal(JSContext* aCx);
+  FreezeInternal();
 
   bool
-  ThawInternal(JSContext* aCx);
+  ThawInternal();
 
   void
   TraceTimeouts(const TraceCallbacks& aCallbacks, void* aClosure) const;
