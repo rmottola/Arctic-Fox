@@ -41,14 +41,7 @@ using mozilla::LogLevel;
 
 static const char16_t kUTF16[] = { 'U', 'T', 'F', '-', '1', '6', '\0' };
 
-static PRLogModuleInfo *
-GetExpatDriverLog()
-{
-  static PRLogModuleInfo *sLog;
-  if (!sLog)
-    sLog = PR_NewLogModule("expatdriver");
-  return sLog;
-}
+static mozilla::LazyLogModule gExpatDriverLog("expatdriver");
 
 // Use the same maximum tree depth as Chromium (see
 // https://chromium.googlesource.com/chromium/src/+/f464165c1dedff1c955d3c051c5a9a1c6a0e8f6b/third_party/WebKit/Source/core/xml/parser/XMLDocumentParser.cpp#85).
@@ -1081,7 +1074,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
   nsScannerIterator end;
   aScanner.EndReading(end);
 
-  MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+  MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
          ("Remaining in expat's buffer: %i, remaining in scanner: %i.",
           mExpatBuffered, Distance(start, end)));
 
@@ -1102,7 +1095,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
       length = 0;
 
       if (blocked) {
-        MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+        MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
                ("Resuming Expat, will parse data remaining in Expat's "
                 "buffer.\nContent of Expat's buffer:\n-----\n%s\n-----\n",
                 NS_ConvertUTF16toUTF8(currentExpatPosition.get(),
@@ -1111,7 +1104,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
       else {
         NS_ASSERTION(mExpatBuffered == Distance(currentExpatPosition, end),
                      "Didn't pass all the data to Expat?");
-        MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+        MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
                ("Last call to Expat, will parse data remaining in Expat's "
                 "buffer.\nContent of Expat's buffer:\n-----\n%s\n-----\n",
                 NS_ConvertUTF16toUTF8(currentExpatPosition.get(),
@@ -1122,7 +1115,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
       buffer = start.get();
       length = uint32_t(start.size_forward());
 
-      MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+      MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
              ("Calling Expat, will parse data remaining in Expat's buffer and "
               "new data.\nContent of Expat's buffer:\n-----\n%s\n-----\nNew "
               "data:\n-----\n%s\n-----\n",
@@ -1168,7 +1161,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
     mExpatBuffered += length - consumed;
 
     if (BlockedOrInterrupted()) {
-      MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+      MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
              ("Blocked or interrupted parser (probably for loading linked "
               "stylesheets or scripts)."));
 
@@ -1229,7 +1222,7 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner, bool& aFlushTokens)
   aScanner.SetPosition(currentExpatPosition, true);
   aScanner.Mark();
 
-  MOZ_LOG(GetExpatDriverLog(), LogLevel::Debug,
+  MOZ_LOG(gExpatDriverLog, LogLevel::Debug,
          ("Remaining in expat's buffer: %i, remaining in scanner: %i.",
           mExpatBuffered, Distance(currentExpatPosition, end)));
 
