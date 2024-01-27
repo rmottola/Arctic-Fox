@@ -464,6 +464,7 @@
       <method name="doSearch">
         <parameter name="aData"/>
         <parameter name="aWhere"/>
+        <parameter name="aEngine"/>
         <body><![CDATA[
           var textBox = this._textbox;
 
