@@ -772,7 +772,7 @@ nsBindingManager::MediumFeaturesChanged(nsPresContext* aPresContext,
 }
 
 void
-nsBindingManager::AppendAllSheets(nsTArray<CSSStyleSheet*>& aArray)
+nsBindingManager::AppendAllSheets(nsTArray<StyleSheetHandle>& aArray)
 {
   if (!mBoundContentSet) {
     return;
