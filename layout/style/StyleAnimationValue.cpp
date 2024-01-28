@@ -2641,7 +2641,9 @@ StyleAnimationValue::ComputeValues(
   if (!styleContext) {
     return false;
   }
-  nsStyleSet* styleSet = styleContext->PresContext()->StyleSet();
+  MOZ_ASSERT(styleContext->PresContext()->StyleSet()->IsGecko(),
+             "ServoStyleSet should not use StyleAnimationValue for animations");
+  nsStyleSet* styleSet = styleContext->PresContext()->StyleSet()->AsGecko();
 
   RefPtr<nsStyleContext> tmpStyleContext;
   if (aIsContextSensitive) {

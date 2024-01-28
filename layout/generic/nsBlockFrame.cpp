@@ -52,6 +52,8 @@
 #include "nsIFrameInlines.h"
 #include "CounterStyleManager.h"
 #include "nsISelection.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/dom/HTMLDetailsElement.h"
 #include "mozilla/dom/HTMLSummaryElement.h"
 
@@ -929,7 +931,6 @@ AvailableSpaceShrunk(WritingMode aWM,
                      const LogicalRect& aOldAvailableSpace,
                      const LogicalRect& aNewAvailableSpace,
                      bool aCanGrow /* debug-only */)
-
 {
   if (aNewAvailableSpace.ISize(aWM) == 0) {
     // Positions are not significant if the inline size is zero.
@@ -7672,5 +7673,14 @@ nsBlockFrame::GetDepth() const
     depth++;
   }
   return depth;
+}
+
+already_AddRefed<nsStyleContext>
+nsBlockFrame::GetFirstLetterStyle(nsPresContext* aPresContext)
+{
+  return aPresContext->StyleSet()->
+    ProbePseudoElementStyle(mContent->AsElement(),
+                            CSSPseudoElementType::firstLetter,
+                            mStyleContext);
 }
 #endif

@@ -185,6 +185,8 @@
 #include "nsQueryObject.h"
 #include "nsLayoutStylesheetCache.h"
 #include "mozilla/layers/ScrollInputMethods.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 
 #ifdef ANDROID
 #include "nsIDocShellTreeOwner.h"
@@ -815,7 +817,7 @@ PresShell::~PresShell()
              "Some pres arena objects were not freed");
 #endif
 
-  delete mStyleSet;
+  mStyleSet->Delete();
   delete mFrameConstructor;
 
   mCurrentEventContent = nullptr;
@@ -831,7 +833,7 @@ void
 PresShell::Init(nsIDocument* aDocument,
                 nsPresContext* aPresContext,
                 nsViewManager* aViewManager,
-                nsStyleSet* aStyleSet)
+                StyleSetHandle aStyleSet)
 {
   NS_PRECONDITION(aDocument, "null ptr");
   NS_PRECONDITION(aPresContext, "null ptr");
@@ -4101,9 +4103,19 @@ PresShell::DocumentStatesChanged(nsIDocument* aDocument,
   NS_PRECONDITION(!mIsDocumentGone, "Unexpected DocumentStatesChanged");
   NS_PRECONDITION(aDocument == mDocument, "Unexpected aDocument");
 
+  nsStyleSet* styleSet = mStyleSet->GetAsGecko();
+  if (!styleSet) {
+    // XXXheycam ServoStyleSets don't support document state selectors,
+    // but these are only used in chrome documents, which we are not
+    // aiming to support yet.
+    NS_ERROR("stylo: ServoStyleSets cannot respond to document state "
+             "changes yet");
+    return;
+  }
+
   if (mDidInitialize &&
-      mStyleSet->HasDocumentStateDependentStyle(mDocument->GetRootElement(),
-                                                aStateMask)) {
+      styleSet->HasDocumentStateDependentStyle(mDocument->GetRootElement(),
+                                               aStateMask)) {
     mPresContext->RestyleManager()->PostRestyleEvent(mDocument->GetRootElement(),
                                                      eRestyle_Subtree,
                                                      NS_STYLE_HINT_NONE);
@@ -9627,7 +9639,7 @@ FindTopFrame(nsIFrame* aRoot)
 nsStyleSet*
 PresShell::CloneStyleSet(nsStyleSet* aSet)
 {
-  nsStyleSet *clone = new nsStyleSet();
+  nsStyleSet* clone = new nsStyleSet();
 
   int32_t i, n = aSet->SheetCount(SheetType::Override);
   for (i = 0; i < n; i++) {
@@ -9713,8 +9725,12 @@ PresShell::VerifyIncrementalReflow()
 
   // Create a new presentation shell to view the document. Use the
   // exact same style information that this document has.
-  nsAutoPtr<nsStyleSet> newSet(CloneStyleSet(mStyleSet));
-  nsCOMPtr<nsIPresShell> sh = mDocument->CreateShell(cx, vm, newSet);
+  if (mStyleSet->IsServo()) {
+    NS_WARNING("VerifyIncrementalReflow cannot handle ServoStyleSets");
+    return true;
+  }
+  nsAutoPtr<nsStyleSet> newSet(CloneStyleSet(mStyleSet->AsGecko()));
+  nsCOMPtr<nsIPresShell> sh = mDocument->CreateShell(cx, vm, newSet.get());
   NS_ENSURE_TRUE(sh, false);
   newSet.forget();
   // Note that after we create the shell, we must make sure to destroy it
@@ -10599,7 +10615,11 @@ PresShell::AddSizeOfIncludingThis(MallocSizeOf aMallocSizeOf,
   *aPresShellSize += mFramesToDirty.ShallowSizeOfExcludingThis(aMallocSizeOf);
   *aPresShellSize += aArenaObjectsSize->mOther;
 
-  *aStyleSetsSize += StyleSet()->SizeOfIncludingThis(aMallocSizeOf);
+  if (nsStyleSet* styleSet = StyleSet()->GetAsGecko()) {
+    *aStyleSetsSize += styleSet->SizeOfIncludingThis(aMallocSizeOf);
+  } else {
+    NS_WARNING("ServoStyleSets do not support memory measurements yet");
+  }
 
   *aTextRunsSize += SizeOfTextRuns(aMallocSizeOf);
 
@@ -10798,7 +10818,11 @@ nsIPresShell::HasRuleProcessorUsedByMultipleStyleSets(uint32_t aSheetType,
       return NS_ERROR_ILLEGAL_VALUE;
   }
 
-  *aRetVal = mStyleSet->HasRuleProcessorUsedByMultipleStyleSets(type);
+  *aRetVal = false;
+  if (nsStyleSet* styleSet = mStyleSet->GetAsGecko()) {
+    // ServoStyleSets do not have rule processors.
+    *aRetVal = styleSet->HasRuleProcessorUsedByMultipleStyleSets(type);
+  }
   return NS_OK;
 }
 

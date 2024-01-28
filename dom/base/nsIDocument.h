@@ -82,7 +82,6 @@ class nsPresContext;
 class nsRange;
 class nsScriptLoader;
 class nsSMILAnimationController;
-class nsStyleSet;
 class nsTextNode;
 class nsWindowSizes;
 class nsDOMCaretPosition;
@@ -95,6 +94,7 @@ class CSSStyleSheet;
 class ErrorResult;
 class EventStates;
 class PendingAnimationTracker;
+class StyleSetHandle;
 class SVGAttrAnimationRuleProcessor;
 template<typename> class OwningNonNull;
 
@@ -680,9 +680,10 @@ public:
    * method is responsible for calling BeginObservingDocument() on the
    * presshell if the presshell should observe document mutations.
    */
-  virtual already_AddRefed<nsIPresShell> CreateShell(nsPresContext* aContext,
-                                                     nsViewManager* aViewManager,
-                                                     nsStyleSet* aStyleSet) = 0;
+  virtual already_AddRefed<nsIPresShell> CreateShell(
+      nsPresContext* aContext,
+      nsViewManager* aViewManager,
+      mozilla::StyleSetHandle aStyleSet) = 0;
   virtual void DeleteShell() = 0;
 
   nsIPresShell* GetShell() const
