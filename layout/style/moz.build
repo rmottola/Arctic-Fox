@@ -91,6 +91,7 @@ EXPORTS.mozilla += [
     'RuleProcessorCache.h',
     'SheetType.h',
     'StyleAnimationValue.h',
+    'StyleBackendType.h',
 ]
 
 EXPORTS.mozilla.dom += [
