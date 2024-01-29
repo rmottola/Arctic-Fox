@@ -4,27 +4,15 @@
 
 // How to run this file:
 // 1. [obtain Arctic Fox source code]
-// 2. [build/obtain Arcitc Fox binaries]
+// 2. [build/obtain Arctic Fox binaries]
 // 3. run `[path to]/run-mozilla.sh [path to]/xpcshell \
 //                                  [path to]/getHSTSPreloadlist.js \
 //                                  [absolute path to]/nsSTSPreloadlist.inc'
 
-// <https://developer.mozilla.org/en/XPConnect/xpcshell/HOWTO>
-// <https://bugzilla.mozilla.org/show_bug.cgi?id=546628>
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-
-// Register resource://app/ URI
-var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-var resHandler = ios.getProtocolHandler("resource")
-                 .QueryInterface(Ci.nsIResProtocolHandler);
-var mozDir = Cc["@mozilla.org/file/directory_service;1"]
-             .getService(Ci.nsIProperties)
-             .get("CurProcD", Ci.nsILocalFile);
-var mozDirURI = ios.newFileURI(mozDir);
-resHandler.setSubstitution("app", mozDirURI);
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
