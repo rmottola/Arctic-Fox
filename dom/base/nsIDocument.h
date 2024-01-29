@@ -1189,11 +1189,6 @@ public:
   virtual void RestorePreviousFullScreenState() = 0;
 
   /**
-   * Returns true if this document is in full-screen mode.
-   */
-  virtual bool IsFullScreenDoc() = 0;
-
-  /**
    * Returns true if this document is a fullscreen leaf document, i.e. it
    * is in fullscreen mode and has no fullscreen children.
    */
@@ -2546,7 +2541,7 @@ public:
   virtual Element* GetFullscreenElement() = 0;
   bool MozFullScreen()
   {
-    return IsFullScreenDoc();
+    return !!GetFullscreenElement();
   }
   void ExitFullscreen();
   Element* GetMozPointerLockElement();
