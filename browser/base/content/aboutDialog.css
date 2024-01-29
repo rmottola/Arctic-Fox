@@ -64,10 +64,12 @@
 .text-link:focus {
   margin: 0px;
   padding: 0px;
+  text-decoration: underline;
 }
 
 .bottom-link,
 .bottom-link:focus {
   text-align: center;
   margin: 0 40px;
+  text-decoration: underline;
 }
