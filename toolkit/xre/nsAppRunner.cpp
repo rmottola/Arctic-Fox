@@ -104,6 +104,7 @@
 #include <math.h>
 #include "cairo/cairo-features.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/widget/AudioSession.h"
 
 #ifndef PROCESS_DEP_ENABLE
 #define PROCESS_DEP_ENABLE 0x1
@@ -4480,7 +4481,11 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
 
   mScopedXPCOM = nullptr;
 
-  // unlock the profile after ScopedXPCOMStartup object (xpcom)
+#if defined(XP_WIN)
+  mozilla::widget::StopAudioSession();
+#endif
+
+  // unlock the profile after ScopedXPCOMStartup object (xpcom) 
   // has gone out of scope.  see bug #386739 for more details
   mProfileLock->Unlock();
   gProfileLock = nullptr;
