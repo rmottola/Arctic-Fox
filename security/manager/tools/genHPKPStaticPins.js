@@ -13,10 +13,10 @@
 "use strict";
 
 if (arguments.length != 3) {
-  throw "Usage: genHPKPStaticPins.js " +
-        "<absolute path to PreloadedHPKPins.json> " +
-        "<an unused argument - see bug 1205406> " +
-        "<absolute path to StaticHPKPins.h>";
+  throw new Error("Usage: genHPKPStaticPins.js " +
+                  "<absolute path to PreloadedHPKPins.json> " +
+                  "<an unused argument - see bug 1205406> " +
+                  "<absolute path to StaticHPKPins.h>");
 }
 
 var { 'classes': Cc, 'interfaces': Ci, 'utils': Cu, 'results': Cr } = Components;
@@ -126,11 +126,12 @@ function download(filename) {
     req.send();
   }
   catch (e) {
-    throw "ERROR: problem downloading '" + filename + "': " + e;
+    throw new Error(`ERROR: problem downloading '${filename}': ${e}`);
   }
 
   if (req.status != 200) {
-    throw `ERROR: problem downloading '${filename}': status ${req.status}`;
+    throw new Error("ERROR: problem downloading '" + filename + "': status " +
+                    req.status);
   }
 
   let resultDecoded;
@@ -138,7 +139,8 @@ function download(filename) {
     resultDecoded = atob(req.responseText);
   }
   catch (e) {
-    throw "ERROR: could not decode data as base64 from '" + filename + "': " + e;
+    throw new Error("ERROR: could not decode data as base64 from '" + filename +
+                    "': " + e);
   }
   return resultDecoded;
 }
@@ -151,7 +153,7 @@ function downloadAsJson(filename) {
     data = JSON.parse(result);
   }
   catch (e) {
-    throw "ERROR: could not parse data from '" + filename + "': " + e;
+    throw new Error("ERROR: could not parse data from '" + filename + "': " + e);
   }
   return data;
 }
@@ -175,7 +177,7 @@ function sha256Base64(input) {
     decodedValue = atob(input);
   }
   catch (e) {
-    throw `ERROR: could not decode as base64: '${input}': ${e}`;
+    throw new Error(`ERROR: could not decode as base64: '${input}': ${e}`);
   }
 
   // Convert |decodedValue| to an array so that it can be hashed by the
@@ -259,7 +261,8 @@ function downloadAndParseChromeCerts(filename, certNameToSKD, certSKDToName) {
         } else if (line.startsWith(BEGIN_PUB_KEY)) {
           state = IN_PUB_KEY;
         } else {
-          throw "ERROR: couldn't parse Chrome certificate file " + line;
+          throw new Error("ERROR: couldn't parse Chrome certificate file " +
+                          "line: " + line);
         }
         break;
       case IN_CERT:
@@ -297,7 +300,7 @@ function downloadAndParseChromeCerts(filename, certNameToSKD, certSKDToName) {
         }
         break;
       default:
-        throw "ERROR: couldn't parse Chrome certificate file " + line;
+        throw new Error("ERROR: couldn't parse Chrome certificate file " + line);
     }
   }
   return [ chromeNameToHash, chromeNameToMozName ];
@@ -339,7 +342,7 @@ function downloadAndParseChromePins(filename,
         // We should have already added hashes for all of these when we
         // imported the certificate file.
         if (!certNameToSKD[name]) {
-          throw "No hash for name: " + name;
+          throw new Error("ERROR: No hash for name: " + name);
         }
       } else if (name in chromeNameToMozName) {
         pinset.sha256_hashes.push(chromeNameToMozName[name]);
@@ -453,7 +456,7 @@ function genExpirationTime() {
 function writeFullPinset(certNameToSKD, certSKDToName, pinset) {
   let prefix = "kPinset_" + pinset.name;
   if (!pinset.sha256_hashes || pinset.sha256_hashes.length == 0) {
-    throw `ERROR: Pinset ${pinset.name} does not contain any hashes.`;
+    throw new Error(`ERROR: Pinset ${pinset.name} does not contain any hashes`);
   }
   writeFingerprints(certNameToSKD, certSKDToName, pinset.name,
                     pinset.sha256_hashes);
@@ -467,7 +470,7 @@ function writeFingerprints(certNameToSKD, certSKDToName, name, hashes) {
   let SKDList = [];
   for (let certName of hashes) {
     if (!(certName in certNameToSKD)) {
-      throw "Can't find " + certName + " in certNameToSKD";
+      throw new Error(`ERROR: Can't find '${certName}' in certNameToSKD`);
     }
     SKDList.push(certNameToSKD[certName]);
   }
@@ -509,7 +512,7 @@ function writeEntry(entry) {
   }
   if ("id" in entry) {
     if (entry.id >= 256) {
-      throw "Not enough buckets in histogram";
+      throw new Error("ERROR: Not enough buckets in histogram");
     }
     if (entry.id >= 0) {
       printVal += entry.id + ", ";
