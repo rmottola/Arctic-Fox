@@ -655,6 +655,10 @@ public:
       return false;
     }
 
+    uint64_t GetDeviceCounter() const {
+      return mDeviceCounter;
+    }
+
 protected:
     gfxPlatform();
     virtual ~gfxPlatform();
@@ -683,6 +687,11 @@ protected:
      * If in a child process, triggers a refresh of device preferences.
      */
     void UpdateDeviceInitData();
+
+    /**
+     * Increase the global device counter after a device has been removed/reset.
+     */
+    void BumpDeviceCounter();
 
     /**
      * Called when new device preferences are available.
@@ -796,6 +805,9 @@ private:
 
     int32_t mScreenDepth;
     mozilla::gfx::IntSize mScreenSize;
+
+    // Generation number for devices that ClientLayerManagers might depend on.
+    uint64_t mDeviceCounter;
 };
 
 #endif /* GFX_PLATFORM_H */

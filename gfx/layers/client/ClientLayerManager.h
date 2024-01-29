@@ -308,6 +308,8 @@ private:
                               void* aCallbackData,
                               EndTransactionFlags);
 
+  bool DependsOnStaleDevice() const;
+
   LayerRefArray mKeepAlive;
 
   nsIWidget* mWidget;
@@ -358,6 +360,7 @@ private:
   nsTArray<DidCompositeObserver*> mDidCompositeObservers;
 
   RefPtr<MemoryPressureObserver> mMemoryPressureObserver;
+  uint64_t mDeviceCounter;
 };
 
 class ClientLayer : public ShadowableLayer

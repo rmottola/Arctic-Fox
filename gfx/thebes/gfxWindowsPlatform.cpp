@@ -487,6 +487,7 @@ gfxWindowsPlatform::HandleDeviceReset()
   // list of which devices to create.
   UpdateDeviceInitData();
   InitializeDevices();
+  BumpDeviceCounter();
   return true;
 }
 
