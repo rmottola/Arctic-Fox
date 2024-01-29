@@ -500,6 +500,8 @@ protected:
   void CancelCurrentCompositeTask();
   void Invalidate();
 
+  RefPtr<Compositor> NewCompositor(const nsTArray<LayersBackend>& aBackendHints);
+
   /**
    * Add a compositor to the global compositor map.
    */
