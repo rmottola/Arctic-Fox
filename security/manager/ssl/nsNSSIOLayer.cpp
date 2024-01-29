@@ -2213,7 +2213,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
   ScopedSECKEYPrivateKey privKey;
   ScopedCERTCertList certList;
   CERTCertListNode* node;
-  ScopedCERTCertNicknames nicknames;
+  UniqueCERTCertNicknames nicknames;
   int keyError = 0; // used for private key retrieval error
   SSM_UserCertChoice certChoice;
   int32_t NumberOfCerts = 0;
@@ -2417,7 +2417,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
         goto noCert;
       }
 
-      nicknames = getNSSCertNicknamesFromCertList(certList.get());
+      nicknames.reset(getNSSCertNicknamesFromCertList(certList.get()));
 
       if (!nicknames) {
         goto loser;
