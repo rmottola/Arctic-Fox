@@ -1803,6 +1803,16 @@ nsBaseWidget::GetTextEventDispatcher()
   return mTextEventDispatcher;
 }
 
+void*
+nsBaseWidget::GetPseudoIMEContext()
+{
+  TextEventDispatcher* dispatcher = GetTextEventDispatcher();
+  if (!dispatcher) {
+    return nullptr;
+  }
+  return dispatcher->GetPseudoIMEContext();
+}
+
 NS_IMETHODIMP_(TextEventDispatcherListener*)
 nsBaseWidget::GetNativeTextEventDispatcherListener()
 {
