@@ -543,6 +543,7 @@ public:
                            const TimeStamp& aCompositeReqEnd);
 
   void ClearCachedResources();
+  void InvalidateLayers();
 
   static inline TabChild* GetFrom(nsIDOMWindow* aWindow)
   {
