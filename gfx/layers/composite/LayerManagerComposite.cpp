@@ -1492,6 +1492,14 @@ LayerManagerComposite::AutoAddMaskEffect::~AutoAddMaskEffect()
   mCompositable->RemoveMaskEffect();
 }
 
+void
+LayerManagerComposite::ChangeCompositor(Compositor* aNewCompositor)
+{
+  mCompositor = aNewCompositor;
+  mTextRenderer = new TextRenderer(aNewCompositor);
+  mTwoPassTmpTarget = nullptr;
+}
+
 LayerComposite::LayerComposite(LayerManagerComposite *aManager)
   : mCompositeManager(aManager)
   , mCompositor(aManager->GetCompositor())
@@ -1567,6 +1575,12 @@ LayerComposite::GetFullyRenderedRegion() {
   } else {
     return GetShadowVisibleRegion().ToUnknownRegion();
   }
+}
+
+bool
+LayerComposite::HasStaleCompositor() const
+{
+  return mCompositeManager->GetCompositor() != mCompositor;
 }
 
 #ifndef MOZ_HAVE_PLATFORM_SPECIFIC_LAYER_BUFFERS

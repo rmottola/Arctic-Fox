@@ -260,8 +260,6 @@ public:
   virtual bool            AutoErase(HDC dc);
   bool ComputeShouldAccelerate() override;
 
-  static void             ClearCompositor(nsWindow* aWindow);
-
   void                    ForcePresent();
 
   /**
