@@ -2330,6 +2330,13 @@ pref("security.ssl.enable_ocsp_must_staple", true);
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
 
+#ifdef RELEASE_BUILD
+pref("security.onecrl.via.amo", true);
+#else
+pref("security.onecrl.via.amo", false);
+#endif
+
+
 // Modifier key prefs: default to Windows settings,
 // menu access key = alt, accelerator key = control.
 // Use 17 for Ctrl, 18 for Alt, 224 for Meta, 91 for Win, 0 for none. Mac settings in macprefs.js
