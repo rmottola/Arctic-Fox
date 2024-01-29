@@ -2358,7 +2358,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
         if (certdb) {
           nsCOMPtr<nsIX509Cert> found_cert;
           nsresult find_rv =
-            certdb->FindCertByDBKey(rememberedDBKey.get(), nullptr,
+            certdb->FindCertByDBKey(rememberedDBKey.get(),
             getter_AddRefs(found_cert));
           if (NS_SUCCEEDED(find_rv) && found_cert) {
             nsNSSCertificate* obj_cert =
