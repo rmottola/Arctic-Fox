@@ -2869,6 +2869,8 @@ TabChild::InvalidateLayers()
 void
 TabChild::CompositorUpdated(const TextureFactoryIdentifier& aNewIdentifier)
 {
+  gfxPlatform::GetPlatform()->UpdateRenderModeIfDeviceReset();
+
   RefPtr<LayerManager> lm = mPuppetWidget->GetLayerManager();
   ClientLayerManager* clm = lm->AsClientLayerManager();
 
