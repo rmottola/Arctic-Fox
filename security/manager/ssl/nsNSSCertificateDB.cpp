@@ -632,7 +632,7 @@ nsNSSCertificateDB::ImportEmailCertificate(uint8_t * data, uint32_t length,
     SECStatus rv = certVerifier->VerifyCert(node->cert,
                                             certificateUsageEmailRecipient,
                                             mozilla::pkix::Now(), ctx,
-                                            nullptr, 0, nullptr, &certChain);
+                                            nullptr, certChain);
 
     if (rv != SECSuccess) {
       nsCOMPtr<nsIX509Cert> certToShow = nsNSSCertificate::Create(node->cert);
@@ -731,7 +731,7 @@ nsNSSCertificateDB::ImportValidCACertsInList(CERTCertList *certList, nsIInterfac
     SECStatus rv = certVerifier->VerifyCert(node->cert,
                                             certificateUsageVerifyCA,
                                             mozilla::pkix::Now(), ctx,
-                                            nullptr, 0, nullptr, &certChain);
+                                            nullptr, certChain);
     if (rv != SECSuccess) {
       nsCOMPtr<nsIX509Cert> certToShow = nsNSSCertificate::Create(node->cert);
       DisplayCertificateAlert(ctx, "NotImportingUnverifiedCert", certToShow, proofOfLock);
@@ -1285,11 +1285,13 @@ nsNSSCertificateDB::FindCertByEmailAddress(const char* aEmailAddress,
        !CERT_LIST_END(node, certlist);
        node = CERT_LIST_NEXT(node)) {
 
+    ScopedCERTCertList unusedCertChain;
     SECStatus srv = certVerifier->VerifyCert(node->cert,
                                              certificateUsageEmailRecipient,
                                              mozilla::pkix::Now(),
                                              nullptr /*XXX pinarg*/,
-                                             nullptr /*hostname*/);
+                                             nullptr /*hostname*/,
+                                             unusedCertChain);
     if (srv == SECSuccess) {
       break;
     }
@@ -1656,17 +1658,17 @@ VerifyCertAtTime(nsIX509Cert* aCert,
                                             aTime,
                                             nullptr, // Assume no context
                                             aHostname,
+                                            resultChain,
                                             false, // don't save intermediates
                                             aFlags,
-                                            &resultChain,
                                             &evOidPolicy);
   } else {
     srv = certVerifier->VerifyCert(nssCert, aUsage, aTime,
                                    nullptr, // Assume no context
                                    aHostname,
+                                   resultChain,
                                    aFlags,
                                    nullptr, // stapledOCSPResponse
-                                   &resultChain,
                                    &evOidPolicy);
   }
 
