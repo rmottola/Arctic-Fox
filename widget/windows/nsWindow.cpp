@@ -3842,8 +3842,14 @@ void nsWindow::InitEvent(WidgetGUIEvent& event, LayoutDeviceIntPoint* aPoint)
     event.refPoint = *aPoint;
   }
 
-  event.time = ::GetMessageTime();
-  event.timeStamp = GetMessageTimeStamp(event.time);
+  event.AssignEventTime(CurrentMessageWidgetEventTime());
+}
+
+WidgetEventTime
+nsWindow::CurrentMessageWidgetEventTime() const
+{
+  LONG messageTime = ::GetMessageTime();
+  return WidgetEventTime(messageTime, GetMessageTimeStamp(messageTime));
 }
 
 /**************************************************************
@@ -5985,7 +5991,7 @@ nsWindow::ClientMarginHitTestPoint(int32_t mx, int32_t my)
 }
 
 TimeStamp
-nsWindow::GetMessageTimeStamp(LONG aEventTime)
+nsWindow::GetMessageTimeStamp(LONG aEventTime) const
 {
   CurrentWindowsTimeGetter getCurrentTime(mWnd);
   return TimeConverter().GetTimeStampFromSystemTime(aEventTime,
