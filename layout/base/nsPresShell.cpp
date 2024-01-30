@@ -4868,7 +4868,7 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
 }
 
 already_AddRefed<SourceSurface>
-PresShell::PaintRangePaintInfo(nsTArray<UniquePtr<RangePaintInfo>>* aItems,
+PresShell::PaintRangePaintInfo(const nsTArray<UniquePtr<RangePaintInfo>>& aItems,
                                nsISelection* aSelection,
                                nsIntRegion* aRegion,
                                nsRect aArea,
@@ -4970,7 +4970,7 @@ PresShell::PaintRangePaintInfo(nsTArray<UniquePtr<RangePaintInfo>>* aItems,
   frameSelection->SetDisplaySelection(nsISelectionController::SELECTION_HIDDEN);
 
   // next, paint each range in the selection
-  for (UniquePtr<RangePaintInfo>& rangeInfo : *aItems) {
+  for (const UniquePtr<RangePaintInfo>& rangeInfo : aItems) {
     // the display lists paint relative to the offset from the reference
     // frame, so account for that translation too:
     gfxPoint rootOffset =
@@ -5033,7 +5033,7 @@ PresShell::RenderNode(nsIDOMNode* aNode,
                     -pc->AppUnitsToDevPixels(area.y));
   }
 
-  return PaintRangePaintInfo(&rangeItems, nullptr, aRegion, area, aPoint,
+  return PaintRangePaintInfo(rangeItems, nullptr, aRegion, area, aPoint,
                              aScreenRect, aFlags);
 }
 
@@ -5066,7 +5066,7 @@ PresShell::RenderSelection(nsISelection* aSelection,
     }
   }
 
-  return PaintRangePaintInfo(&rangeItems, aSelection, nullptr, area, aPoint,
+  return PaintRangePaintInfo(rangeItems, aSelection, nullptr, area, aPoint,
                              aScreenRect, aFlags);
 }
 

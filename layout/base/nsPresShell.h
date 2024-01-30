@@ -535,7 +535,7 @@ protected:
    *          be set if a custom image was specified
    */
   already_AddRefed<SourceSurface>
-  PaintRangePaintInfo(nsTArray<mozilla::UniquePtr<RangePaintInfo>>* aItems,
+  PaintRangePaintInfo(const nsTArray<mozilla::UniquePtr<RangePaintInfo>>& aItems,
                       nsISelection* aSelection,
                       nsIntRegion* aRegion,
                       nsRect aArea,
