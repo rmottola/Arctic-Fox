@@ -1468,9 +1468,10 @@ PresShell::AddAuthorSheet(nsISupports* aSheet)
     return;
   }
 
-  // Document specific "additional" Author sheets should be stronger than the ones
-  // added with the StyleSheetService.
-  StyleSheetHandle firstAuthorSheet = mDocument->FirstAdditionalAuthorSheet();
+  // Document specific "additional" Author sheets should be stronger than the
+  // ones added with the StyleSheetService.
+  StyleSheetHandle firstAuthorSheet =
+    mDocument->GetFirstAdditionalAuthorSheet();
   if (firstAuthorSheet) {
     mStyleSet->InsertStyleSheetBefore(SheetType::Doc, sheet, firstAuthorSheet);
   } else {

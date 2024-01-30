@@ -1006,7 +1006,7 @@ public:
                                            mozilla::StyleSheetHandle aSheet) = 0;
   virtual void RemoveAdditionalStyleSheet(additionalSheetType aType,
                                           nsIURI* sheetURI) = 0;
-  virtual mozilla::StyleSheetHandle FirstAdditionalAuthorSheet() = 0;
+  virtual mozilla::StyleSheetHandle GetFirstAdditionalAuthorSheet() = 0;
 
   /**
    * Get this document's CSSLoader.  This is guaranteed to not return null.
