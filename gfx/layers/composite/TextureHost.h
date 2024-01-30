@@ -625,11 +625,12 @@ public:
 
   virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override;
 
-  virtual bool HasInternalBuffer() const override { return true; }
+  virtual bool HasInternalBuffer() const override { return mHasInternalBuffer; }
 
 protected:
   bool Upload(nsIntRegion *aRegion = nullptr);
   bool MaybeUpload(nsIntRegion *aRegion = nullptr);
+  bool EnsureWrappingTextureSource();
 
   virtual void UpdatedInternal(const nsIntRegion* aRegion = nullptr) override;
 
@@ -642,6 +643,7 @@ protected:
   uint32_t mUpdateSerial;
   bool mLocked;
   bool mNeedsFullUpdate;
+  bool mHasInternalBuffer;
 };
 
 /**
