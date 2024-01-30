@@ -2542,7 +2542,7 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
     // on demand.)
     bool useOffMainThreadCompositing = !!CompositorParent::CompositorLoop();
     if (useOffMainThreadCompositing) {
-      DebugOnly<bool> opened = PCompositor::Open(this);
+      DebugOnly<bool> opened = PCompositorBridge::Open(this);
       MOZ_ASSERT(opened);
 
       opened = PImageBridge::Open(this);
@@ -3342,9 +3342,9 @@ ContentParent::DeallocPAPZParent(PAPZParent* aActor)
   return true;
 }
 
-PCompositorParent*
-ContentParent::AllocPCompositorParent(mozilla::ipc::Transport* aTransport,
-                                      base::ProcessId aOtherProcess)
+PCompositorBridgeParent*
+ContentParent::AllocPCompositorBridgeParent(mozilla::ipc::Transport* aTransport,
+                                            base::ProcessId aOtherProcess)
 {
   return CompositorParent::Create(aTransport, aOtherProcess);
 }
