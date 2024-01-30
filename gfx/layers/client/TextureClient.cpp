@@ -611,7 +611,9 @@ TextureClient::RecycleTexture(TextureFlags aFlags)
 void
 TextureClient::WaitForCompositorRecycle()
 {
-  mActor->WaitForCompositorRecycle();
+  if (IsSharedWithCompositor()) {
+    mActor->WaitForCompositorRecycle();
+  }
 }
 
 void
