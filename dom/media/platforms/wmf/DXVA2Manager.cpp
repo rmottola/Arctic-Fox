@@ -535,7 +535,7 @@ bool
 D3D11DXVA2Manager::SupportsConfig(IMFMediaType* aType, float aFramerate)
 {
   RefPtr<ID3D11VideoDevice> videoDevice;
-  HRESULT hr = mDevice->QueryInterface(static_cast<ID3D11VideoDevice**>(byRef(videoDevice)));
+  HRESULT hr = mDevice->QueryInterface(static_cast<ID3D11VideoDevice**>(getter_AddRefs(videoDevice)));
   NS_ENSURE_TRUE(SUCCEEDED(hr), false);
 
   D3D11_VIDEO_DECODER_DESC desc;
@@ -639,7 +639,7 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
   }
 
   RefPtr<ID3D11VideoDevice> videoDevice;
-  hr = mDevice->QueryInterface(static_cast<ID3D11VideoDevice**>(byRef(videoDevice)));
+  hr = mDevice->QueryInterface(static_cast<ID3D11VideoDevice**>(getter_AddRefs(videoDevice)));
   if (!SUCCEEDED(hr)) {
     aFailureReason = nsPrintfCString("QI to ID3D11VideoDevice failed with code %X", hr);
     return hr;
@@ -673,7 +673,7 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
   }
 
   RefPtr<IDXGIDevice> dxgiDevice;
-  hr = mDevice->QueryInterface(static_cast<IDXGIDevice**>(byRef(dxgiDevice)));
+  hr = mDevice->QueryInterface(static_cast<IDXGIDevice**>(getter_AddRefs(dxgiDevice)));
   if (!SUCCEEDED(hr)) {
     aFailureReason = nsPrintfCString("QI to IDXGIDevice failed with code %X", hr);
     return hr;
