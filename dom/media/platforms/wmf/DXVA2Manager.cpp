@@ -208,8 +208,8 @@ D3D9DXVA2Manager::SupportsConfig(IMFMediaType* aType, float aFramerate)
 
   RefPtr<IDirect3DSurface9> surface;
   hr = mDecoderService->CreateSurface(desc.SampleWidth, desc.SampleHeight, 0, (D3DFORMAT)MAKEFOURCC('N', 'V', '1', '2'),
-  D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget,
-  surface.StartAssignment(), NULL);
+                                      D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget,
+                                      surface.StartAssignment(), NULL);
   if (!SUCCEEDED(hr)) {
     CoTaskMemFree(configs);
     return false;
@@ -650,7 +650,7 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
   for (UINT i = 0; i < profileCount; i++) {
     GUID id;
     hr = videoDevice->GetVideoDecoderProfile(i, &id);
-    if (SUCCEEDED(hr) && id == DXVA2_ModeH264_E || id == DXVA2_Intel_ModeH264_E) {
+    if (SUCCEEDED(hr) && (id == DXVA2_ModeH264_E || id == DXVA2_Intel_ModeH264_E)) {
       mDecoderGUID = id;
       found = true;
       break;
