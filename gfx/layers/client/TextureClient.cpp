@@ -73,7 +73,7 @@ struct TextureDeallocParams
 {
   TextureData* data;
   RefPtr<TextureChild> actor;
-  RefPtr<ISurfaceAllocator> allocator;
+  RefPtr<ClientIPCAllocator> allocator;
   bool clientDeallocation;
   bool syncDeallocation;
   bool workAroundSharedSurfaceOwnershipIssue;
@@ -135,7 +135,7 @@ public:
 
   CompositableForwarder* GetForwarder() { return mForwarder; }
 
-  ISurfaceAllocator* GetAllocator() { return mForwarder; }
+  ClientIPCAllocator* GetAllocator() { return mForwarder; }
 
   void ActorDestroy(ActorDestroyReason why) override;
 
@@ -180,7 +180,7 @@ private:
 };
 
 
-static void DestroyTextureData(TextureData* aTextureData, ISurfaceAllocator* aAllocator,
+static void DestroyTextureData(TextureData* aTextureData, ClientIPCAllocator* aAllocator,
                                bool aDeallocate, bool aMainThreadOnly)
 {
   if (!aTextureData) {
@@ -188,7 +188,7 @@ static void DestroyTextureData(TextureData* aTextureData, ISurfaceAllocator* aAl
   }
 
   if (aMainThreadOnly && !NS_IsMainThread()) {
-    RefPtr<ISurfaceAllocator> allocatorRef = aAllocator;
+    RefPtr<ClientIPCAllocator> allocatorRef = aAllocator;
     NS_DispatchToMainThread(NS_NewRunnableFunction([aTextureData, allocatorRef, aDeallocate]() -> void {
       DestroyTextureData(aTextureData, allocatorRef, aDeallocate, true);
     }));
@@ -274,7 +274,7 @@ DeallocateTextureClient(TextureDeallocParams params)
 
   if (!ipdlMsgLoop) {
     // If we don't have a message loop we can't know for sure that we are in
-    // the IPDL thread and use the ISurfaceAllocator.
+    // the IPDL thread and use the ClientIPCAllocator.
     // This should ideally not happen outside of gtest, but some shutdown raciness
     // could put us in this situation.
     params.allocator = nullptr;
@@ -785,7 +785,7 @@ TextureClient::CreateForDrawing(CompositableForwarder* aAllocator,
 
 // static
 already_AddRefed<TextureClient>
-TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
+TextureClient::CreateForRawBufferAccess(ClientIPCAllocator* aAllocator,
                                         gfx::SurfaceFormat aFormat,
                                         gfx::IntSize aSize,
                                         gfx::BackendType aMoz2DBackend,
@@ -817,7 +817,7 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
 
 // static
 already_AddRefed<TextureClient>
-TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
+TextureClient::CreateForYCbCr(ClientIPCAllocator* aAllocator,
                               gfx::IntSize aYSize,
                               gfx::IntSize aCbCrSize,
                               StereoMode aStereoMode,
@@ -844,7 +844,7 @@ TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
 
 // static
 already_AddRefed<TextureClient>
-TextureClient::CreateForYCbCrWithBufferSize(ISurfaceAllocator* aAllocator,
+TextureClient::CreateForYCbCrWithBufferSize(ClientIPCAllocator* aAllocator,
                                             gfx::SurfaceFormat aFormat,
                                             size_t aSize,
                                             TextureFlags aTextureFlags)
@@ -865,7 +865,7 @@ TextureClient::CreateForYCbCrWithBufferSize(ISurfaceAllocator* aAllocator,
   return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
 }
 
-TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, ISurfaceAllocator* aAllocator)
+TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, ClientIPCAllocator* aAllocator)
 : mAllocator(aAllocator)
 , mActor(nullptr)
 , mData(aData)
@@ -1026,7 +1026,7 @@ SyncObject::CreateSyncObject(SyncHandle aHandle)
 }
 
 already_AddRefed<TextureClient>
-TextureClient::CreateWithData(TextureData* aData, TextureFlags aFlags, ISurfaceAllocator* aAllocator)
+TextureClient::CreateWithData(TextureData* aData, TextureFlags aFlags, ClientIPCAllocator* aAllocator)
 {
   if (!aData) {
     return nullptr;
