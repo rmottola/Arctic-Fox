@@ -377,6 +377,11 @@ TextureClient::Lock(OpenMode aMode)
     return mOpenMode == aMode;
   }
 
+  if (mRemoveFromCompositableWaiter) {
+    mRemoveFromCompositableWaiter->WaitComplete();
+    mRemoveFromCompositableWaiter = nullptr;
+  }
+
   mIsLocked = mData->Lock(aMode, mReleaseFenceHandle.IsValid() ? &mReleaseFenceHandle : nullptr);
   mOpenMode = aMode;
 
@@ -566,10 +571,12 @@ TextureClient::WaitForBufferOwnership(bool aWaitReleaseFence)
     mRemoveFromCompositableWaiter = nullptr;
   }
 
+#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION < 21
   if (aWaitReleaseFence && mReleaseFenceHandle.IsValid()) {
     mData->WaitForFence(&mReleaseFenceHandle);
     mReleaseFenceHandle = FenceHandle();
   }
+#endif
 }
 
 // static
