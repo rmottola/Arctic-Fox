@@ -638,6 +638,7 @@ protected:
 
   bool mAddedToCompositableClient;
   bool mWorkaroundAnnoyingSharedSurfaceLifetimeIssues;
+  bool mWorkaroundAnnoyingSharedSurfaceOwnershipIssues;
 
   RefPtr<TextureReadbackSink> mReadbackSink;
 

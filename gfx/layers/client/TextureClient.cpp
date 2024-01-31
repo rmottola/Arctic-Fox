@@ -346,6 +346,7 @@ void TextureClient::Destroy(bool aForceSync)
     params.actor = actor;
     params.allocator = mAllocator;
     params.clientDeallocation = !!(mFlags & TextureFlags::DEALLOCATE_CLIENT);
+    params.workAroundSharedSurfaceOwnershipIssue = mWorkaroundAnnoyingSharedSurfaceOwnershipIssues;
     if (mWorkaroundAnnoyingSharedSurfaceLifetimeIssues) {
       params.data = nullptr;
     } else {
@@ -894,6 +895,7 @@ TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, ClientIPCA
 , mIsLocked(false)
 , mAddedToCompositableClient(false)
 , mWorkaroundAnnoyingSharedSurfaceLifetimeIssues(false)
+, mWorkaroundAnnoyingSharedSurfaceOwnershipIssues(false)
 #ifdef GFX_DEBUG_TRACK_CLIENTS_IN_POOL
 , mPoolTracker(nullptr)
 #endif
