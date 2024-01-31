@@ -5612,6 +5612,9 @@ PresShell::MarkImagesInListVisible(const nsDisplayList& aList,
 void
 PresShell::ReportAnyBadState()
 {
+  if (!NS_IsMainThread()) {
+    gfxCriticalNote << "Got null image in image visibility: off-main-thread";
+  }
   if (mIsZombie) {
     gfxCriticalNote << "Got null image in image visibility: mIsZombie";
   }
@@ -5638,6 +5641,12 @@ PresShell::ReportAnyBadState()
   }
 }
 
+void
+PresShell::SetInImageVisibility(bool aState)
+{
+  mInImageVisibility = aState;
+}
+
 static void
 DecrementVisibleCount(nsTHashtable<nsRefPtrHashKey<nsIImageLoadingContent>>& aImages,
                       uint32_t aNonvisibleAction, PresShell* aPresShell)
@@ -5648,7 +5657,9 @@ DecrementVisibleCount(nsTHashtable<nsRefPtrHashKey<nsIImageLoadingContent>>& aIm
       // help debug the crash (bug 1251150)
       aPresShell->ReportAnyBadState();
     }
+    aPresShell->SetInImageVisibility(true);
     iter.Get()->GetKey()->DecrementVisibleCount(aNonvisibleAction);
+    aPresShell->SetInImageVisibility(false);
   }
 }
 
@@ -5749,6 +5760,10 @@ PresShell::ClearImageVisibilityVisited(nsView* aView, bool aClear)
 void
 PresShell::ClearVisibleImagesList(uint32_t aNonvisibleAction)
 {
+  if (mInImageVisibility) {
+    gfxCriticalNoteOnce << "ClearVisibleImagesList is re-entering on "
+                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
+  }
   DecrementVisibleCount(mVisibleImages, aNonvisibleAction, this);
   mVisibleImages.Clear();
 }
@@ -5855,6 +5870,11 @@ PresShell::RebuildImageVisibility(nsRect* aRect,
   nsIFrame* rootFrame = GetRootFrame();
   if (!rootFrame) {
     return;
+  }
+
+  if (mInImageVisibility) {
+    gfxCriticalNoteOnce << "RebuildImageVisibility is re-entering on "
+                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
   }
 
   // Remove the entries of the mVisibleImages hashtable and put them in
@@ -6034,6 +6054,11 @@ PresShell::EnsureImageInVisibleList(nsIImageLoadingContent* aImage)
   }
 #endif
 
+  if (mInImageVisibility) {
+    gfxCriticalNoteOnce << "EnsureImageInVisibleList is re-entering on "
+                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
+  }
+
   if (!mVisibleImages.Contains(aImage)) {
     mVisibleImages.PutEntry(aImage);
     aImage->IncrementVisibleCount();
@@ -6055,6 +6080,11 @@ PresShell::RemoveImageFromVisibleList(nsIImageLoadingContent* aImage)
   if (AssumeAllImagesVisible()) {
     MOZ_ASSERT(mVisibleImages.Count() == 0, "shouldn't have any images in the table");
     return;
+  }
+
+  if (mInImageVisibility) {
+    gfxCriticalNoteOnce << "RemoveImageFromVisibleList is re-entering on "
+                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
   }
 
   uint32_t count = mVisibleImages.Count();
@@ -10794,6 +10824,11 @@ PresShell::UpdateImageLockingState()
   nsresult rv = mDocument->SetImageLockingState(locked);
 
   if (locked) {
+    if (mInImageVisibility) {
+      gfxCriticalNoteOnce << "UpdateImageLockingState is re-entering on "
+                          << (NS_IsMainThread() ? "" : "non-") << "main thread";
+    }
+
     // Request decodes for visible images; we want to start decoding as
     // quickly as possible when we get foregrounded to minimize flashing.
     for (auto iter = mVisibleImages.Iter(); !iter.Done(); iter.Next()) {
