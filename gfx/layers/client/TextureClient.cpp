@@ -133,6 +133,15 @@ public:
     SendClientRecycle();
   }
 
+  void CancelWaitForCompositorRecycle()
+  {
+    RECYCLE_LOG("[CLIENT] Cancelling wait for recycle %p\n", mWaitForRecycle.get());
+    {
+      MonitorAutoLock mon(mMonitor);
+      mWaitForRecycle = nullptr;
+    }
+  }
+
   CompositableForwarder* GetForwarder() { return mForwarder; }
 
   ClientIPCAllocator* GetAllocator() { return mForwarder; }
@@ -619,6 +628,14 @@ TextureClient::WaitForCompositorRecycle()
 {
   if (IsSharedWithCompositor()) {
     mActor->WaitForCompositorRecycle();
+  }
+}
+
+void
+TextureClient::CancelWaitForCompositorRecycle()
+{
+  if (IsSharedWithCompositor()) {
+    mActor->CancelWaitForCompositorRecycle();
   }
 }
 
