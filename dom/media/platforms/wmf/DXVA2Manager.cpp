@@ -386,7 +386,8 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
     return hr;
   }
 
-  if (adapter.VendorId = 0x1022) {
+  if (adapter.VendorId == 0x1022 &&
+      !Preferences::GetBool("media.wmf.skip-blacklist", false)) {
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sAMDPreUVD4); i++) {
       if (adapter.DeviceId == sAMDPreUVD4[i]) {
         mIsAMDPreUVD4 = true;
@@ -507,7 +508,7 @@ public:
 
   bool IsD3D11() override { return true; }
 
-  virtual bool SupportsConfig(IMFMediaType* aType, float aFramerate) override;
+  bool SupportsConfig(IMFMediaType* aType, float aFramerate) override;
 
 private:
   HRESULT CreateFormatConverter();
@@ -564,7 +565,7 @@ D3D11DXVA2Manager::SupportsConfig(IMFMediaType* aType, float aFramerate)
     D3D11_VIDEO_DECODER_CONFIG config;
     hr = videoDevice->GetVideoDecoderConfig(&desc, i, &config);
     if (SUCCEEDED(hr)) {
-      nsRefPtr<ID3D11VideoDecoder> decoder;
+      RefPtr<ID3D11VideoDecoder> decoder;
       hr = videoDevice->CreateVideoDecoder(&desc, &config, decoder.StartAssignment());
       if (SUCCEEDED(hr) && decoder) {
         return true;
@@ -690,7 +691,8 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
     return hr;
   }
 
-  if (adapterDesc.VendorId = 0x1022) {
+  if (adapterDesc.VendorId == 0x1022 &&
+      !Preferences::GetBool("media.wmf.skip-blacklist", false)) {
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sAMDPreUVD4); i++) {
       if (adapterDesc.DeviceId == sAMDPreUVD4[i]) {
         mIsAMDPreUVD4 = true;
