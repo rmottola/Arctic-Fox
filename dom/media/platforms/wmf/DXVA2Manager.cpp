@@ -97,7 +97,7 @@ public:
                       ImageContainer* aContainer,
                       Image** aOutImage) override;
 
-  virtual bool SupportsConfig(IMFMediaType* aType, float aFramerate) override;
+  bool SupportsConfig(IMFMediaType* aType, float aFramerate) override;
 
 private:
   RefPtr<IDirect3D9Ex> mD3D9;
