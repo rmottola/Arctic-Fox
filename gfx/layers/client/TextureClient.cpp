@@ -76,6 +76,7 @@ struct TextureDeallocParams
   RefPtr<ISurfaceAllocator> allocator;
   bool clientDeallocation;
   bool syncDeallocation;
+  bool workAroundSharedSurfaceOwnershipIssue;
 };
 
 void DeallocateTextureClient(TextureDeallocParams params);
@@ -282,9 +283,14 @@ DeallocateTextureClient(TextureDeallocParams params)
   if (!actor) {
     // We don't have an IPDL actor, probably because we destroyed the TextureClient
     // before sharing it with the compositor. It means the data cannot be owned by
-    // the TextureHost since we never created the TextureHost.
+    // the TextureHost since we never created the TextureHost...
+    // ..except if the lovely mWorkaroundAnnoyingSharedSurfaceOwnershipIssues member
+    // is set to true. In this case we are in a special situation where this
+    // TextureClient is in wrapped into another TextureClient which assumes it owns
+    // our data. This is specific to the gralloc SharedSurface.
+    bool shouldDeallocate = !params.workAroundSharedSurfaceOwnershipIssue;
     DestroyTextureData(params.data, params.allocator,
-                       true,    // client-side deallocation
+                       shouldDeallocate,
                        false);  // main-thread deallocation
     return;
   }
