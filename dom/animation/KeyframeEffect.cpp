@@ -2135,7 +2135,7 @@ KeyframeEffect::KeyframeEffect(nsIDocument* aDocument,
                                CSSPseudoElementType aPseudoType,
                                const TimingParams& aTiming)
   : KeyframeEffectReadOnly(aDocument, aTarget, aPseudoType,
-                           new AnimationEffectTiming(aTiming))
+                           new AnimationEffectTiming(aTiming, this))
 {
 }
 
@@ -2144,6 +2144,11 @@ KeyframeEffect::WrapObject(JSContext* aCx,
                            JS::Handle<JSObject*> aGivenProto)
 {
   return KeyframeEffectBinding::Wrap(aCx, this, aGivenProto);
+}
+
+KeyframeEffect::~KeyframeEffect()
+{
+  mTiming->Unlink();
 }
 
 } // namespace dom
