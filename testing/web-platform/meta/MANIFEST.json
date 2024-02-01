@@ -18849,6 +18849,30 @@
         "url": "/web-animations/animation-timeline/idlharness.html"
       },
       {
+        "path": "web-animations/animation/constructor.html",
+        "url": "/web-animations/animation/constructor.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/constructor.html",
+        "url": "/web-animations/keyframe-effect/constructor.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/effect-easing.html",
+        "url": "/web-animations/keyframe-effect/effect-easing.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming-currentIteration.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming-currentIteration.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming-progress.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming-progress.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming.html"
+      },
+      {
         "path": "webaudio/the-audio-api/the-audiobuffer-interface/idl-test.html",
         "url": "/webaudio/the-audio-api/the-audiobuffer-interface/idl-test.html"
       },
@@ -21484,22 +21508,6 @@
       },
       {
         "path": "webdriver/timeouts/page_load_timeouts_tests.py"
-      },
-      {
-        "path": "web-animations/keyframe-effect/constructor.html",
-        "url": "/web-animations/keyframe-effect/constructor.html"
-      },
-      {
-        "path": "web-animations/keyframe-effect/effect-easing.html",
-        "url": "/web-animations/keyframe-effect/effect-easing.html"
-      },
-      {
-        "path": "web-animations/keyframe-effect/getComputedTiming.html",
-        "url": "/web-animations/keyframe-effect/getComputedTiming.html"
-      },
-      {
-        "path": "web-animations/animation/constructor.html",
-        "url": "/web-animations/animation/constructor.html"
       },
       {
         "path": "webdriver/user_input/clear_test.py"
