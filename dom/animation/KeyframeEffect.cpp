@@ -2101,6 +2101,11 @@ KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(const nsIFrame*
   bool shouldLog = nsLayoutUtils::IsAnimationLoggingEnabled();
 
   for (const AnimationProperty& property : mProperties) {
+    // If a property is overridden in the CSS cascade, it should not block other
+    // animations from running on the compositor.
+    if (!property.mWinsInCascade) {
+      continue;
+    }
     // Check for geometric properties
     if (IsGeometricProperty(property.mProperty)) {
       if (shouldLog) {
