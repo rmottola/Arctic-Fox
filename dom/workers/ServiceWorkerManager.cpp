@@ -319,7 +319,13 @@ PopulateRegistrationData(nsIPrincipal* aPrincipal,
   }
 
   aData.scope() = aRegistration->mScope;
-  aData.scriptSpec() = aRegistration->mScriptSpec;
+
+  RefPtr<ServiceWorkerInfo> newest = aRegistration->Newest();
+  if (NS_WARN_IF(!newest)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  aData.scriptSpec() = newest->ScriptSpec();
 
   if (aRegistration->mActiveWorker) {
     aData.currentWorkerURL() = aRegistration->mActiveWorker->ScriptSpec();
@@ -460,7 +466,10 @@ NS_IMETHODIMP
 ServiceWorkerRegistrationInfo::GetScriptSpec(nsAString& aScriptSpec)
 {
   AssertIsOnMainThread();
-  CopyUTF8toUTF16(mScriptSpec, aScriptSpec);
+  RefPtr<ServiceWorkerInfo> newest = Newest();
+  if (newest) {
+    CopyUTF8toUTF16(newest->ScriptSpec(), aScriptSpec);
+  }
   return NS_OK;
 }
 
@@ -1022,7 +1031,7 @@ protected:
       // Remove the old error code so we can replace it with a TypeError.
       aRv.SuppressException();
 
-      NS_ConvertUTF8toUTF16 scriptSpec(mRegistration->mScriptSpec);
+      NS_ConvertUTF8toUTF16 scriptSpec(mScriptSpec);
       NS_ConvertUTF8toUTF16 scope(mRegistration->mScope);
 
       // Throw the type error with a generic error message.
@@ -1256,8 +1265,7 @@ public:
       if (mRegistration) {
         mRegistration->mPendingUninstall = false;
         RefPtr<ServiceWorkerInfo> newest = mRegistration->Newest();
-        if (newest && mScriptSpec.Equals(newest->ScriptSpec()) &&
-            mScriptSpec.Equals(mRegistration->mScriptSpec)) {
+        if (newest && mScriptSpec.Equals(newest->ScriptSpec())) {
           swm->StoreRegistration(mPrincipal, mRegistration);
           Succeed();
 
@@ -1275,8 +1283,6 @@ public:
         mRegistration = swm->CreateNewRegistration(mScope, mPrincipal);
       }
 
-      mRegistration->mScriptSpec = mScriptSpec;
-      mRegistration->NotifyListenersOnChange();
       swm->StoreRegistration(mPrincipal, mRegistration);
     } else {
       MOZ_ASSERT(mJobType == UpdateJob);
@@ -1313,7 +1319,7 @@ public:
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
 
     nsCOMPtr<nsIURI> scriptURI;
-    nsresult rv = NS_NewURI(getter_AddRefs(scriptURI), mRegistration->mScriptSpec);
+    nsresult rv = NS_NewURI(getter_AddRefs(scriptURI), mScriptSpec);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       Fail(NS_ERROR_DOM_SECURITY_ERR);
       return;
@@ -1363,8 +1369,7 @@ public:
 
     MOZ_ASSERT(!mUpdateAndInstallInfo);
     mUpdateAndInstallInfo =
-      new ServiceWorkerInfo(mRegistration, mRegistration->mScriptSpec,
-                            aNewCacheName);
+      new ServiceWorkerInfo(mRegistration, mScriptSpec, aNewCacheName);
 
     RefPtr<ServiceWorkerJob> upcasted = this;
     nsMainThreadPtrHandle<nsISupports> handle(
@@ -1398,7 +1403,7 @@ private:
     if (NS_WARN_IF(!aScriptEvaluationResult)) {
       ErrorResult error;
 
-      NS_ConvertUTF8toUTF16 scriptSpec(mRegistration->mScriptSpec);
+      NS_ConvertUTF8toUTF16 scriptSpec(mScriptSpec);
       NS_ConvertUTF8toUTF16 scope(mRegistration->mScope);
       error.ThrowTypeError<MSG_SW_SCRIPT_THREW>(scriptSpec, scope);
       return Fail(error);
@@ -1449,14 +1454,14 @@ private:
     // 9.2.20 If newestWorker is not null, and newestWorker's script url is
     // equal to registration's registering script url and response is a
     // byte-for-byte match with the script resource of newestWorker...
-    if (workerInfo && workerInfo->ScriptSpec().Equals(mRegistration->mScriptSpec)) {
+    if (workerInfo && workerInfo->ScriptSpec().Equals(mScriptSpec)) {
       cacheName = workerInfo->CacheName();
     }
 
     nsresult rv =
       serviceWorkerScriptCache::Compare(mRegistration, mRegistration->mPrincipal, cacheName,
-                                        NS_ConvertUTF8toUTF16(mRegistration->mScriptSpec),
-                                        this, mLoadGroup);
+                                        NS_ConvertUTF8toUTF16(mScriptSpec), this,
+                                        mLoadGroup);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return Fail(rv);
     }
@@ -2792,13 +2797,14 @@ ServiceWorkerManager::LoadRegistration(
     GetRegistration(principal, aRegistration.scope());
   if (!registration) {
     registration = CreateNewRegistration(aRegistration.scope(), principal);
-  } else if (registration->mScriptSpec == aRegistration.scriptSpec() &&
-             !!registration->mActiveWorker == aRegistration.currentWorkerURL().IsEmpty()) {
-    // No needs for updates.
-    return;
+  } else {
+    RefPtr<ServiceWorkerInfo> newest = registration->Newest();
+    if (newest && newest->ScriptSpec() == aRegistration.scriptSpec() &&
+        !!registration->mActiveWorker == aRegistration.currentWorkerURL().IsEmpty()) {
+      // No needs for updates.
+      return;
+    }
   }
-
-  registration->mScriptSpec = aRegistration.scriptSpec();
 
   const nsCString& currentWorkerURL = aRegistration.currentWorkerURL();
   if (!currentWorkerURL.IsEmpty()) {
@@ -3709,9 +3715,6 @@ ServiceWorkerManager::SoftUpdate(const OriginAttributes& aOriginAttributes,
     return;
   }
 
-  // "Set registration's registering script url to newestWorker's script url."
-  registration->mScriptSpec = newest->ScriptSpec();
-
   // "If the registration queue for registration is empty, invoke Update algorithm,
   // or its equivalent, with client, registration as its argument."
   // TODO(catalinb): We don't implement the force bypass cache flag.
@@ -3765,9 +3768,6 @@ ServiceWorkerManager::Update(nsIPrincipal* aPrincipal,
 
     return;
   }
-
-  // "Set registration's registering script url to newestWorker's script url."
-  registration->mScriptSpec = newest->ScriptSpec();
 
   ServiceWorkerJobQueue* queue =
     GetOrCreateJobQueue(scopeKey, aScope);
