@@ -942,20 +942,16 @@ class ServiceWorkerJobBase : public ServiceWorkerJob
 public:
   ServiceWorkerJobBase(ServiceWorkerJobQueue* aQueue,
                        ServiceWorkerJob::Type aJobType,
-                       ServiceWorkerUpdateFinishCallback* aCallback)
-    : ServiceWorkerJobBase(aQueue, aJobType, aCallback, nullptr, nullptr)
-  { }
-
-  ServiceWorkerJobBase(ServiceWorkerJobQueue* aQueue,
-                       ServiceWorkerJob::Type aJobType,
                        ServiceWorkerUpdateFinishCallback* aCallback,
                        ServiceWorkerRegistrationInfo* aRegistration,
-                       ServiceWorkerInfo* aServiceWorkerInfo)
+                       ServiceWorkerInfo* aServiceWorkerInfo,
+                       const nsACString& aScriptSpec)
     : ServiceWorkerJob(aQueue, aJobType)
     , mCallback(aCallback)
-    , mCanceled(false)
     , mRegistration(aRegistration)
     , mUpdateAndInstallInfo(aServiceWorkerInfo)
+    , mScriptSpec(aScriptSpec)
+    , mCanceled(false)
   {
     AssertIsOnMainThread();
   }
@@ -969,9 +965,10 @@ public:
 
 protected:
   RefPtr<ServiceWorkerUpdateFinishCallback> mCallback;
-  bool mCanceled;
   RefPtr<ServiceWorkerRegistrationInfo> mRegistration;
   RefPtr<ServiceWorkerInfo> mUpdateAndInstallInfo;
+  const nsCString mScriptSpec;
+  bool mCanceled;
 
   ~ServiceWorkerJobBase()
   { }
@@ -985,25 +982,6 @@ protected:
       mCallback->UpdateSucceeded(mRegistration);
       mCallback = nullptr;
     }
-  }
-};
-
-// Base type for jobs that work with a specific service worker script.
-class ServiceWorkerScriptJobBase : public ServiceWorkerJobBase
-{
-protected:
-  const nsCString mScriptSpec;
-
-  ServiceWorkerScriptJobBase(ServiceWorkerJobQueue* aQueue,
-                             ServiceWorkerJob::Type aJobType,
-                             ServiceWorkerUpdateFinishCallback* aCallback,
-                             ServiceWorkerRegistrationInfo* aRegistration,
-                             ServiceWorkerInfo* aServiceWorkerInfo,
-                             const nsACString& aScriptSpec)
-    : ServiceWorkerJobBase(aQueue, aJobType, aCallback, aRegistration,
-                           aServiceWorkerInfo)
-    , mScriptSpec(aScriptSpec)
-  {
   }
 
   // This MUST only be called when the job is still performing actions related
@@ -1069,7 +1047,7 @@ protected:
   }
 };
 
-class ServiceWorkerInstallJob final : public ServiceWorkerScriptJobBase
+class ServiceWorkerInstallJob final : public ServiceWorkerJobBase
 {
   friend class ContinueInstallTask;
 
@@ -1079,9 +1057,9 @@ public:
                           ServiceWorkerRegistrationInfo* aRegistration,
                           ServiceWorkerInfo* aServiceWorkerInfo,
                           const nsACString& aScriptSpec)
-    : ServiceWorkerScriptJobBase(aQueue, Type::InstallJob, aCallback,
-                                 aRegistration, aServiceWorkerInfo,
-                                 aScriptSpec)
+    : ServiceWorkerJobBase(aQueue, Type::InstallJob, aCallback,
+                           aRegistration, aServiceWorkerInfo,
+                           aScriptSpec)
   {
     MOZ_ASSERT(aRegistration);
   }
@@ -1202,7 +1180,7 @@ public:
   }
 };
 
-class ServiceWorkerRegisterJob final : public ServiceWorkerScriptJobBase,
+class ServiceWorkerRegisterJob final : public ServiceWorkerJobBase,
                                        public serviceWorkerScriptCache::CompareCallback
 {
   friend class ContinueUpdateRunnable;
@@ -1224,8 +1202,8 @@ public:
                            ServiceWorkerUpdateFinishCallback* aCallback,
                            nsIPrincipal* aPrincipal,
                            nsILoadGroup* aLoadGroup)
-    : ServiceWorkerScriptJobBase(aQueue, Type::RegisterJob, aCallback, nullptr,
-                                 nullptr, aScriptSpec)
+    : ServiceWorkerJobBase(aQueue, Type::RegisterJob, aCallback, nullptr,
+                           nullptr, aScriptSpec)
     , mScope(aScope)
     , mPrincipal(aPrincipal)
     , mLoadGroup(aLoadGroup)
@@ -1240,8 +1218,8 @@ public:
                            ServiceWorkerRegistrationInfo* aRegistration,
                            ServiceWorkerUpdateFinishCallback* aCallback,
                            const nsACString& aScriptSpec)
-    : ServiceWorkerScriptJobBase(aQueue, Type::UpdateJob, aCallback,
-                                 aRegistration, nullptr, aScriptSpec)
+    : ServiceWorkerJobBase(aQueue, Type::UpdateJob, aCallback,
+                           aRegistration, nullptr, aScriptSpec)
   {
     AssertIsOnMainThread();
   }
