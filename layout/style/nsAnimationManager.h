@@ -325,10 +325,6 @@ public:
   void StopAnimationsForElement(mozilla::dom::Element* aElement,
                                 mozilla::CSSPseudoElementType aPseudoType);
 
-  bool IsAnimationManager() override {
-    return true;
-  }
-
 protected:
   virtual ~nsAnimationManager() {}
 
