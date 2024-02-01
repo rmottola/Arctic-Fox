@@ -451,7 +451,8 @@ KeyframeEffectReadOnly::HasAnimationOfProperties(
 }
 
 void
-KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
+KeyframeEffectReadOnly::UpdateProperties(
+    const InfallibleTArray<AnimationProperty>& aProperties)
 {
   nsCSSPropertySet winningInCascadeProperties;
   nsCSSPropertySet runningOnCompositorProperties;
@@ -465,7 +466,7 @@ KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
     }
   }
 
-  mProperties = aOther.mProperties;
+  mProperties = aProperties;
 
   for (AnimationProperty& property : mProperties) {
     property.mWinsInCascade =
