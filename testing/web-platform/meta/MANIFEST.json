@@ -10902,6 +10902,10 @@
         "url": "/IndexedDB/idbindex_openKeyCursor3.htm"
       },
       {
+        "path": "IndexedDB/idbkeyrange-includes.htm",
+        "url": "/IndexedDB/idbkeyrange-includes.htm"
+      },
+      {
         "path": "IndexedDB/idbkeyrange.htm",
         "url": "/IndexedDB/idbkeyrange.htm"
       },

@@ -127,6 +127,11 @@ public:
   }
 
   bool
+  Includes(JSContext* aCx,
+           JS::Handle<JS::Value> aKey,
+           ErrorResult& aRv) const;
+
+  bool
   IsOnly() const
   {
     return mIsOnly;
