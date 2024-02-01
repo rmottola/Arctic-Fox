@@ -388,7 +388,7 @@ public:
          ServiceWorkerUpdateFinishCallback* aCallback);
 
   void
-  SoftUpdate(const OriginAttributes& aOriginAttributes,
+  SoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
              const nsACString& aScope);
 
   void

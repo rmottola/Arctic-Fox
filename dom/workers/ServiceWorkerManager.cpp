@@ -942,12 +942,14 @@ class ServiceWorkerJobBase : public ServiceWorkerJob
 public:
   ServiceWorkerJobBase(ServiceWorkerJobQueue* aQueue,
                        ServiceWorkerJob::Type aJobType,
+                       nsIPrincipal* aPrincipal,
                        const nsACString& aScope,
                        const nsACString& aScriptSpec,
                        ServiceWorkerUpdateFinishCallback* aCallback,
                        ServiceWorkerRegistrationInfo* aRegistration,
                        ServiceWorkerInfo* aServiceWorkerInfo)
     : ServiceWorkerJob(aQueue, aJobType)
+    , mPrincipal(aPrincipal)
     , mScope(aScope)
     , mScriptSpec(aScriptSpec)
     , mCallback(aCallback)
@@ -956,6 +958,7 @@ public:
     , mCanceled(false)
   {
     AssertIsOnMainThread();
+    MOZ_ASSERT(aPrincipal);
   }
 
   void
@@ -966,6 +969,7 @@ public:
   }
 
 protected:
+  nsCOMPtr<nsIPrincipal> mPrincipal;
   const nsCString mScope;
   const nsCString mScriptSpec;
   RefPtr<ServiceWorkerUpdateFinishCallback> mCallback;
@@ -1056,13 +1060,15 @@ class ServiceWorkerInstallJob final : public ServiceWorkerJobBase
 
 public:
   ServiceWorkerInstallJob(ServiceWorkerJobQueue* aQueue,
+                          nsIPrincipal* aPrincipal,
                           const nsACString& aScope,
                           const nsACString& aScriptSpec,
                           ServiceWorkerUpdateFinishCallback* aCallback,
                           ServiceWorkerRegistrationInfo* aRegistration,
                           ServiceWorkerInfo* aServiceWorkerInfo)
-    : ServiceWorkerJobBase(aQueue, Type::InstallJob, aScope, aScriptSpec,
-                           aCallback, aRegistration, aServiceWorkerInfo)
+    : ServiceWorkerJobBase(aQueue, Type::InstallJob, aPrincipal, aScope,
+                           aScriptSpec, aCallback, aRegistration,
+                           aServiceWorkerInfo)
   {
     MOZ_ASSERT(aRegistration);
   }
@@ -1188,7 +1194,6 @@ class ServiceWorkerRegisterJob final : public ServiceWorkerJobBase,
 {
   friend class ContinueUpdateRunnable;
 
-  nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsILoadGroup> mLoadGroup;
 
   ~ServiceWorkerRegisterJob()
@@ -1199,14 +1204,13 @@ public:
 
   // [[Register]]
   ServiceWorkerRegisterJob(ServiceWorkerJobQueue* aQueue,
+                           nsIPrincipal* aPrincipal,
                            const nsACString& aScope,
                            const nsACString& aScriptSpec,
                            ServiceWorkerUpdateFinishCallback* aCallback,
-                           nsIPrincipal* aPrincipal,
                            nsILoadGroup* aLoadGroup)
-    : ServiceWorkerJobBase(aQueue, Type::RegisterJob, aScope, aScriptSpec,
-                           aCallback, nullptr, nullptr)
-    , mPrincipal(aPrincipal)
+    : ServiceWorkerJobBase(aQueue, Type::RegisterJob, aPrincipal, aScope,
+                           aScriptSpec, aCallback, nullptr, nullptr)
     , mLoadGroup(aLoadGroup)
   {
     AssertIsOnMainThread();
@@ -1216,12 +1220,13 @@ public:
 
   // [[Update]]
   ServiceWorkerRegisterJob(ServiceWorkerJobQueue* aQueue,
+                           nsIPrincipal* aPrincipal,
                            const nsACString& aScope,
                            const nsACString& aScriptSpec,
                            ServiceWorkerRegistrationInfo* aRegistration,
                            ServiceWorkerUpdateFinishCallback* aCallback)
-    : ServiceWorkerJobBase(aQueue, Type::UpdateJob, aScope, aScriptSpec,
-                           aCallback, aRegistration, nullptr)
+    : ServiceWorkerJobBase(aQueue, Type::UpdateJob, aPrincipal, aScope,
+                           aScriptSpec, aCallback, aRegistration, nullptr)
   {
     AssertIsOnMainThread();
   }
@@ -1404,8 +1409,9 @@ private:
     }
 
     RefPtr<ServiceWorkerInstallJob> job =
-      new ServiceWorkerInstallJob(mQueue, mScope, mScriptSpec, mCallback,
-                                  mRegistration, mUpdateAndInstallInfo);
+      new ServiceWorkerInstallJob(mQueue, mPrincipal, mScope, mScriptSpec,
+                                  mCallback, mRegistration,
+                                  mUpdateAndInstallInfo);
     mQueue->Append(job);
     Done(NS_OK);
   }
@@ -1696,8 +1702,8 @@ ServiceWorkerManager::Register(mozIDOMWindow* aWindow,
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(rv));
 
   RefPtr<ServiceWorkerRegisterJob> job =
-    new ServiceWorkerRegisterJob(queue, cleanedScope, spec, cb,
-                                 documentPrincipal, loadGroup);
+    new ServiceWorkerRegisterJob(queue, documentPrincipal, cleanedScope, spec,
+                                 cb, loadGroup);
   queue->Append(job);
 
   AssertIsOnMainThread();
@@ -3679,10 +3685,23 @@ ServiceWorkerManager::NotifyServiceWorkerRegistrationRemoved(ServiceWorkerRegist
 }
 
 void
-ServiceWorkerManager::SoftUpdate(const OriginAttributes& aOriginAttributes,
+ServiceWorkerManager::SoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
                                  const nsACString& aScope)
 {
   AssertIsOnMainThread();
+
+  nsCOMPtr<nsIURI> scopeURI;
+  nsresult rv = NS_NewURI(getter_AddRefs(scopeURI), aScope);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
+
+  nsCOMPtr<nsIPrincipal> principal =
+    BasePrincipal::CreateCodebasePrincipal(scopeURI, aOriginAttributes);
+  if (NS_WARN_IF(!principal)) {
+    return;
+  }
+
   nsAutoCString scopeKey;
   aOriginAttributes.CreateSuffix(scopeKey);
 
@@ -3719,7 +3738,7 @@ ServiceWorkerManager::SoftUpdate(const OriginAttributes& aOriginAttributes,
     MOZ_ASSERT(queue);
 
     RefPtr<ServiceWorkerRegisterJob> job =
-      new ServiceWorkerRegisterJob(queue, registration->mScope,
+      new ServiceWorkerRegisterJob(queue, principal, registration->mScope,
                                    newest->ScriptSpec(), registration, nullptr);
     queue->Append(job);
   }
@@ -3771,7 +3790,7 @@ ServiceWorkerManager::Update(nsIPrincipal* aPrincipal,
   // "Invoke Update algorithm, or its equivalent, with client, registration as
   // its argument."
   RefPtr<ServiceWorkerRegisterJob> job =
-    new ServiceWorkerRegisterJob(queue, registration->mScope,
+    new ServiceWorkerRegisterJob(queue, aPrincipal, registration->mScope,
                                  newest->ScriptSpec(), registration, aCallback);
   queue->Append(job);
 }
