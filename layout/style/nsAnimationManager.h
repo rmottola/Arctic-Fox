@@ -138,11 +138,6 @@ public:
     MOZ_ASSERT(IsTiedToMarkup());
     mAnimationIndex = aIndex;
   }
-  void CopyAnimationIndex(const CSSAnimation& aOther)
-  {
-    MOZ_ASSERT(IsTiedToMarkup() && aOther.IsTiedToMarkup());
-    mAnimationIndex = aOther.mAnimationIndex;
-  }
 
   // Sets the owning element which is used for determining the composite
   // order of CSSAnimation objects generated from CSS markup.
@@ -343,6 +338,7 @@ protected:
 private:
   void BuildAnimations(nsStyleContext* aStyleContext,
                        mozilla::dom::Element* aTarget,
+                       mozilla::AnimationCollection* aCollection,
                        mozilla::AnimationPtrArray& aAnimations);
 };
 
