@@ -284,8 +284,9 @@ public:
   }
   // Updates the set of properties using the supplied list whilst preserving
   // the mWinsInCascade and mIsRunningOnCompositor state of any matching
-  // properties
-  void UpdateProperties(
+  // properties.
+  // Returns true if we updated anything in the properties.
+  bool UpdateProperties(
     const InfallibleTArray<AnimationProperty>& aProperties);
 
   // Updates |aStyleRule| with the animation values produced by this
