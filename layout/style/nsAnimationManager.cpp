@@ -660,43 +660,6 @@ CSSAnimationBuilder::Build(nsPresContext* aPresContext,
 }
 
 void
-nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
-                                    dom::Element* aTarget,
-                                    AnimationCollection* aCollection,
-                                    AnimationPtrArray& aAnimations)
-{
-  MOZ_ASSERT(aAnimations.IsEmpty(), "expect empty array");
-
-  const nsStyleDisplay *disp = aStyleContext->StyleDisplay();
-
-  CSSAnimationBuilder builder(aStyleContext, aTarget, aCollection);
-
-  for (size_t animIdx = disp->mAnimationNameCount; animIdx-- != 0;) {
-    const StyleAnimation& src = disp->mAnimations[animIdx];
-
-    // CSS Animations whose animation-name does not match a @keyframes rule do
-    // not generate animation events. This includes when the animation-name is
-    // "none" which is represented by an empty name in the StyleAnimation.
-    // Since such animations neither affect style nor dispatch events, we do
-    // not generate a corresponding Animation for them.
-    MOZ_ASSERT(mPresContext->StyleSet()->IsGecko(),
-               "ServoStyleSet should not use nsAnimationManager for "
-               "animations");
-    nsCSSKeyframesRule* rule =
-      src.GetName().IsEmpty()
-      ? nullptr
-      : mPresContext->StyleSet()->AsGecko()->KeyframesRuleForName(src.GetName());
-    if (!rule) {
-      continue;
-    }
-
-    RefPtr<CSSAnimation> dest = builder.Build(mPresContext, src, rule);
-    dest->SetAnimationIndex(static_cast<uint64_t>(animIdx));
-    aAnimations.AppendElement(dest);
-  }
-}
-
-void
 CSSAnimationBuilder::BuildAnimationProperties(
   nsPresContext* aPresContext,
   const StyleAnimation& aSrc,
@@ -907,3 +870,41 @@ CSSAnimationBuilder::BuildSegment(InfallibleTArray<AnimationPropertySegment>&
 
   return true;
 }
+
+void
+nsAnimationManager::BuildAnimations(nsStyleContext* aStyleContext,
+                                    dom::Element* aTarget,
+                                    AnimationCollection* aCollection,
+                                    AnimationPtrArray& aAnimations)
+{
+  MOZ_ASSERT(aAnimations.IsEmpty(), "expect empty array");
+
+  const nsStyleDisplay *disp = aStyleContext->StyleDisplay();
+
+  CSSAnimationBuilder builder(aStyleContext, aTarget, aCollection);
+
+  for (size_t animIdx = disp->mAnimationNameCount; animIdx-- != 0;) {
+    const StyleAnimation& src = disp->mAnimations[animIdx];
+
+    // CSS Animations whose animation-name does not match a @keyframes rule do
+    // not generate animation events. This includes when the animation-name is
+    // "none" which is represented by an empty name in the StyleAnimation.
+    // Since such animations neither affect style nor dispatch events, we do
+    // not generate a corresponding Animation for them.
+    MOZ_ASSERT(mPresContext->StyleSet()->IsGecko(),
+               "ServoStyleSet should not use nsAnimationManager for "
+               "animations");
+    nsCSSKeyframesRule* rule =
+      src.GetName().IsEmpty()
+      ? nullptr
+      : mPresContext->StyleSet()->AsGecko()->KeyframesRuleForName(src.GetName());
+    if (!rule) {
+      continue;
+    }
+
+    RefPtr<CSSAnimation> dest = builder.Build(mPresContext, src, rule);
+    dest->SetAnimationIndex(static_cast<uint64_t>(animIdx));
+    aAnimations.AppendElement(dest);
+  }
+}
+
