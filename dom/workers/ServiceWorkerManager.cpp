@@ -1094,14 +1094,21 @@ class ServiceWorkerInstallJob final : public ServiceWorkerJobBase
   friend class ContinueInstallTask;
 
 public:
+  enum InstallType {
+    UpdateSameScript,
+    OverwriteScript
+  };
+
   ServiceWorkerInstallJob(ServiceWorkerJobQueue* aQueue,
                           nsIPrincipal* aPrincipal,
                           const nsACString& aScope,
                           const nsACString& aScriptSpec,
                           ServiceWorkerUpdateFinishCallback* aCallback,
-                          ServiceWorkerInfo* aServiceWorkerInfo)
+                          ServiceWorkerInfo* aServiceWorkerInfo,
+                          InstallType aType)
     : ServiceWorkerJobBase(aQueue, Type::InstallJob, aPrincipal, aScope,
                            aScriptSpec, aCallback, aServiceWorkerInfo)
+    , mType(aType)
   {
   }
 
@@ -1126,6 +1133,16 @@ public:
     nsresult rv = EnsureAndVerifyRegistration();
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return Fail(NS_ERROR_DOM_ABORT_ERR);
+    }
+
+    // If we are trying to install an update for an existing script, then
+    // make sure we don't overwrite a recent script change or resurrect a
+    // dead registration.
+    if (mType == UpdateSameScript) {
+      RefPtr<ServiceWorkerInfo> newest = mRegistration->Newest();
+      if (!newest || !mScriptSpec.Equals(newest->ScriptSpec())) {
+        return Fail(NS_ERROR_DOM_ABORT_ERR);
+      }
     }
 
     // Begin [[Install]] atomic step 3.
@@ -1229,6 +1246,9 @@ public:
     // Activate() is invoked out of band of atomic.
     mRegistration->TryToActivate();
   }
+
+private:
+  const InstallType mType;
 };
 
 class ServiceWorkerRegisterJob final : public ServiceWorkerJobBase,
@@ -1470,9 +1490,22 @@ private:
       return FailWithErrorResult(error);
     }
 
+    // For updates we want to make sure our install job does not end up
+    // changing the script for the registration.  Since a registration
+    // script change can be queued in an install job, we can not
+    // conclusively verify that the update install should proceed here.
+    // Instead, we have to pass a flag into our install job indicating
+    // if a script change is allowed or not.  This can then be used to
+    // check the current script after all previous install jobs have been
+    // flushed.
+    ServiceWorkerInstallJob::InstallType installType =
+      mJobType == UpdateJob ? ServiceWorkerInstallJob::UpdateSameScript
+                            : ServiceWorkerInstallJob::OverwriteScript;
+
     RefPtr<ServiceWorkerInstallJob> job =
       new ServiceWorkerInstallJob(mQueue, mPrincipal, mScope, mScriptSpec,
-                                  mCallback, mUpdateAndInstallInfo);
+                                  mCallback, mUpdateAndInstallInfo,
+                                  installType);
     mQueue->Append(job);
     Done(NS_OK);
   }
