@@ -6185,6 +6185,8 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     pl.length = sizeof(pl);
     ::GetWindowPlacement(mWnd, &pl);
 
+    nsSizeMode previousSizeMode = mSizeMode;
+
     // Windows has just changed the size mode of this window. The call to
     // SizeModeChanged will trigger a call into SetSizeMode where we will
     // set the min/max window state again or for nsSizeMode_Normal, call
@@ -6229,7 +6231,7 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     }
 #endif
 
-    if (mWidgetListener)
+    if (mWidgetListener && mSizeMode != previousSizeMode)
       mWidgetListener->SizeModeChanged(mSizeMode);
 
     // If window was restored, window activation was bypassed during the 
