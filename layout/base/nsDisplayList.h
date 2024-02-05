@@ -3386,7 +3386,7 @@ private:
 class nsDisplayMixBlendMode : public nsDisplayWrapList {
 public:
   nsDisplayMixBlendMode(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                        nsDisplayList* aList,
+                        nsDisplayList* aList, uint8_t aBlendMode,
                         const DisplayItemScrollClip* aScrollClip);
 #ifdef NS_BUILD_REFCNT_LOGGING
   virtual ~nsDisplayMixBlendMode();
@@ -3414,6 +3414,9 @@ public:
     return false;
   }
   NS_DISPLAY_DECL_NAME("MixBlendMode", TYPE_MIX_BLEND_MODE)
+
+private:
+  uint8_t mBlendMode;
 };
 
 class nsDisplayBlendContainer : public nsDisplayWrapList {
