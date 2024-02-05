@@ -1897,8 +1897,10 @@ KeyframeEffectReadOnly::GetPropertyState(
       NS_ConvertASCIItoUTF16(nsCSSProps::GetStringValue(property.mProperty)));
     state.mRunningOnCompositor.Construct(property.mIsRunningOnCompositor);
 
-    if (property.mPerformanceWarning.isSome()) {
-      state.mWarning.Construct(property.mPerformanceWarning.value());
+    nsXPIDLString localizedString;
+    if (property.mPerformanceWarning &&
+        property.mPerformanceWarning->ToLocalizedString(localizedString)) {
+      state.mWarning.Construct(localizedString);
     }
 
     aStates.AppendElement(state);
@@ -2103,19 +2105,14 @@ KeyframeEffectReadOnly::IsGeometricProperty(
 /* static */ bool
 KeyframeEffectReadOnly::CanAnimateTransformOnCompositor(
   const nsIFrame* aFrame,
-  nsAString& aPerformanceWarning)
+  AnimationPerformanceWarning::Type& aPerformanceWarning)
 {
   // Disallow OMTA for preserve-3d transform. Note that we check the style property
   // rather than Extend3DContext() since that can recurse back into this function
   // via HasOpacity(). See bug 779598.
   if (aFrame->Combines3DTransformWithAncestors() ||
       aFrame->StyleDisplay()->mTransformStyle == NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D) {
-    nsXPIDLString localizedMessage;
-    nsContentUtils::GetLocalizedString(
-      nsContentUtils::eLAYOUT_PROPERTIES,
-      "AnimationWarningTransformPreserve3D",
-      localizedMessage);
-    aPerformanceWarning = localizedMessage;
+    aPerformanceWarning = AnimationPerformanceWarning::Type::TransformPreserve3D;
     return false;
   }
   // Note that testing BackfaceIsHidden() is not a sufficient test for
@@ -2123,23 +2120,14 @@ KeyframeEffectReadOnly::CanAnimateTransformOnCompositor(
   // remove the above test for Extend3DContext(); that would require
   // looking at backface-visibility on descendants as well. See bug 1186204.
   if (aFrame->StyleDisplay()->BackfaceIsHidden()) {
-    nsXPIDLString localizedMessage;
-    nsContentUtils::GetLocalizedString(
-      nsContentUtils::eLAYOUT_PROPERTIES,
-      "AnimationWarningTransformBackfaceVisibilityHidden",
-      localizedMessage);
-    aPerformanceWarning = localizedMessage;
+    aPerformanceWarning =
+      AnimationPerformanceWarning::Type::TransformBackfaceVisibilityHidden;
     return false;
   }
   // Async 'transform' animations of aFrames with SVG transforms is not
   // supported.  See bug 779599.
   if (aFrame->IsSVGTransformed()) {
-    nsXPIDLString localizedMessage;
-    nsContentUtils::GetLocalizedString(
-      nsContentUtils::eLAYOUT_PROPERTIES,
-      "AnimationWarningTransformSVG",
-      localizedMessage);
-    aPerformanceWarning = localizedMessage;
+    aPerformanceWarning = AnimationPerformanceWarning::Type::TransformSVG;
     return false;
   }
 
@@ -2149,7 +2137,7 @@ KeyframeEffectReadOnly::CanAnimateTransformOnCompositor(
 bool
 KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(
   const nsIFrame* aFrame,
-  nsAString& aPerformanceWarning) const
+  AnimationPerformanceWarning::Type& aPerformanceWarning) const
 {
   // We currently only expect this method to be called when this effect
   // is attached to a playing Animation. If that ever changes we'll need
@@ -2166,12 +2154,8 @@ KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(
     }
     // Check for geometric properties
     if (IsGeometricProperty(property.mProperty)) {
-      nsXPIDLString localizedMessage;
-      nsContentUtils::GetLocalizedString(
-        nsContentUtils::eLAYOUT_PROPERTIES,
-        "AnimationWarningWithGeometricProperties",
-        localizedMessage);
-      aPerformanceWarning = localizedMessage;
+      aPerformanceWarning =
+        AnimationPerformanceWarning::Type::WithGeometricProperties;
       return true;
     }
 
@@ -2188,16 +2172,20 @@ KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(
 }
 
 void
-KeyframeEffectReadOnly::SetPerformanceWarning(nsCSSProperty aProperty,
-                                              const nsAString &aMessage)
+KeyframeEffectReadOnly::SetPerformanceWarning(
+  nsCSSProperty aProperty,
+  const AnimationPerformanceWarning& aWarning)
 {
   for (AnimationProperty& property : mProperties) {
-    if (property.mProperty == aProperty) {
-      property.mPerformanceWarning.reset();
-      property.mPerformanceWarning.emplace(aMessage);
+    if (property.mProperty == aProperty &&
+        (!property.mPerformanceWarning ||
+         *property.mPerformanceWarning != aWarning)) {
+      property.mPerformanceWarning = Some(aWarning);
 
-      if (nsLayoutUtils::IsAnimationLoggingEnabled()) {
-        nsAutoCString logMessage = NS_ConvertUTF16toUTF8(aMessage);
+      nsXPIDLString localizedString;
+      if (nsLayoutUtils::IsAnimationLoggingEnabled() &&
+          property.mPerformanceWarning->ToLocalizedString(localizedString)) {
+        nsAutoCString logMessage = NS_ConvertUTF16toUTF8(localizedString);
         AnimationUtils::LogAsyncAnimationFailure(logMessage, mTarget);
       }
       return;
