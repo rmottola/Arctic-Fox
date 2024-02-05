@@ -1650,7 +1650,8 @@ nsCSSRendering::PaintBackground(nsPresContext* aPresContext,
                                 const nsRect& aBorderArea,
                                 uint32_t aFlags,
                                 nsRect* aBGClipRect,
-                                int32_t aLayer)
+                                int32_t aLayer,
+                                CompositionOp aCompositonOp)
 {
   PROFILER_LABEL("nsCSSRendering", "PaintBackground",
     js::ProfileEntry::Category::GRAPHICS);
@@ -1680,7 +1681,7 @@ nsCSSRendering::PaintBackground(nsPresContext* aPresContext,
   return PaintBackgroundWithSC(aPresContext, aRenderingContext, aForFrame,
                                aDirtyRect, aBorderArea, sc,
                                *aForFrame->StyleBorder(), aFlags,
-                               aBGClipRect, aLayer);
+                               aBGClipRect, aLayer, aCompositonOp);
 }
 
 static bool
@@ -2860,10 +2861,15 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
                                       const nsStyleBorder& aBorder,
                                       uint32_t aFlags,
                                       nsRect* aBGClipRect,
-                                      int32_t aLayer)
+                                      int32_t aLayer,
+                                      CompositionOp aCompositonOp)
 {
   NS_PRECONDITION(aForFrame,
                   "Frame is expected to be provided to PaintBackground");
+
+  // If we're drawing all layers, aCompositonOp is ignored, so make sure that
+  // it was left at its default value.
+  MOZ_ASSERT_IF(aLayer == -1, aCompositonOp == CompositionOp::OP_OVER);
 
   DrawResult result = DrawResult::SUCCESS;
 
@@ -3035,20 +3041,24 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
       }
       if ((aLayer < 0 || i == (uint32_t)startLayer) &&
           !clipState.mDirtyRectGfx.IsEmpty()) {
+        // When we're drawing a single layer, use the specified composition op,
+        // otherwise get the compositon op from the image layer.
+        CompositionOp co = (aLayer >= 0) ? aCompositonOp :
+          (paintMask ? GetGFXCompositeMode(layer.mComposite) :
+                       GetGFXBlendMode(layer.mBlendMode));
         nsBackgroundLayerState state =
           PrepareImageLayer(aPresContext, aForFrame,
                             aFlags, paintBorderArea, clipState.mBGClipArea,
-                            layer, paintMask);
+                            layer, co);
         result &= state.mImageRenderer.PrepareResult();
         if (!state.mFillArea.IsEmpty()) {
           // Always using OP_OVER mode while drawing the bottom mask layer.
           bool isBottomMaskLayer = paintMask ?
                                    (i == (layers.mImageCount - 1)) : false;
-          if (state.mCompositionOp != CompositionOp::OP_OVER &&
-              !isBottomMaskLayer) {
+          if (co != CompositionOp::OP_OVER && !isBottomMaskLayer) {
             NS_ASSERTION(ctx->CurrentOp() == CompositionOp::OP_OVER,
                          "It is assumed the initial op is OP_OVER, when it is restored later");
-            ctx->SetOp(state.mCompositionOp);
+            ctx->SetOp(co);
           }
 
           result &=
@@ -3058,7 +3068,7 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
                                                 clipState.mDirtyRect,
                                                 state.mRepeatSize);
 
-          if (state.mCompositionOp != CompositionOp::OP_OVER) {
+          if (co != CompositionOp::OP_OVER) {
             ctx->SetOp(CompositionOp::OP_OVER);
           }
         }
@@ -3300,7 +3310,7 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
                                   const nsRect& aBorderArea,
                                   const nsRect& aBGClipRect,
                                   const nsStyleImageLayers::Layer& aLayer,
-                                  bool aMask)
+                                  CompositionOp aCompositonOp)
 {
   /*
    * The properties we need to keep in mind when drawing style image
@@ -3492,9 +3502,6 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
   state.mImageRenderer.SetExtendMode(repeatMode);
 
   state.mFillArea.IntersectRect(state.mFillArea, bgClipRect);
-
-  state.mCompositionOp = aMask ? GetGFXCompositeMode(aLayer.mComposite) :
-                                 GetGFXBlendMode(aLayer.mBlendMode);
 
   return state;
 }
