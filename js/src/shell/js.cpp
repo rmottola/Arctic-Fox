@@ -3784,7 +3784,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Script);
     if (!token) {
@@ -3886,7 +3886,7 @@ FinishOffThreadModule(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Module);
     if (!token) {
