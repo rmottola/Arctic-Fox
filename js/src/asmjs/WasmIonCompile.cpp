@@ -876,9 +876,7 @@ class FunctionCompiler
     }
 
     void assertCurrentBlockIs(MBasicBlock* block) {
-        if (inDeadCode())
-            return;
-        MOZ_ASSERT(curBlock_ == block);
+        MOZ_ASSERT(inDeadCode() || curBlock_ == block);
     }
 
     bool appendThenBlock(BlockVector* thenBlocks)
@@ -890,17 +888,9 @@ class FunctionCompiler
 
     bool joinIf(const BlockVector& thenBlocks, MBasicBlock* joinBlock)
     {
-        if (!joinBlock)
-            return true;
         MOZ_ASSERT_IF(curBlock_, thenBlocks.back() == curBlock_);
-        for (size_t i = 0; i < thenBlocks.length(); i++) {
-            thenBlocks[i]->end(MGoto::New(alloc(), joinBlock));
-            if (!joinBlock->addPredecessor(alloc(), thenBlocks[i]))
-                return false;
-        }
         curBlock_ = joinBlock;
-        mirGraph().moveBlockToEnd(curBlock_);
-        return true;
+        return joinIfElse(thenBlocks);
     }
 
     void switchToElse(MBasicBlock* elseBlock)
@@ -2640,7 +2630,7 @@ EmitTableSwitch(FunctionCompiler& f)
 }
 
 static bool
-EmitRet(FunctionCompiler& f)
+EmitReturn(FunctionCompiler& f)
 {
     ExprType ret = f.sig().ret();
 
@@ -2731,7 +2721,7 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def, LabelVector* may
       case Expr::BreakLabel:
         return EmitBreak(f, HasLabel(true));
       case Expr::Return:
-        return EmitRet(f);
+        return EmitReturn(f);
       case Expr::Call:
         return EmitCall(f, exprOffset, type, def);
       case Expr::CallIndirect:
