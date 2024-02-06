@@ -6427,7 +6427,9 @@ GCRuntime::collect(bool nonincrementalByAPI, SliceBudget budget, JS::gcreason::R
     gcstats::AutoGCSlice agc(stats, scanZonesBeforeGC(), invocationKind, budget, reason);
 
     bool repeat = false;
+    unsigned cycleCount = 0;
     do {
+        cycleCount++;
         poked = false;
         bool wasReset = gcCycle(nonincrementalByAPI, budget, reason);
 
@@ -6460,6 +6462,8 @@ GCRuntime::collect(bool nonincrementalByAPI, SliceBudget budget, JS::gcreason::R
          */
         repeat = (poked && cleanUpEverything) || wasReset || repeatForDeadZone;
     } while (repeat);
+
+    agc.setCycleCount(cycleCount);
 }
 
 js::AutoEnqueuePendingParseTasksAfterGC::~AutoEnqueuePendingParseTasksAfterGC()
@@ -7789,6 +7793,22 @@ NewMemoryInfoObject(JSContext* cx)
     }
 
     return obj;
+}
+
+const char*
+StateName(State state)
+{
+    static const char* names[] = {
+        "None",
+        "MarkRoots",
+        "Mark",
+        "Sweep",
+        "Finalize",
+        "Compact"
+    };
+    MOZ_ASSERT(ArrayLength(names) == NUM_STATES);
+    MOZ_ASSERT(state < NUM_STATES);
+    return names[state];
 }
 
 } /* namespace gc */
