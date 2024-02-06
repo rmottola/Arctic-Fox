@@ -318,7 +318,8 @@ Sanitizer.prototype = {
 
     offlineApps: {
       clear: Task.async(function* (range) {
-        TelemetryStopwatch.start("FX_SANITIZE_OFFLINEAPPS");
+        let refObj = {};
+        TelemetryStopwatch.start("FX_SANITIZE_OFFLINEAPPS", refObj);
         try {
           Components.utils.import("resource:///modules/offlineAppCache.jsm");
           // This doesn't wait for the cleanup to be complete.
@@ -337,8 +338,8 @@ Sanitizer.prototype = {
         try {
           if (range) {
             yield PlacesUtils.history.removeVisitsByFilter({
-              beginDate: new Date(this.range[0] / 1000),
-              endDate: new Date(this.range[1] / 1000)
+              beginDate: new Date(range[0] / 1000),
+              endDate: new Date(range[1] / 1000)
             });
           } else {
             // Remove everything.
