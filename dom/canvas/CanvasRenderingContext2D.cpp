@@ -2565,6 +2565,8 @@ CanvasRenderingContext2D::ClearRect(double aX, double aY, double aW,
     return;
   }
 
+  EnsureTarget();
+
   mTarget->ClearRect(gfx::Rect(aX, aY, aW, aH));
 
   RedrawUser(gfxRect(aX, aY, aW, aH));
