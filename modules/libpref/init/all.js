@@ -143,9 +143,6 @@ pref("dom.workers.maxPerDomain", 20);
 
 pref("dom.serviceWorkers.enabled", false);
 
-// Allow service workers to intercept opaque (cross origin) responses
-pref("dom.serviceWorkers.interception.opaque.enabled", false);
-
 // The amount of time (milliseconds) service workers keep running after each event.
 pref("dom.serviceWorkers.idle_timeout", 30000);
 
