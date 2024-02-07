@@ -153,7 +153,7 @@ this.AppsUtils = {
        associatedWindow: null,
        topWindow : null,
        appId: aAppId,
-       isInBrowserElement: aInIsolatedMozBrowser,
+       isInIsolatedMozBrowserElement: aInIsolatedMozBrowser,
        originAttributes: {
          appId: aAppId,
          inIsolatedMozBrowser: aInIsolatedMozBrowser

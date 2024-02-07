@@ -3533,7 +3533,7 @@ this.DOMApplicationRegistry = {
 
       // nsILoadContext
       appId: aOldApp.installerAppId,
-      isInBrowserElement: aOldApp.installerIsBrowser,
+      isInIsolatedMozBrowserElement: aOldApp.installerIsBrowser,
       originAttributes: {
         appId: aOldApp.installerAppId,
         inIsolatedMozBrowser: aOldApp.installerIsBrowser
