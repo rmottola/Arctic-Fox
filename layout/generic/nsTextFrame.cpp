@@ -2682,7 +2682,7 @@ BuildTextRunsScanner::AssignTextRun(gfxTextRun* aTextRun, float aInflation)
 
 NS_QUERYFRAME_HEAD(nsTextFrame)
   NS_QUERYFRAME_ENTRY(nsTextFrame)
-NS_QUERYFRAME_TAIL_INHERITING(nsTextFrameBase)
+NS_QUERYFRAME_TAIL_INHERITING(nsFrame)
 
 gfxSkipCharsIterator
 nsTextFrame::EnsureTextRun(TextRunType aWhichTextRun,
@@ -4443,7 +4443,7 @@ nsTextFrame::InvalidateFrame(uint32_t aDisplayItemKey)
     svgTextFrame->InvalidateFrame();
     return;
   }
-  nsTextFrameBase::InvalidateFrame(aDisplayItemKey);
+  nsFrame::InvalidateFrame(aDisplayItemKey);
 }
 
 void
@@ -4456,7 +4456,7 @@ nsTextFrame::InvalidateFrameWithRect(const nsRect& aRect, uint32_t aDisplayItemK
     svgTextFrame->InvalidateFrame();
     return;
   }
-  nsTextFrameBase::InvalidateFrameWithRect(aRect, aDisplayItemKey);
+  nsFrame::InvalidateFrameWithRect(aRect, aDisplayItemKey);
 }
 
 gfxTextRun*
