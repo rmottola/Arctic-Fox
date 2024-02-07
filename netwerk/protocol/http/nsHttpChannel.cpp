@@ -7297,14 +7297,11 @@ nsHttpChannel::MaybeWarnAboutAppCache()
     Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
                           true);
 
-    // Then, issue a deprecation warning if service worker interception is
-    // enabled.
-    if (nsContentUtils::ServiceWorkerInterceptionEnabled()) {
-        nsCOMPtr<nsIDeprecationWarner> warner;
-        GetCallback(warner);
-        if (warner) {
-            warner->IssueWarning(nsIDocument::eAppCache, false);
-        }
+    // Then, issue a deprecation warning.
+    nsCOMPtr<nsIDeprecationWarner> warner;
+    GetCallback(warner);
+    if (warner) {
+        warner->IssueWarning(nsIDocument::eAppCache, false);
     }
 }
 

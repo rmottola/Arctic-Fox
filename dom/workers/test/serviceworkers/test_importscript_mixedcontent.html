@@ -5,7 +5,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-  <title>Bug 1133763 - test fetch event in HTTPS origins with a cloned response</title>
+  <title>Bug 1198078 - test that we respect mixed content blocking in importScript() inside service workers</title>
   <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
   <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
 </head>
@@ -20,19 +20,16 @@
   var iframe;
   function runTest() {
     iframe = document.querySelector("iframe");
-    iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/https/clonedresponse/register.html";
+    iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/importscript-mixedcontent/register.html";
     var ios;
     window.onmessage = function(e) {
       if (e.data.status == "ok") {
         ok(e.data.result, e.data.message);
       } else if (e.data.status == "registrationdone") {
-        ios = SpecialPowers.Cc["@mozilla.org/network/io-service;1"]
-                           .getService(SpecialPowers.Ci.nsIIOService);
-        ios.offline = true;
-        iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/https/clonedresponse/index.html";
+        iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/importscript-mixedcontent/index.html";
       } else if (e.data.status == "done") {
-        ios.offline = false;
-        iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/https/clonedresponse/unregister.html";
+        ok(e.data.data, "good", "Mixed content blocking should work correctly for service workers");
+        iframe.src = "https://example.com/tests/dom/workers/test/serviceworkers/fetch/importscript-mixedcontent/unregister.html";
       } else if (e.data.status == "unregistrationdone") {
         window.onmessage = null;
         ok(true, "Test finished successfully");
@@ -47,7 +44,7 @@
       ["dom.serviceWorkers.exemptFromPerDomainMax", true],
       ["dom.serviceWorkers.enabled", true],
       ["dom.serviceWorkers.testing.enabled", true],
-      ["dom.caches.enabled", true]
+      ["security.mixed_content.block_active_content", false],
     ]}, runTest);
   };
 </script>
