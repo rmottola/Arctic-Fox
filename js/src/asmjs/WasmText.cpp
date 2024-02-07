@@ -3455,7 +3455,7 @@ EncodeExpr(Encoder& e, WasmAstExpr& expr);
 static bool
 EncodeBlock(Encoder& e, WasmAstBlock& b)
 {
-    if (!e.writeExpr(Expr::Block))
+    if (!e.writeExpr(b.expr()))
         return false;
 
     size_t numExprs = b.exprs().length();
