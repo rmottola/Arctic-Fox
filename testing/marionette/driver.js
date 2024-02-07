@@ -4,9 +4,9 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
-const loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
+var loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
     .getService(Ci.mozIJSSubScriptLoader);
 
 Cu.import("resource://gre/modules/FileUtils.jsm");
@@ -41,7 +41,7 @@ loader.loadSubScript("chrome://marionette/content/frame-manager.js");
 
 this.EXPORTED_SYMBOLS = ["GeckoDriver", "Context"];
 
-const FRAME_SCRIPT = "chrome://marionette/content/listener.js";
+var FRAME_SCRIPT = "chrome://marionette/content/listener.js";
 const BROWSER_STARTUP_FINISHED = "browser-delayed-startup-finished";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const CLICK_TO_START_PREF = "marionette.debugging.clicktostart";
@@ -56,14 +56,14 @@ const globalMessageManager = Cc["@mozilla.org/globalmessagemanager;1"]
 // API's are ready; see bug 792647.  This assumes that marionette-server.js
 // will be loaded before the 'system-message-listener-ready' message
 // is fired.  If this stops being true, this approach will have to change.
-let systemMessageListenerReady = false;
+var systemMessageListenerReady = false;
 Services.obs.addObserver(function() {
   systemMessageListenerReady = true;
 }, "system-message-listener-ready", false);
 
 // This is used on desktop to prevent newSession from returning before a page
 // load initiated by the Firefox command line has completed.
-let delayedBrowserStarted = false;
+var delayedBrowserStarted = false;
 Services.obs.addObserver(function () {
   delayedBrowserStarted = true;
 }, BROWSER_STARTUP_FINISHED, false);
@@ -2460,13 +2460,37 @@ GeckoDriver.prototype.getCookies = function(cmd, resp) {
 };
 
 /** Delete all cookies that are visible to a document. */
-GeckoDriver.prototype.deleteAllCookies = function(cmd, resp) {
+GeckoDriver.prototype.deleteAllCookies = function*(cmd, resp) {
+  let cb = msg => {
+    let cookie = msg.json;
+    cookieManager.remove(
+        cookie.host,
+        cookie.name,
+        cookie.path,
+        cookie.originAttributes,
+        false);
+    return true;
+  };
+  this.mm.addMessageListener("Marionette:deleteCookie", cb);
   yield this.listener.deleteAllCookies();
+  this.mm.removeMessageListener("Marionette:deleteCookie", cb);
 };
 
 /** Delete a cookie by name. */
-GeckoDriver.prototype.deleteCookie = function(cmd, resp) {
-  yield this.listener.deleteCookie({name: cmd.parameters.name});
+GeckoDriver.prototype.deleteCookie = function*(cmd, resp) {
+  let cb = msg => {
+    this.mm.removeMessageListener("Marionette:deleteCookie", cb);
+    let cookie = msg.json;
+    cookieManager.remove(
+        cookie.host,
+        cookie.name,
+        cookie.path,
+        cookie.originAttributes,
+        false);
+    return true;
+  };
+  this.mm.addMessageListener("Marionette:deleteCookie", cb);
+  yield this.listener.deleteCookie(cmd.parameters.name);
 };
 
 /**
