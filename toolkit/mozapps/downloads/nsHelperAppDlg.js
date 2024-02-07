@@ -1103,7 +1103,7 @@ nsUnknownContentTypeDialog.prototype = {
         localHandlerApp.executable = fp.file;
         this.chosenApp = localHandlerApp;
       }
-#endif // MOZ_WIDGET_GTK3
+#endif // MOZ_WIDGET_GTK == 3
     }
     this.finishChooseApp();
   },
