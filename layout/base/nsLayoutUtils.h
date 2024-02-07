@@ -1542,6 +1542,8 @@ public:
 
   static void MarkDescendantsDirty(nsIFrame *aSubtreeRoot);
 
+  static void MarkIntrinsicISizesDirtyIfDependentOnBSize(nsIFrame* aFrame);
+
   /*
    * Calculate the used values for 'width' and 'height' for a replaced element.
    *

@@ -1943,3 +1943,5 @@ fuzzy(1,74) fuzzy-if(gtkWidget,6,79) == 1174332-1.html 1174332-1-ref.html
 == 1209994-4.html 1209994-4-ref.html
 == 1222226-1.html 1222226-1-ref.html
 pref(browser.display.focus_ring_width,2) == 1234758-1.html 1234758-1-ref.html
+== 1242172-1.html 1242172-1-ref.html
+== 1242172-2.html 1242172-2-ref.html
