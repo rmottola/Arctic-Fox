@@ -66,7 +66,7 @@ enum class Expr : uint16_t
     Select,
     Br,
     BrIf,
-    TableSwitch,
+    BrTable,
     Return,
     Unreachable,
 
@@ -239,20 +239,6 @@ enum class Expr : uint16_t
     F64StoreMem,
 
     // asm.js specific
-    While,          // all CFG ops to be deleted in favor of Loop/Br/BrIf
-    DoWhile,
-
-    ForInitInc,
-    ForInitNoInc,
-    ForNoInitNoInc,
-    ForNoInitInc,
-
-    Label,
-    Continue,
-    ContinueLabel,
-    Break,
-    BreakLabel,
-
     Id,
 
     I32Min,
