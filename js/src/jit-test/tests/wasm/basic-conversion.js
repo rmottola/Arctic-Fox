@@ -3,11 +3,6 @@ load(libdir + "wasm.js");
 if (!wasmIsSupported())
     quit();
 
-function mismatchError(actual, expect) {
-    var str = "type mismatch: expression has type " + actual + " but expected " + expect;
-    return RegExp(str);
-}
-
 function testConversion(resultType, opcode, paramType, op, expect) {
   if (paramType === 'i64') {
     // i64 cannot be imported, so we use a wrapper function.
