@@ -2973,6 +2973,8 @@ EmitExpr(FunctionCompiler& f, ExprType type, MDefinition** def)
       case Expr::I64Clz:
       case Expr::I64Ctz:
       case Expr::I64Popcnt:
+      case Expr::MemorySize:
+      case Expr::GrowMemory:
         MOZ_CRASH("NYI");
       case Expr::Unreachable:
         break;
