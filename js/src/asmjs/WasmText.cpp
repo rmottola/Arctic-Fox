@@ -562,14 +562,18 @@ typedef WasmAstVector<WasmAstSegment*> WasmAstSegmentVector;
 class WasmAstMemory : public WasmAstNode
 {
     uint32_t initialSize_;
+    Maybe<uint32_t> maxSize_;
     WasmAstSegmentVector segments_;
 
   public:
-    explicit WasmAstMemory(uint32_t initialSize, WasmAstSegmentVector&& segments)
+    explicit WasmAstMemory(uint32_t initialSize, Maybe<uint32_t> maxSize,
+                           WasmAstSegmentVector&& segments)
       : initialSize_(initialSize),
+        maxSize_(maxSize),
         segments_(Move(segments))
     {}
     uint32_t initialSize() const { return initialSize_; }
+    const Maybe<uint32_t>& maxSize() const { return maxSize_; }
     const WasmAstSegmentVector& segments() const { return segments_; }
 };
 
@@ -2896,6 +2900,11 @@ ParseMemory(WasmParseContext& c)
     if (!c.ts.match(WasmToken::Index, &initialSize, c.error))
         return nullptr;
 
+    Maybe<uint32_t> maxSize;
+    WasmToken token;
+    if (c.ts.getIf(WasmToken::Index, &token))
+        maxSize.emplace(token.index());
+
     WasmAstSegmentVector segments(c.lifo);
     while (c.ts.getIf(WasmToken::OpenParen)) {
         WasmAstSegment* segment = ParseSegment(c);
@@ -2905,7 +2914,7 @@ ParseMemory(WasmParseContext& c)
             return nullptr;
     }
 
-    return new(c.lifo) WasmAstMemory(initialSize.index(), Move(segments));
+    return new(c.lifo) WasmAstMemory(initialSize.index(), maxSize, Move(segments));
 }
 
 static WasmAstImport*
@@ -3813,13 +3822,11 @@ EncodeMemorySection(Encoder& e, WasmAstModule& module)
 
     WasmAstMemory& memory = *module.maybeMemory();
 
-    if (!e.writeCString(InitialLabel))
-        return false;
-
     if (!e.writeVarU32(memory.initialSize()))
         return false;
 
-    if (!e.writeCString(EndLabel))
+    uint32_t maxSize = memory.maxSize() ? *memory.maxSize() : memory.initialSize();
+    if (!e.writeVarU32(maxSize))
         return false;
 
     e.finishSection(offset);
