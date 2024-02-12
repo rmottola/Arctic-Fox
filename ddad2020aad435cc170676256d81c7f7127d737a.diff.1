@@ -1,0 +1,96 @@
+diff --git a/js/src/asmjs/Wasm.cpp b/js/src/asmjs/Wasm.cpp
+index b76884eb94e6..90884aa528fc 100644
+--- a/js/src/asmjs/Wasm.cpp
++++ b/js/src/asmjs/Wasm.cpp
+@@ -1247,14 +1247,11 @@ DecodeModule(JSContext* cx, UniqueChars file, const uint8_t* bytes, uint32_t len
+ 
+     CacheableCharsVector funcNames;
+ 
+-    while (!d.readCStringIf(EndLabel)) {
++    while (!d.done()) {
+         if (!d.skipSection())
+-            return Fail(cx, d, "unable to skip unknown section");
++            return Fail(cx, d, "failed to skip unknown section at end");
+     }
+ 
+-    if (!d.done())
+-        return Fail(cx, d, "failed to consume all bytes of module");
+-
+     UniqueModuleData module;
+     UniqueStaticLinkData staticLink;
+     SlowFunctionVector slowFuncs(cx);
+diff --git a/js/src/asmjs/WasmBinary.h b/js/src/asmjs/WasmBinary.h
+index dedafc42ab1d..6d1491e64a54 100644
+--- a/js/src/asmjs/WasmBinary.h
++++ b/js/src/asmjs/WasmBinary.h
+@@ -714,7 +714,13 @@ class Decoder
+         uint32_t size;
+         if (!readVarU32(&size) || bytesRemain() < size)
+             return false;
+-        cur_ += size;
++        const uint8_t* begin = cur_;
++        uint32_t idSize;
++        if (!readVarU32(&idSize) || bytesRemain() < idSize)
++            return false;
++        if (uint32_t(cur_ - begin) > size)
++            return false;
++        cur_ = begin + size;
+         return true;
+     }
+ 
+diff --git a/js/src/asmjs/WasmText.cpp b/js/src/asmjs/WasmText.cpp
+index effe82ebf208..1b017259c47a 100644
+--- a/js/src/asmjs/WasmText.cpp
++++ b/js/src/asmjs/WasmText.cpp
+@@ -4054,9 +4054,6 @@ EncodeModule(WasmAstModule& module)
+     if (!EncodeDataSection(e, module))
+         return nullptr;
+ 
+-    if (!e.writeCString(EndLabel))
+-        return nullptr;
+-
+     return Move(bytecode);
+ }
+ 
+diff --git a/js/src/jit-test/tests/wasm/binary.js b/js/src/jit-test/tests/wasm/binary.js
+index 8c56f3afa210..d23044f2b48e 100644
+--- a/js/src/jit-test/tests/wasm/binary.js
++++ b/js/src/jit-test/tests/wasm/binary.js
+@@ -23,7 +23,7 @@ const dataLabel = "data";
+ 
+ const magicError = /failed to match magic number/;
+ const versionError = /failed to match binary version/;
+-const extraError = /failed to consume all bytes of module/;
++const unknownSectionError = /failed to skip unknown section at end/;
+ const sectionError = /failed to start section/;
+ 
+ const I32Code = 0;
+@@ -64,12 +64,18 @@ assertErrorMessage(() => wasmEval(toBuf([magic0, magic1, magic2, magic3, 1])), T
+ assertErrorMessage(() => wasmEval(toBuf([magic0, magic1, magic2, magic3, ver0])), TypeError, versionError);
+ assertErrorMessage(() => wasmEval(toBuf([magic0, magic1, magic2, magic3, ver0, ver1, ver2])), TypeError, versionError);
+ 
+-var o = wasmEval(toBuf(moduleHeaderThen(0)));
++var o = wasmEval(toBuf(moduleHeaderThen()));
+ assertEq(Object.getOwnPropertyNames(o).length, 0);
+ 
++wasmEval(toBuf(moduleHeaderThen(1, 0)));        // unknown section containing 0-length string
++wasmEval(toBuf(moduleHeaderThen(2, 1, 0)));     // unknown section containing 1-length string ("\0")
++wasmEval(toBuf(moduleHeaderThen(1, 0,  1, 0)));
++wasmEval(toBuf(moduleHeaderThen(1, 0,  2, 1, 0)));
++wasmEval(toBuf(moduleHeaderThen(1, 0,  2, 1, 0)));
++
+ assertErrorMessage(() => wasmEval(toBuf(moduleHeaderThen(1))), TypeError, sectionError);
+-assertErrorMessage(() => wasmEval(toBuf(moduleHeaderThen(0, 0))), TypeError, extraError);
+ assertErrorMessage(() => wasmEval(toBuf(moduleHeaderThen(0, 1))), TypeError, sectionError);
++assertErrorMessage(() => wasmEval(toBuf(moduleHeaderThen(0, 0))), TypeError, unknownSectionError);
+ 
+ function cstring(name) {
+     return (name + '\0').split('').map(c => c.charCodeAt(0));
+@@ -88,7 +94,6 @@ function moduleWithSections(sectionArray) {
+         bytes.push(...string(section.name));
+         bytes.push(...section.body);
+     }
+-    bytes.push(0);
+     return bytes;
+ }
+ 
