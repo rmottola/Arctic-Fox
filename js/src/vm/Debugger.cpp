@@ -99,6 +99,13 @@ enum {
     JSSLOT_DEBUGSCRIPT_COUNT
 };
 
+
+// Either a real ScriptSourceObject or a synthesized.
+//
+// If synthesized, the referent is a WasmModuleObject, denoting the
+// synthesized source of a wasm module.
+using DebuggerSourceReferent = Variant<ScriptSourceObject*, WasmModuleObject*>;
+
 extern const Class DebuggerSource_class;
 
 enum {
@@ -2697,6 +2704,7 @@ Debugger::markCrossCompartmentEdges(JSTracer* trc)
     scripts.markCrossCompartmentEdges<DebuggerScript_trace>(trc);
     sources.markCrossCompartmentEdges<DebuggerSource_trace>(trc);
     wasmModuleScripts.markCrossCompartmentEdges<DebuggerScript_trace>(trc);
+    wasmModuleSources.markCrossCompartmentEdges<DebuggerSource_trace>(trc);
 }
 
 /*
@@ -2932,7 +2940,8 @@ Debugger::findZoneEdges(Zone* zone, js::gc::ComponentFinder<Zone>& finder)
             dbg->sources.hasKeyInZone(zone) ||
             dbg->objects.hasKeyInZone(zone) ||
             dbg->environments.hasKeyInZone(zone) ||
-            dbg->wasmModuleScripts.hasKeyInZone(zone))
+            dbg->wasmModuleScripts.hasKeyInZone(zone) ||
+            dbg->wasmModuleSources.hasKeyInZone(zone))
         {
             finder.addEdgeTo(w);
         }
@@ -3847,7 +3856,7 @@ Debugger::removeDebuggeeGlobal(FreeOp* fop, GlobalObject* global,
 }
 
 
-static inline ScriptSourceObject* GetSourceReferent(JSObject* obj);
+static inline DebuggerSourceReferent GetSourceReferent(JSObject* obj);
 
 /*
  * A class for parsing 'findScripts' query arguments and searching for
@@ -3935,7 +3944,15 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
                 return false;
             }
 
-            source = GetSourceReferent(&debuggerSource.toObject());
+            DebuggerSourceReferent referent = GetSourceReferent(&debuggerSource.toObject());
+            if (!referent.is<ScriptSourceObject*>()) {
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
+                                     "query object's 'source' property",
+                                     "not undefined nor a Debugger.Source object for a JS script");
+                return false;
+            }
+
+            source = referent.as<ScriptSourceObject*>();
         }
 
         /* Check for a 'displayURL' property. */
@@ -4929,7 +4946,7 @@ const JSFunctionSpec Debugger::static_methods[] {
 
 // Either a real JSScript or synthesized.
 //
-// If synthesized, the NativeObject is one of the following:
+// If synthesized, the referent is one of the following:
 //
 //   1. A WasmModuleObject, denoting a synthesized toplevel wasm module
 //      script.
@@ -6131,11 +6148,23 @@ static const JSFunctionSpec DebuggerScript_methods[] = {
 
 /*** Debugger.Source *****************************************************************************/
 
-static inline ScriptSourceObject*
-GetSourceReferent(JSObject* obj)
+// For internal use only.
+static inline NativeObject*
+GetSourceReferentRawObject(JSObject* obj)
 {
     MOZ_ASSERT(obj->getClass() == &DebuggerSource_class);
-    return static_cast<ScriptSourceObject*>(obj->as<NativeObject>().getPrivate());
+    return static_cast<NativeObject*>(obj->as<NativeObject>().getPrivate());
+}
+
+static inline DebuggerSourceReferent
+GetSourceReferent(JSObject* obj)
+{
+    if (NativeObject* referent = GetSourceReferentRawObject(obj)) {
+        if (referent->is<ScriptSourceObject>())
+            return AsVariant(&referent->as<ScriptSourceObject>());
+        return AsVariant(&referent->as<WasmModuleObject>());
+    }
+    return AsVariant(static_cast<ScriptSourceObject*>(nullptr));
 }
 
 void
@@ -6145,7 +6174,7 @@ DebuggerSource_trace(JSTracer* trc, JSObject* obj)
      * There is a barrier on private pointers, so the Unbarriered marking
      * is okay.
      */
-    if (JSObject* referent = GetSourceReferent(obj)) {
+    if (JSObject *referent = GetSourceReferentRawObject(obj)) {
         TraceManuallyBarrieredCrossCompartmentEdge(trc, obj, &referent,
                                                    "Debugger.Source referent");
         obj->as<NativeObject>().setPrivateUnbarriered(referent);
@@ -6203,7 +6232,7 @@ Debugger::wrapSource(JSContext* cx, HandleScriptSource source)
         }
     }
 
-    MOZ_ASSERT(GetSourceReferent(p->value()) == source);
+    MOZ_ASSERT(GetSourceReferent(p->value()).as<ScriptSourceObject*>() == source);
     return p->value();
 }
 
@@ -6216,9 +6245,9 @@ DebuggerSource_construct(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static NativeObject*
-DebuggerSource_checkThis(JSContext* cx, const CallArgs& args, const char* fnname)
+DebuggerSource_check(JSContext* cx, HandleValue thisv, const char* fnname)
 {
-    JSObject* thisobj = NonNullObject(cx, args.thisv());
+    JSObject* thisobj = NonNullObject(cx, thisv);
     if (!thisobj)
         return nullptr;
     if (thisobj->getClass() != &DebuggerSource_class) {
@@ -6229,7 +6258,7 @@ DebuggerSource_checkThis(JSContext* cx, const CallArgs& args, const char* fnname
 
     NativeObject* nthisobj = &thisobj->as<NativeObject>();
 
-    if (!GetSourceReferent(thisobj)) {
+    if (!GetSourceReferentRawObject(thisobj)) {
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_PROTO,
                              "Debugger.Frame", fnname, "prototype object");
         return nullptr;
@@ -6238,19 +6267,45 @@ DebuggerSource_checkThis(JSContext* cx, const CallArgs& args, const char* fnname
     return nthisobj;
 }
 
-#define THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, fnname, args, obj, sourceObject)    \
+template <typename ReferentT>
+static NativeObject*
+DebuggerSource_checkThis(JSContext* cx, const CallArgs& args, const char* fnname,
+                         const char* refname)
+{
+    NativeObject* thisobj = DebuggerSource_check(cx, args.thisv(), fnname);
+    if (!thisobj)
+        return nullptr;
+
+    if (!GetSourceReferent(thisobj).is<ReferentT>()) {
+        ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_DEBUG_BAD_REFERENT,
+                              JSDVG_SEARCH_STACK, args.thisv(), nullptr,
+                              refname, nullptr);
+        return nullptr;
+    }
+
+    return thisobj;
+}
+
+#define THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, fnname, args, obj, referent)        \
     CallArgs args = CallArgsFromVp(argc, vp);                                       \
-    RootedNativeObject obj(cx, DebuggerSource_checkThis(cx, args, fnname));         \
+    RootedNativeObject obj(cx, DebuggerSource_check(cx, args.thisv(), fnname));     \
     if (!obj)                                                                       \
         return false;                                                               \
-    RootedScriptSource sourceObject(cx, GetSourceReferent(obj));                    \
-    if (!sourceObject)                                                              \
-        return false;
+    Rooted<DebuggerSourceReferent> referent(cx, GetSourceReferent(obj))
+
+#define THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, fnname, args, obj, sourceObject)      \
+    CallArgs args = CallArgsFromVp(argc, vp);                                       \
+    RootedNativeObject obj(cx,                                                      \
+        DebuggerSource_checkThis<ScriptSourceObject*>(cx, args, fnname,             \
+                                                      "a JS source"));              \
+    if (!obj)                                                                       \
+        return false;                                                               \
+    RootedScriptSource sourceObject(cx, GetSourceReferent(obj).as<ScriptSourceObject*>())
 
 static bool
 DebuggerSource_getText(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get text)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get text)", args, obj, sourceObject);
     Value textv = obj->getReservedSlot(JSSLOT_DEBUGSOURCE_TEXT);
     if (!textv.isUndefined()) {
         MOZ_ASSERT(textv.isString());
@@ -6276,7 +6331,7 @@ DebuggerSource_getText(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getUrl(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get url)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get url)", args, obj, sourceObject);
 
     ScriptSource* ss = sourceObject->source();
     if (ss->filename()) {
@@ -6293,7 +6348,7 @@ DebuggerSource_getUrl(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getDisplayURL(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get url)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get url)", args, obj, sourceObject);
 
     ScriptSource* ss = sourceObject->source();
     MOZ_ASSERT(ss);
@@ -6313,7 +6368,7 @@ DebuggerSource_getDisplayURL(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getElement(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get element)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get element)", args, obj, sourceObject);
 
     if (sourceObject->element()) {
         args.rval().setObjectOrNull(sourceObject->element());
@@ -6328,7 +6383,7 @@ DebuggerSource_getElement(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getElementProperty(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get elementAttributeName)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get elementAttributeName)", args, obj, sourceObject);
     args.rval().set(sourceObject->elementAttributeName());
     return Debugger::fromChildJSObject(obj)->wrapDebuggeeValue(cx, args.rval());
 }
@@ -6336,7 +6391,7 @@ DebuggerSource_getElementProperty(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getIntroductionScript(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get introductionScript)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get introductionScript)", args, obj, sourceObject);
 
     RootedScript script(cx, sourceObject->introductionScript());
     if (script) {
@@ -6353,7 +6408,7 @@ DebuggerSource_getIntroductionScript(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getIntroductionOffset(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get introductionOffset)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get introductionOffset)", args, obj, sourceObject);
 
     // Regardless of what's recorded in the ScriptSourceObject and
     // ScriptSource, only hand out the introduction offset if we also have
@@ -6369,7 +6424,7 @@ DebuggerSource_getIntroductionOffset(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getIntroductionType(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get introductionType)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get introductionType)", args, obj, sourceObject);
 
     ScriptSource* ss = sourceObject->source();
     if (ss->hasIntroductionType()) {
@@ -6386,7 +6441,7 @@ DebuggerSource_getIntroductionType(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_setSourceMapUrl(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "sourceMapURL", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "sourceMapURL", args, obj, sourceObject);
     ScriptSource* ss = sourceObject->source();
     MOZ_ASSERT(ss);
 
@@ -6406,7 +6461,7 @@ DebuggerSource_setSourceMapUrl(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getSourceMapUrl(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get sourceMapURL)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get sourceMapURL)", args, obj, sourceObject);
 
     ScriptSource* ss = sourceObject->source();
     MOZ_ASSERT(ss);
@@ -6426,7 +6481,7 @@ DebuggerSource_getSourceMapUrl(JSContext* cx, unsigned argc, Value* vp)
 static bool
 DebuggerSource_getCanonicalId(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGSOURCE_REFERENT(cx, argc, vp, "(get sourceMapURL)", args, obj, sourceObject);
+    THIS_DEBUGSOURCE_SOURCE(cx, argc, vp, "(get sourceMapURL)", args, obj, sourceObject);
 
     ScriptSource* ss = sourceObject->source();
     MOZ_ASSERT(ss);
