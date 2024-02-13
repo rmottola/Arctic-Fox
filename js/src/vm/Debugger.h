@@ -205,6 +205,10 @@ typedef JSObject Env;
 //      NYI!
 typedef mozilla::Variant<JSScript*, WasmModuleObject*> DebuggerScriptReferent;
 
+// Either a ScriptSourceObject, for ordinary JS, or a WasmModuleObject,
+// denoting the synthesized source of a wasm module.
+typedef mozilla::Variant<ScriptSourceObject*, WasmModuleObject*> DebuggerSourceReferent;
+
 class Debugger : private mozilla::LinkedListElement<Debugger>
 {
     friend class Breakpoint;
@@ -435,6 +439,9 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     typedef DebuggerWeakMap<WasmModuleObject*> WasmModuleWeakMap;
     WasmModuleWeakMap wasmModuleScripts;
 
+    /* The map from WasmModuleObjects to synthesized Debugger.Source instances. */
+    WasmModuleWeakMap wasmModuleSources;
+
     /*
      * Keep track of tracelogger last drained identifiers to know if there are
      * lost events.
@@ -652,6 +659,9 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerScriptReferent> referent) {
         return newDebuggerScript(cx, referent);
     }
+    JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerSourceReferent> referent) {
+        return newDebuggerSource(cx, referent);
+    }
 
     /*
      * Helper function to help wrap Debugger objects whose referents may be
@@ -665,6 +675,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSObject* wrapVariantReferent(JSContext* cx, Map& map, CrossCompartmentKey::Kind keyKind,
                                   Handle<ReferentVariant> referent);
     JSObject* wrapVariantReferent(JSContext* cx, Handle<DebuggerScriptReferent> referent);
+    JSObject* wrapVariantReferent(JSContext* cx, Handle<DebuggerSourceReferent> referent);
 
     /*
      * Allocate and initialize a Debugger.Script instance whose referent is
@@ -674,9 +685,9 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     /*
      * Allocate and initialize a Debugger.Source instance whose referent is
-     * |source|.
+     * |referent|.
      */
-    JSObject* newDebuggerSource(JSContext* cx, js::HandleScriptSource source);
+    JSObject* newDebuggerSource(JSContext* cx, Handle<DebuggerSourceReferent> referent);
 
     /*
      * Receive a "new script" event from the engine. A new script was compiled
@@ -979,6 +990,14 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * must be a script source object in a debuggee compartment.
      */
     JSObject* wrapSource(JSContext* cx, js::HandleScriptSource source);
+
+    /*
+     * Return the Debugger.Source object for |wasmModule| (the entire module),
+     * synthesizing a new one if needed. The context |cx| must be in the
+     * debugger compartment; |wasmModule| must be a WasmModuleObject in the
+     * debuggee compartment.
+     */
+    JSObject* wrapWasmSource(JSContext* cx, Handle<WasmModuleObject*> wasmModule);
 
   private:
     Debugger(const Debugger&) = delete;
