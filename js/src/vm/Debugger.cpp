@@ -4072,8 +4072,8 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
         // TODOshu: Until such time that wasm modules are real ES6 modules,
         // unconditionally consider all wasm toplevel module scripts.
         for (WeakGlobalObjectSet::Range r = debugger->allDebuggees(); !r.empty(); r.popFront()) {
-            for (wasm::Module* module : r.front()->compartment()->wasmModules)
-                consider(module->owner());
+            for (wasm::Module* module : r.front()->compartment()->wasmModuleWeakList)
+                consider(module);
         }
 
         return true;
@@ -4305,14 +4305,19 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
      * If |wasmModule| matches this query, append it to |wasmModuleVector|.
      * Set |oom| if an out of memory condition occurred.
      */
-    void consider(WasmModuleObject* wasmModule) {
+    void consider(wasm::Module* wasmModule) {
         if (oom)
             return;
 
-        if (hasSource && source != AsVariant(wasmModule))
+        WasmModuleObject* moduleObject = wasmModule->owner();
+        if (hasSource && source != AsVariant(moduleObject))
             return;
 
-        if (!wasmModuleVector.append(wasmModule))
+        // The compartment-wide wasm::Module list is held weakly. Read barrier
+        // the ones we intend to expose.
+        wasmModule->readBarrier();
+
+        if (!wasmModuleVector.append(moduleObject))
             oom = true;
     }
 };
