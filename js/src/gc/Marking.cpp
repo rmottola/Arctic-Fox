@@ -2151,10 +2151,6 @@ js::TenuringTracer::moveToTenured(JSObject* src)
     overlay->forwardTo(dst);
     insertIntoFixupList(overlay);
 
-    if (MOZ_UNLIKELY(zone->hasDebuggers())) {
-        zone->enqueueForPromotionToTenuredLogging(*dst);
-    }
-
     TracePromoteToTenured(src, dst);
     MemProfiler::MoveNurseryToTenured(src, dst);
     return dst;
