@@ -10623,6 +10623,13 @@ CodeGenerator::visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir)
     masm.bind(&rejoin);
 }
 
+void
+CodeGenerator::visitAsmThrowUnreachable(LAsmThrowUnreachable* lir)
+{
+    MOZ_ASSERT(gen->compilingAsmJS());
+    masm.jump(wasm::JumpTarget::UnreachableTrap);
+}
+
 typedef bool (*RecompileFn)(JSContext*);
 static const VMFunction RecompileFnInfo = FunctionInfo<RecompileFn>(Recompile);
 

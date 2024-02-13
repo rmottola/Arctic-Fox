@@ -2466,6 +2466,12 @@ LIRGenerator::visitAsmJSInterruptCheck(MAsmJSInterruptCheck* ins)
 }
 
 void
+LIRGenerator::visitAsmThrowUnreachable(MAsmThrowUnreachable* ins)
+{
+    add(new(alloc()) LAsmThrowUnreachable, ins);
+}
+
+void
 LIRGenerator::visitStoreSlot(MStoreSlot* ins)
 {
     LInstruction* lir;
