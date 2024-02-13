@@ -1,0 +1,11 @@
+Bug 1239813 - Add some asserts to IterateScripts to help us track down bug 1240231. r=sfink
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch dev
+# Your branch is ahead of 'origin/dev' by 34 commits.
+#   (use "git push" to publish your local commits)
+#
+# Changes to be committed:
+#	modified:   js/src/gc/Iteration.cpp
+#
