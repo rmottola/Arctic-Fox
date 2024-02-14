@@ -8330,6 +8330,8 @@ CodeGenerator::generateAsmJS(wasm::FuncOffsets* offsets)
         return false;
 
     masm.flush();
+    if (masm.oom())
+        return false;
 
     offsets->end = masm.currentOffset();
 
