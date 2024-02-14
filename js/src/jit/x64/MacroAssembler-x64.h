@@ -1205,8 +1205,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         storeValue(JSVAL_TYPE_INT32, scratch, Dest);
     }
 
-    void branchValueIsNurseryObject(Condition cond, ValueOperand value, Register temp, Label* label);
-
     // Instrumentation for entering and leaving the profiler.
     void profilerEnterFrame(Register framePtr, Register scratch);
     void profilerExitFrame();
