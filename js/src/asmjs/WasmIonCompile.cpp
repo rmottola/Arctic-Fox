@@ -458,6 +458,15 @@ class FunctionCompiler
         return ins;
     }
 
+    MDefinition* select(MDefinition* trueExpr, MDefinition* falseExpr, MDefinition* condExpr)
+    {
+        if (inDeadCode())
+            return nullptr;
+        auto* ins = MAsmSelect::New(alloc(), trueExpr, falseExpr, condExpr);
+        curBlock_->add(ins);
+        return ins;
+    }
+
     MDefinition* extendI32(MDefinition* op, bool isUnsigned)
     {
         if (inDeadCode())
@@ -2188,6 +2197,25 @@ EmitMultiply(FunctionCompiler& f, ValType type, MDefinition** def)
     return true;
 }
 
+static bool
+EmitSelect(FunctionCompiler& f, MDefinition** def)
+{
+    MDefinition* trueExpr;
+    if (!EmitExpr(f, &trueExpr))
+        return false;
+
+    MDefinition* falseExpr;
+    if (!EmitExpr(f, &falseExpr))
+        return false;
+
+    MDefinition* condExpr;
+    if (!EmitExpr(f, &condExpr))
+        return false;
+
+    *def = f.select(trueExpr, falseExpr, condExpr);
+    return true;
+}
+
 typedef bool IsAdd;
 
 static bool
@@ -2754,6 +2782,10 @@ EmitExpr(FunctionCompiler& f, MDefinition** def)
       case Expr::StoreGlobal:
         return EmitStoreGlobal(f, def);
 
+      // Select
+      case Expr::Select:
+        return EmitSelect(f, def);
+
       // I32
       case Expr::I32Const:
         return EmitLiteral(f, ValType::I32, def);
@@ -3049,7 +3081,6 @@ EmitExpr(FunctionCompiler& f, MDefinition** def)
         return EmitAtomicsBinOp(f, def);
 
       // Future opcodes
-      case Expr::Select:
       case Expr::F32CopySign:
       case Expr::F32Trunc:
       case Expr::F32Nearest:
