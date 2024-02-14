@@ -5048,4 +5048,10 @@ MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
     ma_b(label, cond);
 }
 
+void
+MacroAssembler::flush()
+{
+    Assembler::flush();
+}
+
 //}}} check_macroassembler_style
