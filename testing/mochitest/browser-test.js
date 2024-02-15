@@ -34,8 +34,7 @@ window.addEventListener("load", function testOnLoad() {
 
 function testInit() {
   gConfig = readConfig();
-  if (gConfig.testRoot == "browser" ||
-      gConfig.testRoot == "webapprtChrome") {
+  if (gConfig.testRoot == "browser") {
     // Make sure to launch the test harness for the first opened window only
     var prefs = Services.prefs;
     if (prefs.prefHasUserValue("testing.browserTestHarness.running"))

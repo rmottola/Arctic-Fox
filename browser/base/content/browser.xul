@@ -515,7 +515,6 @@
             <image id="indexedDB-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="login-fill-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="password-notification-icon" class="notification-anchor-icon" role="button"/>
-            <image id="webapps-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="plugins-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="web-notifications-notification-icon" class="notification-anchor-icon" role="button"/>
             <image id="bad-content-blocked-notification-icon" class="notification-anchor-icon" role="button"/>

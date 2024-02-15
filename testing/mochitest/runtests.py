@@ -351,8 +351,7 @@ class MochitestServer(object):
         self.shutdownURL = "http://%(server)s:%(port)s/server/shutdown" % {
             "server": self.webServer,
             "port": self.httpPort}
-        self.testPrefix = "'webapprt_'" if options.get(
-            'webapprtContent') else "undefined"
+        self.testPrefix = "undefined"
 
         if options.get('httpdPath'):
             self._httpdPath = options['httpdPath']
@@ -594,8 +593,7 @@ class MochitestUtilsMixin(object):
             options.logFile = self.getLogFilePath(options.logFile)
 
         if options.browserChrome or options.chrome or \
-           options.a11y or options.webapprtChrome or options.jetpackPackage or \
-           options.jetpackAddon:
+           options.a11y or options.jetpackPackage or options.jetpackAddon:
             self.makeTestConfig(options)
         else:
             if options.autorun:
@@ -606,8 +604,6 @@ class MochitestUtilsMixin(object):
                 self.urlOpts.append("maxTimeouts=%d" % options.maxTimeouts)
             if not options.keep_open:
                 self.urlOpts.append("closeWhenDone=1")
-            if options.webapprtContent:
-                self.urlOpts.append("testRoot=webapprtContent")
             if options.logFile:
                 self.urlOpts.append(
                     "logFile=" +
@@ -677,10 +673,6 @@ class MochitestUtilsMixin(object):
             return "chrome"
         elif options.a11y:
             return "a11y"
-        elif options.webapprtChrome:
-            return "webapprt-chrome"
-        elif options.webapprtContent:
-            return "webapprt-content"
         else:
             return "mochitest"
 
@@ -697,11 +689,6 @@ class MochitestUtilsMixin(object):
             testPattern = re.compile(r".+\.xpi")
         elif options.chrome or options.a11y:
             testPattern = re.compile(r"(browser|test)_.+\.(xul|html|js|xhtml)")
-        elif options.webapprtContent:
-            testPattern = re.compile(r"webapprt_")
-        elif options.webapprtChrome:
-            allow_js_css = True
-            testPattern = re.compile(r"browser_")
         else:
             testPattern = re.compile(r"test_")
 
@@ -725,10 +712,6 @@ class MochitestUtilsMixin(object):
             self.testRoot = 'jetpack-addon'
         elif options.a11y:
             self.testRoot = 'a11y'
-        elif options.webapprtChrome:
-            self.testRoot = 'webapprtChrome'
-        elif options.webapprtContent:
-            self.testRoot = 'webapprtContent'
         elif options.chrome:
             self.testRoot = 'chrome'
         else:
@@ -938,15 +921,13 @@ toolbar#nav-bar {
                 "TEST-UNEXPECTED-FAIL | invalid setup: missing mochikit extension")
             return None
 
-        # Support Firefox (browser), B2G (shell), SeaMonkey (navigator), and Webapp
-        # Runtime (webapp).
+        # Support Firefox (browser), B2G (shell), SeaMonkey (navigator)
         chrome = ""
-        if options.browserChrome or options.chrome or options.a11y or options.webapprtChrome:
+        if options.browserChrome or options.chrome or options.a11y:
             chrome += """
 overlay chrome://browser/content/browser.xul chrome://mochikit/content/browser-test-overlay.xul
 overlay chrome://browser/content/shell.xhtml chrome://mochikit/content/browser-test-overlay.xul
 overlay chrome://navigator/content/navigator.xul chrome://mochikit/content/browser-test-overlay.xul
-overlay chrome://webapprt/content/webapp.xul chrome://mochikit/content/browser-test-overlay.xul
 """
 
         if options.jetpackPackage:
@@ -2091,7 +2072,7 @@ class Mochitest(MochitestUtilsMixin):
         self.killNamedOrphans('xpcshell')
 
         # Until we have all green, this only runs on bc*/dt*/mochitest-chrome
-        # jobs, not webapprt*, jetpack*, a11yr (for perf reasons), or plain
+        # jobs, not jetpack*, a11yr (for perf reasons), or plain
 
         testsToRun = self.getTestsToRun(options)
         if not options.runByDir:
@@ -2238,15 +2219,6 @@ class Mochitest(MochitestUtilsMixin):
             if self.urlOpts:
                 testURL += "?" + "&".join(self.urlOpts)
 
-            # On Mac, pass the path to the runtime, to ensure the test app
-            # uses that specific runtime instead of another one on the system.
-            if mozinfo.isMac and options.webapprtChrome:
-                options.browserArgs.extend(('-runtime', os.path.dirname(os.path.dirname(options.xrePath))))
-
-            if options.webapprtContent:
-                options.browserArgs.extend(('-test-mode', testURL))
-                testURL = None
-
             if options.immersiveMode:
                 options.browserArgs.extend(('-firefoxpath', options.app))
                 options.app = self.immersiveHelperPath
@@ -2270,7 +2242,7 @@ class Mochitest(MochitestUtilsMixin):
 
             # detect shutdown leaks for m-bc runs
             detectShutdownLeaks = mozinfo.info[
-                "debug"] and options.browserChrome and not options.webapprtChrome
+                "debug"] and options.browserChrome
 
             self.log.info("runtests.py | Running tests: start.\n")
             try:

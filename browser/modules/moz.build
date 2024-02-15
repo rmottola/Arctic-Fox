@@ -42,7 +42,6 @@ EXTRA_JS_MODULES += [
     'TabGroupsMigrator.jsm',
     'TransientPrefs.jsm',
     'UserContextUI.jsm',
-    'WebappManager.jsm',
     'webrtcUI.jsm',
 ]
 

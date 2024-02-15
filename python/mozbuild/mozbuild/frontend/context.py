@@ -1482,14 +1482,6 @@ VARIABLES = {
         """List of manifest files defining mochitest tests.
         """),
 
-    'MOCHITEST_WEBAPPRT_CONTENT_MANIFESTS': (StrictOrderingOnAppendList, list,
-        """List of manifest files defining webapprt mochitest content tests.
-        """),
-
-    'MOCHITEST_WEBAPPRT_CHROME_MANIFESTS': (StrictOrderingOnAppendList, list,
-        """List of manifest files defining webapprt mochitest chrome tests.
-        """),
-
     'REFTEST_MANIFESTS': (StrictOrderingOnAppendList, list,
         """List of manifest files defining reftests.
 

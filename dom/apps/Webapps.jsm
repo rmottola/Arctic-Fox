@@ -132,9 +132,7 @@ function supportSystemMessages() {
 // Minimum delay between two progress events while downloading, in ms.
 const MIN_PROGRESS_EVENT_DELAY = 1500;
 
-const WEBAPP_RUNTIME = Services.appinfo.ID == "webapprt@mozilla.org";
-
-const chromeWindowType = WEBAPP_RUNTIME ? "webapprt:webapp" : "navigator:browser";
+const chromeWindowType = "navigator:browser";
 
 XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
                                    "@mozilla.org/parentprocessmessagemanager;1",
@@ -177,10 +175,8 @@ XPCOMUtils.defineLazyGetter(this, "permMgr", function() {
 #elifdef ANDROID
   const DIRECTORY_NAME = "webappsDir";
 #else
-  // If we're executing in the context of the webapp runtime, the data files
-  // are in a different directory (currently the Firefox profile that installed
-  // the webapp); otherwise, they're in the current profile.
-  const DIRECTORY_NAME = WEBAPP_RUNTIME ? "WebappRegD" : "ProfD";
+  // Mulet, B2G Desktop, etc.
+  const DIRECTORY_NAME = "ProfD";
 #endif
 
 // We'll use this to identify privileged apps that have been preinstalled
