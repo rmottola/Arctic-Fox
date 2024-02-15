@@ -165,7 +165,7 @@ class CommonCaretsTestCase(object):
         self.long_press_on_word(el, 0)
 
         # Ignore extra spaces selected after the word.
-        assertFunc(target_content, sel.selected_content.rstrip())
+        assertFunc(target_content, sel.selected_content)
 
     def _test_move_selection_carets(self, el, assertFunc):
         sel = SelectionManager(el)
@@ -191,8 +191,7 @@ class CommonCaretsTestCase(object):
         # Move the left caret to the previous position of the right caret.
         self.actions.flick(el, caret1_x, caret1_y, caret2_x, caret2_y).perform()
 
-        # Ignore extra spaces at the beginning of the content in comparison.
-        assertFunc(target_content.lstrip(), sel.selected_content.lstrip())
+        assertFunc(target_content, sel.selected_content)
 
     def _test_minimum_select_one_character(self, el, assertFunc,
                                            x=None, y=None):
@@ -364,7 +363,7 @@ class CommonCaretsTestCase(object):
         # Drag end caret back to the target word
         self.actions.flick(self._body, start_caret_x, start_caret_y, caret2_x, caret2_y).perform()
 
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()), 'select')
+        self.assertEqual(self._to_unix_line_ending(sel.selected_content), 'select')
 
     @skip_if_not_rotatable
     def test_caret_position_after_changing_orientation_of_device(self):
@@ -388,7 +387,7 @@ class CommonCaretsTestCase(object):
         # other tests
         self.marionette.set_orientation('portrait')
 
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()), 'o')
+        self.assertEqual(self._to_unix_line_ending(sel.selected_content), 'o')
 
     def test_select_word_inside_an_iframe(self):
         '''Bug 1088552
@@ -410,7 +409,7 @@ class CommonCaretsTestCase(object):
         self._bottomtext = self.marionette.find_element(By.ID, 'bottomtext')
         self.long_press_on_location(self._bottomtext)
 
-        self.assertNotEqual(self._to_unix_line_ending(sel.selected_content.strip()), '')
+        self.assertNotEqual(self._to_unix_line_ending(sel.selected_content), '')
 
     ########################################################################
     # <input> test cases with selection carets enabled
@@ -629,9 +628,9 @@ class SelectionCaretsTestCase(CommonCaretsTestCase, MarionetteTestCase):
     def setUp(self):
         super(SelectionCaretsTestCase, self).setUp()
         self.carets_tested_pref = 'selectioncaret.enabled'
-
         self.prefs = {
             'layout.accessiblecaret.enabled': False,
+            'layout.word_select.eat_space_to_next_word': False,
             self.carets_tested_pref: True,
         }
         self.marionette.set_prefs(self.prefs)
@@ -644,6 +643,8 @@ class AccessibleCaretSelectionModeTestCase(CommonCaretsTestCase, MarionetteTestC
 
         self.prefs = {
             'selectioncaret.enabled': False,
+            'layout.word_select.eat_space_to_next_word': False,
+            'layout.accessiblecaret.use_long_tap_injector': False,
             self.carets_tested_pref: True,
         }
         self.marionette.set_prefs(self.prefs)
