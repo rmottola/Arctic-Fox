@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,16 +19,21 @@ def skip_if_not_rotatable(target):
     return wrapper
 
 
-class CommonCaretsTestCase(object):
-    '''Common test cases for a selection with a two carets.
-
-    To run these test cases, a subclass must inherit from both this class and
-    MarionetteTestCase.
+class AccessibleCaretSelectionModeTestCase(MarionetteTestCase):
+    '''Test cases for AccessibleCaret under selection mode, aka selection carets.
 
     '''
+
     def setUp(self):
         # Code to execute before a tests are run.
-        super(CommonCaretsTestCase, self).setUp()
+        super(AccessibleCaretSelectionModeTestCase, self).setUp()
+        self.carets_tested_pref = 'layout.accessiblecaret.enabled'
+        self.prefs = {
+            'layout.word_select.eat_space_to_next_word': False,
+            'layout.accessiblecaret.use_long_tap_injector': False,
+            self.carets_tested_pref: True,
+        }
+        self.marionette.set_prefs(self.prefs)
         self.actions = Actions(self.marionette)
 
     def open_test_html(self):
@@ -174,7 +180,7 @@ class CommonCaretsTestCase(object):
         x, y = self.word_location(el, wordOrdinal)
         self.long_press_on_location(el, x, y)
 
-    def _to_unix_line_ending(self, s):
+    def to_unix_line_ending(self, s):
         """Changes all Windows/Mac line endings in s to UNIX line endings."""
 
         return s.replace('\r\n', '\n').replace('\r', '\n')
@@ -362,18 +368,18 @@ class CommonCaretsTestCase(object):
         # Drag end caret to target location
         (caret1_x, caret1_y), (caret2_x, caret2_y) = sel.selection_carets_location()
         self.actions.flick(self._body, caret2_x, caret2_y, end_caret_x, end_caret_y, 1).perform()
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()),
+        self.assertEqual(self.to_unix_line_ending(sel.selected_content.strip()),
                          'this 3\nuser can select this')
 
         (caret1_x, caret1_y), (caret2_x, caret2_y) = sel.selection_carets_location()
         self.actions.flick(self._body, caret2_x, caret2_y, end_caret2_x, end_caret2_y, 1).perform()
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()),
+        self.assertEqual(self.to_unix_line_ending(sel.selected_content.strip()),
                          'this 3\nuser can select this 4\nuser can select this 5\nuser')
 
         # Drag first caret to target location
         (caret1_x, caret1_y), (caret2_x, caret2_y) = sel.selection_carets_location()
         self.actions.flick(self._body, caret1_x, caret1_y, end_caret_x, end_caret_y, 1).perform()
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content.strip()),
+        self.assertEqual(self.to_unix_line_ending(sel.selected_content.strip()),
                          '4\nuser can select this 5\nuser')
 
     def test_drag_caret_to_beginning_of_a_line(self):
@@ -397,7 +403,7 @@ class CommonCaretsTestCase(object):
         # Drag end caret back to the target word
         self.actions.flick(self._body, start_caret_x, start_caret_y, caret2_x, caret2_y).perform()
 
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content), 'select')
+        self.assertEqual(self.to_unix_line_ending(sel.selected_content), 'select')
 
     @skip_if_not_rotatable
     def test_caret_position_after_changing_orientation_of_device(self):
@@ -421,7 +427,7 @@ class CommonCaretsTestCase(object):
         # other tests
         self.marionette.set_orientation('portrait')
 
-        self.assertEqual(self._to_unix_line_ending(sel.selected_content), 'o')
+        self.assertEqual(self.to_unix_line_ending(sel.selected_content), 'o')
 
     def test_select_word_inside_an_iframe(self):
         '''Bug 1088552
@@ -443,7 +449,7 @@ class CommonCaretsTestCase(object):
         self._bottomtext = self.marionette.find_element(By.ID, 'bottomtext')
         self.long_press_on_location(self._bottomtext)
 
-        self.assertNotEqual(self._to_unix_line_ending(sel.selected_content), '')
+        self.assertNotEqual(self.to_unix_line_ending(sel.selected_content), '')
 
     def test_carets_initialized_in_display_none(self):
         '''Test AccessibleCaretEventHub is properly initialized on a <html> with
@@ -689,32 +695,6 @@ class CommonCaretsTestCase(object):
     def test_content_non_editable2_minimum_select_one_character(self):
         self.open_test_html2()
         self._test_minimum_select_one_character(self._content2, self.assertEqual)
-
-
-class SelectionCaretsTestCase(CommonCaretsTestCase, MarionetteTestCase):
-    def setUp(self):
-        super(SelectionCaretsTestCase, self).setUp()
-        self.carets_tested_pref = 'selectioncaret.enabled'
-        self.prefs = {
-            'layout.accessiblecaret.enabled': False,
-            'layout.word_select.eat_space_to_next_word': False,
-            self.carets_tested_pref: True,
-        }
-        self.marionette.set_prefs(self.prefs)
-
-
-class AccessibleCaretSelectionModeTestCase(CommonCaretsTestCase, MarionetteTestCase):
-    def setUp(self):
-        super(AccessibleCaretSelectionModeTestCase, self).setUp()
-        self.carets_tested_pref = 'layout.accessiblecaret.enabled'
-
-        self.prefs = {
-            'selectioncaret.enabled': False,
-            'layout.word_select.eat_space_to_next_word': False,
-            'layout.accessiblecaret.use_long_tap_injector': False,
-            self.carets_tested_pref: True,
-        }
-        self.marionette.set_prefs(self.prefs)
 
     def test_long_press_to_select_when_partial_visible_word_is_selected(self):
         self.open_test_html()
