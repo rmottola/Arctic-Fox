@@ -1,10 +1,11 @@
-/* vim: set ts=2 et sw=2 tw=80: */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
-   http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-let {Toolbox} = require("devtools/framework/toolbox");
+var {Toolbox} = require("devtools/client/framework/toolbox");
 
-let toolbox, target, tab1, tab2;
+var toolbox, target, tab1, tab2;
 
 function test() {
   gBrowser.selectedTab = tab1 = gBrowser.addTab();
