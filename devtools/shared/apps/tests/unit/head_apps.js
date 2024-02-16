@@ -1,11 +1,11 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-const CC = Components.Constructor;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
+var CC = Components.Constructor;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -90,6 +90,10 @@ function setup() {
   WebappOSUtils.getPackagePath = function(aApp) {
     return aApp.basePath + "/" + aApp.id;
   }
+
+  // Enable launch/close method of the webapps actor
+  let {WebappsActor} = require("devtools/server/actors/webapps");
+  WebappsActor.prototype.supportsLaunch = true;
 }
 
 function do_get_webappsdir() {
