@@ -1888,16 +1888,8 @@ WebSocket::CreateAndDispatchMessageEvent(const nsACString& aData,
     }
   }
 
-  return CreateAndDispatchMessageEvent(jsapi.cx(), aData, aIsBinary);
-}
-
-nsresult
-WebSocket::CreateAndDispatchMessageEvent(JSContext* aCx,
-                                         const nsACString& aData,
-                                         bool aIsBinary)
-{
-  MOZ_ASSERT(mImpl);
-  AssertIsOnTargetThread();
+  jsapi.TakeOwnershipOfErrorReporting();
+  JSContext* cx = jsapi.cx();
 
   nsresult rv = CheckInnerWindowCorrectness();
   if (NS_FAILED(rv)) {
@@ -1907,19 +1899,19 @@ WebSocket::CreateAndDispatchMessageEvent(JSContext* aCx,
   uint16_t messageType = nsIWebSocketEventListener::TYPE_STRING;
 
   // Create appropriate JS object for message
-  JS::Rooted<JS::Value> jsData(aCx);
+  JS::Rooted<JS::Value> jsData(cx);
   if (aIsBinary) {
     if (mBinaryType == dom::BinaryType::Blob) {
       messageType = nsIWebSocketEventListener::TYPE_BLOB;
 
-      nsresult rv = nsContentUtils::CreateBlobBuffer(aCx, GetOwner(), aData,
+      nsresult rv = nsContentUtils::CreateBlobBuffer(cx, GetOwner(), aData,
                                                      &jsData);
       NS_ENSURE_SUCCESS(rv, rv);
     } else if (mBinaryType == dom::BinaryType::Arraybuffer) {
       messageType = nsIWebSocketEventListener::TYPE_ARRAYBUFFER;
 
-      JS::Rooted<JSObject*> arrayBuf(aCx);
-      nsresult rv = nsContentUtils::CreateArrayBuffer(aCx, aData,
+      JS::Rooted<JSObject*> arrayBuf(cx);
+      nsresult rv = nsContentUtils::CreateArrayBuffer(cx, aData,
                                                       arrayBuf.address());
       NS_ENSURE_SUCCESS(rv, rv);
       jsData.setObject(*arrayBuf);
@@ -1931,7 +1923,7 @@ WebSocket::CreateAndDispatchMessageEvent(JSContext* aCx,
     // JS string
     NS_ConvertUTF8toUTF16 utf16Data(aData);
     JSString* jsString;
-    jsString = JS_NewUCStringCopyN(aCx, utf16Data.get(), utf16Data.Length());
+    jsString = JS_NewUCStringCopyN(cx, utf16Data.get(), utf16Data.Length());
     NS_ENSURE_TRUE(jsString, NS_ERROR_FAILURE);
 
     jsData.setString(jsString);
