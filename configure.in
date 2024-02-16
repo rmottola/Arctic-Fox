@@ -3971,10 +3971,6 @@ if test -n "$MOZ_MULET"; then
     AC_DEFINE(MOZ_MULET)
 fi
 
-if test -n "$MOZ_B2GDROID"; then
-    AC_DEFINE(MOZ_B2GDROID)
-fi
-
 # Propagate feature switches for code written in rust from confvars.sh
 if test -n "$MOZ_RUST"; then
     if test -n "$MOZ_RUST_MP4PARSE"; then

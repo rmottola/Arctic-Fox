@@ -351,8 +351,7 @@ setUpdateTrackingId();
     });
   }
 
-  syncPrefDefault(AppConstants.MOZ_B2GDROID ? 'app.update.url.android'
-                                            : 'app.update.url');
+  syncPrefDefault('app.update.url');
   syncPrefDefault('app.update.channel');
 })();
 
