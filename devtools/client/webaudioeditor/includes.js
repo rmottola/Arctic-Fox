@@ -3,9 +3,8 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 
@@ -22,6 +21,7 @@ const L10N = new ViewHelpers.L10N(STRINGS_URI);
 const Telemetry = require("devtools/client/shared/telemetry");
 const telemetry = new Telemetry();
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
+const Services = require("Services");
 const { gDevTools } = require("devtools/client/framework/devtools");
 
 loader.lazyRequireGetter(this, "LineGraphWidget",
