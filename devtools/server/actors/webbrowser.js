@@ -1401,6 +1401,16 @@ TabActor.prototype = {
   },
 
   /**
+   * Bring the tab's window to front.
+   */
+  onFocus: function() {
+    if (this.window) {
+      this.window.focus();
+    }
+    return {};
+  },
+
+  /**
    * Reload the page in this tab.
    */
   onReload: function(aRequest) {
@@ -1862,6 +1872,7 @@ TabActor.prototype = {
 TabActor.prototype.requestTypes = {
   "attach": TabActor.prototype.onAttach,
   "detach": TabActor.prototype.onDetach,
+  "focus": TabActor.prototype.onFocus,
   "reload": TabActor.prototype.onReload,
   "navigateTo": TabActor.prototype.onNavigateTo,
   "reconfigure": TabActor.prototype.onReconfigure,

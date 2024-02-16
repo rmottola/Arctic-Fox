@@ -12,6 +12,7 @@ var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 var Heritage = require("sdk/core/heritage");
 var {TargetFactory} = require("devtools/client/framework/target");
 var {Tools} = require("devtools/client/definitions");
+const { Task } = require("resource://gre/modules/Task.jsm");
 var promise = require("promise");
 
 loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
@@ -604,10 +605,9 @@ WebConsole.prototype = {
       }
     }
 
-    let onDestroy = function WC_onDestroyUI() {
+    let onDestroy = Task.async(function*() {
       try {
-        let tabWindow = this.target.isLocalTab ? this.target.window : null;
-        tabWindow && tabWindow.focus();
+        yield this.target.activeTab.focus()
       }
       catch (ex) {
         // Tab focus can fail if the tab or target is closed.
@@ -616,7 +616,7 @@ WebConsole.prototype = {
       let id = WebConsoleUtils.supportsString(this.hudId);
       Services.obs.notifyObservers(id, "web-console-destroyed", null);
       this._destroyer.resolve(null);
-    }.bind(this);
+    }.bind(this));
 
     if (this.ui) {
       this.ui.destroy().then(onDestroy);
