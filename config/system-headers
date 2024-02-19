@@ -1267,7 +1267,7 @@ libavcodec/avfft.h
 #if MOZ_SYSTEM_PNG==1
 png.h
 #endif
-#if MOZ_WEBP==1
+#if MOZ_SYSTEM_WEBP==1
 webp/encode.h
 enc/vp8enci.h
 enc/cost.h
