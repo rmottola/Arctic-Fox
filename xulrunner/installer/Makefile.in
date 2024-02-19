@@ -45,7 +45,7 @@ pkg_config_files = \
 	mozilla-plugin.pc \
 	$(NULL)
 
-ifdef MOZ_NATIVE_NSPR
+ifdef MOZ_SYSTEM_NSPR
 NSPR_NAME=nspr
 NSPR_VERSION=$(shell $(NSPR_CONFIG) --version)
 else
@@ -65,7 +65,7 @@ endif
 
 $(warning FULL_NSPR_CFLAGS=$(FULL_NSPR_CFLAGS))
 
-ifndef MOZ_NATIVE_NSS
+ifndef MOZ_SYSTEM_NSS
 pkg_config_files += mozilla-nss.pc
 endif
 
