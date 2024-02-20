@@ -28878,8 +28878,6 @@ trap 'rm -f $CONFIG_STATUS conftest*; exit 1' 1 2 15
 
 echo creating $CONFIG_STATUS
 
-extra_python_path=${COMM_BUILD:+"'mozilla', "}
-
 cat > $CONFIG_STATUS <<EOF
 def unique_list(l):
     result = []
