@@ -313,11 +313,14 @@ def resolve_target_to_make(topobjdir, target):
 
 
 class ListMixin(object):
-    def __init__(self, iterable=[]):
+    def __init__(self, iterable=None, **kwargs):
+        if iterable is None:
+            iterable = []
         if not isinstance(iterable, list):
             raise ValueError('List can only be created from other list instances.')
 
-        return super(ListMixin, self).__init__(iterable)
+        self._kwargs = kwargs
+        return super(ListMixin, self).__init__(iterable, **kwargs)
 
     def extend(self, l):
         if not isinstance(l, list):
@@ -338,7 +341,7 @@ class ListMixin(object):
         if not isinstance(other, list):
             raise ValueError('Only lists can be appended to lists.')
 
-        new_list = self.__class__(self)
+        new_list = self.__class__(self, **self._kwargs)
         new_list.extend(other)
         return new_list
 
@@ -396,10 +399,13 @@ class StrictOrderingOnAppendListMixin(object):
         if srtd != l:
             raise UnsortedError(srtd, l)
 
-    def __init__(self, iterable=[]):
+    def __init__(self, iterable=None, **kwargs):
+        if iterable is None:
+            iterable = []
+
         StrictOrderingOnAppendListMixin.ensure_sorted(iterable)
 
-        super(StrictOrderingOnAppendListMixin, self).__init__(iterable)
+        super(StrictOrderingOnAppendListMixin, self).__init__(iterable, **kwargs)
 
     def extend(self, l):
         StrictOrderingOnAppendListMixin.ensure_sorted(l)
@@ -431,6 +437,48 @@ class StrictOrderingOnAppendList(ListMixin, StrictOrderingOnAppendListMixin,
     elements be ordered. This enforces cleaner style in moz.build files.
     """
 
+class ListWithActionMixin(object):
+    """Mixin to create lists with pre-processing. See ListWithAction."""
+    def __init__(self, iterable=None, action=None):
+        if iterable is None:
+            iterable = []
+        if not callable(action):
+            raise ValueError('A callabe action is required to construct '
+                             'a ListWithAction')
+
+        self._action = action
+        iterable = [self._action(i) for i in iterable]
+        super(ListWithActionMixin, self).__init__(iterable)
+
+    def extend(self, l):
+        l = [self._action(i) for i in l]
+        return super(ListWithActionMixin, self).extend(l)
+
+    def __setslice__(self, i, j, sequence):
+        sequence = [self._action(item) for item in sequence]
+        return super(ListWithActionMixin, self).__setslice__(i, j, sequence)
+
+    def __iadd__(self, other):
+        other = [self._action(i) for i in other]
+        return super(ListWithActionMixin, self).__iadd__(other)
+
+class StrictOrderingOnAppendListWithAction(StrictOrderingOnAppendListMixin,
+    ListMixin, ListWithActionMixin, list):
+    """An ordered list that accepts a callable to be applied to each item.
+
+    A callable (action) passed to the constructor is run on each item of input.
+    The result of running the callable on each item will be stored in place of
+    the original input, but the original item must be used to enforce sortedness.
+    Note that the order of superclasses is therefore significant.
+    """
+
+class ListWithAction(ListMixin, ListWithActionMixin, list):
+    """A list that accepts a callable to be applied to each item.
+
+    A callable (action) may optionally be passed to the constructor to run on
+    each item of input. The result of calling the callable on each item will be
+    stored in place of the original input.
+    """
 
 class MozbuildDeletionError(Exception):
     pass
@@ -507,7 +555,9 @@ def StrictOrderingOnAppendListWithFlagsFactory(flags):
         foo['b'].bar = 'bar'
     """
     class StrictOrderingOnAppendListWithFlagsSpecialization(StrictOrderingOnAppendListWithFlags):
-        def __init__(self, iterable=[]):
+        def __init__(self, iterable=None):
+            if iterable is None:
+                iterable = []
             StrictOrderingOnAppendListWithFlags.__init__(self, iterable)
             self._flags_type = FlagsFactory(flags)
             self._flags = dict()
@@ -905,10 +955,12 @@ class TypedListMixin(object):
 
         return [self.normalize(e) for e in l]
 
-    def __init__(self, iterable=[]):
+    def __init__(self, iterable=None, **kwargs):
+        if iterable is None:
+            iterable = []
         iterable = self._ensure_type(iterable)
 
-        super(TypedListMixin, self).__init__(iterable)
+        super(TypedListMixin, self).__init__(iterable, **kwargs)
 
     def extend(self, l):
         l = self._ensure_type(l)
