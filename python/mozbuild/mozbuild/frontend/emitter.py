@@ -57,6 +57,7 @@ from .data import (
     PreprocessedTestWebIDLFile,
     PreprocessedWebIDLFile,
     Program,
+    SdkFiles,
     SharedLibrary,
     SimpleProgram,
     Sources,
@@ -827,6 +828,7 @@ class TreeMetadataEmitter(LoggingMixin):
             ('EXPORTS', Exports),
             ('FINAL_TARGET_FILES', FinalTargetFiles),
             ('FINAL_TARGET_PP_FILES', FinalTargetPreprocessedFiles),
+            ('SDK_FILES', SdkFiles),
             ('TESTING_FILES', TestingFiles),
         ):
             all_files = context.get(var)
