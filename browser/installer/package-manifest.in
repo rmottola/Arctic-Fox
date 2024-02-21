@@ -505,10 +505,8 @@
 @RESPATH@/browser/components/ProfileMigrator.js
 @RESPATH@/browser/components/ChromeProfileMigrator.js
 @RESPATH@/browser/components/FirefoxProfileMigrator.js
-#ifdef MOZ_BROWSER_STATUSBAR
 @RESPATH@/browser/components/status4evar.js
 @RESPATH@/browser/components/status4evar.manifest
-#endif
 #ifdef XP_WIN
 @RESPATH@/browser/components/360seProfileMigrator.js
 @RESPATH@/browser/components/EdgeProfileMigrator.js
