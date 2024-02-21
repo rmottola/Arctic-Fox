@@ -485,6 +485,7 @@ Tester.prototype = {
         this.SimpleTest[m] = this.SimpleTestOriginal[m];
       });
 
+      this.ContentTask.setTestScope(null);
       testScope.destroy();
       this.currentTest.scope = null;
     }
@@ -635,6 +636,8 @@ Tester.prototype = {
       }
       currentTest.addResult(res);
     });
+
+    this.ContentTask.setTestScope(currentScope);
 
     // Allow Assert.jsm methods to be tacked to the current scope.
     this.currentTest.scope.export_assertions = function() {
