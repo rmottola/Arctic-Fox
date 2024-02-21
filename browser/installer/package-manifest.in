@@ -329,9 +329,7 @@
 @RESPATH@/components/services-crypto-component.xpt
 @RESPATH@/components/captivedetect.xpt
 @RESPATH@/browser/components/shellservice.xpt
-#ifdef MOZ_BROWSER_STATUSBAR
 @RESPATH@/browser/components/status4evar.xpt
-#endif
 @RESPATH@/components/shistory.xpt
 @RESPATH@/components/spellchecker.xpt
 @RESPATH@/components/storage.xpt
