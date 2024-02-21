@@ -1804,8 +1804,11 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
     return NS_OK;
   }
 
-  // Set user agent override
+  // Set user agent override from docshell
   HttpBaseChannel::SetDocshellUserAgentOverride();
+
+  // Set user agent override from loadgroup
+  HttpBaseChannel::SetLoadGroupUserAgentOverride();
 
   MOZ_ASSERT_IF(mPostRedirectChannelShouldUpgrade,
                 mPostRedirectChannelShouldIntercept);
