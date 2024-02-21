@@ -1066,24 +1066,6 @@ class Package(MachCommandBase):
         if ret == 0:
             self.notify('Packaging complete')
         return ret
-		
-@CommandProvider
-class Install(MachCommandBase):
-    """Create the windows installer for the built product."""
-
-    @Command('installer', category='post-build',
-        description='Create the installer for the built product for distribution.')
-    def installer(self):
-        return self._run_make(directory=".", target='installer', ensure_exit_code=False)
-
-@CommandProvider
-class Mar(MachCommandBase):
-    """Create the mar file for the built product."""
-
-    @Command('mar', category='post-build',
-        description='Create the mar file for the built product for distribution.')
-    def mar(self):
-        return self._run_make(directory="./tools/update-packaging/", target='', ensure_exit_code=False)
 
 @CommandProvider
 class Install(MachCommandBase):
