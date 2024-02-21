@@ -23,10 +23,8 @@ DIRS += [
     'sessionstore',
     'shell',
     'selfsupport',
+    'statusbar',
 ]
-
-if CONFIG['MOZ_BROWSER_STATUSBAR']:
-    DIRS += ['statusbar']
 
 DIRS += ['build']
 
