@@ -47,6 +47,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mTainting(LoadTainting::Basic)
   , mUpgradeInsecureRequests(false)
   , mVerifySignedContent(false)
+  , mEnforceSRI(false)
   , mInnerWindowID(0)
   , mOuterWindowID(0)
   , mParentOuterWindowID(0)
@@ -105,6 +106,15 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
       aLoadingContext->OwnerDoc()->GetUpgradeInsecureRequests(false) ||
       (nsContentUtils::IsPreloadType(mInternalContentPolicyType) &&
        aLoadingContext->OwnerDoc()->GetUpgradeInsecureRequests(true));
+
+    // if owner doc has content signature, we enforce SRI
+    nsCOMPtr<nsIChannel> channel = aLoadingContext->OwnerDoc()->GetChannel();
+    if (channel) {
+      nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
+      if (loadInfo) {
+        loadInfo->GetVerifySignedContent(&mEnforceSRI);
+      }
+    }
   }
 
   InheritOriginAttributes(mLoadingPrincipal, mOriginAttributes);
@@ -121,6 +131,7 @@ LoadInfo::LoadInfo(nsPIDOMWindowOuter* aOuterWindow,
   , mTainting(LoadTainting::Basic)
   , mUpgradeInsecureRequests(false)
   , mVerifySignedContent(false)
+  , mEnforceSRI(false)
   , mInnerWindowID(0)
   , mOuterWindowID(0)
   , mParentOuterWindowID(0)
@@ -159,6 +170,7 @@ LoadInfo::LoadInfo(const LoadInfo& rhs)
   , mTainting(rhs.mTainting)
   , mUpgradeInsecureRequests(rhs.mUpgradeInsecureRequests)
   , mVerifySignedContent(rhs.mVerifySignedContent)
+  , mEnforceSRI(rhs.mEnforceSRI)
   , mInnerWindowID(rhs.mInnerWindowID)
   , mOuterWindowID(rhs.mOuterWindowID)
   , mParentOuterWindowID(rhs.mParentOuterWindowID)
@@ -183,6 +195,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                    LoadTainting aTainting,
                    bool aUpgradeInsecureRequests,
                    bool aVerifySignedContent,
+                   bool aEnforceSRI,
                    uint64_t aInnerWindowID,
                    uint64_t aOuterWindowID,
                    uint64_t aParentOuterWindowID,
@@ -202,6 +215,7 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   , mTainting(aTainting)
   , mUpgradeInsecureRequests(aUpgradeInsecureRequests)
   , mVerifySignedContent(aVerifySignedContent)
+  , mEnforceSRI(aEnforceSRI)
   , mInnerWindowID(aInnerWindowID)
   , mOuterWindowID(aOuterWindowID)
   , mParentOuterWindowID(aParentOuterWindowID)
@@ -448,6 +462,20 @@ NS_IMETHODIMP
 LoadInfo::GetVerifySignedContent(bool* aResult)
 {
   *aResult = mVerifySignedContent;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::SetEnforceSRI(bool aEnforceSRI)
+{
+  mEnforceSRI = aEnforceSRI;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetEnforceSRI(bool* aResult)
+{
+  *aResult = mEnforceSRI;
   return NS_OK;
 }
 

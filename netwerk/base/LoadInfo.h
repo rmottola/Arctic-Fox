@@ -82,6 +82,7 @@ private:
            LoadTainting aTainting,
            bool aUpgradeInsecureRequests,
            bool aVerifySignedContent,
+           bool aEnforceSRI,
            uint64_t aInnerWindowID,
            uint64_t aOuterWindowID,
            uint64_t aParentOuterWindowID,
@@ -120,6 +121,7 @@ private:
   LoadTainting                     mTainting;
   bool                             mUpgradeInsecureRequests;
   bool                             mVerifySignedContent;
+  bool                             mEnforceSRI;
   uint64_t                         mInnerWindowID;
   uint64_t                         mOuterWindowID;
   uint64_t                         mParentOuterWindowID;
