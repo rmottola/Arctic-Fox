@@ -24,6 +24,7 @@
 
 #include "nsDirectoryServiceDefs.h"
 #include "nsIFile.h"
+#include "nsPrintfCString.h"
 
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/ipc/BrowserProcessSubThread.h"
@@ -1085,7 +1086,13 @@ GeckoChildProcessHost::OpenPrivilegedHandle(base::ProcessId aPid)
     MOZ_ASSERT(aPid == base::GetProcId(mChildProcessHandle));
     return;
   }
-  if (!base::OpenPrivilegedProcessHandle(aPid, &mChildProcessHandle)) {
+  int64_t error = 0;
+  if (!base::OpenPrivilegedProcessHandle(aPid, &mChildProcessHandle, &error)) {
+#ifdef MOZ_CRASHREPORTER
+    CrashReporter::
+      AnnotateCrashReport(NS_LITERAL_CSTRING("LastError"),
+                          nsPrintfCString ("%lld", error));
+#endif
     NS_RUNTIMEABORT("can't open handle to child process");
   }
 }
