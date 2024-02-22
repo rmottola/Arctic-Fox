@@ -10625,20 +10625,16 @@ nsDocShell::DoURILoad(nsIURI* aURI,
     securityFlags |= nsILoadInfo::SEC_SANDBOXED;
   }
 
-  nsCOMPtr<nsILoadInfo> loadInfo =
+  RefPtr<LoadInfo> loadInfo =
     requestingWindow ?
       new LoadInfo(requestingWindow, loadingPrincipal, triggeringPrincipal,
                    securityFlags) :
       new LoadInfo(loadingPrincipal, triggeringPrincipal, requestingNode,
                    securityFlags, aContentPolicyType);
 
-#if(0)
-  // XXX: bug 1487964 has this code, but we have no nsILoadInfo set up yet.
-  // Do we need it?
   if (aIsFromProcessingFrameAttributes) {
     loadInfo->SetIsFromProcessingFrameAttributes();
   }
-#endif
 
   if (!isSrcdoc) {
     rv = NS_NewChannelInternal(getter_AddRefs(channel),
