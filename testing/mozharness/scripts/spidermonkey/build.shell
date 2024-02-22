@@ -1,6 +1,5 @@
 #!/bin/bash -ex
 
 mkdir -p "$MOZ_OBJDIR"
-cd "$MOZ_OBJDIR"
-"$GECKO_DIR"/js/src/configure --enable-debug --enable-optimize --enable-stdcxx-compat --enable-ctypes --enable-nspr-build
+$SOURCE/js/src/configure --enable-debug --enable-optimize --enable-stdcxx-compat --enable-ctypes --enable-exact-rooting --enable-gcgenerational --with-system-nspr
 make -j12 -s
