@@ -760,6 +760,7 @@ nsHttpHandler::InitUserAgentComponents()
     nsresult rv;
     // Add the Android version number to the Fennec platform identifier.
 #if defined MOZ_WIDGET_ANDROID
+#ifndef MOZ_UA_OS_AGNOSTIC // Don't add anything to mPlatform since it's empty.
     nsAutoString androidVersion;
     rv = infoService->GetPropertyAsAString(
         NS_LITERAL_STRING("release_version"), androidVersion);
@@ -774,6 +775,7 @@ nsHttpHandler::InitUserAgentComponents()
         mPlatform += NS_LossyConvertUTF16toASCII(androidVersion);
       }
     }
+#endif
 #endif
     // Add the `Mobile` or `Tablet` or `TV` token when running on device.
     bool isTablet;
