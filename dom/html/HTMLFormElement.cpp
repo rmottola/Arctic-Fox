@@ -1752,8 +1752,10 @@ HTMLFormElement::GetActionURL(nsIURI** aActionURL,
     NS_ConvertUTF8toUTF16 reportSpec(spec);
 
     // upgrade the actionURL from http:// to use https://
-    rv = actionURL->SetScheme(NS_LITERAL_CSTRING("https"));
+    nsCOMPtr<nsIURI> upgradedActionURL;
+    rv = NS_GetSecureUpgradedURI(actionURL, getter_AddRefs(upgradedActionURL));
     NS_ENSURE_SUCCESS(rv, rv);
+    actionURL = upgradedActionURL.forget();
 
     // let's log a message to the console that we are upgrading a request
     nsAutoCString scheme;
