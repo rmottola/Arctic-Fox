@@ -574,6 +574,8 @@ nsHttpHandler::GetCookieService()
 nsresult
 nsHttpHandler::GetIOService(nsIIOService** result)
 {
+    NS_ENSURE_ARG_POINTER(result);
+
     NS_ADDREF(*result = mIOService);
     return NS_OK;
 }
