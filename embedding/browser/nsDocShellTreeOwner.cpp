@@ -1214,8 +1214,7 @@ DefaultTooltipTextProvider::GetNodeText(nsIDOMNode* aNode, char16_t** aText,
               nsCOMPtr<nsIURI> uri(linkContent->GetURIExternal());
               if (uri) {
                 currElement->GetAttributeNS(
-                  NS_LITERAL_STRING("http://www.w3.org/1999/xlink"),
-                  NS_LITERAL_STRING("title"), outText);
+                  xlinkNS, NS_LITERAL_STRING("title"), outText);
                 if (outText.Length()) {
                   found = true;
                 }
@@ -1225,7 +1224,7 @@ DefaultTooltipTextProvider::GetNodeText(nsIDOMNode* aNode, char16_t** aText,
                 lookingForSVGTitle = UseSVGTitle(currElement);
               }
               if (lookingForSVGTitle) {
-                nsINodeList* childNodes = node->ChildNodes();
+                nsINodeList* childNodes = content->ChildNodes();
                 uint32_t childNodeCount = childNodes->Length();
                 for (uint32_t i = 0; i < childNodeCount; i++) {
                   nsIContent* child = childNodes->Item(i);
