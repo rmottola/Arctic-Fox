@@ -929,7 +929,7 @@ protected:
   /**
    * Update mFileList with the currently selected file.
    */
-  nsresult UpdateFileList();
+  void UpdateFileList();
 
   /**
    * Called after calling one of the SetFilesOrDirectories() functions.

@@ -1153,7 +1153,7 @@ DefaultTooltipTextProvider::GetNodeText(nsIDOMNode* aNode, char16_t** aText,
                 NS_ENSURE_SUCCESS(rv, rv);
               } else {
                 FileList* fl = static_cast<FileList*>(fileList.get());
-                fl->Item(0)->GetName(outText);
+                fl->UnsafeItem(0).GetAsFile()->GetName(outText);
 
                 // For UX and performance (jank) reasons we cap the number of
                 // files that we list in the tooltip to 20 plus a "and xxx more"
@@ -1162,7 +1162,7 @@ DefaultTooltipTextProvider::GetNodeText(nsIDOMNode* aNode, char16_t** aText,
                 uint32_t count = std::min(listLength, TRUNCATED_FILE_COUNT);
                 for (uint32_t i = 1; i < count; ++i) {
                   nsString fileName;
-                  fl->Item(i)->GetName(fileName);
+                  fl->UnsafeItem(i).GetAsFile()->GetName(fileName);
                   outText.Append(NS_LITERAL_STRING("\n"));
                   outText.Append(fileName);
                 }
