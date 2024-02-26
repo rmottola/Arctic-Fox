@@ -47,6 +47,8 @@ extern "C" {
 #include "FakeIPC.h"
 #include "FakeIPC.cpp"
 
+#include "TestHarness.h"
+
 using namespace mozilla;
 
 namespace test {
@@ -4231,6 +4233,8 @@ TEST(NewSdpTestNoFixture, CheckRidSerialize)
 } // End namespace test.
 
 int main(int argc, char **argv) {
+  ScopedXPCOM xpcom("sdp_unittests");
+
   test_utils = new MtransportTestUtils();
   NSS_NoDB_Init(nullptr);
   NSS_SetDomesticPolicy();
