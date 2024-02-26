@@ -39,10 +39,6 @@ function devicestorage_setup(callback) {
   });
 }
 
-function devicestorage_cleanup() {
-  SimpleTest.finish();
-}
-
 function getRandomBuffer() {
   var size = 1024;
   var buffer = new ArrayBuffer(size);
@@ -69,7 +65,7 @@ function randomFilename(l) {
 
 function reportErrorAndQuit(e) {
   ok(false, "handleError was called : " + e.target.error.name);
-  devicestorage_cleanup();
+  SimpleTest.finish();
 }
 
 function createTestFiles(storage, paths) {
