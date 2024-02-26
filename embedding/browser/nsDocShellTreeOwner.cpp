@@ -329,6 +329,24 @@ nsDocShellTreeOwner::RemoveFromWatcher()
   }
 }
 
+void
+nsDocShellTreeOwner::EnsureContentTreeOwner()
+{
+  if (mContentTreeOwner) {
+    return;
+  }
+
+  mContentTreeOwner = new nsDocShellTreeOwner();
+  nsCOMPtr<nsIWebBrowserChrome> browserChrome = GetWebBrowserChrome();
+  if (browserChrome) {
+    mContentTreeOwner->SetWebBrowserChrome(browserChrome);
+  }
+
+  if (mWebBrowser) {
+    mContentTreeOwner->WebBrowser(mWebBrowser);
+  }
+}
+
 NS_IMETHODIMP
 nsDocShellTreeOwner::ContentShellAdded(nsIDocShellTreeItem* aContentShell,
                                        bool aPrimary, bool aTargetable,
@@ -337,6 +355,9 @@ nsDocShellTreeOwner::ContentShellAdded(nsIDocShellTreeItem* aContentShell,
   if (mTreeOwner)
     return mTreeOwner->ContentShellAdded(aContentShell, aPrimary, aTargetable,
                                          aID);
+
+  EnsureContentTreeOwner();
+  aContentShell->SetTreeOwner(mContentTreeOwner);
 
   if (aPrimary) {
     mPrimaryContentShell = aContentShell;
@@ -817,6 +838,13 @@ nsDocShellTreeOwner::WebBrowser(nsWebBrowser* aWebBrowser)
   }
 
   mWebBrowser = aWebBrowser;
+
+  if (mContentTreeOwner) {
+    mContentTreeOwner->WebBrowser(aWebBrowser);
+    if (!aWebBrowser) {
+      mContentTreeOwner = nullptr;
+    }
+  }
 }
 
 nsWebBrowser*
@@ -870,6 +898,11 @@ nsDocShellTreeOwner::SetWebBrowserChrome(nsIWebBrowserChrome* aWebBrowserChrome)
       mOwnerRequestor = requestor;
     }
   }
+
+  if (mContentTreeOwner) {
+    mContentTreeOwner->SetWebBrowserChrome(aWebBrowserChrome);
+  }
+
   return NS_OK;
 }
 
