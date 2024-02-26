@@ -82,7 +82,7 @@ Directory::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 void
-Directory::GetName(nsString& aRetval) const
+Directory::GetName(nsAString& aRetval) const
 {
   aRetval.Truncate();
 
