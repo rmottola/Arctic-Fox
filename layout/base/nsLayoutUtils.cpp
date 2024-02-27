@@ -635,6 +635,7 @@ nsLayoutUtils::IsTextAlignUnsafeValueEnabled()
 {
   static bool sTextAlignUnsafeValueEnabled;
   static bool sTextAlignUnsafeValueEnabledPrefCached = false;
+
   if (!sTextAlignUnsafeValueEnabledPrefCached) {
     sTextAlignUnsafeValueEnabledPrefCached = true;
     Preferences::AddBoolVarCache(&sTextAlignUnsafeValueEnabled,
@@ -4578,7 +4579,7 @@ AddIntrinsicSizeOffset(nsRenderingContext* aRenderingContext,
       (((aStyleSize.HasPercent() || aStyleMaxSize.HasPercent()) &&
         aFrame->IsFrameOfType(nsIFrame::eReplacedSizing)) ||
        (aStyleSize.HasPercent() &&
-        aFrame->GetType() == nsGkAtoms::textInputFrame))) {
+        FormControlShrinksForPercentISize(aFrame)))) {
     // A percentage width or max-width on replaced elements means they
     // can shrink to 0.
     // This is also true for percentage widths (but not max-widths) on
