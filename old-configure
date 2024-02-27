@@ -28796,6 +28796,17 @@ fi
 
 
 
+if test "$MOZ_ENABLE_MASK_AS_SHORTHAND"; then
+  cat >> confdefs.pytmp <<\EOF
+    (''' MOZ_ENABLE_MASK_AS_SHORTHAND ''', ' 1 ')
+EOF
+cat >> confdefs.h <<\EOF
+#define MOZ_ENABLE_MASK_AS_SHORTHAND 1
+EOF
+
+fi
+
+
 if test -z "$JS_SHARED_LIBRARY"; then
   cat >> confdefs.pytmp <<\EOF
     (''' MOZ_STATIC_JS ''', ' 1 ')
@@ -29633,6 +29644,7 @@ sed 's/$/,/' >> $CONFIG_STATUS <<EOF
     (''' ENABLE_INTL_API ''', r''' $ENABLE_INTL_API ''')
     (''' USE_ICU ''', r''' $USE_ICU ''')
     (''' ICU_LIB_NAMES ''', list(r''' $ICU_LIB_NAMES '''.split()))
+    (''' MOZ_ENABLE_MASK_AS_SHORTHAND ''', r''' $MOZ_ENABLE_MASK_AS_SHORTHAND ''')
     (''' JS_SHARED_LIBRARY ''', r''' $JS_SHARED_LIBRARY ''')
     (''' WIN_TOP_SRC ''', r''' $WIN_TOP_SRC ''')
     (''' top_srcdir ''', r''' $top_srcdir ''')
