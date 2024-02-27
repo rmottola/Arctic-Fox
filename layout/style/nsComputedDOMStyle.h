@@ -302,6 +302,7 @@ private:
 
   /* Mask properties */
   already_AddRefed<CSSValue> DoGetMask();
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
   already_AddRefed<CSSValue> DoGetMaskImage();
   already_AddRefed<CSSValue> DoGetMaskPosition();
   already_AddRefed<CSSValue> DoGetMaskRepeat();
@@ -310,7 +311,7 @@ private:
   already_AddRefed<CSSValue> DoGetMaskSize();
   already_AddRefed<CSSValue> DoGetMaskMode();
   already_AddRefed<CSSValue> DoGetMaskComposite();
-
+#endif
   /* Padding properties */
   already_AddRefed<CSSValue> DoGetPaddingTop();
   already_AddRefed<CSSValue> DoGetPaddingBottom();

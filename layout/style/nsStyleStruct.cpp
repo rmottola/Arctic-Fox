@@ -2225,6 +2225,7 @@ const nsCSSProperty nsStyleImageLayers::kBackgroundLayerTable[] = {
   eCSSProperty_UNKNOWN                    // composite
 };
 
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
 const nsCSSProperty nsStyleImageLayers::kMaskLayerTable[] = {
   eCSSProperty_mask,                      // shorthand
   eCSSProperty_UNKNOWN,                   // color
@@ -2238,6 +2239,7 @@ const nsCSSProperty nsStyleImageLayers::kMaskLayerTable[] = {
   eCSSProperty_mask_mode,                 // maskMode
   eCSSProperty_mask_composite             // composite
 };
+#endif
 
 nsStyleImageLayers::nsStyleImageLayers()
   : mAttachmentCount(1)

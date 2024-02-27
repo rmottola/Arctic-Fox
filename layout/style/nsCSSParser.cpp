@@ -11461,6 +11461,7 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParseClipPath();
   case eCSSProperty_scroll_snap_type:
     return ParseScrollSnapType();
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
   case eCSSProperty_mask:
     return ParseImageLayers(nsStyleImageLayers::kMaskLayerTable);
   case eCSSProperty_mask_repeat:
@@ -11469,6 +11470,7 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParseImageLayerPosition(eCSSProperty_mask_position);
   case eCSSProperty_mask_size:
     return ParseImageLayerSize(eCSSProperty_mask_size);
+#endif
   case eCSSProperty_all:
     return ParseAll();
   default:
