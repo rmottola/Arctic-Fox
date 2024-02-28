@@ -693,7 +693,10 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
 
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aThread);
+#ifndef MOZILLA_EXTERNAL_LINKAGE
   mThread = do_QueryInterface(aThread);
+#endif
+  MOZ_ASSERT(mThread);
   CheckThread();
 
   mPCObserver = do_GetWeakReference(&aObserver);
@@ -868,6 +871,10 @@ PeerConnectionImpl::Initialize(PeerConnectionObserver& aObserver,
                                nsISupports* aThread,
                                ErrorResult &rv)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aThread);
+  mThread = do_QueryInterface(aThread);
+
   PeerConnectionConfiguration converted;
   nsresult res = converted.Init(aConfiguration);
   if (NS_FAILED(res)) {
@@ -2530,6 +2537,10 @@ PeerConnectionImpl::PluginCrash(uint32_t aPluginID,
 void
 PeerConnectionImpl::RecordEndOfCallTelemetry() const
 {
+  if (!mJsepSession) {
+    return;
+  }
+
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   // Bitmask used for WEBRTC/LOOP_CALL_TYPE telemetry reporting
   static const uint32_t kAudioTypeMask = 1;
