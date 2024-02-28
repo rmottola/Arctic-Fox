@@ -813,7 +813,9 @@ struct CSSValueSerializeCalcOps {
 
   void AppendLeafValue(const input_type& aValue)
   {
-    MOZ_ASSERT(aValue.GetUnit() == eCSSUnit_Percent || aValue.IsLengthUnit(),
+    MOZ_ASSERT(aValue.GetUnit() == eCSSUnit_Percent ||
+               aValue.IsLengthUnit() ||
+               aValue.GetUnit() == eCSSUnit_Number,
                "unexpected unit");
     aValue.AppendToString(mProperty, mResult, mValueSerialization);
   }
