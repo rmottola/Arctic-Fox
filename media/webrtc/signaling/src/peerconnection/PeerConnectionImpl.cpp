@@ -1165,7 +1165,7 @@ PeerConnectionImpl::ConfigureJsepSessionCodecs() {
 NS_IMETHODIMP
 PeerConnectionImpl::EnsureDataConnection(uint16_t aNumstreams)
 {
-  PC_AUTO_ENTER_API_CALL_NO_CHECK();
+  PC_AUTO_ENTER_API_CALL(false);
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   if (mDataConnection) {
@@ -1300,7 +1300,7 @@ PeerConnectionImpl::AddTrackToJsepSession(SdpMediaSection::MediaType type,
 nsresult
 PeerConnectionImpl::InitializeDataChannel()
 {
-  PC_AUTO_ENTER_API_CALL_NO_CHECK();
+  PC_AUTO_ENTER_API_CALL(false);
   CSFLogDebug(logTag, "%s", __FUNCTION__);
 
   const JsepApplicationCodecDescription* codec;
@@ -1382,7 +1382,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
                                       uint16_t aStream,
                                       nsDOMDataChannel** aRetval)
 {
-  PC_AUTO_ENTER_API_CALL_NO_CHECK();
+  PC_AUTO_ENTER_API_CALL(false);
   MOZ_ASSERT(aRetval);
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
