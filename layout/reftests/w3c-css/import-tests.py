@@ -33,6 +33,7 @@ gSubtrees = [
     #os.path.join("approved", "css3-multicol", "src"),
     os.path.join("contributors", "opera", "submitted", "css3-conditional"),
     #os.path.join("contributors", "opera", "submitted", "multicol")
+    os.path.join("css-values-3"),
 ]
 
 gPrefixedProperties = [
