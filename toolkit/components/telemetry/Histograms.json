@@ -1697,14 +1697,14 @@
   "TRANSACTION_WAIT_TIME_HTTP_PIPELINES": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 100,
     "description": "Time from submission to dispatch of HTTP with pipelines transaction (ms)"
   },
   "TRANSACTION_WAIT_TIME_SPDY": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 100,
     "description": "Time from submission to dispatch of SPDY transaction (ms)"
   },
@@ -1713,10 +1713,16 @@
     "kind": "boolean",
     "description": "Fraction of responses with a quic alt-protocol advertisement."
   },
- "HTTP_DISK_CACHE_OVERHEAD": {
+  "HTTP_CONTENT_ENCODING": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 6,
+    "description": "encoding removed: 0=unknown, 1=gzip, 2=deflate, 3=brotli"
+  },
+  "HTTP_DISK_CACHE_OVERHEAD": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "32000000",
+    "high": 32000000,
     "n_buckets": 100,
     "description": "HTTP Disk cache memory overhead (bytes)"
   },
@@ -1728,14 +1734,14 @@
   "CACHE_SERVICE_LOCK_WAIT_2": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms)"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_2": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock on the main thread (ms)"
   },
@@ -1754,63 +1760,63 @@
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSPROCESSREQUESTEVENT_RUN": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSPROCESSREQUESTEVENT_RUN"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSOUTPUTSTREAMWRAPPER_LAZYINIT": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSOUTPUTSTREAMWRAPPER_LAZYINIT"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSOUTPUTSTREAMWRAPPER_CLOSEINTERNAL": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSOUTPUTSTREAMWRAPPER_CLOSEINTERNAL"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSOUTPUTSTREAMWRAPPER_RELEASE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSOUTPUTSTREAMWRAPPER_RELEASE"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCOMPRESSOUTPUTSTREAMWRAPPER_RELEASE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCOMPRESSOUTPUTSTREAMWRAPPER_RELEASE"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSINPUTSTREAMWRAPPER_LAZYINIT": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSINPUTSTREAMWRAPPER_LAZYINIT"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSINPUTSTREAMWRAPPER_CLOSEINTERNAL": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSINPUTSTREAMWRAPPER_CLOSEINTERNAL"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSINPUTSTREAMWRAPPER_RELEASE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSINPUTSTREAMWRAPPER_RELEASE"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSDECOMPRESSINPUTSTREAMWRAPPER_RELEASE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSDECOMPRESSINPUTSTREAMWRAPPER_RELEASE"
   },
