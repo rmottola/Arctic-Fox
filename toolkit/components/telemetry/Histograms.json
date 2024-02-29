@@ -407,7 +407,7 @@
   "GC_SCC_SWEEP_MAX_PAUSE_MS": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "500",
+    "high": 500,
     "n_buckets": 50,
     "description": "Time spent sweeping slowest compartment SCC (ms)"
   },
@@ -426,14 +426,14 @@
   "GC_MINOR_US": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "1000000",
+    "high": 1000000,
     "n_buckets": 100,
     "description": "Time spent running JS minor GC (us)"
   },
   "GEOLOCATION_ACCURACY_EXPONENTIAL": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "100000",
+    "high": 100000,
     "n_buckets": 50,
     "description": "Location accuracy"
   },
@@ -2248,28 +2248,28 @@
   "DNS_CLEANUP_AGE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "1440",
+    "high": 1440,
     "n_buckets": 50,
     "description": "DNS Cache Entry Age at Removal Time (minutes)"
   },
   "DNS_LOOKUP_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 50,
     "description": "Time for a successful DNS OS resolution (msec)"
   },
   "DNS_RENEWAL_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 50,
     "description": "Time for a renewed DNS OS resolution (msec)"
   },
   "DNS_RENEWAL_TIME_FOR_TTL": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 50,
     "description": "Time for a DNS OS resolution (msec) used to get TTL"
   },
@@ -6017,70 +6017,78 @@
     "description": "A bit pattern to collect H.264 constraint set flag from the decoded SPS. Bits 0 through 5 represent constraint_set0_flag through constraint_set5_flag, respectively."
   },
   "VIDEO_DECODED_H264_SPS_LEVEL": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 51,
     "description": "The H.264 level (level_idc) as extracted from the decoded SPS, from levels 1 (10) to 5.2 (51), with the addition of 0 for unknown values."
   },
   "VIDEO_DECODED_H264_SPS_PROFILE": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 244,
     "description": "The H.264 profile number (profile_idc) as extracted from the decoded SPS."
   },
   "VIDEO_H264_SPS_MAX_NUM_REF_FRAMES": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 17,
     "description": "SPS.max_num_ref_frames indicates how deep the H.264 queue is going to be, and as such the minimum memory usage by the decoder, from 0 to 16. 17 indicates an invalid value."
   },
   "WEBRTC_ICE_FINAL_CONNECTION_STATE": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "enumerated",
     "n_values": 7,
     "description": "The ICE connection state when the PC was closed"
   },
   "WEBRTC_ICE_ON_TIME_TRICKLE_ARRIVAL_TIME": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) that a trickle candidate took to arrive after the start of ICE, given that it arrived when ICE was not in a failure state (ie; a candidate that we could do something with, hence 'on time')"
   },
   "WEBRTC_ICE_LATE_TRICKLE_ARRIVAL_TIME": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) that a trickle candidate took to arrive after the start of ICE, given that it arrived after ICE failed."
   },
   "WEBRTC_ICE_SUCCESS_TIME": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) it took for ICE to complete, given that ICE succeeded."
   },
   "WEBRTC_ICE_FAILURE_TIME": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) it took for ICE to complete, given that it failed."
   },
   "WEBRTC_ICE_SUCCESS_RATE": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "boolean",
     "description": "The number of failed ICE Connections (0) vs. number of successful ICE connections (1)."
   },
   "WEBRTC_STUN_RATE_LIMIT_EXCEEDED_BY_TYPE_GIVEN_SUCCESS": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "enumerated",
     "n_values": 4,
     "description": "For each successful PeerConnection, bit 0 indicates the short-duration rate limit was reached, bit 1 indicates the long-duration rate limit was reached"
   },
   "WEBRTC_STUN_RATE_LIMIT_EXCEEDED_BY_TYPE_GIVEN_FAILURE": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "enumerated",
     "n_values": 4,
     "description": "For each failed PeerConnection, bit 0 indicates the short-duration rate limit was reached, bit 1 indicates the long-duration rate limit was reached"
@@ -6298,29 +6306,31 @@
   "WEBRTC_CALL_DURATION": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The length of time (in seconds) that a call lasted."
   },
   "WEBRTC_CALL_COUNT": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "500",
-    "n_buckets": "50",
+    "high": 500,
+    "n_buckets": 50,
     "description": "The number of calls made during a session."
   },
   "WEBRTC_ICE_ADD_CANDIDATE_ERRORS_GIVEN_SUCCESS": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE succeeded."
   },
   "WEBRTC_ICE_ADD_CANDIDATE_ERRORS_GIVEN_FAILURE": {
-    "expires_in_version": "never",
+    "alert_emails": ["webrtc-ice-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "53",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE failed."
   },
   "WEBRTC_GET_USER_MEDIA_SECURE_ORIGIN": {
@@ -6340,78 +6350,78 @@
   "WEBRTC_LOAD_STATE_RELAXED": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Relaxed load state in calls over 30 seconds."
   },
   "WEBRTC_LOAD_STATE_RELAXED_SHORT": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Relaxed load state in calls 5-30 seconds."
   },
   "WEBRTC_LOAD_STATE_NORMAL": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Normal load state in calls over 30 seconds."
   },
   "WEBRTC_LOAD_STATE_NORMAL_SHORT": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Normal load state in calls over 5-30 seconds."
   },
   "WEBRTC_LOAD_STATE_STRESSED": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Stressed load state in calls over 30 seconds."
   },
   "WEBRTC_LOAD_STATE_STRESSED_SHORT": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "25",
+    "high": 100,
+    "n_buckets": 25,
     "description": "Percentage of time spent in the Stressed load state in calls 5-30 seconds."
   },
   "WEBRTC_RENEGOTIATIONS": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "21",
-    "n_buckets": "20",
+    "high": 21,
+    "n_buckets": 20,
     "description": "Number of Renegotiations during each call"
   },
   "WEBRTC_MAX_VIDEO_SEND_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "10",
-    "n_buckets": "9",
+    "high": 10,
+    "n_buckets": 9,
     "description": "Number of Video tracks sent simultaneously"
   },
   "WEBRTC_MAX_VIDEO_RECEIVE_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "20",
-    "n_buckets": "19",
+    "high": 20,
+    "n_buckets": 19,
     "description": "Number of Video tracks received simultaneously"
   },
   "WEBRTC_MAX_AUDIO_SEND_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "20",
-    "n_buckets": "19",
+    "high": 20,
+    "n_buckets": 19,
     "description": "Number of Audio tracks sent simultaneously"
   },
   "WEBRTC_MAX_AUDIO_RECEIVE_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "Number of Audio tracks received simultaneously"
   },
   "WEBRTC_DATACHANNEL_NEGOTIATED": {
@@ -6422,61 +6432,61 @@
   "WEBRTC_CALL_TYPE": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "8",
+    "n_values": 8,
     "description": "Type of call: (Bitmask) Audio = 1, Video = 2, DataChannels = 4"
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_TRACERDETACH_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_TRACERDETACH_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'detach' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_STARTTRACE_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'startTrace' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_STARTTRACE_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'startTrace' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_STOPTRACE_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'stopTrace' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_STOPTRACE_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'stopTrace' request to go round trip."
   },
   "COOKIES_3RDPARTY_NUM_SITES_ACCEPTED": {
     "expires_in_version": "40",
     "kind": "linear",
-    "low": "5",
-    "high": "145",
-    "n_buckets": "30",
-    "description": "The number of distinct pairs (first-party site, third-party site attempting to set cookie) for which the third-party cookie has been accepted. Sites are considered identical if they have the same eTLD + 1. Measures are normalized per 24h."
+    "low": 5,
+    "high": 145,
+    "n_buckets": 30,
+    "description": "The number of distinct pairs (first-party site, third-party site attempting to set cookie) for which the third-party cookie has been accepted. Sites are considered identical if they have the same eTLD + 1. Measures are normalized per 24h. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
   "COOKIES_3RDPARTY_NUM_SITES_BLOCKED": {
-    "expires_in_version": "default",
+    "expires_in_version": "40",
     "kind": "linear",
     "low": "5",
     "high": "145",
@@ -6502,43 +6512,43 @@
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_GET_EXECUTABLE_LINES_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'getExecutableLines' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_GET_EXECUTABLE_LINES_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'getExecutableLines' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_BLACKBOX_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'blackbox' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_BLACKBOX_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took a 'blackbox' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_UNBLACKBOX_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took an 'ublackbox' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_REMOTE_UNBLACKBOX_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The time (in milliseconds) that it took an 'unblackbox' request to go round trip."
   },
   "DEVTOOLS_DEBUGGER_RDP_LOCAL_SCOPE_MS": {
@@ -6952,133 +6962,133 @@
   "DEVTOOLS_TOOLBOX_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the toolbox been active (seconds)"
   },
   "DEVTOOLS_OPTIONS_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the options panel been active (seconds)"
   },
   "DEVTOOLS_WEBCONSOLE_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the web console been active (seconds)"
   },
   "DEVTOOLS_BROWSERCONSOLE_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the browser console been active (seconds)"
   },
   "DEVTOOLS_INSPECTOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the inspector been active (seconds)"
   },
   "DEVTOOLS_RULEVIEW_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the rule view been active (seconds)"
   },
   "DEVTOOLS_COMPUTEDVIEW_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the computed view been active (seconds)"
   },
   "DEVTOOLS_LAYOUTVIEW_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the layout view been active (seconds)"
   },
   "DEVTOOLS_FONTINSPECTOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the font inspector been active (seconds)"
   },
   "DEVTOOLS_ANIMATIONINSPECTOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the animation inspector been active (seconds)"
   },
   "DEVTOOLS_JSDEBUGGER_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the JS debugger been active (seconds)"
   },
   "DEVTOOLS_JSBROWSERDEBUGGER_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the JS browser debugger been active (seconds)"
   },
   "DEVTOOLS_STYLEEDITOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the style editor been active (seconds)"
   },
   "DEVTOOLS_SHADEREDITOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the Shader Editor been active (seconds)"
   },
   "DEVTOOLS_WEBAUDIOEDITOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the Web Audio Editor been active (seconds)"
   },
   "DEVTOOLS_CANVASDEBUGGER_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the Canvas Debugger been active (seconds)"
   },
   "DEVTOOLS_JSPROFILER_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the JS profiler been active (seconds)"
   },
   "DEVTOOLS_MEMORY_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the Memory Tool been active (seconds)"
   },
   "DEVTOOLS_NETMONITOR_TIME_ACTIVE_SECONDS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000000",
+    "high": 10000000,
     "n_buckets": 100,
     "description": "How long has the network monitor been active (seconds)"
   },
@@ -9096,15 +9106,15 @@
   "LOOP_ICE_SUCCESS_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) it took for ICE to complete, given that ICE succeeded."
   },
   "LOOP_ICE_FAILURE_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "20",
+    "high": 10000,
+    "n_buckets": 20,
     "description": "The length of time (in milliseconds) it took for ICE to complete, given that it failed."
   },
   "LOOP_ICE_SUCCESS_RATE": {
@@ -9234,15 +9244,15 @@
   "LOOP_VIDEO_DECODER_FRAMERATE_AVG_PER_CALL": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "200",
-    "n_buckets": "50",
+    "high": 200,
+    "n_buckets": 50,
     "description": "Video decoder's average framerate (in fps) over an entire call"
   },
   "LOOP_VIDEO_DECODER_FRAMERATE_10X_STD_DEV_PER_CALL": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "200",
-    "n_buckets": "50",
+    "high": 200,
+    "n_buckets": 50,
     "description": "Standard deviation from video decoder's average framerate (in 1/10 fps) over an entire call"
   },
   "LOOP_VIDEO_DECODER_DISCARDED_PACKETS_PER_CALL_PPM": {
@@ -9255,22 +9265,22 @@
   "LOOP_CALL_DURATION": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "1000",
+    "high": 10000,
+    "n_buckets": 1000,
     "description": "The length of time (in seconds) that a call lasted."
   },
   "LOOP_ICE_ADD_CANDIDATE_ERRORS_GIVEN_SUCCESS": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE succeeded."
   },
   "LOOP_ICE_ADD_CANDIDATE_ERRORS_GIVEN_FAILURE": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "The number of times AddIceCandidate failed on a given PeerConnection, given that ICE failed."
   },
   "LOOP_GET_USER_MEDIA_TYPE": {
@@ -9282,36 +9292,36 @@
   "LOOP_RENEGOTIATIONS": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "21",
-    "n_buckets": "20",
+    "high": 21,
+    "n_buckets": 20,
     "description": "Number of Renegotiations during each call"
   },
   "LOOP_MAX_VIDEO_SEND_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "10",
-    "n_buckets": "9",
+    "high": 10,
+    "n_buckets": 9,
     "description": "Number of Video tracks sent simultaneously"
   },
   "LOOP_MAX_VIDEO_RECEIVE_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "20",
-    "n_buckets": "19",
+    "high": 20,
+    "n_buckets": 19,
     "description": "Number of Video tracks received simultaneously"
   },
   "LOOP_MAX_AUDIO_SEND_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "20",
-    "n_buckets": "19",
+    "high": 20,
+    "n_buckets": 19,
     "description": "Number of Audio tracks sent simultaneously"
   },
   "LOOP_MAX_AUDIO_RECEIVE_TRACK": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "30",
-    "n_buckets": "29",
+    "high": 30,
+    "n_buckets": 29,
     "description": "Number of Audio tracks received simultaneously"
   },
   "LOOP_DATACHANNEL_NEGOTIATED": {
@@ -9322,15 +9332,15 @@
   "LOOP_CALL_TYPE": {
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "8",
+    "n_values": 8,
     "description": "Type of call: (Bitmask) Audio = 1, Video = 2, DataChannels = 4"
   },
   "PERF_MONITORING_TEST_CPU_RESCHEDULING_PROPORTION_MOVED": {
     "alert_emails": ["dteller@mozilla.com"],
     "expires_in_version": "48",
     "kind": "linear",
-    "high": "100",
-    "n_buckets": "20",
+    "high": 100,
+    "n_buckets": 20,
     "description": "Proportion (%) of reschedulings of the main process to another CPU during the execution of code inside a JS compartment. Updated while we are measuring jank."
   },
   "PERF_MONITORING_SLOW_ADDON_JANK_US": {
@@ -9525,7 +9535,7 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "15000",
+    "high": 15000,
     "n_buckets": 10,
     "description": "Time taken to subscribe over HTTP2 (ms)."
   },
@@ -9533,7 +9543,7 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "31622400",
+    "high": 31622400,
     "n_buckets": 20,
     "description": "Time taken for a push subscription to expire its quota (seconds). The maximum is just over an year."
   },
@@ -9541,7 +9551,7 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "200",
+    "high": 200,
     "n_buckets": 10,
     "description": "The value a push record quota (a count) is reset to based on the user's browsing history."
   },
@@ -9633,7 +9643,7 @@
     "alert_emails": ["jdaggett@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 50,
     "description": "Time to download a webfont (ms)"
   },
@@ -9641,7 +9651,7 @@
     "alert_emails": ["jdaggett@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 50,
     "description": "Time after navigationStart webfont download completed (ms)"
   },
@@ -9669,7 +9679,7 @@
     "alert_emails": ["jdaggett@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 50,
     "description": "Size of all fonts loaded at page load (kb)"
   },
@@ -9677,7 +9687,7 @@
     "alert_emails": ["jdaggett@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 50,
     "description": "Size of font loaded (kb)"
   },
