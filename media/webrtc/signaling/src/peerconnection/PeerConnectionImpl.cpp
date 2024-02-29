@@ -2407,6 +2407,7 @@ PeerConnectionImpl::SetParameters(MediaStreamTrack& aTrack,
       if (encoding.mMaxBitrate.WasPassed()) {
         constraint.constraints.maxBr = encoding.mMaxBitrate.Value();
       }
+      constraint.constraints.scaleDownBy = encoding.mScaleResolutionDownBy;
       constraints.push_back(constraint);
     }
   }
@@ -2441,6 +2442,7 @@ PeerConnectionImpl::GetParameters(MediaStreamTrack& aTrack,
     RTCRtpEncodingParameters encoding;
     encoding.mRid.Construct(NS_ConvertASCIItoUTF16(constraint.rid.c_str()));
     encoding.mMaxBitrate.Construct(constraint.constraints.maxBr);
+    encoding.mScaleResolutionDownBy = constraint.constraints.scaleDownBy;
     aOutParameters.mEncodings.Value().AppendElement(Move(encoding), fallible);
   }
   return NS_OK;
