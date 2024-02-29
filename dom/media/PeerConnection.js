@@ -1564,7 +1564,8 @@ RTCRtpSender.prototype = {
   },
 
   setParameters: function(parameters) {
-    return this._pc._setParameters(this, parameters);
+    return this._pc._win.Promise.resolve()
+      .then(() => this._pc._setParameters(this, parameters));
   },
 
   getParameters: function() {
