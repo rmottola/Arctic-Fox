@@ -4851,9 +4851,6 @@ pref("dom.sms.defaultServiceId", 0);
 // negative: read ahead all IDs if possible.
 pref("dom.sms.maxReadAheadEntries", 0);
 
-// WebContacts
-pref("dom.mozContacts.enabled", false);
-
 // WebAlarms
 pref("dom.mozAlarms.enabled", false);
 
