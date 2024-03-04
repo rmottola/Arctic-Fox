@@ -110,6 +110,6 @@ invoke_copy_to_stack(uint32_t* d,
 }
 
 extern "C"
-XPTC_PUBLIC_API(nsresult)
+EXPORT_XPCOM_API(nsresult)
 XPTC_InvokeByIndex(nsISupports* that, uint32_t methodIndex,
                    uint32_t paramCount, nsXPTCVariant* params);

@@ -6,6 +6,7 @@
 /* Implement shared vtbl methods. */
 
 #include "xptcprivate.h"
+#include "xptiprivate.h"
 
 #if defined(sparc) || defined(__sparc__)
 
@@ -23,19 +24,17 @@ PrepareAndDispatch(nsXPTCStubBase* self, uint32_t methodIndex, uint32_t* args)
 
     nsXPTCMiniVariant paramBuffer[PARAM_BUFFER_COUNT];
     nsXPTCMiniVariant* dispatchParams = nullptr;
-    nsIInterfaceInfo* iface_info = nullptr;
-    const nsXPTMethodInfo* info;
+    const nsXPTMethodInfo* info = nullptr;
     uint8_t paramCount;
     uint8_t i;
     nsresult result = NS_ERROR_FAILURE;
 
     NS_ASSERTION(self,"no self");
 
-    self->GetInterfaceInfo(&iface_info);
-    NS_ASSERTION(iface_info,"no interface info");
-
-    iface_info->GetMethodInfo(uint16_t(methodIndex), &info);
-    NS_ASSERTION(info,"no interface info");
+    self->mEntry->GetMethodInfo(uint16_t(methodIndex), &info);
+    NS_ASSERTION(info,"no method info");
+    if (!info)
+        return NS_ERROR_UNEXPECTED;
 
     paramCount = info->GetParamCount();
 
@@ -86,9 +85,7 @@ PrepareAndDispatch(nsXPTCStubBase* self, uint32_t methodIndex, uint32_t* args)
         }
     }
 
-    result = self->CallMethod((uint16_t)methodIndex, info, dispatchParams);
-
-    NS_RELEASE(iface_info);
+    result = self->oMouter->CallMethod((uint16_t)methodIndex, info, dispatchParams);
 
     if(dispatchParams != paramBuffer)
         delete [] dispatchParams;
