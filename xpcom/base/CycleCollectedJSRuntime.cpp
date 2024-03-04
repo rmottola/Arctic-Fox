@@ -85,6 +85,7 @@
 #endif
 
 #include "nsIException.h"
+#include "nsIPlatformInfo.h"
 #include "nsThread.h"
 #include "nsThreadUtils.h"
 #include "xpcpublic.h"
@@ -409,6 +410,29 @@ void JSObjectsTenuredCb(JSRuntime* aRuntime, void* aData)
   static_cast<CycleCollectedJSRuntime*>(aData)->JSObjectsTenured();
 }
 
+bool
+mozilla::GetBuildId(JS::BuildIdCharVector* aBuildID)
+{
+  nsCOMPtr<nsIPlatformInfo> info = do_GetService("@mozilla.org/xre/app-info;1");
+  if (!info) {
+    return false;
+  }
+
+  nsCString buildID;
+  nsresult rv = info->GetPlatformBuildID(buildID);
+  NS_ENSURE_SUCCESS(rv, false);
+
+  if (!aBuildID->resize(buildID.Length())) {
+    return false;
+  }
+
+  for (size_t i = 0; i < buildID.Length(); i++) {
+    (*aBuildID)[i] = buildID[i];
+  }
+
+  return true;
+}
+
 CycleCollectedJSRuntime::CycleCollectedJSRuntime()
   : mGCThingCycleCollectorGlobal(sGCThingCycleCollectorGlobal)
   , mJSZoneCycleCollectorGlobal(sJSZoneCycleCollectorGlobal)
@@ -454,6 +478,12 @@ CycleCollectedJSRuntime::~CycleCollectedJSRuntime()
   NS_RELEASE(mOwningThread);
 }
 
+static void
+MozCrashErrorReporter(JSContext*, const char*, JSErrorReport*)
+{
+  MOZ_CRASH("Why is someone touching JSAPI without an AutoJSAPI?");
+}
+
 nsresult
 CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
                                     uint32_t aMaxBytes,
@@ -497,11 +527,16 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
   JS_SetContextCallback(mJSRuntime, ContextCallback, this);
   JS_SetDestroyZoneCallback(mJSRuntime, XPCStringConvert::FreeZoneCache);
   JS_SetSweepZoneCallback(mJSRuntime, XPCStringConvert::ClearZoneCache);
+  JS::SetBuildIdOp(mJSRuntime, GetBuildId);
+  // XPCJSRuntime currently overrides this because we don't
+  // TakeOwnershipOfErrorReporting everwhere on the main thread yet.
+  JS_SetErrorReporter(mJSRuntime, MozCrashErrorReporter);
 
   static js::DOMCallbacks DOMcallbacks = {
     InstanceClassHasProtoAtDepth
   };
   SetDOMCallbacks(mJSRuntime, &DOMcallbacks);
+  js::SetScriptEnvironmentPreparer(mJSRuntime, &mEnvironmentPreparer);
 
 #ifdef SPIDERMONKEY_PROMISE
   JS::SetEnqueuePromiseJobCallback(mJSRuntime, EnqueuePromiseJobCallback, this);
@@ -898,7 +933,7 @@ protected:
   NS_IMETHOD
   Run() override
   {
-    mCallback->Call();
+    mCallback->Call("promise callback");
     return NS_OK;
   }
 
@@ -1612,4 +1647,29 @@ CycleCollectedJSRuntime::PrepareWaitingZonesForGC()
     }
     mZonesWaitingForGC.Clear();
   }
+}
+
+void
+CycleCollectedJSRuntime::EnvironmentPreparer::invoke(JS::HandleObject scope,
+                                                     js::ScriptEnvironmentPreparer::Closure& closure)
+{
+  nsIGlobalObject* global = xpc::NativeGlobal(scope);
+
+  // Not much we can do if we simply don't have a usable global here...
+  NS_ENSURE_TRUE_VOID(global && global->GetGlobalJSObject());
+
+  bool mainThread = NS_IsMainThread();
+  JSContext* cx =
+    mainThread ? nullptr : nsContentUtils::GetDefaultJSContextForThread();
+  AutoEntryScript aes(global, "JS-engine-initiated execution", mainThread, cx);
+  aes.TakeOwnershipOfErrorReporting();
+
+  MOZ_ASSERT(!JS_IsExceptionPending(aes.cx()));
+
+  DebugOnly<bool> ok = closure(aes.cx());
+
+  MOZ_ASSERT_IF(ok, !JS_IsExceptionPending(aes.cx()));
+
+  // The AutoEntryScript will check for JS_IsExceptionPending on the
+  // JSContext and report it as needed as it comes off the stack.
 }

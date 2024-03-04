@@ -10,11 +10,6 @@ var Preferences = Cu.import("resource://gre/modules/Preferences.jsm", {}).Prefer
 var TelemetryReportingPolicy =
   Cu.import("resource://gre/modules/TelemetryReportingPolicy.jsm", {}).TelemetryReportingPolicy;
 
-XPCOMUtils.defineLazyGetter(this, "gDatareportingService",
-  () => Cc["@mozilla.org/datareporting/service;1"]
-          .getService(Ci.nsISupports)
-          .wrappedJSObject);
-
 const PREF_BRANCH = "datareporting.policy.";
 const PREF_BYPASS_NOTIFICATION = PREF_BRANCH + "dataSubmissionPolicyBypassNotification";
 const PREF_CURRENT_POLICY_VERSION = PREF_BRANCH + "currentPolicyVersion";
@@ -115,9 +110,6 @@ add_task(function* setup(){
     Preferences.set(PREF_BYPASS_NOTIFICATION, bypassNotification);
     Preferences.set(PREF_CURRENT_POLICY_VERSION, currentPolicyVersion);
 
-    // Start polling again.
-    gDatareportingService.policy.startPolling();
-
     return closeAllNotifications();
   });
 
@@ -125,9 +117,6 @@ add_task(function* setup(){
   Preferences.set(PREF_BYPASS_NOTIFICATION, false);
   // Set the current policy version.
   Preferences.set(PREF_CURRENT_POLICY_VERSION, TEST_POLICY_VERSION);
-
-  // Stop the polling to make sure no policy gets displayed by FHR.
-  gDatareportingService.policy.stopPolling();
 });
 
 function clearAcceptedPolicy() {

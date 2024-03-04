@@ -27,6 +27,8 @@ If you would like to use a different directory, hit CTRL+c and set the
 MOZBUILD_STATE_PATH environment variable to the directory you would like to
 use and re-run mach. For this change to take effect forever, you'll likely
 want to export this environment variable from your shell's init scripts.
+
+Press ENTER/RETURN to continue or CTRL+c to abort.
 '''.lstrip()
 
 NO_MERCURIAL_SETUP = '''
@@ -70,20 +72,16 @@ SEARCH_PATHS = [
     'config',
     'dom/bindings',
     'dom/bindings/parser',
+    'dom/media/test/external',
     'layout/tools/reftest',
     'other-licenses/ply',
-    'xpcom/idl-parser',
     'testing',
-    'testing/tools/autotry',
-    'testing/taskcluster',
-    'testing/xpcshell',
-    'testing/web-platform',
-    'testing/web-platform/harness',
-    'testing/marionette/client',
-    'testing/marionette/client/marionette/runner/mixins/browsermob-proxy-py',
-    'testing/marionette/transport',
-    'testing/marionette/driver',
+    'testing/firefox-ui/harness',
+    'testing/firefox-ui/tests',
     'testing/luciddream',
+    'testing/marionette/harness',
+    'testing/marionette/harness/marionette/runner/mixins/browsermob-proxy-py',
+    'testing/marionette/client',
     'testing/mozbase/mozcrash',
     'testing/mozbase/mozdebug',
     'testing/mozbase/mozdevice',
@@ -102,6 +100,13 @@ SEARCH_PATHS = [
     'testing/mozbase/moztest',
     'testing/mozbase/mozversion',
     'testing/mozbase/manifestparser',
+    'testing/puppeteer/firefox',
+    'testing/taskcluster',
+    'testing/tools/autotry',
+    'testing/web-platform',
+    'testing/web-platform/harness',
+    'testing/web-platform/tests/tools/wptserve',
+    'testing/xpcshell',
     'xpcom/idl-parser',
 ]
 
@@ -110,6 +115,7 @@ MACH_MODULES = [
     'addon-sdk/mach_commands.py',
     'build/valgrind/mach_commands.py',
     'dom/bindings/mach_commands.py',
+    'dom/media/test/external/mach_commands.py',
     'layout/tools/reftest/mach_commands.py',
     'python/mach_commands.py',
     'python/mach/mach/commands/commandinfo.py',
@@ -120,6 +126,7 @@ MACH_MODULES = [
     'python/mozbuild/mozbuild/compilation/codecomplete.py',
     'python/mozbuild/mozbuild/frontend/mach_commands.py',
     'services/common/tests/mach_commands.py',
+    'testing/firefox-ui/mach_commands.py',
     'testing/luciddream/mach_commands.py',
     'testing/mach_commands.py',
     'testing/marionette/mach_commands.py',
@@ -395,25 +402,18 @@ def bootstrap(topsrcdir, mozilla_dir=None):
             if is_environ:
                 if not os.path.exists(state_dir):
                     print('Creating global state directory from environment variable: %s'
-                        % state_dir)
+                          % state_dir)
                     os.makedirs(state_dir, mode=0o770)
-                    print('Please re-run mach.')
-                    sys.exit(1)
             else:
                 if not os.path.exists(state_dir):
                     print(STATE_DIR_FIRST_RUN.format(userdir=state_dir))
                     try:
-                        for i in range(20, -1, -1):
-                            time.sleep(1)
-                            sys.stdout.write('%d ' % i)
-                            sys.stdout.flush()
+                        sys.stdin.readline()
                     except KeyboardInterrupt:
                         sys.exit(1)
 
                     print('\nCreating default state directory: %s' % state_dir)
-                    os.mkdir(state_dir)
-                    print('Please re-run mach.')
-                    sys.exit(1)
+                    os.makedirs(state_dir, mode=0o770)
 
             return state_dir
 

@@ -20,6 +20,8 @@ using mozilla::dom::bluetooth::BluetoothGattResponse
   from "mozilla/dom/bluetooth/BluetoothCommon.h";
 using mozilla::dom::bluetooth::BluetoothGattServiceId
   from "mozilla/dom/bluetooth/BluetoothCommon.h";
+using mozilla::dom::bluetooth::BluetoothGattStatus
+  from "mozilla/dom/bluetooth/BluetoothCommon.h";
 using mozilla::dom::bluetooth::BluetoothGattWriteType
   from "mozilla/dom/bluetooth/BluetoothCommon.h";
 using mozilla::dom::bluetooth::BluetoothRemoteName
@@ -61,6 +63,7 @@ union BluetoothValue
   BluetoothAttributeHandle;
   BluetoothRemoteName;
   BluetoothUuid;
+  BluetoothUuid[];
 };
 
 /**
@@ -85,9 +88,15 @@ struct BluetoothReplySuccess
   BluetoothValue value;
 };
 
+union BluetoothErrorStatus
+{
+  BluetoothStatus;
+  BluetoothGattStatus;
+};
+
 struct BluetoothReplyError
 {
-  BluetoothStatus errorStatus;
+  BluetoothErrorStatus errorStatus;
   nsString errorString;
 };
 

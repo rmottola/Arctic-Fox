@@ -14,13 +14,14 @@
 #include "BluetoothDaemonGattInterface.h"
 #include "BluetoothDaemonHandsfreeInterface.h"
 #include "BluetoothDaemonHelpers.h"
+#include "BluetoothDaemonHidInterface.h"
 #include "BluetoothDaemonSetupInterface.h"
 #include "BluetoothDaemonSocketInterface.h"
+#include "mozilla/Hal.h"
 #include "mozilla/ipc/DaemonRunnables.h"
 #include "mozilla/ipc/DaemonSocket.h"
 #include "mozilla/ipc/DaemonSocketConnector.h"
 #include "mozilla/ipc/ListenSocket.h"
-#include "mozilla/unused.h"
 
 BEGIN_BLUETOOTH_NAMESPACE
 
@@ -80,6 +81,7 @@ class BluetoothDaemonProtocol final
   , public BluetoothDaemonA2dpModule
   , public BluetoothDaemonAvrcpModule
   , public BluetoothDaemonGattModule
+  , public BluetoothDaemonHidModule
 {
 public:
   BluetoothDaemonProtocol();
@@ -124,6 +126,9 @@ private:
   void HandleGattSvc(const DaemonSocketPDUHeader& aHeader,
                      DaemonSocketPDU& aPDU,
                      DaemonSocketResultHandler* aRes);
+  void HandleHidSvc(const DaemonSocketPDUHeader& aHeader,
+                    DaemonSocketPDU& aPDU,
+                    DaemonSocketResultHandler* aRes);
 
   DaemonSocket* mConnection;
   nsTArray<RefPtr<DaemonSocketResultHandler>> mResQ;
@@ -145,14 +150,14 @@ BluetoothDaemonProtocol::Send(DaemonSocketPDU* aPDU,
   MOZ_ASSERT(mConnection);
   MOZ_ASSERT(aPDU);
 
-  aPDU->SetConsumer(this);
-  aPDU->SetResultHandler(aRes);
-  aPDU->UpdateHeader();
-
   if (mConnection->GetConnectionStatus() == SOCKET_DISCONNECTED) {
     BT_LOGR("Connection to Bluetooth daemon is closed.");
     return NS_ERROR_FAILURE;
   }
+
+  aPDU->SetConsumer(this);
+  aPDU->SetResultHandler(aRes);
+  aPDU->UpdateHeader();
 
   mConnection->SendSocketData(aPDU); // Forward PDU to command channel
 
@@ -216,6 +221,14 @@ BluetoothDaemonProtocol::HandleGattSvc(
 }
 
 void
+BluetoothDaemonProtocol::HandleHidSvc(
+  const DaemonSocketPDUHeader& aHeader, DaemonSocketPDU& aPDU,
+  DaemonSocketResultHandler* aRes)
+{
+  BluetoothDaemonHidModule::HandleSvc(aHeader, aPDU, aRes);
+}
+
+void
 BluetoothDaemonProtocol::Handle(DaemonSocketPDU& aPDU)
 {
   static void (BluetoothDaemonProtocol::* const HandleSvc[])(
@@ -227,7 +240,8 @@ BluetoothDaemonProtocol::Handle(DaemonSocketPDU& aPDU)
       &BluetoothDaemonProtocol::HandleCoreSvc,
     [BluetoothDaemonSocketModule::SERVICE_ID] =
       &BluetoothDaemonProtocol::HandleSocketSvc,
-    [0x03] = nullptr, // HID host
+    [BluetoothDaemonHidModule::SERVICE_ID] =
+      &BluetoothDaemonProtocol::HandleHidSvc,
     [0x04] = nullptr, // PAN
     [BluetoothDaemonHandsfreeModule::SERVICE_ID] =
       &BluetoothDaemonProtocol::HandleHandsfreeSvc,
@@ -281,19 +295,6 @@ BluetoothDaemonProtocol::FetchResultHandler(
 // Interface
 //
 
-static bool
-IsDaemonRunning()
-{
-  char value[PROPERTY_VALUE_MAX];
-  NS_WARN_IF(property_get("init.svc.bluetoothd", value, "") < 0);
-  if (strcmp(value, "running")) {
-    BT_LOGR("[RESTART] Bluetooth daemon state <%s>", value);
-    return false;
-  }
-
-  return true;
-}
-
 BluetoothDaemonInterface*
 BluetoothDaemonInterface::GetInstance()
 {
@@ -313,42 +314,6 @@ BluetoothDaemonInterface::BluetoothDaemonInterface()
 
 BluetoothDaemonInterface::~BluetoothDaemonInterface()
 { }
-
-class BluetoothDaemonInterface::StartDaemonTask final : public Task
-{
-public:
-  StartDaemonTask(BluetoothDaemonInterface* aInterface,
-                  const nsACString& aCommand)
-    : mInterface(aInterface)
-    , mCommand(aCommand)
-  {
-    MOZ_ASSERT(mInterface);
-  }
-
-  void Run() override
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-
-    BT_LOGR("Start Daemon Task");
-    // Start Bluetooth daemon again
-    if (NS_WARN_IF(property_set("ctl.start", mCommand.get()) < 0)) {
-      mInterface->OnConnectError(CMD_CHANNEL);
-    }
-
-    // We're done if Bluetooth daemon is already running
-    if (IsDaemonRunning()) {
-      return;
-    }
-
-    // Otherwise try again later
-    MessageLoop::current()->PostDelayedTask(FROM_HERE,
-      new StartDaemonTask(mInterface, mCommand), sRetryInterval);
-  }
-
-private:
-  BluetoothDaemonInterface* mInterface;
-  nsCString mCommand;
-};
 
 class BluetoothDaemonInterface::InitResultHandler final
   : public BluetoothSetupResultHandler
@@ -445,12 +410,12 @@ BluetoothDaemonInterface::Init(
   // If we could not cleanup properly before and an old
   // instance of the daemon is still running, we kill it
   // here.
-  Unused << NS_WARN_IF(property_set("ctl.stop", "bluetoothd"));
+  mozilla::hal::StopSystemService("bluetoothd");
 
   mResultHandlerQ.AppendElement(aRes);
 
   if (!mProtocol) {
-    mProtocol = new BluetoothDaemonProtocol();
+    mProtocol = MakeUnique<BluetoothDaemonProtocol>();
   }
 
   if (!mListenSocket) {
@@ -460,7 +425,7 @@ BluetoothDaemonInterface::Init(
   // Init, step 1: Listen for command channel... */
 
   if (!mCmdChannel) {
-    mCmdChannel = new DaemonSocket(mProtocol, this, CMD_CHANNEL);
+    mCmdChannel = new DaemonSocket(mProtocol.get(), this, CMD_CHANNEL);
   } else if (
     NS_WARN_IF(mCmdChannel->GetConnectionStatus() == SOCKET_CONNECTED)) {
     // Command channel should not be open; let's close it.
@@ -603,84 +568,97 @@ BluetoothSetupInterface*
 BluetoothDaemonInterface::GetBluetoothSetupInterface()
 {
   if (mSetupInterface) {
-    return mSetupInterface;
+    return mSetupInterface.get();
   }
 
-  mSetupInterface = new BluetoothDaemonSetupInterface(mProtocol);
+  mSetupInterface = MakeUnique<BluetoothDaemonSetupInterface>(mProtocol.get());
 
-  return mSetupInterface;
+  return mSetupInterface.get();
 }
 
 BluetoothCoreInterface*
 BluetoothDaemonInterface::GetBluetoothCoreInterface()
 {
   if (mCoreInterface) {
-    return mCoreInterface;
+    return mCoreInterface.get();
   }
 
-  mCoreInterface = new BluetoothDaemonCoreInterface(mProtocol);
+  mCoreInterface = MakeUnique<BluetoothDaemonCoreInterface>(mProtocol.get());
 
-  return mCoreInterface;
+  return mCoreInterface.get();
 }
 
 BluetoothSocketInterface*
 BluetoothDaemonInterface::GetBluetoothSocketInterface()
 {
   if (mSocketInterface) {
-    return mSocketInterface;
+    return mSocketInterface.get();
   }
 
-  mSocketInterface = new BluetoothDaemonSocketInterface(mProtocol);
+  mSocketInterface = MakeUnique<BluetoothDaemonSocketInterface>(mProtocol.get());
 
-  return mSocketInterface;
+  return mSocketInterface.get();
+}
+
+BluetoothHidInterface*
+BluetoothDaemonInterface::GetBluetoothHidInterface()
+{
+  if (mHidInterface) {
+    return mHidInterface.get();
+  }
+
+  mHidInterface = MakeUnique<BluetoothDaemonHidInterface>(mProtocol.get());
+
+  return mHidInterface.get();
 }
 
 BluetoothHandsfreeInterface*
 BluetoothDaemonInterface::GetBluetoothHandsfreeInterface()
 {
   if (mHandsfreeInterface) {
-    return mHandsfreeInterface;
+    return mHandsfreeInterface.get();
   }
 
-  mHandsfreeInterface = new BluetoothDaemonHandsfreeInterface(mProtocol);
+  mHandsfreeInterface =
+    MakeUnique<BluetoothDaemonHandsfreeInterface>(mProtocol.get());
 
-  return mHandsfreeInterface;
+  return mHandsfreeInterface.get();
 }
 
 BluetoothA2dpInterface*
 BluetoothDaemonInterface::GetBluetoothA2dpInterface()
 {
   if (mA2dpInterface) {
-    return mA2dpInterface;
+    return mA2dpInterface.get();
   }
 
-  mA2dpInterface = new BluetoothDaemonA2dpInterface(mProtocol);
+  mA2dpInterface = MakeUnique<BluetoothDaemonA2dpInterface>(mProtocol.get());
 
-  return mA2dpInterface;
+  return mA2dpInterface.get();
 }
 
 BluetoothAvrcpInterface*
 BluetoothDaemonInterface::GetBluetoothAvrcpInterface()
 {
   if (mAvrcpInterface) {
-    return mAvrcpInterface;
+    return mAvrcpInterface.get();
   }
 
-  mAvrcpInterface = new BluetoothDaemonAvrcpInterface(mProtocol);
+  mAvrcpInterface = MakeUnique<BluetoothDaemonAvrcpInterface>(mProtocol.get());
 
-  return mAvrcpInterface;
+  return mAvrcpInterface.get();
 }
 
 BluetoothGattInterface*
 BluetoothDaemonInterface::GetBluetoothGattInterface()
 {
   if (mGattInterface) {
-    return mGattInterface;
+    return mGattInterface.get();
   }
 
-  mGattInterface = new BluetoothDaemonGattInterface(mProtocol);
+  mGattInterface = MakeUnique<BluetoothDaemonGattInterface>(mProtocol.get());
 
-  return mGattInterface;
+  return mGattInterface.get();
 }
 
 // |DaemonSocketConsumer|, |ListenSocketConsumer|
@@ -694,30 +672,15 @@ BluetoothDaemonInterface::OnConnectSuccess(int aIndex)
   switch (aIndex) {
     case LISTEN_SOCKET: {
         // Init, step 2: Start Bluetooth daemon */
-        nsCString value("bluetoothd:-a ");
-        value.Append(mListenSocketName);
-        if (NS_WARN_IF(property_set("ctl.start", value.get()) < 0)) {
-          OnConnectError(CMD_CHANNEL);
-        }
-
-        /*
-         * If Bluetooth daemon is not running, retry to start it later.
-         *
-         * This condition happens when when we restart Bluetooth daemon
-         * immediately after it crashed, as the daemon state remains 'stopping'
-         * instead of 'stopped'. Due to the limitation of property service,
-         * hereby add delay. See Bug 1143925 Comment 41.
-         */
-        if (!IsDaemonRunning()) {
-          MessageLoop::current()->PostDelayedTask(FROM_HERE,
-              new StartDaemonTask(this, value), sRetryInterval);
-        }
+        nsCString args("-a ");
+        args.Append(mListenSocketName);
+        mozilla::hal::StartSystemService("bluetoothd", args.get());
       }
       break;
     case CMD_CHANNEL:
       // Init, step 3: Listen for notification channel...
       if (!mNtfChannel) {
-        mNtfChannel = new DaemonSocket(mProtocol, this, NTF_CHANNEL);
+        mNtfChannel = new DaemonSocket(mProtocol.get(), this, NTF_CHANNEL);
       } else if (
         NS_WARN_IF(mNtfChannel->GetConnectionStatus() == SOCKET_CONNECTED)) {
         /* Notification channel should not be open; let's close it. */
@@ -757,7 +720,7 @@ BluetoothDaemonInterface::OnConnectError(int aIndex)
       mCmdChannel->Close();
     case CMD_CHANNEL:
       // Stop daemon and close listen socket
-      Unused << NS_WARN_IF(property_set("ctl.stop", "bluetoothd"));
+      mozilla::hal::StopSystemService("bluetoothd");
       mListenSocket->Close();
     case LISTEN_SOCKET:
       if (!mResultHandlerQ.IsEmpty()) {

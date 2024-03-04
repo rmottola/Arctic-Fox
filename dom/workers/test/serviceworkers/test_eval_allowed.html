@@ -29,8 +29,10 @@
     register()
       .then(function(swr) {
         ok(true, "eval restriction didn't get inherited");
-        swr.unregister();
-        SimpleTest.finish();
+        swr.unregister()
+          .then(function() {
+            SimpleTest.finish();
+          });
       }).catch(function(e) {
         ok(false, "Some test failed with error " + e);
         SimpleTest.finish();
@@ -42,7 +44,6 @@
     ["dom.serviceWorkers.exemptFromPerDomainMax", true],
     ["dom.serviceWorkers.enabled", true],
     ["dom.serviceWorkers.testing.enabled", true],
-    ['dom.serviceWorkers.interception.enabled', true],
   ]}, runTest);
 </script>
 </pre>

@@ -88,6 +88,20 @@ template void LIRGeneratorARM64::lowerForFPU(LInstructionHelper<1, 2, 1>* ins, M
                                              MDefinition* lhs, MDefinition* rhs);
 
 void
+LIRGeneratorARM64::lowerForALUInt64(LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>* ins,
+                                    MDefinition* mir, MDefinition* lhs, MDefinition* rhs)
+{
+    MOZ_CRASH("NYI");
+}
+
+void
+LIRGeneratorARM64::lowerForShiftInt64(LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, 0>* ins,
+                                      MDefinition* mir, MDefinition* lhs, MDefinition* rhs)
+{
+    MOZ_CRASH("NYI");
+}
+
+void
 LIRGeneratorARM64::lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
                                          MDefinition* lhs, MDefinition* rhs)
 {
@@ -133,6 +147,18 @@ LIRGeneratorARM64::lowerModI(MMod* mod)
 }
 
 void
+LIRGeneratorARM64::lowerDivI64(MDiv* div)
+{
+    MOZ_CRASH("NYI");
+}
+
+void
+LIRGeneratorARM64::lowerModI64(MMod* mod)
+{
+    MOZ_CRASH("NYI");
+}
+
+void
 LIRGeneratorARM64::visitPowHalf(MPowHalf* ins)
 {
     MOZ_CRASH("visitPowHalf");
@@ -173,6 +199,12 @@ void
 LIRGeneratorARM64::visitAsmJSNeg(MAsmJSNeg* ins)
 {
     MOZ_CRASH("visitAsmJSNeg");
+}
+
+void
+LIRGeneratorARM64::visitAsmSelect(MAsmSelect* ins)
+{
+    MOZ_CRASH("visitAsmSelect");
 }
 
 void
@@ -308,4 +340,16 @@ LIRGeneratorARM64::visitRandom(MRandom* ins)
                                         temp(),
                                         temp());
     defineFixed(lir, ins, LFloatReg(ReturnDoubleReg));
+}
+
+void
+LIRGeneratorARM64::visitTruncateToInt64(MTruncateToInt64* ins)
+{
+    MOZ_CRASH("NY");
+}
+
+void
+LIRGeneratorARM64::visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins)
+{
+    MOZ_CRASH("NY");
 }

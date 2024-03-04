@@ -10,7 +10,7 @@
 #include "BluetoothService.h"
 #include "BluetoothSocket.h"
 #include "BluetoothUtils.h"
-#include "BluetoothUuid.h"
+#include "BluetoothUuidHelper.h"
 
 #include "mozilla/dom/BluetoothPbapParametersBinding.h"
 #include "mozilla/Endian.h"
@@ -19,7 +19,6 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
-#include "nsAutoPtr.h"
 #include "nsIInputStream.h"
 #include "nsIObserver.h"
 #include "nsIObserverService.h"
@@ -206,7 +205,7 @@ BluetoothPbapManager::Listen()
 // Virtual function of class SocketConsumer
 void
 BluetoothPbapManager::ReceiveSocketData(BluetoothSocket* aSocket,
-                                        nsAutoPtr<UnixSocketBuffer>& aMessage)
+                                        UniquePtr<UnixSocketBuffer>& aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -517,9 +516,7 @@ BluetoothPbapManager::NotifyPasswordRequest(const ObexHeaderSet& aHeader)
   MOZ_ASSERT(aHeader.Has(ObexHeaderId::AuthChallenge));
 
   // Get authentication challenge data
-  int dataLength;
-  nsAutoArrayPtr<uint8_t> dataPtr;
-  aHeader.GetAuthChallenge(dataPtr, &dataLength);
+  const ObexHeader* authHeader = aHeader.GetHeader(ObexHeaderId::AuthChallenge);
 
   // Get nonce from authentication challenge
   // Section 3.5.1 "Digest Challenge", IrOBEX spec 1.2
@@ -527,16 +524,16 @@ BluetoothPbapManager::NotifyPasswordRequest(const ObexHeaderSet& aHeader)
   //   [tagId:1][length:1][nonce:16]
   uint8_t offset = 0;
   do {
-    uint8_t tagId = dataPtr[offset++];
-    uint8_t length = dataPtr[offset++];
+    uint8_t tagId = authHeader->mData[offset++];
+    uint8_t length = authHeader->mData[offset++];
 
     BT_LOGR("AuthChallenge header includes tagId %d", tagId);
     if (tagId == ObexDigestChallenge::Nonce) {
-      memcpy(mRemoteNonce, &dataPtr[offset], DIGEST_LENGTH);
+      memcpy(mRemoteNonce, &authHeader->mData[offset], DIGEST_LENGTH);
     }
 
     offset += length;
-  } while (offset < dataLength);
+  } while (offset < authHeader->mDataLength);
 
   // Ensure bluetooth service is available
   BluetoothService* bs = BluetoothService::Get();
@@ -745,14 +742,14 @@ BluetoothPbapManager::ReplyToConnect(const nsAString& aPassword)
     // The request-digest is required and calculated as follows:
     //   H(nonce ":" password)
     uint32_t hashStringLength = DIGEST_LENGTH + aPassword.Length() + 1;
-    nsAutoArrayPtr<char> hashString(new char[hashStringLength]);
+    UniquePtr<char[]> hashString(new char[hashStringLength]);
 
-    memcpy(hashString, mRemoteNonce, DIGEST_LENGTH);
+    memcpy(hashString.get(), mRemoteNonce, DIGEST_LENGTH);
     hashString[DIGEST_LENGTH] = ':';
     memcpy(&hashString[DIGEST_LENGTH + 1],
            NS_ConvertUTF16toUTF8(aPassword).get(),
            aPassword.Length());
-    MD5Hash(hashString, hashStringLength);
+    MD5Hash(hashString.get(), hashStringLength);
 
     // 2 tag-length-value triplets: <request-digest:16><nonce:16>
     uint8_t digestResponse[(DIGEST_LENGTH + 2) * 2];
@@ -1040,8 +1037,8 @@ BluetoothPbapManager::ReplyToGet(uint16_t aPhonebookSize)
 
       // Read vCard data from input stream
       uint32_t numRead = 0;
-      nsAutoArrayPtr<char> buf(new char[remainingPacketSize]);
-      rv = mVCardDataStream->Read(buf, remainingPacketSize, &numRead);
+      UniquePtr<char[]> buf(new char[remainingPacketSize]);
+      rv = mVCardDataStream->Read(buf.get(), remainingPacketSize, &numRead);
       if (NS_FAILED(rv)) {
         BT_LOGR("Failed to read from input stream. rv=0x%x",
                 static_cast<uint32_t>(rv));

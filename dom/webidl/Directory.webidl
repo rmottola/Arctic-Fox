@@ -20,6 +20,7 @@ interface Directory {
   /*
    * The leaf name of the directory.
    */
+  [Throws]
   readonly attribute DOMString name;
 
   /*
@@ -99,13 +100,19 @@ partial interface Directory {
   //readonly attribute DOMString name;
 
   /*
-   * The base name of the directory (a relative path excluding the leaf name).
+   * The path of the Directory (includes both its basename and leafname).
+   * The path begins with the name of the ancestor Directory that was
+   * originally exposed to content (say via a directory picker) and traversed
+   * to obtain this Directory.  Full filesystem paths are not exposed to
+   * unprivilaged content.
    */
+  [Throws]
   readonly attribute DOMString path;
 
   /*
    * Getter for the immediate children of this directory.
    */
+  [Throws]
   Promise<sequence<(File or Directory)>> getFilesAndDirectories();
 };
 

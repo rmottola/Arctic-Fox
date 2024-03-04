@@ -546,8 +546,6 @@ gfxDWriteFont::GetCairoScaledFont()
         cairo_dwrite_scaled_font_allow_manual_show_glyphs(mScaledFont,
                                                           mAllowManualShowGlyphs);
 
-        gfxDWriteFontEntry *fe =
-            static_cast<gfxDWriteFontEntry*>(mFontEntry.get());
         cairo_dwrite_scaled_font_set_force_GDI_classic(mScaledFont,
                                                        GetForceGDIClassic());
     }

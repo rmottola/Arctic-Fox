@@ -2,19 +2,14 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
-
-var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-
-var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
-// To enable logging for try runs, just set the pref to true.
-Services.prefs.setBoolPref("devtools.debugger.log", false);
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
+var Services = require("Services");
 var promise = require("promise");
+var { gDevTools } = require("devtools/client/framework/devtools");
 var { DebuggerClient } = require("devtools/shared/client/main");
 var { DebuggerServer } = require("devtools/server/main");
 var { WebGLFront } = require("devtools/server/actors/webgl");
@@ -31,6 +26,10 @@ const SHADER_ORDER_URL = EXAMPLE_URL + "doc_shader-order.html";
 const MULTIPLE_CONTEXTS_URL = EXAMPLE_URL + "doc_multiple-contexts.html";
 const OVERLAPPING_GEOMETRY_CANVAS_URL = EXAMPLE_URL + "doc_overlapping-geometry.html";
 const BLENDED_GEOMETRY_CANVAS_URL = EXAMPLE_URL + "doc_blended-geometry.html";
+
+var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+// To enable logging for try runs, just set the pref to true.
+Services.prefs.setBoolPref("devtools.debugger.log", false);
 
 // All tests are asynchronous.
 waitForExplicitFinish();

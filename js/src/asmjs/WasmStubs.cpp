@@ -295,10 +295,17 @@ FillArgumentArray(MacroAssembler& masm, const ValTypeVector& args, unsigned argO
             MOZ_CRASH("AsmJS uses hardfp for function calls.");
             break;
 #endif
-          case ABIArg::FPU:
-            masm.canonicalizeDouble(i->fpu());
-            masm.storeDouble(i->fpu(), dstAddr);
+          case ABIArg::FPU: {
+            MOZ_ASSERT(IsFloatingPointType(i.mirType()));
+            FloatRegister srcReg = i->fpu();
+            if (i.mirType() == MIRType_Float32) {
+                masm.convertFloat32ToDouble(i->fpu(), ScratchDoubleReg);
+                srcReg = ScratchDoubleReg;
+            }
+            masm.canonicalizeDouble(srcReg);
+            masm.storeDouble(srcReg, dstAddr);
             break;
+          }
           case ABIArg::Stack:
             if (i.mirType() == MIRType_Int32) {
                 Address src(masm.getStackPointer(), offsetToCallerStackArgs + i->offsetFromArgBase());
@@ -309,9 +316,14 @@ FillArgumentArray(MacroAssembler& masm, const ValTypeVector& args, unsigned argO
                 masm.memIntToValue(src, dstAddr);
 #endif
             } else {
-                MOZ_ASSERT(i.mirType() == MIRType_Double);
+                MOZ_ASSERT(IsFloatingPointType(i.mirType()));
                 Address src(masm.getStackPointer(), offsetToCallerStackArgs + i->offsetFromArgBase());
-                masm.loadDouble(src, ScratchDoubleReg);
+                if (i.mirType() == MIRType_Float32) {
+                    masm.loadFloat32(src, ScratchFloat32Reg);
+                    masm.convertFloat32ToDouble(ScratchFloat32Reg, ScratchDoubleReg);
+                } else {
+                    masm.loadDouble(src, ScratchDoubleReg);
+                }
                 masm.canonicalizeDouble(ScratchDoubleReg);
                 masm.storeDouble(ScratchDoubleReg, dstAddr);
             }
@@ -776,7 +788,8 @@ GenerateErrorStub(MacroAssembler& masm, SymbolicAddress address)
     offsets.begin = masm.currentOffset();
 
     // sp can be anything at this point, so ensure it is aligned when calling
-    // into C++.  We unconditionally jump to throw so don't worry about restoring sp.
+    // into C++.  We unconditionally jump to throw so don't worry about
+    // restoring sp.
     masm.andToStackPtr(Imm32(~(ABIStackAlignment - 1)));
 
     masm.assertStackAlignment(ABIStackAlignment);
@@ -832,6 +845,8 @@ wasm::GenerateJumpTarget(MacroAssembler& masm, JumpTarget target)
         return GenerateErrorStub(masm, SymbolicAddress::OnOutOfBounds);
       case JumpTarget::BadIndirectCall:
         return GenerateErrorStub(masm, SymbolicAddress::BadIndirectCall);
+      case JumpTarget::UnreachableTrap:
+        return GenerateErrorStub(masm, SymbolicAddress::UnreachableTrap);
       case JumpTarget::Throw:
         return GenerateThrow(masm);
       case JumpTarget::Limit:

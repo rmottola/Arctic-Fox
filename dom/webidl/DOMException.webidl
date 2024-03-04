@@ -50,10 +50,11 @@ interface ExceptionMembers
 
   // A stack trace, if available.  nsIStackFrame does not have classinfo so
   // this was only ever usefully available to chrome JS.
-  [ChromeOnly]
+  [ChromeOnly, Exposed=Window]
   readonly attribute StackFrame?             location;
 
   // Arbitary data for the implementation.
+  [Exposed=Window]
   readonly attribute nsISupports?            data;
 
   // Formatted exception stack
@@ -61,7 +62,7 @@ interface ExceptionMembers
   readonly attribute DOMString               stack;
 };
 
-[NoInterfaceObject]
+[NoInterfaceObject, Exposed=(Window,Worker)]
 interface Exception {
   // A generic formatter - make it suitable to print, etc.
   stringifier;

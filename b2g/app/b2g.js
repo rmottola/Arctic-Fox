@@ -350,6 +350,10 @@ pref("browser.safebrowsing.malware.enabled", true);
 pref("browser.safebrowsing.downloads.enabled", true);
 pref("browser.safebrowsing.downloads.remote.enabled", true);
 pref("browser.safebrowsing.downloads.remote.timeout_ms", 10000);
+pref("browser.safebrowsing.downloads.remote.block_dangerous",            true);
+pref("browser.safebrowsing.downloads.remote.block_dangerous_host",       true);
+pref("browser.safebrowsing.downloads.remote.block_potentially_unwanted", false);
+pref("browser.safebrowsing.downloads.remote.block_uncommon",             false);
 pref("browser.safebrowsing.debug", false);
 
 pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
@@ -433,9 +437,6 @@ pref("dom.sms.enabled", true);
 
 //The waiting time in network manager.
 pref("network.gonk.ms-release-mms-connection", 30000);
-
-// WebContacts
-pref("dom.mozContacts.enabled", true);
 
 // Shortnumber matching needed for e.g. Brazil:
 // 03187654321 can be found with 87654321

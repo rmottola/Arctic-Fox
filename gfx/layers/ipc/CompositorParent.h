@@ -22,6 +22,7 @@
 #include "base/thread.h"                // for Thread
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT_HELPER2
 #include "mozilla/Attributes.h"         // for override
+#include "mozilla/Maybe.h"
 #include "mozilla/Monitor.h"            // for Monitor
 #include "mozilla/RefPtr.h"             // for RefPtr
 #include "mozilla/TimeStamp.h"          // for TimeStamp
@@ -30,7 +31,7 @@
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/layers/LayersMessages.h"  // for TargetConfig
-#include "mozilla/layers/PCompositorParent.h"
+#include "mozilla/layers/PCompositorBridgeParent.h"
 #include "mozilla/layers/ShadowLayersManager.h" // for ShadowLayersManager
 #include "mozilla/layers/APZTestData.h"
 #include "nsAutoPtr.h"                  // for nsRefPtr
@@ -56,6 +57,7 @@ class CompositorParent;
 class LayerManagerComposite;
 class LayerTransactionParent;
 class PAPZParent;
+class CrossProcessCompositorParent;
 
 struct ScopedLayerTreeRegistration
 {
@@ -212,7 +214,7 @@ protected:
   virtual ~CompositorUpdateObserver() {}
 };
 
-class CompositorParent final : public PCompositorParent,
+class CompositorParent final : public PCompositorBridgeParent,
                                public ShadowLayersManager
 {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING_WITH_MAIN_THREAD_DESTRUCTION(CompositorParent)
@@ -237,6 +239,7 @@ public:
                                 const gfx::IntRect& aRect) override;
   virtual bool RecvMakeWidgetSnapshot(const SurfaceDescriptor& aInSnapshot) override;
   virtual bool RecvFlushRendering() override;
+  virtual bool RecvForcePresent() override;
 
   virtual bool RecvGetTileSize(int32_t* aWidth, int32_t* aHeight) override;
 
@@ -247,6 +250,13 @@ public:
   // Unused for chrome <-> compositor communication (which this class does).
   // @see CrossProcessCompositorParent::RecvRequestNotifyAfterRemotePaint
   virtual bool RecvRequestNotifyAfterRemotePaint() override { return true; };
+
+  virtual bool RecvClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
+                                                    const uint32_t& aPresShellId) override;
+  void ClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
+                                        const Maybe<uint32_t>& aPresShellId);
+  virtual bool RecvNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
+                                                    const CSSIntRegion& aRegion) override;
 
   virtual void ActorDestroy(ActorDestroyReason why) override;
 
@@ -272,6 +282,20 @@ public:
                                       const uint64_t& aInputBlockId,
                                       const nsTArray<ScrollableLayerGuid>& aTargets) override;
   virtual AsyncCompositionManager* GetCompositionManager(LayerTransactionParent* aLayerTree) override { return mCompositionManager; }
+
+  /**
+   * Request that the compositor be recreated due to a shared device reset.
+   * This must be called on the main thread, and blocks until a task posted
+   * to the compositor thread has completed.
+   *
+   * Note that this posts a task directly, rather than using synchronous
+   * IPDL, and waits on a monitor notification from the compositor thread.
+   * We do this as a best-effort attempt to jump any IPDL messages that
+   * have not yet been posted (and are sitting around in the IO pipe), to
+   * minimize the amount of time the main thread is blocked.
+   */
+  bool ResetCompositor(const nsTArray<LayersBackend>& aBackendHints,
+                       TextureFactoryIdentifier* aOutIdentifier);
 
   /**
    * This forces the is-first-paint flag to true. This is intended to
@@ -316,6 +340,15 @@ public:
    * tree of this compositor.
    */
   uint64_t RootLayerTreeId();
+
+  /**
+   * Notify local and remote layer trees connected to this compositor that
+   * the compositor's local device is being reset. All layers must be
+   * invalidated to clear any cached TextureSources.
+   *
+   * This must be called on the compositor thread.
+   */
+  void InvalidateRemoteLayers();
 
   /**
    * Returns a pointer to the compositor corresponding to the given ID.
@@ -376,7 +409,7 @@ public:
    * A new child process has been configured to push transactions
    * directly to us.  Transport is to its thread context.
    */
-  static PCompositorParent*
+  static PCompositorBridgeParent*
   Create(Transport* aTransport, ProcessId aOtherProcess);
 
   struct LayerTreeState {
@@ -388,8 +421,8 @@ public:
     LayerManagerComposite* mLayerManager;
     // Pointer to the CrossProcessCompositorParent. Used by APZCs to share
     // their FrameMetrics with the corresponding child process that holds
-    // the PCompositorChild
-    PCompositorParent* mCrossProcessParent;
+    // the PCompositorBridgeChild
+    CrossProcessCompositorParent* mCrossProcessParent;
     TargetConfig mTargetConfig;
     APZTestData mApzTestData;
     LayerTransactionParent* mLayerTree;
@@ -397,6 +430,8 @@ public:
     bool mUpdatedPluginDataAvailable;
     RefPtr<CompositorUpdateObserver> mLayerTreeReadyObserver;
     RefPtr<CompositorUpdateObserver> mLayerTreeClearedObserver;
+
+    PCompositorBridgeParent* CrossProcessPCompositorBridge() const;
   };
 
   /**
@@ -488,6 +523,11 @@ protected:
   void CancelCurrentCompositeTask();
   void Invalidate();
 
+  RefPtr<Compositor> NewCompositor(const nsTArray<LayersBackend>& aBackendHints);
+  void ResetCompositorTask(const nsTArray<LayersBackend>& aBackendHints,
+                           Maybe<TextureFactoryIdentifier>* aOutNewIdentifier);
+  Maybe<TextureFactoryIdentifier> ResetCompositorImpl(const nsTArray<LayersBackend>& aBackendHints);
+
   /**
    * Add a compositor to the global compositor map.
    */
@@ -505,6 +545,11 @@ protected:
 
   void DidComposite(TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd);
 
+  // The indirect layer tree lock must be held before calling this function.
+  // Callback should take (LayerTreeState* aState, const uint64_t& aLayersId)
+  template <typename Lambda>
+  inline void ForEachIndirectLayerTree(const Lambda& aCallback);
+
   RefPtr<LayerManagerComposite> mLayerManager;
   RefPtr<Compositor> mCompositor;
   RefPtr<AsyncCompositionManager> mCompositionManager;
@@ -521,6 +566,7 @@ protected:
 
   mozilla::Monitor mPauseCompositionMonitor;
   mozilla::Monitor mResumeCompositionMonitor;
+  mozilla::Monitor mResetCompositorMonitor;
 
   uint64_t mCompositorID;
   const uint64_t mRootLayerTreeID;

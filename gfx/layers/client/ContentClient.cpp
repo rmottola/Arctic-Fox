@@ -73,7 +73,7 @@ ContentClient::CreateContentClient(CompositableForwarder* aForwarder)
 
 #ifdef XP_WIN
   if (backend == LayersBackend::LAYERS_D3D11) {
-    useDoubleBuffering = !!gfxWindowsPlatform::GetPlatform()->GetD3D10Device();
+    useDoubleBuffering = gfxWindowsPlatform::GetPlatform()->GetRenderMode() == gfxWindowsPlatform::RENDER_DIRECT2D;
   } else
 #endif
 #ifdef MOZ_WIDGET_GTK
@@ -448,31 +448,13 @@ ContentClientDoubleBuffered::Updated(const nsIntRegion& aRegionToDraw,
 {
   ContentClientRemoteBuffer::Updated(aRegionToDraw, aVisibleRegion, aDidSelfCopy);
 
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
   if (mFrontClient) {
-    // remove old buffer from CompositableHost
-    RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
-    RefPtr<AsyncTransactionTracker> tracker =
-        new RemoveTextureFromCompositableTracker(waiter);
-    // Hold TextureClient until transaction complete.
-    tracker->SetTextureClient(mFrontClient);
-    mFrontClient->SetRemoveFromCompositableWaiter(waiter);
-    // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
-    GetForwarder()->RemoveTextureFromCompositableAsync(tracker, this, mFrontClient);
+    mFrontClient->RemoveFromCompositable(this);
   }
 
   if (mFrontClientOnWhite) {
-    // remove old buffer from CompositableHost
-    RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
-    RefPtr<AsyncTransactionTracker> tracker =
-        new RemoveTextureFromCompositableTracker(waiter);
-    // Hold TextureClient until transaction complete.
-    tracker->SetTextureClient(mFrontClientOnWhite);
-    mFrontClientOnWhite->SetRemoveFromCompositableWaiter(waiter);
-    // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
-    GetForwarder()->RemoveTextureFromCompositableAsync(tracker, this, mFrontClientOnWhite);
+    mFrontClientOnWhite->RemoveFromCompositable(this);
   }
-#endif
 }
 
 void

@@ -203,22 +203,6 @@ class Defines(BaseDefines):
 class HostDefines(BaseDefines):
     pass
 
-class TestHarnessFiles(ContextDerived):
-    """Sandbox container object for TEST_HARNESS_FILES,
-    which is a HierarchicalStringList.
-
-    We need an object derived from ContextDerived for use in the backend, so
-    this object fills that role. It just has a reference to the underlying
-    HierarchicalStringList, which is created when parsing TEST_HARNESS_FILES.
-    """
-    __slots__ = ('srcdir_files', 'srcdir_pattern_files', 'objdir_files')
-
-    def __init__(self, context, srcdir_files, srcdir_pattern_files, objdir_files):
-        ContextDerived.__init__(self, context)
-        self.srcdir_files = srcdir_files
-        self.srcdir_pattern_files = srcdir_pattern_files
-        self.objdir_files = objdir_files
-
 class IPDLFile(ContextDerived):
     """Describes an individual .ipdl source file."""
 
@@ -814,7 +798,10 @@ class FinalTargetPreprocessedFiles(ContextDerived):
         self.files = files
 
 
-class TestingFiles(FinalTargetFiles):
+class TestHarnessFiles(FinalTargetFiles):
+    """Sandbox container object for TEST_HARNESS_FILES,
+    which is a HierarchicalStringList.
+    """
     @property
     def install_target(self):
         return '_tests'
@@ -846,22 +833,35 @@ class BrandingFiles(FinalTargetFiles):
         return 'dist/branding'
 
 
+class SdkFiles(FinalTargetFiles):
+    """Sandbox container object for SDK_FILES, which is a
+    HierarchicalStringList.
+
+    We need an object derived from ContextDerived for use in the backend, so
+    this object fills that role. It just has a reference to the underlying
+    HierarchicalStringList, which is created when parsing SDK_FILES.
+    """
+    @property
+    def install_target(self):
+        return 'dist/sdk'
+
+
 class GeneratedFile(ContextDerived):
     """Represents a generated file."""
 
     __slots__ = (
         'script',
         'method',
-        'output',
+        'outputs',
         'inputs',
         'flags',
     )
 
-    def __init__(self, context, script, method, output, inputs, flags=()):
+    def __init__(self, context, script, method, outputs, inputs, flags=()):
         ContextDerived.__init__(self, context)
         self.script = script
         self.method = method
-        self.output = output
+        self.outputs = outputs if isinstance(outputs, tuple) else (outputs,)
         self.inputs = inputs
         self.flags = flags
 

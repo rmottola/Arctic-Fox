@@ -2171,6 +2171,14 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
   }
 #endif
 
+  case NPNVCSSZoomFactor: {
+    nsNPAPIPluginInstance *inst =
+      (nsNPAPIPluginInstance *) (npp ? npp->ndata : nullptr);
+    double scaleFactor = inst ? inst->GetCSSZoomFactor() : 1.0;
+    *(double*)result = scaleFactor;
+    return NPERR_NO_ERROR;
+  }
+
 #ifdef MOZ_WIDGET_ANDROID
     case kLogInterfaceV0_ANPGetValue: {
       LOG("get log interface");
@@ -2288,9 +2296,7 @@ _getvalue(NPP npp, NPNVariable variable, void *result)
 
     case kOpenGLInterfaceV0_ANPGetValue: {
       LOG("get openGL interface");
-      ANPOpenGLInterfaceV0 *i = (ANPOpenGLInterfaceV0*) result;
-      InitOpenGLInterface(i);
-      return NPERR_NO_ERROR;
+      return NPERR_GENERIC_ERROR;
     }
 
     case kWindowInterfaceV1_ANPGetValue: {

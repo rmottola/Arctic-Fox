@@ -207,12 +207,6 @@ MOZ_PROGRAM_LDFLAGS += -Wl,-rpath -Wl,@executable_path/Frameworks
 endif
 endif
 
-ifeq ($(SOLARIS_SUNPRO_CXX),1)
-ifeq (86,$(findstring 86,$(OS_TEST)))
-OS_LDFLAGS += -M $(MOZILLA_DIR)/config/solaris_ia32.map
-endif # x86
-endif # Solaris Sun Studio C++
-
 ifeq ($(HOST_OS_ARCH),WINNT)
 HOST_PDBFILE=$(basename $(@F)).pdb
 HOST_PDB_FLAG ?= -Fd$(HOST_PDBFILE)
@@ -236,7 +230,8 @@ SOBJS = $(notdir $(SSRCS:.S=.$(OBJ_SUFFIX)))
 CPPOBJS = $(notdir $(addsuffix .$(OBJ_SUFFIX),$(basename $(CPPSRCS))))
 CMOBJS = $(notdir $(CMSRCS:.m=.$(OBJ_SUFFIX)))
 CMMOBJS = $(notdir $(CMMSRCS:.mm=.$(OBJ_SUFFIX)))
-ASOBJS = $(notdir $(ASFILES:.$(ASM_SUFFIX)=.$(OBJ_SUFFIX)))
+# ASFILES can have different extensions (.s, .asm)
+ASOBJS = $(notdir $(addsuffix .$(OBJ_SUFFIX),$(basename $(ASFILES))))
 RSOBJS = $(addprefix lib,$(notdir $(RSSRCS:.rs=.$(LIB_SUFFIX))))
 ifndef OBJS
 _OBJS = $(COBJS) $(SOBJS) $(CPPOBJS) $(CMOBJS) $(CMMOBJS) $(ASOBJS) $(RSOBJS)
@@ -262,7 +257,6 @@ SIMPLE_PROGRAMS :=
 HOST_LIBRARY :=
 HOST_PROGRAM :=
 HOST_SIMPLE_PROGRAMS :=
-SDK_BINARY := $(filter %.py,$(SDK_BINARY))
 SDK_LIBRARY :=
 endif
 
@@ -291,14 +285,6 @@ endif
 
 ifdef HOST_SIMPLE_PROGRAMS
 GARBAGE			+= $(HOST_SIMPLE_PROGRAMS:%=%.$(OBJ_SUFFIX))
-endif
-
-#
-# the Solaris WorkShop template repository cache.  it occasionally can get
-# out of sync, so targets like clobber should kill it.
-#
-ifeq ($(SOLARIS_SUNPRO_CXX),1)
-GARBAGE_DIRS += SunWS_cache
 endif
 
 ifdef MOZ_UPDATE_XTERM
@@ -864,25 +850,6 @@ ifdef ENABLE_STRIP
 	$(STRIP) $(STRIP_FLAGS) $@
 endif
 
-ifeq ($(SOLARIS_SUNPRO_CC),1)
-_MDDEPFILE = $(MDDEPDIR)/$(@F).pp
-
-define MAKE_DEPS_AUTO_CC
-if test -d $(@D); then \
-	echo 'Building deps for $< using Sun Studio cc'; \
-	$(CC) $(COMPILE_CFLAGS) -xM  $< >$(_MDDEPFILE) ; \
-	$(PYTHON) $(MOZILLA_DIR)/build/unix/add_phony_targets.py $(_MDDEPFILE) ; \
-fi
-endef
-define MAKE_DEPS_AUTO_CXX
-if test -d $(@D); then \
-	echo 'Building deps for $< using Sun Studio CC'; \
-	$(CXX) $(COMPILE_CXXFLAGS) -xM $< >$(_MDDEPFILE) ; \
-	$(PYTHON) $(MOZILLA_DIR)/build/unix/add_phony_targets.py $(_MDDEPFILE) ; \
-fi
-endef
-endif # Sun Studio on Solaris
-
 # The object file is in the current directory, and the source file can be any
 # relative path. This macro adds the dependency obj: src for each source file.
 # This dependency must be first for the $< flag to work correctly, and the
@@ -922,7 +889,6 @@ $(HOST_CMMOBJS):
 
 $(COBJS):
 	$(REPORT_BUILD)
-	@$(MAKE_DEPS_AUTO_CC)
 	$(ELOG) $(CC) $(OUTOPTION)$@ -c $(COMPILE_CFLAGS) $($(notdir $<)_FLAGS) $(TARGET_LOCAL_INCLUDES) $(_VPATH_SRCS)
 
 # DEFINES and ACDEFINES are needed here to enable conditional compilation of Q_OBJECTs:
@@ -963,17 +929,14 @@ $(SOBJS):
 $(CPPOBJS):
 	$(REPORT_BUILD)
 	$(call BUILDSTATUS,OBJECT_FILE $@)
-	@$(MAKE_DEPS_AUTO_CXX)
 	$(ELOG) $(CCC) $(OUTOPTION)$@ -c $(COMPILE_CXXFLAGS) $($(notdir $<)_FLAGS) $(TARGET_LOCAL_INCLUDES) $(_VPATH_SRCS)
 
 $(CMMOBJS):
 	$(REPORT_BUILD)
-	@$(MAKE_DEPS_AUTO_CXX)
 	$(ELOG) $(CCC) -o $@ -c $(COMPILE_CXXFLAGS) $(COMPILE_CMMFLAGS) $($(notdir $<)_FLAGS) $(TARGET_LOCAL_INCLUDES) $(_VPATH_SRCS)
 
 $(CMOBJS):
 	$(REPORT_BUILD)
-	@$(MAKE_DEPS_AUTO_CC)
 	$(ELOG) $(CC) -o $@ -c $(COMPILE_CFLAGS) $(COMPILE_CMFLAGS) $($(notdir $<)_FLAGS) $(TARGET_LOCAL_INCLUDES) $(_VPATH_SRCS)
 
 $(filter %.s,$(CPPSRCS:%.cpp=%.s)): %.s: %.cpp $(call mkdir_deps,$(MDDEPDIR))
@@ -1159,18 +1122,6 @@ PREF_DIR = defaults/preferences
 endif
 
 ################################################################################
-# Copy each element of AUTOCFG_JS_EXPORTS to $(FINAL_TARGET)/defaults/autoconfig
-
-ifneq ($(AUTOCFG_JS_EXPORTS),)
-ifndef NO_DIST_INSTALL
-AUTOCFG_JS_EXPORTS_FILES := $(AUTOCFG_JS_EXPORTS)
-AUTOCFG_JS_EXPORTS_DEST := $(FINAL_TARGET)/defaults/autoconfig
-AUTOCFG_JS_EXPORTS_TARGET := export
-INSTALL_TARGETS += AUTOCFG_JS_EXPORTS
-endif
-endif
-
-################################################################################
 # SDK
 
 ifneq (,$(SDK_LIBRARY))
@@ -1181,18 +1132,6 @@ SDK_LIBRARY_TARGET := target
 INSTALL_TARGETS += SDK_LIBRARY
 endif
 endif # SDK_LIBRARY
-
-# SDK_BINARY is still used in various makefiles for non-products of the
-# compilation, so we need to keep that running on the libs tier.
-ifneq (,$(strip $(SDK_BINARY)))
-ifndef NO_DIST_INSTALL
-SDK_BINARY_FILES := $(SDK_BINARY)
-SDK_BINARY_DEST := $(SDK_BIN_DIR)
-# SDK_BINARY_TARGET is set in xpcom/idl-parser/Makefile.in
-SDK_BINARY_TARGET ?= libs target
-INSTALL_TARGETS += SDK_BINARY
-endif
-endif # SDK_BINARY
 
 ################################################################################
 # CHROME PACKAGING
@@ -1562,9 +1501,6 @@ libs export::
 	$(CHECK_FROZEN_VARIABLES)
 
 PURGECACHES_DIRS ?= $(DIST)/bin
-ifdef MOZ_WEBAPP_RUNTIME
-PURGECACHES_DIRS += $(DIST)/bin/webapprt
-endif
 
 PURGECACHES_FILES = $(addsuffix /.purgecaches,$(PURGECACHES_DIRS))
 

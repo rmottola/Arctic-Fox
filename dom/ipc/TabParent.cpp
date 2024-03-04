@@ -279,6 +279,7 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mDPI(0)
   , mDefaultScale(0)
   , mUpdatedDimensions(false)
+  , mSizeMode(nsSizeMode_Normal)
   , mManager(aManager)
   , mDocShellIsActive(false)
   , mMarkedDestroying(false)
@@ -296,7 +297,9 @@ TabParent::TabParent(nsIContentParent* aManager,
   , mCursor(nsCursor(-1))
   , mTabSetsCursor(false)
   , mHasContentOpener(false)
+#ifdef DEBUG
   , mActiveSupressDisplayportCount(0)
+#endif
 {
   MOZ_ASSERT(aManager);
 }
@@ -894,8 +897,14 @@ TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
         }
     }
 
+    nsCOMPtr<nsISupports> container = mFrameElement->OwnerDoc()->GetContainer();
+    nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(container);
+    nsCOMPtr<nsIWidget> mainWidget;
+    baseWindow->GetMainWidget(getter_AddRefs(mainWidget));
+    mSizeMode = mainWidget ? mainWidget->SizeMode() : nsSizeMode_Normal;
+
     Unused << SendShow(size, GetShowInfo(), textureFactoryIdentifier,
-                       layersId, renderFrame, aParentIsActive);
+                       layersId, renderFrame, aParentIsActive, mSizeMode);
 }
 
 bool
@@ -906,7 +915,6 @@ TabParent::RecvSetDimensions(const uint32_t& aFlags,
   MOZ_ASSERT(!(aFlags & nsIEmbeddingSiteWindow::DIM_FLAGS_SIZE_INNER),
              "We should never see DIM_FLAGS_SIZE_INNER here!");
 
-  nsCOMPtr<nsIWidget> widget = GetWidget();
   NS_ENSURE_TRUE(mFrameElement, true);
   nsCOMPtr<nsIDocShell> docShell = mFrameElement->OwnerDoc()->GetDocShell();
   NS_ENSURE_TRUE(docShell, true);
@@ -990,8 +998,16 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
     CSSRect unscaledRect = devicePixelRect / widgetScale;
     CSSSize unscaledSize = devicePixelSize / widgetScale;
     Unused << SendUpdateDimensions(unscaledRect, unscaledSize,
-                                   widget->SizeMode(),
                                    orientation, chromeOffset);
+  }
+}
+
+void
+TabParent::SizeModeChanged(const nsSizeMode& aSizeMode)
+{
+  if (!mIsDestroyed && aSizeMode != mSizeMode) {
+    mSizeMode = aSizeMode;
+    Unused << SendSizeModeChanged(aSizeMode);
   }
 }
 
@@ -2821,13 +2837,14 @@ TabParent::SuppressDisplayport(bool aEnabled)
     return NS_OK;
   }
 
+#ifdef DEBUG
   if (aEnabled) {
     mActiveSupressDisplayportCount++;
   } else {
     mActiveSupressDisplayportCount--;
   }
-
   MOZ_ASSERT(mActiveSupressDisplayportCount >= 0);
+#endif
 
   Unused << SendSuppressDisplayport(aEnabled);
   return NS_OK;
@@ -3089,7 +3106,7 @@ public:
   NS_IMETHOD GetUsePrivateBrowsing(bool*) NO_IMPL
   NS_IMETHOD SetUsePrivateBrowsing(bool) NO_IMPL
   NS_IMETHOD SetPrivateBrowsing(bool) NO_IMPL
-  NS_IMETHOD GetIsInBrowserElement(bool*) NO_IMPL
+  NS_IMETHOD GetIsInIsolatedMozBrowserElement(bool*) NO_IMPL
   NS_IMETHOD GetAppId(uint32_t*) NO_IMPL
   NS_IMETHOD GetOriginAttributes(JS::MutableHandleValue) NO_IMPL
   NS_IMETHOD GetUseRemoteTabs(bool*) NO_IMPL

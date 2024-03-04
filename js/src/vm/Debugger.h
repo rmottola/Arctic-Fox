@@ -18,9 +18,11 @@
 #include "jsweakmap.h"
 #include "jswrapper.h"
 
+#include "asmjs/WasmModule.h"
 #include "ds/TraceableFifo.h"
 #include "gc/Barrier.h"
 #include "js/Debug.h"
+#include "js/GCVariant.h"
 #include "js/HashTable.h"
 #include "vm/GlobalObject.h"
 #include "vm/SavedStacks.h"
@@ -34,8 +36,6 @@ enum JSTrapStatus {
 };
 
 namespace js {
-
-class LSprinter;
 
 class Breakpoint;
 class DebuggerMemory;
@@ -193,6 +193,20 @@ class LeaveDebuggeeNoExecute;
  */
 typedef JSObject Env;
 
+// Either a real JSScript or synthesized.
+//
+// If synthesized, the referent is one of the following:
+//
+//   1. A WasmModuleObject, denoting a synthesized toplevel wasm module
+//      script.
+//   2. A wasm JSFunction, denoting a synthesized wasm function script.
+//      NYI!
+typedef mozilla::Variant<JSScript*, WasmModuleObject*> DebuggerScriptReferent;
+
+// Either a ScriptSourceObject, for ordinary JS, or a WasmModuleObject,
+// denoting the synthesized source of a wasm module.
+typedef mozilla::Variant<ScriptSourceObject*, WasmModuleObject*> DebuggerSourceReferent;
+
 class Debugger : private mozilla::LinkedListElement<Debugger>
 {
     friend class Breakpoint;
@@ -218,7 +232,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         OnNewPromise,
         OnPromiseSettled,
         OnGarbageCollection,
-        OnIonCompilation,
         HookCount
     };
     enum {
@@ -273,31 +286,11 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         return observedGCs.put(majorGCNumber);
     }
 
-    bool isTrackingTenurePromotions() const {
-        return trackingTenurePromotions;
-    }
-
     bool isEnabled() const {
         return enabled;
     }
 
-    void logTenurePromotion(JSRuntime* rt, JSObject& obj, double when);
     static SavedFrame* getObjectAllocationSite(JSObject& obj);
-
-    struct TenurePromotionsLogEntry
-    {
-        TenurePromotionsLogEntry(JSRuntime* rt, JSObject& obj, double when);
-
-        const char* className;
-        double when;
-        RelocatablePtrObject frame;
-        size_t size;
-
-        void trace(JSTracer* trc) {
-            if (frame)
-                TraceEdge(trc, &frame, "Debugger::TenurePromotionsLogEntry::frame");
-        }
-    };
 
     struct AllocationsLogEntry
     {
@@ -328,6 +321,12 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         }
     };
 
+    // Barrier methods so we can have ReadBarriered<Debugger*>.
+    static void readBarrier(Debugger* dbg) {
+        InternalBarrierMethods<JSObject*>::readBarrier(dbg->object);
+    }
+    static void writeBarrierPost(Debugger** vp, Debugger* prev, Debugger* next) {}
+
   private:
     HeapPtrNativeObject object;         /* The Debugger object. Strong reference. */
     WeakGlobalObjectSet debuggees;      /* Debuggee globals. Cross-compartment weak references. */
@@ -336,7 +335,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     bool enabled;
     bool allowUnobservedAsmJS;
 
-    // Wether to enable code coverage on the Debuggee.
+    // Whether to enable code coverage on the Debuggee.
     bool collectCoverageInfo;
 
     JSCList breakpoints;                /* Circular list of all js::Breakpoints in this debugger */
@@ -345,12 +344,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     // debuggees participated in.
     using GCNumberSet = HashSet<uint64_t, DefaultHasher<uint64_t>, RuntimeAllocPolicy>;
     GCNumberSet observedGCs;
-
-    using TenurePromotionsLog = js::TraceableFifo<TenurePromotionsLogEntry>;
-    TenurePromotionsLog tenurePromotionsLog;
-    bool trackingTenurePromotions;
-    size_t maxTenurePromotionsLogLength;
-    bool tenurePromotionsLogOverflowed;
 
     using AllocationsLog = js::TraceableFifo<AllocationsLogEntry>;
 
@@ -444,6 +437,13 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     /* The map from debuggee Envs to Debugger.Environment instances. */
     ObjectWeakMap environments;
+
+    /* The map from WasmModuleObjects to synthesized Debugger.Script instances. */
+    typedef DebuggerWeakMap<WasmModuleObject*> WasmModuleWeakMap;
+    WasmModuleWeakMap wasmModuleScripts;
+
+    /* The map from WasmModuleObjects to synthesized Debugger.Source instances. */
+    WasmModuleWeakMap wasmModuleSources;
 
     /*
      * Keep track of tracelogger last drained identifiers to know if there are
@@ -567,8 +567,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool getCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
     static bool setCollectCoverageInfo(JSContext* cx, unsigned argc, Value* vp);
     static bool getMemory(JSContext* cx, unsigned argc, Value* vp);
-    static bool getOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
-    static bool setOnIonCompilation(JSContext* cx, unsigned argc, Value* vp);
     static bool addDebuggee(JSContext* cx, unsigned argc, Value* vp);
     static bool addAllGlobalsAsDebuggees(JSContext* cx, unsigned argc, Value* vp);
     static bool removeDebuggee(JSContext* cx, unsigned argc, Value* vp);
@@ -640,12 +638,11 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static JSTrapStatus slowPathOnDebuggerStatement(JSContext* cx, AbstractFramePtr frame);
     static JSTrapStatus slowPathOnExceptionUnwind(JSContext* cx, AbstractFramePtr frame);
     static void slowPathOnNewScript(JSContext* cx, HandleScript script);
+    static void slowPathOnNewWasmModule(JSContext* cx, Handle<WasmModuleObject*> wasmModule);
     static void slowPathOnNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global);
     static bool slowPathOnLogAllocationSite(JSContext* cx, HandleObject obj, HandleSavedFrame frame,
                                             double when, GlobalObject::DebuggerVector& dbgs);
     static void slowPathPromiseHook(JSContext* cx, Hook hook, HandleObject promise);
-    static void slowPathOnIonCompilation(JSContext* cx, Handle<ScriptVector> scripts,
-                                         LSprinter& graph);
 
     template <typename HookIsEnabledFun /* bool (Debugger*) */,
               typename FireHookFun /* JSTrapStatus (Debugger*) */>
@@ -658,23 +655,44 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSTrapStatus fireNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global, MutableHandleValue vp);
     JSTrapStatus firePromiseHook(JSContext* cx, Hook hook, HandleObject promise, MutableHandleValue vp);
 
+    JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerScriptReferent> referent) {
+        return newDebuggerScript(cx, referent);
+    }
+    JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerSourceReferent> referent) {
+        return newDebuggerSource(cx, referent);
+    }
+
+    /*
+     * Helper function to help wrap Debugger objects whose referents may be
+     * variants. Currently Debugger.Script and Debugger.Source referents may
+     * be variants.
+     *
+     * Prefer using wrapScript, wrapWasmScript, wrapSource, and wrapWasmSource
+     * whenever possible.
+     */
+    template <typename ReferentVariant, typename Referent, typename Map>
+    JSObject* wrapVariantReferent(JSContext* cx, Map& map, CrossCompartmentKey::Kind keyKind,
+                                  Handle<ReferentVariant> referent);
+    JSObject* wrapVariantReferent(JSContext* cx, Handle<DebuggerScriptReferent> referent);
+    JSObject* wrapVariantReferent(JSContext* cx, Handle<DebuggerSourceReferent> referent);
+
     /*
      * Allocate and initialize a Debugger.Script instance whose referent is
-     * |script|.
+     * |referent|.
      */
-    JSObject* newDebuggerScript(JSContext* cx, HandleScript script);
+    JSObject* newDebuggerScript(JSContext* cx, Handle<DebuggerScriptReferent> referent);
 
     /*
      * Allocate and initialize a Debugger.Source instance whose referent is
-     * |source|.
+     * |referent|.
      */
-    JSObject* newDebuggerSource(JSContext* cx, js::HandleScriptSource source);
+    JSObject* newDebuggerSource(JSContext* cx, Handle<DebuggerSourceReferent> referent);
 
     /*
      * Receive a "new script" event from the engine. A new script was compiled
      * or deserialized.
      */
-    void fireNewScript(JSContext* cx, HandleScript script);
+    void fireNewScript(JSContext* cx, Handle<DebuggerScriptReferent> scriptReferent);
 
     /*
      * Receive a "garbage collection" event from the engine. A GC cycle with the
@@ -682,13 +700,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      */
     void fireOnGarbageCollectionHook(JSContext* cx,
                                      const JS::dbg::GarbageCollectionEvent::Ptr& gcData);
-
-    /*
-     * Receive a "Ion compilation" event from the engine. An Ion compilation with
-     * the given summary just got linked.
-     */
-    JSTrapStatus fireOnIonCompilationHook(JSContext* cx, Handle<ScriptVector> scripts,
-                                          LSprinter& graph);
 
     /*
      * Gets a Debugger.Frame object. If maybeIter is non-null, we eagerly copy
@@ -807,12 +818,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static inline bool onLeaveFrame(JSContext* cx, AbstractFramePtr frame, jsbytecode* pc, bool ok);
 
     static inline void onNewScript(JSContext* cx, HandleScript script);
+    static inline void onNewWasmModule(JSContext* cx, Handle<WasmModuleObject*> wasmModule);
     static inline void onNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global);
     static inline bool onLogAllocationSite(JSContext* cx, JSObject* obj, HandleSavedFrame frame,
                                            double when);
-    static inline bool observesIonCompilation(JSContext* cx);
-    static inline void onIonCompilation(JSContext* cx, Handle<ScriptVector> scripts,
-                                        LSprinter& graph);
     static JSTrapStatus onTrap(JSContext* cx, MutableHandleValue vp);
     static JSTrapStatus onSingleStep(JSContext* cx, MutableHandleValue vp);
     static bool handleBaselineOsr(JSContext* cx, InterpreterFrame* from, jit::BaselineFrame* to);
@@ -957,11 +966,27 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSObject* wrapScript(JSContext* cx, HandleScript script);
 
     /*
+     * Return the Debugger.Script object for |wasmModule| (the toplevel
+     * script), synthesizing a new one if needed. The context |cx| must be in
+     * the debugger compartment; |wasmModule| must be a WasmModuleObject in
+     * the debuggee compartment.
+     */
+    JSObject* wrapWasmScript(JSContext* cx, Handle<WasmModuleObject*> wasmModule);
+
+    /*
      * Return the Debugger.Source object for |source|, or create a new one if
      * needed. The context |cx| must be in the debugger compartment; |source|
      * must be a script source object in a debuggee compartment.
      */
     JSObject* wrapSource(JSContext* cx, js::HandleScriptSource source);
+
+    /*
+     * Return the Debugger.Source object for |wasmModule| (the entire module),
+     * synthesizing a new one if needed. The context |cx| must be in the
+     * debugger compartment; |wasmModule| must be a WasmModuleObject in the
+     * debuggee compartment.
+     */
+    JSObject* wrapWasmSource(JSContext* cx, Handle<WasmModuleObject*> wasmModule);
 
   private:
     Debugger(const Debugger&) = delete;

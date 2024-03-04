@@ -1057,6 +1057,20 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     color: GrayText;
 }
 
+/* undo close tab menu item */
+#alltabs_undoCloseTab {
+  list-style-image: url(chrome://browser/skin/undoCloseTab.png);
+}
+
+@media (min-resolution: 2dppx) {
+  #alltabs_undoCloseTab {
+    list-style-image: url(chrome://browser/skin/undoCloseTab@2x.png);
+  }
+  #alltabs_undoCloseTab > .toolbarbutton-icon {
+    width: 16px;
+  }
+}
+
 /* identity box */
 
 #identity-box {
@@ -1923,6 +1937,14 @@ toolbar[brighttext] .tabs-closebutton {
     -moz-image-region: rect(0px 48px 16px 32px);
 }
 
+
+.alltabs-endimage[muted] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
+}
+
+.alltabs-endimage[soundplaying] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
+}
 
 /* Bookmarks toolbar */
 #PlacesToolbarDropIndicator {

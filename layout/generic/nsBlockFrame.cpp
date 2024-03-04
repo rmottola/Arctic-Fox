@@ -12,6 +12,7 @@
 #include "nsBlockFrame.h"
 
 #include "mozilla/DebugOnly.h"
+#include "mozilla/Maybe.h"
 
 #include "nsCOMPtr.h"
 #include "nsAbsoluteContainingBlock.h"
@@ -51,6 +52,8 @@
 #include "nsIFrameInlines.h"
 #include "CounterStyleManager.h"
 #include "nsISelection.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/dom/HTMLDetailsElement.h"
 #include "mozilla/dom/HTMLSummaryElement.h"
 
@@ -511,9 +514,9 @@ nsBlockFrame::GetCaretBaseline() const
       return bp.top + firstLine->mFirstChild->GetCaretBaseline();
     }
   }
-  RefPtr<nsFontMetrics> fm;
   float inflation = nsLayoutUtils::FontSizeInflationFor(this);
-  nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm), inflation);
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetFontMetricsForFrame(this, inflation);
   nscoord lineHeight =
     nsHTMLReflowState::CalcLineHeight(GetContent(), StyleContext(),
                                       contentRect.height, inflation);
@@ -928,7 +931,6 @@ AvailableSpaceShrunk(WritingMode aWM,
                      const LogicalRect& aOldAvailableSpace,
                      const LogicalRect& aNewAvailableSpace,
                      bool aCanGrow /* debug-only */)
-
 {
   if (aNewAvailableSpace.ISize(aWM) == 0) {
     // Positions are not significant if the inline size is zero.
@@ -2632,9 +2634,8 @@ nsBlockFrame::ReflowDirtyLines(nsBlockReflowState& aState)
         }
       }
 
-      RefPtr<nsFontMetrics> fm;
-      nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm),
-        nsLayoutUtils::FontSizeInflationFor(this));
+      RefPtr<nsFontMetrics> fm =
+        nsLayoutUtils::GetInflatedFontMetricsForFrame(this);
 
       nscoord minAscent =
         nsLayoutUtils::GetCenteredFontBaseline(fm, aState.mMinLineHeight,
@@ -3356,11 +3357,12 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
       availSpace.BSize(wm) += bStartMargin;
     }
 
-    // Construct the html reflow state for the block. ReflowBlock
-    // will initialize it
-    nsHTMLReflowState
-      blockHtmlRS(aState.mPresContext, aState.mReflowState, frame,
-                  availSpace.Size(wm).ConvertTo(frame->GetWritingMode(), wm));
+    // construct the html reflow state for the block. ReflowBlock
+    // will initialize it.
+    Maybe<nsHTMLReflowState> blockHtmlRS;
+    blockHtmlRS.emplace(
+      aState.mPresContext, aState.mReflowState, frame,
+      availSpace.Size(wm).ConvertTo(frame->GetWritingMode(), wm));
 
     nsFloatManager::SavedState floatManagerState;
     nsReflowStatus frameReflowStatus;
@@ -3385,16 +3387,16 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
       }
 
       if (mayNeedRetry) {
-        blockHtmlRS.mDiscoveredClearance = &clearanceFrame;
+        blockHtmlRS->mDiscoveredClearance = &clearanceFrame;
       } else if (!applyBStartMargin) {
-        blockHtmlRS.mDiscoveredClearance =
+        blockHtmlRS->mDiscoveredClearance =
           aState.mReflowState.mDiscoveredClearance;
       }
 
       frameReflowStatus = NS_FRAME_COMPLETE;
       brc.ReflowBlock(availSpace, applyBStartMargin, aState.mPrevBEndMargin,
                       clearance, aState.IsAdjacentWithTop(),
-                      aLine.get(), blockHtmlRS, frameReflowStatus, aState);
+                      aLine.get(), *blockHtmlRS, frameReflowStatus, aState);
 
       // Now the block has a height.  Using that height, get the
       // available space again and call ComputeBlockAvailSpace again.
@@ -3481,11 +3483,10 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
         clearance = 0;
       }
 
-      blockHtmlRS.~nsHTMLReflowState();
-      new (&blockHtmlRS) nsHTMLReflowState(aState.mPresContext,
-                           aState.mReflowState, frame,
-                           availSpace.Size(wm).ConvertTo(
-                             frame->GetWritingMode(), wm));
+      blockHtmlRS.reset();
+      blockHtmlRS.emplace(
+        aState.mPresContext, aState.mReflowState, frame,
+        availSpace.Size(wm).ConvertTo(frame->GetWritingMode(), wm));
     } while (true);
 
     if (mayNeedRetry && clearanceFrame) {
@@ -3497,7 +3498,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
 
     aState.mPrevChild = frame;
 
-    if (blockHtmlRS.WillReflowAgainForClearance()) {
+    if (blockHtmlRS->WillReflowAgainForClearance()) {
       // If an ancestor of ours is going to reflow for clearance, we
       // need to avoid calling PlaceBlock, because it unsets dirty bits
       // on the child block (both itself, and through its call to
@@ -3535,7 +3536,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
         !floatAvailableSpace.mHasFloats;
       nsCollapsingMargin collapsedBEndMargin;
       nsOverflowAreas overflowAreas;
-      *aKeepReflowGoing = brc.PlaceBlock(blockHtmlRS, forceFit, aLine.get(),
+      *aKeepReflowGoing = brc.PlaceBlock(*blockHtmlRS, forceFit, aLine.get(),
                                          collapsedBEndMargin,
                                          overflowAreas,
                                          frameReflowStatus);
@@ -7671,5 +7672,14 @@ nsBlockFrame::GetDepth() const
     depth++;
   }
   return depth;
+}
+
+already_AddRefed<nsStyleContext>
+nsBlockFrame::GetFirstLetterStyle(nsPresContext* aPresContext)
+{
+  return aPresContext->StyleSet()->
+    ProbePseudoElementStyle(mContent->AsElement(),
+                            CSSPseudoElementType::firstLetter,
+                            mStyleContext);
 }
 #endif

@@ -79,8 +79,10 @@ static RedirEntry kRedirMap[] = {
   { "home", "chrome://browser/content/abouthome/aboutHome.xhtml",
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::MAKE_LINKABLE |
-    nsIAboutModule::ALLOW_SCRIPT },
-  { "newtab", "chrome://browser/content/newtab/newTab.xhtml",
+    nsIAboutModule::ALLOW_SCRIPT |
+    nsIAboutModule::ENABLE_INDEXED_DB },
+  // the newtab's actual URL will be determined when the channel is created
+  { "newtab", "about:blank",
     nsIAboutModule::ALLOW_SCRIPT },
   { "permissions", "chrome://browser/content/preferences/aboutPermissions.xul",
     nsIAboutModule::ALLOW_SCRIPT },
@@ -127,18 +129,25 @@ AboutRedirector::NewChannel(nsIURI* aURI,
   for (int i = 0; i < kRedirTotal; i++) {
     if (!strcmp(path.get(), kRedirMap[i].id)) {
       nsAutoCString url;
+      nsLoadFlags loadFlags = static_cast<nsLoadFlags>(nsIChannel::LOAD_NORMAL);
 
-      // check if about:newtab got overridden
       if (path.EqualsLiteral("newtab")) {
+        // let the aboutNewTabService decide where to redirect
         nsCOMPtr<nsIAboutNewTabService> aboutNewTabService =
           do_GetService("@mozilla.org/browser/aboutnewtab-service;1", &rv);
         NS_ENSURE_SUCCESS(rv, rv);
-        bool overridden = false;
-        rv = aboutNewTabService->GetOverridden(&overridden);
+        rv = aboutNewTabService->GetDefaultURL(url);
         NS_ENSURE_SUCCESS(rv, rv);
-        if (overridden) {
-          rv = aboutNewTabService->GetNewTabURL(url);
-          NS_ENSURE_SUCCESS(rv, rv);
+
+        // if about:newtab points to an external resource we have to make sure
+        // the content is signed and trusted
+        bool remoteEnabled = false;
+        rv = aboutNewTabService->GetRemoteEnabled(&remoteEnabled);
+        NS_ENSURE_SUCCESS(rv, rv);
+        if (remoteEnabled) {
+          NS_ENSURE_ARG_POINTER(aLoadInfo);
+          aLoadInfo->SetVerifySignedContent(true);
+          loadFlags = static_cast<nsLoadFlags>(nsIChannel::LOAD_REPLACE);
         }
       }
       // fall back to the specified url in the map
@@ -160,9 +169,9 @@ AboutRedirector::NewChannel(nsIURI* aURI,
                                &isUIResource);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      nsLoadFlags loadFlags =
-        isUIResource ? static_cast<nsLoadFlags>(nsIChannel::LOAD_NORMAL)
-                     : static_cast<nsLoadFlags>(nsIChannel::LOAD_REPLACE);
+      loadFlags = isUIResource
+                    ? static_cast<nsLoadFlags>(nsIChannel::LOAD_NORMAL)
+                    : static_cast<nsLoadFlags>(nsIChannel::LOAD_REPLACE);
 
       rv = NS_NewChannelInternal(getter_AddRefs(tempChannel),
                                  tempURI,

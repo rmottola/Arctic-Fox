@@ -126,7 +126,7 @@ GetLocationProperty(JSContext* cx, unsigned argc, Value* vp)
     //XXX: your platform should really implement this
     return false;
 #else
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     if (JS::DescribeScriptedCaller(cx, &filename) && filename.get()) {
         nsresult rv;
         nsCOMPtr<nsIXPConnect> xpc =
@@ -794,7 +794,7 @@ typedef enum JSShellErrNum {
 
 static const JSErrorFormatString jsShell_ErrorFormatString[JSShellErr_Limit] = {
 #define MSG_DEF(name, number, count, exception, format) \
-    { format, count } ,
+    { #name, format, count } ,
 #include "jsshell.msg"
 #undef MSG_DEF
 };
@@ -969,7 +969,8 @@ ProcessArgsForCompartment(JSContext* cx, char** argv, int argc)
             break;
         case 'I':
             RuntimeOptionsRef(cx).toggleIon()
-                                 .toggleAsmJS();
+                                 .toggleAsmJS()
+                                 .toggleWasm();
             break;
         }
     }

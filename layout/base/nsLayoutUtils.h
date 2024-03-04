@@ -29,6 +29,7 @@
 #include "mozilla/ToString.h"
 #include "nsHTMLReflowMetrics.h"
 #include "ImageContainer.h"
+#include "gfx2DGlue.h"
 
 #include <limits>
 #include <algorithm>
@@ -183,6 +184,16 @@ public:
    * Check whether the given element has a displayport.
    */
   static bool HasDisplayPort(nsIContent* aContent);
+
+
+  /**
+   * Go through the IPC Channel and update displayport margins for content
+   * elements based on UpdateFrame messages. The messages are left in the
+   * queue and will be fully processed when dequeued. The aim is to paint
+   * the most up-to-date displayport without waiting for these message to
+   * go through the message queue.
+   */
+  static void UpdateDisplayPortMarginsFromPendingMessages();
 
   /**
    * @return the display port for the given element which should be used for
@@ -890,13 +901,6 @@ public:
                             nscoord aInflateSize);
 
   /**
-   * Check whether aRect is visible in the boundary of the scroll frames
-   * boundary.
-   */
-  static bool IsRectVisibleInScrollFrames(nsIFrame* aFrame,
-                                          const nsRect& aRect);
-
-  /**
    * Clamp aRect relative to aFrame to the scroll frames boundary searching from
    * aFrame.
    */
@@ -1218,40 +1222,36 @@ public:
   /**
    * Get the font metrics corresponding to the frame's style data.
    * @param aFrame the frame
-   * @param aFontMetrics the font metrics result
    * @param aSizeInflation number to multiply font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsForFrame(const nsIFrame* aFrame,
-                                         nsFontMetrics** aFontMetrics,
-                                         float aSizeInflation = 1.0f);
+  static already_AddRefed<nsFontMetrics> GetFontMetricsForFrame(
+    const nsIFrame* aFrame, float aSizeInflation);
+
+  static already_AddRefed<nsFontMetrics>
+    GetInflatedFontMetricsForFrame(const nsIFrame* aFrame)
+  {
+    return GetFontMetricsForFrame(aFrame, FontSizeInflationFor(aFrame));
+  }
 
   /**
    * Get the font metrics corresponding to the given style data.
    * @param aStyleContext the style data
-   * @param aFontMetrics the font metrics result
    * @param aSizeInflation number to multiply font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsForStyleContext(nsStyleContext* aStyleContext,
-                                                nsFontMetrics** aFontMetrics,
-                                                float aSizeInflation = 1.0f);
+  static already_AddRefed<nsFontMetrics> GetFontMetricsForStyleContext(
+      nsStyleContext* aStyleContext, float aSizeInflation = 1.0f);
 
   /**
    * Get the font metrics of emphasis marks corresponding to the given
    * style data. The result is same as GetFontMetricsForStyleContext
    * except that the font size is scaled down to 50%.
    * @param aStyleContext the style data
-   * @param aFontMetrics the font metrics result
    * @param aInflation number to multiple font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsOfEmphasisMarks(nsStyleContext* aStyleContext,
-                                                nsFontMetrics** aFontMetrics,
-                                                float aInflation)
+  static already_AddRefed<nsFontMetrics> GetFontMetricsOfEmphasisMarks(
+      nsStyleContext* aStyleContext, float aInflation)
   {
-    return GetFontMetricsForStyleContext(aStyleContext, aFontMetrics,
-                                         aInflation * 0.5f);
+    return GetFontMetricsForStyleContext(aStyleContext, aInflation * 0.5f);
   }
 
   /**
@@ -1544,6 +1544,8 @@ public:
   }
 
   static void MarkDescendantsDirty(nsIFrame *aSubtreeRoot);
+
+  static void MarkIntrinsicISizesDirtyIfDependentOnBSize(nsIFrame* aFrame);
 
   /*
    * Calculate the used values for 'width' and 'height' for a replaced element.

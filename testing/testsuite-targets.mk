@@ -389,7 +389,6 @@ stage-all: \
   stage-mach \
   stage-extensions \
   stage-mochitest \
-  stage-xpcshell \
   stage-jstests \
   stage-jetpack \
   stage-marionette \
@@ -455,10 +454,6 @@ stage-all: stage-android
 stage-all: stage-instrumentation-tests
 endif
 
-ifeq ($(MOZ_BUILD_APP),mobile/android/b2gdroid)
-stage-all: stage-android
-endif
-
 ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
 stage-all: stage-b2g
 endif
@@ -487,13 +482,10 @@ stage-mach: make-stage-dir
 	cp $(topsrcdir)/mach $(PKG_STAGE)
 
 stage-mochitest: make-stage-dir
-	$(MAKE) -C $(DEPTH)/testing/mochitest stage-package
 ifeq ($(MOZ_BUILD_APP),mobile/android)
+	$(MAKE) -C $(DEPTH)/testing/mochitest stage-package
 	$(NSINSTALL) $(DEPTH)/mobile/android/base/fennec_ids.txt $(PKG_STAGE)/mochitest
 endif
-
-stage-xpcshell: make-stage-dir
-	$(MAKE) -C $(DEPTH)/testing/xpcshell stage-package
 
 stage-jstests: make-stage-dir
 	$(MAKE) -C $(DEPTH)/js/src/tests stage-package
@@ -557,19 +549,17 @@ stage-luciddream: make-stage-dir
 MARIONETTE_DIR=$(PKG_STAGE)/marionette
 stage-marionette: make-stage-dir
 	$(NSINSTALL) -D $(MARIONETTE_DIR)/tests
-	$(NSINSTALL) -D $(MARIONETTE_DIR)/transport
-	$(NSINSTALL) -D $(MARIONETTE_DIR)/driver
-	@(cd $(topsrcdir)/testing/marionette/client && tar --exclude marionette/tests $(TAR_CREATE_FLAGS) - *) | (cd $(MARIONETTE_DIR)/ && tar -xf -)
-	@(cd $(topsrcdir)/testing/marionette/transport && tar $(TAR_CREATE_FLAGS) - *) | (cd $(MARIONETTE_DIR)/transport && tar -xf -)
-	@(cd $(topsrcdir)/testing/marionette/driver && tar $(TAR_CREATE_FLAGS) - *) | (cd $(MARIONETTE_DIR)/driver && tar -xf -)
-	$(PYTHON) $(topsrcdir)/testing/marionette/client/marionette/tests/print-manifest-dirs.py \
+	$(NSINSTALL) -D $(MARIONETTE_DIR)/client
+	@(cd $(topsrcdir)/testing/marionette/harness && tar --exclude marionette/tests $(TAR_CREATE_FLAGS) - *) | (cd $(MARIONETTE_DIR)/ && tar -xf -)
+	@(cd $(topsrcdir)/testing/marionette/client && tar $(TAR_CREATE_FLAGS) - *) | (cd $(MARIONETTE_DIR)/client && tar -xf -)
+	$(PYTHON) $(topsrcdir)/testing/marionette/harness/marionette/tests/print-manifest-dirs.py \
           $(topsrcdir) \
-          $(topsrcdir)/testing/marionette/client/marionette/tests/unit-tests.ini \
+          $(topsrcdir)/testing/marionette/harness/marionette/tests/unit-tests.ini \
           | (cd $(topsrcdir) && xargs tar $(TAR_CREATE_FLAGS) -) \
           | (cd $(MARIONETTE_DIR)/tests && tar -xf -)
-	$(PYTHON) $(topsrcdir)/testing/marionette/client/marionette/tests/print-manifest-dirs.py \
+	$(PYTHON) $(topsrcdir)/testing/marionette/harness/marionette/tests/print-manifest-dirs.py \
           $(topsrcdir) \
-          $(topsrcdir)/testing/marionette/client/marionette/tests/webapi-tests.ini \
+          $(topsrcdir)/testing/marionette/harness/marionette/tests/webapi-tests.ini \
           | (cd $(topsrcdir) && xargs tar $(TAR_CREATE_FLAGS) -) \
           | (cd $(MARIONETTE_DIR)/tests && tar -xf -)
 
@@ -602,7 +592,6 @@ stage-extensions: make-stage-dir
   stage-b2g \
   stage-config \
   stage-mochitest \
-  stage-xpcshell \
   stage-jstests \
   stage-android \
   stage-jetpack \

@@ -2074,12 +2074,6 @@ CSS_PROP_POSITION(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
 CSS_PROP_SHORTHAND(
-    grid-template,
-    grid_template,
-    GridTemplate,
-    CSS_PROPERTY_PARSE_FUNCTION,
-    "layout.css.grid.enabled")
-CSS_PROP_SHORTHAND(
     grid,
     grid,
     Grid,
@@ -2270,7 +2264,7 @@ CSS_PROP_TEXT(
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH,
     "",
-    VARIANT_HLPN | VARIANT_KEYWORD | VARIANT_NORMAL | VARIANT_SYSFONT,
+    VARIANT_HLPN | VARIANT_KEYWORD | VARIANT_NORMAL | VARIANT_SYSFONT | VARIANT_CALC,
     kLineHeightKTable,
     offsetof(nsStyleText, mLineHeight),
     eStyleAnimType_Coord)
@@ -4075,6 +4069,7 @@ CSS_PROP_SVG(
     nullptr,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
 CSS_PROP_SHORTHAND(
     mask,
     mask,
@@ -4174,6 +4169,19 @@ CSS_PROP_SVGRESET(
     kImageLayerSizeKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_Custom)
+#else
+CSS_PROP_SVGRESET(
+    mask,
+    mask,
+    Mask,
+    CSS_PROPERTY_PARSE_VALUE |
+      CSS_PROPERTY_CREATES_STACKING_CONTEXT,
+    "",
+    VARIANT_HUO,
+    nullptr,
+    CSS_PROP_NO_OFFSET,
+    eStyleAnimType_None)
+#endif
 CSS_PROP_SVGRESET(
     mask-type,
     mask_type,

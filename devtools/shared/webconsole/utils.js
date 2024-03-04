@@ -8,10 +8,9 @@
 
 const {Cc, Ci, Cu, components} = require("chrome");
 const {isWindowIncluded} = require("devtools/shared/layout/utils");
+const Services = require("Services");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-
-loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
 
 // TODO: Bug 842672 - browser/ imports modules from toolkit/.
 // Note that these are only used in WebConsoleCommands, see $0 and pprint().
@@ -618,12 +617,11 @@ exports.Utils = WebConsoleUtils;
 // Localization
 //////////////////////////////////////////////////////////////////////////
 
-WebConsoleUtils.l10n = function WCU_l10n(aBundleURI)
-{
-  this._bundleUri = aBundleURI;
+WebConsoleUtils.L10n = function(bundleURI) {
+  this._bundleUri = bundleURI;
 };
 
-WebConsoleUtils.l10n.prototype = {
+WebConsoleUtils.L10n.prototype = {
   _stringBundle: null,
 
   get stringBundle()

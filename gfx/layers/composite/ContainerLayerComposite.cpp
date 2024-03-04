@@ -210,6 +210,9 @@ ContainerRenderVR(ContainerT* aContainer,
     if (!layer->IsVisible() && !layer->AsContainerLayer()) {
       continue;
     }
+    if (layerToRender->HasStaleCompositor()) {
+      continue;
+    }
 
     // We flip between pre-rendered and Gecko-rendered VR based on
     // whether the child layer of this VR container layer has
@@ -474,11 +477,12 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   const int verticalPadding = 10;
   const int horizontalPadding = 5;
   gfx::Color backgroundColor(0.3f, 0.3f, 0.3f, 0.3f);
-  gfx::Color tileActiveColor(1, 1, 1, 0.5f);
+  gfx::Color tileActiveColor(1, 1, 1, 0.4f);
   gfx::Color tileBorderColor(0, 0, 0, 0.1f);
   gfx::Color pageBorderColor(0, 0, 0);
   gfx::Color displayPortColor(0, 1.f, 0);
-  gfx::Color viewPortColor(0, 0, 1.f);
+  gfx::Color viewPortColor(0, 0, 1.f, 0.3f);
+  gfx::Color visibilityColor(1.f, 0, 0);
 
   // Rects
   const FrameMetrics& fm = aLayer->GetFrameMetrics(0);
@@ -529,12 +533,45 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   }
   */
 
+  // Render the scrollable area.
   r = transform.TransformBounds(scrollRect.ToUnknownRect());
   compositor->SlowDrawRect(r, pageBorderColor, clipRect, aContainer->GetEffectiveTransform());
+
+  // If enabled, render information about visibility.
+  if (gfxPrefs::APZMinimapVisibilityEnabled()) {
+    // Retrieve the APZC scrollable layer guid, which we'll use to get the
+    // appropriate visibility information from the layer manager.
+    AsyncPanZoomController* controller = aLayer->GetAsyncPanZoomController(0);
+    MOZ_ASSERT(controller);
+
+    ScrollableLayerGuid guid = controller->GetGuid();
+
+    // Get the approximately visible region.
+    static CSSIntRegion emptyRegion;
+    CSSIntRegion* visibleRegion = aManager->GetApproximatelyVisibleRegion(guid);
+    if (!visibleRegion) {
+      visibleRegion = &emptyRegion;
+    }
+
+    // Iterate through and draw the rects in the region.
+    for (CSSIntRegion::RectIterator iterator = visibleRegion->RectIter();
+         !iterator.Done();
+         iterator.Next())
+    {
+      CSSIntRect rect = iterator.Get();
+      LayerRect scaledRect = rect * fm.LayersPixelsPerCSSPixel();
+      Rect r = transform.TransformBounds(scaledRect.ToUnknownRect());
+      compositor->FillRect(r, visibilityColor, clipRect, aContainer->GetEffectiveTransform());
+    }
+  }
+
+  // Render the displayport.
   r = transform.TransformBounds(dp.ToUnknownRect());
   compositor->FillRect(r, tileActiveColor, clipRect, aContainer->GetEffectiveTransform());
   r = transform.TransformBounds(dp.ToUnknownRect());
   compositor->SlowDrawRect(r, displayPortColor, clipRect, aContainer->GetEffectiveTransform());
+
+  // Render the viewport.
   r = transform.TransformBounds(viewRect.ToUnknownRect());
   compositor->SlowDrawRect(r, viewPortColor, clipRect, aContainer->GetEffectiveTransform(), 2);
 }
@@ -552,6 +589,10 @@ RenderLayers(ContainerT* aContainer,
     LayerComposite* layerToRender = preparedData.mLayer;
     const RenderTargetIntRect& clipRect = preparedData.mClipRect;
     Layer* layer = layerToRender->GetLayer();
+
+    if (layerToRender->HasStaleCompositor()) {
+      continue;
+    }
 
     Color color;
     if (NeedToDrawCheckerboardingForLayer(layer, &color)) {

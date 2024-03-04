@@ -4,27 +4,17 @@
 
 // How to run this file:
 // 1. [obtain Arctic Fox source code]
-// 2. [build/obtain Arcitc Fox binaries]
+// 2. [build/obtain Arctic Fox binaries]
 // 3. run `[path to]/run-mozilla.sh [path to]/xpcshell \
 //                                  [path to]/getHSTSPreloadlist.js \
 //                                  [absolute path to]/nsSTSPreloadlist.inc'
+// Note: Running this file outputs a new nsSTSPreloadlist.inc in the current
+//       working directory.
 
-// <https://developer.mozilla.org/en/XPConnect/xpcshell/HOWTO>
-// <https://bugzilla.mozilla.org/show_bug.cgi?id=546628>
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
-
-// Register resource://app/ URI
-var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-var resHandler = ios.getProtocolHandler("resource")
-                 .QueryInterface(Ci.nsIResProtocolHandler);
-var mozDir = Cc["@mozilla.org/file/directory_service;1"]
-             .getService(Ci.nsIProperties)
-             .get("CurProcD", Ci.nsILocalFile);
-var mozDirURI = ios.newFileURI(mozDir);
-resHandler.setSubstitution("app", mozDirURI);
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
@@ -70,11 +60,12 @@ function download() {
     req.send();
   }
   catch (e) {
-    throw "ERROR: problem downloading '" + SOURCE + "': " + e;
+    throw new Error(`ERROR: problem downloading '${SOURCE}': ${e}`);
   }
 
   if (req.status != 200) {
-    throw "ERROR: problem downloading '" + SOURCE + "': status " + req.status;
+    throw new Error("ERROR: problem downloading '" + SOURCE + "': status " +
+                    req.status);
   }
 
   var resultDecoded;
@@ -82,7 +73,8 @@ function download() {
     resultDecoded = atob(req.responseText);
   }
   catch (e) {
-    throw "ERROR: could not decode data as base64 from '" + SOURCE + "': " + e;
+    throw new Error("ERROR: could not decode data as base64 from '" + SOURCE +
+                    "': " + e);
   }
 
   // we have to filter out '//' comments, while not mangling the json
@@ -92,7 +84,7 @@ function download() {
     data = JSON.parse(result);
   }
   catch (e) {
-    throw "ERROR: could not parse data from '" + SOURCE + "': " + e;
+    throw new Error(`ERROR: could not parse data from '${SOURCE}': ${e}`);
   }
   return data;
 }
@@ -101,7 +93,8 @@ function getHosts(rawdata) {
   var hosts = [];
 
   if (!rawdata || !rawdata.entries) {
-    throw "ERROR: source data not formatted correctly: 'entries' not found";
+    throw new Error("ERROR: source data not formatted correctly: 'entries' " +
+                    "not found");
   }
 
   for (let entry of rawdata.entries) {
@@ -114,7 +107,7 @@ function getHosts(rawdata) {
         entry.originalIncludeSubdomains = entry.include_subdomains;
         hosts.push(entry);
       } else {
-        throw "ERROR: entry not formatted correctly: no name found";
+        throw new Error("ERROR: entry not formatted correctly: no name found");
       }
     }
   }
@@ -143,13 +136,10 @@ function processStsHeader(host, header, status, securityInfo) {
            host.name + ": " + e + "\n");
       error = e;
     }
-  }
-  else {
-    if (status == 0) {
-      error = ERROR_CONNECTING_TO_HOST;
-    } else {
-      error = ERROR_NO_HSTS_HEADER;
-    }
+  } else if (status == 0) {
+    error = ERROR_CONNECTING_TO_HOST;
+  } else {
+    error = ERROR_NO_HSTS_HEADER;
   }
 
   let forceInclude = (host.forceInclude || host.pins == "google");
@@ -173,7 +163,7 @@ function RedirectAndAuthStopper() {}
 RedirectAndAuthStopper.prototype = {
   // nsIChannelEventSink
   asyncOnChannelRedirect: function(oldChannel, newChannel, flags, callback) {
-    throw Cr.NS_ERROR_ENTITY_CHANGED;
+    throw new Error(Cr.NS_ERROR_ENTITY_CHANGED);
   },
 
   // nsIAuthPrompt2
@@ -182,7 +172,7 @@ RedirectAndAuthStopper.prototype = {
   },
 
   asyncPromptAuth: function(channel, callback, context, level, authInfo) {
-    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
+    throw new Error(Cr.NS_ERROR_NOT_IMPLEMENTED);
   },
 
   getInterface: function(iid) {
@@ -219,7 +209,13 @@ function getHSTSStatus(host, resultList) {
 }
 
 function compareHSTSStatus(a, b) {
-  return (a.name > b.name ? 1 : (a.name < b.name ? -1 : 0));
+  if (a.name > b.name) {
+    return 1;
+  }
+  if (a.name < b.name) {
+    return -1;
+  }
+  return 0;
 }
 
 function writeTo(string, fos) {
@@ -308,7 +304,7 @@ function getHSTSStatuses(inHosts, outStatuses) {
   var expectedOutputLength = inHosts.length;
   var tmpOutput = [];
   for (var i = 0; i < MAX_CONCURRENT_REQUESTS && inHosts.length > 0; i++) {
-    var host = inHosts.shift();
+    let host = inHosts.shift();
     dump("spinning off request to '" + host.name + "' (remaining retries: " +
          host.retries + ")\n");
     getHSTSStatus(host, tmpOutput);
@@ -318,13 +314,14 @@ function getHSTSStatuses(inHosts, outStatuses) {
     waitForAResponse(tmpOutput);
     var response = tmpOutput.shift();
     dump("request to '" + response.name + "' finished\n");
-    if (shouldRetry(response))
+    if (shouldRetry(response)) {
       inHosts.push(response);
-    else
+    } else {
       outStatuses.push(response);
+    }
 
     if (inHosts.length > 0) {
-      var host = inHosts.shift();
+      let host = inHosts.shift();
       dump("spinning off request to '" + host.name + "' (remaining retries: " +
            host.retries + ")\n");
       getHSTSStatus(host, tmpOutput);
@@ -379,8 +376,9 @@ function combineLists(newHosts, currentHosts) {
 
 // ****************************************************************************
 // This is where the action happens:
-if (arguments.length < 1) {
-  throw "Usage: getHSTSPreloadList.js <absolute path to current nsSTSPreloadList.inc>";
+if (arguments.length != 1) {
+  throw new Error("Usage: getHSTSPreloadList.js " +
+                  "<absolute path to current nsSTSPreloadList.inc>");
 }
 // get the current preload list
 var currentHosts = readCurrentList(arguments[0]);

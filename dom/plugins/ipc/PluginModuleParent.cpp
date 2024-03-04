@@ -33,6 +33,7 @@
 #include "nsCRT.h"
 #include "nsIFile.h"
 #include "nsIObserverService.h"
+#include "nsIXULRuntime.h"
 #include "nsNPAPIPlugin.h"
 #include "nsPrintfCString.h"
 #include "prsystem.h"
@@ -133,16 +134,6 @@ mozilla::plugins::SetupBridge(uint32_t aPluginId,
         return true;
     }
     *rv = PPluginModule::Bridge(aContentParent, chromeParent);
-    if (NS_FAILED(*rv)) {
-#if defined(MOZ_CRASHREPORTER)
-        // We are going to abort due to the failure, lets note the cause
-        // in the report for diagnosing.
-        nsAutoCString error;
-        error.AppendPrintf("%X %d", *rv, chromeParent->GetIPCChannel()->GetChannelState__TotallyRacy());
-        CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("BridgePluginError"), error);
-#endif
-      return false;
-    }
     return true;
 }
 
@@ -673,7 +664,8 @@ PluginModuleParent::PluginModuleParent(bool aIsChrome, bool aAllowAsyncInit)
 {
 #if defined(XP_WIN) || defined(XP_MACOSX) || defined(MOZ_WIDGET_GTK)
     mIsStartingAsync = aAllowAsyncInit &&
-                       Preferences::GetBool(kAsyncInitPref, false);
+                       Preferences::GetBool(kAsyncInitPref, false) &&
+                       !BrowserTabsRemoteAutostart();
 #if defined(MOZ_CRASHREPORTER)
     CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("AsyncPluginInit"),
                                        mIsStartingAsync ?
@@ -2008,6 +2000,22 @@ PluginModuleParent::EndUpdateBackground(NPP instance, const nsIntRect& aRect)
     return i->EndUpdateBackground(aRect);
 }
 
+#if defined(XP_WIN)
+nsresult
+PluginModuleParent::GetScrollCaptureContainer(NPP aInstance,
+                                              mozilla::layers::ImageContainer** aContainer)
+{
+    PluginInstanceParent* inst = PluginInstanceParent::Cast(aInstance);
+    return !inst ? NS_ERROR_FAILURE : inst->GetScrollCaptureContainer(aContainer);
+}
+nsresult
+PluginModuleParent::UpdateScrollState(NPP aInstance, bool aIsScrolling)
+{
+    PluginInstanceParent* inst = PluginInstanceParent::Cast(aInstance);
+    return !inst ? NS_ERROR_FAILURE : inst->UpdateScrollState(aIsScrolling);
+}
+#endif
+
 void
 PluginModuleParent::OnInitFailure()
 {
@@ -2364,8 +2372,8 @@ PluginModuleChromeParent::RecvNP_InitializeResult(const NPError& aError)
             SetPluginFuncs(mNPPIface);
         }
 
-        // Send the info needed to join the chrome process's audio session to the
-        // plugin process
+        // Send the info needed to join the browser process's audio session to the
+        // plugin process.
         nsID id;
         nsString sessionName;
         nsString iconPath;

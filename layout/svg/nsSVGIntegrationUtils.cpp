@@ -573,9 +573,7 @@ nsSVGIntegrationUtils::PaintFramesWithEffects(gfxContext& aContext,
                                             aBorderArea,
                                             firstFrame->StyleContext(),
                                             *aFrame->StyleBorder(),
-                                            flags,
-                                            nullptr,
-                                            -1);
+                                            flags);
       maskSurface = targetDT->Snapshot();
 
       // Compute mask transform.

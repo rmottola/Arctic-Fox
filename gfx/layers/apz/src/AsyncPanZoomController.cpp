@@ -53,7 +53,7 @@
 #include "mozilla/layers/AxisPhysicsMSDModel.h" // for AxisPhysicsMSDModel
 #include "mozilla/layers/CompositorParent.h" // for CompositorParent
 #include "mozilla/layers/LayerTransactionParent.h" // for LayerTransactionParent
-#include "mozilla/layers/PCompositorParent.h" // for PCompositorParent
+#include "mozilla/layers/PCompositorBridgeParent.h" // for PCompositorBridgeParent
 #include "mozilla/layers/ScrollInputMethods.h" // for ScrollInputMethod
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "mozilla/unused.h"             // for unused
@@ -277,6 +277,11 @@ using mozilla::gfx::PointTyped;
  * and the velocity fall below their thresholds, we stop oscillating.\n
  * Units: screen pixels (for distance)
  *        screen pixels per millisecond (for velocity)
+ *
+ * \li\b apz.paint_skipping.enabled
+ * When APZ is scrolling and sending repaint requests to the main thread, often
+ * the main thread doesn't actually need to do a repaint. This pref allows the
+ * main thread to skip doing those repaints in cases where it doesn't need to.
  *
  * \li\b apz.record_checkerboarding
  * Whether or not to record detailed info on checkerboarding events.
@@ -879,15 +884,17 @@ AsyncPanZoomController::~AsyncPanZoomController()
   MOZ_ASSERT(IsDestroyed());
 }
 
-PCompositorParent*
+PCompositorBridgeParent*
 AsyncPanZoomController::GetSharedFrameMetricsCompositor()
 {
   APZThreadUtils::AssertOnCompositorThread();
 
   if (mSharingFrameMetricsAcrossProcesses) {
-    const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mLayersId);
     // |state| may be null here if the CrossProcessCompositorParent has already been destroyed.
-    return state ? state->mCrossProcessParent : nullptr;
+    if (const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mLayersId)) {
+      return state->CrossProcessPCompositorBridge();
+    }
+    return nullptr;
   }
   return mCompositorParent.get();
 }
@@ -926,7 +933,7 @@ AsyncPanZoomController::Destroy()
   mParent = nullptr;
   mTreeManager = nullptr;
 
-  PCompositorParent* compositor = GetSharedFrameMetricsCompositor();
+  PCompositorBridgeParent* compositor = GetSharedFrameMetricsCompositor();
   // Only send the release message if the SharedFrameMetrics has been created.
   if (compositor && mSharedFrameMetricsBuffer) {
     Unused << compositor->SendReleaseSharedCompositorFrameMetrics(mFrameMetrics.GetScrollId(), mAPZCId);
@@ -3771,7 +3778,7 @@ void AsyncPanZoomController::UpdateSharedCompositorFrameMetrics()
 
 void AsyncPanZoomController::ShareCompositorFrameMetrics() {
 
-  PCompositorParent* compositor = GetSharedFrameMetricsCompositor();
+  PCompositorBridgeParent* compositor = GetSharedFrameMetricsCompositor();
 
   // Only create the shared memory buffer if it hasn't already been created,
   // we are using progressive tile painting, and we have a

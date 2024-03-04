@@ -32,7 +32,7 @@ static bool WriteValidBytes(wasm::Encoder& encoder, bool* passed)
 
     if (encoder.empty())
         return true;
-    if (encoder.bytecodeOffset() != 7)
+    if (encoder.currentOffset() != 7)
         return true;
     *passed = true;
     return true;
@@ -42,8 +42,8 @@ BEGIN_TEST(testWasmLEB128_encoding)
 {
     using namespace wasm;
 
-    Bytecode bc;
-    Encoder encoder(bc);
+    Bytes bytes;
+    Encoder encoder(bytes);
 
     bool passed;
     if (!WriteValidBytes(encoder, &passed))
@@ -51,18 +51,18 @@ BEGIN_TEST(testWasmLEB128_encoding)
     CHECK(passed);
 
     size_t i = 0;
-    CHECK(bc[i++] == 0x0);
-    CHECK(bc[i++] == 0x1);
-    CHECK(bc[i++] == 0x42);
+    CHECK(bytes[i++] == 0x0);
+    CHECK(bytes[i++] == 0x1);
+    CHECK(bytes[i++] == 0x42);
 
-    CHECK(bc[i++] == 0x80);
-    CHECK(bc[i++] == 0x01);
+    CHECK(bytes[i++] == 0x80);
+    CHECK(bytes[i++] == 0x01);
 
-    CHECK(bc[i++] == 0x80);
-    CHECK(bc[i++] == 0x03);
+    CHECK(bytes[i++] == 0x80);
+    CHECK(bytes[i++] == 0x03);
 
-    if (i + 1 < bc.length())
-        CHECK(bc[i++] == 0x00);
+    if (i + 1 < bytes.length())
+        CHECK(bytes[i++] == 0x00);
     return true;
 }
 END_TEST(testWasmLEB128_encoding)
@@ -71,19 +71,19 @@ BEGIN_TEST(testWasmLEB128_valid_decoding)
 {
     using namespace wasm;
 
-    Bytecode bc;
-    if (!bc.append(0x0) || !bc.append(0x1) || !bc.append(0x42))
+    Bytes bytes;
+    if (!bytes.append(0x0) || !bytes.append(0x1) || !bytes.append(0x42))
         return false;
 
-    if (!bc.append(0x80) || !bc.append(0x01))
+    if (!bytes.append(0x80) || !bytes.append(0x01))
         return false;
 
-    if (!bc.append(0x80) || !bc.append(0x03))
+    if (!bytes.append(0x80) || !bytes.append(0x03))
         return false;
 
     {
         // Fallible decoding
-        Decoder decoder(bc);
+        Decoder decoder(bytes);
         uint32_t value;
 
         CHECK(decoder.readVarU32(&value) && value == 0x0);
@@ -97,7 +97,7 @@ BEGIN_TEST(testWasmLEB128_valid_decoding)
 
     {
         // Infallible decoding
-        Decoder decoder(bc);
+        Decoder decoder(bytes);
         uint32_t value;
 
         value = decoder.uncheckedReadVarU32();
@@ -121,20 +121,20 @@ BEGIN_TEST(testWasmLEB128_invalid_decoding)
 {
     using namespace wasm;
 
-    Bytecode bc;
+    Bytes bytes;
     // Fill bits as per 28 encoded bits
-    if (!bc.append(0x80) || !bc.append(0x80) || !bc.append(0x80) || !bc.append(0x80))
+    if (!bytes.append(0x80) || !bytes.append(0x80) || !bytes.append(0x80) || !bytes.append(0x80))
         return false;
 
     // Test last valid values
-    if (!bc.append(0x00))
+    if (!bytes.append(0x00))
         return false;
 
     for (uint8_t i = 0; i < 0x0F; i++) {
-        bc[4] = i;
+        bytes[4] = i;
 
         {
-            Decoder decoder(bc);
+            Decoder decoder(bytes);
             uint32_t value;
             CHECK(decoder.readVarU32(&value));
             CHECK(value == uint32_t(i << 28));
@@ -142,7 +142,7 @@ BEGIN_TEST(testWasmLEB128_invalid_decoding)
         }
 
         {
-            Decoder decoder(bc);
+            Decoder decoder(bytes);
             uint32_t value = decoder.uncheckedReadVarU32();
             CHECK(value == uint32_t(i << 28));
             CHECK(decoder.done());
@@ -151,9 +151,9 @@ BEGIN_TEST(testWasmLEB128_invalid_decoding)
 
     // Test all invalid values of the same size
     for (uint8_t i = 0x10; i < 0xF0; i++) {
-        bc[4] = i;
+        bytes[4] = i;
 
-        Decoder decoder(bc);
+        Decoder decoder(bytes);
         uint32_t value;
         CHECK(!decoder.readVarU32(&value));
     }

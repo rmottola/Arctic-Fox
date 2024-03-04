@@ -347,6 +347,7 @@ AsyncScriptLoader::OnStreamComplete(nsIIncrementalStreamLoader* aLoader,
 
     nsCOMPtr<nsIGlobalObject> globalObject = xpc::NativeGlobal(mTargetObj);
     AutoEntryScript aes(globalObject, "async loadSubScript");
+    aes.TakeOwnershipOfErrorReporting();
     JSContext* cx = aes.cx();
     AutoRejectPromise autoPromise(cx, mPromise, globalObject);
 
@@ -600,7 +601,7 @@ mozJSSubScriptLoader::DoLoadSubScriptWithOptions(const nsAString& url,
     nsAutoCString scheme;
 
     // Figure out who's calling us
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     if (!JS::DescribeScriptedCaller(cx, &filename)) {
         // No scripted frame means we don't know who's calling, bail.
         return NS_ERROR_FAILURE;
@@ -656,8 +657,13 @@ mozJSSubScriptLoader::DoLoadSubScriptWithOptions(const nsAString& url,
 
     RootedFunction function(cx);
     RootedScript script(cx);
-    if (cache && !options.ignoreCache)
+    if (cache && !options.ignoreCache) {
         rv = ReadCachedScript(cache, cachePath, cx, mSystemPrincipal, &script);
+        if (NS_FAILED(rv)) {
+            // ReadCachedScript may have set a pending exception.
+            JS_ClearPendingException(cx);
+        }
+    }
 
     // If we are doing an async load, trigger it and bail out.
     if (!script && options.async) {

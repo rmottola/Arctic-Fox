@@ -123,7 +123,7 @@ CompositorChild::LookupCompositorFrameMetrics(const FrameMetrics::ViewID aId,
   return false;
 }
 
-/*static*/ PCompositorChild*
+/*static*/ PCompositorBridgeChild*
 CompositorChild::Create(Transport* aTransport, ProcessId aOtherPid)
 {
   // There's only one compositor per child process.
@@ -197,10 +197,30 @@ CompositorChild::DeallocPLayerTransactionChild(PLayerTransactionChild* actor)
 }
 
 bool
-CompositorChild::RecvInvalidateAll()
+CompositorChild::RecvInvalidateLayers(const uint64_t& aLayersId)
 {
   if (mLayerManager) {
+    MOZ_ASSERT(aLayersId == 0);
     FrameLayerBuilder::InvalidateAllLayers(mLayerManager);
+  } else if (aLayersId != 0) {
+    if (dom::TabChild* child = dom::TabChild::GetFrom(aLayersId)) {
+      child->InvalidateLayers();
+    }
+  }
+  return true;
+}
+
+bool
+CompositorChild::RecvCompositorUpdated(const uint64_t& aLayersId,
+                                      const TextureFactoryIdentifier& aNewIdentifier)
+{
+  if (mLayerManager) {
+    // This case is handled directly by nsBaseWidget.
+    MOZ_ASSERT(aLayersId == 0);
+  } else if (aLayersId != 0) {
+    if (dom::TabChild* child = dom::TabChild::GetFrom(aLayersId)) {
+      child->CompositorUpdated(aNewIdentifier);
+    }
   }
   return true;
 }
@@ -548,7 +568,7 @@ CompositorChild::CancelNotifyAfterRemotePaint(TabChild* aTabChild)
 bool
 CompositorChild::SendWillStop()
 {
-  return PCompositorChild::SendWillStop();
+  return PCompositorBridgeChild::SendWillStop();
 }
 
 bool
@@ -558,7 +578,7 @@ CompositorChild::SendPause()
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendPause();
+  return PCompositorBridgeChild::SendPause();
 }
 
 bool
@@ -568,7 +588,7 @@ CompositorChild::SendResume()
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendResume();
+  return PCompositorBridgeChild::SendResume();
 }
 
 bool
@@ -578,7 +598,7 @@ CompositorChild::SendNotifyHidden(const uint64_t& id)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendNotifyHidden(id);
+  return PCompositorBridgeChild::SendNotifyHidden(id);
 }
 
 bool
@@ -588,7 +608,7 @@ CompositorChild::SendNotifyVisible(const uint64_t& id)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendNotifyVisible(id);
+  return PCompositorBridgeChild::SendNotifyVisible(id);
 }
 
 bool
@@ -598,7 +618,7 @@ CompositorChild::SendNotifyChildCreated(const uint64_t& id)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendNotifyChildCreated(id);
+  return PCompositorBridgeChild::SendNotifyChildCreated(id);
 }
 
 bool
@@ -608,7 +628,7 @@ CompositorChild::SendAdoptChild(const uint64_t& id)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendAdoptChild(id);
+  return PCompositorBridgeChild::SendAdoptChild(id);
 }
 
 bool
@@ -618,7 +638,7 @@ CompositorChild::SendMakeSnapshot(const SurfaceDescriptor& inSnapshot, const gfx
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendMakeSnapshot(inSnapshot, dirtyRect);
+  return PCompositorBridgeChild::SendMakeSnapshot(inSnapshot, dirtyRect);
 }
 
 bool
@@ -628,7 +648,7 @@ CompositorChild::SendFlushRendering()
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendFlushRendering();
+  return PCompositorBridgeChild::SendFlushRendering();
 }
 
 bool
@@ -638,7 +658,7 @@ CompositorChild::SendGetTileSize(int32_t* tileWidth, int32_t* tileHeight)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendGetTileSize(tileWidth, tileHeight);
+  return PCompositorBridgeChild::SendGetTileSize(tileWidth, tileHeight);
 }
 
 bool
@@ -648,7 +668,7 @@ CompositorChild::SendStartFrameTimeRecording(const int32_t& bufferSize, uint32_t
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendStartFrameTimeRecording(bufferSize, startIndex);
+  return PCompositorBridgeChild::SendStartFrameTimeRecording(bufferSize, startIndex);
 }
 
 bool
@@ -658,7 +678,7 @@ CompositorChild::SendStopFrameTimeRecording(const uint32_t& startIndex, nsTArray
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendStopFrameTimeRecording(startIndex, intervals);
+  return PCompositorBridgeChild::SendStopFrameTimeRecording(startIndex, intervals);
 }
 
 bool
@@ -668,7 +688,7 @@ CompositorChild::SendNotifyRegionInvalidated(const nsIntRegion& region)
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendNotifyRegionInvalidated(region);
+  return PCompositorBridgeChild::SendNotifyRegionInvalidated(region);
 }
 
 bool
@@ -678,7 +698,30 @@ CompositorChild::SendRequestNotifyAfterRemotePaint()
   if (!mCanSend) {
     return true;
   }
-  return PCompositorChild::SendRequestNotifyAfterRemotePaint();
+  return PCompositorBridgeChild::SendRequestNotifyAfterRemotePaint();
+}
+
+bool
+CompositorChild::SendClearApproximatelyVisibleRegions(uint64_t aLayersId,
+                                                      uint32_t aPresShellId)
+{
+  MOZ_ASSERT(mCanSend);
+  if (!mCanSend) {
+    return true;
+  }
+  return PCompositorBridgeChild::SendClearApproximatelyVisibleRegions(aLayersId,
+                                                                aPresShellId);
+}
+
+bool
+CompositorChild::SendNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
+                                                      const CSSIntRegion& aRegion)
+{
+  MOZ_ASSERT(mCanSend);
+  if (!mCanSend) {
+    return true;
+  }
+  return PCompositorBridgeChild::SendNotifyApproximatelyVisibleRegion(aGuid, aRegion);
 }
 
 

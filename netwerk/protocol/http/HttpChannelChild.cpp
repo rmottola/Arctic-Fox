@@ -1804,8 +1804,11 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
     return NS_OK;
   }
 
-  // Set user agent override
+  // Set user agent override from docshell
   HttpBaseChannel::SetDocshellUserAgentOverride();
+
+  // Set user agent override from loadgroup
+  HttpBaseChannel::SetLoadGroupUserAgentOverride();
 
   MOZ_ASSERT_IF(mPostRedirectChannelShouldUpgrade,
                 mPostRedirectChannelShouldIntercept);
@@ -2654,7 +2657,7 @@ HttpChannelChild::ShouldInterceptURI(nsIChannel* aChannel,
 
   nsCOMPtr<nsIURI> upgradedURI;
   if (aShouldUpgrade) {
-    rv = GetSecureUpgradedURI(aURI, getter_AddRefs(upgradedURI));
+    rv = NS_GetSecureUpgradedURI(aURI, getter_AddRefs(upgradedURI));
     NS_ENSURE_SUCCESS(rv, false);
   }
 

@@ -521,12 +521,16 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
     sExitManager = new AtExitManager();
   }
 
-  if (!MessageLoop::current()) {
+  MessageLoop* messageLoop = MessageLoop::current();
+  if (!messageLoop) {
     sMessageLoop = new MessageLoopForUI(MessageLoop::TYPE_MOZILLA_UI);
     sMessageLoop->set_thread_name("Gecko");
     // Set experimental values for main thread hangs:
     // 128ms for transient hangs and 8192ms for permanent hangs
     sMessageLoop->set_hang_timeouts(128, 8192);
+  } else if (messageLoop->type() == MessageLoop::TYPE_MOZILLA_CHILD) {
+    messageLoop->set_thread_name("Gecko_Child");
+    messageLoop->set_hang_timeouts(128, 8192);
   }
 
   if (XRE_IsParentProcess() &&
@@ -845,10 +849,12 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
 
     mozilla::scache::StartupCache::DeleteSingleton();
     if (observerService)
+    {
       mozilla::KillClearOnShutdown(ShutdownPhase::ShutdownThreads);
       observerService->NotifyObservers(nullptr,
                                        NS_XPCOM_SHUTDOWN_THREADS_OBSERVER_ID,
                                        nullptr);
+    }
 
     gXPCOMThreadsShutDown = true;
     NS_ProcessPendingEvents(thread);
@@ -954,18 +960,6 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
   NS_ShutdownNativeCharsetUtils();
 #endif
 
-#if defined(XP_WIN)
-  // This exit(0) call is intended to be temporary, to get shutdown leak
-  // checking working on Linux.
-  // On Windows XP debug, there are intermittent failures in
-  // dom/media/tests/mochitest/test_peerConnection_basicH264Video.html
-  // if we don't exit early in a child process. See bug 1073310.
-  if (XRE_IsContentProcess() && !IsVistaOrLater()) {
-      NS_WARNING("Exiting child process early!");
-      exit(0);
-  }
-#endif
-
   // Shutdown xpcom. This will release all loaders and cause others holding
   // a refcount to the component manager to release it.
   if (nsComponentManagerImpl::gComponentManager) {
@@ -974,6 +968,20 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
   } else {
     NS_WARNING("Component Manager was never created ...");
   }
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  // In optimized builds we don't do shutdown collections by default, so
+  // uncollected (garbage) objects may keep the nsXPConnect singleton alive,
+  // and its XPCJSRuntime along with it. However, we still destroy various
+  // bits of state in JS_ShutDown(), so we need to make sure the profiler
+  // can't access them when it shuts down. This call nulls out the
+  // JS pseudo-stack's internal reference to the main thread JSRuntime,
+  // duplicating the call in XPCJSRuntime::~XPCJSRuntime() in case that
+  // never fired.
+  if (PseudoStack* stack = mozilla_get_pseudo_stack()) {
+    stack->sampleRuntime(nullptr);
+  }
+#endif
 
   // Shut down the JS engine.
   JS_ShutDown();
@@ -1026,13 +1034,13 @@ ShutdownXPCOM(nsIServiceManager* aServMgr)
   NS_LogTerm();
 
 #if defined(MOZ_WIDGET_GONK)
-  // This exit(0) call is intended to be temporary, to get shutdown leak
-  // checking working on Linux.
+  // This _exit(0) call is intended to be temporary, to get shutdown leak
+  // checking working on non-B2G platforms.
   // On debug B2G, the child process crashes very late.  Instead, just
   // give up so at least we exit cleanly. See bug 1071866.
   if (XRE_IsContentProcess()) {
       NS_WARNING("Exiting child process early!");
-      exit(0);
+      _exit(0);
   }
 #endif
 

@@ -11,6 +11,7 @@
 #include "nsCycleCollectionParticipant.h"
 #include "nsIDocument.h"
 #include "nsWrapperCache.h"
+#include "mozilla/AnimationPerformanceWarning.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ComputedTimingFunction.h" // ComputedTimingFunction
 #include "mozilla/LayerAnimationInfo.h"     // LayerAnimations::kRecords
@@ -18,9 +19,9 @@
 #include "mozilla/StickyTimeDuration.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/TimingParams.h"
 #include "mozilla/dom/AnimationEffectReadOnly.h"
-#include "mozilla/dom/AnimationEffectTiming.h"
-#include "mozilla/dom/AnimationEffectTimingReadOnly.h" // TimingParams
+#include "mozilla/dom/AnimationEffectTimingReadOnly.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/KeyframeBinding.h"
 #include "mozilla/dom/Nullable.h"
@@ -35,7 +36,6 @@ class nsPresContext;
 
 namespace mozilla {
 
-struct AnimationCollection;
 class AnimValuesStyleRule;
 enum class CSSPseudoElementType : uint8_t;
 
@@ -45,6 +45,7 @@ class OwningElementOrCSSPseudoElement;
 class UnrestrictedDoubleOrKeyframeEffectOptions;
 enum class IterationCompositeOperation : uint32_t;
 enum class CompositeOperation : uint32_t;
+struct AnimationPropertyState;
 }
 
 /**
@@ -57,6 +58,10 @@ struct ComputedTiming
   // Will equal StickyTimeDuration::Forever() if the animation repeats
   // indefinitely.
   StickyTimeDuration  mActiveDuration;
+  // The effect end time in local time (i.e. an offset from the effect's
+  // start time). Will equal StickyTimeDuration::Forever() if the animation
+  // plays indefinitely.
+  StickyTimeDuration  mEndTime;
   // Progress towards the end of the current iteration. If the effect is
   // being sampled backwards, this will go from 1.0 to 0.0.
   // Will be null if the animation is neither animating nor
@@ -67,6 +72,7 @@ struct ComputedTiming
   // Unlike TimingParams::mIterations, this value is
   // guaranteed to be in the range [0, Infinity].
   double              mIterations = 1.0;
+  double              mIterationStart = 0.0;
   StickyTimeDuration  mDuration;
 
   // This is the computed fill mode so it is never auto
@@ -134,13 +140,15 @@ struct AnimationProperty
   // If true, the propery is currently being animated on the compositor.
   //
   // Note that when the owning Animation requests a non-throttled restyle, in
-  // between calling RequestRestyle on its AnimationCollection and when the
+  // between calling RequestRestyle on its EffectCompositor and when the
   // restyle is performed, this member may temporarily become false even if
   // the animation remains on the layer after the restyle.
   //
   // **NOTE**: This member is not included when comparing AnimationProperty
   // objects for equality.
   bool mIsRunningOnCompositor = false;
+
+  Maybe<AnimationPerformanceWarning> mPerformanceWarning;
 
   InfallibleTArray<AnimationPropertySegment> mSegments;
 
@@ -196,9 +204,13 @@ public:
               const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
               ErrorResult& aRv)
   {
+    TimingParams timingParams =
+      TimingParams::FromOptionsUnion(aOptions, aTarget, aRv);
+    if (aRv.Failed()) {
+      return nullptr;
+    }
     return ConstructKeyframeEffect<KeyframeEffectReadOnly>(
-      aGlobal, aTarget, aFrames,
-      TimingParams::FromOptionsUnion(aOptions, aTarget), aRv);
+             aGlobal, aTarget, aFrames, timingParams, aRv);
   }
 
   void GetTarget(Nullable<OwningElementOrCSSPseudoElement>& aRv) const;
@@ -283,10 +295,12 @@ public:
   InfallibleTArray<AnimationProperty>& Properties() {
     return mProperties;
   }
-  // Copies the properties from another keyframe effect whilst preserving
-  // the mWinsInCascade and mIsRunningOnCompositor state of matching
+  // Updates the set of properties using the supplied list whilst preserving
+  // the mWinsInCascade and mIsRunningOnCompositor state of any matching
   // properties.
-  void CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther);
+  // Returns true if we updated anything in the properties.
+  bool UpdateProperties(
+    const InfallibleTArray<AnimationProperty>& aProperties);
 
   // Updates |aStyleRule| with the animation values produced by this
   // AnimationEffect for the current time except any properties already
@@ -297,6 +311,8 @@ public:
   // Returns true if at least one property is being animated on compositor.
   bool IsRunningOnCompositor() const;
   void SetIsRunningOnCompositor(nsCSSProperty aProperty, bool aIsRunning);
+
+  void GetPropertyState(nsTArray<AnimationPropertyState>& aStates) const;
 
   // Returns true if this effect, applied to |aFrame|, contains
   // properties that mean we shouldn't run *any* compositor animations on this
@@ -312,12 +328,23 @@ public:
   //
   // Bug 1218620 - It seems like we don't need to be this restrictive. Wouldn't
   // it be ok to do 'opacity' animations on the compositor in either case?
-  bool ShouldBlockCompositorAnimations(const nsIFrame* aFrame) const;
+  //
+  // When returning true, |aOutPerformanceWarning| stores the reason why
+  // we shouldn't run the compositor animations.
+  bool ShouldBlockCompositorAnimations(
+    const nsIFrame* aFrame,
+    AnimationPerformanceWarning::Type& aPerformanceWarning) const;
 
   nsIDocument* GetRenderedDocument() const;
   nsPresContext* GetPresContext() const;
 
-  inline AnimationCollection* GetCollection() const;
+  // Associates a warning with the animated property on the specified frame
+  // indicating why, for example, the property could not be animated on the
+  // compositor. |aParams| and |aParamsLength| are optional parameters which
+  // will be used to generate a localized message for devtools.
+  void SetPerformanceWarning(
+    nsCSSProperty aProperty,
+    const AnimationPerformanceWarning& aWarning);
 
 protected:
   KeyframeEffectReadOnly(nsIDocument* aDocument,
@@ -380,11 +407,11 @@ private:
   bool CanThrottleTransformChanges(nsIFrame& aFrame) const;
 
   // Returns true unless Gecko limitations prevent performing transform
-  // animations for |aFrame|. Any limitations that are encountered are
-  // logged using |aContent| to describe the affected content.
-  // If |aContent| is nullptr, no logging is performed
-  static bool CanAnimateTransformOnCompositor(const nsIFrame* aFrame,
-                                              const nsIContent* aContent);
+  // animations for |aFrame|. When returning true, the reason for the
+  // limitation is stored in |aOutPerformanceWarning|.
+  static bool CanAnimateTransformOnCompositor(
+    const nsIFrame* aFrame,
+    AnimationPerformanceWarning::Type& aPerformanceWarning);
   static bool IsGeometricProperty(const nsCSSProperty aProperty);
 
   static const TimeDuration OverflowRegionRefreshInterval();
@@ -408,9 +435,13 @@ public:
               const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
               ErrorResult& aRv)
   {
+    TimingParams timingParams =
+      TimingParams::FromOptionsUnion(aOptions, aTarget, aRv);
+    if (aRv.Failed()) {
+      return nullptr;
+    }
     return ConstructKeyframeEffect<KeyframeEffect>(
-      aGlobal, aTarget, aFrames,
-      TimingParams::FromOptionsUnion(aOptions, aTarget), aRv);
+      aGlobal, aTarget, aFrames, timingParams, aRv);
   }
 
   // More generalized version for Animatable.animate.
@@ -425,6 +456,11 @@ public:
     return ConstructKeyframeEffect<KeyframeEffect>(aGlobal, aTarget, aFrames,
                                                    aTiming, aRv);
   }
+
+  void NotifySpecifiedTimingUpdated();
+
+protected:
+  ~KeyframeEffect() override;
 };
 
 } // namespace dom

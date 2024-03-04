@@ -792,6 +792,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
     usesArguments(false),
     usesApply(false),
     usesThis(false),
+    usesReturn(false),
     funCxFlags()
 {
     // Functions created at parse time may be set singleton after parsing and
@@ -2888,8 +2889,8 @@ Parser<SyntaxParseHandler>::finishFunctionDefinition(Node pn, FunctionBox* funbo
     if (pc->sc->strict())
         lazy->setStrict();
     lazy->setGeneratorKind(funbox->generatorKind());
-    if (funbox->usesArguments && funbox->usesApply && funbox->usesThis)
-        lazy->setUsesArgumentsApplyAndThis();
+    if (funbox->isLikelyConstructorWrapper())
+        lazy->setLikelyConstructorWrapper();
     if (funbox->isDerivedClassConstructor())
         lazy->setIsDerivedClassConstructor();
     if (funbox->needsHomeObject())
@@ -4057,7 +4058,8 @@ Parser<ParseHandler>::bindVar(BindData<ParseHandler>* data,
 
         // Synthesize a new 'var' binding if one does not exist.
         DefinitionNode last = pc->decls().lookupLast(name);
-        if (last && parser->handler.getDefinitionKind(last) != Definition::VAR) {
+        Definition::Kind lastKind = parser->handler.getDefinitionKind(last);
+        if (last && lastKind != Definition::VAR && lastKind != Definition::ARG) {
             parser->handler.setFlag(parser->handler.getDefinitionNode(last), PND_CLOSED);
 
             Node synthesizedVarName = parser->newName(name);
@@ -6433,6 +6435,7 @@ Parser<ParseHandler>::returnStatement(YieldHandling yieldHandling)
     uint32_t begin = pos().begin;
 
     MOZ_ASSERT(pc->sc->isFunctionBox());
+    pc->sc->asFunctionBox()->usesReturn = true;
 
     // Parse an optional operand.
     //
@@ -7478,10 +7481,6 @@ Parser<ParseHandler>::expr(InHandling inHandling, YieldHandling yieldHandling,
     if (!seq)
         return null();
     while (true) {
-        if (handler.isUnparenthesizedYieldExpression(pn)) {
-            report(ParseError, false, pn, JSMSG_BAD_YIELD_SYNTAX);
-            return null();
-        }
 
         pn = assignExpr(inHandling, yieldHandling, tripledotHandling);
         if (!pn)
@@ -8460,16 +8459,6 @@ Parser<ParseHandler>::argumentList(YieldHandling yieldHandling, Node listNode, b
             argNode = handler.newUnary(PNK_SPREAD, JSOP_NOP, begin, argNode);
             if (!argNode)
                 return false;
-        }
-
-        if (handler.isUnparenthesizedYieldExpression(argNode)) {
-            TokenKind tt;
-            if (!tokenStream.peekToken(&tt))
-                return false;
-            if (tt == TOK_COMMA) {
-                report(ParseError, false, argNode, JSMSG_BAD_YIELD_SYNTAX);
-                return false;
-            }
         }
 
         handler.addList(listNode, argNode);

@@ -614,6 +614,7 @@ nsPIDOMWindow<T>::nsPIDOMWindow(nsPIDOMWindowOuter *aOuterWindow)
   mMayHavePaintEventListener(false), mMayHaveTouchEventListener(false),
   mMayHaveMouseEnterLeaveEventListener(false),
   mMayHavePointerEnterLeaveEventListener(false),
+  mInnerObjectsFreed(false),
   mIsModalContentWindow(false),
   mIsActive(false), mIsBackground(false),
   mAudioMuted(false), mAudioVolume(1.0), mAudioCaptured(false),
@@ -1172,7 +1173,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 #endif
     mShowFocusRingForContent(false),
     mFocusByKeyOccurred(false),
-    mInnerObjectsFreed(false),
     mHasGamepad(false),
 #ifdef MOZ_GAMEPAD
     mHasSeenGamepadInput(false),
@@ -3436,9 +3436,9 @@ nsGlobalWindow::DefineArgumentsProperty(nsIArray *aArguments)
 
   nsIScriptContext *ctx = GetOuterWindowInternal()->mContext;
   NS_ENSURE_TRUE(aArguments && ctx, NS_ERROR_NOT_INITIALIZED);
-  AutoJSContext cx;
 
-  JS::Rooted<JSObject*> obj(cx, GetWrapperPreserveColor());
+  JS::Rooted<JSObject*> obj(nsContentUtils::RootingCx(),
+                            GetWrapperPreserveColor());
   return ctx->SetProperty(obj, "arguments", aArguments);
 }
 
@@ -4027,7 +4027,9 @@ nsGlobalWindow::GetMozSelfSupport(ErrorResult& aError)
     return mMozSelfSupport;
   }
 
-  AutoSafeJSContext cx;
+  // We're called from JS and want to use out existing JSContext (and,
+  // importantly, its compartment!) here.
+  AutoJSContext cx;
   GlobalObject global(cx, FastGetGlobalJSObject());
   mMozSelfSupport = MozSelfSupport::Constructor(global, cx, aError);
   return mMozSelfSupport;
@@ -5732,8 +5734,13 @@ nsGlobalWindow::DispatchResizeEvent(const CSSIntSize& aSize)
     return false;
   }
 
-  AutoSafeJSContext cx;
+  // We don't init the AutoJSAPI with ourselves because we don't want it
+  // reporting errors to our onerror handlers.
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  JSContext* cx = jsapi.cx();
   JSAutoCompartment ac(cx, GetWrapperPreserveColor());
+
   DOMWindowResizeEventDetail detail;
   detail.mWidth = aSize.width;
   detail.mHeight = aSize.height;
@@ -8706,8 +8713,7 @@ nsGlobalWindow::NotifyDOMWindowThawed(nsGlobalWindow* aWindow) {
 JSObject*
 nsGlobalWindow::GetCachedXBLPrototypeHandler(nsXBLPrototypeHandler* aKey)
 {
-  AutoSafeJSContext cx;
-  JS::Rooted<JSObject*> handler(cx);
+  JS::Rooted<JSObject*> handler(nsContentUtils::RootingCx());
   if (mCachedXBLPrototypeHandlers) {
     mCachedXBLPrototypeHandlers->Get(aKey, handler.address());
   }
@@ -10673,7 +10679,7 @@ nsGlobalWindow::ShowSlowScriptDialog()
   }
 
   // Check if we should offer the option to debug
-  JS::UniqueChars filename;
+  JS::AutoFilename filename;
   unsigned lineno;
   bool hasFrame = JS::DescribeScriptedCaller(cx, &filename, &lineno);
 

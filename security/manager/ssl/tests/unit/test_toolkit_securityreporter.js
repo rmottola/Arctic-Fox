@@ -18,6 +18,7 @@ const CC = Components.Constructor;
 const Cm = Components.manager;
 
 Cu.import("resource://testing-common/AppInfo.jsm");
+/*global updateAppInfo:false*/ // Imported via AppInfo.jsm.
 updateAppInfo();
 
 // We must get the profile before performing operations on the cert db.
@@ -52,7 +53,7 @@ function getReportCheck(expectReport, expectedError) {
     });
 
     reporter.reportTLSError(transportSecurityInfo, "example.com", -1);
-  }
+  };
 }
 
 // read the request body from a request

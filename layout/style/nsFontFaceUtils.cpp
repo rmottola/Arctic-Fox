@@ -21,7 +21,7 @@ StyleContextContainsFont(nsStyleContext* aStyleContext,
   // if the font is null, simply check to see whether fontlist includes
   // downloadable fonts
   if (!aFont) {
-    const FontFamilyList& fontlist =
+    const mozilla::FontFamilyList& fontlist =
       aStyleContext->StyleFont()->mFont.fontlist;
     return aUserFontSet->ContainsUserFontSetFonts(fontlist);
   }
@@ -34,10 +34,8 @@ StyleContextContainsFont(nsStyleContext* aStyleContext,
 
   // family name is in the fontlist, check to see if the font group
   // associated with the frame includes the specific userfont
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForStyleContext(aStyleContext,
-                                               getter_AddRefs(fm),
-                                               1.0f);
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetFontMetricsForStyleContext(aStyleContext, 1.0f);
 
   if (fm->GetThebesFontGroup()->ContainsUserFont(aFont)) {
     return true;

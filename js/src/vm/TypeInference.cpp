@@ -772,10 +772,10 @@ TypeSet::IsTypeAllocatedDuringIncremental(TypeSet::Type v)
     bool rv;
     if (v.isSingletonUnchecked()) {
         JSObject* obj = v.singletonNoBarrier();
-        rv = obj->isTenured() && obj->asTenured().arenaHeader()->allocatedDuringIncremental;
+        rv = obj->isTenured() && obj->asTenured().arena()->allocatedDuringIncremental;
     } else if (v.isGroupUnchecked()) {
         ObjectGroup* group = v.groupNoBarrier();
-        rv = group->arenaHeader()->allocatedDuringIncremental;
+        rv = group->arena()->allocatedDuringIncremental;
     } else {
         rv = false;
     }
@@ -2911,12 +2911,15 @@ ObjectGroup::detachNewScript(bool writeBarrier, ObjectGroup* replacement)
 
     if (newScript->analyzed()) {
         ObjectGroupCompartment& objectGroups = newScript->function()->compartment()->objectGroups;
+        TaggedProto proto = this->proto();
+        if (proto.isObject() && IsForwarded(proto.toObject()))
+            proto = TaggedProto(Forwarded(proto.toObject()));
+        JSObject* associated = MaybeForwarded(newScript->function());
         if (replacement) {
             MOZ_ASSERT(replacement->newScript()->function() == newScript->function());
-            objectGroups.replaceDefaultNewGroup(nullptr, proto(), newScript->function(),
-                                                replacement);
+            objectGroups.replaceDefaultNewGroup(nullptr, proto, associated, replacement);
         } else {
-            objectGroups.removeDefaultNewGroup(nullptr, proto(), newScript->function());
+            objectGroups.removeDefaultNewGroup(nullptr, proto, associated);
         }
     } else {
         MOZ_ASSERT(!replacement);
@@ -4437,7 +4440,7 @@ TypeZone::endSweep(JSRuntime* rt)
 void
 TypeZone::clearAllNewScriptsOnOOM()
 {
-    for (gc::ZoneCellIterUnderGC iter(zone(), gc::AllocKind::OBJECT_GROUP);
+    for (gc::ZoneCellIter iter(zone(), gc::AllocKind::OBJECT_GROUP);
          !iter.done(); iter.next())
     {
         ObjectGroup* group = iter.get<ObjectGroup>();

@@ -16,8 +16,14 @@ Cu.import("resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
                                   "resource:///modules/AboutHome.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "AboutNewTab",
+                                  "resource:///modules/AboutNewTab.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
+                                  "resource:///modules/NewTabPrefsProvider.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
@@ -42,9 +48,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "BookmarkHTMLUtils",
 
 XPCOMUtils.defineLazyModuleGetter(this, "BookmarkJSONUtils",
                                   "resource://gre/modules/BookmarkJSONUtils.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "WebappManager",
-                                  "resource:///modules/WebappManager.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
                                   "resource://gre/modules/PageThumbs.jsm");
@@ -143,8 +146,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ShellService",
 
 XPCOMUtils.defineLazyServiceGetter(this, "AlertsService",
                                    "@mozilla.org/alerts-service;1", "nsIAlertsService");
-
-const ABOUT_NEWTAB = "about:newtab";
 
 const PREF_PLUGINS_NOTIFYUSER = "plugins.update.notifyUser";
 const PREF_PLUGINS_UPDATEURL  = "plugins.update.url";
@@ -377,6 +378,18 @@ BrowserGlue.prototype = {
         break;
       case "profile-before-change":
         this._onProfileShutdown();
+        break;
+      case "keyword-search":
+        // This notification is broadcast by the docshell when it "fixes up" a
+        // URI that it's been asked to load into a keyword search.
+        let engine = null;
+        try {
+          engine = subject.QueryInterface(Ci.nsISearchEngine);
+        } catch (ex) {
+          Cu.reportError(ex);
+        }
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        win.BrowserSearch.recordSearchInTelemetry(engine, "urlbar");
         break;
       case "browser-search-engine-modified":
         // Ensure we cleanup the hiddenOneOffs pref when removing
@@ -663,11 +676,13 @@ BrowserGlue.prototype = {
 
     this._setUpUserAgentOverrides();
 
-    WebappManager.init();
     PageThumbs.init();
     webrtcUI.init();
     AboutHome.init();
     NewTabUtils.init();
+    AboutNewTab.init();
+    NewTabPrefsProvider.prefs.init();
+
     SessionStore.init();
     BrowserUITelemetry.init();
     ContentSearch.init();
@@ -941,7 +956,9 @@ BrowserGlue.prototype = {
    */
   _onProfileShutdown: function BG__onProfileShutdown() {
     UserAgentOverrides.uninit();
-    WebappManager.uninit();
+
+    NewTabPrefsProvider.prefs.uninit();
+    AboutNewTab.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
     if (AppConstants.NIGHTLY_BUILD) {
@@ -2301,50 +2318,6 @@ BrowserGlue.prototype = {
   _xpcom_factory: BrowserGlueServiceFactory,
 }
 
-// ------------------------------------
-// nsIAboutNewTabService implementation
-//-------------------------------------
-
-function AboutNewTabService()
-{
-  this._newTabURL = ABOUT_NEWTAB;
-  this._overridden = false;
-}
-
-AboutNewTabService.prototype = {
-  classID: Components.ID("{97eea4bb-db50-4ae0-9147-1e5ed55b4ed5}"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIAboutNewTabService]),
-
-  get newTabURL() {
-
-    if (!AppConstants.RELEASE_BUILD && Services.prefs.getBoolPref("browser.newtabpage.remote")) {
-      return "about:remote-newtab";
-    }
-
-    return this._newTabURL;
-  },
-
-  set newTabURL(aNewTabURL) {
-    if (aNewTabURL === ABOUT_NEWTAB) {
-      this.resetNewTabURL();
-      return;
-    }
-    this._newTabURL = aNewTabURL;
-    this._overridden = true;
-    Services.obs.notifyObservers(null, "newtab-url-changed", this._newTabURL);
-  },
-
-  get overridden() {
-    return this._overridden;
-  },
-
-  resetNewTabURL: function() {
-    this._newTabURL = ABOUT_NEWTAB;
-    this._overridden = false;
-    Services.obs.notifyObservers(null, "newtab-url-changed", this._newTabURL);
-   }
-};
-
 function ContentPermissionPrompt() {}
 
 ContentPermissionPrompt.prototype = {
@@ -3059,5 +3032,5 @@ var E10SUINotification = {
   },
 };
 
-var components = [BrowserGlue, ContentPermissionPrompt, AboutNewTabService];
+var components = [BrowserGlue, ContentPermissionPrompt];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(components);

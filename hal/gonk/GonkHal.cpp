@@ -55,8 +55,10 @@
 #include "mozilla/Monitor.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Services.h"
+#include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/UniquePtrExtensions.h"
 #include "nsAlgorithm.h"
 #include "nsPrintfCString.h"
 #include "nsIObserver.h"
@@ -297,6 +299,9 @@ public:
 
   static bool ShuttingDown() { return sShuttingDown; }
 
+protected:
+  ~VibratorRunnable() {}
+
 private:
   Monitor mMonitor;
 
@@ -471,7 +476,7 @@ public:
 
 } // namespace
 
-class BatteryObserver : public IUeventObserver
+class BatteryObserver final : public IUeventObserver
 {
 public:
   NS_INLINE_DECL_REFCOUNTING(BatteryObserver)
@@ -494,6 +499,9 @@ public:
       NS_DispatchToMainThread(mUpdater);
     }
   }
+
+protected:
+  ~BatteryObserver() {}
 
 private:
   RefPtr<BatteryUpdater> mUpdater;
@@ -603,6 +611,11 @@ void
 GetCurrentBatteryInformation(hal::BatteryInformation* aBatteryInfo)
 {
   int charge;
+  static bool previousCharging = false;
+  static double previousLevel = 0.0, remainingTime = 0.0;
+  static struct timespec lastLevelChange;
+  struct timespec now;
+  double dtime, dlevel;
 
   if (GetCurrentBatteryCharge(&charge)) {
     aBatteryInfo->level() = (double)charge / 100.0;
@@ -618,35 +631,84 @@ GetCurrentBatteryInformation(hal::BatteryInformation* aBatteryInfo)
     aBatteryInfo->charging() = true;
   }
 
-  if (!aBatteryInfo->charging() || (aBatteryInfo->level() < 1.0)) {
+  if (aBatteryInfo->charging() != previousCharging){
     aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
-  } else {
-    aBatteryInfo->remainingTime() = dom::battery::kDefaultRemainingTime;
+    memset(&lastLevelChange, 0, sizeof(struct timespec));
+    remainingTime = 0.0;
   }
+
+  if (aBatteryInfo->charging()) {
+    if (aBatteryInfo->level() == 1.0) {
+      aBatteryInfo->remainingTime() = dom::battery::kDefaultRemainingTime;
+    } else if (aBatteryInfo->level() != previousLevel){
+      if (lastLevelChange.tv_sec != 0) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        dtime = now.tv_sec - lastLevelChange.tv_sec;
+        dlevel = aBatteryInfo->level() - previousLevel;
+
+        if (dlevel <= 0.0) {
+          aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+        } else {
+          remainingTime = (double) round(dtime / dlevel * (1.0 - aBatteryInfo->level()));
+          aBatteryInfo->remainingTime() = remainingTime;
+        }
+
+        lastLevelChange = now;
+      } else { // lastLevelChange.tv_sec == 0
+        clock_gettime(CLOCK_MONOTONIC, &lastLevelChange);
+        aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+      }
+
+    } else {
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      dtime = now.tv_sec - lastLevelChange.tv_sec;
+      if (dtime < remainingTime) {
+        aBatteryInfo->remainingTime() = round(remainingTime - dtime);
+      } else {
+        aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+      }
+
+    }
+
+  } else {
+    if (aBatteryInfo->level() == 0.0) {
+      aBatteryInfo->remainingTime() = dom::battery::kDefaultRemainingTime;
+    } else if (aBatteryInfo->level() != previousLevel){
+      if (lastLevelChange.tv_sec != 0) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        dtime = now.tv_sec - lastLevelChange.tv_sec;
+        dlevel = previousLevel - aBatteryInfo->level();
+
+        if (dlevel <= 0.0) {
+          aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+        } else {
+          remainingTime = (double) round(dtime / dlevel * aBatteryInfo->level());
+          aBatteryInfo->remainingTime() = remainingTime;
+        }
+
+        lastLevelChange = now;
+      } else { // lastLevelChange.tv_sec == 0
+        clock_gettime(CLOCK_MONOTONIC, &lastLevelChange);
+        aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+      }
+
+    } else {
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      dtime = now.tv_sec - lastLevelChange.tv_sec;
+      if (dtime < remainingTime) {
+        aBatteryInfo->remainingTime() = round(remainingTime - dtime);
+      } else {
+        aBatteryInfo->remainingTime() = dom::battery::kUnknownRemainingTime;
+      }
+
+    }
+  }
+
+  previousCharging = aBatteryInfo->charging();
+  previousLevel = aBatteryInfo->level();
 }
 
 namespace {
-
-/**
- * RAII class to help us remember to close file descriptors.
- */
-
-bool WriteToFile(const char *filename, const char *toWrite)
-{
-  int fd = open(filename, O_WRONLY);
-  ScopedClose autoClose(fd);
-  if (fd < 0) {
-    HAL_LOG("Unable to open file %s.", filename);
-    return false;
-  }
-
-  if (write(fd, toWrite, strlen(toWrite)) < 0) {
-    HAL_LOG("Unable to write to file %s.", filename);
-    return false;
-  }
-
-  return true;
-}
 
 // We can write to screenEnabledFilename to enable/disable the screen, but when
 // we read, we always get "mem"!  So we have to keep track ourselves whether
@@ -660,7 +722,7 @@ bool sScreenEnabled = true;
 bool sCpuSleepAllowed = true;
 
 // Some CPU wake locks may be acquired internally in HAL. We use a counter to
-// keep track of these needs. Note we have to hold |sInternalLockCpuMonitor|
+// keep track of these needs. Note we have to hold |sInternalLockCpuMutex|
 // when reading or writing this variable to ensure thread-safe.
 int32_t sInternalLockCpuCount = 0;
 
@@ -683,8 +745,11 @@ bool
 GetKeyLightEnabled()
 {
   LightConfiguration config;
-  GetLight(eHalLightID_Buttons, &config);
-  return (config.color != 0x00000000);
+  bool ok = GetLight(eHalLightID_Buttons, &config);
+  if (ok) {
+    return (config.color != 0x00000000);
+  }
+  return false;
 }
 
 void
@@ -717,10 +782,15 @@ GetScreenBrightness()
   LightConfiguration config;
   LightType light = eHalLightID_Backlight;
 
-  GetLight(light, &config);
-  // backlight is brightness only, so using one of the RGB elements as value.
-  int brightness = config.color & 0xFF;
-  return brightness / 255.0;
+  bool ok = GetLight(light, &config);
+  if (ok) {
+    // backlight is brightness only, so using one of the RGB elements as value.
+    int brightness = config.color & 0xFF;
+    return brightness / 255.0;
+  }
+  // If GetLight fails, it's because the light doesn't exist.  So return
+  // a value corresponding to "off".
+  return 0;
 }
 
 void
@@ -750,7 +820,7 @@ SetScreenBrightness(double brightness)
   }
 }
 
-static Monitor* sInternalLockCpuMonitor = nullptr;
+static StaticMutex sInternalLockCpuMutex;
 
 static void
 UpdateCpuSleepState()
@@ -758,21 +828,21 @@ UpdateCpuSleepState()
   const char *wakeLockFilename = "/sys/power/wake_lock";
   const char *wakeUnlockFilename = "/sys/power/wake_unlock";
 
-  sInternalLockCpuMonitor->AssertCurrentThreadOwns();
+  sInternalLockCpuMutex.AssertCurrentThreadOwns();
   bool allowed = sCpuSleepAllowed && !sInternalLockCpuCount;
-  WriteToFile(allowed ? wakeUnlockFilename : wakeLockFilename, "gecko");
+  WriteSysFile(allowed ? wakeUnlockFilename : wakeLockFilename, "gecko");
 }
 
 static void
 InternalLockCpu() {
-  MonitorAutoLock monitor(*sInternalLockCpuMonitor);
+  StaticMutexAutoLock lock(sInternalLockCpuMutex);
   ++sInternalLockCpuCount;
   UpdateCpuSleepState();
 }
 
 static void
 InternalUnlockCpu() {
-  MonitorAutoLock monitor(*sInternalLockCpuMonitor);
+  StaticMutexAutoLock lock(sInternalLockCpuMutex);
   --sInternalLockCpuCount;
   UpdateCpuSleepState();
 }
@@ -786,7 +856,7 @@ GetCpuSleepAllowed()
 void
 SetCpuSleepAllowed(bool aAllowed)
 {
-  MonitorAutoLock monitor(*sInternalLockCpuMonitor);
+  StaticMutexAutoLock lock(sInternalLockCpuMutex);
   sCpuSleepAllowed = aAllowed;
   UpdateCpuSleepState();
 }
@@ -1073,14 +1143,10 @@ EnableAlarm()
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-  // Initialize the monitor for internally locking CPU to ensure thread-safe
-  // before running the alarm-watcher thread.
-  sInternalLockCpuMonitor = new Monitor("sInternalLockCpuMonitor");
   int status = pthread_create(&sAlarmFireWatcherThread, &attr, WaitForAlarm,
                               alarmData.get());
   if (status) {
     alarmData = nullptr;
-    delete sInternalLockCpuMonitor;
     HAL_LOG("Failed to create alarm-watcher thread. Status: %d.", status);
     return false;
   }
@@ -1104,8 +1170,6 @@ DisableAlarm()
   // data pointed at by sAlarmData.
   DebugOnly<int> err = pthread_kill(sAlarmFireWatcherThread, SIGUSR1);
   MOZ_ASSERT(!err);
-
-  delete sInternalLockCpuMonitor;
 }
 
 bool
@@ -1168,14 +1232,18 @@ public:
       mRegexes(nullptr)
   {
     // Enable timestamps in kernel's printk
-    WriteToFile("/sys/module/printk/parameters/time", "Y");
+    WriteSysFile("/sys/module/printk/parameters/time", "Y");
   }
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSIOBSERVER
+
+protected:
+  ~OomVictimLogger() {}
+
 private:
   double mLastLineChecked;
-  ScopedFreePtr<regex_t> mRegexes;
+  UniqueFreePtr<regex_t> mRegexes;
 };
 NS_IMPL_ISUPPORTS(OomVictimLogger, nsIObserver);
 
@@ -1209,9 +1277,13 @@ OomVictimLogger::Observe(
 
   // Compile our regex just in time
   if (!mRegexes) {
-    mRegexes = static_cast<regex_t*>(malloc(sizeof(regex_t) * regex_count));
+    UniqueFreePtr<regex_t> regexes(
+      static_cast<regex_t*>(malloc(sizeof(regex_t) * regex_count))
+    );
+    mRegexes.swap(regexes);
     for (size_t i = 0; i < regex_count; i++) {
-      int compilation_err = regcomp(&(mRegexes[i]), regexes_raw[i], REG_NOSUB);
+      int compilation_err =
+        regcomp(&(mRegexes.get()[i]), regexes_raw[i], REG_NOSUB);
       if (compilation_err) {
         OOM_LOG(ANDROID_LOG_ERROR, "Cannot compile regex \"%s\"\n", regexes_raw[i]);
         return NS_OK;
@@ -1231,16 +1303,16 @@ OomVictimLogger::Observe(
 #endif
   // Retreive kernel log
   int msg_buf_size = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
-  ScopedFreePtr<char> msg_buf(static_cast<char *>(malloc(msg_buf_size + 1)));
-  int read_size = klogctl(KLOG_READ_ALL, msg_buf.rwget(), msg_buf_size);
+  UniqueFreePtr<char> msg_buf(static_cast<char *>(malloc(msg_buf_size + 1)));
+  int read_size = klogctl(KLOG_READ_ALL, msg_buf.get(), msg_buf_size);
 
   // Turn buffer into cstring
   read_size = read_size > msg_buf_size ? msg_buf_size : read_size;
-  msg_buf.rwget()[read_size] = '\0';
+  msg_buf.get()[read_size] = '\0';
 
   // Foreach line
   char* line_end;
-  char* line_begin = msg_buf.rwget();
+  char* line_begin = msg_buf.get();
   for (; (line_end = strchr(line_begin, '\n')); line_begin = line_end + 1) {
     // make line into cstring
     *line_end = '\0';
@@ -1273,7 +1345,7 @@ OomVictimLogger::Observe(
 
     // Log interesting lines
     for (size_t i = 0; i < regex_count; i++) {
-      int matching = !regexec(&(mRegexes[i]), line_begin, 0, NULL, 0);
+      int matching = !regexec(&(mRegexes.get()[i]), line_begin, 0, NULL, 0);
       if (matching) {
         // Log content of kernel message. We try to skip the ], but if for
         // some reason (most likely due to buffer overflow/wraparound), we
@@ -1466,16 +1538,16 @@ EnsureCpuCGroupExists(const nsACString &aGroup)
 
   nsAutoCString pathPrefix(kDevCpuCtl + aGroup + kSlash);
   nsAutoCString cpuSharesPath(pathPrefix + NS_LITERAL_CSTRING("cpu.shares"));
-  if (cpuShares && !WriteToFile(cpuSharesPath.get(),
-                                nsPrintfCString("%d", cpuShares).get())) {
+  if (cpuShares && !WriteSysFile(cpuSharesPath.get(),
+                                 nsPrintfCString("%d", cpuShares).get())) {
     HAL_LOG("Could not set the cpu share for group %s", cpuSharesPath.get());
     return false;
   }
 
   nsAutoCString notifyOnMigratePath(pathPrefix
     + NS_LITERAL_CSTRING("cpu.notify_on_migrate"));
-  if (!WriteToFile(notifyOnMigratePath.get(),
-                   nsPrintfCString("%d", cpuNotifyOnMigrate).get())) {
+  if (!WriteSysFile(notifyOnMigratePath.get(),
+                    nsPrintfCString("%d", cpuNotifyOnMigrate).get())) {
     HAL_LOG("Could not set the cpu migration notification flag for group %s",
             notifyOnMigratePath.get());
     return false;
@@ -1523,8 +1595,8 @@ EnsureMemCGroupExists(const nsACString &aGroup)
 
   nsAutoCString pathPrefix(kMemCtl + aGroup + kSlash);
   nsAutoCString memSwappinessPath(pathPrefix + NS_LITERAL_CSTRING("memory.swappiness"));
-  if (!WriteToFile(memSwappinessPath.get(),
-                   nsPrintfCString("%d", memSwappiness).get())) {
+  if (!WriteSysFile(memSwappinessPath.get(),
+                    nsPrintfCString("%d", memSwappiness).get())) {
     HAL_LOG("Could not set the memory.swappiness for group %s", memSwappinessPath.get());
     return false;
   }
@@ -1562,8 +1634,12 @@ PriorityClass::PriorityClass(ProcessPriority aPriority)
 
 PriorityClass::~PriorityClass()
 {
-  close(mCpuCGroupProcsFd);
-  close(mMemCGroupProcsFd);
+  if (mCpuCGroupProcsFd != -1) {
+    close(mCpuCGroupProcsFd);
+  }
+  if (mMemCGroupProcsFd != -1) {
+    close(mMemCGroupProcsFd);
+  }
 }
 
 PriorityClass::PriorityClass(const PriorityClass& aOther)
@@ -1712,9 +1788,9 @@ EnsureKernelLowMemKillerParamsSet()
   adjParams.Cut(adjParams.Length() - 1, 1);
   minfreeParams.Cut(minfreeParams.Length() - 1, 1);
   if (!adjParams.IsEmpty() && !minfreeParams.IsEmpty()) {
-    WriteToFile("/sys/module/lowmemorykiller/parameters/adj", adjParams.get());
-    WriteToFile("/sys/module/lowmemorykiller/parameters/minfree",
-                minfreeParams.get());
+    WriteSysFile("/sys/module/lowmemorykiller/parameters/adj", adjParams.get());
+    WriteSysFile("/sys/module/lowmemorykiller/parameters/minfree",
+                 minfreeParams.get());
   }
 
   // Set the low-memory-notification threshold.
@@ -1724,7 +1800,7 @@ EnsureKernelLowMemKillerParamsSet()
         &lowMemNotifyThresholdKB))) {
 
     // notify_trigger is in pages.
-    WriteToFile("/sys/module/lowmemorykiller/parameters/notify_trigger",
+    WriteSysFile("/sys/module/lowmemorykiller/parameters/notify_trigger",
       nsPrintfCString("%ld", lowMemNotifyThresholdKB * 1024 / page_size).get());
   }
 
@@ -1759,11 +1835,11 @@ SetProcessPriority(int aPid, ProcessPriority aPriority, uint32_t aLRU)
 
   // We try the newer interface first, and fall back to the older interface
   // on failure.
-  if (!WriteToFile(nsPrintfCString("/proc/%d/oom_score_adj", aPid).get(),
-                   nsPrintfCString("%d", oomScoreAdj).get()))
+  if (!WriteSysFile(nsPrintfCString("/proc/%d/oom_score_adj", aPid).get(),
+                    nsPrintfCString("%d", oomScoreAdj).get()))
   {
-    WriteToFile(nsPrintfCString("/proc/%d/oom_adj", aPid).get(),
-                nsPrintfCString("%d", OomAdjOfOomScoreAdj(oomScoreAdj)).get());
+    WriteSysFile(nsPrintfCString("/proc/%d/oom_adj", aPid).get(),
+                 nsPrintfCString("%d", OomAdjOfOomScoreAdj(oomScoreAdj)).get());
   }
 
   HAL_LOG("Assigning pid %d to cgroup %s", aPid, pc->CGroup().get());

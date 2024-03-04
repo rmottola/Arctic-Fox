@@ -127,37 +127,21 @@ pref("dom.indexedDB.logging.details", true);
 // Enable profiler marks for indexedDB events.
 pref("dom.indexedDB.logging.profiler-marks", false);
 
+// Whether or not File Handle is enabled.
+pref("dom.fileHandle.enabled", true);
+
 // Whether or not selection events are enabled
 pref("dom.select_events.enabled", true);
 
 // Whether or not selection events on text controls are enabled
 pref("dom.select_events.textcontrols.enabled", true);
 
-// Whether or not File Handle is enabled.
-pref("dom.fileHandle.enabled", true);
-
-// Whether or not the Permissions API is enabled.
-#ifdef NIGHTLY_BUILD
-pref("dom.permissions.enabled", true);
-#else
-pref("dom.permissions.enabled", false);
-#endif
-
 // Whether or not Web Workers are enabled.
 pref("dom.workers.enabled", true);
 // The number of workers per domain allowed to run concurrently.
 pref("dom.workers.maxPerDomain", 20);
 
-// Whether or not Shared Web Workers are enabled.
-pref("dom.workers.sharedWorkers.enabled", true);
-
 pref("dom.serviceWorkers.enabled", false);
-
-// Allow service workers to intercept network requests using the fetch event
-pref("dom.serviceWorkers.interception.enabled", false);
-
-// Allow service workers to intercept opaque (cross origin) responses
-pref("dom.serviceWorkers.interception.opaque.enabled", false);
 
 // The amount of time (milliseconds) service workers keep running after each event.
 pref("dom.serviceWorkers.idle_timeout", 30000);
@@ -361,6 +345,7 @@ pref("media.use-blank-decoder", false);
 pref("media.wmf.enabled", true);
 pref("media.wmf.decoder.thread-count", -1);
 pref("media.wmf.low-latency.enabled", false);
+pref("media.wmf.skip-blacklist", false);
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
@@ -420,11 +405,6 @@ pref("media.navigator.video.h264.max_br", 700); // 8x10
 pref("media.navigator.video.h264.max_mbps", 11880); // CIF@30fps
 pref("media.peerconnection.video.h264_enabled", false);
 pref("media.getusermedia.aec", 4);
-// Gonk typically captures at QVGA, and so min resolution is QQVGA or
-// 160x120; 100Kbps is plenty for that.
-pref("media.peerconnection.video.min_bitrate", 100);
-pref("media.peerconnection.video.start_bitrate", 220);
-pref("media.peerconnection.video.max_bitrate", 1000);
 #else
 pref("media.navigator.video.default_width",0);  // adaptive default
 pref("media.navigator.video.default_height",0); // adaptive default
@@ -438,12 +418,15 @@ pref("media.navigator.video.h264.max_mbps", 0);
 pref("media.peerconnection.video.h264_enabled", false);
 pref("media.getusermedia.aec", 1);
 pref("media.getusermedia.browser.enabled", true);
+#endif
+// Gonk typically captures at QVGA, and so min resolution is QQVGA or
+// 160x120; 100Kbps is plenty for that.
 // Desktop is typically VGA capture or more; and qm_select will not drop resolution
 // below 1/2 in each dimension (or so), so QVGA (320x200) is the lowest here usually.
-pref("media.peerconnection.video.min_bitrate", 200);
-pref("media.peerconnection.video.start_bitrate", 300);
-pref("media.peerconnection.video.max_bitrate", 2000);
-#endif
+pref("media.peerconnection.video.min_bitrate", 0);
+pref("media.peerconnection.video.start_bitrate", 0);
+pref("media.peerconnection.video.max_bitrate", 0);
+pref("media.peerconnection.video.min_bitrate_estimate", 0);
 pref("media.navigator.audio.fake_frequency", 1000);
 pref("media.navigator.permission.disabled", false);
 pref("media.peerconnection.default_iceservers", "[]");
@@ -619,6 +602,7 @@ pref("apz.max_velocity_inches_per_ms", "-1.0");
 pref("apz.max_velocity_queue_size", 5);
 pref("apz.min_skate_speed", "1.0");
 pref("apz.minimap.enabled", false);
+pref("apz.minimap.visibility.enabled", false);
 pref("apz.overscroll.enabled", false);
 pref("apz.overscroll.min_pan_distance_ratio", "1.0");
 pref("apz.overscroll.spring_friction", "0.015");
@@ -626,6 +610,9 @@ pref("apz.overscroll.spring_stiffness", "0.0018");
 pref("apz.overscroll.stop_distance_threshold", "5.0");
 pref("apz.overscroll.stop_velocity_threshold", "0.01");
 pref("apz.overscroll.stretch_factor", "0.35");
+pref("apz.paint_skipping.enabled", true);
+// Fetch displayport updates early from the message queue
+pref("apz.peek_messages.enabled", true);
 
 // Whether to print the APZC tree for debugging
 pref("apz.printtree", false);
@@ -747,8 +734,8 @@ pref("gfx.font_rendering.opentype_svg.enabled", true);
 #ifdef XP_WIN
 // comma separated list of backends to use in order of preference
 // e.g., pref("gfx.canvas.azure.backends", "direct2d,skia,cairo");
-pref("gfx.canvas.azure.backends", "direct2d1.1,direct2d,skia,cairo");
-pref("gfx.content.azure.backends", "direct2d1.1,direct2d,cairo");
+pref("gfx.canvas.azure.backends", "direct2d1.1,skia,cairo");
+pref("gfx.content.azure.backends", "direct2d1.1,cairo");
 #else
 #ifdef XP_MACOSX
 pref("gfx.content.azure.backends", "cg");
@@ -805,8 +792,7 @@ pref("canvas.hitregions.enabled", false);
 pref("canvas.filters.enabled", false);
 // Add support for canvas path objects
 pref("canvas.path.enabled", true);
-// captureStream() on canvas disabled by default
-pref("canvas.capturestream.enabled", false);
+pref("canvas.capturestream.enabled", true);
 
 // We want the ability to forcibly disable platform a11y, because
 // some non-a11y-related components attempt to bring it up.  See bug
@@ -1264,10 +1250,6 @@ pref("nglayout.debug.widget_update_flashing", false);
 // Whether image visibility is enabled globally (ie we will try to unlock images
 // that are not visible).
 pref("layout.imagevisibility.enabled", true);
-// Whether image visibility is enabled in documents that are within a browser
-// element as defined by nsDocShell::FrameType and GetInheritedFrameType. This
-// pref only has an effect if layout.imagevisibility.enabled is false.
-pref("layout.imagevisibility.enabled_for_browser_elements_only", false);
 pref("layout.imagevisibility.numscrollportwidths", 0);
 pref("layout.imagevisibility.numscrollportheights", 1);
 
@@ -1461,6 +1443,7 @@ pref("javascript.options.strict.debug",     true);
 pref("javascript.options.baselinejit",      true);
 pref("javascript.options.ion",              true);
 pref("javascript.options.asmjs",            true);
+pref("javascript.options.wasm",             false);
 pref("javascript.options.native_regexp",    true);
 pref("javascript.options.parallel_parsing", true);
 #if !defined(RELEASE_BUILD) && !defined(ANDROID) && !defined(MOZ_B2G) && !defined(XP_IOS)
@@ -1543,6 +1526,13 @@ pref("network.allow-experiments", false);
 // Allow the network changed event to get sent when a network topology or
 // setup change is noticed while running.
 pref("network.notify.changed", true);
+
+// Allow network detection of IPv6 related changes (bug 1245059)
+#if defined(XP_WIN)
+pref("network.notify.IPv6", false);
+#else
+pref("network.notify.IPv6", true);
+#endif
 
 // Transmit UDP busy-work to the LAN when anticipating low latency
 // network reads and on wifi to mitigate 802.11 Power Save Polling delays
@@ -1649,6 +1639,9 @@ pref("network.http.max-persistent-connections-per-proxy", 16);
 // host has been reached.  however, a new connection will not be created if
 // max-connections or max-connections-per-server has also been reached.
 pref("network.http.request.max-start-delay", 10);
+
+// If a connection is reset, we will retry it max-attempts times.
+pref("network.http.request.max-attempts", 6);
 
 // Headers
 pref("network.http.accept.default", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
@@ -2341,6 +2334,17 @@ pref("security.ssl.enable_ocsp_must_staple", true);
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
 
+#ifdef RELEASE_BUILD
+pref("security.onecrl.via.amo", true);
+#else
+pref("security.onecrl.via.amo", false);
+#endif
+
+
+// If set to true, allow view-source URIs to be opened from URIs that share
+// their protocol with the inner URI of the view-source URI
+pref("security.view-source.reachable-from-inner-protocol", false);
+
 // Modifier key prefs: default to Windows settings,
 // menu access key = alt, accelerator key = control.
 // Use 17 for Ctrl, 18 for Alt, 224 for Meta, 91 for Win, 0 for none. Mac settings in macprefs.js
@@ -2626,9 +2630,6 @@ pref("layout.css.scroll-snap.prediction-sensitivity", "0.750");
 
 // Is support for basic shapes in clip-path enabled?
 pref("layout.css.clip-path-shapes.enabled", false);
-
-// Is support for CSS sticky positioning enabled?
-pref("layout.css.sticky.enabled", true);
 
 // Is support for DOMPoint enabled?
 pref("layout.css.DOMPoint.enabled", true);
@@ -4724,7 +4725,6 @@ pref("gfx.content.use-native-pushlayer", true);
 
 // Whether to disable the automatic detection and use of direct2d.
 pref("gfx.direct2d.disabled", false);
-pref("gfx.direct2d.use1_1", true);
 
 // Whether to attempt to enable Direct2D regardless of automatic detection or
 // blacklisting
@@ -4770,6 +4770,8 @@ pref("browser.history.allowPushState", true);
 pref("browser.history.allowReplaceState", true);
 pref("browser.history.allowPopState", true);
 pref("browser.history.maxStateObjectSize", 655360);
+
+pref("browser.meta_refresh_when_inactive.disabled", false);
 
 // XPInstall prefs
 pref("xpinstall.whitelist.required", true);
@@ -4848,9 +4850,6 @@ pref("dom.sms.defaultServiceId", 0);
 // 0: don't read ahead unless explicitly requested, (default)
 // negative: read ahead all IDs if possible.
 pref("dom.sms.maxReadAheadEntries", 0);
-
-// WebContacts
-pref("dom.mozContacts.enabled", false);
 
 // WebAlarms
 pref("dom.mozAlarms.enabled", false);
@@ -5048,8 +5047,12 @@ pref("dom.browserElement.maxScreenshotDelayMS", 2000);
 // Whether we should show the placeholder when the element is focused but empty.
 pref("dom.placeholder.show_on_focus", true);
 
-// VR is disabled by default
+// VR is disabled by default in release and enabled for nightly and aurora
+#ifdef RELEASE_BUILD
 pref("dom.vr.enabled", false);
+#else
+pref("dom.vr.enabled", true);
+#endif
 // Oculus > 0.5
 pref("dom.vr.oculus.enabled", true);
 // Oculus <= 0.5; will only trigger if > 0.5 is not used or found
@@ -5057,7 +5060,7 @@ pref("dom.vr.oculus050.enabled", true);
 // Cardboard VR device is disabled by default
 pref("dom.vr.cardboard.enabled", false);
 // 0 = never; 1 = only if real devices aren't there; 2 = always
-pref("dom.vr.add-test-devices", 1);
+pref("dom.vr.add-test-devices", 0);
 // Pose prediction reduces latency effects by returning future predicted HMD
 // poses to callers of the WebVR API.  This currently only has an effect for
 // Oculus Rift on SDK 0.8 or greater.  It is disabled by default for now due to

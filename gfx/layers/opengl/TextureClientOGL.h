@@ -26,17 +26,17 @@ public:
 
   static already_AddRefed<TextureClient>
   CreateTextureClient(EGLImageImage* aImage, gfx::IntSize aSize,
-                      ISurfaceAllocator* aAllocator, TextureFlags aFlags);
+                      ClientIPCAllocator* aAllocator, TextureFlags aFlags);
 
-  virtual bool HasInternalBuffer() const override { return false; }
+  virtual bool HasIntermediateBuffer() const override { return false; }
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
   virtual bool Serialize(SurfaceDescriptor& aOutDescriptor) override;
 
-  virtual void Deallocate(ISurfaceAllocator*) override { mImage = nullptr; }
+  virtual void Deallocate(ClientIPCAllocator*) override { mImage = nullptr; }
 
-  virtual void Forget(ISurfaceAllocator*) override { mImage = nullptr; }
+  virtual void Forget(ClientIPCAllocator*) override { mImage = nullptr; }
 
   // Unused functions.
   virtual bool Lock(OpenMode, FenceHandle*) override { return true; }
@@ -64,12 +64,12 @@ public:
   CreateTextureClient(gl::AndroidSurfaceTexture* aSurfTex,
                       gfx::IntSize aSize,
                       gl::OriginPos aOriginPos,
-                      ISurfaceAllocator* aAllocator,
+                      ClientIPCAllocator* aAllocator,
                       TextureFlags aFlags);
 
   ~AndroidSurfaceTextureData();
 
-  virtual bool HasInternalBuffer() const override { return false; }
+  virtual bool HasIntermediateBuffer() const override { return false; }
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
@@ -86,7 +86,7 @@ public:
   }
 
   // Our data is always owned externally.
-  virtual void Deallocate(ISurfaceAllocator*) override {}
+  virtual void Deallocate(ClientIPCAllocator*) override {}
 
 protected:
   AndroidSurfaceTextureData(gl::AndroidSurfaceTexture* aSurfTex,

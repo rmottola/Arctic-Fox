@@ -11,54 +11,20 @@
 // * it does a sanity check to ensure other cert verifier behavior is
 //   unmodified
 
-var { XPCOMUtils } = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
-
 // First, we need to setup appInfo for the blocklist service to work
 var id = "xpcshell@tests.mozilla.org";
 var appName = "XPCShell";
 var version = "1";
 var platformVersion = "1.9.2";
-var appInfo = {
-  // nsIXULAppInfo
-  vendor: "Mozilla",
+Cu.import("resource://testing-common/AppInfo.jsm", this);
+/*global updateAppInfo:false*/ // Imported via AppInfo.jsm.
+updateAppInfo({
   name: appName,
   ID: id,
   version: version,
-  appBuildID: "2007010101",
   platformVersion: platformVersion ? platformVersion : "1.0",
-  platformBuildID: "2007010101",
-
-  // nsIXULRuntime
-  inSafeMode: false,
-  logConsoleErrors: true,
-  OS: "XPCShell",
-  XPCOMABI: "noarch-spidermonkey",
-  invalidateCachesOnRestart: function invalidateCachesOnRestart() {
-    // Do nothing
-  },
-
-  // nsICrashReporter
-  annotations: {},
-
-  annotateCrashReport: function(key, data) {
-    this.annotations[key] = data;
-  },
-
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIXULAppInfo,
-                                         Ci.nsIXULRuntime,
-                                         Ci.nsICrashReporter,
-                                         Ci.nsISupports])
-};
-
-var XULAppInfoFactory = {
-  createInstance: function (outer, iid) {
-    appInfo.QueryInterface(iid);
-    if (outer != null) {
-      throw Cr.NS_ERROR_NO_AGGREGATION;
-    }
-    return appInfo.QueryInterface(iid);
-  }
-};
+  crashReporter: true,
+});
 
 // we need to ensure we setup revocation data before certDB, or we'll start with
 // no revocation.txt in the profile
@@ -80,17 +46,14 @@ var data = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
 stream.write(data, data.length);
 stream.close();
 
-var registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
-const XULAPPINFO_CONTRACTID = "@mozilla.org/xre/app-info;1";
-const XULAPPINFO_CID = Components.ID("{c763b610-9d49-455a-bbd2-ede71682a1ac}");
-registrar.registerFactory(XULAPPINFO_CID, "XULAppInfo",
-                          XULAPPINFO_CONTRACTID, XULAppInfoFactory);
+const PREF_KINTO_UPDATE_ENABLED = "services.kinto.update_enabled";
+const PREF_ONECRL_VIA_AMO = "security.onecrl.via.amo";
 
 var revocations = profile.clone();
 revocations.append("revocations.txt");
 if (!revocations.exists()) {
   let existing = do_get_file("test_onecrl/sample_revocations.txt", false);
-  existing.copyTo(profile,"revocations.txt");
+  existing.copyTo(profile, "revocations.txt");
 }
 
 var certDB = Cc["@mozilla.org/security/x509certdb;1"]
@@ -128,9 +91,9 @@ var initialBlocklist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
     // also in the blocklist
     "<certItem issuerName='YW5vdGhlciBpbWFnaW5hcnkgaXNzdWVy'>" +
     "<serialNumber>c2VyaWFsMi4=</serialNumber>" +
-    "<serialNumber>YW5vdGhlciBzZXJpYWwu</serialNumber>" +
+    "<serialNumber>YW5vdGhlciBzZXJpYWwu</serialNumber></certItem>" +
     // This item revokes same-issuer-ee.pem by subject and pubKeyHash.
-    "</certItem><certItem subject='MCIxIDAeBgNVBAMMF0Fub3RoZXIgVGVzdCBFbmQtZW50aXR5'"+
+    "<certItem subject='MCIxIDAeBgNVBAMMF0Fub3RoZXIgVGVzdCBFbmQtZW50aXR5'" +
     " pubKeyHash='VCIlmPM9NkgFQtrs4Oa5TeFcDu6MWRTKSNdePEhOgD8='>" +
     "</certItem></certItems></blocklist>";
 
@@ -139,13 +102,13 @@ var updatedBlocklist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
     "<certItems>" +
     "<certItem issuerName='something new in both the issuer'>" +
     "<serialNumber>and the serial number</serialNumber></certItem>" +
-    "</certItems></blocklist>"
+    "</certItems></blocklist>";
 
 
 var blocklists = {
   "/initialBlocklist/" : initialBlocklist,
   "/updatedBlocklist/" : updatedBlocklist
-}
+};
 
 function serveResponse(request, response) {
   do_print("Serving for path " + request.path + "\n");
@@ -211,7 +174,7 @@ function fetch_blocklist(blocklistPath) {
       Services.obs.removeObserver(this, "blocklist-updated");
       run_next_test();
     }
-  }
+  };
 
   Services.obs.addObserver(certblockObserver, "blocklist-updated", false);
   Services.prefs.setCharPref("extensions.blocklist.url",
@@ -228,7 +191,7 @@ function check_revocations_txt_contents(expected) {
   ok(revocations.exists(), "the revocations file should exist");
   let inputStream = Cc["@mozilla.org/network/file-input-stream;1"]
                       .createInstance(Ci.nsIFileInputStream);
-  inputStream.init(revocations,-1, -1, 0);
+  inputStream.init(revocations, -1, -1, 0);
   inputStream.QueryInterface(Ci.nsILineInputStream);
   let contents = "";
   let hasmore = false;
@@ -251,8 +214,8 @@ function run_test() {
                   .getService(Ci.nsICertBlocklist);
 
   let expected = "# Auto generated contents. Do not edit.\n" +
-                 "MCIxIDAeBgNVBAMMF0Fub3RoZXIgVGVzdCBFbmQtZW50aXR5\n"+
-                 "\tVCIlmPM9NkgFQtrs4Oa5TeFcDu6MWRTKSNdePEhOgD8=\n"+
+                 "MCIxIDAeBgNVBAMMF0Fub3RoZXIgVGVzdCBFbmQtZW50aXR5\n" +
+                 "\tVCIlmPM9NkgFQtrs4Oa5TeFcDu6MWRTKSNdePEhOgD8=\n" +
                  "MBIxEDAOBgNVBAMMB1Rlc3QgQ0E=\n" +
                  " BVio/iQ21GCi2iUven8oJ/gae74=\n" +
                  "MBgxFjAUBgNVBAMMDU90aGVyIHRlc3QgQ0E=\n" +
@@ -260,6 +223,10 @@ function run_test() {
                  "YW5vdGhlciBpbWFnaW5hcnkgaXNzdWVy\n" +
                  " YW5vdGhlciBzZXJpYWwu\n" +
                  " c2VyaWFsMi4=";
+
+  // This test assumes OneCRL updates via AMO
+  Services.prefs.setBoolPref(PREF_KINTO_UPDATE_ENABLED, false);
+  Services.prefs.setBoolPref(PREF_ONECRL_VIA_AMO, true);
 
   add_test(function () {
     // check some existing items in revocations.txt are blocked. Since the

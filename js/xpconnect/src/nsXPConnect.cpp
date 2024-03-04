@@ -177,15 +177,7 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
                           : NS_LITERAL_CSTRING("content javascript");
     mWindowID = aWindowID;
 
-    const char16_t* m = static_cast<const char16_t*>(aReport->ucmessage);
-    if (m) {
-        JSFlatString* name = js::GetErrorTypeName(CycleCollectedJSRuntime::Get()->Runtime(), aReport->exnType);
-        if (name) {
-            AssignJSFlatString(mErrorMsg, name);
-            mErrorMsg.AppendLiteral(": ");
-        }
-        mErrorMsg.Append(m);
-    }
+    ErrorReportToMessageString(aReport, mErrorMsg);
 
     if (mErrorMsg.IsEmpty() && aFallbackMessage) {
         mErrorMsg.AssignWithConversion(aFallbackMessage);
@@ -197,7 +189,7 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
         mFileName.AssignWithConversion(aReport->filename);
     }
 
-    mSourceLine = static_cast<const char16_t*>(aReport->uclinebuf);
+    mSourceLine.Assign(aReport->linebuf(), aReport->linebufLength());
 
     mLineNumber = aReport->lineno;
     mColumn = aReport->column;
@@ -205,7 +197,7 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
     mIsMuted = aReport->isMuted;
 }
 
-static PRLogModuleInfo* gJSDiagnostics;
+static LazyLogModule gJSDiagnostics("JSDiagnostics");
 
 void
 xpc::ErrorReport::LogToConsole()
@@ -235,15 +227,10 @@ xpc::ErrorReport::LogToConsoleWithStack(JS::HandleObject aStack)
         fflush(stderr);
     }
 
-    // Log to the PR Log Module.
-    if (!gJSDiagnostics)
-        gJSDiagnostics = PR_NewLogModule("JSDiagnostics");
-    if (gJSDiagnostics) {
-        MOZ_LOG(gJSDiagnostics,
-                JSREPORT_IS_WARNING(mFlags) ? LogLevel::Warning : LogLevel::Error,
-                ("file %s, line %u\n%s", NS_LossyConvertUTF16toASCII(mFileName).get(),
-                 mLineNumber, NS_LossyConvertUTF16toASCII(mErrorMsg).get()));
-    }
+    MOZ_LOG(gJSDiagnostics,
+            JSREPORT_IS_WARNING(mFlags) ? LogLevel::Warning : LogLevel::Error,
+            ("file %s, line %u\n%s", NS_LossyConvertUTF16toASCII(mFileName).get(),
+             mLineNumber, NS_LossyConvertUTF16toASCII(mErrorMsg).get()));
 
     // Log to the console. We do this last so that we can simply return if
     // there's no console service without affecting the other reporting
@@ -269,6 +256,23 @@ xpc::ErrorReport::LogToConsoleWithStack(JS::HandleObject aStack)
     NS_ENSURE_SUCCESS_VOID(rv);
     consoleService->LogMessage(errorObject);
 
+}
+
+/* static */
+void
+xpc::ErrorReport::ErrorReportToMessageString(JSErrorReport* aReport,
+                                             nsAString& aString)
+{
+    aString.Truncate();
+    const char16_t* m = aReport->ucmessage;
+    if (m) {
+        JSFlatString* name = js::GetErrorTypeName(CycleCollectedJSRuntime::Get()->Runtime(), aReport->exnType);
+        if (name) {
+            AssignJSFlatString(aString, name);
+            aString.AppendLiteral(": ");
+        }
+        aString.Append(m);
+    }
 }
 
 /***************************************************************************/
@@ -403,13 +407,18 @@ InitGlobalObjectOptions(JS::CompartmentOptions& aOptions,
     if (shouldDiscardSystemSource || extraWarningsForSystemJS)
         isSystem = nsContentUtils::IsSystemPrincipal(aPrincipal);
 
+    short status = aPrincipal->GetAppStatus();
+
+    // Enable the ECMA-402 experimental formatToParts in certified apps.
+    if (status == nsIPrincipal::APP_STATUS_CERTIFIED) {
+        aOptions.creationOptions()
+                .setExperimentalDateTimeFormatFormatToPartsEnabled(true);
+    }
+
     if (shouldDiscardSystemSource) {
-        bool discardSource = isSystem;
-        if (!discardSource) {
-            short status = aPrincipal->GetAppStatus();
-            discardSource = status == nsIPrincipal::APP_STATUS_PRIVILEGED ||
-                            status == nsIPrincipal::APP_STATUS_CERTIFIED;
-        }
+        bool discardSource = isSystem ||
+                             (status == nsIPrincipal::APP_STATUS_PRIVILEGED ||
+                              status == nsIPrincipal::APP_STATUS_CERTIFIED);
 
         aOptions.behaviors().setDiscardSource(discardSource);
     }

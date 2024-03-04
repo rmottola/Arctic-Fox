@@ -27,7 +27,8 @@
 #include "nsFontMetrics.h"
 #include "nsITimer.h"
 #include "nsAutoPtr.h"
-#include "nsStyleSet.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "nsPIBoxObject.h"
 #include "nsLayoutUtils.h"
 #include "nsPIListBoxObject.h"
@@ -196,8 +197,8 @@ nsListBoxBodyFrame::Init(nsIContent*       aContent,
       scrollbarFrame->SetScrollbarMediatorContent(GetContent());
     }
   }
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fm));
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetFontMetricsForFrame(this, 1.0f);
   mRowHeight = fm->MaxHeight();
 }
 
@@ -727,9 +728,8 @@ nsListBoxBodyFrame::ComputeIntrinsicISize(nsBoxLayoutState& aBoxLayoutState)
             }
           }
 
-          RefPtr<nsFontMetrics> fm;
-          nsLayoutUtils::GetFontMetricsForStyleContext(styleContext,
-                                                       getter_AddRefs(fm));
+          RefPtr<nsFontMetrics> fm =
+            nsLayoutUtils::GetFontMetricsForStyleContext(styleContext);
 
           nscoord textWidth =
             nsLayoutUtils::AppUnitWidthOfStringBidi(value, this, *fm,

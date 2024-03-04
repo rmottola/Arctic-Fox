@@ -2,32 +2,32 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global React, TargetComponent */
+/* global React */
 
 "use strict";
 
-loader.lazyRequireGetter(this, "React",
-  "devtools/client/shared/vendor/react");
-loader.lazyRequireGetter(this, "TargetComponent",
-  "devtools/client/aboutdebugging/components/target", true);
-loader.lazyRequireGetter(this, "Services");
+const Services = require("Services");
+
+const React = require("devtools/client/shared/vendor/react");
+const { Target } = require("./target");
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
+
 const LocaleCompare = (a, b) => {
   return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 };
 
-exports.TargetListComponent = React.createClass({
-  displayName: "TargetListComponent",
+exports.TargetList = React.createClass({
+  displayName: "TargetList",
 
   render() {
-    let client = this.props.client;
+    let { client, debugDisabled } = this.props;
     let targets = this.props.targets.sort(LocaleCompare).map(target => {
-      return React.createElement(TargetComponent, { client, target });
+      return React.createElement(Target, { client, target, debugDisabled });
     });
     return (
-      React.createElement("div", { className: "targets" },
+      React.createElement("div", { id: this.props.id, className: "targets" },
         React.createElement("h4", null, this.props.name),
         targets.length > 0 ? targets :
           React.createElement("p", null, Strings.GetStringFromName("nothing"))

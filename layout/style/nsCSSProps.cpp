@@ -937,10 +937,7 @@ const KTableEntry nsCSSProps::kImageLayerSizeKTable[] = {
 const KTableEntry nsCSSProps::kImageLayerModeKTable[] = {
   { eCSSKeyword_alpha, NS_STYLE_MASK_MODE_ALPHA },
   { eCSSKeyword_luminance, NS_STYLE_MASK_MODE_LUMINANCE },
-  // FIXME https://bugzilla.mozilla.org/show_bug.cgi?id=1224424
-  // It's ambigious at mask shorthand parsing while we have both mask-mode:auto
-  // and mask-size:auto.
-  { eCSSKeyword_auto, NS_STYLE_MASK_MODE_AUTO },
+  { eCSSKeyword_match_source, NS_STYLE_MASK_MODE_MATCH_SOURCE },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -1871,12 +1868,11 @@ const KTableEntry nsCSSProps::kPointerEventsKTable[] = {
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
-KTableEntry nsCSSProps::kPositionKTable[] = {
+const KTableEntry nsCSSProps::kPositionKTable[] = {
   { eCSSKeyword_static, NS_STYLE_POSITION_STATIC },
   { eCSSKeyword_relative, NS_STYLE_POSITION_RELATIVE },
   { eCSSKeyword_absolute, NS_STYLE_POSITION_ABSOLUTE },
   { eCSSKeyword_fixed, NS_STYLE_POSITION_FIXED },
-  // The next entry is controlled by the layout.css.sticky.enabled pref.
   { eCSSKeyword_sticky, NS_STYLE_POSITION_STICKY },
   { eCSSKeyword_UNKNOWN, -1 }
 };
@@ -2830,13 +2826,6 @@ static const nsCSSProperty gFlexFlowSubpropTable[] = {
   eCSSProperty_UNKNOWN
 };
 
-static const nsCSSProperty gGridTemplateSubpropTable[] = {
-  eCSSProperty_grid_template_areas,
-  eCSSProperty_grid_template_rows, 
-  eCSSProperty_grid_template_columns,
-  eCSSProperty_UNKNOWN
-};
-
 static const nsCSSProperty gGridSubpropTable[] = {
   eCSSProperty_grid_template_areas,
   eCSSProperty_grid_template_rows,
@@ -2939,7 +2928,7 @@ static const nsCSSProperty gScrollSnapTypeSubpropTable[] = {
   eCSSProperty_scroll_snap_type_y,
   eCSSProperty_UNKNOWN
 };
-
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
 static const nsCSSProperty gMaskSubpropTable[] = {
   eCSSProperty_mask_image,
   eCSSProperty_mask_repeat,
@@ -2951,7 +2940,7 @@ static const nsCSSProperty gMaskSubpropTable[] = {
   eCSSProperty_mask_mode,
   eCSSProperty_UNKNOWN
 };
-
+#endif
 // FIXME: mask-border tables should be added when we implement
 // mask-border properties.
 

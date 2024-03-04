@@ -57,6 +57,7 @@ public:
   ScrollFrameHelper(nsContainerFrame* aOuter, bool aIsRoot);
   ~ScrollFrameHelper();
 
+  bool IsScrollFrameWithSnapping() const;
   mozilla::ScrollbarStyles GetScrollbarStylesFromFrame() const;
 
   // If a child frame was added or removed on the scrollframe,
@@ -356,6 +357,7 @@ public:
       // because we have special behaviour for it when APZ scrolling is active.
       mOuter->SchedulePaint();
     }
+    NotifyPluginFrames(aTransforming ? BEGIN_APZ : END_APZ);
   }
   bool IsTransformingByAPZ() const {
     return mTransformingByAPZ;
@@ -563,7 +565,7 @@ protected:
    * Helper that notifies plugins about async smooth scroll operations managed
    * by nsGfxScrollFrame.
    */
-  enum AsyncScrollEventType { BEGIN_DOM, END_DOM };
+  enum AsyncScrollEventType { BEGIN_DOM, BEGIN_APZ, END_DOM, END_APZ };
   void NotifyPluginFrames(AsyncScrollEventType aEvent);
   AsyncScrollEventType mAsyncScrollEvent;
 
@@ -691,6 +693,9 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
+  }
+  virtual bool IsScrollFrameWithSnapping() const override {
+    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
@@ -1096,6 +1101,9 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
+  }
+  virtual bool IsScrollFrameWithSnapping() const override {
+    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();

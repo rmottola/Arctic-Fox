@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,17 +11,11 @@
  * Please now use the modules:
  * - devtools/client/framework/devtools for gDevTools
  * - devtools/client/framework/devtools-browser for gDevToolsBrowser
- *
- * We still do use gDevTools.jsm in our codebase,
- * bug 1245462 is going to ensure we no longer do that.
  */
 
 this.EXPORTED_SYMBOLS = [ "gDevTools", "gDevToolsBrowser" ];
 
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
 
 const { loader } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 

@@ -2,21 +2,15 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
-
-var { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
-
-// Disable logging for all the tests. Both the debugger server and frontend will
-// be affected by this pref.
-var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
-Services.prefs.setBoolPref("devtools.debugger.log", false);
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 var { generateUUID } = Cc['@mozilla.org/uuid-generator;1'].getService(Ci.nsIUUIDGenerator);
 var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
-var { gDevTools } = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
 var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
+var Services = require("Services");
 var promise = require("promise");
+var { gDevTools } = require("devtools/client/framework/devtools");
 var { DebuggerClient } = require("devtools/shared/client/main");
 var { DebuggerServer } = require("devtools/server/main");
 var { CallWatcherFront } = require("devtools/server/actors/call-watcher");
@@ -39,7 +33,14 @@ const SIMPLE_CANVAS_TRANSPARENT_URL = EXAMPLE_URL + "doc_simple-canvas-transpare
 const SIMPLE_CANVAS_DEEP_STACK_URL = EXAMPLE_URL + "doc_simple-canvas-deep-stack.html";
 const WEBGL_ENUM_URL = EXAMPLE_URL + "doc_webgl-enum.html";
 const WEBGL_BINDINGS_URL = EXAMPLE_URL + "doc_webgl-bindings.html";
+const WEBGL_DRAW_ARRAYS = EXAMPLE_URL + "doc_webgl-drawArrays.html";
+const WEBGL_DRAW_ELEMENTS = EXAMPLE_URL + "doc_webgl-drawElements.html";
 const RAF_BEGIN_URL = EXAMPLE_URL + "doc_raf-begin.html";
+
+// Disable logging for all the tests. Both the debugger server and frontend will
+// be affected by this pref.
+var gEnableLogging = Services.prefs.getBoolPref("devtools.debugger.log");
+Services.prefs.setBoolPref("devtools.debugger.log", false);
 
 // All tests are asynchronous.
 waitForExplicitFinish();

@@ -8,15 +8,15 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 
-const { Services } = require("resource://gre/modules/Services.jsm");
+const Services = require("Services");
 
 loader.lazyImporter(this, "VariablesView", "resource://devtools/client/shared/widgets/VariablesView.jsm");
 loader.lazyImporter(this, "escapeHTML", "resource://devtools/client/shared/widgets/VariablesView.jsm");
-loader.lazyImporter(this, "gDevTools", "resource://devtools/client/framework/gDevTools.jsm");
 loader.lazyImporter(this, "Task", "resource://gre/modules/Task.jsm");
 loader.lazyImporter(this, "PluralForm", "resource://gre/modules/PluralForm.jsm");
 
 loader.lazyRequireGetter(this, "promise");
+loader.lazyRequireGetter(this, "gDevTools", "devtools/client/framework/devtools", true);
 loader.lazyRequireGetter(this, "TableWidget", "devtools/client/shared/widgets/TableWidget", true);
 loader.lazyRequireGetter(this, "ObjectClient", "devtools/shared/client/main", true);
 
@@ -27,7 +27,7 @@ const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
 
 const WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
-const l10n = new WebConsoleUtils.l10n(STRINGS_URI);
+const l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const MAX_STRING_GRIP_LENGTH = 36;
 const ELLIPSIS = Services.prefs.getComplexValue("intl.ellipsis", Ci.nsIPrefLocalizedString).data;

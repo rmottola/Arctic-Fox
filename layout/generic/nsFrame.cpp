@@ -40,7 +40,9 @@
 #include "mozilla/Snprintf.h"
 #include "nsFrameManager.h"
 #include "nsLayoutUtils.h"
-#include "RestyleManager.h"
+#include "mozilla/RestyleManager.h"
+#include "mozilla/RestyleManagerHandle.h"
+#include "mozilla/RestyleManagerHandleInlines.h"
 
 #include "nsIDOMNode.h"
 #include "nsISelection.h"
@@ -81,6 +83,7 @@
 #include "gfxContext.h"
 #include "nsRenderingContext.h"
 #include "nsAbsoluteContainingBlock.h"
+#include "DisplayItemScrollClip.h"
 #include "StickyScrollContainer.h"
 #include "nsFontInflationData.h"
 #include "gfxASurface.h"
@@ -672,21 +675,30 @@ nsFrame::DestroyFrom(nsIFrame* aDestructRoot)
     // and not only those whose current style involves CSS transitions,
     // because what matters is whether the new style (not the old)
     // specifies CSS transitions.
-    RestyleManager::ReframingStyleContexts* rsc =
-      presContext->RestyleManager()->GetReframingStyleContexts();
-    if (rsc) {
-      rsc->Put(mContent, mStyleContext);
+    if (presContext->RestyleManager()->IsGecko()) {
+      // stylo: ServoRestyleManager does not handle transitions yet, and when
+      // it does it probably won't need to track reframed style contexts to
+      // start transitions correctly.
+      RestyleManager::ReframingStyleContexts* rsc =
+        presContext->RestyleManager()->AsGecko()->GetReframingStyleContexts();
+      if (rsc) {
+        rsc->Put(mContent, mStyleContext);
+      }
     }
   }
 
   if (HasCSSAnimations()) {
     // If no new frame for this element is created by the end of the
     // restyling process, stop animations for this frame
-    RestyleManager::AnimationsWithDestroyedFrame* adf =
-      presContext->RestyleManager()->GetAnimationsWithDestroyedFrame();
-    // AnimationsWithDestroyedFrame only lives during the restyling process.
-    if (adf) {
-      adf->Put(mContent, mStyleContext);
+    if (presContext->RestyleManager()->IsGecko()) {
+      RestyleManager::AnimationsWithDestroyedFrame* adf =
+        presContext->RestyleManager()->AsGecko()->GetAnimationsWithDestroyedFrame();
+      // AnimationsWithDestroyedFrame only lives during the restyling process.
+      if (adf) {
+        adf->Put(mContent, mStyleContext);
+      }
+    } else {
+      NS_ERROR("stylo: ServoRestyleManager does not support animations yet");
     }
   }
 
@@ -1142,12 +1154,6 @@ nsIFrame::Extend3DContext() const
 
   // If we're all scroll frame, then all descendants will be clipped, so we can't preserve 3d.
   if (GetType() == nsGkAtoms::scrollFrame) {
-    return false;
-  }
-
-  // Opacity can only be only the root or leaves of a preserve-3d context
-  // as it requires flattening.
-  if (HasOpacity() && Combines3DTransformWithAncestors()) {
     return false;
   }
 
@@ -1816,99 +1822,18 @@ IsScrollFrameActive(nsDisplayListBuilder* aBuilder, nsIScrollableFrame* aScrolla
   return aScrollableFrame && aScrollableFrame->IsScrollingActive(aBuilder);
 }
 
-class AutoSaveRestoreBlendMode
+class AutoSaveRestoreContainsBlendMode
 {
   nsDisplayListBuilder& mBuilder;
-  EnumSet<gfx::CompositionOp> mSavedBlendModes;
+  bool mSavedContainsBlendMode;
 public:
-  explicit AutoSaveRestoreBlendMode(nsDisplayListBuilder& aBuilder)
+  explicit AutoSaveRestoreContainsBlendMode(nsDisplayListBuilder& aBuilder)
     : mBuilder(aBuilder)
-    , mSavedBlendModes(aBuilder.ContainedBlendModes())
+    , mSavedContainsBlendMode(aBuilder.ContainsBlendMode())
   { }
 
-  ~AutoSaveRestoreBlendMode() {
-    mBuilder.SetContainsBlendModes(mSavedBlendModes);
-  }
-};
-
-class AutoHoistScrollInfoItems
-{
-  nsDisplayListBuilder& mBuilder;
-  nsDisplayList* mParentPendingList;
-  nsDisplayList mPendingList;
-
-public:
-  explicit AutoHoistScrollInfoItems(nsDisplayListBuilder& aBuilder)
-    : mBuilder(aBuilder),
-      mParentPendingList(nullptr)
-  {
-    if (!mBuilder.ShouldBuildScrollInfoItemsForHoisting()) {
-      return;
-    }
-    mParentPendingList = mBuilder.EnterScrollInfoItemHoisting(&mPendingList);
-  }
-  ~AutoHoistScrollInfoItems() {
-    if (!mParentPendingList) {
-      // If we have no parent stacking context, we will throw out any scroll
-      // info items that are pending (meaning, we can safely ignore them since
-      // the scrollable layers they represent will not be flattened).
-      return;
-    }
-    mParentPendingList->AppendToTop(&mPendingList);
-    mBuilder.LeaveScrollInfoItemHoisting(mParentPendingList);
-  }
-
-  // The current stacking context will definitely be flattened, so commit all
-  // pending scroll info items and make sure they will not be optimized away
-  // in the case they were also inside a compositor-supported mix-blend-mode.
-  void Commit() {
-    nsDisplayItem* iter = nullptr;
-    while ((iter = mPendingList.RemoveBottom()) != nullptr) {
-      MOZ_ASSERT(iter->GetType() == nsDisplayItem::TYPE_SCROLL_INFO_LAYER);
-      auto item = static_cast<nsDisplayScrollInfoLayer*>(iter);
-
-      item->UnsetIgnoreIfCompositorSupportsBlending();
-      mBuilder.CommittedScrollInfoItems()->AppendToTop(item);
-    }
-  }
-
-  // The current stacking context will only be flattened if the given mix-blend
-  // mode is not supported in the compositor. Annotate the scroll info items
-  // and keep them in the pending list.
-  void AnnotateForBlendModes(BlendModeSet aBlendModes) {
-    for (nsDisplayItem* iter = mPendingList.GetBottom(); iter; iter = iter->GetAbove()) {
-      MOZ_ASSERT(iter->GetType() == nsDisplayItem::TYPE_SCROLL_INFO_LAYER);
-      auto item = static_cast<nsDisplayScrollInfoLayer*>(iter);
-
-      item->IgnoreIfCompositorSupportsBlending(aBlendModes);
-    }
-  }
-
-  bool IsRootStackingContext() {
-    // We're only finished building the hoisted list if we have no parent
-    // stacking context.
-    return !mParentPendingList;
-  }
-
-  // Any scroll info items which contain a mix-blend mode are moved into the
-  // parent display list.
-  void Finish(nsDisplayList* aResultList) {
-    MOZ_ASSERT(IsRootStackingContext());
-
-    nsDisplayItem* iter = nullptr;
-    while ((iter = mPendingList.RemoveBottom()) != nullptr) {
-      MOZ_ASSERT(iter->GetType() == nsDisplayItem::TYPE_SCROLL_INFO_LAYER);
-      nsDisplayScrollInfoLayer *item = static_cast<decltype(item)>(iter);
-
-      if (!item->ContainedInMixBlendMode()) {
-        // Discard the item, it was not committed for having an SVG effect nor
-        // was it contained with a mix-blend mode.
-        item->~nsDisplayScrollInfoLayer();
-        continue;
-      }
-
-      aResultList->AppendToTop(item);
-    }
+  ~AutoSaveRestoreContainsBlendMode() {
+    mBuilder.SetContainsBlendMode(mSavedContainsBlendMode);
   }
 };
 
@@ -1948,7 +1873,8 @@ static bool
 ItemParticipatesIn3DContext(nsIFrame* aAncestor, nsDisplayItem* aItem)
 {
   nsIFrame* transformFrame;
-  if (aItem->GetType() == nsDisplayItem::TYPE_TRANSFORM) {
+  if (aItem->GetType() == nsDisplayItem::TYPE_TRANSFORM ||
+      aItem->GetType() == nsDisplayItem::TYPE_OPACITY) {
     transformFrame = aItem->Frame();
   } else if (aItem->GetType() == nsDisplayItem::TYPE_PERSPECTIVE) {
     transformFrame = static_cast<nsDisplayPerspective*>(aItem)->TransformFrame();
@@ -1977,24 +1903,22 @@ WrapSeparatorTransform(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
 
 static void
 CreateOpacityItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                  nsDisplayList& aList, bool aItemForEventsOnly)
+                  nsDisplayList& aList, bool aItemForEventsOnly,
+                  const DisplayItemScrollClip* aScrollClip,
+                  bool aParticipatesInPreserve3D)
 {
   // Don't clip nsDisplayOpacity items. We clip their descendants instead.
   // The clip we would set on an element with opacity would clip
   // all descendant content, but some should not be clipped.
-  // We clear both regular clips and scroll clips. If this item's animated
-  // geometry root has async scrolling, then the async scroll transform will
-  // be applied on the opacity's descendants (because that's where the
-  // scroll clip will be). However, this won't work if the opacity item is
-  // inactive, which is why we record the pre-clear scroll clip here.
-  const DisplayItemScrollClip* scrollClipForSameAGRChildren =
-    aBuilder->ClipState().GetCurrentInnermostScrollClip();
   DisplayListClipState::AutoSaveRestore opacityClipState(aBuilder);
-  opacityClipState.ClearIncludingScrollClip();
-  aList.AppendNewToTop(
+  opacityClipState.Clear();
+  nsDisplayOpacity* opacity =
       new (aBuilder) nsDisplayOpacity(aBuilder, aFrame, &aList,
-                                      scrollClipForSameAGRChildren,
-                                      aItemForEventsOnly));
+                                      aScrollClip, aItemForEventsOnly);
+  if (opacity) {
+    opacity->SetParticipatesInPreserve3D(aParticipatesInPreserve3D);
+    aList.AppendToTop(opacity);
+  }
 }
 
 void
@@ -2053,8 +1977,8 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
   // reset blend mode so we can keep track if this stacking context needs have
   // a nsDisplayBlendContainer. Set the blend mode back when the routine exits
   // so we keep track if the parent stacking context needs a container too.
-  AutoSaveRestoreBlendMode autoRestoreBlendMode(*aBuilder);
-  aBuilder->SetContainsBlendModes(BlendModeSet());
+  AutoSaveRestoreContainsBlendMode autoRestoreBlendMode(*aBuilder);
+  aBuilder->SetContainsBlendMode(false);
  
   nsRect dirtyRectOutsideTransform = dirtyRect;
   if (isTransformed) {
@@ -2086,16 +2010,16 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     inTransform = true;
   }
 
-  AutoHoistScrollInfoItems hoistedScrollInfoItems(*aBuilder);
-
   bool usingSVGEffects = nsSVGIntegrationUtils::UsingEffectsForFrame(this);
   nsRect dirtyRectOutsideSVGEffects = dirtyRect;
+  nsDisplayList hoistedScrollInfoItemsStorage;
   if (usingSVGEffects) {
     dirtyRect =
       nsSVGIntegrationUtils::GetRequiredSourceForInvalidArea(this, dirtyRect);
+    aBuilder->EnterSVGEffectsContents(&hoistedScrollInfoItemsStorage);
   }
 
-  bool useOpacity = HasVisualOpacity() && !nsSVGUtils::CanOptimizeOpacity(this);
+  bool useOpacity = HasVisualOpacity() && !nsSVGUtils::CanOptimizeOpacity(this) && !usingSVGEffects;
   bool useBlendMode = disp->mMixBlendMode != NS_STYLE_BLEND_NORMAL;
   bool useStickyPosition = disp->mPosition == NS_STYLE_POSITION_STICKY &&
     IsScrollFrameActive(aBuilder,
@@ -2114,18 +2038,17 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
 
   DisplayListClipState::AutoSaveRestore clipState(aBuilder);
 
-  if (isTransformed || useBlendMode || usingSVGEffects || useFixedPosition || useStickyPosition) {
+  bool clearClip = false;
+  if (isTransformed || usingSVGEffects || useFixedPosition || useStickyPosition) {
     // We don't need to pass ancestor clipping down to our children;
     // everything goes inside a display item's child list, and the display
     // item itself will be clipped.
     // For transforms we also need to clear ancestor clipping because it's
     // relative to the wrong display item reference frame anyway.
-    // We clear both regular and scroll clips here. Our content needs to be
-    // able to walk up the complete cross stacking context scroll clip chain,
-    // so we call a special method on the clip state that keeps the ancestor
-    // scroll clip around.
-    clipState.ClearForStackingContextContents();
+    clearClip = true;
   }
+
+  clipState.EnterStackingContextContents(clearClip);
 
   nsDisplayListCollection set;
   {
@@ -2218,13 +2141,34 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
   // 8, 9: non-negative z-index children
   resultList.AppendToTop(set.PositionedDescendants());
 
-  if (!isTransformed) {
-    // Restore saved clip state now so that any display items we create below
-    // are clipped properly.
-    clipState.Restore();
+  // Get the scroll clip to use for the container items that we create here.
+  // If we cleared the clip, and we create multiple container items, then the
+  // items we create before we restore the clip will have a different scroll
+  // clip from the items we create after we restore the clip.
+  const DisplayItemScrollClip* containerItemScrollClip =
+    aBuilder->ClipState().CurrentAncestorScrollClipForStackingContextContents();
+
+  /* If adding both a nsDisplayBlendContainer and a nsDisplayBlendMode to the
+   * same list, the nsDisplayBlendContainer should be added first. This only
+   * happens when the element creating this stacking context has mix-blend-mode
+   * and also contains a child which has mix-blend-mode.
+   * The nsDisplayBlendContainer must be added to the list first, so it does not
+   * isolate the containing element blending as well.
+   */
+
+  if (aBuilder->ContainsBlendMode()) {
+    DisplayListClipState::AutoSaveRestore blendContainerClipState(aBuilder);
+    blendContainerClipState.Clear();
+    resultList.AppendNewToTop(
+      new (aBuilder) nsDisplayBlendContainer(aBuilder, this, &resultList,
+                                             containerItemScrollClip));
   }
 
-  bool is3DContextRoot = Extend3DContext() && !Combines3DTransformWithAncestors();
+  if (!isTransformed && !useFixedPosition && !useStickyPosition) {
+    // Restore saved clip state now so that any display items we create below
+    // are clipped properly.
+    clipState.ExitStackingContextContents(&containerItemScrollClip);
+  }
 
   /* If there are any SVG effects, wrap the list up in an SVG effects item
    * (which also handles CSS group opacity). Note that we create an SVG effects
@@ -2237,17 +2181,10 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     /* List now emptied, so add the new list to the top. */
     resultList.AppendNewToTop(
         new (aBuilder) nsDisplaySVGEffects(aBuilder, this, &resultList));
-  }
-  else if (useOpacity && !resultList.IsEmpty() && !is3DContextRoot) {
-    /* If this element is the root of a preserve-3d context, then we want
-     * to make sure any opacity items are on the outside of the transform
-     * so that they don't interfere with the chain of nsDisplayTransforms.
-     * Opacity on preserve-3d leaves need to be inside the transform for the
-     * same reason, and we do this in the general case as well to preserve
-     * existing behaviour.
-     */
-    CreateOpacityItem(aBuilder, this, resultList, opacityItemForEventsOnly);
-    useOpacity = false;
+    // Also add the hoisted scroll info items. We need those for APZ scrolling
+    // because nsDisplaySVGEffects items can't build active layers.
+    aBuilder->ExitSVGEffectsContents();
+    resultList.AppendToTop(&hoistedScrollInfoItemsStorage);
   }
 
   /* If we're going to apply a transformation and don't have preserve-3d set, wrap
@@ -2261,39 +2198,52 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
    * We also traverse into sublists created by nsDisplayWrapList or nsDisplayOpacity, so that
    * we find all the correct children.
    */
-  if (isTransformed && !resultList.IsEmpty()) {
-    if (!resultList.IsEmpty() && Extend3DContext()) {
-      // Install dummy nsDisplayTransform as a leaf containing
-      // descendants not participating this 3D rendering context.
-      nsDisplayList nonparticipants;
-      nsDisplayList participants;
-      int index = 1;
+  bool hasPreserve3DChildren = false;
+  if (isTransformed && !resultList.IsEmpty() && Extend3DContext()) {
+    // Install dummy nsDisplayTransform as a leaf containing
+    // descendants not participating this 3D rendering context.
+    nsDisplayList nonparticipants;
+    nsDisplayList participants;
+    int index = 1;
 
-      while (nsDisplayItem* item = resultList.RemoveBottom()) {
-        if (ItemParticipatesIn3DContext(this, item) && !item->GetClip().HasClip()) {
-          // The frame of this item participates the same 3D context.
-          WrapSeparatorTransform(aBuilder, this, dirtyRect,
-                                 &nonparticipants, &participants, index++);
-          participants.AppendToTop(item);
-        } else {
-          // The frame of the item doesn't participate the current
-          // context, or has no transform.
-          //
-          // For items participating but not transformed, they are add
-          // to nonparticipants to get a separator layer for handling
-          // clips, if there is, on an intermediate surface.
-          // \see ContainerLayer::DefaultComputeEffectiveTransforms().
-          nonparticipants.AppendToTop(item);
-        }
+    while (nsDisplayItem* item = resultList.RemoveBottom()) {
+      if (ItemParticipatesIn3DContext(this, item) && !item->GetClip().HasClip()) {
+        // The frame of this item participates the same 3D context.
+        WrapSeparatorTransform(aBuilder, this, dirtyRect,
+                               &nonparticipants, &participants, index++);
+        participants.AppendToTop(item);
+        hasPreserve3DChildren = true;
+      } else {
+        // The frame of the item doesn't participate the current
+        // context, or has no transform.
+        //
+        // For items participating but not transformed, they are add
+        // to nonparticipants to get a separator layer for handling
+        // clips, if there is, on an intermediate surface.
+        // \see ContainerLayer::DefaultComputeEffectiveTransforms().
+        nonparticipants.AppendToTop(item);
       }
-      WrapSeparatorTransform(aBuilder, this, dirtyRect,
-                             &nonparticipants, &participants, index++);
-      resultList.AppendToTop(&participants);
     }
+    WrapSeparatorTransform(aBuilder, this, dirtyRect,
+                           &nonparticipants, &participants, index++);
+    resultList.AppendToTop(&participants);
+  }
 
+  /* We create the opacity outside any transform separators we created,
+   * so that the opacity will be applied to them as groups. When we have
+   * opacity and preserve-3d we break the 'group' nature of opacity in order
+   * to maintain preserve-3d. This matches the behaviour of blink and WebKit,
+   * see bug 1250718.
+   */
+  if (useOpacity && !resultList.IsEmpty()) {
+    CreateOpacityItem(aBuilder, this, resultList,
+                      opacityItemForEventsOnly, containerItemScrollClip, hasPreserve3DChildren);
+  }
+
+  if (isTransformed && !resultList.IsEmpty()) {
     // Restore clip state now so nsDisplayTransform is clipped properly.
-    if (!HasPerspective()) {
-      clipState.Restore();
+    if (!HasPerspective() && !useFixedPosition && !useStickyPosition) {
+      clipState.ExitStackingContextContents(&containerItemScrollClip);
     }
     // Revert to the dirtyrect coming in from the parent, without our transform
     // taken into account.
@@ -2314,19 +2264,18 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     resultList.AppendNewToTop(transformItem);
 
     if (HasPerspective()) {
-      clipState.Restore();
+      if (!useFixedPosition && !useStickyPosition) {
+        clipState.ExitStackingContextContents(&containerItemScrollClip);
+      }
       resultList.AppendNewToTop(
         new (aBuilder) nsDisplayPerspective(
           aBuilder, this,
           GetContainingBlock()->GetContent()->GetPrimaryFrame(), &resultList));
     }
+  }
 
-    /* If we need an opacity item, but didn't do it earlier, add it now on the
-     * outside of the transform.
-     */
-    if (useOpacity && !usingSVGEffects) {
-      CreateOpacityItem(aBuilder, this, resultList, opacityItemForEventsOnly);
-    }
+  if (useFixedPosition || useStickyPosition) {
+    clipState.ExitStackingContextContents(&containerItemScrollClip);
   }
 
   /* If we have sticky positioning, wrap it in a sticky position item.
@@ -2346,44 +2295,18 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
       new (aBuilder) nsDisplayVR(aBuilder, this, &resultList, vrHMDInfo));
   }
 
-  /* If adding both a nsDisplayBlendContainer and a nsDisplayMixBlendMode to the
-   * same list, the nsDisplayBlendContainer should be added first. This only
-   * happens when the element creating this stacking context has mix-blend-mode
-   * and also contains a child which has mix-blend-mode.
-   * The nsDisplayBlendContainer must be added to the list first, so it does not
-   * isolate the containing element blending as well.
-   */
-
-  if (aBuilder->ContainsBlendMode()) {
-    resultList.AppendNewToTop(
-      new (aBuilder) nsDisplayBlendContainer(aBuilder, this, &resultList, aBuilder->ContainedBlendModes()));
-  }
-
-  if (aBuilder->ShouldBuildScrollInfoItemsForHoisting()) {
-    if (usingSVGEffects) {
-      // We know this stacking context will be flattened, so hoist any scroll
-      // info items we created.
-      hoistedScrollInfoItems.Commit();
-    } else if (aBuilder->ContainsBlendMode()) {
-      hoistedScrollInfoItems.AnnotateForBlendModes(aBuilder->ContainedBlendModes());
-    }
-
-    if (hoistedScrollInfoItems.IsRootStackingContext()) {
-      // If we're the root stacking context, no more mix-blend modes can be
-      // introduced and it's safe to hoist scroll info items.
-      resultList.AppendToTop(aBuilder->CommittedScrollInfoItems());
-      hoistedScrollInfoItems.Finish(&resultList);
-    }
-  }
-
   /* If there's blending, wrap up the list in a blend-mode item. Note
    * that opacity can be applied before blending as the blend color is
    * not affected by foreground opacity (only background alpha).
    */
 
   if (useBlendMode && !resultList.IsEmpty()) {
+    DisplayListClipState::AutoSaveRestore mixBlendClipState(aBuilder);
+    mixBlendClipState.Clear();
     resultList.AppendNewToTop(
-        new (aBuilder) nsDisplayMixBlendMode(aBuilder, this, &resultList));
+        new (aBuilder) nsDisplayBlendMode(aBuilder, this, &resultList,
+                                          disp->mMixBlendMode,
+                                          containerItemScrollClip));
   }
 
   CreateOwnLayerIfNeeded(aBuilder, &resultList);
@@ -2585,7 +2508,7 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
   nsDisplayList extraPositionedDescendants;
   if (isStackingContext) {
     if (disp->mMixBlendMode != NS_STYLE_BLEND_NORMAL) {
-      aBuilder->SetContainsBlendMode(disp->mMixBlendMode);
+      aBuilder->SetContainsBlendMode(true);
     }
     // True stacking context.
     // For stacking contexts, BuildDisplayListForStackingContext handles
@@ -4712,12 +4635,9 @@ nsFrame::ReflowAbsoluteFrames(nsPresContext*           aPresContext,
     // The containing block for the abs pos kids is formed by our padding edge.
     nsMargin usedBorder = GetUsedBorder();
     nscoord containingBlockWidth =
-      aDesiredSize.Width() - usedBorder.LeftRight();
-    MOZ_ASSERT(containingBlockWidth >= 0);
+      std::max(0, aDesiredSize.Width() - usedBorder.LeftRight());
     nscoord containingBlockHeight =
-      aDesiredSize.Height() - usedBorder.TopBottom();
-    MOZ_ASSERT(containingBlockHeight >= 0);
-
+      std::max(0, aDesiredSize.Height() - usedBorder.TopBottom());
     nsContainerFrame* container = do_QueryFrame(this);
     NS_ASSERTION(container, "Abs-pos children only supported on container frames for now");
 
@@ -9155,8 +9075,8 @@ nsIFrame::CaretPosition::~CaretPosition()
 bool
 nsFrame::HasCSSAnimations()
 {
-  AnimationCollection* collection =
-    PresContext()->AnimationManager()->GetAnimationCollection(this);
+  auto collection =
+    AnimationCollection<CSSAnimation>::GetAnimationCollection(this);
   return collection && collection->mAnimations.Length() > 0;
 }
 

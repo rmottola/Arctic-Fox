@@ -38,7 +38,6 @@
 #include "nsWrapperCacheInlines.h"
 #include "nsIXPConnect.h"
 #include "nsDOMCID.h"
-#include "nsIDOMScriptObjectFactory.h"
 #include "nsIScriptGlobalObject.h"
 #include "nsTHashtable.h"
 
@@ -773,7 +772,7 @@ nsBindingManager::MediumFeaturesChanged(nsPresContext* aPresContext,
 }
 
 void
-nsBindingManager::AppendAllSheets(nsTArray<CSSStyleSheet*>& aArray)
+nsBindingManager::AppendAllSheets(nsTArray<StyleSheetHandle>& aArray)
 {
   if (!mBoundContentSet) {
     return;

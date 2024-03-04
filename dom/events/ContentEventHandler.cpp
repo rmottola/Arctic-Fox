@@ -658,10 +658,9 @@ ContentEventHandler::AppendFontRanges(FontRangeArray& aFontRanges,
       }
     }
 
-    uint32_t skipStart = iter.ConvertOriginalToSkipped(frameXPStart);
-    uint32_t skipEnd = iter.ConvertOriginalToSkipped(frameXPEnd);
-    gfxTextRun::GlyphRunIterator runIter(
-      textRun, skipStart, skipEnd - skipStart);
+    gfxTextRun::Range skipRange(iter.ConvertOriginalToSkipped(frameXPStart),
+                                iter.ConvertOriginalToSkipped(frameXPEnd));
+    gfxTextRun::GlyphRunIterator runIter(textRun, skipRange);
     int32_t lastXPEndOffset = frameXPStart;
     while (runIter.NextRun()) {
       gfxFont* font = runIter.GetGlyphRun()->mFont.get();
@@ -1445,23 +1444,14 @@ ContentEventHandler::OnQueryCaretRect(WidgetQueryContentEvent* aEvent)
   rect.x = posInFrame.x;
   rect.y = posInFrame.y;
 
-  nscoord fontHeight = 0;
-  float inflation = nsLayoutUtils::FontSizeInflationFor(frame);
-  RefPtr<nsFontMetrics> fontMetrics;
-  rv = nsLayoutUtils::GetFontMetricsForFrame(frame, getter_AddRefs(fontMetrics),
-                                             inflation);
-  if (NS_WARN_IF(!fontMetrics)) {
-    // If we cannot get font height, use frame size instead.
-    fontHeight = isVertical ? frame->GetSize().width : frame->GetSize().height;
-  } else {
-    fontHeight = fontMetrics->MaxAscent() + fontMetrics->MaxDescent();
-  }
+  RefPtr<nsFontMetrics> fontMetrics =
+    nsLayoutUtils::GetInflatedFontMetricsForFrame(frame);
   if (isVertical) {
-    rect.width = fontHeight;
+    rect.width = fontMetrics->MaxHeight();
     rect.height = caretRect.height;
   } else {
     rect.width = caretRect.width;
-    rect.height = fontHeight;
+    rect.height = fontMetrics->MaxHeight();
   }
 
   rv = ConvertToRootRelativeOffset(frame, rect);

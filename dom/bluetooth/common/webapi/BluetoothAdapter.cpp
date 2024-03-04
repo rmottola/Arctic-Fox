@@ -131,7 +131,7 @@ class StartLeScanTask final : public BluetoothReplyRunnable
 {
 public:
   StartLeScanTask(BluetoothAdapter* aAdapter, Promise* aPromise,
-                  const nsTArray<nsString>& aServiceUuids)
+                  const nsTArray<BluetoothUuid>& aServiceUuids)
     : BluetoothReplyRunnable(nullptr, aPromise)
     , mAdapter(aAdapter)
     , mServiceUuids(aServiceUuids)
@@ -150,7 +150,7 @@ public:
     JSContext* cx = jsapi.cx();
 
     const BluetoothValue& v = mReply->get_BluetoothReplySuccess().value();
-    NS_ENSURE_TRUE(v.type() == BluetoothValue::TnsString, false);
+    NS_ENSURE_TRUE(v.type() == BluetoothValue::TBluetoothUuid, false);
 
     /**
      * Create a new discovery handle and wrap it to return. Each
@@ -158,7 +158,7 @@ public:
      */
     RefPtr<BluetoothDiscoveryHandle> discoveryHandle =
       BluetoothDiscoveryHandle::Create(mAdapter->GetParentObject(),
-                                       mServiceUuids, v.get_nsString());
+                                       mServiceUuids, v.get_BluetoothUuid());
 
     if (!ToJSValue(cx, discoveryHandle, aValue)) {
       JS_ClearPendingException(cx);
@@ -180,7 +180,7 @@ public:
 
 private:
   RefPtr<BluetoothAdapter> mAdapter;
-  nsTArray<nsString> mServiceUuids;
+  nsTArray<BluetoothUuid> mServiceUuids;
 };
 
 class StopLeScanTask final : public BluetoothReplyRunnable
@@ -188,14 +188,14 @@ class StopLeScanTask final : public BluetoothReplyRunnable
 public:
   StopLeScanTask(BluetoothAdapter* aAdapter,
                  Promise* aPromise,
-                 const nsAString& aScanUuid)
+                 const BluetoothUuid& aScanUuid)
       : BluetoothReplyRunnable(nullptr, aPromise)
       , mAdapter(aAdapter)
       , mScanUuid(aScanUuid)
   {
     MOZ_ASSERT(aPromise);
     MOZ_ASSERT(aAdapter);
-    MOZ_ASSERT(!aScanUuid.IsEmpty());
+    MOZ_ASSERT(!aScanUuid.IsCleared());
   }
 
 protected:
@@ -216,7 +216,7 @@ protected:
 
 private:
   RefPtr<BluetoothAdapter> mAdapter;
-  nsString mScanUuid;
+  BluetoothUuid mScanUuid;
 };
 
 class GetDevicesTask : public BluetoothReplyRunnable
@@ -366,16 +366,12 @@ BluetoothAdapter::Cleanup()
     BluetoothService* bs = BluetoothService::Get();
     NS_ENSURE_TRUE_VOID(bs);
 
-    nsString uuidStr;
-    for (uint32_t i = 0; i < mLeScanHandleArray.Length(); ++i) {
-      mLeScanHandleArray[i]->GetLeScanUuid(uuidStr);
+    for (size_t i = 0; i < mLeScanHandleArray.Length(); ++i) {
+      BluetoothUuid uuid;
+      mLeScanHandleArray[i]->GetLeScanUuid(uuid);
       RefPtr<BluetoothVoidReplyRunnable> results =
         new BluetoothVoidReplyRunnable(nullptr);
-
-      BluetoothUuid uuid;
-      if (NS_SUCCEEDED(StringToUuid(uuidStr, uuid))) {
-        bs->StopLeScanInternal(uuid, results);
-      }
+      bs->StopLeScanInternal(uuid, results);
     }
     mLeScanHandleArray.Clear();
   }
@@ -458,7 +454,11 @@ BluetoothAdapter::SetPropertyByValue(const BluetoothNamedValue& aValue)
   } else if (name.EqualsLiteral("Name")) {
     RemoteNameToString(value.get_BluetoothRemoteName(), mName);
   } else if (name.EqualsLiteral("Address")) {
-    AddressToString(value.get_BluetoothAddress(), mAddress);
+    if (value.get_BluetoothAddress().IsCleared()) {
+      mAddress.Truncate(); // Reset to empty string
+    } else {
+      AddressToString(value.get_BluetoothAddress(), mAddress);
+    }
   } else if (name.EqualsLiteral("Discoverable")) {
     mDiscoverable = value.get_bool();
   } else if (name.EqualsLiteral("Discovering")) {
@@ -539,6 +539,7 @@ BluetoothAdapter::Notify(const BluetoothSignal& aData)
     HandleDeviceUnpaired(aData.value());
   } else if (aData.name().EqualsLiteral(HFP_STATUS_CHANGED_ID) ||
              aData.name().EqualsLiteral(SCO_STATUS_CHANGED_ID) ||
+             aData.name().EqualsLiteral(HID_STATUS_CHANGED_ID) ||
              aData.name().EqualsLiteral(A2DP_STATUS_CHANGED_ID)) {
     MOZ_ASSERT(v.type() == BluetoothValue::TArrayOfBluetoothNamedValue);
     const InfallibleTArray<BluetoothNamedValue>& arr =
@@ -602,12 +603,12 @@ BluetoothAdapter::AppendLeScanHandle(
 }
 
 void
-BluetoothAdapter::RemoveLeScanHandle(const nsAString& aScanUuid)
+BluetoothAdapter::RemoveLeScanHandle(const BluetoothUuid& aScanUuid)
 {
-  nsString uuid;
-  for (uint32_t i = 0; i < mLeScanHandleArray.Length(); ++i) {
+  for (size_t i = 0; i < mLeScanHandleArray.Length(); ++i) {
+    BluetoothUuid uuid;
     mLeScanHandleArray[i]->GetLeScanUuid(uuid);
-    if (aScanUuid.Equals(uuid)) {
+    if (aScanUuid == uuid) {
       mLeScanHandleArray.RemoveElementAt(i);
       break;
     }
@@ -714,7 +715,7 @@ BluetoothAdapter::StartLeScan(const nsTArray<nsString>& aServiceUuids,
   BT_ENSURE_TRUE_REJECT(bs, promise, NS_ERROR_NOT_AVAILABLE);
 
   RefPtr<BluetoothReplyRunnable> result =
-    new StartLeScanTask(this, promise, aServiceUuids);
+    new StartLeScanTask(this, promise, serviceUuids);
   bs->StartLeScanInternal(serviceUuids, result);
 
   return promise.forget();
@@ -745,16 +746,11 @@ BluetoothAdapter::StopLeScan(BluetoothDiscoveryHandle& aDiscoveryHandle,
                         promise,
                         NS_ERROR_DOM_BLUETOOTH_DONE);
 
-  nsString scanUuidStr;
-  aDiscoveryHandle.GetLeScanUuid(scanUuidStr);
-
   BluetoothUuid scanUuid;
-  BT_ENSURE_TRUE_REJECT(NS_SUCCEEDED(StringToUuid(scanUuidStr, scanUuid)),
-                        promise,
-                        NS_ERROR_DOM_OPERATION_ERR);
+  aDiscoveryHandle.GetLeScanUuid(scanUuid);
 
   RefPtr<BluetoothReplyRunnable> result =
-    new StopLeScanTask(this, promise, scanUuidStr);
+    new StopLeScanTask(this, promise, scanUuid);
   bs->StopLeScanInternal(scanUuid, result);
 
   return promise.forget();

@@ -4,9 +4,9 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
-const loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
+var loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
     .getService(Ci.mozIJSSubScriptLoader);
 
 Cu.import("resource://gre/modules/FileUtils.jsm");
@@ -27,6 +27,7 @@ Cu.import("chrome://marionette/content/elements.js");
 Cu.import("chrome://marionette/content/emulator.js");
 Cu.import("chrome://marionette/content/error.js");
 Cu.import("chrome://marionette/content/modal.js");
+Cu.import("chrome://marionette/content/proxy.js");
 Cu.import("chrome://marionette/content/simpletest.js");
 
 loader.loadSubScript("chrome://marionette/content/common.js");
@@ -41,7 +42,7 @@ loader.loadSubScript("chrome://marionette/content/frame-manager.js");
 
 this.EXPORTED_SYMBOLS = ["GeckoDriver", "Context"];
 
-const FRAME_SCRIPT = "chrome://marionette/content/listener.js";
+var FRAME_SCRIPT = "chrome://marionette/content/listener.js";
 const BROWSER_STARTUP_FINISHED = "browser-delayed-startup-finished";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const CLICK_TO_START_PREF = "marionette.debugging.clicktostart";
@@ -56,14 +57,14 @@ const globalMessageManager = Cc["@mozilla.org/globalmessagemanager;1"]
 // API's are ready; see bug 792647.  This assumes that marionette-server.js
 // will be loaded before the 'system-message-listener-ready' message
 // is fired.  If this stops being true, this approach will have to change.
-let systemMessageListenerReady = false;
+var systemMessageListenerReady = false;
 Services.obs.addObserver(function() {
   systemMessageListenerReady = true;
 }, "system-message-listener-ready", false);
 
 // This is used on desktop to prevent newSession from returning before a page
 // load initiated by the Firefox command line has completed.
-let delayedBrowserStarted = false;
+var delayedBrowserStarted = false;
 Services.obs.addObserver(function () {
   delayedBrowserStarted = true;
 }, BROWSER_STARTUP_FINISHED, false);
@@ -79,111 +80,6 @@ this.Context.fromString = function(s) {
     return this[s];
   }
   return null;
-};
-
-/**
- * Creates a transparent interface between the chrome- and content
- * processes.
- *
- * Calls to this object will  be proxied via the message manager to the active
- * browsing context (content) and responses will be provided back as
- * promises.
- *
- * The argument sequence is serialised and passed as an array, unless it
- * consists of a single object type that isn't null, in which case it's
- * passed literally.  The latter specialisation is temporary to achieve
- * backwards compatibility with listener.js.
- *
- * @param {function(): nsIMessageManager} mmFn
- *     Function returning the current message manager.
- * @param {function(string, Object, number)} sendAsyncFn
- *     Callback for sending async messages to the current listener.
- * @param {function(): BrowserObj} curBrowserFn
- *     Function that returns the current browser.
- */
-let ListenerProxy = function(mmFn, sendAsyncFn, curBrowserFn) {
-  this.curCmdId = null;
-  this.sendAsync = sendAsyncFn;
-
-  this.mmFn_ = mmFn;
-  this.curBrowserFn_ = curBrowserFn;
-};
-
-Object.defineProperty(ListenerProxy.prototype, "mm", {
-  get: function() { return this.mmFn_(); }
-});
-
-Object.defineProperty(ListenerProxy.prototype, "curBrowser", {
-  get: function() { return this.curBrowserFn_(); }
-});
-
-ListenerProxy.prototype.__noSuchMethod__ = function*(name, args) {
-  const ok = "Marionette:ok";
-  const val = "Marionette:done";
-  const err = "Marionette:error";
-
-  let proxy = new Promise((resolve, reject) => {
-    let removeListeners = (name, fn) => {
-      let rmFn = msg => {
-        if (this.isOutOfSync(msg.json.command_id)) {
-          logger.warn("Skipping out-of-sync response from listener: " +
-              msg.name + msg.json.toSource());
-          return;
-        }
-
-        listeners.remove();
-        modal.removeHandler(handleDialog);
-
-        fn(msg);
-        this.curCmdId = null;
-      };
-
-      listeners.push([name, rmFn]);
-      return rmFn;
-    };
-
-    let listeners = [];
-    listeners.add = () => {
-      this.mm.addMessageListener(ok, removeListeners(ok, okListener));
-      this.mm.addMessageListener(val, removeListeners(val, valListener));
-      this.mm.addMessageListener(err, removeListeners(err, errListener));
-    };
-    listeners.remove = () =>
-        listeners.map(l => this.mm.removeMessageListener(l[0], l[1]));
-
-    let okListener = () => resolve();
-    let valListener = msg => resolve(msg.json.value);
-    let errListener = msg => reject(
-        "error" in msg.objects ? msg.objects.error : msg.json);
-
-    let handleDialog = function(subject, topic) {
-      listeners.remove();
-      modal.removeHandler(handleDialog);
-      this.sendAsync("cancelRequest");
-      resolve();
-    }.bind(this);
-
-    // start content process listeners, and install observers for global-
-    // and tab modal dialogues
-    listeners.add();
-    modal.addHandler(handleDialog);
-
-    // convert to array if passed arguments
-    let msg;
-    if (args.length == 1 && typeof args[0] == "object" && args[0] !== null) {
-      msg = args[0];
-    } else {
-      msg = Array.prototype.slice.call(args);
-    }
-
-    this.sendAsync(name, msg, this.curCmdId);
-  });
-
-  return proxy;
-};
-
-ListenerProxy.prototype.isOutOfSync = function(id) {
-  return this.curCmdId !== id;
 };
 
 /**
@@ -266,10 +162,7 @@ this.GeckoDriver = function(appName, device, emulator) {
   };
 
   this.mm = globalMessageManager;
-  this.listener = new ListenerProxy(
-      () => this.mm,
-      this.sendAsync.bind(this),
-      () => this.curBrowser);
+  this.listener = proxy.toListener(() => this.mm, this.sendAsync.bind(this));
 
   this.dialog = null;
   let handleDialog = (subject, topic) => {
@@ -1324,16 +1217,20 @@ GeckoDriver.prototype.get = function(cmd, resp) {
 
   switch (this.context) {
     case Context.CONTENT:
+      let get = this.listener.get({url: url, pageTimeout: this.pageTimeout});
+      let id = this.listener.curId;
+
       // If a remoteness update interrupts our page load, this will never return
       // We need to re-issue this request to correctly poll for readyState and
       // send errors.
       this.curBrowser.pendingCommands.push(() => {
-        cmd.parameters.command_id = this.listener.curCmdId;
+        cmd.parameters.command_id = id;
         this.mm.broadcastAsyncMessage(
             "Marionette:pollForReadyState" + this.curBrowser.curFrameId,
             cmd.parameters);
       });
-      yield this.listener.get({url: url, pageTimeout: this.pageTimeout});
+
+      yield get;
       break;
 
     case Context.CHROME:
@@ -2460,13 +2357,37 @@ GeckoDriver.prototype.getCookies = function(cmd, resp) {
 };
 
 /** Delete all cookies that are visible to a document. */
-GeckoDriver.prototype.deleteAllCookies = function(cmd, resp) {
+GeckoDriver.prototype.deleteAllCookies = function*(cmd, resp) {
+  let cb = msg => {
+    let cookie = msg.json;
+    cookieManager.remove(
+        cookie.host,
+        cookie.name,
+        cookie.path,
+        cookie.originAttributes,
+        false);
+    return true;
+  };
+  this.mm.addMessageListener("Marionette:deleteCookie", cb);
   yield this.listener.deleteAllCookies();
+  this.mm.removeMessageListener("Marionette:deleteCookie", cb);
 };
 
 /** Delete a cookie by name. */
-GeckoDriver.prototype.deleteCookie = function(cmd, resp) {
-  yield this.listener.deleteCookie({name: cmd.parameters.name});
+GeckoDriver.prototype.deleteCookie = function*(cmd, resp) {
+  let cb = msg => {
+    this.mm.removeMessageListener("Marionette:deleteCookie", cb);
+    let cookie = msg.json;
+    cookieManager.remove(
+        cookie.host,
+        cookie.name,
+        cookie.path,
+        cookie.originAttributes,
+        false);
+    return true;
+  };
+  this.mm.addMessageListener("Marionette:deleteCookie", cb);
+  yield this.listener.deleteCookie(cmd.parameters.name);
 };
 
 /**

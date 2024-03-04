@@ -57,7 +57,7 @@ namespace dom {
 
 JSErrorFormatString ErrorFormatString[] = {
 #define MSG_DEF(_name, _argc, _exn, _str) \
-  { _str, _argc, _exn },
+  { #_name, _str, _argc, _exn },
 #include "mozilla/dom/Errors.msg"
 #undef MSG_DEF
 };
@@ -495,6 +495,22 @@ ErrorResult::SetPendingException(JSContext* cx)
     return;
   }
   SetPendingGenericErrorException(cx);
+}
+
+void
+ErrorResult::StealExceptionFromJSContext(JSContext* cx)
+{
+  MOZ_ASSERT(mMightHaveUnreportedJSException,
+             "Why didn't you tell us you planned to throw a JS exception?");
+
+  JS::Rooted<JS::Value> exn(cx);
+  if (!JS_GetPendingException(cx, &exn)) {
+    ThrowUncatchableException();
+    return;
+  }
+
+  ThrowJSException(cx, exn);
+  JS_ClearPendingException(cx);
 }
 
 namespace dom {

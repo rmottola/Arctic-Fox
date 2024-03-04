@@ -822,7 +822,7 @@ SpecialPowersAPI.prototype = {
     if (this._permissionsUndoStack.length > 0) {
       // See pushPermissions comment regarding delay.
       let cb = callback ? this._delayCallbackTwice(callback) : null;
-      /* Each pop from the stack will yield an object {op/type/permission/value/url/appid/isInBrowserElement} or null */
+      /* Each pop from the stack will yield an object {op/type/permission/value/url/appid/isInIsolatedMozBrowserElement} or null */
       this._pendingPermissions.push([this._permissionsUndoStack.pop(), cb]);
       this._applyPermissions();
     } else {
@@ -1108,15 +1108,6 @@ SpecialPowersAPI.prototype = {
     this.pushPrefEnv({set: [['dom.mozApps.auto_confirm_uninstall', true]]}, cb);
   },
 
-  // Allow tests to disable the per platform app validity checks so we can
-  // test higher level WebApp functionality without full platform support.
-  setAllAppsLaunchable: function(launchable) {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "set-launchable",
-      launchable: launchable
-    });
-  },
-
   // Allow tests to install addons without signing the package, for convenience.
   allowUnsignedAddons: function() {
     this._sendSyncMessage("SPWebAppService", {
@@ -1129,14 +1120,6 @@ SpecialPowersAPI.prototype = {
     this._sendSyncMessage("SPWebAppService", {
       op: "debug-customizations",
       value: value
-    });
-  },
-
-  // Restore the launchable property to its default value.
-  flushAllAppsLaunchable: function() {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "set-launchable",
-      launchable: false
     });
   },
 

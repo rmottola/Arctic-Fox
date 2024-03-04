@@ -1995,14 +1995,6 @@ public:
   }
 
   /*
-   * Returns true if ServiceWorker Interception is enabled by pref.
-   */
-  static bool ServiceWorkerInterceptionEnabled()
-  {
-    return sSWInterceptionEnabled;
-  }
-
-  /*
    * Returns true if the frame timing APIs are enabled.
    */
   static bool IsFrameTimingEnabled();
@@ -2684,7 +2676,6 @@ private:
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
   static bool sSendPerformanceTimingNotifications;
-  static bool sSWInterceptionEnabled;
   static uint32_t sCookiesLifetimePolicy;
   static uint32_t sCookiesBehavior;
 

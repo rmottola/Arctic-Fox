@@ -19,8 +19,11 @@
   function runTest() {
     navigator.serviceWorker
       .register("strict_mode_warning.js", {scope: "strict_mode_warning"})
-      .then(() => {
+      .then((reg) => {
         ok(true, "Registration should not fail for warnings");
+        return reg.unregister();
+      })
+      .then(() => {
         SimpleTest.finish();
       });
   }
@@ -29,7 +32,6 @@
   onload = function() {
     SpecialPowers.pushPrefEnv({"set": [
       ["dom.serviceWorkers.exemptFromPerDomainMax", true],
-      ["dom.serviceWorkers.interception.enabled", true],
       ["dom.serviceWorkers.enabled", true],
       ["dom.serviceWorkers.testing.enabled", true],
     ]}, runTest);

@@ -36,7 +36,7 @@ class URIParams;
 }// namespace ipc
 
 namespace layers {
-class PCompositorChild;
+class PCompositorBridgeChild;
 } // namespace layers
 
 namespace dom {
@@ -149,9 +149,9 @@ public:
   bool
   DeallocPAPZChild(PAPZChild* aActor) override;
 
-  PCompositorChild*
-  AllocPCompositorChild(mozilla::ipc::Transport* aTransport,
-                        base::ProcessId aOtherProcess) override;
+  PCompositorBridgeChild*
+  AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
+                              base::ProcessId aOtherProcess) override;
 
   PSharedBufferManagerChild*
   AllocPSharedBufferManagerChild(mozilla::ipc::Transport* aTransport,
@@ -610,7 +610,11 @@ public:
 
   virtual bool RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent) override;
 
-  virtual bool RecvTestGraphicsDeviceReset(const uint32_t& aResetReason) override;
+  // Windows specific - set up audio session
+  virtual bool
+  RecvSetAudioSessionData(const nsID& aId,
+                          const nsString& aDisplayName,
+                          const nsString& aIconPath) override;
 
 private:
   virtual void ActorDestroy(ActorDestroyReason why) override;

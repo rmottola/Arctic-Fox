@@ -33,7 +33,7 @@ with Files('jit/**'):
 for gcfile in ['jsgc*', 'devtools/rootAnalysis', 'devtools/gc-ubench', 'devtools/gctrace']:
     with Files(gcfile):
         BUG_COMPONENT = component_gc
-for header in ('GCAPI.h', 'HeapAPI.h', 'RootingAPI.h', 'SliceBudget.h', 'TraceKind.h', 'TracingAPI.h', 'WeakMapPtr.h'):
+for header in ('GCAnnotations.h', 'GCAPI.h', 'HeapAPI.h', 'RootingAPI.h', 'SliceBudget.h', 'TraceKind.h', 'TracingAPI.h', 'WeakMapPtr.h'):
     with Files('../public/' + header):
         BUG_COMPONENT = component_gc
 
@@ -109,9 +109,11 @@ EXPORTS.js += [
     '../public/Conversions.h',
     '../public/Date.h',
     '../public/Debug.h',
+    '../public/GCAnnotations.h',
     '../public/GCAPI.h',
     '../public/GCHashTable.h',
     '../public/GCPolicyAPI.h',
+    '../public/GCVariant.h',
     '../public/GCVector.h',
     '../public/HashTable.h',
     '../public/HeapAPI.h',
@@ -147,13 +149,15 @@ EXPORTS.js += [
 UNIFIED_SOURCES += [
     'asmjs/AsmJS.cpp',
     'asmjs/Wasm.cpp',
+    'asmjs/WasmBinary.cpp',
+    'asmjs/WasmBinaryToText.cpp',
     'asmjs/WasmFrameIterator.cpp',
     'asmjs/WasmGenerator.cpp',
     'asmjs/WasmIonCompile.cpp',
     'asmjs/WasmModule.cpp',
     'asmjs/WasmSignalHandlers.cpp',
     'asmjs/WasmStubs.cpp',
-    'asmjs/WasmText.cpp',
+    'asmjs/WasmTextToBinary.cpp',
     'asmjs/WasmTypes.cpp',
     'builtin/AtomicsObject.cpp',
     'builtin/Eval.cpp',
@@ -555,7 +559,7 @@ if CONFIG['JS_HAS_CTYPES']:
         'ctypes/CTypes.cpp',
         'ctypes/Library.cpp',
     ]
-    if not CONFIG['MOZ_NATIVE_FFI']:
+    if not CONFIG['MOZ_SYSTEM_FFI']:
         LOCAL_INCLUDES += [
             '!ctypes/libffi/include',
         ]
@@ -723,7 +727,7 @@ selfhosted.inputs = [
 ]
 
 if CONFIG['JS_HAS_CTYPES']:
-    if CONFIG['MOZ_NATIVE_FFI']:
+    if CONFIG['MOZ_SYSTEM_FFI']:
         CXXFLAGS += CONFIG['MOZ_FFI_CFLAGS']
     else:
         # Windows needs this to be linked with a static library.

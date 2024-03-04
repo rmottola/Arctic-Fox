@@ -219,18 +219,6 @@
         ]]></getter>
       </property>
 
-      <field name="_outerWindowID">null</field>
-      <property name="outerWindowID"
-                onget="return this._outerWindowID"
-                readonly="true"/>
-
-      <field name="_innerWindowID">null</field>
-      <property name="innerWindowID">
-        <getter><![CDATA[
-          return this._innerWindowID;
-        ]]></getter>
-      </property>
-
       <property name="autoCompletePopup"
                 onget="return document.getElementById(this.getAttribute('autocompletepopup'))"
                 readonly="true"/>
@@ -353,9 +341,10 @@
            * the <browser> element may not be initialized yet.
            */
 
-          let jsm = "resource://gre/modules/RemoteWebNavigation.jsm";
-          let RemoteWebNavigation = Cu.import(jsm, {}).RemoteWebNavigation;
-          this._remoteWebNavigation = new RemoteWebNavigation(this);
+          this._remoteWebNavigation =
+            Cc["@mozilla.org/remote-web-navigation;1"].createInstance(Ci.nsIWebNavigation);
+          this._remoteWebNavigationImpl = this._remoteWebNavigation.wrappedJSObject;
+          this._remoteWebNavigationImpl.swapBrowser(this);
 
           this.messageManager.addMessageListener("Browser:Init", this);
           this.messageManager.addMessageListener("DOMTitleChanged", this);
@@ -375,10 +364,10 @@
           }
 
           if (!this.hasAttribute("disablehistory")) {
-            Services.obs.addObserver(this, "browser:purge-session-history", false)
+            Services.obs.addObserver(this, "browser:purge-session-history", true)
           }
 
-          jsm = "resource://gre/modules/RemoteController.jsm";
+          let jsm = "resource://gre/modules/RemoteController.jsm";
           let RemoteController = Components.utils.import(jsm, {}).RemoteController;
           this._controller = new RemoteController(this);
           this.controllers.appendController(this._controller);
@@ -493,20 +482,6 @@
               break;
             }
 
-            case "DOMFullscreen:RequestExit": {
-              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                                      .getInterface(Ci.nsIDOMWindowUtils);
-              windowUtils.exitFullscreen();
-              break;
-            }
-
-            case "DOMFullscreen:RequestRollback": {
-              let windowUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                                      .getInterface(Ci.nsIDOMWindowUtils);
-              windowUtils.remoteFrameFullscreenReverted();
-              break;
-            }
-
             default:
               // Delegate to browser.xml.
               return this._receiveMessage(aMessage);
@@ -575,8 +550,8 @@
                 throw ex;
               }
             }
-            this.webNavigation.canGoBack = false;
-            this.webNavigation.canGoForward = false;
+            this._remoteWebNavigationImpl.canGoBack = false;
+            this._remoteWebNavigationImpl.canGoForward = false;
           ]]>
         </body>
       </method>

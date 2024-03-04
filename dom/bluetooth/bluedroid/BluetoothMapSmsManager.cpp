@@ -10,7 +10,7 @@
 #include "BluetoothService.h"
 #include "BluetoothSocket.h"
 #include "BluetoothUtils.h"
-#include "BluetoothUuid.h"
+#include "BluetoothUuidHelper.h"
 #include "ObexBase.h"
 
 #include "mozilla/dom/BluetoothMapParametersBinding.h"
@@ -21,7 +21,6 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
-#include "nsAutoPtr.h"
 #include "nsIInputStream.h"
 #include "nsIObserver.h"
 #include "nsIObserverService.h"
@@ -406,14 +405,14 @@ BluetoothMapSmsManager::MasDataHandler(UnixSocketBuffer* aMessage)
 // Virtual function of class SocketConsumer
 void
 BluetoothMapSmsManager::ReceiveSocketData(BluetoothSocket* aSocket,
-                                          nsAutoPtr<UnixSocketBuffer>& aMessage)
+                                          UniquePtr<UnixSocketBuffer>& aMessage)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   if (aSocket == mMnsSocket) {
-    MnsDataHandler(aMessage);
+    MnsDataHandler(aMessage.get());
   } else {
-    MasDataHandler(aMessage);
+    MasDataHandler(aMessage.get());
   }
 }
 
@@ -633,8 +632,8 @@ BluetoothMapSmsManager::ReplyToGetWithHeaderBody(UniquePtr<uint8_t[]> aResponse,
 
     // Read blob data from input stream
     uint32_t numRead = 0;
-    nsAutoArrayPtr<char> buf(new char[remainingPacketSize]);
-    nsresult rv = mDataStream->Read(buf, remainingPacketSize, &numRead);
+    auto buf = MakeUnique<char[]>(remainingPacketSize);
+    nsresult rv = mDataStream->Read(buf.get(), remainingPacketSize, &numRead);
     if (NS_FAILED(rv)) {
       BT_LOGR("Failed to read from input stream. rv=0x%x",
               static_cast<uint32_t>(rv));
@@ -722,16 +721,16 @@ BluetoothMapSmsManager::ReplyToMessagesListing(Blob* aBlob, long aMasId,
   uint8_t len = timestampStr.Length();
 
   // Total length: [NewMessage:3] + [MseTime:var] + [MessageListingSize:4]
-  nsAutoArrayPtr<uint8_t> appParameters(new uint8_t[len + 9]);
+  auto appParameters = MakeUnique<uint8_t[]>(len + 9);
   uint8_t newMessage = aNewMessage ? 1 : 0;
 
-  AppendAppParameter(appParameters,
+  AppendAppParameter(&appParameters[0],
                      3,
                      (uint8_t) Map::AppParametersTagId::NewMessage,
                      &newMessage,
                      sizeof(newMessage));
 
-  AppendAppParameter(appParameters + 3,
+  AppendAppParameter(&appParameters[3],
                      len + 2,
                      (uint8_t) Map::AppParametersTagId::MSETime,
                      str,
@@ -740,7 +739,7 @@ BluetoothMapSmsManager::ReplyToMessagesListing(Blob* aBlob, long aMasId,
   uint8_t msgListingSize[2];
   BigEndian::writeUint16(&msgListingSize[0], aSize);
 
-  AppendAppParameter(appParameters + 5 + len,
+  AppendAppParameter(&appParameters[5 + len],
                      4,
                      (uint8_t) Map::AppParametersTagId::MessagesListingSize,
                      msgListingSize,
@@ -748,7 +747,7 @@ BluetoothMapSmsManager::ReplyToMessagesListing(Blob* aBlob, long aMasId,
 
   index += AppendHeaderAppParameters(&res[index],
                                      mRemoteMaxPacketLength,
-                                     appParameters,
+                                     appParameters.get(),
                                      len + 9);
 
   if (mBodyRequired) {
@@ -844,7 +843,7 @@ BluetoothMapSmsManager::ReplyToSendMessage(
    * with 16 hexadecimal digits.
    */
   int len = aHandleId.Length();
-  nsAutoArrayPtr<uint8_t> handleId(new uint8_t[(len + 1) * 2]);
+  auto handleId = MakeUnique<uint8_t[]>((len + 1) * 2);
 
   for (int i = 0; i < len; i++) {
     BigEndian::writeUint16(&handleId[i * 2], aHandleId[i]);
@@ -854,7 +853,7 @@ BluetoothMapSmsManager::ReplyToSendMessage(
   auto res = MakeUnique<uint8_t[]>(mRemoteMaxPacketLength);
   int index = kObexRespHeaderSize;
   index += AppendHeaderName(&res[index], mRemoteMaxPacketLength - index,
-                            handleId, (len + 1) * 2);
+                            handleId.get(), (len + 1) * 2);
   SendMasObexData(Move(res), ObexResponseCode::Success, index);
 
   return true;
@@ -1392,7 +1391,7 @@ BluetoothMapSmsManager::HandleSmsMmsPushMessage(const ObexHeaderSet& aHeader)
   // Get Body
   uint8_t* bodyPtr = nullptr;
   aHeader.GetBody(&bodyPtr, &mBodySegmentLength);
-  mBodySegment = bodyPtr;
+  mBodySegment.reset(bodyPtr);
 
   RefPtr<BluetoothMapBMessage> bmsg =
     new BluetoothMapBMessage(bodyPtr, mBodySegmentLength);

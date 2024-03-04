@@ -73,9 +73,6 @@ public:
   NS_DECL_NSISERVICEWORKERREGISTRATIONINFO
 
   nsCString mScope;
-  // The scriptURL for the registration. This may be completely different from
-  // the URLs of the following three workers.
-  nsCString mScriptSpec;
 
   nsCOMPtr<nsIPrincipal> mPrincipal;
 
@@ -100,7 +97,7 @@ public:
                                 nsIPrincipal* aPrincipal);
 
   already_AddRefed<ServiceWorkerInfo>
-  Newest()
+  Newest() const
   {
     RefPtr<ServiceWorkerInfo> newest;
     if (mInstallingWorker) {
@@ -141,6 +138,9 @@ public:
 
   void
   PurgeActiveWorker();
+
+  void
+  TryToActivateAsync();
 
   void
   TryToActivate();
@@ -391,7 +391,7 @@ public:
          ServiceWorkerUpdateFinishCallback* aCallback);
 
   void
-  SoftUpdate(const OriginAttributes& aOriginAttributes,
+  SoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
              const nsACString& aScope);
 
   void
@@ -649,10 +649,9 @@ private:
   void
   RemoveRegistrationInternal(ServiceWorkerRegistrationInfo* aRegistration);
 
-  // Removes all service worker registrations that matches the given
-  // mozIApplicationClearPrivateDataParams.
+  // Removes all service worker registrations that matches the given pattern.
   void
-  RemoveAllRegistrations(PrincipalOriginAttributes* aParams);
+  RemoveAllRegistrations(OriginAttributesPattern* aPattern);
 
   RefPtr<ServiceWorkerManagerChild> mActor;
 

@@ -87,7 +87,6 @@ SimpleTest.requestFlakyTimeout("untriaged");
 var steps = [
   function() {
     // Set up
-    SpecialPowers.setAllAppsLaunchable(true);
     SpecialPowers.addPermission("webapps-manage", true, document);
     info("Set up");
     PackagedTestHelper.next();
@@ -155,7 +154,7 @@ var steps = [
                                              PackagedTestHelper.gAppName);
   },
   function() {
-      PackagedTestHelper.setAppVersion(1, PackagedTestHelper.next);
+    PackagedTestHelper.setAppVersion(1, PackagedTestHelper.next);
   },
   function() {
     // Test mini-manifest app name is different from the webapp manifest name.

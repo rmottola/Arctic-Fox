@@ -34,8 +34,7 @@ window.addEventListener("load", function testOnLoad() {
 
 function testInit() {
   gConfig = readConfig();
-  if (gConfig.testRoot == "browser" ||
-      gConfig.testRoot == "webapprtChrome") {
+  if (gConfig.testRoot == "browser") {
     // Make sure to launch the test harness for the first opened window only
     var prefs = Services.prefs;
     if (prefs.prefHasUserValue("testing.browserTestHarness.running"))
@@ -486,6 +485,7 @@ Tester.prototype = {
         this.SimpleTest[m] = this.SimpleTestOriginal[m];
       });
 
+      this.ContentTask.setTestScope(null);
       testScope.destroy();
       this.currentTest.scope = null;
     }
@@ -636,6 +636,8 @@ Tester.prototype = {
       }
       currentTest.addResult(res);
     });
+
+    this.ContentTask.setTestScope(currentScope);
 
     // Allow Assert.jsm methods to be tacked to the current scope.
     this.currentTest.scope.export_assertions = function() {

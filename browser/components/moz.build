@@ -15,6 +15,7 @@ DIRS += [
     'feeds',
     'fuel',
     'migration',
+    'newtab',
     'places',
     'preferences',
     'privatebrowsing',
@@ -22,15 +23,12 @@ DIRS += [
     'sessionstore',
     'shell',
     'selfsupport',
+    'statusbar',
 ]
-
-if CONFIG['MOZ_BROWSER_STATUSBAR']:
-    DIRS += ['statusbar']
 
 DIRS += ['build']
 
 XPIDL_SOURCES += [
-    'nsIAboutNewTabService.idl',
     'nsIBrowserGlue.idl',
     'nsIBrowserHandler.idl',
 ]

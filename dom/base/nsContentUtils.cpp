@@ -117,7 +117,6 @@
 #include "nsIDOMHTMLInputElement.h"
 #include "nsIDOMNode.h"
 #include "nsIDOMNodeList.h"
-#include "nsIDOMScriptObjectFactory.h"
 #include "nsIDOMWindowUtils.h"
 #include "nsIDOMXULCommandEvent.h"
 #include "nsIDragService.h"
@@ -271,7 +270,6 @@ bool nsContentUtils::sEncodeDecodeURLHash = false;
 bool nsContentUtils::sGettersDecodeURLHash = false;
 bool nsContentUtils::sPrivacyResistFingerprinting = false;
 bool nsContentUtils::sSendPerformanceTimingNotifications = false;
-bool nsContentUtils::sSWInterceptionEnabled = false;
 
 uint32_t nsContentUtils::sHandlingInputTimeout = 1000;
 
@@ -565,10 +563,6 @@ nsContentUtils::Init()
 
   Preferences::AddBoolVarCache(&sPrivacyResistFingerprinting,
                                "privacy.resistFingerprinting", false);
-
-  Preferences::AddBoolVarCache(&sSWInterceptionEnabled,
-                               "dom.serviceWorkers.interception.enabled",
-                               false);
 
   Preferences::AddUintVarCache(&sHandlingInputTimeout,
                                "dom.event.handling-user-input-time-limit",
@@ -1760,8 +1754,7 @@ nsContentUtils::ParseLegacyFontSize(const nsAString& aValue)
 bool
 nsContentUtils::IsControlledByServiceWorker(nsIDocument* aDocument)
 {
-  if (!ServiceWorkerInterceptionEnabled() ||
-      nsContentUtils::IsInPrivateBrowsing(aDocument)) {
+  if (nsContentUtils::IsInPrivateBrowsing(aDocument)) {
     return false;
   }
 
@@ -7563,7 +7556,6 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
             // has this data available to it when passed over:
             blobImpl->GetSize(rv);
             blobImpl->GetLastModified(rv);
-            blobImpl->LookupAndCacheIsDirectory();
           } else {
             if (aInSyncMessage) {
               // Can't do anything.

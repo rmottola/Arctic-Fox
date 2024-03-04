@@ -539,7 +539,7 @@ GfxInfo::Init()
     } else if (dllNumericVersion == 0 && dllNumericVersion2 == 0) {
       // Leave it as an asserting error for now, to see if we can find
       // a system that exhibits this kind of a problem internally.
-      gfxCriticalErrorOnce() << "Potential driver version mismatch ignored due to missing DLLs";
+      gfxCriticalErrorOnce() << "Potential driver version mismatch ignored due to missing DLLs " << NS_ConvertUTF16toUTF8(dllVersion).get() << " and " << NS_ConvertUTF16toUTF8(dllVersion2).get();
     }
   }
 
@@ -1090,10 +1090,27 @@ GfxInfo::GetGfxDriverInfo()
       nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
       DRIVER_EQUAL, V(15,200,1006,0));
 
+    /* Bug 1213107: D3D9 crashes with ATI cards on Windows 7. */
+    APPEND_TO_DRIVER_BLOCKLIST_RANGE(DRIVER_OS_WINDOWS_7,
+      (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorATI), GfxDriverInfo::allDevices,
+      nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
+      DRIVER_BETWEEN_INCLUSIVE, V(8,861,0,0), V(8,862,6,5000), "Radeon driver > 8.862.6.5000");
+    APPEND_TO_DRIVER_BLOCKLIST_RANGE(DRIVER_OS_WINDOWS_7,
+      (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorATI), GfxDriverInfo::allDevices,
+      nsIGfxInfo::FEATURE_WEBGL_ANGLE, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
+      DRIVER_BETWEEN_INCLUSIVE, V(8,861,0,0), V(8,862,6,5000), "Radeon driver > 8.862.6.5000");
+
+    /* This may not be needed at all */
     APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_WINDOWS_7,
       (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorIntel), (GfxDeviceFamily*)GfxDriverInfo::GetDeviceFamily(Bug1155608),
       nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
-      DRIVER_LESS_THAN_OR_EQUAL, V(8,15,10,2869));
+      DRIVER_LESS_THAN, V(8,15,10,2869));
+
+    /* Bug 1203199/1092166: DXVA startup crashes on some intel drivers. */
+    APPEND_TO_DRIVER_BLOCKLIST_RANGE(DRIVER_OS_ALL,
+      (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorIntel), GfxDriverInfo::allDevices,
+      nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING, nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION,
+      DRIVER_BETWEEN_INCLUSIVE, V(9,17,10,0), V(9,17,10,2849), "Intel driver > 9.17.10.2849");
 
     APPEND_TO_DRIVER_BLOCKLIST2(DRIVER_OS_ALL,
       (nsAString&)GfxDriverInfo::GetDeviceVendor(VendorNVIDIA), (GfxDeviceFamily*)GfxDriverInfo::GetDeviceFamily(Nvidia8800GTS),
@@ -1259,14 +1276,12 @@ GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj)
     JS_SetProperty(aCx, obj, "blacklisted", val);
   }
 
-  gfx::FeatureStatus d2d = platform->GetD2DStatus();
+  gfx::FeatureStatus d2d = platform->GetD2D1Status();
   if (!InitFeatureObject(aCx, aObj, "d2d", d2d, &obj)) {
     return;
   }
   {
-    const char* version = "1.0";
-    if (platform->GetD2D1Status() == gfx::FeatureStatus::Available)
-      version = "1.1";
+    const char* version = "1.1";
     JS::Rooted<JSString*> str(aCx, JS_NewStringCopyZ(aCx, version));
     JS::Rooted<JS::Value> val(aCx, JS::StringValue(str));
     JS_SetProperty(aCx, obj, "version", val);

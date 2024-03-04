@@ -114,10 +114,14 @@ const backgroundPageThumbsContent = {
           this._startNextCapture();
         }
       }
-      else if (this._state == STATE_LOADING) {
+      else if (this._state == STATE_LOADING &&
+               Components.isSuccessCode(status)) {
         // The requested page has loaded.  Capture it.
         this._state = STATE_CAPTURING;
         this._captureCurrentPage();
+      } else {
+        this._state = STATE_CANCELED;
+        this._loadAboutBlank();
       }
     }
   },
@@ -129,7 +133,7 @@ const backgroundPageThumbsContent = {
 
     let canvasDrawDate = new Date();
 
-    let finalCanvas = PageThumbUtils.createSnapshotThumbnail(content);
+    let finalCanvas = PageThumbUtils.createSnapshotThumbnail(content, null);
     capture.canvasDrawTime = new Date() - canvasDrawDate;
 
     finalCanvas.toBlob(blob => {

@@ -108,6 +108,7 @@
 #include "mozilla/css/ImageLoader.h"
 #include "mozilla/layers/APZCTreeManager.h" // for layers::ZoomToRectBehavior
 #include "mozilla/dom/Promise.h"
+#include "mozilla/CSSStyleSheet.h"
 
 #ifdef XP_WIN
 #undef GetClassName
@@ -3171,7 +3172,7 @@ nsDOMWindowUtils::ExitFullscreen()
   // Although we would not use the old size if we have already exited
   // fullscreen, we still want to cleanup in case we haven't.
   nsSize oldSize = OldWindowSize::GetAndRemove(doc->GetWindow());
-  if (!doc->IsFullScreenDoc()) {
+  if (!doc->GetFullscreenElement()) {
     return NS_OK;
   }
 
@@ -3616,8 +3617,10 @@ nsDOMWindowUtils::GetContentAPZTestData(JSContext* aContext,
 {
   if (nsIWidget* widget = GetWidget()) {
     RefPtr<LayerManager> lm = widget->GetLayerManager();
-    if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
-      ClientLayerManager* clm = static_cast<ClientLayerManager*>(lm.get());
+    if (!lm) {
+      return NS_OK;
+    }
+    if (ClientLayerManager* clm = lm->AsClientLayerManager()) {
       if (!clm->GetAPZTestData().ToJS(aOutContentTestData, aContext)) {
         return NS_ERROR_FAILURE;
       }
@@ -3633,8 +3636,10 @@ nsDOMWindowUtils::GetCompositorAPZTestData(JSContext* aContext,
 {
   if (nsIWidget* widget = GetWidget()) {
     RefPtr<LayerManager> lm = widget->GetLayerManager();
-    if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
-      ClientLayerManager* clm = static_cast<ClientLayerManager*>(lm.get());
+    if (!lm) {
+      return NS_OK;
+    }
+    if (ClientLayerManager* clm = lm->AsClientLayerManager()) {
       APZTestData compositorSideData;
       clm->GetCompositorSideAPZTestData(&compositorSideData);
       if (!compositorSideData.ToJS(aOutCompositorTestData, aContext)) {
@@ -3854,9 +3859,8 @@ nsDOMWindowUtils::SetNextPaintSyncId(int32_t aSyncId)
 {
   if (nsIWidget* widget = GetWidget()) {
     RefPtr<LayerManager> lm = widget->GetLayerManager();
-    if (lm && lm->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
-      ClientLayerManager* clm = static_cast<ClientLayerManager*>(lm.get());
-      clm->SetNextPaintSyncId(aSyncId);
+    if (lm && lm->AsClientLayerManager()) {
+      lm->AsClientLayerManager()->SetNextPaintSyncId(aSyncId);
       return NS_OK;
     }
   }

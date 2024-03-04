@@ -640,17 +640,6 @@ public:
     mRegionToClear = aRegion;
   }
 
-  virtual bool SupportsMixBlendModes(EnumSet<gfx::CompositionOp>& aMixBlendModes)
-  {
-    return false;
-  }
-
-  bool SupportsMixBlendMode(gfx::CompositionOp aMixBlendMode)
-  {
-    EnumSet<gfx::CompositionOp> modes(aMixBlendMode);
-    return SupportsMixBlendModes(modes);
-  }
-
   virtual float RequestProperty(const nsAString& property) { return -1; }
 
   const TimeStamp& GetAnimationReadyTime() const {
@@ -1845,7 +1834,9 @@ protected:
   // CSS pixels of the scrollframe's space).
   float mScrollbarThumbRatio;
   bool mIsScrollbarContainer;
-  DebugOnly<uint32_t> mDebugColorIndex;
+#ifdef DEBUG
+  uint32_t mDebugColorIndex;
+#endif
   // If this layer is used for OMTA, then this counter is used to ensure we
   // stay in sync with the animation manager
   uint64_t mAnimationGeneration;

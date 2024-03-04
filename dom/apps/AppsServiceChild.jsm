@@ -413,6 +413,10 @@ this.DOMApplicationRegistry = {
     return null;
   },
 
+  areAnyAppsInstalled: function() {
+    return AppsUtils.areAnyAppsInstalled(this.webapps);
+  },
+
   getAppInfo: function getAppInfo(aAppId) {
     return AppsUtils.getAppInfo(this.webapps, aAppId);
   },

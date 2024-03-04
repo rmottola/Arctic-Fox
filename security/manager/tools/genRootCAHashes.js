@@ -21,7 +21,7 @@ const CertDb = Components.classes[nsX509CertDB].getService(Ci.nsIX509CertDB);
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
-Cu.import("resource://services-common/utils.js");
+const { CommonUtils } = Cu.import("resource://services-common/utils.js", {});
 
 const FILENAME_OUTPUT = "RootHashes.inc";
 const FILENAME_TRUST_ANCHORS = "KnownRootHashes.json";
@@ -130,7 +130,7 @@ function writeRootHashes(fos) {
       let fpBytes = atob(fp.sha256Fingerprint);
 
       writeString(fos, "  {\n");
-      writeString(fos, "    /* "+fp.label+" */\n");
+      writeString(fos, "    /* " + fp.label + " */\n");
       writeString(fos, "    { " + hexSlice(fpBytes, 0, 16) + ",\n");
       writeString(fos, "      " + hexSlice(fpBytes, 16, 32) + " },\n");
       writeString(fos, "      " + fp.binNumber + " /* Bin Number */\n");
@@ -215,8 +215,9 @@ function insertTrustAnchorsFromDatabase() {
 //  PRIMARY LOGIC
 //
 
-if (arguments.length < 1) {
-  throw "Usage: genRootCAHashes.js <absolute path to current RootHashes.inc>";
+if (arguments.length != 1) {
+  throw new Error("Usage: genRootCAHashes.js " +
+                  "<absolute path to current RootHashes.inc>");
 }
 
 var trustAnchorsFile = FileUtils.getFile("CurWorkD", [FILENAME_TRUST_ANCHORS]);
@@ -238,14 +239,15 @@ writeTrustAnchors(trustAnchorsFile);
 gTrustAnchors.roots.sort(function(a, b) {
   // We need to work from the binary values, not the base64 values.
   let aBin = atob(a.sha256Fingerprint);
-  let bBin = atob(b.sha256Fingerprint)
+  let bBin = atob(b.sha256Fingerprint);
 
-  if (aBin < bBin)
-     return -1;
-  else if (aBin > bBin)
-     return 1;
-   else
-     return 0;
+  if (aBin < bBin) {
+    return -1;
+  }
+  if (aBin > bBin) {
+    return 1;
+  }
+  return 0;
 });
 
 // Write the output file.

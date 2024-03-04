@@ -9,7 +9,7 @@
 
 #include "BluetoothCommon.h"
 #include "mozilla/Endian.h"
-#include "nsAutoPtr.h"
+#include "mozilla/UniquePtr.h"
 #include "nsTArray.h"
 
 BEGIN_BLUETOOTH_NAMESPACE
@@ -144,8 +144,8 @@ public:
     , mDataLength(aDataLength)
     , mData(nullptr)
   {
-    mData = new uint8_t[mDataLength];
-    memcpy(mData, aData, aDataLength);
+    mData.reset(new uint8_t[mDataLength]);
+    memcpy(mData.get(), aData, aDataLength);
   }
 
   ~ObexHeader()
@@ -154,7 +154,7 @@ public:
 
   ObexHeaderId mId;
   int mDataLength;
-  nsAutoArrayPtr<uint8_t> mData;
+  UniquePtr<uint8_t[]> mData;
 };
 
 class ObexHeaderSet
@@ -248,21 +248,6 @@ public:
     }
   }
 
-  void GetAuthChallenge(nsAutoArrayPtr<uint8_t>& aRetData,
-                        int* aRetDataLength) const
-  {
-    *aRetDataLength = 0;
-
-    for (uint8_t i = 0; i < mHeaders.Length(); ++i) {
-      if (mHeaders[i]->mId == ObexHeaderId::AuthChallenge) {
-        aRetData = new uint8_t[mHeaders[i]->mDataLength];
-        memcpy(aRetData, mHeaders[i]->mData, mHeaders[i]->mDataLength);
-        *aRetDataLength = mHeaders[i]->mDataLength;
-        return;
-      }
-    }
-  }
-
   uint32_t GetConnectionId() const
   {
     int length = mHeaders.Length();
@@ -330,7 +315,7 @@ public:
   {
     for (int i = 0, length = mHeaders.Length(); i < length; ++i) {
       if (mHeaders[i]->mId == aId) {
-        return mHeaders[i];
+        return mHeaders[i].get();
       }
     }
 
@@ -348,7 +333,7 @@ public:
   }
 
 private:
-  nsTArray<nsAutoPtr<ObexHeader> > mHeaders;
+  nsTArray<UniquePtr<ObexHeader> > mHeaders;
 };
 
 int AppendHeaderName(uint8_t* aRetBuf, int aBufferSize, const uint8_t* aName,

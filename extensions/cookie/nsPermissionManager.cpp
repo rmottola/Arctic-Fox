@@ -123,10 +123,10 @@ GetPrincipalFromOrigin(const nsACString& aOrigin, nsIPrincipal** aPrincipal)
 
 
 nsresult
-GetPrincipal(nsIURI* aURI, uint32_t aAppId, bool aIsInBrowserElement, nsIPrincipal** aPrincipal)
+GetPrincipal(nsIURI* aURI, uint32_t aAppId, bool aIsInIsolatedMozBrowserElement, nsIPrincipal** aPrincipal)
 {
   // TODO: Bug 1165267 - Use OriginAttributes for nsCookieService
-  mozilla::PrincipalOriginAttributes attrs(aAppId, aIsInBrowserElement);
+  mozilla::PrincipalOriginAttributes attrs(aAppId, aIsInIsolatedMozBrowserElement);
   nsCOMPtr<nsIPrincipal> principal = mozilla::BasePrincipal::CreateCodebasePrincipal(aURI, attrs);
   NS_ENSURE_TRUE(principal, NS_ERROR_FAILURE);
 
@@ -363,7 +363,7 @@ private:
 nsresult
 UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aType,
                              uint32_t aPermission, uint32_t aExpireType, int64_t aExpireTime,
-                             int64_t aModificationTime, uint32_t aAppId, bool aIsInBrowserElement,
+                             int64_t aModificationTime, uint32_t aAppId, bool aIsInIsolatedMozBrowserElement,
                              UpgradeHostToOriginHelper* aHelper)
 {
   if (aHost.EqualsLiteral("<file>")) {
@@ -387,7 +387,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     }
 
     nsCOMPtr<nsIPrincipal> principal;
-    rv = GetPrincipal(uri, aAppId, aIsInBrowserElement, getter_AddRefs(principal));
+    rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsAutoCString origin;
@@ -495,7 +495,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
 
       // We now have a URI which we can make a nsIPrincipal out of
       nsCOMPtr<nsIPrincipal> principal;
-      rv = GetPrincipal(uri, aAppId, aIsInBrowserElement, getter_AddRefs(principal));
+      rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
       if (NS_WARN_IF(NS_FAILED(rv))) continue;
 
       nsAutoCString origin;
@@ -541,7 +541,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     rv = NS_NewURI(getter_AddRefs(uri), NS_LITERAL_CSTRING("http://") + hostSegment);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = GetPrincipal(uri, aAppId, aIsInBrowserElement, getter_AddRefs(principal));
+    rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = principal->GetOrigin(origin);
@@ -554,7 +554,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     rv = NS_NewURI(getter_AddRefs(uri), NS_LITERAL_CSTRING("https://") + hostSegment);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = GetPrincipal(uri, aAppId, aIsInBrowserElement, getter_AddRefs(principal));
+    rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = principal->GetOrigin(origin);
@@ -1773,14 +1773,6 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
 
       // If requested, create the entry in the DB.
       if (aDBOperation == eWriteToDB) {
-        uint32_t appId;
-        rv = aPrincipal->GetAppId(&appId);
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        bool isInBrowserElement;
-        rv = aPrincipal->GetIsInBrowserElement(&isInBrowserElement);
-        NS_ENSURE_SUCCESS(rv, rv);
-
         UpdateDB(eOperationAdding, mStmtInsert, id, origin, aType, aPermission,
                  aExpireType, aExpireTime, aModificationTime);
       }
@@ -2948,4 +2940,3 @@ nsPermissionManager::FetchPermissions() {
   }
   return NS_OK;
 }
-

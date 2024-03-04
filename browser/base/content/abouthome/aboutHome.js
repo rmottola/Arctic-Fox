@@ -345,6 +345,7 @@ function showSnippets()
  */
 function showDefaultSnippets()
 {
+  /* AF - hide snippets
   // Clear eventual contents...
   let snippetsElt = document.getElementById("snippets");
   snippetsElt.innerHTML = "";
@@ -366,6 +367,7 @@ function showDefaultSnippets()
   }
   // Move the default snippet to the snippets element.
   snippetsElt.appendChild(entry);
+  */
 }
 
 function fitToWidth() {

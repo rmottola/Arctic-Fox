@@ -387,7 +387,7 @@ gfxMemorySharedReadLock::GetReadCount()
   return mReadCount;
 }
 
-gfxShmSharedReadLock::gfxShmSharedReadLock(ISurfaceAllocator* aAllocator)
+gfxShmSharedReadLock::gfxShmSharedReadLock(ClientIPCAllocator* aAllocator)
   : mAllocator(aAllocator)
   , mAllocSuccess(false)
 {
@@ -395,7 +395,8 @@ gfxShmSharedReadLock::gfxShmSharedReadLock(ISurfaceAllocator* aAllocator)
   MOZ_ASSERT(mAllocator);
   if (mAllocator) {
 #define MOZ_ALIGN_WORD(x) (((x) + 3) & ~3)
-    if (mAllocator->AllocShmemSection(MOZ_ALIGN_WORD(sizeof(ShmReadLockInfo)), &mShmemSection)) {
+    if (mAllocator->AsLayerForwarder()->GetTileLockAllocator()->AllocShmemSection(
+        MOZ_ALIGN_WORD(sizeof(ShmReadLockInfo)), &mShmemSection)) {
       ShmReadLockInfo* info = GetShmReadLockInfoPtr();
       info->readCount = 1;
       mAllocSuccess = true;
@@ -427,7 +428,13 @@ gfxShmSharedReadLock::ReadUnlock() {
   int32_t readCount = PR_ATOMIC_DECREMENT(&info->readCount);
   MOZ_ASSERT(readCount >= 0);
   if (readCount <= 0) {
-    mAllocator->FreeShmemSection(mShmemSection);
+    auto fwd = mAllocator->AsLayerForwarder();
+    if (fwd) {
+      fwd->GetTileLockAllocator()->DeallocShmemSection(mShmemSection);
+    } else {
+      // we are on the compositor process
+      FixedSizeSmallShmemSectionAllocator::FreeShmemSection(mShmemSection);
+    }
   }
   return readCount;
 }
@@ -569,22 +576,15 @@ TileClient::Dump(std::stringstream& aStream)
 void
 TileClient::Flip()
 {
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-  if (mFrontBuffer && mFrontBuffer->GetIPDLActor() &&
-      mCompositableClient && mCompositableClient->GetIPDLActor()) {
-    // remove old buffer from CompositableHost
-    RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
-    RefPtr<AsyncTransactionTracker> tracker =
-        new RemoveTextureFromCompositableTracker(waiter);
-    // Hold TextureClient until transaction complete.
-    tracker->SetTextureClient(mFrontBuffer);
-    mFrontBuffer->SetRemoveFromCompositableWaiter(waiter);
-    // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
-    mManager->AsShadowForwarder()->RemoveTextureFromCompositableAsync(tracker,
-                                                                      mCompositableClient,
-                                                                      mFrontBuffer);
+  if (mCompositableClient) {
+    if (mFrontBuffer) {
+      mFrontBuffer->RemoveFromCompositable(mCompositableClient);
+    }
+    if (mFrontBufferOnWhite) {
+      mFrontBufferOnWhite->RemoveFromCompositable(mCompositableClient);
+    }
   }
-#endif
+
   RefPtr<TextureClient> frontBuffer = mFrontBuffer;
   RefPtr<TextureClient> frontBufferOnWhite = mFrontBufferOnWhite;
   mFrontBuffer = mBackBuffer;
@@ -667,25 +667,14 @@ TileClient::DiscardFrontBuffer()
 {
   if (mFrontBuffer) {
     MOZ_ASSERT(mFrontLock);
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-    MOZ_ASSERT(!mFrontBufferOnWhite);
-    if (mFrontBuffer->GetIPDLActor() &&
-        mCompositableClient && mCompositableClient->GetIPDLActor()) {
-      // remove old buffer from CompositableHost
-      RefPtr<AsyncTransactionWaiter> waiter = new AsyncTransactionWaiter();
-      RefPtr<AsyncTransactionTracker> tracker =
-          new RemoveTextureFromCompositableTracker(waiter);
-      // Hold TextureClient until transaction complete.
-      tracker->SetTextureClient(mFrontBuffer);
-      mFrontBuffer->SetRemoveFromCompositableWaiter(waiter);
-      // RemoveTextureFromCompositableAsync() expects CompositorChild's presence.
-      mManager->AsShadowForwarder()->RemoveTextureFromCompositableAsync(tracker,
-                                                                        mCompositableClient,
-                                                                        mFrontBuffer);
+
+    if (mCompositableClient) {
+      mFrontBuffer->RemoveFromCompositable(mCompositableClient);
     }
-#endif
+
     mAllocator->ReturnTextureClientDeferred(mFrontBuffer);
     if (mFrontBufferOnWhite) {
+      mFrontBufferOnWhite->RemoveFromCompositable(mCompositableClient);
       mAllocator->ReturnTextureClientDeferred(mFrontBufferOnWhite);
     }
     mFrontLock->ReadUnlock();
@@ -743,7 +732,7 @@ TileClient::GetBackBuffer(const nsIntRegion& aDirtyRegion,
   // Try to re-use the front-buffer if possible
   bool createdTextureClient = false;
   if (mFrontBuffer &&
-      mFrontBuffer->HasInternalBuffer() &&
+      mFrontBuffer->HasIntermediateBuffer() &&
       mFrontLock->GetReadCount() == 1 &&
       !(aMode == SurfaceMode::SURFACE_COMPONENT_ALPHA && !mFrontBufferOnWhite)) {
     // If we had a backbuffer we no longer care about it since we'll
@@ -1380,7 +1369,7 @@ ClientMultiTiledLayerBuffer::ValidateTile(TileClient& aTile,
   // Note, we don't call UpdatedTexture. The Updated function is called manually
   // by the TiledContentHost before composition.
 
-  if (backBuffer->HasInternalBuffer()) {
+  if (backBuffer->HasIntermediateBuffer()) {
     // If our new buffer has an internal buffer, we don't want to keep another
     // TextureClient around unnecessarily, so discard the back-buffer.
     aTile.DiscardBackBuffer();

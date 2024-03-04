@@ -28,8 +28,6 @@ class PropertyProvider;
 struct SelectionDetails;
 class nsTextFragment;
 
-typedef nsFrame nsTextFrameBase;
-
 class nsDisplayTextGeometry;
 class nsDisplayText;
 
@@ -39,12 +37,14 @@ public:
   static void Shutdown();
 };
 
-class nsTextFrame : public nsTextFrameBase {
+class nsTextFrame : public nsFrame {
+  typedef mozilla::LayoutDeviceRect LayoutDeviceRect;
   typedef mozilla::TextRangeStyle TextRangeStyle;
   typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef mozilla::gfx::Point Point;
   typedef mozilla::gfx::Rect Rect;
   typedef mozilla::gfx::Size Size;
+  typedef gfxTextRun::Range Range;
 
 public:
   NS_DECL_QUERYFRAME_TARGET(nsTextFrame)
@@ -55,7 +55,7 @@ public:
   friend class nsDisplayText;
 
   explicit nsTextFrame(nsStyleContext* aContext)
-    : nsTextFrameBase(aContext)
+    : nsFrame(aContext)
   {
     NS_ASSERTION(mContentOffset == 0, "Bogus content offset");
   }
@@ -399,12 +399,37 @@ public:
     virtual void NotifySelectionDecorationLinePathEmitted() { }
   };
 
+  struct DrawTextRunParams
+  {
+    gfxContext* context;
+    PropertyProvider* provider = nullptr;
+    gfxFloat* advanceWidth = nullptr;
+    gfxTextContextPaint* contextPaint = nullptr;
+    DrawPathCallbacks* callbacks = nullptr;
+    nscolor textColor = NS_RGBA(0, 0, 0, 0);
+    bool drawSoftHyphen = false;
+    explicit DrawTextRunParams(gfxContext* aContext)
+      : context(aContext) {}
+  };
+
+  struct DrawTextParams : DrawTextRunParams
+  {
+    gfxPoint framePt;
+    LayoutDeviceRect dirtyRect;
+    const nsTextPaintStyle* textStyle = nullptr;
+    const nsCharClipDisplayItem::ClipEdges* clipEdges = nullptr;
+    const nscolor* decorationOverrideColor = nullptr;
+    explicit DrawTextParams(gfxContext* aContext)
+      : DrawTextRunParams(aContext) {}
+  };
+
   // Primary frame paint method called from nsDisplayText.  Can also be used
   // to generate paths rather than paint the frame's text by passing a callback
   // object.  The private DrawText() is what applies the text to a graphics
   // context.
   void PaintText(nsRenderingContext* aRenderingContext, nsPoint aPt,
-                 const nsRect& aDirtyRect, const nsCharClipDisplayItem& aItem,
+                 const LayoutDeviceRect& aDirtyRect,
+                 const nsCharClipDisplayItem& aItem,
                  gfxTextContextPaint* aContextPaint = nullptr,
                  DrawPathCallbacks* aCallbacks = nullptr,
                  float aOpacity = 1.0f);
@@ -414,10 +439,9 @@ public:
   bool PaintTextWithSelection(gfxContext* aCtx,
                               const gfxPoint& aFramePt,
                               const gfxPoint& aTextBaselinePt,
-                              const gfxRect& aDirtyRect,
+                              const LayoutDeviceRect& aDirtyRect,
                               PropertyProvider& aProvider,
-                              uint32_t aContentOffset,
-                              uint32_t aContentLength,
+                              Range aRange,
                               nsTextPaintStyle& aTextPaintStyle,
                               const nsCharClipDisplayItem::ClipEdges& aClipEdges,
                               gfxTextContextPaint* aContextPaint,
@@ -430,10 +454,9 @@ public:
   bool PaintTextWithSelectionColors(gfxContext* aCtx,
                                     const gfxPoint& aFramePt,
                                     const gfxPoint& aTextBaselinePt,
-                                    const gfxRect& aDirtyRect,
+                                    const LayoutDeviceRect& aDirtyRect,
                                     PropertyProvider& aProvider,
-                                    uint32_t aContentOffset,
-                                    uint32_t aContentLength,
+                                    Range aContentRange,
                                     nsTextPaintStyle& aTextPaintStyle,
                                     SelectionDetails* aDetails,
                                     SelectionType* aAllTypes,
@@ -443,10 +466,9 @@ public:
   void PaintTextSelectionDecorations(gfxContext* aCtx,
                                      const gfxPoint& aFramePt,
                                      const gfxPoint& aTextBaselinePt,
-                                     const gfxRect& aDirtyRect,
+                                     const LayoutDeviceRect& aDirtyRect,
                                      PropertyProvider& aProvider,
-                                     uint32_t aContentOffset,
-                                     uint32_t aContentLength,
+                                     Range aContentRange,
                                      nsTextPaintStyle& aTextPaintStyle,
                                      SelectionDetails* aDetails,
                                      SelectionType aSelectionType,
@@ -455,9 +477,9 @@ public:
   void DrawEmphasisMarks(gfxContext* aContext,
                          mozilla::WritingMode aWM,
                          const gfxPoint& aTextBaselinePt,
-                         uint32_t aOffset, uint32_t aLength,
+                         Range aRange,
                          const nscolor* aDecorationOverrideColor,
-                         PropertyProvider& aProvider);
+                         PropertyProvider* aProvider);
 
   virtual nscolor GetCaretColorAt(int32_t aOffset) override;
 
@@ -608,11 +630,10 @@ protected:
   nsRect UpdateTextEmphasis(mozilla::WritingMode aWM,
                             PropertyProvider& aProvider);
 
-  void PaintOneShadow(uint32_t aOffset,
-                      uint32_t aLength,
+  void PaintOneShadow(Range aRange,
                       nsCSSShadowItem* aShadowDetails,
                       PropertyProvider* aProvider,
-                      const nsRect& aDirtyRect,
+                      const LayoutDeviceRect& aDirtyRect,
                       const gfxPoint& aFramePt,
                       const gfxPoint& aTextBaselinePt,
                       gfxContext* aCtx,
@@ -623,8 +644,8 @@ protected:
                       uint32_t aBlurFlags);
 
   void PaintShadows(nsCSSShadowArray* aShadow,
-                    uint32_t aOffset, uint32_t aLength,
-                    const nsRect& aDirtyRect,
+                    Range aRange,
+                    const LayoutDeviceRect& aDirtyRect,
                     const gfxPoint& aFramePt,
                     const gfxPoint& aTextBaselinePt,
                     nscoord aLeftEdgeOffset,
@@ -707,49 +728,15 @@ protected:
                           TextDecorationColorResolution aColorResolution,
                           TextDecorations& aDecorations);
 
-  void DrawTextRun(gfxContext* const aCtx,
-                   const gfxPoint& aTextBaselinePt,
-                   uint32_t aOffset,
-                   uint32_t aLength,
-                   PropertyProvider& aProvider,
-                   nscolor aTextColor,
-                   gfxFloat& aAdvanceWidth,
-                   bool aDrawSoftHyphen,
-                   gfxTextContextPaint* aContextPaint,
-                   DrawPathCallbacks* aCallbacks);
+  void DrawTextRun(Range aRange, const gfxPoint& aTextBaselinePt,
+                   const DrawTextRunParams& aParams);
 
-  void DrawTextRunAndDecorations(gfxContext* const aCtx,
-                                 const gfxRect& aDirtyRect,
-                                 const gfxPoint& aFramePt,
-                                 const gfxPoint& aTextBaselinePt,
-                                 uint32_t aOffset,
-                                 uint32_t aLength,
-                                 PropertyProvider& aProvider,
-                                 const nsTextPaintStyle& aTextStyle,
-                                 nscolor aTextColor,
-                             const nsCharClipDisplayItem::ClipEdges& aClipEdges,
-                                 gfxFloat& aAdvanceWidth,
-                                 bool aDrawSoftHyphen,
-                                 const TextDecorations& aDecorations,
-                                 const nscolor* const aDecorationOverrideColor,
-                                 gfxTextContextPaint* aContextPaint,
-                                 DrawPathCallbacks* aCallbacks);
+  void DrawTextRunAndDecorations(Range aRange, const gfxPoint& aTextBaselinePt,
+                                 const DrawTextParams& aParams,
+                                 const TextDecorations& aDecorations);
 
-  void DrawText(gfxContext* const aCtx,
-                const gfxRect& aDirtyRect,
-                const gfxPoint& aFramePt,
-                const gfxPoint& aTextBaselinePt,
-                uint32_t aOffset,
-                uint32_t aLength,
-                PropertyProvider& aProvider,
-                const nsTextPaintStyle& aTextStyle,
-                nscolor aTextColor,
-                const nsCharClipDisplayItem::ClipEdges& aClipEdges,
-                gfxFloat& aAdvanceWidth,
-                bool aDrawSoftHyphen,
-                const nscolor* const aDecorationOverrideColor = nullptr,
-                gfxTextContextPaint* aContextPaint = nullptr,
-                DrawPathCallbacks* aCallbacks = nullptr);
+  void DrawText(Range aRange, const gfxPoint& aTextBaselinePt,
+                const DrawTextParams& aParams);
 
   // Set non empty rect to aRect, it should be overflow rect or frame rect.
   // If the result rect is larger than the given rect, this returns true.
@@ -760,7 +747,7 @@ protected:
    * Utility methods to paint selection.
    */
   void DrawSelectionDecorations(gfxContext* aContext,
-                                const gfxRect& aDirtyRect,
+                                const LayoutDeviceRect& aDirtyRect,
                                 SelectionType aType,
                                 nsTextPaintStyle& aTextPaintStyle,
                                 const TextRangeStyle &aRangeStyle,
@@ -779,7 +766,7 @@ protected:
     eSelectionDecoration
   };
   void PaintDecorationLine(gfxContext* const aCtx,
-                           const gfxRect& aDirtyRect,
+                           const LayoutDeviceRect& aDirtyRect,
                            nscolor aColor,
                            const nscolor* aOverrideColor,
                            const Point& aPt,

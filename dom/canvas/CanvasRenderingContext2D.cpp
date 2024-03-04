@@ -121,6 +121,8 @@
 #include "nsFontMetrics.h"
 #include "Units.h"
 #include "CanvasUtils.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 
 #undef free // apparently defined by some windows header, clashing with a free()
             // method in SkTypes.h
@@ -795,10 +797,16 @@ CanvasDrawObserver::FrameEnd()
     // If we don't have enough data, don't bother changing...
     if (mGPUPreferredCalls > mMinCallsBeforeDecision ||
         mSoftwarePreferredCalls > mMinCallsBeforeDecision) {
+      CanvasRenderingContext2D::RenderingMode switchToMode;
       if (mGPUPreferredCalls >= mSoftwarePreferredCalls) {
-        mCanvasContext->SwitchRenderingMode(CanvasRenderingContext2D::RenderingMode::OpenGLBackendMode);
+        switchToMode = CanvasRenderingContext2D::RenderingMode::OpenGLBackendMode;
       } else {
-        mCanvasContext->SwitchRenderingMode(CanvasRenderingContext2D::RenderingMode::SoftwareBackendMode);
+        switchToMode = CanvasRenderingContext2D::RenderingMode::SoftwareBackendMode;
+      }
+      if (switchToMode != mCanvasContext->mRenderingMode) {
+        if (!mCanvasContext->SwitchRenderingMode(switchToMode)) {
+          gfxDebug() << "Canvas acceleration failed mode switch to " << switchToMode;
+        }
       }
     }
 
@@ -968,12 +976,10 @@ CanvasRenderingContext2D::CanvasRenderingContext2D()
   sNumLivingContexts++;
 
   // The default is to use OpenGL mode
-  if (!gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas()) {
-    mRenderingMode = RenderingMode::SoftwareBackendMode;
-  }
-
-  if (gfxPlatform::GetPlatform()->HaveChoiceOfHWAndSWCanvas()) {
+  if (gfxPlatform::GetPlatform()->UseAcceleratedCanvas()) {
     mDrawObserver = new CanvasDrawObserver(this);
+  } else {
+    mRenderingMode = RenderingMode::SoftwareBackendMode;
   }
 }
 
@@ -992,9 +998,10 @@ CanvasRenderingContext2D::~CanvasRenderingContext2D()
   }
 #ifdef USE_SKIA_GPU
   if (mVideoTexture) {
-    MOZ_ASSERT(gfxPlatform::GetPlatform()->GetSkiaGLGlue(), "null SkiaGLGlue");
-    gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->MakeCurrent();
-    gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->fDeleteTextures(1, &mVideoTexture);
+    SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
+    MOZ_ASSERT(glue);
+    glue->GetGLContext()->MakeCurrent();
+    glue->GetGLContext()->fDeleteTextures(1, &mVideoTexture);
   }
 #endif
 
@@ -1208,8 +1215,7 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
 #ifdef USE_SKIA_GPU
   // Do not attempt to switch into GL mode if the platform doesn't allow it.
   if ((aRenderingMode == RenderingMode::OpenGLBackendMode) &&
-      (!gfxPlatform::GetPlatform()->HaveChoiceOfHWAndSWCanvas() ||
-       !gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas())) {
+      !gfxPlatform::GetPlatform()->UseAcceleratedCanvas()) {
       return false;
   }
 
@@ -1416,7 +1422,7 @@ CanvasRenderingContext2D::EnsureTarget(RenderingMode aRenderingMode)
 
     if (layerManager) {
       if (mode == RenderingMode::OpenGLBackendMode &&
-          gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas() &&
+          gfxPlatform::GetPlatform()->UseAcceleratedCanvas() &&
           CheckSizeForSkiaGL(size)) {
         DemoteOldestContextIfNecessary();
         mBufferProvider = nullptr;
@@ -2213,6 +2219,16 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* aPresShell,
   }
 
   // otherwise inherit from default (10px sans-serif)
+
+  nsStyleSet* styleSet = aPresShell->StyleSet()->GetAsGecko();
+  if (!styleSet) {
+    // XXXheycam ServoStyleSets do not support resolving style from a list of
+    // rules yet.
+    NS_ERROR("stylo: cannot resolve style for canvas from a ServoStyleSet yet");
+    aError.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
   bool changed;
   RefPtr<css::Declaration> parentRule =
     CreateFontDeclaration(NS_LITERAL_STRING("10px sans-serif"),
@@ -2221,7 +2237,7 @@ GetFontParentStyleContext(Element* aElement, nsIPresShell* aPresShell,
   nsTArray<nsCOMPtr<nsIStyleRule>> parentRules;
   parentRules.AppendElement(parentRule);
   RefPtr<nsStyleContext> result =
-    aPresShell->StyleSet()->ResolveStyleForRules(nullptr, parentRules);
+    styleSet->ResolveStyleForRules(nullptr, parentRules);
 
   if (!result) {
     aError.Throw(NS_ERROR_FAILURE);
@@ -2248,6 +2264,15 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
                     nsAString& aOutUsedFont,
                     ErrorResult& aError)
 {
+  nsStyleSet* styleSet = aPresShell->StyleSet()->GetAsGecko();
+  if (!styleSet) {
+    // XXXheycam ServoStyleSets do not support resolving style from a list of
+    // rules yet.
+    NS_ERROR("stylo: cannot resolve style for canvas from a ServoStyleSet yet");
+    aError.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
   bool fontParsedSuccessfully = false;
   RefPtr<css::Declaration> decl =
     CreateFontDeclaration(aFont, aPresShell->GetDocument(),
@@ -2287,7 +2312,6 @@ GetFontStyleContext(Element* aElement, const nsAString& aFont,
   // add a rule to prevent text zoom from affecting the style
   rules.AppendElement(new nsDisableTextZoomStyleRule);
 
-  nsStyleSet* styleSet = aPresShell->StyleSet();
   RefPtr<nsStyleContext> sc =
     styleSet->ResolveStyleForRules(parentContext, rules);
 
@@ -2317,6 +2341,15 @@ ResolveStyleForFilter(const nsAString& aFilterString,
                       nsStyleContext* aParentContext,
                       ErrorResult& aError)
 {
+  nsStyleSet* styleSet = aPresShell->StyleSet()->GetAsGecko();
+  if (!styleSet) {
+    // XXXheycam ServoStyleSets do not support resolving style from a list of
+    // rules yet.
+    NS_ERROR("stylo: cannot resolve style for canvas from a ServoStyleSet yet");
+    aError.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
   nsIDocument* document = aPresShell->GetDocument();
   bool filterChanged = false;
   RefPtr<css::Declaration> decl =
@@ -2337,7 +2370,7 @@ ResolveStyleForFilter(const nsAString& aFilterString,
   rules.AppendElement(decl);
 
   RefPtr<nsStyleContext> sc =
-    aPresShell->StyleSet()->ResolveStyleForRules(aParentContext, rules);
+    styleSet->ResolveStyleForRules(aParentContext, rules);
 
   return sc.forget();
 }
@@ -2441,12 +2474,12 @@ public:
 
   virtual float GetExLength() const override
   {
-    gfxTextPerfMetrics* tp = mPresContext->GetTextPerfMetrics();
-    RefPtr<nsFontMetrics> fontMetrics;
     nsDeviceContext* dc = mPresContext->DeviceContext();
-    dc->GetMetricsFor(mFont, mFontLanguage, mExplicitLanguage,
-                      gfxFont::eHorizontal, nullptr, tp,
-                      *getter_AddRefs(fontMetrics));
+    nsFontMetrics::Params params;
+    params.language = mFontLanguage;
+    params.explicitLanguage = mExplicitLanguage;
+    params.textPerf = mPresContext->GetTextPerfMetrics();
+    RefPtr<nsFontMetrics> fontMetrics = dc->GetMetricsFor(mFont, params);
     return NSAppUnitsToFloatPixels(fontMetrics->XHeight(),
                                    nsPresContext::AppUnitsPerCSSPixel());
   }
@@ -2531,6 +2564,8 @@ CanvasRenderingContext2D::ClearRect(double aX, double aY, double aW,
   if (!ValidateRect(aX, aY, aW, aH, false)) {
     return;
   }
+
+  EnsureTarget();
 
   mTarget->ClearRect(gfx::Rect(aX, aY, aW, aH));
 
@@ -3201,14 +3236,13 @@ CanvasRenderingContext2D::SetFontInternal(const nsAString& aFont,
   resizedFont.size =
     (fontStyle->mSize * c->AppUnitsPerDevPixel()) / c->AppUnitsPerCSSPixel();
 
-  RefPtr<nsFontMetrics> metrics;
-  c->DeviceContext()->GetMetricsFor(resizedFont,
-                                    fontStyle->mLanguage,
-                                    fontStyle->mExplicitLanguage,
-                                    gfxFont::eHorizontal,
-                                    c->GetUserFontSet(),
-                                    c->GetTextPerfMetrics(),
-                                    *getter_AddRefs(metrics));
+  nsFontMetrics::Params params;
+  params.language = fontStyle->mLanguage;
+  params.explicitLanguage = fontStyle->mExplicitLanguage;
+  params.userFontSet = c->GetUserFontSet();
+  params.textPerf = c->GetTextPerfMetrics();
+  RefPtr<nsFontMetrics> metrics =
+    c->DeviceContext()->GetMetricsFor(resizedFont, params);
 
   gfxFontGroup* newFontGroup = metrics->GetThebesFontGroup();
   CurrentState().fontGroup = newFontGroup;
@@ -3487,13 +3521,9 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
 
   virtual nscoord GetWidth()
   {
-    gfxTextRun::Metrics textRunMetrics = mTextRun->MeasureText(0,
-                                                               mTextRun->GetLength(),
-                                                               mDoMeasureBoundingBox ?
-                                                                 gfxFont::TIGHT_INK_EXTENTS :
-                                                                 gfxFont::LOOSE_INK_EXTENTS,
-                                                               mDrawTarget,
-                                                               nullptr);
+    gfxTextRun::Metrics textRunMetrics = mTextRun->MeasureText(
+        mDoMeasureBoundingBox ? gfxFont::TIGHT_INK_EXTENTS
+                              : gfxFont::LOOSE_INK_EXTENTS, mDrawTarget);
 
     // this only measures the height; the total width is gotten from the
     // the return value of ProcessText.
@@ -3523,13 +3553,10 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
       // glyph string on OS X and DWrite where textrun widths may
       // involve fractional pixels.
       gfxTextRun::Metrics textRunMetrics =
-        mTextRun->MeasureText(0,
-                              mTextRun->GetLength(),
-                              mDoMeasureBoundingBox ?
-                                  gfxFont::TIGHT_INK_EXTENTS :
-                                  gfxFont::LOOSE_INK_EXTENTS,
-                              mDrawTarget,
-                              nullptr);
+        mTextRun->MeasureText(mDoMeasureBoundingBox ?
+                                gfxFont::TIGHT_INK_EXTENTS :
+                                gfxFont::LOOSE_INK_EXTENTS,
+                              mDrawTarget);
       inlineCoord += textRunMetrics.mAdvanceWidth;
       // old code was:
       //   point.x += width * mAppUnitsPerDevPixel;
@@ -4392,8 +4419,8 @@ ClipImageDimension(double& aSourceCoord, double& aSourceSize, int32_t aImageSize
 
 // drawImage(in HTMLImageElement image, in float dx, in float dy);
 //   -- render image from 0,0 at dx,dy top-left coords
-// drawImage(in HTMLImageElement image, in float dx, in float dy, in float sw, in float sh);
-//   -- render image from 0,0 at dx,dy top-left coords clipping it to sw,sh
+// drawImage(in HTMLImageElement image, in float dx, in float dy, in float dw, in float dh);
+//   -- render image from 0,0 at dx,dy top-left coords clipping it to dw,dh
 // drawImage(in HTMLImageElement image, in float sx, in float sy, in float sw, in float sh, in float dx, in float dy, in float dw, in float dh);
 //   -- render the region defined by (sx,sy,sw,wh) in image-local space into the region (dx,dy,dw,dh) on the canvas
 
@@ -4416,9 +4443,11 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
   MOZ_ASSERT(aOptional_argc == 0 || aOptional_argc == 2 || aOptional_argc == 6);
 
+  if (!ValidateRect(aDx, aDy, aDw, aDh, true)) {
+    return;
+  }
   if (aOptional_argc == 6) {
-    if (!ValidateRect(aSx, aSy, aSw, aSh, true) ||
-        !ValidateRect(aSx, aDy, aDw, aDh, true)) {
+    if (!ValidateRect(aSx, aSy, aSw, aSh, true)) {
       return;
     }
   }
@@ -4467,8 +4496,9 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       mIsSkiaGL &&
       !srcSurf &&
       aImage.IsHTMLVideoElement() &&
-      gfxPlatform::GetPlatform()->GetSkiaGLGlue()) {
+      gfxPlatform::GetPlatform()->UseAcceleratedCanvas()) {
     mozilla::gl::GLContext* gl = gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext();
+    MOZ_ASSERT(gl);
 
     HTMLVideoElement* video = &aImage.GetAsHTMLVideoElement();
     if (!video) {
@@ -4925,8 +4955,15 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& aWindow, double aX,
 
   nsCOMPtr<nsIPresShell> shell = presContext->PresShell();
   Unused << shell->RenderDocument(r, renderDocFlags, backgroundColor, thebes);
+  // If this canvas was contained in the drawn window, the pre-transaction callback
+  // may have returned its DT. If so, we must reacquire it here.
+  EnsureTarget();
   if (drawDT) {
     RefPtr<SourceSurface> snapshot = drawDT->Snapshot();
+    if (NS_WARN_IF(!snapshot)) {
+      aError.Throw(NS_ERROR_FAILURE);
+      return;
+    }
     RefPtr<DataSourceSurface> data = snapshot->GetDataSurface();
 
     DataSourceSurface::MappedSurface rawData;
@@ -5341,7 +5378,7 @@ void
 CanvasRenderingContext2D::PutImageData(ImageData& aImageData, double aDx,
                                        double aDy, ErrorResult& aError)
 {
-  dom::Uint8ClampedArray arr;
+  RootedTypedArray<Uint8ClampedArray> arr(nsContentUtils::RootingCxForThread());
   DebugOnly<bool> inited = arr.Init(aImageData.GetDataObject());
   MOZ_ASSERT(inited);
 
@@ -5357,7 +5394,7 @@ CanvasRenderingContext2D::PutImageData(ImageData& aImageData, double aDx,
                                        double aDirtyHeight,
                                        ErrorResult& aError)
 {
-  dom::Uint8ClampedArray arr;
+  RootedTypedArray<Uint8ClampedArray> arr(nsContentUtils::RootingCxForThread());
   DebugOnly<bool> inited = arr.Init(aImageData.GetDataObject());
   MOZ_ASSERT(inited);
 
@@ -5631,7 +5668,7 @@ CanvasRenderingContext2D::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
     CanvasLayer::Data data;
 
     GLuint skiaGLTex = SkiaGLTex();
-    if (skiaGLTex) {
+    if (mIsSkiaGL && skiaGLTex) {
       SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
       MOZ_ASSERT(glue);
 
@@ -5685,7 +5722,7 @@ CanvasRenderingContext2D::GetCanvasLayer(nsDisplayListBuilder* aBuilder,
           CanvasRenderingContext2DUserData::PreTransactionCallback, userData);
 
   GLuint skiaGLTex = SkiaGLTex();
-  if (skiaGLTex) {
+  if (mIsSkiaGL && skiaGLTex) {
     SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
     MOZ_ASSERT(glue);
 

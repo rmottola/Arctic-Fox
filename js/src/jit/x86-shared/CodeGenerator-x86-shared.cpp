@@ -301,6 +301,47 @@ CodeGeneratorX86Shared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
 }
 
 void
+CodeGeneratorX86Shared::visitAsmSelect(LAsmSelect* ins)
+{
+    MIRType mirType = ins->mir()->type();
+
+    Register cond = ToRegister(ins->condExpr());
+    Operand falseExpr = ToOperand(ins->falseExpr());
+
+    masm.test32(cond, cond);
+
+    if (mirType == MIRType_Int32) {
+        Register out = ToRegister(ins->output());
+        MOZ_ASSERT(ToRegister(ins->trueExpr()) == out, "true expr input is reused for output");
+        masm.cmovz(falseExpr, out);
+        return;
+    }
+
+    FloatRegister out = ToFloatRegister(ins->output());
+    MOZ_ASSERT(ToFloatRegister(ins->trueExpr()) == out, "true expr input is reused for output");
+
+    Label done;
+    masm.j(Assembler::NonZero, &done);
+
+    if (mirType == MIRType_Float32) {
+        if (falseExpr.kind() == Operand::FPREG)
+            masm.moveFloat32(ToFloatRegister(ins->falseExpr()), out);
+        else
+            masm.loadFloat32(falseExpr, out);
+    } else if (mirType == MIRType_Double) {
+        if (falseExpr.kind() == Operand::FPREG)
+            masm.moveDouble(ToFloatRegister(ins->falseExpr()), out);
+        else
+            masm.loadDouble(falseExpr, out);
+    } else {
+        MOZ_CRASH("unhandled type in visitAsmSelect!");
+    }
+
+    masm.bind(&done);
+    return;
+}
+
+void
 CodeGeneratorX86Shared::visitOutOfLineLoadTypedArrayOutOfBounds(OutOfLineLoadTypedArrayOutOfBounds* ool)
 {
     switch (ool->viewType()) {
@@ -722,6 +763,58 @@ CodeGeneratorX86Shared::visitClzI(LClzI* ins)
     masm.bsr(input, output);
     masm.xor32(Imm32(0x1F), output);
     masm.bind(&done);
+}
+
+void
+CodeGeneratorX86Shared::visitCtzI(LCtzI* ins)
+{
+    Register input = ToRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    // bsf is undefined on 0
+    Label done, nonzero;
+    if (!ins->mir()->operandIsNeverZero()) {
+        masm.test32(input, input);
+        masm.j(Assembler::NonZero, &nonzero);
+        masm.move32(Imm32(32), output);
+        masm.jump(&done);
+    }
+
+    masm.bind(&nonzero);
+    masm.bsf(input, output);
+    masm.bind(&done);
+}
+
+void
+CodeGeneratorX86Shared::visitPopcntI(LPopcntI* ins)
+{
+    Register input = ToRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    if (AssemblerX86Shared::HasPOPCNT()) {
+        masm.popcnt(input, output);
+        return;
+    }
+
+    // Equivalent to mozilla::CountPopulation32()
+    Register tmp = ToRegister(ins->temp());
+
+    masm.movl(input, output);
+    masm.movl(input, tmp);
+    masm.shrl(Imm32(1), output);
+    masm.andl(Imm32(0x55555555), output);
+    masm.subl(output, tmp);
+    masm.movl(tmp, output);
+    masm.andl(Imm32(0x33333333), output);
+    masm.shrl(Imm32(2), tmp);
+    masm.andl(Imm32(0x33333333), tmp);
+    masm.addl(output, tmp);
+    masm.movl(tmp, output);
+    masm.shrl(Imm32(4), output);
+    masm.addl(tmp, output);
+    masm.andl(Imm32(0xF0F0F0F), output);
+    masm.imull(Imm32(0x1010101), output, output);
+    masm.shrl(Imm32(24), output);
 }
 
 void

@@ -12,9 +12,12 @@
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/PromiseWorkerProxy.h"
 #include "mozilla/UniquePtr.h"
+#include "nsContentUtils.h"
 #include "nsGlobalWindow.h"
 #include "WorkerPrivate.h"
+#include "WorkerScope.h"
 
+using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::dom::workers;
 
@@ -63,7 +66,7 @@ public:
     }
 
     // Release the reference on the worker thread.
-    mPromiseProxy->CleanUp(aCx);
+    mPromiseProxy->CleanUp();
 
     return true;
   }
@@ -118,9 +121,7 @@ private:
       new ResolveOrRejectPromiseRunnable(mPromiseProxy->GetWorkerPrivate(),
                                          mPromiseProxy, Move(aClientInfo));
 
-    AutoJSAPI jsapi;
-    jsapi.Init();
-    resolveRunnable->Dispatch(jsapi.cx());
+    resolveRunnable->Dispatch();
   }
 };
 

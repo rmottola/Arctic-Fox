@@ -610,3 +610,4 @@ load details-display-none-summary-2.html
 load details-display-none-summary-3.html
 load 1304441.html
 pref(dom.details_element.enabled,true) load summary-position-out-of-flow.html
+asserts(4) load 1225005.html # bug 682647 and bug 448083

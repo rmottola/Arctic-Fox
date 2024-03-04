@@ -642,6 +642,12 @@ protected:
   bool                   mMayHaveMouseEnterLeaveEventListener;
   bool                   mMayHavePointerEnterLeaveEventListener;
 
+  // Used to detect whether we have called FreeInnerObjects() (e.g. to ensure
+  // that a call to ResumeTimeouts() after FreeInnerObjects() does nothing).
+  // This member is only used by inner windows.
+  bool                   mInnerObjectsFreed;
+
+
   // This variable is used on both inner and outer windows (and they
   // should match).
   bool                   mIsModalContentWindow;
@@ -791,6 +797,13 @@ public:
     mMayHavePointerEnterLeaveEventListener = true;
   }
 
+  /**
+   * Check whether this has had inner objects freed.
+   */
+  bool InnerObjectsFreed() const
+  {
+    return mInnerObjectsFreed;
+  }
 
 protected:
   void CreatePerformanceObjectIfNeeded();

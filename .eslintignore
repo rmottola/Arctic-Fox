@@ -45,7 +45,6 @@ testing/**
 tools/**
 uriloader/**
 view/**
-webapprt/**
 widget/**
 xpcom/**
 xpfe/**
@@ -66,7 +65,6 @@ browser/base/content/newtab/**
 browser/components/customizableui/**
 browser/components/downloads/**
 browser/components/feeds/**
-browser/components/migration/**
 browser/components/*.js
 browser/components/pocket/**
 browser/components/preferences/**
@@ -87,7 +85,6 @@ browser/extensions/loop/**
 
 # devtools/ exclusions
 devtools/*.js
-devtools/client/aboutdebugging/**
 devtools/client/animationinspector/**
 devtools/client/canvasdebugger/**
 devtools/client/commandline/**
@@ -99,7 +96,7 @@ devtools/client/framework/**
 devtools/client/inspector/computed/**
 devtools/client/inspector/fonts/**
 devtools/client/inspector/layout/**
-devtools/client/inspector/markup/**
+devtools/client/inspector/markup/test/**
 devtools/client/inspector/rules/**
 devtools/client/inspector/shared/test/**
 devtools/client/inspector/test/**
@@ -116,7 +113,6 @@ devtools/client/shadereditor/**
 devtools/client/shared/**
 devtools/client/sourceeditor/**
 devtools/client/storage/**
-devtools/client/styleeditor/**
 devtools/client/tilt/**
 devtools/client/webaudioeditor/**
 devtools/client/webconsole/**
@@ -192,7 +188,6 @@ toolkit/components/passwordmgr/**
 toolkit/mozapps/extensions/**
 
 # Uses preprocessing
-toolkit/content/contentAreaUtils.js
 toolkit/content/widgets/videocontrols.xml
 toolkit/components/jsdownloads/src/DownloadIntegration.jsm
 toolkit/components/search/nsSearchService.js

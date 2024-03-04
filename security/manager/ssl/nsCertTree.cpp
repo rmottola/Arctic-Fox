@@ -26,7 +26,7 @@
 
 using namespace mozilla;
 
-extern PRLogModuleInfo* gPIPNSSLog;
+extern LazyLogModule gPIPNSSLog;
 
 static NS_DEFINE_CID(kCertOverrideCID, NS_CERTOVERRIDE_CID);
 
@@ -61,8 +61,7 @@ CompareCacheHashEntry::CompareCacheHashEntry()
 }
 
 static bool
-CompareCacheMatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                         const void *key)
+CompareCacheMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
   const CompareCacheHashEntryPtr *entryPtr = static_cast<const CompareCacheHashEntryPtr*>(hdr);
   return entryPtr->entry->key == key;

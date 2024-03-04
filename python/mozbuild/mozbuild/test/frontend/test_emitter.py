@@ -30,7 +30,7 @@ from mozbuild.frontend.data import (
     JARManifest,
     LocalInclude,
     Program,
-    Resources,
+    SdkFiles,
     SharedLibrary,
     SimpleProgram,
     Sources,
@@ -199,13 +199,14 @@ class TestEmitterBasic(unittest.TestCase):
         reader = self.reader('generated-files')
         objs = self.read_topsrcdir(reader)
 
-        self.assertEqual(len(objs), 2)
+        self.assertEqual(len(objs), 3)
         for o in objs:
             self.assertIsInstance(o, GeneratedFile)
 
-        expected = ['bar.c', 'foo.c']
-        for o, expected_filename in zip(objs, expected):
-            self.assertEqual(o.output, expected_filename)
+        expected = ['bar.c', 'foo.c', ('xpidllex.py', 'xpidlyacc.py'), ]
+        for o, f in zip(objs, expected):
+            expected_filename = f if isinstance(f, tuple) else (f,)
+            self.assertEqual(o.outputs, expected_filename)
             self.assertEqual(o.script, None)
             self.assertEqual(o.method, None)
             self.assertEqual(o.inputs, [])
@@ -221,7 +222,7 @@ class TestEmitterBasic(unittest.TestCase):
         expected = ['bar.c', 'foo.c']
         expected_method_names = ['make_bar', 'main']
         for o, expected_filename, expected_method in zip(objs, expected, expected_method_names):
-            self.assertEqual(o.output, expected_filename)
+            self.assertEqual(o.outputs, (expected_filename,))
             self.assertEqual(o.method, expected_method)
             self.assertEqual(o.inputs, [])
 
@@ -233,7 +234,7 @@ class TestEmitterBasic(unittest.TestCase):
 
         o = objs[0]
         self.assertIsInstance(o, GeneratedFile)
-        self.assertEqual(o.output, 'bar.c')
+        self.assertEqual(o.outputs, ('bar.c',))
         self.assertRegexpMatches(o.script, 'script.py$')
         self.assertEqual(o.method, 'make_bar')
         self.assertEqual(o.inputs, [])
@@ -320,7 +321,7 @@ class TestEmitterBasic(unittest.TestCase):
             'testing/mochitest': ['mochitest.py', 'mochitest.ini'],
         }
 
-        for path, strings in objs[0].srcdir_files.iteritems():
+        for path, strings in objs[0].files.walk():
             self.assertTrue(path in expected)
             basenames = sorted(mozpath.basename(s) for s in strings)
             self.assertEqual(sorted(expected[path]), basenames)
@@ -337,6 +338,22 @@ class TestEmitterBasic(unittest.TestCase):
 
         self.assertEqual(len(objs), 1)
         self.assertIsInstance(objs[0], BrandingFiles)
+
+        files = objs[0].files
+
+        self.assertEqual(files._strings, ['bar.ico', 'baz.png', 'foo.xpm'])
+
+        self.assertIn('icons', files._children)
+        icons = files._children['icons']
+
+        self.assertEqual(icons._strings, ['quux.icns'])
+
+    def test_sdk_files(self):
+        reader = self.reader('sdk-files')
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], SdkFiles)
 
         files = objs[0].files
 
@@ -364,7 +381,7 @@ class TestEmitterBasic(unittest.TestCase):
         """A missing manifest file should result in an error."""
         reader = self.reader('test-manifest-missing-manifest')
 
-        with self.assertRaisesRegexp(SandboxValidationError, 'IOError: Missing files'):
+        with self.assertRaisesRegexp(BuildReaderError, 'IOError: Missing files'):
             self.read_topsrcdir(reader)
 
     def test_empty_test_manifest_rejected(self):
@@ -451,6 +468,12 @@ class TestEmitterBasic(unittest.TestCase):
         for t in obj.tests:
             self.assertTrue(t['manifest'].endswith(expected_manifests[t['name']]))
 
+    def test_python_unit_test_missing(self):
+        """Missing files in PYTHON_UNIT_TESTS should raise."""
+        reader = self.reader('test-python-unit-test-missing')
+        with self.assertRaisesRegexp(SandboxValidationError,
+            'Path specified in PYTHON_UNIT_TESTS does not exist:'):
+            objs = self.read_topsrcdir(reader)
 
     def test_test_manifest_keys_extracted(self):
         """Ensure all metadata from test manifests is extracted."""
@@ -459,7 +482,7 @@ class TestEmitterBasic(unittest.TestCase):
         objs = [o for o in self.read_topsrcdir(reader)
                 if isinstance(o, TestManifest)]
 
-        self.assertEqual(len(objs), 8)
+        self.assertEqual(len(objs), 9)
 
         metadata = {
             'a11y.ini': {
@@ -524,6 +547,10 @@ class TestEmitterBasic(unittest.TestCase):
                 'flavor': 'crashtest',
                 'installs': {},
             },
+            'moz.build': {
+                'flavor': 'python',
+                'installs': {},
+            }
         }
 
         for o in objs:

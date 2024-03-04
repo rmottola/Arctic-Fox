@@ -53,6 +53,20 @@ MacroAssembler::and64(Imm64 imm, Register64 dest)
 }
 
 void
+MacroAssembler::or64(Imm64 imm, Register64 dest)
+{
+    or32(Imm32(imm.value & LOW_32_MASK), dest.low);
+    or32(Imm32((imm.value >> 32) & LOW_32_MASK), dest.high);
+}
+
+void
+MacroAssembler::xor64(Imm64 imm, Register64 dest)
+{
+    xor32(Imm32(imm.value & LOW_32_MASK), dest.low);
+    xor32(Imm32((imm.value >> 32) & LOW_32_MASK), dest.high);
+}
+
+void
 MacroAssembler::orPtr(Register src, Register dest)
 {
     ma_or(dest, src);
@@ -274,6 +288,112 @@ MacroAssembler::branchTest64(Condition cond, Register64 lhs, Register64 rhs, Reg
     }
 }
 
+void
+MacroAssembler::branchTestUndefined(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestUndefined(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestInt32(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestInt32(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestInt32Truthy(bool b, const ValueOperand& value, Label* label)
+{
+    ScratchRegisterScope scratch(*this);
+    as_and(scratch, value.payloadReg(), value.payloadReg());
+    ma_b(scratch, scratch, label, b ? NonZero : Zero);
+}
+
+void
+MacroAssembler::branchTestDouble(Condition cond, Register tag, Label* label)
+{
+    MOZ_ASSERT(cond == Equal || cond == NotEqual);
+    Condition actual = (cond == Equal) ? Below : AboveOrEqual;
+    ma_b(tag, ImmTag(JSVAL_TAG_CLEAR), label, actual);
+}
+
+void
+MacroAssembler::branchTestDouble(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestDouble(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestNumber(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestNumber(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestBoolean(Condition cond, const ValueOperand& value, Label* label)
+{
+    MOZ_ASSERT(cond == Equal || cond == NotEqual);
+    ma_b(value.typeReg(), ImmType(JSVAL_TYPE_BOOLEAN), label, cond);
+}
+
+void
+MacroAssembler::branchTestBooleanTruthy(bool b, const ValueOperand& value, Label* label)
+{
+    ma_b(value.payloadReg(), value.payloadReg(), label, b ? NonZero : Zero);
+}
+
+void
+MacroAssembler::branchTestString(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestString(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestStringTruthy(bool b, const ValueOperand& value, Label* label)
+{
+    Register string = value.payloadReg();
+    SecondScratchRegisterScope scratch2(*this);
+    ma_lw(scratch2, Address(string, JSString::offsetOfLength()));
+    ma_b(scratch2, Imm32(0), label, b ? NotEqual : Equal);
+}
+
+void
+MacroAssembler::branchTestSymbol(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestSymbol(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestNull(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestNull(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestObject(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestObject(cond, value.typeReg(), label);
+}
+
+void
+MacroAssembler::branchTestPrimitive(Condition cond, const ValueOperand& value, Label* label)
+{
+    branchTestPrimitive(cond, value.typeReg(), label);
+}
+
+template <class L>
+void
+MacroAssembler::branchTestMagic(Condition cond, const ValueOperand& value, L label)
+{
+    ma_b(value.typeReg(), ImmTag(JSVAL_TAG_MAGIC), label, cond);
+}
+
+void
+MacroAssembler::branchTestMagic(Condition cond, const Address& valaddr, JSWhyMagic why, Label* label)
+{
+    branchTestMagic(cond, valaddr, label);
+    branch32(cond, ToPayload(valaddr), Imm32(why), label);
+}
+
 //}}} check_macroassembler_style
 // ===============================================================
 
@@ -298,13 +418,6 @@ MacroAssemblerMIPSCompat::retn(Imm32 n) {
     asMasm().addPtr(n, StackPointer);
     as_jr(ra);
     as_nop();
-}
-
-void
-MacroAssemblerMIPSCompat::decBranchPtr(Condition cond, Register lhs, Imm32 imm, Label* label)
-{
-    asMasm().subPtr(imm, lhs);
-    asMasm().branchPtr(cond, lhs, Imm32(0), label);
 }
 
 } // namespace jit

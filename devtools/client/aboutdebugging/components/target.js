@@ -2,65 +2,83 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global alert, BrowserToolboxProcess, gDevTools, React, TargetFactory,
-   Toolbox */
+/* eslint-env browser */
 
 "use strict";
 
-loader.lazyRequireGetter(this, "React",
-  "devtools/client/shared/vendor/react");
 loader.lazyRequireGetter(this, "TargetFactory",
-  "devtools/client/framework/target", true);
+      "devtools/client/framework/target", true);
+loader.lazyRequireGetter(this, "gDevTools",
+      "devtools/client/framework/devtools", true);
 loader.lazyRequireGetter(this, "Toolbox",
-  "devtools/client/framework/toolbox", true);
-loader.lazyRequireGetter(this, "Services");
+      "devtools/client/framework/toolbox", true);
 
 loader.lazyImporter(this, "BrowserToolboxProcess",
-  "resource://devtools/client/framework/ToolboxProcess.jsm");
-loader.lazyImporter(this, "gDevTools",
-  "resource://devtools/client/framework/gDevTools.jsm");
+      "resource://devtools/client/framework/ToolboxProcess.jsm");
+
+const Services = require("Services");
+const React = require("devtools/client/shared/vendor/react");
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
 
-exports.TargetComponent = React.createClass({
-  displayName: "TargetComponent",
+exports.Target = React.createClass({
+  displayName: "Target",
+
+  render() {
+    let { target, debugDisabled } = this.props;
+    let isServiceWorker = (target.type === "serviceworker");
+    let isRunning = (!isServiceWorker || target.workerActor);
+    return React.createElement("div", { className: "target" },
+      React.createElement("img", {
+        className: "target-icon",
+        role: "presentation",
+        src: target.icon }),
+      React.createElement("div", { className: "target-details" },
+        React.createElement("div", { className: "target-name" }, target.name)
+      ),
+      (isRunning ?
+        React.createElement("button", {
+          className: "debug-button",
+          onClick: this.debug,
+          disabled: debugDisabled,
+        }, Strings.GetStringFromName("debug")) :
+        null
+      )
+    );
+  },
 
   debug() {
-    let client = this.props.client;
-    let target = this.props.target;
+    let { target } = this.props;
     switch (target.type) {
       case "extension":
         BrowserToolboxProcess.init({ addonID: target.addonID });
         break;
       case "serviceworker":
-        // Fall through.
+        if (target.workerActor) {
+          this.openWorkerToolbox(target.workerActor);
+        }
+        break;
       case "sharedworker":
-        // Fall through.
+        this.openWorkerToolbox(target.workerActor);
+        break;
       case "worker":
-        let workerActor = this.props.target.actorID;
-        client.attachWorker(workerActor, (response, workerClient) => {
-          gDevTools.showToolbox(TargetFactory.forWorker(workerClient),
-            "jsdebugger", Toolbox.HostType.WINDOW);
-        });
+        this.openWorkerToolbox(target.workerActor);
         break;
       default:
-        alert("Not implemented yet!");
+        window.alert("Not implemented yet!");
+        break;
     }
   },
 
-  render() {
-    let target = this.props.target;
-    return React.createElement("div", { className: "target" },
-      React.createElement("img", {
-        className: "target-icon",
-        src: target.icon }),
-      React.createElement("div", { className: "target-details" },
-        React.createElement("div", { className: "target-name" }, target.name),
-        React.createElement("div", { className: "target-url" }, target.url)
-      ),
-      React.createElement("button", { onClick: this.debug },
-        Strings.GetStringFromName("debug"))
-    );
+  openWorkerToolbox(workerActor) {
+    let { client } = this.props;
+    client.attachWorker(workerActor, (response, workerClient) => {
+      gDevTools.showToolbox(TargetFactory.forWorker(workerClient),
+        "jsdebugger", Toolbox.HostType.WINDOW)
+        .then(toolbox => {
+          toolbox.once("destroy", () => workerClient.detach());
+        });
+    });
   },
 });

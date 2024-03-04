@@ -66,6 +66,7 @@
 #include "nsIScriptableRegion.h"
 #include <algorithm>
 #include "ScrollbarActivity.h"
+#include "../../editor/libeditor/nsTextEditRules.h"
 
 #ifdef ACCESSIBILITY
 #include "nsAccessibilityService.h"
@@ -1248,9 +1249,8 @@ nsTreeBodyFrame::GetCoordsForCellItem(int32_t aRow, nsITreeColumn* aCol, const n
     // we add in borders and padding to the text dimension and give that back. 
     nsStyleContext* textContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreecelltext);
 
-    RefPtr<nsFontMetrics> fm;
-    nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
-                                                 getter_AddRefs(fm));
+    RefPtr<nsFontMetrics> fm =
+      nsLayoutUtils::GetFontMetricsForStyleContext(textContext);
     nscoord height = fm->MaxHeight();
 
     nsMargin textMargin;
@@ -1620,9 +1620,8 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
 
   AdjustForBorderPadding(textContext, textRect);
 
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
-                                               getter_AddRefs(fm));
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetFontMetricsForStyleContext(textContext);
   AdjustForCellText(cellText, aRowIndex, aColumn, rc, *fm, textRect);
 
   if (aX >= textRect.x && aX < textRect.x + textRect.width)
@@ -1748,9 +1747,8 @@ nsTreeBodyFrame::GetCellWidth(int32_t aRow, nsTreeColumn* aCol,
   // Get the borders and padding for the text.
   GetBorderPadding(textContext, bp);
 
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
-                                               getter_AddRefs(fm));
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetFontMetricsForStyleContext(textContext);
   // Get the width of the text itself
   nscoord width = nsLayoutUtils::AppUnitWidthOfStringBidi(cellText, this, *fm,
                                                           *aRenderingContext);
@@ -3364,6 +3362,7 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
     if (dirtyRect.IntersectRect(aDirtyRect, elementRect)) {
       switch (aColumn->GetType()) {
         case nsITreeColumn::TYPE_TEXT:
+        case nsITreeColumn::TYPE_PASSWORD:
           PaintText(aRowIndex, aColumn, elementRect, aPresContext, aRenderingContext, aDirtyRect, currX);
           break;
         case nsITreeColumn::TYPE_CHECKBOX:
@@ -3670,6 +3669,11 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   // Now obtain the text for our cell.
   nsAutoString text;
   mView->GetCellText(aRowIndex, aColumn, text);
+
+  if (aColumn->Type() == nsITreeColumn::TYPE_PASSWORD) {
+    nsTextEditRules::FillBufWithPWChars(&text, text.Length());
+  }
+
   // We're going to paint this text so we need to ensure bidi is enabled if
   // necessary
   CheckTextForBidi(text);
@@ -3700,9 +3704,8 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   textRect.Deflate(bp);
 
   // Compute our text size.
-  RefPtr<nsFontMetrics> fontMet;
-  nsLayoutUtils::GetFontMetricsForStyleContext(textContext,
-                                               getter_AddRefs(fontMet));
+  RefPtr<nsFontMetrics> fontMet =
+    nsLayoutUtils::GetFontMetricsForStyleContext(textContext);
 
   nscoord height = fontMet->MaxHeight();
   nscoord baseline = fontMet->MaxAscent();

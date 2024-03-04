@@ -12,6 +12,7 @@ Cu.import("resource://gre/modules/NotificationDB.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
 Cu.import("resource:///modules/UserContextUI.jsm");
 
+
 XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Deprecated",
@@ -52,6 +53,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
                                   "resource:///modules/NewTabURL.jsm");
+
+XPCOMUtils.defineLazyServiceGetter(this, "gAboutNewTabService",
+                                   "@mozilla.org/browser/aboutnewtab-service;1",
+                                   "nsIAboutNewTabService");
 
 const nsIWebNavigation = Ci.nsIWebNavigation;
 const gToolbarInfoSeparators = ["|", "-"];
@@ -144,9 +149,9 @@ XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function () {
 });
 
 XPCOMUtils.defineLazyGetter(this, "DeveloperToolbar", function() {
-  let tmp = {};
-  Cu.import("resource://devtools/client/shared/DeveloperToolbar.jsm", tmp);
-  return new tmp.DeveloperToolbar(window, document.getElementById("developer-toolbar"));
+  let { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+  let { DeveloperToolbar } = require("devtools/client/shared/developer-toolbar");
+  return new DeveloperToolbar(window, document.getElementById("developer-toolbar"));
 });
 
 XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
@@ -946,7 +951,8 @@ var gBrowserInit = {
     FeedHandler.init();
     DevEdition.init();
     AboutPrivateBrowsingListener.init();
-    
+    RefreshBlocker.init();
+
     let mm = window.getGroupMessageManager("browsers");
     mm.loadFrameScript("chrome://browser/content/tab-content.js", true);
     mm.loadFrameScript("chrome://browser/content/content.js", true);
@@ -1181,6 +1187,12 @@ var gBrowserInit = {
         // swap the given tab with the default about:blank tab and then close
         // the original tab in the other window.
         let tabToOpen = uriToLoad;
+
+        // If this tab was passed as a window argument, clear the
+        // reference to it from the arguments array.
+        if (window.arguments[0] == tabToOpen) {
+          window.arguments[0] = null;
+        }
 
         // Stop the about:blank load
         gBrowser.stop();
@@ -1537,7 +1549,11 @@ var gBrowserInit = {
 
     BrowserOnClick.uninit();
 
+    FeedHandler.uninit();
+
     DevEdition.uninit();
+
+    RefreshBlocker.uninit();
 
     SidebarUI.uninit();
 
@@ -2478,8 +2494,11 @@ function URLBarSetURI(aURI) {
     } catch (e) {}
 
     // Replace initial page URIs with an empty string
-    // only if there's no opener (bug 370555).
-    if (gInitialPages.indexOf(uri.spec) != -1)
+    // 1. only if there's no opener (bug 370555).
+    // 2. if remote newtab is enabled and it's the default remote newtab page
+    let defaultRemoteURL = gAboutNewTabService.remoteEnabled &&
+                           uri.spec === gAboutNewTabService.newTabURL;
+    if (gInitialPages.includes(uri.spec) || defaultRemoteURL)
       value = gBrowser.selectedBrowser.hasContentOpener ? uri.spec : "";
     else
       value = losslessDecodeURI(uri);
@@ -3575,7 +3594,7 @@ const BrowserSearch = {
   loadSearchFromContext: function (terms) {
     let engine = BrowserSearch._loadSearch(terms, true, "contextmenu");
     if (engine) {
-      BrowserSearch.recordSearchInHealthReport(engine, "contextmenu");
+      BrowserSearch.recordSearchInTelemetry(engine, "contextmenu");
     }
   },
 
@@ -3599,10 +3618,26 @@ const BrowserSearch = {
     openUILinkIn(searchEnginesURL, where);
   },
 
+  _getSearchEngineId: function (engine) {
+    if (!engine) {
+      return "other";
+    }
+
+    if (engine.identifier) {
+      return engine.identifier;
+    }
+
+    if (!("name" in engine) || engine.name === undefined) {
+      return "other";
+    }
+
+    return "other-" + engine.name;
+  },
+
   /**
-   * Helper to record a search with Firefox Health Report.
+   * Helper to record a search with Telemetry.
    *
-   * FHR records only search counts and nothing pertaining to the search itself.
+   * Telemetry records only search counts and nothing pertaining to the search itself.
    *
    * @param engine
    *        (nsISearchEngine) The engine handling the search.
@@ -3614,30 +3649,35 @@ const BrowserSearch = {
    *        the search was a suggested search, this indicates where the
    *        item was in the suggestion list and how the user selected it.
    */
-  recordSearchInHealthReport: function (engine, source, selection) {
-//    BrowserUITelemetry.countSearchEvent(source, null, selection);
-#ifdef MOZ_SERVICES_HEALTHREPORT
-    let reporter = Cc["@mozilla.org/datareporting/service;1"]
-                     .getService()
-                     .wrappedJSObject
-                     .healthReporter;
+  recordSearchInTelemetry: function (engine, source, selection) {
+    const SOURCES = [
+      "abouthome",
+      "contextmenu",
+      "newtab",
+      "searchbar",
+      "urlbar",
+    ];
 
-    // This can happen if the FHR component of the data reporting service is
-    // disabled. This is controlled by a pref that most will never use.
-    if (!reporter) {
+    BrowserUITelemetry.countSearchEvent(source, null, selection);
+
+    if (SOURCES.indexOf(source) == -1) {
+      Cu.reportError("Unknown source for search: " + source);
       return;
     }
 
-    reporter.onInit().then(function record() {
-      try {
-        reporter.getProvider("org.mozilla.searches").recordSearch(engine, source);
-      } catch (ex) {
-        Cu.reportError(ex);
-      }
-    });
-#endif
+    let countId = this._getSearchEngineId(engine) + "." + source;
+
+    let count = Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS");
+    count.add(countId);
   },
+
+  recordOneoffSearchInTelemetry: function (engine, source, type, where) {
+    let id = this._getSearchEngineId(engine) + "." + source;
+    BrowserUITelemetry.countOneoffSearchEvent(id, type, where);
+  }
 };
+
+XPCOMUtils.defineConstant(this, "BrowserSearch", BrowserSearch);
 
 function FillHistoryMenu(aParent) {
   // Lazily add the hover listeners on first showing and never remove them
@@ -3970,7 +4010,6 @@ function BrowserToolboxCustomizeChange(aType) {
     default:
       gHomeButton.updatePersonalToolbarStyle();
       BookmarkingUI.customizeChange();
-      allTabs.readPref();
   }
 }
 
@@ -4870,54 +4909,6 @@ var TabsProgressListener = {
 
     FullZoom.onLocationChange(aLocationURI, false, aBrowser);
   },
-
-  onRefreshAttempted: function (aBrowser, aWebProgress, aURI, aDelay, aSameURI) {
-    if (gPrefService.getBoolPref("accessibility.blockautorefresh")) {
-      let brandBundle = document.getElementById("bundle_brand");
-      let brandShortName = brandBundle.getString("brandShortName");
-      let refreshButtonText =
-        gNavigatorBundle.getString("refreshBlocked.goButton");
-      let refreshButtonAccesskey =
-        gNavigatorBundle.getString("refreshBlocked.goButton.accesskey");
-      let message =
-        gNavigatorBundle.getFormattedString(aSameURI ? "refreshBlocked.refreshLabel"
-                                                     : "refreshBlocked.redirectLabel",
-                                            [brandShortName]);
-      let docShell = aWebProgress.DOMWindow
-                                 .QueryInterface(Ci.nsIInterfaceRequestor)
-                                 .getInterface(Ci.nsIWebNavigation)
-                                 .QueryInterface(Ci.nsIDocShell);
-      let notificationBox = gBrowser.getNotificationBox(aBrowser);
-      let notification = notificationBox.getNotificationWithValue("refresh-blocked");
-      if (notification) {
-        notification.label = message;
-        notification.refreshURI = aURI;
-        notification.delay = aDelay;
-        notification.docShell = docShell;
-      } else {
-        let buttons = [{
-          label: refreshButtonText,
-          accessKey: refreshButtonAccesskey,
-          callback: function (aNotification, aButton) {
-            var refreshURI = aNotification.docShell
-                                          .QueryInterface(Ci.nsIRefreshURI);
-            refreshURI.forceRefreshURI(aNotification.refreshURI,
-                                       aNotification.delay, true);
-          }
-        }];
-        notification =
-          notificationBox.appendNotification(message, "refresh-blocked",
-                                             "chrome://browser/skin/Info.png",
-                                             notificationBox.PRIORITY_INFO_MEDIUM,
-                                             buttons);
-        notification.refreshURI = aURI;
-        notification.delay = aDelay;
-        notification.docShell = docShell;
-      }
-      return false;
-    }
-    return true;
-  }
 }
 
 function nsBrowserAccess() { }
@@ -5126,6 +5117,55 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
     popup.insertBefore(menuItem, firstMenuItem);
 
     menuItem.addEventListener("command", onViewToolbarCommand, false);
+  }
+
+  // The explicitOriginalTarget can be a nested child element of a toolbaritem.
+  let toolbarItem = aEvent.explicitOriginalTarget;
+
+  if (toolbarItem && toolbarItem.localName == "toolbarpaletteitem") {
+    toolbarItem = toolbarItem.firstChild;
+  } else {
+    while (toolbarItem && toolbarItem.parentNode) {
+      let parent = toolbarItem.parentNode;
+      if ((parent.classList && parent.classList.contains("customization-target")) ||
+          parent.localName == "toolbarpaletteitem" ||
+          parent.localName == "toolbar")
+        break;
+      toolbarItem = parent;
+    }
+  }
+
+  let showTabStripItems = toolbarItem && toolbarItem.id == "tabbrowser-tabs";
+  for (let node of popup.querySelectorAll('menuitem[contexttype="toolbaritem"]')) {
+    node.hidden = showTabStripItems;
+  }
+
+  for (let node of popup.querySelectorAll('menuitem[contexttype="tabbar"]')) {
+    node.hidden = !showTabStripItems;
+  }
+
+  if (showTabStripItems) {
+    PlacesCommandHook.updateBookmarkAllTabsCommand();
+
+    let haveMultipleTabs = gBrowser.visibleTabs.length > 1;
+    document.getElementById("toolbar-context-reloadAllTabs").disabled = !haveMultipleTabs;
+
+    document.getElementById("toolbar-context-undoCloseTab").disabled =
+      SessionStore.getClosedTabCount(window) == 0;
+    return;
+  }
+
+  // In some cases, we will exit the above loop with toolbarItem being the
+  // xul:document. That has no parentNode, and we should disable the items in
+  // this case.
+  let movable = toolbarItem && toolbarItem.parentNode &&
+                CustomizableUI.isWidgetRemovable(toolbarItem);
+  if (movable) {
+    moveToPanel.removeAttribute("disabled");
+    removeFromToolbar.removeAttribute("disabled");
+  } else {
+    moveToPanel.setAttribute("disabled", true);
+    removeFromToolbar.setAttribute("disabled", true);
   }
 }
 

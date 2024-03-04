@@ -422,7 +422,7 @@ nsFrameLoader::ReallyStartLoadingInternal()
   int32_t flags = nsIWebNavigation::LOAD_FLAGS_NONE;
 
   // Flags for browser frame:
-  if (OwnerIsBrowserFrame()) {
+  if (OwnerIsMozBrowserFrame()) {
     flags = nsIWebNavigation::LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |
             nsIWebNavigation::LOAD_FLAGS_DISALLOW_INHERIT_OWNER;
   }
@@ -930,7 +930,7 @@ nsFrameLoader::SwapWithOtherRemoteLoader(nsFrameLoader* aOther,
   nsCOMPtr<nsIBrowserDOMWindow> browserDOMWindow =
     mRemoteBrowser->GetBrowserDOMWindow();
 
-  if (!otherBrowserDOMWindow || !browserDOMWindow) {
+  if (!!otherBrowserDOMWindow != !!browserDOMWindow) {
     return NS_ERROR_NOT_IMPLEMENTED;
   }
 
@@ -1577,7 +1577,7 @@ nsFrameLoader::SetOwnerContent(Element* aContent)
 }
 
 bool
-nsFrameLoader::OwnerIsBrowserOrAppFrame()
+nsFrameLoader::OwnerIsMozBrowserOrAppFrame()
 {
   nsCOMPtr<nsIMozBrowserFrame> browserFrame = do_QueryInterface(mOwnerContent);
   return browserFrame ? browserFrame->GetReallyIsBrowserOrApp() : false;
@@ -1585,9 +1585,9 @@ nsFrameLoader::OwnerIsBrowserOrAppFrame()
 
 // The xpcom getter version
 NS_IMETHODIMP
-nsFrameLoader::GetOwnerIsBrowserOrAppFrame(bool* aResult)
+nsFrameLoader::GetOwnerIsMozBrowserOrAppFrame(bool* aResult)
 {
-  *aResult = OwnerIsBrowserOrAppFrame();
+  *aResult = OwnerIsMozBrowserOrAppFrame();
   return NS_OK;
 }
 
@@ -1615,9 +1615,66 @@ nsFrameLoader::OwnerIsAppFrame()
 }
 
 bool
-nsFrameLoader::OwnerIsBrowserFrame()
+nsFrameLoader::OwnerIsMozBrowserFrame()
 {
-  return OwnerIsBrowserOrAppFrame() && !OwnerIsAppFrame();
+  return OwnerIsMozBrowserOrAppFrame() && !OwnerIsAppFrame();
+}
+
+bool
+nsFrameLoader::OwnerIsIsolatedMozBrowserFrame()
+{
+  nsCOMPtr<nsIMozBrowserFrame> browserFrame = do_QueryInterface(mOwnerContent);
+  if (!browserFrame) {
+    return false;
+  }
+
+  if (!OwnerIsMozBrowserFrame()) {
+    return false;
+  }
+
+  bool isolated = browserFrame->GetIsolated();
+  if (isolated) {
+    return true;
+  }
+
+  // After bug 1238160, which allows isolation to be disabled on mozbrowser
+  // frames, we no longer have a way to tell from the principal alone if
+  // something "is a mozbrowser".  Instead, we now only know "is an isolated
+  // mozbrowser".  The following code paths would return invalid results if it
+  // were possible to have apps *and* isolation could be disabled:
+  //   * CheckPermission in AppProcessChecker.cpp
+  //   * nsScriptSecurityManager::AppStatusForPrincipal
+  //   * init() in SystemMessageManager.js
+  // Currently, desktop is the only platform where we intend to disable
+  // isolation on a browser frame, so non-desktop should be able to assume that
+  // inIsolatedMozBrowser is true for all mozbrowser frames.  To enforce these
+  // assumptions, we assert that there are no apps installed if we have tried
+  // to disable isolation.
+  nsCOMPtr<nsIAppsService> appsService = do_GetService(APPS_SERVICE_CONTRACTID);
+  if (!appsService) {
+    // If the apps service is not present, we assume this means there can't be
+    // any apps at all, so there is no problem.
+    return false;
+  }
+  bool appsInstalled;
+  nsresult rv = appsService->AreAnyAppsInstalled(&appsInstalled);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    // The apps service exists, but it threw an error when checking if there are
+    // any apps, so we don't know if we have them or not.
+    return false;
+  }
+#ifdef MOZ_B2G
+  MOZ_RELEASE_ASSERT(!appsInstalled,
+                     "Disabling mozbrowser isolation is not currently "
+                     "allowed when apps are installed.");
+#else
+  if (appsInstalled) {
+    NS_WARNING("Disabling mozbrowser isolation is not currently allowed when "
+               "apps are installed.");
+  }
+#endif
+
+  return false;
 }
 
 void
@@ -1692,7 +1749,7 @@ nsFrameLoader::ShouldUseRemoteProcess()
 
   // If we're an <iframe mozbrowser> and we don't have a "remote" attribute,
   // fall back to the default.
-  if (OwnerIsBrowserOrAppFrame() &&
+  if (OwnerIsMozBrowserOrAppFrame() &&
       !mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::Remote)) {
 
     return Preferences::GetBool("dom.ipc.browser_frames.oop_by_default", false);
@@ -1700,7 +1757,7 @@ nsFrameLoader::ShouldUseRemoteProcess()
 
   // Otherwise, we're remote if we have "remote=true" and we're either a
   // browser frame or a XUL element.
-  return (OwnerIsBrowserOrAppFrame() ||
+  return (OwnerIsMozBrowserOrAppFrame() ||
           mOwnerContent->GetNameSpaceID() == kNameSpaceID_XUL) &&
          mOwnerContent->AttrValueIs(kNameSpaceID_None,
                                     nsGkAtoms::Remote,
@@ -1880,7 +1937,7 @@ nsFrameLoader::MaybeCreateDocShell()
 
   if (OwnerIsAppFrame()) {
     // You can't be both an app and a browser frame.
-    MOZ_ASSERT(!OwnerIsBrowserFrame());
+    MOZ_ASSERT(!OwnerIsMozBrowserFrame());
 
     nsCOMPtr<mozIApplication> ownApp = GetOwnApp();
     MOZ_ASSERT(ownApp);
@@ -1892,7 +1949,7 @@ nsFrameLoader::MaybeCreateDocShell()
     mDocShell->SetIsApp(ownAppId);
   }
 
-  if (OwnerIsBrowserFrame()) {
+  if (OwnerIsMozBrowserFrame()) {
     // You can't be both a browser and an app frame.
     MOZ_ASSERT(!OwnerIsAppFrame());
 
@@ -1905,7 +1962,7 @@ nsFrameLoader::MaybeCreateDocShell()
     mDocShell->SetIsBrowserInsideApp(containingAppId);
   }
 
-  if (OwnerIsBrowserOrAppFrame()) {
+  if (OwnerIsMozBrowserOrAppFrame()) {
     // For inproc frames, set the docshell properties.
     nsCOMPtr<nsIDocShellTreeItem> item = do_GetInterface(docShell);
     nsAutoString name;
@@ -2246,7 +2303,7 @@ nsFrameLoader::TryRemoteBrowser()
   }
 
   // <iframe mozbrowser> gets to skip these checks.
-  if (!OwnerIsBrowserOrAppFrame()) {
+  if (!OwnerIsMozBrowserOrAppFrame()) {
     if (parentDocShell->ItemType() != nsIDocShellTreeItem::typeChrome) {
       return false;
     }
@@ -2563,7 +2620,7 @@ nsFrameLoader::EnsureMessageManager()
   }
 
   if (!mIsTopLevelContent &&
-      !OwnerIsBrowserOrAppFrame() &&
+      !OwnerIsMozBrowserOrAppFrame() &&
       !IsRemoteFrame() &&
       !(mOwnerContent->IsXULElement() &&
         mOwnerContent->AttrValueIs(kNameSpaceID_None,
@@ -2669,7 +2726,7 @@ nsFrameLoader::SwapRemoteBrowser(nsITabParent* aTabParent)
     NS_WARNING("Switching from in-process to out-of-process is not supported.");
     return NS_ERROR_NOT_IMPLEMENTED;
   }
-  if (!OwnerIsBrowserOrAppFrame()) {
+  if (!OwnerIsMozBrowserOrAppFrame()) {
     NS_WARNING("Switching process for non-mozbrowser/app frame is not supported.");
     return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -2820,7 +2877,7 @@ nsFrameLoader::ResetPermissionManagerStatus()
   uint32_t appId = nsIScriptSecurityManager::NO_APP_ID;
   if (OwnerIsAppFrame()) {
     // You can't be both an app and a browser frame.
-    MOZ_ASSERT(!OwnerIsBrowserFrame());
+    MOZ_ASSERT(!OwnerIsMozBrowserFrame());
 
     nsCOMPtr<mozIApplication> ownApp = GetOwnApp();
     MOZ_ASSERT(ownApp);
@@ -2830,7 +2887,7 @@ nsFrameLoader::ResetPermissionManagerStatus()
     }
   }
 
-  if (OwnerIsBrowserFrame()) {
+  if (OwnerIsMozBrowserFrame()) {
     // You can't be both a browser and an app frame.
     MOZ_ASSERT(!OwnerIsAppFrame());
 
@@ -2968,7 +3025,7 @@ nsFrameLoader::GetLoadContext(nsILoadContext** aLoadContext)
 void
 nsFrameLoader::InitializeBrowserAPI()
 {
-  if (OwnerIsBrowserOrAppFrame()) {
+  if (OwnerIsMozBrowserOrAppFrame()) {
     if (!IsRemoteFrame()) {
       nsresult rv = EnsureMessageManager();
       if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -3063,7 +3120,7 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
   nsCOMPtr<mozIApplication> ownApp = GetOwnApp();
   nsCOMPtr<mozIApplication> containingApp = GetContainingApp();
   DocShellOriginAttributes attrs;
-  attrs.mInBrowser = OwnerIsBrowserFrame();
+  attrs.mInIsolatedMozBrowser = OwnerIsIsolatedMozBrowserFrame();
 
   nsCString signedPkgOrigin;
   if (!aPackageId.IsEmpty()) {

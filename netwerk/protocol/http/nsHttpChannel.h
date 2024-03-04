@@ -367,6 +367,17 @@ private:
     nsresult ProcessSecurityHeaders();
 
     /**
+     * Taking care of the Content-Signature header and fail the channel if
+     * the signature verification fails or is required but the header is not
+     * present.
+     * This sets mListener to ContentVerifier, which buffers the entire response
+     * before verifying the Content-Signature header. If the verification is
+     * successful, the load proceeds as usual. If the verification fails, a
+     * NS_ERROR_INVALID_SIGNATURE is thrown and a fallback loaded in nsDocShell
+     */
+    nsresult ProcessContentSignatureHeader(nsHttpResponseHead *aResponseHead);
+
+    /**
      * A function that will, if the feature is enabled, send security reports.
      */
     void ProcessSecurityReport(nsresult status);
@@ -482,6 +493,10 @@ private:
     uint32_t                          mTransactionReplaced      : 1;
     uint32_t                          mAuthRetryPending         : 1;
     uint32_t                          mProxyAuthPending         : 1;
+    // Set if before the first authentication attempt a custom authorization
+    // header has been set on the channel.  This will make that custom header
+    // go to the server instead of any cached credentials.
+    uint32_t                          mCustomAuthHeader         : 1;
     uint32_t                          mResuming                 : 1;
     uint32_t                          mInitedCacheEntry         : 1;
     // True if we are loading a fallback cache entry from the

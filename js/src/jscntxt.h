@@ -190,6 +190,7 @@ class ExclusiveContext : public ContextFriendFields,
     bool isPermanentAtomsInitialized() { return !!runtime_->permanentAtoms; }
     FrozenAtomSet& permanentAtoms() { return *runtime_->permanentAtoms; }
     WellKnownSymbols& wellKnownSymbols() { return *runtime_->wellKnownSymbols; }
+    JS::BuildIdOp buildIdOp() { return runtime_->buildIdOp; }
     const JS::AsmJSCacheOps& asmJSCacheOps() { return runtime_->asmJSCacheOps; }
     PropertyName* emptyString() { return runtime_->emptyString; }
     FreeOp* defaultFreeOp() { return runtime_->defaultFreeOp(); }
@@ -767,7 +768,9 @@ class MOZ_RAII AutoLockForExclusiveAccess
 #endif
         } else {
             MOZ_ASSERT(!runtime->mainThreadHasExclusiveAccess);
+#ifdef DEBUG
             runtime->mainThreadHasExclusiveAccess = true;
+#endif
         }
     }
 
@@ -782,12 +785,16 @@ class MOZ_RAII AutoLockForExclusiveAccess
     }
     ~AutoLockForExclusiveAccess() {
         if (runtime->numExclusiveThreads) {
+#ifdef DEBUG
             MOZ_ASSERT(runtime->exclusiveAccessOwner == PR_GetCurrentThread());
             runtime->exclusiveAccessOwner = nullptr;
+#endif
             PR_Unlock(runtime->exclusiveAccessLock);
         } else {
             MOZ_ASSERT(runtime->mainThreadHasExclusiveAccess);
+#ifdef DEBUG
             runtime->mainThreadHasExclusiveAccess = false;
+#endif
         }
     }
 

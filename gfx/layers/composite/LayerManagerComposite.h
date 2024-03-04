@@ -77,11 +77,6 @@ public:
   virtual void Destroy() override;
 
   /**
-   * return True if initialization was succesful, false when it was not.
-   */
-  bool Initialize();
-
-  /**
    * Sets the clipping region for this layer manager. This is important on
    * windows because using OGL we no longer have GDI's native clipping. Therefor
    * widget must tell us what part of the screen is being invalidated,
@@ -225,10 +220,41 @@ public:
     mInvalidRegion.Or(mInvalidRegion, aRegion);
   }
 
+  void ClearApproximatelyVisibleRegions(uint64_t aLayersId,
+                                        const Maybe<uint32_t>& aPresShellId)
+  {
+    for (auto iter = mVisibleRegions.Iter(); !iter.Done(); iter.Next()) {
+      if (iter.Key().mLayersId == aLayersId &&
+          (!aPresShellId || iter.Key().mPresShellId == *aPresShellId)) {
+        iter.Remove();
+      }
+    }
+  }
+
+  void UpdateApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
+                                        const CSSIntRegion& aRegion)
+  {
+    CSSIntRegion* regionForScrollFrame = mVisibleRegions.LookupOrAdd(aGuid);
+    MOZ_ASSERT(regionForScrollFrame);
+
+    *regionForScrollFrame = aRegion;
+  }
+
+  CSSIntRegion* GetApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid)
+  {
+    return mVisibleRegions.Get(aGuid);
+  }
+
   Compositor* GetCompositor() const
   {
     return mCompositor;
   }
+
+  // Called by CompositorParent when a new compositor has been created due
+  // to a device reset. The layer manager must clear any cached resources
+  // attached to the old compositor, and make a best effort at ignoring
+  // layer or texture updates against the old compositor.
+  void ChangeCompositor(Compositor* aNewCompositor);
 
   /**
    * LayerManagerComposite provides sophisticated debug overlays
@@ -285,6 +311,8 @@ public:
   // overlay.
   void SetWindowOverlayChanged() { mWindowOverlayChanged = true; }
 
+  void ForcePresent() { mCompositor->ForcePresent(); }
+
 private:
   /** Region we're clipping our current drawing to. */
   nsIntRegion mClippingRegion;
@@ -335,6 +363,8 @@ private:
                                bool aInvertEffect,
                                float aContrastEffect);
 
+  void ChangeCompositorInternal(Compositor* aNewCompositor);
+
   float mWarningLevel;
   mozilla::TimeStamp mWarnTime;
   bool mUnusedApzTransformWarning;
@@ -350,6 +380,11 @@ private:
   gfx::IntRect mTargetBounds;
 
   nsIntRegion mInvalidRegion;
+
+  typedef nsClassHashtable<nsGenericHashKey<ScrollableLayerGuid>,
+                           CSSIntRegion> VisibleRegions;
+  VisibleRegions mVisibleRegions;
+
   UniquePtr<FPSState> mFPS;
 
   bool mInTransaction;
@@ -484,6 +519,9 @@ public:
   bool GetShadowTransformSetByAnimation() { return mShadowTransformSetByAnimation; }
   bool HasLayerBeenComposited() { return mLayerComposited; }
   gfx::IntRect GetClearRect() { return mClearRect; }
+
+  // Returns false if the layer is attached to an older compositor.
+  bool HasStaleCompositor() const;
 
   /**
    * Return the part of the visible region that has been fully rendered.

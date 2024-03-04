@@ -76,7 +76,9 @@ private:
   nsCOMPtr<nsIStreamListener> mListener;
   nsCOMPtr<nsIURI> mURI;
   bool mPending;
-  DebugOnly<bool> mDiverted;
+#ifdef DEBUG
+  bool mDiverted;
+#endif
   bool mIPCClosed;
   nsLoadFlags mLoadFlags;
   nsresult mStatus;

@@ -19,6 +19,7 @@
 #include "nsCSSProps.h" // For nsCSSProps::PropHasFlags
 #include "nsCSSPseudoElements.h"
 #include "nsCSSValue.h"
+#include "nsDOMMutationObserver.h" // For nsAutoAnimationMutationBatch
 #include "nsStyleUtil.h"
 #include <algorithm> // For std::max
 
@@ -33,18 +34,20 @@ GetComputedTimingDictionary(const ComputedTiming& aComputedTiming,
 {
   // AnimationEffectTimingProperties
   aRetVal.mDelay = aTiming.mDelay.ToMilliseconds();
+  aRetVal.mEndDelay = aTiming.mEndDelay.ToMilliseconds();
   aRetVal.mFill = aComputedTiming.mFill;
   aRetVal.mIterations = aComputedTiming.mIterations;
+  aRetVal.mIterationStart = aComputedTiming.mIterationStart;
   aRetVal.mDuration.SetAsUnrestrictedDouble() =
     aComputedTiming.mDuration.ToMilliseconds();
   aRetVal.mDirection = aTiming.mDirection;
 
   // ComputedTimingProperties
   aRetVal.mActiveDuration = aComputedTiming.mActiveDuration.ToMilliseconds();
-  aRetVal.mEndTime
-    = std::max(aRetVal.mDelay + aRetVal.mActiveDuration + aRetVal.mEndDelay, 0.0);
+  aRetVal.mEndTime = aComputedTiming.mEndTime.ToMilliseconds();
   aRetVal.mLocalTime = AnimationUtils::TimeDurationToDouble(aLocalTime);
   aRetVal.mProgress = aComputedTiming.mProgress;
+
   if (!aRetVal.mProgress.IsNull()) {
     // Convert the returned currentIteration into Infinity if we set
     // (uint64_t) aComputedTiming.mCurrentIteration to UINT64_MAX
@@ -235,16 +238,20 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
   // Always return the same object to benefit from return-value optimization.
   ComputedTiming result;
 
-  if (aTiming.mDuration.IsUnrestrictedDouble()) {
-    double durationMs = aTiming.mDuration.GetAsUnrestrictedDouble();
-    if (!IsNaN(durationMs) && durationMs >= 0.0f) {
-      result.mDuration = StickyTimeDuration::FromMilliseconds(durationMs);
-    }
+  if (aTiming.mDuration) {
+    MOZ_ASSERT(aTiming.mDuration.ref() >= zeroDuration,
+               "Iteration duration should be positive");
+    result.mDuration = aTiming.mDuration.ref();
   }
+
   result.mIterations = IsNaN(aTiming.mIterations) || aTiming.mIterations < 0.0f ?
                        1.0f :
                        aTiming.mIterations;
+  result.mIterationStart = std::max(aTiming.mIterationStart, 0.0);
+
   result.mActiveDuration = ActiveDuration(result.mDuration, result.mIterations);
+  result.mEndTime = aTiming.mDelay + result.mActiveDuration +
+                    aTiming.mEndDelay;
   result.mFill = aTiming.mFill == dom::FillMode::Auto ?
                  dom::FillMode::None :
                  aTiming.mFill;
@@ -263,7 +270,9 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
 
   // Get the normalized time within the active interval.
   StickyTimeDuration activeTime;
-  if (localTime >= aTiming.mDelay + result.mActiveDuration) {
+  if (localTime >=
+        std::min(StickyTimeDuration(aTiming.mDelay + result.mActiveDuration),
+                 result.mEndTime)) {
     result.mPhase = ComputedTiming::AnimationPhase::After;
     if (!result.FillsForwards()) {
       // The animation isn't active or filling at this time.
@@ -271,11 +280,13 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
       return result;
     }
     activeTime = result.mActiveDuration;
-    // Note that infinity == floor(infinity) so this will also be true when we
-    // have finished an infinitely repeating animation of zero duration.
+    double finiteProgress =
+      (IsInfinite(result.mIterations) ? 0.0 : result.mIterations)
+      + result.mIterationStart;
     isEndOfFinalIteration = result.mIterations != 0.0 &&
-                            result.mIterations == floor(result.mIterations);
-  } else if (localTime < aTiming.mDelay) {
+                            fmod(finiteProgress, 1.0) == 0;
+  } else if (localTime <
+               std::min(StickyTimeDuration(aTiming.mDelay), result.mEndTime)) {
     result.mPhase = ComputedTiming::AnimationPhase::Before;
     if (!result.FillsBackwards()) {
       // The animation isn't active or filling at this time.
@@ -290,49 +301,66 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
     activeTime = localTime - aTiming.mDelay;
   }
 
+  // Calculate the scaled active time
+  // (We handle the case where the iterationStart is zero separately in case
+  // the duration is infinity, since 0 * Infinity is undefined.)
+  StickyTimeDuration startOffset =
+    result.mIterationStart == 0.0
+    ? StickyTimeDuration(0)
+    : result.mDuration.MultDouble(result.mIterationStart);
+  StickyTimeDuration scaledActiveTime = activeTime + startOffset;
+
   // Get the position within the current iteration.
   StickyTimeDuration iterationTime;
-  if (result.mDuration != zeroDuration) {
+  if (result.mDuration != zeroDuration &&
+      scaledActiveTime != StickyTimeDuration::Forever()) {
     iterationTime = isEndOfFinalIteration
                     ? result.mDuration
-                    : activeTime % result.mDuration;
-  } /* else, iterationTime is zero */
+      : scaledActiveTime % result.mDuration;
+  } /* else, either the duration is zero and iterationTime is zero,
+       or the scaledActiveTime is infinity in which case the iterationTime
+       should become infinity but we will not use the iterationTime in that
+       case so we just leave it as zero */
 
   // Determine the 0-based index of the current iteration.
-  if (isEndOfFinalIteration) {
+  if (result.mPhase == ComputedTiming::AnimationPhase::Before ||
+      result.mIterations == 0) {
+    result.mCurrentIteration = static_cast<uint64_t>(result.mIterationStart);
+  } else if (result.mPhase == ComputedTiming::AnimationPhase::After) {
     result.mCurrentIteration =
-      IsInfinite(result.mIterations) // Positive Infinity?
+      IsInfinite(result.mIterations)
       ? UINT64_MAX // In GetComputedTimingDictionary(), we will convert this
                    // into Infinity.
-      : static_cast<uint64_t>(result.mIterations) - 1;
-  } else if (activeTime == zeroDuration) {
-    // If the active time is zero we're either in the first iteration
-    // (including filling backwards) or we have finished an animation with an
-    // iteration duration of zero that is filling forwards (but we're not at
-    // the exact end of an iteration since we deal with that above).
-    result.mCurrentIteration =
-      result.mPhase == ComputedTiming::AnimationPhase::After
-      ? static_cast<uint64_t>(result.mIterations) // floor
-      : 0;
+      : static_cast<uint64_t>(ceil(result.mIterations +
+                              result.mIterationStart)) - 1;
+  } else if (result.mDuration == StickyTimeDuration::Forever()) {
+    result.mCurrentIteration = static_cast<uint64_t>(result.mIterationStart);
   } else {
     result.mCurrentIteration =
-      static_cast<uint64_t>(activeTime / result.mDuration); // floor
+      static_cast<uint64_t>(scaledActiveTime / result.mDuration); // floor
   }
 
   // Normalize the iteration time into a fraction of the iteration duration.
-  if (result.mPhase == ComputedTiming::AnimationPhase::Before) {
-    result.mProgress.SetValue(0.0);
+  if (result.mPhase == ComputedTiming::AnimationPhase::Before ||
+      result.mIterations == 0) {
+    double progress = fmod(result.mIterationStart, 1.0);
+    result.mProgress.SetValue(progress);
   } else if (result.mPhase == ComputedTiming::AnimationPhase::After) {
-    double progress = isEndOfFinalIteration
-                      ? 1.0
-                      : fmod(result.mIterations, 1.0);
+    double progress;
+    if (isEndOfFinalIteration) {
+      progress = 1.0;
+    } else if (IsInfinite(result.mIterations)) {
+      progress = fmod(result.mIterationStart, 1.0);
+    } else {
+      progress = fmod(result.mIterations + result.mIterationStart, 1.0);
+    }
     result.mProgress.SetValue(progress);
   } else {
     // We are in the active phase so the iteration duration can't be zero.
     MOZ_ASSERT(result.mDuration != zeroDuration,
                "In the active phase of a zero-duration animation?");
     double progress = result.mDuration == StickyTimeDuration::Forever()
-                      ? 0.0
+                      ? fmod(result.mIterationStart, 1.0)
                       : iterationTime / result.mDuration;
     result.mProgress.SetValue(progress);
   }
@@ -367,18 +395,19 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
 }
 
 StickyTimeDuration
-KeyframeEffectReadOnly::ActiveDuration(const StickyTimeDuration& aIterationDuration,
-                                       double aIterationCount)
+KeyframeEffectReadOnly::ActiveDuration(
+  const StickyTimeDuration& aIterationDuration,
+  double aIterationCount)
 {
-  if (IsInfinite(aIterationCount)) {
-    // An animation that repeats forever has an infinite active duration
-    // unless its iteration duration is zero, in which case it has a zero
-    // active duration.
-    const StickyTimeDuration zeroDuration;
-    return aIterationDuration == zeroDuration ?
-           zeroDuration :
-           StickyTimeDuration::Forever();
+  // If either the iteration duration or iteration count is zero,
+  // Web Animations says that the active duration is zero. This is to
+  // ensure that the result is defined when the other argument is Infinity.
+  const StickyTimeDuration zeroDuration;
+  if (aIterationDuration == zeroDuration ||
+      aIterationCount == 0.0) {
+    return zeroDuration;
   }
+
   return aIterationDuration.MultDouble(aIterationCount);
 }
 
@@ -450,9 +479,17 @@ KeyframeEffectReadOnly::HasAnimationOfProperties(
   return false;
 }
 
-void
-KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
+bool
+KeyframeEffectReadOnly::UpdateProperties(
+    const InfallibleTArray<AnimationProperty>& aProperties)
 {
+  // AnimationProperty::operator== does not compare mWinsInCascade and
+  // mIsRunningOnCompositor, we don't need to update anything here because
+  // we want to preserve
+  if (mProperties == aProperties) {
+    return false;
+  }
+
   nsCSSPropertySet winningInCascadeProperties;
   nsCSSPropertySet runningOnCompositorProperties;
 
@@ -465,7 +502,7 @@ KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
     }
   }
 
-  mProperties = aOther.mProperties;
+  mProperties = aProperties;
 
   for (AnimationProperty& property : mProperties) {
     property.mWinsInCascade =
@@ -473,6 +510,18 @@ KeyframeEffectReadOnly::CopyPropertiesFrom(const KeyframeEffectReadOnly& aOther)
     property.mIsRunningOnCompositor =
       runningOnCompositorProperties.HasProperty(property.mProperty);
   }
+
+  if (mAnimation) {
+    nsPresContext* presContext = GetPresContext();
+    if (presContext) {
+      presContext->EffectCompositor()->
+        RequestRestyle(mTarget, mPseudoType,
+                       EffectCompositor::RestyleType::Layer,
+                       mAnimation->CascadeLevel());
+    }
+  }
+
+  return true;
 }
 
 void
@@ -588,6 +637,12 @@ KeyframeEffectReadOnly::SetIsRunningOnCompositor(nsCSSProperty aProperty,
   for (AnimationProperty& property : mProperties) {
     if (property.mProperty == aProperty) {
       property.mIsRunningOnCompositor = aIsRunning;
+      // We currently only set a performance warning message when animations
+      // cannot be run on the compositor, so if this animation is running
+      // on the compositor we don't need a message.
+      if (aIsRunning) {
+        property.mPerformanceWarning.reset();
+      }
       return;
     }
   }
@@ -1826,6 +1881,32 @@ KeyframeEffectReadOnly::GetFrames(JSContext*& aCx,
   }
 }
 
+
+void
+KeyframeEffectReadOnly::GetPropertyState(
+    nsTArray<AnimationPropertyState>& aStates) const
+{
+  for (const AnimationProperty& property : mProperties) {
+    // Bug 1252730: We should also expose this winsInCascade as well.
+    if (!property.mWinsInCascade) {
+      continue;
+    }
+
+    AnimationPropertyState state;
+    state.mProperty.Construct(
+      NS_ConvertASCIItoUTF16(nsCSSProps::GetStringValue(property.mProperty)));
+    state.mRunningOnCompositor.Construct(property.mIsRunningOnCompositor);
+
+    nsXPIDLString localizedString;
+    if (property.mPerformanceWarning &&
+        property.mPerformanceWarning->ToLocalizedString(localizedString)) {
+      state.mWarning.Construct(localizedString);
+    }
+
+    aStates.AppendElement(state);
+  }
+}
+
 /* static */ const TimeDuration
 KeyframeEffectReadOnly::OverflowRegionRefreshInterval()
 {
@@ -2024,42 +2105,29 @@ KeyframeEffectReadOnly::IsGeometricProperty(
 /* static */ bool
 KeyframeEffectReadOnly::CanAnimateTransformOnCompositor(
   const nsIFrame* aFrame,
-  const nsIContent* aContent)
+  AnimationPerformanceWarning::Type& aPerformanceWarning)
 {
   // Disallow OMTA for preserve-3d transform. Note that we check the style property
   // rather than Extend3DContext() since that can recurse back into this function
-  // via HasOpacity().
+  // via HasOpacity(). See bug 779598.
   if (aFrame->Combines3DTransformWithAncestors() ||
       aFrame->StyleDisplay()->mTransformStyle == NS_STYLE_TRANSFORM_STYLE_PRESERVE_3D) {
-    if (aContent) {
-      nsCString message;
-      message.AppendLiteral("Gecko bug: Async animation of 'preserve-3d' "
-        "transforms is not supported.  See bug 779598");
-      AnimationUtils::LogAsyncAnimationFailure(message, aContent);
-    }
+    aPerformanceWarning = AnimationPerformanceWarning::Type::TransformPreserve3D;
     return false;
   }
   // Note that testing BackfaceIsHidden() is not a sufficient test for
   // what we need for animating backface-visibility correctly if we
   // remove the above test for Extend3DContext(); that would require
-  // looking at backface-visibility on descendants as well.
+  // looking at backface-visibility on descendants as well. See bug 1186204.
   if (aFrame->StyleDisplay()->BackfaceIsHidden()) {
-    if (aContent) {
-      nsCString message;
-      message.AppendLiteral("Gecko bug: Async animation of "
-        "'backface-visibility: hidden' transforms is not supported."
-        "  See bug 1186204.");
-      AnimationUtils::LogAsyncAnimationFailure(message, aContent);
-    }
+    aPerformanceWarning =
+      AnimationPerformanceWarning::Type::TransformBackfaceVisibilityHidden;
     return false;
   }
+  // Async 'transform' animations of aFrames with SVG transforms is not
+  // supported.  See bug 779599.
   if (aFrame->IsSVGTransformed()) {
-    if (aContent) {
-      nsCString message;
-      message.AppendLiteral("Gecko bug: Async 'transform' animations of "
-        "aFrames with SVG transforms is not supported.  See bug 779599");
-      AnimationUtils::LogAsyncAnimationFailure(message, aContent);
-    }
+    aPerformanceWarning = AnimationPerformanceWarning::Type::TransformSVG;
     return false;
   }
 
@@ -2067,8 +2135,9 @@ KeyframeEffectReadOnly::CanAnimateTransformOnCompositor(
 }
 
 bool
-KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(const nsIFrame*
-                                                          aFrame) const
+KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(
+  const nsIFrame* aFrame,
+  AnimationPerformanceWarning::Type& aPerformanceWarning) const
 {
   // We currently only expect this method to be called when this effect
   // is attached to a playing Animation. If that ever changes we'll need
@@ -2077,31 +2146,51 @@ KeyframeEffectReadOnly::ShouldBlockCompositorAnimations(const nsIFrame*
   // running on the compositor.
   MOZ_ASSERT(mAnimation && mAnimation->IsPlaying());
 
-  bool shouldLog = nsLayoutUtils::IsAnimationLoggingEnabled();
-
   for (const AnimationProperty& property : mProperties) {
+    // If a property is overridden in the CSS cascade, it should not block other
+    // animations from running on the compositor.
+    if (!property.mWinsInCascade) {
+      continue;
+    }
     // Check for geometric properties
     if (IsGeometricProperty(property.mProperty)) {
-      if (shouldLog) {
-        nsCString message;
-        message.AppendLiteral("Performance warning: Async animation of "
-          "'transform' or 'opacity' not possible due to animation of geometric"
-          "properties on the same element");
-        AnimationUtils::LogAsyncAnimationFailure(message, aFrame->GetContent());
-      }
+      aPerformanceWarning =
+        AnimationPerformanceWarning::Type::WithGeometricProperties;
       return true;
     }
 
     // Check for unsupported transform animations
     if (property.mProperty == eCSSProperty_transform) {
       if (!CanAnimateTransformOnCompositor(aFrame,
-            shouldLog ? aFrame->GetContent() : nullptr)) {
+                                           aPerformanceWarning)) {
         return true;
       }
     }
   }
 
   return false;
+}
+
+void
+KeyframeEffectReadOnly::SetPerformanceWarning(
+  nsCSSProperty aProperty,
+  const AnimationPerformanceWarning& aWarning)
+{
+  for (AnimationProperty& property : mProperties) {
+    if (property.mProperty == aProperty &&
+        (!property.mPerformanceWarning ||
+         *property.mPerformanceWarning != aWarning)) {
+      property.mPerformanceWarning = Some(aWarning);
+
+      nsXPIDLString localizedString;
+      if (nsLayoutUtils::IsAnimationLoggingEnabled() &&
+          property.mPerformanceWarning->ToLocalizedString(localizedString)) {
+        nsAutoCString logMessage = NS_ConvertUTF16toUTF8(localizedString);
+        AnimationUtils::LogAsyncAnimationFailure(logMessage, mTarget);
+      }
+      return;
+    }
+  }
 }
 
 //---------------------------------------------------------------------
@@ -2115,7 +2204,7 @@ KeyframeEffect::KeyframeEffect(nsIDocument* aDocument,
                                CSSPseudoElementType aPseudoType,
                                const TimingParams& aTiming)
   : KeyframeEffectReadOnly(aDocument, aTarget, aPseudoType,
-                           new AnimationEffectTiming(aTiming))
+                           new AnimationEffectTiming(aTiming, this))
 {
 }
 
@@ -2124,6 +2213,40 @@ KeyframeEffect::WrapObject(JSContext* aCx,
                            JS::Handle<JSObject*> aGivenProto)
 {
   return KeyframeEffectBinding::Wrap(aCx, this, aGivenProto);
+}
+
+void KeyframeEffect::NotifySpecifiedTimingUpdated()
+{
+  nsIDocument* doc = nullptr;
+  // Bug 1249219:
+  // We don't support animation mutation observers on pseudo-elements yet.
+  if (mTarget &&
+      mPseudoType == CSSPseudoElementType::NotPseudo) {
+    doc = mTarget->OwnerDoc();
+  }
+
+  nsAutoAnimationMutationBatch mb(doc);
+
+  if (mAnimation) {
+    mAnimation->NotifyEffectTimingUpdated();
+
+    if (mAnimation->IsRelevant()) {
+      nsNodeUtils::AnimationChanged(mAnimation);
+    }
+
+    nsPresContext* presContext = GetPresContext();
+    if (presContext) {
+      presContext->EffectCompositor()->
+        RequestRestyle(mTarget, mPseudoType,
+                       EffectCompositor::RestyleType::Layer,
+                       mAnimation->CascadeLevel());
+    }
+  }
+}
+
+KeyframeEffect::~KeyframeEffect()
+{
+  mTiming->Unlink();
 }
 
 } // namespace dom

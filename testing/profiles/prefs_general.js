@@ -103,6 +103,8 @@ user_pref("extensions.getAddons.get.url", "http://%(server)s/extensions-dummy/re
 user_pref("extensions.getAddons.getWithPerformance.url", "http://%(server)s/extensions-dummy/repositoryGetWithPerformanceURL");
 user_pref("extensions.getAddons.search.browseURL", "http://%(server)s/extensions-dummy/repositoryBrowseURL");
 user_pref("extensions.getAddons.search.url", "http://%(server)s/extensions-dummy/repositorySearchURL");
+// Ensure kinto updates don't hit the network
+user_pref("services.kinto.base", "http://%(server)s/dummy-kinto/v1");
 // Make sure that opening the plugins check page won't hit the network
 user_pref("plugins.update.url", "http://%(server)s/plugins-dummy/updateCheckURL");
 // Make sure SNTP requests don't hit the network
@@ -147,6 +149,7 @@ user_pref("layout.css.report_errors", true);
 
 // Enable CSS Grid for testing
 user_pref("layout.css.grid.enabled", true);
+user_pref("layout.css.grid-template-subgrid-value.enabled", true);
 
 // Enable CSS 'contain' for testing
 user_pref("layout.css.contain.enabled", true);
@@ -196,9 +199,6 @@ user_pref("browser.download.panel.shown", true);
 // Assume the about:newtab page's intro panels have been shown to not depend on
 // which test runs first and happens to open about:newtab
 user_pref("browser.newtabpage.introShown", true);
-
-// Tell the PBackground infrastructure to run a test at startup.
-user_pref("pbackground.testing", true);
 
 // Enable webapps testing mode, which bypasses native installation.
 user_pref("browser.webapps.testing", true);
@@ -291,7 +291,6 @@ user_pref("browser.search.geoSpecificDefaults", false);
 user_pref("browser.selfsupport.url", "https://%(server)s/selfsupport-dummy/");
 
 user_pref("media.eme.enabled", true);
-user_pref("media.eme.apiVisible", true);
 
 #if defined(XP_WIN)
 user_pref("media.decoder.heuristic.dormant.timeout", 0);

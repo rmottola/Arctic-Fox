@@ -326,14 +326,16 @@ public:
            const TextureFactoryIdentifier& aTextureFactoryIdentifier,
            const uint64_t& aLayersId,
            PRenderFrameChild* aRenderFrame,
-           const bool& aParentIsActive) override;
+           const bool& aParentIsActive,
+           const nsSizeMode& aSizeMode) override;
 
   virtual bool
   RecvUpdateDimensions(const CSSRect& aRect,
                        const CSSSize& aSize,
-                       const nsSizeMode& aSizeMode,
                        const ScreenOrientationInternal& aOrientation,
                        const LayoutDeviceIntPoint& aChromeDisp) override;
+  virtual bool
+  RecvSizeModeChanged(const nsSizeMode& aSizeMode) override;
 
   virtual bool RecvActivate() override;
 
@@ -535,6 +537,8 @@ public:
   static TabChild* GetFrom(nsIPresShell* aPresShell);
   static TabChild* GetFrom(uint64_t aLayersId);
 
+  uint64_t LayersId() { return mLayersId; }
+
   void DidComposite(uint64_t aTransactionId,
                     const TimeStamp& aCompositeStart,
                     const TimeStamp& aCompositeEnd);
@@ -543,6 +547,8 @@ public:
                            const TimeStamp& aCompositeReqEnd);
 
   void ClearCachedResources();
+  void InvalidateLayers();
+  void CompositorUpdated(const TextureFactoryIdentifier& aNewIdentifier);
 
   static inline TabChild* GetFrom(nsIDOMWindow* aWindow)
   {

@@ -10902,6 +10902,10 @@
         "url": "/IndexedDB/idbindex_openKeyCursor3.htm"
       },
       {
+        "path": "IndexedDB/idbkeyrange-includes.htm",
+        "url": "/IndexedDB/idbkeyrange-includes.htm"
+      },
+      {
         "path": "IndexedDB/idbkeyrange.htm",
         "url": "/IndexedDB/idbkeyrange.htm"
       },
@@ -18794,6 +18798,26 @@
         "url": "/web-animations/animatable/animate.html"
       },
       {
+        "path": "web-animations/animation-effect-timing/duration.html",
+        "url": "/web-animations/animation-effect-timing/duration.html"
+      },
+      {
+        "path": "web-animations/animation-effect-timing/endDelay.html",
+        "url": "/web-animations/animation-effect-timing/endDelay.html"
+      },
+      {
+        "path": "web-animations/animation-effect-timing/getAnimations.html",
+        "url": "/web-animations/animation-effect-timing/getAnimations.html"
+      },
+      {
+        "path": "web-animations/animation-effect-timing/getComputedStyle.html",
+        "url": "/web-animations/animation-effect-timing/getComputedStyle.html"
+      },
+      {
+        "path": "web-animations/animation-effect-timing/iterationStart.html",
+        "url": "/web-animations/animation-effect-timing/iterationStart.html"
+      },
+      {
         "path": "web-animations/animation-node/animation-node-after.html",
         "url": "/web-animations/animation-node/animation-node-after.html"
       },
@@ -18831,6 +18855,30 @@
       {
         "path": "web-animations/animation-timeline/idlharness.html",
         "url": "/web-animations/animation-timeline/idlharness.html"
+      },
+      {
+        "path": "web-animations/animation/constructor.html",
+        "url": "/web-animations/animation/constructor.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/constructor.html",
+        "url": "/web-animations/keyframe-effect/constructor.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/effect-easing.html",
+        "url": "/web-animations/keyframe-effect/effect-easing.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming-currentIteration.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming-currentIteration.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming-progress.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming-progress.html"
+      },
+      {
+        "path": "web-animations/keyframe-effect/getComputedTiming.html",
+        "url": "/web-animations/keyframe-effect/getComputedTiming.html"
       },
       {
         "path": "webaudio/the-audio-api/the-audiobuffer-interface/idl-test.html",
@@ -21468,22 +21516,6 @@
       },
       {
         "path": "webdriver/timeouts/page_load_timeouts_tests.py"
-      },
-      {
-        "path": "web-animations/keyframe-effect/constructor.html",
-        "url": "/web-animations/keyframe-effect/constructor.html"
-      },
-      {
-        "path": "web-animations/keyframe-effect/effect-easing.html",
-        "url": "/web-animations/keyframe-effect/effect-easing.html"
-      },
-      {
-        "path": "web-animations/keyframe-effect/getComputedTiming.html",
-        "url": "/web-animations/keyframe-effect/getComputedTiming.html"
-      },
-      {
-        "path": "web-animations/animation/constructor.html",
-        "url": "/web-animations/animation/constructor.html"
       },
       {
         "path": "webdriver/user_input/clear_test.py"

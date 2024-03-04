@@ -205,7 +205,7 @@ ReportWrapperDenial(JSContext* cx, HandleId id, WrapperDenialType type, const ch
         return false;
     if (!propertyName.init(cx, str))
         return false;
-    UniqueChars filename;
+    AutoFilename filename;
     unsigned line = 0, column = 0;
     DescribeScriptedCaller(cx, &filename, &line, &column);
 
@@ -911,6 +911,48 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
     return AppendNamesFromFunctionAndPropertySpecs(
         cx, clasp->spec.prototypeFunctions(),
         clasp->spec.prototypeProperties(), flags, props);
+}
+
+bool
+JSXrayTraits::construct(JSContext* cx, HandleObject wrapper,
+                        const JS::CallArgs& args, const js::Wrapper& baseInstance)
+{
+    JSXrayTraits& self = JSXrayTraits::singleton;
+    JS::RootedObject holder(cx, self.ensureHolder(cx, wrapper));
+    if (self.getProtoKey(holder) == JSProto_Function) {
+        JSProtoKey standardConstructor = constructorFor(holder);
+        if (standardConstructor == JSProto_Null)
+            return baseInstance.construct(cx, wrapper, args);
+
+        const js::Class* clasp = js::ProtoKeyToClass(standardConstructor);
+        MOZ_ASSERT(clasp);
+        if (!(clasp->flags & JSCLASS_HAS_XRAYED_CONSTRUCTOR))
+            return baseInstance.construct(cx, wrapper, args);
+
+        // If the JSCLASS_HAS_XRAYED_CONSTRUCTOR flag is set on the Class,
+        // we don't use the constructor at hand. Instead, we retrieve the
+        // equivalent standard constructor in the xray compartment and run
+        // it in that compartment. The newTarget isn't unwrapped, and the
+        // constructor has to be able to detect and handle this situation.
+        // See the comments in js/public/Class.h and PromiseConstructor for
+        // details and an example.
+        RootedObject ctor(cx);
+        if (!JS_GetClassObject(cx, standardConstructor, &ctor))
+            return false;
+
+        RootedValue ctorVal(cx, ObjectValue(*ctor));
+        HandleValueArray vals(args);
+        RootedObject result(cx);
+        if (!JS::Construct(cx, ctorVal, wrapper, vals, &result))
+            return false;
+        AssertSameCompartment(cx, result);
+        args.rval().setObject(*result);
+        return true;
+    }
+
+    JS::RootedValue v(cx, JS::ObjectValue(*wrapper));
+    js::ReportIsNotFunction(cx, v);
+    return false;
 }
 
 JSObject*

@@ -166,10 +166,6 @@ const Tree = module.exports = createClass({
     onFocus: PropTypes.func,
     // The depth to which we should automatically expand new items.
     autoExpandDepth: PropTypes.number,
-    // A predicate that returns true if the last DFS traversal that was cached
-    // can be reused, false otherwise. The predicate function is passed the
-    // cached traversal as an array of nodes.
-    reuseCachedTraversal: PropTypes.func,
     // Optional event handlers for when items are expanded or collapsed.
     onExpand: PropTypes.func,
     onCollapse: PropTypes.func,
@@ -178,7 +174,6 @@ const Tree = module.exports = createClass({
   getDefaultProps() {
     return {
       autoExpandDepth: AUTO_EXPAND_DEPTH,
-      reuseCachedTraversal: null,
     };
   },
 
@@ -187,7 +182,6 @@ const Tree = module.exports = createClass({
       scroll: 0,
       height: window.innerHeight,
       seen: new Set(),
-      cachedTraversal: undefined,
     };
   },
 
@@ -330,21 +324,10 @@ const Tree = module.exports = createClass({
    * Perform a pre-order depth-first search over the whole forest.
    */
   _dfsFromRoots(maxDepth = Infinity) {
-    const cached = this.state.cachedTraversal;
-    if (cached
-        && maxDepth === Infinity
-        && this.props.reuseCachedTraversal
-        && this.props.reuseCachedTraversal(cached)) {
-      return cached;
-    }
-
     const traversal = [];
+
     for (let root of this.props.getRoots()) {
       this._dfs(root, maxDepth, traversal);
-    }
-
-    if (this.props.reuseCachedTraversal) {
-      this.state.cachedTraversal = traversal;
     }
 
     return traversal;
@@ -366,10 +349,6 @@ const Tree = module.exports = createClass({
         }
       }
     }
-
-    this.setState({
-      cachedTraversal: null,
-    });
   }),
 
   /**
@@ -381,10 +360,6 @@ const Tree = module.exports = createClass({
     if (this.props.onCollapse) {
       this.props.onCollapse(item);
     }
-
-    this.setState({
-      cachedTraversal: null,
-    });
   }),
 
   /**

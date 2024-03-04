@@ -63,6 +63,7 @@ menucaption > .menu-iconic-text {
 .menuitem-iconic,
 .menu-iconic,
 menuitem[image],
+menuitem[endimage],
 menuitem[src] {
   /* 2px higher than those without icons */
   padding-top: 1px;
@@ -161,7 +162,8 @@ menulist[editable="true"] > menupopup > menucaption {
   -moz-appearance: none;
 }
 
-menulist[editable="true"] > menupopup > :moz-any(menuitem, menucaption) > .menu-iconic-left
+menulist[editable="true"] > menupopup > :-moz-any(menuitem, menucaption) > .menu-iconic-left,
+menulist[editable="true"] > menupopup > :-moz-any(menuitem, menucaption) > .menu-iconic-right {
   display: none;
 }
 

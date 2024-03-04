@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
+/* import-globals-from pippki.js */
 
 var gDialog;
 var gBundleBrand;
@@ -24,14 +24,16 @@ badCertListener.prototype = {
   QueryInterface: function(aIID) {
     if (aIID.equals(Components.interfaces.nsIBadCertListener2) ||
         aIID.equals(Components.interfaces.nsIInterfaceRequestor) ||
-        aIID.equals(Components.interfaces.nsISupports))
+        aIID.equals(Components.interfaces.nsISupports)) {
       return this;
+    }
 
-    throw Components.results.NS_ERROR_NO_INTERFACE;
+    throw new Error(Components.results.NS_ERROR_NO_INTERFACE);
   },
   handle_test_result: function () {
-    if (gSSLStatus)
+    if (gSSLStatus) {
       gCert = gSSLStatus.QueryInterface(Components.interfaces.nsISSLStatus).serverCert;
+    }
   },
   notifyCertProblem: function MSR_notifyCertProblem(socketInfo, sslStatus, targetHost) {
     gBroken = true;
@@ -39,7 +41,7 @@ badCertListener.prototype = {
     this.handle_test_result();
     return true; // suppress error UI
   }
-}
+};
 
 function initExceptionDialog() {
   gNeedReset = false;
@@ -102,7 +104,7 @@ function checkCert() {
 
   var req = new XMLHttpRequest();
   try {
-    if(uri) {
+    if (uri) {
       req.open('GET', uri.prePath, false);
       req.channel.notificationCallbacks = new badCertListener();
       req.send(null);
@@ -314,8 +316,9 @@ function viewCertButtonClick() {
  * Handle user request to add an exception for the specified cert
  */
 function addException() {
-  if(!gCert || !gSSLStatus)
+  if (!gCert || !gSSLStatus) {
     return;
+  }
 
   var overrideService = Components.classes["@mozilla.org/security/certoverride;1"]
                                   .getService(Components.interfaces.nsICertOverrideService);
@@ -336,8 +339,9 @@ function addException() {
 
   var permanentCheckbox = document.getElementById("permanent");
   var shouldStorePermanently = permanentCheckbox.checked && !inPrivateBrowsingMode();
-  if(!permanentCheckbox.checked)
-   gSecHistogram.add(gNsISecTel.WARNING_BAD_CERT_TOP_DONT_REMEMBER_EXCEPTION);
+  if (!permanentCheckbox.checked) {
+    gSecHistogram.add(gNsISecTel.WARNING_BAD_CERT_TOP_DONT_REMEMBER_EXCEPTION);
+  }
 
   gSecHistogram.add(confirmBucketId);
   var uri = getURI();

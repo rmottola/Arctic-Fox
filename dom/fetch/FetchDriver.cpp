@@ -14,7 +14,6 @@
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
-#include "nsIJARChannel.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIThreadRetargetableRequest.h"
 #include "nsIUploadChannel2.h"
@@ -51,8 +50,10 @@ FetchDriver::FetchDriver(InternalRequest* aRequest, nsIPrincipal* aPrincipal,
   : mPrincipal(aPrincipal)
   , mLoadGroup(aLoadGroup)
   , mRequest(aRequest)
+#ifdef DEBUG
   , mResponseAvailableCalled(false)
   , mFetchCalled(false)
+#endif
 {
 }
 
@@ -67,8 +68,10 @@ nsresult
 FetchDriver::Fetch(FetchDriverObserver* aObserver)
 {
   workers::AssertIsOnMainThread();
+#ifdef DEBUG
   MOZ_ASSERT(!mFetchCalled);
   mFetchCalled = true;
+#endif
 
   mObserver = aObserver;
 
@@ -397,7 +400,9 @@ FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse,
   MOZ_ASSERT(filteredResponse);
   MOZ_ASSERT(mObserver);
   mObserver->OnResponseAvailable(filteredResponse);
+#ifdef DEBUG
   mResponseAvailableCalled = true;
+#endif
   return filteredResponse.forget();
 }
 
@@ -408,7 +413,9 @@ FetchDriver::FailWithNetworkError()
   RefPtr<InternalResponse> error = InternalResponse::NetworkError();
   if (mObserver) {
     mObserver->OnResponseAvailable(error);
+#ifdef DEBUG
     mResponseAvailableCalled = true;
+#endif
     mObserver->OnResponseEnd();
     mObserver = nullptr;
   }
@@ -471,7 +478,6 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
   RefPtr<InternalResponse> response;
   nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aRequest);
-  nsCOMPtr<nsIJARChannel> jarChannel = do_QueryInterface(aRequest);
 
   // On a successful redirect we perform the following substeps of HTTP Fetch,
   // step 5, "redirect status", step 11.
@@ -516,18 +522,6 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
     if (NS_WARN_IF(NS_FAILED(rv))) {
       NS_WARNING("Failed to visit all headers.");
     }
-  } else if (jarChannel) {
-    // We simulate the http protocol for jar/app requests
-    uint32_t responseStatus = 200;
-    nsAutoCString statusText;
-    response = new InternalResponse(responseStatus, NS_LITERAL_CSTRING("OK"));
-    ErrorResult result;
-    nsAutoCString contentType;
-    jarChannel->GetContentType(contentType);
-    response->Headers()->Append(NS_LITERAL_CSTRING("content-type"),
-                                contentType,
-                                result);
-    MOZ_ASSERT(!result.Failed());
   } else {
     response = new InternalResponse(200, NS_LITERAL_CSTRING("OK"));
 

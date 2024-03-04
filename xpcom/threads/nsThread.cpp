@@ -6,9 +6,7 @@
 
 #include "nsThread.h"
 
-#if !defined(MOZILLA_XPCOMRT_API)
 #include "base/message_loop.h"
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
 // Chromium's logging can sometimes leak through...
 #ifdef LOG
@@ -26,16 +24,15 @@
 #include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/Logging.h"
 #include "nsIObserverService.h"
-#if !defined(MOZILLA_XPCOMRT_API)
 #include "mozilla/HangMonitor.h"
 #include "mozilla/IOInterposer.h"
 #include "mozilla/ipc/MessageChannel.h"
 #include "mozilla/ipc/BackgroundChild.h"
-#endif // defined(MOZILLA_XPCOMRT_API)
 #include "mozilla/Services.h"
 #include "nsXPCOMPrivate.h"
 #include "mozilla/ChaosMode.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/unused.h"
 #include "nsThreadSyncDispatch.h"
 #include "LeakRefPtr.h"
 
@@ -60,6 +57,11 @@
 
 #if defined(XP_LINUX) && !defined(ANDROID) && defined(_GNU_SOURCE)
 #define HAVE_SCHED_SETAFFINITY
+#endif
+
+#ifdef XP_MACOSX
+#include <mach/mach.h>
+#include <mach/thread_policy.h>
 #endif
 
 #ifdef MOZ_CANARY
@@ -233,6 +235,15 @@ private:
 
 struct nsThreadShutdownContext
 {
+  nsThreadShutdownContext()
+  {
+    MOZ_COUNT_CTOR(nsThreadShutdownContext);
+  }
+  ~nsThreadShutdownContext()
+  {
+    MOZ_COUNT_DTOR(nsThreadShutdownContext);
+  }
+
   // NB: This will be the last reference.
   RefPtr<nsThread> terminatingThread;
   nsThread* joiningThread;
@@ -282,9 +293,7 @@ public:
   NS_IMETHOD Run()
   {
     mThread->mShutdownContext = mShutdownContext;
-#if !defined(MOZILLA_XPCOMRT_API)
     MessageLoop::current()->Quit();
-#endif // !defined(MOZILLA_XPCOMRT_API)
     return NS_OK;
   }
 private:
@@ -293,6 +302,31 @@ private:
 };
 
 //-----------------------------------------------------------------------------
+
+static void
+SetThreadAffinity(unsigned int cpu)
+{
+#ifdef HAVE_SCHED_SETAFFINITY
+  cpu_set_t cpus;
+  CPU_ZERO(&cpus);
+  CPU_SET(cpu, &cpus);
+  sched_setaffinity(0, sizeof(cpus), &cpus);
+  // Don't assert sched_setaffinity's return value because it intermittently (?)
+  // fails with EINVAL on Linux x64 try runs.
+#elif defined(XP_MACOSX)
+  // OS X does not provide APIs to pin threads to specific processors, but you
+  // can tag threads as belonging to the same "affinity set" and the OS will try
+  // to run them on the same processor. To run threads on different processors,
+  // tag them as belonging to different affinity sets. Tag 0, the default, means
+  // "no affinity" so let's pretend each CPU has its own tag `cpu+1`.
+  thread_affinity_policy_data_t policy;
+  policy.affinity_tag = cpu + 1;
+  MOZ_ALWAYS_TRUE(thread_policy_set(mach_thread_self(), THREAD_AFFINITY_POLICY,
+                                    &policy.affinity_tag, 1) == KERN_SUCCESS);
+#elif defined(XP_WIN)
+  MOZ_ALWAYS_TRUE(SetThreadIdealProcessor(GetCurrentThread(), cpu) != -1);
+#endif
+}
 
 static void
 SetupCurrentThreadForChaosMode()
@@ -321,23 +355,16 @@ SetupCurrentThreadForChaosMode()
   PR_SetThreadPriority(PR_GetCurrentThread(), PRThreadPriority(priority));
 #endif
 
-#ifdef HAVE_SCHED_SETAFFINITY
   // Force half the threads to CPU 0 so they compete for CPU
   if (ChaosMode::randomUint32LessThan(2)) {
-    cpu_set_t cpus;
-    CPU_ZERO(&cpus);
-    CPU_SET(0, &cpus);
-    sched_setaffinity(0, sizeof(cpus), &cpus);
+    SetThreadAffinity(0);
   }
-#endif
 }
 
 /*static*/ void
 nsThread::ThreadFunc(void* aArg)
 {
-#if !defined(MOZILLA_XPCOMRT_API)
   using mozilla::ipc::BackgroundChild;
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
   nsThread* self = static_cast<nsThread*>(aArg);  // strong reference
   self->mThread = PR_GetCurrentThread();
@@ -346,9 +373,7 @@ nsThread::ThreadFunc(void* aArg)
   // Inform the ThreadManager
   nsThreadManager::get()->RegisterCurrentThread(self);
 
-#if !defined(MOZILLA_XPCOMRT_API)
   mozilla::IOInterposer::RegisterCurrentThread();
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
   // Wait for and process startup event
   nsCOMPtr<nsIRunnable> event;
@@ -363,11 +388,6 @@ nsThread::ThreadFunc(void* aArg)
   event = nullptr;
 
   {
-#if defined(MOZILLA_XPCOMRT_API)
-    while(!self->mShutdownContext) {
-      NS_ProcessNextEvent();
-    }
-#else
     // Scope for MessageLoop.
     nsAutoPtr<MessageLoop> loop(
       new MessageLoop(MessageLoop::TYPE_MOZILLA_NONMAINTHREAD));
@@ -376,7 +396,9 @@ nsThread::ThreadFunc(void* aArg)
     loop->Run();
 
     BackgroundChild::CloseForCurrentThread();
-#endif // defined(MOZILLA_XPCOMRT_API)
+
+    // NB: The main thread does not shut down here!  It shuts down via
+    // nsThreadManager::Shutdown.
 
     // Do NS_ProcessPendingEvents but with special handling to set
     // mEventsAreDoomed atomically with the removal of the last event. The key
@@ -386,10 +408,7 @@ nsThread::ThreadFunc(void* aArg)
     // as we have outstanding mRequestedShutdownContexts.
     while (true) {
       // Check and see if we're waiting on any threads.
-      while (self->mRequestedShutdownContexts.Length()) {
-        // We can't stop accepting events just yet.  Block and check again.
-        NS_ProcessNextEvent(self, true);
-      }
+      self->WaitForAllAsynchronousShutdowns();
 
       {
         MutexAutoLock lock(self->mLock);
@@ -406,9 +425,7 @@ nsThread::ThreadFunc(void* aArg)
     }
   }
 
-#if !defined(MOZILLA_XPCOMRT_API)
   mozilla::IOInterposer::UnregisterCurrentThread();
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
   // Inform the threadmanager that this thread is going away
   nsThreadManager::get()->UnregisterCurrentThread(self);
@@ -480,6 +497,19 @@ nsThread::nsThread(MainThreadFlag aMainThread, uint32_t aStackSize)
 
 nsThread::~nsThread()
 {
+  NS_ASSERTION(mRequestedShutdownContexts.IsEmpty(),
+               "shouldn't be waiting on other threads to shutdown");
+#ifdef DEBUG
+  // We deliberately leak these so they can be tracked by the leak checker.
+  // If you're having nsThreadShutdownContext leaks, you can set:
+  //   XPCOM_MEM_LOG_CLASSES=nsThreadShutdownContext
+  // during a test run and that will at least tell you what thread is
+  // requesting shutdown on another, which can be helpful for diagnosing
+  // the leak.
+  for (size_t i = 0; i < mRequestedShutdownContexts.Length(); ++i) {
+    Unused << mRequestedShutdownContexts[i].forget();
+  }
+#endif
 }
 
 nsresult
@@ -751,6 +781,14 @@ nsThread::ShutdownComplete(nsThreadShutdownContext* aContext)
     aContext->joiningThread->mRequestedShutdownContexts.RemoveElement(aContext));
 }
 
+void
+nsThread::WaitForAllAsynchronousShutdowns()
+{
+  while (mRequestedShutdownContexts.Length()) {
+    NS_ProcessNextEvent(this, true);
+  }
+}
+
 NS_IMETHODIMP
 nsThread::Shutdown()
 {
@@ -849,12 +887,10 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
   LOG(("THRD(%p) ProcessNextEvent [%u %u]\n", this, aMayWait,
        mNestedEventLoopDepth));
 
-#if !defined(MOZILLA_XPCOMRT_API)
   // If we're on the main thread, we shouldn't be dispatching CPOWs.
   if (mIsMainThread == MAIN_THREAD) {
     ipc::CancelCPOWs();
   }
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
   if (NS_WARN_IF(PR_GetCurrentThread() != mThread)) {
     return NS_ERROR_NOT_SAME_THREAD;
@@ -870,11 +906,9 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
   // and repeat the nested event loop since its state change hasn't happened yet.
   bool reallyWait = aMayWait && (mNestedEventLoopDepth > 0 || !ShuttingDown());
 
-#if !defined(MOZILLA_XPCOMRT_API)
   if (MAIN_THREAD == mIsMainThread && reallyWait) {
     HangMonitor::Suspend();
   }
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
   // Fire a memory pressure notification, if we're the main thread and one is
   // pending.
@@ -954,11 +988,9 @@ nsThread::ProcessNextEvent(bool aMayWait, bool* aResult)
 
     if (event) {
       LOG(("THRD(%p) running [%p]\n", this, event.get()));
-#if !defined(MOZILLA_XPCOMRT_API)
       if (MAIN_THREAD == mIsMainThread) {
         HangMonitor::NotifyActivity();
       }
-#endif // !defined(MOZILLA_XPCOMRT_API)
       event->Run();
     } else if (aMayWait) {
       MOZ_ASSERT(ShuttingDown(),

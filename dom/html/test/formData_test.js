@@ -83,7 +83,6 @@ function testIterate() {
 
 function testFilename() {
   var f = new FormData();
-  // Spec says if a Blob (which is not a File) is added, the name parameter is set to "blob".
   f.append("blob", new Blob(["hi"]));
   ok(f.get("blob") instanceof Blob, "We should have a blob back.");
 

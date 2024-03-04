@@ -34,15 +34,15 @@ if ('MOZ_OFFICIAL_BRANDING' in listConfig) or (strBrandingDirectory.endswith("br
     if ('MOZ_PHOENIX' in listConfig):
         # Define a list of system libs and features that are in violation of Official branding
         listViolations = [
-            'MOZ_NATIVE_LIBEVENT',
-            'MOZ_NATIVE_NSS',
-            'MOZ_NATIVE_NSPR',
-            'MOZ_NATIVE_JPEG',
-            'MOZ_NATIVE_ZLIB',
-            'MOZ_NATIVE_BZ2',
-            'MOZ_NATIVE_PNG',
-            'MOZ_NATIVE_LIBVPX',
-            'MOZ_NATIVE_SQLITE',
+            'MOZ_SYSTEM_LIBEVENT',
+            'MOZ_SYSTEM_NSS',
+            'MOZ_SYSTEM_NSPR',
+            'MOZ_SYSTEM_JPEG',
+            'MOZ_SYSTEM_ZLIB',
+            'MOZ_SYSTEM_BZ2',
+            'MOZ_SYSTEM_PNG',
+            'MOZ_SYSTEM_LIBVPX',
+            'MOZ_SYSTEM_SQLITE',
             'MOZ_NATIVE_JEMALLOC',
             'MOZ_SANDBOX'
         ]

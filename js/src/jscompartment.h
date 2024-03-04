@@ -7,6 +7,7 @@
 #ifndef jscompartment_h
 #define jscompartment_h
 
+#include "mozilla/LinkedList.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Variant.h"
@@ -29,6 +30,10 @@ class JitCompartment;
 namespace gc {
 template<class Node> class ComponentFinder;
 } // namespace gc
+
+namespace wasm {
+class Module;
+} // namespace wasm
 
 struct NativeIterator;
 class ClonedBlockObject;
@@ -68,7 +73,9 @@ struct CrossCompartmentKey
         DebuggerScript,
         DebuggerSource,
         DebuggerObject,
-        DebuggerEnvironment
+        DebuggerEnvironment,
+        DebuggerWasmScript,
+        DebuggerWasmSource
     };
 
     Kind kind;
@@ -273,6 +280,14 @@ struct JSCompartment
         performanceMonitoring.unlink();
         isSystem_ = isSystem;
     }
+
+    // Used to approximate non-content code when reporting telemetry.
+    inline bool isProbablySystemOrAddonCode() const {
+        if (creationOptions_.addonIdOrNull())
+            return true;
+
+        return isSystem_;
+    }
   private:
     JSPrincipals*                principals_;
     bool                         isSystem_;
@@ -457,6 +472,11 @@ struct JSCompartment
     // All unboxed layouts in the compartment.
     mozilla::LinkedList<js::UnboxedLayout> unboxedLayouts;
 
+    // All wasm modules in the compartment. Weakly held.
+    //
+    // The caller needs to call wasm::Module::readBarrier() manually!
+    mozilla::LinkedList<js::wasm::Module> wasmModuleWeakList;
+
   private:
     // All non-syntactic lexical scopes in the compartment. These are kept in
     // a map because when loading scripts into a non-syntactic scope, we need
@@ -588,7 +608,7 @@ struct JSCompartment
     void forgetObjectMetadataCallback() {
         objectMetadataCallback = nullptr;
     }
-    void setNewObjectMetadata(JSContext* cx, JSObject* obj);
+    void setNewObjectMetadata(JSContext* cx, JS::HandleObject obj);
     void clearObjectMetadata();
     const void* addressOfMetadataCallback() const {
         return &objectMetadataCallback;

@@ -12,19 +12,20 @@ var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 var Heritage = require("sdk/core/heritage");
 var {TargetFactory} = require("devtools/client/framework/target");
 var {Tools} = require("devtools/client/definitions");
+const { Task } = require("resource://gre/modules/Task.jsm");
 var promise = require("promise");
+var Services = require("Services");
 
-loader.lazyGetter(this, "Telemetry", () => require("devtools/client/shared/telemetry"));
-loader.lazyGetter(this, "WebConsoleFrame", () => require("devtools/client/webconsole/webconsole").WebConsoleFrame);
-loader.lazyImporter(this, "gDevTools", "resource://devtools/client/framework/gDevTools.jsm");
-loader.lazyImporter(this, "Services", "resource://gre/modules/Services.jsm");
+loader.lazyRequireGetter(this, "Telemetry", "devtools/client/shared/telemetry");
+loader.lazyRequireGetter(this, "WebConsoleFrame", "devtools/client/webconsole/webconsole", true);
+loader.lazyRequireGetter(this, "gDevTools", "devtools/client/framework/devtools", true);
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
-loader.lazyGetter(this, "showDoorhanger", () => require("devtools/client/shared/doorhanger").showDoorhanger);
+loader.lazyRequireGetter(this, "showDoorhanger", "devtools/client/shared/doorhanger", true);
 loader.lazyRequireGetter(this, "viewSource", "devtools/client/shared/view-source");
 
 const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
-var l10n = new WebConsoleUtils.l10n(STRINGS_URI);
+var l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const BROWSER_CONSOLE_WINDOW_FEATURES = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
 
@@ -604,10 +605,9 @@ WebConsole.prototype = {
       }
     }
 
-    let onDestroy = function WC_onDestroyUI() {
+    let onDestroy = Task.async(function*() {
       try {
-        let tabWindow = this.target.isLocalTab ? this.target.window : null;
-        tabWindow && tabWindow.focus();
+        yield this.target.activeTab.focus()
       }
       catch (ex) {
         // Tab focus can fail if the tab or target is closed.
@@ -616,7 +616,7 @@ WebConsole.prototype = {
       let id = WebConsoleUtils.supportsString(this.hudId);
       Services.obs.notifyObservers(id, "web-console-destroyed", null);
       this._destroyer.resolve(null);
-    }.bind(this);
+    }.bind(this));
 
     if (this.ui) {
       this.ui.destroy().then(onDestroy);

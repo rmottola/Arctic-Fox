@@ -44,6 +44,8 @@
 #include "mozilla/dom/CDATASection.h"
 #include "mozilla/dom/Comment.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/StyleSheetHandle.h"
+#include "mozilla/StyleSheetHandleInlines.h"
 
 #ifdef MOZ_XUL
 #include "nsXULElement.h"
@@ -878,9 +880,12 @@ nsXBLPrototypeBinding::Read(nsIObjectInputStream* aStream,
     mInterfaceTable.Put(iid, mBinding);
   }
 
-  AutoSafeJSContext cx;
-  JS::Rooted<JSObject*> compilationGlobal(cx, xpc::CompilationScope());
-  JSAutoCompartment ac(cx, compilationGlobal);
+  // We're not directly using this AutoJSAPI here, but callees use it via
+  // AutoJSContext.
+  AutoJSAPI jsapi;
+  if (!jsapi.Init(xpc::CompilationScope())) {
+    return NS_ERROR_UNEXPECTED;
+  }
 
   bool isFirstBinding = aFlags & XBLBinding_Serialize_IsFirstBinding;
   rv = Init(id, aDocInfo, nullptr, isFirstBinding);
@@ -1021,9 +1026,12 @@ nsXBLPrototypeBinding::Write(nsIObjectOutputStream* aStream)
   // mKeyHandlersRegistered and mKeyHandlers are not serialized as they are
   // computed on demand.
 
-  AutoSafeJSContext cx;
-  JS::Rooted<JSObject*> compilationGlobal(cx, xpc::CompilationScope());
-  JSAutoCompartment ac(cx, compilationGlobal);
+  // We're not directly using this AutoJSAPI here, but callees use it via
+  // AutoJSContext.
+  AutoJSAPI jsapi;
+  if (!jsapi.Init(xpc::CompilationScope())) {
+    return NS_ERROR_UNEXPECTED;
+  }
 
   uint8_t flags = mInheritStyle ? XBLBinding_Serialize_InheritStyle : 0;
 
@@ -1629,14 +1637,14 @@ nsXBLPrototypeBinding::EnsureResources()
 }
 
 void
-nsXBLPrototypeBinding::AppendStyleSheet(CSSStyleSheet* aSheet)
+nsXBLPrototypeBinding::AppendStyleSheet(StyleSheetHandle aSheet)
 {
   EnsureResources();
   mResources->AppendStyleSheet(aSheet);
 }
 
 void
-nsXBLPrototypeBinding::RemoveStyleSheet(CSSStyleSheet* aSheet)
+nsXBLPrototypeBinding::RemoveStyleSheet(StyleSheetHandle aSheet)
 {
   if (!mResources) {
     MOZ_ASSERT(false, "Trying to remove a sheet that does not exist.");
@@ -1646,13 +1654,13 @@ nsXBLPrototypeBinding::RemoveStyleSheet(CSSStyleSheet* aSheet)
   mResources->RemoveStyleSheet(aSheet);
 } 
 void
-nsXBLPrototypeBinding::InsertStyleSheetAt(size_t aIndex, CSSStyleSheet* aSheet)
+nsXBLPrototypeBinding::InsertStyleSheetAt(size_t aIndex, StyleSheetHandle aSheet)
 {
   EnsureResources();
   mResources->InsertStyleSheetAt(aIndex, aSheet);
 }
 
-CSSStyleSheet*
+StyleSheetHandle
 nsXBLPrototypeBinding::StyleSheetAt(size_t aIndex) const
 {
   MOZ_ASSERT(mResources);
@@ -1673,7 +1681,7 @@ nsXBLPrototypeBinding::HasStyleSheets() const
 
 void
 nsXBLPrototypeBinding::AppendStyleSheetsTo(
-                                      nsTArray<CSSStyleSheet*>& aResult) const
+                                      nsTArray<StyleSheetHandle>& aResult) const
 {
   if (mResources) {
     mResources->AppendStyleSheetsTo(aResult);

@@ -1132,6 +1132,20 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
   list-style-image: url("chrome://browser/skin/menu-forward.png") !important;
 }
 
+/* undo close tab menu item */
+#alltabs_undoCloseTab {
+  list-style-image: url(chrome://browser/skin/undoCloseTab.png);
+}
+
+@media (min-resolution: 1.25dppx) {
+  #alltabs_undoCloseTab {
+    list-style-image: url(chrome://browser/skin/undoCloseTab@2x.png);
+  }
+  #alltabs_undoCloseTab > .toolbarbutton-icon {
+    width: 16px;
+  }
+}
+
 #stop-button {
   -moz-image-region: rect(0, 54px, 18px, 36px);
 }
@@ -2300,6 +2314,14 @@ toolbar[brighttext] .tabs-closebutton {
   -moz-margin-end: 0px !important;
   -moz-padding-end: 2px !important;
   -moz-padding-start: 2px !important;
+}
+
+.alltabs-endimage[muted] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
+}
+
+.alltabs-endimage[soundplaying] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
 }
 
 toolbarbutton.chevron {

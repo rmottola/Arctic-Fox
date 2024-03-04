@@ -34,6 +34,12 @@
             "url": "/_mozilla/service-workers/service-worker/ServiceWorkerGlobalScope/update.https.html"
           }
         ],
+        "service-workers/service-worker/activate-event-after-install-state-change.https.html": [
+          {
+            "path": "service-workers/service-worker/activate-event-after-install-state-change.https.html",
+            "url": "/_mozilla/service-workers/service-worker/activate-event-after-install-state-change.https.html"
+          }
+        ],
         "service-workers/service-worker/activation-after-registration.https.html": [
           {
             "path": "service-workers/service-worker/activation-after-registration.https.html",
@@ -64,16 +70,16 @@
             "url": "/_mozilla/service-workers/service-worker/claim-using-registration.https.html"
           }
         ],
-        "service-workers/service-worker/clients-get.https.html": [
-          {
-            "path": "service-workers/service-worker/clients-get.https.html",
-            "url": "/_mozilla/service-workers/service-worker/clients-get.https.html"
-          }
-        ],
         "service-workers/service-worker/clients-get-cross-origin.https.html": [
           {
             "path": "service-workers/service-worker/clients-get-cross-origin.https.html",
             "url": "/_mozilla/service-workers/service-worker/clients-get-cross-origin.https.html"
+          }
+        ],
+        "service-workers/service-worker/clients-get.https.html": [
+          {
+            "path": "service-workers/service-worker/clients-get.https.html",
+            "url": "/_mozilla/service-workers/service-worker/clients-get.https.html"
           }
         ],
         "service-workers/service-worker/clients-matchall-client-types.https.html": [
@@ -163,6 +169,7 @@
         "service-workers/service-worker/fetch-event-redirect.https.html": [
           {
             "path": "service-workers/service-worker/fetch-event-redirect.https.html",
+            "timeout": "long",
             "url": "/_mozilla/service-workers/service-worker/fetch-event-redirect.https.html"
           }
         ],
@@ -181,6 +188,7 @@
         "service-workers/service-worker/fetch-frame-resource.https.html": [
           {
             "path": "service-workers/service-worker/fetch-frame-resource.https.html",
+            "timeout": "long",
             "url": "/_mozilla/service-workers/service-worker/fetch-frame-resource.https.html"
           }
         ],
@@ -193,12 +201,14 @@
         "service-workers/service-worker/fetch-mixed-content-to-inscope.https.html": [
           {
             "path": "service-workers/service-worker/fetch-mixed-content-to-inscope.https.html",
+            "timeout": "long",
             "url": "/_mozilla/service-workers/service-worker/fetch-mixed-content-to-inscope.https.html"
           }
         ],
         "service-workers/service-worker/fetch-mixed-content-to-outscope.https.html": [
           {
             "path": "service-workers/service-worker/fetch-mixed-content-to-outscope.https.html",
+            "timeout": "long",
             "url": "/_mozilla/service-workers/service-worker/fetch-mixed-content-to-outscope.https.html"
           }
         ],
@@ -208,16 +218,16 @@
             "url": "/_mozilla/service-workers/service-worker/fetch-request-css-base-url.https.html"
           }
         ],
+        "service-workers/service-worker/fetch-request-css-images.https.html": [
+          {
+            "path": "service-workers/service-worker/fetch-request-css-images.https.html",
+            "url": "/_mozilla/service-workers/service-worker/fetch-request-css-images.https.html"
+          }
+        ],
         "service-workers/service-worker/fetch-request-fallback.https.html": [
           {
             "path": "service-workers/service-worker/fetch-request-fallback.https.html",
             "url": "/_mozilla/service-workers/service-worker/fetch-request-fallback.https.html"
-          }
-        ],
-        "service-workers/service-worker/fetch-request-html-imports.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-html-imports.https.html",
-            "url": "/_mozilla/service-workers/service-worker/fetch-request-html-imports.https.html"
           }
         ],
         "service-workers/service-worker/fetch-request-no-freshness-headers.https.html": [
@@ -264,10 +274,10 @@
             "url": "/_mozilla/service-workers/service-worker/getregistration.https.html"
           }
         ],
-        "service-workers/service-worker/getregistrations.sub.html": [
+        "service-workers/service-worker/getregistrations.https.html": [
           {
-            "path": "service-workers/service-worker/getregistrations.sub.html",
-            "url": "/_mozilla/service-workers/service-worker/getregistrations.sub.html"
+            "path": "service-workers/service-worker/getregistrations.https.html",
+            "url": "/_mozilla/service-workers/service-worker/getregistrations.https.html"
           }
         ],
         "service-workers/service-worker/indexeddb.https.html": [
@@ -310,6 +320,18 @@
           {
             "path": "service-workers/service-worker/multiple-register.https.html",
             "url": "/_mozilla/service-workers/service-worker/multiple-register.https.html"
+          }
+        ],
+        "service-workers/service-worker/multiple-update.https.html": [
+          {
+            "path": "service-workers/service-worker/multiple-update.https.html",
+            "url": "/_mozilla/service-workers/service-worker/multiple-update.https.html"
+          }
+        ],
+        "service-workers/service-worker/navigation-redirect.https.html": [
+          {
+            "path": "service-workers/service-worker/navigation-redirect.https.html",
+            "url": "/_mozilla/service-workers/service-worker/navigation-redirect.https.html"
           }
         ],
         "service-workers/service-worker/onactivate-script-error.https.html": [
@@ -505,12 +527,6 @@
             "url": "/_mozilla/service-workers/service-worker/state.https.html"
           }
         ],
-        "service-workers/service-worker/sync-xhr-doesnt-deadlock.https.html": [
-          {
-            "path": "service-workers/service-worker/sync-xhr-doesnt-deadlock.https.html",
-            "url": "/_mozilla/service-workers/service-worker/sync-xhr-doesnt-deadlock.https.html"
-          }
-        ],
         "service-workers/service-worker/synced-state.https.html": [
           {
             "path": "service-workers/service-worker/synced-state.https.html",
@@ -571,10 +587,22 @@
             "url": "/_mozilla/service-workers/service-worker/waiting.https.html"
           }
         ],
+        "service-workers/service-worker/websocket.https.html": [
+          {
+            "path": "service-workers/service-worker/websocket.https.html",
+            "url": "/_mozilla/service-workers/service-worker/websocket.https.html"
+          }
+        ],
         "service-workers/service-worker/worker-interception.https.html": [
           {
             "path": "service-workers/service-worker/worker-interception.https.html",
             "url": "/_mozilla/service-workers/service-worker/worker-interception.https.html"
+          }
+        ],
+        "service-workers/service-worker/xhr.https.html": [
+          {
+            "path": "service-workers/service-worker/xhr.https.html",
+            "url": "/_mozilla/service-workers/service-worker/xhr.https.html"
           }
         ]
       }

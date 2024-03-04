@@ -318,7 +318,9 @@ class ChildImpl final : public BackgroundChildImpl
   struct ThreadLocalInfo
   {
     explicit ThreadLocalInfo(nsIIPCBackgroundChildCreateCallback* aCallback)
+#ifdef DEBUG
       : mClosed(false)
+#endif
     {
       mCallbacks.AppendElement(aCallback);
     }
@@ -326,7 +328,9 @@ class ChildImpl final : public BackgroundChildImpl
     RefPtr<ChildImpl> mActor;
     nsTArray<nsCOMPtr<nsIIPCBackgroundChildCreateCallback>> mCallbacks;
     nsAutoPtr<BackgroundChildImpl::ThreadLocal> mConsumerThreadLocal;
-    DebugOnly<bool> mClosed;
+#ifdef DEBUG
+    bool mClosed;
+#endif
   };
 
   // This is only modified on the main thread. It is a FIFO queue for actors
@@ -337,13 +341,13 @@ class ChildImpl final : public BackgroundChildImpl
   // create the background thread after application shutdown has started.
   static bool sShutdownHasStarted;
 
-#ifdef RELEASE_BUILD
-  DebugOnly<nsIThread*> mBoundThread;
-#else
+#if defined(DEBUG) || !defined(RELEASE_BUILD)
   nsIThread* mBoundThread;
 #endif
 
-  DebugOnly<bool> mActorDestroyed;
+#ifdef DEBUG
+  bool mActorDestroyed;
+#endif
 
 public:
   static bool
@@ -374,8 +378,12 @@ public:
   }
 
   ChildImpl()
+#if defined(DEBUG) || !defined(RELEASE_BUILD)
   : mBoundThread(nullptr)
+#endif
+#ifdef DEBUG
   , mActorDestroyed(false)
+#endif
   {
     AssertIsOnMainThread();
   }
@@ -1612,6 +1620,7 @@ ChildImpl::Shutdown()
 
   sShutdownHasStarted = true;
 
+#ifdef DEBUG
   MOZ_ASSERT(sThreadLocalIndex != kBadThreadLocalIndex);
 
   auto threadLocalInfo =
@@ -1621,6 +1630,7 @@ ChildImpl::Shutdown()
     MOZ_ASSERT(!threadLocalInfo->mClosed);
     threadLocalInfo->mClosed = true;
   }
+#endif
 
   DebugOnly<PRStatus> status = PR_SetThreadPrivate(sThreadLocalIndex, nullptr);
   MOZ_ASSERT(status == PR_SUCCESS);
@@ -1747,8 +1757,10 @@ ChildImpl::CloseForCurrentThread()
     return;
   }
 
+#ifdef DEBUG
   MOZ_ASSERT(!threadLocalInfo->mClosed);
   threadLocalInfo->mClosed = true;
+#endif
 
   if (threadLocalInfo->mActor) {
     threadLocalInfo->mActor->FlushPendingInterruptQueue();
@@ -2092,8 +2104,10 @@ ChildImpl::ActorDestroy(ActorDestroyReason aWhy)
 {
   AssertIsOnBoundThread();
 
+#ifdef DEBUG
   MOZ_ASSERT(!mActorDestroyed);
   mActorDestroyed = true;
+#endif
 
   BackgroundChildImpl::ActorDestroy(aWhy);
 }

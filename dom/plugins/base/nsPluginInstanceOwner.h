@@ -138,7 +138,6 @@ public:
   enum { ePluginPaintEnable, ePluginPaintDisable };
 
   void WindowFocusMayHaveChanged();
-  void ResolutionMayHaveChanged();
 
   bool WindowIsActive();
   void SendWindowFocusChanged(bool aIsActive);
@@ -160,6 +159,7 @@ public:
   void UpdateWindowVisibility(bool aVisible);
 #endif // XP_MACOSX
 
+  void ResolutionMayHaveChanged();
   void UpdateDocumentActiveState(bool aIsActive);
 
   void SetFrame(nsPluginFrame *aFrame);
@@ -228,6 +228,11 @@ public:
 
   // Returns the image container that has our currently displayed image.
   already_AddRefed<mozilla::layers::ImageContainer> GetImageContainer();
+  // Returns true if this is windowed plugin that can return static captures
+  // for scroll operations.
+  bool NeedsScrollImageLayer();
+  // Notification we receive from nsPluginFrame about scroll state.
+  bool UpdateScrollState(bool aIsScrolling);
 
   void DidComposite();
 
@@ -273,6 +278,7 @@ public:
            const mozilla::widget::CandidateWindowPosition& aPosition);
   bool RequestCommitOrCancel(bool aCommitted);
 
+  void GetCSSZoomFactor(float *result);
 private:
   virtual ~nsPluginInstanceOwner();
 
@@ -323,7 +329,7 @@ private:
   // True if, the next time the window is activated, we should blur ourselves.
   bool                                      mShouldBlurOnActivate;
 #endif
-
+  double                                    mLastCSSZoomFactor;
   // Initially, the event loop nesting level we were created on, it's updated
   // if we detect the appshell is on a lower level as long as we're not stopped.
   // We delay DoStopPlugin() until the appshell reaches this level or lower.
@@ -397,6 +403,9 @@ private:
 #endif
 
   bool mWaitingForPaint;
+#if defined(XP_WIN)
+  bool mScrollState;
+#endif
 };
 
 #endif // nsPluginInstanceOwner_h_

@@ -4,7 +4,7 @@
 
 const TEST_URL = "http://www.example.com/browser/toolkit/modules/tests/browser/testremotepagemanager.html";
 
-let { RemotePages, RemotePageManager } = Cu.import("resource://gre/modules/RemotePageManager.jsm", {});
+var { RemotePages, RemotePageManager } = Cu.import("resource://gre/modules/RemotePageManager.jsm", {});
 
 function failOnMessage(message) {
   ok(false, "Should not have seen message " + message.name);
@@ -47,6 +47,16 @@ function waitForPage(pages) {
     pages.addMessageListener("RemotePage:Init", listener);
     gBrowser.selectedTab = gBrowser.addTab(TEST_URL);
   });
+}
+
+function swapDocShells(browser1, browser2) {
+  // Swap frameLoaders.
+  browser1.swapDocShells(browser2);
+
+  // Swap permanentKeys.
+  let tmp = browser1.permanentKey;
+  browser1.permanentKey = browser2.permanentKey;
+  browser2.permanentKey = tmp;
 }
 
 // Test that opening a page creates a port, sends the load event and then
@@ -193,7 +203,7 @@ add_task(function* browser_switch() {
   port1.removeMessageListener("Cookie", failOnMessage);
   is(message.data.value, "om nom nom", "Should have the right cookie");
 
-  browser1.swapDocShells(browser2);
+  swapDocShells(browser1, browser2);
   is(port1.browser, browser2, "Should have noticed the swap");
   is(port2.browser, browser1, "Should have noticed the swap");
 
@@ -210,7 +220,7 @@ add_task(function* browser_switch() {
   port1.removeMessageListener("Cookie", failOnMessage);
   is(message.data.value, "om nom nom", "Should have the right cookie");
 
-  browser1.swapDocShells(browser2);
+  swapDocShells(browser1, browser2);
   is(port1.browser, browser1, "Should have noticed the swap");
   is(port2.browser, browser2, "Should have noticed the swap");
 

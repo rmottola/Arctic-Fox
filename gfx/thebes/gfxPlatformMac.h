@@ -6,9 +6,18 @@
 #ifndef GFX_PLATFORM_MAC_H
 #define GFX_PLATFORM_MAC_H
 
+#include <AvailabilityMacros.h>
+
 #include "nsTArrayForwardDeclare.h"
 #include "gfxPlatform.h"
 #include "mozilla/LookAndFeel.h"
+
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+#include "nsDataHashtable.h"
+#include "nsClassHashtable.h"
+
+typedef size_t ByteCount;
+#endif
 
 namespace mozilla {
 namespace gfx {
@@ -16,6 +25,21 @@ class DrawTarget;
 class VsyncSource;
 } // namespace gfx
 } // namespace mozilla
+
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+// 10.4Fx
+class FontDirWrapper {
+public:
+	uint8_t fontDir[1024];
+	ByteCount sizer;
+	FontDirWrapper(ByteCount sized, uint8_t *dir) {
+		if (MOZ_UNLIKELY(sized < 1 || sized > 1023)) return;
+		sizer = sized;
+		memcpy(fontDir, dir, sizer);
+	}
+	~FontDirWrapper() { }
+};
+#endif
 
 class gfxPlatformMac : public gfxPlatform {
 public:
@@ -90,13 +114,18 @@ public:
       return true;
     }
 
-    virtual bool UseAcceleratedSkiaCanvas() override;
-
     virtual bool UseProgressivePaint() override;
     virtual already_AddRefed<mozilla::gfx::VsyncSource> CreateHardwareVsyncSource() override;
 
     // lower threshold on font anti-aliasing
     uint32_t GetAntiAliasingThreshold() { return mFontAntiAliasingThreshold; }
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+/* ATS acceleration functions for 10.4 */
+ByteCount GetCachedDirSizeForFont(nsString name);
+uint8_t *GetCachedDirForFont(nsString name);
+void SetCachedDirForFont(nsString name, uint8_t* table, ByteCount sizer);
+nsClassHashtable< nsStringHashKey, FontDirWrapper > PlatformFontDirCache;
+#endif
 
 protected:
     bool AccelerateLayersByDefault() override;

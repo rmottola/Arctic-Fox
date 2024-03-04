@@ -6,6 +6,7 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/TextEventDispatcher.h"
+#include "mozilla/TextEventDispatcherListener.h"
 
 #include "mozilla/layers/CompositorChild.h"
 #include "mozilla/layers/CompositorParent.h"
@@ -62,6 +63,7 @@
 #include "TouchEvents.h"
 #include "WritingModes.h"
 #include "InputData.h"
+#include "FrameLayerBuilder.h"
 #ifdef ACCESSIBILITY
 #include "nsAccessibilityService.h"
 #endif
@@ -290,6 +292,47 @@ void nsBaseWidget::DestroyLayerManager()
     mLayerManager = nullptr;
   }
   DestroyCompositor();
+}
+
+void
+nsBaseWidget::OnRenderingDeviceReset()
+{
+  if (!mLayerManager || !mCompositorParent) {
+    return;
+  }
+
+  nsTArray<LayersBackend> backendHints;
+  gfxPlatform::GetPlatform()->GetCompositorBackends(ComputeShouldAccelerate(), backendHints);
+
+  // If the existing compositor does not use acceleration, and this widget
+  // should not be accelerated, then there's no point in resetting.
+  //
+  // Note that if this widget should be accelerated, but instead has a basic
+  // compositor, we still reset just in case we're now in the position to get
+  // accelerated layers again.
+  RefPtr<ClientLayerManager> clm = mLayerManager->AsClientLayerManager();
+  if (!ComputeShouldAccelerate() &&
+      clm->GetTextureFactoryIdentifier().mParentBackend != LayersBackend::LAYERS_BASIC)
+  {
+    return;
+  }
+
+  // Recreate the compositor.
+  TextureFactoryIdentifier identifier;
+  if (!mCompositorParent->ResetCompositor(backendHints, &identifier)) {
+    // No action was taken, so we don't have to do anything.
+    return;
+  }
+
+  // Invalidate all layers.
+  FrameLayerBuilder::InvalidateAllLayers(mLayerManager);
+
+  // Update the texture factory identifier.
+  clm->UpdateTextureFactoryIdentifier(identifier);
+  if (ShadowLayerForwarder* lf = clm->AsShadowForwarder()) {
+    lf->IdentifyTextureHost(identifier);
+  }
+  ImageBridgeChild::IdentifyCompositorTextureHost(identifier);
 }
 
 void
@@ -1012,14 +1055,13 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
   MOZ_ASSERT(NS_IsMainThread());
   InputAPZContext context(aGuid, aInputBlockId, aApzResponse);
 
-  // If this is a touch event and APZ has targeted it to an APZC in the root
+  // If this is an event that the APZ has targeted to an APZC in the root
   // process, apply that APZC's callback-transform before dispatching the
   // event. If the event is instead targeted to an APZC in the child process,
   // the transform will be applied in the child process before dispatching
   // the event there (see e.g. TabChild::RecvRealTouchEvent()).
-  // TODO: Do other types of events (than touch) need this?
-  if (aEvent->AsTouchEvent() && aGuid.mLayersId == mCompositorParent->RootLayerTreeId()) {
-    APZCCallbackHelper::ApplyCallbackTransform(*aEvent->AsTouchEvent(), aGuid,
+  if (aGuid.mLayersId == mCompositorParent->RootLayerTreeId()) {
+    APZCCallbackHelper::ApplyCallbackTransform(*aEvent, aGuid,
         GetDefaultScale());
   }
 
@@ -1030,7 +1072,7 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
   UniquePtr<WidgetEvent> original(aEvent->Duplicate());
   DispatchEvent(aEvent, status);
 
-  if (mAPZC && !context.WasRoutedToChildProcess()) {
+  if (mAPZC && !context.WasRoutedToChildProcess() && aInputBlockId) {
     // EventStateManager did not route the event into the child process.
     // It's safe to communicate to APZ that the event has been processed.
     // TODO: Eventually we'll be able to move the SendSetTargetAPZCNotification
@@ -1067,16 +1109,7 @@ nsBaseWidget::ProcessUntransformedAPZEvent(WidgetInputEvent* aEvent,
 nsEventStatus
 nsBaseWidget::DispatchInputEvent(WidgetInputEvent* aEvent)
 {
-  if (mAPZC) {
-    nsEventStatus result = mAPZC->ReceiveInputEvent(*aEvent, nullptr, nullptr);
-    if (result == nsEventStatus_eConsumeNoDefault) {
-      return result;
-    }
-  }
-
-  nsEventStatus status;
-  DispatchEvent(aEvent, status);
-  return status;
+  return DispatchAPZAwareEvent(aEvent);
 }
 
 class DispatchWheelEventOnMainThread : public Task
@@ -1724,37 +1757,59 @@ nsBaseWidget::NotifyIME(const IMENotification& aIMENotification)
       }
       // Otherwise, it should be handled by native IME.
       return NotifyIMEInternal(aIMENotification);
-    case NOTIFY_IME_OF_FOCUS:
-      mIMEHasFocus = true;
-      // We should notify TextEventDispatcher of focus notification, first.
-      // After that, notify native IME too.
-      if (mTextEventDispatcher) {
-        mTextEventDispatcher->NotifyIME(aIMENotification);
+    default: {
+      if (aIMENotification.mMessage == NOTIFY_IME_OF_FOCUS) {
+        mIMEHasFocus = true;
       }
-      return NotifyIMEInternal(aIMENotification);
-    case NOTIFY_IME_OF_BLUR: {
-      // We should notify TextEventDispatcher of blur notification, first.
-      // After that, notify native IME too.
-      if (mTextEventDispatcher) {
-        mTextEventDispatcher->NotifyIME(aIMENotification);
+      EnsureTextEventDispatcher();
+      // If the platform specific widget uses TextEventDispatcher for handling
+      // native IME and keyboard events, IME event handler should be notified
+      // of the notification via TextEventDispatcher.  Otherwise, on the other
+      // platforms which have not used TextEventDispatcher yet, IME event
+      // handler should be notified by the old path (NotifyIMEInternal).
+      nsresult rv = mTextEventDispatcher->NotifyIME(aIMENotification);
+      nsresult rv2 = NotifyIMEInternal(aIMENotification);
+      if (aIMENotification.mMessage == NOTIFY_IME_OF_BLUR) {
+        mIMEHasFocus = false;
       }
-      nsresult rv = NotifyIMEInternal(aIMENotification);
-      mIMEHasFocus = false;
-      return rv;
+      return rv2 == NS_ERROR_NOT_IMPLEMENTED ? rv : rv2;
     }
-    default:
-      // Otherwise, notify only native IME for now.
-      return NotifyIMEInternal(aIMENotification);
   }
+}
+
+void
+nsBaseWidget::EnsureTextEventDispatcher()
+{
+  if (mTextEventDispatcher) {
+    return;
+  }
+  mTextEventDispatcher = new TextEventDispatcher(this);
 }
 
 NS_IMETHODIMP_(nsIWidget::TextEventDispatcher*)
 nsBaseWidget::GetTextEventDispatcher()
 {
-  if (!mTextEventDispatcher) {
-    mTextEventDispatcher = new TextEventDispatcher(this);
-  }
+  EnsureTextEventDispatcher();
   return mTextEventDispatcher;
+}
+
+void*
+nsBaseWidget::GetPseudoIMEContext()
+{
+  TextEventDispatcher* dispatcher = GetTextEventDispatcher();
+  if (!dispatcher) {
+    return nullptr;
+  }
+  return dispatcher->GetPseudoIMEContext();
+}
+
+NS_IMETHODIMP_(TextEventDispatcherListener*)
+nsBaseWidget::GetNativeTextEventDispatcherListener()
+{
+  // TODO: If all platforms supported use of TextEventDispatcher for handling
+  //       native IME and keyboard events, this method should be removed since
+  //       in such case, this is overridden by all the subclasses.
+  return nullptr;
 }
 
 void
@@ -2062,7 +2117,7 @@ nsIWidget::SnapshotWidgetOnScreen()
   RefPtr<gfx::DrawTarget> dt =
     gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(size, gfx::SurfaceFormat::B8G8R8A8);
   if (!snapshot || !dt) {
-    forwarder->DestroySharedSurface(&surface);
+    forwarder->DestroySurfaceDescriptor(&surface);
     return nullptr;
   }
 
@@ -2071,7 +2126,7 @@ nsIWidget::SnapshotWidgetOnScreen()
                   gfx::Rect(gfx::Point(), gfx::Size(size)),
                   gfx::DrawSurfaceOptions(gfx::Filter::POINT));
 
-  forwarder->DestroySharedSurface(&surface);
+  forwarder->DestroySurfaceDescriptor(&surface);
   return dt->Snapshot();
 }
 

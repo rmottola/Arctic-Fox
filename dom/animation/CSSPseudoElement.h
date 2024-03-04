@@ -11,6 +11,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/Element.h"
 #include "mozilla/RefPtr.h"
 #include "nsCSSPseudoElements.h"
 #include "nsWrapperCache.h"
@@ -32,10 +33,7 @@ protected:
   virtual ~CSSPseudoElement();
 
 public:
-  ParentObject GetParentObject() const
-  {
-    return mParentElement->GetParentObject();
-  }
+  ParentObject GetParentObject() const;
 
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
@@ -46,7 +44,12 @@ public:
     MOZ_ASSERT(nsCSSPseudoElements::GetPseudoAtom(mPseudoType),
                "All pseudo-types allowed by this class should have a"
                " corresponding atom");
-    nsCSSPseudoElements::GetPseudoAtom(mPseudoType)->ToString(aRetVal);
+    // Our atoms use one colon and we would like to return two colons syntax
+    // for the returned pseudo type string, so serialize this to the
+    // non-deprecated two colon syntax.
+    aRetVal.Assign(char16_t(':'));
+    aRetVal.Append(
+      nsDependentAtomString(nsCSSPseudoElements::GetPseudoAtom(mPseudoType)));
   }
   already_AddRefed<Element> ParentElement() const
   {

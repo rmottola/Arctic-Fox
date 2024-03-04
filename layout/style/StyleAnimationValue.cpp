@@ -2641,7 +2641,9 @@ StyleAnimationValue::ComputeValues(
   if (!styleContext) {
     return false;
   }
-  nsStyleSet* styleSet = styleContext->PresContext()->StyleSet();
+  MOZ_ASSERT(styleContext->PresContext()->StyleSet()->IsGecko(),
+             "ServoStyleSet should not use StyleAnimationValue for animations");
+  nsStyleSet* styleSet = styleContext->PresContext()->StyleSet()->AsGecko();
 
   RefPtr<nsStyleContext> tmpStyleContext;
   if (aIsContextSensitive) {
@@ -3401,28 +3403,28 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
           ExtractImageLayerPositionList(layers, aComputedValue);
           break;
         }
-
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
         case eCSSProperty_mask_position: {
           const nsStyleImageLayers& layers =
             static_cast<const nsStyleSVGReset*>(styleStruct)->mMask;
           ExtractImageLayerPositionList(layers, aComputedValue);
           break;
         }
-
+#endif
         case eCSSProperty_background_size: {
           const nsStyleImageLayers& layers =
             static_cast<const nsStyleBackground*>(styleStruct)->mImage;
           ExtractImageLayerSizePairList(layers, aComputedValue);
           break;
         }
-
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
         case eCSSProperty_mask_size: {
           const nsStyleImageLayers& layers =
             static_cast<const nsStyleSVGReset*>(styleStruct)->mMask;
           ExtractImageLayerSizePairList(layers, aComputedValue);
           break;
         }
-
+#endif
         case eCSSProperty_filter: {
           const nsStyleSVGReset *svgReset =
             static_cast<const nsStyleSVGReset*>(styleStruct);

@@ -62,7 +62,6 @@ EXTRA_JS_MODULES += [
     'RemoteFinder.jsm',
     'RemotePageManager.jsm',
     'RemoteSecurityUI.jsm',
-    'RemoteWebNavigation.jsm',
     'RemoteWebProgress.jsm',
     'ResetProfile.jsm',
     'secondscreen/RokuApp.jsm',
@@ -114,6 +113,7 @@ for var in ('ANDROID_PACKAGE_NAME',
             'MOZ_APP_NAME',
             'MOZ_APP_VERSION',
             'MOZ_APP_VERSION_DISPLAY',
+            'MOZ_MACBUNDLE_NAME',
             'MOZ_WIDGET_TOOLKIT',
             'DLL_PREFIX',
             'DLL_SUFFIX',
@@ -121,6 +121,8 @@ for var in ('ANDROID_PACKAGE_NAME',
             DEFINES[var] = CONFIG[var]
 
 for var in ('MOZ_TOOLKIT_SEARCH',
+            'MOZ_REQUIRE_SIGNING',
+            'MOZ_SYSTEM_NSS',
             'MOZ_UPDATER'):
     if CONFIG[var]:
         DEFINES[var] = True

@@ -101,8 +101,37 @@ gfxPlatformMac::gfxPlatformMac()
 
 gfxPlatformMac::~gfxPlatformMac()
 {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     gfxCoreTextShaper::Shutdown();
+#endif
 }
+
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+ByteCount
+gfxPlatformMac::GetCachedDirSizeForFont(nsString name)
+{
+	FontDirWrapper *x = PlatformFontDirCache.Get(name);
+	if (x) return x->sizer;
+	return 0;
+}
+uint8_t*
+gfxPlatformMac::GetCachedDirForFont(nsString name)
+{
+	FontDirWrapper *x = PlatformFontDirCache.Get(name);
+	if (x)
+		return x->fontDir;
+	else
+		return nullptr;
+}
+void
+gfxPlatformMac::SetCachedDirForFont(nsString name, uint8_t* table, ByteCount sizer)
+{
+	if (MOZ_UNLIKELY(sizer < 1 || sizer > 1023)) return;
+
+	FontDirWrapper *k = new FontDirWrapper(sizer, table);
+	PlatformFontDirCache.Put(name, k);
+}
+#endif
 
 gfxPlatformFontList*
 gfxPlatformMac::CreatePlatformFontList()
@@ -424,13 +453,6 @@ gfxPlatformMac::ReadAntiAliasingThreshold()
     }
 
     return threshold;
-}
-
-bool
-gfxPlatformMac::UseAcceleratedSkiaCanvas()
-{
-  // Lion or later is required
-  return nsCocoaFeatures::OnLionOrLater() && gfxPlatform::UseAcceleratedSkiaCanvas();
 }
 
 bool

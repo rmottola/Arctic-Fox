@@ -351,8 +351,7 @@ setUpdateTrackingId();
     });
   }
 
-  syncPrefDefault(AppConstants.MOZ_B2GDROID ? 'app.update.url.android'
-                                            : 'app.update.url');
+  syncPrefDefault('app.update.url');
   syncPrefDefault('app.update.channel');
 })();
 
@@ -642,7 +641,6 @@ var settingsToObserve = {
   'dom.mozApps.signed_apps_installable_from': 'https://marketplace.firefox.com',
   'dom.presentation.discovery.enabled': false,
   'dom.presentation.discoverable': false,
-  'dom.serviceWorkers.interception.enabled': true,
   'dom.serviceWorkers.testing.enabled': false,
   'gfx.layerscope.enabled': false,
   'layers.draw-borders': false,

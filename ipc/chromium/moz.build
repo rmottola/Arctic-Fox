@@ -73,7 +73,7 @@ if os_win:
         'src/chrome/common/process_watcher_win.cc',
         'src/chrome/common/transport_dib_win.cc',
     ]
-elif not CONFIG['MOZ_NATIVE_LIBEVENT']:
+elif not CONFIG['MOZ_SYSTEM_LIBEVENT']:
     DIRS += ['src/third_party']
 
 if os_posix:
@@ -162,7 +162,7 @@ if os_bsd or os_linux:
         ]
 
 ost = CONFIG['OS_TEST']
-if '86' not in ost and 'arm' not in ost and 'mips' not in ost:
+if '86' not in ost and 'arm' not in ost and 'aarch64' != ost and 'mips' not in ost:
     SOURCES += [
         'src/base/atomicops_internals_mutex.cc',
     ]

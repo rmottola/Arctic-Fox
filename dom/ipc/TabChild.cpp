@@ -109,6 +109,7 @@
 #include "nsIScriptError.h"
 #include "mozilla/EventForwards.h"
 #include "nsDeviceContext.h"
+#include "FrameLayerBuilder.h"
 
 #define BROWSER_ELEMENT_CHILD_SCRIPT \
     NS_LITERAL_STRING("chrome://global/content/BrowserElementChild.js")
@@ -1482,7 +1483,7 @@ TabChild::DoFakeShow(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
                      PRenderFrameChild* aRenderFrame, const ShowInfo& aShowInfo)
 {
   RecvShow(ScreenIntSize(0, 0), aShowInfo, aTextureFactoryIdentifier,
-           aLayersId, aRenderFrame, mParentIsActive);
+           aLayersId, aRenderFrame, mParentIsActive, nsSizeMode_Normal);
   mDidFakeShow = true;
 }
 
@@ -1594,10 +1595,12 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
                    const TextureFactoryIdentifier& aTextureFactoryIdentifier,
                    const uint64_t& aLayersId,
                    PRenderFrameChild* aRenderFrame,
-                   const bool& aParentIsActive)
+                   const bool& aParentIsActive,
+                   const nsSizeMode& aSizeMode)
 {
     MOZ_ASSERT((!mDidFakeShow && aRenderFrame) || (mDidFakeShow && !aRenderFrame));
 
+    mPuppetWidget->SetSizeMode(aSizeMode);
     if (mDidFakeShow) {
         ApplyShowInfo(aInfo);
         RecvParentActivated(aParentIsActive);
@@ -1633,7 +1636,6 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
 
 bool
 TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
-                               const nsSizeMode& sizeMode,
                                const ScreenOrientationInternal& orientation,
                                const LayoutDeviceIntPoint& chromeDisp)
 {
@@ -1660,12 +1662,27 @@ TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
     baseWin->SetPositionAndSize(0, 0, screenSize.width, screenSize.height,
                                 true);
 
-    mPuppetWidget->SetSizeMode(sizeMode);
     mPuppetWidget->Resize(screenRect.x + chromeDisp.x,
                           screenRect.y + chromeDisp.y,
                           screenSize.width, screenSize.height, true);
 
     return true;
+}
+
+bool
+TabChild::RecvSizeModeChanged(const nsSizeMode& aSizeMode)
+{
+  mPuppetWidget->SetSizeMode(aSizeMode);
+  nsCOMPtr<nsIDocument> document(GetDocument());
+  nsCOMPtr<nsIPresShell> presShell = document->GetShell();
+  if (presShell) {
+    nsPresContext* presContext = presShell->GetPresContext();
+    if (presContext) {
+      presContext->MediaFeatureValuesChangedAllDocuments(eRestyle_Subtree,
+                                                         NS_STYLE_HINT_REFLOW);
+    }
+  }
+  return true;
 }
 
 bool
@@ -1684,7 +1701,7 @@ TabChild::RecvSuppressDisplayport(const bool& aEnabled)
   }
 
   MOZ_ASSERT(mActiveSuppressDisplayport >= 0);
-  APZCCallbackHelper::SuppressDisplayport(aEnabled);
+  APZCCallbackHelper::SuppressDisplayport(aEnabled, GetPresShell());
   return true;
 }
 
@@ -1834,35 +1851,37 @@ TabChild::RecvMouseEvent(const nsString& aType,
 }
 
 bool
-TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event,
+TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& aEvent,
                                  const ScrollableLayerGuid& aGuid,
                                  const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
+  return RecvRealMouseButtonEvent(aEvent, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event,
+TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& aEvent,
                                   const ScrollableLayerGuid& aGuid,
                                   const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
+  return RecvRealMouseButtonEvent(aEvent, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event,
+TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& aEvent,
                                    const ScrollableLayerGuid& aGuid,
                                    const uint64_t& aInputBlockId)
 {
   nsEventStatus unused;
   InputAPZContext context(aGuid, aInputBlockId, unused);
 
-  WidgetMouseEvent localEvent(event);
+  WidgetMouseEvent localEvent(aEvent);
   localEvent.widget = mPuppetWidget;
+  APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
+      mPuppetWidget->GetDefaultScale());
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (event.mFlags.mHandledByAPZ) {
-    mAPZEventState->ProcessMouseEvent(event, aGuid, aInputBlockId);
+  if (aEvent.mFlags.mHandledByAPZ) {
+    mAPZEventState->ProcessMouseEvent(aEvent, aGuid, aInputBlockId);
   }
   return true;
 }
@@ -1878,16 +1897,18 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
       mPuppetWidget, document, aEvent, aGuid, aInputBlockId);
   }
 
-  WidgetWheelEvent event(aEvent);
-  event.widget = mPuppetWidget;
-  APZCCallbackHelper::DispatchWidgetEvent(event);
+  WidgetWheelEvent localEvent(aEvent);
+  localEvent.widget = mPuppetWidget;
+  APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
+      mPuppetWidget->GetDefaultScale());
+  APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (event.mCanTriggerSwipe) {
-    SendRespondStartSwipeEvent(aInputBlockId, event.TriggersSwipe());
+  if (localEvent.mCanTriggerSwipe) {
+    SendRespondStartSwipeEvent(aInputBlockId, localEvent.TriggersSwipe());
   }
 
   if (aEvent.mFlags.mHandledByAPZ) {
-    mAPZEventState->ProcessWheelEvent(event, aGuid, aInputBlockId);
+    mAPZEventState->ProcessWheelEvent(localEvent, aGuid, aInputBlockId);
   }
   return true;
 }
@@ -2364,7 +2385,7 @@ TabChild::RecvDestroy()
   }
 
   while (mActiveSuppressDisplayport > 0) {
-    APZCCallbackHelper::SuppressDisplayport(false);
+    APZCCallbackHelper::SuppressDisplayport(false, nullptr);
     mActiveSuppressDisplayport--;
   }
 
@@ -2535,7 +2556,7 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
 
     // Pushing layers transactions directly to a separate
     // compositor context.
-    PCompositorChild* compositorChild = CompositorChild::Get();
+    PCompositorBridgeChild* compositorChild = CompositorChild::Get();
     if (!compositorChild) {
       NS_WARNING("failed to get CompositorChild instance");
       PRenderFrameChild::Send__delete__(remoteFrame);
@@ -2815,7 +2836,7 @@ TabChild::DidComposite(uint64_t aTransactionId,
   MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
                LayersBackend::LAYERS_CLIENT);
 
-  RefPtr<ClientLayerManager> manager =
+  ClientLayerManager *manager =
     static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
 
   manager->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
@@ -2849,9 +2870,33 @@ TabChild::ClearCachedResources()
   MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
                LayersBackend::LAYERS_CLIENT);
 
-  ClientLayerManager *manager =
-    static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
+  ClientLayerManager *manager = mPuppetWidget->GetLayerManager()->AsClientLayerManager();
   manager->ClearCachedResources();
+}
+
+void
+TabChild::InvalidateLayers()
+{
+  MOZ_ASSERT(mPuppetWidget);
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager());
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
+               LayersBackend::LAYERS_CLIENT);
+
+  RefPtr<LayerManager> lm = mPuppetWidget->GetLayerManager();
+  FrameLayerBuilder::InvalidateAllLayers(lm);
+}
+
+void
+TabChild::CompositorUpdated(const TextureFactoryIdentifier& aNewIdentifier)
+{
+  gfxPlatform::GetPlatform()->UpdateRenderModeIfDeviceReset();
+
+  RefPtr<LayerManager> lm = mPuppetWidget->GetLayerManager();
+  ClientLayerManager* clm = lm->AsClientLayerManager();
+
+  mTextureFactoryIdentifier = aNewIdentifier;
+  clm->UpdateTextureFactoryIdentifier(aNewIdentifier);
+  FrameLayerBuilder::InvalidateAllLayers(clm);
 }
 
 NS_IMETHODIMP

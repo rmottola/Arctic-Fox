@@ -34,6 +34,8 @@
 #include "ShimInterfaceInfo.h"
 #include "nsIAddonInterposition.h"
 #include "nsISimpleEnumerator.h"
+#include "nsPIDOMWindow.h"
+#include "nsGlobalWindow.h"
 
 using namespace mozilla;
 using namespace JS;
@@ -2294,32 +2296,61 @@ nsXPCComponents_Utils::ReportError(HandleValue error, JSContext* cx)
     // This function shall never fail! Silently eat any failure conditions.
 
     nsCOMPtr<nsIConsoleService> console(do_GetService(NS_CONSOLESERVICE_CONTRACTID));
-
-    nsCOMPtr<nsIScriptError> scripterr(do_CreateInstance(NS_SCRIPTERROR_CONTRACTID));
-
-    if (!scripterr || !console)
+    if (!console)
         return NS_OK;
 
-    const uint64_t innerWindowID = nsJSUtils::GetCurrentlyRunningCodeInnerWindowID(cx);
+    nsGlobalWindow* globalWin = CurrentWindowOrNull(cx);
+    nsPIDOMWindowInner* win = globalWin ? globalWin->AsInner() : nullptr;
+    const uint64_t innerWindowID = win ? win->WindowID() : 0;
 
     RootedObject errorObj(cx, error.isObject() ? &error.toObject() : nullptr);
     JSErrorReport* err = errorObj ? JS_ErrorFromException(cx, errorObj) : nullptr;
+
+    nsCOMPtr<nsIScriptError> scripterr;
+
+    if (errorObj) {
+        JS::RootedObject stackVal(cx,
+          FindExceptionStackForConsoleReport(win, error));
+        if (stackVal) {
+            scripterr = new nsScriptErrorWithStack(stackVal);
+        }
+    }
+
+    nsString fileName;
+    int32_t lineNo = 0;
+
+    if (!scripterr) {
+        nsCOMPtr<nsIStackFrame> frame = dom::GetCurrentJSStack();
+        if (frame) {
+            frame->GetFilename(cx, fileName);
+            frame->GetLineNumber(cx, &lineNo);
+            JS::Rooted<JS::Value> stack(cx);
+            nsresult rv = frame->GetNativeSavedFrame(&stack);
+            if (NS_SUCCEEDED(rv) && stack.isObject()) {
+              JS::Rooted<JSObject*> stackObj(cx, &stack.toObject());
+              scripterr = new nsScriptErrorWithStack(stackObj);
+            }
+        }
+    }
+
+    if (!scripterr) {
+        scripterr = new nsScriptError();
+    }
+
     if (err) {
         // It's a proper JS Error
         nsAutoString fileUni;
         CopyUTF8toUTF16(err->filename, fileUni);
 
-        uint32_t column = err->uctokenptr - err->uclinebuf;
+        uint32_t column = err->tokenOffset();
 
-        const char16_t* ucmessage =
-            static_cast<const char16_t*>(err->ucmessage);
-        const char16_t* uclinebuf =
-            static_cast<const char16_t*>(err->uclinebuf);
+        const char16_t* ucmessage = err->ucmessage;
+        const char16_t* linebuf = err->linebuf();
 
         nsresult rv = scripterr->InitWithWindowID(
                 ucmessage ? nsDependentString(ucmessage) : EmptyString(),
                 fileUni,
-                uclinebuf ? nsDependentString(uclinebuf) : EmptyString(),
+                linebuf ? nsDependentString(linebuf, err->linebufLength()) : EmptyString(),
                 err->lineno,
                 column, err->flags, "XPConnect JavaScript", innerWindowID);
         NS_ENSURE_SUCCESS(rv, NS_OK);
@@ -2332,17 +2363,6 @@ nsXPCComponents_Utils::ReportError(HandleValue error, JSContext* cx)
     RootedString msgstr(cx, ToString(cx, error));
     if (!msgstr)
         return NS_OK;
-
-    nsCOMPtr<nsIStackFrame> frame;
-    nsXPConnect* xpc = nsXPConnect::XPConnect();
-    xpc->GetCurrentJSStack(getter_AddRefs(frame));
-
-    nsString fileName;
-    int32_t lineNo = 0;
-    if (frame) {
-        frame->GetFilename(fileName);
-        frame->GetLineNumber(&lineNo);
-    }
 
     nsAutoJSString msg;
     if (!msg.init(cx, msgstr))
@@ -2409,9 +2429,9 @@ nsXPCComponents_Utils::EvalInSandbox(const nsAString& source,
         xpc->GetCurrentJSStack(getter_AddRefs(frame));
         if (frame) {
             nsString frameFile;
-            frame->GetFilename(frameFile);
+            frame->GetFilename(cx, frameFile);
             CopyUTF16toUTF8(frameFile, filename);
-            frame->GetLineNumber(&lineNo);
+            frame->GetLineNumber(cx, &lineNo);
         }
     }
 
@@ -3500,11 +3520,14 @@ NS_IMETHODIMP nsXPCComponents::ReportError(HandleValue error, JSContext* cx)
 class ComponentsSH : public nsIXPCScriptable
 {
 public:
-    explicit ComponentsSH(unsigned dummy)
+    explicit MOZ_CONSTEXPR ComponentsSH(unsigned dummy)
     {
     }
 
-    NS_DECL_ISUPPORTS
+    // We don't actually inherit any ref counting infrastructure, but we don't
+    // need an nsAutoRefCnt member, so the _INHERITED macro is a hack to avoid
+    // having one.
+    NS_DECL_ISUPPORTS_INHERITED
     NS_DECL_NSIXPCSCRIPTABLE
     // The NS_IMETHODIMP isn't really accurate here, but NS_CALLBACK requires
     // the referent to be declared __stdcall on Windows, and this is the only

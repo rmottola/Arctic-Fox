@@ -442,6 +442,10 @@ public:
   void PostRebuildAllStyleDataEvent(nsChangeHint aExtraHint,
                                     nsRestyleHint aRestyleHint);
 
+#ifdef DEBUG
+  bool InRebuildAllStyleData() const { return mInRebuildAllStyleData; }
+#endif
+
 #ifdef RESTYLE_LOGGING
   /**
    * Returns whether a restyle event currently being processed by this
@@ -484,6 +488,8 @@ public:
 #endif
 
 private:
+  inline nsStyleSet* StyleSet() const;
+
   /* aMinHint is the minimal change that should be made to the element */
   // XXXbz do we really need the aPrimaryFrame argument here?
   void RestyleElement(Element*        aElement,
@@ -678,6 +684,8 @@ public:
 #endif
 
 private:
+  inline nsStyleSet* StyleSet() const;
+
   // Enum for the result of RestyleSelf, which indicates whether the
   // restyle procedure should continue to the children, and how.
   //

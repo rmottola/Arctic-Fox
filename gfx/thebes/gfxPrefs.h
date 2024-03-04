@@ -167,6 +167,7 @@ private:
   DECL_GFX_PREF(Once, "apz.max_velocity_queue_size",           APZMaxVelocityQueueSize, uint32_t, 5);
   DECL_GFX_PREF(Live, "apz.min_skate_speed",                   APZMinSkateSpeed, float, 1.0f);
   DECL_GFX_PREF(Live, "apz.minimap.enabled",                   APZMinimap, bool, false);
+  DECL_GFX_PREF(Live, "apz.minimap.visibility.enabled",        APZMinimapVisibilityEnabled, bool, false);
   DECL_GFX_PREF(Live, "apz.overscroll.enabled",                APZOverscrollEnabled, bool, false);
   DECL_GFX_PREF(Live, "apz.overscroll.min_pan_distance_ratio", APZMinPanDistanceRatio, float, 1.0f);
   DECL_GFX_PREF(Live, "apz.overscroll.spring_friction",        APZOverscrollSpringFriction, float, 0.015f);
@@ -174,6 +175,8 @@ private:
   DECL_GFX_PREF(Live, "apz.overscroll.stop_distance_threshold", APZOverscrollStopDistanceThreshold, float, 5.0f);
   DECL_GFX_PREF(Live, "apz.overscroll.stop_velocity_threshold", APZOverscrollStopVelocityThreshold, float, 0.01f);
   DECL_GFX_PREF(Live, "apz.overscroll.stretch_factor",         APZOverscrollStretchFactor, float, 0.5f);
+  DECL_GFX_PREF(Live, "apz.paint_skipping.enabled",            APZPaintSkipping, bool, true);
+  DECL_GFX_PREF(Live, "apz.peek_messages.enabled",             APZPeekMessages, bool, true);
   DECL_GFX_PREF(Live, "apz.printtree",                         APZPrintTree, bool, false);
   DECL_GFX_PREF(Live, "apz.record_checkerboarding",            APZRecordCheckerboarding, bool, false);
   DECL_GFX_PREF(Live, "apz.test.logging_enabled",              APZTestLoggingEnabled, bool, false);
@@ -253,8 +256,6 @@ private:
 
   DECL_GFX_PREF(Once, "gfx.direct2d.disabled",                 Direct2DDisabled, bool, false);
   DECL_GFX_PREF(Once, "gfx.direct2d.force-enabled",            Direct2DForceEnabled, bool, false);
-  DECL_GFX_PREF(Live, "gfx.direct2d.use1_1",                   Direct2DUse1_1, bool, false);
-  DECL_GFX_PREF(Live, "gfx.direct2d.allow1_0",                 Direct2DAllow1_0, bool, false);
   DECL_GFX_PREF(Live, "gfx.draw-color-bars",                   CompositorDrawColorBars, bool, false);
   DECL_GFX_PREF(Once, "gfx.e10s.hide-plugins-for-scroll",      HidePluginsForScroll, bool, true);
   DECL_GFX_PREF(Once, "gfx.font_rendering.directwrite.force-enabled", DirectWriteFontRenderingForceEnabled, bool, false);
@@ -361,6 +362,7 @@ private:
   DECL_GFX_PREF(Live, "layers.low-precision-buffer",           UseLowPrecisionBuffer, bool, false);
   DECL_GFX_PREF(Live, "layers.low-precision-opacity",          LowPrecisionOpacity, float, 1.0f);
   DECL_GFX_PREF(Live, "layers.low-precision-resolution",       LowPrecisionResolution, float, 0.25f);
+  DECL_GFX_PREF(Live, "layers.max-active",                     MaxActiveLayers, int32_t, -1);
   DECL_GFX_PREF(Once, "layers.offmainthreadcomposition.enabled", LayersOffMainThreadCompositionEnabled, bool, false);
   DECL_GFX_PREF(Once, "layers.offmainthreadcomposition.force-enabled", LayersOffMainThreadCompositionForceEnabled, bool, false);
   DECL_GFX_PREF(Live, "layers.offmainthreadcomposition.frame-rate", LayersCompositionFrameRate, int32_t,-1);

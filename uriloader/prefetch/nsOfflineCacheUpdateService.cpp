@@ -52,6 +52,7 @@ using namespace mozilla;
 using namespace mozilla::dom;
 
 static nsOfflineCacheUpdateService *gOfflineCacheUpdateService = nullptr;
+static bool sAllowOfflineCache = true;
 
 nsTHashtable<nsCStringHashKey>* nsOfflineCacheUpdateService::mAllowedDomains = nullptr;
 
@@ -77,7 +78,7 @@ typedef mozilla::docshell::OfflineCacheUpdateGlue OfflineCacheUpdateGlue;
 // this enables LogLevel::Debug level information and places all output in
 // the file offlineupdate.log
 //
-PRLogModuleInfo *gOfflineCacheUpdateLog;
+LazyLogModule gOfflineCacheUpdateLog("nsOfflineCacheUpdate");
 
 #undef LOG
 #define LOG(args) MOZ_LOG(gOfflineCacheUpdateLog, mozilla::LogLevel::Debug, args)
@@ -247,6 +248,10 @@ nsOfflineCacheUpdateService::nsOfflineCacheUpdateService()
     , mUpdateRunning(false)
     , mLowFreeSpace(false)
 {
+    MOZ_ASSERT(NS_IsMainThread());
+    Preferences::AddBoolVarCache(&sAllowOfflineCache,
+                                 "browser.cache.offline.enable",
+                                 true);
 }
 
 nsOfflineCacheUpdateService::~nsOfflineCacheUpdateService()
@@ -257,9 +262,6 @@ nsOfflineCacheUpdateService::~nsOfflineCacheUpdateService()
 nsresult
 nsOfflineCacheUpdateService::Init()
 {
-    if (!gOfflineCacheUpdateLog)
-        gOfflineCacheUpdateLog = PR_NewLogModule("nsOfflineCacheUpdate");
-
     // Observe xpcom-shutdown event
     nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
@@ -605,6 +607,10 @@ OfflineAppPermForPrincipal(nsIPrincipal *aPrincipal,
 {
     *aAllowed = false;
 
+    if (!sAllowOfflineCache) {
+        return NS_OK;
+    }
+
     if (!aPrincipal)
         return NS_ERROR_INVALID_ARG;
 
@@ -695,6 +701,10 @@ NS_IMETHODIMP
 nsOfflineCacheUpdateService::AllowOfflineApp(nsIPrincipal *aPrincipal)
 {
     nsresult rv;
+
+    if (!sAllowOfflineCache) {
+        return NS_ERROR_NOT_AVAILABLE;
+    }
 
     if (GeckoProcessType_Default != XRE_GetProcessType()) {
         ContentChild* child = ContentChild::GetSingleton();

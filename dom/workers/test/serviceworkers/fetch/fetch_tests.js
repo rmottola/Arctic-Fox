@@ -121,6 +121,12 @@ fetchXHR('headers.txt', function(xhr) {
   finish();
 }, null, [["X-Test1", "header1"], ["X-Test2", "header2"]]);
 
+fetchXHR('http://user:pass@mochi.test:8888/user-pass', function(xhr) {
+  my_ok(xhr.status == 200, "load should be successful");
+  my_ok(xhr.responseText == 'http://user:pass@mochi.test:8888/user-pass', 'The username and password should be preserved');
+  finish();
+});
+
 var expectedUncompressedResponse = "";
 for (var i = 0; i < 10; ++i) {
   expectedUncompressedResponse += "hello";
@@ -402,7 +408,7 @@ fetch('fetchevent-request')
 .then(function(res) {
   return res.text();
 }).then(function(body) {
-  my_ok(body == "nullable", "FetchEvent.request must be nullable");
+  my_ok(body == "non-nullable", "FetchEvent.request must be non-nullable");
   finish();
 }, function(err) {
   my_ok(false, "A promise was rejected with " + err);

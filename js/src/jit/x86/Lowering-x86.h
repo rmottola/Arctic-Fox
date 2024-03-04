@@ -42,6 +42,9 @@ class LIRGeneratorX86 : public LIRGeneratorX86Shared
     void lowerUntypedPhiInput(MPhi* phi, uint32_t inputPosition, LBlock* block, size_t lirIndex);
     void defineUntypedPhi(MPhi* phi, size_t lirIndex);
 
+    void lowerDivI64(MDiv* div);
+    void lowerModI64(MMod* mod);
+
   public:
     void visitBox(MBox* box);
     void visitUnbox(MUnbox* unbox);
@@ -60,6 +63,8 @@ class LIRGeneratorX86 : public LIRGeneratorX86Shared
     void visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic* ins);
     void visitSubstr(MSubstr* ins);
     void visitRandom(MRandom* ins);
+    void visitTruncateToInt64(MTruncateToInt64* ins);
+    void visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins);
     void lowerPhi(MPhi* phi);
 
     static bool allowTypedElementHoleCheck() {

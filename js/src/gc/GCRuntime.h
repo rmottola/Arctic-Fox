@@ -17,6 +17,7 @@
 #include "gc/Statistics.h"
 #include "gc/StoreBuffer.h"
 #include "gc/Tracer.h"
+#include "js/GCAnnotations.h"
 
 namespace js {
 
@@ -653,7 +654,8 @@ class GCRuntime
 
     uint64_t nextCellUniqueId() {
         MOZ_ASSERT(nextCellUniqueId_ > 0);
-        return nextCellUniqueId_++;
+        uint64_t uid = ++nextCellUniqueId_;
+        return uid;
     }
 
   public:
@@ -675,7 +677,7 @@ class GCRuntime
     bool onBackgroundThread() { return helperState.onBackgroundThread(); }
 
     bool currentThreadOwnsGCLock() {
-        return lockOwner.value == PR_GetCurrentThread();
+        return lockOwner == PR_GetCurrentThread();
     }
 
 #endif // DEBUG
@@ -687,15 +689,15 @@ class GCRuntime
     void lockGC() {
         PR_Lock(lock);
 #ifdef DEBUG
-        MOZ_ASSERT(!lockOwner.value);
-        lockOwner.value = PR_GetCurrentThread();
+        MOZ_ASSERT(!lockOwner);
+        lockOwner = PR_GetCurrentThread();
 #endif
     }
 
     void unlockGC() {
 #ifdef DEBUG
-        MOZ_ASSERT(lockOwner.value == PR_GetCurrentThread());
-        lockOwner.value = nullptr;
+        MOZ_ASSERT(lockOwner == PR_GetCurrentThread());
+        lockOwner = nullptr;
 #endif
         PR_Unlock(lock);
     }
@@ -706,6 +708,13 @@ class GCRuntime
     void allowAlloc() {
         MOZ_ASSERT(!isAllocAllowed());
         --noGCOrAllocationCheck;
+    }
+
+    bool isNurseryAllocAllowed() { return noNurseryAllocationCheck == 0; }
+    void disallowNurseryAlloc() { ++noNurseryAllocationCheck; }
+    void allowNurseryAlloc() {
+        MOZ_ASSERT(!isNurseryAllocAllowed());
+        --noNurseryAllocationCheck;
     }
 
     bool isInsideUnsafeRegion() { return inUnsafeRegion != 0; }
@@ -721,7 +730,7 @@ class GCRuntime
         MOZ_ASSERT(disableStrictProxyCheckingCount > 0);
         --disableStrictProxyCheckingCount;
     }
-#endif
+#endif // DEBUG
 
     void setAlwaysPreserveCode() { alwaysPreserveCode = true; }
 
@@ -840,7 +849,7 @@ class GCRuntime
     void freeAllLifoBlocksAfterSweeping(LifoAlloc* lifo);
 
     // Public here for ReleaseArenaLists and FinalizeTypedArenas.
-    void releaseArena(ArenaHeader* aheader, const AutoLockGC& lock);
+    void releaseArena(Arena* arena, const AutoLockGC& lock);
 
     void releaseHeldRelocatedArenas();
     void releaseHeldRelocatedArenasWithoutUnlocking(const AutoLockGC& lock);
@@ -865,14 +874,14 @@ class GCRuntime
         Finished
     };
 
-    void minorGCImpl(JS::gcreason::Reason reason, Nursery::ObjectGroupList* pretenureGroups);
+    void minorGCImpl(JS::gcreason::Reason reason, Nursery::ObjectGroupList* pretenureGroups) JS_HAZ_GC_CALL;
 
     // For ArenaLists::allocateFromArena()
     friend class ArenaLists;
     Chunk* pickChunk(const AutoLockGC& lock,
                      AutoMaybeStartBackgroundAllocation& maybeStartBGAlloc);
-    ArenaHeader* allocateArena(Chunk* chunk, Zone* zone, AllocKind kind, const AutoLockGC& lock);
-    void arenaAllocatedDuringGC(JS::Zone* zone, ArenaHeader* arena);
+    Arena* allocateArena(Chunk* chunk, Zone* zone, AllocKind kind, const AutoLockGC& lock);
+    void arenaAllocatedDuringGC(JS::Zone* zone, Arena* arena);
 
     // Allocator internals
     bool gcIfNeededPerAllocation(JSContext* cx);
@@ -911,7 +920,7 @@ class GCRuntime
     bool checkIfGCAllowedInCurrentState(JS::gcreason::Reason reason);
 
     gcstats::ZoneGCStats scanZonesBeforeGC();
-    void collect(bool nonincrementalByAPI, SliceBudget budget, JS::gcreason::Reason reason);
+    void collect(bool nonincrementalByAPI, SliceBudget budget, JS::gcreason::Reason reason) JS_HAZ_GC_CALL;
     bool gcCycle(bool nonincrementalByAPI, SliceBudget& budget, JS::gcreason::Reason reason);
     void incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason reason);
 
@@ -949,20 +958,19 @@ class GCRuntime
     void sweepBackgroundThings(ZoneList& zones, LifoAlloc& freeBlocks, ThreadType threadType);
     void assertBackgroundSweepingFinished();
     bool shouldCompact();
-    IncrementalProgress beginCompactPhase();
+    void beginCompactPhase();
     IncrementalProgress compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget);
     void endCompactPhase(JS::gcreason::Reason reason);
     void sweepTypesAfterCompacting(Zone* zone);
     void sweepZoneAfterCompacting(Zone* zone);
-    bool relocateArenas(Zone* zone, JS::gcreason::Reason reason, ArenaHeader*& relocatedListOut,
+    bool relocateArenas(Zone* zone, JS::gcreason::Reason reason, Arena*& relocatedListOut,
                         SliceBudget& sliceBudget);
-    void updateAllCellPointersParallel(MovingTracer* trc, Zone* zone);
-    void updateAllCellPointersSerial(MovingTracer* trc, Zone* zone);
+    void updateAllCellPointers(MovingTracer* trc, Zone* zone);
     void updatePointersToRelocatedCells(Zone* zone);
-    void protectAndHoldArenas(ArenaHeader* arenaList);
+    void protectAndHoldArenas(Arena* arenaList);
     void unprotectHeldRelocatedArenas();
-    void releaseRelocatedArenas(ArenaHeader* arenaList);
-    void releaseRelocatedArenasWithoutUnlocking(ArenaHeader* arenaList, const AutoLockGC& lock);
+    void releaseRelocatedArenas(Arena* arenaList);
+    void releaseRelocatedArenasWithoutUnlocking(Arena* arenaList, const AutoLockGC& lock);
     void finishCollection(JS::gcreason::Reason reason);
 
     void computeNonIncrementalMarkingForValidation();
@@ -1026,7 +1034,7 @@ class GCRuntime
     size_t maxMallocBytes;
 
     // An incrementing id used to assign unique ids to cells that require one.
-    uint64_t nextCellUniqueId_;
+    mozilla::Atomic<uint64_t, mozilla::SequentiallyConsistent> nextCellUniqueId_;
 
     /*
      * Number of the committed arenas in all GC chunks including empty chunks.
@@ -1112,13 +1120,15 @@ class GCRuntime
     /* The initial GC reason, taken from the first slice. */
     JS::gcreason::Reason initialReason;
 
+#ifdef DEBUG
     /*
      * If this is 0, all cross-compartment proxies must be registered in the
      * wrapper map. This checking must be disabled temporarily while creating
      * new wrappers. When non-zero, this records the recursion depth of wrapper
      * creation.
      */
-    mozilla::DebugOnly<uintptr_t> disableStrictProxyCheckingCount;
+    uintptr_t disableStrictProxyCheckingCount;
+#endif
 
     /*
      * The current incremental GC phase. This is also used internally in
@@ -1170,14 +1180,14 @@ class GCRuntime
     /*
      * List head of arenas allocated during the sweep phase.
      */
-    js::gc::ArenaHeader* arenasAllocatedDuringSweep;
+    js::gc::Arena* arenasAllocatedDuringSweep;
 
     /*
      * Incremental compacting state.
      */
     bool startedCompacting;
     js::gc::ZoneList zonesToMaybeCompact;
-    ArenaHeader* relocatedArenasToRelease;
+    Arena* relocatedArenasToRelease;
 
 #ifdef JS_GC_ZEAL
     js::gc::MarkingValidator* markingValidator;
@@ -1312,11 +1322,14 @@ class GCRuntime
     int inUnsafeRegion;
 
     size_t noGCOrAllocationCheck;
+    size_t noNurseryAllocationCheck;
 #endif
 
     /* Synchronize GC heap access between main thread and GCHelperState. */
     PRLock* lock;
-    mozilla::DebugOnly<mozilla::Atomic<PRThread*>> lockOwner;
+#ifdef DEBUG
+    mozilla::Atomic<PRThread*> lockOwner;
+#endif
 
     BackgroundAllocTask allocTask;
     GCHelperState helperState;

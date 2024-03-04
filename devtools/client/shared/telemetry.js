@@ -55,7 +55,7 @@ this.Telemetry = function() {
 module.exports = Telemetry;
 
 var {Cc, Ci, Cu} = require("chrome");
-var {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
+var Services = require("Services");
 var {XPCOMUtils} = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
 
 Telemetry.prototype = {
@@ -145,6 +145,11 @@ Telemetry.prototype = {
       userHistogram: "DEVTOOLS_JSPROFILER_OPENED_PER_USER_FLAG",
       timerHistogram: "DEVTOOLS_JSPROFILER_TIME_ACTIVE_SECONDS"
     },
+    memory: {
+      histogram: "DEVTOOLS_MEMORY_OPENED_BOOLEAN",
+      userHistogram: "DEVTOOLS_MEMORY_OPENED_PER_USER_FLAG",
+      timerHistogram: "DEVTOOLS_MEMORY_TIME_ACTIVE_SECONDS"
+    },
     netmonitor: {
       histogram: "DEVTOOLS_NETMONITOR_OPENED_BOOLEAN",
       userHistogram: "DEVTOOLS_NETMONITOR_OPENED_PER_USER_FLAG",
@@ -169,6 +174,11 @@ Telemetry.prototype = {
       histogram: "DEVTOOLS_SCRATCHPAD_OPENED_BOOLEAN",
       userHistogram: "DEVTOOLS_SCRATCHPAD_OPENED_PER_USER_FLAG",
       timerHistogram: "DEVTOOLS_SCRATCHPAD_TIME_ACTIVE_SECONDS"
+    },
+    "scratchpad-window": {
+      histogram: "DEVTOOLS_SCRATCHPAD_WINDOW_OPENED_BOOLEAN",
+      userHistogram: "DEVTOOLS_SCRATCHPAD_WINDOW_OPENED_PER_USER_FLAG",
+      timerHistogram: "DEVTOOLS_SCRATCHPAD_WINDOW_TIME_ACTIVE_SECONDS"
     },
     responsive: {
       histogram: "DEVTOOLS_RESPONSIVE_OPENED_BOOLEAN",

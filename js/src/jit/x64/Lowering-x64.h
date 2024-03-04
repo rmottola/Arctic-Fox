@@ -36,6 +36,11 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared
 
     bool needTempForPostBarrier() { return false; }
 
+    void lowerDivI64(MDiv* div);
+    void lowerModI64(MMod* mod);
+    void lowerUDiv64(MDiv* div);
+    void lowerUMod64(MMod* mod);
+
   public:
     void visitBox(MBox* box);
     void visitUnbox(MUnbox* unbox);
@@ -54,6 +59,8 @@ class LIRGeneratorX64 : public LIRGeneratorX86Shared
     void visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic* ins);
     void visitSubstr(MSubstr* ins);
     void visitRandom(MRandom* ins);
+    void visitTruncateToInt64(MTruncateToInt64* ins);
+    void visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins);
 };
 
 typedef LIRGeneratorX64 LIRGeneratorSpecific;

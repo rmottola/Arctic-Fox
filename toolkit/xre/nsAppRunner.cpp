@@ -68,6 +68,7 @@
 #include "nsIIOService2.h"
 #include "nsIObserverService.h"
 #include "nsINativeAppSupport.h"
+#include "nsIPlatformInfo.h"
 #include "nsIProcess.h"
 #include "nsIProfileUnlocker.h"
 #include "nsIPromptService.h"
@@ -104,6 +105,7 @@
 #include <math.h>
 #include "cairo/cairo-features.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/widget/AudioSession.h"
 
 #ifndef PROCESS_DEP_ENABLE
 #define PROCESS_DEP_ENABLE 0x1
@@ -605,41 +607,75 @@ CanShowProfileManager()
 }
 
 #if defined(XP_WIN) && defined(MOZ_CONTENT_SANDBOX)
-static already_AddRefed<nsIFile>
-GetAndCleanLowIntegrityTemp(const nsAString& aTempDirSuffix)
+static const char*
+SandboxTempDirParent()
 {
-  // Get the base low integrity Mozilla temp directory.
-  nsCOMPtr<nsIFile> lowIntegrityTemp;
-  nsresult rv = NS_GetSpecialDirectory(NS_WIN_LOW_INTEGRITY_TEMP_BASE,
-                                       getter_AddRefs(lowIntegrityTemp));
+  return NS_WIN_LOW_INTEGRITY_TEMP_BASE;
+}
+#endif
+
+#if defined(XP_MACOSX) && defined(MOZ_CONTENT_SANDBOX)
+static const char*
+SandboxTempDirParent()
+{
+  return NS_OS_TEMP_DIR;
+}
+#endif
+
+#if (defined(XP_WIN) || defined(XP_MACOSX)) && defined(MOZ_CONTENT_SANDBOX)
+static already_AddRefed<nsIFile>
+GetAndCleanTempDir(const nsAString& aTempDirSuffix)
+{
+  // Get the directory within which we'll place the
+  // sandbox-writable temp directory
+  nsCOMPtr<nsIFile> tempDir;
+  nsresult rv = NS_GetSpecialDirectory(SandboxTempDirParent(),
+      getter_AddRefs(tempDir));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return nullptr;
   }
 
   // Append our profile specific temp name.
-  rv = lowIntegrityTemp->Append(NS_LITERAL_STRING("Temp-") + aTempDirSuffix);
+  rv = tempDir->Append(NS_LITERAL_STRING("Temp-") + aTempDirSuffix);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return nullptr;
   }
 
-  rv = lowIntegrityTemp->Remove(/* aRecursive */ true);
+  rv = tempDir->Remove(/* aRecursive */ true);
   if (NS_FAILED(rv) && rv != NS_ERROR_FILE_NOT_FOUND) {
-    NS_WARNING("Failed to delete low integrity temp directory.");
+    NS_WARNING("Failed to delete temp directory.");
     return nullptr;
   }
 
-  return lowIntegrityTemp.forget();
+  return tempDir.forget();
 }
 
 static void
 SetUpSandboxEnvironment()
 {
-  // A low integrity temp only currently makes sense for Vista and later, e10s
-  // and sandbox pref level >= 1.
-  if (!IsVistaOrLater() || !BrowserTabsRemoteAutostart() ||
-      Preferences::GetInt("security.sandbox.content.level") < 1) {
+  // Setup a sandbox-writable temp directory. i.e., a directory
+  // that is writable by a sandboxed content process. This
+  // only applies when e10s is enabled, depending on the platform
+  // and setting of security.sandbox.content.level.
+  if (!BrowserTabsRemoteAutostart()) {
     return;
   }
+
+#if defined(XP_WIN)
+  // For Windows, the temp dir only makes sense for Vista and later
+  // with a sandbox pref level >= 1
+  if (!IsVistaOrLater() ||
+      (Preferences::GetInt("security.sandbox.content.level") < 1)) {
+    return;
+  }
+#endif
+
+#if defined(XP_MACOSX)
+  // For OSX, we just require sandbox pref level >= 1.
+  if (Preferences::GetInt("security.sandbox.content.level") < 1) {
+    return;
+  }
+#endif
 
   // Get (and create if blank) temp directory suffix pref.
   nsresult rv;
@@ -680,14 +716,14 @@ SetUpSandboxEnvironment()
     }
   }
 
-  // Get (and clean up if still there) the low integrity Mozilla temp directory.
-  nsCOMPtr<nsIFile> lowIntegrityTemp = GetAndCleanLowIntegrityTemp(tempDirSuffix);
-  if (!lowIntegrityTemp) {
-    NS_WARNING("Failed to get or clean low integrity Mozilla temp directory.");
+  // Get (and clean up if still there) the sandbox-writable temp directory.
+  nsCOMPtr<nsIFile> tempDir = GetAndCleanTempDir(tempDirSuffix);
+  if (!tempDir) {
+    NS_WARNING("Failed to get or clean sandboxed temp directory.");
     return;
   }
 
-  rv = lowIntegrityTemp->Create(nsIFile::DIRECTORY_TYPE, 0700);
+  rv = tempDir->Create(nsIFile::DIRECTORY_TYPE, 0700);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
@@ -696,10 +732,12 @@ SetUpSandboxEnvironment()
 static void
 CleanUpSandboxEnvironment()
 {
-  // We can't have created a low integrity temp before Vista.
+#if defined(XP_WIN)
+  // We can't have created the temp directory before Vista.
   if (!IsVistaOrLater()) {
     return;
   }
+#endif
 
   // Get temp directory suffix pref.
   nsAdoptingString tempDirSuffix =
@@ -708,9 +746,9 @@ CleanUpSandboxEnvironment()
     return;
   }
 
-  // Get and remove the low integrity Mozilla temp directory.
+  // Get and remove the sandbox-writable temp directory.
   // This function already warns if the deletion fails.
-  nsCOMPtr<nsIFile> lowIntegrityTemp = GetAndCleanLowIntegrityTemp(tempDirSuffix);
+  nsCOMPtr<nsIFile> tempDir = GetAndCleanTempDir(tempDirSuffix);
 }
 #endif
 
@@ -735,6 +773,7 @@ class nsXULAppInfo : public nsIXULAppInfo,
 public:
   MOZ_CONSTEXPR nsXULAppInfo() {}
   NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_NSIPLATFORMINFO
   NS_DECL_NSIXULAPPINFO
   NS_DECL_NSIXULRUNTIME
   NS_DECL_NSIOBSERVER
@@ -758,6 +797,7 @@ NS_INTERFACE_MAP_BEGIN(nsXULAppInfo)
   NS_INTERFACE_MAP_ENTRY(nsICrashReporter)
   NS_INTERFACE_MAP_ENTRY(nsIFinishDumpingCallback)
 #endif
+  NS_INTERFACE_MAP_ENTRY(nsIPlatformInfo)
   NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIXULAppInfo, gAppData ||
                                      XRE_IsContentProcess())
 NS_INTERFACE_MAP_END
@@ -4314,7 +4354,7 @@ XREMain::XRE_mainRun()
   }
 #endif /* MOZ_INSTRUMENT_EVENT_LOOP */
 
-#if defined(XP_WIN) && defined(MOZ_CONTENT_SANDBOX)
+#if (defined(XP_WIN) || defined(XP_MACOSX)) && defined(MOZ_CONTENT_SANDBOX)
   SetUpSandboxEnvironment();
 #endif
 
@@ -4326,7 +4366,7 @@ XREMain::XRE_mainRun()
     }
   }
 
-#if defined(XP_WIN) && defined(MOZ_CONTENT_SANDBOX)
+#if (defined(XP_WIN) || defined(XP_MACOSX)) && defined(MOZ_CONTENT_SANDBOX)
   CleanUpSandboxEnvironment();
 #endif
 
@@ -4444,7 +4484,11 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
 
   mScopedXPCOM = nullptr;
 
-  // unlock the profile after ScopedXPCOMStartup object (xpcom)
+#if defined(XP_WIN)
+  mozilla::widget::StopAudioSession();
+#endif
+
+  // unlock the profile after ScopedXPCOMStartup object (xpcom) 
   // has gone out of scope.  see bug #386739 for more details
   mProfileLock->Unlock();
   gProfileLock = nullptr;

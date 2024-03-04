@@ -320,6 +320,10 @@ nsHTMLScrollFrame::TryLayout(ScrollReflowState* aState,
   if (aAssumeVScroll != aState->mReflowedContentsWithVScrollbar ||
       (aAssumeHScroll != aState->mReflowedContentsWithHScrollbar &&
        ScrolledContentDependsOnHeight(aState))) {
+    if (aAssumeHScroll != aState->mReflowedContentsWithHScrollbar) {
+      nsLayoutUtils::MarkIntrinsicISizesDirtyIfDependentOnBSize(
+          mHelper.mScrolledFrame);
+    }
     ReflowScrolledFrame(aState, aAssumeHScroll, aAssumeVScroll, aKidMetrics,
                         false);
   }
@@ -423,7 +427,8 @@ nsHTMLScrollFrame::ScrolledContentDependsOnHeight(ScrollReflowState* aState)
 {
   // Return true if ReflowScrolledFrame is going to do something different
   // based on the presence of a horizontal scrollbar.
-  return (mHelper.mScrolledFrame->GetStateBits() & NS_FRAME_CONTAINS_RELATIVE_BSIZE) ||
+  return mHelper.mScrolledFrame->HasAnyStateBits(
+      NS_FRAME_CONTAINS_RELATIVE_BSIZE | NS_FRAME_DESCENDANT_INTRINSIC_ISIZE_DEPENDS_ON_BSIZE) ||
     aState->mReflowState.ComputedBSize() != NS_UNCONSTRAINEDSIZE ||
     aState->mReflowState.ComputedMinBSize() > 0 ||
     aState->mReflowState.ComputedMaxBSize() != NS_UNCONSTRAINEDSIZE;
@@ -2044,9 +2049,13 @@ ScrollFrameHelper::NotifyPluginFrames(AsyncScrollEventType aEvent)
     return;
   }
   if (XRE_IsContentProcess()) {
+    // Ignore 'inner' dom events triggered by apz transformations
+    if (mAsyncScrollEvent == BEGIN_APZ && aEvent != END_APZ) {
+      return;
+    }
     if (aEvent != mAsyncScrollEvent) {
       nsPresContext* presContext = mOuter->PresContext();
-      PluginSearchCtx ctx = { mOuter, (aEvent == BEGIN_DOM) };
+      PluginSearchCtx ctx = { mOuter, (aEvent == BEGIN_APZ || aEvent == BEGIN_DOM) };
       presContext->Document()->EnumerateActivityObservers(NotifyPluginFramesCallback,
                                                           (void*)&ctx);
       presContext->Document()->EnumerateSubDocuments(NotifyPluginSubframesCallback,
@@ -2662,7 +2671,7 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
 
   ScrollVisual();
 
-  if (LastScrollOrigin() == nsGkAtoms::apz) {
+  if (LastScrollOrigin() == nsGkAtoms::apz && gfxPrefs::APZPaintSkipping()) {
     // If this was an apz scroll and the displayport (relative to the
     // scrolled frame) hasn't changed, then this won't trigger
     // any painting, so no need to schedule one.
@@ -3534,6 +3543,26 @@ static void HandleScrollPref(nsIScrollable *aScrollable, int32_t aOrientation,
   }
 }
 
+bool
+ScrollFrameHelper::IsScrollFrameWithSnapping() const
+{
+  nsPresContext* presContext = mOuter->PresContext();
+  if (!presContext->IsDynamic() &&
+      !(mIsRoot && presContext->HasPaginatedScrolling())) {
+    return false;
+  }
+
+  if (!mIsRoot) {
+    const nsStyleDisplay& display = *mOuter->StyleDisplay();
+    return display.mScrollSnapTypeY != NS_STYLE_SCROLL_SNAP_TYPE_NONE ||
+           display.mScrollSnapTypeX != NS_STYLE_SCROLL_SNAP_TYPE_NONE;
+  } else {
+    const ScrollbarStyles& display = presContext->GetViewportScrollbarStylesOverride();
+    return display.mScrollSnapTypeY != NS_STYLE_SCROLL_SNAP_TYPE_NONE ||
+           display.mScrollSnapTypeX != NS_STYLE_SCROLL_SNAP_TYPE_NONE;
+  }
+}
+
 ScrollbarStyles
 ScrollFrameHelper::GetScrollbarStylesFromFrame() const
 {
@@ -3808,9 +3837,8 @@ ScrollFrameHelper::ScrollSnap(const nsPoint &aDestination,
 nsSize
 ScrollFrameHelper::GetLineScrollAmount() const
 {
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForFrame(mOuter, getter_AddRefs(fm),
-    nsLayoutUtils::FontSizeInflationFor(mOuter));
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetInflatedFontMetricsForFrame(mOuter);
   NS_ASSERTION(fm, "FontMetrics is null, assuming fontHeight == 1 appunit");
   static nscoord sMinLineScrollAmountInPixels = -1;
   if (sMinLineScrollAmountInPixels < 0) {
@@ -4385,13 +4413,17 @@ ScrollFrameHelper::ScrollEvent::ScrollEvent(ScrollFrameHelper* aHelper)
 
 ScrollFrameHelper::ScrollEvent::~ScrollEvent()
 {
-  mDriver->RemoveRefreshObserver(this, Flush_Style);
-  mDriver = nullptr;
+  if (mDriver) {
+    mDriver->RemoveRefreshObserver(this, Flush_Style);
+    mDriver = nullptr;
+  }
 }
 
 void
 ScrollFrameHelper::ScrollEvent::WillRefresh(mozilla::TimeStamp aTime)
 {
+  mDriver->RemoveRefreshObserver(this, Flush_Style);
+  mDriver = nullptr;
   mHelper->FireScrollEvent();
 }
 

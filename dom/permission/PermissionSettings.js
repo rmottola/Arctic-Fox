@@ -42,7 +42,7 @@ PermissionSettings.prototype = {
     let principal =
       Services.scriptSecurityManager.createCodebasePrincipal(uri,
                                                              {appId: appID,
-                                                              inBrowser: aBrowserFlag});
+                                                              inIsolatedMozBrowser: aBrowserFlag});
     let result = Services.perms.testExactPermanentPermission(principal, aPermName);
 
     switch (result)
@@ -68,7 +68,7 @@ PermissionSettings.prototype = {
     let uri = Services.io.newURI(aOrigin, null, null);
     let app = appsService.getAppByManifestURL(aManifestURL);
     let principal = Services.scriptSecurityManager
-      .createCodebasePrincipal(uri, {appId: app.localId, inBrowser: aBrowserFlag});
+      .createCodebasePrincipal(uri, {appId: app.localId, inIsolatedMozBrowser: aBrowserFlag});
 
     return isExplicitInPermissionsTable(aPermName,
                                         principal.appStatus);
@@ -77,7 +77,7 @@ PermissionSettings.prototype = {
   set: function set(aPermName, aPermValue, aManifestURL, aOrigin,
                     aBrowserFlag) {
     debug("Set called with: " + aPermName + ", " + aManifestURL + ", " +
-          aOrigin + ",  " + aPermValue + ", " + aBrowserFlag);
+          aOrigin + ", " + aPermValue + ", " + aBrowserFlag);
     let currentPermValue = this.get(aPermName, aManifestURL, aOrigin,
                                     aBrowserFlag);
     let action;
@@ -109,7 +109,7 @@ PermissionSettings.prototype = {
     let principal =
       Services.scriptSecurityManager.createCodebasePrincipal(uri,
                                                              {appId: appID,
-                                                              inBrowser: true});
+                                                              inIsolatedMozBrowser: true});
 
     if (principal.appStatus !== Ci.nsIPrincipal.APP_STATUS_NOT_INSTALLED) {
       let errorMsg = "PermissionSettings.js: '" + aOrigin + "'" +

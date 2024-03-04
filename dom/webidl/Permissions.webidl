@@ -10,8 +10,8 @@
 enum PermissionName {
   "geolocation",
   "notifications",
-  "push",
-  "midi"
+  "push"
+  // Unsupported: "midi"
 };
 
 dictionary PermissionDescriptor {
@@ -22,8 +22,7 @@ dictionary PushPermissionDescriptor : PermissionDescriptor {
   boolean userVisible = false;
 };
 
-[Exposed=(Window),
- Pref="dom.permissions.enabled"]
+[Exposed=(Window)]
 interface Permissions {
   [Throws]
   Promise<PermissionStatus> query(object permission);

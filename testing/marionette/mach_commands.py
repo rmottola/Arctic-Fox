@@ -40,7 +40,7 @@ def run_marionette(tests, b2g_path=None, emulator=None, testtype=None,
     from marionette.runtests import (
         MarionetteTestRunner,
         BaseMarionetteArguments,
-        startTestRunner
+        MarionetteHarness
     )
 
     parser = BaseMarionetteArguments()
@@ -49,7 +49,7 @@ def run_marionette(tests, b2g_path=None, emulator=None, testtype=None,
 
     if not tests:
         tests = [os.path.join(topsrcdir,
-                 'testing/marionette/client/marionette/tests/unit-tests.ini')]
+                 'testing/marionette/harness/marionette/tests/unit-tests.ini')]
     args.tests = tests
 
     if b2g_path:
@@ -68,12 +68,11 @@ def run_marionette(tests, b2g_path=None, emulator=None, testtype=None,
     args.logger = commandline.setup_logging("Marionette Unit Tests",
                                             args,
                                             {"mach": sys.stdout})
-
-    runner = startTestRunner(MarionetteTestRunner, args)
-    if runner.failed > 0:
+    failed = MarionetteHarness(MarionetteTestRunner, args=args).run()
+    if failed > 0:
         return 1
-
-    return 0
+    else:
+        return 0
 
 @CommandProvider
 class B2GCommands(MachCommandBase):

@@ -56,6 +56,7 @@
 #include "gfxFontFamilyList.h"
 
 using namespace mozilla;
+using namespace mozilla::css;
 
 typedef nsCSSProps::KTableEntry KTableEntry;
 
@@ -118,9 +119,9 @@ struct CSSParserInputState {
   bool mHavePushBack;
 };
 
-static_assert(eAuthorSheetFeatures == 0 &&
-              eUserSheetFeatures == 1 &&
-              eAgentSheetFeatures == 2,
+static_assert(css::eAuthorSheetFeatures == 0 &&
+              css::eUserSheetFeatures == 1 &&
+              css::eAgentSheetFeatures == 2,
               "sheet parsing mode constants won't fit "
               "in CSSParserImpl::mParsingMode");
 
@@ -148,8 +149,8 @@ public:
                       nsIURI*          aBaseURI,
                       nsIPrincipal*    aSheetPrincipal,
                       uint32_t         aLineNumber,
-                      SheetParsingMode aParsingMode,
-                      LoaderReusableStyleSheets* aReusableSheets);
+                      css::SheetParsingMode aParsingMode,
+                      css::LoaderReusableStyleSheets* aReusableSheets);
 
   already_AddRefed<css::Declaration>
            ParseStyleAttribute(const nsAString&  aAttributeValue,
@@ -344,11 +345,11 @@ public:
                                            uint32_t aLineOffset);
 
   bool AgentRulesEnabled() const {
-    return mParsingMode == eAgentSheetFeatures;
+    return mParsingMode == css::eAgentSheetFeatures;
   }
   bool UserRulesEnabled() const {
-    return mParsingMode == eAgentSheetFeatures ||
-           mParsingMode == eUserSheetFeatures;
+    return mParsingMode == css::eAgentSheetFeatures ||
+           mParsingMode == css::eUserSheetFeatures;
   }
 
   nsCSSProps::EnabledState PropertyEnabledState() const {
@@ -945,9 +946,7 @@ protected:
   bool ParseGridLineNameListRepeat(nsCSSValueList** aTailPtr);
   bool ParseOptionalLineNameListAfterSubgrid(nsCSSValue& aValue);
 
-  // eFixedTrackSize in aFlags makes it parse a <fixed-breadth>.
-  CSSParseResult ParseGridTrackBreadth(nsCSSValue& aValue,
-    GridTrackSizeFlags aFlags = GridTrackSizeFlags::eDefaultTrackSize);
+  CSSParseResult ParseGridTrackBreadth(nsCSSValue& aValue);
   // eFixedTrackSize in aFlags makes it parse a <fixed-size>.
   CSSParseResult ParseGridTrackSize(nsCSSValue& aValue,
     GridTrackSizeFlags aFlags = GridTrackSizeFlags::eDefaultTrackSize);
@@ -961,7 +960,7 @@ protected:
   // Assuming a [ <line-names>? ] has already been parsed,
   // parse the rest of a <track-list>.
   //
-  // This exists because [ <line-names>? ] is ambiguous in the 'grid-template'
+  // This exists because [ <line-names>? ] is ambiguous in the 'grid'
   // shorthand: it can be either the start of a <track-list> (in
   // a <'grid-template-rows'>) or of the intertwined syntax that sets both
   // grid-template-rows and grid-template-areas.
@@ -1356,10 +1355,10 @@ protected:
   RefPtr<CSSStyleSheet> mSheet;
 
   // Used for @import rules
-  mozilla::css::Loader* mChildLoader; // not ref counted, it owns us
+  css::Loader* mChildLoader; // not ref counted, it owns us
 
   // Any sheets we may reuse when parsing an @import.
-  LoaderReusableStyleSheets* mReusableSheets;
+  css::LoaderReusableStyleSheets* mReusableSheets;
 
   // Sheet section we're in.  This is used to enforce correct ordering of the
   // various rule types (eg the fact that a @charset rule must come before
@@ -1393,7 +1392,7 @@ protected:
   // useful in user sheets.  The only values stored in this field are
   // 0, 1, and 2; three bits are allocated to avoid issues should the
   // enum type be signed.
-  SheetParsingMode mParsingMode : 3;
+  css::SheetParsingMode mParsingMode : 3;
 
   // True if we are in parsing rules for the chrome.
   bool mIsChrome : 1;
@@ -1523,7 +1522,7 @@ CSSParserImpl::CSSParserImpl()
     mNavQuirkMode(false),
     mHashlessColorQuirk(false),
     mUnitlessLengthQuirk(false),
-    mParsingMode(eAuthorSheetFeatures),
+    mParsingMode(css::eAuthorSheetFeatures),
     mIsChrome(false),
     mViewportUnitsEnabled(true),
     mHTMLMediaMode(false),
@@ -1630,8 +1629,8 @@ CSSParserImpl::ParseSheet(const nsAString& aInput,
                           nsIURI*          aBaseURI,
                           nsIPrincipal*    aSheetPrincipal,
                           uint32_t         aLineNumber,
-                          SheetParsingMode aParsingMode,
-                          LoaderReusableStyleSheets* aReusableSheets)
+                          css::SheetParsingMode aParsingMode,
+                          css::LoaderReusableStyleSheets* aReusableSheets)
 {
   NS_PRECONDITION(aSheetPrincipal, "Must have principal here!");
   NS_PRECONDITION(aBaseURI, "need base URI");
@@ -1701,7 +1700,7 @@ CSSParserImpl::ParseSheet(const nsAString& aInput,
   }
   ReleaseScanner();
 
-  mParsingMode = eAuthorSheetFeatures;
+  mParsingMode = css::eAuthorSheetFeatures;
   mIsChrome = false;
   mReusableSheets = nullptr;
 
@@ -1853,7 +1852,7 @@ CSSParserImpl::ParseLonghandProperty(const nsCSSProperty aPropID,
   MOZ_ASSERT(aPropID < eCSSProperty_COUNT_no_shorthands,
              "ParseLonghandProperty must only take a longhand property");
 
-  RefPtr<Declaration> declaration = new Declaration;
+  RefPtr<css::Declaration> declaration = new css::Declaration;
   declaration->InitializeEmpty();
 
   bool changed;
@@ -1874,7 +1873,7 @@ CSSParserImpl::ParseTransformProperty(const nsAString& aPropValue,
                                       bool aDisallowRelativeValues,
                                       nsCSSValue& aValue)
 {
-  RefPtr<Declaration> declaration = new Declaration();
+  RefPtr<css::Declaration> declaration = new css::Declaration();
   declaration->InitializeEmpty();
 
   mData.AssertInitialState();
@@ -2468,7 +2467,7 @@ SeparatorRequiredBetweenTokens(nsCSSTokenSerializationType aToken1,
                  aToken1 == eCSSTokenSerialization_Symbol_Equals ||
                  aToken1 == eCSSTokenSerialization_Symbol_Bar ||
                  aToken1 == eCSSTokenSerialization_Symbol_Slash ||
-                 aToken1 == eCSSTokenSerialization_Other ||
+                 aToken1 == eCSSTokenSerialization_Other,
                  "unexpected nsCSSTokenSerializationType value");
       return false;
   }
@@ -7586,6 +7585,14 @@ CSSParserImpl::ParseOneOrLargerVariant(nsCSSValue& aValue,
   return result;
 }
 
+static bool
+IsCSSTokenCalcFunction(const nsCSSToken& aToken)
+{
+  return aToken.mType == eCSSToken_Function &&
+         (aToken.mIdent.LowerCaseEqualsLiteral("calc") ||
+          aToken.mIdent.LowerCaseEqualsLiteral("-moz-calc"));
+}
+
 // Assigns to aValue iff it returns CSSParseResult::Ok.
 CSSParseResult
 CSSParserImpl::ParseVariant(nsCSSValue& aValue,
@@ -7889,11 +7896,11 @@ CSSParserImpl::ParseVariant(nsCSSValue& aValue,
     }
   }
   if ((aVariantMask & VARIANT_CALC) &&
-      (eCSSToken_Function == tk->mType) &&
-      (tk->mIdent.LowerCaseEqualsLiteral("calc") ||
-       tk->mIdent.LowerCaseEqualsLiteral("-moz-calc"))) {
-    // calc() currently allows only lengths and percents inside it.
-    if (!ParseCalc(aValue, aVariantMask & VARIANT_LP)) {
+      IsCSSTokenCalcFunction(*tk)) {
+    // calc() currently allows only lengths and percents and number inside it.
+    // And note that in current implementation, number cannot be mixed with
+    // length and percent.
+    if (!ParseCalc(aValue, aVariantMask & VARIANT_LPN)) {
       return CSSParseResult::Error;
     }
     return CSSParseResult::Ok;
@@ -8448,7 +8455,7 @@ CSSParserImpl::ParseGridLineNames(nsCSSValue& aValue)
   nsCSSValueList* item;
   if (aValue.GetUnit() == eCSSUnit_List) {
     // Find the end of an existing list.
-    // The grid-template shorthand uses this, at most once for a given list.
+    // The 'grid' shorthand uses this, at most once for a given list.
 
     // NOTE: we could avoid this traversal by somehow keeping around
     // a pointer to the last item from the previous call.
@@ -8507,9 +8514,6 @@ CSSParserImpl::ParseGridLineNameListRepeat(nsCSSValueList** aTailPtr)
     kwd.SetIntValue(repeatAutoEnum.value(), eCSSUnit_Enumerated);
     *aTailPtr = (*aTailPtr)->mNext = new nsCSSValueList;
     (*aTailPtr)->mValue.SetPairValue(kwd, listValue);
-    // Append an empty list since the caller expects that to represent the names
-    // that follows the repeat() function.
-    *aTailPtr = (*aTailPtr)->mNext = new nsCSSValueList;
     return true;
   }
 
@@ -8592,20 +8596,15 @@ CSSParserImpl::ParseOptionalLineNameListAfterSubgrid(nsCSSValue& aValue)
   }
 }
 
-// Parse a <track-breadth>, or <fixed-breadth> when aFlags has eFixedTrackSize.
 CSSParseResult
-CSSParserImpl::ParseGridTrackBreadth(nsCSSValue& aValue,
-                                     GridTrackSizeFlags aFlags)
+CSSParserImpl::ParseGridTrackBreadth(nsCSSValue& aValue)
 {
-  CSSParseResult result = (aFlags & GridTrackSizeFlags::eFixedTrackSize) ?
-      ParseNonNegativeVariant(aValue, VARIANT_LPCALC, nullptr) :
-      ParseNonNegativeVariant(aValue,
-                              VARIANT_AUTO | VARIANT_LPCALC | VARIANT_KEYWORD,
-                              nsCSSProps::kGridTrackBreadthKTable);
+  CSSParseResult result = ParseNonNegativeVariant(aValue,
+                            VARIANT_AUTO | VARIANT_LPCALC | VARIANT_KEYWORD,
+                            nsCSSProps::kGridTrackBreadthKTable);
 
   if (result == CSSParseResult::Ok ||
-      result == CSSParseResult::Error ||
-      (aFlags & GridTrackSizeFlags::eFixedTrackSize)) {
+      result == CSSParseResult::Error) {
     return result;
   }
 
@@ -8628,8 +8627,14 @@ CSSParseResult
 CSSParserImpl::ParseGridTrackSize(nsCSSValue& aValue,
                                   GridTrackSizeFlags aFlags)
 {
+  const bool requireFixedSize =
+    !!(aFlags & GridTrackSizeFlags::eFixedTrackSize);
   // Attempt to parse a single <track-breadth>.
-  CSSParseResult result = ParseGridTrackBreadth(aValue, aFlags);
+  CSSParseResult result = ParseGridTrackBreadth(aValue);
+  if (requireFixedSize && result == CSSParseResult::Ok &&
+      !aValue.IsLengthPercentCalcUnit()) {
+    result = CSSParseResult::Error;
+  }
   if (result == CSSParseResult::Ok ||
       result == CSSParseResult::Error) {
     return result;
@@ -8645,10 +8650,15 @@ CSSParserImpl::ParseGridTrackSize(nsCSSValue& aValue,
     return CSSParseResult::NotFound;
   }
   nsCSSValue::Array* func = aValue.InitFunction(eCSSKeyword_minmax, 2);
-  if (ParseGridTrackBreadth(func->Item(1), aFlags) == CSSParseResult::Ok &&
+  if (ParseGridTrackBreadth(func->Item(1)) == CSSParseResult::Ok &&
       ExpectSymbol(',', true) &&
-      ParseGridTrackBreadth(func->Item(2), aFlags) == CSSParseResult::Ok &&
+      ParseGridTrackBreadth(func->Item(2)) == CSSParseResult::Ok &&
       ExpectSymbol(')', true)) {
+    if (requireFixedSize &&
+        !func->Item(1).IsLengthPercentCalcUnit() &&
+        !func->Item(2).IsLengthPercentCalcUnit()) {
+      return CSSParseResult::Error;
+    }
     return CSSParseResult::Ok;
   }
   SkipUntil(')');
@@ -8699,19 +8709,40 @@ CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
         SkipUntil(')');
         return false;
       }
-      if (startOfRepeat->mNext->mValue.GetUnit() == eCSSUnit_Pair) {
+      auto firstRepeat = startOfRepeat->mNext;
+      if (firstRepeat->mValue.GetUnit() == eCSSUnit_Pair) {
         if (haveRepeatAuto) {
           REPORT_UNEXPECTED(PEMoreThanOneGridRepeatAutoFillFitInTrackList);
           return false;
         }
         haveRepeatAuto = true;
+        // We're parsing an <auto-track-list>, which requires that all tracks
+        // are <fixed-size>, so we need to check the ones we've parsed already.
+        for (nsCSSValueList* list = firstLineNamesItem->mNext;
+             list != firstRepeat; list = list->mNext) {
+          if (list->mValue.GetUnit() == eCSSUnit_Function) {
+            nsCSSValue::Array* func = list->mValue.GetArrayValue();
+            NS_ASSERTION(func->Item(0).GetKeywordValue() == eCSSKeyword_minmax,
+                         "Expected minmax(), got another function name");
+            if (!func->Item(1).IsLengthPercentCalcUnit() &&
+                !func->Item(2).IsLengthPercentCalcUnit()) {
+              return false;
+            }
+          } else if (!list->mValue.IsLengthPercentCalcUnit()) {
+            return false;
+          }
+          list = list->mNext; // skip line names
+        }
       }
     } else {
       UngetToken();
 
-      // This was not a repeat() function. Try to parse <track-size>.
+      // Not a repeat() function; try to parse <track-size> | <fixed-size>.
       nsCSSValue trackSize;
-      CSSParseResult result = ParseGridTrackSize(trackSize);
+      GridTrackSizeFlags flags = haveRepeatAuto
+        ? GridTrackSizeFlags::eFixedTrackSize
+        : GridTrackSizeFlags::eDefaultTrackSize;
+      CSSParseResult result = ParseGridTrackSize(trackSize, flags);
       if (result == CSSParseResult::Error) {
         return false;
       }
@@ -9262,7 +9293,7 @@ CSSParserImpl::ParseGridTemplate()
   return ParseGridTemplateColumnsRows(eCSSProperty_grid_template_columns);
 }
 
-// Helper for parsing the 'grid-template' shorthand:
+// Helper for parsing <'grid-template'> part of the 'grid' shorthand:
 // Parse [ <line-names>? <string> <track-size>? <line-names>? ]+
 // with a <line-names>? already consumed, stored in |aFirstLineNames|,
 // and the current token a <string>
@@ -11380,8 +11411,6 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
   case eCSSProperty_grid_template_columns:
   case eCSSProperty_grid_template_rows:
     return ParseGridTemplateColumnsRows(aPropID);
-  case eCSSProperty_grid_template:
-    return ParseGridTemplate();
   case eCSSProperty_grid:
     return ParseGrid();
   case eCSSProperty_grid_column_start:
@@ -11460,6 +11489,7 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParseClipPath();
   case eCSSProperty_scroll_snap_type:
     return ParseScrollSnapType();
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
   case eCSSProperty_mask:
     return ParseImageLayers(nsStyleImageLayers::kMaskLayerTable);
   case eCSSProperty_mask_repeat:
@@ -11468,6 +11498,7 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParseImageLayerPosition(eCSSProperty_mask_position);
   case eCSSProperty_mask_size:
     return ParseImageLayerSize(eCSSProperty_mask_size);
+#endif
   case eCSSProperty_all:
     return ParseAll();
   default:
@@ -11878,7 +11909,7 @@ CSSParserImpl::ParseImageLayersItem(
   aState.mSize->mYValue.SetAutoValue();
   aState.mComposite->mValue.SetIntValue(NS_STYLE_MASK_COMPOSITE_ADD,
                                         eCSSUnit_Enumerated);
-  aState.mMode->mValue.SetIntValue(NS_STYLE_MASK_MODE_AUTO,
+  aState.mMode->mValue.SetIntValue(NS_STYLE_MASK_MODE_MATCH_SOURCE,
                                    eCSSUnit_Enumerated);
   bool haveColor = false,
        haveImage = false,
@@ -12973,7 +13004,6 @@ CSSParserImpl::ParseCalc(nsCSSValue &aValue, uint32_t aVariantMask)
   // for a token that is *either* a value of the property or a number.
   // This can be done without lookahead when we assume that the property
   // values cannot themselves be numbers.
-  NS_ASSERTION(!(aVariantMask & VARIANT_NUMBER), "unexpected variant mask");
   MOZ_ASSERT(aVariantMask != 0, "unexpected variant mask");
 
   bool oldUnitlessLengthQuirk = mUnitlessLengthQuirk;
@@ -13178,7 +13208,9 @@ CSSParserImpl::ParseCalcTerm(nsCSSValue& aValue, uint32_t& aVariantMask)
   if (!GetToken(true))
     return false;
   // Either an additive expression in parentheses...
-  if (mToken.IsSymbol('(')) {
+  if (mToken.IsSymbol('(') ||
+      // Treat nested calc() as plain parenthesis.
+      IsCSSTokenCalcFunction(mToken)) {
     if (!ParseCalcAdditiveExpression(aValue, aVariantMask) ||
         !ExpectSymbol(')', true)) {
       SkipUntil(')');
@@ -13571,10 +13603,10 @@ CSSParserImpl::ParseFont()
   // Get optional "/" line-height
   nsCSSValue  lineHeight;
   if (ExpectSymbol('/', true)) {
-    if (!ParseSingleTokenNonNegativeVariant(lineHeight,
-                                            VARIANT_NUMBER | VARIANT_LP |
-                                              VARIANT_NORMAL,
-                                            nullptr)) {
+    if (ParseNonNegativeVariant(lineHeight,
+                                VARIANT_NUMBER | VARIANT_LP |
+                                  VARIANT_NORMAL | VARIANT_CALC,
+                                nullptr) != CSSParseResult::Ok) {
       return false;
     }
   }
@@ -17252,8 +17284,8 @@ nsCSSParser::ParseSheet(const nsAString& aInput,
                         nsIURI*          aBaseURI,
                         nsIPrincipal*    aSheetPrincipal,
                         uint32_t         aLineNumber,
-                        SheetParsingMode aParsingMode,
-                        LoaderReusableStyleSheets* aReusableSheets)
+                        css::SheetParsingMode aParsingMode,
+                        css::LoaderReusableStyleSheets* aReusableSheets)
 {
   return static_cast<CSSParserImpl*>(mImpl)->
     ParseSheet(aInput, aSheetURI, aBaseURI, aSheetPrincipal, aLineNumber,

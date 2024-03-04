@@ -52,8 +52,6 @@ if test "$MOZ_OFFICIAL_BRANDING"; then
   fi
 fi
 
-MOZ_BROWSER_STATUSBAR=1
-
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
 # Changing MOZ_*BRANDING_DIRECTORY requires a clobber to ensure correct results,
 # because branding dependencies are broken.

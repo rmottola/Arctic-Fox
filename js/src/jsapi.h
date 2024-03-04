@@ -15,6 +15,7 @@
 #include "mozilla/Range.h"
 #include "mozilla/RangedPtr.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/Variant.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -624,6 +625,9 @@ typedef enum JSExnType {
 } JSExnType;
 
 typedef struct JSErrorFormatString {
+     /** The error message name in ASCII. */
+    const char* name;
+
     /** The error format string in ASCII. */
     const char* format;
 
@@ -1101,6 +1105,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
       : baseline_(true),
         ion_(true),
         asmJS_(true),
+        wasm_(false),
         throwOnAsmJSValidationFailure_(false),
         nativeRegExp_(true),
         unboxedArrays_(false),
@@ -1145,6 +1150,16 @@ class JS_PUBLIC_API(RuntimeOptions) {
     }
     RuntimeOptions& toggleAsmJS() {
         asmJS_ = !asmJS_;
+        return *this;
+    }
+
+    bool wasm() const { return wasm_; }
+    RuntimeOptions& setWasm(bool flag) {
+        wasm_ = flag;
+        return *this;
+    }
+    RuntimeOptions& toggleWasm() {
+        wasm_ = !wasm_;
         return *this;
     }
 
@@ -1228,6 +1243,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool baseline_ : 1;
     bool ion_ : 1;
     bool asmJS_ : 1;
+    bool wasm_ : 1;
     bool throwOnAsmJSValidationFailure_ : 1;
     bool nativeRegExp_ : 1;
     bool unboxedArrays_ : 1;
@@ -4947,26 +4963,43 @@ JS_ReportAllocationOverflow(JSContext* cx);
 
 class JSErrorReport
 {
+    // Offending source line without final '\n'.
+    const char16_t* linebuf_;
+
+    // Number of chars in linebuf_. Does not include trailing '\0'.
+    size_t linebufLength_;
+
+    // The 0-based offset of error token in linebuf_.
+    size_t tokenOffset_;
+
   public:
     JSErrorReport()
-      : filename(nullptr), lineno(0), column(0), isMuted(false), linebuf(nullptr),
-        tokenptr(nullptr), uclinebuf(nullptr), uctokenptr(nullptr), flags(0), errorNumber(0),
-        ucmessage(nullptr), messageArgs(nullptr), exnType(0)
+      : linebuf_(nullptr), linebufLength_(0), tokenOffset_(0),
+        filename(nullptr), lineno(0), column(0), isMuted(false),
+        flags(0), errorNumber(0), ucmessage(nullptr),
+        messageArgs(nullptr), exnType(0)
     {}
 
     const char*     filename;      /* source file name, URL, etc., or null */
     unsigned        lineno;         /* source line number */
     unsigned        column;         /* zero-based column index in line */
     bool            isMuted;        /* See the comment in ReadOnlyCompileOptions. */
-    const char*     linebuf;       /* offending source line without final \n */
-    const char*     tokenptr;      /* pointer to error token in linebuf */
-    const char16_t* uclinebuf;     /* unicode (original) line buffer */
-    const char16_t* uctokenptr;    /* unicode (original) token pointer */
     unsigned        flags;          /* error/warning, etc. */
     unsigned        errorNumber;    /* the error number, e.g. see js.msg */
     const char16_t* ucmessage;     /* the (default) error message */
     const char16_t** messageArgs;  /* arguments for the error message */
     int16_t         exnType;        /* One of the JSExnType constants */
+
+    const char16_t* linebuf() const {
+        return linebuf_;
+    }
+    size_t linebufLength() const {
+        return linebufLength_;
+    }
+    size_t tokenOffset() const {
+        return tokenOffset_;
+    }
+    void initLinebuf(const char16_t* linebuf, size_t linebufLength, size_t tokenOffset);
 };
 
 /*
@@ -5273,8 +5306,15 @@ JS_DropExceptionState(JSContext* cx, JSExceptionState* state);
 extern JS_PUBLIC_API(JSErrorReport*)
 JS_ErrorFromException(JSContext* cx, JS::HandleObject obj);
 
+/**
+ * If the given object is an exception object (or an unwrappable
+ * cross-compartment wrapper for one), return the stack for that exception, if
+ * any.  Will return null if the given object is not an exception object
+ * (including if it's null or a security wrapper that can't be unwrapped) or if
+ * the exception has no stack.
+ */
 extern JS_PUBLIC_API(JSObject*)
-ExceptionStackOrNull(JSContext* cx, JS::HandleObject obj);
+ExceptionStackOrNull(JS::HandleObject obj);
 
 /*
  * Throws a StopIteration exception on cx.
@@ -5388,6 +5428,35 @@ JS_IsIdentifier(const char16_t* chars, size_t length);
 
 namespace JS {
 
+class MOZ_RAII JS_PUBLIC_API(AutoFilename)
+{
+  private:
+    // Actually a ScriptSource, not put here to avoid including the world.
+    void* ss_;
+    mozilla::Variant<const char*, UniqueChars> filename_;
+
+    AutoFilename(const AutoFilename&) = delete;
+    AutoFilename& operator=(const AutoFilename&) = delete;
+
+  public:
+    AutoFilename()
+      : ss_(nullptr),
+        filename_(mozilla::AsVariant<const char*>(nullptr))
+    {}
+
+    ~AutoFilename() {
+        reset();
+    }
+
+    void reset();
+
+    void setOwned(UniqueChars&& filename);
+    void setUnowned(const char* filename);
+    void setScriptSource(void* ss);
+
+    const char* get() const;
+};
+
 /**
  * Return the current filename, line number and column number of the most
  * currently running frame. Returns true if a scripted frame was found, false
@@ -5397,7 +5466,7 @@ namespace JS {
  * record, this will also return false.
  */
 extern JS_PUBLIC_API(bool)
-DescribeScriptedCaller(JSContext* cx, UniqueChars* filename = nullptr,
+DescribeScriptedCaller(JSContext* cx, AutoFilename* filename = nullptr,
                        unsigned* lineno = nullptr, unsigned* column = nullptr);
 
 extern JS_PUBLIC_API(JSObject*)
@@ -5531,11 +5600,13 @@ struct AsmJSCacheOps
     CloseAsmJSCacheEntryForReadOp closeEntryForRead;
     OpenAsmJSCacheEntryForWriteOp openEntryForWrite;
     CloseAsmJSCacheEntryForWriteOp closeEntryForWrite;
-    BuildIdOp buildId;
 };
 
 extern JS_PUBLIC_API(void)
 SetAsmJSCacheOps(JSRuntime* rt, const AsmJSCacheOps* callbacks);
+
+extern JS_PUBLIC_API(void)
+SetBuildIdOp(JSRuntime* rt, BuildIdOp buildIdOp);
 
 /**
  * Convenience class for imitating a JS level for-of loop. Typical usage:

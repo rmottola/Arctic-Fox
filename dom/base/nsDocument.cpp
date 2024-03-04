@@ -243,6 +243,10 @@
 #include "gfxVR.h"
 #include "gfxPrefs.h"
 #include "nsISupportsPrimitives.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
+#include "mozilla/StyleSheetHandle.h"
+#include "mozilla/StyleSheetHandleInlines.h"
 
 #include "mozilla/DocLoadingTimelineMarker.h"
 
@@ -731,10 +735,16 @@ nsDOMStyleSheetList::IndexedGetter(uint32_t aIndex, bool& aFound)
   }
 
   aFound = true;
-  CSSStyleSheet* sheet = mDocument->GetStyleSheetAt(aIndex);
+  StyleSheetHandle sheet = mDocument->GetStyleSheetAt(aIndex);
   NS_ASSERTION(sheet, "Must have a sheet");
 
-  return static_cast<CSSStyleSheet*>(sheet);
+  // XXXheycam Return null until ServoStyleSheet implements the right DOM
+  // interfaces.
+  if (sheet->IsServo()) {
+    NS_ERROR("stylo: can't return a ServoStyleSheet to the DOM yet");
+    return nullptr;
+  }
+  return sheet->AsGecko();
 }
 
 void
@@ -744,7 +754,7 @@ nsDOMStyleSheetList::NodeWillBeDestroyed(const nsINode *aNode)
 }
 
 void
-nsDOMStyleSheetList::StyleSheetAdded(CSSStyleSheet* aStyleSheet,
+nsDOMStyleSheetList::StyleSheetAdded(StyleSheetHandle aStyleSheet,
                                      bool aDocumentSheet)
 {
   if (aDocumentSheet && -1 != mLength) {
@@ -753,7 +763,7 @@ nsDOMStyleSheetList::StyleSheetAdded(CSSStyleSheet* aStyleSheet,
 }
 
 void
-nsDOMStyleSheetList::StyleSheetRemoved(CSSStyleSheet* aStyleSheet,
+nsDOMStyleSheetList::StyleSheetRemoved(StyleSheetHandle aStyleSheet,
                                        bool aDocumentSheet)
 {
   if (aDocumentSheet && -1 != mLength) {
@@ -1320,9 +1330,14 @@ nsDOMStyleSheetSetList::EnsureFresh()
   int32_t count = mDocument->GetNumberOfStyleSheets();
   nsAutoString title;
   for (int32_t index = 0; index < count; index++) {
-    CSSStyleSheet* sheet = mDocument->GetStyleSheetAt(index);
+    StyleSheetHandle sheet = mDocument->GetStyleSheetAt(index);
     NS_ASSERTION(sheet, "Null sheet in sheet list!");
-    sheet->GetTitle(title);
+    // XXXheycam ServoStyleSheets don't expose their title yet.
+    if (sheet->IsServo()) {
+      NS_ERROR("stylo: ServoStyleSets don't expose their title yet");
+      continue;
+    }
+    sheet->AsGecko()->GetTitle(title);
     if (!title.IsEmpty() && !mNames.Contains(title) && !Add(title)) {
       return;
     }
@@ -1413,6 +1428,8 @@ nsIDocument::nsIDocument()
   : nsINode(nullNodeInfo),
     mReferrerPolicySet(false),
     mReferrerPolicy(mozilla::net::RP_Default),
+    mBlockAllMixedContent(false),
+    mBlockAllMixedContentPreloads(false),
     mUpgradeInsecureRequests(false),
     mUpgradeInsecurePreloads(false),
     mCharacterSet(NS_LITERAL_CSTRING("ISO-8859-1")),
@@ -1602,7 +1619,7 @@ nsDocument::~nsDocument()
   mCachedRootElement = nullptr;
 
   // Let the stylesheets know we're going away
-  for (CSSStyleSheet* sheet : mStyleSheets) {
+  for (StyleSheetHandle sheet : mStyleSheets) {
     sheet->SetOwningDocument(nullptr);
   }
   if (mAttrStyleSheet) {
@@ -2280,7 +2297,7 @@ void
 nsDocument::RemoveDocStyleSheetsFromStyleSets()
 {
   // The stylesheets should forget us
-  for (CSSStyleSheet* sheet : Reversed(mStyleSheets)) {
+  for (StyleSheetHandle sheet : Reversed(mStyleSheets)) {
     sheet->SetOwningDocument(nullptr);
 
     if (sheet->IsApplicable()) {
@@ -2295,11 +2312,11 @@ nsDocument::RemoveDocStyleSheetsFromStyleSets()
 
 void
 nsDocument::RemoveStyleSheetsFromStyleSets(
-    nsTArray<RefPtr<CSSStyleSheet>>& aSheets,
+    nsTArray<StyleSheetHandle::RefPtr>& aSheets,
     SheetType aType)
 {
   // The stylesheets should forget us
-  for (CSSStyleSheet* sheet : Reversed(aSheets)) {
+  for (StyleSheetHandle sheet : Reversed(aSheets)) {
     sheet->SetOwningDocument(nullptr);
 
     if (sheet->IsApplicable()) {
@@ -2318,15 +2335,26 @@ nsDocument::ResetStylesheetsToURI(nsIURI* aURI)
   MOZ_ASSERT(aURI);
 
   mozAutoDocUpdate upd(this, UPDATE_STYLE, true);
-  RemoveDocStyleSheetsFromStyleSets();
-  RemoveStyleSheetsFromStyleSets(mOnDemandBuiltInUASheets, SheetType::Agent);
-  RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eAgentSheet], SheetType::Agent);
-  RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eUserSheet], SheetType::User);
-  RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eAuthorSheet], SheetType::Doc);
+  if (mStyleSetFilled) {
+    // Skip removing style sheets from the style set if we know we haven't
+    // filled the style set.  (This allows us to avoid calling
+    // GetStyleBackendType() too early.)
+    RemoveDocStyleSheetsFromStyleSets();
+    RemoveStyleSheetsFromStyleSets(mOnDemandBuiltInUASheets, SheetType::Agent);
+    RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eAgentSheet], SheetType::Agent);
+    RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eUserSheet], SheetType::User);
+    RemoveStyleSheetsFromStyleSets(mAdditionalSheets[eAuthorSheet], SheetType::Doc);
 
-  nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
-  if (sheetService) {
-    RemoveStyleSheetsFromStyleSets(*sheetService->AuthorStyleSheets(), SheetType::Doc);
+    if (GetStyleBackendType() == StyleBackendType::Gecko) {
+      nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
+      if (sheetService) {
+        RemoveStyleSheetsFromStyleSets(*sheetService->AuthorStyleSheets(), SheetType::Doc);
+      }
+    } else {
+      NS_ERROR("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
+    }
+
+    mStyleSetFilled = false;
   }
 
   // Release all the sheets
@@ -2365,41 +2393,47 @@ nsDocument::ResetStylesheetsToURI(nsIURI* aURI)
 }
 
 static void
-AppendSheetsToStyleSet(nsStyleSet* aStyleSet,
-                       const nsTArray<RefPtr<CSSStyleSheet>>& aSheets,
+AppendSheetsToStyleSet(StyleSetHandle aStyleSet,
+                       const nsTArray<StyleSheetHandle::RefPtr>& aSheets,
                        SheetType aType)
 {
-  for (CSSStyleSheet* sheet : Reversed(aSheets)) {
+  for (StyleSheetHandle sheet : Reversed(aSheets)) {
     aStyleSet->AppendStyleSheet(aType, sheet);
   }
 }
 
 
 void
-nsDocument::FillStyleSet(nsStyleSet* aStyleSet)
+nsDocument::FillStyleSet(StyleSetHandle aStyleSet)
 {
   NS_PRECONDITION(aStyleSet, "Must have a style set");
   NS_PRECONDITION(aStyleSet->SheetCount(SheetType::Doc) == 0,
                   "Style set already has document sheets?");
 
-  for (CSSStyleSheet* sheet : Reversed(mStyleSheets)) {
+  MOZ_ASSERT(!mStyleSetFilled);
+
+  for (StyleSheetHandle sheet : Reversed(mStyleSheets)) {
     if (sheet->IsApplicable()) {
       aStyleSet->AddDocStyleSheet(sheet, this);
     }
   }
 
-  nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
-  if (sheetService) {
-    for (CSSStyleSheet* sheet : *sheetService->AuthorStyleSheets()) {
-      aStyleSet->AppendStyleSheet(SheetType::Doc, sheet);
+  if (aStyleSet->IsGecko()) {
+    nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
+    if (sheetService) {
+      for (StyleSheetHandle sheet : *sheetService->AuthorStyleSheets()) {
+        aStyleSet->AppendStyleSheet(SheetType::Doc, sheet);
+      }
     }
-  }
 
-  // Iterate backwards to maintain order
-  for (CSSStyleSheet* sheet : Reversed(mOnDemandBuiltInUASheets)) {
-    if (sheet->IsApplicable()) {
-      aStyleSet->PrependStyleSheet(SheetType::Agent, sheet);
+    // Iterate backwards to maintain order
+    for (StyleSheetHandle sheet : Reversed(mOnDemandBuiltInUASheets)) {
+      if (sheet->IsApplicable()) {
+        aStyleSet->PrependStyleSheet(SheetType::Agent, sheet);
+      }
     }
+  } else {
+    NS_ERROR("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
   }
 
   AppendSheetsToStyleSet(aStyleSet, mAdditionalSheets[eAgentSheet],
@@ -2408,6 +2442,8 @@ nsDocument::FillStyleSet(nsStyleSet* aStyleSet)
                          SheetType::User);
   AppendSheetsToStyleSet(aStyleSet, mAdditionalSheets[eAuthorSheet],
                          SheetType::Doc);
+
+  mStyleSetFilled = true;
 }
 
 static void
@@ -2548,13 +2584,18 @@ nsDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
     nsCOMPtr<nsIDocShellTreeItem> sameTypeParent;
     treeItem->GetSameTypeParent(getter_AddRefs(sameTypeParent));
     if (sameTypeParent) {
-      mUpgradeInsecureRequests =
-        sameTypeParent->GetDocument()->GetUpgradeInsecureRequests(false);
+      nsIDocument* doc = sameTypeParent->GetDocument();
+      mBlockAllMixedContent = doc->GetBlockAllMixedContent(false);
+      // if the parent document makes use of block-all-mixed-content
+      // then subdocument preloads should always be blocked.
+      mBlockAllMixedContentPreloads =
+        mBlockAllMixedContent || doc->GetBlockAllMixedContent(true);
+
+      mUpgradeInsecureRequests = doc->GetUpgradeInsecureRequests(false);
       // if the parent document makes use of upgrade-insecure-requests
       // then subdocument preloads should always be upgraded.
       mUpgradeInsecurePreloads =
-        mUpgradeInsecureRequests ||
-        sameTypeParent->GetDocument()->GetUpgradeInsecureRequests(true);
+        mUpgradeInsecureRequests || doc->GetUpgradeInsecureRequests(true);
     }
   }
 
@@ -2653,6 +2694,16 @@ nsDocument::ApplySettingsFromCSP(bool aSpeculative)
         mReferrerPolicy = static_cast<ReferrerPolicy>(referrerPolicy);
         mReferrerPolicySet = true;
       }
+ 
+      // Set up 'block-all-mixed-content' if not already inherited
+      // from the parent context or set by any other CSP.
+      if (!mBlockAllMixedContent) {
+        rv = csp->GetBlockAllMixedContent(&mBlockAllMixedContent);
+        NS_ENSURE_SUCCESS_VOID(rv);
+      }
+      if (!mBlockAllMixedContentPreloads) {
+        mBlockAllMixedContentPreloads = mBlockAllMixedContent;
+     }
 
       // Set up 'upgrade-insecure-requests' if not already inherited
       // from the parent context or set by any other CSP.
@@ -2668,12 +2719,17 @@ nsDocument::ApplySettingsFromCSP(bool aSpeculative)
   }
 
   // 2) apply settings from speculative csp
-  if (!mUpgradeInsecurePreloads) {
-    nsCOMPtr<nsIContentSecurityPolicy> preloadCsp;
-    rv = NodePrincipal()->GetPreloadCsp(getter_AddRefs(preloadCsp));
-    NS_ENSURE_SUCCESS_VOID(rv);
-    if (preloadCsp) {
-      preloadCsp->GetUpgradeInsecureRequests(&mUpgradeInsecurePreloads);
+  nsCOMPtr<nsIContentSecurityPolicy> preloadCsp;
+  rv = NodePrincipal()->GetPreloadCsp(getter_AddRefs(preloadCsp));
+  NS_ENSURE_SUCCESS_VOID(rv);
+  if (preloadCsp) {
+    if (!mBlockAllMixedContentPreloads) {
+      rv = preloadCsp->GetBlockAllMixedContent(&mBlockAllMixedContentPreloads);
+      NS_ENSURE_SUCCESS_VOID(rv);
+    }
+    if (!mUpgradeInsecurePreloads) {
+      rv = preloadCsp->GetUpgradeInsecureRequests(&mUpgradeInsecurePreloads);
+      NS_ENSURE_SUCCESS_VOID(rv);
     }
   }
 }
@@ -3719,7 +3775,7 @@ nsDocument::TryChannelCharset(nsIChannel *aChannel,
 
 already_AddRefed<nsIPresShell>
 nsDocument::CreateShell(nsPresContext* aContext, nsViewManager* aViewManager,
-                        nsStyleSet* aStyleSet)
+                        StyleSetHandle aStyleSet)
 {
   // Don't add anything here.  Add it to |doCreateShell| instead.
   // This exists so that subclasses can pass other values for the 4th
@@ -3729,7 +3785,7 @@ nsDocument::CreateShell(nsPresContext* aContext, nsViewManager* aViewManager,
 
 already_AddRefed<nsIPresShell>
 nsDocument::doCreateShell(nsPresContext* aContext,
-                          nsViewManager* aViewManager, nsStyleSet* aStyleSet)
+                          nsViewManager* aViewManager, StyleSetHandle aStyleSet)
 {
   NS_ASSERTION(!mPresShell, "We have a presshell already!");
 
@@ -3843,6 +3899,7 @@ nsDocument::DeleteShell()
   RebuildUserFontSet();
 
   mPresShell = nullptr;
+  mStyleSetFilled = false;
 }
 
 void
@@ -4049,7 +4106,7 @@ nsDocument::RemoveChildAt(uint32_t aIndex, bool aNotify)
 }
 
 void
-nsDocument::EnsureOnDemandBuiltInUASheet(CSSStyleSheet* aSheet)
+nsDocument::EnsureOnDemandBuiltInUASheet(StyleSheetHandle aSheet)
 {
   if (mOnDemandBuiltInUASheets.Contains(aSheet)) {
     return;
@@ -4060,7 +4117,7 @@ nsDocument::EnsureOnDemandBuiltInUASheet(CSSStyleSheet* aSheet)
 }
 
 void
-nsDocument::AddOnDemandBuiltInUASheet(CSSStyleSheet* aSheet)
+nsDocument::AddOnDemandBuiltInUASheet(StyleSheetHandle aSheet)
 {
   MOZ_ASSERT(!mOnDemandBuiltInUASheets.Contains(aSheet));
 
@@ -4089,20 +4146,20 @@ nsDocument::GetNumberOfStyleSheets() const
   return mStyleSheets.Length();
 }
 
-CSSStyleSheet*
+StyleSheetHandle
 nsDocument::GetStyleSheetAt(int32_t aIndex) const
 {
-  return mStyleSheets.SafeElementAt(aIndex, nullptr);
+  return mStyleSheets.SafeElementAt(aIndex, StyleSheetHandle());
 }
 
 int32_t
-nsDocument::GetIndexOfStyleSheet(CSSStyleSheet* aSheet) const
+nsDocument::GetIndexOfStyleSheet(StyleSheetHandle aSheet) const
 {
   return mStyleSheets.IndexOf(aSheet);
 }
 
 void
-nsDocument::AddStyleSheetToStyleSets(CSSStyleSheet* aSheet)
+nsDocument::AddStyleSheetToStyleSets(StyleSheetHandle aSheet)
 {
   nsCOMPtr<nsIPresShell> shell = GetShell();
   if (shell) {
@@ -4115,7 +4172,11 @@ nsDocument::AddStyleSheetToStyleSets(CSSStyleSheet* aSheet)
     className##Init init;                                                     \
     init.mBubbles = true;                                                     \
     init.mCancelable = true;                                                  \
-    init.mStylesheet = aSheet;                                                \
+    /* XXXheycam ServoStyleSheet doesn't implement DOM interfaces yet */      \
+    if (aSheet->IsServo()) {                                                  \
+      NS_ERROR("stylo: can't dispatch events for ServoStyleSheets yet");      \
+    }                                                                         \
+    init.mStylesheet = aSheet->IsGecko() ? aSheet->AsGecko() : nullptr;       \
     init.memberName = argName;                                                \
                                                                               \
     RefPtr<className> event =                                               \
@@ -4129,7 +4190,7 @@ nsDocument::AddStyleSheetToStyleSets(CSSStyleSheet* aSheet)
   } while (0);
 
 void
-nsDocument::NotifyStyleSheetAdded(CSSStyleSheet* aSheet, bool aDocumentSheet)
+nsDocument::NotifyStyleSheetAdded(StyleSheetHandle aSheet, bool aDocumentSheet)
 {
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetAdded, (aSheet, aDocumentSheet));
 
@@ -4142,7 +4203,7 @@ nsDocument::NotifyStyleSheetAdded(CSSStyleSheet* aSheet, bool aDocumentSheet)
 }
 
 void
-nsDocument::NotifyStyleSheetRemoved(CSSStyleSheet* aSheet, bool aDocumentSheet)
+nsDocument::NotifyStyleSheetRemoved(StyleSheetHandle aSheet, bool aDocumentSheet)
 {
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetRemoved, (aSheet, aDocumentSheet));
 
@@ -4155,7 +4216,7 @@ nsDocument::NotifyStyleSheetRemoved(CSSStyleSheet* aSheet, bool aDocumentSheet)
 }
 
 void
-nsDocument::AddStyleSheet(CSSStyleSheet* aSheet)
+nsDocument::AddStyleSheet(StyleSheetHandle aSheet)
 {
   NS_PRECONDITION(aSheet, "null arg");
   mStyleSheets.AppendElement(aSheet);
@@ -4169,7 +4230,7 @@ nsDocument::AddStyleSheet(CSSStyleSheet* aSheet)
 }
 
 void
-nsDocument::RemoveStyleSheetFromStyleSets(CSSStyleSheet* aSheet)
+nsDocument::RemoveStyleSheetFromStyleSets(StyleSheetHandle aSheet)
 {
   nsCOMPtr<nsIPresShell> shell = GetShell();
   if (shell) {
@@ -4178,10 +4239,10 @@ nsDocument::RemoveStyleSheetFromStyleSets(CSSStyleSheet* aSheet)
 }
 
 void
-nsDocument::RemoveStyleSheet(CSSStyleSheet* aSheet)
+nsDocument::RemoveStyleSheet(StyleSheetHandle aSheet)
 {
   NS_PRECONDITION(aSheet, "null arg");
-  RefPtr<CSSStyleSheet> sheet = aSheet; // hold ref so it won't die too soon
+  StyleSheetHandle::RefPtr sheet = aSheet; // hold ref so it won't die too soon
 
   if (!mStyleSheets.RemoveElement(aSheet)) {
     NS_ASSERTION(mInUnlinkOrDeletion, "stylesheet not found");
@@ -4200,8 +4261,8 @@ nsDocument::RemoveStyleSheet(CSSStyleSheet* aSheet)
 }
 
 void
-nsDocument::UpdateStyleSheets(nsTArray<RefPtr<CSSStyleSheet>>& aOldSheets,
-                              nsTArray<RefPtr<CSSStyleSheet>>& aNewSheets)
+nsDocument::UpdateStyleSheets(nsTArray<StyleSheetHandle::RefPtr>& aOldSheets,
+                              nsTArray<StyleSheetHandle::RefPtr>& aNewSheets)
 {
   BeginUpdate(UPDATE_STYLE);
 
@@ -4210,7 +4271,7 @@ nsDocument::UpdateStyleSheets(nsTArray<RefPtr<CSSStyleSheet>>& aOldSheets,
                   "The lists must be the same length!");
   int32_t count = aOldSheets.Length();
 
-  RefPtr<CSSStyleSheet> oldSheet;
+  StyleSheetHandle::RefPtr oldSheet;
   int32_t i;
   for (i = 0; i < count; ++i) {
     oldSheet = aOldSheets[i];
@@ -4221,7 +4282,7 @@ nsDocument::UpdateStyleSheets(nsTArray<RefPtr<CSSStyleSheet>>& aOldSheets,
     RemoveStyleSheet(oldSheet);  // This does the right notifications
 
     // Now put the new one in its place.  If it's null, just ignore it.
-    CSSStyleSheet* newSheet = aNewSheets[i];
+    StyleSheetHandle newSheet = aNewSheets[i];
     if (newSheet) {
       mStyleSheets.InsertElementAt(oldIndex, newSheet);
       newSheet->SetOwningDocument(this);
@@ -4237,7 +4298,7 @@ nsDocument::UpdateStyleSheets(nsTArray<RefPtr<CSSStyleSheet>>& aOldSheets,
 }
 
 void
-nsDocument::InsertStyleSheetAt(CSSStyleSheet* aSheet, int32_t aIndex)
+nsDocument::InsertStyleSheetAt(StyleSheetHandle aSheet, int32_t aIndex)
 {
   NS_PRECONDITION(aSheet, "null ptr");
 
@@ -4254,7 +4315,7 @@ nsDocument::InsertStyleSheetAt(CSSStyleSheet* aSheet, int32_t aIndex)
 
 
 void
-nsDocument::SetStyleSheetApplicableState(CSSStyleSheet* aSheet,
+nsDocument::SetStyleSheetApplicableState(StyleSheetHandle aSheet,
                                          bool aApplicable)
 {
   NS_PRECONDITION(aSheet, "null arg");
@@ -4320,7 +4381,7 @@ ConvertAdditionalSheetType(nsIDocument::additionalSheetType aType)
 }
 
 static int32_t
-FindSheet(const nsTArray<RefPtr<CSSStyleSheet>>& aSheets, nsIURI* aSheetURI)
+FindSheet(const nsTArray<StyleSheetHandle::RefPtr>& aSheets, nsIURI* aSheetURI)
 {
   for (int32_t i = aSheets.Length() - 1; i >= 0; i-- ) {
     bool bEqual;
@@ -4344,7 +4405,7 @@ nsDocument::LoadAdditionalStyleSheet(additionalSheetType aType,
     return NS_ERROR_INVALID_ARG;
 
   // Loading the sheet sync.
-  RefPtr<css::Loader> loader = new css::Loader();
+  RefPtr<css::Loader> loader = new css::Loader(GetStyleBackendType());
 
   css::SheetParsingMode parsingMode;
   switch (aType) {
@@ -4364,9 +4425,8 @@ nsDocument::LoadAdditionalStyleSheet(additionalSheetType aType,
       MOZ_CRASH("impossible value for aType");
   }
 
-  RefPtr<CSSStyleSheet> sheet;
-  nsresult rv = loader->LoadSheetSync(aSheetURI, parsingMode, true,
-                                      getter_AddRefs(sheet));
+  StyleSheetHandle::RefPtr sheet;
+  nsresult rv = loader->LoadSheetSync(aSheetURI, parsingMode, true, &sheet);
   NS_ENSURE_SUCCESS(rv, rv);
 
   sheet->SetOwningDocument(this);
@@ -4376,7 +4436,7 @@ nsDocument::LoadAdditionalStyleSheet(additionalSheetType aType,
 }
 
 nsresult
-nsDocument::AddAdditionalStyleSheet(additionalSheetType aType, CSSStyleSheet* aSheet)
+nsDocument::AddAdditionalStyleSheet(additionalSheetType aType, StyleSheetHandle aSheet)
 {
   if (mAdditionalSheets[aType].Contains(aSheet))
     return NS_ERROR_INVALID_ARG;
@@ -4405,11 +4465,11 @@ nsDocument::RemoveAdditionalStyleSheet(additionalSheetType aType, nsIURI* aSheet
 {
   MOZ_ASSERT(aSheetURI);
 
-  nsTArray<RefPtr<CSSStyleSheet>>& sheets = mAdditionalSheets[aType];
+  nsTArray<StyleSheetHandle::RefPtr>& sheets = mAdditionalSheets[aType];
 
   int32_t i = FindSheet(mAdditionalSheets[aType], aSheetURI);
   if (i >= 0) {
-    RefPtr<CSSStyleSheet> sheetRef = sheets[i];
+    StyleSheetHandle::RefPtr sheetRef = sheets[i];
     sheets.RemoveElementAt(i);
 
     BeginUpdate(UPDATE_STYLE);
@@ -4431,10 +4491,10 @@ nsDocument::RemoveAdditionalStyleSheet(additionalSheetType aType, nsIURI* aSheet
   }
 }
 
-CSSStyleSheet*
-nsDocument::FirstAdditionalAuthorSheet()
+StyleSheetHandle
+nsDocument::GetFirstAdditionalAuthorSheet()
 {
-  return mAdditionalSheets[eAuthorSheet].SafeElementAt(0, nullptr);
+  return mAdditionalSheets[eAuthorSheet].SafeElementAt(0, StyleSheetHandle());
 }
 
 nsIGlobalObject*
@@ -5172,7 +5232,7 @@ nsDocument::DocumentStatesChanged(EventStates aStateMask)
 }
 
 void
-nsDocument::StyleRuleChanged(CSSStyleSheet* aSheet,
+nsDocument::StyleRuleChanged(StyleSheetHandle aSheet,
                              css::Rule* aStyleRule)
 {
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleChanged, (aSheet));
@@ -5186,7 +5246,7 @@ nsDocument::StyleRuleChanged(CSSStyleSheet* aSheet,
 }
 
 void
-nsDocument::StyleRuleAdded(CSSStyleSheet* aSheet,
+nsDocument::StyleRuleAdded(StyleSheetHandle aSheet,
                            css::Rule* aStyleRule)
 {
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleAdded, (aSheet));
@@ -5201,7 +5261,7 @@ nsDocument::StyleRuleAdded(CSSStyleSheet* aSheet,
 }
 
 void
-nsDocument::StyleRuleRemoved(CSSStyleSheet* aSheet,
+nsDocument::StyleRuleRemoved(StyleSheetHandle aSheet,
                              css::Rule* aStyleRule)
 {
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleRuleRemoved, (aSheet));
@@ -6442,17 +6502,23 @@ nsIDocument::GetSelectedStyleSheetSet(nsAString& aSheetSet)
   int32_t count = GetNumberOfStyleSheets();
   nsAutoString title;
   for (int32_t index = 0; index < count; index++) {
-    CSSStyleSheet* sheet = GetStyleSheetAt(index);
+    StyleSheetHandle sheet = GetStyleSheetAt(index);
     NS_ASSERTION(sheet, "Null sheet in sheet list!");
 
+    // XXXheycam Make this work with ServoStyleSheets.
+    if (sheet->IsServo()) {
+      NS_ERROR("stylo: can't handle alternate ServoStyleSheets yet");
+      continue;
+    }
+
     bool disabled;
-    sheet->GetDisabled(&disabled);
+    sheet->AsGecko()->GetDisabled(&disabled);
     if (disabled) {
       // Disabled sheets don't affect the currently selected set
       continue;
     }
 
-    sheet->GetTitle(title);
+    sheet->AsGecko()->GetTitle(title);
 
     if (aSheetSet.IsEmpty()) {
       aSheetSet = title;
@@ -6556,11 +6622,18 @@ nsDocument::EnableStyleSheetsForSetInternal(const nsAString& aSheetSet,
   int32_t count = GetNumberOfStyleSheets();
   nsAutoString title;
   for (int32_t index = 0; index < count; index++) {
-    CSSStyleSheet* sheet = GetStyleSheetAt(index);
+    StyleSheetHandle sheet = GetStyleSheetAt(index);
     NS_ASSERTION(sheet, "Null sheet in sheet list!");
-    sheet->GetTitle(title);
+
+    // XXXheycam Make this work with ServoStyleSheets.
+    if (sheet->IsServo()) {
+      NS_ERROR("stylo: can't handle alternate ServoStyleSheets yet");
+      continue;
+    }
+
+    sheet->AsGecko()->GetTitle(title);
     if (!title.IsEmpty()) {
-      sheet->SetEnabled(title.Equals(aSheetSet));
+      sheet->AsGecko()->SetEnabled(title.Equals(aSheetSet));
     }
   }
   if (aUpdateCSSLoader) {
@@ -9260,7 +9333,7 @@ nsDocument::OnPageHide(bool aPersisted,
   EnumerateActivityObservers(NotifyActivityChanged, nullptr);
 
   ClearPendingFullscreenRequests(this);
-  if (IsFullScreenDoc()) {
+  if (GetFullscreenElement()) {
     // If this document was fullscreen, we should exit fullscreen in this
     // doctree branch. This ensures that if the user navigates while in
     // fullscreen mode we don't leave its still visible ancestor documents
@@ -9826,7 +9899,7 @@ class StubCSSLoaderObserver final : public nsICSSLoaderObserver {
   ~StubCSSLoaderObserver() {}
 public:
   NS_IMETHOD
-  StyleSheetLoaded(CSSStyleSheet*, bool, nsresult) override
+  StyleSheetLoaded(StyleSheetHandle, bool, nsresult) override
   {
     return NS_OK;
   }
@@ -9855,12 +9928,12 @@ nsDocument::PreloadStyle(nsIURI* uri, const nsAString& charset,
 
 nsresult
 nsDocument::LoadChromeSheetSync(nsIURI* uri, bool isAgentSheet,
-                                CSSStyleSheet** sheet)
+                                mozilla::StyleSheetHandle::RefPtr* aSheet)
 {
   css::SheetParsingMode mode =
     isAgentSheet ? css::eAgentSheetFeatures
                  : css::eAuthorSheetFeatures;
-  return CSSLoader()->LoadSheetSync(uri, mode, isAgentSheet, sheet);
+  return CSSLoader()->LoadSheetSync(uri, mode, isAgentSheet, aSheet);
 }
 
 class nsDelayedEventDispatcher : public nsRunnable
@@ -10186,28 +10259,38 @@ nsIDocument::CreateStaticClone(nsIDocShell* aCloneContainer)
 
       int32_t sheetsCount = GetNumberOfStyleSheets();
       for (int32_t i = 0; i < sheetsCount; ++i) {
-        RefPtr<CSSStyleSheet> sheet = GetStyleSheetAt(i);
+        StyleSheetHandle::RefPtr sheet = GetStyleSheetAt(i);
         if (sheet) {
           if (sheet->IsApplicable()) {
-            RefPtr<CSSStyleSheet> clonedSheet =
-              sheet->Clone(nullptr, nullptr, clonedDoc, nullptr);
-            NS_WARN_IF_FALSE(clonedSheet, "Cloning a stylesheet didn't work!");
-            if (clonedSheet) {
-              clonedDoc->AddStyleSheet(clonedSheet);
+            // XXXheycam Need to make ServoStyleSheet cloning work.
+            if (sheet->IsGecko()) {
+              RefPtr<CSSStyleSheet> clonedSheet =
+                sheet->AsGecko()->Clone(nullptr, nullptr, clonedDoc, nullptr);
+              NS_WARN_IF_FALSE(clonedSheet, "Cloning a stylesheet didn't work!");
+              if (clonedSheet) {
+                clonedDoc->AddStyleSheet(clonedSheet);
+              }
+            } else {
+              NS_ERROR("stylo: ServoStyleSheet doesn't support cloning");
             }
           }
         }
       }
 
       // Iterate backwards to maintain order
-      for (CSSStyleSheet* sheet : Reversed(thisAsDoc->mOnDemandBuiltInUASheets)) {
+      for (StyleSheetHandle sheet : Reversed(thisAsDoc->mOnDemandBuiltInUASheets)) {
         if (sheet) {
           if (sheet->IsApplicable()) {
-            RefPtr<CSSStyleSheet> clonedSheet =
-              sheet->Clone(nullptr, nullptr, clonedDoc, nullptr);
-            NS_WARN_IF_FALSE(clonedSheet, "Cloning a stylesheet didn't work!");
-            if (clonedSheet) {
-              clonedDoc->AddOnDemandBuiltInUASheet(clonedSheet);
+            // XXXheycam Need to make ServoStyleSheet cloning work.
+            if (sheet->IsGecko()) {
+              RefPtr<CSSStyleSheet> clonedSheet =
+                sheet->AsGecko()->Clone(nullptr, nullptr, clonedDoc, nullptr);
+              NS_WARN_IF_FALSE(clonedSheet, "Cloning a stylesheet didn't work!");
+              if (clonedSheet) {
+                clonedDoc->AddOnDemandBuiltInUASheet(clonedSheet);
+              }
+            } else {
+              NS_ERROR("stylo: ServoStyleSheet doesn't support cloning");
             }
           }
         }
@@ -11073,7 +11156,7 @@ nsIDocument::AsyncExitFullscreen(nsIDocument* aDoc)
 static bool
 CountFullscreenSubDocuments(nsIDocument* aDoc, void* aData)
 {
-  if (aDoc->IsFullScreenDoc()) {
+  if (aDoc->GetFullscreenElement()) {
     uint32_t* count = static_cast<uint32_t*>(aData);
     (*count)++;
   }
@@ -11093,7 +11176,7 @@ nsDocument::IsFullscreenLeaf()
 {
   // A fullscreen leaf document is fullscreen, and has no fullscreen
   // subdocuments.
-  if (!IsFullScreenDoc()) {
+  if (!GetFullscreenElement()) {
     return false;
   }
   return CountFullscreenSubDocuments(this) == 0;
@@ -11102,11 +11185,12 @@ nsDocument::IsFullscreenLeaf()
 static bool
 ResetFullScreen(nsIDocument* aDocument, void* aData)
 {
-  if (aDocument->IsFullScreenDoc()) {
+  if (aDocument->GetFullscreenElement()) {
     NS_ASSERTION(CountFullscreenSubDocuments(aDocument) <= 1,
         "Should have at most 1 fullscreen subdocument.");
     static_cast<nsDocument*>(aDocument)->CleanupFullscreenState();
-    NS_ASSERTION(!aDocument->IsFullScreenDoc(), "Should reset full-screen");
+    NS_ASSERTION(!aDocument->GetFullscreenElement(),
+                 "Should reset full-screen");
     auto changed = reinterpret_cast<nsCOMArray<nsIDocument>*>(aData);
     changed->AppendElement(aDocument);
     aDocument->EnumerateSubDocuments(ResetFullScreen, aData);
@@ -11153,7 +11237,7 @@ nsIDocument::ExitFullscreenInDocTree(nsIDocument* aMaybeNotARootDoc)
   UnlockPointer();
 
   nsCOMPtr<nsIDocument> root = aMaybeNotARootDoc->GetFullscreenRoot();
-  if (!root || !root->IsFullScreenDoc()) {
+  if (!root || !root->GetFullscreenElement()) {
     // If a document was detached before exiting from fullscreen, it is
     // possible that the root had left fullscreen state. In this case,
     // we would not get anything from the ResetFullScreen() call. Root's
@@ -11182,7 +11266,7 @@ nsIDocument::ExitFullscreenInDocTree(nsIDocument* aMaybeNotARootDoc)
     DispatchFullScreenChange(changed[changed.Length() - i - 1]);
   }
 
-  NS_ASSERTION(!root->IsFullScreenDoc(),
+  NS_ASSERTION(!root->GetFullscreenElement(),
     "Fullscreen root should no longer be a fullscreen doc...");
 
   // Move the top-level window out of fullscreen mode.
@@ -11199,7 +11283,7 @@ GetFullscreenLeaf(nsIDocument* aDoc, void* aData)
     nsIDocument** result = static_cast<nsIDocument**>(aData);
     *result = aDoc;
     return false;
-  } else if (aDoc->IsFullScreenDoc()) {
+  } else if (aDoc->GetFullscreenElement()) {
     aDoc->EnumerateSubDocuments(GetFullscreenLeaf, aData);
   }
   return true;
@@ -11218,7 +11302,7 @@ GetFullscreenLeaf(nsIDocument* aDoc)
   nsIDocument* root = nsContentUtils::GetRootDocument(aDoc);
   // Check that the root is actually fullscreen so we don't waste time walking
   // around its descendants.
-  if (!root->IsFullScreenDoc()) {
+  if (!root->GetFullscreenElement()) {
     return nullptr;
   }
   GetFullscreenLeaf(root, &leaf);
@@ -11228,10 +11312,10 @@ GetFullscreenLeaf(nsIDocument* aDoc)
 void
 nsDocument::RestorePreviousFullScreenState()
 {
-  NS_ASSERTION(!IsFullScreenDoc() || !FullscreenRoots::IsEmpty(),
+  NS_ASSERTION(!GetFullscreenElement() || !FullscreenRoots::IsEmpty(),
     "Should have at least 1 fullscreen root when fullscreen!");
 
-  if (!IsFullScreenDoc() || !GetWindow() || FullscreenRoots::IsEmpty()) {
+  if (!GetFullscreenElement() || !GetWindow() || FullscreenRoots::IsEmpty()) {
     return;
   }
 
@@ -11309,12 +11393,6 @@ nsDocument::RestorePreviousFullScreenState()
       newFullscreenDoc, NS_LITERAL_STRING("MozDOMFullscreen:NewOrigin"),
       /* Bubbles */ true, /* ChromeOnly */ true);
   }
-}
-
-bool
-nsDocument::IsFullScreenDoc()
-{
-  return GetFullscreenElement() != nullptr;
 }
 
 class nsCallRequestFullScreen : public nsRunnable
@@ -11788,7 +11866,7 @@ ShouldApplyFullscreenDirectly(nsIDocument* aDoc,
     // If we are in the content process, we can apply the fullscreen
     // state directly only if we have been in DOM fullscreen, because
     // otherwise we always need to notify the chrome.
-    return nsContentUtils::GetRootDocument(aDoc)->IsFullScreenDoc();
+    return !!nsContentUtils::GetRootDocument(aDoc)->GetFullscreenElement();
   } else {
     // If we are in the chrome process, and the window has not been in
     // fullscreen, we certainly need to make that fullscreen first.
@@ -12125,7 +12203,7 @@ public:
       return NS_OK;
     }
 
-    if (doc->IsFullScreenDoc() || doc->mAllowRelocking) {
+    if (doc->GetFullscreenElement() || doc->mAllowRelocking) {
       Allow(JS::UndefinedHandleValue);
       return NS_OK;
     }
@@ -12343,7 +12421,7 @@ nsDocument::OnAppThemeChanged()
   }
 
   for (int32_t i = 0; i < GetNumberOfStyleSheets(); i++) {
-    RefPtr<CSSStyleSheet> sheet = GetStyleSheetAt(i);
+    StyleSheetHandle::RefPtr sheet = GetStyleSheetAt(i);
     if (!sheet) {
       continue;
     }
@@ -12710,12 +12788,12 @@ nsIDocument::DocAddSizeOfIncludingThis(nsWindowSizes* aWindowSizes) const
 }
 
 static size_t
-SizeOfOwnedSheetArrayExcludingThis(const nsTArray<RefPtr<CSSStyleSheet>>& aSheets,
+SizeOfOwnedSheetArrayExcludingThis(const nsTArray<StyleSheetHandle::RefPtr>& aSheets,
                                    MallocSizeOf aMallocSizeOf)
 {
   size_t n = 0;
   n += aSheets.ShallowSizeOfExcludingThis(aMallocSizeOf);
-  for (CSSStyleSheet* sheet : aSheets) {
+  for (StyleSheetHandle sheet : aSheets) {
     if (!sheet->GetOwningDocument()) {
       // Avoid over-reporting shared sheets.
       continue;
@@ -13312,8 +13390,15 @@ nsIDocument::FlushUserFontSet()
     if (gfxPlatform::GetPlatform()->DownloadableFontsEnabled()) {
       nsTArray<nsFontFaceRuleContainer> rules;
       nsIPresShell* shell = GetShell();
-      if (shell && !shell->StyleSet()->AppendFontFaceRules(rules)) {
-        return;
+      if (shell) {
+        // XXXheycam ServoStyleSets don't support exposing @font-face rules yet.
+        if (shell->StyleSet()->IsGecko()) {
+          if (!shell->StyleSet()->AsGecko()->AppendFontFaceRules(rules)) {
+            return;
+          }
+        } else {
+          NS_ERROR("stylo: ServoStyleSets cannot handle @font-face rules yet");
+        }
       }
 
       bool changed = false;
@@ -13394,4 +13479,16 @@ nsIDocument::ReportHasScrollLinkedEffect()
                                   NS_LITERAL_CSTRING("Async Pan/Zoom"),
                                   this, nsContentUtils::eLAYOUT_PROPERTIES,
                                   "ScrollLinkedEffectFound2");
+}
+
+mozilla::StyleBackendType
+nsIDocument::GetStyleBackendType() const
+{
+  if (!mPresShell) {
+#ifdef MOZ_STYLO
+    NS_WARNING("GetStyleBackendType() called on document without a pres shell");
+#endif
+    return StyleBackendType::Gecko;
+  }
+  return mPresShell->StyleSet()->BackendType();
 }

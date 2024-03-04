@@ -40,6 +40,7 @@
 #include "nsDNSPrefetch.h"
 #include "nsChannelClassifier.h"
 #include "nsIRedirectResultListener.h"
+#include "mozilla/dom/ContentVerifier.h"
 #include "mozilla/TimeStamp.h"
 #include "nsError.h"
 #include "nsPrintfCString.h"
@@ -240,6 +241,7 @@ nsHttpChannel::nsHttpChannel()
     , mTransactionReplaced(false)
     , mAuthRetryPending(false)
     , mProxyAuthPending(false)
+    , mCustomAuthHeader(false)
     , mResuming(false)
     , mInitedCacheEntry(false)
     , mFallbackChannel(false)
@@ -338,6 +340,10 @@ nsHttpChannel::Connect()
     // ensure that we are using a valid hostname
     if (!net_IsValidHostName(nsDependentCString(mConnectionInfo->Origin())))
         return NS_ERROR_UNKNOWN_HOST;
+
+    if (mUpgradeProtocolCallback) {
+        mCaps |=  NS_HTTP_DISALLOW_SPDY;
+    }
 
     // Finalize ConnectionInfo flags before SpeculativeConnect
     mConnectionInfo->SetAnonymous((mLoadFlags & LOAD_ANONYMOUS) != 0);
@@ -859,7 +865,6 @@ nsHttpChannel::SetupTransaction()
         mCaps |=  NS_HTTP_STICKY_CONNECTION;
         mCaps &= ~NS_HTTP_ALLOW_PIPELINING;
         mCaps &= ~NS_HTTP_ALLOW_KEEPALIVE;
-        mCaps |=  NS_HTTP_DISALLOW_SPDY;
     }
 
     if (mPushedStream) {
@@ -983,6 +988,20 @@ nsHttpChannel::CallOnStartRequest()
           LOG(("  entry too big"));
         } else {
           NS_ENSURE_SUCCESS(rv, rv);
+        }
+    }
+
+    // Check for a Content-Signature header and inject mediator if the header is
+    // requested and available.
+    // If requested (mLoadInfo->GetVerifySignedContent), but not present, or
+    // present but not valid, fail this channel and return
+    // NS_ERROR_INVALID_SIGNATURE to indicate a signature error and trigger a
+    // fallback load in nsDocShell.
+    if (!mCanceled) {
+        rv = ProcessContentSignatureHeader(mResponseHead);
+        if (NS_FAILED(rv)) {
+            LOG(("Content-signature verification failed.\n"));
+            return rv;
         }
     }
 
@@ -1321,6 +1340,57 @@ nsHttpChannel::ProcessSecurityHeaders()
     rv = ProcessSingleSecurityHeader(nsISiteSecurityService::HEADER_HPKP,
                                      sslStatus, flags);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    return NS_OK;
+}
+
+nsresult
+nsHttpChannel::ProcessContentSignatureHeader(nsHttpResponseHead *aResponseHead)
+{
+    nsresult rv = NS_OK;
+
+    // we only do this if we require it in loadInfo
+    if (!mLoadInfo || !mLoadInfo->GetVerifySignedContent()) {
+        return NS_OK;
+    }
+
+    // check if we verify content signatures on this newtab channel
+    if (gHttpHandler->NewTabContentSignaturesDisabled()) {
+        return NS_OK;
+    }
+
+    NS_ENSURE_TRUE(aResponseHead, NS_ERROR_ABORT);
+    nsAutoCString contentSignatureHeader;
+    nsHttpAtom atom = nsHttp::ResolveAtom("Content-Signature");
+    rv = aResponseHead->GetHeader(atom, contentSignatureHeader);
+    if (NS_FAILED(rv)) {
+        LOG(("Content-Signature header is missing but expected."));
+        DoInvalidateCacheEntry(mURI);
+        return NS_ERROR_INVALID_SIGNATURE;
+    }
+
+    // if we require a signature but it is empty, fail
+    if (contentSignatureHeader.IsEmpty()) {
+      DoInvalidateCacheEntry(mURI);
+      LOG(("An expected content-signature header is missing.\n"));
+      return NS_ERROR_INVALID_SIGNATURE;
+    }
+
+    // we ensure a content type here to avoid running into problems with
+    // content sniffing, which might sniff parts of the content before we can
+    // verify the signature
+    if (aResponseHead->ContentType().IsEmpty()) {
+        NS_WARNING("Empty content type can get us in trouble when verifying "
+                   "content signatures");
+        return NS_ERROR_INVALID_SIGNATURE;
+    }
+    // create a new listener that meadiates the content
+    RefPtr<ContentVerifier> contentVerifyingMediator =
+      new ContentVerifier(mListener, mListenerContext);
+    rv = contentVerifyingMediator->Init(
+      NS_ConvertUTF8toUTF16(contentSignatureHeader));
+    NS_ENSURE_SUCCESS(rv, NS_ERROR_INVALID_SIGNATURE);
+    mListener = contentVerifyingMediator;
 
     return NS_OK;
 }
@@ -1776,9 +1846,17 @@ nsHttpChannel::ContinueProcessResponse1(nsresult rv)
         break;
     case 401:
     case 407:
-        rv = mAuthProvider->ProcessAuthentication(
-            httpStatus, mConnectionInfo->EndToEndSSL() &&
-                        mTransaction->ProxyConnectFailed());
+        if (MOZ_UNLIKELY(mCustomAuthHeader) && httpStatus == 401) {
+            // When a custom auth header fails, we don't want to try
+            // any cached credentials, nor we want to ask the user.
+            // It's up to the consumer to re-try w/o setting a custom
+            // auth header if cached credentials should be attempted.
+            rv = NS_ERROR_FAILURE;
+        } else {
+            rv = mAuthProvider->ProcessAuthentication(
+                httpStatus,
+                mConnectionInfo->EndToEndSSL() && mTransaction->ProxyConnectFailed());
+        }
         if (rv == NS_ERROR_IN_PROGRESS)  {
             // authentication prompt has been invoked and result
             // is expected asynchronously
@@ -1793,17 +1871,16 @@ nsHttpChannel::ContinueProcessResponse1(nsresult rv)
             LOG(("Suspending the transaction, asynchronously prompting for credentials"));
             mTransactionPump->Suspend();
             rv = NS_OK;
-        }
-        else if (NS_FAILED(rv)) {
+        } else if (NS_FAILED(rv)) {
             LOG(("ProcessAuthentication failed [rv=%x]\n", rv));
             if (mTransaction->ProxyConnectFailed())
                 return ProcessFailedProxyConnect(httpStatus);
             if (!mAuthRetryPending)
                 mAuthProvider->CheckForSuperfluousAuth();
             rv = ProcessNormal();
-        }
-        else
+        } else {
             mAuthRetryPending = true; // see DoAuthRetry
+        }
         break;
     default:
         rv = ProcessNormal();
@@ -2052,7 +2129,7 @@ nsHttpChannel::StartRedirectChannelToHttps()
     LOG(("nsHttpChannel::HandleAsyncRedirectChannelToHttps() [STS]\n"));
 
     nsCOMPtr<nsIURI> upgradedURI;
-    nsresult rv = GetSecureUpgradedURI(mURI, getter_AddRefs(upgradedURI));
+    nsresult rv = NS_GetSecureUpgradedURI(mURI, getter_AddRefs(upgradedURI));
     NS_ENSURE_SUCCESS(rv,rv);
 
     return StartRedirectChannelToURI(upgradedURI,
@@ -3127,6 +3204,11 @@ nsHttpChannel::OpenCacheEntry(bool isHttps)
         intercepted->NotifyController();
     } else {
         if (mInterceptCache == INTERCEPTED) {
+            cacheEntryOpenFlags |= nsICacheStorage::OPEN_INTERCEPTED;
+            // Clear OPEN_TRUNCATE for the fake cache entry, since otherwise
+            // cache storage will close the current entry which breaks the
+            // response synthesis.
+            cacheEntryOpenFlags &= ~nsICacheStorage::OPEN_TRUNCATE;
             DebugOnly<bool> exists;
             MOZ_ASSERT(NS_SUCCEEDED(cacheStorage->Exists(openURI, extension, &exists)) && exists,
                        "The entry must exist in the cache after we create it here");
@@ -3441,6 +3523,14 @@ nsHttpChannel::OnCacheEntryCheck(nsICacheEntry* entry, nsIApplicationCache* appC
             doValidation = true;
 
         LOG(("%salidating based on expiration time\n", doValidation ? "V" : "Not v"));
+    }
+
+
+    // If a content signature is expected to be valid in this load,
+    // set doValidation to force a signature check.
+    if (!doValidation &&
+        mLoadInfo && mLoadInfo->GetVerifySignedContent()) {
+        doValidation = true;
     }
 
     if (!doValidation && mRequestHead.PeekHeader(nsHttp::If_Match) &&
@@ -5172,6 +5262,10 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
     // timing.
     mAsyncOpenTime = TimeStamp::Now();
 
+    // Remember we have Authorization header set here.  We need to check on it
+    // just once and early, AsyncOpen is the best place.
+    mCustomAuthHeader = !!mRequestHead.PeekHeader(nsHttp::Authorization);
+
     // the only time we would already know the proxy information at this
     // point would be if we were proxying a non-http protocol like ftp
     if (!mProxyInfo && NS_SUCCEEDED(ResolveProxy()))
@@ -5307,10 +5401,16 @@ nsHttpChannel::BeginConnect()
     }
 
     // check to see if authorization headers should be included
-    mAuthProvider->AddAuthorizationHeaders();
+    // mCustomAuthHeader is set in AsyncOpen if we find Authorization header
+    mAuthProvider->AddAuthorizationHeaders(mCustomAuthHeader);
 
     // notify "http-on-modify-request" observers
     CallOnModifyRequestObservers();
+
+    // If mLoadGroup is null, e10s is enabled and this will be handled by HttpChannelChild.
+    if (mLoadGroup) {
+      HttpBaseChannel::SetLoadGroupUserAgentOverride();
+    }
 
     // Check to see if we should redirect this channel elsewhere by
     // nsIHttpChannel.redirectTo API request
@@ -7297,14 +7397,11 @@ nsHttpChannel::MaybeWarnAboutAppCache()
     Telemetry::Accumulate(Telemetry::HTTP_OFFLINE_CACHE_DOCUMENT_LOAD,
                           true);
 
-    // Then, issue a deprecation warning if service worker interception is
-    // enabled.
-    if (nsContentUtils::ServiceWorkerInterceptionEnabled()) {
-        nsCOMPtr<nsIDeprecationWarner> warner;
-        GetCallback(warner);
-        if (warner) {
-            warner->IssueWarning(nsIDocument::eAppCache, false);
-        }
+    // Then, issue a deprecation warning.
+    nsCOMPtr<nsIDeprecationWarner> warner;
+    GetCallback(warner);
+    if (warner) {
+        warner->IssueWarning(nsIDocument::eAppCache, false);
     }
 }
 

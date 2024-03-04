@@ -40,7 +40,7 @@ class PTextureChild;
  * additionally forward modifications of the Layer tree).
  * ImageBridgeChild is another CompositableForwarder.
  */
-class CompositableForwarder : public ISurfaceAllocator
+class CompositableForwarder : public ClientIPCAllocator
 {
 public:
 
@@ -136,12 +136,13 @@ public:
 
   void IdentifyTextureHost(const TextureFactoryIdentifier& aIdentifier);
 
+  void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier) {
+    mTextureFactoryIdentifier = aNewIdentifier;
+  }
   virtual int32_t GetMaxTextureSize() const override
   {
     return mTextureFactoryIdentifier.mMaxTextureSize;
   }
-
-  bool IsOnCompositorSide() const override { return false; }
 
   /**
    * Returns the type of backend that is used off the main thread.
@@ -171,6 +172,8 @@ public:
   int32_t GetSerial() { return mSerial; }
 
   SyncObject* GetSyncObject() { return mSyncObject; }
+
+  virtual CompositableForwarder* AsCompositableForwarder() override { return this; }
 
 protected:
   TextureFactoryIdentifier mTextureFactoryIdentifier;

@@ -32,7 +32,7 @@ from mozharness.mozilla.testing.codecoverage import (
 )
 from mozharness.mozilla.testing.testbase import TestingMixin, testing_config_options
 
-SUITE_CATEGORIES = ['gtest', 'cppunittest', 'jittest', 'mochitest', 'reftest', 'xpcshell', 'mozbase', 'mozmill', 'webapprt']
+SUITE_CATEGORIES = ['gtest', 'cppunittest', 'jittest', 'mochitest', 'reftest', 'xpcshell', 'mozbase', 'mozmill']
 
 # DesktopUnittest {{{1
 class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMixin, CodeCoverageMixin):
@@ -44,14 +44,6 @@ class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMix
             "help": "Specify which mochi suite to run. "
                     "Suites are defined in the config file.\n"
                     "Examples: 'all', 'plain1', 'plain5', 'chrome', or 'a11y'"}
-         ],
-        [['--webapprt-suite', ], {
-            "action": "extend",
-            "dest": "specified_webapprt_suites",
-            "type": "string",
-            "help": "Specify which webapprt suite to run. "
-                    "Suites are defined in the config file.\n"
-                    "Examples: 'content', 'chrome'"}
          ],
         [['--reftest-suite', ], {
             "action": "extend",
@@ -209,7 +201,6 @@ class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMix
         dirs['abs_test_bin_components_dir'] = os.path.join(dirs['abs_test_bin_dir'],
                                                            'components')
         dirs['abs_mochitest_dir'] = os.path.join(dirs['abs_test_install_dir'], "mochitest")
-        dirs['abs_webapprt_dir'] = os.path.join(dirs['abs_test_install_dir'], "mochitest")
         dirs['abs_reftest_dir'] = os.path.join(dirs['abs_test_install_dir'], "reftest")
         dirs['abs_xpcshell_dir'] = os.path.join(dirs['abs_test_install_dir'], "xpcshell")
         dirs['abs_cppunittest_dir'] = os.path.join(dirs['abs_test_install_dir'], "cppunittest")
@@ -304,11 +295,6 @@ class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMix
             abs_app_dir = self.query_abs_app_dir()
             abs_res_dir = self.query_abs_res_dir()
 
-            webapprt_path = os.path.join(os.path.dirname(self.binary_path),
-                                         'webapprt-stub')
-            if c.get('exe_suffix'):
-                webapprt_path += c['exe_suffix']
-
             raw_log_file = os.path.join(dirs['abs_blob_upload_dir'],
                                         '%s_raw.log' % suite)
 
@@ -318,7 +304,7 @@ class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMix
                 'binary_path': self.binary_path,
                 'symbols_path': self._query_symbols_url(),
                 'abs_app_dir': abs_app_dir,
-                'app_path': webapprt_path,
+                'abs_res_dir': abs_res_dir,
                 'raw_log_file': raw_log_file,
                 'error_summary_file': error_summary_file,
                 'gtest_dir': os.path.join(dirs['abs_test_install_dir'],
@@ -466,7 +452,6 @@ class DesktopUnittest(TestingMixin, MercurialScript, BlobUploadMixin, MozbaseMix
     def run_tests(self):
         self._run_category_suites('mochitest')
         self._run_category_suites('reftest')
-        self._run_category_suites('webapprt')
         self._run_category_suites('xpcshell',
                                   preflight_run_method=self.preflight_xpcshell)
         self._run_category_suites('cppunittest',

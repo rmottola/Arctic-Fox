@@ -11,7 +11,7 @@
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT_HELPER2
 #include "mozilla/Attributes.h"         // for override
 #include "mozilla/ipc/ProtocolUtils.h"
-#include "mozilla/layers/PCompositorChild.h"
+#include "mozilla/layers/PCompositorBridgeChild.h"
 #include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsClassHashtable.h"           // for nsClassHashtable
 #include "nsCOMPtr.h"                   // for nsCOMPtr
@@ -34,7 +34,7 @@ class ClientLayerManager;
 class CompositorParent;
 struct FrameMetrics;
 
-class CompositorChild final : public PCompositorChild
+class CompositorChild final : public PCompositorBridgeChild
 {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING_WITH_MAIN_THREAD_DESTRUCTION(CompositorChild)
 
@@ -55,7 +55,7 @@ public:
    * or Bridge() request from our parent process.  The Transport is to
    * the compositor's context.
    */
-  static PCompositorChild*
+  static PCompositorBridgeChild*
   Create(Transport* aTransport, ProcessId aOtherProcess);
 
   /**
@@ -79,7 +79,11 @@ public:
                    const TimeStamp& aCompositeEnd) override;
 
   virtual bool
-  RecvInvalidateAll() override;
+  RecvInvalidateLayers(const uint64_t& aLayersId) override;
+
+  virtual bool
+  RecvCompositorUpdated(const uint64_t& aLayersId,
+                        const TextureFactoryIdentifier& aNewIdentifier) override;
 
   virtual bool
   RecvOverfill(const uint32_t &aOverfill) override;
@@ -122,6 +126,9 @@ public:
   bool SendStopFrameTimeRecording(const uint32_t& startIndex, nsTArray<float>* intervals);
   bool SendNotifyRegionInvalidated(const nsIntRegion& region);
   bool SendRequestNotifyAfterRemotePaint();
+  bool SendClearApproximatelyVisibleRegions(uint64_t aLayersId, uint32_t aPresShellId);
+  bool SendNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
+                                            const mozilla::CSSIntRegion& aRegion);
 
 private:
   // Private destructor, to discourage deletion outside of Release():

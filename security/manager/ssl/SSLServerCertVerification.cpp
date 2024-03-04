@@ -133,7 +133,7 @@
 #include "secport.h"
 #include "sslerr.h"
 
-extern PRLogModuleInfo* gPIPNSSLog;
+extern mozilla::LazyLogModule gPIPNSSLog;
 
 using namespace mozilla::pkix;
 
@@ -901,16 +901,16 @@ GatherBaselineRequirementsTelemetry(const ScopedCERTCertList& certList)
     return;
   }
   bool isBuiltIn = false;
-  SECStatus rv = IsCertBuiltInRoot(rootCert, isBuiltIn);
-  if (rv != SECSuccess || !isBuiltIn) {
+  Result result = IsCertBuiltInRoot(rootCert, isBuiltIn);
+  if (result != Success || !isBuiltIn) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("BR telemetry: root certificate for '%s' is not a built-in root "
             "(or IsCertBuiltInRoot failed)\n", commonName.get()));
     return;
   }
   SECItem altNameExtension;
-  rv = CERT_FindCertExtension(cert, SEC_OID_X509_SUBJECT_ALT_NAME,
-                              &altNameExtension);
+  SECStatus rv = CERT_FindCertExtension(cert, SEC_OID_X509_SUBJECT_ALT_NAME,
+                                        &altNameExtension);
   if (rv != SECSuccess) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("BR telemetry: no subject alt names extension for '%s'\n",
@@ -1064,8 +1064,8 @@ GatherEKUTelemetry(const ScopedCERTCertList& certList)
     return;
   }
   bool isBuiltIn = false;
-  SECStatus rv = IsCertBuiltInRoot(rootCert, isBuiltIn);
-  if (rv != SECSuccess || !isBuiltIn) {
+  Result rv = IsCertBuiltInRoot(rootCert, isBuiltIn);
+  if (rv != Success || !isBuiltIn) {
     return;
   }
 
@@ -1088,7 +1088,7 @@ GatherEKUTelemetry(const ScopedCERTCertList& certList)
   }
 
   // Parse the EKU extension
-  ScopedCERTOidSequence ekuSequence(
+  UniqueCERTOidSequence ekuSequence(
     CERT_DecodeOidSequence(&ekuExtension->value));
   if (!ekuSequence) {
     return;
@@ -1222,7 +1222,7 @@ AuthCertificate(CertVerifier& certVerifier,
   CertVerifier::OCSPStaplingStatus ocspStaplingStatus =
     CertVerifier::OCSP_STAPLING_NEVER_CHECKED;
   KeySizeStatus keySizeStatus = KeySizeStatus::NeverChecked;
-  SignatureDigestStatus sigDigestStatus = SignatureDigestStatus::NeverChecked;
+  SHA1ModeResult sha1ModeResult = SHA1ModeResult::NeverChecked;
   PinningTelemetryInfo pinningTelemetryInfo;
 
   int flags = 0;
@@ -1234,9 +1234,9 @@ AuthCertificate(CertVerifier& certVerifier,
   rv = certVerifier.VerifySSLServerCert(cert, stapledOCSPResponse,
                                         time, infoObject,
                                         infoObject->GetHostNameRaw(),
-                                        saveIntermediates, flags, &certList,
+                                        certList, saveIntermediates, flags,
                                         &evOidPolicy, &ocspStaplingStatus,
-                                        &keySizeStatus, &sigDigestStatus,
+                                        &keySizeStatus, &sha1ModeResult,
                                         &pinningTelemetryInfo);
   PRErrorCode savedErrorCode;
   if (rv != SECSuccess) {
@@ -1250,9 +1250,9 @@ AuthCertificate(CertVerifier& certVerifier,
     Telemetry::Accumulate(Telemetry::CERT_CHAIN_KEY_SIZE_STATUS,
                           static_cast<uint32_t>(keySizeStatus));
   }
-  if (sigDigestStatus != SignatureDigestStatus::NeverChecked) {
-    Telemetry::Accumulate(Telemetry::CERT_CHAIN_SIGNATURE_DIGEST_STATUS,
-                          static_cast<uint32_t>(sigDigestStatus));
+  if (sha1ModeResult != SHA1ModeResult::NeverChecked) {
+    Telemetry::Accumulate(Telemetry::CERT_CHAIN_SHA1_POLICY_STATUS,
+                          static_cast<uint32_t>(sha1ModeResult));
   }
 
   if (pinningTelemetryInfo.accumulateForRoot) {

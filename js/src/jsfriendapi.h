@@ -131,8 +131,13 @@ enum {
     JS_TELEMETRY_GC_MINOR_US,
     JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT,
     JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_ADDONS,
-    JS_TELEMETRY_ADDON_EXCEPTIONS
+    JS_TELEMETRY_ADDON_EXCEPTIONS,
+    JS_TELEMETRY_DEFINE_GETTER_SETTER_THIS_NULL_UNDEFINED,
+    JS_TELEMETRY_END
 };
+
+static_assert(JS_TELEMETRY_DEFINE_GETTER_SETTER_THIS_NULL_UNDEFINED == 25,
+              "This value needs to be kept in sync with SelfHostingDefines.h");
 
 typedef void
 (*JSAccumulateTelemetryDataCallback)(int id, uint32_t sample, const char* key);
@@ -960,9 +965,6 @@ JS_FRIEND_API(bool)
 IsObjectInContextCompartment(JSObject* obj, const JSContext* cx);
 
 /*
- * NB: these flag bits are encoded into the bytecode stream in the immediate
- * operand of JSOP_ITER, so don't change them without advancing vm/Xdr.h's
- * XDR_BYTECODE_VERSION.
  * NB: keep these in sync with the copy in builtin/SelfHostingDefines.h.
  * The first three are omitted because they shouldn't be used in new code.
  */
@@ -1374,13 +1376,6 @@ class MOZ_STACK_CLASS AutoStableStringChars
     AutoStableStringChars(const AutoStableStringChars& other) = delete;
     void operator=(const AutoStableStringChars& other) = delete;
 };
-
-/**
- * Creates a string of the form |ErrorType: ErrorMessage| for a JSErrorReport,
- * which generally matches the toString() behavior of an ErrorObject.
- */
-extern JS_FRIEND_API(JSString*)
-ErrorReportToString(JSContext* cx, JSErrorReport* reportp);
 
 struct MOZ_STACK_CLASS JS_FRIEND_API(ErrorReport)
 {
@@ -2677,7 +2672,7 @@ class MOZ_RAII JS_FRIEND_API(AutoCTypesActivityCallback) {
 };
 
 typedef JSObject*
-(* ObjectMetadataCallback)(JSContext* cx, JSObject* obj);
+(* ObjectMetadataCallback)(JSContext* cx, JS::HandleObject obj);
 
 /**
  * Specify a callback to invoke when creating each JS object in the current
