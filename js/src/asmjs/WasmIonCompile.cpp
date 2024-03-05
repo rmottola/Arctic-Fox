@@ -1084,7 +1084,8 @@ class FunctionCompiler
         }
     }
 
-    bool setLoopBackedge(MBasicBlock* loopEntry, MBasicBlock* loopBody, MBasicBlock* backedge)
+    bool setLoopBackedge(MBasicBlock* loopEntry, MBasicBlock* loopBody, MBasicBlock* backedge,
+                         MDefinition** loopResult)
     {
         if (!loopEntry->setBackedgeAsmJS(backedge))
             return false;
@@ -1095,6 +1096,10 @@ class FunctionCompiler
             if (phi->getOperand(0) == phi->getOperand(1))
                 phi->setUnused();
         }
+
+        // The loop result may also be referencing a recycled phi.
+        if (*loopResult && (*loopResult)->isUnused())
+            *loopResult = (*loopResult)->toPhi()->getOperand(0);
 
         // Fix up phis stored in the slots Vector of pending blocks.
         for (BlockVector& vec : targets_) {
@@ -1123,7 +1128,7 @@ class FunctionCompiler
     }
 
   public:
-    bool closeLoop(MBasicBlock* loopHeader)
+    bool closeLoop(MBasicBlock* loopHeader, MDefinition** loopResult)
     {
         MOZ_ASSERT(blockDepth_ >= 2);
         MOZ_ASSERT(loopDepth_);
@@ -1157,7 +1162,7 @@ class FunctionCompiler
             // We're on the loop backedge block, created by bindBranches.
             MOZ_ASSERT(curBlock_->loopDepth() == loopDepth_);
             curBlock_->end(MGoto::New(alloc(), loopHeader));
-            if (!setLoopBackedge(loopHeader, loopBody, curBlock_))
+            if (!setLoopBackedge(loopHeader, loopBody, curBlock_, loopResult))
                 return false;
         }
 
@@ -2553,7 +2558,7 @@ EmitLoop(FunctionCompiler& f, MDefinition** def)
         *def = nullptr;
     }
 
-    return f.closeLoop(loopHeader);
+    return f.closeLoop(loopHeader, def);
 }
 
 static bool
