@@ -3094,7 +3094,6 @@ MOZ_ARG_ENABLE_BOOL(readline,
 
 JS_BUNDLED_EDITLINE=
 EDITLINE_LIBS=
-JS_DISABLE_SHELL=
 
 case "$target" in
 *-mingw*)
@@ -3118,7 +3117,6 @@ if test -z "$SKIP_LIBRARY_CHECKS" -a -z "$NO_EDITLINE"; then
   AC_DEFINE(EDITLINE)
 fi
 AC_SUBST(JS_BUNDLED_EDITLINE)
-AC_SUBST(JS_DISABLE_SHELL)
 AC_SUBST_LIST(EDITLINE_LIBS)
 
 dnl ========================================================
