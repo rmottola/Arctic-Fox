@@ -2632,6 +2632,8 @@ EmitBrTable(FunctionCompiler& f, MDefinition** def)
     if (!EmitExpr(f, &index))
         return false;
 
+    *def = nullptr;
+
     // Empty table
     if (!numCases)
         return f.br(defaultDepth);
@@ -2663,7 +2665,6 @@ EmitBrTable(FunctionCompiler& f, MDefinition** def)
     if (!f.joinSwitch(switchBlock, cases, defaultBlock))
         return false;
 
-    *def = nullptr;
     return true;
 }
 
