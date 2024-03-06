@@ -4322,13 +4322,8 @@ fi
 dnl ========================================================
 dnl = Apple platform decoder support
 dnl ========================================================
-MOZ_ARG_DISABLE_BOOL(applemedia,
-[  --disable-applemedia    Disable support for AppleMedia (Cocoa only)],
-    MOZ_APPLEMEDIA=,
-    MOZ_APPLEMEDIA=1)
-
-if test "$MOZ_WIDGET_TOOLKIT" = "cocoa" -a -n "$MOZ_APPLEMEDIA"; then
-  AC_DEFINE(MOZ_APPLEMEDIA)
+if test "$COMPILE_ENVIRONMENT"; then
+if test -n "$MOZ_APPLEMEDIA"; then
   # hack in frameworks for fmp4 - see bug 1029974
   # We load VideoToolbox and CoreMedia dynamically, so they don't appear here.
   LDFLAGS="$LDFLAGS -framework AudioToolbox"
@@ -4336,6 +4331,7 @@ if test "$MOZ_WIDGET_TOOLKIT" = "cocoa" -a -n "$MOZ_APPLEMEDIA"; then
   AC_CHECK_HEADER([CoreMedia/CoreMedia.h], [],
     [AC_MSG_ERROR([MacOS X 10.7 SDK or later is required])])
 fi
+fi # COMPILE_ENVIRONMENT
 
 dnl ========================================================
 dnl = DirectShow support
@@ -7875,7 +7871,6 @@ AC_SUBST_LIST(FFVPX_ASFLAGS)
 AC_SUBST(MOZ_FMP4)
 AC_SUBST(MOZ_DIRECTSHOW)
 AC_SUBST(MOZ_ANDROID_OMX)
-AC_SUBST(MOZ_APPLEMEDIA)
 AC_SUBST(MOZ_OMX_PLUGIN)
 AC_SUBST(MOZ_VPX_ERROR_CONCEALMENT)
 AC_SUBST(VPX_USE_YASM)
