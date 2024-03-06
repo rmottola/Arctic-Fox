@@ -32,6 +32,18 @@ def jprof(value):
         add_old_configure_assignment('MOZ_JPROF', '1')
 
 
+option('--enable-dmd', env='MOZ_DMD',
+       help='Enable Dark Matter Detector (heap profiler). '
+            'Also enables jemalloc, replace-malloc and profiling')
+
+@depends('--enable-dmd')
+def dmd(value):
+    if value:
+        set_config('MOZ_DMD', '1')
+        set_define('MOZ_DMD', '1')
+        add_old_configure_assignment('MOZ_DMD', '1')
+
+
 # Javascript engine
 # ==============================================================
 include('../js/moz.configure')
