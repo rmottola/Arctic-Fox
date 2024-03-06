@@ -15,24 +15,6 @@ endif
 
 include $(topsrcdir)/config/rules.mk
 
-PRIMARY_CERT = dep1.der
-SECONDARY_CERT = dep2.der
-
-CERT_HEADERS := primaryCert.h secondaryCert.h xpcshellCert.h
-
-export:: $(CERT_HEADERS)
-
-primaryCert.h: $(PRIMARY_CERT)
-secondaryCert.h: $(SECONDARY_CERT)
-
-# This is how the xpcshellCertificate.der file is generated, in case we ever
-# have to regenerate it.
-# ./certutil -L -d modules/libmar/tests/unit/data -n mycert -r > xpcshellCertificate.der
-xpcshellCert.h: xpcshellCertificate.der
-
-$(CERT_HEADERS): gen_cert_header.py
-	$(PYTHON) $< $(@:.h=Data) $(filter-out $<,$^) > $@
-
 ifdef MOZ_WIDGET_GTK
 libs:: updater.png
 	$(NSINSTALL) -D $(DIST)/bin/icons
