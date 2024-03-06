@@ -453,9 +453,6 @@ AC_SUBST(INTEL_CXX)
 dnl ========================================================
 dnl Checks for programs.
 dnl ========================================================
-AC_PROG_INSTALL
-AC_PROG_LN_S
-
 if test -z "$COMPILE_ENVIRONMENT"; then
     NSINSTALL_BIN='$(PYTHON) $(topsrcdir)/config/nsinstall.py'
 fi
