@@ -924,61 +924,6 @@ dnl System overrides of the defaults for target
 dnl ========================================================
 
 case "$target" in
-*-aix*)
-    AC_DEFINE(AIX)
-    if test ! "$GNU_CC"; then
-        if test ! "$HAVE_64BIT_BUILD"; then
-            # Compiling with Visual Age C++ object model compat is the
-            # default. To compile with object model ibm, add
-            # AIX_OBJMODEL=ibm to .mozconfig.
-            if test "$AIX_OBJMODEL" = "ibm"; then
-                CXXFLAGS="$CXXFLAGS -qobjmodel=ibm"
-            else
-                AIX_OBJMODEL=compat
-            fi
-        else
-            AIX_OBJMODEL=compat
-        fi
-        AC_SUBST(AIX_OBJMODEL)
-        DSO_LDOPTS='-qmkshrobj=1'
-        DSO_CFLAGS='-qflag=w:w'
-        DSO_PIC_CFLAGS=
-        LDFLAGS="$LDFLAGS -Wl,-brtl -blibpath:/usr/lib:/lib"
-        MOZ_FIX_LINK_PATHS=
-        MKSHLIB='$(CXX) $(DSO_LDOPTS) -o $@'
-        MKCSHLIB='$(CC) $(DSO_LDOPTS) -o $@'
-        if test "$COMPILE_ENVIRONMENT"; then
-            AC_LANG_SAVE
-            AC_LANG_CPLUSPLUS
-            AC_MSG_CHECKING([for IBM XLC/C++ compiler version >= 9.0.0.7])
-            AC_TRY_COMPILE([],
-                [#if (__IBMCPP__ < 900)
-                 #error "Bad compiler"
-                 #endif],
-                _BAD_COMPILER=,_BAD_COMPILER=1)
-            if test -n "$_BAD_COMPILER"; then
-                AC_MSG_RESULT([no])
-                AC_MSG_ERROR([IBM XLC/C++ 9.0.0.7 or higher is required to build.])
-            else
-                AC_MSG_RESULT([yes])
-            fi
-            AC_LANG_RESTORE
-            TARGET_COMPILER_ABI="ibmc"
-            CC_VERSION=`lslpp -Lcq vac.C 2>/dev/null | awk -F: '{ print $3 }'`
-            CXX_VERSION=`lslpp -Lcq vacpp.cmp.core 2>/dev/null | awk -F: '{ print $3 }'`
-        fi
-    fi
-    case "${target_os}" in
-    aix4.1*)
-        DLL_SUFFIX='_shr.a'
-        ;;
-    esac
-    if test "$COMPILE_ENVIRONMENT"; then
-        MOZ_CHECK_HEADERS(sys/inttypes.h)
-    fi
-    AC_DEFINE(NSCAP_DISABLE_DEBUG_PTR_TYPES)
-    ;;
-
 *-darwin*)
     AC_DEFINE(XP_DARWIN)
     MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
@@ -1027,43 +972,6 @@ case "$target" in
         LDFLAGS=$_SAVE_LDFLAGS
     fi
     MOZ_FIX_LINK_PATHS="-Wl,-executable_path,${DIST}/bin"
-    ;;
-
-ia64*-hpux*)
-    DLL_SUFFIX=".so"
-    if test ! "$GNU_CC"; then
-       DSO_LDOPTS='-b'
-       DSO_CFLAGS=""
-       DSO_PIC_CFLAGS=
-       MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_LDOPTS) -o $@'
-       MKCSHLIB='$(CC) $(CFLAGS) $(DSO_LDOPTS) -o $@'
-       CXXFLAGS="$CXXFLAGS -Wc,-ansi_for_scope,on"
-    else
-       DSO_LDOPTS='-b -E'
-       MKSHLIB='$(LD) $(DSO_LDOPTS) -o $@'
-       MKCSHLIB='$(LD) $(DSO_LDOPTS) -o $@'
-    fi
-    MOZ_FIX_LINK_PATHS=
-    AC_DEFINE(NSCAP_DISABLE_DEBUG_PTR_TYPES)
-    AC_DEFINE(_LARGEFILE64_SOURCE)
-    ;;
-
-*-hpux*)
-    DLL_SUFFIX=".sl"
-    if test ! "$GNU_CC"; then
-    	DSO_LDOPTS='-b -Wl,+s'
-    	DSO_CFLAGS=""
-    	DSO_PIC_CFLAGS="+Z"
-    	MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_LDOPTS) -L$(DIST)/bin -o $@'
-    	MKCSHLIB='$(LD) -b +s -L$(DIST)/bin -o $@'
-        CXXFLAGS="$CXXFLAGS -Wc,-ansi_for_scope,on"
-    else
-        DSO_LDOPTS='-b -E +s'
-        MKSHLIB='$(LD) $(DSO_LDOPTS) -L$(DIST)/bin -L$(DIST)/lib -o $@'
-        MKCSHLIB='$(LD) $(DSO_LDOPTS) -L$(DIST)/bin -L$(DIST)/lib -o $@'
-    fi
-    MOZ_POST_PROGRAM_COMMAND='chatr +s enable'
-    AC_DEFINE(NSCAP_DISABLE_DEBUG_PTR_TYPES)
     ;;
 
 *-android*|*-linuxandroid*)
@@ -1545,25 +1453,13 @@ if test "x$enable_dtrace" = "xyes"; then
 fi
 AC_SUBST(HAVE_DTRACE)
 
-case $target in
-*-aix4.3*|*-aix5*)
-	;;
-*)
-    MOZ_CHECK_HEADERS(sys/cdefs.h)
-	;;
-esac
+MOZ_CHECK_HEADERS(sys/cdefs.h)
 
 MOZ_LINUX_PERF_EVENT
 
 dnl Checks for libraries.
 dnl ========================================================
-case $target in
-*-hpux11.*)
-	;;
-*)
-	AC_CHECK_LIB(c_r, gethostbyname_r)
-	;;
-esac
+AC_CHECK_LIB(c_r, gethostbyname_r)
 
 dnl We don't want to link with libdl even if it's present on OS X, since
 dnl it's not used and not part of the default installation. OS/2 has dlfcn
@@ -1582,15 +1478,7 @@ case $target in
 esac
 
 if test ! "$GNU_CXX"; then
-
-    case $target in
-    *-aix*)
-	AC_CHECK_LIB(C_r, demangle)
-	;;
-     *)
-	AC_CHECK_LIB(C, demangle)
-	;;
-     esac
+    AC_CHECK_LIB(C, demangle)
 fi
 
 AC_CHECK_LIB(socket, socket)
@@ -1703,21 +1591,6 @@ then
 			AC_DEFINE(_REENTRANT)
 			;;
 
-	    *-aix4.3*|*-aix5*)
-			AC_DEFINE(_REENTRANT)
-			;;
-
-	    *-hpux11.*)
-			AC_DEFINE(_REENTRANT)
-			;;
-
-	    *-*-solaris*)
-			AC_DEFINE(_REENTRANT)
-			if test "$SOLARIS_SUNPRO_CC"; then
-				CFLAGS="$CFLAGS -mt"
-				CXXFLAGS="$CXXFLAGS -mt"
-			fi
-			;;
 	esac
     LDFLAGS="${_PTHREAD_LDFLAGS} ${LDFLAGS}"
 fi
@@ -2258,9 +2131,6 @@ if test "$MOZ_MEMORY"; then
     ;;
   *-netbsd*)
     AC_DEFINE(MOZ_MEMORY_BSD)
-    ;;
-  *-solaris*)
-    AC_DEFINE(MOZ_MEMORY_SOLARIS)
     ;;
   *-mingw*)
     AC_DEFINE(MOZ_MEMORY_WINDOWS)
