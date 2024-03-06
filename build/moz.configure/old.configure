@@ -211,7 +211,6 @@ def old_configure_options(*options):
     '--enable-jemalloc',
     '--enable-jemalloc-lib',
     '--enable-jitspew',
-    '--enable-jprof',
     '--enable-jxr',
     '--enable-libjpeg-turbo',
     '--enable-libproxy',
