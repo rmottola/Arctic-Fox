@@ -993,6 +993,13 @@ var DebuggerServer = {
     // provides hook to actor modules that need to exchange messages
     // between e10s parent and child processes
     let onSetupInParent = function (msg) {
+      // We may have multiple connectToChild instance running for the same tab
+      // and need to filter the messages. Also the DebuggerServerConnection's
+      // prefix has an additional '/' and the end, so use `includes`.
+      if (!msg.json.prefix.includes(prefix)) {
+        return;
+      }
+
       let { module, setupParent } = msg.json;
       let m, fn;
 
@@ -1776,7 +1783,7 @@ DebuggerServerConnection.prototype = {
    * @return boolean
    *         true if the setup helper returned successfully
    */
-  setupInParent: function({ conn, module, setupParent }) {
+  setupInParent: function({ module, setupParent }) {
     if (!this.parentMessageManager) {
       return false;
     }
@@ -1784,6 +1791,7 @@ DebuggerServerConnection.prototype = {
     let { sendSyncMessage } = this.parentMessageManager;
 
     return sendSyncMessage("debug:setup-in-parent", {
+      prefix: this.prefix,
       module: module,
       setupParent: setupParent
     });
