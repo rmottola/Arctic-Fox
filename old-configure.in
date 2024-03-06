@@ -97,29 +97,6 @@ DIST="$MOZ_BUILD_ROOT/dist"
 
 MOZ_DEFAULT_COMPILER
 
-AC_SUBST(GAIADIR)
-if test -n "$GAIADIR" ; then
-    AC_DEFINE(PACKAGE_GAIA)
-fi
-
-if test -n "$FXOS_SIMULATOR" -a -z "$GAIADIR" ; then
-    AC_MSG_ERROR([FXOS_SIMULATOR=1 requires GAIADIR to be defined])
-fi
-
-if test -n "$FXOS_SIMULATOR" ; then
-    AC_DEFINE(FXOS_SIMULATOR)
-    AC_SUBST(FXOS_SIMULATOR)
-fi
-
-if test -n "$MOZTTDIR" -a ! -d "$MOZTTDIR" ; then
-    AC_MSG_ERROR([MOZTTDIR '$MOZTTDIR' isn't a valid directory])
-fi
-
-AC_SUBST(MOZTTDIR)
-if test -n "$MOZTTDIR" ; then
-    AC_DEFINE(PACKAGE_MOZTT)
-fi
-
 MOZ_ARG_WITH_STRING(gonk-toolchain-prefix,
 [  --with-gonk-toolchain-prefix=DIR
                           prefix to gonk toolchain commands],
@@ -6401,6 +6378,29 @@ if test -n "$MOZ_DISABLE_PRECOMPILED_STARTUPCACHE"; then
 fi
 
 AC_SUBST(MOZ_DISABLE_PRECOMPILED_STARTUPCACHE)
+
+dnl =========================================
+dnl = Enable packaging Gaia with B2G desktop
+dnl =========================================
+if test x"$MOZ_WIDGET_TOOLKIT" != x"gonk"; then
+    if test -n "$GAIADIR" -a ! -d "$GAIADIR" ; then
+        AC_MSG_ERROR([GAIADIR '$GAIADIR' isn't a valid directory])
+    fi
+
+    AC_SUBST(GAIADIR)
+    if test -n "$GAIADIR" ; then
+        AC_DEFINE(PACKAGE_GAIA)
+    fi
+
+    if test -n "$FXOS_SIMULATOR" -a -z "$GAIADIR" ; then
+        AC_MSG_ERROR([FXOS_SIMULATOR=1 requires GAIADIR to be defined])
+    fi
+
+    if test -n "$FXOS_SIMULATOR" ; then
+        AC_DEFINE(FXOS_SIMULATOR)
+        AC_SUBST(FXOS_SIMULATOR)
+    fi
+fi
 
 dnl ========================================================
 dnl = Enable Radio Interface for B2G (Gonk usually)
