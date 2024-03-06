@@ -5,6 +5,7 @@
 
 import concurrent.futures
 import mock
+import mozunit
 import os
 import platform
 import shutil
@@ -528,5 +529,5 @@ if __name__ == '__main__':
     # that our mocking/module-patching works.
     symbolstore.Dumper.GlobalInit(concurrent.futures.ThreadPoolExecutor)
 
-    unittest.main()
+    mozunit.main()
 
