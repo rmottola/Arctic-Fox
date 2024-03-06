@@ -17,6 +17,3 @@ ac_add_options --enable-release
 ac_add_options --enable-js-shell
 
 . "$topsrcdir/build/mozconfig.automation"
-
-# Temporarily enable building the new Performance++ tool.
-ac_add_options --enable-devtools-perf
