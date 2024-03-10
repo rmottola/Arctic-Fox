@@ -528,6 +528,13 @@ CompositorVsyncScheduler::Composite(TimeStamp aVsyncTimestamp)
     mCurrentCompositeTask = nullptr;
   }
 
+  if ((aVsyncTimestamp < mLastCompose) && !mAsapScheduling) {
+    // We can sometimes get vsync timestamps that are in the past
+    // compared to the last compose with force composites.
+    // In those cases, wait until the next vsync;
+    return;
+  }
+
   DispatchTouchEvents(aVsyncTimestamp);
   DispatchVREvents(aVsyncTimestamp);
 
@@ -565,6 +572,7 @@ CompositorVsyncScheduler::OnForceComposeToTarget()
 void
 CompositorVsyncScheduler::ForceComposeToTarget(gfx::DrawTarget* aTarget, const IntRect* aRect)
 {
+  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
   OnForceComposeToTarget();
   mLastCompose = TimeStamp::Now();
   ComposeToTarget(aTarget, aRect);
@@ -652,6 +660,7 @@ CompositorVsyncScheduler::ScheduleTask(CancelableTask* aTask, int aTime)
 void
 CompositorVsyncScheduler::ResumeComposition()
 {
+  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
   mLastCompose = TimeStamp::Now();
   ComposeToTarget(nullptr);
 }
