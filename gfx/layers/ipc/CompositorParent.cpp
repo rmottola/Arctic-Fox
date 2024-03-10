@@ -2103,7 +2103,7 @@ CompositorParent::DidComposite(TimeStamp& aCompositeStart,
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   ForEachIndirectLayerTree([&] (LayerTreeState* lts, const uint64_t& aLayersId) -> void {
     if (lts->mCrossProcessParent) {
-      auto cpcp = static_cast<CrossProcessCompositorParent*>(lts->mCrossProcessParent);
+      CrossProcessCompositorParent* cpcp = lts->mCrossProcessParent;
       cpcp->DidComposite(aLayersId, aCompositeStart, aCompositeEnd);
     }
   });
@@ -2119,7 +2119,7 @@ CompositorParent::InvalidateRemoteLayers()
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   ForEachIndirectLayerTree([] (LayerTreeState* lts, const uint64_t& aLayersId) -> void {
     if (lts->mCrossProcessParent) {
-      auto cpcp = static_cast<CrossProcessCompositorParent*>(lts->mCrossProcessParent);
+      CrossProcessCompositorParent* cpcp = lts->mCrossProcessParent;
       Unused << cpcp->SendInvalidateLayers(aLayersId);
     }
   });
@@ -2686,11 +2686,10 @@ CrossProcessCompositorParent::SetConfirmedTargetAPZC(const LayerTransactionParen
   uint64_t id = aLayerTree->GetId();
   MOZ_ASSERT(id != 0);
   const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(id);
-  if (!state) {
+  if (!state || !state->mParent) {
     return;
   }
 
-  MOZ_ASSERT(state->mParent);
   state->mParent->SetConfirmedTargetAPZC(aLayerTree, aInputBlockId, aTargets);
 }
 
