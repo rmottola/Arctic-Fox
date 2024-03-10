@@ -34,7 +34,7 @@ def jprof(value):
 
 @depends(target)
 def sps_profiler(target):
-    return  # FIXME hack
+    return False # FIXME hack
     if target.os == 'Android':
         return target.cpu in ('arm', 'x86')
     elif target.kernel == 'Linux':
@@ -223,14 +223,20 @@ def fc_freetype(value, toolkit):
 
 # Apple platform decoder support
 # ==============================================================
-@depends(toolkit)
-def applemedia(toolkit):
-    if toolkit in ('cocoa', 'uikit'):
+# We should perhaos use configure test on CoreMedia.h
+option('--disable-applemedia',
+       help='Disable support Apple Media')
+
+@depends('--disable-applemedia', toolkit)
+def applemedia(value, toolkit):
+    enabled = bool(value)
+    if value.origin == 'default':
+       enabled =  toolkit in ('cocoa', 'uikit')
+    if enabled:
         set_config('MOZ_APPLEMEDIA', '1')
         set_define('MOZ_APPLEMEDIA', '1')
         add_old_configure_assignment('MOZ_APPLEMEDIA', '1')
-        return True
-    return False
+    return enabled
 
 
 # Windows Media Foundation support
