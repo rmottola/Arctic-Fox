@@ -115,7 +115,7 @@ using namespace mozilla::widget;
 #include "Layers.h"
 #include "GLContextProvider.h"
 #include "mozilla/gfx/2D.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 
 #ifdef MOZ_X11
 #include "gfxXlibSurface.h"
@@ -2143,7 +2143,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         ? static_cast<ClientLayerManager*>(GetLayerManager())
         : nullptr;
 
-    if (clientLayers && mCompositorParent) {
+    if (clientLayers && mCompositorBridgeParent) {
         // We need to paint to the screen even if nothing changed, since if we
         // don't have a compositing window manager, our pixels could be stale.
         clientLayers->SetNeedsComposite(true);
@@ -2168,8 +2168,8 @@ nsWindow::OnExposeEvent(cairo_t *cr)
             return FALSE;
     }
 
-    if (clientLayers && mCompositorParent && clientLayers->NeedsComposite()) {
-        mCompositorParent->ScheduleRenderOnCompositorThread();
+    if (clientLayers && mCompositorBridgeParent && clientLayers->NeedsComposite()) {
+        mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
         clientLayers->SetNeedsComposite(false);
     }
 

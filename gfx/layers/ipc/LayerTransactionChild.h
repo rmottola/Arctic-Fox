@@ -84,7 +84,7 @@ protected:
     mIPCOpen = false;
     Release();
   }
-  friend class CompositorChild;
+  friend class CompositorBridgeChild;
   friend class layout::RenderFrameChild;
 
   ShadowLayerForwarder* mForwarder;

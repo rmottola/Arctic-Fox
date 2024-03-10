@@ -33,7 +33,7 @@
 #include "mozilla/layers/APZCCallbackHelper.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/APZEventState.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/DoubleTapToZoom.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/InputAPZContext.h"
@@ -1213,7 +1213,7 @@ TabChild::ActorDestroy(ActorDestroyReason why)
     mTabChildGlobal->mMessageManager = nullptr;
   }
 
-  CompositorChild* compositorChild = static_cast<CompositorChild*>(CompositorChild::Get());
+  CompositorBridgeChild* compositorChild = static_cast<CompositorBridgeChild*>(CompositorBridgeChild::Get());
   compositorChild->CancelNotifyAfterRemotePaint(this);
 
   if (GetTabId() != 0) {
@@ -2556,9 +2556,9 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
 
     // Pushing layers transactions directly to a separate
     // compositor context.
-    PCompositorBridgeChild* compositorChild = CompositorChild::Get();
+    PCompositorBridgeChild* compositorChild = CompositorBridgeChild::Get();
     if (!compositorChild) {
-      NS_WARNING("failed to get CompositorChild instance");
+      NS_WARNING("failed to get CompositorBridgeChild instance");
       PRenderFrameChild::Send__delete__(remoteFrame);
       return false;
     }
@@ -2664,7 +2664,7 @@ TabChild::NotifyPainted()
 void
 TabChild::MakeVisible()
 {
-  CompositorChild* compositor = CompositorChild::Get();
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
   if (UsingCompositorLRU()) {
     compositor->SendNotifyVisible(mLayersId);
   }
@@ -2677,12 +2677,12 @@ TabChild::MakeVisible()
 void
 TabChild::MakeHidden()
 {
-  CompositorChild* compositor = CompositorChild::Get();
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
   if (UsingCompositorLRU()) {
     compositor->SendNotifyHidden(mLayersId);
   } else {
     // Clear cached resources directly. This avoids one extra IPC
-    // round-trip from CompositorChild to CompositorParent when
+    // round-trip from CompositorBridgeChild to CompositorBridgeParent when
     // CompositorLRU is not used.
     compositor->RecvClearCachedResources(mLayersId);
   }
@@ -2917,10 +2917,10 @@ TabChild::OnHideTooltip()
 bool
 TabChild::RecvRequestNotifyAfterRemotePaint()
 {
-  // Get the CompositorChild instance for this content thread.
-  CompositorChild* compositor = CompositorChild::Get();
+  // Get the CompositorBridgeChild instance for this content thread.
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
 
-  // Tell the CompositorChild that, when it gets a RemotePaintIsReady
+  // Tell the CompositorBridgeChild that, when it gets a RemotePaintIsReady
   // message that it should forward it us so that we can bounce it to our
   // RenderFrameParent.
   compositor->RequestNotifyAfterRemotePaint(this);

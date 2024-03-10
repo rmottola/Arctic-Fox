@@ -18,7 +18,7 @@
 #include "mozilla/layers/APZThreadUtils.h"  // for AssertOnCompositorThread, etc
 #include "mozilla/layers/AsyncCompositionManager.h" // for ViewTransform
 #include "mozilla/layers/AsyncDragMetrics.h" // for AsyncDragMetrics
-#include "mozilla/layers/CompositorParent.h" // for CompositorParent, etc
+#include "mozilla/layers/CompositorBridgeParent.h" // for CompositorBridgeParent, etc
 #include "mozilla/layers/LayerMetricsWrapper.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/mozalloc.h"           // for operator new
@@ -54,7 +54,7 @@ typedef mozilla::gfx::Matrix4x4 Matrix4x4;
 float APZCTreeManager::sDPI = 160.0;
 
 struct APZCTreeManager::TreeBuildingState {
-  TreeBuildingState(CompositorParent* aCompositor,
+  TreeBuildingState(CompositorBridgeParent* aCompositor,
                     bool aIsFirstPaint, uint64_t aOriginatingLayersId,
                     APZTestData* aTestData, uint32_t aPaintSequence)
     : mCompositor(aCompositor)
@@ -65,7 +65,7 @@ struct APZCTreeManager::TreeBuildingState {
   }
 
   // State that doesn't change as we recurse in the tree building
-  CompositorParent* const mCompositor;
+  CompositorBridgeParent* const mCompositor;
   const bool mIsFirstPaint;
   const uint64_t mOriginatingLayersId;
   const APZPaintLogHelper mPaintLogger;
@@ -130,7 +130,7 @@ APZCTreeManager::SetAllowedTouchBehavior(uint64_t aInputBlockId,
 }
 
 void
-APZCTreeManager::UpdateHitTestingTree(CompositorParent* aCompositor,
+APZCTreeManager::UpdateHitTestingTree(CompositorBridgeParent* aCompositor,
                                       Layer* aRoot,
                                       bool aIsFirstPaint,
                                       uint64_t aOriginatingLayersId,
@@ -144,7 +144,7 @@ APZCTreeManager::UpdateHitTestingTree(CompositorParent* aCompositor,
   // the layers id that originated this update.
   APZTestData* testData = nullptr;
   if (gfxPrefs::APZTestLoggingEnabled()) {
-    if (CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(aOriginatingLayersId)) {
+    if (CompositorBridgeParent::LayerTreeState* state = CompositorBridgeParent::GetIndirectShadowTree(aOriginatingLayersId)) {
       testData = &state->mApzTestData;
       testData->StartNewPaint(aPaintSequenceNumber);
     }
@@ -350,7 +350,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     needsApzc = false;
   }
 
-  const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(aLayersId);
+  const CompositorBridgeParent::LayerTreeState* state = CompositorBridgeParent::GetIndirectShadowTree(aLayersId);
   if (!(state && state->mController.get())) {
     needsApzc = false;
   }
@@ -437,7 +437,7 @@ APZCTreeManager::PrepareNodeForLayer(const LayerMetricsWrapper& aLayer,
     bool newApzc = (apzc == nullptr || apzc->IsDestroyed());
     if (newApzc) {
       apzc = NewAPZCInstance(aLayersId, state->mController);
-      apzc->SetCompositorParent(aState.mCompositor);
+      apzc->SetCompositorBridgeParent(aState.mCompositor);
       if (state->mCrossProcessParent != nullptr) {
         apzc->ShareFrameMetricsAcrossProcesses();
       }
@@ -642,7 +642,8 @@ APZCTreeManager::FlushApzRepaints(uint64_t aLayersId)
   // ensure any pending paints were flushed. Now, paints are flushed
   // immediately, so it is safe to simply send a notification now.
   APZCTM_LOG("Flushing repaints for layers id %" PRIu64, aLayersId);
-  const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(aLayersId);
+  const CompositorBridgeParent::LayerTreeState* state =
+    CompositorBridgeParent::GetIndirectShadowTree(aLayersId);
   MOZ_ASSERT(state && state->mController);
   NS_DispatchToMainThread(NS_NewRunnableMethod(
     state->mController.get(), &GeckoContentController::NotifyFlushComplete));
