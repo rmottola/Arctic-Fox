@@ -867,9 +867,7 @@ TabChild::NotifyTabContextUpdated()
         // UNKNOWN_APP_ID for aOwnOrContainingAppId.
         if (IsMozBrowserElement()) {
           docShell->SetIsBrowserInsideApp(BrowserOwnerAppId());
-          // TODO: Wants to call TabContext::IsIsolatedMozBrowserElement() based
-          // on isolation in principal, which is added in a later patch.
-          docShell->SetIsInIsolatedMozBrowserElement(IsMozBrowserElement());
+          docShell->SetIsInIsolatedMozBrowserElement(IsIsolatedMozBrowserElement());
         } else {
           docShell->SetIsApp(OwnAppId());
         }
