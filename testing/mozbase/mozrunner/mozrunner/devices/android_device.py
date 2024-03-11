@@ -554,8 +554,6 @@ class AndroidEmulator(object):
         if self.substs:
             if not self.substs['TARGET_CPU'].startswith('arm'):
                 return 'x86'
-            if self.substs['MOZ_ANDROID_MIN_SDK_VERSION'] == '9':
-                return '2.3'
         return '4.3'
 
 def _find_sdk_exe(substs, exe, tools):
