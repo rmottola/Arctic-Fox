@@ -64,6 +64,7 @@
 #include "mozilla/dom/mobileconnection/MobileConnectionParent.h"
 #include "mozilla/dom/mobilemessage/SmsParent.h"
 #include "mozilla/dom/power/PowerManagerService.h"
+#include "mozilla/dom/Permissions.h"
 #include "mozilla/dom/PresentationParent.h"
 #include "mozilla/dom/PPresentationParent.h"
 #include "mozilla/dom/quota/QuotaManagerService.h"
@@ -1054,6 +1055,14 @@ ContentParent::RecvUngrabPointer(const uint32_t& aTime)
   gdk_pointer_ungrab(aTime);
   return true;
 #endif
+}
+
+bool
+ContentParent::RecvRemovePermission(const IPC::Principal& aPrincipal,
+                                    const nsCString& aPermissionType,
+                                    nsresult* aRv) {
+  *aRv = Permissions::RemovePermission(aPrincipal, aPermissionType.get());
+  return true;
 }
 
 bool
