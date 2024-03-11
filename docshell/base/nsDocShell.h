@@ -1002,9 +1002,6 @@ protected:
   // Are we a regular frame, a browser frame, or an app frame?
   uint32_t mFrameType;
 
-  // Whether we are in an isolated mozbrowser frame.
-  bool mIsInIsolatedMozBrowser;
-
   nsString mPaymentRequestId;
 
   nsString GetInheritedPaymentRequestId();
