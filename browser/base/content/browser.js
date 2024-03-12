@@ -7567,6 +7567,7 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams={}) {
   // Certain URLs can be switched to irrespective of the source or destination
   // window being in private browsing mode:
   const kPrivateBrowsingWhitelist = new Set([
+    "about:addons",
     "about:customizing",
   ]);
 
