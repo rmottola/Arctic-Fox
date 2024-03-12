@@ -1524,6 +1524,7 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
   nsAutoCString uri;
   aURI->GetSpec(uri);
   if (uri.Find("enablejsapi=1", true, 0, -1) != kNotFound) {
+    Telemetry::Accumulate(Telemetry::YOUTUBE_NONREWRITABLE_EMBED_SEEN, 1);
     return;
   }
 
@@ -1542,8 +1543,12 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
       replaceQuery = true;
     }
   }
- 
-  // If we're pref'd off, just return.
+
+  // If we've made it this far, we've got a rewritable embed. Log it in
+  // telemetry.
+  Telemetry::Accumulate(Telemetry::YOUTUBE_REWRITABLE_EMBED_SEEN, 1);
+
+  // If we're pref'd off, return after telemetry has been logged.
   if (!Preferences::GetBool(kPrefYoutubeRewrite)) {
     return;
   }
