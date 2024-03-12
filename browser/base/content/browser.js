@@ -7774,48 +7774,6 @@ function safeModeRestart() {
   Services.obs.notifyObservers(null, "restart-in-safe-mode", "");
 }
 
-let PanicButtonNotifier = {
-  init: function() {
-    this._initialized = true;
-    if (window.PanicButtonNotifierShouldNotify) {
-      delete window.PanicButtonNotifierShouldNotify;
-      this.notify();
-    }
-  },
-  notify: function() {
-    if (!this._initialized) {
-      window.PanicButtonNotifierShouldNotify = true;
-      return;
-    }
-    // Display notification panel here...
-    try {
-      let popup = document.getElementById("panic-button-success-notification");
-      popup.hidden = false;
-      let widget = CustomizableUI.getWidget("panic-button").forWindow(window);
-      let anchor = widget.anchor;
-      anchor = document.getAnonymousElementByAttribute(anchor, "class", "toolbarbutton-icon");
-      popup.openPopup(anchor, popup.getAttribute("position"));
-    } catch (ex) {
-      Cu.reportError(ex);
-    }
-  },
-  close: function() {
-    let popup = document.getElementById("panic-button-success-notification");
-    popup.hidePopup();
-  },
-};
-
-let AboutPrivateBrowsingListener = {
-  init: function () {
-    window.messageManager.addMessageListener(
-      "AboutPrivateBrowsing:OpenPrivateWindow",
-      msg => {
-        OpenBrowserWindow({private: true});
-    });
-  }
-};
-
-
 /* duplicateTabIn duplicates tab in a place specified by the parameter |where|.
  *
  * |where| can be:
@@ -8060,6 +8018,47 @@ var ToolbarIconColor = {
     gPrefService.clearUserPref("ui.colorChanged");
   }
 }
+
+var PanicButtonNotifier = {
+  init: function() {
+    this._initialized = true;
+    if (window.PanicButtonNotifierShouldNotify) {
+      delete window.PanicButtonNotifierShouldNotify;
+      this.notify();
+    }
+  },
+  notify: function() {
+    if (!this._initialized) {
+      window.PanicButtonNotifierShouldNotify = true;
+      return;
+    }
+    // Display notification panel here...
+    try {
+      let popup = document.getElementById("panic-button-success-notification");
+      popup.hidden = false;
+      let widget = CustomizableUI.getWidget("panic-button").forWindow(window);
+      let anchor = widget.anchor;
+      anchor = document.getAnonymousElementByAttribute(anchor, "class", "toolbarbutton-icon");
+      popup.openPopup(anchor, popup.getAttribute("position"));
+    } catch (ex) {
+      Cu.reportError(ex);
+    }
+  },
+  close: function() {
+    let popup = document.getElementById("panic-button-success-notification");
+    popup.hidePopup();
+  },
+};
+
+var AboutPrivateBrowsingListener = {
+  init: function () {
+    window.messageManager.addMessageListener(
+      "AboutPrivateBrowsing:OpenPrivateWindow",
+      msg => {
+        OpenBrowserWindow({private: true});
+    });
+  }
+};
 
 function TabModalPromptBox(browser) {
   this._weakBrowserRef = Cu.getWeakReference(browser);
