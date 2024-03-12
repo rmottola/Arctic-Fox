@@ -2500,7 +2500,12 @@ function URLBarSetURI(aURI) {
         checkEmptyPageOrigin(gBrowser.selectedBrowser, uri)) {
       value = "";
     } else {
-      value = losslessDecodeURI(uri);
+      // We should deal with losslessDecodeURI throwing for exotic URIs
+      try {
+        value = losslessDecodeURI(uri);
+      } catch (ex) {
+        value = "about:blank";
+      }
     }
 
     valid = !isBlankPageURL(uri.spec);
