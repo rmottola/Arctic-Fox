@@ -22,8 +22,6 @@
     locale/browser/baseMenuOverlay.dtd             (%chrome/browser/baseMenuOverlay.dtd)
     locale/browser/charsetOverlay.dtd              (%chrome/browser/charsetOverlay.dtd)
     locale/browser/browser.properties              (%chrome/browser/browser.properties)
-    locale/browser/charsetMenu.properties          (%chrome/browser/charsetMenu.properties)
-    locale/browser/charsetMenu.dtd                 (%chrome/browser/charsetMenu.dtd)
     locale/browser/newTab.dtd                      (%chrome/browser/newTab.dtd)
     locale/browser/newTab.properties               (%chrome/browser/newTab.properties)
     locale/browser/openLocation.dtd                (%chrome/browser/openLocation.dtd)

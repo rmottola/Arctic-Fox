@@ -204,9 +204,9 @@
 
           <!-- Charset Menu -->
           <menu id="charsetMenu"
-                label="&charsetMenu.label;"
-                accesskey="&charsetMenu.accesskey;"
-		oncommand="viewSourceChrome.onSetCharacterSet(event);"
+                label="&charsetMenu2.label;"
+                accesskey="&charsetMenu2.accesskey;"
+                oncommand="viewSourceChrome.onSetCharacterSet(event);"
                 onpopupshowing="CharsetMenu.build(event.target);"
                 onpopupshown="CharsetMenu.update(event.target, content.document.characterSet);">
             <menupopup/>
