@@ -128,6 +128,8 @@ var WebProgressListener = {
     // the documentURI.
     if (aWebProgress && aWebProgress.isTopLevel) {
       json.documentURI = content.document.documentURIObject.spec;
+      json.charset = content.document.characterSet;
+      json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
     }
 
     this._send("Content:StateChange", json, objects);
@@ -491,6 +493,11 @@ addMessageListener("Browser:Thumbnail:CheckState", function (aMessage) {
   sendAsyncMessage("Browser:Thumbnail:CheckState:Response", {
     result: result
   });
+});
+
+addMessageListener("UpdateCharacterSet", function (aMessage) {
+  docShell.charset = aMessage.data.value;
+  docShell.gatherCharsetMenuTelemetry();
 });
 
 // The AddonsChild needs to be rooted so that it stays alive as long as
