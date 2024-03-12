@@ -529,6 +529,7 @@ child:
 
     async UpdateDimensions(CSSRect rect, CSSSize size,
                            ScreenOrientationInternal orientation,
+                           LayoutDeviceIntPoint clientOffset,
                            LayoutDeviceIntPoint chromeDisp) compressall;
 
     async SizeModeChanged(nsSizeMode sizeMode);
