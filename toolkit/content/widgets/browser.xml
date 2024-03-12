@@ -304,7 +304,7 @@
         <getter>
           <![CDATA[
             var document = this.contentDocument;
-            if (!document || !(document instanceof Ci.nsIImageDocument))
+            if (!document || !(document instanceof Components.interfaces.nsIImageDocument))
               return null;
 
             try {
