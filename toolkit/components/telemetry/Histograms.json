@@ -65,15 +65,15 @@
   "AUDIOSTREAM_FIRST_OPEN_MS": {
     "expires_in_version": "50",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "50",
+    "high": 10000,
+    "n_buckets": 50,
     "description": "The length of time (in milliseconds) for the first open of AudioStream."
   },
   "AUDIOSTREAM_LATER_OPEN_MS": {
     "expires_in_version": "50",
     "kind": "exponential",
-    "high": "10000",
-    "n_buckets": "50",
+    "high": 10000,
+    "n_buckets": 50,
     "description": "The length of time (in milliseconds) for the subsequent opens of AudioStream."
   },
   "BACKGROUNDFILESAVER_THREAD_COUNT": {
@@ -1456,14 +1456,14 @@
     "expires_in_version": "never",
     "kind": "exponential",
     "low": 20,
-    "high": "20000",
+    "high": 20000,
     "n_buckets": 50,
     "description": "SPDY: SYN Frame Header Size"
   },
   "SPDY_SYN_RATIO": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "99",
+    "high": 99,
     "n_buckets": 20,
     "description": "SPDY: SYN Frame Header Ratio (lower better)"
   },
@@ -1471,14 +1471,14 @@
     "expires_in_version": "never",
     "kind": "exponential",
     "low": 16,
-    "high": "20000",
+    "high": 20000,
     "n_buckets": 50,
     "description": "SPDY: SYN Reply Header Size"
   },
   "SPDY_SYN_REPLY_RATIO": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "99",
+    "high": 99,
     "n_buckets": 20,
     "description": "SPDY: SYN Reply Header Ratio (lower better)"
   },
@@ -1495,56 +1495,56 @@
   "SPDY_KBREAD_PER_CONN": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 50,
     "description": "SPDY: KB read per connection"
   },
   "SPDY_SETTINGS_UL_BW": {
     "expires_in_version": "42",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 100,
     "description": "SPDY: Settings Upload Bandwidth"
   },
   "SPDY_SETTINGS_DL_BW": {
     "expires_in_version": "42",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 100,
     "description": "SPDY: Settings Download Bandwidth"
   },
   "SPDY_SETTINGS_RTT": {
     "expires_in_version": "42",
     "kind": "exponential",
-    "high": "1000",
+    "high": 1000,
     "n_buckets": 100,
     "description": "SPDY: Settings RTT"
   },
   "SPDY_SETTINGS_MAX_STREAMS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 100,
     "description": "H2: Settings Max Streams parameter"
   },
   "SPDY_SETTINGS_CWND": {
     "expires_in_version": "42",
     "kind": "exponential",
-    "high": "500",
+    "high": 500,
     "n_buckets": 50,
     "description": "SPDY: Settings CWND (packets)"
   },
   "SPDY_SETTINGS_RETRANS": {
     "expires_in_version": "42",
     "kind": "exponential",
-    "high": "100",
+    "high": 100,
     "n_buckets": 50,
     "description": "SPDY: Retransmission Rate"
   },
   "SPDY_SETTINGS_IW": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "1000",
+    "high": 1000,
     "n_buckets": 50,
     "description": "H2: Settings Initial Window (rounded to KB)"
   },
@@ -1624,21 +1624,21 @@
   "HTTP_CACHE_ENTRY_RELOAD_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "900000",
+    "high": 900000,
     "n_buckets": 50,
     "description": "Time before we reload an HTTP cache entry again to memory"
   },
   "HTTP_CACHE_ENTRY_ALIVE_TIME": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "7200000",
+    "high": 7200000,
     "n_buckets": 50,
     "description": "Time for which an HTTP cache entry is kept warmed in memory"
   },
   "HTTP_CACHE_ENTRY_REUSE_COUNT": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "20",
+    "high": 20,
     "n_buckets": 19,
     "description": "Reuse count of an HTTP cache entry warmed in memory"
   },
@@ -1662,21 +1662,21 @@
   "CACHE_DEVICE_SEARCH_2": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time to search cache (ms)"
   },
   "CACHE_MEMORY_SEARCH_2": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time to search memory cache (ms)"
   },
   "CACHE_DISK_SEARCH_2": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time to search disk cache (ms)"
   },
@@ -1907,35 +1907,35 @@
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHESERVICE_SETMEMORYCACHEMAXENTRYSIZE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHESERVICE_SETMEMORYCACHEMAXENTRYSIZE"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHESERVICE_SETDISKCACHEENABLED": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHESERVICE_SETDISKCACHEENABLED"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHESERVICE_SETDISKCACHECAPACITY": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHESERVICE_SETDISKCACHECAPACITY"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHESERVICE_OPENCACHEENTRY": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHESERVICE_OPENCACHEENTRY"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHESERVICE_ONPROFILESHUTDOWN": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHESERVICE_ONPROFILESHUTDOWN"
   },
@@ -2019,56 +2019,56 @@
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_SETDATASIZE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_SETDATASIZE"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_OPENINPUTSTREAM": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_OPENINPUTSTREAM"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_OPENOUTPUTSTREAM": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_OPENOUTPUTSTREAM"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_GETCACHEELEMENT": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_GETCACHEELEMENT"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_SETCACHEELEMENT": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_SETCACHEELEMENT"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_GETSTORAGEPOLICY": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_GETSTORAGEPOLICY"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_SETSTORAGEPOLICY": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_SETSTORAGEPOLICY"
   },
   "CACHE_SERVICE_LOCK_WAIT_MAINTHREAD_NSCACHEENTRYDESCRIPTOR_GETFILE": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10 * 1000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent waiting on the cache service lock (ms) on the main thread in NSCACHEENTRYDESCRIPTOR_GETFILE"
   },
@@ -2814,16 +2814,16 @@
   "FLASH_PLUGIN_WIDTH": {
     "expires_in_version": "50",
     "kind": "linear",
-    "low": "1",
-    "high": "2000",
+    "low": 1,
+    "high": 2000,
     "n_buckets": 50,
     "description": "Flash object width"
   },
   "FLASH_PLUGIN_HEIGHT": {
     "expires_in_version": "50",
     "kind": "linear",
-    "low": "1",
-    "high": "2000",
+    "low": 1,
+    "high": 2000,
     "n_buckets": 50,
     "description": "Flash object height"
   },
@@ -2836,28 +2836,28 @@
   "MOZ_SQLITE_OPEN_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite open() (ms)"
   },
   "MOZ_SQLITE_OPEN_MAIN_THREAD_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite open() (ms) *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
   "MOZ_SQLITE_TRUNCATE_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite truncate() (ms) *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
   "MOZ_SQLITE_TRUNCATE_MAIN_THREAD_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite truncate() (ms) *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
@@ -2920,35 +2920,35 @@
   "MOZ_SQLITE_WEBAPPS_READ_MAIN_THREAD_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite read() (ms) *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
   "MOZ_SQLITE_OTHER_WRITE_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite write() (ms)"
   },
   "MOZ_SQLITE_OTHER_WRITE_MAIN_THREAD_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite write() (ms)"
   },
   "MOZ_SQLITE_PLACES_WRITE_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite write() (ms)"
   },
   "MOZ_SQLITE_PLACES_WRITE_MAIN_THREAD_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time spent on SQLite write() (ms) *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
@@ -4022,7 +4022,7 @@
   "FX_IDENTITY_POPUP_OPEN_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "1000",
+    "high": 1000,
     "n_buckets": 10,
     "description": "Firefox: Time taken by the identity popup to open in milliseconds"
   },
@@ -4030,7 +4030,7 @@
     "expires_in_version": "never",
     "kind": "exponential",
     "low": 50,
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 10,
     "description": "Firefox: Time to initialize the bookmarks toolbar view (ms)"
   },
@@ -4042,16 +4042,16 @@
   "FX_NEW_WINDOW_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 20,
     "description": "Firefox: Time taken to open a new browser window (ms)"
   },
   "FX_PAGE_LOAD_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 20,
-    "description": "Firefox: Time taken to load a page (ms)"
+    "description": "Firefox: Time taken to load a page (ms). This includes all static contents, no dynamic content. Loading of about: pages is not counted."
   },
   "FX_TOTAL_TOP_VISITS": {
     "expires_in_version": "default",
@@ -4468,14 +4468,14 @@
   "LOCALDOMSTORAGE_INIT_DATABASE_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time to open the localStorage database (ms)"
   },
   "LOCALDOMSTORAGE_SHUTDOWN_DATABASE_MS": {
     "expires_in_version": "default",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time to flush and close the localStorage database (ms)"
   },
@@ -4487,14 +4487,14 @@
   "LOCALDOMSTORAGE_GETALLKEYS_BLOCKING_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time to block before we return a list of all keys in domain's LocalStorage (ms)"
   },
   "LOCALDOMSTORAGE_GETKEY_BLOCKING_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Time to block before we return a key name in domain's LocalStorage (ms)"
   },
@@ -4575,7 +4575,7 @@
     "expires_in_version": "40",
     "kind": "exponential",
     "low": 1024,
-    "high": "32768",
+    "high": 32768,
     "n_buckets": 10,
     "description": "DOM storage: size of values stored in sessionStorage"
   },
@@ -4583,7 +4583,7 @@
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Number of histograms with range checksum errors"
   },
@@ -4591,7 +4591,7 @@
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Number of histograms with bucket order errors"
   },
@@ -4599,7 +4599,7 @@
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Number of histograms with total count high errors"
   },
