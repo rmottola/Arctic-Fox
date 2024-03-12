@@ -3082,7 +3082,8 @@ nsObjectLoadingContent::LoadFallback(FallbackType aType, bool aNotify) {
     aType = eFallbackAlternate;
   }
 
-  if (thisContent->IsHTMLElement(nsGkAtoms::object) &&
+  if ((thisContent->IsHTMLElement(nsGkAtoms::object) ||
+       thisContent->IsHTMLElement(nsGkAtoms::applet)) &&
       (aType == eFallbackUnsupported ||
        aType == eFallbackDisabled ||
        aType == eFallbackBlocklisted))
