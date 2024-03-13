@@ -3,7 +3,7 @@
 
 'use strict';
 
-let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
 Cu.import('resource://gre/modules/Services.jsm');
@@ -13,6 +13,11 @@ Cu.import('resource://gre/modules/Promise.jsm');
 Cu.import('resource://gre/modules/Preferences.jsm');
 Cu.import('resource://gre/modules/PlacesUtils.jsm');
 Cu.import('resource://gre/modules/ObjectUtils.jsm');
+
+XPCOMUtils.defineLazyModuleGetter(this, 'PlacesTestUtils',
+                                  'resource://testing-common/PlacesTestUtils.jsm');
+XPCOMUtils.defineLazyServiceGetter(this, 'PushServiceComponent',
+                                   '@mozilla.org/push/Service;1', 'nsIPushService');
 
 const serviceExports = Cu.import('resource://gre/modules/PushService.jsm', {});
 const servicePrefs = new Preferences('dom.push.');
