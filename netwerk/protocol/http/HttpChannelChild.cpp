@@ -611,7 +611,7 @@ HttpChannelChild::RecvOnTransportAndData(const nsresult& channelStatus,
                                                   transportStatus, progress,
                                                   progressMax, data, offset,
                                                   count),
-                        !mDivertingToParent);
+                        mDivertingToParent);
   return true;
 }
 
@@ -810,7 +810,8 @@ HttpChannelChild::RecvOnStopRequest(const nsresult& channelStatus,
   MOZ_RELEASE_ASSERT(!mFlushedForDiversion,
     "Should not be receiving any more callbacks from parent!");
 
-  mEventQ->RunOrEnqueue(new StopRequestEvent(this, channelStatus, timing));
+  mEventQ->RunOrEnqueue(new StopRequestEvent(this, channelStatus, timing),
+                        mDivertingToParent);
   return true;
 }
 
@@ -1335,7 +1336,7 @@ HttpChannelChild::RecvFlushedForDiversion()
   LOG(("HttpChannelChild::RecvFlushedForDiversion [this=%p]\n", this));
   MOZ_RELEASE_ASSERT(mDivertingToParent);
 
-  mEventQ->RunOrEnqueue(new HttpFlushedForDiversionEvent(this));
+  mEventQ->RunOrEnqueue(new HttpFlushedForDiversionEvent(this), true);
 
   return true;
 }
