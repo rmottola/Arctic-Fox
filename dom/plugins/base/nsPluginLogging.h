@@ -10,8 +10,6 @@
 
 #include "mozilla/Logging.h"
 
-#ifdef PR_LOGGING
-
 #ifndef PLUGIN_LOGGING    // allow external override
 #define PLUGIN_LOGGING 1  // master compile-time switch for pluging logging
 #endif
@@ -56,8 +54,6 @@ public:
 };
 
 #endif   // PLUGIN_LOGGING
-
-#endif  // PR_LOGGING
 
 // Quick-use macros
 #ifdef PLUGIN_LOGGING
