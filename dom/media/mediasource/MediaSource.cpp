@@ -29,6 +29,7 @@
 #include "mozilla/Logging.h"
 #include "nsServiceManagerUtils.h"
 #include "gfxPlatform.h"
+#include "mozilla/Snprintf.h"
 
 #ifdef MOZ_WIDGET_ANDROID
 #include "AndroidBridge.h"
