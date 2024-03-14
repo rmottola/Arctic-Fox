@@ -738,7 +738,6 @@ nsJSObjWrapper::NP_HasMethod(NPObject *npobj, NPIdentifier id)
   }
 
   dom::AutoEntryScript aes(globalObject, "NPAPI HasMethod");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
@@ -775,7 +774,6 @@ doInvoke(NPObject *npobj, NPIdentifier method, const NPVariant *args,
   // We're about to run script via JS_CallFunctionValue, so we need an
   // AutoEntryScript. NPAPI plugins are Gecko-specific and not in any spec.
   dom::AutoEntryScript aes(globalObject, "NPAPI doInvoke");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj || !result) {
@@ -868,7 +866,6 @@ nsJSObjWrapper::NP_HasProperty(NPObject *npobj, NPIdentifier npid)
   }
 
   dom::AutoEntryScript aes(globalObject, "NPAPI HasProperty");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
@@ -907,7 +904,6 @@ nsJSObjWrapper::NP_GetProperty(NPObject *npobj, NPIdentifier id,
   // We're about to run script via JS_CallFunctionValue, so we need an
   // AutoEntryScript. NPAPI plugins are Gecko-specific and not in any spec.
   dom::AutoEntryScript aes(globalObject, "NPAPI get");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
@@ -942,7 +938,6 @@ nsJSObjWrapper::NP_SetProperty(NPObject *npobj, NPIdentifier npid,
   // We're about to run script via JS_CallFunctionValue, so we need an
   // AutoEntryScript. NPAPI plugins are Gecko-specific and not in any spec.
   dom::AutoEntryScript aes(globalObject, "NPAPI set");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
@@ -980,7 +975,6 @@ nsJSObjWrapper::NP_RemoveProperty(NPObject *npobj, NPIdentifier npid)
   }
 
   dom::AutoEntryScript aes(globalObject, "NPAPI RemoveProperty");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
@@ -1032,7 +1026,6 @@ nsJSObjWrapper::NP_Enumerate(NPObject *npobj, NPIdentifier **idarray,
   }
 
   dom::AutoEntryScript aes(globalObject, "NPAPI Enumerate");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   *idarray = 0;
@@ -2311,7 +2304,6 @@ nsJSObjWrapper::HasOwnProperty(NPObject *npobj, NPIdentifier npid)
   }
 
   dom::AutoEntryScript aes(globalObject, "NPAPI HasOwnProperty");
-  aes.TakeOwnershipOfErrorReporting();
   JSContext *cx = aes.cx();
 
   if (!npobj) {
