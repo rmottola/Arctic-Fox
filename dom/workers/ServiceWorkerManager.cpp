@@ -2814,7 +2814,8 @@ ServiceWorkerManager::HandleError(JSContext* aCx,
 void
 ServiceWorkerRegistrationInfo::FinishActivate(bool aSuccess)
 {
-  if (mPendingUninstall || !mActiveWorker) {
+  if (mPendingUninstall || !mActiveWorker ||
+      mActiveWorker->State() != ServiceWorkerState::Activating) {
     return;
   }
 
