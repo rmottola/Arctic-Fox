@@ -286,14 +286,10 @@ FTPChannelChild::RecvOnStartRequest(const nsresult& aChannelStatus,
 
   LOG(("FTPChannelChild::RecvOnStartRequest [this=%p]\n", this));
 
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(new FTPStartRequestEvent(this, aChannelStatus,
-                                              aContentLength, aContentType,
-                                              aLastModified, aEntityID, aURI));
-  } else {
-    DoOnStartRequest(aChannelStatus, aContentLength, aContentType,
-                     aLastModified, aEntityID, aURI);
-  }
+  mEventQ->RunOrEnqueue(new FTPStartRequestEvent(this, aChannelStatus,
+                                                 aContentLength, aContentType,
+                                                 aLastModified, aEntityID,
+                                                 aURI));
   return true;
 }
 
@@ -381,15 +377,10 @@ FTPChannelChild::RecvOnDataAvailable(const nsresult& channelStatus,
 
   LOG(("FTPChannelChild::RecvOnDataAvailable [this=%p]\n", this));
 
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(
-      new FTPDataAvailableEvent(this, channelStatus, data, offset, count));
-  } else {
-    MOZ_RELEASE_ASSERT(!mDivertingToParent,
-                       "ShouldEnqueue when diverting to parent!");
+  mEventQ->RunOrEnqueue(new FTPDataAvailableEvent(this, channelStatus, data,
+                                                  offset, count),
+                        !mDivertingToParent);
 
-    DoOnDataAvailable(channelStatus, data, offset, count);
-  }
   return true;
 }
 
@@ -506,11 +497,7 @@ FTPChannelChild::RecvOnStopRequest(const nsresult& aChannelStatus)
   LOG(("FTPChannelChild::RecvOnStopRequest [this=%p status=%x]\n",
        this, aChannelStatus));
 
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(new FTPStopRequestEvent(this, aChannelStatus));
-  } else {
-    DoOnStopRequest(aChannelStatus);
-  }
+  mEventQ->RunOrEnqueue(new FTPStopRequestEvent(this, aChannelStatus));
   return true;
 }
 
@@ -595,11 +582,7 @@ FTPChannelChild::RecvFailedAsyncOpen(const nsresult& statusCode)
 {
   LOG(("FTPChannelChild::RecvFailedAsyncOpen [this=%p status=%x]\n",
        this, statusCode));
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(new FTPFailedAsyncOpenEvent(this, statusCode));
-  } else {
-    DoFailedAsyncOpen(statusCode);
-  }
+  mEventQ->RunOrEnqueue(new FTPFailedAsyncOpenEvent(this, statusCode));
   return true;
 }
 
@@ -651,11 +634,7 @@ FTPChannelChild::RecvFlushedForDiversion()
   LOG(("FTPChannelChild::RecvFlushedForDiversion [this=%p]\n", this));
   MOZ_ASSERT(mDivertingToParent);
 
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(new FTPFlushedForDiversionEvent(this));
-  } else {
-    MOZ_CRASH();
-  }
+  mEventQ->RunOrEnqueue(new FTPFlushedForDiversionEvent(this));
   return true;
 }
 
@@ -701,11 +680,7 @@ class FTPDeleteSelfEvent : public ChannelEvent
 bool
 FTPChannelChild::RecvDeleteSelf()
 {
-  if (mEventQ->ShouldEnqueue()) {
-    mEventQ->Enqueue(new FTPDeleteSelfEvent(this));
-  } else {
-    DoDeleteSelf();
-  }
+  mEventQ->RunOrEnqueue(new FTPDeleteSelfEvent(this));
   return true;
 }
 
