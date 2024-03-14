@@ -1609,6 +1609,8 @@ protected:
 
   inline int32_t DOMMinTimeoutValue() const;
 
+  void InitializeShowFocusRings();
+
   // Clear the document-dependent slots on our JS wrapper.  Inner windows only.
   void ClearDocumentDependentSlots(JSContext* aCx);
 
