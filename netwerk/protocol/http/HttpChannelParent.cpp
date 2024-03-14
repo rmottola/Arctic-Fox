@@ -383,8 +383,6 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     mChannel->SetUploadStreamHasHeaders(uploadStreamHasHeaders);
   }
 
-  mChannel->SetAllowStaleCacheContent(aAllowStaleCacheContent);
-
   if (aSynthesizedResponseHead.type() == OptionalHttpResponseHead::TnsHttpResponseHead) {
     mParentListener->SetupInterception(aSynthesizedResponseHead.get_nsHttpResponseHead());
     mWillSynthesizeResponse = true;
@@ -415,6 +413,8 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   }
 
   mChannel->SetCacheKey(cacheKey);
+
+  mChannel->SetAllowStaleCacheContent(aAllowStaleCacheContent);
 
   mChannel->SetContentType(aContentTypeHint);
 
