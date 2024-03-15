@@ -4180,7 +4180,6 @@ DoGetPropGeneric(JSContext* cx, void* payload, ICGetProp_Generic* stub,
 {
     ICFallbackStub* fallback = stub->getChainFallback();
     SharedStubInfo info(cx, payload, fallback->icEntry());
-    MOZ_ASSERT(info.outerScript(cx));
     HandleScript script = info.innerScript();
     jsbytecode* pc = info.pc();
     JSOp op = JSOp(*pc);
