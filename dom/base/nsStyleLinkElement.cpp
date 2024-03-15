@@ -57,7 +57,7 @@ nsStyleLinkElement::~nsStyleLinkElement()
 void
 nsStyleLinkElement::Unlink()
 {
-  mStyleSheet = nullptr;
+  nsStyleLinkElement::SetStyleSheet(nullptr);
 }
 
 void
