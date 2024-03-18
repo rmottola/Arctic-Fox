@@ -1056,5 +1056,10 @@ js::ValueToSourceForError(JSContext* cx, HandleValue val, JSAutoByteString& byte
         return bytes.encodeLatin1(cx, str);
     }
     sb.append(str);
-    return bytes.encodeLatin1(cx, sb.finishString());
+    str = sb.finishString();
+    if (!str) {
+        JS_ClearPendingException(cx);
+        return "<<error converting value to string>>";
+    }
+    return bytes.encodeLatin1(cx, str);
 }
