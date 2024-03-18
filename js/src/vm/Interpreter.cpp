@@ -2875,9 +2875,10 @@ CASE(JSOP_FUNCALL)
                 goto error;
             if (status == jit::Method_Compiled) {
                 jit::JitExecStatus exec = jit::IonCannon(cx, state.ref());
-                CHECK_BRANCH();
-                REGS.sp = args.spAfterCall();
                 interpReturnOK = !IsErrorStatus(exec);
+                if (interpReturnOK)
+                    CHECK_BRANCH();
+                REGS.sp = args.spAfterCall();
                 goto jit_return;
             }
         }
@@ -2888,9 +2889,10 @@ CASE(JSOP_FUNCALL)
                 goto error;
             if (status == jit::Method_Compiled) {
                 jit::JitExecStatus exec = jit::EnterBaselineMethod(cx, state.ref());
-                CHECK_BRANCH();
-                REGS.sp = args.spAfterCall();
                 interpReturnOK = !IsErrorStatus(exec);
+                if (interpReturnOK)
+                    CHECK_BRANCH();
+                REGS.sp = args.spAfterCall();
                 goto jit_return;
             }
         }
