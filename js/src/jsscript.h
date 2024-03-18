@@ -12,6 +12,7 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/PodOperations.h"
+#include "mozilla/Variant.h"
 
 #include "jsatom.h"
 #include "jslock.h"
@@ -613,27 +614,44 @@ class ScriptSource
     // on the main thread.
 
     // Indicate which field in the |data| union is active.
-    enum {
-        DataMissing,
-        DataUncompressed,
-        DataCompressed,
-        DataParent
-    } dataType;
 
-    union {
-        struct {
-            const char16_t* chars;
-            bool ownsChars;
-        } uncompressed;
+    struct Missing { };
 
-        struct {
-            void* raw;
-            size_t nbytes;
-            HashNumber hash;
-        } compressed;
+    struct Uncompressed
+    {
+        Uncompressed(const char16_t* chars, bool ownsChars)
+          : chars(chars)
+          , ownsChars(ownsChars)
+        { }
+
+        const char16_t* chars;
+        bool ownsChars;
+    };
+
+    struct Compressed
+    {
+        Compressed(void* raw, size_t nbytes, HashNumber hash)
+          : raw(raw)
+          , nbytes(nbytes)
+          , hash(hash)
+        { }
+
+        void* raw;
+        size_t nbytes;
+        HashNumber hash;
+    };
+
+    struct Parent
+    {
+        explicit Parent(ScriptSource* parent)
+          : parent(parent)
+        { }
 
         ScriptSource* parent;
-    } data;
+    };
+
+    using SourceType = mozilla::Variant<Missing, Uncompressed, Compressed, Parent>;
+    SourceType data;
 
     uint32_t length_;
 
@@ -687,7 +705,7 @@ class ScriptSource
   public:
     explicit ScriptSource()
       : refs(0),
-        dataType(DataMissing),
+        data(SourceType(Missing())),
         length_(0),
         filename_(nullptr),
         displayURL_(nullptr),
@@ -716,8 +734,8 @@ class ScriptSource
                        SourceCompressionTask* tok);
     void setSourceRetrievable() { sourceRetrievable_ = true; }
     bool sourceRetrievable() const { return sourceRetrievable_; }
-    bool hasSourceData() const { return dataType != DataMissing; }
-    bool hasCompressedSource() const { return dataType == DataCompressed; }
+    bool hasSourceData() const { return !data.is<Missing>(); }
+    bool hasCompressedSource() const { return data.is<Compressed>(); }
     size_t length() const {
         MOZ_ASSERT(hasSourceData());
         return length_;
@@ -733,33 +751,27 @@ class ScriptSource
                                 JS::ScriptSourceInfo* info) const;
 
     const char16_t* uncompressedChars() const {
-        MOZ_ASSERT(dataType == DataUncompressed);
-        return data.uncompressed.chars;
+        return data.as<Uncompressed>().chars;
     }
 
     bool ownsUncompressedChars() const {
-        MOZ_ASSERT(dataType == DataUncompressed);
-        return data.uncompressed.ownsChars;
+        return data.as<Uncompressed>().ownsChars;
     }
 
     void* compressedData() const {
-        MOZ_ASSERT(dataType == DataCompressed);
-        return data.compressed.raw;
+        return data.as<Compressed>().raw;
     }
 
     size_t compressedBytes() const {
-        MOZ_ASSERT(dataType == DataCompressed);
-        return data.compressed.nbytes;
+        return data.as<Compressed>().nbytes;
     }
 
     HashNumber compressedHash() const {
-        MOZ_ASSERT(dataType == DataCompressed);
-        return data.compressed.hash;
+        return data.as<Compressed>().hash;
     }
 
     ScriptSource* parent() const {
-        MOZ_ASSERT(dataType == DataParent);
-        return data.parent;
+        return data.as<Parent>().parent;
     }
 
     void setSource(const char16_t* chars, size_t length, bool ownsChars = true);
@@ -2267,7 +2279,7 @@ class LazyScript : public gc::TenuredCell
         return (p_.version == JS_BIT(8) - 1) ? JSVERSION_UNKNOWN : JSVersion(p_.version);
     }
 
-    void setParent(JSObject* enclosingScope, ScriptSourceObject* sourceObject);
+    void setEnclosingScopeAndSource(JSObject* enclosingScope, ScriptSourceObject* sourceObject);
 
     uint32_t numFreeVariables() const {
         return p_.numFreeVariables;
