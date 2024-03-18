@@ -297,7 +297,6 @@ UNIFIED_SOURCES += [
     'proxy/ScriptedDirectProxyHandler.cpp',
     'proxy/SecurityWrapper.cpp',
     'proxy/Wrapper.cpp',
-    'threading/ExclusiveData.cpp',
     'vm/ArgumentsObject.cpp',
     'vm/ArrayBufferObject.cpp',
     'vm/CallNonGenericMethod.cpp',
