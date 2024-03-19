@@ -1679,7 +1679,7 @@ nsWindowWatcher::CalculateChromeFlags(mozIDOMWindowProxy* aParent,
     }
   }
 
-  if (aDialog && !presenceFlag) {
+  if (aDialog && aFeaturesSpecified && !presenceFlag) {
     chromeFlags = nsIWebBrowserChrome::CHROME_DEFAULT;
   }
 
