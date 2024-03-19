@@ -139,7 +139,7 @@ APZCTreeManager::UpdateHitTestingTree(CompositorBridgeParent* aCompositor,
 {
   APZThreadUtils::AssertOnCompositorThread();
 
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   // For testing purposes, we log some data to the APZTestData associated with
   // the layers id that originated this update.
@@ -1202,7 +1202,7 @@ void
 APZCTreeManager::UpdateZoomConstraints(const ScrollableLayerGuid& aGuid,
                                        const Maybe<ZoomConstraints>& aConstraints)
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   RefPtr<HitTestingTreeNode> node = GetTargetNode(aGuid, nullptr);
   MOZ_ASSERT(!node || node->GetApzc()); // any node returned must have an APZC
 
@@ -1261,7 +1261,7 @@ APZCTreeManager::FlushRepaintsToClearScreenToGeckoTransform()
   // matched APZCs is the same. It is simplest to ensure that by flushing the
   // pending repaint requests, which makes all of the untransforms empty (and
   // therefore equal).
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   mTreeLock.AssertCurrentThreadOwns();
 
   ForEachNode(mRootNode.get(),
@@ -1286,7 +1286,7 @@ APZCTreeManager::CancelAnimation(const ScrollableLayerGuid &aGuid)
 void
 APZCTreeManager::AdjustScrollForSurfaceShift(const ScreenPoint& aShift)
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   RefPtr<AsyncPanZoomController> apzc = FindRootContentOrRootApzc();
   if (apzc) {
     apzc->AdjustScrollForSurfaceShift(aShift);
@@ -1302,7 +1302,7 @@ APZCTreeManager::ClearTree()
   APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
     mInputQueue.get(), &InputQueue::Clear));
 
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   // Collect the nodes into a list, and then destroy each one.
   // We can't destroy them as we collect them, because ForEachNode()
@@ -1324,7 +1324,7 @@ APZCTreeManager::ClearTree()
 RefPtr<HitTestingTreeNode>
 APZCTreeManager::GetRootNode() const
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   return mRootNode;
 }
 
@@ -1516,7 +1516,7 @@ APZCTreeManager::HitTestAPZC(const ScreenIntPoint& aPoint)
 already_AddRefed<AsyncPanZoomController>
 APZCTreeManager::GetTargetAPZC(const ScrollableLayerGuid& aGuid)
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   RefPtr<HitTestingTreeNode> node = GetTargetNode(aGuid, nullptr);
   MOZ_ASSERT(!node || node->GetApzc()); // any node returned must have an APZC
   RefPtr<AsyncPanZoomController> apzc = node ? node->GetApzc() : nullptr;
@@ -1548,7 +1548,7 @@ APZCTreeManager::GetTargetNode(const ScrollableLayerGuid& aGuid,
 already_AddRefed<AsyncPanZoomController>
 APZCTreeManager::GetTargetAPZC(const ScreenPoint& aPoint, HitTestResult* aOutHitResult)
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   HitTestResult hitResult = HitNothing;
   ParentLayerPoint point = ViewAs<ParentLayerPixel>(aPoint,
     PixelCastJustification::ScreenIsParentLayerForRoot);
@@ -1581,7 +1581,7 @@ APZCTreeManager::BuildOverscrollHandoffChain(const RefPtr<AsyncPanZoomController
   // order in which scroll will be handed off to them.
 
   // Grab tree lock since we'll be walking the APZC tree.
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   // Build the chain. If there is a scroll parent link, we use that. This is
   // needed to deal with scroll info layers, because they participate in handoff
@@ -1654,7 +1654,7 @@ APZCTreeManager::SetLongTapEnabled(bool aLongTapEnabled)
 RefPtr<HitTestingTreeNode>
 APZCTreeManager::FindScrollNode(const AsyncDragMetrics& aDragMetrics)
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   return DepthFirstSearch(mRootNode.get(),
       [&aDragMetrics](HitTestingTreeNode* aNode) {
@@ -1885,7 +1885,7 @@ ScreenToParentLayerMatrix4x4
 APZCTreeManager::GetScreenToApzcTransform(const AsyncPanZoomController *aApzc) const
 {
   Matrix4x4 result;
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   // The comments below assume there is a chain of layers L..R with L and P having APZC instances as
   // explained in the comment above. This function is called with aApzc at L, and the loop
@@ -1926,7 +1926,7 @@ ParentLayerToScreenMatrix4x4
 APZCTreeManager::GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) const
 {
   Matrix4x4 result;
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
 
   // The comments below assume there is a chain of layers L..R with L and P having APZC instances as
   // explained in the comment above. This function is called with aApzc at L, and the loop
@@ -1955,7 +1955,7 @@ APZCTreeManager::GetApzcToGeckoTransform(const AsyncPanZoomController *aApzc) co
 already_AddRefed<AsyncPanZoomController>
 APZCTreeManager::GetMultitouchTarget(AsyncPanZoomController* aApzc1, AsyncPanZoomController* aApzc2) const
 {
-  MonitorAutoLock lock(mTreeLock);
+  MutexAutoLock lock(mTreeLock);
   RefPtr<AsyncPanZoomController> apzc;
   // For now, we only ever want to do pinching on the root-content APZC for
   // a given layers id.
