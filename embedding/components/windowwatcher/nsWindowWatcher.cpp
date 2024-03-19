@@ -82,6 +82,7 @@ struct nsWatcherWindowEntry
 {
 
   nsWatcherWindowEntry(mozIDOMWindowProxy* aWindow, nsIWebBrowserChrome* aChrome)
+    : mChrome(nullptr)
   {
 #ifdef USEWEAKREFS
     mWindow = do_GetWeakReference(aWindow);
