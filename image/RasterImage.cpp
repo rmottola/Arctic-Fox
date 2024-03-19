@@ -646,11 +646,7 @@ RasterImage::GetCurrentImage(ImageContainer* aContainer, uint32_t aFlags)
     return MakePair(drawResult, RefPtr<layers::Image>());
   }
 
-  IntSize size;
-  GetWidth(&size.width);
-  GetHeight(&size.height);
-
-  RefPtr<layers::Image> image = new layers::SourceSurfaceImage(size, surface);
+  RefPtr<layers::Image> image = new layers::SourceSurfaceImage(surface);
   return MakePair(drawResult, Move(image));
 }
 
