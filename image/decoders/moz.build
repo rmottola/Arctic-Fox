@@ -36,9 +36,15 @@ UNIFIED_SOURCES += [
 if CONFIG['MOZ_JXR']:
     SOURCES += ['nsJXRDecoder.cpp']
 
-# Decoders need RasterImage.h
+include('/ipc/chromium/chromium-config.mozbuild')
+
 LOCAL_INCLUDES += [
+    # Access to Skia headers for Downscaler.
+    '/gfx/2d',
+    # Decoders need ImageLib headers.
     '/image',
 ]
+
+LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
 
 FINAL_LIBRARY = 'xul'
