@@ -262,7 +262,6 @@ NSSCertDBTrustDomain::DigestBuf(Input item, DigestAlgorithm digestAlg,
   return DigestBufNSS(item, digestAlg, digestBuf, digestBufLen);
 }
 
-
 static PRIntervalTime
 OCSPFetchingTypeToTimeoutTime(NSSCertDBTrustDomain::OCSPFetching ocspFetching)
 {
@@ -277,9 +276,10 @@ OCSPFetchingTypeToTimeoutTime(NSSCertDBTrustDomain::OCSPFetching ocspFetching)
     case NSSCertDBTrustDomain::NeverFetchOCSP:
     case NSSCertDBTrustDomain::LocalOnlyOCSPForEV:
       PR_NOT_REACHED("we should never see this OCSPFetching type here");
-    default:
-      PR_NOT_REACHED("we're not handling every OCSPFetching type");
+      break;
   }
+
+  PR_NOT_REACHED("we're not handling every OCSPFetching type");
   return PR_SecondsToInterval(2);
 }
 
