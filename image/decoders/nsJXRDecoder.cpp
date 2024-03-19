@@ -2787,7 +2787,7 @@ void nsJXRDecoder::FinishInternal()
         }
         else
         {
-            PostFrameStop(Opacity::OPAQUE);
+            PostFrameStop(Opacity::FULLY_OPAQUE);
         }
 
         PostDecodeDone();
