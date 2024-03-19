@@ -1119,6 +1119,12 @@ static bool IsFocused(nsIContent* aContent)
 #endif
 
 void
+ScrollFrameHelper::SetScrollableByAPZ(bool aScrollable)
+{
+  mScrollableByAPZ = aScrollable;
+}
+
+void
 ScrollFrameHelper::SetZoomableByAPZ(bool aZoomable)
 {
   if (mZoomableByAPZ != aZoomable) {
@@ -1877,6 +1883,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mHasBeenScrolled(false)
   , mIgnoreMomentumScroll(false)
   , mTransformingByAPZ(false)
+  , mScrollableByAPZ(false)
   , mZoomableByAPZ(false)
   , mVelocityQueue(aOuter->PresContext())
   , mAsyncScrollEvent(END_DOM)
@@ -2386,6 +2393,9 @@ RemoveDisplayPortCallback(nsITimer* aTimer, void* aClosure)
   nsLayoutUtils::RemoveDisplayPort(helper->mOuter->GetContent());
   nsLayoutUtils::ExpireDisplayPortOnAsyncScrollableAncestor(helper->mOuter);
   helper->mOuter->SchedulePaint();
+  // Be conservative and unflag this this scrollframe as being scrollable by
+  // APZ. If it is still scrollable this will get flipped back soon enough.
+  helper->mScrollableByAPZ = false;
 }
 
 void ScrollFrameHelper::MarkNotRecentlyScrolled()
