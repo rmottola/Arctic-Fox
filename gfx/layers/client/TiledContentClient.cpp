@@ -1685,7 +1685,7 @@ BasicTiledLayerPaintData::ResetPaintData()
   mLowPrecisionPaintCount = 0;
   mPaintFinished = false;
   mCompositionBounds.SetEmpty();
-  mCriticalDisplayPort.SetEmpty();
+  mCriticalDisplayPort = Nothing();
 }
 
 } // namespace layers
