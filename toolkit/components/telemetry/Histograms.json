@@ -3287,6 +3287,27 @@
     "kind": "boolean",
     "description": "Did UrlClassifier fail to construct the PrefixSet?"
   },
+  "CSP_DOCUMENTS_COUNT": {
+    "alert_emails": ["seceng@mozilla.com"],
+    "bug_numbers": [1252829],
+    "expires_in_version": "55",
+    "kind": "count",
+    "description": "Number of unique pages that contain a CSP"
+  },
+  "CSP_UNSAFE_INLINE_DOCUMENTS_COUNT": {
+    "alert_emails": ["seceng@mozilla.com"],
+    "bug_numbers": [1252829],
+    "expires_in_version": "55",
+    "kind": "count",
+    "description": "Number of unique pages that contain an unsafe-inline CSP directive"
+  },
+  "CSP_UNSAFE_EVAL_DOCUMENTS_COUNT": {
+    "alert_emails": ["seceng@mozilla.com"],
+    "bug_numbers": [1252829],
+    "expires_in_version": "55",
+    "kind": "count",
+    "description": "Number of unique pages that contain an unsafe-eval CSP directive"
+  },
   "PLACES_PAGES_COUNT": {
     "expires_in_version": "never",
     "kind": "exponential",
