@@ -1587,6 +1587,8 @@ TypedObject::createZeroed(JSContext* cx, HandleTypeDescr descr, int32_t length, 
 {
     // If possible, create an object with inline data.
     if ((size_t) descr->size() <= InlineTypedObject::MaximumSize) {
+        AutoSetNewObjectMetadata metadata(cx);
+
         InlineTypedObject* obj = InlineTypedObject::create(cx, descr, heap);
         if (!obj)
             return nullptr;
@@ -2133,6 +2135,8 @@ InlineTypedObject::create(JSContext* cx, HandleTypeDescr descr, gc::InitialHeap 
 InlineTypedObject::createCopy(JSContext* cx, Handle<InlineTypedObject*> templateObject,
                               gc::InitialHeap heap)
 {
+    AutoSetNewObjectMetadata metadata(cx);
+
     Rooted<TypeDescr*> descr(cx, &templateObject->typeDescr());
     InlineTypedObject* res = create(cx, descr, heap);
     if (!res)
@@ -2242,10 +2246,10 @@ OutlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
  * Typed object classes
  */
 
-#define DEFINE_TYPEDOBJ_CLASS(Name, Trace)        \
+#define DEFINE_TYPEDOBJ_CLASS(Name, Trace, flag)         \
     const Class Name::class_ = {                         \
         # Name,                                          \
-        Class::NON_NATIVE, \
+        Class::NON_NATIVE | flag,                        \
         nullptr,        /* addProperty */                \
         nullptr,        /* delProperty */                \
         nullptr,        /* getProperty */                \
@@ -2275,10 +2279,12 @@ OutlineTransparentTypedObject::getOrCreateBuffer(JSContext* cx)
         }                                                \
     }
 
-DEFINE_TYPEDOBJ_CLASS(OutlineTransparentTypedObject, OutlineTypedObject::obj_trace);
-DEFINE_TYPEDOBJ_CLASS(OutlineOpaqueTypedObject,      OutlineTypedObject::obj_trace);
-DEFINE_TYPEDOBJ_CLASS(InlineTransparentTypedObject,  InlineTypedObject::obj_trace);
-DEFINE_TYPEDOBJ_CLASS(InlineOpaqueTypedObject,       InlineTypedObject::obj_trace);
+DEFINE_TYPEDOBJ_CLASS(OutlineTransparentTypedObject, OutlineTypedObject::obj_trace, 0);
+DEFINE_TYPEDOBJ_CLASS(OutlineOpaqueTypedObject,      OutlineTypedObject::obj_trace, 0);
+DEFINE_TYPEDOBJ_CLASS(InlineTransparentTypedObject,  InlineTypedObject::obj_trace,
+                      JSCLASS_DELAY_METADATA_CALLBACK);
+DEFINE_TYPEDOBJ_CLASS(InlineOpaqueTypedObject,       InlineTypedObject::obj_trace,
+                      JSCLASS_DELAY_METADATA_CALLBACK);
 
 static int32_t
 LengthForType(TypeDescr& descr)
