@@ -2271,12 +2271,12 @@ public:
 private:
     union
     {
-        XPCWrappedNativeScope*   mMaybeScope;
-        XPCWrappedNativeProto*   mMaybeProto;
+        XPCWrappedNativeScope* mMaybeScope;
+        XPCWrappedNativeProto* mMaybeProto;
     };
-    XPCNativeSet*                mSet;
-    JS::TenuredHeap<JSObject*>   mFlatJSObject;
-    XPCNativeScriptableInfo*     mScriptableInfo;
+    XPCNativeSet* mSet;
+    JS::TenuredHeap<JSObject*> mFlatJSObject;
+    XPCNativeScriptableInfo* mScriptableInfo;
     XPCWrappedNativeTearOffChunk mFirstChunk;
 };
 
