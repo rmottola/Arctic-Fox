@@ -101,7 +101,7 @@
     "bug_numbers": [1238040],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "100000",
+    "high": 100000,
     "n_buckets": 50,
     "description": "Duration of a checkerboard event in milliseconds"
   },
@@ -110,7 +110,7 @@
     "bug_numbers": [1238040],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "3840 * 2160 * 8",
+    "high": 66355200,
     "n_buckets": 50,
     "description": "Peak number of CSS pixels checkerboarded during a checkerboard event (the high value is the size of a 4k display with max APZ zooming)"
   },
@@ -119,7 +119,7 @@
     "bug_numbers": [1238040],
     "expires_in_version": "55",
     "kind": "exponential",
-    "high": "1000000",
+    "high": 1000000,
     "n_buckets": 50,
     "description": "Duration of a chunk of time (in ms) that could reasonably have had checkerboarding"
   },
@@ -6040,26 +6040,41 @@
     "description": "Whether Ogg audio/video encountered are chained or not.",
     "bug_numbers": [1230295]
   },
+  "VIDEO_MFT_OUTPUT_NULL_SAMPLES": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "53",
+    "kind": "enumerated",
+    "n_values": 10,
+    "description": "Does the WMF video decoder return success but null output? 0 = playback successful, 1 = excessive null output but able to decode some frames, 2 = excessive null output and gave up, 3 = null output but recovered, 4 = non-excessive null output without being able to decode frames.",
+    "bug_numbers": [1176071]
+  },
+  "AUDIO_MFT_OUTPUT_NULL_SAMPLES": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "53",
+    "kind": "count",
+    "description": "How many times the audio MFT decoder returns success but output nothing.",
+    "bug_numbers": [1176071]
+  },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 128,
     "description": "The H.264 constraint set flag as extracted from the codecs parameter passed to HTMLMediaElement.canPlayType, with the addition of 0 for unknown values."
   },
   "VIDEO_CANPLAYTYPE_H264_LEVEL": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 51,
     "description": "The H.264 level (level_idc) as extracted from the codecs parameter passed to HTMLMediaElement.canPlayType, from levels 1 (10) to 5.2 (51), with the addition of 0 for unknown values."
   },
   "VIDEO_CANPLAYTYPE_H264_PROFILE": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 244,
     "description": "The H.264 profile number (profile_idc) as extracted from the codecs parameter passed to HTMLMediaElement.canPlayType."
   },
   "VIDEO_DECODED_H264_SPS_CONSTRAINT_SET_FLAG": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 128,
     "description": "A bit pattern to collect H.264 constraint set flag from the decoded SPS. Bits 0 through 5 represent constraint_set0_flag through constraint_set5_flag, respectively."
@@ -7770,48 +7785,48 @@
   "NETWORK_CACHE_METADATA_FIRST_READ_TIME_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent to read the first part of the metadata from the cache entry file."
   },
   "NETWORK_CACHE_METADATA_SECOND_READ_TIME_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time spent to read the missing part of the metadata from the cache entry file."
   },
   "NETWORK_CACHE_METADATA_FIRST_READ_SIZE": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "5119",
+    "high": 5119,
     "n_buckets": 256,
     "description": "Guessed size of the metadata that we read from the cache file as the first part."
   },
   "NETWORK_CACHE_METADATA_SIZE": {
     "expires_in_version": "never",
     "kind": "linear",
-    "high": "5119",
+    "high": 5119,
     "n_buckets": 256,
     "description": "Actual size of the metadata parsed from the disk."
   },
   "NETWORK_CACHE_HASH_STATS": {
     "expires_in_version": "46",
     "kind": "enumerated",
-    "n_values": "160",
+    "n_values": 160,
     "description": "The longest hash match between a newly added entry and all the existing entries."
   },
   "DATABASE_LOCKED_EXCEPTION": {
     "expires_in_version": "42",
     "kind": "enumerated",
     "description": "Record database locks when opening one of Fennec's databases. The index corresponds to how many attempts, beginning with 0.",
-    "n_values": "5"
+    "n_values": 5
   },
   "DATABASE_SUCCESSFUL_UNLOCK": {
     "expires_in_version": "42",
     "kind": "enumerated",
     "description": "Record on which attempt we successfully unlocked a database. See DATABASE_LOCKED_EXCEPTION.",
-    "n_values": "5"
+    "n_values": 5
   },
   "SQLITEBRIDGE_PROVIDER_PASSWORDS_LOCKED": {
     "expires_in_version": "40",
