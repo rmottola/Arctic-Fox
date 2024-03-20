@@ -46,6 +46,8 @@ public:
       ? "wmf hardware video decoder" : "wmf software video decoder";
   }
 
+  void ConfigurationChanged(const TrackInfo& aConfig) override;
+
 private:
 
   bool InitializeDXVA(bool aForceD3D9);
