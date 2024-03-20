@@ -134,6 +134,7 @@
 #include "mozilla/TextEvents.h" // For WidgetKeyboardEvent
 #include "mozilla/TextEventDispatcherListener.h"
 #include "nsThemeConstants.h"
+#include "nsBidiKeyboard.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -5539,6 +5540,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
     case WM_INPUTLANGCHANGE:
       KeyboardLayout::GetInstance()->
         OnLayoutChange(reinterpret_cast<HKL>(lParam));
+      nsBidiKeyboard::OnLayoutChange();
       result = false; // always pass to child window
       break;
 
