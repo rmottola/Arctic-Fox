@@ -2429,10 +2429,10 @@ KeyboardLayout::LoadLayout(HKL aLayout)
 
   ::SetKeyboardState(originalKbdState);
 
-  if (MOZ_LOG_TEST(sKeyboardLayoutLogger, PR_LOG_DEBUG)) {
+  if (MOZ_LOG_TEST(sKeyboardLayoutLogger, LogLevel::Debug)) {
     static const UINT kExtendedScanCode[] = { 0x0000, 0xE000 };
     static const UINT kMapType = MAPVK_VSC_TO_VK_EX;
-    MOZ_LOG(sKeyboardLayoutLogger, PR_LOG_DEBUG,
+    MOZ_LOG(sKeyboardLayoutLogger, LogLevel::Debug,
            ("Logging virtual keycode values for scancode (0x%p)...",
             mKeyboardLayout));
     for (uint32_t i = 0; i < ArrayLength(kExtendedScanCode); i++) {
