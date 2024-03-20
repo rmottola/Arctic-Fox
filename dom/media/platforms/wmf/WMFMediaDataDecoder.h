@@ -52,9 +52,9 @@ public:
 
   virtual TrackInfo::TrackType GetType() = 0;
 
-  virtual const char* GetDescriptionName() const = 0;
-
   virtual void ConfigurationChanged(const TrackInfo& aConfig) {}
+
+  virtual const char* GetDescriptionName() const = 0;
 
 protected:
   // IMFTransform wrapper that performs the decoding.
@@ -85,12 +85,12 @@ public:
 
   bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
 
+  nsresult ConfigurationChanged(const TrackInfo& aConfig) override;
+
   const char* GetDescriptionName() const override
   {
     return mMFTManager ? mMFTManager->GetDescriptionName() : "";
   }
-
-  nsresult ConfigurationChanged(const TrackInfo& aConfig) override;
 
 private:
 
