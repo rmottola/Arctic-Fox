@@ -14,7 +14,6 @@ mk_add_options AUTOCLOBBER=1
 
 ac_add_options --enable-release
 
-. "$topsrcdir/build/mozconfig.automation"
+ac_add_options --enable-js-shell
 
-# Temporarily enable building the new Performance++ tool.
-ac_add_options --enable-devtools-perf
+. "$topsrcdir/build/mozconfig.automation"

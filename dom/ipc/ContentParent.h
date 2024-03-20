@@ -213,6 +213,10 @@ public:
 
   virtual bool RecvUngrabPointer(const uint32_t& aTime) override;
 
+  virtual bool RecvRemovePermission(const IPC::Principal& aPrincipal,
+                                    const nsCString& aPermissionType,
+                                    nsresult* aRv) override;
+
   NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(ContentParent, nsIObserver)
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -1087,6 +1091,9 @@ private:
   virtual bool RecvGetDeviceStorageLocations(DeviceStorageLocationInfo* info) override;
 
   virtual bool RecvGetAndroidSystemInfo(AndroidSystemInfo* aInfo) override;
+
+  virtual bool RecvNotifyBenchmarkResult(const nsString& aCodecName,
+                                         const uint32_t& aDecodeFPS) override;
 
   // If you add strong pointers to cycle collected objects here, be sure to
   // release these objects in ShutDownProcess.  See the comment there for more

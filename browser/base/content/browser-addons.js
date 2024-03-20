@@ -343,8 +343,6 @@ const gXPInstallObserver = {
         if (install.error < 0) {
           error += install.error;
           args = [brandShortName, install.name];
-	}  else if (install.addon.jetsdk) {
-          error += "JetSDK";
         } else if (install.addon.blocklistState == Ci.nsIBlocklistService.STATE_BLOCKED) {
           error += "Blocklisted";
           args = [install.name];

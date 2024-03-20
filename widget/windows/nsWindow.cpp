@@ -134,6 +134,7 @@
 #include "mozilla/TextEvents.h" // For WidgetKeyboardEvent
 #include "mozilla/TextEventDispatcherListener.h"
 #include "nsThemeConstants.h"
+#include "nsBidiKeyboard.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -190,6 +191,7 @@
 
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/InputAPZContext.h"
+#include "mozilla/layers/ScrollInputMethods.h"
 #include "ClientLayerManager.h"
 #include "InputData.h"
 
@@ -471,11 +473,10 @@ nsWindow::~nsWindow()
   mInDtor = true;
 
   // If the widget was released without calling Destroy() then the native window still
-  // exists, and we need to destroy it. This will also result in a call to OnDestroy.
-  //
-  // XXX How could this happen???
-  if (nullptr != mWnd)
-    Destroy();
+  // exists, and we need to destroy it.
+  // Destroy() will early-return if it was already called. In any case it is important
+  // to call it before destroying mPresentLock (cf. 1156182).
+  Destroy();
 
   // Free app icon resources.  This must happen after `OnDestroy` (see bug 708033).
   if (mIconSmall)
@@ -517,6 +518,16 @@ NS_IMPL_ISUPPORTS_INHERITED0(nsWindow, nsBaseWidget)
 int32_t nsWindow::GetHeight(int32_t aProposedHeight)
 {
   return aProposedHeight;
+}
+
+static bool
+ShouldCacheTitleBarInfo(nsWindowType aWindowType, nsBorderStyle aBorderStyle)
+{
+  return (aWindowType == eWindowType_toplevel)  &&
+         (aBorderStyle == eBorderStyle_default  ||
+            aBorderStyle == eBorderStyle_all)   &&
+      (!nsUXThemeData::sTitlebarInfoPopulatedThemed ||
+       !nsUXThemeData::sTitlebarInfoPopulatedAero);
 }
 
 // Create the proper widget
@@ -705,10 +716,8 @@ nsWindow::Create(nsIWidget* aParent,
   }
 
   // Query for command button metric data for rendering the titlebar. We
-  // only do this once on the first window.
-  if (mWindowType == eWindowType_toplevel &&
-      (!nsUXThemeData::sTitlebarInfoPopulatedThemed ||
-       !nsUXThemeData::sTitlebarInfoPopulatedAero)) {
+  // only do this once on the first window that has an actual titlebar
+  if (ShouldCacheTitleBarInfo(mWindowType, mBorderStyle)) {
     nsUXThemeData::UpdateTitlebarInfo(mWnd);
   }
 
@@ -1427,16 +1436,16 @@ nsWindow::GetSizeConstraints()
   }
   scale /= mSizeConstraintsScale;
   SizeConstraints c = mSizeConstraints;
-  if (c.mMinSize.width != NS_UNCONSTRAINEDSIZE) {
+  if (c.mMinSize.width != NS_MAXSIZE) {
     c.mMinSize.width = NSToIntRound(c.mMinSize.width * scale);
   }
-  if (c.mMinSize.height != NS_UNCONSTRAINEDSIZE) {
+  if (c.mMinSize.height != NS_MAXSIZE) {
     c.mMinSize.height = NSToIntRound(c.mMinSize.height * scale);
   }
-  if (c.mMaxSize.width != NS_UNCONSTRAINEDSIZE) {
+  if (c.mMaxSize.width != NS_MAXSIZE) {
     c.mMaxSize.width = NSToIntRound(c.mMaxSize.width * scale);
   }
-  if (c.mMaxSize.height != NS_UNCONSTRAINEDSIZE) {
+  if (c.mMaxSize.height != NS_MAXSIZE) {
     c.mMaxSize.height = NSToIntRound(c.mMaxSize.height * scale);
   }
   return c;
@@ -1826,42 +1835,31 @@ NS_METHOD nsWindow::ConstrainPosition(bool aAllowSlop,
   RECT screenRect;
 
   nsCOMPtr<nsIScreenManager> screenmgr = do_GetService(sScreenManagerContractID);
-  if (screenmgr) {
-    nsCOMPtr<nsIScreen> screen;
-    int32_t left, top, width, height;
+  if (!screenmgr) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  nsCOMPtr<nsIScreen> screen;
+  int32_t left, top, width, height;
 
-    screenmgr->ScreenForRect(*aX, *aY, logWidth, logHeight,
-                             getter_AddRefs(screen));
-    if (screen) {
-      if (mSizeMode != nsSizeMode_Fullscreen) {
-        // For normalized windows, use the desktop work area.
-        screen->GetAvailRectDisplayPix(&left, &top, &width, &height);
-      } else {
-        // For full screen windows, use the desktop.
-        screen->GetRectDisplayPix(&left, &top, &width, &height);
-      }
-      screenRect.left = left;
-      screenRect.right = left + width;
-      screenRect.top = top;
-      screenRect.bottom = top + height;
+  screenmgr->ScreenForRect(*aX, *aY, logWidth, logHeight,
+                           getter_AddRefs(screen));
+  if (mSizeMode != nsSizeMode_Fullscreen) {
+    // For normalized windows, use the desktop work area.
+    nsresult rv = screen->GetAvailRectDisplayPix(&left, &top, &width, &height);
+    if (NS_FAILED(rv)) {
+      return rv;
     }
   } else {
-    if (mWnd) {
-      HDC dc = ::GetDC(mWnd);
-      if (dc) {
-        if (::GetDeviceCaps(dc, TECHNOLOGY) == DT_RASDISPLAY) {
-          if (mSizeMode != nsSizeMode_Fullscreen) {
-            ::SystemParametersInfo(SPI_GETWORKAREA, 0, &screenRect, 0);
-          } else {
-            screenRect.left = screenRect.top = 0;
-            screenRect.right = GetSystemMetrics(SM_CXFULLSCREEN);
-            screenRect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
-          }
-        }
-        ::ReleaseDC(mWnd, dc);
-      }
+    // For full screen windows, use the desktop.
+    nsresult rv = screen->GetRectDisplayPix(&left, &top, &width, &height);
+    if (NS_FAILED(rv)) {
+      return rv;
     }
   }
+  screenRect.left = left;
+  screenRect.right = left + width;
+  screenRect.top = top;
+  screenRect.bottom = top + height;
 
   if (aAllowSlop) {
     if (*aX < screenRect.left - logWidth + kWindowPositionSlop)
@@ -2210,7 +2208,7 @@ nsWindow::UpdateGetWindowInfoCaptionStatus(bool aActiveCaption)
   }
   // Update our internally tracked caption status
   SetPropW(mWnd, kManageWindowInfoProperty, 
-    reinterpret_cast<HANDLE>(static_cast<int>(aActiveCaption) + 1));
+    reinterpret_cast<HANDLE>(static_cast<INT_PTR>(aActiveCaption) + 1));
 }
 
 /**
@@ -3636,7 +3634,7 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
   }
 
   if (!mLayerManager) {
-    MOZ_ASSERT(!mCompositorParent && !mCompositorChild);
+    MOZ_ASSERT(!mCompositorBridgeParent && !mCompositorBridgeChild);
     mLayerManager = CreateBasicLayerManager();
   }
 
@@ -3918,7 +3916,7 @@ bool nsWindow::DispatchContentCommandEvent(WidgetContentCommandEvent* aEvent)
 
 bool nsWindow::DispatchWheelEvent(WidgetWheelEvent* aEvent)
 {
-  nsEventStatus status = DispatchAPZAwareEvent(aEvent->AsInputEvent());
+  nsEventStatus status = DispatchInputEvent(aEvent->AsInputEvent());
   return ConvertStatus(status);
 }
 
@@ -4256,7 +4254,7 @@ nsWindow::DispatchMouseEvent(EventMessage aEventMessage, WPARAM wParam,
       }
     }
 
-    result = ConvertStatus(DispatchAPZAwareEvent(&event));
+    result = ConvertStatus(DispatchInputEvent(&event));
 
     // Release the widget with NS_IF_RELEASE() just in case
     // the context menu key code in EventListenerManager::HandleEvent()
@@ -5539,6 +5537,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
     case WM_INPUTLANGCHANGE:
       KeyboardLayout::GetInstance()->
         OnLayoutChange(reinterpret_cast<HKL>(lParam));
+      nsBidiKeyboard::OnLayoutChange();
       result = false; // always pass to child window
       break;
 
@@ -5573,6 +5572,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         }
       }
     }
+    break;
 #endif
 
     case WM_SYSCOMMAND:
@@ -6516,13 +6516,13 @@ bool nsWindow::OnTouch(WPARAM wParam, LPARAM lParam)
     if (!touchInput.mTimeStamp.IsNull()) {
       // Convert MultiTouchInput to WidgetTouchEvent interface.
       WidgetTouchEvent widgetTouchEvent = touchInput.ToWidgetTouchEvent(this);
-      DispatchAPZAwareEvent(&widgetTouchEvent);
+      DispatchInputEvent(&widgetTouchEvent);
     }
     // Dispatch touch end event if we have one.
     if (!touchEndInput.mTimeStamp.IsNull()) {
       // Convert MultiTouchInput to WidgetTouchEvent interface.
       WidgetTouchEvent widgetTouchEvent = touchEndInput.ToWidgetTouchEvent(this);
-      DispatchAPZAwareEvent(&widgetTouchEvent);
+      DispatchInputEvent(&widgetTouchEvent);
     }
   }
 
@@ -6554,6 +6554,8 @@ bool nsWindow::OnGesture(WPARAM wParam, LPARAM lParam)
     bool endFeedback = true;
 
     if (mGesture.PanDeltaToPixelScroll(wheelEvent)) {
+      mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+          (uint32_t) ScrollInputMethod::MainThreadTouch);
       DispatchEvent(&wheelEvent, status);
     }
 
@@ -6909,13 +6911,19 @@ nsWindow::OnSysColorChanged()
 void
 nsWindow::OnDPIChanged(int32_t x, int32_t y, int32_t width, int32_t height)
 {
+  // Don't try to handle WM_DPICHANGED for popup windows (see bug 1239353);
+  // they remain tied to their original parent's resolution.
+  if (mWindowType == eWindowType_popup) {
+    return;
+  }
   if (DefaultScaleOverride() > 0.0) {
     return;
   }
   double oldScale = mDefaultScale;
   mDefaultScale = -1.0; // force recomputation of scale factor
   double newScale = GetDefaultScaleInternal();
-  if (mResizeState != NOT_RESIZING) {
+
+  if (mResizeState != RESIZING && mSizeMode == nsSizeMode_Normal) {
     // We want to try and maintain the size of the client area, rather than
     // the overall size of the window including non-client area, so we prefer
     // to calculate the new size instead of using Windows' suggested values.
@@ -6932,6 +6940,22 @@ nsWindow::OnDPIChanged(int32_t x, int32_t y, int32_t width, int32_t height)
       width = w;
       height = h;
     }
+
+    // Limit the position & size, if it would overflow the destination screen
+    nsCOMPtr<nsIScreenManager> sm = do_GetService(sScreenManagerContractID);
+    if (sm) {
+      nsCOMPtr<nsIScreen> screen;
+      sm->ScreenForRect(x, y, width, height, getter_AddRefs(screen));
+      if (screen) {
+        int32_t availLeft, availTop, availWidth, availHeight;
+        screen->GetAvailRect(&availLeft, &availTop, &availWidth, &availHeight);
+        x = std::max(x, availLeft);
+        y = std::max(y, availTop);
+        width = std::min(width, availWidth);
+        height = std::min(height, availHeight);
+      }
+    }
+
     Resize(x, y, width, height, true);
   }
   ChangedDPI();

@@ -481,6 +481,7 @@ ConvertWinError(DWORD aWinErr)
     case ERROR_FILE_NOT_FOUND:
     case ERROR_PATH_NOT_FOUND:
     case ERROR_INVALID_DRIVE:
+    case ERROR_NOT_READY:
       rv = NS_ERROR_FILE_NOT_FOUND;
       break;
     case ERROR_ACCESS_DENIED:
@@ -807,7 +808,6 @@ ReadDir(nsDir* aDir, PRDirFlags aFlags, nsString& aName)
     }
 
     const wchar_t* fileName;
-    nsString tmp;
     fileName = (aDir)->data.cFileName;
 
     if ((aFlags & PR_SKIP_DOT) &&
@@ -825,11 +825,7 @@ ReadDir(nsDir* aDir, PRDirFlags aFlags, nsString& aName)
       continue;
     }
 
-    if (fileName == tmp.get()) {
-      aName = tmp;
-    } else {
-      aName = fileName;
-    }
+    aName = fileName;
     return NS_OK;
   }
 

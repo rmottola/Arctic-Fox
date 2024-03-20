@@ -337,8 +337,13 @@ DocAccessible::GetEditor() const
       (!mContent || !mContent->HasFlag(NODE_IS_EDITABLE)))
     return nullptr;
 
-  nsCOMPtr<nsISupports> container = mDocumentNode->GetContainer();
-  nsCOMPtr<nsIEditingSession> editingSession(do_GetInterface(container));
+  nsCOMPtr<nsIDocShell> docShell = mDocumentNode->GetDocShell();
+  if (!docShell) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIEditingSession> editingSession;
+  docShell->GetEditingSession(getter_AddRefs(editingSession));
   if (!editingSession)
     return nullptr; // No editing session interface
 
@@ -1278,7 +1283,7 @@ DocAccessible::GetAccessibleOrDescendant(nsINode* aNode) const
 
 void
 DocAccessible::BindToDocument(Accessible* aAccessible,
-                              nsRoleMapEntry* aRoleMapEntry)
+                              const nsRoleMapEntry* aRoleMapEntry)
 {
   // Put into DOM node cache.
   if (aAccessible->IsNodeMapEntry())
@@ -1486,14 +1491,8 @@ DocAccessible::DoInitialUpdate()
 
   mLoadState |= eTreeConstructed;
 
-  // The content element may be changed before the initial update and then we
-  // miss the notification (since content tree change notifications are ignored
-  // prior to initial update). Make sure the content element is valid.
-  nsIContent* contentElm = nsCoreUtils::GetRoleContent(mDocumentNode);
-  if (contentElm) {
-    mContent = contentElm;
-    SetRoleMapEntry(aria::GetRoleMap(mContent));
-  }
+  // Set up a root element and ARIA role mapping.
+  UpdateRootElIfNeeded();
 
   // Build initial tree.  Since its the initial tree there's no group info to
   // invalidate.
@@ -1726,11 +1725,7 @@ DocAccessible::ProcessContentInserted(Accessible* aContainer,
 
     if (container == this) {
       // If new root content has been inserted then update it.
-      nsIContent* rootContent = nsCoreUtils::GetRoleContent(mDocumentNode);
-      if (rootContent != mContent) {
-        mContent = rootContent;
-        SetRoleMapEntry(aria::GetRoleMap(mContent));
-      }
+      UpdateRootElIfNeeded();
 
       // Continue to update the tree even if we don't have root content.
       // For example, elements may be inserted under the document element while

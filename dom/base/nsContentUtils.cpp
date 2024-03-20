@@ -25,7 +25,9 @@
 #include "MediaDecoder.h"
 // nsNPAPIPluginInstance must be included before nsIDocument.h, which is included in mozAutoDocUpdate.h.
 #include "nsNPAPIPluginInstance.h"
+#include "gfxDrawable.h"
 #include "gfxPrefs.h"
+#include "ImageOps.h"
 #include "mozAutoDocUpdate.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
@@ -154,6 +156,7 @@
 #include "nsIScriptGlobalObject.h"
 #include "nsIScriptObjectPrincipal.h"
 #include "nsIScriptSecurityManager.h"
+#include "nsIScrollable.h"
 #include "nsIStreamConverterService.h"
 #include "nsIStringBundle.h"
 #include "nsIURI.h"
@@ -199,6 +202,7 @@
 #include "nsICookieService.h"
 #include "mozilla/EnumSet.h"
 #include "mozilla/BloomFilter.h"
+#include "SourceSurfaceRawData.h"
 
 #include "nsIBidiKeyboard.h"
 
@@ -215,6 +219,7 @@ extern "C" int MOZ_XMLCheckQName(const char* ptr, const char* end,
 class imgLoader;
 
 using namespace mozilla::dom;
+using namespace mozilla::gfx;
 using namespace mozilla::layers;
 using namespace mozilla::widget;
 using namespace mozilla;
@@ -6585,6 +6590,20 @@ nsContentUtils::IsPDFJSEnabled()
    return NS_SUCCEEDED(rv) && canConvert;
 }
 
+bool
+nsContentUtils::IsSWFPlayerEnabled()
+{
+   nsCOMPtr<nsIStreamConverterService> convServ =
+     do_GetService("@mozilla.org/streamConverters;1");
+   nsresult rv = NS_ERROR_FAILURE;
+   bool canConvert = false;
+   if (convServ) {
+     rv = convServ->CanConvert("application/x-shockwave-flash",
+                               "text/html", &canConvert);
+   }
+   return NS_SUCCEEDED(rv) && canConvert;
+}
+
 already_AddRefed<nsIDocumentLoaderFactory>
 nsContentUtils::FindInternalContentViewer(const nsACString& aType,
                                           ContentViewerType* aLoaderType)
@@ -7433,6 +7452,48 @@ nsContentUtils::IsFileImage(nsIFile* aFile, nsACString& aType)
   }
 
   return StringBeginsWith(aType, NS_LITERAL_CSTRING("image/"));
+}
+
+nsresult
+nsContentUtils::DataTransferItemToImage(const IPCDataTransferItem& aItem,
+                                        imgIContainer** aContainer)
+{
+  MOZ_ASSERT(aItem.data().type() == IPCDataTransferData::TnsCString);
+  MOZ_ASSERT(IsFlavorImage(aItem.flavor()));
+
+  const IPCDataTransferImage& imageDetails = aItem.imageDetails();
+  const IntSize size(imageDetails.width(), imageDetails.height());
+  if (!size.width || !size.height) {
+    return NS_ERROR_FAILURE;
+  }
+
+  const nsCString& text = aItem.data().get_nsCString();
+
+  // InitWrappingData takes a non-const pointer for reading.
+  nsCString& nonConstText = const_cast<nsCString&>(text);
+  RefPtr<SourceSurfaceRawData> image = new SourceSurfaceRawData();
+  image->InitWrappingData(reinterpret_cast<uint8_t*>(nonConstText.BeginWriting()),
+                          size, imageDetails.stride(),
+                          static_cast<SurfaceFormat>(imageDetails.format()),
+                          false);
+  image->GuaranteePersistance();
+
+  RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
+  nsCOMPtr<imgIContainer> imageContainer =
+    image::ImageOps::CreateFromDrawable(drawable);
+  imageContainer.forget(aContainer);
+
+  return NS_OK;
+}
+
+bool
+nsContentUtils::IsFlavorImage(const nsACString& aFlavor)
+{
+  return aFlavor.EqualsLiteral(kNativeImageMime) ||
+         aFlavor.EqualsLiteral(kJPEGImageMime) ||
+         aFlavor.EqualsLiteral(kJPGImageMime) ||
+         aFlavor.EqualsLiteral(kPNGImageMime) ||
+         aFlavor.EqualsLiteral(kGIFImageMime);
 }
 
 void
@@ -8902,4 +8963,25 @@ nsContentUtils::IsSpecificAboutPage(JSObject* aGlobal, const char* aUri)
   nsAutoCString spec;
   uri->GetSpec(spec);
   return spec.EqualsASCII(aUri);
+}
+
+/* static */ void
+nsContentUtils::SetScrollbarsVisibility(nsIDocShell* aDocShell, bool aVisible)
+{
+  nsCOMPtr<nsIScrollable> scroller = do_QueryInterface(aDocShell);
+
+  if (scroller) {
+    int32_t prefValue;
+
+    if (aVisible) {
+      prefValue = nsIScrollable::Scrollbar_Auto;
+    } else {
+      prefValue = nsIScrollable::Scrollbar_Never;
+    }
+
+    scroller->SetDefaultScrollbarPreferences(
+                nsIScrollable::ScrollOrientation_Y, prefValue);
+    scroller->SetDefaultScrollbarPreferences(
+                nsIScrollable::ScrollOrientation_X, prefValue);
+  }
 }

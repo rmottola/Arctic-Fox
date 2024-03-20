@@ -92,7 +92,7 @@
 #include "jsapi.h"
 #include "mozilla/dom/HTMLIFrameElement.h"
 #include "nsSandboxFlags.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 
 #include "mozilla/dom/ipc/StructuredCloneData.h"
 #include "mozilla/WebBrowserPersistLocalDocument.h"
@@ -1200,8 +1200,8 @@ nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,
     return NS_ERROR_NOT_IMPLEMENTED;
   }
 
-  if (ourDocshell->GetIsBrowserElement() !=
-      otherDocshell->GetIsBrowserElement() ||
+  if (ourDocshell->GetIsIsolatedMozBrowserElement() !=
+      otherDocshell->GetIsIsolatedMozBrowserElement() ||
       ourDocshell->GetIsApp() != otherDocshell->GetIsApp()) {
       return NS_ERROR_NOT_IMPLEMENTED;
   }
@@ -1737,7 +1737,7 @@ nsFrameLoader::ShouldUseRemoteProcess()
   // Don't try to launch nested children if we don't have OMTC.
   // They won't render!
   if (XRE_IsContentProcess() &&
-      !CompositorChild::ChildProcessHasCompositor()) {
+      !CompositorBridgeChild::ChildProcessHasCompositor()) {
     return false;
   }
 
@@ -1848,23 +1848,6 @@ nsFrameLoader::MaybeCreateDocShell()
     mDocShell->SetName(frameName);
   }
 
-  //Grab the userContextId from owner if XUL
-  nsAutoString userContextIdStr;
-  if (namespaceID == kNameSpaceID_XUL) {
-    if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
-      mOwnerContent->GetAttr(kNameSpaceID_None,
-                             nsGkAtoms::usercontextid,
-                             userContextIdStr);
-    }
-  }
-
-  if (!userContextIdStr.IsEmpty()) {
-    nsresult err;
-    nsDocShell * ds = nsDocShell::Cast(mDocShell);
-    ds->SetUserContextId(userContextIdStr.ToInteger(&err));
-    NS_ENSURE_SUCCESS(err, err);
-  }
-
   // Inform our docShell that it has a new child.
   // Note: This logic duplicates a lot of logic in
   // nsSubDocumentFrame::AttributeChanged.  We should fix that.
@@ -1935,6 +1918,14 @@ nsFrameLoader::MaybeCreateDocShell()
     webNav->SetSessionHistory(sessionHistory);
   }
 
+  DocShellOriginAttributes attrs;
+
+  if (!mOwnerContent->IsXULElement(nsGkAtoms::browser)) {
+    nsCOMPtr<nsIPrincipal> parentPrin = doc->NodePrincipal();
+    PrincipalOriginAttributes poa = BasePrincipal::Cast(parentPrin)->OriginAttributesRef();
+    attrs.InheritFromDocToChildDocShell(poa);
+  }
+
   if (OwnerIsAppFrame()) {
     // You can't be both an app and a browser frame.
     MOZ_ASSERT(!OwnerIsMozBrowserFrame());
@@ -1946,7 +1937,8 @@ nsFrameLoader::MaybeCreateDocShell()
       NS_ENSURE_SUCCESS(ownApp->GetLocalId(&ownAppId), NS_ERROR_FAILURE);
     }
 
-    mDocShell->SetIsApp(ownAppId);
+    attrs.mAppId = ownAppId;
+    mDocShell->SetFrameType(nsIDocShell::FRAME_TYPE_APP);
   }
 
   if (OwnerIsMozBrowserFrame()) {
@@ -1959,8 +1951,23 @@ nsFrameLoader::MaybeCreateDocShell()
       NS_ENSURE_SUCCESS(containingApp->GetLocalId(&containingAppId),
                         NS_ERROR_FAILURE);
     }
-    mDocShell->SetIsBrowserInsideApp(containingAppId);
+
+    attrs.mAppId = containingAppId;
+    attrs.mInIsolatedMozBrowser = OwnerIsIsolatedMozBrowserFrame();
+    mDocShell->SetFrameType(nsIDocShell::FRAME_TYPE_BROWSER);
   }
+
+  // Grab the userContextId from owner if XUL
+  nsAutoString userContextIdStr;
+  if ((namespaceID == kNameSpaceID_XUL) &&
+      mOwnerContent->GetAttr(kNameSpaceID_None, nsGkAtoms::usercontextid, userContextIdStr) &&
+      !userContextIdStr.IsEmpty()) {
+    nsresult rv;
+    attrs.mUserContextId = userContextIdStr.ToInteger(&rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  nsDocShell::Cast(mDocShell)->SetOriginAttributes(attrs);
 
   if (OwnerIsMozBrowserOrAppFrame()) {
     // For inproc frames, set the docshell properties.
@@ -3147,23 +3154,25 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
 
   // set the userContextId on the attrs before we pass them into
   // the tab context
-  if (mOwnerContent) {
-    nsAutoString userContextIdStr;
-    if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
-      mOwnerContent->GetAttr(kNameSpaceID_None,
-                             nsGkAtoms::usercontextid,
-                             userContextIdStr);
-    }
-    if (!userContextIdStr.IsEmpty()) {
-      nsresult err;
-      uint32_t userContextId = userContextIdStr.ToInteger(&err);
-      NS_ENSURE_SUCCESS(err, err);
-      attrs.mUserContextId = userContextId;
-    }
+  nsAutoString userContextIdStr;
+  if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
+    mOwnerContent->GetAttr(kNameSpaceID_None,
+                           nsGkAtoms::usercontextid,
+                           userContextIdStr);
+  }
+  if (!userContextIdStr.IsEmpty()) {
+    nsresult err;
+    uint32_t userContextId = userContextIdStr.ToInteger(&err);
+    NS_ENSURE_SUCCESS(err, err);
+    attrs.mUserContextId = userContextId;
   }
 
   bool tabContextUpdated =
-    aTabContext->SetTabContext(ownApp, containingApp, attrs, signedPkgOrigin);
+    aTabContext->SetTabContext(OwnerIsMozBrowserFrame(),
+                               ownApp,
+                               containingApp,
+                               attrs,
+                               signedPkgOrigin);
   NS_ENSURE_STATE(tabContextUpdated);
 
   return NS_OK;

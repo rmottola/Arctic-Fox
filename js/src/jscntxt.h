@@ -664,6 +664,7 @@ namespace js {
 MOZ_ALWAYS_INLINE bool
 CheckForInterrupt(JSContext* cx)
 {
+    MOZ_ASSERT(!cx->isExceptionPending());
     // Add an inline fast-path since we have to check for interrupts in some hot
     // C++ loops of library builtins.
     JSRuntime* rt = cx->runtime();
@@ -762,7 +763,7 @@ class MOZ_RAII AutoLockForExclusiveAccess
         runtime = rt;
         if (runtime->numExclusiveThreads) {
             runtime->assertCanLock(ExclusiveAccessLock);
-            PR_Lock(runtime->exclusiveAccessLock);
+            runtime->exclusiveAccessLock.lock();
 #ifdef DEBUG
             runtime->exclusiveAccessOwner = PR_GetCurrentThread();
 #endif
@@ -789,7 +790,7 @@ class MOZ_RAII AutoLockForExclusiveAccess
             MOZ_ASSERT(runtime->exclusiveAccessOwner == PR_GetCurrentThread());
             runtime->exclusiveAccessOwner = nullptr;
 #endif
-            PR_Unlock(runtime->exclusiveAccessLock);
+            runtime->exclusiveAccessLock.unlock();
         } else {
             MOZ_ASSERT(runtime->mainThreadHasExclusiveAccess);
 #ifdef DEBUG

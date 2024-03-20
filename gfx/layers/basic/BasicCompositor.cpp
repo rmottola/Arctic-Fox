@@ -166,26 +166,34 @@ BasicCompositor::CreateRenderTargetFromSource(const IntRect &aRect,
 }
 
 already_AddRefed<CompositingRenderTarget>
-BasicCompositor::CreateRenderTargetForWindow(const IntRect& aRect, SurfaceInitMode aInit, BufferMode aBufferMode)
+BasicCompositor::CreateRenderTargetForWindow(const LayoutDeviceIntRect& aRect, SurfaceInitMode aInit, BufferMode aBufferMode)
 {
-  if (aBufferMode != BufferMode::BUFFER_NONE) {
-    return CreateRenderTarget(aRect, aInit);
-  }
-
+  MOZ_ASSERT(mDrawTarget);
   MOZ_ASSERT(aRect.width != 0 && aRect.height != 0, "Trying to create a render target of invalid size");
 
   if (aRect.width * aRect.height == 0) {
     return nullptr;
   }
 
-  MOZ_ASSERT(mDrawTarget);
+  RefPtr<BasicCompositingRenderTarget> rt;
+  IntRect rect = aRect.ToUnknownRect();
 
-  // Adjust bounds rect to account for new origin at (0, 0).
-  IntRect rect(0, 0, aRect.XMost(), aRect.YMost());
-  RefPtr<BasicCompositingRenderTarget> rt = new BasicCompositingRenderTarget(mDrawTarget, rect);
-
-  if (aInit == INIT_MODE_CLEAR) {
-    mDrawTarget->ClearRect(gfx::Rect(aRect));
+  if (aBufferMode != BufferMode::BUFFER_NONE) {
+    RefPtr<DrawTarget> target = mWidget->CreateBackBufferDrawTarget(mDrawTarget, aRect);
+    if (!target) {
+      return nullptr;
+    }
+    rt = new BasicCompositingRenderTarget(target, rect);
+  } else {
+    IntRect windowRect = rect;
+    // Adjust bounds rect to account for new origin at (0, 0).
+    if (windowRect.Size() != mDrawTarget->GetSize()) {
+      windowRect.ExpandToEnclose(IntPoint(0, 0));
+    }
+    rt = new BasicCompositingRenderTarget(mDrawTarget, windowRect);
+    if (aInit == INIT_MODE_CLEAR) {
+      mDrawTarget->ClearRect(Rect(rect - rt->GetOrigin()));
+    }
   }
 
   return rt.forget();
@@ -389,6 +397,25 @@ RoundOut(Rect r)
   return IntRect(r.x, r.y, r.width, r.height);
 }
 
+static void
+SetupMask(const EffectChain& aEffectChain,
+          DrawTarget* aDest,
+          const IntPoint& aOffset,
+          RefPtr<SourceSurface>& aMaskSurface,
+          Matrix& aMaskTransform)
+{
+  if (aEffectChain.mSecondaryEffects[EffectTypes::MASK]) {
+    EffectMask *effectMask = static_cast<EffectMask*>(aEffectChain.mSecondaryEffects[EffectTypes::MASK].get());
+    aMaskSurface = effectMask->mMaskTexture->AsSourceBasic()->GetSurface(aDest);
+    if (!aMaskSurface) {
+      gfxWarning() << "Invalid sourceMask effect";
+    }
+    MOZ_ASSERT(effectMask->mMaskTransform.Is2D(), "How did we end up with a 3D transform here?!");
+    aMaskTransform = effectMask->mMaskTransform.As2D();
+    aMaskTransform.PostTranslate(-aOffset.x, -aOffset.y);
+  }
+}
+
 void
 BasicCompositor::DrawQuad(const gfx::Rect& aRect,
                           const gfx::Rect& aClipRect,
@@ -434,7 +461,8 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
 
     // When we apply the 3D transformation, we do it against a temporary
     // surface, so undo the coordinate offset.
-    new3DTransform = Matrix4x4::Translation(aRect.x, aRect.y, 0) * aTransform;
+    new3DTransform = aTransform;
+    new3DTransform.PreTranslate(aRect.x, aRect.y, 0);
   }
 
   buffer->PushClipRect(aClipRect);
@@ -444,16 +472,8 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
 
   RefPtr<SourceSurface> sourceMask;
   Matrix maskTransform;
-  if (aEffectChain.mSecondaryEffects[EffectTypes::MASK]) {
-    EffectMask *effectMask = static_cast<EffectMask*>(aEffectChain.mSecondaryEffects[EffectTypes::MASK].get());
-    sourceMask = effectMask->mMaskTexture->AsSourceBasic()->GetSurface(dest);
-    if (!sourceMask) {
-      gfxWarning() << "Invalid sourceMask effect";
-    }
-    MOZ_ASSERT(effectMask->mMaskTransform.Is2D(), "How did we end up with a 3D transform here?!");
-    MOZ_ASSERT(!effectMask->mIs3D);
-    maskTransform = effectMask->mMaskTransform.As2D();
-    maskTransform.PreTranslate(-offset.x, -offset.y);
+  if (aTransform.Is2D()) {
+    SetupMask(aEffectChain, dest, offset, sourceMask, maskTransform);
   }
 
   CompositionOp blendMode = CompositionOp::OP_OVER;
@@ -560,8 +580,40 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
 
     Transform(temp, source, new3DTransform, transformBounds.TopLeft());
 
+    SetupMask(aEffectChain, buffer, offset, sourceMask, maskTransform);
+
+    // Adjust for the fact that our content now start at 0,0 instead
+    // of the top left of transformBounds.
     transformBounds.MoveTo(0, 0);
-    buffer->DrawSurface(temp, transformBounds, transformBounds);
+    maskTransform.PostTranslate(-transformBounds.x, -transformBounds.y);
+
+    if (sourceMask) {
+      // Transform the source by it's normal transform, and then the inverse
+      // of the mask transform so that it's in the mask's untransformed
+      // coordinate space.
+      Matrix old = buffer->GetTransform();
+      Matrix sourceTransform = old;
+
+      Matrix inverseMask = maskTransform;
+      inverseMask.Invert();
+
+      sourceTransform *= inverseMask;
+
+      SurfacePattern source(temp, ExtendMode::CLAMP, sourceTransform);
+
+      buffer->PushClipRect(transformBounds);
+
+      // Mask in the untransformed coordinate space, and then transform
+      // by the mask transform to put the result back into destination
+      // coords.
+      buffer->SetTransform(maskTransform);
+      buffer->MaskSurface(source, sourceMask, Point(0, 0));
+      buffer->SetTransform(old);
+
+      buffer->PopClip();
+    } else {
+      buffer->DrawSurface(temp, transformBounds, transformBounds);
+    }
   }
 
   buffer->PopClip();
@@ -577,6 +629,7 @@ void
 BasicCompositor::BeginFrame(const nsIntRegion& aInvalidRegion,
                             const gfx::Rect *aClipRectIn,
                             const gfx::Rect& aRenderBounds,
+                            bool aOpaque,
                             gfx::Rect *aClipRectOut /* = nullptr */,
                             gfx::Rect *aRenderBoundsOut /* = nullptr */)
 {
@@ -627,7 +680,9 @@ BasicCompositor::BeginFrame(const nsIntRegion& aInvalidRegion,
   // Setup an intermediate render target to buffer all compositing. We will
   // copy this into mDrawTarget (the widget), and/or mTarget in EndFrame()
   RefPtr<CompositingRenderTarget> target =
-    CreateRenderTargetForWindow(mInvalidRect.ToUnknownRect(), INIT_MODE_CLEAR, bufferMode);
+    CreateRenderTargetForWindow(mInvalidRect,
+                                aOpaque ? INIT_MODE_NONE : INIT_MODE_CLEAR,
+                                bufferMode);
   if (!target) {
     if (!mTarget) {
       mWidget->EndRemoteDrawingInRegion(mDrawTarget, mInvalidRegion);

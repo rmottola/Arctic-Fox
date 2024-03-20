@@ -552,9 +552,17 @@
 
   /*
    * A success code that indicates that evaluating a string of JS went
-   * just fine except it threw an exception.
+   * just fine except it threw an exception. Only for legacy use by
+   * nsJSUtils.
    */
   ERROR(NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW,    SUCCESS(2)),
+
+  /*
+   * A success code that indicates that evaluating a string of JS went
+   * just fine except it was killed by an uncatchable exception.
+   * Only for legacy use by nsJSUtils.
+   */
+  ERROR(NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW_UNCATCHABLE, SUCCESS(3)),
 #undef MODULE
 
 
@@ -643,8 +651,6 @@
   ERROR(NS_ERROR_XPC_BAD_CONVERT_JS_ZERO_ISNOT_NULL,   FAILURE(53)),
   ERROR(NS_ERROR_XPC_CANT_PASS_CPOW_TO_NATIVE,         FAILURE(54)),
   /* any new errors here should have an associated entry added in xpc.msg */
-
-  ERROR(NS_SUCCESS_I_DID_SOMETHING,      SUCCESS(1)),
 #undef MODULE
 
 

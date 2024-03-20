@@ -30,10 +30,6 @@ endif
 -include $(DEPTH)/.mozconfig.mk
 
 ifndef EXTERNALLY_MANAGED_MAKE_FILE
-# Using $(firstword) may not be perfect. But it should be good enough for most
-# scenarios.
-_current_makefile = $(CURDIR)/$(firstword $(MAKEFILE_LIST))
-
 # Import the automatically generated backend file. If this file doesn't exist,
 # the backend hasn't been properly configured. We want this to be a fatal
 # error, hence not using "-include".
@@ -142,7 +138,7 @@ _DEBUG_CFLAGS :=
 _DEBUG_LDFLAGS :=
 
 ifneq (,$(MOZ_DEBUG)$(MOZ_DEBUG_SYMBOLS))
-  ifeq ($(AS),yasm)
+  ifeq ($(AS),$(YASM))
     ifeq ($(OS_ARCH)_$(GNU_CC),WINNT_)
       _DEBUG_ASFLAGS += -g cv8
     else
@@ -157,14 +153,7 @@ ifneq (,$(MOZ_DEBUG)$(MOZ_DEBUG_SYMBOLS))
   _DEBUG_LDFLAGS += $(MOZ_DEBUG_LDFLAGS)
 endif
 
-ifeq ($(YASM),$(AS))
-# yasm doesn't like the GNU as flags we may already have in ASFLAGS, so reset.
-ASFLAGS := $(_DEBUG_ASFLAGS)
-# yasm doesn't like -c
-AS_DASH_C_FLAG=
-else
 ASFLAGS += $(_DEBUG_ASFLAGS)
-endif
 OS_CFLAGS += $(_DEBUG_CFLAGS)
 OS_CXXFLAGS += $(_DEBUG_CFLAGS)
 OS_LDFLAGS += $(_DEBUG_LDFLAGS)
@@ -257,11 +246,6 @@ MY_RULES	:= $(DEPTH)/config/myrules.mk
 # Default command macros; can be overridden in <arch>.mk.
 #
 CCC = $(CXX)
-
-# Java macros
-JAVA_GEN_DIR  = _javagen
-JAVA_DIST_DIR = $(DEPTH)/$(JAVA_GEN_DIR)
-JAVA_IFACES_PKG_NAME = org/mozilla/interfaces
 
 INCLUDES = \
   -I$(srcdir) \

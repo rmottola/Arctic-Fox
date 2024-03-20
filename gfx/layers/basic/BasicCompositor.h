@@ -63,7 +63,7 @@ public:
                                const gfx::IntPoint &aSourcePoint) override;
 
   virtual already_AddRefed<CompositingRenderTarget>
-  CreateRenderTargetForWindow(const gfx::IntRect& aRect,
+  CreateRenderTargetForWindow(const LayoutDeviceIntRect& aRect,
                               SurfaceInitMode aInit,
                               BufferMode aBufferMode);
 
@@ -97,6 +97,7 @@ public:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect *aClipRectIn,
                           const gfx::Rect& aRenderBounds,
+                          bool aOpaque,
                           gfx::Rect *aClipRectOut = nullptr,
                           gfx::Rect *aRenderBoundsOut = nullptr) override;
   virtual void EndFrame() override;

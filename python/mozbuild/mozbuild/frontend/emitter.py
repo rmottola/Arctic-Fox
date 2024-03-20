@@ -178,9 +178,8 @@ class TreeMetadataEmitter(LoggingMixin):
             else:
                 raise Exception('Unhandled output type: %s' % type(out))
 
-        # Don't emit Linkable objects when COMPILE_ENVIRONMENT is explicitely
-        # set to a value meaning false (usually '').
-        if self.config.substs.get('COMPILE_ENVIRONMENT', True):
+        # Don't emit Linkable objects when COMPILE_ENVIRONMENT is not set
+        if self.config.substs.get('COMPILE_ENVIRONMENT'):
             start = time.time()
             objs = list(self._emit_libs_derived(contexts))
             self._emitter_time += time.time() - start
@@ -923,6 +922,14 @@ class TreeMetadataEmitter(LoggingMixin):
 
         for name, data in context.get('ANDROID_ECLIPSE_PROJECT_TARGETS', {}).items():
             yield ContextWrapped(context, data)
+
+        if context.get('USE_YASM') is True:
+            yasm = context.config.substs.get('YASM')
+            if not yasm:
+                raise SandboxValidationError('yasm is not available', context)
+            passthru.variables['AS'] = yasm
+            passthru.variables['ASFLAGS'] = context.config.substs.get('YASM_ASFLAGS')
+            passthru.variables['AS_DASH_C_FLAG'] = ''
 
         for (symbol, cls) in [
                 ('ANDROID_RES_DIRS', AndroidResDirs),

@@ -51,9 +51,8 @@
 #include "mozilla/layers/AsyncCompositionManager.h"  // for ViewTransform
 #include "mozilla/layers/AxisPhysicsModel.h" // for AxisPhysicsModel
 #include "mozilla/layers/AxisPhysicsMSDModel.h" // for AxisPhysicsMSDModel
-#include "mozilla/layers/CompositorParent.h" // for CompositorParent
+#include "mozilla/layers/CompositorBridgeParent.h" // for CompositorBridgeParent
 #include "mozilla/layers/LayerTransactionParent.h" // for LayerTransactionParent
-#include "mozilla/layers/PCompositorBridgeParent.h" // for PCompositorBridgeParent
 #include "mozilla/layers/ScrollInputMethods.h" // for ScrollInputMethod
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "mozilla/unused.h"             // for unused
@@ -890,13 +889,13 @@ AsyncPanZoomController::GetSharedFrameMetricsCompositor()
   APZThreadUtils::AssertOnCompositorThread();
 
   if (mSharingFrameMetricsAcrossProcesses) {
-    // |state| may be null here if the CrossProcessCompositorParent has already been destroyed.
-    if (const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mLayersId)) {
+    // |state| may be null here if the CrossProcessCompositorBridgeParent has already been destroyed.
+    if (const CompositorBridgeParent::LayerTreeState* state = CompositorBridgeParent::GetIndirectShadowTree(mLayersId)) {
       return state->CrossProcessPCompositorBridge();
     }
     return nullptr;
   }
-  return mCompositorParent.get();
+  return mCompositorBridgeParent.get();
 }
 
 already_AddRefed<GeckoContentController>
@@ -1033,6 +1032,10 @@ static float GetAxisScale(AsyncDragMetrics::DragDirection aDir, T aValue) {
 nsEventStatus AsyncPanZoomController::HandleDragEvent(const MouseInput& aEvent,
                                                       const AsyncDragMetrics& aDragMetrics)
 {
+  if (!gfxPrefs::APZDragEnabled()) {
+    return nsEventStatus_eIgnore;
+  }
+
   if (!GetApzcTreeManager()) {
     return nsEventStatus_eConsumeNoDefault;
   }
@@ -2036,7 +2039,13 @@ nsEventStatus AsyncPanZoomController::OnLongPress(const TapGestureInput& aEvent)
   if (controller) {
     CSSPoint geckoScreenPoint;
     if (ConvertToGecko(aEvent.mPoint, &geckoScreenPoint)) {
-      if (CurrentTouchBlock()->IsDuringFastFling()) {
+      CancelableBlockState* block = CurrentInputBlock();
+      MOZ_ASSERT(block);
+      if (!block->AsTouchBlock()) {
+        APZC_LOG("%p dropping long-press because some non-touch block interrupted it\n", this);
+        return nsEventStatus_eIgnore;
+      }
+      if (block->AsTouchBlock()->IsDuringFastFling()) {
         APZC_LOG("%p dropping long-press because of fast fling\n", this);
         return nsEventStatus_eIgnore;
       }
@@ -2058,8 +2067,21 @@ nsEventStatus AsyncPanZoomController::GenerateSingleTap(const ScreenIntPoint& aP
   if (controller) {
     CSSPoint geckoScreenPoint;
     if (ConvertToGecko(aPoint, &geckoScreenPoint)) {
-      if (!CurrentTouchBlock()->SetSingleTapOccurred()) {
-        return nsEventStatus_eIgnore;
+      CancelableBlockState* block = CurrentInputBlock();
+      MOZ_ASSERT(block);
+      TouchBlockState* touch = block->AsTouchBlock();
+      // |block| may be a non-touch block in the case where this function is
+      // invoked by GestureEventListener on a timeout. In that case we already
+      // verified that the single tap is allowed so we let it through.
+      // XXX there is a bug here that in such a case the touch block that
+      // generated this tap will not get its mSingleTapOccurred flag set.
+      // See https://bugzilla.mozilla.org/show_bug.cgi?id=1256344#c6
+      if (touch) {
+        if (touch->IsDuringFastFling()) {
+          APZC_LOG("%p dropping single-tap because it was during a fast-fling\n", this);
+          return nsEventStatus_eIgnore;
+        }
+        touch->SetSingleTapOccurred();
       }
       // Because this may be being running as part of APZCTreeManager::ReceiveInputEvent,
       // calling controller->HandleSingleTap directly might mean that content receives
@@ -2327,7 +2349,18 @@ bool AsyncPanZoomController::AttemptScroll(ParentLayerPoint& aStartPoint,
   ParentLayerPoint displacement = aStartPoint - aEndPoint;
 
   ParentLayerPoint overscroll;  // will be used outside monitor block
-  {
+
+  // If the direction of panning is reversed within the same input block,
+  // a later event in the block could potentially scroll an APZC earlier
+  // in the handoff chain, than an earlier event in the block (because
+  // the earlier APZC was scrolled to its extent in the original direction).
+  // If immediate handoff is disallowed, we want to disallow this (to
+  // preserve the property that a single input block only scrolls one APZC),
+  // so we skip the earlier APZC.
+  bool scrollThisApzc = gfxPrefs::APZAllowImmediateHandoff() ||
+      (CurrentInputBlock() && (!CurrentInputBlock()->GetScrolledApzc() || this == CurrentInputBlock()->GetScrolledApzc()));
+
+  if (scrollThisApzc) {
     ReentrantMonitorAutoEnter lock(mMonitor);
 
     ParentLayerPoint adjustedDisplacement;
@@ -2352,6 +2385,8 @@ bool AsyncPanZoomController::AttemptScroll(ParentLayerPoint& aStartPoint,
       ScheduleCompositeAndMaybeRepaint();
       UpdateSharedCompositorFrameMetrics();
     }
+  } else {
+    overscroll = displacement;
   }
 
   // Adjust the start point to reflect the consumed portion of the scroll.
@@ -2668,8 +2703,8 @@ void AsyncPanZoomController::ClearOverscroll() {
   mY.ClearOverscroll();
 }
 
-void AsyncPanZoomController::SetCompositorParent(CompositorParent* aCompositorParent) {
-  mCompositorParent = aCompositorParent;
+void AsyncPanZoomController::SetCompositorBridgeParent(CompositorBridgeParent* aCompositorBridgeParent) {
+  mCompositorBridgeParent = aCompositorBridgeParent;
 }
 
 void AsyncPanZoomController::ShareFrameMetricsAcrossProcesses() {
@@ -2684,7 +2719,10 @@ void AsyncPanZoomController::AdjustScrollForSurfaceShift(const ScreenPoint& aShi
     / mFrameMetrics.GetZoom();
   APZC_LOG("%p adjusting scroll position by %s for surface shift\n",
     this, Stringify(adjustment).c_str());
-  mFrameMetrics.ScrollBy(adjustment);
+  CSSPoint scrollOffset = mFrameMetrics.GetScrollOffset();
+  scrollOffset.y = mY.ClampOriginToScrollableRect(scrollOffset.y + adjustment.y);
+  scrollOffset.x = mX.ClampOriginToScrollableRect(scrollOffset.x + adjustment.x);
+  mFrameMetrics.SetScrollOffset(scrollOffset);
   ScheduleCompositeAndMaybeRepaint();
   UpdateSharedCompositorFrameMetrics();
 }
@@ -2810,8 +2848,8 @@ const ScreenMargin AsyncPanZoomController::CalculatePendingDisplayPort(
 }
 
 void AsyncPanZoomController::ScheduleComposite() {
-  if (mCompositorParent) {
-    mCompositorParent->ScheduleRenderOnCompositorThread();
+  if (mCompositorBridgeParent) {
+    mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
   }
 }
 
@@ -2980,7 +3018,10 @@ bool AsyncPanZoomController::UpdateAnimation(const TimeStamp& aSampleTime,
       mAnimation = nullptr;
       SetState(NOTHING);
     }
-    if (wantsRepaints) {
+    // Request a repaint at the end of the animation in case something such as a
+    // call to NotifyLayersUpdated was invoked during the animation and Gecko's
+    // current state is some intermediate point of the animation.
+    if (!continueAnimation || wantsRepaints) {
       RequestContentRepaint();
     }
     UpdateSharedCompositorFrameMetrics();
@@ -3248,6 +3289,15 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
   ReentrantMonitorAutoEnter lock(mMonitor);
   bool isDefault = mFrameMetrics.IsDefault();
 
+  if ((aLayerMetrics == mLastContentPaintMetrics) && !isDefault) {
+    // No new information here, skip it. Note that this is not just an
+    // optimization; it's correctness too. In the case where we get one of these
+    // stale aLayerMetrics *after* a call to NotifyScrollUpdated, processing the
+    // stale aLayerMetrics would clobber the more up-to-date information from
+    // NotifyScrollUpdated.
+    APZC_LOG("%p NotifyLayersUpdated short-circuit\n", this);
+    return;
+  }
   mLastContentPaintMetrics = aLayerMetrics;
 
   mFrameMetrics.SetScrollParentId(aLayerMetrics.GetScrollParentId());
@@ -3451,6 +3501,35 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
 }
 
 void
+AsyncPanZoomController::NotifyScrollUpdated(uint32_t aScrollGeneration,
+                                            const CSSPoint& aScrollOffset)
+{
+  APZThreadUtils::AssertOnCompositorThread();
+  ReentrantMonitorAutoEnter lock(mMonitor);
+
+  APZC_LOG("%p NotifyScrollUpdated(%d, %s)\n", this, aScrollGeneration,
+      Stringify(aScrollOffset).c_str());
+
+  bool scrollOffsetUpdated = aScrollGeneration != mFrameMetrics.GetScrollGeneration();
+  if (!scrollOffsetUpdated) {
+    return;
+  }
+  APZC_LOG("%p updating scroll offset from %s to %s\n", this,
+      Stringify(mFrameMetrics.GetScrollOffset()).c_str(),
+      Stringify(aScrollOffset).c_str());
+
+  mFrameMetrics.UpdateScrollInfo(aScrollGeneration, aScrollOffset);
+  AcknowledgeScrollUpdate();
+  mExpectedGeckoMetrics.UpdateScrollInfo(aScrollGeneration, aScrollOffset);
+  CancelAnimation();
+  RequestContentRepaint();
+  UpdateSharedCompositorFrameMetrics();
+  // We don't call ScheduleComposite() here because that happens higher up
+  // in the call stack, when LayerTransactionParent handles this message.
+  // If we did it here it would incur an extra message posting unnecessarily.
+}
+
+void
 AsyncPanZoomController::AcknowledgeScrollUpdate() const
 {
   // Once layout issues a scroll offset update, it becomes impervious to
@@ -3551,11 +3630,30 @@ void AsyncPanZoomController::ZoomToRect(CSSRect aRect, const uint32_t aFlags) {
     FrameMetrics endZoomToMetrics = mFrameMetrics;
     if (aFlags & PAN_INTO_VIEW_ONLY) {
       targetZoom = currentZoom;
+    } else if(aFlags & ONLY_ZOOM_TO_DEFAULT_SCALE) {
+      CSSToParentLayerScale zoomAtDefaultScale =
+        mFrameMetrics.GetDevPixelsPerCSSPixel() * LayoutDeviceToParentLayerScale(1.0);
+      if (targetZoom.scale > zoomAtDefaultScale.scale) {
+        // Only change the zoom if we are less than the default zoom
+        if (currentZoom.scale < zoomAtDefaultScale.scale) {
+          targetZoom = zoomAtDefaultScale;
+        } else {
+          targetZoom = currentZoom;
+        }
+      }
     }
     endZoomToMetrics.SetZoom(CSSToParentLayerScale2D(targetZoom));
 
     // Adjust the zoomToRect to a sensible position to prevent overscrolling.
     CSSSize sizeAfterZoom = endZoomToMetrics.CalculateCompositedSizeInCssPixels();
+
+    // Vertically center the zoomed element in the screen.
+    if (!zoomOut && (sizeAfterZoom.height > aRect.height)) {
+      aRect.y -= (sizeAfterZoom.height - aRect.height) * 0.5f;
+      if (aRect.y < 0.0f) {
+        aRect.y = 0.0f;
+      }
+    }
 
     // If either of these conditions are met, the page will be
     // overscrolled after zoomed
@@ -3566,14 +3664,6 @@ void AsyncPanZoomController::ZoomToRect(CSSRect aRect, const uint32_t aFlags) {
     if (aRect.x + sizeAfterZoom.width > cssPageRect.width) {
       aRect.x = cssPageRect.width - sizeAfterZoom.width;
       aRect.x = aRect.x > 0 ? aRect.x : 0;
-    }
-
-    // Vertically center the zoomed element in the screen.
-    if (!zoomOut && (sizeAfterZoom.height > aRect.height)) {
-      aRect.y -= (sizeAfterZoom.height - aRect.height) * 0.5f;
-      if (aRect.y < 0.0f) {
-        aRect.y = 0.0f;
-      }
     }
 
     endZoomToMetrics.SetScrollOffset(aRect.TopLeft());
@@ -3684,16 +3774,16 @@ void AsyncPanZoomController::DispatchStateChangeNotification(PanZoomState aOldSt
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
       // Let the compositor know about scroll state changes so it can manage
       // windowed plugins.
-      if (mCompositorParent) {
-        mCompositorParent->ScheduleHideAllPluginWindows();
+      if (mCompositorBridgeParent) {
+        mCompositorBridgeParent->ScheduleHideAllPluginWindows();
       }
 #endif
     } else if (IsTransformingState(aOldState) && !IsTransformingState(aNewState)) {
       controller->NotifyAPZStateChange(
           GetGuid(), APZStateChange::TransformEnd);
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
-      if (mCompositorParent) {
-        mCompositorParent->ScheduleShowAllPluginWindows();
+      if (mCompositorBridgeParent) {
+        mCompositorBridgeParent->ScheduleShowAllPluginWindows();
       }
 #endif
     }

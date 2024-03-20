@@ -138,6 +138,59 @@ intrinsic_IsConstructor(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+/**
+ * Intrinsic for calling a wrapped self-hosted function without invoking the
+ * wrapper's security checks.
+ *
+ * Takes a wrapped function as the first and the receiver object as the
+ * second argument. Any additional arguments are passed on to the unwrapped
+ * function.
+ *
+ * Xray wrappers prevent lower-privileged code from passing objects to wrapped
+ * functions from higher-privileged realms. In some cases, this check is too
+ * strict, so this intrinsic allows getting around it.
+ *
+ * Note that it's not possible to replace all usages with dedicated intrinsics
+ * as the function in question might be an inner function that closes over
+ * state relevant to its execution.
+ *
+ * Right now, this is used for the Promise implementation to enable creating
+ * resolution functions for xrayed Promises in the privileged realm and then
+ * creating the Promise instance in the non-privileged one. The callbacks have
+ * to be called by non-privileged code in various places, in many cases
+ * passing objects as arguments.
+ */
+static bool
+intrinsic_UnsafeCallWrappedFunction(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() >= 2);
+    MOZ_ASSERT(IsCallable(args[0]));
+    MOZ_ASSERT(IsWrapper(&args[0].toObject()));
+    MOZ_ASSERT(args[1].isObject() || args[1].isUndefined());
+
+    MOZ_RELEASE_ASSERT(args[0].isObject());
+    RootedObject wrappedFun(cx, &args[0].toObject());
+    RootedObject fun(cx, UncheckedUnwrap(wrappedFun));
+    MOZ_RELEASE_ASSERT(fun->is<JSFunction>());
+    MOZ_RELEASE_ASSERT(fun->as<JSFunction>().isSelfHostedBuiltin());
+
+    InvokeArgs args2(cx);
+    if (!args2.init(args.length() - 2))
+        return false;
+
+    args2.setThis(args[1]);
+
+    for (size_t i = 0; i < args2.length(); i++)
+        args2[i].set(args[i + 2]);
+
+    AutoWaivePolicy waivePolicy(cx, wrappedFun, JSID_VOIDHANDLE, BaseProxyHandler::CALL);
+    if (!CrossCompartmentWrapper::singleton.call(cx, wrappedFun, args2))
+        return false;
+    args.rval().set(args2.rval());
+    return true;
+}
+
 template<typename T>
 static bool
 intrinsic_IsInstanceOfBuiltin(JSContext* cx, unsigned argc, Value* vp)
@@ -559,6 +612,34 @@ intrinsic_UnsafeGetBooleanFromReservedSlot(JSContext* cx, unsigned argc, Value* 
         return false;
     MOZ_ASSERT(vp->isBoolean());
     return true;
+}
+
+/**
+ * Intrinsic for creating an empty array in the compartment of the object
+ * passed as the first argument.
+ *
+ * Returns the array, wrapped in the default wrapper to use between the two
+ * compartments.
+ */
+static bool
+intrinsic_NewArrayInCompartment(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    RootedObject wrapped(cx, &args[0].toObject());
+    MOZ_ASSERT(IsWrapper(wrapped));
+    RootedObject obj(cx, UncheckedUnwrap(wrapped));
+
+    RootedArrayObject arr(cx);
+    {
+        AutoCompartment ac(cx, obj);
+        arr = NewDenseEmptyArray(cx);
+        if (!arr)
+            return false;
+    }
+
+    args.rval().setObject(*arr);
+    return wrapped->compartment()->wrap(cx, args.rval());
 }
 
 static bool
@@ -1441,16 +1522,31 @@ js::ReportIncompatibleSelfHostedMethod(JSContext* cx, const CallArgs& args)
     // because they always call the different CallXXXMethodIfWrapped methods,
     // which would be reported as the called function instead.
 
-    // Lookup the selfhosted method that was invoked.
+    // Lookup the selfhosted method that was invoked.  But skip over
+    // IsTypedArrayEnsuringArrayBuffer frames, because those are never the
+    // actual self-hosted callee from external code.  We can't just skip
+    // self-hosted things until we find a non-self-hosted one because of cases
+    // like array.sort(somethingSelfHosted), where we want to report the error
+    // in the somethingSelfHosted, not in the sort() call.
     ScriptFrameIter iter(cx);
     MOZ_ASSERT(iter.isFunctionFrame());
 
-    JSAutoByteString funNameBytes;
-    if (const char* funName = GetFunctionNameBytes(cx, iter.callee(cx), &funNameBytes)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_METHOD,
-                             funName, "method", InformalValueTypeName(args.thisv()));
+    while (!iter.done()) {
+        MOZ_ASSERT(iter.callee(cx)->isSelfHostedOrIntrinsic() &&
+                   !iter.callee(cx)->isBoundFunction());
+        JSAutoByteString funNameBytes;
+        const char* funName = GetFunctionNameBytes(cx, iter.callee(cx), &funNameBytes);
+        if (!funName)
+            return false;
+        if (strcmp(funName, "IsTypedArrayEnsuringArrayBuffer") != 0) {
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_METHOD,
+                                 funName, "method", InformalValueTypeName(args.thisv()));
+            return false;
+        }
+        ++iter;
     }
 
+    MOZ_ASSERT_UNREACHABLE("How did we not find a useful self-hosted frame?");
     return false;
 }
 
@@ -1548,9 +1644,11 @@ intrinsic_ConstructorForTypedArray(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
     MOZ_ASSERT(args.length() == 1);
     MOZ_ASSERT(args[0].isObject());
-    MOZ_ASSERT(args[0].toObject().is<TypedArrayObject>());
 
     RootedObject object(cx, &args[0].toObject());
+    object = CheckedUnwrap(object);
+    MOZ_ASSERT(object->is<TypedArrayObject>());
+
     JSProtoKey protoKey = StandardProtoKeyOrNull(object);
     MOZ_ASSERT(protoKey);
 
@@ -1856,6 +1954,9 @@ static const JSFunctionSpec intrinsic_functions[] = {
                     IntrinsicUnsafeGetStringFromReservedSlot),
     JS_INLINABLE_FN("UnsafeGetBooleanFromReservedSlot", intrinsic_UnsafeGetBooleanFromReservedSlot,2,0,
                     IntrinsicUnsafeGetBooleanFromReservedSlot),
+
+    JS_FN("UnsafeCallWrappedFunction", intrinsic_UnsafeCallWrappedFunction,2,0),
+    JS_FN("NewArrayInCompartment",   intrinsic_NewArrayInCompartment,   1,0),
 
     JS_FN("IsPackedArray",           intrinsic_IsPackedArray,           1,0),
 

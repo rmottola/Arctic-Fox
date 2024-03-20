@@ -23,7 +23,7 @@
 #include "nsNameSpaceManager.h"
 #include "nsTextFragment.h"
 #include "nsString.h"
-#include "prprf.h"
+#include "mozilla/Snprintf.h"
 #include "nsUnicharUtils.h"
 #include "nsCRT.h"
 #include "nsContentUtils.h"
@@ -112,6 +112,8 @@ nsXMLContentSerializer::Init(uint32_t aFlags, uint32_t aWrapColumn,
   mDoFormat = (mFlags & nsIDocumentEncoder::OutputFormatted && !mDoRaw);
 
   mDoWrap = (mFlags & nsIDocumentEncoder::OutputWrap && !mDoRaw);
+
+  mAllowLineBreaking = !(mFlags & nsIDocumentEncoder::OutputDisallowLineBreaking);
 
   if (!aWrapColumn) {
     mMaxColumn = 72;
@@ -606,7 +608,7 @@ nsXMLContentSerializer::GenerateNewPrefix(nsAString& aPrefix)
 {
   aPrefix.Assign('a');
   char buf[128];
-  PR_snprintf(buf, sizeof(buf), "%d", mPrefixIndex++);
+  snprintf_literal(buf, "%d", mPrefixIndex++);
   AppendASCIItoUTF16(buf, aPrefix);
 }
 
@@ -959,8 +961,7 @@ nsXMLContentSerializer::AppendElementStart(Element* aElement,
                                      name, aStr, skipAttr, addNSAttr),
                  NS_ERROR_OUT_OF_MEMORY);
 
-  NS_ENSURE_TRUE(AppendEndOfElementStart(aOriginalElement, name,
-                                         content->GetNameSpaceID(), aStr),
+  NS_ENSURE_TRUE(AppendEndOfElementStart(aElement, aOriginalElement, aStr),
                  NS_ERROR_OUT_OF_MEMORY);
 
   if ((mDoFormat || forceFormat) && !mDoRaw && !PreLevel()
@@ -973,19 +974,56 @@ nsXMLContentSerializer::AppendElementStart(Element* aElement,
   return NS_OK;
 }
 
+// aElement is the actual element we're outputting.  aOriginalElement is the one
+// in the original DOM, which is the one we have to test for kids.
+static bool
+ElementNeedsSeparateEndTag(Element* aElement, Element* aOriginalElement)
+{
+  if (aOriginalElement->GetChildCount()) {
+    // We have kids, so we need a separate end tag.  This needs to be checked on
+    // aOriginalElement because that's the one that's actually in the DOM and
+    // might have kids.
+    return true;
+  }
+
+  if (!aElement->IsHTMLElement()) {
+    // Empty non-HTML elements can just skip a separate end tag.
+    return false;
+  }
+
+  // HTML container tags should have a separate end tag even if empty, per spec.
+  // See
+  // https://w3c.github.io/DOM-Parsing/#dfn-concept-xml-serialization-algorithm
+  bool isHTMLContainer = true; // Default in case we get no parser service.
+  nsIParserService* parserService = nsContentUtils::GetParserService();
+  if (parserService) {
+    nsIAtom* localName = aElement->NodeInfo()->NameAtom();
+    parserService->IsContainer(
+      parserService->HTMLCaseSensitiveAtomTagToId(localName),
+      isHTMLContainer);
+  }
+  return isHTMLContainer;
+}
+
 bool
-nsXMLContentSerializer::AppendEndOfElementStart(nsIContent *aOriginalElement,
-                                                nsIAtom * aName,
-                                                int32_t aNamespaceID,
+nsXMLContentSerializer::AppendEndOfElementStart(Element* aElement,
+                                                Element* aOriginalElement,
                                                 nsAString& aStr)
 {
-  // We don't output a separate end tag for empty elements
-  if (!aOriginalElement->GetChildCount()) {
-    return AppendToString(NS_LITERAL_STRING("/>"), aStr);
-  }
-  else {
+  if (ElementNeedsSeparateEndTag(aElement, aOriginalElement)) {
     return AppendToString(kGreaterThan, aStr);
   }
+
+  // We don't need a separate end tag.  For HTML elements (which at this point
+  // must be non-containers), append a space before the '/', per spec.  See
+  // https://w3c.github.io/DOM-Parsing/#dfn-concept-xml-serialization-algorithm
+  if (aOriginalElement->IsHTMLElement()) {
+    if (!AppendToString(kSpace, aStr)) {
+      return false;
+    }
+  }
+
+  return AppendToString(NS_LITERAL_STRING("/>"), aStr);
 }
 
 NS_IMETHODIMP 
@@ -997,7 +1035,7 @@ nsXMLContentSerializer::AppendElementEnd(Element* aElement,
   nsIContent* content = aElement;
 
   bool forceFormat = false, outputElementEnd;
-  outputElementEnd = CheckElementEnd(content, forceFormat, aStr);
+  outputElementEnd = CheckElementEnd(aElement, forceFormat, aStr);
 
   nsIAtom *name = content->NodeInfo()->NameAtom();
 
@@ -1118,13 +1156,17 @@ nsXMLContentSerializer::CheckElementStart(nsIContent * aContent,
 }
 
 bool
-nsXMLContentSerializer::CheckElementEnd(nsIContent * aContent,
-                                        bool & aForceFormat,
+nsXMLContentSerializer::CheckElementEnd(Element* aElement,
+                                        bool& aForceFormat,
                                         nsAString& aStr)
 {
   // We don't output a separate end tag for empty element
   aForceFormat = false;
-  return aContent->GetChildCount() > 0;
+
+  // XXXbz this is a bit messed up, but by now we don't have our fixed-up
+  // version of aElement anymore.  Let's hope fixup never changes the localName
+  // or namespace...
+  return ElementNeedsSeparateEndTag(aElement, aElement);
 }
 
 bool
@@ -1151,24 +1193,39 @@ nsXMLContentSerializer::AppendToString(const nsAString& aStr,
 
 
 static const uint16_t kGTVal = 62;
-static const char* kEntities[] = {
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "&amp;", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "&lt;", "", "&gt;"
+
+#define _ 0
+
+// This table indexes into kEntityStrings[].
+static const uint8_t kEntities[] = {
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, 2, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  3, _, 4
 };
 
-static const char* kAttrEntities[] = {
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "&quot;", "", "", "", "&amp;", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "", "", "", "", "", "", "", "", "", "",
-  "&lt;", "", "&gt;"
+// This table indexes into kEntityStrings[].
+static const uint8_t kAttrEntities[] = {
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, 1, _, _, _, 2, _,
+  _, _, _, _, _, _, _, _, _, _,
+  _, _, _, _, _, _, _, _, _, _,
+  3, _, 4
+};
+
+#undef _
+
+static const char* const kEntityStrings[] = {
+  /* 0 */ nullptr,
+  /* 1 */ "&quot;",
+  /* 2 */ "&amp;",
+  /* 3 */ "&lt;",
+  /* 4 */ "&gt;",
 };
 
 bool
@@ -1182,7 +1239,7 @@ nsXMLContentSerializer::AppendAndTranslateEntities(const nsAString& aStr,
   uint32_t advanceLength = 0;
   nsReadingIterator<char16_t> iter;
 
-  const char **entityTable = mInAttribute ? kAttrEntities : kEntities;
+  const uint8_t* entityTable = mInAttribute ? kAttrEntities : kEntities;
 
   for (aStr.BeginReading(iter);
        iter != done_reading;
@@ -1198,8 +1255,8 @@ nsXMLContentSerializer::AppendAndTranslateEntities(const nsAString& aStr,
     // needs to be replaced
     for (; c < fragmentEnd; c++, advanceLength++) {
       char16_t val = *c;
-      if ((val <= kGTVal) && (entityTable[val][0] != 0)) {
-        entityText = entityTable[val];
+      if ((val <= kGTVal) && entityTable[val]) {
+        entityText = kEntityStrings[entityTable[val]];
         break;
       }
     }
@@ -1540,22 +1597,24 @@ nsXMLContentSerializer::AppendWrapped_NonWhitespaceSequence(
         // we must wrap
         onceAgainBecauseWeAddedBreakInFront = false;
         bool foundWrapPosition = false;
-        int32_t wrapPosition;
+        int32_t wrapPosition = 0;
 
-        nsILineBreaker *lineBreaker = nsContentUtils::LineBreaker();
+        if (mAllowLineBreaking) {
+          nsILineBreaker *lineBreaker = nsContentUtils::LineBreaker();
 
-        wrapPosition = lineBreaker->Prev(aSequenceStart,
-                                         (aEnd - aSequenceStart),
-                                         (aPos - aSequenceStart) + 1);
-        if (wrapPosition != NS_LINEBREAKER_NEED_MORE_TEXT) {
-          foundWrapPosition = true;
-        }
-        else {
-          wrapPosition = lineBreaker->Next(aSequenceStart,
+          wrapPosition = lineBreaker->Prev(aSequenceStart,
                                            (aEnd - aSequenceStart),
-                                           (aPos - aSequenceStart));
+                                           (aPos - aSequenceStart) + 1);
           if (wrapPosition != NS_LINEBREAKER_NEED_MORE_TEXT) {
             foundWrapPosition = true;
+          }
+          else {
+            wrapPosition = lineBreaker->Next(aSequenceStart,
+                                             (aEnd - aSequenceStart),
+                                             (aPos - aSequenceStart));
+            if (wrapPosition != NS_LINEBREAKER_NEED_MORE_TEXT) {
+              foundWrapPosition = true;
+            }
           }
         }
 

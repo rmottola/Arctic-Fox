@@ -5074,6 +5074,7 @@ NS_INTERFACE_MAP_BEGIN(nsHttpChannel)
     NS_INTERFACE_MAP_ENTRY(nsIDNSListener)
     NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
     NS_INTERFACE_MAP_ENTRY(nsICorsPreflightCallback)
+    NS_INTERFACE_MAP_ENTRY(nsIChannelWithDivertableParentListener)
     // we have no macro that covers this case.
     if (aIID.Equals(NS_GET_IID(nsHttpChannel)) ) {
         AddRef();
@@ -5122,48 +5123,27 @@ nsHttpChannel::Cancel(nsresult status)
 NS_IMETHODIMP
 nsHttpChannel::Suspend()
 {
-    NS_ENSURE_TRUE(mIsPending, NS_ERROR_NOT_AVAILABLE);
+    nsresult rv = SuspendInternal();
 
-    LOG(("nsHttpChannel::Suspend [this=%p]\n", this));
-
-    ++mSuspendCount;
-
-    nsresult rvTransaction = NS_OK;
-    if (mTransactionPump) {
-        rvTransaction = mTransactionPump->Suspend();
-    }
-    nsresult rvCache = NS_OK;
-    if (mCachePump) {
-        rvCache = mCachePump->Suspend();
+    nsresult rvParentChannel = NS_OK;
+    if (mParentChannel) {
+      rvParentChannel = mParentChannel->SuspendMessageDiversion();
     }
 
-    return NS_FAILED(rvTransaction) ? rvTransaction : rvCache;
+    return NS_FAILED(rv) ? rv : rvParentChannel;
 }
 
 NS_IMETHODIMP
 nsHttpChannel::Resume()
 {
-    NS_ENSURE_TRUE(mSuspendCount > 0, NS_ERROR_UNEXPECTED);
+    nsresult rv = ResumeInternal();
 
-    LOG(("nsHttpChannel::Resume [this=%p]\n", this));
-
-    if (--mSuspendCount == 0 && mCallOnResume) {
-        nsresult rv = AsyncCall(mCallOnResume);
-        mCallOnResume = nullptr;
-        NS_ENSURE_SUCCESS(rv, rv);
+    nsresult rvParentChannel = NS_OK;
+    if (mParentChannel) {
+      rvParentChannel = mParentChannel->ResumeMessageDiversion();
     }
 
-    nsresult rvTransaction = NS_OK;
-    if (mTransactionPump) {
-        rvTransaction = mTransactionPump->Resume();
-    }
-
-    nsresult rvCache = NS_OK;
-    if (mCachePump) {
-        rvCache = mCachePump->Resume();
-    }
-
-    return NS_FAILED(rvTransaction) ? rvTransaction : rvCache;
+    return NS_FAILED(rv) ? rv : rvParentChannel;
 }
 
 //-----------------------------------------------------------------------------
@@ -7388,6 +7368,75 @@ nsHttpChannel::OnPreflightFailed(nsresult aError)
     CloseCacheEntry(true);
     AsyncAbort(aError);
     return NS_OK;
+}
+
+//-----------------------------------------------------------------------------
+// AChannelHasDivertableParentChannelAsListener internal functions
+//-----------------------------------------------------------------------------
+
+NS_IMETHODIMP
+nsHttpChannel::MessageDiversionStarted(ADivertableParentChannel *aParentChannel)
+{
+  LOG(("nsHttpChannel::MessageDiversionStarted [this=%p]", this));
+  MOZ_ASSERT(!mParentChannel);
+  mParentChannel = aParentChannel;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::MessageDiversionStop()
+{
+  LOG(("nsHttpChannel::MessageDiversionStop [this=%p]", this));
+  MOZ_ASSERT(mParentChannel);
+  mParentChannel = nullptr;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::SuspendInternal()
+{
+    NS_ENSURE_TRUE(mIsPending, NS_ERROR_NOT_AVAILABLE);
+
+    LOG(("nsHttpChannel::SuspendInternal [this=%p]\n", this));
+
+    ++mSuspendCount;
+
+    nsresult rvTransaction = NS_OK;
+    if (mTransactionPump) {
+        rvTransaction = mTransactionPump->Suspend();
+    }
+    nsresult rvCache = NS_OK;
+    if (mCachePump) {
+        rvCache = mCachePump->Suspend();
+    }
+
+    return NS_FAILED(rvTransaction) ? rvTransaction : rvCache;
+}
+
+NS_IMETHODIMP
+nsHttpChannel::ResumeInternal()
+{
+    NS_ENSURE_TRUE(mSuspendCount > 0, NS_ERROR_UNEXPECTED);
+
+    LOG(("nsHttpChannel::ResumeInternal [this=%p]\n", this));
+
+    if (--mSuspendCount == 0 && mCallOnResume) {
+        nsresult rv = AsyncCall(mCallOnResume);
+        mCallOnResume = nullptr;
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    nsresult rvTransaction = NS_OK;
+    if (mTransactionPump) {
+        rvTransaction = mTransactionPump->Resume();
+    }
+
+    nsresult rvCache = NS_OK;
+    if (mCachePump) {
+        rvCache = mCachePump->Resume();
+    }
+
+    return NS_FAILED(rvTransaction) ? rvTransaction : rvCache;
 }
 
 void

@@ -115,7 +115,7 @@ using namespace mozilla::widget;
 #include "Layers.h"
 #include "GLContextProvider.h"
 #include "mozilla/gfx/2D.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 
 #ifdef MOZ_X11
 #include "gfxXlibSurface.h"
@@ -2143,7 +2143,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         ? static_cast<ClientLayerManager*>(GetLayerManager())
         : nullptr;
 
-    if (clientLayers && mCompositorParent) {
+    if (clientLayers && mCompositorBridgeParent) {
         // We need to paint to the screen even if nothing changed, since if we
         // don't have a compositing window manager, our pixels could be stale.
         clientLayers->SetNeedsComposite(true);
@@ -2168,8 +2168,8 @@ nsWindow::OnExposeEvent(cairo_t *cr)
             return FALSE;
     }
 
-    if (clientLayers && mCompositorParent && clientLayers->NeedsComposite()) {
-        mCompositorParent->ScheduleRenderOnCompositorThread();
+    if (clientLayers && mCompositorBridgeParent && clientLayers->NeedsComposite()) {
+        mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
         clientLayers->SetNeedsComposite(false);
     }
 
@@ -2234,22 +2234,21 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         return FALSE;
     }
     RefPtr<gfxContext> ctx;
+    IntRect boundsRect = region.GetBounds().ToUnknownRect();
+    IntPoint offset(0, 0);
+    if (dt->GetSize() == boundsRect.Size()) {
+      offset = boundsRect.TopLeft();
+      dt->SetTransform(Matrix::Translation(-offset));
+    }
 
 #ifdef MOZ_X11
-    nsIntRect boundsRect; // for shaped only
-
     if (shaped) {
         // Collapse update area to the bounding box. This is so we only have to
         // call UpdateTranslucentWindowAlpha once. After we have dropped
         // support for non-Thebes graphics, UpdateTranslucentWindowAlpha will be
         // our private interface so we can rework things to avoid this.
-        boundsRect = region.GetBounds().ToUnknownRect();
         dt->PushClipRect(Rect(boundsRect));
-    } else {
-        gfxUtils::ClipToRegion(dt, region.ToUnknownRegion());
-    }
 
-    if (shaped) {
         // The double buffering is done here to extract the shape mask.
         // (The shape mask won't be necessary when a visual with an alpha
         // channel is used on compositing window managers.)
@@ -2257,7 +2256,9 @@ nsWindow::OnExposeEvent(cairo_t *cr)
         RefPtr<DrawTarget> destDT = dt->CreateSimilarDrawTarget(boundsRect.Size(), SurfaceFormat::B8G8R8A8);
         ctx = new gfxContext(destDT, boundsRect.TopLeft());
     } else {
-        ctx = new gfxContext(dt);
+        gfxUtils::ClipToRegion(dt, region.ToUnknownRegion());
+
+        ctx = new gfxContext(dt, offset);
     }
 
 #if 0
@@ -2302,7 +2303,7 @@ nsWindow::OnExposeEvent(cairo_t *cr)
 
 #  ifdef MOZ_HAVE_SHMIMAGE
     if (mShmImage && MOZ_LIKELY(!mIsDestroyed)) {
-      mShmImage->Put(mXDisplay, mXWindow, region);
+      mShmImage->Put(region);
     }
 #  endif  // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
@@ -2688,7 +2689,7 @@ nsWindow::DispatchMissedButtonReleases(GdkEventCrossing *aGdkEvent)
             WidgetMouseEvent synthEvent(true, eMouseUp, this,
                                         WidgetMouseEvent::eSynthesized);
             synthEvent.button = buttonType;
-            DispatchAPZAwareEvent(&synthEvent);
+            DispatchInputEvent(&synthEvent);
         }
     }
 }
@@ -2810,7 +2811,7 @@ nsWindow::OnButtonPressEvent(GdkEventButton *aEvent)
     InitButtonEvent(event, aEvent);
     event.pressure = mLastMotionPressure;
 
-    DispatchAPZAwareEvent(&event);
+    DispatchInputEvent(&event);
 
     // right menu click on linux should also pop up a context menu
     if (domButton == WidgetMouseEvent::eRightButton &&
@@ -2853,7 +2854,7 @@ nsWindow::OnButtonReleaseEvent(GdkEventButton *aEvent)
     gdk_event_get_axis ((GdkEvent*)aEvent, GDK_AXIS_PRESSURE, &pressure);
     event.pressure = pressure ? pressure : mLastMotionPressure;
 
-    DispatchAPZAwareEvent(&event);
+    DispatchInputEvent(&event);
     mLastMotionPressure = pressure;
 }
 
@@ -3221,7 +3222,7 @@ nsWindow::OnScrollEvent(GdkEventScroll *aEvent)
     wheelEvent.time = aEvent->time;
     wheelEvent.timeStamp = GetEventTimeStamp(aEvent->time);
 
-    DispatchAPZAwareEvent(&wheelEvent);
+    DispatchInputEvent(&wheelEvent);
 }
 
 void
@@ -3438,7 +3439,7 @@ nsWindow::OnTouchEvent(GdkEventTouch* aEvent)
         *event.touches.AppendElement() = touch.forget();
     }
 
-    DispatchAPZAwareEvent(&event);
+    DispatchInputEvent(&event);
     return TRUE;
 }
 #endif
@@ -6450,13 +6451,7 @@ nsWindow::GetSurfaceForGdkDrawable(GdkDrawable* aDrawable,
 already_AddRefed<DrawTarget>
 nsWindow::GetDrawTarget(const LayoutDeviceIntRegion& aRegion, BufferMode* aBufferMode)
 {
-  if (!mGdkWindow) {
-    return nullptr;
-  }
-
-  LayoutDeviceIntRect bounds = aRegion.GetBounds();
-  LayoutDeviceIntSize size(bounds.XMost(), bounds.YMost());
-  if (size.width <= 0 || size.height <= 0) {
+  if (!mGdkWindow || aRegion.IsEmpty()) {
     return nullptr;
   }
 
@@ -6465,12 +6460,19 @@ nsWindow::GetDrawTarget(const LayoutDeviceIntRegion& aRegion, BufferMode* aBuffe
 #ifdef MOZ_X11
 #  ifdef MOZ_HAVE_SHMIMAGE
   if (nsShmImage::UseShm()) {
-    dt = nsShmImage::EnsureShmImage(size,
-                                    mXDisplay, mXVisual, mXDepth, mShmImage);
+    if (!mShmImage) {
+      mShmImage = new nsShmImage(mXDisplay, mXWindow, mXVisual, mXDepth);
+    }
+    dt = mShmImage->CreateDrawTarget(aRegion);
     *aBufferMode = BufferMode::BUFFER_NONE;
+    if (!dt) {
+      mShmImage = nullptr;
+    }
   }
 #  endif  // MOZ_HAVE_SHMIMAGE
   if (!dt) {
+    LayoutDeviceIntRect bounds = aRegion.GetBounds();
+    LayoutDeviceIntSize size(bounds.XMost(), bounds.YMost());
     RefPtr<gfxXlibSurface> surf = new gfxXlibSurface(mXDisplay, mXWindow, mXVisual, size.ToUnknownSize());
     if (!surf->CairoStatus()) {
       dt = gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(surf.get(), surf->GetSize());
@@ -6498,7 +6500,7 @@ nsWindow::EndRemoteDrawingInRegion(DrawTarget* aDrawTarget,
     return;
   }
 
-  mShmImage->Put(mXDisplay, mXWindow, aInvalidRegion);
+  mShmImage->Put(aInvalidRegion);
 #  endif // MOZ_HAVE_SHMIMAGE
 #endif // MOZ_X11
 }

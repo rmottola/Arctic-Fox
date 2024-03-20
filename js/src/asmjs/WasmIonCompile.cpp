@@ -1084,7 +1084,8 @@ class FunctionCompiler
         }
     }
 
-    bool setLoopBackedge(MBasicBlock* loopEntry, MBasicBlock* loopBody, MBasicBlock* backedge)
+    bool setLoopBackedge(MBasicBlock* loopEntry, MBasicBlock* loopBody, MBasicBlock* backedge,
+                         MDefinition** loopResult)
     {
         if (!loopEntry->setBackedgeAsmJS(backedge))
             return false;
@@ -1095,6 +1096,10 @@ class FunctionCompiler
             if (phi->getOperand(0) == phi->getOperand(1))
                 phi->setUnused();
         }
+
+        // The loop result may also be referencing a recycled phi.
+        if (*loopResult && (*loopResult)->isUnused())
+            *loopResult = (*loopResult)->toPhi()->getOperand(0);
 
         // Fix up phis stored in the slots Vector of pending blocks.
         for (BlockVector& vec : targets_) {
@@ -1123,7 +1128,7 @@ class FunctionCompiler
     }
 
   public:
-    bool closeLoop(MBasicBlock* loopHeader)
+    bool closeLoop(MBasicBlock* loopHeader, MDefinition** loopResult)
     {
         MOZ_ASSERT(blockDepth_ >= 2);
         MOZ_ASSERT(loopDepth_);
@@ -1157,7 +1162,7 @@ class FunctionCompiler
             // We're on the loop backedge block, created by bindBranches.
             MOZ_ASSERT(curBlock_->loopDepth() == loopDepth_);
             curBlock_->end(MGoto::New(alloc(), loopHeader));
-            if (!setLoopBackedge(loopHeader, loopBody, curBlock_))
+            if (!setLoopBackedge(loopHeader, loopBody, curBlock_, loopResult))
                 return false;
         }
 
@@ -1456,23 +1461,15 @@ EmitHeapAddress(FunctionCompiler& f, MDefinition** base, MAsmJSHeapAccess* acces
     if (endOffset < offset)
         return false;
     bool accessNeedsBoundsCheck = true;
-    if (endOffset > f.mirGen().foldableOffsetRange(accessNeedsBoundsCheck)) {
+    // Assume worst case.
+    bool atomicAccess = true;
+    if (endOffset > f.mirGen().foldableOffsetRange(accessNeedsBoundsCheck, atomicAccess)) {
         MDefinition* rhs = f.constant(Int32Value(offset), MIRType_Int32);
         *base = f.binary<MAdd>(*base, rhs, MIRType_Int32);
         offset = 0;
         access->setOffset(offset);
     }
 
-    // TODO Remove this after implementing unaligned loads/stores.
-    int32_t maskVal = ~(Scalar::byteSize(access->accessType()) - 1);
-    if (maskVal == -1)
-        return true;
-
-    offset &= maskVal;
-    access->setOffset(offset);
-
-    MDefinition* mask = f.constant(Int32Value(maskVal), MIRType_Int32);
-    *base = f.bitwise<MBitAnd>(*base, mask, MIRType_Int32);
     return true;
 }
 
@@ -2553,7 +2550,7 @@ EmitLoop(FunctionCompiler& f, MDefinition** def)
         *def = nullptr;
     }
 
-    return f.closeLoop(loopHeader);
+    return f.closeLoop(loopHeader, def);
 }
 
 static bool
@@ -2625,6 +2622,8 @@ EmitBrTable(FunctionCompiler& f, MDefinition** def)
     if (!EmitExpr(f, &index))
         return false;
 
+    *def = nullptr;
+
     // Empty table
     if (!numCases)
         return f.br(defaultDepth);
@@ -2656,7 +2655,6 @@ EmitBrTable(FunctionCompiler& f, MDefinition** def)
     if (!f.joinSwitch(switchBlock, cases, defaultBlock))
         return false;
 
-    *def = nullptr;
     return true;
 }
 

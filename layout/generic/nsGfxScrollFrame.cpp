@@ -63,11 +63,17 @@
 #include "nsPluginFrame.h"
 #include <mozilla/layers/AxisPhysicsModel.h>
 #include <mozilla/layers/AxisPhysicsMSDModel.h>
+#include "mozilla/layers/LayerTransactionChild.h"
 #include "mozilla/layers/ScrollLinkedEffectDetector.h"
+#include "mozilla/layers/ShadowLayers.h"
 #include "mozilla/unused.h"
+#include "LayersLogging.h"  // for Stringify
 #include <algorithm>
 #include <cstdlib> // for std::abs(int/long)
 #include <cmath> // for std::abs(float/double)
+
+#define PAINT_SKIP_LOG(...)
+// #define PAINT_SKIP_LOG(...) printf_stderr("PSKIP: " __VA_ARGS__)
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -1119,6 +1125,12 @@ static bool IsFocused(nsIContent* aContent)
 #endif
 
 void
+ScrollFrameHelper::SetScrollableByAPZ(bool aScrollable)
+{
+  mScrollableByAPZ = aScrollable;
+}
+
+void
 ScrollFrameHelper::SetZoomableByAPZ(bool aZoomable)
 {
   if (mZoomableByAPZ != aZoomable) {
@@ -1877,6 +1889,7 @@ ScrollFrameHelper::ScrollFrameHelper(nsContainerFrame* aOuter,
   , mHasBeenScrolled(false)
   , mIgnoreMomentumScroll(false)
   , mTransformingByAPZ(false)
+  , mScrollableByAPZ(false)
   , mZoomableByAPZ(false)
   , mVelocityQueue(aOuter->PresContext())
   , mAsyncScrollEvent(END_DOM)
@@ -2009,8 +2022,13 @@ ScrollFrameHelper::CompleteAsyncScroll(const nsRect &aRange, nsIAtom* aOrigin)
 
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
 struct PluginSearchCtx {
+  enum PluginAction {
+    UPDATE, // Update the scroll visibility of any plugin frames using |value|
+    QUERY   // Set |value| to true if plugin frames were found
+  };
+  PluginAction action;
   nsIFrame* outer;
-  bool begin;
+  bool value;
 };
 static void
 NotifyPluginFramesCallback(nsISupports* aSupports, void* aCtx)
@@ -2025,7 +2043,11 @@ NotifyPluginFramesCallback(nsISupports* aSupports, void* aCtx)
         // Check to be sure this plugin is contained within a subframe of
         // the nsGfxScrollFrame that initiated this callback.
         if (nsLayoutUtils::IsAncestorFrameCrossDoc(pCtx->outer, plugin, nullptr)) {
-          plugin->SetScrollVisibility(pCtx->begin);
+          if (pCtx->action == PluginSearchCtx::UPDATE) {
+            plugin->SetScrollVisibility(pCtx->value);
+          } else if (pCtx->action == PluginSearchCtx::QUERY) {
+            pCtx->value = true;
+          }
         }
       }
     }
@@ -2055,7 +2077,7 @@ ScrollFrameHelper::NotifyPluginFrames(AsyncScrollEventType aEvent)
     }
     if (aEvent != mAsyncScrollEvent) {
       nsPresContext* presContext = mOuter->PresContext();
-      PluginSearchCtx ctx = { mOuter, (aEvent == BEGIN_APZ || aEvent == BEGIN_DOM) };
+      PluginSearchCtx ctx = { PluginSearchCtx::UPDATE, mOuter, (aEvent == BEGIN_APZ || aEvent == BEGIN_DOM) };
       presContext->Document()->EnumerateActivityObservers(NotifyPluginFramesCallback,
                                                           (void*)&ctx);
       presContext->Document()->EnumerateSubDocuments(NotifyPluginSubframesCallback,
@@ -2065,6 +2087,28 @@ ScrollFrameHelper::NotifyPluginFrames(AsyncScrollEventType aEvent)
     }
   }
 #endif
+}
+
+bool
+ScrollFrameHelper::HasPluginFrames()
+{
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+  if (XRE_IsContentProcess()) {
+    nsPresContext* presContext = mOuter->PresContext();
+    PluginSearchCtx ctx = { PluginSearchCtx::QUERY, mOuter, false };
+    presContext->Document()->EnumerateActivityObservers(NotifyPluginFramesCallback,
+                                                        (void*)&ctx);
+    if (ctx.value) {
+      return true;
+    }
+    presContext->Document()->EnumerateSubDocuments(NotifyPluginSubframesCallback,
+                                                   (void*)&ctx);
+    if (ctx.value) {
+      return true;
+    }
+  }
+#endif
+  return false;
 }
 
 void
@@ -2386,6 +2430,9 @@ RemoveDisplayPortCallback(nsITimer* aTimer, void* aClosure)
   nsLayoutUtils::RemoveDisplayPort(helper->mOuter->GetContent());
   nsLayoutUtils::ExpireDisplayPortOnAsyncScrollableAncestor(helper->mOuter);
   helper->mOuter->SchedulePaint();
+  // Be conservative and unflag this this scrollframe as being scrollable by
+  // APZ. If it is still scrollable this will get flipped back soon enough.
+  helper->mScrollableByAPZ = false;
 }
 
 void ScrollFrameHelper::MarkNotRecentlyScrolled()
@@ -2660,7 +2707,8 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
   }
 
   nsRect oldDisplayPort;
-  nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), &oldDisplayPort);
+  nsIContent* content = mOuter->GetContent();
+  nsLayoutUtils::GetDisplayPort(content, &oldDisplayPort);
   oldDisplayPort.MoveBy(-mScrolledFrame->GetPosition());
 
   // Update frame position for scrolling
@@ -2671,25 +2719,52 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
 
   ScrollVisual();
 
-  if (LastScrollOrigin() == nsGkAtoms::apz && gfxPrefs::APZPaintSkipping()) {
-    // If this was an apz scroll and the displayport (relative to the
-    // scrolled frame) hasn't changed, then this won't trigger
-    // any painting, so no need to schedule one.
+  bool schedulePaint = true;
+  if (nsLayoutUtils::AsyncPanZoomEnabled(mOuter) && gfxPrefs::APZPaintSkipping()) {
+    // If APZ is enabled with paint-skipping, there are certain conditions in
+    // which we can skip paints:
+    // 1) If APZ triggered this scroll, and the tile-aligned displayport is
+    //    unchanged.
+    // 2) If non-APZ triggered this scroll, but we can handle it by just asking
+    //    APZ to update the scroll position. Again we make this conditional on
+    //    the tile-aligned displayport being unchanged.
+    // We do the displayport check first since it's common to all scenarios,
+    // and then if the displayport is unchanged, we check if APZ triggered,
+    // or can handle, this scroll. If so, we set schedulePaint to false and
+    // skip the paint.
     nsRect displayPort;
-    DebugOnly<bool> usingDisplayPort =
-      nsLayoutUtils::GetDisplayPort(mOuter->GetContent(), &displayPort);
-    NS_ASSERTION(usingDisplayPort, "Must have a displayport for apz scrolls!");
-
+    bool usingDisplayPort =
+      nsLayoutUtils::GetDisplayPort(content, &displayPort);
     displayPort.MoveBy(-mScrolledFrame->GetPosition());
 
-    if (!displayPort.IsEqualEdges(oldDisplayPort)) {
-      mOuter->SchedulePaint();
-
-      if (needImageVisibilityUpdate) {
-        presContext->PresShell()->ScheduleImageVisibilityUpdate();
+    PAINT_SKIP_LOG("New scrollpos %s usingDP %d dpEqual %d scrollableByApz %d plugins %d sle %d\n",
+        Stringify(CSSPoint::FromAppUnits(GetScrollPosition())).c_str(),
+        usingDisplayPort, displayPort.IsEqualEdges(oldDisplayPort),
+        mScrollableByAPZ, HasPluginFrames(),
+        content->GetComposedDoc()->HasScrollLinkedEffect());
+    if (usingDisplayPort && displayPort.IsEqualEdges(oldDisplayPort)) {
+      if (LastScrollOrigin() == nsGkAtoms::apz) {
+        schedulePaint = false;
+        PAINT_SKIP_LOG("Skipping due to APZ scroll\n");
+      } else if (mScrollableByAPZ && !HasPluginFrames() &&
+                 !content->GetComposedDoc()->HasScrollLinkedEffect()) {
+        nsIWidget* widget = presContext->GetNearestWidget();
+        LayerManager* manager = widget ? widget->GetLayerManager() : nullptr;
+        ShadowLayerForwarder* forwarder = manager ? manager->AsShadowForwarder() : nullptr;
+        if (forwarder && forwarder->HasShadowManager()) {
+          mozilla::layers::FrameMetrics::ViewID id;
+          DebugOnly<bool> success = nsLayoutUtils::FindIDFor(content, &id);
+          MOZ_ASSERT(success); // we have a displayport, we better have an ID
+          forwarder->GetShadowManager()->SendUpdateScrollOffset(id,
+              mScrollGeneration, CSSPoint::FromAppUnits(GetScrollPosition()));
+          schedulePaint = false;
+          PAINT_SKIP_LOG("Skipping due to APZ-forwarded main-thread scroll\n");
+        }
       }
     }
-  } else {
+  }
+
+  if (schedulePaint) {
     mOuter->SchedulePaint();
 
     if (needImageVisibilityUpdate) {
@@ -2704,11 +2779,16 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
   }
 
   ScheduleSyntheticMouseMove();
-  nsWeakFrame weakFrame(mOuter);
-  UpdateScrollbarPosition();
-  if (!weakFrame.IsAlive()) {
-    return;
+
+  { // scope the AutoScrollbarRepaintSuppression
+    AutoScrollbarRepaintSuppression repaintSuppression(this, !schedulePaint);
+    nsWeakFrame weakFrame(mOuter);
+    UpdateScrollbarPosition();
+    if (!weakFrame.IsAlive()) {
+      return;
+    }
   }
+
   PostScrollEvent();
 
   // notify the listeners.
@@ -3396,6 +3476,13 @@ ScrollFrameHelper::DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
             if (rootFrame) {
               nsRect rootCompBounds =
                 nsRect(nsPoint(0, 0), nsLayoutUtils::CalculateCompositionSizeForFrame(rootFrame));
+
+              // If rootFrame is the RCD-RSF then CalculateCompositionSizeForFrame
+              // did not take the document's resolution into account, so we must.
+              if (rootPresContext->IsRootContentDocument() &&
+                  rootFrame == rootPresShell->GetRootScrollFrame()) {
+                rootCompBounds = rootCompBounds.RemoveResolution(rootPresShell->GetResolution());
+              }
 
               nsLayoutUtils::TransformRect(rootFrame, mOuter, rootCompBounds);
 
@@ -4408,13 +4495,13 @@ ScrollFrameHelper::ScrollEvent::ScrollEvent(ScrollFrameHelper* aHelper)
   : mHelper(aHelper)
 {
   mDriver = mHelper->mOuter->PresContext()->RefreshDriver();
-  mDriver->AddRefreshObserver(this, Flush_Style);
+  mDriver->AddRefreshObserver(this, Flush_Layout);
 }
 
 ScrollFrameHelper::ScrollEvent::~ScrollEvent()
 {
   if (mDriver) {
-    mDriver->RemoveRefreshObserver(this, Flush_Style);
+    mDriver->RemoveRefreshObserver(this, Flush_Layout);
     mDriver = nullptr;
   }
 }
@@ -4422,7 +4509,7 @@ ScrollFrameHelper::ScrollEvent::~ScrollEvent()
 void
 ScrollFrameHelper::ScrollEvent::WillRefresh(mozilla::TimeStamp aTime)
 {
-  mDriver->RemoveRefreshObserver(this, Flush_Style);
+  mDriver->RemoveRefreshObserver(this, Flush_Layout);
   mDriver = nullptr;
   mHelper->FireScrollEvent();
 }

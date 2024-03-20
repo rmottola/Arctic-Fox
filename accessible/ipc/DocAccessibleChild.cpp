@@ -353,7 +353,7 @@ DocAccessibleChild::RecvARIARoleAtom(const uint64_t& aID, nsString* aRole)
     return true;
   }
 
-  if (nsRoleMapEntry* roleMap = acc->ARIARoleMap()) {
+  if (const nsRoleMapEntry* roleMap = acc->ARIARoleMap()) {
     if (nsIAtom* roleAtom = *(roleMap->roleAtom)) {
       roleAtom->ToString(*aRole);
     }
@@ -2047,6 +2047,27 @@ DocAccessibleChild::RecvExtents(const uint64_t& aID,
       *aHeight = screenRect.height;
     }
   }
+  return true;
+}
+
+bool
+DocAccessibleChild::RecvDOMNodeID(const uint64_t& aID, nsString* aDOMNodeID)
+{
+  Accessible* acc = IdToAccessible(aID);
+  if (!acc) {
+    return true;
+  }
+
+  nsIContent* content = acc->GetContent();
+  if (!content) {
+    return true;
+  }
+
+  nsIAtom* id = content->GetID();
+  if (id) {
+    id->ToString(*aDOMNodeID);
+  }
+
   return true;
 }
 

@@ -16837,6 +16837,9 @@
         "url": "/html/syntax/serializing-html-fragments/outerHTML.html"
       },
       {
+        "path": "html/syntax/serializing-xml-fragments/outerHTML.html",
+        "url": "/html/syntax/serializing-xml-fragments/outerHTML.html"
+      },
         "path": "html/webappapis/atob/base64.html",
         "url": "/html/webappapis/atob/base64.html"
       },

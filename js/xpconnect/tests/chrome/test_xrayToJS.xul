@@ -405,6 +405,75 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
        "getOwnPropertySymbols works on Xrayed ctors");
   }
 
+  // We will need arraysEqual and testArrayIterators both in this global scope
+  // and in sandboxes, so define them as strings up front.
+  var arraysEqualSource = `function arraysEqual(arr1, arr2, reason) {
+    is(arr1.length, arr2.length, \`\${reason}; lengths should be equal\`)
+    for (var i = 0; i < arr1.length; ++i) {
+      if (Array.isArray(arr2[i])) {
+        arraysEqual(arr1[i], arr2[i], \`\${reason}; item at index \${i}\`);
+      } else {
+        is(arr1[i], arr2[i], \`\${reason}; item at index \${i} should be equal\`);
+      }
+    }
+  }`;
+  eval(arraysEqualSource);
+
+  var testArrayIteratorsSource = `
+    function testArrayIterators(arrayLike, equivalentArray, reason) {
+    arraysEqual([...arrayLike], equivalentArray, \`\${reason}; spread operator\`);
+    arraysEqual([...arrayLike.entries()], [...equivalentArray.entries()],
+                \`\${reason}; entries\`);
+    arraysEqual([...arrayLike.keys()], [...equivalentArray.keys()],
+                \`\${reason}; keys\`);
+    if (arrayLike.values) {
+      arraysEqual([...arrayLike.values()], equivalentArray,
+                  \`\${reason}; values\`);
+    }
+
+    var forEachCopy = [];
+    arrayLike.forEach(function(arg) { forEachCopy.push(arg); });
+    arraysEqual(forEachCopy, equivalentArray, \`\${reason}; forEach copy\`);
+
+    var everyCopy = [];
+    arrayLike.every(function(arg) { everyCopy.push(arg); return true; });
+    arraysEqual(everyCopy, equivalentArray, \`\${reason}; every() copy\`);
+
+    var filterCopy = [];
+    var filterResult = arrayLike.filter(function(arg) {
+      filterCopy.push(arg);
+      return true;
+    });
+    arraysEqual(filterCopy, equivalentArray, \`\${reason}; filter copy\`);
+    arraysEqual([...filterResult], equivalentArray, \`\${reason}; filter result\`);
+
+    var findCopy = [];
+    arrayLike.find(function(arg) { findCopy.push(arg); return false; });
+    arraysEqual(findCopy, equivalentArray, \`\${reason}; find() copy\`);
+
+    var findIndexCopy = [];
+    arrayLike.findIndex(function(arg) { findIndexCopy.push(arg); return false; });
+    arraysEqual(findIndexCopy, equivalentArray, \`\${reason}; findIndex() copy\`);
+
+    var mapCopy = [];
+    var mapResult = arrayLike.map(function(arg) { mapCopy.push(arg); return arg});
+    arraysEqual(mapCopy, equivalentArray, \`\${reason}; map() copy\`);
+    arraysEqual([...mapResult], equivalentArray, \`\${reason}; map() result\`);
+
+    var reduceCopy = [];
+    arrayLike.reduce(function(_, arg) { reduceCopy.push(arg); }, 0);
+    arraysEqual(reduceCopy, equivalentArray, \`\${reason}; reduce() copy\`);
+
+    var reduceRightCopy = [];
+    arrayLike.reduceRight(function(_, arg) { reduceRightCopy.unshift(arg); }, 0);
+    arraysEqual(reduceRightCopy, equivalentArray, \`\${reason}; reduceRight() copy\`);
+
+    var someCopy = [];
+    arrayLike.some(function(arg) { someCopy.push(arg); return false; });
+    arraysEqual(someCopy, equivalentArray, \`\${reason}; some() copy\`);
+  }`;
+  eval(testArrayIteratorsSource);
+
   function testDate() {
     // toGMTString is handled oddly in the engine. We don't bother to support
     // it over Xrays.
@@ -507,6 +576,8 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
     is(trickyArray[1], undefined, "Frozen length forbids new properties");
 
     testTrickyObject(trickyArray);
+
+    testArrayIterators(new iwin.Array(1, 1, 2, 3, 5), [1, 1, 2, 3, 5]);
   }
 
   // Parts of this function are kind of specific to testing Object, but we factor
@@ -658,6 +729,19 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
       var xray = new iwin[c](0);
       var xrayTypedArrayProto = Object.getPrototypeOf(Object.getPrototypeOf(xray));
       testProtoCallables(inheritedCallables, new iwin[c](0), xrayTypedArrayProto, typedArrayProto);
+
+      // When testing iterators, make sure to do so from inside our web
+      // extension sandbox, since from chrome we can't poke their indices.  Note
+      // that we have to actually recreate our functions that touch typed array
+      // indices inside the sandbox, not just export them, because otherwise
+      // they'll just run with our principal anyway.
+      //
+      // But we do want to export is(), since we want ours called.
+      wesb.eval(arraysEqualSource);
+      wesb.eval(testArrayIteratorsSource);
+      Cu.exportFunction(is, wesb,
+                        { defineAs: "is" });
+      wesb.eval('testArrayIterators(t, [0, 0, 3, 0, 0, 0, 0, 0, 0, 0])');
     }
   }
 

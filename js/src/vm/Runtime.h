@@ -922,7 +922,7 @@ struct JSRuntime : public JS::shadow::Runtime,
      * Locking this only occurs if there is actually a thread other than the
      * main thread with an ExclusiveContext which could access such data.
      */
-    PRLock* exclusiveAccessLock;
+    js::Mutex exclusiveAccessLock;
 #ifdef DEBUG
     PRThread* exclusiveAccessOwner;
     bool mainThreadHasExclusiveAccess;
@@ -1203,7 +1203,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* Client opaque pointers */
     void*               data;
 
-#if defined(XP_DARWIN) && defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
+#if defined(XP_DARWIN) && defined(ASMJS_MAY_USE_SIGNAL_HANDLERS)
     js::wasm::MachExceptionHandler wasmMachExceptionHandler;
 #endif
 

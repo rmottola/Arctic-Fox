@@ -397,6 +397,7 @@ JitRuntime::patchIonBackedges(JSRuntime* rt, BackedgeTarget target)
 
 JitCompartment::JitCompartment()
   : stubCodes_(nullptr),
+    cacheIRStubCodes_(nullptr),
     baselineGetPropReturnAddr_(nullptr),
     baselineSetPropReturnAddr_(nullptr),
     stringConcatStub_(nullptr),
@@ -409,6 +410,7 @@ JitCompartment::JitCompartment()
 JitCompartment::~JitCompartment()
 {
     js_delete(stubCodes_);
+    js_delete(cacheIRStubCodes_);
 }
 
 bool
@@ -419,6 +421,15 @@ JitCompartment::initialize(JSContext* cx)
         return false;
 
     if (!stubCodes_->init()) {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
+    cacheIRStubCodes_ = cx->new_<CacheIRStubCodeMap>(cx->runtime());
+    if (!cacheIRStubCodes_)
+        return false;
+
+    if (!cacheIRStubCodes_->init()) {
         ReportOutOfMemory(cx);
         return false;
     }
@@ -632,6 +643,7 @@ JitCompartment::sweep(FreeOp* fop, JSCompartment* compartment)
     FinishAllOffThreadCompilations(compartment);
 
     stubCodes_->sweep();
+    cacheIRStubCodes_->sweep();
 
     // If the sweep removed the ICCall_Fallback stub, nullptr the baselineCallReturnAddr_ field.
     if (!stubCodes_->lookup(ICCall_Fallback::Compiler::BASELINE_CALL_KEY))
@@ -674,6 +686,10 @@ JitCompartment::toggleBarriers(bool enabled)
         JitCode* code = *e.front().value().unsafeGet();
         code->togglePreBarriers(enabled, Reprotect);
     }
+    for (CacheIRStubCodeMap::Enum e(*cacheIRStubCodes_); !e.empty(); e.popFront()) {
+        JitCode* code = *e.front().value().unsafeGet();
+        code->togglePreBarriers(enabled, Reprotect);
+    }
 }
 
 size_t
@@ -682,6 +698,8 @@ JitCompartment::sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const
     size_t n = mallocSizeOf(this);
     if (stubCodes_)
         n += stubCodes_->sizeOfIncludingThis(mallocSizeOf);
+    if (cacheIRStubCodes_)
+        n += cacheIRStubCodes_->sizeOfIncludingThis(mallocSizeOf);
     return n;
 }
 
@@ -1228,15 +1246,19 @@ IonScript::purgeOptimizedStubs(Zone* zone)
                 stub = stub->next();
             }
 
+            lastStub->toFallbackStub()->setInvalid();
+
             if (lastStub->isMonitoredFallback()) {
                 // Monitor stubs can't make calls, so are always in the
                 // optimized stub space.
                 ICTypeMonitor_Fallback* lastMonStub =
                     lastStub->toMonitoredFallbackStub()->fallbackMonitorStub();
                 lastMonStub->resetMonitorStubChain(zone);
+                lastMonStub->setInvalid();
             }
         } else if (lastStub->isTypeMonitor_Fallback()) {
             lastStub->toTypeMonitor_Fallback()->resetMonitorStubChain(zone);
+            lastStub->toTypeMonitor_Fallback()->setInvalid();
         } else {
             MOZ_ASSERT(lastStub->isTableSwitch());
         }

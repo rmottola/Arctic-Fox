@@ -60,7 +60,7 @@ exports.Tools = Tools;
 Tools.options = {
   id: "options",
   ordinal: 0,
-  url: "chrome://devtools/content/framework/toolbox-options.xul",
+  url: "chrome://devtools/content/framework/toolbox-options.xhtml",
   icon: "chrome://devtools/skin/images/tool-options.svg",
   invertIconForLightTheme: true,
   bgTheme: "theme-body",
@@ -388,7 +388,7 @@ Tools.scratchpad = {
   commands: "devtools/client/scratchpad/scratchpad-commands",
 
   isTargetSupported: function(target) {
-    return target.isRemote;
+    return target.hasActor("console");
   },
 
   build: function(iframeWindow, toolbox) {

@@ -55,7 +55,7 @@ function getTree(rootGuid, onlyChildren) {
       // It seems like the array always just contains the root node.
       return [convert(root, null)];
     }
-  });
+  }).catch(e => Promise.reject({message: e.message}));
 }
 
 function convert(result) {
@@ -95,7 +95,7 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
             bookmarks.push(convert(bookmark));
           }
           return bookmarks;
-        });
+        }).catch(error => Promise.reject({message: error.message}));
       },
 
       getChildren: function(id) {
@@ -113,6 +113,10 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
 
       search: function(query) {
         return Bookmarks.search(query).then(result => result.map(convert));
+      },
+
+      getRecent: function(numberOfItems) {
+        return Bookmarks.getRecent(numberOfItems).then(result => result.map(convert));
       },
 
       create: function(bookmark) {
@@ -139,7 +143,8 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
         }
 
         try {
-          return Bookmarks.insert(info).then(convert);
+          return Bookmarks.insert(info).then(convert)
+                          .catch(error => Promise.reject({message: error.message}));
         } catch (e) {
           return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
@@ -153,12 +158,12 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
         if (destination.parentId !== null) {
           info.parentGuid = destination.parentId;
         }
-        if (destination.index !== null) {
-          info.index = destination.index;
-        }
+        info.index = (destination.index === null) ?
+          Bookmarks.DEFAULT_INDEX : destination.index;
 
         try {
-          return Bookmarks.update(info).then(convert);
+          return Bookmarks.update(info).then(convert)
+                          .catch(error => Promise.reject({message: error.message}));
         } catch (e) {
           return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
@@ -177,7 +182,8 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
         }
 
         try {
-          return Bookmarks.update(info).then(convert);
+          return Bookmarks.update(info).then(convert)
+                          .catch(error => Promise.reject({message: error.message}));
         } catch (e) {
           return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
@@ -190,7 +196,21 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
 
         // The API doesn't give you the old bookmark at the moment
         try {
-          return Bookmarks.remove(info).then(result => {});
+          return Bookmarks.remove(info, {preventRemovalOfNonEmptyFolders: true}).then(result => {})
+                          .catch(error => Promise.reject({message: error.message}));
+        } catch (e) {
+          return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
+        }
+      },
+
+      removeTree: function(id) {
+        let info = {
+          guid: id,
+        };
+
+        try {
+          return Bookmarks.remove(info).then(result => {})
+                          .catch(error => Promise.reject({message: error.message}));
         } catch (e) {
           return Promise.reject({message: `Invalid bookmark: ${JSON.stringify(info)}`});
         }
@@ -198,4 +218,3 @@ extensions.registerSchemaAPI("bookmarks", "bookmarks", (extension, context) => {
     },
   };
 });
-

@@ -19,10 +19,11 @@ namespace mozilla {
 
 namespace layout {
 class RenderFrameChild;
-class ShadowLayerForwarder;
 } // namespace layout
 
 namespace layers {
+
+class ShadowLayerForwarder;
 
 class LayerTransactionChild : public PLayerTransactionChild
                             , public AsyncTransactionTrackersHolder
@@ -84,7 +85,7 @@ protected:
     mIPCOpen = false;
     Release();
   }
-  friend class CompositorChild;
+  friend class CompositorBridgeChild;
   friend class layout::RenderFrameChild;
 
   ShadowLayerForwarder* mForwarder;

@@ -313,9 +313,6 @@ public:
                            const BrowserConfiguration& aConfiguration,
                            const ShowInfo& aInfo) override;
 
-  virtual bool RecvOpenURI(const URIParams& aURI,
-                           const uint32_t& aFlags) override;
-
   virtual bool RecvCacheFileDescriptor(const nsString& aPath,
                                        const FileDescriptor& aFileDescriptor)
                                        override;
@@ -333,6 +330,7 @@ public:
   RecvUpdateDimensions(const CSSRect& aRect,
                        const CSSSize& aSize,
                        const ScreenOrientationInternal& aOrientation,
+                       const LayoutDeviceIntPoint& aClientOffset,
                        const LayoutDeviceIntPoint& aChromeDisp) override;
   virtual bool
   RecvSizeModeChanged(const nsSizeMode& aSizeMode) override;
@@ -514,7 +512,11 @@ public:
   static inline TabChild*
   GetFrom(nsIDocShell* aDocShell)
   {
-    nsCOMPtr<nsITabChild> tc = do_GetInterface(aDocShell);
+    if (!aDocShell) {
+      return nullptr;
+    }
+
+    nsCOMPtr<nsITabChild> tc = aDocShell->GetTabChild();
     return static_cast<TabChild*>(tc.get());
   }
 
@@ -580,6 +582,7 @@ public:
 
   nsresult CreatePluginWidget(nsIWidget* aParent, nsIWidget** aOut);
 
+  LayoutDeviceIntPoint GetClientOffset() const { return mClientOffset; }
   LayoutDeviceIntPoint GetChromeDisplacement() const { return mChromeDisp; };
 
   bool IPCOpen() const { return mIPCOpen; }
@@ -731,6 +734,8 @@ private:
   SetAllowedTouchBehaviorCallback mSetAllowedTouchBehaviorCallback;
   bool mHasValidInnerSize;
   bool mDestroyed;
+  // Position of client area relative to the outer window
+  LayoutDeviceIntPoint mClientOffset;
   // Position of tab, relative to parent widget (typically the window)
   LayoutDeviceIntPoint mChromeDisp;
   TabId mUniqueId;
@@ -744,6 +749,7 @@ private:
   bool mAsyncPanZoomEnabled;
   CSSSize mUnscaledInnerSize;
   bool mDidSetRealShowInfo;
+  bool mDidLoadURLInit;
 
   AutoTArray<bool, NUMBER_OF_AUDIO_CHANNELS> mAudioChannelsActive;
 

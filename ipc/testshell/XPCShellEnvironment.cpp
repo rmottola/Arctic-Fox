@@ -73,7 +73,7 @@ private:
 };
 
 inline XPCShellEnvironment*
-Environment(Handle<JSObject*> global)
+Environment(JS::Handle<JSObject*> global)
 {
     AutoJSAPI jsapi;
     if (!jsapi.Init(global)) {

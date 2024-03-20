@@ -57,10 +57,13 @@ function testSelectTool(aToolbox) {
 }
 
 function testPreferenceAndUIStateIsConsistent() {
-  let checkNodes = [...panelWin.document.querySelectorAll("#enabled-toolbox-buttons-box > checkbox")];
+  let checkNodes = [...panelWin.document.querySelectorAll("#enabled-toolbox-buttons-box input[type=checkbox]")];
   let toolboxButtonNodes = [...doc.querySelectorAll(".command-button")];
   toolboxButtonNodes.push(doc.getElementById("command-button-frames"));
   let toggleableTools = toolbox.toolboxButtons;
+
+  // The noautohide button is only displayed in the browser toolbox
+  toggleableTools = toggleableTools.filter(tool => tool.id != "command-button-noautohide");
 
   for (let tool of toggleableTools) {
     let isVisible = getBoolPref(tool.visibilityswitch);
@@ -74,7 +77,7 @@ function testPreferenceAndUIStateIsConsistent() {
 }
 
 function testToggleToolboxButtons() {
-  let checkNodes = [...panelWin.document.querySelectorAll("#enabled-toolbox-buttons-box > checkbox")];
+  let checkNodes = [...panelWin.document.querySelectorAll("#enabled-toolbox-buttons-box input[type=checkbox]")];
   let toolboxButtonNodes = [...doc.querySelectorAll(".command-button")];
   let toggleableTools = toolbox.toolboxButtons;
 
@@ -84,6 +87,10 @@ function testToggleToolboxButtons() {
     toolboxButtonNodes = [...doc.querySelectorAll(".command-button:not(#command-button-tilt)")];
   }
 
+  // The noautohide button is only displayed in the browser toolbox
+  toggleableTools = toggleableTools.filter(tool => tool.id != "command-button-noautohide");
+  toolboxButtonNodes = toolboxButtonNodes.filter(btn => btn.id != "command-button-noautohide");
+
   is (checkNodes.length, toggleableTools.length, "All of the buttons are toggleable." );
   is (checkNodes.length, toolboxButtonNodes.length, "All of the DOM buttons are toggleable." );
 
@@ -91,14 +98,14 @@ function testToggleToolboxButtons() {
     let id = tool.id;
     let matchedCheckboxes = checkNodes.filter(node=>node.id === id);
     let matchedButtons = toolboxButtonNodes.filter(button=>button.id === id);
-    ok (matchedCheckboxes.length === 1,
+    is (matchedCheckboxes.length, 1,
       "There should be a single toggle checkbox for: " + id);
-    ok (matchedButtons.length === 1,
+    is (matchedButtons.length, 1,
       "There should be a DOM button for: " + id);
     is (matchedButtons[0], tool.button,
       "DOM buttons should match for: " + id);
 
-    is (matchedCheckboxes[0].getAttribute("label"), tool.label,
+    is (matchedCheckboxes[0].nextSibling.textContent, tool.label,
       "The label for checkbox matches the tool definition.");
     is (matchedButtons[0].getAttribute("tooltiptext"), tool.label,
       "The tooltip for button matches the tool definition.");
@@ -116,7 +123,7 @@ function testToggleToolboxButtons() {
     let isVisible = getBoolPref(tool.visibilityswitch);
 
     testPreferenceAndUIStateIsConsistent();
-    toggleButton(node);
+    node.click();
     testPreferenceAndUIStateIsConsistent();
 
     let isVisibleAfterClick = getBoolPref(tool.visibilityswitch);
@@ -130,11 +137,6 @@ function testToggleToolboxButtons() {
 
 function getBoolPref(key) {
   return Services.prefs.getBoolPref(key);
-}
-
-function toggleButton(node) {
-  node.scrollIntoView();
-  EventUtils.synthesizeMouseAtCenter(node, {}, panelWin);
 }
 
 function cleanup() {

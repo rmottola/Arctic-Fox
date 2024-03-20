@@ -253,10 +253,16 @@ class IOInterposerInit
 public:
   IOInterposerInit()
   {
+#if !defined(RELEASE_BUILD)
+    IOInterposer::Init();
+#endif
   }
 
   ~IOInterposerInit()
   {
+#if !defined(RELEASE_BUILD)
+    IOInterposer::Clear();
+#endif
   }
 };
 

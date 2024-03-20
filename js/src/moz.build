@@ -53,7 +53,6 @@ with Files('../public/TrackedOptimizationInfo.h'):
 if CONFIG['JS_BUNDLED_EDITLINE']:
     DIRS += ['editline']
 
-# editline needs to get built before the shell
 if not CONFIG['JS_DISABLE_SHELL']:
     DIRS += ['shell']
 
@@ -208,6 +207,7 @@ UNIFIED_SOURCES += [
     'jit/BacktrackingAllocator.cpp',
     'jit/Bailouts.cpp',
     'jit/BaselineBailouts.cpp',
+    'jit/BaselineCacheIR.cpp',
     'jit/BaselineCompiler.cpp',
     'jit/BaselineDebugModeOSR.cpp',
     'jit/BaselineFrame.cpp',
@@ -218,6 +218,7 @@ UNIFIED_SOURCES += [
     'jit/BitSet.cpp',
     'jit/BytecodeAnalysis.cpp',
     'jit/C1Spewer.cpp',
+    'jit/CacheIR.cpp',
     'jit/CodeGenerator.cpp',
     'jit/CompileWrappers.cpp',
     'jit/Disassembler.cpp',
@@ -294,7 +295,6 @@ UNIFIED_SOURCES += [
     'proxy/OpaqueCrossCompartmentWrapper.cpp',
     'proxy/Proxy.cpp',
     'proxy/ScriptedDirectProxyHandler.cpp',
-    'proxy/ScriptedIndirectProxyHandler.cpp',
     'proxy/SecurityWrapper.cpp',
     'proxy/Wrapper.cpp',
     'vm/ArgumentsObject.cpp',
@@ -546,12 +546,14 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [
         'jit/ExecutableAllocatorWin.cpp',
+        'threading/windows/Mutex.cpp',
     ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
     DEFINES['_CRT_RAND_S'] = True
 else:
     SOURCES += [
         'jit/ExecutableAllocatorPosix.cpp',
+        'threading/posix/Mutex.cpp',
     ]
 
 if CONFIG['JS_HAS_CTYPES']:
@@ -662,6 +664,11 @@ if CONFIG['_MSC_VER']:
     CXXFLAGS += ['-we4067', '-we4258', '-we4275']
     CXXFLAGS += ['-wd4146'] # FIXME: unary minus operator applied to unsigned type (bug 1229189)
     CXXFLAGS += ['-wd4273'] # FIXME: inconsistent dll linkage (bug 1229666)
+
+    # This is intended as a temporary hack to support building with VS2015.
+    # 'noexcept' used with no exception handling mode specified;
+    # termination on exception is not guaranteed. Specify /EHsc
+    CXXFLAGS += ['-wd4577']
 
 if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
     OS_LIBS += [

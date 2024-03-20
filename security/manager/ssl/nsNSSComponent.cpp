@@ -135,7 +135,7 @@ bool EnsureNSSInitialized(EnsureNSSOperator op)
   case nssInitFailed:
     NS_ASSERTION(loading, "Bad call to EnsureNSSInitialized(nssInitFailed)");
     loading = false;
-    // no break
+    MOZ_FALLTHROUGH;
 
   case nssShutdown:
     PR_AtomicSet(&haveLoaded, 0);
@@ -1153,8 +1153,6 @@ nsNSSComponent::InitializeNSS()
 
   // dynamic options from prefs
   setValidationOptions(true, lock);
-
-  mHttpForNSS.initTable();
 
 #ifndef MOZ_NO_SMART_CARDS
   LaunchSmartCardThreads();

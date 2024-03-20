@@ -93,7 +93,7 @@ class ConfigureSandbox(dict):
     BUILTINS = ReadOnlyDict({
         b: __builtins__[b]
         for b in ('None', 'False', 'True', 'int', 'bool', 'any', 'all', 'len',
-                  'list', 'set', 'dict')
+                  'list', 'tuple', 'set', 'dict', 'isinstance')
     }, __import__=forbidden_import)
 
     # Expose a limited set of functions from os.path
@@ -159,7 +159,7 @@ class ConfigureSandbox(dict):
                     'Cannot include `%s` because it is not in a subdirectory '
                     'of `%s`' % (path, mozpath.dirname(self._paths[0])))
         else:
-            path = mozpath.abspath(path)
+            path = mozpath.realpath(mozpath.abspath(path))
         if path in self._paths:
             raise ConfigureError(
                 'Cannot include `%s` because it was included already.' % path)

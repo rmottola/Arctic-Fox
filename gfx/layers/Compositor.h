@@ -9,6 +9,7 @@
 #include "Units.h"                      // for ScreenPoint
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
 #include "mozilla/RefPtr.h"             // for already_AddRefed, RefCounted
+#include "mozilla/gfx/2D.h"             // for DrawTarget
 #include "mozilla/gfx/MatrixFwd.h"      // for Matrix4x4
 #include "mozilla/gfx/Point.h"          // for IntSize, Point
 #include "mozilla/gfx/Rect.h"           // for Rect, IntRect
@@ -125,7 +126,7 @@ class Layer;
 class TextureSource;
 class DataTextureSource;
 class CompositingRenderTarget;
-class CompositorParent;
+class CompositorBridgeParent;
 class LayerManagerComposite;
 
 enum SurfaceInitMode
@@ -184,7 +185,7 @@ protected:
 public:
   NS_INLINE_DECL_REFCOUNTING(Compositor)
 
-  explicit Compositor(CompositorParent* aParent = nullptr)
+  explicit Compositor(CompositorBridgeParent* aParent = nullptr)
     : mCompositorID(0)
     , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
     , mParent(aParent)
@@ -363,10 +364,14 @@ public:
    * If aRenderBoundsOut is non-null, it will be set to the render bounds
    * actually used by the compositor in window space. If aRenderBoundsOut
    * is returned empty, composition should be aborted.
+   *
+   * If aOpaque is true, then all of aInvalidRegion will be drawn to with
+   * opaque content.
    */
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect* aClipRectIn,
                           const gfx::Rect& aRenderBounds,
+                          bool aOpaque,
                           gfx::Rect* aClipRectOut = nullptr,
                           gfx::Rect* aRenderBoundsOut = nullptr) = 0;
 
@@ -549,7 +554,7 @@ protected:
 
   uint32_t mCompositorID;
   DiagnosticTypes mDiagnosticTypes;
-  CompositorParent* mParent;
+  CompositorBridgeParent* mParent;
 
   /**
    * We keep track of the total number of pixels filled as we composite the

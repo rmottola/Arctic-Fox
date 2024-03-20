@@ -19,6 +19,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
 XPCOMUtils.defineLazyModuleGetter(this, "AboutNewTab",
                                   "resource:///modules/AboutNewTab.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "DirectoryLinksProvider",
+                                  "resource:///modules/DirectoryLinksProvider.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
 
@@ -514,6 +517,9 @@ BrowserGlue.prototype = {
     this._isPlacesShutdownObserver = true;
     os.addObserver(this, "handle-xul-text-link", false);
     os.addObserver(this, "profile-before-change", false);
+    if (AppConstants.MOZ_TELEMETRY_REPORTING) {
+      os.addObserver(this, "keyword-search", false);
+    }
     os.addObserver(this, "browser-search-engine-modified", false);
     os.addObserver(this, "restart-in-safe-mode", false);
     os.addObserver(this, "flash-plugin-hang", false);
@@ -527,6 +533,7 @@ BrowserGlue.prototype = {
     ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-browserAction.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-pageAction.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-commands.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-contextMenus.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-desktop-runtime.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-tabs.js");
@@ -535,6 +542,7 @@ BrowserGlue.prototype = {
 
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/bookmarks.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/browser_action.json");
+    ExtensionManagement.registerSchema("chrome://browser/content/schemas/commands.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus_internal.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/page_action.json");
@@ -663,7 +671,16 @@ BrowserGlue.prototype = {
     this._sanitizer.onStartup();
     // check if we're in safe mode
     if (Services.appinfo.inSafeMode) {
-      Services.ww.openWindow(null, "chrome://browser/content/safeMode.xul", 
+      // See https://bugzilla.mozilla.org/show_bug.cgi?id=1231112#c7 . We need to
+      // register the observer early if we have to migrate tab groups
+      let currentUIVersion = 0;
+      try {
+        currentUIVersion = Services.prefs.getIntPref("browser.migration.version");
+      } catch(ex) {}
+      if (currentUIVersion < 35) {
+        this._maybeMigrateTabGroups();
+      }
+      Services.ww.openWindow(null, "chrome://browser/content/safeMode.xul",
                              "_blank", "chrome,centerscreen,modal,resizable=no", null);
     }
 
@@ -679,7 +696,10 @@ BrowserGlue.prototype = {
     PageThumbs.init();
     webrtcUI.init();
     AboutHome.init();
+
+    DirectoryLinksProvider.init();
     NewTabUtils.init();
+    NewTabUtils.links.addProvider(DirectoryLinksProvider);
     AboutNewTab.init();
     NewTabPrefsProvider.prefs.init();
 
@@ -781,7 +801,9 @@ BrowserGlue.prototype = {
       samples = Services.prefs.getIntPref("browser.slowStartup.samples");
     } catch (e) { }
 
-    averageTime = (averageTime * samples + currentTime) / ++samples;
+    let totalTime = (averageTime * samples) + currentTime;
+    samples++;
+    averageTime = totalTime / samples;
 
     if (samples >= Services.prefs.getIntPref("browser.slowStartup.maxSamples")) {
       if (averageTime > Services.prefs.getIntPref("browser.slowStartup.timeThreshold"))
@@ -1683,10 +1705,16 @@ BrowserGlue.prototype = {
   _migrateUI: function BG__migrateUI() {
     const UI_VERSION = 35;
     const BROWSER_DOCURL = "chrome://browser/content/browser.xul";
-    let currentUIVersion = 0;
-    try {
+
+    let currentUIVersion;
+    if (Services.prefs.prefHasUserValue("browser.migration.version")) {
       currentUIVersion = Services.prefs.getIntPref("browser.migration.version");
-    } catch(ex) {}
+    } else {
+      // This is a new profile, nothing to migrate.
+      Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
+      return;
+    }
+
     if (currentUIVersion >= UI_VERSION)
       return;
 
@@ -2029,7 +2057,8 @@ BrowserGlue.prototype = {
       this._notifyNotificationsUpgrade().catch(Cu.reportError);
     }
 
-    if (currentUIVersion < 35) {
+    // Only do this outside of safe mode, because in safe mode we do this earlier.
+    if (currentUIVersion < 35 && !Services.appinfo.inSafeMode) {
       this._maybeMigrateTabGroups();
     }
 
@@ -2326,15 +2355,11 @@ ContentPermissionPrompt.prototype = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIContentPermissionPrompt]),
 
   _getBrowserForRequest: function (aRequest) {
-    var browser;
-    try {
-      // "element" is only defined in e10s mode, otherwise it throws.
-      browser = aRequest.element;
-    } catch (e) {}
+    // "element" is only defined in e10s mode.
+    let browser = aRequest.element;
     if (!browser) {
-      var requestingWindow = aRequest.window.top;
-      // find the requesting browser or iframe
-      browser = requestingWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+      // Find the requesting browser.
+      browser = aRequest.window.QueryInterface(Ci.nsIInterfaceRequestor)
                                   .getInterface(Ci.nsIWebNavigation)
                                   .QueryInterface(Ci.nsIDocShell)
                                   .chromeEventHandler;
@@ -2413,7 +2438,7 @@ ContentPermissionPrompt.prototype = {
 
     if (!aOptions)
       aOptions = {};
-    aOptions.displayOrigin = requestPrincipal.URI;
+    aOptions.displayURI = requestPrincipal.URI;
 
     return chromeWin.PopupNotifications.show(browser, aNotificationId, aMessage, aAnchorId,
                                              mainAction, secondaryActions, aOptions);
@@ -2612,6 +2637,13 @@ ContentPermissionPrompt.prototype = {
         return;
       }
     }
+
+    var browser = this._getBrowserForRequest(request);
+    var chromeWin = browser.ownerDocument.defaultView;
+    if (!chromeWin.PopupNotifications)
+      // Ignore requests from browsers hosted in windows that don't support
+      // PopupNotifications.
+      return;
 
     // Show the prompt.
     switch (perm.type) {
@@ -2826,12 +2858,28 @@ var DefaultBrowserCheck = {
 };
 
 var E10SUINotification = {
-  // Increase this number each time we want to roll out an
-  // e10s testing period to Nightly users.
-  CURRENT_NOTICE_COUNT: 0,
-  CURRENT_NOTICE_COUNT: 1,
   CURRENT_PROMPT_PREF: "browser.displayedE10SPrompt.1",
   PREVIOUS_PROMPT_PREF: "browser.displayedE10SPrompt",
+
+  get forcedOn() {
+    try {
+      return Services.prefs.getBoolPref("browser.tabs.remote.force-enable");
+    } catch (e) {}
+    return false;
+  },
+
+  get a11yRecentlyRan() {
+    try {
+      if (Services.prefs.getBoolPref("accessibility.loadedInLastSession")) {
+        return true;
+      }
+    } catch (e) {}
+    try {
+      Services.prefs.getBoolPref("accessibility.lastLoadDate");
+      return true;
+    } catch (e) {}
+    return false;
+  },
 
   checkStatus: function() {
     let updateChannel = UpdateUtils.UpdateChannel;
@@ -2840,18 +2888,32 @@ var E10SUINotification = {
       return;
     }
 
-    if (Services.appinfo.browserTabsRemoteAutostart) {
-      let notice = 0;
+    if (!Services.appinfo.browserTabsRemoteAutostart) {
+      let displayFeedbackRequest = false;
       try {
-        notice = Services.prefs.getIntPref("browser.displayedE10SNotice");
-      } catch(e) {}
-      let activationNoticeShown = notice >= this.CURRENT_NOTICE_COUNT;
+        displayFeedbackRequest = Services.prefs.getBoolPref("browser.requestE10sFeedback");
+      } catch (e) {}
 
-      if (!activationNoticeShown) {
-        this._showE10sActivatedNotice();
+      if (displayFeedbackRequest) {
+        let win = RecentWindow.getMostRecentBrowserWindow();
+        if (!win) {
+          return;
+        }
+
+        Services.prefs.clearUserPref("browser.requestE10sFeedback");
+
+        let url = Services.urlFormatter.formatURLPref("app.feedback.baseURL");
+        url += "?utm_source=tab&utm_campaign=e10sfeedback";
+
+        win.openUILinkIn(url, "tab");
+        return;
       }
 
-    } else {
+      // If accessibility recently ran, don't prompt about trying out e10s
+      if (this.a11yRecentlyRan) {
+        return;
+      }
+
       let e10sPromptShownCount = 0;
       try {
         e10sPromptShownCount = Services.prefs.getIntPref(this.CURRENT_PROMPT_PREF);
@@ -2882,32 +2944,6 @@ var E10SUINotification = {
   },
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
-
-  _showE10sActivatedNotice: function() {
-    let win = RecentWindow.getMostRecentBrowserWindow();
-    if (!win)
-      return;
-
-    Services.prefs.setIntPref("browser.displayedE10SNotice", this.CURRENT_NOTICE_COUNT);
-
-    let nb = win.document.getElementById("high-priority-global-notificationbox");
-    let message = win.gNavigatorBundle.getFormattedString(
-                    "e10s.postActivationInfobar.message",
-                    [gBrandBundle.GetStringFromName("brandShortName")]
-                  );
-    let buttons = [
-      {
-        label: win.gNavigatorBundle.getString("e10s.postActivationInfobar.learnMore.label"),
-        accessKey: win.gNavigatorBundle.getString("e10s.postActivationInfobar.learnMore.accesskey"),
-        callback: function () {
-          win.openUILinkIn("https://wiki.mozilla.org/Electrolysis", "tab");
-        }
-      }
-    ];
-    nb.appendNotification(message, "e10s-activated-noticed",
-                          null, nb.PRIORITY_WARNING_MEDIUM, buttons);
-
-  },
 
   _showE10SPrompt: function BG__showE10SPrompt() {
     let win = RecentWindow.getMostRecentBrowserWindow();
@@ -2955,6 +2991,48 @@ var E10SUINotification = {
       win.gNavigatorBundle.getString("e10s.offerPopup.highlight1"),
       win.gNavigatorBundle.getString("e10s.offerPopup.highlight2")
     ];
+
+    let doorhangerExtraContent = win.document.getElementById("enable-e10s-notification")
+                                             .querySelector("popupnotificationcontent");
+    for (let highlight of highlights) {
+      let highlightLabel = win.document.createElement("label");
+      highlightLabel.setAttribute("value", highlight);
+      doorhangerExtraContent.appendChild(highlightLabel);
+    }
+  }
+};
+
+var E10SAccessibilityCheck = {
+  init: function() {
+    Services.obs.addObserver(this, "a11y-init-or-shutdown", true);
+    Services.obs.addObserver(this, "quit-application-granted", true);
+  },
+
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
+
+  get forcedOn() {
+    try {
+      return Services.prefs.getBoolPref("browser.tabs.remote.force-enable");
+    } catch (e) {}
+    return false;
+  },
+
+  observe: function(subject, topic, data) {
+    switch (topic) {
+      case "quit-application-granted":
+        // Tag the profile with a11y load state. We use this in nsAppRunner
+        // checks on the next start.
+        Services.prefs.setBoolPref("accessibility.loadedInLastSession",
+                                   Services.appinfo.accessibilityEnabled);
+        break;
+      case "a11y-init-or-shutdown":
+        if (data == "1") {
+          // Update this so users can check this while still running
+          Services.prefs.setBoolPref("accessibility.loadedInLastSession", true);
+          this._showE10sAccessibilityWarning();
+        }
+        break;
+    }
   },
 
   _warnedAboutAccessibility: false,

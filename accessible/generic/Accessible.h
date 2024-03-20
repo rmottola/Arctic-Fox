@@ -226,7 +226,7 @@ public:
   /**
    * Retrun ARIA role map if any.
    */
-  nsRoleMapEntry* ARIARoleMap() const { return mRoleMapEntry; }
+  const nsRoleMapEntry* ARIARoleMap() const { return mRoleMapEntry; }
 
   /**
    * Return accessible role specified by ARIA (see constants in
@@ -372,7 +372,7 @@ public:
   /**
    * Set the ARIA role map entry for a new accessible.
    */
-  void SetRoleMapEntry(nsRoleMapEntry* aRoleMapEntry)
+  void SetRoleMapEntry(const nsRoleMapEntry* aRoleMapEntry)
     { mRoleMapEntry = aRoleMapEntry; }
 
   /**
@@ -497,7 +497,8 @@ public:
   /**
    * Return true if the accessible is an acceptable child.
    */
-  virtual bool IsAcceptableChild(Accessible* aPossibleChild) const { return true; }
+  virtual bool IsAcceptableChild(nsIContent* aEl) const
+    { return true; }
 
   /**
    * Returns text of accessible if accessible has text role otherwise empty
@@ -1178,7 +1179,7 @@ protected:
   /**
    * Non-null indicates author-supplied role; possibly state & value as well
    */
-  nsRoleMapEntry* mRoleMapEntry;
+  const nsRoleMapEntry* mRoleMapEntry;
 
 private:
   Accessible() = delete;

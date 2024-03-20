@@ -304,7 +304,7 @@
         <getter>
           <![CDATA[
             var document = this.contentDocument;
-            if (!document || !(document instanceof Ci.nsIImageDocument))
+            if (!document || !(document instanceof Components.interfaces.nsIImageDocument))
               return null;
 
             try {
@@ -528,6 +528,13 @@
                        return val;"
                 onget="return this.getAttribute('showresizer') == 'true';"/>
 
+      <property name="manifestURI"
+                readonly="true">
+        <getter><![CDATA[
+          return this.contentDocument.documentElement &&
+                 this.contentDocument.documentElement.getAttribute("manifest");
+        ]]></getter>
+      </property>
 
       <property name="fullZoom">
         <getter><![CDATA[
@@ -781,12 +788,23 @@
         </setter>
       </property>
 
+      <!-- increases or decreases the browser's network priority -->
       <method name="adjustPriority">
         <parameter name="adjustment"/>
         <body><![CDATA[
-          let loadGroup = this.webNavigation.QueryInterface(Ci.nsIDocumentLoader)
-                              .loadGroup.QueryInterface(Ci.nsISupportsPriority);
+          let loadGroup = this.webNavigation.QueryInterface(Components.interfaces.nsIDocumentLoader)
+                              .loadGroup.QueryInterface(Components.interfaces.nsISupportsPriority);
           loadGroup.adjustPriority(adjustment);
+        ]]></body>
+      </method>
+
+      <!-- sets the browser's network priority to a discrete value -->
+      <method name="setPriority">
+        <parameter name="priority"/>
+        <body><![CDATA[
+          let loadGroup = this.webNavigation.QueryInterface(Components.interfaces.nsIDocumentLoader)
+                              .loadGroup.QueryInterface(Components.interfaces.nsISupportsPriority);
+          loadGroup.priority = priority;
         ]]></body>
       </method>
 
@@ -1257,6 +1275,7 @@
               "_textZoom",
               "_isSyntheticDocument",
               "_innerWindowID",
+              "_manifestURI",
             ]);
           }
 

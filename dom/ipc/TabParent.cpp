@@ -29,7 +29,7 @@
 #include "mozilla/ipc/DocumentRendererParent.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/AsyncDragMetrics.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/LookAndFeel.h"
@@ -962,28 +962,28 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
   if (mIsDestroyed) {
     return;
   }
-  hal::ScreenConfiguration config;
-  hal::GetCurrentScreenConfiguration(&config);
-  ScreenOrientationInternal orientation = config.orientation();
-  LayoutDeviceIntPoint chromeOffset = -GetChildProcessOffset();
-
   nsCOMPtr<nsIWidget> widget = GetWidget();
   if (!widget) {
     NS_WARNING("No widget found in TabParent::UpdateDimensions");
     return;
   }
-  nsIntRect contentRect = rect;
-  contentRect.x += widget->GetClientOffset().x;
-  contentRect.y += widget->GetClientOffset().y;
+
+  hal::ScreenConfiguration config;
+  hal::GetCurrentScreenConfiguration(&config);
+  ScreenOrientationInternal orientation = config.orientation();
+  LayoutDeviceIntPoint clientOffset = widget->GetClientOffset();
+  LayoutDeviceIntPoint chromeOffset = -GetChildProcessOffset();
 
   if (!mUpdatedDimensions || mOrientation != orientation ||
-      mDimensions != size || !mRect.IsEqualEdges(contentRect) ||
+      mDimensions != size || !mRect.IsEqualEdges(rect) ||
+      clientOffset != mClientOffset ||
       chromeOffset != mChromeOffset) {
 
     mUpdatedDimensions = true;
-    mRect = contentRect;
+    mRect = rect;
     mDimensions = size;
     mOrientation = orientation;
+    mClientOffset = clientOffset;
     mChromeOffset = chromeOffset;
 
     CSSToLayoutDeviceScale widgetScale = widget->GetDefaultScale();
@@ -998,7 +998,7 @@ TabParent::UpdateDimensions(const nsIntRect& rect, const ScreenIntSize& size)
     CSSRect unscaledRect = devicePixelRect / widgetScale;
     CSSSize unscaledSize = devicePixelSize / widgetScale;
     Unused << SendUpdateDimensions(unscaledRect, unscaledSize,
-                                   orientation, chromeOffset);
+                                   orientation, clientOffset, chromeOffset);
   }
 }
 
@@ -1362,7 +1362,7 @@ bool TabParent::RecvDispatchWheelEvent(const mozilla::WidgetWheelEvent& aEvent)
   localEvent.widget = widget;
   localEvent.refPoint -= GetChildProcessOffset();
 
-  widget->DispatchAPZAwareEvent(&localEvent);
+  widget->DispatchInputEvent(&localEvent);
   return true;
 }
 
@@ -2915,8 +2915,9 @@ TabParent::RequestNotifyLayerTreeReady()
   if (!frame) {
     mNeedLayerTreeReadyNotification = true;
   } else {
-    CompositorParent::RequestNotifyLayerTreeReady(frame->GetLayersId(),
-                                                  new LayerTreeUpdateObserver());
+    CompositorBridgeParent::RequestNotifyLayerTreeReady(
+      frame->GetLayersId(),
+      new LayerTreeUpdateObserver());
   }
   return true;
 }
@@ -2929,8 +2930,9 @@ TabParent::RequestNotifyLayerTreeCleared()
     return false;
   }
 
-  CompositorParent::RequestNotifyLayerTreeCleared(frame->GetLayersId(),
-                                                  new LayerTreeUpdateObserver());
+  CompositorBridgeParent::RequestNotifyLayerTreeCleared(
+    frame->GetLayersId(),
+    new LayerTreeUpdateObserver());
   return true;
 }
 
@@ -2965,12 +2967,13 @@ TabParent::SwapLayerTreeObservers(TabParent* aOther)
 
   RenderFrameParent* rfp = GetRenderFrame();
   RenderFrameParent* otherRfp = aOther->GetRenderFrame();
-  if(!rfp || !otherRfp) {
+  if (!rfp || !otherRfp) {
     return;
   }
 
-  CompositorParent::SwapLayerTreeObservers(rfp->GetLayersId(),
-                                           otherRfp->GetLayersId());
+  CompositorBridgeParent::SwapLayerTreeObservers(
+    rfp->GetLayersId(),
+    otherRfp->GetLayersId());
 }
 
 bool
@@ -3169,24 +3172,7 @@ TabParent::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
 
   EventStateManager* esm = shell->GetPresContext()->EventStateManager();
   for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
-    auto& items = aTransfers[i].items();
-    nsTArray<DataTransferItem>* itemArray = mInitialDataTransferItems.AppendElement();
-    for (uint32_t j = 0; j < items.Length(); ++j) {
-      const IPCDataTransferItem& item = items[j];
-      DataTransferItem* localItem = itemArray->AppendElement();
-      localItem->mFlavor = item.flavor();
-      if (item.data().type() == IPCDataTransferData::TnsString) {
-        localItem->mType = DataTransferItem::DataType::eString;
-        localItem->mStringData = item.data().get_nsString();
-      } else if (item.data().type() == IPCDataTransferData::TPBlobChild) {
-        localItem->mType = DataTransferItem::DataType::eBlob;
-        BlobParent* blobParent =
-          static_cast<BlobParent*>(item.data().get_PBlobParent());
-        if (blobParent) {
-          localItem->mBlobData = blobParent->GetBlobImpl();
-        }
-      }
-    }
+    mInitialDataTransferItems.AppendElement(mozilla::Move(aTransfers[i].items()));
   }
   if (Manager()->IsContentParent()) {
     nsCOMPtr<nsIDragService> dragService =
@@ -3222,24 +3208,37 @@ void
 TabParent::AddInitialDnDDataTo(DataTransfer* aDataTransfer)
 {
   for (uint32_t i = 0; i < mInitialDataTransferItems.Length(); ++i) {
-    nsTArray<DataTransferItem>& itemArray = mInitialDataTransferItems[i];
-    for (uint32_t j = 0; j < itemArray.Length(); ++j) {
-      DataTransferItem& item = itemArray[j];
+    nsTArray<IPCDataTransferItem>& itemArray = mInitialDataTransferItems[i];
+    for (auto& item : itemArray) {
       RefPtr<nsVariantCC> variant = new nsVariantCC();
       // Special case kFilePromiseMime so that we get the right
       // nsIFlavorDataProvider for it.
-      if (item.mFlavor.EqualsLiteral(kFilePromiseMime)) {
+      if (item.flavor().EqualsLiteral(kFilePromiseMime)) {
         RefPtr<nsISupports> flavorDataProvider =
           new nsContentAreaDragDropDataProvider();
         variant->SetAsISupports(flavorDataProvider);
-      } else if (item.mType == DataTransferItem::DataType::eString) {
-        variant->SetAsAString(item.mStringData);
-      } else if (item.mType == DataTransferItem::DataType::eBlob) {
-        variant->SetAsISupports(item.mBlobData);
+      } else if (item.data().type() == IPCDataTransferData::TnsString) {
+        variant->SetAsAString(item.data().get_nsString());
+      } else if (item.data().type() == IPCDataTransferData::TPBlobParent) {
+        auto* parent = static_cast<BlobParent*>(item.data().get_PBlobParent());
+        RefPtr<BlobImpl> impl = parent->GetBlobImpl();
+        variant->SetAsISupports(impl);
+      } else if (item.data().type() == IPCDataTransferData::TnsCString &&
+                 nsContentUtils::IsFlavorImage(item.flavor())) {
+        // An image! Get the imgIContainer for it and set it in the variant.
+        nsCOMPtr<imgIContainer> imageContainer;
+        nsresult rv =
+          nsContentUtils::DataTransferItemToImage(item,
+                                                  getter_AddRefs(imageContainer));
+        if (NS_FAILED(rv)) {
+          continue;
+        }
+        variant->SetAsISupports(imageContainer);
       }
+
       // Using system principal here, since once the data is on parent process
       // side, it can be handled as being from browser chrome or OS.
-      aDataTransfer->SetDataWithPrincipal(NS_ConvertUTF8toUTF16(item.mFlavor),
+      aDataTransfer->SetDataWithPrincipal(NS_ConvertUTF8toUTF16(item.flavor()),
                                           variant, i,
                                           nsContentUtils::GetSystemPrincipal());
     }

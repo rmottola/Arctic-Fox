@@ -804,7 +804,14 @@ bool
 xpc::SandboxProxyHandler::has(JSContext* cx, JS::Handle<JSObject*> proxy,
                               JS::Handle<jsid> id, bool* bp) const
 {
-    return BaseProxyHandler::has(cx, proxy, id, bp);
+    // This uses getPropertyDescriptor for backward compatibility with
+    // the old BaseProxyHandler::has implementation.
+    Rooted<PropertyDescriptor> desc(cx);
+    if (!getPropertyDescriptor(cx, proxy, id, &desc))
+        return false;
+
+    *bp = !!desc.object();
+    return true;
 }
 bool
 xpc::SandboxProxyHandler::hasOwn(JSContext* cx, JS::Handle<JSObject*> proxy,
@@ -1716,9 +1723,8 @@ xpc::EvalInSandbox(JSContext* cx, HandleObject sandboxArg, const nsAString& sour
                           PromiseFlatString(source).get(), source.Length(), &v);
 
         // If the sandbox threw an exception, grab it off the context.
-        if (JS_GetPendingException(sandcx, &exn)) {
-            MOZ_ASSERT(!ok);
-            JS_ClearPendingException(sandcx);
+        if (aes.HasException()) {
+            aes.StealException(&exn);
         }
     }
 

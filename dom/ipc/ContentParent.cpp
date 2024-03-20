@@ -64,6 +64,7 @@
 #include "mozilla/dom/mobileconnection/MobileConnectionParent.h"
 #include "mozilla/dom/mobilemessage/SmsParent.h"
 #include "mozilla/dom/power/PowerManagerService.h"
+#include "mozilla/dom/Permissions.h"
 #include "mozilla/dom/PresentationParent.h"
 #include "mozilla/dom/PPresentationParent.h"
 #include "mozilla/dom/quota/QuotaManagerService.h"
@@ -81,7 +82,7 @@
 #include "mozilla/ipc/InputStreamUtils.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/PAPZParent.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/ImageBridgeParent.h"
 #include "mozilla/layers/SharedBufferManagerParent.h"
 #include "mozilla/LookAndFeel.h"
@@ -153,8 +154,6 @@
 #include "nsPIWindowWatcher.h"
 #include "nsWindowWatcher.h"
 #include "nsIXULRuntime.h"
-#include "gfxDrawable.h"
-#include "ImageOps.h"
 #include "mozilla/dom/nsMixedContentBlocker.h"
 #include "nsMemoryInfoDumper.h"
 #include "nsMemoryReporterManager.h"
@@ -266,6 +265,9 @@ using namespace mozilla::system;
 #endif
 
 #include "VRManagerParent.h"            // for VRManagerParent
+
+// For VP9Benchmark::sBenchmarkFpsPref
+#include "Benchmark.h"
 
 static NS_DEFINE_CID(kCClipboardCID, NS_CLIPBOARD_CID);
 
@@ -1057,6 +1059,14 @@ ContentParent::RecvUngrabPointer(const uint32_t& aTime)
 }
 
 bool
+ContentParent::RecvRemovePermission(const IPC::Principal& aPrincipal,
+                                    const nsCString& aPermissionType,
+                                    nsresult* aRv) {
+  *aRv = Permissions::RemovePermission(aPrincipal, aPermissionType.get());
+  return true;
+}
+
+bool
 ContentParent::RecvConnectPluginBridge(const uint32_t& aPluginId, nsresult* aRv)
 {
   *aRv = NS_OK;
@@ -1125,11 +1135,11 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
     openerTabId = TabParent::GetTabIdFrom(docShell);
   }
 
-  if (aContext.IsBrowserElement() || !aContext.HasOwnApp()) {
+  if (aContext.IsMozBrowserElement() || !aContext.HasOwnApp()) {
     RefPtr<TabParent> tp;
     RefPtr<nsIContentParent> constructorSender;
     if (isInContentProcess) {
-      MOZ_ASSERT(aContext.IsBrowserElement());
+      MOZ_ASSERT(aContext.IsMozBrowserElement());
       constructorSender = CreateContentBridgeParent(aContext, initialPriority,
                                                     openerTabId, &tabId);
     } else {
@@ -1137,7 +1147,7 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
         constructorSender = aOpenerContentParent;
       } else {
         constructorSender =
-          GetNewOrUsedBrowserProcess(aContext.IsBrowserElement(),
+          GetNewOrUsedBrowserProcess(aContext.IsMozBrowserElement(),
                                      initialPriority);
         if (!constructorSender) {
           return nullptr;
@@ -1593,12 +1603,9 @@ RemoteWindowContext::GetInterface(const nsIID& aIID, void** aSink)
 }
 
 NS_IMETHODIMP
-RemoteWindowContext::OpenURI(nsIURI* aURI, uint32_t aFlags)
+RemoteWindowContext::OpenURI(nsIURI* aURI)
 {
-  URIParams uri;
-  SerializeURI(aURI, uri);
-
-  Unused << mTabParent->SendOpenURI(uri, aFlags);
+  mTabParent->LoadURL(aURI);
   return NS_OK;
 }
 
@@ -1911,7 +1918,7 @@ ContentParent::AllocateLayerTreeId(ContentParent* aContent,
                                    TabParent* aTopLevel, const TabId& aTabId,
                                    uint64_t* aId)
 {
-  *aId = CompositorParent::AllocateLayerTreeId();
+  *aId = CompositorBridgeParent::AllocateLayerTreeId();
 
   if (!gfxPlatform::AsyncPanZoomEnabled()) {
     return true;
@@ -1921,7 +1928,7 @@ ContentParent::AllocateLayerTreeId(ContentParent* aContent,
     return false;
   }
 
-  return CompositorParent::UpdateRemoteContentController(*aId, aContent,
+  return CompositorBridgeParent::UpdateRemoteContentController(*aId, aContent,
                                                          aTabId, aTopLevel);
 }
 
@@ -1969,7 +1976,7 @@ ContentParent::RecvDeallocateLayerTreeId(const uint64_t& aId)
   auto iter = NestedBrowserLayerIds().find(this);
   if (iter != NestedBrowserLayerIds().end() &&
     iter->second.find(aId) != iter->second.end()) {
-    CompositorParent::DeallocateLayerTreeId(aId);
+    CompositorBridgeParent::DeallocateLayerTreeId(aId);
   } else {
     // You can't deallocate layer tree ids that you didn't allocate
     KillHard("DeallocateLayerTreeId");
@@ -2533,14 +2540,14 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
 
   if (aSetupOffMainThreadCompositing) {
     // NB: internally, this will send an IPC message to the child
-    // process to get it to create the CompositorChild.  This
+    // process to get it to create the CompositorBridgeChild.  This
     // message goes through the regular IPC queue for this
     // channel, so delivery will happen-before any other messages
-    // we send.  The CompositorChild must be created before any
+    // we send.  The CompositorBridgeChild must be created before any
     // PBrowsers are created, because they rely on the Compositor
     // already being around.  (Creation is async, so can't happen
     // on demand.)
-    bool useOffMainThreadCompositing = !!CompositorParent::CompositorLoop();
+    bool useOffMainThreadCompositing = !!CompositorBridgeParent::CompositorLoop();
     if (useOffMainThreadCompositing) {
       DebugOnly<bool> opened = PCompositorBridge::Open(this);
       MOZ_ASSERT(opened);
@@ -2743,75 +2750,56 @@ ContentParent::RecvSetClipboard(const IPCDataTransfer& aDataTransfer,
   nsCOMPtr<nsIClipboard> clipboard(do_GetService(kCClipboardCID, &rv));
   NS_ENSURE_SUCCESS(rv, true);
 
-  nsCOMPtr<nsITransferable> trans = do_CreateInstance("@mozilla.org/widget/transferable;1", &rv);
+  nsCOMPtr<nsITransferable> trans =
+    do_CreateInstance("@mozilla.org/widget/transferable;1", &rv);
   NS_ENSURE_SUCCESS(rv, true);
   trans->Init(nullptr);
 
   const nsTArray<IPCDataTransferItem>& items = aDataTransfer.items();
-  for (uint32_t j = 0; j < items.Length(); ++j) {
-    const IPCDataTransferItem& item = items[j];
-
+  for (const auto& item : items) {
     trans->AddDataFlavor(item.flavor().get());
 
     if (item.data().type() == IPCDataTransferData::TnsString) {
-    nsCOMPtr<nsISupportsString> dataWrapper =
-      do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID, &rv);
-    NS_ENSURE_SUCCESS(rv, true);
-
-    nsString text = item.data().get_nsString();
-    rv = dataWrapper->SetData(text);
-    NS_ENSURE_SUCCESS(rv, true);
-
-    rv = trans->SetTransferData(item.flavor().get(), dataWrapper,
-                                text.Length() * sizeof(char16_t));
-
-    NS_ENSURE_SUCCESS(rv, true);
-    } else if (item.data().type() == IPCDataTransferData::TnsCString) {
-    if (item.flavor().EqualsLiteral(kNativeImageMime) ||
-        item.flavor().EqualsLiteral(kJPEGImageMime) ||
-        item.flavor().EqualsLiteral(kJPGImageMime) ||
-        item.flavor().EqualsLiteral(kPNGImageMime) ||
-        item.flavor().EqualsLiteral(kGIFImageMime)) {
-      const IPCDataTransferImage& imageDetails = item.imageDetails();
-      const gfx::IntSize size(imageDetails.width(), imageDetails.height());
-      if (!size.width || !size.height) {
-      return true;
-      }
-
-      nsCString text = item.data().get_nsCString();
-      RefPtr<gfx::DataSourceSurface> image =
-      new mozilla::gfx::SourceSurfaceRawData();
-      mozilla::gfx::SourceSurfaceRawData* raw =
-      static_cast<mozilla::gfx::SourceSurfaceRawData*>(image.get());
-      raw->InitWrappingData(
-      reinterpret_cast<uint8_t*>(const_cast<nsCString&>(text).BeginWriting()),
-      size, imageDetails.stride(),
-      static_cast<mozilla::gfx::SurfaceFormat>(imageDetails.format()), false);
-      raw->GuaranteePersistance();
-
-      RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
-      nsCOMPtr<imgIContainer> imageContainer(image::ImageOps::CreateFromDrawable(drawable));
-
-      nsCOMPtr<nsISupportsInterfacePointer>
-      imgPtr(do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID, &rv));
-
-      rv = imgPtr->SetData(imageContainer);
+      nsCOMPtr<nsISupportsString> dataWrapper =
+        do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID, &rv);
       NS_ENSURE_SUCCESS(rv, true);
 
-      trans->SetTransferData(item.flavor().get(), imgPtr, sizeof(nsISupports*));
-    } else {
-      nsCOMPtr<nsISupportsCString> dataWrapper =
-      do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID, &rv);
-      NS_ENSURE_SUCCESS(rv, true);
-
-      const nsCString& text = item.data().get_nsCString();
+      const nsString& text = item.data().get_nsString();
       rv = dataWrapper->SetData(text);
       NS_ENSURE_SUCCESS(rv, true);
 
-      rv = trans->SetTransferData(item.flavor().get(), dataWrapper, text.Length());
+      rv = trans->SetTransferData(item.flavor().get(), dataWrapper,
+                                  text.Length() * sizeof(char16_t));
 
       NS_ENSURE_SUCCESS(rv, true);
-    }
+    } else if (item.data().type() == IPCDataTransferData::TnsCString) {
+      if (nsContentUtils::IsFlavorImage(item.flavor())) {
+        nsCOMPtr<imgIContainer> imageContainer;
+        rv = nsContentUtils::DataTransferItemToImage(item,
+                                                     getter_AddRefs(imageContainer));
+        NS_ENSURE_SUCCESS(rv, true);
+
+        nsCOMPtr<nsISupportsInterfacePointer> imgPtr =
+          do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID);
+        NS_ENSURE_TRUE(imgPtr, true);
+
+        rv = imgPtr->SetData(imageContainer);
+        NS_ENSURE_SUCCESS(rv, true);
+
+        trans->SetTransferData(item.flavor().get(), imgPtr, sizeof(nsISupports*));
+      } else {
+        nsCOMPtr<nsISupportsCString> dataWrapper =
+          do_CreateInstance(NS_SUPPORTS_CSTRING_CONTRACTID, &rv);
+        NS_ENSURE_SUCCESS(rv, true);
+
+        const nsCString& text = item.data().get_nsCString();
+        rv = dataWrapper->SetData(text);
+        NS_ENSURE_SUCCESS(rv, true);
+
+        rv = trans->SetTransferData(item.flavor().get(), dataWrapper, text.Length());
+
+        NS_ENSURE_SUCCESS(rv, true);
+      }
     }
   }
 
@@ -3346,7 +3334,7 @@ PCompositorBridgeParent*
 ContentParent::AllocPCompositorBridgeParent(mozilla::ipc::Transport* aTransport,
                                             base::ProcessId aOtherProcess)
 {
-  return CompositorParent::Create(aTransport, aOtherProcess);
+  return CompositorBridgeParent::Create(aTransport, aOtherProcess);
 }
 
 gfx::PVRManagerParent*
@@ -5366,7 +5354,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     thisTabParent = TabParent::GetFrom(aThisTab);
   }
 
-  if (NS_WARN_IF(thisTabParent && thisTabParent->IsBrowserOrApp())) {
+  if (NS_WARN_IF(thisTabParent && thisTabParent->IsMozBrowserOrApp())) {
     return false;
   }
 
@@ -5721,6 +5709,17 @@ ContentParent::RecvGetAndroidSystemInfo(AndroidSystemInfo* aInfo)
   MOZ_CRASH("wrong platform!");
   return false;
 #endif
+}
+
+bool
+ContentParent::RecvNotifyBenchmarkResult(const nsString& aCodecName,
+                                         const uint32_t& aDecodeFPS)
+
+{
+  if (aCodecName.EqualsLiteral("VP9")) {
+    Preferences::SetUint(VP9Benchmark::sBenchmarkFpsPref, aDecodeFPS);
+  }
+  return true;
 }
 
 void

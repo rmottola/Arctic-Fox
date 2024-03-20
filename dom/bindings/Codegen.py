@@ -14356,7 +14356,7 @@ def genConstructorBody(descriptor, initCall=""):
         """
         JS::Rooted<JSObject*> jsImplObj(cx);
         nsCOMPtr<nsIGlobalObject> globalHolder =
-          ConstructJSImplementation(cx, "${contractId}", global, &jsImplObj, aRv);
+          ConstructJSImplementation("${contractId}", global, &jsImplObj, aRv);
         if (aRv.Failed()) {
           return nullptr;
         }
@@ -14672,17 +14672,29 @@ class CGCallback(CGClass):
             # Not much we can assert about it, other than not being null, and
             # CallbackObject does that already.
             body = ""
-        return [ClassConstructor(
-            [Argument("JSContext*", "aCx"),
-             Argument("JS::Handle<JSObject*>", "aCallback"),
-             Argument("nsIGlobalObject*", "aIncumbentGlobal")],
-            bodyInHeader=True,
-            visibility="public",
-            explicit=True,
-            baseConstructors=[
-                "%s(aCx, aCallback, aIncumbentGlobal)" % self.baseName,
-            ],
-            body=body)]
+        return [
+            ClassConstructor(
+                [Argument("JSContext*", "aCx"),
+                 Argument("JS::Handle<JSObject*>", "aCallback"),
+                 Argument("nsIGlobalObject*", "aIncumbentGlobal")],
+                bodyInHeader=True,
+                visibility="public",
+                explicit=True,
+                baseConstructors=[
+                    "%s(aCx, aCallback, aIncumbentGlobal)" % self.baseName,
+                ],
+                body=body),
+            ClassConstructor(
+                [Argument("JS::Handle<JSObject*>", "aCallback"),
+                 Argument("JS::Handle<JSObject*>", "aAsyncStack"),
+                 Argument("nsIGlobalObject*", "aIncumbentGlobal")],
+                bodyInHeader=True,
+                visibility="public",
+                explicit=True,
+                baseConstructors=[
+                    "%s(aCallback, aAsyncStack, aIncumbentGlobal)" % self.baseName,
+                ],
+                body=body)]
 
     def getMethodImpls(self, method):
         assert method.needThisHandling
@@ -15168,7 +15180,7 @@ class CallbackMethod(CallbackMember):
             $*{declThis}
             if (${callGuard}!JS::Call(cx, ${thisVal}, callable,
                           ${args}, &rval)) {
-              aRv.Throw(NS_ERROR_UNEXPECTED);
+              aRv.NoteJSContextException(cx);
               return${errorReturn};
             }
             """,

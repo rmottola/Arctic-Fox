@@ -595,6 +595,7 @@ TabTarget.prototype = {
     this._tab = null;
     this._form = null;
     this._remote = null;
+    this._root = null;
   },
 
   toString: function() {
@@ -728,6 +729,10 @@ WorkerTarget.prototype = {
   destroy: function() {},
 
   hasActor: function (name) {
+    // console is the only one actor implemented by WorkerActor
+    if (name == "console") {
+      return true;
+    }
     return false;
   },
 

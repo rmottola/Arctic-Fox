@@ -1022,7 +1022,7 @@ ClonedBlockObject::createGlobal(JSContext* cx, Handle<GlobalObject*> global)
 
     // Currently the global lexical scope cannot have any bindings with frame
     // slots.
-    staticLexical->setLocalOffset(UINT32_MAX);
+    staticLexical->setLocalOffsetToInvalid();
     staticLexical->initEnclosingScope(nullptr);
     Rooted<ClonedBlockObject*> lexical(cx, ClonedBlockObject::create(cx, staticLexical, global));
     if (!lexical)
@@ -1043,7 +1043,7 @@ ClonedBlockObject::createNonSyntactic(JSContext* cx, HandleObject enclosingStati
     if (!staticLexical)
         return nullptr;
 
-    staticLexical->setLocalOffset(UINT32_MAX);
+    staticLexical->setLocalOffsetToInvalid();
     staticLexical->initEnclosingScope(enclosingStatic);
     Rooted<ClonedBlockObject*> lexical(cx, ClonedBlockObject::create(cx, staticLexical,
                                                                      enclosingScope));
@@ -1948,9 +1948,38 @@ class DebugScopeProxy : public BaseProxyHandler
     static bool isMagicMissingArgumentsValue(JSContext* cx, ScopeObject& scope, HandleValue v)
     {
         bool isMagic = v.isMagic() && v.whyMagic() == JS_OPTIMIZED_ARGUMENTS;
-        MOZ_ASSERT_IF(isMagic,
-                      isFunctionScope(scope) &&
-                      scope.as<CallObject>().callee().nonLazyScript()->argumentsHasVarBinding());
+
+#ifdef DEBUG
+        // The |scope| object here is not limited to CallObjects but may also
+        // be block scopes in case of the following:
+        //
+        //   function f() { { let a = arguments; } }
+        //
+        // We need to check that |scope|'s static scope's nearest function
+        // scope has an 'arguments' var binding. The dynamic scope chain is
+        // not sufficient: |f| above will not have a CallObject because there
+        // are no aliased body-level bindings.
+        if (isMagic) {
+            JSFunction* callee = nullptr;
+            if (isFunctionScope(scope)) {
+                callee = &scope.as<CallObject>().callee();
+            } else {
+                // We will never have a DynamicWithObject here because no
+                // binding accesses on with scopes are unaliased.
+                for (StaticScopeIter<NoGC> ssi(&scope.as<ClonedBlockObject>().staticBlock());
+                     !ssi.done();
+                     ssi++)
+                {
+                    if (ssi.type() == StaticScopeIter<NoGC>::Function) {
+                        callee = &ssi.fun();
+                        break;
+                    }
+                }
+            }
+            MOZ_ASSERT(callee && callee->nonLazyScript()->argumentsHasVarBinding());
+        }
+#endif
+
         return isMagic;
     }
 
@@ -3393,8 +3422,12 @@ js::CheckEvalDeclarationConflicts(JSContext* cx, HandleScript script,
     // Check that a direct eval will not hoist 'var' bindings over lexical
     // bindings with the same name.
     while (obj != varObj) {
-        if (!CheckVarNameConflictsInScope<ClonedBlockObject>(cx, script, obj))
-            return false;
+        // Annex B.3.5 says 'var' declarations with the same name as catch
+        // parameters are allowed.
+        if (!obj->is<ClonedBlockObject>() || !obj->as<ClonedBlockObject>().isForCatchParameters()) {
+            if (!CheckVarNameConflictsInScope<ClonedBlockObject>(cx, script, obj))
+                return false;
+        }
         obj = obj->enclosingScope();
     }
 

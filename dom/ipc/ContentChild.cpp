@@ -45,9 +45,8 @@
 #include "mozilla/ipc/TestShellChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/APZChild.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
-#include "mozilla/layers/PCompositorBridgeChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/net/NeckoChild.h"
@@ -599,9 +598,6 @@ ReinitTaskTracer(void* /*aUnused*/)
 
 ContentChild::ContentChild()
  : mID(uint64_t(-1))
-#ifdef ANDROID
- , mScreenSize(0, 0)
-#endif
  , mCanOverrideProcessName(true)
  , mIsAlive(true)
 {
@@ -807,7 +803,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     PopupIPCTabContext context;
     openerTabId = aTabOpener->GetTabId();
     context.opener() = openerTabId;
-    context.isBrowserElement() = aTabOpener->IsBrowserElement();
+    context.isMozBrowserElement() = aTabOpener->IsMozBrowserElement();
     ipcContext = new IPCTabContext(context);
   } else {
     // It's possible to not have a TabChild opener in the case
@@ -1291,7 +1287,7 @@ PCompositorBridgeChild*
 ContentChild::AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
                                           base::ProcessId aOtherProcess)
 {
-  return CompositorChild::Create(aTransport, aOtherProcess);
+  return CompositorBridgeChild::Create(aTransport, aOtherProcess);
 }
 
 PSharedBufferManagerChild*
@@ -2510,17 +2506,6 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
                                  nsPermissionManager::eNoDBOperation);
 #endif
 
-  return true;
-}
-
-bool
-ContentChild::RecvScreenSizeChanged(const gfx::IntSize& size)
-{
-#ifdef ANDROID
-  mScreenSize = size;
-#else
-  NS_RUNTIMEABORT("Message currently only expected on android");
-#endif
   return true;
 }
 

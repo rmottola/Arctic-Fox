@@ -51,6 +51,7 @@ pref("devtools.command-button-eyedropper.enabled", false);
 pref("devtools.command-button-screenshot.enabled", false);
 pref("devtools.command-button-rulers.enabled", false);
 pref("devtools.command-button-measure.enabled", false);
+pref("devtools.command-button-noautohide.enabled", false);
 
 // Inspector preferences
 // Enable the Inspector
@@ -213,6 +214,9 @@ pref("devtools.canvasdebugger.enabled", false);
 
 // Enable the Web Audio Editor
 pref("devtools.webaudioeditor.enabled", false);
+
+// Enable Scratchpad
+pref("devtools.scratchpad.enabled", false);
 
 // Web Audio Editor Inspector Width should be a preference
 pref("devtools.webaudioeditor.inspectorWidth", 300);

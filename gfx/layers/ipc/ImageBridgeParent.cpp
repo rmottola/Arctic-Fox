@@ -19,7 +19,7 @@
 #include "mozilla/ipc/Transport.h"      // for Transport
 #include "mozilla/media/MediaSystemResourceManagerParent.h" // for MediaSystemResourceManagerParent
 #include "mozilla/layers/CompositableTransactionParent.h"
-#include "mozilla/layers/CompositorParent.h"  // for CompositorParent
+#include "mozilla/layers/CompositorBridgeParent.h"  // for CompositorBridgeParent
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "mozilla/layers/LayersMessages.h"  // for EditReply
 #include "mozilla/layers/LayersSurfaces.h"  // for PGrallocBufferParent
@@ -49,7 +49,7 @@ std::map<base::ProcessId, ImageBridgeParent*> ImageBridgeParent::sImageBridges;
 
 MessageLoop* ImageBridgeParent::sMainLoop = nullptr;
 
-// defined in CompositorParent.cpp
+// defined in CompositorBridgeParent.cpp
 CompositorThreadHolder* GetCompositorThreadHolder();
 
 ImageBridgeParent::ImageBridgeParent(MessageLoop* aLoop,
@@ -184,7 +184,7 @@ ConnectImageBridgeInParentProcess(ImageBridgeParent* aBridge,
 /*static*/ PImageBridgeParent*
 ImageBridgeParent::Create(Transport* aTransport, ProcessId aChildProcessId)
 {
-  MessageLoop* loop = CompositorParent::CompositorLoop();
+  MessageLoop* loop = CompositorBridgeParent::CompositorLoop();
   RefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(loop, aTransport, aChildProcessId);
   bridge->mSelfRef = bridge;
   loop->PostTask(FROM_HERE,
@@ -447,25 +447,22 @@ ImageBridgeParent::ReplyRemoveTexture(base::ProcessId aChildProcessId,
 }
 
 void
-ImageBridgeParent::SendFenceHandleIfPresent(PTextureParent* aTexture,
-                                            CompositableHost* aCompositableHost)
+ImageBridgeParent::SendFenceHandleIfPresent(PTextureParent* aTexture)
 {
   RefPtr<TextureHost> texture = TextureHost::AsTextureHost(aTexture);
-  if (!texture) {
+  if (!texture || !texture->NeedsFenceHandle()) {
     return;
   }
 
   // Send a ReleaseFence of CompositorOGL.
-  if (aCompositableHost && aCompositableHost->GetCompositor()) {
-    FenceHandle fence = aCompositableHost->GetCompositor()->GetReleaseFence();
-    if (fence.IsValid()) {
-      mPendingAsyncMessage.push_back(OpDeliverFence(aTexture, nullptr,
-                                                    fence));
-    }
+  FenceHandle fence = texture->GetCompositorReleaseFence();
+  if (fence.IsValid()) {
+    mPendingAsyncMessage.push_back(OpDeliverFence(aTexture, nullptr,
+                                                  fence));
   }
 
-  // Send a ReleaseFence that is set by HwcComposer2D.
-  FenceHandle fence = texture->GetAndResetReleaseFenceHandle();
+  // Send a ReleaseFence that is set to TextureHost by HwcComposer2D.
+  fence = texture->GetAndResetReleaseFenceHandle();
   if (fence.IsValid()) {
     mPendingAsyncMessage.push_back(OpDeliverFence(aTexture, nullptr,
                                                   fence));
@@ -475,26 +472,23 @@ ImageBridgeParent::SendFenceHandleIfPresent(PTextureParent* aTexture,
 void
 ImageBridgeParent::AppendDeliverFenceMessage(uint64_t aDestHolderId,
                                              uint64_t aTransactionId,
-                                             PTextureParent* aTexture,
-                                             CompositableHost* aCompositableHost)
+                                             PTextureParent* aTexture)
 {
   RefPtr<TextureHost> texture = TextureHost::AsTextureHost(aTexture);
-  if (!texture) {
+  if (!texture || !texture->NeedsFenceHandle()) {
     return;
   }
 
   // Send a ReleaseFence of CompositorOGL.
-  if (aCompositableHost && aCompositableHost->GetCompositor()) {
-    FenceHandle fence = aCompositableHost->GetCompositor()->GetReleaseFence();
-    if (fence.IsValid()) {
-      mPendingAsyncMessage.push_back(OpDeliverFenceToTracker(aDestHolderId,
-                                                             aTransactionId,
-                                                             fence));
-    }
+  FenceHandle fence = texture->GetCompositorReleaseFence();
+  if (fence.IsValid()) {
+    mPendingAsyncMessage.push_back(OpDeliverFenceToTracker(aDestHolderId,
+                                                           aTransactionId,
+                                                           fence));
   }
 
-  // Send a ReleaseFence that is set by HwcComposer2D.
-  FenceHandle fence = texture->GetAndResetReleaseFenceHandle();
+  // Send a ReleaseFence that is set to TextureHost by HwcComposer2D.
+  fence = texture->GetAndResetReleaseFenceHandle();
   if (fence.IsValid()) {
     mPendingAsyncMessage.push_back(OpDeliverFenceToTracker(aDestHolderId,
                                                            aTransactionId,
@@ -506,8 +500,7 @@ ImageBridgeParent::AppendDeliverFenceMessage(uint64_t aDestHolderId,
 ImageBridgeParent::AppendDeliverFenceMessage(base::ProcessId aChildProcessId,
                                              uint64_t aDestHolderId,
                                              uint64_t aTransactionId,
-                                             PTextureParent* aTexture,
-                                             CompositableHost* aCompositableHost)
+                                             PTextureParent* aTexture)
 {
   ImageBridgeParent* imageBridge = ImageBridgeParent::GetInstance(aChildProcessId);
   if (!imageBridge) {
@@ -515,8 +508,7 @@ ImageBridgeParent::AppendDeliverFenceMessage(base::ProcessId aChildProcessId,
   }
   imageBridge->AppendDeliverFenceMessage(aDestHolderId,
                                          aTransactionId,
-                                         aTexture,
-                                         aCompositableHost);
+                                         aTexture);
 }
 
 /*static*/ void

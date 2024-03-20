@@ -52,6 +52,8 @@ public:
 
   virtual TrackInfo::TrackType GetType() = 0;
 
+  virtual void ConfigurationChanged(const TrackInfo& aConfig) {}
+
   virtual const char* GetDescriptionName() const = 0;
 
 protected:
@@ -83,6 +85,8 @@ public:
 
   bool IsHardwareAccelerated(nsACString& aFailureReason) const override;
 
+  nsresult ConfigurationChanged(const TrackInfo& aConfig) override;
+
   const char* GetDescriptionName() const override
   {
     return mMFTManager ? mMFTManager->GetDescriptionName() : "";
@@ -107,6 +111,10 @@ private:
   void ProcessDrain();
 
   void ProcessShutdown();
+
+  // Called on the task queue. Tell the MFT that the next Input will have a
+  // different configuration (typically resolution change).
+  void ProcessConfigurationChanged(UniquePtr<TrackInfo>&& aConfig);
 
   RefPtr<FlushableTaskQueue> mTaskQueue;
   MediaDataDecoderCallback* mCallback;
