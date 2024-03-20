@@ -1825,7 +1825,7 @@ TokenStream::getStringOrTemplateToken(int untilChar, Token** tp)
             if (c == '\r') {
                 c = '\n';
                 if (userbuf.peekRawChar() == '\n')
-                    skipChars(1);
+                    skipCharsIgnoreEOL(1);
             }
             updateLineInfoForEOL();
             updateFlagsForEOL();
