@@ -57,6 +57,7 @@ public:
   ScrollFrameHelper(nsContainerFrame* aOuter, bool aIsRoot);
   ~ScrollFrameHelper();
 
+  bool IsScrollFrameWithSnapping() const;
   mozilla::ScrollbarStyles GetScrollbarStylesFromFrame() const;
 
   // If a child frame was added or removed on the scrollframe,
@@ -101,6 +102,29 @@ public:
 
   bool IsSmoothScrollingEnabled();
 
+  /**
+   * This class handles the dispatching of scroll events to content.
+   *
+   * nsRefreshDriver maintains three lists of refresh observers, one for each
+   * flush type: Flush_Style, Flush_Layout, and Flush_Display.
+   *
+   * During a tick, it runs through each list of observers, in order, and runs
+   * them. To iterate over each list, it uses an EndLimitedIterator, which is
+   * designed to iterate only over elements present when the iterator was
+   * created, not elements added afterwards. This means that, for a given flush
+   * type, a refresh observer added during the execution of another refresh
+   * observer of that flush type, will not run until the next tick.
+   *
+   * During main-thread animation-driven scrolling, ScrollEvents are *posted*
+   * by AsyncScroll::WillRefresh(). AsyncScroll registers itself as a Flush_Style
+   * refresh observer.
+   *
+   * Posting a scroll event, as of bug 1250550, registers a Flush_Layout
+   * refresh observer, which *fires* the event when run. This allows the event
+   * to be fired to content in the same refresh driver tick as it is posted.
+   * This is an important invariant to maintain to reduce scroll event latency
+   * for main-thread scrolling.
+   */
   class ScrollEvent : public nsARefreshObserver {
   public:
     NS_INLINE_DECL_REFCOUNTING(ScrollEvent, override)
@@ -356,10 +380,12 @@ public:
       // because we have special behaviour for it when APZ scrolling is active.
       mOuter->SchedulePaint();
     }
+    NotifyPluginFrames(aTransforming ? BEGIN_APZ : END_APZ);
   }
   bool IsTransformingByAPZ() const {
     return mTransformingByAPZ;
   }
+  void SetScrollableByAPZ(bool aScrollable);
   void SetZoomableByAPZ(bool aZoomable);
 
   bool UsesContainerScrolling() const;
@@ -416,6 +442,9 @@ public:
                     nsIScrollableFrame::ScrollUnit aUnit,
                     nsIScrollbarMediator::ScrollSnapMode aSnap
                       = nsIScrollbarMediator::DISABLE_SNAP);
+  bool ShouldSuppressScrollbarRepaints() const {
+    return mSuppressScrollbarRepaints;
+  }
 
   // owning references to the nsIAnonymousContentCreator-built content
   nsCOMPtr<nsIContent> mHScrollbarContent;
@@ -541,12 +570,40 @@ public:
   // (as best as we can tell on the main thread, anyway).
   bool mTransformingByAPZ:1;
 
+  // True if APZ can scroll this frame asynchronously (i.e. it has an APZC
+  // set up for this frame and it's not a scrollinfo layer).
+  bool mScrollableByAPZ:1;
+
   // True if the APZ is allowed to zoom this scrollframe.
   bool mZoomableByAPZ:1;
+
+  // True if we don't want the scrollbar to repaint itself right now.
+  bool mSuppressScrollbarRepaints:1;
 
   mozilla::layout::ScrollVelocityQueue mVelocityQueue;
 
 protected:
+  class AutoScrollbarRepaintSuppression;
+  friend class AutoScrollbarRepaintSuppression;
+  class AutoScrollbarRepaintSuppression {
+  public:
+    AutoScrollbarRepaintSuppression(ScrollFrameHelper* aHelper, bool aSuppress)
+      : mHelper(aHelper)
+      , mOldSuppressValue(aHelper->mSuppressScrollbarRepaints)
+    {
+      mHelper->mSuppressScrollbarRepaints = aSuppress;
+    }
+
+    ~AutoScrollbarRepaintSuppression()
+    {
+      mHelper->mSuppressScrollbarRepaints = mOldSuppressValue;
+    }
+
+  private:
+    ScrollFrameHelper* mHelper;
+    bool mOldSuppressValue;
+  };
+
   /**
    * @note This method might destroy the frame, pres shell and other objects.
    */
@@ -563,9 +620,10 @@ protected:
    * Helper that notifies plugins about async smooth scroll operations managed
    * by nsGfxScrollFrame.
    */
-  enum AsyncScrollEventType { BEGIN_DOM, END_DOM };
+  enum AsyncScrollEventType { BEGIN_DOM, BEGIN_APZ, END_DOM, END_APZ };
   void NotifyPluginFrames(AsyncScrollEventType aEvent);
   AsyncScrollEventType mAsyncScrollEvent;
+  bool HasPluginFrames();
 
   static void EnsureImageVisPrefsCached();
   static bool sImageVisPrefsCached;
@@ -691,6 +749,9 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
+  }
+  virtual bool IsScrollFrameWithSnapping() const override {
+    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
@@ -932,11 +993,18 @@ public:
     return mHelper.IsScrollbarOnRight();
   }
 
+  virtual bool ShouldSuppressScrollbarRepaints() const override {
+    return mHelper.ShouldSuppressScrollbarRepaints();
+  }
+
   virtual void SetTransformingByAPZ(bool aTransforming) override {
     mHelper.SetTransformingByAPZ(aTransforming);
   }
   bool IsTransformingByAPZ() const override {
     return mHelper.IsTransformingByAPZ();
+  }
+  void SetScrollableByAPZ(bool aScrollable) override {
+    mHelper.SetScrollableByAPZ(aScrollable);
   }
   void SetZoomableByAPZ(bool aZoomable) override {
     mHelper.SetZoomableByAPZ(aZoomable);
@@ -1096,6 +1164,9 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
+  }
+  virtual bool IsScrollFrameWithSnapping() const override {
+    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
@@ -1324,6 +1395,10 @@ public:
     return mHelper.IsScrollbarOnRight();
   }
 
+  virtual bool ShouldSuppressScrollbarRepaints() const override {
+    return mHelper.ShouldSuppressScrollbarRepaints();
+  }
+
   virtual void SetTransformingByAPZ(bool aTransforming) override {
     mHelper.SetTransformingByAPZ(aTransforming);
   }
@@ -1332,6 +1407,9 @@ public:
   }
   bool IsTransformingByAPZ() const override {
     return mHelper.IsTransformingByAPZ();
+  }
+  void SetScrollableByAPZ(bool aScrollable) override {
+    mHelper.SetScrollableByAPZ(aScrollable);
   }
   void SetZoomableByAPZ(bool aZoomable) override {
     mHelper.SetZoomableByAPZ(aZoomable);

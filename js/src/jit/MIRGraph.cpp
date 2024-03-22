@@ -126,6 +126,12 @@ MIRGenerator::needsAsmJSBoundsCheckBranch(const MAsmJSHeapAccess* access) const
 size_t
 MIRGenerator::foldableOffsetRange(const MAsmJSHeapAccess* access) const
 {
+    return foldableOffsetRange(access->needsBoundsCheck(), access->isAtomicAccess());
+}
+
+size_t
+MIRGenerator::foldableOffsetRange(bool accessNeedsBoundsCheck, bool atomic) const
+{
     // This determines whether it's ok to fold up to WasmImmediateSize
     // offsets, instead of just WasmCheckedImmediateSize.
 
@@ -141,14 +147,15 @@ MIRGenerator::foldableOffsetRange(const MAsmJSHeapAccess* access) const
                   "spill over, so ensure a space at the end.");
 
     // Signal-handling can be dynamically disabled by OS bugs or flags.
-    if (usesSignalHandlersForAsmJSOOB_)
+    // Bug 1254935: Atomic accesses can't be handled with signal handlers yet.
+    if (usesSignalHandlersForAsmJSOOB_ && !atomic)
         return WasmImmediateRange;
 #endif
 
     // On 32-bit platforms, if we've proven the access is in bounds after
     // 32-bit wrapping, we can fold full offsets because they're added with
     // 32-bit arithmetic.
-    if (sizeof(intptr_t) == sizeof(int32_t) && !access->needsBoundsCheck())
+    if (sizeof(intptr_t) == sizeof(int32_t) && !accessNeedsBoundsCheck)
         return WasmImmediateRange;
 
     // Otherwise, only allow the checked size. This is always less than the
@@ -603,8 +610,6 @@ MBasicBlock::shimmySlots(int discardDepth)
 bool
 MBasicBlock::linkOsrValues(MStart* start)
 {
-    MOZ_ASSERT(start->startType() == MStart::StartType_Osr);
-
     MResumePoint* res = start->resumePoint();
 
     for (uint32_t i = 0; i < stackDepth(); i++) {

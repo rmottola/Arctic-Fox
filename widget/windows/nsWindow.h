@@ -25,6 +25,7 @@
 #include "nsITimer.h"
 #include "nsRegion.h"
 #include "mozilla/EventForwards.h"
+#include "mozilla/gfx/CriticalSection.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TimeStamp.h"
 #include "nsMargin.h"
@@ -85,6 +86,7 @@ public:
   // nsWindowBase
   virtual void InitEvent(mozilla::WidgetGUIEvent& aEvent,
                          LayoutDeviceIntPoint* aPoint = nullptr) override;
+  virtual WidgetEventTime CurrentMessageWidgetEventTime() const override;
   virtual bool DispatchWindowEvent(mozilla::WidgetGUIEvent* aEvent) override;
   virtual bool DispatchKeyboardEvent(mozilla::WidgetKeyboardEvent* aEvent) override;
   virtual bool DispatchWheelEvent(mozilla::WidgetWheelEvent* aEvent) override;
@@ -198,6 +200,8 @@ public:
   NS_IMETHOD_(void)       SetInputContext(const InputContext& aContext,
                                           const InputContextAction& aAction) override;
   NS_IMETHOD_(InputContext) GetInputContext() override;
+  NS_IMETHOD_(TextEventDispatcherListener*)
+    GetNativeTextEventDispatcherListener() override;
 #ifdef MOZ_XUL
   virtual void            SetTransparencyMode(nsTransparencyMode aMode) override;
   virtual nsTransparencyMode GetTransparencyMode() override;
@@ -260,7 +264,7 @@ public:
   virtual bool            AutoErase(HDC dc);
   bool ComputeShouldAccelerate() override;
 
-  static void             ClearCompositor(nsWindow* aWindow);
+  void                    ForcePresent();
 
   /**
    * AssociateDefaultIMC() associates or disassociates the default IMC for
@@ -316,12 +320,17 @@ protected:
   virtual void WindowUsesOMTC() override;
   virtual void RegisterTouchWindow() override;
 
-  virtual nsresult NotifyIMEInternal(
-                     const IMENotification& aIMENotification) override;
-
   // A magic number to identify the FAKETRACKPOINTSCROLLABLE window created
   // when the trackpoint hack is enabled.
   enum { eFakeTrackPointScrollableID = 0x46545053 };
+
+  // Used for displayport suppression during window resize
+  enum ResizeState {
+    NOT_RESIZING,
+    IN_SIZEMOVE,
+    RESIZING,
+    MOVING
+  };
 
   /**
    * Callbacks
@@ -398,8 +407,9 @@ protected:
   static bool             ConvertStatus(nsEventStatus aStatus);
   static void             PostSleepWakeNotification(const bool aIsSleepMode);
   int32_t                 ClientMarginHitTestPoint(int32_t mx, int32_t my);
-  TimeStamp               GetMessageTimeStamp(LONG aEventTime);
+  TimeStamp               GetMessageTimeStamp(LONG aEventTime) const;
   static void             UpdateFirstEventTime(DWORD aEventTime);
+  void                    FinishLiveResizing(ResizeState aNewState);
 
   /**
    * Event handlers
@@ -583,12 +593,6 @@ protected:
 
   LayoutDeviceIntRect   mLastPaintBounds;
 
-  // Used for displayport suppression during window resize
-  enum ResizeState {
-    NOT_RESIZING,
-    IN_SIZEMOVE,
-    RESIZING,
-  };
   ResizeState mResizeState;
 
   // Transparency
@@ -629,7 +633,7 @@ protected:
   static bool sNeedsToInitMouseWheelSettings;
   static void InitMouseWheelScrollData();
 
-  CRITICAL_SECTION mPresentLock;
+  mozilla::gfx::CriticalSection mPresentLock;
 
   double mSizeConstraintsScale; // scale in effect when setting constraints
 };

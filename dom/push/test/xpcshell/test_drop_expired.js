@@ -101,7 +101,7 @@ add_task(function* setUp() {
   });
 
   let subChangePromise = promiseObserverNotification(
-    'push-subscription-change',
+    PushServiceComponent.subscriptionChangeTopic,
     (subject, data) => data == 'https://example.com/expired-quota-restored'
   );
 
@@ -128,7 +128,7 @@ add_task(function* setUp() {
 
 add_task(function* test_site_visited() {
   let subChangePromise = promiseObserverNotification(
-    'push-subscription-change',
+    PushServiceComponent.subscriptionChangeTopic,
     (subject, data) => data == 'https://example.xyz/expired-quota-exceeded'
   );
 
@@ -141,7 +141,7 @@ add_task(function* test_site_visited() {
 
 add_task(function* test_perm_restored() {
   let subChangePromise = promiseObserverNotification(
-    'push-subscription-change',
+    PushServiceComponent.subscriptionChangeTopic,
     (subject, data) => data == 'https://example.info/expired-perm-revoked'
   );
 

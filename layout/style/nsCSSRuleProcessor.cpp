@@ -185,7 +185,7 @@ struct RuleHashTagTableEntry : public RuleHashTableEntry {
 };
 
 static PLDHashNumber
-RuleHash_CIHashKey(PLDHashTable *table, const void *key)
+RuleHash_CIHashKey(const void *key)
 {
   nsIAtom *atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>(key));
 
@@ -195,56 +195,64 @@ RuleHash_CIHashKey(PLDHashTable *table, const void *key)
   return HashString(str);
 }
 
-typedef nsIAtom*
-(* RuleHashGetKey) (PLDHashTable *table, const PLDHashEntryHdr *entry);
-
-struct RuleHashTableOps {
-  const PLDHashTableOps ops;
-  // Extra callback to avoid duplicating the matchEntry callback for
-  // each table.  (There used to be a getKey callback in
-  // PLDHashTableOps.)
-  RuleHashGetKey getKey;
-};
-
-inline const RuleHashTableOps*
-ToLocalOps(const PLDHashTableOps *aOps)
+static inline nsCSSSelector*
+SubjectSelectorForRuleHash(const PLDHashEntryHdr *hdr)
 {
-  return (const RuleHashTableOps*)
-           (((const char*) aOps) - offsetof(RuleHashTableOps, ops));
+  auto entry = static_cast<const RuleHashTableEntry*>(hdr);
+  nsCSSSelector* selector = entry->mRules[0].mSelector;
+  if (selector->IsPseudoElement()) {
+    selector = selector->mNext;
+  }
+  return selector;
 }
 
-static bool
-RuleHash_CIMatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                      const void *key)
+static inline bool
+CIMatchAtoms(const void* key, nsIAtom *entry_atom)
 {
-  nsIAtom *match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>
-                                              (key));
-  // Use our extra |getKey| callback to avoid code duplication.
-  nsIAtom *entry_atom = ToLocalOps(table->Ops())->getKey(table, hdr);
+  auto match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>(key));
 
   // Check for case-sensitive match first.
-  if (match_atom == entry_atom)
+  if (match_atom == entry_atom) {
     return true;
+  }
 
   // Use EqualsIgnoreASCIICase instead of full on unicode case conversion
   // in order to save on performance. This is only used in quirks mode
   // anyway.
-
   return
     nsContentUtils::EqualsIgnoreASCIICase(nsDependentAtomString(entry_atom),
                                           nsDependentAtomString(match_atom));
 }
 
-static bool
-RuleHash_CSMatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                      const void *key)
+static inline bool
+CSMatchAtoms(const void* key, nsIAtom *entry_atom)
 {
-  nsIAtom *match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>
-                                              (key));
-  // Use our extra |getKey| callback to avoid code duplication.
-  nsIAtom *entry_atom = ToLocalOps(table->Ops())->getKey(table, hdr);
-
+  auto match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>(key));
   return match_atom == entry_atom;
+}
+
+static bool
+RuleHash_ClassCIMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
+{
+  return CIMatchAtoms(key, SubjectSelectorForRuleHash(hdr)->mClassList->mAtom);
+}
+
+static bool
+RuleHash_IdCIMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
+{
+  return CIMatchAtoms(key, SubjectSelectorForRuleHash(hdr)->mIDList->mAtom);
+}
+
+static bool
+RuleHash_ClassCSMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
+{
+  return CSMatchAtoms(key, SubjectSelectorForRuleHash(hdr)->mClassList->mAtom);
+}
+
+static bool
+RuleHash_IdCSMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
+{
+  return CSMatchAtoms(key, SubjectSelectorForRuleHash(hdr)->mIDList->mAtom);
 }
 
 static void
@@ -275,11 +283,9 @@ RuleHash_MoveEntry(PLDHashTable *table, const PLDHashEntryHdr *from,
 }
 
 static bool
-RuleHash_TagTable_MatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                      const void *key)
+RuleHash_TagTable_MatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
-  nsIAtom *match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>
-                                              (key));
+  nsIAtom *match_atom = const_cast<nsIAtom*>(static_cast<const nsIAtom*>(key));
   nsIAtom *entry_atom = static_cast<const RuleHashTagTableEntry*>(hdr)->mTag;
 
   return match_atom == entry_atom;
@@ -314,40 +320,14 @@ RuleHash_TagTable_MoveEntry(PLDHashTable *table, const PLDHashEntryHdr *from,
   oldEntry->~RuleHashTagTableEntry();
 }
 
-static nsIAtom*
-RuleHash_ClassTable_GetKey(PLDHashTable *table, const PLDHashEntryHdr *hdr)
-{
-  const RuleHashTableEntry *entry =
-    static_cast<const RuleHashTableEntry*>(hdr);
-  nsCSSSelector* selector = entry->mRules[0].mSelector;
-  if (selector->IsPseudoElement()) {
-    selector = selector->mNext;
-  }
-  return selector->mClassList->mAtom;
-}
-
-static nsIAtom*
-RuleHash_IdTable_GetKey(PLDHashTable *table, const PLDHashEntryHdr *hdr)
-{
-  const RuleHashTableEntry *entry =
-    static_cast<const RuleHashTableEntry*>(hdr);
-  nsCSSSelector* selector = entry->mRules[0].mSelector;
-  if (selector->IsPseudoElement()) {
-    selector = selector->mNext;
-  }
-  return selector->mIDList->mAtom;
-}
-
 static PLDHashNumber
-RuleHash_NameSpaceTable_HashKey(PLDHashTable *table, const void *key)
+RuleHash_NameSpaceTable_HashKey(const void *key)
 {
   return NS_PTR_TO_INT32(key);
 }
 
 static bool
-RuleHash_NameSpaceTable_MatchEntry(PLDHashTable *table,
-                                   const PLDHashEntryHdr *hdr,
-                                   const void *key)
+RuleHash_NameSpaceTable_MatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
   const RuleHashTableEntry *entry =
     static_cast<const RuleHashTableEntry*>(hdr);
@@ -368,51 +348,39 @@ static const PLDHashTableOps RuleHash_TagTable_Ops = {
 };
 
 // Case-sensitive ops.
-static const RuleHashTableOps RuleHash_ClassTable_CSOps = {
-  {
+static const PLDHashTableOps RuleHash_ClassTable_CSOps = {
   PLDHashTable::HashVoidPtrKeyStub,
-  RuleHash_CSMatchEntry,
+  RuleHash_ClassCSMatchEntry,
   RuleHash_MoveEntry,
   RuleHash_ClearEntry,
   RuleHash_InitEntry
-  },
-  RuleHash_ClassTable_GetKey
 };
 
 // Case-insensitive ops.
-static const RuleHashTableOps RuleHash_ClassTable_CIOps = {
-  {
+static const PLDHashTableOps RuleHash_ClassTable_CIOps = {
   RuleHash_CIHashKey,
-  RuleHash_CIMatchEntry,
+  RuleHash_ClassCIMatchEntry,
   RuleHash_MoveEntry,
   RuleHash_ClearEntry,
   RuleHash_InitEntry
-  },
-  RuleHash_ClassTable_GetKey
 };
 
 // Case-sensitive ops.
-static const RuleHashTableOps RuleHash_IdTable_CSOps = {
-  {
+static const PLDHashTableOps RuleHash_IdTable_CSOps = {
   PLDHashTable::HashVoidPtrKeyStub,
-  RuleHash_CSMatchEntry,
+  RuleHash_IdCSMatchEntry,
   RuleHash_MoveEntry,
   RuleHash_ClearEntry,
   RuleHash_InitEntry
-  },
-  RuleHash_IdTable_GetKey
 };
 
 // Case-insensitive ops.
-static const RuleHashTableOps RuleHash_IdTable_CIOps = {
-  {
+static const PLDHashTableOps RuleHash_IdTable_CIOps = {
   RuleHash_CIHashKey,
-  RuleHash_CIMatchEntry,
+  RuleHash_IdCIMatchEntry,
   RuleHash_MoveEntry,
   RuleHash_ClearEntry,
   RuleHash_InitEntry
-  },
-  RuleHash_IdTable_GetKey
 };
 
 static const PLDHashTableOps RuleHash_NameSpaceTable_Ops = {
@@ -492,11 +460,11 @@ protected:
 
 RuleHash::RuleHash(bool aQuirksMode)
   : mRuleCount(0),
-    mIdTable(aQuirksMode ? &RuleHash_IdTable_CIOps.ops
-                         : &RuleHash_IdTable_CSOps.ops,
+    mIdTable(aQuirksMode ? &RuleHash_IdTable_CIOps
+                         : &RuleHash_IdTable_CSOps,
              sizeof(RuleHashTableEntry)),
-    mClassTable(aQuirksMode ? &RuleHash_ClassTable_CIOps.ops
-                            : &RuleHash_ClassTable_CSOps.ops,
+    mClassTable(aQuirksMode ? &RuleHash_ClassTable_CIOps
+                            : &RuleHash_ClassTable_CSOps,
                 sizeof(RuleHashTableEntry)),
     mTagTable(&RuleHash_TagTable_Ops, sizeof(RuleHashTagTableEntry)),
     mNameSpaceTable(&RuleHash_NameSpaceTable_Ops, sizeof(RuleHashTableEntry)),
@@ -842,11 +810,11 @@ AtomSelector_MoveEntry(PLDHashTable *table, const PLDHashEntryHdr *from,
   oldEntry->~AtomSelectorEntry();
 }
 
-static nsIAtom*
-AtomSelector_GetKey(PLDHashTable *table, const PLDHashEntryHdr *hdr)
+static bool
+AtomSelector_CIMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
   const AtomSelectorEntry *entry = static_cast<const AtomSelectorEntry*>(hdr);
-  return entry->mAtom;
+  return CIMatchAtoms(key, entry->mAtom);
 }
 
 // Case-sensitive ops.
@@ -859,15 +827,12 @@ static const PLDHashTableOps AtomSelector_CSOps = {
 };
 
 // Case-insensitive ops.
-static const RuleHashTableOps AtomSelector_CIOps = {
-  {
+static const PLDHashTableOps AtomSelector_CIOps = {
   RuleHash_CIHashKey,
-  RuleHash_CIMatchEntry,
+  AtomSelector_CIMatchEntry,
   AtomSelector_MoveEntry,
   AtomSelector_ClearEntry,
   AtomSelector_InitEntry
-  },
-  AtomSelector_GetKey
 };
 
 //--------------------------------
@@ -877,10 +842,10 @@ struct RuleCascadeData {
     : mRuleHash(aQuirksMode),
       mStateSelectors(),
       mSelectorDocumentStates(0),
-      mClassSelectors(aQuirksMode ? &AtomSelector_CIOps.ops
+      mClassSelectors(aQuirksMode ? &AtomSelector_CIOps
                                   : &AtomSelector_CSOps,
                       sizeof(AtomSelectorEntry)),
-      mIdSelectors(aQuirksMode ? &AtomSelector_CIOps.ops
+      mIdSelectors(aQuirksMode ? &AtomSelector_CIOps
                                : &AtomSelector_CSOps,
                    sizeof(AtomSelectorEntry)),
       // mAttributeSelectors is matching on the attribute _name_, not the
@@ -1199,17 +1164,11 @@ InitSystemMetrics()
     sSystemMetrics->AppendElement(nsGkAtoms::swipe_animation_enabled);
   }
 
-// On b2gdroid, make it so that we always have a physical home button from
-// gecko's point of view, event if it's just the Android home button remapped.
-#ifdef MOZ_B2GDROID
-  sSystemMetrics->AppendElement(nsGkAtoms::physical_home_button);
-#else
   rv = LookAndFeel::GetInt(LookAndFeel::eIntID_PhysicalHomeButton,
                            &metricResult);
   if (NS_SUCCEEDED(rv) && metricResult) {
     sSystemMetrics->AppendElement(nsGkAtoms::physical_home_button);
   }
-#endif
 
 #ifdef XP_WIN
   if (NS_SUCCEEDED(
@@ -3518,14 +3477,13 @@ struct RuleByWeightEntry : public PLDHashEntryHdr {
 };
 
 static PLDHashNumber
-HashIntKey(PLDHashTable *table, const void *key)
+HashIntKey(const void *key)
 {
   return PLDHashNumber(NS_PTR_TO_INT32(key));
 }
 
 static bool
-MatchWeightEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                 const void *key)
+MatchWeightEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
   const RuleByWeightEntry *entry = (const RuleByWeightEntry *)hdr;
   return entry->data.mWeight == NS_PTR_TO_INT32(key);

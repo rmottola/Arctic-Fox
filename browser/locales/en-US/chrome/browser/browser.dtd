@@ -15,6 +15,9 @@
                                                                 inside the private browsing mode -->
 <!ENTITY mainWindow.titlePrivateBrowsingSuffix "(Private Browsing)">
 
+<!ENTITY appmenu.tooltip                     "Open menu">
+<!ENTITY navbarOverflow.label                "More tools…">
+
 <!-- Tab context menu -->
 <!ENTITY  reloadTab.label                    "Reload Tab">
 <!ENTITY  reloadTab.accesskey                "R">
@@ -174,6 +177,8 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY goEndCap.tooltip             "Go to the address in the Location Bar">
 <!ENTITY printButton.label            "Print">
 <!ENTITY printButton.tooltip          "Print this page">
+
+<!ENTITY urlbar.webNotsNotificationAnchor2.label        "Change whether the site can receive notifications">
 
 <!ENTITY backForwardItem.title        "Back/Forward">
 <!ENTITY locationItem.title           "Location">
@@ -378,8 +383,17 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY appMenuWebDeveloper.label "Web Developer">
 <!ENTITY appMenuGettingStarted.label "Getting Started">
 <!ENTITY appMenuSafeMode.label "Restart in Safe Mode…">
+<!ENTITY customizeMenu.addToPanel.label "Add to Menu">
+<!ENTITY customizeMenu.addToPanel.accesskey "M">
+<!ENTITY customizeMenu.removeFromToolbar.label "Remove from Toolbar">
+<!ENTITY customizeMenu.removeFromToolbar.accesskey "R">
+<!ENTITY customizeMenu.removeFromMenu.label "Remove from Menu">
+<!ENTITY customizeMenu.removeFromMenu.accesskey "R">
+<!ENTITY customizeMenu.addMoreItems.label "Add More Items…">
+<!ENTITY customizeMenu.addMoreItems.accesskey "A">
 
 <!ENTITY openCmd.commandkey           "l">
+<!ENTITY urlbar.placeholder2          "Search or enter address">
 <!ENTITY urlbar.accesskey             "d">
 <!ENTITY urlbar.switchToTab.label     "Switch to tab:">
 

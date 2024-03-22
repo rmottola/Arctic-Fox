@@ -135,9 +135,7 @@ class GlobalObject : public NativeObject
 
     enum WarnOnceFlag : int32_t {
         WARN_WATCH_DEPRECATED                   = 1 << 0,
-        WARN_PROTO_SETTING_SLOW                 = 1 << 1,
-        WARN_STRING_CONTAINS_DEPRECATED         = 1 << 2,
-        WARN_PROXY_CREATE_DEPRECATED            = 1 << 3,
+        WARN_STRING_CONTAINS_DEPRECATED         = 1 << 1,
     };
 
     // Emit the specified warning if the given slot in |obj|'s global isn't
@@ -700,22 +698,10 @@ class GlobalObject : public NativeObject
         return true;
     }
 
-    // Warn about use of the given __proto__ setter to attempt to mutate an
-    // object's [[Prototype]], if no prior warning was given.
-    static bool warnOnceAboutPrototypeMutation(JSContext* cx, HandleObject protoSetter) {
-        return warnOnceAbout(cx, protoSetter, WARN_PROTO_SETTING_SLOW, JSMSG_PROTO_SETTING_SLOW);
-    }
-
     // Warn about use of the deprecated String.prototype.contains method
     static bool warnOnceAboutStringContains(JSContext* cx, HandleObject strContains) {
         return warnOnceAbout(cx, strContains, WARN_STRING_CONTAINS_DEPRECATED,
                              JSMSG_DEPRECATED_STRING_CONTAINS);
-    }
-
-    // Warn about uses of Proxy.create and Proxy.createFunction
-    static bool warnOnceAboutProxyCreate(JSContext* cx, HandleObject create) {
-        return warnOnceAbout(cx, create, WARN_PROXY_CREATE_DEPRECATED,
-                             JSMSG_DEPRECATED_PROXY_CREATE);
     }
 
     static bool getOrCreateEval(JSContext* cx, Handle<GlobalObject*> global,
@@ -759,7 +745,7 @@ class GlobalObject : public NativeObject
     static bool initSelfHostingBuiltins(JSContext* cx, Handle<GlobalObject*> global,
                                         const JSFunctionSpec* builtins);
 
-    typedef js::Vector<js::Debugger*, 0, js::SystemAllocPolicy> DebuggerVector;
+    typedef js::Vector<js::ReadBarriered<js::Debugger*>, 0, js::SystemAllocPolicy> DebuggerVector;
 
     /*
      * The collection of Debugger objects debugging this global. If this global

@@ -170,27 +170,6 @@ nsPluginInstanceOwner::NotifyPaintWaiter(nsDisplayListBuilder* aBuilder)
 
 #if MOZ_WIDGET_ANDROID
 static void
-AttachToContainerAsEGLImage(ImageContainer* container,
-                            nsNPAPIPluginInstance* instance,
-                            const LayoutDeviceRect& rect,
-                            RefPtr<Image>* out_image)
-{
-  MOZ_ASSERT(out_image);
-  MOZ_ASSERT(!*out_image);
-
-  EGLImage image = instance->AsEGLImage();
-  if (!image) {
-    return;
-  }
-
-  RefPtr<EGLImageImage> img = new EGLImageImage(
-    image, nullptr,
-    gfx::IntSize(rect.width, rect.height), instance->OriginPos(),
-    false /* owns */);
-  *out_image = img;
-}
-
-static void
 AttachToContainerAsSurfaceTexture(ImageContainer* container,
                                   nsNPAPIPluginInstance* instance,
                                   const LayoutDeviceRect& rect,
@@ -211,6 +190,21 @@ AttachToContainerAsSurfaceTexture(ImageContainer* container,
   *out_image = img;
 }
 #endif
+
+bool
+nsPluginInstanceOwner::NeedsScrollImageLayer()
+{
+#if defined(XP_WIN)
+  // If this is a windowed plugin and we're doing layout in the content
+  // process, force the creation of an image layer for the plugin. We'll
+  // paint to this when scrolling.
+  return XRE_IsContentProcess() &&
+         mPluginWindow &&
+         mPluginWindow->type == NPWindowTypeWindow;
+#else
+  return false;
+#endif
+}
 
 already_AddRefed<ImageContainer>
 nsPluginInstanceOwner::GetImageContainer()
@@ -238,15 +232,21 @@ nsPluginInstanceOwner::GetImageContainer()
 
   // Try to get it as an EGLImage first.
   RefPtr<Image> img;
-  AttachToContainerAsEGLImage(container, mInstance, r, &img);
-  if (!img) {
-    AttachToContainerAsSurfaceTexture(container, mInstance, r, &img);
-  }
-  MOZ_ASSERT(img);
+  AttachToContainerAsSurfaceTexture(container, mInstance, r, &img);
 
-  container->SetCurrentImageInTransaction(img);
+  if (img) {
+    container->SetCurrentImageInTransaction(img);
+  }
 #else
-  mInstance->GetImageContainer(getter_AddRefs(container));
+  if (NeedsScrollImageLayer()) {
+    // windowed plugin under e10s
+#if defined(XP_WIN)
+    mInstance->GetScrollCaptureContainer(getter_AddRefs(container));
+#endif
+  } else {
+    // async windowless rendering
+    mInstance->GetImageContainer(getter_AddRefs(container));
+  }
 #endif
 
   return container.forget();
@@ -326,6 +326,21 @@ nsPluginInstanceOwner::GetCurrentImageSize()
   return size;
 }
 
+bool
+nsPluginInstanceOwner::UpdateScrollState(bool aIsScrolling)
+{
+#if defined(XP_WIN)
+  if (!mInstance) {
+    return false;
+  }
+  mScrollState = aIsScrolling;
+  nsresult rv = mInstance->UpdateScrollState(aIsScrolling);
+  return NS_SUCCEEDED(rv);
+#else
+  return false;
+#endif
+}
+
 nsPluginInstanceOwner::nsPluginInstanceOwner()
 {
   // create nsPluginNativeWindow object, it is derived from NPWindow
@@ -346,6 +361,7 @@ nsPluginInstanceOwner::nsPluginInstanceOwner()
   mLastScaleFactor = 1.0;
   mShouldBlurOnActivate = false;
 #endif
+  mLastCSSZoomFactor = 1.0;
   mContentFocused = false;
   mWidgetVisible = true;
   mPluginWindowVisible = false;
@@ -373,6 +389,7 @@ nsPluginInstanceOwner::nsPluginInstanceOwner()
   mGotCompositionData = false;
   mSentStartComposition = false;
   mPluginDidNotHandleIMEComposition = false;
+  mScrollState = false;
 #endif
 }
 
@@ -612,14 +629,18 @@ NS_IMETHODIMP nsPluginInstanceOwner::InvalidateRect(NPRect *invalidRect)
 #endif
 
 #ifndef XP_MACOSX
-  // Windowed plugins should not be calling NPN_InvalidateRect, but
-  // Silverlight does and expects it to "work"
+  // Silverlight calls invalidate for windowed plugins so this needs to work.
   if (mWidget) {
     mWidget->Invalidate(
       LayoutDeviceIntRect(invalidRect->left, invalidRect->top,
                           invalidRect->right - invalidRect->left,
                           invalidRect->bottom - invalidRect->top));
-    return NS_OK;
+    // Plugin instances also call invalidate when plugin windows are hidden
+    // during scrolling. In this case fall through so we invalidate the
+    // underlying layer.
+    if (!NeedsScrollImageLayer()) {
+      return NS_OK;
+    }
   }
 #endif
   nsIntRect rect(invalidRect->left,
@@ -971,9 +992,9 @@ nsPluginInstanceOwner::RequestCommitOrCancel(bool aCommitted)
   }
 
   if (aCommitted) {
-    widget->NotifyIME(widget::REQUEST_TO_COMMIT_COMPOSITION); 
+    widget->NotifyIME(widget::REQUEST_TO_COMMIT_COMPOSITION);
   } else {
-    widget->NotifyIME(widget::REQUEST_TO_CANCEL_COMPOSITION); 
+    widget->NotifyIME(widget::REQUEST_TO_CANCEL_COMPOSITION);
   }
   return true;
 }
@@ -3324,6 +3345,15 @@ NS_IMETHODIMP nsPluginInstanceOwner::CreateWidget(void)
       }
 #endif // XP_MACOSX
     }
+
+#ifndef XP_MACOSX
+    // A failure here is terminal since we can't fall back on the non-e10s code
+    // path below.
+    if (!mWidget && XRE_IsContentProcess()) {
+      return NS_ERROR_UNEXPECTED;
+    }
+#endif // XP_MACOSX
+
     if (!mWidget) {
       // native (single process)
       mWidget = do_CreateInstance(kWidgetCID, &rv);
@@ -3507,17 +3537,6 @@ nsPluginInstanceOwner::SendWindowFocusChanged(bool aIsActive)
 }
 
 void
-nsPluginInstanceOwner::ResolutionMayHaveChanged()
-{
-  double scaleFactor = 1.0;
-  GetContentsScaleFactor(&scaleFactor);
-  if (scaleFactor != mLastScaleFactor) {
-    ContentsScaleFactorChanged(scaleFactor);
-    mLastScaleFactor = scaleFactor;
-   }
-}
-
-void
 nsPluginInstanceOwner::HidePluginWindow()
 {
   if (!mPluginWindow || !mInstance) {
@@ -3586,6 +3605,28 @@ nsPluginInstanceOwner::UpdateWindowVisibility(bool aVisible)
   UpdateWindowPositionAndClipRect(true);
 }
 #endif // XP_MACOSX
+
+void
+nsPluginInstanceOwner::ResolutionMayHaveChanged()
+{
+#ifdef XP_MACOSX
+  double scaleFactor = 1.0;
+  GetContentsScaleFactor(&scaleFactor);
+  if (scaleFactor != mLastScaleFactor) {
+    ContentsScaleFactorChanged(scaleFactor);
+    mLastScaleFactor = scaleFactor;
+  }
+#endif
+  float zoomFactor = 1.0;
+  GetCSSZoomFactor(&zoomFactor);
+  if (zoomFactor != mLastCSSZoomFactor) {
+    if (mInstance) {
+      mInstance->CSSZoomFactorChanged(zoomFactor);
+    }
+    mLastCSSZoomFactor = zoomFactor;
+  }
+
+}
 
 void
 nsPluginInstanceOwner::UpdateDocumentActiveState(bool aIsActive)
@@ -3664,6 +3705,18 @@ nsPluginInstanceOwner::GetContentsScaleFactor(double *result)
 #endif
   *result = scaleFactor;
   return NS_OK;
+}
+
+void
+nsPluginInstanceOwner::GetCSSZoomFactor(float *result)
+{
+  nsCOMPtr<nsIContent> content = do_QueryReferent(mContent);
+  nsIPresShell* presShell = nsContentUtils::FindPresShellForDocument(content->OwnerDoc());
+  if (presShell) {
+    *result = presShell->GetPresContext()->DeviceContext()->GetFullZoom();
+  } else {
+    *result = 1.0;
+  }
 }
 
 void nsPluginInstanceOwner::SetFrame(nsPluginFrame *aFrame)

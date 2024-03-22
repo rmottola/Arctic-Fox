@@ -128,8 +128,11 @@ var WebProgressListener = {
     // the documentURI.
     if (aWebProgress && aWebProgress.isTopLevel) {
       json.documentURI = content.document.documentURIObject.spec;
+      json.charset = content.document.characterSet;
+      json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
     }
 
+    json.inLoadURI = WebNavigation.inLoadURI;
     this._send("Content:StateChange", json, objects);
   },
 
@@ -206,6 +209,10 @@ var WebProgressListener = {
     return true;
   },
 
+  sendLoadCallResult() {
+    sendAsyncMessage("Content:LoadURIResult");
+  },
+
   QueryInterface: function QueryInterface(aIID) {
     if (aIID.equals(Ci.nsIWebProgressListener) ||
         aIID.equals(Ci.nsIWebProgressListener2) ||
@@ -231,23 +238,16 @@ var WebNavigation =  {
     addMessageListener("WebNavigation:LoadURI", this);
     addMessageListener("WebNavigation:Reload", this);
     addMessageListener("WebNavigation:Stop", this);
-
-    // Send a CPOW for the sessionHistory object. We need to make sure
-    // it stays alive as long as the content script since CPOWs are
-    // weakly held.
-    let history = this.webNavigation.sessionHistory;
-    this._sessionHistory = history;
-    sendAsyncMessage("WebNavigation:setHistory", {}, {history: history});
-
-    addEventListener("unload", this.uninit);
-  },
-
-  uninit: function() {
-    this._sessionHistory = null;
   },
 
   get webNavigation() {
     return docShell.QueryInterface(Ci.nsIWebNavigation);
+  },
+
+  _inLoadURI: false,
+
+  get inLoadURI() {
+    return this._inLoadURI;
   },
 
   receiveMessage: function(message) {
@@ -311,8 +311,14 @@ var WebNavigation =  {
       headers = makeInputStream(headers);
     if (baseURI)
       baseURI = Services.io.newURI(baseURI, null, null);
-    this.webNavigation.loadURIWithOptions(uri, flags, referrer, referrerPolicy,
-                                          postData, headers, baseURI);
+    this._inLoadURI = true;
+    try {
+      this.webNavigation.loadURIWithOptions(uri, flags, referrer, referrerPolicy,
+                                            postData, headers, baseURI);
+    } finally {
+      this._inLoadURI = false;
+      WebProgressListener.sendLoadCallResult();
+    }
   },
 
   reload: function(flags) {
@@ -506,6 +512,11 @@ addMessageListener("Browser:Thumbnail:CheckState", function (aMessage) {
   });
 });
 
+addMessageListener("UpdateCharacterSet", function (aMessage) {
+  docShell.charset = aMessage.data.value;
+  docShell.gatherCharsetMenuTelemetry();
+});
+
 // The AddonsChild needs to be rooted so that it stays alive as long as
 // the tab.
 var AddonsChild = RemoteAddonsChild.init(this);
@@ -520,6 +531,13 @@ addMessageListener("NetworkPrioritizer:AdjustPriority", (msg) => {
   let loadGroup = webNav.QueryInterface(Ci.nsIDocumentLoader)
                         .loadGroup.QueryInterface(Ci.nsISupportsPriority);
   loadGroup.adjustPriority(msg.data.adjustment);
+});
+
+addMessageListener("NetworkPrioritizer:SetPriority", (msg) => {
+  let webNav = docShell.QueryInterface(Ci.nsIWebNavigation);
+  let loadGroup = webNav.QueryInterface(Ci.nsIDocumentLoader)
+                        .loadGroup.QueryInterface(Ci.nsISupportsPriority);
+  loadGroup.priority = msg.data.priority;
 });
 
 var AutoCompletePopup = {

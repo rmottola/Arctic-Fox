@@ -34,7 +34,7 @@ nsILoadContext::GetOriginAttributes(mozilla::DocShellOriginAttributes& aAttrs)
   aAttrs = attrs;
   return true;
 }
-  
+
 namespace mozilla {
 
 NS_IMPL_ISUPPORTS(LoadContext, nsILoadContext, nsIInterfaceRequestor)
@@ -51,7 +51,7 @@ LoadContext::LoadContext(nsIPrincipal* aPrincipal,
 #endif
 {
   PrincipalOriginAttributes poa = BasePrincipal::Cast(aPrincipal)->OriginAttributesRef();
-  mOriginAttributes = DocShellOriginAttributes(poa.mAppId, poa.mInBrowser);
+  mOriginAttributes.InheritFromDocToChildDocShell(poa);
 
   if (!aOptionalBase) {
     return;
@@ -172,13 +172,13 @@ LoadContext::SetRemoteTabs(bool aUseRemoteTabs)
 }
 
 NS_IMETHODIMP
-LoadContext::GetIsInBrowserElement(bool* aIsInBrowserElement)
+LoadContext::GetIsInIsolatedMozBrowserElement(bool* aIsInIsolatedMozBrowserElement)
 {
   MOZ_ASSERT(mIsNotNull);
 
-  NS_ENSURE_ARG_POINTER(aIsInBrowserElement);
+  NS_ENSURE_ARG_POINTER(aIsInIsolatedMozBrowserElement);
 
-  *aIsInBrowserElement = mOriginAttributes.mInBrowser;
+  *aIsInIsolatedMozBrowserElement = mOriginAttributes.mInIsolatedMozBrowser;
   return NS_OK;
 }
 

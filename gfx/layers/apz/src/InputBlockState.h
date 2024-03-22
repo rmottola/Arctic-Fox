@@ -9,9 +9,11 @@
 
 #include "InputData.h"                      // for MultiTouchInput
 #include "mozilla/gfx/Matrix.h"             // for Matrix4x4
+#include "mozilla/layers/APZUtils.h"        // for TouchBehaviorFlags
 #include "mozilla/layers/AsyncDragMetrics.h"
 #include "nsAutoPtr.h"                      // for nsRefPtr
 #include "nsTArray.h"                       // for nsTArray
+#include "TouchCounter.h"
 
 namespace mozilla {
 namespace layers {
@@ -53,6 +55,11 @@ public:
 
 protected:
   virtual void UpdateTargetApzc(const RefPtr<AsyncPanZoomController>& aTargetApzc);
+
+private:
+  // Checks whether |aA| is an ancestor of |aB| (or the same as |aB|) in
+  // |mOverscrollHandoffChain|.
+  bool IsAncestorOf(AsyncPanZoomController* aA, AsyncPanZoomController* aB);
 
 private:
   RefPtr<AsyncPanZoomController> mTargetApzc;
@@ -409,10 +416,8 @@ public:
   /**
    * Set the single-tap-occurred flag that indicates that this touch block
    * triggered a single tap event.
-   * @return true if the flag was set. This may not happen if, for example,
-   *         SetDuringFastFling was previously called.
    */
-  bool SetSingleTapOccurred();
+  void SetSingleTapOccurred();
   /**
    * @return true iff the single-tap-occurred flag is set on this block.
    */

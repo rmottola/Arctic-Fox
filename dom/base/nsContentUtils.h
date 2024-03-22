@@ -121,6 +121,7 @@ class DocumentFragment;
 class Element;
 class EventTarget;
 class IPCDataTransfer;
+class IPCDataTransferItem;
 class NodeInfo;
 class nsIContentChild;
 class nsIContentParent;
@@ -1995,14 +1996,6 @@ public:
   }
 
   /*
-   * Returns true if ServiceWorker Interception is enabled by pref.
-   */
-  static bool ServiceWorkerInterceptionEnabled()
-  {
-    return sSWInterceptionEnabled;
-  }
-
-  /*
    * Returns true if the frame timing APIs are enabled.
    */
   static bool IsFrameTimingEnabled();
@@ -2133,6 +2126,11 @@ public:
    * Checks if internal PDF viewer is enabled.
    */
   static bool IsPDFJSEnabled();
+
+  /**
+   * Checks if internal SWF player is enabled.
+   */
+  static bool IsSWFPlayerEnabled();
 
   enum ContentViewerType
   {
@@ -2423,6 +2421,21 @@ public:
    */
   static bool IsFileImage(nsIFile* aFile, nsACString& aType);
 
+  /**
+   * Given an IPCDataTransferItem that has a flavor for which IsFlavorImage
+   * returns true and whose IPCDataTransferData is of type nsCString (raw image
+   * data), construct an imgIContainer for the image encoded by the transfer
+   * item.
+   */
+  static nsresult DataTransferItemToImage(const mozilla::dom::IPCDataTransferItem& aItem,
+                                          imgIContainer** aContainer);
+
+  /**
+   * Given a flavor obtained from an IPCDataTransferItem or nsITransferable,
+   * returns true if we should treat the data as an image.
+   */
+  static bool IsFlavorImage(const nsACString& aFlavor);
+
   static void TransferablesToIPCTransferables(nsISupportsArray* aTransferables,
                                               nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
                                               bool aInSyncMessage,
@@ -2567,6 +2580,8 @@ public:
    */
   static bool IsSpecificAboutPage(JSObject* aGlobal, const char* aUri);
 
+  static void SetScrollbarsVisibility(nsIDocShell* aDocShell, bool aVisible);
+
 private:
   static bool InitializeEventTable();
 
@@ -2684,7 +2699,6 @@ private:
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
   static bool sSendPerformanceTimingNotifications;
-  static bool sSWInterceptionEnabled;
   static uint32_t sCookiesLifetimePolicy;
   static uint32_t sCookiesBehavior;
 

@@ -368,12 +368,13 @@ IDBRequest::SetResultCallback(ResultCallback* aCallback)
   } else {
     // Otherwise our owner is a window and we use that to initialize.
     MOZ_ASSERT(GetOwner());
-    if (!autoJS.InitWithLegacyErrorReporting(GetOwner())) {
+    if (!autoJS.Init(GetOwner())) {
       IDB_WARNING("Failed to initialize AutoJSAPI!");
       SetError(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR);
       return;
     }
   }
+  autoJS.TakeOwnershipOfErrorReporting();
 
   JSContext* cx = autoJS.cx();
 
@@ -491,7 +492,7 @@ public:
     MOZ_COUNT_DTOR(IDBOpenDBRequest::WorkerFeature);
 
     if (mWorkerPrivate) {
-      mWorkerPrivate->RemoveFeature(mWorkerPrivate->GetJSContext(), this);
+      mWorkerPrivate->RemoveFeature(this);
     }
   }
 
@@ -572,11 +573,8 @@ IDBOpenDBRequest::CreateForJS(IDBFactory* aFactory,
 
     workerPrivate->AssertIsOnWorkerThread();
 
-    JSContext* cx = workerPrivate->GetJSContext();
-    MOZ_ASSERT(cx);
-
     nsAutoPtr<WorkerFeature> feature(new WorkerFeature(workerPrivate));
-    if (NS_WARN_IF(!workerPrivate->AddFeature(cx, feature))) {
+    if (NS_WARN_IF(!workerPrivate->AddFeature(feature))) {
       feature->NoteAddFeatureFailed();
       return nullptr;
     }

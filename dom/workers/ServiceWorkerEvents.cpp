@@ -10,6 +10,7 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsINetworkInterceptController.h"
 #include "nsIOutputStream.h"
+#include "nsIScriptError.h"
 #include "nsContentPolicyUtils.h"
 #include "nsContentUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -19,6 +20,8 @@
 #include "nsNetUtil.h"
 #include "nsSerializationHelper.h"
 #include "nsQueryObject.h"
+#include "ServiceWorkerClient.h"
+#include "ServiceWorkerManager.h"
 
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Preferences.h"
@@ -48,6 +51,7 @@
 #include "xpcpublic.h"
 
 using namespace mozilla::dom;
+using namespace mozilla::dom::workers;
 
 BEGIN_WORKERS_NAMESPACE
 
@@ -242,7 +246,9 @@ class RespondWithHandler final : public PromiseNativeHandler
 {
   nsMainThreadPtrHandle<nsIInterceptedChannel> mInterceptedChannel;
   const RequestMode mRequestMode;
-  const DebugOnly<bool> mIsClientRequest;
+#ifdef DEBUG
+  const bool mIsClientRequest;
+#endif
   const bool mIsNavigationRequest;
   const nsCString mScriptSpec;
   const nsString mRequestURL;
@@ -263,7 +269,9 @@ public:
                      uint32_t aRespondWithColumnNumber)
     : mInterceptedChannel(aChannel)
     , mRequestMode(aRequestMode)
+#ifdef DEBUG
     , mIsClientRequest(aIsClientRequest)
+#endif
     , mIsNavigationRequest(aIsNavigationRequest)
     , mScriptSpec(aScriptSpec)
     , mRequestURL(aRequestURL)
@@ -399,10 +407,10 @@ ExtractErrorValues(JSContext* aCx, JS::Handle<JS::Value> aValue,
     else if(NS_SUCCEEDED(UNWRAP_OBJECT(DOMException, obj, domException))) {
 
       nsAutoString filename;
-      domException->GetFilename(filename);
+      domException->GetFilename(aCx, filename);
       if (!filename.IsEmpty()) {
         CopyUTF16toUTF8(filename, aSourceSpecOut);
-        *aLineOut = domException->LineNumber();
+        *aLineOut = domException->LineNumber(aCx);
         *aColumnOut = domException->ColumnNumber();
       }
 
@@ -539,15 +547,6 @@ RespondWithHandler::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValu
   WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
   MOZ_ASSERT(worker);
   worker->AssertIsOnWorkerThread();
-
-  // Allow opaque response interception to be disabled until we can ensure the
-  // security implications are not a complete disaster.
-  if (response->Type() == ResponseType::Opaque &&
-      !worker->OpaqueInterceptionEnabled()) {
-    autoCancel.SetCancelMessage(
-      NS_LITERAL_CSTRING("OpaqueInterceptionDisabledWithURL"), mRequestURL);
-    return;
-  }
 
   // Section "HTTP Fetch", step 2.2:
   //  If one of the following conditions is true, return a network error:

@@ -37,7 +37,7 @@
 #include "gfxGDIFontList.h"
 #include "gfxGDIFont.h"
 
-#include "mozilla/layers/CompositorParent.h"   // for CompositorParent::IsInCompositorThread
+#include "mozilla/layers/CompositorBridgeParent.h"   // for CompositorBridgeParent::IsInCompositorThread
 #include "DeviceManagerD3D9.h"
 #include "mozilla/layers/ReadbackManagerD3D11.h"
 
@@ -464,17 +464,7 @@ gfxWindowsPlatform::HandleDeviceReset()
     return false;
   }
 
-  if (mHasFakeDeviceReset) {
-    if (XRE_IsParentProcess()) {
-      // Notify child processes that we got a device reset.
-      nsTArray<dom::ContentParent*> processes;
-      dom::ContentParent::GetAll(processes);
-
-      for (size_t i = 0; i < processes.Length(); i++) {
-        processes[i]->SendTestGraphicsDeviceReset(uint32_t(resetReason));
-      }
-    }
-  } else {
+  if (!mHasFakeDeviceReset) {
     Telemetry::Accumulate(Telemetry::DEVICE_RESET_REASON, uint32_t(resetReason));
   }
 
@@ -497,6 +487,7 @@ gfxWindowsPlatform::HandleDeviceReset()
   // list of which devices to create.
   UpdateDeviceInitData();
   InitializeDevices();
+  BumpDeviceCounter();
   return true;
 }
 
@@ -1064,13 +1055,13 @@ InvalidateWindowForDeviceReset(HWND aWnd, LPARAM aMsg)
     return TRUE;
 }
 
-bool
-gfxWindowsPlatform::UpdateForDeviceReset()
+void
+gfxWindowsPlatform::SchedulePaintIfDeviceReset()
 {
   PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
 
   if (!DidRenderingDeviceReset()) {
-    return false;
+    return;
   }
 
   // Trigger an ::OnPaint for each window.
@@ -1079,7 +1070,16 @@ gfxWindowsPlatform::UpdateForDeviceReset()
                       0);
 
   gfxCriticalNote << "Detected rendering device reset on refresh";
-  return true;
+}
+
+void
+gfxWindowsPlatform::UpdateRenderModeIfDeviceReset()
+{
+  PROFILER_LABEL_FUNC(js::ProfileEntry::Category::GRAPHICS);
+
+  if (DidRenderingDeviceReset()) {
+    UpdateRenderMode();
+  }
 }
 
 void
@@ -1439,7 +1439,7 @@ gfxWindowsPlatform::GetD3D9DeviceManager()
   // or we don't have a compositor thread.
   if (!mDeviceManager &&
       (!gfxPlatform::UsesOffMainThreadCompositing() ||
-       CompositorParent::IsInCompositorThread())) {
+       CompositorBridgeParent::IsInCompositorThread())) {
     mDeviceManager = new DeviceManagerD3D9();
     if (!mDeviceManager->Init()) {
       gfxCriticalError() << "[D3D9] Could not Initialize the DeviceManagerD3D9";

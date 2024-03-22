@@ -151,9 +151,10 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     handlingSegFault(false),
     handlingJitInterrupt_(false),
     interruptCallback(nullptr),
-    exclusiveAccessLock(nullptr),
+#ifdef DEBUG
     exclusiveAccessOwner(nullptr),
     mainThreadHasExclusiveAccess(false),
+#endif
     numExclusiveThreads(0),
     numCompartments(0),
     localeCallbacks(nullptr),
@@ -193,7 +194,9 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     profilingScripts(false),
     suppressProfilerSampling(false),
     hadOutOfMemory(false),
+#ifdef DEBUG
     handlingInitFailure(false),
+#endif
     haveCreatedContext(false),
     allowRelazificationForTesting(false),
     data(nullptr),
@@ -206,6 +209,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     destroyPrincipals(nullptr),
     readPrincipals(nullptr),
     errorReporter(nullptr),
+    buildIdOp(nullptr),
     propertyRemovals(0),
 #if !EXPOSE_INTL_API
     thousandsSeparator(0),
@@ -282,10 +286,6 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
     static_assert(sizeof(pthread_t) <= sizeof(ownerThreadNative_), "need bigger field");
     ownerThreadNative_ = (size_t)pthread_self();
 #endif
-
-    exclusiveAccessLock = PR_NewLock();
-    if (!exclusiveAccessLock)
-        return false;
 
     if (!mainThread.init())
         return false;
@@ -424,12 +424,12 @@ JSRuntime::~JSRuntime()
     finishSelfHosting();
 
     MOZ_ASSERT(!exclusiveAccessOwner);
-    if (exclusiveAccessLock)
-        PR_DestroyLock(exclusiveAccessLock);
 
     // Avoid bogus asserts during teardown.
     MOZ_ASSERT(!numExclusiveThreads);
+#ifdef DEBUG
     mainThreadHasExclusiveAccess = true;
+#endif
 
     /*
      * Even though all objects in the compartment are dead, we may have keep

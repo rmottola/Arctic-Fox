@@ -39,12 +39,9 @@ public:
     return TrackInfo::kVideoTrack;
   }
 
-  const char* GetDescriptionName() const override
-  {
-    nsCString failureReason;
-    return IsHardwareAccelerated(failureReason)
-      ? "wmf hardware video decoder" : "wmf software video decoder";
-  }
+  void ConfigurationChanged(const TrackInfo& aConfig) override;
+
+  const char* GetDescriptionName() const override;
 
 private:
 
@@ -64,21 +61,19 @@ private:
 
   HRESULT SetDecoderMediaTypes();
 
-  bool MaybeToggleDXVA(IMFMediaType* aType);
+  bool CanUseDXVA(IMFMediaType* aType);
 
   // Video frame geometry.
   VideoInfo mVideoInfo;
   uint32_t mVideoStride;
-  uint32_t mVideoWidth;
-  uint32_t mVideoHeight;
-  nsIntRect mPictureRegion;
 
   RefPtr<layers::ImageContainer> mImageContainer;
   nsAutoPtr<DXVA2Manager> mDXVA2Manager;
 
   RefPtr<IMFSample> mLastInput;
+  float mLastDuration;
 
-  const bool mDXVAEnabled;
+  bool mDXVAEnabled;
   const layers::LayersBackend mLayersBackend;
   bool mUseHwAccel;
 
@@ -95,6 +90,10 @@ private:
 
   const GUID& GetMFTGUID();
   const GUID& GetMediaSubtypeGUID();
+
+  uint32_t mNullOutputCount;
+  bool mGotValidOutputAfterNullOutput;
+  bool mGotExcessiveNullOutput;
 };
 
 } // namespace mozilla

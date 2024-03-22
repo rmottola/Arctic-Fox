@@ -30,7 +30,7 @@
 #include "xpcprivate.h"
 #include "XrayWrapper.h"
 #include "nsPrintfCString.h"
-#include "prprf.h"
+#include "mozilla/Snprintf.h"
 #include "nsGlobalWindow.h"
 
 #include "mozilla/dom/ScriptSettings.h"
@@ -57,7 +57,7 @@ namespace dom {
 
 JSErrorFormatString ErrorFormatString[] = {
 #define MSG_DEF(_name, _argc, _exn, _str) \
-  { _str, _argc, _exn },
+  { #_name, _str, _argc, _exn },
 #include "mozilla/dom/Errors.msg"
 #undef MSG_DEF
 };
@@ -476,9 +476,8 @@ ErrorResult::SetPendingException(JSContext* cx)
     return;
   }
   if (IsJSContextException()) {
-    // Whatever we need to throw is on the JSContext already.  We
-    // can't assert that there is a pending exception on it, though,
-    // because in the uncatchable exception case there won't be one.
+    // Whatever we need to throw is on the JSContext already.
+    MOZ_ASSERT(JS_IsExceptionPending(cx));
     mResult = NS_OK;
     return;
   }
@@ -495,6 +494,32 @@ ErrorResult::SetPendingException(JSContext* cx)
     return;
   }
   SetPendingGenericErrorException(cx);
+}
+
+void
+ErrorResult::StealExceptionFromJSContext(JSContext* cx)
+{
+  MOZ_ASSERT(mMightHaveUnreportedJSException,
+             "Why didn't you tell us you planned to throw a JS exception?");
+
+  JS::Rooted<JS::Value> exn(cx);
+  if (!JS_GetPendingException(cx, &exn)) {
+    ThrowUncatchableException();
+    return;
+  }
+
+  ThrowJSException(cx, exn);
+  JS_ClearPendingException(cx);
+}
+
+void
+ErrorResult::NoteJSContextException(JSContext* aCx)
+{
+  if (JS_IsExceptionPending(aCx)) {
+    mResult = NS_ERROR_DOM_EXCEPTION_ON_JSCONTEXT;
+  } else {
+    mResult = NS_ERROR_UNCATCHABLE_EXCEPTION;
+  }
 }
 
 namespace dom {
@@ -2234,7 +2259,7 @@ GetContentGlobalForJSImplementedObject(JSContext* cx, JS::Handle<JSObject*> obj,
 }
 
 already_AddRefed<nsIGlobalObject>
-ConstructJSImplementation(JSContext* aCx, const char* aContractId,
+ConstructJSImplementation(const char* aContractId,
                           const GlobalObject& aGlobal,
                           JS::MutableHandle<JSObject*> aObject,
                           ErrorResult& aRv)
@@ -2246,7 +2271,7 @@ ConstructJSImplementation(JSContext* aCx, const char* aContractId,
     return nullptr;
   }
 
-  ConstructJSImplementation(aCx, aContractId, global, aObject, aRv);
+  ConstructJSImplementation(aContractId, global, aObject, aRv);
 
   if (aRv.Failed()) {
     return nullptr;
@@ -2255,11 +2280,13 @@ ConstructJSImplementation(JSContext* aCx, const char* aContractId,
 }
 
 void
-ConstructJSImplementation(JSContext* aCx, const char* aContractId,
+ConstructJSImplementation(const char* aContractId,
                           nsIGlobalObject* aGlobal,
                           JS::MutableHandle<JSObject*> aObject,
                           ErrorResult& aRv)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   // Make sure to divorce ourselves from the calling JS while creating and
   // initializing the object, so exceptions from that will get reported
   // properly, since those are never exceptions that a spec wants to be thrown.
@@ -2282,7 +2309,7 @@ ConstructJSImplementation(JSContext* aCx, const char* aContractId,
       do_QueryInterface(implISupports);
     nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aGlobal);
     if (gpi) {
-      JS::Rooted<JS::Value> initReturn(aCx);
+      JS::Rooted<JS::Value> initReturn(nsContentUtils::RootingCxForThread());
       rv = gpi->Init(window, &initReturn);
       if (NS_FAILED(rv)) {
         aRv.Throw(rv);
@@ -2408,13 +2435,13 @@ ConvertJSValueToByteString(JSContext* cx, JS::Handle<JS::Value> v,
       // 20 digits, plus one more for the null terminator.
       char index[21];
       static_assert(sizeof(size_t) <= 8, "index array too small");
-      PR_snprintf(index, sizeof(index), "%d", badCharIndex);
+      snprintf_literal(index, "%d", badCharIndex);
       // A char16_t is 16 bits long.  The biggest unsigned 16 bit
       // number (65,535) has 5 digits, plus one more for the null
       // terminator.
       char badCharArray[6];
       static_assert(sizeof(char16_t) <= 2, "badCharArray too small");
-      PR_snprintf(badCharArray, sizeof(badCharArray), "%d", badChar);
+      snprintf_literal(badCharArray, "%d", badChar);
       ThrowErrorMessage(cx, MSG_INVALID_BYTESTRING, index, badCharArray);
       return false;
     }

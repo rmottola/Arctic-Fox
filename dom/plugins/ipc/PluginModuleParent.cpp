@@ -2000,6 +2000,22 @@ PluginModuleParent::EndUpdateBackground(NPP instance, const nsIntRect& aRect)
     return i->EndUpdateBackground(aRect);
 }
 
+#if defined(XP_WIN)
+nsresult
+PluginModuleParent::GetScrollCaptureContainer(NPP aInstance,
+                                              mozilla::layers::ImageContainer** aContainer)
+{
+    PluginInstanceParent* inst = PluginInstanceParent::Cast(aInstance);
+    return !inst ? NS_ERROR_FAILURE : inst->GetScrollCaptureContainer(aContainer);
+}
+nsresult
+PluginModuleParent::UpdateScrollState(NPP aInstance, bool aIsScrolling)
+{
+    PluginInstanceParent* inst = PluginInstanceParent::Cast(aInstance);
+    return !inst ? NS_ERROR_FAILURE : inst->UpdateScrollState(aIsScrolling);
+}
+#endif
+
 void
 PluginModuleParent::OnInitFailure()
 {
@@ -2356,8 +2372,8 @@ PluginModuleChromeParent::RecvNP_InitializeResult(const NPError& aError)
             SetPluginFuncs(mNPPIface);
         }
 
-        // Send the info needed to join the chrome process's audio session to the
-        // plugin process
+        // Send the info needed to join the browser process's audio session to the
+        // plugin process.
         nsID id;
         nsString sessionName;
         nsString iconPath;

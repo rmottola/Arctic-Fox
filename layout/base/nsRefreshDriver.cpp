@@ -46,7 +46,9 @@
 #include "nsNPAPIPluginInstance.h"
 #include "nsPerformance.h"
 #include "mozilla/dom/WindowBinding.h"
-#include "RestyleManager.h"
+#include "mozilla/RestyleManager.h"
+#include "mozilla/RestyleManagerHandle.h"
+#include "mozilla/RestyleManagerHandleInlines.h"
 #include "Layers.h"
 #include "imgIContainer.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -1483,35 +1485,10 @@ nsRefreshDriver::DispatchPendingEvents()
 }
 
 static bool
-DispatchAnimationEventsOnSubDocuments(nsIDocument* aDocument,
-                                      void* aRefreshDriver)
+CollectDocuments(nsIDocument* aDocument, void* aDocArray)
 {
-  nsIPresShell* shell = aDocument->GetShell();
-  if (!shell) {
-    return true;
-  }
-
-  RefPtr<nsPresContext> context = shell->GetPresContext();
-  if (!context || context->RefreshDriver() != aRefreshDriver) {
-    return true;
-  }
-
-  nsCOMPtr<nsIDocument> kungFuDeathGrip(aDocument);
-
-  context->TransitionManager()->SortEvents();
-  context->AnimationManager()->SortEvents();
-
-  // Dispatch transition events first since transitions conceptually sit
-  // below animations in terms of compositing order.
-  context->TransitionManager()->DispatchEvents();
-  // Check that the presshell has not been destroyed
-  if (context->GetPresShell()) {
-    context->AnimationManager()->DispatchEvents();
-  }
-
-  aDocument->EnumerateSubDocuments(DispatchAnimationEventsOnSubDocuments,
-                                   aRefreshDriver);
-
+  static_cast<nsCOMArray<nsIDocument>*>(aDocArray)->AppendObject(aDocument);
+  aDocument->EnumerateSubDocuments(CollectDocuments, aDocArray);
   return true;
 }
 
@@ -1522,7 +1499,32 @@ nsRefreshDriver::DispatchAnimationEvents()
     return;
   }
 
-  DispatchAnimationEventsOnSubDocuments(mPresContext->Document(), this);
+  nsCOMArray<nsIDocument> documents;
+  CollectDocuments(mPresContext->Document(), &documents);
+
+  for (int32_t i = 0; i < documents.Count(); ++i) {
+    nsIDocument* doc = documents[i];
+    nsIPresShell* shell = doc->GetShell();
+    if (!shell) {
+      continue;
+    }
+
+    RefPtr<nsPresContext> context = shell->GetPresContext();
+    if (!context || context->RefreshDriver() != this) {
+      continue;
+    }
+
+    context->TransitionManager()->SortEvents();
+    context->AnimationManager()->SortEvents();
+
+    // Dispatch transition events first since transitions conceptually sit
+    // below animations in terms of compositing order.
+    context->TransitionManager()->DispatchEvents();
+    // Check that the presshell has not been destroyed
+    if (context->GetPresShell()) {
+      context->AnimationManager()->DispatchEvents();
+    }
+  }
 }
 
 void
@@ -1678,7 +1680,14 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
   AutoRestore<TimeStamp> restoreTickStart(mTickStart);
   mTickStart = TimeStamp::Now();
 
-  gfxPlatform::GetPlatform()->UpdateForDeviceReset();
+  gfxPlatform::GetPlatform()->SchedulePaintIfDeviceReset();
+
+  // We want to process any pending APZ metrics ahead of their positions
+  // in the queue. This will prevent us from spending precious time
+  // painting a stale displayport.
+  if (gfxPrefs::APZPeekMessages()) {
+    nsLayoutUtils::UpdateDisplayPortMarginsFromPendingMessages();
+  }
 
   /*
    * The timer holds a reference to |this| while calling |Notify|.
@@ -1725,7 +1734,12 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
 
           NS_ADDREF(shell);
           mStyleFlushObservers.RemoveElement(shell);
-          shell->GetPresContext()->RestyleManager()->mObservingRefreshDriver = false;
+          RestyleManagerHandle restyleManager =
+            shell->GetPresContext()->RestyleManager();
+          // XXX stylo: ServoRestyleManager does not observer the refresh driver yet.
+          if (restyleManager->IsGecko()) {
+            restyleManager->AsGecko()->mObservingRefreshDriver = false;
+          }
           shell->FlushPendingNotifications(ChangesToFlush(Flush_Style, false));
           // Inform the FontFaceSet that we ticked, so that it can resolve its
           // ready promise if it needs to (though it might still be waiting on

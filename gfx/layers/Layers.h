@@ -564,12 +564,13 @@ public:
    * Dump information about this layer manager and its managed tree to
    * aStream.
    */
-  void Dump(std::stringstream& aStream, const char* aPrefix="", bool aDumpHtml=false);
+  void Dump(std::stringstream& aStream, const char* aPrefix="",
+            bool aDumpHtml=false, bool aSorted=false);
   /**
    * Dump information about just this layer manager itself to aStream
    */
-  void DumpSelf(std::stringstream& aStream, const char* aPrefix="");
-  void Dump();
+  void DumpSelf(std::stringstream& aStream, const char* aPrefix="", bool aSorted=false);
+  void Dump(bool aSorted=false);
 
   /**
    * Dump information about this layer manager and its managed tree to
@@ -638,17 +639,6 @@ public:
   virtual void SetRegionToClear(const nsIntRegion& aRegion)
   {
     mRegionToClear = aRegion;
-  }
-
-  virtual bool SupportsMixBlendModes(EnumSet<gfx::CompositionOp>& aMixBlendModes)
-  {
-    return false;
-  }
-
-  bool SupportsMixBlendMode(gfx::CompositionOp aMixBlendMode)
-  {
-    EnumSet<gfx::CompositionOp> modes(aMixBlendMode);
-    return SupportsMixBlendModes(modes);
   }
 
   virtual float RequestProperty(const nsAString& property) { return -1; }
@@ -1598,7 +1588,8 @@ public:
    * Dump information about this layer manager and its managed tree to
    * aStream.
    */
-  void Dump(std::stringstream& aStream, const char* aPrefix="", bool aDumpHtml=false);
+  void Dump(std::stringstream& aStream, const char* aPrefix="",
+            bool aDumpHtml=false, bool aSorted=false);
   /**
    * Dump information about just this layer manager itself to aStream.
    */
@@ -1845,7 +1836,9 @@ protected:
   // CSS pixels of the scrollframe's space).
   float mScrollbarThumbRatio;
   bool mIsScrollbarContainer;
-  DebugOnly<uint32_t> mDebugColorIndex;
+#ifdef DEBUG
+  uint32_t mDebugColorIndex;
+#endif
   // If this layer is used for OMTA, then this counter is used to ensure we
   // stay in sync with the animation manager
   uint64_t mAnimationGeneration;

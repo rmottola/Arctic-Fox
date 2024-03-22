@@ -61,7 +61,7 @@ class PJavaScriptParent;
 } // namespace jsipc
 
 namespace layers {
-class PCompositorParent;
+class PCompositorBridgeParent;
 class PSharedBufferManagerParent;
 } // namespace layers
 
@@ -212,6 +212,10 @@ public:
                                uint32_t* aNewPluginEpoch) override;
 
   virtual bool RecvUngrabPointer(const uint32_t& aTime) override;
+
+  virtual bool RecvRemovePermission(const IPC::Principal& aPrincipal,
+                                    const nsCString& aPermissionType,
+                                    nsresult* aRv) override;
 
   NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(ContentParent, nsIObserver)
 
@@ -666,9 +670,9 @@ private:
   bool
   DeallocPAPZParent(PAPZParent* aActor) override;
 
-  PCompositorParent*
-  AllocPCompositorParent(mozilla::ipc::Transport* aTransport,
-                         base::ProcessId aOtherProcess) override;
+  PCompositorBridgeParent*
+  AllocPCompositorBridgeParent(mozilla::ipc::Transport* aTransport,
+                               base::ProcessId aOtherProcess) override;
 
   PImageBridgeParent*
   AllocPImageBridgeParent(mozilla::ipc::Transport* aTransport,
@@ -1087,6 +1091,9 @@ private:
   virtual bool RecvGetDeviceStorageLocations(DeviceStorageLocationInfo* info) override;
 
   virtual bool RecvGetAndroidSystemInfo(AndroidSystemInfo* aInfo) override;
+
+  virtual bool RecvNotifyBenchmarkResult(const nsString& aCodecName,
+                                         const uint32_t& aDecodeFPS) override;
 
   // If you add strong pointers to cycle collected objects here, be sure to
   // release these objects in ShutDownProcess.  See the comment there for more

@@ -453,7 +453,7 @@ class JSObject : public js::gc::Cell
      * this will just be the global (the name "enclosing scope" still applies
      * in this situation because non-scope objects can be on the scope chain).
      */
-    inline JSObject* enclosingScope();
+    inline JSObject* enclosingScope() const;
 
     inline js::GlobalObject& global() const;
     inline bool isOwnGlobal() const;
@@ -992,8 +992,7 @@ enum DefineAsIntrinsic {
 
 extern bool
 DefineFunctions(JSContext* cx, HandleObject obj, const JSFunctionSpec* fs,
-                DefineAsIntrinsic intrinsic,
-                PropertyDefinitionBehavior behavior = DefineAllProperties);
+                DefineAsIntrinsic intrinsic);
 
 /*
  * Set a watchpoint: a synchronous callback when the given property of the

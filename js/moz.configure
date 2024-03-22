@@ -1,0 +1,132 @@
+# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# /!\ Use js_option() instead of option() in this file. /!\
+# =========================================================
+
+@depends(build_project, '--help')
+def building_js(build_project, help):
+    return build_project == 'js'
+
+# Exception to the rule above: JS_STANDALONE is a special option that doesn't
+# want the js_option treatment. When we're done merging js/src/configure and
+# top-level configure, it can go away, although the JS_STANDALONE config
+# will still need to be set depending on building_js above.
+option(env='JS_STANDALONE', default=building_js,
+       help='Reserved for internal use')
+
+@depends('JS_STANDALONE')
+def js_standalone(value):
+    if value:
+        set_config('JS_STANDALONE', '1')
+        add_old_configure_assignment('JS_STANDALONE', '1')
+
+
+js_option('--disable-js-shell', default=building_js,
+       help='Do not build the JS shell')
+
+@depends('--disable-js-shell')
+def js_shell(value):
+    if not value:
+        set_config('JS_DISABLE_SHELL', '1')
+
+
+# SpiderMonkey as a shared library, and how its symbols are exported
+# ==================================================================
+js_option('--disable-shared-js', default=building_js,
+          help='Do not create a shared library')
+
+js_option('--disable-export-js', default=building_js,
+          help='Do not mark JS symbols as DLL exported/visible')
+
+@depends('--disable-shared-js', '--disable-export-js')
+def static_js(shared_js, export_js):
+    if shared_js:
+        if not export_js:
+            error('Must export JS symbols when building a shared library.')
+        set_config('JS_SHARED_LIBRARY', '1')
+        add_old_configure_assignment('JS_SHARED_LIBRARY', '1')
+    else:
+        if export_js:
+            set_define('STATIC_EXPORTABLE_JS_API', '1')
+        else:
+            set_define('STATIC_JS_API', '1')
+        set_define('MOZ_STATIC_JS', '1')
+
+
+@deprecated_option(env='DISABLE_SHARED_JS', nargs='?')
+def disable_shared_js(value):
+    # DISABLE_SHARED_JS=1 gets us an empty PositiveOptionValue
+    if value and not len(value):
+        suggestion = '--disable-shared-js'
+    else:
+        suggestion = '--enable-shared-js'
+
+    error('Setting %s is deprecated, use %s instead.'
+          % (value.format('DISABLE_SHARED_JS'), suggestion))
+
+@deprecated_option(env='DISABLE_EXPORT_JS', nargs='?')
+def disable_export_js(value):
+    # DISABLE_EXPORT_JS=1 gets us an empty PositiveOptionValue
+    if value and not len(value):
+        suggestion = '--disable-export-js'
+    else:
+        suggestion = '--enable-export-js'
+
+    error('Setting %s is deprecated, use %s instead.'
+          % (value.format('DISABLE_EXPORT_JS'), suggestion))
+
+
+# Profiling
+# =======================================================
+js_option('--enable-instruments', env='MOZ_INSTRUMENTS',
+          help='Enable instruments remote profiling')
+
+@depends('--enable-instruments', target)
+def instruments(value, target):
+    if value and target.os != 'OSX':
+        error('--enable-instruments cannot be used when targeting %s'
+              % target.os)
+    if value:
+        set_config('MOZ_INSTRUMENTS', '1')
+        set_define('MOZ_INSTRUMENTS', '1')
+        add_old_configure_assignment('MOZ_INSTRUMENTS', '1')
+        imply_option('--enable-profiling', reason='--enable-instruments')
+
+
+js_option('--enable-callgrind', env='MOZ_CALLGRIND',
+          help='Enable callgrind profiling')
+
+@depends('--enable-callgrind')
+def callgrind(value):
+    if value:
+        set_define('MOZ_CALLGRIND', '1')
+        imply_option('--enable-profiling')
+
+
+js_option('--enable-profiling', env='MOZ_PROFILING',
+          help='Set compile flags necessary for using sampling profilers '
+               '(e.g. shark, perf)')
+
+@depends('--enable-profiling', target)
+def profiling(value, target):
+    if value:
+        set_config('MOZ_PROFILING', '1')
+        set_define('MOZ_PROFILING', '1')
+        add_old_configure_assignment('MOZ_PROFILING', '1')
+
+        if target.kernel == 'WINNT' or (target.kernel == 'Linux' and
+                                        target.os == 'GNU'):
+            imply_option('--enable-vtune', reason='--enable-profiling')
+
+
+js_option('--enable-vtune', env='MOZ_VTUNE', help='Enable vtune profiling')
+
+@depends('--enable-vtune')
+def vtune(value):
+    if value:
+        set_config('MOZ_VTUNE', '1')
+        set_define('MOZ_VTUNE', '1')

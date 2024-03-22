@@ -10,7 +10,7 @@ const nsIPKCS11Slot = Components.interfaces.nsIPKCS11Slot;
 const nsIPK11Token = Components.interfaces.nsIPK11Token;
 
 var params;
-var tokenName="";
+var tokenName = "";
 var pw1;
 
 function doPrompt(msg)
@@ -28,7 +28,7 @@ function onLoad()
   try {
      params = window.arguments[0].QueryInterface(nsIDialogParamBlock);
      tokenName = params.GetString(1);
-  } catch(exception) {
+  } catch (e) {
       // this should not happen.
       // previously we had self.name, but self.name was a bad idea
       // as window name must be a subset of ascii, and the code was
@@ -39,33 +39,29 @@ function onLoad()
   }
 
   if (tokenName == "") {
-     var sectokdb = Components.classes[nsPK11TokenDB].getService(nsIPK11TokenDB);
-     var tokenList = sectokdb.listTokens();
-     var enumElement;
-     var i=0;
-     var menu = document.getElementById("tokenMenu");
-     try {
-        for (; !tokenList.isDone(); tokenList.next()) {
-           enumElement = tokenList.currentItem();
-           var token = enumElement.QueryInterface(nsIPK11Token);
-           if(token.needsLogin() || !(token.needsUserInit)) {
-              var menuItemNode = document.createElement("menuitem");
-              menuItemNode.setAttribute("value", token.tokenName);
-              menuItemNode.setAttribute("label", token.tokenName);
-              menu.firstChild.appendChild(menuItemNode);
-              if (i == 0) {
-                 menu.selectedItem = menuItemNode;
-                 tokenName = token.tokenName;
-              }
-              i++;
-           }
+    let tokenDB = Components.classes[nsPK11TokenDB].getService(nsIPK11TokenDB);
+    let tokenList = tokenDB.listTokens();
+    let i = 0;
+    let menu = document.getElementById("tokenMenu");
+    while (tokenList.hasMoreElements()) {
+      let token = tokenList.getNext().QueryInterface(nsIPK11Token);
+      if (token.needsLogin() || !(token.needsUserInit)) {
+        let menuItemNode = document.createElement("menuitem");
+        menuItemNode.setAttribute("value", token.tokenName);
+        menuItemNode.setAttribute("label", token.tokenName);
+        menu.firstChild.appendChild(menuItemNode);
+        if (i == 0) {
+          menu.selectedItem = menuItemNode;
+          tokenName = token.tokenName;
         }
-     } catch (exception) {}
+        i++;
+      }
+    }
   } else {
     var sel = document.getElementById("tokenMenu");
     sel.setAttribute("hidden", "true");
     var tag = document.getElementById("tokenName");
-    tag.setAttribute("value",tokenName);
+    tag.setAttribute("value", tokenName);
   }
 
   process();
@@ -199,9 +195,10 @@ function setPassword()
     success = true;
   }
 
-  if (success && params)
+  if (success && params) {
     // Return value 1 means "successfully executed ok"
     params.SetInt(1, 1);
+  }
 
   // Terminate dialog
   return success;
@@ -233,7 +230,7 @@ function setPasswordStrength()
   }
 
   let numnumeric = pw.replace(/[0-9]/g, "");
-  let numeric= pw.length - numnumeric.length;
+  let numeric = pw.length - numnumeric.length;
   if (numeric > 3) {
     numeric = 3;
   }
@@ -269,8 +266,8 @@ function setPasswordStrength()
 
 function checkPasswords()
 {
-  var pw1=document.getElementById('pw1').value;
-  var pw2=document.getElementById('pw2').value;
+  let pw1 = document.getElementById("pw1").value;
+  let pw2 = document.getElementById("pw2").value;
 
   var oldpwbox = document.getElementById("oldpw");
   if (oldpwbox) {

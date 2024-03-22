@@ -190,6 +190,7 @@ class ExclusiveContext : public ContextFriendFields,
     bool isPermanentAtomsInitialized() { return !!runtime_->permanentAtoms; }
     FrozenAtomSet& permanentAtoms() { return *runtime_->permanentAtoms; }
     WellKnownSymbols& wellKnownSymbols() { return *runtime_->wellKnownSymbols; }
+    JS::BuildIdOp buildIdOp() { return runtime_->buildIdOp; }
     const JS::AsmJSCacheOps& asmJSCacheOps() { return runtime_->asmJSCacheOps; }
     PropertyName* emptyString() { return runtime_->emptyString; }
     FreeOp* defaultFreeOp() { return runtime_->defaultFreeOp(); }
@@ -663,6 +664,7 @@ namespace js {
 MOZ_ALWAYS_INLINE bool
 CheckForInterrupt(JSContext* cx)
 {
+    MOZ_ASSERT(!cx->isExceptionPending());
     // Add an inline fast-path since we have to check for interrupts in some hot
     // C++ loops of library builtins.
     JSRuntime* rt = cx->runtime();
@@ -761,13 +763,15 @@ class MOZ_RAII AutoLockForExclusiveAccess
         runtime = rt;
         if (runtime->numExclusiveThreads) {
             runtime->assertCanLock(ExclusiveAccessLock);
-            PR_Lock(runtime->exclusiveAccessLock);
+            runtime->exclusiveAccessLock.lock();
 #ifdef DEBUG
             runtime->exclusiveAccessOwner = PR_GetCurrentThread();
 #endif
         } else {
             MOZ_ASSERT(!runtime->mainThreadHasExclusiveAccess);
+#ifdef DEBUG
             runtime->mainThreadHasExclusiveAccess = true;
+#endif
         }
     }
 
@@ -782,12 +786,16 @@ class MOZ_RAII AutoLockForExclusiveAccess
     }
     ~AutoLockForExclusiveAccess() {
         if (runtime->numExclusiveThreads) {
+#ifdef DEBUG
             MOZ_ASSERT(runtime->exclusiveAccessOwner == PR_GetCurrentThread());
             runtime->exclusiveAccessOwner = nullptr;
-            PR_Unlock(runtime->exclusiveAccessLock);
+#endif
+            runtime->exclusiveAccessLock.unlock();
         } else {
             MOZ_ASSERT(runtime->mainThreadHasExclusiveAccess);
+#ifdef DEBUG
             runtime->mainThreadHasExclusiveAccess = false;
+#endif
         }
     }
 

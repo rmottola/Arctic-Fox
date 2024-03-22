@@ -6,7 +6,7 @@
 
 #include "nsDOMWindowUtils.h"
 
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/LayerTransactionChild.h"
 #include "nsPresContext.h"
 #include "nsDOMClassInfoID.h"
@@ -108,6 +108,7 @@
 #include "mozilla/css/ImageLoader.h"
 #include "mozilla/layers/APZCTreeManager.h" // for layers::ZoomToRectBehavior
 #include "mozilla/dom/Promise.h"
+#include "mozilla/CSSStyleSheet.h"
 
 #ifdef XP_WIN
 #undef GetClassName
@@ -813,7 +814,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX,
 
   wheelEvent.refPoint = nsContentUtils::ToWidgetPoint(CSSPoint(aX, aY), offset, presContext);
 
-  widget->DispatchAPZAwareEvent(&wheelEvent);
+  widget->DispatchInputEvent(&wheelEvent);
 
   if (widget->AsyncPanZoomEnabled()) {
     // Computing overflow deltas is not compatible with APZ, so if APZ is
@@ -2467,6 +2468,8 @@ nsDOMWindowUtils::ZoomToFocusedInput()
     uint32_t flags = layers::DISABLE_ZOOM_OUT;
     if (!Preferences::GetBool("formhelper.autozoom")) {
       flags |= layers::PAN_INTO_VIEW_ONLY;
+    } else {
+      flags |= layers::ONLY_ZOOM_TO_DEFAULT_SCALE;
     }
 
     CSSRect bounds = nsLayoutUtils::GetBoundingContentRect(content, rootScrollFrame);
@@ -3171,7 +3174,7 @@ nsDOMWindowUtils::ExitFullscreen()
   // Although we would not use the old size if we have already exited
   // fullscreen, we still want to cleanup in case we haven't.
   nsSize oldSize = OldWindowSize::GetAndRemove(doc->GetWindow());
-  if (!doc->IsFullScreenDoc()) {
+  if (!doc->GetFullscreenElement()) {
     return NS_OK;
   }
 

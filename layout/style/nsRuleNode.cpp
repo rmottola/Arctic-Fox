@@ -128,18 +128,17 @@ struct ChildrenHashEntry : public PLDHashEntryHdr {
 };
 
 /* static */ PLDHashNumber
-nsRuleNode::ChildrenHashHashKey(PLDHashTable *aTable, const void *aKey)
+nsRuleNode::ChildrenHashHashKey(const void *aKey)
 {
   const nsRuleNode::Key *key =
     static_cast<const nsRuleNode::Key*>(aKey);
   // Disagreement on importance and level for the same rule is extremely
   // rare, so hash just on the rule.
-  return PLDHashTable::HashVoidPtrKeyStub(aTable, key->mRule);
+  return PLDHashTable::HashVoidPtrKeyStub(key->mRule);
 }
 
 /* static */ bool
-nsRuleNode::ChildrenHashMatchEntry(PLDHashTable *aTable,
-                                   const PLDHashEntryHdr *aHdr,
+nsRuleNode::ChildrenHashMatchEntry(const PLDHashEntryHdr *aHdr,
                                    const void *aKey)
 {
   const ChildrenHashEntry *entry =
@@ -322,11 +321,6 @@ GetMetricsFor(nsPresContext* aPresContext,
 {
   nsFont font = aStyleFont->mFont;
   font.size = aFontSize;
-  gfxUserFontSet *fs = nullptr;
-  if (aUseUserFontSet) {
-    fs = aPresContext->GetUserFontSet();
-  }
-  gfxTextPerfMetrics *tp = aPresContext->GetTextPerfMetrics();
   gfxFont::Orientation orientation = gfxFont::eHorizontal;
   if (aStyleContext) {
     WritingMode wm(aStyleContext);
@@ -334,13 +328,14 @@ GetMetricsFor(nsPresContext* aPresContext,
       orientation = gfxFont::eVertical;
     }
   }
-  RefPtr<nsFontMetrics> fm;
-  aPresContext->DeviceContext()->GetMetricsFor(font,
-                                               aStyleFont->mLanguage,
-                                               aStyleFont->mExplicitLanguage,
-                                               orientation,
-                                               fs, tp, *getter_AddRefs(fm));
-  return fm.forget();
+  nsFontMetrics::Params params;
+  params.language = aStyleFont->mLanguage;
+  params.explicitLanguage = aStyleFont->mExplicitLanguage;
+  params.orientation = orientation;
+  params.userFontSet =
+    aUseUserFontSet ? aPresContext->GetUserFontSet() : nullptr;
+  params.textPerf = aPresContext->GetTextPerfMetrics();
+  return aPresContext->DeviceContext()->GetMetricsFor(font, params);
 }
 
 
@@ -1534,7 +1529,9 @@ nsRuleNode::nsRuleNode(nsPresContext* aContext, nsRuleNode* aParent,
      unused.  */
   if (!IsRoot()) {
     mParent->AddRef();
-    aContext->StyleSet()->RuleNodeUnused();
+    MOZ_ASSERT(aContext->StyleSet()->IsGecko(),
+               "ServoStyleSets should not have rule nodes");
+    aContext->StyleSet()->AsGecko()->RuleNodeUnused();
   }
 
   // nsStyleSet::GetContext depends on there being only one animation
@@ -3685,8 +3682,10 @@ nsRuleNode::SetFont(nsPresContext* aPresContext, nsStyleContext* aContext,
 
     if (variantAlternates & NS_FONT_VARIANT_ALTERNATES_FUNCTIONAL_MASK) {
       // fetch the feature lookup object from the styleset
+      MOZ_ASSERT(aPresContext->StyleSet()->IsGecko(),
+                 "ServoStyleSets should not have rule nodes");
       aFont->mFont.featureValueLookup =
-        aPresContext->StyleSet()->GetFontFeatureValuesLookup();
+        aPresContext->StyleSet()->AsGecko()->GetFontFeatureValuesLookup();
 
       NS_ASSERTION(variantAlternatesValue->GetPairValue().mYValue.GetUnit() ==
                    eCSSUnit_List, "function list not a list value");
@@ -4268,6 +4267,101 @@ TruncateStringToSingleGrapheme(nsAString& aStr)
   }
 }
 
+struct LineHeightCalcObj
+{
+  float mLineHeight;
+  bool mIsNumber;
+};
+
+struct SetLineHeightCalcOps : public css::NumbersAlreadyNormalizedOps
+{
+  typedef LineHeightCalcObj result_type;
+  nsStyleContext* const mStyleContext;
+  nsPresContext* const mPresContext;
+  RuleNodeCacheConditions& mConditions;
+
+  SetLineHeightCalcOps(nsStyleContext* aStyleContext,
+                       nsPresContext* aPresContext,
+                       RuleNodeCacheConditions& aConditions)
+    : mStyleContext(aStyleContext),
+      mPresContext(aPresContext),
+      mConditions(aConditions)
+  {
+  }
+
+  result_type
+  MergeAdditive(nsCSSUnit aCalcFunction,
+                result_type aValue1, result_type aValue2)
+  {
+    MOZ_ASSERT(aValue1.mIsNumber == aValue2.mIsNumber);
+
+    LineHeightCalcObj result;
+    result.mIsNumber = aValue1.mIsNumber;
+    if (aCalcFunction == eCSSUnit_Calc_Plus) {
+      result.mLineHeight = aValue1.mLineHeight + aValue2.mLineHeight;
+      return result;
+    }
+    MOZ_ASSERT(aCalcFunction == eCSSUnit_Calc_Minus,
+               "unexpected unit");
+    result.mLineHeight = aValue1.mLineHeight - aValue2.mLineHeight;
+    return result;
+  }
+
+  result_type
+  MergeMultiplicativeL(nsCSSUnit aCalcFunction,
+                       float aValue1, result_type aValue2)
+  {
+    MOZ_ASSERT(aCalcFunction == eCSSUnit_Calc_Times_L,
+               "unexpected unit");
+    LineHeightCalcObj result;
+    result.mIsNumber = aValue2.mIsNumber;
+    result.mLineHeight = aValue1 * aValue2.mLineHeight;
+    return result;
+  }
+
+  result_type
+  MergeMultiplicativeR(nsCSSUnit aCalcFunction,
+                       result_type aValue1, float aValue2)
+  {
+    LineHeightCalcObj result;
+    result.mIsNumber = aValue1.mIsNumber;
+    if (aCalcFunction == eCSSUnit_Calc_Times_R) {
+      result.mLineHeight = aValue1.mLineHeight * aValue2;
+      return result;
+    }
+    MOZ_ASSERT(aCalcFunction == eCSSUnit_Calc_Divided,
+               "unexpected unit");
+    result.mLineHeight = aValue1.mLineHeight / aValue2;
+    return result;
+  }
+
+  result_type ComputeLeafValue(const nsCSSValue& aValue)
+  {
+    LineHeightCalcObj result;
+    if (aValue.IsLengthUnit()) {
+      result.mIsNumber = false;
+      result.mLineHeight = CalcLength(aValue, mStyleContext,
+                                      mPresContext, mConditions);
+    }
+    else if (eCSSUnit_Percent == aValue.GetUnit()) {
+      mConditions.SetUncacheable();
+      result.mIsNumber = false;
+      nscoord fontSize = mStyleContext->StyleFont()->mFont.size;
+      result.mLineHeight = fontSize * aValue.GetPercentValue();
+    }
+    else if (eCSSUnit_Number == aValue.GetUnit()) {
+      result.mIsNumber = true;
+      result.mLineHeight = aValue.GetFloatValue();
+    } else {
+      MOZ_ASSERT(false, "unexpected value");
+      result.mIsNumber = true;
+      result.mLineHeight = 1.0f;
+    }
+
+    return result;
+  }
+};
+
 const void*
 nsRuleNode::ComputeTextData(void* aStartStruct,
                             const nsRuleData* aRuleData,
@@ -4310,7 +4404,7 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
     }
   }
 
-  // line-height: normal, number, length, percent, inherit
+  // line-height: normal, number, length, percent, calc, inherit
   const nsCSSValue* lineHeightValue = aRuleData->ValueForLineHeight();
   if (eCSSUnit_Percent == lineHeightValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -4322,6 +4416,16 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
   else if (eCSSUnit_Initial == lineHeightValue->GetUnit() ||
            eCSSUnit_System_Font == lineHeightValue->GetUnit()) {
     text->mLineHeight.SetNormalValue();
+  }
+  else if (eCSSUnit_Calc == lineHeightValue->GetUnit()) {
+    SetLineHeightCalcOps ops(aContext, mPresContext, conditions);
+    LineHeightCalcObj obj = css::ComputeCalc(*lineHeightValue, ops);
+    if (obj.mIsNumber) {
+      text->mLineHeight.SetFactorValue(obj.mLineHeight);
+    } else {
+      text->mLineHeight.SetCoordValue(
+        NSToCoordRoundWithClamp(obj.mLineHeight));
+    }
   }
   else {
     SetCoord(*lineHeightValue, text->mLineHeight, parentText->mLineHeight,
@@ -9762,6 +9866,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
               parentSVGReset->mMaskType,
               NS_STYLE_MASK_TYPE_LUMINANCE, 0, 0, 0, 0);
 
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
   uint32_t maxItemCount = 1;
   bool rebuild = false;
 
@@ -9840,7 +9945,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                     svgReset->mMask.mLayers,
                     parentSVGReset->mMask.mLayers,
                     &nsStyleImageLayers::Layer::mMaskMode,
-                    uint8_t(NS_STYLE_MASK_MODE_AUTO),
+                    uint8_t(NS_STYLE_MASK_MODE_MATCH_SOURCE),
                     parentSVGReset->mMask.mMaskModeCount,
                     svgReset->mMask.mMaskModeCount, maxItemCount, rebuild, conditions);
 
@@ -9888,6 +9993,21 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                        &nsStyleImageLayers::Layer::mComposite,
                        svgReset->mMask.mCompositeCount, fillCount);
   }
+#else
+  // mask: none | <url>
+  const nsCSSValue* maskValue = aRuleData->ValueForMask();
+  if (eCSSUnit_URL == maskValue->GetUnit()) {
+    svgReset->mMask.mLayers[0].mSourceURI = maskValue->GetURLValue();
+  } else if (eCSSUnit_None == maskValue->GetUnit() ||
+             eCSSUnit_Initial == maskValue->GetUnit() ||
+             eCSSUnit_Unset == maskValue->GetUnit()) {
+    svgReset->mMask.mLayers[0].mSourceURI = nullptr;
+  } else if (eCSSUnit_Inherit == maskValue->GetUnit()) {
+    conditions.SetUncacheable();
+    svgReset->mMask.mLayers[0].mSourceURI =
+      parentSVGReset->mMask.mLayers[0].mSourceURI;
+  }
+#endif
 
   svgReset->mMask.TrackImages(aContext->PresContext());
 
@@ -9970,9 +10090,11 @@ nsRuleNode::DestroyIfNotMarked()
   // However, we never allow the root node to GC itself, because nsStyleSet
   // wants to hold onto the root node and not worry about re-creating a
   // rule walker if the root node is deleted.
+  MOZ_ASSERT(mPresContext->StyleSet()->IsGecko(),
+             "ServoStyleSets should not have rule nodes");
   if (!(mDependentBits & NS_RULE_NODE_GC_MARK) &&
       // Skip this only if we're the *current* root and not an old one.
-      !(IsRoot() && mPresContext->StyleSet()->GetRuleTree() == this)) {
+      !(IsRoot() && mPresContext->StyleSet()->AsGecko()->GetRuleTree() == this)) {
     Destroy();
     return true;
   }

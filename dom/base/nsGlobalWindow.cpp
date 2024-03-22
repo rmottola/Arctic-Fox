@@ -20,6 +20,7 @@
 #include "mozilla/dom/DOMStorage.h"
 #include "mozilla/dom/StorageEvent.h"
 #include "mozilla/dom/StorageEventBinding.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
 #include "mozilla/dom/WindowOrientationObserver.h"
 #endif
@@ -614,6 +615,7 @@ nsPIDOMWindow<T>::nsPIDOMWindow(nsPIDOMWindowOuter *aOuterWindow)
   mMayHavePaintEventListener(false), mMayHaveTouchEventListener(false),
   mMayHaveMouseEnterLeaveEventListener(false),
   mMayHavePointerEnterLeaveEventListener(false),
+  mInnerObjectsFreed(false),
   mIsModalContentWindow(false),
   mIsActive(false), mIsBackground(false),
   mAudioMuted(false), mAudioVolume(1.0), mAudioCaptured(false),
@@ -1156,6 +1158,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mIsPopupSpam(false),
     mBlockScriptedClosingFlag(false),
     mWasOffline(false),
+    mHasHadSlowScript(false),
     mNotifyIdleObserversIdleOnThaw(false),
     mNotifyIdleObserversActiveOnThaw(false),
     mCreatingInnerWindow(false),
@@ -1172,7 +1175,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 #endif
     mShowFocusRingForContent(false),
     mFocusByKeyOccurred(false),
-    mInnerObjectsFreed(false),
     mHasGamepad(false),
 #ifdef MOZ_GAMEPAD
     mHasSeenGamepadInput(false),
@@ -1225,6 +1227,8 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 
       Preferences::AddStrongObserver(mObserver, "intl.accept_languages");
     }
+
+    InitializeShowFocusRings();
   } else {
     // |this| is an outer window. Outer windows start out frozen and
     // remain frozen until they get an inner window, so freeze this
@@ -1817,9 +1821,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
     if (tmp->mDoc && tmp->mDoc->GetDocumentURI()) {
       tmp->mDoc->GetDocumentURI()->GetSpec(uri);
     }
-    PR_snprintf(name, sizeof(name), "nsGlobalWindow #%llu %s %s",
-                tmp->mWindowID, tmp->IsInnerWindow() ? "inner" : "outer",
-                uri.get());
+    snprintf_literal(name, "nsGlobalWindow # %" PRIu64 " %s %s", tmp->mWindowID,
+                     tmp->IsInnerWindow() ? "inner" : "outer", uri.get());
     cb.DescribeRefCountedNode(tmp->mRefCnt.get(), name);
   } else {
     NS_IMPL_CYCLE_COLLECTION_DESCRIBE(nsGlobalWindow, tmp->mRefCnt.get())
@@ -3436,9 +3439,9 @@ nsGlobalWindow::DefineArgumentsProperty(nsIArray *aArguments)
 
   nsIScriptContext *ctx = GetOuterWindowInternal()->mContext;
   NS_ENSURE_TRUE(aArguments && ctx, NS_ERROR_NOT_INITIALIZED);
-  AutoJSContext cx;
 
-  JS::Rooted<JSObject*> obj(cx, GetWrapperPreserveColor());
+  JS::Rooted<JSObject*> obj(nsContentUtils::RootingCx(),
+                            GetWrapperPreserveColor());
   return ctx->SetProperty(obj, "arguments", aArguments);
 }
 
@@ -3812,7 +3815,7 @@ nsGlobalWindow::GetParentOuter()
   }
 
   nsCOMPtr<nsPIDOMWindowOuter> parent;
-  if (mDocShell->GetIsBrowserOrApp()) {
+  if (mDocShell->GetIsMozBrowserOrApp()) {
     parent = AsOuter();
   } else {
     parent = GetParent();
@@ -3978,7 +3981,7 @@ nsGlobalWindow::GetContentInternal(ErrorResult& aError, bool aUnprivilegedCaller
 
   // If we're contained in <iframe mozbrowser> or <iframe mozapp>, then
   // GetContent is the same as window.top.
-  if (mDocShell && mDocShell->GetIsInBrowserOrApp()) {
+  if (mDocShell && mDocShell->GetIsInMozBrowserOrApp()) {
     return GetTopOuter();
   }
 
@@ -4027,7 +4030,9 @@ nsGlobalWindow::GetMozSelfSupport(ErrorResult& aError)
     return mMozSelfSupport;
   }
 
-  AutoSafeJSContext cx;
+  // We're called from JS and want to use out existing JSContext (and,
+  // importantly, its compartment!) here.
+  AutoJSContext cx;
   GlobalObject global(cx, FastGetGlobalJSObject());
   mMozSelfSupport = MozSelfSupport::Constructor(global, cx, aError);
   return mMozSelfSupport;
@@ -4197,23 +4202,6 @@ nsGlobalWindow::IndexedGetter(uint32_t aIndex)
 {
   FORWARD_TO_OUTER(IndexedGetterOuter, (aIndex), nullptr);
   MOZ_CRASH();
-}
-
-void
-nsGlobalWindow::GetSupportedNames(nsTArray<nsString>& aNames)
-{
-  FORWARD_TO_OUTER_VOID(GetSupportedNames, (aNames));
-
-  nsDOMWindowList* windows = GetWindowList();
-  if (windows) {
-    uint32_t length = windows->GetLength();
-    nsString* name = aNames.AppendElements(length);
-    for (uint32_t i = 0; i < length; ++i, ++name) {
-      nsCOMPtr<nsIDocShellTreeItem> item =
-        windows->GetDocShellTreeItemAt(i);
-      item->GetName(*name);
-    }
-  }
 }
 
 bool
@@ -5732,8 +5720,13 @@ nsGlobalWindow::DispatchResizeEvent(const CSSIntSize& aSize)
     return false;
   }
 
-  AutoSafeJSContext cx;
+  // We don't init the AutoJSAPI with ourselves because we don't want it
+  // reporting errors to our onerror handlers.
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  JSContext* cx = jsapi.cx();
   JSAutoCompartment ac(cx, GetWrapperPreserveColor());
+
   DOMWindowResizeEventDetail detail;
   detail.mWidth = aSize.width;
   detail.mHeight = aSize.height;
@@ -7203,7 +7196,7 @@ nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight, ErrorResult& aErr
    * If caller is a browser-element then dispatch a resize event to
    * the embedder.
    */
-  if (mDocShell && mDocShell->GetIsBrowserOrApp()) {
+  if (mDocShell && mDocShell->GetIsMozBrowserOrApp()) {
     CSSIntSize size(aWidth, aHeight);
     if (!DispatchResizeEvent(size)) {
       // The embedder chose to prevent the default action for this
@@ -7253,7 +7246,7 @@ nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
    * If caller is a browser-element then dispatch a resize event to
    * parent.
    */
-  if (mDocShell && mDocShell->GetIsBrowserOrApp()) {
+  if (mDocShell && mDocShell->GetIsMozBrowserOrApp()) {
     CSSIntSize size;
     if (NS_FAILED(GetInnerSize(size))) {
       return;
@@ -7567,20 +7560,20 @@ nsGlobalWindow::MozRequestOverfill(OverfillCallback& aCallback,
 }
 
 void
-nsGlobalWindow::ClearTimeout(int32_t aHandle, ErrorResult& aError)
+nsGlobalWindow::ClearTimeout(int32_t aHandle)
 {
   MOZ_RELEASE_ASSERT(IsInnerWindow());
 
   if (aHandle > 0) {
-    ClearTimeoutOrInterval(aHandle, aError);
+    ClearTimeoutOrInterval(aHandle);
   }
 }
 
 void
-nsGlobalWindow::ClearInterval(int32_t aHandle, ErrorResult& aError)
+nsGlobalWindow::ClearInterval(int32_t aHandle)
 {
   if (aHandle > 0) {
-    ClearTimeoutOrInterval(aHandle, aError);
+    ClearTimeoutOrInterval(aHandle);
   }
 }
 
@@ -8204,7 +8197,7 @@ nsGlobalWindow::CloseOuter(bool aTrustedCaller)
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
   if (!mDocShell || IsInModalState() ||
-      (IsFrame() && !mDocShell->GetIsBrowserOrApp())) {
+      (IsFrame() && !mDocShell->GetIsMozBrowserOrApp())) {
     // window.close() is called on a frame in a frameset, on a window
     // that's already closed, or on a window for which there's
     // currently a modal dialog open. Ignore such calls.
@@ -8706,8 +8699,7 @@ nsGlobalWindow::NotifyDOMWindowThawed(nsGlobalWindow* aWindow) {
 JSObject*
 nsGlobalWindow::GetCachedXBLPrototypeHandler(nsXBLPrototypeHandler* aKey)
 {
-  AutoSafeJSContext cx;
-  JS::Rooted<JSObject*> handler(cx);
+  JS::Rooted<JSObject*> handler(nsContentUtils::RootingCx());
   if (mCachedXBLPrototypeHandlers) {
     mCachedXBLPrototypeHandlers->Get(aKey, handler.address());
   }
@@ -8731,7 +8723,7 @@ nsGlobalWindow::GetFrameElementOuter()
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  if (!mDocShell || mDocShell->GetIsBrowserOrApp()) {
+  if (!mDocShell || mDocShell->GetIsMozBrowserOrApp()) {
     return nullptr;
   }
 
@@ -9090,9 +9082,12 @@ nsresult
 nsGlobalWindow::UpdateCommands(const nsAString& anAction, nsISelection* aSel, int16_t aReason)
 {
   // If this is a child process, redirect to the parent process.
-  if (nsCOMPtr<nsITabChild> child = do_GetInterface(GetDocShell())) {
-    nsContentUtils::AddScriptRunner(new ChildCommandDispatcher(this, child, anAction));
-    return NS_OK;
+  if (nsIDocShell* docShell = GetDocShell()) {
+    if (nsCOMPtr<nsITabChild> child = docShell->GetTabChild()) {
+      nsContentUtils::AddScriptRunner(new ChildCommandDispatcher(this, child,
+                                                                 anAction));
+      return NS_OK;
+    }
   }
 
   nsPIDOMWindowOuter *rootWindow = nsGlobalWindow::GetPrivateRoot();
@@ -9560,6 +9555,24 @@ nsGlobalWindow::SetActive(bool aActive)
   NotifyDocumentTree(mDoc, nullptr);
 }
 
+bool
+nsGlobalWindow::IsTopLevelWindowActive()
+{
+   nsCOMPtr<nsIDocShellTreeItem> treeItem(GetDocShell());
+   if (!treeItem) {
+     return false;
+   }
+
+   nsCOMPtr<nsIDocShellTreeItem> rootItem;
+   treeItem->GetRootTreeItem(getter_AddRefs(rootItem));
+   if (!rootItem) {
+     return false;
+   }
+
+   nsCOMPtr<nsPIDOMWindowOuter> domWindow = rootItem->GetWindow();
+   return domWindow && domWindow->IsActive();
+}
+
 void nsGlobalWindow::SetIsBackground(bool aIsBackground)
 {
   MOZ_ASSERT(IsOuterWindow());
@@ -9648,6 +9661,15 @@ static bool IsLink(nsIContent* aContent)
                                             nsGkAtoms::simple, eCaseMatters));
 }
 
+static bool ShouldShowFocusRingIfFocusedByMouse(nsIContent* aNode)
+{
+  if (!aNode) {
+    return true;
+  }
+  return !IsLink(aNode) &&
+         !aNode->IsAnyOfHTMLElements(nsGkAtoms::video, nsGkAtoms::audio);
+}
+
 void
 nsGlobalWindow::SetFocusedNode(nsIContent* aNode,
                                uint32_t aFocusMethod,
@@ -9681,9 +9703,10 @@ nsGlobalWindow::SetFocusedNode(nsIContent* aNode,
       // otherwise, we set mShowFocusRingForContent, as we don't want this to
       // be permanent for the window. On Windows, focus rings are only shown
       // when the FLAG_SHOWRING flag is used. On other platforms, focus rings
-      // are only hidden for clicks on links.
+      // are only visible on some elements.
 #ifndef XP_WIN
-      !(mFocusMethod & nsIFocusManager::FLAG_BYMOUSE) || !IsLink(aNode) ||
+      !(mFocusMethod & nsIFocusManager::FLAG_BYMOUSE) ||
+      ShouldShowFocusRingIfFocusedByMouse(aNode) ||
 #endif
       aFocusMethod & nsIFocusManager::FLAG_SHOWRING) {
         mShowFocusRingForContent = true;
@@ -9700,6 +9723,17 @@ nsGlobalWindow::GetFocusMethod()
   FORWARD_TO_INNER(GetFocusMethod, (), 0);
 
   return mFocusMethod;
+}
+
+void
+nsGlobalWindow::InitializeShowFocusRings()
+{
+  nsPIDOMWindowOuter* root = GetPrivateRoot();
+  if (root) {
+    bool showAccelerators = false, showFocusRings = false;
+    root->GetKeyboardIndicators(&showAccelerators, &showFocusRings);
+    mShowFocusRings = showFocusRings;
+  }
 }
 
 bool
@@ -9804,14 +9838,6 @@ nsGlobalWindow::SetReadyForFocus()
 
   bool oldNeedsFocus = mNeedsFocus;
   mNeedsFocus = false;
-
-  // update whether focus rings need to be shown using the state from the
-  // root window
-  if (nsPIDOMWindowOuter* root = GetPrivateRoot()) {
-    bool showAccelerators, showFocusRings;
-    root->GetKeyboardIndicators(&showAccelerators, &showFocusRings);
-    mShowFocusRings = showFocusRings;
-  }
 
   nsIFocusManager* fm = nsFocusManager::GetFocusManager();
   if (fm) {
@@ -10673,15 +10699,23 @@ nsGlobalWindow::ShowSlowScriptDialog()
   }
 
   // Check if we should offer the option to debug
-  JS::UniqueChars filename;
+  JS::AutoFilename filename;
   unsigned lineno;
   bool hasFrame = JS::DescribeScriptedCaller(cx, &filename, &lineno);
+
+  // Record the slow script event if we haven't done so already for this inner window
+  // (which represents a particular page to the user).
+  if (!mHasHadSlowScript) {
+    Telemetry::Accumulate(Telemetry::SLOW_SCRIPT_PAGE_COUNT, 1);
+  }
+  mHasHadSlowScript = true;
 
   if (XRE_IsContentProcess() &&
       ProcessHangMonitor::Get()) {
     ProcessHangMonitor::SlowScriptAction action;
     RefPtr<ProcessHangMonitor> monitor = ProcessHangMonitor::Get();
-    nsCOMPtr<nsITabChild> child = do_GetInterface(GetDocShell());
+    nsIDocShell* docShell = GetDocShell();
+    nsCOMPtr<nsITabChild> child = docShell ? docShell->GetTabChild() : nullptr;
     action = monitor->NotifySlowScript(child,
                                        filename.get(),
                                        lineno);
@@ -11467,6 +11501,10 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
     }
   }
 
+  // XXXbz When this gets fixed to not use LegacyIsCallerNativeCode()
+  // (indirectly) maybe we can nix the AutoJSAPI usage OnLinkClickEvent::Run.
+  // But note that if you change this to GetEntryGlobal(), say, then
+  // OnLinkClickEvent::Run will need a full-blown AutoEntryScript.
   const bool checkForPopup = !nsContentUtils::LegacyIsCallerChromeOrNativeCode() &&
     !isApp && !aDialog && !WindowExists(aName, !aCalledNoScript);
 
@@ -11938,6 +11976,7 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     reason = "setTimeout handler";
   }
 
+  bool abortIntervalHandler = false;
   nsCOMPtr<nsIScriptTimeoutHandler> handler(timeout->mScriptHandler);
   RefPtr<Function> callback = handler->GetCallback();
   if (!callback) {
@@ -11952,22 +11991,39 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     // New script entry point required, due to the "Create a script" sub-step of
     // http://www.whatwg.org/specs/web-apps/current-work/#timer-initialisation-steps
     nsAutoMicroTask mt;
-    AutoEntryScript entryScript(this, reason, true, aScx->GetNativeContext());
-    entryScript.TakeOwnershipOfErrorReporting();
-    JS::CompileOptions options(entryScript.cx());
+    AutoEntryScript aes(this, reason, true, aScx->GetNativeContext());
+    JS::CompileOptions options(aes.cx());
     options.setFileAndLine(filename, lineNo)
            .setVersion(JSVERSION_DEFAULT);
-    JS::Rooted<JSObject*> global(entryScript.cx(), FastGetGlobalJSObject());
-    nsJSUtils::EvaluateString(entryScript.cx(), nsDependentString(script),
-                              global, options);
+    JS::Rooted<JSObject*> global(aes.cx(), FastGetGlobalJSObject());
+    nsresult rv =
+      nsJSUtils::EvaluateString(aes.cx(), nsDependentString(script),
+                                global, options);
+    if (rv == NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW_UNCATCHABLE) {
+      abortIntervalHandler = true;
+    }
   } else {
     // Hold strong ref to ourselves while we call the callback.
     nsCOMPtr<nsISupports> me(static_cast<nsIDOMWindow *>(this));
-    ErrorResult ignored;
+    ErrorResult rv;
     JS::Rooted<JS::Value> ignoredVal(CycleCollectedJSRuntime::Get()->Runtime());
-    callback->Call(me, handler->GetArgs(), &ignoredVal, ignored, reason);
-    ignored.SuppressException();
+    callback->Call(me, handler->GetArgs(), &ignoredVal, rv, reason);
+    if (rv.IsUncatchableException()) {
+      abortIntervalHandler = true;
+    }
+
+    rv.SuppressException();
   }
+
+  // If we received an uncatchable exception, do not schedule the timeout again.
+  // This allows the slow script dialog to break easy DoS attacks like
+  // setInterval(function() { while(1); }, 100);
+  if (abortIntervalHandler) {
+    // If it wasn't an interval timer to begin with, this does nothing.  If it
+    // was, we'll treat it as a timeout that we just ran and discard it when
+    // we return.
+    timeout->mIsInterval = false;
+   }
 
   // We ignore any failures from calling EvaluateString() on the context or
   // Call() on a Function here since we're in a loop
@@ -12244,7 +12300,7 @@ nsGlobalWindow::RunTimeout(nsTimeout *aTimeout)
 }
 
 void
-nsGlobalWindow::ClearTimeoutOrInterval(int32_t aTimerID, ErrorResult& aError)
+nsGlobalWindow::ClearTimeoutOrInterval(int32_t aTimerID)
 {
   MOZ_RELEASE_ASSERT(IsInnerWindow());
 
@@ -13795,8 +13851,7 @@ nsGlobalWindow::GetExternal(ErrorResult& aRv)
   if (!mExternal) {
     AutoJSContext cx;
     JS::Rooted<JSObject*> jsImplObj(cx);
-    ConstructJSImplementation(cx, "@mozilla.org/sidebar;1",
-                              this, &jsImplObj, aRv);
+    ConstructJSImplementation("@mozilla.org/sidebar;1", this, &jsImplObj, aRv);
     if (aRv.Failed()) {
       return nullptr;
     }

@@ -25,7 +25,7 @@
 #include "mozilla/media/MediaSystemResourceManager.h" // for MediaSystemResourceManager
 #include "mozilla/media/MediaSystemResourceManagerChild.h" // for MediaSystemResourceManagerChild
 #include "mozilla/layers/CompositableClient.h"  // for CompositableChild, etc
-#include "mozilla/layers/CompositorParent.h" // for CompositorParent
+#include "mozilla/layers/CompositorBridgeParent.h" // for CompositorBridgeParent
 #include "mozilla/layers/ISurfaceAllocator.h"  // for ISurfaceAllocator
 #include "mozilla/layers/ImageClient.h"  // for ImageClient
 #include "mozilla/layers/LayersMessages.h"  // for CompositableOperation
@@ -771,7 +771,7 @@ bool ImageBridgeChild::StartUpOnThread(Thread* aThread)
     }
     sImageBridgeChildSingleton = new ImageBridgeChild();
     sImageBridgeParentSingleton = new ImageBridgeParent(
-      CompositorParent::CompositorLoop(), nullptr, base::GetCurrentProcId());
+      CompositorBridgeParent::CompositorLoop(), nullptr, base::GetCurrentProcId());
     sImageBridgeChildSingleton->ConnectAsync(sImageBridgeParentSingleton);
     sImageBridgeChildSingleton->GetMessageLoop()->PostTask(
       FROM_HERE,
@@ -904,7 +904,8 @@ ImageBridgeChild::AllocShmem(size_t aSize,
 {
   MOZ_ASSERT(!mShuttingDown);
   if (InImageBridgeChildThread()) {
-    return PImageBridgeChild::AllocShmem(aSize, aType, aShmem);
+    return PImageBridgeChild::AllocShmem(aSize, aType,
+                                         aShmem);
   } else {
     return DispatchAllocShmemInternal(aSize, aType, aShmem, false); // false: unsafe
   }
@@ -929,14 +930,15 @@ static void ProxyAllocShmemNow(AllocShmemParams* aParams,
   MOZ_ASSERT(aDone);
   MOZ_ASSERT(aBarrier);
 
+  auto shmAllocator = aParams->mAllocator->AsShmemAllocator();
   if (aParams->mUnsafe) {
-    aParams->mSuccess = aParams->mAllocator->AllocUnsafeShmem(aParams->mSize,
-                                                              aParams->mType,
-                                                              aParams->mShmem);
+    aParams->mSuccess = shmAllocator->AllocUnsafeShmem(aParams->mSize,
+                                                       aParams->mType,
+                                                       aParams->mShmem);
   } else {
-    aParams->mSuccess = aParams->mAllocator->AllocShmem(aParams->mSize,
-                                                        aParams->mType,
-                                                        aParams->mShmem);
+    aParams->mSuccess = shmAllocator->AllocShmem(aParams->mSize,
+                                                 aParams->mType,
+                                                 aParams->mShmem);
   }
 
   ReentrantMonitorAutoEnter autoMon(*aBarrier);
@@ -978,7 +980,7 @@ static void ProxyDeallocShmemNow(ISurfaceAllocator* aAllocator,
   MOZ_ASSERT(aDone);
   MOZ_ASSERT(aBarrier);
 
-  aAllocator->DeallocShmem(*aShmem);
+  aAllocator->AsShmemAllocator()->DeallocShmem(*aShmem);
 
   ReentrantMonitorAutoEnter autoMon(*aBarrier);
   *aDone = true;

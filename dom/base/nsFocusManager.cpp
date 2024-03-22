@@ -866,9 +866,11 @@ nsFocusManager::WindowShown(mozIDOMWindowProxy* aWindow, bool aNeedsFocus)
     }
   }
 
-  if (nsCOMPtr<nsITabChild> child = do_GetInterface(window->GetDocShell())) {
-    bool active = static_cast<TabChild*>(child.get())->ParentIsActive();
-    ActivateOrDeactivate(window, active);
+  if (nsIDocShell* docShell = window->GetDocShell()) {
+    if (nsCOMPtr<nsITabChild> child = docShell->GetTabChild()) {
+      bool active = static_cast<TabChild*>(child.get())->ParentIsActive();
+      ActivateOrDeactivate(window, active);
+    }
   }
 
   if (mFocusedWindow != window)
@@ -1225,7 +1227,8 @@ nsFocusManager::SetFocusInner(nsIContent* aNewContent, int32_t aFlags,
   // to guard against phishing.
 #ifndef XP_MACOSX
   if (contentToFocus &&
-      nsContentUtils::GetRootDocument(contentToFocus->OwnerDoc())->IsFullScreenDoc() &&
+      nsContentUtils::
+        GetRootDocument(contentToFocus->OwnerDoc())->GetFullscreenElement() &&
       nsContentUtils::HasPluginWithUncontrolledEventDispatch(contentToFocus)) {
     nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
                                     NS_LITERAL_CSTRING("DOM"),
@@ -1626,7 +1629,7 @@ nsFocusManager::Blur(nsPIDOMWindowOuter* aWindowToClear,
       if (aAdjustWidgets && objectFrame && !sTestMode) {
         if (XRE_IsContentProcess()) {
           // set focus to the top level window via the chrome process.
-          nsCOMPtr<nsITabChild> tabChild = do_GetInterface(docShell);
+          nsCOMPtr<nsITabChild> tabChild = docShell->GetTabChild();
           if (tabChild) {
             static_cast<TabChild*>(tabChild.get())->SendDispatchFocusToTopLevelWindow();
           }

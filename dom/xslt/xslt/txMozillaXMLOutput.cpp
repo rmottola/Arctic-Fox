@@ -977,7 +977,7 @@ txTransformNotifier::ScriptEvaluated(nsresult aResult,
 }
 
 NS_IMETHODIMP 
-txTransformNotifier::StyleSheetLoaded(CSSStyleSheet* aSheet,
+txTransformNotifier::StyleSheetLoaded(StyleSheetHandle aSheet,
                                       bool aWasAlternate,
                                       nsresult aStatus)
 {

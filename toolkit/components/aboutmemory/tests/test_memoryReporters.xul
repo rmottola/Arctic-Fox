@@ -155,7 +155,7 @@
     "residentPeak",
     "residentUnique",
     "heapAllocated",
-    "heapOverheadRatio",
+    "heapOverheadFraction",
     "JSMainRuntimeGCHeap",
     "JSMainRuntimeTemporaryPeak",
     "JSMainRuntimeCompartmentsSystem",

@@ -5,8 +5,7 @@
 "use strict";
 
 const {Cc, Ci} = require("chrome");
-
-const { Services } = require("resource://gre/modules/Services.jsm");
+const Services = require("Services");
 
 loader.lazyGetter(this, "osString", () => Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).OS);
 
@@ -61,7 +60,7 @@ exports.Tools = Tools;
 Tools.options = {
   id: "options",
   ordinal: 0,
-  url: "chrome://devtools/content/framework/toolbox-options.xul",
+  url: "chrome://devtools/content/framework/toolbox-options.xhtml",
   icon: "chrome://devtools/skin/images/tool-options.svg",
   invertIconForLightTheme: true,
   bgTheme: "theme-body",
@@ -389,7 +388,7 @@ Tools.scratchpad = {
   commands: "devtools/client/scratchpad/scratchpad-commands",
 
   isTargetSupported: function(target) {
-    return target.isRemote;
+    return target.hasActor("console");
   },
 
   build: function(iframeWindow, toolbox) {

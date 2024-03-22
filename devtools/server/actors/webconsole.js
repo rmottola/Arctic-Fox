@@ -19,6 +19,7 @@ loader.lazyRequireGetter(this, "ConsoleProgressListener", "devtools/shared/webco
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "ServerLoggingListener", "devtools/shared/webconsole/server-logger", true);
 loader.lazyRequireGetter(this, "JSPropertyProvider", "devtools/shared/webconsole/js-property-provider", true);
+loader.lazyRequireGetter(this, "Parser", "resource://devtools/shared/Parser.jsm", true);
 
 for (let name of ["WebConsoleUtils", "ConsoleServiceListener",
     "ConsoleAPIListener", "addWebConsoleCommands",
@@ -84,7 +85,7 @@ function WebConsoleActor(aConnection, aParentActor)
   };
 }
 
-WebConsoleActor.l10n = new WebConsoleUtils.l10n("chrome://global/locale/console.properties");
+WebConsoleActor.l10n = new WebConsoleUtils.L10n("chrome://global/locale/console.properties");
 
 WebConsoleActor.prototype =
 {
@@ -1238,6 +1239,27 @@ WebConsoleActor.prototype =
     }
     else {
       result = dbgWindow.executeInGlobalWithBindings(aString, bindings, evalOptions);
+      // Attempt to initialize any declarations found in the evaluated string
+      // since they may now be stuck in an "initializing" state due to the
+      // error. Already-initialized bindings will be ignored.
+      if ("throw" in result) {
+        let ast;
+        // Parse errors will raise an exception. We can/should ignore the error
+        // since it's already being handled elsewhere and we are only interested
+        // in initializing bindings.
+        try {
+          ast = Parser.reflectionAPI.parse(aString);
+        } catch (ex) {
+          ast = {"body": []};
+        }
+        for (let line of ast.body) {
+          if (line.type == "VariableDeclaration" &&
+            (line.kind == "let" || line.kind == "const")) {
+            for (let decl of line.declarations)
+              dbgWindow.forceLexicalInitializationByName(decl.id.name);
+          }
+        }
+      }
     }
 
     let helperResult = helpers.helperResult;

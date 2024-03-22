@@ -54,6 +54,12 @@ public:
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType);
 
+  // Constructor used for TYPE_DOCUMENT loads with no reasonable loadingNode.
+  LoadInfo(nsPIDOMWindowOuter* aOuterWindow,
+           nsIPrincipal* aLoadingPrincipal,
+           nsIPrincipal* aTriggeringPrincipal,
+           nsSecurityFlags aSecurityFlags);
+
   // create an exact copy of the loadinfo
   already_AddRefed<nsILoadInfo> Clone() const;
   // creates a copy of the loadinfo which is appropriate to use for a
@@ -75,6 +81,8 @@ private:
            nsContentPolicyType aContentPolicyType,
            LoadTainting aTainting,
            bool aUpgradeInsecureRequests,
+           bool aVerifySignedContent,
+           bool aEnforceSRI,
            uint64_t aInnerWindowID,
            uint64_t aOuterWindowID,
            uint64_t aParentOuterWindowID,
@@ -112,6 +120,8 @@ private:
   nsContentPolicyType              mInternalContentPolicyType;
   LoadTainting                     mTainting;
   bool                             mUpgradeInsecureRequests;
+  bool                             mVerifySignedContent;
+  bool                             mEnforceSRI;
   uint64_t                         mInnerWindowID;
   uint64_t                         mOuterWindowID;
   uint64_t                         mParentOuterWindowID;

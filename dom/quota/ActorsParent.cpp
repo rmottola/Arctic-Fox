@@ -918,7 +918,9 @@ private:
 class Quota final
   : public PQuotaParent
 {
-  DebugOnly<bool> mActorDestroyed;
+#ifdef DEBUG
+  bool mActorDestroyed;
+#endif
 
 public:
   Quota();
@@ -1355,7 +1357,7 @@ class MOZ_STACK_CLASS OriginParser final
 
   SchemaType mSchemaType;
   State mState;
-  bool mInMozBrowser;
+  bool mInIsolatedMozBrowser;
   bool mMaybeDriveLetter;
   bool mError;
 
@@ -1367,7 +1369,7 @@ public:
     , mPort()
     , mSchemaType(eNone)
     , mState(eExpectingAppIdOrSchema)
-    , mInMozBrowser(false)
+    , mInIsolatedMozBrowser(false)
     , mMaybeDriveLetter(false)
     , mError(false)
   { }
@@ -2403,6 +2405,10 @@ QuotaObject::MaybeUpdateSize(int64_t aSize, bool aTruncate)
 
   MutexAutoLock lock(quotaManager->mQuotaMutex);
 
+  if (mQuotaCheckDisabled) {
+    return true;
+  }
+
   if (mSize == aSize) {
     return true;
   }
@@ -2576,6 +2582,28 @@ QuotaObject::MaybeUpdateSize(int64_t aSize, bool aTruncate)
   mSize = aSize;
 
   return true;
+}
+
+void
+QuotaObject::DisableQuotaCheck()
+{
+  QuotaManager* quotaManager = QuotaManager::Get();
+  MOZ_ASSERT(quotaManager);
+
+  MutexAutoLock lock(quotaManager->mQuotaMutex);
+
+  mQuotaCheckDisabled = true;
+}
+
+void
+QuotaObject::EnableQuotaCheck()
+{
+  QuotaManager* quotaManager = QuotaManager::Get();
+  MOZ_ASSERT(quotaManager);
+
+  MutexAutoLock lock(quotaManager->mQuotaMutex);
+
+  mQuotaCheckDisabled = false;
 }
 
 /*******************************************************************************
@@ -3773,6 +3801,7 @@ QuotaManager::OpenDirectory(PersistenceType aPersistenceType,
 void
 QuotaManager::OpenDirectoryInternal(Nullable<PersistenceType> aPersistenceType,
                                     const OriginScope& aOriginScope,
+                                    Nullable<Client::Type> aClientType,
                                     bool aExclusive,
                                     OpenDirectoryListener* aOpenListener)
 {
@@ -3783,7 +3812,7 @@ QuotaManager::OpenDirectoryInternal(Nullable<PersistenceType> aPersistenceType,
                         EmptyCString(),
                         aOriginScope,
                         Nullable<bool>(),
-                        Nullable<Client::Type>(),
+                        Nullable<Client::Type>(aClientType),
                         aExclusive,
                         true,
                         aOpenListener);
@@ -5029,6 +5058,7 @@ NormalOriginOperationBase::Open()
 
   QuotaManager::Get()->OpenDirectoryInternal(mPersistenceType,
                                              mOriginScope,
+                                             Nullable<Client::Type>(),
                                              mExclusive,
                                              this);
 }
@@ -5123,7 +5153,9 @@ SaveOriginAccessTimeOp::SendResults()
  ******************************************************************************/
 
 Quota::Quota()
+#ifdef DEBUG
   : mActorDestroyed(false)
+#endif
 {
 }
 
@@ -5150,9 +5182,10 @@ void
 Quota::ActorDestroy(ActorDestroyReason aWhy)
 {
   AssertIsOnBackgroundThread();
+#ifdef DEBUG
   MOZ_ASSERT(!mActorDestroyed);
-
   mActorDestroyed = true;
+#endif
 }
 
 PQuotaUsageRequestParent*
@@ -5711,7 +5744,7 @@ OriginClearOp::DoInitOnMainThread()
     mozilla::BasePrincipal::Cast(principal)->OriginAttributesRef();
 
   nsAutoCString pattern;
-  QuotaManager::GetOriginPatternString(attrs.mAppId, attrs.mInBrowser, origin,
+  QuotaManager::GetOriginPatternString(attrs.mAppId, attrs.mInIsolatedMozBrowser, origin,
                                        pattern);
 
   mOriginScope.SetFromPattern(pattern);
@@ -6264,7 +6297,7 @@ OriginParser::Parse(nsACString& aSpec, PrincipalOriginAttributes* aAttrs)
 
   MOZ_ASSERT(mState == eComplete || mState == eHandledTrailingSeparator);
 
-  *aAttrs = PrincipalOriginAttributes(mAppId, mInMozBrowser);
+  *aAttrs = PrincipalOriginAttributes(mAppId, mInIsolatedMozBrowser);
 
   nsAutoCString spec(mSchema);
 
@@ -6389,9 +6422,9 @@ OriginParser::HandleToken(const nsDependentCSubstring& aToken)
       }
 
       if (aToken.First() == 't') {
-        mInMozBrowser = true;
+        mInIsolatedMozBrowser = true;
       } else if (aToken.First() == 'f') {
-        mInMozBrowser = false;
+        mInIsolatedMozBrowser = false;
       } else {
         QM_WARNING("'%s' is not a valid value for the inMozBrowser flag!",
                    nsCString(aToken).get());

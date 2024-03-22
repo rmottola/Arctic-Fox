@@ -22,7 +22,7 @@
 #include "mozilla/gfx/ScaleFactor.h"    // for ScaleFactor
 #include "mozilla/layers/APZUtils.h"    // for CompleteAsyncTransform
 #include "mozilla/layers/Compositor.h"  // for Compositor
-#include "mozilla/layers/CompositorParent.h" // for CompositorParent, etc
+#include "mozilla/layers/CompositorBridgeParent.h" // for CompositorBridgeParent, etc
 #include "mozilla/layers/LayerAnimationUtils.h" // for TimingFunctionToComputedTimingFunction
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "nsCoord.h"                    // for NSAppUnitsToFloatPixels, etc
@@ -74,14 +74,14 @@ static void
 WalkTheTree(Layer* aLayer,
             bool& aReady,
             const TargetConfig& aTargetConfig,
-            CompositorParent* aCompositor,
+            CompositorBridgeParent* aCompositor,
             bool& aHasRemote,
             bool aWillResolvePlugins,
             bool& aDidResolvePlugins)
 {
   if (RefLayer* ref = aLayer->AsRefLayer()) {
     aHasRemote = true;
-    if (const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(ref->GetReferentId())) {
+    if (const CompositorBridgeParent::LayerTreeState* state = CompositorBridgeParent::GetIndirectShadowTree(ref->GetReferentId())) {
       if (Layer* referent = state->mRoot) {
         if (!ref->GetLocalVisibleRegion().IsEmpty()) {
           dom::ScreenOrientationInternal chromeOrientation = aTargetConfig.orientation();
@@ -131,7 +131,7 @@ AsyncCompositionManager::~AsyncCompositionManager()
 }
 
 void
-AsyncCompositionManager::ResolveRefLayers(CompositorParent* aCompositor,
+AsyncCompositionManager::ResolveRefLayers(CompositorBridgeParent* aCompositor,
                                           bool* aHasRemoteContent,
                                           bool* aResolvePlugins)
 {
@@ -174,7 +174,7 @@ AsyncCompositionManager::DetachRefLayers()
   if (!mLayerManager->GetRoot()) {
     return;
   }
-  CompositorParent* dummy = nullptr;
+  CompositorBridgeParent* dummy = nullptr;
   bool ignored = false;
   WalkTheTree<Detach>(mLayerManager->GetRoot(),
                       mReadyForCompose,
@@ -583,12 +583,12 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
     }
 
     TimingParams timing;
-    timing.mDuration.SetAsUnrestrictedDouble() =
-      animation.duration().ToMilliseconds();
+    timing.mDuration.emplace(animation.duration());
     // Currently animations run on the compositor have their delay factored
     // into their start time, hence the delay is effectively zero.
     timing.mDelay = TimeDuration(0);
     timing.mIterations = animation.iterations();
+    timing.mIterationStart = animation.iterationStart();
     timing.mDirection =
       static_cast<dom::PlaybackDirection>(animation.direction());
     // Animations typically only run on the compositor during their active
@@ -679,7 +679,7 @@ void
 AsyncCompositionManager::RecordShadowTransforms(Layer* aLayer)
 {
   MOZ_ASSERT(gfxPrefs::CollectScrollTransforms());
-  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
+  MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
 
   for (Layer* child = aLayer->GetFirstChild();
       child; child = child->GetNextSibling()) {
@@ -832,7 +832,7 @@ AsyncCompositionManager::ApplyAsyncContentTransformToTree(Layer *aLayer,
   // async transformed for async scrolls of this scroll frame's ancestor
   // scroll frames, not for async scrolls of this scroll frame itself.
   // In the loop below, we iterate over scroll frames from inside to outside.
-  // At each iteration, this array contains the layer's ancestor mask layers 
+  // At each iteration, this array contains the layer's ancestor mask layers
   // of all scroll frames inside the current one.
   nsTArray<Layer*> ancestorMaskLayers;
 
@@ -1363,7 +1363,7 @@ AsyncCompositionManager::TransformScrollableLayer(Layer* aLayer)
 void
 AsyncCompositionManager::GetFrameUniformity(FrameUniformityData* aOutData)
 {
-  MOZ_ASSERT(CompositorParent::IsInCompositorThread());
+  MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
   mLayerTransformRecorder.EndTest(aOutData);
 }
 

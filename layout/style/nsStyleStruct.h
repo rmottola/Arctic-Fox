@@ -582,7 +582,7 @@ struct nsStyleImageLayers {
                                   // This property is used for mask layer only.
                                   // For a background layer, it should always
                                   // be the initial value, which is
-                                  // NS_STYLE_MASK_MODE_AUTO.
+                                  // NS_STYLE_MASK_MODE_MATCH_SOURCE.
     Repeat        mRepeat;        // [reset] See nsStyleConsts.h
 
     // Initializes only mImage
@@ -1766,6 +1766,13 @@ struct nsStyleTextReset
     this->~nsStyleTextReset();
     aContext->PresShell()->
       FreeByObjectID(mozilla::eArenaObjectID_nsStyleTextReset, this);
+  }
+
+  // Note the difference between this and
+  // nsStyleContext::HasTextDecorationLines.
+  bool HasTextDecorationLines() const {
+    return mTextDecorationLine != NS_STYLE_TEXT_DECORATION_LINE_NONE &&
+           mTextDecorationLine != NS_STYLE_TEXT_DECORATION_LINE_OVERRIDE_ALL;
   }
 
   uint8_t GetDecorationStyle() const

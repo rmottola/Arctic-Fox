@@ -29,7 +29,7 @@
 #include "BluetoothProfileController.h"
 #include "BluetoothReplyRunnable.h"
 #include "BluetoothUtils.h"
-#include "BluetoothUuid.h"
+#include "BluetoothUuidHelper.h"
 #include "mozilla/dom/bluetooth/BluetoothTypes.h"
 #include "mozilla/ipc/SocketBase.h"
 #include "mozilla/StaticMutex.h"
@@ -2250,19 +2250,7 @@ BluetoothServiceBluedroid::RemoteDevicePropertiesNotification(
       }
 
       // Handler for |FetchUuidsInternal|
-
-      nsTArray<nsString> uuids;
-
-      // Construct a sorted uuid set
-      for (index = 0; index < p.mUuidArray.Length(); ++index) {
-        nsAutoString uuid;
-        UuidToString(p.mUuidArray[index], uuid);
-
-        if (!uuids.Contains(uuid)) { // filter out duplicate uuids
-          uuids.InsertElementSorted(uuid);
-        }
-      }
-      AppendNamedValue(propertiesArray, "UUIDs", uuids);
+      AppendNamedValue(propertiesArray, "UUIDs", p.mUuidArray);
 
     } else if (p.mType == PROPERTY_TYPE_OF_DEVICE) {
       AppendNamedValue(propertiesArray, "Type",
@@ -2370,18 +2358,7 @@ BluetoothServiceBluedroid::DeviceFoundNotification(
       AppendNamedValue(propertiesArray, "Cod", p.mUint32);
 
     } else if (p.mType == PROPERTY_UUIDS) {
-      nsTArray<nsString> uuids;
-
-      // Construct a sorted uuid set
-      for (uint32_t index = 0; index < p.mUuidArray.Length(); ++index) {
-        nsAutoString uuid;
-        UuidToString(p.mUuidArray[index], uuid);
-
-        if (!uuids.Contains(uuid)) { // filter out duplicate uuids
-          uuids.InsertElementSorted(uuid);
-        }
-      }
-      AppendNamedValue(propertiesArray, "UUIDs", uuids);
+      AppendNamedValue(propertiesArray, "UUIDs", p.mUuidArray);
 
     } else if (p.mType == PROPERTY_TYPE_OF_DEVICE) {
       AppendNamedValue(propertiesArray, "Type",
@@ -2646,6 +2623,7 @@ BluetoothServiceBluedroid::BackendErrorNotification(bool aCrashed)
    * Reset following profile manager states for unexpected backend crash.
    * - HFP: connection state and audio state
    * - A2DP: connection state
+   * - HID: connection state
    */
   BluetoothHfpManager* hfp = BluetoothHfpManager::Get();
   NS_ENSURE_TRUE_VOID(hfp);
@@ -2653,6 +2631,9 @@ BluetoothServiceBluedroid::BackendErrorNotification(bool aCrashed)
   BluetoothA2dpManager* a2dp = BluetoothA2dpManager::Get();
   NS_ENSURE_TRUE_VOID(a2dp);
   a2dp->HandleBackendError();
+  BluetoothHidManager* hid = BluetoothHidManager::Get();
+  NS_ENSURE_TRUE_VOID(hid);
+  hid->HandleBackendError();
 
   mIsRestart = true;
   BT_LOGR("Recovery step2: stop bluetooth");

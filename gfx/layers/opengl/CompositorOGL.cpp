@@ -629,6 +629,7 @@ void
 CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
                           const Rect *aClipRectIn,
                           const Rect& aRenderBounds,
+                          bool aOpaque,
                           Rect *aClipRectOut,
                           Rect *aRenderBoundsOut)
 {
@@ -867,7 +868,8 @@ CompositorOGL::GetShaderConfigFor(Effect *aEffect,
     MOZ_ASSERT_IF(source->GetTextureTarget() == LOCAL_GL_TEXTURE_RECTANGLE_ARB,
                   source->GetFormat() == gfx::SurfaceFormat::R8G8B8A8 ||
                   source->GetFormat() == gfx::SurfaceFormat::R8G8B8X8 ||
-                  source->GetFormat() == gfx::SurfaceFormat::R5G6B5_UINT16);
+                  source->GetFormat() == gfx::SurfaceFormat::R5G6B5_UINT16 ||
+                  source->GetFormat() == gfx::SurfaceFormat::YUV422 );
     config = ShaderConfigFromTargetAndFormat(source->GetTextureTarget(),
                                              source->GetFormat());
     if (!texturedEffect->mPremultiplied) {
@@ -877,8 +879,7 @@ CompositorOGL::GetShaderConfigFor(Effect *aEffect,
   }
   }
   config.SetColorMatrix(aColorMatrix);
-  config.SetMask2D(aMask == MaskType::Mask2d);
-  config.SetMask3D(aMask == MaskType::Mask3d);
+  config.SetMask(aMask == MaskType::Mask);
   config.SetDEAA(aDEAAEnabled);
   config.SetCompositionOp(aOp);
   return config;
@@ -1068,9 +1069,7 @@ CompositorOGL::DrawQuad(const Rect& aRect,
     maskQuadTransform._41 = float(-bounds.x)/bounds.width;
     maskQuadTransform._42 = float(-bounds.y)/bounds.height;
 
-    maskType = effectMask->mIs3D
-                 ? MaskType::Mask3d
-                 : MaskType::Mask2d;
+    maskType = MaskType::Mask;
   } else {
     maskType = MaskType::MaskNone;
   }

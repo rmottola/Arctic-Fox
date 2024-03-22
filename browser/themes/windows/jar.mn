@@ -134,7 +134,6 @@ browser.jar:
 * skin/classic/browser/preferences/preferences.css             (preferences/preferences.css)
   skin/classic/browser/preferences/applications.css            (preferences/applications.css)
   skin/classic/browser/preferences/aboutPermissions.css        (preferences/aboutPermissions.css)
-#ifdef MOZ_BROWSER_STATUSBAR
   skin/classic/browser/statusbar/dynamic.css                   (../shared/statusbar/dynamic.css)
 * skin/classic/browser/statusbar/overlay.css                   (statusbar/overlay.css)
 * skin/classic/browser/statusbar/prefs.css                     (statusbar/prefs.css)
@@ -143,7 +142,6 @@ browser.jar:
   skin/classic/browser/statusbar/pms24.png                     (../shared/statusbar/pms24.png)
   skin/classic/browser/statusbar/throbber-idle.png             (../shared/statusbar/throbber-idle.png)
   skin/classic/browser/statusbar/throbberStatic.png            (../shared/statusbar/throbberStatic.png)
-#endif
   skin/classic/browser/tabbrowser/alltabs.png                  (tabbrowser/alltabs.png)
   skin/classic/browser/tabbrowser/alltabs-inverted.png         (tabbrowser/alltabs-inverted.png)
   skin/classic/browser/tabbrowser/newtab.png                   (tabbrowser/newtab.png)

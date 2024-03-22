@@ -393,8 +393,7 @@ var DebuggerServer = {
         type: { global: true }
       });
     }
-    let win = Services.wm.getMostRecentWindow(DebuggerServer.chromeWindowType);
-    if (win && win.navigator.mozSettings) {
+    if (Services.prefs.getBoolPref("dom.mozSettings.enabled")) {
       this.registerModule("devtools/server/actors/settings", {
         prefix: "settings",
         constructor: "SettingsActor",
@@ -993,6 +992,13 @@ var DebuggerServer = {
     // provides hook to actor modules that need to exchange messages
     // between e10s parent and child processes
     let onSetupInParent = function (msg) {
+      // We may have multiple connectToChild instance running for the same tab
+      // and need to filter the messages. Also the DebuggerServerConnection's
+      // prefix has an additional '/' and the end, so use `includes`.
+      if (!msg.json.prefix.includes(prefix)) {
+        return;
+      }
+
       let { module, setupParent } = msg.json;
       let m, fn;
 
@@ -1059,7 +1065,11 @@ var DebuggerServer = {
         aConnection.cancelForwarding(prefix);
 
         // ... and notify the child process to clean the tab actors.
-        mm.sendAsyncMessage("debug:disconnect", { prefix: prefix });
+        try {
+          // Bug 1169643: Ignore any exception as the child process
+          // may already be destroyed by now.
+          mm.sendAsyncMessage("debug:disconnect", { prefix: prefix });
+        } catch(e) {}
       } else {
         // Otherwise, the app has been closed before the actor
         // had a chance to be created, so we are not able to create
@@ -1776,7 +1786,7 @@ DebuggerServerConnection.prototype = {
    * @return boolean
    *         true if the setup helper returned successfully
    */
-  setupInParent: function({ conn, module, setupParent }) {
+  setupInParent: function({ module, setupParent }) {
     if (!this.parentMessageManager) {
       return false;
     }
@@ -1784,6 +1794,7 @@ DebuggerServerConnection.prototype = {
     let { sendSyncMessage } = this.parentMessageManager;
 
     return sendSyncMessage("debug:setup-in-parent", {
+      prefix: this.prefix,
       module: module,
       setupParent: setupParent
     });

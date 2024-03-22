@@ -81,6 +81,7 @@ class RTCCertificate;
 struct RTCConfiguration;
 struct RTCIceServer;
 struct RTCOfferOptions;
+struct RTCRtpParameters;
 #ifdef USE_FAKE_MEDIA_STREAMS
 typedef Fake_MediaStreamTrack MediaStreamTrack;
 #else
@@ -156,12 +157,11 @@ public:
   bool addStunServer(const std::string& addr, uint16_t port,
                      const char* transport)
   {
-    NrIceStunServer* server(NrIceStunServer::Create(addr, port, transport));
+    UniquePtr<NrIceStunServer> server(NrIceStunServer::Create(addr, port, transport));
     if (!server) {
       return false;
     }
     addStunServer(*server);
-    delete server;
     return true;
   }
   bool addTurnServer(const std::string& addr, uint16_t port,
@@ -173,13 +173,12 @@ public:
     // username and password. Bug # ???
     std::vector<unsigned char> password(pwd.begin(), pwd.end());
 
-    NrIceTurnServer* server(NrIceTurnServer::Create(addr, port, username, password,
-                                                    transport));
+    UniquePtr<NrIceTurnServer> server(NrIceTurnServer::Create(addr, port, username, password,
+							      transport));
     if (!server) {
       return false;
     }
     addTurnServer(*server);
-    delete server;
     return true;
   }
   void addStunServer(const NrIceStunServer& server) { mStunServers.push_back (server); }
@@ -441,6 +440,37 @@ public:
                                mozilla::dom::MediaStreamTrack& aWithTrack)
   {
     rv = ReplaceTrack(aThisTrack, aWithTrack);
+  }
+
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  NS_IMETHODIMP_TO_ERRORRESULT(SetParameters, ErrorResult &rv,
+                               dom::MediaStreamTrack& aTrack,
+                               const dom::RTCRtpParameters& aParameters)
+  {
+    rv = SetParameters(aTrack, aParameters);
+  }
+
+  NS_IMETHODIMP_TO_ERRORRESULT(GetParameters, ErrorResult &rv,
+                               dom::MediaStreamTrack& aTrack,
+                               dom::RTCRtpParameters& aOutParameters)
+  {
+    rv = GetParameters(aTrack, aOutParameters);
+  }
+#endif
+
+  nsresult
+  SetParameters(dom::MediaStreamTrack& aTrack,
+                const std::vector<JsepTrack::JsConstraints>& aConstraints);
+
+  nsresult
+  GetParameters(dom::MediaStreamTrack& aTrack,
+                std::vector<JsepTrack::JsConstraints>* aOutConstraints);
+
+  NS_IMETHODIMP_TO_ERRORRESULT(SelectSsrc, ErrorResult &rv,
+                               dom::MediaStreamTrack& aRecvTrack,
+                               unsigned short aSsrcIndex)
+  {
+    rv = SelectSsrc(aRecvTrack, aSsrcIndex);
   }
 
   nsresult GetPeerIdentity(nsAString& peerIdentity)

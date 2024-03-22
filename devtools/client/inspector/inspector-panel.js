@@ -8,8 +8,7 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 
-Cu.import("resource://gre/modules/Services.jsm");
-
+var Services = require("Services");
 var promise = require("promise");
 var EventEmitter = require("devtools/shared/event-emitter");
 var clipboard = require("sdk/clipboard");
@@ -36,7 +35,7 @@ loader.lazyGetter(this, "clipboardHelper", () => {
   return Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper);
 });
 
-loader.lazyImporter(this, "CommandUtils", "resource://devtools/client/shared/DeveloperToolbar.jsm");
+loader.lazyRequireGetter(this, "CommandUtils", "devtools/client/shared/developer-toolbar", true);
 
 /**
  * Represents an open instance of the Inspector for a tab.
@@ -1035,7 +1034,7 @@ InspectorPanel.prototype = {
       let jsterm = panel.hud.jsterm;
 
       jsterm.execute("inspect($0)");
-      jsterm.inputNode.focus();
+      jsterm.focus();
     });
   },
 

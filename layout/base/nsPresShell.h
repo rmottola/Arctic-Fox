@@ -29,13 +29,14 @@
 #include "nsCRT.h"
 #include "nsAutoPtr.h"
 #include "nsIWidget.h"
-#include "nsStyleSet.h"
 #include "nsContentUtils.h" // For AddScriptBlocker().
 #include "nsRefreshDriver.h"
 #include "TouchManager.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/UniquePtr.h"
 #include "MobileViewportManager.h"
 #include "ZoomConstraintsClient.h"
 
@@ -51,8 +52,14 @@ class nsPresShellEventCB;
 class nsAutoCauseReflowNotifier;
 
 namespace mozilla {
-class CSSStyleSheet;
+
 class EventDispatchingCallback;
+
+// A hash table type for tracking visible regions, for use by the visibility
+// code in PresShell. The mapping is from view IDs to regions in the
+// coordinate system of that view's scrolled frame.
+typedef nsClassHashtable<nsUint64HashKey, mozilla::CSSIntRegion> VisibleRegions;
+
 } // namespace mozilla
 
 // 250ms.  This is actually pref-controlled, but we use this value if we fail
@@ -65,6 +72,9 @@ class PresShell final : public nsIPresShell,
                         public nsIObserver,
                         public nsSupportsWeakReference
 {
+  template <typename T> using Maybe = mozilla::Maybe<T>;
+  using VisibleRegions = mozilla::VisibleRegions;
+
 public:
   PresShell();
 
@@ -79,7 +89,7 @@ public:
   static bool BeforeAfterKeyboardEventEnabled();
 
   void Init(nsIDocument* aDocument, nsPresContext* aPresContext,
-            nsViewManager* aViewManager, nsStyleSet* aStyleSet);
+            nsViewManager* aViewManager, mozilla::StyleSetHandle aStyleSet);
   virtual void Destroy() override;
   virtual void MakeZombie() override;
 
@@ -155,12 +165,12 @@ public:
   virtual void UnsuppressPainting() override;
 
   virtual nsresult GetAgentStyleSheets(
-      nsTArray<RefPtr<mozilla::CSSStyleSheet>>& aSheets) override;
+      nsTArray<mozilla::StyleSheetHandle::RefPtr>& aSheets) override;
   virtual nsresult SetAgentStyleSheets(
-      const nsTArray<RefPtr<mozilla::CSSStyleSheet>>& aSheets) override;
+      const nsTArray<mozilla::StyleSheetHandle::RefPtr>& aSheets) override;
 
-  virtual nsresult AddOverrideStyleSheet(mozilla::CSSStyleSheet* aSheet) override;
-  virtual nsresult RemoveOverrideStyleSheet(mozilla::CSSStyleSheet* aSheet) override;
+  virtual nsresult AddOverrideStyleSheet(mozilla::StyleSheetHandle aSheet) override;
+  virtual nsresult RemoveOverrideStyleSheet(mozilla::StyleSheetHandle aSheet) override;
 
   virtual nsresult HandleEventWithTarget(
                                  mozilla::WidgetEvent* aEvent,
@@ -375,7 +385,8 @@ public:
   virtual void ScheduleImageVisibilityUpdate() override;
 
   virtual void RebuildImageVisibilityDisplayList(const nsDisplayList& aList) override;
-  virtual void RebuildImageVisibility(nsRect* aRect = nullptr) override;
+  virtual void RebuildImageVisibility(nsRect* aRect = nullptr,
+                                      bool aRemoveOnly = false) override;
 
   virtual void EnsureImageInVisibleList(nsIImageLoadingContent* aImage) override;
 
@@ -390,6 +401,10 @@ public:
                                           bool aEmbeddedCancelled) override;
 
   void SetNextPaintCompressed() { mNextPaintCompressed = true; }
+
+  void ReportAnyBadState();
+
+  void SetInImageVisibility(bool aState);
 
 protected:
   virtual ~PresShell();
@@ -463,7 +478,7 @@ protected:
       : mResolution(aPresShell->mResolution)
       , mRenderFlags(aPresShell->mRenderFlags)
     { }
-    mozilla::Maybe<float> mResolution;
+    Maybe<float> mResolution;
     RenderFlags mRenderFlags;
   };
 
@@ -503,7 +518,7 @@ protected:
   void ShowEventTargetDebug();
 #endif
 
-  void RecordStyleSheetChange(mozilla::CSSStyleSheet* aStyleSheet);
+  void RecordStyleSheetChange(mozilla::StyleSheetHandle aStyleSheet);
 
   void RemovePreferenceStyles();
 
@@ -517,9 +532,10 @@ protected:
 
   // create a RangePaintInfo for the range aRange containing the
   // display list needed to paint the range to a surface
-  RangePaintInfo* CreateRangePaintInfo(nsIDOMRange* aRange,
-                                       nsRect& aSurfaceRect,
-                                       bool aForPrimarySelection);
+  mozilla::UniquePtr<RangePaintInfo>
+  CreateRangePaintInfo(nsIDOMRange* aRange,
+                       nsRect& aSurfaceRect,
+                       bool aForPrimarySelection);
 
   /*
    * Paint the items to a new surface and return it.
@@ -534,7 +550,7 @@ protected:
    *          be set if a custom image was specified
    */
   already_AddRefed<SourceSurface>
-  PaintRangePaintInfo(nsTArray<nsAutoPtr<RangePaintInfo> >* aItems,
+  PaintRangePaintInfo(const nsTArray<mozilla::UniquePtr<RangePaintInfo>>& aItems,
                       nsISelection* aSelection,
                       nsIntRegion* aRegion,
                       nsRect aArea,
@@ -727,14 +743,19 @@ protected:
   virtual void ResumePainting() override;
 
   void UpdateImageVisibility();
+  void DoUpdateImageVisibility(bool aRemoveOnly);
   void UpdateActivePointerState(mozilla::WidgetGUIEvent* aEvent);
 
   nsRevocableEventPtr<nsRunnableMethod<PresShell> > mUpdateImageVisibilityEvent;
 
   void ClearVisibleImagesList(uint32_t aNonvisibleAction);
   static void ClearImageVisibilityVisited(nsView* aView, bool aClear);
-  static void MarkImagesInListVisible(const nsDisplayList& aList);
-  void MarkImagesInSubtreeVisible(nsIFrame* aFrame, const nsRect& aRect);
+  static void MarkImagesInListVisible(const nsDisplayList& aList,
+                                      Maybe<VisibleRegions>& aVisibleRegions);
+  void MarkImagesInSubtreeVisible(nsIFrame* aFrame,
+                                  const nsRect& aRect,
+                                  Maybe<VisibleRegions>& aVisibleRegions,
+                                  bool aRemoveOnly = false);
 
   // Methods for dispatching KeyboardEvent and BeforeAfterKeyboardEvent.
   void HandleKeyboardEvent(nsINode* aTarget,
@@ -779,9 +800,13 @@ protected:
   // over our window or there is no last observed mouse location for some
   // reason.
   nsPoint                   mMouseLocation;
+  // This is an APZ state variable that tracks the target guid for the last
+  // mouse event that was processed (corresponding to mMouseLocation). This is
+  // needed for the synthetic mouse events.
+  mozilla::layers::ScrollableLayerGuid mMouseEventTargetGuid;
 
   // mStyleSet owns it but we maintain a ref, may be null
-  RefPtr<mozilla::CSSStyleSheet> mPrefStyleSheet;
+  mozilla::StyleSheetHandle::RefPtr mPrefStyleSheet;
 
   // Set of frames that we should mark with NS_FRAME_HAS_DIRTY_CHILDREN after
   // we finish reflowing mCurrentReflowRoot.
@@ -878,6 +903,8 @@ protected:
 
   // Whether the widget has received a paint message yet.
   bool                      mHasReceivedPaintMessage : 1;
+
+  bool                      mInImageVisibility : 1;
 
   static bool               sDisableNonTestMouseEvents;
 };

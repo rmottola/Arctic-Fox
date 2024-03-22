@@ -7,7 +7,6 @@ from __future__ import absolute_import, unicode_literals
 import logging
 import os
 import re
-import types
 
 from collections import (
     defaultdict,
@@ -36,14 +35,12 @@ from ..frontend.data import (
     AndroidExtraResDirs,
     AndroidExtraPackages,
     AndroidEclipseProjectData,
-    BrandingFiles,
     ChromeManifestEntry,
     ConfigFileSubstitution,
     ContextDerived,
     ContextWrapped,
     Defines,
     DirectoryTraversal,
-    Exports,
     ExternalLibrary,
     FinalTargetFiles,
     FinalTargetPreprocessedFiles,
@@ -65,7 +62,6 @@ from ..frontend.data import (
     SimpleProgram,
     Sources,
     StaticLibrary,
-    TestHarnessFiles,
     TestManifest,
     VariablePassthru,
     XPIDLFile,
@@ -509,26 +505,28 @@ class RecursiveMakeBackend(CommonBackend):
             self._process_defines(obj, backend_file)
 
         elif isinstance(obj, GeneratedFile):
-            self._no_skip['export'].add(backend_file.relobjdir)
-            dep_file = "%s.pp" % obj.output
-            backend_file.write('export:: %s\n' % obj.output)
-            backend_file.write('GARBAGE += %s\n' % obj.output)
+            tier = 'misc' if any(isinstance(f, ObjDirPath) for f in obj.inputs) else 'export'
+            self._no_skip[tier].add(backend_file.relobjdir)
+            first_output = obj.outputs[0]
+            dep_file = "%s.pp" % first_output
+            backend_file.write('%s:: %s\n' % (tier, first_output))
+            for output in obj.outputs:
+                if output != first_output:
+                    backend_file.write('%s: %s ;\n' % (output, first_output))
+                backend_file.write('GARBAGE += %s\n' % output)
             backend_file.write('EXTRA_MDDEPEND_FILES += %s\n' % dep_file)
             if obj.script:
                 backend_file.write("""{output}: {script}{inputs}{backend}
 \t$(REPORT_BUILD)
 \t$(call py_action,file_generate,{script} {method} {output} $(MDDEPDIR)/{dep_file}{inputs}{flags})
 
-""".format(output=obj.output,
+""".format(output=first_output,
            dep_file=dep_file,
-           inputs=' ' + ' '.join(obj.inputs) if obj.inputs else '',
+           inputs=' ' + ' '.join([f.full_path for f in obj.inputs]) if obj.inputs else '',
            flags=' ' + ' '.join(obj.flags) if obj.flags else '',
            backend=' backend.mk' if obj.flags else '',
            script=obj.script,
            method=obj.method))
-
-        elif isinstance(obj, TestHarnessFiles):
-            self._process_test_harness_files(obj, backend_file)
 
         elif isinstance(obj, JARManifest):
             self._no_skip['libs'].add(backend_file.relobjdir)
@@ -909,29 +907,6 @@ class RecursiveMakeBackend(CommonBackend):
             defines = ' '.join(shell_quote(d) for d in defines)
             backend_file.write_once('%s += %s\n' % (which, defines))
 
-    def _process_test_harness_files(self, obj, backend_file):
-        for path, files in obj.srcdir_files.iteritems():
-            for source in files:
-                dest = '%s/%s' % (path, mozpath.basename(source))
-                self._install_manifests['_tests'].add_symlink(source, dest)
-
-        for path, patterns in obj.srcdir_pattern_files.iteritems():
-            for p in patterns:
-                self._install_manifests['_tests'].add_pattern_symlink(p[0], p[1], path)
-
-        for path, files in obj.objdir_files.iteritems():
-            self._no_skip['misc'].add(backend_file.relobjdir)
-            prefix = 'TEST_HARNESS_%s' % path.replace('/', '_')
-            backend_file.write("""
-%(prefix)s_FILES := %(files)s
-%(prefix)s_DEST := %(dest)s
-%(prefix)s_TARGET := misc
-INSTALL_TARGETS += %(prefix)s
-""" % { 'prefix': prefix,
-        'dest': '$(DEPTH)/_tests/%s' % path,
-        'files': ' '.join(mozpath.relpath(f, backend_file.objdir)
-                          for f in files) })
-
     def _process_installation_target(self, obj, backend_file):
         # A few makefiles need to be able to override the following rules via
         # make XPI_NAME=blah commands, so we default to the lazy evaluation as
@@ -1244,6 +1219,7 @@ INSTALL_TARGETS += %(prefix)s
             '_tests',
             'dist/include',
             'dist/branding',
+            'dist/sdk',
         ))
         if not path:
             raise Exception("Cannot install to " + target)
@@ -1268,17 +1244,27 @@ INSTALL_TARGETS += %(prefix)s
                 assert not isinstance(f, RenamedSourcePath)
                 dest = mozpath.join(reltarget, path, f.target_basename)
                 if not isinstance(f, ObjDirPath):
-                    install_manifest.add_symlink(f.full_path, dest)
+                    if '*' in f:
+                        if not isinstance(f, SourcePath):
+                            raise Exception("Wildcards are only supported in "
+                                            "SourcePath objects in %s. Path is: %s" % (
+                                                type(obj), f
+                                            ))
+                        install_manifest.add_pattern_symlink(f.srcdir, f, path)
+                    else:
+                        install_manifest.add_symlink(f.full_path, dest)
                 else:
                     install_manifest.add_optional_exists(dest)
                     backend_file.write('%s_FILES += %s\n' % (
                         target_var, self._pretty_path(f, backend_file)))
                     have_objdir_files = True
             if have_objdir_files:
+                tier = 'export' if obj.install_target == 'dist/include' else 'misc'
+                self._no_skip[tier].add(backend_file.relobjdir)
                 backend_file.write('%s_DEST := $(DEPTH)/%s\n'
                                    % (target_var,
                                       mozpath.join(target, path)))
-                backend_file.write('%s_TARGET := export\n' % target_var)
+                backend_file.write('%s_TARGET := %s\n' % (target_var, tier))
                 backend_file.write('INSTALL_TARGETS += %s\n' % target_var)
 
     def _process_final_target_pp_files(self, obj, files, backend_file):

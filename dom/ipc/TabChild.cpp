@@ -33,7 +33,7 @@
 #include "mozilla/layers/APZCCallbackHelper.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/APZEventState.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/DoubleTapToZoom.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/InputAPZContext.h"
@@ -109,6 +109,7 @@
 #include "nsIScriptError.h"
 #include "mozilla/EventForwards.h"
 #include "nsDeviceContext.h"
+#include "FrameLayerBuilder.h"
 
 #define BROWSER_ELEMENT_CHILD_SCRIPT \
     NS_LITERAL_STRING("chrome://global/content/BrowserElementChild.js")
@@ -548,7 +549,7 @@ TabChild::Create(nsIContentChild* aManager,
 {
     if (sPreallocatedTab &&
         sPreallocatedTab->mChromeFlags == aChromeFlags &&
-        aContext.IsBrowserOrApp()) {
+        aContext.IsMozBrowserOrApp()) {
 
         RefPtr<TabChild> child = sPreallocatedTab.get();
         sPreallocatedTab = nullptr;
@@ -592,6 +593,7 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mIPCOpen(true)
   , mParentIsActive(false)
   , mDidSetRealShowInfo(false)
+  , mDidLoadURLInit(false)
   , mAPZChild(nullptr)
 {
   // In the general case having the TabParent tell us if APZ is enabled or not
@@ -840,6 +842,9 @@ TabChild::Init()
     do_QueryInterface(window->GetChromeEventHandler());
   docShell->SetChromeEventHandler(chromeHandler);
 
+  nsContentUtils::SetScrollbarsVisibility(window->GetDocShell(),
+    !!(mChromeFlags & nsIWebBrowserChrome::CHROME_SCROLLBARS));
+
   nsWeakPtr weakPtrThis = do_GetWeakReference(static_cast<nsITabChild*>(this));  // for capture by the lambda
   ContentReceivedInputBlockCallback callback(
       [weakPtrThis](const ScrollableLayerGuid& aGuid,
@@ -858,22 +863,19 @@ TabChild::Init()
 void
 TabChild::NotifyTabContextUpdated()
 {
-    nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
-    MOZ_ASSERT(docShell);
+  nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
+  MOZ_ASSERT(docShell);
 
-    if (docShell) {
-        // nsDocShell will do the right thing if we pass NO_APP_ID or
-        // UNKNOWN_APP_ID for aOwnOrContainingAppId.
-        if (IsBrowserElement()) {
-          docShell->SetIsBrowserInsideApp(BrowserOwnerAppId());
-        } else {
-          docShell->SetIsApp(OwnAppId());
-        }
+  if (!docShell) {
+    return;
+  }
 
-        OriginAttributes attrs = OriginAttributesRef();
-        docShell->SetIsSignedPackage(attrs.mSignedPkg);
-        docShell->SetUserContextId(attrs.mUserContextId);
-    }
+  docShell->SetFrameType(IsMozBrowserElement() ?
+                           nsIDocShell::FRAME_TYPE_BROWSER :
+                           HasOwnApp() ?
+                             nsIDocShell::FRAME_TYPE_APP :
+                             nsIDocShell::FRAME_TYPE_REGULAR);
+  nsDocShell::Cast(docShell)->SetOriginAttributes(OriginAttributesRef());
 }
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(TabChild)
@@ -1109,7 +1111,7 @@ TabChild::ProvideWindow(mozIDOMWindowProxy* aParent,
     // isn't a request to open a modal-type window, we're going to create a new
     // <iframe mozbrowser/mozapp> and return its window here.
     nsCOMPtr<nsIDocShell> docshell = do_GetInterface(aParent);
-    bool iframeMoz = (docshell && docshell->GetIsInBrowserOrApp() &&
+    bool iframeMoz = (docshell && docshell->GetIsInMozBrowserOrApp() &&
                       !(aChromeFlags & (nsIWebBrowserChrome::CHROME_MODAL |
                                         nsIWebBrowserChrome::CHROME_OPENAS_DIALOG |
                                         nsIWebBrowserChrome::CHROME_OPENAS_CHROME)));
@@ -1212,7 +1214,7 @@ TabChild::ActorDestroy(ActorDestroyReason why)
     mTabChildGlobal->mMessageManager = nullptr;
   }
 
-  CompositorChild* compositorChild = static_cast<CompositorChild*>(CompositorChild::Get());
+  CompositorBridgeChild* compositorChild = static_cast<CompositorBridgeChild*>(CompositorBridgeChild::Get());
   compositorChild->CancelNotifyAfterRemotePaint(this);
 
   if (GetTabId() != 0) {
@@ -1277,6 +1279,8 @@ TabChild::RecvLoadURL(const nsCString& aURI,
                       const BrowserConfiguration& aConfiguration,
                       const ShowInfo& aInfo)
 {
+  if (!mDidLoadURLInit) {
+    mDidLoadURLInit = true;
     if (!InitTabChildGlobal()) {
       return false;
     }
@@ -1288,44 +1292,21 @@ TabChild::RecvLoadURL(const nsCString& aURI,
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
     MOZ_ASSERT(swm);
     swm->LoadRegistrations(aConfiguration.serviceWorkerRegistrations());
+  }
 
-    nsresult rv = WebNavigation()->LoadURI(NS_ConvertUTF8toUTF16(aURI).get(),
-                                           nsIWebNavigation::LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |
-                                           nsIWebNavigation::LOAD_FLAGS_DISALLOW_INHERIT_OWNER,
-                                           nullptr, nullptr, nullptr);
-    if (NS_FAILED(rv)) {
-        NS_WARNING("WebNavigation()->LoadURI failed. Eating exception, what else can I do?");
-    }
+  nsresult rv =
+    WebNavigation()->LoadURI(NS_ConvertUTF8toUTF16(aURI).get(),
+                             nsIWebNavigation::LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP |
+                             nsIWebNavigation::LOAD_FLAGS_DISALLOW_INHERIT_OWNER,
+                             nullptr, nullptr, nullptr);
+  if (NS_FAILED(rv)) {
+      NS_WARNING("WebNavigation()->LoadURI failed. Eating exception, what else can I do?");
+  }
 
 #ifdef MOZ_CRASHREPORTER
-    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("URL"), aURI);
+  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("URL"), aURI);
 #endif
 
-    return true;
-}
-
-bool
-TabChild::RecvOpenURI(const URIParams& aURI, const uint32_t& aFlags)
-{
-  nsCOMPtr<nsIURI> uri = DeserializeURI(aURI);
-  nsCOMPtr<nsIChannel> channel;
-  nsresult rv =
-    NS_NewChannel(getter_AddRefs(channel),
-                  uri,
-                  nsContentUtils::GetSystemPrincipal(),
-                  nsILoadInfo::SEC_NORMAL,
-                  nsIContentPolicy::TYPE_DOCUMENT);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return true;
-  }
-
-  nsCOMPtr<nsIURILoader> loader = do_GetService("@mozilla.org/uriloader;1");
-  if (NS_WARN_IF(!loader)) {
-    return true;
-  }
-
-  nsCOMPtr<nsIInterfaceRequestor> context(do_QueryInterface(WebNavigation()));
-  loader->OpenURI(channel, aFlags, context);
   return true;
 }
 
@@ -1482,7 +1463,7 @@ TabChild::DoFakeShow(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
                      PRenderFrameChild* aRenderFrame, const ShowInfo& aShowInfo)
 {
   RecvShow(ScreenIntSize(0, 0), aShowInfo, aTextureFactoryIdentifier,
-           aLayersId, aRenderFrame, mParentIsActive);
+           aLayersId, aRenderFrame, mParentIsActive, nsSizeMode_Normal);
   mDidFakeShow = true;
 }
 
@@ -1502,7 +1483,7 @@ TabChild::ApplyShowInfo(const ShowInfo& aInfo)
   nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
   if (docShell) {
     nsCOMPtr<nsIDocShellTreeItem> item = do_GetInterface(docShell);
-    if (IsBrowserOrApp()) {
+    if (IsMozBrowserOrApp()) {
       // B2G allows window.name to be set by changing the name attribute on the
       // <iframe mozbrowser> element. window.open calls cause this attribute to
       // be set to the correct value. A normal <xul:browser> element has no such
@@ -1539,7 +1520,7 @@ TabChild::MaybeRequestPreinitCamera()
 {
     // Check if this tab is an app (not a browser frame) and will use the
     // `camera` permission,
-    if (IsBrowserElement()) {
+    if (IsIsolatedMozBrowserElement()) {
       return;
     }
 
@@ -1594,10 +1575,12 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
                    const TextureFactoryIdentifier& aTextureFactoryIdentifier,
                    const uint64_t& aLayersId,
                    PRenderFrameChild* aRenderFrame,
-                   const bool& aParentIsActive)
+                   const bool& aParentIsActive,
+                   const nsSizeMode& aSizeMode)
 {
     MOZ_ASSERT((!mDidFakeShow && aRenderFrame) || (mDidFakeShow && !aRenderFrame));
 
+    mPuppetWidget->SetSizeMode(aSizeMode);
     if (mDidFakeShow) {
         ApplyShowInfo(aInfo);
         RecvParentActivated(aParentIsActive);
@@ -1633,8 +1616,8 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
 
 bool
 TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
-                               const nsSizeMode& sizeMode,
                                const ScreenOrientationInternal& orientation,
+                               const LayoutDeviceIntPoint& clientOffset,
                                const LayoutDeviceIntPoint& chromeDisp)
 {
     if (!mRemoteFrame) {
@@ -1642,6 +1625,7 @@ TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
     }
 
     mUnscaledOuterRect = rect;
+    mClientOffset = clientOffset;
     mChromeDisp = chromeDisp;
 
     mOrientation = orientation;
@@ -1660,12 +1644,27 @@ TabChild::RecvUpdateDimensions(const CSSRect& rect, const CSSSize& size,
     baseWin->SetPositionAndSize(0, 0, screenSize.width, screenSize.height,
                                 true);
 
-    mPuppetWidget->SetSizeMode(sizeMode);
-    mPuppetWidget->Resize(screenRect.x + chromeDisp.x,
-                          screenRect.y + chromeDisp.y,
+    mPuppetWidget->Resize(screenRect.x + clientOffset.x + chromeDisp.x,
+                          screenRect.y + clientOffset.y + chromeDisp.y,
                           screenSize.width, screenSize.height, true);
 
     return true;
+}
+
+bool
+TabChild::RecvSizeModeChanged(const nsSizeMode& aSizeMode)
+{
+  mPuppetWidget->SetSizeMode(aSizeMode);
+  nsCOMPtr<nsIDocument> document(GetDocument());
+  nsCOMPtr<nsIPresShell> presShell = document->GetShell();
+  if (presShell) {
+    nsPresContext* presContext = presShell->GetPresContext();
+    if (presContext) {
+      presContext->MediaFeatureValuesChangedAllDocuments(eRestyle_Subtree,
+                                                         NS_STYLE_HINT_REFLOW);
+    }
+  }
+  return true;
 }
 
 bool
@@ -1684,7 +1683,7 @@ TabChild::RecvSuppressDisplayport(const bool& aEnabled)
   }
 
   MOZ_ASSERT(mActiveSuppressDisplayport >= 0);
-  APZCCallbackHelper::SuppressDisplayport(aEnabled);
+  APZCCallbackHelper::SuppressDisplayport(aEnabled, GetPresShell());
   return true;
 }
 
@@ -1752,9 +1751,8 @@ TabChild::NotifyAPZStateChange(const ViewID& aViewId,
   if (aChange == layers::GeckoContentController::APZStateChange::TransformEnd) {
     // This is used by tests to determine when the APZ is done doing whatever
     // it's doing. XXX generify this as needed when writing additional tests.
-    DispatchMessageManagerMessage(
-      NS_LITERAL_STRING("APZ:TransformEnd"),
-      NS_LITERAL_STRING("{}"));
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    observerService->NotifyObservers(nullptr, "APZ:TransformEnd", nullptr);
   }
   return true;
 }
@@ -1834,35 +1832,37 @@ TabChild::RecvMouseEvent(const nsString& aType,
 }
 
 bool
-TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& event,
+TabChild::RecvRealMouseMoveEvent(const WidgetMouseEvent& aEvent,
                                  const ScrollableLayerGuid& aGuid,
                                  const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
+  return RecvRealMouseButtonEvent(aEvent, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& event,
+TabChild::RecvSynthMouseMoveEvent(const WidgetMouseEvent& aEvent,
                                   const ScrollableLayerGuid& aGuid,
                                   const uint64_t& aInputBlockId)
 {
-  return RecvRealMouseButtonEvent(event, aGuid, aInputBlockId);
+  return RecvRealMouseButtonEvent(aEvent, aGuid, aInputBlockId);
 }
 
 bool
-TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& event,
+TabChild::RecvRealMouseButtonEvent(const WidgetMouseEvent& aEvent,
                                    const ScrollableLayerGuid& aGuid,
                                    const uint64_t& aInputBlockId)
 {
   nsEventStatus unused;
   InputAPZContext context(aGuid, aInputBlockId, unused);
 
-  WidgetMouseEvent localEvent(event);
+  WidgetMouseEvent localEvent(aEvent);
   localEvent.widget = mPuppetWidget;
+  APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
+      mPuppetWidget->GetDefaultScale());
   APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (event.mFlags.mHandledByAPZ) {
-    mAPZEventState->ProcessMouseEvent(event, aGuid, aInputBlockId);
+  if (aEvent.mFlags.mHandledByAPZ) {
+    mAPZEventState->ProcessMouseEvent(aEvent, aGuid, aInputBlockId);
   }
   return true;
 }
@@ -1878,16 +1878,18 @@ TabChild::RecvMouseWheelEvent(const WidgetWheelEvent& aEvent,
       mPuppetWidget, document, aEvent, aGuid, aInputBlockId);
   }
 
-  WidgetWheelEvent event(aEvent);
-  event.widget = mPuppetWidget;
-  APZCCallbackHelper::DispatchWidgetEvent(event);
+  WidgetWheelEvent localEvent(aEvent);
+  localEvent.widget = mPuppetWidget;
+  APZCCallbackHelper::ApplyCallbackTransform(localEvent, aGuid,
+      mPuppetWidget->GetDefaultScale());
+  APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
-  if (event.mCanTriggerSwipe) {
-    SendRespondStartSwipeEvent(aInputBlockId, event.TriggersSwipe());
+  if (localEvent.mCanTriggerSwipe) {
+    SendRespondStartSwipeEvent(aInputBlockId, localEvent.TriggersSwipe());
   }
 
   if (aEvent.mFlags.mHandledByAPZ) {
-    mAPZEventState->ProcessWheelEvent(event, aGuid, aInputBlockId);
+    mAPZEventState->ProcessWheelEvent(localEvent, aGuid, aInputBlockId);
   }
   return true;
 }
@@ -2364,7 +2366,7 @@ TabChild::RecvDestroy()
   }
 
   while (mActiveSuppressDisplayport > 0) {
-    APZCCallbackHelper::SuppressDisplayport(false);
+    APZCCallbackHelper::SuppressDisplayport(false, nullptr);
     mActiveSuppressDisplayport--;
   }
 
@@ -2509,7 +2511,7 @@ TabChild::InitTabChildGlobal(FrameScriptLoading aScriptLoading)
     mTriedBrowserInit = true;
     // Initialize the child side of the browser element machinery,
     // if appropriate.
-    if (IsBrowserOrApp()) {
+    if (IsMozBrowserOrApp()) {
       RecvLoadRemoteScript(BROWSER_ELEMENT_CHILD_SCRIPT, true);
     }
   }
@@ -2535,9 +2537,9 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
 
     // Pushing layers transactions directly to a separate
     // compositor context.
-    PCompositorChild* compositorChild = CompositorChild::Get();
+    PCompositorBridgeChild* compositorChild = CompositorBridgeChild::Get();
     if (!compositorChild) {
-      NS_WARNING("failed to get CompositorChild instance");
+      NS_WARNING("failed to get CompositorBridgeChild instance");
       PRenderFrameChild::Send__delete__(remoteFrame);
       return false;
     }
@@ -2643,7 +2645,7 @@ TabChild::NotifyPainted()
 void
 TabChild::MakeVisible()
 {
-  CompositorChild* compositor = CompositorChild::Get();
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
   if (UsingCompositorLRU()) {
     compositor->SendNotifyVisible(mLayersId);
   }
@@ -2656,12 +2658,12 @@ TabChild::MakeVisible()
 void
 TabChild::MakeHidden()
 {
-  CompositorChild* compositor = CompositorChild::Get();
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
   if (UsingCompositorLRU()) {
     compositor->SendNotifyHidden(mLayersId);
   } else {
     // Clear cached resources directly. This avoids one extra IPC
-    // round-trip from CompositorChild to CompositorParent when
+    // round-trip from CompositorBridgeChild to CompositorBridgeParent when
     // CompositorLRU is not used.
     compositor->RecvClearCachedResources(mLayersId);
   }
@@ -2815,8 +2817,7 @@ TabChild::DidComposite(uint64_t aTransactionId,
   MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
                LayersBackend::LAYERS_CLIENT);
 
-  ClientLayerManager *manager =
-    static_cast<ClientLayerManager*>(mPuppetWidget->GetLayerManager());
+  ClientLayerManager *manager = mPuppetWidget->GetLayerManager()->AsClientLayerManager();
 
   manager->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
 }
@@ -2853,6 +2854,31 @@ TabChild::ClearCachedResources()
   manager->ClearCachedResources();
 }
 
+void
+TabChild::InvalidateLayers()
+{
+  MOZ_ASSERT(mPuppetWidget);
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager());
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
+               LayersBackend::LAYERS_CLIENT);
+
+  RefPtr<LayerManager> lm = mPuppetWidget->GetLayerManager();
+  FrameLayerBuilder::InvalidateAllLayers(lm);
+}
+
+void
+TabChild::CompositorUpdated(const TextureFactoryIdentifier& aNewIdentifier)
+{
+  gfxPlatform::GetPlatform()->UpdateRenderModeIfDeviceReset();
+
+  RefPtr<LayerManager> lm = mPuppetWidget->GetLayerManager();
+  ClientLayerManager* clm = lm->AsClientLayerManager();
+
+  mTextureFactoryIdentifier = aNewIdentifier;
+  clm->UpdateTextureFactoryIdentifier(aNewIdentifier);
+  FrameLayerBuilder::InvalidateAllLayers(clm);
+}
+
 NS_IMETHODIMP
 TabChild::OnShowTooltip(int32_t aXCoords, int32_t aYCoords, const char16_t *aTipText)
 {
@@ -2871,10 +2897,10 @@ TabChild::OnHideTooltip()
 bool
 TabChild::RecvRequestNotifyAfterRemotePaint()
 {
-  // Get the CompositorChild instance for this content thread.
-  CompositorChild* compositor = CompositorChild::Get();
+  // Get the CompositorBridgeChild instance for this content thread.
+  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
 
-  // Tell the CompositorChild that, when it gets a RemotePaintIsReady
+  // Tell the CompositorBridgeChild that, when it gets a RemotePaintIsReady
   // message that it should forward it us so that we can bounce it to our
   // RenderFrameParent.
   compositor->RequestNotifyAfterRemotePaint(this);
@@ -2900,8 +2926,8 @@ TabChild::RecvUIResolutionChanged(const float& aDpi, const double& aScale)
   ScreenIntSize screenSize = GetInnerSize();
   if (mHasValidInnerSize && oldScreenSize != screenSize) {
     ScreenIntRect screenRect = GetOuterRect();
-    mPuppetWidget->Resize(screenRect.x + mChromeDisp.x,
-                          screenRect.y + mChromeDisp.y,
+    mPuppetWidget->Resize(screenRect.x + mClientOffset.x + mChromeDisp.x,
+                          screenRect.y + mClientOffset.y + mChromeDisp.y,
                           screenSize.width, screenSize.height, true);
 
     nsCOMPtr<nsIBaseWindow> baseWin = do_QueryInterface(WebNavigation());

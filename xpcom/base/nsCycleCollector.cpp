@@ -794,9 +794,7 @@ struct PtrToNodeEntry : public PLDHashEntryHdr
 };
 
 static bool
-PtrToNodeMatchEntry(PLDHashTable* aTable,
-                    const PLDHashEntryHdr* aEntry,
-                    const void* aKey)
+PtrToNodeMatchEntry(const PLDHashEntryHdr* aEntry, const void* aKey)
 {
   const PtrToNodeEntry* n = static_cast<const PtrToNodeEntry*>(aEntry);
   return n->mNode->mPointer == aKey;
@@ -1275,7 +1273,9 @@ private:
   nsAutoPtr<CCGraphBuilder> mBuilder;
   RefPtr<nsCycleCollectorLogger> mLogger;
 
-  DebugOnly<void*> mThread;
+#ifdef DEBUG
+  void* mThread;
+#endif
 
   nsCycleCollectorParams mParams;
 
@@ -2470,8 +2470,9 @@ CCGraphBuilder::NoteWeakMapping(JSObject* aMap, JS::GCCellPtr aKey,
   mapping->mVal = aVal ? AddWeakMapNode(aVal) : nullptr;
 
   if (mLogger) {
-    mLogger->NoteWeakMapEntry((uint64_t)aMap, aKey.unsafeAsInteger(),
-                              (uint64_t)aKdelegate, aVal.unsafeAsInteger());
+    mLogger->NoteWeakMapEntry((uint64_t)aMap, aKey ? aKey.unsafeAsInteger() : 0,
+                              (uint64_t)aKdelegate,
+                              aVal ? aVal.unsafeAsInteger() : 0);
   }
 }
 
@@ -3283,6 +3284,7 @@ nsCycleCollector::CollectWhite()
     PtrInfo* pinfo = etor.GetNext();
     if (pinfo->mColor == white && pinfo->mParticipant) {
       if (pinfo->IsGrayJS()) {
+        MOZ_ASSERT(mJSRuntime);
         ++numWhiteGCed;
         JS::Zone* zone;
         if (MOZ_UNLIKELY(pinfo->mParticipant == zoneParticipant)) {
@@ -3401,7 +3403,9 @@ nsCycleCollector::nsCycleCollector() :
   mScanInProgress(false),
   mJSRuntime(nullptr),
   mIncrementalPhase(IdlePhase),
+#ifdef DEBUG
   mThread(NS_GetCurrentThread()),
+#endif
   mWhiteNodeCount(0),
   mBeforeUnlinkCB(nullptr),
   mForgetSkippableCB(nullptr),
@@ -4024,11 +4028,13 @@ nsCycleCollector_suspectedCount()
 bool
 nsCycleCollector_init()
 {
-  static DebugOnly<bool> sInitialized;
+#ifdef DEBUG
+  static bool sInitialized;
 
   MOZ_ASSERT(NS_IsMainThread(), "Wrong thread!");
   MOZ_ASSERT(!sInitialized, "Called twice!?");
   sInitialized = true;
+#endif
 
   return sCollectorData.init();
 }

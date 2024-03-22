@@ -52,7 +52,7 @@ namespace layers {
 class AsyncDragMetrics;
 class Composer2D;
 class Compositor;
-class CompositorChild;
+class CompositorBridgeChild;
 class LayerManager;
 class LayerManagerComposite;
 class PLayerTransactionChild;
@@ -64,6 +64,7 @@ class SourceSurface;
 } // namespace gfx
 namespace widget {
 class TextEventDispatcher;
+class TextEventDispatcherListener;
 } // namespace widget
 } // namespace mozilla
 
@@ -326,7 +327,7 @@ class nsIWidget : public nsISupports {
 
   public:
     typedef mozilla::layers::Composer2D Composer2D;
-    typedef mozilla::layers::CompositorChild CompositorChild;
+    typedef mozilla::layers::CompositorBridgeChild CompositorBridgeChild;
     typedef mozilla::layers::AsyncDragMetrics AsyncDragMetrics;
     typedef mozilla::layers::FrameMetrics FrameMetrics;
     typedef mozilla::layers::LayerManager LayerManager;
@@ -342,6 +343,8 @@ class nsIWidget : public nsISupports {
     typedef mozilla::widget::NativeIMEContext NativeIMEContext;
     typedef mozilla::widget::SizeConstraints SizeConstraints;
     typedef mozilla::widget::TextEventDispatcher TextEventDispatcher;
+    typedef mozilla::widget::TextEventDispatcherListener
+      TextEventDispatcherListener;
     typedef mozilla::CompositorVsyncDispatcher CompositorVsyncDispatcher;
     typedef mozilla::LayoutDeviceIntMargin LayoutDeviceIntMargin;
     typedef mozilla::LayoutDeviceIntPoint LayoutDeviceIntPoint;
@@ -1318,6 +1321,12 @@ class nsIWidget : public nsISupports {
     virtual void CleanupRemoteDrawing() = 0;
 
     /**
+     * Create DrawTarget used as BackBuffer of the screen
+     */
+    virtual already_AddRefed<mozilla::gfx::DrawTarget> CreateBackBufferDrawTarget(mozilla::gfx::DrawTarget* aScreenTarget,
+                                                                                  const LayoutDeviceIntRect& aRect) = 0;
+
+    /**
      * A hook for the widget to prepare a Compositor, during the latter's initialization.
      *
      * If this method returns true, it means that the widget will be able to
@@ -1418,13 +1427,6 @@ class nsIWidget : public nsISupports {
      * Dispatches an event that must be handled by APZ first, when APZ is
      * enabled. If invoked in the child process, it is forwarded to the
      * parent process synchronously.
-     */
-    virtual nsEventStatus DispatchAPZAwareEvent(mozilla::WidgetInputEvent* aEvent) = 0;
-
-    /**
-     * Dispatches an event that must be transformed by APZ first, but is not
-     * actually handled by APZ. If invoked in the child process, it is
-     * forwarded to the parent process synchronously.
      */
     virtual nsEventStatus DispatchInputEvent(mozilla::WidgetInputEvent* aEvent) = 0;
 
@@ -2019,7 +2021,7 @@ public:
      * If this isn't directly compositing to its window surface,
      * return the compositor which is doing that on our behalf.
      */
-    virtual CompositorChild* GetRemoteRenderer()
+    virtual CompositorBridgeChild* GetRemoteRenderer()
     { return nullptr; }
 
     /**
@@ -2048,6 +2050,14 @@ public:
      * widget.  Note that this never returns nullptr.
      */
     NS_IMETHOD_(TextEventDispatcher*) GetTextEventDispatcher() = 0;
+
+    /**
+     * GetNativeTextEventDispatcherListener() returns a
+     * TextEventDispatcherListener instance which is used when the widget
+     * instance handles native IME and/or keyboard events.
+     */
+    NS_IMETHOD_(TextEventDispatcherListener*)
+      GetNativeTextEventDispatcherListener() = 0;
 
     virtual void ZoomToRect(const uint32_t& aPresShellId,
                             const FrameMetrics::ViewID& aViewId,

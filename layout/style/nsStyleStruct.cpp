@@ -2225,6 +2225,7 @@ const nsCSSProperty nsStyleImageLayers::kBackgroundLayerTable[] = {
   eCSSProperty_UNKNOWN                    // composite
 };
 
+#ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
 const nsCSSProperty nsStyleImageLayers::kMaskLayerTable[] = {
   eCSSProperty_mask,                      // shorthand
   eCSSProperty_UNKNOWN,                   // color
@@ -2238,6 +2239,7 @@ const nsCSSProperty nsStyleImageLayers::kMaskLayerTable[] = {
   eCSSProperty_mask_mode,                 // maskMode
   eCSSProperty_mask_composite             // composite
 };
+#endif
 
 nsStyleImageLayers::nsStyleImageLayers()
   : mAttachmentCount(1)
@@ -2497,7 +2499,7 @@ nsStyleImageLayers::Layer::Layer()
   mAttachment(NS_STYLE_IMAGELAYER_ATTACHMENT_SCROLL),
   mBlendMode(NS_STYLE_BLEND_NORMAL),
   mComposite(NS_STYLE_MASK_COMPOSITE_ADD),
-  mMaskMode(NS_STYLE_MASK_MODE_AUTO)
+  mMaskMode(NS_STYLE_MASK_MODE_MATCH_SOURCE)
 {
   mPosition.SetInitialPercentValues(0.0f); // Initial value is "0% 0%"
   mImage.SetNull();

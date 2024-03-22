@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* import-globals-from pippki.js */
 
 const nsIDialogParamBlock = Components.interfaces.nsIDialogParamBlock;
 const nsIX509Cert = Components.interfaces.nsIX509Cert;
@@ -32,27 +33,22 @@ function viewCert()
 
 function doOK()
 {
-  var checkSSL = document.getElementById("trustSSL");
-  var checkEmail = document.getElementById("trustEmail");
-  var checkObjSign = document.getElementById("trustObjSign");
-  if (checkSSL.checked)
-    params.SetInt(2,1);
-  else
-    params.SetInt(2,0);
-  if (checkEmail.checked)
-    params.SetInt(3,1);
-  else
-    params.SetInt(3,0);
-  if (checkObjSign.checked)
-    params.SetInt(4,1);
-  else
-    params.SetInt(4,0);
-  params.SetInt(1,1);
+  let checkSSL = document.getElementById("trustSSL");
+  let checkEmail = document.getElementById("trustEmail");
+  let checkObjSign = document.getElementById("trustObjSign");
+
+  // Signal which trust bits the user wanted to enable.
+  params.SetInt(2, checkSSL.checked ? 1 : 0);
+  params.SetInt(3, checkEmail.checked ? 1 : 0);
+  params.SetInt(4, checkObjSign.checked ? 1 : 0);
+
+  // Signal that the user accepted.
+  params.SetInt(1, 1);
   return true;
 }
 
 function doCancel()
 {
-  params.SetInt(1,0);
+  params.SetInt(1, 0); // Signal that the user cancelled.
   return true;
 }

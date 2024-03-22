@@ -44,7 +44,7 @@ public:
 
   virtual void Unlock() override {}
 
-  virtual bool HasInternalBuffer() const override { return false; }
+  virtual bool HasIntermediateBuffer() const override { return false; }
 
   virtual gfx::SurfaceFormat GetFormat() const override {
     return gfx::SurfaceFormat::UNKNOWN;
@@ -54,7 +54,7 @@ public:
 
   virtual bool Serialize(SurfaceDescriptor& aOutDescriptor) override;
 
-  virtual void Deallocate(ISurfaceAllocator*) override;
+  virtual void Deallocate(ClientIPCAllocator*) override;
 
   gl::SharedSurface* Surf() const { return mSurf.get(); }
 };
@@ -64,13 +64,13 @@ class SharedSurfaceTextureClient : public TextureClient
 public:
   SharedSurfaceTextureClient(SharedSurfaceTextureData* aData,
                              TextureFlags aFlags,
-                             ISurfaceAllocator* aAllocator);
+                             ClientIPCAllocator* aAllocator);
 
   ~SharedSurfaceTextureClient();
 
   static already_AddRefed<SharedSurfaceTextureClient>
   Create(UniquePtr<gl::SharedSurface> surf, gl::SurfaceFactory* factory,
-         ISurfaceAllocator* aAllocator, TextureFlags aFlags);
+         ClientIPCAllocator* aAllocator, TextureFlags aFlags);
 
   virtual void SetReleaseFenceHandle(const FenceHandle& aReleaseFenceHandle) override;
 

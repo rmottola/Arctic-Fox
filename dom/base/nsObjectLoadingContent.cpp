@@ -557,6 +557,11 @@ IsPluginEnabledByExtension(nsIURI* uri, nsCString& mimeType)
     return false;
   }
 
+  // Disables any native SWF plugins, when internal SWF player is enabled.
+  if (ext.EqualsIgnoreCase("swf") && nsContentUtils::IsSWFPlayerEnabled()) {
+    return false;
+  }
+
   RefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();
 
   if (!pluginHost) {
@@ -1490,6 +1495,7 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
       !thisContent->NodeInfo()->Equals(nsGkAtoms::object)) {
     return;
   }
+
   nsCOMPtr<nsIEffectiveTLDService> tldService =
     do_GetService(NS_EFFECTIVETLDSERVICE_CONTRACTID);
   // If we can't analyze the URL, just pass on through.
@@ -1523,6 +1529,7 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
   nsAutoCString uri;
   aURI->GetSpec(uri);
   if (uri.Find("enablejsapi=1", true, 0, -1) != kNotFound) {
+    Telemetry::Accumulate(Telemetry::YOUTUBE_NONREWRITABLE_EMBED_SEEN, 1);
     return;
   }
 
@@ -1541,8 +1548,12 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
       replaceQuery = true;
     }
   }
- 
-  // If we're pref'd off, just return.
+
+  // If we've made it this far, we've got a rewritable embed. Log it in
+  // telemetry.
+  Telemetry::Accumulate(Telemetry::YOUTUBE_REWRITABLE_EMBED_SEEN, 1);
+
+  // If we're pref'd off, return after telemetry has been logged.
   if (!Preferences::GetBool(kPrefYoutubeRewrite)) {
     return;
   }
@@ -2763,8 +2774,8 @@ nsObjectLoadingContent::NotifyStateChanged(ObjectType aOldType,
   EventStates newState = ObjectState();
 
   if (newState != aOldState) {
+    NS_ASSERTION(thisContent->IsInComposedDoc(), "Something is confused");
     // This will trigger frame construction
-    NS_ASSERTION(InActiveDocument(thisContent), "Something is confused");
     EventStates changedBits = aOldState ^ newState;
 
     {
@@ -2772,6 +2783,7 @@ nsObjectLoadingContent::NotifyStateChanged(ObjectType aOldType,
       doc->ContentStateChanged(thisContent, changedBits);
     }
     if (aSync) {
+      NS_ASSERTION(InActiveDocument(thisContent), "Something is confused");
       // Make sure that frames are actually constructed immediately.
       doc->FlushPendingNotifications(Flush_Frames);
     }
@@ -2802,6 +2814,13 @@ nsObjectLoadingContent::GetTypeOfContent(const nsCString& aMIMEType)
   // when internal PDF viewer is enabled.
   if (aMIMEType.LowerCaseEqualsLiteral("application/pdf") &&
       nsContentUtils::IsPDFJSEnabled()) {
+    return eType_Document;
+  }
+
+  // Faking support of the SWF content as a document for EMBED tags
+  // when internal SWF player is enabled.
+  if (aMIMEType.LowerCaseEqualsLiteral("application/x-shockwave-flash") &&
+      nsContentUtils::IsSWFPlayerEnabled()) {
     return eType_Document;
   }
 
@@ -2867,8 +2886,10 @@ nsObjectLoadingContent::PluginDestroyed()
   // plugins in plugin host. Invalidate instance owner / prototype but otherwise
   // don't take any action.
   TeardownProtoChain();
-  mInstanceOwner->Destroy();
-  mInstanceOwner = nullptr;
+  if (mInstanceOwner) {
+    mInstanceOwner->Destroy();
+    mInstanceOwner = nullptr;
+  }
   return NS_OK;
 }
 
@@ -2929,8 +2950,7 @@ nsObjectLoadingContent::ScriptRequestPluginInstance(JSContext* aCx,
                 aCx == nsContentUtils::GetCurrentJSContext());
   bool callerIsContentJS = (nsContentUtils::GetCurrentJSContext() &&
                             !nsContentUtils::IsCallerChrome() &&
-                            !nsContentUtils::IsCallerContentXBL() &&
-                            JS_IsRunning(aCx));
+                            !nsContentUtils::IsCallerContentXBL());
 
   nsCOMPtr<nsIContent> thisContent =
     do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
@@ -3062,7 +3082,8 @@ nsObjectLoadingContent::LoadFallback(FallbackType aType, bool aNotify) {
     aType = eFallbackAlternate;
   }
 
-  if (thisContent->IsHTMLElement(nsGkAtoms::object) &&
+  if ((thisContent->IsHTMLElement(nsGkAtoms::object) ||
+       thisContent->IsHTMLElement(nsGkAtoms::applet)) &&
       (aType == eFallbackUnsupported ||
        aType == eFallbackDisabled ||
        aType == eFallbackBlocklisted))
@@ -3696,11 +3717,15 @@ nsObjectLoadingContent::TeardownProtoChain()
   nsCOMPtr<nsIContent> thisContent =
     do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
 
-  // Use the safe JSContext here as we're not always able to find the
-  // JSContext associated with the NPP any more.
-  AutoSafeJSContext cx;
+  NS_ENSURE_TRUE_VOID(thisContent->GetWrapper());
+
+  // We don't init the AutoJSAPI with our wrapper because we don't want it
+  // reporting errors to our window's onerror listeners.
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  JSContext* cx = jsapi.cx();
   JS::Rooted<JSObject*> obj(cx, thisContent->GetWrapper());
-  NS_ENSURE_TRUE(obj, /* void */);
+  MOZ_ASSERT(obj);
 
   JS::Rooted<JSObject*> proto(cx);
   JSAutoCompartment ac(cx, obj);

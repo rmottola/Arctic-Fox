@@ -8,7 +8,7 @@ var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 const loaders = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", {});
 const { devtools } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const { joinURI } = devtools.require("devtools/shared/path");
-const { Services } = devtools.require("resource://gre/modules/Services.jsm");
+const Services = devtools.require("Services");
 Cu.import("resource://gre/modules/AppConstants.jsm");
 
 const BROWSER_BASED_DIRS = [
@@ -20,36 +20,6 @@ const BROWSER_BASED_DIRS = [
 
 function clearCache() {
   Services.obs.notifyObservers(null, "startupcache-invalidate", null);
-}
-
-function hotReloadFile(window, require, loader, componentProxies, fileURI) {
-  dump("Hot reloading: " + fileURI + "\n");
-
-  if (fileURI.match(/\.js$/)) {
-    // Test for React proxy components
-    const proxy = componentProxies.get(fileURI);
-    if (proxy) {
-      // Remove the old module and re-require the new one; the require
-      // hook in the loader will take care of the rest
-      delete loader.modules[fileURI];
-      clearCache();
-      require(fileURI);
-    }
-  } else if (fileURI.match(/\.css$/)) {
-    const links = [...window.document.getElementsByTagNameNS("http://www.w3.org/1999/xhtml", "link")];
-    links.forEach(link => {
-      if (link.href.indexOf(fileURI) === 0) {
-        const parentNode = link.parentNode;
-        const newLink = window.document.createElementNS("http://www.w3.org/1999/xhtml", "link");
-        newLink.rel = "stylesheet";
-        newLink.type = "text/css";
-        newLink.href = fileURI + "?s=" + Math.random();
-
-        parentNode.insertBefore(newLink, link);
-        parentNode.removeChild(link);
-      }
-    });
-  }
 }
 
 /*
@@ -78,6 +48,23 @@ function hotReloadFile(window, require, loader, componentProxies, fileURI) {
  *         - require: a function to require modules with
  */
 function BrowserLoader(baseURI, window) {
+  const browserLoaderBuilder = new BrowserLoaderBuilder(baseURI, window);
+  return {
+    loader: browserLoaderBuilder.loader,
+    require: browserLoaderBuilder.require
+  };
+}
+
+/**
+ * Private class used to build the Loader instance and require method returned
+ * by BrowserLoader(baseURI, window).
+ *
+ * @param string baseURI
+ *        Base path to load modules from.
+ * @param Object window
+ *        The window instance to evaluate modules within
+ */
+function BrowserLoaderBuilder(baseURI, window) {
   const loaderOptions = devtools.require("@loader/options");
   const dynamicPaths = {};
   const componentProxies = new Map();
@@ -126,6 +113,13 @@ function BrowserLoader(baseURI, window) {
       define(factory) {
         factory(this.require, this.exports, this.module);
       },
+      // Allow modules to use the DevToolsLoader lazy loading helpers.
+      loader: {
+        lazyGetter: devtools.lazyGetter,
+        lazyImporter: devtools.lazyImporter,
+        lazyServiceGetter: devtools.lazyServiceGetter,
+        lazyRequireGetter: this.lazyRequireGetter.bind(this),
+      },
     }
   };
 
@@ -155,28 +149,61 @@ function BrowserLoader(baseURI, window) {
     }
   }
 
-
   const mainModule = loaders.Module(baseURI, joinURI(baseURI, "main.js"));
-  const mainLoader = loaders.Loader(opts);
-  const require = loaders.Require(mainLoader, mainModule);
+  this.loader = loaders.Loader(opts);
+  this.require = loaders.Require(this.loader, mainModule);
 
   if (hotReloadEnabled) {
     const watcher = devtools.require("devtools/client/shared/file-watcher");
-    function onFileChanged(_, fileURI) {
-      hotReloadFile(window, require, mainLoader, componentProxies, fileURI);
-    }
+    const onFileChanged = (_, relativePath) => {
+      this.hotReloadFile(window, componentProxies,
+                         "resource://devtools/" + relativePath);
+    };
     watcher.on("file-changed", onFileChanged);
 
     window.addEventListener("unload", () => {
       watcher.off("file-changed", onFileChanged);
     });
   }
-
-  return {
-    loader: mainLoader,
-    require: require
-  };
 }
+
+BrowserLoaderBuilder.prototype = {
+  /**
+   * Define a getter property on the given object that requires the given
+   * module. This enables delaying importing modules until the module is
+   * actually used.
+   *
+   * @param Object obj
+   *    The object to define the property on.
+   * @param String property
+   *    The property name.
+   * @param String module
+   *    The module path.
+   * @param Boolean destructure
+   *    Pass true if the property name is a member of the module's exports.
+   */
+  lazyRequireGetter: function(obj, property, module, destructure) {
+    devtools.lazyGetter(obj, property, () => {
+      return destructure
+          ? this.require(module)[property]
+          : this.require(module || property);
+    });
+  },
+
+  hotReloadFile: function(window, componentProxies, fileURI) {
+    if (fileURI.match(/\.js$/)) {
+      // Test for React proxy components
+      const proxy = componentProxies.get(fileURI);
+      if (proxy) {
+        // Remove the old module and re-require the new one; the require
+        // hook in the loader will take care of the rest
+        delete this.loader.modules[fileURI];
+        clearCache();
+        this.require(fileURI);
+      }
+    }
+  }
+};
 
 this.BrowserLoader = BrowserLoader;
 

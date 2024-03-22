@@ -133,13 +133,6 @@ LayerManagerComposite::~LayerManagerComposite()
 }
 
 
-bool
-LayerManagerComposite::Initialize()
-{
-  bool result = mCompositor->Initialize();
-  return result;
-}
-
 void
 LayerManagerComposite::Destroy()
 {
@@ -848,7 +841,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion)
 
   // Dump to console
   if (gfxPrefs::LayersDump()) {
-    this->Dump();
+    this->Dump(/* aSorted= */true);
   } else if (profiler_feature_active("layersdump")) {
     std::stringstream ss;
     Dump(ss);
@@ -906,13 +899,15 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion)
 
   CompositorBench(mCompositor, bounds);
 
+  MOZ_ASSERT(mRoot->GetOpacity() == 1);
+  bool opaqueContent = (mRoot->GetContentFlags() & Layer::CONTENT_OPAQUE) != 0;
   if (mRoot->GetClipRect()) {
     clipRect = *mRoot->GetClipRect();
     Rect rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-    mCompositor->BeginFrame(aInvalidRegion, &rect, bounds, nullptr, &actualBounds);
+    mCompositor->BeginFrame(aInvalidRegion, &rect, bounds, opaqueContent, nullptr, &actualBounds);
   } else {
     gfx::Rect rect;
-    mCompositor->BeginFrame(aInvalidRegion, nullptr, bounds, &rect, &actualBounds);
+    mCompositor->BeginFrame(aInvalidRegion, nullptr, bounds, opaqueContent, &rect, &actualBounds);
     clipRect = ParentLayerIntRect(rect.x, rect.y, rect.width, rect.height);
   }
 
@@ -1165,8 +1160,10 @@ LayerManagerComposite::RenderToPresentationSurface()
   nsIntRegion invalid;
   Rect bounds(0.0f, 0.0f, scale * pageWidth, (float)actualHeight);
   Rect rect, actualBounds;
+  MOZ_ASSERT(mRoot->GetOpacity() == 1);
+  bool opaqueContent = (mRoot->GetContentFlags() & Layer::CONTENT_OPAQUE) != 0;
 
-  mCompositor->BeginFrame(invalid, nullptr, bounds, &rect, &actualBounds);
+  mCompositor->BeginFrame(invalid, nullptr, bounds, opaqueContent, &rect, &actualBounds);
 
   // The Java side of Fennec sets a scissor rect that accounts for
   // chrome such as the URL bar. Override that so that the entire frame buffer
@@ -1469,8 +1466,7 @@ LayerManagerComposite::CreateRefLayerComposite()
 }
 
 LayerManagerComposite::AutoAddMaskEffect::AutoAddMaskEffect(Layer* aMaskLayer,
-                                                            EffectChain& aEffects,
-                                                            bool aIs3D)
+                                                            EffectChain& aEffects)
   : mCompositable(nullptr), mFailed(false)
 {
   if (!aMaskLayer) {
@@ -1484,7 +1480,7 @@ LayerManagerComposite::AutoAddMaskEffect::AutoAddMaskEffect(Layer* aMaskLayer,
     return;
   }
 
-  if (!mCompositable->AddMaskEffect(aEffects, aMaskLayer->GetEffectiveTransform(), aIs3D)) {
+  if (!mCompositable->AddMaskEffect(aEffects, aMaskLayer->GetEffectiveTransform())) {
     mCompositable = nullptr;
     mFailed = true;
   }
@@ -1497,6 +1493,14 @@ LayerManagerComposite::AutoAddMaskEffect::~AutoAddMaskEffect()
   }
 
   mCompositable->RemoveMaskEffect();
+}
+
+void
+LayerManagerComposite::ChangeCompositor(Compositor* aNewCompositor)
+{
+  mCompositor = aNewCompositor;
+  mTextRenderer = new TextRenderer(aNewCompositor);
+  mTwoPassTmpTarget = nullptr;
 }
 
 LayerComposite::LayerComposite(LayerManagerComposite *aManager)
@@ -1574,6 +1578,12 @@ LayerComposite::GetFullyRenderedRegion() {
   } else {
     return GetShadowVisibleRegion().ToUnknownRegion();
   }
+}
+
+bool
+LayerComposite::HasStaleCompositor() const
+{
+  return mCompositeManager->GetCompositor() != mCompositor;
 }
 
 #ifndef MOZ_HAVE_PLATFORM_SPECIFIC_LAYER_BUFFERS

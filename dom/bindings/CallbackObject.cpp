@@ -189,9 +189,6 @@ CallbackObject::CallSetup::CallSetup(CallbackObject* aCallback,
 
   // And now we're ready to go.
   mCx = cx;
-
-  // Make sure the JS engine doesn't report exceptions we want to re-throw.
-  mAutoEntryScript->TakeOwnershipOfErrorReporting();
 }
 
 bool
@@ -300,6 +297,12 @@ CallbackObject::CallSetup::~CallSetup()
       if (saved) {
         JS_RestoreFrameChain(mCx);
       }
+
+      if (mErrorResult.IsJSContextException()) {
+        // XXXkhuey bug 1117269.
+        // This isn't true anymore ... so throw something else.
+        mErrorResult.Throw(NS_ERROR_UNEXPECTED);
+      }
     }
   }
 
@@ -322,7 +325,11 @@ CallbackObjectHolderBase::ToXPCOMCallback(CallbackObject* aCallback,
     return nullptr;
   }
 
-  AutoSafeJSContext cx;
+  // We don't init the AutoJSAPI with our callback because we don't want it
+  // reporting errors to its global's onerror handlers.
+  AutoJSAPI jsapi;
+  jsapi.Init();
+  JSContext* cx = jsapi.cx();
 
   JS::Rooted<JSObject*> callback(cx, aCallback->Callback());
 

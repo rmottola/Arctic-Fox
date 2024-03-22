@@ -597,11 +597,6 @@ public:
     void AddGCCallback(xpcGCCallback cb);
     void RemoveGCCallback(xpcGCCallback cb);
 
-    struct EnvironmentPreparer : public js::ScriptEnvironmentPreparer {
-        void invoke(JS::HandleObject scope, Closure& closure) override;
-    };
-    EnvironmentPreparer mEnvironmentPreparer;
-
     static void ActivityCallback(void* arg, bool active);
     static bool InterruptCallback(JSContext* cx);
 
@@ -1355,7 +1350,7 @@ private:
     // creation of XPCNativeInterfaces which have more than 2^12 members.
     // If the width of this field changes, update GetMaxIndexInInterface.
     uint16_t mIndexInInterface : 12;
-};
+} JS_HAZ_NON_GC_POINTER; // Only stores a pinned string
 
 /***************************************************************************/
 // XPCNativeInterface represents a single idl declared interface. This is
@@ -2353,11 +2348,12 @@ public:
                                               const nsAString& aName,
                                               nsIVariant** aResult);
 
+private:
     static nsresult CheckForException(XPCCallContext & ccx,
+                                      mozilla::dom::AutoEntryScript& aes,
                                       const char * aPropertyName,
                                       const char * anInterfaceName,
                                       bool aForceReport);
-private:
     virtual ~nsXPCWrappedJSClass();
 
     nsXPCWrappedJSClass();   // not implemented

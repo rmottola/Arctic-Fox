@@ -51,6 +51,7 @@ pref("devtools.command-button-eyedropper.enabled", false);
 pref("devtools.command-button-screenshot.enabled", false);
 pref("devtools.command-button-rulers.enabled", false);
 pref("devtools.command-button-measure.enabled", false);
+pref("devtools.command-button-noautohide.enabled", false);
 
 // Inspector preferences
 // Enable the Inspector
@@ -69,8 +70,10 @@ pref("devtools.inspector.showAllAnonymousContent", false);
 // Enable the MDN docs tooltip
 pref("devtools.inspector.mdnDocsTooltip.enabled", true);
 
-// Collapse attributes that are too long.
-// Use -1 to not collapse attributes at all.
+// Enable to collapse attributes that are too long.
+pref("devtools.markup.collapseAttributes", true);
+
+// Length to collapse attributes
 pref("devtools.markup.collapseAttributeLength", 120);
 
 // DevTools default color unit
@@ -212,6 +215,9 @@ pref("devtools.canvasdebugger.enabled", false);
 // Enable the Web Audio Editor
 pref("devtools.webaudioeditor.enabled", false);
 
+// Enable Scratchpad
+pref("devtools.scratchpad.enabled", false);
+
 // Web Audio Editor Inspector Width should be a preference
 pref("devtools.webaudioeditor.inspectorWidth", 300);
 
@@ -332,3 +338,7 @@ pref("devtools.telemetry.tools.opened.version", "{}");
 #else
   pref("devtools.jsonview.enabled", false);
 #endif
+
+// Disable the HTML responsive design tool by default.  Currently disabled until
+// ready to replace the legacy XUL version.
+pref("devtools.responsive.html.enabled", false);

@@ -60,7 +60,7 @@ add_task(function* test_pushUnsubscriptionSuccess() {
     pushReceiptEndpoint: serverURL + '/receiptPushEndpointUnsubscriptionSuccess',
     scope: 'https://example.com/page/unregister-success',
     originAttributes: ChromeUtils.originAttributesToSuffix(
-      { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false }),
+      { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inIsolatedMozBrowser: false }),
     quota: Infinity,
   });
 
@@ -72,7 +72,7 @@ add_task(function* test_pushUnsubscriptionSuccess() {
   yield PushService.unregister({
     scope: 'https://example.com/page/unregister-success',
     originAttributes: ChromeUtils.originAttributesToSuffix(
-      { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inBrowser: false }),
+      { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inIsolatedMozBrowser: false }),
   });
   let record = yield db.getByKeyID(serverURL + '/subscriptionUnsubscriptionSuccess');
   ok(!record, 'Unregister did not remove record');

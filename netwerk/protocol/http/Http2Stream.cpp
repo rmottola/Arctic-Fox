@@ -748,8 +748,7 @@ Http2Stream::AdjustPushedPriority()
   mTxInlineFrameUsed += Http2Session::kFrameHeaderBytes + 5;
 
   mSession->CreateFrameHeader(packet, 5,
-                              Http2Session::FRAME_TYPE_PRIORITY,
-                              Http2Session::kFlag_PRIORITY,
+                              Http2Session::FRAME_TYPE_PRIORITY, 0,
                               mPushSource->mStreamID);
 
   mPushSource->SetPriority(mPriority);
@@ -1074,7 +1073,9 @@ Http2Stream::ConvertPushHeaders(Http2Decompressor *decompressor,
   }
 
   aHeadersIn.Truncate();
-  LOG (("decoded push headers are:\n%s", aHeadersOut.BeginReading()));
+  LOG (("id 0x%X decoded push headers %s %s %s are:\n%s", mStreamID,
+        mHeaderScheme.get(), mHeaderHost.get(), mHeaderPath.get(),
+        aHeadersOut.BeginReading()));
   return NS_OK;
 }
 

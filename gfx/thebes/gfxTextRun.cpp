@@ -1579,7 +1579,9 @@ gfxFontGroup::gfxFontGroup(const FontFamilyList& aFontFamilyList,
     , mDevToCssSize(aDevToCssSize)
     , mUserFontSet(aUserFontSet)
     , mTextPerf(aTextPerf)
+    , mLastPrefLang(eFontPrefLang_Western)
     , mPageLang(gfxPlatformFontList::GetFontPrefLangFor(aStyle->language))
+    , mLastPrefFirstFont(false)
     , mSkipDrawing(false)
     , mSkipUpdateUserFonts(false)
 {
@@ -2962,10 +2964,11 @@ void gfxFontGroup::ComputeRanges(nsTArray<gfxTextRange>& aRanges,
             lastRangeIndex++;
             prevFont = font;
         } else {
-            // if font has changed, make a new range
+            // if font or orientation has changed, make a new range...
+            // unless ch is a variation selector (bug 1248248)
             gfxTextRange& prevRange = aRanges[lastRangeIndex];
             if (prevRange.font != font || prevRange.matchType != matchType ||
-                prevRange.orientation != orient) {
+                (prevRange.orientation != orient && !IsClusterExtender(ch))) {
                 // close out the previous range
                 prevRange.end = origI;
                 aRanges.AppendElement(gfxTextRange(origI, i + 1,

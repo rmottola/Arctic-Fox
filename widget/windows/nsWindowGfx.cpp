@@ -42,7 +42,8 @@ using mozilla::plugins::PluginInstanceParent;
 #include "nsDebug.h"
 #include "nsIXULRuntime.h"
 
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "ClientLayerManager.h"
 
 #include "nsUXThemeData.h"
@@ -166,6 +167,13 @@ nsIWidgetListener* nsWindow::GetPaintListener()
   return mAttachedWidgetListener ? mAttachedWidgetListener : mWidgetListener;
 }
 
+void nsWindow::ForcePresent()
+{
+  if (CompositorBridgeChild* remoteRenderer = GetRemoteRenderer()) {
+    remoteRenderer->SendForcePresent();
+  }
+}
+
 bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 {
   // We never have reentrant paint events, except when we're running our RPC
@@ -177,7 +185,9 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 
   if (gfxWindowsPlatform::GetPlatform()->DidRenderingDeviceReset()) {
     gfxWindowsPlatform::GetPlatform()->UpdateRenderMode();
-    EnumAllWindows(ClearCompositor);
+    EnumAllWindows([] (nsWindow* aWindow) -> void {
+      aWindow->OnRenderingDeviceReset();
+    });
     return false;
   }
 
@@ -220,12 +230,12 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 
   ClientLayerManager *clientLayerManager = GetLayerManager()->AsClientLayerManager();
 
-  if (clientLayerManager && mCompositorParent &&
+  if (clientLayerManager && mCompositorBridgeParent &&
       !mBounds.IsEqualEdges(mLastPaintBounds))
   {
     // Do an early async composite so that we at least have something on the
     // screen in the right place, even if the content is out of date.
-    mCompositorParent->ScheduleRenderOnCompositorThread();
+    mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
   }
   mLastPaintBounds = mBounds;
 
@@ -271,7 +281,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 #endif
   nsIntRegion region = GetRegionToPaint(forceRepaint, ps, hDC);
 
-  if (clientLayerManager && mCompositorParent) {
+  if (clientLayerManager && mCompositorBridgeParent) {
     // We need to paint to the screen even if nothing changed, since if we
     // don't have a compositing window manager, our pixels could be stale.
     clientLayerManager->SetNeedsComposite(true);
@@ -288,8 +298,8 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     return false;
   }
 
-  if (clientLayerManager && mCompositorParent && clientLayerManager->NeedsComposite()) {
-    mCompositorParent->ScheduleRenderOnCompositorThread();
+  if (clientLayerManager && mCompositorBridgeParent && clientLayerManager->NeedsComposite()) {
+    mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
     clientLayerManager->SetNeedsComposite(false);
   }
 
@@ -513,8 +523,13 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
         }
         break;
       case LayersBackend::LAYERS_CLIENT:
-        result = listener->PaintWindow(
-          this, LayoutDeviceIntRegion::FromUnknownRegion(region));
+        {
+          result = listener->PaintWindow(
+            this, LayoutDeviceIntRegion::FromUnknownRegion(region));
+          nsCOMPtr<nsIRunnable> event =
+            NS_NewRunnableMethod(this, &nsWindow::ForcePresent);
+          NS_DispatchToMainThread(event);
+        }
         break;
       default:
         NS_ERROR("Unknown layers backend used!");

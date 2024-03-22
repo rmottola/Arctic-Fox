@@ -166,6 +166,8 @@ fuzzy-if(gtkWidget||B2G,255,6) fuzzy-if(cocoaWidget,65,69) == 1193519-sideways-l
 == 1216747-1.html 1216747-1-ref.html
 != 1216747-1.html 1216747-1-notref.html
 
+HTTP(..) == 1248248-1-orientation-break-glyphrun.html 1248248-1-orientation-break-glyphrun-ref.html
+
 # Suite of tests from Gérard Talbot in bug 1079151
 include abspos/reftest.list
 

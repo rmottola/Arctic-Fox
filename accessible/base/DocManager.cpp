@@ -470,17 +470,15 @@ DocManager::CreateDocOrRootAccessible(nsIDocument* aDocument)
 
   // We only create root accessibles for the true root, otherwise create a
   // doc accessible.
-  nsIContent *rootElm = nsCoreUtils::GetRoleContent(aDocument);
   RefPtr<DocAccessible> docAcc = isRootDoc ?
-    new RootAccessibleWrap(aDocument, rootElm, presShell) :
-    new DocAccessibleWrap(aDocument, rootElm, presShell);
+    new RootAccessibleWrap(aDocument, presShell) :
+    new DocAccessibleWrap(aDocument, presShell);
 
   // Cache the document accessible into document cache.
   mDocAccessibleCache.Put(aDocument, docAcc);
 
   // Initialize the document accessible.
   docAcc->Init();
-  docAcc->SetRoleMapEntry(aria::GetRoleMap(aDocument));
 
   // Bind the document to the tree.
   if (isRootDoc) {
@@ -501,7 +499,7 @@ DocManager::CreateDocOrRootAccessible(nsIDocument* aDocument)
     if (IPCAccessibilityActive()) {
       nsIDocShell* docShell = aDocument->GetDocShell();
       if (docShell) {
-        nsCOMPtr<nsITabChild> tabChild = do_GetInterface(docShell);
+        nsCOMPtr<nsITabChild> tabChild = docShell->GetTabChild();
 
         // XXX We may need to handle the case that we don't have a tab child
         // differently.  It may be that this will cause us to fail to notify

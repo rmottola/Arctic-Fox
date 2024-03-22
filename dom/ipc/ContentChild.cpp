@@ -45,9 +45,8 @@
 #include "mozilla/ipc/TestShellChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/APZChild.h"
-#include "mozilla/layers/CompositorChild.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
-#include "mozilla/layers/PCompositorChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/net/NeckoChild.h"
@@ -102,6 +101,7 @@
 #include "nsISpellChecker.h"
 #include "nsClipboardProxy.h"
 #include "nsISystemMessageCache.h"
+#include "nsDirectoryService.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsContentPermissionHelper.h"
@@ -146,6 +146,7 @@
 #ifdef XP_WIN
 #include <process.h>
 #define getpid _getpid
+#include "mozilla/widget/AudioSession.h"
 #endif
 
 #ifdef MOZ_X11
@@ -597,9 +598,6 @@ ReinitTaskTracer(void* /*aUnused*/)
 
 ContentChild::ContentChild()
  : mID(uint64_t(-1))
-#ifdef ANDROID
- , mScreenSize(0, 0)
-#endif
  , mCanOverrideProcessName(true)
  , mIsAlive(true)
 {
@@ -805,7 +803,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     PopupIPCTabContext context;
     openerTabId = aTabOpener->GetTabId();
     context.opener() = openerTabId;
-    context.isBrowserElement() = aTabOpener->IsBrowserElement();
+    context.isMozBrowserElement() = aTabOpener->IsMozBrowserElement();
     ipcContext = new IPCTabContext(context);
   } else {
     // It's possible to not have a TabChild opener in the case
@@ -1285,11 +1283,11 @@ ContentChild::DeallocPAPZChild(PAPZChild* aActor)
   return true;
 }
 
-PCompositorChild*
-ContentChild::AllocPCompositorChild(mozilla::ipc::Transport* aTransport,
-                                    base::ProcessId aOtherProcess)
+PCompositorBridgeChild*
+ContentChild::AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
+                                          base::ProcessId aOtherProcess)
 {
-  return CompositorChild::Create(aTransport, aOtherProcess);
+  return CompositorBridgeChild::Create(aTransport, aOtherProcess);
 }
 
 PSharedBufferManagerChild*
@@ -1410,12 +1408,29 @@ StartMacOSContentSandbox()
     MOZ_CRASH("Error resolving child process path");
   }
 
+  // During sandboxed content process startup, before reaching
+  // this point, NS_OS_TEMP_DIR is modified to refer to a sandbox-
+  // writable temporary directory
+  nsCOMPtr<nsIFile> tempDir;
+  nsresult rv = nsDirectoryService::gService->Get(NS_OS_TEMP_DIR,
+      NS_GET_IID(nsIFile), getter_AddRefs(tempDir));
+  if (NS_FAILED(rv)) {
+    MOZ_CRASH("Failed to get NS_OS_TEMP_DIR");
+  }
+
+  nsAutoCString tempDirPath;
+  rv = tempDir->GetNativePath(tempDirPath);
+  if (NS_FAILED(rv)) {
+    MOZ_CRASH("Failed to get NS_OS_TEMP_DIR path");
+  }
+
   MacSandboxInfo info;
   info.type = MacSandboxType_Content;
   info.level = Preferences::GetInt("security.sandbox.content.level");
   info.appPath.assign(appPath.get());
   info.appBinaryPath.assign(appBinaryPath.get());
   info.appDir.assign(appDir.get());
+  info.appTempDir.assign(tempDirPath.get());
 
   std::string err;
   if (!mozilla::StartMacSandbox(info, err)) {
@@ -2495,17 +2510,6 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
 }
 
 bool
-ContentChild::RecvScreenSizeChanged(const gfx::IntSize& size)
-{
-#ifdef ANDROID
-  mScreenSize = size;
-#else
-  NS_RUNTIMEABORT("Message currently only expected on android");
-#endif
-  return true;
-}
-
-bool
 ContentChild::RecvFlushMemory(const nsString& reason)
 {
 #ifdef MOZ_NUWA_PROCESS
@@ -2561,8 +2565,8 @@ OnFinishNuwaPreparation()
 {
   // We want to ensure that the PBackground actor gets cloned in the Nuwa
   // process before we freeze. Also, we have to do this to avoid deadlock.
-  // Protocols that are "opened" (e.g. PBackground, PCompositor) block the
-  // main thread to wait for the IPC thread during the open operation.
+  // Protocols that are "opened" (e.g. PBackground, PCompositorBridge) block
+  // the main thread to wait for the IPC thread during the open operation.
   // NuwaSpawnWait() blocks the IPC thread to wait for the main thread when
   // the Nuwa process is forked. Unless we ensure that the two cannot happen
   // at the same time then we risk deadlock. Spinning the event loop here
@@ -2584,7 +2588,10 @@ static void
 PreloadSlowThings()
 {
   // This fetches and creates all the built-in stylesheets.
-  nsLayoutStylesheetCache::UserContentSheet();
+  //
+  // XXXheycam In the future we might want to preload the Servo-flavoured
+  // UA sheets too, but for now that will be a waste of time.
+  nsLayoutStylesheetCache::For(StyleBackendType::Gecko)->UserContentSheet();
 
   TabChild::PreloadSlowThings();
 
@@ -3022,6 +3029,10 @@ ContentChild::RecvShutdown()
                           "content-child-shutdown", nullptr);
   }
 
+#if defined(XP_WIN)
+    mozilla::widget::StopAudioSession();
+#endif
+
   GetIPCChannel()->SetAbortOnError(false);
 
 #ifdef MOZ_ENABLE_PROFILER_SPS
@@ -3140,6 +3151,26 @@ ContentChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
   return true;
 }
 
+bool
+ContentChild::RecvSetAudioSessionData(const nsID& aId,
+                                      const nsString& aDisplayName,
+                                      const nsString& aIconPath)
+{
+#if defined(XP_WIN)
+    if (NS_FAILED(mozilla::widget::RecvAudioSessionData(aId, aDisplayName,
+                                                        aIconPath))) {
+      return true;
+    }
+
+    // Ignore failures here; we can't really do anything about them
+    mozilla::widget::StartAudioSession();
+    return true;
+#else
+    NS_RUNTIMEABORT("Not Reached!");
+    return false;
+#endif
+}
+
 // This code goes here rather than nsGlobalWindow.cpp because nsGlobalWindow.cpp
 // can't include ContentChild.h since it includes windows.h.
 
@@ -3230,15 +3261,6 @@ ContentChild::RecvEndDragSession(const bool& aDoneDrag,
     }
     dragService->EndDragSession(aDoneDrag);
   }
-  return true;
-}
-
-bool
-ContentChild::RecvTestGraphicsDeviceReset(const uint32_t& aResetReason)
-{
-#if defined(XP_WIN)
-  gfxPlatform::GetPlatform()->TestDeviceReset(DeviceResetReason(aResetReason));
-#endif
   return true;
 }
 

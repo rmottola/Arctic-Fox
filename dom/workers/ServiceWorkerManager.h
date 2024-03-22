@@ -73,9 +73,6 @@ public:
   NS_DECL_NSISERVICEWORKERREGISTRATIONINFO
 
   nsCString mScope;
-  // The scriptURL for the registration. This may be completely different from
-  // the URLs of the following three workers.
-  nsCString mScriptSpec;
 
   nsCOMPtr<nsIPrincipal> mPrincipal;
 
@@ -100,7 +97,7 @@ public:
                                 nsIPrincipal* aPrincipal);
 
   already_AddRefed<ServiceWorkerInfo>
-  Newest()
+  Newest() const
   {
     RefPtr<ServiceWorkerInfo> newest;
     if (mInstallingWorker) {
@@ -141,6 +138,9 @@ public:
 
   void
   PurgeActiveWorker();
+
+  void
+  TryToActivateAsync();
 
   void
   TryToActivate();
@@ -305,6 +305,9 @@ public:
 
   void
   RemoveWorker(ServiceWorker* aWorker);
+
+  already_AddRefed<ServiceWorker>
+  GetOrCreateInstance(nsPIDOMWindowInner* aWindow);
 };
 
 #define NS_SERVICEWORKERMANAGER_IMPL_IID                 \
@@ -391,7 +394,7 @@ public:
          ServiceWorkerUpdateFinishCallback* aCallback);
 
   void
-  SoftUpdate(const OriginAttributes& aOriginAttributes,
+  SoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
              const nsACString& aScope);
 
   void

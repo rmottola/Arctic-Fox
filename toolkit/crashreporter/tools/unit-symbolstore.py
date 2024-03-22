@@ -5,6 +5,7 @@
 
 import concurrent.futures
 import mock
+import mozunit
 import os
 import platform
 import shutil
@@ -478,12 +479,17 @@ class TestFunctional(HelperMixin, unittest.TestCase):
                                         'crashreporter', 'tools',
                                         'symbolstore.py')
         if platform.system() in ("Windows", "Microsoft"):
-            self.dump_syms = os.path.join(self.topsrcdir,
-                                          'toolkit',
-                                          'crashreporter',
-                                          'tools',
-                                          'win32',
-                                          'dump_syms_vc{_MSC_VER}.exe'.format(**buildconfig.substs))
+            if buildconfig.substs['MSVC_HAS_DIA_SDK']:
+                self.dump_syms = os.path.join(buildconfig.topobjdir,
+                                              'dist', 'host', 'bin',
+                                              'dump_syms.exe')
+            else:
+                self.dump_syms = os.path.join(self.topsrcdir,
+                                              'toolkit',
+                                              'crashreporter',
+                                              'tools',
+                                              'win32',
+                                              'dump_syms_vc{_MSC_VER}.exe'.format(**buildconfig.substs))
             self.target_bin = os.path.join(buildconfig.topobjdir,
                                            'browser',
                                            'app',
@@ -528,5 +534,5 @@ if __name__ == '__main__':
     # that our mocking/module-patching works.
     symbolstore.Dumper.GlobalInit(concurrent.futures.ThreadPoolExecutor)
 
-    unittest.main()
+    mozunit.main()
 

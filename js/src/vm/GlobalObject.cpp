@@ -15,6 +15,7 @@
 #include "jsprototypes.h"
 #include "jsweakmap.h"
 
+#include "asmjs/Wasm.h"
 #include "builtin/AtomicsObject.h"
 #include "builtin/Eval.h"
 #if EXPOSE_INTL_API
@@ -93,6 +94,9 @@ js::GlobalObject::getTypedObjectModule() const {
 /* static */ bool
 GlobalObject::skipDeselectedConstructor(JSContext* cx, JSProtoKey key)
 {
+    if (key == JSProto_Wasm)
+        return !cx->runtime()->options().wasm();
+
 #ifdef ENABLE_SHARED_ARRAY_BUFFER
     // Return true if the given constructor has been disabled at run-time.
     switch (key) {
@@ -197,10 +201,12 @@ GlobalObject::resolveConstructor(JSContext* cx, Handle<GlobalObject*> global, JS
     global->setConstructorPropertySlot(key, ObjectValue(*ctor));
 
     // Define any specified functions and properties, unless we're a dependent
-    // standard class (in which case they live on the prototype).
-    if (!StandardClassIsDependent(key)) {
+    // standard class (in which case they live on the prototype), or we're
+    // operating on the self-hosting global, in which case we don't want any
+    // functions and properties on the builtins and their prototypes.
+    if (!StandardClassIsDependent(key) && !cx->runtime()->isSelfHostingGlobal(global)) {
         if (const JSFunctionSpec* funs = clasp->spec.prototypeFunctions()) {
-            if (!JS_DefineFunctions(cx, proto, funs, DontDefineLateProperties))
+            if (!JS_DefineFunctions(cx, proto, funs))
                 return false;
         }
         if (const JSPropertySpec* props = clasp->spec.prototypeProperties()) {
@@ -208,7 +214,7 @@ GlobalObject::resolveConstructor(JSContext* cx, Handle<GlobalObject*> global, JS
                 return false;
         }
         if (const JSFunctionSpec* funs = clasp->spec.constructorFunctions()) {
-            if (!JS_DefineFunctions(cx, ctor, funs, DontDefineLateProperties))
+            if (!JS_DefineFunctions(cx, ctor, funs))
                 return false;
         }
         if (const JSPropertySpec* props = clasp->spec.constructorProperties()) {

@@ -179,6 +179,10 @@
    * a document with a calculated checksum that does not match the Content-MD5
    * http header. */
   ERROR(NS_ERROR_CORRUPTED_CONTENT,                   FAILURE(29)),
+  /* A content signature verification failed for some reason. This can be either
+   * an actual verification error, or any other error that led to the fact that
+   * a content signature that was expected couldn't be verified. */
+  ERROR(NS_ERROR_INVALID_SIGNATURE,                   FAILURE(58)),
   /* While parsing for the first component of a header field using syntax as in
    * Content-Disposition or Content-Type, the first component was found to be
    * empty, such as in: Content-Disposition: ; filename=foo */
@@ -548,9 +552,17 @@
 
   /*
    * A success code that indicates that evaluating a string of JS went
-   * just fine except it threw an exception.
+   * just fine except it threw an exception. Only for legacy use by
+   * nsJSUtils.
    */
   ERROR(NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW,    SUCCESS(2)),
+
+  /*
+   * A success code that indicates that evaluating a string of JS went
+   * just fine except it was killed by an uncatchable exception.
+   * Only for legacy use by nsJSUtils.
+   */
+  ERROR(NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW_UNCATCHABLE, SUCCESS(3)),
 #undef MODULE
 
 
@@ -639,8 +651,6 @@
   ERROR(NS_ERROR_XPC_BAD_CONVERT_JS_ZERO_ISNOT_NULL,   FAILURE(53)),
   ERROR(NS_ERROR_XPC_CANT_PASS_CPOW_TO_NATIVE,         FAILURE(54)),
   /* any new errors here should have an associated entry added in xpc.msg */
-
-  ERROR(NS_SUCCESS_I_DID_SOMETHING,      SUCCESS(1)),
 #undef MODULE
 
 

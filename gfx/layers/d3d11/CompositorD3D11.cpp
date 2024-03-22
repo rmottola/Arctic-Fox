@@ -461,11 +461,6 @@ CompositorD3D11::GetTextureFactoryIdentifier()
   ident.mParentProcessId = XRE_GetProcessType();
   ident.mParentBackend = LayersBackend::LAYERS_D3D11;
   ident.mSyncHandle = mAttachments->mSyncHandle;
-  for (uint8_t op = 0; op < uint8_t(gfx::CompositionOp::OP_COUNT); op++) {
-    if (BlendOpIsMixBlendMode(gfx::CompositionOp(op))) {
-      ident.mSupportedBlendModes += gfx::CompositionOp(op);
-    }
-  }
   return ident;
 }
 
@@ -912,12 +907,7 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
   MaskType maskType = MaskType::MaskNone;
 
   if (aEffectChain.mSecondaryEffects[EffectTypes::MASK]) {
-    if (aTransform.Is2D()) {
-      maskType = MaskType::Mask2d;
-    } else {
-      MOZ_ASSERT(aEffectChain.mPrimaryEffect->mType == EffectTypes::RGB);
-      maskType = MaskType::Mask3d;
-    }
+    maskType = MaskType::Mask;
 
     EffectMask* maskEffect =
       static_cast<EffectMask*>(aEffectChain.mSecondaryEffects[EffectTypes::MASK].get());
@@ -1134,6 +1124,7 @@ void
 CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
                             const Rect* aClipRectIn,
                             const Rect& aRenderBounds,
+                            bool aOpaque,
                             Rect* aClipRectOut,
                             Rect* aRenderBoundsOut)
 {
@@ -1498,8 +1489,7 @@ DeviceAttachmentsD3D11::InitBlendShaders()
 {
   if (!mVSQuadBlendShader[MaskType::MaskNone]) {
     InitVertexShader(sLayerQuadBlendVS, mVSQuadBlendShader, MaskType::MaskNone);
-    InitVertexShader(sLayerQuadBlendMaskVS, mVSQuadBlendShader, MaskType::Mask2d);
-    InitVertexShader(sLayerQuadBlendMask3DVS, mVSQuadBlendShader, MaskType::Mask3d);
+    InitVertexShader(sLayerQuadBlendMaskVS, mVSQuadBlendShader, MaskType::Mask);
   }
   if (!mBlendShader[MaskType::MaskNone]) {
     InitPixelShader(sBlendShader, mBlendShader, MaskType::MaskNone);
@@ -1511,21 +1501,19 @@ bool
 DeviceAttachmentsD3D11::CreateShaders()
 {
   InitVertexShader(sLayerQuadVS, mVSQuadShader, MaskType::MaskNone);
-  InitVertexShader(sLayerQuadMaskVS, mVSQuadShader, MaskType::Mask2d);
-  InitVertexShader(sLayerQuadMask3DVS, mVSQuadShader, MaskType::Mask3d);
+  InitVertexShader(sLayerQuadMaskVS, mVSQuadShader, MaskType::Mask);
 
   InitPixelShader(sSolidColorShader, mSolidColorShader, MaskType::MaskNone);
-  InitPixelShader(sSolidColorShaderMask, mSolidColorShader, MaskType::Mask2d);
+  InitPixelShader(sSolidColorShaderMask, mSolidColorShader, MaskType::Mask);
   InitPixelShader(sRGBShader, mRGBShader, MaskType::MaskNone);
-  InitPixelShader(sRGBShaderMask, mRGBShader, MaskType::Mask2d);
+  InitPixelShader(sRGBShaderMask, mRGBShader, MaskType::Mask);
   InitPixelShader(sRGBAShader, mRGBAShader, MaskType::MaskNone);
-  InitPixelShader(sRGBAShaderMask, mRGBAShader, MaskType::Mask2d);
-  InitPixelShader(sRGBAShaderMask3D, mRGBAShader, MaskType::Mask3d);
+  InitPixelShader(sRGBAShaderMask, mRGBAShader, MaskType::Mask);
   InitPixelShader(sYCbCrShader, mYCbCrShader, MaskType::MaskNone);
-  InitPixelShader(sYCbCrShaderMask, mYCbCrShader, MaskType::Mask2d);
+  InitPixelShader(sYCbCrShaderMask, mYCbCrShader, MaskType::Mask);
   if (gfxPrefs::ComponentAlphaEnabled()) {
     InitPixelShader(sComponentAlphaShader, mComponentAlphaShader, MaskType::MaskNone);
-    InitPixelShader(sComponentAlphaShaderMask, mComponentAlphaShader, MaskType::Mask2d);
+    InitPixelShader(sComponentAlphaShaderMask, mComponentAlphaShader, MaskType::Mask);
   }
 
   InitVertexShader(sOculus050VRDistortionVS, getter_AddRefs(mVRDistortionVS[VRHMDType::Oculus050]));

@@ -688,53 +688,6 @@ var AddonManagerInternal = {
   // Store telemetry details per addon provider
   telemetryDetails: {},
 
-  // A read-only wrapper around the types dictionary
-  typesProxy: Proxy.create({
-    getOwnPropertyDescriptor: function(aName) {
-      if (!(aName in AddonManagerInternal.types))
-        return undefined;
-
-      return {
-        value: AddonManagerInternal.types[aName].type,
-        writable: false,
-        configurable: false,
-        enumerable: true
-      }
-    },
-
-    getPropertyDescriptor: function(aName) {
-      return this.getOwnPropertyDescriptor(aName);
-    },
-
-    getOwnPropertyNames: function() {
-      return Object.keys(AddonManagerInternal.types);
-    },
-
-    getPropertyNames: function() {
-      return this.getOwnPropertyNames();
-    },
-
-    delete: function(aName) {
-      // Not allowed to delete properties
-      return false;
-    },
-
-    defineProperty: function(aName, aProperty) {
-      // Ignore attempts to define properties
-    },
-
-    fix: function(){
-      return undefined;
-    },
-
-    // Despite MDC's claims to the contrary, it is required that this trap
-    // be defined
-    enumerate: function() {
-      // All properties are enumerable
-      return this.getPropertyNames();
-    }
-  }),
-
   recordTimestamp: function(name, value) {
     this.TelemetryTimestamps.add(name, value);
   },
@@ -2324,6 +2277,28 @@ var AddonManagerInternal = {
                                .installTemporaryAddon(aFile);
   },
 
+  /**
+   * Returns an Addon corresponding to an instance ID.
+   * @param aInstanceID
+   *        An Addon Instance ID symbol
+   * @return {Promise}
+   * @resolves The found Addon or null if no such add-on exists.
+   * @rejects  Never
+   * @throws if the aInstanceID argument is not specified
+   *         or the AddonManager is not initialized
+   */
+   getAddonByInstanceID: function(aInstanceID) {
+     if (!gStarted)
+       throw Components.Exception("AddonManager is not initialized",
+                                  Cr.NS_ERROR_NOT_INITIALIZED);
+
+     if (!aInstanceID || typeof aInstanceID != "symbol")
+       throw Components.Exception("aInstanceID must be a Symbol()",
+                                  Cr.NS_ERROR_INVALID_ARG);
+
+     return AddonManagerInternal._getProviderByName("XPIProvider")
+                                .getAddonByInstanceID(aInstanceID);
+   },
 
   /**
    * Gets an icon from the icon set provided by the add-on
@@ -2697,7 +2672,53 @@ var AddonManagerInternal = {
   },
 
   get addonTypes() {
-    return this.typesProxy;
+    // A read-only wrapper around the types dictionary
+    return new Proxy(this.types, {
+      defineProperty(target, property, descriptor) {
+        // Not allowed to define properties
+        return false;
+      },
+
+      deleteProperty(target, property) {
+        // Not allowed to delete properties
+        return false;
+      },
+
+      get(target, property, receiver) {
+        if (!target.hasOwnProperty(property))
+          return undefined;
+
+        return target[property].type;
+      },
+
+      getOwnPropertyDescriptor(target, property) {
+        if (!target.hasOwnProperty(property))
+          return undefined;
+
+        return {
+          value: target[property].type,
+          writable: false,
+          // Claim configurability to maintain the proxy invariants.
+          configurable: true,
+          enumerable: true
+        }
+      },
+
+      preventExtensions(target) {
+        // Not allowed to prevent adding new properties
+        return false;
+      },
+
+      set(target, property, value, receiver) {
+        // Not allowed to set properties
+        return false;
+      },
+
+      setPrototypeOf(target, prototype) {
+        // Not allowed to change prototype
+        return false;
+      }
+    });
   },
 
   get autoUpdateDefault() {
@@ -3080,6 +3101,10 @@ this.AddonManager = {
   // Same as OPTIONS_TYPE_INLINE, but no Preferences button will be shown.
   // Used to indicate that only non-interactive information will be shown.
   OPTIONS_TYPE_INLINE_INFO: 4,
+  // Similar to OPTIONS_TYPE_INLINE, but rather than generating inline
+  // options from a specially-formatted XUL file, the contents of the
+  // file are simply displayed in an inline <browser> element.
+  OPTIONS_TYPE_INLINE_BROWSER: 5,
 
   // Constants for displayed or hidden options notifications
   // Options notification will be displayed
@@ -3229,6 +3254,10 @@ this.AddonManager = {
 
   installTemporaryAddon: function(aDirectory) {
     return AddonManagerInternal.installTemporaryAddon(aDirectory);
+  },
+
+  getAddonByInstanceID: function(aInstanceID) {
+    return AddonManagerInternal.getAddonByInstanceID(aInstanceID);
   },
 
   addManagerListener: function(aListener) {

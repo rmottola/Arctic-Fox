@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <title>Service Worker: Fetch Event Redirect Handling</title>
+<meta name=timeout content=long>
 <script src="/resources/testharness.js"></script>
 <script src="resources/testharness-helpers.js"></script>
 <script src="/resources/testharnessreport.js"></script>
@@ -51,14 +52,12 @@ function redirect_fetch_test(t, test) {
     var p = new Promise(function(resolve, reject) {
       var channel = new MessageChannel();
       channel.port1.onmessage = function(e) {
+        frame.remove();
         if (e.data.result === 'reject') {
-          frame.remove();
           reject(e.data.detail);
         } else if (e.data.result === 'success') {
-          frame.remove();
           resolve(e.data.result);
         } else {
-          frame.remove();
           resolve(e.data.detail);
         }
       };

@@ -263,6 +263,17 @@ class TestRecursiveMakeBackend(BackendTester):
             'TEST = foo',
         ])
 
+    def test_install_substitute_config_files(self):
+        """Ensure we recurse into the dirs that install substituted config files."""
+        env = self._consume('install_substitute_config_files', RecursiveMakeBackend)
+
+        root_deps_path = mozpath.join(env.topobjdir, 'root-deps.mk')
+        lines = [l.strip() for l in open(root_deps_path, 'rt').readlines()]
+
+        # Make sure we actually recurse into the sub directory during export to
+        # install the subst file.
+        self.assertTrue(any(l == 'recurse_export: sub/export' for l in lines))
+
     def test_variable_passthru(self):
         """Ensure variable passthru is written out correctly."""
         env = self._consume('variable_passthru', RecursiveMakeBackend)
@@ -478,6 +489,18 @@ class TestRecursiveMakeBackend(BackendTester):
         #BRANDING_FILES should appear in the dist_branding install manifest.
         m = InstallManifest(path=os.path.join(env.topobjdir,
             '_build_manifests', 'install', 'dist_branding'))
+        self.assertEqual(len(m), 3)
+        self.assertIn('bar.ico', m)
+        self.assertIn('quux.png', m)
+        self.assertIn('icons/foo.ico', m)
+
+    def test_sdk_files(self):
+        """Ensure SDK_FILES is handled properly."""
+        env = self._consume('sdk-files', RecursiveMakeBackend)
+
+        #SDK_FILES should appear in the dist_sdk install manifest.
+        m = InstallManifest(path=os.path.join(env.topobjdir,
+            '_build_manifests', 'install', 'dist_sdk'))
         self.assertEqual(len(m), 3)
         self.assertIn('bar.ico', m)
         self.assertIn('quux.png', m)
@@ -847,6 +870,32 @@ class TestRecursiveMakeBackend(BackendTester):
             'IS_COMPONENT := 1\n',
             'DSO_SONAME := bar\n',
         ])
+
+        self.assertTrue(os.path.exists(mozpath.join(env.topobjdir, 'binaries.json')))
+        with open(mozpath.join(env.topobjdir, 'binaries.json'), 'rb') as fh:
+            binaries = json.load(fh)
+
+        self.assertEqual(binaries, {
+            'programs': [],
+            'shared_libraries': [
+                {
+                    'basename': 'foo',
+                    'import_name': 'foo',
+                    'install_target': 'dist/bin',
+                    'lib_name': 'foo',
+                    'relobjdir': 'foo',
+                    'soname': 'foo',
+                },
+                {
+                    'basename': 'bar',
+                    'import_name': 'bar',
+                    'install_target': 'dist/bin',
+                    'lib_name': 'bar',
+                    'relobjdir': 'bar',
+                    'soname': 'bar',
+                }
+            ],
+        })
 
 
 if __name__ == '__main__':

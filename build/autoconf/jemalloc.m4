@@ -4,11 +4,11 @@ dnl file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 AC_DEFUN([MOZ_SUBCONFIGURE_JEMALLOC], [
 
-if test -z "$BUILDING_JS" -o -n "$JS_STANDALONE"; then
+if test "$MOZ_BUILD_APP" != js -o -n "$JS_STANDALONE"; then
 
   # Run jemalloc configure script
 
-  if test -z "$MOZ_NATIVE_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC4" -o -n "$MOZ_REPLACE_MALLOC"; then
+  if test -z "$MOZ_SYSTEM_JEMALLOC" -a "$MOZ_MEMORY" && test -n "$MOZ_JEMALLOC4" -o -n "$MOZ_REPLACE_MALLOC"; then
     ac_configure_args="--build=$build --host=$target --enable-stats --with-jemalloc-prefix=je_ --disable-valgrind"
     # We're using memalign for _aligned_malloc in memory/build/mozmemory_wrap.c
     # on Windows, so just export memalign on all platforms.

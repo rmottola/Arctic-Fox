@@ -8,6 +8,7 @@
 
 #include <stdint.h>                     // for uint32_t, uint64_t
 #include "Units.h"                      // for CSSRect, CSSPixel, etc
+#include "mozilla/HashFunctions.h"      // for HashGeneric
 #include "mozilla/Maybe.h"
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/Rect.h"           // for RoundedIn
@@ -231,6 +232,12 @@ public:
     mSmoothScrollOffset = aOther.mSmoothScrollOffset;
     mScrollGeneration = aOther.mScrollGeneration;
     mDoSmoothScroll = aOther.mDoSmoothScroll;
+  }
+
+  void UpdateScrollInfo(uint32_t aScrollGeneration, const CSSPoint& aScrollOffset)
+  {
+    mScrollOffset = aScrollOffset;
+    mScrollGeneration = aScrollGeneration;
   }
 
   // Make a copy of this FrameMetrics object which does not have any pointers
@@ -859,6 +866,11 @@ struct ScrollableLayerGuid {
       }
     }
     return false;
+  }
+
+  uint32_t Hash() const
+  {
+    return HashGeneric(mLayersId, mPresShellId, mScrollId);
   }
 };
 

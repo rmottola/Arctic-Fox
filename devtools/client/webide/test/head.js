@@ -5,13 +5,13 @@
 
 var {utils: Cu, classes: Cc, interfaces: Ci} = Components;
 
-Cu.import('resource://gre/modules/Services.jsm');
 Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-const {gDevTools} = Cu.import("resource://devtools/client/framework/gDevTools.jsm", {});
+const {gDevTools} = require("devtools/client/framework/devtools");
 const promise = require("promise");
+const Services = require("Services");
 const {AppProjects} = require("devtools/client/webide/modules/app-projects");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 DevToolsUtils.testing = true;
@@ -95,7 +95,7 @@ function removeAllProjects() {
     yield AppProjects.load();
     // use a new array so we're not iterating over the same
     // underlying array that's being modified by AppProjects
-    let projects = AppProjects.store.object.projects.map(p => p.location);
+    let projects = AppProjects.projects.map(p => p.location);
     for (let i = 0; i < projects.length; i++) {
       yield AppProjects.remove(projects[i]);
     }

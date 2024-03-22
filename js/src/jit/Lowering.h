@@ -129,7 +129,9 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitMinMax(MMinMax* ins);
     void visitAbs(MAbs* ins);
     void visitClz(MClz* ins);
+    void visitCtz(MCtz* ins);
     void visitSqrt(MSqrt* ins);
+    void visitPopcnt(MPopcnt* ins);
     void visitAtan2(MAtan2* ins);
     void visitHypot(MHypot* ins);
     void visitPow(MPow* ins);
@@ -156,6 +158,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitToFloat32(MToFloat32* convert);
     void visitToInt32(MToInt32* convert);
     void visitTruncateToInt32(MTruncateToInt32* truncate);
+    void visitWrapInt64ToInt32(MWrapInt64ToInt32* ins);
+    void visitExtendInt32ToInt64(MExtendInt32ToInt64* ins);
     void visitToString(MToString* convert);
     void visitToObjectOrNull(MToObjectOrNull* convert);
     void visitRegExp(MRegExp* ins);
@@ -179,6 +183,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitFunctionEnvironment(MFunctionEnvironment* ins);
     void visitInterruptCheck(MInterruptCheck* ins);
     void visitAsmJSInterruptCheck(MAsmJSInterruptCheck* ins);
+    void visitAsmThrowUnreachable(MAsmThrowUnreachable* ins);
     void visitStoreSlot(MStoreSlot* ins);
     void visitFilterTypeSet(MFilterTypeSet* ins);
     void visitTypeBarrier(MTypeBarrier* ins);
@@ -187,6 +192,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitPostWriteElementBarrier(MPostWriteElementBarrier* ins);
     void visitArrayLength(MArrayLength* ins);
     void visitSetArrayLength(MSetArrayLength* ins);
+    void visitGetNextMapEntryForIterator(MGetNextMapEntryForIterator* ins);
     void visitTypedArrayLength(MTypedArrayLength* ins);
     void visitTypedArrayElements(MTypedArrayElements* ins);
     void visitSetDisjointTypedElements(MSetDisjointTypedElements* ins);

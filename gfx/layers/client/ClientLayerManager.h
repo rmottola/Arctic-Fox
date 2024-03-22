@@ -31,7 +31,7 @@ namespace mozilla {
 namespace layers {
 
 class ClientPaintedLayer;
-class CompositorChild;
+class CompositorBridgeChild;
 class ImageLayer;
 class PLayerChild;
 class FrameUniformityData;
@@ -97,6 +97,7 @@ public:
   virtual already_AddRefed<ColorLayer> CreateColorLayer() override;
   virtual already_AddRefed<RefLayer> CreateRefLayer() override;
 
+  void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier);
   TextureFactoryIdentifier GetTextureFactoryIdentifier()
   {
     return mForwarder->GetTextureFactoryIdentifier();
@@ -157,9 +158,9 @@ public:
   void* GetPaintedLayerCallbackData() const
   { return mPaintedLayerCallbackData; }
 
-  CompositorChild* GetRemoteRenderer();
+  CompositorBridgeChild* GetRemoteRenderer();
 
-  CompositorChild* GetCompositorChild();
+  CompositorBridgeChild* GetCompositorBridgeChild();
 
   // Disable component alpha layers with the software compositor.
   virtual bool ShouldAvoidComponentAlphaLayers() override { return !IsCompositingCheap(); }
@@ -201,11 +202,6 @@ public:
   void DidComposite(uint64_t aTransactionId,
                     const mozilla::TimeStamp& aCompositeStart,
                     const mozilla::TimeStamp& aCompositeEnd);
-
-  virtual bool SupportsMixBlendModes(EnumSet<gfx::CompositionOp>& aMixBlendModes) override
-  {
-   return (GetTextureFactoryIdentifier().mSupportedBlendModes & aMixBlendModes) == aMixBlendModes;
-  }
 
   virtual bool AreComponentAlphaLayersEnabled() override;
 
@@ -307,6 +303,8 @@ private:
                               void* aCallbackData,
                               EndTransactionFlags);
 
+  bool DependsOnStaleDevice() const;
+
   LayerRefArray mKeepAlive;
 
   nsIWidget* mWidget;
@@ -357,6 +355,7 @@ private:
   nsTArray<DidCompositeObserver*> mDidCompositeObservers;
 
   RefPtr<MemoryPressureObserver> mMemoryPressureObserver;
+  uint64_t mDeviceCounter;
 };
 
 class ClientLayer : public ShadowableLayer

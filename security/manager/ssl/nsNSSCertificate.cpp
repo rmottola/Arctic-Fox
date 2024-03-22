@@ -11,6 +11,7 @@
 #include "CertVerifier.h"
 #include "ExtendedValidation.h"
 #include "mozilla/UniquePtr.h"
+#include "mozilla/unused.h"
 #include "pkix/pkixnss.h"
 #include "pkix/pkixtypes.h"
 #include "nsNSSComponent.h" // for PIPNSS string bundle calls.
@@ -57,7 +58,7 @@
 using namespace mozilla;
 using namespace mozilla::psm;
 
-extern PRLogModuleInfo* gPIPNSSLog;
+extern LazyLogModule gPIPNSSLog;
 
 // This is being stored in an uint32_t that can otherwise
 // only take values from nsIX509Cert's list of cert types.
@@ -216,6 +217,22 @@ nsNSSCertificate::GetIsSelfSigned(bool* aIsSelfSigned)
     return NS_ERROR_NOT_AVAILABLE;
 
   *aIsSelfSigned = mCert->isRoot;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsNSSCertificate::GetIsBuiltInRoot(bool* aIsBuiltInRoot)
+{
+  NS_ENSURE_ARG(aIsBuiltInRoot);
+
+  nsNSSShutDownPreventionLock locker;
+  if (isAlreadyShutDown()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  Result rv = IsCertBuiltInRoot(mCert, *aIsBuiltInRoot);
+  if (rv != Success) {
+    return NS_ERROR_FAILURE;
+  }
   return NS_OK;
 }
 
@@ -838,9 +855,8 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
   if (certVerifier->VerifyCert(mCert.get(), certificateUsageSSLServer, now,
                                nullptr, /*XXX fixme*/
                                nullptr, /* hostname */
-                               CertVerifier::FLAG_LOCAL_ONLY,
-                               nullptr, /* stapledOCSPResponse */
-                               &nssChain) != SECSuccess) {
+                               nssChain,
+                               CertVerifier::FLAG_LOCAL_ONLY) != SECSuccess) {
     nssChain = nullptr;
     // keep going
   }
@@ -865,9 +881,8 @@ nsNSSCertificate::GetChain(nsIArray** _rvChain)
     if (certVerifier->VerifyCert(mCert.get(), usage, now,
                                  nullptr, /*XXX fixme*/
                                  nullptr, /*hostname*/
-                                 CertVerifier::FLAG_LOCAL_ONLY,
-                                 nullptr, /* stapledOCSPResponse */
-                                 &nssChain) != SECSuccess) {
+                                 nssChain,
+                                 CertVerifier::FLAG_LOCAL_ONLY) != SECSuccess) {
       nssChain = nullptr;
       // keep going
     }
@@ -923,14 +938,13 @@ nsNSSCertificate::GetAllTokenNames(uint32_t* aLength, char16_t*** aTokenNames)
   *aTokenNames = nullptr;
 
   // Get the slots from NSS
-  ScopedPK11SlotList slots;
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Getting slots for \"%s\"\n", mCert->nickname));
-  slots = PK11_GetAllSlotsForCert(mCert.get(), nullptr);
+  UniquePK11SlotList slots(PK11_GetAllSlotsForCert(mCert.get(), nullptr));
   if (!slots) {
-    if (PORT_GetError() == SEC_ERROR_NO_TOKEN)
+    if (PORT_GetError() == SEC_ERROR_NO_TOKEN) {
       return NS_OK; // List of slots is empty, return empty array
-    else
-      return NS_ERROR_FAILURE;
+    }
+    return NS_ERROR_FAILURE;
   }
 
   // read the token names from slots
@@ -1149,7 +1163,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
       return NS_ERROR_INVALID_ARG;
   }
 
-  ScopedNSSCMSMessage cmsg(NSS_CMSMessage_Create(nullptr));
+  UniqueNSSCMSMessage cmsg(NSS_CMSMessage_Create(nullptr));
   if (!cmsg) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("nsNSSCertificate::ExportAsCMS - can't create CMS message\n"));
@@ -1157,8 +1171,8 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
   }
 
   // first, create SignedData with the certificate only (no chain)
-  ScopedNSSCMSSignedData sigd(
-    NSS_CMSSignedData_CreateCertsOnly(cmsg, mCert.get(), false));
+  UniqueNSSCMSSignedData sigd(
+    NSS_CMSSignedData_CreateCertsOnly(cmsg.get(), mCert.get(), false));
   if (!sigd) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("nsNSSCertificate::ExportAsCMS - can't create SignedData\n"));
@@ -1182,7 +1196,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
       ScopedCERTCertificateList certChain(
           CERT_CertChainFromCert(issuerCert, certUsageAnyCA, includeRoot));
       if (certChain) {
-        if (NSS_CMSSignedData_AddCertList(sigd, certChain) == SECSuccess) {
+        if (NSS_CMSSignedData_AddCertList(sigd.get(), certChain) == SECSuccess) {
           certChain.forget();
         }
         else {
@@ -1193,7 +1207,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
       }
       else {
         // try to add the issuerCert, at least
-        if (NSS_CMSSignedData_AddCertificate(sigd, issuerCert)
+        if (NSS_CMSSignedData_AddCertificate(sigd.get(), issuerCert)
             == SECSuccess) {
           issuerCert.forget();
         }
@@ -1206,10 +1220,10 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
     }
   }
 
-  NSSCMSContentInfo* cinfo = NSS_CMSMessage_GetContentInfo(cmsg);
-  if (NSS_CMSContentInfo_SetContent_SignedData(cmsg, cinfo, sigd)
+  NSSCMSContentInfo* cinfo = NSS_CMSMessage_GetContentInfo(cmsg.get());
+  if (NSS_CMSContentInfo_SetContent_SignedData(cmsg.get(), cinfo, sigd.get())
        == SECSuccess) {
-    sigd.forget();
+    Unused << sigd.release();
   }
   else {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
@@ -1225,7 +1239,7 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
   }
 
   SECItem certP7 = { siBuffer, nullptr, 0 };
-  NSSCMSEncoderContext* ecx = NSS_CMSEncoder_Start(cmsg, nullptr, nullptr,
+  NSSCMSEncoderContext* ecx = NSS_CMSEncoder_Start(cmsg.get(), nullptr, nullptr,
                                                    &certP7, arena, nullptr,
                                                    nullptr, nullptr, nullptr,
                                                    nullptr, nullptr);
@@ -1400,11 +1414,13 @@ nsNSSCertificate::hasValidEVOidTag(SECOidTag& resultOidTag, bool& validEV)
 
   uint32_t flags = mozilla::psm::CertVerifier::FLAG_LOCAL_ONLY |
     mozilla::psm::CertVerifier::FLAG_MUST_BE_EV;
+  ScopedCERTCertList unusedBuiltChain;
   SECStatus rv = certVerifier->VerifyCert(mCert.get(),
     certificateUsageSSLServer, mozilla::pkix::Now(),
     nullptr /* XXX pinarg */,
     nullptr /* hostname */,
-    flags, nullptr /* stapledOCSPResponse */ , nullptr, &resultOidTag);
+    unusedBuiltChain,
+    flags, nullptr /* stapledOCSPResponse */, &resultOidTag);
 
   if (rv != SECSuccess) {
     resultOidTag = SEC_OID_UNKNOWN;

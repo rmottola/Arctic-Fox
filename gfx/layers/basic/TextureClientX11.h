@@ -17,7 +17,7 @@ class X11TextureData : public TextureData
 {
 public:
   static X11TextureData* Create(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                                TextureFlags aFlags, ISurfaceAllocator* aAllocator);
+                                TextureFlags aFlags, ClientIPCAllocator* aAllocator);
 
   virtual bool Serialize(SurfaceDescriptor& aOutDescriptor) override;
 
@@ -33,12 +33,12 @@ public:
 
   virtual bool SupportsMoz2D() const override { return true; }
 
-  virtual bool HasInternalBuffer() const override { return false; }
+  virtual bool HasIntermediateBuffer() const override { return false; }
 
-  virtual void Deallocate(ISurfaceAllocator*) override;
+  virtual void Deallocate(ClientIPCAllocator*) override;
 
   virtual TextureData*
-  CreateSimilar(ISurfaceAllocator* aAllocator,
+  CreateSimilar(ClientIPCAllocator* aAllocator,
                 TextureFlags aFlags = TextureFlags::DEFAULT,
                 TextureAllocationFlags aAllocFlags = ALLOC_DEFAULT) const override;
 

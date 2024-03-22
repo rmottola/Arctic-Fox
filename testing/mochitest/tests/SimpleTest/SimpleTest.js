@@ -599,7 +599,6 @@ window.setTimeout = function SimpleTest_setTimeoutShim() {
         case "browser":
         case "chrome":
         case "a11y":
-        case "webapprtContent":
             break;
         default:
             if (!SimpleTest._alreadyFinished && arguments.length > 1 && arguments[1] > 0) {
@@ -1037,7 +1036,6 @@ SimpleTest.finish = function() {
         }
 
         if (!parentRunner || parentRunner.showTestReport) {
-            SpecialPowers.flushAllAppsLaunchable();
             SpecialPowers.flushPermissions(function () {
               SpecialPowers.flushPrefEnv(function() {
                 SimpleTest.showReport();

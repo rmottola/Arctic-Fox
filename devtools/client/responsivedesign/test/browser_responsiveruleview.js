@@ -25,44 +25,45 @@ add_task(function*() {
   yield addTab(TEST_URI);
 
   info("Open the responsive design mode and set its size to 500x500 to start");
-  let {rdm, manager} = yield openRDM();
-  rdm.setSize(500, 500);
+  let { rdm, manager } = yield openRDM();
+  yield setSize(rdm, manager, 500, 500);
 
   info("Open the inspector, rule-view and select the test node");
   let {inspector, view} = yield openRuleView();
   yield selectNode("div", inspector);
 
   info("Try shrinking the viewport and checking the applied styles");
-  yield testShrink(view, rdm);
+  yield testShrink(view, rdm, manager);
 
   info("Try growing the viewport and checking the applied styles");
-  yield testGrow(view, rdm);
+  yield testGrow(view, rdm, manager);
 
   info("Check that ESC still opens the split console");
   yield testEscapeOpensSplitConsole(inspector);
 
+  yield closeToolbox();
+
   info("Test the state of the RDM menu item");
-  yield testMenuItem(manager);
+  yield testMenuItem(rdm);
 
   Services.prefs.clearUserPref("devtools.toolbox.splitconsoleEnabled");
-  gBrowser.removeCurrentTab();
 });
 
-function* testShrink(ruleView, rdm) {
+function* testShrink(ruleView, rdm, manager) {
   is(numberOfRules(ruleView), 2, "Should have two rules initially.");
 
   info("Resize to 100x100 and wait for the rule-view to update");
   let onRefresh = ruleView.once("ruleview-refreshed");
-  rdm.setSize(100, 100);
+  yield setSize(rdm, manager, 100, 100);
   yield onRefresh;
 
   is(numberOfRules(ruleView), 3, "Should have three rules after shrinking.");
 }
 
-function* testGrow(ruleView, rdm) {
+function* testGrow(ruleView, rdm, manager) {
   info("Resize to 500x500 and wait for the rule-view to update");
   let onRefresh = ruleView.once("ruleview-refreshed");
-  rdm.setSize(500, 500);
+  yield setSize(rdm, manager, 500, 500);
   yield onRefresh;
 
   is(numberOfRules(ruleView), 2, "Should have two rules after growing.");
@@ -79,19 +80,14 @@ function* testEscapeOpensSplitConsole(inspector) {
   ok(inspector._toolbox._splitConsole, "Console is split after pressing ESC.");
 }
 
-function* testMenuItem(manager) {
+function* testMenuItem(rdm) {
   is(document.getElementById("Tools:ResponsiveUI").getAttribute("checked"),
-     "true",
-     "The menu item is checked");
+     "true", "The menu item is checked");
 
-  info("Toggle off the RDM");
-  let onManagerOff = manager.once("off");
-  manager.toggle(window, gBrowser.selectedTab);
-  yield onManagerOff;
+  yield closeRDM(rdm);
 
   is(document.getElementById("Tools:ResponsiveUI").getAttribute("checked"),
-     "false",
-     "The menu item is unchecked");
+     "false", "The menu item is unchecked");
 }
 
 function numberOfRules(ruleView) {

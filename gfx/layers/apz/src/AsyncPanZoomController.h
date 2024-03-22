@@ -42,9 +42,9 @@ namespace layers {
 
 class AsyncDragMetrics;
 struct ScrollableLayerGuid;
-class CompositorParent;
+class CompositorBridgeParent;
 class GestureEventListener;
-class PCompositorParent;
+class PCompositorBridgeParent;
 struct AsyncTransform;
 class AsyncPanZoomAnimation;
 class FlingAnimation;
@@ -188,10 +188,17 @@ public:
                            bool aThisLayerTreeUpdated);
 
   /**
+   * A lightweight version of NotifyLayersUpdated that allows just the scroll
+   * offset and scroll generation from the main thread to be propagated to APZ.
+   */
+  void NotifyScrollUpdated(uint32_t aScrollGeneration,
+                           const CSSPoint& aScrollOffset);
+
+  /**
    * The platform implementation must set the compositor parent so that we can
    * request composites.
    */
-  void SetCompositorParent(CompositorParent* aCompositorParent);
+  void SetCompositorBridgeParent(CompositorBridgeParent* aCompositorBridgeParent);
 
   /**
    * Inform this APZC that it will be sharing its FrameMetrics with a cross-process
@@ -508,7 +515,7 @@ protected:
 
   /**
    * Schedules a composite on the compositor thread. Wrapper for
-   * CompositorParent::ScheduleRenderOnCompositorThread().
+   * CompositorBridgeParent::ScheduleRenderOnCompositorThread().
    */
   void ScheduleComposite();
 
@@ -615,11 +622,6 @@ protected:
   APZCTreeManager* GetApzcTreeManager() const;
 
   /**
-   * Gets a ref to the input queue that is shared across the entire tree manager.
-   */
-  const RefPtr<InputQueue>& GetInputQueue() const;
-
-  /**
    * Convert ScreenPoint relative to the screen to CSSPoint relative
    * to the parent document. This excludes the transient compositor transform.
    * NOTE: This must be converted to CSSPoint relative to the child
@@ -650,7 +652,7 @@ protected:
   void RequestSnapToDestination();
 
   uint64_t mLayersId;
-  RefPtr<CompositorParent> mCompositorParent;
+  RefPtr<CompositorBridgeParent> mCompositorBridgeParent;
 
   /* Access to the following two fields is protected by the mRefPtrMonitor,
      since they are accessed on the UI thread but can be cleared on the
@@ -674,7 +676,7 @@ protected:
   bool mSharingFrameMetricsAcrossProcesses;
   /* Utility function to get the Compositor with which we share the FrameMetrics.
      This function is only callable from the compositor thread. */
-  PCompositorParent* GetSharedFrameMetricsCompositor();
+  PCompositorBridgeParent* GetSharedFrameMetricsCompositor();
 
 protected:
   // Both |mFrameMetrics| and |mLastContentPaintMetrics| are protected by the
@@ -812,6 +814,11 @@ public:
    * Clear internal state relating to touch input handling.
    */
   void ResetTouchInputState();
+
+  /**
+   * Gets a ref to the input queue that is shared across the entire tree manager.
+   */
+  const RefPtr<InputQueue>& GetInputQueue() const;
 
 private:
   void CancelAnimationAndGestureState();

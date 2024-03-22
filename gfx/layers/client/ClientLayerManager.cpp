@@ -12,7 +12,7 @@
 #include "mozilla/dom/TabChild.h"       // for TabChild
 #include "mozilla/hal_sandbox/PHal.h"   // for ScreenConfiguration
 #include "mozilla/layers/CompositableClient.h"
-#include "mozilla/layers/CompositorChild.h" // for CompositorChild
+#include "mozilla/layers/CompositorBridgeChild.h" // for CompositorBridgeChild
 #include "mozilla/layers/ContentClient.h"
 #include "mozilla/layers/FrameUniformityData.h"
 #include "mozilla/layers/ISurfaceAllocator.h"
@@ -102,6 +102,7 @@ ClientLayerManager::ClientLayerManager(nsIWidget* aWidget)
   , mNeedsComposite(false)
   , mPaintSequenceNumber(0)
   , mForwarder(new ShadowLayerForwarder)
+  , mDeviceCounter(gfxPlatform::GetPlatform()->GetDeviceCounter())
 {
   MOZ_COUNT_CTOR(ClientLayerManager);
   mMemoryPressureObserver = new MemoryPressureObserver(this);
@@ -119,7 +120,7 @@ ClientLayerManager::~ClientLayerManager()
   // After the call, the message is directly handled by LayerTransactionChild. 
   // Basically this function should be called in ShadowLayerForwarder's
   // destructor. But when the destructor is triggered by 
-  // CompositorChild::Destroy(), the destructor can not handle it correctly.
+  // CompositorBridgeChild::Destroy(), the destructor can not handle it correctly.
   // See Bug 1000525.
   mForwarder->StopReceiveAsyncParentMessge();
   mRoot = nullptr;
@@ -188,6 +189,10 @@ ClientLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
 
   NS_ASSERTION(!InTransaction(), "Nested transactions not allowed");
   mPhase = PHASE_CONSTRUCTION;
+
+  if (DependsOnStaleDevice()) {
+    FrameLayerBuilder::InvalidateAllLayers(this);
+  }
 
   MOZ_ASSERT(mKeepAlive.IsEmpty(), "uncommitted txn?");
 
@@ -364,7 +369,7 @@ ClientLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags)
   return true;
 }
 
-CompositorChild *
+CompositorBridgeChild *
 ClientLayerManager::GetRemoteRenderer()
 {
   if (!mWidget) {
@@ -374,11 +379,11 @@ ClientLayerManager::GetRemoteRenderer()
   return mWidget->GetRemoteRenderer();
 }
 
-CompositorChild*
-ClientLayerManager::GetCompositorChild()
+CompositorBridgeChild*
+ClientLayerManager::GetCompositorBridgeChild()
 {
   if (!XRE_IsParentProcess()) {
-    return CompositorChild::Get();
+    return CompositorBridgeChild::Get();
   }
   return GetRemoteRenderer();
 }
@@ -453,7 +458,7 @@ ClientLayerManager::GetFrameUniformity(FrameUniformityData* aOutData)
   MOZ_ASSERT(XRE_IsParentProcess(), "Frame Uniformity only supported in parent process");
 
   if (HasShadowManager()) {
-    CompositorChild* child = GetRemoteRenderer();
+    CompositorBridgeChild* child = GetRemoteRenderer();
     child->SendGetFrameUniformity(aOutData);
     return;
   }
@@ -468,8 +473,8 @@ ClientLayerManager::RequestOverfill(mozilla::dom::OverfillCallback* aCallback)
   MOZ_ASSERT(HasShadowManager(), "Request Overfill only supported on b2g for now");
 
   if (HasShadowManager()) {
-    CompositorChild* child = GetRemoteRenderer();
-    NS_ASSERTION(child, "Could not get CompositorChild");
+    CompositorBridgeChild* child = GetRemoteRenderer();
+    NS_ASSERTION(child, "Could not get CompositorBridgeChild");
 
     child->AddOverfillObserver(this);
     child->SendRequestOverfill();
@@ -497,7 +502,7 @@ ClientLayerManager::MakeSnapshotIfRequired()
     return;
   }
   if (mWidget) {
-    if (CompositorChild* remoteRenderer = GetRemoteRenderer()) {
+    if (CompositorBridgeChild* remoteRenderer = GetRemoteRenderer()) {
       // The compositor doesn't draw to a different sized surface
       // when there's a rotation. Instead we rotate the result
       // when drawing into dt
@@ -533,7 +538,7 @@ ClientLayerManager::MakeSnapshotIfRequired()
                           DrawOptions(1.0f, CompositionOp::OP_OVER));
           dt->SetTransform(oldMatrix);
         }
-        mForwarder->DestroySharedSurface(&inSnapshot);
+        mForwarder->DestroySurfaceDescriptor(&inSnapshot);
       }
     }
   }
@@ -544,17 +549,23 @@ void
 ClientLayerManager::FlushRendering()
 {
   if (mWidget) {
-    if (CompositorChild* remoteRenderer = mWidget->GetRemoteRenderer()) {
+    if (CompositorBridgeChild* remoteRenderer = mWidget->GetRemoteRenderer()) {
       remoteRenderer->SendFlushRendering();
     }
   }
 }
 
 void
+ClientLayerManager::UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier)
+{
+  mForwarder->UpdateTextureFactoryIdentifier(aNewIdentifier);
+}
+
+void
 ClientLayerManager::SendInvalidRegion(const nsIntRegion& aRegion)
 {
   if (mWidget) {
-    if (CompositorChild* remoteRenderer = mWidget->GetRemoteRenderer()) {
+    if (CompositorBridgeChild* remoteRenderer = mWidget->GetRemoteRenderer()) {
       remoteRenderer->SendNotifyRegionInvalidated(aRegion);
     }
   }
@@ -563,7 +574,7 @@ ClientLayerManager::SendInvalidRegion(const nsIntRegion& aRegion)
 uint32_t
 ClientLayerManager::StartFrameTimeRecording(int32_t aBufferSize)
 {
-  CompositorChild* renderer = GetRemoteRenderer();
+  CompositorBridgeChild* renderer = GetRemoteRenderer();
   if (renderer) {
     uint32_t startIndex;
     renderer->SendStartFrameTimeRecording(aBufferSize, &startIndex);
@@ -576,7 +587,7 @@ void
 ClientLayerManager::StopFrameTimeRecording(uint32_t         aStartIndex,
                                            nsTArray<float>& aFrameIntervals)
 {
-  CompositorChild* renderer = GetRemoteRenderer();
+  CompositorBridgeChild* renderer = GetRemoteRenderer();
   if (renderer) {
     renderer->SendStopFrameTimeRecording(aStartIndex, &aFrameIntervals);
   }
@@ -783,7 +794,7 @@ ClientLayerManager::ProgressiveUpdateCallback(bool aHasPendingNewThebesContent,
 #ifdef MOZ_WIDGET_ANDROID
   MOZ_ASSERT(aMetrics.IsScrollable());
   // This is derived from the code in
-  // gfx/layers/ipc/CompositorParent.cpp::TransformShadowTree.
+  // gfx/layers/ipc/CompositorBridgeParent.cpp::TransformShadowTree.
   CSSToLayerScale paintScale = aMetrics.LayersPixelsPerCSSPixel().ToScaleFactor();
   const CSSRect& metricsDisplayPort =
     (aDrawingCritical && !aMetrics.GetCriticalDisplayPort().IsEmpty()) ?
@@ -827,6 +838,12 @@ void
 ClientLayerManager::RemoveDidCompositeObserver(DidCompositeObserver* aObserver)
 {
   mDidCompositeObservers.RemoveElement(aObserver);
+}
+
+bool
+ClientLayerManager::DependsOnStaleDevice() const
+{
+  return gfxPlatform::GetPlatform()->GetDeviceCounter() != mDeviceCounter;
 }
 
 ClientLayer::~ClientLayer()

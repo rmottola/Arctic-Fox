@@ -980,7 +980,9 @@ EventStateManager::ExecuteAccessKey(nsTArray<uint32_t>& aAccessCharCodes,
         if (focusChanged && aIsTrustedEvent) {
           // If this is a child process, inform the parent that we want the focus, but
           // pass false since we don't want to change the window order.
-          nsCOMPtr<nsITabChild> child = do_GetInterface(mPresContext->GetDocShell());
+          nsIDocShell* docShell = mPresContext->GetDocShell();
+          nsCOMPtr<nsITabChild> child =
+            docShell ? docShell->GetTabChild() : nullptr;
           if (child) {
             child->SendRequestFocus(false);
           }
@@ -2504,9 +2506,8 @@ EventStateManager::GetScrollAmount(nsPresContext* aPresContext,
   if (!rootFrame) {
     return nsSize(0, 0);
   }
-  RefPtr<nsFontMetrics> fm;
-  nsLayoutUtils::GetFontMetricsForFrame(rootFrame, getter_AddRefs(fm),
-    nsLayoutUtils::FontSizeInflationFor(rootFrame));
+  RefPtr<nsFontMetrics> fm =
+    nsLayoutUtils::GetInflatedFontMetricsForFrame(rootFrame);
   NS_ENSURE_TRUE(fm, nsSize(0, 0));
   return nsSize(fm->AveCharWidth(), fm->MaxHeight());
 }

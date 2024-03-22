@@ -62,7 +62,7 @@ public:
 
     MOZ_COUNT_DTOR(IDBTransaction::WorkerFeature);
 
-    mWorkerPrivate->RemoveFeature(mWorkerPrivate->GetJSContext(), this);
+    mWorkerPrivate->RemoveFeature(this);
   }
 
 private:
@@ -216,7 +216,8 @@ IDBTransaction::Create(IDBDatabase* aDatabase,
   MOZ_ASSERT(!aObjectStoreNames.IsEmpty());
   MOZ_ASSERT(aMode == READ_ONLY ||
              aMode == READ_WRITE ||
-             aMode == READ_WRITE_FLUSH);
+             aMode == READ_WRITE_FLUSH ||
+             aMode == CLEANUP);
 
   RefPtr<IDBTransaction> transaction =
     new IDBTransaction(aDatabase, aObjectStoreNames, aMode);
@@ -239,11 +240,8 @@ IDBTransaction::Create(IDBDatabase* aDatabase,
 
     workerPrivate->AssertIsOnWorkerThread();
 
-    JSContext* cx = workerPrivate->GetJSContext();
-    MOZ_ASSERT(cx);
-
     transaction->mWorkerFeature = new WorkerFeature(workerPrivate, transaction);
-    MOZ_ALWAYS_TRUE(workerPrivate->AddFeature(cx, transaction->mWorkerFeature));
+    MOZ_ALWAYS_TRUE(workerPrivate->AddFeature(transaction->mWorkerFeature));
   }
 
   return transaction.forget();
@@ -840,6 +838,9 @@ IDBTransaction::GetMode(ErrorResult& aRv) const
 
     case READ_WRITE_FLUSH:
       return IDBTransactionMode::Readwriteflush;
+
+    case CLEANUP:
+      return IDBTransactionMode::Cleanup;
 
     case VERSION_CHANGE:
       return IDBTransactionMode::Versionchange;

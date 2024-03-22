@@ -44,7 +44,8 @@
 #include "mozilla/dom/Selection.h"
 #include "nsContentUtils.h"
 #include "nsTextNode.h"
-#include "nsStyleSet.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/MathAlgorithms.h"
 #include "nsFrameSelection.h"
@@ -154,11 +155,8 @@ nsTextControlFrame::CalcIntrinsicSize(nsRenderingContext* aRenderingContext,
   nscoord charWidth   = 0;
   nscoord charMaxAdvance  = 0;
 
-  RefPtr<nsFontMetrics> fontMet;
-  nsresult rv =
-    nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet),
-                                          aFontSizeInflation);
-  NS_ENSURE_SUCCESS(rv, rv);
+  RefPtr<nsFontMetrics> fontMet =
+    nsLayoutUtils::GetFontMetricsForFrame(this, aFontSizeInflation);
 
   lineHeight =
     nsHTMLReflowState::CalcLineHeight(GetContent(), StyleContext(),
@@ -522,9 +520,8 @@ nsTextControlFrame::Reflow(nsPresContext*   aPresContext,
     lineHeight = nsHTMLReflowState::CalcLineHeight(GetContent(), StyleContext(),
                                                    NS_AUTOHEIGHT, inflation);
   }
-  RefPtr<nsFontMetrics> fontMet;
-  nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet),
-                                        inflation);
+  RefPtr<nsFontMetrics> fontMet =
+    nsLayoutUtils::GetFontMetricsForFrame(this, inflation);
   // now adjust for our borders and padding
   aDesiredSize.SetBlockStartAscent(
     nsLayoutUtils::GetCenteredFontBaseline(fontMet, lineHeight,

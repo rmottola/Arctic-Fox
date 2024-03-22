@@ -46,12 +46,6 @@ SingleTiledContentClient::ClientSupportsLayerSize(const gfx::IntSize& aSize, Cli
   return aSize.width <= maxTextureSize && aSize.height <= maxTextureSize;
 }
 
-bool
-SingleTiledContentClient::SupportsLayerSize(const gfx::IntSize& aSize, ClientLayerManager* aManager) const
-{
-  return ClientSupportsLayerSize(aSize, aManager);
-}
-
 ClientSingleTiledLayerBuffer::ClientSingleTiledLayerBuffer(ClientTiledPaintedLayer* aPaintedLayer,
                                                            CompositableClient* aCompositableClient,
                                                            ClientLayerManager* aManager)
@@ -209,7 +203,7 @@ ClientSingleTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
   mTile.Flip();
   UnlockTile(mTile);
 
-  if (backBuffer->HasInternalBuffer()) {
+  if (backBuffer->HasIntermediateBuffer()) {
     // If our new buffer has an internal buffer, we don't want to keep another
     // TextureClient around unnecessarily, so discard the back-buffer.
     mTile.DiscardBackBuffer();

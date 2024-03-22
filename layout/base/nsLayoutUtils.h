@@ -185,6 +185,16 @@ public:
    */
   static bool HasDisplayPort(nsIContent* aContent);
 
+
+  /**
+   * Go through the IPC Channel and update displayport margins for content
+   * elements based on UpdateFrame messages. The messages are left in the
+   * queue and will be fully processed when dequeued. The aim is to paint
+   * the most up-to-date displayport without waiting for these message to
+   * go through the message queue.
+   */
+  static void UpdateDisplayPortMarginsFromPendingMessages();
+
   /**
    * @return the display port for the given element which should be used for
    * visibility testing purposes.
@@ -891,13 +901,6 @@ public:
                             nscoord aInflateSize);
 
   /**
-   * Check whether aRect is visible in the boundary of the scroll frames
-   * boundary.
-   */
-  static bool IsRectVisibleInScrollFrames(nsIFrame* aFrame,
-                                          const nsRect& aRect);
-
-  /**
    * Clamp aRect relative to aFrame to the scroll frames boundary searching from
    * aFrame.
    */
@@ -1219,40 +1222,36 @@ public:
   /**
    * Get the font metrics corresponding to the frame's style data.
    * @param aFrame the frame
-   * @param aFontMetrics the font metrics result
    * @param aSizeInflation number to multiply font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsForFrame(const nsIFrame* aFrame,
-                                         nsFontMetrics** aFontMetrics,
-                                         float aSizeInflation = 1.0f);
+  static already_AddRefed<nsFontMetrics> GetFontMetricsForFrame(
+    const nsIFrame* aFrame, float aSizeInflation);
+
+  static already_AddRefed<nsFontMetrics>
+    GetInflatedFontMetricsForFrame(const nsIFrame* aFrame)
+  {
+    return GetFontMetricsForFrame(aFrame, FontSizeInflationFor(aFrame));
+  }
 
   /**
    * Get the font metrics corresponding to the given style data.
    * @param aStyleContext the style data
-   * @param aFontMetrics the font metrics result
    * @param aSizeInflation number to multiply font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsForStyleContext(nsStyleContext* aStyleContext,
-                                                nsFontMetrics** aFontMetrics,
-                                                float aSizeInflation = 1.0f);
+  static already_AddRefed<nsFontMetrics> GetFontMetricsForStyleContext(
+      nsStyleContext* aStyleContext, float aSizeInflation = 1.0f);
 
   /**
    * Get the font metrics of emphasis marks corresponding to the given
    * style data. The result is same as GetFontMetricsForStyleContext
    * except that the font size is scaled down to 50%.
    * @param aStyleContext the style data
-   * @param aFontMetrics the font metrics result
    * @param aInflation number to multiple font size by
-   * @return success or failure code
    */
-  static nsresult GetFontMetricsOfEmphasisMarks(nsStyleContext* aStyleContext,
-                                                nsFontMetrics** aFontMetrics,
-                                                float aInflation)
+  static already_AddRefed<nsFontMetrics> GetFontMetricsOfEmphasisMarks(
+      nsStyleContext* aStyleContext, float aInflation)
   {
-    return GetFontMetricsForStyleContext(aStyleContext, aFontMetrics,
-                                         aInflation * 0.5f);
+    return GetFontMetricsForStyleContext(aStyleContext, aInflation * 0.5f);
   }
 
   /**
@@ -1412,40 +1411,6 @@ public:
   static nscoord ComputeCBDependentValue(nscoord aPercentBasis,
                                          const nsStyleCoord& aCoord);
 
-  /*
-   * Convert nsStyleCoord to nscoord when percentages depend on the
-   * containing block width, and enumerated values are for width,
-   * min-width, or max-width.  Returns the content-box width value based
-   * on aContentEdgeToBoxSizing and aBoxSizingToMarginEdge (which are
-   * also used for the enumerated values for width.  This function does
-   * not handle 'auto'.  It ensures that the result is nonnegative.
-   *
-   * @param aRenderingContext Rendering context for font measurement/metrics.
-   * @param aFrame Frame whose (min-/max-/)width is being computed.
-   * @param aContainingBlockWidth Width of aFrame's containing block.
-   * @param aContentEdgeToBoxSizing The sum of any left/right padding and
-   *          border that goes inside the rect chosen by box-sizing.
-   * @param aBoxSizingToMarginEdge The sum of any left/right padding, border,
-   *          and margin that goes outside the rect chosen by box-sizing.
-   * @param aCoord The width value to compute.
-   */
-  // XXX to be removed
-  static nscoord ComputeWidthValue(
-                   nsRenderingContext* aRenderingContext,
-                   nsIFrame*            aFrame,
-                   nscoord              aContainingBlockWidth,
-                   nscoord              aContentEdgeToBoxSizing,
-                   nscoord              aBoxSizingToMarginEdge,
-                   const nsStyleCoord&  aCoord)
-  {
-    return ComputeISizeValue(aRenderingContext,
-                             aFrame,
-                             aContainingBlockWidth,
-                             aContentEdgeToBoxSizing,
-                             aBoxSizingToMarginEdge,
-                             aCoord);
-  }
-
   static nscoord ComputeISizeValue(
                    nsRenderingContext* aRenderingContext,
                    nsIFrame*           aFrame,
@@ -1454,34 +1419,9 @@ public:
                    nscoord             aBoxSizingToMarginEdge,
                    const nsStyleCoord& aCoord);
 
-  /*
-   * Convert nsStyleCoord to nscoord when percentages depend on the
-   * containing block height.
-   */
-  // XXX to be removed
-  static nscoord ComputeHeightDependentValue(
-                   nscoord              aContainingBlockHeight,
-                   const nsStyleCoord&  aCoord)
-  {
-    return ComputeBSizeDependentValue(aContainingBlockHeight, aCoord);
-  }
-
   static nscoord ComputeBSizeDependentValue(
                    nscoord              aContainingBlockBSize,
                    const nsStyleCoord&  aCoord);
-
-  /*
-   * Likewise, but for 'height', 'min-height', or 'max-height'.
-   */
-  // XXX to be removed
-  static nscoord ComputeHeightValue(nscoord aContainingBlockHeight,
-                                    nscoord aContentEdgeToBoxSizingBoxEdge,
-                                    const nsStyleCoord& aCoord)
-  {
-    return ComputeBSizeValue(aContainingBlockHeight,
-                             aContentEdgeToBoxSizingBoxEdge,
-                             aCoord);
-  }
 
   static nscoord ComputeBSizeValue(nscoord aContainingBlockBSize,
                                     nscoord aContentEdgeToBoxSizingBoxEdge,
@@ -1545,6 +1485,8 @@ public:
   }
 
   static void MarkDescendantsDirty(nsIFrame *aSubtreeRoot);
+
+  static void MarkIntrinsicISizesDirtyIfDependentOnBSize(nsIFrame* aFrame);
 
   /*
    * Calculate the used values for 'width' and 'height' for a replaced element.

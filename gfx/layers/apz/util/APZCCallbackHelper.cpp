@@ -38,9 +38,10 @@ using dom::TabParent;
 
 uint64_t APZCCallbackHelper::sLastTargetAPZCNotificationInputBlock = uint64_t(-1);
 
-static void
-AdjustDisplayPortForScrollDelta(mozilla::layers::FrameMetrics& aFrameMetrics,
-                                const CSSPoint& aActualScrollOffset)
+void
+APZCCallbackHelper::AdjustDisplayPortForScrollDelta(
+    mozilla::layers::FrameMetrics& aFrameMetrics,
+    const CSSPoint& aActualScrollOffset)
 {
   // Correct the display-port by the difference between the requested scroll
   // offset and the resulting scroll offset after setting the requested value.
@@ -95,9 +96,7 @@ ScrollFrameTo(nsIScrollableFrame* aFrame, const CSSPoint& aPoint, bool& aSuccess
   // Also if the scrollable frame got a scroll request from a higher priority origin
   // since the last layers update, then we don't want to push our scroll request
   // because we'll clobber that one, which is bad.
-  bool scrollInProgress = aFrame->IsProcessingAsyncScroll()
-      || nsLayoutUtils::CanScrollOriginClobberApz(aFrame->LastScrollOrigin())
-      || aFrame->LastSmoothScrollOrigin();
+  bool scrollInProgress = APZCCallbackHelper::IsScrollInProgress(aFrame);
   if (!scrollInProgress) {
     aFrame->ScrollToCSSPixelsApproximate(targetScrollPosition, nsGkAtoms::apz);
     geckoScrollPosition = CSSPoint::FromAppUnits(aFrame->GetScrollPosition());
@@ -124,6 +123,10 @@ ScrollFrame(nsIContent* aContent,
 {
   // Scroll the window to the desired spot
   nsIScrollableFrame* sf = nsLayoutUtils::FindScrollableFrameFor(aMetrics.GetScrollId());
+  if (sf) {
+    sf->SetScrollableByAPZ(!aMetrics.IsScrollInfoLayer());
+  }
+
   bool scrollUpdated = false;
   CSSPoint apzScrollOffset = aMetrics.GetScrollOffset();
   CSSPoint actualScrollOffset = ScrollFrameTo(sf, apzScrollOffset, scrollUpdated);
@@ -141,7 +144,7 @@ ScrollFrame(nsIContent* aContent,
     } else {
       // Correct the display port due to the difference between mScrollOffset and the
       // actual scroll offset.
-      AdjustDisplayPortForScrollDelta(aMetrics, actualScrollOffset);
+      APZCCallbackHelper::AdjustDisplayPortForScrollDelta(aMetrics, actualScrollOffset);
     }
   } else {
     // For whatever reason we couldn't update the scroll offset on the scroll frame,
@@ -532,13 +535,19 @@ APZCCallbackHelper::ApplyCallbackTransform(const LayoutDeviceIntPoint& aPoint,
 }
 
 void
-APZCCallbackHelper::ApplyCallbackTransform(WidgetTouchEvent& aEvent,
+APZCCallbackHelper::ApplyCallbackTransform(WidgetEvent& aEvent,
                                            const ScrollableLayerGuid& aGuid,
                                            const CSSToLayoutDeviceScale& aScale)
 {
-  for (size_t i = 0; i < aEvent.touches.Length(); i++) {
-    aEvent.touches[i]->mRefPoint = ApplyCallbackTransform(
-        aEvent.touches[i]->mRefPoint, aGuid, aScale);
+  if (aEvent.AsTouchEvent()) {
+    WidgetTouchEvent& event = *(aEvent.AsTouchEvent());
+    for (size_t i = 0; i < event.touches.Length(); i++) {
+      event.touches[i]->mRefPoint = ApplyCallbackTransform(
+          event.touches[i]->mRefPoint, aGuid, aScale);
+    }
+  } else {
+    aEvent.refPoint = ApplyCallbackTransform(
+        aEvent.refPoint, aGuid, aScale);
   }
 }
 
@@ -892,9 +901,19 @@ APZCCallbackHelper::NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& aScrol
 }
 
 void
-APZCCallbackHelper::NotifyFlushComplete()
+APZCCallbackHelper::NotifyFlushComplete(nsIPresShell* aShell)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  // In some cases, flushing the APZ state to the main thread doesn't actually
+  // trigger a flush and repaint (this is an intentional optimization - the stuff
+  // visible to the user is still correct). However, reftests update their
+  // snapshot based on invalidation events that are emitted during paints,
+  // so we ensure that we kick off a paint when an APZ flush is done. Note that
+  // only chrome/testing code can trigger this behaviour.
+  if (aShell && aShell->GetRootFrame()) {
+    aShell->GetRootFrame()->SchedulePaint();
+  }
+
   nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
   MOZ_ASSERT(observerService);
   observerService->NotifyObservers(nullptr, "apz-repaints-flushed", nullptr);
@@ -903,12 +922,16 @@ APZCCallbackHelper::NotifyFlushComplete()
 static int32_t sActiveSuppressDisplayport = 0;
 
 void
-APZCCallbackHelper::SuppressDisplayport(const bool& aEnabled)
+APZCCallbackHelper::SuppressDisplayport(const bool& aEnabled,
+                                        const nsCOMPtr<nsIPresShell>& aShell)
 {
   if (aEnabled) {
     sActiveSuppressDisplayport++;
   } else {
     sActiveSuppressDisplayport--;
+    if (sActiveSuppressDisplayport == 0 && aShell && aShell->GetRootFrame()) {
+      aShell->GetRootFrame()->SchedulePaint();
+    }
   }
 
   MOZ_ASSERT(sActiveSuppressDisplayport >= 0);
@@ -918,6 +941,14 @@ bool
 APZCCallbackHelper::IsDisplayportSuppressed()
 {
   return sActiveSuppressDisplayport > 0;
+}
+
+/* static */ bool
+APZCCallbackHelper::IsScrollInProgress(nsIScrollableFrame* aFrame)
+{
+  return aFrame->IsProcessingAsyncScroll()
+         || nsLayoutUtils::CanScrollOriginClobberApz(aFrame->LastScrollOrigin())
+         || aFrame->LastSmoothScrollOrigin();
 }
 
 } // namespace layers

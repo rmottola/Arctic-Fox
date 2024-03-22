@@ -460,6 +460,7 @@ js::StartOffThreadParseScript(JSContext* cx, const ReadOnlyCompileOptions& optio
     // Suppress GC so that calls below do not trigger a new incremental GC
     // which could require barriers on the atoms compartment.
     gc::AutoSuppressGC nogc(cx);
+    gc::AutoAssertNoNurseryAlloc noNurseryAlloc(cx->runtime());
 
     JSObject* global = CreateGlobalForOffThreadParse(cx, ParseTaskKind::Script, nogc);
     if (!global)
@@ -669,7 +670,7 @@ GlobalHelperThreadState::lock()
     AssertCurrentThreadCanLock(HelperThreadStateLock);
     PR_Lock(helperLock);
 #ifdef DEBUG
-    lockOwner.value = PR_GetCurrentThread();
+    lockOwner = PR_GetCurrentThread();
 #endif
 }
 
@@ -678,7 +679,7 @@ GlobalHelperThreadState::unlock()
 {
     MOZ_ASSERT(isLocked());
 #ifdef DEBUG
-    lockOwner.value = nullptr;
+    lockOwner = nullptr;
 #endif
     PR_Unlock(helperLock);
 }
@@ -687,7 +688,7 @@ GlobalHelperThreadState::unlock()
 bool
 GlobalHelperThreadState::isLocked()
 {
-    return lockOwner.value == PR_GetCurrentThread();
+    return lockOwner == PR_GetCurrentThread();
 }
 #endif
 
@@ -696,14 +697,14 @@ GlobalHelperThreadState::wait(CondVar which, uint32_t millis)
 {
     MOZ_ASSERT(isLocked());
 #ifdef DEBUG
-    lockOwner.value = nullptr;
+    lockOwner = nullptr;
 #endif
     DebugOnly<PRStatus> status =
         PR_WaitCondVar(whichWakeup(which),
                        millis ? PR_MillisecondsToInterval(millis) : PR_INTERVAL_NO_TIMEOUT);
     MOZ_ASSERT(status == PR_SUCCESS);
 #ifdef DEBUG
-    lockOwner.value = PR_GetCurrentThread();
+    lockOwner = PR_GetCurrentThread();
 #endif
 }
 
@@ -1238,7 +1239,7 @@ GlobalHelperThreadState::mergeParseTaskCompartment(JSRuntime* rt, ParseTask* par
     // finished merging the contents of the parse task's compartment into the
     // destination compartment.  Finish any ongoing incremental GC first and
     // assert that no allocation can occur.
-    gc::AutoFinishGC finishGC(rt);
+    gc::FinishGC(rt);
     JS::AutoAssertNoAlloc noAlloc(rt);
 
     LeaveParseTaskZone(rt, parseTask);

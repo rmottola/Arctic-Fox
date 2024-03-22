@@ -3235,7 +3235,7 @@ ICSetElemDenseOrUnboxedArrayAddCompiler::generateStubCode(MacroAssembler& masm)
         masm.branch32(Assembler::NotEqual, scratchReg, key, &failure);
 
         // Capacity check.
-        masm.checkUnboxedArrayCapacity(obj, Int32Key(key), scratchReg, &failure);
+        masm.checkUnboxedArrayCapacity(obj, RegisterOrInt32Constant(key), scratchReg, &failure);
 
         // Load obj->elements.
         masm.loadPtr(Address(obj, UnboxedArrayObject::offsetOfElements()), scratchReg);
@@ -3509,7 +3509,7 @@ TryAttachNativeInDoesNotExistStub(JSContext* cx, HandleScript outerScript,
     RootedPropertyName name(cx, JSID_TO_ATOM(id)->asPropertyName());
     RootedObject lastProto(cx);
     size_t protoChainDepth = SIZE_MAX;
-    if (!CheckHasNoSuchProperty(cx, obj, name, &lastProto, &protoChainDepth))
+    if (!CheckHasNoSuchProperty(cx, obj.get(), name.get(), lastProto.address(), &protoChainDepth))
         return true;
     MOZ_ASSERT(protoChainDepth < SIZE_MAX);
 

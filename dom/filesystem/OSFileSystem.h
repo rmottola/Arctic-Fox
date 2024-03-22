@@ -12,18 +12,21 @@
 namespace mozilla {
 namespace dom {
 
-class OSFileSystem : public FileSystemBase
+class OSFileSystem final : public FileSystemBase
 {
 public:
   explicit OSFileSystem(const nsAString& aRootDir);
 
   void
-  Init(nsPIDOMWindowInner* aWindow);
+  Init(nsISupports* aParent);
 
   // Overrides FileSystemBase
 
-  virtual nsPIDOMWindowInner*
-  GetWindow() const override;
+  virtual already_AddRefed<FileSystemBase>
+  Clone() override;
+
+  virtual nsISupports*
+  GetParentObject() const override;
 
   virtual void
   GetRootName(nsAString& aRetval) const override;
@@ -34,10 +37,17 @@ public:
   virtual bool
   IsSafeDirectory(Directory* aDir) const override;
 
+  virtual void
+  SerializeDOMPath(nsAString& aOutput) const override;
+
+  // CC methods
+  virtual void Unlink() override;
+  virtual void Traverse(nsCycleCollectionTraversalCallback &cb) override;
+
 private:
   virtual ~OSFileSystem() {}
 
-   nsCOMPtr<nsPIDOMWindowInner> mWindow;
+   nsCOMPtr<nsISupports> mParent;
 };
 
 } // namespace dom

@@ -123,6 +123,8 @@ class CodeGeneratorARM : public CodeGeneratorShared
     virtual void visitUrshD(LUrshD* ins);
 
     virtual void visitClzI(LClzI* ins);
+    virtual void visitCtzI(LCtzI* ins);
+    virtual void visitPopcntI(LPopcntI* ins);
 
     virtual void visitTestIAndBranch(LTestIAndBranch* test);
     virtual void visitCompare(LCompare* comp);
@@ -198,6 +200,7 @@ class CodeGeneratorARM : public CodeGeneratorShared
     void visitAtomicTypedArrayElementBinopForEffect(LAtomicTypedArrayElementBinopForEffect* lir);
     void visitCompareExchangeTypedArrayElement(LCompareExchangeTypedArrayElement* lir);
     void visitAtomicExchangeTypedArrayElement(LAtomicExchangeTypedArrayElement* lir);
+    void visitAsmSelect(LAsmSelect* ins);
     void visitAsmJSCall(LAsmJSCall* ins);
     void visitAsmJSLoadHeap(LAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(LAsmJSStoreHeap* ins);

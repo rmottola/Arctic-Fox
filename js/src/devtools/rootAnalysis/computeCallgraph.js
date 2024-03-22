@@ -6,6 +6,12 @@ loadRelativeToScript('utility.js');
 loadRelativeToScript('annotations.js');
 loadRelativeToScript('CFG.js');
 
+var theFunctionNameToFind;
+if (scriptArgs[0] == '--function') {
+    theFunctionNameToFind = scriptArgs[1];
+    scriptArgs = scriptArgs.slice(2);
+}
+
 var subclasses = {};
 var superclasses = {};
 var classFunctions = {};
@@ -54,6 +60,7 @@ function processCSU(csuName, csu)
 function findVirtualFunctions(initialCSU, field, suppressed)
 {
     var worklist = [initialCSU];
+    var functions = [];
 
     // Virtual call targets on subclasses of nsISupports may be incomplete,
     // if the interface is scriptable. Just treat all indirect calls on
@@ -65,8 +72,12 @@ function findVirtualFunctions(initialCSU, field, suppressed)
             suppressed[0] = true;
             return [];
         }
-        if (isOverridableField(initialCSU, csu, field))
-            return null;
+        if (isOverridableField(initialCSU, csu, field)) {
+            // We will still resolve the virtual function call, because it's
+            // nice to have as complete a callgraph as possible for other uses.
+            // But push a token saying that we can run arbitrary code.
+            functions.push(null);
+        }
 
         if (csu in superclasses) {
             for (var superclass of superclasses[csu])
@@ -74,9 +85,7 @@ function findVirtualFunctions(initialCSU, field, suppressed)
         }
     }
 
-    var functions = [];
-    var worklist = [csu];
-
+    worklist = [csu];
     while (worklist.length) {
         var csu = worklist.pop();
         var key = csu + ":" + field;
@@ -149,14 +158,21 @@ function getCallees(edge)
                 // pointer held live across this field call, it will know
                 // whether any of the direct callees can GC or not.
                 var targets = [];
+                var fullyResolved = true;
                 for (var name of functions) {
-                    callees.push({'kind': "direct", 'name': name});
-                    targets.push({'kind': "direct", 'name': name});
+                    if (name === null) {
+                        // virtual call on an nsISupports object
+                        callees.push({'kind': "field", 'csu': csuName, 'field': fieldName});
+                        fullyResolved = false;
+                    } else {
+                        callees.push({'kind': "direct", 'name': name});
+                        targets.push({'kind': "direct", 'name': name});
+                    }
                 }
-                callees.push({'kind': "resolved-field", 'csu': csuName, 'field': fieldName, 'callees': targets});
+                if (fullyResolved)
+                    callees.push({'kind': "resolved-field", 'csu': csuName, 'field': fieldName, 'callees': targets});
             } else {
-                // Unknown set of call targets. Non-virtual field call,
-                // or virtual call on an nsISupports object.
+                // Unknown set of call targets. Non-virtual field call.
                 callees.push({'kind': "field", 'csu': csuName, 'field': fieldName});
             }
         } else if (callee.Exp[0].Kind == "Var") {
@@ -180,10 +196,45 @@ function printOnce(line)
     }
 }
 
-function processBody(caller, body)
+// Returns a table mapping function name to lists of [annotation-name,
+// annotation-value] pairs: { function-name => [ [annotation-name, annotation-value] ] }
+function getAnnotations(body)
+{
+    var all_annotations = {};
+    for (var v of (body.DefineVariable || [])) {
+        if (v.Variable.Kind != 'Func')
+            continue;
+        var name = v.Variable.Name[0];
+        var annotations = all_annotations[name] = [];
+
+        for (var ann of (v.Type.Annotation || [])) {
+            annotations.push(ann.Name);
+        }
+    }
+
+    return all_annotations;
+}
+
+function getTags(functionName, body) {
+    var tags = new Set();
+    var annotations = getAnnotations(body);
+    if (functionName in annotations) {
+        print("crawling through");
+        for (var [ annName, annValue ] of annotations[functionName]) {
+            if (annName == 'Tag')
+                tags.add(annValue);
+        }
+    }
+    return tags;
+}
+
+function processBody(functionName, body)
 {
     if (!('PEdge' in body))
         return;
+
+    for (var tag of getTags(functionName, body).values())
+        print("T " + memo(functionName) + " " + tag);
 
     lastline = null;
     for (var edge of body.PEdge) {
@@ -197,7 +248,7 @@ function processBody(caller, body)
         }
         for (var callee of getCallees(edge)) {
             var prologue = (edgeSuppressed || callee.suppressed) ? "SUPPRESS_GC " : "";
-            prologue += memo(caller) + " ";
+            prologue += memo(functionName) + " ";
             if (callee.kind == 'direct') {
                 if (!(callee.name in seen)) {
                     seen[callee.name] = true;
@@ -258,21 +309,27 @@ printErr("Finished loading data structures");
 var minStream = xdb.min_data_stream();
 var maxStream = xdb.max_data_stream();
 
-for (var nameIndex = minStream; nameIndex <= maxStream; nameIndex++) {
-    var name = xdb.read_key(nameIndex);
-    var data = xdb.read_entry(name);
-    functionBodies = JSON.parse(data.readString());
+if (theFunctionNameToFind) {
+    var index = xdb.lookup_key(theFunctionNameToFind);
+    if (!index) {
+        printErr("Function not found");
+        quit(1);
+    }
+    minStream = maxStream = index;
+}
+
+function process(functionName, functionBodies)
+{
     for (var body of functionBodies)
         body.suppressed = [];
     for (var body of functionBodies) {
-        for (var [pbody, id] of allRAIIGuardedCallPoints(body, isSuppressConstructor))
+        for (var [pbody, id] of allRAIIGuardedCallPoints(functionBodies, body, isSuppressConstructor))
             pbody.suppressed[id] = true;
     }
 
     seenCallees = {};
     seenSuppressedCallees = {};
 
-    var functionName = name.readString();
     for (var body of functionBodies)
         processBody(functionName, body);
 
@@ -339,7 +396,12 @@ for (var nameIndex = minStream; nameIndex <= maxStream; nameIndex++) {
             print("D " + memo(C3) + " " + memo(mangled));
         }
     }
+}
 
+for (var nameIndex = minStream; nameIndex <= maxStream; nameIndex++) {
+    var name = xdb.read_key(nameIndex);
+    var data = xdb.read_entry(name);
+    process(name.readString(), JSON.parse(data.readString()));
     xdb.free_string(name);
     xdb.free_string(data);
 }

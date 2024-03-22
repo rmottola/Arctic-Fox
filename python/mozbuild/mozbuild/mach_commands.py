@@ -41,6 +41,7 @@ from mozpack.manifests import (
 )
 
 from mozbuild.backend import backends
+from mozbuild.shellutil import quote as shell_quote
 
 
 BUILD_WHAT_HELP = '''
@@ -305,7 +306,10 @@ class Build(MachCommandBase):
         """
         import which
         from mozbuild.controller.building import BuildMonitor
-        from mozbuild.util import resolve_target_to_make
+        from mozbuild.util import (
+            mkdir,
+            resolve_target_to_make,
+        )
 
         self.log_manager.register_structured_logger(logging.getLogger('mozbuild'))
 
@@ -313,6 +317,10 @@ class Build(MachCommandBase):
         monitor = self._spawn(BuildMonitor)
         monitor.init(warnings_path)
         ccache_start = monitor.ccache_stats()
+
+        # Disable indexing in objdir because it is not necessary and can slow
+        # down builds.
+        mkdir(self.topobjdir, not_indexed=True)
 
         with BuildOutputManager(self.log_manager, monitor) as output:
             monitor.start()
@@ -459,6 +467,7 @@ class Build(MachCommandBase):
 
         ccache_end = monitor.ccache_stats()
 
+        ccache_diff = None
         if ccache_start and ccache_end:
             ccache_diff = ccache_end - ccache_start
             if ccache_diff:
@@ -501,14 +510,24 @@ class Build(MachCommandBase):
             # Record build configuration data. For now, we cherry pick
             # items we need rather than grabbing everything, in order
             # to avoid accidentally disclosing PII.
+            telemetry_data['substs'] = {}
             try:
-                moz_artifact_builds = self.substs.get('MOZ_ARTIFACT_BUILDS',
-                                                      False)
-                telemetry_data['substs'] = {
-                    'MOZ_ARTIFACT_BUILDS': moz_artifact_builds,
-                }
+                for key in ['MOZ_ARTIFACT_BUILDS', 'MOZ_USING_CCACHE']:
+                    value = self.substs.get(key, False)
+                    telemetry_data['substs'][key] = value
             except BuildEnvironmentNotFoundException:
                 pass
+
+            # Grab ccache stats if available. We need to be careful not
+            # to capture information that can potentially identify the
+            # user (such as the cache location)
+            if ccache_diff:
+                telemetry_data['ccache'] = {}
+                for key in [key[0] for key in ccache_diff.STATS_KEYS]:
+                    try:
+                        telemetry_data['ccache'][key] = ccache_diff._values[key]
+                    except KeyError:
+                        pass
 
             telemetry_handler(self._mach_context, telemetry_data)
 
@@ -533,13 +552,17 @@ class Build(MachCommandBase):
 
     @Command('configure', category='build',
         description='Configure the tree (run configure and config.status).')
-    def configure(self):
+    @CommandArgument('options', default=None, nargs=argparse.REMAINDER,
+                     help='Configure options')
+    def configure(self, options=None):
         def on_line(line):
             self.log(logging.INFO, 'build_output', {'line': line}, '{line}')
 
+        options = ' '.join(shell_quote(o) for o in options or ())
         status = self._run_make(srcdir=True, filename='client.mk',
             target='configure', line_handler=on_line, log=False,
-            print_directory=False, allow_parallel=False, ensure_exit_code=False)
+            print_directory=False, allow_parallel=False, ensure_exit_code=False,
+            append_env={b'CONFIGURE_ARGS': options.encode('utf-8')})
 
         if not status:
             print('Configure complete!')
@@ -1043,24 +1066,6 @@ class Package(MachCommandBase):
         if ret == 0:
             self.notify('Packaging complete')
         return ret
-		
-@CommandProvider
-class Install(MachCommandBase):
-    """Create the windows installer for the built product."""
-
-    @Command('installer', category='post-build',
-        description='Create the installer for the built product for distribution.')
-    def installer(self):
-        return self._run_make(directory=".", target='installer', ensure_exit_code=False)
-
-@CommandProvider
-class Mar(MachCommandBase):
-    """Create the mar file for the built product."""
-
-    @Command('mar', category='post-build',
-        description='Create the mar file for the built product for distribution.')
-    def mar(self):
-        return self._run_make(directory="./tools/update-packaging/", target='', ensure_exit_code=False)
 
 @CommandProvider
 class Install(MachCommandBase):
@@ -1391,31 +1396,6 @@ class MachDebug(MachCommandBase):
             print('FOUND_MOZCONFIG=%s' % mozpath.normsep(self.mozconfig['path']),
                 file=out)
 
-    def _environment_configure(self, out, verbose):
-        if self.mozconfig['path']:
-            # Replace ' with '"'"', so that shell quoting e.g.
-            # a'b becomes 'a'"'"'b'.
-            quote = lambda s: s.replace("'", """'"'"'""")
-            if self.mozconfig['configure_args'] and \
-                    'COMM_BUILD' not in os.environ:
-                print('echo Adding configure options from %s' %
-                    mozpath.normsep(self.mozconfig['path']), file=out)
-                for arg in self.mozconfig['configure_args']:
-                    quoted_arg = quote(arg)
-                    print("echo '  %s'" % quoted_arg, file=out)
-                    print("""set -- "$@" '%s'""" % quoted_arg, file=out)
-            for key, value in self.mozconfig['env']['added'].items():
-                print("export %s='%s'" % (key, quote(value)), file=out)
-            for key, (old, value) in self.mozconfig['env']['modified'].items():
-                print("export %s='%s'" % (key, quote(value)), file=out)
-            for key, value in self.mozconfig['vars']['added'].items():
-                print("%s='%s'" % (key, quote(value)), file=out)
-            for key, (old, value) in self.mozconfig['vars']['modified'].items():
-                print("%s='%s'" % (key, quote(value)), file=out)
-            for key in self.mozconfig['env']['removed'].keys() + \
-                    self.mozconfig['vars']['removed'].keys():
-                print("unset %s" % key, file=out)
-
     def _environment_json(self, out, verbose):
         import json
         class EnvironmentEncoder(json.JSONEncoder):
@@ -1465,10 +1445,7 @@ class PackageFrontend(MachCommandBase):
     """Fetch and install binary artifacts from Mozilla automation."""
 
     @Command('artifact', category='post-build',
-        description='Use pre-built artifacts to build Firefox.',
-        conditions=[
-            conditions.is_hg,  # mercurial only for now.
-        ])
+        description='Use pre-built artifacts to build Firefox.')
     def artifact(self):
         '''Download, cache, and install pre-built binary artifacts to build Firefox.
 
@@ -1486,11 +1463,32 @@ class PackageFrontend(MachCommandBase):
     def _set_log_level(self, verbose):
         self.log_manager.terminal_handler.setLevel(logging.INFO if not verbose else logging.DEBUG)
 
-    def _make_artifacts(self, tree=None, job=None):
+    def _install_pip_package(self, package):
+        if os.environ.get('MOZ_AUTOMATION'):
+            self.virtualenv_manager._run_pip([
+                'install',
+                package,
+                '--no-index',
+                '--find-links',
+                'http://pypi.pub.build.mozilla.org/pub',
+                '--trusted-host',
+                'pypi.pub.build.mozilla.org',
+            ])
+            return
+        self.virtualenv_manager.install_pip_package(package)
+
+    def _make_artifacts(self, tree=None, job=None, skip_cache=False):
+        # Undo PATH munging that will be done by activating the virtualenv,
+        # so that invoked subprocesses expecting to find system python
+        # (git cinnabar, in particular), will not find virtualenv python.
+        original_path = os.environ.get('PATH', '')
         self._activate_virtualenv()
-        self.virtualenv_manager.install_pip_package('pylru==1.0.9')
-        self.virtualenv_manager.install_pip_package('taskcluster==0.0.32')
-        self.virtualenv_manager.install_pip_package('mozregression==1.0.2')
+        os.environ['PATH'] = original_path
+
+        for package in ('pylru==1.0.9',
+                        'taskcluster==0.0.32',
+                        'mozregression==1.0.2'):
+            self._install_pip_package(package)
 
         state_dir = self._mach_context.state_dir
         cache_dir = os.path.join(state_dir, 'package-frontend')
@@ -1502,14 +1500,27 @@ class PackageFrontend(MachCommandBase):
                 raise
 
         import which
-        if self._is_windows():
-          hg = which.which('hg.exe')
-        else:
-          hg = which.which('hg')
+
+        here = os.path.abspath(os.path.dirname(__file__))
+        build_obj = MozbuildObject.from_environment(cwd=here)
+
+        hg = None
+        if conditions.is_hg(build_obj):
+            if self._is_windows():
+                hg = which.which('hg.exe')
+            else:
+                hg = which.which('hg')
+
+        git = None
+        if conditions.is_git(build_obj):
+            if self._is_windows():
+                git = which.which('git.exe')
+            else:
+                git = which.which('git')
 
         # Absolutely must come after the virtualenv is populated!
         from mozbuild.artifacts import Artifacts
-        artifacts = Artifacts(tree, job, log=self.log, cache_dir=cache_dir, hg=hg)
+        artifacts = Artifacts(tree, job, log=self.log, cache_dir=cache_dir, skip_cache=skip_cache, hg=hg, git=git)
         return artifacts
 
     @ArtifactSubCommand('artifact', 'install',
@@ -1519,9 +1530,12 @@ class PackageFrontend(MachCommandBase):
             'which case the current hg repository is inspected; an hg revision; '
             'a remote URL; or a local file.',
         default=None)
-    def artifact_install(self, source=None, tree=None, job=None, verbose=False):
+    @CommandArgument('--skip-cache', action='store_true',
+        help='Skip all local caches to force re-fetching remote artifacts.',
+        default=False)
+    def artifact_install(self, source=None, skip_cache=False, tree=None, job=None, verbose=False):
         self._set_log_level(verbose)
-        artifacts = self._make_artifacts(tree=tree, job=job)
+        artifacts = self._make_artifacts(tree=tree, job=job, skip_cache=skip_cache)
 
         return artifacts.install_from(source, self.distdir)
 

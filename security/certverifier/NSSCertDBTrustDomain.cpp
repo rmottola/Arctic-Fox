@@ -33,7 +33,7 @@
 using namespace mozilla;
 using namespace mozilla::pkix;
 
-extern PRLogModuleInfo* gCertVerifierLog;
+extern LazyLogModule gCertVerifierLog;
 
 static const uint64_t ServerFailureDelaySeconds = 5 * 60;
 
@@ -50,11 +50,10 @@ NSSCertDBTrustDomain::NSSCertDBTrustDomain(SECTrustType certDBTrustType,
                                            CertVerifier::PinningMode pinningMode,
                                            unsigned int minRSABits,
                                            ValidityCheckingMode validityCheckingMode,
-                                           SignatureDigestOption signatureDigestOption,
                                            CertVerifier::SHA1Mode sha1Mode,
+                                           ScopedCERTCertList& builtChain,
                               /*optional*/ PinningTelemetryInfo* pinningTelemetryInfo,
-                              /*optional*/ const char* hostname,
-                              /*optional*/ ScopedCERTCertList* builtChain)
+                              /*optional*/ const char* hostname)
   : mCertDBTrustType(certDBTrustType)
   , mOCSPFetching(ocspFetching)
   , mOCSPCache(ocspCache)
@@ -64,11 +63,10 @@ NSSCertDBTrustDomain::NSSCertDBTrustDomain(SECTrustType certDBTrustType,
   , mPinningMode(pinningMode)
   , mMinRSABits(minRSABits)
   , mValidityCheckingMode(validityCheckingMode)
-  , mSignatureDigestOption(signatureDigestOption)
   , mSHA1Mode(sha1Mode)
+  , mBuiltChain(builtChain)
   , mPinningTelemetryInfo(pinningTelemetryInfo)
   , mHostname(hostname)
-  , mBuiltChain(builtChain)
   , mCertBlocklist(do_GetService(NS_CERTBLOCKLIST_CONTRACTID))
   , mOCSPStaplingStatus(CertVerifier::OCSP_STAPLING_NEVER_CHECKED)
 {
@@ -264,7 +262,6 @@ NSSCertDBTrustDomain::DigestBuf(Input item, DigestAlgorithm digestAlg,
   return DigestBufNSS(item, digestAlg, digestBuf, digestBufLen);
 }
 
-
 static PRIntervalTime
 OCSPFetchingTypeToTimeoutTime(NSSCertDBTrustDomain::OCSPFetching ocspFetching)
 {
@@ -279,9 +276,10 @@ OCSPFetchingTypeToTimeoutTime(NSSCertDBTrustDomain::OCSPFetching ocspFetching)
     case NSSCertDBTrustDomain::NeverFetchOCSP:
     case NSSCertDBTrustDomain::LocalOnlyOCSPForEV:
       PR_NOT_REACHED("we should never see this OCSPFetching type here");
-    default:
-      PR_NOT_REACHED("we're not handling every OCSPFetching type");
+      break;
   }
+
+  PR_NOT_REACHED("we're not handling every OCSPFetching type");
   return PR_SecondsToInterval(2);
 }
 
@@ -429,8 +427,8 @@ NSSCertDBTrustDomain::CheckRevocation(EndEntityOrCA endEntityOrCA,
     // expired. Don't return with either of these statuses yet - we may be
     // able to fetch a more recent one.
     MOZ_LOG(gCertVerifierLog, LogLevel::Debug,
-           ("NSSCertDBTrustDomain: cached OCSP response: error %ld valid "
-           "until %lld", cachedResponseResult, cachedResponseValidThrough));
+           ("NSSCertDBTrustDomain: cached OCSP response: error %d",
+           cachedResponseResult));
     // When a good cached response has expired, it is more convenient
     // to convert that to an error code and just deal with
     // cachedResponseResult from here on out.
@@ -551,12 +549,15 @@ NSSCertDBTrustDomain::CheckRevocation(EndEntityOrCA endEntityOrCA,
       static_cast<unsigned int>(ocspRequestLength)
     };
     // Owned by arena
-    const SECItem* responseSECItem =
+    SECItem* responseSECItem = nullptr;
+    Result tempRV =
       DoOCSPRequest(arena.get(), url, &ocspRequestItem,
                     OCSPFetchingTypeToTimeoutTime(mOCSPFetching),
-                    mOCSPGetConfig == CertVerifier::ocspGetEnabled);
-    if (!responseSECItem) {
-      rv = MapPRErrorCodeToResult(PR_GetError());
+                    mOCSPGetConfig == CertVerifier::ocspGetEnabled,
+                    responseSECItem);
+    MOZ_ASSERT((tempRV != Success) || responseSECItem);
+    if (tempRV != Success) {
+      rv = tempRV;
     } else if (response.Init(responseSECItem->data, responseSECItem->len)
                  != Success) {
       rv = Result::ERROR_OCSP_MALFORMED_RESPONSE; // too big
@@ -782,9 +783,9 @@ NSSCertDBTrustDomain::IsChainValid(const DERArray& certArray, Time time)
   }
 
   bool isBuiltInRoot = false;
-  srv = IsCertBuiltInRoot(root, isBuiltInRoot);
-  if (srv != SECSuccess) {
-    return MapPRErrorCodeToResult(PR_GetError());
+  Result rv = IsCertBuiltInRoot(root, isBuiltInRoot);
+  if (rv != Success) {
+    return rv;
   }
   bool skipPinningChecksBecauseOfMITMMode =
     (!isBuiltInRoot && mPinningMode == CertVerifier::pinningAllowUserCAMITM);
@@ -806,9 +807,7 @@ NSSCertDBTrustDomain::IsChainValid(const DERArray& certArray, Time time)
     }
   }
 
-  if (mBuiltChain) {
-    *mBuiltChain = certList.forget();
-  }
+  mBuiltChain = certList.forget();
 
   return Success;
 }
@@ -824,40 +823,25 @@ NSSCertDBTrustDomain::CheckSignatureDigestAlgorithm(DigestAlgorithm aAlg,
   MOZ_LOG(gCertVerifierLog, LogLevel::Debug,
           ("NSSCertDBTrustDomain: CheckSignatureDigestAlgorithm"));
   if (aAlg == DigestAlgorithm::sha1) {
-    // First check based on SHA1Mode
     switch (mSHA1Mode) {
       case CertVerifier::SHA1Mode::Forbidden:
         MOZ_LOG(gCertVerifierLog, LogLevel::Debug, ("SHA-1 certificate rejected"));
         return Result::ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED;
-      case CertVerifier::SHA1Mode::OnlyBefore2016:
+      case CertVerifier::SHA1Mode::Before2016:
         if (JANUARY_FIRST_2016 <= notBefore) {
           MOZ_LOG(gCertVerifierLog, LogLevel::Debug, ("Post-2015 SHA-1 certificate rejected"));
           return Result::ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED;
         }
         break;
       case CertVerifier::SHA1Mode::Allowed:
+      // Enforcing that the resulting chain uses an imported root is only
+      // possible at a higher level. This is done in CertVerifier::VerifyCert.
+      case CertVerifier::SHA1Mode::ImportedRoot:
       default:
         break;
     }
-
-    // Then check the signatureDigestOption values
-    if (mSignatureDigestOption == DisableSHA1Everywhere) {
-      MOZ_LOG(gCertVerifierLog, LogLevel::Debug, ("SHA-1 certificate rejected"));
-      return Result::ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED;
-    }
-
-    if (endEntityOrCA == EndEntityOrCA::MustBeCA) {
-      MOZ_LOG(gCertVerifierLog, LogLevel::Debug, ("CA cert is SHA-1"));
-      return mSignatureDigestOption == DisableSHA1ForCA
-             ? Result::ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED
-             : Success;
-    } else {
-      MOZ_LOG(gCertVerifierLog, LogLevel::Debug, ("EE cert is SHA-1"));
-      return mSignatureDigestOption == DisableSHA1ForEE
-             ? Result::ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED
-             : Success;
-    }
   }
+
   return Success;
 }
 
@@ -1036,7 +1020,7 @@ LoadLoadableRoots(/*optional*/ const char* dir, const char* modNameUTF8)
     return SECFailure;
   }
 
-  ScopedSECMODModule rootsModule(SECMOD_LoadUserModule(pkcs11ModuleSpec.get(),
+  UniqueSECMODModule rootsModule(SECMOD_LoadUserModule(pkcs11ModuleSpec.get(),
                                                        nullptr, false));
   if (!rootsModule) {
     return SECFailure;
@@ -1054,7 +1038,7 @@ void
 UnloadLoadableRoots(const char* modNameUTF8)
 {
   PR_ASSERT(modNameUTF8);
-  ScopedSECMODModule rootsModule(SECMOD_FindModule(modNameUTF8));
+  UniqueSECMODModule rootsModule(SECMOD_FindModule(modNameUTF8));
 
   if (rootsModule) {
     SECMOD_UnloadUserModule(rootsModule.get());

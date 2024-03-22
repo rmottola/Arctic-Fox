@@ -304,7 +304,7 @@
         <getter>
           <![CDATA[
             var document = this.contentDocument;
-            if (!document || !(document instanceof Ci.nsIImageDocument))
+            if (!document || !(document instanceof Components.interfaces.nsIImageDocument))
               return null;
 
             try {
@@ -436,11 +436,6 @@
         ]]></getter>
       </property>
 
-      <field name="_permanentKey">({})</field>
-
-      <property name="permanentKey" readonly="true"
-                onget="return this._permanentKey;"/>
-
       <property name="outerWindowID" readonly="true">
         <getter><![CDATA[
           return this.contentWindow
@@ -533,6 +528,13 @@
                        return val;"
                 onget="return this.getAttribute('showresizer') == 'true';"/>
 
+      <property name="manifestURI"
+                readonly="true">
+        <getter><![CDATA[
+          return this.contentDocument.documentElement &&
+                 this.contentDocument.documentElement.getAttribute("manifest");
+        ]]></getter>
+      </property>
 
       <property name="fullZoom">
         <getter><![CDATA[
@@ -786,12 +788,23 @@
         </setter>
       </property>
 
+      <!-- increases or decreases the browser's network priority -->
       <method name="adjustPriority">
         <parameter name="adjustment"/>
         <body><![CDATA[
-          let loadGroup = this.webNavigation.QueryInterface(Ci.nsIDocumentLoader)
-                              .loadGroup.QueryInterface(Ci.nsISupportsPriority);
+          let loadGroup = this.webNavigation.QueryInterface(Components.interfaces.nsIDocumentLoader)
+                              .loadGroup.QueryInterface(Components.interfaces.nsISupportsPriority);
           loadGroup.adjustPriority(adjustment);
+        ]]></body>
+      </method>
+
+      <!-- sets the browser's network priority to a discrete value -->
+      <method name="setPriority">
+        <parameter name="priority"/>
+        <body><![CDATA[
+          let loadGroup = this.webNavigation.QueryInterface(Components.interfaces.nsIDocumentLoader)
+                              .loadGroup.QueryInterface(Components.interfaces.nsISupportsPriority);
+          loadGroup.priority = priority;
         ]]></body>
       </method>
 
@@ -879,7 +892,7 @@
             if (this.docShell && this.webNavigation.sessionHistory) {
               var os = Components.classes["@mozilla.org/observer-service;1"]
                                  .getService(Components.interfaces.nsIObserverService);
-              os.addObserver(this, "browser:purge-session-history", false);
+              os.addObserver(this, "browser:purge-session-history", true);
 
               // enable global history if we weren't told otherwise
               if (!this.hasAttribute("disableglobalhistory") && !this.isRemoteBrowser) {
@@ -1108,6 +1121,7 @@
               this._autoScrollPopup.setAttribute("translucent", /Win|Mac/.test(navigator.platform));
             }
 
+            this._autoScrollPopup.setAttribute("noautofocus", "true");
             this._autoScrollPopup.setAttribute("scrolldir", scrolldir);
             this._autoScrollPopup.addEventListener("popuphidden", this, true);
             this._autoScrollPopup.showPopup(document.documentElement,
@@ -1211,6 +1225,20 @@
             throw new Error("Can only swap docshells between browsers in the same process.");
 
           // Give others a chance to swap state.
+          // IMPORTANT: Since a swapDocShells call does not swap the messageManager
+          //            instances attached to a browser to aOtherBrowser, others
+          //            will need to add the message listeners to the new
+          //            messageManager.
+          //            This is not a bug in swapDocShells or the FrameLoader,
+          //            merely a design decision: If message managers were swapped,
+          //            so that no new listeners were needed, the new
+          //            aOtherBrowser.messageManager would have listeners pointing
+          //            to the JS global of the current browser, which would rather
+          //            easily create leaks while swapping.
+          // IMPORTANT2: When the current browser element is removed from DOM,
+          //             which is quite common after a swpDocShells call, its
+          //             frame loader is destroyed, and that destroys the relevant
+          //             message manager, which will remove the listeners.
           let event = new CustomEvent("SwapDocShells", {"detail": aOtherBrowser});
           this.dispatchEvent(event);
           event = new CustomEvent("SwapDocShells", {"detail": this});
@@ -1226,13 +1254,13 @@
             "_docShell",
             "_webBrowserFind",
             "_contentWindow",
-            "_webNavigation",
-            "_innerWindowID",
+            "_webNavigation"
           ];
 
           if (this.isRemoteBrowser) {
             fieldsToSwap.push(...[
               "_remoteWebNavigation",
+              "_remoteWebNavigationImpl",
               "_remoteWebProgressManager",
               "_remoteWebProgress",
               "_remoteFinder",
@@ -1247,6 +1275,7 @@
               "_textZoom",
               "_isSyntheticDocument",
               "_innerWindowID",
+              "_manifestURI",
             ]);
           }
 
@@ -1287,8 +1316,8 @@
           }
           else {
             // Rewire the remote listeners
-            this._remoteWebNavigation.swapBrowser(this);
-            aOtherBrowser._remoteWebNavigation.swapBrowser(aOtherBrowser);
+            this._remoteWebNavigationImpl.swapBrowser(this);
+            aOtherBrowser._remoteWebNavigationImpl.swapBrowser(aOtherBrowser);
 
             this._remoteWebProgressManager.swapBrowser(this);
             aOtherBrowser._remoteWebProgressManager.swapBrowser(aOtherBrowser);

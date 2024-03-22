@@ -3,7 +3,6 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 <?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
-<?xml-stylesheet href="chrome://devtools/skin/common.css" type="text/css"?>
 
 <?xul-overlay href="chrome://global/content/editMenuOverlay.xul"?>
 
@@ -126,6 +125,10 @@
                        hidden="true">
           <menupopup position="bottomright topright"></menupopup>
         </toolbarbutton>
+        <toolbarbutton id="command-button-noautohide"
+                       class="command-button command-button-invertable"
+                       tooltiptext="&toolboxNoAutoHideTooltip;"
+                       hidden="true" />
       </hbox>
       <vbox id="toolbox-controls-separator" class="devtools-separator"/>
       <hbox id="toolbox-option-container"/>

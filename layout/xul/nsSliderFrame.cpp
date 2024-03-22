@@ -11,6 +11,8 @@
 //
 
 #include "nsSliderFrame.h"
+
+#include "gfxPrefs.h"
 #include "nsStyleContext.h"
 #include "nsPresContext.h"
 #include "nsIContent.h"
@@ -758,8 +760,10 @@ nsSliderFrame::CurrentPositionChanged()
   thumbFrame->SetRect(newThumbRect);
 
   // Request a repaint of the scrollbar
-  nsIScrollableFrame* scrollableFrame = do_QueryFrame(GetScrollbar()->GetParent());
-  if (!scrollableFrame || scrollableFrame->LastScrollOrigin() != nsGkAtoms::apz) {
+  nsScrollbarFrame* scrollbarFrame = do_QueryFrame(scrollbarBox);
+  nsIScrollbarMediator* mediator = scrollbarFrame
+      ? scrollbarFrame->GetScrollbarMediator() : nullptr;
+  if (!mediator || !mediator->ShouldSuppressScrollbarRepaints()) {
     SchedulePaint();
   }
 

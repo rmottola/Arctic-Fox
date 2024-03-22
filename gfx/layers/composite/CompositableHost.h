@@ -121,8 +121,7 @@ public:
    * @return true if the effect was added, false otherwise.
    */
   bool AddMaskEffect(EffectChain& aEffects,
-                     const gfx::Matrix4x4& aTransform,
-                     bool aIs3D = false);
+                     const gfx::Matrix4x4& aTransform);
 
   void RemoveMaskEffect();
 
@@ -237,6 +236,11 @@ public:
   }
 
   virtual int32_t GetLastInputFrameID() const { return -1; }
+
+  /// Called when shutting down the layer tree.
+  /// This is a good place to clear all potential gpu resources before the widget
+  /// is is destroyed.
+  virtual void CleanupResources() {}
 
 protected:
   TextureInfo mTextureInfo;

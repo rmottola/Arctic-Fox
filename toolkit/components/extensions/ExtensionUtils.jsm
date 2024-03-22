@@ -168,6 +168,26 @@ class BaseContext {
   }
 
   /**
+   * Normalizes the given error object for use by the target scope. If
+   * the target is an error object which belongs to that scope, it is
+   * returned as-is. If it is an ordinary object with a `message`
+   * property, it is converted into an error belonging to the target
+   * scope. If it is an Error object which does *not* belong to the
+   * clone scope, it is reported, and converted to an unexpected
+   * exception error.
+   */
+  normalizeError(error) {
+    if (error instanceof this.cloneScope.Error) {
+      return error;
+    }
+    if (!instanceOf(error, "Object")) {
+      Cu.reportError(error);
+      error = {message: "An unexpected error occurred"};
+    }
+    return new this.cloneScope.Error(error.message);
+  }
+
+  /**
    * Sets the value of `.lastError` to `error`, calls the given
    * callback, and reports an error if the value has not been checked
    * when the callback returns.
@@ -178,15 +198,12 @@ class BaseContext {
    * @returns {*} The return value of callback.
    */
   withLastError(error, callback) {
-    if (!(error instanceof this.cloneScope.Error)) {
-      error = new this.cloneScope.Error(error.message);
-    }
-    this.lastError = error;
+    this.lastError = this.normalizeError(error);
     try {
       return callback();
     } finally {
       if (!this.checkedLastError) {
-        Cu.reportError(`Unchecked lastError value: ${error}`);
+        Cu.reportError(`Unchecked lastError value: ${this.lastError}`);
       }
       this.lastError = null;
     }
@@ -244,10 +261,7 @@ class BaseContext {
         promise.then(
           value => { runSafe(resolve, value); },
           value => {
-            if (!(value instanceof this.cloneScope.Error)) {
-              value = new this.cloneScope.Error(value.message);
-            }
-            runSafeSyncWithoutClone(reject, value);
+            runSafeSyncWithoutClone(reject, this.normalizeError(value));
           });
       });
     }
@@ -842,25 +856,34 @@ Messenger.prototype = {
     recipient.messageId = id;
     this.broker.sendMessage(messageManager, "message", msg, this.sender, recipient);
 
-    let onClose;
-    let listener = ({data: response}) => {
-      messageManager.removeMessageListener(replyName, listener);
-      this.context.forgetOnClose(onClose);
-
-      if (response.gotData) {
-        // TODO: Handle failure to connect to the extension?
-        runSafe(this.context, responseCallback, response.data);
-      }
-    };
-    onClose = {
-      close() {
+    let promise = new Promise((resolve, reject) => {
+      let onClose;
+      let listener = ({data: response}) => {
         messageManager.removeMessageListener(replyName, listener);
-      },
-    };
-    if (responseCallback) {
+        this.context.forgetOnClose(onClose);
+
+        if (response.gotData) {
+          resolve(response.data);
+        } else if (response.error) {
+          reject(response.error);
+        } else if (!responseCallback) {
+          // As a special case, we don't call the callback variant if we
+          // receive no response, but the promise needs to resolve or
+          // reject in either case.
+          resolve();
+        }
+      };
+      onClose = {
+        close() {
+          messageManager.removeMessageListener(replyName, listener);
+        },
+      };
+
       messageManager.addMessageListener(replyName, listener);
       this.context.callOnClose(onClose);
-    }
+    });
+
+    return this.context.wrapPromise(promise, responseCallback);
   },
 
   onMessage(name) {
@@ -875,23 +898,33 @@ Messenger.prototype = {
         let mm = getMessageManager(target);
         let replyName = `Extension:Reply-${recipient.messageId}`;
 
-        let valid = true, sent = false;
-        let sendResponse = data => {
-          if (!valid) {
-            return;
-          }
-          sent = true;
-          mm.sendAsyncMessage(replyName, {data, gotData: true});
-        };
-        sendResponse = Cu.exportFunction(sendResponse, this.context.cloneScope);
+        new Promise((resolve, reject) => {
+          let sendResponse = Cu.exportFunction(resolve, this.context.cloneScope);
 
-        let result = runSafeSyncWithoutClone(callback, message, sender, sendResponse);
-        if (result !== true) {
-          valid = false;
-          if (!sent) {
-            mm.sendAsyncMessage(replyName, {gotData: false});
+          // Note: We intentionally do not use runSafe here so that any
+          // errors are propagated to the message sender.
+          let result = callback(message, sender, sendResponse);
+          if (result instanceof Promise) {
+            resolve(result);
+          } else if (result !== true) {
+            reject();
           }
-        }
+        }).then(
+          data => {
+            mm.sendAsyncMessage(replyName, {data, gotData: true});
+          },
+          error => {
+            if (error) {
+              // The result needs to be structured-clonable, which
+              // ordinary Error objects are not.
+              try {
+                error = {message: String(error.message), stack: String(error.stack)};
+              } catch (e) {
+                error = {message: String(error)};
+              }
+            }
+            mm.sendAsyncMessage(replyName, {error, gotData: false});
+          });
       };
 
       this.broker.addListener("message", listener, this.filter);

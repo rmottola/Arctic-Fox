@@ -337,6 +337,8 @@ public:
 
   void UpdateDimensions(const nsIntRect& aRect, const ScreenIntSize& aSize);
 
+  void SizeModeChanged(const nsSizeMode& aSizeMode);
+
   void UIResolutionChanged();
 
   void ThemeChanged();
@@ -600,6 +602,8 @@ protected:
   float mDPI;
   CSSToLayoutDeviceScale mDefaultScale;
   bool mUpdatedDimensions;
+  nsSizeMode mSizeMode;
+  LayoutDeviceIntPoint mClientOffset;
   LayoutDeviceIntPoint mChromeOffset;
 
 private:
@@ -644,19 +648,7 @@ private:
 
   uint32_t mChromeFlags;
 
-  struct DataTransferItem
-  {
-    nsCString mFlavor;
-    nsString mStringData;
-    RefPtr<mozilla::dom::BlobImpl> mBlobData;
-    enum DataType
-    {
-      eString,
-      eBlob
-    };
-    DataType mType;
-  };
-  nsTArray<nsTArray<DataTransferItem>> mInitialDataTransferItems;
+  nsTArray<nsTArray<IPCDataTransferItem>> mInitialDataTransferItems;
 
   RefPtr<gfx::DataSourceSurface> mDnDVisualization;
   int32_t mDragAreaX;
@@ -729,7 +721,9 @@ private:
 
   bool mHasContentOpener;
 
-  DebugOnly<int32_t> mActiveSupressDisplayportCount;
+#ifdef DEBUG
+  int32_t mActiveSupressDisplayportCount;
+#endif
 
   ShowInfo GetShowInfo();
 

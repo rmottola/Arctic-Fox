@@ -36,7 +36,7 @@ class URIParams;
 }// namespace ipc
 
 namespace layers {
-class PCompositorChild;
+class PCompositorBridgeChild;
 } // namespace layers
 
 namespace dom {
@@ -149,9 +149,9 @@ public:
   bool
   DeallocPAPZChild(PAPZChild* aActor) override;
 
-  PCompositorChild*
-  AllocPCompositorChild(mozilla::ipc::Transport* aTransport,
-                        base::ProcessId aOtherProcess) override;
+  PCompositorBridgeChild*
+  AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
+                              base::ProcessId aOtherProcess) override;
 
   PSharedBufferManagerChild*
   AllocPSharedBufferManagerChild(mozilla::ipc::Transport* aTransport,
@@ -441,8 +441,6 @@ public:
 
   virtual bool RecvAddPermission(const IPC::Permission& permission) override;
 
-  virtual bool RecvScreenSizeChanged(const gfx::IntSize &size) override;
-
   virtual bool RecvFlushMemory(const nsString& reason) override;
 
   virtual bool RecvActivateA11y() override;
@@ -544,10 +542,6 @@ public:
   RecvPushSubscriptionChange(const nsCString& aScope,
                              const IPC::Principal& aPrincipal) override;
 
-#ifdef ANDROID
-  gfx::IntSize GetScreenSize() { return mScreenSize; }
-#endif
-
   // Get the directory for IndexedDB files. We query the parent for this and
   // cache the value
   nsString &GetIndexedDBPath();
@@ -610,7 +604,11 @@ public:
 
   virtual bool RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent) override;
 
-  virtual bool RecvTestGraphicsDeviceReset(const uint32_t& aResetReason) override;
+  // Windows specific - set up audio session
+  virtual bool
+  RecvSetAudioSessionData(const nsID& aId,
+                          const nsString& aDisplayName,
+                          const nsString& aIconPath) override;
 
 private:
   virtual void ActorDestroy(ActorDestroyReason why) override;
@@ -640,10 +638,6 @@ private:
   ContentParentId mID;
 
   AppInfo mAppInfo;
-
-#ifdef ANDROID
-  gfx::IntSize mScreenSize;
-#endif
 
   bool mIsForApp;
   bool mIsForBrowser;

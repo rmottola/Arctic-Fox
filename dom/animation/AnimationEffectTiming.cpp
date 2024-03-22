@@ -8,6 +8,7 @@
 
 #include "mozilla/dom/AnimatableBinding.h"
 #include "mozilla/dom/AnimationEffectTimingBinding.h"
+#include "mozilla/TimingParams.h"
 
 namespace mozilla {
 namespace dom {
@@ -16,6 +17,63 @@ JSObject*
 AnimationEffectTiming::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return AnimationEffectTimingBinding::Wrap(aCx, this, aGivenProto);
+}
+
+static inline void
+PostSpecifiedTimingUpdated(KeyframeEffect* aEffect)
+{
+  if (aEffect) {
+    aEffect->NotifySpecifiedTimingUpdated();
+  }
+}
+
+void
+AnimationEffectTiming::SetEndDelay(double aEndDelay)
+{
+  TimeDuration endDelay = TimeDuration::FromMilliseconds(aEndDelay);
+  if (mTiming.mEndDelay == endDelay) {
+    return;
+  }
+  mTiming.mEndDelay = endDelay;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
+AnimationEffectTiming::SetIterationStart(double aIterationStart,
+                                         ErrorResult& aRv)
+{
+  if (mTiming.mIterationStart == aIterationStart) {
+    return;
+  }
+
+  TimingParams::ValidateIterationStart(aIterationStart, aRv);
+  if (aRv.Failed()) {
+    return;
+  }
+
+  mTiming.mIterationStart = aIterationStart;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
+AnimationEffectTiming::SetDuration(const UnrestrictedDoubleOrString& aDuration,
+                                   ErrorResult& aRv)
+{
+  Maybe<StickyTimeDuration> newDuration =
+    TimingParams::ParseDuration(aDuration, aRv);
+  if (aRv.Failed()) {
+    return;
+  }
+
+  if (mTiming.mDuration == newDuration) {
+    return;
+  }
+
+  mTiming.mDuration = newDuration;
+
+  PostSpecifiedTimingUpdated(mEffect);
 }
 
 } // namespace dom

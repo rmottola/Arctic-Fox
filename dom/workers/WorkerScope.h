@@ -105,8 +105,7 @@ public:
   SetOnerror(OnErrorEventHandlerNonNull* aHandler);
 
   void
-  ImportScripts(JSContext* aCx, const Sequence<nsString>& aScriptURLs,
-                ErrorResult& aRv);
+  ImportScripts(const Sequence<nsString>& aScriptURLs, ErrorResult& aRv);
 
   int32_t
   SetTimeout(JSContext* aCx, Function& aHandler, const int32_t aTimeout,
@@ -116,7 +115,7 @@ public:
              const int32_t aTimeout, const Sequence<JS::Value>& /* unused */,
              ErrorResult& aRv);
   void
-  ClearTimeout(int32_t aHandle, ErrorResult& aRv);
+  ClearTimeout(int32_t aHandle);
   int32_t
   SetInterval(JSContext* aCx, Function& aHandler,
               const Optional<int32_t>& aTimeout,
@@ -126,7 +125,7 @@ public:
               const Optional<int32_t>& aTimeout,
               const Sequence<JS::Value>& /* unused */, ErrorResult& aRv);
   void
-  ClearInterval(int32_t aHandle, ErrorResult& aRv);
+  ClearInterval(int32_t aHandle);
 
   void
   Atob(const nsAString& aAtob, nsAString& aOutput, ErrorResult& aRv) const;
@@ -241,9 +240,6 @@ public:
                    JS::MutableHandle<JSObject*> aReflector) override;
 
   static bool
-  InterceptionEnabled(JSContext* aCx, JSObject* aObj);
-
-  static bool
   OpenWindowEnabled(JSContext* aCx, JSObject* aObj);
 
   void
@@ -325,7 +321,7 @@ public:
   IMPL_EVENT_HANDLER(message)
 
   void
-  SetImmediate(JSContext* aCx, Function& aHandler, ErrorResult& aRv);
+  SetImmediate(Function& aHandler, ErrorResult& aRv);
 
   void
   ReportError(JSContext* aCx, const nsAString& aMessage);

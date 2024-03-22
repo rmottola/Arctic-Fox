@@ -21,6 +21,8 @@
 #include "nsContentList.h"
 #include "nsCSSPseudoElements.h"
 #include "nsStyleSet.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "nsThemeConstants.h"
 #include <algorithm>
 
@@ -255,9 +257,8 @@ nsProgressFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
 nscoord
 nsProgressFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 {
-  RefPtr<nsFontMetrics> fontMet;
-  NS_ENSURE_SUCCESS(
-      nsLayoutUtils::GetFontMetricsForFrame(this, getter_AddRefs(fontMet)), 0);
+  RefPtr<nsFontMetrics> fontMet =
+    nsLayoutUtils::GetFontMetricsForFrame(this, 1.0f);
 
   nscoord minISize = fontMet->Font().size; // 1em
 

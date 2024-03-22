@@ -3,9 +3,8 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
@@ -14,6 +13,7 @@ Cu.import("resource://gre/modules/Console.jsm");
 
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
+const Services = require("Services");
 const EventEmitter = require("devtools/shared/event-emitter");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const Editor = require("devtools/client/sourceeditor/editor");
@@ -38,6 +38,7 @@ const EVENTS = {
   // When the editor's error markers are all removed
   EDITOR_ERROR_MARKERS_REMOVED: "ShaderEditor:EditorCleaned"
 };
+XPCOMUtils.defineConstant(this, "EVENTS", EVENTS);
 
 const STRINGS_URI = "chrome://devtools/locale/shadereditor.properties"
 const HIGHLIGHT_TINT = [1, 0, 0.25, 1]; // rgba

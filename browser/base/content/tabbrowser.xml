@@ -693,8 +693,10 @@
 
                     this.mBrowser.userTypedValue = null;
 
-                    if (this.mTab.selected && gURLBar)
+                    let inLoadURI = this.mBrowser.inLoadURI;
+                    if (this.mTab.selected && gURLBar && !inLoadURI) {
                       URLBarSetURI();
+                    }
                   } else {
                     // The document is done loading, we no longer want the
                     // value cleared.
@@ -1349,7 +1351,7 @@
         We ignore the effect of dragging tabs between windows.
       -->
       <method name="_recordTabAccess">
-	<parameter name="aTab"/>
+        <parameter name="aTab"/>
         <body><![CDATA[
           if (!Services.telemetry.canRecordExtended) {
             return;
@@ -1599,12 +1601,8 @@
 
             // Change the "remote" attribute.
             let parent = aBrowser.parentNode;
-            let permanentKey = aBrowser.permanentKey;
             parent.removeChild(aBrowser);
             aBrowser.setAttribute("remote", aShouldBeRemote ? "true" : "false");
-            // Tearing down the browser gives a new permanentKey but we want to
-            // keep the old one. Re-set it explicitly after unbinding from DOM.
-            aBrowser._permanentKey = permanentKey;
             parent.appendChild(aBrowser);
 
             aBrowser.droppedLinkHandler = droppedLinkHandler;
@@ -1888,6 +1886,13 @@
 
             var uriIsAboutBlank = !aURI || aURI == "about:blank";
 
+            if (!aURI || isBlankPageURL(aURI)) {
+              t.setAttribute("label", this.mStringBundle.getString("tabs.emptyTabTitle"));
+            } else if (aURI.toLowerCase().startsWith("javascript:")) {
+              // This can go away when bug 672618 or bug 55696 are fixed.
+              t.setAttribute("label", aURI);
+            }
+
             if (aUserContextId)
               t.setAttribute("usercontextid", aUserContextId);
             t.setAttribute("crop", "end");
@@ -1916,8 +1921,7 @@
               }, 0, this.tabContainer);
             }
 
-            // invalidate caches
-            this._browsers = null;
+            // invalidate cache
             this._visibleTabs = null;
 
             this.tabContainer.appendChild(t);
@@ -1962,12 +1966,6 @@
               // state, so it is important that the tab element is fully
               // initialized by this point.
               this.mPanelContainer.appendChild(notificationbox);
-            }
-
-            // We've waited until the tab is in the DOM to set the label. This
-            // allows the TabLabelModified event to be properly dispatched.
-            if (!aURI || isBlankPageURL(aURI)) {
-              t.label = this.mStringBundle.getString("tabs.emptyTabTitle");
             }
 
             this.tabContainer.updateVisibility();
@@ -2124,11 +2122,13 @@
           // solve the problem of windows "obscuring" the prompt.
           // see bug #350299 for more details
           window.focus();
+          var warningMessage =
+            PluralForm.get(tabsToClose, bundle.getString("tabs.closeWarningMultiple"))
+                      .replace("#1", tabsToClose);
           var buttonPressed =
             ps.confirmEx(window,
                          bundle.getString("tabs.closeWarningTitle"),
-                         bundle.getFormattedString("tabs.closeWarningMultipleTabs",
-                                                   [tabsToClose]),
+                         warningMessage,
                          (ps.BUTTON_TITLE_IS_STRING * ps.BUTTON_POS_0)
                          + (ps.BUTTON_TITLE_CANCEL * ps.BUTTON_POS_1),
                          bundle.getString("tabs.closeButtonMultiple"),
@@ -2337,6 +2337,11 @@
             aTab.closing = true;
             this._removingTabs.push(aTab);
             this._visibleTabs = null; // invalidate cache
+
+            // Invalidate hovered tab state tracking for this closing tab.
+            if (this.tabContainer._hoveredTab == aTab)
+              aTab._mouseleave();
+
             if (newTab)
               this.addTab(BROWSER_NEW_TAB_URL, {skipAnimation: true});
             else
@@ -2444,10 +2449,6 @@
               this.mCurrentBrowser = null;
 
             var wasPinned = aTab.pinned;
-
-            // Invalidate browsers cache, as the tab is removed from the
-            // tab container.
-            this._browsers = null;
 
             // Remove the tab ...
             this.tabContainer.removeChild(aTab);
@@ -2697,6 +2698,9 @@
               remoteBrowser._outerWindowIDBrowserMap.delete(aOtherBrowser.outerWindowID);
             }
 
+            aOtherBrowser.docShellIsActive = (ourBrowser == this.selectedBrowser &&
+                                              window.windowState != window.STATE_MINIMIZED);
+
             // Swap the docshells
             ourBrowser.swapDocShells(aOtherBrowser);
 
@@ -2926,15 +2930,32 @@
                 onget="return this.mCurrentBrowser;"
                 readonly="true"/>
 
-      <property name="browsers" readonly="true">
-       <getter>
-          <![CDATA[
-            return this._browsers ||
-                   (this._browsers = Array.map(this.tabs, tab => tab.linkedBrowser));
-          ]]>
-        </getter>
-      </property>
-      <field name="_browsers">null</field>
+      <field name="browsers" readonly="true">
+        <![CDATA[
+          // This defines a proxy which allows us to access browsers by
+          // index without actually creating a full array of browsers.
+          new Proxy([], {
+            has: (target, name) => {
+              if (typeof name == "string" && Number.isInteger(parseInt(name))) {
+                return (name in this.tabs);
+              }
+              return false;
+            },
+            get: (target, name) => {
+              if (name == "length") {
+                return this.tabs.length;
+              }
+              if (typeof name == "string" && Number.isInteger(parseInt(name))) {
+                if (!(name in this.tabs)) {
+                  return undefined;
+                }
+                return this.tabs[name].linkedBrowser;
+              }
+              return target[name];
+            }
+          });
+        ]]>
+      </field>
 
       <!-- Moves a tab to a new browser window, unless it's already the only tab
            in the current window, in which case this will do nothing. -->
@@ -2995,8 +3016,7 @@
           this.mCurrentTab._logicallySelected = false;
           this.mCurrentTab._visuallySelected = false;
 
-          // invalidate caches
-          this._browsers = null;
+          // invalidate cache
           this._visibleTabs = null;
 
           // use .item() instead of [] because dragging to the end of the strip goes out of
@@ -3616,6 +3636,16 @@
             // Called when the user asks to switch to a given tab.
             requestTab: function(tab) {
               if (tab === this.requestedTab) {
+                return;
+              }
+
+              // Instrumentation to figure out bug 1166351 - if the binding
+              // on the browser we're switching to has gone away, try to find out
+              // why. We should remove this and the checkBrowserBindingAlive
+              // method once bug 1166351 has been closed.
+              if (this.tabbrowser.AppConstants.E10S_TESTING_ONLY &&
+                  !this.checkBrowserBindingAlive(tab)) {
+                Cu.reportError("Please report the above errors in bug 1166351.");
                 return;
               }
 
@@ -5685,6 +5715,61 @@
         event.preventDefault();
       ]]></handler>
 
+      <handler event="click" button="0" phase="capturing"><![CDATA[
+        /* Catches extra clicks meant for the in-tab close button.
+         * Placed here to avoid leaking (a temporary handler added from the
+         * in-tab close button binding would close over the tab and leak it
+         * until the handler itself was removed). (bug 897751)
+         *
+         * The only sequence in which a second click event (i.e. dblclik)
+         * can be dispatched on an in-tab close button is when it is shown
+         * after the first click (i.e. the first click event was dispatched
+         * on the tab). This happens when we show the close button only on
+         * the active tab. (bug 352021)
+         * The only sequence in which a third click event can be dispatched
+         * on an in-tab close button is when the tab was opened with a
+         * double click on the tabbar. (bug 378344)
+         * In both cases, it is most likely that the close button area has
+         * been accidentally clicked, therefore we do not close the tab.
+         *
+         * We don't want to ignore processing of more than one click event,
+         * though, since the user might actually be repeatedly clicking to
+         * close many tabs at once.
+         */
+        let target = event.originalTarget;
+        if (target.className == 'tab-close-button') {
+          // We preemptively set this to allow the closing-multiple-tabs-
+          // in-a-row case.
+          if (this._blockDblClick) {
+            target._ignoredCloseButtonClicks = true;
+          } else if (event.detail > 1 && !target._ignoredCloseButtonClicks) {
+            target._ignoredCloseButtonClicks = true;
+            event.stopPropagation();
+            return;
+          } else {
+            // Reset the "ignored click" flag
+            target._ignoredCloseButtonClicks = false;
+          }
+        }
+
+        /* Protects from close-tab-button errant doubleclick:
+         * Since we're removing the event target, if the user
+         * double-clicks the button, the dblclick event will be dispatched
+         * with the tabbar as its event target (and explicit/originalTarget),
+         * which treats that as a mouse gesture for opening a new tab.
+         * In this context, we're manually blocking the dblclick event
+         * (see tabbrowser-close-tab-button dblclick handler).
+         */
+        if (this._blockDblClick) {
+          if (!("_clickedTabBarOnce" in this)) {
+            this._clickedTabBarOnce = true;
+            return;
+          }
+          delete this._clickedTabBarOnce;
+          this._blockDblClick = false;
+        }
+      ]]></handler>
+
       <handler event="click"><![CDATA[
         if (event.button != 1)
           return;
@@ -6076,53 +6161,10 @@
       <handler event="click" button="0"><![CDATA[
         var bindingParent = document.getBindingParent(this);
         var tabContainer = bindingParent.parentNode;
-        /* The only sequence in which a second click event (i.e. dblclik)
-         * can be dispatched on an in-tab close button is when it is shown
-         * after the first click (i.e. the first click event was dispatched
-         * on the tab). This happens when we show the close button only on
-         * the active tab. (bug 352021)
-         * The only sequence in which a third click event can be dispatched
-         * on an in-tab close button is when the tab was opened with a
-         * double click on the tabbar. (bug 378344)
-         * In both cases, it is most likely that the close button area has
-         * been accidentally clicked, therefore we do not close the tab.
-         *
-         * We don't want to ignore processing of more than one click event,
-         * though, since the user might actually be repeatedly clicking to
-         * close many tabs at once.
-         */
-        if (event.detail > 1 && !this._ignoredClick) {
-          this._ignoredClick = true;
-          return;
-        }
-
-        // Reset the "ignored click" flag
-        this._ignoredClick = false;
-
         tabContainer.tabbrowser.removeTab(bindingParent, {animate: true, byMouse: true});
+        // This enables double-click protection for the tab container
+        // (see tabbrowser-tabs 'click' handler).
         tabContainer._blockDblClick = true;
-
-        /* XXXmano hack (see bug 343628):
-         * Since we're removing the event target, if the user
-         * double-clicks this button, the dblclick event will be dispatched
-         * with the tabbar as its event target (and explicit/originalTarget),
-         * which treats that as a mouse gesture for opening a new tab.
-         * In this context, we're manually blocking the dblclick event
-         * (see dblclick handler).
-         */
-        var clickedOnce = false;
-        function enableDblClick(event) {
-          var target = event.originalTarget;
-          if (target.className == 'tab-close-button')
-            target._ignoredClick = true;
-          if (!clickedOnce) {
-            clickedOnce = true;
-            return;
-          }
-          tabContainer._blockDblClick = false;
-          tabContainer.removeEventListener("click", enableDblClick, true);
-        }
-        tabContainer.addEventListener("click", enableDblClick, true);
       ]]></handler>
 
       <handler event="dblclick" button="0" phase="capturing">
@@ -6169,8 +6211,7 @@
                      class="tab-icon-overlay"
                      role="presentation"/>
           <xul:label flex="1"
-                     anonid="tab-label"
-                     xbl:inherits="value=visibleLabel,crop,accesskey,fadein,pinned,selected,visuallyselected,attention"
+                     xbl:inherits="value=label,crop,accesskey,fadein,pinned,selected,visuallyselected,attention"
                      class="tab-text tab-label"
                      role="presentation"/>
           <xul:image xbl:inherits="soundplaying,pinned,muted,visuallyselected"
@@ -6288,32 +6329,6 @@
         </setter>
       </property>
 
-      <property name="label">
-        <getter>
-          return this.getAttribute("label");
-        </getter>
-        <setter>
-          this.setAttribute("label", val);
-          let event = new CustomEvent("TabLabelModified", {
-            bubbles: true,
-            cancelable: true
-          });
-          this.dispatchEvent(event);
-
-          // Let listeners prevent synchronizing the actual label to the
-          // visible label (allowing them to override the visible label).
-          if (!event.defaultPrevented)
-            this.visibleLabel = val;
-        </setter>
-      </property>
-      <property name="visibleLabel">
-        <getter>
-          return this.getAttribute("visibleLabel");
-        </getter>
-        <setter>
-          this.setAttribute("visibleLabel", val);
-        </setter>
-      </property>
       <property name="pinned" readonly="true">
         <getter>
           return this.getAttribute("pinned") == "true";
@@ -6576,6 +6591,24 @@
             aMenuitem.setAttribute("selected", "true");
           else
             aMenuitem.removeAttribute("selected");
+
+          function addEndImage() {
+            let endImage = document.createElement("image");
+            endImage.setAttribute("class", "alltabs-endimage");
+            let endImageContainer = document.createElement("hbox");
+            endImageContainer.setAttribute("align", "center");
+            endImageContainer.setAttribute("pack", "center");
+            endImageContainer.appendChild(endImage);
+            aMenuitem.appendChild(endImageContainer);
+            return endImage;
+          }
+
+          if (aMenuitem.firstChild)
+            aMenuitem.firstChild.remove();
+          if (aTab.hasAttribute("muted"))
+            addEndImage().setAttribute("muted", "true");
+          else if (aTab.hasAttribute("soundplaying"))
+            addEndImage().setAttribute("soundplaying", "true");
         ]]></body>
       </method>
     </implementation>
@@ -6725,17 +6758,16 @@
 
       <method name="_calcMouseTargetRect">
         <body><![CDATA[
-          let alignRight = false;
+          let container = this.parentNode;
+          let alignRight = (getComputedStyle(container).direction == "rtl");
+          let panelRect = this.getBoundingClientRect();
+          let containerRect = container.getBoundingClientRect();
 
-          if (getComputedStyle(document.documentElement).direction == "rtl")
-            alignRight = !alignRight;
-
-          let rect = this.getBoundingClientRect();
           this._mouseTargetRect = {
-            top:    rect.top,
-            bottom: rect.bottom,
-            left:   alignRight ? window.innerWidth - rect.width : 0,
-            right:  alignRight ? window.innerWidth : rect.width
+            top:    panelRect.top,
+            bottom: panelRect.bottom,
+            left:   alignRight ? containerRect.right - panelRect.width : containerRect.left,
+            right:  alignRight ? containerRect.right : containerRect.left + panelRect.width
           };
         ]]></body>
       </method>

@@ -10,6 +10,7 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/GuardObjects.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/mozalloc.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/SizePrintfMacros.h"
@@ -75,6 +76,7 @@
 #include "js/TrackedOptimizationInfo.h"
 #include "perf/jsperf.h"
 #include "shell/jsoptparse.h"
+#include "shell/jsshell.h"
 #include "shell/OSObject.h"
 #include "vm/ArgumentsObject.h"
 #include "vm/Compression.h"
@@ -359,7 +361,7 @@ GetLine(FILE* file, const char * prompt)
         return nullptr;
 
     char* current = buffer;
-    while (true) {
+    do {
         while (true) {
             if (fgets(current, size - len, file))
                 break;
@@ -387,11 +389,7 @@ GetLine(FILE* file, const char * prompt)
             buffer = tmp;
         }
         current = buffer + len;
-    }
-
-    if (len && !ferror(file))
-        return buffer;
-    free(buffer);
+    } while (true);
     return nullptr;
 }
 
@@ -2714,7 +2712,7 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     unsigned lineno;
 
     DescribeScriptedCaller(cx, &filename, &lineno);
@@ -3593,18 +3591,26 @@ SyntaxParse(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+enum class ScriptKind
+{
+    Script,
+    Module
+};
+
 class OffThreadState {
-  public:
     enum State {
         IDLE,           /* ready to work; no token, no source */
         COMPILING,      /* working; no token, have source */
         DONE            /* compilation done: have token and source */
     };
 
+  public:
     OffThreadState() : monitor(), state(IDLE), token(), source(nullptr) { }
     bool init() { return monitor.init(); }
 
-    bool startIfIdle(JSContext* cx, ScopedJSFreePtr<char16_t>& newSource) {
+    bool startIfIdle(JSContext* cx, ScriptKind kind,
+                     ScopedJSFreePtr<char16_t>& newSource)
+    {
         AutoLockMonitor alm(monitor);
         if (state != IDLE)
             return false;
@@ -3613,6 +3619,7 @@ class OffThreadState {
 
         source = newSource.forget();
 
+        scriptKind = kind;
         state = COMPILING;
         return true;
     }
@@ -3641,9 +3648,9 @@ class OffThreadState {
         alm.notify();
     }
 
-    void* waitUntilDone(JSContext* cx) {
+    void* waitUntilDone(JSContext* cx, ScriptKind kind) {
         AutoLockMonitor alm(monitor);
-        if (state == IDLE)
+        if (state == IDLE || scriptKind != kind)
             return nullptr;
 
         if (state == COMPILING) {
@@ -3664,6 +3671,7 @@ class OffThreadState {
 
   private:
     Monitor monitor;
+    ScriptKind scriptKind;
     State state;
     void* token;
     char16_t* source;
@@ -3750,7 +3758,7 @@ OffThreadCompileScript(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    if (!offThreadState.startIfIdle(cx, ownedChars)) {
+    if (!offThreadState.startIfIdle(cx, ScriptKind::Script, ownedChars)) {
         JS_ReportError(cx, "called offThreadCompileScript without calling runOffThreadScript"
                        " to receive prior off-thread compilation");
         return false;
@@ -3774,9 +3782,9 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
-    void* token = offThreadState.waitUntilDone(cx);
+    void* token = offThreadState.waitUntilDone(cx, ScriptKind::Script);
     if (!token) {
         JS_ReportError(cx, "called runOffThreadScript when no compilation is pending");
         return false;
@@ -3852,7 +3860,7 @@ OffThreadCompileModule(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    if (!offThreadState.startIfIdle(cx, ownedChars)) {
+    if (!offThreadState.startIfIdle(cx, ScriptKind::Module, ownedChars)) {
         JS_ReportError(cx, "called offThreadCompileModule without receiving prior off-thread "
                        "compilation");
         return false;
@@ -3876,9 +3884,9 @@ FinishOffThreadModule(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
-    void* token = offThreadState.waitUntilDone(cx);
+    void* token = offThreadState.waitUntilDone(cx, ScriptKind::Module);
     if (!token) {
         JS_ReportError(cx, "called finishOffThreadModule when no compilation is pending");
         return false;
@@ -4128,7 +4136,7 @@ ThisFilename(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     if (!DescribeScriptedCaller(cx, &filename) || !filename.get()) {
         args.rval().setString(cx->runtime()->emptyString);
         return true;
@@ -5057,12 +5065,8 @@ WasmLoop(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         Rooted<TypedArrayObject*> typedArray(cx, &ret->as<TypedArrayObject>());
-        if (!TypedArrayObject::ensureHasBuffer(cx, typedArray))
-            return false;
-
-        Rooted<ArrayBufferObject*> arrayBuffer(cx, typedArray->bufferUnshared());
         RootedObject exportObj(cx);
-        if (!wasm::Eval(cx, arrayBuffer, importObj, &exportObj)) {
+        if (!wasm::Eval(cx, typedArray, importObj, &exportObj)) {
             // Clear any pending exceptions, we don't care about them
             cx->clearPendingException();
         }
@@ -5682,7 +5686,7 @@ Help(JSContext* cx, unsigned argc, Value* vp)
 
 static const JSErrorFormatString jsShell_ErrorFormatString[JSShellErr_Limit] = {
 #define MSG_DEF(name, count, exception, format) \
-    { format, count, JSEXN_ERR } ,
+    { #name, format, count, JSEXN_ERR } ,
 #include "jsshell.msg"
 #undef MSG_DEF
 };
@@ -6306,8 +6310,7 @@ static const JS::AsmJSCacheOps asmJSCacheOps = {
     ShellOpenAsmJSCacheEntryForRead,
     ShellCloseAsmJSCacheEntryForRead,
     ShellOpenAsmJSCacheEntryForWrite,
-    ShellCloseAsmJSCacheEntryForWrite,
-    ShellBuildId
+    ShellCloseAsmJSCacheEntryForWrite
 };
 
 static JSContext*
@@ -6566,6 +6569,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
                              .setIon(enableIon)
                              .setAsmJS(enableAsmJS)
+                             .setWasm(true)
                              .setNativeRegExp(enableNativeRegExp)
                              .setUnboxedArrays(enableUnboxedArrays);
 
@@ -6823,6 +6827,7 @@ SetWorkerRuntimeOptions(JSRuntime* rt)
     JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
                              .setIon(enableIon)
                              .setAsmJS(enableAsmJS)
+                             .setWasm(true)
                              .setNativeRegExp(enableNativeRegExp)
                              .setUnboxedArrays(enableUnboxedArrays);
     rt->setOffthreadIonCompilationEnabled(offthreadCompilation);
@@ -7196,6 +7201,7 @@ main(int argc, char** argv, char** envp)
     JS_InitDestroyPrincipalsCallback(rt, ShellPrincipals::destroy);
 
     JS_SetInterruptCallback(rt, ShellInterruptCallback);
+    JS::SetBuildIdOp(rt, ShellBuildId);
     JS::SetAsmJSCacheOps(rt, &asmJSCacheOps);
 
     JS_SetNativeStackQuota(rt, gMaxStackSize);
@@ -7233,7 +7239,7 @@ main(int argc, char** argv, char** envp)
 
 #ifdef DEBUG
     if (OOM_printAllocationCount)
-        printf("OOM max count: %u\n", OOM_counter);
+        printf("OOM max count: %" PRIu64 "\n", js::oom::counter);
 #endif
 
     JS::SetLargeAllocationFailureCallback(rt, nullptr, nullptr);

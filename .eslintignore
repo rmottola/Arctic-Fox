@@ -45,7 +45,6 @@ testing/**
 tools/**
 uriloader/**
 view/**
-webapprt/**
 widget/**
 xpcom/**
 xpfe/**
@@ -86,7 +85,6 @@ browser/extensions/loop/**
 
 # devtools/ exclusions
 devtools/*.js
-devtools/client/aboutdebugging/**
 devtools/client/animationinspector/**
 devtools/client/canvasdebugger/**
 devtools/client/commandline/**
@@ -98,7 +96,7 @@ devtools/client/framework/**
 devtools/client/inspector/computed/**
 devtools/client/inspector/fonts/**
 devtools/client/inspector/layout/**
-devtools/client/inspector/markup/**
+devtools/client/inspector/markup/test/**
 devtools/client/inspector/rules/**
 devtools/client/inspector/shared/test/**
 devtools/client/inspector/test/**
@@ -115,7 +113,6 @@ devtools/client/shadereditor/**
 devtools/client/shared/**
 devtools/client/sourceeditor/**
 devtools/client/storage/**
-devtools/client/styleeditor/**
 devtools/client/tilt/**
 devtools/client/webaudioeditor/**
 devtools/client/webconsole/**

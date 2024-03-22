@@ -9,6 +9,7 @@
 #include "Units.h"                      // for ScreenPoint
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc
 #include "mozilla/RefPtr.h"             // for already_AddRefed, RefCounted
+#include "mozilla/gfx/2D.h"             // for DrawTarget
 #include "mozilla/gfx/MatrixFwd.h"      // for Matrix4x4
 #include "mozilla/gfx/Point.h"          // for IntSize, Point
 #include "mozilla/gfx/Rect.h"           // for Rect, IntRect
@@ -112,6 +113,7 @@ namespace mozilla {
 namespace gfx {
 class Matrix;
 class DrawTarget;
+class DataSourceSurface;
 } // namespace gfx
 
 namespace layers {
@@ -124,7 +126,7 @@ class Layer;
 class TextureSource;
 class DataTextureSource;
 class CompositingRenderTarget;
-class PCompositorParent;
+class CompositorBridgeParent;
 class LayerManagerComposite;
 
 enum SurfaceInitMode
@@ -183,7 +185,7 @@ protected:
 public:
   NS_INLINE_DECL_REFCOUNTING(Compositor)
 
-  explicit Compositor(PCompositorParent* aParent = nullptr)
+  explicit Compositor(CompositorBridgeParent* aParent = nullptr)
     : mCompositorID(0)
     , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
     , mParent(aParent)
@@ -192,6 +194,10 @@ public:
   }
 
   virtual already_AddRefed<DataTextureSource> CreateDataTextureSource(TextureFlags aFlags = TextureFlags::NO_FLAGS) = 0;
+
+  virtual already_AddRefed<DataTextureSource>
+  CreateDataTextureSourceAround(gfx::DataSourceSurface* aSurface) { return nullptr; }
+
   virtual bool Initialize() = 0;
   virtual void Destroy() = 0;
 
@@ -358,10 +364,14 @@ public:
    * If aRenderBoundsOut is non-null, it will be set to the render bounds
    * actually used by the compositor in window space. If aRenderBoundsOut
    * is returned empty, composition should be aborted.
+   *
+   * If aOpaque is true, then all of aInvalidRegion will be drawn to with
+   * opaque content.
    */
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect* aClipRectIn,
                           const gfx::Rect& aRenderBounds,
+                          bool aOpaque,
                           gfx::Rect* aClipRectOut = nullptr,
                           gfx::Rect* aRenderBoundsOut = nullptr) = 0;
 
@@ -449,6 +459,8 @@ public:
    * composite. Returns false if rendering should be aborted.
    */
   virtual bool Ready() { return true; }
+
+  virtual void ForcePresent() { }
 
   // XXX I expect we will want to move mWidget into this class and implement
   // these methods properly.
@@ -542,7 +554,7 @@ protected:
 
   uint32_t mCompositorID;
   DiagnosticTypes mDiagnosticTypes;
-  PCompositorParent* mParent;
+  CompositorBridgeParent* mParent;
 
   /**
    * We keep track of the total number of pixels filled as we composite the

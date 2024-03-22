@@ -86,6 +86,8 @@ namespace jit {
     _(MinMax)                                                               \
     _(Abs)                                                                  \
     _(Clz)                                                                  \
+    _(Ctz)                                                                  \
+    _(Popcnt)                                                               \
     _(Sqrt)                                                                 \
     _(Atan2)                                                                \
     _(Hypot)                                                                \
@@ -116,6 +118,10 @@ namespace jit {
     _(ToFloat32)                                                            \
     _(ToInt32)                                                              \
     _(TruncateToInt32)                                                      \
+    _(TruncateToInt64)                                                      \
+    _(WrapInt64ToInt32)                                                     \
+    _(ExtendInt32ToInt64)                                                   \
+    _(Int64ToFloatingPoint)                                                 \
     _(ToString)                                                             \
     _(ToObjectOrNull)                                                       \
     _(NewArray)                                                             \
@@ -174,6 +180,7 @@ namespace jit {
     _(LoadUnboxedExpando)                                                   \
     _(ArrayLength)                                                          \
     _(SetArrayLength)                                                       \
+    _(GetNextMapEntryForIterator)                                           \
     _(TypedArrayLength)                                                     \
     _(TypedArrayElements)                                                   \
     _(SetDisjointTypedElements)                                             \
@@ -248,6 +255,7 @@ namespace jit {
     _(CallInstanceOf)                                                       \
     _(InterruptCheck)                                                       \
     _(AsmJSInterruptCheck)                                                  \
+    _(AsmThrowUnreachable)                                                  \
     _(GetDOMProperty)                                                       \
     _(GetDOMMember)                                                         \
     _(SetDOMProperty)                                                       \
@@ -268,6 +276,7 @@ namespace jit {
     _(AsmJSVoidReturn)                                                      \
     _(AsmJSPassStackArg)                                                    \
     _(AsmJSCall)                                                            \
+    _(AsmSelect)                                                            \
     _(NewDerivedTypedObject)                                                \
     _(RecompileCheck)                                                       \
     _(MemoryBarrier)                                                        \

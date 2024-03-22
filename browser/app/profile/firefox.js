@@ -43,6 +43,8 @@ pref("extensions.getAddons.link.url", "https://addons.mozilla.org/%LOCALE%/firef
 
 // Blocklist preferences
 pref("extensions.blocklist.enabled", true);
+// OneCRL freshness checking depends on this value, so if you change it,
+// please also update security.onecrl.maximum_staleness_in_seconds.
 pref("extensions.blocklist.interval", 86400);
 pref("extensions.blocklist.level.updated", false);
 // Controls what level the blocklist switches from warning about items to forcibly
@@ -54,9 +56,17 @@ pref("extensions.blocklist.itemURL", "https://addons.mozilla.org/%LOCALE%/%APP%/
 
 // Kinto blocklist preferences
 pref("services.kinto.base", "https://firefox.settings.services.mozilla.com/v1");
+pref("services.kinto.changes.path", "/buckets/monitor/collections/changes/records");
 pref("services.kinto.bucket", "blocklists");
 pref("services.kinto.onecrl.collection", "certificates");
 pref("services.kinto.onecrl.checked", 0);
+
+// for now, let's keep kinto update out of the release channel
+#ifdef RELEASE_BUILD
+pref("services.kinto.update_enabled", false);
+#else
+pref("services.kinto.update_enabled", true);
+#endif
 
 pref("extensions.update.autoUpdateDefault", true);
 
@@ -1027,10 +1037,6 @@ pref("security.sandbox.content.level", 2);
 pref("security.sandbox.content.level", 0);
 #endif
 
-// ID (a UUID when set by gecko) that is used as a per profile suffix to a low
-// integrity temp directory.
-pref("security.sandbox.content.tempDirSuffix", "");
-
 #if defined(MOZ_STACKWALKING)
 // This controls the depth of stack trace that is logged when Windows sandbox
 // logging is turned on.  This is only currently available for the content
@@ -1063,6 +1069,15 @@ pref("browser.tabs.remote", true);
 pref("browser.tabs.remote", false);
 #endif
 pref("browser.tabs.remote.autostart", false);
+
+#if defined(XP_MACOSX) || defined(XP_WIN)
+#if defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
+// ID (a UUID when set by gecko) that is used to form the name of a
+// sandbox-writable temporary directory to be used by content processes
+// when a temporary writable file is required in a level 1 sandbox.
+pref("security.sandbox.content.tempDirSuffix", "");
+#endif
+#endif
 
 // This pref governs whether we attempt to work around problems caused by
 // plugins using OS calls to manipulate the cursor while running out-of-
@@ -1206,16 +1221,28 @@ pref("browser.newtabpage.rows", 4);
 // number of columns of newtab grid
 pref("browser.newtabpage.columns", 4);
 
+// directory tiles download URL
+pref("browser.newtabpage.directory.source", "https://tiles.services.mozilla.com/v3/links/fetch/%LOCALE%/%CHANNEL%");
+
 // about:permissions
 // Maximum number of sites to return from the places database.
 // 0-100 (currently)
 pref("permissions.places-sites-limit", 50);
 
 // endpoint to send newtab click and view pings
-pref("browser.newtabpage.directory.ping", "https://tiles.up.mozillalabs.com/v2/links/");
+pref("browser.newtabpage.directory.ping", "https://tiles.services.mozilla.com/v3/links/");
 
 // activates the remote-hosted newtab page
 pref("browser.newtabpage.remote", false);
+
+// Toggles endpoints allowed for remote newtab communications
+pref("browser.newtabpage.remote.mode", "production");
+
+// content-signature tests for remote newtab
+pref("browser.newtabpage.remote.content-signing-test", false);
+
+// verification keys for remote-hosted newtab page
+pref("browser.newtabpage.remote.keys", "");
 
 // Enable the DOM fullscreen API.
 pref("full-screen-api.enabled", true);
@@ -1261,8 +1288,8 @@ pref("security.sandbox.content.tempDirSuffix", "");
 pref("security.pki.sha1_enforcement_level", 2);
 
 // Required blocklist freshness for OneCRL OCSP bypass
-// (default should be at least as large as extensions.blocklist.interval)
-pref("security.onecrl.maximum_staleness_in_seconds", 0);
+// (default is 1.25x extensions.blocklist.interval, or 30 hours)
+pref("security.onecrl.maximum_staleness_in_seconds", 108000);
 
 // Override the Gecko-default value of false for Firefox.
 pref("plain_text.wrap_long_lines", true);
@@ -1274,7 +1301,11 @@ pref("media.webaudio.enabled", true);
 pref("dom.debug.propagate_gesture_events_through_content", false);
 
 // The request URL of the GeoLocation backend.
-pref("geo.wifi.uri", "http://ip-api.com/json/?fields=lat,lon,status,message");
+#ifdef RELEASE_BUILD
+pref("geo.wifi.uri", "https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_API_KEY%");
+#else
+pref("geo.wifi.uri", "https://location.services.mozilla.com/v1/geolocate?key=%MOZILLA_API_KEY%");
+#endif
 
 #ifdef XP_MACOSX
 #ifdef RELEASE_BUILD
@@ -1373,6 +1404,17 @@ pref("status4evar.status.toolbar.maxLength", 0);
 pref("status4evar.status.popup.invertMirror", false);
 pref("status4evar.status.popup.mouseMirror", true);
 
+// Telemetry settings.
+// Determines if Telemetry pings can be archived locally.
+pref("toolkit.telemetry.archive.enabled", true);
+
+// Telemetry experiments settings.
+pref("experiments.enabled", true);
+pref("experiments.manifest.fetchIntervalSeconds", 86400);
+pref("experiments.manifest.uri", "https://telemetry-experiment.cdn.mozilla.net/manifest/v1/firefox/%VERSION%/%CHANNEL%");
+// Whether experiments are supported by the current application profile.
+pref("experiments.supported", true);
+
 #ifdef NIGHTLY_BUILD
 pref("privacy.trackingprotection.ui.enabled", false);
 #else
@@ -1416,7 +1458,6 @@ pref("dom.ipc.reportProcessHangs", true);
 pref("view_source.tab", true);
 
 pref("dom.serviceWorkers.enabled", true);
-pref("dom.serviceWorkers.interception.enabled", true);
 pref("dom.serviceWorkers.openWindow.enabled", true);
 pref("dom.webnotifications.serviceworker.enabled", true);
 
@@ -1430,3 +1471,8 @@ pref("toolkit.pageThumbs.minWidth", 280);
 pref("toolkit.pageThumbs.minHeight", 190);
 
 pref("browser.esedbreader.loglevel", "Error");
+
+pref("browser.laterrun.enabled", false);
+
+// Enable browser frames for use on desktop.  Only exposed to chrome callers.
+pref("dom.mozBrowserFramesEnabled", true);

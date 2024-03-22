@@ -25,6 +25,39 @@ template<typename T, class D = DefaultDelete<T>> class UniquePtr;
 
 namespace mozilla {
 
+namespace detail {
+
+struct HasPointerTypeHelper
+{
+  template <class U> static double Test(...);
+  template <class U> static char Test(typename U::pointer* = 0);
+};
+
+template <class T>
+class HasPointerType : public IntegralConstant<bool, sizeof(HasPointerTypeHelper::Test<T>(0)) == 1>
+{
+};
+
+template <class T, class D, bool = HasPointerType<D>::value>
+struct PointerTypeImpl
+{
+  typedef typename D::pointer Type;
+};
+
+template <class T, class D>
+struct PointerTypeImpl<T, D, false>
+{
+  typedef T* Type;
+};
+
+template <class T, class D>
+struct PointerType
+{
+  typedef typename PointerTypeImpl<T, typename RemoveReference<D>::Type>::Type Type;
+};
+
+} // namespace detail
+
 /**
  * UniquePtr is a smart pointer that wholly owns a resource.  Ownership may be
  * transferred out of a UniquePtr through explicit action, but otherwise the
@@ -154,9 +187,9 @@ template<typename T, class D>
 class UniquePtr
 {
 public:
-  typedef T* Pointer;
   typedef T ElementType;
   typedef D DeleterType;
+  typedef typename detail::PointerType<T, DeleterType>::Type Pointer;
 
 private:
   Pair<Pointer, DeleterType> mTuple;
@@ -463,7 +496,19 @@ public:
   void operator=(const UniquePtr& aOther) = delete; // assign using Move()!
 };
 
-/** A default deletion policy using plain old operator delete. */
+/**
+ * A default deletion policy using plain old operator delete.
+ *
+ * Note that this type can be specialized, but authors should beware of the risk
+ * that the specialization may at some point cease to match (either because it
+ * gets moved to a different compilation unit or the signature changes). If the
+ * non-specialized (|delete|-based) version compiles for that type but does the
+ * wrong thing, bad things could happen.
+ *
+ * This is a non-issue for types which are always incomplete (i.e. opaque handle
+ * types), since |delete|-ing such a type will always trigger a compilation
+ * error.
+ */
 template<typename T>
 class DefaultDelete
 {

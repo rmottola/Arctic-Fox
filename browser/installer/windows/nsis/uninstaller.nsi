@@ -243,31 +243,31 @@ Section "Uninstall"
   ${If} ${AtLeastWin8}
     ${RemoveDEHRegistration} ${DELEGATE_EXECUTE_HANDLER_ID} \
                              $AppUserModelID \
-                             "FirefoxURL" \
-                             "FirefoxHTML"
+                             "ArcticFoxURL" \
+                             "ArcticFoxHTML"
   ${EndIf}
 
-  ${un.RegCleanAppHandler} "FirefoxURL"
-  ${un.RegCleanAppHandler} "FirefoxHTML"
+  ${un.RegCleanAppHandler} "ArcticFoxURL"
+  ${un.RegCleanAppHandler} "ArcticFoxHTML"
   ${un.RegCleanProtocolHandler} "ftp"
   ${un.RegCleanProtocolHandler} "http"
   ${un.RegCleanProtocolHandler} "https"
 
   ClearErrors
-  ReadRegStr $R9 HKCR "FirefoxHTML" ""
-  ; Don't clean up the file handlers if the FirefoxHTML key still exists since
+  ReadRegStr $R9 HKCR "ArcticFoxHTML" ""
+  ; Don't clean up the file handlers if the ArcticFoxHTML key still exists since
   ; there should be a second installation that may be the default file handler
   ${If} ${Errors}
-    ${un.RegCleanFileHandler}  ".htm"   "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".html"  "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".shtml" "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".xht"   "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".xhtml" "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".oga"  "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".ogg"  "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".ogv"  "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".pdf"  "FirefoxHTML"
-    ${un.RegCleanFileHandler}  ".webm"  "FirefoxHTML"
+    ${un.RegCleanFileHandler}  ".htm"   "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".html"  "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".shtml" "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".xht"   "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".xhtml" "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".oga"  "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".ogg"  "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".ogv"  "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".pdf"  "ArcticFoxHTML"
+    ${un.RegCleanFileHandler}  ".webm"  "ArcticFoxHTML"
   ${EndIf}
 
   SetShellVarContext all  ; Set SHCTX to HKLM

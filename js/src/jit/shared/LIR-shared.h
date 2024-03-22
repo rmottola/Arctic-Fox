@@ -1247,6 +1247,15 @@ class LAsmJSInterruptCheck : public LInstructionHelper<0, 0, 0>
     }
 };
 
+class LAsmThrowUnreachable : public LInstructionHelper<0, 0, 0>
+{
+  public:
+    LIR_HEADER(AsmThrowUnreachable);
+
+    LAsmThrowUnreachable()
+    { }
+};
+
 class LInterruptCheck : public LInstructionHelper<0, 0, 0>
 {
     Label* oolEntry_;
@@ -2262,6 +2271,76 @@ class LCompare : public LInstructionHelper<1, 2, 0>
     }
 };
 
+class LCompare64 : public LInstructionHelper<1, 2 * INT64_PIECES, 0>
+{
+    JSOp jsop_;
+
+  public:
+    LIR_HEADER(Compare64)
+
+    static const size_t Lhs = 0;
+    static const size_t Rhs = INT64_PIECES;
+
+    LCompare64(JSOp jsop, const LInt64Allocation& left, const LInt64Allocation& right)
+      : jsop_(jsop)
+    {
+        setInt64Operand(Lhs, left);
+        setInt64Operand(Rhs, right);
+    }
+
+    JSOp jsop() const {
+        return jsop_;
+    }
+    MCompare* mir() {
+        return mir_->toCompare();
+    }
+    const char* extraName() const {
+        return CodeName[jsop_];
+    }
+};
+
+class LCompare64AndBranch : public LControlInstructionHelper<2, 2 * INT64_PIECES, 0>
+{
+    MCompare* cmpMir_;
+    JSOp jsop_;
+
+  public:
+    LIR_HEADER(Compare64AndBranch)
+
+    static const size_t Lhs = 0;
+    static const size_t Rhs = INT64_PIECES;
+
+    LCompare64AndBranch(MCompare* cmpMir, JSOp jsop,
+                        const LInt64Allocation& left, const LInt64Allocation& right,
+                        MBasicBlock* ifTrue, MBasicBlock* ifFalse)
+      : cmpMir_(cmpMir), jsop_(jsop)
+    {
+        setInt64Operand(Lhs, left);
+        setInt64Operand(Rhs, right);
+        setSuccessor(0, ifTrue);
+        setSuccessor(1, ifFalse);
+    }
+
+    JSOp jsop() const {
+        return jsop_;
+    }
+    MBasicBlock* ifTrue() const {
+        return getSuccessor(0);
+    }
+    MBasicBlock* ifFalse() const {
+        return getSuccessor(1);
+    }
+    MTest* mir() const {
+        return mir_->toTest();
+    }
+    MCompare* cmpMir() const {
+        return cmpMir_;
+    }
+    const char* extraName() const {
+        return CodeName[jsop_];
+    }
+};
+
 // Compares two integral values of the same JS type, either integer or object.
 // For objects, both operands are in registers.
 class LCompareAndBranch : public LControlInstructionHelper<2, 2, 0>
@@ -2878,6 +2957,29 @@ class LBitOpI : public LInstructionHelper<1, 2, 0>
     }
 };
 
+class LBitOpI64 : public LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>
+{
+    JSOp op_;
+
+  public:
+    LIR_HEADER(BitOpI64)
+
+    static const size_t Lhs = 0;
+    static const size_t Rhs = INT64_PIECES;
+
+    explicit LBitOpI64(JSOp op)
+      : op_(op)
+    { }
+
+    const char* extraName() const {
+        return CodeName[op_];
+    }
+
+    JSOp bitop() const {
+        return op_;
+    }
+};
+
 // Call a VM function to perform a bitwise operation.
 class LBitOpV : public LCallInstructionHelper<1, 2 * BOX_PIECES, 0>
 {
@@ -2915,6 +3017,30 @@ class LShiftI : public LBinaryMath<0>
     LIR_HEADER(ShiftI)
 
     explicit LShiftI(JSOp op)
+      : op_(op)
+    { }
+
+    JSOp bitop() {
+        return op_;
+    }
+
+    MInstruction* mir() {
+        return mir_->toInstruction();
+    }
+
+    const char* extraName() const {
+        return CodeName[op_];
+    }
+};
+
+class LShiftI64 : public LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, 0>
+{
+    JSOp op_;
+
+  public:
+    LIR_HEADER(ShiftI64)
+
+    explicit LShiftI64(JSOp op)
       : op_(op)
     { }
 
@@ -3088,6 +3214,39 @@ class LClzI : public LInstructionHelper<1, 1, 0>
 
     MClz* mir() const {
         return mir_->toClz();
+    }
+};
+
+// Count trailing zeroes
+class LCtzI : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(CtzI)
+    explicit LCtzI(const LAllocation& num) {
+        setOperand(0, num);
+    }
+
+    MCtz* mir() const {
+        return mir_->toCtz();
+    }
+};
+
+// Count population
+class LPopcntI : public LInstructionHelper<1, 1, 1>
+{
+  public:
+    LIR_HEADER(PopcntI)
+    explicit LPopcntI(const LAllocation& num, const LDefinition& temp) {
+        setOperand(0, num);
+        setTemp(0, temp);
+    }
+
+    MPopcnt* mir() const {
+        return mir_->toPopcnt();
+    }
+
+    const LDefinition* temp() {
+        return getTemp(0);
     }
 };
 
@@ -3301,6 +3460,12 @@ class LAddI : public LBinaryMath<0>
     }
 };
 
+class LAddI64 : public LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(AddI64)
+};
+
 // Subtracts two integers, returning an integer value.
 class LSubI : public LBinaryMath<0>
 {
@@ -3326,6 +3491,18 @@ class LSubI : public LBinaryMath<0>
     MSub* mir() const {
         return mir_->toSub();
     }
+};
+
+class LSubI64 : public LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(SubI64)
+};
+
+class LMulI64 : public LInstructionHelper<INT64_PIECES, 2 * INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(MulI64)
 };
 
 // Performs an add, sub, mul, or div on two double values.
@@ -3792,6 +3969,32 @@ class LTruncateFToInt32 : public LInstructionHelper<1, 1, 1>
 
     MTruncateToInt32* mir() const {
         return mir_->toTruncateToInt32();
+    }
+};
+
+class LWrapInt64ToInt32 : public LInstructionHelper<1, INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(WrapInt64ToInt32)
+
+    static const size_t Input = 0;
+
+    explicit LWrapInt64ToInt32(const LInt64Allocation& input) {
+        setInt64Operand(Input, input);
+    }
+};
+
+class LExtendInt32ToInt64 : public LInstructionHelper<INT64_PIECES, 1, 0>
+{
+  public:
+    LIR_HEADER(ExtendInt32ToInt64)
+
+    explicit LExtendInt32ToInt64(const LAllocation& input) {
+        setOperand(0, input);
+    }
+
+    const MExtendInt32ToInt64* mir() {
+        return mir_->toExtendInt32ToInt64();
     }
 };
 
@@ -4524,6 +4727,39 @@ class LSetArrayLength : public LInstructionHelper<0, 2, 0>
     }
     const LAllocation* index() {
         return getOperand(1);
+    }
+};
+
+class LGetNextMapEntryForIterator : public LInstructionHelper<1, 2, 3>
+{
+  public:
+    LIR_HEADER(GetNextMapEntryForIterator)
+
+    explicit LGetNextMapEntryForIterator(const LAllocation& iter, const LAllocation& result,
+                                         const LDefinition& temp0, const LDefinition& temp1,
+                                         const LDefinition& temp2)
+    {
+        setOperand(0, iter);
+        setOperand(1, result);
+        setTemp(0, temp0);
+        setTemp(1, temp1);
+        setTemp(2, temp2);
+    }
+
+    const LAllocation* iter() {
+        return getOperand(0);
+    }
+    const LAllocation* result() {
+        return getOperand(1);
+    }
+    const LDefinition* temp0() {
+        return getTemp(0);
+    }
+    const LDefinition* temp1() {
+        return getTemp(1);
+    }
+    const LDefinition* temp2() {
+        return getTemp(2);
     }
 };
 
@@ -7016,6 +7252,57 @@ class LHasClass : public LInstructionHelper<1, 1, 0>
     }
     MHasClass* mir() const {
         return mir_->toHasClass();
+    }
+};
+
+template<size_t Defs, size_t Ops>
+class LAsmSelectBase : public LInstructionHelper<Defs, Ops, 0>
+{
+    typedef LInstructionHelper<Defs, Ops, 0> Base;
+  public:
+    static const size_t TrueExprIndex = 0;
+
+    const LAllocation* trueExpr() {
+        static_assert(TrueExprIndex == 0, "trueExprIndex kept in sync");
+        return Base::getOperand(0);
+    }
+    const LAllocation* falseExpr() {
+        return Base::getOperand(1);
+    }
+    const LAllocation* condExpr() {
+        return Base::getOperand(2);
+    }
+
+    MAsmSelect* mir() const {
+        return Base::mir_->toAsmSelect();
+    }
+};
+
+class LAsmSelect : public LAsmSelectBase<1, 3>
+{
+  public:
+    LIR_HEADER(AsmSelect);
+
+    LAsmSelect(const LAllocation& trueExpr, const LAllocation& falseExpr, const LAllocation& cond) {
+        static_assert(TrueExprIndex == 0, "trueExprIndex kept in sync");
+        setOperand(0, trueExpr);
+        setOperand(1, falseExpr);
+        setOperand(2, cond);
+    }
+};
+
+class LAsmSelectI64 : public LAsmSelectBase<INT64_PIECES, 2 * INT64_PIECES + 1>
+{
+  public:
+    LIR_HEADER(AsmSelectI64);
+
+    LAsmSelectI64(const LInt64Allocation& trueExpr, const LInt64Allocation& falseExpr,
+                  const LAllocation& cond)
+    {
+        static_assert(TrueExprIndex == 0, "trueExprIndex kept in sync");
+        setInt64Operand(0, trueExpr);
+        setInt64Operand(1, falseExpr);
+        setOperand(2, cond);
     }
 };
 

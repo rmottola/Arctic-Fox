@@ -298,7 +298,7 @@ public:
       return false;
     }
 
-    if (NS_WARN_IF(!mWorkerPrivate->AddFeature(cx, this))) {
+    if (NS_WARN_IF(!mWorkerPrivate->AddFeature(this))) {
       return false;
     }
 
@@ -360,7 +360,7 @@ private:
         mRunnable->ReleaseData();
         mRunnable->mConsole = nullptr;
 
-        aWorkerPrivate->RemoveFeature(aCx, mRunnable);
+        aWorkerPrivate->RemoveFeature(mRunnable);
         return true;
       }
 
@@ -371,7 +371,7 @@ private:
 
     RefPtr<WorkerControlRunnable> runnable =
       new ConsoleReleaseRunnable(mWorkerPrivate, this);
-    runnable->Dispatch(nullptr);
+    runnable->Dispatch();
   }
 
   void
@@ -1033,64 +1033,58 @@ Console::NoopMethod()
 
 static
 nsresult
-StackFrameToStackEntry(nsIStackFrame* aStackFrame,
-                       ConsoleStackEntry& aStackEntry,
-                       uint32_t aLanguage)
+StackFrameToStackEntry(JSContext* aCx, nsIStackFrame* aStackFrame,
+                       ConsoleStackEntry& aStackEntry)
 {
   MOZ_ASSERT(aStackFrame);
 
-  nsresult rv = aStackFrame->GetFilename(aStackEntry.mFilename);
+  nsresult rv = aStackFrame->GetFilename(aCx, aStackEntry.mFilename);
   NS_ENSURE_SUCCESS(rv, rv);
 
   int32_t lineNumber;
-  rv = aStackFrame->GetLineNumber(&lineNumber);
+  rv = aStackFrame->GetLineNumber(aCx, &lineNumber);
   NS_ENSURE_SUCCESS(rv, rv);
 
   aStackEntry.mLineNumber = lineNumber;
 
   int32_t columnNumber;
-  rv = aStackFrame->GetColumnNumber(&columnNumber);
+  rv = aStackFrame->GetColumnNumber(aCx, &columnNumber);
   NS_ENSURE_SUCCESS(rv, rv);
 
   aStackEntry.mColumnNumber = columnNumber;
 
-  rv = aStackFrame->GetName(aStackEntry.mFunctionName);
+  rv = aStackFrame->GetName(aCx, aStackEntry.mFunctionName);
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsString cause;
-  rv = aStackFrame->GetAsyncCause(cause);
+  rv = aStackFrame->GetAsyncCause(aCx, cause);
   NS_ENSURE_SUCCESS(rv, rv);
   if (!cause.IsEmpty()) {
     aStackEntry.mAsyncCause.Construct(cause);
   }
 
-  aStackEntry.mLanguage = aLanguage;
+  aStackEntry.mLanguage = nsIProgrammingLanguage::JAVASCRIPT;
   return NS_OK;
 }
 
 static
 nsresult
-ReifyStack(nsIStackFrame* aStack, nsTArray<ConsoleStackEntry>& aRefiedStack)
+ReifyStack(JSContext* aCx, nsIStackFrame* aStack,
+           nsTArray<ConsoleStackEntry>& aRefiedStack)
 {
   nsCOMPtr<nsIStackFrame> stack(aStack);
 
   while (stack) {
-    uint32_t language;
-    nsresult rv = stack->GetLanguage(&language);
+    ConsoleStackEntry& data = *aRefiedStack.AppendElement();
+    nsresult rv = StackFrameToStackEntry(aCx, stack, data);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    if (language == nsIProgrammingLanguage::JAVASCRIPT) {
-      ConsoleStackEntry& data = *aRefiedStack.AppendElement();
-      rv = StackFrameToStackEntry(stack, data, language);
-      NS_ENSURE_SUCCESS(rv, rv);
-    }
-
     nsCOMPtr<nsIStackFrame> caller;
-    rv = stack->GetCaller(getter_AddRefs(caller));
+    rv = stack->GetCaller(aCx, getter_AddRefs(caller));
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!caller) {
-      rv = stack->GetAsyncCaller(getter_AddRefs(caller));
+      rv = stack->GetAsyncCaller(aCx, getter_AddRefs(caller));
       NS_ENSURE_SUCCESS(rv, rv);
     }
     stack.swap(caller);
@@ -1129,38 +1123,14 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
                       DEFAULT_MAX_STACKTRACE_DEPTH : 1;
   nsCOMPtr<nsIStackFrame> stack = CreateStack(aCx, maxDepth);
 
-  if (!stack) {
-    return;
+  if (stack) {
+    callData->mTopStackFrame.emplace();
+    nsresult rv = StackFrameToStackEntry(aCx, stack,
+                                         *callData->mTopStackFrame);
+    if (NS_FAILED(rv)) {
+      return;
+    }
   }
-
-  // Walk up to the first JS stack frame and save it if we find it.
-  do {
-    uint32_t language;
-    nsresult rv = stack->GetLanguage(&language);
-    if (NS_FAILED(rv)) {
-      return;
-    }
-
-    if (language == nsIProgrammingLanguage::JAVASCRIPT) {
-      callData->mTopStackFrame.emplace();
-      nsresult rv = StackFrameToStackEntry(stack,
-                                           *callData->mTopStackFrame,
-                                           language);
-      if (NS_FAILED(rv)) {
-        return;
-      }
-
-      break;
-    }
-
-    nsCOMPtr<nsIStackFrame> caller;
-    rv = stack->GetCaller(getter_AddRefs(caller));
-    if (NS_FAILED(rv)) {
-      return;
-    }
-
-    stack.swap(caller);
-  } while (stack);
 
   if (NS_IsMainThread()) {
     callData->mStack = stack;
@@ -1168,7 +1138,7 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
     // nsIStackFrame is not threadsafe, so we need to snapshot it now,
     // before we post our runnable to the main thread.
     callData->mReifiedStack.emplace();
-    nsresult rv = ReifyStack(stack, *callData->mReifiedStack);
+    nsresult rv = ReifyStack(aCx, stack, *callData->mReifiedStack);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return;
     }
@@ -1301,7 +1271,7 @@ LazyStackGetter(JSContext* aCx, unsigned aArgc, JS::Value* aVp)
 
   nsIStackFrame* stack = reinterpret_cast<nsIStackFrame*>(v.toPrivate());
   nsTArray<ConsoleStackEntry> reifiedStack;
-  nsresult rv = ReifyStack(stack, reifiedStack);
+  nsresult rv = ReifyStack(aCx, stack, reifiedStack);
   if (NS_FAILED(rv)) {
     Throw(aCx, rv);
     return false;
@@ -1333,11 +1303,13 @@ Console::ProcessCallData(ConsoleCallData* aData, JS::Handle<JSObject*> aGlobal,
     frame = *aData->mTopStackFrame;
   }
 
-  AutoSafeJSContext cx;
+  AutoJSAPI jsapi;
+  if (!jsapi.Init(aGlobal)) {
+    return;
+  }
+  JSContext* cx = jsapi.cx();
   ClearException ce(cx);
   RootedDictionary<ConsoleEvent> event(cx);
-
-  JSAutoCompartment ac(cx, aGlobal);
 
   event.mID.Construct();
   event.mInnerID.Construct();

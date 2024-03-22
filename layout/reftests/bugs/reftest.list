@@ -1788,7 +1788,7 @@ skip-if((B2G&&browserIsRemote)||Mulet) == 858803-1.html 858803-1-ref.html # bug 
 fuzzy(2,10000) fuzzy-if(Android&&AndroidVersion>=15,5,10000) == 902330-1.html 902330-1-ref.html
 fuzzy-if(Android,8,400) == 906199-1.html 906199-1-ref.html
 == 921716-1.html 921716-1-ref.html
-test-pref(layout.css.sticky.enabled,true) == 926155-1.html 926155-1-ref.html
+== 926155-1.html 926155-1-ref.html
 fuzzy-if(cocoaWidget,1,40) == 928607-1.html 928607-1-ref.html
 == 931464-1.html 931464-1-ref.html
 == 931853.html 931853-ref.html
@@ -1824,7 +1824,7 @@ fuzzy-if(d2d,1,36) == 991046-1.html 991046-1-ref.html
 pref(layout.css.overflow-clip-box.enabled,true) == 992447.html 992447-ref.html
 == 1003425-1.html 1003425-1-ref.html
 == 1003425-2.html 1003425-2-ref.html
-pref(layout.css.sticky.enabled,true) == 1005405-1.html 1005405-1-ref.html
+== 1005405-1.html 1005405-1-ref.html
 == 1012640-1.html 1012640-1-ref.html
 fuzzy-if(/^Windows\x20NT\x205\.1/.test(http.oscpu),255,1) == 1013054-1.html 1013054-1-ref.html
 == 1018522-1.html 1018522-1-ref.html
@@ -1943,3 +1943,5 @@ fuzzy(1,74) fuzzy-if(gtkWidget,6,79) == 1174332-1.html 1174332-1-ref.html
 == 1209994-4.html 1209994-4-ref.html
 == 1222226-1.html 1222226-1-ref.html
 pref(browser.display.focus_ring_width,2) == 1234758-1.html 1234758-1-ref.html
+== 1242172-1.html 1242172-1-ref.html
+== 1242172-2.html 1242172-2-ref.html

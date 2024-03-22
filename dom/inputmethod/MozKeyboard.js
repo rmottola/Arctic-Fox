@@ -23,7 +23,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "tm",
  * A WeakMap to map input method iframe window to
  * it's active status, kbID, and ipcHelper.
  */
-let WindowMap = {
+var WindowMap = {
   // WeakMap of <window, object> pairs.
   _map: null,
 
@@ -122,7 +122,7 @@ let WindowMap = {
   }
 };
 
-let cpmmSendAsyncMessageWithKbID = function (self, msg, data) {
+var cpmmSendAsyncMessageWithKbID = function (self, msg, data) {
   data.kbID = WindowMap.getKbID(self._window);
   cpmm.sendAsyncMessage(msg, data);
 };

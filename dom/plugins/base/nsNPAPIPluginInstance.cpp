@@ -98,67 +98,6 @@ static bool EnsureGLContext()
   return sPluginContext != nullptr;
 }
 
-class SharedPluginTexture final {
-public:
-  NS_INLINE_DECL_REFCOUNTING(SharedPluginTexture)
-
-  SharedPluginTexture() : mLock("SharedPluginTexture.mLock")
-  {
-  }
-
-  nsNPAPIPluginInstance::TextureInfo Lock()
-  {
-    if (!EnsureGLContext()) {
-      mTextureInfo.mTexture = 0;
-      return mTextureInfo;
-    }
-
-    if (!mTextureInfo.mTexture && sPluginContext->MakeCurrent()) {
-      sPluginContext->fGenTextures(1, &mTextureInfo.mTexture);
-    }
-
-    mLock.Lock();
-    return mTextureInfo;
-  }
-
-  void Release(nsNPAPIPluginInstance::TextureInfo& aTextureInfo)
-  {
-    mTextureInfo = aTextureInfo;
-    mLock.Unlock();
-  }
-
-  EGLImage CreateEGLImage()
-  {
-    MutexAutoLock lock(mLock);
-
-    if (!EnsureGLContext())
-      return 0;
-
-    if (mTextureInfo.mWidth == 0 || mTextureInfo.mHeight == 0)
-      return 0;
-
-    GLuint& tex = mTextureInfo.mTexture;
-    EGLImage image = gl::CreateEGLImage(sPluginContext, tex);
-
-    // We want forget about this now, so delete the texture. Assigning it to zero
-    // ensures that we create a new one in Lock()
-    sPluginContext->fDeleteTextures(1, &tex);
-    tex = 0;
-
-    return image;
-  }
-
-private:
-  // Private destructor, to discourage deletion outside of Release():
-  ~SharedPluginTexture()
-  {
-  }
-
-  nsNPAPIPluginInstance::TextureInfo mTextureInfo;
-
-  Mutex mLock;
-};
-
 static std::map<NPP, nsNPAPIPluginInstance*> sPluginNPPMap;
 
 #endif
@@ -259,7 +198,6 @@ nsNPAPIPluginInstance::Destroy()
   if (mContentSurface)
     mContentSurface->SetFrameAvailableCallback(nullptr);
 
-  mContentTexture = nullptr;
   mContentSurface = nullptr;
 
   std::map<void*, VideoInfo*>::iterator it;
@@ -930,30 +868,12 @@ void nsNPAPIPluginInstance::SetWakeLock(bool aLocked)
                       hal::WAKE_LOCK_NO_CHANGE);
 }
 
-void nsNPAPIPluginInstance::EnsureSharedTexture()
-{
-  if (!mContentTexture)
-    mContentTexture = new SharedPluginTexture();
-}
-
 GLContext* nsNPAPIPluginInstance::GLContext()
 {
   if (!EnsureGLContext())
     return nullptr;
 
   return sPluginContext;
-}
-
-nsNPAPIPluginInstance::TextureInfo nsNPAPIPluginInstance::LockContentTexture()
-{
-  EnsureSharedTexture();
-  return mContentTexture->Lock();
-}
-
-void nsNPAPIPluginInstance::ReleaseContentTexture(nsNPAPIPluginInstance::TextureInfo& aTextureInfo)
-{
-  EnsureSharedTexture();
-  mContentTexture->Release(aTextureInfo);
 }
 
 already_AddRefed<AndroidSurfaceTexture> nsNPAPIPluginInstance::CreateSurfaceTexture()
@@ -992,15 +912,6 @@ void* nsNPAPIPluginInstance::AcquireContentWindow()
   }
 
   return mContentSurface->NativeWindow()->Handle();
-}
-
-EGLImage
-nsNPAPIPluginInstance::AsEGLImage()
-{
-  if (!mContentTexture)
-    return 0;
-
-  return mContentTexture->CreateEGLImage();
 }
 
 AndroidSurfaceTexture*
@@ -1090,7 +1001,8 @@ nsresult nsNPAPIPluginInstance::IsRemoteDrawingCoreAnimation(bool* aDrawing)
 #endif
 }
 
-nsresult nsNPAPIPluginInstance::ContentsScaleFactorChanged(double aContentsScaleFactor)
+nsresult
+nsNPAPIPluginInstance::ContentsScaleFactorChanged(double aContentsScaleFactor)
 {
 #ifdef XP_MACOSX
   if (!mPlugin)
@@ -1108,6 +1020,31 @@ nsresult nsNPAPIPluginInstance::ContentsScaleFactorChanged(double aContentsScale
 #else
   return NS_ERROR_FAILURE;
 #endif
+}
+
+nsresult
+nsNPAPIPluginInstance::CSSZoomFactorChanged(float aCSSZoomFactor)
+{
+  if (RUNNING != mRunning)
+    return NS_OK;
+
+  PLUGIN_LOG(PLUGIN_LOG_NORMAL, ("nsNPAPIPluginInstance informing plugin of CSS Zoom Factor change this=%p\n",this));
+
+  if (!mPlugin || !mPlugin->GetLibrary())
+    return NS_ERROR_FAILURE;
+
+  NPPluginFuncs* pluginFunctions = mPlugin->PluginFuncs();
+
+  if (!pluginFunctions->setvalue)
+    return NS_ERROR_FAILURE;
+
+  PluginDestructionGuard guard(this);
+
+  NPError error;
+  double value = static_cast<double>(aCSSZoomFactor);
+  NS_TRY_SAFE_CALL_RETURN(error, (*pluginFunctions->setvalue)(&mNPP, NPNVCSSZoomFactor, &value), this,
+                          NS_PLUGIN_CALL_UNSAFE_TO_REENTER_GECKO);
+  return (error == NPERR_NO_ERROR) ? NS_OK : NS_ERROR_FAILURE;
 }
 
 nsresult
@@ -1209,6 +1146,29 @@ nsNPAPIPluginInstance::GetImageSize(nsIntSize* aSize)
   AutoPluginLibraryCall library(this);
   return !library ? NS_ERROR_FAILURE : library->GetImageSize(&mNPP, aSize);
 }
+
+#if defined(XP_WIN)
+nsresult
+nsNPAPIPluginInstance::GetScrollCaptureContainer(ImageContainer**aContainer)
+{
+  *aContainer = nullptr;
+
+  if (RUNNING != mRunning)
+    return NS_OK;
+
+  AutoPluginLibraryCall library(this);
+  return !library ? NS_ERROR_FAILURE : library->GetScrollCaptureContainer(&mNPP, aContainer);
+}
+nsresult
+nsNPAPIPluginInstance::UpdateScrollState(bool aIsScrolling)
+{
+  if (RUNNING != mRunning)
+    return NS_OK;
+
+  AutoPluginLibraryCall library(this);
+  return !library ? NS_ERROR_FAILURE : library->UpdateScrollState(&mNPP, aIsScrolling);
+}
+#endif
 
 void
 nsNPAPIPluginInstance::DidComposite()
@@ -1803,6 +1763,16 @@ nsNPAPIPluginInstance::GetContentsScaleFactor()
     mOwner->GetContentsScaleFactor(&scaleFactor);
   }
   return scaleFactor;
+}
+
+float
+nsNPAPIPluginInstance::GetCSSZoomFactor()
+{
+  float zoomFactor = 1.0;
+  if (mOwner) {
+    mOwner->GetCSSZoomFactor(&zoomFactor);
+  }
+  return zoomFactor;
 }
 
 nsresult

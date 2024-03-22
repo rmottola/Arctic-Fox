@@ -26,7 +26,7 @@
 #include <CoreVideo/CoreVideo.h>
 
 #include "nsCocoaFeatures.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "VsyncSource.h"
 
 using namespace mozilla;
@@ -453,13 +453,6 @@ gfxPlatformMac::ReadAntiAliasingThreshold()
     }
 
     return threshold;
-}
-
-bool
-gfxPlatformMac::UseAcceleratedSkiaCanvas()
-{
-  // Lion or later is required
-  return nsCocoaFeatures::OnLionOrLater() && gfxPlatform::UseAcceleratedSkiaCanvas();
 }
 
 bool

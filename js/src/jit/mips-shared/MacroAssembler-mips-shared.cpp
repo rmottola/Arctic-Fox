@@ -1242,21 +1242,15 @@ MacroAssembler::call(JitCode* c)
 }
 
 void
-MacroAssembler::callAndPushReturnAddress(Register callee)
+MacroAssembler::pushReturnAddress()
 {
-    // Push return address during jalr delay slot.
-    subPtr(Imm32(sizeof(intptr_t)), StackPointer);
-    as_jalr(callee);
-    storePtr(ra, Address(StackPointer, 0));
+    push(ra);
 }
 
 void
-MacroAssembler::callAndPushReturnAddress(Label* label)
+MacroAssembler::popReturnAddress()
 {
-    // Push return address during bal delay slot.
-    subPtr(Imm32(sizeof(intptr_t)), StackPointer);
-    ma_bal(label, DontFillDelaySlot);
-    storePtr(ra, Address(StackPointer, 0));
+    pop(ra);
 }
 
 // ===============================================================
@@ -1275,5 +1269,24 @@ MacroAssembler::pushFakeReturnAddress(Register scratch)
     addCodeLabel(cl);
     return retAddr;
 }
+
+void
+MacroAssembler::branchPtrInNurseryRange(Condition cond, Register ptr, Register temp,
+                                        Label* label)
+{
+    MOZ_ASSERT(cond == Assembler::Equal || cond == Assembler::NotEqual);
+    MOZ_ASSERT(ptr != temp);
+    MOZ_ASSERT(ptr != SecondScratchReg);
+
+    const Nursery& nursery = GetJitContext()->runtime->gcNursery();
+    movePtr(ImmWord(-ptrdiff_t(nursery.start())), SecondScratchReg);
+    addPtr(ptr, SecondScratchReg);
+    branchPtr(cond == Assembler::Equal ? Assembler::Below : Assembler::AboveOrEqual,
+              SecondScratchReg, Imm32(nursery.nurserySize()), label);
+}
+
+void
+MacroAssembler::flush()
+{}
 
 //}}} check_macroassembler_style

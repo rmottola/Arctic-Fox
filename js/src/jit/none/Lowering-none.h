@@ -38,6 +38,10 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void lowerForALU(T, MDefinition*, MDefinition*, MDefinition* v = nullptr) { MOZ_CRASH(); }
     template <typename T>
     void lowerForFPU(T, MDefinition*, MDefinition*, MDefinition* v = nullptr) { MOZ_CRASH(); }
+    template <typename T>
+    void lowerForALUInt64(T, MDefinition*, MDefinition*, MDefinition* v = nullptr) { MOZ_CRASH(); }
+    template <typename T>
+    void lowerForShiftInt64(T, MDefinition*, MDefinition*, MDefinition* v = nullptr) { MOZ_CRASH(); }
     void lowerForCompIx4(LSimdBinaryCompIx4* ins, MSimdBinaryComp* mir,
                          MDefinition* lhs, MDefinition* rhs) {
         MOZ_CRASH();
@@ -57,6 +61,8 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void lowerTruncateFToInt32(MTruncateToInt32*) { MOZ_CRASH(); }
     void lowerDivI(MDiv*) { MOZ_CRASH(); }
     void lowerModI(MMod*) { MOZ_CRASH(); }
+    void lowerDivI64(MDiv*) { MOZ_CRASH(); }
+    void lowerModI64(MMod*) { MOZ_CRASH(); }
     void lowerMulI(MMul*, MDefinition*, MDefinition*) { MOZ_CRASH(); }
     void lowerUDiv(MDiv*) { MOZ_CRASH(); }
     void lowerUMod(MMod*) { MOZ_CRASH(); }
@@ -79,6 +85,7 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins) { MOZ_CRASH(); }
     void visitAsmJSAtomicExchangeHeap(MAsmJSAtomicExchangeHeap* ins) { MOZ_CRASH(); }
     void visitAsmJSAtomicBinopHeap(MAsmJSAtomicBinopHeap* ins) { MOZ_CRASH(); }
+    void visitAsmSelect(MAsmSelect*) { MOZ_CRASH(); }
 
     LTableSwitch* newLTableSwitch(LAllocation, LDefinition, MTableSwitch*) { MOZ_CRASH(); }
     LTableSwitchV* newLTableSwitchV(MTableSwitch*) { MOZ_CRASH(); }
@@ -88,7 +95,8 @@ class LIRGeneratorNone : public LIRGeneratorShared
     void visitSubstr(MSubstr*) { MOZ_CRASH(); }
     void visitSimdBinaryArith(js::jit::MSimdBinaryArith*) { MOZ_CRASH(); }
     void visitRandom(js::jit::MRandom*) { MOZ_CRASH(); }
-
+    void visitTruncateToInt64(MTruncateToInt64*) { MOZ_CRASH(); }
+    void visitInt64ToFloatingPoint(MInt64ToFloatingPoint*) { MOZ_CRASH(); }
 };
 
 typedef LIRGeneratorNone LIRGeneratorSpecific;

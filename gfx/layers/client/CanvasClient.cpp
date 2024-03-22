@@ -16,7 +16,7 @@
 #include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/AsyncCanvasRenderer.h"
 #include "mozilla/layers/CompositableForwarder.h"
-#include "mozilla/layers/CompositorChild.h" // for CompositorChild
+#include "mozilla/layers/CompositorBridgeChild.h" // for CompositorBridgeChild
 #include "mozilla/layers/GrallocTextureClient.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/TextureClient.h"  // for TextureClient, etc
@@ -182,7 +182,7 @@ static inline void SwapRB_R8G8B8A8(uint8_t* pixel) {
 
 class TexClientFactory
 {
-  ISurfaceAllocator* const mAllocator;
+  ClientIPCAllocator* const mAllocator;
   const bool mHasAlpha;
   const gfx::IntSize mSize;
   const gfx::BackendType mBackendType;
@@ -190,7 +190,7 @@ class TexClientFactory
   const LayersBackend mLayersBackend;
 
 public:
-  TexClientFactory(ISurfaceAllocator* allocator, bool hasAlpha,
+  TexClientFactory(ClientIPCAllocator* allocator, bool hasAlpha,
                    const gfx::IntSize& size, gfx::BackendType backendType,
                    TextureFlags baseTexFlags, LayersBackend layersBackend)
     : mAllocator(allocator)
@@ -238,7 +238,7 @@ public:
 };
 
 static already_AddRefed<TextureClient>
-TexClientFromReadback(SharedSurface* src, ISurfaceAllocator* allocator,
+TexClientFromReadback(SharedSurface* src, ClientIPCAllocator* allocator,
                       TextureFlags baseFlags, LayersBackend layersBackend)
 {
   auto backendType = gfx::BackendType::CAIRO;

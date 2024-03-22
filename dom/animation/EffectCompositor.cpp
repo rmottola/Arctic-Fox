@@ -10,9 +10,12 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/KeyframeEffect.h" // For KeyframeEffectReadOnly
 #include "mozilla/AnimationUtils.h"
+#include "mozilla/AnimationPerformanceWarning.h"
 #include "mozilla/EffectSet.h"
 #include "mozilla/InitializerList.h"
 #include "mozilla/LayerAnimationInfo.h"
+#include "mozilla/RestyleManagerHandle.h"
+#include "mozilla/RestyleManagerHandleInlines.h"
 #include "nsComputedDOMStyle.h" // nsComputedDOMStyle::GetPresShellForContent
 #include "nsCSSPropertySet.h"
 #include "nsCSSProps.h"
@@ -22,7 +25,6 @@
 #include "nsRuleNode.h" // For nsRuleNode::ComputePropertiesOverridingAnimation
 #include "nsRuleProcessorData.h" // For ElementRuleProcessorData etc.
 #include "nsTArray.h"
-#include "RestyleManager.h"
 
 using mozilla::dom::Animation;
 using mozilla::dom::Element;
@@ -108,10 +110,14 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
       continue;
     }
 
-    if (effect->ShouldBlockCompositorAnimations(aFrame)) {
+    AnimationPerformanceWarning::Type warningType;
+    if (effect->ShouldBlockCompositorAnimations(aFrame,
+                                                warningType)) {
       if (aMatches) {
         aMatches->Clear();
       }
+      effect->SetPerformanceWarning(
+        aProperty, AnimationPerformanceWarning(warningType));
       return false;
     }
 
@@ -161,7 +167,10 @@ EffectCompositor::RequestRestyle(dom::Element* aElement,
 
   if (aRestyleType == RestyleType::Layer) {
     // Prompt layers to re-sync their animations.
-    mPresContext->RestyleManager()->IncrementAnimationGeneration();
+    MOZ_ASSERT(mPresContext->RestyleManager()->IsGecko(),
+               "stylo: Servo-backed style system should not be using "
+               "EffectCompositor");
+    mPresContext->RestyleManager()->AsGecko()->IncrementAnimationGeneration();
     EffectSet* effectSet =
       EffectSet::GetEffectSet(aElement, aPseudoType);
     if (effectSet) {
@@ -252,7 +261,10 @@ EffectCompositor::GetAnimationRule(dom::Element* aElement,
     return nullptr;
   }
 
-  if (mPresContext->RestyleManager()->SkipAnimationRules()) {
+  MOZ_ASSERT(mPresContext->RestyleManager()->IsGecko(),
+             "stylo: Servo-backed style system should not be using "
+             "EffectCompositor");
+  if (mPresContext->RestyleManager()->AsGecko()->SkipAnimationRules()) {
     // We don't need to worry about updating mElementsToRestyle in this case
     // since this is not the animation restyle we requested when we called
     // PostRestyleForAnimation (see comment at start of this method).
@@ -707,6 +719,22 @@ EffectCompositor::GetPresContext(Element* aElement)
     return nullptr;
   }
   return shell->GetPresContext();
+}
+
+/* static */ void
+EffectCompositor::SetPerformanceWarning(
+  const nsIFrame *aFrame,
+  nsCSSProperty aProperty,
+  const AnimationPerformanceWarning& aWarning)
+{
+  EffectSet* effects = EffectSet::GetEffectSet(aFrame);
+  if (!effects) {
+    return;
+  }
+
+  for (KeyframeEffectReadOnly* effect : *effects) {
+    effect->SetPerformanceWarning(aProperty, aWarning);
+  }
 }
 
 // ---------------------------------------------------------

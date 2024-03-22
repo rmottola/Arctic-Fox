@@ -2,6 +2,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* import-globals-from pippki.js */
 
 const nsIDialogParamBlock = Components.interfaces.nsIDialogParamBlock;
 
@@ -38,12 +39,13 @@ function onLoad()
 
 function setDetails()
 {
-  var selItem = document.getElementById("nicknames").value;
-  if (!selItem.length)
+  let selItem = document.getElementById("nicknames").value;
+  if (selItem.length == 0) {
     return;
+  }
 
-  var index = parseInt(selItem);
-  var details = dialogParams.GetString(index+itemCount);
+  let index = parseInt(selItem);
+  let details = dialogParams.GetString(index + itemCount);
   document.getElementById("details").value = details;
 }
 
@@ -54,14 +56,18 @@ function onCertSelected()
 
 function doOK()
 {
-  dialogParams.SetInt(0,1);
-  var index = parseInt(document.getElementById("nicknames").value);
+  // Signal that the user accepted.
+  dialogParams.SetInt(0, 1);
+
+  // Signal the index of the selected cert in the list of cert nicknames
+  // provided.
+  let index = parseInt(document.getElementById("nicknames").value);
   dialogParams.SetInt(1, index);
   return true;
 }
 
 function doCancel()
 {
-  dialogParams.SetInt(0,0);
+  dialogParams.SetInt(0, 0); // Signal that the user cancelled.
   return true;
 }

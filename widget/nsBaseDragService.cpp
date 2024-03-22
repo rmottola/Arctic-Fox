@@ -263,7 +263,16 @@ nsBaseDragService::InvokeDragSessionWithImage(nsIDOMNode* aDOMNode,
   aDragEvent->GetScreenY(&mScreenY);
   aDragEvent->GetMozInputSource(&mInputSource);
 
-  return InvokeDragSession(aDOMNode, aTransferableArray, aRegion, aActionType);
+  nsresult rv = InvokeDragSession(aDOMNode, aTransferableArray,
+                                  aRegion, aActionType);
+
+  if (NS_FAILED(rv)) {
+    mImage = nullptr;
+    mHasImage = false;
+    mDataTransfer = nullptr;
+  }
+
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -294,7 +303,16 @@ nsBaseDragService::InvokeDragSessionWithSelection(nsISelection* aSelection,
   nsCOMPtr<nsIDOMNode> node;
   aSelection->GetFocusNode(getter_AddRefs(node));
 
-  return InvokeDragSession(node, aTransferableArray, nullptr, aActionType);
+  nsresult rv = InvokeDragSession(node, aTransferableArray,
+                                  nullptr, aActionType);
+
+  if (NS_FAILED(rv)) {
+    mHasImage = false;
+    mSelection = nullptr;
+    mDataTransfer = nullptr;
+  }
+
+  return rv;
 }
 
 //-------------------------------------------------------------------------
@@ -539,7 +557,7 @@ nsBaseDragService::DrawDrag(nsIDOMNode* aDOMNode,
     if (aRegion) {
       // the region's coordinates are relative to the root frame
       nsIFrame* rootFrame = presShell->GetRootFrame();
-      if (rootFrame && *aPresContext) {
+      if (rootFrame) {
         nsIntRect dragRect;
         aRegion->GetBoundingBox(&dragRect.x, &dragRect.y, &dragRect.width, &dragRect.height);
         dragRect = ToAppUnits(dragRect, nsPresContext::AppUnitsPerCSSPixel()).
@@ -676,10 +694,14 @@ nsBaseDragService::DrawDragForImage(nsIImageLoadingContent* aImageLoader,
     if (!ctx)
       return NS_ERROR_FAILURE;
 
-    imgContainer->Draw(ctx, destSize, ImageRegion::Create(destSize),
-                       imgIContainer::FRAME_CURRENT,
-                       Filter::GOOD, Nothing(),
-                       imgIContainer::FLAG_SYNC_DECODE);
+    DrawResult res =
+      imgContainer->Draw(ctx, destSize, ImageRegion::Create(destSize),
+                         imgIContainer::FRAME_CURRENT,
+                         Filter::GOOD, Nothing(),
+                         imgIContainer::FLAG_SYNC_DECODE);
+    if (res == DrawResult::BAD_IMAGE || res == DrawResult::BAD_ARGS) {
+      return NS_ERROR_FAILURE;
+    }
     *aSurface = dt->Snapshot();
   } else {
     *aSurface = aCanvas->GetSurfaceSnapshot();

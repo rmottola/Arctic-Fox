@@ -359,17 +359,17 @@ Section "-Application" APP_IDX
   ; it doesn't cause problems always add them.
   ${SetUninstallKeys}
 
-  ; On install always add the FirefoxHTML and FirefoxURL keys.
-  ; An empty string is used for the 5th param because FirefoxHTML is not a
+  ; On install always add the ArcticFoxHTML and ArcticFoxURL keys.
+  ; An empty string is used for the 5th param because ArcticFoxHTML is not a
   ; protocol handler.
   ${GetLongPath} "$INSTDIR\${FileMainEXE}" $8
   StrCpy $2 "$\"$8$\" -osint -url $\"%1$\""
 
-  ; In Win8, the delegate execute handler picks up the value in FirefoxURL and
-  ; FirefoxHTML to launch the desktop browser when it needs to.
-  ${AddDisabledDDEHandlerValues} "FirefoxHTML" "$2" "$8,1" \
+  ; In Win8, the delegate execute handler picks up the value in ArcticFoxURL and
+  ; ArcticFoxHTML to launch the desktop browser when it needs to.
+  ${AddDisabledDDEHandlerValues} "ArcticFoxHTML" "$2" "$8,1" \
                                  "${AppRegName} Document" ""
-  ${AddDisabledDDEHandlerValues} "FirefoxURL" "$2" "$8,1" "${AppRegName} URL" \
+  ${AddDisabledDDEHandlerValues} "ArcticFoxURL" "$2" "$8,1" "${AppRegName} URL" \
                                  "true"
 
   ; For pre win8, the following keys should only be set if we can write to HKLM.
@@ -409,8 +409,8 @@ Section "-Application" APP_IDX
   ${If} ${AtLeastWin8}
     ${RemoveDEHRegistration} ${DELEGATE_EXECUTE_HANDLER_ID} \
                              $AppUserModelID \
-                             "FirefoxURL" \
-                             "FirefoxHTML"
+                             "ArcticFoxURL" \
+                             "ArcticFoxHTML"
   ${EndIf}
 
   ; These need special handling on uninstall since they may be overwritten by
@@ -542,6 +542,12 @@ Section "-InstallEndCleanup"
       ${Else}
         GetFunctionAddress $0 SetAsDefaultAppUserHKCU
         UAC::ExecCodeSegment $0
+      ${EndIf}
+    ${Else}
+      ${LogHeader} "Writing default-browser opt-out"
+      WriteRegStr HKCU "Software\Mozilla\ArcticFox" "DefaultBrowserOptOut" "True"
+      ${If} ${Errors}
+        ${LogHeader} "Error writing default-browser opt-out"
       ${EndIf}
     ${EndIf}
     ; Adds a pinned Task Bar shortcut (see MigrateTaskBarShortcut for details).

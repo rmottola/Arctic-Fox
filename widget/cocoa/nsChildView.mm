@@ -64,7 +64,7 @@
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/GLManager.h"
 #include "mozilla/layers/CompositorOGL.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/BasicCompositor.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "gfxUtils.h"
@@ -709,6 +709,10 @@ void* nsChildView::GetNativeData(uint32_t aDataType)
       break;
 
     case NS_RAW_NATIVE_IME_CONTEXT:
+      retVal = GetPseudoIMEContext();
+      if (retVal) {
+        break;
+      }
       retVal = [mView inputContext];
       // If input context isn't available on this widget, we should set |this|
       // instead of nullptr since if this returns nullptr, IMEStateManager
@@ -1965,7 +1969,7 @@ void
 nsChildView::CreateCompositor()
 {
   nsBaseWidget::CreateCompositor();
-  if (mCompositorChild) {
+  if (mCompositorBridgeChild) {
     [(ChildView *)mView setUsingOMTCompositor:true];
   }
 }
@@ -4645,7 +4649,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   else
     geckoEvent.button = WidgetMouseEvent::eLeftButton;
 
-  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   mBlockedLastMouseDown = NO;
 
   // XXX maybe call markedTextSelectionChanged:client: here?
@@ -4672,7 +4676,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   // This might destroy our widget (and null out mGeckoChild).
   bool defaultPrevented =
-    (mGeckoChild->DispatchAPZAwareEvent(&geckoEvent) == nsEventStatus_eConsumeNoDefault);
+    (mGeckoChild->DispatchInputEvent(&geckoEvent) == nsEventStatus_eConsumeNoDefault);
 
   // Check to see if we are double-clicking in the titlebar.
   CGFloat locationInTitlebar = [[self window] frame].size.height - [theEvent locationInWindow].y;
@@ -4818,7 +4822,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
 
-  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4864,7 +4868,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
   geckoEvent.button = WidgetMouseEvent::eRightButton;
   geckoEvent.clickCount = [theEvent clickCount];
 
-  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
     return;
 
@@ -4888,7 +4892,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
   geckoEvent.clickCount = [theEvent clickCount];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
-  mGeckoChild->DispatchAPZAwareEvent(&geckoEvent);
+  mGeckoChild->DispatchInputEvent(&geckoEvent);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
@@ -4972,7 +4976,7 @@ static int32_t RoundUp(double aDouble)
   WidgetWheelEvent wheelEvent(true, msg, mGeckoChild);
   [self convertCocoaMouseWheelEvent:theEvent toGeckoEvent:&wheelEvent];
   mExpectingWheelStop = (msg == eWheelOperationStart);
-  mGeckoChild->DispatchAPZAwareEvent(wheelEvent.AsInputEvent());
+  mGeckoChild->DispatchInputEvent(wheelEvent.AsInputEvent());
 }
 
 - (void)sendWheelCondition:(BOOL)condition

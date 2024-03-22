@@ -8,7 +8,6 @@
 
 #include <algorithm>
 
-#include "DOMError.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FileSystemBase.h"
@@ -26,34 +25,104 @@ namespace dom {
 
 uint32_t CreateFileTask::sOutputBufferSize = 0;
 
-CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
-                               const nsAString& aPath,
-                               Blob* aBlobData,
-                               InfallibleTArray<uint8_t>& aArrayData,
-                               bool replace,
-                               ErrorResult& aRv)
-  : FileSystemTaskBase(aFileSystem)
-  , mTargetRealPath(aPath)
-  , mReplace(replace)
+/* static */ already_AddRefed<CreateFileTask>
+CreateFileTask::Create(FileSystemBase* aFileSystem,
+                       nsIFile* aTargetPath,
+                       Blob* aBlobData,
+                       InfallibleTArray<uint8_t>& aArrayData,
+                       bool aReplace,
+                       ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   MOZ_ASSERT(aFileSystem);
-  GetOutputBufferSize();
+
+  RefPtr<CreateFileTask> task =
+    new CreateFileTask(aFileSystem, aTargetPath, aReplace);
+
+  // aTargetPath can be null. In this case SetError will be called.
+
+  task->GetOutputBufferSize();
+
   if (aBlobData) {
     if (XRE_IsParentProcess()) {
-      aBlobData->GetInternalStream(getter_AddRefs(mBlobStream), aRv);
-      NS_WARN_IF(aRv.Failed());
+      aBlobData->GetInternalStream(getter_AddRefs(task->mBlobStream), aRv);
+      if (NS_WARN_IF(aRv.Failed())) {
+        return nullptr;
+      }
     } else {
-      mBlobData = aBlobData;
+      task->mBlobData = aBlobData;
     }
   }
-  mArrayData.SwapElements(aArrayData);
+
+  task->mArrayData.SwapElements(aArrayData);
+
   nsCOMPtr<nsIGlobalObject> globalObject =
-    do_QueryInterface(aFileSystem->GetWindow());
-  if (!globalObject) {
-    return;
+    do_QueryInterface(aFileSystem->GetParentObject());
+  if (NS_WARN_IF(!globalObject)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
   }
-  mPromise = Promise::Create(globalObject, aRv);
+
+  task->mPromise = Promise::Create(globalObject, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  return task.forget();
+}
+
+/* static */ already_AddRefed<CreateFileTask>
+CreateFileTask::Create(FileSystemBase* aFileSystem,
+                       const FileSystemCreateFileParams& aParam,
+                       FileSystemRequestParent* aParent,
+                       ErrorResult& aRv)
+{
+  MOZ_ASSERT(XRE_IsParentProcess(), "Only call from parent process!");
+  MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
+  MOZ_ASSERT(aFileSystem);
+
+  RefPtr<CreateFileTask> task =
+    new CreateFileTask(aFileSystem, aParam, aParent);
+
+  task->GetOutputBufferSize();
+
+  NS_ConvertUTF16toUTF8 path(aParam.realPath());
+  aRv = NS_NewNativeLocalFile(path, true, getter_AddRefs(task->mTargetPath));
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  task->mReplace = aParam.replace();
+
+  auto& data = aParam.data();
+
+  if (data.type() == FileSystemFileDataValue::TArrayOfuint8_t) {
+    task->mArrayData = data;
+    return task.forget();
+  }
+
+  BlobParent* bp = static_cast<BlobParent*>(static_cast<PBlobParent*>(data));
+  RefPtr<BlobImpl> blobImpl = bp->GetBlobImpl();
+  MOZ_ASSERT(blobImpl, "blobData should not be null.");
+
+  ErrorResult rv;
+  blobImpl->GetInternalStream(getter_AddRefs(task->mBlobStream), rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
+  }
+
+  return task.forget();
+}
+
+CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
+                               nsIFile* aTargetPath,
+                               bool aReplace)
+  : FileSystemTaskBase(aFileSystem)
+  , mTargetPath(aTargetPath)
+  , mReplace(aReplace)
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
+  MOZ_ASSERT(aFileSystem);
 }
 
 CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
@@ -62,32 +131,9 @@ CreateFileTask::CreateFileTask(FileSystemBase* aFileSystem,
   : FileSystemTaskBase(aFileSystem, aParam, aParent)
   , mReplace(false)
 {
-  MOZ_ASSERT(XRE_IsParentProcess(),
-             "Only call from parent process!");
+  MOZ_ASSERT(XRE_IsParentProcess(), "Only call from parent process!");
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   MOZ_ASSERT(aFileSystem);
-  GetOutputBufferSize();
-
-  mTargetRealPath = aParam.realPath();
-
-  mReplace = aParam.replace();
-
-  auto& data = aParam.data();
-
-  if (data.type() == FileSystemFileDataValue::TArrayOfuint8_t) {
-    mArrayData = data;
-    return;
-  }
-
-  BlobParent* bp = static_cast<BlobParent*>(static_cast<PBlobParent*>(data));
-  RefPtr<BlobImpl> blobImpl = bp->GetBlobImpl();
-  MOZ_ASSERT(blobImpl, "blobData should not be null.");
-
-  ErrorResult rv;
-  blobImpl->GetInternalStream(getter_AddRefs(mBlobStream), rv);
-  if (NS_WARN_IF(rv.Failed())) {
-    rv.SuppressException();
-  }
 }
 
 CreateFileTask::~CreateFileTask()
@@ -108,16 +154,22 @@ CreateFileTask::GetPromise()
 }
 
 FileSystemParams
-CreateFileTask::GetRequestParams(const nsString& aFileSystem) const
+CreateFileTask::GetRequestParams(const nsString& aSerializedDOMPath,
+                                 ErrorResult& aRv) const
 {
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   FileSystemCreateFileParams param;
-  param.filesystem() = aFileSystem;
-  param.realPath() = mTargetRealPath;
+  param.filesystem() = aSerializedDOMPath;
+
+  aRv = mTargetPath->GetPath(param.realPath());
+  if (NS_WARN_IF(aRv.Failed())) {
+    return param;
+  }
+
   param.replace() = mReplace;
   if (mBlobData) {
-    BlobChild* actor
-      = ContentChild::GetSingleton()->GetOrCreateActorForBlob(mBlobData);
+    BlobChild* actor =
+      ContentChild::GetSingleton()->GetOrCreateActorForBlob(mBlobData);
     if (actor) {
       param.data() = actor;
     }
@@ -128,7 +180,7 @@ CreateFileTask::GetRequestParams(const nsString& aFileSystem) const
 }
 
 FileSystemResponseValue
-CreateFileTask::GetSuccessRequestResult() const
+CreateFileTask::GetSuccessRequestResult(ErrorResult& aRv) const
 {
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   BlobParent* actor = GetBlobParent(mTargetBlobImpl);
@@ -141,7 +193,8 @@ CreateFileTask::GetSuccessRequestResult() const
 }
 
 void
-CreateFileTask::SetSuccessRequestResult(const FileSystemResponseValue& aValue)
+CreateFileTask::SetSuccessRequestResult(const FileSystemResponseValue& aValue,
+                                        ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   FileSystemFileResponse r = aValue;
@@ -152,7 +205,7 @@ CreateFileTask::SetSuccessRequestResult(const FileSystemResponseValue& aValue)
 nsresult
 CreateFileTask::Work()
 {
-  class AutoClose
+  class MOZ_RAII AutoClose final
   {
   public:
     explicit AutoClose(nsIOutputStream* aStream)
@@ -165,6 +218,7 @@ CreateFileTask::Work()
     {
       mStream->Close();
     }
+
   private:
     nsCOMPtr<nsIOutputStream> mStream;
   };
@@ -177,24 +231,19 @@ CreateFileTask::Work()
     return NS_ERROR_FAILURE;
   }
 
-  nsCOMPtr<nsIFile> file = mFileSystem->GetLocalFile(mTargetRealPath);
-  if (!file) {
-    return NS_ERROR_DOM_FILESYSTEM_INVALID_PATH_ERR;
-  }
-
-  if (!mFileSystem->IsSafeFile(file)) {
+  if (!mFileSystem->IsSafeFile(mTargetPath)) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
   bool exists = false;
-  nsresult rv = file->Exists(&exists);
+  nsresult rv = mTargetPath->Exists(&exists);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
   if (exists) {
     bool isFile = false;
-    rv = file->IsFile(&isFile);
+    rv = mTargetPath->IsFile(&isFile);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -208,19 +257,19 @@ CreateFileTask::Work()
     }
 
     // Remove the old file before creating.
-    rv = file->Remove(false);
+    rv = mTargetPath->Remove(false);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
   }
 
-  rv = file->Create(nsIFile::NORMAL_FILE_TYPE, 0600);
+  rv = mTargetPath->Create(nsIFile::NORMAL_FILE_TYPE, 0600);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
   nsCOMPtr<nsIOutputStream> outputStream;
-  rv = NS_NewLocalFileOutputStream(getter_AddRefs(outputStream), file);
+  rv = NS_NewLocalFileOutputStream(getter_AddRefs(outputStream), mTargetPath);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -263,7 +312,7 @@ CreateFileTask::Work()
       return NS_ERROR_FAILURE;
     }
 
-    mTargetBlobImpl = new BlobImplFile(file);
+    mTargetBlobImpl = new BlobImplFile(mTargetPath);
     return NS_OK;
   }
 
@@ -282,7 +331,7 @@ CreateFileTask::Work()
     return NS_ERROR_DOM_FILESYSTEM_UNKNOWN_ERR;
   }
 
-  mTargetBlobImpl = new BlobImplFile(file);
+  mTargetBlobImpl = new BlobImplFile(mTargetPath);
   return NS_OK;
 }
 
@@ -297,15 +346,14 @@ CreateFileTask::HandlerCallback()
   }
 
   if (HasError()) {
-    RefPtr<DOMError> domError = new DOMError(mFileSystem->GetWindow(),
-      mErrorValue);
-    mPromise->MaybeRejectBrokenly(domError);
+    mPromise->MaybeReject(mErrorValue);
     mPromise = nullptr;
     mBlobData = nullptr;
     return;
   }
 
-  RefPtr<Blob> blob = Blob::Create(mFileSystem->GetWindow(), mTargetBlobImpl);
+  RefPtr<Blob> blob = Blob::Create(mFileSystem->GetParentObject(),
+                                   mTargetBlobImpl);
   mPromise->MaybeResolve(blob);
   mPromise = nullptr;
   mBlobData = nullptr;

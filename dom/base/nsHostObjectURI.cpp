@@ -85,15 +85,6 @@ nsHostObjectURI::Write(nsIObjectOutputStream* aStream)
                                         true);
 }
 
-NS_IMETHODIMP
-nsHostObjectURI::SetScheme(const nsACString& aScheme)
-{
-  // Disallow setting the scheme, since that could cause us to be associated
-  // with a different protocol handler that doesn't expect us to be carrying
-  // around a principal with nsIURIWithPrincipal.
-  return NS_ERROR_FAILURE;
-}
-
 // nsIIPCSerializableURI methods:
 void
 nsHostObjectURI::Serialize(mozilla::ipc::URIParams& aParams)
@@ -142,6 +133,15 @@ nsHostObjectURI::Deserialize(const mozilla::ipc::URIParams& aParams)
 
   mPrincipal = PrincipalInfoToPrincipal(hostParams.principal().get_PrincipalInfo());
   return mPrincipal != nullptr;
+}
+
+NS_IMETHODIMP
+nsHostObjectURI::SetScheme(const nsACString& aScheme)
+{
+  // Disallow setting the scheme, since that could cause us to be associated
+  // with a different protocol handler that doesn't expect us to be carrying
+  // around a principal with nsIURIWithPrincipal.
+  return NS_ERROR_FAILURE;
 }
 
 // nsIURI methods:

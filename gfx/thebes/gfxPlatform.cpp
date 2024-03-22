@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/layers/AsyncTransactionTracker.h" // for AsyncTransactionTracker
-#include "mozilla/layers/CompositorChild.h"
-#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/CompositorBridgeChild.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
@@ -477,6 +477,7 @@ gfxPlatform::gfxPlatform()
   , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
   , mScreenDepth(0)
+  , mDeviceCounter(0)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -821,7 +822,7 @@ gfxPlatform::InitLayersIPC()
 
     if (XRE_IsParentProcess())
     {
-        mozilla::layers::CompositorParent::StartUp();
+        mozilla::layers::CompositorBridgeParent::StartUp();
 #ifdef MOZ_WIDGET_GONK
         SharedBufferManagerChild::StartUp();
 #endif
@@ -840,15 +841,15 @@ gfxPlatform::ShutdownLayersIPC()
 
     if (XRE_IsParentProcess())
     {
-        // This must happen after the shutdown of media and widgets, which
-        // are triggered by the NS_XPCOM_SHUTDOWN_OBSERVER_ID notification.
-        gfx::VRManagerChild::ShutDown();
-        layers::ImageBridgeChild::ShutDown();
+      // This must happen after the shutdown of media and widgets, which
+      // are triggered by the NS_XPCOM_SHUTDOWN_OBSERVER_ID notification.
+      gfx::VRManagerChild::ShutDown();
+      layers::ImageBridgeChild::ShutDown();
 #ifdef MOZ_WIDGET_GONK
-        layers::SharedBufferManagerChild::ShutDown();
+      layers::SharedBufferManagerChild::ShutDown();
 #endif
 
-        layers::CompositorParent::ShutDown();
+      layers::CompositorBridgeParent::ShutDown();
 	} else if (XRE_GetProcessType() == GeckoProcessType_Content) {
 		gfx::VRManagerChild::ShutDown();
 	}
@@ -1208,22 +1209,24 @@ gfxPlatform::SupportsAzureContentForDrawTarget(DrawTarget* aTarget)
   return SupportsAzureContentForType(aTarget->GetBackendType());
 }
 
-bool
-gfxPlatform::UseAcceleratedSkiaCanvas()
+bool gfxPlatform::UseAcceleratedCanvas()
 {
-  return gfxPrefs::CanvasAzureAccelerated() &&
-         mPreferredCanvasBackend == BackendType::SKIA;
-}
-
-bool gfxPlatform::HaveChoiceOfHWAndSWCanvas()
-{
-  return mPreferredCanvasBackend == BackendType::SKIA;
+  // Allow acceleration on Skia if the preference is set, unless it's blocked
+  if (mPreferredCanvasBackend == BackendType::SKIA && gfxPrefs::CanvasAzureAccelerated()) {
+    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
+    int32_t status;
+    return !gfxInfo ||
+      (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_CANVAS2D_ACCELERATION,
+                                              &status)) &&
+       status == nsIGfxInfo::FEATURE_STATUS_OK);
+  }
+  return false;
 }
 
 void
 gfxPlatform::InitializeSkiaCacheLimits()
 {
-  if (UseAcceleratedSkiaCanvas()) {
+  if (UseAcceleratedCanvas()) {
 #ifdef USE_SKIA_GPU
     bool usingDynamicCache = gfxPrefs::CanvasSkiaGLDynamicCache();
     int cacheItemLimit = gfxPrefs::CanvasSkiaGLCacheItems();
@@ -1255,7 +1258,10 @@ SkiaGLGlue*
 gfxPlatform::GetSkiaGLGlue()
 {
 #ifdef USE_SKIA_GPU
-  if (!gfxPlatform::GetPlatform()->UseAcceleratedSkiaCanvas()) {
+  // Check the accelerated Canvas is enabled for the first time,
+  // because the callers should check it before using.
+  if (!mSkiaGlue &&
+      !UseAcceleratedCanvas()) {
     gfxCriticalNote << "Accelerated Skia canvas is disabled";
     return nullptr;
   }
@@ -2415,4 +2421,10 @@ bool
 gfxPlatform::SupportsApzDragInput() const
 {
   return gfxPrefs::APZDragEnabled();
+}
+
+void
+gfxPlatform::BumpDeviceCounter()
+{
+  mDeviceCounter++;
 }

@@ -395,7 +395,8 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
                                  unsigned char *aData,
                                  const IntSize &aSize,
                                  int32_t aStride,
-                                 SurfaceFormat aFormat)
+                                 SurfaceFormat aFormat,
+                                 bool aUninitialized)
 {
   MOZ_ASSERT(aData);
   if (!AllowedSurfaceSize(aSize)) {
@@ -411,7 +412,7 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
     {
       RefPtr<DrawTargetSkia> newTarget;
       newTarget = new DrawTargetSkia();
-      newTarget->Init(aData, aSize, aStride, aFormat);
+      newTarget->Init(aData, aSize, aStride, aFormat, aUninitialized);
       retVal = newTarget;
       break;
     }

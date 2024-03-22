@@ -110,7 +110,6 @@ chrome/en-US/locale/en-US/browser/overrides/about.dtd
 chrome/en-US/locale/en-US/browser/overrides/aboutAbout.dtd
 chrome/en-US/locale/en-US/browser/overrides/aboutReader.properties
 chrome/en-US/locale/en-US/browser/overrides/aboutRights.dtd
-chrome/en-US/locale/en-US/browser/overrides/charsetMenu.properties
 chrome/en-US/locale/en-US/browser/overrides/commonDialogs.properties
 chrome/en-US/locale/en-US/browser/overrides/crashreporter/crashes.dtd
 chrome/en-US/locale/en-US/browser/overrides/crashreporter/crashes.properties
@@ -145,7 +144,6 @@ chrome/en-US/locale/en-US/global/aboutSupport.properties
 chrome/en-US/locale/en-US/global/aboutTelemetry.dtd
 chrome/en-US/locale/en-US/global/aboutTelemetry.properties
 chrome/en-US/locale/en-US/global/aboutWebrtc.properties
-chrome/en-US/locale/en-US/global/charsetMenu.properties
 chrome/en-US/locale/en-US/global/commonDialogs.properties
 chrome/en-US/locale/en-US/global/crashes.dtd
 chrome/en-US/locale/en-US/global/crashes.properties

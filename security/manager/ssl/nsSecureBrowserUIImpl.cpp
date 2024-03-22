@@ -49,15 +49,14 @@ using namespace mozilla;
 // this enables LogLevel::Debug level information and places all output in
 // the file nspr.log
 //
-PRLogModuleInfo* gSecureDocLog = nullptr;
+LazyLogModule gSecureDocLog("nsSecureBrowserUI");
 
 struct RequestHashEntry : PLDHashEntryHdr {
     void *r;
 };
 
 static bool
-RequestMapMatchEntry(PLDHashTable *table, const PLDHashEntryHdr *hdr,
-                         const void *key)
+RequestMapMatchEntry(const PLDHashEntryHdr *hdr, const void *key)
 {
   const RequestHashEntry *entry = static_cast<const RequestHashEntry*>(hdr);
   return entry->r == key;
@@ -117,9 +116,6 @@ nsSecureBrowserUIImpl::nsSecureBrowserUIImpl()
   MOZ_ASSERT(NS_IsMainThread());
 
   ResetStateTracking();
-
-  if (!gSecureDocLog)
-    gSecureDocLog = PR_NewLogModule("nsSecureBrowserUI");
 }
 
 NS_IMPL_ISUPPORTS(nsSecureBrowserUIImpl,
@@ -1317,7 +1313,7 @@ nsSecureBrowserUIImpl::GetSSLStatus(nsISSLStatus** _result)
       break;
 
     default:
-      NS_NOTREACHED("if this is reached you must add more entries to the switch");
+      MOZ_FALLTHROUGH_ASSERT("if this is reached you must add more entries to the switch");
     case lis_no_security:
       *_result = nullptr;
       return NS_OK;

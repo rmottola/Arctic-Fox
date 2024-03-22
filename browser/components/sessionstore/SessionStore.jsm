@@ -1228,9 +1228,7 @@ var SessionStoreInternal = {
 
     var tabbrowser = aWindow.gBrowser;
 
-    // The tabbrowser binding will go away once the window is closed,
-    // so we'll hold a reference to the browsers in the closure here.
-    let browsers = tabbrowser.browsers;
+    let browsers = Array.from(tabbrowser.browsers);
 
     TAB_EVENTS.forEach(function(aEvent) {
       tabbrowser.tabContainer.removeEventListener(aEvent, this, true);
@@ -1312,7 +1310,6 @@ var SessionStoreInternal = {
         // access any DOM elements from aWindow within this callback unless
         // you're holding on to them in the closure.
 
-        // We can still access tabbrowser.browsers, thankfully.
         for (let browser of browsers) {
           if (this._closedWindowTabs.has(browser.permanentKey)) {
             let tabData = this._closedWindowTabs.get(browser.permanentKey);
@@ -2521,7 +2518,7 @@ var SessionStoreInternal = {
       let window = tab.ownerDocument && tab.ownerDocument.defaultView;
 
       // The tab or its window might be gone.
-      if (!window || !window.__SSi) {
+      if (!window || !window.__SSi || window.closed) {
         return;
       }
 
