@@ -184,8 +184,8 @@ static char gZealStr[128];
 static bool printTiming = false;
 static const char* jsCacheDir = nullptr;
 static const char* jsCacheAsmJSPath = nullptr;
-static FILE* gErrFile = nullptr;
-static FILE* gOutFile = nullptr;
+static RCFile* gErrFile = nullptr;
+static RCFile* gOutFile = nullptr;
 static bool reportWarnings = true;
 static bool compileOnly = false;
 static bool fuzzingSafe = false;
@@ -350,9 +350,9 @@ GetLine(FILE* file, const char * prompt)
 #endif
 
     size_t len = 0;
-    if (*prompt != '\0') {
-        fprintf(gOutFile, "%s", prompt);
-        fflush(gOutFile);
+    if (*prompt != '\0' && gOutFile->isOpen()) {
+        fprintf(gOutFile->fp, "%s", prompt);
+        fflush(gOutFile->fp);
     }
 
     size_t size = 80;
@@ -619,7 +619,7 @@ RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 
 static bool
 EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
-             int lineno, bool compileOnly, FILE* out)
+             int lineno, bool compileOnly)
 {
     // Eval.
     JS::CompileOptions options(cx);
@@ -636,7 +636,7 @@ EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
     if (!JS_ExecuteScript(cx, script, &result))
         return false;
 
-    if (!result.isUndefined()) {
+    if (!result.isUndefined() && gOutFile->isOpen()) {
         // Print.
         RootedString str(cx);
         str = JS_ValueToSource(cx, result);
@@ -646,14 +646,14 @@ EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
         char* utf8chars = JS_EncodeStringToUTF8(cx, str);
         if (!utf8chars)
             return false;
-        fprintf(out, "%s\n", utf8chars);
+        fprintf(gOutFile->fp, "%s\n", utf8chars);
         JS_free(cx, utf8chars);
     }
     return true;
 }
 
 static void
-ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
+ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
     int lineno = 1;
@@ -698,9 +698,7 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
         if (hitEOF && buffer.empty())
             break;
 
-        if (!EvalAndPrint(cx, buffer.begin(), buffer.length(), startline, compileOnly,
-                          out))
-        {
+        if (!EvalAndPrint(cx, buffer.begin(), buffer.length(), startline, compileOnly)) {
             // Catch the error, report it, and keep going.
             JS_ReportPendingException(cx);
         }
@@ -708,7 +706,7 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
         // without further intervention. This call cleans up the global scope,
         // setting uninitialized lexicals to undefined so that they may still
         // be used. This behavior is _only_ acceptable in the context of the repl.
-        if (JS::ForceLexicalInitialization(cx, globalLexical)) {
+        if (JS::ForceLexicalInitialization(cx, globalLexical) && gErrFile->isOpen()) {
             fputs("Warning: According to the standard, after the above exception,\n"
                   "Warning: the global bindings should be permanently uninitialized.\n"
                   "Warning: We have non-standard-ly initialized them to `undefined`"
@@ -717,7 +715,8 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, FILE* out, bool compileOnly)
         }
     } while (!hitEOF && !sr->quitting);
 
-    fprintf(out, "\n");
+    if (gOutFile->isOpen())
+        fprintf(gOutFile->fp, "\n");
 }
 
 enum FileKind
@@ -751,7 +750,7 @@ Process(JSContext* cx, const char* filename, bool forceTTY, FileKind kind = File
     } else {
         // It's an interactive filehandle; drop into read-eval-print loop.
         MOZ_ASSERT(kind == FileScript);
-        ReadEvalPrintLoop(cx, file, gOutFile, compileOnly);
+        ReadEvalPrintLoop(cx, file, compileOnly);
     }
 }
 
@@ -1649,15 +1648,20 @@ PutStr(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 0) {
+        if (!gOutFile->isOpen()) {
+            JS_ReportError(cx, "output file is closed");
+            return false;
+        }
+
         RootedString str(cx, JS::ToString(cx, args[0]));
         if (!str)
             return false;
         char* bytes = JS_EncodeStringToUTF8(cx, str);
         if (!bytes)
             return false;
-        fputs(bytes, gOutFile);
+        fputs(bytes, gOutFile->fp);
         JS_free(cx, bytes);
-        fflush(gOutFile);
+        fflush(gOutFile->fp);
     }
 
     args.rval().setUndefined();
@@ -1674,8 +1678,13 @@ Now(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
-PrintInternal(JSContext* cx, const CallArgs& args, FILE* file)
+PrintInternal(JSContext* cx, const CallArgs& args, RCFile* file)
 {
+    if (!file->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
+
     for (unsigned i = 0; i < args.length(); i++) {
         RootedString str(cx, JS::ToString(cx, args[i]));
         if (!str)
@@ -1683,12 +1692,12 @@ PrintInternal(JSContext* cx, const CallArgs& args, FILE* file)
         char* bytes = JS_EncodeStringToUTF8(cx, str);
         if (!bytes)
             return false;
-        fprintf(file, "%s%s", i ? " " : "", bytes);
+        fprintf(file->fp, "%s%s", i ? " " : "", bytes);
         JS_free(cx, bytes);
     }
 
-    fputc('\n', file);
-    fflush(file);
+    fputc('\n', file->fp);
+    fflush(file->fp);
 
     args.rval().setUndefined();
     return true;
@@ -1777,8 +1786,8 @@ StopTimingMutator(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
     double total_ms = mutator_ms + gc_ms;
-    if (total_ms > 0) {
-        fprintf(gOutFile, "Mutator: %.3fms (%.1f%%), GC: %.3fms (%.1f%%)\n",
+    if (total_ms > 0 && gOutFile->isOpen()) {
+        fprintf(gOutFile->fp, "Mutator: %.3fms (%.1f%%), GC: %.3fms (%.1f%%)\n",
                 mutator_ms, mutator_ms / total_ms * 100.0, gc_ms, gc_ms / total_ms * 100.0);
     }
 
@@ -2321,13 +2330,19 @@ static bool
 Disassemble(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!gOutFile->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
+
     Sprinter sprinter(cx);
     if (!sprinter.init())
         return false;
     if (!DisassembleToSprinter(cx, args.length(), vp, &sprinter))
         return false;
 
-    fprintf(stdout, "%s\n", sprinter.string());
+    fprintf(gOutFile->fp, "%s\n", sprinter.string());
     args.rval().setUndefined();
     return true;
 }
@@ -2336,6 +2351,11 @@ static bool
 DisassFile(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!gOutFile->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
 
     /* Support extra options at the start, just like Disassemble. */
     DisassembleOptionParser p(args.length(), args.array());
@@ -2373,7 +2393,7 @@ DisassFile(JSContext* cx, unsigned argc, Value* vp)
         return false;
     bool ok = DisassembleScript(cx, script, nullptr, p.lines, p.recursive, p.sourceNotes, &sprinter);
     if (ok)
-        fprintf(stdout, "%s\n", sprinter.string());
+        fprintf(gOutFile->fp, "%s\n", sprinter.string());
     if (!ok)
         return false;
 
@@ -2385,6 +2405,11 @@ static bool
 DisassWithSrc(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!gOutFile->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
 
 #define LINE_BUF_LEN 512
     unsigned len, line1, line2, bupline;
@@ -2467,7 +2492,7 @@ DisassWithSrc(JSContext* cx, unsigned argc, Value* vp)
             pc += len;
         }
 
-        fprintf(stdout, "%s\n", sprinter.string());
+        fprintf(gOutFile->fp, "%s\n", sprinter.string());
 
       bail:
         fclose(file);
@@ -2483,6 +2508,7 @@ static bool
 Intern(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+
     JSString* str = JS::ToString(cx, args.get(0));
     if (!str)
         return false;
@@ -3325,15 +3351,20 @@ StackDump(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
+    if (!gOutFile->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
+
     bool showArgs = ToBoolean(args.get(0));
     bool showLocals = ToBoolean(args.get(1));
     bool showThisProps = ToBoolean(args.get(2));
 
     char* buf = JS::FormatStackDump(cx, nullptr, showArgs, showLocals, showThisProps);
     if (!buf) {
-        fputs("Failed to format JavaScript stack for dump\n", gOutFile);
+        fputs("Failed to format JavaScript stack for dump\n", gOutFile->fp);
     } else {
-        fputs(buf, gOutFile);
+        fputs(buf, gOutFile->fp);
         JS_smprintf_free(buf);
     }
 
@@ -5608,6 +5639,7 @@ static bool
 PrintHelpString(JSContext* cx, Value v)
 {
     JSString* str = v.toString();
+    MOZ_ASSERT(gOutFile->isOpen());
 
     JSLinearString* linear = str->ensureLinear(cx);
     if (!linear)
@@ -5616,12 +5648,12 @@ PrintHelpString(JSContext* cx, Value v)
     JS::AutoCheckCannotGC nogc;
     if (linear->hasLatin1Chars()) {
         for (const Latin1Char* p = linear->latin1Chars(nogc); *p; p++)
-            fprintf(gOutFile, "%c", char(*p));
+            fprintf(gOutFile->fp, "%c", char(*p));
     } else {
         for (const char16_t* p = linear->twoByteChars(nogc); *p; p++)
-            fprintf(gOutFile, "%c", char(*p));
+            fprintf(gOutFile->fp, "%c", char(*p));
     }
-    fprintf(gOutFile, "\n");
+    fprintf(gOutFile->fp, "\n");
 
     return true;
 }
@@ -5667,11 +5699,16 @@ PrintEnumeratedHelp(JSContext* cx, HandleObject obj, bool brief)
 static bool
 Help(JSContext* cx, unsigned argc, Value* vp)
 {
+    if (!gOutFile->isOpen()) {
+        JS_ReportError(cx, "output file is closed");
+        return false;
+    }
+
     CallArgs args = CallArgsFromVp(argc, vp);
 
     RootedObject obj(cx);
     if (args.length() == 0) {
-        fprintf(gOutFile, "%s\n", JS_GetImplementationVersion());
+        fprintf(gOutFile->fp, "%s\n", JS_GetImplementationVersion());
 
         RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
         if (!PrintEnumeratedHelp(cx, global, false))
@@ -5745,6 +5782,16 @@ CreateLastWarningObject(JSContext* cx, JSErrorReport* report)
     return true;
 }
 
+static FILE*
+ErrorFilePointer()
+{
+    if (gErrFile->isOpen())
+        return gErrFile->fp;
+
+    fprintf(stderr, "error file is closed; falling back to stderr\n");
+    return stderr;
+}
+
 static bool
 PrintStackTrace(JSContext* cx, HandleValue exn)
 {
@@ -5775,8 +5822,9 @@ PrintStackTrace(JSContext* cx, HandleValue exn)
     if (!stack)
         return false;
 
-    fputs("Stack:\n", gErrFile);
-    fputs(stack.get(), gErrFile);
+    FILE* fp = ErrorFilePointer();
+    fputs("Stack:\n", fp);
+    fputs(stack.get(), fp);
 
     return true;
 }
@@ -5785,12 +5833,13 @@ void
 js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
+    FILE* fp = ErrorFilePointer();
 
     if (report && JSREPORT_IS_WARNING(report->flags) && sr->lastWarningEnabled) {
         JS::AutoSaveExceptionState savedExc(cx);
         if (!CreateLastWarningObject(cx, report)) {
-            fputs("Unhandled error happened while creating last warning object.\n", gOutFile);
-            fflush(gOutFile);
+            fputs("Unhandled error happened while creating last warning object.\n", fp);
+            fflush(fp);
         }
         savedExc.restore();
     }
@@ -5800,11 +5849,11 @@ js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* r
     if (JS_IsExceptionPending(cx))
         (void) JS_GetPendingException(cx, &exn);
 
-    sr->gotError = PrintError(cx, gErrFile, message, report, reportWarnings);
+    sr->gotError = PrintError(cx, fp, message, report, reportWarnings);
     if (!exn.isUndefined()) {
         JS::AutoSaveExceptionState savedExc(cx);
         if (!PrintStackTrace(cx, exn))
-            fputs("(Unable to print stack trace)\n", gOutFile);
+            fputs("(Unable to print stack trace)\n", fp);
         savedExc.restore();
     }
 
@@ -6399,7 +6448,7 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
                 return nullptr;
         }
 
-        if (!DefineOS(cx, glob, fuzzingSafe))
+        if (!DefineOS(cx, glob, fuzzingSafe, &gOutFile, &gErrFile))
             return nullptr;
 
         RootedObject performanceObj(cx, JS_NewObject(cx, nullptr));
@@ -6898,13 +6947,18 @@ Shell(JSContext* cx, OptionParser* op, char** envp)
 }
 
 static void
-MaybeOverrideOutFileFromEnv(const char* const envVar,
-                            FILE* defaultOut,
-                            FILE** outFile)
+SetOutputFile(const char* const envVar,
+              FILE* defaultOut,
+              RCFile** outFile)
 {
     const char* outPath = getenv(envVar);
-    if (!outPath || !*outPath || !(*outFile = fopen(outPath, "w"))) {
-        *outFile = defaultOut;
+    FILE* newfp;
+    if (outPath && *outPath && (newfp = fopen(outPath, "w"))) {
+        *outFile = js_new<RCFile>(newfp);
+        (*outFile)->acquire();
+    } else {
+        *outFile = js_new<RCFile>(defaultOut);
+        (*outFile)->acquire();
     }
 }
 
@@ -6946,8 +7000,8 @@ main(int argc, char** argv, char** envp)
     setlocale(LC_ALL, "");
 #endif
 
-    MaybeOverrideOutFileFromEnv("JS_STDERR", stderr, &gErrFile);
-    MaybeOverrideOutFileFromEnv("JS_STDOUT", stdout, &gOutFile);
+    SetOutputFile("JS_STDERR", stderr, &gErrFile);
+    SetOutputFile("JS_STDOUT", stdout, &gOutFile);
 
     OptionParser op("Usage: {progname} [options] [[script] scriptArgs*]");
 
