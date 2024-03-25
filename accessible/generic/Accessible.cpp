@@ -1983,6 +1983,10 @@ Accessible::BindToParent(Accessible* aParent, uint32_t aIndexInParent)
 
   if (mParent->IsARIAHidden() || aria::HasDefinedARIAHidden(mContent))
     SetARIAHidden(true);
+
+  mContextFlags |=
+    static_cast<uint32_t>((mParent->IsAlert() ||
+                           mParent->IsInsideAlert())) & eInsideAlert;
 }
 
 // Accessible protected
@@ -2000,7 +2004,7 @@ Accessible::UnbindFromParent()
 
   delete mBits.groupInfo;
   mBits.groupInfo = nullptr;
-  mContextFlags &= ~eHasNameDependentParent;
+  mContextFlags &= ~eHasNameDependentParent & ~eInsideAlert;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
