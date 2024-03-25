@@ -14,7 +14,7 @@ requestLongerTimeout(2);
 const TEST_URL = "data:text/html;charset=utf8,<div>test element</div>";
 
 add_task(function*() {
-  let {toolbox, inspector} = yield addTab(TEST_URL).then(openInspector);
+  let {inspector, testActor} = yield openInspectorForURL(TEST_URL);
 
   info("Select the test node with the browser ctx menu");
   yield selectWithBrowserMenu(inspector);
@@ -22,14 +22,11 @@ add_task(function*() {
 
   info("Press arrowUp to focus <body> " +
        "(which works if the node was focused properly)");
-  let onNodeHighlighted = toolbox.once("node-highlight");
-  EventUtils.synthesizeKey("VK_UP", {});
-  yield waitForChildrenUpdated(inspector);
-  yield onNodeHighlighted;
+  yield selectPreviousNodeWithArrowUp(inspector);
   assertNodeSelected(inspector, "body");
 
   info("Select the test node with the element picker");
-  yield selectWithElementPicker(inspector);
+  yield selectWithElementPicker(inspector, testActor);
   assertNodeSelected(inspector, "div");
 
   info("Press arrowUp to focus <body> " +
@@ -44,6 +41,13 @@ add_task(function*() {
 function assertNodeSelected(inspector, tagName) {
   is(inspector.selection.nodeFront.tagName.toLowerCase(), tagName,
     `The <${tagName}> node is selected`);
+}
+
+function selectPreviousNodeWithArrowUp(inspector) {
+  let onNodeHighlighted = inspector.toolbox.once("node-highlight");
+  let onUpdated = inspector.once("inspector-updated");
+  EventUtils.synthesizeKey("VK_UP", {});
+  return Promise.all([onUpdated, onNodeHighlighted]);
 }
 
 function* selectWithBrowserMenu(inspector) {
@@ -67,16 +71,13 @@ function* selectWithBrowserMenu(inspector) {
   yield contextClosed;
 }
 
-function* selectWithElementPicker(inspector) {
+function* selectWithElementPicker(inspector, testActor) {
   yield inspector.toolbox.highlighterUtils.startPicker();
 
   yield BrowserTestUtils.synthesizeMouseAtCenter("div", {
     type: "mousemove",
   }, gBrowser.selectedBrowser);
 
-  executeInContent("Test:SynthesizeKey", {
-    key: "VK_RETURN",
-    options: {}
-  }, false);
+  yield testActor.synthesizeKey({key: "VK_RETURN", options: {}});
   yield inspector.once("inspector-updated");
 }
