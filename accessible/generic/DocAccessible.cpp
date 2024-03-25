@@ -2024,6 +2024,7 @@ DocAccessible::DoARIAOwnsRelocation(Accessible* aOwner)
       MoveChild(child, insertIdx);
       children->InsertElementAt(arrayIdx, child);
       arrayIdx++;
+      insertIdx = child->IndexInParent() + 1;
 
     } else if (SeizeChild(aOwner, child, insertIdx)) {
       children->InsertElementAt(arrayIdx, child);
@@ -2050,6 +2051,12 @@ DocAccessible::SeizeChild(Accessible* aNewParent, Accessible* aChild,
 
   int32_t oldIdxInParent = aChild->IndexInParent();
 
+#ifdef A11Y_LOG
+  logging::TreeInfo("aria owns seize child", 0,
+                    "old parent", oldParent, "new parent", aNewParent,
+                    "child", aChild, nullptr);
+#endif
+
   RefPtr<AccReorderEvent> reorderEvent = new AccReorderEvent(oldParent);
   RefPtr<AccMutationEvent> hideEvent = new AccHideEvent(aChild, false);
   reorderEvent->AddSubMutationEvent(hideEvent);
@@ -2064,6 +2071,11 @@ DocAccessible::SeizeChild(Accessible* aNewParent, Accessible* aChild,
     AutoTreeMutation mut(aNewParent);
     isReinserted = aNewParent->InsertChildAt(aIdxInParent, aChild);
   }
+
+#ifdef A11Y_LOG
+    logging::TreeInfo("aria owns seize child: new parent tree after",
+                      logging::eVerbose, aNewParent);
+#endif
 
   if (!isReinserted) {
     AutoTreeMutation mut(oldParent);
@@ -2103,9 +2115,19 @@ DocAccessible::MoveChild(Accessible* aChild, int32_t aIdxInParent)
   RefPtr<AccMutationEvent> hideEvent = new AccHideEvent(aChild, false);
   reorderEvent->AddSubMutationEvent(hideEvent);
 
+#ifdef A11Y_LOG
+  logging::TreeInfo("aria owns move child", 0,
+                    "parent", parent, "child", aChild, nullptr);
+#endif
+
   AutoTreeMutation mut(parent);
   parent->MoveChild(aIdxInParent, aChild);
   aChild->SetRelocated(true);
+
+#ifdef A11Y_LOG
+  logging::TreeInfo("aria owns move child: parent tree after",
+                    logging::eVerbose, parent);
+#endif
 
   FireDelayedEvent(hideEvent);
 
