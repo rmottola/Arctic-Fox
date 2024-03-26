@@ -148,7 +148,7 @@ EffectCompositor::RequestRestyle(dom::Element* aElement,
   }
 
   auto& elementsToRestyle = mElementsToRestyle[aCascadeLevel];
-  PseudoElementHashKey key = { aElement, aPseudoType };
+  PseudoElementHashEntry::KeyType key = { aElement, aPseudoType };
 
   if (aRestyleType == RestyleType::Throttled) {
     if (!elementsToRestyle.Contains(key)) {
@@ -230,7 +230,7 @@ EffectCompositor::MaybeUpdateAnimationRule(dom::Element* aElement,
   MaybeUpdateCascadeResults(aElement, aPseudoType);
 
   auto& elementsToRestyle = mElementsToRestyle[aCascadeLevel];
-  PseudoElementHashKey key = { aElement, aPseudoType };
+  PseudoElementHashEntry::KeyType key = { aElement, aPseudoType };
 
   if (!mPresContext || !elementsToRestyle.Contains(key)) {
     return;
@@ -276,7 +276,7 @@ EffectCompositor::GetAnimationRule(dom::Element* aElement,
 #ifdef DEBUG
   {
     auto& elementsToRestyle = mElementsToRestyle[aCascadeLevel];
-    PseudoElementHashKey key = { aElement, aPseudoType };
+    PseudoElementHashEntry::KeyType key = { aElement, aPseudoType };
     MOZ_ASSERT(!elementsToRestyle.Contains(key),
                "Element should no longer require a restyle after its "
                "animation rule has been updated");
@@ -362,7 +362,8 @@ EffectCompositor::AddStyleUpdatesTo(RestyleTracker& aTracker)
     // it will only mutate the bool value associated with each element in the
     // set but even doing that will cause assertions in PLDHashTable to fail
     // if we are iterating over the hashtable at the same time.
-    nsTArray<PseudoElementHashKey> elementsToRestyle(elementSet.Count());
+    nsTArray<PseudoElementHashEntry::KeyType> elementsToRestyle(
+      elementSet.Count());
     for (auto iter = elementSet.Iter(); !iter.Done(); iter.Next()) {
       elementsToRestyle.AppendElement(iter.Key());
     }
