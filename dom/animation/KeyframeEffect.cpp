@@ -1827,11 +1827,6 @@ KeyframeEffectReadOnly::GetProperties(
     nsTArray<AnimationPropertyDetails>& aProperties) const
 {
   for (const AnimationProperty& property : mProperties) {
-    // Bug 1252730: We should also expose this winsInCascade as well.
-    if (!property.mWinsInCascade) {
-      continue;
-    }
-
     AnimationPropertyDetails propertyDetails;
     propertyDetails.mProperty.Construct(
       NS_ConvertASCIItoUTF16(nsCSSProps::GetStringValue(property.mProperty)));
