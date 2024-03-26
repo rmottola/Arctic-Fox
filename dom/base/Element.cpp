@@ -3352,15 +3352,8 @@ Element::Animate(const Nullable<ElementOrCSSPseudoElement>& aTarget,
     }
   }
 
-  TimingParams timingParams =
-    TimingParams::FromOptionsUnion(aOptions, referenceElement->OwnerDoc(),
-                                   aError);
-  if (aError.Failed()) {
-    return nullptr;
-  }
-
   RefPtr<KeyframeEffect> effect =
-    KeyframeEffect::Constructor(global, aTarget, frames, timingParams, aError);
+    KeyframeEffect::Constructor(global, aTarget, frames, aOptions, aError);
   if (aError.Failed()) {
     return nullptr;
   }
