@@ -505,7 +505,3 @@ html, body, #app, #memory-tool {
   text-align: center;
   padding: 5px;
 }
-
-label select {
-  margin: 5px;
-}
