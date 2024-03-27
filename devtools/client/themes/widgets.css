@@ -1206,6 +1206,10 @@
   color: var(--theme-body-color);
 }
 
+.table-widget-column-header + .table-widget-cell {
+  border-top: 1px solid var(--theme-splitter-color);
+}
+
 .table-widget-cell:last-child {
   border-bottom: 1px solid var(--table-splitter-color);
 }
