@@ -15,7 +15,7 @@ function test()
   content.location = "data:text/html;charset=utf8,test Scratchpad pretty print.";
 }
 
-let gTabsize;
+var gTabsize;
 
 function runTests(sw)
 {
@@ -27,7 +27,7 @@ function runTests(sw)
   sp.setText("function main() { console.log(5); }");
   sp.prettyPrint().then(() => {
     const prettyText = sp.getText();
-    ok(prettyText.contains(space));
+    ok(prettyText.includes(space));
     finish();
   }).then(null, error => {
     ok(false, error);
