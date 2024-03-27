@@ -337,11 +337,16 @@ StorageUI.prototype = {
   populateStorageTree: function(storageTypes) {
     this.storageTypes = {};
     for (let type in storageTypes) {
+      // Ignore `from` field, which is just a protocol.js implementation artifact
       if (type === "from") {
         continue;
       }
-
-      let typeLabel = L10N.getStr("tree.labels." + type);
+      let typeLabel = type;
+      try {
+        typeLabel = L10N.getStr("tree.labels." + type);
+      } catch(e) {
+        console.error("Unable to localize tree label type:" + type);
+      }
       this.tree.add([{id: type, label: typeLabel, type: "store"}]);
       if (!storageTypes[type].hosts) {
         continue;
