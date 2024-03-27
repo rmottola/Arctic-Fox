@@ -32,13 +32,9 @@ const nsIDOMWindow           = Components.interfaces.nsIDOMWindow;
 const nsIFileURL             = Components.interfaces.nsIFileURL;
 const nsIInterfaceRequestor  = Components.interfaces.nsIInterfaceRequestor;
 const nsINetUtil             = Components.interfaces.nsINetUtil;
-const nsIPrefBranch          = Components.interfaces.nsIPrefBranch;
 const nsIPrefLocalizedString = Components.interfaces.nsIPrefLocalizedString;
 const nsISupportsString      = Components.interfaces.nsISupportsString;
-const nsIURIFixup            = Components.interfaces.nsIURIFixup;
 const nsIWebNavigation       = Components.interfaces.nsIWebNavigation;
-const nsIWindowMediator      = Components.interfaces.nsIWindowMediator;
-const nsIWindowWatcher       = Components.interfaces.nsIWindowWatcher;
 const nsIWebNavigationInfo   = Components.interfaces.nsIWebNavigationInfo;
 const nsICommandLineValidator = Components.interfaces.nsICommandLineValidator;
 
@@ -60,12 +56,11 @@ function shouldLoadURI(aURI) {
 
 function resolveURIInternal(aCmdLine, aArgument) {
   var uri = aCmdLine.resolveURI(aArgument);
-  var urifixup = Components.classes["@mozilla.org/docshell/urifixup;1"]
-                           .getService(nsIURIFixup);
+  var uriFixup = Services.uriFixup;
 
   if (!(uri instanceof nsIFileURL)) {
-    return urifixup.createFixupURI(aArgument,
-                                   urifixup.FIXUP_FLAG_FIX_SCHEME_TYPOS);
+    return uriFixup.createFixupURI(aArgument,
+                                   uriFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS);
   }
 
   try {
@@ -80,7 +75,7 @@ function resolveURIInternal(aCmdLine, aArgument) {
   // doesn't exist. Try URI fixup heuristics: see bug 290782.
 
   try {
-    uri = urifixup.createFixupURI(aArgument, 0);
+    uri = uriFixup.createFixupURI(aArgument, 0);
   }
   catch (e) {
     Components.utils.reportError(e);
@@ -182,9 +177,6 @@ function getPostUpdateOverridePage(defaultOverridePage) {
 const NO_EXTERNAL_URIS = 1;
 
 function openWindow(parent, url, target, features, args, noExternalArgs) {
-  var wwatch = Components.classes["@mozilla.org/embedcomp/window-watcher;1"]
-                         .getService(nsIWindowWatcher);
-
   if (noExternalArgs == NO_EXTERNAL_URIS) {
     // Just pass in the defaultArgs directly
     var argstring;
@@ -194,7 +186,7 @@ function openWindow(parent, url, target, features, args, noExternalArgs) {
       argstring.data = args;
     }
 
-    return wwatch.openWindow(parent, url, target, features, argstring);
+    return Services.ww.openWindow(parent, url, target, features, argstring);
   }
 
   // Pass an array to avoid the browser "|"-splitting behavior.
@@ -231,7 +223,7 @@ function openWindow(parent, url, target, features, args, noExternalArgs) {
   argArray.AppendElement(null); // postData
   argArray.AppendElement(null); // allowThirdPartyFixup
 
-  return wwatch.openWindow(parent, url, target, features, argArray);
+  return Services.ww.openWindow(parent, url, target, features, argArray);
 }
 
 function openPreferences() {
@@ -242,8 +234,12 @@ function openPreferences() {
   if (win) {
     win.focus();
   } else {
-    openWindow(null, url, "_blank", features);
-  }
+    return Services.ww.openWindow(null, gBrowserContentHandler.chromeURL,
+                                  "_blank",
+                                  "chrome,dialog=no,all" +
+                                  gBrowserContentHandler.getFeatures(cmdLine),
+                                  sa);
+    }
 }
 
 function getMostRecentWindow(aType) {
@@ -280,14 +276,11 @@ function doSearch(searchTerm, cmdLine) {
   // XXXbsmedberg: use handURIToExistingBrowser to obey tabbed-browsing
   // preferences, but need nsIBrowserDOMWindow extensions
 
-  var wwatch = Components.classes["@mozilla.org/embedcomp/window-watcher;1"]
-                         .getService(nsIWindowWatcher);
-
-  return wwatch.openWindow(null, gBrowserContentHandler.chromeURL,
-                           "_blank",
-                           "chrome,dialog=no,all" +
-                           gBrowserContentHandler.getFeatures(cmdLine),
-                           sa);
+  return Services.ww.openWindow(null, gBrowserContentHandler.chromeURL,
+                                "_blank",
+                                "chrome,dialog=no,all" +
+                                gBrowserContentHandler.getFeatures(cmdLine),
+                                sa);
 }
 
 function nsBrowserContentHandler() {
@@ -312,9 +305,7 @@ nsBrowserContentHandler.prototype = {
       return this.mChromeURL;
     }
 
-    var prefb = Components.classes["@mozilla.org/preferences-service;1"]
-                          .getService(nsIPrefBranch);
-    this.mChromeURL = prefb.getCharPref("browser.chromeURL");
+    this.mChromeURL = Services.prefs.getCharPref("browser.chromeURL");
 
     return this.mChromeURL;
   },
@@ -338,7 +329,7 @@ nsBrowserContentHandler.prototype = {
     var uriparam;
     try {
       while ((uriparam = cmdLine.handleFlagWithParam("new-window", false))) {
-        var uri = resolveURIInternal(cmdLine, uriparam);
+        let uri = resolveURIInternal(cmdLine, uriparam);
         if (!shouldLoadURI(uri))
           continue;
         openWindow(null, this.chromeURL, "_blank",
@@ -353,7 +344,7 @@ nsBrowserContentHandler.prototype = {
 
     try {
       while ((uriparam = cmdLine.handleFlagWithParam("new-tab", false))) {
-        var uri = resolveURIInternal(cmdLine, uriparam);
+        let uri = resolveURIInternal(cmdLine, uriparam);
         handURIToExistingBrowser(uri, nsIBrowserDOMWindow.OPEN_NEWTAB, cmdLine);
         cmdLine.preventDefault = true;
       }
@@ -426,12 +417,10 @@ nsBrowserContentHandler.prototype = {
     var fileParam = cmdLine.handleFlagWithParam("file", false);
     if (fileParam) {
       var file = cmdLine.resolveFile(fileParam);
-      var ios = Components.classes["@mozilla.org/network/io-service;1"]
-                          .getService(Components.interfaces.nsIIOService);
-      var uri = ios.newFileURI(file);
-      openWindow(null, this.chromeURL, "_blank", 
+      var fileURI = Services.io.newFileURI(file);
+      openWindow(null, this.chromeURL, "_blank",
                  "chrome,dialog=no,all" + this.getFeatures(cmdLine),
-                 uri.spec);
+                 fileURI.spec);
       cmdLine.preventDefault = true;
     }
 
@@ -468,8 +457,7 @@ nsBrowserContentHandler.prototype = {
   /* nsIBrowserHandler */
 
   get defaultArgs() {
-    var prefb = Components.classes["@mozilla.org/preferences-service;1"]
-                          .getService(nsIPrefBranch);
+    var prefb = Services.prefs;
 
     if (!gFirstWindow) {
       gFirstWindow = true;
@@ -685,9 +673,7 @@ nsDefaultCommandLineHandler.prototype = {
       if (!this._haveProfile) {
         try {
           // This will throw when a profile has not been selected.
-          var fl = Components.classes["@mozilla.org/file/directory_service;1"]
-                             .getService(Components.interfaces.nsIProperties);
-          var dir = fl.get("ProfD", Components.interfaces.nsILocalFile);
+          var dir = Services.dirsvc.get("ProfD", Components.interfaces.nsILocalFile);
           this._haveProfile = true;
         }
         catch (e) {
