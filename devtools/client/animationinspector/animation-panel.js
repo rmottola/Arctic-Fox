@@ -282,11 +282,8 @@ var AnimationsPanel = {
   },
 
   displayTimelineCurrentTime: function() {
-    let {isMoving, isPaused, time} = this.timelineData;
-
-    if (isMoving || isPaused) {
-      this.timelineCurrentTimeEl.textContent = formatStopwatchTime(time);
-    }
+    let {time} = this.timelineData;
+    this.timelineCurrentTimeEl.textContent = formatStopwatchTime(time);
   },
 
   /**
