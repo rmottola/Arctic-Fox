@@ -346,7 +346,7 @@ DistributionCustomizer.prototype = {
     if (sections["Preferences"]) {
       for (let key of enumerate(this._ini.getKeys("Preferences"))) {
         try {
-          let value = eval(this._ini.getString("Preferences", key));
+          let value = parseValue(this._ini.getString("Preferences", key));
           switch (typeof value) {
           case "boolean":
             defaults.setBoolPref(key, value);
@@ -377,7 +377,7 @@ DistributionCustomizer.prototype = {
     if (sections["LocalizablePreferences-" + this._locale]) {
       for (let key of enumerate(this._ini.getKeys("LocalizablePreferences-" + this._locale))) {
         try {
-          let value = eval(this._ini.getString("LocalizablePreferences-" + this._locale, key));
+          let value = parseValue(this._ini.getString("LocalizablePreferences-" + this._locale, key));
           if (value !== undefined) {
             localizedStr.data = "data:text/plain," + key + "=" + value;
             defaults.setComplexValue(key, Ci.nsIPrefLocalizedString, localizedStr);
@@ -393,7 +393,7 @@ DistributionCustomizer.prototype = {
           continue;
         }
         try {
-          let value = eval(this._ini.getString("LocalizablePreferences-" + this._language, key));
+          let value = parseValue(this._ini.getString("LocalizablePreferences-" + this._language, key));
           if (value !== undefined) {
             localizedStr.data = "data:text/plain," + key + "=" + value;
             defaults.setComplexValue(key, Ci.nsIPrefLocalizedString, localizedStr);
@@ -409,7 +409,7 @@ DistributionCustomizer.prototype = {
           continue;
         }
         try {
-          let value = eval(this._ini.getString("LocalizablePreferences", key));
+          let value = parseValue(this._ini.getString("LocalizablePreferences", key));
           if (value !== undefined) {
             value = value.replace(/%LOCALE%/g, this._locale);
             value = value.replace(/%LANGUAGE%/g, this._language);
@@ -433,6 +433,19 @@ DistributionCustomizer.prototype = {
     }
   }
 };
+
+function parseValue(value) {
+  try {
+    value = JSON.parse(value);
+  } catch (e) {
+    // JSON.parse catches numbers and booleans.
+    // Anything else, we assume is a string.
+    // Remove the quotes that aren't needed anymore.
+    value = value.replace(/^"/, "");
+    value = value.replace(/"$/, "");
+  }
+  return value;
+}
 
 function* enumerate(UTF8Enumerator) {
   while (UTF8Enumerator.hasMore())
