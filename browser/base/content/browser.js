@@ -5164,6 +5164,14 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
     menuItem.addEventListener("command", onViewToolbarCommand, false);
   }
 
+
+  let moveToPanel = popup.querySelector(".customize-context-moveToPanel");
+  let removeFromToolbar = popup.querySelector(".customize-context-removeFromToolbar");
+  // View -> Toolbars menu doesn't have the moveToPanel or removeFromToolbar items.
+  if (!moveToPanel || !removeFromToolbar) {
+    return;
+  }
+
   // The explicitOriginalTarget can be a nested child element of a toolbaritem.
   let toolbarItem = aEvent.explicitOriginalTarget;
 
