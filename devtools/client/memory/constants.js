@@ -112,7 +112,7 @@ const OBJECT_CLASS = { by: "objectClass", then: COUNT, other: COUNT };
 
 const breakdowns = exports.breakdowns = {
   coarseType: {
-    displayName: "Coarse Type",
+    displayName: "Type",
     get tooltip() {
       // Importing down here is necessary because of the circular dependency
       // this introduces with `./utils.js`.
@@ -133,30 +133,12 @@ const breakdowns = exports.breakdowns = {
   },
 
   allocationStack: {
-    displayName: "Allocation Stack",
+    displayName: "Call Stack",
     get tooltip() {
       const { L10N } = require("./utils");
       return L10N.getStr("breakdowns.allocationStack.tooltip");
     },
     breakdown: ALLOCATION_STACK,
-  },
-
-  objectClass: {
-    displayName: "Object Class",
-    get tooltip() {
-      const { L10N } = require("./utils");
-      return L10N.getStr("breakdowns.objectClass.tooltip");
-    },
-    breakdown: OBJECT_CLASS,
-  },
-
-  internalType: {
-    displayName: "Internal Type",
-    get tooltip() {
-      const { L10N } = require("./utils");
-      return L10N.getStr("breakdowns.internalType.tooltip");
-    },
-    breakdown: INTERNAL_TYPE,
   },
 };
 
@@ -177,7 +159,7 @@ const DOMINATOR_TREE_LABEL_COARSE_TYPE = {
 
 const dominatorTreeBreakdowns = exports.dominatorTreeBreakdowns = {
   coarseType: {
-    displayName: "Coarse Type",
+    displayName: "Type",
     get tooltip() {
       const { L10N } = require("./utils");
       return L10N.getStr("dominatorTreeBreakdowns.coarseType.tooltip");
@@ -186,7 +168,7 @@ const dominatorTreeBreakdowns = exports.dominatorTreeBreakdowns = {
   },
 
   allocationStack: {
-    displayName: "Allocation Stack",
+    displayName: "Call Stack",
     get tooltip() {
       const { L10N } = require("./utils");
       return L10N.getStr("dominatorTreeBreakdowns.allocationStack.tooltip");
@@ -196,15 +178,6 @@ const dominatorTreeBreakdowns = exports.dominatorTreeBreakdowns = {
       then: DOMINATOR_TREE_LABEL_COARSE_TYPE,
       noStack: DOMINATOR_TREE_LABEL_COARSE_TYPE,
     },
-  },
-
-  internalType: {
-    displayName: "Internal Type",
-    get tooltip() {
-      const { L10N } = require("./utils");
-      return L10N.getStr("dominatorTreeBreakdowns.internalType.tooltip");
-    },
-    breakdown: INTERNAL_TYPE,
   },
 };
 
