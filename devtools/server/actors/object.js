@@ -1469,9 +1469,6 @@ DebuggerServer.ObjectActorPreviewers.Object = [
       preview.attributesLength = rawObj.attributes.length;
       for (let attr of rawObj.attributes) {
         preview.attributes[attr.nodeName] = hooks.createValueGrip(attr.value);
-        if (++i == OBJECT_PREVIEW_MAX_ITEMS) {
-          break;
-        }
       }
     } else if (rawObj instanceof Ci.nsIDOMAttr) {
       preview.value = hooks.createValueGrip(rawObj.value);
