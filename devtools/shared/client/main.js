@@ -451,7 +451,7 @@ DebuggerClient.prototype = {
         traits: cachedTab.traits,
       };
       DevToolsUtils.executeSoon(() => aOnResponse(cachedResponse, cachedTab));
-      return;
+      return promise.resolve([cachedResponse, cachedTab]);
     }
 
     let packet = {
@@ -472,12 +472,13 @@ DebuggerClient.prototype = {
   attachWorker: function DC_attachWorker(aWorkerActor, aOnResponse = noop) {
     let workerClient = this._clients.get(aWorkerActor);
     if (workerClient !== undefined) {
-      DevToolsUtils.executeSoon(() => aOnResponse({
+      let response = {
         from: workerClient.actor,
         type: "attached",
         url: workerClient.url
-      }, workerClient));
-      return;
+      };
+      DevToolsUtils.executeSoon(() => aOnResponse(response, workerClient));
+      return promise.resolve([response, workerClient]);
     }
 
     return this.request({ to: aWorkerActor, type: "attach" }).then(aResponse => {
@@ -567,8 +568,9 @@ DebuggerClient.prototype = {
    */
   attachThread: function (aThreadActor, aOnResponse = noop, aOptions={}) {
     if (this._clients.has(aThreadActor)) {
-      DevToolsUtils.executeSoon(() => aOnResponse({}, this._clients.get(aThreadActor)));
-      return;
+      let client = this._clients.get(aThreadActor);
+      DevToolsUtils.executeSoon(() => aOnResponse({}, client));
+      return promise.resolve([{}, client]);
     }
 
     let packet = {
@@ -597,8 +599,9 @@ DebuggerClient.prototype = {
    */
   attachTracer: function (aTraceActor, aOnResponse = noop) {
     if (this._clients.has(aTraceActor)) {
-      DevToolsUtils.executeSoon(() => aOnResponse({}, this._clients.get(aTraceActor)));
-      return;
+      let client = this._clients.get(aTraceActor);
+      DevToolsUtils.executeSoon(() => aOnResponse({}, client));
+      return promise.resolve([{}, client]);
     }
 
     let packet = {
@@ -1272,7 +1275,7 @@ TabClient.prototype = {
   attachThread: function(aOptions={}, aOnResponse = noop) {
     if (this.thread) {
       DevToolsUtils.executeSoon(() => aOnResponse({}, this.thread));
-      return;
+      return promise.resolve([{}, this.thread]);
     }
 
     let packet = {
@@ -1858,11 +1861,10 @@ ThreadClient.prototype = {
     // If the debuggee is paused, we have to send the flag via a reconfigure
     // request.
     if (this.paused) {
-      this.reconfigure({
+      return this.reconfigure({
         pauseOnExceptions: aPauseOnExceptions,
         ignoreCaughtExceptions: aIgnoreCaughtExceptions
       }, aOnResponse);
-      return;
     }
     // Otherwise send the flag using a standard resume request.
     return this.interrupt(aResponse => {
