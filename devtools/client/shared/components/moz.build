@@ -6,6 +6,7 @@
 
 DevToolsModules(
     'frame.js',
+    'h-split-box.js',
     'tree.js',
 )
 
