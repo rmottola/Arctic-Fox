@@ -2988,6 +2988,7 @@ protected:
     InitializeOnMainThread();
 
     nsString mMessage;
+    nsString mMessageName;
     nsString mSourceName;
     uint32_t mLineNumber;
     nsString mSourceLine;
