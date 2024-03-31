@@ -3422,8 +3422,7 @@ PreliminaryObjectArray::sweep()
 void
 PreliminaryObjectArrayWithTemplate::trace(JSTracer* trc)
 {
-    if (shape_)
-        TraceEdge(trc, &shape_, "PreliminaryObjectArrayWithTemplate_shape");
+    TraceNullableEdge(trc, &shape_, "PreliminaryObjectArrayWithTemplate_shape");
 }
 
 /* static */ void
@@ -3993,15 +3992,9 @@ void
 TypeNewScript::trace(JSTracer* trc)
 {
     TraceEdge(trc, &function_, "TypeNewScript_function");
-
-    if (templateObject_)
-        TraceEdge(trc, &templateObject_, "TypeNewScript_templateObject");
-
-    if (initializedShape_)
-        TraceEdge(trc, &initializedShape_, "TypeNewScript_initializedShape");
-
-    if (initializedGroup_)
-        TraceEdge(trc, &initializedGroup_, "TypeNewScript_initializedGroup");
+    TraceNullableEdge(trc, &templateObject_, "TypeNewScript_templateObject");
+    TraceNullableEdge(trc, &initializedShape_, "TypeNewScript_initializedShape");
+    TraceNullableEdge(trc, &initializedGroup_, "TypeNewScript_initializedGroup");
 }
 
 /* static */ void
