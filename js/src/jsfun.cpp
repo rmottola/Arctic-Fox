@@ -1178,7 +1178,7 @@ JSString*
 fun_toStringHelper(JSContext* cx, HandleObject obj, unsigned indent)
 {
     if (!obj->is<JSFunction>()) {
-        if (JSFunToStringOp op = obj->getOps()->funToString)
+        if (JSFunToStringOp op = obj->getOpsFunToString())
             return op(cx, obj, indent);
 
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
