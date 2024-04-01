@@ -5652,7 +5652,7 @@ GetTemplateObjectForNative(JSContext* cx, JSFunction* target, const CallArgs& ar
         }
     }
 
-    if (native == js::array_concat || native == js::array_slice) {
+    if (native == js::array_slice) {
         if (args.thisv().isObject()) {
             JSObject* obj = &args.thisv().toObject();
             if (!obj->isSingleton()) {
