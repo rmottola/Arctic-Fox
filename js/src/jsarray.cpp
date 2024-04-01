@@ -3316,6 +3316,16 @@ array_proto_finish(JSContext* cx, JS::HandleObject ctor, JS::HandleObject proto)
     return DefineProperty(cx, proto, id, value, nullptr, nullptr, JSPROP_READONLY);
 }
 
+static const ClassSpec ArrayObjectClassSpec = {
+    GenericCreateConstructor<ArrayConstructor, 1, AllocKind::FUNCTION, &jit::JitInfo_Array>,
+    CreateArrayPrototype,
+    array_static_methods,
+    nullptr,
+    array_methods,
+    nullptr,
+    array_proto_finish
+};
+
 const Class ArrayObject::class_ = {
     "Array",
     JSCLASS_HAS_CACHED_PROTO(JSProto_Array) | JSCLASS_DELAY_METADATA_CALLBACK,
@@ -3331,15 +3341,7 @@ const Class ArrayObject::class_ = {
     nullptr, /* hasInstance */
     nullptr, /* construct */
     nullptr, /* trace */
-    {
-        GenericCreateConstructor<ArrayConstructor, 1, AllocKind::FUNCTION, &jit::JitInfo_Array>,
-        CreateArrayPrototype,
-        array_static_methods,
-        nullptr,
-        array_methods,
-        nullptr,
-        array_proto_finish
-    }
+    &ArrayObjectClassSpec
 };
 
 /*
