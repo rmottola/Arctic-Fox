@@ -404,7 +404,7 @@ private:
 
     mFinishedWorker->DisableDebugger();
 
-    runtime->UnregisterWorker(aCx, mFinishedWorker);
+    runtime->UnregisterWorker(mFinishedWorker);
 
     mFinishedWorker->ClearSelfRef();
     return true;
@@ -435,12 +435,9 @@ private:
     RuntimeService* runtime = RuntimeService::GetService();
     MOZ_ASSERT(runtime);
 
-    AutoSafeJSContext cx;
-    JSAutoRequest ar(cx);
-
     mFinishedWorker->DisableDebugger();
 
-    runtime->UnregisterWorker(cx, mFinishedWorker);
+    runtime->UnregisterWorker(mFinishedWorker);
 
     nsCOMPtr<nsILoadGroup> loadGroupToCancel;
     mFinishedWorker->ForgetOverridenLoadGroup(loadGroupToCancel);
@@ -4084,7 +4081,7 @@ WorkerPrivate::Constructor(JSContext* aCx,
     new WorkerPrivate(parent, aScriptURL, aIsChromeWorker,
                       aWorkerType, aWorkerName, *aLoadInfo);
 
-  if (!runtimeService->RegisterWorker(aCx, worker)) {
+  if (!runtimeService->RegisterWorker(worker)) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
