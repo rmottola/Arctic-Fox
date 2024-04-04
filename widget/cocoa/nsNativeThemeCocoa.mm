@@ -7,6 +7,7 @@
 
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Helpers.h"
+#include "nsChildView.h"
 #include "nsDeviceContext.h"
 #include "nsLayoutUtils.h"
 #include "nsObjCExceptions.h"
@@ -3587,7 +3588,8 @@ nsNativeThemeCocoa::GetMinimumWidgetSize(nsPresContext* aPresContext,
 
 NS_IMETHODIMP
 nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType, 
-                                     nsIAtom* aAttribute, bool* aShouldRepaint)
+                                       nsIAtom* aAttribute, bool* aShouldRepaint,
+                                       const nsAttrValue* aOldValue)
 {
   // Some widget types just never change state.
   switch (aWidgetType) {
