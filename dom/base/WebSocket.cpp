@@ -2150,7 +2150,7 @@ public:
   {
   }
 
-  bool Notify(JSContext* aCx, Status aStatus) override
+  bool Notify(Status aStatus) override
   {
     MOZ_ASSERT(aStatus > workers::Running);
 

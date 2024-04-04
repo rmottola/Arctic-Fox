@@ -2663,7 +2663,7 @@ Promise::RemoveFeature()
 }
 
 bool
-PromiseReportRejectFeature::Notify(JSContext* aCx, workers::Status aStatus)
+PromiseReportRejectFeature::Notify(workers::Status aStatus)
 {
   MOZ_ASSERT(aStatus > workers::Running);
   mPromise->MaybeReportRejectedOnce();
@@ -2926,7 +2926,7 @@ PromiseWorkerProxy::RejectedCallback(JSContext* aCx,
 }
 
 bool
-PromiseWorkerProxy::Notify(JSContext* aCx, Status aStatus)
+PromiseWorkerProxy::Notify(Status aStatus)
 {
   if (aStatus >= Canceling) {
     CleanUp();

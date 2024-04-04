@@ -1891,10 +1891,9 @@ XMLHttpRequest::SendInternal(SendRunnable* aRunnable,
 }
 
 bool
-XMLHttpRequest::Notify(JSContext* aCx, Status aStatus)
+XMLHttpRequest::Notify(Status aStatus)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
-  MOZ_ASSERT(mWorkerPrivate->GetJSContext() == aCx);
 
   if (aStatus >= Canceling && !mCanceled) {
     mCanceled = true;
