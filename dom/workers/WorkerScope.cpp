@@ -811,9 +811,12 @@ const js::Class workerdebuggersandbox_class = {
 void
 WorkerDebuggerGlobalScope::CreateSandbox(JSContext* aCx, const nsAString& aName,
                                          JS::Handle<JSObject*> aPrototype,
-                                         JS::MutableHandle<JSObject*> aResult)
+                                         JS::MutableHandle<JSObject*> aResult,
+                                         ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
+
+  aResult.set(nullptr);
 
   JS::CompartmentOptions options;
   options.creationOptions().setInvisibleToDebugger(true);
@@ -822,8 +825,7 @@ WorkerDebuggerGlobalScope::CreateSandbox(JSContext* aCx, const nsAString& aName,
     JS_NewGlobalObject(aCx, js::Jsvalify(&workerdebuggersandbox_class), nullptr,
                        JS::DontFireOnNewGlobalHook, options));
   if (!sandbox) {
-    JS_ReportError(aCx, "Can't create sandbox!");
-    aResult.set(nullptr);
+    aRv.NoteJSContextException(aCx);
     return;
   }
 
@@ -832,14 +834,12 @@ WorkerDebuggerGlobalScope::CreateSandbox(JSContext* aCx, const nsAString& aName,
 
     JS::Rooted<JSObject*> prototype(aCx, aPrototype);
     if (!JS_WrapObject(aCx, &prototype)) {
-      JS_ReportError(aCx, "Can't wrap sandbox prototype!");
-      aResult.set(nullptr);
+      aRv.NoteJSContextException(aCx);
       return;
     }
 
     if (!JS_SetPrototype(aCx, sandbox, prototype)) {
-      JS_ReportError(aCx, "Can't set sandbox prototype!");
-      aResult.set(nullptr);
+      aRv.NoteJSContextException(aCx);
       return;
     }
 
@@ -853,8 +853,7 @@ WorkerDebuggerGlobalScope::CreateSandbox(JSContext* aCx, const nsAString& aName,
   JS_FireOnNewGlobalObject(aCx, sandbox);
 
   if (!JS_WrapObject(aCx, &sandbox)) {
-    JS_ReportError(aCx, "Can't wrap sandbox!");
-    aResult.set(nullptr);
+    aRv.NoteJSContextException(aCx);
     return;
   }
 
