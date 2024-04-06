@@ -2507,7 +2507,7 @@ Debugger::updateObservesAsmJSOnDebuggees(IsObserving observing)
 Debugger::cannotTrackAllocations(const GlobalObject& global)
 {
     auto existingCallback = global.compartment()->getAllocationMetadataBuilder();
-    return existingCallback && existingCallback != SavedStacksMetadataBuilder;
+    return existingCallback && existingCallback != &SavedStacks::metadataBuilder;
 }
 
 /* static */ bool
@@ -2537,7 +2537,7 @@ Debugger::addAllocationsTracking(JSContext* cx, Handle<GlobalObject*> debuggee)
         return false;
     }
 
-    debuggee->compartment()->setAllocationMetadataBuilder(SavedStacksMetadataBuilder);
+    debuggee->compartment()->setAllocationMetadataBuilder(&SavedStacks::metadataBuilder);
     debuggee->compartment()->chooseAllocationSamplingProbability();
     return true;
 }
