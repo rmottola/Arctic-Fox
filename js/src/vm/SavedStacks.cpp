@@ -1430,7 +1430,8 @@ SavedStacks::chooseSamplingProbability(JSCompartment* compartment)
 }
 
 JSObject*
-SavedStacks::MetadataBuilder::build(JSContext* cx, HandleObject target) const
+SavedStacks::MetadataBuilder::build(JSContext* cx, HandleObject target,
+                                    AutoEnterOOMUnsafeRegion& oomUnsafe) const
 {
     RootedObject obj(cx, target);
 
@@ -1438,7 +1439,6 @@ SavedStacks::MetadataBuilder::build(JSContext* cx, HandleObject target) const
     if (!stacks.bernoulli.trial())
         return nullptr;
 
-    AutoEnterOOMUnsafeRegion oomUnsafe;
     RootedSavedFrame frame(cx);
     if (!stacks.saveCurrentStack(cx, &frame))
         oomUnsafe.crash("SavedStacksMetadataBuilder");
