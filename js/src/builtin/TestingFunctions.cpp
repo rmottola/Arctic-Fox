@@ -1684,6 +1684,8 @@ DisplayName(JSContext* cx, unsigned argc, Value* vp)
 
 class ShellAllocationMetadataBuilder : public AllocationMetadataBuilder {
   public:
+    ShellAllocationMetadataBuilder() : AllocationMetadataBuilder() { }
+
     virtual JSObject* build(JSContext *cx, HandleObject,
                             AutoEnterOOMUnsafeRegion& oomUnsafe) const override;
 
