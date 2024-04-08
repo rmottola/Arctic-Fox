@@ -3188,7 +3188,7 @@ CreateArrayPrototype(JSContext* cx, JSProtoKey key)
 static bool
 array_proto_finish(JSContext* cx, JS::HandleObject ctor, JS::HandleObject proto)
 {
-    // Add Array.prototype[@@unscopables]. ECMA-262 6.0 22.1.3.31.
+    // Add Array.prototype[@@unscopables]. ECMA-262 draft (2016 Mar 19) 22.1.3.32.
     RootedObject unscopables(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr, TenuredObject));
     if (!unscopables)
         return false;
