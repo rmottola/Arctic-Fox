@@ -2420,6 +2420,8 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
     sweepTypesAfterCompacting(zone);
     zone->sweepBreakpoints(fop);
     zone->sweepWeakMaps();
+    for (auto* cache : zone->weakCaches_)
+        cache->sweep();
 
     for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
         c->sweepInnerViews();
@@ -5130,6 +5132,9 @@ GCRuntime::beginSweepingZoneGroup()
                 *edge = nullptr;
         }
         zone->gcWeakRefs.clear();
+
+        for (JS::WeakCache<void*>* cache : zone->weakCaches_)
+            cache->sweep();
 
         /* No need to look up any more weakmap keys from this zone group. */
         AutoEnterOOMUnsafeRegion oomUnsafe;
