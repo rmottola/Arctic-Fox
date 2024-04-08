@@ -374,7 +374,6 @@ IDBRequest::SetResultCallback(ResultCallback* aCallback)
       return;
     }
   }
-  autoJS.TakeOwnershipOfErrorReporting();
 
   JSContext* cx = autoJS.cx();
 

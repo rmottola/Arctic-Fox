@@ -901,7 +901,6 @@ ExtendableEvent::GetPromise()
   if (!jsapi.Init(globalObj)) {
     return nullptr;
   }
-  jsapi.TakeOwnershipOfErrorReporting();
   JSContext* cx = jsapi.cx();
 
   GlobalObject global(cx, globalObj->GetGlobalJSObject());
