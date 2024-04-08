@@ -566,14 +566,6 @@ class FunctionCompiler
         curBlock_->add(store);
     }
 
-    void memoryBarrier(MemoryBarrierBits type)
-    {
-        if (inDeadCode())
-            return;
-        MMemoryBarrier* ins = MMemoryBarrier::New(alloc(), type);
-        curBlock_->add(ins);
-    }
-
     MDefinition* atomicLoadHeap(MDefinition* base, const MAsmJSHeapAccess& access)
     {
         if (inDeadCode())
@@ -3091,10 +3083,6 @@ EmitExpr(FunctionCompiler& f, MDefinition** def)
                           SimdSign::Unsigned, def);
 
       // Atomics
-      case Expr::AtomicsFence:
-        *def = nullptr;
-        f.memoryBarrier(MembarFull);
-        return true;
       case Expr::I32AtomicsCompareExchange:
         return EmitAtomicsCompareExchange(f, def);
       case Expr::I32AtomicsExchange:

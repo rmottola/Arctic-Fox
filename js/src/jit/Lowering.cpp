@@ -4220,13 +4220,6 @@ LIRGenerator::visitRecompileCheck(MRecompileCheck* ins)
 }
 
 void
-LIRGenerator::visitMemoryBarrier(MMemoryBarrier* ins)
-{
-    LMemoryBarrier* lir = new(alloc()) LMemoryBarrier(ins->type());
-    add(lir, ins);
-}
-
-void
 LIRGenerator::visitSimdBox(MSimdBox* ins)
 {
     MOZ_ASSERT(IsSimdType(ins->input()->type()));
