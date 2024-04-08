@@ -1083,9 +1083,9 @@ class HashTable : private AllocPolicy
     static const size_t CAP_BITS = 30;
 
   public:
-    Entry*      table;                 // entry storage
-    uint32_t    gen:24;                 // entry storage generation number
-    uint32_t    hashShift:8;            // multiplicative hash shift
+    uint64_t    gen:56;                 // entry storage generation number
+    uint64_t    hashShift:8;            // multiplicative hash shift
+    Entry*      table;                  // entry storage
     uint32_t    entryCount;             // number of entries in table
     uint32_t    removedCount;           // removed entry sentinels in table
 
@@ -1182,9 +1182,9 @@ class HashTable : private AllocPolicy
   public:
     explicit HashTable(AllocPolicy ap)
       : AllocPolicy(ap)
-      , table(nullptr)
       , gen(0)
       , hashShift(sHashBits)
+      , table(nullptr)
       , entryCount(0)
       , removedCount(0)
 #ifdef JS_DEBUG
