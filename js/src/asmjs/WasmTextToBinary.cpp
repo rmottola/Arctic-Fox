@@ -3307,6 +3307,9 @@ ResolveBranch(Resolver& r, WasmAstBranch& br)
     if (!r.resolveBranchTarget(br.target()))
         return false;
 
+    if (br.maybeValue() && !ResolveExpr(r, *br.maybeValue()))
+        return false;
+
     if (br.expr() == Expr::BrIf) {
         if (!ResolveExpr(r, br.cond()))
             return false;
