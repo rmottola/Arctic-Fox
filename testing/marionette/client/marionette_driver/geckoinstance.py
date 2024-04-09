@@ -173,6 +173,46 @@ class B2GDesktopInstance(GeckoInstance):
         self.prefs["focusmanager.testmode"] = True
         self.app_args += ['-chrome', 'chrome://b2g/content/shell.html']
 
+
+class DesktopInstance(GeckoInstance):
+    desktop_prefs = {
+        'app.update.auto': False,
+        'app.update.enabled': False,
+        'browser.dom.window.dump.enabled': True,
+        # Bug 1145668 - Has to be reverted to about:blank once Marionette
+        # can correctly handle error pages
+        'browser.newtab.url': 'about:newtab',
+        'browser.newtabpage.enabled': False,
+        'browser.reader.detectedFirstArticle': True,
+        'browser.safebrowsing.enabled': False,
+        'browser.safebrowsing.forbiddenURIs.enabled': False,
+        'browser.safebrowsing.malware.enabled': False,
+        'browser.safebrowsing.blockedURIs.enabled': False,
+        'browser.search.update': False,
+        'browser.tabs.animate': False,
+        'browser.tabs.warnOnClose': False,
+        'browser.tabs.warnOnOpen': False,
+        'browser.uitour.enabled': False,
+        'dom.report_all_js_exceptions': True,
+        'extensions.getAddons.cache.enabled': False,
+        'extensions.installDistroAddons': False,
+        'extensions.showMismatchUI': False,
+        'extensions.update.enabled': False,
+        'extensions.update.notifyUser': False,
+        'geo.provider.testing': True,
+        'javascript.options.showInConsole': True,
+        'privacy.trackingprotection.enabled': False,
+        'privacy.trackingprotection.pbmode.enabled': False,
+        'security.notification_enable_delay': 0,
+        'signon.rememberSignons': False,
+        'toolkit.startup.max_resumed_crashes': -1,
+    }
+
+    def __init__(self, *args, **kwargs):
+        super(DesktopInstance, self).__init__(*args, **kwargs)
+        self.required_prefs.update(DesktopInstance.desktop_prefs)
+
+
 class NullOutput(object):
     def __call__(self, line):
         pass
