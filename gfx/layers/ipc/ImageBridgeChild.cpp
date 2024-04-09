@@ -236,7 +236,7 @@ static void ImageBridgeShutdownStep1(ReentrantMonitor *aBarrier, bool *aDone)
     }
     sImageBridgeChildSingleton->FallbackDestroyActors();
 
-    sImageBridgeChildSingleton->SendWillStop();
+    sImageBridgeChildSingleton->SendWillClose();
     sImageBridgeChildSingleton->MarkShutDown();
     // From now on, no message can be sent through the image bridge from the
     // client side except the final Stop message.
@@ -254,7 +254,7 @@ static void ImageBridgeShutdownStep2(ReentrantMonitor *aBarrier, bool *aDone)
   MOZ_ASSERT(InImageBridgeChildThread(),
              "Should be in ImageBridgeChild thread.");
 
-  sImageBridgeChildSingleton->SendStop();
+  sImageBridgeChildSingleton->Close();
 
   *aDone = true;
   aBarrier->NotifyAll();
