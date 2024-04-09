@@ -207,6 +207,8 @@ public:
 
   virtual void Destroy() override;
 
+  virtual void DetachWidget() override { mWidget = nullptr; }
+
   virtual TextureFactoryIdentifier GetTextureFactoryIdentifier() override
   {
     TextureFactoryIdentifier result =

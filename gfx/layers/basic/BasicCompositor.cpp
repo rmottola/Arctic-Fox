@@ -121,10 +121,12 @@ BasicCompositingRenderTarget::BindRenderTarget()
   }
 }
 
-void BasicCompositor::Destroy()
+void BasicCompositor::DetachWidget()
 {
-  mWidget->CleanupRemoteDrawing();
-  mWidget = nullptr;
+  if (mWidget) {
+    mWidget->CleanupRemoteDrawing();
+    mWidget = nullptr;
+  }
 }
 
 TextureFactoryIdentifier
