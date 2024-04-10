@@ -1143,7 +1143,8 @@ ArrayJoinKernel(JSContext* cx, SeparatorOp sepOp, HandleObject obj, uint32_t len
                     RootedValue fun(cx);
                     if (!GetProperty(cx, v, cx->names().toLocaleString, &fun))
                         return false;
-                    if (!Invoke(cx, v, fun, 0, nullptr, &v))
+
+                    if (!Call(cx, fun, v, &v))
                         return false;
                 }
                 if (!ValueToStringBuffer(cx, v, sb))
@@ -1832,8 +1833,7 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    RootedValue fvalRoot(cx);
-    Value& fval = fvalRoot.get();
+    RootedValue fval(cx);
 
     if (args.hasDefined(0)) {
         if (args[0].isPrimitive()) {
@@ -1870,20 +1870,7 @@ js::array_sort(JSContext* cx, unsigned argc, Value* vp)
         MOZ_ASSERT(selfHostedSortValue.isObject());
         MOZ_ASSERT(selfHostedSortValue.toObject().is<JSFunction>());
 
-        InvokeArgs iargs(cx);
-
-        if (!iargs.init(1))
-            return false;
-
-        iargs.setCallee(selfHostedSortValue);
-        iargs.setThis(args.thisv());
-        iargs[0].set(fval);
-
-        if (!Invoke(cx, iargs))
-            return false;
-
-        args.rval().set(iargs.rval());
-        return true;
+        return Call(cx, selfHostedSortValue, args.thisv(), fval, args.rval());
     }
 
     uint32_t len;
