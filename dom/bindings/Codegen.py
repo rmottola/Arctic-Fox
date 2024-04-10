@@ -12431,10 +12431,12 @@ class CGDictionary(CGThing):
             methods.append(self.initIdsMethod())
 
         methods.append(self.initMethod())
-        methods.append(self.initFromJSONMethod())
+        canBeRepresentedAsJSON = self.dictionarySafeToJSONify(self.dictionary)
+        if canBeRepresentedAsJSON:
+            methods.append(self.initFromJSONMethod())
         try:
             methods.append(self.toObjectInternalMethod())
-            if self.dictionarySafeToJSONify(self.dictionary):
+            if canBeRepresentedAsJSON:
                 methods.append(self.toJSONMethod())
         except MethodNotNewObjectError:
             # If we can't have a ToObjectInternal() because one of our members
