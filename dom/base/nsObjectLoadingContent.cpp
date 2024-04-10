@@ -1249,12 +1249,6 @@ nsObjectLoadingContent::SetIsPrerendered()
 }
 
 NS_IMETHODIMP
-nsObjectLoadingContent::SwapFrameLoaders(nsIFrameLoaderOwner* aOtherLoader)
-{
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
 nsObjectLoadingContent::GetActualType(nsACString& aType)
 {
   aType = mContentType;
@@ -1663,7 +1657,7 @@ nsObjectLoadingContent::CheckProcessPolicy(int16_t *aContentPolicy)
   NS_ASSERTION(thisContent, "Must be an instance of content");
 
   nsIDocument* doc = thisContent->OwnerDoc();
-  
+
   int32_t objectType;
   switch (mType) {
     case eType_Image:
@@ -2930,7 +2924,7 @@ nsObjectLoadingContent::PluginCrashed(nsIPluginTag* aPluginTag,
 
   // send nsPluginCrashedEvent
 
-  // Note that aPluginTag in invalidated after we're called, so copy 
+  // Note that aPluginTag in invalidated after we're called, so copy
   // out any data we need now.
   nsAutoCString pluginName;
   aPluginTag->GetName(pluginName);
@@ -3842,4 +3836,3 @@ nsObjectLoadingContent::SetupProtoChainRunner::Run()
 }
 
 NS_IMPL_ISUPPORTS(nsObjectLoadingContent::SetupProtoChainRunner, nsIRunnable)
-
