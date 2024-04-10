@@ -12267,8 +12267,15 @@ class CGDictionary(CGThing):
             "Init", "bool",
             [Argument('const nsAString&', 'aJSON')],
             body=dedent("""
-                MOZ_ASSERT(NS_IsMainThread());
-                AutoSafeJSContext cx;
+                AutoJSAPI jsapi;
+                JSObject* cleanGlobal = SimpleGlobalObject::Create(SimpleGlobalObject::GlobalType::BindingDetail);
+                if (!cleanGlobal) {
+                  return false;
+                }
+                if (!jsapi.Init(cleanGlobal)) {
+                  return false;
+                }
+                JSContext* cx = jsapi.cx();
                 JS::Rooted<JS::Value> json(cx);
                 bool ok = ParseJSON(cx, aJSON, &json);
                 NS_ENSURE_TRUE(ok, false);
@@ -13324,6 +13331,8 @@ class CGBindingRoot(CGThing):
             return any(m.getExtendedAttribute("UseCounter") for m in iface.members)
         bindingHeaders["mozilla/UseCounter.h"] = any(
             descriptorRequiresTelemetry(d) for d in descriptors)
+        bindingHeaders["mozilla/dom/SimpleGlobalObject.h"] = any(
+            CGDictionary.dictionarySafeToJSONify(d) for d in dictionaries)
 
         cgthings.extend(traverseMethods)
         cgthings.extend(unlinkMethods)
