@@ -1051,9 +1051,10 @@ protected:
     // stderr as a warning.
     nsresult origStatus = static_cast<nsresult>(aRv.ErrorCodeAsInt());
 
-    // Ensure that we only surface SecurityErr or TypeErr to script.
+    // Ensure that we only surface SecurityErr, TypeErr or InvalidStateErr to script.
     if (aRv.Failed() && !aRv.ErrorCodeIs(NS_ERROR_DOM_SECURITY_ERR) &&
-                        !aRv.ErrorCodeIs(NS_ERROR_DOM_TYPE_ERR)) {
+                        !aRv.ErrorCodeIs(NS_ERROR_DOM_TYPE_ERR) &&
+                        !aRv.ErrorCodeIs(NS_ERROR_DOM_INVALID_STATE_ERR)) {
 
       // Remove the old error code so we can replace it with a TypeError.
       aRv.SuppressException();
@@ -1350,6 +1351,18 @@ public:
         // Do nothing here, but since mRegistration is nullptr we will
         // trigger the async Fail() call below.
         MOZ_ASSERT(!mRegistration);
+      }
+
+      // "If registration's uninstalling flag is set, abort these steps."
+      if (mRegistration && mRegistration->mPendingUninstall) {
+        nsCOMPtr<nsIRunnable> runnable =
+          NS_NewRunnableMethodWithArg<nsresult>(
+            this,
+            &ServiceWorkerRegisterJob::Fail,
+            NS_ERROR_DOM_INVALID_STATE_ERR);
+          MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToCurrentThread(runnable)));
+
+        return;
       }
 
       // If a different script spec has been registered between when this update
@@ -3888,11 +3901,6 @@ ServiceWorkerManager::Update(nsIPrincipal* aPrincipal,
   RefPtr<ServiceWorkerRegistrationInfo> registration =
     GetRegistration(scopeKey, aScope);
   if (NS_WARN_IF(!registration)) {
-    return;
-  }
-
-  // "If registration's uninstalling flag is set, abort these steps."
-  if (registration->mPendingUninstall) {
     return;
   }
 
