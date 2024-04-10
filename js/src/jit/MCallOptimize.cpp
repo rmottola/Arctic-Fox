@@ -1811,7 +1811,7 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
     // This is called from Self-hosted JS, after testing each argument,
     // most of following tests should be passed.
 
-    if (callInfo.argc() != 4 || callInfo.constructing()) {
+    if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
         return InliningStatus_NotInlined;
     }
@@ -1819,7 +1819,6 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
     MDefinition* rxArg = callInfo.getArg(0);
     MDefinition* strArg = callInfo.getArg(1);
     MDefinition* lastIndexArg = callInfo.getArg(2);
-    MDefinition* stickyArg = callInfo.getArg(3);
 
     if (rxArg->type() != MIRType_Object)
         return InliningStatus_NotInlined;
@@ -1835,9 +1834,6 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
 
-    if (stickyArg->type() != MIRType_Boolean)
-        return InliningStatus_NotInlined;
-
     JSContext* cx = GetJitContext()->cx;
     if (!cx->compartment()->jitCompartment()->ensureRegExpMatcherStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
@@ -1846,7 +1842,7 @@ IonBuilder::inlineRegExpMatcher(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* matcher = MRegExpMatcher::New(alloc(), rxArg, strArg, lastIndexArg, stickyArg);
+    MInstruction* matcher = MRegExpMatcher::New(alloc(), rxArg, strArg, lastIndexArg);
     current->add(matcher);
     current->push(matcher);
 
@@ -1865,7 +1861,7 @@ IonBuilder::inlineRegExpSearcher(CallInfo& callInfo)
     // This is called from Self-hosted JS, after testing each argument,
     // most of following tests should be passed.
 
-    if (callInfo.argc() != 4 || callInfo.constructing()) {
+    if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
         return InliningStatus_NotInlined;
     }
@@ -1873,7 +1869,6 @@ IonBuilder::inlineRegExpSearcher(CallInfo& callInfo)
     MDefinition* rxArg = callInfo.getArg(0);
     MDefinition* strArg = callInfo.getArg(1);
     MDefinition* lastIndexArg = callInfo.getArg(2);
-    MDefinition* stickyArg = callInfo.getArg(3);
 
     if (rxArg->type() != MIRType_Object)
         return InliningStatus_NotInlined;
@@ -1889,9 +1884,6 @@ IonBuilder::inlineRegExpSearcher(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
 
-    if (stickyArg->type() != MIRType_Boolean)
-        return InliningStatus_NotInlined;
-
     JSContext* cx = GetJitContext()->cx;
     if (!cx->compartment()->jitCompartment()->ensureRegExpSearcherStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
@@ -1900,7 +1892,7 @@ IonBuilder::inlineRegExpSearcher(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* searcher = MRegExpSearcher::New(alloc(), rxArg, strArg, lastIndexArg, stickyArg);
+    MInstruction* searcher = MRegExpSearcher::New(alloc(), rxArg, strArg, lastIndexArg);
     current->add(searcher);
     current->push(searcher);
 
@@ -1919,7 +1911,7 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
     // This is called from Self-hosted JS, after testing each argument,
     // most of following tests should be passed.
 
-    if (callInfo.argc() != 4 || callInfo.constructing()) {
+    if (callInfo.argc() != 3 || callInfo.constructing()) {
         trackOptimizationOutcome(TrackedOutcome::CantInlineNativeBadForm);
         return InliningStatus_NotInlined;
     }
@@ -1927,7 +1919,6 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
     MDefinition* rxArg = callInfo.getArg(0);
     MDefinition* strArg = callInfo.getArg(1);
     MDefinition* lastIndexArg = callInfo.getArg(2);
-    MDefinition* stickyArg = callInfo.getArg(3);
 
     if (rxArg->type() != MIRType_Object)
         return InliningStatus_NotInlined;
@@ -1943,9 +1934,6 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
     if (lastIndexArg->type() != MIRType_Int32)
         return InliningStatus_NotInlined;
 
-    if (stickyArg->type() != MIRType_Boolean)
-        return InliningStatus_NotInlined;
-
     JSContext* cx = GetJitContext()->cx;
     if (!cx->compartment()->jitCompartment()->ensureRegExpTesterStubExists(cx)) {
         cx->clearPendingException(); // OOM or overrecursion.
@@ -1954,7 +1942,7 @@ IonBuilder::inlineRegExpTester(CallInfo& callInfo)
 
     callInfo.setImplicitlyUsedUnchecked();
 
-    MInstruction* tester = MRegExpTester::New(alloc(), rxArg, strArg, lastIndexArg, stickyArg);
+    MInstruction* tester = MRegExpTester::New(alloc(), rxArg, strArg, lastIndexArg);
     current->add(tester);
     current->push(tester);
 

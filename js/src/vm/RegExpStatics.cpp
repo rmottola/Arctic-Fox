@@ -86,7 +86,7 @@ RegExpStatics::executeLazy(JSContext* cx)
 
     /* Execute the full regular expression. */
     RootedLinearString input(cx, matchesInput);
-    RegExpRunStatus status = g->execute(cx, input, lazyIndex, lazySticky, &this->matches, nullptr);
+    RegExpRunStatus status = g->execute(cx, input, lazyIndex, &this->matches, nullptr);
     if (status == RegExpRunStatus_Error)
         return false;
 

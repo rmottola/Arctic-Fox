@@ -7883,22 +7883,19 @@ class MRegExp : public MNullaryInstruction
 };
 
 class MRegExpMatcher
-  : public MAryInstruction<4>,
-    public Mix4Policy<ObjectPolicy<0>,
+  : public MAryInstruction<3>,
+    public Mix3Policy<ObjectPolicy<0>,
                       StringPolicy<1>,
-                      IntPolicy<2>,
-                      BooleanPolicy<3> >::Data
+                      IntPolicy<2> >::Data
 {
   private:
 
-    MRegExpMatcher(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex,
-                   MDefinition* sticky)
-      : MAryInstruction<4>()
+    MRegExpMatcher(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex)
+      : MAryInstruction<3>()
     {
         initOperand(0, regexp);
         initOperand(1, string);
         initOperand(2, lastIndex);
-        initOperand(3, sticky);
 
         setMovable();
         // May be object or null.
@@ -7909,9 +7906,9 @@ class MRegExpMatcher
     INSTRUCTION_HEADER(RegExpMatcher)
 
     static MRegExpMatcher* New(TempAllocator& alloc, MDefinition* regexp, MDefinition* string,
-                               MDefinition* lastIndex, MDefinition* sticky)
+                               MDefinition* lastIndex)
     {
-        return new(alloc) MRegExpMatcher(regexp, string, lastIndex, sticky);
+        return new(alloc) MRegExpMatcher(regexp, string, lastIndex);
     }
 
     MDefinition* regexp() const {
@@ -7922,9 +7919,6 @@ class MRegExpMatcher
     }
     MDefinition* lastIndex() const {
         return getOperand(2);
-    }
-    MDefinition* sticky() const {
-        return getOperand(3);
     }
 
     bool writeRecoverData(CompactBufferWriter& writer) const override;
@@ -7939,22 +7933,19 @@ class MRegExpMatcher
 };
 
 class MRegExpSearcher
-  : public MAryInstruction<4>,
-    public Mix4Policy<ObjectPolicy<0>,
+  : public MAryInstruction<3>,
+    public Mix3Policy<ObjectPolicy<0>,
                       StringPolicy<1>,
-                      IntPolicy<2>,
-                      BooleanPolicy<3> >::Data
+                      IntPolicy<2> >::Data
 {
   private:
 
-    MRegExpSearcher(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex,
-                    MDefinition* sticky)
-      : MAryInstruction<4>()
+    MRegExpSearcher(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex)
+      : MAryInstruction<3>()
     {
         initOperand(0, regexp);
         initOperand(1, string);
         initOperand(2, lastIndex);
-        initOperand(3, sticky);
 
         setMovable();
         setResultType(MIRType_Int32);
@@ -7964,9 +7955,9 @@ class MRegExpSearcher
     INSTRUCTION_HEADER(RegExpSearcher)
 
     static MRegExpSearcher* New(TempAllocator& alloc, MDefinition* regexp, MDefinition* string,
-                                MDefinition* lastIndex, MDefinition* sticky)
+                                MDefinition* lastIndex)
     {
-        return new(alloc) MRegExpSearcher(regexp, string, lastIndex, sticky);
+        return new(alloc) MRegExpSearcher(regexp, string, lastIndex);
     }
 
     MDefinition* regexp() const {
@@ -7977,9 +7968,6 @@ class MRegExpSearcher
     }
     MDefinition* lastIndex() const {
         return getOperand(2);
-    }
-    MDefinition* sticky() const {
-        return getOperand(3);
     }
 
     bool writeRecoverData(CompactBufferWriter& writer) const override;
@@ -7994,22 +7982,19 @@ class MRegExpSearcher
 };
 
 class MRegExpTester
-  : public MAryInstruction<4>,
-    public Mix4Policy<ObjectPolicy<0>,
+  : public MAryInstruction<3>,
+    public Mix3Policy<ObjectPolicy<0>,
                       StringPolicy<1>,
-                      IntPolicy<2>,
-                      BooleanPolicy<3> >::Data
+                      IntPolicy<2> >::Data
 {
   private:
 
-    MRegExpTester(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex,
-                  MDefinition* sticky)
-      : MAryInstruction<4>()
+    MRegExpTester(MDefinition* regexp, MDefinition* string, MDefinition* lastIndex)
+      : MAryInstruction<3>()
     {
         initOperand(0, regexp);
         initOperand(1, string);
         initOperand(2, lastIndex);
-        initOperand(3, sticky);
 
         setMovable();
         setResultType(MIRType_Int32);
@@ -8019,9 +8004,9 @@ class MRegExpTester
     INSTRUCTION_HEADER(RegExpTester)
 
     static MRegExpTester* New(TempAllocator& alloc, MDefinition* regexp, MDefinition* string,
-                              MDefinition* lastIndex, MDefinition* sticky)
+                              MDefinition* lastIndex)
     {
-        return new(alloc) MRegExpTester(regexp, string, lastIndex, sticky);
+        return new(alloc) MRegExpTester(regexp, string, lastIndex);
     }
 
     MDefinition* regexp() const {
@@ -8032,9 +8017,6 @@ class MRegExpTester
     }
     MDefinition* lastIndex() const {
         return getOperand(2);
-    }
-    MDefinition* sticky() const {
-        return getOperand(3);
     }
 
     bool possiblyCalls() const override {
