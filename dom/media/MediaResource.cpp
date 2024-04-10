@@ -55,7 +55,7 @@ MediaResource::Destroy()
     delete this;
     return;
   }
-   nsCOMPtr<nsIRunnable> destroyRunnable =
+  nsCOMPtr<nsIRunnable> destroyRunnable =
     NS_NewNonOwningRunnableMethod(this, &MediaResource::Destroy);
   MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(destroyRunnable)));
 }
