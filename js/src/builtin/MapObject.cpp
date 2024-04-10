@@ -502,14 +502,16 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
 
         bool isOriginalAdder = IsNativeFunction(adderVal, MapObject::set);
         RootedValue mapVal(cx, ObjectValue(*obj));
-        FastInvokeGuard fig(cx, adderVal);
+        FastCallGuard fig(cx, adderVal);
         InvokeArgs& args2 = fig.args();
 
         ForOfIterator iter(cx);
         if (!iter.init(args[0]))
             return false;
+
         RootedValue pairVal(cx);
         RootedObject pairObj(cx);
+        RootedValue dummy(cx);
         Rooted<HashableValue> hkey(cx);
         ValueMap* map = obj->getData();
         while (true) {
@@ -550,12 +552,10 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!args2.init(2))
                     return false;
 
-                args2.setCallee(adderVal);
-                args2.setThis(mapVal);
                 args2[0].set(key);
                 args2[1].set(val);
 
-                if (!fig.invoke(cx))
+                if (!fig.call(cx, adderVal, mapVal, &dummy))
                     return false;
             }
         }
@@ -1166,7 +1166,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
 
         bool isOriginalAdder = IsNativeFunction(adderVal, SetObject::add);
         RootedValue setVal(cx, ObjectValue(*obj));
-        FastInvokeGuard fig(cx, adderVal);
+        FastCallGuard fig(cx, adderVal);
         InvokeArgs& args2 = fig.args();
 
         RootedValue keyVal(cx);
@@ -1174,6 +1174,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
         if (!iter.init(args[0]))
             return false;
         Rooted<HashableValue> key(cx);
+        RootedValue dummy(cx);
         ValueSet* set = obj->getData();
         while (true) {
             bool done;
@@ -1194,11 +1195,9 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!args2.init(1))
                     return false;
 
-                args2.setCallee(adderVal);
-                args2.setThis(setVal);
                 args2[0].set(keyVal);
 
-                if (!fig.invoke(cx))
+                if (!fig.call(cx, adderVal, setVal, &dummy))
                     return false;
             }
         }
