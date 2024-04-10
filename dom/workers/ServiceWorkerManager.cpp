@@ -2227,16 +2227,17 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
     if (!data.InsertElementsAt(0, aDataBytes, aDataLength, fallible)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
-    return SendPushEvent(aOriginAttributes, aScope, Some(data));
+    return SendPushEvent(aOriginAttributes, aScope, EmptyString(), Some(data));
   }
   MOZ_ASSERT(optional_argc == 0);
-  return SendPushEvent(aOriginAttributes, aScope, Nothing());
+  return SendPushEvent(aOriginAttributes, aScope, EmptyString(), Nothing());
 }
 
 nsresult
 ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
                                     const nsACString& aScope,
-                                    Maybe<nsTArray<uint8_t>> aData)
+                                    const nsAString& aMessageId,
+                                    const Maybe<nsTArray<uint8_t>>& aData)
 {
 #ifdef MOZ_SIMPLEPUSH
   return NS_ERROR_NOT_AVAILABLE;
@@ -2254,7 +2255,8 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
   RefPtr<ServiceWorkerRegistrationInfo> registration =
     GetRegistration(serviceWorker->GetPrincipal(), aScope);
 
-  return serviceWorker->WorkerPrivate()->SendPushEvent(aData, registration);
+  return serviceWorker->WorkerPrivate()->SendPushEvent(aMessageId, aData,
+                                                       registration);
 #endif // MOZ_SIMPLEPUSH
 }
 

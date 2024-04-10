@@ -3266,7 +3266,8 @@ ContentChild::RecvEndDragSession(const bool& aDoneDrag,
 
 bool
 ContentChild::RecvPush(const nsCString& aScope,
-                       const IPC::Principal& aPrincipal)
+                       const IPC::Principal& aPrincipal,
+                       const nsString& aMessageId)
 {
 #ifndef MOZ_SIMPLEPUSH
   nsCOMPtr<nsIPushNotifier> pushNotifierIface =
@@ -3276,7 +3277,8 @@ ContentChild::RecvPush(const nsCString& aScope,
   }
   PushNotifier* pushNotifier =
     static_cast<PushNotifier*>(pushNotifierIface.get());
-  nsresult rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal, Nothing());
+  nsresult rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal,
+                                                aMessageId, Nothing());
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
@@ -3285,6 +3287,7 @@ ContentChild::RecvPush(const nsCString& aScope,
 bool
 ContentChild::RecvPushWithData(const nsCString& aScope,
                                const IPC::Principal& aPrincipal,
+                               const nsString& aMessageId,
                                InfallibleTArray<uint8_t>&& aData)
 {
 #ifndef MOZ_SIMPLEPUSH
@@ -3296,7 +3299,7 @@ ContentChild::RecvPushWithData(const nsCString& aScope,
   PushNotifier* pushNotifier =
     static_cast<PushNotifier*>(pushNotifierIface.get());
   nsresult rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal,
-                                                Some(aData));
+                                                aMessageId, Some(aData));
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
