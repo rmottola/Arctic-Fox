@@ -2655,6 +2655,7 @@ ServiceWorkerJobQueue*
 ServiceWorkerManager::GetOrCreateJobQueue(const nsACString& aKey,
                                           const nsACString& aScope)
 {
+  MOZ_ASSERT(!aKey.IsEmpty());
   ServiceWorkerManager::RegistrationDataPerPrincipal* data;
   if (!mRegistrationInfos.Get(aKey, &data)) {
     data = new RegistrationDataPerPrincipal();
@@ -3148,10 +3149,10 @@ ServiceWorkerManager::GetServiceWorkerRegistrationInfo(const nsACString& aScopeK
   MOZ_ASSERT(registration);
 
 #ifdef DEBUG
-  nsAutoCString originSuffix;
-  rv = registration->mPrincipal->GetOriginSuffix(originSuffix);
+  nsAutoCString origin;
+  rv = registration->mPrincipal->GetOrigin(origin);
   MOZ_ASSERT(NS_SUCCEEDED(rv));
-  MOZ_ASSERT(originSuffix.Equals(aScopeKey));
+  MOZ_ASSERT(origin.Equals(aScopeKey));
 #endif
 
   if (registration->mPendingUninstall) {
@@ -3170,7 +3171,7 @@ ServiceWorkerManager::PrincipalToScopeKey(nsIPrincipal* aPrincipal,
     return NS_ERROR_FAILURE;
   }
 
-  nsresult rv = aPrincipal->GetOriginSuffix(aKey);
+  nsresult rv = aPrincipal->GetOrigin(aKey);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -3193,6 +3194,8 @@ ServiceWorkerManager::AddScopeAndRegistration(const nsACString& aScope,
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
+
+  MOZ_ASSERT(!scopeKey.IsEmpty());
 
   RegistrationDataPerPrincipal* data;
   if (!swm->mRegistrationInfos.Get(scopeKey, &data)) {
