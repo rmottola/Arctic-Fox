@@ -11,6 +11,8 @@
 #include "mozilla/PodOperations.h"
 #include "mozilla/TextUtils.h"
 
+#include <stdio.h>
+
 #include "jsutil.h"
 #include "NamespaceImports.h"
 
@@ -111,6 +113,9 @@ js_strncpy(char16_t* dst, const char16_t* src, size_t nelem)
 {
     return mozilla::PodCopy(dst, src, nelem);
 }
+
+extern int32_t
+js_fputs(const char16_t* s, FILE* f);
 
 namespace js {
 
