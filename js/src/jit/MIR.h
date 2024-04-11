@@ -6409,6 +6409,8 @@ class MPow
         return false;
     }
 
+    MDefinition* foldsTo(TempAllocator& alloc) override;
+
     ALLOW_CLONE(MPow)
 };
 
