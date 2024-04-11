@@ -220,7 +220,6 @@ CreateNPObjectMember(NPP npp, JSContext *cx,
                      JS::MutableHandle<JS::Value> vp);
 
 const static js::ClassExtension sNPObjectJSWrapperClassExtension = {
-    false,                                                /* isWrappedNative */
     nullptr,                                              /* weakmapKeyDelegateOp */
     NPObjWrapper_ObjectMoved
 };

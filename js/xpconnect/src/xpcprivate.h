@@ -225,7 +225,7 @@ template class JS_PUBLIC_API(JS::WeakMapPtr)<JSObject*, JSObject*>;
 // wrappednative wrapper, holding the XPCWrappedNative in its private slot.
 static inline bool IS_WN_CLASS(const js::Class* clazz)
 {
-    return clazz->extIsWrappedNative();
+    return clazz->isWrappedNative();
 }
 
 static inline bool IS_WN_REFLECTOR(JSObject* obj)
