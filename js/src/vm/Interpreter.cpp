@@ -553,7 +553,7 @@ InternalConstruct(JSContext* cx, const AnyConstructArgs& args)
 {
     MOZ_ASSERT(args.array() + args.length() + 1 == args.end(),
                "must pass constructing arguments to a construction attempt");
-    MOZ_ASSERT(!JSFunction::class_.construct);
+    MOZ_ASSERT(!JSFunction::class_.getConstruct());
 
     // Callers are responsible for enforcing these preconditions.
     MOZ_ASSERT(IsConstructor(args.calleev()),
@@ -780,10 +780,9 @@ js::HasInstance(JSContext* cx, HandleObject obj, HandleValue v, bool* bp)
 {
     const Class* clasp = obj->getClass();
     RootedValue local(cx, v);
-    if (clasp->hasInstance)
-        return clasp->hasInstance(cx, obj, &local, bp);
+    if (JSHasInstanceOp hasInstance = clasp->getHasInstance())
+        return hasInstance(cx, obj, &local, bp);
 
-// XXX RM FIXME 2018-12-10 try to update this
     RootedValue val(cx, ObjectValue(*obj));
     ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
                         JSDVG_SEARCH_STACK, val, nullptr);

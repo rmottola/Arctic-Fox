@@ -1266,10 +1266,10 @@ CallTraceHook(Functor f, JSTracer* trc, JSObject* obj, CheckGeneration check, Ar
     MOZ_ASSERT(clasp);
     MOZ_ASSERT(obj->isNative() == clasp->isNative());
 
-    if (!clasp->trace)
+    if (!clasp->hasTrace())
         return &obj->as<NativeObject>();
 
-    if (clasp->trace == InlineTypedObject::obj_trace) {
+    if (clasp->isTrace(InlineTypedObject::obj_trace)) {
         Shape** pshape = obj->as<InlineTypedObject>().addressOfShapeFromGC();
         f(pshape, mozilla::Forward<Args>(args)...);
 
@@ -1299,7 +1299,7 @@ CallTraceHook(Functor f, JSTracer* trc, JSObject* obj, CheckGeneration check, Ar
         return nullptr;
     }
 
-    clasp->trace(trc, obj);
+    clasp->doTrace(trc, obj);
 
     if (!clasp->isNative())
         return nullptr;
