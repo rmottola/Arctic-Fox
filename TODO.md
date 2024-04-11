@@ -42,6 +42,7 @@
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- Bug 1287520 - 2026-07-29 - Check IsPackedArray for the result array in Array.proto
 - 1114580 - toStringTag - several diffs still to analyze
 - Bug 1263340 - finish to part 8
 - Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
@@ -50,7 +51,6 @@
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
 - Bug 1263778 - 2016-03-19 Rename a bunch of low-level [[Prototype]] access method
-- Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
 - 2016-02-21 Back out 3 changesets (bug 1216001) for Win8 reftest failures in 1193¿ 
 - Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
@@ -101,8 +101,6 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 ### Further Further ToDo:
 - Check for STLPort removal: https://bugzilla.mozilla.org/show_bug.cgi?id=1276927
 - import PPC JIT from TenFourFox
-- flatten out security manager ssl
-- NekcoOriginAttributes
 - see if window.requestIdleCallback can be backported
 
 ### last checked TFF backport commit
