@@ -2760,9 +2760,6 @@ js::InitStringClass(JSContext* cx, HandleObject obj)
     if (!ctor)
         return nullptr;
 
-    if (!GlobalObject::initBuiltinConstructor(cx, global, JSProto_String, ctor, proto))
-        return nullptr;
-
     if (!LinkConstructorAndPrototype(cx, ctor, proto))
         return nullptr;
 
@@ -2777,6 +2774,9 @@ js::InitStringClass(JSContext* cx, HandleObject obj)
      * uneval on the global object.
      */
     if (!JS_DefineFunctions(cx, global, string_functions))
+        return nullptr;
+
+    if (!GlobalObject::initBuiltinConstructor(cx, global, JSProto_String, ctor, proto))
         return nullptr;
 
     return proto;
