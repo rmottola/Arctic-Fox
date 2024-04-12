@@ -2836,6 +2836,8 @@ GCRuntime::updatePointersToRelocatedCells(Zone* zone)
     callWeakPointerZoneGroupCallbacks();
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next())
         callWeakPointerCompartmentCallbacks(comp);
+    if (rt->sweepZoneCallback)
+        rt->sweepZoneCallback(zone);
 }
 
 void
