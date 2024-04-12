@@ -2441,7 +2441,6 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
 
     for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
         c->sweepInnerViews();
-        c->sweepBaseShapeTable();
         c->sweepInitialShapeTable();
         c->objectGroups.sweep(fop);
         c->sweepRegExps();
@@ -5059,13 +5058,6 @@ SweepCCWrappersTask::run()
 }
 
 /* virtual */ void
-SweepBaseShapesTask::run()
-{
-    for (GCCompartmentGroupIter c(runtime); !c.done(); c.next())
-        c->sweepBaseShapeTable();
-}
-
-/* virtual */ void
 SweepInitialShapesTask::run()
 {
     for (GCCompartmentGroupIter c(runtime); !c.done(); c.next())
@@ -5166,7 +5158,6 @@ GCRuntime::beginSweepingZoneGroup()
     SweepAtomsTask sweepAtomsTask(rt);
     SweepInnerViewsTask sweepInnerViewsTask(rt);
     SweepCCWrappersTask sweepCCWrappersTask(rt);
-    SweepBaseShapesTask sweepBaseShapesTask(rt);
     SweepInitialShapesTask sweepInitialShapesTask(rt);
     SweepObjectGroupsTask sweepObjectGroupsTask(rt);
     SweepRegExpsTask sweepRegExpsTask(rt);
@@ -5201,7 +5192,6 @@ GCRuntime::beginSweepingZoneGroup()
             AutoLockHelperThreadState helperLock;
             startTask(sweepInnerViewsTask, gcstats::PHASE_SWEEP_INNER_VIEWS);
             startTask(sweepCCWrappersTask, gcstats::PHASE_SWEEP_CC_WRAPPER);
-            startTask(sweepBaseShapesTask, gcstats::PHASE_SWEEP_BASE_SHAPE);
             startTask(sweepInitialShapesTask, gcstats::PHASE_SWEEP_INITIAL_SHAPE);
             startTask(sweepObjectGroupsTask, gcstats::PHASE_SWEEP_TYPE_OBJECT);
             startTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP);
@@ -5285,7 +5275,6 @@ GCRuntime::beginSweepingZoneGroup()
         AutoLockHelperThreadState helperLock;
         joinTask(sweepInnerViewsTask, gcstats::PHASE_SWEEP_INNER_VIEWS);
         joinTask(sweepCCWrappersTask, gcstats::PHASE_SWEEP_CC_WRAPPER);
-        joinTask(sweepBaseShapesTask, gcstats::PHASE_SWEEP_BASE_SHAPE);
         joinTask(sweepInitialShapesTask, gcstats::PHASE_SWEEP_INITIAL_SHAPE);
         joinTask(sweepObjectGroupsTask, gcstats::PHASE_SWEEP_TYPE_OBJECT);
         joinTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP);
