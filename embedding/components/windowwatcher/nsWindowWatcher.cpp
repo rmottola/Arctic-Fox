@@ -369,7 +369,8 @@ nsWindowWatcher::OpenWindow(mozIDOMWindowProxy* aParent,
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             /* calledFromJS = */ false, dialog,
                             /* navigate = */ true, nullptr, argv,
-                            /* aLoadInfo */ nullptr, aResult);
+                            /* aLoadInfo */ nullptr,
+                            /* openerFullZoom = */ nullptr, aResult);
 }
 
 struct SizeSpec
@@ -428,6 +429,8 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
                              nsITabParent* aOpeningTab,
                              nsISupports* aArguments,
                              nsIDocShellLoadInfo* aLoadInfo,
+                             float aOpenerFullZoom,
+                             uint8_t aOptionalArgc,
                              mozIDOMWindowProxy** aResult)
 {
   nsCOMPtr<nsIArray> argv = ConvertArgsToArray(aArguments);
@@ -449,6 +452,7 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
                             aCalledFromScript, dialog,
                             aNavigate, aOpeningTab, argv,
                             aLoadInfo,
+                            aOptionalArgc >= 1 ? &aOpenerFullZoom : nullptr,
                             aResult);
 }
 
@@ -493,6 +497,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
                                     nsITabParent* aOpeningTab,
                                     nsIArray* aArgv,
                                     nsIDocShellLoadInfo* aLoadInfo,
+                                    float* aOpenerFullZoom,
                                     mozIDOMWindowProxy** aResult)
 {
   nsresult rv = NS_OK;
@@ -1080,7 +1085,8 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
   }
 
   if (isNewToplevelWindow) {
-    SizeOpenedDocShellItem(newDocShellItem, aParent, isCallerChrome, sizeSpec);
+    SizeOpenedDocShellItem(newDocShellItem, aParent, isCallerChrome, sizeSpec,
+                           aOpenerFullZoom);
   }
 
   // XXXbz isn't windowIsModal always true when windowIsModalContentDialog?
@@ -2060,7 +2066,8 @@ void
 nsWindowWatcher::SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
                                         mozIDOMWindowProxy* aParent,
                                         bool aIsCallerChrome,
-                                        const SizeSpec& aSizeSpec)
+                                        const SizeSpec& aSizeSpec,
+                                        float* aOpenerFullZoom)
 {
   // position and size of window
   int32_t left = 0, top = 0, width = 100, height = 100;
@@ -2077,8 +2084,8 @@ nsWindowWatcher::SizeOpenedDocShellItem(nsIDocShellTreeItem* aDocShellItem,
     return;
   }
 
-  double openerZoom = 1.0;
-  if (aParent) {
+  double openerZoom = aOpenerFullZoom ? *aOpenerFullZoom : 1.0;
+  if (aParent && !aOpenerFullZoom) {
     nsCOMPtr<nsPIDOMWindowOuter> piWindow = nsPIDOMWindowOuter::From(aParent);
     if (nsIDocument* doc = piWindow->GetDoc()) {
       if (nsIPresShell* shell = doc->GetShell()) {

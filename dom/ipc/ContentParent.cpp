@@ -5330,6 +5330,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
                                 const nsCString& aFeatures,
                                 const nsCString& aBaseURI,
                                 const DocShellOriginAttributes& aOpenerOriginAttributes,
+                                const float& aFullZoom,
                                 nsresult* aResult,
                                 bool* aWindowIsNew,
                                 InfallibleTArray<FrameScriptInfo>* aFrameScripts,
@@ -5487,7 +5488,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
 
   *aResult = pwwatch->OpenWindow2(parent, uri, name, features, aCalledFromJS,
                                   false, false, thisTabParent, nullptr, nullptr,
-                                  getter_AddRefs(window));
+                                  aFullZoom, 1, getter_AddRefs(window));
 
   if (NS_WARN_IF(!window)) {
     return true;
