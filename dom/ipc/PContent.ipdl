@@ -309,17 +309,11 @@ struct FileSystemGetFileOrDirectoryParams
   bool isRoot;
 };
 
-union FileSystemPathOrFileValue
-{
-  nsString;
-  PBlob;
-};
-
 struct FileSystemRemoveParams
 {
   nsString filesystem;
   nsString directory;
-  FileSystemPathOrFileValue target;
+  nsString targetDirectory;
   bool recursive;
 };
 
