@@ -450,6 +450,7 @@ struct JSCompartment
     void checkInitialShapesTableAfterMovingGC();
     void checkWrapperMapAfterMovingGC();
     void checkBaseShapeTableAfterMovingGC();
+    void checkScriptMapsAfterMovingGC();
 #endif
 
     /*
@@ -602,6 +603,7 @@ struct JSCompartment
     void fixupInitialShapeTable();
     void fixupAfterMovingGC();
     void fixupGlobal();
+    void fixupScriptMapsAfterMovingGC();
 
     bool hasAllocationMetadataBuilder() const { return allocationMetadataBuilder; }
     const js::AllocationMetadataBuilder* getAllocationMetadataBuilder() const {
