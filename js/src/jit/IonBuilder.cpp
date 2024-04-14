@@ -1065,10 +1065,6 @@ IonBuilder::buildInline(IonBuilder* callerBuilder, MResumePoint* callerResumePoi
         current->initSlot(info().argSlot(i), arg);
     }
 
-    // Initialize the scope chain now that args are initialized.
-    if (!initScopeChain(callInfo.fun()))
-        return false;
-
     JitSpew(JitSpew_Inlining, "Initializing %u local slots; fixed lexicals begin at %u",
             info().nlocals(), info().fixedLexicalBegin());
 
@@ -1086,6 +1082,11 @@ IonBuilder::buildInline(IonBuilder* callerBuilder, MResumePoint* callerResumePoi
     }
 
     insertRecompileCheck();
+
+    // Initialize the scope chain now that all resume points operands are
+    // initialized.
+    if (!initScopeChain(callInfo.fun()))
+        return false;
 
     if (!traverseBytecode())
         return false;
