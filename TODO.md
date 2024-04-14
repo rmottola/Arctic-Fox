@@ -55,8 +55,6 @@
 - Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
-- Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
-- Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
 - 2016-02-20 : Bug 1014185 - Remove about:customizing
 
 impacting download and shutdown:
