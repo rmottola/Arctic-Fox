@@ -1041,7 +1041,7 @@ StructTypeDescr::fieldCount() const
 size_t
 StructTypeDescr::maybeForwardedFieldCount() const
 {
-    ArrayObject& fieldInfo = *MaybeForwarded(&fieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_NAMES));
+    ArrayObject& fieldInfo = maybeForwardedFieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_NAMES);
     return fieldInfo.getDenseInitializedLength();
 }
 
@@ -1077,7 +1077,7 @@ StructTypeDescr::fieldOffset(size_t index) const
 size_t
 StructTypeDescr::maybeForwardedFieldOffset(size_t index) const
 {
-    ArrayObject& fieldOffsets = *MaybeForwarded(&fieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_OFFSETS));
+    ArrayObject& fieldOffsets = maybeForwardedFieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_OFFSETS);
     MOZ_ASSERT(index < fieldOffsets.getDenseInitializedLength());
     return AssertedCast<size_t>(fieldOffsets.getDenseElement(index).toInt32());
 }
@@ -1093,7 +1093,7 @@ StructTypeDescr::fieldDescr(size_t index) const
 TypeDescr&
 StructTypeDescr::maybeForwardedFieldDescr(size_t index) const
 {
-    ArrayObject& fieldDescrs = *MaybeForwarded(&fieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_TYPES));
+    ArrayObject& fieldDescrs = maybeForwardedFieldInfoObject(JS_DESCR_SLOT_STRUCT_FIELD_TYPES);
     MOZ_ASSERT(index < fieldDescrs.getDenseInitializedLength());
     return MaybeForwarded(&fieldDescrs.getDenseElement(index).toObject())->as<TypeDescr>();
 }
