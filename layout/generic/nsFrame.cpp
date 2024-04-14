@@ -5268,6 +5268,9 @@ DoesLayerHaveOutOfDateFrameMetrics(Layer* aLayer)
 {
   for (uint32_t i = 0; i < aLayer->GetFrameMetricsCount(); i++) {
     const FrameMetrics& metrics = aLayer->GetFrameMetrics(i);
+    if (!metrics.IsScrollable()) {
+      continue;
+    }
     nsIScrollableFrame* scrollableFrame =
       nsLayoutUtils::FindScrollableFrameFor(metrics.GetScrollId());
     if (!scrollableFrame) {
