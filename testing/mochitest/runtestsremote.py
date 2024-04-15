@@ -365,7 +365,8 @@ def main(args):
     auto.setRemoteLog(options.remoteLogFile)
     auto.setServerInfo(options.webServer, options.httpPort, options.sslPort)
 
-    mochitest.printDeviceInfo()
+    if options.log_mach is None:
+        mochitest.printDeviceInfo()
 
     # Add Android version (SDK level) to mozinfo so that manifest entries
     # can be conditional on android_version.
@@ -403,7 +404,8 @@ def main(args):
             pass
         retVal = 1
 
-    mochitest.printDeviceInfo(printLogcat=True)
+    if options.log_mach is None:
+        mochitest.printDeviceInfo(printLogcat=True)
 
     message_logger.finish()
 
