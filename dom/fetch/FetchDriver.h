@@ -101,6 +101,8 @@ private:
   // Utility since not all cases need to do any post processing of the filtered
   // response.
   nsresult FailWithNetworkError();
+
+  void SetRequestHeaders(nsIHttpChannel* aChannel) const;
 };
 
 } // namespace dom
