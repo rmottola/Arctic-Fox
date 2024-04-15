@@ -735,7 +735,7 @@ FetchDriver::SetRequestHeaders(nsIHttpChannel* aChannel) const
 {
   MOZ_ASSERT(aChannel);
 
-  nsAutoTArray<InternalHeaders::Entry, 5> headers;
+  AutoTArray<InternalHeaders::Entry, 5> headers;
   mRequest->Headers()->GetEntries(headers);
   bool hasAccept = false;
   for (uint32_t i = 0; i < headers.Length(); ++i) {
