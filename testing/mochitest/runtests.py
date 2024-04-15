@@ -525,6 +525,7 @@ class MochitestBase(object):
 
         self.marionette = None
         self.start_script = None
+        self.nsprLogs = None
         self.start_script_args = []
 
         if self.log is None:
