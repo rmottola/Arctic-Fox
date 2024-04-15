@@ -266,6 +266,7 @@ class RemoteReftest(RefTest):
 
         try:
             self._devicemanager.pushDir(profileDir, options.remoteProfile)
+            self._devicemanager.chmodDir(options.remoteProfile)
         except devicemanager.DMError:
             print "Automation Error: Failed to copy profiledir to device"
             raise
@@ -277,6 +278,7 @@ class RemoteReftest(RefTest):
         RefTest.copyExtraFilesToProfile(self, options, profile)
         try:
             self._devicemanager.pushDir(profileDir, options.remoteProfile)
+            self._devicemanager.chmodDir(options.remoteProfile)
         except devicemanager.DMError:
             print "Automation Error: Failed to copy extra files to device"
             raise
