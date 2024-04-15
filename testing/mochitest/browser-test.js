@@ -33,6 +33,51 @@ if (Services.appinfo.OS == 'Android') {
   setTimeout(testInit, 0);
 }
 
+function b2gStart() {
+  let homescreen = document.getElementById('systemapp');
+  var webNav = homescreen.contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                                   .getInterface(Ci.nsIWebNavigation);
+  var url = "chrome://mochikit/content/harness.xul?manifestFile=tests.json";
+
+  webNav.loadURI(url, null, null, null, null);
+}
+
+var TabDestroyObserver = {
+  outstanding: new Set(),
+  promiseResolver: null,
+
+  init: function() {
+    Services.obs.addObserver(this, "message-manager-close", false);
+    Services.obs.addObserver(this, "message-manager-disconnect", false);
+  },
+
+  destroy: function() {
+    Services.obs.removeObserver(this, "message-manager-close");
+    Services.obs.removeObserver(this, "message-manager-disconnect");
+  },
+
+  observe: function(subject, topic, data) {
+    if (topic == "message-manager-close") {
+      this.outstanding.add(subject);
+    } else if (topic == "message-manager-disconnect") {
+      this.outstanding.delete(subject);
+      if (!this.outstanding.size && this.promiseResolver) {
+        this.promiseResolver();
+      }
+    }
+  },
+
+  wait: function() {
+    if (!this.outstanding.size) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.promiseResolver = resolve;
+    });
+  },
+};
+
 function testInit() {
   gConfig = readConfig();
   if (gConfig.testRoot == "browser") {
@@ -101,7 +146,11 @@ function Tester(aTests, structuredLogger, aCallback) {
   this._scriptLoader.loadSubScript("chrome://mochikit/content/chrome-harness.js", simpleTestScope);
   this.SimpleTest = simpleTestScope.SimpleTest;
 
-  var extensionUtilsScope = {};
+  var extensionUtilsScope = {
+    registerCleanupFunction: (fn) => {
+      this.currentTest.scope.registerCleanupFunction(fn);
+    },
+  };
   extensionUtilsScope.SimpleTest = this.SimpleTest;
   this._scriptLoader.loadSubScript("chrome://mochikit/content/tests/SimpleTest/ExtensionTestUtils.js", extensionUtilsScope);
   this.ExtensionTestUtils = extensionUtilsScope.ExtensionTestUtils;
@@ -178,6 +227,8 @@ Tester.prototype = {
   },
 
   start: function Tester_start() {
+    TabDestroyObserver.init();
+
     //if testOnLoad was not called, then gConfig is not defined
     if (!gConfig)
       gConfig = readConfig();
@@ -611,6 +662,9 @@ Tester.prototype = {
           "ShutdownLeaks: Wait for cleanup to be finished before checking for leaks");
         Services.obs.notifyObservers({wrappedJSObject: barrier},
           "shutdown-leaks-before-check", null);
+
+        barrier.client.addBlocker("ShutdownLeaks: Wait for tabs to finish closing",
+                                  TabDestroyObserver.wait());
 
         barrier.wait().then(() => {
           // Simulate memory pressure so that we're forced to free more resources
