@@ -416,7 +416,7 @@ FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse,
   return filteredResponse.forget();
 }
 
-nsresult
+void
 FetchDriver::FailWithNetworkError()
 {
   workers::AssertIsOnMainThread();
@@ -429,7 +429,6 @@ FetchDriver::FailWithNetworkError()
     mObserver->OnResponseEnd();
     mObserver = nullptr;
   }
-  return NS_OK;
 }
 
 namespace {
