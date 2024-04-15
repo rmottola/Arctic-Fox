@@ -168,6 +168,7 @@ Tester.prototype = {
   lastStartTime: null,
   openedWindows: null,
   lastAssertionCount: 0,
+  failuresFromInitialWindowState: 0,
 
   get currentTest() {
     return this.tests[this.currentTestIndex];
@@ -203,13 +204,28 @@ Tester.prototype = {
     this.Promise.Debugging.addUncaughtErrorObserver(this._uncaughtErrorObserver);
 
     if (this.tests.length)
-      this.nextTest();
+      this.waitForGraphicsTestWindowToBeGone(this.nextTest.bind(this));
     else
       this.finish();
   },
 
+  waitForGraphicsTestWindowToBeGone(aCallback) {
+    let windowsEnum = Services.wm.getEnumerator(null);
+    while (windowsEnum.hasMoreElements()) {
+      let win = windowsEnum.getNext();
+      if (win != window && !win.closed &&
+          win.document.documentURI == "chrome://gfxsanity/content/sanityparent.html") {
+        this.BrowserTestUtils.domWindowClosed(win).then(aCallback);
+        return;
+      }
+    }
+    // graphics test window is already gone, just call callback immediately
+    aCallback();
+  },
+
   waitForWindowsState: function Tester_waitForWindowsState(aCallback) {
     let timedOut = this.currentTest && this.currentTest.timedOut;
+    let startTime = Date.now();
     let baseMsg = timedOut ? "Found a {elt} after previous test timed out"
                            : this.currentTest ? "Found an unexpected {elt} at the end of test run"
                                               : "Found an unexpected {elt}";
@@ -284,6 +300,9 @@ Tester.prototype = {
     var passCount = this.tests.reduce((a, f) => a + f.passCount, 0);
     var failCount = this.tests.reduce((a, f) => a + f.failCount, 0);
     var todoCount = this.tests.reduce((a, f) => a + f.todoCount, 0);
+
+    // Include failures from window state checking prior to running the first test
+    failCount += this.failuresFromInitialWindowState;
 
     if (this.repeat > 0) {
       --this.repeat;
