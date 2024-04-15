@@ -181,14 +181,14 @@ class Base(unittest.TestCase):
 class TestTestMetadata(Base):
     def test_load(self):
         t = self._get_test_metadata()
-        self.assertEqual(len(t._tests_by_path), 6)
+        self.assertEqual(len(t._tests_by_path), 8)
 
         self.assertEqual(len(list(t.tests_with_flavor('xpcshell'))), 3)
         self.assertEqual(len(list(t.tests_with_flavor('mochitest-plain'))), 0)
 
     def test_resolve_all(self):
         t = self._get_test_metadata()
-        self.assertEqual(len(list(t.resolve_tests())), 7)
+        self.assertEqual(len(list(t.resolve_tests())), 9)
 
     def test_resolve_filter_flavor(self):
         t = self._get_test_metadata()
@@ -209,6 +209,11 @@ class TestTestMetadata(Base):
         t = self._get_test_metadata()
         result = list(t.resolve_tests(paths=['services', 'toolkit']))
         self.assertEqual(len(result), 4)
+
+    def test_resolve_path_prefix(self):
+        t = self._get_test_metadata()
+        result = list(t.resolve_tests(paths=['image']))
+        self.assertEqual(len(result), 1)
 
 
 class TestTestResolver(Base):
