@@ -475,7 +475,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
 
   nsresult rv;
   aRequest->GetStatus(&rv);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
+  if (NS_FAILED(rv)) {
     FailWithNetworkError();
     return rv;
   }
