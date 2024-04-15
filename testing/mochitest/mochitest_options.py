@@ -583,7 +583,7 @@ class MochitestArguments(ArgumentContainer):
 
         if options.extra_mozinfo_json:
             if not os.path.isfile(options.extra_mozinfo_json):
-               parser.error("Error: couldn't find mozinfo.json at '%s'."\
+                parser.error("Error: couldn't find mozinfo.json at '%s'."
                              % options.extra_mozinfo_json)
 
             options.extra_mozinfo_json = json.load(open(options.extra_mozinfo_json))
@@ -762,7 +762,7 @@ class MochitestArguments(ArgumentContainer):
         if options.test_paths and build_obj:
             # Normalize test paths so they are relative to test root
             options.test_paths = [build_obj._wrap_path_argument(p).relpath()
-                for p in options.test_paths]
+                                  for p in options.test_paths]
 
         return options
 
@@ -775,12 +775,6 @@ class B2GArguments(ArgumentContainer):
          {"dest": "b2gPath",
           "default": None,
           "help": "Path to B2G repo or QEMU directory.",
-          "suppress": True,
-          }],
-        [["--desktop"],
-         {"action": "store_true",
-          "default": False,
-          "help": "Run the tests on a B2G desktop build.",
           "suppress": True,
           }],
         [["--marionette"],
@@ -856,11 +850,6 @@ class B2GArguments(ArgumentContainer):
                   "prior to test.",
           "suppress": True,
           }],
-        [["--profile"],
-         {"dest": "profile",
-          "default": None,
-          "help": "For desktop testing, the path to the gaia profile to use.",
-          }],
         [["--logdir"],
          {"dest": "logdir",
           "default": None,
@@ -891,20 +880,6 @@ class B2GArguments(ArgumentContainer):
 
     def validate(self, parser, options, context):
         """Validate b2g options."""
-
-        if options.desktop and not options.app:
-            if not (build_obj and conditions.is_b2g_desktop(build_obj)):
-                parser.error(
-                    "--desktop specified, but no b2g desktop build detected! Either "
-                    "build for b2g desktop, or point --appname to a b2g desktop binary.")
-        elif build_obj and conditions.is_b2g_desktop(build_obj):
-            options.desktop = True
-            if not options.app:
-                options.app = build_obj.get_binary_path()
-                if not options.app.endswith('-bin'):
-                    options.app = '%s-bin' % options.app
-                if not os.path.isfile(options.app):
-                    options.app = options.app[:-len('-bin')]
 
         if options.remoteWebServer is None:
             if os.name != "nt":
@@ -1183,7 +1158,7 @@ class MochitestArgumentParser(ArgumentParser):
         if not self.app and build_obj:
             if conditions.is_android(build_obj):
                 self.app = 'android'
-            elif conditions.is_b2g(build_obj) or conditions.is_b2g_desktop(build_obj):
+            elif conditions.is_b2g(build_obj):
                 self.app = 'b2g'
         if not self.app:
             # platform can't be determined and app wasn't specified explicitly,
