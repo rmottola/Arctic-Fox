@@ -17,20 +17,21 @@ XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
 XPCOMUtils.defineLazyModuleGetter(this, "SelfSupportBackend",
   "resource:///modules/SelfSupportBackend.jsm");
 
-var nativeConsole = console;
-XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/Console.jsm");
-
 const SIMPLETEST_OVERRIDES =
   ["ok", "is", "isnot", "todo", "todo_is", "todo_isnot", "info", "expectAssertions", "requestCompleteLog"];
 
-window.addEventListener("load", function testOnLoad() {
-  window.removeEventListener("load", testOnLoad);
-  window.addEventListener("MozAfterPaint", function testOnMozAfterPaint() {
-    window.removeEventListener("MozAfterPaint", testOnMozAfterPaint);
-    setTimeout(testInit, 0);
+// non-android is bootstrapped by marionette
+if (Services.appinfo.OS == 'Android') {
+  window.addEventListener("load", function testOnLoad() {
+    window.removeEventListener("load", testOnLoad);
+    window.addEventListener("MozAfterPaint", function testOnMozAfterPaint() {
+      window.removeEventListener("MozAfterPaint", testOnMozAfterPaint);
+      setTimeout(testInit, 0);
+    });
   });
-});
+} else {
+  setTimeout(testInit, 0);
+}
 
 function testInit() {
   gConfig = readConfig();
@@ -82,8 +83,8 @@ function testInit() {
   gmm.loadFrameScript("chrome://mochikit/content/tests/SimpleTest/AsyncUtilsContent.js", true);
 }
 
-function Tester(aTests, aDumper, aCallback) {
-  this.dumper = aDumper;
+function Tester(aTests, structuredLogger, aCallback) {
+  this.structuredLogger = structuredLogger;
   this.tests = aTests;
   this.callback = aCallback;
   this.openedWindows = {};
@@ -186,7 +187,7 @@ Tester.prototype = {
     if (gConfig.repeat)
       this.repeat = gConfig.repeat;
 
-    this.dumper.structuredLogger.info("*** Start BrowserChrome Test Results ***");
+    this.structuredLogger.info("checking window state");
     Services.console.registerListener(this);
     Services.obs.addObserver(this, "chrome-document-global-created", false);
     Services.obs.addObserver(this, "content-document-global-created", false);
@@ -232,8 +233,9 @@ Tester.prototype = {
     }
 
     // Remove stale windows
-    this.dumper.structuredLogger.info("checking window state");
+    this.structuredLogger.info("checking window state");
     let windowsEnum = Services.wm.getEnumerator(null);
+    let createdFakeTestForLogging = false;
     while (windowsEnum.hasMoreElements()) {
       let win = windowsEnum.getNext();
       if (win != window && !win.closed &&
@@ -244,20 +246,32 @@ Tester.prototype = {
           type = "browser window";
           break;
         case null:
-          type = "unknown window";
+          type = "unknown window with document URI: " + win.document.documentURI +
+                 " and title: " + win.document.title;
           break;
         }
         let msg = baseMsg.replace("{elt}", type);
-        if (this.currentTest)
+        if (this.currentTest) {
           this.currentTest.addResult(new testResult(false, msg, "", false));
-        else
-          this.dumper.structuredLogger.testEnd("browser-test.js",
-                                               "FAIL",
-                                               "PASS",
-                                               msg);
+        } else {
+          if (!createdFakeTestForLogging) {
+            createdFakeTestForLogging = true;
+            this.structuredLogger.testStart("browser-test.js");
+          }
+          this.failuresFromInitialWindowState++;
+          this.structuredLogger.testStatus("browser-test.js",
+                                           msg, "FAIL", false, "");
+        }
 
         win.close();
       }
+    }
+    if (createdFakeTestForLogging) {
+      let time = Date.now() - startTime;
+      this.structuredLogger.testEnd("browser-test.js",
+                                    "OK",
+                                    undefined,
+                                    "finished window state check in " + time + "ms");
     }
 
     // Make sure the window is raised before each test.
@@ -283,22 +297,27 @@ Tester.prototype = {
       Services.obs.removeObserver(this, "content-document-global-created");
       this.Promise.Debugging.clearUncaughtErrorObservers();
       this._treatUncaughtRejectionsAsFailures = false;
-      this.dumper.structuredLogger.info("TEST-START | Shutdown");
+
+      // In the main process, we print the ShutdownLeaksCollector message here.
+      let pid = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).processID;
+      dump("Completed ShutdownLeaks collections in process " + pid + "\n");
+
+      this.structuredLogger.info("TEST-START | Shutdown");
 
       if (this.tests.length) {
-        this.dumper.structuredLogger.info("Browser Chrome Test Summary");
-        this.dumper.structuredLogger.info("Passed:  " + passCount);
-        this.dumper.structuredLogger.info("Failed:  " + failCount);
-        this.dumper.structuredLogger.info("Todo:    " + todoCount);
+        let e10sMode = gMultiProcessBrowser ? "e10s" : "non-e10s";
+        this.structuredLogger.info("Browser Chrome Test Summary");
+        this.structuredLogger.info("Passed:  " + passCount);
+        this.structuredLogger.info("Failed:  " + failCount);
+        this.structuredLogger.info("Todo:    " + todoCount);
+        this.structuredLogger.info("Mode:    " + e10sMode);
       } else {
-        this.dumper.structuredLogger.testEnd("browser-test.js",
-                                             "FAIL",
-                                             "PASS",
-                                             "No tests to run. Did you pass invalid test_paths?");
+        this.structuredLogger.testEnd("browser-test.js",
+                                      "FAIL",
+                                      "PASS",
+                                      "No tests to run. Did you pass invalid test_paths?");
       }
-      this.dumper.structuredLogger.info("*** End BrowserChrome Test Results ***");
-
-      this.dumper.done();
+      this.structuredLogger.info("*** End BrowserChrome Test Results ***");
 
       // Tests complete, notify the callback and return
       this.callback(this.tests);
@@ -347,7 +366,7 @@ Tester.prototype = {
       if (this.currentTest)
         this.currentTest.addResult(new testMessage(msg));
       else
-        this.dumper.dump("TEST-INFO | (browser-test.js) | " + msg.replace(/\n$/, "") + "\n");
+        this.structuredLogger.info("TEST-INFO | (browser-test.js) | " + msg.replace(/\n$/, "") + "\n");
     } catch (ex) {
       // Swallow exception so we don't lead to another error being reported,
       // throwing us into an infinite loop
@@ -470,7 +489,7 @@ Tester.prototype = {
 
       // Note the test run time
       let time = Date.now() - this.lastStartTime;
-      this.dumper.structuredLogger.testEnd(this.currentTest.path,
+      this.structuredLogger.testEnd(this.currentTest.path,
                                            "OK",
                                            undefined,
                                            "finished in " + time + "ms");
@@ -609,7 +628,7 @@ Tester.prototype = {
   }),
 
   execTest: function Tester_execTest() {
-    this.dumper.structuredLogger.testStart(this.currentTest.path);
+    this.structuredLogger.testStart(this.currentTest.path);
 
     this.SimpleTest.reset();
 
