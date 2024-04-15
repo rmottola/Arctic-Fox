@@ -15530,6 +15530,10 @@
         "url": "/html/semantics/embedded-content/the-canvas-element/context.unrecognised.badname.html"
       },
       {
+        "path": "fetch/api/request/request-cache.html",
+        "url": "/fetch/api/request/request-cache.html"
+      },
+      {
         "path": "html/semantics/embedded-content/the-canvas-element/context.unrecognised.badsuffix.html",
         "url": "/html/semantics/embedded-content/the-canvas-element/context.unrecognised.badsuffix.html"
       },
@@ -21611,6 +21615,13 @@
           {
             "path": "dom/nodes/Element-insertAdjacentText.html",
             "url": "/dom/nodes/Element-insertAdjacentText.html"
+          }
+        ],
+        "fetch/api/request/request-cache.html": [
+          {
+            "path": "fetch/api/request/request-cache.html",
+            "timeout": "long",
+            "url": "/fetch/api/request/request-cache.html"
           }
         ]
       }
