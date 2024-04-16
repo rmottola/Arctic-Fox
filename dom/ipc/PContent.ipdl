@@ -41,6 +41,7 @@ include protocol PPluginModule;
 include protocol PGMP;
 include protocol PPrinting;
 include protocol POfflineCacheUpdate;
+include protocol PRenderFrame;
 include protocol PScreenManager;
 include protocol PSharedBufferManager;
 include protocol PSms;
@@ -94,6 +95,7 @@ using struct LookAndFeelInt from "mozilla/widget/WidgetMessageUtils.h";
 using class mozilla::dom::ipc::StructuredCloneData from "ipc/IPCMessageUtils.h";
 using mozilla::DataStorageType from "ipc/DataStorageIPCUtils.h";
 using mozilla::DocShellOriginAttributes from "mozilla/ipc/BackgroundUtils.h";
+using struct mozilla::layers::TextureFactoryIdentifier from "mozilla/layers/CompositorTypes.h";
 
 union ChromeRegistryItem
 {
@@ -1099,6 +1101,7 @@ parent:
 
     sync CreateWindow(nullable PBrowser aThisTab,
                       PBrowser aNewTab,
+                      PRenderFrame aRenderFrame,
                       uint32_t aChromeFlags,
                       bool aCalledFromJS,
                       bool aPositionSpecified,
@@ -1112,7 +1115,9 @@ parent:
       returns (nsresult rv,
                bool windowOpened,
                FrameScriptInfo[] frameScripts,
-               nsCString urlToLoad);
+               nsCString urlToLoad,
+               TextureFactoryIdentifier textureFactoryIdentifier,
+               uint64_t layersId);
 
     sync GetDeviceStorageLocation(nsString type)
         returns (nsString path);
