@@ -2428,9 +2428,9 @@ ContentChild::RecvLoadProcessScript(const nsString& aURL)
 
 bool
 ContentChild::RecvAsyncMessage(const nsString& aMsg,
-                               const ClonedMessageData& aData,
                                InfallibleTArray<CpowEntry>&& aCpows,
-                               const IPC::Principal& aPrincipal)
+                               const IPC::Principal& aPrincipal,
+                               const ClonedMessageData& aData)
 {
   RefPtr<nsFrameMessageManager> cpm =
     nsFrameMessageManager::GetChildProcessManager();
