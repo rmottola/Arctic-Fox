@@ -122,6 +122,14 @@ public:
     return (mInBubblingPhase && mInCapturePhase);
   }
 
+  /**
+   * Helper methods for methods of DOM Event.
+   */
+  inline void StopPropagation()
+  {
+    mPropagationStopped = true;
+  }
+
   inline void Clear()
   {
     SetRawFlags(0);
@@ -299,6 +307,11 @@ public:
     currentTarget = aCopyTargets ? aEvent.currentTarget : nullptr;
     originalTarget = aCopyTargets ? aEvent.originalTarget : nullptr;
   }
+
+  /**
+   * Helper methods for methods of DOM Event.
+   */
+  void StopPropagation() { mFlags.StopPropagation(); }
 
   void PreventDefault()
   {
