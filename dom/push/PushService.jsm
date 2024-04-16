@@ -99,6 +99,9 @@ this.PushService = {
   // reduce the quota for a record. Used for testing purposes.
   _updateQuotaTestCallback: null,
 
+  // Set of timeout ID of tasks to reduce quota.
+  _updateQuotaTimeouts: new Set(),
+
   // When serverURI changes (this is used for testing), db is cleaned up and a
   // a new db is started. This events must be sequential.
   _stateChangeProcessQueue: null,
@@ -246,7 +249,7 @@ this.PushService = {
        * aren't very good at automatically cleaning up, so we don't get shutdown
        * leaks on browser shutdown.
        */
-      case "xpcom-shutdown":
+      case "quit-application":
         this.uninit();
         break;
       case "network-active-changed":         /* On B2G. */
@@ -430,7 +433,7 @@ this.PushService = {
 
   /**
    * PushService initialization is divided into 4 parts:
-   * init() - start listening for xpcom-shutdown and serverURL changes.
+   * init() - start listening for quit-application and serverURL changes.
    *          state is change to PUSH_SERVICE_INIT
    * startService() - if serverURL is present this function is called. It starts
    *                  listening for broadcasted messages, starts db and
@@ -452,7 +455,7 @@ this.PushService = {
 
     this._setState(PUSH_SERVICE_ACTIVATING);
 
-    Services.obs.addObserver(this, "xpcom-shutdown", false);
+    Services.obs.addObserver(this, "quit-application", false);
 
     if (options.serverURI) {
       // this is use for xpcshell test.
@@ -548,7 +551,7 @@ this.PushService = {
    * stopService() - It stops listening for broadcasted messages, stops db and
    *                 PushService connection (WebSocket).
    *                 state is changed to PUSH_SERVICE_INIT.
-   * uninit() - stop listening for xpcom-shutdown and serverURL changes.
+   * uninit() - stop listening for quit-application and serverURL changes.
    *            state is change to PUSH_SERVICE_UNINIT
    */
   _stopService: function(event) {
@@ -563,6 +566,9 @@ this.PushService = {
     this._service.disconnect();
     this._service.uninit();
     this._service = null;
+
+    this._updateQuotaTimeouts.forEach((timeoutID) => clearTimeout(timeoutID));
+    this._updateQuotaTimeouts.clear();
 
     if (!this._db) {
       return Promise.resolve();
@@ -607,7 +613,7 @@ this.PushService = {
     }
 
     prefs.ignore("serverURL", this);
-    Services.obs.removeObserver(this, "xpcom-shutdown");
+    Services.obs.removeObserver(this, "quit-application");
 
     this._stateChangeProcessEnqueue(_ =>
       {
@@ -809,8 +815,14 @@ this.PushService = {
         }
         // Update quota after the delay, at which point
         // we check for visible notifications.
-        setTimeout(() => this._updateQuota(keyID),
-          prefs.get("quotaUpdateDelay"));
+        let timeoutID = setTimeout(_ =>
+          {
+            this._updateQuota(keyID);
+            if (!this._updateQuotaTimeouts.delete(timeoutID)) {
+              console.debug("receivedPushMessage: quota update timeout missing?");
+            }
+          }, prefs.get("quotaUpdateDelay"));
+        this._updateQuotaTimeouts.add(timeoutID);
         return notified;
       }, error => {
         console.error("receivedPushMessage: Error decrypting message", error);
