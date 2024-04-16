@@ -365,7 +365,10 @@ Request::Constructor(const GlobalObject& aGlobal,
             nsresult rv = principal->CheckMayLoad(uri, /* report */ false,
                                                   /* allowIfInheritsPrincipal */ false);
             if (NS_FAILED(rv)) {
-              aRv.ThrowTypeError<MSG_INVALID_REFERRER_URL>(referrer);
+              nsAutoCString globalOrigin;
+              principal->GetOrigin(globalOrigin);
+              aRv.ThrowTypeError<MSG_CROSS_ORIGIN_REFERRER_URL>(referrer,
+                                                                NS_ConvertUTF8toUTF16(globalOrigin));
               return nullptr;
             }
           }
@@ -393,7 +396,8 @@ Request::Constructor(const GlobalObject& aGlobal,
             new ReferrerSameOriginChecker(worker, referrerURL, rv);
           checker->Dispatch(aRv);
           if (aRv.Failed() || NS_FAILED(rv)) {
-            aRv.ThrowTypeError<MSG_INVALID_REFERRER_URL>(referrer);
+            aRv.ThrowTypeError<MSG_CROSS_ORIGIN_REFERRER_URL>(referrer,
+                                                              worker->GetLocationInfo().mOrigin);
             return nullptr;
           }
         }
