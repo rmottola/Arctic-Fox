@@ -129,6 +129,11 @@ public:
   {
     mPropagationStopped = true;
   }
+  inline void StopImmediatePropagation()
+  {
+    StopPropagation();
+    mImmediatePropagationStopped = true;
+  }
 
   inline void Clear()
   {
@@ -312,6 +317,7 @@ public:
    * Helper methods for methods of DOM Event.
    */
   void StopPropagation() { mFlags.StopPropagation(); }
+  void StopImmediatePropagation() { mFlags.StopImmediatePropagation(); }
 
   void PreventDefault()
   {
