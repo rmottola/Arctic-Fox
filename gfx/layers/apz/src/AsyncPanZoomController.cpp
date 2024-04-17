@@ -1996,6 +1996,10 @@ nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
   SetState(NOTHING);
   RequestContentRepaint();
 
+  if (!aEvent.mFollowedByMomentum) {
+    RequestSnap();
+  }
+
   return nsEventStatus_eConsumeNoDefault;
 }
 
