@@ -351,7 +351,15 @@ TEST(Layers, RepositionChild) {
   ASSERT_EQ(nullptr, layers[1]->GetNextSibling());
 }
 
-TEST(LayerMetricsWrapper, SimpleTree) {
+class LayerMetricsWrapperTester : public ::testing::Test {
+protected:
+  virtual void SetUp() {
+    // This ensures ScrollMetadata::sNullMetadata is initialized.
+    gfxPlatform::GetPlatform();
+  }
+};
+
+TEST_F(LayerMetricsWrapperTester, SimpleTree) {
   nsTArray<RefPtr<Layer> > layers;
   RefPtr<LayerManager> lm;
   RefPtr<Layer> root = CreateLayerTree("c(c(c(tt)c(t)))", nullptr, nullptr, lm, layers);
@@ -395,7 +403,7 @@ MakeMetadata(FrameMetrics::ViewID aId) {
   return metadata;
 }
 
-TEST(LayerMetricsWrapper, MultiFramemetricsTree) {
+TEST_F(LayerMetricsWrapperTester, MultiFramemetricsTree) {
   nsTArray<RefPtr<Layer> > layers;
   RefPtr<LayerManager> lm;
   RefPtr<Layer> root = CreateLayerTree("c(c(c(tt)c(t)))", nullptr, nullptr, lm, layers);
