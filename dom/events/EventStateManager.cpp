@@ -2223,7 +2223,7 @@ EventStateManager::DispatchLegacyMouseScrollEvents(nsIFrame* aTargetFrame,
   nsWeakFrame targetFrame(aTargetFrame);
 
   MOZ_ASSERT(*aStatus != nsEventStatus_eConsumeNoDefault &&
-             !aEvent->mFlags.mDefaultPrevented,
+             !aEvent->DefaultPrevented(),
              "If you make legacy events dispatched for default prevented wheel "
              "event, you need to initialize stateX and stateY");
   EventState stateX, stateY;
@@ -2309,8 +2309,8 @@ EventStateManager::SendLineScrollEvent(nsIFrame* aTargetFrame,
   EventDispatcher::Dispatch(targetContent, aTargetFrame->PresContext(),
                             &event, nullptr, &status);
   aState.mDefaultPrevented =
-    event.mFlags.mDefaultPrevented || status == nsEventStatus_eConsumeNoDefault;
-  aState.mDefaultPreventedByContent = event.mFlags.mDefaultPreventedByContent;
+    event.DefaultPrevented() || status == nsEventStatus_eConsumeNoDefault;
+  aState.mDefaultPreventedByContent = event.DefaultPreventedByContent();
 }
 
 void
@@ -2349,8 +2349,8 @@ EventStateManager::SendPixelScrollEvent(nsIFrame* aTargetFrame,
   EventDispatcher::Dispatch(targetContent, aTargetFrame->PresContext(),
                             &event, nullptr, &status);
   aState.mDefaultPrevented =
-    event.mFlags.mDefaultPrevented || status == nsEventStatus_eConsumeNoDefault;
-  aState.mDefaultPreventedByContent = event.mFlags.mDefaultPreventedByContent;
+    event.DefaultPrevented() || status == nsEventStatus_eConsumeNoDefault;
+  aState.mDefaultPreventedByContent = event.DefaultPreventedByContent();
 }
 
 nsIFrame*
