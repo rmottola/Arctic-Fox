@@ -306,7 +306,9 @@ this.PushService = {
         break;
 
       case "idle-daily":
-        this._dropExpiredRegistrations();
+        this._dropExpiredRegistrations().catch(error => {
+          console.error("Failed to drop expired registrations on idle", error);
+        });
         break;
 
       case "perm-changed":
@@ -458,6 +460,9 @@ this.PushService = {
             return this._stopService(STOPPING_SERVICE_EVENT);
           }
         }
+      default:
+        console.error("Unexpected event in _changeServerURL", event);
+        return Promise.reject(new Error(`Unexpected event ${event}`));
     }
   },
 
@@ -578,7 +583,7 @@ this.PushService = {
     console.debug("stopService()");
 
     if (this._state < PUSH_SERVICE_ACTIVATING) {
-      return;
+      return Promise.resolve();
     }
 
     this._stopObservers();
