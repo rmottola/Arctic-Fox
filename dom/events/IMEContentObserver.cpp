@@ -755,7 +755,7 @@ IMEContentObserver::OnMouseButtonEvent(nsPresContext* aPresContext,
   if (!mUpdatePreference.WantMouseButtonEventOnChar()) {
     return false;
   }
-  if (!aMouseEvent->mFlags.mIsTrusted ||
+  if (!aMouseEvent->IsTrusted() ||
       aMouseEvent->DefaultPrevented() ||
       !aMouseEvent->widget) {
     return false;
