@@ -1024,6 +1024,7 @@ private:
   // and such entries are stored at the end of the array. Uninitialized entries
   // and entries marked as deleted are not present in this array.
   nsTArray<CacheIndexRecord *>  mFrecencyArray;
+  bool                          mFrecencyArraySorted;
 
   nsTArray<CacheIndexIterator *> mIterators;
 
