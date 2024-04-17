@@ -1264,6 +1264,16 @@ CacheStorageService::PurgeOverMemoryLimit()
 
   LOG(("CacheStorageService::PurgeOverMemoryLimit"));
 
+  static TimeDuration const kFourSeconds = TimeDuration::FromSeconds(4);
+  TimeStamp now = TimeStamp::NowLoRes();
+
+  if (!mLastPurgeTime.IsNull() && now - mLastPurgeTime < kFourSeconds) {
+    LOG(("  bypassed, too soon"));
+    return;
+  }
+
+  mLastPurgeTime = now;
+
   Pool(true).PurgeOverMemoryLimit();
   Pool(false).PurgeOverMemoryLimit();
 }
