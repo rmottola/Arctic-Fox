@@ -2263,11 +2263,14 @@ EventStateManager::DispatchLegacyMouseScrollEvents(nsIFrame* aTargetFrame,
     }
   }
 
-  if (stateY.mDefaultPrevented || stateX.mDefaultPrevented) {
+  if (stateY.mDefaultPrevented) {
     *aStatus = nsEventStatus_eConsumeNoDefault;
-    aEvent->mFlags.mDefaultPrevented = true;
-    aEvent->mFlags.mDefaultPreventedByContent |=
-      stateY.mDefaultPreventedByContent || stateX.mDefaultPreventedByContent;
+    aEvent->PreventDefault(!stateY.mDefaultPreventedByContent);
+  }
+
+  if (stateX.mDefaultPrevented) {
+    *aStatus = nsEventStatus_eConsumeNoDefault;
+    aEvent->PreventDefault(!stateX.mDefaultPreventedByContent);
   }
 }
 
@@ -3171,7 +3174,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         // APZ to handle it, because it will track the velocity and predicted
         // destination from the momentum.
         if (wheelEvent->mFlags.mHandledByAPZ) {
-          wheelEvent->mFlags.mDefaultPrevented = true;
+          wheelEvent->PreventDefault();
         }
         action = WheelPrefs::GetInstance()->ComputeActionFor(wheelEvent);
       } else if (wheelEvent->mFlags.mHandledByAPZ) {
