@@ -31,6 +31,7 @@ using namespace mozilla::net;
 
 LazyLogModule gSocketTransportLog("nsSocketTransport");
 LazyLogModule gUDPSocketLog("UDPSocket");
+LazyLogModule gTCPSocketLog("TCPSocket");
 
 nsSocketTransportService *gSocketTransportService = nullptr;
 Atomic<PRThread*, Relaxed> gSocketThread;
