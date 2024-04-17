@@ -841,12 +841,14 @@ public:
 
   ScrollMetadata()
     : mMetrics()
+    , mSnapInfo()
     , mMaskLayerIndex()
     , mClipRect()
   {}
 
   bool operator==(const ScrollMetadata& aOther) const
   {
+    // TODO(botond): Should we include mSnapInfo in the comparison?
     return mMetrics == aOther.mMetrics &&
            mMaskLayerIndex == aOther.mMaskLayerIndex &&
            mClipRect == aOther.mClipRect;
@@ -867,6 +869,11 @@ public:
 
   FrameMetrics& GetMetrics() { return mMetrics; }
   const FrameMetrics& GetMetrics() const { return mMetrics; }
+
+  void SetSnapInfo(ScrollSnapInfo&& aSnapInfo) {
+    mSnapInfo = Move(aSnapInfo);
+  }
+  const ScrollSnapInfo& GetSnapInfo() const { return mSnapInfo; }
 
   void SetMaskLayerIndex(const Maybe<size_t>& aIndex) {
     mMaskLayerIndex = aIndex;
@@ -891,6 +898,9 @@ public:
   }
 private:
   FrameMetrics mMetrics;
+
+  // Information used to determine where to snap to for a given scroll.
+  ScrollSnapInfo mSnapInfo;
 
   // An extra clip mask layer to use when compositing a layer with this
   // FrameMetrics. This is an index into the MetricsMaskLayers array on
