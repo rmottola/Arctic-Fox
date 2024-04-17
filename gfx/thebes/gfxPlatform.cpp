@@ -1254,8 +1254,10 @@ bool gfxPlatform::UseAcceleratedCanvas()
   if (mPreferredCanvasBackend == BackendType::SKIA && gfxPrefs::CanvasAzureAccelerated()) {
     nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
     int32_t status;
+    nsCString discardFailureId;
     return !gfxInfo ||
       (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_CANVAS2D_ACCELERATION,
+                                              discardFailureId,
                                               &status)) &&
        status == nsIGfxInfo::FEATURE_STATUS_OK);
   }
@@ -2054,19 +2056,20 @@ InitLayersAccelerationPrefs()
     sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
 
     nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
+    nsCString discardFailureId;
     int32_t status;
 #ifdef XP_WIN
     if (gfxPrefs::LayersAccelerationForceEnabled()) {
       sLayersSupportsD3D9 = true;
       sLayersSupportsD3D11 = true;
     } else if (!gfxPrefs::LayersAccelerationDisabled() && gfxInfo) {
-      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, &status))) {
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS, discardFailureId, &status))) {
         if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
           MOZ_ASSERT(!sPrefBrowserTabsRemoteAutostart || IsVistaOrLater());
           sLayersSupportsD3D9 = true;
         }
       }
-      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status))) {
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, discardFailureId, &status))) {
         if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
           sLayersSupportsD3D11 = true;
         }
@@ -2075,7 +2078,7 @@ InitLayersAccelerationPrefs()
         // Always support D3D11 when WARP is allowed.
         sLayersSupportsD3D11 = true;
       }
-      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, &status))) {
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, discardFailureId, &status))) {
         if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
           gANGLESupportsD3D11 = true;
         }
@@ -2088,7 +2091,7 @@ InitLayersAccelerationPrefs()
         Preferences::GetBool("media.windows-media-foundation.use-dxva", true) &&
 #endif
         NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING,
-                                               &status))) {
+                                               discardFailureId, &status))) {
         if (status == nsIGfxInfo::FEATURE_STATUS_OK || gfxPrefs::HardwareVideoDecodingForceEnabled()) {
            sLayersSupportsHardwareVideoDecoding = true;
       }
@@ -2365,7 +2368,8 @@ AllowOpenGL(bool* aWhitelisted)
     gfxInfo->GetData();
 
     int32_t status;
-    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &status))) {
+    nsCString discardFailureId;
+    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_OPENGL_LAYERS, discardFailureId, &status))) {
       if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
         *aWhitelisted = true;
         return true;

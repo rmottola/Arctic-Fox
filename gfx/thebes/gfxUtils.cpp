@@ -1495,11 +1495,13 @@ public:
     GetFeatureStatusRunnable(dom::workers::WorkerPrivate* workerPrivate,
                              const nsCOMPtr<nsIGfxInfo>& gfxInfo,
                              int32_t feature,
+                             nsACString& failureId,
                              int32_t* status)
       : WorkerMainThreadRunnable(workerPrivate)
       , mGfxInfo(gfxInfo)
       , mFeature(feature)
       , mStatus(status)
+      , mFailureId(failureId)
       , mNSResult(NS_OK)
     {
     }
@@ -1507,7 +1509,7 @@ public:
     bool MainThreadRun() override
     {
       if (mGfxInfo) {
-        mNSResult = mGfxInfo->GetFeatureStatus(mFeature, mStatus);
+        mNSResult = mGfxInfo->GetFeatureStatus(mFeature, mFailureId, mStatus);
       }
       return true;
     }
@@ -1524,18 +1526,22 @@ private:
     nsCOMPtr<nsIGfxInfo> mGfxInfo;
     int32_t mFeature;
     int32_t* mStatus;
+    nsACString& mFailureId;
     nsresult mNSResult;
 };
 
 /* static */ nsresult
 gfxUtils::ThreadSafeGetFeatureStatus(const nsCOMPtr<nsIGfxInfo>& gfxInfo,
-                                     int32_t feature, int32_t* status)
+                                     int32_t feature, nsACString& failureId,
+                                     int32_t* status)
 {
   if (!NS_IsMainThread()) {
     dom::workers::WorkerPrivate* workerPrivate =
       dom::workers::GetCurrentThreadWorkerPrivate();
+
     RefPtr<GetFeatureStatusRunnable> runnable =
-      new GetFeatureStatusRunnable(workerPrivate, gfxInfo, feature, status);
+      new GetFeatureStatusRunnable(workerPrivate, gfxInfo, feature, failureId,
+                                   status);
 
     ErrorResult rv;
     runnable->Dispatch(rv);
@@ -1549,7 +1555,7 @@ gfxUtils::ThreadSafeGetFeatureStatus(const nsCOMPtr<nsIGfxInfo>& gfxInfo,
     return runnable->GetNSResult();
   }
 
-  return gfxInfo->GetFeatureStatus(feature, status);
+  return gfxInfo->GetFeatureStatus(feature, failureId, status);
 }
 
 /* static */ bool

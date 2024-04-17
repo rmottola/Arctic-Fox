@@ -1986,7 +1986,8 @@ gfxWindowsPlatform::CheckD3D11Support(bool* aCanUseHardware)
 
   if (nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo()) {
     int32_t status;
-    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, &status))) {
+    nsCString discardFailureId;
+    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS, discardFailureId, &status))) {
       if (status != nsIGfxInfo::FEATURE_STATUS_OK) {
         if (CanUseWARP()) {
           *aCanUseHardware = false;
@@ -2421,7 +2422,8 @@ IsD2DBlacklisted()
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
   if (gfxInfo) {
     int32_t status;
-    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT2D, &status))) {
+    nsCString discardFailureId;
+    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT2D, discardFailureId, &status))) {
       if (status != nsIGfxInfo::FEATURE_STATUS_OK) {
         return true;
       }
