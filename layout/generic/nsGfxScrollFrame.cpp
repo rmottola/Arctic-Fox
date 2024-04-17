@@ -3540,11 +3540,11 @@ ScrollFrameHelper::DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
 }
 
 
-Maybe<FrameMetrics>
-ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
-                                       nsIFrame* aContainerReferenceFrame,
-                                       const ContainerLayerParameters& aParameters,
-                                       const DisplayItemClip* aClip) const
+Maybe<ScrollMetadata>
+ScrollFrameHelper::ComputeScrollMetadata(Layer* aLayer,
+                                         nsIFrame* aContainerReferenceFrame,
+                                         const ContainerLayerParameters& aParameters,
+                                         const DisplayItemClip* aClip) const
 {
   if (!mWillBuildScrollableLayer || mIsScrollableLayerInRootContainer) {
     return Nothing();
@@ -3596,7 +3596,7 @@ ScrollFrameHelper::ComputeFrameMetrics(Layer* aLayer,
 
   nsRect scrollport = mScrollPort + toReferenceFrame;
 
-  return Some(nsLayoutUtils::ComputeFrameMetrics(
+  return Some(nsLayoutUtils::ComputeScrollMetadata(
     mScrolledFrame, mOuter, mOuter->GetContent(),
     aContainerReferenceFrame, aLayer, mScrollParentID,
     scrollport, parentLayerClip, isRootContent, aParameters));
