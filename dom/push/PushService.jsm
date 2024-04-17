@@ -142,6 +142,7 @@ this.PushService = {
         console.error(
           "stateChangeProcessEnqueue: Error shutting down service", error);
       });
+    return this._stateChangeProcessQueue;
   },
 
   // Pending request. If a worker try to register for the same scope again, do
@@ -193,7 +194,6 @@ this.PushService = {
     if (this._state == PUSH_SERVICE_ACTIVATING) {
       // It is not important what is the new state as soon as we leave
       // PUSH_SERVICE_ACTIVATING
-      this._state = aNewState;
       if (this._notifyActivated) {
         if (aNewState < PUSH_SERVICE_ACTIVATING) {
           this._notifyActivated.reject(new Error("Push service not active"));
@@ -262,7 +262,7 @@ this.PushService = {
   changeTestServer(url, options = {}) {
     console.debug("changeTestServer()");
 
-    this._stateChangeProcessEnqueue(_ => {
+    return this._stateChangeProcessEnqueue(_ => {
       if (this._state < PUSH_SERVICE_ACTIVATING) {
         console.debug("changeTestServer: PushService not activated?");
         return Promise.resolve();
@@ -422,8 +422,7 @@ this.PushService = {
           return Promise.resolve();
         }
         return this._startService(service, uri, options)
-          .then(_ => this._stateChangeProcessEnqueue(_ =>
-            this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled")))
+          .then(_ => this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled"))
           );
       }
       case CHANGING_SERVICE_EVENT:
@@ -433,8 +432,7 @@ this.PushService = {
             this._setState(PUSH_SERVICE_ACTIVATING);
             // The service has not been running - start it.
             return this._startService(service, uri, options)
-              .then(_ => this._stateChangeProcessEnqueue(_ =>
-                this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled")))
+              .then(_ => this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled"))
               );
 
           } else {
@@ -446,8 +444,7 @@ this.PushService = {
               .then(_ =>
                  this._startService(service, uri, options)
               )
-              .then(_ => this._stateChangeProcessEnqueue(_ =>
-                this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled")))
+              .then(_ => this._changeStateConnectionEnabledEvent(prefs.get("connection.enabled"))
               );
 
           }
@@ -1007,13 +1004,18 @@ this.PushService = {
       }
       return Promise.reject(new Error("Push service offline"));
     }
-    switch (action) {
-      case "register":
-        return this._service.register(...params);
-      case "unregister":
-        return this._service.unregister(...params);
-    }
-    return Promise.reject(new Error("Unknown request type: " + action));
+    // Ensure the backend is ready. `getByPageRecord` already checks this, but
+    // we need to check again here in case the service was restarted in the
+    // meantime.
+    return this._checkActivated().then(_ => {
+      switch (action) {
+        case "register":
+          return this._service.register(...params);
+        case "unregister":
+          return this._service.unregister(...params);
+      }
+      return Promise.reject(new Error("Unknown request type: " + action));
+    });
   },
 
   /**
@@ -1077,7 +1079,7 @@ this.PushService = {
     Services.telemetry.getHistogramById("PUSH_API_SUBSCRIBE_FAILED").add()
     if (!reply.error) {
       console.warn("onRegisterError: Called without valid error message!",
-        reply);
+        reply, String(reply));
       throw new Error("Registration error");
     }
     throw reply.error;
