@@ -93,6 +93,7 @@ public:
     , mIsLayersIdRoot(false)
     , mUsesContainerScrolling(false)
     , mIsScrollInfoLayer(false)
+    , mForceDisableApz(false)
   {
   }
 
@@ -132,7 +133,8 @@ public:
            mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
            mIsLayersIdRoot == aOther.mIsLayersIdRoot &&
            mUsesContainerScrolling == aOther.mUsesContainerScrolling &&
-           mIsScrollInfoLayer == aOther.mIsScrollInfoLayer;
+           mIsScrollInfoLayer == aOther.mIsScrollInfoLayer &&
+           mForceDisableApz == aOther.mForceDisableApz;
   }
 
   bool operator!=(const FrameMetrics& aOther) const
@@ -576,6 +578,13 @@ public:
     return mIsScrollInfoLayer;
   }
 
+  void SetForceDisableApz(bool aForceDisable) {
+    mForceDisableApz = aForceDisable;
+  }
+  bool IsApzForceDisabled() const {
+    return mForceDisableApz;
+  }
+
 private:
   // A unique ID assigned to each scrollable frame.
   ViewID mScrollId;
@@ -763,6 +772,10 @@ private:
 
   // Whether or not this frame has a "scroll info layer" to capture events.
   bool mIsScrollInfoLayer:1;
+
+  // Whether or not the compositor should actually do APZ-scrolling on this
+  // scrollframe.
+  bool mForceDisableApz:1;
 
   // WARNING!!!!
   //
