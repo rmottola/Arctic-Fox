@@ -614,7 +614,8 @@ DrawTargetCairo::~DrawTargetCairo()
 bool
 DrawTargetCairo::IsValid() const
 {
-  return mSurface && !cairo_surface_status(mSurface) && !cairo_surface_status(cairo_get_group_target(mContext));
+  return mSurface && !cairo_surface_status(mSurface) &&
+         mContext && !cairo_surface_status(cairo_get_group_target(mContext));
 }
 
 DrawTargetType
@@ -1286,6 +1287,10 @@ DrawTargetCairo::FillGlyphs(ScaledFont *aFont,
   if (!IsValid()) {
     gfxDebug() << "FillGlyphs bad surface " << cairo_surface_status(cairo_get_group_target(mContext));
     return;
+  }
+
+  if (!aFont) {
+    gfxDevCrash(LogReason::InvalidFont) << "Invalid scaled font";
   }
 
   AutoPrepareForDrawing prep(this, mContext);
