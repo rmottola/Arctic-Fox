@@ -16,6 +16,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/CSSVariableValues.h"
 #include "mozilla/SheetType.h"
+#include "mozilla/StyleStructContext.h"
 #include "nsColor.h"
 #include "nsCoord.h"
 #include "nsMargin.h"
@@ -149,9 +150,9 @@ static_assert(offsetof(nsRect_Simple, height) == offsetof(nsRect, height), "Wron
 // The lifetime of these objects is managed by the presshell's arena.
 struct nsStyleFont
 {
-  nsStyleFont(const nsFont& aFont, nsPresContext *aPresContext);
+  nsStyleFont(const nsFont& aFont, StyleStructContext aContext);
   nsStyleFont(const nsStyleFont& aStyleFont);
-  explicit nsStyleFont(nsPresContext *aPresContext);
+  explicit nsStyleFont(StyleStructContext aContext);
   ~nsStyleFont(void) {
     MOZ_COUNT_DTOR(nsStyleFont);
   }
@@ -174,14 +175,14 @@ struct nsStyleFont
    * aSize is allowed to be negative, but the caller is expected to deal with
    * negative results.  The result is clamped to nscoord_MIN .. nscoord_MAX.
    */
-  static nscoord ZoomText(nsPresContext* aPresContext, nscoord aSize);
+  static nscoord ZoomText(StyleStructContext aContext, nscoord aSize);
   /**
    * Return aSize divided by the current text zoom factor (in aPresContext).
    * aSize is allowed to be negative, but the caller is expected to deal with
    * negative results.  The result is clamped to nscoord_MIN .. nscoord_MAX.
    */
   static nscoord UnZoomText(nsPresContext* aPresContext, nscoord aSize);
-  static already_AddRefed<nsIAtom> GetLanguage(nsPresContext* aPresContext);
+  static already_AddRefed<nsIAtom> GetLanguage(StyleStructContext aPresContext);
 
   void* operator new(size_t sz, nsStyleFont* aSelf) CPP_THROW_NEW { return aSelf; }
   void* operator new(size_t sz, nsPresContext* aContext) CPP_THROW_NEW {
@@ -418,7 +419,7 @@ private:
 
 struct nsStyleColor
 {
-  explicit nsStyleColor(nsPresContext* aPresContext);
+  explicit nsStyleColor(StyleStructContext aContext);
   nsStyleColor(const nsStyleColor& aOther);
   ~nsStyleColor(void) {
     MOZ_COUNT_DTOR(nsStyleColor);
@@ -720,7 +721,7 @@ struct nsStyleImageLayers {
 };
 
 struct nsStyleBackground {
-  nsStyleBackground();
+  explicit nsStyleBackground(StyleStructContext aContext);
   nsStyleBackground(const nsStyleBackground& aOther);
   ~nsStyleBackground();
 
@@ -774,7 +775,7 @@ struct nsStyleBackground {
 
 struct nsStyleMargin
 {
-  nsStyleMargin(void);
+  explicit nsStyleMargin(StyleStructContext aContext);
   nsStyleMargin(const nsStyleMargin& aMargin);
   ~nsStyleMargin(void) {
     MOZ_COUNT_DTOR(nsStyleMargin);
@@ -820,7 +821,7 @@ protected:
 
 struct nsStylePadding
 {
-  nsStylePadding(void);
+  explicit nsStylePadding(StyleStructContext aContext);
   nsStylePadding(const nsStylePadding& aPadding);
   ~nsStylePadding(void) {
     MOZ_COUNT_DTOR(nsStylePadding);
@@ -1023,7 +1024,7 @@ static bool IsVisibleBorderStyle(uint8_t aStyle)
 
 struct nsStyleBorder
 {
-  explicit nsStyleBorder(nsPresContext* aContext);
+  explicit nsStyleBorder(StyleStructContext aContext);
   nsStyleBorder(const nsStyleBorder& aBorder);
   ~nsStyleBorder();
 
@@ -1251,7 +1252,7 @@ private:
 
 struct nsStyleOutline
 {
-  explicit nsStyleOutline(nsPresContext* aPresContext);
+  explicit nsStyleOutline(StyleStructContext aContext);
   nsStyleOutline(const nsStyleOutline& aOutline);
   ~nsStyleOutline(void) {
     MOZ_COUNT_DTOR(nsStyleOutline);
@@ -1351,7 +1352,7 @@ protected:
 
 struct nsStyleList
 {
-  explicit nsStyleList(nsPresContext* aPresContext);
+  explicit nsStyleList(StyleStructContext aContext);
   nsStyleList(const nsStyleList& aStyleList);
   ~nsStyleList(void);
 
@@ -1559,7 +1560,7 @@ struct nsStyleGridTemplate
 
 struct nsStylePosition
 {
-  nsStylePosition(void);
+  explicit nsStylePosition(StyleStructContext aContext);
   nsStylePosition(const nsStylePosition& aOther);
   ~nsStylePosition(void);
 
@@ -1810,7 +1811,7 @@ struct nsStyleTextOverflow
 
 struct nsStyleTextReset
 {
-  nsStyleTextReset(void);
+  explicit nsStyleTextReset(StyleStructContext aContext);
   nsStyleTextReset(const nsStyleTextReset& aOther);
   ~nsStyleTextReset(void);
 
@@ -1896,7 +1897,7 @@ protected:
 
 struct nsStyleText
 {
-  explicit nsStyleText(nsPresContext* aPresContext);
+  explicit nsStyleText(StyleStructContext aContext);
   nsStyleText(const nsStyleText& aOther);
   ~nsStyleText(void);
 
@@ -2105,7 +2106,7 @@ protected:
 
 struct nsStyleVisibility
 {
-  explicit nsStyleVisibility(nsPresContext* aPresContext);
+  explicit nsStyleVisibility(StyleStructContext aContext);
   nsStyleVisibility(const nsStyleVisibility& aVisibility);
   ~nsStyleVisibility() {
     MOZ_COUNT_DTOR(nsStyleVisibility);
@@ -2386,7 +2387,7 @@ private:
 
 struct nsStyleDisplay
 {
-  nsStyleDisplay();
+  explicit nsStyleDisplay(StyleStructContext aContext);
   nsStyleDisplay(const nsStyleDisplay& aOther);
   ~nsStyleDisplay() {
     MOZ_COUNT_DTOR(nsStyleDisplay);
@@ -2667,7 +2668,7 @@ struct nsStyleDisplay
 
 struct nsStyleTable
 {
-  nsStyleTable(void);
+  explicit nsStyleTable(StyleStructContext aContext);
   nsStyleTable(const nsStyleTable& aOther);
   ~nsStyleTable(void);
 
@@ -2700,7 +2701,7 @@ struct nsStyleTable
 
 struct nsStyleTableBorder
 {
-  nsStyleTableBorder();
+  explicit nsStyleTableBorder(StyleStructContext aContext);
   nsStyleTableBorder(const nsStyleTableBorder& aOther);
   ~nsStyleTableBorder(void);
 
@@ -2800,7 +2801,7 @@ struct nsStyleCounterData
 
 struct nsStyleQuotes
 {
-  nsStyleQuotes();
+  explicit nsStyleQuotes(StyleStructContext aContext);
   nsStyleQuotes(const nsStyleQuotes& aQuotes);
   ~nsStyleQuotes();
 
@@ -2884,7 +2885,7 @@ protected:
 
 struct nsStyleContent
 {
-  nsStyleContent(void);
+  explicit nsStyleContent(StyleStructContext aContext);
   nsStyleContent(const nsStyleContent& aContent);
   ~nsStyleContent(void);
 
@@ -2995,7 +2996,7 @@ protected:
 
 struct nsStyleUIReset
 {
-  nsStyleUIReset(void);
+  explicit nsStyleUIReset(StyleStructContext aContext);
   nsStyleUIReset(const nsStyleUIReset& aOther);
   ~nsStyleUIReset(void);
 
@@ -3061,7 +3062,7 @@ private:
 
 struct nsStyleUserInterface
 {
-  nsStyleUserInterface(void);
+  explicit nsStyleUserInterface(StyleStructContext aContext);
   nsStyleUserInterface(const nsStyleUserInterface& aOther);
   ~nsStyleUserInterface(void);
 
@@ -3109,7 +3110,7 @@ struct nsStyleUserInterface
 
 struct nsStyleXUL
 {
-  nsStyleXUL();
+  explicit nsStyleXUL(StyleStructContext aContext);
   nsStyleXUL(const nsStyleXUL& aSource);
   ~nsStyleXUL();
 
@@ -3147,7 +3148,7 @@ struct nsStyleXUL
 
 struct nsStyleColumn
 {
-  explicit nsStyleColumn(nsPresContext* aPresContext);
+  explicit nsStyleColumn(StyleStructContext aContext);
   nsStyleColumn(const nsStyleColumn& aSource);
   ~nsStyleColumn();
 
@@ -3242,7 +3243,7 @@ struct nsStyleSVGPaint
 
 struct nsStyleSVG
 {
-  nsStyleSVG();
+  explicit nsStyleSVG(StyleStructContext aContext);
   nsStyleSVG(const nsStyleSVG& aSource);
   ~nsStyleSVG();
 
@@ -3529,7 +3530,7 @@ struct nsTArray_CopyChooser<nsStyleFilter>
 
 struct nsStyleSVGReset
 {
-  nsStyleSVGReset();
+  explicit nsStyleSVGReset(StyleStructContext aContext);
   nsStyleSVGReset(const nsStyleSVGReset& aSource);
   ~nsStyleSVGReset();
 
@@ -3584,7 +3585,7 @@ struct nsStyleSVGReset
 
 struct nsStyleVariables
 {
-  nsStyleVariables();
+  explicit nsStyleVariables(StyleStructContext aContext);
   nsStyleVariables(const nsStyleVariables& aSource);
   ~nsStyleVariables();
 
