@@ -5734,7 +5734,7 @@ nsComputedDOMStyle::DoGetImageRendering()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleSVG()->mImageRendering,
+    nsCSSProps::ValueToKeywordEnum(StyleVisibility()->mImageRendering,
                                    nsCSSProps::kImageRenderingKTable));
   return val.forget();
 }
