@@ -3940,7 +3940,7 @@ nsComputedDOMStyle::DoGetPointerEvents()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleVisibility()->mPointerEvents,
+    nsCSSProps::ValueToKeywordEnum(StyleUserInterface()->mPointerEvents,
                                    nsCSSProps::kPointerEventsKTable));
   return val.forget();
 }
