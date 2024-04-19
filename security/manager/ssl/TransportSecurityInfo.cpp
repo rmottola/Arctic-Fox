@@ -641,7 +641,7 @@ GetSubjectAltNames(CERTCertificate *nssCert,
     return false;
   }
 
-  ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+  UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
   if (!arena) {
     return false;
   }
