@@ -1149,7 +1149,10 @@ retryDueToTLSIntolerance(PRErrorCode err, nsNSSSocketInfo* socketInfo)
                                  nsIWebProgressListener::STATE_USES_SSL_3);
   }
 
-  if (err == SSL_ERROR_INAPPROPRIATE_FALLBACK_ALERT) {
+  // NSS will return SSL_ERROR_RX_MALFORMED_SERVER_HELLO if anti-downgrade
+  // detected the downgrade.
+  if (err == SSL_ERROR_INAPPROPRIATE_FALLBACK_ALERT ||
+      err == SSL_ERROR_RX_MALFORMED_SERVER_HELLO) {
     // This is a clear signal that we've fallen back too many versions.  Treat
     // this as a hard failure, but forget any intolerance so that later attempts
     // don't use this version (i.e., range.max) and trigger the error again.
@@ -2687,6 +2690,10 @@ nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
       if (SECSuccess != SSL_OptionSet(fd, SSL_ENABLE_FALLBACK_SCSV, true)) {
         return NS_ERROR_FAILURE;
       }
+    }
+    // tell NSS the max enabled version to make anti-downgrade effective
+    if (SECSuccess != SSL_SetDowngradeCheckVersion(fd, maxEnabledVersion)) {
+      return NS_ERROR_FAILURE;
     }
   }
 
