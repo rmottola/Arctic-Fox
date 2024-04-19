@@ -2840,7 +2840,6 @@ nsStyleDisplay::nsStyleDisplay(StyleStructContext aContext)
   mOverflowY = NS_STYLE_OVERFLOW_VISIBLE;
   mOverflowClipBox = NS_STYLE_OVERFLOW_CLIP_BOX_PADDING_BOX;
   mResize = NS_STYLE_RESIZE_NONE;
-  mOpacity = 1.0f;
   mSpecifiedTransform = nullptr;
   mTransformOrigin[0].SetPercentValue(0.5f); // Transform is centered on origin
   mTransformOrigin[1].SetPercentValue(0.5f);
@@ -2889,7 +2888,6 @@ nsStyleDisplay::nsStyleDisplay(StyleStructContext aContext)
 
 nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
   : mBinding(aSource.mBinding)
-  , mOpacity(aSource.mOpacity)
   , mDisplay(aSource.mDisplay)
   , mOriginalDisplay(aSource.mOriginalDisplay)
   , mContain(aSource.mContain)
@@ -3020,21 +3018,6 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
       || mOverflowClipBox != aOther.mOverflowClipBox)
     NS_UpdateHint(hint, NS_CombineHint(nsChangeHint_AllReflowHints,
                                        nsChangeHint_RepaintFrame));
-
-  if (mOpacity != aOther.mOpacity) {
-    // If we're going from the optimized >=0.99 opacity value to 1.0 or back, then
-    // repaint the frame because DLBI will not catch the invalidation.  Otherwise,
-    // just update the opacity layer.
-    if ((mOpacity >= 0.99f && mOpacity < 1.0f && aOther.mOpacity == 1.0f) ||
-        (aOther.mOpacity >= 0.99f && aOther.mOpacity < 1.0f && mOpacity == 1.0f)) {
-      NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
-    } else {
-      NS_UpdateHint(hint, nsChangeHint_UpdateOpacityLayer);
-      if ((mOpacity == 1.0f) != (aOther.mOpacity == 1.0f)) {
-        NS_UpdateHint(hint, nsChangeHint_UpdateUsesOpacity);
-      }
-    }
-  }
 
   if (mIsolation != aOther.mIsolation) {
     NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
@@ -3954,6 +3937,7 @@ nsStyleVariables::CalcDifference(const nsStyleVariables& aOther) const
 nsStyleEffects::nsStyleEffects(StyleStructContext aContext)
   : mBoxShadow(nullptr)
   , mClip(0, 0, 0, 0)
+  , mOpacity(1.0f)
   , mClipFlags(NS_STYLE_CLIP_AUTO)
   , mMixBlendMode(NS_STYLE_BLEND_NORMAL)
 {
@@ -3963,6 +3947,7 @@ nsStyleEffects::nsStyleEffects(StyleStructContext aContext)
 nsStyleEffects::nsStyleEffects(const nsStyleEffects& aSource)
   : mBoxShadow(aSource.mBoxShadow)
   , mClip(aSource.mClip)
+  , mOpacity(aSource.mOpacity)
   , mClipFlags(aSource.mClipFlags)
   , mMixBlendMode(aSource.mMixBlendMode)
 {
@@ -3999,6 +3984,21 @@ nsStyleEffects::CalcDifference(const nsStyleEffects& aOther) const
     // will handle the invalidation.
     hint |= nsChangeHint_UpdateOverflow |
             nsChangeHint_SchedulePaint;
+  }
+
+  if (mOpacity != aOther.mOpacity) {
+    // If we're going from the optimized >=0.99 opacity value to 1.0 or back, then
+    // repaint the frame because DLBI will not catch the invalidation.  Otherwise,
+    // just update the opacity layer.
+    if ((mOpacity >= 0.99f && mOpacity < 1.0f && aOther.mOpacity == 1.0f) ||
+        (aOther.mOpacity >= 0.99f && aOther.mOpacity < 1.0f && mOpacity == 1.0f)) {
+      hint |= nsChangeHint_RepaintFrame;
+    } else {
+      hint |= nsChangeHint_UpdateOpacityLayer;
+      if ((mOpacity == 1.0f) != (aOther.mOpacity == 1.0f)) {
+        hint |= nsChangeHint_UpdateUsesOpacity;
+      }
+    }
   }
 
   if (mMixBlendMode != aOther.mMixBlendMode) {
