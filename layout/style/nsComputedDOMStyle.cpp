@@ -1461,7 +1461,7 @@ nsComputedDOMStyle::DoGetCounterReset()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetQuotes()
 {
-  const auto& quotePairs = StyleQuotes()->GetQuotePairs();
+  const auto& quotePairs = StyleList()->GetQuotePairs();
 
   if (quotePairs.IsEmpty()) {
     RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
