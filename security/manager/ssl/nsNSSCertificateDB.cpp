@@ -15,6 +15,7 @@
 #include "SharedSSLState.h"
 #include "mozilla/Base64.h"
 #include "mozilla/unused.h"
+#include "nsArray.h"
 #include "nsArrayUtils.h"
 #include "nsCOMPtr.h"
 #include "nsCRT.h"
@@ -463,10 +464,9 @@ nsNSSCertificateDB::ImportCertificates(uint8_t* data, uint32_t length,
     return NS_ERROR_FAILURE;
   }
 
-  nsresult rv;
-  nsCOMPtr<nsIMutableArray> array = do_CreateInstance(NS_ARRAY_CONTRACTID, &rv);
-  if (NS_FAILED(rv)) {
-    return rv;
+  nsCOMPtr<nsIMutableArray> array = nsArrayBase::Create();
+  if (!array) {
+    return NS_ERROR_FAILURE;
   }
 
   // Now let's create some certs to work with
@@ -478,7 +478,7 @@ nsNSSCertificateDB::ImportCertificates(uint8_t* data, uint32_t length,
     if (!cert) {
       return NS_ERROR_FAILURE;
     }
-    rv = array->AppendElement(cert, false);
+    nsresult rv = array->AppendElement(cert, false);
     if (NS_FAILED(rv)) {
       return rv;
     }
