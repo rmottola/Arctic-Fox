@@ -6032,7 +6032,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForStyleFilter(
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetFilter()
 {
-  const nsTArray<nsStyleFilter>& filters = StyleSVGReset()->mFilters;
+  const nsTArray<nsStyleFilter>& filters = StyleEffects()->mFilters;
 
   if (filters.IsEmpty()) {
     RefPtr<nsROCSSPrimitiveValue> value = new nsROCSSPrimitiveValue;

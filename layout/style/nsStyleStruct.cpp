@@ -1322,7 +1322,6 @@ nsStyleSVGReset::nsStyleSVGReset(const nsStyleSVGReset& aSource)
   mFloodColor = aSource.mFloodColor;
   mLightingColor = aSource.mLightingColor;
   mClipPath = aSource.mClipPath;
-  mFilters = aSource.mFilters;
   mStopOpacity = aSource.mStopOpacity;
   mFloodOpacity = aSource.mFloodOpacity;
   mDominantBaseline = aSource.mDominantBaseline;
@@ -1342,19 +1341,11 @@ nsChangeHint nsStyleSVGReset::CalcDifference(const nsStyleSVGReset& aOther) cons
 {
   nsChangeHint hint = nsChangeHint(0);
 
-  if (HasFilters() != aOther.HasFilters()) {
-    // A change from/to being a containing block for position:fixed.
-    NS_UpdateHint(hint, nsChangeHint_UpdateContainingBlock);
-  }
-
-  if (mClipPath != aOther.mClipPath ||
-      mFilters != aOther.mFilters) {
+  if (mClipPath != aOther.mClipPath) {
     NS_UpdateHint(hint, nsChangeHint_UpdateEffects);
     NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
-    // We only actually need to update the overflow area for filter
-    // changes.  However, clip-path changes require that we update
-    // the PreEffectsBBoxProperty, which is done during overflow
-    // computation.
+    // clip-path changes require that we update the PreEffectsBBoxProperty,
+    // which is done during overflow computation.
     NS_UpdateHint(hint, nsChangeHint_UpdateOverflow);
   }
 
@@ -3950,7 +3941,8 @@ nsStyleEffects::nsStyleEffects(StyleStructContext aContext)
 }
 
 nsStyleEffects::nsStyleEffects(const nsStyleEffects& aSource)
-  : mBoxShadow(aSource.mBoxShadow)
+  : mFilters(aSource.mFilters)
+  , mBoxShadow(aSource.mBoxShadow)
   , mClip(aSource.mClip)
   , mOpacity(aSource.mOpacity)
   , mClipFlags(aSource.mClipFlags)
@@ -4004,6 +3996,17 @@ nsStyleEffects::CalcDifference(const nsStyleEffects& aOther) const
         hint |= nsChangeHint_UpdateUsesOpacity;
       }
     }
+  }
+
+  if (HasFilters() != aOther.HasFilters()) {
+    // A change from/to being a containing block for position:fixed.
+    hint |= nsChangeHint_UpdateContainingBlock;
+  }
+
+  if (mFilters != aOther.mFilters) {
+    hint |= nsChangeHint_UpdateEffects |
+            nsChangeHint_RepaintFrame |
+            nsChangeHint_UpdateOverflow;
   }
 
   if (mMixBlendMode != aOther.mMixBlendMode) {
