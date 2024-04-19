@@ -27,6 +27,8 @@
 #include "nsNSSShutDown.h"
 #include "nsXULAppAPI.h"
 
+#include "mozilla/Telemetry.h"
+
 //These defines are taken from the PKCS#11 spec
 #define CKM_RSA_PKCS_KEY_PAIR_GEN     0x00000000
 #define CKM_DH_PKCS_KEY_PAIR_GEN      0x00000020
@@ -678,6 +680,8 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     free(keystring);
 
     rv = NS_OK;
+
+    GatherKeygenTelemetry(keyGenMechanism, keysize, keyparamsString);
 loser:
     if ( sec_rv != SECSuccess ) {
         if ( privateKey ) {
