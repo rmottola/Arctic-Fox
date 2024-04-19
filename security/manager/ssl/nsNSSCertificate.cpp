@@ -1194,11 +1194,12 @@ nsNSSCertificate::ExportAsCMS(uint32_t chainMode,
     if (issuerCert && issuerCert != mCert.get()) {
       bool includeRoot =
         (chainMode == nsIX509Cert::CMS_CHAIN_MODE_CertChainWithRoot);
-      ScopedCERTCertificateList certChain(
+      UniqueCERTCertificateList certChain(
           CERT_CertChainFromCert(issuerCert, certUsageAnyCA, includeRoot));
       if (certChain) {
-        if (NSS_CMSSignedData_AddCertList(sigd.get(), certChain) == SECSuccess) {
-          certChain.forget();
+        if (NSS_CMSSignedData_AddCertList(sigd.get(), certChain.get())
+              == SECSuccess) {
+          Unused << certChain.release();
         }
         else {
           MOZ_LOG(gPIPNSSLog, LogLevel::Debug,

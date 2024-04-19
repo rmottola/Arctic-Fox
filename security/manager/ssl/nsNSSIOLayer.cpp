@@ -2210,7 +2210,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
   PLArenaPool* arena = nullptr;
   char** caNameStrings;
   ScopedCERTCertificate cert;
-  ScopedSECKEYPrivateKey privKey;
+  UniqueSECKEYPrivateKey privKey;
   ScopedCERTCertList certList;
   CERTCertListNode* node;
   UniqueCERTCertNicknames nicknames;
@@ -2232,13 +2232,13 @@ ClientAuthDataRunnable::RunOnTargetThread()
     }
 
     // Get the private key
-    privKey = PK11_FindKeyByAnyCert(cert.get(), wincx);
+    privKey.reset(PK11_FindKeyByAnyCert(cert.get(), wincx));
     if (!privKey) {
       goto loser;
     }
 
     *mPRetCert = cert.forget();
-    *mPRetKey = privKey.forget();
+    *mPRetKey = privKey.release();
     mRV = SECSuccess;
     return;
   }
@@ -2296,7 +2296,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
     while (!CERT_LIST_END(node, certList)) {
       // if the certificate has restriction and we do not satisfy it we do not
       // use it
-      privKey = PK11_FindKeyByAnyCert(node->cert, wincx);
+      privKey.reset(PK11_FindKeyByAnyCert(node->cert, wincx));
       if (privKey) {
         if (hasExplicitKeyUsageNonRepudiation(node->cert)) {
           privKey = nullptr;
@@ -2321,7 +2321,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
 
     if (!cert && low_prio_nonrep_cert) {
       cert = low_prio_nonrep_cert.forget();
-      privKey = PK11_FindKeyByAnyCert(cert.get(), wincx);
+      privKey.reset(PK11_FindKeyByAnyCert(cert.get(), wincx));
     }
 
     if (!cert) {
@@ -2545,7 +2545,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
     }
 
     // go get the private key
-    privKey = PK11_FindKeyByAnyCert(cert.get(), wincx);
+    privKey.reset(PK11_FindKeyByAnyCert(cert.get(), wincx));
     if (!privKey) {
       keyError = PR_GetError();
       if (keyError == SEC_ERROR_BAD_PASSWORD) {
@@ -2571,7 +2571,7 @@ done:
   }
 
   *mPRetCert = cert.forget();
-  *mPRetKey = privKey.forget();
+  *mPRetKey = privKey.release();
 
   if (mRV == SECFailure) {
     mErrorCodeToReport = error;
