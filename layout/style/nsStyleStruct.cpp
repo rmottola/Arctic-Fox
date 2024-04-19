@@ -3603,6 +3603,7 @@ nsStyleText::nsStyleText(nsPresContext* aPresContext)
   mTextAlignTrue = false;
   mTextAlignLastTrue = false;
   mTextEmphasisColorForeground = true;
+  mWebkitTextFillColorForeground = true;
   mTextTransform = NS_STYLE_TEXT_TRANSFORM_NONE;
   mWhiteSpace = NS_STYLE_WHITESPACE_NORMAL;
   mWordBreak = NS_STYLE_WORDBREAK_NORMAL;
@@ -3619,6 +3620,7 @@ nsStyleText::nsStyleText(nsPresContext* aPresContext)
     NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT_ZH :
     NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT;
   mTextEmphasisColor = aPresContext->DefaultColor();
+  mWebkitTextFillColor = aPresContext->DefaultColor();
   mControlCharacterVisibility = nsCSSParser::ControlCharVisibilityDefault();
 
   mWordSpacing.SetCoordValue(0);
@@ -3636,6 +3638,7 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
     mTextAlignTrue(false),
     mTextAlignLastTrue(false),
     mTextEmphasisColorForeground(aSource.mTextEmphasisColorForeground),
+    mWebkitTextFillColorForeground(aSource.mWebkitTextFillColorForeground),
     mTextTransform(aSource.mTextTransform),
     mWhiteSpace(aSource.mWhiteSpace),
     mWordBreak(aSource.mWordBreak),
@@ -3650,6 +3653,7 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
     mTextEmphasisStyle(aSource.mTextEmphasisStyle),
     mTabSize(aSource.mTabSize),
     mTextEmphasisColor(aSource.mTextEmphasisColor),
+    mWebkitTextFillColor(aSource.mWebkitTextFillColor),
     mWordSpacing(aSource.mWordSpacing),
     mLetterSpacing(aSource.mLetterSpacing),
     mLineHeight(aSource.mLineHeight),
@@ -3719,7 +3723,9 @@ nsChangeHint nsStyleText::CalcDifference(const nsStyleText& aOther) const
              "If the text-emphasis-color are both foreground color, "
              "mTextEmphasisColor should also be identical");
   if (mTextEmphasisColorForeground != aOther.mTextEmphasisColorForeground ||
-      mTextEmphasisColor != aOther.mTextEmphasisColor) {
+      mTextEmphasisColor != aOther.mTextEmphasisColor ||
+      mWebkitTextFillColorForeground != aOther.mWebkitTextFillColorForeground ||
+      mWebkitTextFillColor != aOther.mWebkitTextFillColor) {
     return nsChangeHint_SchedulePaint |
            nsChangeHint_RepaintFrame;
   }
