@@ -3655,6 +3655,14 @@ ElementRestyler::ComputeRestyleResultFromNewContext(nsIFrame* aSelf,
     aCanStopWithStyleChange = false;
     return;
   }
+
+  if (oldContext->IsTextCombined() != aNewContext->IsTextCombined()) {
+    LOG_RESTYLE_CONTINUE("NS_STYLE_IS_TEXT_COMBINED differs between "
+                         "old and new style contexts");
+    aRestyleResult = eRestyleResult_Continue;
+    aCanStopWithStyleChange = false;
+    return;
+  }
 }
 
 bool
