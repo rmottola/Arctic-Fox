@@ -792,8 +792,7 @@ bool
 nsSSLIOLayerHelpers::fallbackLimitReached(const nsACString& hostName,
                                           uint16_t intolerant)
 {
-  MutexAutoLock lock(mutex);
-  if (mInsecureFallbackSites.Contains(hostName)) {
+  if (isInsecureFallbackSite(hostName)) {
     return intolerant <= SSL_LIBRARY_VERSION_TLS_1_0;
   }
   return intolerant <= mVersionFallbackLimit;
@@ -1172,15 +1171,17 @@ retryDueToTLSIntolerance(PRErrorCode err, nsNSSSocketInfo* socketInfo)
 
   if ((err == SSL_ERROR_NO_CYPHER_OVERLAP || err == PR_END_OF_FILE_ERROR ||
        err == PR_CONNECT_RESET_ERROR) &&
-      (!fallbackLimitReached || helpers.mUnrestrictedRC4Fallback) &&
-      nsNSSComponent::AreAnyWeakCiphersEnabled()) {
-    if (helpers.rememberStrongCiphersFailed(socketInfo->GetHostName(),
-                                            socketInfo->GetPort(), err)) {
-      Telemetry::Accumulate(Telemetry::SSL_WEAK_CIPHERS_FALLBACK,
-                            tlsIntoleranceTelemetryBucket(err));
-      return true;
+       nsNSSComponent::AreAnyWeakCiphersEnabled()) {
+    if (helpers.isInsecureFallbackSite(socketInfo->GetHostName()) ||
+        helpers.mUnrestrictedRC4Fallback) {
+      if (helpers.rememberStrongCiphersFailed(socketInfo->GetHostName(),
+                                              socketInfo->GetPort(), err)) {
+        Telemetry::Accumulate(Telemetry::SSL_WEAK_CIPHERS_FALLBACK,
+                              tlsIntoleranceTelemetryBucket(err));
+        return true;
+      }
+      Telemetry::Accumulate(Telemetry::SSL_WEAK_CIPHERS_FALLBACK, 0);
     }
-    Telemetry::Accumulate(Telemetry::SSL_WEAK_CIPHERS_FALLBACK, 0);
   }
 
   // When not using a proxy we'll see a connection reset error.
