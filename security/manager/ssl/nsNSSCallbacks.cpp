@@ -833,11 +833,6 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
   if (!infoObject)
     return;
 
-  if (infoObject->IsPreliminaryHandshakeDone())
-    return;
-
-  infoObject->SetPreliminaryHandshakeDone();
-
   SSLChannelInfo channelInfo;
   if (SSL_GetChannelInfo(fd, &channelInfo, sizeof(channelInfo)) == SECSuccess) {
     infoObject->SetSSLVersionUsed(channelInfo.protocolVersion);
@@ -862,6 +857,11 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
     }
   }
 
+  // Don't update NPN details on renegotiation.
+  if (infoObject->IsPreliminaryHandshakeDone()) {
+    return;
+  }
+
   // Get the NPN value.
   SSLNextProtoState state;
   unsigned char npnbuf[256];
@@ -880,6 +880,8 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
   else {
     infoObject->SetNegotiatedNPN(nullptr, 0);
   }
+
+  infoObject->SetPreliminaryHandshakeDone();
 }
 
 SECStatus
