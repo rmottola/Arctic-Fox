@@ -23,6 +23,7 @@
 #include "nsProxyRelease.h"
 #include "pkix/pkixtypes.h"
 #include "PSMRunnable.h"
+#include "ScopedNSSTypes.h"
 #include "SharedSSLState.h"
 #include "ssl.h"
 #include "sslproto.h"
@@ -1246,7 +1247,7 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("HandshakeCallback KEEPING existing cert\n"));
   } else {
-    ScopedCERTCertificate serverCert(SSL_PeerCertificate(fd));
+    UniqueCERTCertificate serverCert(SSL_PeerCertificate(fd));
     RefPtr<nsNSSCertificate> nssc(nsNSSCertificate::Create(serverCert.get()));
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("HandshakeCallback using NEW cert %p\n", nssc.get()));

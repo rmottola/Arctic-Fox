@@ -18,6 +18,7 @@
 #include "mozilla/Casting.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Logging.h"
+#include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "nsCharSeparatedTokenizer.h"
@@ -404,14 +405,14 @@ nsNSSSocketInfo::IsAcceptableForHost(const nsACString& hostname, bool* _retval)
   // Ensure that the server certificate covers the hostname that would
   // like to join this connection
 
-  ScopedCERTCertificate nssCert;
+  UniqueCERTCertificate nssCert;
 
   nsCOMPtr<nsIX509Cert> cert;
   if (NS_FAILED(SSLStatus()->GetServerCert(getter_AddRefs(cert)))) {
     return NS_OK;
   }
   if (cert) {
-    nssCert = cert->GetCert();
+    nssCert.reset(cert->GetCert());
   }
 
   if (!nssCert) {
@@ -2062,14 +2063,14 @@ public:
                          CERTCertificate** pRetCert,
                          SECKEYPrivateKey** pRetKey,
                          nsNSSSocketInfo* info,
-                         CERTCertificate* serverCert)
+                         const UniqueCERTCertificate& serverCert)
     : mRV(SECFailure)
     , mErrorCodeToReport(SEC_ERROR_NO_MEMORY)
     , mPRetCert(pRetCert)
     , mPRetKey(pRetKey)
     , mCANames(caNames)
     , mSocketInfo(info)
-    , mServerCert(serverCert)
+    , mServerCert(serverCert.get())
   {
   }
 
@@ -2110,7 +2111,7 @@ nsNSS_SSLGetClientAuthData(void* arg, PRFileDesc* socket,
   RefPtr<nsNSSSocketInfo> info(
     reinterpret_cast<nsNSSSocketInfo*>(socket->higher->secret));
 
-  ScopedCERTCertificate serverCert(SSL_PeerCertificate(socket));
+  UniqueCERTCertificate serverCert(SSL_PeerCertificate(socket));
   if (!serverCert) {
     NS_NOTREACHED("Missing server certificate should have been detected during "
                   "server cert authentication.");
@@ -2158,7 +2159,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
 
   UniquePLArenaPool arena;
   char** caNameStrings;
-  ScopedCERTCertificate cert;
+  UniqueCERTCertificate cert;
   UniqueSECKEYPrivateKey privKey;
   ScopedCERTCertList certList;
   CERTCertListNode* node;
@@ -2174,7 +2175,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
   // If a client cert preference was set on the socket info, use that and skip
   // the client cert UI and/or search of the user's past cert decisions.
   if (socketClientCert) {
-    cert = socketClientCert->GetCert();
+    cert.reset(socketClientCert->GetCert());
     if (!cert) {
       goto loser;
     }
@@ -2185,7 +2186,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
       goto loser;
     }
 
-    *mPRetCert = cert.forget();
+    *mPRetCert = cert.release();
     *mPRetKey = privKey.release();
     mRV = SECSuccess;
     return;
@@ -2233,7 +2234,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
       goto noCert;
     }
 
-    ScopedCERTCertificate low_prio_nonrep_cert;
+    UniqueCERTCertificate lowPrioNonrepCert;
 
     // loop through the list until we find a cert with a key
     while (!CERT_LIST_END(node, certList)) {
@@ -2243,13 +2244,13 @@ ClientAuthDataRunnable::RunOnTargetThread()
       if (privKey) {
         if (hasExplicitKeyUsageNonRepudiation(node->cert)) {
           privKey = nullptr;
-          // Not a prefered cert
-          if (!low_prio_nonrep_cert) { // did not yet find a low prio cert
-            low_prio_nonrep_cert = CERT_DupCertificate(node->cert);
+          // Not a preferred cert
+          if (!lowPrioNonrepCert) { // did not yet find a low prio cert
+            lowPrioNonrepCert.reset(CERT_DupCertificate(node->cert));
           }
         } else {
           // this is a good cert to present
-          cert = CERT_DupCertificate(node->cert);
+          cert.reset(CERT_DupCertificate(node->cert));
           break;
         }
       }
@@ -2262,8 +2263,8 @@ ClientAuthDataRunnable::RunOnTargetThread()
       node = CERT_LIST_NEXT(node);
     }
 
-    if (!cert && low_prio_nonrep_cert) {
-      cert = low_prio_nonrep_cert.forget();
+    if (!cert && lowPrioNonrepCert) {
+      cert = Move(lowPrioNonrepCert);
       privKey.reset(PK11_FindKeyByAnyCert(cert.get(), wincx));
     }
 
@@ -2307,7 +2308,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
             nsNSSCertificate* obj_cert =
               reinterpret_cast<nsNSSCertificate*>(found_cert.get());
             if (obj_cert) {
-              cert = obj_cert->GetCert();
+              cert.reset(obj_cert->GetCert());
             }
           }
 
@@ -2467,7 +2468,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
         ++i, node = CERT_LIST_NEXT(node)) {
 
         if (i == selectedIndex) {
-          cert = CERT_DupCertificate(node->cert);
+          cert.reset(CERT_DupCertificate(node->cert));
           break;
         }
       }
@@ -2506,7 +2507,7 @@ loser:
 done:
   int error = PR_GetError();
 
-  *mPRetCert = cert.forget();
+  *mPRetCert = cert.release();
   *mPRetKey = privKey.release();
 
   if (mRV == SECFailure) {
