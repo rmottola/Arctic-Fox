@@ -1370,7 +1370,8 @@ nsComboboxControlFrame::CreateFrameFor(nsIContent*      aContent)
                              nsStyleSet::eSkipParentDisplayBasedStyleFixup);
 
   RefPtr<nsStyleContext> textStyleContext;
-  textStyleContext = styleSet->ResolveStyleForNonElement(mStyleContext);
+  textStyleContext = styleSet->
+    ResolveStyleForNonElement(mStyleContext, nsCSSAnonBoxes::mozText);
 
   // Start by creating our anonymous block frame
   mDisplayFrame = new (shell) nsComboboxDisplayFrame(styleContext, this);
