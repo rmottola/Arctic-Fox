@@ -2834,7 +2834,7 @@ gfxFontGroup::FindFontForChar(uint32_t aCh, uint32_t aPrevCh, uint32_t aNextCh,
     }
 
     // never fall back for characters from unknown scripts
-    if (aRunScript == HB_SCRIPT_UNKNOWN) {
+    if (aRunScript == MOZ_SCRIPT_UNKNOWN) {
         return nullptr;
     }
 
