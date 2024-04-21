@@ -692,7 +692,7 @@ static const char kFontYuGothic[] = "Yu Gothic";
 
 void
 gfxWindowsPlatform::GetCommonFallbackFonts(uint32_t aCh, uint32_t aNextCh,
-                                           int32_t aRunScript,
+                                           Script aRunScript,
                                            nsTArray<const char*>& aFontList)
 {
     if (aNextCh == 0xfe0fu) {
