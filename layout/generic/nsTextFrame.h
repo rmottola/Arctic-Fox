@@ -584,6 +584,8 @@ public:
   void AssignJustificationGaps(const mozilla::JustificationAssignment& aAssign);
   mozilla::JustificationAssignment GetJustificationAssignment() const;
 
+  uint32_t CountGraphemeClusters() const;
+
 protected:
   virtual ~nsTextFrame();
 
