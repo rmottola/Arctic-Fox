@@ -21529,6 +21529,10 @@
         "path": "webdriver/timeouts/page_load_timeouts_tests.py"
       },
       {
+        "path": "web-animations/animation-effect-timing/direction.html",
+        "url": "/web-animations/animation-effect-timing/direction.html"
+      },
+      {
         "path": "webdriver/user_input/clear_test.py"
       }
     ]
@@ -22211,6 +22215,18 @@
           {
             "path": "service-workers/service-worker/xhr.https.html",
             "url": "/service-workers/service-worker/xhr.https.html"
+          }
+        ],
+        "compat/webkit-text-fill-color-property-001d.html": [
+          {
+            "path": "compat/webkit-text-fill-color-property-001d.html",
+            "references": [
+              [
+                "/compat/webkit-text-fill-color-property-001-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/compat/webkit-text-fill-color-property-001d.html"
           }
         ]
       }
