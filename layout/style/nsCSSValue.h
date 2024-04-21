@@ -719,6 +719,10 @@ public:
   nsCSSValueList* SetListValue();
   nsCSSValuePairList* SetPairListValue();
 
+  // These take ownership of the passed-in resource.
+  void AdoptListValue(nsCSSValueList*&& aValue);
+  void AdoptPairListValue(nsCSSValuePairList*&& aValue);
+
   void StartImageLoad(nsIDocument* aDocument) const;  // Only pretend const
 
   // Initializes as a function value with the specified function id.
@@ -992,7 +996,7 @@ nsCSSValue::GetListValue()
   if (mUnit == eCSSUnit_List)
     return mValue.mList;
   else {
-    MOZ_ASSERT(mUnit == eCSSUnit_ListDep, "not a pairlist value");
+    MOZ_ASSERT(mUnit == eCSSUnit_ListDep, "not a list value");
     return mValue.mListDependent;
   }
 }
@@ -1003,7 +1007,7 @@ nsCSSValue::GetListValue() const
   if (mUnit == eCSSUnit_List)
     return mValue.mList;
   else {
-    MOZ_ASSERT(mUnit == eCSSUnit_ListDep, "not a pairlist value");
+    MOZ_ASSERT(mUnit == eCSSUnit_ListDep, "not a list value");
     return mValue.mListDependent;
   }
 }
