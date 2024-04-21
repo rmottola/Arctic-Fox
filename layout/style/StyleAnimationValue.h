@@ -266,6 +266,7 @@ public:
     eUnit_Percent,
     eUnit_Float,
     eUnit_Color,
+    eUnit_CurrentColor,
     eUnit_Calc, // nsCSSValue* (never null), always with a single
                 // calc() expression that's either length or length+percent
     eUnit_ObjectPosition, // nsCSSValue* (never null), always with a
@@ -422,6 +423,7 @@ public:
   void SetPercentValue(float aPercent);
   void SetFloatValue(float aFloat);
   void SetColorValue(nscolor aColor);
+  void SetCurrentColorValue();
   void SetUnparsedStringValue(const nsString& aString);
 
   // These setters take ownership of |aValue|, and are therefore named
