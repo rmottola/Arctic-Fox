@@ -5887,7 +5887,8 @@ nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
       case nsStyleBasicShape::Type::eCircle:
       case nsStyleBasicShape::Type::eEllipse: {
         const nsTArray<nsStyleCoord>& radii = aStyleBasicShape->Coordinates();
-        MOZ_ASSERT(radii.Length() == (nsStyleBasicShape::Type::eCircle ? 1 : 2),
+        MOZ_ASSERT(radii.Length() ==
+                   (type == nsStyleBasicShape::Type::eCircle ? 1 : 2),
                    "wrong number of radii");
         for (size_t i = 0; i < radii.Length(); ++i) {
           nsAutoString radius;
