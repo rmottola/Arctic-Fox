@@ -153,7 +153,7 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Event)
   if (tmp->mEventIsInternal) {
-    tmp->mEvent->target = nullptr;
+    tmp->mEvent->mTarget = nullptr;
     tmp->mEvent->currentTarget = nullptr;
     tmp->mEvent->originalTarget = nullptr;
     switch (tmp->mEvent->mClass) {
@@ -191,7 +191,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Event)
   if (tmp->mEventIsInternal) {
-    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEvent->target)
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEvent->mTarget)
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEvent->currentTarget)
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEvent->originalTarget)
     switch (tmp->mEvent->mClass) {
@@ -288,7 +288,7 @@ GetDOMEventTarget(nsIDOMEventTarget* aTarget)
 EventTarget*
 Event::GetTarget() const
 {
-  return GetDOMEventTarget(mEvent->target);
+  return GetDOMEventTarget(mEvent->mTarget);
 }
 
 NS_METHOD
@@ -319,7 +319,7 @@ Event::GetTargetFromFrame()
 {
   if (!mPresContext) { return nullptr; }
 
-  // Get the target frame (have to get the ESM first)
+  // Get the mTarget frame (have to get the ESM first)
   nsIFrame* targetFrame = mPresContext->EventStateManager()->GetEventTarget();
   if (!targetFrame) { return nullptr; }
 
@@ -424,7 +424,7 @@ Event::EventPhase() const
   // Note, remember to check that this works also
   // if or when Bug 235441 is fixed.
   if ((mEvent->currentTarget &&
-       mEvent->currentTarget == mEvent->target) ||
+       mEvent->currentTarget == mEvent->mTarget) ||
        mEvent->mFlags.InTargetPhase()) {
     return nsIDOMEvent::AT_TARGET;
   }
@@ -586,7 +586,7 @@ Event::InitEvent(const nsAString& aEventTypeArg,
 
   // Clearing the old targets, so that the event is targeted correctly when
   // re-dispatching it.
-  mEvent->target = nullptr;
+  mEvent->mTarget = nullptr;
   mEvent->originalTarget = nullptr;
 }
 
@@ -609,7 +609,7 @@ Event::DuplicatePrivateData()
 NS_IMETHODIMP
 Event::SetTarget(nsIDOMEventTarget* aTarget)
 {
-  mEvent->target = do_QueryInterface(aTarget);
+  mEvent->mTarget = do_QueryInterface(aTarget);
   return NS_OK;
 }
 
@@ -991,22 +991,10 @@ Event::GetOffsetCoords(nsPresContext* aPresContext,
                        LayoutDeviceIntPoint aPoint,
                        CSSIntPoint aDefaultPoint)
 {
-  // XXX: Known spec bug (WD 3 August 2016):
-  // The behavior in the spec doesn't do "during and after the dispatch".
-  // It just does "during the dispatch", and goes back to "pageX" after the
-  // dispatch. This is not expected (and cf. implemented) behavior, so we
-  // don't follow the spec here to align the property with all other browsers.
-  // Spec-compliant would be:
-  //   if (!aEvent->mFlags.mIsBeingDispatched) {
-  //     return GetPageCoords(aPresContext, aEvent, aPoint, aDefaultPoint);
-  //   }
-  // See also:
-  // https://www.w3.org/Bugs/Public/show_bug.cgi?id=16673
-  if (!aEvent->target) {
+  if (!aEvent->mTarget) {
     return GetPageCoords(aPresContext, aEvent, aPoint, aDefaultPoint);
   }
-  
-  nsCOMPtr<nsIContent> content = do_QueryInterface(aEvent->target);
+  nsCOMPtr<nsIContent> content = do_QueryInterface(aEvent->mTarget);
   if (!content || !aPresContext) {
     return CSSIntPoint(0, 0);
   }
