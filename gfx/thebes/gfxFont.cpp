@@ -1491,7 +1491,7 @@ gfxFont::SupportsSubSuperscript(uint32_t aSubSuperscript,
             ch = ' ';
         }
 
-        hb_codepoint_t gid = shaper->GetGlyph(ch, 0);
+        hb_codepoint_t gid = shaper->GetNominalGlyph(ch);
         hb_set_add(defaultGlyphsInRun, gid);
     }
 
