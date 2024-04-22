@@ -80,7 +80,8 @@ KeyframeEffectReadOnly::KeyframeEffectReadOnly(
   CSSPseudoElementType aPseudoType,
   const TimingParams& aTiming)
   : KeyframeEffectReadOnly(aDocument, aTarget, aPseudoType,
-                           new AnimationEffectTimingReadOnly(aTiming))
+                           new AnimationEffectTimingReadOnly(aDocument,
+                                                             aTiming))
 {
 }
 
@@ -1518,7 +1519,7 @@ KeyframeEffect::KeyframeEffect(nsIDocument* aDocument,
                                CSSPseudoElementType aPseudoType,
                                const TimingParams& aTiming)
   : KeyframeEffectReadOnly(aDocument, aTarget, aPseudoType,
-                           new AnimationEffectTiming(aTiming, this))
+                           new AnimationEffectTiming(aDocument, aTiming, this))
 {
 }
 
