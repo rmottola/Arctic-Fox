@@ -1685,7 +1685,7 @@ class nsIWidget : public nsISupports {
      *
      * @param aPointerId The touch point id to create or update.
      * @param aPointerState one or more of the touch states listed above
-     * @param aScreenX, aScreenY screen coords of this event
+     * @param aPoint coords of this event
      * @param aPressure 0.0 -> 1.0 float val indicating pressure
      * @param aOrientation 0 -> 359 degree value indicating the
      * orientation of the pointer. Use 90 for normal taps.
@@ -1694,7 +1694,7 @@ class nsIWidget : public nsISupports {
      */
     virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
                                                 TouchPointerState aPointerState,
-                                                ScreenIntPoint aPointerScreenPoint,
+                                                LayoutDeviceIntPoint aPoint,
                                                 double aPointerPressure,
                                                 uint32_t aPointerOrientation,
                                                 nsIObserver* aObserver) = 0;
@@ -1707,7 +1707,7 @@ class nsIWidget : public nsISupports {
      * @param aObserver The observer that will get notified once the events
      * have been dispatched.
      */
-    virtual nsresult SynthesizeNativeTouchTap(ScreenIntPoint aPointerScreenPoint,
+    virtual nsresult SynthesizeNativeTouchTap(LayoutDeviceIntPoint aPoint,
                                               bool aLongTap,
                                               nsIObserver* aObserver);
 
@@ -1743,7 +1743,7 @@ private:
   class LongTapInfo
   {
   public:
-    LongTapInfo(int32_t aPointerId, ScreenIntPoint& aPoint,
+    LongTapInfo(int32_t aPointerId, LayoutDeviceIntPoint& aPoint,
                 mozilla::TimeDuration aDuration,
                 nsIObserver* aObserver) :
       mPointerId(aPointerId),
@@ -1755,7 +1755,7 @@ private:
     }
 
     int32_t mPointerId;
-    ScreenIntPoint mPosition;
+    LayoutDeviceIntPoint mPosition;
     mozilla::TimeDuration mDuration;
     nsCOMPtr<nsIObserver> mObserver;
     mozilla::TimeStamp mStamp;
