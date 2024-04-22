@@ -1886,13 +1886,10 @@ nsCocoaWindow::DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus)
 {
   aStatus = nsEventStatus_eIgnore;
 
-  nsIWidget* aWidget = event->widget;
-  NS_IF_ADDREF(aWidget);
+  nsCOMPtr<nsIWidget> kungFuDeathGrip(event->mWidget);
 
   if (mWidgetListener)
     aStatus = mWidgetListener->HandleEvent(event, mUseAttachedEvents);
-
-  NS_IF_RELEASE(aWidget);
 
   return NS_OK;
 }

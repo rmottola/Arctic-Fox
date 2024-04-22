@@ -5094,7 +5094,7 @@ nsEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
       break;
   }
   if (needsWidget &&
-      (!widgetGUIEvent || !widgetGUIEvent->widget)) {
+      (!widgetGUIEvent || !widgetGUIEvent->mWidget)) {
     return false;
   }
 

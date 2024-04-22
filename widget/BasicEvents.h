@@ -495,7 +495,7 @@ protected:
   WidgetGUIEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget,
                  EventClassID aEventClassID)
     : WidgetEvent(aIsTrusted, aMessage, aEventClassID)
-    , widget(aWidget)
+    , mWidget(aWidget)
   {
   }
 
@@ -508,7 +508,7 @@ public:
 
   WidgetGUIEvent(bool aIsTrusted, EventMessage aMessage, nsIWidget* aWidget)
     : WidgetEvent(aIsTrusted, aMessage, eGUIEventClass)
-    , widget(aWidget)
+    , mWidget(aWidget)
   {
   }
 
@@ -523,8 +523,8 @@ public:
     return result;
   }
 
-  /// Originator of the event
-  nsCOMPtr<nsIWidget> widget;
+  // Originator of the event
+  nsCOMPtr<nsIWidget> mWidget;
 
   /*
    * Explanation for this PluginEvent class:
@@ -587,7 +587,7 @@ public:
     }
   };
 
-  /// Event for NPAPI plugin
+  // Event for NPAPI plugin
   PluginEvent mPluginEvent;
 
   void AssignGUIEventData(const WidgetGUIEvent& aEvent, bool aCopyTargets)

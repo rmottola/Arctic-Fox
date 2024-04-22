@@ -327,7 +327,7 @@ APZEventState::ProcessTouchEvent(const WidgetTouchEvent& aEvent,
       }
     }
     nsEventStatus status;
-    cancelEvent.widget->DispatchEvent(&cancelEvent, status);
+    cancelEvent.mWidget->DispatchEvent(&cancelEvent, status);
   }
 }
 
