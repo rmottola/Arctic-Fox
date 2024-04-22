@@ -2778,7 +2778,7 @@ mozilla::StyleTransition::SetUnknownProperty(nsCSSProperty aProperty,
              aProperty == eCSSPropertyExtra_variable,
              "should be either unknown or custom property");
   mProperty = aProperty;
-  mUnknownProperty = do_GetAtom(aPropertyString);
+  mUnknownProperty = NS_Atomize(aPropertyString);
 }
 
 bool

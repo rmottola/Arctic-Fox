@@ -437,7 +437,7 @@ already_AddRefed<nsINodeList>
 nsXULElement::GetElementsByAttribute(const nsAString& aAttribute,
                                      const nsAString& aValue)
 {
-    nsCOMPtr<nsIAtom> attrAtom(do_GetAtom(aAttribute));
+    nsCOMPtr<nsIAtom> attrAtom(NS_Atomize(aAttribute));
     void* attrValue = new nsString(aValue);
     RefPtr<nsContentList> list =
         new nsContentList(this,
@@ -468,7 +468,7 @@ nsXULElement::GetElementsByAttributeNS(const nsAString& aNamespaceURI,
                                        const nsAString& aValue,
                                        ErrorResult& rv)
 {
-    nsCOMPtr<nsIAtom> attrAtom(do_GetAtom(aAttribute));
+    nsCOMPtr<nsIAtom> attrAtom(NS_Atomize(aAttribute));
 
     int32_t nameSpaceId = kNameSpaceID_Wildcard;
     if (!aNamespaceURI.EqualsLiteral("*")) {
