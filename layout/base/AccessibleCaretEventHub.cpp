@@ -340,6 +340,12 @@ public:
     return nsEventStatus_eIgnore;
   }
 
+  virtual void OnScrollStart(AccessibleCaretEventHub* aContext) override
+  {
+    aContext->mManager->OnScrollStart();
+    aContext->SetState(aContext->ScrollState());
+  }
+
   virtual void OnReflow(AccessibleCaretEventHub* aContext) override
   {
     aContext->mManager->OnReflow();
