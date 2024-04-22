@@ -2069,7 +2069,7 @@ nsChildView::MaybeDrawResizeIndicator(GLManager* aManager)
   }
 
   if (!mResizerImage) {
-    mResizerImage = new RectTextureImage(aManager->gl());
+    mResizerImage = MakeUnique<RectTextureImage>(aManager->gl());
   }
 
   LayoutDeviceIntSize size = mResizeIndicatorRect.Size();
@@ -2287,7 +2287,7 @@ nsChildView::MaybeDrawTitlebar(GLManager* aManager)
   mUpdatedTitlebarRegion.SetEmpty();
 
   if (!mTitlebarImage) {
-    mTitlebarImage = new RectTextureImage(aManager->gl());
+    mTitlebarImage = MakeUnique<RectTextureImage>(aManager->gl());
   }
 
   mTitlebarImage->UpdateFromCGContext(mTitlebarRect.Size(),
@@ -2311,7 +2311,7 @@ nsChildView::MaybeDrawRoundedCorners(GLManager* aManager,
   MutexAutoLock lock(mEffectsLock);
 
   if (!mCornerMaskImage) {
-    mCornerMaskImage = new RectTextureImage(aManager->gl());
+    mCornerMaskImage = MakeUnique<RectTextureImage>(aManager->gl());
   }
 
   LayoutDeviceIntSize size(mDevPixelCornerRadius, mDevPixelCornerRadius);
@@ -2632,7 +2632,7 @@ nsChildView::StartRemoteDrawingInRegion(LayoutDeviceIntRegion& aInvalidRegion,
   LayoutDeviceIntSize renderSize = mBounds.Size();
 
   if (!mBasicCompositorImage) {
-    mBasicCompositorImage = new RectTextureImage(mGLPresenter->gl());
+    mBasicCompositorImage = MakeUnique<RectTextureImage>(mGLPresenter->gl());
   }
 
   RefPtr<gfx::DrawTarget> drawTarget =
