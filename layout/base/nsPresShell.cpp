@@ -4725,8 +4725,8 @@ PresShell::ClipListToRange(nsDisplayListBuilder *aBuilder,
       // Don't try to descend into subdocuments.
       // If this ever changes we'd need to add handling for subdocuments with
       // different zoom levels.
-      else if (content->GetCurrentDoc() ==
-                 aRange->GetStartParent()->GetCurrentDoc()) {
+      else if (content->GetUncomposedDoc() ==
+                 aRange->GetStartParent()->GetUncomposedDoc()) {
         // if the node is within the range, append it to the temporary list
         bool before, after;
         nsresult rv =
@@ -5521,7 +5521,7 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
                          WidgetMouseEvent::eSynthesized);
   event.refPoint = LayoutDeviceIntPoint::FromAppUnitsToNearest(refpoint, viewAPD);
   event.mTime = PR_IntervalNow();
-  // XXX set event.modifiers ?
+  // XXX set event.mModifiers ?
   // XXX mnakano I think that we should get the latest information from widget.
 
   nsCOMPtr<nsIPresShell> shell = pointVM->GetPresShell();
@@ -6885,7 +6885,7 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
       event.isPrimary = i == 0;
       event.pointerId = touch->Identifier();
       event.refPoint = touch->mRefPoint;
-      event.modifiers = touchEvent->modifiers;
+      event.mModifiers = touchEvent->mModifiers;
       event.width = touch->RadiusX();
       event.height = touch->RadiusY();
       event.tiltX = touch->tiltX;

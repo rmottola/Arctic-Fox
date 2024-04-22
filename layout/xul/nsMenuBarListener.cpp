@@ -279,7 +279,7 @@ nsMenuBarListener::GetModifiersForAccessKey(nsIDOMKeyEvent* aKeyEvent)
   static const Modifiers kPossibleModifiersForAccessKey =
     (MODIFIER_SHIFT | MODIFIER_CONTROL | MODIFIER_ALT | MODIFIER_META |
      MODIFIER_OS);
-  return (inputEvent->modifiers & kPossibleModifiersForAccessKey);
+  return (inputEvent->mModifiers & kPossibleModifiersForAccessKey);
 }
 
 ////////////////////////////////////////////////////////////////////////
