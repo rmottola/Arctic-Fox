@@ -51,6 +51,7 @@
 #include "nsFrameManager.h"
 #include "nsITabChild.h"
 #include "nsPluginFrame.h"
+#include "nsMenuPopupFrame.h"
 
 #include "nsIDOMXULElement.h"
 #include "nsIDOMKeyEvent.h"
@@ -2430,6 +2431,10 @@ EventStateManager::ComputeScrollTarget(nsIFrame* aTargetFrame,
             pluginFrame->WantsToHandleWheelEventAsDefaultAction()) {
           return scrollFrame;
         }
+      }
+      nsMenuPopupFrame* menuPopupFrame = do_QueryFrame(scrollFrame);
+      if (menuPopupFrame) {
+        return nullptr;
       }
       continue;
     }
