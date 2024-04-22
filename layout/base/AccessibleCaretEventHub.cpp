@@ -460,7 +460,7 @@ AccessibleCaretEventHub::Terminate()
     mScrollEndInjectorTimer->Cancel();
   }
 
-  mManager = nullptr;
+  mManager->Terminate();
   mPresShell = nullptr;
   mInitialized = false;
 }
