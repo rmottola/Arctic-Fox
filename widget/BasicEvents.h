@@ -268,7 +268,7 @@ protected:
     , mClass(aEventClassID)
     , mMessage(aMessage)
     , mRefPoint(0, 0)
-    , lastRefPoint(0, 0)
+    , mLastRefPoint(0, 0)
     , userType(nullptr)
   {
     MOZ_COUNT_CTOR(WidgetEvent);
@@ -290,7 +290,7 @@ public:
     , mClass(eBasicEventClass)
     , mMessage(aMessage)
     , mRefPoint(0, 0)
-    , lastRefPoint(0, 0)
+    , mLastRefPoint(0, 0)
     , userType(nullptr)
   {
     MOZ_COUNT_CTOR(WidgetEvent);
@@ -327,7 +327,7 @@ public:
   // in screen coordinates. Not modified by layout code.
   LayoutDeviceIntPoint mRefPoint;
   // The previous mRefPoint, if known, used to calculate mouse movement deltas.
-  LayoutDeviceIntPoint lastRefPoint;
+  LayoutDeviceIntPoint mLastRefPoint;
   // See BaseEventFlags definition for the detail.
   BaseEventFlags mFlags;
 
@@ -346,7 +346,7 @@ public:
     // mClass should be initialized with the constructor.
     // mMessage should be initialized with the constructor.
     mRefPoint = aEvent.mRefPoint;
-    // lastRefPoint doesn't need to be copied.
+    // mLastRefPoint doesn't need to be copied.
     AssignEventTime(aEvent);
     // mFlags should be copied manually if it's necessary.
     userType = aEvent.userType;
