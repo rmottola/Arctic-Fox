@@ -390,7 +390,7 @@ PanGestureInput::ToWidgetWheelEvent(nsIWidget* aWidget) const
   wheelEvent.isMomentum = IsMomentum();
   wheelEvent.lineOrPageDeltaX = mLineOrPageDeltaX;
   wheelEvent.lineOrPageDeltaY = mLineOrPageDeltaY;
-  wheelEvent.deltaX = mPanDisplacement.x;
+  wheelEvent.mDeltaX = mPanDisplacement.x;
   wheelEvent.deltaY = mPanDisplacement.y;
   wheelEvent.mFlags.mHandledByAPZ = mHandledByAPZ;
   return wheelEvent;
@@ -457,7 +457,7 @@ ScrollWheelInput::ScrollWheelInput(const WidgetWheelEvent& aWheelEvent)
   , mDeltaType(DeltaTypeForDeltaMode(aWheelEvent.deltaMode))
   , mScrollMode(SCROLLMODE_INSTANT)
   , mHandledByAPZ(aWheelEvent.mFlags.mHandledByAPZ)
-  , mDeltaX(aWheelEvent.deltaX)
+  , mDeltaX(aWheelEvent.mDeltaX)
   , mDeltaY(aWheelEvent.deltaY)
   , mLineOrPageDeltaX(aWheelEvent.lineOrPageDeltaX)
   , mLineOrPageDeltaY(aWheelEvent.lineOrPageDeltaY)
@@ -488,7 +488,7 @@ ScrollWheelInput::ToWidgetWheelEvent(nsIWidget* aWidget) const
   wheelEvent.deltaMode = DeltaModeForDeltaType(mDeltaType);
   wheelEvent.mayHaveMomentum = mMayHaveMomentum;
   wheelEvent.isMomentum = mIsMomentum;
-  wheelEvent.deltaX = mDeltaX;
+  wheelEvent.mDeltaX = mDeltaX;
   wheelEvent.deltaY = mDeltaY;
   wheelEvent.lineOrPageDeltaX = mLineOrPageDeltaX;
   wheelEvent.lineOrPageDeltaY = mLineOrPageDeltaY;
