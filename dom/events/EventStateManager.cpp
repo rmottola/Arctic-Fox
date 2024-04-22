@@ -2296,7 +2296,7 @@ EventStateManager::SendLineScrollEvent(nsIFrame* aTargetFrame,
   event.mFlags.mDefaultPreventedByContent = aState.mDefaultPreventedByContent;
   event.refPoint = aEvent->refPoint;
   event.widget = aEvent->widget;
-  event.time = aEvent->time;
+  event.mTime = aEvent->mTime;
   event.timeStamp = aEvent->timeStamp;
   event.modifiers = aEvent->modifiers;
   event.buttons = aEvent->buttons;
@@ -2336,7 +2336,7 @@ EventStateManager::SendPixelScrollEvent(nsIFrame* aTargetFrame,
   event.mFlags.mDefaultPreventedByContent = aState.mDefaultPreventedByContent;
   event.refPoint = aEvent->refPoint;
   event.widget = aEvent->widget;
-  event.time = aEvent->time;
+  event.mTime = aEvent->mTime;
   event.timeStamp = aEvent->timeStamp;
   event.modifiers = aEvent->modifiers;
   event.buttons = aEvent->buttons;
@@ -4650,7 +4650,7 @@ EventStateManager::InitAndDispatchClickEvent(WidgetMouseEvent* aEvent,
   event.clickCount = aEvent->clickCount;
   event.modifiers = aEvent->modifiers;
   event.buttons = aEvent->buttons;
-  event.time = aEvent->time;
+  event.mTime = aEvent->mTime;
   event.timeStamp = aEvent->timeStamp;
   event.mFlags.mNoContentDispatch = aNoContentDispatch;
   event.button = aEvent->button;
