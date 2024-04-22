@@ -269,7 +269,7 @@ protected:
     , mMessage(aMessage)
     , mRefPoint(0, 0)
     , mLastRefPoint(0, 0)
-    , userType(nullptr)
+    , mSpecifiedEventType(nullptr)
   {
     MOZ_COUNT_CTOR(WidgetEvent);
     mFlags.Clear();
@@ -291,7 +291,7 @@ public:
     , mMessage(aMessage)
     , mRefPoint(0, 0)
     , mLastRefPoint(0, 0)
-    , userType(nullptr)
+    , mSpecifiedEventType(nullptr)
   {
     MOZ_COUNT_CTOR(WidgetEvent);
     mFlags.Clear();
@@ -331,8 +331,10 @@ public:
   // See BaseEventFlags definition for the detail.
   BaseEventFlags mFlags;
 
-  // Additional type info for user defined events
-  nsCOMPtr<nsIAtom> userType;
+  // If JS creates an event with unknown event type or known event type but
+  // for different event interface, the event type is stored to this.
+  // NOTE: This is always used if the instance is a WidgetCommandEvent instance.
+  nsCOMPtr<nsIAtom> mSpecifiedEventType;
 
   nsString typeString; // always set on non-main-thread events
 
@@ -349,7 +351,7 @@ public:
     // mLastRefPoint doesn't need to be copied.
     AssignEventTime(aEvent);
     // mFlags should be copied manually if it's necessary.
-    userType = aEvent.userType;
+    mSpecifiedEventType = aEvent.mSpecifiedEventType;
     // typeString should be copied manually if it's necessary.
     target = aCopyTargets ? aEvent.target : nullptr;
     currentTarget = aCopyTargets ? aEvent.currentTarget : nullptr;
