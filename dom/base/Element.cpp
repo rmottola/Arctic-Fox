@@ -2084,7 +2084,7 @@ Element::DispatchClickEvent(nsPresContext* aPresContext,
 
   WidgetMouseEvent event(aSourceEvent->IsTrusted(), eMouseClick,
                          aSourceEvent->mWidget, WidgetMouseEvent::eReal);
-  event.refPoint = aSourceEvent->refPoint;
+  event.mRefPoint = aSourceEvent->mRefPoint;
   uint32_t clickCount = 1;
   float pressure = 0;
   uint16_t inputSource = 0;

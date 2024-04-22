@@ -267,7 +267,7 @@ protected:
     : WidgetEventTime()
     , mClass(aEventClassID)
     , mMessage(aMessage)
-    , refPoint(0, 0)
+    , mRefPoint(0, 0)
     , lastRefPoint(0, 0)
     , userType(nullptr)
   {
@@ -289,7 +289,7 @@ public:
     : WidgetEventTime()
     , mClass(eBasicEventClass)
     , mMessage(aMessage)
-    , refPoint(0, 0)
+    , mRefPoint(0, 0)
     , lastRefPoint(0, 0)
     , userType(nullptr)
   {
@@ -325,8 +325,8 @@ public:
   EventMessage mMessage;
   // Relative to the widget of the event, or if there is no widget then it is
   // in screen coordinates. Not modified by layout code.
-  LayoutDeviceIntPoint refPoint;
-  // The previous refPoint, if known, used to calculate mouse movement deltas.
+  LayoutDeviceIntPoint mRefPoint;
+  // The previous mRefPoint, if known, used to calculate mouse movement deltas.
   LayoutDeviceIntPoint lastRefPoint;
   // See BaseEventFlags definition for the detail.
   BaseEventFlags mFlags;
@@ -345,7 +345,7 @@ public:
   {
     // mClass should be initialized with the constructor.
     // mMessage should be initialized with the constructor.
-    refPoint = aEvent.refPoint;
+    mRefPoint = aEvent.mRefPoint;
     // lastRefPoint doesn't need to be copied.
     AssignEventTime(aEvent);
     // mFlags should be copied manually if it's necessary.
