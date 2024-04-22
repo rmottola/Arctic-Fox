@@ -111,6 +111,11 @@ struct TimingParams
     return mDuration->MultDouble(mIterations);
   }
 
+  StickyTimeDuration EndTime() const
+  {
+    return mDelay + ActiveDuration() + mEndDelay;
+  }
+
   bool operator==(const TimingParams& aOther) const;
   bool operator!=(const TimingParams& aOther) const
   {
