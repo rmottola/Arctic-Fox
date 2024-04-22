@@ -675,6 +675,10 @@ protected:
                              nsIAtom *aProperty,
                              const nsAString *aAttribute,
                              const bool aChildrenOnly = false);
+  nsresult RemoveStyleInside(nsIContent& aNode,
+                             nsIAtom* aProperty,
+                             const nsAString* aAttribute,
+                             const bool aChildrenOnly = false);
   nsresult RemoveInlinePropertyImpl(nsIAtom* aProperty,
                                     const nsAString* aAttribute);
 
