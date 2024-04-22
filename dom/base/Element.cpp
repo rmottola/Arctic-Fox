@@ -3026,7 +3026,7 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
   }
   case eLegacyDOMActivate:
     {
-      if (aVisitor.mEvent->originalTarget == this) {
+      if (aVisitor.mEvent->mOriginalTarget == this) {
         nsAutoString target;
         GetLinkTarget(target);
         const InternalUIEvent* activeEvent = aVisitor.mEvent->AsUIEvent();
