@@ -1233,9 +1233,9 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
             event.forget(aDOMEvent);
           }
           if (*aDOMEvent) {
-            if (!aEvent->currentTarget) {
-              aEvent->currentTarget = aCurrentTarget->GetTargetForDOMEvent();
-              if (!aEvent->currentTarget) {
+            if (!aEvent->mCurrentTarget) {
+              aEvent->mCurrentTarget = aCurrentTarget->GetTargetForDOMEvent();
+              if (!aEvent->mCurrentTarget) {
                 break;
               }
             }
@@ -1302,7 +1302,7 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
     usingLegacyMessage = true;
   }
 
-  aEvent->currentTarget = nullptr;
+  aEvent->mCurrentTarget = nullptr;
 
   if (mIsMainThreadELM && !hasListener) {
     mNoListenerForEvent = aEvent->mMessage;

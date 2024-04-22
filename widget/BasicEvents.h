@@ -343,7 +343,7 @@ public:
 
   // Event targets, needed by DOM Events
   nsCOMPtr<dom::EventTarget> mTarget;
-  nsCOMPtr<dom::EventTarget> currentTarget;
+  nsCOMPtr<dom::EventTarget> mCurrentTarget;
   nsCOMPtr<dom::EventTarget> originalTarget;
 
   void AssignEventData(const WidgetEvent& aEvent, bool aCopyTargets)
@@ -357,7 +357,7 @@ public:
     mSpecifiedEventType = aEvent.mSpecifiedEventType;
     // mSpecifiedEventTypeString should be copied manually if it's necessary.
     mTarget = aCopyTargets ? aEvent.mTarget : nullptr;
-    currentTarget = aCopyTargets ? aEvent.currentTarget : nullptr;
+    mCurrentTarget = aCopyTargets ? aEvent.mCurrentTarget : nullptr;
     originalTarget = aCopyTargets ? aEvent.originalTarget : nullptr;
   }
 
