@@ -2227,7 +2227,6 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
     mPlayingThroughTheAudioChannel(false),
     mDisableVideo(false),
     mPlayBlockedBecauseHidden(false),
-    mMediaStreamTrackListener(nullptr),
     mElementInTreeState(ELEMENT_NOT_INTREE),
     mHasUserInteraction(false),
     mFirstFrameLoaded(false),
@@ -3251,8 +3250,6 @@ public:
   }
 
 protected:
-  ~MediaStreamTrackListener() {}
-
   HTMLMediaElement* const mElement;
 };
 
