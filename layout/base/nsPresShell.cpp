@@ -3959,6 +3959,23 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
    */
   mozFlushType flushType = aFlush.mFlushType;
 
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  static const char flushTypeNames[][20] = {
+    "Content",
+    "ContentAndNotify",
+    "Style",
+    "InterruptibleLayout",
+    "Layout",
+    "Display"
+  };
+
+  // Make sure that we don't miss things added to mozFlushType!
+  MOZ_ASSERT(static_cast<uint32_t>(flushType) <= ArrayLength(flushTypeNames));
+
+  PROFILER_LABEL_PRINTF("PresShell", "Flush",
+    js::ProfileEntry::Category::GRAPHICS, "(Flush_%s)", flushTypeNames[flushType - 1]);
+#endif
+
 #ifdef ACCESSIBILITY
 #ifdef DEBUG
   nsAccessibilityService* accService = GetAccService();
