@@ -1232,7 +1232,7 @@ DocAccessible::GetAccessibleByUniqueIDInSubtree(void* aUniqueID)
 Accessible*
 DocAccessible::GetAccessibleOrContainer(nsINode* aNode) const
 {
-  if (!aNode || !aNode->GetCrossShadowCurrentDoc())
+  if (!aNode || !aNode->GetComposedDoc())
     return nullptr;
 
   nsINode* currNode = aNode;

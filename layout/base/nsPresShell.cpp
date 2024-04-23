@@ -4797,7 +4797,6 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
                                 bool aForPrimarySelection)
 {
   nsRange* range = static_cast<nsRange*>(aRange);
-
   nsIFrame* ancestorFrame;
   nsIFrame* rootFrame = GetRootFrame();
 
@@ -4806,7 +4805,7 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
   // range.
   nsINode* startParent = range->GetStartParent();
   nsINode* endParent = range->GetEndParent();
-  nsIDocument* doc = startParent->GetCrossShadowCurrentDoc();
+  nsIDocument* doc = startParent->GetComposedDoc();
   if (startParent == doc || endParent == doc) {
     ancestorFrame = rootFrame;
   } else {
@@ -6597,7 +6596,7 @@ nsIContent*
 PresShell::GetCurrentEventContent()
 {
   if (mCurrentEventContent &&
-      mCurrentEventContent->GetCrossShadowCurrentDoc() != mDocument) {
+      mCurrentEventContent->GetComposedDoc() != mDocument) {
     mCurrentEventContent = nullptr;
     mCurrentEventFrame = nullptr;
   }
@@ -6638,7 +6637,7 @@ PresShell::GetEventTargetContent(WidgetEvent* aEvent)
     nsIFrame* currentEventFrame = GetCurrentEventFrame();
     if (currentEventFrame) {
       currentEventFrame->GetContentForEvent(aEvent, getter_AddRefs(content));
-      NS_ASSERTION(!content || content->GetCrossShadowCurrentDoc() == mDocument,
+      NS_ASSERTION(!content || content->GetComposedDoc() == mDocument,
                    "handing out content from a different doc");
     }
   }
@@ -6670,7 +6669,7 @@ PresShell::PopCurrentEventInfo()
 
     // Don't use it if it has moved to a different document.
     if (mCurrentEventContent &&
-        mCurrentEventContent->GetCrossShadowCurrentDoc() != mDocument) {
+        mCurrentEventContent->GetComposedDoc() != mDocument) {
       mCurrentEventContent = nullptr;
       mCurrentEventFrame = nullptr;
     }
@@ -7403,7 +7402,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     } else if (capturingContent) {
       // if the mouse is being captured then retarget the mouse event at the
       // document that is being captured.
-      retargetEventDoc = capturingContent->GetCrossShadowCurrentDoc();
+      retargetEventDoc = capturingContent->GetComposedDoc();
 #ifdef ANDROID
     } else if ((aEvent->mClass == eTouchEventClass) ||
                (aEvent->mClass == eMouseEventClass) ||
@@ -7517,7 +7516,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
         if (!captureRetarget) {
           // A check was already done above to ensure that capturingContent is
           // in this presshell.
-          NS_ASSERTION(capturingContent->GetCrossShadowCurrentDoc() == GetDocument(),
+          NS_ASSERTION(capturingContent->GetComposedDoc() == GetDocument(),
                        "Unexpected document");
           nsIFrame* captureFrame = capturingContent->GetPrimaryFrame();
           if (captureFrame) {
@@ -7674,7 +7673,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
                                                         capturingContent))) {
       // A check was already done above to ensure that capturingContent is
       // in this presshell.
-      NS_ASSERTION(capturingContent->GetCrossShadowCurrentDoc() == GetDocument(),
+      NS_ASSERTION(capturingContent->GetComposedDoc() == GetDocument(),
                    "Unexpected document");
       nsIFrame* capturingFrame = capturingContent->GetPrimaryFrame();
       if (capturingFrame) {
