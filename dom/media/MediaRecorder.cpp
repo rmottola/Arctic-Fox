@@ -514,7 +514,7 @@ public:
     mStopIssued = true;
     CleanupStreams();
     if (mNeedSessionEndTask) {
-      LOG(PR_LOG_DEBUG, ("Session.Stop mNeedSessionEndTask %p", this));
+      LOG(LogLevel::Debug, ("Session.Stop mNeedSessionEndTask %p", this));
       // End the Session directly if there is no ExtractRunnable.
       DoSessionEndTask(NS_OK);
     }
@@ -528,6 +528,9 @@ public:
 
     NS_ENSURE_TRUE(mTrackUnionStream, NS_ERROR_FAILURE);
     mTrackUnionStream->Suspend();
+    if (mEncoder) {
+      mEncoder->Suspend();
+    }
 
     return NS_OK;
   }
@@ -538,6 +541,9 @@ public:
     MOZ_ASSERT(NS_IsMainThread());
 
     NS_ENSURE_TRUE(mTrackUnionStream, NS_ERROR_FAILURE);
+    if (mEncoder) {
+      mEncoder->Resume();
+    }
     mTrackUnionStream->Resume();
 
     return NS_OK;
@@ -733,7 +739,7 @@ private:
     MOZ_ASSERT(NS_IsMainThread());
 
     if (!mRecorder) {
-      LOG(PR_LOG_DEBUG, ("Session.InitEncoder failure, mRecorder is null %p", this));
+      LOG(LogLevel::Debug, ("Session.InitEncoder failure, mRecorder is null %p", this));
       return;
     }
     // Allocate encoder and bind with union stream.
@@ -761,7 +767,7 @@ private:
     }
 
     if (!mEncoder) {
-      LOG(PR_LOG_DEBUG, ("Session.InitEncoder !mEncoder %p", this));
+      LOG(LogLevel::Debug, ("Session.InitEncoder !mEncoder %p", this));
       DoSessionEndTask(NS_ERROR_ABORT);
       return;
     }
@@ -770,7 +776,7 @@ private:
     // The Session::stop would clean the mTrackUnionStream. If the AfterTracksAdded
     // comes after stop command, this function would crash.
     if (!mTrackUnionStream) {
-      LOG(PR_LOG_DEBUG, ("Session.InitEncoder !mTrackUnionStream %p", this));
+      LOG(LogLevel::Debug, ("Session.InitEncoder !mTrackUnionStream %p", this));
       DoSessionEndTask(NS_OK);
       return;
     }
@@ -789,7 +795,7 @@ private:
     if (!mReadThread) {
       nsresult rv = NS_NewNamedThread("Media_Encoder", getter_AddRefs(mReadThread));
       if (NS_FAILED(rv)) {
-        LOG(PR_LOG_DEBUG, ("Session.InitEncoder !mReadThread %p", this));
+        LOG(LogLevel::Debug, ("Session.InitEncoder !mReadThread %p", this));
         DoSessionEndTask(rv);
         return;
       }
@@ -802,7 +808,7 @@ private:
     nsCOMPtr<nsIRunnable> event = new ExtractRunnable(this);
     if (NS_FAILED(mReadThread->Dispatch(event, NS_DISPATCH_NORMAL))) {
       NS_WARNING("Failed to dispatch ExtractRunnable at beginning");
-      LOG(PR_LOG_DEBUG, ("Session.InitEncoder !ReadThread->Dispatch %p", this));
+      LOG(LogLevel::Debug, ("Session.InitEncoder !ReadThread->Dispatch %p", this));
       DoSessionEndTask(NS_ERROR_ABORT);
     }
     // Set mNeedSessionEndTask to false because the
