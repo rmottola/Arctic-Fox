@@ -1961,7 +1961,7 @@ public:
     event.mFlags.mBubbles = false;
     event.mFlags.mCancelable = false;
     event.mFromRaise = mWindowRaised;
-    event.isRefocus = mIsRefocus;
+    event.mIsRefocus = mIsRefocus;
     return EventDispatcher::Dispatch(mTarget, mContext, &event);
   }
 
