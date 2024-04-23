@@ -623,7 +623,7 @@ void nsCSSValue::SetDependentListValue(nsCSSValueList* aList)
 }
 
 void
-nsCSSValue::AdoptListValue(nsCSSValueList*&& aValue)
+nsCSSValue::AdoptListValue(UniquePtr<nsCSSValueList> aValue)
 {
   // We have to copy the first element since for owned lists the first
   // element should be an nsCSSValueList_heap object.
@@ -633,8 +633,7 @@ nsCSSValue::AdoptListValue(nsCSSValueList*&& aValue)
   mValue.mList->mValue = aValue->mValue;
   mValue.mList->mNext  = aValue->mNext;
   aValue->mNext = nullptr;
-  delete aValue;
-  aValue = nullptr;
+  aValue.reset();
 }
 
 nsCSSValuePairList* nsCSSValue::SetPairListValue()
@@ -656,9 +655,9 @@ void nsCSSValue::SetDependentPairListValue(nsCSSValuePairList* aList)
 }
 
 void
-nsCSSValue::AdoptPairListValue(nsCSSValuePairList*&& aValue)
+nsCSSValue::AdoptPairListValue(UniquePtr<nsCSSValuePairList> aValue)
 {
-  // We have to copy the first element since for owned pair lists the first
+  // We have to copy the first element, since for owned pair lists, the first
   // element should be an nsCSSValuePairList_heap object.
   SetPairListValue();
   // FIXME: If nsCSSValue gets a swap method or move assignment operator,
@@ -667,8 +666,7 @@ nsCSSValue::AdoptPairListValue(nsCSSValuePairList*&& aValue)
   mValue.mPairList->mYValue = aValue->mYValue;
   mValue.mPairList->mNext   = aValue->mNext;
   aValue->mNext = nullptr;
-  delete aValue;
-  aValue = nullptr;
+  aValue.reset();
 }
 
 void nsCSSValue::SetAutoValue()

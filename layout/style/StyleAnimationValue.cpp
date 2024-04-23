@@ -1972,7 +1972,7 @@ AddShapeFunction(nsCSSProperty aProperty,
       if (!resultPoints) {
         return nullptr;
       }
-      resultFuncArgs->Item(2).AdoptPairListValue(resultPoints.release());
+      resultFuncArgs->Item(2).AdoptPairListValue(Move(resultPoints));
       break;
     }
     case eCSSKeyword_inset: {
@@ -3101,7 +3101,7 @@ StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
         UniquePtr<nsCSSValueList> computedList =
           aComputedValue.TakeCSSValueListValue();
         if (computedList) {
-          aSpecifiedValue.AdoptListValue(computedList.release());
+          aSpecifiedValue.AdoptListValue(Move(computedList));
         } else {
           aSpecifiedValue.SetNoneValue();
         }
@@ -3112,7 +3112,7 @@ StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
         UniquePtr<nsCSSValuePairList> computedList =
           aComputedValue.TakeCSSValuePairListValue();
         MOZ_ASSERT(computedList, "Pair list should never be null");
-        aSpecifiedValue.AdoptPairListValue(computedList.release());
+        aSpecifiedValue.AdoptPairListValue(Move(computedList));
       }
       break;
     default:
