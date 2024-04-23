@@ -1341,16 +1341,16 @@ DOMHwMediaStream::DOMHwMediaStream(nsPIDOMWindowInner* aWindow)
 #ifdef MOZ_WIDGET_GONK
   if (!mWindow) {
     NS_ERROR("Expected window here.");
-    mPrincipalHandle = PRINCIPAL_ID_NONE;
+    mPrincipalHandle = PRINCIPAL_HANDLE_NONE;
     return;
   }
-  nsIDocument* doc = mWindow->GetDoc();
+  nsIDocument* doc = mWindow->GetExtantDoc();
   if (!doc) {
     NS_ERROR("Expected document here.");
-    mPrincipalHandle = PRINCIPAL_ID_NONE;
+    mPrincipalHandle = PRINCIPAL_HANDLE_NONE;
     return;
   }
-  mPrincipalHandle = ConvertPrincipalToID(doc->GetPrincipal());
+  mPrincipalHandle = MakePrincipalHandle(doc->NodePrincipal());
 #endif
 }
 
@@ -1458,7 +1458,7 @@ DOMHwMediaStream::SetImageSize(uint32_t width, uint32_t height)
   mozilla::gfx::IntSize size = image->GetSize();
   VideoSegment segment;
 
-  segment.AppendFrame(image.forget(), delta, size, PRINCIPAL_ID_NONE);
+  segment.AppendFrame(image.forget(), delta, size, mPrincipalHandle);
   srcStream->AppendToTrack(TRACK_VIDEO_PRIMARY, &segment);
 #endif
 }
@@ -1494,7 +1494,7 @@ DOMHwMediaStream::SetOverlayImage(OverlayImage* aImage)
   mozilla::gfx::IntSize size = image->GetSize();
   VideoSegment segment;
 
-  segment.AppendFrame(image.forget(), delta, size, PRINCIPAL_ID_NONE);
+  segment.AppendFrame(image.forget(), delta, size, mPrincipalHandle);
   srcStream->AppendToTrack(TRACK_VIDEO_PRIMARY, &segment);
 #endif
 }
