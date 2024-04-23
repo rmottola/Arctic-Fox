@@ -1866,7 +1866,9 @@ public:
                                            MediaStreamTrackSource)
 
   explicit CaptureStreamTrackSource(HTMLMediaElement* aElement)
-    : MediaStreamTrackSource(nsCOMPtr<nsIPrincipal>(aElement->GetCurrentPrincipal()), true)
+    : MediaStreamTrackSource(nsCOMPtr<nsIPrincipal>(aElement->GetCurrentPrincipal()),
+                             true,
+                             nsString())
     , mElement(aElement)
   {
     MOZ_ASSERT(mElement);
@@ -2005,14 +2007,14 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
         RefPtr<MediaStreamTrackSource> trackSource =
           getter->GetMediaStreamTrackSource(audioTrackId);
         out->mStream->CreateDOMTrack(audioTrackId, MediaSegment::AUDIO,
-                                     nsString(), trackSource);
+                                     trackSource);
       }
       if (HasVideo()) {
         TrackID videoTrackId = mMediaInfo.mVideo.mTrackId;
         RefPtr<MediaStreamTrackSource> trackSource =
           getter->GetMediaStreamTrackSource(videoTrackId);
         out->mStream->CreateDOMTrack(videoTrackId, MediaSegment::VIDEO,
-                                     nsString(), trackSource);
+                                     trackSource);
       }
     }
   }
