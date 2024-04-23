@@ -508,14 +508,6 @@ public:
   }
 
   /**
-   * @deprecated
-   */
-  bool IsInDoc() const
-  {
-    return IsInUncomposedDoc();
-  }
-
-  /**
    * Get the document that this content is currently in, if any. This will be
    * null if the content has no ancestor that is a document.
    *
@@ -1679,7 +1671,7 @@ protected:
   void SetSubtreeRootPointer(nsINode* aSubtreeRoot)
   {
     NS_ASSERTION(aSubtreeRoot, "aSubtreeRoot can never be null!");
-    NS_ASSERTION(!(IsNodeOfType(eCONTENT) && IsInDoc()) &&
+    NS_ASSERTION(!(IsNodeOfType(eCONTENT) && IsInUncomposedDoc()) &&
                  !IsInShadowTree(), "Shouldn't be here!");
     mSubtreeRoot = aSubtreeRoot;
   }

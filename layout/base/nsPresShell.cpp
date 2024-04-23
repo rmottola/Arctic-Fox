@@ -5024,7 +5024,7 @@ PresShell::RenderNode(nsIDOMNode* aNode,
 
   // nothing to draw if the node isn't in a document
   nsCOMPtr<nsINode> node = do_QueryInterface(aNode);
-  if (!node->IsInDoc())
+  if (!node->IsInUncomposedDoc())
     return nullptr;
 
   RefPtr<nsRange> range = new nsRange(node);
@@ -8270,7 +8270,7 @@ nsIPresShell::DispatchGotOrLostPointerCaptureEvent(bool aIsGotCapture,
     bool dummy;
     // If the capturing element was removed from the DOM tree,
     // lostpointercapture event should be fired at the document.
-    if (!aIsGotCapture && !aCaptureTarget->IsInDoc()) {
+    if (!aIsGotCapture && !aCaptureTarget->IsInUncomposedDoc()) {
       aCaptureTarget->OwnerDoc()->DispatchEvent(event->InternalDOMEvent(), &dummy);
     } else {
       aCaptureTarget->DispatchEvent(event->InternalDOMEvent(), &dummy);
