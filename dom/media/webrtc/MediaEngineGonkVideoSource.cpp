@@ -555,10 +555,11 @@ MediaEngineGonkVideoSource::OnUserError(UserContext aContext, nsresult aError)
     mCallbackMonitor.Notify();
   }
 
-  // A main thread runnable to send error code to all queued PhotoCallbacks.
+  // A main thread runnable to send error code to all queued
+  // MediaEnginePhotoCallbacks.
   class TakePhotoError : public nsRunnable {
   public:
-    TakePhotoError(nsTArray<RefPtr<PhotoCallback>>& aCallbacks,
+    TakePhotoError(nsTArray<RefPtr<MediaEnginePhotoCallback>>& aCallbacks,
                    nsresult aRv)
       : mRv(aRv)
     {
@@ -571,13 +572,13 @@ MediaEngineGonkVideoSource::OnUserError(UserContext aContext, nsresult aError)
       for (uint8_t i = 0; i < callbackNumbers; i++) {
         mCallbacks[i]->PhotoError(mRv);
       }
-      // PhotoCallback needs to dereference on main thread.
+      // MediaEnginePhotoCallback needs to dereference on main thread.
       mCallbacks.Clear();
       return NS_OK;
     }
 
   protected:
-    nsTArray<RefPtr<PhotoCallback>> mCallbacks;
+    nsTArray<RefPtr<MediaEnginePhotoCallback>> mCallbacks;
     nsresult mRv;
   };
 
@@ -597,10 +598,10 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(const uint8_t* aData, uint32_t
   mCameraControl->StartPreview();
 
   // Create a main thread runnable to generate a blob and call all current queued
-  // PhotoCallbacks.
+  // MediaEnginePhotoCallbacks.
   class GenerateBlobRunnable : public nsRunnable {
   public:
-    GenerateBlobRunnable(nsTArray<RefPtr<PhotoCallback>>& aCallbacks,
+    GenerateBlobRunnable(nsTArray<RefPtr<MediaEnginePhotoCallback>>& aCallbacks,
                          const uint8_t* aData,
                          uint32_t aLength,
                          const nsAString& aMimeType)
@@ -621,12 +622,12 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(const uint8_t* aData, uint32_t
         RefPtr<dom::Blob> tempBlob = blob;
         mCallbacks[i]->PhotoComplete(tempBlob.forget());
       }
-      // PhotoCallback needs to dereference on main thread.
+      // MediaEnginePhotoCallback needs to dereference on main thread.
       mCallbacks.Clear();
       return NS_OK;
     }
 
-    nsTArray<RefPtr<PhotoCallback>> mCallbacks;
+    nsTArray<RefPtr<MediaEnginePhotoCallback>> mCallbacks;
     uint8_t* mPhotoData;
     nsString mMimeType;
     uint32_t mPhotoDataLength;
@@ -634,7 +635,7 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(const uint8_t* aData, uint32_t
 
   // All elements in mPhotoCallbacks will be swapped in GenerateBlobRunnable
   // constructor. This captured image will be sent to all the queued
-  // PhotoCallbacks in this runnable.
+  // MediaEnginePhotoCallbacks in this runnable.
   MonitorAutoLock lock(mMonitor);
   if (mPhotoCallbacks.Length()) {
     NS_DispatchToMainThread(
@@ -643,7 +644,7 @@ MediaEngineGonkVideoSource::OnTakePictureComplete(const uint8_t* aData, uint32_t
 }
 
 nsresult
-MediaEngineGonkVideoSource::TakePhoto(PhotoCallback* aCallback)
+MediaEngineGonkVideoSource::TakePhoto(MediaEnginePhotoCallback* aCallback)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
