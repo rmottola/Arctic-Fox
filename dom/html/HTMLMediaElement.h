@@ -287,6 +287,9 @@ public:
    */
   bool RemoveDecoderPrincipalChangeObserver(DecoderPrincipalChangeObserver* aObserver);
 
+  class CaptureStreamTrackSource;
+  class CaptureStreamTrackSourceGetter;
+
   // Update the visual size of the media. Called from the decoder on the
   // main thread when/if the size changes.
   void UpdateMediaSize(const nsIntSize& aSize);
