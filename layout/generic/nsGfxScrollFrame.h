@@ -58,7 +58,6 @@ public:
   ScrollFrameHelper(nsContainerFrame* aOuter, bool aIsRoot);
   ~ScrollFrameHelper();
 
-  bool IsScrollFrameWithSnapping() const;
   mozilla::ScrollbarStyles GetScrollbarStylesFromFrame() const;
 
   // If a child frame was added or removed on the scrollframe,
@@ -753,9 +752,6 @@ public:
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
   }
-  virtual bool IsScrollFrameWithSnapping() const override {
-    return mHelper.IsScrollFrameWithSnapping();
-  }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
   }
@@ -1171,9 +1167,6 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
-  }
-  virtual bool IsScrollFrameWithSnapping() const override {
-    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();

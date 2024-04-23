@@ -9071,16 +9071,6 @@ nsLayoutUtils::GetSelectionBoundingRect(Selection* aSel)
   return res;
 }
 
-/* static */ bool
-nsLayoutUtils::IsScrollFrameWithSnapping(nsIFrame* aFrame)
-{
-  nsIScrollableFrame* sf = do_QueryFrame(aFrame);
-  if (!sf) {
-    return false;
-  }
-  return sf->IsScrollFrameWithSnapping();
-}
-
 /* static */ nsBlockFrame*
 nsLayoutUtils::GetFloatContainingBlock(nsIFrame* aFrame)
 {
