@@ -617,7 +617,7 @@ Event::SetTarget(nsIDOMEventTarget* aTarget)
 NS_IMETHODIMP_(bool)
 Event::IsDispatchStopped()
 {
-  return mEvent->mFlags.mPropagationStopped;
+  return mEvent->PropagationStopped();
 }
 
 NS_IMETHODIMP_(WidgetEvent*)
