@@ -1801,6 +1801,7 @@ MediaStream::MediaStream(DOMMediaStream* aWrapper)
   , mMainThreadFinished(false)
   , mFinishedNotificationSent(false)
   , mMainThreadDestroyed(false)
+  , mNrOfMainThreadUsers(0)
   , mGraph(nullptr)
   , mAudioChannelType(dom::AudioChannel::Normal)
 {
@@ -1944,6 +1945,8 @@ MediaStream::DestroyImpl()
 void
 MediaStream::Destroy()
 {
+  NS_ASSERTION(mNrOfMainThreadUsers == 0,
+               "Do not mix Destroy() and RegisterUser()/UnregisterUser()");
   // Keep this stream alive until we leave this method
   RefPtr<MediaStream> kungFuDeathGrip = this;
 
@@ -1966,6 +1969,26 @@ MediaStream::Destroy()
   // but our kungFuDeathGrip above will have kept this stream alive if
   // necessary.
   mMainThreadDestroyed = true;
+}
+
+void
+MediaStream::RegisterUser()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  ++mNrOfMainThreadUsers;
+}
+
+void
+MediaStream::UnregisterUser()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  --mNrOfMainThreadUsers;
+  NS_ASSERTION(mNrOfMainThreadUsers >= 0, "Double-removal of main thread user");
+  NS_ASSERTION(!IsDestroyed(), "Do not mix Destroy() and RegisterUser()/UnregisterUser()");
+  if (mNrOfMainThreadUsers == 0) {
+    Destroy();
+  }
 }
 
 void
