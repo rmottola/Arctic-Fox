@@ -855,14 +855,6 @@ gfxFont::gfxFont(gfxFontEntry *aFontEntry, const gfxFontStyle *aFontStyle,
 
 gfxFont::~gfxFont()
 {
-    uint32_t i, count = mGlyphExtentsArray.Length();
-    // We destroy the contents of mGlyphExtentsArray explicitly instead of
-    // using UniquePtr because VC++ can't deal with nsTArrays of UniquePtrs
-    // of classes that lack a proper copy constructor
-    for (i = 0; i < count; ++i) {
-        delete mGlyphExtentsArray[i];
-    }
-
     mFontEntry->NotifyFontDestroyed(this);
 
     if (mGlyphChangeObservers) {
@@ -3298,7 +3290,7 @@ gfxFont::GetOrCreateGlyphExtents(int32_t aAppUnitsPerDevUnit) {
     uint32_t i, count = mGlyphExtentsArray.Length();
     for (i = 0; i < count; ++i) {
         if (mGlyphExtentsArray[i]->GetAppUnitsPerDevUnit() == aAppUnitsPerDevUnit)
-            return mGlyphExtentsArray[i];
+            return mGlyphExtentsArray[i].get();
     }
     gfxGlyphExtents *glyphExtents = new gfxGlyphExtents(aAppUnitsPerDevUnit);
     if (glyphExtents) {
