@@ -552,6 +552,8 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
                       "MediaDecoder::mLogicallySeeking (Canonical)")
   , mSameOriginMedia(AbstractThread::MainThread(), false,
                      "MediaDecoder::mSameOriginMedia (Canonical)")
+  , mMediaPrincipalHandle(AbstractThread::MainThread(), PRINCIPAL_HANDLE_NONE,
+                          "MediaDecoder::mMediaPrincipalHandle (Canonical)")
   , mPlaybackBytesPerSecond(AbstractThread::MainThread(), 0.0,
                             "MediaDecoder::mPlaybackBytesPerSecond (Canonical)")
   , mPlaybackRateReliable(AbstractThread::MainThread(), true,
@@ -1187,6 +1189,8 @@ MediaDecoder::NotifyPrincipalChanged()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!mShuttingDown);
+  nsCOMPtr<nsIPrincipal> newPrincipal = GetCurrentPrincipal();
+  mMediaPrincipalHandle = MakePrincipalHandle(newPrincipal);
   mOwner->NotifyDecoderPrincipalChanged();
 }
 
