@@ -382,8 +382,9 @@ protected:
   virtual ~WebRTCAudioDataListener() {}
 
 public:
-  explicit WebRTCAudioDataListener(MediaEngineAudioSource* aAudioSource) :
-    mAudioSource(aAudioSource)
+  explicit WebRTCAudioDataListener(MediaEngineAudioSource* aAudioSource)
+    : mMutex("WebRTCAudioDataListener")
+    , mAudioSource(aAudioSource)
   {}
 
   // AudioDataListenerInterface methods
@@ -391,16 +392,29 @@ public:
                                 AudioDataValue* aBuffer, size_t aFrames,
                                 TrackRate aRate, uint32_t aChannels) override
   {
-    mAudioSource->NotifyOutputData(aGraph, aBuffer, aFrames, aRate, aChannels);
+    MutexAutoLock lock(mMutex);
+    if (mAudioSource) {
+      mAudioSource->NotifyOutputData(aGraph, aBuffer, aFrames, aRate, aChannels);
+    }
   }
   virtual void NotifyInputData(MediaStreamGraph* aGraph,
                                const AudioDataValue* aBuffer, size_t aFrames,
                                TrackRate aRate, uint32_t aChannels) override
   {
-    mAudioSource->NotifyInputData(aGraph, aBuffer, aFrames, aRate, aChannels);
+    MutexAutoLock lock(mMutex);
+    if (mAudioSource) {
+      mAudioSource->NotifyInputData(aGraph, aBuffer, aFrames, aRate, aChannels);
+    }
+  }
+
+  void Shutdown()
+  {
+    MutexAutoLock lock(mMutex);
+    mAudioSource = nullptr;
   }
 
 private:
+  Mutex mMutex;
   RefPtr<MediaEngineAudioSource> mAudioSource;
 };
 
@@ -496,7 +510,9 @@ public:
   NS_DECL_THREADSAFE_ISUPPORTS
 
 protected:
-  ~MediaEngineWebRTCMicrophoneSource() { Shutdown(); }
+  ~MediaEngineWebRTCMicrophoneSource() {
+    Shutdown();
+  }
 
 private:
   void Init();
@@ -510,7 +526,9 @@ private:
   ScopedCustomReleasePtr<webrtc::VoENetwork> mVoENetwork;
   ScopedCustomReleasePtr<webrtc::VoEAudioProcessing> mVoEProcessing;
 
+  // accessed from the GraphDriver thread except for deletion
   nsAutoPtr<AudioPacketizer<AudioDataValue, int16_t>> mPacketizer;
+  ScopedCustomReleasePtr<webrtc::VoEExternalMedia> mVoERenderListener;
 
   // mMonitor protects mSources[] access/changes, and transitions of mState
   // from kStarted to kStopped (which are combined with EndTrack()).
