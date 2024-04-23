@@ -879,8 +879,8 @@ public:
           mAudioDevice->GetSource()->GetMediaSource();
         RefPtr<MediaStreamTrackSource> audioSource =
           new LocalTrackSource(principal, mListener, source, kAudioTrack);
-        domStream->CreateOwnDOMTrack(kAudioTrack, MediaSegment::AUDIO,
-                                     audioDeviceName, audioSource);
+        domStream->CreateDOMTrack(kAudioTrack, MediaSegment::AUDIO,
+                                  audioDeviceName, audioSource);
       }
       if (mVideoDevice) {
         nsString videoDeviceName;
@@ -889,8 +889,8 @@ public:
           mVideoDevice->GetSource()->GetMediaSource();
         RefPtr<MediaStreamTrackSource> videoSource =
           new LocalTrackSource(principal, mListener, source, kVideoTrack);
-        domStream->CreateOwnDOMTrack(kVideoTrack, MediaSegment::VIDEO,
-                                     videoDeviceName, videoSource);
+        domStream->CreateDOMTrack(kVideoTrack, MediaSegment::VIDEO,
+                                  videoDeviceName, videoSource);
       }
       stream = domStream->GetInputStream()->AsSourceStream();
     }
