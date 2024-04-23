@@ -5808,6 +5808,8 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
     (aFlags & ITEM_ALLOW_PAGE_BREAK) &&
     aState.mPresContext->IsPaginated() &&
     !display->IsAbsolutelyPositionedStyle() &&
+    !(aParentFrame &&
+      aParentFrame->GetType() == nsGkAtoms::gridContainerFrame) &&
     !(bits & FCDATA_IS_TABLE_PART) &&
     !(bits & FCDATA_IS_SVG_TEXT);
 
