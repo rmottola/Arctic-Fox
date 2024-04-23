@@ -749,7 +749,7 @@ PeerConnectionMedia::RemoveRemoteTrack(const std::string& streamId,
 
 nsresult
 PeerConnectionMedia::GetRemoteTrackId(const std::string streamId,
-                                      TrackID numericTrackId,
+                                      const MediaStreamTrack& track,
                                       std::string* trackId) const
 {
   auto* ncThis = const_cast<PeerConnectionMedia*>(this);
@@ -761,7 +761,7 @@ PeerConnectionMedia::GetRemoteTrackId(const std::string streamId,
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return info->GetTrackId(numericTrackId, trackId);
+  return info->GetTrackId(track, trackId);
 }
 
 void
