@@ -880,6 +880,7 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
 
   // Collect any new frames produced in this iteration.
   AutoTArray<ImageContainer::NonOwningImage,4> newImages;
+  PrincipalHandle lastPrincipalHandle = PRINCIPAL_HANDLE_NONE;
   RefPtr<Image> blackImage;
 
   MOZ_ASSERT(mProcessedTime >= aStream->mBufferStartTime, "frame position before buffer?");
@@ -943,6 +944,8 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
     }
     newImages.AppendElement(ImageContainer::NonOwningImage(image, targetTime));
 
+    lastPrincipalHandle = chunk->GetPrincipalHandle();
+
     aStream->mLastPlayedVideoFrame = *frame;
   }
 
@@ -954,6 +957,10 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
 
   for (uint32_t i = 0; i < aStream->mVideoOutputs.Length(); ++i) {
     VideoFrameContainer* output = aStream->mVideoOutputs[i];
+
+    bool principalHandleChanged =
+      lastPrincipalHandle != PRINCIPAL_HANDLE_NONE &&
+      lastPrincipalHandle != output->GetLastPrincipalHandle();
 
     // Find previous frames that may still be valid.
     AutoTArray<ImageContainer::OwningImage,4> previousImages;
@@ -994,6 +1001,12 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
       image.mFrameID = output->NewFrameID();
       images.AppendElement(image);
     }
+
+    if (principalHandleChanged) {
+      output->UpdatePrincipalHandleForFrameID(lastPrincipalHandle,
+                                              newImages.LastElement().mFrameID);
+    }
+
     output->SetCurrentFrames(aStream->mLastPlayedVideoFrame.GetIntrinsicSize(),
                              images);
 
