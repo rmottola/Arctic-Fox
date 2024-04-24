@@ -1274,10 +1274,6 @@ MediaDecoderStateMachine::SetDormant(bool aDormant)
     return;
   }
 
-  if (!mReader) {
-    return;
-  }
-
   if (mMetadataRequest.Exists()) {
     if (mPendingDormant && mPendingDormant.ref() != aDormant && !aDormant) {
       // We already have a dormant request pending; the new request would have
