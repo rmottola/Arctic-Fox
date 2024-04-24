@@ -172,7 +172,7 @@ nsSprocketLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   // See if we are collapsed. If we are, then simply iterate over all our
   // children and give them a rect of 0 width and height.
-  if (aBox->IsCollapsed()) {
+  if (aBox->IsXULCollapsed()) {
     nsIFrame* child = nsBox::GetChildBox(aBox);
     while(child) 
     {
@@ -708,7 +708,7 @@ nsSprocketLayout::PopulateBoxSizes(nsIFrame* aBox, nsBoxLayoutState& aState, nsB
       flex = child->GetXULFlex();
 
       currentBox->flex = flex;
-      currentBox->collapsed = child->IsCollapsed();
+      currentBox->collapsed = child->IsXULCollapsed();
     } else {
       flex = start->flex;
       start = start->next;
@@ -740,7 +740,7 @@ nsSprocketLayout::PopulateBoxSizes(nsIFrame* aBox, nsBoxLayoutState& aState, nsB
     nsSize minSize(0,0);
     nsSize maxSize(NS_INTRINSICSIZE,NS_INTRINSICSIZE);
     nscoord ascent = 0;
-    bool collapsed = child->IsCollapsed();
+    bool collapsed = child->IsXULCollapsed();
 
     if (!collapsed) {
     // only one flexible child? Cool we will just make its preferred size
@@ -1326,7 +1326,7 @@ nsSprocketLayout::GetXULPrefSize(nsIFrame* aBox, nsBoxLayoutState& aState)
    while (child) 
    {  
       // ignore collapsed children
-      if (!child->IsCollapsed())
+      if (!child->IsXULCollapsed())
       {
         nsSize pref = child->GetXULPrefSize(aState);
         AddMargin(child, pref);
@@ -1383,7 +1383,7 @@ nsSprocketLayout::GetXULMinSize(nsIFrame* aBox, nsBoxLayoutState& aState)
    while (child) 
    {  
        // ignore collapsed children
-      if (!child->IsCollapsed())
+      if (!child->IsXULCollapsed())
       {
         nsSize min = child->GetXULMinSize(aState);
         nsSize pref(0,0);
@@ -1452,7 +1452,7 @@ nsSprocketLayout::GetXULMaxSize(nsIFrame* aBox, nsBoxLayoutState& aState)
    while (child) 
    {  
       // ignore collapsed children
-      if (!child->IsCollapsed())
+      if (!child->IsXULCollapsed())
       {
         // if completely redefined don't even ask our child for its size.
         nsSize min = child->GetXULMinSize(aState);
@@ -1513,7 +1513,7 @@ nsSprocketLayout::GetAscent(nsIFrame* aBox, nsBoxLayoutState& aState)
    while (child) 
    {  
       // ignore collapsed children
-      //if (!child->IsCollapsed())
+      //if (!child->IsXULCollapsed())
       //{
         // if completely redefined don't even ask our child for its size.
         nscoord ascent = child->GetXULBoxAscent(aState);
