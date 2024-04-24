@@ -8691,7 +8691,7 @@ nsFrame::GetLineIterator()
 }
 
 nsSize
-nsFrame::GetPrefSize(nsBoxLayoutState& aState)
+nsFrame::GetXULPrefSize(nsBoxLayoutState& aState)
 {
   nsSize size(0,0);
   DISPLAY_PREF_SIZE(this, size);

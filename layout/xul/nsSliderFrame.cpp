@@ -404,7 +404,7 @@ nsSliderFrame::DoLayout(nsBoxLayoutState& aState)
   scrollbar = GetContentOfBox(scrollbarBox);
 
   // get the thumb's pref size
-  nsSize thumbSize = thumbBox->GetPrefSize(aState);
+  nsSize thumbSize = thumbBox->GetXULPrefSize(aState);
 
   if (IsHorizontal())
     thumbSize.height = clientRect.height;
@@ -1305,10 +1305,10 @@ nsSliderFrame::DestroyFrom(nsIFrame* aDestructRoot)
 }
 
 nsSize
-nsSliderFrame::GetPrefSize(nsBoxLayoutState& aState)
+nsSliderFrame::GetXULPrefSize(nsBoxLayoutState& aState)
 {
   EnsureOrient();
-  return nsBoxFrame::GetPrefSize(aState);
+  return nsBoxFrame::GetXULPrefSize(aState);
 }
 
 nsSize
