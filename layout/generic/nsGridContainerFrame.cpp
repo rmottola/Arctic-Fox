@@ -2053,12 +2053,10 @@ nsGridContainerFrame::GridReflowState::CalculateTrackSizes(
   mRows.Initialize(mRowFunctions, mGridStyle->mGridRowGap,
                    aGrid.mGridRowEnd, aContentBox.BSize(mWM));
 
-  mIter.Reset(); // XXX cleanup this Reset mess!
   mCols.CalculateSizes(*this, mGridItems, mColFunctions,
                        aContentBox.ISize(mWM), &GridArea::mCols,
                        aConstraint);
 
-  mIter.Reset(); // XXX cleanup this Reset mess!
   mRows.CalculateSizes(*this, mGridItems, mRowFunctions,
                        aContentBox.BSize(mWM), &GridArea::mRows,
                        aConstraint);
@@ -2952,6 +2950,7 @@ nsGridContainerFrame::Grid::PlaceGridItems(GridReflowState& aState,
   int32_t minCol = 1;
   int32_t minRow = 1;
   aState.mGridItems.ClearAndRetainStorage();
+  aState.mIter.Reset();
   for (; !aState.mIter.AtEnd(); aState.mIter.Next()) {
     nsIFrame* child = *aState.mIter;
     GridItemInfo* info =
@@ -3496,6 +3495,7 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
   const TrackSize::StateBits flexMin =
     aConstraint == nsLayoutUtils::MIN_ISIZE ? TrackSize::eFlexMinSizing
                                             : TrackSize::StateBits(0);
+  iter.Reset();
   for (; !iter.AtEnd(); iter.Next()) {
     nsIFrame* child = *iter;
     const GridArea& area = aGridItems[iter.GridItemIndex()].mArea;
@@ -5016,7 +5016,6 @@ nsGridContainerFrame::Reflow(nsPresContext*           aPresContext,
     grid.PlaceGridItems(gridReflowState, computedMinSize, computedSize,
                         aReflowState.ComputedMaxSize());
 
-    gridReflowState.mIter.Reset();
     gridReflowState.CalculateTrackSizes(grid, computedSize,
                                         nsLayoutUtils::PREF_ISIZE);
 
@@ -5160,7 +5159,6 @@ nsGridContainerFrame::IntrinsicISize(nsRenderingContext* aRenderingContext,
   }
   state.mCols.Initialize(state.mColFunctions, state.mGridStyle->mGridColumnGap,
                          grid.mGridColEnd, NS_UNCONSTRAINEDSIZE);
-  state.mIter.Reset();
   state.mCols.CalculateSizes(state, state.mGridItems, state.mColFunctions,
                              NS_UNCONSTRAINEDSIZE, &GridArea::mCols,
                              aConstraint);
