@@ -425,7 +425,7 @@ nsSprocketLayout::XULLayout(nsIFrame* aBox, nsBoxLayoutState& aState)
       bool layout = true;
 
       // Deflate the rect of our child by its margin.
-      child->GetMargin(margin);
+      child->GetXULMargin(margin);
       childRect.Deflate(margin);
       if (childRect.width < 0)
         childRect.width = 0;
@@ -752,7 +752,7 @@ nsSprocketLayout::PopulateBoxSizes(nsIFrame* aBox, nsBoxLayoutState& aState, nsB
       maxSize = nsBox::BoundsCheckMinMax(minSize, child->GetXULMaxSize(aState));
       ascent = child->GetXULBoxAscent(aState);
       nsMargin margin;
-      child->GetMargin(margin);
+      child->GetXULMargin(margin);
       ascent += margin.top;
     //}
 
@@ -952,7 +952,7 @@ nsSprocketLayout::AlignChildren(nsIFrame* aBox,
   while (child) {
 
     nsMargin margin;
-    child->GetMargin(margin);
+    child->GetXULMargin(margin);
     nsRect childRect = child->GetRect();
 
     if (isHorizontal) {
@@ -1133,7 +1133,7 @@ nsSprocketLayout::ChildResized(nsIFrame* aBox,
         // make sure we remove it before setting 
         // the bounds.
         nsMargin margin(0,0,0,0);
-        aChild->GetMargin(margin);
+        aChild->GetXULMargin(margin);
         nsRect rect(aChildActualRect);
         if (rect.width >= margin.left + margin.right && rect.height >= margin.top + margin.bottom) 
           rect.Deflate(margin);
@@ -1519,7 +1519,7 @@ nsSprocketLayout::GetAscent(nsIFrame* aBox, nsBoxLayoutState& aState)
         nscoord ascent = child->GetXULBoxAscent(aState);
 
         nsMargin margin;
-        child->GetMargin(margin);
+        child->GetXULMargin(margin);
         ascent += margin.top;
 
         if (isHorizontal)
