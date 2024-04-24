@@ -1354,7 +1354,7 @@ nsMenuFrame::SizeToPopup(nsBoxLayoutState& aState, nsSize& aSize)
       //  (3) there's enough room in the popup for the content and its
       //      scrollbar
       nsMargin borderPadding;
-      GetBorderAndPadding(borderPadding);
+      GetXULBorderAndPadding(borderPadding);
 
       // if there is a scroll frame, add the desired width of the scrollbar as well
       nsIScrollableFrame* scrollFrame = do_QueryFrame(popupFrame->PrincipalChildList().FirstChild());
