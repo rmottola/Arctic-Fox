@@ -1108,7 +1108,7 @@ nsTextBoxFrame::GetXULPrefSize(nsBoxLayoutState& aBoxLayoutState)
 
     AddBorderAndPadding(size);
     bool widthSet, heightSet;
-    nsIFrame::AddCSSPrefSize(this, size, widthSet, heightSet);
+    nsIFrame::AddXULPrefSize(this, size, widthSet, heightSet);
 
     return size;
 }
@@ -1135,7 +1135,7 @@ nsTextBoxFrame::GetXULMinSize(nsBoxLayoutState& aBoxLayoutState)
 
     AddBorderAndPadding(size);
     bool widthSet, heightSet;
-    nsIFrame::AddCSSMinSize(aBoxLayoutState, this, size, widthSet, heightSet);
+    nsIFrame::AddXULMinSize(aBoxLayoutState, this, size, widthSet, heightSet);
 
     return size;
 }
