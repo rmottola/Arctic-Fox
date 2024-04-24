@@ -1147,6 +1147,9 @@ private:
 
   mozilla::RollingMean<uint32_t, uint32_t> mCorruptFrames;
 
+  // Track our request to update the buffered ranges
+  MozPromiseRequestHolder<MediaDecoderReader::BufferedUpdatePromise> mBufferedUpdateRequest;
+
   // True if we need to call FinishDecodeFirstFrame() upon frame decoding
   // successeeding.
   bool mDecodingFirstFrame;
