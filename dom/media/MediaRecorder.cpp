@@ -824,7 +824,10 @@ private:
   {
     MOZ_ASSERT(NS_IsMainThread());
     if (NS_FAILED(rv)) {
-      mRecorder->NotifyError(rv);
+      nsCOMPtr<nsIRunnable> runnable =
+        NS_NewRunnableMethodWithArg<nsresult>(mRecorder,
+                                              &MediaRecorder::NotifyError, rv);
+      NS_DispatchToMainThread(runnable);
     }
 
     CleanupStreams();
