@@ -884,7 +884,8 @@ MediaDecoderStateMachine::MaybeFinishDecodeFirstFrame()
 }
 
 void
-MediaDecoderStateMachine::OnVideoDecoded(MediaData* aVideoSample)
+MediaDecoderStateMachine::OnVideoDecoded(MediaData* aVideoSample,
+                                         TimeStamp aDecodeStartTime)
 {
   MOZ_ASSERT(OnTaskQueue());
   RefPtr<MediaData> video(aVideoSample);
@@ -926,7 +927,7 @@ MediaDecoderStateMachine::OnVideoDecoded(MediaData* aVideoSample)
       if (mReader->IsAsync()) {
         return;
       }
-      TimeDuration decodeTime = TimeStamp::Now() - mVideoDecodeStartTime;
+      TimeDuration decodeTime = TimeStamp::Now() - aDecodeStartTime;
       if (!IsDecodingFirstFrame() &&
           THRESHOLD_FACTOR * DurationToUsecs(decodeTime) > mLowAudioThresholdUsecs &&
           !HasLowUndecodedData())
@@ -1775,7 +1776,7 @@ MediaDecoderStateMachine::RequestVideoData()
   // Time the video decode, so that if it's slow, we can increase our low
   // audio threshold to reduce the chance of an audio underrun while we're
   // waiting for a video decode to complete.
-  mVideoDecodeStartTime = TimeStamp::Now();
+  TimeStamp videoDecodeStartTime = TimeStamp::Now();
 
   bool skipToNextKeyFrame = mSentFirstFrameLoadedEvent &&
     NeedToSkipToNextKeyframe();
@@ -1788,14 +1789,19 @@ MediaDecoderStateMachine::RequestVideoData()
              VideoQueue().GetSize(), mReader->SizeOfVideoQueueInFrames(), skipToNextKeyFrame,
              currentTime);
 
+  RefPtr<MediaDecoderStateMachine> self = this;
   if (mSentFirstFrameLoadedEvent) {
     mVideoDataRequest.Begin(
       InvokeAsync(DecodeTaskQueue(), mReader.get(), __func__,
                   &MediaDecoderReader::RequestVideoData,
                   skipToNextKeyFrame, currentTime)
-      ->Then(OwnerThread(), __func__, this,
-             &MediaDecoderStateMachine::OnVideoDecoded,
-             &MediaDecoderStateMachine::OnVideoNotDecoded));
+      ->Then(OwnerThread(), __func__,
+             [self, videoDecodeStartTime] (MediaData* aVideoSample) {
+               self->OnVideoDecoded(aVideoSample, videoDecodeStartTime);
+             },
+             [self] (MediaDecoderReader::NotDecodedReason aReason) {
+               self->OnVideoNotDecoded(aReason);
+             }));
   } else {
     mVideoDataRequest.Begin(
       InvokeAsync(DecodeTaskQueue(), mReader.get(), __func__,
@@ -1805,9 +1811,13 @@ MediaDecoderStateMachine::RequestVideoData()
              &StartTimeRendezvous::ProcessFirstSample<VideoDataPromise, MediaData::VIDEO_DATA>,
              &StartTimeRendezvous::FirstSampleRejected<MediaData::VIDEO_DATA>)
       ->CompletionPromise()
-      ->Then(OwnerThread(), __func__, this,
-             &MediaDecoderStateMachine::OnVideoDecoded,
-             &MediaDecoderStateMachine::OnVideoNotDecoded));
+      ->Then(OwnerThread(), __func__,
+             [self, videoDecodeStartTime] (MediaData* aVideoSample) {
+               self->OnVideoDecoded(aVideoSample, videoDecodeStartTime);
+             },
+             [self] (MediaDecoderReader::NotDecodedReason aReason) {
+               self->OnVideoNotDecoded(aReason);
+             }));
   }
 }
 
