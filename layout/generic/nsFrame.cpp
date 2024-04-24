@@ -8783,13 +8783,13 @@ nsFrame::GetXULMaxSize(nsBoxLayoutState& aState)
 }
 
 nscoord
-nsFrame::GetFlex()
+nsFrame::GetXULFlex()
 {
   nsBoxLayoutMetrics *metrics = BoxMetrics();
   if (!DoesNeedRecalc(metrics->mFlex))
      return metrics->mFlex;
 
-  metrics->mFlex = nsBox::GetFlex();
+  metrics->mFlex = nsBox::GetXULFlex();
 
   return metrics->mFlex;
 }
