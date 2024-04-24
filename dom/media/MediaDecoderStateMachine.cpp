@@ -879,7 +879,7 @@ MediaDecoderStateMachine::MaybeFinishDecodeFirstFrame()
 
   // We can now complete the pending seek.
   SetState(DECODER_STATE_SEEKING);
-  InitiateSeek(mQueuedSeek);
+  InitiateSeek(Move(mQueuedSeek));
   return true;
 }
 
@@ -1278,7 +1278,7 @@ MediaDecoderStateMachine::SetDormant(bool aDormant)
       if (mQueuedSeek.Exists()) {
         // Keep latest seek target
       } else if (mCurrentSeek.Exists()) {
-        mQueuedSeek.Steal(mCurrentSeek);
+        mQueuedSeek = Move(mCurrentSeek);
       } else {
         mQueuedSeek.mTarget = SeekTarget(mCurrentPosition,
                                          SeekTarget::Accurate,
@@ -1386,7 +1386,7 @@ void MediaDecoderStateMachine::StartDecoding()
     }
     if (mQueuedSeek.Exists()) {
       SetState(DECODER_STATE_SEEKING);
-      InitiateSeek(mQueuedSeek);
+      InitiateSeek(Move(mQueuedSeek));
       return;
     }
   }
@@ -1526,7 +1526,7 @@ MediaDecoderStateMachine::Seek(SeekTarget aTarget)
 
   SeekJob seekJob;
   seekJob.mTarget = aTarget;
-  InitiateSeek(seekJob);
+  InitiateSeek(Move(seekJob));
   return mCurrentSeek.mPromise.Ensure(__func__);
 }
 
@@ -1607,12 +1607,12 @@ MediaDecoderStateMachine::DispatchDecodeTasksIfNeeded()
 }
 
 void
-MediaDecoderStateMachine::InitiateSeek(SeekJob& aSeekJob)
+MediaDecoderStateMachine::InitiateSeek(SeekJob aSeekJob)
 {
   MOZ_ASSERT(OnTaskQueue());
 
   mCurrentSeek.RejectIfExists(__func__);
-  mCurrentSeek.Steal(aSeekJob);
+  mCurrentSeek = Move(aSeekJob);
 
   // Bound the seek time to be inside the media range.
   int64_t end = Duration().ToMicroseconds();
