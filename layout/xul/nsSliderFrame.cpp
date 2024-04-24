@@ -672,7 +672,7 @@ nsSliderFrame::GetScrollbar()
    if (scrollbar == nullptr)
        return this;
 
-   return scrollbar->IsBoxFrame() ? scrollbar : this;
+   return scrollbar->IsXULBoxFrame() ? scrollbar : this;
 }
 
 void

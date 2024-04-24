@@ -570,7 +570,7 @@ static bool
 HasBoxAncestor(nsIFrame* aFrame)
 {
   for (nsIFrame* f = aFrame; f; f = f->GetParent()) {
-    if (f->IsBoxFrame()) {
+    if (f->IsXULBoxFrame()) {
       return true;
     }
   }
