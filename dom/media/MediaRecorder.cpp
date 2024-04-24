@@ -584,8 +584,7 @@ public:
   size_t
   SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   {
-    size_t amount = mEncoder->SizeOfExcludingThis(aMallocSizeOf);
-    return amount;
+    return (mEncoder ?  mEncoder->SizeOfExcludingThis(aMallocSizeOf) : 0);
   }
 
 
