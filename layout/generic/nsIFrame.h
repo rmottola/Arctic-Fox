@@ -2096,7 +2096,6 @@ public:
    */
   bool HasView() const { return !!(mState & NS_FRAME_HAS_VIEW); }
   nsView* GetView() const;
-  virtual nsView* GetViewExternal() const;
   nsresult SetView(nsView* aView);
 
   /**
@@ -2110,7 +2109,6 @@ public:
    * Find the closest ancestor (excluding |this| !) that has a view
    */
   nsIFrame* GetAncestorWithView() const;
-  virtual nsIFrame* GetAncestorWithViewExternal() const;
 
   /**
    * Get the offset between the coordinate systems of |this| and aOther.
@@ -2129,7 +2127,6 @@ public:
    * aOther.
    */
   nsPoint GetOffsetTo(const nsIFrame* aOther) const;
-  virtual nsPoint GetOffsetToExternal(const nsIFrame* aOther) const;
 
   /**
    * Get the offset between the coordinate systems of |this| and aOther
@@ -2164,14 +2161,12 @@ public:
    * @return the pixel rect of the frame in screen coordinates.
    */
   nsIntRect GetScreenRect() const;
-  virtual nsIntRect GetScreenRectExternal() const;
 
   /**
    * Get the screen rect of the frame in app units.
    * @return the app unit rect of the frame in screen coordinates.
    */
   nsRect GetScreenRectInAppUnits() const;
-  virtual nsRect GetScreenRectInAppUnitsExternal() const;
 
   /**
    * Returns the offset from this frame to the closest geometric parent that
@@ -2935,8 +2930,6 @@ public:
 
   nsresult Redraw(nsBoxLayoutState& aState);
   virtual nsresult RelayoutChildAtOrdinal(nsIFrame* aChild)=0;
-  // XXX take this out after we've branched
-  virtual bool GetMouseThrough() const { return false; }
 
 #ifdef DEBUG_LAYOUT
   virtual nsresult SetDebug(nsBoxLayoutState& aState, bool aDebug)=0;
