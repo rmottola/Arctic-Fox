@@ -1042,8 +1042,6 @@ nsSplitterFrameInner::ResizeChildTo(nscoord& aDiff,
     if (aBounded) {
        aDiff += spaceLeft;
        AddRemoveSpace(spaceLeft, aChildrenBeforeInfos,aChildrenBeforeCount,spaceLeft);
-    } else {
-      spaceLeft = 0;
     }
   }
 }
