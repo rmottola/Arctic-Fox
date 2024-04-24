@@ -1141,7 +1141,7 @@ nsTextBoxFrame::GetXULMinSize(nsBoxLayoutState& aBoxLayoutState)
 }
 
 nscoord
-nsTextBoxFrame::GetBoxAscent(nsBoxLayoutState& aBoxLayoutState)
+nsTextBoxFrame::GetXULBoxAscent(nsBoxLayoutState& aBoxLayoutState)
 {
     CalcTextSize(aBoxLayoutState);
 
