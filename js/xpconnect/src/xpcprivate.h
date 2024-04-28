@@ -3371,7 +3371,8 @@ struct GlobalProperties {
 
     }
     bool Parse(JSContext* cx, JS::HandleObject obj);
-    bool Define(JSContext* cx, JS::HandleObject obj);
+    bool DefineInXPCComponents(JSContext* cx, JS::HandleObject obj);
+    bool DefineInSandbox(JSContext* cx, JS::HandleObject obj);
     bool CSS : 1;
     bool indexedDB : 1;
     bool XMLHttpRequest : 1;
@@ -3388,6 +3389,8 @@ struct GlobalProperties {
     bool fetch : 1;
     bool caches : 1;
     bool fileReader: 1;
+private:
+    bool Define(JSContext* cx, JS::HandleObject obj);
 };
 
 // Infallible.
