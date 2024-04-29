@@ -1062,27 +1062,6 @@ class FunctionCompiler
         return true;
     }
 
-    bool usesPhiSlot()
-    {
-        return curBlock_->stackDepth() == info().firstStackSlot() + 1;
-    }
-
-    void pushPhiInput(MDefinition* def)
-    {
-        if (inDeadCode())
-            return;
-        MOZ_ASSERT(!usesPhiSlot());
-        curBlock_->push(def);
-    }
-
-    MDefinition* popPhiOutput()
-    {
-        if (inDeadCode())
-            return nullptr;
-        MOZ_ASSERT(usesPhiSlot());
-        return curBlock_->pop();
-    }
-
     bool startBlock()
     {
         MOZ_ASSERT_IF(blockDepth_ < blockPatches_.length(), blockPatches_[blockDepth_].empty());
