@@ -2123,7 +2123,7 @@ NetworkEventActor.prototype =
       type: "networkEventUpdate",
       updateType: "responseContent",
       mimeType: aContent.mimeType,
-      contentSize: aContent.text.length,
+      contentSize: aContent.size,
       transferredSize: aContent.transferredSize,
       discardResponseBody: aDiscardedResponseBody,
     };
