@@ -204,7 +204,8 @@ bool isIgnoredPathForImplicitCtor(const Decl *decl) {
         begin->compare_lower(StringRef("harfbuzz")) == 0 ||
         begin->compare_lower(StringRef("hunspell")) == 0 ||
         begin->compare_lower(StringRef("scoped_ptr.h")) == 0 ||
-        begin->compare_lower(StringRef("graphite2")) == 0) {
+        begin->compare_lower(StringRef("graphite2")) == 0 ||
+        begin->compare_lower(StringRef("icu")) == 0) {
       return true;
     }
     if (begin->compare_lower(StringRef("chromium")) == 0) {
