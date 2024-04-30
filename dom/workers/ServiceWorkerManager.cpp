@@ -2508,6 +2508,10 @@ private:
   {
     AssertIsOnMainThread();
 
+    if (mCanceled) {
+      return mCallback ? mCallback->UnregisterSucceeded(false) : NS_OK;
+    }
+
     PrincipalInfo principalInfo;
     if (NS_WARN_IF(NS_FAILED(PrincipalToPrincipalInfo(mPrincipal,
                                                       &principalInfo)))) {
