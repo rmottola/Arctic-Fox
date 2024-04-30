@@ -3,6 +3,8 @@
 var {interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
+                                  "resource://gre/modules/AddonManager.jsm");
 
 // WeakMap[Extension -> BackgroundPage]
 var backgroundPagesMap = new WeakMap();
@@ -68,6 +70,11 @@ BackgroundPage.prototype = {
     this.contentWindow = window;
     this.context.contentWindow = window;
 
+    if (this.extension.addonData.instanceID) {
+      AddonManager.getAddonByInstanceID(this.extension.addonData.instanceID)
+                  .then(addon => addon.setDebugGlobal(window));
+    }
+
     // TODO: Right now we run onStartup after the background page
     // finishes. See if this is what Chrome does.
     let loadListener = event => {
@@ -109,6 +116,11 @@ BackgroundPage.prototype = {
     this.chromeWebNav.loadURI("about:blank", 0, null, null, null);
     this.chromeWebNav.close();
     this.chromeWebNav = null;
+
+    if (this.extension.addonData.instanceID) {
+      AddonManager.getAddonByInstanceID(this.extension.addonData.instanceID)
+                  .then(addon => addon.setDebugGlobal(null));
+    }
   },
 };
 
