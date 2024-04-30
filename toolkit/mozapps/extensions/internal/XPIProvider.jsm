@@ -3832,8 +3832,9 @@ this.XPIProvider = {
    * @param aFile
    *        An nsIFile for the unpacked add-on directory or XPI file.
    *
-   * @return a Promise that rejects if the add-on is not a valid restartless
-   *         add-on or if the same ID is already temporarily installed
+   * @return a Promise that resolves to an Addon object on success, or rejects
+   *         if the add-on is not a valid restartless add-on or if the
+   *         same ID is already temporarily installed
    */
   installTemporaryAddon: Task.async(function*(aFile) {
     let addon = yield loadManifestFromFile(aFile, TemporaryInstallLocation);
