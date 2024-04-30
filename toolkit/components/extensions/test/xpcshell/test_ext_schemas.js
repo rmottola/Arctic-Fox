@@ -361,8 +361,7 @@ let wrapper = {
     tally("call", ns, name, args);
   },
 
-  shouldInject(path) {
-    let ns = path.join(".");
+  shouldInject(ns) {
     return ns != "do-not-inject";
   },
 
@@ -392,8 +391,7 @@ let wrapper = {
 
 add_task(function* () {
   let url = "data:," + JSON.stringify(json);
-  let uri = BrowserUtils.makeURI(url);
-  yield Schemas.load(uri);
+  yield Schemas.load(url);
 
   let root = {};
   Schemas.inject(root, wrapper);
@@ -791,8 +789,7 @@ let deprecatedJson = [
 
 add_task(function* testDeprecation() {
   let url = "data:," + JSON.stringify(deprecatedJson);
-  let uri = BrowserUtils.makeURI(url);
-  yield Schemas.load(uri);
+  yield Schemas.load(url);
 
   let root = {};
   Schemas.inject(root, wrapper);
