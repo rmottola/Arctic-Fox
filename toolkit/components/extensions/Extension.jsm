@@ -91,7 +91,6 @@ Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   BaseContext,
   LocaleData,
-  MessageBroker,
   Messenger,
   injectAPI,
   instanceOf,
@@ -216,12 +215,6 @@ var Management = {
   },
 };
 
-// A MessageBroker that's used to send and receive messages for
-// extension pages (which run in the chrome process).
-var globalBroker = new MessageBroker([Services.mm, Services.ppmm]);
-
-var gContextId = 0;
-
 // An extension page is an execution context for any extension content
 // that runs in the chrome process. It's used for background pages
 // (type="background"), popups (type="popup"), and any extension
@@ -243,7 +236,6 @@ ExtensionPage = class extends BaseContext {
     this.contentWindow = contentWindow || null;
     this.uri = uri || extension.baseURI;
     this.incognito = params.incognito || false;
-    this.contextId = gContextId++;
     this.unloaded = false;
 
     // This is the MessageSender property passed to extension.
@@ -260,7 +252,7 @@ ExtensionPage = class extends BaseContext {
     // Properties in |filter| must match those in the |recipient|
     // parameter of sendMessage.
     let filter = {extensionId: extension.id};
-    this.messenger = new Messenger(this, globalBroker, sender, filter, delegate);
+    this.messenger = new Messenger(this, [Services.mm, Services.ppmm], sender, filter, delegate);
 
     this.extension.views.add(this);
   }
@@ -271,17 +263,6 @@ ExtensionPage = class extends BaseContext {
 
   get principal() {
     return this.contentWindow.document.nodePrincipal;
-  }
-
-  // A wrapper around MessageChannel.sendMessage which adds the extension ID
-  // to the recipient object, and ensures replies are not processed after the
-  // context has been unloaded.
-  sendMessage(target, messageName, data, recipient = {}, sender = {}) {
-    recipient.extensionId = this.extension.id;
-    sender.extensionId = this.extension.id;
-    sender.contextId = this.contextId;
-
-    return MessageChannel.sendMessage(target, messageName, data, recipient, sender);
   }
 
   // Called when the extension shuts down.
@@ -302,16 +283,11 @@ ExtensionPage = class extends BaseContext {
 
     this.unloaded = true;
 
-    MessageChannel.abortResponses({
-      extensionId: this.extension.id,
-      contextId: this.contextId,
-    });
+    super.unload();
 
     Management.emit("page-unload", this);
 
     this.extension.views.delete(this);
-
-    super.unload();
   }
 };
 
