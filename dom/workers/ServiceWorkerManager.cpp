@@ -178,6 +178,13 @@ public:
 
   virtual void Start() = 0;
 
+  void
+  Cancel()
+  {
+    mQueue = nullptr;
+    mCanceled = true;
+  }
+
   bool
   IsRegisterOrInstallJob() const
   {
@@ -191,10 +198,12 @@ protected:
   ServiceWorkerJobQueue* mQueue;
 
   Type mJobType;
+  bool mCanceled;
 
   explicit ServiceWorkerJob(ServiceWorkerJobQueue* aQueue, Type aJobType)
     : mQueue(aQueue)
     , mJobType(aJobType)
+    , mCanceled(false)
   {}
 
   virtual ~ServiceWorkerJob()
@@ -963,17 +972,9 @@ public:
     , mScriptSpec(aScriptSpec)
     , mCallback(aCallback)
     , mUpdateAndInstallInfo(aServiceWorkerInfo)
-    , mCanceled(false)
   {
     AssertIsOnMainThread();
     MOZ_ASSERT(aPrincipal);
-  }
-
-  void
-  Cancel()
-  {
-    mQueue = nullptr;
-    mCanceled = true;
   }
 
 protected:
@@ -983,7 +984,6 @@ protected:
   RefPtr<ServiceWorkerUpdateFinishCallback> mCallback;
   RefPtr<ServiceWorkerRegistrationInfo> mRegistration;
   RefPtr<ServiceWorkerInfo> mUpdateAndInstallInfo;
-  bool mCanceled;
 
   ~ServiceWorkerJobBase()
   { }
