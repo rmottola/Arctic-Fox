@@ -56,7 +56,7 @@ BackgroundPage.prototype = {
     let frameLoader = browser.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader;
     let docShell = frameLoader.docShell;
 
-    this.context = new ExtensionPage(this.extension, {type: "background", docShell, uri});
+    this.context = new ExtensionContext(this.extension, {type: "background", docShell, uri});
     GlobalManager.injectInDocShell(docShell, this.extension, this.context);
 
     let webNav = docShell.QueryInterface(Ci.nsIWebNavigation);
