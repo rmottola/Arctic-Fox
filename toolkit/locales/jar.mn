@@ -37,6 +37,7 @@
   locale/@AB_CD@/global/dateFormat.properties           (%chrome/global/dateFormat.properties)
   locale/@AB_CD@/global/dialogOverlay.dtd               (%chrome/global/dialogOverlay.dtd)
   locale/@AB_CD@/global/editMenuOverlay.dtd             (%chrome/global/editMenuOverlay.dtd)
+  locale/@AB_CD@/global/extensions.properties           (%chrome/global/extensions.properties)
   locale/@AB_CD@/global/fallbackMenubar.properties      (%chrome/global/fallbackMenubar.properties)
   locale/@AB_CD@/global/filefield.properties            (%chrome/global/filefield.properties)
   locale/@AB_CD@/global/filepicker.dtd                  (%chrome/global/filepicker.dtd)
