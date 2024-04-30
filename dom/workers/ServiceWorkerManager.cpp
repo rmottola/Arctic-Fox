@@ -1189,7 +1189,7 @@ public:
 
     // Step 8 "Queue a task..." for updatefound.
     nsCOMPtr<nsIRunnable> upr =
-      NS_NewRunnableMethodWithArg<ServiceWorkerRegistrationInfo*>(
+      NS_NewRunnableMethodWithArg<RefPtr<ServiceWorkerRegistrationInfo>>(
         swm,
         &ServiceWorkerManager::FireUpdateFoundOnServiceWorkerRegistrations,
         mRegistration);
@@ -1963,9 +1963,8 @@ ServiceWorkerRegistrationInfo::Activate()
 
   // "Queue a task to fire a simple event named controllerchange..."
   nsCOMPtr<nsIRunnable> controllerChangeRunnable =
-    NS_NewRunnableMethodWithArg<ServiceWorkerRegistrationInfo*>(swm,
-                                                                &ServiceWorkerManager::FireControllerChange,
-                                                                this);
+    NS_NewRunnableMethodWithArg<RefPtr<ServiceWorkerRegistrationInfo>>(
+      swm, &ServiceWorkerManager::FireControllerChange, this);
   NS_DispatchToMainThread(controllerChangeRunnable);
 
   nsCOMPtr<nsIRunnable> failRunnable =
