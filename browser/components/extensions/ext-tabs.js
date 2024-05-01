@@ -432,7 +432,7 @@ extensions.registerSchemaAPI("tabs", null, (extension, context) => {
           }
 
           let window = createProperties.windowId !== null ?
-            WindowManager.getWindow(createProperties.windowId) :
+            WindowManager.getWindow(createProperties.windowId, context) :
             WindowManager.topWindow;
           if (!window.gBrowser) {
             let obs = (finishedWindow, topic, data) => {
@@ -616,7 +616,7 @@ extensions.registerSchemaAPI("tabs", null, (extension, context) => {
 
         let window = windowId == null ?
           WindowManager.topWindow :
-          WindowManager.getWindow(windowId);
+          WindowManager.getWindow(windowId, context);
 
         let browser = window.gBrowser.selectedBrowser;
         let recipient = {
@@ -761,7 +761,7 @@ extensions.registerSchemaAPI("tabs", null, (extension, context) => {
 
         let destinationWindow = null;
         if (moveProperties.windowId !== null) {
-          destinationWindow = WindowManager.getWindow(moveProperties.windowId);
+          destinationWindow = WindowManager.getWindow(moveProperties.windowId, context);
           // Ignore invalid window.
           if (!destinationWindow) {
             return;
