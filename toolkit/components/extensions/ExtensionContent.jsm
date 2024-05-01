@@ -62,6 +62,12 @@ function isWhenBeforeOrSame(when1, when2) {
   return table[when1] <= table[when2];
 }
 
+function getInnerWindowID(window) {
+  return window.QueryInterface(Ci.nsIInterfaceRequestor)
+    .getInterface(Ci.nsIDOMWindowUtils)
+    .currentInnerWindowID;
+}
+
 // This is the fairly simple API that we inject into content
 // scripts.
 var api = context => {
@@ -324,7 +330,15 @@ class ExtensionContext extends BaseContext {
         isWebExtensionContentScript: true,
       });
     } else {
+      // sandbox metadata is needed to be recognized and supported in
+      // the Developer Tools of the tab where the content script is running.
+      let metadata = {
+        "inner-window-id": getInnerWindowID(contentWindow),
+        addonId: attrs.addonId,
+      };
+
       this.sandbox = Cu.Sandbox(prin, {
+        metadata,
         sandboxPrototype: contentWindow,
         wantXrays: true,
         isWebExtensionContentScript: true,
@@ -422,12 +436,6 @@ class ExtensionContext extends BaseContext {
     Cu.nukeSandbox(this.sandbox);
     this.sandbox = null;
   }
-}
-
-function windowId(window) {
-  return window.QueryInterface(Ci.nsIInterfaceRequestor)
-               .getInterface(Ci.nsIDOMWindowUtils)
-               .currentInnerWindowID;
 }
 
 // Responsible for creating ExtensionContexts and injecting content
@@ -574,8 +582,19 @@ DocumentManager = {
     }
   },
 
+  getContentScriptGlobalsForWindow(window) {
+    let winId = getInnerWindowID(window);
+    let extensions = this.contentScriptWindows.get(winId);
+
+    if (extensions) {
+      return Array.from(extensions.values(), ctx => ctx.sandbox);
+    }
+
+    return [];
+  },
+
   getContentScriptContext(extensionId, window) {
-    let winId = windowId(window);
+    let winId = getInnerWindowID(window);
     if (!this.contentScriptWindows.has(winId)) {
       this.contentScriptWindows.set(winId, new Map());
     }
@@ -590,7 +609,7 @@ DocumentManager = {
   },
 
   getExtensionPageContext(extensionId, window) {
-    let winId = windowId(window);
+    let winId = getInnerWindowID(window);
 
     let context = this.extensionPageWindows.get(winId);
     if (!context) {
@@ -662,7 +681,7 @@ DocumentManager = {
         }
       }
     } else {
-      let contexts = this.contentScriptWindows.get(windowId(window)) || new Map();
+      let contexts = this.contentScriptWindows.get(getInnerWindowID(window)) || new Map();
       for (let context of contexts.values()) {
         context.triggerScripts(state);
       }
@@ -787,7 +806,7 @@ class ExtensionGlobal {
 
   get messageFilterStrict() {
     return {
-      innerWindowID: windowId(this.global.content),
+      innerWindowID: getInnerWindowID(this.global.content),
     };
   }
 
@@ -889,6 +908,14 @@ this.ExtensionContent = {
   uninit(global) {
     this.globals.get(global).uninit();
     this.globals.delete(global);
+  },
+
+  // This helper is exported to be integrated in the devtools RDP actors,
+  // that can use it to retrieve the existent WebExtensions ContentScripts
+  // of a target window and be able to show the ContentScripts source in the
+  // DevTools Debugger panel.
+  getContentScriptGlobalsForWindow(window) {
+    return DocumentManager.getContentScriptGlobalsForWindow(window);
   },
 };
 
