@@ -680,7 +680,7 @@ global.WindowManager = {
   convert(extension, window, getInfo) {
     let result = {
       id: this.getId(window),
-      focused: window == WindowManager.topWindow,
+      focused: window.document.hasFocus(),
       top: window.screenY,
       left: window.screenX,
       width: window.outerWidth,
