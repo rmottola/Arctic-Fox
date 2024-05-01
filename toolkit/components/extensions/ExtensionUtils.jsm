@@ -878,7 +878,7 @@ Port.prototype = {
 function getMessageManager(target) {
   if (target instanceof Ci.nsIFrameLoaderOwner) {
     return target.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader.messageManager;
-   }
+  }
   return target;
 }
 
@@ -957,7 +957,7 @@ Messenger.prototype = {
           // Note: We intentionally do not use runSafe here so that any
           // errors are propagated to the message sender.
           let result = callback(message, sender, sendResponse);
-          if (result instanceof Promise) {
+          if (result instanceof this.context.cloneScope.Promise) {
             return result;
           } else if (result === true) {
             return promise;
