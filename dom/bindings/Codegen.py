@@ -2840,11 +2840,15 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
         if needInterfaceObject:
             interfaceClass = "&sInterfaceObjectClass.mBase"
             interfaceCache = "&aProtoAndIfaceCache.EntrySlotOrCreate(constructors::id::%s)" % self.descriptor.name
+            getConstructorProto = CGGeneric(getConstructorProto)
+            constructorProto = "constructorProto"
         else:
             # We don't have slots to store the named constructors.
             assert len(self.descriptor.interface.namedConstructors) == 0
             interfaceClass = "nullptr"
             interfaceCache = "nullptr"
+            getConstructorProto = None
+            constructorProto = "nullptr"
 
         isGlobal = self.descriptor.isGlobal() is not None
         if not isGlobal and self.properties.hasNonChromeOnly():
@@ -2862,7 +2866,7 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             JS::Heap<JSObject*>* interfaceCache = ${interfaceCache};
             dom::CreateInterfaceObjects(aCx, aGlobal, ${parentProto},
                                         ${protoClass}, protoCache,
-                                        constructorProto, ${interfaceClass}, ${constructHookHolder}, ${constructArgs}, ${namedConstructors},
+                                        ${constructorProto}, ${interfaceClass}, ${constructHookHolder}, ${constructArgs}, ${namedConstructors},
                                         interfaceCache,
                                         ${properties},
                                         ${chromeProperties},
@@ -2871,6 +2875,7 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             protoClass=protoClass,
             parentProto=parentProto,
             protoCache=protoCache,
+            constructorProto=constructorProto,
             interfaceClass=interfaceClass,
             constructHookHolder=constructHookHolder,
             constructArgs=constructArgs,
@@ -3046,7 +3051,7 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             makeProtoPrototypeImmutable = None
 
         return CGList(
-            [getParentProto, CGGeneric(getConstructorProto), initIds,
+            [getParentProto, getConstructorProto, initIds,
              prefCache, CGGeneric(call), defineAliases, unforgeableHolderSetup,
              speciesSetup, makeProtoPrototypeImmutable],
             "\n").define()
