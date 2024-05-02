@@ -45,10 +45,6 @@ var FullZoom = {
   // Initialization & Destruction
 
   init: function FullZoom_init() {
-    // Bug 691614 - zooming support for electrolysis
-    if (gMultiProcessBrowser)
-      return;
-
     // Listen for scrollwheel events so we can save scrollwheel-based changes.
     window.addEventListener("DOMMouseScroll", this, false);
 
@@ -78,10 +74,6 @@ var FullZoom = {
   },
 
   destroy: function FullZoom_destroy() {
-    // Bug 691614 - zooming support for electrolysis
-    if (gMultiProcessBrowser)
-      return;
-
     gPrefService.removeObserver("browser.zoom.", this);
     this._cps2.removeObserverForName(this.name, this);
     window.removeEventListener("DOMMouseScroll", this, false);
@@ -236,11 +228,8 @@ var FullZoom = {
    *        (optional) browser object displaying the document
    */
   onLocationChange: function FullZoom_onLocationChange(aURI, aIsTabSwitch, aBrowser) {
-    // Bug 691614 - zooming support for electrolysis
-    if (gMultiProcessBrowser)
-      return;
-
     let browser = aBrowser || gBrowser.selectedBrowser;
+
     // If we haven't been initialized yet but receive an onLocationChange
     // notification then let's store and replay it upon initialization.
     if (this._initialLocations) {
@@ -419,6 +408,7 @@ var FullZoom = {
    * @param browser  The zoom of this browser will be saved.  Required.
    */
   _applyZoomToPref: function FullZoom__applyZoomToPref(browser) {
+    Services.obs.notifyObservers(null, "browser-fullZoom:zoomChange", "");
     if (!this.siteSpecific ||
         gInPrintPreviewMode ||
         browser.isSyntheticDocument)
@@ -439,6 +429,7 @@ var FullZoom = {
    * @param browser  The zoom of this browser will be removed.  Required.
    */
   _removePref: function FullZoom__removePref(browser) {
+    Services.obs.notifyObservers(null, "browser-fullZoom:zoomReset", "");
     if (browser.isSyntheticDocument)
       return;
     let ctxt = this._loadContextFromBrowser(browser);
