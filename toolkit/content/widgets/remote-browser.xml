@@ -520,19 +520,6 @@
         ]]></body>
       </method>
 
-      <method name="observe">
-        <parameter name="aSubject"/>
-        <parameter name="aTopic"/>
-        <parameter name="aData"/>
-        <body><![CDATA[
-          if (aTopic == "ask-children-to-exit-fullscreen") {
-            if (aSubject == window.document) {
-              this.messageManager.sendAsyncMessage("DOMFullscreen:ChildrenMustExit");
-            }
-          }
-        ]]></body>
-      </method>
-
       <method name="enableDisableCommands">
         <parameter name="aAction"/>
         <parameter name="aEnabledLength"/>
