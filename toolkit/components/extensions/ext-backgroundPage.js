@@ -39,7 +39,6 @@ BackgroundPage.prototype = {
     }
 
     let uri = Services.io.newURI(url, null, null);
-    let principal = this.extension.createPrincipal(uri);
 
     let system = Services.scriptSecurityManager.getSystemPrincipal();
     let interfaceRequestor = chromeWebNav.QueryInterface(Ci.nsIInterfaceRequestor);
