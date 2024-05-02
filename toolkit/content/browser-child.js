@@ -513,11 +513,6 @@ addMessageListener("Browser:Thumbnail:CheckState", function (aMessage) {
   });
 });
 
-addMessageListener("UpdateCharacterSet", function (aMessage) {
-  docShell.charset = aMessage.data.value;
-  docShell.gatherCharsetMenuTelemetry();
-});
-
 // The AddonsChild needs to be rooted so that it stays alive as long as
 // the tab.
 var AddonsChild = RemoteAddonsChild.init(this);
