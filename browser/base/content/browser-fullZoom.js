@@ -2,10 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// One of the possible values for the mousewheel.* preferences.
-// From nsEventStateManager.cpp.
-const MOUSE_SCROLL_ZOOM = 3;
-
 /**
  * Controls the "full zoom" setting and its site-specific preferences.
  */
@@ -506,24 +502,24 @@ var FullZoom = {
   },
 
   /**
-   * Gets the load context from the given content browser.
+   * Gets the load context from the given Browser.
    *
    * @param Browser  The Browser whose load context will be returned.
-   * @return         The nsILoadContext of the given Browser.
+   * @return        The nsILoadContext of the given Browser.
    */
   _loadContextFromBrowser: function FullZoom__loadContextFromBrowser(browser) {
     return browser.loadContext;
   },
 
   /**
-   * Asynchronously broadcasts a "browser-fullZoom:locationChange" notification
-   * so that tests can select tabs, load pages, etc. and be notified when the
-   * zoom levels on those pages change.  The notification is always asynchronous
-   * so that observers are guaranteed a consistent behavior.
+   * Asynchronously broadcasts "browser-fullZoom:location-change" so that
+   * listeners can be notified when the zoom levels on those pages change.
+   * The notification is always asynchronous so that observers are guaranteed a
+   * consistent behavior.
    */
   _notifyOnLocationChange: function FullZoom__notifyOnLocationChange() {
     this._executeSoon(function () {
-      Services.obs.notifyObservers(null, "browser-fullZoom:locationChange", "");
+      Services.obs.notifyObservers(null, "browser-fullZoom:location-change", "");
     });
   },
 
