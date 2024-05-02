@@ -26,7 +26,6 @@ var ReaderParent = {
     "Reader:FaviconRequest",
     "Reader:ListStatusRequest",
     "Reader:RemoveFromList",
-    "Reader:Share",
     "Reader:SystemUIVisibility",
     "Reader:UpdateReaderButton",
     "Reader:SetIntPref",
@@ -66,9 +65,6 @@ var ReaderParent = {
         }
         break;
       }
-      case "Reader:Share":
-        // XXX: To implement.
-        break;
 
       case "Reader:SystemUIVisibility":
         // XXX: To implement.
