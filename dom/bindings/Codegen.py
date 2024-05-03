@@ -3399,7 +3399,7 @@ def InitUnforgeablePropertiesOnHolder(descriptor, properties, failureCode):
     assert (properties.unforgeableAttrs.hasNonChromeOnly() or
             properties.unforgeableAttrs.hasChromeOnly() or
             properties.unforgeableMethods.hasNonChromeOnly() or
-            properties.unforgeableMethods.hasChromeOnly)
+            properties.unforgeableMethods.hasChromeOnly())
 
     unforgeables = []
 
