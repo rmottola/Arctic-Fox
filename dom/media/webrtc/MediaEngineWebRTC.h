@@ -103,6 +103,8 @@ public:
                         AudioDataValue* aBuffer, size_t aFrames,
                         TrackRate aRate, uint32_t aChannels) override
   {}
+  void DeviceChanged() override
+  {}
   void NotifyInputData(MediaStreamGraph* aGraph,
                        const AudioDataValue* aBuffer, size_t aFrames,
                        TrackRate aRate, uint32_t aChannels) override
@@ -384,6 +386,12 @@ public:
       mAudioSource->NotifyInputData(aGraph, aBuffer, aFrames, aRate, aChannels);
     }
   }
+  virtual void DeviceChanged() override
+  {
+    if (mAudioSource) {
+      mAudioSource->DeviceChanged();
+    }
+  }
 
   void Shutdown()
   {
@@ -463,6 +471,8 @@ public:
   void NotifyInputData(MediaStreamGraph* aGraph,
                        const AudioDataValue* aBuffer, size_t aFrames,
                        TrackRate aRate, uint32_t aChannels) override;
+
+  void DeviceChanged() override;
 
   bool IsFake() override {
     return false;
