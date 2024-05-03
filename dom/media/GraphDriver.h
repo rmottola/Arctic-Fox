@@ -535,7 +535,9 @@ private:
    * the graph's monitor. */
   bool mMicrophoneActive;
 
+
 #ifdef XP_MACOSX
+
   /* Implements the workaround for the osx audio stack when changing output
    * devices. See comments in .cpp */
   bool OSXDeviceSwitchingWorkaround();

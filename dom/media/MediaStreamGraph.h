@@ -955,7 +955,7 @@ public:
   // last stream referencing an input goes away, so it can close the cubeb
   // input.  Also note: callable on any thread (though it bounces through
   // MainThread to set the command if needed).
-  nsresult OpenAudioInput(CubebUtils::AudioDeviceID aID,
+  nsresult OpenAudioInput(int aID,
                           AudioDataListener *aListener);
   // Note: also implied when Destroy() happens
   void CloseAudioInput();
@@ -1469,7 +1469,7 @@ public:
   // Idempotent
   static void DestroyNonRealtimeInstance(MediaStreamGraph* aGraph);
 
-  virtual nsresult OpenAudioInput(CubebUtils::AudioDeviceID aID,
+  virtual nsresult OpenAudioInput(int aID,
                                   AudioDataListener *aListener) {
     return NS_ERROR_FAILURE;
   }

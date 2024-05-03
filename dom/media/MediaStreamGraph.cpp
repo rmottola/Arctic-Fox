@@ -1025,7 +1025,7 @@ MediaStreamGraphImpl::PlayVideo(MediaStream* aStream)
 }
 
 void
-MediaStreamGraphImpl::OpenAudioInputImpl(CubebUtils::AudioDeviceID aID,
+MediaStreamGraphImpl::OpenAudioInputImpl(int aID,
                                          AudioDataListener *aListener)
 {
   // Bug 1238038 Need support for multiple mics at once
@@ -1064,7 +1064,7 @@ MediaStreamGraphImpl::OpenAudioInputImpl(CubebUtils::AudioDeviceID aID,
 }
 
 nsresult
-MediaStreamGraphImpl::OpenAudioInput(CubebUtils::AudioDeviceID aID,
+MediaStreamGraphImpl::OpenAudioInput(int aID,
                                      AudioDataListener *aListener)
 {
   // So, so, so annoying.  Can't AppendMessage except on Mainthread
@@ -1076,7 +1076,7 @@ MediaStreamGraphImpl::OpenAudioInput(CubebUtils::AudioDeviceID aID,
   }
   class Message : public ControlMessage {
   public:
-    Message(MediaStreamGraphImpl *aGraph, CubebUtils::AudioDeviceID aID,
+    Message(MediaStreamGraphImpl *aGraph, int aID,
             AudioDataListener *aListener) :
       ControlMessage(nullptr), mGraph(aGraph), mID(aID), mListener(aListener) {}
     virtual void Run()
@@ -1084,9 +1084,7 @@ MediaStreamGraphImpl::OpenAudioInput(CubebUtils::AudioDeviceID aID,
       mGraph->OpenAudioInputImpl(mID, mListener);
     }
     MediaStreamGraphImpl *mGraph;
-    // aID is a cubeb_devid, and we assume that opaque ptr is valid until
-    // we close cubeb.
-    CubebUtils::AudioDeviceID mID;
+    int mID;
     RefPtr<AudioDataListener> mListener;
   };
   // XXX Check not destroyed!
@@ -1105,7 +1103,7 @@ MediaStreamGraphImpl::CloseAudioInputImpl(AudioDataListener *aListener)
     return; // still in use
   }
   mInputDeviceUsers.Remove(aListener);
-  mInputDeviceID = nullptr;
+  mInputDeviceID = -1;
   mInputWanted = false;
   AudioCallbackDriver *driver = CurrentDriver()->AsAudioCallbackDriver();
   if (driver) {
@@ -2568,7 +2566,7 @@ MediaStream::AddMainThreadListener(MainThreadMediaStreamListener* aListener)
 }
 
 nsresult
-SourceMediaStream::OpenAudioInput(CubebUtils::AudioDeviceID aID,
+SourceMediaStream::OpenAudioInput(int aID,
                                   AudioDataListener *aListener)
 {
   if (GraphImpl()) {
@@ -3163,9 +3161,9 @@ MediaStreamGraphImpl::MediaStreamGraphImpl(GraphDriverType aDriverRequested,
   : MediaStreamGraph(aSampleRate)
   , mPortCount(0)
   , mInputWanted(false)
-  , mInputDeviceID(nullptr)
+  , mInputDeviceID(-1)
   , mOutputWanted(true)
-  , mOutputDeviceID(nullptr)
+  , mOutputDeviceID(-1)
   , mNeedAnotherIteration(false)
   , mGraphDriverAsleep(false)
   , mMonitor("MediaStreamGraphImpl")
