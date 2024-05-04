@@ -627,6 +627,16 @@ public:
   {
     return mInterleaved;
   }
+  bool operator==(const AudioConfig& aOther) const
+  {
+    return mChannelLayout == aOther.mChannelLayout &&
+      mRate == aOther.mRate && mFormat == aOther.mFormat &&
+      mInterleaved == aOther.mInterleaved;
+  }
+  bool operator!=(const AudioConfig& aOther) const
+  {
+    return !(*this == aOther);
+  }
 
   static const char* FormatToString(SampleFormat aFormat);
   static uint32_t SampleSize(SampleFormat aFormat);
