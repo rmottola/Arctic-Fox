@@ -1628,7 +1628,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         return ok;
 
     // Check for indexed access on a window.
-    int32_t index = GetArrayIndexFromId(cx, id);
+    uint32_t index = GetArrayIndexFromId(cx, id);
     if (IsArrayIndex(index)) {
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
