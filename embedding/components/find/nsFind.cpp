@@ -1257,4 +1257,3 @@ nsFind::CreateRange(nsINode* aNode)
   range->SetMaySpanAnonymousSubtrees(true);
   return range.forget();
 }
-
