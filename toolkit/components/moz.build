@@ -33,6 +33,7 @@ DIRS += [
     'gfx',
     'jsdownloads',
     'lz4',
+    'narrate',
     'mediasniffer',
     'microformats',
     'osfile',
