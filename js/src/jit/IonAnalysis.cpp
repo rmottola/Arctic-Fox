@@ -1890,14 +1890,12 @@ jit::MakeMRegExpHoistable(MIRGraph& graph)
     return true;
 }
 
-bool
+void
 jit::RenumberBlocks(MIRGraph& graph)
 {
     size_t id = 0;
     for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); block++)
         block->setId(id++);
-
-    return true;
 }
 
 // A utility for code which deletes blocks. Renumber the remaining blocks,
@@ -3749,19 +3747,22 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
 
     FinishDefinitePropertiesAnalysis(cx, constraints);
 
-    if (!SplitCriticalEdges(graph))
+    if (!SplitCriticalEdges(graph)) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
-    if (!RenumberBlocks(graph))
-        return false;
+    RenumberBlocks(graph);
 
     if (!BuildDominatorTree(graph)) {
         ReportOutOfMemory(cx);
         return false;
     }
 
-    if (!EliminatePhis(&builder, graph, AggressiveObservability))
+    if (!EliminatePhis(&builder, graph, AggressiveObservability)) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
     MDefinition* thisValue = graph.entryBlock()->getSlot(info.thisSlot());
 
@@ -3970,19 +3971,22 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
         return true;
     }
 
-    if (!SplitCriticalEdges(graph))
+    if (!SplitCriticalEdges(graph)) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
-    if (!RenumberBlocks(graph))
-        return false;
+    RenumberBlocks(graph);
 
     if (!BuildDominatorTree(graph)) {
         ReportOutOfMemory(cx);
         return false;
     }
 
-    if (!EliminatePhis(&builder, graph, AggressiveObservability))
+    if (!EliminatePhis(&builder, graph, AggressiveObservability)) {
+        ReportOutOfMemory(cx);
         return false;
+    }
 
     MDefinition* argumentsValue = graph.entryBlock()->getSlot(info.argsObjSlot());
 
