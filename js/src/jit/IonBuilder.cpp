@@ -5926,7 +5926,8 @@ IonBuilder::inlineCalls(CallInfo& callInfo, const ObjectVector& targets, BoolVec
     returnBlock->push(retPhi);
 
     // Create a resume point from current stack state.
-    returnBlock->initEntrySlots(alloc());
+    if (!returnBlock->initEntrySlots(alloc()))
+        return false;
 
     // Reserve the capacity for the phi.
     // Note: this is an upperbound. Unreachable targets and uninlineable natives are also counted.
