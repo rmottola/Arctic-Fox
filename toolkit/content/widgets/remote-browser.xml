@@ -517,6 +517,7 @@
               return this._receiveMessage(aMessage);
               break;
           }
+          return undefined;
         ]]></body>
       </method>
 
