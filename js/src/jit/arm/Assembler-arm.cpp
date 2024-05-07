@@ -2785,13 +2785,6 @@ Assembler::bind(Label* label, BufferOffset boff)
         BufferOffset dest = boff.assigned() ? boff : nextOffset();
         BufferOffset b(label);
         do {
-            // Even a 0 offset may be invalid if we're out of memory.
-            if (oom()) {
-                // Ensure we always bind the label. This matches what we do on
-                // x86/x64 and silences the assert in ~Label.
-                label->bind(0);
-                return;
-            }
             BufferOffset next;
             more = nextLink(b, &next);
             Instruction branch = *editSrc(b);
@@ -2824,6 +2817,9 @@ Assembler::bindLater(Label* label, wasm::JumpTarget target)
 void
 Assembler::bind(RepatchLabel* label)
 {
+    // It does not seem to be useful to record this label for
+    // disassembly, as the value that is bound to the label is often
+    // effectively garbage and is replaced by something else later.
     BufferOffset dest = nextOffset();
     if (label->used() && !oom()) {
         // If the label has a use, then change this use to refer to the bound
