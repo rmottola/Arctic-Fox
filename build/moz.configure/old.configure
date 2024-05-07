@@ -11,7 +11,13 @@ def encoded_open(path, mode):
     return codecs.open(path, mode, encoding)
 
 
-m4 = check_prog('M4', ('m4',))
+m4 = check_prog(
+    "M4",
+    (
+        "gm4",
+        "m4",
+    ),
+)
 
 @depends('OLD_CONFIGURE', mozconfig, awk, m4, check_build_environment, shell,
          old_configure_assignments, build_project)
