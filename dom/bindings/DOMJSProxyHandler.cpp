@@ -126,10 +126,6 @@ DOMProxyHandler::EnsureExpandoObject(JSContext* cx, JS::Handle<JSObject*> obj)
   nsISupports* native = UnwrapDOMObject<nsISupports>(obj);
   nsWrapperCache* cache;
   CallQueryInterface(native, &cache);
-  if (!cache) {
-    return expando;
-  }
-
   if (expandoAndGeneration) {
     cache->PreserveWrapper(native);
     expandoAndGeneration->expando.setObject(*expando);
