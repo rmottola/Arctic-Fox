@@ -2844,9 +2844,6 @@ void
 Assembler::retarget(Label* label, Label* target)
 {
 #ifdef JS_DISASM_ARM
-    spewLabel(label);
-#endif
-#ifdef JS_DISASM_ARM
     spewRetarget(label, target);
 #endif
     if (label->used() && !oom()) {
