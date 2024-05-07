@@ -4566,6 +4566,15 @@ MacroAssemblerARMCompat::asMasm() const
 
 //{{{ check_macroassembler_style
 // ===============================================================
+// MacroAssembler high-level usage.
+
+void
+MacroAssembler::flush()
+{
+    Assembler::flush();
+}
+
+// ===============================================================
 // Stack manipulation functions.
 
 void
@@ -5048,12 +5057,6 @@ MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
         ma_cmp(lhs.payloadReg(), Imm32(jv.s.payload.i32));
     ma_cmp(lhs.typeReg(), Imm32(jv.s.tag), Equal);
     ma_b(label, cond);
-}
-
-void
-MacroAssembler::flush()
-{
-    Assembler::flush();
 }
 
 //}}} check_macroassembler_style
