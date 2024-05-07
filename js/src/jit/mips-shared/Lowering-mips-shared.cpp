@@ -433,7 +433,6 @@ LIRGeneratorMIPSShared::visitCompareExchangeTypedArrayElement(MCompareExchangeTy
 {
     MOZ_ASSERT(ins->arrayType() != Scalar::Float32);
     MOZ_ASSERT(ins->arrayType() != Scalar::Float64);
-    MOZ_ASSERT(ins->offset() == 0);
 
     MOZ_ASSERT(ins->elements()->type() == MIRType_Elements);
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
@@ -462,7 +461,6 @@ void
 LIRGeneratorMIPSShared::visitAtomicExchangeTypedArrayElement(MAtomicExchangeTypedArrayElement* ins)
 {
     MOZ_ASSERT(ins->arrayType() <= Scalar::Uint32);
-    MOZ_ASSERT(ins->offset() == 0);
 
     MOZ_ASSERT(ins->elements()->type() == MIRType_Elements);
     MOZ_ASSERT(ins->index()->type() == MIRType_Int32);
