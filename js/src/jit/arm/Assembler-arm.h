@@ -910,6 +910,13 @@ class EDtrAddr
     uint32_t encode() const {
         return data;
     }
+#ifdef DEBUG
+    Register maybeOffsetRegister() const {
+        if (data & IsImmEDTR)
+            return InvalidReg;
+        return Register::FromCode(data & 0xf);
+    }
+#endif
 };
 
 class VFPOff
