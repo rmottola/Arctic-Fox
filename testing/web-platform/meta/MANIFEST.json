@@ -3659,6 +3659,46 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_past-ref.html"
       },
       {
+        "path": "compat/webkit-text-fill-color-property-001a.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/compat/webkit-text-fill-color-property-001a.html"
+      },
+      {
+        "path": "compat/webkit-text-fill-color-property-001b.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/compat/webkit-text-fill-color-property-001b.html"
+      },
+      {
+        "path": "compat/webkit-text-fill-color-property-001c.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/compat/webkit-text-fill-color-property-001c.html"
+      },
+      {
+        "path": "compat/webkit-text-fill-color-property-001d.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/compat/webkit-text-fill-color-property-001d.html"
+      },
+      {
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_transition_with_timestamp-ref.html"
       },
       {
@@ -11664,6 +11704,10 @@
         "url": "/XMLHttpRequest/responsetype.html"
       },
       {
+        "path": "XMLHttpRequest/responseurl.html",
+        "url": "/XMLHttpRequest/responseurl.html"
+      },
+      {
         "path": "XMLHttpRequest/responsexml-basic.htm",
         "url": "/XMLHttpRequest/responsexml-basic.htm"
       },
@@ -12425,6 +12469,10 @@
         "url": "/custom-elements/registering-custom-elements/unresolved-elements-interface-svg-element.html"
       },
       {
+        "path": "dom/collections/HTMLCollection-as-proto-length-get-throws.html",
+        "url": "/dom/collections/HTMLCollection-as-proto-length-get-throws.html"
+      },
+      {
         "path": "dom/collections/HTMLCollection-empty-name.html",
         "url": "/dom/collections/HTMLCollection-empty-name.html"
       },
@@ -12887,6 +12935,14 @@
       {
         "path": "dom/nodes/MutationObserver-characterData.html",
         "url": "/dom/nodes/MutationObserver-characterData.html"
+      },
+      {
+        "path": "dom/nodes/Element-insertAdjacentElement.html",
+        "url": "/dom/nodes/Element-insertAdjacentElement.html"
+      },
+      {
+        "path": "dom/nodes/Element-insertAdjacentText.html",
+        "url": "/dom/nodes/Element-insertAdjacentText.html"
       },
       {
         "path": "dom/nodes/MutationObserver-childList.html",
@@ -16068,6 +16124,10 @@
         "url": "/html/semantics/forms/textfieldselection/select-event.html"
       },
       {
+        "path": "html/semantics/forms/textfieldselection/selection-after-content-change.html",
+        "url": "/html/semantics/forms/textfieldselection/selection-after-content-change.html"
+      },
+      {
         "path": "html/semantics/forms/textfieldselection/selection-not-application-textarea.html",
         "url": "/html/semantics/forms/textfieldselection/selection-not-application-textarea.html"
       },
@@ -16495,6 +16555,14 @@
       {
         "path": "html/semantics/scripting-1/the-template-element/additions-to-parsing-xhtml-documents/template-child-nodes.html",
         "url": "/html/semantics/scripting-1/the-template-element/additions-to-parsing-xhtml-documents/template-child-nodes.html"
+      },
+      {
+        "path": "html/semantics/scripting-1/the-script-element/script-charset-01.html",
+        "url": "/html/semantics/scripting-1/the-script-element/script-charset-01.html"
+      },
+      {
+        "path": "html/semantics/scripting-1/the-script-element/script-charset-02.html",
+        "url": "/html/semantics/scripting-1/the-script-element/script-charset-02.html"
       },
       {
         "path": "html/semantics/scripting-1/the-template-element/additions-to-serializing-xhtml-documents/outerhtml.html",
@@ -17247,6 +17315,10 @@
       {
         "path": "media-source/mediasource-seek-beyond-duration.html",
         "url": "/media-source/mediasource-seek-beyond-duration.html"
+      },
+      {
+        "path": "js/builtins/Promise-incumbent-global.sub.html",
+        "url": "/js/builtins/Promise-incumbent-global.sub.html"
       },
       {
         "path": "media-source/mediasource-seek-during-pending-seek.html",
@@ -21547,6 +21619,366 @@
       {
         "path": "web-animations/animation-effect-timing/direction.html",
         "url": "/web-animations/animation-effect-timing/direction.html"
+      },
+      {
+        "path": "service-workers/service-worker/ServiceWorkerGlobalScope/close.https.html",
+        "url": "/service-workers/service-worker/ServiceWorkerGlobalScope/close.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/ServiceWorkerGlobalScope/registration-attribute.https.html",
+        "url": "/service-workers/service-worker/ServiceWorkerGlobalScope/registration-attribute.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/ServiceWorkerGlobalScope/unregister.https.html",
+        "url": "/service-workers/service-worker/ServiceWorkerGlobalScope/unregister.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/ServiceWorkerGlobalScope/update.https.html",
+        "url": "/service-workers/service-worker/ServiceWorkerGlobalScope/update.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/activate-event-after-install-state-change.https.html",
+        "url": "/service-workers/service-worker/activate-event-after-install-state-change.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/activation-after-registration.https.html",
+        "url": "/service-workers/service-worker/activation-after-registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/active.https.html",
+        "url": "/service-workers/service-worker/active.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/appcache-ordering-main.https.html",
+        "url": "/service-workers/service-worker/appcache-ordering-main.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/claim-not-using-registration.https.html",
+        "url": "/service-workers/service-worker/claim-not-using-registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/claim-using-registration.https.html",
+        "url": "/service-workers/service-worker/claim-using-registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/clients-get-cross-origin.https.html",
+        "url": "/service-workers/service-worker/clients-get-cross-origin.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/clients-get.https.html",
+        "url": "/service-workers/service-worker/clients-get.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/clients-matchall-client-types.https.html",
+        "url": "/service-workers/service-worker/clients-matchall-client-types.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/clients-matchall-include-uncontrolled.https.html",
+        "url": "/service-workers/service-worker/clients-matchall-include-uncontrolled.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/clients-matchall.https.html",
+        "url": "/service-workers/service-worker/clients-matchall.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/controller-on-load.https.html",
+        "url": "/service-workers/service-worker/controller-on-load.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/controller-on-reload.https.html",
+        "url": "/service-workers/service-worker/controller-on-reload.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/extendable-event-async-waituntil.https.html",
+        "url": "/service-workers/service-worker/extendable-event-async-waituntil.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/extendable-event-waituntil.https.html",
+        "url": "/service-workers/service-worker/extendable-event-waituntil.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-canvas-tainting-cache.https.html",
+        "url": "/service-workers/service-worker/fetch-canvas-tainting-cache.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-canvas-tainting.https.html",
+        "url": "/service-workers/service-worker/fetch-canvas-tainting.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-cors-xhr.https.html",
+        "url": "/service-workers/service-worker/fetch-cors-xhr.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-csp.https.html",
+        "url": "/service-workers/service-worker/fetch-csp.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-event-after-navigation-within-page.https.html",
+        "url": "/service-workers/service-worker/fetch-event-after-navigation-within-page.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-event-async-respond-with.https.html",
+        "url": "/service-workers/service-worker/fetch-event-async-respond-with.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-event-network-error.https.html",
+        "url": "/service-workers/service-worker/fetch-event-network-error.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-event-respond-with-stops-propagation.https.html",
+        "url": "/service-workers/service-worker/fetch-event-respond-with-stops-propagation.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-event.https.html",
+        "url": "/service-workers/service-worker/fetch-event.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-header-visibility.https.html",
+        "url": "/service-workers/service-worker/fetch-header-visibility.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-css-base-url.https.html",
+        "url": "/service-workers/service-worker/fetch-request-css-base-url.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-css-images.https.html",
+        "url": "/service-workers/service-worker/fetch-request-css-images.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-fallback.https.html",
+        "url": "/service-workers/service-worker/fetch-request-fallback.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-no-freshness-headers.https.html",
+        "url": "/service-workers/service-worker/fetch-request-no-freshness-headers.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-resources.https.html",
+        "url": "/service-workers/service-worker/fetch-request-resources.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-request-xhr.https.html",
+        "url": "/service-workers/service-worker/fetch-request-xhr.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/fetch-response-xhr.https.html",
+        "url": "/service-workers/service-worker/fetch-response-xhr.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/getregistration.https.html",
+        "url": "/service-workers/service-worker/getregistration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/getregistrations.https.html",
+        "url": "/service-workers/service-worker/getregistrations.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/indexeddb.https.html",
+        "url": "/service-workers/service-worker/indexeddb.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/install-event-type.https.html",
+        "url": "/service-workers/service-worker/install-event-type.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/installing.https.html",
+        "url": "/service-workers/service-worker/installing.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/interfaces.https.html",
+        "url": "/service-workers/service-worker/interfaces.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/invalid-blobtype.https.html",
+        "url": "/service-workers/service-worker/invalid-blobtype.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/invalid-header.https.html",
+        "url": "/service-workers/service-worker/invalid-header.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/multiple-register.https.html",
+        "url": "/service-workers/service-worker/multiple-register.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/multiple-update.https.html",
+        "url": "/service-workers/service-worker/multiple-update.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/navigation-redirect.https.html",
+        "url": "/service-workers/service-worker/navigation-redirect.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/onactivate-script-error.https.html",
+        "url": "/service-workers/service-worker/onactivate-script-error.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/oninstall-script-error.https.html",
+        "url": "/service-workers/service-worker/oninstall-script-error.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/performance-timeline.https.html",
+        "url": "/service-workers/service-worker/performance-timeline.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/postmessage-msgport-to-client.https.html",
+        "url": "/service-workers/service-worker/postmessage-msgport-to-client.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/postmessage-to-client.https.html",
+        "url": "/service-workers/service-worker/postmessage-to-client.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/postmessage.https.html",
+        "url": "/service-workers/service-worker/postmessage.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/ready.https.html",
+        "url": "/service-workers/service-worker/ready.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/referer.https.html",
+        "url": "/service-workers/service-worker/referer.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/register-default-scope.https.html",
+        "url": "/service-workers/service-worker/register-default-scope.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/register-same-scope-different-script-url.https.html",
+        "url": "/service-workers/service-worker/register-same-scope-different-script-url.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/register-wait-forever-in-install-worker.https.html",
+        "url": "/service-workers/service-worker/register-wait-forever-in-install-worker.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/registration-end-to-end.https.html",
+        "url": "/service-workers/service-worker/registration-end-to-end.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/registration-events.https.html",
+        "url": "/service-workers/service-worker/registration-events.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/registration-iframe.https.html",
+        "url": "/service-workers/service-worker/registration-iframe.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/registration-service-worker-attributes.https.html",
+        "url": "/service-workers/service-worker/registration-service-worker-attributes.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/registration.https.html",
+        "url": "/service-workers/service-worker/registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/rejections.https.html",
+        "url": "/service-workers/service-worker/rejections.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/request-end-to-end.https.html",
+        "url": "/service-workers/service-worker/request-end-to-end.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/resource-timing.https.html",
+        "url": "/service-workers/service-worker/resource-timing.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/service-worker-csp-connect.https.html",
+        "url": "/service-workers/service-worker/service-worker-csp-connect.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/service-worker-csp-default.https.html",
+        "url": "/service-workers/service-worker/service-worker-csp-default.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/service-worker-csp-script.https.html",
+        "url": "/service-workers/service-worker/service-worker-csp-script.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/serviceworkerobject-scripturl.https.html",
+        "url": "/service-workers/service-worker/serviceworkerobject-scripturl.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/shared-worker-controlled.https.html",
+        "url": "/service-workers/service-worker/shared-worker-controlled.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/skip-waiting-installed.https.html",
+        "url": "/service-workers/service-worker/skip-waiting-installed.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/skip-waiting-using-registration.https.html",
+        "url": "/service-workers/service-worker/skip-waiting-using-registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/skip-waiting-without-client.https.html",
+        "url": "/service-workers/service-worker/skip-waiting-without-client.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/skip-waiting-without-using-registration.https.html",
+        "url": "/service-workers/service-worker/skip-waiting-without-using-registration.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/skip-waiting.https.html",
+        "url": "/service-workers/service-worker/skip-waiting.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/state.https.html",
+        "url": "/service-workers/service-worker/state.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/synced-state.https.html",
+        "url": "/service-workers/service-worker/synced-state.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/uncontrolled-page.https.html",
+        "url": "/service-workers/service-worker/uncontrolled-page.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/unregister-controller.https.html",
+        "url": "/service-workers/service-worker/unregister-controller.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/unregister-then-register-new-script.https.html",
+        "url": "/service-workers/service-worker/unregister-then-register-new-script.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/unregister-then-register.https.html",
+        "url": "/service-workers/service-worker/unregister-then-register.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/unregister.https.html",
+        "url": "/service-workers/service-worker/unregister.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/update-after-navigation-fetch-event.https.html",
+        "url": "/service-workers/service-worker/update-after-navigation-fetch-event.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/update-after-oneday.https.html",
+        "url": "/service-workers/service-worker/update-after-oneday.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/update.https.html",
+        "url": "/service-workers/service-worker/update.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/waiting.https.html",
+        "url": "/service-workers/service-worker/waiting.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/websocket.https.html",
+        "url": "/service-workers/service-worker/websocket.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/worker-interception.https.html",
+        "url": "/service-workers/service-worker/worker-interception.https.html"
+      },
+      {
+        "path": "service-workers/service-worker/xhr.https.html",
+        "url": "/service-workers/service-worker/xhr.https.html"
       },
       {
         "path": "webdriver/user_input/clear_test.py"
