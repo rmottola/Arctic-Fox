@@ -18805,6 +18805,10 @@
         "url": "/web-animations/animatable/animate.html"
       },
       {
+        "path": "web-animations/animation-effect-timing/delay.html",
+        "url": "/web-animations/animation-effect-timing/delay.html"
+      },
+      {
         "path": "web-animations/animation-effect-timing/duration.html",
         "url": "/web-animations/animation-effect-timing/duration.html"
       },
