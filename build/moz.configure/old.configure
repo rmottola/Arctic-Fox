@@ -24,6 +24,7 @@ m4 = check_prog(
 @imports(_from='__builtin__', _import='open')
 @imports(_from='__builtin__', _import='print')
 @imports('glob')
+@imports('sys')
 @imports('itertools')
 @imports('subprocess')
 # Import getmtime without overwriting the sandbox os.path.
@@ -66,10 +67,16 @@ def prepare_configure(old_configure, mozconfig, awk, m4, build_env, shell,
         env['M4'] = m4
         env['AWK'] = awk
         env['AC_MACRODIR'] = os.path.join(build_env.topsrcdir, 'build', 'autoconf')
+        my_env = env
+        # Handle Python 2.7 not allowing unicode in the environment on Windows
+        if sys.platform == 'win32':
+            my_env = dict()
+            for e in env:
+                my_env[e.encode('ascii','ignore')] = env[e].encode('ascii','ignore')
         script = subprocess.check_output([
             shell, autoconf,
             '--localdir=%s' % os.path.dirname(old_configure),
-            old_configure + '.in'], env=env)
+            old_configure + '.in'], env=my_env)
 
         # Make old-configure append to config.log, where we put our own log.
         # This could be done with a m4 macro, but it's way easier this way
