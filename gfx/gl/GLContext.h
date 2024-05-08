@@ -3455,8 +3455,6 @@ protected:
     friend class GLScreenBuffer;
     UniquePtr<GLScreenBuffer> mScreen;
 
-    void DestroyScreenBuffer();
-
     SharedSurface* mLockedSurface;
 
 public:
