@@ -84,9 +84,9 @@ nsAboutProtocolHandler::GetFlagsForURI(nsIURI* aURI, uint32_t* aFlags)
     // This should never happen, so pass back the error:
     NS_ENSURE_SUCCESS(rv, rv);
 
-    // If marked as safe, and not marked unlinkable, pass 'safe' flags.
+    // If marked as safe, and marked linkable, pass 'safe' flags.
     if ((aboutModuleFlags & nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT) &&
-        !(aboutModuleFlags & nsIAboutModule::MAKE_UNLINKABLE)) {
+        (aboutModuleFlags & nsIAboutModule::MAKE_LINKABLE)) {
         *aFlags = URI_NORELATIVE | URI_NOAUTH | URI_LOADABLE_BY_ANYONE |
             URI_SAFE_TO_LOAD_IN_SECURE_CONTEXT;
     }
