@@ -46,16 +46,16 @@ namespace net {
 NS_IMPL_ISUPPORTS(nsHttpConnectionMgr, nsIObserver)
 
 static void
-InsertTransactionSorted(nsTArray<nsHttpTransaction*> &pendingQ, nsHttpTransaction *trans)
+InsertTransactionSorted(nsTArray<RefPtr<nsHttpTransaction> > &pendingQ, nsHttpTransaction *trans)
 {
     // insert into queue with smallest valued number first.  search in reverse
     // order under the assumption that many of the existing transactions will
     // have the same priority (usually 0).
 
-    for (int32_t i=pendingQ.Length()-1; i>=0; --i) {
+    for (int32_t i = pendingQ.Length() - 1; i >= 0; --i) {
         nsHttpTransaction *t = pendingQ[i];
         if (trans->Priority() >= t->Priority()) {
-	  if (ChaosMode::isActive(ChaosFeature::NetworkScheduling)) {
+            if (ChaosMode::isActive(ChaosFeature::NetworkScheduling)) {
                 int32_t samePriorityCount;
                 for (samePriorityCount = 0; i - samePriorityCount >= 0; ++samePriorityCount) {
                     if (pendingQ[i - samePriorityCount]->Priority() != trans->Priority()) {
@@ -460,7 +460,8 @@ nsHttpConnectionMgr::GetSocketThreadTarget(nsIEventTarget **target)
     EnsureSocketThreadTarget();
 
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
-    NS_IF_ADDREF(*target = mSocketThreadTarget);
+    nsCOMPtr<nsIEventTarget> temp(mSocketThreadTarget);
+    temp.forget(target);
     return NS_OK;
 }
 
@@ -651,11 +652,11 @@ nsHttpConnectionMgr::CloseIdleConnection(nsHttpConnection *conn)
     nsConnectionEntry *ent = LookupConnectionEntry(conn->ConnectionInfo(),
                                                    conn, nullptr);
 
+    RefPtr<nsHttpConnection> deleteProtector(conn);
     if (!ent || !ent->mIdleConns.RemoveElement(conn))
         return NS_ERROR_UNEXPECTED;
 
     conn->Close(NS_ERROR_ABORT);
-    NS_RELEASE(conn);
     mNumIdleConns--;
     ConditionallyStopPruneDeadConnectionsTimer();
     return NS_OK;
@@ -881,8 +882,8 @@ nsHttpConnectionMgr::ProcessPendingQForEntry(nsConnectionEntry *ent, bool consid
                      "TryDispatchTransaction returning hard error %x\n", rv));
 
             if (ent->mPendingQ.RemoveElement(trans)) {
+                // trans is now potentially destroyed
                 dispatchedSuccessfully = true;
-                NS_RELEASE(trans);
                 continue; // dont ++i as we just made the array shorter
             }
 
@@ -1073,11 +1074,10 @@ nsHttpConnectionMgr::ClosePersistentConnections(nsConnectionEntry *ent)
     LOG(("nsHttpConnectionMgr::ClosePersistentConnections [ci=%s]\n",
          ent->mConnInfo->HashKey().get()));
     while (ent->mIdleConns.Length()) {
-        nsHttpConnection *conn = ent->mIdleConns[0];
+        RefPtr<nsHttpConnection> conn(ent->mIdleConns[0]);
         ent->mIdleConns.RemoveElementAt(0);
         mNumIdleConns--;
         conn->Close(NS_ERROR_ABORT);
-        NS_RELEASE(conn);
     }
 
     int32_t activeCount = ent->mActiveConns.Length();
@@ -1223,10 +1223,9 @@ nsHttpConnectionMgr::MakeNewConnection(nsConnectionEntry *ent,
               iter.Next();
               continue;
             }
-            nsHttpConnection *conn = ent->mIdleConns[0];
+            RefPtr<nsHttpConnection> conn(ent->mIdleConns[0]);
             ent->mIdleConns.RemoveElementAt(0);
             conn->Close(NS_ERROR_ABORT);
-            NS_RELEASE(conn);
             mNumIdleConns--;
             ConditionallyStopPruneDeadConnectionsTimer();
         }
@@ -1544,8 +1543,6 @@ nsHttpConnectionMgr::TryDispatchTransaction(nsConnectionEntry *ent,
             conn = ent->mIdleConns[0];
             ent->mIdleConns.RemoveElementAt(0);
             mNumIdleConns--;
-            nsHttpConnection *temp = conn;
-            NS_RELEASE(temp);
 
             // we check if the connection can be reused before even checking if
             // it is a "matching" connection.
@@ -1702,11 +1699,11 @@ public:
     NS_DECL_THREADSAFE_ISUPPORTS
     NS_DECL_NSAHTTPCONNECTION(mConn)
 
-    explicit ConnectionHandle(nsHttpConnection *conn) { NS_ADDREF(mConn = conn); }
-    nsHttpConnection *mConn;
-
+    explicit ConnectionHandle(nsHttpConnection *conn) : mConn(conn) { }
+    void Reset() { mConn = nullptr; }
 private:
     virtual ~ConnectionHandle();
+    RefPtr<nsHttpConnection> mConn;
 };
 
 nsAHttpConnection *
@@ -1719,7 +1716,6 @@ ConnectionHandle::~ConnectionHandle()
 {
     if (mConn) {
         gHttpHandler->ReclaimConnection(mConn);
-        NS_RELEASE(mConn);
     }
 }
 
@@ -1780,9 +1776,7 @@ nsHttpConnectionMgr::DispatchAbstractTransaction(nsConnectionEntry *ent,
         // sever back references to connection, and do so without triggering
         // a call to ReclaimConnection ;-)
         transaction->SetConnection(nullptr);
-        NS_RELEASE(handle->mConn);
-        // destroy the connection
-        NS_RELEASE(conn);
+        handle->Reset(); // destroy the connection
     }
 
     // As transaction goes out of scope it will drop the last refernece to the
@@ -1877,7 +1871,7 @@ nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction *trans)
     nsAHttpConnection *wrappedConnection = trans->Connection();
     RefPtr<nsHttpConnection> conn;
     if (wrappedConnection)
-        conn = dont_AddRef(wrappedConnection->TakeHttpConnection());
+        conn = wrappedConnection->TakeHttpConnection();
 
     if (conn) {
         MOZ_ASSERT(trans->Caps() & NS_HTTP_STICKY_CONNECTION);
@@ -1913,7 +1907,6 @@ nsHttpConnectionMgr::ProcessNewTransaction(nsHttpTransaction *trans)
              trans, ent->mPendingQ.Length()+1));
         // put this transaction on the pending queue...
         InsertTransactionSorted(ent->mPendingQ, trans);
-        NS_ADDREF(trans);
         return NS_OK;
     }
 
@@ -1926,7 +1919,6 @@ void
 nsHttpConnectionMgr::AddActiveConn(nsHttpConnection *conn,
                                    nsConnectionEntry *ent)
 {
-    NS_ADDREF(conn);
     ent->mActiveConns.AppendElement(conn);
     mNumActiveConns++;
     ActivateTimeoutTick();
@@ -2002,7 +1994,7 @@ nsHttpConnectionMgr::ProcessSpdyPendingQ(nsConnectionEntry *ent)
     if (!conn || !conn->CanDirectlyActivate())
         return;
 
-    nsTArray<nsHttpTransaction*> leftovers;
+    nsTArray<RefPtr<nsHttpTransaction> > leftovers;
     uint32_t index;
 
     // Dispatch all the transactions we can
@@ -2026,7 +2018,6 @@ nsHttpConnectionMgr::ProcessSpdyPendingQ(nsConnectionEntry *ent)
                     trans));
             trans->Close(rv);
         }
-        NS_RELEASE(trans);
     }
 
     // Slurp up the rest of the pending queue into our leftovers bucket (we
@@ -2123,24 +2114,20 @@ nsHttpConnectionMgr::OnMsgShutdown(int32_t, ARefBase *param)
 
         // Close all active connections.
         while (ent->mActiveConns.Length()) {
-            nsHttpConnection* conn = ent->mActiveConns[0];
-
+            RefPtr<nsHttpConnection> conn(ent->mActiveConns[0]);
             ent->mActiveConns.RemoveElementAt(0);
             DecrementActiveConnCount(conn);
-
             conn->Close(NS_ERROR_ABORT, true);
-            NS_RELEASE(conn);
         }
 
         // Close all idle connections.
         while (ent->mIdleConns.Length()) {
-            nsHttpConnection* conn = ent->mIdleConns[0];
+            RefPtr<nsHttpConnection> conn(ent->mIdleConns[0]);
 
             ent->mIdleConns.RemoveElementAt(0);
             mNumIdleConns--;
 
             conn->Close(NS_ERROR_ABORT);
-            NS_RELEASE(conn);
         }
 
         // If all idle connections are removed we can stop pruning dead
@@ -2149,12 +2136,9 @@ nsHttpConnectionMgr::OnMsgShutdown(int32_t, ARefBase *param)
 
         // Close all pending transactions.
         while (ent->mPendingQ.Length()) {
-            nsHttpTransaction* trans = ent->mPendingQ[0];
-
-            ent->mPendingQ.RemoveElementAt(0);
-
+            nsHttpTransaction *trans = ent->mPendingQ[0];
             trans->Close(NS_ERROR_ABORT);
-            NS_RELEASE(trans);
+            ent->mPendingQ.RemoveElementAt(0);
         }
 
         // Close all half open tcp connections.
@@ -2214,7 +2198,7 @@ nsHttpConnectionMgr::OnMsgReschedTransaction(int32_t priority, ARefBase *param)
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
     LOG(("nsHttpConnectionMgr::OnMsgReschedTransaction [trans=%p]\n", param));
 
-    nsHttpTransaction *trans = static_cast<nsHttpTransaction *>(param);
+    RefPtr<nsHttpTransaction> trans = static_cast<nsHttpTransaction *>(param);
     trans->SetPriority(priority);
 
     nsConnectionEntry *ent = LookupConnectionEntry(trans->ConnectionInfo(),
@@ -2236,6 +2220,8 @@ nsHttpConnectionMgr::OnMsgCancelTransaction(int32_t reason, ARefBase *param)
     LOG(("nsHttpConnectionMgr::OnMsgCancelTransaction [trans=%p]\n", param));
 
     nsresult closeCode = static_cast<nsresult>(reason);
+
+    // caller holds a ref to param/trans on stack
     nsHttpTransaction *trans = static_cast<nsHttpTransaction *>(param);
 
     //
@@ -2256,8 +2242,6 @@ nsHttpConnectionMgr::OnMsgCancelTransaction(int32_t reason, ARefBase *param)
                 LOG(("nsHttpConnectionMgr::OnMsgCancelTransaction [trans=%p]"
                      " found in pending queue\n", trans));
                 ent->mPendingQ.RemoveElementAt(index);
-                nsHttpTransaction *temp = trans;
-                NS_RELEASE(temp); // b/c NS_RELEASE nulls its argument!
             }
 
             // Abandon all half-open sockets belonging to the given transaction.
@@ -2348,14 +2332,12 @@ nsHttpConnectionMgr::OnMsgCancelTransactions(int32_t code, ARefBase *param)
         return;
     }
 
-    RefPtr<nsHttpTransaction> trans;
     for (int32_t i = ent->mPendingQ.Length() - 1; i >= 0; --i) {
-        trans = dont_AddRef(ent->mPendingQ[i]);
+        nsHttpTransaction *trans = ent->mPendingQ[i];
         LOG(("nsHttpConnectionMgr::OnMsgCancelTransactions %s %p %p\n",
-             ci->HashKey().get(), ent, trans.get()));
-        ent->mPendingQ.RemoveElementAt(i);
+             ci->HashKey().get(), ent, trans));
         trans->Close(reason);
-        trans = nullptr;
+        ent->mPendingQ.RemoveElementAt(i);
     }
 }
 
@@ -2382,11 +2364,10 @@ nsHttpConnectionMgr::OnMsgPruneDeadConnections(int32_t, ARefBase *)
             int32_t count = ent->mIdleConns.Length();
             if (count > 0) {
                 for (int32_t i = count - 1; i >= 0; --i) {
-                    nsHttpConnection* conn = ent->mIdleConns[i];
+                    RefPtr<nsHttpConnection> conn(ent->mIdleConns[i]);
                     if (!conn->CanReuse()) {
                         ent->mIdleConns.RemoveElementAt(i);
                         conn->Close(NS_ERROR_ABORT);
-                        NS_RELEASE(conn);
                         mNumIdleConns--;
                     } else {
                         timeToNextExpire =
@@ -2472,8 +2453,7 @@ nsHttpConnectionMgr::OnMsgPruneNoTraffic(int32_t, ARefBase *)
             // Walk the list backwards to allow us to remove entries easily.
             for (int index = numConns - 1; index >= 0; index--) {
                 if (ent->mActiveConns[index]->NoTraffic()) {
-                    RefPtr<nsHttpConnection> conn =
-                        dont_AddRef(ent->mActiveConns[index]);
+                    RefPtr<nsHttpConnection> conn = ent->mActiveConns[index];
                     ent->mActiveConns.RemoveElementAt(index);
                     DecrementActiveConnCount(conn);
                     conn->Close(NS_ERROR_ABORT);
@@ -2601,8 +2581,6 @@ nsHttpConnectionMgr::OnMsgReclaimConnection(int32_t, ARefBase *param)
         if (conn == ent->mYellowConnection) {
             ent->OnYellowComplete();
         }
-        nsHttpConnection *temp = conn;
-        NS_RELEASE(temp);
         DecrementActiveConnCount(conn);
         ConditionallyStopTimeoutTick();
     }
@@ -2623,7 +2601,6 @@ nsHttpConnectionMgr::OnMsgReclaimConnection(int32_t, ARefBase *param)
                 break;
         }
 
-        NS_ADDREF(conn);
         ent->mIdleConns.InsertElementAt(idx, conn);
         mNumIdleConns++;
         conn->BeginIdleMonitoring();
@@ -3366,7 +3343,7 @@ nsHalfOpenSocket::OnOutputStreamReady(nsIAsyncOutputStream *out)
     if (index != -1) {
         MOZ_ASSERT(!mSpeculative,
                    "Speculative Half Open found mTransaction");
-        RefPtr<nsHttpTransaction> temp = dont_AddRef(mEnt->mPendingQ[index]);
+        RefPtr<nsHttpTransaction> temp = mEnt->mPendingQ[index];
         mEnt->mPendingQ.RemoveElementAt(index);
         gHttpHandler->ConnMgr()->AddActiveConn(conn, mEnt);
         rv = gHttpHandler->ConnMgr()->DispatchTransaction(mEnt, temp, conn);
@@ -3522,16 +3499,13 @@ nsHttpConnectionMgr::nsHalfOpenSocket::GetInterface(const nsIID &iid,
 }
 
 
-nsHttpConnection *
+already_AddRefed<nsHttpConnection>
 ConnectionHandle::TakeHttpConnection()
 {
     // return our connection object to the caller and clear it internally
     // do not drop our reference - the caller now owns it.
-
     MOZ_ASSERT(mConn);
-    nsHttpConnection *conn = mConn;
-    mConn = nullptr;
-    return conn;
+    return mConn.forget();
 }
 
 uint32_t
@@ -3979,6 +3953,7 @@ nsHttpConnectionMgr::MoveToWildCardConnEntry(nsHttpConnectionInfo *specificCI,
          wcEnt->mHalfOpens.Length(), wcEnt->mPendingQ.Length()));
 
     int32_t count = ent->mActiveConns.Length();
+    RefPtr<nsHttpConnection> deleteProtector(proxyConn);
     for (int32_t i = 0; i < count; ++i) {
         if (ent->mActiveConns[i] == proxyConn) {
             ent->mActiveConns.RemoveElementAt(i);
