@@ -662,8 +662,13 @@ public:
                                    MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
     {
         MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-        // Note that obj might be null here, since we're doing this
-        // before UnwrapSavedFrame.
+
+        MOZ_RELEASE_ASSERT(cx->compartment());
+        if (obj)
+            MOZ_RELEASE_ASSERT(obj->compartment());
+
+        // Note that obj might be null here, since we're doing this before
+        // UnwrapSavedFrame.
         if (obj && cx->compartment() != obj->compartment())
         {
             JSSubsumesOp subsumes = cx->runtime()->securityCallbacks->subsumes;
@@ -693,7 +698,7 @@ UnwrapSavedFrame(JSContext* cx, HandleObject obj, SavedFrameSelfHosted selfHoste
     if (!savedFrameObj)
         return nullptr;
 
-    MOZ_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*savedFrameObj));
+    MOZ_RELEASE_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*savedFrameObj));
     js::RootedSavedFrame frame(cx, &savedFrameObj->as<js::SavedFrame>());
     return GetFirstSubsumedFrame(cx, frame, selfHosted, skippedAsync);
 }
@@ -702,6 +707,10 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameSource(JSContext* cx, HandleObject savedFrame, MutableHandleString sourcep,
                     SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -717,7 +726,11 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameLine(JSContext* cx, HandleObject savedFrame, uint32_t* linep,
                   SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
     MOZ_ASSERT(linep);
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -733,7 +746,11 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameColumn(JSContext* cx, HandleObject savedFrame, uint32_t* columnp,
                     SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
     MOZ_ASSERT(columnp);
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -749,6 +766,10 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameFunctionDisplayName(JSContext* cx, HandleObject savedFrame, MutableHandleString namep,
                                  SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -764,6 +785,10 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameAsyncCause(JSContext* cx, HandleObject savedFrame, MutableHandleString asyncCausep,
                         SavedFrameSelfHosted unused_ /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     // This function is always called with self-hosted frames excluded by
@@ -787,6 +812,10 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameAsyncParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject asyncParentp,
                          SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -816,6 +845,10 @@ JS_PUBLIC_API(SavedFrameResult)
 GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject parentp,
                     SavedFrameSelfHosted selfHosted /* = SavedFrameSelfHosted::Include */)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     AutoMaybeEnterFrameCompartment ac(cx, savedFrame);
     bool skippedAsync;
     js::RootedSavedFrame frame(cx, UnwrapSavedFrame(cx, savedFrame, selfHosted, skippedAsync));
@@ -844,6 +877,10 @@ GetSavedFrameParent(JSContext* cx, HandleObject savedFrame, MutableHandleObject 
 JS_PUBLIC_API(bool)
 BuildStackString(JSContext* cx, HandleObject stack, MutableHandleString stringp, size_t indent)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    MOZ_RELEASE_ASSERT(cx->compartment());
+
     js::StringBuffer sb(cx);
 
     // Enter a new block to constrain the scope of possibly entering the stack's
@@ -1031,6 +1068,7 @@ bool
 SavedStacks::saveCurrentStack(JSContext* cx, MutableHandleSavedFrame frame, unsigned maxFrameCount)
 {
     MOZ_ASSERT(initialized());
+    MOZ_RELEASE_ASSERT(cx->compartment());
     assertSameCompartment(cx, this);
 
     if (creatingSavedFrame ||
@@ -1051,11 +1089,12 @@ SavedStacks::copyAsyncStack(JSContext* cx, HandleObject asyncStack, HandleString
                             MutableHandleSavedFrame adoptedStack, unsigned maxFrameCount)
 {
     MOZ_ASSERT(initialized());
+    MOZ_RELEASE_ASSERT(cx->compartment());
     assertSameCompartment(cx, this);
 
     RootedObject asyncStackObj(cx, CheckedUnwrap(asyncStack));
-    MOZ_ASSERT(asyncStackObj);
-    MOZ_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*asyncStackObj));
+    MOZ_RELEASE_ASSERT(asyncStackObj);
+    MOZ_RELEASE_ASSERT(js::SavedFrame::isSavedFrameAndNotProto(*asyncStackObj));
     RootedSavedFrame frame(cx, &asyncStackObj->as<js::SavedFrame>());
 
     return adoptAsyncStack(cx, frame, asyncCause, adoptedStack, maxFrameCount);
