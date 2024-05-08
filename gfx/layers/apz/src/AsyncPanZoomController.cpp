@@ -1645,6 +1645,14 @@ AsyncPanZoomController::ConvertToGecko(const ScreenIntPoint& aPoint, CSSPoint* a
   return false;
 }
 
+static bool
+AllowsScrollingMoreThanOnePage(double aMultiplier)
+{
+  const int32_t kMinAllowPageScroll =
+    EventStateManager::MIN_MULTIPLIER_VALUE_ALLOWING_OVER_ONE_PAGE_SCROLL;
+  return Abs(aMultiplier) >= kMinAllowPageScroll;
+}
+
 ParentLayerPoint
 AsyncPanZoomController::GetScrollWheelDelta(const ScrollWheelInput& aEvent) const
 {
@@ -1715,12 +1723,16 @@ AsyncPanZoomController::GetScrollWheelDelta(const ScrollWheelInput& aEvent) cons
     }
   }
 
-  if (Abs(delta.x) > pageScrollSize.width) {
+  // We shouldn't scroll more than one page at once except when the
+  // user preference is large.
+  if (!AllowsScrollingMoreThanOnePage(aEvent.mUserDeltaMultiplierX) &&
+      Abs(delta.x) > pageScrollSize.width) {
     delta.x = (delta.x >= 0)
               ? pageScrollSize.width
               : -pageScrollSize.width;
   }
-  if (Abs(delta.y) > pageScrollSize.height) {
+  if (!AllowsScrollingMoreThanOnePage(aEvent.mUserDeltaMultiplierY) &&
+      Abs(delta.y) > pageScrollSize.height) {
     delta.y = (delta.y >= 0)
               ? pageScrollSize.height
               : -pageScrollSize.height;
