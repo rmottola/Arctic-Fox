@@ -1080,6 +1080,14 @@ APZCTreeManager::ProcessMouseEvent(WidgetMouseEventBase& aEvent,
   return status;
 }
 
+void
+APZCTreeManager::ProcessTouchVelocity(uint32_t aTimestampMs, float aSpeedY)
+{
+  if (mApzcForInputBlock) {
+    mApzcForInputBlock->HandleTouchVelocity(aTimestampMs, aSpeedY);
+  }
+}
+
 nsEventStatus
 APZCTreeManager::ProcessWheelEvent(WidgetWheelEvent& aEvent,
                                    ScrollableLayerGuid* aOutTargetGuid,
