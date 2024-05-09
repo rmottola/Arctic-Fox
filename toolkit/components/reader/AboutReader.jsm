@@ -31,6 +31,8 @@ var AboutReader = function(mm, win, articlePromise) {
 
   this._mm = mm;
   this._mm.addMessageListener("Reader:CloseDropdown", this);
+  this._mm.addMessageListener("Reader:AddButton", this);
+  this._mm.addMessageListener("Reader:RemoveButton", this);
 
   this._docRef = Cu.getWeakReference(doc);
   this._winRef = Cu.getWeakReference(win);
@@ -61,6 +63,12 @@ var AboutReader = function(mm, win, articlePromise) {
 
   this._setupStyleDropdown();
   this._setupButton("close-button", this._onReaderClose.bind(this), "aboutReader.toolbar.close");
+
+  const gIsFirefoxDesktop = Services.appinfo.ID == "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}";
+  if (gIsFirefoxDesktop) {
+    // we're ready for any external setup, send a signal for that.
+    this._mm.sendAsyncMessage("Reader:OnSetup");
+  }
 
   let colorSchemeValues = JSON.parse(Services.prefs.getCharPref("reader.color_scheme.values"));
   let colorSchemeOptions = colorSchemeValues.map((value) => {
@@ -165,6 +173,31 @@ AboutReader.prototype = {
         this._closeDropdown();
         break;
       }
+      case "Reader:AddButton": {
+        if (message.data.id && message.data.image) {
+          let btn = this._doc.createElement("button");
+          btn.setAttribute("class", "button");
+          btn.setAttribute("style", "background-image: url('" + message.data.image + "')");
+          btn.setAttribute("id", message.data.id);
+          if (message.data.title)
+            btn.setAttribute("title", message.data.title);
+          if (message.data.text)
+            btn.textContent = message.data.text;
+          let tb = this._doc.getElementById("reader-toolbar");
+          tb.appendChild(btn);
+          this._setupButton(message.data.id, button => {
+            this._mm.sendAsyncMessage("Reader:Clicked-" + button.getAttribute("id"), { article: this._article });
+          });
+        }
+        break;
+      }
+      case "Reader:RemoveButton": {
+        if (message.data.id) {
+          let btn = this._doc.getElementById(message.data.id);
+          btn.remove();
+        }
+        break;
+      }
 
       case "Reader:Removed": {
         if (message.data.url == this._article.url) {
@@ -213,6 +246,8 @@ AboutReader.prototype = {
         this._closeDropdown();
 
         this._mm.removeMessageListener("Reader:CloseDropdown", this);
+        this._mm.removeMessageListener("Reader:AddButton", this);
+        this._mm.removeMessageListener("Reader:RemoveButton", this);
         this._windowUnloaded = true;
         break;
     }
@@ -671,7 +706,8 @@ AboutReader.prototype = {
         return;
 
       aEvent.stopPropagation();
-      callback();
+      let btn = aEvent.target;
+      callback(btn);
     }, true);
   },
 
