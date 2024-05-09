@@ -6,7 +6,6 @@ dnl file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 dnl Process this file with autoconf to produce a configure script.
 dnl ========================================================
-
 AC_PREREQ(2.13)
 AC_INIT(js/src/jsapi.h)
 AC_CONFIG_AUX_DIR(${srcdir}/build/autoconf)
@@ -719,14 +718,6 @@ dnl ========================================================
 dnl GNU specific defaults
 dnl ========================================================
 if test "$GNU_CC"; then
-    # Per bug 719659 comment 2, some of the headers on ancient build machines
-    # may require gnu89 inline semantics.  But otherwise, we use C99.
-    # But on OS X we just use C99 plus GNU extensions, in order to fix
-    # bug 917526.
-    CFLAGS="$CFLAGS -std=gnu99"
-    if test "${OS_ARCH}" != Darwin; then
-        CFLAGS="$CFLAGS -fgnu89-inline"
-    fi
     MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -Wl,-h,$(DSO_SONAME) -o $@'
     MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -Wl,-h,$(DSO_SONAME) -o $@'
     DSO_LDOPTS='-shared'
