@@ -1270,12 +1270,11 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
       this._getOldestRequest(visibleItems).attachment.startedMillis;
 
     // https://developer.mozilla.org/en-US/docs/Localization_and_Plurals
-    let str = PluralForm.get(visibleRequestsCount, L10N.getStr("networkMenu.summary2"));
+    let str = PluralForm.get(visibleRequestsCount, L10N.getStr("networkMenu.summary"));
     this._summary.setAttribute("label", str
       .replace("#1", visibleRequestsCount)
-      .replace("#2", L10N.numberWithDecimals((totalBytes.contentSize || 0) / 1024, CONTENT_SIZE_DECIMALS))
-      .replace("#3", L10N.numberWithDecimals((totalBytes.transferredSize || 0) / 1024, CONTENT_SIZE_DECIMALS))
-      .replace("#4", L10N.numberWithDecimals((totalMillis || 0) / 1000, REQUEST_TIME_DECIMALS))
+      .replace("#2", L10N.numberWithDecimals((totalBytes || 0) / 1024, CONTENT_SIZE_DECIMALS))
+      .replace("#3", L10N.numberWithDecimals((totalMillis || 0) / 1000, REQUEST_TIME_DECIMALS))
     );
   },
 
@@ -3420,7 +3419,7 @@ PerformanceStatisticsView.prototype = {
    *        True if the cache is considered enabled, false for disabled.
    */
   _sanitizeChartDataSource: function(aItems, aEmptyCache) {
-    const data = [
+    let data = [
       "html", "css", "js", "xhr", "fonts", "images", "media", "flash", "other"
     ].map(e => ({
       cached: 0,
