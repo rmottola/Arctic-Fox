@@ -2185,33 +2185,21 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   },
 
   /**
-   * Gets the total number of bytes representing the cumulated
-   * content and transferred size of a set of requests.
-   * Returns 0 for an empty set.
+   * Gets the total number of bytes representing the cumulated content size of
+   * a set of requests. Returns 0 for an empty set.
    *
    * @param array aItemsArray
-   * @return object {contentSize: number, transferredSize: number}
+   * @return number
    */
   _getTotalBytesOfRequests: function(aItemsArray) {
-    let contentSize = 0;
-    let transferredSize = 0;
-
-    let result = {
-      contentSize: contentSize,
-      transferredSize: transferredSize,
-    };
     if (!aItemsArray.length) {
-      return result;
+      return 0;
     }
 
+    let result = 0;
     aItemsArray.forEach(item => {
-      let size;
-      size = item.attachment.contentSize;
-      contentSize += (typeof size == "number") ? size : 0;
-      result.contentSize = contentSize;
-      size = item.attachment.transferredSize;
-      transferredSize += (typeof size == "number") ? size : 0;
-      result.transferredSize = transferredSize;
+      let size = item.attachment.contentSize;
+      result += (typeof size == "number") ? size : 0;
     });
 
     return result;

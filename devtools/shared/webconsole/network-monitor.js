@@ -388,8 +388,7 @@ NetworkResponseListener.prototype = {
       response.encoding = "base64";
       try {
         response.text = btoa(response.text);
-      }
-      catch (ex) { }
+      } catch (err) { }
     }
 
     if (response.mimeType && this.request.contentCharset) {
