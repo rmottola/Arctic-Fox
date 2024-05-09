@@ -14,6 +14,7 @@ from mozbuild.configure import (
     ConfigureError,
     ConfigureSandbox,
 )
+from mozbuild.util import exec_
 
 from buildconfig import topsrcdir
 
@@ -57,7 +58,7 @@ class TestChecksConfigure(unittest.TestCase):
         base_dir = os.path.join(topsrcdir, 'build', 'moz.configure')
         sandbox.include_file(os.path.join(base_dir, 'checks.configure'))
 
-        exec(textwrap.dedent('''
+        exec_(textwrap.dedent('''
             @checking('for a thing')
             def foo(value):
                 return value
@@ -87,7 +88,7 @@ class TestChecksConfigure(unittest.TestCase):
 
         # When the function given to checking does nothing interesting, the
         # behavior is not altered
-        exec(textwrap.dedent('''
+        exec_(textwrap.dedent('''
             @checking('for a thing', lambda x: x)
             def foo(value):
                 return value
@@ -116,7 +117,7 @@ class TestChecksConfigure(unittest.TestCase):
         foo(data)
         self.assertEqual(out.getvalue(), 'checking for a thing... %r\n' % data)
 
-        exec(textwrap.dedent('''
+        exec_(textwrap.dedent('''
             def munge(x):
                 if not x:
                     return 'not found'
@@ -162,7 +163,7 @@ class TestChecksConfigure(unittest.TestCase):
 
         status = 0
         try:
-            exec(command, sandbox)
+            exec_(command, sandbox)
             sandbox.run()
         except SystemExit as e:
             status = e.code
