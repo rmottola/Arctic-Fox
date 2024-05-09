@@ -4,6 +4,8 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Check that the timeline toolbar contains a pause button and that this pause
 // button can be clicked. Check that when it is, the current animations
 // displayed in the timeline get their playstates changed accordingly, and check
@@ -15,7 +17,7 @@
 // the timeline does the right thing.
 
 add_task(function*() {
-  yield addTab(TEST_URL_ROOT + "doc_simple_animation.html");
+  yield addTab(URL_ROOT + "doc_simple_animation.html");
 
   let {panel, inspector} = yield openAnimationInspector();
   let timeline = panel.animationsTimelineComponent;
@@ -43,7 +45,7 @@ add_task(function*() {
   // at the end of the timeline, and the button should remain in play mode.
   info("Select an infinite animation, reload the page and wait for the " +
        "animation to complete");
-  yield selectNode(".multi", inspector);
+  yield selectNodeAndWaitForAnimations(".multi", inspector);
   yield reloadTab(inspector);
   yield waitForOutOfBoundScrubber(timeline);
 
@@ -62,7 +64,7 @@ add_task(function*() {
   // timeline, it should go back to paused mode.
   info("Select a finite animation, reload the page and wait for the " +
        "animation to complete");
-  yield selectNode(".negative-delay", inspector);
+  yield selectNodeAndWaitForAnimations(".negative-delay", inspector);
   yield reloadTab(inspector);
   yield waitForScrubberStopped(timeline);
 
