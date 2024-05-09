@@ -163,6 +163,7 @@ class TestChecksConfigure(unittest.TestCase):
         status = 0
         try:
             exec(command, sandbox)
+            sandbox.run()
         except SystemExit as e:
             status = e.code
 
