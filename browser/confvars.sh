@@ -62,7 +62,7 @@ fi
 MOZ_BRANDING_DIRECTORY=browser/branding/arcticfox
 MOZ_OFFICIAL_BRANDING_DIRECTORY=browser/branding/arcticfox
 # New Pale Moon App GUID
-# Firefox MOZ_APP_ID={ec8030f7-c20a-464f-9b0e-13a3a9e97384}
+# Firefox MOZ_APP_ID={8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}
 MOZ_APP_ID={8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}
 # This should usually be the same as the value MAR_CHANNEL_ID.
 # If more than one ID is needed, then you should use a comma separated list

@@ -1235,7 +1235,7 @@ this.DOMApplicationRegistry = {
       //                "severity":"1",
       //                "vulnerabilityStatus":0,
       //                "targetApps":{
-      //                  "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}":[{"minVersion":"3.7a1pre","maxVersion":"*"}]
+      //                  "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}":[{"minVersion":"3.7a1pre","maxVersion":"*"}]
       //                }
       //               }],
       //   "prefs":[],
