@@ -538,9 +538,11 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        True if this request was initiated via XHR.
    * @param boolean aFromCache
    *        Indicates if the result came from the browser cache
+   * @param boolean aFromServiceWorker
+   *        Indicates if the request has been intercepted by a Service Worker
    */
-  addRequest: function(aId, aStartedDateTime, aMethod, aUrl, aIsXHR, aFromCache) {
-    this._addQueue.push([aId, aStartedDateTime, aMethod, aUrl, aIsXHR, aFromCache]);
+  addRequest: function(aId, aStartedDateTime, aMethod, aUrl, aIsXHR, aFromCache, aFromServiceWorker) {
+    this._addQueue.push([aId, aStartedDateTime, aMethod, aUrl, aIsXHR, aFromCache, aFromServiceWorker]);
 
     // Lazy updating is disabled in some tests.
     if (!this.lazyUpdate) {
@@ -1351,7 +1353,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     let widget = NetMonitorView.RequestsMenu.widget;
     let isScrolledToBottom = widget.isScrolledToBottom();
 
-    for (let [id, startedDateTime, method, url, isXHR, fromCache] of this._addQueue) {
+    for (let [id, startedDateTime, method, url, isXHR, fromCache, fromServiceWorker] of this._addQueue) {
       // Convert the received date/time string to a unix timestamp.
       let unixTime = Date.parse(startedDateTime);
 
@@ -1370,7 +1372,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
           method: method,
           url: url,
           isXHR: isXHR,
-          fromCache: fromCache
+          fromCache: fromCache,
+          fromServiceWorker: fromServiceWorker
         }
       });
 
@@ -1472,7 +1475,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             requestItem.attachment.status = value;
             this.updateMenuView(requestItem, key, {
               status: value,
-              cached: requestItem.attachment.fromCache
+              cached: requestItem.attachment.fromCache,
+              serviceWorker: requestItem.attachment.fromServiceWorker
             });
             break;
           case "statusText":
@@ -1481,6 +1485,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
                         requestItem.attachment.statusText);
             if(requestItem.attachment.fromCache) {
               text += " (cached)";
+            } else if(requestItem.attachment.fromServiceWorker) {
+              text += " (service worker)";
             }
 
             this.updateMenuView(requestItem, key, text);
@@ -1496,6 +1502,10 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             if(requestItem.attachment.fromCache) {
               requestItem.attachment.transferredSize = 0;
               this.updateMenuView(requestItem, key, 'cached');
+            }
+            else if(requestItem.attachment.fromServiceWorker) {
+              requestItem.attachment.transferredSize = 0;
+              this.updateMenuView(requestItem, key, 'service worker');
             }
             else {
               requestItem.attachment.transferredSize = value;
@@ -1525,7 +1535,9 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
           case "eventTimings":
             requestItem.attachment.eventTimings = value;
             this._createWaterfallView(
-              requestItem, value.timings, requestItem.attachment.fromCache
+              requestItem, value.timings,
+              requestItem.attachment.fromCache ||
+              requestItem.attachment.fromServiceWorker
             );
             break;
         }
@@ -1657,7 +1669,16 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
       }
       case "status": {
         let node = $(".requests-menu-status-icon", target);
-        node.setAttribute("code", aValue.cached ? "cached" : aValue.status);
+        let code;
+        if (aValue.cached) {
+          code = L10N.getStr("netmonitor.status.cached");
+          code = "cached";
+        } else if (aValue.serviceWorker) {
+          code = L10N.getStr("netmonitor.status.serviceWorker");
+        } else {
+          code = aValue.status;
+        }
+        node.setAttribute("code", code);
         let codeNode = $(".requests-menu-status-code", target);
         codeNode.setAttribute("value", aValue.status);
         break;
@@ -1685,6 +1706,10 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         }
         else if(aValue === "cached") {
           text = L10N.getStr("networkMenu.sizeCached");
+          node.classList.add('theme-comment');
+        }
+        else if(aValue === "service worker") {
+          text = L10N.getStr("networkMenu.sizeServiceWorker");
           node.classList.add('theme-comment');
         }
         else {
@@ -1738,7 +1763,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    * @param object aTimings
    *        An object containing timing information.
    * @param boolean aFromCache
-   *        Indicates if the result came from the browser cache
+   *        Indicates if the result came from the browser cache or a service worker
    */
   _createWaterfallView: function(aItem, aTimings, aFromCache) {
     let { target, attachment } = aItem;
@@ -2681,7 +2706,15 @@ NetworkDetailsView.prototype = {
     }
 
     if (aData.status) {
-      $("#headers-summary-status-circle").setAttribute("code", aData.fromCache ? "cached" : aData.status);
+      let code;
+      if (aData.fromCache) {
+        code = L10N.getStr("netmonitor.status.cached");
+      } else if (aData.fromServiceWorker) {
+        code = L10N.getStr("netmonitor.status.serviceWorker");
+      } else {
+        code = aData.status;
+      }
+      $("#headers-summary-status-circle").setAttribute("code", code);
       $("#headers-summary-status-value").setAttribute("value", aData.status + " " + aData.statusText);
       $("#headers-summary-status").removeAttribute("hidden");
     } else {

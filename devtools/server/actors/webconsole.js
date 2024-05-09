@@ -282,6 +282,11 @@ WebConsoleActor.prototype =
   networkMonitor: null,
 
   /**
+   * The NetworkMonitor instance living in the same (child) process.
+   */
+  networkMonitorChild: null,
+
+  /**
    * The ConsoleProgressListener instance.
    */
   consoleProgressListener: null,
@@ -340,6 +345,10 @@ WebConsoleActor.prototype =
     if (this.networkMonitor) {
       this.networkMonitor.destroy();
       this.networkMonitor = null;
+    }
+    if (this.networkMonitorChild) {
+      this.networkMonitorChild.destroy();
+      this.networkMonitorChild = null;
     }
     if (this.consoleProgressListener) {
       this.consoleProgressListener.destroy();
@@ -585,14 +594,21 @@ WebConsoleActor.prototype =
         case "NetworkActivity":
           if (!this.networkMonitor) {
             if (appId || messageManager) {
+              // Start a network monitor in the parent process to listen to
+              // most requests than happen in parent
               this.networkMonitor =
                 new NetworkMonitorChild(appId, messageManager,
                                         this.parentActor.actorID, this);
+              this.networkMonitor.init();
+              // Spawn also one in the child to listen to service workers
+              this.networkMonitorChild = new NetworkMonitor({ window: window },
+                                                            this);
+              this.networkMonitorChild.init();
             }
             else {
               this.networkMonitor = new NetworkMonitor({ window: window }, this);
+              this.networkMonitor.init();
             }
-            this.networkMonitor.init();
           }
           startedListeners.push(listener);
           break;
@@ -674,6 +690,10 @@ WebConsoleActor.prototype =
           if (this.networkMonitor) {
             this.networkMonitor.destroy();
             this.networkMonitor = null;
+          }
+          if (this.networkMonitorChild) {
+            this.networkMonitorChild.destroy();
+            this.networkMonitorChild = null;
           }
           stoppedListeners.push(listener);
           break;
@@ -1753,6 +1773,7 @@ NetworkEventActor.prototype =
       method: this._request.method,
       isXHR: this._isXHR,
       fromCache: this._fromCache,
+      fromServiceWorker: this._fromServiceWorker,
       private: this._private,
     };
   },
@@ -1797,6 +1818,7 @@ NetworkEventActor.prototype =
     this._startedDateTime = aNetworkEvent.startedDateTime;
     this._isXHR = aNetworkEvent.isXHR;
     this._fromCache = aNetworkEvent.fromCache;
+    this._fromServiceWorker = aNetworkEvent.fromServiceWorker;
 
     for (let prop of ['method', 'url', 'httpVersion', 'headersSize']) {
       this._request[prop] = aNetworkEvent[prop];
