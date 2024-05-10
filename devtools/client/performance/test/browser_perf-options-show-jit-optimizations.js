@@ -19,7 +19,7 @@ function* spawnTest() {
 
   ok(!$("#jit-optimizations-view").classList.contains("hidden"), "JIT Optimizations shown");
 
-  rendered = once(JsCallTreeView, EVENTS.JS_CALL_TREE_RENDERED);
+  rendered = once(JsCallTreeView, EVENTS.UI_JS_CALL_TREE_RENDERED);
   Services.prefs.setBoolPref(JIT_PREF, false);
   yield rendered;
   ok(true, "JsCallTreeView rerendered when toggling off show-jit-optimizations.");

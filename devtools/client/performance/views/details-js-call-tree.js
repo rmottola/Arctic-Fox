@@ -70,7 +70,7 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
       this.hideOptimizations();
     }
 
-    this.emit(EVENTS.JS_CALL_TREE_RENDERED);
+    this.emit(EVENTS.UI_JS_CALL_TREE_RENDERED);
   },
 
   showOptimizations: function () {
