@@ -1359,8 +1359,9 @@ AccessibleWrap::HandleAccEvent(AccEvent* aEvent)
         AccMutationEvent* event = downcast_accEvent(aEvent);
         Accessible* parentAcc = event ? event->Parent() : accessible->Parent();
         AtkObject* parent = AccessibleWrap::GetAtkObject(parentAcc);
-        return FireAtkShowHideEvent(atkObj, parent, true,
-                                    aEvent->IsFromUserInput());
+        NS_ENSURE_STATE(parent);
+        FireAtkShowHideEvent(atkObj, parent, true, aEvent->IsFromUserInput());
+        return NS_OK;
       }
 
     case nsIAccessibleEvent::EVENT_HIDE:
@@ -1375,8 +1376,9 @@ AccessibleWrap::HandleAccEvent(AccEvent* aEvent)
         AccMutationEvent* event = downcast_accEvent(aEvent);
         Accessible* parentAcc = event ? event->Parent() : accessible->Parent();
         AtkObject* parent = AccessibleWrap::GetAtkObject(parentAcc);
-        return FireAtkShowHideEvent(atkObj, parent, false,
-                                    aEvent->IsFromUserInput());
+        NS_ENSURE_STATE(parent);
+        FireAtkShowHideEvent(atkObj, parent, false, aEvent->IsFromUserInput());
+        return NS_OK;
       }
 
         /*
@@ -1590,17 +1592,13 @@ static const char *kMutationStrings[2][2] = {
   { HIDE_EVENT, ADD_EVENT },
 };
 
-nsresult
+void
 AccessibleWrap::FireAtkShowHideEvent(AtkObject* aObject, AtkObject* aParent,
                                      bool aIsAdded, bool aFromUser)
 {
     int32_t indexInParent = getIndexInParentCB(aObject);
-    NS_ENSURE_STATE(aParent);
-
     const char *signal_name = kMutationStrings[aFromUser][aIsAdded];
     g_signal_emit_by_name(aParent, signal_name, indexInParent, aObject, nullptr);
-
-    return NS_OK;
 }
 
 // static
