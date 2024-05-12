@@ -381,15 +381,6 @@ HTMLComboboxAccessible::NativeRole()
   return roles::COMBOBOX;
 }
 
-void
-HTMLComboboxAccessible::InvalidateChildren()
-{
-  AccessibleWrap::InvalidateChildren();
-
-  if (mListAccessible)
-    mListAccessible->InvalidateChildren();
-}
-
 bool
 HTMLComboboxAccessible::RemoveChild(Accessible* aChild)
 {
@@ -410,7 +401,10 @@ void
 HTMLComboboxAccessible::Shutdown()
 {
   MOZ_ASSERT(mDoc->IsDefunct() || !mListAccessible);
-  mListAccessible = nullptr;
+  if (mListAccessible) {
+    mListAccessible->Shutdown();
+    mListAccessible = nullptr;
+  }
 
   AccessibleWrap::Shutdown();
 }
