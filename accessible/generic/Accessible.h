@@ -1032,7 +1032,7 @@ protected:
     eNotNodeMapEntry = 1 << 3, // accessible shouldn't be in document node map
     eHasNumericValue = 1 << 4, // accessible has a numeric value
     eGroupInfoDirty = 1 << 5, // accessible needs to update group info
-    eSubtreeMutating = 1 << 6, // subtree is being mutated
+    eKidsMutating = 1 << 6, // subtree is being mutated
     eIgnoreDOMUIEvent = 1 << 7, // don't process DOM UI events for a11y events
     eSurvivingInUpdate = 1 << 8, // parent drops children to recollect them
     eRelocated = 1 << 9, // accessible was moved in tree
@@ -1130,22 +1130,6 @@ protected:
    */
   AccGroupInfo* GetGroupInfo();
 
-  /**
-   * Set dirty state of the accessible's group info.
-   */
-  inline void SetDirtyGroupInfo(bool aIsDirty)
-  {
-    if (aIsDirty)
-      mStateFlags |= eGroupInfoDirty;
-    else
-      mStateFlags &= ~eGroupInfoDirty;
-  }
-
-  /**
-   * Flag all children group info as needing to be updated.
-   */
-  void InvalidateChildrenGroupInfo();
-
   // Data Members
   nsCOMPtr<nsIContent> mContent;
   DocAccessible* mDoc;
@@ -1170,7 +1154,6 @@ protected:
   uint32_t mGenericTypes : kGenericTypesBits;
 
   void StaticAsserts() const;
-  void AssertInMutatingSubtree() const;
 
   friend class DocAccessible;
   friend class xpcAccessible;
@@ -1266,6 +1249,7 @@ private:
   uint32_t mModifierMask;
 };
 
+
 /**
  * This class makes sure required tasks are done before and after tree
  * mutations. Currently this only includes group info invalidation. You must
@@ -1275,24 +1259,31 @@ private:
 class AutoTreeMutation
 {
 public:
-  explicit AutoTreeMutation(Accessible* aRoot, bool aInvalidationRequired = true) :
-    mInvalidationRequired(aInvalidationRequired), mRoot(aRoot)
+  explicit AutoTreeMutation(Accessible* aParent) :
+    mParent(aParent), mStartIdx(UINT32_MAX),
+    mStateFlagsCopy(mParent->mStateFlags)
   {
-    MOZ_ASSERT(!(mRoot->mStateFlags & Accessible::eSubtreeMutating));
-    mRoot->mStateFlags |= Accessible::eSubtreeMutating;
-  }
-  ~AutoTreeMutation()
-  {
-    if (mInvalidationRequired)
-      mRoot->InvalidateChildrenGroupInfo();
-
-    MOZ_ASSERT(mRoot->mStateFlags & Accessible::eSubtreeMutating);
-    mRoot->mStateFlags &= ~Accessible::eSubtreeMutating;
+    mParent->mStateFlags |= Accessible::eKidsMutating;
   }
 
-  bool mInvalidationRequired;
+  void AfterInsertion(const Accessible* aChild) {
+    if (static_cast<uint32_t>(aChild->IndexInParent()) < mStartIdx) {
+      mStartIdx = aChild->IndexInParent() + 1;
+    }
+  }
+
+  void BeforeRemoval(const Accessible* aChild) {
+    if (static_cast<uint32_t>(aChild->IndexInParent()) < mStartIdx) {
+      mStartIdx = aChild->IndexInParent();
+    }
+  }
+
+  void Done();
+
 private:
-  Accessible* mRoot;
+  Accessible* mParent;
+  uint32_t mStartIdx;
+  uint32_t mStateFlagsCopy;
 };
 
 } // namespace a11y
