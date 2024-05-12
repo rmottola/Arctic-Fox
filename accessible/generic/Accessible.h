@@ -585,6 +585,7 @@ public:
   HyperTextAccessible* AsHyperText();
 
   bool IsHTMLBr() const { return mType == eHTMLBRType; }
+  bool IsHTMLCaption() const { return mType == eHTMLCaptionType; }
   bool IsHTMLCombobox() const { return mType == eHTMLComboboxType; }
   bool IsHTMLFileInput() const { return mType == eHTMLFileInputType; }
 
