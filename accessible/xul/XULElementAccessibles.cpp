@@ -120,18 +120,6 @@ XULLabelAccessible::UpdateLabelValue(const nsString& aValue)
   TextUpdater::Run(mDoc, mValueTextLeaf, aValue);
 }
 
-void
-XULLabelAccessible::CacheChildren()
-{
-  if (mValueTextLeaf) {
-    AppendChild(mValueTextLeaf);
-    return;
-  }
-
-  // Cache children from subtree.
-  AccessibleWrap::CacheChildren();
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // XULLabelTextLeafAccessible
