@@ -7529,8 +7529,6 @@ fi
 
 AC_SUBST(MOZILLA_VERSION)
 
-AC_SUBST(ac_configure_args)
-
 dnl ========================================================
 dnl Directive 4
 dnl ========================================================
