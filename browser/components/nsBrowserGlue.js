@@ -586,6 +586,9 @@ BrowserGlue.prototype = {
       os.removeObserver(this, "places-shutdown");
     os.removeObserver(this, "handle-xul-text-link");
     os.removeObserver(this, "profile-before-change");
+    if (AppConstants.MOZ_TELEMETRY_REPORTING) {
+      os.removeObserver(this, "keyword-search");
+    }
     os.removeObserver(this, "browser-search-engine-modified");
     os.removeObserver(this, "flash-plugin-hang");
     os.removeObserver(this, "xpi-signature-changed");
