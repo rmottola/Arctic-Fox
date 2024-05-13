@@ -2869,16 +2869,9 @@ esac
 
 case "${target}" in
     *-android*|*-linuxandroid*)
-        if test "$CPU_ARCH" = "arm" ; then
-          USE_ARM_KUSER=1
-        fi
-
         NSS_DISABLE_DBM=1
         MOZ_THEME_FASTSTRIPE=1
         MOZ_TREE_FREETYPE=1
-        if test "$COMPILE_ENVIRONMENT"; then
-            MOZ_MEMORY=1
-        fi
         MOZ_RAW=1
         ;;
 
@@ -5771,39 +5764,18 @@ else
   dnl complicated.  Therefore, simply define special cpp variables for the
   dnl platforms we have special knowledge of.
   case "${target}" in
-  *-darwin*)
-    AC_DEFINE(MOZ_MEMORY_DARWIN)
-    ;;
-  *-*freebsd*)
-    AC_DEFINE(MOZ_MEMORY_BSD)
-    ;;
-  *-android*|*-linuxandroid*)
-    AC_DEFINE(MOZ_MEMORY_LINUX)
-    AC_DEFINE(MOZ_MEMORY_ANDROID)
-    if test -n "$gonkdir"; then
-      AC_DEFINE(MOZ_MEMORY_GONK)
-    fi
-    ;;
-  *-*linux*)
-    AC_DEFINE(MOZ_MEMORY_LINUX)
-    ;;
-  *-netbsd*)
-    AC_DEFINE(MOZ_MEMORY_BSD)
-    ;;
   *-mingw*)
-    AC_DEFINE(MOZ_MEMORY_WINDOWS)
     export MOZ_NO_DEBUG_RTL=1
-    WIN32_CRT_LIBS="msvcrt.lib msvcprt.lib"
-    dnl Look for a broken crtdll.obj
-    WIN32_CRTDLL_FULLPATH=`lib -nologo -list $WIN32_CRT_LIBS | grep crtdll\\.obj`
-    lib -NOLOGO -OUT:crtdll.obj $WIN32_CRT_LIBS -EXTRACT:$WIN32_CRTDLL_FULLPATH
-    if grep -q '__imp__\{0,1\}free' crtdll.obj; then
-      MOZ_CRT=1
+    if test "$MSVS_VERSION" != "2015"; then
+        WIN32_CRT_LIBS="msvcrt.lib msvcprt.lib"
+        dnl Look for a broken crtdll.obj
+        WIN32_CRTDLL_FULLPATH=`lib -nologo -list $WIN32_CRT_LIBS | grep crtdll\\.obj`
+        lib -NOLOGO -OUT:crtdll.obj $WIN32_CRT_LIBS -EXTRACT:$WIN32_CRTDLL_FULLPATH
+        if grep -q '__imp__\{0,1\}free' crtdll.obj; then
+          MOZ_CRT=1
+        fi
+        rm crtdll.obj
     fi
-    rm crtdll.obj
-    ;;
-  *)
-    AC_MSG_ERROR([--enable-jemalloc not supported on ${target}])
     ;;
   esac
 fi # MOZ_MEMORY
