@@ -201,7 +201,6 @@ def old_configure_options(*options):
     '--enable-ios-target',
     '--enable-ipdl-tests',
     '--enable-jemalloc',
-    '--enable-jemalloc-lib',
     '--enable-jitspew',
     '--enable-jxr',
     '--enable-libjpeg-turbo',

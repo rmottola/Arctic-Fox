@@ -5685,19 +5685,6 @@ Android|WINNT|Darwin)
 esac
 
 dnl ========================================================
-dnl = Enable full jemalloc lib
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(jemalloc-lib,
-[  --enable-jemalloc-lib       Use the full jemalloc lib],
-    MOZ_JEMALLOC3=1,
-    MOZ_JEMALLOC3= )
-
-if test -n "$MOZ_JEMALLOC3" -a -z "$MOZ_MEMORY"; then
-    dnl We need jemalloc enabled to use jemalloc3
-    AC_MSG_ERROR([--enable-jemalloc-lib requires --enable-jemalloc])
-fi
-
-dnl ========================================================
 dnl = Enable dynamic replacement of malloc implementation
 dnl ========================================================
 if test -n "$NIGHTLY_BUILD" -a -n "$MOZ_MEMORY"; then
