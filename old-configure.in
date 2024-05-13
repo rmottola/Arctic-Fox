@@ -414,14 +414,7 @@ case "$target" in
         AC_SUBST(MSVC_REDIST_OPENMP_DIR)
         AC_SUBST(MSVC_OPENMP_DLL)
 
-        # Disable SEH on clang-cl because it doesn't implement them yet.
-        if test -z "$CLANG_CL"; then
-            AC_DEFINE(HAVE_SEH_EXCEPTIONS)
-        else
-            # Send our CFLAGS to NSS
-            MOZ_CFLAGS_NSS=1
-            AC_DEFINE_UNQUOTED(GTEST_HAS_SEH, 0)
-        fi
+        AC_DEFINE(HAVE_SEH_EXCEPTIONS)
 
         if test -n "$WIN32_REDIST_DIR"; then
           if test ! -d "$WIN32_REDIST_DIR"; then
