@@ -313,8 +313,9 @@ DecoderTraits::IsMP4TypeAndEnabled(const nsACString& aType)
 {
 #ifdef MOZ_FMP4
   return IsMP4SupportedType(aType);
-#endif
+#else
   return false;
+#endif
 }
 
 static bool
@@ -323,8 +324,9 @@ IsMP3SupportedType(const nsACString& aType,
 {
 #ifdef MOZ_OMX_DECODER
   return false;
-#endif
+#else
   return MP3Decoder::CanHandleMediaType(aType, aCodecs);
+#endif
 }
 
 static bool
