@@ -80,10 +80,8 @@
 #include "WidgetUtils.h"
 #include "nsIPresentationService.h"
 
-#ifdef MOZ_MEDIA_NAVIGATOR
 #include "mozilla/dom/MediaDevices.h"
 #include "MediaManager.h"
-#endif
 #ifdef MOZ_B2G_BT
 #include "BluetoothManager.h"
 #endif
@@ -1348,7 +1346,6 @@ Navigator::SendBeacon(const nsAString& aUrl,
   return true;
 }
 
-#ifdef MOZ_MEDIA_NAVIGATOR
 MediaDevices*
 Navigator::GetMediaDevices(ErrorResult& aRv)
 {
@@ -1416,7 +1413,6 @@ Navigator::MozGetUserMediaDevices(const MediaStreamConstraints& aConstraints,
   aRv = manager->GetUserMediaDevices(mWindow, aConstraints, onsuccess, onerror,
                                      aInnerWindowID, aCallID);
 }
-#endif
 
 DesktopNotificationCenter*
 Navigator::GetMozNotification(ErrorResult& aRv)
@@ -2182,13 +2178,11 @@ Navigator::OnNavigation()
     return;
   }
 
-#ifdef MOZ_MEDIA_NAVIGATOR
   // If MediaManager is open let it inform any live streams or pending callbacks
   MediaManager *manager = MediaManager::GetIfExists();
   if (manager) {
     manager->OnNavigation(mWindow->WindowID());
   }
-#endif
   if (mCameraManager) {
     mCameraManager->OnNavigation(mWindow->WindowID());
   }
@@ -2291,7 +2285,6 @@ Navigator::HasNFCSupport(JSContext* /* unused */, JSObject* aGlobal)
 }
 #endif // MOZ_NFC
 
-#ifdef MOZ_MEDIA_NAVIGATOR
 /* static */
 bool
 Navigator::HasUserMediaSupport(JSContext* /* unused */,
@@ -2301,7 +2294,6 @@ Navigator::HasUserMediaSupport(JSContext* /* unused */,
   return Preferences::GetBool("media.navigator.enabled", false) ||
          Preferences::GetBool("media.peerconnection.enabled", false);
 }
-#endif // MOZ_MEDIA_NAVIGATOR
 
 /* static */
 bool
