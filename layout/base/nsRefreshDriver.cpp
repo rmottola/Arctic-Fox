@@ -2012,6 +2012,12 @@ nsRefreshDriver::GetTransactionId()
   return mPendingTransaction;
 }
 
+uint64_t
+nsRefreshDriver::LastTransactionId() const
+{
+  return mPendingTransaction;
+}
+
 void
 nsRefreshDriver::RevokeTransactionId(uint64_t aTransactionId)
 {

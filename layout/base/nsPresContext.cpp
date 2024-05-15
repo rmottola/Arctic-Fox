@@ -2159,7 +2159,7 @@ nsPresContext::EnsureSafeToHandOutCSSRules()
 }
 
 void
-nsPresContext::FireDOMPaintEvent(nsInvalidateRequestList* aList)
+nsPresContext::FireDOMPaintEvent(nsInvalidateRequestList* aList, uint64_t aTransactionId)
 {
   nsPIDOMWindowInner* ourWindow = mDocument->GetInnerWindow();
   if (!ourWindow)
@@ -2184,7 +2184,7 @@ nsPresContext::FireDOMPaintEvent(nsInvalidateRequestList* aList)
   // (hopefully it won't, or we're likely to get an infinite loop! At least
   // it won't be blocking app execution though).
   RefPtr<NotifyPaintEvent> event =
-    NS_NewDOMNotifyPaintEvent(eventTarget, this, nullptr, eAfterPaint, aList);
+    NS_NewDOMNotifyPaintEvent(eventTarget, this, nullptr, eAfterPaint, aList, aTransactionId);
 
   // Even if we're not telling the window about the event (so eventTarget is
   // the chrome event handler, not the window), the window is still
@@ -2381,6 +2381,7 @@ nsPresContext::ClearNotifySubDocInvalidationData(ContainerLayer* aContainer)
 
 struct NotifyDidPaintSubdocumentCallbackClosure {
   uint32_t mFlags;
+  uint64_t mTransactionId;
   bool mNeedsAnotherDidPaintNotification;
 };
 static bool
@@ -2392,7 +2393,7 @@ NotifyDidPaintSubdocumentCallback(nsIDocument* aDocument, void* aData)
   if (shell) {
     nsPresContext* pc = shell->GetPresContext();
     if (pc) {
-      pc->NotifyDidPaintForSubtree(closure->mFlags);
+      pc->NotifyDidPaintForSubtree(closure->mFlags, closure->mTransactionId);
       if (pc->IsDOMPaintEventPending()) {
         closure->mNeedsAnotherDidPaintNotification = true;
       }
@@ -2404,8 +2405,10 @@ NotifyDidPaintSubdocumentCallback(nsIDocument* aDocument, void* aData)
 class DelayedFireDOMPaintEvent : public nsRunnable {
 public:
   DelayedFireDOMPaintEvent(nsPresContext* aPresContext,
-                           nsInvalidateRequestList* aList)
+                           nsInvalidateRequestList* aList,
+                           uint64_t aTransactionId)
     : mPresContext(aPresContext)
+    , mTransactionId(aTransactionId)
   {
     MOZ_ASSERT(mPresContext->GetContainerWeak(),
                "DOMPaintEvent requested for a detached pres context");
@@ -2416,17 +2419,19 @@ public:
     // The pres context might have been detached during the delay -
     // that's fine, just don't fire the event.
     if (mPresContext->GetContainerWeak()) {
-      mPresContext->FireDOMPaintEvent(&mList);
+      mPresContext->FireDOMPaintEvent(&mList, mTransactionId);
     }
     return NS_OK;
   }
 
   RefPtr<nsPresContext> mPresContext;
+  uint64_t mTransactionId;
   nsInvalidateRequestList mList;
 };
 
 void
-nsPresContext::NotifyDidPaintForSubtree(uint32_t aFlags)
+nsPresContext::NotifyDidPaintForSubtree(uint32_t aFlags, uint64_t aTransactionId,
+                                        const mozilla::TimeStamp& aTimeStamp)
 {
   if (IsRoot()) {
     static_cast<nsRootPresContext*>(this)->CancelDidPaintTimer();
@@ -2453,11 +2458,12 @@ nsPresContext::NotifyDidPaintForSubtree(uint32_t aFlags)
   }
   if (aFlags & nsIPresShell::PAINT_COMPOSITE) {
     nsCOMPtr<nsIRunnable> ev =
-      new DelayedFireDOMPaintEvent(this, &mUndeliveredInvalidateRequestsBeforeLastPaint);
+      new DelayedFireDOMPaintEvent(this, &mUndeliveredInvalidateRequestsBeforeLastPaint,
+                                   aTransactionId);
     nsContentUtils::AddScriptRunner(ev);
   }
 
-  NotifyDidPaintSubdocumentCallbackClosure closure = { aFlags, false };
+  NotifyDidPaintSubdocumentCallbackClosure closure = { aFlags, aTransactionId, false };
   mDocument->EnumerateSubDocuments(NotifyDidPaintSubdocumentCallback, &closure);
 
   if (!closure.mNeedsAnotherDidPaintNotification &&
