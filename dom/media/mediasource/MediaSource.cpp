@@ -87,7 +87,7 @@ static nsresult
 IsTypeSupported(const nsAString& aType)
 {
   if (aType.IsEmpty()) {
-    return NS_ERROR_DOM_TYPE_ERR;
+    return NS_ERROR_DOM_INVALID_ACCESS_ERR;
   }
   nsContentTypeParser parser(aType);
   nsAutoString mimeType;
@@ -196,7 +196,7 @@ MediaSource::SetDuration(double aDuration, ErrorResult& aRv)
   MOZ_ASSERT(NS_IsMainThread());
   MSE_API("SetDuration(aDuration=%f, ErrorResult)", aDuration);
   if (aDuration < 0 || IsNaN(aDuration)) {
-    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
+    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
     return;
   }
   if (mReadyState != MediaSourceReadyState::Open ||
@@ -330,7 +330,7 @@ MediaSource::EndOfStream(const Optional<MediaSourceEndOfStreamError>& aError, Er
     mDecoder->DecodeError();
     break;
   default:
-    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
+    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
   }
 }
 
