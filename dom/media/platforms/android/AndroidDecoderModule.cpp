@@ -325,7 +325,8 @@ public:
 };
 
 bool
-AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
+AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType,
+                                       DecoderDoctorDiagnostics* aDiagnostics) const
 {
   if (!AndroidBridge::Bridge() ||
       AndroidBridge::Bridge()->GetAPIVersion() < 16) {
@@ -363,7 +364,8 @@ already_AddRefed<MediaDataDecoder>
 AndroidDecoderModule::CreateVideoDecoder(
     const VideoInfo& aConfig, layers::LayersBackend aLayersBackend,
     layers::ImageContainer* aImageContainer, FlushableTaskQueue* aVideoTaskQueue,
-    MediaDataDecoderCallback* aCallback)
+    MediaDataDecoderCallback* aCallback,
+    DecoderDoctorDiagnostics* aDiagnostics)
 {
   MediaFormat::LocalRef format;
 
@@ -382,7 +384,8 @@ AndroidDecoderModule::CreateVideoDecoder(
 already_AddRefed<MediaDataDecoder>
 AndroidDecoderModule::CreateAudioDecoder(
     const AudioInfo& aConfig, FlushableTaskQueue* aAudioTaskQueue,
-    MediaDataDecoderCallback* aCallback)
+    MediaDataDecoderCallback* aCallback,
+    DecoderDoctorDiagnostics* aDiagnostics)
 {
   MOZ_ASSERT(aConfig.mBitDepth == 16, "We only handle 16-bit audio!");
 

@@ -51,7 +51,8 @@ GMPDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer,
                                      FlushableTaskQueue* aVideoTaskQueue,
-                                     MediaDataDecoderCallback* aCallback)
+                                     MediaDataDecoderCallback* aCallback,
+                                     DecoderDoctorDiagnostics* aDiagnostics)
 {
   if (!aConfig.mMimeType.EqualsLiteral("video/avc")) {
     return nullptr;
@@ -69,7 +70,8 @@ GMPDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
 already_AddRefed<MediaDataDecoder>
 GMPDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
                                      FlushableTaskQueue* aAudioTaskQueue,
-                                     MediaDataDecoderCallback* aCallback)
+                                     MediaDataDecoderCallback* aCallback,
+                                     DecoderDoctorDiagnostics* aDiagnostics)
 {
   if (!aConfig.mMimeType.EqualsLiteral("audio/mp4a-latm")) {
     return nullptr;
@@ -105,11 +107,13 @@ HasGMPFor(const nsACString& aAPI,
   if (aGMP.EqualsLiteral("org.w3.clearkey")) {
     RefPtr<WMFDecoderModule> pdm(new WMFDecoderModule());
     if (aCodec.EqualsLiteral("aac") &&
-        !pdm->SupportsMimeType(NS_LITERAL_CSTRING("audio/mp4a-latm"))) {
+        !pdm->SupportsMimeType(NS_LITERAL_CSTRING("audio/mp4a-latm"),
+                               /* DecoderDoctorDiagnostics* */ nullptr)) {
       return false;
     }
     if (aCodec.EqualsLiteral("h264") &&
-        !pdm->SupportsMimeType(NS_LITERAL_CSTRING("video/avc"))) {
+        !pdm->SupportsMimeType(NS_LITERAL_CSTRING("video/avc"),
+                               /* DecoderDoctorDiagnostics* */ nullptr)) {
       return false;
     }
   }
@@ -228,7 +232,8 @@ GMPDecoderModule::SupportsMimeType(const nsACString& aMimeType,
 }
 
 bool
-GMPDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
+GMPDecoderModule::SupportsMimeType(const nsACString& aMimeType,
+                                   DecoderDoctorDiagnostics* aDiagnostics) const
 {
   return SupportsMimeType(aMimeType, PreferredGMP(aMimeType));
 }
