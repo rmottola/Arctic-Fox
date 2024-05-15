@@ -4144,17 +4144,17 @@ class IDLAttribute(IDLInterfaceMember):
                 raise WebIDLError("[Unscopable] is only allowed on non-static "
                                   "attributes and operations",
                                   [attr.location, self.location])
-        elif (identifier == "Throws" or
-              identifier == "NewObject" or
-              identifier == "ChromeOnly" or
-              identifier == "UnsafeInPrerendering" or
-              identifier == "Pref" or
+        elif (identifier == "Pref" or
               identifier == "Deprecated" or
               identifier == "SetterThrows" or
+              identifier == "Throws" or
               identifier == "GetterThrows" or
+              identifier == "ChromeOnly" or
               identifier == "Func" or
               identifier == "Frozen" or
               identifier == "AvailableIn" or
+              identifier == "NewObject" or
+              identifier == "UnsafeInPrerendering" or
               identifier == "CheckAnyPermissions" or
               identifier == "CheckAllPermissions" or
               identifier == "BinaryName"):
