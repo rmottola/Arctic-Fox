@@ -1,7 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const { utils: Cu, interfaces: Ci, classes: Cc } = Components;
+var { utils: Cu, interfaces: Ci, classes: Cc } = Components;
 
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/AddonManager.jsm", this);
@@ -93,15 +93,19 @@ CPUBurner.frameScript = function() {
       });
     }
 
-    sendAsyncMessage("test-performance-watcher:cpow-init", {}, {
-      burnCPOWInSandbox: function(addonId) {
-        try {
-          burnCPUInSandbox(addonId);
-        } catch (ex) {
-          dump(`This is the addon attempting to burn CPOW: error ${ex}\n`);
-          dump(`${ex.stack}\n`);
-        }
+    // Bind the function to the global context or it might be GC'd during test
+    // causing failures (bug 1230027)
+    this.burnCPOWInSandbox = function(addonId) {
+      try {
+        burnCPUInSandbox(addonId);
+      } catch (ex) {
+        dump(`This is the addon attempting to burn CPOW: error ${ex}\n`);
+        dump(`${ex.stack}\n`);
       }
+    }
+
+    sendAsyncMessage("test-performance-watcher:cpow-init", {}, {
+      burnCPOWInSandbox: this.burnCPOWInSandbox
     });
 
   } catch (ex) {
@@ -160,9 +164,15 @@ function AddonBurner(addonId = "fake add-on id: " + Math.random()) {
   CPUBurner.call(this, `http://example.com/?uri=${addonId}`)
   this._addonId = addonId;
   this._sandbox = Components.utils.Sandbox(Services.scriptSecurityManager.getSystemPrincipal(), { addonId: this._addonId });
+  this._CPOWBurner = null;
+
   this._promiseCPOWBurner = new Promise(resolve => {
     this._browser.messageManager.addMessageListener("test-performance-watcher:cpow-init", msg => {
-      resolve(msg.objects.burnCPOWInSandbox);
+      // Note that we cannot resolve Promises with CPOWs now that they
+      // have been outlawed in bug 1233497, so we stash it in the
+      // AddonBurner instance instead.
+      this._CPOWBurner = msg.objects.burnCPOWInSandbox;
+      resolve();
     });
   });
 }
@@ -184,7 +194,9 @@ AddonBurner.prototype.burnCPU = function() {
  * Simulate slow code being executed by the add-on in a CPOW.
  */
 AddonBurner.prototype.promiseBurnCPOW = Task.async(function*() {
-  let burner = yield this._promiseCPOWBurner;
+  yield this._promiseCPOWBurner;
+  ok(this._CPOWBurner, "Got the CPOW burner");
+  let burner = this._CPOWBurner;
   info("Parent: Preparing to burn CPOW");
   try {
     yield burner(this._addonId);
