@@ -572,6 +572,7 @@ public:
       : ChannelLayout(aChannels, SMPTEDefault(aChannels))
     {}
     ChannelLayout(uint32_t aChannels, const Channel* aConfig)
+      : ChannelLayout()
     {
       if (!aConfig) {
         mValid = false;
