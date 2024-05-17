@@ -736,10 +736,6 @@ void GonkVideoDecoderManager::PostReleaseVideoBuffer(
                                 android::MediaBuffer *aBuffer,
                                 FenceHandle aReleaseFence)
 {
-  if (mDecoder == nullptr) {
-    GVDM_LOG("Decoder is not inited");
-    return NS_ERROR_UNEXPECTED;
-  }
   {
     MutexAutoLock autoLock(mPendingReleaseItemsLock);
     if (aBuffer) {
@@ -764,7 +760,7 @@ void GonkVideoDecoderManager::ReleaseAllPendingVideoBuffers()
   // Free all pending video buffers without holding mPendingReleaseItemsLock.
   size_t size = releasingItems.Length();
   for (size_t i = 0; i < size; i++) {
-    nsRefPtr<FenceHandle::FdObj> fdObj = releasingItems[i].mReleaseFence.GetAndResetFdObj();
+    RefPtr<FenceHandle::FdObj> fdObj = releasingItems[i].mReleaseFence.GetAndResetFdObj();
     sp<Fence> fence = new Fence(fdObj->GetAndResetFd());
     fence->waitForever("GonkVideoDecoderManager");
     mDecoder->ReleaseMediaBuffer(releasingItems[i].mBuffer);
