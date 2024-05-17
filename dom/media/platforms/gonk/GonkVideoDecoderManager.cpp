@@ -19,7 +19,6 @@
 #include <stagefright/MediaErrors.h>
 #include <stagefright/foundation/AString.h>
 #include "GonkNativeWindow.h"
-#include "GonkNativeWindowClient.h"
 #include "mozilla/layers/GrallocTextureClient.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/TextureClient.h"
