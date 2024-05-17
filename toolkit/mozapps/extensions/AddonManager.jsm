@@ -820,6 +820,7 @@ var AddonManagerInternal = {
       if (providerName(provider) == aName)
         return provider;
     }
+    return undefined;
   },
 
   /**
