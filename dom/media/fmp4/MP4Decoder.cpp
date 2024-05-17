@@ -227,8 +227,7 @@ CreateTestH264Decoder(layers::LayersBackend aBackend,
   aConfig.mId = 1;
   aConfig.mDuration = 40000;
   aConfig.mMediaTime = 0;
-  aConfig.mDisplay = nsIntSize(640, 360);
-  aConfig.mImage = nsIntRect(0, 0, 640, 360);
+  aConfig.mImage = aConfig.mDisplay = nsIntSize(640, 360);
   aConfig.mExtraData = new MediaByteBuffer();
   aConfig.mExtraData->AppendElements(sTestH264ExtraData,
                                      MOZ_ARRAY_LENGTH(sTestH264ExtraData));
@@ -278,10 +277,10 @@ MP4Decoder::IsVideoAccelerated(layers::LayersBackend aBackend, nsIGlobalObject* 
                result.AssignLiteral("Yes");
              } else {
                result.AssignLiteral("No");
-               if (failureReason.Length()) {
-                 result.AppendLiteral("; ");
-                 AppendUTF8toUTF16(failureReason, result);
-               }
+             }
+             if (failureReason.Length()) {
+               result.AppendLiteral("; ");
+               AppendUTF8toUTF16(failureReason, result);
              }
              decoder->Shutdown();
              taskQueue->BeginShutdown();

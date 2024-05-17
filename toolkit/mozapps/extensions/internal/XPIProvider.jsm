@@ -261,6 +261,7 @@ const COMPATIBLE_BY_DEFAULT_TYPES = {
 };
 
 const MSG_JAR_FLUSH = "AddonJarFlush";
+const MSG_MESSAGE_MANAGER_CACHES_FLUSH = "AddonMessageManagerCachesFlush";
 
 var gGlobalScope = this;
 
@@ -300,7 +301,7 @@ function loadLazyObjects() {
     isUsableAddon,
     recordAddonTelemetry,
     applyBlocklistChanges,
-    flushStartupCache,
+    flushChromeCaches,
     canRunInSafeMode,
   }
 
@@ -702,13 +703,16 @@ function isUsableAddon(aAddon) {
       aAddon.signedState != AddonManager.SIGNEDSTATE_SYSTEM) {
     return false;
   }
-  // temporary and system add-ons do not require signing
-  if ((aAddon._installLocation.name != KEY_APP_SYSTEM_DEFAULTS &&
+  // Temporary and system add-ons do not require signing.
+  // On UNIX platforms except OSX, an additional location for system add-ons
+  // exists in /usr/{lib,share}/mozilla/extensions. Add-ons installed there
+  // do not require signing either.
+  if (((aAddon._installLocation.scope != AddonManager.SCOPE_SYSTEM ||
+        Services.appinfo.OS == "Darwin") &&
+       aAddon._installLocation.name != KEY_APP_SYSTEM_DEFAULTS &&
        aAddon._installLocation.name != KEY_APP_TEMPORARY) &&
        mustSign(aAddon.type)) {
     if (aAddon.signedState <= AddonManager.SIGNEDSTATE_MISSING)
-      return false;
-    if (aAddon.foreignInstall && aAddon.signedState < AddonManager.SIGNEDSTATE_SIGNED)
       return false;
   }
 
@@ -1517,13 +1521,16 @@ function buildJarURI(aJarfile, aPath) {
  */
 function flushJarCache(aJarFile) {
   Services.obs.notifyObservers(aJarFile, "flush-cache-entry", null);
-  Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageBroadcaster)
-    .broadcastAsyncMessage(MSG_JAR_FLUSH, aJarFile.path);
+  Services.mm.broadcastAsyncMessage(MSG_JAR_FLUSH, aJarFile.path);
 }
 
-function flushStartupCache() {
+function flushChromeCaches() {
   // Init this, so it will get the notification.
   Services.obs.notifyObservers(null, "startupcache-invalidate", null);
+  // Flush message manager cached scripts
+  Services.obs.notifyObservers(null, "message-manager-flush-caches", null);
+  // Also dispatch this event to child processes
+  Services.mm.broadcastAsyncMessage(MSG_MESSAGE_MANAGER_CACHES_FLUSH, null);
 }
 
 /**
@@ -2662,7 +2669,7 @@ this.XPIProvider = {
       }
 
       if (flushCaches) {
-        flushStartupCache();
+        Services.obs.notifyObservers(null, "startupcache-invalidate", null);
         // UI displayed early in startup (like the compatibility UI) may have
         // caused us to cache parts of the skin or locale in memory. These must
         // be flushed to allow extension provided skins and locales to take full
@@ -2824,6 +2831,7 @@ this.XPIProvider = {
       logger.debug("Notifying XPI shutdown observers");
       Services.obs.notifyObservers(null, "xpi-provider-shutdown", null);
     }
+    return undefined;
   },
 
   /**
@@ -2918,16 +2926,18 @@ this.XPIProvider = {
   updateSystemAddons: Task.async(function*() {
     let systemAddonLocation = XPIProvider.installLocationsByName[KEY_APP_SYSTEM_ADDONS];
     if (!systemAddonLocation)
-      return undefined;
+      return;
 
     // Don't do anything in safe mode
     if (Services.appinfo.inSafeMode)
-      return undefined;
+      return;
 
     // Download the list of system add-ons
     let url = Preferences.get(PREF_SYSTEM_ADDON_UPDATE_URL, null);
-    if (!url)
-      return systemAddonLocation.cleanDirectories();
+    if (!url) {
+      yield systemAddonLocation.cleanDirectories();
+      return;
+    }
 
     url = UpdateUtils.formatUpdateURL(url);
 
@@ -2937,7 +2947,8 @@ this.XPIProvider = {
     // If there was no list then do nothing.
     if (!addonList) {
       logger.info("No system add-ons list was returned.");
-      return systemAddonLocation.cleanDirectories();
+      yield systemAddonLocation.cleanDirectories();
+      return;
     }
 
     addonList = new Map(
@@ -2969,7 +2980,8 @@ this.XPIProvider = {
     let updatedAddons = addonMap(yield getAddonsInLocation(KEY_APP_SYSTEM_ADDONS));
     if (setMatches(addonList, updatedAddons)) {
       logger.info("Retaining existing updated system add-ons.");
-      return systemAddonLocation.cleanDirectories();
+      yield systemAddonLocation.cleanDirectories();
+      return;
     }
 
     // If this matches the current set in the default location then reset the
@@ -2978,7 +2990,8 @@ this.XPIProvider = {
     if (setMatches(addonList, defaultAddons)) {
       logger.info("Resetting system add-ons.");
       systemAddonLocation.resetAddonSet();
-      return systemAddonLocation.cleanDirectories();
+      yield systemAddonLocation.cleanDirectories();
+      return;
     }
 
     // Download all the add-ons
@@ -3342,7 +3355,7 @@ this.XPIProvider = {
                                        existingAddon, "uninstall", uninstallReason,
                                        { newVersion: newVersion });
               this.unloadBootstrapScope(existingAddonID);
-              flushStartupCache();
+              flushChromeCaches();
             }
           }
           catch (e) {
@@ -3883,7 +3896,7 @@ this.XPIProvider = {
         this.callBootstrapMethod(oldAddon, existingAddon,
                                  "uninstall", uninstallReason, { newVersion });
         this.unloadBootstrapScope(existingAddonID);
-        flushStartupCache();
+        flushChromeCaches();
       }
     }
 
@@ -5007,7 +5020,7 @@ this.XPIProvider = {
         this.callBootstrapMethod(aAddon, aAddon._sourceBundle, "uninstall",
                                  BOOTSTRAP_REASONS.ADDON_UNINSTALL);
         this.unloadBootstrapScope(aAddon.id);
-        flushStartupCache();
+        flushChromeCaches();
       }
       aAddon._installLocation.uninstallAddon(aAddon.id);
       XPIDatabase.removeAddonMetadata(aAddon);
@@ -5656,6 +5669,7 @@ AddonInstall.prototype = {
                                     repoAddon.compatibilityOverrides :
                                     null;
     this.addon.appDisabled = !isUsableAddon(this.addon);
+    return undefined;
   }),
 
   observe: function(aSubject, aTopic, aData) {
@@ -6113,7 +6127,7 @@ AddonInstall.prototype = {
                                             "uninstall", reason,
                                             { newVersion: this.addon.version });
             XPIProvider.unloadBootstrapScope(this.existingAddon.id);
-            flushStartupCache();
+            flushChromeCaches();
           }
 
           if (!isUpgrade && this.existingAddon.active) {
@@ -7310,6 +7324,28 @@ AddonWrapper.prototype = {
     }
   },
 
+  reload: function() {
+    return new Promise(resolve => {
+      if (this.appDisabled) {
+        throw new Error(
+          "cannot reload add-on because it is disabled by the application");
+      }
+
+      const addon = addonFor(this);
+      const isReloadable = (!XPIProvider.enableRequiresRestart(addon) &&
+                            !XPIProvider.disableRequiresRestart(addon));
+      if (!isReloadable) {
+        throw new Error(
+          "cannot reload add-on because it requires a browser restart");
+      }
+
+      this.userDisabled = true;
+      flushChromeCaches();
+      this.userDisabled = false;
+      resolve();
+    });
+  },
+
   /**
    * Returns a URI to the selected resource or to the add-on bundle if aPath
    * is null. URIs to the bundle will always be file: URIs. URIs to resources
@@ -7438,8 +7474,9 @@ PROP_LOCALE_SINGLE.forEach(function(aProp) {
       }
     }
 
+    let rest;
     if (result == null)
-      [result, ] = chooseValue(addon, addon.selectedLocale, aProp);
+      [result, ...rest] = chooseValue(addon, addon.selectedLocale, aProp);
 
     if (aProp == "creator")
       return result ? new AddonManagerPrivate.AddonAuthor(result) : null;
