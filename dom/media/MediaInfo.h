@@ -573,6 +573,10 @@ public:
     {}
     ChannelLayout(uint32_t aChannels, const Channel* aConfig)
     {
+      if (!aConfig) {
+        mValid = false;
+        return;
+      }
       mChannels.AppendElements(aConfig, aChannels);
       UpdateChannelMap();
     }
