@@ -215,12 +215,12 @@ if CONFIG['OS_TEST'] in ('powerpc64', 'powerpc64le'):
               'xptcstubs_ppc64_linux.cpp',
           ]
 
-if CONFIG['OS_TEST'] in ('macppc', 'bebox', 'ofppc', 'prep', 'amigappc'):
+if CONFIG['OS_TEST'] in ('powerpc', 'macppc', 'bebox', 'ofppc', 'prep', 'amigappc'):
     if CONFIG['OS_ARCH'] == 'NetBSD':
         SOURCES += [
-            'xptcinvoke_asm_ppc_netbsd.s',
+            'xptcinvoke_asm_ppc_netbsd.S',
             'xptcinvoke_ppc_netbsd.cpp',
-            'xptcstubs_asm_ppc_netbsd.s',
+            'xptcstubs_asm_ppc_netbsd.S',
             'xptcstubs_ppc_netbsd.cpp',
         ]
 
