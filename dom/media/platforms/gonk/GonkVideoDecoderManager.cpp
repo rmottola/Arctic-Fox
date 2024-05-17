@@ -623,7 +623,7 @@ GonkVideoDecoderManager::Output(int64_t aStreamOffset,
     }
     case -EAGAIN:
     {
-      GVDM_LOG("Need to try again!");
+//      GVDM_LOG("Need to try again!");
       return NS_ERROR_NOT_AVAILABLE;
     }
     case android::ERROR_END_OF_STREAM:
@@ -666,7 +666,7 @@ GonkVideoDecoderManager::codecReserved()
   GVDM_LOG("codecReserved");
   sp<AMessage> format = new AMessage;
   sp<Surface> surface;
-
+  status_t rv = OK;
   // Fixed values
   GVDM_LOG("Configure video mime type: %s, widht:%d, height:%d", mMimeType.get(), mVideoWidth, mVideoHeight);
   format->setString("mime", mMimeType.get());
