@@ -1,0 +1,30 @@
+diff --git a/media/webrtc/signaling/src/media-conduit/VideoConduit.cpp b/media/webrtc/signaling/src/media-conduit/VideoConduit.cpp
+index 7c51d6b157c16..728e7fb2477fe 100755
+--- a/media/webrtc/signaling/src/media-conduit/VideoConduit.cpp
++++ b/media/webrtc/signaling/src/media-conduit/VideoConduit.cpp
+@@ -83,8 +83,8 @@ WebrtcVideoConduit::WebrtcVideoConduit():
+   mLastHeight(0),
+   mSendingWidth(0),
+   mSendingHeight(0),
+-  mReceivingWidth(640),
+-  mReceivingHeight(480),
++  mReceivingWidth(0),
++  mReceivingHeight(0),
+   mSendingFramerate(DEFAULT_VIDEO_MAX_FRAMERATE),
+   mLastFramerateTenths(DEFAULT_VIDEO_MAX_FRAMERATE*10),
+   mNumReceivingStreams(1),
+diff --git a/media/webrtc/signaling/src/mediapipeline/MediaPipeline.cpp b/media/webrtc/signaling/src/mediapipeline/MediaPipeline.cpp
+index cf01776ece2a0..43735737d3b95 100644
+--- a/media/webrtc/signaling/src/mediapipeline/MediaPipeline.cpp
++++ b/media/webrtc/signaling/src/mediapipeline/MediaPipeline.cpp
+@@ -2127,8 +2127,8 @@ class MediaPipelineReceiveVideo::PipelineListener
+   PipelineListener(SourceMediaStream * source, TrackID track_id,
+                    bool queue_track)
+     : GenericReceiveListener(source, track_id, source->GraphRate(), queue_track),
+-      width_(640),
+-      height_(480),
++      width_(0),
++      height_(0),
+ #if defined(MOZILLA_INTERNAL_API)
+       image_container_(),
+       image_(),

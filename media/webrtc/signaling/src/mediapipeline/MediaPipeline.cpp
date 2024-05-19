@@ -1857,8 +1857,8 @@ public:
   PipelineListener(SourceMediaStream * source, TrackID track_id,
                    bool queue_track)
     : GenericReceiveListener(source, track_id, source->GraphRate(), queue_track),
-      width_(640),
-      height_(480),
+      width_(0),
+      height_(0),
 #if defined(MOZILLA_INTERNAL_API)
       image_container_(),
       image_(),
