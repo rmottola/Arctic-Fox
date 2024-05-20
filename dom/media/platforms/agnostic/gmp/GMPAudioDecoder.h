@@ -84,60 +84,22 @@ protected:
   virtual nsCString GetNodeId();
 
 private:
-  class GMPInitDoneRunnable : public nsRunnable
-  {
-  public:
-    GMPInitDoneRunnable()
-      : mInitDone(false),
-        mThread(do_GetCurrentThread())
-    {
-    }
-
-    NS_IMETHOD Run()
-    {
-      mInitDone = true;
-      return NS_OK;
-    }
-
-    void Dispatch()
-    {
-      mThread->Dispatch(this, NS_DISPATCH_NORMAL);
-    }
-
-    bool IsDone()
-    {
-      MOZ_ASSERT(nsCOMPtr<nsIThread>(do_GetCurrentThread()) == mThread);
-      return mInitDone;
-    }
-
-  private:
-    bool mInitDone;
-    nsCOMPtr<nsIThread> mThread;
-  };
-
-  void GetGMPAPI(GMPInitDoneRunnable* aInitDone);
 
   class GMPInitDoneCallback : public GetGMPAudioDecoderCallback
   {
   public:
-    GMPInitDoneCallback(GMPAudioDecoder* aDecoder,
-                        GMPInitDoneRunnable* aGMPInitDone)
+    explicit GMPInitDoneCallback(GMPAudioDecoder* aDecoder)
       : mDecoder(aDecoder)
-      , mGMPInitDone(aGMPInitDone)
     {
     }
 
     void Done(GMPAudioDecoderProxy* aGMP) override
     {
-      if (aGMP) {
-        mDecoder->GMPInitDone(aGMP);
-      }
-      mGMPInitDone->Dispatch();
+      mDecoder->GMPInitDone(aGMP);
     }
 
   private:
     RefPtr<GMPAudioDecoder> mDecoder;
-    RefPtr<GMPInitDoneRunnable> mGMPInitDone;
   };
   void GMPInitDone(GMPAudioDecoderProxy* aGMP);
 
@@ -146,6 +108,7 @@ private:
   nsCOMPtr<mozIGeckoMediaPluginService> mMPS;
   GMPAudioDecoderProxy* mGMP;
   nsAutoPtr<AudioCallbackAdapter> mAdapter;
+  MozPromiseHolder<InitPromise> mInitPromise;
 };
 
 } // namespace mozilla

@@ -100,60 +100,22 @@ protected:
   virtual GMPUniquePtr<GMPVideoEncodedFrame> CreateFrame(MediaRawData* aSample);
 
 private:
-  class GMPInitDoneRunnable : public nsRunnable
-  {
-  public:
-    GMPInitDoneRunnable()
-      : mInitDone(false),
-        mThread(do_GetCurrentThread())
-    {
-    }
-
-    NS_IMETHOD Run()
-    {
-      mInitDone = true;
-      return NS_OK;
-    }
-
-    void Dispatch()
-    {
-      mThread->Dispatch(this, NS_DISPATCH_NORMAL);
-    }
-
-    bool IsDone()
-    {
-      MOZ_ASSERT(nsCOMPtr<nsIThread>(do_GetCurrentThread()) == mThread);
-      return mInitDone;
-    }
-
-  private:
-    bool mInitDone;
-    nsCOMPtr<nsIThread> mThread;
-  };
-
-  void GetGMPAPI(GMPInitDoneRunnable* aInitDone);
 
   class GMPInitDoneCallback : public GetGMPVideoDecoderCallback
   {
   public:
-    GMPInitDoneCallback(GMPVideoDecoder* aDecoder,
-                        GMPInitDoneRunnable* aGMPInitDone)
+    explicit GMPInitDoneCallback(GMPVideoDecoder* aDecoder)
       : mDecoder(aDecoder)
-      , mGMPInitDone(aGMPInitDone)
     {
     }
 
     void Done(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost) override
     {
-      if (aGMP) {
-        mDecoder->GMPInitDone(aGMP, aHost);
-      }
-      mGMPInitDone->Dispatch();
+      mDecoder->GMPInitDone(aGMP, aHost);
     }
 
   private:
     RefPtr<GMPVideoDecoder> mDecoder;
-    RefPtr<GMPInitDoneRunnable> mGMPInitDone;
   };
   void GMPInitDone(GMPVideoDecoderProxy* aGMP, GMPVideoHost* aHost);
 
@@ -164,6 +126,7 @@ private:
   GMPVideoHost* mHost;
   nsAutoPtr<VideoCallbackAdapter> mAdapter;
   bool mConvertNALUnitLengths;
+  MozPromiseHolder<InitPromise> mInitPromise;
 };
 
 } // namespace mozilla
