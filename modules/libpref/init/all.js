@@ -341,9 +341,7 @@ pref("media.jxr.workaround_alphaplane_bug", true);
 pref("media.directshow.enabled", true);
 #endif
 #ifdef MOZ_FMP4
-pref("media.fragmented-mp4.enabled", true);
-pref("media.fragmented-mp4.gmp.aac", 0);
-pref("media.fragmented-mp4.gmp.h264", 0);
+pref("media.mp4.enabled", true);
 #endif
 // Specifies whether the PDM can create a test decoder that
 // just outputs blank frames/audio instead of actually decoding. The blank
