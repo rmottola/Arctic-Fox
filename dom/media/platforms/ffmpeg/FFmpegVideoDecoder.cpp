@@ -357,6 +357,14 @@ FFmpegVideoDecoder<LIBAV_VER>::ProcessDrain()
   mCallback->DrainComplete();
 }
 
+void
+FFmpegVideoDecoder<LIBAV_VER>::ProcessFlush()
+{
+  mPtsContext.Reset();
+  mDurationMap.Clear();
+  FFmpegDataDecoder::ProcessFlush();
+}
+
 FFmpegVideoDecoder<LIBAV_VER>::~FFmpegVideoDecoder()
 {
   MOZ_COUNT_DTOR(FFmpegVideoDecoder);

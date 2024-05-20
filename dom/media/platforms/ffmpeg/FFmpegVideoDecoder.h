@@ -42,6 +42,7 @@ public:
   RefPtr<InitPromise> Init() override;
   nsresult Input(MediaRawData* aSample) override;
   void ProcessDrain() override;
+  void ProcessFlush() override;
   void InitCodecContext() override;
   const char* GetDescriptionName() const override
   {
