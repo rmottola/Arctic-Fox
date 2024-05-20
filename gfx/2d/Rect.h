@@ -124,6 +124,10 @@ struct IntRectTyped :
 
     void InflateToMultiple(const IntSizeTyped<units>& aTileSize)
     {
+      if (this->IsEmpty()) {
+        return;
+      }
+
       int32_t yMost = this->YMost();
       int32_t xMost = this->XMost();
 
