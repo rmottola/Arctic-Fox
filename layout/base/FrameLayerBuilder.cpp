@@ -5817,6 +5817,9 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
                                builder, presContext,
                                offset, userData->mXScale, userData->mYScale,
                                entry->mCommonClipCount);
+      if (gfxPrefs::GfxLoggingPaintedPixelCountEnabled()) {
+        aLayer->Manager()->AddPaintedPixelCount(iterRect.Area());
+      }
     }
   } else {
     // Apply the residual transform if it has been enabled, to ensure that
@@ -5830,6 +5833,10 @@ FrameLayerBuilder::DrawPaintedLayer(PaintedLayer* aLayer,
                              builder, presContext,
                              offset, userData->mXScale, userData->mYScale,
                              entry->mCommonClipCount);
+    if (gfxPrefs::GfxLoggingPaintedPixelCountEnabled()) {
+      aLayer->Manager()->AddPaintedPixelCount(
+        aRegionToDraw.GetBounds().Area());
+    }
   }
 
   aContext->SetFontSmoothingBackgroundColor(Color());
