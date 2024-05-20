@@ -361,7 +361,7 @@ GonkOmxPlatformLayer::AllocateOmxBuffer(OMX_DIRTYPE aType,
   // Get port definition.
   OMX_PARAM_PORTDEFINITIONTYPE def;
   nsTArray<uint32_t> portindex;
-  GetOmxPortIndex(portindex);
+  GetPortIndices(portindex);
   for (auto idx : portindex) {
     InitOmxParameter(&def);
     def.nPortIndex = idx;
