@@ -199,6 +199,7 @@ PluginInstanceChild::PluginInstanceChild(const NPPluginFuncs* aPluginIface,
     , mHasPainted(false)
     , mSurfaceDifferenceRect(0,0,0,0)
     , mDestroyed(false)
+    , mStackDepth(0)
 {
     memset(&mWindow, 0, sizeof(mWindow));
     mWindow.type = NPWindowTypeWindow;
@@ -386,6 +387,7 @@ PluginInstanceChild::NPN_GetValue(NPNVariable aVar,
 {
     PLUGIN_LOG_DEBUG(("%s (aVar=%i)", FULLFUNCTION, (int) aVar));
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     switch(aVar) {
 
@@ -594,6 +596,8 @@ PluginInstanceChild::NPN_SetValue(NPPVariable aVar, void* aValue)
 
     AssertPluginThread();
 
+    AutoStackHelper guard(this);
+
     switch (aVar) {
     case NPPVpluginWindowBool: {
         NPError rv;
@@ -698,6 +702,7 @@ PluginInstanceChild::AnswerNPP_GetValue_NPPVpluginWantsAllNetworkStreams(
     bool* wantsAllStreams, NPError* rv)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     uint32_t value = 0;
     if (!mPluginIface->getvalue) {
@@ -716,6 +721,7 @@ PluginInstanceChild::AnswerNPP_GetValue_NPPVpluginNeedsXEmbed(
     bool* needs, NPError* rv)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
 #ifdef MOZ_X11
     // The documentation on the types for many variables in NP(N|P)_GetValue
@@ -750,6 +756,7 @@ PluginInstanceChild::AnswerNPP_GetValue_NPPVpluginScriptableNPObject(
                                           NPError* aResult)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     NPObject* object = nullptr;
     NPError result = NPERR_GENERIC_ERROR;
@@ -787,6 +794,7 @@ PluginInstanceChild::AnswerNPP_GetValue_NPPVpluginNativeAccessibleAtkPlugId(
                                           NPError* aResult)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
 #if MOZ_ACCESSIBILITY_ATK
 
@@ -859,6 +867,7 @@ PluginInstanceChild::AnswerNPP_HandleEvent(const NPRemoteEvent& event,
 {
     PLUGIN_LOG_DEBUG_FUNCTION;
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
 #if defined(MOZ_X11) && defined(DEBUG)
     if (GraphicsExpose == event.event.type)
@@ -941,6 +950,7 @@ PluginInstanceChild::AnswerNPP_HandleEvent_Shmem(const NPRemoteEvent& event,
 {
     PLUGIN_LOG_DEBUG_FUNCTION;
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     PaintTracker pt;
 
@@ -1045,6 +1055,7 @@ PluginInstanceChild::AnswerNPP_HandleEvent_IOSurface(const NPRemoteEvent& event,
 {
     PLUGIN_LOG_DEBUG_FUNCTION;
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     PaintTracker pt;
 
@@ -1240,6 +1251,7 @@ PluginInstanceChild::AnswerNPP_SetWindow(const NPRemoteWindow& aWindow)
     NS_ASSERTION(!mLayersRendering && !mPendingPluginCall,
                  "Shouldn't be receiving NPP_SetWindow with layer rendering");
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
 #if defined(MOZ_X11) && defined(XP_UNIX) && !defined(XP_MACOSX)
     NS_ASSERTION(mWsInfo.display, "We should have a valid display!");
@@ -2679,6 +2691,7 @@ PluginInstanceChild::DoNPP_NewStream(BrowserStreamChild* actor,
                                      uint16_t* stype)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
     NPError rv = actor->StreamConstructed(mimeType, seekable, stype);
     return rv;
 }
@@ -2897,6 +2910,7 @@ PluginInstanceChild::NPN_NewStream(NPMIMEType aMIMEType, const char* aWindow,
                                    NPStream** aStream)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     PluginStreamChild* ps = new PluginStreamChild();
 
@@ -2979,6 +2993,7 @@ PluginInstanceChild::NPN_InitAsyncSurface(NPSize *size, NPImageFormat format,
                                           void *initData, NPAsyncSurface *surface)
 {
     AssertPluginThread();
+    AutoStackHelper guard(this);
 
     if (!IsUsingDirectDrawing()) {
         return NPERR_INVALID_PARAM;
@@ -3196,6 +3211,7 @@ PluginInstanceChild::RecvAsyncSetWindow(const gfxSurfaceType& aSurfaceType,
 {
     AssertPluginThread();
 
+    AutoStackHelper guard(this);
     NS_ASSERTION(!aWindow.window, "Remote window should be null.");
 
     if (mCurrentAsyncSetWindowTask) {
@@ -4449,6 +4465,9 @@ PluginInstanceChild::Destroy()
 {
     if (mDestroyed) {
         return;
+    }
+    if (mStackDepth != 0) {
+        NS_RUNTIMEABORT("Destroying plugin instance on the stack.");
     }
     mDestroyed = true;
 
