@@ -224,7 +224,7 @@ public:
               const ChromeFilePropertyBag& aBag,
               ErrorResult& aRv);
 
-  void GetName(nsAString& aName);
+  void GetName(nsAString& aName) const;
 
   int64_t GetLastModified(ErrorResult& aRv);
 
@@ -256,7 +256,7 @@ public:
 
   BlobImpl() {}
 
-  virtual void GetName(nsAString& aName) = 0;
+  virtual void GetName(nsAString& aName) const = 0;
 
   virtual void GetPath(nsAString& aName, ErrorResult& aRv) = 0;
 
@@ -392,7 +392,7 @@ public:
     mContentType.SetIsVoid(false);
   }
 
-  virtual void GetName(nsAString& aName) override;
+  virtual void GetName(nsAString& aName) const override;
 
   virtual void GetPath(nsAString& aName, ErrorResult& aRv) override;
 

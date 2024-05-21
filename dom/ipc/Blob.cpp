@@ -1925,7 +1925,7 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
 
   virtual void
-  GetName(nsAString& aName) override;
+  GetName(nsAString& aName) const override;
 
   virtual void
   GetPath(nsAString& aPath, ErrorResult& aRv) override;
@@ -2587,7 +2587,7 @@ NS_IMPL_QUERY_INTERFACE_INHERITED(BlobParent::RemoteBlobImpl,
 
 void
 BlobParent::
-RemoteBlobImpl::GetName(nsAString& aName)
+RemoteBlobImpl::GetName(nsAString& aName) const
 {
   mBlobImpl->GetName(aName);
 }
