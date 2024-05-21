@@ -72,8 +72,12 @@ var Readability = function(uri, doc, options) {
         return rv + '("' + e.textContent + '")';
       }
       var classDesc = e.className && ("." + e.className.replace(/ /g, "."));
-      var elDesc = e.id ? "(#" + e.id + classDesc + ")" :
-                          (classDesc ? "(" + classDesc + ")" : "");
+      var elDesc = "";
+      if (e.id) {
+        elDesc = "(#" + e.id + classDesc + ")";
+      } else if (classDesc) {
+        elDesc = "(" + classDesc + ")";
+      }
       return rv + elDesc;
     }
     this.log = function () {
